@@ -4,7 +4,17 @@
 
 Eine Mischung aus **Sticky Notes × Notion × OneNote × Excalidraw × Kanban** — aber radikal einfacher.
 
-## 🚀 App starten (MVP v0.1)
+## 🚀 Ohne Installation nutzen (empfohlen!)
+
+**[`release/pixinotes.html`](release/pixinotes.html) herunterladen → Doppelklick → fertig.**
+
+Die komplette App steckt in **einer HTML-Datei** (~3 MB): läuft in jedem modernen Browser direkt von der Festplatte, dem USB-Stick oder dem Netzlaufwerk — **kein npm, kein Server, keine Adminrechte nötig**. Auch auf dem Handy: Datei aufs Gerät schicken (z. B. per Mail/OneDrive) und im Browser öffnen.
+
+> 💡 Die Daten liegen im Browser-Speicher (localStorage), gebunden an Browser + Ablageort der Datei. Gleicher Browser + gleicher Ort = alles bleibt erhalten. Zum Mitnehmen: Karten über die Auswahl-Toolbar teilen/exportieren. Der geplante **Arbeitsordner-Modus** (Kapitel 8b im Konzept) speichert künftig direkt als Markdown-Dateien.
+
+Neu bauen nach Code-Änderungen: `npm run build:single` → erzeugt `release/pixinotes.html`.
+
+## 🛠️ Entwicklung (mit npm)
 
 ```bash
 npm install
