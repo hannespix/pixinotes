@@ -223,6 +223,38 @@ Hi, anbei das finale Angebot…
 
 ---
 
+## 8b. Arbeitsordner-Modus: Eine HTML-Datei + deine Ordner 📁
+
+**Ziel:** PixiNotes als **eine einzige HTML-Datei**, die man in einen Arbeitsordner legt. Die App verbindet sich per **File System Access API** (Chrome/Edge, `showDirectoryPicker()`) mit diesem Ordner und legt dort alle Inhalte als Markdown und Dateien ab — versionierbar, durchsuchbar, Backup-fähig, keinerlei Server oder Installation.
+
+**Die 3-Ebenen-Struktur der App wird 1:1 zur Ordnerstruktur:**
+
+```
+📁 Mein-Arbeitsordner/
+├─ pixinotes.html                  ← die komplette App (Single-File-Build)
+├─ workspace.json                  ← Hierarchie & Reihenfolge (Bereiche/Projekte/Boards)
+└─ 📁 01 Arbeit/                   ← Ebene 1: Bereich
+   └─ 📁 Projekt Atlas/            ← Ebene 2: Projekt
+      ├─ 📁 Angebote (Board)/      ← Ebene 3: Board
+      │  ├─ board.json             ← Canvas: Positionen, Verbindungen, Kartentypen
+      │  ├─ karten/
+      │  │  ├─ angebot-q3.md       ← jede Karte = eine Markdown-Datei (mit Frontmatter)
+      │  │  └─ aufgaben.md
+      │  └─ dateien/               ← Anhänge, Screenshots, E-Mail-Originale (.msg/.eml)
+      │     └─ Angebot_Q3.pdf
+      └─ 📁 Team-Board/…
+```
+
+**Warum das stark ist:**
+- **Kein Lock-in:** Notizen sind lesbare `.md`-Dateien — jederzeit mit Obsidian, VS Code oder jedem Editor zu öffnen.
+- **Sync gratis:** Der Arbeitsordner kann in OneDrive/Nextcloud/Dropbox liegen → Synchronisation und Backup ohne eigenen Server.
+- **Umbenennen/Verschieben in der App = Umbenennen/Verschieben der Ordner** (und umgekehrt beim nächsten Öffnen erkannt).
+
+**Technischer Fahrplan:**
+1. Single-File-Build via `vite-plugin-singlefile` (alles inline: JS, CSS, Fonts).
+2. Storage-Adapter-Schicht: heute `localStorage`, dann austauschbar gegen `FileSystemDirectoryHandle` (gleiche Store-API, nur anderes Backend) — die jetzige Trennung *Inhalte (boards) vs. Hierarchie (spaces)* ist genau dafür gebaut.
+3. Fallback-Kette: File System Access API (Chrome/Edge) → Origin Private File System + Export-Button (Firefox/Safari).
+
 ## 9. Architektur & Tech-Stack
 
 ```mermaid
