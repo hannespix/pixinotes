@@ -1,0 +1,220 @@
+:root {
+  --bg: #f2efe9;
+  --ink: #2b2a27;
+  --muted: #8a8578;
+  --accent: #4f7cff;
+  --card-shadow: 0 2px 6px rgba(60, 50, 30, 0.12), 0 10px 24px rgba(60, 50, 30, 0.08);
+  --card-shadow-lift: 0 6px 14px rgba(60, 50, 30, 0.18), 0 24px 48px rgba(60, 50, 30, 0.16);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: ui-rounded, 'SF Pro Rounded', 'Segoe UI', system-ui, sans-serif;
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.app { height: 100%; position: relative; }
+.board-wrap { height: 100%; }
+.react-flow { background: var(--bg); }
+
+/* ---------- Topbar ---------- */
+.topbar {
+  position: fixed; top: 14px; left: 18px; z-index: 50;
+  display: flex; align-items: center; gap: 12px; pointer-events: none;
+}
+.logo {
+  font-weight: 800; font-size: 17px; letter-spacing: -0.02em;
+  background: #fff; padding: 7px 14px; border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(50, 40, 20, 0.1); pointer-events: auto;
+}
+.logo span { color: var(--accent); }
+.hint {
+  font-size: 12px; color: var(--muted);
+  background: rgba(255, 255, 255, 0.75); padding: 5px 11px; border-radius: 999px;
+}
+
+/* ---------- Karten (gemeinsam) ---------- */
+.card-shell { position: relative; }
+.react-flow__node {
+  border-radius: 10px;
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.18s ease;
+  font-size: 13px;
+}
+.react-flow__node:hover, .react-flow__node.dragging { box-shadow: var(--card-shadow-lift); }
+.react-flow__node.selected { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 10px; }
+
+.card-x {
+  position: absolute; top: -9px; right: -9px; z-index: 5;
+  width: 20px; height: 20px; border-radius: 50%; border: none;
+  background: #2b2a27; color: #fff; font-size: 10px; line-height: 1;
+  cursor: pointer; opacity: 0; transition: opacity 0.15s;
+}
+.card-shell:hover .card-x { opacity: 0.85; }
+
+.pn-handle {
+  width: 9px !important; height: 9px !important;
+  background: var(--accent) !important; border: 2px solid #fff !important;
+  opacity: 0; transition: opacity 0.15s;
+}
+.card-shell:hover .pn-handle { opacity: 1; }
+
+.meta { font-size: 11px; color: var(--muted); }
+h3 { font-size: 14px; margin: 0 0 8px; }
+
+/* ---------- Haftnotizen ---------- */
+.note-card {
+  width: 270px; min-height: 90px; padding: 10px 6px 10px;
+  border-radius: 10px;
+}
+.sticky-yellow { background: #fff3a3; }
+.sticky-pink   { background: #ffd6e0; }
+.sticky-mint   { background: #d2f5dd; }
+.sticky-sky    { background: #d9ecff; }
+.sticky-white  { background: #fffdf7; }
+
+.color-dot {
+  position: absolute; top: 8px; right: 10px; z-index: 4;
+  width: 14px; height: 14px; border-radius: 50%; cursor: pointer;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  background: conic-gradient(#fff3a3, #ffd6e0, #d2f5dd, #d9ecff, #fff3a3);
+  opacity: 0; transition: opacity 0.15s;
+}
+.card-shell:hover .color-dot { opacity: 1; }
+
+/* BlockNote in der Karte: transparent & kompakt */
+.note-editor .bn-editor {
+  background: transparent !important;
+  padding-inline: 10px !important;
+  font-size: 13px;
+}
+.note-editor .bn-block-outer { line-height: 1.4; }
+.note-editor { cursor: text; }
+
+/* ---------- E-Mail-Karte ---------- */
+.email-card {
+  width: 320px; background: #fffdf7; border-radius: 10px; padding: 14px 16px 14px;
+}
+.email-from { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.email-from b { font-size: 12.5px; }
+.avatar {
+  width: 28px; height: 28px; border-radius: 50%; flex: none;
+  background: #6c8ef5; color: #fff; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.email-body {
+  font-size: 12.5px; line-height: 1.5; margin: 0;
+  white-space: pre-wrap; word-break: break-word;
+  cursor: text; user-select: text;
+}
+.link-btn {
+  border: none; background: none; color: var(--accent);
+  font-size: 12px; cursor: pointer; padding: 0; font-family: inherit;
+}
+
+.ent-tel {
+  color: #0a7d40; font-weight: 600; text-decoration: none;
+  border-bottom: 1.5px dotted #0a7d40; white-space: nowrap;
+}
+.ent-tel:hover { background: rgba(10, 125, 64, 0.1); border-radius: 3px; }
+.ent-link { color: var(--accent); word-break: break-all; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip {
+  font-size: 11px; background: #fff; border: 1px solid #e3ddcf; border-radius: 999px;
+  padding: 3px 10px; display: inline-flex; gap: 5px; align-items: center;
+  cursor: pointer; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  transition: transform 0.12s ease, border-color 0.12s ease; font-family: inherit;
+}
+.chip:hover { transform: translateY(-1px) scale(1.03); border-color: var(--accent); }
+.chip-size { color: var(--muted); font-size: 10px; }
+
+.card-actions { display: flex; gap: 6px; margin-top: 10px; }
+.card-actions button {
+  font-size: 11px; border: none; background: rgba(0, 0, 0, 0.06); border-radius: 7px;
+  padding: 4px 9px; cursor: pointer; font-family: inherit; color: var(--ink);
+}
+.card-actions button:hover { background: rgba(0, 0, 0, 0.12); }
+
+/* ---------- Bild-Karte ---------- */
+.image-card { background: #fffdf7; border-radius: 10px; padding: 8px; width: 260px; }
+.image-card img { width: 100%; border-radius: 6px; display: block; }
+.img-name { margin-top: 6px; }
+
+/* ---------- Datei-Karte ---------- */
+.file-card { background: #fffdf7; border-radius: 10px; padding: 6px; }
+.file-body {
+  display: flex; align-items: center; gap: 10px; border: none; background: none;
+  font-family: inherit; font-size: 12.5px; color: var(--ink);
+  padding: 8px 12px; cursor: pointer; text-align: left;
+}
+.file-icon { font-size: 22px; }
+
+/* ---------- Kanban-Karte ---------- */
+.kanban-card { width: 430px; background: #fffdf7; border-radius: 10px; padding: 12px 14px 12px; }
+.kanban-title {
+  border: none; background: transparent; font-family: inherit; font-weight: 700;
+  font-size: 14px; width: 100%; outline: none; color: var(--ink); margin-bottom: 6px;
+}
+.kanban-cols { display: flex; gap: 8px; }
+.kanban-col {
+  flex: 1; background: rgba(0, 0, 0, 0.045); border-radius: 8px; padding: 7px; min-height: 80px;
+}
+.kanban-col h4 {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); margin: 0 0 7px;
+}
+.kanban-item {
+  background: #fff; border-radius: 6px; padding: 6px 8px; font-size: 11.5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); margin-bottom: 6px;
+  border-left: 3px solid #f5b53f;
+  display: flex; justify-content: space-between; align-items: center; gap: 4px;
+}
+.kanban-item.col-1 { border-left-color: var(--accent); }
+.kanban-item.col-2 { border-left-color: #55b96a; opacity: 0.75; }
+.done-text { text-decoration: line-through; }
+.kanban-item-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.kanban-item:hover .kanban-item-actions { opacity: 1; }
+.kanban-item-actions button {
+  border: none; background: rgba(0, 0, 0, 0.06); border-radius: 4px;
+  font-size: 10px; cursor: pointer; padding: 1px 5px; font-family: inherit;
+}
+.kanban-add input {
+  width: 100%; margin-top: 8px; border: 1px dashed #d5cfc0; border-radius: 7px;
+  background: transparent; padding: 6px 9px; font-family: inherit; font-size: 12px;
+  outline: none; color: var(--ink);
+}
+.kanban-add input:focus { border-color: var(--accent); }
+
+/* ---------- Dock ---------- */
+.dock {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  background: #fff; border-radius: 16px; box-shadow: 0 4px 24px rgba(50, 40, 20, 0.18);
+  display: flex; gap: 4px; padding: 7px; z-index: 50;
+}
+.dock button {
+  border: none; background: none; font-size: 19px; width: 42px; height: 42px;
+  border-radius: 11px; cursor: pointer;
+}
+.dock button:hover { background: #f1ede4; }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed; bottom: 84px; left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: #2b2a27; color: #fff; font-size: 12.5px; padding: 8px 16px;
+  border-radius: 10px; opacity: 0; transition: all 0.25s ease;
+  z-index: 60; pointer-events: none; max-width: 80vw;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ---------- React-Flow-Feintuning ---------- */
+.pn-minimap { border-radius: 10px; overflow: hidden; }
+.react-flow__controls { border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(50,40,20,.12); }
+.react-flow__edge-path { stroke-linecap: round; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

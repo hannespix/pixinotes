@@ -1,0 +1,239 @@
+import { useCallback, useRef } from 'react';
+import {
+  Background,
+  BackgroundVariant,
+  ConnectionMode,
+  Controls,
+  MiniMap,
+  ReactFlow,
+  useReactFlow,
+  type Node,
+  type NodeTypes,
+} from '@xyflow/react';
+import { useBoard } from '../store';
+import { uid, type StickyColor } from '../types';
+import { guessMime, parseEml, parseMsg } from '../lib/parseEmail';
+import { NoteCard } from './nodes/NoteCard';
+import { EmailCard } from './nodes/EmailCard';
+import { ImageCard } from './nodes/ImageCard';
+import { FileCard } from './nodes/FileCard';
+import { KanbanCard } from './nodes/KanbanCard';
+
+const nodeTypes: NodeTypes = {
+  note: NoteCard,
+  email: EmailCard,
+  image: ImageCard,
+  file: FileCard,
+  kanban: KanbanCard,
+};
+
+const STICKY_ROTATION: StickyColor[] = ['yellow', 'pink', 'mint', 'sky'];
+let colorIdx = 0;
+const nextColor = () => STICKY_ROTATION[colorIdx++ % STICKY_ROTATION.length];
+
+/** Physik: Reibung pro Frame für den „Wurf" nach dem Loslassen */
+const FRICTION = 0.93;
+const MIN_SPEED = 0.6;
+
+export function Board() {
+  const nodes = useBoard((s) => s.nodes);
+  const edges = useBoard((s) => s.edges);
+  const onNodesChange = useBoard((s) => s.onNodesChange);
+  const onEdgesChange = useBoard((s) => s.onEdgesChange);
+  const onConnect = useBoard((s) => s.onConnect);
+  const addNode = useBoard((s) => s.addNode);
+  const setNodePosition = useBoard((s) => s.setNodePosition);
+  const showToast = useBoard((s) => s.showToast);
+
+  const { screenToFlowPosition } = useReactFlow();
+
+  // ---------- Wurf-Physik (Momentum nach dem Loslassen) ----------
+  const dragTrack = useRef<{ id: string; x: number; y: number; t: number; vx: number; vy: number } | null>(null);
+  const animRef = useRef<number>(0);
+
+  const onNodeDragStart = useCallback((_: unknown, node: Node) => {
+    cancelAnimationFrame(animRef.current);
+    dragTrack.current = { id: node.id, x: node.position.x, y: node.position.y, t: performance.now(), vx: 0, vy: 0 };
+  }, []);
+
+  const onNodeDrag = useCallback((_: unknown, node: Node) => {
+    const track = dragTrack.current;
+    if (!track || track.id !== node.id) return;
+    const now = performance.now();
+    const dt = Math.max(1, now - track.t);
+    // Geschwindigkeit in Flow-Einheiten pro Frame (~16 ms), leicht geglättet
+    track.vx = 0.6 * track.vx + 0.4 * ((node.position.x - track.x) / dt) * 16;
+    track.vy = 0.6 * track.vy + 0.4 * ((node.position.y - track.y) / dt) * 16;
+    track.x = node.position.x;
+    track.y = node.position.y;
+    track.t = now;
+  }, []);
+
+  const onNodeDragStop = useCallback(
+    (_: unknown, node: Node) => {
+      const track = dragTrack.current;
+      if (!track || track.id !== node.id) return;
+      let { vx, vy } = track;
+      let { x, y } = node.position;
+      dragTrack.current = null;
+      if (Math.hypot(vx, vy) < MIN_SPEED * 2) return;
+
+      const step = () => {
+        vx *= FRICTION;
+        vy *= FRICTION;
+        x += vx;
+        y += vy;
+        setNodePosition(node.id, x, y);
+        if (Math.hypot(vx, vy) > MIN_SPEED) {
+          animRef.current = requestAnimationFrame(step);
+        }
+      };
+      animRef.current = requestAnimationFrame(step);
+    },
+    [setNodePosition],
+  );
+
+  // ---------- Karten erstellen ----------
+  const addNote = useCallback(
+    (pos: { x: number; y: number }) => {
+      addNode({ id: uid(), type: 'note', position: pos, data: { color: nextColor(), blocks: [] } });
+    },
+    [addNode],
+  );
+
+  const handleDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.classList.contains('react-flow__pane')) return;
+      addNote(screenToFlowPosition({ x: e.clientX - 130, y: e.clientY - 30 }));
+      showToast('Notiz erstellt — lostippen! „/" öffnet das Block-Menü ✍️');
+    },
+    [addNote, screenToFlowPosition, showToast],
+  );
+
+  // ---------- Drag & Drop von Dateien (E-Mails! Bilder! Alles!) ----------
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      const basePos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      const files = Array.from(e.dataTransfer.files);
+
+      if (files.length === 0) {
+        const text = e.dataTransfer.getData('text/plain');
+        if (text) {
+          addNode({
+            id: uid(),
+            type: 'note',
+            position: basePos,
+            data: { color: nextColor(), blocks: [{ type: 'paragraph', content: text }] },
+          });
+          showToast('Text als Notiz abgelegt 📝');
+        }
+        return;
+      }
+
+      let offset = 0;
+      for (const file of files) {
+        const pos = { x: basePos.x + offset, y: basePos.y + offset };
+        offset += 36;
+        const ext = file.name.split('.').pop()?.toLowerCase();
+
+        try {
+          if (ext === 'eml' || file.type === 'message/rfc822') {
+            const email = await parseEml(await file.arrayBuffer());
+            addNode({ id: uid(), type: 'email', position: pos, data: email });
+            showToast(`📧 „${email.subject}" importiert — ${email.attachments.length} Anhänge als Chips`);
+          } else if (ext === 'msg') {
+            const email = await parseMsg(await file.arrayBuffer());
+            addNode({ id: uid(), type: 'email', position: pos, data: email });
+            showToast(`📧 Outlook-Mail „${email.subject}" importiert`);
+          } else if (file.type.startsWith('image/')) {
+            const src = await fileToDataUrl(file);
+            addNode({ id: uid(), type: 'image', position: pos, data: { src, name: file.name } });
+          } else {
+            const dataUrl = file.size <= 1_500_000 ? await fileToDataUrl(file) : undefined;
+            addNode({
+              id: uid(),
+              type: 'file',
+              position: pos,
+              data: { name: file.name, size: file.size, mime: file.type || guessMime(file.name), dataUrl },
+            });
+          }
+        } catch (err) {
+          console.error('Import fehlgeschlagen:', err);
+          showToast(`⚠️ „${file.name}" konnte nicht gelesen werden`);
+        }
+      }
+    },
+    [addNode, screenToFlowPosition, showToast],
+  );
+
+  // ---------- Strg+V: Screenshots direkt aufs Board ----------
+  const handlePaste = useCallback(
+    async (e: React.ClipboardEvent) => {
+      // Nicht eingreifen, wenn in einem Editor/Input eingefügt wird
+      const target = e.target as HTMLElement;
+      if (target.closest('.note-editor, input, textarea, [contenteditable="true"]')) return;
+
+      const items = Array.from(e.clipboardData.items);
+      const imageItem = items.find((it) => it.type.startsWith('image/'));
+      if (imageItem) {
+        const file = imageItem.getAsFile();
+        if (!file) return;
+        const src = await fileToDataUrl(file);
+        const pos = screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 90 });
+        addNode({ id: uid(), type: 'image', position: pos, data: { src, name: 'Screenshot' } });
+        showToast('🖼️ Screenshot eingefügt');
+      }
+    },
+    [addNode, screenToFlowPosition, showToast],
+  );
+
+  return (
+    <div
+      className="board-wrap"
+      onDrop={handleDrop}
+      onDragOver={(e) => e.preventDefault()}
+      onDoubleClick={handleDoubleClick}
+      onPaste={handlePaste}
+    >
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeDragStart={onNodeDragStart}
+        onNodeDrag={onNodeDrag}
+        onNodeDragStop={onNodeDragStop}
+        connectionMode={ConnectionMode.Loose}
+        zoomOnDoubleClick={false}
+        deleteKeyCode={null}
+        minZoom={0.15}
+        maxZoom={2.5}
+        fitView
+        fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
+        defaultEdgeOptions={{
+          style: { stroke: 'rgba(90,80,60,.45)', strokeWidth: 2 },
+          labelStyle: { fontSize: 11, fill: '#7a7263' },
+          labelBgStyle: { fill: '#f2efe9', fillOpacity: 0.9 },
+        }}
+        proOptions={{ hideAttribution: false }}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} color="#d8d3c8" />
+        <MiniMap pannable zoomable className="pn-minimap" />
+        <Controls showInteractive={false} />
+      </ReactFlow>
+    </div>
+  );
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}

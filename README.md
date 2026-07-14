@@ -4,23 +4,29 @@
 
 Eine Mischung aus **Sticky Notes × Notion × OneNote × Excalidraw × Kanban** — aber radikal einfacher.
 
-## 🚀 Schnellstart
-
-| Was | Wo |
-|---|---|
-| 📖 **Vollständiges Konzept** (Vision, Features, Datenmodell, Architektur, Roadmap) | [`docs/KONZEPT.md`](docs/KONZEPT.md) |
-| 🖱️ **Interaktiver Prototyp** (einfach im Browser öffnen!) | [`prototype/index.html`](prototype/index.html) |
-
-Den Prototyp ausprobieren:
+## 🚀 App starten (MVP v0.1)
 
 ```bash
-# Beliebiger Browser genügt — keine Installation nötig:
-open prototype/index.html        # macOS
-xdg-open prototype/index.html    # Linux
-start prototype\index.html       # Windows
+npm install
+npm run dev        # → http://localhost:5173
 ```
 
-Im Prototyp erlebbar: Karten ziehen & mit Schwung **werfen** (Physik!), sanfte Kollision, E-Mail-Karte mit Anhang-Chips und klickbarer ☎️ Telefonnummer, Kanban- und Tabellen-Objekte, Verbindungslinien, editierbare Haftnotizen (Doppelklick = neue Notiz) und der ✨-Button für die KI-Aufräum-Demo.
+**Was schon funktioniert:**
+
+- ♾️ **Infinite Canvas** mit Pan/Zoom, Minimap und Verbindungslinien (React Flow)
+- 📝 **Haftnotizen mit Notion-Editor** (BlockNote): Doppelklick aufs Board → lostippen, `/` öffnet das Block-Menü (Checklisten, Tabellen, Überschriften …), Farbwechsel per Klick
+- 📧 **Outlook-E-Mails per Drag & Drop**: `.eml`- und `.msg`-Dateien werden im Browser geparst (postal-mime / msgreader) und zu strukturierten Karten mit **Anhang-Chips** — Bild-Anhänge lassen sich als eigene Karten herauslösen
+- ☎️ **Smart Layer**: Telefonnummern werden automatisch klickbar (`tel:`-Link), URLs und E-Mail-Adressen ebenso (libphonenumber-js)
+- 🖼️ **Strg+V** fügt Screenshots als Bild-Karten ein; beliebige Dateien per Drop als Datei-Karten
+- 📋 **Kanban-Karten** mit drei Spalten, Ticket nach *Done* schieben → 🎉 Konfetti
+- 🚀 **Wurf-Physik**: Karten mit Schwung loslassen — sie gleiten mit Momentum weiter
+- 💾 **Local-first**: Alles wird automatisch im Browser gespeichert (localStorage), kein Account nötig
+
+| Weitere Ressourcen | Wo |
+|---|---|
+| 📖 Vollständiges Konzept (Vision, Features, Datenmodell, Architektur, Roadmap) | [`docs/KONZEPT.md`](docs/KONZEPT.md) |
+| 🧩 OSS-Baustein-Recherche mit Lizenz-Ampel | [`docs/OSS-BAUSTEINE.md`](docs/OSS-BAUSTEINE.md) |
+| 🖱️ Ur-Prototyp (statische HTML-Designstudie) | [`prototype/index.html`](prototype/index.html) |
 
 ## 🧭 Kernidee in 30 Sekunden
 
