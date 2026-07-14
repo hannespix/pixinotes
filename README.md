@@ -32,7 +32,10 @@ npm run dev        # → http://localhost:5173
 - 🗂️ **3-Ebenen-Organisation**: Bereiche → Projekte → Boards, verwaltet in der **Mission-Control-Übersicht** (🏠): Boards per Drag & Drop verschieben/sortieren, alles per Doppelklick umbenennbar, Board-Kacheln mit Live-Statistik und Mini-Vorschau; dazu Tab-Leiste zum schnellen Wechseln und **Portal-Karten**, die Projekte visuell verlinken
 - 🧩 **Prozessmanagement**: Prozess-Formen (Schritt/Entscheidung/Start-Ende), Pfeil-Verbindungen mit umschaltbarem Stil, **Mermaid-Diagramme** mit Live-Vorschau (Flowchart/Sequenz/Gantt)
 - ✏️ **Freihand-Zeichnen**: Stift, halbtransparenter Textmarker (mehrere Farben) und Radierer — Striche wandern mit Pan/Zoom mit
-- ⚙️ **Einstellungen**: KI-Anbindung mit eigenem API-Key (nur lokal gespeichert) und **Datenordner-Export** — alle Boards als Markdown-Dateien (Bereich/Projekt/Board.md) via File System Access, plus Board-Export als PNG/SVG
+- 📕 **PDF-Karten mit Inline-Vorschau**: erste Seite als Thumbnail, Klick öffnet den Viewer mit Seiten-Navigation (pdf.js)
+- ▶️ **Präsentationsmodus**: Karten des Boards als Vollbild-Folien (Pfeiltasten/Esc) — ideal, um Dritten einen Überblick zu geben
+- 🤖 **KI-Anbindung, du wählst wo**: eigener Cloud-Key (Anthropic/OpenAI) **oder Ollama / selbstgehosteter Server** (dann bleibt alles lokal); Zugangsdaten nur im Browser
+- 📁 **Datenordner-Export**: alle Boards als echte Markdown-Dateien (Bereich/Projekt/Board.md) via File System Access, plus Board-Export als PNG/SVG (→ PDF via Drucken)
 - 🔗 **Verbindungen mit Beziehung**: Karten am Rand-Punkt verbinden; auf die Linien-Mitte klicken benennt die Beziehung („blockiert", „gehört zu" …), ✕ löscht sie
 - 🔍 **Spotlight-Suche** (`Strg+K`): findet Karten über alle Boards und fliegt animiert hin
 - 📤 **Teilen**: Auswahl-Toolbar mit „Als E-Mail" (mailto) und „Formatiert kopieren" (HTML für Outlook/Word-Paste), Duplizieren, Löschen mit **Undo**
@@ -55,4 +58,6 @@ npm run dev        # → http://localhost:5173
 
 ## 🗺️ Status
 
-Projektphase: **Konzept & Prototyp**. Nächster Schritt laut Roadmap: MVP mit Infinite Canvas (tldraw SDK), Markdown-Karten, Datei-Drop und Local-first-Speicherung. Details in [`docs/KONZEPT.md`](docs/KONZEPT.md#11-roadmap-mvp--wow).
+**Version 1.0** — voll funktionsfähige App, lokal nutzbar ohne Installation. Drei Audit-Runden (Design/Usability, Logik, Code inkl. Security) sind eingeflossen; siehe [`docs/AUDIT.md`](docs/AUDIT.md).
+
+**Noch offen (Roadmap):** Echtzeit-Kollaboration (Yjs/CRDT), aktive KI-Aktionen auf den Karten (Anbindung steht, Aktionen folgen), Live-Anbindung an Microsoft 365 (MS Graph). Details in [`docs/KONZEPT.md`](docs/KONZEPT.md).
