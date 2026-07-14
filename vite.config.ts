@@ -6,6 +6,8 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 // Modus "single": baut EINE portable pixinotes.html (läuft per Doppelklick,
 // auch von file:// ohne Server/Installation/Adminrechte).
 export default defineConfig(({ mode }) => ({
+  // Relative Pfade: läuft so unter jeder URL — GitHub Pages (/repo/), Unterordner, file://
+  base: './',
   // nodePolyfills: @kenjiuno/msgreader (iconv-lite) erwartet Node-Buffer im Browser
   plugins: [
     react(),
