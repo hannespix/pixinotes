@@ -69,5 +69,5 @@ export const seedNodes: AppNode[] = [
 ];
 
 export const seedEdges: Edge[] = [
-  { id: 'e1', source: 'demo-email', target: 'demo-kanban', label: 'gehört zu' },
+  { id: 'e1', source: 'demo-email', target: 'demo-kanban', type: 'labeled', data: { label: 'gehört zu' } },
 ];

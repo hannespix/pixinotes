@@ -7,6 +7,7 @@ import {
   MiniMap,
   ReactFlow,
   useReactFlow,
+  type EdgeTypes,
   type Node,
   type NodeTypes,
 } from '@xyflow/react';
@@ -20,6 +21,7 @@ import { ImageCard } from './nodes/ImageCard';
 import { FileCard } from './nodes/FileCard';
 import { KanbanCard } from './nodes/KanbanCard';
 import { PortalCard } from './nodes/PortalCard';
+import { LabeledEdge } from './LabeledEdge';
 import { SelectionToolbar } from './SelectionToolbar';
 
 const nodeTypes: NodeTypes = {
@@ -30,6 +32,8 @@ const nodeTypes: NodeTypes = {
   kanban: KanbanCard,
   portal: PortalCard,
 };
+
+const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
 
 /** Physik: Reibung pro Frame für den „Wurf" nach dem Loslassen */
 const FRICTION = 0.93;
@@ -265,6 +269,7 @@ export function Board() {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}

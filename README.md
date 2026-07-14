@@ -30,6 +30,7 @@ npm run dev        # → http://localhost:5173
 - 🖼️ **Strg+V** fügt Screenshots als Bild-Karten ein; beliebige Dateien per Drop als Datei-Karten
 - 📋 **Kanban-Karten** mit drei Spalten, Ticket nach *Done* schieben → 🎉 Konfetti
 - 🗂️ **3-Ebenen-Organisation**: Bereiche → Projekte → Boards, verwaltet in der **Mission-Control-Übersicht** (🏠): Boards per Drag & Drop verschieben/sortieren, alles per Doppelklick umbenennbar, Board-Kacheln mit Live-Statistik und Mini-Vorschau; dazu Tab-Leiste zum schnellen Wechseln und **Portal-Karten**, die Projekte visuell verlinken
+- 🔗 **Verbindungen mit Beziehung**: Karten am Rand-Punkt verbinden; auf die Linien-Mitte klicken benennt die Beziehung („blockiert", „gehört zu" …), ✕ löscht sie
 - 🔍 **Spotlight-Suche** (`Strg+K`): findet Karten über alle Boards und fliegt animiert hin
 - 📤 **Teilen**: Auswahl-Toolbar mit „Als E-Mail" (mailto) und „Formatiert kopieren" (HTML für Outlook/Word-Paste), Duplizieren, Löschen mit **Undo**
 - 🚀 **Wurf-Physik**: Karten mit Schwung loslassen — sie gleiten mit Momentum weiter
