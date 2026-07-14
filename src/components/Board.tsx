@@ -12,6 +12,7 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
+import { computePush } from '../lib/physics';
 import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from '../lib/parseEmail';
 import { imageFileToDataUrl, readFileAsDataUrl } from '../lib/image';
 import { canEmbed, makeEmail, makeFile, makeImage, makeNote } from '../lib/nodes';
@@ -40,9 +41,15 @@ const nodeTypes: NodeTypes = {
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
 
-/** Physik: Reibung pro Frame für den „Wurf" nach dem Loslassen */
-const FRICTION = 0.93;
-const MIN_SPEED = 0.6;
+/** Physik: Reibung pro Frame für Wurf & Verdrängung */
+const FRICTION = 0.9;
+const MIN_SPEED = 0.5;
+/** Wie kräftig eingedrungene Karten pro Frame hinausfedern (0..1) */
+const PUSH_SPRING = 0.32;
+/** Wunschabstand zwischen Karten beim Verdrängen */
+const PUSH_GAP = 12;
+/** Geschwindigkeits-Deckel für weggeschobene Karten */
+const PUSH_MAX = 22;
 
 export function Board() {
   const activeId = useBoard((s) => s.activeId);
@@ -52,7 +59,6 @@ export function Board() {
   const onEdgesChange = useBoard((s) => s.onEdgesChange);
   const onConnect = useBoard((s) => s.onConnect);
   const addNode = useBoard((s) => s.addNode);
-  const setNodePosition = useBoard((s) => s.setNodePosition);
   const removeNodes = useBoard((s) => s.removeNodes);
   const showToast = useBoard((s) => s.showToast);
 
@@ -77,24 +83,109 @@ export function Board() {
     return () => clearTimeout(t);
   }, [pendingFocus, activeId, nodes, setCenter, clearPendingFocus, onNodesChange]);
 
-  // Tastatur: N = neue Notiz in Bildschirmmitte (außerhalb von Eingabefeldern)
+  // Tastatur: N = neue Notiz; Strg+Z/Strg+Y = Undo/Redo (außerhalb von Eingabefeldern —
+  // in Editoren gilt deren eigenes Undo)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== 'n' || e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement;
       if (target.closest('input, textarea, [contenteditable="true"]')) return;
+      const st = useBoard.getState();
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) st.redo(); else st.undo();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        st.redo();
+        return;
+      }
+      if (e.key.toLowerCase() !== 'n' || e.metaKey || e.ctrlKey || e.altKey) return;
       addNode(makeNote(screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 40 })));
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [addNode, screenToFlowPosition]);
 
-  // ---------- Wurf-Physik (Momentum nach dem Loslassen) ----------
+  // ---------- Physik-Engine: Wurf-Momentum + Verdrängung (FigJam-Gefühl) ----------
+  // Ein gemeinsamer Loop integriert alle Geschwindigkeiten: geworfene Karten
+  // gleiten aus, überlappte Nachbarn federn beiseite — inkl. Kettenreaktion.
   const dragTrack = useRef<{ id: string; x: number; y: number; t: number; vx: number; vy: number } | null>(null);
   const animRef = useRef<number>(0);
+  const vels = useRef(new Map<string, { vx: number; vy: number }>());
+  const physicsOn = useRef(false);
+
+  const nodeRect = (n: Node) => ({
+    x: n.position.x,
+    y: n.position.y,
+    w: n.measured?.width ?? 260,
+    h: n.measured?.height ?? 120,
+  });
+
+  /** `mover` drückt alle überlappten Nachbarn federnd weg (Impuls sammeln) */
+  const pushNeighbors = useCallback((mover: Node, all: Node[], strength: number) => {
+    const mr = nodeRect(mover);
+    for (const other of all) {
+      if (other.id === mover.id || dragTrack.current?.id === other.id) continue;
+      const push = computePush(mr, nodeRect(other), PUSH_GAP);
+      if (!push) continue;
+      const v = vels.current.get(other.id) ?? { vx: 0, vy: 0 };
+      v.vx += push[0] * strength;
+      v.vy += push[1] * strength;
+      const speed = Math.hypot(v.vx, v.vy);
+      if (speed > PUSH_MAX) {
+        v.vx *= PUSH_MAX / speed;
+        v.vy *= PUSH_MAX / speed;
+      }
+      vels.current.set(other.id, v);
+    }
+  }, []);
+
+  const startPhysics = useCallback(() => {
+    if (physicsOn.current) return;
+    physicsOn.current = true;
+    const startBoard = useBoard.getState().activeId;
+    const tick = () => {
+      // Board gewechselt? Physik nicht aufs falsche Board schreiben (M4)
+      if (useBoard.getState().activeId !== startBoard) {
+        physicsOn.current = false;
+        vels.current.clear();
+        return;
+      }
+      const st = useBoard.getState();
+      const board = selectActiveBoard(st);
+      const moves: Array<[string, number, number]> = [];
+      for (const [id, v] of vels.current) {
+        const n = board.nodes.find((nn) => nn.id === id);
+        if (!n || dragTrack.current?.id === id) { vels.current.delete(id); continue; }
+        v.vx *= FRICTION;
+        v.vy *= FRICTION;
+        if (Math.hypot(v.vx, v.vy) < MIN_SPEED) { vels.current.delete(id); continue; }
+        moves.push([id, n.position.x + v.vx, n.position.y + v.vy]);
+      }
+      if (moves.length) {
+        st.setNodePositions(moves);
+        // Kettenreaktion: bewegte Karten verdrängen ihrerseits Nachbarn
+        const fresh = selectActiveBoard(useBoard.getState()).nodes;
+        for (const [id] of moves) {
+          const mover = fresh.find((n) => n.id === id);
+          if (mover) pushNeighbors(mover, fresh, PUSH_SPRING * 0.7);
+        }
+      }
+      if (vels.current.size > 0) animRef.current = requestAnimationFrame(tick);
+      else physicsOn.current = false;
+    };
+    animRef.current = requestAnimationFrame(tick);
+  }, [pushNeighbors]);
+
+  /** Neigungs-Effekt: gezogene Karte kippt leicht in Bewegungsrichtung */
+  const setTilt = (id: string, deg: number) => {
+    const el = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`);
+    if (el) el.style.setProperty('--tilt', `${deg.toFixed(2)}deg`);
+  };
 
   const onNodeDragStart = useCallback((_: unknown, node: Node) => {
-    cancelAnimationFrame(animRef.current);
+    vels.current.delete(node.id); // gegriffene Karte gehorcht der Maus, nicht der Physik
     dragTrack.current = { id: node.id, x: node.position.x, y: node.position.y, t: performance.now(), vx: 0, vy: 0 };
   }, []);
 
@@ -109,36 +200,30 @@ export function Board() {
     track.x = node.position.x;
     track.y = node.position.y;
     track.t = now;
-  }, []);
+    // Fancy: Karte neigt sich mit der Bewegung
+    setTilt(node.id, Math.max(-5, Math.min(5, track.vx * 0.45)));
+    // Verdrängung: alles, was unter der Karte liegt, federt beiseite
+    pushNeighbors(node, selectActiveBoard(useBoard.getState()).nodes, PUSH_SPRING);
+    if (vels.current.size > 0) startPhysics();
+  }, [pushNeighbors, startPhysics]);
 
   // Physik-Loop beim Unmount stoppen (M4)
-  useEffect(() => () => cancelAnimationFrame(animRef.current), []);
+  useEffect(() => () => { cancelAnimationFrame(animRef.current); physicsOn.current = false; }, []);
 
   const onNodeDragStop = useCallback(
     (_: unknown, node: Node) => {
       const track = dragTrack.current;
+      setTilt(node.id, 0);
       if (!track || track.id !== node.id) return;
-      let { vx, vy } = track;
-      let { x, y } = node.position;
+      const { vx, vy } = track;
       dragTrack.current = null;
-      if (Math.hypot(vx, vy) < MIN_SPEED * 2) return;
-
-      const startBoard = useBoard.getState().activeId;
-      const step = () => {
-        // Board gewechselt? Dann den Wurf nicht aufs falsche Board schreiben (M4)
-        if (useBoard.getState().activeId !== startBoard) return;
-        vx *= FRICTION;
-        vy *= FRICTION;
-        x += vx;
-        y += vy;
-        setNodePosition(node.id, x, y);
-        if (Math.hypot(vx, vy) > MIN_SPEED) {
-          animRef.current = requestAnimationFrame(step);
-        }
-      };
-      animRef.current = requestAnimationFrame(step);
+      if (Math.hypot(vx, vy) >= MIN_SPEED * 2) {
+        // Wurf: Karte gleitet mit Momentum weiter (und räumt sich den Weg frei)
+        vels.current.set(node.id, { vx, vy });
+      }
+      if (vels.current.size > 0) startPhysics();
     },
-    [setNodePosition],
+    [startPhysics],
   );
 
   // ---------- Karten erstellen ----------

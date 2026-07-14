@@ -6,6 +6,7 @@ import { de as blockNoteDe } from '@blocknote/core/locales';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodeToHtml } from '../lib/serialize';
 import { getMermaid } from '../lib/mermaid';
+import { presentationOrder } from '../lib/presentOrder';
 import { KanbanBody } from './nodes/KanbanCard';
 import type { AppNode, KanbanNode, MermaidNode, NoteNode, ShapeNode } from '../types';
 
@@ -143,18 +144,14 @@ export function Presenter() {
 
   const slides = useMemo(() => {
     if (!open) return [];
-    return [...board.nodes]
-      .filter((n) => n.type !== 'portal')
-      .sort((a, b) => {
-        const rowA = Math.round(a.position.y / 260);
-        const rowB = Math.round(b.position.y / 260);
-        return rowA === rowB ? a.position.x - b.position.x : a.position.y - b.position.y;
-      })
+    // Reihenfolge folgt der Gliederung: verbundene Karten als Cluster,
+    // innerhalb den Pfeilen nach (Prozess-Logik); Unverbundenes in Lesereihenfolge
+    return presentationOrder(board.nodes, board.edges)
       // Editierbare Typen immer zeigen (auch leere Notizen — die füllt man live);
       // statische nur, wenn sie Inhalt haben
       .filter((n) => EDITABLE.has(n.type) || nodeToHtml(n).trim());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, board.nodes]);
+  }, [open, board.nodes, board.edges]);
 
   useEffect(() => {
     if (!open) return;

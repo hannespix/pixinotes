@@ -30,6 +30,7 @@ export function DrawingLayer() {
   const addStroke = useBoard((s) => s.addStroke);
   const showToast = useBoard((s) => s.showToast);
   const eraseStrokesNear = useBoard((s) => s.eraseStrokesNear);
+  const beginEraseGesture = useBoard((s) => s.beginEraseGesture);
   const { screenToFlowPosition } = useReactFlow();
   const { x: tx, y: ty, zoom } = useViewport();
   // Stift und Textmarker merken sich ihre Farbe getrennt — der Marker startet neongelb
@@ -90,7 +91,7 @@ export function DrawingLayer() {
     // Capture kann bei exotischen/synthetischen Pointern fehlschlagen — Zeichnen geht trotzdem
     try { (e.target as Element).setPointerCapture(e.pointerId); } catch { /* ignorieren */ }
     const pt = toFlow(e);
-    if (tool === 'eraser') { eraseStrokesNear(pt[0], pt[1], 12 / zoom); return; }
+    if (tool === 'eraser') { beginEraseGesture(); eraseStrokesNear(pt[0], pt[1], 12 / zoom); return; }
     if (tool !== 'pen' && tool !== 'marker') return; // passiver Layer (pointer-events: none)
     drawing.current = {
       id: uid(),

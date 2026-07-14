@@ -33,6 +33,17 @@ export interface BoardDoc {
 
 export type Tool = 'select' | 'pen' | 'marker' | 'eraser';
 
+/** Ein Undo-Schritt: kompletter Struktur-Stand eines Boards (Referenzen, kein Deep-Copy —
+ *  alle Mutationen laufen immutabel, alte Objekte bleiben gültig). */
+interface HistoryEntry {
+  boardId: string;
+  nodes: AppNode[];
+  edges: Edge[];
+  drawings?: Stroke[];
+}
+
+const HISTORY_LIMIT = 50;
+
 export type AiProvider = 'none' | 'anthropic' | 'openai' | 'ollama' | 'custom';
 export interface AiSettings {
   provider: AiProvider;
@@ -92,6 +103,15 @@ interface BoardState {
   updateAi: (patch: Partial<AiSettings>) => void;
   addStroke: (stroke: Stroke) => void;
   eraseStrokesNear: (x: number, y: number, radius: number) => void;
+  /** Radier-Geste beginnt: nächster tatsächlicher Lösch-Treffer macht EINEN History-Eintrag */
+  beginEraseGesture: () => void;
+
+  // Undo/Redo für Board-Struktur (Karten, Verbindungen, Striche — keine Tipp-Edits)
+  past: HistoryEntry[];
+  future: HistoryEntry[];
+  pushHistory: () => void;
+  undo: () => void;
+  redo: () => void;
 
   // Hierarchie (Bereiche / Projekte / Boards)
   addSpace: (name?: string) => void;
@@ -119,6 +139,8 @@ interface BoardState {
   restoreDeleted: () => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
   setNodePosition: (id: string, x: number, y: number) => void;
+  /** Mehrere Positionen in EINEM Store-Update — für den Physik-Loop (60 fps) */
+  setNodePositions: (entries: Array<[string, number, number]>) => void;
   focusNode: (boardId: string, nodeId: string) => void;
   clearPendingFocus: () => void;
 
@@ -129,6 +151,8 @@ export const selectActiveBoard = (s: BoardState): BoardDoc =>
   s.boards.find((b) => b.id === s.activeId) ?? s.boards[0];
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+/** Radier-Geste: erster Treffer erzeugt den History-Eintrag, Rest der Geste nicht */
+let eraseSnapPending = false;
 
 /**
  * K1+M5-Schutz: localStorage-Writes werden gedrosselt (max. alle 400 ms statt
@@ -228,14 +252,75 @@ export const useBoard = create<BoardState>()(
         setTool: (tool) => set({ tool }),
         updateAi: (patch) => set({ ai: { ...get().ai, ...patch } }),
 
-        addStroke: (stroke) => patchActive((b) => ({ drawings: [...(b.drawings ?? []), stroke] })),
+        addStroke: (stroke) => {
+          get().pushHistory();
+          patchActive((b) => ({ drawings: [...(b.drawings ?? []), stroke] }));
+        },
 
-        eraseStrokesNear: (x, y, radius) =>
+        beginEraseGesture: () => { eraseSnapPending = true; },
+
+        eraseStrokesNear: (x, y, radius) => {
+          const board = get().boards.find((b) => b.id === get().activeId);
+          const hit = (board?.drawings ?? []).some(
+            (s) => s.points.some((p) => Math.hypot(p[0] - x, p[1] - y) < radius),
+          );
+          if (!hit) return;
+          // pro Radier-Geste genau EIN History-Eintrag (beim ersten Treffer)
+          if (eraseSnapPending) { get().pushHistory(); eraseSnapPending = false; }
           patchActive((b) => ({
             drawings: (b.drawings ?? []).filter(
               (s) => !s.points.some((p) => Math.hypot(p[0] - x, p[1] - y) < radius),
             ),
-          })),
+          }));
+        },
+
+        // ---------- Undo/Redo (Board-Struktur) ----------
+        past: [],
+        future: [],
+
+        pushHistory: () => {
+          const s = get();
+          const b = s.boards.find((x) => x.id === s.activeId);
+          if (!b) return;
+          set({
+            past: [...s.past.slice(-(HISTORY_LIMIT - 1)), { boardId: b.id, nodes: b.nodes, edges: b.edges, drawings: b.drawings }],
+            future: [],
+          });
+        },
+
+        undo: () => {
+          const s = get();
+          const entry = s.past[s.past.length - 1];
+          if (!entry) return;
+          const board = s.boards.find((b) => b.id === entry.boardId);
+          if (!board) { set({ past: s.past.slice(0, -1) }); return; }
+          set({
+            past: s.past.slice(0, -1),
+            future: [...s.future, { boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings }],
+            activeId: entry.boardId,
+            view: 'board',
+            boards: s.boards.map((b) =>
+              b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings } : b,
+            ),
+          });
+        },
+
+        redo: () => {
+          const s = get();
+          const entry = s.future[s.future.length - 1];
+          if (!entry) return;
+          const board = s.boards.find((b) => b.id === entry.boardId);
+          if (!board) { set({ future: s.future.slice(0, -1) }); return; }
+          set({
+            future: s.future.slice(0, -1),
+            past: [...s.past, { boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings }],
+            activeId: entry.boardId,
+            view: 'board',
+            boards: s.boards.map((b) =>
+              b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings } : b,
+            ),
+          });
+        },
 
         setView: (view) => set({ view }),
 
@@ -395,10 +480,12 @@ export const useBoard = create<BoardState>()(
         onEdgesChange: (changes) =>
           patchActive((b) => ({ edges: applyEdgeChanges(changes, b.edges) })),
 
-        onConnect: (connection) =>
+        onConnect: (connection) => {
+          get().pushHistory();
           patchActive((b) => ({
             edges: addEdge({ ...connection, type: 'labeled', data: { label: '', kind: 'arrow' } }, b.edges),
-          })),
+          }));
+        },
 
         updateEdgeLabel: (id, label) =>
           patchActive((b) => ({
@@ -414,10 +501,15 @@ export const useBoard = create<BoardState>()(
             ),
           })),
 
-        removeEdge: (id) =>
-          patchActive((b) => ({ edges: b.edges.filter((e) => e.id !== id) })),
+        removeEdge: (id) => {
+          get().pushHistory();
+          patchActive((b) => ({ edges: b.edges.filter((e) => e.id !== id) }));
+        },
 
-        addNode: (node) => patchActive((b) => ({ nodes: [...b.nodes, node] })),
+        addNode: (node) => {
+          get().pushHistory();
+          patchActive((b) => ({ nodes: [...b.nodes, node] }));
+        },
 
         removeNode: (id) => get().removeNodes([id]),
 
@@ -428,6 +520,7 @@ export const useBoard = create<BoardState>()(
           const removedNodes = board.nodes.filter((n) => idSet.has(n.id));
           const removedEdges = board.edges.filter((e) => idSet.has(e.source) || idSet.has(e.target));
           if (removedNodes.length === 0) return;
+          get().pushHistory();
           patchActive((b) => ({
             nodes: b.nodes.filter((n) => !idSet.has(n.id)),
             edges: b.edges.filter((e) => !idSet.has(e.source) && !idSet.has(e.target)),
@@ -447,6 +540,7 @@ export const useBoard = create<BoardState>()(
             get().showToast('Das Board dieser Karten existiert nicht mehr.');
             return;
           }
+          get().pushHistory();
           set({
             boards: get().boards.map((b) =>
               b.id === snap.boardId
@@ -475,6 +569,17 @@ export const useBoard = create<BoardState>()(
               n.id === id ? ({ ...n, position: { x, y } } as AppNode) : n,
             ),
           })),
+
+        setNodePositions: (entries) =>
+          patchActive((b) => {
+            const map = new Map(entries.map(([id, x, y]) => [id, { x, y }]));
+            return {
+              nodes: b.nodes.map((n) => {
+                const p = map.get(n.id);
+                return p ? ({ ...n, position: p } as AppNode) : n;
+              }),
+            };
+          }),
 
         focusNode: (boardId, nodeId) => {
           set({ pendingFocus: { boardId, nodeId }, activeId: boardId, view: 'board' });

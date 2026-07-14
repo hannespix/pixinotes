@@ -13,6 +13,10 @@ export function Dock() {
   const setPresenting = useBoard((s) => s.setPresenting);
   const tool = useBoard((s) => s.tool);
   const setTool = useBoard((s) => s.setTool);
+  const undo = useBoard((s) => s.undo);
+  const redo = useBoard((s) => s.redo);
+  const canUndo = useBoard((s) => s.past.length > 0);
+  const canRedo = useBoard((s) => s.future.length > 0);
   const { screenToFlowPosition } = useReactFlow();
   const [addMenu, setAddMenu] = useState(false);
 
@@ -42,6 +46,11 @@ export function Dock() {
         )}
         <button className={addMenu ? 'active' : ''} onClick={() => setAddMenu((o) => !o)} title="Objekt hinzufügen" aria-label="Objekt hinzufügen">➕</button>
       </div>
+
+      {/* Undo/Redo — Karten, Striche, Verbindungen (Strg+Z / Strg+Y) */}
+      <button onClick={undo} disabled={!canUndo} title="Rückgängig (Strg+Z)" aria-label="Rückgängig">↩️</button>
+      <button onClick={redo} disabled={!canRedo} title="Wiederholen (Strg+Y)" aria-label="Wiederholen">↪️</button>
+      <span className="dock-sep" />
 
       {/* Zeichen-Werkzeuge */}
       <button className={tool === 'pen' ? 'active' : ''} onClick={() => setTool(tool === 'pen' ? 'select' : 'pen')} title="Stift" aria-label="Stift">✏️</button>
