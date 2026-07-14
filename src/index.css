@@ -188,6 +188,60 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .kanban-add input:focus { border-color: var(--accent); }
 
+/* ---------- Projekt-Tabs ---------- */
+.tabs {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 4px; z-index: 50; align-items: center;
+  background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(6px);
+  padding: 5px; border-radius: 12px; box-shadow: 0 2px 10px rgba(50, 40, 20, 0.1);
+  max-width: 55vw; overflow-x: auto;
+}
+.tab {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; padding: 5px 10px; border-radius: 8px;
+  cursor: pointer; white-space: nowrap; color: var(--muted);
+}
+.tab:hover { background: #f1ede4; }
+.tab.active { background: #e8efff; color: var(--ink); font-weight: 600; }
+.tab-count {
+  font-size: 10px; background: rgba(0, 0, 0, 0.07); border-radius: 999px;
+  padding: 1px 6px; color: var(--muted);
+}
+.tab-x {
+  border: none; background: none; font-size: 9px; cursor: pointer;
+  color: var(--muted); padding: 2px; opacity: 0; transition: opacity 0.15s;
+}
+.tab:hover .tab-x { opacity: 0.7; }
+.tab input {
+  border: none; outline: none; font-family: inherit; font-size: 12.5px;
+  background: transparent; width: 130px; color: var(--ink);
+}
+.tab-add {
+  border: none; background: none; font-size: 16px; color: var(--muted);
+  width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
+}
+.tab-add:hover { background: #f1ede4; color: var(--ink); }
+
+/* ---------- Portal-Karte ---------- */
+.portal-card {
+  width: 200px; background: linear-gradient(135deg, #fffdf7 0%, #f4efff 100%);
+  border-radius: 12px; padding: 16px; text-align: center;
+  border: 1.5px dashed rgba(124, 92, 255, 0.35);
+}
+.portal-icon { font-size: 26px; margin-bottom: 4px; }
+.portal-name { font-weight: 700; font-size: 13.5px; margin-bottom: 2px; }
+.portal-open {
+  margin-top: 10px; border: none; background: #5b3fd4; color: #fff;
+  font-family: inherit; font-size: 12px; padding: 5px 14px; border-radius: 8px;
+  cursor: pointer;
+}
+.portal-open:hover { background: #4a30b8; }
+.portal-select {
+  margin-top: 8px; font-family: inherit; font-size: 12px;
+  border: 1px solid #d5cfc0; border-radius: 7px; padding: 4px 6px;
+  background: #fff; max-width: 100%;
+}
+
 /* ---------- Dock ---------- */
 .dock {
   position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);

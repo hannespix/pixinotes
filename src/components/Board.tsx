@@ -10,7 +10,7 @@ import {
   type Node,
   type NodeTypes,
 } from '@xyflow/react';
-import { useBoard } from '../store';
+import { selectActiveBoard, useBoard } from '../store';
 import { uid, type StickyColor } from '../types';
 import { guessMime, parseEml, parseMsg } from '../lib/parseEmail';
 import { NoteCard } from './nodes/NoteCard';
@@ -18,6 +18,7 @@ import { EmailCard } from './nodes/EmailCard';
 import { ImageCard } from './nodes/ImageCard';
 import { FileCard } from './nodes/FileCard';
 import { KanbanCard } from './nodes/KanbanCard';
+import { PortalCard } from './nodes/PortalCard';
 
 const nodeTypes: NodeTypes = {
   note: NoteCard,
@@ -25,6 +26,7 @@ const nodeTypes: NodeTypes = {
   image: ImageCard,
   file: FileCard,
   kanban: KanbanCard,
+  portal: PortalCard,
 };
 
 const STICKY_ROTATION: StickyColor[] = ['yellow', 'pink', 'mint', 'sky'];
@@ -36,8 +38,9 @@ const FRICTION = 0.93;
 const MIN_SPEED = 0.6;
 
 export function Board() {
-  const nodes = useBoard((s) => s.nodes);
-  const edges = useBoard((s) => s.edges);
+  const activeId = useBoard((s) => s.activeId);
+  const nodes = useBoard((s) => selectActiveBoard(s).nodes);
+  const edges = useBoard((s) => selectActiveBoard(s).edges);
   const onNodesChange = useBoard((s) => s.onNodesChange);
   const onEdgesChange = useBoard((s) => s.onEdgesChange);
   const onConnect = useBoard((s) => s.onConnect);
@@ -198,6 +201,7 @@ export function Board() {
       onPaste={handlePaste}
     >
       <ReactFlow
+        key={activeId}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}

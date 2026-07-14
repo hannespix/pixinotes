@@ -28,10 +28,16 @@ export function Dock() {
     });
   };
 
+  const addPortal = () => {
+    addNode({ id: uid(), type: 'portal', position: centerPos(200, 140), data: {} });
+    showToast('🗂️ Portal-Karte: verlinke damit ein anderes Projekt-Board');
+  };
+
   return (
     <div className="dock">
       <button onClick={addNote} title="Neue Notiz (oder Doppelklick aufs Board)">📝</button>
       <button onClick={addKanban} title="Neues Kanban-Board">📋</button>
+      <button onClick={addPortal} title="Portal zu einem anderen Projekt-Board">🗂️</button>
       <button
         onClick={() =>
           showToast('📧 E-Mails (.eml/.msg), Bilder & Dateien einfach aufs Board ziehen · Screenshots mit Strg+V')

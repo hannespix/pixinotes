@@ -1,6 +1,7 @@
 import { ReactFlowProvider } from '@xyflow/react';
 import { Board } from './components/Board';
 import { Dock } from './components/Dock';
+import { Tabs } from './components/Tabs';
 import { useBoard } from './store';
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
             Doppelklick = Notiz · E-Mails &amp; Dateien reinziehen · Strg+V für Screenshots · Karten werfen 🚀
           </div>
         </div>
+        <Tabs />
         <Board />
         <Dock />
         <div className={`toast ${toast ? 'show' : ''}`}>{toast}</div>
