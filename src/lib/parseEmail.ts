@@ -46,6 +46,8 @@ export async function parseMsg(buffer: ArrayBuffer): Promise<EmailData> {
   // Lazy-Import: msgreader (+iconv-lite) nur laden, wenn wirklich eine .msg-Datei kommt
   const { default: MsgReader } = await import('@kenjiuno/msgreader');
   const reader = new MsgReader(buffer);
+  // Deutsche Umlaute in ANSI-kodierten Outlook-Mails korrekt dekodieren (M7)
+  (reader as { parserConfig?: { ansiEncoding?: string } }).parserConfig = { ansiEncoding: 'windows-1252' };
   const data = reader.getFileData();
 
   const attachments: ParsedAttachment[] = (data.attachments ?? []).map((att) => {
@@ -70,7 +72,7 @@ export async function parseMsg(buffer: ArrayBuffer): Promise<EmailData> {
     fromName: data.senderName || data.senderEmail || 'Unbekannt',
     fromAddress: data.senderEmail,
     date: data.messageDeliveryTime,
-    text: (data.body || '').trim(),
+    text: (data.body || stripHtml((data as { bodyHtml?: string }).bodyHtml || '')).trim(),
     attachments,
   };
 }

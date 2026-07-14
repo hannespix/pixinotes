@@ -26,8 +26,9 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
     .join('')
     .toUpperCase();
 
-  const dateLabel = email.date
-    ? new Date(email.date).toLocaleString('de-DE', {
+  const parsedDate = email.date ? new Date(email.date) : null;
+  const dateLabel = parsedDate && !Number.isNaN(parsedDate.getTime())
+    ? parsedDate.toLocaleString('de-DE', {
         weekday: 'short',
         day: '2-digit',
         month: '2-digit',

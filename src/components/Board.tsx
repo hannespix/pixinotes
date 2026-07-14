@@ -13,6 +13,7 @@ import {
 import { selectActiveBoard, useBoard } from '../store';
 import { uid, type StickyColor } from '../types';
 import { guessMime, parseEml, parseMsg } from '../lib/parseEmail';
+import { imageFileToDataUrl } from '../lib/image';
 import { NoteCard } from './nodes/NoteCard';
 import { EmailCard } from './nodes/EmailCard';
 import { ImageCard } from './nodes/ImageCard';
@@ -47,6 +48,7 @@ export function Board() {
   const onConnect = useBoard((s) => s.onConnect);
   const addNode = useBoard((s) => s.addNode);
   const setNodePosition = useBoard((s) => s.setNodePosition);
+  const removeNodes = useBoard((s) => s.removeNodes);
   const showToast = useBoard((s) => s.showToast);
 
   const { screenToFlowPosition, setCenter } = useReactFlow();
@@ -111,6 +113,9 @@ export function Board() {
     track.t = now;
   }, []);
 
+  // Physik-Loop beim Unmount stoppen (M4)
+  useEffect(() => () => cancelAnimationFrame(animRef.current), []);
+
   const onNodeDragStop = useCallback(
     (_: unknown, node: Node) => {
       const track = dragTrack.current;
@@ -120,7 +125,10 @@ export function Board() {
       dragTrack.current = null;
       if (Math.hypot(vx, vy) < MIN_SPEED * 2) return;
 
+      const startBoard = useBoard.getState().activeId;
       const step = () => {
+        // Board gewechselt? Dann den Wurf nicht aufs falsche Board schreiben (M4)
+        if (useBoard.getState().activeId !== startBoard) return;
         vx *= FRICTION;
         vy *= FRICTION;
         x += vx;
@@ -217,7 +225,7 @@ export function Board() {
             addNode({ id: uid(), type: 'email', width: 320, position: pos, data: email });
             showToast(`📧 Outlook-Mail „${email.subject}" importiert`);
           } else if (file.type.startsWith('image/')) {
-            const src = await fileToDataUrl(file);
+            const src = await imageFileToDataUrl(file);
             addNode({ id: uid(), type: 'image', width: 260, position: pos, data: { src, name: file.name } });
           } else {
             const dataUrl = file.size <= 1_500_000 ? await fileToDataUrl(file) : undefined;
@@ -250,7 +258,7 @@ export function Board() {
       if (imageItem) {
         const file = imageItem.getAsFile();
         if (!file) return;
-        const src = await fileToDataUrl(file);
+        const src = await imageFileToDataUrl(file);
         const pos = screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 90 });
         addNode({ id: uid(), type: 'image', width: 260, position: pos, data: { src, name: 'Screenshot' } });
         showToast('🖼️ Screenshot eingefügt');
@@ -283,6 +291,12 @@ export function Board() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onBeforeDelete={async ({ nodes: delNodes }) => {
+          // Entf-Taste: durch removeNodes leiten, damit Undo auch die Kanten kennt (M1)
+          if (delNodes.length === 0) return true;
+          removeNodes(delNodes.map((n) => n.id));
+          return false;
+        }}
         onNodeDragStart={onNodeDragStart}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}

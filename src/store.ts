@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import {
   addEdge,
   applyEdgeChanges,
@@ -95,6 +95,44 @@ export const selectActiveBoard = (s: BoardState): BoardDoc =>
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
+/**
+ * K1+M5-Schutz: localStorage-Writes werden gedrosselt (max. alle 400 ms statt
+ * pro Tastendruck/Drag-Frame) und Quota-Fehler abgefangen statt die App zu
+ * crashen. Bei vollem Speicher informiert ein Event die UI (Toast in App.tsx).
+ */
+let writeTimer: ReturnType<typeof setTimeout> | undefined;
+let pendingWrite: { key: string; value: string } | null = null;
+let quotaWarned = false;
+
+function flushWrite() {
+  if (!pendingWrite) return;
+  try {
+    localStorage.setItem(pendingWrite.key, pendingWrite.value);
+    quotaWarned = false;
+  } catch {
+    if (!quotaWarned) {
+      quotaWarned = true;
+      window.dispatchEvent(new CustomEvent('pixinotes:quota'));
+    }
+  }
+  pendingWrite = null;
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', flushWrite);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushWrite();
+  });
+}
+const debouncedSafeStorage = {
+  getItem: (k: string) => localStorage.getItem(k),
+  setItem: (k: string, v: string) => {
+    pendingWrite = { key: k, value: v };
+    clearTimeout(writeTimer);
+    writeTimer = setTimeout(flushWrite, 400);
+  },
+  removeItem: (k: string) => localStorage.removeItem(k),
+};
+
 /** „Board 2", „Board 3" … statt fünfmal „Neues Board" */
 function nextName(base: string, existing: string[]): string {
   let n = existing.filter((e) => e.startsWith(base)).length + 1;
@@ -114,12 +152,15 @@ const defaultHierarchy = (boardIds: string[]): Space[] => [
 export const useBoard = create<BoardState>()(
   persist(
     (set, get) => {
-      const patchActive = (fn: (b: BoardDoc) => Partial<BoardDoc>) =>
+      const patchActive = (fn: (b: BoardDoc) => Partial<BoardDoc>) => {
+        const active = selectActiveBoard(get());
+        if (!active) return;
         set({
           boards: get().boards.map((b) =>
-            b.id === get().activeId ? { ...b, ...fn(b) } : b,
+            b.id === active.id ? { ...b, ...fn(b) } : b,
           ),
         });
+      };
 
       /** Board-ID aus allen Projekten entfernen (Hilfsfunktion für move/delete) */
       const stripBoardFromHierarchy = (spaces: Space[], boardId: string): Space[] =>
@@ -219,7 +260,9 @@ export const useBoard = create<BoardState>()(
           const id = uid();
           const spaces = get().spaces;
           // Ziel: angegebenes Projekt, sonst das erste existierende (notfalls anlegen)
-          let target = projectId;
+          let target = projectId && spaces.some((sp) => sp.projects.some((p) => p.id === projectId))
+            ? projectId
+            : undefined;
           let newSpaces = spaces;
           if (!target) {
             const first = spaces.flatMap((sp) => sp.projects)[0];
@@ -268,6 +311,9 @@ export const useBoard = create<BoardState>()(
         },
 
         moveBoard: (boardId, targetProjectId, beforeBoardId) => {
+          // Geister-Boards verhindern: Ziel muss existieren, sonst no-op
+          const targetExists = get().spaces.some((sp) => sp.projects.some((p) => p.id === targetProjectId));
+          if (!targetExists) return;
           const stripped = stripBoardFromHierarchy(get().spaces, boardId);
           set({
             spaces: stripped.map((sp) => ({
@@ -325,6 +371,11 @@ export const useBoard = create<BoardState>()(
         restoreDeleted: () => {
           const snap = get().lastDeleted;
           if (!snap) return;
+          if (!get().boards.some((b) => b.id === snap.boardId)) {
+            set({ lastDeleted: null });
+            get().showToast('Das Board dieser Karten existiert nicht mehr.');
+            return;
+          }
           set({
             boards: get().boards.map((b) =>
               b.id === snap.boardId
@@ -370,6 +421,7 @@ export const useBoard = create<BoardState>()(
     {
       name: 'pixinotes-board',
       version: 2,
+      storage: createJSONStorage(() => debouncedSafeStorage),
       partialize: (s) => ({
         boards: s.boards,
         spaces: s.spaces,
@@ -387,13 +439,26 @@ export const useBoard = create<BoardState>()(
         }
         // v1: {boards, activeId} — flache Boards ohne Hierarchie
         if (version === 1 && p && 'boards' in p) {
-          const boards = p.boards as BoardDoc[];
+          const boards = (p.boards as BoardDoc[]) ?? [];
+          if (boards.length === 0) {
+            return { boards: [{ id: 'main', name: '🏠 Mein Schreibtisch', nodes: [], edges: [] }], spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' };
+          }
           return {
             boards,
             spaces: defaultHierarchy(boards.map((b) => b.id)),
             activeId: (p.activeId as string) ?? boards[0]?.id,
             view: 'board',
           };
+        }
+        // v2: defensiv validieren (leeres boards-Array oder tote activeId reparieren)
+        if (p && 'boards' in p) {
+          const boards = (p.boards as BoardDoc[]) ?? [];
+          if (boards.length === 0) {
+            return { boards: [{ id: 'main', name: '🏠 Mein Schreibtisch', nodes: [], edges: [] }], spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' };
+          }
+          if (!boards.some((b) => b.id === (p.activeId as string))) {
+            return { ...p, activeId: boards[0].id };
+          }
         }
         return p;
       },

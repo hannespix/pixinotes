@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Board } from './components/Board';
 import { Dock } from './components/Dock';
@@ -10,6 +11,15 @@ export default function App() {
   const toast = useBoard((s) => s.toast);
   const view = useBoard((s) => s.view);
   const restoreDeleted = useBoard((s) => s.restoreDeleted);
+  const showToast = useBoard((s) => s.showToast);
+
+  // Quota-Warnung aus dem Storage-Layer (Audit K1)
+  useEffect(() => {
+    const warn = () =>
+      showToast('⚠️ Browser-Speicher voll — Änderungen werden nicht mehr gesichert! Große Bilder löschen oder Inhalte exportieren.');
+    window.addEventListener('pixinotes:quota', warn);
+    return () => window.removeEventListener('pixinotes:quota', warn);
+  }, [showToast]);
 
   return (
     <ReactFlowProvider>

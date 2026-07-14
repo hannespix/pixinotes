@@ -34,6 +34,10 @@ export function Tabs() {
       showToast('Das letzte Board bleibt offen 🙂');
       return;
     }
+    const board = boards.find((b) => b.id === id);
+    if (board && board.nodes.length > 0) {
+      if (!window.confirm(`Board „${board.name}" mit ${board.nodes.length} Karten wirklich löschen?`)) return;
+    }
     removeBoard(id);
   };
 

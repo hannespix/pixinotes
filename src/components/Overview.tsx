@@ -54,8 +54,9 @@ function OverviewCanvas() {
     [spaces, boards, tick],
   );
 
-  // Bei Strukturänderung (Board/Projekt/Bereich dazu oder weg) neu einpassen
-  const structureKey = `${tick}|${spaces.length}|${spaces.reduce((a, s) => a + s.projects.length, 0)}|${boards.length}`;
+  // Nur bei ECHTER Strukturänderung remounten (fitView); nach einem reinen
+  // Drag reicht die neue nodes-Referenz zum Zurückschnappen — Zoom bleibt (N2)
+  const structureKey = `${spaces.length}|${spaces.reduce((a, s) => a + s.projects.length, 0)}|${boards.length}`;
 
   return (
     <div className="board-wrap ov-canvas">

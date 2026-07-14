@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { detectDates, downloadIcs, formatDue } from '../../lib/dates';
 import { useBoard } from '../../store';
 
@@ -8,7 +8,14 @@ import { useBoard } from '../../store';
  */
 export function DueChips({ text, context }: { text: string; context: string }) {
   const showToast = useBoard((s) => s.showToast);
-  const dates = useMemo(() => detectDates(text), [text]);
+  // Countdown bleibt aktuell, auch wenn die App lange offen ist (N5)
+  const [nowTick, setNowTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setNowTick((x) => x + 1), 10 * 60 * 1000);
+    return () => clearInterval(t);
+  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const dates = useMemo(() => detectDates(text), [text, nowTick]);
   if (dates.length === 0) return null;
 
   return (
