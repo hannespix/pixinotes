@@ -2,15 +2,15 @@ import { useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
 import { useBoard } from '../../store';
-import { kanbanCols, uid, type KanbanItem, type KanbanNode } from '../../types';
+import { kanbanCols, uid, type KanbanData, type KanbanItem, type KanbanNode } from '../../types';
 import { CardShell } from './CardShell';
 
 /**
- * Kanban-Board als Karte. Tickets wandern mit ◀ ▶ durch die Spalten.
- * Spalten sind frei benennbar und in der Anzahl variabel (➕/✕) —
- * die letzte Spalte ist immer die „Erledigt"-Spalte (🎉 + Durchstreichen).
+ * Der eigentliche Kanban-Inhalt — geteilt zwischen Board-Karte und
+ * Präsentations-Folie. Spalten sind frei benennbar und in der Anzahl
+ * variabel (➕/✕); die letzte Spalte ist immer „Erledigt" (🎉 + Durchstreichen).
  */
-export function KanbanCard({ id, data, selected }: NodeProps<KanbanNode>) {
+export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const kanban = data;
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
@@ -74,7 +74,7 @@ export function KanbanCard({ id, data, selected }: NodeProps<KanbanNode>) {
   const colOf = (it: KanbanItem) => Math.max(0, Math.min(done, it.col));
 
   return (
-    <CardShell id={id} selected={selected} minWidth={330} minHeight={200} className="kanban-card">
+    <>
       <div className="kanban-head">
         <input
           className="kanban-title nodrag"
@@ -133,6 +133,15 @@ export function KanbanCard({ id, data, selected }: NodeProps<KanbanNode>) {
           onKeyDown={(e) => e.key === 'Enter' && addItem()}
         />
       </div>
+    </>
+  );
+}
+
+/** Kanban-Board als Karte auf dem Whiteboard. */
+export function KanbanCard({ id, data, selected }: NodeProps<KanbanNode>) {
+  return (
+    <CardShell id={id} selected={selected} minWidth={330} minHeight={200} className="kanban-card">
+      <KanbanBody id={id} data={data} />
     </CardShell>
   );
 }

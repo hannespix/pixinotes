@@ -12,6 +12,7 @@ import { useBoard } from './store';
 export default function App() {
   const toast = useBoard((s) => s.toast);
   const view = useBoard((s) => s.view);
+  const presenting = useBoard((s) => s.presenting);
   const restoreDeleted = useBoard((s) => s.restoreDeleted);
   const showToast = useBoard((s) => s.showToast);
 
@@ -48,7 +49,11 @@ export default function App() {
         <Tabs />
         {view === 'overview' ? (
           <Overview />
-        ) : (
+        ) : presenting ? null : (
+          // Während der Präsentation ist das Board ausgehängt: Die Folien
+          // editieren dieselben Karten, und die Karten-Editoren (BlockNote)
+          // lesen ihren Inhalt nur beim Mount — so übernimmt das Board die
+          // Präsentations-Änderungen beim Zurückkehren garantiert frisch.
           <>
             <Board />
             <Dock />

@@ -2,25 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { type NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { MermaidNode } from '../../types';
+import { getMermaid, MERMAID_TEMPLATES as TEMPLATES } from '../../lib/mermaid';
 import { CardShell } from './CardShell';
-
-// mermaid ist groß → nur laden, wenn wirklich ein Diagramm auf dem Board ist
-let mermaidPromise: Promise<typeof import('mermaid').default> | null = null;
-function getMermaid() {
-  if (!mermaidPromise) {
-    mermaidPromise = import('mermaid').then((m) => {
-      m.default.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'strict' });
-      return m.default;
-    });
-  }
-  return mermaidPromise;
-}
-
-const TEMPLATES: Record<string, string> = {
-  Flow: 'flowchart TD\n  A[Start] --> B{Entscheidung}\n  B -->|Ja| C[Schritt]\n  B -->|Nein| D[Ende]',
-  Sequenz: 'sequenceDiagram\n  Alice->>Bob: Anfrage\n  Bob-->>Alice: Antwort',
-  Gantt: 'gantt\n  title Projektplan\n  section Phase 1\n  Aufgabe A :a1, 2026-07-01, 7d\n  Aufgabe B :after a1, 5d',
-};
 
 /**
  * Mermaid-Diagramm mit Live-Vorschau (WYSIWYG-nah): links Code, rechts
