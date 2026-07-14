@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useBoard } from '../store';
-import { makeKanban, makeMermaid, makeNote, makePortal, makeShape } from '../lib/nodes';
+import { makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape } from '../lib/nodes';
 import { collectTasks } from '../lib/tasks';
 import type { ShapeKind } from '../types';
 
@@ -44,6 +44,7 @@ export function Dock() {
             <button onClick={() => add(() => addNode(makeNote(centerPos())))}>📝 Notiz</button>
             <button onClick={() => add(() => addNode(makeKanban(centerPos(420, 200))))}>📋 Kanban</button>
             <button onClick={() => add(() => addNode(makeMermaid(centerPos(380, 240))))}>📊 Diagramm (Mermaid)</button>
+            <button onClick={() => add(() => addNode(makeGantt(centerPos(560, 240))))}>📅 Zeitplan (Gantt)</button>
             <div className="dock-menu-label">Prozess-Formen</div>
             <button onClick={() => addShape('process')}>▭ Schritt</button>
             <button onClick={() => addShape('decision')}>◇ Entscheidung</button>

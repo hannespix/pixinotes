@@ -88,8 +88,29 @@ export type KanbanNode = Node<KanbanData, 'kanban'>;
 export type PortalNode = Node<PortalData, 'portal'>;
 export type ShapeNode = Node<ShapeData, 'shape'>;
 export type MermaidNode = Node<MermaidData, 'mermaid'>;
+
+/** Ein Vorgang im Zeitplan. start === end ⇒ Meilenstein (Raute). */
+export interface GanttRow {
+  id: string;
+  name: string;
+  /** ISO yyyy-mm-dd, inklusiv */
+  start: string;
+  end: string;
+  color?: string;
+  /** 0–100 */
+  progress?: number;
+}
+export interface GanttData {
+  title: string;
+  rows: GanttRow[];
+  /** Pixel pro Tag (Zoom) */
+  dayWidth?: number;
+  [key: string]: unknown;
+}
+export type GanttNode = Node<GanttData, 'gantt'>;
+
 export type AppNode =
-  | NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode;
+  | NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode;
 
 export const KANBAN_COLS = ['To Do', 'Doing', 'Done'] as const;
 /** Effektive Spalten eines Kanban-Boards — Default für alte Boards ohne `cols` */

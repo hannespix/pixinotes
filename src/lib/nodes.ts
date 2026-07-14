@@ -35,6 +35,7 @@ export const CARD_WIDTHS = {
   portal: 200,
   shape: 150,
   mermaid: 380,
+  gantt: 560,
 } as const;
 
 type Pos = { x: number; y: number };
@@ -86,6 +87,28 @@ export function makeShape(position: Pos, shape: ShapeKind = 'process'): AppNode 
     height: 70,
     position,
     data: { shape, text: '', color: '#eef2ff' },
+  };
+}
+
+export function makeGantt(position: Pos): AppNode {
+  const day = 864e5;
+  const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+  const now = Date.now();
+  return {
+    id: uid(),
+    type: 'gantt',
+    width: CARD_WIDTHS.gantt,
+    height: 240,
+    position,
+    data: {
+      title: '📅 Zeitplan',
+      dayWidth: 24,
+      rows: [
+        { id: uid(), name: 'Phase 1', start: iso(now), end: iso(now + 6 * day), color: '#4f7cff', progress: 30 },
+        { id: uid(), name: 'Phase 2', start: iso(now + 7 * day), end: iso(now + 13 * day), color: '#3fa564' },
+        { id: uid(), name: 'Meilenstein', start: iso(now + 14 * day), end: iso(now + 14 * day), color: '#e07a3f' },
+      ],
+    },
   };
 }
 

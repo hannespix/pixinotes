@@ -8,10 +8,11 @@ import { nodeToHtml } from '../lib/serialize';
 import { getMermaid } from '../lib/mermaid';
 import { presentationOrder } from '../lib/presentOrder';
 import { KanbanBody } from './nodes/KanbanCard';
-import type { AppNode, KanbanNode, MermaidNode, NoteNode, ShapeNode } from '../types';
+import { GanttBody } from './nodes/GanttCard';
+import type { AppNode, GanttNode, KanbanNode, MermaidNode, NoteNode, ShapeNode } from '../types';
 
 /** Kartentypen, die auf der Folie LIVE editierbar sind */
-const EDITABLE = new Set(['note', 'shape', 'mermaid', 'kanban']);
+const EDITABLE = new Set(['note', 'shape', 'mermaid', 'kanban', 'gantt']);
 
 /** Tippt der Nutzer gerade in ein Eingabefeld / einen Editor? */
 function inEditable(t: EventTarget | null): boolean {
@@ -122,6 +123,12 @@ function SlideContent({ node }: { node: AppNode }) {
       return (
         <div className="slide-kanban kanban-card">
           <KanbanBody id={node.id} data={(node as KanbanNode).data} />
+        </div>
+      );
+    case 'gantt':
+      return (
+        <div className="slide-gantt gantt-card">
+          <GanttBody id={node.id} data={(node as GanttNode).data} />
         </div>
       );
     default:

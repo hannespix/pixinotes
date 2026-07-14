@@ -24,6 +24,7 @@ import { KanbanCard } from './nodes/KanbanCard';
 import { PortalCard } from './nodes/PortalCard';
 import { ShapeCard } from './nodes/ShapeCard';
 import { MermaidCard } from './nodes/MermaidCard';
+import { GanttCard } from './nodes/GanttCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { DrawingLayer } from './DrawingLayer';
 import { SelectionToolbar } from './SelectionToolbar';
@@ -37,6 +38,7 @@ const nodeTypes: NodeTypes = {
   portal: PortalCard,
   shape: ShapeCard,
   mermaid: MermaidCard,
+  gantt: GanttCard,
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };

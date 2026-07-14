@@ -906,3 +906,36 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 
 /* Portal: Öffnen + Präsentieren nebeneinander */
 .portal-actions { display: flex; gap: 5px; justify-content: center; }
+
+/* ---------- Gantt / Zeitplan-Karte ---------- */
+.gantt-card { background: #fffdf7; border-radius: 10px; padding: 10px 12px 12px; overflow: hidden; display: flex; flex-direction: column; }
+.gantt-body { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.gantt-head { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
+.gantt-tools { display: flex; gap: 3px; flex: none; }
+.gantt-tools button {
+  border: none; background: rgba(0,0,0,.05); border-radius: 6px; cursor: pointer;
+  font-size: 11px; padding: 3px 7px; line-height: 1.2; font-family: inherit;
+}
+.gantt-tools button:hover { background: rgba(0,0,0,.1); }
+.gantt-rowbar {
+  display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted);
+  background: rgba(79,124,255,.08); border-radius: 7px; padding: 3px 8px; margin-bottom: 4px;
+}
+.gantt-rowbar-name { font-weight: 600; color: var(--ink); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gantt-rowbar button { border: none; background: none; cursor: pointer; font-size: 11px; padding: 1px 4px; border-radius: 4px; }
+.gantt-rowbar button:hover { background: rgba(0,0,0,.08); }
+.gantt-rowbar select { font-size: 11px; margin-left: 3px; border: 1px solid #d5cfc0; border-radius: 5px; background: #fff; }
+.gantt-scroll { display: flex; flex: 1; min-height: 0; overflow: auto; border: 1px solid rgba(0,0,0,.08); border-radius: 8px; background: #fff; }
+.gantt-labels { flex: none; display: flex; flex-direction: column; border-right: 1px solid rgba(0,0,0,.1); background: #fbf9f2; position: sticky; left: 0; z-index: 2; }
+.gantt-label {
+  width: 128px; border: none; background: transparent; outline: none; font-family: inherit;
+  font-size: 11.5px; color: var(--ink); padding: 0 8px; box-sizing: border-box;
+}
+.gantt-label.sel { background: rgba(79,124,255,.1); }
+.gantt-chartwrap { flex: 1; }
+.gantt-svg { display: block; touch-action: none; }
+.gantt-month { font-size: 10px; font-weight: 700; fill: #6f6a5b; text-transform: uppercase; letter-spacing: .04em; }
+.gantt-day { font-size: 9px; fill: #a09a8a; }
+/* Präsentations-Folie: Zeitplan groß */
+.slide-gantt { width: min(1100px, 100%); height: min(60vh, 100%); align-self: center; padding: 20px 24px !important; box-shadow: 0 10px 40px rgba(0,0,0,.15); }
+.slide-gantt .kanban-title { font-size: 20px; }

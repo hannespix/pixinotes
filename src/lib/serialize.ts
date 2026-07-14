@@ -162,6 +162,12 @@ export function nodeToText(node: AppNode): string {
       return node.data.text || '';
     case 'mermaid':
       return `Diagramm:\n${node.data.code}`;
+    case 'gantt': {
+      const g = node.data;
+      return `${g.title}\n${g.rows
+        .map((r) => `  ${r.start === r.end ? '◆' : '▬'} ${r.name}: ${r.start} → ${r.end}${r.progress ? ` (${r.progress}%)` : ''}`)
+        .join('\n')}`;
+    }
     case 'portal':
       return 'Projekt-Portal';
     default:
@@ -195,6 +201,13 @@ export function nodeToHtml(node: AppNode): string {
     }
     case 'shape':
       return node.data.text ? `<p style="text-align:center;font-weight:600">${esc(node.data.text)}</p>` : '';
+    case 'gantt': {
+      const g = node.data;
+      const items = g.rows
+        .map((r) => `<li>${r.start === r.end ? '◆' : '▬'} ${esc(r.name)}: ${esc(r.start)} → ${esc(r.end)}${r.progress ? ` (${r.progress}%)` : ''}</li>`)
+        .join('');
+      return `<h3>${esc(g.title)}</h3><ul>${items || '<li>—</li>'}</ul>`;
+    }
     case 'mermaid':
       return `<pre style="background:#faf8f3;border-radius:8px;padding:10px;font-size:13px;overflow:auto">${esc(node.data.code)}</pre>`;
     default:
