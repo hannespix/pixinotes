@@ -36,8 +36,11 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       >
         ✕
       </button>
-      <Handle type="target" position={Position.Left} className="pn-handle" />
-      <Handle type="source" position={Position.Right} className="pn-handle" />
+      {/* Anschlusspunkte an allen 4 Seiten — die Linie selbst dockt dank
+          Floating Edges immer automatisch an der zugewandten Seite an */}
+      {[Position.Top, Position.Right, Position.Bottom, Position.Left].map((pos) => (
+        <Handle key={pos} id={pos} type="source" position={pos} className="pn-handle" />
+      ))}
       <div className={`card-body ${className ?? ''}`}>{children}</div>
     </div>
   );

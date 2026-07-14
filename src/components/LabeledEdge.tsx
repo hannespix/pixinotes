@@ -5,9 +5,11 @@ import {
   getBezierPath,
   getSmoothStepPath,
   MarkerType,
+  useInternalNode,
   type EdgeProps,
 } from '@xyflow/react';
 import { useBoard } from '../store';
+import { getFloatingEdgeParams } from '../lib/floatingEdge';
 
 /** Verbindungs-Stile für Prozessdiagramme */
 export type EdgeKind = 'arrow' | 'line' | 'dashed' | 'step';
@@ -26,22 +28,38 @@ const KIND_LABEL: Record<EdgeKind, string> = {
  * Icon wechselt Pfeil / Winkel-Route / gestrichelt / schlichte Linie.
  */
 export function LabeledEdge({
-  id, sourceX, sourceY, targetX, targetY,
+  id, source, target, sourceX, sourceY, targetX, targetY,
   sourcePosition, targetPosition, data, selected,
 }: EdgeProps) {
   const updateEdgeLabel = useBoard((s) => s.updateEdgeLabel);
   const updateEdgeKind = useBoard((s) => s.updateEdgeKind);
   const removeEdge = useBoard((s) => s.removeEdge);
+  const sourceNode = useInternalNode(source);
+  const targetNode = useInternalNode(target);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
   const kind = (data?.kind as EdgeKind) ?? 'arrow';
   const label = (data?.label as string) ?? '';
 
+  // Floating: Andockpunkte aus den echten Knoten-Rechtecken berechnen — die
+  // Linie tritt immer an der zugewandten Seite aus, keine Schleifen mehr.
+  // Fallback auf die Handle-Koordinaten, falls die Knoten (noch) nicht vermessen sind.
+  let sx = sourceX, sy = sourceY, tx = targetX, ty = targetY;
+  let sPos = sourcePosition, tPos = targetPosition;
+  if (sourceNode && targetNode && sourceNode.measured.width && targetNode.measured.width) {
+    const p = getFloatingEdgeParams(sourceNode, targetNode);
+    if (Number.isFinite(p.sx) && Number.isFinite(p.tx)) {
+      ({ sx, sy, tx, ty } = p);
+      sPos = p.sourcePos;
+      tPos = p.targetPos;
+    }
+  }
+
   const [edgePath, labelX, labelY] =
     kind === 'step'
-      ? getSmoothStepPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
-      : getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+      ? getSmoothStepPath({ sourceX: sx, sourceY: sy, sourcePosition: sPos, targetX: tx, targetY: ty, targetPosition: tPos })
+      : getBezierPath({ sourceX: sx, sourceY: sy, sourcePosition: sPos, targetX: tx, targetY: ty, targetPosition: tPos });
 
   const stroke = selected ? '#4f7cff' : 'rgba(90,80,60,.5)';
   const marker = kind === 'line'
