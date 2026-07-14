@@ -33,10 +33,13 @@ export interface BoardDoc {
 
 export type Tool = 'select' | 'pen' | 'marker' | 'eraser';
 
+export type AiProvider = 'none' | 'anthropic' | 'openai' | 'ollama' | 'custom';
 export interface AiSettings {
-  provider: 'anthropic' | 'openai' | 'none';
+  provider: AiProvider;
   model: string;
   apiKey: string;
+  /** Basis-URL für Ollama / selbstgehostete OpenAI-kompatible Server */
+  baseUrl: string;
 }
 
 /** Ebene 2: Ein Projekt bündelt Boards (geordnete Liste). */
@@ -75,6 +78,7 @@ interface BoardState {
   lastDeleted: DeletedSnapshot | null;
   tool: Tool;
   settingsOpen: boolean;
+  presenting: boolean;
   ai: AiSettings;
 
   // Navigation
@@ -83,6 +87,7 @@ interface BoardState {
   searchOpen: boolean;
   setSearchOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
+  setPresenting: (on: boolean) => void;
   setTool: (tool: Tool) => void;
   updateAi: (patch: Partial<AiSettings>) => void;
   addStroke: (stroke: Stroke) => void;
@@ -211,13 +216,15 @@ export const useBoard = create<BoardState>()(
         view: 'board',
         searchOpen: false,
         settingsOpen: false,
+        presenting: false,
         tool: 'select',
-        ai: { provider: 'none', model: 'claude-opus-4-8', apiKey: '' },
+        ai: { provider: 'none', model: 'claude-opus-4-8', apiKey: '', baseUrl: '' },
         toast: null,
         pendingFocus: null,
         lastDeleted: null,
 
         setSettingsOpen: (open) => set({ settingsOpen: open }),
+        setPresenting: (on) => set({ presenting: on }),
         setTool: (tool) => set({ tool }),
         updateAi: (patch) => set({ ai: { ...get().ai, ...patch } }),
 

@@ -5,8 +5,16 @@ import { exportToFolder, exportViewport } from '../lib/exporter';
 const MODELS: Record<string, string[]> = {
   anthropic: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5'],
   openai: ['gpt-4o', 'gpt-4o-mini'],
+  ollama: ['llama3.1', 'mistral', 'qwen2.5', 'phi3'],
+  custom: [''],
   none: [],
 };
+const DEFAULT_BASE: Record<string, string> = {
+  ollama: 'http://localhost:11434',
+  custom: 'http://localhost:8080/v1',
+};
+const NEEDS_KEY = new Set(['anthropic', 'openai', 'custom']);
+const NEEDS_URL = new Set(['ollama', 'custom']);
 
 /**
  * Einstellungen: KI-Anbindung (eigener Key, lokal gespeichert) und
@@ -45,36 +53,57 @@ export function Settings() {
         <section className="modal-section">
           <h3>🤖 KI-Assistent</h3>
           <p className="modal-hint">
-            KI-Funktionen (Textpolitur, E-Mail-Zusammenfassung, Auto-Clustering) nutzen deinen
-            eigenen API-Schlüssel. Er wird <b>nur lokal in diesem Browser</b> gespeichert und bei
-            Bedarf direkt an den Anbieter gesendet — nichts läuft über fremde Server.
+            KI-Funktionen (Textpolitur, E-Mail-Zusammenfassung, Auto-Clustering) laufen über einen
+            Anbieter deiner Wahl. Cloud-Dienste nutzen deinen eigenen Schlüssel; mit <b>Ollama</b> oder
+            einem selbstgehosteten Server bleibt <b>alles auf deinem Rechner</b>. Zugangsdaten werden
+            nur lokal in diesem Browser gespeichert.
           </p>
           <label className="modal-row">
             <span>Anbieter</span>
             <select value={ai.provider} onChange={(e) => {
               const provider = e.target.value as typeof ai.provider;
-              updateAi({ provider, model: MODELS[provider][0] ?? '' });
+              updateAi({ provider, model: MODELS[provider]?.[0] ?? '', baseUrl: DEFAULT_BASE[provider] ?? '' });
             }}>
               <option value="none">— aus —</option>
               <option value="anthropic">Anthropic (Claude)</option>
               <option value="openai">OpenAI</option>
+              <option value="ollama">Ollama (lokal, selbstgehostet)</option>
+              <option value="custom">Eigener Server (OpenAI-kompatibel)</option>
             </select>
           </label>
           {ai.provider !== 'none' && (
             <>
               <label className="modal-row">
                 <span>Modell</span>
-                <select value={ai.model} onChange={(e) => updateAi({ model: e.target.value })}>
-                  {MODELS[ai.provider].map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
+                {ai.provider === 'custom' ? (
+                  <input type="text" placeholder="modellname" value={ai.model}
+                    onChange={(e) => updateAi({ model: e.target.value })} />
+                ) : (
+                  <select value={ai.model} onChange={(e) => updateAi({ model: e.target.value })}>
+                    {MODELS[ai.provider].map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                )}
               </label>
-              <label className="modal-row">
-                <span>API-Schlüssel</span>
-                <input type="password" placeholder="sk-…" value={ai.apiKey}
-                  onChange={(e) => updateAi({ apiKey: e.target.value })} />
-              </label>
+              {NEEDS_URL.has(ai.provider) && (
+                <label className="modal-row">
+                  <span>Server-URL</span>
+                  <input type="text" placeholder="http://localhost:11434" value={ai.baseUrl}
+                    onChange={(e) => updateAi({ baseUrl: e.target.value })} />
+                </label>
+              )}
+              {NEEDS_KEY.has(ai.provider) && (
+                <label className="modal-row">
+                  <span>API-Schlüssel{ai.provider === 'custom' ? ' (optional)' : ''}</span>
+                  <input type="password" placeholder="sk-…" value={ai.apiKey}
+                    onChange={(e) => updateAi({ apiKey: e.target.value })} />
+                </label>
+              )}
               <div className="modal-note">
-                {ai.apiKey ? '✅ Schlüssel gesetzt — KI-Aktionen erscheinen auf den Karten.' : 'Ohne Schlüssel bleiben die KI-Aktionen ausgeblendet.'}
+                {ai.provider === 'ollama'
+                  ? '🖥️ Ollama muss lokal laufen (ollama serve). Für den Browser-Zugriff ggf. OLLAMA_ORIGINS setzen. Kein Schlüssel, keine Cloud.'
+                  : (NEEDS_KEY.has(ai.provider) && !ai.apiKey)
+                    ? 'Ohne Schlüssel bleiben die KI-Aktionen ausgeblendet.'
+                    : '✅ Konfiguriert — KI-Aktionen erscheinen auf den Karten.'}
               </div>
             </>
           )}

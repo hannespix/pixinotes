@@ -651,3 +651,65 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 @media (pointer: coarse) {
   .shape-toolbar, .shape-handle { opacity: 1 !important; }
 }
+
+/* ---------- PDF-Vorschau ---------- */
+.pdf-thumb {
+  display: block; width: calc(100% - 8px); margin: 2px 4px 4px; padding: 0;
+  border: 1px solid #e3ddcf; border-radius: 7px; overflow: hidden; cursor: zoom-in;
+  background: #fff; line-height: 0;
+}
+.pdf-thumb canvas { width: 100%; height: auto; }
+.pdf-backdrop {
+  position: fixed; inset: 0; z-index: 90; background: rgba(30,26,18,.55);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.pdf-viewer {
+  background: #fff; border-radius: 14px; box-shadow: 0 16px 60px rgba(0,0,0,.35);
+  max-width: min(960px, 94vw); max-height: 92vh; display: flex; flex-direction: column; overflow: hidden;
+}
+.pdf-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border-bottom: 1px solid #eee9de; font-size: 13px;
+}
+.pdf-bar b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdf-nav { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); flex: none; }
+.pdf-nav button {
+  border: none; background: rgba(0,0,0,.06); border-radius: 6px; cursor: pointer;
+  font-size: 13px; padding: 3px 9px; font-family: inherit;
+}
+.pdf-nav button:disabled { opacity: .35; cursor: default; }
+.pdf-page { overflow: auto; background: #efece6; padding: 14px; display: flex; justify-content: center; }
+.pdf-page canvas { max-width: 100%; height: auto; box-shadow: 0 2px 12px rgba(0,0,0,.2); border-radius: 4px; }
+
+/* ---------- Präsentationsmodus ---------- */
+.presenter {
+  position: fixed; inset: 0; z-index: 95; background: #1a1814;
+  display: flex; flex-direction: column; color: #f2efe9;
+}
+.presenter-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 22px; font-size: 13px; color: #b8b2a4;
+}
+.presenter-head button { border: none; background: rgba(255,255,255,.1); color: #f2efe9; border-radius: 8px; cursor: pointer; font-size: 14px; padding: 5px 11px; }
+.presenter-count { font-variant-numeric: tabular-nums; }
+.presenter-slide {
+  flex: 1; margin: 0 6vw 10px; background: #fffdf7; color: #2b2a27; border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.4); overflow: auto; padding: 40px 48px;
+  font-size: clamp(15px, 2.4vw, 26px); line-height: 1.5;
+}
+.presenter-slide h3 { font-size: 1.5em; margin: 0 0 0.5em; }
+.presenter-slide h4 { font-size: 1.1em; margin: 0.6em 0 0.2em; color: #6f6a5b; }
+.presenter-slide img { max-width: 100%; height: auto; border-radius: 8px; }
+.presenter-slide ul { padding-left: 1.2em; }
+.presenter-slide table { border-collapse: collapse; }
+.presenter-foot {
+  display: flex; align-items: center; justify-content: center; gap: 18px; padding: 0 22px 18px;
+}
+.presenter-foot > button {
+  border: none; background: rgba(255,255,255,.12); color: #f2efe9; border-radius: 10px;
+  cursor: pointer; font-size: 14px; padding: 9px 18px; font-family: inherit;
+}
+.presenter-foot > button:disabled { opacity: .35; cursor: default; }
+.presenter-dots { display: flex; gap: 6px; }
+.presenter-dots button { width: 9px; height: 9px; border-radius: 50%; border: none; background: rgba(255,255,255,.28); cursor: pointer; padding: 0; }
+.presenter-dots button.on { background: #f2efe9; }

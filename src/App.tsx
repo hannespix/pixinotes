@@ -6,6 +6,7 @@ import { Tabs } from './components/Tabs';
 import { Overview } from './components/Overview';
 import { SearchOverlay } from './components/SearchOverlay';
 import { Settings } from './components/Settings';
+import { Presenter } from './components/Presenter';
 import { useBoard } from './store';
 
 export default function App() {
@@ -44,6 +45,7 @@ export default function App() {
         )}
         <SearchOverlay />
         <Settings />
+        <Presenter />
         <div className={`toast ${toast ? 'show' : ''}`}>
           {toast?.message}
           {toast?.undo && (

@@ -10,6 +10,7 @@ export function Dock() {
   const showToast = useBoard((s) => s.showToast);
   const setSearchOpen = useBoard((s) => s.setSearchOpen);
   const setSettingsOpen = useBoard((s) => s.setSettingsOpen);
+  const setPresenting = useBoard((s) => s.setPresenting);
   const tool = useBoard((s) => s.tool);
   const setTool = useBoard((s) => s.setTool);
   const { screenToFlowPosition } = useReactFlow();
@@ -48,6 +49,7 @@ export function Dock() {
       <button className={tool === 'eraser' ? 'active' : ''} onClick={() => setTool(tool === 'eraser' ? 'select' : 'eraser')} title="Radierer" aria-label="Radierer">🧽</button>
 
       <span className="dock-sep" />
+      <button onClick={() => setPresenting(true)} title="Präsentationsmodus (Karten als Folien)" aria-label="Präsentieren">▶️</button>
       <button onClick={() => setSearchOpen(true)} title="Suche über alle Boards (Strg+K)" aria-label="Suche">🔍</button>
       <button onClick={() => setSettingsOpen(true)} title="Einstellungen (KI, Datenordner, Export)" aria-label="Einstellungen">⚙️</button>
       <button
