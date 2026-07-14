@@ -39,6 +39,12 @@ export function Dock() {
       <button onClick={addKanban} title="Neues Kanban-Board">📋</button>
       <button onClick={addPortal} title="Portal zu einem anderen Projekt-Board">🗂️</button>
       <button
+        onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+        title="Suche über alle Boards (Strg+K)"
+      >
+        🔍
+      </button>
+      <button
         onClick={() =>
           showToast('📧 E-Mails (.eml/.msg), Bilder & Dateien einfach aufs Board ziehen · Screenshots mit Strg+V')
         }

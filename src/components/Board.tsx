@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -48,7 +48,44 @@ export function Board() {
   const setNodePosition = useBoard((s) => s.setNodePosition);
   const showToast = useBoard((s) => s.showToast);
 
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, setCenter } = useReactFlow();
+  const pendingFocus = useBoard((s) => s.pendingFocus);
+  const clearPendingFocus = useBoard((s) => s.clearPendingFocus);
+  const onNodesChangeStore = onNodesChange;
+
+  // Suche: nach Board-Wechsel zur gefundenen Karte fliegen und sie markieren
+  useEffect(() => {
+    if (!pendingFocus || pendingFocus.boardId !== activeId) return;
+    const node = nodes.find((n) => n.id === pendingFocus.nodeId);
+    if (!node) { clearPendingFocus(); return; }
+    const t = setTimeout(() => {
+      const w = node.measured?.width ?? 280;
+      const h = node.measured?.height ?? 120;
+      setCenter(node.position.x + w / 2, node.position.y + h / 2, { zoom: 1, duration: 650 });
+      onNodesChangeStore(
+        nodes.map((n) => ({ id: n.id, type: 'select' as const, selected: n.id === node.id })),
+      );
+      clearPendingFocus();
+    }, 80);
+    return () => clearTimeout(t);
+  }, [pendingFocus, activeId, nodes, setCenter, clearPendingFocus, onNodesChangeStore]);
+
+  // Tastatur: N = neue Notiz in Bildschirmmitte (außerhalb von Eingabefeldern)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== 'n' || e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('input, textarea, [contenteditable="true"]')) return;
+      addNode({
+        id: uid(),
+        type: 'note',
+        position: screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 40 }),
+        data: { color: nextColor(), blocks: [] },
+      });
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [addNode, screenToFlowPosition]);
 
   // ---------- Wurf-Physik (Momentum nach dem Loslassen) ----------
   const dragTrack = useRef<{ id: string; x: number; y: number; t: number; vx: number; vy: number } | null>(null);

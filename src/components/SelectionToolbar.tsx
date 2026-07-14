@@ -12,7 +12,7 @@ const MAILTO_LIMIT = 1800; // konservativ: längere mailto-URLs schlucken manche
 export function SelectionToolbar() {
   const board = useBoard(selectActiveBoard);
   const addNode = useBoard((s) => s.addNode);
-  const removeNode = useBoard((s) => s.removeNode);
+  const removeNodes = useBoard((s) => s.removeNodes);
   const showToast = useBoard((s) => s.showToast);
 
   const selected = board.nodes.filter((n) => n.selected);
@@ -57,9 +57,7 @@ export function SelectionToolbar() {
     showToast(`${selected.length} Karte${selected.length > 1 ? 'n' : ''} dupliziert`);
   };
 
-  const remove = () => {
-    for (const n of selected) removeNode(n.id);
-  };
+  const remove = () => removeNodes(selected.map((n) => n.id));
 
   return (
     <div className="sel-toolbar">
