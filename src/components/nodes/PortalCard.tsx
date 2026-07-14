@@ -14,6 +14,7 @@ export function PortalCard({ id, data, selected }: NodeProps<PortalNode>) {
   const boards = useBoard((s) => s.boards);
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const openBoard = useBoard((s) => s.openBoard);
+  const setPresenting = useBoard((s) => s.setPresenting);
 
   const target = boards.find((b) => b.id === data.boardId);
 
@@ -24,9 +25,18 @@ export function PortalCard({ id, data, selected }: NodeProps<PortalNode>) {
         <>
           <div className="portal-name">{target.name}</div>
           <div className="meta">{boardMetaLabel(target)}</div>
-          <button className="portal-open nodrag" onClick={() => openBoard(target.id)}>
-            → Öffnen
-          </button>
+          <div className="portal-actions">
+            <button className="portal-open nodrag" onClick={() => openBoard(target.id)}>
+              → Öffnen
+            </button>
+            <button
+              className="portal-open nodrag"
+              title="Ziel-Board direkt präsentieren"
+              onClick={() => { openBoard(target.id); setPresenting(true); }}
+            >
+              ▶️
+            </button>
+          </div>
         </>
       ) : (
         <>

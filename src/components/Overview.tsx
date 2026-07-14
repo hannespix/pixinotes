@@ -242,11 +242,24 @@ function BoardTile({ data }: NodeProps<Node<BoardTileData, 'ovBoard'>>) {
   const { board, accent } = data;
   const renameBoard = useBoard((s) => s.renameBoard);
   const removeBoard = useBoard((s) => s.removeBoard);
+  const openBoard = useBoard((s) => s.openBoard);
+  const setPresenting = useBoard((s) => s.setPresenting);
   const [editing, setEditing] = useState(false);
 
   return (
     <div className="ov-board ovc-tile" style={{ borderTopColor: accent }} title="Klick öffnet das Board · Ziehen verschiebt es">
       <span className="ovc-tile-actions nodrag">
+        <button
+          title="Board direkt präsentieren"
+          aria-label={`Board ${board.name} präsentieren`}
+          onClick={(e) => {
+            e.stopPropagation();
+            openBoard(board.id);
+            setPresenting(true);
+          }}
+        >
+          ▶️
+        </button>
         <button
           title="Umbenennen"
           aria-label="Board umbenennen"

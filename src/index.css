@@ -903,3 +903,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   flex-basis: 100%; margin-top: 3px; border: 1px solid #d5cfc0; border-radius: 6px;
   font-family: inherit; font-size: 10.5px; padding: 2px 5px; color: var(--ink); background: #fff;
 }
+
+/* Portal: Öffnen + Präsentieren nebeneinander */
+.portal-actions { display: flex; gap: 5px; justify-content: center; }
