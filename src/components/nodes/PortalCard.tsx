@@ -13,7 +13,7 @@ interface PortalData {
  * und springt per Klick hinein. Portale sind normale Karten — sie lassen sich
  * mit anderen Karten verbinden und machen Projekt-Beziehungen sichtbar.
  */
-export function PortalCard({ id, data }: NodeProps) {
+export function PortalCard({ id, data, selected }: NodeProps) {
   const portal = data as unknown as PortalData;
   const boards = useBoard((s) => s.boards);
   const updateNodeData = useBoard((s) => s.updateNodeData);
@@ -28,7 +28,7 @@ export function PortalCard({ id, data }: NodeProps) {
     : 0;
 
   return (
-    <CardShell id={id} className="portal-card">
+    <CardShell id={id} selected={selected} minWidth={160} minHeight={130} className="portal-card">
       <div className="portal-icon">🗂️</div>
       {target ? (
         <>

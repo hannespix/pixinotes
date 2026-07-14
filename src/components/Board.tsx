@@ -19,6 +19,7 @@ import { ImageCard } from './nodes/ImageCard';
 import { FileCard } from './nodes/FileCard';
 import { KanbanCard } from './nodes/KanbanCard';
 import { PortalCard } from './nodes/PortalCard';
+import { SelectionToolbar } from './SelectionToolbar';
 
 const nodeTypes: NodeTypes = {
   note: NoteCard,
@@ -79,6 +80,7 @@ export function Board() {
       addNode({
         id: uid(),
         type: 'note',
+        width: 270,
         position: screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 40 }),
         data: { color: nextColor(), blocks: [] },
       });
@@ -136,7 +138,7 @@ export function Board() {
   // ---------- Karten erstellen ----------
   const addNote = useCallback(
     (pos: { x: number; y: number }) => {
-      addNode({ id: uid(), type: 'note', position: pos, data: { color: nextColor(), blocks: [] } });
+      addNode({ id: uid(), type: 'note', width: 270, position: pos, data: { color: nextColor(), blocks: [] } });
     },
     [addNode],
   );
@@ -190,6 +192,7 @@ export function Board() {
           addNode({
             id: uid(),
             type: 'note',
+            width: 270,
             position: basePos,
             data: { color: nextColor(), blocks: [{ type: 'paragraph', content: text }] },
           });
@@ -207,20 +210,21 @@ export function Board() {
         try {
           if (ext === 'eml' || file.type === 'message/rfc822') {
             const email = await parseEml(await file.arrayBuffer());
-            addNode({ id: uid(), type: 'email', position: pos, data: email });
+            addNode({ id: uid(), type: 'email', width: 320, position: pos, data: email });
             showToast(`📧 „${email.subject}" importiert — ${email.attachments.length} Anhänge als Chips`);
           } else if (ext === 'msg') {
             const email = await parseMsg(await file.arrayBuffer());
-            addNode({ id: uid(), type: 'email', position: pos, data: email });
+            addNode({ id: uid(), type: 'email', width: 320, position: pos, data: email });
             showToast(`📧 Outlook-Mail „${email.subject}" importiert`);
           } else if (file.type.startsWith('image/')) {
             const src = await fileToDataUrl(file);
-            addNode({ id: uid(), type: 'image', position: pos, data: { src, name: file.name } });
+            addNode({ id: uid(), type: 'image', width: 260, position: pos, data: { src, name: file.name } });
           } else {
             const dataUrl = file.size <= 1_500_000 ? await fileToDataUrl(file) : undefined;
             addNode({
               id: uid(),
               type: 'file',
+              width: 240,
               position: pos,
               data: { name: file.name, size: file.size, mime: file.type || guessMime(file.name), dataUrl },
             });
@@ -248,7 +252,7 @@ export function Board() {
         if (!file) return;
         const src = await fileToDataUrl(file);
         const pos = screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 90 });
-        addNode({ id: uid(), type: 'image', position: pos, data: { src, name: 'Screenshot' } });
+        addNode({ id: uid(), type: 'image', width: 260, position: pos, data: { src, name: 'Screenshot' } });
         showToast('🖼️ Screenshot eingefügt');
       }
     },
@@ -293,6 +297,7 @@ export function Board() {
         <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} color="#d8d3c8" />
         <MiniMap pannable zoomable className="pn-minimap" />
         <Controls showInteractive={false} />
+        <SelectionToolbar />
       </ReactFlow>
     </div>
   );

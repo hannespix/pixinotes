@@ -6,7 +6,7 @@ import { KANBAN_COLS, uid, type KanbanData, type KanbanItem } from '../../types'
 import { CardShell } from './CardShell';
 
 /** Kanban-Board als Karte. Tickets wandern mit ◀ ▶ durch die Spalten; Done = 🎉 */
-export function KanbanCard({ id, data }: NodeProps) {
+export function KanbanCard({ id, data, selected }: NodeProps) {
   const kanban = data as unknown as KanbanData;
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const [newText, setNewText] = useState('');
@@ -34,7 +34,7 @@ export function KanbanCard({ id, data }: NodeProps) {
   const setTitle = (title: string) => updateNodeData(id, { title });
 
   return (
-    <CardShell id={id} className="kanban-card">
+    <CardShell id={id} selected={selected} minWidth={330} minHeight={200} className="kanban-card">
       <input
         className="kanban-title nodrag"
         value={kanban.title}

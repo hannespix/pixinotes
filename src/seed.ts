@@ -5,6 +5,7 @@ export const seedNodes: Node[] = [
   {
     id: 'welcome',
     type: 'note',
+    width: 270,
     position: { x: 80, y: 120 },
     data: {
       color: 'yellow',
@@ -21,6 +22,7 @@ export const seedNodes: Node[] = [
   {
     id: 'demo-email',
     type: 'email',
+    width: 320,
     position: { x: 520, y: 100 },
     data: {
       subject: 'Angebot Q3 — bitte Freigabe',
@@ -38,6 +40,7 @@ export const seedNodes: Node[] = [
   {
     id: 'demo-kanban',
     type: 'kanban',
+    width: 430,
     position: { x: 520, y: 470 },
     data: {
       title: '📋 Projekt Atlas',
@@ -52,6 +55,7 @@ export const seedNodes: Node[] = [
   {
     id: 'demo-idea',
     type: 'note',
+    width: 270,
     position: { x: 130, y: 520 },
     data: {
       color: 'pink',

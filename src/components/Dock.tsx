@@ -15,7 +15,7 @@ export function Dock() {
     });
 
   const addNote = () => {
-    addNode({ id: uid(), type: 'note', position: centerPos(), data: { color: 'yellow', blocks: [] } });
+    addNode({ id: uid(), type: 'note', width: 270, position: centerPos(), data: { color: 'yellow', blocks: [] } });
     showToast('Notiz erstellt — Tipp: Doppelklick aufs Board geht noch schneller!');
   };
 
@@ -23,13 +23,14 @@ export function Dock() {
     addNode({
       id: uid(),
       type: 'kanban',
+      width: 430,
       position: centerPos(420, 200),
       data: { title: '📋 Neues Board', items: [] },
     });
   };
 
   const addPortal = () => {
-    addNode({ id: uid(), type: 'portal', position: centerPos(200, 140), data: {} });
+    addNode({ id: uid(), type: 'portal', width: 200, position: centerPos(200, 140), data: {} });
     showToast('🗂️ Portal-Karte: verlinke damit ein anderes Projekt-Board');
   };
 

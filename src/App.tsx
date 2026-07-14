@@ -3,7 +3,6 @@ import { Board } from './components/Board';
 import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
 import { Overview } from './components/Overview';
-import { SelectionToolbar } from './components/SelectionToolbar';
 import { SearchOverlay } from './components/SearchOverlay';
 import { useBoard } from './store';
 
@@ -30,7 +29,6 @@ export default function App() {
           <>
             <Board />
             <Dock />
-            <SelectionToolbar />
           </>
         )}
         <SearchOverlay />

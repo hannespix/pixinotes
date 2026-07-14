@@ -12,7 +12,7 @@ import { DueChips } from './DueChips';
 const PREVIEW_CHARS = 420;
 
 /** E-Mail als lebendige Karte: Absender, Text mit klickbaren Entities, Anhänge als Chips. */
-export function EmailCard({ id, data, positionAbsoluteX, positionAbsoluteY }: NodeProps) {
+export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsoluteY }: NodeProps) {
   const email = data as unknown as EmailData;
   const [expanded, setExpanded] = useState(false);
   const addNode = useBoard((s) => s.addNode);
@@ -45,6 +45,7 @@ export function EmailCard({ id, data, positionAbsoluteX, positionAbsoluteY }: No
       addNode({
         id: uid(),
         type: 'image',
+        width: 260,
         position: { x: positionAbsoluteX + 340, y: positionAbsoluteY + 40 },
         data: { src: att.dataUrl, name: att.name },
       });
@@ -66,7 +67,7 @@ export function EmailCard({ id, data, positionAbsoluteX, positionAbsoluteY }: No
   };
 
   return (
-    <CardShell id={id} className="email-card">
+    <CardShell id={id} selected={selected} minWidth={240} minHeight={140} className="email-card">
       <h3>📧 {email.subject}</h3>
       <div className="email-from">
         <div className="avatar">{initials}</div>

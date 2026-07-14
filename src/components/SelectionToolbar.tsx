@@ -1,3 +1,4 @@
+import { NodeToolbar, Position } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { uid } from '../types';
@@ -5,9 +6,9 @@ import { uid } from '../types';
 const MAILTO_LIMIT = 1800; // konservativ: längere mailto-URLs schlucken manche Clients
 
 /**
- * Schwebende Aktionsleiste, sobald Karten selektiert sind:
- * teilen, kopieren, duplizieren, löschen. Der kürzeste Weg von der
- * Karte zurück in den Office-Alltag.
+ * Aktionsleiste, die direkt über der Selektion schwebt (NodeToolbar):
+ * teilen, kopieren, duplizieren, löschen — verdeckt keine anderen Karten
+ * und wandert beim Pannen/Zoomen mit. Muss als Kind von <ReactFlow> gerendert werden.
  */
 export function SelectionToolbar() {
   const board = useBoard(selectActiveBoard);
@@ -60,12 +61,18 @@ export function SelectionToolbar() {
   const remove = () => removeNodes(selected.map((n) => n.id));
 
   return (
-    <div className="sel-toolbar">
+    <NodeToolbar
+      nodeId={selected.map((n) => n.id)}
+      isVisible
+      position={Position.Top}
+      offset={14}
+      className="sel-toolbar"
+    >
       <span className="sel-count">{selected.length} ausgewählt</span>
       <button onClick={shareByMail} title="Inhalt als E-Mail-Entwurf öffnen">📤 E-Mail</button>
       <button onClick={copyHtml} title="Formatiert kopieren (Outlook/Word-tauglich)">📋 Kopieren</button>
       <button onClick={duplicate} title="Duplizieren">⧉</button>
       <button onClick={remove} title="Löschen" className="danger">🗑️</button>
-    </div>
+    </NodeToolbar>
   );
 }

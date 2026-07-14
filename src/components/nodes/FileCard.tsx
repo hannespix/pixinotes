@@ -15,7 +15,7 @@ const ICONS: Record<string, string> = {
 };
 
 /** Beliebige Datei als Karte mit Icon, Name und Größe. */
-export function FileCard({ id, data }: NodeProps) {
+export function FileCard({ id, data, selected }: NodeProps) {
   const file = data as unknown as FileData;
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
   const icon = ICONS[ext] ?? '📎';
@@ -29,7 +29,7 @@ export function FileCard({ id, data }: NodeProps) {
   };
 
   return (
-    <CardShell id={id} className="file-card">
+    <CardShell id={id} selected={selected} minWidth={170} minHeight={50} className="file-card">
       <button className="file-body nodrag" onClick={download} title={file.dataUrl ? 'Herunterladen' : undefined}>
         <span className="file-icon">{icon}</span>
         <span>

@@ -20,7 +20,7 @@ function NoteDueChips({ blocks }: { blocks?: unknown[] }) {
 }
 
 /** Haftnotiz mit vollem Notion-artigem Block-Editor (BlockNote, MPL-2.0). */
-export function NoteCard({ id, data }: NodeProps) {
+export function NoteCard({ id, data, selected }: NodeProps) {
   const noteData = data as unknown as NoteData;
   const updateNodeData = useBoard((s) => s.updateNodeData);
 
@@ -45,7 +45,7 @@ export function NoteCard({ id, data }: NodeProps) {
   };
 
   return (
-    <CardShell id={id} className={`note-card sticky-${noteData.color}`}>
+    <CardShell id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${noteData.color}`}>
       <button className="color-dot nodrag" title="Farbe wechseln" onClick={cycleColor} />
       <div className="nodrag nowheel note-editor">
         <BlockNoteView
