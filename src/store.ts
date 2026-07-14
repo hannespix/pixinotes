@@ -95,6 +95,14 @@ export const selectActiveBoard = (s: BoardState): BoardDoc =>
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
+/** „Board 2", „Board 3" … statt fünfmal „Neues Board" */
+function nextName(base: string, existing: string[]): string {
+  let n = existing.filter((e) => e.startsWith(base)).length + 1;
+  let candidate = n === 1 ? base : `${base} ${n}`;
+  while (existing.includes(candidate)) candidate = `${base} ${++n}`;
+  return candidate;
+}
+
 const defaultHierarchy = (boardIds: string[]): Space[] => [
   {
     id: 'space-work',
@@ -148,7 +156,7 @@ export const useBoard = create<BoardState>()(
           set({
             spaces: [
               ...get().spaces,
-              { id: uid(), name: name ?? '✨ Neuer Bereich', projects: [] },
+              { id: uid(), name: name ?? nextName('Neuer Bereich', get().spaces.map((s) => s.name)), projects: [] },
             ],
           }),
 
@@ -177,7 +185,7 @@ export const useBoard = create<BoardState>()(
                     ...sp,
                     projects: [
                       ...sp.projects,
-                      { id: uid(), name: name ?? '📁 Neues Projekt', boardIds: [] },
+                      { id: uid(), name: name ?? nextName('📁 Projekt', sp.projects.map((p) => p.name)), boardIds: [] },
                     ],
                   }
                 : sp,
@@ -230,7 +238,7 @@ export const useBoard = create<BoardState>()(
             }
           }
           set({
-            boards: [...get().boards, { id, name: name ?? '✨ Neues Board', nodes: [], edges: [] }],
+            boards: [...get().boards, { id, name: name ?? nextName('✨ Board', get().boards.map((b) => b.name)), nodes: [], edges: [] }],
             spaces: newSpaces.map((sp) => ({
               ...sp,
               projects: sp.projects.map((p) =>

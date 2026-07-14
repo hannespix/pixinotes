@@ -54,10 +54,13 @@ function OverviewCanvas() {
     [spaces, boards, tick],
   );
 
+  // Bei Strukturänderung (Board/Projekt/Bereich dazu oder weg) neu einpassen
+  const structureKey = `${tick}|${spaces.length}|${spaces.reduce((a, s) => a + s.projects.length, 0)}|${boards.length}`;
+
   return (
     <div className="board-wrap ov-canvas">
       <ReactFlow
-        key={tick /* nach Drag sauber neu einrasten */}
+        key={structureKey /* nach Drag/Strukturänderung sauber neu einrasten + fitView */}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}

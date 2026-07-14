@@ -47,7 +47,7 @@ export function Dock() {
       </button>
       <button
         onClick={() =>
-          showToast('📧 E-Mails (.eml/.msg), Bilder & Dateien einfach aufs Board ziehen · Screenshots mit Strg+V')
+          showToast('📧 E-Mails/Dateien aufs Board ziehen · Strg+V für Screenshots · Strg+Scroll = Zoom, Scroll = Verschieben')
         }
         title="Import-Hilfe"
       >

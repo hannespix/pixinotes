@@ -268,6 +268,13 @@ export function Board() {
       onTouchEnd={handleTouchEnd}
       onPaste={handlePaste}
     >
+      {nodes.length === 0 && (
+        <div className="empty-board-hint">
+          <div>📝 Doppelklick (oder N) = neue Notiz</div>
+          <div>📧 E-Mails (.eml/.msg) &amp; Dateien hierher ziehen</div>
+          <div>🖼️ Strg+V fügt Screenshots ein</div>
+        </div>
+      )}
       <ReactFlow
         key={activeId}
         nodes={nodes}

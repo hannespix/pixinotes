@@ -59,7 +59,13 @@ export function SearchOverlay() {
   }, []);
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 30);
+    if (!open) return;
+    // Fokus hart erzwingen — auch wenn gerade ein anderes Eingabefeld fokussiert war
+    const grab = () => inputRef.current?.focus();
+    grab();
+    const raf = requestAnimationFrame(grab);
+    const t = setTimeout(grab, 80);
+    return () => { cancelAnimationFrame(raf); clearTimeout(t); };
   }, [open]);
 
   // Index: jede Karte als durchsuchbarer Text (inkl. Board-Name)
@@ -124,7 +130,7 @@ export function SearchOverlay() {
       <div className="search-box" onClick={(e) => e.stopPropagation()}>
         <input
           ref={inputRef}
-          placeholder="Karten durchsuchen… (alle Boards, tippfehlertolerant, mehrere Wörter möglich)"
+          placeholder="Karten durchsuchen…"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -156,7 +162,7 @@ export function SearchOverlay() {
             ))}
           </div>
         )}
-        <div className="search-footer">↑↓ navigieren · Enter springt zur Karte · Esc schließt</div>
+        <div className="search-footer">↑↓ navigieren · Enter springt zur Karte · Esc schließt · sucht in allen Boards, tippfehlertolerant</div>
       </div>
     </div>
   );
