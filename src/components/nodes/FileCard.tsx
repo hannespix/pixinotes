@@ -55,7 +55,10 @@ function PdfThumb({ dataUrl, onOpen }: { dataUrl: string; onOpen: () => void }) 
   const ref = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
-    if (ref.current) renderPdfPage(dataUrl, 1, ref.current, 220).catch(() => setFailed(true));
+    if (!ref.current) return;
+    const h = renderPdfPage(dataUrl, 1, ref.current, 220);
+    h.promise.catch(() => setFailed(true));
+    return () => h.cancel();
   }, [dataUrl]);
   if (failed) return null;
   return (
@@ -74,11 +77,10 @@ function PdfViewer({ dataUrl, name, onClose, onDownload }: {
   const [pages, setPages] = useState(1);
 
   useEffect(() => {
-    if (ref.current) {
-      renderPdfPage(dataUrl, page, ref.current, Math.min(900, window.innerWidth - 80))
-        .then(setPages)
-        .catch(() => {});
-    }
+    if (!ref.current) return;
+    const h = renderPdfPage(dataUrl, page, ref.current, Math.min(900, window.innerWidth - 80));
+    h.promise.then(setPages).catch(() => {});
+    return () => h.cancel();
   }, [dataUrl, page]);
 
   useEffect(() => {

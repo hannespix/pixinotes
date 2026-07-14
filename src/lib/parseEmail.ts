@@ -8,7 +8,10 @@ export const MAX_EMBED_BYTES = 1_500_000;
 
 /** Aktive Inhalte nicht als solche ausliefern — Download statt Render (Audit SEC-3) */
 function safeMime(mime?: string): string {
-  return mime && /text\/html|application\/xhtml/i.test(mime) ? 'application/octet-stream' : (mime || 'application/octet-stream');
+  // text/html, xhtml UND svg (Script/onload!) als reinen Download ausliefern
+  return mime && /text\/html|application\/xhtml|image\/svg/i.test(mime)
+    ? 'application/octet-stream'
+    : (mime || 'application/octet-stream');
 }
 
 function bytesToDataUrl(bytes: Uint8Array, mime = 'application/octet-stream'): string {

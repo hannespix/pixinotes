@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { type NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { MermaidNode } from '../../types';
-import { uid } from '../../types';
 import { CardShell } from './CardShell';
 
 // mermaid ist groß → nur laden, wenn wirklich ein Diagramm auf dem Board ist
@@ -38,11 +37,15 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
   useEffect(() => {
     let cancelled = false;
     const myKey = ++renderKey.current;
-    getMermaid()
-      .then((mermaid) => mermaid.render(`m-${id}-${uid()}`, data.code))
-      .then(({ svg }) => { if (!cancelled && myKey === renderKey.current) { setSvg(svg); setError(''); } })
-      .catch((e) => { if (!cancelled) setError(String(e?.message ?? e).split('\n')[0]); });
-    return () => { cancelled = true; };
+    // Stabile Render-ID pro Karte + kleines Debounce, damit nicht jeder
+    // Tastendruck einen (oft ungültigen) Zwischenstand rendert (Audit).
+    const t = setTimeout(() => {
+      getMermaid()
+        .then((mermaid) => mermaid.render(`pn-mermaid-${id}`, data.code))
+        .then(({ svg }) => { if (!cancelled && myKey === renderKey.current) { setSvg(svg); setError(''); } })
+        .catch((e) => { if (!cancelled && myKey === renderKey.current) setError(String(e?.message ?? e).split('\n')[0]); });
+    }, 250);
+    return () => { cancelled = true; clearTimeout(t); };
   }, [data.code, id]);
 
   return (

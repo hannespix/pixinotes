@@ -101,3 +101,23 @@
 - 📋 Backlog: BlockNote 0.31 → 0.49+ (Major-Sprung, behebt die Advisory an der Wurzel — bei nächster Gelegenheit mit Regressionstest)
 
 *Regressionslauf nach dem Umbau: 13/13 Checks grün, inkl. XSS-Probe mit präpariertem Dateinamen, Entf+Undo mit Kanten, Suche/Kanban/Übersicht/Umbenennen.*
+
+---
+
+# Review neuer Features — Release 1.0 (Workflow, Juli 2026)
+
+Vor Release 1.0 lief ein mehrstufiger Review-Workflow: drei parallele Prüf-Agenten (Korrektheit / Security / Vollständigkeit) über den neuen Code (Formen, Mermaid, PDF-Viewer, Zeichnen, Präsentation, Einstellungen), jeder Fund von einem zweiten Agenten gegen den echten Code verifiziert. **7 bestätigte Funde — alle behoben ✅:**
+
+| Schwere | Befund | Fix |
+|---|---|---|
+| **HOCH** | **Präsentations-Crash:** `slides[idx]` ohne Bereichsprüfung — schrumpfte das Board während der Präsentation (z. B. Backspace löscht eine Karte), stürzte die ganze App ab | idx wird geklemmt (`safeIdx`); Presenter schluckt Board-Shortcuts (Entf/Backspace) statt sie durchzulassen |
+| **HOCH** | **localStorage-Quota:** ein großer Import konnte den Speicher sprengen — danach scheiterte *jeder* Write still, der ganze Board-Stand ging beim Reload verloren | Budget-Wächter (`canEmbed`): große Assets werden bei knappem Speicher gar nicht erst eingebettet, mit klarer Meldung „→ in Datenordner exportieren" (Bilder werden ohnehin herunterskaliert) |
+| MITTEL | PDF-Viewer: überlappende Renders auf demselben Canvas bei schnellem Blättern (pdf.js-Fehler, verschluckt) | Render ist abbrechbar (`RenderHandle.cancel` im Effect-Cleanup); PDF-Dokument wird pro dataUrl gecacht statt bei jedem Seitenwechsel neu geparst |
+| MITTEL | Mermaid: neue Render-ID + Vollrender bei *jedem* Tastendruck | stabile Render-ID pro Karte + 250 ms Debounce |
+| NIEDRIG | SVG-Anhänge (`image/svg+xml` mit `<script>`) wurden als `data:`-URL eingebettet | `safeMime` neutralisiert jetzt auch SVG auf `application/octet-stream` (reiner Download) |
+| NIEDRIG | Prozess-Formen/Mermaid ohne Icon in Suchtreffern | `TYPE_ICON` um 🔷/📊 ergänzt |
+| — | (bereits vorab gefixt) shape/mermaid fehlten im Serializer → nicht durchsuchbar/exportierbar | im `switch` von `nodeToText`/`nodeToHtml` ergänzt |
+
+**Verbleibendes Roadmap-Item:** Für sehr viele oder große eingebettete Assets ist eine Auslagerung der Binärdaten (Datei-/Bild-`dataUrl`) nach **IndexedDB** vorgesehen (statt localStorage) — der Budget-Wächter verhindert bis dahin den katastrophalen Fall (stiller Totalverlust).
+
+*Regressionslauf nach den Fixes: 8/8 gezielte Checks grün (Presenter-Crash-Probe, PDF-Schnellblättern, Mermaid-Edit, Shape-Suche) + 15/15 Voll-Regression Desktop/Mobile + 4/4 auf `file://`.*

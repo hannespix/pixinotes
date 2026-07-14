@@ -14,7 +14,7 @@ import {
 import { selectActiveBoard, useBoard } from '../store';
 import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from '../lib/parseEmail';
 import { imageFileToDataUrl, readFileAsDataUrl } from '../lib/image';
-import { makeEmail, makeFile, makeImage, makeNote } from '../lib/nodes';
+import { canEmbed, makeEmail, makeFile, makeImage, makeNote } from '../lib/nodes';
 import { NoteCard } from './nodes/NoteCard';
 import { EmailCard } from './nodes/EmailCard';
 import { ImageCard } from './nodes/ImageCard';
@@ -218,9 +218,14 @@ export function Board() {
             showToast(`📧 Outlook-Mail „${email.subject}" importiert`);
           } else if (file.type.startsWith('image/')) {
             const src = await imageFileToDataUrl(file);
+            if (!canEmbed(src.length)) { showToast('⚠️ Speicher fast voll — Bild nicht eingebettet. Exportiere in den Datenordner (⚙️).'); continue; }
             addNode(makeImage(pos, src, file.name));
           } else {
-            const dataUrl = file.size <= MAX_EMBED_BYTES ? await readFileAsDataUrl(file) : undefined;
+            let dataUrl = file.size <= MAX_EMBED_BYTES ? await readFileAsDataUrl(file) : undefined;
+            if (dataUrl && !canEmbed(dataUrl.length)) {
+              dataUrl = undefined;
+              showToast('⚠️ Speicher fast voll — Datei nur als Verweis abgelegt. Exportiere in den Datenordner (⚙️).');
+            }
             addNode(makeFile(pos, { name: file.name, size: file.size, mime: file.type || guessMime(file.name), dataUrl }));
           }
         } catch (err) {
@@ -245,6 +250,7 @@ export function Board() {
         const file = imageItem.getAsFile();
         if (!file) return;
         const src = await imageFileToDataUrl(file);
+        if (!canEmbed(src.length)) { showToast('⚠️ Speicher fast voll — Screenshot nicht eingebettet. Exportiere in den Datenordner (⚙️).'); return; }
         const pos = screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 90 });
         addNode(makeImage(pos, src, 'Screenshot'));
         showToast('🖼️ Screenshot eingefügt');

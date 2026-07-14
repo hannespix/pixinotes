@@ -1,5 +1,6 @@
 // Karten-Fabriken: eine Quelle für Default-Größen, Farb-Rotation und
 // Node-Erzeugung (Audit M5/N5 — vorher vierfach dupliziert).
+import { useBoard } from '../store';
 import {
   STICKY_COLORS,
   uid,
@@ -8,6 +9,22 @@ import {
   type ShapeKind,
   type StickyColor,
 } from '../types';
+
+/**
+ * Schutz vor stillem Datenverlust (Audit HOCH): Wenn der persistierte Zustand
+ * plus das neue Asset ein sicheres Budget überschreiten würde, wird das Asset
+ * NICHT eingebettet — sonst scheitern ab da alle localStorage-Writes und der
+ * gesamte Board-Stand ginge beim Reload verloren. ~4 MB lässt Luft zum ~5-MB-Limit.
+ */
+const EMBED_BUDGET = 4_000_000;
+export function canEmbed(dataUrlLength: number): boolean {
+  try {
+    const used = JSON.stringify(useBoard.getState().boards).length;
+    return used + dataUrlLength < EMBED_BUDGET;
+  } catch {
+    return true;
+  }
+}
 
 export const CARD_WIDTHS = {
   note: 270,

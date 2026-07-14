@@ -23,6 +23,8 @@ const TYPE_ICON: Record<string, string> = {
   image: '🖼️',
   file: '📎',
   portal: '🗂️',
+  shape: '🔷',
+  mermaid: '📊',
 };
 
 import type { AppNode } from '../types';
