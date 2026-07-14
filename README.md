@@ -34,7 +34,7 @@ npm run dev        # → http://localhost:5173
 - ✏️ **Freihand-Zeichnen**: Stift, halbtransparenter Textmarker (mehrere Farben) und Radierer — Striche wandern mit Pan/Zoom mit
 - 📕 **PDF-Karten mit Inline-Vorschau**: erste Seite als Thumbnail, Klick öffnet den Viewer mit Seiten-Navigation (pdf.js)
 - ▶️ **Präsentationsmodus**: Karten des Boards als Vollbild-Folien (Pfeiltasten/Esc) — ideal, um Dritten einen Überblick zu geben
-- 🤖 **KI-Anbindung, du wählst wo**: eigener Cloud-Key (Anthropic/OpenAI) **oder Ollama / selbstgehosteter Server** (dann bleibt alles lokal); Zugangsdaten nur im Browser
+- 🤖 **KI-Aktionen direkt auf den Karten**: ✨ E-Mails zusammenfassen, ✨ Notiztexte verbessern (immer als neuer Vorschlag daneben — nie destruktiv). Anbieter frei wählbar: eigener Cloud-Key (Anthropic/OpenAI) **oder Ollama / selbstgehosteter Server** (dann bleibt alles lokal); Zugangsdaten nur im Browser
 - 📁 **Datenordner-Export**: alle Boards als echte Markdown-Dateien (Bereich/Projekt/Board.md) via File System Access, plus Board-Export als PNG/SVG (→ PDF via Drucken)
 - 🔗 **Verbindungen mit Beziehung**: Karten am Rand-Punkt verbinden; auf die Linien-Mitte klicken benennt die Beziehung („blockiert", „gehört zu" …), ✕ löscht sie
 - 🔍 **Spotlight-Suche** (`Strg+K`): findet Karten über alle Boards und fliegt animiert hin
@@ -60,4 +60,4 @@ npm run dev        # → http://localhost:5173
 
 **Version 1.0** — voll funktionsfähige App, lokal nutzbar ohne Installation. Drei Audit-Runden (Design/Usability, Logik, Code inkl. Security) sind eingeflossen; siehe [`docs/AUDIT.md`](docs/AUDIT.md).
 
-**Noch offen (Roadmap):** Echtzeit-Kollaboration (Yjs/CRDT), aktive KI-Aktionen auf den Karten (Anbindung steht, Aktionen folgen), Live-Anbindung an Microsoft 365 (MS Graph). Details in [`docs/KONZEPT.md`](docs/KONZEPT.md).
+**Noch offen (Roadmap):** Echtzeit-Kollaboration (Yjs/CRDT), IndexedDB-Auslagerung großer Binärdaten, weitere KI-Aktionen (Auto-Clustering, Board-Briefing), Live-Anbindung an Microsoft 365 (MS Graph). Details in [`docs/KONZEPT.md`](docs/KONZEPT.md).

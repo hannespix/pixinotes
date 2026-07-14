@@ -713,3 +713,9 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .presenter-dots { display: flex; gap: 6px; }
 .presenter-dots button { width: 9px; height: 9px; border-radius: 50%; border: none; background: rgba(255,255,255,.28); cursor: pointer; padding: 0; }
 .presenter-dots button.on { background: #f2efe9; }
+
+/* ---------- KI-Aktionen ---------- */
+.ai-btn { background: rgba(124, 92, 255, 0.12) !important; color: #5b3fd4 !important; font-weight: 600; }
+.ai-btn:hover:not(:disabled) { background: rgba(124, 92, 255, 0.22) !important; }
+.ai-btn:disabled { opacity: 0.6; cursor: default; }
+.note-ai { padding: 0 6px 2px; margin-top: 4px; }

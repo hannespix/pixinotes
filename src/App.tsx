@@ -15,6 +15,17 @@ export default function App() {
   const restoreDeleted = useBoard((s) => s.restoreDeleted);
   const showToast = useBoard((s) => s.showToast);
 
+  // Zweiter Browser-Tab? Letzter Schreiber gewinnt — ehrlich warnen (Backlog M6)
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'pixinotes-board' && e.newValue !== null) {
+        showToast('⚠️ PixiNotes ist in einem weiteren Tab geöffnet — bitte nur einen Tab nutzen, sonst überschreiben sich die Stände.');
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [showToast]);
+
   // Quota-Warnung aus dem Storage-Layer (Audit K1)
   useEffect(() => {
     const warn = () =>

@@ -4,8 +4,9 @@ import { useBoard } from '../../store';
 import type { EmailNode, ParsedAttachment } from '../../types';
 import { enrichText } from '../../lib/entities';
 import { formatBytes, isImageMime } from '../../lib/parseEmail';
-import { makeImage } from '../../lib/nodes';
+import { makeImage, makeNote } from '../../lib/nodes';
 import { triggerDownload } from '../../lib/download';
+import { aiReady, askAi, textToBlocks } from '../../lib/ai';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
 
@@ -15,8 +16,10 @@ const PREVIEW_CHARS = 420;
 export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsoluteY }: NodeProps<EmailNode>) {
   const email = data;
   const [expanded, setExpanded] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const addNode = useBoard((s) => s.addNode);
   const showToast = useBoard((s) => s.showToast);
+  const ai = useBoard((s) => s.ai);
 
   const initials = email.fromName
     .split(/\s+/)
@@ -50,6 +53,24 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
       triggerDownload(att.dataUrl, att.name);
     } else {
       showToast('Anhang zu groß zum Einbetten — nur Metadaten gespeichert.');
+    }
+  };
+
+  const summarize = async () => {
+    setAiBusy(true);
+    try {
+      const answer = await askAi(
+        `Fasse diese E-Mail in 3-5 kurzen Stichpunkten auf Deutsch zusammen. Nenne konkrete Aufgaben und Fristen zuerst. Antworte NUR mit den Stichpunkten (mit "- " beginnend).\n\nBetreff: ${email.subject}\n\n${email.text.slice(0, 6000)}`,
+      );
+      addNode(makeNote(
+        { x: positionAbsoluteX + 340, y: positionAbsoluteY },
+        { color: 'yellow', blocks: textToBlocks('✨ Zusammenfassung', answer) },
+      ));
+      showToast('✨ Zusammenfassung als Notiz daneben gelegt');
+    } catch (e) {
+      showToast(`⚠️ KI-Fehler: ${(e as Error).message}`);
+    } finally {
+      setAiBusy(false);
     }
   };
 
@@ -108,6 +129,11 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
       <DueChips text={email.text} context={email.subject} />
       <div className="card-actions">
         <button className="nodrag" onClick={reply}>↩ Antworten</button>
+        {aiReady(ai) && (
+          <button className="nodrag ai-btn" onClick={summarize} disabled={aiBusy} title="KI fasst die Mail als Notiz zusammen">
+            {aiBusy ? '⏳…' : '✨ Zusammenfassen'}
+          </button>
+        )}
       </div>
     </CardShell>
   );
