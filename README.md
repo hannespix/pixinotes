@@ -4,7 +4,13 @@
 
 Eine Mischung aus **Sticky Notes × Notion × OneNote × Excalidraw × Kanban** — aber radikal einfacher.
 
-## 🚀 Ohne Installation nutzen (empfohlen!)
+## 🌐 Sofort im Browser nutzen
+
+**Live-Version: <https://hannespix.github.io/pixinotes/>** — wird bei jedem Update automatisch per GitHub Actions neu deployt. Die portable Offline-Variante liegt dort auch zum Download: [pixinotes.html](https://hannespix.github.io/pixinotes/pixinotes.html).
+
+> Daten liegen im Browser-Speicher der jeweiligen Adresse — Web-Version und lokale Datei haben getrennte Stände (Abgleich über ⚙️ → Synchronisation).
+
+## 🚀 Ohne Installation nutzen (Offline-Variante)
 
 **[`release/pixinotes.html`](release/pixinotes.html) herunterladen → Doppelklick → fertig.**
 
