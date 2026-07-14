@@ -14,12 +14,16 @@ npm run dev        # → http://localhost:5173
 **Was schon funktioniert:**
 
 - ♾️ **Infinite Canvas** mit Pan/Zoom, Minimap und Verbindungslinien (React Flow)
-- 📝 **Haftnotizen mit Notion-Editor** (BlockNote): Doppelklick aufs Board → lostippen, `/` öffnet das Block-Menü (Checklisten, Tabellen, Überschriften …), Farbwechsel per Klick
+- 📝 **Haftnotizen mit Notion-Editor** (BlockNote, deutsch): Doppelklick (oder `N`) → lostippen, `/` öffnet das Block-Menü (Checklisten, Tabellen, Überschriften …), Farbwechsel per Klick
 - 📧 **Outlook-E-Mails per Drag & Drop**: `.eml`- und `.msg`-Dateien werden im Browser geparst (postal-mime / msgreader) und zu strukturierten Karten mit **Anhang-Chips** — Bild-Anhänge lassen sich als eigene Karten herauslösen
-- ☎️ **Smart Layer**: Telefonnummern werden automatisch klickbar (`tel:`-Link), URLs und E-Mail-Adressen ebenso (libphonenumber-js)
+- ☎️ **Smart Layer**: Telefonnummern automatisch klickbar (`tel:`-Link), URLs und E-Mail-Adressen ebenso (libphonenumber-js); 📅 **Fristen-Erkennung** („bis Freitag") mit Countdown-Chips und `.ics`-Kalender-Export (chrono-node)
 - 🖼️ **Strg+V** fügt Screenshots als Bild-Karten ein; beliebige Dateien per Drop als Datei-Karten
 - 📋 **Kanban-Karten** mit drei Spalten, Ticket nach *Done* schieben → 🎉 Konfetti
+- 🗂️ **Projekt-Boards**: Tab-Leiste für mehrere Boards + **Portal-Karten**, die Projekte visuell verlinken (mit Live-Statistik und Sprung ins Ziel-Board)
+- 🔍 **Spotlight-Suche** (`Strg+K`): findet Karten über alle Boards und fliegt animiert hin
+- 📤 **Teilen**: Auswahl-Toolbar mit „Als E-Mail" (mailto) und „Formatiert kopieren" (HTML für Outlook/Word-Paste), Duplizieren, Löschen mit **Undo**
 - 🚀 **Wurf-Physik**: Karten mit Schwung loslassen — sie gleiten mit Momentum weiter
+- 👆 **Touch & responsiv**: große Hit-Targets und permanente Controls auf Touch-Geräten, Doppel-Tap = Notiz, angepasstes Layout für schmale Screens
 - 💾 **Local-first**: Alles wird automatisch im Browser gespeichert (localStorage), kein Account nötig
 
 | Weitere Ressourcen | Wo |
