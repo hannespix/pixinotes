@@ -48,6 +48,8 @@ export interface KanbanItem {
   text: string;
   /** Spaltenindex: 0 = To Do, 1 = Doing, 2 = Done */
   col: number;
+  /** Fälligkeitsdatum (ISO yyyy-mm-dd) — Basis für Erinnerungen & Aufgaben-Zentrale */
+  due?: string;
 }
 
 export interface KanbanData {

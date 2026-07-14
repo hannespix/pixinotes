@@ -832,3 +832,74 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* Undo/Redo im Dock */
 .dock button:disabled { opacity: 0.32; cursor: default; }
 .dock button:disabled:hover { background: none; }
+
+/* ---------- Aufgaben-Zentrale ---------- */
+.taskhub {
+  position: fixed; inset: 0; z-index: 40; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 110px 18px 24px; overflow-y: auto;
+}
+.taskhub-head {
+  width: min(860px, 100%); display: flex; align-items: center; gap: 12px;
+  margin-bottom: 14px; flex-wrap: wrap;
+}
+.taskhub-head h2 { margin: 0; font-size: 20px; }
+.taskhub-meta { color: var(--muted); font-size: 13px; }
+.taskhub-actions { margin-left: auto; display: flex; gap: 6px; }
+.taskhub-actions button {
+  border: none; background: #fff; border-radius: 9px; padding: 7px 12px; cursor: pointer;
+  font-family: inherit; font-size: 12.5px; box-shadow: 0 1px 4px rgba(50,40,20,.12);
+}
+.taskhub-actions button:hover { background: #eef4ff; }
+.taskhub-x { font-size: 13px !important; }
+.taskhub-list {
+  list-style: none; margin: 0; padding: 0; width: min(860px, 100%);
+  display: flex; flex-direction: column; gap: 7px;
+}
+.task-row {
+  display: flex; align-items: center; gap: 10px; background: #fffdf7;
+  border-radius: 11px; padding: 10px 14px; box-shadow: 0 1px 5px rgba(50,40,20,.1);
+  border-left: 4px solid transparent;
+}
+.task-row.urgency-overdue { border-left-color: #d84b3d; }
+.task-row.urgency-soon { border-left-color: #e8a13a; }
+.task-row input[type='checkbox'] { width: 17px; height: 17px; cursor: pointer; flex: none; }
+.task-text {
+  border: none; background: none; font-family: inherit; font-size: 13.5px; color: var(--ink);
+  cursor: pointer; text-align: left; flex: 1; min-width: 0; padding: 0;
+  display: flex; gap: 8px; align-items: baseline;
+}
+.task-text:hover { color: var(--accent); }
+.task-kind { flex: none; }
+.task-due { font-size: 11.5px; white-space: nowrap; color: var(--muted); }
+.task-due.urgency-overdue { color: #a4231a; font-weight: 700; }
+.task-due.urgency-soon { color: #8a5a00; font-weight: 600; }
+.task-board {
+  font-size: 11px; color: var(--muted); background: rgba(0,0,0,.05);
+  border-radius: 999px; padding: 3px 9px; white-space: nowrap; flex: none;
+}
+.taskhub-empty { width: min(860px, 100%); color: var(--muted); font-size: 14px; padding: 30px 0; }
+.taskhub-foot { width: min(860px, 100%); color: var(--muted); font-size: 11.5px; margin-top: 16px; }
+
+/* Aufgaben-Badge am Dock-Button */
+.dock-tasks { position: relative; }
+.dock-badge {
+  position: absolute; top: 2px; right: 0; min-width: 16px; height: 16px;
+  background: var(--accent); color: #fff; border-radius: 999px;
+  font-size: 9.5px; font-weight: 700; line-height: 16px; padding: 0 4px;
+  pointer-events: none;
+}
+.dock-badge.red { background: #d84b3d; }
+
+/* Fälligkeit am Kanban-Ticket */
+.kanban-due {
+  flex-basis: 100%; border: none; background: rgba(0,0,0,.05); cursor: pointer;
+  font-family: inherit; font-size: 10px; color: var(--muted); border-radius: 6px;
+  padding: 2px 6px; text-align: left; margin-top: 2px;
+}
+.kanban-due.urgency-soon { background: #ffe4b8; color: #8a5a00; }
+.kanban-due.urgency-overdue { background: #ffd2cc; color: #a4231a; font-weight: 700; }
+.kanban-due-input {
+  flex-basis: 100%; margin-top: 3px; border: 1px solid #d5cfc0; border-radius: 6px;
+  font-family: inherit; font-size: 10.5px; padding: 2px 5px; color: var(--ink); background: #fff;
+}

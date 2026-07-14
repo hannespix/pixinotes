@@ -98,6 +98,11 @@ interface BoardState {
   searchOpen: boolean;
   setSearchOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
+  /** Aufgaben-Zentrale (✅): eigene Ansicht statt Board */
+  tasksOpen: boolean;
+  setTasksOpen: (open: boolean) => void;
+  /** Karten-Daten auf einem BELIEBIGEN Board ändern (Aufgaben-Zentrale arbeitet boardübergreifend) */
+  updateNodeDataOnBoard: (boardId: string, nodeId: string, data: Record<string, unknown>) => void;
   setPresenting: (on: boolean) => void;
   setTool: (tool: Tool) => void;
   updateAi: (patch: Partial<AiSettings>) => void;
@@ -251,6 +256,22 @@ export const useBoard = create<BoardState>()(
         lastDeleted: null,
 
         setSettingsOpen: (open) => set({ settingsOpen: open }),
+        tasksOpen: false,
+        setTasksOpen: (open) => set({ tasksOpen: open }),
+
+        updateNodeDataOnBoard: (boardId, nodeId, data) =>
+          set({
+            boards: get().boards.map((b) =>
+              b.id === boardId
+                ? {
+                    ...b,
+                    nodes: b.nodes.map((n) =>
+                      n.id === nodeId ? ({ ...n, data: { ...n.data, ...data } } as AppNode) : n,
+                    ),
+                  }
+                : b,
+            ),
+          }),
         setPresenting: (on) => set({ presenting: on }),
         setTool: (tool) => set({ tool }),
         updateAi: (patch) => set({ ai: { ...get().ai, ...patch } }),

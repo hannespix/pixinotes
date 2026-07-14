@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { useBoard } from '../store';
 import { makeKanban, makeMermaid, makeNote, makePortal, makeShape } from '../lib/nodes';
+import { collectTasks } from '../lib/tasks';
 import type { ShapeKind } from '../types';
 
 /** Das Werkzeug-Dock. „Objekt hinzufügen" bündelt die Kartentypen in einem Menü. */
@@ -17,6 +18,12 @@ export function Dock() {
   const redo = useBoard((s) => s.redo);
   const canUndo = useBoard((s) => s.past.length > 0);
   const canRedo = useBoard((s) => s.future.length > 0);
+  const setTasksOpen = useBoard((s) => s.setTasksOpen);
+  const boards = useBoard((s) => s.boards);
+  const taskStats = useMemo(() => {
+    const ts = collectTasks(boards);
+    return { open: ts.length, overdue: ts.filter((t) => t.urgency === 'overdue').length };
+  }, [boards]);
   const { screenToFlowPosition } = useReactFlow();
   const [addMenu, setAddMenu] = useState(false);
 
@@ -58,6 +65,12 @@ export function Dock() {
       <button className={tool === 'eraser' ? 'active' : ''} onClick={() => setTool(tool === 'eraser' ? 'select' : 'eraser')} title="Radierer" aria-label="Radierer">🧽</button>
 
       <span className="dock-sep" />
+      <button className="dock-tasks" onClick={() => setTasksOpen(true)} title="Aufgaben & Erinnerungen (alle Boards)" aria-label="Aufgaben">
+        ✅
+        {taskStats.open > 0 && (
+          <span className={`dock-badge ${taskStats.overdue > 0 ? 'red' : ''}`}>{taskStats.open}</span>
+        )}
+      </button>
       <button onClick={() => setPresenting(true)} title="Präsentationsmodus (Karten als Folien)" aria-label="Präsentieren">▶️</button>
       <button onClick={() => setSearchOpen(true)} title="Suche über alle Boards (Strg+K)" aria-label="Suche">🔍</button>
       <button onClick={() => setSettingsOpen(true)} title="Einstellungen (KI, Datenordner, Export)" aria-label="Einstellungen">⚙️</button>

@@ -3,6 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
 import { useBoard } from '../../store';
 import { kanbanCols, uid, type KanbanData, type KanbanItem, type KanbanNode } from '../../types';
+import { formatDueShort, urgencyFor } from '../../lib/tasks';
 import { CardShell } from './CardShell';
 
 /**
@@ -15,6 +16,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
   const [newText, setNewText] = useState('');
+  const [editingDue, setEditingDue] = useState<string | null>(null);
 
   const cols = kanbanCols(kanban);
   const done = cols.length - 1;
@@ -118,8 +120,30 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     {colIdx < done && (
                       <button onClick={() => move(it, 1)} title="Weiter">›</button>
                     )}
+                    <button onClick={() => setEditingDue(editingDue === it.id ? null : it.id)} title="Fälligkeit setzen (Erinnerung!)">📅</button>
                     <button onClick={() => remove(it)} title="Entfernen">✕</button>
                   </span>
+                  {editingDue === it.id ? (
+                    <input
+                      type="date"
+                      className="kanban-due-input nodrag"
+                      autoFocus
+                      value={it.due ?? ''}
+                      onChange={(e) =>
+                        setItems(kanban.items.map((x) => (x.id === it.id ? { ...x, due: e.target.value || undefined } : x)))
+                      }
+                      onBlur={() => setEditingDue(null)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditingDue(null); }}
+                    />
+                  ) : it.due && colIdx < done ? (
+                    <button
+                      className={`kanban-due urgency-${urgencyFor(it.due)} nodrag`}
+                      title="Fälligkeit ändern"
+                      onClick={() => setEditingDue(it.id)}
+                    >
+                      📅 {formatDueShort(it.due)}
+                    </button>
+                  ) : null}
                 </div>
               ))}
           </div>
