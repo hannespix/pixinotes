@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { ShapeKind, ShapeNode } from '../../types';
@@ -48,7 +48,11 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
         <button title={SHAPE_LABEL[data.shape]} onClick={cycleShape}>◇</button>
         <button title="Farbe" onClick={cycleColor}>🎨</button>
       </div>
-      <div className="shape-body" style={{ background: data.color }} onDoubleClick={() => setEditing(true)}>
+      <div
+        className="shape-body"
+        style={{ background: data.color, '--shape-fill': data.color } as CSSProperties}
+        onDoubleClick={() => setEditing(true)}
+      >
         {editing ? (
           <textarea
             autoFocus className="shape-input nodrag" value={data.text}

@@ -1,6 +1,6 @@
 // Karten → Text / HTML: für „Per E-Mail teilen", Zwischenablage (Outlook-Paste)
 // und die Suche. Bewusst schlicht gehalten — sauberes Office-taugliches HTML.
-import { DONE_COL, KANBAN_COLS, type AppNode } from '../types';
+import { doneCol, kanbanCols, type AppNode } from '../types';
 import { formatBytes } from './parseEmail';
 
 /* ---------- BlockNote-Blöcke → Text/HTML ---------- */
@@ -146,8 +146,10 @@ export function nodeToText(node: AppNode): string {
     }
     case 'kanban': {
       const k = node.data;
-      return `${k.title}\n${KANBAN_COLS.map(
-        (col, i) => `\n${col}:\n${k.items.filter((it) => it.col === i).map((it) => `  ${i === DONE_COL ? '☑' : '☐'} ${it.text}`).join('\n') || '  —'}`,
+      const cols = kanbanCols(k);
+      const done = doneCol(k);
+      return `${k.title}\n${cols.map(
+        (col, i) => `\n${col}:\n${k.items.filter((it) => Math.min(it.col, done) === i).map((it) => `  ${i === done ? '☑' : '☐'} ${it.text}`).join('\n') || '  —'}`,
       ).join('')}`;
     }
     case 'file': {
@@ -180,9 +182,10 @@ export function nodeToHtml(node: AppNode): string {
     }
     case 'kanban': {
       const k = node.data;
-      const cols = KANBAN_COLS.map((col, i) => {
-        const items = k.items.filter((it) => it.col === i);
-        return `<h4>${esc(col)}</h4><ul>${items.map((it) => `<li>${i === DONE_COL ? '☑' : '☐'} ${esc(it.text)}</li>`).join('') || '<li>—</li>'}</ul>`;
+      const done = doneCol(k);
+      const cols = kanbanCols(k).map((col, i) => {
+        const items = k.items.filter((it) => Math.min(it.col, done) === i);
+        return `<h4>${esc(col)}</h4><ul>${items.map((it) => `<li>${i === done ? '☑' : '☐'} ${esc(it.text)}</li>`).join('') || '<li>—</li>'}</ul>`;
       }).join('');
       return `<h3>${esc(k.title)}</h3>${cols}`;
     }

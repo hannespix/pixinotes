@@ -53,6 +53,8 @@ export interface KanbanItem {
 export interface KanbanData {
   title: string;
   items: KanbanItem[];
+  /** Spaltennamen — frei benennbar und in der Anzahl variabel; fehlt bei alten Boards (dann Default) */
+  cols?: string[];
   [key: string]: unknown;
 }
 
@@ -88,9 +90,15 @@ export type AppNode =
   | NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode;
 
 export const KANBAN_COLS = ['To Do', 'Doing', 'Done'] as const;
-/** Index der „Done"-Spalte — nie wieder Magic Number 2 (Audit M4) */
-export const DONE_COL = KANBAN_COLS.length - 1;
-export const isOpenItem = (item: KanbanItem): boolean => item.col < DONE_COL;
+/** Effektive Spalten eines Kanban-Boards — Default für alte Boards ohne `cols` */
+export function kanbanCols(data: KanbanData): string[] {
+  return data.cols && data.cols.length >= 2 ? data.cols : [...KANBAN_COLS];
+}
+/** Die letzte Spalte ist per Konvention immer die „Erledigt"-Spalte */
+export function doneCol(data: KanbanData): number {
+  return kanbanCols(data).length - 1;
+}
+export const isOpenItem = (item: KanbanItem, data: KanbanData): boolean => item.col < doneCol(data);
 
 export function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
