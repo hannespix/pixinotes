@@ -80,6 +80,7 @@ interface BoardState {
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
   updateEdgeLabel: (id: string, label: string) => void;
+  updateEdgeKind: (id: string, kind: string) => void;
   removeEdge: (id: string) => void;
   addNode: (node: AppNode) => void;
   removeNode: (id: string) => void;
@@ -347,13 +348,20 @@ export const useBoard = create<BoardState>()(
 
         onConnect: (connection) =>
           patchActive((b) => ({
-            edges: addEdge({ ...connection, type: 'labeled', data: { label: '' } }, b.edges),
+            edges: addEdge({ ...connection, type: 'labeled', data: { label: '', kind: 'arrow' } }, b.edges),
           })),
 
         updateEdgeLabel: (id, label) =>
           patchActive((b) => ({
             edges: b.edges.map((e) =>
               e.id === id ? { ...e, data: { ...e.data, label } } : e,
+            ),
+          })),
+
+        updateEdgeKind: (id, kind) =>
+          patchActive((b) => ({
+            edges: b.edges.map((e) =>
+              e.id === id ? { ...e, data: { ...e.data, kind } } : e,
             ),
           })),
 

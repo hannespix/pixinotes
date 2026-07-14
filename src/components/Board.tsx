@@ -21,7 +21,7 @@ import { ImageCard } from './nodes/ImageCard';
 import { FileCard } from './nodes/FileCard';
 import { KanbanCard } from './nodes/KanbanCard';
 import { PortalCard } from './nodes/PortalCard';
-import { LabeledEdge } from './LabeledEdge';
+import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { SelectionToolbar } from './SelectionToolbar';
 
 const nodeTypes: NodeTypes = {
@@ -257,6 +257,7 @@ export function Board() {
       onTouchEnd={handleTouchEnd}
       onPaste={handlePaste}
     >
+      <EdgeMarkerDefs />
       {nodes.length === 0 && (
         <div className="empty-board-hint">
           <div>📝 Doppelklick (oder N) = neue Notiz</div>

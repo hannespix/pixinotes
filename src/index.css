@@ -94,6 +94,11 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .note-editor .bn-block-outer { line-height: 1.4; }
 .note-editor { cursor: text; }
+/* Kompaktere Zeilen — v. a. Checklisten waren zu hoch */
+.note-editor .bn-block-content { padding: 1px 0 !important; }
+.note-editor .bn-block-group .bn-block-group { margin-left: 14px; }
+.note-editor [data-content-type='checkListItem'] { margin: 0 !important; }
+.note-editor [data-content-type='checkListItem'] > .bn-block-content { display: flex; align-items: center; }
 
 /* Tabellen im Notiz-Editor: klare Ränder, lesbar auf farbigem Grund */
 .note-editor table { border-collapse: collapse; }
@@ -521,3 +526,9 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   .edge-label.empty { opacity: 1; }
   .edge-label-x { opacity: 1; }
 }
+
+.edge-kind-btn {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  font-size: 11px; padding: 1px 3px; border-radius: 4px; line-height: 1;
+}
+.edge-kind-btn:hover { background: rgba(0,0,0,.08); color: var(--ink); }
