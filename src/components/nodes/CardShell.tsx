@@ -18,8 +18,10 @@ interface Props {
  */
 export function CardShell({ id, className, children, selected, minWidth = 170, minHeight = 70 }: Props) {
   const removeNode = useBoard((s) => s.removeNode);
+  // Wichtig: Lösch-Knopf & Handles liegen AUSSERHALB des card-body,
+  // damit dessen overflow:hidden sie nicht abschneidet.
   return (
-    <div className={`card-shell ${className ?? ''}`}>
+    <div className="card-shell">
       <NodeResizer
         isVisible={!!selected}
         minWidth={minWidth}
@@ -36,7 +38,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       </button>
       <Handle type="target" position={Position.Left} className="pn-handle" />
       <Handle type="source" position={Position.Right} className="pn-handle" />
-      {children}
+      <div className={`card-body ${className ?? ''}`}>{children}</div>
     </div>
   );
 }
