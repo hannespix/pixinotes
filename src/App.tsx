@@ -2,12 +2,14 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { Board } from './components/Board';
 import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
+import { Overview } from './components/Overview';
 import { SelectionToolbar } from './components/SelectionToolbar';
 import { SearchOverlay } from './components/SearchOverlay';
 import { useBoard } from './store';
 
 export default function App() {
   const toast = useBoard((s) => s.toast);
+  const view = useBoard((s) => s.view);
   const restoreDeleted = useBoard((s) => s.restoreDeleted);
 
   return (
@@ -22,9 +24,15 @@ export default function App() {
           </div>
         </div>
         <Tabs />
-        <Board />
-        <Dock />
-        <SelectionToolbar />
+        {view === 'overview' ? (
+          <Overview />
+        ) : (
+          <>
+            <Board />
+            <Dock />
+            <SelectionToolbar />
+          </>
+        )}
         <SearchOverlay />
         <div className={`toast ${toast ? 'show' : ''}`}>
           {toast?.message}

@@ -13,12 +13,26 @@ import {
 import { seedEdges, seedNodes } from './seed';
 import { uid } from './types';
 
-/** Ein Board = ein Projekt/Raum. Wie Browser-Tabs, aber mit Portal-Karten verlinkbar. */
+/** Ebene 3: Ein Board = eine Leinwand voller Karten. */
 export interface BoardDoc {
   id: string;
   name: string;
   nodes: Node[];
   edges: Edge[];
+}
+
+/** Ebene 2: Ein Projekt bündelt Boards (geordnete Liste). */
+export interface Project {
+  id: string;
+  name: string;
+  boardIds: string[];
+}
+
+/** Ebene 1: Ein Bereich bündelt Projekte (z. B. „Arbeit", „Privat", „Team"). */
+export interface Space {
+  id: string;
+  name: string;
+  projects: Project[];
 }
 
 interface Toast {
@@ -35,19 +49,32 @@ interface DeletedSnapshot {
 
 interface BoardState {
   boards: BoardDoc[];
+  spaces: Space[];
   activeId: string;
+  view: 'overview' | 'board';
   toast: Toast | null;
-  /** Karte, zu der nach einem Board-Wechsel gesprungen werden soll (Suche) */
   pendingFocus: { boardId: string; nodeId: string } | null;
   lastDeleted: DeletedSnapshot | null;
 
-  // Board-Verwaltung
+  // Navigation
+  setView: (view: 'overview' | 'board') => void;
+  openBoard: (id: string) => void;
   setActiveBoard: (id: string) => void;
-  addBoard: (name?: string) => string;
+
+  // Hierarchie (Bereiche / Projekte / Boards)
+  addSpace: (name?: string) => void;
+  renameSpace: (id: string, name: string) => void;
+  removeSpace: (id: string) => void;
+  addProject: (spaceId: string, name?: string) => void;
+  renameProject: (id: string, name: string) => void;
+  removeProject: (id: string) => void;
+  addBoard: (name?: string, projectId?: string) => string;
   renameBoard: (id: string, name: string) => void;
   removeBoard: (id: string) => void;
+  /** Board in ein (anderes) Projekt verschieben, optional vor ein bestimmtes Board */
+  moveBoard: (boardId: string, targetProjectId: string, beforeBoardId?: string) => void;
 
-  // Karten & Verbindungen (wirken immer auf das aktive Board)
+  // Karten & Verbindungen (aktives Board)
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
@@ -63,16 +90,22 @@ interface BoardState {
   showToast: (message: string, undo?: boolean) => void;
 }
 
-/** Selektoren für Komponenten */
 export const selectActiveBoard = (s: BoardState): BoardDoc =>
   s.boards.find((b) => b.id === s.activeId) ?? s.boards[0];
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
+const defaultHierarchy = (boardIds: string[]): Space[] => [
+  {
+    id: 'space-work',
+    name: '🏢 Arbeit',
+    projects: [{ id: 'proj-general', name: 'Allgemein', boardIds }],
+  },
+];
+
 export const useBoard = create<BoardState>()(
   persist(
     (set, get) => {
-      /** Hilfsfunktion: das aktive Board immutabel patchen */
       const patchActive = (fn: (b: BoardDoc) => Partial<BoardDoc>) =>
         set({
           boards: get().boards.map((b) =>
@@ -80,23 +113,130 @@ export const useBoard = create<BoardState>()(
           ),
         });
 
+      /** Board-ID aus allen Projekten entfernen (Hilfsfunktion für move/delete) */
+      const stripBoardFromHierarchy = (spaces: Space[], boardId: string): Space[] =>
+        spaces.map((sp) => ({
+          ...sp,
+          projects: sp.projects.map((p) => ({
+            ...p,
+            boardIds: p.boardIds.filter((id) => id !== boardId),
+          })),
+        }));
+
       return {
         boards: [
           { id: 'main', name: '🏠 Mein Schreibtisch', nodes: seedNodes, edges: seedEdges },
         ],
+        spaces: defaultHierarchy(['main']),
         activeId: 'main',
+        view: 'board',
         toast: null,
         pendingFocus: null,
         lastDeleted: null,
+
+        setView: (view) => set({ view }),
+
+        openBoard: (id) => {
+          if (get().boards.some((b) => b.id === id)) set({ activeId: id, view: 'board' });
+        },
 
         setActiveBoard: (id) => {
           if (get().boards.some((b) => b.id === id)) set({ activeId: id });
         },
 
-        addBoard: (name) => {
-          const id = uid();
+        addSpace: (name) =>
           set({
-            boards: [...get().boards, { id, name: name ?? '✨ Neues Projekt', nodes: [], edges: [] }],
+            spaces: [
+              ...get().spaces,
+              { id: uid(), name: name ?? '✨ Neuer Bereich', projects: [] },
+            ],
+          }),
+
+        renameSpace: (id, name) =>
+          set({ spaces: get().spaces.map((sp) => (sp.id === id ? { ...sp, name } : sp)) }),
+
+        removeSpace: (id) => {
+          const space = get().spaces.find((sp) => sp.id === id);
+          if (!space) return;
+          if (space.projects.some((p) => p.boardIds.length > 0)) {
+            get().showToast('Bereich enthält noch Boards — erst verschieben oder löschen.');
+            return;
+          }
+          if (get().spaces.length <= 1) {
+            get().showToast('Der letzte Bereich bleibt bestehen 🙂');
+            return;
+          }
+          set({ spaces: get().spaces.filter((sp) => sp.id !== id) });
+        },
+
+        addProject: (spaceId, name) =>
+          set({
+            spaces: get().spaces.map((sp) =>
+              sp.id === spaceId
+                ? {
+                    ...sp,
+                    projects: [
+                      ...sp.projects,
+                      { id: uid(), name: name ?? '📁 Neues Projekt', boardIds: [] },
+                    ],
+                  }
+                : sp,
+            ),
+          }),
+
+        renameProject: (id, name) =>
+          set({
+            spaces: get().spaces.map((sp) => ({
+              ...sp,
+              projects: sp.projects.map((p) => (p.id === id ? { ...p, name } : p)),
+            })),
+          }),
+
+        removeProject: (id) => {
+          const project = get().spaces.flatMap((sp) => sp.projects).find((p) => p.id === id);
+          if (!project) return;
+          if (project.boardIds.length > 0) {
+            get().showToast('Projekt enthält noch Boards — erst verschieben oder löschen.');
+            return;
+          }
+          set({
+            spaces: get().spaces.map((sp) => ({
+              ...sp,
+              projects: sp.projects.filter((p) => p.id !== id),
+            })),
+          });
+        },
+
+        addBoard: (name, projectId) => {
+          const id = uid();
+          const spaces = get().spaces;
+          // Ziel: angegebenes Projekt, sonst das erste existierende (notfalls anlegen)
+          let target = projectId;
+          let newSpaces = spaces;
+          if (!target) {
+            const first = spaces.flatMap((sp) => sp.projects)[0];
+            if (first) {
+              target = first.id;
+            } else {
+              const pid = uid();
+              newSpaces = spaces.length
+                ? spaces.map((sp, i) =>
+                    i === 0
+                      ? { ...sp, projects: [{ id: pid, name: 'Allgemein', boardIds: [] }] }
+                      : sp,
+                  )
+                : defaultHierarchy([]);
+              target = newSpaces[0].projects[0]?.id ?? pid;
+            }
+          }
+          set({
+            boards: [...get().boards, { id, name: name ?? '✨ Neues Board', nodes: [], edges: [] }],
+            spaces: newSpaces.map((sp) => ({
+              ...sp,
+              projects: sp.projects.map((p) =>
+                p.id === target ? { ...p, boardIds: [...p.boardIds, id] } : p,
+              ),
+            })),
             activeId: id,
           });
           return id;
@@ -107,16 +247,44 @@ export const useBoard = create<BoardState>()(
 
         removeBoard: (id) => {
           const boards = get().boards;
-          if (boards.length <= 1) return;
+          if (boards.length <= 1) {
+            get().showToast('Das letzte Board bleibt offen 🙂');
+            return;
+          }
           const rest = boards.filter((b) => b.id !== id);
           set({
             boards: rest,
+            spaces: stripBoardFromHierarchy(get().spaces, id),
             activeId: get().activeId === id ? rest[0].id : get().activeId,
           });
         },
 
-        onNodesChange: (changes) =>
-          patchActive((b) => ({ nodes: applyNodeChanges(changes, b.nodes) })),
+        moveBoard: (boardId, targetProjectId, beforeBoardId) => {
+          const stripped = stripBoardFromHierarchy(get().spaces, boardId);
+          set({
+            spaces: stripped.map((sp) => ({
+              ...sp,
+              projects: sp.projects.map((p) => {
+                if (p.id !== targetProjectId) return p;
+                const ids = [...p.boardIds];
+                const at = beforeBoardId ? ids.indexOf(beforeBoardId) : -1;
+                if (at >= 0) ids.splice(at, 0, boardId);
+                else ids.push(boardId);
+                return { ...p, boardIds: ids };
+              }),
+            })),
+          });
+        },
+
+        onNodesChange: (changes) => {
+          // Entfernen-Änderungen (Entf-Taste) durch die Undo-Logik schleusen
+          const removeIds = changes
+            .filter((c): c is Extract<NodeChange, { type: 'remove' }> => c.type === 'remove')
+            .map((c) => c.id);
+          const rest = changes.filter((c) => c.type !== 'remove');
+          if (rest.length) patchActive((b) => ({ nodes: applyNodeChanges(rest, b.nodes) }));
+          if (removeIds.length) get().removeNodes(removeIds);
+        },
 
         onEdgesChange: (changes) =>
           patchActive((b) => ({ edges: applyEdgeChanges(changes, b.edges) })),
@@ -179,7 +347,7 @@ export const useBoard = create<BoardState>()(
           })),
 
         focusNode: (boardId, nodeId) => {
-          set({ pendingFocus: { boardId, nodeId }, activeId: boardId });
+          set({ pendingFocus: { boardId, nodeId }, activeId: boardId, view: 'board' });
         },
 
         clearPendingFocus: () => set({ pendingFocus: null }),
@@ -193,20 +361,33 @@ export const useBoard = create<BoardState>()(
     },
     {
       name: 'pixinotes-board',
-      version: 1,
-      partialize: (s) => ({ boards: s.boards, activeId: s.activeId }),
+      version: 2,
+      partialize: (s) => ({
+        boards: s.boards,
+        spaces: s.spaces,
+        activeId: s.activeId,
+        view: s.view,
+      }),
       migrate: (persisted: unknown, version: number) => {
-        // v0 → v1: Einzelboard {nodes, edges} wird zum Multi-Board-Format
-        if (version === 0 && persisted && typeof persisted === 'object' && 'nodes' in persisted) {
-          const old = persisted as { nodes: Node[]; edges: Edge[] };
+        const p = persisted as Record<string, unknown>;
+        // v0: {nodes, edges} — Einzelboard
+        if (version === 0 && p && 'nodes' in p) {
+          const boards = [
+            { id: 'main', name: '🏠 Mein Schreibtisch', nodes: p.nodes as Node[], edges: p.edges as Edge[] },
+          ];
+          return { boards, spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' };
+        }
+        // v1: {boards, activeId} — flache Boards ohne Hierarchie
+        if (version === 1 && p && 'boards' in p) {
+          const boards = p.boards as BoardDoc[];
           return {
-            boards: [
-              { id: 'main', name: '🏠 Mein Schreibtisch', nodes: old.nodes, edges: old.edges },
-            ],
-            activeId: 'main',
+            boards,
+            spaces: defaultHierarchy(boards.map((b) => b.id)),
+            activeId: (p.activeId as string) ?? boards[0]?.id,
+            view: 'board',
           };
         }
-        return persisted as { boards: BoardDoc[]; activeId: string };
+        return p;
       },
     },
   ),

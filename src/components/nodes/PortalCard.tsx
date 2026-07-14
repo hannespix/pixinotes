@@ -17,7 +17,7 @@ export function PortalCard({ id, data }: NodeProps) {
   const portal = data as unknown as PortalData;
   const boards = useBoard((s) => s.boards);
   const updateNodeData = useBoard((s) => s.updateNodeData);
-  const setActiveBoard = useBoard((s) => s.setActiveBoard);
+  const openBoard = useBoard((s) => s.openBoard);
 
   const target = boards.find((b) => b.id === portal.boardId);
   const openCount = target
@@ -37,7 +37,7 @@ export function PortalCard({ id, data }: NodeProps) {
             {target.nodes.length} Karten
             {openCount > 0 ? ` · ${openCount} offene Tickets` : ''}
           </div>
-          <button className="portal-open nodrag" onClick={() => setActiveBoard(target.id)}>
+          <button className="portal-open nodrag" onClick={() => openBoard(target.id)}>
             → Öffnen
           </button>
         </>

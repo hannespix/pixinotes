@@ -8,7 +8,9 @@ import { useBoard } from '../store';
 export function Tabs() {
   const boards = useBoard((s) => s.boards);
   const activeId = useBoard((s) => s.activeId);
-  const setActiveBoard = useBoard((s) => s.setActiveBoard);
+  const view = useBoard((s) => s.view);
+  const setView = useBoard((s) => s.setView);
+  const openBoard = useBoard((s) => s.openBoard);
   const addBoard = useBoard((s) => s.addBoard);
   const renameBoard = useBoard((s) => s.renameBoard);
   const removeBoard = useBoard((s) => s.removeBoard);
@@ -37,11 +39,18 @@ export function Tabs() {
 
   return (
     <div className="tabs">
+      <button
+        className={`tab-home ${view === 'overview' ? 'active' : ''}`}
+        title="Übersicht: alle Bereiche, Projekte & Boards"
+        onClick={() => setView('overview')}
+      >
+        🏠
+      </button>
       {boards.map((b) => (
         <div
           key={b.id}
-          className={`tab ${b.id === activeId ? 'active' : ''}`}
-          onClick={() => setActiveBoard(b.id)}
+          className={`tab ${b.id === activeId && view === 'board' ? 'active' : ''}`}
+          onClick={() => openBoard(b.id)}
           onDoubleClick={() => startEdit(b.id, b.name)}
           title="Klick = wechseln · Doppelklick = umbenennen"
         >

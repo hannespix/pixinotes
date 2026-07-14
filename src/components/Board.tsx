@@ -278,7 +278,7 @@ export function Board() {
         connectionMode={ConnectionMode.Loose}
         panOnScroll
         zoomOnDoubleClick={false}
-        deleteKeyCode={null}
+        deleteKeyCode={['Delete', 'Backspace']}
         minZoom={0.15}
         maxZoom={2.5}
         fitView
