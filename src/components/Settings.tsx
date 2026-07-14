@@ -1,6 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { exportToFolder, exportViewport } from '../lib/exporter';
+import {
+  applySync, disconnectSync, ensurePermission, getSyncHandle, knownStamp,
+  pickSyncFolder, readSync, syncSupported, writeSync, type SyncDirHandle,
+} from '../lib/syncFolder';
 
 const MODELS: Record<string, string[]> = {
   anthropic: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5'],
@@ -30,8 +34,44 @@ export function Settings() {
   const activeBoard = useBoard(selectActiveBoard);
   const showToast = useBoard((s) => s.showToast);
   const [busy, setBusy] = useState('');
+  const [syncHandle, setSyncHandle] = useState<SyncDirHandle | null>(null);
+
+  // Verbundenen Sync-Ordner anzeigen (Handle überlebt Neustarts via IndexedDB)
+  useEffect(() => {
+    if (!open || !syncSupported()) return;
+    getSyncHandle().then((h) => setSyncHandle(h ?? null)).catch(() => {});
+  }, [open]);
 
   if (!open) return null;
+
+  const connectSync = async () => {
+    const handle = await pickSyncFolder();
+    setSyncHandle(handle);
+    const remote = await readSync(handle);
+    if (remote && window.confirm(
+      `Im Ordner liegt bereits ein PixiNotes-Stand (${new Date(remote.savedAt).toLocaleString('de-DE')}).\n\nOK = diesen Stand LADEN (ersetzt die lokalen Boards)\nAbbrechen = lokalen Stand in den Ordner schreiben`,
+    )) {
+      applySync(remote);
+      showToast('☁️ Stand aus dem Sync-Ordner geladen');
+    } else {
+      await writeSync(handle);
+      showToast(`☁️ Verbunden — Änderungen werden automatisch nach „${handle.name}" gespeichert`);
+    }
+  };
+
+  const loadFromSync = async () => {
+    if (!syncHandle || !(await ensurePermission(syncHandle, true))) return;
+    const remote = await readSync(syncHandle);
+    if (!remote) { showToast('Keine (gültige) pixinotes-daten.json im Ordner gefunden.'); return; }
+    applySync(remote);
+    showToast('☁️ Stand aus dem Sync-Ordner geladen');
+  };
+
+  const saveToSync = async () => {
+    if (!syncHandle || !(await ensurePermission(syncHandle, true))) return;
+    await writeSync(syncHandle);
+    showToast('☁️ In den Sync-Ordner gespeichert');
+  };
 
   const doExport = async (fn: () => Promise<unknown>, label: string) => {
     setBusy(label);
@@ -105,6 +145,50 @@ export function Settings() {
                     ? 'Ohne Schlüssel bleiben die KI-Aktionen ausgeblendet.'
                     : '✅ Konfiguriert — KI-Aktionen erscheinen auf den Karten.'}
               </div>
+            </>
+          )}
+        </section>
+
+        {/* ---- Synchronisation (Nextcloud & Co.) ---- */}
+        <section className="modal-section">
+          <h3>☁️ Synchronisation (Nextcloud, OneDrive, Dropbox …)</h3>
+          <p className="modal-hint">
+            {syncSupported()
+              ? <>Verbinde einen Ordner, den dein <b>Nextcloud-/OneDrive-/Dropbox-Client</b> synchronisiert — PixiNotes speichert dort automatisch eine <code>pixinotes-daten.json</code> mit allen Boards. Der Cloud-Client bringt sie auf deine anderen Geräte; dort einfach denselben Ordner verbinden. Kein Server-Setup, KI-Schlüssel bleiben lokal.</>
+              : 'Dieser Browser unterstützt keine Ordner-Anbindung (Chrome/Edge empfohlen). Alternative: regelmäßig über den Datenordner-Export sichern.'}
+          </p>
+          {syncSupported() && (
+            <>
+              <div className="modal-buttons">
+                {!syncHandle ? (
+                  <button disabled={!!busy} onClick={() => doExport(connectSync, 'sync')}>
+                    {busy === 'sync' ? '…' : '📁 Sync-Ordner verbinden…'}
+                  </button>
+                ) : (
+                  <>
+                    <button disabled={!!busy} onClick={() => doExport(saveToSync, 'syncsave')}>
+                      {busy === 'syncsave' ? '…' : '⬆️ Jetzt speichern'}
+                    </button>
+                    <button disabled={!!busy} onClick={() => doExport(loadFromSync, 'syncload')}>
+                      {busy === 'syncload' ? '…' : '⬇️ Vom Ordner laden'}
+                    </button>
+                    <button disabled={!!busy} onClick={() => doExport(async () => {
+                      await disconnectSync();
+                      setSyncHandle(null);
+                      showToast('Sync-Ordner getrennt — Daten bleiben lokal erhalten.');
+                    }, 'syncoff')}>
+                      {busy === 'syncoff' ? '…' : '✂️ Trennen'}
+                    </button>
+                  </>
+                )}
+              </div>
+              {syncHandle && (
+                <div className="modal-note">
+                  ✅ Verbunden mit Ordner „{syncHandle.name}" — Änderungen werden automatisch gespeichert
+                  {knownStamp() ? ` (letzter Sync: ${new Date(knownStamp()!).toLocaleString('de-DE')})` : ''}.
+                  Schreibt ein anderes Gerät zwischenzeitlich, warnt PixiNotes statt zu überschreiben.
+                </div>
+              )}
             </>
           )}
         </section>

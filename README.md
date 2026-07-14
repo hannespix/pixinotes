@@ -35,7 +35,10 @@ npm run dev        # → http://localhost:5173
 - 📕 **PDF-Karten mit Inline-Vorschau**: erste Seite als Thumbnail, Klick öffnet den Viewer mit Seiten-Navigation (pdf.js)
 - ▶️ **Präsentationsmodus mit Live-Bearbeitung**: Karten des Boards als Vollbild-Folien (Pfeiltasten/Esc) — Notizen, Formen, Diagramme und Kanban-Boards sind **direkt auf der Folie editierbar** (Tickets im Meeting weiterschieben!), alle Änderungen landen live auf dem Board. Die **Folien-Reihenfolge folgt der Gliederung**: verbundene Karten werden als Cluster zusammenhängend gezeigt, innerhalb geht es den Pfeilen nach (Prozess-Logik)
 - 🤖 **KI-Aktionen direkt auf den Karten**: ✨ E-Mails zusammenfassen, ✨ Notiztexte verbessern (immer als neuer Vorschlag daneben — nie destruktiv). Anbieter frei wählbar: eigener Cloud-Key (Anthropic/OpenAI) **oder Ollama / selbstgehosteter Server** (dann bleibt alles lokal); Zugangsdaten nur im Browser
+- ☁️ **Nextcloud/OneDrive/Dropbox-Sync**: Sync-Ordner in den Einstellungen verbinden → PixiNotes speichert alle Boards automatisch als `pixinotes-daten.json` dorthin, der Cloud-Client verteilt sie auf alle Geräte (Konfliktschutz warnt, statt fremde Stände zu überschreiben; KI-Schlüssel bleiben lokal)
 - 📁 **Datenordner-Export**: alle Boards als echte Markdown-Dateien (Bereich/Projekt/Board.md) via File System Access, plus Board-Export als PNG/SVG (→ PDF via Drucken)
+- ↩️ **Undo/Redo**: Karten, Verbindungen und Zeichnungen (Strg+Z / Strg+Y oder ↩️/↪️ im Dock); Texte haben ihr eigenes Editor-Undo
+- 🧲 **Verdrängungs-Physik**: Karten schieben sich beim Ziehen federnd beiseite (inkl. Kettenreaktion), geworfene Karten räumen sich den Weg frei, die gezogene Karte neigt sich in Bewegungsrichtung
 - 🔗 **Verbindungen mit Beziehung**: Karten am Rand-Punkt verbinden; auf die Linien-Mitte klicken benennt die Beziehung („blockiert", „gehört zu" …), ✕ löscht sie
 - 🔍 **Spotlight-Suche** (`Strg+K`): findet Karten über alle Boards und fliegt animiert hin
 - 📤 **Teilen**: Auswahl-Toolbar mit „Als E-Mail" (mailto) und „Formatiert kopieren" (HTML für Outlook/Word-Paste), Duplizieren, Löschen mit **Undo**

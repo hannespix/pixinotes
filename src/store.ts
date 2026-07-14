@@ -113,6 +113,9 @@ interface BoardState {
   undo: () => void;
   redo: () => void;
 
+  /** Kompletten Stand aus der Sync-Datei übernehmen (ersetzt Boards & Hierarchie) */
+  importSync: (boards: BoardDoc[], spaces: Space[], activeId: string) => void;
+
   // Hierarchie (Bereiche / Projekte / Boards)
   addSpace: (name?: string) => void;
   renameSpace: (id: string, name: string) => void;
@@ -302,6 +305,19 @@ export const useBoard = create<BoardState>()(
             boards: s.boards.map((b) =>
               b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings } : b,
             ),
+          });
+        },
+
+        importSync: (boards, spaces, activeId) => {
+          if (!Array.isArray(boards) || boards.length === 0 || !Array.isArray(spaces)) return;
+          set({
+            boards,
+            spaces,
+            activeId: boards.some((b) => b.id === activeId) ? activeId : boards[0].id,
+            past: [],
+            future: [],
+            lastDeleted: null,
+            pendingFocus: null,
           });
         },
 

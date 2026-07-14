@@ -8,6 +8,7 @@ import { SearchOverlay } from './components/SearchOverlay';
 import { Settings } from './components/Settings';
 import { Presenter } from './components/Presenter';
 import { useBoard } from './store';
+import { initAutoSync } from './lib/syncFolder';
 
 export default function App() {
   const toast = useBoard((s) => s.toast);
@@ -15,6 +16,9 @@ export default function App() {
   const presenting = useBoard((s) => s.presenting);
   const restoreDeleted = useBoard((s) => s.restoreDeleted);
   const showToast = useBoard((s) => s.showToast);
+
+  // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
+  useEffect(() => { initAutoSync(); }, []);
 
   // Zweiter Browser-Tab? Letzter Schreiber gewinnt — ehrlich warnen (Backlog M6)
   useEffect(() => {
