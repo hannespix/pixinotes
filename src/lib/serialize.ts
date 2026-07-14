@@ -156,6 +156,10 @@ export function nodeToText(node: AppNode): string {
     }
     case 'image':
       return `Bild: ${node.data.name ?? 'Screenshot'}`;
+    case 'shape':
+      return node.data.text || '';
+    case 'mermaid':
+      return `Diagramm:\n${node.data.code}`;
     case 'portal':
       return 'Projekt-Portal';
     default:
@@ -186,6 +190,10 @@ export function nodeToHtml(node: AppNode): string {
       const img = node.data;
       return `<img src="${esc(img.src)}" alt="${esc(img.name ?? 'Bild')}" style="max-width:600px" />`;
     }
+    case 'shape':
+      return node.data.text ? `<p style="text-align:center;font-weight:600">${esc(node.data.text)}</p>` : '';
+    case 'mermaid':
+      return `<pre style="background:#faf8f3;border-radius:8px;padding:10px;font-size:13px;overflow:auto">${esc(node.data.code)}</pre>`;
     default:
       return `<p style="white-space:pre-wrap">${esc(nodeToText(node))}</p>`;
   }
