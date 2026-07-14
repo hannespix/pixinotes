@@ -21,7 +21,10 @@ import { ImageCard } from './nodes/ImageCard';
 import { FileCard } from './nodes/FileCard';
 import { KanbanCard } from './nodes/KanbanCard';
 import { PortalCard } from './nodes/PortalCard';
+import { ShapeCard } from './nodes/ShapeCard';
+import { MermaidCard } from './nodes/MermaidCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
+import { DrawingLayer } from './DrawingLayer';
 import { SelectionToolbar } from './SelectionToolbar';
 
 const nodeTypes: NodeTypes = {
@@ -31,6 +34,8 @@ const nodeTypes: NodeTypes = {
   file: FileCard,
   kanban: KanbanCard,
   portal: PortalCard,
+  shape: ShapeCard,
+  mermaid: MermaidCard,
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
@@ -302,6 +307,7 @@ export function Board() {
         <MiniMap pannable zoomable className="pn-minimap" />
         <Controls showInteractive={false} />
         <SelectionToolbar />
+        <DrawingLayer />
       </ReactFlow>
     </div>
   );

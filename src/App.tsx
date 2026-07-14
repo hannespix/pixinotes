@@ -5,6 +5,7 @@ import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
 import { Overview } from './components/Overview';
 import { SearchOverlay } from './components/SearchOverlay';
+import { Settings } from './components/Settings';
 import { useBoard } from './store';
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
           </>
         )}
         <SearchOverlay />
+        <Settings />
         <div className={`toast ${toast ? 'show' : ''}`}>
           {toast?.message}
           {toast?.undo && (

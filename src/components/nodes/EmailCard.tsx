@@ -5,6 +5,7 @@ import type { EmailNode, ParsedAttachment } from '../../types';
 import { enrichText } from '../../lib/entities';
 import { formatBytes, isImageMime } from '../../lib/parseEmail';
 import { makeImage } from '../../lib/nodes';
+import { triggerDownload } from '../../lib/download';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
 
@@ -46,10 +47,7 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
       addNode(makeImage({ x: positionAbsoluteX + 340, y: positionAbsoluteY + 40 }, att.dataUrl, att.name));
       showToast(`🖼️ „${att.name}" als eigene Karte herausgelöst`);
     } else if (att.dataUrl) {
-      const a = document.createElement('a');
-      a.href = att.dataUrl;
-      a.download = att.name;
-      a.click();
+      triggerDownload(att.dataUrl, att.name);
     } else {
       showToast('Anhang zu groß zum Einbetten — nur Metadaten gespeichert.');
     }

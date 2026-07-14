@@ -5,6 +5,7 @@ import {
   uid,
   type AppNode,
   type EmailData,
+  type ShapeKind,
   type StickyColor,
 } from '../types';
 
@@ -15,6 +16,8 @@ export const CARD_WIDTHS = {
   file: 240,
   kanban: 430,
   portal: 200,
+  shape: 150,
+  mermaid: 380,
 } as const;
 
 type Pos = { x: number; y: number };
@@ -56,4 +59,26 @@ export function makeKanban(position: Pos, title = '📋 Neues Board'): AppNode {
 
 export function makePortal(position: Pos): AppNode {
   return { id: uid(), type: 'portal', width: CARD_WIDTHS.portal, position, data: {} };
+}
+
+export function makeShape(position: Pos, shape: ShapeKind = 'process'): AppNode {
+  return {
+    id: uid(),
+    type: 'shape',
+    width: CARD_WIDTHS.shape,
+    height: 70,
+    position,
+    data: { shape, text: '', color: '#eef2ff' },
+  };
+}
+
+export function makeMermaid(position: Pos): AppNode {
+  return {
+    id: uid(),
+    type: 'mermaid',
+    width: CARD_WIDTHS.mermaid,
+    height: 240,
+    position,
+    data: { code: 'flowchart TD\n  A[Start] --> B{Prüfen}\n  B -->|OK| C[Fertig]\n  B -->|Fehler| A' },
+  };
 }

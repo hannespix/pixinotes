@@ -1,6 +1,7 @@
 // Fristen-Erkennung: chrono-node (deutsch) findet Datumsangaben wie
 // „bis Freitag", „am 24.07." oder „nächste Woche" in Kartentexten.
 import { de as chronoDe, type ParsedResult } from 'chrono-node';
+import { triggerDownload } from './download';
 
 export interface DetectedDate {
   /** Originaltext, z. B. „bis Freitag" */
@@ -72,10 +73,7 @@ export function downloadIcs(title: string, date: Date): void {
     'END:VEVENT',
     'END:VCALENDAR',
   ].join('\r\n');
-  const blob = new Blob([ics], { type: 'text/calendar' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'pixinotes-termin.ics';
-  a.click();
-  URL.revokeObjectURL(a.href);
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+  triggerDownload(url, 'pixinotes-termin.ics');
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

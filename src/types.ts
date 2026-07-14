@@ -62,6 +62,19 @@ export interface PortalData {
   [key: string]: unknown;
 }
 
+export type ShapeKind = 'process' | 'decision' | 'terminator' | 'note';
+export interface ShapeData {
+  shape: ShapeKind;
+  text: string;
+  color: string;
+  [key: string]: unknown;
+}
+
+export interface MermaidData {
+  code: string;
+  [key: string]: unknown;
+}
+
 /** Typisierte Karten-Nodes — macht `node.data` überall typsicher (Audit H1). */
 export type NoteNode = Node<NoteData, 'note'>;
 export type EmailNode = Node<EmailData, 'email'>;
@@ -69,7 +82,10 @@ export type ImageNode = Node<ImageData, 'image'>;
 export type FileNode = Node<FileData, 'file'>;
 export type KanbanNode = Node<KanbanData, 'kanban'>;
 export type PortalNode = Node<PortalData, 'portal'>;
-export type AppNode = NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode;
+export type ShapeNode = Node<ShapeData, 'shape'>;
+export type MermaidNode = Node<MermaidData, 'mermaid'>;
+export type AppNode =
+  | NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode;
 
 export const KANBAN_COLS = ['To Do', 'Doing', 'Done'] as const;
 /** Index der „Done"-Spalte — nie wieder Magic Number 2 (Audit M4) */

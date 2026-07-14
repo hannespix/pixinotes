@@ -13,12 +13,30 @@ import {
 import { seedEdges, seedNodes } from './seed';
 import { uid, type AppNode } from './types';
 
+/** Ein Freihand-Strich (Punkte in Flow-Koordinaten) */
+export interface Stroke {
+  id: string;
+  tool: 'pen' | 'marker';
+  color: string;
+  width: number;
+  points: [number, number][];
+}
+
 /** Ebene 3: Ein Board = eine Leinwand voller Karten. */
 export interface BoardDoc {
   id: string;
   name: string;
   nodes: AppNode[];
   edges: Edge[];
+  drawings?: Stroke[];
+}
+
+export type Tool = 'select' | 'pen' | 'marker' | 'eraser';
+
+export interface AiSettings {
+  provider: 'anthropic' | 'openai' | 'none';
+  model: string;
+  apiKey: string;
 }
 
 /** Ebene 2: Ein Projekt bündelt Boards (geordnete Liste). */
@@ -55,12 +73,20 @@ interface BoardState {
   toast: Toast | null;
   pendingFocus: { boardId: string; nodeId: string } | null;
   lastDeleted: DeletedSnapshot | null;
+  tool: Tool;
+  settingsOpen: boolean;
+  ai: AiSettings;
 
   // Navigation
   setView: (view: 'overview' | 'board') => void;
   openBoard: (id: string) => void;
   searchOpen: boolean;
   setSearchOpen: (open: boolean) => void;
+  setSettingsOpen: (open: boolean) => void;
+  setTool: (tool: Tool) => void;
+  updateAi: (patch: Partial<AiSettings>) => void;
+  addStroke: (stroke: Stroke) => void;
+  eraseStrokesNear: (x: number, y: number, radius: number) => void;
 
   // Hierarchie (Bereiche / Projekte / Boards)
   addSpace: (name?: string) => void;
@@ -184,9 +210,25 @@ export const useBoard = create<BoardState>()(
         activeId: 'main',
         view: 'board',
         searchOpen: false,
+        settingsOpen: false,
+        tool: 'select',
+        ai: { provider: 'none', model: 'claude-opus-4-8', apiKey: '' },
         toast: null,
         pendingFocus: null,
         lastDeleted: null,
+
+        setSettingsOpen: (open) => set({ settingsOpen: open }),
+        setTool: (tool) => set({ tool }),
+        updateAi: (patch) => set({ ai: { ...get().ai, ...patch } }),
+
+        addStroke: (stroke) => patchActive((b) => ({ drawings: [...(b.drawings ?? []), stroke] })),
+
+        eraseStrokesNear: (x, y, radius) =>
+          patchActive((b) => ({
+            drawings: (b.drawings ?? []).filter(
+              (s) => !s.points.some((p) => Math.hypot(p[0] - x, p[1] - y) < radius),
+            ),
+          })),
 
         setView: (view) => set({ view }),
 
@@ -449,6 +491,7 @@ export const useBoard = create<BoardState>()(
         spaces: s.spaces,
         activeId: s.activeId,
         view: s.view,
+        ai: s.ai,
       }),
       migrate: (persisted: unknown, version: number) => {
         const p = persisted as Record<string, unknown>;

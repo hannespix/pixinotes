@@ -1,6 +1,7 @@
 import type { NodeProps } from '@xyflow/react';
 import type { FileNode } from '../../types';
 import { formatBytes } from '../../lib/parseEmail';
+import { triggerDownload } from '../../lib/download';
 import { CardShell } from './CardShell';
 
 const ICONS: Record<string, string> = {
@@ -21,11 +22,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
   const icon = ICONS[ext] ?? '📎';
 
   const download = () => {
-    if (!file.dataUrl) return;
-    const a = document.createElement('a');
-    a.href = file.dataUrl;
-    a.download = file.name;
-    a.click();
+    if (file.dataUrl) triggerDownload(file.dataUrl, file.name);
   };
 
   return (
