@@ -269,6 +269,45 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .react-flow__controls { border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(50,40,20,.12); }
 .react-flow__edge-path { stroke-linecap: round; }
 
+/* ---------- Selektierte Karte: Controls auch ohne Hover (Maus & Touch) ---------- */
+.react-flow__node.selected .card-x,
+.react-flow__node.selected .pn-handle,
+.react-flow__node.selected .color-dot,
+.react-flow__node.selected .kanban-item-actions,
+.react-flow__node.selected .tab-x {
+  opacity: 1;
+}
+
+/* ---------- Touch-Geräte: größere Ziele, Controls immer sichtbar ---------- */
+@media (pointer: coarse) {
+  .card-x, .color-dot, .pn-handle, .tab-x, .kanban-item-actions { opacity: 1 !important; }
+  .card-x { width: 28px; height: 28px; font-size: 13px; top: -13px; right: -13px; }
+  .color-dot { width: 22px; height: 22px; top: 6px; right: 8px; }
+  .pn-handle { width: 16px !important; height: 16px !important; }
+  .dock button { width: 50px; height: 50px; font-size: 22px; }
+  .kanban-item-actions button { padding: 5px 9px; font-size: 13px; }
+  .chip { padding: 6px 13px; font-size: 12px; }
+  .card-actions button { padding: 7px 12px; font-size: 12px; }
+  .tab { padding: 8px 12px; font-size: 13.5px; }
+  .tab-x { font-size: 12px; padding: 4px; }
+  .link-btn { font-size: 13px; padding: 4px; }
+}
+
+/* ---------- Schmale Screens (Tablet hochkant / Phone) ---------- */
+@media (max-width: 860px) {
+  .hint { display: none; }
+  .tabs {
+    top: 62px; left: 12px; transform: none;
+    max-width: calc(100vw - 24px);
+  }
+  .topbar { left: 12px; }
+  .dock { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+  .react-flow__minimap { display: none; }
+  .email-card { width: min(320px, 78vw); }
+  .kanban-card { width: min(430px, 88vw); }
+  .note-card { width: min(270px, 74vw); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }

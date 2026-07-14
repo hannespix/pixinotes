@@ -104,14 +104,40 @@ export function Board() {
     [addNode],
   );
 
+  const createNoteAt = useCallback(
+    (clientX: number, clientY: number) => {
+      addNote(screenToFlowPosition({ x: clientX - 130, y: clientY - 30 }));
+      showToast('Notiz erstellt — lostippen! „/" öffnet das Block-Menü ✍️');
+    },
+    [addNote, screenToFlowPosition, showToast],
+  );
+
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.classList.contains('react-flow__pane')) return;
-      addNote(screenToFlowPosition({ x: e.clientX - 130, y: e.clientY - 30 }));
-      showToast('Notiz erstellt — lostippen! „/" öffnet das Block-Menü ✍️');
+      createNoteAt(e.clientX, e.clientY);
     },
-    [addNote, screenToFlowPosition, showToast],
+    [createNoteAt],
+  );
+
+  // Doppel-Tap auf Touch-Geräten (dblclick feuert dort nicht zuverlässig)
+  const lastTap = useRef<{ x: number; y: number; t: number } | null>(null);
+  const handleTouchEnd = useCallback(
+    (e: React.TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.classList.contains('react-flow__pane')) return;
+      const touch = e.changedTouches[0];
+      if (!touch) return;
+      const now = performance.now();
+      const prev = lastTap.current;
+      lastTap.current = { x: touch.clientX, y: touch.clientY, t: now };
+      if (prev && now - prev.t < 350 && Math.hypot(touch.clientX - prev.x, touch.clientY - prev.y) < 32) {
+        lastTap.current = null;
+        createNoteAt(touch.clientX, touch.clientY);
+      }
+    },
+    [createNoteAt],
   );
 
   // ---------- Drag & Drop von Dateien (E-Mails! Bilder! Alles!) ----------
@@ -198,6 +224,7 @@ export function Board() {
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}
       onDoubleClick={handleDoubleClick}
+      onTouchEnd={handleTouchEnd}
       onPaste={handlePaste}
     >
       <ReactFlow
@@ -212,6 +239,7 @@ export function Board() {
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         connectionMode={ConnectionMode.Loose}
+        panOnScroll
         zoomOnDoubleClick={false}
         deleteKeyCode={null}
         minZoom={0.15}
