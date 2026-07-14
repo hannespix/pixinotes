@@ -36,6 +36,7 @@ export const CARD_WIDTHS = {
   shape: 150,
   mermaid: 380,
   gantt: 560,
+  calendar: 430,
 } as const;
 
 type Pos = { x: number; y: number };
@@ -109,6 +110,17 @@ export function makeGantt(position: Pos): AppNode {
         { id: uid(), name: 'Meilenstein', start: iso(now + 14 * day), end: iso(now + 14 * day), color: '#e07a3f' },
       ],
     },
+  };
+}
+
+export function makeCalendar(position: Pos): AppNode {
+  return {
+    id: uid(),
+    type: 'calendar',
+    width: CARD_WIDTHS.calendar,
+    height: 340,
+    position,
+    data: {},
   };
 }
 

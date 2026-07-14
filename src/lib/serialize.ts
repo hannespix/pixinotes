@@ -168,6 +168,8 @@ export function nodeToText(node: AppNode): string {
         .map((r) => `  ${r.start === r.end ? '◆' : '▬'} ${r.name}: ${r.start} → ${r.end}${r.progress ? ` (${r.progress}%)` : ''}`)
         .join('\n')}`;
     }
+    case 'calendar':
+      return `Kalender (Monatsansicht${node.data.month ? ` ${node.data.month}` : ''})`;
     case 'portal':
       return 'Projekt-Portal';
     default:

@@ -123,6 +123,35 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   const zoom = (dir: -1 | 1) =>
     updateNodeData(id, { dayWidth: Math.max(10, Math.min(48, dw + dir * 6)) });
 
+  /** Vorgänger setzen — mit Zyklus-Schutz (A→B→A wäre Endlosschleife) */
+  const setDep = (rowId: string, dep: string) => {
+    if (dep) {
+      let cur: string | undefined = dep;
+      const byId = new Map(rows.map((r) => [r.id, r]));
+      for (let i = 0; cur && i <= rows.length; i++) {
+        if (cur === rowId) { showToast('⚠️ Zirkuläre Abhängigkeit — nicht möglich.'); return; }
+        cur = byId.get(cur)?.dep;
+      }
+    }
+    patchRow(rowId, { dep: dep || undefined });
+  };
+
+  /** Nach Ressource gruppieren: Zeilen stabil nach `who` sortieren (ohne Ressource ans Ende) */
+  const groupByResource = () => {
+    setRows([...rows].sort((a, b) => {
+      const aw = a.who?.trim() ?? '';
+      const bw = b.who?.trim() ?? '';
+      if (!aw && bw) return 1;
+      if (aw && !bw) return -1;
+      return aw.localeCompare(bw);
+    }));
+    showToast('👥 Nach Ressource gruppiert');
+  };
+
+  const initials = (who?: string) =>
+    (who ?? '').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+
+  const rowIndex = new Map(rows.map((r, i) => [r.id, i]));
   const sel = rows.find((r) => r.id === selected);
 
   return (
@@ -132,6 +161,7 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
         <div className="gantt-tools nodrag">
           <button title="Vorgang hinzufügen" onClick={addRow}>＋</button>
           <button title="Offene Aufgaben mit Frist als Meilensteine übernehmen" onClick={importTasks}>⬇️📋</button>
+          <button title="Nach Ressource gruppieren" onClick={groupByResource}>👥</button>
           <button title="Rauszoomen" onClick={() => zoom(-1)}>−</button>
           <button title="Reinzoomen" onClick={() => zoom(1)}>＋🔍</button>
         </div>
@@ -146,6 +176,22 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
             </select>
           </label>
           <button title="Zum Meilenstein machen (Dauer 0)" onClick={() => patchRow(sel.id, { end: sel.start })}>◆</button>
+          <label title="Ressource/Person">👤
+            <input
+              className="gantt-who"
+              placeholder="wer?"
+              value={sel.who ?? ''}
+              onChange={(e) => patchRow(sel.id, { who: e.target.value || undefined })}
+            />
+          </label>
+          <label title="Vorgänger (Finish-to-Start)">↳
+            <select value={sel.dep ?? ''} onChange={(e) => setDep(sel.id, e.target.value)}>
+              <option value="">— kein Vorgänger —</option>
+              {rows.filter((r) => r.id !== sel.id).map((r) => (
+                <option key={r.id} value={r.id}>{r.name || 'Vorgang'}</option>
+              ))}
+            </select>
+          </label>
           <button title="Vorgang löschen" onClick={() => { removeRow(sel.id); setSelected(null); }}>✕</button>
           <button title="Auswahl schließen" onClick={() => setSelected(null)}>—</button>
         </div>
@@ -176,6 +222,14 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
           >
+            <defs>
+              <marker id={`gdep-${id}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0,0 L8,4 L0,8 Z" fill="#8a8375" />
+              </marker>
+              <marker id={`gdep-warn-${id}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+                <path d="M0,0 L8,4 L0,8 Z" fill="#d84b3d" />
+              </marker>
+            </defs>
             {/* Wochenenden */}
             {Array.from({ length: nDays }, (_, i) => {
               const dow = new Date((minD + i) * DAY).getDay();
@@ -244,6 +298,53 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
                   <rect x={bx - 2} y={y} width={7} height={BAR_H} fill="transparent" style={{ cursor: 'ew-resize' }} onPointerDown={(e) => startDrag(e, r, 'start')} />
                   <rect x={bx + bw - 4} y={y} width={8} height={BAR_H} fill="transparent" style={{ cursor: 'ew-resize' }} onPointerDown={(e) => startDrag(e, r, 'end')} />
                 </g>
+              );
+            })}
+            {/* Ressourcen-Initialen an Balken/Meilensteinen */}
+            {rows.map((r, i) => {
+              if (!r.who) return null;
+              const y = HEAD_H + i * ROW_H + ROW_H / 2;
+              const isMile = r.start === r.end;
+              const cx = isMile ? x(r.start) + dw / 2 : x(r.start) + 1 + 9;
+              const cy = isMile ? y - 13 : y;
+              return (
+                <g key={`w${r.id}`} pointerEvents="none">
+                  <circle cx={cx} cy={cy} r={7.5} fill="#fff" stroke={r.color ?? COLORS[0]} strokeWidth={1.5} />
+                  <text x={cx} y={cy + 2.6} textAnchor="middle" className="gantt-who-badge">{initials(r.who)}</text>
+                </g>
+              );
+            })}
+            {/* Abhängigkeits-Pfeile (Finish-to-Start); rot = Konflikt (Start vor Vorgänger-Ende) */}
+            {rows.map((r) => {
+              if (!r.dep) return null;
+              const d = rows.find((rr) => rr.id === r.dep);
+              const di = rowIndex.get(r.dep ?? '');
+              const ri = rowIndex.get(r.id);
+              if (!d || di === undefined || ri === undefined) return null;
+              const dMile = d.start === d.end;
+              const rMile = r.start === r.end;
+              const ex = dMile
+                ? x(d.start) + dw / 2 + 9
+                : x(d.start) + Math.max(dw, (toDays(d.end) - toDays(d.start) + 1) * dw) - 1;
+              const ey = HEAD_H + di * ROW_H + ROW_H / 2;
+              const sx = rMile ? x(r.start) + dw / 2 - 9 : x(r.start) + 1;
+              const sy = HEAD_H + ri * ROW_H + ROW_H / 2;
+              const conflict = toDays(r.start) <= toDays(d.end) && !rMile;
+              const midX = Math.max(ex + 8, sx - 8);
+              const path = `M${ex},${ey} L${ex + 8},${ey} L${ex + 8},${sy} L${midX},${sy} L${sx - 2},${sy}`;
+              return (
+                <path
+                  key={`d${r.id}`}
+                  d={path}
+                  fill="none"
+                  stroke={conflict ? '#d84b3d' : '#8a8375'}
+                  strokeWidth={1.4}
+                  strokeDasharray={conflict ? '4 3' : undefined}
+                  markerEnd={`url(#gdep${conflict ? '-warn' : ''}-${id})`}
+                  pointerEvents="none"
+                  data-dep-of={r.id}
+                  data-conflict={conflict ? '1' : '0'}
+                />
               );
             })}
             {/* Heute-Linie */}

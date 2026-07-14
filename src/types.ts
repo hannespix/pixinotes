@@ -99,6 +99,10 @@ export interface GanttRow {
   color?: string;
   /** 0–100 */
   progress?: number;
+  /** Vorgänger-Vorgang (Finish-to-Start-Abhängigkeit) */
+  dep?: string;
+  /** Ressource/Person (z. B. „Anna") */
+  who?: string;
 }
 export interface GanttData {
   title: string;
@@ -109,8 +113,16 @@ export interface GanttData {
 }
 export type GanttNode = Node<GanttData, 'gantt'>;
 
+/** Kalender-Karte: zeigt Fristen & Zeitplan-Einträge aller Boards im Monatsraster */
+export interface CalendarData {
+  /** angezeigter Monat als yyyy-mm; fehlt ⇒ aktueller Monat */
+  month?: string;
+  [key: string]: unknown;
+}
+export type CalendarNode = Node<CalendarData, 'calendar'>;
+
 export type AppNode =
-  | NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode;
+  | NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode;
 
 export const KANBAN_COLS = ['To Do', 'Doing', 'Done'] as const;
 /** Effektive Spalten eines Kanban-Boards — Default für alte Boards ohne `cols` */

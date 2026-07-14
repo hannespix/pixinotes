@@ -21,6 +21,7 @@ const TYPE_ICON: Record<string, string> = {
   email: '📧',
   kanban: '📋',
   gantt: '📅',
+  calendar: '🗓️',
   image: '🖼️',
   file: '📎',
   portal: '🗂️',

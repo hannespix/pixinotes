@@ -25,6 +25,7 @@ import { PortalCard } from './nodes/PortalCard';
 import { ShapeCard } from './nodes/ShapeCard';
 import { MermaidCard } from './nodes/MermaidCard';
 import { GanttCard } from './nodes/GanttCard';
+import { CalendarCard } from './nodes/CalendarCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { DrawingLayer } from './DrawingLayer';
 import { SelectionToolbar } from './SelectionToolbar';
@@ -39,6 +40,7 @@ const nodeTypes: NodeTypes = {
   shape: ShapeCard,
   mermaid: MermaidCard,
   gantt: GanttCard,
+  calendar: CalendarCard,
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
