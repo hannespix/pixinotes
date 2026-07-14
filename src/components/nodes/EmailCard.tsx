@@ -7,6 +7,7 @@ import { enrichText } from '../../lib/entities';
 import { formatBytes, isImageMime } from '../../lib/parseEmail';
 import { uid } from '../../types';
 import { CardShell } from './CardShell';
+import { DueChips } from './DueChips';
 
 const PREVIEW_CHARS = 420;
 
@@ -107,6 +108,7 @@ export function EmailCard({ id, data, positionAbsoluteX, positionAbsoluteY }: No
           ))}
         </div>
       )}
+      <DueChips text={email.text} context={email.subject} />
       <div className="card-actions">
         <button className="nodrag" onClick={reply}>↩ Antworten</button>
       </div>

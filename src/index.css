@@ -131,6 +131,17 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .chip:hover { transform: translateY(-1px) scale(1.03); border-color: var(--accent); }
 .chip-size { color: var(--muted); font-size: 10px; }
 
+/* ---------- Fristen-Chips ---------- */
+.due-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; padding: 0 4px; }
+.due-chip {
+  font-size: 10.5px; font-family: inherit; border-radius: 999px; cursor: pointer;
+  padding: 3px 9px; border: 1px solid transparent; white-space: nowrap;
+  background: rgba(0, 0, 0, 0.05); color: var(--ink);
+}
+.due-chip:hover { border-color: var(--accent); }
+.due-soon { background: #ffe4b8; color: #8a5a00; }
+.due-overdue { background: #ffd2cc; color: #a4231a; font-weight: 700; }
+
 .card-actions { display: flex; gap: 6px; margin-top: 10px; }
 .card-actions button {
   font-size: 11px; border: none; background: rgba(0, 0, 0, 0.06); border-radius: 7px;

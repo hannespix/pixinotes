@@ -15,6 +15,7 @@
     "@kenjiuno/msgreader": "^1.28.0",
     "@xyflow/react": "^12.6.0",
     "canvas-confetti": "^1.9.3",
+    "chrono-node": "^2.10.0",
     "libphonenumber-js": "^1.11.0",
     "postal-mime": "^2.4.0",
     "react": "^18.3.1",

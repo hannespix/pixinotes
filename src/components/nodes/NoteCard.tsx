@@ -6,9 +6,18 @@ import type { PartialBlock } from '@blocknote/core';
 import * as locales from '@blocknote/core/locales';
 import { useBoard } from '../../store';
 import type { NoteData, StickyColor } from '../../types';
+import { blocksToText } from '../../lib/serialize';
 import { CardShell } from './CardShell';
+import { DueChips } from './DueChips';
 
 const COLORS: StickyColor[] = ['yellow', 'pink', 'mint', 'sky', 'white'];
+
+/** Fristen-Chips für Notizen: Text aus den BlockNote-Blöcken extrahieren */
+function NoteDueChips({ blocks }: { blocks?: unknown[] }) {
+  const text = useMemo(() => blocksToText(blocks), [blocks]);
+  const title = text.split('\n')[0]?.slice(0, 60) || 'Notiz';
+  return <DueChips text={text} context={title} />;
+}
 
 /** Haftnotiz mit vollem Notion-artigem Block-Editor (BlockNote, MPL-2.0). */
 export function NoteCard({ id, data }: NodeProps) {
@@ -46,6 +55,7 @@ export function NoteCard({ id, data }: NodeProps) {
           onChange={() => updateNodeData(id, { blocks: editor.document })}
         />
       </div>
+      <NoteDueChips blocks={noteData.blocks} />
     </CardShell>
   );
 }
