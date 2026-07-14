@@ -5,8 +5,10 @@ import { uid } from '../types';
 
 const EMPTY: Stroke[] = [];
 const PEN = { width: 2.5, opacity: 1 };
-const MARKER = { width: 16, opacity: 0.35 };
-const COLORS = ['#2b2a27', '#e0392b', '#e8a13a', '#3fa564', '#4f7cff', '#a05fd4'];
+const MARKER = { width: 16, opacity: 0.5 };
+const PEN_COLORS = ['#2b2a27', '#e0392b', '#e8a13a', '#3fa564', '#4f7cff', '#a05fd4'];
+/** Textmarker: echte Neon-Töne wie beim Leuchtstift (gelb/grün/orange/pink/cyan/lila) */
+const MARKER_COLORS = ['#fff200', '#aaff00', '#ff9100', '#ff2d95', '#00e5ff', '#c45fff'];
 
 /**
  * Freihand-Zeichnen über dem Board: Stift (deckend) und Textmarker (breit,
@@ -23,12 +25,19 @@ export function DrawingLayer() {
   const eraseStrokesNear = useBoard((s) => s.eraseStrokesNear);
   const { screenToFlowPosition } = useReactFlow();
   const { x: tx, y: ty, zoom } = useViewport();
-  const [color, setColor] = useState('#2b2a27');
+  // Stift und Textmarker merken sich ihre Farbe getrennt — der Marker startet neongelb
+  const [penColor, setPenColor] = useState(PEN_COLORS[0]);
+  const [markerColor, setMarkerColor] = useState(MARKER_COLORS[0]);
   const drawing = useRef<Stroke | null>(null);
   const [, force] = useState(0);
 
   const active = tool === 'pen' || tool === 'marker' || tool === 'eraser';
   if (!active) return null;
+
+  const isMarker = tool === 'marker';
+  const palette = isMarker ? MARKER_COLORS : PEN_COLORS;
+  const color = isMarker ? markerColor : penColor;
+  const setColor = isMarker ? setMarkerColor : setPenColor;
 
   const toFlow = (e: React.PointerEvent): [number, number] => {
     const p = screenToFlowPosition({ x: e.clientX, y: e.clientY });
@@ -36,7 +45,8 @@ export function DrawingLayer() {
   };
 
   const onDown = (e: React.PointerEvent) => {
-    (e.target as Element).setPointerCapture(e.pointerId);
+    // Capture kann bei exotischen/synthetischen Pointern fehlschlagen — Zeichnen geht trotzdem
+    try { (e.target as Element).setPointerCapture(e.pointerId); } catch { /* ignorieren */ }
     const pt = toFlow(e);
     if (tool === 'eraser') { eraseStrokesNear(pt[0], pt[1], 12 / zoom); return; }
     drawing.current = {
@@ -86,12 +96,14 @@ export function DrawingLayer() {
               strokeLinecap="round"
               strokeLinejoin="round"
               opacity={s.tool === 'marker' ? MARKER.opacity : PEN.opacity}
+              // Multiply lässt den Text unter dem Marker durchscheinen — wie beim echten Leuchtstift
+              style={s.tool === 'marker' ? { mixBlendMode: 'multiply' } : undefined}
             />
           ))}
         </g>
       </svg>
       <div className="draw-palette">
-        {COLORS.map((c) => (
+        {palette.map((c) => (
           <button
             key={c}
             className={`draw-swatch ${color === c ? 'active' : ''}`}

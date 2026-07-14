@@ -439,7 +439,9 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   .card-x { width: 28px; height: 28px; font-size: 13px; top: -13px; right: -13px; }
   .color-dot { width: 22px; height: 22px; top: 6px; right: 8px; }
   .pn-handle { width: 16px !important; height: 16px !important; }
-  .dock button { width: 50px; height: 50px; font-size: 22px; }
+  /* Nur Werkzeugleisten-Buttons — Menü-Einträge behalten ihre Listenform */
+  .dock > button, .dock-add-wrap > button { width: 50px; height: 50px; font-size: 22px; }
+  .dock-menu button { padding: 10px 12px; font-size: 14px; }
   .kanban-item-actions button { padding: 5px 9px; font-size: 13px; }
   .chip { padding: 6px 13px; font-size: 12px; }
   .card-actions button { padding: 7px 12px; font-size: 12px; }
@@ -623,9 +625,11 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* ---------- Zeichen-Layer ---------- */
 .drawing-layer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 6; touch-action: none; }
 .draw-palette {
-  position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%);
+  position: fixed; left: 50%; bottom: 78px; transform: translateX(-50%);
   display: flex; align-items: center; gap: 6px; z-index: 55;
   background: #fff; border-radius: 12px; padding: 7px 10px; box-shadow: 0 4px 24px rgba(50,40,20,.18);
+  /* Schmale Screens: umbrechen statt überlaufen */
+  flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 20px);
 }
 .draw-swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
 .draw-swatch.active { box-shadow: 0 0 0 2px var(--accent); }
@@ -640,6 +644,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   position: absolute; bottom: 54px; left: 0; background: #fff; border-radius: 12px;
   box-shadow: 0 6px 28px rgba(50,40,20,.22); padding: 6px; display: flex; flex-direction: column;
   gap: 2px; min-width: 190px;
+  /* Auf kleinen Screens nie unter Topbar/Tabs schieben — lieber intern scrollen */
+  max-height: calc(100vh - 170px); overflow-y: auto;
 }
 .dock-menu button {
   width: 100%; text-align: left; border: none; background: none; font-family: inherit;
@@ -750,3 +756,25 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ai-btn:hover:not(:disabled) { background: rgba(124, 92, 255, 0.22) !important; }
 .ai-btn:disabled { opacity: 0.6; cursor: default; }
 .note-ai { padding: 0 6px 2px; margin-top: 4px; }
+
+/* ---------- Touch: Untermenüs über dem höheren Dock (50px-Buttons) ansetzen.
+   Muss NACH den Basisregeln von .draw-palette/.dock-menu stehen, sonst
+   verliert der Override bei gleicher Spezifität. ---------- */
+@media (pointer: coarse) {
+  .draw-palette { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .dock-menu { bottom: 68px; }
+}
+
+/* ---------- Sehr schmale Screens: Dock muss komplett ins Bild passen,
+   sonst ragen ➕-Menü & Buttons seitlich raus ---------- */
+@media (max-width: 520px) {
+  .dock {
+    max-width: calc(100vw - 12px);
+    gap: 2px; padding: 6px;
+  }
+  /* Nur die Werkzeugleisten-Buttons verkleinern — NICHT die Einträge im ➕-Menü */
+  .dock > button, .dock-add-wrap > button { width: 40px; height: 40px; font-size: 18px; }
+  .dock-sep { margin: 2px 1px; }
+  /* Menü am linken Dock-Rand ausrichten, aber nie über den Viewport hinaus */
+  .dock-menu { bottom: 52px; max-width: calc(100vw - 20px); }
+}
