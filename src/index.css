@@ -270,42 +270,16 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 
 /* ---------- Übersicht (Mission Control) ---------- */
-.overview {
-  height: 100%; overflow-y: auto; background: var(--bg);
-  padding: 84px 28px 60px;
-}
-.ov-head { max-width: 1100px; margin: 0 auto 22px; }
-.ov-head h1 { font-size: 24px; margin: 0 0 4px; letter-spacing: -0.02em; }
-.ov-sub { font-size: 12.5px; color: var(--muted); margin: 0; }
-
-.ov-space {
-  max-width: 1100px; margin: 0 auto 26px;
-  background: rgba(255, 255, 255, 0.55); border-radius: 18px;
-  border-left: 4px solid; padding: 16px 18px 18px;
-  box-shadow: 0 2px 12px rgba(50, 40, 20, 0.06);
-}
-.ov-space-head, .ov-project-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-}
-.ov-space-name { font-size: 16.5px; font-weight: 800; cursor: default; }
 .ov-head-actions { display: flex; gap: 4px; opacity: 0.55; transition: opacity 0.15s; }
-.ov-space:hover .ov-space-head .ov-head-actions,
-.ov-project:hover .ov-project-head .ov-head-actions { opacity: 1; }
+.ovc-space:hover .ov-head-actions, .ovc-project:hover .ov-head-actions { opacity: 1; }
 .ov-head-actions button {
   border: none; background: rgba(0, 0, 0, 0.05); border-radius: 7px;
   font-family: inherit; font-size: 11.5px; padding: 4px 9px; cursor: pointer; color: var(--ink);
 }
 .ov-head-actions button:hover { background: rgba(0, 0, 0, 0.1); }
 
-.ov-projects { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
-.ov-project {
-  background: rgba(255, 255, 255, 0.75); border-radius: 13px; padding: 12px 14px;
-  border: 1.5px dashed transparent; transition: border-color 0.15s, background 0.15s;
-}
-.ov-project.drag-over { border-color: var(--accent); background: #eef4ff; }
 .ov-project-name { font-size: 13.5px; font-weight: 700; color: var(--ink); }
 
-.ov-boards { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
 .ov-board {
   position: relative; width: 190px; background: #fffdf7; border-radius: 12px;
   border-top: 4px solid; padding: 12px 12px 10px; cursor: pointer;
@@ -315,12 +289,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ov-board:active { cursor: grabbing; }
 .ov-board-name { font-size: 13px; font-weight: 700; display: block; margin-bottom: 3px; word-break: break-word; }
 .ov-board-meta { font-size: 10.5px; color: var(--muted); margin-bottom: 8px; }
-.ov-board-x {
-  position: absolute; top: 6px; right: 7px; border: none; background: none;
-  font-size: 10px; color: var(--muted); cursor: pointer; padding: 3px;
-  opacity: 0; transition: opacity 0.15s;
-}
-.ov-board:hover .ov-board-x { opacity: 0.8; }
 .ov-minimap {
   width: 100%; height: 52px; background: rgba(0, 0, 0, 0.04); border-radius: 7px; display: block;
 }
@@ -330,13 +298,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .ov-empty { font-size: 12px; color: var(--muted); padding: 10px 4px; }
 .ov-empty.small { font-size: 11px; padding: 12px; border: 1.5px dashed #ddd6c6; border-radius: 9px; }
-.ov-add-space {
-  display: block; max-width: 1100px; margin: 0 auto; width: 100%;
-  border: 2px dashed #d5cfc0; background: none; border-radius: 14px;
-  font-family: inherit; font-size: 13px; color: var(--muted);
-  padding: 14px; cursor: pointer;
-}
-.ov-add-space:hover { border-color: var(--accent); color: var(--accent); }
 .inline-edit {
   border: none; outline: 2px solid var(--accent); border-radius: 6px;
   font-family: inherit; font-size: inherit; font-weight: inherit;
@@ -350,7 +311,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .tab-home.active { background: #e8efff; }
 
 @media (pointer: coarse) {
-  .ov-head-actions, .ov-board-x { opacity: 1 !important; }
+  .ov-head-actions { opacity: 1 !important; }
 }
 
 /* ---------- Dock ---------- */
@@ -440,8 +401,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .react-flow__node.selected .card-x,
 .react-flow__node.selected .pn-handle,
 .react-flow__node.selected .color-dot,
-.react-flow__node.selected .kanban-item-actions,
-.react-flow__node.selected .tab-x {
+.react-flow__node.selected .kanban-item-actions {
   opacity: 1;
 }
 

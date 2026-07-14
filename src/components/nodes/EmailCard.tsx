@@ -1,23 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
-import { useReactFlow } from '@xyflow/react';
 import { useBoard } from '../../store';
-import type { EmailData } from '../../types';
+import type { EmailNode, ParsedAttachment } from '../../types';
 import { enrichText } from '../../lib/entities';
 import { formatBytes, isImageMime } from '../../lib/parseEmail';
-import { uid } from '../../types';
+import { makeImage } from '../../lib/nodes';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
 
 const PREVIEW_CHARS = 420;
 
 /** E-Mail als lebendige Karte: Absender, Text mit klickbaren Entities, Anhänge als Chips. */
-export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsoluteY }: NodeProps) {
-  const email = data as unknown as EmailData;
+export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsoluteY }: NodeProps<EmailNode>) {
+  const email = data;
   const [expanded, setExpanded] = useState(false);
   const addNode = useBoard((s) => s.addNode);
   const showToast = useBoard((s) => s.showToast);
-  useReactFlow(); // hält die Karte im Flow-Kontext
 
   const initials = email.fromName
     .split(/\s+/)
@@ -39,17 +37,13 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
 
   const text = expanded ? email.text : email.text.slice(0, PREVIEW_CHARS);
   const truncated = email.text.length > PREVIEW_CHARS;
+  // Entity-Erkennung (libphonenumber etc.) nicht bei jedem Render neu (Audit PERF-2)
+  const enriched = useMemo(() => enrichText(text), [text]);
 
-  const openAttachment = (att: EmailData['attachments'][number]) => {
+  const openAttachment = (att: ParsedAttachment) => {
     if (att.dataUrl && isImageMime(att.mime)) {
       // Bild-Anhang wird eine eigene Bild-Karte neben der E-Mail
-      addNode({
-        id: uid(),
-        type: 'image',
-        width: 260,
-        position: { x: positionAbsoluteX + 340, y: positionAbsoluteY + 40 },
-        data: { src: att.dataUrl, name: att.name },
-      });
+      addNode(makeImage({ x: positionAbsoluteX + 340, y: positionAbsoluteY + 40 }, att.dataUrl, att.name));
       showToast(`🖼️ „${att.name}" als eigene Karte herausgelöst`);
     } else if (att.dataUrl) {
       const a = document.createElement('a');
@@ -62,9 +56,12 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
   };
 
   const reply = () => {
-    const to = email.fromAddress ?? '';
+    // Nur echte Adressen durchlassen — präparierte From-Header könnten sonst
+    // mailto-Parameter injizieren (?bcc=…&body=…) (Audit SEC-2)
+    const raw = email.fromAddress ?? '';
+    const to = /^[\w.+-]+@[\w-]+(\.[\w-]+)+$/.test(raw) ? raw : '';
     const subject = encodeURIComponent(`Re: ${email.subject}`);
-    window.open(`mailto:${to}?subject=${subject}`, '_self');
+    window.open(`mailto:${encodeURIComponent(to)}?subject=${subject}`, '_self');
   };
 
   return (
@@ -81,7 +78,7 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
         </div>
       </div>
       <p className="email-body nodrag">
-        {enrichText(text)}
+        {enriched}
         {truncated && !expanded ? '… ' : ' '}
         {truncated && (
           <button className="link-btn nodrag" onClick={() => setExpanded(!expanded)}>

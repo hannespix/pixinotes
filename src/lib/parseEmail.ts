@@ -4,7 +4,12 @@ import PostalMime from 'postal-mime';
 import type { EmailData, ParsedAttachment } from '../types';
 
 /** Anhänge nur bis zu dieser Größe als data:-URL einbetten (localStorage-Budget!) */
-const MAX_EMBED_BYTES = 1_500_000;
+export const MAX_EMBED_BYTES = 1_500_000;
+
+/** Aktive Inhalte nicht als solche ausliefern — Download statt Render (Audit SEC-3) */
+function safeMime(mime?: string): string {
+  return mime && /text\/html|application\/xhtml/i.test(mime) ? 'application/octet-stream' : (mime || 'application/octet-stream');
+}
 
 function bytesToDataUrl(bytes: Uint8Array, mime = 'application/octet-stream'): string {
   let binary = '';
@@ -27,7 +32,7 @@ export async function parseEml(buffer: ArrayBuffer): Promise<EmailData> {
       size,
       dataUrl:
         content && size > 0 && size <= MAX_EMBED_BYTES
-          ? bytesToDataUrl(content, a.mimeType)
+          ? bytesToDataUrl(content, safeMime(a.mimeType))
           : undefined,
     };
   });
@@ -58,7 +63,7 @@ export async function parseMsg(buffer: ArrayBuffer): Promise<EmailData> {
       if (file?.content) {
         size = file.content.byteLength;
         if (size <= MAX_EMBED_BYTES) {
-          dataUrl = bytesToDataUrl(file.content, guessMime(att.fileName ?? ''));
+          dataUrl = bytesToDataUrl(file.content, safeMime(guessMime(att.fileName ?? '')));
         }
       }
     } catch {

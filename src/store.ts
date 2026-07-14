@@ -11,13 +11,13 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import { seedEdges, seedNodes } from './seed';
-import { uid } from './types';
+import { uid, type AppNode } from './types';
 
 /** Ebene 3: Ein Board = eine Leinwand voller Karten. */
 export interface BoardDoc {
   id: string;
   name: string;
-  nodes: Node[];
+  nodes: AppNode[];
   edges: Edge[];
 }
 
@@ -43,7 +43,7 @@ interface Toast {
 
 interface DeletedSnapshot {
   boardId: string;
-  nodes: Node[];
+  nodes: AppNode[];
   edges: Edge[];
 }
 
@@ -59,7 +59,8 @@ interface BoardState {
   // Navigation
   setView: (view: 'overview' | 'board') => void;
   openBoard: (id: string) => void;
-  setActiveBoard: (id: string) => void;
+  searchOpen: boolean;
+  setSearchOpen: (open: boolean) => void;
 
   // Hierarchie (Bereiche / Projekte / Boards)
   addSpace: (name?: string) => void;
@@ -78,7 +79,7 @@ interface BoardState {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
-  addNode: (node: Node) => void;
+  addNode: (node: AppNode) => void;
   removeNode: (id: string) => void;
   removeNodes: (ids: string[]) => void;
   restoreDeleted: () => void;
@@ -179,6 +180,7 @@ export const useBoard = create<BoardState>()(
         spaces: defaultHierarchy(['main']),
         activeId: 'main',
         view: 'board',
+        searchOpen: false,
         toast: null,
         pendingFocus: null,
         lastDeleted: null,
@@ -189,9 +191,7 @@ export const useBoard = create<BoardState>()(
           if (get().boards.some((b) => b.id === id)) set({ activeId: id, view: 'board' });
         },
 
-        setActiveBoard: (id) => {
-          if (get().boards.some((b) => b.id === id)) set({ activeId: id });
-        },
+        setSearchOpen: (open) => set({ searchOpen: open }),
 
         addSpace: (name) =>
           set({
@@ -336,7 +336,7 @@ export const useBoard = create<BoardState>()(
             .filter((c): c is Extract<NodeChange, { type: 'remove' }> => c.type === 'remove')
             .map((c) => c.id);
           const rest = changes.filter((c) => c.type !== 'remove');
-          if (rest.length) patchActive((b) => ({ nodes: applyNodeChanges(rest, b.nodes) }));
+          if (rest.length) patchActive((b) => ({ nodes: applyNodeChanges(rest, b.nodes) as AppNode[] }));
           if (removeIds.length) get().removeNodes(removeIds);
         },
 
@@ -381,7 +381,7 @@ export const useBoard = create<BoardState>()(
               b.id === snap.boardId
                 ? {
                     ...b,
-                    nodes: [...b.nodes, ...snap.nodes.map((n) => ({ ...n, selected: false }))],
+                    nodes: [...b.nodes, ...snap.nodes.map((n) => ({ ...n, selected: false }) as AppNode)],
                     edges: [...b.edges, ...snap.edges],
                   }
                 : b,
@@ -394,14 +394,14 @@ export const useBoard = create<BoardState>()(
         updateNodeData: (id, data) =>
           patchActive((b) => ({
             nodes: b.nodes.map((n) =>
-              n.id === id ? { ...n, data: { ...n.data, ...data } } : n,
+              n.id === id ? ({ ...n, data: { ...n.data, ...data } } as AppNode) : n,
             ),
           })),
 
         setNodePosition: (id, x, y) =>
           patchActive((b) => ({
             nodes: b.nodes.map((n) =>
-              n.id === id ? { ...n, position: { x, y } } : n,
+              n.id === id ? ({ ...n, position: { x, y } } as AppNode) : n,
             ),
           })),
 

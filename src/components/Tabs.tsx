@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { useBoard } from '../store';
+import { InlineName } from './InlineName';
 
 /**
  * Projekt-Tabs: jedes Board ist ein Raum. Doppelklick = umbenennen,
@@ -15,19 +15,6 @@ export function Tabs() {
   const renameBoard = useBoard((s) => s.renameBoard);
   const removeBoard = useBoard((s) => s.removeBoard);
   const showToast = useBoard((s) => s.showToast);
-
-  const [editing, setEditing] = useState<string | null>(null);
-  const [draft, setDraft] = useState('');
-
-  const startEdit = (id: string, name: string) => {
-    setEditing(id);
-    setDraft(name);
-  };
-
-  const commitEdit = () => {
-    if (editing && draft.trim()) renameBoard(editing, draft.trim());
-    setEditing(null);
-  };
 
   const close = (id: string) => {
     if (boards.length <= 1) {
@@ -55,38 +42,21 @@ export function Tabs() {
           key={b.id}
           className={`tab ${b.id === activeId && view === 'board' ? 'active' : ''}`}
           onClick={() => openBoard(b.id)}
-          onDoubleClick={() => startEdit(b.id, b.name)}
-          title="Klick = wechseln · Doppelklick = umbenennen"
+          title="Klick = wechseln · Doppelklick auf den Namen = umbenennen"
         >
-          {editing === b.id ? (
-            <input
-              autoFocus
-              value={draft}
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={commitEdit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitEdit();
-                if (e.key === 'Escape') setEditing(null);
-              }}
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <>
-              <span className="tab-name">{b.name}</span>
-              <span className="tab-count">{b.nodes.length}</span>
-              <button
-                className="tab-x"
-                title="Board schließen"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  close(b.id);
-                }}
-              >
-                ✕
-              </button>
-            </>
-          )}
+          <InlineName value={b.name} className="tab-name" onRename={(name) => renameBoard(b.id, name)} />
+          <span className="tab-count">{b.nodes.length}</span>
+          <button
+            className="tab-x"
+            title="Board schließen"
+            aria-label={`Board ${b.name} schließen`}
+            onClick={(e) => {
+              e.stopPropagation();
+              close(b.id);
+            }}
+          >
+            ✕
+          </button>
         </div>
       ))}
       <button

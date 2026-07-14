@@ -1,6 +1,6 @@
 import { useReactFlow } from '@xyflow/react';
 import { useBoard } from '../store';
-import { uid } from '../types';
+import { makeKanban, makeNote, makePortal } from '../lib/nodes';
 
 /** Das Werkzeug-Dock: bewusst nur eine Handvoll Knöpfe. */
 export function Dock() {
@@ -14,23 +14,17 @@ export function Dock() {
       y: window.innerHeight / 2 - h / 2 + (Math.random() * 60 - 30),
     });
 
+  const setSearchOpen = useBoard((s) => s.setSearchOpen);
+
   const addNote = () => {
-    addNode({ id: uid(), type: 'note', width: 270, position: centerPos(), data: { color: 'yellow', blocks: [] } });
+    addNode(makeNote(centerPos()));
     showToast('Notiz erstellt — Tipp: Doppelklick aufs Board geht noch schneller!');
   };
 
-  const addKanban = () => {
-    addNode({
-      id: uid(),
-      type: 'kanban',
-      width: 430,
-      position: centerPos(420, 200),
-      data: { title: '📋 Neues Board', items: [] },
-    });
-  };
+  const addKanban = () => addNode(makeKanban(centerPos(420, 200)));
 
   const addPortal = () => {
-    addNode({ id: uid(), type: 'portal', width: 200, position: centerPos(200, 140), data: {} });
+    addNode(makePortal(centerPos(200, 140)));
     showToast('🗂️ Portal-Karte: verlinke damit ein anderes Projekt-Board');
   };
 
@@ -39,10 +33,7 @@ export function Dock() {
       <button onClick={addNote} title="Neue Notiz (oder Doppelklick aufs Board)">📝</button>
       <button onClick={addKanban} title="Neues Kanban-Board">📋</button>
       <button onClick={addPortal} title="Portal zu einem anderen Projekt-Board">🗂️</button>
-      <button
-        onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
-        title="Suche über alle Boards (Strg+K)"
-      >
+      <button onClick={() => setSearchOpen(true)} title="Suche über alle Boards (Strg+K)" aria-label="Suche">
         🔍
       </button>
       <button

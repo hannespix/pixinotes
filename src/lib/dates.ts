@@ -1,6 +1,6 @@
 // Fristen-Erkennung: chrono-node (deutsch) findet Datumsangaben wie
 // „bis Freitag", „am 24.07." oder „nächste Woche" in Kartentexten.
-import * as chrono from 'chrono-node';
+import { de as chronoDe, type ParsedResult } from 'chrono-node';
 
 export interface DetectedDate {
   /** Originaltext, z. B. „bis Freitag" */
@@ -12,9 +12,9 @@ export interface DetectedDate {
 
 export function detectDates(text: string, ref: Date = new Date()): DetectedDate[] {
   if (!text) return [];
-  let results: chrono.ParsedResult[] = [];
+  let results: ParsedResult[] = [];
   try {
-    results = chrono.de.parse(text, ref, { forwardDate: true });
+    results = chronoDe.parse(text, ref, { forwardDate: true });
   } catch {
     return [];
   }

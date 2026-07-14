@@ -11,9 +11,9 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
-import { uid, type StickyColor } from '../types';
-import { guessMime, parseEml, parseMsg } from '../lib/parseEmail';
-import { imageFileToDataUrl } from '../lib/image';
+import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from '../lib/parseEmail';
+import { imageFileToDataUrl, readFileAsDataUrl } from '../lib/image';
+import { makeEmail, makeFile, makeImage, makeNote } from '../lib/nodes';
 import { NoteCard } from './nodes/NoteCard';
 import { EmailCard } from './nodes/EmailCard';
 import { ImageCard } from './nodes/ImageCard';
@@ -30,10 +30,6 @@ const nodeTypes: NodeTypes = {
   kanban: KanbanCard,
   portal: PortalCard,
 };
-
-const STICKY_ROTATION: StickyColor[] = ['yellow', 'pink', 'mint', 'sky'];
-let colorIdx = 0;
-const nextColor = () => STICKY_ROTATION[colorIdx++ % STICKY_ROTATION.length];
 
 /** Physik: Reibung pro Frame für den „Wurf" nach dem Loslassen */
 const FRICTION = 0.93;
@@ -54,7 +50,6 @@ export function Board() {
   const { screenToFlowPosition, setCenter } = useReactFlow();
   const pendingFocus = useBoard((s) => s.pendingFocus);
   const clearPendingFocus = useBoard((s) => s.clearPendingFocus);
-  const onNodesChangeStore = onNodesChange;
 
   // Suche: nach Board-Wechsel zur gefundenen Karte fliegen und sie markieren
   useEffect(() => {
@@ -65,13 +60,13 @@ export function Board() {
       const w = node.measured?.width ?? 280;
       const h = node.measured?.height ?? 120;
       setCenter(node.position.x + w / 2, node.position.y + h / 2, { zoom: 1, duration: 650 });
-      onNodesChangeStore(
+      onNodesChange(
         nodes.map((n) => ({ id: n.id, type: 'select' as const, selected: n.id === node.id })),
       );
       clearPendingFocus();
     }, 80);
     return () => clearTimeout(t);
-  }, [pendingFocus, activeId, nodes, setCenter, clearPendingFocus, onNodesChangeStore]);
+  }, [pendingFocus, activeId, nodes, setCenter, clearPendingFocus, onNodesChange]);
 
   // Tastatur: N = neue Notiz in Bildschirmmitte (außerhalb von Eingabefeldern)
   useEffect(() => {
@@ -79,13 +74,7 @@ export function Board() {
       if (e.key.toLowerCase() !== 'n' || e.metaKey || e.ctrlKey || e.altKey) return;
       const target = e.target as HTMLElement;
       if (target.closest('input, textarea, [contenteditable="true"]')) return;
-      addNode({
-        id: uid(),
-        type: 'note',
-        width: 270,
-        position: screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 40 }),
-        data: { color: nextColor(), blocks: [] },
-      });
+      addNode(makeNote(screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 40 })));
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -146,7 +135,7 @@ export function Board() {
   // ---------- Karten erstellen ----------
   const addNote = useCallback(
     (pos: { x: number; y: number }) => {
-      addNode({ id: uid(), type: 'note', width: 270, position: pos, data: { color: nextColor(), blocks: [] } });
+      addNode(makeNote(pos));
     },
     [addNode],
   );
@@ -197,13 +186,7 @@ export function Board() {
       if (files.length === 0) {
         const text = e.dataTransfer.getData('text/plain');
         if (text) {
-          addNode({
-            id: uid(),
-            type: 'note',
-            width: 270,
-            position: basePos,
-            data: { color: nextColor(), blocks: [{ type: 'paragraph', content: text }] },
-          });
+          addNode(makeNote(basePos, { blocks: [{ type: 'paragraph', content: text }] }));
           showToast('Text als Notiz abgelegt 📝');
         }
         return;
@@ -218,24 +201,18 @@ export function Board() {
         try {
           if (ext === 'eml' || file.type === 'message/rfc822') {
             const email = await parseEml(await file.arrayBuffer());
-            addNode({ id: uid(), type: 'email', width: 320, position: pos, data: email });
+            addNode(makeEmail(pos, email));
             showToast(`📧 „${email.subject}" importiert — ${email.attachments.length} Anhänge als Chips`);
           } else if (ext === 'msg') {
             const email = await parseMsg(await file.arrayBuffer());
-            addNode({ id: uid(), type: 'email', width: 320, position: pos, data: email });
+            addNode(makeEmail(pos, email));
             showToast(`📧 Outlook-Mail „${email.subject}" importiert`);
           } else if (file.type.startsWith('image/')) {
             const src = await imageFileToDataUrl(file);
-            addNode({ id: uid(), type: 'image', width: 260, position: pos, data: { src, name: file.name } });
+            addNode(makeImage(pos, src, file.name));
           } else {
-            const dataUrl = file.size <= 1_500_000 ? await fileToDataUrl(file) : undefined;
-            addNode({
-              id: uid(),
-              type: 'file',
-              width: 240,
-              position: pos,
-              data: { name: file.name, size: file.size, mime: file.type || guessMime(file.name), dataUrl },
-            });
+            const dataUrl = file.size <= MAX_EMBED_BYTES ? await readFileAsDataUrl(file) : undefined;
+            addNode(makeFile(pos, { name: file.name, size: file.size, mime: file.type || guessMime(file.name), dataUrl }));
           }
         } catch (err) {
           console.error('Import fehlgeschlagen:', err);
@@ -260,7 +237,7 @@ export function Board() {
         if (!file) return;
         const src = await imageFileToDataUrl(file);
         const pos = screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 90 });
-        addNode({ id: uid(), type: 'image', width: 260, position: pos, data: { src, name: 'Screenshot' } });
+        addNode(makeImage(pos, src, 'Screenshot'));
         showToast('🖼️ Screenshot eingefügt');
       }
     },
@@ -324,11 +301,4 @@ export function Board() {
   );
 }
 
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
+

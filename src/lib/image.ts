@@ -7,7 +7,7 @@ const MAX_DIMENSION = 1600;      // längste Kante nach Skalierung
 const HARD_DIMENSION = 2400;     // darüber wird immer skaliert (auch bei kleinen Dateien)
 
 export async function imageFileToDataUrl(file: File): Promise<string> {
-  const raw = await readAsDataUrl(file);
+  const raw = await readFileAsDataUrl(file);
   const img = await loadImage(raw).catch(() => null);
   if (!img) return raw;
   const maxSide = Math.max(img.width, img.height);
@@ -25,7 +25,7 @@ export async function imageFileToDataUrl(file: File): Promise<string> {
   return jpeg.length < raw.length ? jpeg : raw;
 }
 
-function readAsDataUrl(file: File): Promise<string> {
+export function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result as string);

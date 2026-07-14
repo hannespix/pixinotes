@@ -1,5 +1,5 @@
 import type { NodeProps } from '@xyflow/react';
-import type { FileData } from '../../types';
+import type { FileNode } from '../../types';
 import { formatBytes } from '../../lib/parseEmail';
 import { CardShell } from './CardShell';
 
@@ -15,8 +15,8 @@ const ICONS: Record<string, string> = {
 };
 
 /** Beliebige Datei als Karte mit Icon, Name und Größe. */
-export function FileCard({ id, data, selected }: NodeProps) {
-  const file = data as unknown as FileData;
+export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
+  const file = data;
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
   const icon = ICONS[ext] ?? '📎';
 

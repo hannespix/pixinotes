@@ -10,7 +10,12 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import { useBoard, type BoardDoc, type Project, type Space } from '../store';
-import type { KanbanData } from '../types';
+import { boardMetaLabel } from '../lib/boardStats';
+import { InlineName } from './InlineName';
+
+interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
+interface ProjectZoneData { project: Project; spaceId: string; [key: string]: unknown }
+interface BoardTileData { board: BoardDoc; projectId: string; accent: string; [key: string]: unknown }
 
 const SPACE_ACCENTS = ['#4f7cff', '#e07a3f', '#3fa564', '#a05fd4', '#d44f6e'];
 
@@ -196,8 +201,8 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[]) {
 
 /* ---------- Zonen & Kacheln ---------- */
 
-function SpaceZone({ data }: NodeProps) {
-  const { space, accent } = data as unknown as { space: Space; accent: string };
+function SpaceZone({ data }: NodeProps<Node<SpaceZoneData, 'ovSpace'>>) {
+  const { space, accent } = data;
   const renameSpace = useBoard((s) => s.renameSpace);
   const removeSpace = useBoard((s) => s.removeSpace);
   const addProject = useBoard((s) => s.addProject);
@@ -214,8 +219,8 @@ function SpaceZone({ data }: NodeProps) {
   );
 }
 
-function ProjectZone({ data }: NodeProps) {
-  const { project } = data as unknown as { project: Project };
+function ProjectZone({ data }: NodeProps<Node<ProjectZoneData, 'ovProject'>>) {
+  const { project } = data;
   const renameProject = useBoard((s) => s.renameProject);
   const removeProject = useBoard((s) => s.removeProject);
   const addBoard = useBoard((s) => s.addBoard);
@@ -233,26 +238,20 @@ function ProjectZone({ data }: NodeProps) {
   );
 }
 
-function BoardTile({ data }: NodeProps) {
-  const { board, accent } = data as unknown as { board: BoardDoc; accent: string };
+function BoardTile({ data }: NodeProps<Node<BoardTileData, 'ovBoard'>>) {
+  const { board, accent } = data;
   const renameBoard = useBoard((s) => s.renameBoard);
   const removeBoard = useBoard((s) => s.removeBoard);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(board.name);
-
-  const openTickets = board.nodes.reduce((acc, n) => {
-    const items = (n.data as Partial<KanbanData>).items;
-    return acc + (Array.isArray(items) ? items.filter((it) => it.col < 2).length : 0);
-  }, 0);
 
   return (
     <div className="ov-board ovc-tile" style={{ borderTopColor: accent }} title="Klick öffnet das Board · Ziehen verschiebt es">
       <span className="ovc-tile-actions nodrag">
         <button
           title="Umbenennen"
+          aria-label="Board umbenennen"
           onClick={(e) => {
             e.stopPropagation();
-            setDraft(board.name);
             setEditing(true);
           }}
         >
@@ -270,30 +269,14 @@ function BoardTile({ data }: NodeProps) {
           ✕
         </button>
       </span>
-      {editing ? (
-        <input
-          className="inline-edit nodrag"
-          autoFocus
-          value={draft}
-          onFocus={(e) => e.target.select()}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => {
-            if (draft.trim()) renameBoard(board.id, draft.trim());
-            setEditing(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-            if (e.key === 'Escape') setEditing(false);
-          }}
-        />
-      ) : (
-        <span className="ov-board-name">{board.name}</span>
-      )}
-      <div className="ov-board-meta">
-        {board.nodes.length} Karten
-        {openTickets > 0 ? ` · ${openTickets} offen` : ''}
-      </div>
+      <InlineName
+        value={board.name}
+        className="ov-board-name"
+        editing={editing}
+        onEditingChange={setEditing}
+        onRename={(name) => renameBoard(board.id, name)}
+      />
+      <div className="ov-board-meta">{boardMetaLabel(board)}</div>
       <BoardMiniMap board={board} accent={accent} />
     </div>
   );
@@ -325,55 +308,3 @@ function BoardMiniMap({ board, accent }: { board: BoardDoc; accent: string }) {
   );
 }
 
-/* ---------- Inline-Umbenennen (Doppelklick) ---------- */
-
-function InlineName({
-  value,
-  onRename,
-  className,
-  style,
-}: {
-  value: string;
-  onRename: (name: string) => void;
-  className?: string;
-  style?: React.CSSProperties;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-
-  if (!editing) {
-    return (
-      <span
-        className={`${className ?? ''} nodrag`}
-        style={style}
-        title="Doppelklick zum Umbenennen"
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          setDraft(value);
-          setEditing(true);
-        }}
-      >
-        {value}
-      </span>
-    );
-  }
-  return (
-    <input
-      className={`${className ?? ''} inline-edit nodrag`}
-      style={style}
-      autoFocus
-      value={draft}
-      onFocus={(e) => e.target.select()}
-      onClick={(e) => e.stopPropagation()}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        if (draft.trim()) onRename(draft.trim());
-        setEditing(false);
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-        if (e.key === 'Escape') setEditing(false);
-      }}
-    />
-  );
-}

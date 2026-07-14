@@ -1,16 +1,16 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
-import * as locales from '@blocknote/core/locales';
+import { de as blockNoteDe } from '@blocknote/core/locales';
 import { useBoard } from '../../store';
-import type { NoteData, StickyColor } from '../../types';
+import { STICKY_COLORS, type NoteNode } from '../../types';
 import { blocksToText } from '../../lib/serialize';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
 
-const COLORS: StickyColor[] = ['yellow', 'pink', 'mint', 'sky', 'white'];
+
 
 /** Fristen-Chips für Notizen: Text aus den BlockNote-Blöcken extrahieren */
 function NoteDueChips({ blocks }: { blocks?: unknown[] }) {
@@ -20,16 +20,16 @@ function NoteDueChips({ blocks }: { blocks?: unknown[] }) {
 }
 
 /** Haftnotiz mit vollem Notion-artigem Block-Editor (BlockNote, MPL-2.0). */
-export function NoteCard({ id, data, selected }: NodeProps) {
-  const noteData = data as unknown as NoteData;
+export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
 
-  const initialContent = useMemo<PartialBlock[] | undefined>(() => {
-    const blocks = noteData.blocks as PartialBlock[] | undefined;
+  // bewusst nur beim Mount gelesen — danach ist der Editor die Quelle der Wahrheit
+  const [initialContent] = useState<PartialBlock[] | undefined>(() => {
+    const blocks = data.blocks as PartialBlock[] | undefined;
     return blocks && blocks.length > 0 ? blocks : undefined;
-  }, []);
+  });
 
-  const editor = useCreateBlockNote({ initialContent, dictionary: locales.de });
+  const editor = useCreateBlockNote({ initialContent, dictionary: blockNoteDe });
 
   // Frische, leere Notiz: sofort den Cursor reinsetzen — lostippen ohne Extra-Klick
   useEffect(() => {
@@ -40,12 +40,12 @@ export function NoteCard({ id, data, selected }: NodeProps) {
   }, [editor, initialContent]);
 
   const cycleColor = () => {
-    const next = COLORS[(COLORS.indexOf(noteData.color) + 1) % COLORS.length];
+    const next = STICKY_COLORS[(STICKY_COLORS.indexOf(data.color) + 1) % STICKY_COLORS.length];
     updateNodeData(id, { color: next });
   };
 
   return (
-    <CardShell id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${noteData.color}`}>
+    <CardShell id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${data.color}`}>
       <button className="color-dot nodrag" title="Farbe wechseln" onClick={cycleColor} />
       <div className="nodrag nowheel note-editor">
         <BlockNoteView
@@ -55,7 +55,7 @@ export function NoteCard({ id, data, selected }: NodeProps) {
           onChange={() => updateNodeData(id, { blocks: editor.document })}
         />
       </div>
-      <NoteDueChips blocks={noteData.blocks} />
+      <NoteDueChips blocks={data.blocks} />
     </CardShell>
   );
 }

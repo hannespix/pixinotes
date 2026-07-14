@@ -1,7 +1,8 @@
-import type { Edge, Node } from '@xyflow/react';
+import type { Edge } from '@xyflow/react';
+import type { AppNode } from './types';
 
 // Startinhalt beim ersten Öffnen: erklärt das Tool durch Benutzung (keine Anleitung nötig)
-export const seedNodes: Node[] = [
+export const seedNodes: AppNode[] = [
   {
     id: 'welcome',
     type: 'note',

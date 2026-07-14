@@ -2,20 +2,20 @@ import { useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
 import { useBoard } from '../../store';
-import { KANBAN_COLS, uid, type KanbanData, type KanbanItem } from '../../types';
+import { DONE_COL, KANBAN_COLS, uid, type KanbanItem, type KanbanNode } from '../../types';
 import { CardShell } from './CardShell';
 
 /** Kanban-Board als Karte. Tickets wandern mit ◀ ▶ durch die Spalten; Done = 🎉 */
-export function KanbanCard({ id, data, selected }: NodeProps) {
-  const kanban = data as unknown as KanbanData;
+export function KanbanCard({ id, data, selected }: NodeProps<KanbanNode>) {
+  const kanban = data;
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const [newText, setNewText] = useState('');
 
   const setItems = (items: KanbanItem[]) => updateNodeData(id, { items });
 
   const move = (item: KanbanItem, dir: -1 | 1) => {
-    const col = Math.max(0, Math.min(KANBAN_COLS.length - 1, item.col + dir));
-    if (col === KANBAN_COLS.length - 1 && item.col !== col) {
+    const col = Math.max(0, Math.min(DONE_COL, item.col + dir));
+    if (col === DONE_COL && item.col !== col) {
       confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
     }
     setItems(kanban.items.map((it) => (it.id === item.id ? { ...it, col } : it)));
@@ -48,12 +48,12 @@ export function KanbanCard({ id, data, selected }: NodeProps) {
               .filter((it) => it.col === colIdx)
               .map((it) => (
                 <div className={`kanban-item col-${colIdx} nodrag`} key={it.id}>
-                  <span className={colIdx === 2 ? 'done-text' : ''}>{it.text}</span>
+                  <span className={colIdx === DONE_COL ? 'done-text' : ''}>{it.text}</span>
                   <span className="kanban-item-actions">
                     {colIdx > 0 && (
                       <button onClick={() => move(it, -1)} title="Zurück">‹</button>
                     )}
-                    {colIdx < KANBAN_COLS.length - 1 && (
+                    {colIdx < DONE_COL && (
                       <button onClick={() => move(it, 1)} title="Weiter">›</button>
                     )}
                     <button onClick={() => remove(it)} title="Entfernen">✕</button>

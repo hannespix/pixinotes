@@ -1,11 +1,8 @@
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
+import { boardMetaLabel } from '../../lib/boardStats';
+import type { PortalNode } from '../../types';
 import { CardShell } from './CardShell';
-
-interface PortalData {
-  boardId?: string;
-  [key: string]: unknown;
-}
 
 /**
  * Portal-Karte: verlinkt ein anderes Projekt-Board (Obsidian-Gefühl, aber visuell).
@@ -13,19 +10,12 @@ interface PortalData {
  * und springt per Klick hinein. Portale sind normale Karten — sie lassen sich
  * mit anderen Karten verbinden und machen Projekt-Beziehungen sichtbar.
  */
-export function PortalCard({ id, data, selected }: NodeProps) {
-  const portal = data as unknown as PortalData;
+export function PortalCard({ id, data, selected }: NodeProps<PortalNode>) {
   const boards = useBoard((s) => s.boards);
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const openBoard = useBoard((s) => s.openBoard);
 
-  const target = boards.find((b) => b.id === portal.boardId);
-  const openCount = target
-    ? target.nodes.reduce((acc, n) => {
-        const items = (n.data as { items?: { col: number }[] }).items;
-        return acc + (items ? items.filter((it) => it.col < 2).length : 0);
-      }, 0)
-    : 0;
+  const target = boards.find((b) => b.id === data.boardId);
 
   return (
     <CardShell id={id} selected={selected} minWidth={160} minHeight={130} className="portal-card">
@@ -33,10 +23,7 @@ export function PortalCard({ id, data, selected }: NodeProps) {
       {target ? (
         <>
           <div className="portal-name">{target.name}</div>
-          <div className="meta">
-            {target.nodes.length} Karten
-            {openCount > 0 ? ` · ${openCount} offene Tickets` : ''}
-          </div>
+          <div className="meta">{boardMetaLabel(target)}</div>
           <button className="portal-open nodrag" onClick={() => openBoard(target.id)}>
             → Öffnen
           </button>

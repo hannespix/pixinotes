@@ -1,6 +1,8 @@
 // Gemeinsame Datentypen der Karten ("alles ist eine Karte")
+import type { Node } from '@xyflow/react';
 
-export type StickyColor = 'yellow' | 'pink' | 'mint' | 'sky' | 'white';
+export const STICKY_COLORS = ['yellow', 'pink', 'mint', 'sky', 'white'] as const;
+export type StickyColor = (typeof STICKY_COLORS)[number];
 
 export interface NoteData {
   color: StickyColor;
@@ -54,7 +56,25 @@ export interface KanbanData {
   [key: string]: unknown;
 }
 
+export interface PortalData {
+  /** Ziel-Board der Portal-Karte */
+  boardId?: string;
+  [key: string]: unknown;
+}
+
+/** Typisierte Karten-Nodes — macht `node.data` überall typsicher (Audit H1). */
+export type NoteNode = Node<NoteData, 'note'>;
+export type EmailNode = Node<EmailData, 'email'>;
+export type ImageNode = Node<ImageData, 'image'>;
+export type FileNode = Node<FileData, 'file'>;
+export type KanbanNode = Node<KanbanData, 'kanban'>;
+export type PortalNode = Node<PortalData, 'portal'>;
+export type AppNode = NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode;
+
 export const KANBAN_COLS = ['To Do', 'Doing', 'Done'] as const;
+/** Index der „Done"-Spalte — nie wieder Magic Number 2 (Audit M4) */
+export const DONE_COL = KANBAN_COLS.length - 1;
+export const isOpenItem = (item: KanbanItem): boolean => item.col < DONE_COL;
 
 export function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { Node } from '@xyflow/react';
 import uFuzzy from '@leeoniya/ufuzzy';
 import { useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
@@ -26,10 +25,12 @@ const TYPE_ICON: Record<string, string> = {
   portal: '🗂️',
 };
 
+import type { AppNode } from '../types';
+
 interface Hit {
   boardId: string;
   boardName: string;
-  node: Node;
+  node: AppNode;
   title: string;
   snippet: string;
 }
@@ -38,7 +39,8 @@ interface Hit {
 export function SearchOverlay() {
   const boards = useBoard((s) => s.boards);
   const focusNode = useBoard((s) => s.focusNode);
-  const [open, setOpen] = useState(false);
+  const open = useBoard((s) => s.searchOpen);
+  const setOpen = useBoard((s) => s.setSearchOpen);
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -47,7 +49,7 @@ export function SearchOverlay() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setOpen((o) => !o);
+        setOpen(!useBoard.getState().searchOpen);
         setQuery('');
         setCursor(0);
       } else if (e.key === 'Escape') {
@@ -56,7 +58,7 @@ export function SearchOverlay() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [setOpen]);
 
   useEffect(() => {
     if (!open) return;
@@ -68,9 +70,12 @@ export function SearchOverlay() {
     return () => { cancelAnimationFrame(raf); clearTimeout(t); };
   }, [open]);
 
-  // Index: jede Karte als durchsuchbarer Text (inkl. Board-Name)
+  // Index: jede Karte als durchsuchbarer Text (inkl. Board-Name).
+  // Nur bei geöffneter Suche bauen — sonst liefe das bei jedem Tastendruck
+  // in irgendeiner Karte über alle Boards (Audit PERF-1).
   const entries = useMemo(() => {
-    const list: { boardId: string; boardName: string; node: Node; text: string }[] = [];
+    const list: { boardId: string; boardName: string; node: AppNode; text: string }[] = [];
+    if (!open) return list;
     for (const b of boards) {
       for (const n of b.nodes) {
         const text = nodeToText(n);
@@ -78,7 +83,7 @@ export function SearchOverlay() {
       }
     }
     return list;
-  }, [boards]);
+  }, [boards, open]);
 
   const hits = useMemo<Hit[]>(() => {
     const q = query.trim();
@@ -127,7 +132,7 @@ export function SearchOverlay() {
 
   return (
     <div className="search-backdrop" onClick={() => setOpen(false)}>
-      <div className="search-box" onClick={(e) => e.stopPropagation()}>
+      <div className="search-box" role="dialog" aria-modal="true" aria-label="Kartensuche" onClick={(e) => e.stopPropagation()}>
         <input
           ref={inputRef}
           placeholder="Karten durchsuchen…"
