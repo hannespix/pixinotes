@@ -598,13 +598,16 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   outline: none; font-family: inherit; font-size: 12.5px; text-align: center; color: var(--ink);
 }
 .shape-toolbar {
-  position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 3px; opacity: 0; transition: opacity .15s; z-index: 6;
+  /* UNTER der Form: oben ist bei schmalen Formen kein Platz — dort sitzen
+     schon Verbindungspunkt und ✕ (Überlappung, User-Screenshot) */
+  position: absolute; bottom: -48px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 4px; opacity: 0; transition: opacity .15s; z-index: 6;
 }
 .shape-wrap:hover .shape-toolbar, .react-flow__node.selected .shape-toolbar { opacity: 1; }
 .shape-toolbar button {
   border: none; background: #fff; border-radius: 6px; font-size: 11px; cursor: pointer;
-  padding: 2px 5px; box-shadow: 0 1px 3px rgba(0,0,0,.15);
+  width: 24px; height: 22px; padding: 0; display: inline-flex; align-items: center;
+  justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,.15);
 }
 .shape-handle { opacity: 0 !important; }
 .shape-wrap:hover .shape-handle, .react-flow__node.selected .shape-handle { opacity: 1 !important; }
@@ -692,7 +695,14 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .modal-foot { padding: 12px 20px; font-size: 11px; color: var(--muted); text-align: center; }
 
 @media (pointer: coarse) {
-  .shape-toolbar, .shape-handle { opacity: 1 !important; }
+  /* Handles immer sichtbar; die Form-Toolbar erscheint erst bei Auswahl
+     (Tipp auf die Form) — dauerhaft eingeblendet kollidierte sie mit den
+     Verbindungspunkten (User-Screenshot) */
+  .shape-handle { opacity: 1 !important; }
+  /* feste Chip-Größe — Android rendert Emojis sonst übergroß und die
+     Buttons wachsen ineinander */
+  .shape-toolbar button { width: 34px; height: 32px; font-size: 15px; }
+  .card-x { border: 2px solid #fff; }
 }
 
 /* ---------- PDF-Vorschau ---------- */
