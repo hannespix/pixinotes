@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { CalendarData, CalendarNode, GanttData } from '../../types';
 import { collectTasks } from '../../lib/tasks';
-import { IChevronL, IChevronR } from '../Icons';
+import { downloadIcsEvents, fetchIcsUrl, mergeEvents, parseIcs, type IcsEvent } from '../../lib/ics';
+import { IChevronL, IChevronR, ISettings } from '../Icons';
 import { CardShell } from './CardShell';
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -12,27 +13,38 @@ const DAY = 864e5;
 interface CalEntry {
   icon: string;
   text: string;
-  boardId: string;
-  nodeId: string;
+  boardId?: string;
+  nodeId?: string;
   color?: string;
   urgent?: boolean;
+  ext?: boolean;
 }
 interface CalStrip {
   text: string;
   color: string;
-  boardId: string;
-  nodeId: string;
+  boardId?: string;
+  nodeId?: string;
   startsHere: boolean;
+  ext?: boolean;
 }
+
+interface ShowFlags { tasks: boolean; gantt: boolean; miles: boolean; ics: boolean }
+const SHOW_DEFAULT: ShowFlags = { tasks: true, gantt: true, miles: true, ics: true };
+const SHOW_LABEL: Record<keyof ShowFlags, string> = {
+  tasks: 'Kanban-Fristen',
+  gantt: 'Zeitplan-Balken',
+  miles: 'Meilensteine',
+  ics: 'Externe Termine (ICS)',
+};
 
 const ymOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const dayOf = (iso: string) => Math.floor(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / DAY);
 
 /**
- * Kalender-Karte: Monats- ODER Wochenansicht mit allen Terminen aus den
- * Boards — Kanban-Fristen als Einträge, Zeitplan-Vorgänge als Laufzeit-
- * Streifen über die komplette Dauer. Filter: alle Boards / nur dieses.
- * Klick springt zur Quell-Karte.
+ * Kalender-Karte: Monat/Woche mit wählbaren Quellen — Kanban-Fristen,
+ * Zeitplan-Balken/Meilensteine und EXTERNE Termine (.ics-Import & URL-Abos:
+ * Outlook, Google, Apple, Nextcloud). Export des Sichtbaren als .ics.
  */
 export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   const boards = useBoard((s) => s.boards);
@@ -42,18 +54,23 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   const focusNode = useBoard((s) => s.focusNode);
   const presenting = useBoard((s) => s.presenting);
   const setPresenting = useBoard((s) => s.setPresenting);
+  const showToast = useBoard((s) => s.showToast);
+  const [menu, setMenu] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const view = (data.view as 'month' | 'week') ?? 'month';
   const scope = (data.scope as 'all' | 'board') ?? 'all';
+  const show = { ...SHOW_DEFAULT, ...(data.show as Partial<ShowFlags> | undefined) };
+  const icsEvents = (data.icsEvents as IcsEvent[] | undefined) ?? [];
+  const icsUrls = (data.icsUrls as string[] | undefined) ?? [];
   const sourceBoards = scope === 'board' ? boards.filter((b) => b.id === activeId) : boards;
 
   const todayIso = isoOf(new Date());
   const ym = (data.month as string) ?? ymOf(new Date());
   const [year, month] = ym.split('-').map(Number);
-  // Wochenansicht ankert auf einem beliebigen Datum (Montag der Woche wird berechnet)
   const anchorIso = (data.anchor as string) ?? todayIso;
 
-  // Punkt-Einträge (Fristen) und Laufzeit-Streifen (Gantt) pro Tag
   const { byDay, stripsByDay } = useMemo(() => {
     const byDay = new Map<string, CalEntry[]>();
     const stripsByDay = new Map<string, CalStrip[]>();
@@ -61,18 +78,18 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
       if (!m.has(k)) m.set(k, []);
       m.get(k)!.push(v);
     };
-    for (const t of collectTasks(sourceBoards)) {
-      if (t.due) push(byDay, t.due, { icon: '☐', text: t.text, boardId: t.boardId, nodeId: t.nodeId, urgent: t.urgency === 'overdue' });
+    if (show.tasks) {
+      for (const t of collectTasks(sourceBoards)) {
+        if (t.due) push(byDay, t.due, { icon: '☐', text: t.text, boardId: t.boardId, nodeId: t.nodeId, urgent: t.urgency === 'overdue' });
+      }
     }
     for (const b of sourceBoards) {
       for (const n of b.nodes) {
         if (n.type !== 'gantt') continue;
         for (const r of (n.data as GanttData).rows) {
           if (r.start === r.end) {
-            push(byDay, r.start, { icon: '◆', text: r.name, boardId: b.id, nodeId: n.id, color: r.color });
-          } else {
-            // Laufzeit-Streifen über JEDEN Tag der Dauer (K1) — UTC-rein, sonst 1-Tag-Versatz
-            const dayOf = (iso: string) => Math.floor(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / DAY);
+            if (show.miles) push(byDay, r.start, { icon: '◆', text: r.name, boardId: b.id, nodeId: n.id, color: r.color });
+          } else if (show.gantt) {
             const s = dayOf(r.start);
             const e = dayOf(r.end);
             for (let d = s; d <= e && d - s < 120; d++) {
@@ -84,8 +101,23 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
         }
       }
     }
+    if (show.ics) {
+      for (const ev of icsEvents) {
+        if (!ev.end) {
+          push(byDay, ev.start, { icon: '▪', text: ev.title, ext: true });
+        } else {
+          const s = dayOf(ev.start);
+          const e = dayOf(ev.end);
+          for (let d = s; d <= e && d - s < 120; d++) {
+            push(stripsByDay, new Date(d * DAY).toISOString().slice(0, 10), {
+              text: ev.title, color: '#8a8375', startsHere: d === s, ext: true,
+            });
+          }
+        }
+      }
+    }
     return { byDay, stripsByDay };
-  }, [sourceBoards]);
+  }, [sourceBoards, show.tasks, show.gantt, show.miles, show.ics, icsEvents]);
 
   const nav = (delta: number) => {
     if (view === 'week') {
@@ -97,13 +129,64 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     }
   };
 
-  const jump = (boardId: string, nodeId: string) => {
+  const jump = (e: { boardId?: string; nodeId?: string }) => {
+    if (!e.boardId || !e.nodeId) return;
     if (presenting) setPresenting(false);
-    openBoard(boardId);
-    focusNode(boardId, nodeId);
+    openBoard(e.boardId);
+    focusNode(e.boardId, e.nodeId);
   };
 
-  // Zellen berechnen: Monat = 6×7-Raster, Woche = 7 Tage ab Montag
+  // ---------- ICS: Import, Abo, Export ----------
+  const importIcsFile = async (file: File) => {
+    const events = parseIcs(await file.text());
+    if (events.length === 0) { showToast('Keine Termine in der Datei gefunden.'); return; }
+    updateNodeData(id, { icsEvents: mergeEvents(icsEvents, events) });
+    showToast(`${events.length} Termin(e) importiert — als „Externe Termine" eingeblendet`);
+  };
+
+  const subscribeUrl = () => {
+    const url = window.prompt('ICS-/webcal-URL abonnieren (z. B. veröffentlichter Outlook-/Google-Kalender):');
+    if (!url?.trim()) return;
+    updateNodeData(id, { icsUrls: [...icsUrls, url.trim()] });
+    void refreshSubscriptions([...icsUrls, url.trim()]);
+  };
+
+  const refreshSubscriptions = async (urls = icsUrls) => {
+    if (urls.length === 0) { showToast('Keine ICS-Abos vorhanden — erst eine URL abonnieren.'); return; }
+    setBusy(true);
+    let ok = 0, fail = 0, added = 0;
+    let merged = icsEvents;
+    for (const url of urls) {
+      try {
+        const events = await fetchIcsUrl(url);
+        const before = merged.length;
+        merged = mergeEvents(merged, events);
+        added += merged.length - before;
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+    updateNodeData(id, { icsEvents: merged });
+    setBusy(false);
+    showToast(fail === 0
+      ? `Abos aktualisiert: ${added} neue Termin(e) aus ${ok} Kalender(n)`
+      : `${ok} Abo(s) aktualisiert, ${fail} fehlgeschlagen — viele Server erlauben Browser-Zugriff (CORS) nicht; dann die .ics-Datei importieren.`);
+  };
+
+  const exportVisible = () => {
+    const events: IcsEvent[] = [];
+    for (const [day, entries] of byDay) for (const e of entries) events.push({ title: e.text, start: day });
+    const n = downloadIcsEvents(events);
+    showToast(n ? `${n} sichtbare Einträge als .ics exportiert — in Outlook importierbar.` : 'Nichts zu exportieren.');
+  };
+
+  const clearIcs = () => {
+    updateNodeData(id, { icsEvents: [], icsUrls: [] });
+    showToast('Externe Termine & Abos entfernt.');
+  };
+
+  // ---------- Raster ----------
   let cells: Array<{ iso: string; day: number; inMonth: boolean }>;
   let title: string;
   if (view === 'week') {
@@ -134,6 +217,14 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
         <span className="cal-title">{title}</span>
         <span className="cal-nav">
           <button
+            className={menu ? 'on' : ''}
+            onClick={() => setMenu((o) => !o)}
+            title="Anzeige & ICS-Import/-Abo/-Export"
+            aria-label="Kalender-Optionen"
+          >
+            <ISettings size={13} />
+          </button>
+          <button
             className={scope === 'board' ? 'on' : ''}
             onClick={() => updateNodeData(id, { scope: scope === 'all' ? 'board' : 'all' })}
             title={scope === 'all' ? 'Zeigt: alle Boards — Klick: nur dieses Board' : 'Zeigt: nur dieses Board — Klick: alle Boards'}
@@ -151,6 +242,39 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
           <button onClick={() => nav(1)} title="Weiter" aria-label="Weiter"><IChevronR size={13} /></button>
         </span>
       </div>
+      {menu && (
+        <div className="cal-menu nodrag">
+          <div className="cal-menu-col">
+            <div className="cal-menu-label">Anzeigen</div>
+            {(Object.keys(SHOW_LABEL) as Array<keyof ShowFlags>).map((k) => (
+              <label key={k} className="cal-menu-check">
+                <input
+                  type="checkbox"
+                  checked={show[k]}
+                  onChange={(e) => updateNodeData(id, { show: { ...show, [k]: e.target.checked } })}
+                />
+                {SHOW_LABEL[k]}
+              </label>
+            ))}
+          </div>
+          <div className="cal-menu-col">
+            <div className="cal-menu-label">Termine (ICS — Outlook/Google/Apple)</div>
+            <button disabled={busy} onClick={() => fileRef.current?.click()}>.ics-Datei importieren…</button>
+            <button disabled={busy} onClick={subscribeUrl}>ICS-URL abonnieren…</button>
+            <button disabled={busy} onClick={() => void refreshSubscriptions()}>
+              {busy ? 'aktualisiere…' : `Abos aktualisieren (${icsUrls.length})`}
+            </button>
+            <button disabled={busy} onClick={exportVisible}>Sichtbares als .ics exportieren</button>
+            {(icsEvents.length > 0 || icsUrls.length > 0) && (
+              <button disabled={busy} onClick={clearIcs}>Externe Termine entfernen ({icsEvents.length})</button>
+            )}
+            <input
+              ref={fileRef} type="file" accept=".ics,text/calendar" style={{ display: 'none' }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void importIcsFile(f); e.target.value = ''; }}
+            />
+          </div>
+        </div>
+      )}
       <div className={`cal-grid nodrag nowheel ${view === 'week' ? 'week' : ''}`}>
         {WEEKDAYS.map((w) => <div key={w} className="cal-dow">{w}</div>)}
         {cells.map((c) => (
@@ -159,21 +283,21 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
             {(stripsByDay.get(c.iso) ?? []).slice(0, 3).map((s, i) => (
               <button
                 key={`s${i}`}
-                className="cal-strip"
+                className={`cal-strip ${s.ext ? 'ext' : ''}`}
                 style={{ background: s.color }}
-                title={`${s.text} — zur Karte springen`}
-                onClick={() => jump(s.boardId, s.nodeId)}
+                title={`${s.text}${s.ext ? ' (extern)' : ' — zur Karte springen'}`}
+                onClick={() => jump(s)}
               >
-                {s.startsHere || cells[0].iso === c.iso ? s.text : ' '}
+                {s.startsHere || cells[0].iso === c.iso ? s.text : ' '}
               </button>
             ))}
             {(byDay.get(c.iso) ?? []).slice(0, maxEntries).map((e, i) => (
               <button
                 key={i}
-                className={`cal-chip ${e.urgent ? 'urgent' : ''}`}
+                className={`cal-chip ${e.urgent ? 'urgent' : ''} ${e.ext ? 'ext' : ''}`}
                 style={e.color ? { borderLeftColor: e.color } : undefined}
-                title={`${e.text} — zur Karte springen`}
-                onClick={() => jump(e.boardId, e.nodeId)}
+                title={`${e.text}${e.ext ? ' (externer Termin)' : ' — zur Karte springen'}`}
+                onClick={() => jump(e)}
               >
                 {e.icon} {e.text}
               </button>

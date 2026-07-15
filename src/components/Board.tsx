@@ -15,8 +15,10 @@ import { selectActiveBoard, useBoard } from '../store';
 import { computePush } from '../lib/physics';
 import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from '../lib/parseEmail';
 import { imageFileToDataUrl, readFileAsDataUrl } from '../lib/image';
-import { canEmbed, makeEmail, makeFile, makeImage, makeNote } from '../lib/nodes';
+import { canEmbed, makeCalendar, makeEmail, makeFile, makeImage, makeNote } from '../lib/nodes';
 import { cloneSharedBoard, parseBoardPayload } from '../lib/share';
+import { mergeEvents, parseIcs, type IcsEvent } from '../lib/ics';
+import type { AppNode } from '../types';
 import { NoteCard } from './nodes/NoteCard';
 import { EmailCard } from './nodes/EmailCard';
 import { ImageCard } from './nodes/ImageCard';
@@ -299,6 +301,18 @@ export function Board() {
         const ext = file.name.split('.').pop()?.toLowerCase();
 
         try {
+          if (ext === 'ics') {
+            // Outlook/Google/Apple-Kalender: Termine in die Kalender-Karte mergen
+            const events = parseIcs(await file.text());
+            if (events.length === 0) { showToast('Keine Termine in der .ics-Datei gefunden.'); continue; }
+            const st = useBoard.getState();
+            let cal: AppNode | undefined = selectActiveBoard(st).nodes.find((n) => n.type === 'calendar');
+            if (!cal) { cal = makeCalendar(pos); st.addNode(cal); }
+            const cur = (cal.data.icsEvents as IcsEvent[] | undefined) ?? [];
+            st.updateNodeData(cal.id, { icsEvents: mergeEvents(cur, events) });
+            showToast(`${events.length} Termin(e) in die Kalender-Karte importiert`);
+            continue;
+          }
           if (ext === 'json') {
             // Geteiltes Board (.pixiboard.json) oder Voll-Export per Drop importieren
             const text = await file.text();
