@@ -1103,3 +1103,10 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .sel-ai-menu button:hover { background: #f1ede4; }
 .sel-toolbar button.ai-on { color: #5b3fd4; background: rgba(124,92,255,.14); }
+
+/* Teilen-Button in der Tab-Leiste */
+.tab-share {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  border-radius: 8px; padding: 6px 8px; display: inline-flex; align-items: center; justify-content: center;
+}
+.tab-share:hover { background: #f1ede4; color: var(--accent); }

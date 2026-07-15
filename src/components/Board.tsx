@@ -16,6 +16,7 @@ import { computePush } from '../lib/physics';
 import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from '../lib/parseEmail';
 import { imageFileToDataUrl, readFileAsDataUrl } from '../lib/image';
 import { canEmbed, makeEmail, makeFile, makeImage, makeNote } from '../lib/nodes';
+import { cloneSharedBoard, parseBoardPayload } from '../lib/share';
 import { NoteCard } from './nodes/NoteCard';
 import { EmailCard } from './nodes/EmailCard';
 import { ImageCard } from './nodes/ImageCard';
@@ -298,6 +299,25 @@ export function Board() {
         const ext = file.name.split('.').pop()?.toLowerCase();
 
         try {
+          if (ext === 'json') {
+            // Geteiltes Board (.pixiboard.json) oder Voll-Export per Drop importieren
+            const text = await file.text();
+            const shared = parseBoardPayload(text);
+            if (shared) {
+              useBoard.getState().importBoard(cloneSharedBoard(shared));
+              showToast(`Geteiltes Board „${shared.name}" importiert`);
+              continue;
+            }
+            const full = JSON.parse(text);
+            if (full?.app === 'pixinotes' && Array.isArray(full.boards) && full.boards.length > 0) {
+              if (window.confirm(`Kompletten Stand vom ${full.savedAt ? new Date(full.savedAt).toLocaleString('de-DE') : '?'} laden? Die aktuellen Boards werden ersetzt.`)) {
+                useBoard.getState().importSync(full.boards, full.spaces ?? [], full.activeId ?? full.boards[0].id);
+                showToast('Stand aus Datei geladen');
+              }
+              continue;
+            }
+            showToast('JSON erkannt, aber keine PixiNotes-Datei — als Datei-Karte abgelegt.');
+          }
           if (ext === 'eml' || file.type === 'message/rfc822') {
             const email = await parseEml(await file.arrayBuffer());
             addNode(makeEmail(pos, email));

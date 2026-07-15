@@ -1,6 +1,7 @@
-import { useBoard } from '../store';
+import { selectActiveBoard, useBoard } from '../store';
+import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
 import { InlineName } from './InlineName';
-import { IHome, IPlus, IX } from './Icons';
+import { IHome, IPlus, IShare, IX } from './Icons';
 
 /**
  * Projekt-Tabs: jedes Board ist ein Raum. Doppelklick = umbenennen,
@@ -16,6 +17,24 @@ export function Tabs() {
   const renameBoard = useBoard((s) => s.renameBoard);
   const removeBoard = useBoard((s) => s.removeBoard);
   const showToast = useBoard((s) => s.showToast);
+  const activeBoard = useBoard(selectActiveBoard);
+
+  /** Aktives Board serverlos teilen: Link in die Zwischenablage (Fallback: Datei) */
+  const shareActive = async () => {
+    try {
+      const url = await boardToShareUrl(activeBoard);
+      if (url.length > SHARE_URL_LIMIT) {
+        downloadBoardFile(activeBoard);
+        showToast('Board ist zu groß für einen Link (Bilder!) — stattdessen als Datei exportiert. Empfänger zieht sie einfach aufs Board.');
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      showToast('Teilen-Link kopiert! Der Link enthält das komplette Board — einfach verschicken, Empfänger öffnet ihn im Browser.');
+    } catch {
+      downloadBoardFile(activeBoard);
+      showToast('Link konnte nicht kopiert werden — Board stattdessen als Datei exportiert.');
+    }
+  };
 
   const close = (id: string) => {
     if (boards.length <= 1) {
@@ -60,6 +79,14 @@ export function Tabs() {
           </button>
         </div>
       ))}
+      <button
+        className="tab-share"
+        title="Aktives Board teilen: Link mit komplettem Inhalt kopieren (serverlos)"
+        aria-label="Board teilen"
+        onClick={shareActive}
+      >
+        <IShare size={13} />
+      </button>
       <button
         className="tab-add"
         title="Neues Projekt-Board"

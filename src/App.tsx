@@ -11,6 +11,7 @@ import { useBoard } from './store';
 import { initAutoSync } from './lib/syncFolder';
 import { TaskHub } from './components/TaskHub';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
+import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
 
 export default function App() {
   const toast = useBoard((s) => s.toast);
@@ -23,6 +24,20 @@ export default function App() {
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
   useEffect(() => { initAutoSync(); }, []);
+
+  // Geteiltes Board im URL-Hash? (#b=… — der Link IST die Datei)
+  useEffect(() => {
+    void (async () => {
+      const shared = await readShareHash();
+      if (!shared) return;
+      clearShareHash();
+      const st = useBoard.getState();
+      if (window.confirm(`Geteiltes Board „${shared.name ?? 'Board'}" (${shared.nodes?.length ?? 0} Karten) übernehmen?`)) {
+        st.importBoard(cloneSharedBoard(shared));
+        st.showToast('Geteiltes Board übernommen — liegt als eigenes Board in deiner Tab-Leiste.');
+      }
+    })();
+  }, []);
 
   // Erinnerungen: beim Start und dann alle 5 Minuten fällige Aufgaben melden
   useEffect(() => {

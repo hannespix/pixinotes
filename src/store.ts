@@ -131,6 +131,8 @@ interface BoardState {
   renameProject: (id: string, name: string) => void;
   removeProject: (id: string) => void;
   addBoard: (name?: string, projectId?: string) => string;
+  /** Fertiges Board (geteilt/importiert) einhängen und öffnen */
+  importBoard: (doc: BoardDoc) => void;
   renameBoard: (id: string, name: string) => void;
   removeBoard: (id: string) => void;
   /** Board in ein (anderes) Projekt verschieben, optional vor ein bestimmtes Board */
@@ -475,6 +477,18 @@ export const useBoard = create<BoardState>()(
             activeId: id,
           });
           return id;
+        },
+
+        importBoard: (doc) => {
+          // leeres Board über addBoard anlegen (kümmert sich um die Hierarchie) …
+          const id = get().addBoard(doc.name);
+          // … und mit dem geteilten Inhalt füllen
+          set({
+            boards: get().boards.map((b) =>
+              b.id === id ? { ...b, nodes: doc.nodes, edges: doc.edges, drawings: doc.drawings } : b,
+            ),
+            view: 'board',
+          });
         },
 
         renameBoard: (id, name) =>
