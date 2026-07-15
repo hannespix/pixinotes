@@ -132,6 +132,10 @@ function GraphView() {
   // ---------- Pan & Zoom wie auf dem Whiteboard (viewBox-Steuerung) ----------
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [vb, setVb] = useState({ x: 0, y: 0, w: GRAPH_W, h: GRAPH_H });
+  // Ref statt Closure: der Wheel-Listener wird nur einmal registriert und
+  // soll trotzdem immer die aktuellen Knoten-Positionen sehen
+  const posRef = useRef(pos);
+  posRef.current = pos;
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const downAt = useRef<{ x: number; y: number } | null>(null);
   const moved = useRef(false);
@@ -153,7 +157,26 @@ function GraphView() {
       const oy = (rect.height - v.h * scale) / 2;
       const px = v.x + (cx - rect.left - ox) / scale;
       const py = v.y + (cy - rect.top - oy) / scale;
-      return { x: px - (px - v.x) * realF, y: py - (py - v.y) * realF, w: v.w * realF, h: v.h * realF };
+      const next = { x: px - (px - v.x) * realF, y: py - (py - v.y) * realF, w: v.w * realF, h: v.h * realF };
+      // Leerlauf-Sicherung: Wer per Button/Pinch am Inhalt vorbeizoomt, sähe
+      // sonst nur noch Beige — dann auf den nächstgelegenen Knoten zentrieren
+      const pts = [...posRef.current.values()];
+      const visible = pts.some(
+        (p) => p.x >= next.x && p.x <= next.x + next.w && p.y >= next.y && p.y <= next.y + next.h,
+      );
+      if (pts.length > 0 && !visible) {
+        const cx0 = next.x + next.w / 2;
+        const cy0 = next.y + next.h / 2;
+        let best = pts[0];
+        let bd = Infinity;
+        for (const p of pts) {
+          const d = (p.x - cx0) ** 2 + (p.y - cy0) ** 2;
+          if (d < bd) { bd = d; best = p; }
+        }
+        next.x = best.x - next.w / 2;
+        next.y = best.y - next.h / 2;
+      }
+      return next;
     });
   };
 
@@ -274,12 +297,24 @@ function GraphView() {
   }, [showCards, boards, pos]);
 
   // ---------- Semantischer Zoom: Detailgrad folgt der Zoomstufe ----------
-  // z = 1 bei „Alles einpassen". Stufe 0 (weit weg): nur Boards + Namen.
-  // Stufe 1: Karten-Punkte. Stufe 2 (nah): Karten-Titel an den Punkten.
-  const z = GRAPH_W / vb.w;
-  const lod = z < 0.7 ? 0 : z < 1.6 ? 1 : 2;
-  /** Wunschgröße in Bildschirm-Pixeln → SVG-Einheiten (bleibt beim Zoomen optisch konstant) */
-  const ui = (px: number, min = 0, max = Infinity) => Math.min(max, Math.max(min, px / z));
+  // Maßstab = ECHTE Bildschirm-Pixel pro SVG-Einheit (gemessen, nicht relativ
+  // zur Graph-Breite — sonst ist auf dem Handy alles ⅓ so groß wie gedacht).
+  const [rectW, setRectW] = useState(0);
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const measure = () => setRectW(el.getBoundingClientRect().width);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const scale = (rectW || GRAPH_W) / vb.w;
+  // Stufe 0 (zu klein für Details): nur Boards + Namen. Stufe 1: Karten-Punkte.
+  // Stufe 2 (nah): Karten-Titel an den Punkten.
+  const lod = scale < 0.42 ? 0 : scale <= 1.35 ? 1 : 2;
+  /** Wunschgröße in Bildschirm-Pixeln → SVG-Einheiten (konstant auf dem Schirm) */
+  const ui = (px: number) => px / scale;
 
   return (
     <div className="ov-graph">
@@ -316,20 +351,24 @@ function GraphView() {
               key={i}
               x1={a.x} y1={a.y} x2={b.x} y2={b.y}
               stroke={l.kind === 'portal' ? 'rgba(79,124,255,.5)' : 'rgba(120,110,90,.45)'}
-              strokeWidth={l.kind === 'portal' ? ui(2, 0.6, 6) : ui(1.5, 0.5, 5)}
-              strokeDasharray={l.kind === 'wikilink' ? `${ui(5, 2, 14)} ${ui(4, 1.5, 11)}` : undefined}
+              strokeWidth={l.kind === 'portal' ? ui(2) : ui(1.5)}
+              strokeDasharray={l.kind === 'wikilink' ? `${ui(5)} ${ui(4)}` : undefined}
             />
           );
         })}
         {lod >= 1 && satellites.lines.map((l, i) => (
-          <line key={`c${i}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="rgba(120,110,90,.3)" strokeWidth={ui(1, 0.4, 3)} />
+          <line key={`c${i}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="rgba(120,110,90,.3)" strokeWidth={ui(1)} />
         ))}
         {lod >= 1 && satellites.dots.map((d) => (
           <g key={d.key} className="ov-graph-dot" onClick={() => { openBoard(d.boardId); focusNode(d.boardId, d.nodeId); }}>
             <title>{d.title}</title>
-            <circle cx={d.x} cy={d.y} r={ui(5, 2.5, 10)} />
+            <circle cx={d.x} cy={d.y} r={ui(5)} strokeWidth={ui(1.5)} />
             {lod === 2 && (
-              <text className="ov-graph-dot-label" x={d.x + ui(9)} y={d.y + ui(4)} fontSize={ui(11)}>
+              <text
+                className="ov-graph-dot-label"
+                x={d.x + ui(9)} y={d.y + ui(4)} fontSize={ui(11.5)}
+                stroke="#f2efe7" strokeWidth={ui(3)} paintOrder="stroke"
+              >
                 {d.title.slice(0, 28)}
               </text>
             )}
@@ -340,12 +379,18 @@ function GraphView() {
           const rad = r(n.cards);
           return (
             <g key={n.id} className="ov-graph-node" onClick={() => openBoard(n.id)}>
-              <circle cx={p.x} cy={p.y} r={rad} strokeWidth={ui(2, 0.7, 5)} />
-              <text x={p.x} y={p.y + rad + ui(16, 12, 30)} textAnchor="middle" fontSize={ui(13, 6, 26)}>
+              <circle cx={p.x} cy={p.y} r={rad} strokeWidth={ui(2)} />
+              <text
+                x={p.x} y={p.y + rad + ui(17)} textAnchor="middle"
+                // Deckel in SVG-Einheiten: weit rausgezoomt schrumpfen Namen,
+                // statt sich gegenseitig zu überlagern
+                fontSize={Math.min(ui(13.5), 30)}
+                stroke="#f2efe7" strokeWidth={Math.min(ui(3.5), 7)} paintOrder="stroke"
+              >
                 {n.label.slice(0, 24)}
               </text>
               {lod >= 1 && (
-                <text x={p.x} y={p.y + ui(4, 2, 8)} textAnchor="middle" className="ov-graph-count" fontSize={ui(10, 5, 18)}>
+                <text x={p.x} y={p.y + ui(4)} textAnchor="middle" className="ov-graph-count" fontSize={Math.min(ui(10), 20)}>
                   {n.cards}
                 </text>
               )}
