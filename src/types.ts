@@ -50,6 +50,12 @@ export interface KanbanItem {
   col: number;
   /** Fälligkeitsdatum (ISO yyyy-mm-dd) — Basis für Erinnerungen & Aufgaben-Zentrale */
   due?: string;
+  /** Beschreibung/Details (Ticket-Detailansicht) */
+  note?: string;
+  /** Verantwortliche Person */
+  who?: string;
+  /** Verknüpfung zu einem Board bzw. einer Karte (Sprung-Chip am Ticket) */
+  link?: { boardId: string; nodeId?: string };
 }
 
 export interface KanbanData {

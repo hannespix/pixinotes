@@ -449,7 +449,9 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 
 /* ---------- Touch-Geräte: größere Ziele, Controls immer sichtbar ---------- */
 @media (pointer: coarse) {
-  .card-x, .color-dot, .pn-handle, .tab-x, .kanban-item-actions,
+  /* ✕ absichtlich NICHT dabei: erscheint erst, wenn die Karte aktiv
+     (selektiert) ist — dauerhaft sichtbare Lösch-Knöpfe wirken unruhig */
+  .color-dot, .pn-handle, .tab-x, .kanban-item-actions,
   .kanban-addcol, .kanban-col-x { opacity: 1 !important; }
   .card-x { width: 28px; height: 28px; font-size: 13px; top: -13px; right: -13px; }
   .color-dot { width: 22px; height: 22px; top: 6px; right: 8px; }
@@ -1302,6 +1304,53 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ov-graph-dot:hover circle { stroke: var(--accent); fill: #e8efff; }
 .ov-graph-dot-label { fill: var(--muted); font-family: inherit; pointer-events: none; }
 .ov-graph-dot:hover .ov-graph-dot-label { fill: var(--accent); }
+
+/* ---------- Kanban: Ticket-Detail, Chips, klickbarer Text ---------- */
+.kanban-item-text { cursor: pointer; }
+.kanban-item-text:hover { color: var(--accent); }
+.kanban-chips { display: inline-flex; gap: 4px; align-items: center; margin-left: 4px; flex: none; }
+.kanban-chips em, .kanban-chips button {
+  font-style: normal; font-size: 9px; font-weight: 700; border: none; cursor: pointer;
+  border-radius: 999px; padding: 1px 5px; line-height: 1.5;
+}
+.k-who { background: #e8efff; color: #3557c9; }
+.k-note { background: rgba(0,0,0,.07); color: var(--muted); }
+.k-link { background: rgba(124,92,255,.14); color: #5b3fd4; font-size: 10px; }
+.k-link:hover { background: rgba(124,92,255,.28); }
+.ticket-detail {
+  position: absolute; inset: 34px 10px auto 10px; z-index: 40;
+  background: #fff; border-radius: 12px; box-shadow: 0 10px 36px rgba(50,40,20,.3);
+  padding: 10px; display: flex; flex-direction: column; gap: 7px;
+  max-height: calc(100% - 48px); overflow-y: auto;
+}
+.ticket-detail-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+}
+.ticket-detail-head button { border: none; background: none; cursor: pointer; color: var(--muted); display: inline-flex; padding: 3px; border-radius: 6px; }
+.ticket-detail-head button:hover { background: #f1ede4; color: var(--ink); }
+.ticket-title {
+  border: 1px solid rgba(0,0,0,.12); border-radius: 8px; font-family: inherit;
+  font-size: 13px; font-weight: 600; padding: 7px 9px; color: var(--ink);
+}
+.ticket-note {
+  border: 1px solid rgba(0,0,0,.12); border-radius: 8px; font-family: inherit;
+  font-size: 12px; padding: 7px 9px; color: var(--ink); resize: vertical; background: #fbf9f2;
+}
+.ticket-title:focus, .ticket-note:focus, .ticket-row input:focus, .ticket-row select:focus { outline: none; border-color: var(--accent); }
+.ticket-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ticket-row label { font-size: 10.5px; font-weight: 600; color: var(--muted); display: inline-flex; align-items: center; gap: 3px; flex: none; }
+.ticket-row input, .ticket-row select {
+  border: 1px solid rgba(0,0,0,.12); border-radius: 7px; font-family: inherit;
+  font-size: 11.5px; padding: 4px 7px; color: var(--ink); min-width: 0; flex: 1; background: #fff;
+}
+.ticket-jump {
+  border: none; background: rgba(124,92,255,.14); color: #5b3fd4; border-radius: 7px;
+  font-family: inherit; font-size: 11px; font-weight: 600; padding: 5px 9px; cursor: pointer; flex: none;
+}
+.ticket-jump:hover { background: rgba(124,92,255,.28); }
+.ticket-detail-foot { font-size: 10px; color: var(--muted); text-align: center; }
+.slide-kanban { position: relative; }
 
 /* ---------- KI-Freitext-Kommando ---------- */
 .ai-cmd-input {

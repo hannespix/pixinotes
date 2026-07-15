@@ -2,9 +2,9 @@ import { useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
 import { useBoard } from '../../store';
-import { kanbanCols, uid, type KanbanData, type KanbanItem, type KanbanNode } from '../../types';
-import { formatDueShort, urgencyFor } from '../../lib/tasks';
-import { ICalendar, IChevronL, IChevronR, IPlus, IX } from '../Icons';
+import { kanbanCols, uid, type GanttData, type KanbanData, type KanbanItem, type KanbanNode } from '../../types';
+import { collectTasks, formatDueShort, urgencyFor } from '../../lib/tasks';
+import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IX } from '../Icons';
 import { CardShell } from './CardShell';
 
 /**
@@ -16,13 +16,58 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const kanban = data;
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
+  const boards = useBoard((s) => s.boards);
+  const openBoard = useBoard((s) => s.openBoard);
+  const focusNode = useBoard((s) => s.focusNode);
+  const setPresenting = useBoard((s) => s.setPresenting);
   const [newText, setNewText] = useState('');
   const [editingDue, setEditingDue] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const cols = kanbanCols(kanban);
   const done = cols.length - 1;
 
   const setItems = (items: KanbanItem[]) => updateNodeData(id, { items });
+  const patchItem = (itemId: string, patch: Partial<KanbanItem>) =>
+    setItems(kanban.items.map((it) => (it.id === itemId ? { ...it, ...patch } : it)));
+
+  /** Sprung-Chip: verknüpftes Board (bzw. Karte) öffnen */
+  const followLink = (link: NonNullable<KanbanItem['link']>) => {
+    setPresenting(false);
+    openBoard(link.boardId);
+    if (link.nodeId) focusNode(link.boardId, link.nodeId);
+  };
+
+  /** Offene Aufgaben aus ALLEN Boards als Tickets einsammeln (mit Quell-Verknüpfung) */
+  const collectFromBoards = () => {
+    const norm = (t: string) => t.trim().toLowerCase();
+    const have = new Set(kanban.items.map((it) => norm(it.text)));
+    const fresh: KanbanItem[] = [];
+    // Kanban-Tickets + Checklisten (Aufgaben-Zentrale-Logik) — ohne dieses Kanban selbst
+    for (const t of collectTasks(boards)) {
+      if (t.nodeId === id || have.has(norm(t.text))) continue;
+      have.add(norm(t.text));
+      fresh.push({ id: uid(), text: t.text, col: 0, due: t.due, link: { boardId: t.boardId, nodeId: t.nodeId } });
+    }
+    // Zeitplan-Vorgänge (< 100 %) — „diverse Module" liefern mit
+    for (const b of boards) {
+      for (const n of b.nodes) {
+        if (n.type !== 'gantt' || n.id === id) continue;
+        for (const row of (n.data as GanttData).rows ?? []) {
+          const text = `${row.name} (Zeitplan)`;
+          if ((row.progress ?? 0) >= 100 || have.has(norm(text))) continue;
+          have.add(norm(text));
+          fresh.push({ id: uid(), text, col: 0, due: row.end, link: { boardId: b.id, nodeId: n.id } });
+        }
+      }
+    }
+    if (fresh.length === 0) {
+      showToast('Nichts Neues gefunden — alle offenen Aufgaben sind schon hier.');
+      return;
+    }
+    setItems([...kanban.items, ...fresh]);
+    showToast(`${fresh.length} Aufgabe(n) aus allen Boards eingesammelt — jedes Ticket verlinkt auf seine Quelle (↗).`);
+  };
 
   const move = (item: KanbanItem, dir: -1 | 1) => {
     const col = Math.max(0, Math.min(done, item.col + dir));
@@ -84,6 +129,13 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           value={kanban.title}
           onChange={(e) => setTitle(e.target.value)}
         />
+        <button
+          className="kanban-addcol nodrag"
+          title="Offene Aufgaben aus ALLEN Boards einsammeln (Kanbans, Checklisten, Zeitpläne)"
+          onClick={collectFromBoards}
+        >
+          <IDownload size={12} />
+        </button>
         <button className="kanban-addcol nodrag" title="Spalte hinzufügen" onClick={addCol}><IPlus size={12} /></button>
       </div>
       <div className="kanban-cols">
@@ -113,7 +165,28 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   className={`kanban-item nodrag ${colIdx === done ? 'col-done' : colIdx === 0 ? 'col-first' : 'col-mid'}`}
                   key={it.id}
                 >
-                  <span className={colIdx === done ? 'done-text' : ''}>{it.text}</span>
+                  <span
+                    className={`kanban-item-text ${colIdx === done ? 'done-text' : ''}`}
+                    title="Ticket öffnen (Details, Person, Verknüpfung)"
+                    onClick={() => setDetailId(it.id)}
+                  >
+                    {it.text}
+                  </span>
+                  {(it.who || it.note || it.link) && (
+                    <span className="kanban-chips">
+                      {it.who && <em className="k-who" title={it.who}>{it.who.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}</em>}
+                      {it.note && <em className="k-note" title="Hat Beschreibung — Ticket öffnen" onClick={() => setDetailId(it.id)}>≡</em>}
+                      {it.link && (
+                        <button
+                          className="k-link"
+                          title={`Zur Quelle springen: ${boards.find((b) => b.id === it.link!.boardId)?.name ?? 'Board'}`}
+                          onClick={() => followLink(it.link!)}
+                        >
+                          ↗
+                        </button>
+                      )}
+                    </span>
+                  )}
                   <span className="kanban-item-actions">
                     {colIdx > 0 && (
                       <button onClick={() => move(it, -1)} title="Zurück"><IChevronL size={11} /></button>
@@ -158,6 +231,61 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           onKeyDown={(e) => e.key === 'Enter' && addItem()}
         />
       </div>
+      {(() => {
+        const it = kanban.items.find((x) => x.id === detailId);
+        if (!it) return null;
+        return (
+          <div className="ticket-detail nodrag" onKeyDown={(e) => e.key === 'Escape' && setDetailId(null)}>
+            <div className="ticket-detail-head">
+              <span>Ticket</span>
+              <button title="Schließen" onClick={() => setDetailId(null)}><IX size={12} /></button>
+            </div>
+            <input
+              className="ticket-title"
+              value={it.text}
+              onChange={(e) => patchItem(it.id, { text: e.target.value })}
+            />
+            <textarea
+              className="ticket-note"
+              rows={3}
+              placeholder="Beschreibung / Details / Kontext …"
+              value={it.note ?? ''}
+              onChange={(e) => patchItem(it.id, { note: e.target.value || undefined })}
+            />
+            <div className="ticket-row">
+              <label>Fällig</label>
+              <input
+                type="date"
+                value={it.due ?? ''}
+                onChange={(e) => patchItem(it.id, { due: e.target.value || undefined })}
+              />
+              <label>Person</label>
+              <input
+                type="text"
+                placeholder="wer?"
+                value={it.who ?? ''}
+                onChange={(e) => patchItem(it.id, { who: e.target.value || undefined })}
+              />
+            </div>
+            <div className="ticket-row">
+              <label><IFolder size={12} /> Verknüpft</label>
+              <select
+                value={it.link?.boardId ?? ''}
+                onChange={(e) => patchItem(it.id, { link: e.target.value ? { boardId: e.target.value } : undefined })}
+              >
+                <option value="">— kein Board —</option>
+                {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+              {it.link && (
+                <button className="ticket-jump" title="Verknüpftes Board öffnen" onClick={() => followLink(it.link!)}>↗ öffnen</button>
+              )}
+            </div>
+            <div className="ticket-detail-foot">
+              Änderungen werden sofort gespeichert · Esc schließt
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }
