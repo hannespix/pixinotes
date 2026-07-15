@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -14,7 +14,7 @@ import { boardMetaLabel } from '../lib/boardStats';
 import { boardGraph, layoutGraph } from '../lib/links';
 import { nodeToText } from '../lib/serialize';
 import { InlineName } from './InlineName';
-import { IPen, IPlay, IX } from './Icons';
+import { IPen, IPlay, ITarget, IX, IZoomIn, IZoomOut } from './Icons';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
 interface ProjectZoneData { project: Project; spaceId: string; [key: string]: unknown }
@@ -114,6 +114,8 @@ function OverviewCanvas() {
 
 /* ---------- Graph-Ansicht (Obsidian-Netz): Boards als Knoten, Portale & Wikilinks als Kanten ---------- */
 
+const GRAPH_W = 1100, GRAPH_H = 640;
+
 function GraphView() {
   const boards = useBoard((s) => s.boards);
   const openBoard = useBoard((s) => s.openBoard);
@@ -121,11 +123,121 @@ function GraphView() {
   const [showCards, setShowCards] = useState(false);
   const [showPortals, setShowPortals] = useState(true);
   const [showWikis, setShowWikis] = useState(true);
-  const W = 1100, H = 640;
+  const W = GRAPH_W, H = GRAPH_H;
   const { nodes, links, pos } = useMemo(() => {
     const g = boardGraph(boards);
     return { ...g, pos: layoutGraph(g.nodes, g.links, W, H) };
   }, [boards]);
+
+  // ---------- Pan & Zoom wie auf dem Whiteboard (viewBox-Steuerung) ----------
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [vb, setVb] = useState({ x: 0, y: 0, w: GRAPH_W, h: GRAPH_H });
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const downAt = useRef<{ x: number; y: number } | null>(null);
+  const moved = useRef(false);
+  const pinchDist = useRef<number | null>(null);
+
+  /** Um einen Bildschirmpunkt herum zoomen — der Punkt unterm Cursor bleibt stehen */
+  const zoomAt = (cx: number, cy: number, f: number) => {
+    setVb((v) => {
+      const el = svgRef.current;
+      if (!el) return v;
+      const rect = el.getBoundingClientRect();
+      // Zoomstufe begrenzen: 10× rein bis 2,5× raus
+      const w = Math.min(GRAPH_W * 2.5, Math.max(GRAPH_W / 10, v.w * f));
+      const realF = w / v.w;
+      if (realF === 1) return v;
+      // preserveAspectRatio "meet": einheitlicher Maßstab + zentrierter Versatz
+      const scale = Math.min(rect.width / v.w, rect.height / v.h);
+      const ox = (rect.width - v.w * scale) / 2;
+      const oy = (rect.height - v.h * scale) / 2;
+      const px = v.x + (cx - rect.left - ox) / scale;
+      const py = v.y + (cy - rect.top - oy) / scale;
+      return { x: px - (px - v.x) * realF, y: py - (py - v.y) * realF, w: v.w * realF, h: v.h * realF };
+    });
+  };
+
+  const zoomButton = (f: number) => {
+    const el = svgRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    zoomAt(r.left + r.width / 2, r.top + r.height / 2, f);
+  };
+
+  // Rad-Zoom braucht preventDefault → nativer non-passive Listener
+  // (Reacts onWheel ist am Root passiv registriert)
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 1.12 : 1 / 1.12);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+    // zoomAt nutzt nur Refs + funktionales setState — Closure bleibt gültig
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 1) {
+      downAt.current = { x: e.clientX, y: e.clientY };
+      moved.current = false;
+    }
+    pinchDist.current = null;
+    // KEIN setPointerCapture hier: Capture würde auch den Klick aufs SVG
+    // umleiten und Knoten-Klicks schlucken — erst beim echten Pannen (s. unten)
+  };
+
+  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const pts = pointers.current;
+    const prev = pts.get(e.pointerId);
+    if (!prev) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pts.size === 1) {
+      const dx = e.clientX - prev.x;
+      const dy = e.clientY - prev.y;
+      if (!moved.current && downAt.current
+        && Math.abs(e.clientX - downAt.current.x) + Math.abs(e.clientY - downAt.current.y) > 4) {
+        moved.current = true;
+        // Ab jetzt ist es ein Pan — Capture hält die Geste auch außerhalb des SVG
+        try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetische Pointer */ }
+      }
+      if (!moved.current) return;
+      setVb((v) => {
+        const el = svgRef.current;
+        if (!el) return v;
+        const rect = el.getBoundingClientRect();
+        const scale = Math.min(rect.width / v.w, rect.height / v.h);
+        return { ...v, x: v.x - dx / scale, y: v.y - dy / scale };
+      });
+    } else if (pts.size === 2) {
+      const [p1, p2] = [...pts.values()];
+      const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+      if (pinchDist.current && dist > 0) {
+        zoomAt(mid.x, mid.y, pinchDist.current / dist);
+        moved.current = true;
+      }
+      pinchDist.current = dist;
+    }
+  };
+
+  const onPointerEnd = (e: React.PointerEvent<SVGSVGElement>) => {
+    pointers.current.delete(e.pointerId);
+    pinchDist.current = null;
+  };
+
+  /** Nach einem Pan/Pinch darf der abschließende Klick keine Knoten öffnen */
+  const onClickCapture = (e: React.MouseEvent) => {
+    if (moved.current) {
+      e.stopPropagation();
+      e.preventDefault();
+      moved.current = false;
+    }
+  };
 
   const r = (cards: number) => 14 + Math.min(26, Math.sqrt(cards) * 5);
 
@@ -174,7 +286,18 @@ function GraphView() {
           </label>
         ))}
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="ov-graph-svg" role="img" aria-label="Board-Netz">
+      <svg
+        ref={svgRef}
+        viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
+        className="ov-graph-svg"
+        role="img"
+        aria-label="Board-Netz"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerEnd}
+        onPointerCancel={onPointerEnd}
+        onClickCapture={onClickCapture}
+      >
         {links.map((l, i) => {
           if (l.kind === 'portal' && !showPortals) return null;
           if (l.kind === 'wikilink' && !showWikis) return null;
@@ -211,8 +334,19 @@ function GraphView() {
           );
         })}
       </svg>
+      <div className="ov-graph-zoom nodrag">
+        <button onClick={() => zoomButton(1 / 1.35)} title="Vergrößern" aria-label="Vergrößern"><IZoomIn size={16} /></button>
+        <button onClick={() => zoomButton(1.35)} title="Verkleinern" aria-label="Verkleinern"><IZoomOut size={16} /></button>
+        <button
+          onClick={() => setVb({ x: 0, y: 0, w: GRAPH_W, h: GRAPH_H })}
+          title="Alles einpassen"
+          aria-label="Alles einpassen"
+        >
+          <ITarget size={16} />
+        </button>
+      </div>
       <div className="ov-graph-legend">
-        ── Portal · ┄┄ [[Wikilink]] · Kreisgröße = Kartenzahl · kleine Punkte = verbundene Karten · Klick öffnet
+        ── Portal · ┄┄ [[Wikilink]] · Kreisgröße = Kartenzahl · Klick öffnet · Rad/Pinch = Zoom · Ziehen = Verschieben
       </div>
     </div>
   );
