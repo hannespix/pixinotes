@@ -273,6 +273,14 @@ function GraphView() {
     return { dots, lines };
   }, [showCards, boards, pos]);
 
+  // ---------- Semantischer Zoom: Detailgrad folgt der Zoomstufe ----------
+  // z = 1 bei „Alles einpassen". Stufe 0 (weit weg): nur Boards + Namen.
+  // Stufe 1: Karten-Punkte. Stufe 2 (nah): Karten-Titel an den Punkten.
+  const z = GRAPH_W / vb.w;
+  const lod = z < 0.7 ? 0 : z < 1.6 ? 1 : 2;
+  /** Wunschgröße in Bildschirm-Pixeln → SVG-Einheiten (bleibt beim Zoomen optisch konstant) */
+  const ui = (px: number, min = 0, max = Infinity) => Math.min(max, Math.max(min, px / z));
+
   return (
     <div className="ov-graph">
       <div className="ov-graph-toggles nodrag">
@@ -308,18 +316,23 @@ function GraphView() {
               key={i}
               x1={a.x} y1={a.y} x2={b.x} y2={b.y}
               stroke={l.kind === 'portal' ? 'rgba(79,124,255,.5)' : 'rgba(120,110,90,.45)'}
-              strokeWidth={l.kind === 'portal' ? 2 : 1.5}
-              strokeDasharray={l.kind === 'wikilink' ? '5 4' : undefined}
+              strokeWidth={l.kind === 'portal' ? ui(2, 0.6, 6) : ui(1.5, 0.5, 5)}
+              strokeDasharray={l.kind === 'wikilink' ? `${ui(5, 2, 14)} ${ui(4, 1.5, 11)}` : undefined}
             />
           );
         })}
-        {satellites.lines.map((l, i) => (
-          <line key={`c${i}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="rgba(120,110,90,.3)" strokeWidth={1} />
+        {lod >= 1 && satellites.lines.map((l, i) => (
+          <line key={`c${i}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="rgba(120,110,90,.3)" strokeWidth={ui(1, 0.4, 3)} />
         ))}
-        {satellites.dots.map((d) => (
+        {lod >= 1 && satellites.dots.map((d) => (
           <g key={d.key} className="ov-graph-dot" onClick={() => { openBoard(d.boardId); focusNode(d.boardId, d.nodeId); }}>
             <title>{d.title}</title>
-            <circle cx={d.x} cy={d.y} r={5} />
+            <circle cx={d.x} cy={d.y} r={ui(5, 2.5, 10)} />
+            {lod === 2 && (
+              <text className="ov-graph-dot-label" x={d.x + ui(9)} y={d.y + ui(4)} fontSize={ui(11)}>
+                {d.title.slice(0, 28)}
+              </text>
+            )}
           </g>
         ))}
         {nodes.map((n) => {
@@ -327,9 +340,15 @@ function GraphView() {
           const rad = r(n.cards);
           return (
             <g key={n.id} className="ov-graph-node" onClick={() => openBoard(n.id)}>
-              <circle cx={p.x} cy={p.y} r={rad} />
-              <text x={p.x} y={p.y + rad + 14} textAnchor="middle">{n.label.slice(0, 24)}</text>
-              <text x={p.x} y={p.y + 4} textAnchor="middle" className="ov-graph-count">{n.cards}</text>
+              <circle cx={p.x} cy={p.y} r={rad} strokeWidth={ui(2, 0.7, 5)} />
+              <text x={p.x} y={p.y + rad + ui(16, 12, 30)} textAnchor="middle" fontSize={ui(13, 6, 26)}>
+                {n.label.slice(0, 24)}
+              </text>
+              {lod >= 1 && (
+                <text x={p.x} y={p.y + ui(4, 2, 8)} textAnchor="middle" className="ov-graph-count" fontSize={ui(10, 5, 18)}>
+                  {n.cards}
+                </text>
+              )}
             </g>
           );
         })}
@@ -346,7 +365,7 @@ function GraphView() {
         </button>
       </div>
       <div className="ov-graph-legend">
-        ── Portal · ┄┄ [[Wikilink]] · Kreisgröße = Kartenzahl · Klick öffnet · Rad/Pinch = Zoom · Ziehen = Verschieben
+        ── Portal · ┄┄ [[Wikilink]] · Kreisgröße = Kartenzahl · Klick öffnet · Rad/Pinch = Zoom · Ziehen = Verschieben · Detailgrad folgt dem Zoom (nah heranzoomen zeigt Kartentitel)
       </div>
     </div>
   );

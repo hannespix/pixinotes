@@ -1281,6 +1281,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ov-graph-dot { cursor: pointer; }
 .ov-graph-dot circle { fill: #fff; stroke: #a09a8a; stroke-width: 1.5; }
 .ov-graph-dot:hover circle { stroke: var(--accent); fill: #e8efff; }
+.ov-graph-dot-label { fill: var(--muted); font-family: inherit; pointer-events: none; }
+.ov-graph-dot:hover .ov-graph-dot-label { fill: var(--accent); }
 
 /* ---------- Responsivitäts-Overrides (Audit Runde 5) ----------
    WICHTIG: Dieser Block muss am DATEIENDE stehen — bei gleicher Spezifität
