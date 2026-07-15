@@ -3,10 +3,13 @@ import { useReactFlow } from '@xyflow/react';
 import { useBoard } from '../store';
 import { makeCalendar, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape } from '../lib/nodes';
 import { collectTasks } from '../lib/tasks';
+import { aiReady } from '../lib/ai';
+import { aiBriefing, aiCluster, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
+import { selectActiveBoard } from '../store';
 import type { ShapeKind } from '../types';
 import {
   ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
-  IMousePointer, INote, IPen, IPill, IPlay, IPlus, IRedo, ISearch, ISettings, ISquare, ITasks, IUndo,
+  IMousePointer, INote, IPen, IPill, IPlay, IPlus, IRedo, ISearch, ISettings, ISquare, ITasks, IUndo, IWand,
 } from './Icons';
 
 /**
@@ -32,8 +35,29 @@ export function Dock() {
     return { open: ts.length, overdue: ts.filter((t) => t.urgency === 'overdue').length };
   }, [boards]);
   const { screenToFlowPosition } = useReactFlow();
+  const ai = useBoard((s) => s.ai);
   const [addMenu, setAddMenu] = useState(false);
   const [drawMenu, setDrawMenu] = useState(false);
+  const [aiMenu, setAiMenu] = useState(false);
+  const [aiBusy, setAiBusy] = useState('');
+
+  /** KI-Aktion aufs ganze Board ausführen (mit Fortschritts-Toast + Fehlerbehandlung) */
+  const runAi = async (label: string, fn: (nodes: import('../types').AppNode[], pos: { x: number; y: number }) => Promise<string>) => {
+    setAiMenu(false);
+    if (!aiReady(ai)) { showToast('Zuerst die KI in den Einstellungen konfigurieren (Ollama, Anthropic, OpenAI …).'); setSettingsOpen(true); return; }
+    setAiBusy(label);
+    showToast('✨ KI analysiert das Board …');
+    try {
+      const st = useBoard.getState();
+      const nodes = selectActiveBoard(st).nodes;
+      const msg = await fn(nodes, screenToFlowPosition({ x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 120 }));
+      showToast(`✨ ${msg}`);
+    } catch (e) {
+      showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`);
+    } finally {
+      setAiBusy('');
+    }
+  };
 
   const centerPos = (w = 260, h = 80) =>
     screenToFlowPosition({
@@ -69,7 +93,7 @@ export function Dock() {
         )}
         <button
           className={addMenu ? 'active' : ''}
-          onClick={() => { setAddMenu((o) => !o); setDrawMenu(false); }}
+          onClick={() => { setAddMenu((o) => !o); setDrawMenu(false); setAiMenu(false); }}
           title="Objekt hinzufügen"
           aria-label="Objekt hinzufügen"
         >
@@ -89,11 +113,38 @@ export function Dock() {
         )}
         <button
           className={drawing ? 'active' : ''}
-          onClick={() => { setDrawMenu((o) => !o); setAddMenu(false); }}
+          onClick={() => { setDrawMenu((o) => !o); setAddMenu(false); setAiMenu(false); }}
           title="Zeichnen (Stift, Textmarker, Radierer)"
           aria-label="Zeichnen"
         >
           {tool === 'marker' ? <IHighlighter /> : tool === 'eraser' ? <IEraser /> : <IPen />}
+        </button>
+      </div>
+
+      {/* KI-Assistent: boardweite Aktionen */}
+      <div className="dock-add-wrap">
+        {aiMenu && (
+          <div className="dock-menu dock-menu-ai">
+            <div className="dock-menu-label">KI-Assistent (ganzes Board)</div>
+            <button disabled={!!aiBusy} onClick={() => runAi('cluster', (n) => aiCluster(n))}>Themen clustern &amp; anordnen</button>
+            <button disabled={!!aiBusy} onClick={() => runAi('tasks', aiTasks)}>Aufgaben &amp; Termine extrahieren</button>
+            <button disabled={!!aiBusy} onClick={() => runAi('process', aiProcess)}>Workflow als Diagramm ableiten</button>
+            <button disabled={!!aiBusy} onClick={() => runAi('brief', aiBriefing)}>Analytisches Briefing erstellen</button>
+            <button disabled={!!aiBusy} onClick={() => runAi('edges', (n) => aiEdges(n))}>Verbindungen vorschlagen</button>
+            <div className="dock-menu-foot">
+              {aiReady(ai)
+                ? 'Nicht destruktiv: legt neue Karten an bzw. ordnet nur an — Strg+Z macht alles rückgängig.'
+                : 'KI zuerst in den Einstellungen konfigurieren (Ollama = alles lokal).'}
+            </div>
+          </div>
+        )}
+        <button
+          className={aiMenu || aiBusy ? 'active' : ''}
+          onClick={() => { setAiMenu((o) => !o); setAddMenu(false); setDrawMenu(false); }}
+          title="KI-Assistent (Clustern, Aufgaben, Briefing …)"
+          aria-label="KI-Assistent"
+        >
+          <IWand />
         </button>
       </div>
 

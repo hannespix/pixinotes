@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { exportToFolder, exportViewport } from '../lib/exporter';
 import {
@@ -36,6 +36,8 @@ export function Settings() {
   const [busy, setBusy] = useState('');
   const [syncHandle, setSyncHandle] = useState<SyncDirHandle | null>(null);
   const [syncPerm, setSyncPerm] = useState<'granted' | 'prompt'>('granted');
+  // WICHTIG: vor dem early-return deklarieren (Hook-Reihenfolge!)
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Verbundenen Sync-Ordner + Berechtigungs-Status anzeigen (Handle überlebt Neustarts via IndexedDB)
   useEffect(() => {
@@ -77,6 +79,38 @@ export function Settings() {
     if (!syncHandle || !(await ensurePermission(syncHandle, true))) return;
     await writeSync(syncHandle);
     showToast('☁️ In den Sync-Ordner gespeichert');
+  };
+
+  // ---- Datei-Sync: funktioniert überall (Firefox, file://, USB-Stick, Mail-Anhang) ----
+  const exportStateFile = () => {
+    const st = useBoard.getState();
+    const payload = {
+      app: 'pixinotes', version: 2, savedAt: new Date().toISOString(),
+      boards: st.boards, spaces: st.spaces, activeId: st.activeId,
+    };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pixinotes-daten-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('💾 Kompletter Stand als Datei exportiert');
+  };
+
+  const importStateFile = async (file: File) => {
+    try {
+      const p = JSON.parse(await file.text());
+      if (p?.app !== 'pixinotes' || !Array.isArray(p.boards) || p.boards.length === 0) {
+        showToast('Das ist keine gültige PixiNotes-Datei.');
+        return;
+      }
+      if (!window.confirm(`Stand vom ${p.savedAt ? new Date(p.savedAt).toLocaleString('de-DE') : '?'} laden? Die aktuellen Boards werden ersetzt.`)) return;
+      useBoard.getState().importSync(p.boards, p.spaces ?? [], p.activeId ?? p.boards[0].id);
+      showToast('📂 Stand aus Datei geladen');
+      setOpen(false);
+    } catch {
+      showToast('Datei konnte nicht gelesen werden.');
+    }
   };
 
   const doExport = async (fn: () => Promise<unknown>, label: string) => {
@@ -215,6 +249,31 @@ export function Settings() {
               )}
             </>
           )}
+        </section>
+
+        {/* ---- Datei-Sync (überall) ---- */}
+        <section className="modal-section">
+          <h3>💾 Als Datei sichern &amp; übertragen</h3>
+          <p className="modal-hint">
+            Der einfachste Weg ohne Cloud: kompletten Stand als <code>.json</code>-Datei exportieren und
+            auf dem anderen Gerät laden — per USB-Stick, Mail-Anhang oder Netzlaufwerk.
+            Funktioniert in <b>jedem Browser</b>.
+          </p>
+          <div className="modal-buttons">
+            <button disabled={!!busy} onClick={exportStateFile}>💾 Datei exportieren</button>
+            <button disabled={!!busy} onClick={() => fileInputRef.current?.click()}>📂 Datei laden…</button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void importStateFile(f);
+                e.target.value = '';
+              }}
+            />
+          </div>
         </section>
 
         {/* ---- Datenordner & Export ---- */}

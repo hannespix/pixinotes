@@ -1,8 +1,11 @@
-import { NodeToolbar, Position } from '@xyflow/react';
+import { useState } from 'react';
+import { NodeToolbar, Position, useReactFlow } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodesToHtml, nodesToText } from '../lib/serialize';
-import { uid } from '../types';
-import { ICopy, IDuplicate, IMail, ITrash } from './Icons';
+import { aiReady } from '../lib/ai';
+import { aiBriefing, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
+import { uid, type AppNode } from '../types';
+import { ICopy, IDuplicate, IMail, ITrash, IWand } from './Icons';
 
 const MAILTO_LIMIT = 1800; // konservativ: längere mailto-URLs schlucken manche Clients
 
@@ -16,9 +19,28 @@ export function SelectionToolbar() {
   const addNode = useBoard((s) => s.addNode);
   const removeNodes = useBoard((s) => s.removeNodes);
   const showToast = useBoard((s) => s.showToast);
+  const ai = useBoard((s) => s.ai);
+  const { screenToFlowPosition } = useReactFlow();
+  const [aiMenu, setAiMenu] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
 
   const selected = board.nodes.filter((n) => n.selected);
   if (selected.length === 0) return null;
+
+  /** KI-Aktion nur auf die ausgewählten Karten */
+  const runAi = async (fn: (nodes: AppNode[], pos: { x: number; y: number }) => Promise<string>) => {
+    setAiMenu(false);
+    setAiBusy(true);
+    showToast(`✨ KI analysiert ${selected.length} Karte(n) …`);
+    try {
+      const pos = screenToFlowPosition({ x: window.innerWidth / 2 + 160, y: window.innerHeight / 2 - 80 });
+      showToast(`✨ ${await fn(selected, pos)}`);
+    } catch (e) {
+      showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`);
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   const shareByMail = () => {
     let text = nodesToText(selected);
@@ -73,6 +95,23 @@ export function SelectionToolbar() {
       <button onClick={shareByMail} title="Inhalt als E-Mail-Entwurf öffnen"><IMail size={15} /> E-Mail</button>
       <button onClick={copyHtml} title="Formatiert kopieren (Outlook/Word-tauglich)"><ICopy size={15} /> Kopieren</button>
       <button onClick={duplicate} title="Duplizieren"><IDuplicate size={15} /></button>
+      {aiReady(ai) && (
+        <span className="sel-ai-wrap">
+          {aiMenu && (
+            <div className="sel-ai-menu nodrag">
+              <button disabled={aiBusy} onClick={() => runAi(aiTasks)}>Aufgaben extrahieren</button>
+              <button disabled={aiBusy} onClick={() => runAi(aiProcess)}>Als Workflow-Diagramm</button>
+              <button disabled={aiBusy} onClick={() => runAi(aiBriefing)}>Zusammenfassen</button>
+              {selected.length >= 2 && (
+                <button disabled={aiBusy} onClick={() => runAi((n) => aiEdges(n))}>Verbindungen vorschlagen</button>
+              )}
+            </div>
+          )}
+          <button className={aiMenu || aiBusy ? 'ai-on' : ''} onClick={() => setAiMenu((o) => !o)} title="KI-Aktionen auf die Auswahl">
+            <IWand size={15} />
+          </button>
+        </span>
+      )}
       <button onClick={remove} title="Löschen" className="danger"><ITrash size={15} /></button>
     </NodeToolbar>
   );

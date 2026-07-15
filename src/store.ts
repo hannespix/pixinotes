@@ -140,6 +140,8 @@ interface BoardState {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
+  /** Verbindung mit Label direkt anlegen (KI-Vorschläge) */
+  addLabeledEdge: (source: string, target: string, label: string) => void;
   updateEdgeLabel: (id: string, label: string) => void;
   updateEdgeKind: (id: string, kind: string) => void;
   removeEdge: (id: string) => void;
@@ -529,6 +531,16 @@ export const useBoard = create<BoardState>()(
           get().pushHistory();
           patchActive((b) => ({
             edges: addEdge({ ...connection, type: 'labeled', data: { label: '', kind: 'arrow' } }, b.edges),
+          }));
+        },
+
+        addLabeledEdge: (source, target, label) => {
+          get().pushHistory();
+          patchActive((b) => ({
+            edges: addEdge(
+              { id: `e-${uid()}`, source, target, type: 'labeled', data: { label, kind: 'arrow' } },
+              b.edges,
+            ),
           }));
         },
 
