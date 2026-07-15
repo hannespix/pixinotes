@@ -60,7 +60,7 @@ export interface CardTemplate {
   node: AppNode;
 }
 
-export type AiProvider = 'none' | 'free' | 'anthropic' | 'openai' | 'ollama' | 'custom';
+export type AiProvider = 'none' | 'free' | 'openrouter' | 'anthropic' | 'openai' | 'ollama' | 'custom';
 export interface AiSettings {
   provider: AiProvider;
   model: string;

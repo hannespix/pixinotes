@@ -10,6 +10,7 @@ export function aiReady(ai: AiSettings): boolean {
       return true;
     case 'anthropic':
     case 'openai':
+    case 'openrouter':
       return !!ai.apiKey && !!ai.model;
     case 'ollama':
       return !!ai.baseUrl && !!ai.model;
@@ -56,22 +57,38 @@ export async function askAi(prompt: string): Promise<string> {
         // Schlüssel oder Konto. Ehrlich gesagt: Inhalte gehen an einen
         // Community-Dienst ohne Verfügbarkeits-/Datenschutz-Garantien —
         // für sensible Daten Ollama (lokal) nutzen.
-        const res = await fetch('https://text.pollinations.ai/openai', {
+        // Anonym gibt es aktuell NUR das Modell "openai" (GPT-OSS 20B) —
+        // alte gespeicherte Namen (z. B. "mistral") liefern 404 → sanieren.
+        const model = ['openai', 'openai-fast', 'gpt-oss', 'gpt-oss-20b'].includes(ai.model) ? ai.model : 'openai';
+        const doFetch = () => fetch('https://text.pollinations.ai/openai', {
           method: 'POST',
           signal: ctrl.signal,
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            model: ai.model || 'openai',
+            model,
             messages: [{ role: 'user', content: prompt }],
           }),
         });
-        if (!res.ok) throw new Error(`Gratis-KI: HTTP ${res.status} — der kostenlose Dienst ist gerade ausgelastet, einfach nochmal versuchen (oder Anbieter wechseln).`);
+        let res = await doFetch();
+        if (res.status >= 500) {
+          // Community-Dienst wackelt gern kurz — einmal kurz warten und nochmal
+          await new Promise((r) => setTimeout(r, 1500));
+          res = await doFetch();
+        }
+        if (!res.ok) throw new Error(`Gratis-KI: HTTP ${res.status} — der kostenlose Dienst ist gerade ausgelastet. Kurz warten und nochmal versuchen, oder in den Einstellungen OpenRouter/Ollama wählen.`);
         const data = await res.json();
-        return data.choices?.[0]?.message?.content ?? '';
+        const msg = data.choices?.[0]?.message;
+        // Reasoning-Modell: manchmal steht die Antwort nur im reasoning-Feld
+        return msg?.content || msg?.reasoning || '';
       }
       case 'openai':
+      case 'openrouter':
       case 'custom': {
-        const base = ai.provider === 'openai' ? 'https://api.openai.com/v1' : ai.baseUrl.replace(/\/$/, '');
+        const base = ai.provider === 'openai'
+          ? 'https://api.openai.com/v1'
+          : ai.provider === 'openrouter'
+            ? 'https://openrouter.ai/api/v1'
+            : ai.baseUrl.replace(/\/$/, '');
         const res = await fetch(`${base}/chat/completions`, {
           method: 'POST',
           signal: ctrl.signal,
