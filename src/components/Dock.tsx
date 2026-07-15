@@ -77,6 +77,21 @@ export function Dock() {
           <div className="dock-menu">
             <div className="dock-menu-label">Notizen &amp; Boards</div>
             <button onClick={() => add(() => addNode(makeNote(centerPos())))}><INote size={16} /> Notiz</button>
+            <button
+              onClick={() => add(() => {
+                const heading = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+                addNode(makeNote(centerPos(), {
+                  color: 'white',
+                  blocks: [
+                    { type: 'heading', props: { level: 3 }, content: heading },
+                    { type: 'paragraph', content: '' },
+                  ],
+                }));
+              })}
+              title="Notiz mit heutigem Datum als Überschrift (Daily Note)"
+            >
+              <ICalendar size={16} /> Tagesnotiz
+            </button>
             <button onClick={() => add(() => addNode(makeKanban(centerPos(420, 200))))}><IKanban size={16} /> Kanban-Board</button>
             <div className="dock-menu-label">Planung</div>
             <button onClick={() => add(() => addNode(makeGantt(centerPos(560, 240))))}><IGantt size={16} /> Zeitplan (Gantt)</button>

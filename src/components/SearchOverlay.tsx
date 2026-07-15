@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import uFuzzy from '@leeoniya/ufuzzy';
 import { useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
+import { collectAllTags } from '../lib/links';
 
 // Fuzzy + Multi-Token: Tippfehler-tolerant (1 Fehler pro Wort), Wörter in
 // beliebiger Reihenfolge, Umlaute korrekt (Unicode-Preset für Deutsch).
@@ -151,7 +152,19 @@ export function SearchOverlay() {
             if (e.key === 'Enter' && hits[cursor]) jump(hits[cursor]);
           }}
         />
-        {query.trim() && (
+        {query.trim() === '#' && (
+          <div className="search-tags">
+            {collectAllTags(useBoard.getState().boards).slice(0, 24).map(({ tag, count }) => (
+              <button key={tag} className="search-tag" onClick={() => { setQuery(tag); setCursor(0); }}>
+                {tag} <span>{count}</span>
+              </button>
+            ))}
+            {collectAllTags(useBoard.getState().boards).length === 0 && (
+              <div className="search-empty">Noch keine #Tags — einfach #stichwort in eine Notiz schreiben.</div>
+            )}
+          </div>
+        )}
+        {query.trim() && query.trim() !== '#' && (
           <div className="search-results">
             {hits.length === 0 && <div className="search-empty">Keine Treffer</div>}
             {hits.map((h, i) => (
@@ -171,7 +184,7 @@ export function SearchOverlay() {
             ))}
           </div>
         )}
-        <div className="search-footer">↑↓ navigieren · Enter springt zur Karte · Esc schließt · sucht in allen Boards, tippfehlertolerant</div>
+        <div className="search-footer">↑↓ navigieren · Enter springt zur Karte · # zeigt alle Tags · Esc schließt · sucht in allen Boards, tippfehlertolerant</div>
       </div>
     </div>
   );

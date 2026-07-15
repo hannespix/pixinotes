@@ -11,6 +11,7 @@ import {
 } from '@xyflow/react';
 import { useBoard, type BoardDoc, type Project, type Space } from '../store';
 import { boardMetaLabel } from '../lib/boardStats';
+import { boardGraph, layoutGraph } from '../lib/links';
 import { InlineName } from './InlineName';
 import { IPen, IPlay, IX } from './Icons';
 
@@ -32,9 +33,14 @@ interface ProjectRect { id: string; x: number; y: number; w: number; h: number }
  * ziehen = verschieben · Portal-Verknüpfungen erscheinen als Linien.
  */
 export function Overview() {
+  const [mode, setMode] = useState<'hierarchie' | 'netz'>('hierarchie');
   return (
     <ReactFlowProvider>
-      <OverviewCanvas />
+      <div className="ov-mode nodrag">
+        <button className={mode === 'hierarchie' ? 'on' : ''} onClick={() => setMode('hierarchie')}>Hierarchie</button>
+        <button className={mode === 'netz' ? 'on' : ''} onClick={() => setMode('netz')} title="Board-Netz: Portale & [[Wikilinks]] als Graph">Netz</button>
+      </div>
+      {mode === 'netz' ? <GraphView /> : <OverviewCanvas />}
     </ReactFlowProvider>
   );
 }
@@ -101,6 +107,54 @@ function OverviewCanvas() {
       <button className="ov-add-space-float" onClick={() => addSpace()}>
         + Neuer Bereich
       </button>
+    </div>
+  );
+}
+
+/* ---------- Graph-Ansicht (Obsidian-Netz): Boards als Knoten, Portale & Wikilinks als Kanten ---------- */
+
+function GraphView() {
+  const boards = useBoard((s) => s.boards);
+  const openBoard = useBoard((s) => s.openBoard);
+  const W = 1100, H = 640;
+  const { nodes, links, pos } = useMemo(() => {
+    const g = boardGraph(boards);
+    return { ...g, pos: layoutGraph(g.nodes, g.links, W, H) };
+  }, [boards]);
+
+  const r = (cards: number) => 14 + Math.min(26, Math.sqrt(cards) * 5);
+
+  return (
+    <div className="ov-graph">
+      <svg viewBox={`0 0 ${W} ${H}`} className="ov-graph-svg" role="img" aria-label="Board-Netz">
+        {links.map((l, i) => {
+          const a = pos.get(l.a), b = pos.get(l.b);
+          if (!a || !b) return null;
+          return (
+            <line
+              key={i}
+              x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+              stroke={l.kind === 'portal' ? 'rgba(79,124,255,.5)' : 'rgba(120,110,90,.45)'}
+              strokeWidth={l.kind === 'portal' ? 2 : 1.5}
+              strokeDasharray={l.kind === 'wikilink' ? '5 4' : undefined}
+            />
+          );
+        })}
+        {nodes.map((n) => {
+          const p = pos.get(n.id)!;
+          const rad = r(n.cards);
+          return (
+            <g key={n.id} className="ov-graph-node" onClick={() => openBoard(n.id)}>
+              <circle cx={p.x} cy={p.y} r={rad} />
+              <text x={p.x} y={p.y + rad + 14} textAnchor="middle">{n.label.slice(0, 24)}</text>
+              <text x={p.x} y={p.y + 4} textAnchor="middle" className="ov-graph-count">{n.cards}</text>
+            </g>
+          );
+        })}
+      </svg>
+      <div className="ov-graph-legend">
+        ── Portal · ┄┄ [[Wikilink]] · Kreisgröße = Kartenzahl · Klick öffnet das Board
+      </div>
     </div>
   );
 }
