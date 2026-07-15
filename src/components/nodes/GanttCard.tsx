@@ -16,7 +16,8 @@ const LABEL_W = 128;
 const PAD_DAYS = 2;
 const COLORS = ['#4f7cff', '#3fa564', '#e07a3f', '#a05fd4', '#d44f6e', '#2b2a27'];
 
-const toDays = (iso: string) => Math.round(new Date(`${iso}T12:00:00`).getTime() / DAY);
+// UTC-reine Tagesarithmetik — T12:00-Local + round kippt in UTC-Zeitzonen (exakt ,5) um einen Tag
+const toDays = (iso: string) => Math.floor(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / DAY);
 const fromDays = (d: number) => new Date(d * DAY).toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => fromDays(toDays(iso) + n);
 const fmtShort = (iso: string) =>
@@ -224,7 +225,11 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
               {[0, 25, 50, 75, 100].map((p) => <option key={p} value={p}>{p}%</option>)}
             </select>
           </label>
-          <button title="Zum Meilenstein machen (Dauer 0)" onClick={() => patchRow(sel.id, { end: sel.start })}>◆</button>
+          {sel.start === sel.end ? (
+            <button title="Zurück zum Balken (4 Tage Dauer — Enden danach ziehbar)" onClick={() => patchRow(sel.id, { end: addDays(sel.start, 3) })}>▬</button>
+          ) : (
+            <button title="Zum Meilenstein machen (Dauer 0 — ▬ macht es rückgängig)" onClick={() => patchRow(sel.id, { end: sel.start })}>◆</button>
+          )}
           <label title="Ressource/Person">👤
             <input
               className="gantt-who"

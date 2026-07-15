@@ -71,11 +71,12 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
           if (r.start === r.end) {
             push(byDay, r.start, { icon: '◆', text: r.name, boardId: b.id, nodeId: n.id, color: r.color });
           } else {
-            // Laufzeit-Streifen über JEDEN Tag der Dauer (K1)
-            const s = Math.round(new Date(`${r.start}T12:00:00`).getTime() / DAY);
-            const e = Math.round(new Date(`${r.end}T12:00:00`).getTime() / DAY);
+            // Laufzeit-Streifen über JEDEN Tag der Dauer (K1) — UTC-rein, sonst 1-Tag-Versatz
+            const dayOf = (iso: string) => Math.floor(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / DAY);
+            const s = dayOf(r.start);
+            const e = dayOf(r.end);
             for (let d = s; d <= e && d - s < 120; d++) {
-              push(stripsByDay, isoOf(new Date(d * DAY)), {
+              push(stripsByDay, new Date(d * DAY).toISOString().slice(0, 10), {
                 text: r.name, color: r.color ?? '#4f7cff', boardId: b.id, nodeId: n.id, startsHere: d === s,
               });
             }
