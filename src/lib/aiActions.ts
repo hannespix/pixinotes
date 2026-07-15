@@ -4,9 +4,9 @@
 // nur Positionen — und jede läuft über die Undo-History.
 import { askAi, textToBlocks } from './ai';
 import { nodeToText } from './serialize';
-import { makeNote } from './nodes';
+import { makeKanban, makeMermaid, makeNote, makeShape } from './nodes';
 import { useBoard } from '../store';
-import { uid, type AppNode } from '../types';
+import { uid, type AppNode, type ShapeKind, type StickyColor } from '../types';
 
 interface Ctx { id: string; type: string; text: string }
 
@@ -192,4 +192,182 @@ export async function aiEdges(nodes: AppNode[]): Promise<string> {
   }
   if (created === 0) throw new Error('Keine neuen sinnvollen Verbindungen gefunden.');
   return `${created} Verbindung(en) mit Beziehungs-Label gezogen`;
+}
+
+/* ---------- Freitext-Kommando: die KI darf (fast) alles ---------- */
+
+interface AiOp {
+  op: string;
+  id?: string;
+  ids?: string[];
+  title?: string;
+  text?: string;
+  color?: string;
+  code?: string;
+  shape?: string;
+  source?: string;
+  target?: string;
+  label?: string;
+  items?: Array<{ text?: string; due?: string }>;
+}
+
+/** Freitext → Blöcke: erste Zeile wird Überschrift, Rest Stichpunkte/Absätze */
+function blocksFromText(text: string): unknown[] {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return [];
+  return textToBlocks(lines[0].replace(/^#+\s*/, ''), lines.slice(1).join('\n'));
+}
+
+const STICKY = new Set(['yellow', 'pink', 'mint', 'sky', 'white']);
+const SHAPES = new Set(['process', 'decision', 'terminator']);
+
+/**
+ * Freitext-Anweisung ausführen: „Erstelle …", „Verbessere …", „Verbinde …".
+ * Die KI liefert einen Operationsplan (JSON), der validiert und über die
+ * Undo-History ausgeführt wird — Strg+Z macht ALLES auf einmal rückgängig.
+ */
+export async function aiCommand(instruction: string, nodes: AppNode[], pos: { x: number; y: number }): Promise<string> {
+  const wish = instruction.trim();
+  if (!wish) throw new Error('Bitte zuerst eine Anweisung eingeben.');
+  const items = gather(nodes);
+  const { summary, ops } = await askJson<{ summary?: string; ops: AiOp[] }>(
+    `Du bist der Assistent eines Whiteboard-Tools (Karten auf einer Leinwand). Setze den Wunsch des Nutzers als Operationsplan um.
+
+Wunsch: "${wish}"
+
+Vorhandene Karten (id, type, text):
+${JSON.stringify(items)}
+
+Antworte NUR mit JSON: {"summary":"1 kurzer deutscher Satz, was du getan hast","ops":[...]}
+Erlaubte Operationen (max. 15):
+{"op":"note","title":"...","text":"Zeilen; '- ' für Stichpunkte","color":"yellow|pink|mint|sky|white"}
+{"op":"kanban","title":"...","items":[{"text":"...","due":"yyyy-mm-dd"}]}
+{"op":"mermaid","code":"flowchart TD\\n  A[Start] --> B[Ende]"}
+{"op":"shape","shape":"process|decision|terminator","text":"..."}
+{"op":"edit_note","id":"<existierende Notiz-id>","text":"KOMPLETTER neuer Inhalt; erste Zeile = Überschrift"}
+{"op":"edit_title","id":"<id>","title":"..."} (für Kanban/Zeitplan-Titel oder Form-Text)
+{"op":"add_tickets","id":"<Kanban-id>","items":[{"text":"...","due":"yyyy-mm-dd"}]}
+{"op":"edge","source":"<id>","target":"<id>","label":"kurzes Label"}
+{"op":"delete","ids":["<id>"]} (NUR wenn der Nutzer ausdrücklich löschen will)
+Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben" nutze edit_note mit dem vollständigen neuen Text; erfinde keine Fakten.`,
+  );
+
+  const plan = (ops ?? []).slice(0, 15);
+  if (plan.length === 0) throw new Error('Die KI hat keine ausführbaren Schritte geliefert — Anweisung bitte konkreter formulieren.');
+
+  const st = useBoard.getState();
+  const known = new Map(nodes.map((n) => [n.id, n]));
+  st.pushHistory();
+
+  let done = 0;
+  let editedNote = false;
+  let y = pos.y;
+  const place = (h: number) => {
+    const p = { x: pos.x, y };
+    y += h + 40;
+    return p;
+  };
+
+  for (const o of plan) {
+    switch (o.op) {
+      case 'note': {
+        const text = [o.title, o.text].filter(Boolean).join('\n');
+        if (!text) break;
+        const color = STICKY.has(o.color ?? '') ? (o.color as StickyColor) : undefined;
+        st.addNode(makeNote(place(180), { color, blocks: blocksFromText(text) }));
+        done++;
+        break;
+      }
+      case 'kanban': {
+        const node = makeKanban(place(220), (o.title ?? 'Aufgaben').slice(0, 60));
+        (node.data as { items: unknown[] }).items = (o.items ?? [])
+          .filter((t) => t.text?.trim())
+          .slice(0, 30)
+          .map((t) => ({
+            id: uid(), text: t.text!.trim().slice(0, 140), col: 0,
+            due: /^\d{4}-\d{2}-\d{2}$/.test(t.due ?? '') ? t.due : undefined,
+          }));
+        st.addNode(node);
+        done++;
+        break;
+      }
+      case 'mermaid': {
+        const code = (o.code ?? '').replace(/```(mermaid)?/g, '').trim();
+        if (!code) break;
+        const node = makeMermaid(place(260));
+        (node.data as { code: string }).code = code;
+        st.addNode(node);
+        done++;
+        break;
+      }
+      case 'shape': {
+        const node = makeShape(place(90), SHAPES.has(o.shape ?? '') ? (o.shape as ShapeKind) : 'process');
+        (node.data as { text: string }).text = (o.text ?? '').slice(0, 60);
+        st.addNode(node);
+        done++;
+        break;
+      }
+      case 'edit_note': {
+        const target = known.get(o.id ?? '');
+        if (!target || target.type !== 'note' || !o.text?.trim()) break;
+        st.updateNodeData(target.id, { blocks: blocksFromText(o.text) });
+        editedNote = true;
+        done++;
+        break;
+      }
+      case 'edit_title': {
+        const target = known.get(o.id ?? '');
+        if (!target || !o.title?.trim()) break;
+        const title = o.title.trim().slice(0, 80);
+        if (target.type === 'kanban' || target.type === 'gantt') st.updateNodeData(target.id, { title });
+        else if (target.type === 'shape') st.updateNodeData(target.id, { text: title });
+        else break;
+        done++;
+        break;
+      }
+      case 'add_tickets': {
+        const target = known.get(o.id ?? '');
+        if (!target || target.type !== 'kanban') break;
+        const fresh = (o.items ?? [])
+          .filter((t) => t.text?.trim())
+          .slice(0, 30)
+          .map((t) => ({
+            id: uid(), text: t.text!.trim().slice(0, 140), col: 0,
+            due: /^\d{4}-\d{2}-\d{2}$/.test(t.due ?? '') ? t.due : undefined,
+          }));
+        if (fresh.length === 0) break;
+        const existing = (target.data as { items?: unknown[] }).items ?? [];
+        st.updateNodeData(target.id, { items: [...existing, ...fresh] });
+        done++;
+        break;
+      }
+      case 'edge': {
+        if (!known.has(o.source ?? '') || !known.has(o.target ?? '') || o.source === o.target) break;
+        st.addLabeledEdge(o.source!, o.target!, (o.label ?? '').slice(0, 30));
+        done++;
+        break;
+      }
+      case 'delete': {
+        const ids = (o.ids ?? []).filter((id) => known.has(id));
+        if (ids.length === 0) break;
+        st.removeNodes(ids);
+        done++;
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  if (done === 0) throw new Error('Kein Schritt war ausführbar (unbekannte ids?) — Anweisung bitte konkreter formulieren.');
+  if (editedNote) {
+    // BlockNote liest Inhalte nur beim Mount — geänderte Notizen brauchen
+    // einen Board-Remount, sonst zeigt der Editor den alten Text. Der
+    // History-Eintrag wird markiert, damit auch Undo/Redo neu mountet.
+    useBoard.setState((s) => ({
+      importEpoch: s.importEpoch + 1,
+      past: s.past.map((e, i) => (i === s.past.length - 1 ? { ...e, remount: true } : e)),
+    }));
+  }
+  return `${summary?.trim() || 'Anweisung umgesetzt'} (${done} Schritt${done > 1 ? 'e' : ''} — Strg+Z macht alles rückgängig)`;
 }

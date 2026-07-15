@@ -40,6 +40,9 @@ interface HistoryEntry {
   nodes: AppNode[];
   edges: Edge[];
   drawings?: Stroke[];
+  /** Notiz-INHALTE haben sich geändert → Undo/Redo muss den Board-Remount
+   *  erzwingen, sonst zeigen BlockNote-Editoren (lesen nur beim Mount) alten Text */
+  remount?: boolean;
 }
 
 const HISTORY_LIMIT = 50;
@@ -351,12 +354,13 @@ export const useBoard = create<BoardState>()(
           if (!board) { set({ past: s.past.slice(0, -1) }); return; }
           set({
             past: s.past.slice(0, -1),
-            future: [...s.future, { boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings }],
+            future: [...s.future, { boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount: entry.remount }],
             activeId: entry.boardId,
             view: 'board',
             boards: s.boards.map((b) =>
               b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings } : b,
             ),
+            ...(entry.remount ? { importEpoch: s.importEpoch + 1 } : {}),
           });
         },
 
@@ -439,12 +443,13 @@ export const useBoard = create<BoardState>()(
           if (!board) { set({ future: s.future.slice(0, -1) }); return; }
           set({
             future: s.future.slice(0, -1),
-            past: [...s.past, { boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings }],
+            past: [...s.past, { boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount: entry.remount }],
             activeId: entry.boardId,
             view: 'board',
             boards: s.boards.map((b) =>
               b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings } : b,
             ),
+            ...(entry.remount ? { importEpoch: s.importEpoch + 1 } : {}),
           });
         },
 

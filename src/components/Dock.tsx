@@ -4,7 +4,7 @@ import { useBoard } from '../store';
 import { makeCalendar, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape } from '../lib/nodes';
 import { collectTasks } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
-import { aiBriefing, aiCluster, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
+import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
 import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
 import {
@@ -43,6 +43,7 @@ export function Dock() {
   const [drawMenu, setDrawMenu] = useState(false);
   const [aiMenu, setAiMenu] = useState(false);
   const [aiBusy, setAiBusy] = useState('');
+  const [cmd, setCmd] = useState('');
 
   /** KI-Aktion aufs ganze Board ausführen (mit Fortschritts-Toast + Fehlerbehandlung) */
   const runAi = async (label: string, fn: (nodes: import('../types').AppNode[], pos: { x: number; y: number }) => Promise<string>) => {
@@ -175,6 +176,29 @@ export function Dock() {
       <div className="dock-add-wrap">
         {aiMenu && (
           <div className="dock-menu dock-menu-ai">
+            <div className="dock-menu-label">Freitext-Anweisung</div>
+            <textarea
+              className="ai-cmd-input"
+              rows={2}
+              placeholder={'z. B. „Erstelle einen Wochenplan als Kanban" oder „Fasse alle Notizen zu einer zusammen"'}
+              value={cmd}
+              onChange={(e) => setCmd(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && cmd.trim()) {
+                  e.preventDefault();
+                  const wish = cmd;
+                  setCmd('');
+                  runAi('cmd', (n, p) => aiCommand(wish, n, p));
+                }
+              }}
+            />
+            <button
+              className="ai-cmd-go"
+              disabled={!!aiBusy || !cmd.trim()}
+              onClick={() => { const wish = cmd; setCmd(''); runAi('cmd', (n, p) => aiCommand(wish, n, p)); }}
+            >
+              ✨ Ausführen (erstellen, ändern, verbessern …)
+            </button>
             <div className="dock-menu-label">KI-Assistent (ganzes Board)</div>
             <button disabled={!!aiBusy} onClick={() => runAi('cluster', (n) => aiCluster(n))}>Themen clustern &amp; anordnen</button>
             <button disabled={!!aiBusy} onClick={() => runAi('tasks', aiTasks)}>Aufgaben &amp; Termine extrahieren</button>

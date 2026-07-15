@@ -3,7 +3,7 @@ import { NodeToolbar, Position, useReactFlow } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
-import { aiBriefing, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
+import { aiBriefing, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
 import { IBookmark, ICopy, IDuplicate, IMail, ITag, ITrash, IWand, IX } from './Icons';
 
@@ -28,6 +28,7 @@ export function SelectionToolbar() {
   const [attrMenu, setAttrMenu] = useState(false);
   const [attrKey, setAttrKey] = useState('');
   const [attrVal, setAttrVal] = useState('');
+  const [cmd, setCmd] = useState('');
 
   const selected = board.nodes.filter((n) => n.selected);
   if (selected.length === 0) return null;
@@ -162,6 +163,19 @@ export function SelectionToolbar() {
         <span className="sel-ai-wrap">
           {aiMenu && (
             <div className="sel-ai-menu nodrag">
+              <input
+                className="ai-cmd-input ai-cmd-small"
+                placeholder="Anweisung für die Auswahl …"
+                value={cmd}
+                onChange={(e) => setCmd(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && cmd.trim()) {
+                    const wish = cmd;
+                    setCmd('');
+                    runAi((n, p) => aiCommand(wish, n, p));
+                  }
+                }}
+              />
               <button disabled={aiBusy} onClick={() => runAi(aiTasks)}>Aufgaben extrahieren</button>
               <button disabled={aiBusy} onClick={() => runAi(aiProcess)}>Als Workflow-Diagramm</button>
               <button disabled={aiBusy} onClick={() => runAi(aiBriefing)}>Zusammenfassen</button>
