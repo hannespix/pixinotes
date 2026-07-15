@@ -5,6 +5,9 @@ import { useBoard, type AiSettings } from '../store';
 
 export function aiReady(ai: AiSettings): boolean {
   switch (ai.provider) {
+    case 'free':
+      // Gratis-Dienst ohne Schlüssel — sofort einsatzbereit
+      return true;
     case 'anthropic':
     case 'openai':
       return !!ai.apiKey && !!ai.model;
@@ -47,6 +50,24 @@ export async function askAi(prompt: string): Promise<string> {
         if (!res.ok) throw new Error(`Anthropic: HTTP ${res.status}`);
         const data = await res.json();
         return data.content?.[0]?.text ?? '';
+      }
+      case 'free': {
+        // Pollinations.ai: kostenloser, OpenAI-kompatibler Endpunkt ohne
+        // Schlüssel oder Konto. Ehrlich gesagt: Inhalte gehen an einen
+        // Community-Dienst ohne Verfügbarkeits-/Datenschutz-Garantien —
+        // für sensible Daten Ollama (lokal) nutzen.
+        const res = await fetch('https://text.pollinations.ai/openai', {
+          method: 'POST',
+          signal: ctrl.signal,
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            model: ai.model || 'openai',
+            messages: [{ role: 'user', content: prompt }],
+          }),
+        });
+        if (!res.ok) throw new Error(`Gratis-KI: HTTP ${res.status} — der kostenlose Dienst ist gerade ausgelastet, einfach nochmal versuchen (oder Anbieter wechseln).`);
+        const data = await res.json();
+        return data.choices?.[0]?.message?.content ?? '';
       }
       case 'openai':
       case 'custom': {

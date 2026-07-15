@@ -1318,3 +1318,11 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   .ov-graph { padding-top: 205px; }
   .ov-graph-zoom { right: 12px; bottom: 60px; }
 }
+
+@media (max-width: 860px) {
+  /* Zoom-Controls (+/−/Einpassen) verschwinden sonst hinterm Dock (User-Screenshot) */
+  .react-flow__controls {
+    margin-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+    margin-left: 8px !important;
+  }
+}

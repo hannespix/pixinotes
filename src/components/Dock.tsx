@@ -38,6 +38,7 @@ export function Dock() {
   const ai = useBoard((s) => s.ai);
   const templates = useBoard((s) => s.templates);
   const removeTemplate = useBoard((s) => s.removeTemplate);
+  const focusNode = useBoard((s) => s.focusNode);
   const [addMenu, setAddMenu] = useState(false);
   const [drawMenu, setDrawMenu] = useState(false);
   const [aiMenu, setAiMenu] = useState(false);
@@ -67,8 +68,14 @@ export function Dock() {
       y: window.innerHeight / 2 - h / 2 + (Math.random() * 60 - 30),
     });
 
-  const add = (fn: () => void) => { fn(); setAddMenu(false); };
-  const addShape = (shape: ShapeKind) => add(() => addNode(makeShape(centerPos(150, 70), shape)));
+  /** Modul anlegen + direkt hinfliegen (Pan & Zoom über die pendingFocus-Mechanik) */
+  const add = (make: () => AppNode) => {
+    const node = make();
+    addNode(node);
+    focusNode(useBoard.getState().activeId, node.id);
+    setAddMenu(false);
+  };
+  const addShape = (shape: ShapeKind) => add(() => makeShape(centerPos(150, 70), shape));
   const pickTool = (t: typeof tool) => { setTool(t); setDrawMenu(false); };
   const drawing = tool !== 'select';
 
@@ -78,33 +85,33 @@ export function Dock() {
         {addMenu && (
           <div className="dock-menu">
             <div className="dock-menu-label">Notizen &amp; Boards</div>
-            <button onClick={() => add(() => addNode(makeNote(centerPos())))}><INote size={16} /> Notiz</button>
+            <button onClick={() => add(() => makeNote(centerPos()))}><INote size={16} /> Notiz</button>
             <button
               onClick={() => add(() => {
                 const heading = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-                addNode(makeNote(centerPos(), {
+                return makeNote(centerPos(), {
                   color: 'white',
                   blocks: [
                     { type: 'heading', props: { level: 3 }, content: heading },
                     { type: 'paragraph', content: '' },
                   ],
-                }));
+                });
               })}
               title="Notiz mit heutigem Datum als Überschrift (Daily Note)"
             >
               <ICalendar size={16} /> Tagesnotiz
             </button>
-            <button onClick={() => add(() => addNode(makeKanban(centerPos(420, 200))))}><IKanban size={16} /> Kanban-Board</button>
+            <button onClick={() => add(() => makeKanban(centerPos(420, 200)))}><IKanban size={16} /> Kanban-Board</button>
             <div className="dock-menu-label">Planung</div>
-            <button onClick={() => add(() => addNode(makeGantt(centerPos(560, 240))))}><IGantt size={16} /> Zeitplan (Gantt)</button>
-            <button onClick={() => add(() => addNode(makeCalendar(centerPos(430, 340))))}><ICalendar size={16} /> Kalender (Monat)</button>
-            <button onClick={() => add(() => addNode(makeMermaid(centerPos(380, 240))))}><IDiagram size={16} /> Diagramm (Mermaid)</button>
+            <button onClick={() => add(() => makeGantt(centerPos(560, 240)))}><IGantt size={16} /> Zeitplan (Gantt)</button>
+            <button onClick={() => add(() => makeCalendar(centerPos(430, 340)))}><ICalendar size={16} /> Kalender (Monat)</button>
+            <button onClick={() => add(() => makeMermaid(centerPos(380, 240)))}><IDiagram size={16} /> Diagramm (Mermaid)</button>
             <div className="dock-menu-label">Prozess-Formen</div>
             <button onClick={() => addShape('process')}><ISquare size={16} /> Schritt</button>
             <button onClick={() => addShape('decision')}><IDiamond size={16} /> Entscheidung</button>
             <button onClick={() => addShape('terminator')}><IPill size={16} /> Start/Ende</button>
             <div className="dock-menu-label">Verknüpfen</div>
-            <button onClick={() => add(() => { addNode(makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board'); })}><IFolder size={16} /> Portal zu Board</button>
+            <button onClick={() => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board'); }}><IFolder size={16} /> Portal zu Board</button>
             {templates.length > 0 && (
               <>
                 <div className="dock-menu-label">Vorlagen</div>
@@ -116,7 +123,7 @@ export function Dock() {
                     onClick={() => add(() => {
                       const clone = JSON.parse(JSON.stringify(t.node)) as AppNode;
                       const size = { w: clone.width ?? 260, h: clone.height ?? 120 };
-                      addNode({ ...clone, id: uid(), position: centerPos(size.w, size.h), selected: false });
+                      return { ...clone, id: uid(), position: centerPos(size.w, size.h), selected: false };
                     })}
                   >
                     <IBookmark size={16} /> {t.name}
@@ -177,7 +184,7 @@ export function Dock() {
             <div className="dock-menu-foot">
               {aiReady(ai)
                 ? 'Nicht destruktiv: legt neue Karten an bzw. ordnet nur an — Strg+Z macht alles rückgängig.'
-                : 'KI zuerst in den Einstellungen konfigurieren (Ollama = alles lokal).'}
+                : 'KI zuerst in den Einstellungen wählen — „Gratis" geht ohne Schlüssel, Ollama = alles lokal.'}
             </div>
           </div>
         )}

@@ -7,6 +7,7 @@ import {
 } from '../lib/syncFolder';
 
 const MODELS: Record<string, string[]> = {
+  free: ['openai', 'mistral'],
   anthropic: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5'],
   openai: ['gpt-4o', 'gpt-4o-mini'],
   ollama: ['llama3.1', 'mistral', 'qwen2.5', 'phi3'],
@@ -155,6 +156,7 @@ export function Settings() {
               updateAi({ provider, model: MODELS[provider]?.[0] ?? '', baseUrl: DEFAULT_BASE[provider] ?? '' });
             }}>
               <option value="none">— aus —</option>
+              <option value="free">Gratis (Pollinations.ai, ohne Schlüssel)</option>
               <option value="anthropic">Anthropic (Claude)</option>
               <option value="openai">OpenAI</option>
               <option value="ollama">Ollama (lokal, selbstgehostet)</option>
@@ -189,11 +191,13 @@ export function Settings() {
                 </label>
               )}
               <div className="modal-note">
-                {ai.provider === 'ollama'
-                  ? '🖥️ Ollama muss lokal laufen (ollama serve). Für den Browser-Zugriff ggf. OLLAMA_ORIGINS setzen. Kein Schlüssel, keine Cloud.'
-                  : (NEEDS_KEY.has(ai.provider) && !ai.apiKey)
-                    ? 'Ohne Schlüssel bleiben die KI-Aktionen ausgeblendet.'
-                    : '✅ Konfiguriert — KI-Aktionen erscheinen auf den Karten.'}
+                {ai.provider === 'free'
+                  ? '✅ Sofort nutzbar, kein Konto nötig. Aber ehrlich: Inhalte gehen an den Community-Dienst Pollinations.ai (keine Datenschutz-/Verfügbarkeits-Garantie) — für sensible Notizen besser Ollama (lokal) oder einen eigenen Schlüssel nutzen.'
+                  : ai.provider === 'ollama'
+                    ? '🖥️ Ollama muss lokal laufen (ollama serve). Für den Browser-Zugriff ggf. OLLAMA_ORIGINS setzen. Kein Schlüssel, keine Cloud.'
+                    : (NEEDS_KEY.has(ai.provider) && !ai.apiKey)
+                      ? 'Ohne Schlüssel bleiben die KI-Aktionen ausgeblendet.'
+                      : '✅ Konfiguriert — KI-Aktionen erscheinen auf den Karten.'}
               </div>
             </>
           )}
