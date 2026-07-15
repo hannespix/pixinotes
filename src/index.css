@@ -248,7 +248,13 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   display: flex; gap: 4px; z-index: 50; align-items: center;
   background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(6px);
   padding: 5px; border-radius: 12px; box-shadow: 0 2px 10px rgba(50, 40, 20, 0.1);
-  max-width: 42vw; overflow-x: auto;
+  max-width: 42vw;
+}
+/* Nur die Board-Tabs scrollen; Home/Teilen/Verlauf/＋ bleiben immer sichtbar.
+   Kein overflow auf .tabs selbst — sonst wird das Verlaufs-Dropdown geclippt. */
+.tabs-scroll {
+  display: flex; gap: 4px; align-items: center;
+  overflow-x: auto; min-width: 0; scrollbar-width: thin;
 }
 .tab {
   display: flex; align-items: center; gap: 6px;
@@ -1263,3 +1269,39 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ov-graph-dot { cursor: pointer; }
 .ov-graph-dot circle { fill: #fff; stroke: #a09a8a; stroke-width: 1.5; }
 .ov-graph-dot:hover circle { stroke: var(--accent); fill: #e8efff; }
+
+/* ---------- Responsivitäts-Overrides (Audit Runde 5) ----------
+   WICHTIG: Dieser Block muss am DATEIENDE stehen — bei gleicher Spezifität
+   gewinnt die spätere Regel, sonst schlagen die Basisregeln oben die
+   Media-Query-Overrides (Kaskaden-Falle aus Runde 2). */
+@media (max-width: 860px) {
+  /* Übersicht-Bedienelemente unter die (auf 62px gerutschte) Tab-Leiste —
+     sonst überlappen sie sich genau dort (R5-1) */
+  .ov-mode { top: 112px; right: 12px; }
+  .ov-graph-toggles { top: 112px; left: 12px; right: auto; max-width: calc(100vw - 160px); flex-wrap: wrap; gap: 8px 12px; }
+  .ov-graph { padding: 156px 12px 12px; }
+  .backlinks { right: 12px; bottom: 150px; }
+  .backlinks-panel { max-width: calc(100vw - 24px); }
+}
+
+@media (max-width: 640px) {
+  /* Selection-Toolbar: umbrechen statt über den Rand laufen (R5-4) */
+  .sel-toolbar { flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 16px); }
+  .sel-toolbar .sel-label, .sel-count { display: none; }
+  /* Popover (KI/Attribute) mittig überm Button verankern statt rechtsbündig —
+     rechtsbündig schiebt es bei mittig sitzenden Buttons aus dem Bild (R5-5) */
+  .sel-ai-menu {
+    right: auto; left: 50%; transform: translateX(-50%);
+    width: max-content; max-width: min(320px, calc(100vw - 24px)); min-width: 0;
+  }
+  /* Aufgaben-Zeile: Fälligkeit & Board-Chip in die zweite Zeile (R5-6) */
+  .task-row { flex-wrap: wrap; }
+  .task-text { flex: 1 1 calc(100% - 40px); }
+  .task-due-input { margin-left: 27px; }
+  .task-board { margin-left: auto; }
+  /* Verlaufs-Panel: nie breiter als der Viewport */
+  .tab-history { min-width: 0; width: min(300px, calc(100vw - 24px)); }
+  /* Netz-Ansicht: Umschalter + Filter passen nicht nebeneinander → stapeln */
+  .ov-graph-toggles { top: 158px; max-width: calc(100vw - 24px); }
+  .ov-graph { padding-top: 205px; }
+}

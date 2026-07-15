@@ -123,8 +123,8 @@ export function SelectionToolbar() {
       className="sel-toolbar"
     >
       <span className="sel-count">{selected.length} ausgewählt</span>
-      <button onClick={shareByMail} title="Inhalt als E-Mail-Entwurf öffnen"><IMail size={15} /> E-Mail</button>
-      <button onClick={copyHtml} title="Formatiert kopieren (Outlook/Word-tauglich)"><ICopy size={15} /> Kopieren</button>
+      <button onClick={shareByMail} title="Inhalt als E-Mail-Entwurf öffnen"><IMail size={15} /><span className="sel-label"> E-Mail</span></button>
+      <button onClick={copyHtml} title="Formatiert kopieren (Outlook/Word-tauglich)"><ICopy size={15} /><span className="sel-label"> Kopieren</span></button>
       <button onClick={duplicate} title="Duplizieren"><IDuplicate size={15} /></button>
       {single && (
         <span className="sel-ai-wrap">

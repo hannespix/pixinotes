@@ -39,6 +39,16 @@ export function Settings() {
   // WICHTIG: vor dem early-return deklarieren (Hook-Reihenfolge!)
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Esc schließt das Panel — wie überall sonst (Suche, TaskHub, Präsentation)
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, setOpen]);
+
   // Verbundenen Sync-Ordner + Berechtigungs-Status anzeigen (Handle überlebt Neustarts via IndexedDB)
   useEffect(() => {
     if (!open || !syncSupported()) return;

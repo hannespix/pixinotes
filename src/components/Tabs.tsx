@@ -66,28 +66,31 @@ export function Tabs() {
       >
         <IHome size={15} />
       </button>
-      {boards.map((b) => (
-        <div
-          key={b.id}
-          className={`tab ${b.id === activeId && view === 'board' ? 'active' : ''}`}
-          onClick={() => openBoard(b.id)}
-          title="Klick = wechseln · Doppelklick auf den Namen = umbenennen"
-        >
-          <InlineName value={b.name} className="tab-name" onRename={(name) => renameBoard(b.id, name)} />
-          <span className="tab-count">{b.nodes.length}</span>
-          <button
-            className="tab-x"
-            title="Board schließen"
-            aria-label={`Board ${b.name} schließen`}
-            onClick={(e) => {
-              e.stopPropagation();
-              close(b.id);
-            }}
+      {/* Nur die Board-Tabs scrollen — Home & Aktions-Buttons bleiben immer erreichbar */}
+      <div className="tabs-scroll">
+        {boards.map((b) => (
+          <div
+            key={b.id}
+            className={`tab ${b.id === activeId && view === 'board' ? 'active' : ''}`}
+            onClick={() => openBoard(b.id)}
+            title="Klick = wechseln · Doppelklick auf den Namen = umbenennen"
           >
-            <IX size={11} />
-          </button>
-        </div>
-      ))}
+            <InlineName value={b.name} className="tab-name" onRename={(name) => renameBoard(b.id, name)} />
+            <span className="tab-count">{b.nodes.length}</span>
+            <button
+              className="tab-x"
+              title="Board schließen"
+              aria-label={`Board ${b.name} schließen`}
+              onClick={(e) => {
+                e.stopPropagation();
+                close(b.id);
+              }}
+            >
+              <IX size={11} />
+            </button>
+          </div>
+        ))}
+      </div>
       <button
         className="tab-share"
         title="Aktives Board teilen: Link mit komplettem Inhalt kopieren (serverlos)"

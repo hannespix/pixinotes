@@ -162,3 +162,41 @@ funktionieren, haben aber zu wenig Bedienungstiefe.
 - [x] T2 Fälligkeit direkt in der Liste ändern (Datumsfeld pro Aufgabe)
 - [x] T3 Schnell-Eingabe: neue Aufgabe tippen → landet als Ticket im
       Kanban des aktiven Boards (wird bei Bedarf angelegt)
+
+---
+
+## Runde 5 — Responsivitäts-Audit (Phone 390px / Tablet ≤860px)
+
+Methode: Playwright-Durchlauf bei 390×844 (Touch), Screenshot + automatische
+Überlauf-Messung (fixe/absolute Elemente außerhalb des Viewports) über alle
+UI-Schichten: Board, Tab-Leiste, Dock-Menüs, Auswahl-Leiste, Übersicht
+(Hierarchie & Netz), Aufgaben-Zentrale, Suche, Einstellungen, Presenter.
+
+**Befunde & Fixes**
+- [x] R5-1 Übersicht-Umschalter (Hierarchie ⇄ Netz) und Graph-Filter liegen
+      bei ≤860px AUF der Tab-Leiste (beide `top: 6xpx`) → auf 112px unter
+      die Leiste verschoben, Netz-Ansicht bekommt mehr Kopf-Padding
+      *(exakt der Fehler aus dem User-Screenshot)*
+- [x] R5-2 Tab-Leiste: Home-, Teilen-, Verlauf- und ＋-Button scrollen bei
+      vielen Boards aus dem Bild → nur die Board-Tabs scrollen
+      (`.tabs-scroll`), Aktionen bleiben fix
+- [x] R5-3 Verlaufs-Dropdown wurde vom `overflow-x: auto` der Tab-Leiste
+      geclippt (unsichtbar auf Phone) → Scroll-Container nur noch um die
+      Tabs, Panel liegt außerhalb; Breite auf Viewport geklemmt
+- [x] R5-4 Auswahl-Leiste (Selection-Toolbar) breiter als der Viewport,
+      Buttons rechts/links abgeschnitten → bricht ab 640px um,
+      Text-Labels („E-Mail", „Kopieren", Zähler) weichen Icon-only
+- [x] R5-5 Attribut-/KI-Popover lief links aus dem Bild (rechtsbündig am
+      mittig sitzenden Button verankert) → ab 640px mittig über dem Button,
+      Breite max. `100vw - 24px`
+- [x] R5-6 Aufgaben-Zentrale: Datumsfeld überlappte den Aufgabentext bei
+      schmalen Zeilen → Zeile bricht um, Fälligkeit + Board-Chip rutschen
+      in die zweite Zeile
+- [x] R5-7 Einstellungen ließen sich nicht mit Esc schließen (alle anderen
+      Overlays können das) → Esc-Handler ergänzt
+- [x] R5-8 Backlinks-Pill kollidierte auf Phones mit dem Dock-Bereich →
+      Abstand angepasst, Panel-Breite geklemmt
+
+**Bewusst nicht geändert:** Karten (Kanban/Gantt/Kalender) skalieren über
+Canvas-Zoom statt eigener Mobile-Layouts — auf dem Board ist Pan/Zoom die
+natürliche Geste; die Karten selbst bleiben desktop-identisch.
