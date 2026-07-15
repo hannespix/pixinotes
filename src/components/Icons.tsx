@@ -64,3 +64,6 @@ export const IDiamond = make(<path d="M12 3l9 9-9 9-9-9Z" />);
 export const IPill = make(<rect width="18" height="10" x="3" y="7" rx="5" />);
 export const IMousePointer = make(<><path d="m4 3 7.1 17 2.4-7.5L21 10Z" /></>);
 export const IShare = make(<><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.6 13.5 6.8 4" /><path d="m15.4 6.5-6.8 4" /></>);
+export const IHistory = make(<><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3.5 2" /></>);
+export const ITag = make(<><path d="M12 2H4a2 2 0 0 0-2 2v8l10 10 10-10Z" /><circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none" /></>);
+export const IBookmark = make(<path d="M19 21 12 16 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z" />);

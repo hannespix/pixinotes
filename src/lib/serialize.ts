@@ -134,6 +134,18 @@ export function blocksToHtml(blocks: unknown[] | undefined): string {
 /* ---------- Karten → Text/HTML ---------- */
 
 export function nodeToText(node: AppNode): string {
+  const base = baseNodeText(node);
+  // Attribute (Trilium-Stil: schlüssel=wert) anhängen — damit sind sie
+  // durchsuchbar und landen in Export/Clipboard
+  const attrs = node.data?.attrs as Record<string, string> | undefined;
+  if (attrs && Object.keys(attrs).length > 0) {
+    const lines = Object.entries(attrs).map(([k, v]) => `${k}: ${v}`).join('\n');
+    return base ? `${base}\n${lines}` : lines;
+  }
+  return base;
+}
+
+function baseNodeText(node: AppNode): string {
   switch (node.type) {
     case 'note':
       return blocksToText(node.data.blocks);

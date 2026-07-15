@@ -5,7 +5,7 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { ICopy, IDuplicate, IMail, ITrash, IWand } from './Icons';
+import { IBookmark, ICopy, IDuplicate, IMail, ITag, ITrash, IWand, IX } from './Icons';
 
 const MAILTO_LIMIT = 1800; // konservativ: längere mailto-URLs schlucken manche Clients
 
@@ -20,9 +20,14 @@ export function SelectionToolbar() {
   const removeNodes = useBoard((s) => s.removeNodes);
   const showToast = useBoard((s) => s.showToast);
   const ai = useBoard((s) => s.ai);
+  const updateNodeData = useBoard((s) => s.updateNodeData);
+  const saveTemplate = useBoard((s) => s.saveTemplate);
   const { screenToFlowPosition } = useReactFlow();
   const [aiMenu, setAiMenu] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const [attrMenu, setAttrMenu] = useState(false);
+  const [attrKey, setAttrKey] = useState('');
+  const [attrVal, setAttrVal] = useState('');
 
   const selected = board.nodes.filter((n) => n.selected);
   if (selected.length === 0) return null;
@@ -83,6 +88,32 @@ export function SelectionToolbar() {
 
   const remove = () => removeNodes(selected.map((n) => n.id));
 
+  // ---------- Attribute (Trilium-Stil, nur bei EINER Karte) ----------
+  const single = selected.length === 1 ? selected[0] : null;
+  const attrs = (single?.data?.attrs as Record<string, string> | undefined) ?? {};
+
+  const addAttr = () => {
+    const k = attrKey.trim().slice(0, 30);
+    const v = attrVal.trim().slice(0, 60);
+    if (!single || !k || !v) return;
+    updateNodeData(single.id, { attrs: { ...attrs, [k]: v } });
+    setAttrKey('');
+    setAttrVal('');
+  };
+
+  const removeAttr = (k: string) => {
+    if (!single) return;
+    const next = { ...attrs };
+    delete next[k];
+    updateNodeData(single.id, { attrs: Object.keys(next).length ? next : undefined });
+  };
+
+  const asTemplate = () => {
+    if (!single) return;
+    const name = window.prompt('Name der Vorlage:', nodesToText([single]).split('\n')[0]?.slice(0, 30) || 'Vorlage');
+    if (name) saveTemplate(single, name);
+  };
+
   return (
     <NodeToolbar
       nodeId={selected.map((n) => n.id)}
@@ -95,6 +126,38 @@ export function SelectionToolbar() {
       <button onClick={shareByMail} title="Inhalt als E-Mail-Entwurf öffnen"><IMail size={15} /> E-Mail</button>
       <button onClick={copyHtml} title="Formatiert kopieren (Outlook/Word-tauglich)"><ICopy size={15} /> Kopieren</button>
       <button onClick={duplicate} title="Duplizieren"><IDuplicate size={15} /></button>
+      {single && (
+        <span className="sel-ai-wrap">
+          {attrMenu && (
+            <div className="sel-ai-menu sel-attr-menu nodrag">
+              <div className="sel-attr-title">Eigenschaften (schlüssel = wert)</div>
+              {Object.entries(attrs).map(([k, v]) => (
+                <div key={k} className="sel-attr-row">
+                  <b>{k}</b><span>{v}</span>
+                  <button title="Eigenschaft entfernen" onClick={() => removeAttr(k)}><IX size={10} /></button>
+                </div>
+              ))}
+              <div className="sel-attr-add">
+                <input placeholder="schlüssel" value={attrKey} onChange={(e) => setAttrKey(e.target.value)} />
+                <input
+                  placeholder="wert" value={attrVal}
+                  onChange={(e) => setAttrVal(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addAttr()}
+                />
+                <button onClick={addAttr} title="Hinzufügen">＋</button>
+              </div>
+              <div className="sel-attr-hint">z. B. status = wartet · kunde = ACME — über Strg+K durchsuchbar</div>
+            </div>
+          )}
+          <button className={attrMenu ? 'ai-on' : ''} onClick={() => { setAttrMenu((o) => !o); setAiMenu(false); }} title="Eigenschaften (Attribute) der Karte">
+            <ITag size={15} />
+            {Object.keys(attrs).length > 0 && <span className="sel-attr-count">{Object.keys(attrs).length}</span>}
+          </button>
+        </span>
+      )}
+      {single && (
+        <button onClick={asTemplate} title="Karte als Vorlage speichern (➕-Menü → Vorlagen)"><IBookmark size={15} /></button>
+      )}
       {aiReady(ai) && (
         <span className="sel-ai-wrap">
           {aiMenu && (

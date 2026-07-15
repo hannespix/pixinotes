@@ -6,10 +6,10 @@ import { collectTasks } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCluster, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
 import { selectActiveBoard } from '../store';
-import type { ShapeKind } from '../types';
+import { uid, type AppNode, type ShapeKind } from '../types';
 import {
-  ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
-  IMousePointer, INote, IPen, IPill, IPlay, IPlus, IRedo, ISearch, ISettings, ISquare, ITasks, IUndo, IWand,
+  IBookmark, ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
+  IMousePointer, INote, IPen, IPill, IPlay, IPlus, IRedo, ISearch, ISettings, ISquare, ITasks, IUndo, IWand, IX,
 } from './Icons';
 
 /**
@@ -36,6 +36,8 @@ export function Dock() {
   }, [boards]);
   const { screenToFlowPosition } = useReactFlow();
   const ai = useBoard((s) => s.ai);
+  const templates = useBoard((s) => s.templates);
+  const removeTemplate = useBoard((s) => s.removeTemplate);
   const [addMenu, setAddMenu] = useState(false);
   const [drawMenu, setDrawMenu] = useState(false);
   const [aiMenu, setAiMenu] = useState(false);
@@ -103,7 +105,33 @@ export function Dock() {
             <button onClick={() => addShape('terminator')}><IPill size={16} /> Start/Ende</button>
             <div className="dock-menu-label">Verknüpfen</div>
             <button onClick={() => add(() => { addNode(makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board'); })}><IFolder size={16} /> Portal zu Board</button>
-            <div className="dock-menu-foot">E-Mails (.eml/.msg), Bilder &amp; PDFs einfach aufs Board ziehen · Strg+V für Screenshots</div>
+            {templates.length > 0 && (
+              <>
+                <div className="dock-menu-label">Vorlagen</div>
+                {templates.map((t) => (
+                  <button
+                    key={t.id}
+                    className="dock-menu-template"
+                    title="Vorlage als neue Karte einfügen"
+                    onClick={() => add(() => {
+                      const clone = JSON.parse(JSON.stringify(t.node)) as AppNode;
+                      const size = { w: clone.width ?? 260, h: clone.height ?? 120 };
+                      addNode({ ...clone, id: uid(), position: centerPos(size.w, size.h), selected: false });
+                    })}
+                  >
+                    <IBookmark size={16} /> {t.name}
+                    <span
+                      className="dock-menu-template-x"
+                      title="Vorlage löschen"
+                      onClick={(e) => { e.stopPropagation(); removeTemplate(t.id); }}
+                    >
+                      <IX size={11} />
+                    </span>
+                  </button>
+                ))}
+              </>
+            )}
+            <div className="dock-menu-foot">E-Mails (.eml/.msg), Bilder &amp; PDFs einfach aufs Board ziehen · Strg+V für Screenshots · Karte auswählen → 🔖 macht sie zur Vorlage</div>
           </div>
         )}
         <button

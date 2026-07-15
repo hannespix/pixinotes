@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
 import { InlineName } from './InlineName';
-import { IHome, IPlus, IShare, IX } from './Icons';
+import { IHistory, IHome, IPlus, IShare, IX } from './Icons';
 
 /**
  * Projekt-Tabs: jedes Board ist ein Raum. Doppelklick = umbenennen,
@@ -18,6 +19,14 @@ export function Tabs() {
   const removeBoard = useBoard((s) => s.removeBoard);
   const showToast = useBoard((s) => s.showToast);
   const activeBoard = useBoard(selectActiveBoard);
+  // Map selektieren und erst außerhalb indizieren — `?? []` im Selector
+  // würde bei jedem Snapshot ein neues Array liefern (Endlos-Render, React #185)
+  const versionsMap = useBoard((s) => s.versions);
+  const versions = versionsMap[activeId] ?? [];
+  const saveVersion = useBoard((s) => s.saveVersion);
+  const restoreVersion = useBoard((s) => s.restoreVersion);
+  const deleteVersion = useBoard((s) => s.deleteVersion);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   /** Aktives Board serverlos teilen: Link in die Zwischenablage (Fallback: Datei) */
   const shareActive = async () => {
@@ -87,6 +96,45 @@ export function Tabs() {
       >
         <IShare size={13} />
       </button>
+      <span className="tab-history-wrap">
+        <button
+          className={`tab-share ${historyOpen ? 'active' : ''}`}
+          title="Board-Verlauf: Versionen sichern & wiederherstellen"
+          aria-label="Board-Verlauf"
+          onClick={() => setHistoryOpen((o) => !o)}
+        >
+          <IHistory size={13} />
+        </button>
+        {historyOpen && (
+          <div className="tab-history">
+            <div className="tab-history-title">Verlauf „{activeBoard.name}"</div>
+            <button
+              className="tab-history-save"
+              onClick={() => saveVersion(activeBoard.id)}
+            >
+              ＋ Version jetzt sichern
+            </button>
+            {versions.length === 0 && (
+              <div className="tab-history-empty">Noch keine Version — sichere einen Stand, bevor du groß umbaust.</div>
+            )}
+            {versions.map((v) => (
+              <div key={v.ts} className="tab-history-row">
+                <span>{new Date(v.ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                <em>{v.nodes.length} Karten</em>
+                <button
+                  title="Diesen Stand wiederherstellen (Strg+Z macht es rückgängig)"
+                  onClick={() => { restoreVersion(activeBoard.id, v.ts); setHistoryOpen(false); }}
+                >
+                  Wiederherstellen
+                </button>
+                <button className="tab-history-x" title="Version löschen" onClick={() => deleteVersion(activeBoard.id, v.ts)}>
+                  <IX size={10} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </span>
       <button
         className="tab-add"
         title="Neues Projekt-Board"

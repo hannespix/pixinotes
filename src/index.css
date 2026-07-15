@@ -1109,7 +1109,73 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   border: none; background: none; cursor: pointer; color: var(--muted);
   border-radius: 8px; padding: 6px 8px; display: inline-flex; align-items: center; justify-content: center;
 }
-.tab-share:hover { background: #f1ede4; color: var(--accent); }
+.tab-share:hover, .tab-share.active { background: #f1ede4; color: var(--accent); }
+
+/* ---------- Trilium-Paket: Attribute, Verlauf, Vorlagen ---------- */
+.sel-attr-menu { min-width: 250px; gap: 4px; }
+.sel-attr-title { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 3px 6px 1px; }
+.sel-attr-row {
+  display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 6px;
+  background: #f7f4ec; border-radius: 7px;
+}
+.sel-attr-row b { color: var(--ink); font-weight: 650; }
+.sel-attr-row span { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel-attr-row button {
+  border: none; background: none; cursor: pointer; color: var(--muted); padding: 2px;
+  display: inline-flex; border-radius: 5px; width: auto;
+}
+.sel-attr-row button:hover { color: #c0392b; background: rgba(192,57,43,.1); }
+.sel-attr-add { display: flex; gap: 4px; padding: 2px 4px; }
+.sel-attr-add input {
+  flex: 1; min-width: 0; border: 1px solid rgba(0,0,0,.12); border-radius: 7px;
+  font-family: inherit; font-size: 12px; padding: 5px 7px; background: #fff;
+}
+.sel-attr-add input:focus { outline: none; border-color: var(--accent); }
+.sel-attr-add button {
+  width: 28px; flex: none; border: none; background: var(--accent); color: #fff;
+  border-radius: 7px; cursor: pointer; font-size: 13px; padding: 0; text-align: center;
+}
+.sel-attr-hint { font-size: 10px; color: var(--muted); padding: 2px 6px 3px; line-height: 1.4; }
+.sel-attr-count {
+  position: absolute; top: -4px; right: -4px; background: var(--accent); color: #fff;
+  border-radius: 999px; font-size: 8.5px; font-weight: 700; min-width: 13px; height: 13px;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0 3px;
+}
+.sel-toolbar .sel-ai-wrap > button { position: relative; }
+
+.tab-history-wrap { position: relative; display: inline-flex; }
+.tab-history {
+  position: absolute; top: calc(100% + 8px); right: 0; background: #fff; z-index: 60;
+  border-radius: 12px; box-shadow: 0 8px 32px rgba(50,40,20,.25); padding: 8px;
+  display: flex; flex-direction: column; gap: 5px; min-width: 270px;
+}
+.tab-history-title { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 2px 4px; }
+.tab-history-save {
+  border: 1px dashed rgba(0,0,0,.2); background: #fbf9f2; border-radius: 8px; cursor: pointer;
+  font-family: inherit; font-size: 12px; padding: 7px 9px; color: var(--ink); text-align: left;
+}
+.tab-history-save:hover { border-color: var(--accent); color: var(--accent); }
+.tab-history-empty { font-size: 11px; color: var(--muted); padding: 3px 5px 5px; line-height: 1.45; max-width: 250px; }
+.tab-history-row {
+  display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 5px 6px;
+  background: #f7f4ec; border-radius: 8px;
+}
+.tab-history-row em { font-style: normal; color: var(--muted); font-size: 10.5px; flex: 1; }
+.tab-history-row > button {
+  border: none; background: #fff; border-radius: 6px; cursor: pointer; font-family: inherit;
+  font-size: 11px; padding: 4px 8px; color: var(--accent); box-shadow: 0 1px 3px rgba(50,40,20,.1);
+}
+.tab-history-row > button:hover { background: #eef4ff; }
+.tab-history-row > button.tab-history-x { color: var(--muted); box-shadow: none; background: none; padding: 3px; display: inline-flex; }
+.tab-history-row > button.tab-history-x:hover { color: #c0392b; background: rgba(192,57,43,.1); }
+
+.dock-menu-template { position: relative; padding-right: 30px !important; }
+.dock-menu-template-x {
+  position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 5px; color: var(--muted); cursor: pointer;
+}
+.dock-menu-template-x:hover { color: #c0392b; background: rgba(192,57,43,.12); }
 
 /* ---------- Kalender: Options-Panel + externe Termine ---------- */
 .cal-menu {

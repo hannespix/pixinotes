@@ -44,6 +44,22 @@ interface HistoryEntry {
 
 const HISTORY_LIMIT = 50;
 
+/** Gesicherter Board-Stand (Trilium-Revisionen light — manuell, max. 3 pro Board) */
+export interface BoardVersion {
+  ts: string;
+  nodes: AppNode[];
+  edges: Edge[];
+  drawings?: Stroke[];
+}
+const VERSION_LIMIT = 3;
+
+/** Wiederverwendbare Karten-Vorlage */
+export interface CardTemplate {
+  id: string;
+  name: string;
+  node: AppNode;
+}
+
 export type AiProvider = 'none' | 'anthropic' | 'openai' | 'ollama' | 'custom';
 export interface AiSettings {
   provider: AiProvider;
@@ -120,6 +136,15 @@ interface BoardState {
 
   /** Kompletten Stand aus der Sync-Datei übernehmen (ersetzt Boards & Hierarchie) */
   importSync: (boards: BoardDoc[], spaces: Space[], activeId: string) => void;
+
+  // Trilium-Paket: Board-Verlauf (Revisionen) + Karten-Vorlagen
+  versions: Record<string, BoardVersion[]>;
+  saveVersion: (boardId: string) => void;
+  restoreVersion: (boardId: string, ts: string) => void;
+  deleteVersion: (boardId: string, ts: string) => void;
+  templates: CardTemplate[];
+  saveTemplate: (node: AppNode, name: string) => void;
+  removeTemplate: (id: string) => void;
   /** Zählt Voll-Importe hoch — erzwingt Board-Remount (BlockNote liest nur beim Mount!) */
   importEpoch: number;
 
@@ -334,6 +359,58 @@ export const useBoard = create<BoardState>()(
             ),
           });
         },
+
+        // ---------- Trilium-Paket: Verlauf & Vorlagen ----------
+        versions: {},
+
+        saveVersion: (boardId) => {
+          const board = get().boards.find((b) => b.id === boardId);
+          if (!board) return;
+          const cur = get().versions[boardId] ?? [];
+          set({
+            versions: {
+              ...get().versions,
+              [boardId]: [
+                { ts: new Date().toISOString(), nodes: board.nodes, edges: board.edges, drawings: board.drawings },
+                ...cur,
+              ].slice(0, VERSION_LIMIT),
+            },
+          });
+          get().showToast(`Version gesichert (${Math.min(cur.length + 1, VERSION_LIMIT)}/${VERSION_LIMIT}) — Wiederherstellen über den Verlauf.`);
+        },
+
+        restoreVersion: (boardId, ts) => {
+          const v = (get().versions[boardId] ?? []).find((x) => x.ts === ts);
+          if (!v) return;
+          get().pushHistory();
+          set({
+            boards: get().boards.map((b) =>
+              b.id === boardId ? { ...b, nodes: v.nodes, edges: v.edges, drawings: v.drawings } : b,
+            ),
+            // Editor-Remount erzwingen (BlockNote liest nur beim Mount)
+            importEpoch: get().importEpoch + 1,
+          });
+          get().showToast('Version wiederhergestellt — Strg+Z bringt den vorherigen Stand zurück.');
+        },
+
+        deleteVersion: (boardId, ts) =>
+          set({
+            versions: {
+              ...get().versions,
+              [boardId]: (get().versions[boardId] ?? []).filter((v) => v.ts !== ts),
+            },
+          }),
+
+        templates: [],
+
+        saveTemplate: (node, name) => {
+          const clean = JSON.parse(JSON.stringify({ ...node, selected: false })) as AppNode;
+          set({ templates: [...get().templates, { id: uid(), name: name.trim().slice(0, 40) || 'Vorlage', node: clean }].slice(-20) });
+          get().showToast(`Vorlage „${name}" gespeichert — im ➕-Menü unter „Vorlagen".`);
+        },
+
+        removeTemplate: (id) =>
+          set({ templates: get().templates.filter((t) => t.id !== id) }),
 
         importEpoch: 0,
 
@@ -675,6 +752,8 @@ export const useBoard = create<BoardState>()(
         activeId: s.activeId,
         view: s.view,
         ai: s.ai,
+        versions: s.versions,
+        templates: s.templates,
       }),
       migrate: (persisted: unknown, version: number) => {
         const p = persisted as Record<string, unknown>;
