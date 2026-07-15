@@ -207,7 +207,7 @@ export function Presenter() {
     <div className="presenter" role="dialog" aria-modal="true" aria-label="Präsentation">
       <div className="presenter-head">
         <span>{board.name}</span>
-        <span className="presenter-hint-edit">✏️ Folien sind direkt editierbar</span>
+        <span className="presenter-hint-edit">Folien sind direkt editierbar</span>
         <span className="presenter-count">{slides.length ? safeIdx + 1 : 0} / {slides.length}</span>
         <button onClick={() => setOpen(false)} aria-label="Präsentation beenden">✕</button>
       </div>

@@ -1,8 +1,11 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import { uid, type GanttData, type GanttNode, type GanttRow } from '../../types';
 import { collectTasks } from '../../lib/tasks';
+import {
+  IArrowDown, IArrowUp, IDownload, IPlus, ITarget, IUsers, IWand, IX, IZoomIn, IZoomOut,
+} from '../Icons';
 import { CardShell } from './CardShell';
 
 const DAY = 864e5;
@@ -41,6 +44,7 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   const [selected, setSelected] = useState<string | null>(null);
   const drag = useRef<DragState | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const dw = data.dayWidth ?? 24;
   const rows = data.rows;
@@ -151,6 +155,49 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   const initials = (who?: string) =>
     (who ?? '').trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
 
+  /** Konflikte auflösen: abhängige Vorgänge topologisch nach ihren Vorgängern terminieren */
+  const resolveConflicts = () => {
+    let next = [...rows];
+    let changed = false;
+    for (let pass = 0; pass < 20; pass++) {
+      let any = false;
+      next = next.map((r) => {
+        if (!r.dep) return r;
+        const d = next.find((x) => x.id === r.dep);
+        if (!d) return r;
+        const delta = toDays(d.end) + 1 - toDays(r.start);
+        if (delta > 0) {
+          any = true;
+          changed = true;
+          return { ...r, start: addDays(r.start, delta), end: addDays(r.end, delta) };
+        }
+        return r;
+      });
+      if (!any) break;
+    }
+    if (changed) { setRows(next); showToast('Terminkette aufgelöst — abhängige Vorgänge nachgezogen'); }
+    else showToast('Keine Terminkonflikte vorhanden.');
+  };
+
+  /** Zeile in der Reihenfolge verschieben */
+  const moveRow = (rowId: string, dir: -1 | 1) => {
+    const i = rows.findIndex((r) => r.id === rowId);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= rows.length) return;
+    const next = [...rows];
+    [next[i], next[j]] = [next[j], next[i]];
+    setRows(next);
+  };
+
+  /** Heute-Linie ins Blickfeld scrollen */
+  const scrollToToday = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollLeft = Math.max(0, LABEL_W + (todayD - minD) * dw - el.clientWidth * 0.45);
+  };
+  // beim Öffnen automatisch zu heute springen
+  useEffect(() => { scrollToToday(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
   const rowIndex = new Map(rows.map((r, i) => [r.id, i]));
   const sel = rows.find((r) => r.id === selected);
 
@@ -159,11 +206,13 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
       <div className="gantt-head">
         <input className="kanban-title nodrag" value={data.title} onChange={(e) => updateNodeData(id, { title: e.target.value })} />
         <div className="gantt-tools nodrag">
-          <button title="Vorgang hinzufügen" onClick={addRow}>＋</button>
-          <button title="Offene Aufgaben mit Frist als Meilensteine übernehmen" onClick={importTasks}>⬇️📋</button>
-          <button title="Nach Ressource gruppieren" onClick={groupByResource}>👥</button>
-          <button title="Rauszoomen" onClick={() => zoom(-1)}>−</button>
-          <button title="Reinzoomen" onClick={() => zoom(1)}>＋🔍</button>
+          <button title="Vorgang hinzufügen" onClick={addRow}><IPlus size={14} /></button>
+          <button title="Offene Aufgaben mit Frist als Meilensteine übernehmen" onClick={importTasks}><IDownload size={14} /></button>
+          <button title="Konflikte auflösen (Terminkette nachziehen)" onClick={resolveConflicts}><IWand size={14} /></button>
+          <button title="Nach Ressource gruppieren" onClick={groupByResource}><IUsers size={14} /></button>
+          <button title="Zu heute springen" onClick={scrollToToday}><ITarget size={14} /></button>
+          <button title="Rauszoomen" onClick={() => zoom(-1)}><IZoomOut size={14} /></button>
+          <button title="Reinzoomen" onClick={() => zoom(1)}><IZoomIn size={14} /></button>
         </div>
       </div>
       {sel && (
@@ -192,11 +241,13 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
               ))}
             </select>
           </label>
-          <button title="Vorgang löschen" onClick={() => { removeRow(sel.id); setSelected(null); }}>✕</button>
+          <button title="Zeile nach oben" onClick={() => moveRow(sel.id, -1)}><IArrowUp size={12} /></button>
+          <button title="Zeile nach unten" onClick={() => moveRow(sel.id, 1)}><IArrowDown size={12} /></button>
+          <button title="Vorgang löschen" onClick={() => { removeRow(sel.id); setSelected(null); }}><IX size={12} /></button>
           <button title="Auswahl schließen" onClick={() => setSelected(null)}>—</button>
         </div>
       )}
-      <div className="gantt-scroll nodrag nowheel">
+      <div className="gantt-scroll nodrag nowheel" ref={scrollRef}>
         {/* Zeilen-Namen (fixe Spalte) */}
         <div className="gantt-labels" style={{ paddingTop: HEAD_H }}>
           {rows.map((r) => (

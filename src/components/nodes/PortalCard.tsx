@@ -2,6 +2,7 @@ import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import { boardMetaLabel } from '../../lib/boardStats';
 import type { PortalNode } from '../../types';
+import { IPlay } from '../Icons';
 import { CardShell } from './CardShell';
 
 /**
@@ -34,7 +35,7 @@ export function PortalCard({ id, data, selected }: NodeProps<PortalNode>) {
               title="Ziel-Board direkt präsentieren"
               onClick={() => { openBoard(target.id); setPresenting(true); }}
             >
-              ▶️
+              <IPlay size={12} />
             </button>
           </div>
         </>

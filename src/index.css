@@ -984,3 +984,64 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .gantt-who-badge { font-size: 7px; font-weight: 700; fill: #2b2a27; }
 .gantt-who { width: 60px; border: 1px solid #d5cfc0; border-radius: 5px; font-family: inherit; font-size: 11px; padding: 1px 4px; margin-left: 3px; }
 .gantt-rowbar label { display: inline-flex; align-items: center; }
+
+/* ---------- Icon-Chrome (Design-Runde 4) ---------- */
+.dock button { display: inline-flex; align-items: center; justify-content: center; color: #4a463c; }
+.dock button:hover { color: var(--ink); }
+.dock button.active { color: var(--accent); }
+.dock-menu button {
+  display: flex; align-items: center; gap: 9px;
+}
+.dock-menu button svg { color: #6f6a5b; flex: none; }
+.dock-menu button:hover svg { color: var(--accent); }
+.dock-menu button.on { background: #e8efff; color: var(--accent); }
+.dock-menu button.on svg { color: var(--accent); }
+.dock-menu-foot {
+  font-size: 10px; color: var(--muted); padding: 8px 10px 4px; max-width: 230px;
+  line-height: 1.45; border-top: 1px solid rgba(0,0,0,.07); margin-top: 4px;
+}
+.dock-menu-draw { min-width: 160px; }
+
+/* ---------- Runde 4: Filter, Schnell-Eingabe, Kalender-Streifen, Woche ---------- */
+.taskhub-filters { width: min(860px, 100%); display: flex; gap: 6px; align-items: center; margin-bottom: 10px; }
+.th-chip {
+  border: none; background: #fff; border-radius: 999px; padding: 5px 13px; cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--muted); box-shadow: 0 1px 4px rgba(50,40,20,.1);
+}
+.th-chip.on { background: var(--accent); color: #fff; }
+.th-board {
+  margin-left: auto; font-family: inherit; font-size: 12px; border: none; background: #fff;
+  border-radius: 8px; padding: 5px 8px; box-shadow: 0 1px 4px rgba(50,40,20,.1); color: var(--ink);
+}
+.taskhub-quick {
+  width: min(860px, 100%); border: 1px dashed #d5cfc0; border-radius: 10px; padding: 9px 13px;
+  font-family: inherit; font-size: 12.5px; margin-bottom: 12px; background: #fffdf7; outline: none; color: var(--ink);
+}
+.taskhub-quick:focus { border-color: var(--accent); border-style: solid; }
+.task-due-input {
+  border: 1px solid rgba(0,0,0,.12); border-radius: 6px; font-size: 10.5px; font-family: inherit;
+  padding: 1px 4px; color: var(--muted); background: #fff; flex: none;
+}
+.task-due-input.urgency-overdue { color: #a4231a; border-color: #e5b1ab; }
+.task-kind { display: inline-flex; color: var(--muted); }
+.taskhub-actions button { display: inline-flex; align-items: center; gap: 6px; }
+.taskhub-head h2 { display: flex; align-items: center; gap: 8px; }
+
+/* Kalender: Laufzeit-Streifen + Wochenansicht + Filter-Buttons */
+.cal-strip {
+  display: block; width: 100%; border: none; height: 7px; border-radius: 3px; cursor: pointer;
+  padding: 0; font-size: 0; opacity: 0.85; flex: none;
+}
+.cal-strip:hover { opacity: 1; }
+.cal-grid.week { grid-template-rows: auto 1fr; }
+.cal-grid.week .cal-cell { min-height: 150px; }
+.cal-grid.week .cal-strip { height: 13px; font-size: 8.5px; color: #fff; line-height: 13px; padding: 0 4px; text-align: left; white-space: nowrap; overflow: hidden; }
+.cal-nav button.on { background: var(--accent); color: #fff; }
+.slide-cal .cal-grid.week .cal-cell { min-height: 46vh; }
+
+/* Sel-Toolbar & Karten-Buttons mit Icons ausrichten */
+.sel-toolbar button { display: inline-flex; align-items: center; gap: 6px; }
+.kanban-item-actions button, .kanban-addcol, .kanban-col-x, .gantt-tools button, .gantt-rowbar button, .cal-nav button {
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.tab-home, .tab-add, .tab-x { display: inline-flex; align-items: center; justify-content: center; }

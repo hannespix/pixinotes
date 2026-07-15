@@ -121,3 +121,44 @@ Vor Release 1.0 lief ein mehrstufiger Review-Workflow: drei parallele Prüf-Agen
 **Verbleibendes Roadmap-Item:** Für sehr viele oder große eingebettete Assets ist eine Auslagerung der Binärdaten (Datei-/Bild-`dataUrl`) nach **IndexedDB** vorgesehen (statt localStorage) — der Budget-Wächter verhindert bis dahin den katastrophalen Fall (stiller Totalverlust).
 
 *Regressionslauf nach den Fixes: 8/8 gezielte Checks grün (Presenter-Crash-Probe, PDF-Schnellblättern, Mermaid-Edit, Shape-Suche) + 15/15 Voll-Regression Desktop/Mobile + 4/4 auf `file://`.*
+
+---
+
+## Runde 4: Design-Refresh & Modul-Tiefe (auf Nutzer-Feedback)
+
+**Befund:** Das UI-Chrome (Dock, Menüs, Toolbars) setzt durchgehend auf farbige
+Emojis — das wirkt verspielt bis kindisch und visuell unruhig. Das Dock hat
+12 Slots ohne Gruppierung. Die neuen Module (Zeitplan, Kalender, Aufgaben)
+funktionieren, haben aber zu wenig Bedienungstiefe.
+
+### Fix-Liste
+
+**Design / Chrome**
+- [x] D1 Emoji-Icons im Chrome durch monochrome SVG-Icons ersetzen (Dock,
+      ➕-Menü, Karten-Toolbars, Aufgaben-Zentrale, Presenter-Kopf, Tabs) —
+      Emojis bleiben nur im INHALT (Notizen etc.), nicht in der Bedienung
+- [x] D2 Dock entrümpeln: Zeichenwerkzeuge (Stift/Marker/Radierer) in ein
+      Flyout gebündelt, Import-Hilfe ins ➕-Menü verlagert → 8 statt 12 Slots
+- [x] D3 ➕-Menü strukturieren: Sektionen „Notizen & Boards" / „Planung" /
+      „Prozess-Formen" / „Verknüpfen" + Import-Hinweis als Fußzeile
+- [x] D4 Einheitliche Icon-Buttons (Größe, Abstände, Hover, Aktiv-Zustand)
+- [x] D5 Kanban-Ticket-Aktionen auf Icons umgestellt, Fälligkeit dezenter
+
+**Gantt (G)**
+- [x] G1 „Heute"-Sprung: Button zentriert die Heute-Linie; beim Öffnen
+      scrollt das Diagramm automatisch zu heute
+- [x] G2 Konflikt-Auflösung: ein Klick terminiert abhängige Vorgänge
+      automatisch nach ihren Vorgängern (topologisch, Dauer bleibt)
+- [x] G3 Zeilen umsortierbar (↑/↓ in der Auswahl-Leiste)
+
+**Kalender (K)**
+- [x] K1 Zeitplan-Vorgänge als Laufzeit-Streifen über ALLE Tage der Dauer
+      (nicht nur am Starttag)
+- [x] K2 Wochenansicht: Monat ⇄ Woche umschaltbar, Navigation folgt
+- [x] K3 Quellen-Filter: „Alle Boards" ⇄ „nur dieses Board"
+
+**Aufgaben (T)**
+- [x] T1 Filter-Chips (Alle / Heute / Überfällig) + Board-Filter
+- [x] T2 Fälligkeit direkt in der Liste ändern (Datumsfeld pro Aufgabe)
+- [x] T3 Schnell-Eingabe: neue Aufgabe tippen → landet als Ticket im
+      Kanban des aktiven Boards (wird bei Bedarf angelegt)

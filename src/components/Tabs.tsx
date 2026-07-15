@@ -1,5 +1,6 @@
 import { useBoard } from '../store';
 import { InlineName } from './InlineName';
+import { IHome, IPlus, IX } from './Icons';
 
 /**
  * Projekt-Tabs: jedes Board ist ein Raum. Doppelklick = umbenennen,
@@ -35,7 +36,7 @@ export function Tabs() {
         title="Übersicht: alle Bereiche, Projekte & Boards"
         onClick={() => setView('overview')}
       >
-        🏠
+        <IHome size={15} />
       </button>
       {boards.map((b) => (
         <div
@@ -55,7 +56,7 @@ export function Tabs() {
               close(b.id);
             }}
           >
-            ✕
+            <IX size={11} />
           </button>
         </div>
       ))}
@@ -67,7 +68,7 @@ export function Tabs() {
           showToast('Neues Board — Doppelklick auf den Tab zum Umbenennen');
         }}
       >
-        +
+        <IPlus size={14} />
       </button>
     </div>
   );

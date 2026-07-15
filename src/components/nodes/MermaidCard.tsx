@@ -34,7 +34,7 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
   return (
     <CardShell id={id} selected={selected} minWidth={280} minHeight={180} className="mermaid-card">
       <div className="mermaid-head">
-        <span>📊 Diagramm</span>
+        <span>Diagramm</span>
         <div className="mermaid-tools nodrag">
           {Object.keys(TEMPLATES).map((t) => (
             <button key={t} title={`Vorlage ${t}`} onClick={() => updateNodeData(id, { code: TEMPLATES[t] })}>{t}</button>

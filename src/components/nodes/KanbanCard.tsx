@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import { useBoard } from '../../store';
 import { kanbanCols, uid, type KanbanData, type KanbanItem, type KanbanNode } from '../../types';
 import { formatDueShort, urgencyFor } from '../../lib/tasks';
+import { ICalendar, IChevronL, IChevronR, IPlus, IX } from '../Icons';
 import { CardShell } from './CardShell';
 
 /**
@@ -83,7 +84,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           value={kanban.title}
           onChange={(e) => setTitle(e.target.value)}
         />
-        <button className="kanban-addcol nodrag" title="Spalte hinzufügen" onClick={addCol}>➕</button>
+        <button className="kanban-addcol nodrag" title="Spalte hinzufügen" onClick={addCol}><IPlus size={12} /></button>
       </div>
       <div className="kanban-cols">
         {cols.map((colName, colIdx) => (
@@ -101,7 +102,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   title="Spalte löschen (Tickets rücken nach links)"
                   onClick={() => removeCol(colIdx)}
                 >
-                  ✕
+                  <IX size={10} />
                 </button>
               )}
             </div>
@@ -115,13 +116,13 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   <span className={colIdx === done ? 'done-text' : ''}>{it.text}</span>
                   <span className="kanban-item-actions">
                     {colIdx > 0 && (
-                      <button onClick={() => move(it, -1)} title="Zurück">‹</button>
+                      <button onClick={() => move(it, -1)} title="Zurück"><IChevronL size={11} /></button>
                     )}
                     {colIdx < done && (
-                      <button onClick={() => move(it, 1)} title="Weiter">›</button>
+                      <button onClick={() => move(it, 1)} title="Weiter"><IChevronR size={11} /></button>
                     )}
-                    <button onClick={() => setEditingDue(editingDue === it.id ? null : it.id)} title="Fälligkeit setzen (Erinnerung!)">📅</button>
-                    <button onClick={() => remove(it)} title="Entfernen">✕</button>
+                    <button onClick={() => setEditingDue(editingDue === it.id ? null : it.id)} title="Fälligkeit setzen (Erinnerung!)"><ICalendar size={11} /></button>
+                    <button onClick={() => remove(it)} title="Entfernen"><IX size={11} /></button>
                   </span>
                   {editingDue === it.id ? (
                     <input
@@ -141,7 +142,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                       title="Fälligkeit ändern"
                       onClick={() => setEditingDue(it.id)}
                     >
-                      📅 {formatDueShort(it.due)}
+                      {formatDueShort(it.due)}
                     </button>
                   ) : null}
                 </div>

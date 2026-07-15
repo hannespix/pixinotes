@@ -12,6 +12,7 @@ import {
 import { useBoard, type BoardDoc, type Project, type Space } from '../store';
 import { boardMetaLabel } from '../lib/boardStats';
 import { InlineName } from './InlineName';
+import { IPen, IPlay, IX } from './Icons';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
 interface ProjectZoneData { project: Project; spaceId: string; [key: string]: unknown }
@@ -258,7 +259,7 @@ function BoardTile({ data }: NodeProps<Node<BoardTileData, 'ovBoard'>>) {
             setPresenting(true);
           }}
         >
-          ▶️
+          <IPlay size={12} />
         </button>
         <button
           title="Umbenennen"
@@ -268,7 +269,7 @@ function BoardTile({ data }: NodeProps<Node<BoardTileData, 'ovBoard'>>) {
             setEditing(true);
           }}
         >
-          ✏️
+          <IPen size={12} />
         </button>
         <button
           title="Board löschen"
@@ -279,7 +280,7 @@ function BoardTile({ data }: NodeProps<Node<BoardTileData, 'ovBoard'>>) {
             }
           }}
         >
-          ✕
+          <IX size={12} />
         </button>
       </span>
       <InlineName
