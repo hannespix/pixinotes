@@ -54,8 +54,9 @@ export interface KanbanItem {
   note?: string;
   /** Verantwortliche Person */
   who?: string;
-  /** Verknüpfung zu einem Board bzw. einer Karte (Sprung-Chip am Ticket) */
-  link?: { boardId: string; nodeId?: string };
+  /** Verknüpfung zu einem Board bzw. einer Karte (Sprung-Chip am Ticket);
+   *  itemId = Quell-Ticket/-Block/-Vorgang — Basis für den Auto-Abgleich */
+  link?: { boardId: string; nodeId?: string; itemId?: string };
 }
 
 export interface KanbanData {
@@ -63,6 +64,8 @@ export interface KanbanData {
   items: KanbanItem[];
   /** Spaltennamen — frei benennbar und in der Anzahl variabel; fehlt bei alten Boards (dann Default) */
   cols?: string[];
+  /** Auto-Einsammeln: hält sich selbst mit offenen Aufgaben aller Boards aktuell */
+  autoCollect?: boolean;
   [key: string]: unknown;
 }
 

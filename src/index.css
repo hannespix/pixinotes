@@ -1351,6 +1351,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ticket-jump:hover { background: rgba(124,92,255,.28); }
 .ticket-detail-foot { font-size: 10px; color: var(--muted); text-align: center; }
 .slide-kanban { position: relative; }
+.kanban-addcol.k-auto-on { color: #fff; background: var(--accent); opacity: 1; }
+.kanban-addcol.k-auto-on:hover { background: #3557c9; }
 
 /* ---------- KI-Freitext-Kommando ---------- */
 .ai-cmd-input {

@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
 import { useBoard } from '../../store';
 import { kanbanCols, uid, type GanttData, type KanbanData, type KanbanItem, type KanbanNode } from '../../types';
 import { collectTasks, formatDueShort, urgencyFor } from '../../lib/tasks';
-import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IX } from '../Icons';
+import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, IX } from '../Icons';
 import { CardShell } from './CardShell';
 
 /**
@@ -38,36 +38,68 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     if (link.nodeId) focusNode(link.boardId, link.nodeId);
   };
 
-  /** Offene Aufgaben aus ALLEN Boards als Tickets einsammeln (mit Quell-Verknüpfung) */
-  const collectFromBoards = () => {
+  /**
+   * Offene Aufgaben aus ALLEN Boards einsammeln (mit Quell-Verknüpfung) und
+   * bereits eingesammelte Tickets abgleichen: ist die Quelle erledigt oder
+   * verschwunden, wandert das Ticket automatisch in die Erledigt-Spalte.
+   */
+  const syncFromBoards = (announce: boolean) => {
     const norm = (t: string) => t.trim().toLowerCase();
     const have = new Set(kanban.items.map((it) => norm(it.text)));
+    const openKeys = new Set<string>();
     const fresh: KanbanItem[] = [];
     // Kanban-Tickets + Checklisten (Aufgaben-Zentrale-Logik) — ohne dieses Kanban selbst
     for (const t of collectTasks(boards)) {
-      if (t.nodeId === id || have.has(norm(t.text))) continue;
+      if (t.nodeId === id) continue;
+      openKeys.add(`${t.nodeId}|${t.itemId}`);
+      if (have.has(norm(t.text))) continue;
       have.add(norm(t.text));
-      fresh.push({ id: uid(), text: t.text, col: 0, due: t.due, link: { boardId: t.boardId, nodeId: t.nodeId } });
+      fresh.push({ id: uid(), text: t.text, col: 0, due: t.due, link: { boardId: t.boardId, nodeId: t.nodeId, itemId: t.itemId } });
     }
     // Zeitplan-Vorgänge (< 100 %) — „diverse Module" liefern mit
     for (const b of boards) {
       for (const n of b.nodes) {
         if (n.type !== 'gantt' || n.id === id) continue;
         for (const row of (n.data as GanttData).rows ?? []) {
+          if ((row.progress ?? 0) >= 100) continue;
+          openKeys.add(`${n.id}|${row.id}`);
           const text = `${row.name} (Zeitplan)`;
-          if ((row.progress ?? 0) >= 100 || have.has(norm(text))) continue;
+          if (have.has(norm(text))) continue;
           have.add(norm(text));
-          fresh.push({ id: uid(), text, col: 0, due: row.end, link: { boardId: b.id, nodeId: n.id } });
+          fresh.push({ id: uid(), text, col: 0, due: row.end, link: { boardId: b.id, nodeId: n.id, itemId: row.id } });
         }
       }
     }
-    if (fresh.length === 0) {
-      showToast('Nichts Neues gefunden — alle offenen Aufgaben sind schon hier.');
+    // Abgleich: Quelle nicht mehr offen → Ticket erledigen (nur vorwärts)
+    let moved = 0;
+    const items = kanban.items.map((it) => {
+      if (it.link?.nodeId && it.link.itemId && it.col < done && !openKeys.has(`${it.link.nodeId}|${it.link.itemId}`)) {
+        moved++;
+        return { ...it, col: done };
+      }
+      return it;
+    });
+    if (fresh.length === 0 && moved === 0) {
+      if (announce) showToast('Nichts Neues gefunden — alle offenen Aufgaben sind schon hier.');
       return;
     }
-    setItems([...kanban.items, ...fresh]);
-    showToast(`${fresh.length} Aufgabe(n) aus allen Boards eingesammelt — jedes Ticket verlinkt auf seine Quelle (↗).`);
+    setItems([...items, ...fresh]);
+    if (announce) {
+      showToast(`${fresh.length} Aufgabe(n) eingesammelt${moved ? `, ${moved} als erledigt abgeglichen` : ''} — Tickets verlinken auf ihre Quelle (↗).`);
+    } else if (fresh.length > 0 || moved > 0) {
+      showToast(`⟳ Auto-Abgleich: ${fresh.length} neu${moved ? `, ${moved} erledigt` : ''}`);
+    }
   };
+
+  // Auto-Einsammeln: solange der ⟳-Schalter aktiv ist, hält sich das Kanban
+  // selbst aktuell. Debounced; loop-sicher, weil ein Lauf ohne Änderungen
+  // den State nicht anfasst.
+  useEffect(() => {
+    if (!kanban.autoCollect) return;
+    const t = setTimeout(() => syncFromBoards(false), 900);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boards, kanban.autoCollect]);
 
   const move = (item: KanbanItem, dir: -1 | 1) => {
     const col = Math.max(0, Math.min(done, item.col + dir));
@@ -132,9 +164,18 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         <button
           className="kanban-addcol nodrag"
           title="Offene Aufgaben aus ALLEN Boards einsammeln (Kanbans, Checklisten, Zeitpläne)"
-          onClick={collectFromBoards}
+          onClick={() => syncFromBoards(true)}
         >
           <IDownload size={12} />
+        </button>
+        <button
+          className={`kanban-addcol nodrag ${kanban.autoCollect ? 'k-auto-on' : ''}`}
+          title={kanban.autoCollect
+            ? 'Auto-Einsammeln AN: neue Aufgaben erscheinen automatisch, erledigte Quellen haken ihre Tickets ab — Klick schaltet aus'
+            : 'Auto-Einsammeln: dieses Kanban hält sich selbst mit den offenen Aufgaben aller Boards aktuell'}
+          onClick={() => updateNodeData(id, { autoCollect: !kanban.autoCollect })}
+        >
+          <IRedo size={12} />
         </button>
         <button className="kanban-addcol nodrag" title="Spalte hinzufügen" onClick={addCol}><IPlus size={12} /></button>
       </div>
