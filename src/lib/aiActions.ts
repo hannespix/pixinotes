@@ -16,11 +16,72 @@ function gather(nodes: AppNode[]): Ctx[] {
     .filter((c) => c.text);
 }
 
+/* ---------- Robustes JSON-Parsen ----------
+   Gerade Gratis-/kleine Modelle liefern gern kaputtes JSON: Markdown-Zäune,
+   Geschwätz drumherum, fehlende Kommas, abgeschnittene Antworten. Statt mit
+   einer kryptischen Fehlermeldung aufzugeben (User-Screenshot: "Expected ','
+   or ']' …"), wird hier repariert — und zur Not einmal strenger nachgefragt. */
+
+/** Abgeschnittene Antwort: offenen String + offene Klammern schließen */
+function autoClose(s: string): string {
+  let inStr = false;
+  let esc = false;
+  const stack: string[] = [];
+  for (const ch of s) {
+    if (esc) { esc = false; continue; }
+    if (inStr && ch === '\\') { esc = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === '{') stack.push('}');
+    else if (ch === '[') stack.push(']');
+    else if (ch === '}' || ch === ']') stack.pop();
+  }
+  let out = inStr ? `${s}"` : s;
+  // hängenden Schlüssel ohne Wert bzw. hängendes Komma abschneiden
+  out = out.replace(/"[^"\n]*"\s*:\s*$/, '').replace(/,\s*$/, '');
+  while (stack.length) out += stack.pop();
+  return out;
+}
+
+/** Reparatur-Kandidaten in aufsteigender Aggressivität */
+function repairCandidates(core: string): string[] {
+  const noTrail = core.replace(/,\s*([}\]])/g, '$1'); // trailing commas
+  const commas = noTrail // fehlende Kommas zwischen Array-Elementen
+    .replace(/}(\s*){/g, '},$1{')
+    .replace(/](\s*)\[/g, '],$1[')
+    .replace(/"(\s*\n\s*)"/g, '",$1"');
+  return [core, noTrail, commas, autoClose(noTrail), autoClose(commas)];
+}
+
 /** Erstes JSON-Objekt aus einer (evtl. geschwätzigen) LLM-Antwort schälen */
 function parseJson<T>(raw: string): T {
-  const m = raw.match(/\{[\s\S]*\}/);
-  if (!m) throw new Error('Die KI hat kein verwertbares JSON geliefert.');
-  return JSON.parse(m[0]) as T;
+  const cleaned = raw.replace(/```[a-z]*\n?/gi, '').trim();
+  const start = cleaned.indexOf('{');
+  if (start < 0) throw new Error('Die KI hat kein verwertbares JSON geliefert.');
+  const end = cleaned.lastIndexOf('}');
+  const core = cleaned.slice(start, end > start ? end + 1 : undefined);
+  for (const candidate of repairCandidates(core)) {
+    try {
+      return JSON.parse(candidate) as T;
+    } catch { /* nächsten Kandidaten probieren */ }
+  }
+  throw new Error('Die KI hat kein verwertbares JSON geliefert.');
+}
+
+/** askAi + parseJson mit einem automatischen, strengeren zweiten Versuch */
+async function askJson<T>(prompt: string): Promise<T> {
+  const first = await askAi(prompt);
+  try {
+    return parseJson<T>(first);
+  } catch { /* einmal strenger nachfragen */ }
+  const second = await askAi(
+    `${prompt}\n\nWICHTIG: Antworte AUSSCHLIESSLICH mit dem vollständigen, gültigen JSON-Objekt — keine Einleitung, kein Markdown, keine Kommentare, nichts danach.`,
+  );
+  try {
+    return parseJson<T>(second);
+  } catch {
+    throw new Error('Die KI hat zweimal kein sauberes JSON geliefert — einfach nochmal versuchen (bei Gratis-Modellen passiert das öfter) oder in den Einstellungen ein stärkeres Modell wählen.');
+  }
 }
 
 const SECTION_COLORS = ['#eef2ff', '#e6f7ec', '#fff4e0', '#ffe9ef', '#f3eeff', '#eef7ff'];
@@ -29,10 +90,9 @@ const SECTION_COLORS = ['#eef2ff', '#e6f7ec', '#fff4e0', '#ffe9ef', '#f3eeff', '
 export async function aiCluster(nodes: AppNode[]): Promise<string> {
   const items = gather(nodes);
   if (items.length < 3) throw new Error('Zu wenig Inhalt zum Clustern (mind. 3 Karten mit Text).');
-  const res = await askAi(
+  const { clusters } = await askJson<{ clusters: Array<{ title: string; nodeIds: string[] }> }>(
     `Gruppiere die folgenden Whiteboard-Karten in 2-5 thematische Cluster. Jede Karte gehört in genau ein Cluster. Prägnante deutsche Cluster-Titel (max. 4 Wörter). Antworte NUR mit JSON, exakt in dieser Form: {"clusters":[{"title":"...","nodeIds":["..."]}]}\n\nKarten:\n${JSON.stringify(items)}`,
   );
-  const { clusters } = parseJson<{ clusters: Array<{ title: string; nodeIds: string[] }> }>(res);
   if (!clusters?.length) throw new Error('Keine Cluster erkannt.');
 
   const st = useBoard.getState();
@@ -65,10 +125,9 @@ export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): 
   const items = gather(nodes);
   if (items.length === 0) throw new Error('Keine Inhalte gefunden.');
   const today = new Date().toISOString().slice(0, 10);
-  const res = await askAi(
+  const { tasks } = await askJson<{ tasks: Array<{ text: string; due?: string }> }>(
     `Heute ist ${today}. Extrahiere aus den folgenden Karten alle konkreten Aufgaben/TODOs. Erkenne Termine/Fristen und setze sie als ISO-Datum (yyyy-mm-dd). Antworte NUR mit JSON: {"tasks":[{"text":"...","due":"yyyy-mm-dd"}]} — "due" nur, wenn wirklich ein Termin erkennbar ist.\n\nKarten:\n${JSON.stringify(items)}`,
   );
-  const { tasks } = parseJson<{ tasks: Array<{ text: string; due?: string }> }>(res);
   const clean = (tasks ?? []).filter((t) => t.text?.trim()).slice(0, 30);
   if (clean.length === 0) throw new Error('Keine Aufgaben im Inhalt erkannt.');
   const st = useBoard.getState();
@@ -116,10 +175,9 @@ export async function aiBriefing(nodes: AppNode[], pos: { x: number; y: number }
 export async function aiEdges(nodes: AppNode[]): Promise<string> {
   const items = gather(nodes);
   if (items.length < 2) throw new Error('Mindestens 2 Karten mit Inhalt nötig.');
-  const res = await askAi(
+  const { edges } = await askJson<{ edges: Array<{ source: string; target: string; label?: string }> }>(
     `Welche der folgenden Karten hängen inhaltlich zusammen? Schlage 1-6 gerichtete Verbindungen vor, jede mit knappem deutschen Beziehungs-Label (z. B. "blockiert", "gehört zu", "liefert Input für"). Antworte NUR mit JSON: {"edges":[{"source":"id","target":"id","label":"..."}]}\n\nKarten:\n${JSON.stringify(items)}`,
   );
-  const { edges } = parseJson<{ edges: Array<{ source: string; target: string; label?: string }> }>(res);
   const valid = new Set(items.map((i) => i.id));
   const st = useBoard.getState();
   const existing = new Set(
