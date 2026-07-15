@@ -29,6 +29,14 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
         color="#4f7cff"
         handleStyle={{ width: 9, height: 9, borderRadius: 3 }}
       />
+      {/* Sichtbarer Griff: hier packt man die Karte IMMER — auch wenn sie
+          innen komplett aus Editor/Eingabefeldern besteht */}
+      <div className="card-grip" title="Ziehen zum Verschieben" aria-hidden="true">
+        <svg width="18" height="8" viewBox="0 0 18 8" fill="currentColor">
+          <circle cx="3" cy="2" r="1.3" /><circle cx="9" cy="2" r="1.3" /><circle cx="15" cy="2" r="1.3" />
+          <circle cx="3" cy="6" r="1.3" /><circle cx="9" cy="6" r="1.3" /><circle cx="15" cy="6" r="1.3" />
+        </svg>
+      </div>
       <button
         className="card-x nodrag"
         title="Karte löschen (oder Entf-Taste)"
@@ -41,6 +49,9 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       {[Position.Top, Position.Right, Position.Bottom, Position.Left].map((pos) => (
         <Handle key={pos} id={pos} type="source" position={pos} className="pn-handle" />
       ))}
+      {/* Ganzkarten-Ziel: während einer Verbindung reicht es, IRGENDWO auf der
+          Karte loszulassen (CSS aktiviert diesen Handle nur beim Verbinden) */}
+      <Handle id="body" type="source" position={Position.Left} className="pn-handle-body" isConnectableStart={false} />
       <div className={`card-body ${className ?? ''}`}>{children}</div>
     </div>
   );

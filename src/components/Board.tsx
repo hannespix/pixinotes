@@ -384,6 +384,8 @@ export function Board() {
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         connectionMode={ConnectionMode.Loose}
+        connectionRadius={42}
+        connectionLineStyle={{ stroke: '#4f7cff', strokeWidth: 2.5 }}
         panOnScroll
         zoomOnDoubleClick={false}
         deleteKeyCode={['Delete', 'Backspace']}
