@@ -73,6 +73,7 @@ export async function askAi(prompt: string): Promise<string> {
         if (res.status >= 500) {
           // Community-Dienst wackelt gern kurz — einmal kurz warten und nochmal
           await new Promise((r) => setTimeout(r, 1500));
+          if (ctrl.signal.aborted) throw new Error('Zeitüberschreitung — der Gratis-Dienst antwortet gerade nicht.');
           res = await doFetch();
         }
         if (!res.ok) throw new Error(`Gratis-KI: HTTP ${res.status} — der kostenlose Dienst ist gerade ausgelastet. Kurz warten und nochmal versuchen, oder in den Einstellungen OpenRouter/Ollama wählen.`);

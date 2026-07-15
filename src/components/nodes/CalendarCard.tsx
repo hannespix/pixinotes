@@ -159,9 +159,11 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     for (const url of urls) {
       try {
         const events = await fetchIcsUrl(url);
-        const before = merged.length;
+        // „neu" über die Dedupe-Schlüssel zählen — die Längendifferenz lügt,
+        // sobald mergeEvents auf 800 kappt (Audit R6-F8)
+        const seen = new Set(merged.map((e) => `${e.title}|${e.start}`));
+        added += events.filter((e) => !seen.has(`${e.title}|${e.start}`)).length;
         merged = mergeEvents(merged, events);
-        added += merged.length - before;
         ok++;
       } catch {
         fail++;
@@ -175,8 +177,28 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   };
 
   const exportVisible = () => {
+    // Wirklich nur die SICHTBARE Ansicht exportieren — und mehrtägige
+    // Streifen (Zeitpläne, externe Termine) als EINEN Termin mit Zeitspanne
+    // statt sie ganz zu verlieren (Audit R6-F1)
+    const visible = new Set(cells.map((c) => c.iso));
     const events: IcsEvent[] = [];
-    for (const [day, entries] of byDay) for (const e of entries) events.push({ title: e.text, start: day });
+    for (const [day, entries] of byDay) {
+      if (!visible.has(day)) continue;
+      for (const e of entries) events.push({ title: e.text, start: day });
+    }
+    const spans = new Map<string, { start: string; end: string }>();
+    for (const [day, strips] of stripsByDay) {
+      if (!visible.has(day)) continue;
+      for (const s of strips) {
+        const cur = spans.get(s.text);
+        if (!cur) spans.set(s.text, { start: day, end: day });
+        else {
+          if (day < cur.start) cur.start = day;
+          if (day > cur.end) cur.end = day;
+        }
+      }
+    }
+    for (const [title, span] of spans) events.push({ title, start: span.start, end: span.end });
     const n = downloadIcsEvents(events);
     showToast(n ? `${n} sichtbare Einträge als .ics exportiert — in Outlook importierbar.` : 'Nichts zu exportieren.');
   };

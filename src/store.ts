@@ -187,12 +187,41 @@ interface BoardState {
   clearPendingFocus: () => void;
 
   showToast: (message: string, undo?: boolean) => void;
+
+  /** Globale KI-Sperre: verhindert parallele KI-Aktionen aus Dock UND Auswahl-Leiste */
+  aiBusy: boolean;
+  setAiBusy: (busy: boolean) => void;
 }
 
 export const selectActiveBoard = (s: BoardState): BoardDoc =>
   s.boards.find((b) => b.id === s.activeId) ?? s.boards[0];
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Sammel-Aktionen (z. B. KI-Pläne): innere Mutatoren pushen KEINE eigenen
+ *  History-Einträge — der Aufrufer sichert vorher genau einen Snapshot.
+ *  So macht wirklich EIN Strg+Z den kompletten Plan rückgängig (Audit R6-K1). */
+let historyMuted = false;
+export function mutedHistory<T>(fn: () => T): T {
+  historyMuted = true;
+  try {
+    return fn();
+  } finally {
+    historyMuted = false;
+  }
+}
+
+/** Haben sich Notiz-INHALTE zwischen zwei Ständen geändert? (Referenzvergleich)
+ *  Dann muss Undo/Redo den Board-Remount erzwingen — BlockNote-Editoren lesen
+ *  ihre Blöcke nur beim Mount und würden sonst alten Text zurückschreiben. */
+function notesDiffer(a: AppNode[], b: AppNode[]): boolean {
+  const blocksById = new Map(a.filter((n) => n.type === 'note').map((n) => [n.id, n.data.blocks]));
+  return b.some((n) => {
+    if (n.type !== 'note') return false;
+    const prev = blocksById.get(n.id);
+    return prev !== undefined && prev !== n.data.blocks;
+  });
+}
 /** Radier-Geste: erster Treffer erzeugt den History-Eintrag, Rest der Geste nicht */
 let eraseSnapPending = false;
 
@@ -288,6 +317,8 @@ export const useBoard = create<BoardState>()(
         toast: null,
         pendingFocus: null,
         lastDeleted: null,
+        aiBusy: false,
+        setAiBusy: (busy) => set({ aiBusy: busy }),
 
         setSettingsOpen: (open) => set({ settingsOpen: open }),
         tasksOpen: false,
@@ -337,6 +368,7 @@ export const useBoard = create<BoardState>()(
         future: [],
 
         pushHistory: () => {
+          if (historyMuted) return; // Sammel-Aktionen (KI-Pläne) sichern EINEN Snapshot selbst
           const s = get();
           const b = s.boards.find((x) => x.id === s.activeId);
           if (!b) return;
@@ -352,15 +384,18 @@ export const useBoard = create<BoardState>()(
           if (!entry) return;
           const board = s.boards.find((b) => b.id === entry.boardId);
           if (!board) { set({ past: s.past.slice(0, -1) }); return; }
+          // Remount, wenn Notiz-Inhalte betroffen sind — egal woher der Eintrag
+          // stammt (Versions-Restore, KI-Edit, Struktur-Undo über Tipp-Grenzen)
+          const remount = entry.remount || notesDiffer(board.nodes, entry.nodes);
           set({
             past: s.past.slice(0, -1),
-            future: [...s.future, { boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount: entry.remount }],
+            future: [...s.future, { boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount }],
             activeId: entry.boardId,
             view: 'board',
             boards: s.boards.map((b) =>
               b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings } : b,
             ),
-            ...(entry.remount ? { importEpoch: s.importEpoch + 1 } : {}),
+            ...(remount ? { importEpoch: s.importEpoch + 1 } : {}),
           });
         },
 
@@ -441,15 +476,16 @@ export const useBoard = create<BoardState>()(
           if (!entry) return;
           const board = s.boards.find((b) => b.id === entry.boardId);
           if (!board) { set({ future: s.future.slice(0, -1) }); return; }
+          const remount = entry.remount || notesDiffer(board.nodes, entry.nodes);
           set({
             future: s.future.slice(0, -1),
-            past: [...s.past, { boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount: entry.remount }],
+            past: [...s.past, { boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount }],
             activeId: entry.boardId,
             view: 'board',
             boards: s.boards.map((b) =>
               b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings } : b,
             ),
-            ...(entry.remount ? { importEpoch: s.importEpoch + 1 } : {}),
+            ...(remount ? { importEpoch: s.importEpoch + 1 } : {}),
           });
         },
 
@@ -583,10 +619,15 @@ export const useBoard = create<BoardState>()(
             return;
           }
           const rest = boards.filter((b) => b.id !== id);
+          // Verwaiste Versionen mit entsorgen — sonst wächst der persistierte
+          // State unbegrenzt (localStorage-Quota, Audit R6-S8)
+          const versions = { ...get().versions };
+          delete versions[id];
           set({
             boards: rest,
             spaces: stripBoardFromHierarchy(get().spaces, id),
             activeId: get().activeId === id ? rest[0].id : get().activeId,
+            versions,
           });
         },
 
@@ -620,8 +661,11 @@ export const useBoard = create<BoardState>()(
           if (removeIds.length) get().removeNodes(removeIds);
         },
 
-        onEdgesChange: (changes) =>
-          patchActive((b) => ({ edges: applyEdgeChanges(changes, b.edges) })),
+        onEdgesChange: (changes) => {
+          // Kantenlöschung (Entf-Taste) muss undo-fähig sein — wie bei Nodes (Audit R6-S2)
+          if (changes.some((c) => c.type === 'remove')) get().pushHistory();
+          patchActive((b) => ({ edges: applyEdgeChanges(changes, b.edges) }));
+        },
 
         onConnect: (connection) => {
           get().pushHistory();

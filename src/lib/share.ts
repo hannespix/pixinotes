@@ -4,7 +4,7 @@
 // öffnet ihn auf der Web-Version (oder jeder lokalen Kopie) und bekommt
 // das Board als neues Board importiert.
 import type { BoardDoc } from '../store';
-import { uid, type AppNode } from '../types';
+import { uid, type AppNode, type KanbanData } from '../types';
 import { triggerDownload } from './download';
 
 interface SharePayload {
@@ -62,7 +62,20 @@ export function cloneSharedBoard(board: BoardDoc): BoardDoc {
   const nodes = (board.nodes ?? []).map((n) => {
     const nid = uid();
     idMap.set(n.id, nid);
-    return { ...n, id: nid, selected: false } as AppNode;
+    const clone = { ...n, id: nid, selected: false } as AppNode;
+    // Referenzen auf die Welt des ABSENDERS entwerten (Audit R6-S5):
+    // Portale zeigen auf Board-IDs, die es beim Empfänger nicht gibt …
+    if (clone.type === 'portal' && (clone.data as { boardId?: string }).boardId) {
+      clone.data = { ...clone.data, boardId: undefined };
+    }
+    // … und Ticket-Verknüpfungen ebenso (nodeIds werden gleich neu vergeben)
+    if (clone.type === 'kanban') {
+      const data = clone.data as KanbanData;
+      if (data.items?.some((it) => it.link)) {
+        clone.data = { ...data, items: data.items.map((it) => ({ ...it, link: undefined })) };
+      }
+    }
+    return clone;
   });
   const edges = (board.edges ?? [])
     .filter((e) => idMap.has(e.source) && idMap.has(e.target))

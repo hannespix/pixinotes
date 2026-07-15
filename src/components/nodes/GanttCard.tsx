@@ -160,7 +160,8 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   const resolveConflicts = () => {
     let next = [...rows];
     let changed = false;
-    for (let pass = 0; pass < 20; pass++) {
+    // genug Pässe für lineare Ketten beliebiger Länge (Audit R6-F10)
+    for (let pass = 0; pass < next.length + 2; pass++) {
       let any = false;
       next = next.map((r) => {
         if (!r.dep) return r;
@@ -385,7 +386,9 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
               const ey = HEAD_H + di * ROW_H + ROW_H / 2;
               const sx = rMile ? x(r.start) + dw / 2 - 9 : x(r.start) + 1;
               const sy = HEAD_H + ri * ROW_H + ROW_H / 2;
-              const conflict = toDays(r.start) <= toDays(d.end) && !rMile;
+              // auch Meilensteine rot markieren — „Konflikte auflösen" verschiebt
+              // sie ja ebenfalls, das Feedback muss dazu passen (Audit R6-F6)
+              const conflict = toDays(r.start) <= toDays(d.end);
               const midX = Math.max(ex + 8, sx - 8);
               const path = `M${ex},${ey} L${ex + 8},${ey} L${ex + 8},${sy} L${midX},${sy} L${sx - 2},${sy}`;
               return (

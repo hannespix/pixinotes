@@ -46,9 +46,12 @@ export function Dock() {
   const [cmd, setCmd] = useState('');
 
   /** KI-Aktion aufs ganze Board ausführen (mit Fortschritts-Toast + Fehlerbehandlung) */
-  const runAi = async (label: string, fn: (nodes: import('../types').AppNode[], pos: { x: number; y: number }) => Promise<string>) => {
+  const runAi = async (label: string, fn: (nodes: import('../types').AppNode[], pos: { x: number; y: number }) => Promise<string>, restoreCmd?: string) => {
     setAiMenu(false);
     if (!aiReady(ai)) { showToast('Zuerst die KI in den Einstellungen konfigurieren (Ollama, Anthropic, OpenAI …).'); setSettingsOpen(true); return; }
+    // GLOBALE Sperre: auch die Auswahl-Leiste darf währenddessen nichts starten
+    if (useBoard.getState().aiBusy) { showToast('Eine KI-Aktion läuft bereits — kurz warten.'); return; }
+    useBoard.getState().setAiBusy(true);
     setAiBusy(label);
     showToast('✨ KI analysiert das Board …');
     try {
@@ -58,8 +61,11 @@ export function Dock() {
       showToast(`✨ ${msg}`);
     } catch (e) {
       showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`);
+      // Freitext-Eingabe bei Fehler zurückgeben — nicht neu tippen müssen
+      if (restoreCmd) setCmd(restoreCmd);
     } finally {
       setAiBusy('');
+      useBoard.getState().setAiBusy(false);
     }
   };
 
@@ -184,18 +190,18 @@ export function Dock() {
               value={cmd}
               onChange={(e) => setCmd(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && cmd.trim()) {
+                if (e.key === 'Enter' && !e.shiftKey && cmd.trim() && !aiBusy) {
                   e.preventDefault();
                   const wish = cmd;
                   setCmd('');
-                  runAi('cmd', (n, p) => aiCommand(wish, n, p));
+                  runAi('cmd', (n, p) => aiCommand(wish, n, p), wish);
                 }
               }}
             />
             <button
               className="ai-cmd-go"
               disabled={!!aiBusy || !cmd.trim()}
-              onClick={() => { const wish = cmd; setCmd(''); runAi('cmd', (n, p) => aiCommand(wish, n, p)); }}
+              onClick={() => { const wish = cmd; setCmd(''); runAi('cmd', (n, p) => aiCommand(wish, n, p), wish); }}
             >
               ✨ Ausführen (erstellen, ändern, verbessern …)
             </button>

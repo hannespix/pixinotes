@@ -158,7 +158,9 @@ export function Settings() {
             <span>Anbieter</span>
             <select value={ai.provider} onChange={(e) => {
               const provider = e.target.value as typeof ai.provider;
-              updateAi({ provider, model: MODELS[provider]?.[0] ?? '', baseUrl: DEFAULT_BASE[provider] ?? '' });
+              // apiKey IMMER zurücksetzen: sonst ginge z. B. ein OpenAI-Key beim
+              // Wechsel auf „Eigener Server" an eine fremde URL (Audit R6-K2)
+              updateAi({ provider, model: MODELS[provider]?.[0] ?? '', baseUrl: DEFAULT_BASE[provider] ?? '', apiKey: '' });
             }}>
               <option value="none">— aus —</option>
               <option value="free">Gratis (Pollinations.ai, ohne Schlüssel)</option>

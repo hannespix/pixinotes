@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
 import { useBoard } from '../../store';
@@ -23,6 +23,12 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const [newText, setNewText] = useState('');
   const [editingDue, setEditingDue] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  // Fokus EINMAL beim Öffnen aufs Panel — sonst wirkt Esc erst nach Feld-Klick.
+  // (Kein Callback-Ref: der würde bei jedem Tipp-Rerender den Fokus klauen.)
+  const detailRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (detailId) detailRef.current?.focus();
+  }, [detailId]);
 
   const cols = kanbanCols(kanban);
   const done = cols.length - 1;
@@ -46,13 +52,18 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const syncFromBoards = (announce: boolean) => {
     const norm = (t: string) => t.trim().toLowerCase();
     const have = new Set(kanban.items.map((it) => norm(it.text)));
+    // Dedupe zusätzlich über die Link-Identität: ändert sich der Quelltext,
+    // entsteht sonst ein Duplikat neben dem alten Ticket (Audit R6-F3)
+    const haveKeys = new Set(
+      kanban.items.filter((it) => it.link?.nodeId && it.link.itemId).map((it) => `${it.link!.nodeId}|${it.link!.itemId}`),
+    );
     const openKeys = new Set<string>();
     const fresh: KanbanItem[] = [];
     // Kanban-Tickets + Checklisten (Aufgaben-Zentrale-Logik) — ohne dieses Kanban selbst
     for (const t of collectTasks(boards)) {
       if (t.nodeId === id) continue;
       openKeys.add(`${t.nodeId}|${t.itemId}`);
-      if (have.has(norm(t.text))) continue;
+      if (haveKeys.has(`${t.nodeId}|${t.itemId}`) || have.has(norm(t.text))) continue;
       have.add(norm(t.text));
       fresh.push({ id: uid(), text: t.text, col: 0, due: t.due, link: { boardId: t.boardId, nodeId: t.nodeId, itemId: t.itemId } });
     }
@@ -64,16 +75,22 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           if ((row.progress ?? 0) >= 100) continue;
           openKeys.add(`${n.id}|${row.id}`);
           const text = `${row.name} (Zeitplan)`;
-          if (have.has(norm(text))) continue;
+          if (haveKeys.has(`${n.id}|${row.id}`) || have.has(norm(text))) continue;
           have.add(norm(text));
           fresh.push({ id: uid(), text, col: 0, due: row.end, link: { boardId: b.id, nodeId: n.id, itemId: row.id } });
         }
       }
     }
-    // Abgleich: Quelle nicht mehr offen → Ticket erledigen (nur vorwärts)
+    // Abgleich: Quelle nicht mehr offen → Ticket erledigen (nur vorwärts).
+    // pos:-Adressen (Checklisten-Blöcke ohne echte ID) ausgenommen: BlockNote
+    // vergibt beim ersten Edit echte IDs, der pos:-Schlüssel würde dann
+    // fälschlich als „erledigt" gelten (Audit R6-S6)
     let moved = 0;
     const items = kanban.items.map((it) => {
-      if (it.link?.nodeId && it.link.itemId && it.col < done && !openKeys.has(`${it.link.nodeId}|${it.link.itemId}`)) {
+      if (
+        it.link?.nodeId && it.link.itemId && !it.link.itemId.startsWith('pos:')
+        && it.col < done && !openKeys.has(`${it.link.nodeId}|${it.link.itemId}`)
+      ) {
         moved++;
         return { ...it, col: done };
       }
@@ -276,7 +293,12 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         const it = kanban.items.find((x) => x.id === detailId);
         if (!it) return null;
         return (
-          <div className="ticket-detail nodrag" onKeyDown={(e) => e.key === 'Escape' && setDetailId(null)}>
+          <div
+            className="ticket-detail nodrag"
+            tabIndex={-1}
+            ref={detailRef}
+            onKeyDown={(e) => e.key === 'Escape' && setDetailId(null)}
+          >
             <div className="ticket-detail-head">
               <span>Ticket</span>
               <button title="Schließen" onClick={() => setDetailId(null)}><IX size={12} /></button>
@@ -312,7 +334,13 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
               <label><IFolder size={12} /> Verknüpft</label>
               <select
                 value={it.link?.boardId ?? ''}
-                onChange={(e) => patchItem(it.id, { link: e.target.value ? { boardId: e.target.value } : undefined })}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (!v) return patchItem(it.id, { link: undefined });
+                  // gleiches Board erneut gewählt → nodeId/itemId (Auto-Abgleich!) behalten
+                  if (v === it.link?.boardId) return;
+                  patchItem(it.id, { link: { boardId: v } });
+                }}
               >
                 <option value="">— kein Board —</option>
                 {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}

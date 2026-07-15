@@ -68,6 +68,10 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
         const done = doneCol(k);
         for (const item of k.items) {
           if (Math.min(item.col, done) >= done) continue;
+          // Eingesammelte Kopien (Auto-Sammler) nicht als eigene Aufgaben zählen —
+          // sonst füttern sich zwei Sammler gegenseitig und die Aufgaben-Zentrale
+          // zeigt Duplikate (Audit R6-S7)
+          if (item.link?.itemId) continue;
           out.push({
             key: `k:${board.id}:${node.id}:${item.id}`,
             kind: 'kanban',

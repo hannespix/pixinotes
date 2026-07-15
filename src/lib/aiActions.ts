@@ -5,15 +5,29 @@
 import { askAi, textToBlocks } from './ai';
 import { nodeToText } from './serialize';
 import { makeKanban, makeMermaid, makeNote, makeShape } from './nodes';
-import { useBoard } from '../store';
+import { mutedHistory, useBoard } from '../store';
 import { uid, type AppNode, type ShapeKind, type StickyColor } from '../types';
 
 interface Ctx { id: string; type: string; text: string }
 
+// Kontext-Deckel: große Boards würden sonst Prompts >100 KB erzeugen
+// (Provider-Limits, Kosten, Timeouts) — Audit R6-K4
+const CTX_MAX_NODES = 80;
+const CTX_MAX_CHARS = 30_000;
+
 function gather(nodes: AppNode[]): Ctx[] {
-  return nodes
+  const all = nodes
     .map((n) => ({ id: n.id, type: n.type ?? '?', text: nodeToText(n).trim().slice(0, 400) }))
-    .filter((c) => c.text);
+    .filter((c) => c.text)
+    .slice(0, CTX_MAX_NODES);
+  let budget = CTX_MAX_CHARS;
+  const out: Ctx[] = [];
+  for (const c of all) {
+    budget -= c.text.length + 60;
+    if (budget < 0) break;
+    out.push(c);
+  }
+  return out;
 }
 
 /* ---------- Robustes JSON-Parsen ----------
@@ -43,13 +57,40 @@ function autoClose(s: string): string {
   return out;
 }
 
+/** Fehlende Kommas zwischen Elementen einfügen — String-bewusst: innerhalb
+ *  von "…" wird NICHTS angefasst, sonst verfälscht die Reparatur Inhalte,
+ *  die selbst `}{` o. Ä. enthalten (Audit R6-K5) */
+function insertMissingCommas(s: string): string {
+  let out = '';
+  let inStr = false;
+  let esc = false;
+  const boundary = (i: number) => {
+    // nächstes Nicht-Whitespace-Zeichen: beginnt dort ein neues Element?
+    let j = i + 1;
+    while (j < s.length && /\s/.test(s[j])) j++;
+    return j < s.length && (s[j] === '{' || s[j] === '[' || s[j] === '"');
+  };
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    out += ch;
+    if (esc) { esc = false; continue; }
+    if (inStr && ch === '\\') { esc = true; continue; }
+    if (ch === '"') {
+      inStr = !inStr;
+      // gerade einen String GESCHLOSSEN → Element-Grenze prüfen
+      if (!inStr && boundary(i)) out += ',';
+      continue;
+    }
+    if (inStr) continue;
+    if ((ch === '}' || ch === ']') && boundary(i)) out += ',';
+  }
+  return out;
+}
+
 /** Reparatur-Kandidaten in aufsteigender Aggressivität */
 function repairCandidates(core: string): string[] {
   const noTrail = core.replace(/,\s*([}\]])/g, '$1'); // trailing commas
-  const commas = noTrail // fehlende Kommas zwischen Array-Elementen
-    .replace(/}(\s*){/g, '},$1{')
-    .replace(/](\s*)\[/g, '],$1[')
-    .replace(/"(\s*\n\s*)"/g, '",$1"');
+  const commas = insertMissingCommas(noTrail);
   return [core, noTrail, commas, autoClose(noTrail), autoClose(commas)];
 }
 
@@ -100,7 +141,7 @@ export async function aiCluster(nodes: AppNode[]): Promise<string> {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const X0 = 80, Y0 = 140, GAP_X = 90, GAP_Y = 44, COLW = 380;
   const moves: Array<[string, number, number]> = [];
-  clusters.forEach((c, i) => {
+  mutedHistory(() => clusters.forEach((c, i) => {
     const x = X0 + i * (COLW + GAP_X);
     st.addNode({
       id: uid(), type: 'shape', width: 320, height: 52,
@@ -114,7 +155,7 @@ export async function aiCluster(nodes: AppNode[]): Promise<string> {
       moves.push([nid, x, y]);
       y += (node.measured?.height ?? (node.height as number | undefined) ?? 170) + GAP_Y;
     }
-  });
+  }));
   if (moves.length === 0) throw new Error('Die KI hat keine bekannten Karten-IDs geliefert.');
   st.setNodePositions(moves);
   return `${clusters.length} Themen-Cluster angeordnet: ${clusters.map((c) => c.title).join(' · ')}`;
@@ -184,12 +225,15 @@ export async function aiEdges(nodes: AppNode[]): Promise<string> {
     useBoard.getState().boards.flatMap((b) => b.edges.map((e) => `${e.source}>${e.target}`)),
   );
   let created = 0;
-  for (const e of (edges ?? []).slice(0, 8)) {
-    if (!valid.has(e.source) || !valid.has(e.target) || e.source === e.target) continue;
-    if (existing.has(`${e.source}>${e.target}`) || existing.has(`${e.target}>${e.source}`)) continue;
-    st.addLabeledEdge(e.source, e.target, (e.label ?? '').slice(0, 30));
-    created++;
-  }
+  st.pushHistory();
+  mutedHistory(() => {
+    for (const e of (edges ?? []).slice(0, 8)) {
+      if (!valid.has(e.source) || !valid.has(e.target) || e.source === e.target) continue;
+      if (existing.has(`${e.source}>${e.target}`) || existing.has(`${e.target}>${e.source}`)) continue;
+      st.addLabeledEdge(e.source, e.target, (e.label ?? '').slice(0, 30));
+      created++;
+    }
+  });
   if (created === 0) throw new Error('Keine neuen sinnvollen Verbindungen gefunden.');
   return `${created} Verbindung(en) mit Beziehungs-Label gezogen`;
 }
@@ -268,6 +312,9 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
     return p;
   };
 
+  // EIN Snapshot für den ganzen Plan (oben gesichert): innere Mutatoren
+  // (addNode/removeNodes/addLabeledEdge) pushen keine eigenen Einträge
+  mutedHistory(() => {
   for (const o of plan) {
     switch (o.op) {
       case 'note': {
@@ -358,6 +405,7 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
         break;
     }
   }
+  });
 
   if (done === 0) throw new Error('Kein Schritt war ausführbar (unbekannte ids?) — Anweisung bitte konkreter formulieren.');
   if (editedNote) {

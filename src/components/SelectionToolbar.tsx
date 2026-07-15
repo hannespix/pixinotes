@@ -34,8 +34,11 @@ export function SelectionToolbar() {
   if (selected.length === 0) return null;
 
   /** KI-Aktion nur auf die ausgewählten Karten */
-  const runAi = async (fn: (nodes: AppNode[], pos: { x: number; y: number }) => Promise<string>) => {
+  const runAi = async (fn: (nodes: AppNode[], pos: { x: number; y: number }) => Promise<string>, restoreCmd?: string) => {
     setAiMenu(false);
+    // GLOBALE Sperre teilt sich die Auswahl-Leiste mit dem Dock (Audit R6-K6)
+    if (useBoard.getState().aiBusy) { showToast('Eine KI-Aktion läuft bereits — kurz warten.'); return; }
+    useBoard.getState().setAiBusy(true);
     setAiBusy(true);
     showToast(`✨ KI analysiert ${selected.length} Karte(n) …`);
     try {
@@ -43,8 +46,10 @@ export function SelectionToolbar() {
       showToast(`✨ ${await fn(selected, pos)}`);
     } catch (e) {
       showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`);
+      if (restoreCmd) setCmd(restoreCmd);
     } finally {
       setAiBusy(false);
+      useBoard.getState().setAiBusy(false);
     }
   };
 
@@ -169,10 +174,10 @@ export function SelectionToolbar() {
                 value={cmd}
                 onChange={(e) => setCmd(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && cmd.trim()) {
+                  if (e.key === 'Enter' && cmd.trim() && !aiBusy) {
                     const wish = cmd;
                     setCmd('');
-                    runAi((n, p) => aiCommand(wish, n, p));
+                    runAi((n, p) => aiCommand(wish, n, p), wish);
                   }
                 }}
               />

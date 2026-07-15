@@ -45,7 +45,11 @@ export function parseIcs(text: string): IcsEvent[] {
     const key = line.slice(0, idx);
     const val = line.slice(idx + 1);
     if (key === 'SUMMARY' || key.startsWith('SUMMARY;')) {
-      cur.title = val.replace(/\\([,;nN])/g, (_, c) => (c.toLowerCase() === 'n' ? ' ' : c)).trim().slice(0, 120);
+      // RFC-5545-Escapes in EINEM Durchgang — \\ gehört dazu, sonst frisst
+      // es das Folgezeichen (Audit R6-F9)
+      cur.title = val
+        .replace(/\\([\\,;nN])/g, (_, c: string) => (c === 'n' || c === 'N' ? ' ' : c))
+        .trim().slice(0, 120);
     } else if (key === 'DTSTART' || key.startsWith('DTSTART;')) {
       const d = icsDate(val);
       if (d) cur.start = d.iso;

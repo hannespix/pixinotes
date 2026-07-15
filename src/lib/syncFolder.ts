@@ -159,7 +159,10 @@ async function autoSave(): Promise<void> {
   if (!handle || !(await ensurePermission(handle, false))) return;
   const remote = await readSync(handle);
   // Konfliktschutz: hat ein anderes Gerät seit unserem letzten Sync geschrieben?
-  if (remote && knownStamp() && remote.savedAt !== knownStamp()) {
+  // WICHTIG: auch OHNE eigenen Stempel (frisch verbundenes Gerät) gilt fremder
+  // Bestand als Konflikt — sonst überschreibt das erste lokale Edit die Daten
+  // des anderen Geräts (Audit R6-S4)
+  if (remote && remote.savedAt !== knownStamp()) {
     if (!conflictWarned) {
       conflictWarned = true;
       useBoard.getState().showToast('⚠️ Der Sync-Ordner hat einen neueren Stand (anderes Gerät?). In ⚙️ → Synchronisation laden oder überschreiben.');

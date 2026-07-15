@@ -160,8 +160,12 @@ function baseNodeText(node: AppNode): string {
       const k = node.data;
       const cols = kanbanCols(k);
       const done = doneCol(k);
+      // Ticket-Details (Person/Frist/Beschreibung) mit ausgeben — sonst sind
+      // sie weder durchsuchbar noch im E-Mail-/Clipboard-Export (Audit R6-F2)
+      const line = (it: (typeof k.items)[number], i: number) =>
+        `  ${i === done ? '☑' : '☐'} ${it.text}${it.due ? ` (bis ${it.due})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` — ${it.note}` : ''}`;
       return `${k.title}\n${cols.map(
-        (col, i) => `\n${col}:\n${k.items.filter((it) => Math.min(it.col, done) === i).map((it) => `  ${i === done ? '☑' : '☐'} ${it.text}`).join('\n') || '  —'}`,
+        (col, i) => `\n${col}:\n${k.items.filter((it) => Math.min(it.col, done) === i).map((it) => line(it, i)).join('\n') || '  —'}`,
       ).join('')}`;
     }
     case 'file': {
@@ -177,7 +181,7 @@ function baseNodeText(node: AppNode): string {
     case 'gantt': {
       const g = node.data;
       return `${g.title}\n${g.rows
-        .map((r) => `  ${r.start === r.end ? '◆' : '▬'} ${r.name}: ${r.start} → ${r.end}${r.progress ? ` (${r.progress}%)` : ''}`)
+        .map((r) => `  ${r.start === r.end ? '◆' : '▬'} ${r.name}: ${r.start} → ${r.end}${r.progress ? ` (${r.progress}%)` : ''}${(r as { who?: string }).who ? ` @${(r as { who?: string }).who}` : ''}`)
         .join('\n')}`;
     }
     case 'calendar':

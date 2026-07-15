@@ -200,3 +200,85 @@ UI-Schichten: Board, Tab-Leiste, Dock-Menüs, Auswahl-Leiste, Übersicht
 **Bewusst nicht geändert:** Karten (Kanban/Gantt/Kalender) skalieren über
 Canvas-Zoom statt eigener Mobile-Layouts — auf dem Board ist Pan/Zoom die
 natürliche Geste; die Karten selbst bleiben desktop-identisch.
+
+---
+
+## Runde 6 — Komplett-Audit: Logik, Features, KI
+
+Methode: drei parallele Prüf-Agenten (Store/State, Feature-Module, KI-Schicht),
+jeder Befund am Code verifiziert. 30 Befunde, davon 21 gefixt, 4 als
+Fehlalarm/By-Design verworfen, Rest dokumentiert.
+
+**Logik/Store**
+- [x] R6-S1 Undo über Notiz-Inhalte remountete Editoren nicht (Store/Editor
+      liefen auseinander, Editor schrieb alten Text zurück) → Undo/Redo
+      vergleichen Notiz-Blöcke per Referenz und erzwingen den Remount
+- [x] R6-S2 Kantenlöschung per Entf-Taste war nicht undo-fähig → läuft
+      jetzt durch pushHistory
+- [x] R6-S4 Frisch verbundenes Gerät überschrieb fremde Sync-Daten beim
+      ersten Edit (Stempel-Prüfung übersprang den Null-Fall) → fremder
+      Bestand gilt auch ohne eigenen Stempel als Konflikt
+- [x] R6-S5 Geteilte Boards: Portal-boardId und Ticket-Verknüpfungen
+      zeigten auf die Welt des Absenders → werden beim Klonen entwertet
+- [x] R6-S6 Auto-gesammelte Checklisten-Tickets galten fälschlich als
+      erledigt, sobald die Quellnotiz erstmals editiert wurde (pos:-IDs
+      wechseln zu echten Block-IDs) → pos:-Links vom Abgleich ausgenommen
+- [x] R6-S7 Zwei Auto-Sammler fütterten sich gegenseitig → eingesammelte
+      Kopien (link.itemId) zählen nirgends mehr als eigene Aufgaben
+      (entdoppelt auch die Aufgaben-Zentrale)
+- [x] R6-S8 versions[] gelöschter Boards blieben für immer im Storage →
+      removeBoard räumt auf
+- [~] R6-S3 (Fehlalarm) TaskHub-Abhaken: das Board ist während der
+      Aufgaben-Zentrale unmounted, es gibt keinen veralteten Editor
+
+**Features**
+- [x] R6-F1 Kalender-Export verlor ALLE mehrtägigen Einträge und
+      exportierte mehr als die sichtbare Ansicht → nur sichtbare Zellen,
+      Streifen als ein Termin mit Zeitspanne
+- [x] R6-F2 Suche/Export ignorierten Ticket-Person/-Beschreibung/-Frist
+      und Gantt-Person → in nodeToText aufgenommen
+- [x] R6-F3 Auto-Einsammeln duplizierte Tickets bei Textänderung der
+      Quelle → Dedupe zusätzlich über die Link-Identität
+- [x] R6-F4 Präsentation: Pfeiltasten in Dropdowns blätterten die Folie
+      um → SELECT/BUTTON gelten als Bedienelemente
+- [x] R6-F5 Board-Dropdown im Ticket-Detail warf nodeId/itemId weg
+      (Auto-Abgleich tot) → unveränderte Auswahl behält die IDs
+- [x] R6-F6 Meilensteine zeigten nie einen Konflikt-Pfeil, wurden aber
+      von „Konflikte auflösen" verschoben → Anzeige angeglichen
+- [x] R6-F7 Esc schloss das Ticket-Detail erst nach Feld-Klick → Panel
+      erhält beim Öffnen den Fokus
+- [x] R6-F8 „0 neue Termine" trotz Import, sobald 800er-Kappung griff →
+      Zählung über Dedupe-Schlüssel
+- [x] R6-F9 ICS-Titel mit \\ wurden falsch entescaped → ein Durchgang
+      inkl. Backslash
+- [x] R6-F10 „Konflikte auflösen" brach bei Ketten > 20 ab → Pässe
+      skalieren mit der Zeilenzahl
+
+**KI**
+- [x] R6-K1 „1× Strg+Z macht alles rückgängig" stimmte nicht: innere
+      Mutatoren pushten eigene History-Einträge → mutedHistory(): ein
+      Snapshot pro KI-Plan (aiCommand, aiCluster, aiEdges)
+- [x] R6-K2 API-Schlüssel überlebte den Anbieterwechsel und ging an den
+      falschen Anbieter (Credential-Leak, z. B. an eigene Server-URL) →
+      Schlüssel wird beim Wechsel geleert
+- [x] R6-K4 Kein Limit für die Prompt-Größe → Kontext-Deckel (80 Karten /
+      30 kB)
+- [x] R6-K5 JSON-Reparatur konnte String-Inhalte mit }{ verfälschen →
+      String-bewusste Komma-Einfügung (Zeichen-Walker statt Regex)
+- [x] R6-K6/K9 Zwei getrennte Busy-Sperren (Dock/Auswahl) erlaubten
+      parallele KI-Aktionen; Enter umging die Sperre → globale Sperre im
+      Store + Enter-Guard
+- [x] R6-K8 Freitext-Eingabe war nach Fehlschlag weg → wird bei Fehler
+      wiederhergestellt
+- [x] R6-K12 free-Retry ignorierte laufenden Abort → Signal-Check vor dem
+      zweiten Versuch
+- [~] R6-K3 Lösch-Toast „verdrängt" Erfolgsmeldung: Reihenfolge ist
+      umgekehrt (Zusammenfassung kommt zuletzt) — durch K1 ohnehin ein
+      einziger Undo-Schritt
+- [~] R6-K10 Doppelte Kosten beim JSON-Retry: bewusster Trade-off (nur
+      im Fehlerfall)
+- [~] R6-K11 „claude-sonnet-5 existiert nicht": doch — Agentenwissen
+      veraltet; OpenRouter-Rotation bleibt beobachtet
+- [ ] R6-K7 edit_note-Remount setzt den Viewport zurück (fitView) —
+      bekannt, bewusst zurückgestellt: Viewport-Erhalt über Remounts ist
+      ein eigenes Vorhaben

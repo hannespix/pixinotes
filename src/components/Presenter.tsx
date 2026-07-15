@@ -15,11 +15,12 @@ import type { AppNode, CalendarNode, GanttNode, KanbanNode, MermaidNode, NoteNod
 /** Kartentypen, die auf der Folie LIVE editierbar sind */
 const EDITABLE = new Set(['note', 'shape', 'mermaid', 'kanban', 'gantt', 'calendar']);
 
-/** Tippt der Nutzer gerade in ein Eingabefeld / einen Editor? */
+/** Bedient der Nutzer gerade ein Eingabe-/Bedienelement? Dann keine Folien-Navigation.
+ *  SELECT/BUTTON gehören dazu: Pfeiltasten/Leertaste wählen dort Werte (Audit R6-F4) */
 function inEditable(t: EventTarget | null): boolean {
   return (
     t instanceof HTMLElement &&
-    (t.isContentEditable || t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')
+    (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(t.tagName))
   );
 }
 
