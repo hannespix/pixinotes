@@ -10,6 +10,7 @@ import { Presenter } from './components/Presenter';
 import { useBoard } from './store';
 import { initAutoSync } from './lib/syncFolder';
 import { TaskHub } from './components/TaskHub';
+import { BacklinksPanel } from './components/BacklinksPanel';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
 import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
 
@@ -105,6 +106,7 @@ export default function App() {
           <>
             <Board />
             <Dock />
+            <BacklinksPanel />
           </>
         )}
         <SearchOverlay />

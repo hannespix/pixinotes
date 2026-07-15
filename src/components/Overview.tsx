@@ -12,6 +12,7 @@ import {
 import { useBoard, type BoardDoc, type Project, type Space } from '../store';
 import { boardMetaLabel } from '../lib/boardStats';
 import { boardGraph, layoutGraph } from '../lib/links';
+import { nodeToText } from '../lib/serialize';
 import { InlineName } from './InlineName';
 import { IPen, IPlay, IX } from './Icons';
 
@@ -116,6 +117,10 @@ function OverviewCanvas() {
 function GraphView() {
   const boards = useBoard((s) => s.boards);
   const openBoard = useBoard((s) => s.openBoard);
+  const focusNode = useBoard((s) => s.focusNode);
+  const [showCards, setShowCards] = useState(false);
+  const [showPortals, setShowPortals] = useState(true);
+  const [showWikis, setShowWikis] = useState(true);
   const W = 1100, H = 640;
   const { nodes, links, pos } = useMemo(() => {
     const g = boardGraph(boards);
@@ -124,10 +129,55 @@ function GraphView() {
 
   const r = (cards: number) => 14 + Math.min(26, Math.sqrt(cards) * 5);
 
+  // Karten-Ebene: verbundene Karten als Satelliten-Ring um ihr Board
+  const satellites = useMemo(() => {
+    if (!showCards) return { dots: [] as Array<{ key: string; x: number; y: number; title: string; boardId: string; nodeId: string }>, lines: [] as Array<{ x1: number; y1: number; x2: number; y2: number }> };
+    const dots: Array<{ key: string; x: number; y: number; title: string; boardId: string; nodeId: string }> = [];
+    const lines: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+    const dotPos = new Map<string, { x: number; y: number }>();
+    for (const b of boards) {
+      const center = pos.get(b.id);
+      if (!center) continue;
+      const connected = new Set(b.edges.flatMap((e) => [e.source, e.target]));
+      const cards = b.nodes.filter((n) => connected.has(n.id));
+      const ring = r(b.nodes.length) + 34;
+      cards.forEach((n, i) => {
+        const angle = (i / Math.max(1, cards.length)) * Math.PI * 2 - Math.PI / 2;
+        const x = center.x + Math.cos(angle) * ring;
+        const y = center.y + Math.sin(angle) * ring;
+        dotPos.set(`${b.id}:${n.id}`, { x, y });
+        dots.push({
+          key: `${b.id}:${n.id}`, x, y,
+          title: (nodeToText(n).split('\n').find((l) => l.trim()) ?? n.type ?? 'Karte').slice(0, 40),
+          boardId: b.id, nodeId: n.id,
+        });
+      });
+      for (const e of b.edges) {
+        const a = dotPos.get(`${b.id}:${e.source}`);
+        const c = dotPos.get(`${b.id}:${e.target}`);
+        if (a && c) lines.push({ x1: a.x, y1: a.y, x2: c.x, y2: c.y });
+      }
+    }
+    return { dots, lines };
+  }, [showCards, boards, pos]);
+
   return (
     <div className="ov-graph">
+      <div className="ov-graph-toggles nodrag">
+        {([
+          ['Karten', showCards, setShowCards],
+          ['Portale', showPortals, setShowPortals],
+          ['Wikilinks', showWikis, setShowWikis],
+        ] as const).map(([label, on, set]) => (
+          <label key={label} className="ov-graph-toggle">
+            <input type="checkbox" checked={on} onChange={(e) => set(e.target.checked)} /> {label}
+          </label>
+        ))}
+      </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="ov-graph-svg" role="img" aria-label="Board-Netz">
         {links.map((l, i) => {
+          if (l.kind === 'portal' && !showPortals) return null;
+          if (l.kind === 'wikilink' && !showWikis) return null;
           const a = pos.get(l.a), b = pos.get(l.b);
           if (!a || !b) return null;
           return (
@@ -140,6 +190,15 @@ function GraphView() {
             />
           );
         })}
+        {satellites.lines.map((l, i) => (
+          <line key={`c${i}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="rgba(120,110,90,.3)" strokeWidth={1} />
+        ))}
+        {satellites.dots.map((d) => (
+          <g key={d.key} className="ov-graph-dot" onClick={() => { openBoard(d.boardId); focusNode(d.boardId, d.nodeId); }}>
+            <title>{d.title}</title>
+            <circle cx={d.x} cy={d.y} r={5} />
+          </g>
+        ))}
         {nodes.map((n) => {
           const p = pos.get(n.id)!;
           const rad = r(n.cards);
@@ -153,7 +212,7 @@ function GraphView() {
         })}
       </svg>
       <div className="ov-graph-legend">
-        ── Portal · ┄┄ [[Wikilink]] · Kreisgröße = Kartenzahl · Klick öffnet das Board
+        ── Portal · ┄┄ [[Wikilink]] · Kreisgröße = Kartenzahl · kleine Punkte = verbundene Karten · Klick öffnet
       </div>
     </div>
   );

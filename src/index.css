@@ -1159,3 +1159,41 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ov-graph-node text { font-size: 12px; fill: var(--ink); font-family: inherit; pointer-events: none; }
 .ov-graph-node .ov-graph-count { font-size: 10px; fill: var(--muted); }
 .ov-graph-legend { text-align: center; font-size: 11.5px; color: var(--muted); padding-top: 6px; }
+
+/* ---------- Backlinks-Panel + Graph-Toggles ---------- */
+.backlinks { position: fixed; right: 18px; bottom: 190px; z-index: 45; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.backlinks-pill {
+  border: none; background: #fff; border-radius: 999px; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted);
+  padding: 6px 13px; box-shadow: 0 2px 10px rgba(50,40,20,.14);
+}
+.backlinks-pill:hover, .backlinks-pill.on { color: var(--accent); }
+.backlinks-panel {
+  background: #fff; border-radius: 12px; box-shadow: 0 6px 28px rgba(50,40,20,.2);
+  padding: 8px; width: 260px; max-height: 300px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.backlinks-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); padding: 2px 6px 6px;
+}
+.backlinks-head button { border: none; background: none; cursor: pointer; color: var(--muted); display: inline-flex; }
+.backlinks-row {
+  display: flex; align-items: center; gap: 7px; border: none; background: none;
+  font-family: inherit; font-size: 12px; color: var(--ink); padding: 6px 8px;
+  border-radius: 7px; cursor: pointer; text-align: left;
+}
+.backlinks-row:hover { background: #f1ede4; }
+.backlinks-icon { color: var(--muted); display: inline-flex; flex: none; }
+.backlinks-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.backlinks-board { font-size: 10px; color: var(--muted); background: rgba(0,0,0,.05); border-radius: 999px; padding: 2px 7px; flex: none; }
+
+.ov-graph-toggles {
+  position: fixed; top: 64px; left: 18px; z-index: 55; display: flex; gap: 12px;
+  background: #fff; border-radius: 10px; padding: 7px 13px; box-shadow: 0 2px 10px rgba(50,40,20,.12);
+}
+.ov-graph-toggle { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink); cursor: pointer; }
+.ov-graph-dot { cursor: pointer; }
+.ov-graph-dot circle { fill: #fff; stroke: #a09a8a; stroke-width: 1.5; }
+.ov-graph-dot:hover circle { stroke: var(--accent); fill: #e8efff; }

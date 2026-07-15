@@ -69,6 +69,39 @@ export function resolveLink(name: string, boards: BoardDoc[]): LinkTarget {
   return null;
 }
 
+export interface Backlink {
+  boardId: string;
+  boardName: string;
+  nodeId: string;
+  label: string;
+  kind: 'portal' | 'wikilink';
+}
+
+/** „Was verlinkt hierher?" — Portale und [[Wikilinks]], die auf dieses Board zeigen */
+export function collectBacklinks(boards: BoardDoc[], targetBoardId: string): Backlink[] {
+  const target = boards.find((b) => b.id === targetBoardId);
+  if (!target) return [];
+  const out: Backlink[] = [];
+  for (const b of boards) {
+    for (const n of b.nodes) {
+      if (n.type === 'portal' && n.data.boardId === targetBoardId && b.id !== targetBoardId) {
+        out.push({ boardId: b.id, boardName: b.name, nodeId: n.id, label: 'Portal', kind: 'portal' });
+      } else if (n.type === 'note') {
+        const text = nodeToText(n);
+        for (const name of extractWikilinks(text)) {
+          const t = resolveLink(name, boards);
+          if (t && t.boardId === targetBoardId && !(b.id === targetBoardId && t.kind === 'board')) {
+            const title = text.split('\n').find((l) => l.trim())?.slice(0, 50) ?? 'Notiz';
+            out.push({ boardId: b.id, boardName: b.name, nodeId: n.id, label: title, kind: 'wikilink' });
+            break; // eine Notiz zählt einmal
+          }
+        }
+      }
+    }
+  }
+  return out.slice(0, 40);
+}
+
 export interface GraphNode { id: string; label: string; cards: number }
 export interface GraphLink { a: string; b: string; kind: 'portal' | 'wikilink' }
 
