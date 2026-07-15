@@ -105,6 +105,12 @@ export async function ensurePermission(handle: SyncDirHandle, ask: boolean): Pro
   return (await handle.requestPermission?.({ mode: 'readwrite' })) === 'granted';
 }
 
+/** Aktueller Berechtigungs-Status ohne Nachfrage */
+export async function permissionState(handle: SyncDirHandle): Promise<'granted' | 'prompt'> {
+  const q = (await handle.queryPermission?.({ mode: 'readwrite' })) ?? 'granted';
+  return q === 'granted' ? 'granted' : 'prompt';
+}
+
 // ---------- Lesen / Schreiben ----------
 export async function readSync(handle: SyncDirHandle): Promise<SyncPayload | null> {
   try {
@@ -174,13 +180,19 @@ export function initAutoSync(): void {
     clearTimeout(timer);
     timer = setTimeout(() => { void autoSave().catch(() => {}); }, 1800);
   });
-  // Start-Check: gibt es im Ordner einen neueren Stand? (nur Hinweis, nie Auto-Laden)
+  // Start-Check: Berechtigung erloschen? Neuerer Stand im Ordner? (nur Hinweise, nie Auto-Laden)
   void (async () => {
     const handle = await getSyncHandle();
-    if (!handle || !(await ensurePermission(handle, false))) return;
+    if (!handle) return;
+    if (!(await ensurePermission(handle, false))) {
+      // Browser hat den Zugriff nach Neustart zurückgesetzt — ehrlich sagen,
+      // statt den Auto-Sync still zu deaktivieren
+      useBoard.getState().showToast('Sync-Ordner verbunden, aber der Browser braucht eine neue Freigabe — in ⚙️ → Synchronisation „Zugriff erlauben" klicken.');
+      return;
+    }
     const remote = await readSync(handle);
     if (remote && remote.savedAt !== knownStamp()) {
-      useBoard.getState().showToast('📁 Im Sync-Ordner liegt ein anderer Stand — in ⚙️ → Synchronisation laden.');
+      useBoard.getState().showToast('Im Sync-Ordner liegt ein anderer Stand — in ⚙️ → Synchronisation laden.');
     }
   })().catch(() => {});
 }

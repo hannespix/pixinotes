@@ -57,6 +57,7 @@ const PUSH_MAX = 22;
 
 export function Board() {
   const activeId = useBoard((s) => s.activeId);
+  const importEpoch = useBoard((s) => s.importEpoch);
   const nodes = useBoard((s) => selectActiveBoard(s).nodes);
   const edges = useBoard((s) => selectActiveBoard(s).edges);
   const onNodesChange = useBoard((s) => s.onNodesChange);
@@ -366,7 +367,7 @@ export function Board() {
         </div>
       )}
       <ReactFlow
-        key={activeId}
+        key={`${activeId}:${importEpoch}`}
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}

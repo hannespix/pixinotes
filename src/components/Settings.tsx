@@ -3,7 +3,7 @@ import { selectActiveBoard, useBoard } from '../store';
 import { exportToFolder, exportViewport } from '../lib/exporter';
 import {
   applySync, disconnectSync, ensurePermission, getSyncHandle, knownStamp,
-  pickSyncFolder, readSync, syncSupported, writeSync, type SyncDirHandle,
+  permissionState, pickSyncFolder, readSync, syncSupported, writeSync, type SyncDirHandle,
 } from '../lib/syncFolder';
 
 const MODELS: Record<string, string[]> = {
@@ -35,11 +35,17 @@ export function Settings() {
   const showToast = useBoard((s) => s.showToast);
   const [busy, setBusy] = useState('');
   const [syncHandle, setSyncHandle] = useState<SyncDirHandle | null>(null);
+  const [syncPerm, setSyncPerm] = useState<'granted' | 'prompt'>('granted');
 
-  // Verbundenen Sync-Ordner anzeigen (Handle überlebt Neustarts via IndexedDB)
+  // Verbundenen Sync-Ordner + Berechtigungs-Status anzeigen (Handle überlebt Neustarts via IndexedDB)
   useEffect(() => {
     if (!open || !syncSupported()) return;
-    getSyncHandle().then((h) => setSyncHandle(h ?? null)).catch(() => {});
+    getSyncHandle()
+      .then(async (h) => {
+        setSyncHandle(h ?? null);
+        if (h) setSyncPerm(await permissionState(h));
+      })
+      .catch(() => {});
   }, [open]);
 
   if (!open) return null;
@@ -166,6 +172,22 @@ export function Settings() {
                   </button>
                 ) : (
                   <>
+                    {syncPerm === 'prompt' && (
+                      <button
+                        disabled={!!busy}
+                        className="sync-perm-btn"
+                        onClick={() => doExport(async () => {
+                          if (await ensurePermission(syncHandle, true)) {
+                            setSyncPerm('granted');
+                            showToast('Zugriff erlaubt — Auto-Sync läuft wieder.');
+                          } else {
+                            showToast('Zugriff nicht erteilt — Sync bleibt pausiert.');
+                          }
+                        }, 'syncperm')}
+                      >
+                        {busy === 'syncperm' ? '…' : '🔓 Zugriff erlauben'}
+                      </button>
+                    )}
                     <button disabled={!!busy} onClick={() => doExport(saveToSync, 'syncsave')}>
                       {busy === 'syncsave' ? '…' : '⬆️ Jetzt speichern'}
                     </button>
@@ -184,9 +206,11 @@ export function Settings() {
               </div>
               {syncHandle && (
                 <div className="modal-note">
-                  ✅ Verbunden mit Ordner „{syncHandle.name}" — Änderungen werden automatisch gespeichert
-                  {knownStamp() ? ` (letzter Sync: ${new Date(knownStamp()!).toLocaleString('de-DE')})` : ''}.
-                  Schreibt ein anderes Gerät zwischenzeitlich, warnt PixiNotes statt zu überschreiben.
+                  {syncPerm === 'prompt'
+                    ? `⚠️ Verbunden mit „${syncHandle.name}", aber der Browser hat den Zugriff nach dem Neustart zurückgesetzt — bitte oben „Zugriff erlauben" klicken, sonst pausiert der Auto-Sync.`
+                    : <>✅ Verbunden mit Ordner „{syncHandle.name}" — Änderungen werden automatisch gespeichert
+                      {knownStamp() ? ` (letzter Sync: ${new Date(knownStamp()!).toLocaleString('de-DE')})` : ''}.
+                      Schreibt ein anderes Gerät zwischenzeitlich, warnt PixiNotes statt zu überschreiben.</>}
                 </div>
               )}
             </>

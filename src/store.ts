@@ -120,6 +120,8 @@ interface BoardState {
 
   /** Kompletten Stand aus der Sync-Datei übernehmen (ersetzt Boards & Hierarchie) */
   importSync: (boards: BoardDoc[], spaces: Space[], activeId: string) => void;
+  /** Zählt Voll-Importe hoch — erzwingt Board-Remount (BlockNote liest nur beim Mount!) */
+  importEpoch: number;
 
   // Hierarchie (Bereiche / Projekte / Boards)
   addSpace: (name?: string) => void;
@@ -329,6 +331,8 @@ export const useBoard = create<BoardState>()(
           });
         },
 
+        importEpoch: 0,
+
         importSync: (boards, spaces, activeId) => {
           if (!Array.isArray(boards) || boards.length === 0 || !Array.isArray(spaces)) return;
           set({
@@ -339,6 +343,10 @@ export const useBoard = create<BoardState>()(
             future: [],
             lastDeleted: null,
             pendingFocus: null,
+            // WICHTIG: Remount erzwingen — sonst zeigen Notiz-Editoren (BlockNote,
+            // liest Inhalt nur beim Mount) nach dem Laden den ALTEN Text und
+            // würden ihn beim nächsten Tastendruck sogar zurückschreiben
+            importEpoch: get().importEpoch + 1,
           });
         },
 

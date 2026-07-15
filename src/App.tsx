@@ -15,6 +15,7 @@ import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
 export default function App() {
   const toast = useBoard((s) => s.toast);
   const view = useBoard((s) => s.view);
+  const importEpoch = useBoard((s) => s.importEpoch);
   const presenting = useBoard((s) => s.presenting);
   const tasksOpen = useBoard((s) => s.tasksOpen);
   const restoreDeleted = useBoard((s) => s.restoreDeleted);
@@ -62,7 +63,11 @@ export default function App() {
   }, [showToast]);
 
   return (
-    <ReactFlowProvider>
+    // key=importEpoch: Nach „Vom Sync-Ordner laden" muss auch der React-Flow-
+    // Provider-Store neu entstehen — sonst serviert er den frisch gemounteten
+    // Karten für einen Moment die ALTEN Knoten, und BlockNote (liest Inhalt
+    // nur beim Mount) friert den alten Text ein.
+    <ReactFlowProvider key={importEpoch}>
       <div className="app">
         <div className="topbar">
           <div className="logo">
