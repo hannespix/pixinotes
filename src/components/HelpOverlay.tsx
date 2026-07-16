@@ -86,7 +86,7 @@ export function HelpOverlay() {
                 <li><b>📝 Notiz:</b> voller Block-Editor („/" öffnet Checklisten, Tabellen, Überschriften). Farbwechsel über den Punkt oben rechts.</li>
                 <li><b>📋 Kanban:</b> Spalten frei benennbar (＋/✕). <b>Klick auf ein Ticket</b> öffnet Details: Beschreibung, Fälligkeit, Person, Board-Verknüpfung. ⤓ sammelt offene Aufgaben aus allen Boards ein, ⟳ hält das automatisch aktuell — erledigte Quellen haken ihre Tickets selbst ab.</li>
                 <li><b>📅 Zeitplan (Gantt):</b> Balken ziehen/resizen, ◆ = Meilenstein (Balken auf Dauer 0), Pfeile = Abhängigkeiten mit Konflikt-Warnung und Ein-Klick-Auflösung, Personen, Zoom, „heute".</li>
-                <li><b>🗓️ Kalender:</b> Monat/Woche, Quellen wählbar (Aufgaben, Zeitpläne, Meilensteine), ICS-Import/-Abo/-Export (Outlook, Google, Apple), .ics-Dateien einfach draufziehen.</li>
+                <li><b>🗓️ Kalender:</b> Monat/Woche, Quellen wählbar (Aufgaben, Zeitpläne, Meilensteine), ICS-Import/-Abo/-Export (Outlook, Google, Apple), .ics-Dateien einfach draufziehen. Über ⚙ → <b>Kalender</b> in den Einstellungen lassen sich Google Kalender und Microsoft 365 direkt verbinden (nur lesend, Zugangsdaten bleiben lokal).</li>
                 <li><b>📊 Mermaid:</b> Diagramme aus Text (Flowchart, Mindmap, Sequenz …).</li>
                 <li><b>▢ Prozess-Formen:</b> Schritt, Entscheidung, Start/Ende — Doppelklick beschriftet, Toolbar unter der Form wechselt Form/Farbe.</li>
                 <li><b>📧 E-Mail/Datei/Bild/PDF:</b> per Drag aufs Board; Termine und Telefonnummern werden automatisch erkannt und klickbar.</li>

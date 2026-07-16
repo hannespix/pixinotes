@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { CalendarData, CalendarNode, GanttData } from '../../types';
 import { collectTasks } from '../../lib/tasks';
 import { downloadIcsEvents, fetchIcsUrl, mergeEvents, parseIcs, type IcsEvent } from '../../lib/ics';
+import { anyAccountConnected, fetchAccountEvents, invalidateAccountEvents, type CalAccountEvent } from '../../lib/calAccounts';
 import { IChevronL, IChevronR, ISettings } from '../Icons';
 import { CardShell } from './CardShell';
 
@@ -28,14 +29,17 @@ interface CalStrip {
   ext?: boolean;
 }
 
-interface ShowFlags { tasks: boolean; gantt: boolean; miles: boolean; ics: boolean }
-const SHOW_DEFAULT: ShowFlags = { tasks: true, gantt: true, miles: true, ics: true };
+interface ShowFlags { tasks: boolean; gantt: boolean; miles: boolean; ics: boolean; konto: boolean }
+const SHOW_DEFAULT: ShowFlags = { tasks: true, gantt: true, miles: true, ics: true, konto: true };
 const SHOW_LABEL: Record<keyof ShowFlags, string> = {
   tasks: 'Kanban-Fristen',
   gantt: 'Zeitplan-Balken',
   miles: 'Meilensteine',
   ics: 'Externe Termine (ICS)',
+  konto: 'Konto-Termine (Google/M365)',
 };
+/** Anzeigefarben der verbundenen Konten (Google-Blau, Microsoft-Blau) */
+const PROVIDER_COLOR: Record<CalAccountEvent['provider'], string> = { google: '#4285f4', ms: '#0f6cbd' };
 
 const ymOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -58,6 +62,16 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   const [menu, setMenu] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Termine aus verbundenen Konten (Google/Microsoft) — live gefetcht,
+  // NICHT persistiert (die Tokens liegen ohnehin nur lokal)
+  const [accEvents, setAccEvents] = useState<CalAccountEvent[]>([]);
+  const [accError, setAccError] = useState('');
+  const [accTick, setAccTick] = useState(0);
+  useEffect(() => {
+    const onAcc = () => setAccTick((t) => t + 1);
+    window.addEventListener('pixinotes-cal-accounts', onAcc);
+    return () => window.removeEventListener('pixinotes-cal-accounts', onAcc);
+  }, []);
 
   const view = (data.view as 'month' | 'week') ?? 'month';
   const scope = (data.scope as 'all' | 'board') ?? 'all';
@@ -70,6 +84,27 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   const ym = (data.month as string) ?? ymOf(new Date());
   const [year, month] = ym.split('-').map(Number);
   const anchorIso = (data.anchor as string) ?? todayIso;
+
+  useEffect(() => {
+    const showKonto = (data.show as Partial<ShowFlags> | undefined)?.konto ?? true;
+    if (!showKonto || !anyAccountConnected()) { setAccEvents([]); setAccError(''); return; }
+    let cancelled = false;
+    // Sichtbarer Bereich plus Puffer (Monat: ±2 Wochen, Woche: −1/+2 Wochen)
+    const from = view === 'week'
+      ? new Date(new Date(`${anchorIso}T12:00:00`).getTime() - 7 * DAY)
+      : new Date(year, month - 1, -7);
+    const to = view === 'week'
+      ? new Date(new Date(`${anchorIso}T12:00:00`).getTime() + 14 * DAY)
+      : new Date(year, month, 14);
+    fetchAccountEvents(from, to)
+      .then(({ events, errors }) => {
+        if (cancelled) return;
+        setAccEvents(events);
+        setAccError(errors.join(' · '));
+      })
+      .catch((e) => { if (!cancelled) setAccError((e as Error).message); });
+    return () => { cancelled = true; };
+  }, [data.show, view, ym, anchorIso, year, month, accTick]);
 
   const { byDay, stripsByDay } = useMemo(() => {
     const byDay = new Map<string, CalEntry[]>();
@@ -116,8 +151,18 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
         }
       }
     }
+    if (show.konto) {
+      for (const ev of accEvents) {
+        push(byDay, ev.date, {
+          icon: '●',
+          text: ev.time ? `${ev.time} ${ev.title}` : ev.title,
+          color: PROVIDER_COLOR[ev.provider],
+          ext: true,
+        });
+      }
+    }
     return { byDay, stripsByDay };
-  }, [sourceBoards, show.tasks, show.gantt, show.miles, show.ics, icsEvents]);
+  }, [sourceBoards, show.tasks, show.gantt, show.miles, show.ics, show.konto, icsEvents, accEvents]);
 
   const nav = (delta: number) => {
     if (view === 'week') {
@@ -294,6 +339,26 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
               ref={fileRef} type="file" accept=".ics,text/calendar" style={{ display: 'none' }}
               onChange={(e) => { const f = e.target.files?.[0]; if (f) void importIcsFile(f); e.target.value = ''; }}
             />
+            <div className="cal-menu-label">Konten (Google/Microsoft 365)</div>
+            {anyAccountConnected() ? (
+              <>
+                <button
+                  disabled={busy}
+                  title="Termine der verbundenen Konten neu laden"
+                  onClick={() => { invalidateAccountEvents(); setAccTick((t) => t + 1); showToast('⟳ Konto-Termine werden aktualisiert …'); }}
+                >
+                  Konto-Termine aktualisieren ({accEvents.length})
+                </button>
+                {accError && <div className="cal-menu-err">⚠️ {accError}</div>}
+              </>
+            ) : (
+              <button
+                title="Google Kalender oder Microsoft 365 direkt verbinden — Einrichtung in den Einstellungen"
+                onClick={() => useBoard.getState().setSettingsOpen(true)}
+              >
+                Konto verbinden… (Einstellungen)
+              </button>
+            )}
           </div>
         </div>
       )}

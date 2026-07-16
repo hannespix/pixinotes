@@ -1682,3 +1682,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   .slide-gantt, .slide-cal { padding: 12px !important; }
   .presenter-foot { padding: 0 10px 10px; gap: 10px; }
 }
+
+/* Kalender: Fehlerzeile im Konten-Block (M70) */
+.cal-menu-err { font-size: 10px; color: #a4231a; max-width: 220px; padding: 2px 0; }
+[data-theme='dark'] .cal-menu-err { color: #ff9a8c; }

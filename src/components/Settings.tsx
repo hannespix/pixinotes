@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
+import {
+  connectGoogle, connectMicrosoft, disconnect as disconnectCalAccount,
+  invalidateAccountEvents, loadCalAccounts, oauthAvailable, patchCalAccounts, type CalAccounts,
+} from '../lib/calAccounts';
 import { exportToFolder, exportViewport } from '../lib/exporter';
 import {
   applySync, disconnectSync, ensurePermission, getSyncHandle, knownStamp,
@@ -43,7 +47,13 @@ export function Settings() {
   const [syncHandle, setSyncHandle] = useState<SyncDirHandle | null>(null);
   const [syncPerm, setSyncPerm] = useState<'granted' | 'prompt'>('granted');
   // Reiter-Gliederung: KI / Synchronisation / Daten / Export / Design
-  const [tab, setTab] = useState<'ki' | 'sync' | 'daten' | 'export' | 'design'>('ki');
+  const [tab, setTab] = useState<'ki' | 'sync' | 'kalender' | 'daten' | 'export' | 'design'>('ki');
+  // Kalender-Konten leben in einem EIGENEN localStorage-Schlüssel (nie im
+  // Board-Store) — flüchtig in den Komponenten-State gespiegelt
+  const [calAcc, setCalAcc] = useState<CalAccounts>({});
+  const [gClientId, setGClientId] = useState('');
+  const [msClientId, setMsClientId] = useState('');
+  const [msTenant, setMsTenant] = useState('');
   const ui = useBoard((s) => s.ui);
   const setUiTheme = useBoard((s) => s.setUiTheme);
   const setUiAccent = useBoard((s) => s.setUiAccent);
@@ -71,7 +81,39 @@ export function Settings() {
       .catch(() => {});
   }, [open]);
 
+  // Kalender-Konten beim Öffnen aus dem separaten localStorage-Schlüssel laden
+  useEffect(() => {
+    if (!open) return;
+    const acc = loadCalAccounts();
+    setCalAcc(acc);
+    setGClientId(acc.google?.clientId ?? '');
+    setMsClientId(acc.ms?.clientId ?? '');
+    setMsTenant(acc.ms?.tenant ?? '');
+  }, [open]);
+
   if (!open) return null;
+
+  const refreshCalAcc = () => setCalAcc(loadCalAccounts());
+
+  const doConnectGoogle = () => doExport(async () => {
+    const name = await connectGoogle(gClientId.trim());
+    refreshCalAcc();
+    showToast(`✅ Google verbunden: ${name}`);
+  }, 'google');
+
+  const doConnectMs = () => doExport(async () => {
+    const name = await connectMicrosoft(msClientId.trim(), msTenant.trim() || 'common');
+    refreshCalAcc();
+    showToast(`✅ Microsoft 365 verbunden: ${name}`);
+  }, 'ms');
+
+  const toggleGoogleCalendar = (calId: string, enabled: boolean) => {
+    const g = loadCalAccounts().google;
+    if (!g) return;
+    patchCalAccounts({ google: { ...g, calendars: (g.calendars ?? []).map((c) => (c.id === calId ? { ...c, enabled } : c)) } });
+    invalidateAccountEvents();
+    refreshCalAcc();
+  };
 
   const connectSync = async () => {
     const handle = await pickSyncFolder();
@@ -174,7 +216,7 @@ export function Settings() {
 
         {/* Reiter: hält jede Ebene übersichtlich */}
         <div className="modal-tabs">
-          {([['ki', '🤖 KI'], ['sync', '☁️ Synchronisation'], ['daten', '💾 Daten'], ['export', '📤 Export'], ['design', '🎨 Design']] as const).map(([k, label]) => (
+          {([['ki', '🤖 KI'], ['sync', '☁️ Synchronisation'], ['kalender', '📅 Kalender'], ['daten', '💾 Daten'], ['export', '📤 Export'], ['design', '🎨 Design']] as const).map(([k, label]) => (
             <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>
           ))}
         </div>
@@ -308,6 +350,90 @@ export function Settings() {
                       Schreibt ein anderes Gerät zwischenzeitlich, warnt PixiNotes statt zu überschreiben.</>}
                 </div>
               )}
+            </>
+          )}
+        </section>
+        )}
+
+        {/* ---- Kalender-Konten: Google & Microsoft 365 direkt verbinden ---- */}
+        {tab === 'kalender' && (
+        <section className="modal-section">
+          <h3>📅 Kalender-Konten</h3>
+          <p className="modal-hint">
+            Verbinde Google Kalender oder Microsoft 365/Outlook direkt — die Termine erscheinen
+            (nur lesend) in den Kalender-Karten. Die Anmeldung läuft ohne PixiNotes-Server direkt
+            zwischen Browser und Anbieter; <b>Zugangsdaten bleiben lokal in diesem Browser</b> und
+            landen nie in Sync-Dateien, Share-Links oder Exporten. Die Client-ID legt eure IT einmalig
+            an (Google Cloud Console → OAuth-Client „Webanwendung" · Azure → App-Registrierung „SPA",
+            jeweils mit dieser Adresse als Redirect-URI).
+          </p>
+          {!oauthAvailable() && (
+            <div className="modal-note">
+              ⚠️ Die Einzeldatei (file://) kann kein OAuth — bitte die gehostete App/PWA nutzen.
+              Alternative ohne Anmeldung: ICS-Abo direkt in der Kalender-Karte (⚙ → „ICS-URL abonnieren").
+            </div>
+          )}
+
+          <h3 style={{ marginTop: 14 }}>Google Kalender</h3>
+          {calAcc.google?.token ? (
+            <>
+              <div className="modal-note">✅ Verbunden{calAcc.google.connectedAs ? ` als „${calAcc.google.connectedAs}"` : ''} — Kalender wählen:</div>
+              {(calAcc.google.calendars ?? []).map((c) => (
+                <label key={c.id} className="cal-menu-check" style={{ display: 'flex', gap: 6 }}>
+                  <input type="checkbox" checked={c.enabled} onChange={(e) => toggleGoogleCalendar(c.id, e.target.checked)} />
+                  {c.name}
+                </label>
+              ))}
+              <div className="modal-buttons">
+                <button onClick={() => { disconnectCalAccount('google'); refreshCalAcc(); showToast('Google-Konto getrennt — Token gelöscht.'); }}>Trennen</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <label className="modal-row">
+                <span>Client-ID</span>
+                <input
+                  type="text" placeholder="xxxxx.apps.googleusercontent.com"
+                  value={gClientId} onChange={(e) => setGClientId(e.target.value)}
+                />
+              </label>
+              <div className="modal-buttons">
+                <button disabled={!gClientId.trim() || !oauthAvailable() || busy === 'google'} onClick={doConnectGoogle}>
+                  {busy === 'google' ? '…' : 'Mit Google verbinden'}
+                </button>
+              </div>
+            </>
+          )}
+
+          <h3 style={{ marginTop: 14 }}>Microsoft 365 / Outlook</h3>
+          {(calAcc.ms?.token || calAcc.ms?.refreshToken) ? (
+            <>
+              <div className="modal-note">✅ Verbunden{calAcc.ms.connectedAs ? ` als „${calAcc.ms.connectedAs}"` : ''}.</div>
+              <div className="modal-buttons">
+                <button onClick={() => { disconnectCalAccount('ms'); refreshCalAcc(); showToast('Microsoft-Konto getrennt — Token gelöscht.'); }}>Trennen</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <label className="modal-row">
+                <span>App-ID (Client)</span>
+                <input
+                  type="text" placeholder="00000000-0000-0000-0000-000000000000"
+                  value={msClientId} onChange={(e) => setMsClientId(e.target.value)}
+                />
+              </label>
+              <label className="modal-row">
+                <span>Tenant (optional)</span>
+                <input
+                  type="text" placeholder="common (oder eure Tenant-ID)"
+                  value={msTenant} onChange={(e) => setMsTenant(e.target.value)}
+                />
+              </label>
+              <div className="modal-buttons">
+                <button disabled={!msClientId.trim() || !oauthAvailable() || busy === 'ms'} onClick={doConnectMs}>
+                  {busy === 'ms' ? '…' : 'Mit Microsoft verbinden'}
+                </button>
+              </div>
             </>
           )}
         </section>
