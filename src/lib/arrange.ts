@@ -139,25 +139,94 @@ function layoutGrid(group: AppNode[]): Block {
   return { w: maxW, h: y - GAP_Y, nodes };
 }
 
+/** Kreis-Bündel: Karten eines Blocks auf einem Ring (Mittelpunkte gleichverteilt) */
+function layoutCircle(group: AppNode[]): Block {
+  if (group.length === 1) return layoutGrid(group);
+  const sorted = [...group].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
+  const sizes = sorted.map(sizeOf);
+  // Umfang muss alle Karten (plus Luft) aufnehmen — Diagonale als sichere
+  // Schranke, damit auch breite Karten (Kanban, Gantt) nirgends kollidieren
+  const diags = sizes.map((s) => Math.hypot(s.w, s.h));
+  const perim = diags.reduce((a, d) => a + d + GAP_Y, 0);
+  const maxDiag = Math.max(...diags);
+  // Sehnenabstand benachbarter Mittelpunkte ≥ größte Diagonale
+  const rChord = maxDiag / (2 * Math.sin(Math.PI / sorted.length));
+  const r = Math.max(160, perim / (2 * Math.PI), rChord);
+  const maxW = Math.max(...sizes.map((s) => s.w));
+  const maxH = Math.max(...sizes.map((s) => s.h));
+  const cx = r + maxW / 2;
+  const cy = r + maxH / 2;
+  const nodes: Placed[] = sorted.map((n, i) => {
+    const a = (i / sorted.length) * Math.PI * 2 - Math.PI / 2;
+    const s = sizes[i];
+    return { id: n.id, x: cx + Math.cos(a) * r - s.w / 2, y: cy + Math.sin(a) * r - s.h / 2 };
+  });
+  return { w: 2 * r + maxW, h: 2 * r + maxH, nodes };
+}
+
+/** Überlappender Stapel: Kaskaden-Versatz, sodass die Überschriften sichtbar bleiben */
+function layoutStack(group: AppNode[]): Block {
+  const sorted = [...group].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
+  const STEP_X = 26;
+  const STEP_Y = 46; // genug für Titel-/Kopfzeile der darunterliegenden Karte
+  const nodes: Placed[] = sorted.map((n, i) => ({ id: n.id, x: i * STEP_X, y: i * STEP_Y }));
+  const last = sizeOf(sorted[sorted.length - 1]);
+  const maxW = Math.max(...sorted.map((n, i) => i * STEP_X + sizeOf(n).w));
+  return { w: maxW, h: (sorted.length - 1) * STEP_Y + last.h, nodes };
+}
+
+export type ArrangeMode = 'flow' | 'grid' | 'circles' | 'stack';
+
 /** Komplettes Board anordnen → Ziel-Positionen [id, x, y] */
-export function computeArrangement(nodes: AppNode[], edges: Edge[]): Array<[string, number, number]> {
+export function computeArrangement(nodes: AppNode[], edges: Edge[], mode: ArrangeMode = 'flow'): Array<[string, number, number]> {
   if (nodes.length === 0) return [];
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const comps = components(nodes, edges);
+  const typeGroups = (): AppNode[][] => {
+    const out: AppNode[][] = [];
+    for (const type of TYPE_ORDER) {
+      const g = nodes.filter((n) => (n.type ?? '') === type);
+      if (g.length) out.push(g);
+    }
+    const rest = nodes.filter((n) => !TYPE_ORDER.includes(n.type ?? ''));
+    if (rest.length) out.push(rest);
+    return out;
+  };
 
   const blocks: Block[] = [];
-  // 1) verbundene Cluster (größte zuerst — sie prägen das Bild)
-  for (const comp of comps.filter((c) => c.length > 1).sort((a, b) => b.length - a.length)) {
-    blocks.push(layoutComponent(comp, byId, edges));
+  if (mode === 'grid') {
+    // Reines Raster: Verbindungen ignorieren, alles nach Typ sortiert rastern
+    for (const g of typeGroups()) blocks.push(layoutGrid(g));
+  } else if (mode === 'stack') {
+    // Überlappende Stapel pro Modultyp — Überschriften bleiben lesbar
+    for (const g of typeGroups()) blocks.push(layoutStack(g));
+  } else if (mode === 'circles') {
+    // Kreis-Bündel: verbundene Cluster + Typ-Gruppen jeweils als Ring
+    for (const comp of comps.filter((c) => c.length > 1).sort((a, b) => b.length - a.length)) {
+      blocks.push(layoutCircle(comp.map((id) => byId.get(id)!)));
+    }
+    const singles = comps.filter((c) => c.length === 1).map((c) => byId.get(c[0])!);
+    for (const type of TYPE_ORDER) {
+      const group = singles.filter((n) => (n.type ?? '') === type);
+      if (group.length) blocks.push(layoutCircle(group));
+    }
+    const rest = singles.filter((n) => !TYPE_ORDER.includes(n.type ?? ''));
+    if (rest.length) blocks.push(layoutCircle(rest));
+  } else {
+    // 'flow' (Standard):
+    // 1) verbundene Cluster (größte zuerst — sie prägen das Bild)
+    for (const comp of comps.filter((c) => c.length > 1).sort((a, b) => b.length - a.length)) {
+      blocks.push(layoutComponent(comp, byId, edges));
+    }
+    // 2) Singles nach Modultyp gruppieren
+    const singles = comps.filter((c) => c.length === 1).map((c) => byId.get(c[0])!);
+    for (const type of TYPE_ORDER) {
+      const group = singles.filter((n) => (n.type ?? '') === type);
+      if (group.length) blocks.push(layoutGrid(group));
+    }
+    const rest = singles.filter((n) => !TYPE_ORDER.includes(n.type ?? ''));
+    if (rest.length) blocks.push(layoutGrid(rest));
   }
-  // 2) Singles nach Modultyp gruppieren
-  const singles = comps.filter((c) => c.length === 1).map((c) => byId.get(c[0])!);
-  for (const type of TYPE_ORDER) {
-    const group = singles.filter((n) => (n.type ?? '') === type);
-    if (group.length) blocks.push(layoutGrid(group));
-  }
-  const rest = singles.filter((n) => !TYPE_ORDER.includes(n.type ?? ''));
-  if (rest.length) blocks.push(layoutGrid(rest));
 
   // 3) Shelf-Packing: Blöcke zeilenweise auf eine harmonische Zielbreite legen
   const totalArea = blocks.reduce((a, b) => a + (b.w + BLOCK_GAP) * (b.h + ROW_GAP), 0);

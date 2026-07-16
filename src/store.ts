@@ -201,6 +201,10 @@ interface BoardState {
   helpOpen: boolean;
   setHelpOpen: (open: boolean) => void;
 
+  /** Physik (Verdrängung/Wurf) global an/aus — aus = Karten dürfen überlappen/stapeln */
+  physicsEnabled: boolean;
+  setPhysicsEnabled: (on: boolean) => void;
+
   /** Design: Hell/Dunkel/System + Akzentfarbe (persistiert) */
   ui: { theme: 'system' | 'light' | 'dark'; accent: string };
   setUiTheme: (theme: 'system' | 'light' | 'dark') => void;
@@ -339,6 +343,9 @@ export const useBoard = create<BoardState>()(
 
         helpOpen: false,
         setHelpOpen: (open) => set({ helpOpen: open }),
+
+        physicsEnabled: true,
+        setPhysicsEnabled: (on) => set({ physicsEnabled: on }),
 
         ui: { theme: 'system', accent: 'blau' },
         setUiTheme: (theme) => set({ ui: { ...get().ui, theme } }),
@@ -861,6 +868,7 @@ export const useBoard = create<BoardState>()(
         versions: s.versions,
         templates: s.templates,
         ui: s.ui,
+        physicsEnabled: s.physicsEnabled,
       }),
       migrate: (persisted: unknown, version: number) => {
         const p = persisted as Record<string, unknown>;

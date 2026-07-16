@@ -7,10 +7,10 @@ import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
 import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
-import { computeArrangement } from '../lib/arrange';
+import { computeArrangement, type ArrangeMode } from '../lib/arrange';
 import {
   IArrange, IBookmark, ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
-  IHelp, IMousePointer, INote, IPen, IPill, IPlay, IPlus, IRedo, ISearch, ISettings, ISquare, ITasks, IUndo, IWand, IX,
+  IHelp, IMagnet, IMousePointer, INote, IPen, IPill, IPlay, IPlus, IRedo, ISearch, ISettings, ISquare, ITasks, IUndo, IWand, IX,
 } from './Icons';
 
 /**
@@ -43,12 +43,21 @@ export function Dock() {
    * Verbindungen, Typ-Gruppen für den Rest, Shelf-Packing. Die Karten
    * morphen animiert (cubic-out, leicht gestaffelt) an ihre Zielplätze.
    */
-  const arrange = () => {
+  const [arrangeMenu, setArrangeMenu] = useState(false);
+  const physicsEnabled = useBoard((s) => s.physicsEnabled);
+  const setPhysicsEnabled = useBoard((s) => s.setPhysicsEnabled);
+
+  const arrange = (mode: ArrangeMode) => {
+    setArrangeMenu(false);
     if (arranging) return;
     const st = useBoard.getState();
     const board = selectActiveBoard(st);
     if (board.nodes.length < 2) { showToast('Zu wenig Karten zum Anordnen.'); return; }
-    const targets = computeArrangement(board.nodes, board.edges);
+    const targets = computeArrangement(board.nodes, board.edges, mode);
+    // Stapel-Modus: Physik MUSS aus, sonst drückt der nächste Drag alles wieder auseinander
+    if (mode === 'stack' && useBoard.getState().physicsEnabled) {
+      setPhysicsEnabled(false);
+    }
     const starts = new Map(board.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]));
     st.pushHistory();
     setArranging(true);
@@ -73,7 +82,13 @@ export function Dock() {
       } else {
         setArranging(false);
         fitView({ padding: 0.12, duration: 500, maxZoom: 1 });
-        showToast('🧹 Aufgeräumt: Verbundenes als Fluss, Rest nach Modultyp gruppiert — Strg+Z stellt die alte Anordnung wieder her.');
+        const msg = {
+          flow: 'Verbundenes als Fluss, Rest nach Modultyp gruppiert',
+          grid: 'alles als Raster nach Modultyp',
+          circles: 'Cluster als Kreis-Bündel',
+          stack: 'überlappende Stapel pro Modultyp (Physik ist jetzt AUS, damit nichts auseinanderrutscht)',
+        }[mode];
+        showToast(`🧹 Aufgeräumt: ${msg} — Strg+Z stellt die alte Anordnung wieder her.`);
       }
     };
     requestAnimationFrame(step);
@@ -271,14 +286,42 @@ export function Dock() {
         </button>
       </div>
 
+      {/* Aufräumen mit Anordnungs-Modi */}
+      <div className="dock-add-wrap">
+        {arrangeMenu && (
+          <div className="dock-menu dock-menu-arrange">
+            <div className="dock-menu-label">Anordnungs-Modus</div>
+            <button onClick={() => arrange('flow')} title="Verbundene Karten als Prozess von links nach rechts, der Rest als Typ-Gruppen">🌊 Fluss &amp; Gruppen</button>
+            <button onClick={() => arrange('grid')} title="Alles in ein sauberes Raster, sortiert nach Modultyp">▦ Raster</button>
+            <button onClick={() => arrange('circles')} title="Zusammenhängendes und Typ-Gruppen jeweils als Kreis-Bündel">◎ Kreis-Bündel</button>
+            <button onClick={() => arrange('stack')} title="Karten pro Modultyp überlappend stapeln — Überschriften bleiben sichtbar; Physik wird dafür ausgeschaltet">🗂 Stapeln (überlappend)</button>
+            <div className="dock-menu-foot">Strg+Z stellt die vorherige Anordnung komplett wieder her</div>
+          </div>
+        )}
+        <button
+          onClick={() => { setArrangeMenu((o) => !o); setAddMenu(false); setDrawMenu(false); setAiMenu(false); }}
+          disabled={arranging}
+          className={arrangeMenu || arranging ? 'active' : ''}
+          title="Board aufräumen & anordnen (Fluss, Raster, Kreise, Stapel)"
+          aria-label="Board aufräumen"
+        >
+          <IArrange />
+        </button>
+      </div>
       <button
-        onClick={arrange}
-        disabled={arranging}
-        className={arranging ? 'active' : ''}
-        title="Board aufräumen: Verbundenes clustern, Rest nach Modultyp anordnen (Strg+Z macht's rückgängig)"
-        aria-label="Board aufräumen"
+        onClick={() => {
+          setPhysicsEnabled(!physicsEnabled);
+          showToast(physicsEnabled
+            ? '🧲 Physik AUS — Karten dürfen jetzt überlappen und gestapelt werden.'
+            : '🧲 Physik AN — Karten verdrängen sich wieder und lassen sich werfen.');
+        }}
+        className={physicsEnabled ? 'active' : ''}
+        title={physicsEnabled
+          ? 'Physik ist AN: Karten verdrängen sich und lassen sich werfen — Klick schaltet aus (zum Stapeln/Überlappen)'
+          : 'Physik ist AUS: Karten dürfen überlappen — Klick schaltet die Verdrängung wieder an'}
+        aria-label="Physik umschalten"
       >
-        <IArrange />
+        <IMagnet />
       </button>
       <button onClick={undo} disabled={!canUndo} title="Rückgängig (Strg+Z)" aria-label="Rückgängig"><IUndo /></button>
       <button onClick={redo} disabled={!canRedo} title="Wiederholen (Strg+Y)" aria-label="Wiederholen"><IRedo /></button>

@@ -132,6 +132,8 @@ export function Board() {
 
   /** `mover` drückt alle überlappten Nachbarn federnd weg (Impuls sammeln) */
   const pushNeighbors = useCallback((mover: Node, all: Node[], strength: number) => {
+    // Physik-Schalter (Dock-Magnet): aus = Karten dürfen überlappen/stapeln
+    if (!useBoard.getState().physicsEnabled) return;
     const mr = nodeRect(mover);
     for (const other of all) {
       if (other.id === mover.id || dragTrack.current?.id === other.id) continue;
@@ -225,7 +227,7 @@ export function Board() {
       if (!track || track.id !== node.id) return;
       const { vx, vy } = track;
       dragTrack.current = null;
-      if (Math.hypot(vx, vy) >= MIN_SPEED * 2) {
+      if (Math.hypot(vx, vy) >= MIN_SPEED * 2 && useBoard.getState().physicsEnabled) {
         // Wurf: Karte gleitet mit Momentum weiter (und räumt sich den Weg frei)
         vels.current.set(node.id, { vx, vy });
       }
