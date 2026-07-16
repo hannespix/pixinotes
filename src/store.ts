@@ -179,6 +179,8 @@ interface BoardState {
   removeNode: (id: string) => void;
   removeNodes: (ids: string[]) => void;
   restoreDeleted: () => void;
+  /** Z-Reihenfolge: Karten in den Vorder- bzw. Hintergrund (Array-Reihenfolge = Stapelreihenfolge) */
+  reorderNodes: (ids: string[], dir: 'front' | 'back') => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
   setNodePosition: (id: string, x: number, y: number) => void;
   /** Mehrere Positionen in EINEM Store-Update — für den Physik-Loop (60 fps) */
@@ -791,6 +793,18 @@ export const useBoard = create<BoardState>()(
             removedNodes.length === 1 ? 'Karte gelöscht' : `${removedNodes.length} Karten gelöscht`,
             true,
           );
+        },
+
+        reorderNodes: (ids, dir) => {
+          const idSet = new Set(ids);
+          get().pushHistory();
+          patchActive((b) => {
+            // Auswahl aufheben, sonst hält die Selektions-Anhebung die Karte
+            // optisch vorn und der Effekt wäre erst beim Wegklicken sichtbar
+            const picked = b.nodes.filter((n) => idSet.has(n.id)).map((n) => ({ ...n, selected: false }) as AppNode);
+            const rest = b.nodes.filter((n) => !idSet.has(n.id));
+            return { nodes: dir === 'front' ? [...rest, ...picked] : [...picked, ...rest] };
+          });
         },
 
         restoreDeleted: () => {

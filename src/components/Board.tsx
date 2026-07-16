@@ -363,27 +363,57 @@ export function Board() {
     [addNode, screenToFlowPosition, showToast],
   );
 
-  // ---------- Strg+V: Screenshots direkt aufs Board ----------
-  const handlePaste = useCallback(
-    async (e: React.ClipboardEvent) => {
+  // ---------- Strg+V: Screenshots & Bilder direkt aufs Board ----------
+  // Globaler Listener statt onPaste am Wrapper: Paste-Events landen beim
+  // FOKUSSIERTEN Element — nach einem Klick auf Dock/Canvas liegt der Fokus
+  // oft auf <body>, dort kam das React-Event nie an (User-Report).
+  useEffect(() => {
+    const onPaste = async (e: ClipboardEvent) => {
       // Nicht eingreifen, wenn in einem Editor/Input eingefügt wird
-      const target = e.target as HTMLElement;
-      if (target.closest('.note-editor, input, textarea, [contenteditable="true"]')) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('.note-editor, input, textarea, [contenteditable="true"]')) return;
+      // Offene Overlays (Suche, Einstellungen, Aufgaben, Hilfe, Präsentation) nicht unterlaufen
+      const st = useBoard.getState();
+      if (st.searchOpen || st.settingsOpen || st.tasksOpen || st.helpOpen || st.presenting) return;
 
-      const items = Array.from(e.clipboardData.items);
-      const imageItem = items.find((it) => it.type.startsWith('image/'));
-      if (imageItem) {
-        const file = imageItem.getAsFile();
-        if (!file) return;
-        const src = await imageFileToDataUrl(file);
-        if (!canEmbed(src.length)) { showToast('⚠️ Speicher fast voll — Screenshot nicht eingebettet. Exportiere in den Datenordner (⚙️).'); return; }
-        const pos = screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 90 });
-        addNode(makeImage(pos, src, 'Screenshot'));
-        showToast('🖼️ Screenshot eingefügt');
+      const dt = e.clipboardData;
+      if (!dt) return;
+      // Manche Quellen (Snipping Tool, Explorer-Kopie) liefern nur `files`,
+      // andere (Browser-„Bild kopieren") nur `items` — beide abklappern
+      let files = Array.from(dt.files ?? []).filter((f) => f.type.startsWith('image/'));
+      if (files.length === 0) {
+        files = Array.from(dt.items ?? [])
+          .filter((it) => it.kind === 'file' && it.type.startsWith('image/'))
+          .map((it) => it.getAsFile())
+          .filter((f): f is File => !!f);
       }
-    },
-    [addNode, screenToFlowPosition, showToast],
-  );
+      if (files.length === 0) return;
+      e.preventDefault();
+
+      let placed = 0;
+      for (const file of files) {
+        try {
+          const src = await imageFileToDataUrl(file);
+          if (!canEmbed(src.length)) {
+            showToast('⚠️ Speicher fast voll — Bild nicht eingebettet. Exportiere in den Datenordner (⚙️).');
+            break;
+          }
+          const pos = screenToFlowPosition({
+            x: window.innerWidth / 2 - 130 + placed * 34,
+            y: window.innerHeight / 2 - 90 + placed * 34,
+          });
+          addNode(makeImage(pos, src, file.name && file.name !== 'image.png' ? file.name : 'Screenshot'));
+          placed++;
+        } catch (err) {
+          console.error('Einfügen fehlgeschlagen:', err);
+          showToast('⚠️ Bild aus der Zwischenablage konnte nicht gelesen werden');
+        }
+      }
+      if (placed > 0) showToast(placed === 1 ? '🖼️ Screenshot eingefügt' : `🖼️ ${placed} Bilder eingefügt`);
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [addNode, screenToFlowPosition, showToast]);
 
   return (
     <div
@@ -392,7 +422,6 @@ export function Board() {
       onDragOver={(e) => e.preventDefault()}
       onDoubleClick={handleDoubleClick}
       onTouchEnd={handleTouchEnd}
-      onPaste={handlePaste}
     >
       <EdgeMarkerDefs />
       {nodes.length === 0 && (

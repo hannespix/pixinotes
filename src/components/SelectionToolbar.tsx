@@ -5,7 +5,7 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IBookmark, ICopy, IDuplicate, IMail, ITag, ITrash, IWand, IX } from './Icons';
+import { IBookmark, IBringFront, ICopy, IDuplicate, IMail, ISendBack, ITag, ITrash, IWand, IX } from './Icons';
 
 const MAILTO_LIMIT = 1800; // konservativ: längere mailto-URLs schlucken manche Clients
 
@@ -18,6 +18,7 @@ export function SelectionToolbar() {
   const board = useBoard(selectActiveBoard);
   const addNode = useBoard((s) => s.addNode);
   const removeNodes = useBoard((s) => s.removeNodes);
+  const reorderNodes = useBoard((s) => s.reorderNodes);
   const showToast = useBoard((s) => s.showToast);
   const ai = useBoard((s) => s.ai);
   const updateNodeData = useBoard((s) => s.updateNodeData);
@@ -132,6 +133,8 @@ export function SelectionToolbar() {
       <button onClick={shareByMail} title="Inhalt als E-Mail-Entwurf öffnen"><IMail size={15} /><span className="sel-label"> E-Mail</span></button>
       <button onClick={copyHtml} title="Formatiert kopieren (Outlook/Word-tauglich)"><ICopy size={15} /><span className="sel-label"> Kopieren</span></button>
       <button onClick={duplicate} title="Duplizieren"><IDuplicate size={15} /></button>
+      <button onClick={() => reorderNodes(selected.map((n) => n.id), 'front')} title="In den Vordergrund — Karte liegt über allen anderen (z. B. beim Stapeln)"><IBringFront size={15} /></button>
+      <button onClick={() => reorderNodes(selected.map((n) => n.id), 'back')} title="In den Hintergrund — Karte liegt unter allen anderen"><ISendBack size={15} /></button>
       {single && (
         <span className="sel-ai-wrap">
           {attrMenu && (
