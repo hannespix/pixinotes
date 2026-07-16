@@ -86,26 +86,6 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
     }
   }, [editor, initialContent]);
 
-  const polish = async () => {
-    const text = blocksToText(data.blocks);
-    if (!text.trim()) { showToast('Notiz ist leer.'); return; }
-    setAiBusy(true);
-    try {
-      const answer = await askAi(
-        `Verbessere den folgenden Notiztext: korrigiere Rechtschreibung und Grammatik, straffe Formulierungen, behalte Bedeutung, Sprache (Deutsch) und Aufzählungsstruktur bei. Antworte NUR mit dem verbesserten Text.\n\n${text.slice(0, 6000)}`,
-      );
-      addNode(makeNote(
-        { x: positionAbsoluteX + 300, y: positionAbsoluteY },
-        { color: 'mint', blocks: textToBlocks('✨ Vorschlag', answer) },
-      ));
-      showToast('✨ Verbesserter Text als Vorschlag daneben — Original bleibt unangetastet');
-    } catch (e) {
-      showToast(`⚠️ KI-Fehler: ${(e as Error).message}`);
-    } finally {
-      setAiBusy(false);
-    }
-  };
-
   const cycleColor = () => {
     const next = STICKY_COLORS[(STICKY_COLORS.indexOf(data.color) + 1) % STICKY_COLORS.length];
     updateNodeData(id, { color: next });
@@ -124,13 +104,8 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
       </div>
       <NoteDueChips blocks={data.blocks} />
       <NoteLinkChips blocks={data.blocks} />
-      {aiReady(ai) && (
-        <div className="card-actions note-ai">
-          <button className="nodrag ai-btn" onClick={polish} disabled={aiBusy} title="KI verbessert den Text (als neuer Vorschlag daneben)">
-            {aiBusy ? '⏳…' : '✨ Verbessern'}
-          </button>
-        </div>
-      )}
+      {/* KI-Politur wohnt jetzt im ✨-Menü der Auswahl-Leiste (KI-Werkzeuge) —
+          kein Dauer-Button mehr auf jeder Notiz (User-Feedback) */}
     </CardShell>
   );
 }

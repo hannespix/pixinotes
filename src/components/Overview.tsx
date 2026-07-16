@@ -367,7 +367,7 @@ function GraphView() {
               <text
                 className="ov-graph-dot-label"
                 x={d.x + ui(9)} y={d.y + ui(4)} fontSize={ui(11.5)}
-                stroke="#f2efe7" strokeWidth={ui(3)} paintOrder="stroke"
+                stroke="var(--bg)" strokeWidth={ui(3)} paintOrder="stroke"
               >
                 {d.title.slice(0, 28)}
               </text>
@@ -385,7 +385,7 @@ function GraphView() {
                 // Deckel in SVG-Einheiten: weit rausgezoomt schrumpfen Namen,
                 // statt sich gegenseitig zu überlagern
                 fontSize={Math.min(ui(13.5), 30)}
-                stroke="#f2efe7" strokeWidth={Math.min(ui(3.5), 7)} paintOrder="stroke"
+                stroke="var(--bg)" strokeWidth={Math.min(ui(3.5), 7)} paintOrder="stroke"
               >
                 {n.label.slice(0, 24)}
               </text>

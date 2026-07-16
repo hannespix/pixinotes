@@ -238,6 +238,23 @@ export async function aiEdges(nodes: AppNode[]): Promise<string> {
   return `${created} Verbindung(en) mit Beziehungs-Label gezogen`;
 }
 
+/** Notiz-Politur: verbesserte Fassung als NEUE Notiz daneben (Original bleibt) */
+export async function aiPolish(nodes: AppNode[]): Promise<string> {
+  const note = nodes.find((n) => n.type === 'note');
+  if (!note) throw new Error('Bitte eine Notiz auswählen.');
+  const text = nodeToText(note);
+  if (!text.trim()) throw new Error('Die Notiz ist leer.');
+  const answer = await askAi(
+    `Verbessere den folgenden Notiztext: korrigiere Rechtschreibung und Grammatik, straffe Formulierungen, behalte Bedeutung, Sprache (Deutsch) und Aufzählungsstruktur bei. Antworte NUR mit dem verbesserten Text.\n\n${text.slice(0, 6000)}`,
+  );
+  const st = useBoard.getState();
+  st.addNode(makeNote(
+    { x: note.position.x + ((note.width as number | undefined) ?? 280) + 40, y: note.position.y },
+    { color: 'mint', blocks: textToBlocks('✨ Vorschlag', answer) },
+  ));
+  return 'Verbesserter Text liegt als Vorschlag daneben — das Original bleibt unangetastet';
+}
+
 /* ---------- Freitext-Kommando: die KI darf (fast) alles ---------- */
 
 interface AiOp {

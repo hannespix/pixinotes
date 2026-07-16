@@ -10,7 +10,7 @@ import { uid, type AppNode, type ShapeKind } from '../types';
 import { computeArrangement } from '../lib/arrange';
 import {
   IArrange, IBookmark, ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
-  IMousePointer, INote, IPen, IPill, IPlay, IPlus, IRedo, ISearch, ISettings, ISquare, ITasks, IUndo, IWand, IX,
+  IHelp, IMousePointer, INote, IPen, IPill, IPlay, IPlus, IRedo, ISearch, ISettings, ISquare, ITasks, IUndo, IWand, IX,
 } from './Icons';
 
 /**
@@ -293,6 +293,7 @@ export function Dock() {
       <button onClick={() => setPresenting(true)} title="Präsentationsmodus (Karten als Folien)" aria-label="Präsentieren"><IPlay /></button>
       <span className="dock-sep" />
       <button onClick={() => setSearchOpen(true)} title="Suche über alle Boards (Strg+K)" aria-label="Suche"><ISearch /></button>
+      <button onClick={() => useBoard.getState().setHelpOpen(true)} title="Hilfe: alle Funktionen erklärt" aria-label="Hilfe"><IHelp /></button>
       <button onClick={() => setSettingsOpen(true)} title="Einstellungen (KI, Synchronisation, Export)" aria-label="Einstellungen"><ISettings /></button>
     </div>
   );

@@ -68,3 +68,4 @@ export const IHistory = make(<><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3
 export const ITag = make(<><path d="M12 2H4a2 2 0 0 0-2 2v8l10 10 10-10Z" /><circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none" /></>);
 export const IBookmark = make(<path d="M19 21 12 16 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z" />);
 export const IArrange = make(<><rect width="7" height="7" x="3" y="3" rx="1.5" /><rect width="7" height="7" x="14" y="3" rx="1.5" /><rect width="7" height="7" x="3" y="14" rx="1.5" /><path d="M17.5 14.5v6" /><path d="M14.5 17.5h6" /></>);
+export const IHelp = make(<><circle cx="12" cy="12" r="9" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.4-3 4" /><path d="M12 17.5h.01" /></>);

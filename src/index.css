@@ -1297,7 +1297,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .ov-graph-zoom button:hover { background: var(--surface-2); color: var(--ink); }
 .ov-graph-node { cursor: pointer; }
-.ov-graph-node circle { fill: #fff; stroke: var(--accent); stroke-width: 2; transition: fill .15s; }
+.ov-graph-node circle { fill: var(--surface); stroke: var(--accent); stroke-width: 2; transition: fill .15s; }
 .ov-graph-node:hover circle { fill: var(--accent-soft); }
 .ov-graph-node text { font-size: 12px; fill: var(--ink); font-family: inherit; pointer-events: none; }
 .ov-graph-node .ov-graph-count { font-size: 10px; fill: var(--muted); }
@@ -1338,7 +1338,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .ov-graph-toggle { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink); cursor: pointer; }
 .ov-graph-dot { cursor: pointer; }
-.ov-graph-dot circle { fill: #fff; stroke: #a09a8a; stroke-width: 1.5; }
+.ov-graph-dot circle { fill: var(--surface); stroke: #a09a8a; stroke-width: 1.5; }
 .ov-graph-dot:hover circle { stroke: var(--accent); fill: var(--accent-soft); }
 .ov-graph-dot-label { fill: var(--muted); font-family: inherit; pointer-events: none; }
 .ov-graph-dot:hover .ov-graph-dot-label { fill: var(--accent); }
@@ -1391,6 +1391,54 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .slide-kanban { position: relative; }
 .kanban-addcol.k-auto-on { color: #fff; background: var(--accent); opacity: 1; }
 .kanban-addcol.k-auto-on:hover { background: var(--accent-strong); }
+
+/* ---------- Hilfe-Seite ---------- */
+.help-modal { width: min(860px, 94vw); max-height: 86vh; display: flex; flex-direction: column; }
+.help-layout { display: flex; min-height: 0; flex: 1; }
+.help-nav {
+  flex: none; width: 210px; border-right: 1px solid var(--border-soft);
+  padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto;
+}
+.help-nav button {
+  border: none; background: none; cursor: pointer; font-family: inherit; font-size: 12.5px;
+  color: var(--ink); text-align: left; padding: 7px 10px; border-radius: 8px;
+  display: flex; align-items: center; gap: 8px;
+}
+.help-nav button:hover { background: var(--surface-2); }
+.help-nav button.on { background: var(--accent-soft); color: var(--accent-strong); font-weight: 650; }
+.help-body { flex: 1; min-width: 0; overflow-y: auto; padding: 6px 22px 20px; scroll-behavior: smooth; }
+.help-body section { padding: 14px 0 6px; border-bottom: 1px solid var(--border-soft); }
+.help-body h3 { font-size: 15px; margin: 4px 0 8px; }
+.help-body p { font-size: 13px; line-height: 1.55; color: var(--ink); margin: 6px 0; }
+.help-body ul { margin: 6px 0; padding-left: 20px; }
+.help-body li { font-size: 12.5px; line-height: 1.6; color: var(--ink); margin: 4px 0; }
+.help-keys { border-collapse: collapse; font-size: 12.5px; margin-top: 6px; }
+.help-keys td { padding: 5px 14px 5px 0; border-bottom: 1px solid var(--border-soft); }
+.help-keys kbd {
+  background: var(--surface-3); border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: 5px; padding: 1px 6px; font-family: inherit; font-size: 11px;
+}
+.help-foot { text-align: center; font-size: 11px; color: var(--muted); padding: 14px 0 4px; }
+@media (max-width: 700px) {
+  .help-layout { flex-direction: column; }
+  .help-nav { width: 100%; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--border-soft); }
+  .help-nav button { font-size: 11.5px; padding: 5px 8px; }
+}
+
+/* ---------- Tooltip-System (ersetzt native title-Tooltips) ---------- */
+.tipbox {
+  position: fixed; z-index: 300; transform: translate(-50%, -100%);
+  background: #26241f; color: #f4f0e6; font-size: 12px; line-height: 1.45;
+  padding: 7px 11px; border-radius: 9px; max-width: 300px; text-align: center;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); pointer-events: none;
+  animation: tip-in 0.12s ease-out;
+}
+.tipbox.below { transform: translate(-50%, 0); }
+[data-theme='dark'] .tipbox { background: #46423a; color: #f4f0e6; }
+@keyframes tip-in {
+  from { opacity: 0; transform: translate(-50%, -100%) translateY(3px); }
+  to { opacity: 1; transform: translate(-50%, -100%); }
+}
 
 /* ---------- Design-Reiter: Akzent-Swatches ---------- */
 .accent-swatches { display: flex; gap: 8px; }

@@ -197,6 +197,10 @@ interface BoardState {
   /** ALLES leeren: ein frisches leeres Board, Hierarchie/Versionen/Vorlagen zurückgesetzt */
   resetAll: () => void;
 
+  /** Hilfe-Seite (❓ im Dock) */
+  helpOpen: boolean;
+  setHelpOpen: (open: boolean) => void;
+
   /** Design: Hell/Dunkel/System + Akzentfarbe (persistiert) */
   ui: { theme: 'system' | 'light' | 'dark'; accent: string };
   setUiTheme: (theme: 'system' | 'light' | 'dark') => void;
@@ -332,6 +336,9 @@ export const useBoard = create<BoardState>()(
         lastDeleted: null,
         aiBusy: false,
         setAiBusy: (busy) => set({ aiBusy: busy }),
+
+        helpOpen: false,
+        setHelpOpen: (open) => set({ helpOpen: open }),
 
         ui: { theme: 'system', accent: 'blau' },
         setUiTheme: (theme) => set({ ui: { ...get().ui, theme } }),

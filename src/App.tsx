@@ -11,6 +11,8 @@ import { useBoard } from './store';
 import { initAutoSync } from './lib/syncFolder';
 import { TaskHub } from './components/TaskHub';
 import { BacklinksPanel } from './components/BacklinksPanel';
+import { HelpOverlay } from './components/HelpOverlay';
+import { TooltipLayer } from './components/TooltipLayer';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
 import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
 
@@ -128,6 +130,8 @@ export default function App() {
           </>
         )}
         <SearchOverlay />
+      <HelpOverlay />
+      <TooltipLayer />
         <Settings />
         <Presenter />
         <div className={`toast ${toast ? 'show' : ''}`}>

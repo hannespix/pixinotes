@@ -3,7 +3,7 @@ import { NodeToolbar, Position, useReactFlow } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
-import { aiBriefing, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
+import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
 import { IBookmark, ICopy, IDuplicate, IMail, ITag, ITrash, IWand, IX } from './Icons';
 
@@ -181,6 +181,10 @@ export function SelectionToolbar() {
                   }
                 }}
               />
+              <div className="sel-attr-title">KI-Werkzeuge</div>
+              {single?.type === 'note' && (
+                <button disabled={aiBusy} onClick={() => runAi((n) => aiPolish(n))} title="Verbesserte Fassung als neue Notiz daneben — das Original bleibt">✨ Text verbessern</button>
+              )}
               <button disabled={aiBusy} onClick={() => runAi(aiTasks)}>Aufgaben extrahieren</button>
               <button disabled={aiBusy} onClick={() => runAi(aiProcess)}>Als Workflow-Diagramm</button>
               <button disabled={aiBusy} onClick={() => runAi(aiBriefing)}>Zusammenfassen</button>
