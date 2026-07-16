@@ -181,6 +181,12 @@ interface BoardState {
   restoreDeleted: () => void;
   /** Zuletzt angefasste Karte dauerhaft nach vorn (persistierter zIndex, ohne Undo-Eintrag) */
   touchNode: (id: string) => void;
+  /** Klick-Zoom: beim Anklicken sanft zur Karte fliegen (wenn klein/außerhalb) */
+  clickZoom: boolean;
+  setClickZoom: (on: boolean) => void;
+  /** Mausrad zoomt statt zu scrollen (Miro-Stil) */
+  wheelZoom: boolean;
+  setWheelZoom: (on: boolean) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
   setNodePosition: (id: string, x: number, y: number) => void;
   /** Mehrere Positionen in EINEM Store-Update — für den Physik-Loop (60 fps) */
@@ -348,6 +354,10 @@ export const useBoard = create<BoardState>()(
 
         physicsEnabled: true,
         setPhysicsEnabled: (on) => set({ physicsEnabled: on }),
+        clickZoom: true,
+        setClickZoom: (on) => set({ clickZoom: on }),
+        wheelZoom: false,
+        setWheelZoom: (on) => set({ wheelZoom: on }),
 
         ui: { theme: 'system', accent: 'blau' },
         setUiTheme: (theme) => set({ ui: { ...get().ui, theme } }),
@@ -887,6 +897,8 @@ export const useBoard = create<BoardState>()(
         templates: s.templates,
         ui: s.ui,
         physicsEnabled: s.physicsEnabled,
+        clickZoom: s.clickZoom,
+        wheelZoom: s.wheelZoom,
       }),
       migrate: (persisted: unknown, version: number) => {
         const p = persisted as Record<string, unknown>;

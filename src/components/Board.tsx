@@ -70,7 +70,8 @@ export function Board() {
   const removeNodes = useBoard((s) => s.removeNodes);
   const showToast = useBoard((s) => s.showToast);
 
-  const { screenToFlowPosition, setCenter } = useReactFlow();
+  const { screenToFlowPosition, setCenter, fitView, getViewport } = useReactFlow();
+  const wheelZoom = useBoard((s) => s.wheelZoom);
   const pendingFocus = useBoard((s) => s.pendingFocus);
   const clearPendingFocus = useBoard((s) => s.clearPendingFocus);
 
@@ -198,6 +199,21 @@ export function Board() {
     vels.current.delete(node.id); // gegriffene Karte gehorcht der Maus, nicht der Physik
     dragTrack.current = { id: node.id, x: node.position.x, y: node.position.y, t: performance.now(), vx: 0, vy: 0 };
   }, []);
+
+  // Klick-Zoom (optional, ⚙ → Design → Bedienung): fliegt NUR, wenn die Karte
+  // klein oder angeschnitten ist — wer schon nah dran arbeitet, wird nicht
+  // herumgeworfen. Drags lösen kein Click-Event aus (React Flow unterdrückt das).
+  const onNodeClick = useCallback((e: React.MouseEvent, node: Node) => {
+    if (!useBoard.getState().clickZoom || e.shiftKey) return; // Shift = Mehrfachauswahl
+    const { x, y, zoom } = getViewport();
+    const w = (node.measured?.width ?? 260) * zoom;
+    const h = (node.measured?.height ?? 160) * zoom;
+    const sx = node.position.x * zoom + x;
+    const sy = node.position.y * zoom + y;
+    const fullyVisible = sx >= 8 && sy >= 64 && sx + w <= window.innerWidth - 8 && sy + h <= window.innerHeight - 76;
+    if (fullyVisible && zoom >= 0.65) return; // gut lesbar im Blick → nicht springen
+    void fitView({ nodes: [{ id: node.id }], padding: 0.35, duration: 450, maxZoom: 1.05 });
+  }, [fitView, getViewport]);
 
   // Angefasst = dauerhaft nach vorn: Capture-Listener statt onNodeClick, damit
   // auch Klicks in Editor/nodrag-Bereiche zählen (die erreichen onNodeClick nicht)
@@ -459,12 +475,14 @@ export function Board() {
           return false;
         }}
         onNodeDragStart={onNodeDragStart}
+        onNodeClick={onNodeClick}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         connectionMode={ConnectionMode.Loose}
         connectionRadius={42}
         connectionLineStyle={{ stroke: '#4f7cff', strokeWidth: 2.5 }}
-        panOnScroll
+        panOnScroll={!wheelZoom}
+        zoomOnScroll={wheelZoom}
         zoomOnDoubleClick={false}
         deleteKeyCode={['Delete', 'Backspace']}
         minZoom={0.15}

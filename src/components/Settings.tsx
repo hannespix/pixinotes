@@ -63,6 +63,10 @@ export function Settings() {
   const [davUrl, setDavUrl] = useState('');
   const [davUser, setDavUser] = useState('');
   const [davSecret, setDavSecret] = useState('');
+  const clickZoom = useBoard((s) => s.clickZoom);
+  const setClickZoom = useBoard((s) => s.setClickZoom);
+  const wheelZoom = useBoard((s) => s.wheelZoom);
+  const setWheelZoom = useBoard((s) => s.setWheelZoom);
   const ui = useBoard((s) => s.ui);
   const setUiTheme = useBoard((s) => s.setUiTheme);
   const setUiAccent = useBoard((s) => s.setUiAccent);
@@ -670,6 +674,24 @@ export function Settings() {
               ))}
             </div>
           </div>
+
+          <h3 style={{ marginTop: 16 }}>🖱️ Bedienung</h3>
+          <label className="modal-row modal-row-check">
+            <span>Klick-Zoom</span>
+            <input type="checkbox" checked={clickZoom} onChange={(e) => setClickZoom(e.target.checked)} />
+          </label>
+          <p className="modal-hint">
+            Beim Anklicken fliegt die Ansicht sanft zur Karte — aber nur, wenn sie klein
+            oder angeschnitten ist. Wer schon nah dran arbeitet, wird nicht herumgeworfen.
+          </p>
+          <label className="modal-row modal-row-check">
+            <span>Mausrad zoomt</span>
+            <input type="checkbox" checked={wheelZoom} onChange={(e) => setWheelZoom(e.target.checked)} />
+          </label>
+          <p className="modal-hint">
+            Miro-Stil: Rad zoomt direkt (verschieben per Karten-Fläche ziehen).
+            Aus = Rad scrollt, Zoomen mit Strg+Rad oder Pinch.
+          </p>
         </section>
         )}
 

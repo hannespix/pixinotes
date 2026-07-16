@@ -1696,3 +1696,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 
 /* Übersicht hat jetzt ein Mini-Dock unten mittig → „+ Neuer Bereich" darüber (M73) */
 .ov-add-space-float { bottom: 84px; }
+
+/* Bedienungs-Schalter im Design-Reiter (M74) */
+.modal-row-check input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--accent); }
