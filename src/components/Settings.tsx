@@ -42,6 +42,8 @@ export function Settings() {
   const [busy, setBusy] = useState('');
   const [syncHandle, setSyncHandle] = useState<SyncDirHandle | null>(null);
   const [syncPerm, setSyncPerm] = useState<'granted' | 'prompt'>('granted');
+  // Reiter-Gliederung: KI / Synchronisation / Daten / Export
+  const [tab, setTab] = useState<'ki' | 'sync' | 'daten' | 'export'>('ki');
   // WICHTIG: vor dem early-return deklarieren (Hook-Reihenfolge!)
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -137,6 +139,28 @@ export function Settings() {
 
   const hasFolderApi = 'showDirectoryPicker' in window;
 
+  /** Alles leeren — bewusst zweistufig (Bestätigung + Tipp-Wort), kein Undo */
+  const resetEverything = async () => {
+    if (!window.confirm(
+      'Wirklich ALLES leeren?\n\nAlle Bereiche, Projekte, Boards, Karten, Versionen und Vorlagen werden gelöscht. '
+      + 'Ein verbundener Sync-Ordner wird getrennt (seine Dateien bleiben unangetastet). KI-Einstellungen bleiben erhalten.\n\n'
+      + 'Tipp: Vorher unter „Daten" den Stand als Datei exportieren.',
+    )) return;
+    const word = window.prompt('Zur Bestätigung bitte LEEREN eingeben:');
+    if ((word ?? '').trim().toUpperCase() !== 'LEEREN') {
+      showToast('Abgebrochen — nichts wurde gelöscht.');
+      return;
+    }
+    // Sync trennen, BEVOR geleert wird — sonst würde der Auto-Sync den
+    // leeren Stand in den Ordner schreiben und die Cloud-Kopie überschreiben
+    if (syncHandle) {
+      await disconnectSync().catch(() => {});
+      setSyncHandle(null);
+    }
+    useBoard.getState().resetAll();
+    setOpen(false);
+  };
+
   return (
     <div className="modal-backdrop" onClick={() => setOpen(false)}>
       <div className="modal" role="dialog" aria-modal="true" aria-label="Einstellungen" onClick={(e) => e.stopPropagation()}>
@@ -145,7 +169,15 @@ export function Settings() {
           <button className="modal-x" onClick={() => setOpen(false)} aria-label="Schließen">✕</button>
         </div>
 
+        {/* Reiter: hält jede Ebene übersichtlich */}
+        <div className="modal-tabs">
+          {([['ki', '🤖 KI'], ['sync', '☁️ Synchronisation'], ['daten', '💾 Daten'], ['export', '📤 Export']] as const).map(([k, label]) => (
+            <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>
+          ))}
+        </div>
+
         {/* ---- KI ---- */}
+        {tab === 'ki' && (
         <section className="modal-section">
           <h3>🤖 KI-Assistent</h3>
           <p className="modal-hint">
@@ -212,8 +244,10 @@ export function Settings() {
             </>
           )}
         </section>
+        )}
 
         {/* ---- Synchronisation (Nextcloud & Co.) ---- */}
+        {tab === 'sync' && (
         <section className="modal-section">
           <h3>☁️ Synchronisation (Nextcloud, OneDrive, Dropbox …)</h3>
           <p className="modal-hint">
@@ -274,9 +308,11 @@ export function Settings() {
             </>
           )}
         </section>
+        )}
 
-        {/* ---- Datei-Sync (überall) ---- */}
-        {/* ---- Starter-Umgebung ---- */}
+        {/* ---- Daten: sichern/laden, Beispieldaten, leeren ---- */}
+        {tab === 'daten' && (
+        <>
         <section className="modal-section">
           <h3>🧭 Starter-Umgebung „Verwaltung"</h3>
           <p className="modal-hint">
@@ -321,7 +357,25 @@ export function Settings() {
           </div>
         </section>
 
+        <section className="modal-section modal-danger">
+          <h3>🧹 Alles leeren &amp; neu starten</h3>
+          <p className="modal-hint">
+            Löscht <b>alle</b> Bereiche, Projekte, Boards, Karten, Versionen und Vorlagen und startet mit
+            einem leeren Board. Kein Rückgängig! KI-Einstellungen bleiben erhalten; ein verbundener
+            Sync-Ordner wird vorher getrennt (seine Dateien bleiben unangetastet).
+            <b> Tipp:</b> vorher oben „Datei exportieren".
+          </p>
+          <div className="modal-buttons">
+            <button className="danger" disabled={!!busy} onClick={() => void resetEverything()}>
+              🧹 Alles leeren…
+            </button>
+          </div>
+        </section>
+        </>
+        )}
+
         {/* ---- Datenordner & Export ---- */}
+        {tab === 'export' && (
         <section className="modal-section">
           <h3>📁 Datenordner &amp; Export</h3>
           <p className="modal-hint">
@@ -345,6 +399,7 @@ export function Settings() {
           </div>
           <div className="modal-note">💡 Für PDF: PNG/SVG exportieren und über „Drucken → Als PDF speichern" ablegen.</div>
         </section>
+        )}
 
         <div className="modal-foot">PixiNotes · lokale Daten, kein Konto nötig</div>
       </div>

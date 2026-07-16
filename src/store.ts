@@ -194,6 +194,8 @@ interface BoardState {
 
   /** Starter-Umgebung „Verwaltung" zusätzlich anlegen (für Bestandsnutzer) */
   addStarter: () => void;
+  /** ALLES leeren: ein frisches leeres Board, Hierarchie/Versionen/Vorlagen zurückgesetzt */
+  resetAll: () => void;
 }
 
 export const selectActiveBoard = (s: BoardState): BoardDoc =>
@@ -337,6 +339,26 @@ export const useBoard = create<BoardState>()(
             importEpoch: get().importEpoch + 1,
           });
           get().showToast('🧭 Starter-Umgebung „Verwaltung" hinzugefügt: 3 Bereiche, 14 Boards — viel Spaß beim Erkunden!');
+        },
+
+        resetAll: () => {
+          // Bewusst KEIN Undo: das ist der „frischer Start"-Schalter.
+          // KI-Einstellungen bleiben erhalten (nur Inhalte werden geleert).
+          const boardId = uid();
+          set({
+            boards: [{ id: boardId, name: '🏠 Mein Board', nodes: [], edges: [], drawings: [] }],
+            spaces: [{ id: uid(), name: '🏢 Arbeit', projects: [{ id: uid(), name: 'Allgemein', boardIds: [boardId] }] }],
+            activeId: boardId,
+            view: 'board',
+            past: [],
+            future: [],
+            lastDeleted: null,
+            pendingFocus: null,
+            versions: {},
+            templates: [],
+            importEpoch: get().importEpoch + 1,
+          });
+          get().showToast('🧹 Alles geleert — frischer Start. Die Starter-Umgebung gibt es jederzeit unter ⚙️ → Daten.');
         },
 
         setSettingsOpen: (open) => set({ settingsOpen: open }),
