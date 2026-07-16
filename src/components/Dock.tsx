@@ -7,8 +7,9 @@ import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
 import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
+import { computeArrangement } from '../lib/arrange';
 import {
-  IBookmark, ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
+  IArrange, IBookmark, ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
   IMousePointer, INote, IPen, IPill, IPlay, IPlus, IRedo, ISearch, ISettings, ISquare, ITasks, IUndo, IWand, IX,
 } from './Icons';
 
@@ -34,7 +35,49 @@ export function Dock() {
     const ts = collectTasks(boards);
     return { open: ts.length, overdue: ts.filter((t) => t.urgency === 'overdue').length };
   }, [boards]);
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
+  const [arranging, setArranging] = useState(false);
+
+  /**
+   * Aufräumen & Anordnen — reiner Algorithmus (lib/arrange): Cluster nach
+   * Verbindungen, Typ-Gruppen für den Rest, Shelf-Packing. Die Karten
+   * morphen animiert (cubic-out, leicht gestaffelt) an ihre Zielplätze.
+   */
+  const arrange = () => {
+    if (arranging) return;
+    const st = useBoard.getState();
+    const board = selectActiveBoard(st);
+    if (board.nodes.length < 2) { showToast('Zu wenig Karten zum Anordnen.'); return; }
+    const targets = computeArrangement(board.nodes, board.edges);
+    const starts = new Map(board.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]));
+    st.pushHistory();
+    setArranging(true);
+    const DUR = 700;
+    const STAGGER = 14; // ms pro Karte — wirkt organisch statt mechanisch
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+    const t0 = performance.now();
+    const step = (now: number) => {
+      let done = true;
+      const frame: Array<[string, number, number]> = [];
+      targets.forEach(([id, tx, ty], i) => {
+        const s = starts.get(id);
+        if (!s) return;
+        const t = Math.min(1, Math.max(0, (now - t0 - i * STAGGER) / DUR));
+        if (t < 1) done = false;
+        const k = ease(t);
+        frame.push([id, s.x + (tx - s.x) * k, s.y + (ty - s.y) * k]);
+      });
+      useBoard.getState().setNodePositions(frame);
+      if (!done) {
+        requestAnimationFrame(step);
+      } else {
+        setArranging(false);
+        fitView({ padding: 0.12, duration: 500, maxZoom: 1 });
+        showToast('🧹 Aufgeräumt: Verbundenes als Fluss, Rest nach Modultyp gruppiert — Strg+Z stellt die alte Anordnung wieder her.');
+      }
+    };
+    requestAnimationFrame(step);
+  };
   const ai = useBoard((s) => s.ai);
   const templates = useBoard((s) => s.templates);
   const removeTemplate = useBoard((s) => s.removeTemplate);
@@ -228,6 +271,15 @@ export function Dock() {
         </button>
       </div>
 
+      <button
+        onClick={arrange}
+        disabled={arranging}
+        className={arranging ? 'active' : ''}
+        title="Board aufräumen: Verbundenes clustern, Rest nach Modultyp anordnen (Strg+Z macht's rückgängig)"
+        aria-label="Board aufräumen"
+      >
+        <IArrange />
+      </button>
       <button onClick={undo} disabled={!canUndo} title="Rückgängig (Strg+Z)" aria-label="Rückgängig"><IUndo /></button>
       <button onClick={redo} disabled={!canRedo} title="Wiederholen (Strg+Y)" aria-label="Wiederholen"><IRedo /></button>
 
