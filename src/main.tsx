@@ -10,3 +10,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <App />
   </React.StrictMode>,
 );
+
+// PWA: Service Worker nur im Prod-Build und über http(s) registrieren —
+// die portable Single-HTML (file://) und der Dev-Server bleiben außen vor.
+if (import.meta.env.PROD && 'serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => { /* z. B. privates Fenster */ });
+  });
+}
