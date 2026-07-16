@@ -66,6 +66,8 @@ export interface KanbanData {
   cols?: string[];
   /** Auto-Einsammeln: hält sich selbst mit offenen Aufgaben aller Boards aktuell */
   autoCollect?: boolean;
+  /** Tickets innerhalb der Spalten nach Quell-Board gruppieren (Swimlanes) */
+  groupBy?: 'board' | 'none';
   [key: string]: unknown;
 }
 

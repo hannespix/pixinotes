@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
 import { useBoard } from '../../store';
 import { kanbanCols, uid, type GanttData, type KanbanData, type KanbanItem, type KanbanNode } from '../../types';
 import { collectTasks, formatDueShort, urgencyFor } from '../../lib/tasks';
-import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, IX } from '../Icons';
+import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, ISearch, IX } from '../Icons';
 import { CardShell } from './CardShell';
+
+/** #Tags aus einem Ticket-Text ziehen (Trello-Labels light: einfach #tag tippen) */
+const tagsOf = (text: string): string[] => [...text.matchAll(/#([\p{L}\d_-]{2,20})/gu)].map((m) => m[1].toLowerCase());
 
 /**
  * Der eigentliche Kanban-Inhalt — geteilt zwischen Board-Karte und
@@ -23,6 +26,13 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const [newText, setNewText] = useState('');
   const [editingDue, setEditingDue] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  // Filterleiste (Trello-Stil): Textsuche, Schnellfilter, #Tag, Quell-Board.
+  // Bewusst NICHT persistiert — Filter sind eine Ansicht, kein Zustand.
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [quick, setQuick] = useState<'alle' | 'faellig' | 'ueberfaellig'>('alle');
+  const [tagFilter, setTagFilter] = useState('');
+  const [boardFilter, setBoardFilter] = useState('');
   // Fokus EINMAL beim Öffnen aufs Panel — sonst wirkt Esc erst nach Feld-Klick.
   // (Kein Callback-Ref: der würde bei jedem Tipp-Rerender den Fokus klauen.)
   const detailRef = useRef<HTMLDivElement | null>(null);
@@ -170,6 +180,95 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   // Defensive: Tickets mit Spaltenindex außerhalb des Bereichs landen in der letzten Spalte
   const colOf = (it: KanbanItem) => Math.max(0, Math.min(done, it.col));
 
+  // ---------- Filter & Gruppierung ----------
+  const allTags = useMemo(() => {
+    const t = new Set<string>();
+    for (const it of kanban.items) for (const tag of tagsOf(it.text)) t.add(tag);
+    return [...t].sort();
+  }, [kanban.items]);
+  const linkedBoards = useMemo(() => {
+    const ids = new Set(kanban.items.map((it) => it.link?.boardId).filter(Boolean) as string[]);
+    return boards.filter((b) => ids.has(b.id));
+  }, [kanban.items, boards]);
+
+  const matches = (it: KanbanItem): boolean => {
+    if (query) {
+      const q = query.toLowerCase();
+      if (!it.text.toLowerCase().includes(q) && !(it.who ?? '').toLowerCase().includes(q) && !(it.note ?? '').toLowerCase().includes(q)) return false;
+    }
+    if (quick === 'faellig' && !it.due) return false;
+    if (quick === 'ueberfaellig' && urgencyFor(it.due) !== 'overdue') return false;
+    if (tagFilter && !tagsOf(it.text).includes(tagFilter)) return false;
+    if (boardFilter && it.link?.boardId !== boardFilter) return false;
+    return true;
+  };
+  const filtering = !!(query || quick !== 'alle' || tagFilter || boardFilter);
+  const visibleItems = kanban.items.filter(matches);
+  const grouped = kanban.groupBy === 'board';
+  const boardName = (bid?: string) => (bid ? boards.find((b) => b.id === bid)?.name ?? 'Board' : '— hier erstellt —');
+  const resetFilters = () => { setQuery(''); setQuick('alle'); setTagFilter(''); setBoardFilter(''); };
+
+  const renderItem = (it: KanbanItem, colIdx: number) => (
+    <div
+      className={`kanban-item nodrag ${colIdx === done ? 'col-done' : colIdx === 0 ? 'col-first' : 'col-mid'}`}
+      key={it.id}
+    >
+      <span
+        className={`kanban-item-text ${colIdx === done ? 'done-text' : ''}`}
+        title="Ticket öffnen (Details, Person, Verknüpfung)"
+        onClick={() => setDetailId(it.id)}
+      >
+        {it.text}
+      </span>
+      {(it.who || it.note || it.link) && (
+        <span className="kanban-chips">
+          {it.who && <em className="k-who" title={it.who}>{it.who.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}</em>}
+          {it.note && <em className="k-note" title="Hat Beschreibung — Ticket öffnen" onClick={() => setDetailId(it.id)}>≡</em>}
+          {it.link && (
+            <button
+              className="k-link"
+              title={`Zur Quelle springen: ${boards.find((b) => b.id === it.link!.boardId)?.name ?? 'Board'}`}
+              onClick={() => followLink(it.link!)}
+            >
+              ↗
+            </button>
+          )}
+        </span>
+      )}
+      <span className="kanban-item-actions">
+        {colIdx > 0 && (
+          <button onClick={() => move(it, -1)} title="Zurück"><IChevronL size={11} /></button>
+        )}
+        {colIdx < done && (
+          <button onClick={() => move(it, 1)} title="Weiter"><IChevronR size={11} /></button>
+        )}
+        <button onClick={() => setEditingDue(editingDue === it.id ? null : it.id)} title="Fälligkeit setzen (Erinnerung!)"><ICalendar size={11} /></button>
+        <button onClick={() => remove(it)} title="Entfernen"><IX size={11} /></button>
+      </span>
+      {editingDue === it.id ? (
+        <input
+          type="date"
+          className="kanban-due-input nodrag"
+          autoFocus
+          value={it.due ?? ''}
+          onChange={(e) =>
+            setItems(kanban.items.map((x) => (x.id === it.id ? { ...x, due: e.target.value || undefined } : x)))
+          }
+          onBlur={() => setEditingDue(null)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditingDue(null); }}
+        />
+      ) : it.due && colIdx < done ? (
+        <button
+          className={`kanban-due urgency-${urgencyFor(it.due)} nodrag`}
+          title="Fälligkeit ändern"
+          onClick={() => setEditingDue(it.id)}
+        >
+          {formatDueShort(it.due)}
+        </button>
+      ) : null}
+    </div>
+  );
+
   return (
     <>
       <div className="kanban-head">
@@ -178,6 +277,13 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           value={kanban.title}
           onChange={(e) => setTitle(e.target.value)}
         />
+        <button
+          className={`kanban-addcol nodrag ${filterOpen || filtering ? 'k-auto-on' : ''}`}
+          title="Filtern & Gruppieren: Suche, Frist, #Tags, Quell-Board (Trello-Stil)"
+          onClick={() => { setFilterOpen((o) => !o); if (filterOpen) resetFilters(); }}
+        >
+          <ISearch size={12} />
+        </button>
         <button
           className="kanban-addcol nodrag"
           title="Offene Aufgaben aus ALLEN Boards einsammeln (Kanbans, Checklisten, Zeitpläne)"
@@ -196,90 +302,80 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         </button>
         <button className="kanban-addcol nodrag" title="Spalte hinzufügen" onClick={addCol}><IPlus size={12} /></button>
       </div>
+      {filterOpen && (
+        <div className="kanban-filter nodrag">
+          <input
+            className="k-filter-q"
+            placeholder="Suchen (Text, Person) …"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button className={`k-chip ${quick === 'faellig' ? 'on' : ''}`} title="Nur Tickets mit Frist" onClick={() => setQuick(quick === 'faellig' ? 'alle' : 'faellig')}>⏰ Frist</button>
+          <button className={`k-chip ${quick === 'ueberfaellig' ? 'on' : ''}`} title="Nur überfällige Tickets" onClick={() => setQuick(quick === 'ueberfaellig' ? 'alle' : 'ueberfaellig')}>🔥 überfällig</button>
+          {allTags.map((tag) => (
+            <button key={tag} className={`k-chip k-tag ${tagFilter === tag ? 'on' : ''}`} title={`Nur Tickets mit #${tag} — Tags einfach im Ticket-Text tippen`} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}>#{tag}</button>
+          ))}
+          {linkedBoards.length > 1 && (
+            <select className="k-filter-board" value={boardFilter} title="Nur Tickets aus einem Quell-Board" onChange={(e) => setBoardFilter(e.target.value)}>
+              <option value="">alle Quell-Boards</option>
+              {linkedBoards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          )}
+          {linkedBoards.length > 0 && (
+            <button
+              className={`k-chip ${grouped ? 'on' : ''}`}
+              title="Tickets in den Spalten nach ihrem Quell-Board gruppieren"
+              onClick={() => updateNodeData(id, { groupBy: grouped ? 'none' : 'board' })}
+            >
+              ⊟ nach Board
+            </button>
+          )}
+          {filtering && <span className="k-filter-count">{visibleItems.length}/{kanban.items.length}</span>}
+          {filtering && <button className="k-chip" title="Alle Filter zurücksetzen" onClick={resetFilters}>✕</button>}
+        </div>
+      )}
       <div className="kanban-cols">
-        {cols.map((colName, colIdx) => (
-          <div className="kanban-col" key={colIdx}>
-            <div className="kanban-col-head">
-              <input
-                className="kanban-col-name nodrag"
-                value={colName}
-                title="Spalte umbenennen"
-                onChange={(e) => renameCol(colIdx, e.target.value)}
-              />
-              {cols.length > 2 && (
-                <button
-                  className="kanban-col-x nodrag"
-                  title="Spalte löschen (Tickets rücken nach links)"
-                  onClick={() => removeCol(colIdx)}
-                >
-                  <IX size={10} />
-                </button>
-              )}
-            </div>
-            {kanban.items
-              .filter((it) => colOf(it) === colIdx)
-              .map((it) => (
-                <div
-                  className={`kanban-item nodrag ${colIdx === done ? 'col-done' : colIdx === 0 ? 'col-first' : 'col-mid'}`}
-                  key={it.id}
-                >
-                  <span
-                    className={`kanban-item-text ${colIdx === done ? 'done-text' : ''}`}
-                    title="Ticket öffnen (Details, Person, Verknüpfung)"
-                    onClick={() => setDetailId(it.id)}
+        {cols.map((colName, colIdx) => {
+          const colItems = visibleItems.filter((it) => colOf(it) === colIdx);
+          return (
+            <div className="kanban-col" key={colIdx}>
+              <div className="kanban-col-head">
+                <input
+                  className="kanban-col-name nodrag"
+                  value={colName}
+                  title="Spalte umbenennen"
+                  onChange={(e) => renameCol(colIdx, e.target.value)}
+                />
+                <span className="kanban-count" title={filtering ? 'sichtbar (gefiltert)' : 'Tickets in der Spalte'}>{colItems.length}</span>
+                {cols.length > 2 && (
+                  <button
+                    className="kanban-col-x nodrag"
+                    title="Spalte löschen (Tickets rücken nach links)"
+                    onClick={() => removeCol(colIdx)}
                   >
-                    {it.text}
-                  </span>
-                  {(it.who || it.note || it.link) && (
-                    <span className="kanban-chips">
-                      {it.who && <em className="k-who" title={it.who}>{it.who.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}</em>}
-                      {it.note && <em className="k-note" title="Hat Beschreibung — Ticket öffnen" onClick={() => setDetailId(it.id)}>≡</em>}
-                      {it.link && (
-                        <button
-                          className="k-link"
-                          title={`Zur Quelle springen: ${boards.find((b) => b.id === it.link!.boardId)?.name ?? 'Board'}`}
-                          onClick={() => followLink(it.link!)}
-                        >
-                          ↗
-                        </button>
-                      )}
-                    </span>
-                  )}
-                  <span className="kanban-item-actions">
-                    {colIdx > 0 && (
-                      <button onClick={() => move(it, -1)} title="Zurück"><IChevronL size={11} /></button>
-                    )}
-                    {colIdx < done && (
-                      <button onClick={() => move(it, 1)} title="Weiter"><IChevronR size={11} /></button>
-                    )}
-                    <button onClick={() => setEditingDue(editingDue === it.id ? null : it.id)} title="Fälligkeit setzen (Erinnerung!)"><ICalendar size={11} /></button>
-                    <button onClick={() => remove(it)} title="Entfernen"><IX size={11} /></button>
-                  </span>
-                  {editingDue === it.id ? (
-                    <input
-                      type="date"
-                      className="kanban-due-input nodrag"
-                      autoFocus
-                      value={it.due ?? ''}
-                      onChange={(e) =>
-                        setItems(kanban.items.map((x) => (x.id === it.id ? { ...x, due: e.target.value || undefined } : x)))
-                      }
-                      onBlur={() => setEditingDue(null)}
-                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditingDue(null); }}
-                    />
-                  ) : it.due && colIdx < done ? (
-                    <button
-                      className={`kanban-due urgency-${urgencyFor(it.due)} nodrag`}
-                      title="Fälligkeit ändern"
-                      onClick={() => setEditingDue(it.id)}
-                    >
-                      {formatDueShort(it.due)}
-                    </button>
-                  ) : null}
-                </div>
-              ))}
-          </div>
-        ))}
+                    <IX size={10} />
+                  </button>
+                )}
+              </div>
+              {!grouped
+                ? colItems.map((it) => renderItem(it, colIdx))
+                : (() => {
+                    const groups = new Map<string, KanbanItem[]>();
+                    for (const it of colItems) {
+                      const k = it.link?.boardId ?? '';
+                      if (!groups.has(k)) groups.set(k, []);
+                      groups.get(k)!.push(it);
+                    }
+                    return [...groups.entries()]
+                      .sort((a, b) => boardName(a[0] || undefined).localeCompare(boardName(b[0] || undefined), 'de'))
+                      .flatMap(([bid, items]) => [
+                        <div className="k-group-head" key={`g-${bid}`}>{boardName(bid || undefined)} <em>{items.length}</em></div>,
+                        ...items.map((it) => renderItem(it, colIdx)),
+                      ]);
+                  })()}
+            </div>
+          );
+        })}
       </div>
       <div className="kanban-add nodrag">
         <input

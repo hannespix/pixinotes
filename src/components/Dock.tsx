@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { useBoard } from '../store';
 import { makeCalendar, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape } from '../lib/nodes';
@@ -100,6 +101,11 @@ export function Dock() {
   const [addMenu, setAddMenu] = useState(false);
   const [drawMenu, setDrawMenu] = useState(false);
   const [aiMenu, setAiMenu] = useState(false);
+  // Hintergrund-Klick/-Tipp schließt alle Dock-Flyouts (User-Wunsch)
+  const dockRef = useRef<HTMLDivElement | null>(null);
+  useOutsideClose(addMenu || drawMenu || aiMenu || arrangeMenu, dockRef, () => {
+    setAddMenu(false); setDrawMenu(false); setAiMenu(false); setArrangeMenu(false);
+  });
   const [aiBusy, setAiBusy] = useState('');
   const [cmd, setCmd] = useState('');
 
@@ -145,7 +151,7 @@ export function Dock() {
   const drawing = tool !== 'select';
 
   return (
-    <div className="dock">
+    <div className="dock" ref={dockRef}>
       <div className="dock-add-wrap">
         {addMenu && (
           <div className="dock-menu">

@@ -853,9 +853,13 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* ---------- Editierbare Präsentations-Folien ---------- */
 .presenter-hint-edit { font-size: 12px; color: #8a8375; margin-left: auto; margin-right: 14px; }
 .presenter-slide.editable {
-  display: flex; align-items: center; justify-content: center;
+  display: flex; align-items: flex-start; justify-content: flex-start;
   padding: 28px; overflow: auto;
 }
+/* Auto-Margins statt align/justify-center: zentriert, wenn Platz ist — aber
+   hoher Inhalt (großes Kanban) bleibt oben erreichbar & scrollbar. Mit
+   align-items:center wäre die Oberkante unerreichbar abgeschnitten (User-Report). */
+.presenter-slide.editable > * { margin: auto; }
 /* Notiz: großer Editor auf Haftnotiz-Grund */
 .slide-note {
   width: min(880px, 100%); max-height: 100%; overflow: auto;
@@ -1617,3 +1621,38 @@ h3 { font-size: 14px; margin: 0 0 8px; }
    Notiz nicht clippen (die Karte liegt durch Auto-Vordergrund ohnehin oben) */
 .note-card:has(.bn-suggestion-menu) { overflow: visible; }
 .note-card .bn-suggestion-menu { z-index: 40; max-height: 320px; }
+
+/* ---------- Kanban: Filterleiste, Zähler & Board-Gruppen (M65) ---------- */
+.kanban-filter {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  padding: 4px 2px 7px; font-size: 10.5px;
+}
+.k-filter-q {
+  flex: 1 1 110px; min-width: 90px; border: 1px solid var(--border-soft);
+  border-radius: 7px; padding: 3px 8px; font-family: inherit; font-size: 11px;
+  background: var(--surface-3); color: var(--ink); outline: none;
+}
+.k-filter-q:focus { border-color: var(--accent); }
+.k-chip {
+  border: 1px solid var(--border-soft); background: var(--surface-dim);
+  color: var(--muted); border-radius: 999px; padding: 2px 8px; cursor: pointer;
+  font-family: inherit; font-size: 10.5px; white-space: nowrap;
+}
+.k-chip:hover { border-color: var(--accent); color: var(--ink); }
+.k-chip.on { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent); font-weight: 600; }
+[data-theme='dark'] .k-chip.on { color: var(--ink); }
+.k-filter-board {
+  border: 1px solid var(--border-soft); border-radius: 7px; padding: 2px 4px;
+  font-family: inherit; font-size: 10.5px; background: var(--surface-3);
+  color: var(--ink); max-width: 150px;
+}
+.k-filter-count { color: var(--muted); font-weight: 700; margin-left: 2px; }
+.kanban-count {
+  font-size: 9.5px; color: var(--muted); background: var(--surface-dim);
+  border-radius: 999px; padding: 1px 6px; flex: none; font-weight: 700;
+}
+.k-group-head {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); padding: 6px 2px 3px; display: flex; align-items: center; gap: 5px;
+}
+.k-group-head em { font-style: normal; background: var(--surface-dim); border-radius: 999px; padding: 0 5px; }

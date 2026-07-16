@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { useOutsideClose } from '../lib/useOutsideClose';
 import { selectActiveBoard, useBoard } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
 import { InlineName } from './InlineName';
@@ -31,6 +32,11 @@ export function Tabs() {
   const deleteVersion = useBoard((s) => s.deleteVersion);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  // Klick/Tipp in den Hintergrund schließt Navigator & Verlauf (User-Wunsch)
+  const navRef = useRef<HTMLElement | null>(null);
+  const historyRef = useRef<HTMLElement | null>(null);
+  useOutsideClose(navOpen, navRef, () => setNavOpen(false));
+  useOutsideClose(historyOpen, historyRef, () => setHistoryOpen(false));
 
   const byId = useMemo(() => new Map(boards.map((b) => [b.id, b])), [boards]);
 
@@ -99,7 +105,7 @@ export function Tabs() {
         <IHome size={15} />
       </button>
       {/* Brotkrume „Bereich › Projekt" öffnet den Navigator über ALLE Ebenen */}
-      <span className="tab-nav-wrap">
+      <span className="tab-nav-wrap" ref={navRef}>
         <button
           className={`tab-nav ${navOpen ? 'active' : ''}`}
           title="Navigator: alle Bereiche, Projekte & Boards"
@@ -190,7 +196,7 @@ export function Tabs() {
       >
         <IShare size={13} />
       </button>
-      <span className="tab-history-wrap">
+      <span className="tab-history-wrap" ref={historyRef}>
         <button
           className={`tab-share ${historyOpen ? 'active' : ''}`}
           title="Board-Verlauf: Versionen sichern & wiederherstellen"
