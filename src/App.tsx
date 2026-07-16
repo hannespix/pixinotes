@@ -4,6 +4,7 @@ import { Board } from './components/Board';
 import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
 import { MiniDock } from './components/MiniDock';
+import { TopActions } from './components/TopActions';
 import { Overview } from './components/Overview';
 import { SearchOverlay } from './components/SearchOverlay';
 import { Settings } from './components/Settings';
@@ -107,6 +108,7 @@ export default function App() {
           <div className="logo">
             Pixi<span>Notes</span>
           </div>
+          <TopActions />
           {/* Board-Gesten nur anzeigen, wo sie auch GELTEN — nicht in
               Übersicht, Aufgaben-Zentrale oder Präsentation (User-Feedback) */}
           {view === 'board' && !presenting && !tasksOpen && (

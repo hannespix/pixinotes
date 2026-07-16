@@ -118,6 +118,17 @@ const GRAPH_W = 1100, GRAPH_H = 640;
 
 function GraphView() {
   const boards = useBoard((s) => s.boards);
+  /** Hover-Vorschau: Board-Name, Kartenzahl + erste Karten-Titel (TooltipLayer zeigt [title]) */
+  const previewOf = (boardId: string): string => {
+    const b = boards.find((x) => x.id === boardId);
+    if (!b) return '';
+    const titles = b.nodes
+      .map((n) => (nodeToText(n).split('\n').find((l) => l.trim()) ?? '').slice(0, 44))
+      .filter(Boolean)
+      .slice(0, 4);
+    const more = b.nodes.length - titles.length;
+    return `${b.name} · ${b.nodes.length} Karten\n${titles.map((t) => `• ${t}`).join('\n')}${more > 0 ? `\n… und ${more} weitere` : ''}`;
+  };
   const openBoard = useBoard((s) => s.openBoard);
   const focusNode = useBoard((s) => s.focusNode);
   const [showCards, setShowCards] = useState(false);
@@ -378,7 +389,7 @@ function GraphView() {
           const p = pos.get(n.id)!;
           const rad = r(n.cards);
           return (
-            <g key={n.id} className="ov-graph-node" onClick={() => openBoard(n.id)}>
+            <g key={n.id} className="ov-graph-node" data-tip={previewOf(n.id)} onClick={() => openBoard(n.id)}>
               <circle cx={p.x} cy={p.y} r={rad} strokeWidth={ui(2)} />
               <text
                 x={p.x} y={p.y + rad + ui(17)} textAnchor="middle"

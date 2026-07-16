@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -70,7 +70,7 @@ export function Board() {
   const removeNodes = useBoard((s) => s.removeNodes);
   const showToast = useBoard((s) => s.showToast);
 
-  const { screenToFlowPosition, setCenter, fitView, getViewport } = useReactFlow();
+  const { screenToFlowPosition, setCenter, fitView, getViewport, setViewport } = useReactFlow();
   const wheelZoom = useBoard((s) => s.wheelZoom);
   const pendingFocus = useBoard((s) => s.pendingFocus);
   const clearPendingFocus = useBoard((s) => s.clearPendingFocus);
@@ -109,12 +109,23 @@ export function Board() {
         st.redo();
         return;
       }
+      // F = Auswahl formatfüllend einpassen (Figma-Gewohnheit); ohne Auswahl: alles
+      if (e.key.toLowerCase() === 'f' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const selected = selectActiveBoard(st).nodes.filter((n) => n.selected);
+        void fitView({
+          nodes: selected.length ? selected.map((n) => ({ id: n.id })) : undefined,
+          padding: selected.length ? 0.3 : 0.15,
+          duration: 400,
+          maxZoom: 1.2,
+        });
+        return;
+      }
       if (e.key.toLowerCase() !== 'n' || e.metaKey || e.ctrlKey || e.altKey) return;
       addNode(makeNote(screenToFlowPosition({ x: window.innerWidth / 2 - 130, y: window.innerHeight / 2 - 40 })));
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [addNode, screenToFlowPosition]);
+  }, [addNode, screenToFlowPosition, fitView]);
 
   // ---------- Physik-Engine: Wurf-Momentum + Verdrängung (FigJam-Gefühl) ----------
   // Ein gemeinsamer Loop integriert alle Geschwindigkeiten: geworfene Karten
@@ -203,6 +214,35 @@ export function Board() {
   // Klick-Zoom (optional, ⚙ → Design → Bedienung): fliegt NUR, wenn die Karte
   // klein oder angeschnitten ist — wer schon nah dran arbeitet, wird nicht
   // herumgeworfen. Drags lösen kein Click-Event aus (React Flow unterdrückt das).
+  // Leertaste halten + ziehen = Pannen, auch ÜBER Karten (Photoshop-Gewohnheit).
+  // React Flow startet den Flächen-Pan nur auf der Fläche selbst — deshalb werden
+  // Karten während gehaltener Leertaste durchklick-transparent (CSS .space-pan).
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' || e.repeat) return;
+      const target = e.target as HTMLElement;
+      if (target.closest('input, textarea, [contenteditable="true"]')) return;
+      e.preventDefault(); // Seite darf nicht scrollen
+      setSpaceHeld(true);
+    };
+    const up = (e: KeyboardEvent) => { if (e.code === 'Space') setSpaceHeld(false); };
+    const reset = () => setSpaceHeld(false);
+    window.addEventListener('keydown', down);
+    window.addEventListener('keyup', up);
+    window.addEventListener('blur', reset);
+    return () => {
+      window.removeEventListener('keydown', down);
+      window.removeEventListener('keyup', up);
+      window.removeEventListener('blur', reset);
+    };
+  }, []);
+
+  // Esc fliegt nach einem Klick-Zoom zur vorherigen Position zurück — aber nur,
+  // solange man die Ansicht nicht selbst weiterbewegt hat
+  const returnViewport = useRef<{ x: number; y: number; zoom: number } | null>(null);
+  const flyingUntil = useRef(0);
+
   const onNodeClick = useCallback((e: React.MouseEvent, node: Node) => {
     if (!useBoard.getState().clickZoom || e.shiftKey) return; // Shift = Mehrfachauswahl
     const { x, y, zoom } = getViewport();
@@ -212,8 +252,30 @@ export function Board() {
     const sy = node.position.y * zoom + y;
     const fullyVisible = sx >= 8 && sy >= 64 && sx + w <= window.innerWidth - 8 && sy + h <= window.innerHeight - 76;
     if (fullyVisible && zoom >= 0.65) return; // gut lesbar im Blick → nicht springen
+    returnViewport.current = { x, y, zoom };
+    flyingUntil.current = performance.now() + 700;
     void fitView({ nodes: [{ id: node.id }], padding: 0.35, duration: 450, maxZoom: 1.05 });
   }, [fitView, getViewport]);
+
+  useEffect(() => {
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || !returnViewport.current) return;
+      const st = useBoard.getState();
+      // Overlays haben Vorrang (deren Esc schließt sie) — und nur im Auswahl-Werkzeug
+      if (st.searchOpen || st.settingsOpen || st.helpOpen || st.tasksOpen || st.presenting || st.tool !== 'select') return;
+      // Der Klick-Zoom fokussiert meist den Karten-Editor — Esc darf trotzdem
+      // zurückfliegen (der Anker existiert nur direkt nach dem Flug und ist
+      // einmalig). Nur ein offenes Slash-Menü hat Vorrang.
+      if (document.querySelector('.bn-suggestion-menu')) return;
+      (document.activeElement as HTMLElement | null)?.blur?.();
+      const prev = returnViewport.current;
+      returnViewport.current = null;
+      flyingUntil.current = performance.now() + 700;
+      void setViewport(prev, { duration: 400 });
+    };
+    window.addEventListener('keydown', onEsc);
+    return () => window.removeEventListener('keydown', onEsc);
+  }, [setViewport]);
 
   // Angefasst = dauerhaft nach vorn: Capture-Listener statt onNodeClick, damit
   // auch Klicks in Editor/nodrag-Bereiche zählen (die erreichen onNodeClick nicht)
@@ -445,7 +507,7 @@ export function Board() {
 
   return (
     <div
-      className="board-wrap"
+      className={`board-wrap ${spaceHeld ? 'space-pan' : ''}`}
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}
       onDoubleClick={handleDoubleClick}
@@ -483,6 +545,8 @@ export function Board() {
         connectionLineStyle={{ stroke: '#4f7cff', strokeWidth: 2.5 }}
         panOnScroll={!wheelZoom}
         zoomOnScroll={wheelZoom}
+        panActivationKeyCode="Space"
+        onMoveEnd={() => { if (performance.now() > flyingUntil.current) returnViewport.current = null; }}
         zoomOnDoubleClick={false}
         deleteKeyCode={['Delete', 'Backspace']}
         minZoom={0.15}
@@ -497,7 +561,10 @@ export function Board() {
         proOptions={{ hideAttribution: false }}
       >
         <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} color={document.documentElement.dataset.theme === 'dark' ? '#4b453c' : '#d8d3c8'} />
-        <MiniMap pannable zoomable className="pn-minimap" />
+        <MiniMap
+          pannable zoomable className="pn-minimap"
+          onClick={(_, pos) => { void setCenter(pos.x, pos.y, { duration: 350, zoom: getViewport().zoom }); }}
+        />
         <Controls showInteractive={false} />
         <SelectionToolbar />
         <DrawingLayer />

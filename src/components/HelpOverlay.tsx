@@ -74,7 +74,7 @@ export function HelpOverlay() {
               <ul>
                 <li><b>Doppelklick</b> auf die Fläche legt eine Notiz an, <b>➕</b> im Dock alle anderen Module.</li>
                 <li>Karten <b>ziehen</b> (Griff-Pill oben oder Karte fassen), am Rand <b>resizen</b>, mit Schwung werfen 🚀.</li>
-                <li><b>Klick-Zoom:</b> Anklicken fliegt sanft zur Karte, wenn sie klein/angeschnitten ist (⚙ → Design → Bedienung abschaltbar); dort auch „Mausrad zoomt" im Miro-Stil.</li>
+                <li><b>Klick-Zoom:</b> Anklicken fliegt sanft zur Karte, wenn sie klein/angeschnitten ist (⚙ → Design → Bedienung abschaltbar); <b>Esc</b> fliegt zurück. Dort auch „Mausrad zoomt" im Miro-Stil. Klick auf die <b>Minimap</b> springt an die Stelle, <b>F</b> passt die Auswahl ein.</li>
                 <li><b>Strg+V</b> fügt Screenshots &amp; Bilder aus der Zwischenablage ein; E-Mails (.eml/.msg), Bilder, PDFs und Dateien einfach aufs Board ziehen.</li>
                 <li>Überlappende Karten: Die <b>zuletzt angefasste Karte legt sich automatisch nach vorn</b> und bleibt dort — bis eine andere angeklickt wird (praktisch mit 🧲 Physik AUS).</li>
                 <li><b>Strg+K</b> durchsucht alles — auch Ticket-Personen, Eigenschaften und #Tags.</li>
@@ -179,6 +179,9 @@ export function HelpOverlay() {
                   <tr><td><kbd>Strg</kbd>+<kbd>Z</kbd> / <kbd>Strg</kbd>+<kbd>Y</kbd></td><td>Rückgängig / Wiederholen</td></tr>
                   <tr><td><kbd>N</kbd></td><td>Neue Notiz (auf dem Board)</td></tr>
                   <tr><td><kbd>Strg</kbd>+<kbd>V</kbd></td><td>Screenshot/Bild einfügen</td></tr>
+                  <tr><td><kbd>F</kbd></td><td>Auswahl einpassen (ohne Auswahl: alles)</td></tr>
+                  <tr><td><kbd>Leertaste</kbd> halten + ziehen</td><td>Ansicht verschieben (auch über Karten)</td></tr>
+                  <tr><td><kbd>Esc</kbd> nach Klick-Zoom</td><td>zurück zur vorherigen Position</td></tr>
                   <tr><td><kbd>Entf</kbd></td><td>Auswahl/Verbindung löschen</td></tr>
                   <tr><td><kbd>Esc</kbd></td><td>Menüs/Overlays schließen · Zeichenmodus beenden</td></tr>
                   <tr><td><kbd>←</kbd> <kbd>→</kbd> / <kbd>Leertaste</kbd></td><td>Präsentation blättern</td></tr>

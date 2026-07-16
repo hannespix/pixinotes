@@ -11,7 +11,7 @@ import { uid, type AppNode, type ShapeKind } from '../types';
 import { computeArrangement, type ArrangeMode } from '../lib/arrange';
 import {
   IArrange, IBookmark, ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
-  IHelp, IMagnet, IMousePointer, INote, IPen, IPill, IPlay, IPlus, IRedo, ISearch, ISettings, ISquare, ITasks, IUndo, IWand, IX,
+  IMagnet, IMousePointer, INote, IPen, IPill, IPlay, IPlus, ISquare, ITasks, IWand, IX,
 } from './Icons';
 
 /**
@@ -21,15 +21,10 @@ import {
 export function Dock() {
   const addNode = useBoard((s) => s.addNode);
   const showToast = useBoard((s) => s.showToast);
-  const setSearchOpen = useBoard((s) => s.setSearchOpen);
   const setSettingsOpen = useBoard((s) => s.setSettingsOpen);
   const setPresenting = useBoard((s) => s.setPresenting);
   const tool = useBoard((s) => s.tool);
   const setTool = useBoard((s) => s.setTool);
-  const undo = useBoard((s) => s.undo);
-  const redo = useBoard((s) => s.redo);
-  const canUndo = useBoard((s) => s.past.length > 0);
-  const canRedo = useBoard((s) => s.future.length > 0);
   const setTasksOpen = useBoard((s) => s.setTasksOpen);
   const boards = useBoard((s) => s.boards);
   const taskStats = useMemo(() => {
@@ -329,9 +324,6 @@ export function Dock() {
       >
         <IMagnet />
       </button>
-      <button onClick={undo} disabled={!canUndo} title="Rückgängig (Strg+Z)" aria-label="Rückgängig"><IUndo /></button>
-      <button onClick={redo} disabled={!canRedo} title="Wiederholen (Strg+Y)" aria-label="Wiederholen"><IRedo /></button>
-
       <span className="dock-sep" />
       <button className="dock-tasks" onClick={() => setTasksOpen(true)} title="Aufgaben & Erinnerungen (alle Boards)" aria-label="Aufgaben">
         <ITasks />
@@ -340,10 +332,7 @@ export function Dock() {
         )}
       </button>
       <button onClick={() => setPresenting(true)} title="Präsentationsmodus (Karten als Folien)" aria-label="Präsentieren"><IPlay /></button>
-      <span className="dock-sep" />
-      <button onClick={() => setSearchOpen(true)} title="Suche über alle Boards (Strg+K)" aria-label="Suche"><ISearch /></button>
-      <button onClick={() => useBoard.getState().setHelpOpen(true)} title="Hilfe: alle Funktionen erklärt" aria-label="Hilfe"><IHelp /></button>
-      <button onClick={() => setSettingsOpen(true)} title="Einstellungen (KI, Synchronisation, Export)" aria-label="Einstellungen"><ISettings /></button>
+
     </div>
   );
 }
