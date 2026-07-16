@@ -205,9 +205,10 @@ interface BoardState {
   /** ALLES leeren: ein frisches leeres Board, Hierarchie/Versionen/Vorlagen zurückgesetzt */
   resetAll: () => void;
 
-  /** Hilfe-Seite (❓ im Dock) */
+  /** Hilfe-Seite (❓ im Dock); section springt direkt zu einem Abschnitt (z. B. 'impressum') */
   helpOpen: boolean;
-  setHelpOpen: (open: boolean) => void;
+  helpSection: string | null;
+  setHelpOpen: (open: boolean, section?: string | null) => void;
 
   /** Physik (Verdrängung/Wurf) global an/aus — aus = Karten dürfen überlappen/stapeln */
   physicsEnabled: boolean;
@@ -350,7 +351,8 @@ export const useBoard = create<BoardState>()(
         setAiBusy: (busy) => set({ aiBusy: busy }),
 
         helpOpen: false,
-        setHelpOpen: (open) => set({ helpOpen: open }),
+        helpSection: null,
+        setHelpOpen: (open, section = null) => set({ helpOpen: open, helpSection: section }),
 
         physicsEnabled: true,
         setPhysicsEnabled: (on) => set({ physicsEnabled: on }),

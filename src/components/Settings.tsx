@@ -695,7 +695,12 @@ export function Settings() {
         </section>
         )}
 
-        <div className="modal-foot">PixiNotes · lokale Daten, kein Konto nötig</div>
+        <div className="modal-foot">
+          PixiNotes · lokale Daten, kein Konto nötig ·{' '}
+          <button className="link-btn legal-link" onClick={() => { setOpen(false); useBoard.getState().setHelpOpen(true, 'impressum'); }}>Impressum</button>
+          {' · '}
+          <button className="link-btn legal-link" onClick={() => { setOpen(false); useBoard.getState().setHelpOpen(true, 'datenschutz'); }}>Datenschutz</button>
+        </div>
       </div>
     </div>
   );

@@ -16,13 +16,26 @@ const SECTIONS = [
   { id: 'ki', icon: '✨', title: 'KI-Assistent' },
   { id: 'daten', icon: '💾', title: 'Speichern, Sync & Teilen' },
   { id: 'tasten', icon: '⌨️', title: 'Tastenkürzel' },
+  { id: 'impressum', icon: '⚖️', title: 'Impressum' },
+  { id: 'datenschutz', icon: '🔒', title: 'Datenschutz' },
 ] as const;
 
 export function HelpOverlay() {
   const open = useBoard((s) => s.helpOpen);
   const setOpen = useBoard((s) => s.setHelpOpen);
+  const helpSection = useBoard((s) => s.helpSection);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState<string>('start');
+
+  // Direktsprung (z. B. „Impressum" aus dem Einstellungs-Fuß)
+  useEffect(() => {
+    if (!open || !helpSection) return;
+    setActive(helpSection);
+    const t = setTimeout(() => {
+      bodyRef.current?.querySelector(`#help-${helpSection}`)?.scrollIntoView({ block: 'start' });
+    }, 30);
+    return () => clearTimeout(t);
+  }, [open, helpSection]);
 
   useEffect(() => {
     if (!open) return;
@@ -172,6 +185,67 @@ export function HelpOverlay() {
                   <tr><td><kbd>/</kbd></td><td>Block-Menü im Notiz-Editor</td></tr>
                 </tbody>
               </table>
+            </section>
+
+            <section id="help-impressum">
+              <h3>⚖️ Impressum</h3>
+              <p className="legal-hint">Angaben gemäß § 5 DDG. Die Felder in [Klammern] bitte vor der Veröffentlichung ergänzen — sie sind bewusst nicht vorausgefüllt.</p>
+              <p>
+                <b>[Vorname Nachname]</b><br />
+                [Straße Hausnummer]<br />
+                [PLZ Ort], Deutschland
+              </p>
+              <p>
+                <b>Kontakt:</b> <a className="ent-link" href="mailto:claude@pix-el.de">claude@pix-el.de</a><br />
+                <b>Quellcode &amp; Projekt:</b>{' '}
+                <a className="ent-link" href="https://github.com/hannespix/pixinotes" target="_blank" rel="noreferrer">github.com/hannespix/pixinotes</a>
+              </p>
+              <p>
+                PixiNotes ist ein nicht-kommerzielles Werkzeug ohne Konto, ohne Bezahlfunktion und ohne
+                redaktionelle Inhalte Dritter. Für extern verlinkte Seiten sind deren Betreiber verantwortlich;
+                zum Zeitpunkt der Verlinkung waren keine Rechtsverstöße erkennbar.
+              </p>
+            </section>
+
+            <section id="help-datenschutz">
+              <h3>🔒 Datenschutzerklärung</h3>
+              <p className="legal-hint">Stand: Juli 2026 · Verantwortlich: siehe Impressum</p>
+
+              <h4>Das Wichtigste zuerst</h4>
+              <ul>
+                <li>PixiNotes arbeitet <b>komplett lokal in deinem Browser</b>. Es gibt keinen PixiNotes-Server, kein Konto, keine Registrierung.</li>
+                <li>Die App setzt <b>keine Cookies</b>, nutzt <b>kein Tracking</b> und keine Analyse-Dienste.</li>
+                <li>Alle Inhalte (Boards, Karten, Einstellungen) liegen ausschließlich im lokalen Speicher deines Browsers (localStorage/IndexedDB) und werden vom Betreiber <b>weder erhoben noch eingesehen</b>.</li>
+              </ul>
+
+              <h4>Hosting (GitHub Pages)</h4>
+              <p>
+                Die Web-Version wird über GitHub Pages (GitHub Inc., USA) ausgeliefert. Beim Abruf verarbeitet
+                GitHub technisch notwendige Server-Logs (u. a. IP-Adresse) zur Bereitstellung und Sicherheit
+                (Art. 6 Abs. 1 lit. f DSGVO). Details:{' '}
+                <a className="ent-link" href="https://docs.github.com/site-policy/privacy-policies/github-privacy-statement" target="_blank" rel="noreferrer">GitHub Privacy Statement</a>.
+                Die als Einzeldatei gespeicherte Version (file://) kommt ganz ohne Hosting aus.
+              </p>
+
+              <h4>Optionale Dienste — nur wenn DU sie aktivierst</h4>
+              <p>Standardmäßig verlässt kein Inhalt dein Gerät. Erst wenn du in den Einstellungen einen Dienst einrichtest, fließen Daten dorthin:</p>
+              <ul>
+                <li><b>KI-Assistent:</b> Beim Ausführen einer KI-Aktion werden die Inhalte der betroffenen Karten an den von dir gewählten Anbieter gesendet (z. B. Pollinations, OpenRouter, Anthropic, OpenAI oder deinen eigenen Ollama-/Firmen-Server). Es gilt die Datenschutzerklärung des jeweiligen Anbieters; API-Schlüssel bleiben lokal.</li>
+                <li><b>Kalender-Konten (Google/Microsoft 365):</b> Nur-Lese-Zugriff auf Termine per OAuth direkt zwischen deinem Browser und dem Anbieter. Zugangs-Tokens werden ausschließlich lokal gespeichert und landen nie in Sync-Dateien, Share-Links oder Exporten.</li>
+                <li><b>Synchronisation (Sync-Ordner/WebDAV):</b> Deine Board-Daten werden in den von dir gewählten Ordner bzw. auf deinen eigenen Server geschrieben — ohne KI-Schlüssel und ohne Konto-Tokens.</li>
+                <li><b>ICS-Abos:</b> Beim Aktualisieren ruft dein Browser die von dir eingetragene Kalender-URL direkt ab.</li>
+                <li><b>Teilen-Links:</b> Der Board-Inhalt steckt komprimiert im Link selbst (hinter „#") und wird beim Öffnen nicht an einen Server übertragen — wer den Link hat, kann das geteilte Board lesen. Teile Links entsprechend bewusst.</li>
+              </ul>
+
+              <h4>Deine Rechte</h4>
+              <p>
+                Da die App selbst keine personenbezogenen Daten an den Betreiber übermittelt, liegen dort in der
+                Regel keine Daten über dich vor. Für die Hosting-Logs gelten die Rechte aus Art. 15–21 DSGVO
+                gegenüber GitHub. Fragen jederzeit an{' '}
+                <a className="ent-link" href="mailto:claude@pix-el.de">claude@pix-el.de</a>.
+                Alle lokalen Daten löschst du selbst: ⚙️ → Daten → „Alles leeren" oder über die Website-Daten deines Browsers.
+              </p>
+              <p className="legal-hint">Dieses Muster ersetzt keine Rechtsberatung.</p>
             </section>
 
             <div className="help-foot">PixiNotes — lokal, offen, deins. Feedback jederzeit willkommen. 📌</div>
