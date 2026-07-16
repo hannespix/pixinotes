@@ -69,6 +69,4 @@ export const ITag = make(<><path d="M12 2H4a2 2 0 0 0-2 2v8l10 10 10-10Z" /><cir
 export const IBookmark = make(<path d="M19 21 12 16 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z" />);
 export const IArrange = make(<><rect width="7" height="7" x="3" y="3" rx="1.5" /><rect width="7" height="7" x="14" y="3" rx="1.5" /><rect width="7" height="7" x="3" y="14" rx="1.5" /><path d="M17.5 14.5v6" /><path d="M14.5 17.5h6" /></>);
 export const IHelp = make(<><circle cx="12" cy="12" r="9" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.4-3 4" /><path d="M12 17.5h.01" /></>);
-export const IBringFront = make(<><rect width="12" height="12" x="9" y="9" rx="2" fill="currentColor" stroke="none" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></>);
-export const ISendBack = make(<><rect width="12" height="12" x="3" y="3" rx="2" fill="currentColor" stroke="none" opacity="0.45" /><rect width="12" height="12" x="9" y="9" rx="2" /></>);
 export const IMagnet = make(<><path d="M5 3v7a7 7 0 0 0 14 0V3" /><path d="M5 3h4v7a3 3 0 0 0 6 0V3h4" /><path d="M5 8h4" /><path d="M15 8h4" /></>);

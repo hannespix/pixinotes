@@ -179,8 +179,8 @@ interface BoardState {
   removeNode: (id: string) => void;
   removeNodes: (ids: string[]) => void;
   restoreDeleted: () => void;
-  /** Z-Reihenfolge: Karten in den Vorder- bzw. Hintergrund (Array-Reihenfolge = Stapelreihenfolge) */
-  reorderNodes: (ids: string[], dir: 'front' | 'back') => void;
+  /** Zuletzt angefasste Karte dauerhaft nach vorn (persistierter zIndex, ohne Undo-Eintrag) */
+  touchNode: (id: string) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
   setNodePosition: (id: string, x: number, y: number) => void;
   /** Mehrere Positionen in EINEM Store-Update — für den Physik-Loop (60 fps) */
@@ -795,16 +795,20 @@ export const useBoard = create<BoardState>()(
           );
         },
 
-        reorderNodes: (ids, dir) => {
-          const idSet = new Set(ids);
-          get().pushHistory();
-          patchActive((b) => {
-            // Auswahl aufheben, sonst hält die Selektions-Anhebung die Karte
-            // optisch vorn und der Effekt wäre erst beim Wegklicken sichtbar
-            const picked = b.nodes.filter((n) => idSet.has(n.id)).map((n) => ({ ...n, selected: false }) as AppNode);
-            const rest = b.nodes.filter((n) => !idSet.has(n.id));
-            return { nodes: dir === 'front' ? [...rest, ...picked] : [...picked, ...rest] };
-          });
+        touchNode: (id) => {
+          const board = get().boards.find((b) => b.id === get().activeId);
+          const node = board?.nodes.find((n) => n.id === id);
+          if (!board || !node) return;
+          // zIndex statt Array-Umsortierung: das DOM-Element bleibt an Ort und
+          // Stelle, sonst verlöre der Notiz-Editor beim Anklicken den Fokus.
+          // Kein pushHistory — das Anfassen ist eine implizite Geste, kein Edit.
+          const maxZ = Math.max(0, ...board.nodes.map((n) => n.zIndex ?? 0));
+          const alreadyTop = (node.zIndex ?? 0) === maxZ
+            && board.nodes.filter((n) => (n.zIndex ?? 0) === maxZ).length === 1;
+          if (alreadyTop) return;
+          patchActive((b) => ({
+            nodes: b.nodes.map((n) => (n.id === id ? ({ ...n, zIndex: maxZ + 1 }) as AppNode : n)),
+          }));
         },
 
         restoreDeleted: () => {

@@ -199,6 +199,18 @@ export function Board() {
     dragTrack.current = { id: node.id, x: node.position.x, y: node.position.y, t: performance.now(), vx: 0, vy: 0 };
   }, []);
 
+  // Angefasst = dauerhaft nach vorn: Capture-Listener statt onNodeClick, damit
+  // auch Klicks in Editor/nodrag-Bereiche zählen (die erreichen onNodeClick nicht)
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      const el = (e.target as HTMLElement | null)?.closest?.('.react-flow__node');
+      const id = el?.getAttribute('data-id');
+      if (id) useBoard.getState().touchNode(id);
+    };
+    window.addEventListener('pointerdown', onDown, true);
+    return () => window.removeEventListener('pointerdown', onDown, true);
+  }, []);
+
   const onNodeDrag = useCallback((_: unknown, node: Node) => {
     const track = dragTrack.current;
     if (!track || track.id !== node.id) return;
