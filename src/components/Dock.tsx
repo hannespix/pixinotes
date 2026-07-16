@@ -84,9 +84,9 @@ export function Dock() {
         fitView({ padding: 0.12, duration: 500, maxZoom: 1 });
         const msg = {
           flow: 'Verbundenes als Fluss, Rest nach Modultyp gruppiert',
-          grid: 'alles als Raster nach Modultyp',
-          circles: 'Cluster als Kreis-Bündel',
-          stack: 'überlappende Stapel pro Modultyp (Physik ist jetzt AUS, damit nichts auseinanderrutscht)',
+          grid: 'Themen-Cluster bleiben zusammen, Rest als Raster nach Modultyp',
+          circles: 'Themen-Cluster als Kreis-Bündel (Titel in der Mitte)',
+          stack: 'Stapel je Themen-Cluster & Modultyp (Physik ist jetzt AUS, damit nichts auseinanderrutscht)',
         }[mode];
         showToast(`🧹 Aufgeräumt: ${msg} — Strg+Z stellt die alte Anordnung wieder her.`);
       }

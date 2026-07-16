@@ -171,7 +171,7 @@ interface BoardState {
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
   /** Verbindung mit Label direkt anlegen (KI-Vorschläge) */
-  addLabeledEdge: (source: string, target: string, label: string) => void;
+  addLabeledEdge: (source: string, target: string, label: string, kind?: string) => void;
   updateEdgeLabel: (id: string, label: string) => void;
   updateEdgeKind: (id: string, kind: string) => void;
   removeEdge: (id: string) => void;
@@ -740,11 +740,11 @@ export const useBoard = create<BoardState>()(
           }));
         },
 
-        addLabeledEdge: (source, target, label) => {
+        addLabeledEdge: (source, target, label, kind = 'arrow') => {
           get().pushHistory();
           patchActive((b) => ({
             edges: addEdge(
-              { id: `e-${uid()}`, source, target, type: 'labeled', data: { label, kind: 'arrow' } },
+              { id: `e-${uid()}`, source, target, type: 'labeled', data: { label, kind } },
               b.edges,
             ),
           }));

@@ -143,8 +143,9 @@ export async function aiCluster(nodes: AppNode[]): Promise<string> {
   const moves: Array<[string, number, number]> = [];
   mutedHistory(() => clusters.forEach((c, i) => {
     const x = X0 + i * (COLW + GAP_X);
+    const titleId = uid();
     st.addNode({
-      id: uid(), type: 'shape', width: 320, height: 52,
+      id: titleId, type: 'shape', width: 320, height: 52,
       position: { x, y: Y0 - 80 },
       data: { shape: 'terminator', text: c.title || `Thema ${i + 1}`, color: SECTION_COLORS[i % SECTION_COLORS.length] },
     } as AppNode);
@@ -154,6 +155,9 @@ export async function aiCluster(nodes: AppNode[]): Promise<string> {
       if (!node) continue;
       moves.push([nid, x, y]);
       y += (node.measured?.height ?? (node.height as number | undefined) ?? 170) + GAP_Y;
+      // Titel-Bubble mit jeder Karte verbinden (dezente Linie ohne Pfeil) —
+      // so bleibt das Thema beim Aufräumen als Cluster zusammen
+      st.addLabeledEdge(titleId, nid, '', 'line');
     }
   }));
   if (moves.length === 0) throw new Error('Die KI hat keine bekannten Karten-IDs geliefert.');

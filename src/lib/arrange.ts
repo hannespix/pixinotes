@@ -139,10 +139,27 @@ function layoutGrid(group: AppNode[]): Block {
   return { w: maxW, h: y - GAP_Y, nodes };
 }
 
-/** Kreis-Bündel: Karten eines Blocks auf einem Ring (Mittelpunkte gleichverteilt) */
-function layoutCircle(group: AppNode[]): Block {
+/** Kreis-Bündel: Karten eines Blocks auf einem Ring (Mittelpunkte gleichverteilt).
+ *  Hat der Block einen „Hub" (Karte, die mit fast allen anderen verbunden ist —
+ *  z. B. die Titel-Bubble eines KI-Clusters), kommt er in die Ringmitte. */
+function layoutCircle(group: AppNode[], edges?: Edge[]): Block {
   if (group.length === 1) return layoutGrid(group);
-  const sorted = [...group].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
+  let hub: AppNode | undefined;
+  if (edges && group.length >= 3) {
+    const ids = new Set(group.map((n) => n.id));
+    const deg = new Map<string, number>();
+    for (const e of edges) {
+      if (ids.has(e.source) && ids.has(e.target)) {
+        deg.set(e.source, (deg.get(e.source) ?? 0) + 1);
+        deg.set(e.target, (deg.get(e.target) ?? 0) + 1);
+      }
+    }
+    const best = [...deg.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (best && best[1] >= (group.length - 1) * 0.6) hub = group.find((n) => n.id === best[0]);
+  }
+  const ringGroup = hub ? group.filter((n) => n.id !== hub.id) : group;
+  if (ringGroup.length < 2) return layoutGrid(group);
+  const sorted = [...ringGroup].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
   const sizes = sorted.map(sizeOf);
   // Umfang muss alle Karten (plus Luft) aufnehmen — Diagonale als sichere
   // Schranke, damit auch breite Karten (Kanban, Gantt) nirgends kollidieren
@@ -151,7 +168,9 @@ function layoutCircle(group: AppNode[]): Block {
   const maxDiag = Math.max(...diags);
   // Sehnenabstand benachbarter Mittelpunkte ≥ größte Diagonale
   const rChord = maxDiag / (2 * Math.sin(Math.PI / sorted.length));
-  const r = Math.max(160, perim / (2 * Math.PI), rChord);
+  // Ring muss auch den Hub in der Mitte freihalten
+  const rHub = hub ? Math.hypot(sizeOf(hub).w, sizeOf(hub).h) / 2 + maxDiag / 2 + GAP_Y : 0;
+  const r = Math.max(160, perim / (2 * Math.PI), rChord, rHub);
   const maxW = Math.max(...sizes.map((s) => s.w));
   const maxH = Math.max(...sizes.map((s) => s.h));
   const cx = r + maxW / 2;
@@ -161,12 +180,22 @@ function layoutCircle(group: AppNode[]): Block {
     const s = sizes[i];
     return { id: n.id, x: cx + Math.cos(a) * r - s.w / 2, y: cy + Math.sin(a) * r - s.h / 2 };
   });
+  if (hub) {
+    const hs = sizeOf(hub);
+    nodes.push({ id: hub.id, x: cx - hs.w / 2, y: cy - hs.h / 2 });
+  }
   return { w: 2 * r + maxW, h: 2 * r + maxH, nodes };
 }
 
-/** Überlappender Stapel: Kaskaden-Versatz, sodass die Überschriften sichtbar bleiben */
+/** Überlappender Stapel: Kaskaden-Versatz, sodass die Überschriften sichtbar bleiben.
+ *  Titel-Bubbles (Formen) liegen zuoberst im Kaskaden-Kopf — so bleibt der
+ *  Cluster-Titel eines KI-Themas lesbar. */
 function layoutStack(group: AppNode[]): Block {
-  const sorted = [...group].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
+  const sorted = [...group].sort((a, b) => {
+    const sa = (a.type ?? '') === 'shape' ? 0 : 1;
+    const sb = (b.type ?? '') === 'shape' ? 0 : 1;
+    return sa - sb || a.position.y - b.position.y || a.position.x - b.position.x;
+  });
   const STEP_X = 26;
   const STEP_Y = 46; // genug für Titel-/Kopfzeile der darunterliegenden Karte
   const nodes: Placed[] = sorted.map((n, i) => ({ id: n.id, x: i * STEP_X, y: i * STEP_Y }));
@@ -182,51 +211,39 @@ export function computeArrangement(nodes: AppNode[], edges: Edge[], mode: Arrang
   if (nodes.length === 0) return [];
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const comps = components(nodes, edges);
-  const typeGroups = (): AppNode[][] => {
+
+  // Themen-Cluster = Zusammenhangskomponenten (z. B. KI-Cluster: Titel-Bubble
+  // ist mit ihren Karten verbunden). Sie bleiben in JEDEM Modus zusammen und
+  // werden nur intern nach dem gewählten Modus gelegt.
+  const clusters = comps
+    .filter((c) => c.length > 1)
+    .sort((a, b) => b.length - a.length)
+    .map((c) => c.map((id) => byId.get(id)!));
+  const singles = comps.filter((c) => c.length === 1).map((c) => byId.get(c[0])!);
+  const singleGroups = (): AppNode[][] => {
     const out: AppNode[][] = [];
     for (const type of TYPE_ORDER) {
-      const g = nodes.filter((n) => (n.type ?? '') === type);
+      const g = singles.filter((n) => (n.type ?? '') === type);
       if (g.length) out.push(g);
     }
-    const rest = nodes.filter((n) => !TYPE_ORDER.includes(n.type ?? ''));
+    const rest = singles.filter((n) => !TYPE_ORDER.includes(n.type ?? ''));
     if (rest.length) out.push(rest);
     return out;
   };
 
+  const clusterBlock = (c: AppNode[]): Block =>
+    mode === 'grid' ? layoutGrid(c)
+    : mode === 'stack' ? layoutStack(c)
+    : mode === 'circles' ? layoutCircle(c, edges)
+    : layoutComponent(c.map((n) => n.id), byId, edges);
+  const singleBlock = (g: AppNode[]): Block =>
+    mode === 'stack' ? layoutStack(g)
+    : mode === 'circles' ? layoutCircle(g)
+    : layoutGrid(g);
+
   const blocks: Block[] = [];
-  if (mode === 'grid') {
-    // Reines Raster: Verbindungen ignorieren, alles nach Typ sortiert rastern
-    for (const g of typeGroups()) blocks.push(layoutGrid(g));
-  } else if (mode === 'stack') {
-    // Überlappende Stapel pro Modultyp — Überschriften bleiben lesbar
-    for (const g of typeGroups()) blocks.push(layoutStack(g));
-  } else if (mode === 'circles') {
-    // Kreis-Bündel: verbundene Cluster + Typ-Gruppen jeweils als Ring
-    for (const comp of comps.filter((c) => c.length > 1).sort((a, b) => b.length - a.length)) {
-      blocks.push(layoutCircle(comp.map((id) => byId.get(id)!)));
-    }
-    const singles = comps.filter((c) => c.length === 1).map((c) => byId.get(c[0])!);
-    for (const type of TYPE_ORDER) {
-      const group = singles.filter((n) => (n.type ?? '') === type);
-      if (group.length) blocks.push(layoutCircle(group));
-    }
-    const rest = singles.filter((n) => !TYPE_ORDER.includes(n.type ?? ''));
-    if (rest.length) blocks.push(layoutCircle(rest));
-  } else {
-    // 'flow' (Standard):
-    // 1) verbundene Cluster (größte zuerst — sie prägen das Bild)
-    for (const comp of comps.filter((c) => c.length > 1).sort((a, b) => b.length - a.length)) {
-      blocks.push(layoutComponent(comp, byId, edges));
-    }
-    // 2) Singles nach Modultyp gruppieren
-    const singles = comps.filter((c) => c.length === 1).map((c) => byId.get(c[0])!);
-    for (const type of TYPE_ORDER) {
-      const group = singles.filter((n) => (n.type ?? '') === type);
-      if (group.length) blocks.push(layoutGrid(group));
-    }
-    const rest = singles.filter((n) => !TYPE_ORDER.includes(n.type ?? ''));
-    if (rest.length) blocks.push(layoutGrid(rest));
-  }
+  for (const c of clusters) blocks.push(clusterBlock(c));
+  for (const g of singleGroups()) blocks.push(singleBlock(g));
 
   // 3) Shelf-Packing: Blöcke zeilenweise auf eine harmonische Zielbreite legen
   const totalArea = blocks.reduce((a, b) => a + (b.w + BLOCK_GAP) * (b.h + ROW_GAP), 0);
