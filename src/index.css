@@ -1354,6 +1354,41 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .kanban-addcol.k-auto-on { color: #fff; background: var(--accent); opacity: 1; }
 .kanban-addcol.k-auto-on:hover { background: #3557c9; }
 
+/* ---------- Kopfleiste: Brotkrume + Navigator-Baum ---------- */
+.tab-nav-wrap { position: relative; display: inline-flex; flex: none; }
+.tab-nav {
+  display: inline-flex; align-items: center; gap: 5px; border: none; cursor: pointer;
+  background: #f1ede4; border-radius: 8px; padding: 5px 10px; font-family: inherit;
+  font-size: 12px; color: var(--ink); max-width: 300px;
+}
+.tab-nav:hover, .tab-nav.active { background: #e8efff; }
+.tab-nav-space, .tab-nav-proj { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab-nav-space { color: var(--muted); max-width: 130px; }
+.tab-nav-proj { font-weight: 650; max-width: 150px; }
+.tab-tree {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 60;
+  background: #fff; border-radius: 12px; box-shadow: 0 8px 32px rgba(50,40,20,.25);
+  padding: 8px; width: 320px; max-height: min(560px, 70vh); overflow-y: auto;
+}
+.tab-tree-space { padding: 4px 2px 2px; }
+.tab-tree-space + .tab-tree-space { border-top: 1px solid #efe9dc; margin-top: 4px; }
+.tab-tree-space-name {
+  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); padding: 4px 6px 2px;
+}
+.tab-tree-proj { padding: 1px 0 4px 6px; }
+.tab-tree-proj-name { font-size: 11px; font-weight: 650; color: var(--ink); padding: 4px 6px 2px; opacity: .75; }
+.tab-tree-board {
+  display: flex; align-items: center; gap: 8px; width: 100%; border: none; background: none;
+  font-family: inherit; font-size: 12.5px; color: var(--ink); text-align: left;
+  padding: 6px 8px 6px 14px; border-radius: 7px; cursor: pointer;
+}
+.tab-tree-board:hover { background: #f1ede4; }
+.tab-tree-board.active { background: #e8efff; font-weight: 650; }
+.tab-tree-board-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab-tree-empty { font-size: 11px; color: var(--muted); padding: 2px 14px 4px; }
+.tab-tree-foot { font-size: 10px; color: var(--muted); text-align: center; padding: 7px 4px 2px; border-top: 1px solid #efe9dc; margin-top: 4px; }
+
 /* ---------- KI-Freitext-Kommando ---------- */
 .ai-cmd-input {
   width: 100%; box-sizing: border-box; border: 1px solid rgba(0,0,0,.14); border-radius: 8px;
@@ -1405,6 +1440,11 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   .ov-graph-toggles { top: 158px; max-width: calc(100vw - 24px); }
   .ov-graph { padding-top: 205px; }
   .ov-graph-zoom { right: 12px; bottom: 60px; }
+  /* Brotkrume kompakt: nur der Projektname, Baum auf Viewport-Breite */
+  .tab-nav-space { display: none; }
+  .tab-nav > svg { display: none; }
+  .tab-nav-proj { max-width: 110px; }
+  .tab-tree { width: min(320px, calc(100vw - 24px)); }
 }
 
 @media (max-width: 860px) {

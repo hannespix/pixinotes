@@ -1,15 +1,18 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
 import { InlineName } from './InlineName';
-import { IHistory, IHome, IPlus, IShare, IX } from './Icons';
+import { IChevronR, IHistory, IHome, IPlus, IShare, IX } from './Icons';
 
 /**
- * Projekt-Tabs: jedes Board ist ein Raum. Doppelklick = umbenennen,
- * ✕ = schließen (Inhalte bleiben weg — bewusst simpel in v0.2).
+ * Kopfleiste mit dreistufiger Gliederung: Die Tab-Reihe zeigt NUR die Boards
+ * des aktiven Projekts (schnelles seitliches Wechseln); davor sitzt die
+ * Brotkrume „Bereich › Projekt", die den Navigator-Baum über alle Bereiche,
+ * Projekte und Boards aufklappt — so bleibt auch ein großer Bestand geordnet.
  */
 export function Tabs() {
   const boards = useBoard((s) => s.boards);
+  const spaces = useBoard((s) => s.spaces);
   const activeId = useBoard((s) => s.activeId);
   const view = useBoard((s) => s.view);
   const setView = useBoard((s) => s.setView);
@@ -27,6 +30,35 @@ export function Tabs() {
   const restoreVersion = useBoard((s) => s.restoreVersion);
   const deleteVersion = useBoard((s) => s.deleteVersion);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+
+  const byId = useMemo(() => new Map(boards.map((b) => [b.id, b])), [boards]);
+
+  // Aktiven Kontext (Bereich + Projekt) zum aktiven Board ermitteln
+  const context = useMemo(() => {
+    for (const sp of spaces) {
+      for (const proj of sp.projects) {
+        if (proj.boardIds.includes(activeId)) return { space: sp, project: proj };
+      }
+    }
+    const first = spaces[0]?.projects[0];
+    return first ? { space: spaces[0], project: first } : null;
+  }, [spaces, activeId]);
+
+  // Boards des aktiven Projekts (in Projekt-Reihenfolge) — nur DIE als Tabs
+  const projectBoards = useMemo(() => {
+    const ids = context?.project.boardIds ?? [];
+    const list = ids.map((id) => byId.get(id)).filter((b): b is NonNullable<typeof b> => !!b);
+    // Waisen-Board aktiv? Dann wenigstens dieses zeigen.
+    if (!list.some((b) => b.id === activeId) && byId.has(activeId)) list.push(byId.get(activeId)!);
+    return list;
+  }, [context, byId, activeId]);
+
+  // Boards ohne Projekt (nach Imports o. Ä.) — im Navigator unter „Ohne Projekt"
+  const orphans = useMemo(() => {
+    const assigned = new Set(spaces.flatMap((sp) => sp.projects.flatMap((p) => p.boardIds)));
+    return boards.filter((b) => !assigned.has(b.id));
+  }, [spaces, boards]);
 
   /** Aktives Board serverlos teilen: Link in die Zwischenablage (Fallback: Datei) */
   const shareActive = async () => {
@@ -66,9 +98,68 @@ export function Tabs() {
       >
         <IHome size={15} />
       </button>
-      {/* Nur die Board-Tabs scrollen — Home & Aktions-Buttons bleiben immer erreichbar */}
+      {/* Brotkrume „Bereich › Projekt" öffnet den Navigator über ALLE Ebenen */}
+      <span className="tab-nav-wrap">
+        <button
+          className={`tab-nav ${navOpen ? 'active' : ''}`}
+          title="Navigator: alle Bereiche, Projekte & Boards"
+          onClick={() => { setNavOpen((o) => !o); setHistoryOpen(false); }}
+        >
+          <span className="tab-nav-space">{context?.space.name ?? '—'}</span>
+          <IChevronR size={11} />
+          <span className="tab-nav-proj">{context?.project.name ?? '—'}</span>
+        </button>
+        {navOpen && (
+          <div className="tab-tree">
+            {spaces.map((sp) => (
+              <div key={sp.id} className="tab-tree-space">
+                <div className="tab-tree-space-name">{sp.name}</div>
+                {sp.projects.map((proj) => (
+                  <div key={proj.id} className="tab-tree-proj">
+                    <div className="tab-tree-proj-name">{proj.name}</div>
+                    {proj.boardIds.map((id) => {
+                      const b = byId.get(id);
+                      if (!b) return null;
+                      return (
+                        <button
+                          key={id}
+                          className={`tab-tree-board ${id === activeId && view === 'board' ? 'active' : ''}`}
+                          onClick={() => { openBoard(id); setNavOpen(false); }}
+                        >
+                          <span className="tab-tree-board-name">{b.name}</span>
+                          <span className="tab-count">{b.nodes.length}</span>
+                        </button>
+                      );
+                    })}
+                    {proj.boardIds.length === 0 && <div className="tab-tree-empty">leer</div>}
+                  </div>
+                ))}
+              </div>
+            ))}
+            {orphans.length > 0 && (
+              <div className="tab-tree-space">
+                <div className="tab-tree-space-name">Ohne Projekt</div>
+                <div className="tab-tree-proj">
+                  {orphans.map((b) => (
+                    <button
+                      key={b.id}
+                      className={`tab-tree-board ${b.id === activeId && view === 'board' ? 'active' : ''}`}
+                      onClick={() => { openBoard(b.id); setNavOpen(false); }}
+                    >
+                      <span className="tab-tree-board-name">{b.name}</span>
+                      <span className="tab-count">{b.nodes.length}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="tab-tree-foot">🏠 öffnet die große Übersicht · Tabs zeigen nur das aktive Projekt</div>
+          </div>
+        )}
+      </span>
+      {/* Nur die Board-Tabs des AKTIVEN Projekts — scrollen bei Bedarf */}
       <div className="tabs-scroll">
-        {boards.map((b) => (
+        {projectBoards.map((b) => (
           <div
             key={b.id}
             className={`tab ${b.id === activeId && view === 'board' ? 'active' : ''}`}
@@ -140,10 +231,10 @@ export function Tabs() {
       </span>
       <button
         className="tab-add"
-        title="Neues Projekt-Board"
+        title={`Neues Board in „${context?.project.name ?? 'Allgemein'}"`}
         onClick={() => {
-          addBoard();
-          showToast('Neues Board — Doppelklick auf den Tab zum Umbenennen');
+          addBoard(undefined, context?.project.id);
+          showToast(`Neues Board in „${context?.project.name ?? 'Allgemein'}" — Doppelklick auf den Tab zum Umbenennen`);
         }}
       >
         <IPlus size={14} />
