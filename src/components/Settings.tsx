@@ -9,6 +9,10 @@ import {
   applySync, disconnectSync, ensurePermission, getSyncHandle, knownStamp,
   permissionState, pickSyncFolder, readSync, syncSupported, writeSync, type SyncDirHandle,
 } from '../lib/syncFolder';
+import {
+  applyWebdav, clearWebdav, loadWebdav, saveWebdav, webdavRead, webdavStamp, webdavTest, webdavWrite,
+  type WebdavConfig,
+} from '../lib/webdav';
 
 const MODELS: Record<string, string[]> = {
   free: ['openai'], // anonym gibt es bei Pollinations aktuell nur dieses Modell
@@ -54,6 +58,11 @@ export function Settings() {
   const [gClientId, setGClientId] = useState('');
   const [msClientId, setMsClientId] = useState('');
   const [msTenant, setMsTenant] = useState('');
+  // WebDAV-Zugang (separater localStorage-Schlüssel — nie in Exporten)
+  const [davCfg, setDavCfg] = useState<WebdavConfig | null>(null);
+  const [davUrl, setDavUrl] = useState('');
+  const [davUser, setDavUser] = useState('');
+  const [davSecret, setDavSecret] = useState('');
   const ui = useBoard((s) => s.ui);
   const setUiTheme = useBoard((s) => s.setUiTheme);
   const setUiAccent = useBoard((s) => s.setUiAccent);
@@ -89,6 +98,11 @@ export function Settings() {
     setGClientId(acc.google?.clientId ?? '');
     setMsClientId(acc.ms?.clientId ?? '');
     setMsTenant(acc.ms?.tenant ?? '');
+    const dav = loadWebdav();
+    setDavCfg(dav);
+    setDavUrl(dav?.url ?? '');
+    setDavUser(dav?.user ?? '');
+    setDavSecret(dav?.secret ?? '');
   }, [open]);
 
   if (!open) return null;
@@ -113,6 +127,39 @@ export function Settings() {
     patchCalAccounts({ google: { ...g, calendars: (g.calendars ?? []).map((c) => (c.id === calId ? { ...c, enabled } : c)) } });
     invalidateAccountEvents();
     refreshCalAcc();
+  };
+
+  const davConnect = () => doExport(async () => {
+    const cfg: WebdavConfig = { url: davUrl.trim(), user: davUser.trim(), secret: davSecret, auto: true };
+    const state = await webdavTest(cfg);
+    saveWebdav(cfg);
+    setDavCfg(cfg);
+    if (state === 'vorhanden') {
+      showToast('✅ Verbunden — auf dem Server liegt bereits ein Stand. „⬇️ Vom Server laden" holt ihn.');
+    } else {
+      await webdavWrite(cfg);
+      showToast('✅ Verbunden — aktueller Stand wurde hochgeladen. Änderungen syncen ab jetzt automatisch.');
+    }
+  }, 'dav');
+
+  const davPush = () => doExport(async () => {
+    const stamp = await webdavWrite(davCfg!);
+    showToast(`⬆️ Hochgeladen (${new Date(stamp).toLocaleTimeString('de-DE')}).`);
+  }, 'davpush');
+
+  const davPull = () => doExport(async () => {
+    const p = await webdavRead(davCfg!);
+    if (!p) { showToast('Auf dem Server liegt (noch) keine PixiNotes-Datei.'); return; }
+    if (!window.confirm(`Stand vom ${new Date(p.savedAt).toLocaleString('de-DE')} laden? Der lokale Stand wird ersetzt (Strg+Z geht danach nicht zurück).`)) return;
+    applyWebdav(p);
+    showToast('⬇️ Stand vom WebDAV-Server geladen.');
+  }, 'davpull');
+
+  const davDisconnect = () => {
+    clearWebdav();
+    setDavCfg(null);
+    setDavSecret('');
+    showToast('WebDAV getrennt — Zugangsdaten gelöscht, Daten bleiben lokal erhalten.');
   };
 
   const connectSync = async () => {
@@ -197,10 +244,15 @@ export function Settings() {
       return;
     }
     // Sync trennen, BEVOR geleert wird — sonst würde der Auto-Sync den
-    // leeren Stand in den Ordner schreiben und die Cloud-Kopie überschreiben
+    // leeren Stand in den Ordner/auf den Server schreiben und die
+    // Cloud-Kopie überschreiben
     if (syncHandle) {
       await disconnectSync().catch(() => {});
       setSyncHandle(null);
+    }
+    if (loadWebdav()) {
+      clearWebdav();
+      setDavCfg(null);
     }
     useBoard.getState().resetAll();
     setOpen(false);
@@ -293,6 +345,7 @@ export function Settings() {
 
         {/* ---- Synchronisation (Nextcloud & Co.) ---- */}
         {tab === 'sync' && (
+        <>
         <section className="modal-section">
           <h3>☁️ Synchronisation (Nextcloud, OneDrive, Dropbox …)</h3>
           <p className="modal-hint">
@@ -353,6 +406,55 @@ export function Settings() {
             </>
           )}
         </section>
+
+        <section className="modal-section">
+          <h3>🌐 WebDAV direkt (Nextcloud, ownCloud …)</h3>
+          <p className="modal-hint">
+            Ohne Desktop-Client: PixiNotes spricht direkt mit dem WebDAV-Server — funktioniert auch am
+            Tablet/Handy. Bei Nextcloud: <b>App-Passwort</b> unter Einstellungen → Sicherheit anlegen
+            (nie das echte Passwort). <b>Zugangsdaten bleiben lokal</b> und landen in keinem Export.
+            Hinweis für die IT: Der Browser braucht CORS-Freigabe für diese Adresse — ohne sie bitte
+            den Sync-Ordner oben nutzen.
+          </p>
+          {!davCfg ? (
+            <>
+              <label className="modal-row">
+                <span>Ordner-URL</span>
+                <input
+                  type="text" placeholder="https://cloud…/remote.php/dav/files/BENUTZER/PixiNotes"
+                  value={davUrl} onChange={(e) => setDavUrl(e.target.value)}
+                />
+              </label>
+              <label className="modal-row">
+                <span>Benutzer</span>
+                <input type="text" placeholder="vorname.name" value={davUser} onChange={(e) => setDavUser(e.target.value)} />
+              </label>
+              <label className="modal-row">
+                <span>App-Passwort</span>
+                <input type="password" placeholder="xxxxx-xxxxx-xxxxx" value={davSecret} onChange={(e) => setDavSecret(e.target.value)} />
+              </label>
+              <div className="modal-buttons">
+                <button disabled={!davUrl.trim() || !davUser.trim() || !davSecret || busy === 'dav'} onClick={davConnect}>
+                  {busy === 'dav' ? '…' : '🔗 Verbinden & testen'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="modal-buttons">
+                <button disabled={!!busy} onClick={davPush}>{busy === 'davpush' ? '…' : '⬆️ Jetzt hochladen'}</button>
+                <button disabled={!!busy} onClick={davPull}>{busy === 'davpull' ? '…' : '⬇️ Vom Server laden'}</button>
+                <button disabled={!!busy} onClick={davDisconnect}>✂️ Trennen</button>
+              </div>
+              <div className="modal-note">
+                ✅ Verbunden mit {davCfg.url.replace(/^https?:\/\//, '').split('/')[0]} — Änderungen werden automatisch hochgeladen
+                {webdavStamp() ? ` (letzter Sync: ${new Date(webdavStamp()!).toLocaleString('de-DE')})` : ''}.
+                Schreibt ein anderes Gerät zwischenzeitlich, warnt PixiNotes statt zu überschreiben.
+              </div>
+            </>
+          )}
+        </section>
+        </>
         )}
 
         {/* ---- Kalender-Konten: Google & Microsoft 365 direkt verbinden ---- */}

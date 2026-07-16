@@ -149,6 +149,7 @@ export function HelpOverlay() {
               <ul>
                 <li>Alles speichert <b>automatisch lokal</b> im Browser. Zusätzlich: ⚙️ → Daten → „Datei exportieren" für Backups (USB-Stick, Mail, Netzlaufwerk).</li>
                 <li><b>Sync-Ordner:</b> einen von Nextcloud/OneDrive/Dropbox synchronisierten Ordner verbinden — PixiNotes schreibt dort automatisch; andere Geräte verbinden denselben Ordner. Bei Konflikten warnt PixiNotes statt zu überschreiben.</li>
+                <li><b>WebDAV direkt:</b> ohne Desktop-Client (auch am Handy) — Ordner-URL + App-Passwort in ⚙ → Synchronisation. Zugangsdaten bleiben lokal; der Server braucht CORS-Freigabe (IT), sonst den Sync-Ordner nutzen.</li>
                 <li><b>Teilen:</b> Der ⧉-Button in der Kopfleiste kopiert einen Link, der das <b>komplette Board enthält</b> — serverlos. Große Boards werden als .pixiboard.json-Datei exportiert; Empfänger zieht sie einfach aufs Board.</li>
                 <li><b>PWA:</b> Über „App installieren" im Browser wird PixiNotes zur eigenständigen App — läuft komplett offline.</li>
                 <li><b>Export:</b> Markdown-Ordner (Obsidian-lesbar), PNG/SVG des Boards, .ics für Kalender.</li>

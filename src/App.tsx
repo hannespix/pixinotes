@@ -9,6 +9,7 @@ import { Settings } from './components/Settings';
 import { Presenter } from './components/Presenter';
 import { useBoard } from './store';
 import { initAutoSync } from './lib/syncFolder';
+import { initWebdavSync } from './lib/webdav';
 import { TaskHub } from './components/TaskHub';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { HelpOverlay } from './components/HelpOverlay';
@@ -26,7 +27,7 @@ export default function App() {
   const showToast = useBoard((s) => s.showToast);
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); }, []);
+  useEffect(() => { initAutoSync(); initWebdavSync(); }, []);
 
   // Design anwenden: data-theme/-accent am <html>; „System" folgt dem Gerät live
   const ui = useBoard((s) => s.ui);
