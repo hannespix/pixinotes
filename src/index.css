@@ -25,17 +25,19 @@
 
 /* ---------- Dunkles Design (nach den Akzenten: --accent-strong muss hell werden) ---------- */
 [data-theme='dark'] {
-  --bg: #211f1b;
-  --ink: #eae5d9;
-  --muted: #a59d8b;
-  --surface: #2e2b25;
-  --surface-2: #3a362e;
-  --surface-3: #262420;
-  --surface-card: #2d2a24;
-  --surface-glass: rgba(38, 36, 32, 0.88);
-  --surface-dim: rgba(255, 255, 255, 0.08);
-  --border: rgba(255, 255, 255, 0.16);
-  --border-soft: rgba(255, 255, 255, 0.1);
+  /* native Elemente (Datums-Picker, Scrollbalken, Selects) dunkel rendern */
+  color-scheme: dark;
+  --bg: #2d2a25;
+  --ink: #efeadd;
+  --muted: #b6ad9b;
+  --surface: #3a362f;
+  --surface-2: #474139;
+  --surface-3: #332f29;
+  --surface-card: #393530;
+  --surface-glass: rgba(56, 52, 45, 0.9);
+  --surface-dim: rgba(255, 255, 255, 0.09);
+  --border: rgba(255, 255, 255, 0.2);
+  --border-soft: rgba(255, 255, 255, 0.12);
   --card-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 10px 24px rgba(0, 0, 0, 0.3);
   --card-shadow-lift: 0 6px 14px rgba(0, 0, 0, 0.5), 0 24px 48px rgba(0, 0, 0, 0.42);
   --accent-strong: var(--accent);
@@ -1575,3 +1577,15 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 [data-theme='dark'] .react-flow__controls button { background: var(--surface); fill: var(--ink); color: var(--ink); border-bottom-color: var(--border-soft); }
 [data-theme='dark'] .react-flow__controls button:hover { background: var(--surface-2); }
 [data-theme='dark'] .toast { background: #3a362e; }
+
+/* ---------- Dark Mode: Kontrast-Durchgang (Signalfarben aufhellen) ---------- */
+[data-theme='dark'] .task-due.urgency-overdue { color: #ff9a8c; }
+[data-theme='dark'] .task-due.urgency-soon { color: #ffcf8a; }
+[data-theme='dark'] .mermaid-error { color: #ff9a8c; }
+[data-theme='dark'] .modal-danger h3 { color: #ff9a8c; }
+[data-theme='dark'] .modal-buttons button.danger { color: #ff9a8c; border-color: rgba(255, 154, 140, 0.4); }
+[data-theme='dark'] .task-due-input.urgency-overdue { color: #ff9a8c; border-color: rgba(255, 154, 140, 0.45); }
+[data-theme='dark'] .sel-attr-row button:hover,
+[data-theme='dark'] .tab-history-row > button.tab-history-x:hover,
+[data-theme='dark'] .dock-menu-template-x:hover { color: #ff9a8c; }
+[data-theme='dark'] .sel-toolbar button.danger { color: #ff9a8c; }
