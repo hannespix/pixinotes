@@ -196,6 +196,11 @@ interface BoardState {
   addStarter: () => void;
   /** ALLES leeren: ein frisches leeres Board, Hierarchie/Versionen/Vorlagen zurückgesetzt */
   resetAll: () => void;
+
+  /** Design: Hell/Dunkel/System + Akzentfarbe (persistiert) */
+  ui: { theme: 'system' | 'light' | 'dark'; accent: string };
+  setUiTheme: (theme: 'system' | 'light' | 'dark') => void;
+  setUiAccent: (accent: string) => void;
 }
 
 export const selectActiveBoard = (s: BoardState): BoardDoc =>
@@ -327,6 +332,10 @@ export const useBoard = create<BoardState>()(
         lastDeleted: null,
         aiBusy: false,
         setAiBusy: (busy) => set({ aiBusy: busy }),
+
+        ui: { theme: 'system', accent: 'blau' },
+        setUiTheme: (theme) => set({ ui: { ...get().ui, theme } }),
+        setUiAccent: (accent) => set({ ui: { ...get().ui, accent } }),
 
         addStarter: () => {
           const fresh = buildStarter();
@@ -844,6 +853,7 @@ export const useBoard = create<BoardState>()(
         ai: s.ai,
         versions: s.versions,
         templates: s.templates,
+        ui: s.ui,
       }),
       migrate: (persisted: unknown, version: number) => {
         const p = persisted as Record<string, unknown>;

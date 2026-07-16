@@ -26,6 +26,20 @@ export default function App() {
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
   useEffect(() => { initAutoSync(); }, []);
 
+  // Design anwenden: data-theme/-accent am <html>; „System" folgt dem Gerät live
+  const ui = useBoard((s) => s.ui);
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () => {
+      const dark = ui.theme === 'dark' || (ui.theme === 'system' && mq.matches);
+      document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      document.documentElement.dataset.accent = ui.accent;
+    };
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, [ui]);
+
   // Geteiltes Board im URL-Hash? (#b=… — der Link IST die Datei)
   useEffect(() => {
     void (async () => {
@@ -89,9 +103,13 @@ export default function App() {
           <div className="logo">
             Pixi<span>Notes</span>
           </div>
-          <div className="hint">
-            Doppelklick = Notiz · E-Mails &amp; Dateien reinziehen · Strg+V für Screenshots · Karten werfen 🚀
-          </div>
+          {/* Board-Gesten nur anzeigen, wo sie auch GELTEN — nicht in
+              Übersicht, Aufgaben-Zentrale oder Präsentation (User-Feedback) */}
+          {view === 'board' && !presenting && !tasksOpen && (
+            <div className="hint">
+              Doppelklick = Notiz · E-Mails &amp; Dateien reinziehen · Strg+V für Screenshots · Karten werfen 🚀
+            </div>
+          )}
         </div>
         <Tabs />
         {view === 'overview' ? (

@@ -42,8 +42,11 @@ export function Settings() {
   const [busy, setBusy] = useState('');
   const [syncHandle, setSyncHandle] = useState<SyncDirHandle | null>(null);
   const [syncPerm, setSyncPerm] = useState<'granted' | 'prompt'>('granted');
-  // Reiter-Gliederung: KI / Synchronisation / Daten / Export
-  const [tab, setTab] = useState<'ki' | 'sync' | 'daten' | 'export'>('ki');
+  // Reiter-Gliederung: KI / Synchronisation / Daten / Export / Design
+  const [tab, setTab] = useState<'ki' | 'sync' | 'daten' | 'export' | 'design'>('ki');
+  const ui = useBoard((s) => s.ui);
+  const setUiTheme = useBoard((s) => s.setUiTheme);
+  const setUiAccent = useBoard((s) => s.setUiAccent);
   // WICHTIG: vor dem early-return deklarieren (Hook-Reihenfolge!)
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -171,7 +174,7 @@ export function Settings() {
 
         {/* Reiter: hält jede Ebene übersichtlich */}
         <div className="modal-tabs">
-          {([['ki', '🤖 KI'], ['sync', '☁️ Synchronisation'], ['daten', '💾 Daten'], ['export', '📤 Export']] as const).map(([k, label]) => (
+          {([['ki', '🤖 KI'], ['sync', '☁️ Synchronisation'], ['daten', '💾 Daten'], ['export', '📤 Export'], ['design', '🎨 Design']] as const).map(([k, label]) => (
             <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>
           ))}
         </div>
@@ -398,6 +401,47 @@ export function Settings() {
             </button>
           </div>
           <div className="modal-note">💡 Für PDF: PNG/SVG exportieren und über „Drucken → Als PDF speichern" ablegen.</div>
+        </section>
+        )}
+
+        {/* ---- Design: Hell/Dunkel + Akzentfarbe ---- */}
+        {tab === 'design' && (
+        <section className="modal-section">
+          <h3>🎨 Design</h3>
+          <p className="modal-hint">
+            Erscheinungsbild und Akzentfarbe gelten sofort und werden lokal gespeichert.
+            „System" folgt automatisch der Hell/Dunkel-Einstellung deines Geräts.
+            Haftnotizen und Formen bleiben bewusst helles „Papier" — auch im dunklen Design.
+          </p>
+          <label className="modal-row">
+            <span>Erscheinungsbild</span>
+            <select value={ui.theme} onChange={(e) => setUiTheme(e.target.value as 'system' | 'light' | 'dark')}>
+              <option value="system">🖥️ System</option>
+              <option value="light">☀️ Hell</option>
+              <option value="dark">🌙 Dunkel</option>
+            </select>
+          </label>
+          <div className="modal-row">
+            <span>Akzentfarbe</span>
+            <div className="accent-swatches">
+              {([
+                ['blau', '#4f7cff', 'Blau'],
+                ['gruen', '#2e9e63', 'Grün'],
+                ['violett', '#7c5cff', 'Violett'],
+                ['orange', '#e0762e', 'Orange'],
+                ['rosa', '#d44f6e', 'Rosa'],
+              ] as const).map(([id, color, name]) => (
+                <button
+                  key={id}
+                  className={`accent-swatch ${ui.accent === id ? 'on' : ''}`}
+                  style={{ background: color }}
+                  title={name}
+                  aria-label={`Akzentfarbe ${name}`}
+                  onClick={() => setUiAccent(id)}
+                />
+              ))}
+            </div>
+          </div>
         </section>
         )}
 

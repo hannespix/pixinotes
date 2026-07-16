@@ -103,7 +103,7 @@ function OverviewCanvas() {
           setTick((t) => t + 1);
         }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} color="#d8d3c8" />
+        <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} color={document.documentElement.dataset.theme === 'dark' ? '#3d3931' : '#d8d3c8'} />
       </ReactFlow>
       <button className="ov-add-space-float" onClick={() => addSpace()}>
         + Neuer Bereich
