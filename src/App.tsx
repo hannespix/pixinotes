@@ -3,6 +3,7 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { Board } from './components/Board';
 import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
+import { MiniDock } from './components/MiniDock';
 import { Overview } from './components/Overview';
 import { SearchOverlay } from './components/SearchOverlay';
 import { Settings } from './components/Settings';
@@ -116,7 +117,10 @@ export default function App() {
         </div>
         <Tabs />
         {view === 'overview' ? (
-          <Overview />
+          <>
+            <Overview />
+            <MiniDock />
+          </>
         ) : presenting ? null : tasksOpen ? (
           <TaskHub />
         ) : (

@@ -1693,3 +1693,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ent-chip-tel { background: rgba(10, 125, 64, 0.12) !important; color: #0a7d40 !important; font-weight: 600; }
 .ent-chip-mail, .ent-chip-url { background: rgba(79, 124, 255, 0.12) !important; color: #3557c9 !important; }
 .due-chip.ent-chip:hover { border-color: currentColor; }
+
+/* Übersicht hat jetzt ein Mini-Dock unten mittig → „+ Neuer Bereich" darüber (M73) */
+.ov-add-space-float { bottom: 84px; }
