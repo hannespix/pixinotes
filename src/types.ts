@@ -68,6 +68,10 @@ export interface KanbanData {
   autoCollect?: boolean;
   /** Tickets innerhalb der Spalten nach Quell-Board gruppieren (Swimlanes) */
   groupBy?: 'board' | 'none';
+  /** Nur aus diesen Boards einsammeln (undefined = aus allen) */
+  collectFrom?: string[];
+  /** „nodeId|itemId"-Schlüssel entfernter Tickets — werden NICHT erneut eingesammelt */
+  ignoreKeys?: string[];
   [key: string]: unknown;
 }
 

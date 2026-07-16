@@ -4,7 +4,7 @@ import confetti from 'canvas-confetti';
 import { useBoard } from '../../store';
 import { kanbanCols, uid, type GanttData, type KanbanData, type KanbanItem, type KanbanNode } from '../../types';
 import { collectTasks, formatDueShort, urgencyFor } from '../../lib/tasks';
-import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, ISearch, IX } from '../Icons';
+import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, ISearch, ISettings, IX } from '../Icons';
 import { CardShell } from './CardShell';
 
 /** #Tags aus einem Ticket-Text ziehen (Trello-Labels light: einfach #tag tippen) */
@@ -69,11 +69,19 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     );
     const openKeys = new Set<string>();
     const fresh: KanbanItem[] = [];
+    // Feingranular: nur aus gewählten Boards NEU einsammeln; entfernte Tickets
+    // (ignoreKeys) bleiben draußen. WICHTIG: openKeys sieht weiterhin ALLE
+    // Boards — sonst würden Tickets aus abgewählten Boards fälschlich als
+    // „Quelle erledigt" abgehakt.
+    const allowed = (boardId: string) => !kanban.collectFrom || kanban.collectFrom.includes(boardId);
+    const ignored = new Set(kanban.ignoreKeys ?? []);
     // Kanban-Tickets + Checklisten (Aufgaben-Zentrale-Logik) — ohne dieses Kanban selbst
     for (const t of collectTasks(boards)) {
       if (t.nodeId === id) continue;
-      openKeys.add(`${t.nodeId}|${t.itemId}`);
-      if (haveKeys.has(`${t.nodeId}|${t.itemId}`) || have.has(norm(t.text))) continue;
+      const key = `${t.nodeId}|${t.itemId}`;
+      openKeys.add(key);
+      if (!allowed(t.boardId) || ignored.has(key)) continue;
+      if (haveKeys.has(key) || have.has(norm(t.text))) continue;
       have.add(norm(t.text));
       fresh.push({ id: uid(), text: t.text, col: 0, due: t.due, link: { boardId: t.boardId, nodeId: t.nodeId, itemId: t.itemId } });
     }
@@ -83,9 +91,11 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         if (n.type !== 'gantt' || n.id === id) continue;
         for (const row of (n.data as GanttData).rows ?? []) {
           if ((row.progress ?? 0) >= 100) continue;
-          openKeys.add(`${n.id}|${row.id}`);
+          const key = `${n.id}|${row.id}`;
+          openKeys.add(key);
+          if (!allowed(b.id) || ignored.has(key)) continue;
           const text = `${row.name} (Zeitplan)`;
-          if (haveKeys.has(`${n.id}|${row.id}`) || have.has(norm(text))) continue;
+          if (haveKeys.has(key) || have.has(norm(text))) continue;
           have.add(norm(text));
           fresh.push({ id: uid(), text, col: 0, due: row.end, link: { boardId: b.id, nodeId: n.id, itemId: row.id } });
         }
@@ -121,12 +131,16 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   // Auto-Einsammeln: solange der ⟳-Schalter aktiv ist, hält sich das Kanban
   // selbst aktuell. Debounced; loop-sicher, weil ein Lauf ohne Änderungen
   // den State nicht anfasst.
+  // WICHTIG: `kanban` (die eigenen Node-Daten) gehört in die Deps. Der
+  // Store-Render (neue boards) kommt einen Tick VOR dem React-Flow-Prop-Render
+  // (neue data) — ohne die Dep feuerte der Timer mit veralteter Closure und
+  // ignorierte frisch geänderte ignoreKeys/collectFrom (M68-Debugging).
   useEffect(() => {
     if (!kanban.autoCollect) return;
     const t = setTimeout(() => syncFromBoards(false), 900);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boards, kanban.autoCollect]);
+  }, [boards, kanban]);
 
   const move = (item: KanbanItem, dir: -1 | 1) => {
     const col = Math.max(0, Math.min(done, item.col + dir));
@@ -136,8 +150,18 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     setItems(kanban.items.map((it) => (it.id === item.id ? { ...it, col } : it)));
   };
 
-  const remove = (item: KanbanItem) =>
-    setItems(kanban.items.filter((it) => it.id !== item.id));
+  const remove = (item: KanbanItem) => {
+    const items = kanban.items.filter((it) => it.id !== item.id);
+    // Eingesammelte Tickets: Entfernen merken — sonst legt der Auto-Abgleich
+    // das Ticket beim nächsten Lauf sofort wieder an (User-Report)
+    if (item.link?.nodeId && item.link.itemId) {
+      const key = `${item.link.nodeId}|${item.link.itemId}`;
+      updateNodeData(id, { items, ignoreKeys: [...new Set([...(kanban.ignoreKeys ?? []), key])] });
+      if (kanban.autoCollect) showToast('Ticket entfernt — wird nicht erneut eingesammelt (⚙ am Kanban macht das rückgängig).');
+    } else {
+      setItems(items);
+    }
+  };
 
   const addItem = () => {
     const text = newText.trim();
@@ -207,6 +231,28 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const grouped = kanban.groupBy === 'board';
   const boardName = (bid?: string) => (bid ? boards.find((b) => b.id === bid)?.name ?? 'Board' : '— hier erstellt —');
   const resetFilters = () => { setQuery(''); setQuick('alle'); setTagFilter(''); setBoardFilter(''); };
+
+  // ---------- Einsammeln konfigurieren (Quell-Boards, board-weise räumen) ----------
+  const [collectOpen, setCollectOpen] = useState(false);
+  const toggleCollectBoard = (bid: string) => {
+    const current = kanban.collectFrom ?? boards.map((b) => b.id);
+    const next = current.includes(bid) ? current.filter((x) => x !== bid) : [...current, bid];
+    // Wieder alle gewählt → Whitelist auflösen, damit auch KÜNFTIGE Boards mitsammeln
+    const all = boards.every((b) => next.includes(b.id));
+    updateNodeData(id, { collectFrom: all ? undefined : next });
+  };
+  const clearBoardTickets = (bid: string) => {
+    const gone = kanban.items.filter((it) => it.link?.boardId === bid);
+    if (gone.length === 0) return;
+    const keys = gone
+      .filter((it) => it.link?.nodeId && it.link.itemId)
+      .map((it) => `${it.link!.nodeId}|${it.link!.itemId}`);
+    updateNodeData(id, {
+      items: kanban.items.filter((it) => it.link?.boardId !== bid),
+      ignoreKeys: [...new Set([...(kanban.ignoreKeys ?? []), ...keys])],
+    });
+    showToast(`${gone.length} Ticket(s) aus „${boardName(bid)}" entfernt — werden nicht erneut eingesammelt.`);
+  };
 
   const renderItem = (it: KanbanItem, colIdx: number) => (
     <div
@@ -300,6 +346,13 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         >
           <IRedo size={12} />
         </button>
+        <button
+          className={`kanban-addcol nodrag ${collectOpen || kanban.collectFrom ? 'k-auto-on' : ''}`}
+          title="Einsammeln konfigurieren: Quell-Boards wählen · Tickets board-weise entfernen · entfernte Tickets wieder zulassen"
+          onClick={() => setCollectOpen((o) => !o)}
+        >
+          <ISettings size={12} />
+        </button>
         <button className="kanban-addcol nodrag" title="Spalte hinzufügen" onClick={addCol}><IPlus size={12} /></button>
       </div>
       {filterOpen && (
@@ -385,6 +438,51 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           onKeyDown={(e) => e.key === 'Enter' && addItem()}
         />
       </div>
+      {collectOpen && (
+        <div
+          className="ticket-detail collect-panel nodrag"
+          tabIndex={-1}
+          onKeyDown={(e) => e.key === 'Escape' && setCollectOpen(false)}
+        >
+          <div className="ticket-detail-head">
+            <span>Einsammeln konfigurieren</span>
+            <button title="Schließen" onClick={() => setCollectOpen(false)}><IX size={12} /></button>
+          </div>
+          <div className="collect-hint">Haken = aus diesem Board sammeln · ✕ räumt dessen Tickets aus dem Kanban</div>
+          {boards.map((b) => {
+            const checked = !kanban.collectFrom || kanban.collectFrom.includes(b.id);
+            const cnt = kanban.items.filter((it) => it.link?.boardId === b.id).length;
+            return (
+              <div className="collect-row" key={b.id}>
+                <label title={checked ? 'Wird eingesammelt — Klick schließt dieses Board aus' : 'Ausgeschlossen — Klick sammelt wieder ein'}>
+                  <input type="checkbox" checked={checked} onChange={() => toggleCollectBoard(b.id)} />
+                  <span className="collect-name">{b.name}</span>
+                </label>
+                {cnt > 0 && <span className="kanban-count">{cnt}</span>}
+                {cnt > 0 && (
+                  <button
+                    className="collect-clear"
+                    title={`Alle ${cnt} Tickets aus „${b.name}" aus diesem Kanban entfernen (kommen nicht automatisch wieder)`}
+                    onClick={() => clearBoardTickets(b.id)}
+                  >
+                    <IX size={10} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+          {(kanban.ignoreKeys?.length ?? 0) > 0 && (
+            <button
+              className="collect-reset"
+              title="Ignorier-Liste leeren — beim nächsten Einsammeln kommen sie zurück"
+              onClick={() => { updateNodeData(id, { ignoreKeys: undefined }); showToast('Entfernte Tickets werden wieder eingesammelt (⭳ bzw. ⟳).'); }}
+            >
+              {kanban.ignoreKeys!.length} dauerhaft entfernte(s) Ticket(s) wieder zulassen
+            </button>
+          )}
+          <div className="ticket-detail-foot">Gilt für ⭳ Einsammeln und ⟳ Auto-Abgleich · Esc schließt</div>
+        </div>
+      )}
       {(() => {
         const it = kanban.items.find((x) => x.id === detailId);
         if (!it) return null;
