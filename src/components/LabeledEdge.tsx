@@ -61,7 +61,7 @@ export function LabeledEdge({
       ? getSmoothStepPath({ sourceX: sx, sourceY: sy, sourcePosition: sPos, targetX: tx, targetY: ty, targetPosition: tPos })
       : getBezierPath({ sourceX: sx, sourceY: sy, sourcePosition: sPos, targetX: tx, targetY: ty, targetPosition: tPos });
 
-  const stroke = selected ? '#4f7cff' : 'rgba(90,80,60,.5)';
+  const stroke = selected ? 'var(--accent)' : 'var(--edge)'; // theme-sensitiv (hell/dunkel)
   const marker = kind === 'line'
     ? undefined
     : { type: MarkerType.ArrowClosed, width: 18, height: 18, color: stroke };
@@ -129,7 +129,9 @@ export function EdgeMarkerDefs() {
             markerHeight="8"
             orient="auto-start-reverse"
           >
-            <path d="M1,1 L10,6 L1,11 Z" fill={k === 'sel' ? '#4f7cff' : 'rgba(90,80,60,.7)'} />
+            {/* Deckende Füllung! Halbtransparent ließe die darunterliegende
+                Linie durchscheinen — die „transparente Spitze" aus dem User-Report */}
+            <path d="M1,1 L10,6 L1,11 Z" fill={k === 'sel' ? 'var(--accent)' : 'var(--edge-head)'} />
           </marker>
         ))}
       </defs>

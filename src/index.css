@@ -15,6 +15,8 @@
   --border-soft: #e7e1d3;
   --card-shadow: 0 2px 6px rgba(60, 50, 30, 0.12), 0 10px 24px rgba(60, 50, 30, 0.08);
   --card-shadow-lift: 0 6px 14px rgba(60, 50, 30, 0.18), 0 24px 48px rgba(60, 50, 30, 0.16);
+  --edge: rgba(90, 80, 60, 0.5);      /* Verbindungs-Linie */
+  --edge-head: #a59e90;               /* Pfeilspitze: deckend = --edge über --bg gemischt */
 }
 
 /* ---------- Akzentfarben-Themes ---------- */
@@ -40,6 +42,8 @@
   --border-soft: rgba(255, 255, 255, 0.12);
   --card-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 10px 24px rgba(0, 0, 0, 0.3);
   --card-shadow-lift: 0 6px 14px rgba(0, 0, 0, 0.5), 0 24px 48px rgba(0, 0, 0, 0.42);
+  --edge: rgba(235, 225, 205, 0.5);
+  --edge-head: #8c8577;
   --accent-strong: var(--accent);
 }
 /* Haftnotizen & Prozess-Formen bleiben helles „Papier" — Text darauf dunkel */
@@ -1608,3 +1612,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 [data-theme='dark'] .ticket-jump { color: #beadff; }
 /* Tooltip hebt sich sonst kaum vom dunklen Grund ab */
 [data-theme='dark'] .tipbox { border: 1px solid var(--border-soft); }
+
+/* Slash-Menü („/") ragt über den Kartenrand — solange es offen ist, darf die
+   Notiz nicht clippen (die Karte liegt durch Auto-Vordergrund ohnehin oben) */
+.note-card:has(.bn-suggestion-menu) { overflow: visible; }
+.note-card .bn-suggestion-menu { z-index: 40; max-height: 320px; }
