@@ -12,6 +12,7 @@ import { CardShell } from './CardShell';
  */
 export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
+  const uiTheme = useBoard((s) => s.ui.theme); // Diagramm folgt Hell/Dunkel
   const [edit, setEdit] = useState(true);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState('');
@@ -29,7 +30,7 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
         .catch((e) => { if (!cancelled && myKey === renderKey.current) setError(String(e?.message ?? e).split('\n')[0]); });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [data.code, id]);
+  }, [data.code, id, uiTheme]);
 
   return (
     <CardShell id={id} selected={selected} minWidth={280} minHeight={180} className="mermaid-card">

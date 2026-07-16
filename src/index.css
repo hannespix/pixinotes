@@ -458,7 +458,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   border: none; background: none; font-family: inherit; text-align: left;
   padding: 10px 16px; cursor: pointer;
 }
-.search-hit.active { background: #f2f6ff; }
+.search-hit.active { background: var(--accent-soft); }
 .hit-icon { font-size: 18px; flex: none; }
 .hit-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .hit-title { font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -561,8 +561,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ovc-tile .ov-board-name { display: block; padding-right: 46px; }
 .ovc-tile:hover .ovc-tile-actions { opacity: 1; }
 .ovc-tile-actions button {
-  border: none; background: rgba(255,255,255,0.9); border-radius: 6px;
-  font-size: 10px; cursor: pointer; padding: 3px 5px;
+  border: none; background: var(--surface); color: var(--ink); border-radius: 6px;
+  font-size: 10px; cursor: pointer; padding: 3px 5px; box-shadow: 0 1px 3px var(--border);
 }
 .ov-add-space-float {
   position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
@@ -579,8 +579,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .edge-label {
   position: absolute; pointer-events: all;
   display: flex; align-items: center; gap: 3px;
-  background: #f2efe9; border: 1px solid var(--border-soft); border-radius: 999px;
-  padding: 2px 4px 2px 8px; font-size: 11px; color: #6f6a5b;
+  background: var(--bg); border: 1px solid var(--border-soft); border-radius: 999px;
+  padding: 2px 4px 2px 8px; font-size: 11px; color: var(--muted);
   box-shadow: 0 1px 3px var(--border); max-width: 200px;
 }
 .edge-label.selected { border-color: var(--accent); }
@@ -676,7 +676,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .mermaid-code {
   flex: 1; min-width: 0; border: 1px solid var(--border-soft); border-radius: 7px; padding: 7px;
   font-family: ui-monospace, monospace; font-size: 11px; resize: none; outline: none;
-  background: #faf8f3; color: var(--ink); line-height: 1.4;
+  background: var(--surface-3); color: var(--ink); line-height: 1.4;
 }
 .mermaid-preview { flex: 1; min-width: 0; overflow: auto; display: flex; align-items: center; justify-content: center; }
 .mermaid-svg svg { max-width: 100%; height: auto; }
@@ -726,7 +726,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; background: var(--surface); border-radius: 16px 16px 0 0; }
 .modal-head h2 { font-size: 17px; margin: 0; }
 .modal-x { border: none; background: none; font-size: 15px; cursor: pointer; color: var(--muted); }
-.modal-section { padding: 16px 20px; border-bottom: 1px solid #f2eee4; }
+.modal-section { padding: 16px 20px; border-bottom: 1px solid var(--border-soft); }
 .modal-section h3 { font-size: 14px; margin: 0 0 8px; }
 .modal-hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0 0 12px; }
 .modal-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 13px; }
@@ -1001,8 +1001,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .gantt-label.sel { background: rgba(79,124,255,.1); }
 .gantt-chartwrap { flex: 1; }
 .gantt-svg { display: block; touch-action: none; }
-.gantt-month { font-size: 10px; font-weight: 700; fill: #6f6a5b; text-transform: uppercase; letter-spacing: .04em; }
-.gantt-day { font-size: 9px; fill: #a09a8a; }
+.gantt-month { font-size: 10px; font-weight: 700; fill: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.gantt-day { font-size: 9px; fill: var(--muted); opacity: 0.75; }
 /* Präsentations-Folie: Zeitplan groß */
 .slide-gantt { width: min(1100px, 100%); height: min(60vh, 100%); align-self: center; padding: 20px 24px !important; box-shadow: 0 10px 40px rgba(0,0,0,.15); }
 .slide-gantt .kanban-title { font-size: 20px; }
@@ -1059,7 +1059,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .dock-menu button {
   display: flex; align-items: center; gap: 9px;
 }
-.dock-menu button svg { color: #6f6a5b; flex: none; }
+.dock-menu button svg { color: var(--muted); flex: none; }
 .dock-menu button:hover svg { color: var(--accent); }
 .dock-menu button.on { background: var(--accent-soft); color: var(--accent); }
 .dock-menu button.on svg { color: var(--accent); }
@@ -1573,7 +1573,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 [data-theme='dark'] .react-flow__minimap { background: var(--surface); }
 [data-theme='dark'] .react-flow__minimap-mask { fill: rgba(20, 19, 16, 0.65); }
 [data-theme='dark'] .react-flow__minimap-node { fill: #4a463d; }
-[data-theme='dark'] .portal-card { color: #2b2a27; }
+[data-theme='dark'] .portal-card { background: linear-gradient(135deg, var(--surface-2) 0%, #453c63 100%); color: var(--ink); }
 [data-theme='dark'] .react-flow__controls button { background: var(--surface); fill: var(--ink); color: var(--ink); border-bottom-color: var(--border-soft); }
 [data-theme='dark'] .react-flow__controls button:hover { background: var(--surface-2); }
 [data-theme='dark'] .toast { background: #3a362e; }
@@ -1589,3 +1589,22 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 [data-theme='dark'] .tab-history-row > button.tab-history-x:hover,
 [data-theme='dark'] .dock-menu-template-x:hover { color: #ff9a8c; }
 [data-theme='dark'] .sel-toolbar button.danger { color: #ff9a8c; }
+
+/* ---------- Dark Mode: Design-Audit Runde 7 ---------- */
+/* Übersicht: Bereichs-/Projekt-Flächen waren hartes Weiß-Overlay → in Dunkel
+   werden sie zu dezenten Aufhellungs-Schichten (Schrift = --ink bleibt lesbar) */
+[data-theme='dark'] .ovc-space { background: rgba(255, 255, 255, 0.05); }
+[data-theme='dark'] .ovc-project { background: rgba(255, 255, 255, 0.07); }
+[data-theme='dark'] .ov-minimap { background: rgba(255, 255, 255, 0.07); }
+/* Haftnotizen bleiben helles Papier → native Checkboxen & Datums-Chips
+   dürfen dort NICHT dem dunklen color-scheme folgen */
+[data-theme='dark'] .react-flow__node-note { color-scheme: light; }
+[data-theme='dark'] .presenter-slide { color-scheme: light; }
+[data-theme='dark'] .react-flow__node-note .due-chip { background: rgba(0, 0, 0, 0.08); color: #6f6a5b; }
+/* Violette KI-Akzente: #5b3fd4 säuft auf dunklen Flächen ab → aufhellen */
+[data-theme='dark'] .ai-btn { color: #beadff !important; background: rgba(124, 92, 255, 0.22) !important; }
+[data-theme='dark'] .sel-toolbar button.ai-on,
+[data-theme='dark'] .k-link,
+[data-theme='dark'] .ticket-jump { color: #beadff; }
+/* Tooltip hebt sich sonst kaum vom dunklen Grund ab */
+[data-theme='dark'] .tipbox { border: 1px solid var(--border-soft); }

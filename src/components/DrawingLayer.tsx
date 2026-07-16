@@ -33,6 +33,11 @@ export function DrawingLayer() {
   const beginEraseGesture = useBoard((s) => s.beginEraseGesture);
   const { screenToFlowPosition } = useReactFlow();
   const { x: tx, y: ty, zoom } = useViewport();
+  const uiTheme = useBoard((s) => s.ui.theme);
+  // Im dunklen Design wäre die Tinten-Farbe unsichtbar → helle „Kreide" anbieten
+  const dark = uiTheme === 'dark'
+    || (uiTheme === 'system' && typeof matchMedia !== 'undefined' && matchMedia('(prefers-color-scheme: dark)').matches);
+  const penColors = dark ? ['#f0ead9', ...PEN_COLORS.slice(1)] : PEN_COLORS;
   // Stift und Textmarker merken sich ihre Farbe getrennt — der Marker startet neongelb
   const [penColor, setPenColor] = useState(PEN_COLORS[0]);
   const [markerColor, setMarkerColor] = useState(MARKER_COLORS[0]);
@@ -57,8 +62,10 @@ export function DrawingLayer() {
   if (!active && drawings.length === 0) return null;
 
   const isMarker = tool === 'marker';
-  const palette = isMarker ? MARKER_COLORS : PEN_COLORS;
-  const color = isMarker ? markerColor : penColor;
+  const palette = isMarker ? MARKER_COLORS : penColors;
+  // Gewählte „Tinte" folgt dem Theme-Wechsel automatisch (dunkel ⇄ hell)
+  const effPenColor = penColor === PEN_COLORS[0] || penColor === '#f0ead9' ? penColors[0] : penColor;
+  const color = isMarker ? markerColor : effPenColor;
   const setColor = isMarker ? setMarkerColor : setPenColor;
 
   const toFlow = (e: React.PointerEvent): [number, number] => {

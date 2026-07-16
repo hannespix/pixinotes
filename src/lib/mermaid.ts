@@ -1,15 +1,21 @@
 // mermaid ist groß → nur laden, wenn wirklich ein Diagramm gebraucht wird.
 // Geteilt zwischen Mermaid-Karte und Präsentations-Folie.
 let mermaidPromise: Promise<typeof import('mermaid').default> | null = null;
+let initializedTheme: string | null = null;
 
 export function getMermaid() {
   if (!mermaidPromise) {
-    mermaidPromise = import('mermaid').then((m) => {
-      m.default.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'strict' });
-      return m.default;
-    });
+    mermaidPromise = import('mermaid').then((m) => m.default);
   }
-  return mermaidPromise;
+  // Theme folgt dem App-Design; bei Wechsel neu initialisieren (dark ⇄ neutral)
+  return mermaidPromise.then((m) => {
+    const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'neutral';
+    if (theme !== initializedTheme) {
+      m.initialize({ startOnLoad: false, theme, securityLevel: 'strict' });
+      initializedTheme = theme;
+    }
+    return m;
+  });
 }
 
 export const MERMAID_TEMPLATES: Record<string, string> = {
