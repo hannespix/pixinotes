@@ -276,6 +276,27 @@ export function Settings() {
         </section>
 
         {/* ---- Datei-Sync (überall) ---- */}
+        {/* ---- Starter-Umgebung ---- */}
+        <section className="modal-section">
+          <h3>🧭 Starter-Umgebung „Verwaltung"</h3>
+          <p className="modal-hint">
+            Beispiel-Struktur mit <b>3 Bereichen, 6 Projekten und 14 Boards</b> für den Verwaltungsalltag:
+            Schreibtisch, Aufgaben-Zentrale, Zeiterfassung, Dienstreise, Dienstwagen, Wissensbasis,
+            Datenschutz, Ansprechpartner, Jour fixe, Mitarbeitergespräche, Beispielprojekt, Onboarding.
+            Erklärt nebenbei jedes Modul — alles ist Beispielinhalt und frei anpassbar/löschbar.
+          </p>
+          <div className="modal-buttons">
+            <button
+              onClick={() => {
+                useBoard.getState().addStarter();
+                setOpen(false);
+              }}
+            >
+              🧭 Starter-Umgebung hinzufügen
+            </button>
+          </div>
+        </section>
+
         <section className="modal-section">
           <h3>💾 Als Datei sichern &amp; übertragen</h3>
           <p className="modal-hint">

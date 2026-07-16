@@ -10,7 +10,7 @@ import {
   type Node,
   type NodeChange,
 } from '@xyflow/react';
-import { seedEdges, seedNodes } from './seed';
+import { buildStarter } from './lib/starter';
 import { uid, type AppNode } from './types';
 
 /** Ein Freihand-Strich (Punkte in Flow-Koordinaten) */
@@ -191,6 +191,9 @@ interface BoardState {
   /** Globale KI-Sperre: verhindert parallele KI-Aktionen aus Dock UND Auswahl-Leiste */
   aiBusy: boolean;
   setAiBusy: (busy: boolean) => void;
+
+  /** Starter-Umgebung „Verwaltung" zusätzlich anlegen (für Bestandsnutzer) */
+  addStarter: () => void;
 }
 
 export const selectActiveBoard = (s: BoardState): BoardDoc =>
@@ -302,12 +305,15 @@ export const useBoard = create<BoardState>()(
           })),
         }));
 
+      // Erststart: komplette Starter-Umgebung „Verwaltung" (Bereiche → Projekte
+      // → Boards) — erklärt jedes Modul im echten Einsatz. Wird bei vorhandenem
+      // persistierten Stand vollständig überschrieben (rehydrate).
+      const starter = buildStarter();
+
       return {
-        boards: [
-          { id: 'main', name: '🏠 Mein Schreibtisch', nodes: seedNodes, edges: seedEdges },
-        ],
-        spaces: defaultHierarchy(['main']),
-        activeId: 'main',
+        boards: starter.boards,
+        spaces: starter.spaces,
+        activeId: starter.firstBoardId,
         view: 'board',
         searchOpen: false,
         settingsOpen: false,
@@ -319,6 +325,19 @@ export const useBoard = create<BoardState>()(
         lastDeleted: null,
         aiBusy: false,
         setAiBusy: (busy) => set({ aiBusy: busy }),
+
+        addStarter: () => {
+          const fresh = buildStarter();
+          set({
+            boards: [...get().boards, ...fresh.boards],
+            spaces: [...get().spaces, ...fresh.spaces],
+            activeId: fresh.firstBoardId,
+            view: 'overview',
+            // Voll-Remount: neue Boards mit BlockNote-Inhalten sauber mounten
+            importEpoch: get().importEpoch + 1,
+          });
+          get().showToast('🧭 Starter-Umgebung „Verwaltung" hinzugefügt: 3 Bereiche, 14 Boards — viel Spaß beim Erkunden!');
+        },
 
         setSettingsOpen: (open) => set({ settingsOpen: open }),
         tasksOpen: false,
