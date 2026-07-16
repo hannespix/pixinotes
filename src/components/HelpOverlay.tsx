@@ -192,16 +192,30 @@ export function HelpOverlay() {
 
             <section id="help-impressum">
               <h3>⚖️ Impressum</h3>
-              <p className="legal-hint">Angaben gemäß § 5 DDG. Die Felder in [Klammern] bitte vor der Veröffentlichung ergänzen — sie sind bewusst nicht vorausgefüllt.</p>
+              <p className="legal-hint">Angaben gemäß § 5 DDG</p>
               <p>
-                <b>[Vorname Nachname]</b><br />
-                [Straße Hausnummer]<br />
-                [PLZ Ort], Deutschland
+                <b>Hannes Pix</b><br />
+                Eisenbahnstraße 19<br />
+                79241 Ihringen am Kaiserstuhl<br />
+                Baden-Württemberg, Deutschland
               </p>
               <p>
-                <b>Kontakt:</b> <a className="ent-link" href="mailto:claude@pix-el.de">claude@pix-el.de</a><br />
+                <b>Kontakt:</b> <a className="ent-link" href="mailto:info@pix-el.de">info@pix-el.de</a><br />
+                <b>Website:</b>{' '}
+                <a className="ent-link" href="https://pix-el.de" target="_blank" rel="noreferrer">pix-el.de</a><br />
                 <b>Quellcode &amp; Projekt:</b>{' '}
                 <a className="ent-link" href="https://github.com/hannespix/pixinotes" target="_blank" rel="noreferrer">github.com/hannespix/pixinotes</a>
+              </p>
+              <p>
+                <b>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV:</b><br />
+                Hannes Pix, Anschrift wie oben
+              </p>
+              <p>
+                <b>EU-Streitschlichtung:</b> Die Europäische Kommission stellt eine Plattform zur
+                Online-Streitbeilegung (OS) bereit:{' '}
+                <a className="ent-link" href="https://ec.europa.eu/consumers/odr/" target="_blank" rel="noreferrer">ec.europa.eu/consumers/odr</a>.
+                Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer
+                Verbraucherschlichtungsstelle teilzunehmen.
               </p>
               <p>
                 PixiNotes ist ein nicht-kommerzielles Werkzeug ohne Konto, ohne Bezahlfunktion und ohne
@@ -245,7 +259,7 @@ export function HelpOverlay() {
                 Da die App selbst keine personenbezogenen Daten an den Betreiber übermittelt, liegen dort in der
                 Regel keine Daten über dich vor. Für die Hosting-Logs gelten die Rechte aus Art. 15–21 DSGVO
                 gegenüber GitHub. Fragen jederzeit an{' '}
-                <a className="ent-link" href="mailto:claude@pix-el.de">claude@pix-el.de</a>.
+                <a className="ent-link" href="mailto:info@pix-el.de">info@pix-el.de</a>.
                 Alle lokalen Daten löschst du selbst: ⚙️ → Daten → „Alles leeren" oder über die Website-Daten deines Browsers.
               </p>
               <p className="legal-hint">Dieses Muster ersetzt keine Rechtsberatung.</p>
