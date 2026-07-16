@@ -19,6 +19,14 @@ const MAIL_RE = /[\w.+-]+@[\w-]+\.[\w.]{2,}/g;
  */
 const DATE_LIKE_RE = /^\s*(\d{1,2}[.\-/]\s?\d{1,2}[.\-/]\s?\d{2,4}|\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2})\s*\.?\s*$/;
 
+/**
+ * Aktenzeichen & Co. sind keine Rufnummern: steht direkt vor dem Treffer
+ * „Az.", „Nr.", „Zimmer", „Raum" o. Ä., ist die Ziffernfolge eine Referenz.
+ * (Praxis-Bug: „Az. 12-0815" wurde als tel:+49120815 verlinkt.)
+ */
+const REF_BEFORE_RE = /(?:\baz|\bnr|\baktenzeichen|\bkassenzeichen|\bzimmer|\braum|\bkd|\brg)\W{0,3}$/i;
+const isReference = (text: string, start: number) => REF_BEFORE_RE.test(text.slice(Math.max(0, start - 16), start));
+
 interface Match {
   start: number;
   end: number;
@@ -28,6 +36,58 @@ interface Match {
 /** Satzzeichen am Match-Ende gehören zum Satz, nicht zum Link (Audit N3). */
 function trimTrailing(raw: string): string {
   return raw.replace(/[.,;:!?)\]]+$/, '');
+}
+
+export interface EntityHit {
+  kind: 'tel' | 'mail' | 'url';
+  display: string;
+  href: string;
+}
+
+/**
+ * Strukturierte Variante von enrichText für die Chips unter Notizen:
+ * liefert Telefonnummern, E-Mail-Adressen und Web-Links als Daten
+ * (BlockNote rendert seinen Text selbst — dort können wir keine Links
+ * injizieren, wohl aber Aktions-Chips unter der Karte zeigen).
+ */
+export function extractEntities(text: string): EntityHit[] {
+  const hits: EntityHit[] = [];
+  const zones: Array<[number, number]> = [];
+  const inZone = (s: number, e: number) => zones.some(([zs, ze]) => s < ze && e > zs);
+
+  for (const m of text.matchAll(URL_RE)) {
+    const url = trimTrailing(m[0]);
+    if (!url) continue;
+    zones.push([m.index!, m.index! + url.length]);
+    hits.push({ kind: 'url', display: url.replace(/^https?:\/\//, '').slice(0, 42), href: url });
+  }
+  // Pfade sind nur Schutzzonen (kein Chip): keine ☎/@-Treffer mitten im Dateinamen
+  for (const m of text.matchAll(FILE_RE)) zones.push([m.index!, m.index! + m[0].length]);
+  for (const m of text.matchAll(WINPATH_RE)) zones.push([m.index!, m.index! + m[0].length]);
+
+  for (const m of text.matchAll(MAIL_RE)) {
+    const addr = trimTrailing(m[0]);
+    if (!addr || inZone(m.index!, m.index! + addr.length)) continue;
+    zones.push([m.index!, m.index! + addr.length]);
+    hits.push({ kind: 'mail', display: addr, href: `mailto:${addr}` });
+  }
+
+  try {
+    for (const p of findPhoneNumbersInText(text, 'DE')) {
+      if (inZone(p.startsAt, p.endsAt)) continue;
+      const display = text.slice(p.startsAt, p.endsAt);
+      const context = text.slice(Math.max(0, p.startsAt - 3), Math.min(text.length, p.endsAt + 3));
+      if (DATE_LIKE_RE.test(display) || /\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(context)) continue;
+      if (isReference(text, p.startsAt)) continue;
+      hits.push({ kind: 'tel', display, href: `tel:${p.number.number}` });
+    }
+  } catch {
+    // Erkennung ist Komfort — ohne Telefon-Treffer weitermachen
+  }
+
+  // Duplikate raus (dieselbe Nummer/Adresse mehrfach im Text)
+  const seen = new Set<string>();
+  return hits.filter((h) => !seen.has(h.href) && seen.add(h.href));
 }
 
 export function enrichText(text: string): ReactNode[] {
@@ -104,6 +164,7 @@ export function enrichText(text: string): ReactNode[] {
       // libphonenumber nur einen Teil des Datums erwischt hat (z. B. „07.2026").
       const context = text.slice(Math.max(0, p.startsAt - 3), Math.min(text.length, p.endsAt + 3));
       if (DATE_LIKE_RE.test(display) || /\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(context)) continue;
+      if (isReference(text, p.startsAt)) continue;
       matches.push({
         start: p.startsAt,
         end: p.endsAt,

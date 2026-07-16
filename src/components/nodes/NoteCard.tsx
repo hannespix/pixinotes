@@ -8,6 +8,7 @@ import { useBoard } from '../../store';
 import { STICKY_COLORS, type NoteNode } from '../../types';
 import { blocksToText } from '../../lib/serialize';
 import { extractWikilinks, resolveLink } from '../../lib/links';
+import { extractEntities } from '../../lib/entities';
 import { makeNote } from '../../lib/nodes';
 import { aiReady, askAi, textToBlocks } from '../../lib/ai';
 import { CardShell } from './CardShell';
@@ -20,6 +21,31 @@ function NoteDueChips({ blocks }: { blocks?: unknown[] }) {
   const text = useMemo(() => blocksToText(blocks), [blocks]);
   const title = text.split('\n')[0]?.slice(0, 60) || 'Notiz';
   return <DueChips text={text} context={title} />;
+}
+
+/** ☎/✉/🔗-Chips: erkannte Telefonnummern, Mails & Links aus dem Notiz-Text
+ *  (im BlockNote-Editor selbst können wir keine Links injizieren) */
+function NoteEntityChips({ blocks }: { blocks?: unknown[] }) {
+  const text = useMemo(() => blocksToText(blocks), [blocks]);
+  const ents = useMemo(() => extractEntities(text).slice(0, 4), [text]);
+  if (ents.length === 0) return null;
+  const ICON = { tel: '\u260e', mail: '\u2709', url: '\ud83d\udd17' } as const;
+  return (
+    <div className="due-chips nodrag">
+      {ents.map((e) => (
+        <a
+          key={e.href}
+          className={`due-chip ent-chip ent-chip-${e.kind}`}
+          href={e.href}
+          target={e.kind === 'url' ? '_blank' : undefined}
+          rel="noreferrer"
+          title={e.kind === 'tel' ? `${e.display} anrufen` : e.kind === 'mail' ? `E-Mail an ${e.display}` : e.href}
+        >
+          {ICON[e.kind]} {e.display}
+        </a>
+      ))}
+    </div>
+  );
 }
 
 /** [[Wikilinks]] als Sprung-Chips (Obsidian-Gefühl): Board/Karte öffnen, sonst Board anlegen */
@@ -103,6 +129,7 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
         />
       </div>
       <NoteDueChips blocks={data.blocks} />
+      <NoteEntityChips blocks={data.blocks} />
       <NoteLinkChips blocks={data.blocks} />
       {/* KI-Politur wohnt jetzt im ✨-Menü der Auswahl-Leiste (KI-Werkzeuge) —
           kein Dauer-Button mehr auf jeder Notiz (User-Feedback) */}

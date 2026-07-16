@@ -1686,3 +1686,10 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* Kalender: Fehlerzeile im Konten-Block (M70) */
 .cal-menu-err { font-size: 10px; color: #a4231a; max-width: 220px; padding: 2px 0; }
 [data-theme='dark'] .cal-menu-err { color: #ff9a8c; }
+
+/* ---------- ☎/✉/🔗-Chips unter Notizen (M72) ---------- */
+/* Notizen sind immer helles Papier → feste Farben, auch im dunklen Theme */
+.due-chip.ent-chip { text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.ent-chip-tel { background: rgba(10, 125, 64, 0.12) !important; color: #0a7d40 !important; font-weight: 600; }
+.ent-chip-mail, .ent-chip-url { background: rgba(79, 124, 255, 0.12) !important; color: #3557c9 !important; }
+.due-chip.ent-chip:hover { border-color: currentColor; }
