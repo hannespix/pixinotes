@@ -59,6 +59,11 @@ export const ITarget = make(<><circle cx="12" cy="12" r="9" /><circle cx="12" cy
 export const IZoomIn = make(<><circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" /><path d="M11 8v6" /><path d="M8 11h6" /></>);
 export const IZoomOut = make(<><circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" /><path d="M8 11h6" /></>);
 
+// Board-Optionen (M88)
+export const IPalette = make(<><circle cx="13.5" cy="6.5" r=".8" fill="currentColor" stroke="none" /><circle cx="17.5" cy="10.5" r=".8" fill="currentColor" stroke="none" /><circle cx="8.5" cy="7.5" r=".8" fill="currentColor" stroke="none" /><circle cx="6.5" cy="12.5" r=".8" fill="currentColor" stroke="none" /><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.84-.44-1.13-.29-.29-.44-.65-.44-1.12a1.64 1.64 0 0 1 1.67-1.67h2c3.05 0 5.55-2.5 5.55-5.55C21.97 6.01 17.46 2 12 2Z" /></>);
+export const ITimer = make(<><path d="M10 2h4" /><path d="M12 14v-4" /><circle cx="12" cy="14" r="8" /></>);
+export const IGrid = make(<><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M3 9h18" /><path d="M3 15h18" /><path d="M9 3v18" /><path d="M15 3v18" /></>);
+
 // Archiv (M87)
 export const IArchive = make(<><rect width="20" height="5" x="2" y="3" rx="1" /><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" /><path d="M10 12h4" /></>);
 export const IArchiveRestore = make(<><rect width="20" height="5" x="2" y="3" rx="1" /><path d="M4 8v11a2 2 0 0 0 2 2h2" /><path d="M20 8v11a2 2 0 0 1-2 2h-2" /><path d="m9 15 3-3 3 3" /><path d="M12 12v9" /></>);

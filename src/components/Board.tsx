@@ -75,6 +75,10 @@ export function Board() {
   const pendingFocus = useBoard((s) => s.pendingFocus);
   const clearPendingFocus = useBoard((s) => s.clearPendingFocus);
 
+  // Board-Optionen (M88): Hintergrund-Tönung + Gitter/Raster-Fang
+  const boardBg = useBoard((s) => selectActiveBoard(s).bg);
+  const gridSnap = useBoard((s) => s.gridSnap);
+
   // Archiv (M87): archivierte Karten sind ausgeblendet (React-Flow `hidden`),
   // bei aktivem Archiv-Schalter gedimmt sichtbar. Anhängende Kanten wandern mit.
   const showArchived = useBoard((s) => s.showArchived);
@@ -531,7 +535,7 @@ export function Board() {
 
   return (
     <div
-      className={`board-wrap ${spaceHeld ? 'space-pan' : ''}`}
+      className={`board-wrap ${spaceHeld ? 'space-pan' : ''} ${boardBg ? `board-bg-${boardBg}` : ''}`}
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}
       onDoubleClick={handleDoubleClick}
@@ -568,6 +572,8 @@ export function Board() {
         connectionRadius={42}
         connectionLineStyle={{ stroke: '#4f7cff', strokeWidth: 2.5 }}
         panOnScroll={!wheelZoom}
+        snapToGrid={gridSnap}
+        snapGrid={[20, 20]}
         zoomOnScroll={wheelZoom}
         panActivationKeyCode="Space"
         onMoveEnd={() => { if (performance.now() > flyingUntil.current) returnViewport.current = null; }}
@@ -584,7 +590,13 @@ export function Board() {
         }}
         proOptions={{ hideAttribution: false }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} color={document.documentElement.dataset.theme === 'dark' ? '#4b453c' : '#d8d3c8'} />
+        <Background
+          variant={gridSnap ? BackgroundVariant.Lines : BackgroundVariant.Dots}
+          gap={gridSnap ? 20 : 26}
+          size={1.6}
+          lineWidth={0.6}
+          color={document.documentElement.dataset.theme === 'dark' ? '#4b453c' : '#d8d3c8'}
+        />
         <MiniMap
           pannable zoomable className="pn-minimap"
           onClick={(_, pos) => { void setCenter(pos.x, pos.y, { duration: 350, zoom: getViewport().zoom }); }}

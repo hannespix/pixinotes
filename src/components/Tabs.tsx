@@ -3,7 +3,7 @@ import { useOutsideClose } from '../lib/useOutsideClose';
 import { selectActiveBoard, useBoard } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
 import { InlineName } from './InlineName';
-import { IChevronR, IHistory, IHome, IPlus, IShare, IX } from './Icons';
+import { IChevronR, IHistory, IHome, IPalette, IPlus, IShare, IX } from './Icons';
 
 /**
  * Kopfleiste mit dreistufiger Gliederung: Die Tab-Reihe zeigt NUR die Boards
@@ -32,11 +32,15 @@ export function Tabs() {
   const deleteVersion = useBoard((s) => s.deleteVersion);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [bgOpen, setBgOpen] = useState(false);
+  const setBoardBg = useBoard((s) => s.setBoardBg);
   // Klick/Tipp in den Hintergrund schließt Navigator & Verlauf (User-Wunsch)
   const navRef = useRef<HTMLElement | null>(null);
   const historyRef = useRef<HTMLElement | null>(null);
+  const bgRef = useRef<HTMLElement | null>(null);
   useOutsideClose(navOpen, navRef, () => setNavOpen(false));
   useOutsideClose(historyOpen, historyRef, () => setHistoryOpen(false));
+  useOutsideClose(bgOpen, bgRef, () => setBgOpen(false));
 
   const byId = useMemo(() => new Map(boards.map((b) => [b.id, b])), [boards]);
 
@@ -188,6 +192,35 @@ export function Tabs() {
           </div>
         ))}
       </div>
+      <span className="tab-history-wrap" ref={bgRef}>
+        <button
+          className={`tab-share ${bgOpen ? 'active' : ''}`}
+          title="Hintergrund-Tönung des Boards (Nextcloud-Whiteboard-Stil)"
+          aria-label="Board-Hintergrund"
+          onClick={() => setBgOpen((o) => !o)}
+        >
+          <IPalette size={13} />
+        </button>
+        {bgOpen && (
+          <div className="tab-bg-menu">
+            <div className="tab-history-title">Hintergrund „{activeBoard.name}"</div>
+            <div className="tab-bg-swatches">
+              {([
+                [undefined, 'Standard'], ['grau', 'Grau'], ['blau', 'Blau'], ['gelb', 'Gelb'],
+                ['gruen', 'Grün'], ['rosa', 'Rosa'], ['flieder', 'Flieder'],
+              ] as Array<[string | undefined, string]>).map(([key, label]) => (
+                <button
+                  key={label}
+                  className={`tab-bg-swatch bg-${key ?? 'none'} ${activeBoard.bg === key ? 'on' : ''}`}
+                  title={label}
+                  aria-label={`Hintergrund ${label}`}
+                  onClick={() => { setBoardBg(activeBoard.id, key); setBgOpen(false); }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </span>
       <button
         className="tab-share"
         title="Aktives Board teilen: Link mit komplettem Inhalt kopieren (serverlos)"

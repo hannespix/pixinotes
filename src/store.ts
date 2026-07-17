@@ -29,6 +29,8 @@ export interface BoardDoc {
   nodes: AppNode[];
   edges: Edge[];
   drawings?: Stroke[];
+  /** Dezente Hintergrund-Tönung (Palette-Schlüssel, M88) — fehlt ⇒ Standard */
+  bg?: string;
 }
 
 export type Tool = 'select' | 'pen' | 'marker' | 'eraser';
@@ -164,6 +166,14 @@ interface BoardState {
   /** Fertiges Board (geteilt/importiert) einhängen und öffnen */
   importBoard: (doc: BoardDoc) => void;
   renameBoard: (id: string, name: string) => void;
+  /** Hintergrund-Tönung eines Boards setzen (undefined = Standard, M88) */
+  setBoardBg: (id: string, bg: string | undefined) => void;
+  /** Gitter anzeigen + Karten am Raster einrasten (persistiert, M88) */
+  gridSnap: boolean;
+  setGridSnap: (on: boolean) => void;
+  /** Besprechungs-Timer ein-/ausblenden (M88) */
+  timerOpen: boolean;
+  setTimerOpen: (open: boolean) => void;
   removeBoard: (id: string) => void;
   /** Board in ein (anderes) Projekt verschieben, optional vor ein bestimmtes Board */
   moveBoard: (boardId: string, targetProjectId: string, beforeBoardId?: string) => void;
@@ -535,6 +545,15 @@ export const useBoard = create<BoardState>()(
 
         showArchived: false,
         setShowArchived: (on) => set({ showArchived: on }),
+
+        setBoardBg: (id, bg) =>
+          set({ boards: get().boards.map((b) => (b.id === id ? { ...b, bg } : b)) }),
+
+        gridSnap: false,
+        setGridSnap: (on) => set({ gridSnap: on }),
+
+        timerOpen: false,
+        setTimerOpen: (open) => set({ timerOpen: open }),
         clickZoom: true,
         setClickZoom: (on) => set({ clickZoom: on }),
         wheelZoom: false,
@@ -1093,6 +1112,7 @@ export const useBoard = create<BoardState>()(
         clickZoom: s.clickZoom,
         wheelZoom: s.wheelZoom,
         showArchived: s.showArchived,
+        gridSnap: s.gridSnap,
       }),
       migrate: (persisted: unknown, version: number) => {
         const p = persisted as Record<string, unknown>;

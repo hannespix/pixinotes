@@ -444,6 +444,78 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .toast-undo:hover { background: rgba(255, 255, 255, 0.28); }
 
+/* ---------- Board-Optionen (M88): Hintergrund-Tönung, Timer ---------- */
+/* Dezente Tönungen — hell und dunkel je eigene Werte, Karten bleiben lesbar.
+   WICHTIG: auf .react-flow legen — die Flow-Ebene malt sonst mit var(--bg)
+   über die Wrapper-Farbe */
+.board-bg-grau .react-flow { background: #ececec; }
+.board-bg-blau .react-flow { background: #e8f0f8; }
+.board-bg-gelb .react-flow { background: #faf3d9; }
+.board-bg-gruen .react-flow { background: #e8f3e4; }
+.board-bg-rosa .react-flow { background: #f9ebee; }
+.board-bg-flieder .react-flow { background: #f0ecf7; }
+[data-theme='dark'] .board-bg-grau .react-flow { background: #26241f; }
+[data-theme='dark'] .board-bg-blau .react-flow { background: #20262e; }
+[data-theme='dark'] .board-bg-gelb .react-flow { background: #2a2619; }
+[data-theme='dark'] .board-bg-gruen .react-flow { background: #20281e; }
+[data-theme='dark'] .board-bg-rosa .react-flow { background: #2b2124; }
+[data-theme='dark'] .board-bg-flieder .react-flow { background: #262130; }
+
+.tab-bg-menu {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 60;
+  background: var(--surface); border-radius: 12px; padding: 10px 12px;
+  box-shadow: 0 10px 34px rgba(40, 30, 10, 0.22); min-width: 200px;
+}
+.tab-bg-swatches { display: flex; gap: 7px; margin-top: 8px; }
+.tab-bg-swatch {
+  width: 26px; height: 26px; border-radius: 8px; cursor: pointer;
+  border: 1.5px solid var(--border-soft);
+}
+.tab-bg-swatch.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.tab-bg-swatch.bg-none { background: var(--bg); }
+.tab-bg-swatch.bg-grau { background: #ececec; }
+.tab-bg-swatch.bg-blau { background: #e8f0f8; }
+.tab-bg-swatch.bg-gelb { background: #faf3d9; }
+.tab-bg-swatch.bg-gruen { background: #e8f3e4; }
+.tab-bg-swatch.bg-rosa { background: #f9ebee; }
+.tab-bg-swatch.bg-flieder { background: #f0ecf7; }
+[data-theme='dark'] .tab-bg-swatch.bg-grau { background: #26241f; }
+[data-theme='dark'] .tab-bg-swatch.bg-blau { background: #20262e; }
+[data-theme='dark'] .tab-bg-swatch.bg-gelb { background: #2a2619; }
+[data-theme='dark'] .tab-bg-swatch.bg-gruen { background: #20281e; }
+[data-theme='dark'] .tab-bg-swatch.bg-rosa { background: #2b2124; }
+[data-theme='dark'] .tab-bg-swatch.bg-flieder { background: #262130; }
+
+/* Besprechungs-Timer: schwebt links unter dem Logo, auch im Presenter (z 110) */
+.timer-widget {
+  position: fixed; top: 62px; left: 18px; z-index: 110;
+  background: var(--surface); border-radius: 14px; padding: 10px 12px;
+  box-shadow: 0 8px 28px rgba(40, 30, 10, 0.2);
+  display: flex; flex-direction: column; gap: 7px;
+}
+.timer-widget.overtime { box-shadow: 0 8px 28px rgba(200, 60, 40, 0.35); }
+.timer-widget.overtime .timer-readout { color: #c0392b; }
+.timer-row { display: flex; align-items: center; gap: 6px; }
+.timer-readout {
+  font-variant-numeric: tabular-nums; font-weight: 800; font-size: 22px;
+  letter-spacing: 0.02em; color: var(--ink); min-width: 86px;
+}
+.timer-btn {
+  border: 1.5px solid var(--border-soft); background: var(--surface);
+  color: var(--ink); border-radius: 8px; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 700; padding: 4px 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.timer-btn:hover { border-color: var(--accent); }
+.timer-x { border: none; color: var(--muted); }
+.timer-presets { justify-content: flex-start; }
+.timer-input {
+  width: 52px; border: 1.5px solid var(--border-soft); border-radius: 8px;
+  background: var(--surface); color: var(--ink);
+  font-family: inherit; font-size: 12px; padding: 4px 6px;
+}
+.timer-input:focus { outline: none; border-color: var(--accent); }
+
 /* Archiv (M87): eingeblendete Archiv-Karten sind gedimmt und tragen ein Band */
 .react-flow__node.archived-card { opacity: 0.55; filter: saturate(0.5); }
 .react-flow__node.archived-card::after {

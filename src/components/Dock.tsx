@@ -11,7 +11,7 @@ import { uid, type AppNode, type ShapeKind } from '../types';
 import { computeArrangement, type ArrangeMode } from '../lib/arrange';
 import {
   IArchive, IArrange, IBookmark, ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
-  IMagnet, IMousePointer, INote, IPen, IPill, IPlay, IPlus, ISquare, ITasks, IWand, IX,
+  IMagnet, IMousePointer, INote, IPen, IPill, IPlay, IPlus, ISquare, ITasks, ITimer, IWand, IX,
 } from './Icons';
 
 /**
@@ -44,6 +44,10 @@ export function Dock() {
   const setPhysicsEnabled = useBoard((s) => s.setPhysicsEnabled);
   const showArchived = useBoard((s) => s.showArchived);
   const setShowArchived = useBoard((s) => s.setShowArchived);
+  const gridSnap = useBoard((s) => s.gridSnap);
+  const setGridSnap = useBoard((s) => s.setGridSnap);
+  const timerOpen = useBoard((s) => s.timerOpen);
+  const setTimerOpen = useBoard((s) => s.setTimerOpen);
   const archivedCount = useBoard((s) => selectActiveBoard(s).nodes.filter((n) => n.archived).length);
 
   const arrange = (mode: ArrangeMode) => {
@@ -301,6 +305,19 @@ export function Dock() {
             <button onClick={() => arrange('grid')} title="Alles in ein sauberes Raster, sortiert nach Modultyp">▦ Raster</button>
             <button onClick={() => arrange('circles')} title="Zusammenhängendes und Typ-Gruppen jeweils als Kreis-Bündel">◎ Kreis-Bündel</button>
             <button onClick={() => arrange('stack')} title="Karten pro Modultyp überlappend stapeln — Überschriften bleiben sichtbar; Physik wird dafür ausgeschaltet">🗂 Stapeln (überlappend)</button>
+            <div className="dock-menu-label">Raster</div>
+            <button
+              className={gridSnap ? 'active' : ''}
+              onClick={() => {
+                setGridSnap(!gridSnap);
+                showToast(gridSnap
+                  ? '⊞ Gitter aus — Karten bewegen sich wieder frei.'
+                  : '⊞ Gitter an — Karten rasten beim Verschieben am Raster ein.');
+              }}
+              title="Linien-Gitter anzeigen und Karten beim Verschieben am Raster einrasten lassen"
+            >
+              ⊞ Gitter &amp; Raster-Fang {gridSnap ? 'AUS' : 'AN'}
+            </button>
             <div className="dock-menu-foot">Strg+Z stellt die vorherige Anordnung komplett wieder her</div>
           </div>
         )}
@@ -355,6 +372,14 @@ export function Dock() {
         )}
       </button>
       <button onClick={() => setPresenting(true)} title="Präsentationsmodus (Karten als Folien)" aria-label="Präsentieren"><IPlay /></button>
+      <button
+        onClick={() => setTimerOpen(!timerOpen)}
+        className={timerOpen ? 'active' : ''}
+        title="Besprechungs-Timer: Countdown/Stoppuhr für Timeboxing — bleibt auch im Präsentationsmodus sichtbar"
+        aria-label="Timer"
+      >
+        <ITimer />
+      </button>
 
     </div>
   );
