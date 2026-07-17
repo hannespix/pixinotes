@@ -11,7 +11,7 @@ import { uid, type AppNode, type ShapeKind } from '../types';
 import { computeArrangement, type ArrangeMode } from '../lib/arrange';
 import {
   IArchive, IArrange, IBookmark, ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
-  IMagnet, IMousePointer, INote, IPen, IPill, IPlay, IPlus, ISquare, ITasks, ITimer, IWand, IX,
+  IMagnet, IMousePointer, INote, IPen, IPill, IPlay, IPlus, ISquare, ITasks, IWand, IX,
 } from './Icons';
 
 /**
@@ -46,8 +46,6 @@ export function Dock() {
   const setShowArchived = useBoard((s) => s.setShowArchived);
   const gridSnap = useBoard((s) => s.gridSnap);
   const setGridSnap = useBoard((s) => s.setGridSnap);
-  const timerOpen = useBoard((s) => s.timerOpen);
-  const setTimerOpen = useBoard((s) => s.setTimerOpen);
   const archivedCount = useBoard((s) => selectActiveBoard(s).nodes.filter((n) => n.archived).length);
 
   const arrange = (mode: ArrangeMode) => {
@@ -372,14 +370,6 @@ export function Dock() {
         )}
       </button>
       <button onClick={() => setPresenting(true)} title="Präsentationsmodus (Karten als Folien)" aria-label="Präsentieren"><IPlay /></button>
-      <button
-        onClick={() => setTimerOpen(!timerOpen)}
-        className={timerOpen ? 'active' : ''}
-        title="Besprechungs-Timer: Countdown/Stoppuhr für Timeboxing — bleibt auch im Präsentationsmodus sichtbar"
-        aria-label="Timer"
-      >
-        <ITimer />
-      </button>
 
     </div>
   );

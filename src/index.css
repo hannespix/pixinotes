@@ -486,36 +486,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 [data-theme='dark'] .tab-bg-swatch.bg-rosa { background: #2b2124; }
 [data-theme='dark'] .tab-bg-swatch.bg-flieder { background: #262130; }
 
-/* Besprechungs-Timer: schwebt links unter dem Logo, auch im Presenter (z 110) */
-.timer-widget {
-  position: fixed; top: 62px; left: 18px; z-index: 110;
-  background: var(--surface); border-radius: 14px; padding: 10px 12px;
-  box-shadow: 0 8px 28px rgba(40, 30, 10, 0.2);
-  display: flex; flex-direction: column; gap: 7px;
-}
-.timer-widget.overtime { box-shadow: 0 8px 28px rgba(200, 60, 40, 0.35); }
-.timer-widget.overtime .timer-readout { color: #c0392b; }
-.timer-row { display: flex; align-items: center; gap: 6px; }
-.timer-readout {
-  font-variant-numeric: tabular-nums; font-weight: 800; font-size: 22px;
-  letter-spacing: 0.02em; color: var(--ink); min-width: 86px;
-}
-.timer-btn {
-  border: 1.5px solid var(--border-soft); background: var(--surface);
-  color: var(--ink); border-radius: 8px; cursor: pointer;
-  font-family: inherit; font-size: 12px; font-weight: 700; padding: 4px 8px;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.timer-btn:hover { border-color: var(--accent); }
-.timer-x { border: none; color: var(--muted); }
-.timer-presets { justify-content: flex-start; }
-.timer-input {
-  width: 52px; border: 1.5px solid var(--border-soft); border-radius: 8px;
-  background: var(--surface); color: var(--ink);
-  font-family: inherit; font-size: 12px; padding: 4px 6px;
-}
-.timer-input:focus { outline: none; border-color: var(--accent); }
-
 /* Archiv (M87): eingeblendete Archiv-Karten sind gedimmt und tragen ein Band */
 .react-flow__node.archived-card { opacity: 0.55; filter: saturate(0.5); }
 .react-flow__node.archived-card::after {
@@ -627,6 +597,18 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 
 /* ---------- Schmale Screens (Tablet hochkant / Phone) ---------- */
+/* Mittelbreite (M89): Die zentrierte Tab-Leiste lief in die (seit M77/M85
+   breitere) Aktionsleiste — hier links NACH der Aktionsleiste verankern.
+   Ab ~1360px ist Zentrierung mit max-width 42vw rechnerisch kollisionsfrei
+   ((100vw − 42vw)/2 ≥ 394px), darunter bis 861px gilt diese Regel,
+   noch schmaler übernimmt die Zwei-Zeilen-Lösung unten. */
+@media (max-width: 1360px) and (min-width: 861px) {
+  .tabs {
+    left: 394px; transform: none;
+    max-width: calc(100vw - 406px);
+  }
+}
+
 @media (max-width: 860px) {
   .hint { display: none; }
   .tabs {

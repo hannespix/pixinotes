@@ -19,7 +19,6 @@ import { TaskHub } from './components/TaskHub';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { HelpOverlay } from './components/HelpOverlay';
 import { TooltipLayer } from './components/TooltipLayer';
-import { TimerWidget } from './components/TimerWidget';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
 import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
 
@@ -177,7 +176,6 @@ export default function App() {
       <TooltipLayer />
         <Settings />
         <Presenter />
-        <TimerWidget />
         {/* §5 DDG: Impressum muss leicht erkennbar und unmittelbar erreichbar
             sein — darum dauerhaft sichtbare, klar beschriftete Links (1 Klick),
             nicht nur versteckt in Hilfe/Einstellungen */}

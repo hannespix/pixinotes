@@ -171,9 +171,6 @@ interface BoardState {
   /** Gitter anzeigen + Karten am Raster einrasten (persistiert, M88) */
   gridSnap: boolean;
   setGridSnap: (on: boolean) => void;
-  /** Besprechungs-Timer ein-/ausblenden (M88) */
-  timerOpen: boolean;
-  setTimerOpen: (open: boolean) => void;
   removeBoard: (id: string) => void;
   /** Board in ein (anderes) Projekt verschieben, optional vor ein bestimmtes Board */
   moveBoard: (boardId: string, targetProjectId: string, beforeBoardId?: string) => void;
@@ -551,9 +548,6 @@ export const useBoard = create<BoardState>()(
 
         gridSnap: false,
         setGridSnap: (on) => set({ gridSnap: on }),
-
-        timerOpen: false,
-        setTimerOpen: (open) => set({ timerOpen: open }),
         clickZoom: true,
         setClickZoom: (on) => set({ clickZoom: on }),
         wheelZoom: false,
