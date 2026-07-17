@@ -444,6 +444,18 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .toast-undo:hover { background: rgba(255, 255, 255, 0.28); }
 
+/* Archiv (M87): eingeblendete Archiv-Karten sind gedimmt und tragen ein Band */
+.react-flow__node.archived-card { opacity: 0.55; filter: saturate(0.5); }
+.react-flow__node.archived-card::after {
+  content: 'Archiviert';
+  position: absolute; top: -9px; right: 12px; z-index: 5; pointer-events: none;
+  background: var(--surface-2); color: var(--muted);
+  border: 1px solid var(--border-soft); border-radius: 999px;
+  font-size: 9px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 1.5px 8px;
+}
+.react-flow__edge.archived-edge { opacity: 0.35; }
+
 /* Sync-Status als Wolken-Icon in der Aktionsleiste (M85/M86): erbt das
    Button-Styling von .top-actions; nur der Aufmerksamkeits-Zustand bekommt
    ein zurückhaltendes Amber statt einer lauten Warnfarbe */

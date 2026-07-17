@@ -5,7 +5,7 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IBookmark, ICopy, IDuplicate, IMail, ITag, ITrash, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IBookmark, ICopy, IDuplicate, IMail, ITag, ITrash, IWand, IX } from './Icons';
 
 const MAILTO_LIMIT = 1800; // konservativ: längere mailto-URLs schlucken manche Clients
 
@@ -17,6 +17,7 @@ const MAILTO_LIMIT = 1800; // konservativ: längere mailto-URLs schlucken manche
 export function SelectionToolbar() {
   const board = useBoard(selectActiveBoard);
   const addNode = useBoard((s) => s.addNode);
+  const setArchived = useBoard((s) => s.setArchived);
   const removeNodes = useBoard((s) => s.removeNodes);
   const showToast = useBoard((s) => s.showToast);
   const ai = useBoard((s) => s.ai);
@@ -197,6 +198,17 @@ export function SelectionToolbar() {
             <IWand size={15} />
           </button>
         </span>
+      )}
+      {selected.every((n) => n.archived) ? (
+        <button
+          onClick={() => setArchived(selected.map((n) => n.id), false)}
+          title="Aus dem Archiv zurückholen — die Karte gilt wieder als aktiv"
+        ><IArchiveRestore size={15} /></button>
+      ) : (
+        <button
+          onClick={() => setArchived(selected.map((n) => n.id), true)}
+          title="Archivieren — Karte gilt als erledigt, wird ausgeblendet und taucht nicht mehr in Aufgaben/Erinnerungen auf"
+        ><IArchive size={15} /></button>
       )}
       <button onClick={remove} title="Löschen" className="danger"><ITrash size={15} /></button>
     </NodeToolbar>

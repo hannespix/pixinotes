@@ -216,6 +216,12 @@ interface BoardState {
   physicsEnabled: boolean;
   setPhysicsEnabled: (on: boolean) => void;
 
+  /** Archiv (M87): ganze Karten als erledigt ablegen bzw. zurückholen (undo-fähig) */
+  setArchived: (ids: string[], archived: boolean) => void;
+  /** Archivierte Karten sichtbar (gedimmt) statt ausgeblendet — persistiert */
+  showArchived: boolean;
+  setShowArchived: (on: boolean) => void;
+
   /** Design: Hell/Dunkel/System + Akzentfarbe (persistiert) */
   ui: { theme: 'system' | 'light' | 'dark'; accent: string };
   setUiTheme: (theme: 'system' | 'light' | 'dark') => void;
@@ -508,6 +514,27 @@ export const useBoard = create<BoardState>()(
 
         physicsEnabled: true,
         setPhysicsEnabled: (on) => set({ physicsEnabled: on }),
+
+        setArchived: (ids, archived) => {
+          if (ids.length === 0) return;
+          get().pushHistory();
+          const idSet = new Set(ids);
+          patchActive((b) => ({
+            nodes: b.nodes.map((n) =>
+              // Beim Archivieren auch abwählen — sonst schwebt die
+              // Auswahl-Leiste über einer unsichtbaren Karte
+              idSet.has(n.id) ? { ...n, archived: archived || undefined, selected: false } : n,
+            ),
+          }));
+          get().showToast(
+            archived
+              ? `🗃 ${ids.length} Karte${ids.length > 1 ? 'n' : ''} archiviert — über das Archiv-Symbol im Dock wieder einblendbar (Strg+Z macht es rückgängig).`
+              : `${ids.length} Karte${ids.length > 1 ? 'n' : ''} aus dem Archiv zurückgeholt.`,
+          );
+        },
+
+        showArchived: false,
+        setShowArchived: (on) => set({ showArchived: on }),
         clickZoom: true,
         setClickZoom: (on) => set({ clickZoom: on }),
         wheelZoom: false,
@@ -1065,6 +1092,7 @@ export const useBoard = create<BoardState>()(
         physicsEnabled: s.physicsEnabled,
         clickZoom: s.clickZoom,
         wheelZoom: s.wheelZoom,
+        showArchived: s.showArchived,
       }),
       migrate: (persisted: unknown, version: number) => {
         const p = persisted as Record<string, unknown>;

@@ -89,6 +89,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     for (const b of boards) {
       for (const n of b.nodes) {
         if (n.type !== 'gantt' || n.id === id) continue;
+        if (n.archived) continue; // archiviert = erledigt (Tickets werden abgeglichen)
         for (const row of (n.data as GanttData).rows ?? []) {
           if ((row.progress ?? 0) >= 100) continue;
           const key = `${n.id}|${row.id}`;

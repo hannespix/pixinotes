@@ -161,9 +161,10 @@ export function Presenter() {
     if (!open) return [];
     // Reihenfolge folgt der Gliederung: verbundene Karten als Cluster,
     // innerhalb den Pfeilen nach (Prozess-Logik); Unverbundenes in Lesereihenfolge
-    return presentationOrder(board.nodes, board.edges)
+    return presentationOrder(board.nodes.filter((n) => !n.archived), board.edges)
       // Editierbare Typen immer zeigen (auch leere Notizen — die füllt man live);
-      // statische nur, wenn sie Inhalt haben
+      // statische nur, wenn sie Inhalt haben. Archivierte Karten sind erledigt
+      // und gehören nicht in den Vortrag (M87)
       .filter((n) => EDITABLE.has(n.type) || nodeToHtml(n).trim());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, board.nodes, board.edges]);

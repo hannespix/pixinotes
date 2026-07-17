@@ -63,6 +63,9 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
   const out: TaskRef[] = [];
   for (const board of boards) {
     for (const node of board.nodes) {
+      // Archivierte Karten gelten als erledigt: ihre Aufgaben tauchen weder in
+      // der Aufgaben-Zentrale noch in Erinnerungen oder Sammel-Kanbans auf (M87)
+      if (node.archived) continue;
       if (node.type === 'kanban') {
         const k = node.data as KanbanData;
         const done = doneCol(k);

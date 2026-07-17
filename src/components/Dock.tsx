@@ -10,7 +10,7 @@ import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
 import { computeArrangement, type ArrangeMode } from '../lib/arrange';
 import {
-  IArrange, IBookmark, ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
+  IArchive, IArrange, IBookmark, ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
   IMagnet, IMousePointer, INote, IPen, IPill, IPlay, IPlus, ISquare, ITasks, IWand, IX,
 } from './Icons';
 
@@ -42,6 +42,9 @@ export function Dock() {
   const [arrangeMenu, setArrangeMenu] = useState(false);
   const physicsEnabled = useBoard((s) => s.physicsEnabled);
   const setPhysicsEnabled = useBoard((s) => s.setPhysicsEnabled);
+  const showArchived = useBoard((s) => s.showArchived);
+  const setShowArchived = useBoard((s) => s.setShowArchived);
+  const archivedCount = useBoard((s) => selectActiveBoard(s).nodes.filter((n) => n.archived).length);
 
   const arrange = (mode: ArrangeMode) => {
     setArrangeMenu(false);
@@ -49,7 +52,9 @@ export function Dock() {
     const st = useBoard.getState();
     const board = selectActiveBoard(st);
     if (board.nodes.length < 2) { showToast('Zu wenig Karten zum Anordnen.'); return; }
-    const targets = computeArrangement(board.nodes, board.edges, mode);
+    // Archivierte Karten bleiben liegen — sie sind meist unsichtbar und sollen
+    // beim Aufräumen weder mitmischen noch heimlich verschoben werden
+    const targets = computeArrangement(board.nodes.filter((n) => !n.archived), board.edges, mode);
     // Stapel-Modus: Physik MUSS aus, sonst drückt der nächste Drag alles wieder auseinander
     if (mode === 'stack' && useBoard.getState().physicsEnabled) {
       setPhysicsEnabled(false);
@@ -324,6 +329,24 @@ export function Dock() {
       >
         <IMagnet />
       </button>
+      {archivedCount > 0 && (
+        <button
+          onClick={() => {
+            setShowArchived(!showArchived);
+            showToast(showArchived
+              ? '🗃 Archiv ausgeblendet — archivierte Karten sind wieder unsichtbar.'
+              : `🗃 Archiv eingeblendet — ${archivedCount} archivierte Karte${archivedCount > 1 ? 'n' : ''} (gedimmt). Zum Zurückholen Karte auswählen → Archiv-Symbol.`);
+          }}
+          className={showArchived ? 'active' : ''}
+          title={showArchived
+            ? `Archivierte Karten ausblenden (${archivedCount} auf diesem Board)`
+            : `Archivierte Karten einblenden (${archivedCount} auf diesem Board)`}
+          aria-label="Archiv ein-/ausblenden"
+        >
+          <IArchive />
+          <span className="dock-badge">{archivedCount}</span>
+        </button>
+      )}
       <span className="dock-sep" />
       <button className="dock-tasks" onClick={() => setTasksOpen(true)} title="Aufgaben & Erinnerungen (alle Boards)" aria-label="Aufgaben">
         <ITasks />

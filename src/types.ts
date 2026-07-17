@@ -137,7 +137,10 @@ export interface CalendarData {
 export type CalendarNode = Node<CalendarData, 'calendar'>;
 
 export type AppNode =
-  | NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode;
+  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode)
+  // Archiv (M87): Karten jedes Typs lassen sich als Ganzes „erledigt" ablegen —
+  // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface
+  & { archived?: boolean };
 
 export const KANBAN_COLS = ['To Do', 'Doing', 'Done'] as const;
 /** Effektive Spalten eines Kanban-Boards — Default für alte Boards ohne `cols` */

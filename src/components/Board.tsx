@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -75,11 +75,34 @@ export function Board() {
   const pendingFocus = useBoard((s) => s.pendingFocus);
   const clearPendingFocus = useBoard((s) => s.clearPendingFocus);
 
+  // Archiv (M87): archivierte Karten sind ausgeblendet (React-Flow `hidden`),
+  // bei aktivem Archiv-Schalter gedimmt sichtbar. Anhängende Kanten wandern mit.
+  const showArchived = useBoard((s) => s.showArchived);
+  const rfNodes = useMemo(
+    () => nodes.map((n) => (n.archived ? { ...n, hidden: !showArchived, className: 'archived-card' } : n)),
+    [nodes, showArchived],
+  );
+  const rfEdges = useMemo(() => {
+    const arch = new Set(nodes.filter((n) => n.archived).map((n) => n.id));
+    if (arch.size === 0) return edges;
+    return edges.map((e) =>
+      arch.has(e.source) || arch.has(e.target)
+        ? { ...e, hidden: !showArchived, className: 'archived-edge' }
+        : e,
+    );
+  }, [nodes, edges, showArchived]);
+
   // Suche: nach Board-Wechsel zur gefundenen Karte fliegen und sie markieren
   useEffect(() => {
     if (!pendingFocus || pendingFocus.boardId !== activeId) return;
     const node = nodes.find((n) => n.id === pendingFocus.nodeId);
     if (!node) { clearPendingFocus(); return; }
+    // Treffer liegt im (ausgeblendeten) Archiv → Archiv einblenden, sonst
+    // fliegt die Suche ins Leere
+    if (node.archived && !useBoard.getState().showArchived) {
+      useBoard.getState().setShowArchived(true);
+      useBoard.getState().showToast('🗃 Der Treffer liegt im Archiv — archivierte Karten sind jetzt eingeblendet.');
+    }
     const t = setTimeout(() => {
       const w = node.measured?.width ?? 280;
       const h = node.measured?.height ?? 120;
@@ -149,6 +172,7 @@ export function Board() {
     const mr = nodeRect(mover);
     for (const other of all) {
       if (other.id === mover.id || dragTrack.current?.id === other.id) continue;
+      if ((other as AppNode).archived) continue; // Archivierte stehen still (meist unsichtbar)
       const push = computePush(mr, nodeRect(other), PUSH_GAP);
       if (!push) continue;
       const v = vels.current.get(other.id) ?? { vx: 0, vy: 0 };
@@ -523,8 +547,8 @@ export function Board() {
       )}
       <ReactFlow
         key={`${activeId}:${importEpoch}`}
-        nodes={nodes}
-        edges={edges}
+        nodes={rfNodes}
+        edges={rfEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
