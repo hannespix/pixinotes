@@ -21,6 +21,43 @@ const SECTIONS = [
   { id: 'datenschutz', icon: '🔒', title: 'Datenschutz' },
 ] as const;
 
+/** Editierdistanz ≤ max? (bandbegrenztes Levenshtein mit Frühabbruch) */
+function editDistanceAtMost(a: string, b: string, max: number): boolean {
+  if (Math.abs(a.length - b.length) > max) return false;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      const v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      cur.push(v);
+      if (v < rowMin) rowMin = v;
+    }
+    if (rowMin > max) return false; // ganze Zeile über dem Limit → nie mehr drunter
+    prev = cur;
+  }
+  return prev[b.length] <= max;
+}
+
+/** Erlaubte Tippfehler pro Suchwort: kurze Wörter exakt, sonst 1–2 */
+const fuzzyMax = (len: number): number => (len >= 7 ? 2 : len >= 4 ? 1 : 0);
+
+/** Wie oft kommt das Suchwort im Text vor? Erst wörtlich (auch als Wortteil,
+ *  wichtig für Komposita wie „Sync-Ordner"), sonst fuzzy gegen jedes Wort und
+ *  gegen Wortanfänge („syncro" trifft „Synchronisation"). */
+function tokenHits(token: string, text: string, words: string[]): number {
+  let n = 0;
+  for (let i = text.indexOf(token); i !== -1; i = text.indexOf(token, i + token.length)) n += 1;
+  if (n > 0) return n;
+  const max = fuzzyMax(token.length);
+  if (max === 0) return 0;
+  for (const w of words) {
+    if (editDistanceAtMost(token, w, max)) n += 1;
+    else if (w.length > token.length && editDistanceAtMost(token, w.slice(0, token.length + 1), max)) n += 1;
+  }
+  return n;
+}
+
 export function HelpOverlay() {
   const open = useBoard((s) => s.helpOpen);
   const setOpen = useBoard((s) => s.setHelpOpen);
@@ -43,14 +80,23 @@ export function HelpOverlay() {
       body.classList.remove('help-filtering');
       return;
     }
+    // Mehrwort-Suche: JEDES Wort muss in der Sektion vorkommen (UND) —
+    // wörtlich oder mit Tippfehler-Toleranz (fuzzy, s. tokenHits)
+    const tokens = q.split(/\s+/).filter(Boolean);
     const res: Record<string, number> = {};
     for (const s of SECTIONS) {
       const el = body.querySelector(`#help-${s.id}`);
       const text = (el?.textContent ?? '').toLowerCase();
-      let n = 0;
-      for (let i = text.indexOf(q); i !== -1; i = text.indexOf(q, i + q.length)) n += 1;
-      if (n > 0) res[s.id] = n;
-      el?.classList.toggle('help-hit', n > 0);
+      const words = text.split(/[^\p{L}\p{N}#+@-]+/u).filter((w) => w.length > 1);
+      let total = 0;
+      let all = true;
+      for (const t of tokens) {
+        const n = tokenHits(t, text, words);
+        if (n === 0) { all = false; break; }
+        total += n;
+      }
+      if (all && total > 0) res[s.id] = total;
+      el?.classList.toggle('help-hit', all && total > 0);
     }
     body.classList.add('help-filtering');
     setHits(res);
