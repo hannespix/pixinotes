@@ -10,7 +10,7 @@
 // - Ehrliche Grenze: Der Browser braucht CORS-Header vom DAV-Server.
 //   Nextcloud liefert die standardmäßig NICHT — dann muss die IT die Origin
 //   freigeben, oder man nutzt den Sync-Ordner (Desktop-Client) bzw. Export.
-import { useBoard } from '../store';
+import { claimWriter, flushPersist, getWriterRole, isImportedState, useBoard } from '../store';
 import type { SyncPayload } from './syncFolder';
 
 const LS_KEY = 'pixinotes-webdav';
@@ -116,9 +116,15 @@ export async function webdavTest(cfg: WebdavConfig): Promise<'leer' | 'vorhanden
   return p ? 'vorhanden' : 'leer';
 }
 
-export function applyWebdav(p: SyncPayload): void {
+/** Geladenen Stand übernehmen. false = konnte NICHT dauerhaft gespeichert
+ *  werden (Browser-Speicher voll) — Stempel bleibt dann unangetastet, damit
+ *  Stempel und Daten nie auseinanderlaufen (gleiche Regel wie applySync). */
+export function applyWebdav(p: SyncPayload): boolean {
+  claimWriter(); // Import ist eine bewusste Nutzer-Aktion — dieses Fenster schreibt ab jetzt
   useBoard.getState().importSync(p.boards, p.spaces, p.activeId);
-  localStorage.setItem(STAMP_KEY, p.savedAt);
+  if (!flushPersist()) return false;
+  try { localStorage.setItem(STAMP_KEY, p.savedAt); } catch { return false; }
+  return true;
 }
 
 // ---------- Auto-Sync (gleiches Konfliktschema wie der Sync-Ordner) ----------
@@ -126,6 +132,7 @@ let started = false;
 let conflictWarned = false;
 
 async function autoPush(): Promise<void> {
+  if (getWriterRole() !== 'writer') return; // Mitlese-Fenster synct nie
   const cfg = loadWebdav();
   if (!cfg?.auto) return;
   const remote = await webdavRead(cfg);
@@ -148,6 +155,8 @@ export function initWebdavSync(): void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   useBoard.subscribe((s, prev) => {
     if (s.boards === prev.boards && s.spaces === prev.spaces) return;
+    // Frisch importierter Stand: kein Re-Upload mit neuem savedAt (s. syncFolder)
+    if (isImportedState(s.boards, s.spaces)) return;
     if (!loadWebdav()?.auto) return;
     clearTimeout(timer);
     timer = setTimeout(() => { void autoPush().catch(() => { /* offline o. Ä. — nächster Versuch beim nächsten Edit */ }); }, 2500);

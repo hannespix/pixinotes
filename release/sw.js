@@ -28,8 +28,12 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put('./', copy));
+          // Nur echte Erfolge cachen — eine 404/500-Seite würde sonst die
+          // funktionierende Offline-Kopie der App ersetzen
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put('./', copy));
+          }
           return res;
         })
         .catch(() => caches.match('./')),

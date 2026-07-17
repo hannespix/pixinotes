@@ -261,34 +261,171 @@ let writeTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingWrite: { key: string; value: string } | null = null;
 let quotaWarned = false;
 
-function flushWrite() {
-  if (!pendingWrite) return;
+// ---------------------------------------------------------------------------
+// Single-Writer-Schutz (Sync-Audit M81): Läuft PixiNotes doppelt (installierte
+// PWA + vergessener Browser-Tab), teilen sich beide Kontexte denselben
+// localStorage — bisher überschrieb der zuletzt schreibende kommentarlos den
+// anderen. Genau so ging ein frisch geladener Sync-Stand nach dem Neustart
+// wieder verloren. Jetzt hält genau EIN Kontext die Schreibrechte (Web Lock);
+// alle weiteren Fenster laufen als Mitleser: sie schreiben nichts und
+// übernehmen den Stand des Schreibers live (storage-Event → adopt).
+export type WriterRole = 'writer' | 'follower';
+let writerRole: WriterRole = 'writer'; // Standard: einziges Fenster schreibt
+const LOCK_NAME = 'pixinotes-writer';
+const hasLocks = typeof navigator !== 'undefined' && 'locks' in navigator;
+
+export const getWriterRole = (): WriterRole => writerRole;
+export const singleWriterSupported = (): boolean => hasLocks;
+
+function setWriterRole(role: WriterRole): void {
+  if (writerRole === role) return;
+  writerRole = role;
+  // Nie einen veralteten Puffer nachschieben (z. B. via visibilitychange-Flush)
+  if (role === 'follower') pendingWrite = null;
+  window.dispatchEvent(new CustomEvent('pixinotes:writer-change'));
+}
+
+/** Ausstehenden (gedrosselten) Persist-Write sofort schreiben.
+ *  true = der aktuelle Stand liegt jetzt sicher in localStorage.
+ *  Bei Quota-Fehler bleibt der Write gepuffert (Retry beim nächsten Flush). */
+export function flushPersist(): boolean {
+  if (!pendingWrite) return true;
   try {
     localStorage.setItem(pendingWrite.key, pendingWrite.value);
+    pendingWrite = null;
     quotaWarned = false;
+    return true;
   } catch {
     if (!quotaWarned) {
       quotaWarned = true;
       window.dispatchEvent(new CustomEvent('pixinotes:quota'));
     }
+    return false;
   }
-  pendingWrite = null;
 }
 if (typeof window !== 'undefined') {
-  window.addEventListener('beforeunload', flushWrite);
+  window.addEventListener('beforeunload', flushPersist);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flushWrite();
+    if (document.visibilityState === 'hidden') flushPersist();
   });
 }
 const debouncedSafeStorage = {
-  getItem: (k: string) => localStorage.getItem(k),
+  // pendingWrite mitlesen: ein getItem direkt nach setItem darf nie den
+  // schon überholten localStorage-Stand liefern
+  getItem: (k: string) => (pendingWrite?.key === k ? pendingWrite.value : localStorage.getItem(k)),
   setItem: (k: string, v: string) => {
+    if (writerRole !== 'writer') return; // Mitlese-Fenster schreibt NIE
     pendingWrite = { key: k, value: v };
     clearTimeout(writeTimer);
-    writeTimer = setTimeout(flushWrite, 400);
+    writeTimer = setTimeout(flushPersist, 400);
   },
-  removeItem: (k: string) => localStorage.removeItem(k),
+  removeItem: (k: string) => {
+    if (writerRole !== 'writer') return;
+    pendingWrite = null;
+    localStorage.removeItem(k);
+  },
 };
+
+/** Persistierten Stand aus localStorage in den laufenden Store übernehmen —
+ *  Mitleser folgen so dem Schreiber; ein Nachfolger übernimmt vor dem ersten
+ *  eigenen Write, was der alte Schreiber zuletzt gesichert hat. */
+export function adoptPersistedState(): boolean {
+  try {
+    const raw = localStorage.getItem('pixinotes-board');
+    if (!raw) return false;
+    const st = (JSON.parse(raw) as { state?: { boards?: BoardDoc[]; spaces?: Space[]; activeId?: string } }).state;
+    if (!st || !Array.isArray(st.boards) || st.boards.length === 0 || !Array.isArray(st.spaces)) return false;
+    useBoard.getState().importSync(st.boards, st.spaces, st.activeId ?? st.boards[0].id);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const holdForever = () => new Promise<never>(() => {});
+let succession: AbortController | null = null;
+
+/** In die Warteschlange: sobald der aktuelle Schreiber schließt, übernehmen wir. */
+function queueSuccession(): void {
+  succession?.abort();
+  const ctl = new AbortController();
+  succession = ctl;
+  void navigator.locks
+    .request(LOCK_NAME, { signal: ctl.signal }, () => {
+      adoptPersistedState(); // der alte Schreiber kann Neueres hinterlassen haben
+      setWriterRole('writer');
+      useBoard.getState().showToast('✍️ Das andere Fenster ist zu — dieses Fenster speichert jetzt wieder selbst.');
+      return holdForever();
+    })
+    .catch(() => {
+      // Eigener abort() (Übernahme-Klick) → nichts tun; sonst wurde uns der
+      // gerade gewonnene Lock gestohlen → zurück in die Mitleser-Rolle
+      if (!ctl.signal.aborted && writerRole === 'writer') demoted();
+    });
+}
+
+/** Wir haben die Schreibrechte verloren (anderes Fenster hat übernommen). */
+function demoted(): void {
+  setWriterRole('follower');
+  adoptPersistedState();
+  useBoard.getState().showToast('👀 Ein anderes Fenster hat die Bearbeitung übernommen — dieses Fenster liest nur noch mit.');
+  queueSuccession();
+}
+
+/** Schreibrechte JETZT in dieses Fenster holen (bewusste Nutzer-Aktion wie
+ *  Import/Zurücksetzen). Wirkt sofort; der Web-Lock-Steal bestätigt asynchron. */
+export function claimWriter(): void {
+  if (!hasLocks || writerRole === 'writer') return;
+  succession?.abort();
+  succession = null;
+  setWriterRole('writer');
+  void navigator.locks
+    .request(LOCK_NAME, { steal: true }, () => holdForever())
+    .catch(() => demoted());
+}
+
+/** „Hier weiterarbeiten"-Banner: letzten Speicherstand übernehmen, dann schreiben. */
+export function takeOverWriter(): void {
+  if (writerRole === 'writer') return;
+  adoptPersistedState();
+  claimWriter();
+}
+
+function initSingleWriter(): void {
+  if (!hasLocks) return; // sehr alte Browser: bisheriges Verhalten (nur Warn-Toast)
+  void navigator.locks
+    .request(LOCK_NAME, { ifAvailable: true }, (lock) => {
+      if (!lock) {
+        // Ein anderes Fenster schreibt bereits → mitlesen und Nachfolge anmelden
+        setWriterRole('follower');
+        queueSuccession();
+        return;
+      }
+      return holdForever();
+    })
+    .catch(() => {
+      if (writerRole === 'writer') demoted(); // Lock gestohlen („Hier weiterarbeiten" woanders)
+    });
+}
+if (typeof window !== 'undefined') initSingleWriter();
+
+// Sync-Audit M81: Nach einem Import (Sync-Ordner/WebDAV/Datei/anderes Fenster)
+// darf der Auto-Sync denselben Stand nicht gleich wieder MIT NEUEM Zeitstempel
+// hochladen — andere Geräte sähen sonst grundlos „fremden Stand" (Konflikt).
+let importedRefs: { boards: unknown; spaces: unknown } = { boards: null, spaces: null };
+export const isImportedState = (boards: unknown, spaces: unknown): boolean =>
+  importedRefs.boards === boards && importedRefs.spaces === spaces;
+export const markImported = (boards: unknown, spaces: unknown): void => {
+  importedRefs = { boards, spaces };
+};
+
+/** Eigenen Stand erneut nach localStorage durchsetzen — der Schreiber wehrt
+ *  damit fremde Writes ab (z. B. ein alter Tab mit einer App-Version ohne
+ *  Single-Writer-Schutz), statt Daten zu verlieren. */
+export function reassertPersist(): void {
+  useBoard.setState({}); // no-op-Merge: stößt den persist-Layer neu an
+  flushPersist();
+}
 
 /** „Board 2", „Board 3" … statt fünfmal „Neues Board" */
 function nextName(base: string, existing: string[]): string {
@@ -381,6 +518,7 @@ export const useBoard = create<BoardState>()(
         resetAll: () => {
           // Bewusst KEIN Undo: das ist der „frischer Start"-Schalter.
           // KI-Einstellungen bleiben erhalten (nur Inhalte werden geleert).
+          claimWriter(); // bewusste Aktion — auch aus einem Mitlese-Fenster wirksam
           const boardId = uid();
           set({
             boards: [{ id: boardId, name: '🏠 Mein Board', nodes: [], edges: [], drawings: [] }],
@@ -533,6 +671,9 @@ export const useBoard = create<BoardState>()(
 
         importSync: (boards, spaces, activeId) => {
           if (!Array.isArray(boards) || boards.length === 0 || !Array.isArray(spaces)) return;
+          // Auto-Sync-Bremse: dieser Stand kam von außen — nicht gleich wieder
+          // mit neuem Zeitstempel hochladen (falsche Konflikte auf anderen Geräten)
+          markImported(boards, spaces);
           set({
             boards,
             spaces,

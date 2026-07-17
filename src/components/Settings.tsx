@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { selectActiveBoard, useBoard } from '../store';
+import { claimWriter, flushPersist, selectActiveBoard, useBoard } from '../store';
 import {
   connectGoogle, connectMicrosoft, disconnect as disconnectCalAccount,
   invalidateAccountEvents, loadCalAccounts, oauthAvailable, patchCalAccounts, type CalAccounts,
@@ -33,6 +33,13 @@ const DEFAULT_BASE: Record<string, string> = {
 };
 const NEEDS_KEY = new Set(['anthropic', 'openai', 'openrouter', 'custom']);
 const NEEDS_URL = new Set(['ollama', 'custom']);
+
+// Sync-Audit M81: Import ist erst „fertig", wenn er auch in localStorage liegt —
+// vorher log der Erfolgs-Toast bei vollem Speicher (Stand nur im RAM, nach
+// Neustart wieder weg). Jetzt wird ehrlich gewarnt und KEIN Stempel gesetzt.
+const QUOTA_IMPORT_MSG =
+  '⚠️ Geladen, aber NICHT dauerhaft gespeichert — der Browser-Speicher ist voll! '
+  + 'Bitte Platz schaffen (z. B. große Bilder löschen) und erneut laden, sonst ist der Stand nach dem Schließen weg.';
 
 /**
  * Einstellungen: KI-Anbindung (eigener Key, lokal gespeichert) und
@@ -155,7 +162,7 @@ export function Settings() {
     const p = await webdavRead(davCfg!);
     if (!p) { showToast('Auf dem Server liegt (noch) keine PixiNotes-Datei.'); return; }
     if (!window.confirm(`Stand vom ${new Date(p.savedAt).toLocaleString('de-DE')} laden? Der lokale Stand wird ersetzt (Strg+Z geht danach nicht zurück).`)) return;
-    applyWebdav(p);
+    if (!applyWebdav(p)) { showToast(QUOTA_IMPORT_MSG); return; }
     showToast('⬇️ Stand vom WebDAV-Server geladen.');
   }, 'davpull');
 
@@ -173,7 +180,7 @@ export function Settings() {
     if (remote && window.confirm(
       `Im Ordner liegt bereits ein PixiNotes-Stand (${new Date(remote.savedAt).toLocaleString('de-DE')}).\n\nOK = diesen Stand LADEN (ersetzt die lokalen Boards)\nAbbrechen = lokalen Stand in den Ordner schreiben`,
     )) {
-      applySync(remote);
+      if (!applySync(remote)) { showToast(QUOTA_IMPORT_MSG); return; }
       showToast('☁️ Stand aus dem Sync-Ordner geladen');
     } else {
       await writeSync(handle);
@@ -185,7 +192,7 @@ export function Settings() {
     if (!syncHandle || !(await ensurePermission(syncHandle, true))) return;
     const remote = await readSync(syncHandle);
     if (!remote) { showToast('Keine (gültige) pixinotes-daten.json im Ordner gefunden.'); return; }
-    applySync(remote);
+    if (!applySync(remote)) { showToast(QUOTA_IMPORT_MSG); return; }
     showToast('☁️ Stand aus dem Sync-Ordner geladen');
   };
 
@@ -219,7 +226,9 @@ export function Settings() {
         return;
       }
       if (!window.confirm(`Stand vom ${p.savedAt ? new Date(p.savedAt).toLocaleString('de-DE') : '?'} laden? Die aktuellen Boards werden ersetzt.`)) return;
+      claimWriter(); // bewusster Import — auch aus einem Mitlese-Fenster wirksam
       useBoard.getState().importSync(p.boards, p.spaces ?? [], p.activeId ?? p.boards[0].id);
+      if (!flushPersist()) { showToast(QUOTA_IMPORT_MSG); return; }
       showToast('📂 Stand aus Datei geladen');
       setOpen(false);
     } catch {

@@ -442,6 +442,24 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .toast-undo:hover { background: rgba(255, 255, 255, 0.28); }
 
+/* Mitlese-Banner (Single-Writer): zweites Fenster liest nur mit */
+.writer-banner {
+  position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface-card); color: var(--ink);
+  border: 1.5px solid var(--accent); border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(40, 30, 10, 0.22);
+  font-size: 12.5px; line-height: 1.45; padding: 9px 14px;
+  z-index: 70; max-width: min(640px, 92vw);
+}
+.writer-banner button {
+  flex: none; border: none; cursor: pointer;
+  background: var(--accent); color: #fff;
+  font-family: inherit; font-size: 12.5px; font-weight: 700;
+  padding: 6px 12px; border-radius: 8px; white-space: nowrap;
+}
+.writer-banner button:hover { filter: brightness(1.08); }
+
 /* ---------- Suche (Strg+K) ---------- */
 .search-backdrop {
   position: fixed; inset: 0; z-index: 80;

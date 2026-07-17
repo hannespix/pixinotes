@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Board } from './components/Board';
 import { Dock } from './components/Dock';
@@ -9,7 +9,10 @@ import { Overview } from './components/Overview';
 import { SearchOverlay } from './components/SearchOverlay';
 import { Settings } from './components/Settings';
 import { Presenter } from './components/Presenter';
-import { useBoard } from './store';
+import {
+  adoptPersistedState, claimWriter, getWriterRole, reassertPersist,
+  singleWriterSupported, takeOverWriter, useBoard, type WriterRole,
+} from './store';
 import { initAutoSync } from './lib/syncFolder';
 import { initWebdavSync } from './lib/webdav';
 import { TaskHub } from './components/TaskHub';
@@ -68,6 +71,7 @@ export default function App() {
       clearShareHash();
       const st = useBoard.getState();
       if (window.confirm(`Geteiltes Board „${shared.name ?? 'Board'}" (${shared.nodes?.length ?? 0} Karten) übernehmen?`)) {
+        claimWriter(); // bewusster Import — auch aus einem Mitlese-Fenster wirksam
         st.importBoard(cloneSharedBoard(shared));
         st.showToast('Geteiltes Board übernommen — liegt als eigenes Board in deiner Tab-Leiste.');
       }
@@ -93,15 +97,38 @@ export default function App() {
     return () => { clearTimeout(t0); clearInterval(iv); };
   }, []);
 
-  // Zweiter Browser-Tab? Letzter Schreiber gewinnt — ehrlich warnen (Backlog M6)
+  // Mitlese-Banner: genau EIN Fenster darf schreiben (Web Lock, Sync-Audit M81) —
+  // alle weiteren zeigen den Hinweis mit „Hier weiterarbeiten"-Übernahme
+  const [writerRole, setWriterRoleUi] = useState<WriterRole>(getWriterRole());
   useEffect(() => {
+    const upd = () => setWriterRoleUi(getWriterRole());
+    window.addEventListener('pixinotes:writer-change', upd);
+    return () => window.removeEventListener('pixinotes:writer-change', upd);
+  }, []);
+
+  // Fremder Write in unseren Speicher (zweiter Browsing-Kontext):
+  //  - Mitleser: Stand des Schreibers übernehmen (kurz gebündelt, Schreib-Bursts)
+  //  - Schreiber: darf eigentlich nie passieren (Lock) — also ein ALTER Kontext
+  //    ohne Single-Writer-Schutz → warnen und eigenen Stand wieder durchsetzen,
+  //    statt ihn wie früher still überschreiben zu lassen (Sync-Audit M81)
+  useEffect(() => {
+    let adoptTimer: ReturnType<typeof setTimeout> | undefined;
+    let lastDefense = 0;
     const onStorage = (e: StorageEvent) => {
-      if (e.key === 'pixinotes-board' && e.newValue !== null) {
-        showToast('⚠️ PixiNotes ist in einem weiteren Tab geöffnet — bitte nur einen Tab nutzen, sonst überschreiben sich die Stände.');
+      if (e.key !== 'pixinotes-board' || e.newValue === null) return;
+      if (getWriterRole() === 'follower') {
+        clearTimeout(adoptTimer);
+        adoptTimer = setTimeout(() => { adoptPersistedState(); }, 800);
+        return;
       }
+      const now = Date.now();
+      if (now - lastDefense < 10_000) return; // gedrosselt: kein Toast/Write-Ping-Pong
+      lastDefense = now;
+      if (singleWriterSupported()) reassertPersist();
+      showToast('⚠️ Ein weiteres PixiNotes-Fenster schreibt in den Speicher (vermutlich mit alter App-Version) — bitte das andere Fenster schließen. Dieses Fenster behält seinen Stand.');
     };
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    return () => { window.removeEventListener('storage', onStorage); clearTimeout(adoptTimer); };
   }, [showToast]);
 
   // Quota-Warnung aus dem Storage-Layer (Audit K1)
@@ -150,6 +177,15 @@ export default function App() {
       <TooltipLayer />
         <Settings />
         <Presenter />
+        {writerRole === 'follower' && (
+          <div className="writer-banner" role="status">
+            <span>
+              👀 PixiNotes ist in einem anderen Fenster/Tab geöffnet — dieses Fenster liest nur
+              mit, damit sich die Stände nicht gegenseitig überschreiben.
+            </span>
+            <button onClick={takeOverWriter}>Hier weiterarbeiten</button>
+          </div>
+        )}
         <div className={`toast ${toast ? 'show' : ''}`}>
           {toast?.message}
           {toast?.undo && (

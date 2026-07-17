@@ -3,7 +3,7 @@
 // der Desktop-Client des Cloud-Dienstes auf alle Geräte spiegelt. Kein Server,
 // kein CORS, keine App-Passwörter — funktioniert überall, wo der Sync-Client läuft.
 // Das Ordner-Handle wird in IndexedDB gemerkt (übersteht Neustarts in Chrome/Edge).
-import { useBoard, type BoardDoc, type Space } from '../store';
+import { claimWriter, flushPersist, getWriterRole, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
 
 const FILE_NAME = 'pixinotes-daten.json';
 const DB_NAME = 'pixinotes-sync';
@@ -143,9 +143,19 @@ export async function writeSync(handle: SyncDirHandle): Promise<string> {
   return payload.savedAt;
 }
 
-export function applySync(p: SyncPayload): void {
+/** Geladenen Stand übernehmen. false = konnte NICHT dauerhaft gespeichert
+ *  werden (Browser-Speicher voll) — dann bleibt auch der Sync-Stempel
+ *  unangetastet, damit Stempel und Daten nie auseinanderlaufen (Audit M81:
+ *  vorher stand der Stempel schon auf „synchron", während die Daten noch
+ *  400 ms im Puffer hingen — ein Crash in dem Fenster hinterließ den alten
+ *  Stand mit neuem Stempel, und der nächste Auto-Save überschrieb still
+ *  den Sync-Ordner). */
+export function applySync(p: SyncPayload): boolean {
+  claimWriter(); // Import ist eine bewusste Nutzer-Aktion — dieses Fenster schreibt ab jetzt
   useBoard.getState().importSync(p.boards, p.spaces, p.activeId);
-  localStorage.setItem(STAMP_KEY, p.savedAt);
+  if (!flushPersist()) return false;
+  try { localStorage.setItem(STAMP_KEY, p.savedAt); } catch { return false; }
+  return true;
 }
 
 export const knownStamp = (): string | null => localStorage.getItem(STAMP_KEY);
@@ -155,6 +165,7 @@ let started = false;
 let conflictWarned = false;
 
 async function autoSave(): Promise<void> {
+  if (getWriterRole() !== 'writer') return; // Mitlese-Fenster synct nie
   const handle = await getSyncHandle();
   if (!handle || !(await ensurePermission(handle, false))) return;
   const remote = await readSync(handle);
@@ -180,6 +191,10 @@ export function initAutoSync(): void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   useBoard.subscribe((s, prev) => {
     if (s.boards === prev.boards && s.spaces === prev.spaces) return;
+    // Frisch importierter Stand (Sync/Datei/anderes Fenster): nichts Neues zu
+    // sichern — ein Re-Upload mit neuem savedAt würde auf allen anderen
+    // Geräten nur falsche „fremder Stand"-Warnungen auslösen
+    if (isImportedState(s.boards, s.spaces)) return;
     clearTimeout(timer);
     timer = setTimeout(() => { void autoSave().catch(() => {}); }, 1800);
   });
