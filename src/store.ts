@@ -197,6 +197,8 @@ interface BoardState {
   wheelZoom: boolean;
   setWheelZoom: (on: boolean) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
+  /** Kartengröße setzen (Auto-Größe der Diagramm-Karte, M92c) */
+  resizeNode: (id: string, width: number, height: number) => void;
   setNodePosition: (id: string, x: number, y: number) => void;
   /** Mehrere Positionen in EINEM Store-Update — für den Physik-Loop (60 fps) */
   setNodePositions: (entries: Array<[string, number, number]>) => void;
@@ -1050,6 +1052,13 @@ export const useBoard = create<BoardState>()(
           });
           get().showToast('Wiederhergestellt ✓');
         },
+
+        resizeNode: (id, width, height) =>
+          patchActive((b) => ({
+            nodes: b.nodes.map((n) =>
+              n.id === id ? ({ ...n, width, height } as AppNode) : n,
+            ),
+          })),
 
         updateNodeData: (id, data) =>
           patchActive((b) => ({

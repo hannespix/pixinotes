@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { NodeToolbar, Position, type NodeProps } from '@xyflow/react';
-import { useBoard } from '../../store';
+import { runDerived, useBoard } from '../../store';
 import type { MermaidNode } from '../../types';
 import { aiReady } from '../../lib/ai';
 import { aiMermaid, buildMermaidSource, getMermaid, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES } from '../../lib/mermaid';
@@ -32,8 +32,9 @@ const NODE_COLORS: Array<[string, string, string]> = [
  * Sprache wie die Auswahl-Toolbar oben). Flowchart-Schritte werden direkt im
  * Bild bearbeitet: umbenennen, anfügen, Form, Farbe, verbinden, entfernen.
  */
-export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
+export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }: NodeProps<MermaidNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
+  const resizeNode = useBoard((s) => s.resizeNode);
   const showToast = useBoard((s) => s.showToast);
   const ai = useBoard((s) => s.ai);
   const uiTheme = useBoard((s) => s.ui.theme); // Diagramm folgt Hell/Dunkel
@@ -79,6 +80,39 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
   }, [data.code, id, uiTheme, style, look]);
+
+  // Auto-Größe (M92c, „gantt viel zu klein"): Nach jedem erfolgreichen Render
+  // die NATÜRLICHE Diagrammgröße aus der viewBox lesen und die Karte darauf
+  // einpassen. Große Diagramme (Gantt!) bekommen so echte Fläche statt einer
+  // Briefmarke. Manuelles Resize schaltet auf „eigene Größe behalten" um
+  // (autoFit=false); der ⤢-Knopf in der Leiste schaltet zurück.
+  useEffect(() => {
+    if (!svg || data.autoFit === false) return;
+    const el = previewRef.current?.querySelector('svg');
+    if (!el) return;
+    const vb = (el as SVGSVGElement).viewBox?.baseVal;
+    let natW = vb?.width ?? 0;
+    let natH = vb?.height ?? 0;
+    if (!natW || !natH) {
+      // Fallback (falls ein Diagrammtyp keine viewBox setzt): Inhalt vermessen
+      try { const bb = (el as SVGSVGElement).getBBox(); natW = bb.width; natH = bb.height; } catch { return; }
+    }
+    if (!natW || !natH) return;
+    const PAD = 12; // Karten-Innenabstand (6 px rundum)
+    const MAXW = 1100, MAXH = 720, MINW = 240, MINH = 150;
+    // SVG skaliert proportional zur Kartenbreite — bei Überbreite/-höhe
+    // gemeinsam herunterskalieren, damit alles ohne Scrollen sichtbar bleibt
+    const scale = Math.min(1, MAXW / natW, MAXH / natH);
+    const w = Math.max(MINW, Math.round(natW * scale) + PAD);
+    const h = Math.max(MINH, Math.round(natH * scale) + PAD);
+    // Nur bei nennenswerter Abweichung anfassen (kein Zittern, keine
+    // Endlos-Writes) — und als „abgeleitet" markieren: die Größe folgt
+    // deterministisch aus dem Code und soll den Sync nicht als Bearbeitung
+    // blockieren (M82-Muster)
+    if (Math.abs((nodeW ?? 0) - w) < 12 && Math.abs((nodeH ?? 0) - h) < 12) return;
+    runDerived(() => resizeNode(id, w, h));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [svg, data.autoFit]);
 
   // Ausgewählten Flowchart-Schritt im SVG markieren (Klasse aufs <g>)
   useEffect(() => {
@@ -240,7 +274,14 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
   };
 
   return (
-    <CardShell id={id} selected={selected} minWidth={300} minHeight={200} className="mermaid-card">
+    <CardShell
+      id={id}
+      selected={selected}
+      minWidth={240}
+      minHeight={150}
+      className="mermaid-card"
+      onManualResize={() => { if (data.autoFit !== false) updateNodeData(id, { autoFit: false }); }}
+    >
       {/* Werkzeuge schweben UNTER dem Diagramm (die Auswahl-Toolbar liegt oben) */}
       <NodeToolbar isVisible={!!selected} position={Position.Bottom} offset={14} className="mm-toolbar nodrag">
         {selNode ? (
@@ -305,6 +346,11 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
             {isFlow && (
               <button title="Neuen Schritt anfügen (an den ausgewählten, sonst frei)" onClick={() => addStepAfter(selNode)}>＋ Schritt</button>
             )}
+            <button
+              className={data.autoFit === false ? '' : 'active'}
+              title={data.autoFit === false ? 'Auto-Größe wieder einschalten — Karte folgt dem Inhalt' : 'Auto-Größe ist an: Karte passt sich dem Diagramm an (manuelles Ziehen schaltet sie aus)'}
+              onClick={() => updateNodeData(id, { autoFit: data.autoFit === false ? undefined : false })}
+            >⤢ Auto</button>
             <button className={edit ? 'active' : ''} title="Mermaid-Code anzeigen/bearbeiten (für Profis)" onClick={() => setEdit((e) => !e)}>‹/›</button>
           </div>
         )}
