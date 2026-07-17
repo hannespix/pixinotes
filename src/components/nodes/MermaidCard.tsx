@@ -25,12 +25,24 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
     // Tastendruck einen (oft ungültigen) Zwischenstand rendert (Audit).
     const t = setTimeout(() => {
       getMermaid()
-        .then((mermaid) => mermaid.render(`pn-mermaid-${id}`, data.code))
+        // Render-ID pro VERSUCH eindeutig: mermaid räumt vor dem Rendern alle
+        // Elemente mit derselben ID weg — mit stabiler ID löscht ein
+        // fehlgeschlagener Versuch sonst das angezeigte SVG aus dem DOM (M90)
+        .then((mermaid) => mermaid.render(`pn-mermaid-${id}-${myKey}`, data.code))
         .then(({ svg }) => { if (!cancelled && myKey === renderKey.current) { setSvg(svg); setError(''); } })
+        // WICHTIG: svg NICHT leeren — beim Tippen bleibt so das letzte gültige
+        // Diagramm sichtbar, der Fehler erscheint nur als kleines Overlay (M90)
         .catch((e) => { if (!cancelled && myKey === renderKey.current) setError(String(e?.message ?? e).split('\n')[0]); });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
   }, [data.code, id, uiTheme]);
+
+  /** Vorlage laden — eigenen Code nicht durch einen Fehlklick verlieren */
+  const applyTemplate = (t: string) => {
+    const isPristine = !data.code.trim() || Object.values(TEMPLATES).includes(data.code);
+    if (!isPristine && !window.confirm(`Aktuellen Diagramm-Code durch die Vorlage „${t}" ersetzen?`)) return;
+    updateNodeData(id, { code: TEMPLATES[t] });
+  };
 
   return (
     <CardShell id={id} selected={selected} minWidth={280} minHeight={180} className="mermaid-card">
@@ -38,7 +50,7 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
         <span>Diagramm</span>
         <div className="mermaid-tools nodrag">
           {Object.keys(TEMPLATES).map((t) => (
-            <button key={t} title={`Vorlage ${t}`} onClick={() => updateNodeData(id, { code: TEMPLATES[t] })}>{t}</button>
+            <button key={t} title={`Vorlage ${t}`} onClick={() => applyTemplate(t)}>{t}</button>
           ))}
           <button className={edit ? 'active' : ''} title="Code/Vorschau" onClick={() => setEdit((e) => !e)}>‹/›</button>
         </div>
@@ -53,10 +65,11 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
           />
         )}
         <div className="mermaid-preview nowheel">
-          {error ? (
-            <div className="mermaid-error">⚠️ {error}</div>
-          ) : (
-            <div className="mermaid-svg" dangerouslySetInnerHTML={{ __html: svg }} />
+          <div className={`mermaid-svg ${error ? 'stale' : ''}`} dangerouslySetInnerHTML={{ __html: svg }} />
+          {error && (
+            <div className="mermaid-error" title={error}>
+              ⚠️ {svg ? 'Code unvollständig — letztes gültiges Diagramm bleibt sichtbar' : error}
+            </div>
           )}
         </div>
       </div>
