@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
@@ -68,9 +68,11 @@ function ShapeSlide({ node }: { node: ShapeNode }) {
 /** Mermaid-Folie: großes Diagramm, Code-Editor per ‹/› zuschaltbar */
 function MermaidSlide({ node }: { node: MermaidNode }) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
+  const uiTheme = useBoard((s) => s.ui.theme); // Folie folgt Hell/Dunkel (Audit M97)
   const [edit, setEdit] = useState(false);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState('');
+  const renderKey = useRef(0);
 
   // Folie rendert mit denselben Stil-/Look-Einstellungen wie die Karte
   // (vorher wurden Farbschema und Handschrift-Look hier ignoriert, M96)
@@ -78,17 +80,20 @@ function MermaidSlide({ node }: { node: MermaidNode }) {
   const look = (node.data.look as string | undefined) ?? '';
   useEffect(() => {
     let cancelled = false;
+    const myKey = ++renderKey.current;
     const t = setTimeout(() => {
       getMermaid()
         .then(async (mermaid) => {
           if (look === 'hand') await preloadHandFont(); // Scribble-Schrift vor der Messung
-          return mermaid.render(`pn-slide-${node.id}`, buildMermaidSource(node.data.code, style, look));
+          // Render-ID pro Versuch eindeutig: mermaids ID-Cleanup löscht sonst
+          // bei einem FEHLGESCHLAGENEN Versuch das angezeigte SVG (M90-Parität)
+          return mermaid.render(`pn-slide-${node.id}-${myKey}`, buildMermaidSource(node.data.code, style, look));
         })
-        .then(({ svg }) => { if (!cancelled) { setSvg(svg); setError(''); } })
-        .catch((e) => { if (!cancelled) setError(String(e?.message ?? e).split('\n')[0]); });
+        .then(({ svg }) => { if (!cancelled && myKey === renderKey.current) { setSvg(svg); setError(''); } })
+        .catch((e) => { if (!cancelled && myKey === renderKey.current) setError(String(e?.message ?? e).split('\n')[0]); });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [node.data.code, node.id, style, look]);
+  }, [node.data.code, node.id, style, look, uiTheme]);
 
   return (
     <div className="slide-mermaid">
@@ -108,10 +113,13 @@ function MermaidSlide({ node }: { node: MermaidNode }) {
           />
         )}
         <div className={`mermaid-preview${look === 'hand' ? ' mm-hand' : ''}`}>
-          {error ? (
-            <div className="mermaid-error">⚠️ {error}</div>
-          ) : (
-            <div className="mermaid-svg" dangerouslySetInnerHTML={{ __html: svg }} />
+          {/* Wie in der Karte (M90): letztes gültiges Diagramm bleibt sichtbar,
+              der Fehler erscheint nur als Overlay-Chip */}
+          <div className={`mermaid-svg ${error ? 'stale' : ''}`} dangerouslySetInnerHTML={{ __html: svg }} />
+          {error && (
+            <div className="mermaid-error" title={error}>
+              ⚠️ {svg ? 'Code unvollständig — letztes gültiges Diagramm bleibt sichtbar' : error}
+            </div>
           )}
         </div>
       </div>

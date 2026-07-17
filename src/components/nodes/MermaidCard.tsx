@@ -169,17 +169,26 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   };
 
   const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  /** Definition „id<Klammer>Label<Klammer>" im Code finden */
+  /** Definition „id<Klammer>Label<Klammer>" im Code finden.
+   *  Label-Gruppe kennt auch die "…"-Form — nur so überleben Beschriftungen
+   *  mit Klammern/Sonderzeichen ein erneutes Umbenennen (Audit M97). */
   const defRe = (nid: string) =>
-    new RegExp(`(\\b${escapeRe(nid)})((?:\\(\\(|\\[|\\{|\\())([^\\]})]*)((?:\\)\\)|\\]|\\}|\\)))`);
+    new RegExp(`(\\b${escapeRe(nid)})((?:\\(\\(|\\[|\\{|\\())("[^"]*"|[^\\]})]*)((?:\\)\\)|\\]|\\}|\\)))`);
 
-  /** Label eines Schritts ersetzen — Klammerform ([…], {…}, ((…)), (…)) bleibt */
+  /** Beschriftung mermaid-sicher machen: Sonderzeichen (Klammern, #, ; …)
+   *  brauchen die "…"-Form; innere Anführungszeichen werden zu ' (Audit M97) */
+  const asLabel = (label: string) =>
+    /[[\](){}"#;|<>&]/.test(label) ? `"${label.replace(/"/g, "'")}"` : label;
+
+  /** Label eines Schritts ersetzen — Klammerform ([…], {…}, ((…)), (…)) bleibt.
+   *  Ersetzung über Callback: $-Zeichen im Label sind sonst Replacement-Muster */
   const renameNode = (nid: string, label: string) => {
     const re = defRe(nid);
+    const safe = asLabel(label);
     if (re.test(data.code)) {
-      updateNodeData(id, { code: data.code.replace(re, `$1$2${label}$4`) });
+      updateNodeData(id, { code: data.code.replace(re, (_m, p1, p2, _p3, p4) => `${p1}${p2}${safe}${p4}`) });
     } else {
-      updateNodeData(id, { code: `${data.code}\n  ${nid}[${label}]` });
+      updateNodeData(id, { code: `${data.code}\n  ${nid}[${safe}]` });
     }
   };
 
@@ -187,7 +196,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   const setShape = (nid: string, open: string, close: string) => {
     const re = defRe(nid);
     if (re.test(data.code)) {
-      updateNodeData(id, { code: data.code.replace(re, `$1${open}$3${close}`) });
+      updateNodeData(id, { code: data.code.replace(re, (_m, p1, _p2, p3, _p4) => `${p1}${open}${p3}${close}`) });
     } else {
       updateNodeData(id, { code: `${data.code}\n  ${nid}${open}${nid}${close}` });
     }
