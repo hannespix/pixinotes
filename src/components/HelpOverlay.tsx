@@ -194,7 +194,7 @@ export function HelpOverlay() {
                 <li><b>📋 Kanban:</b> Spalten frei benennbar (＋/✕). <b>Klick auf ein Ticket</b> öffnet Details: Beschreibung, Fälligkeit, Person, Board-Verknüpfung. ⤓ sammelt offene Aufgaben aus allen Boards ein, ⟳ hält das automatisch aktuell — erledigte Quellen haken ihre Tickets selbst ab.</li>
                 <li><b>📅 Zeitplan (Gantt):</b> Balken ziehen/resizen, ◆ = Meilenstein (Balken auf Dauer 0), Pfeile = Abhängigkeiten mit Konflikt-Warnung und Ein-Klick-Auflösung, Personen, Zoom, „heute".</li>
                 <li><b>🗓️ Kalender:</b> Monat/Woche, Quellen wählbar (Aufgaben, Zeitpläne, Meilensteine), ICS-Import/-Abo/-Export (Outlook, Google, Apple), .ics-Dateien einfach draufziehen. Über ⚙ → <b>Kalender</b> in den Einstellungen lassen sich Google Kalender und Microsoft 365 direkt verbinden (nur lesend, Zugangsdaten bleiben lokal).</li>
-                <li><b>📊 Mermaid:</b> Diagramme aus Text (Flowchart, Mindmap, Sequenz …).</li>
+                <li><b>📊 Diagramm (Mermaid):</b> 8 Typen (Flow, Sequenz, Gantt, Mindmap, Kreis, Status, Zeitstrahl, Quadrant). Flowcharts bearbeitest du <b>direkt im Bild</b>: Klick auf einen Schritt → Umbenennen/Schritt anfügen/Entfernen, Doppelklick = umbenennen. Unter „Stil" gibt es Farbschemata, Handschrift-Look und die Richtung; die ✨-Zeile unten erzeugt oder ändert das Diagramm aus normaler Sprache. Der Code bleibt für Profis hinter ‹/›.</li>
                 <li><b>▢ Prozess-Formen:</b> Schritt, Entscheidung, Start/Ende — Doppelklick beschriftet, Toolbar unter der Form wechselt Form/Farbe.</li>
                 <li><b>📧 E-Mail/Datei/Bild/PDF:</b> per Drag aufs Board; Termine und Telefonnummern werden automatisch erkannt und klickbar.</li>
               </ul>
