@@ -5,7 +5,7 @@ import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe } from '@blocknote/core/locales';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodeToHtml } from '../lib/serialize';
-import { getMermaid } from '../lib/mermaid';
+import { buildMermaidSource, getMermaid, preloadHandFont } from '../lib/mermaid';
 import { presentationOrder } from '../lib/presentOrder';
 import { KanbanBody } from './nodes/KanbanCard';
 import { GanttBody } from './nodes/GanttCard';
@@ -72,16 +72,23 @@ function MermaidSlide({ node }: { node: MermaidNode }) {
   const [svg, setSvg] = useState('');
   const [error, setError] = useState('');
 
+  // Folie rendert mit denselben Stil-/Look-Einstellungen wie die Karte
+  // (vorher wurden Farbschema und Handschrift-Look hier ignoriert, M96)
+  const style = (node.data.style as string | undefined) ?? '';
+  const look = (node.data.look as string | undefined) ?? '';
   useEffect(() => {
     let cancelled = false;
     const t = setTimeout(() => {
       getMermaid()
-        .then((mermaid) => mermaid.render(`pn-slide-${node.id}`, node.data.code))
+        .then(async (mermaid) => {
+          if (look === 'hand') await preloadHandFont(); // Scribble-Schrift vor der Messung
+          return mermaid.render(`pn-slide-${node.id}`, buildMermaidSource(node.data.code, style, look));
+        })
         .then(({ svg }) => { if (!cancelled) { setSvg(svg); setError(''); } })
         .catch((e) => { if (!cancelled) setError(String(e?.message ?? e).split('\n')[0]); });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [node.data.code, node.id]);
+  }, [node.data.code, node.id, style, look]);
 
   return (
     <div className="slide-mermaid">
@@ -100,7 +107,7 @@ function MermaidSlide({ node }: { node: MermaidNode }) {
             onChange={(e) => updateNodeData(node.id, { code: e.target.value })}
           />
         )}
-        <div className="mermaid-preview">
+        <div className={`mermaid-preview${look === 'hand' ? ' mm-hand' : ''}`}>
           {error ? (
             <div className="mermaid-error">⚠️ {error}</div>
           ) : (

@@ -3,7 +3,7 @@ import { NodeToolbar, Position, type NodeProps } from '@xyflow/react';
 import { runDerived, useBoard } from '../../store';
 import type { MermaidNode } from '../../types';
 import { aiReady } from '../../lib/ai';
-import { aiMermaid, buildMermaidSource, getMermaid, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES } from '../../lib/mermaid';
+import { aiMermaid, buildMermaidSource, getMermaid, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES, preloadHandFont } from '../../lib/mermaid';
 import { useOutsideClose } from '../../lib/useOutsideClose';
 import { CardShell } from './CardShell';
 
@@ -72,7 +72,11 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
         // Render-ID pro VERSUCH eindeutig: mermaid räumt vor dem Rendern alle
         // Elemente mit derselben ID weg — mit stabiler ID löscht ein
         // fehlgeschlagener Versuch sonst das angezeigte SVG aus dem DOM (M90)
-        .then((mermaid) => mermaid.render(`pn-mermaid-${id}-${myKey}`, buildMermaidSource(data.code, style, look)))
+        .then(async (mermaid) => {
+          // Handschrift-Look: Scribble-Schrift VOR dem Rendern laden (Messung!)
+          if (look === 'hand') await preloadHandFont();
+          return mermaid.render(`pn-mermaid-${id}-${myKey}`, buildMermaidSource(data.code, style, look));
+        })
         .then(({ svg }) => { if (!cancelled && myKey === renderKey.current) { setSvg(svg); setError(''); } })
         // svg NICHT leeren — beim Tippen bleibt das letzte gültige Diagramm
         // sichtbar, der Fehler erscheint nur als kleines Overlay (M90)
@@ -390,7 +394,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             onChange={(e) => updateNodeData(id, { code: e.target.value })}
           />
         )}
-        <div className="mermaid-preview nowheel" ref={previewRef} onClick={onPreviewClick} onDoubleClick={onPreviewDblClick}>
+        <div className={`mermaid-preview nowheel${look === 'hand' ? ' mm-hand' : ''}`} ref={previewRef} onClick={onPreviewClick} onDoubleClick={onPreviewDblClick}>
           <div className={`mermaid-svg ${error ? 'stale' : ''}`} dangerouslySetInnerHTML={{ __html: svg }} />
           {rename && (
             <input

@@ -12,6 +12,7 @@
 // vom Bundle erwartet. Bonus: geparst wird erst, wenn wirklich ein Diagramm
 // gebraucht wird — Boards ohne Diagramme zahlen nichts.
 import mermaidSource from 'mermaid/dist/mermaid.min.js?raw';
+import kalamWoff2 from '../assets/kalam-latin.woff2?inline';
 import { askAi } from './ai';
 
 type MermaidApi = typeof import('mermaid').default;
@@ -73,6 +74,30 @@ export const MERMAID_STYLES: Record<string, { label: string; dot: string; light:
   },
 };
 
+// ---------------------------------------------------------------------------
+// Handschrift zum handDrawn-Look (M96): „Kalam" (© Indian Type Foundry,
+// SIL Open Font License 1.1), latin-Subset als data:-URL eingebettet —
+// offline/PWA-sicher, keine Nachlade-Chunks (Lehre aus M90).
+const HAND_FONT = "'Kalam', 'Segoe Print', 'Comic Sans MS', cursive";
+let handFontInjected = false;
+
+/** @font-face einmalig injizieren und die Schrift VOR dem Rendern laden —
+ *  mermaid misst Textbreiten; mit Fallback-Metriken liefen Beschriftungen
+ *  sonst aus den handgezeichneten Kästen. */
+export function preloadHandFont(): Promise<unknown> {
+  if (!handFontInjected) {
+    handFontInjected = true;
+    const s = document.createElement('style');
+    s.textContent = `@font-face { font-family: 'Kalam'; font-style: normal; font-weight: 400; font-display: swap; src: url(${kalamWoff2}) format('woff2'); }`;
+    document.head.appendChild(s);
+  }
+  try {
+    return document.fonts.load('16px Kalam').catch(() => undefined);
+  } catch {
+    return Promise.resolve();
+  }
+}
+
 /** Vollständige Render-Quelle: Stil-/Look-Direktive + Code der Karte */
 export function buildMermaidSource(code: string, style?: string, look?: string): string {
   const dark = document.documentElement.dataset.theme === 'dark';
@@ -82,7 +107,13 @@ export function buildMermaidSource(code: string, style?: string, look?: string):
     init.theme = 'base';
     init.themeVariables = dark ? s.dark : s.light;
   }
-  if (look === 'hand') init.look = 'handDrawn';
+  if (look === 'hand') {
+    init.look = 'handDrawn';
+    // Schrift passend zum Kritzel-Look — top-level für alle Diagrammtypen,
+    // zusätzlich als themeVariable, wenn ein Farbschema (theme base) aktiv ist
+    init.fontFamily = HAND_FONT;
+    if (init.themeVariables) (init.themeVariables as Record<string, string>).fontFamily = HAND_FONT;
+  }
   if (Object.keys(init).length === 0) return code;
   return `%%{init: ${JSON.stringify(init)}}%%\n${code}`;
 }

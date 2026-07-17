@@ -876,6 +876,12 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .mm-dot.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .mm-dot-none { background: linear-gradient(135deg, var(--surface) 45%, var(--border-soft) 45%, var(--border-soft) 55%, var(--surface) 55%); }
 .mermaid-svg g.node, .mermaid-svg g.rough-node { cursor: pointer; }
+/* Handschrift-Look (M96): Scribble-Schrift auch dann, wenn einzelne
+   Diagrammtypen die fontFamily aus der init-Direktive ignorieren.
+   Deckt SVG-Text UND HTML-Labels (foreignObject-spans) ab. */
+.mm-hand .mermaid-svg :is(text, tspan, span, div, p) {
+  font-family: 'Kalam', 'Segoe Print', 'Comic Sans MS', cursive !important;
+}
 .mermaid-svg g.mm-selected rect,
 .mermaid-svg g.mm-selected polygon,
 .mermaid-svg g.mm-selected circle,
