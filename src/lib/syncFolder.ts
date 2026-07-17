@@ -298,7 +298,7 @@ export function initAutoSync(): void {
       // statt den Auto-Sync still zu deaktivieren; der Status-Chip bleibt
       // sichtbar und erteilt die Freigabe per Klick
       emitSyncStatus('ordner', 'noperm');
-      useBoard.getState().showToast('Sync-Ordner verbunden, aber der Browser braucht eine neue Freigabe — oben auf „Zugriff erlauben" klicken.');
+      useBoard.getState().showToast('Sync-Ordner verbunden, aber der Browser braucht eine neue Freigabe — oben auf die durchgestrichene Wolke klicken.');
       return;
     }
     await checkSyncRemote();

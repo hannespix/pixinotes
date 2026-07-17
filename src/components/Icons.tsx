@@ -58,6 +58,12 @@ export const IDownload = make(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v
 export const ITarget = make(<><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4" /><path d="M12 3v2" /><path d="M12 19v2" /><path d="M3 12h2" /><path d="M19 12h2" /></>);
 export const IZoomIn = make(<><circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" /><path d="M11 8v6" /><path d="M8 11h6" /></>);
 export const IZoomOut = make(<><circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" /><path d="M8 11h6" /></>);
+
+// Sync-Status (M85): gleiche Formensprache wie der Rest des UI-Chromes
+export const ICloud = make(<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />);
+export const ICloudCheck = make(<><path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24" /><path d="m9 16 2.5 2.5L17 13" /></>);
+export const ICloudAlert = make(<><path d="M4 14.9A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.24" /><path d="M12 12v4" /><path d="M12 20h.01" /></>);
+export const ICloudOff = make(<><path d="M6.28 6.3a7 7 0 0 0 2.72 13.7h8.5a4.5 4.5 0 0 0 2.63-.86" /><path d="M10.6 3.24A7 7 0 0 1 15.71 8h1.79a4.5 4.5 0 0 1 3.86 6.82" /><path d="m2 2 20 20" /></>);
 export const IWand = make(<><path d="M15 4V2" /><path d="M15 16v-2" /><path d="M8 9h2" /><path d="M20 9h2" /><path d="M17.8 11.8 19 13" /><path d="M17.8 6.2 19 5" /><path d="m3 21 9-9" /><path d="M12.2 6.2 11 5" /></>);
 export const ISquare = make(<rect width="16" height="12" x="4" y="6" rx="2" />);
 export const IDiamond = make(<path d="M12 3l9 9-9 9-9-9Z" />);

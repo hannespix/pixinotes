@@ -1,5 +1,6 @@
 import { useBoard } from '../store';
 import { IHelp, IRedo, ISearch, ISettings, IUndo } from './Icons';
+import { SyncStatus } from './SyncStatus';
 
 /**
  * Globale Aktionen oben neben dem Logo (User-Wunsch): Rückgängig/Wiederholen,
@@ -25,6 +26,7 @@ export function TopActions() {
       <button onClick={() => setSearchOpen(true)} title="Suche über alle Boards (Strg+K)" aria-label="Suche"><ISearch size={16} /></button>
       <button onClick={() => setHelpOpen(true)} title="Hilfe: alle Funktionen erklärt" aria-label="Hilfe"><IHelp size={16} /></button>
       <button onClick={() => setSettingsOpen(true)} title="Einstellungen (KI, Synchronisation, Kalender, Design …)" aria-label="Einstellungen"><ISettings size={16} /></button>
+      <SyncStatus />
     </div>
   );
 }

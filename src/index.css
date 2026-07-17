@@ -444,24 +444,15 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .toast-undo:hover { background: rgba(255, 255, 255, 0.28); }
 
-/* Sync-Status-Chip in der Kopfleiste (M85) */
-.sync-chip {
-  /* Zweite Zeile unter dem Logo — in der Kopfzeile selbst kollidierte der
-     Chip mit der zentrierten Tab-Leiste. pointer-events:auto, weil die
-     Kopfleiste als Ganzes durchklickbar ist */
-  position: fixed; top: 62px; left: 18px; z-index: 50;
-  pointer-events: auto;
-  border: 1.5px solid var(--border-soft); border-radius: 999px;
-  background: var(--surface); color: var(--muted); cursor: pointer;
-  font-family: inherit; font-size: 11.5px; font-weight: 650;
-  padding: 6px 12px; white-space: nowrap;
-  box-shadow: 0 2px 10px rgba(60, 50, 30, 0.08);
-}
-.sync-chip:hover { border-color: var(--accent); color: var(--ink); }
-.sync-chip.ok { color: var(--muted); }
-.sync-chip.warn {
-  border-color: rgba(217, 83, 79, 0.55); background: rgba(217, 83, 79, 0.1);
-  color: var(--ink);
+/* Sync-Status als Wolken-Icon in der Aktionsleiste (M85/M86): erbt das
+   Button-Styling von .top-actions; nur der Aufmerksamkeits-Zustand bekommt
+   ein zurückhaltendes Amber statt einer lauten Warnfarbe */
+.top-actions button.sync-warn { color: #c07c10; }
+[data-theme='dark'] .top-actions button.sync-warn { color: #e8a83d; }
+.top-actions button.sync-pending svg { animation: sync-pulse 1.4s ease-in-out infinite; }
+@keyframes sync-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
 }
 
 /* Mitlese-Banner (Single-Writer): zweites Fenster liest nur mit */

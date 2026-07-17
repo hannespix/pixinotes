@@ -5,7 +5,6 @@ import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
 import { MiniDock } from './components/MiniDock';
 import { TopActions } from './components/TopActions';
-import { SyncStatus } from './components/SyncStatus';
 import { Overview } from './components/Overview';
 import { SearchOverlay } from './components/SearchOverlay';
 import { Settings } from './components/Settings';
@@ -152,7 +151,6 @@ export default function App() {
             Pixi<span>Notes</span>
           </div>
           <TopActions />
-          <SyncStatus />
         </div>
         <Tabs />
         {view === 'overview' ? (

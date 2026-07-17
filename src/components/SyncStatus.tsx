@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useBoard } from '../store';
 import { regrantSyncAccess, type SyncState } from '../lib/syncFolder';
+import { ICloud, ICloudAlert, ICloudCheck, ICloudOff } from './Icons';
 
 type Entry = { state: SyncState; at?: string };
 const SOURCE_LABEL: Record<string, string> = { ordner: 'Sync-Ordner', webdav: 'WebDAV' };
@@ -8,11 +9,11 @@ const SOURCE_LABEL: Record<string, string> = { ordner: 'Sync-Ordner', webdav: 'W
 const RANK: Record<SyncState, number> = { noperm: 0, error: 1, conflict: 2, pending: 3, ok: 4 };
 
 /**
- * Sync-Status in der Kopfleiste (M85): Der Auto-Sync war bisher unsichtbar —
- * schlief er (Ordner-Freigabe nach Neustart weg, Konflikt, Fehler), wirkte das
- * wie „speichert nicht". Der Chip zeigt den Zustand dauerhaft und macht das
- * Nötige per Klick: Freigabe erteilen bzw. ⚙ → Synchronisation öffnen.
- * Ohne verbundenes Sync-Ziel erscheint er gar nicht.
+ * Sync-Status als Wolken-Symbol in der Aktionsleiste (M85): gleiche
+ * Formensprache wie Undo/Suche/Einstellungen — monochrome Outline, kein Text,
+ * Details im Tooltip. Braucht Aufmerksamkeit etwas (Freigabe weg, Konflikt,
+ * Fehler), wird das Symbol dezent amber; ein Klick tut das jeweils Nötige.
+ * Ohne verbundenes Sync-Ziel erscheint es gar nicht.
  */
 export function SyncStatus() {
   const [map, setMap] = useState<Record<string, Entry>>({});
@@ -29,43 +30,48 @@ export function SyncStatus() {
   const entries = Object.entries(map);
   if (entries.length === 0) return null;
   const [source, st] = entries.sort((a, b) => RANK[a[1].state] - RANK[b[1].state])[0];
+  const label = SOURCE_LABEL[source] ?? source;
   const openSync = () => useBoard.getState().setSettingsOpen(true, 'sync');
 
-  if (st.state === 'noperm') {
-    return (
-      <button
-        className="sync-chip warn"
-        data-tip="Der Browser hat die Ordner-Freigabe nach dem Neustart zurückgesetzt — der Auto-Sync pausiert, bis du sie neu erteilst"
-        onClick={() => { void regrantSyncAccess().then((ok) => { if (!ok) openSync(); }); }}
-      >
-        ⚠️ Zugriff erlauben
-      </button>
-    );
-  }
-  if (st.state === 'error') {
-    return (
-      <button className="sync-chip warn" data-tip={`${SOURCE_LABEL[source] ?? source}: letzter Sync fehlgeschlagen — Details in den Einstellungen`} onClick={openSync}>
-        ⚠️ Sync-Fehler
-      </button>
-    );
-  }
-  if (st.state === 'conflict') {
-    return (
-      <button className="sync-chip warn" data-tip={`${SOURCE_LABEL[source] ?? source}: dort liegt ein anderer Stand — in den Einstellungen laden oder überschreiben`} onClick={openSync}>
-        ⚠️ Anderer Stand
-      </button>
-    );
-  }
-  if (st.state === 'pending') {
-    return <button className="sync-chip" data-tip="Änderungen werden gerade gespeichert…" onClick={openSync}>☁️ speichert…</button>;
-  }
+  const byState = {
+    noperm: {
+      cls: 'sync-status sync-warn sync-noperm',
+      tip: 'Auto-Sync pausiert: Der Browser hat die Ordner-Freigabe nach dem Neustart zurückgesetzt — klicken, um sie neu zu erteilen',
+      icon: <ICloudOff size={16} />,
+      onClick: () => { void regrantSyncAccess().then((ok) => { if (!ok) openSync(); }); },
+    },
+    error: {
+      cls: 'sync-status sync-warn',
+      tip: `${label}: Speichern fehlgeschlagen — klicken für Details`,
+      icon: <ICloudAlert size={16} />,
+      onClick: openSync,
+    },
+    conflict: {
+      cls: 'sync-status sync-warn',
+      tip: `${label}: dort liegt ein anderer Stand — klicken zum Laden oder Überschreiben`,
+      icon: <ICloudAlert size={16} />,
+      onClick: openSync,
+    },
+    pending: {
+      cls: 'sync-status sync-pending',
+      tip: 'Änderungen werden gespeichert…',
+      icon: <ICloud size={16} />,
+      onClick: openSync,
+    },
+    ok: {
+      cls: 'sync-status sync-ok',
+      tip: `${label}: zuletzt gespeichert ${st.at ? new Date(st.at).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) : '—'}`,
+      icon: <ICloudCheck size={16} />,
+      onClick: openSync,
+    },
+  }[st.state];
+
   return (
-    <button
-      className="sync-chip ok"
-      data-tip={`${SOURCE_LABEL[source] ?? source}: zuletzt gespeichert ${st.at ? new Date(st.at).toLocaleTimeString('de-DE') : '—'}`}
-      onClick={openSync}
-    >
-      ☁️ ✓
-    </button>
+    <>
+      <span className="top-actions-sep" />
+      <button className={byState.cls} data-tip={byState.tip} aria-label="Synchronisations-Status" onClick={byState.onClick}>
+        {byState.icon}
+      </button>
+    </>
   );
 }
