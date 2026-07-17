@@ -6,8 +6,9 @@ import {
 } from '../lib/calAccounts';
 import { exportToFolder, exportViewport } from '../lib/exporter';
 import {
-  applySync, disconnectSync, ensurePermission, getSyncHandle, knownStamp,
-  permissionState, pickSyncFolder, readSync, syncSupported, writeSync, type SyncDirHandle,
+  applySync, checkSyncRemote, disconnectSync, ensurePermission, getSyncHandle, knownStamp,
+  permissionState, pickSyncFolder, readSync, syncSupported, writeSync,
+  SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, type SyncDirHandle,
 } from '../lib/syncFolder';
 import {
   applyWebdav, clearWebdav, loadWebdav, saveWebdav, webdavRead, webdavStamp, webdavTest, webdavWrite,
@@ -229,6 +230,8 @@ export function Settings() {
       claimWriter(); // bewusster Import — auch aus einem Mitlese-Fenster wirksam
       useBoard.getState().importSync(p.boards, p.spaces ?? [], p.activeId ?? p.boards[0].id);
       if (!flushPersist()) { showToast(QUOTA_IMPORT_MSG); return; }
+      // Der Datei-Stand liegt in keinem Sync-Ziel → kein Fast-Forward darüber
+      try { localStorage.setItem(SYNC_DIRTY_KEY, '1'); localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); } catch { /* unkritisch */ }
       showToast('📂 Stand aus Datei geladen');
       setOpen(false);
     } catch {
@@ -383,6 +386,9 @@ export function Settings() {
                           if (await ensurePermission(syncHandle, true)) {
                             setSyncPerm('granted');
                             showToast('Zugriff erlaubt — Auto-Sync läuft wieder.');
+                            // Direkt prüfen: liegt im Ordner ein neuerer Stand,
+                            // wird er jetzt gefahrlos übernommen (Fast-Forward)
+                            await checkSyncRemote();
                           } else {
                             showToast('Zugriff nicht erteilt — Sync bleibt pausiert.');
                           }
@@ -426,8 +432,11 @@ export function Settings() {
             Ohne Desktop-Client: PixiNotes spricht direkt mit dem WebDAV-Server — funktioniert auch am
             Tablet/Handy. Bei Nextcloud: <b>App-Passwort</b> unter Einstellungen → Sicherheit anlegen
             (nie das echte Passwort). <b>Zugangsdaten bleiben lokal</b> und landen in keinem Export.
-            Hinweis für die IT: Der Browser braucht CORS-Freigabe für diese Adresse — ohne sie bitte
-            den Sync-Ordner oben nutzen.
+            <br />
+            ⚠️ <b>Nextcloud blockiert Browser-Zugriffe standardmäßig</b> (CORS): Entweder die
+            Nextcloud-App <b>„WebAppPassword"</b> installieren und dort die PixiNotes-Adresse
+            (z. B. <code>https://hannespix.github.io</code>) als erlaubte Origin eintragen, oder die
+            IT um CORS-Freigabe bitten — ohne Freigabe bitte den Sync-Ordner oben nutzen.
           </p>
           {!davCfg ? (
             <>
@@ -438,6 +447,13 @@ export function Settings() {
                   value={davUrl} onChange={(e) => setDavUrl(e.target.value)}
                 />
               </label>
+              {davUrl.trim() !== '' && !davUrl.includes('remote.php') && (
+                <div className="modal-note">
+                  💡 Das sieht nicht nach einer WebDAV-Ordner-URL aus. Bei Nextcloud lautet sie meist:{' '}
+                  <code>https://DEINE-CLOUD/remote.php/dav/files/BENUTZERNAME/PixiNotes</code>{' '}
+                  (zu finden in Nextcloud unten links unter „Dateieinstellungen" → WebDAV).
+                </div>
+              )}
               <label className="modal-row">
                 <span>Benutzer</span>
                 <input type="text" placeholder="vorname.name" value={davUser} onChange={(e) => setDavUser(e.target.value)} />
@@ -705,7 +721,7 @@ export function Settings() {
         )}
 
         <div className="modal-foot">
-          PixiNotes · lokale Daten, kein Konto nötig ·{' '}
+          PixiNotes (Stand {__BUILD_STAMP__}) · lokale Daten, kein Konto nötig ·{' '}
           <button className="link-btn legal-link" onClick={() => { setOpen(false); useBoard.getState().setHelpOpen(true, 'impressum'); }}>Impressum</button>
           {' · '}
           <button className="link-btn legal-link" onClick={() => { setOpen(false); useBoard.getState().setHelpOpen(true, 'datenschutz'); }}>Datenschutz</button>

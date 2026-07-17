@@ -8,6 +8,11 @@ import { viteSingleFile } from 'vite-plugin-singlefile';
 export default defineConfig(({ mode }) => ({
   // Relative Pfade: läuft so unter jeder URL — GitHub Pages (/repo/), Unterordner, file://
   base: './',
+  // Build-Stempel in den Einstellungen: macht sichtbar, WELCHE Version gerade
+  // läuft (PWA-Caches können nach einem Deploy kurz die alte ausliefern)
+  define: {
+    __BUILD_STAMP__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'),
+  },
   // nodePolyfills: @kenjiuno/msgreader (iconv-lite) erwartet Node-Buffer im Browser
   plugins: [
     react(),

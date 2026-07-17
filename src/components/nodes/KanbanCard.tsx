@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
-import { useBoard } from '../../store';
+import { runDerived, useBoard } from '../../store';
 import { kanbanCols, uid, type GanttData, type KanbanData, type KanbanItem, type KanbanNode } from '../../types';
 import { collectTasks, formatDueShort, urgencyFor } from '../../lib/tasks';
 import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, ISearch, ISettings, IX } from '../Icons';
@@ -137,7 +137,10 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   // ignorierte frisch geänderte ignoreKeys/collectFrom (M68-Debugging).
   useEffect(() => {
     if (!kanban.autoCollect) return;
-    const t = setTimeout(() => syncFromBoards(false), 900);
+    // runDerived: Auto-Einsammeln ist aus den Boards rekonstruierbar und darf
+    // deshalb nicht als „eigene Bearbeitung" zählen — sonst würde es direkt
+    // beim Start das automatische Übernehmen eines neueren Sync-Stands blocken
+    const t = setTimeout(() => runDerived(() => syncFromBoards(false)), 900);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boards, kanban]);

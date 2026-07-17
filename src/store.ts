@@ -419,6 +419,19 @@ export const markImported = (boards: unknown, spaces: unknown): void => {
   importedRefs = { boards, spaces };
 };
 
+// Abgeleitete Änderungen (z. B. Auto-Einsammeln des Kanbans beim Start):
+// verändern zwar die Boards, sind aber jederzeit aus ihnen rekonstruierbar —
+// sie dürfen darum NICHT als „eigene lokale Bearbeitung" zählen, sonst
+// blockieren sie das automatische Übernehmen eines neueren Sync-Stands.
+// zustand-Subscriber laufen synchron innerhalb von set(), daher reicht ein
+// einfacher Tiefenzähler um den Aufruf herum.
+let derivedDepth = 0;
+export function runDerived<T>(fn: () => T): T {
+  derivedDepth += 1;
+  try { return fn(); } finally { derivedDepth -= 1; }
+}
+export const inDerived = (): boolean => derivedDepth > 0;
+
 /** Eigenen Stand erneut nach localStorage durchsetzen — der Schreiber wehrt
  *  damit fremde Writes ab (z. B. ein alter Tab mit einer App-Version ohne
  *  Single-Writer-Schutz), statt Daten zu verlieren. */
@@ -876,7 +889,14 @@ export const useBoard = create<BoardState>()(
             .filter((c): c is Extract<NodeChange, { type: 'remove' }> => c.type === 'remove')
             .map((c) => c.id);
           const rest = changes.filter((c) => c.type !== 'remove');
-          if (rest.length) patchActive((b) => ({ nodes: applyNodeChanges(rest, b.nodes) as AppNode[] }));
+          if (rest.length) {
+            // Maß-/Auswahl-Änderungen schreibt React Flow schon beim Mount in
+            // den Store — das ist Mechanik, keine Bearbeitung, und darf das
+            // automatische Übernehmen eines Sync-Stands nicht blockieren
+            const mechanical = rest.every((c) => c.type === 'dimensions' || c.type === 'select');
+            const apply = () => patchActive((b) => ({ nodes: applyNodeChanges(rest, b.nodes) as AppNode[] }));
+            if (mechanical) runDerived(apply); else apply();
+          }
           if (removeIds.length) get().removeNodes(removeIds);
         },
 

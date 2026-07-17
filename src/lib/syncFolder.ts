@@ -3,11 +3,19 @@
 // der Desktop-Client des Cloud-Dienstes auf alle Geräte spiegelt. Kein Server,
 // kein CORS, keine App-Passwörter — funktioniert überall, wo der Sync-Client läuft.
 // Das Ordner-Handle wird in IndexedDB gemerkt (übersteht Neustarts in Chrome/Edge).
-import { claimWriter, flushPersist, getWriterRole, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
+import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
 
 const FILE_NAME = 'pixinotes-daten.json';
 const DB_NAME = 'pixinotes-sync';
 const STAMP_KEY = 'pixinotes:sync-stamp';
+
+// „Dirty"-Flags (M82): Gibt es lokale Änderungen, die noch nicht im jeweiligen
+// Sync-Ziel liegen? Nur wenn NEIN, darf ein neuerer Fremd-Stand beim Start
+// automatisch übernommen werden (Fast-Forward) — sonst wäre es ein echter
+// Konflikt und der Nutzer entscheidet. Bewusst ohne Uhrzeit-Vergleiche
+// (Geräte-Uhren gehen auseinander), nur gesetzt/gelöscht.
+export const SYNC_DIRTY_KEY = 'pixinotes:sync-dirty';
+export const WEBDAV_DIRTY_KEY = 'pixinotes:webdav-dirty';
 
 export interface SyncPayload {
   app: 'pixinotes';
@@ -140,6 +148,10 @@ export async function writeSync(handle: SyncDirHandle): Promise<string> {
   await w.write(JSON.stringify(payload));
   await w.close();
   localStorage.setItem(STAMP_KEY, payload.savedAt);
+  // Lokale Änderungen liegen jetzt im Ordner — aber nur als „sauber" markieren,
+  // wenn währenddessen nicht weiter editiert wurde (sonst nächster Auto-Save)
+  const cur = useBoard.getState();
+  if (cur.boards === s.boards && cur.spaces === s.spaces) localStorage.removeItem(SYNC_DIRTY_KEY);
   return payload.savedAt;
 }
 
@@ -154,7 +166,12 @@ export function applySync(p: SyncPayload): boolean {
   claimWriter(); // Import ist eine bewusste Nutzer-Aktion — dieses Fenster schreibt ab jetzt
   useBoard.getState().importSync(p.boards, p.spaces, p.activeId);
   if (!flushPersist()) return false;
-  try { localStorage.setItem(STAMP_KEY, p.savedAt); } catch { return false; }
+  try {
+    localStorage.setItem(STAMP_KEY, p.savedAt);
+    localStorage.removeItem(SYNC_DIRTY_KEY); // deckungsgleich mit dem Ordner
+    // Gegenüber einem evtl. verbundenen WebDAV-Server ist der Stand jetzt neu
+    localStorage.setItem(WEBDAV_DIRTY_KEY, '1');
+  } catch { return false; }
   return true;
 }
 
@@ -163,6 +180,34 @@ export const knownStamp = (): string | null => localStorage.getItem(STAMP_KEY);
 // ---------- Auto-Sync ----------
 let started = false;
 let conflictWarned = false;
+let lastRemoteCheck = 0;
+let staleHintShown = false;
+
+/** Ordner prüfen und einen neueren Fremd-Stand GEFAHRLOS automatisch übernehmen
+ *  (Fast-Forward, M82): nur wenn dieses Fenster der Schreiber ist und es seit
+ *  dem letzten Sync keine eigenen lokalen Änderungen gab. Sonst bleibt es beim
+ *  ehrlichen Hinweis — echte Konflikte entscheidet der Nutzer. Genau das
+ *  erwartet man von „Synchronisation": Nach einem Neustart steht der neueste
+ *  Stand da, ohne erst in ⚙️ klicken zu müssen. */
+export async function checkSyncRemote(): Promise<void> {
+  const now = Date.now();
+  if (now - lastRemoteCheck < 15_000) return; // Fokus-Wechsel nicht hämmern
+  if (getWriterRole() !== 'writer') return;   // Mitlese-Fenster folgt dem Schreiber
+  const handle = await getSyncHandle();
+  if (!handle || !(await ensurePermission(handle, false))) return;
+  lastRemoteCheck = now;
+  const remote = await readSync(handle);
+  if (!remote || remote.savedAt === knownStamp()) { staleHintShown = false; return; }
+  if (!localStorage.getItem(SYNC_DIRTY_KEY) && applySync(remote)) {
+    useBoard.getState().showToast(`☁️ Neuerer Stand aus dem Sync-Ordner übernommen (${new Date(remote.savedAt).toLocaleString('de-DE')}).`);
+    staleHintShown = false;
+    return;
+  }
+  if (!staleHintShown) {
+    staleHintShown = true;
+    useBoard.getState().showToast('Im Sync-Ordner liegt ein anderer Stand — hier gibt es aber eigene Änderungen, darum wurde nichts überschrieben. In ⚙️ → Synchronisation wählen.');
+  }
+}
 
 async function autoSave(): Promise<void> {
   if (getWriterRole() !== 'writer') return; // Mitlese-Fenster synct nie
@@ -195,10 +240,17 @@ export function initAutoSync(): void {
     // sichern — ein Re-Upload mit neuem savedAt würde auf allen anderen
     // Geräten nur falsche „fremder Stand"-Warnungen auslösen
     if (isImportedState(s.boards, s.spaces)) return;
+    if (getWriterRole() !== 'writer') return; // Mitleser markiert/synct nichts
+    // Echte lokale Änderung → ab jetzt kein automatisches Fast-Forward mehr.
+    // Abgeleitete Änderungen (Kanban-Auto-Einsammeln) zählen nicht — sie sind
+    // rekonstruierbar und dürfen die Übernahme eines Sync-Stands nicht blocken.
+    if (!inDerived()) {
+      try { localStorage.setItem(SYNC_DIRTY_KEY, '1'); localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); } catch { /* voll → sicherer ohne Fast-Forward */ }
+    }
     clearTimeout(timer);
     timer = setTimeout(() => { void autoSave().catch(() => {}); }, 1800);
   });
-  // Start-Check: Berechtigung erloschen? Neuerer Stand im Ordner? (nur Hinweise, nie Auto-Laden)
+  // Start-Check: Berechtigung erloschen? Neuerer Stand im Ordner? → Fast-Forward
   void (async () => {
     const handle = await getSyncHandle();
     if (!handle) return;
@@ -208,9 +260,11 @@ export function initAutoSync(): void {
       useBoard.getState().showToast('Sync-Ordner verbunden, aber der Browser braucht eine neue Freigabe — in ⚙️ → Synchronisation „Zugriff erlauben" klicken.');
       return;
     }
-    const remote = await readSync(handle);
-    if (remote && remote.savedAt !== knownStamp()) {
-      useBoard.getState().showToast('Im Sync-Ordner liegt ein anderer Stand — in ⚙️ → Synchronisation laden.');
-    }
+    await checkSyncRemote();
   })().catch(() => {});
+  // Beim Zurückkehren ins Fenster erneut prüfen: der Cloud-Client kann die
+  // Datei zwischenzeitlich von einem anderen Gerät hereingespiegelt haben
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void checkSyncRemote().catch(() => {});
+  });
 }

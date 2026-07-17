@@ -10,8 +10,8 @@
 // - Ehrliche Grenze: Der Browser braucht CORS-Header vom DAV-Server.
 //   Nextcloud liefert die standardmäßig NICHT — dann muss die IT die Origin
 //   freigeben, oder man nutzt den Sync-Ordner (Desktop-Client) bzw. Export.
-import { claimWriter, flushPersist, getWriterRole, isImportedState, useBoard } from '../store';
-import type { SyncPayload } from './syncFolder';
+import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard } from '../store';
+import { SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, type SyncPayload } from './syncFolder';
 
 const LS_KEY = 'pixinotes-webdav';
 const STAMP_KEY = 'pixinotes:webdav-stamp';
@@ -54,13 +54,25 @@ function basicAuth(user: string, secret: string): string {
 
 const fileUrl = (cfg: WebdavConfig) => `${cfg.url.replace(/\/+$/, '')}/${FILE_NAME}`;
 
-/** Netzwerk-/CORS-Fehler in verständliche Meldungen übersetzen */
-function friendly(e: unknown): Error {
+/** Netzwerk-/CORS-Fehler unterscheiden statt raten (M82): Ein no-cors-Probe-
+ *  Request klappt auch OHNE CORS-Freigabe — antwortet der Server darauf, ist
+ *  er erreichbar und es fehlt „nur" die CORS-Freigabe (bei Nextcloud der
+ *  Normalfall). Schlägt auch die Probe fehl, stimmt Adresse/Netz nicht. */
+async function friendly(e: unknown, cfg: WebdavConfig): Promise<Error> {
   if (e instanceof TypeError) {
-    return new Error(
-      'Server nicht erreichbar oder CORS blockiert. Nextcloud/ownCloud erlauben Browser-Zugriffe erst, '
-      + 'wenn die IT diese Adresse als erlaubte Origin einträgt — Alternative: Sync-Ordner (Desktop-Client).',
-    );
+    try {
+      await fetch(fileUrl(cfg), { method: 'GET', mode: 'no-cors', cache: 'no-store' });
+      return new Error(
+        'Der Server ist erreichbar, blockiert aber Browser-Zugriffe (fehlende CORS-Freigabe). '
+        + 'Nextcloud: die App „WebAppPassword" installieren und dort diese PixiNotes-Adresse als erlaubte Origin eintragen '
+        + '(oder die IT bitten, CORS für WebDAV freizugeben). Ohne Freigabe klappt vom Browser aus nur der Sync-Ordner (Desktop-Client) oder der Datei-Export.',
+      );
+    } catch {
+      return new Error(
+        'Server nicht erreichbar — Adresse prüfen (Tippfehler? VPN/Firewall? HTTPS?). '
+        + 'Die Ordner-URL sieht bei Nextcloud so aus: https://cloud.example.de/remote.php/dav/files/BENUTZERNAME/PixiNotes',
+      );
+    }
   }
   return e as Error;
 }
@@ -72,7 +84,7 @@ async function davFetch(cfg: WebdavConfig, init: RequestInit): Promise<Response>
       headers: { Authorization: basicAuth(cfg.user, cfg.secret), ...(init.headers ?? {}) },
     });
   } catch (e) {
-    throw friendly(e);
+    throw await friendly(e, cfg);
   }
 }
 
@@ -107,6 +119,9 @@ export async function webdavWrite(cfg: WebdavConfig): Promise<string> {
   if (res.status === 401 || res.status === 403) throw new Error('Anmeldung abgelehnt — Benutzername/App-Passwort prüfen.');
   if (!res.ok && res.status !== 201 && res.status !== 204) throw new Error(`WebDAV: HTTP ${res.status}`);
   localStorage.setItem(STAMP_KEY, payload.savedAt);
+  // Nur „sauber" markieren, wenn währenddessen nicht weiter editiert wurde
+  const cur = useBoard.getState();
+  if (cur.boards === s.boards && cur.spaces === s.spaces) localStorage.removeItem(WEBDAV_DIRTY_KEY);
   return payload.savedAt;
 }
 
@@ -123,13 +138,43 @@ export function applyWebdav(p: SyncPayload): boolean {
   claimWriter(); // Import ist eine bewusste Nutzer-Aktion — dieses Fenster schreibt ab jetzt
   useBoard.getState().importSync(p.boards, p.spaces, p.activeId);
   if (!flushPersist()) return false;
-  try { localStorage.setItem(STAMP_KEY, p.savedAt); } catch { return false; }
+  try {
+    localStorage.setItem(STAMP_KEY, p.savedAt);
+    localStorage.removeItem(WEBDAV_DIRTY_KEY); // deckungsgleich mit dem Server
+    // Gegenüber einem evtl. verbundenen Sync-Ordner ist der Stand jetzt neu
+    localStorage.setItem(SYNC_DIRTY_KEY, '1');
+  } catch { return false; }
   return true;
 }
 
 // ---------- Auto-Sync (gleiches Konfliktschema wie der Sync-Ordner) ----------
 let started = false;
 let conflictWarned = false;
+let lastRemoteCheck = 0;
+let staleHintShown = false;
+
+/** Server prüfen und einen neueren Fremd-Stand GEFAHRLOS automatisch übernehmen
+ *  (Fast-Forward, M82) — gleiche Regeln wie beim Sync-Ordner: nur als Schreiber
+ *  und nur ohne eigene lokale Änderungen seit dem letzten Sync. */
+export async function checkWebdavRemote(): Promise<void> {
+  const now = Date.now();
+  if (now - lastRemoteCheck < 60_000) return; // Netz-Zugriff: sparsamer prüfen
+  if (getWriterRole() !== 'writer') return;
+  const cfg = loadWebdav();
+  if (!cfg) return;
+  lastRemoteCheck = now;
+  const remote = await webdavRead(cfg);
+  if (!remote || remote.savedAt === webdavStamp()) { staleHintShown = false; return; }
+  if (!localStorage.getItem(WEBDAV_DIRTY_KEY) && applyWebdav(remote)) {
+    useBoard.getState().showToast(`☁️ Neuerer Stand vom WebDAV-Server übernommen (${new Date(remote.savedAt).toLocaleString('de-DE')}).`);
+    staleHintShown = false;
+    return;
+  }
+  if (!staleHintShown) {
+    staleHintShown = true;
+    useBoard.getState().showToast('☁️ Auf dem WebDAV-Server liegt ein anderer Stand — hier gibt es aber eigene Änderungen, darum wurde nichts überschrieben. In ⚙️ → Synchronisation wählen.');
+  }
+}
 
 async function autoPush(): Promise<void> {
   if (getWriterRole() !== 'writer') return; // Mitlese-Fenster synct nie
@@ -157,17 +202,21 @@ export function initWebdavSync(): void {
     if (s.boards === prev.boards && s.spaces === prev.spaces) return;
     // Frisch importierter Stand: kein Re-Upload mit neuem savedAt (s. syncFolder)
     if (isImportedState(s.boards, s.spaces)) return;
+    if (getWriterRole() !== 'writer') return;
+    // Dirty auch hier setzen — auf Browsern ohne Ordner-API (Firefox) läuft
+    // der syncFolder-Subscribe nicht, WebDAV aber sehr wohl. Abgeleitete
+    // Änderungen (Auto-Einsammeln) zählen nicht als eigene Bearbeitung.
+    if (!inDerived()) {
+      try { localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); localStorage.setItem(SYNC_DIRTY_KEY, '1'); } catch { /* voll → sicherer ohne Fast-Forward */ }
+    }
     if (!loadWebdav()?.auto) return;
     clearTimeout(timer);
     timer = setTimeout(() => { void autoPush().catch(() => { /* offline o. Ä. — nächster Versuch beim nächsten Edit */ }); }, 2500);
   });
-  // Start-Check: neuerer Stand auf dem Server? (nur Hinweis, nie Auto-Laden)
-  void (async () => {
-    const cfg = loadWebdav();
-    if (!cfg) return;
-    const remote = await webdavRead(cfg);
-    if (remote && remote.savedAt !== webdavStamp()) {
-      useBoard.getState().showToast('☁️ Auf dem WebDAV-Server liegt ein anderer Stand — in ⚙️ → Synchronisation laden.');
-    }
-  })().catch(() => {});
+  // Start-Check: neuerer Stand auf dem Server? → Fast-Forward (sonst Hinweis)
+  void checkWebdavRemote().catch(() => {});
+  // Beim Zurückkehren ins Fenster erneut prüfen (anderes Gerät kann gepusht haben)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void checkWebdavRemote().catch(() => {});
+  });
 }
