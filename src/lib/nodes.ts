@@ -1,6 +1,7 @@
 // Karten-Fabriken: eine Quelle für Default-Größen, Farb-Rotation und
 // Node-Erzeugung (Audit M5/N5 — vorher vierfach dupliziert).
 import { useBoard } from '../store';
+import { MERMAID_TEMPLATES } from './mermaidTemplates';
 import {
   STICKY_COLORS,
   uid,
@@ -131,6 +132,8 @@ export function makeMermaid(position: Pos): AppNode {
     width: CARD_WIDTHS.mermaid,
     height: 240,
     position,
-    data: { code: 'flowchart TD\n  A[Start] --> B{Prüfen}\n  B -->|OK| C[Fertig]\n  B -->|Fehler| A' },
+    // Exakt die Flow-Vorlage: neue Karten gelten als „unberührt" — ein
+    // Vorlagen-Wechsel direkt nach dem Anlegen fragt dann nicht nach (M92)
+    data: { code: MERMAID_TEMPLATES.Flow },
   };
 }

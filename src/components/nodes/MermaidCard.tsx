@@ -1,18 +1,36 @@
 import { useEffect, useRef, useState } from 'react';
-import { type NodeProps } from '@xyflow/react';
+import { NodeToolbar, Position, type NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { MermaidNode } from '../../types';
 import { aiReady } from '../../lib/ai';
-import { aiMermaid, buildMermaidSource, getMermaid, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES } from '../../lib/mermaid';
+import { aiMermaid, buildMermaidSource, getMermaid, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES } from '../../lib/mermaid';
 import { useOutsideClose } from '../../lib/useOutsideClose';
 import { CardShell } from './CardShell';
 
+/** Form je Schritt: Symbol, Name, Klammern (Mermaid-Syntax) */
+const SHAPES: Array<[string, string, string, string]> = [
+  ['▭', 'Rechteck', '[', ']'],
+  ['▢', 'Abgerundet', '(', ')'],
+  ['◇', 'Entscheidung', '{', '}'],
+  ['◯', 'Kreis', '((', '))'],
+];
+
+/** Füllfarben je Schritt (mermaid `style <id> fill:…`) — bewusst kräftige
+ *  Pastelltöne, die auf hellen wie getönten Flächen funktionieren */
+const NODE_COLORS: Array<[string, string, string]> = [
+  ['Gelb', '#ffe9a8', '#c9a227'],
+  ['Blau', '#cfe3f8', '#4a7dbd'],
+  ['Grün', '#d3ecd8', '#4d8f5a'],
+  ['Rosa', '#f8d7de', '#c25b73'],
+  ['Violett', '#e5dcf5', '#7d5bb8'],
+];
+
 /**
- * Diagramm-Karte (M91, „natürlicher"): Standard ist die reine Vorschau —
- * Flowchart-Knoten werden DIREKT im Diagramm bearbeitet (Klick → Aktionen,
- * Doppelklick → Umbenennen), Stil/Farben/Richtung über ein Menü, der rohe
- * Code bleibt als Experten-Ansicht hinter ‹/›. Die KI-Zeile unten erzeugt
- * oder ändert das Diagramm aus natürlicher Sprache (validiert + Auto-Reparatur).
+ * Diagramm (M91/M92, „integral"): Das Diagramm liegt RAHMENLOS direkt auf der
+ * Fläche — kein Karten-Kasten, keine Kopfzeile. Alle Werkzeuge schweben als
+ * Leiste unter dem Diagramm, nur solange die Karte ausgewählt ist (gleiche
+ * Sprache wie die Auswahl-Toolbar oben). Flowchart-Schritte werden direkt im
+ * Bild bearbeitet: umbenennen, anfügen, Form, Farbe, verbinden, entfernen.
  */
 export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
@@ -23,15 +41,20 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
   const [svg, setSvg] = useState('');
   const [error, setError] = useState('');
   const [tplOpen, setTplOpen] = useState(false);
+  const [pendingTpl, setPendingTpl] = useState<string | null>(null);
   const [styleOpen, setStyleOpen] = useState(false);
   const [selNode, setSelNode] = useState<string | null>(null);
+  const [connectFrom, setConnectFrom] = useState<string | null>(null);
+  // Inline-Umbenennen: Eingabefeld schwebt direkt ÜBER dem Schritt im Bild —
+  // kein Browser-Dialog (User-Feedback M92)
+  const [rename, setRename] = useState<{ nid: string; x: number; y: number; w: number; value: string } | null>(null);
   const [aiText, setAiText] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const renderKey = useRef(0);
   const tplRef = useRef<HTMLElement | null>(null);
   const styleRef = useRef<HTMLElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
-  useOutsideClose(tplOpen, tplRef, () => setTplOpen(false));
+  useOutsideClose(tplOpen, tplRef, () => { setTplOpen(false); setPendingTpl(null); });
   useOutsideClose(styleOpen, styleRef, () => setStyleOpen(false));
 
   const style = (data.style as string | undefined) ?? '';
@@ -57,7 +80,7 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
     return () => { cancelled = true; clearTimeout(t); };
   }, [data.code, id, uiTheme, style, look]);
 
-  // Ausgewählten Flowchart-Knoten im SVG markieren (Klasse aufs <g>)
+  // Ausgewählten Flowchart-Schritt im SVG markieren (Klasse aufs <g>)
   useEffect(() => {
     const root = previewRef.current;
     if (!root) return;
@@ -68,16 +91,24 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
     });
   }, [selNode, svg]);
 
-  /** Vorlage laden — eigenen Code nicht durch einen Fehlklick verlieren */
+  // Karte abgewählt → Schritt-Auswahl, Verbinden-Modus, Popovers, Umbenennen aufräumen
+  useEffect(() => {
+    if (!selected) { setSelNode(null); setConnectFrom(null); setTplOpen(false); setStyleOpen(false); setPendingTpl(null); setRename(null); }
+  }, [selected]);
+
+  /** Vorlage laden — eigenen Code nicht durch einen Fehlklick verlieren.
+   *  Statt Browser-confirm: der Knopf verwandelt sich in eine Rückfrage,
+   *  erst der zweite Klick ersetzt wirklich (alles inline, M92). */
   const applyTemplate = (t: string) => {
+    const isPristine = !data.code.trim() || data.code === LEGACY_MERMAID_DEFAULT || Object.values(TEMPLATES).includes(data.code);
+    if (!isPristine && pendingTpl !== t) { setPendingTpl(t); return; }
+    setPendingTpl(null);
     setTplOpen(false);
-    const isPristine = !data.code.trim() || Object.values(TEMPLATES).includes(data.code);
-    if (!isPristine && !window.confirm(`Aktuellen Diagramm-Code durch die Vorlage „${t}" ersetzen?`)) return;
     setSelNode(null);
     updateNodeData(id, { code: TEMPLATES[t] });
   };
 
-  // ---------- WYSIWYG: Flowchart-Knoten direkt bearbeiten ----------
+  // ---------- WYSIWYG: Flowchart-Schritte direkt bearbeiten ----------
   /** mermaid-Element-ID → Knoten-ID im Code. Format ist
    *  „<render-id>-flowchart-<knoten>-<laufnr>" — Präfix und Laufnummer weg */
   const nodeIdOf = (g: SVGGElement): string | null => {
@@ -86,15 +117,36 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
   };
 
   const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  /** Definition „id<Klammer>Label<Klammer>" im Code finden */
+  const defRe = (nid: string) =>
+    new RegExp(`(\\b${escapeRe(nid)})((?:\\(\\(|\\[|\\{|\\())([^\\]})]*)((?:\\)\\)|\\]|\\}|\\)))`);
 
-  /** Label eines Knotens ersetzen — Klammerform ([…], {…}, ((…)), (…)) bleibt */
+  /** Label eines Schritts ersetzen — Klammerform ([…], {…}, ((…)), (…)) bleibt */
   const renameNode = (nid: string, label: string) => {
-    const re = new RegExp(`(\\b${escapeRe(nid)})((?:\\(\\(|\\[|\\{|\\())([^\\]})]*)((?:\\)\\)|\\]|\\}|\\)))`);
+    const re = defRe(nid);
     if (re.test(data.code)) {
       updateNodeData(id, { code: data.code.replace(re, `$1$2${label}$4`) });
     } else {
       updateNodeData(id, { code: `${data.code}\n  ${nid}[${label}]` });
     }
+  };
+
+  /** Form eines Schritts wechseln (Klammern tauschen, Label bleibt) */
+  const setShape = (nid: string, open: string, close: string) => {
+    const re = defRe(nid);
+    if (re.test(data.code)) {
+      updateNodeData(id, { code: data.code.replace(re, `$1${open}$3${close}`) });
+    } else {
+      updateNodeData(id, { code: `${data.code}\n  ${nid}${open}${nid}${close}` });
+    }
+  };
+
+  /** Füllfarbe eines Schritts setzen/entfernen (mermaid style-Zeile) */
+  const setNodeColor = (nid: string, fill?: string, stroke?: string) => {
+    const styleLine = new RegExp(`^\\s*style\\s+${escapeRe(nid)}\\b.*$`, 'm');
+    let code = data.code.replace(styleLine, '').replace(/\n{3,}/g, '\n\n').trimEnd();
+    if (fill) code += `\n  style ${nid} fill:${fill},stroke:${stroke},color:#1f1e1b`;
+    updateNodeData(id, { code });
   };
 
   const addStepAfter = (nid: string | null) => {
@@ -114,25 +166,52 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
 
   const onPreviewClick = (e: React.MouseEvent) => {
     const g = (e.target as Element).closest?.('g.node, g.rough-node') as SVGGElement | null;
-    if (!g || !isFlow) { setSelNode(null); return; }
-    setSelNode(nodeIdOf(g));
+    if (!g || !isFlow) { setSelNode(null); setConnectFrom(null); return; }
+    const nid = nodeIdOf(g);
+    // Verbinden-Modus: zweiter Klick = Ziel → Pfeil ziehen
+    if (connectFrom && nid && nid !== connectFrom) {
+      updateNodeData(id, { code: `${data.code}\n  ${connectFrom} --> ${nid}` });
+      setConnectFrom(null);
+      setSelNode(nid);
+      return;
+    }
+    setSelNode(nid);
+  };
+
+  /** Inline-Umbenennen starten: Eingabefeld exakt über den Schritt legen.
+   *  Bildschirm-Koordinaten → lokale Karte (React-Flow-Zoom herausrechnen). */
+  const startRename = (nid: string) => {
+    const root = previewRef.current;
+    if (!root) return;
+    let target: SVGGElement | null = null;
+    root.querySelectorAll('g.node, g.rough-node').forEach((g) => {
+      if (!target && nodeIdOf(g as SVGGElement) === nid) target = g as SVGGElement;
+    });
+    const rootRect = root.getBoundingClientRect();
+    const scale = root.offsetWidth ? rootRect.width / root.offsetWidth : 1;
+    const r = (target as SVGGElement | null)?.getBoundingClientRect();
+    const x = r ? (r.left - rootRect.left) / scale + root.scrollLeft : 12;
+    const y = r ? (r.top - rootRect.top) / scale + root.scrollTop : 12;
+    const w = r ? Math.max(120, r.width / scale + 16) : 160;
+    const label = ((target as SVGGElement | null)?.textContent ?? '').trim();
+    setSelNode(nid);
+    setConnectFrom(null);
+    setRename({ nid, x, y, w, value: label });
+  };
+
+  const commitRename = () => {
+    if (rename?.value.trim()) renameNode(rename.nid, rename.value.trim());
+    setRename(null);
   };
 
   const onPreviewDblClick = (e: React.MouseEvent) => {
     const g = (e.target as Element).closest?.('g.node, g.rough-node') as SVGGElement | null;
     if (!g || !isFlow) return;
     const nid = nodeIdOf(g);
-    if (!nid) return;
-    const current = (g.textContent ?? '').trim();
-    const next = window.prompt('Beschriftung des Schritts:', current);
-    if (next?.trim()) renameNode(nid, next.trim());
+    if (nid) startRename(nid);
   };
 
-  const renameSelected = () => {
-    if (!selNode) return;
-    const next = window.prompt('Beschriftung des Schritts:');
-    if (next?.trim()) renameNode(selNode, next.trim());
-  };
+  const renameSelected = () => { if (selNode) startRename(selNode); };
 
   /** Richtung TD ⇄ LR (nur Flowchart) */
   const toggleDirection = () => {
@@ -162,58 +241,86 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
 
   return (
     <CardShell id={id} selected={selected} minWidth={300} minHeight={200} className="mermaid-card">
-      <div className="mermaid-head">
-        <span>Diagramm</span>
-        <div className="mermaid-tools nodrag">
-          <span className="mm-pop-wrap" ref={tplRef}>
-            <button className={tplOpen ? 'active' : ''} title="Vorlage wählen" onClick={() => { setTplOpen((o) => !o); setStyleOpen(false); }}>Vorlage ▾</button>
-            {tplOpen && (
-              <div className="mm-pop">
-                {Object.keys(TEMPLATES).map((t) => (
-                  <button key={t} onClick={() => applyTemplate(t)}>{t}</button>
-                ))}
-              </div>
-            )}
-          </span>
-          <span className="mm-pop-wrap" ref={styleRef}>
-            <button className={styleOpen ? 'active' : ''} title="Stil: Farbschema, Handschrift-Look, Richtung" onClick={() => { setStyleOpen((o) => !o); setTplOpen(false); }}>Stil ▾</button>
-            {styleOpen && (
-              <div className="mm-pop mm-style-pop">
-                <div className="mm-pop-label">Farbschema</div>
-                <div className="mm-dots">
-                  <button className={`mm-dot mm-dot-none ${!style ? 'on' : ''}`} title="Standard" onClick={() => updateNodeData(id, { style: undefined })} />
-                  {Object.entries(MERMAID_STYLES).map(([k, s]) => (
-                    <button key={k} className={`mm-dot ${style === k ? 'on' : ''}`} style={{ background: s.dot }} title={s.label} onClick={() => updateNodeData(id, { style: k })} />
+      {/* Werkzeuge schweben UNTER dem Diagramm (die Auswahl-Toolbar liegt oben) */}
+      <NodeToolbar isVisible={!!selected} position={Position.Bottom} offset={14} className="mm-toolbar nodrag">
+        {selNode ? (
+          <div className="mm-row">
+            <span className="mm-sel-name">„{selNode}"</span>
+            <button onClick={renameSelected}>✎ Umbenennen</button>
+            <button onClick={() => addStepAfter(selNode)}>＋ Danach</button>
+            <span className="mm-sep" />
+            {SHAPES.map(([sym, name, o, c]) => (
+              <button key={name} className="mm-shape" title={`Form: ${name}`} onClick={() => setShape(selNode, o, c)}>{sym}</button>
+            ))}
+            <span className="mm-sep" />
+            {NODE_COLORS.map(([name, fill, stroke]) => (
+              <button key={name} className="mm-dot mm-dot-s" style={{ background: fill, borderColor: stroke }} title={`Füllung ${name}`} onClick={() => setNodeColor(selNode, fill, stroke)} />
+            ))}
+            <button className="mm-dot mm-dot-s mm-dot-none" title="Füllung zurücksetzen" onClick={() => setNodeColor(selNode)} />
+            <span className="mm-sep" />
+            <button className={connectFrom ? 'active' : ''} title="Mit anderem Schritt verbinden: danach Ziel anklicken" onClick={() => setConnectFrom(connectFrom ? null : selNode)}>
+              {connectFrom ? 'Ziel anklicken …' : '→ Verbinden'}
+            </button>
+            <button className="danger" onClick={() => removeNode(selNode)}>Entfernen</button>
+            <button onClick={() => { setSelNode(null); setConnectFrom(null); }} title="Schritt-Auswahl aufheben">✕</button>
+          </div>
+        ) : (
+          <div className="mm-row">
+            <span className="mm-pop-wrap" ref={tplRef}>
+              <button className={tplOpen ? 'active' : ''} title="Vorlage wählen" onClick={() => { setTplOpen((o) => !o); setStyleOpen(false); }}>Vorlage ▾</button>
+              {tplOpen && (
+                <div className="mm-pop">
+                  {Object.keys(TEMPLATES).map((t) => (
+                    <button key={t} className={pendingTpl === t ? 'mm-confirm' : ''} onClick={() => applyTemplate(t)}>
+                      {pendingTpl === t ? `„${t}" ersetzt dein Diagramm — sicher?` : t}
+                    </button>
                   ))}
                 </div>
-                <div className="mm-pop-label">Zeichenstil</div>
-                <button className={look === 'hand' ? 'active' : ''} onClick={() => updateNodeData(id, { look: look === 'hand' ? undefined : 'hand' })}>
-                  ✏️ Handgezeichnet {look === 'hand' ? 'AUS' : 'AN'}
-                </button>
-                {isFlow && (
-                  <>
-                    <div className="mm-pop-label">Richtung</div>
-                    <button onClick={toggleDirection}>⇄ Oben/unten ⇄ links/rechts</button>
-                  </>
-                )}
-              </div>
+              )}
+            </span>
+            <span className="mm-pop-wrap" ref={styleRef}>
+              <button className={styleOpen ? 'active' : ''} title="Stil: Farbschema, Handschrift-Look, Richtung" onClick={() => { setStyleOpen((o) => !o); setTplOpen(false); }}>Stil ▾</button>
+              {styleOpen && (
+                <div className="mm-pop mm-style-pop">
+                  <div className="mm-pop-label">Farbschema</div>
+                  <div className="mm-dots">
+                    <button className={`mm-dot mm-dot-none ${!style ? 'on' : ''}`} title="Standard" onClick={() => updateNodeData(id, { style: undefined })} />
+                    {Object.entries(MERMAID_STYLES).map(([k, s]) => (
+                      <button key={k} className={`mm-dot ${style === k ? 'on' : ''}`} style={{ background: s.dot }} title={s.label} onClick={() => updateNodeData(id, { style: k })} />
+                    ))}
+                  </div>
+                  <div className="mm-pop-label">Zeichenstil</div>
+                  <button className={look === 'hand' ? 'active' : ''} onClick={() => updateNodeData(id, { look: look === 'hand' ? undefined : 'hand' })}>
+                    ✏️ Handgezeichnet {look === 'hand' ? 'AUS' : 'AN'}
+                  </button>
+                  {isFlow && (
+                    <>
+                      <div className="mm-pop-label">Richtung</div>
+                      <button onClick={toggleDirection}>⇄ Oben/unten ⇄ links/rechts</button>
+                    </>
+                  )}
+                </div>
+              )}
+            </span>
+            {isFlow && (
+              <button title="Neuen Schritt anfügen (an den ausgewählten, sonst frei)" onClick={() => addStepAfter(selNode)}>＋ Schritt</button>
             )}
-          </span>
-          {isFlow && (
-            <button title="Neuen Schritt anfügen (an den ausgewählten Knoten, sonst frei)" onClick={() => addStepAfter(selNode)}>＋ Schritt</button>
-          )}
-          <button className={edit ? 'active' : ''} title="Mermaid-Code anzeigen/bearbeiten (für Profis)" onClick={() => setEdit((e) => !e)}>‹/›</button>
-        </div>
-      </div>
-      {selNode && (
-        <div className="mm-node-bar nodrag">
-          <span>„{selNode}"</span>
-          <button onClick={renameSelected}>✎ Umbenennen</button>
-          <button onClick={() => addStepAfter(selNode)}>＋ Schritt danach</button>
-          <button className="danger" onClick={() => removeNode(selNode)}>Entfernen</button>
-          <button onClick={() => setSelNode(null)} title="Auswahl aufheben">✕</button>
-        </div>
-      )}
+            <button className={edit ? 'active' : ''} title="Mermaid-Code anzeigen/bearbeiten (für Profis)" onClick={() => setEdit((e) => !e)}>‹/›</button>
+          </div>
+        )}
+        {aiReady(ai) && (
+          <div className="mm-row mm-ai-row">
+            <input
+              value={aiText}
+              disabled={aiBusy}
+              placeholder={data.code.trim() ? '✨ Änderung beschreiben — z. B. „füge eine Prüfung ein"' : '✨ Diagramm beschreiben — z. B. „Urlaubsantrag-Prozess"'}
+              onChange={(e) => setAiText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void runAi(); }}
+            />
+            <button disabled={aiBusy || !aiText.trim()} onClick={() => void runAi()}>{aiBusy ? '…' : '✨'}</button>
+          </div>
+        )}
+      </NodeToolbar>
       <div className="mermaid-split">
         {edit && (
           <textarea
@@ -225,28 +332,38 @@ export function MermaidCard({ id, data, selected }: NodeProps<MermaidNode>) {
         )}
         <div className="mermaid-preview nowheel" ref={previewRef} onClick={onPreviewClick} onDoubleClick={onPreviewDblClick}>
           <div className={`mermaid-svg ${error ? 'stale' : ''}`} dangerouslySetInnerHTML={{ __html: svg }} />
+          {rename && (
+            <input
+              className="mm-rename nodrag"
+              style={{ left: rename.x, top: rename.y, width: rename.w }}
+              autoFocus
+              value={rename.value}
+              placeholder="Beschriftung …"
+              onFocus={(e) => e.currentTarget.select()}
+              onChange={(e) => setRename({ ...rename, value: e.target.value })}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+                if (e.key === 'Enter') commitRename();
+                if (e.key === 'Escape') setRename(null);
+              }}
+              onBlur={commitRename}
+              onClick={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => e.stopPropagation()}
+            />
+          )}
           {error && (
             <div className="mermaid-error" title={error}>
               ⚠️ {svg ? 'Code unvollständig — letztes gültiges Diagramm bleibt sichtbar' : error}
             </div>
           )}
-          {isFlow && !error && (
+          {connectFrom && !error && (
+            <div className="mm-hint mm-hint-connect">→ Ziel-Schritt anklicken, um „{connectFrom}" zu verbinden</div>
+          )}
+          {isFlow && !error && !connectFrom && selected && (
             <div className="mm-hint">Klick auf einen Schritt = bearbeiten · Doppelklick = umbenennen</div>
           )}
         </div>
       </div>
-      {aiReady(ai) && (
-        <div className="mermaid-ai nodrag">
-          <input
-            value={aiText}
-            disabled={aiBusy}
-            placeholder={data.code.trim() ? '✨ Änderung beschreiben — z. B. „füge nach der Entscheidung eine Prüfung ein"' : '✨ Diagramm beschreiben — z. B. „Urlaubsantrag-Prozess mit Genehmigung"'}
-            onChange={(e) => setAiText(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') void runAi(); }}
-          />
-          <button disabled={aiBusy || !aiText.trim()} onClick={() => void runAi()}>{aiBusy ? '…' : '✨'}</button>
-        </div>
-      )}
     </CardShell>
   );
 }
