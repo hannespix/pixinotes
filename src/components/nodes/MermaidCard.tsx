@@ -82,12 +82,14 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   }, [data.code, id, uiTheme, style, look]);
 
   // Auto-Größe (M92c, „gantt viel zu klein"): Nach jedem erfolgreichen Render
-  // die NATÜRLICHE Diagrammgröße aus der viewBox lesen und die Karte darauf
-  // einpassen. Große Diagramme (Gantt!) bekommen so echte Fläche statt einer
-  // Briefmarke. Manuelles Resize schaltet auf „eigene Größe behalten" um
-  // (autoFit=false); der ⤢-Knopf in der Leiste schaltet zurück.
-  useEffect(() => {
-    if (!svg || data.autoFit === false) return;
+  // Die dauernde Automatik aus M93 sprang bei jedem Render dazwischen und
+  // fühlte sich vor allem auf Smartphones „komisch" an (User-Feedback M95).
+  // Jetzt passt sich die Karte NUR auf ausdrückliche Aktion an: Vorlage
+  // laden, KI-Diagramm, ‹/›-Spalte auf/zu oder der ⤢-Einpassen-Knopf.
+  // Manuelles Ziehen bleibt ansonsten unangetastet.
+  const fitOnRender = useRef(false);
+
+  const fitToDiagram = (editNow: boolean = edit) => {
     const el = previewRef.current?.querySelector('svg');
     if (!el) return;
     const vb = (el as SVGSVGElement).viewBox?.baseVal;
@@ -101,21 +103,29 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     const PAD = 12; // Karten-Innenabstand (6 px rundum)
     // Offene Code-Spalte (‹/›) braucht eigene Breite (320 px + 8 px Lücke) —
     // sonst quetscht sie das Diagramm auf die halbe Fläche (M94)
-    const EXTRA = edit ? 328 : 0;
-    const MAXW = 1100, MAXH = 720, MINW = 240, MINH = 120;
+    const EXTRA = editNow ? 328 : 0;
+    // Smartphone-Clamp (M95): Karte nie größer, als der Bildschirm hergibt
+    const MAXW = Math.min(1100, Math.max(280, window.innerWidth - 48));
+    const MAXH = Math.min(720, Math.max(200, window.innerHeight - 200));
     // SVG skaliert proportional zur Kartenbreite — bei Überbreite/-höhe
     // gemeinsam herunterskalieren, damit alles ohne Scrollen sichtbar bleibt
     const scale = Math.min(1, (MAXW - EXTRA) / natW, MAXH / natH);
-    const w = Math.max(MINW, Math.round(natW * scale) + PAD + EXTRA);
-    const h = Math.max(MINH, Math.round(natH * scale) + PAD);
-    // Nur bei nennenswerter Abweichung anfassen (kein Zittern, keine
-    // Endlos-Writes) — und als „abgeleitet" markieren: die Größe folgt
-    // deterministisch aus dem Code und soll den Sync nicht als Bearbeitung
-    // blockieren (M82-Muster)
+    const w = Math.max(240, Math.round(natW * scale) + PAD + EXTRA);
+    const h = Math.max(120, Math.round(natH * scale) + PAD);
     if (Math.abs((nodeW ?? 0) - w) < 12 && Math.abs((nodeH ?? 0) - h) < 12) return;
+    // „abgeleitet": Größe folgt deterministisch aus dem Code und soll den
+    // Sync-Fast-Forward nicht als Bearbeitung blockieren (M82-Muster)
     runDerived(() => resizeNode(id, w, h));
+  };
+
+  // Einmal-Einpassen nach dem NÄCHSTEN Render — Vorlage/KI setzen das Flag,
+  // gemessen wird erst, wenn das neue SVG im DOM steht
+  useEffect(() => {
+    if (!svg || !fitOnRender.current) return;
+    fitOnRender.current = false;
+    fitToDiagram();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [svg, data.autoFit, edit]);
+  }, [svg]);
 
   // Ausgewählten Flowchart-Schritt im SVG markieren (Klasse aufs <g>)
   useEffect(() => {
@@ -142,6 +152,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     setPendingTpl(null);
     setTplOpen(false);
     setSelNode(null);
+    fitOnRender.current = true; // neue Vorlage → Karte einmalig einpassen
     updateNodeData(id, { code: TEMPLATES[t] });
   };
 
@@ -265,6 +276,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     setAiBusy(true);
     try {
       const code = await aiMermaid(wish, data.code);
+      fitOnRender.current = true; // KI-Diagramm → Karte einmalig einpassen
       updateNodeData(id, { code });
       setAiText('');
       setSelNode(null);
@@ -283,7 +295,6 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
       minWidth={240}
       minHeight={120}
       className="mermaid-card"
-      onManualResize={() => { if (data.autoFit !== false) updateNodeData(id, { autoFit: false }); }}
     >
       {/* Werkzeuge schweben UNTER dem Diagramm (die Auswahl-Toolbar liegt oben) */}
       <NodeToolbar isVisible={!!selected} position={Position.Bottom} offset={14} className="mm-toolbar nodrag">
@@ -349,12 +360,12 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             {isFlow && (
               <button title="Neuen Schritt anfügen (an den ausgewählten, sonst frei)" onClick={() => addStepAfter(selNode)}>＋ Schritt</button>
             )}
+            <button title="Kartengröße einmalig an das Diagramm anpassen" onClick={() => fitToDiagram()}>⤢ Einpassen</button>
             <button
-              className={data.autoFit === false ? '' : 'active'}
-              title={data.autoFit === false ? 'Auto-Größe wieder einschalten — Karte folgt dem Inhalt' : 'Auto-Größe ist an: Karte passt sich dem Diagramm an (manuelles Ziehen schaltet sie aus)'}
-              onClick={() => updateNodeData(id, { autoFit: data.autoFit === false ? undefined : false })}
-            >⤢ Auto</button>
-            <button className={edit ? 'active' : ''} title="Mermaid-Code anzeigen/bearbeiten (für Profis)" onClick={() => setEdit((e) => !e)}>‹/›</button>
+              className={edit ? 'active' : ''}
+              title="Mermaid-Code anzeigen/bearbeiten (für Profis)"
+              onClick={() => { const next = !edit; setEdit(next); fitToDiagram(next); }}
+            >‹/›</button>
           </div>
         )}
         {aiReady(ai) && (

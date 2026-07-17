@@ -10,16 +10,13 @@ interface Props {
   selected?: boolean;
   minWidth?: number;
   minHeight?: number;
-  /** Wird nach einem manuellen Resize über die Griffe gerufen (z. B. um eine
-   *  Auto-Größe abzuschalten, Mermaid M92c) */
-  onManualResize?: () => void;
 }
 
 /**
  * Gemeinsame Hülle aller Karten: Lösch-Knopf, Verbindungs-Handles und
  * Resize-Griffe an Ecken/Kanten (sichtbar bei Selektion).
  */
-export function CardShell({ id, className, children, selected, minWidth = 170, minHeight = 70, onManualResize }: Props) {
+export function CardShell({ id, className, children, selected, minWidth = 170, minHeight = 70 }: Props) {
   const removeNode = useBoard((s) => s.removeNode);
   // Wichtig: Lösch-Knopf & Handles liegen AUSSERHALB des card-body,
   // damit dessen overflow:hidden sie nicht abschneidet.
@@ -31,7 +28,6 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
         minHeight={minHeight}
         color="#4f7cff"
         handleStyle={{ width: 9, height: 9, borderRadius: 3 }}
-        onResizeEnd={onManualResize}
       />
       {/* Sichtbarer Griff: hier packt man die Karte IMMER — auch wenn sie
           innen komplett aus Editor/Eingabefeldern besteht */}

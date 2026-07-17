@@ -129,8 +129,11 @@ export function makeMermaid(position: Pos): AppNode {
   return {
     id: uid(),
     type: 'mermaid',
-    width: CARD_WIDTHS.mermaid,
-    height: 240,
+    // Passgenau für die Flow-Vorlage (natürliche Größe ~343×372 + Innenabstand):
+    // seit M95 gibt es keine dauernde Auto-Größe mehr, also muss der Start-
+    // zustand von sich aus ohne Scrollen/Stauchen passen
+    width: 356,
+    height: 384,
     position,
     // Exakt die Flow-Vorlage: neue Karten gelten als „unberührt" — ein
     // Vorlagen-Wechsel direkt nach dem Anlegen fragt dann nicht nach (M92)
