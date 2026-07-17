@@ -768,14 +768,26 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* M92 „integral": Das Diagramm liegt RAHMENLOS auf der Fläche — kein
    Karten-Kasten. Nur bei Hover/Auswahl zeigt eine dezente gestrichelte
    Kontur, wo die Karte endet (zum Greifen/Resizen). */
-/* Milchglas statt voll transparent: wirkt frei auf der Fläche, bleibt aber
-   lesbar, wenn die Karte andere Karten überlappt (Probe-Screenshot M92) */
-.mermaid-card { background: var(--surface-glass); backdrop-filter: blur(3px); border-radius: 10px; padding: 6px; overflow: hidden; display: flex; flex-direction: column; }
+/* Im Ruhezustand WIRKLICH randlos: kein Hintergrund, kein Schatten, kein
+   Rahmen — das Diagramm liegt frei auf der Fläche. Erst bei Hover/Auswahl
+   kommt Milchglas + gestrichelte Kontur dazu (zum Greifen/Resizen und damit
+   es beim Bearbeiten über anderen Karten lesbar bleibt). */
+.mermaid-card {
+  background: transparent; border-radius: 10px; padding: 6px; overflow: hidden;
+  display: flex; flex-direction: column;
+  outline: 1.5px dashed transparent; outline-offset: -1px;
+  transition: outline-color 0.15s ease, background 0.15s ease;
+}
 .react-flow__node:has(> .card-shell > .mermaid-card) { box-shadow: none; }
-.mermaid-card { outline: 1.5px dashed transparent; outline-offset: -1px; transition: outline-color 0.15s ease; }
 .react-flow__node:hover .mermaid-card,
-.react-flow__node.selected .mermaid-card { outline-color: var(--border-soft); }
+.react-flow__node.selected .mermaid-card {
+  background: var(--surface-glass); backdrop-filter: blur(3px);
+  outline-color: var(--border-soft);
+}
 .react-flow__node.selected .mermaid-card { outline-color: var(--accent); }
+/* Der solide Standard-Auswahlrahmen würde doch wieder einen Kasten zeichnen —
+   bei Mermaid übernimmt das die gestrichelte Kontur */
+.react-flow__node.selected:has(> .card-shell > .mermaid-card) { outline: none; }
 
 /* Schwebende Werkzeugleiste unterm Diagramm (nur bei Auswahl) */
 .mm-toolbar {
