@@ -43,7 +43,6 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   const [error, setError] = useState('');
   const [tplOpen, setTplOpen] = useState(false);
   const [pendingTpl, setPendingTpl] = useState<string | null>(null);
-  const [styleOpen, setStyleOpen] = useState(false);
   const [selNode, setSelNode] = useState<string | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   // Inline-Umbenennen: Eingabefeld schwebt direkt ÜBER dem Schritt im Bild —
@@ -53,10 +52,8 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   const [aiBusy, setAiBusy] = useState(false);
   const renderKey = useRef(0);
   const tplRef = useRef<HTMLElement | null>(null);
-  const styleRef = useRef<HTMLElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   useOutsideClose(tplOpen, tplRef, () => { setTplOpen(false); setPendingTpl(null); });
-  useOutsideClose(styleOpen, styleRef, () => setStyleOpen(false));
 
   const style = (data.style as string | undefined) ?? '';
   const look = (data.look as string | undefined) ?? '';
@@ -144,7 +141,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
 
   // Karte abgewählt → Schritt-Auswahl, Verbinden-Modus, Popovers, Umbenennen aufräumen
   useEffect(() => {
-    if (!selected) { setSelNode(null); setConnectFrom(null); setTplOpen(false); setStyleOpen(false); setPendingTpl(null); setRename(null); }
+    if (!selected) { setSelNode(null); setConnectFrom(null); setTplOpen(false); setPendingTpl(null); setRename(null); }
   }, [selected]);
 
   /** Vorlage laden — eigenen Code nicht durch einen Fehlklick verlieren.
@@ -309,13 +306,14 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
       minHeight={120}
       className="mermaid-card"
     >
-      {/* Werkzeuge schweben UNTER dem Diagramm (die Auswahl-Toolbar liegt oben) */}
+      {/* Werkzeuge schweben UNTER dem Diagramm — FLACH wie bei Excalidraw/
+          Nextcloud-Whiteboard: alles direkt sichtbar, keine Untermenüs (M98).
+          Die Schritt-Zeile erscheint ZUSÄTZLICH über der Hauptzeile. */}
       <NodeToolbar isVisible={!!selected} position={Position.Bottom} offset={14} className="mm-toolbar nodrag">
-        {selNode ? (
-          <div className="mm-row">
-            <span className="mm-sel-name">„{selNode}"</span>
+        {selNode && (
+          <div className="mm-row mm-step-row">
+            <span className="mm-sel-name" title="Ausgewählter Schritt">„{selNode}"</span>
             <button onClick={renameSelected}>✎ Umbenennen</button>
-            <button onClick={() => addStepAfter(selNode)}>＋ Danach</button>
             <span className="mm-sep" />
             {SHAPES.map(([sym, name, o, c]) => (
               <button key={name} className="mm-shape" title={`Form: ${name}`} onClick={() => setShape(selNode, o, c)}>{sym}</button>
@@ -329,58 +327,42 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             <button className={connectFrom ? 'active' : ''} title="Mit anderem Schritt verbinden: danach Ziel anklicken" onClick={() => setConnectFrom(connectFrom ? null : selNode)}>
               {connectFrom ? 'Ziel anklicken …' : '→ Verbinden'}
             </button>
-            <button className="danger" onClick={() => removeNode(selNode)}>Entfernen</button>
+            <button className="danger" title="Schritt aus dem Diagramm entfernen" onClick={() => removeNode(selNode)}>Entfernen</button>
             <button onClick={() => { setSelNode(null); setConnectFrom(null); }} title="Schritt-Auswahl aufheben">✕</button>
           </div>
-        ) : (
-          <div className="mm-row">
-            <span className="mm-pop-wrap" ref={tplRef}>
-              <button className={tplOpen ? 'active' : ''} title="Vorlage wählen" onClick={() => { setTplOpen((o) => !o); setStyleOpen(false); }}>Vorlage ▾</button>
-              {tplOpen && (
-                <div className="mm-pop">
-                  {Object.keys(TEMPLATES).map((t) => (
-                    <button key={t} className={pendingTpl === t ? 'mm-confirm' : ''} onClick={() => applyTemplate(t)}>
-                      {pendingTpl === t ? `„${t}" ersetzt dein Diagramm — sicher?` : t}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </span>
-            <span className="mm-pop-wrap" ref={styleRef}>
-              <button className={styleOpen ? 'active' : ''} title="Stil: Farbschema, Handschrift-Look, Richtung" onClick={() => { setStyleOpen((o) => !o); setTplOpen(false); }}>Stil ▾</button>
-              {styleOpen && (
-                <div className="mm-pop mm-style-pop">
-                  <div className="mm-pop-label">Farbschema</div>
-                  <div className="mm-dots">
-                    <button className={`mm-dot mm-dot-none ${!style ? 'on' : ''}`} title="Standard" onClick={() => updateNodeData(id, { style: undefined })} />
-                    {Object.entries(MERMAID_STYLES).map(([k, s]) => (
-                      <button key={k} className={`mm-dot ${style === k ? 'on' : ''}`} style={{ background: s.dot }} title={s.label} onClick={() => updateNodeData(id, { style: k })} />
-                    ))}
-                  </div>
-                  <div className="mm-pop-label">Zeichenstil</div>
-                  <button className={look === 'hand' ? 'active' : ''} onClick={() => updateNodeData(id, { look: look === 'hand' ? undefined : 'hand' })}>
-                    ✏️ Handgezeichnet {look === 'hand' ? 'AUS' : 'AN'}
-                  </button>
-                  {isFlow && (
-                    <>
-                      <div className="mm-pop-label">Richtung</div>
-                      <button onClick={toggleDirection}>⇄ Oben/unten ⇄ links/rechts</button>
-                    </>
-                  )}
-                </div>
-              )}
-            </span>
-            {isFlow && (
-              <button title="Neuen Schritt anfügen (an den ausgewählten, sonst frei)" onClick={() => addStepAfter(selNode)}>＋ Schritt</button>
-            )}
-            <button title="Kartengröße einmalig an das Diagramm anpassen" onClick={() => fitToDiagram()}>⤢ Einpassen</button>
-            <button
-              className={edit ? 'active' : ''}
-              title="Mermaid-Code anzeigen/bearbeiten (für Profis)"
-              onClick={() => { const next = !edit; setEdit(next); fitToDiagram(next); }}
-            >‹/›</button>
-          </div>
         )}
+        <div className="mm-row">
+          <span className="mm-pop-wrap" ref={tplRef}>
+            <button className={tplOpen ? 'active' : ''} title="Vorlage wählen" onClick={() => setTplOpen((o) => !o)}>Vorlage ▾</button>
+            {tplOpen && (
+              <div className="mm-pop">
+                {Object.keys(TEMPLATES).map((t) => (
+                  <button key={t} className={pendingTpl === t ? 'mm-confirm' : ''} onClick={() => applyTemplate(t)}>
+                    {pendingTpl === t ? `„${t}" ersetzt dein Diagramm — sicher?` : t}
+                  </button>
+                ))}
+              </div>
+            )}
+          </span>
+          <span className="mm-sep" />
+          <button className={`mm-dot mm-dot-none ${!style ? 'on' : ''}`} title="Standardfarben" onClick={() => updateNodeData(id, { style: undefined })} />
+          {Object.entries(MERMAID_STYLES).map(([k, s]) => (
+            <button key={k} className={`mm-dot ${style === k ? 'on' : ''}`} style={{ background: s.dot }} title={`Farbschema ${s.label}`} onClick={() => updateNodeData(id, { style: k })} />
+          ))}
+          <span className="mm-sep" />
+          <button className={look === 'hand' ? 'active' : ''} title={look === 'hand' ? 'Handgezeichneter Look ist AN (Kritzel-Formen + Handschrift)' : 'Handgezeichneter Look: Kritzel-Formen + Handschrift'} onClick={() => updateNodeData(id, { look: look === 'hand' ? undefined : 'hand' })}>✏️</button>
+          {isFlow && <button title="Richtung wechseln: oben/unten ⇄ links/rechts" onClick={toggleDirection}>⇄</button>}
+          <span className="mm-sep" />
+          {isFlow && (
+            <button title="Neuen Schritt anfügen (an den ausgewählten, sonst frei)" onClick={() => addStepAfter(selNode)}>＋ Schritt</button>
+          )}
+          <button title="Kartengröße einmalig an das Diagramm anpassen" onClick={() => fitToDiagram()}>⤢</button>
+          <button
+            className={edit ? 'active' : ''}
+            title="Mermaid-Code anzeigen/bearbeiten (für Profis)"
+            onClick={() => { const next = !edit; setEdit(next); fitToDiagram(next); }}
+          >‹/›</button>
+        </div>
         {aiReady(ai) && (
           <div className="mm-row mm-ai-row">
             <input

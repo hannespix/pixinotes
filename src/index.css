@@ -806,6 +806,10 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .mm-pop-wrap > button:hover, .mm-pop-wrap > button.active { background: var(--accent-soft); }
 .mm-row > button.danger { color: #a4231a; }
 .mm-sel-name { font-size: 11px; font-weight: 750; color: var(--accent-strong); padding: 0 3px; }
+/* Schritt-Zeile: erscheint ZUSÄTZLICH über der Hauptzeile (flaches UI, M98) */
+.mm-step-row { background: var(--accent-soft); border-radius: 9px; padding: 4px 7px; }
+.mm-step-row > button { background: var(--surface); }
+.mm-row > .mm-dot { flex: none; }
 .mm-sep { width: 1px; height: 16px; background: var(--border-soft); margin: 0 2px; }
 .mm-shape { font-size: 12px; padding: 4px 7px; }
 .mm-dot-s { width: 17px; height: 17px; }
@@ -867,8 +871,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   padding: 5px 9px; cursor: pointer;
 }
 .mm-pop button:hover, .mm-pop button.active { background: var(--accent-soft); }
-.mm-pop-label { font-size: 10px; font-weight: 750; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; padding: 5px 9px 1px; }
-.mm-dots { display: flex; gap: 6px; padding: 4px 9px 6px; }
 .mm-dot {
   width: 20px; height: 20px; border-radius: 50%; cursor: pointer;
   border: 1.5px solid var(--border-soft); padding: 0;

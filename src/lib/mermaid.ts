@@ -78,7 +78,11 @@ export const MERMAID_STYLES: Record<string, { label: string; dot: string; light:
 // Handschrift zum handDrawn-Look (M96): „Kalam" (© Indian Type Foundry,
 // SIL Open Font License 1.1), latin-Subset als data:-URL eingebettet —
 // offline/PWA-sicher, keine Nachlade-Chunks (Lehre aus M90).
-const HAND_FONT = "'Kalam', 'Segoe Print', 'Comic Sans MS', cursive";
+// BEWUSST ohne Anführungszeichen um die Namen: mermaids %%{init}%%-Parser
+// ersetzte einfache Anführungszeichen durch doppelte und verwarf dadurch die
+// GANZE Direktive (Look + Farben tot, Audit M98) — und auch im Frontmatter
+// bleiben unquotierte CSS-Familiennamen die robusteste Form.
+const HAND_FONT = 'Kalam, Segoe Print, Comic Sans MS, cursive';
 let handFontInjected = false;
 
 /** @font-face einmalig injizieren und die Schrift VOR dem Rendern laden —
@@ -98,24 +102,98 @@ export function preloadHandFont(): Promise<unknown> {
   }
 }
 
-/** Vollständige Render-Quelle: Stil-/Look-Direktive + Code der Karte */
+/** Hexfarben mischen (t=0 → a, t=1 → b) — für abgeleitete Reihenfarben */
+function mixHex(a: string, b: string, t: number): string {
+  const p = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [ar, ag, ab] = p(a);
+  const [br, bg, bb] = p(b);
+  const c = (x: number, y: number) => Math.round(x + (y - x) * t).toString(16).padStart(2, '0');
+  return `#${c(ar, br)}${c(ag, bg)}${c(ab, bb)}`;
+}
+
+/** Vollständiger Variablen-Satz eines Farbschemas für ALLE Diagrammtypen:
+ *  flowchart/state/sequence (primary…), Kreis (pie1…), Zeitstrahl/Journey
+ *  (cScale…), Quadrant und Gantt. Vorher deckten die Schemata nur die
+ *  primary-Variablen ab — Kreis & Co. blieben in Standardfarben (Audit M98). */
+function fullVars(base: Record<string, string>, accent: string, dark: boolean): Record<string, string> {
+  const bg = dark ? '#16150f' : '#ffffff';
+  const ink = base.primaryTextColor;
+  // 8 abgeleitete Reihenfarben rund um den Akzent — hell/dunkel gestaffelt
+  const series = [
+    base.primaryColor,
+    mixHex(accent, bg, 0.55),
+    base.secondaryColor,
+    mixHex(accent, bg, 0.25),
+    base.tertiaryColor,
+    mixHex(accent, ink, 0.3),
+    mixHex(accent, bg, 0.72),
+    mixHex(accent, ink, 0.5),
+  ];
+  const v: Record<string, string> = { ...base };
+  series.forEach((c, i) => {
+    v[`pie${i + 1}`] = c;
+    v[`cScale${i}`] = c;
+    v[`cScaleLabel${i}`] = ink;
+  });
+  v.pieTitleTextColor = ink;
+  v.pieSectionTextColor = ink;
+  v.pieLegendTextColor = ink;
+  v.pieStrokeColor = base.primaryBorderColor;
+  v.pieOuterStrokeColor = base.primaryBorderColor;
+  // Quadrant
+  v.quadrant1Fill = series[1];
+  v.quadrant2Fill = base.tertiaryColor;
+  v.quadrant3Fill = base.secondaryColor;
+  v.quadrant4Fill = series[6];
+  v.quadrant1TextFill = ink;
+  v.quadrant2TextFill = ink;
+  v.quadrant3TextFill = ink;
+  v.quadrant4TextFill = ink;
+  v.quadrantPointFill = accent;
+  v.quadrantPointTextFill = ink;
+  v.quadrantXAxisTextFill = ink;
+  v.quadrantYAxisTextFill = ink;
+  v.quadrantTitleFill = ink;
+  v.quadrantInternalBorderStrokeFill = base.primaryBorderColor;
+  v.quadrantExternalBorderStrokeFill = base.primaryBorderColor;
+  // Gantt
+  v.sectionBkgColor = base.secondaryColor;
+  v.sectionBkgColor2 = base.tertiaryColor;
+  v.altSectionBkgColor = bg;
+  v.taskBkgColor = base.primaryColor;
+  v.taskBorderColor = base.primaryBorderColor;
+  v.taskTextColor = ink;
+  v.taskTextOutsideColor = ink;
+  v.activeTaskBkgColor = mixHex(accent, bg, 0.45);
+  v.activeTaskBorderColor = accent;
+  v.doneTaskBkgColor = mixHex(accent, bg, 0.75);
+  v.doneTaskBorderColor = base.primaryBorderColor;
+  v.todayLineColor = accent;
+  return v;
+}
+
+/** Vollständige Render-Quelle: Stil/Look als YAML-Frontmatter + Code.
+ *  Frontmatter statt %%{init}%%-Direktive: der Direktiven-Parser stolpert
+ *  über Anführungszeichen im JSON und verwirft dann ALLES still (M98). */
 export function buildMermaidSource(code: string, style?: string, look?: string): string {
   const dark = document.documentElement.dataset.theme === 'dark';
-  const init: Record<string, unknown> = {};
+  const cfg: Record<string, unknown> = {};
   const s = style ? MERMAID_STYLES[style] : undefined;
   if (s) {
-    init.theme = 'base';
-    init.themeVariables = dark ? s.dark : s.light;
+    cfg.theme = 'base';
+    const base = dark ? s.dark : s.light;
+    cfg.themeVariables = fullVars(base, dark ? base.primaryBorderColor : s.dot, dark);
   }
   if (look === 'hand') {
-    init.look = 'handDrawn';
-    // Schrift passend zum Kritzel-Look — top-level für alle Diagrammtypen,
-    // zusätzlich als themeVariable, wenn ein Farbschema (theme base) aktiv ist
-    init.fontFamily = HAND_FONT;
-    if (init.themeVariables) (init.themeVariables as Record<string, string>).fontFamily = HAND_FONT;
+    cfg.look = 'handDrawn';
+    cfg.fontFamily = HAND_FONT;
+    if (cfg.themeVariables) (cfg.themeVariables as Record<string, string>).fontFamily = HAND_FONT;
   }
-  if (Object.keys(init).length === 0) return code;
-  return `%%{init: ${JSON.stringify(init)}}%%\n${code}`;
+  if (Object.keys(cfg).length === 0) return code;
+  // Bringt der Code schon eigene Frontmatter mit, nichts voranstellen
+  if (/^\s*---/.test(code)) return code;
+  // JSON ist gültiges YAML (Flow-Stil) — robust gegen Sonderzeichen
+  return `---\nconfig: ${JSON.stringify(cfg)}\n---\n${code}`;
 }
 
 /** ```-Zäune und Geplauder aus KI-Antworten entfernen — es zählt nur der Code */
