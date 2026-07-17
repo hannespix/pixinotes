@@ -11,7 +11,7 @@
 //   Nextcloud liefert die standardmäßig NICHT — dann muss die IT die Origin
 //   freigeben, oder man nutzt den Sync-Ordner (Desktop-Client) bzw. Export.
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard } from '../store';
-import { SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, type SyncPayload } from './syncFolder';
+import { emitSyncStatus, SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, type SyncPayload } from './syncFolder';
 
 const LS_KEY = 'pixinotes-webdav';
 const STAMP_KEY = 'pixinotes:webdav-stamp';
@@ -122,6 +122,7 @@ export async function webdavWrite(cfg: WebdavConfig): Promise<string> {
   // Nur „sauber" markieren, wenn währenddessen nicht weiter editiert wurde
   const cur = useBoard.getState();
   if (cur.boards === s.boards && cur.spaces === s.spaces) localStorage.removeItem(WEBDAV_DIRTY_KEY);
+  emitSyncStatus('webdav', 'ok', payload.savedAt);
   return payload.savedAt;
 }
 
@@ -144,6 +145,7 @@ export function applyWebdav(p: SyncPayload): boolean {
     // Gegenüber einem evtl. verbundenen Sync-Ordner ist der Stand jetzt neu
     localStorage.setItem(SYNC_DIRTY_KEY, '1');
   } catch { return false; }
+  emitSyncStatus('webdav', 'ok', p.savedAt);
   return true;
 }
 
@@ -164,12 +166,17 @@ export async function checkWebdavRemote(): Promise<void> {
   if (!cfg) return;
   lastRemoteCheck = now;
   const remote = await webdavRead(cfg);
-  if (!remote || remote.savedAt === webdavStamp()) { staleHintShown = false; return; }
+  if (!remote || remote.savedAt === webdavStamp()) {
+    staleHintShown = false;
+    if (remote) emitSyncStatus('webdav', 'ok', remote.savedAt); // in sync
+    return;
+  }
   if (!localStorage.getItem(WEBDAV_DIRTY_KEY) && applyWebdav(remote)) {
     useBoard.getState().showToast(`☁️ Neuerer Stand vom WebDAV-Server übernommen (${new Date(remote.savedAt).toLocaleString('de-DE')}).`);
     staleHintShown = false;
     return;
   }
+  emitSyncStatus('webdav', 'conflict');
   if (!staleHintShown) {
     staleHintShown = true;
     useBoard.getState().showToast('☁️ Auf dem WebDAV-Server liegt ein anderer Stand — hier gibt es aber eigene Änderungen, darum wurde nichts überschrieben. In ⚙️ → Synchronisation wählen.');
@@ -180,17 +187,24 @@ async function autoPush(): Promise<void> {
   if (getWriterRole() !== 'writer') return; // Mitlese-Fenster synct nie
   const cfg = loadWebdav();
   if (!cfg?.auto) return;
-  const remote = await webdavRead(cfg);
-  // Fremder/neuerer Stand auf dem Server → warnen statt überschreiben
-  if (remote && remote.savedAt !== webdavStamp()) {
-    if (!conflictWarned) {
-      conflictWarned = true;
-      useBoard.getState().showToast('⚠️ Auf dem WebDAV-Server liegt ein neuerer Stand (anderes Gerät?). In ⚙️ → Synchronisation laden oder überschreiben.');
+  emitSyncStatus('webdav', 'pending');
+  try {
+    const remote = await webdavRead(cfg);
+    // Fremder/neuerer Stand auf dem Server → warnen statt überschreiben
+    if (remote && remote.savedAt !== webdavStamp()) {
+      emitSyncStatus('webdav', 'conflict');
+      if (!conflictWarned) {
+        conflictWarned = true;
+        useBoard.getState().showToast('⚠️ Auf dem WebDAV-Server liegt ein neuerer Stand (anderes Gerät?). In ⚙️ → Synchronisation laden oder überschreiben.');
+      }
+      return;
     }
-    return;
+    await webdavWrite(cfg); // meldet bei Erfolg selbst 'ok'
+    conflictWarned = false;
+  } catch (e) {
+    emitSyncStatus('webdav', 'error');
+    throw e; // Aufrufer behandelt (offline o. Ä.)
   }
-  await webdavWrite(cfg);
-  conflictWarned = false;
 }
 
 /** Einmal beim App-Start aufrufen: lädt Hinweise & pusht Änderungen automatisch. */

@@ -17,6 +17,15 @@ const STAMP_KEY = 'pixinotes:sync-stamp';
 export const SYNC_DIRTY_KEY = 'pixinotes:sync-dirty';
 export const WEBDAV_DIRTY_KEY = 'pixinotes:webdav-dirty';
 
+// Sync-Status für die Kopfleisten-Anzeige (M85): Der Auto-Sync arbeitete
+// bisher komplett unsichtbar — schlief er (Freigabe nach Neustart weg,
+// Konflikt, Fehler), wirkte das wie „speichert nicht". Jeder Zustandswechsel
+// wird jetzt als Event gemeldet; SyncStatus.tsx zeigt ihn dauerhaft an.
+export type SyncState = 'ok' | 'pending' | 'noperm' | 'conflict' | 'error';
+export function emitSyncStatus(source: 'ordner' | 'webdav', state: SyncState, at?: string): void {
+  window.dispatchEvent(new CustomEvent('pixinotes:sync-status', { detail: { source, state, at } }));
+}
+
 export interface SyncPayload {
   app: 'pixinotes';
   version: 2;
@@ -152,6 +161,7 @@ export async function writeSync(handle: SyncDirHandle): Promise<string> {
   // wenn währenddessen nicht weiter editiert wurde (sonst nächster Auto-Save)
   const cur = useBoard.getState();
   if (cur.boards === s.boards && cur.spaces === s.spaces) localStorage.removeItem(SYNC_DIRTY_KEY);
+  emitSyncStatus('ordner', 'ok', payload.savedAt);
   return payload.savedAt;
 }
 
@@ -172,6 +182,7 @@ export function applySync(p: SyncPayload): boolean {
     // Gegenüber einem evtl. verbundenen WebDAV-Server ist der Stand jetzt neu
     localStorage.setItem(WEBDAV_DIRTY_KEY, '1');
   } catch { return false; }
+  emitSyncStatus('ordner', 'ok', p.savedAt);
   return true;
 }
 
@@ -197,36 +208,64 @@ export async function checkSyncRemote(): Promise<void> {
   if (!handle || !(await ensurePermission(handle, false))) return;
   lastRemoteCheck = now;
   const remote = await readSync(handle);
-  if (!remote || remote.savedAt === knownStamp()) { staleHintShown = false; return; }
+  if (!remote || remote.savedAt === knownStamp()) {
+    staleHintShown = false;
+    if (remote) emitSyncStatus('ordner', 'ok', remote.savedAt); // in sync
+    return;
+  }
   if (!localStorage.getItem(SYNC_DIRTY_KEY) && applySync(remote)) {
     useBoard.getState().showToast(`☁️ Neuerer Stand aus dem Sync-Ordner übernommen (${new Date(remote.savedAt).toLocaleString('de-DE')}).`);
     staleHintShown = false;
     return;
   }
+  emitSyncStatus('ordner', 'conflict');
   if (!staleHintShown) {
     staleHintShown = true;
     useBoard.getState().showToast('Im Sync-Ordner liegt ein anderer Stand — hier gibt es aber eigene Änderungen, darum wurde nichts überschrieben. In ⚙️ → Synchronisation wählen.');
   }
 }
 
+/** Status-Chip „Freigabe nötig": Zugriff neu erteilen (braucht eine Nutzer-
+ *  Geste, deshalb nicht automatisch möglich) und den Sync sofort fortsetzen. */
+export async function regrantSyncAccess(): Promise<boolean> {
+  const handle = await getSyncHandle();
+  if (!handle || !(await ensurePermission(handle, true))) return false;
+  useBoard.getState().showToast('Zugriff erlaubt — Auto-Sync läuft wieder.');
+  await checkSyncRemote().catch(() => {});
+  if (localStorage.getItem(SYNC_DIRTY_KEY)) await autoSave().catch(() => {});
+  return true;
+}
+
 async function autoSave(): Promise<void> {
   if (getWriterRole() !== 'writer') return; // Mitlese-Fenster synct nie
   const handle = await getSyncHandle();
-  if (!handle || !(await ensurePermission(handle, false))) return;
-  const remote = await readSync(handle);
-  // Konfliktschutz: hat ein anderes Gerät seit unserem letzten Sync geschrieben?
-  // WICHTIG: auch OHNE eigenen Stempel (frisch verbundenes Gerät) gilt fremder
-  // Bestand als Konflikt — sonst überschreibt das erste lokale Edit die Daten
-  // des anderen Geräts (Audit R6-S4)
-  if (remote && remote.savedAt !== knownStamp()) {
-    if (!conflictWarned) {
-      conflictWarned = true;
-      useBoard.getState().showToast('⚠️ Der Sync-Ordner hat einen neueren Stand (anderes Gerät?). In ⚙️ → Synchronisation laden oder überschreiben.');
-    }
+  if (!handle) return;
+  if (!(await ensurePermission(handle, false))) {
+    // Freigabe weg (typisch nach Browser-/PWA-Neustart): bisher schlief der
+    // Auto-Sync hier LAUTLOS ein — jetzt zeigt der Status-Chip es dauerhaft an
+    emitSyncStatus('ordner', 'noperm');
     return;
   }
-  await writeSync(handle);
-  conflictWarned = false;
+  emitSyncStatus('ordner', 'pending');
+  try {
+    const remote = await readSync(handle);
+    // Konfliktschutz: hat ein anderes Gerät seit unserem letzten Sync geschrieben?
+    // WICHTIG: auch OHNE eigenen Stempel (frisch verbundenes Gerät) gilt fremder
+    // Bestand als Konflikt — sonst überschreibt das erste lokale Edit die Daten
+    // des anderen Geräts (Audit R6-S4)
+    if (remote && remote.savedAt !== knownStamp()) {
+      emitSyncStatus('ordner', 'conflict');
+      if (!conflictWarned) {
+        conflictWarned = true;
+        useBoard.getState().showToast('⚠️ Der Sync-Ordner hat einen neueren Stand (anderes Gerät?). In ⚙️ → Synchronisation laden oder überschreiben.');
+      }
+      return;
+    }
+    await writeSync(handle); // meldet bei Erfolg selbst 'ok'
+    conflictWarned = false;
+  } catch {
+    emitSyncStatus('ordner', 'error');
+  }
 }
 
 /** Einmal beim App-Start aufrufen: speichert Änderungen automatisch in den Sync-Ordner. */
@@ -256,15 +295,28 @@ export function initAutoSync(): void {
     if (!handle) return;
     if (!(await ensurePermission(handle, false))) {
       // Browser hat den Zugriff nach Neustart zurückgesetzt — ehrlich sagen,
-      // statt den Auto-Sync still zu deaktivieren
-      useBoard.getState().showToast('Sync-Ordner verbunden, aber der Browser braucht eine neue Freigabe — in ⚙️ → Synchronisation „Zugriff erlauben" klicken.');
+      // statt den Auto-Sync still zu deaktivieren; der Status-Chip bleibt
+      // sichtbar und erteilt die Freigabe per Klick
+      emitSyncStatus('ordner', 'noperm');
+      useBoard.getState().showToast('Sync-Ordner verbunden, aber der Browser braucht eine neue Freigabe — oben auf „Zugriff erlauben" klicken.');
       return;
     }
     await checkSyncRemote();
+    // Ausstehende Änderungen aus der letzten Sitzung (z. B. Fenster innerhalb
+    // der Speicher-Verzögerung geschlossen) jetzt nachschreiben — bisher
+    // passierte das erst bei der NÄCHSTEN Bearbeitung
+    if (localStorage.getItem(SYNC_DIRTY_KEY)) void autoSave().catch(() => {});
   })().catch(() => {});
-  // Beim Zurückkehren ins Fenster erneut prüfen: der Cloud-Client kann die
-  // Datei zwischenzeitlich von einem anderen Gerät hereingespiegelt haben
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') void checkSyncRemote().catch(() => {});
+    if (document.visibilityState === 'visible') {
+      // Beim Zurückkehren prüfen: der Cloud-Client kann die Datei inzwischen
+      // von einem anderen Gerät hereingespiegelt haben
+      void checkSyncRemote().catch(() => {});
+    } else if (localStorage.getItem(SYNC_DIRTY_KEY)) {
+      // Fenster verlassen: sofort sichern statt auf die 1,8-s-Verzögerung zu
+      // hoffen — sonst fehlt beim schnellen Schließen der letzte Stand
+      clearTimeout(timer);
+      void autoSave().catch(() => {});
+    }
   });
 }

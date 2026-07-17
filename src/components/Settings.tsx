@@ -60,6 +60,11 @@ export function Settings() {
   const [syncPerm, setSyncPerm] = useState<'granted' | 'prompt'>('granted');
   // Reiter-Gliederung: KI / Synchronisation / Daten / Export / Design
   const [tab, setTab] = useState<'ki' | 'sync' | 'kalender' | 'daten' | 'export' | 'design'>('ki');
+  // Direktsprung auf einen Reiter (z. B. „sync" vom Status-Chip in der Kopfleiste)
+  const wantTab = useBoard((s) => s.settingsSection);
+  useEffect(() => {
+    if (open && wantTab) setTab(wantTab as typeof tab);
+  }, [open, wantTab]);
   // Kalender-Konten leben in einem EIGENEN localStorage-Schlüssel (nie im
   // Board-Store) — flüchtig in den Komponenten-State gespiegelt
   const [calAcc, setCalAcc] = useState<CalAccounts>({});

@@ -116,7 +116,9 @@ interface BoardState {
   openBoard: (id: string) => void;
   searchOpen: boolean;
   setSearchOpen: (open: boolean) => void;
-  setSettingsOpen: (open: boolean) => void;
+  setSettingsOpen: (open: boolean, section?: string | null) => void;
+  /** Wunsch-Reiter beim Öffnen der Einstellungen (z. B. 'sync' vom Status-Chip) */
+  settingsSection: string | null;
   /** Aufgaben-Zentrale (✅): eigene Ansicht statt Board */
   tasksOpen: boolean;
   setTasksOpen: (open: boolean) => void;
@@ -549,7 +551,8 @@ export const useBoard = create<BoardState>()(
           get().showToast('🧹 Alles geleert — frischer Start. Die Starter-Umgebung gibt es jederzeit unter ⚙️ → Daten.');
         },
 
-        setSettingsOpen: (open) => set({ settingsOpen: open }),
+        settingsSection: null,
+        setSettingsOpen: (open, section = null) => set({ settingsOpen: open, settingsSection: section }),
         tasksOpen: false,
         setTasksOpen: (open) => set({ tasksOpen: open }),
 
