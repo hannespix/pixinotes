@@ -31,6 +31,21 @@ export default function App() {
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
   useEffect(() => { initAutoSync(); initWebdavSync(); }, []);
 
+  // Gesten-Spickzettel: statt Dauer-Pille im Header (kollidierte mit den
+  // Bedienelementen) einmal pro Sitzung kurz als Toast beim Start
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (sessionStorage.getItem('pixinotes-hint-shown')) return;
+      sessionStorage.setItem('pixinotes-hint-shown', '1');
+      useBoard.getState().showToast(
+        '💡 Doppelklick = Notiz · E-Mails & Dateien reinziehen · Strg+V für Screenshots · Karten werfen 🚀',
+        false,
+        8000,
+      );
+    }, 900);
+    return () => clearTimeout(t);
+  }, []);
+
   // Design anwenden: data-theme/-accent am <html>; „System" folgt dem Gerät live
   const ui = useBoard((s) => s.ui);
   useEffect(() => {
@@ -109,13 +124,7 @@ export default function App() {
             Pixi<span>Notes</span>
           </div>
           <TopActions />
-          {/* Board-Gesten nur anzeigen, wo sie auch GELTEN — nicht in
-              Übersicht, Aufgaben-Zentrale oder Präsentation (User-Feedback) */}
-          {view === 'board' && !presenting && !tasksOpen && (
-            <div className="hint">
-              Doppelklick = Notiz · E-Mails &amp; Dateien reinziehen · Strg+V für Screenshots · Karten werfen 🚀
-            </div>
-          )}
+
         </div>
         <Tabs />
         {view === 'overview' ? (

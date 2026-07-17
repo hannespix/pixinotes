@@ -194,7 +194,7 @@ interface BoardState {
   focusNode: (boardId: string, nodeId: string) => void;
   clearPendingFocus: () => void;
 
-  showToast: (message: string, undo?: boolean) => void;
+  showToast: (message: string, undo?: boolean, durationMs?: number) => void;
 
   /** Globale KI-Sperre: verhindert parallele KI-Aktionen aus Dock UND Auswahl-Leiste */
   aiBusy: boolean;
@@ -878,10 +878,10 @@ export const useBoard = create<BoardState>()(
 
         clearPendingFocus: () => set({ pendingFocus: null }),
 
-        showToast: (message, undo) => {
+        showToast: (message, undo, durationMs) => {
           if (toastTimer) clearTimeout(toastTimer);
           set({ toast: { message, undo } });
-          toastTimer = setTimeout(() => set({ toast: null }), undo ? 6000 : 3000);
+          toastTimer = setTimeout(() => set({ toast: null }), durationMs ?? (undo ? 6000 : 3000));
         },
       };
     },
