@@ -68,6 +68,10 @@ export function Settings() {
   const [msTenant, setMsTenant] = useState('');
   // WebDAV-Zugang (separater localStorage-Schlüssel — nie in Exporten)
   const [davCfg, setDavCfg] = useState<WebdavConfig | null>(null);
+  // WebDAV-Fehler zusätzlich dauerhaft IM Modal zeigen — der Toast liegt
+  // unterm Einstellungsfenster schnell außerhalb des Blicks (User-Report).
+  // WICHTIG: vor dem Early-Return deklarieren (Hook-Reihenfolge, React #310)
+  const [davError, setDavError] = useState('');
   const [davUrl, setDavUrl] = useState('');
   const [davUser, setDavUser] = useState('');
   const [davSecret, setDavSecret] = useState('');
@@ -141,7 +145,12 @@ export function Settings() {
     refreshCalAcc();
   };
 
-  const davConnect = () => doExport(async () => {
+  const doDav = (label: string, fn: () => Promise<unknown>) => doExport(async () => {
+    setDavError('');
+    try { await fn(); } catch (e) { setDavError(String((e as Error).message)); throw e; }
+  }, label);
+
+  const davConnect = () => doDav('dav', async () => {
     const cfg: WebdavConfig = { url: davUrl.trim(), user: davUser.trim(), secret: davSecret, auto: true };
     const state = await webdavTest(cfg);
     saveWebdav(cfg);
@@ -152,20 +161,20 @@ export function Settings() {
       await webdavWrite(cfg);
       showToast('✅ Verbunden — aktueller Stand wurde hochgeladen. Änderungen syncen ab jetzt automatisch.');
     }
-  }, 'dav');
+  });
 
-  const davPush = () => doExport(async () => {
+  const davPush = () => doDav('davpush', async () => {
     const stamp = await webdavWrite(davCfg!);
     showToast(`⬆️ Hochgeladen (${new Date(stamp).toLocaleTimeString('de-DE')}).`);
-  }, 'davpush');
+  });
 
-  const davPull = () => doExport(async () => {
+  const davPull = () => doDav('davpull', async () => {
     const p = await webdavRead(davCfg!);
     if (!p) { showToast('Auf dem Server liegt (noch) keine PixiNotes-Datei.'); return; }
     if (!window.confirm(`Stand vom ${new Date(p.savedAt).toLocaleString('de-DE')} laden? Der lokale Stand wird ersetzt (Strg+Z geht danach nicht zurück).`)) return;
     if (!applyWebdav(p)) { showToast(QUOTA_IMPORT_MSG); return; }
     showToast('⬇️ Stand vom WebDAV-Server geladen.');
-  }, 'davpull');
+  });
 
   const davDisconnect = () => {
     clearWebdav();
@@ -241,7 +250,8 @@ export function Settings() {
 
   const doExport = async (fn: () => Promise<unknown>, label: string) => {
     setBusy(label);
-    try { await fn(); } catch (e) { showToast(`Abgebrochen: ${String((e as Error).message)}`); }
+    // Fehlertexte (WebDAV/CORS & Co.) sind lang — 12 s Lesezeit statt 3 s
+    try { await fn(); } catch (e) { showToast(`Abgebrochen: ${String((e as Error).message)}`, false, 12000); }
     setBusy('');
   };
 
@@ -481,6 +491,9 @@ export function Settings() {
                 Schreibt ein anderes Gerät zwischenzeitlich, warnt PixiNotes statt zu überschreiben.
               </div>
             </>
+          )}
+          {davError && (
+            <div className="modal-error" role="alert">⚠️ {davError}</div>
           )}
         </section>
         </>

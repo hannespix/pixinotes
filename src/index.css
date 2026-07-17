@@ -432,7 +432,9 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   transform: translateX(-50%) translateY(8px);
   background: #2b2a27; color: #fff; font-size: 12.5px; padding: 8px 16px;
   border-radius: 10px; opacity: 0; transition: all 0.25s ease;
-  z-index: 60; pointer-events: none; max-width: 80vw;
+  /* Über ALLEN Overlays (Modals 80, Presenter 95): Fehlermeldungen z. B. vom
+     WebDAV-Verbinden müssen auch bei offenen Einstellungen lesbar sein */
+  z-index: 120; pointer-events: none; max-width: 80vw;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
 .toast-undo {
@@ -1737,6 +1739,14 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 
 /* ---------- Rechtliches (M75) ---------- */
 .legal-hint { font-size: 11px; color: var(--muted); }
+
+/* Dauerhafte Fehlerbox im Modal (z. B. WebDAV/CORS) — Toasts verschwinden
+   und liegen optisch weit weg vom Einstellungsfenster */
+.modal-error {
+  margin-top: 10px; padding: 9px 12px; border-radius: 10px;
+  border: 1.5px solid rgba(217, 83, 79, 0.45); background: rgba(217, 83, 79, 0.09);
+  color: var(--ink); font-size: 12px; line-height: 1.55;
+}
 
 /* Immer sichtbare Legal-Links (§5 DDG: leicht erkennbar, unmittelbar erreichbar).
    Sitzt im schmalen Streifen UNTER der Minimap; dezent, aber klar beschriftet. */
