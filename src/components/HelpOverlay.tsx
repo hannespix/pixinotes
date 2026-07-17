@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBoard } from '../store';
+import { MailLink } from './MailLink';
 
 /**
  * Die Hilfe-Seite (❓ im Dock): erklärt jede Funktion in Alltagssprache,
@@ -200,7 +201,7 @@ export function HelpOverlay() {
                 Baden-Württemberg, Deutschland
               </p>
               <p>
-                <b>Kontakt:</b> <a className="ent-link" href="mailto:info@pix-el.de">info@pix-el.de</a><br />
+                <b>Kontakt:</b> <MailLink /><br />
                 <b>Website:</b>{' '}
                 <a className="ent-link" href="https://pix-el.de" target="_blank" rel="noreferrer">pix-el.de</a><br />
                 <b>Quellcode &amp; Projekt:</b>{' '}
@@ -258,8 +259,7 @@ export function HelpOverlay() {
               <p>
                 Da die App selbst keine personenbezogenen Daten an den Betreiber übermittelt, liegen dort in der
                 Regel keine Daten über dich vor. Für die Hosting-Logs gelten die Rechte aus Art. 15–21 DSGVO
-                gegenüber GitHub. Fragen jederzeit an{' '}
-                <a className="ent-link" href="mailto:info@pix-el.de">info@pix-el.de</a>.
+                gegenüber GitHub. Fragen jederzeit an <MailLink />.
                 Alle lokalen Daten löschst du selbst: ⚙️ → Daten → „Alles leeren" oder über die Website-Daten deines Browsers.
               </p>
               <p className="legal-hint">Dieses Muster ersetzt keine Rechtsberatung.</p>
