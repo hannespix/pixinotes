@@ -99,11 +99,14 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     }
     if (!natW || !natH) return;
     const PAD = 12; // Karten-Innenabstand (6 px rundum)
-    const MAXW = 1100, MAXH = 720, MINW = 240, MINH = 150;
+    // Offene Code-Spalte (‹/›) braucht eigene Breite (320 px + 8 px Lücke) —
+    // sonst quetscht sie das Diagramm auf die halbe Fläche (M94)
+    const EXTRA = edit ? 328 : 0;
+    const MAXW = 1100, MAXH = 720, MINW = 240, MINH = 120;
     // SVG skaliert proportional zur Kartenbreite — bei Überbreite/-höhe
     // gemeinsam herunterskalieren, damit alles ohne Scrollen sichtbar bleibt
-    const scale = Math.min(1, MAXW / natW, MAXH / natH);
-    const w = Math.max(MINW, Math.round(natW * scale) + PAD);
+    const scale = Math.min(1, (MAXW - EXTRA) / natW, MAXH / natH);
+    const w = Math.max(MINW, Math.round(natW * scale) + PAD + EXTRA);
     const h = Math.max(MINH, Math.round(natH * scale) + PAD);
     // Nur bei nennenswerter Abweichung anfassen (kein Zittern, keine
     // Endlos-Writes) — und als „abgeleitet" markieren: die Größe folgt
@@ -112,7 +115,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     if (Math.abs((nodeW ?? 0) - w) < 12 && Math.abs((nodeH ?? 0) - h) < 12) return;
     runDerived(() => resizeNode(id, w, h));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [svg, data.autoFit]);
+  }, [svg, data.autoFit, edit]);
 
   // Ausgewählten Flowchart-Schritt im SVG markieren (Klasse aufs <g>)
   useEffect(() => {
@@ -278,7 +281,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
       id={id}
       selected={selected}
       minWidth={240}
-      minHeight={150}
+      minHeight={120}
       className="mermaid-card"
       onManualResize={() => { if (data.autoFit !== false) updateNodeData(id, { autoFit: false }); }}
     >

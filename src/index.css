@@ -834,8 +834,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* Vorlagen-Rückfrage inline im Popover (statt window.confirm) */
 .mm-pop button.mm-confirm { color: #a4231a; font-weight: 700; }
 .mm-pop button.mm-confirm:hover { background: rgba(164, 35, 26, 0.12); }
-/* Code-Ansicht braucht wieder eine Fläche (rahmenloser Kontext) */
-.mermaid-code { background: var(--surface); }
 .mermaid-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
 .mermaid-tools { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
 .mermaid-tools button {
@@ -844,11 +842,17 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .mermaid-tools button:hover, .mermaid-tools button.active { background: var(--accent-soft); }
 .mermaid-split { display: flex; gap: 8px; flex: 1; min-height: 0; }
+/* In der Karte: feste, schmale Code-Spalte — das Diagramm behält seine Fläche
+   (die Auto-Größe rechnet diese Breite mit ein, M94). Fläche = var(--surface),
+   damit der Code im rahmenlosen Kontext lesbar auf der Karte liegt. */
 .mermaid-code {
-  flex: 1; min-width: 0; border: 1px solid var(--border-soft); border-radius: 7px; padding: 7px;
+  flex: 0 0 min(320px, 45%); min-width: 0; border: 1px solid var(--border-soft);
+  border-radius: 7px; padding: 7px;
   font-family: ui-monospace, monospace; font-size: 11px; resize: none; outline: none;
-  background: var(--surface-3); color: var(--ink); line-height: 1.4;
+  background: var(--surface); color: var(--ink); line-height: 1.4;
 }
+/* Im Presenter (Vollbild-Folie) darf der Code-Editor weiter mitwachsen */
+.slide-mermaid-split .mermaid-code { flex: 1; }
 /* ---------- Mermaid-WYSIWYG (M91) ---------- */
 .mm-pop-wrap { position: relative; display: inline-flex; }
 .mm-pop {
@@ -871,17 +875,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .mm-dot.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .mm-dot-none { background: linear-gradient(135deg, var(--surface) 45%, var(--border-soft) 45%, var(--border-soft) 55%, var(--surface) 55%); }
-.mm-node-bar {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  background: var(--accent-soft); border-radius: 8px;
-  font-size: 11px; color: var(--ink); padding: 4px 8px; margin: 4px 0;
-}
-.mm-node-bar span { font-weight: 700; color: var(--accent-strong); }
-.mm-node-bar button {
-  border: none; background: var(--surface); border-radius: 6px; cursor: pointer;
-  font-family: inherit; font-size: 10.5px; padding: 3px 8px; color: var(--ink);
-}
-.mm-node-bar button.danger { color: #a4231a; }
 .mermaid-svg g.node, .mermaid-svg g.rough-node { cursor: pointer; }
 .mermaid-svg g.mm-selected rect,
 .mermaid-svg g.mm-selected polygon,
@@ -893,19 +886,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   position: absolute; left: 8px; bottom: 6px; pointer-events: none;
   font-size: 9.5px; color: var(--muted); opacity: 0.75;
 }
-.mermaid-ai { display: flex; gap: 6px; margin-top: 6px; }
-.mermaid-ai input {
-  flex: 1; min-width: 0; border: 1.5px solid var(--border-soft); border-radius: 8px;
-  background: var(--surface); color: var(--ink);
-  font-family: inherit; font-size: 11.5px; padding: 6px 9px;
-}
-.mermaid-ai input:focus { outline: none; border-color: var(--accent); }
-.mermaid-ai button {
-  flex: none; border: none; background: var(--accent); color: #fff;
-  border-radius: 8px; cursor: pointer; font-size: 13px; padding: 0 12px;
-}
-.mermaid-ai button:disabled { opacity: 0.5; cursor: default; }
-
 .mermaid-preview { position: relative; flex: 1; min-width: 0; overflow: auto; display: flex; align-items: center; justify-content: center; }
 /* Diagramm füllt die Kartenbreite — sonst rendert z. B. Gantt winzig in
    einer großen Karte (M90); Höhe wächst mit, der Container scrollt */
@@ -1061,7 +1041,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ai-btn { background: rgba(124, 92, 255, 0.12) !important; color: #5b3fd4 !important; font-weight: 600; }
 .ai-btn:hover:not(:disabled) { background: rgba(124, 92, 255, 0.22) !important; }
 .ai-btn:disabled { opacity: 0.6; cursor: default; }
-.note-ai { padding: 0 6px 2px; margin-top: 4px; }
 
 /* ---------- Touch: Untermenüs über dem höheren Dock (50px-Buttons) ansetzen.
    Muss NACH den Basisregeln von .draw-palette/.dock-menu stehen, sonst
@@ -1842,6 +1821,12 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 [data-theme='dark'] .task-due.urgency-overdue { color: #ff9a8c; }
 [data-theme='dark'] .task-due.urgency-soon { color: #ffcf8a; }
 [data-theme='dark'] .mermaid-error { color: #ff9a8c; }
+/* CSS-Audit M94: harte Rottöne der Mermaid-Leiste + Kalender-Fehler waren im
+   Dunkelmodus fast unlesbar (dunkelrot auf dunkler Fläche) */
+[data-theme='dark'] .mm-row > button.danger,
+[data-theme='dark'] .mm-pop button.mm-confirm,
+[data-theme='dark'] .cal-menu-err { color: #ff9a8c; }
+[data-theme='dark'] .mm-pop button.mm-confirm:hover { background: rgba(255, 154, 140, 0.15); }
 [data-theme='dark'] .modal-danger h3 { color: #ff9a8c; }
 [data-theme='dark'] .modal-buttons button.danger { color: #ff9a8c; border-color: rgba(255, 154, 140, 0.4); }
 [data-theme='dark'] .task-due-input.urgency-overdue { color: #ff9a8c; border-color: rgba(255, 154, 140, 0.45); }
