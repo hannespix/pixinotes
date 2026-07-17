@@ -177,6 +177,16 @@ export default function App() {
       <TooltipLayer />
         <Settings />
         <Presenter />
+        {/* §5 DDG: Impressum muss leicht erkennbar und unmittelbar erreichbar
+            sein — darum dauerhaft sichtbare, klar beschriftete Links (1 Klick),
+            nicht nur versteckt in Hilfe/Einstellungen */}
+        {!presenting && (
+          <div className="legal-corner">
+            <button className="link-btn" onClick={() => useBoard.getState().setHelpOpen(true, 'impressum')}>Impressum</button>
+            <span aria-hidden="true">·</span>
+            <button className="link-btn" onClick={() => useBoard.getState().setHelpOpen(true, 'datenschutz')}>Datenschutz</button>
+          </div>
+        )}
         {writerRole === 'follower' && (
           <div className="writer-banner" role="status">
             <span>

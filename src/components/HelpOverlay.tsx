@@ -27,6 +27,34 @@ export function HelpOverlay() {
   const helpSection = useBoard((s) => s.helpSection);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState<string>('start');
+  const [query, setQuery] = useState('');
+  // Treffer pro Sektion (null = keine Suche aktiv). Der Text wird aus dem
+  // gerenderten DOM gelesen — so bleibt die Suche automatisch vollständig,
+  // egal was in den Sektionen steht (kein doppelt gepflegter Suchindex).
+  const [hits, setHits] = useState<Record<string, number> | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const q = query.trim().toLowerCase();
+    const body = bodyRef.current;
+    if (!body) return;
+    if (!q) {
+      setHits(null);
+      body.classList.remove('help-filtering');
+      return;
+    }
+    const res: Record<string, number> = {};
+    for (const s of SECTIONS) {
+      const el = body.querySelector(`#help-${s.id}`);
+      const text = (el?.textContent ?? '').toLowerCase();
+      let n = 0;
+      for (let i = text.indexOf(q); i !== -1; i = text.indexOf(q, i + q.length)) n += 1;
+      if (n > 0) res[s.id] = n;
+      el?.classList.toggle('help-hit', n > 0);
+    }
+    body.classList.add('help-filtering');
+    setHits(res);
+  }, [query, open]);
 
   // Direktsprung (z. B. „Impressum" aus dem Einstellungs-Fuß)
   useEffect(() => {
@@ -40,10 +68,14 @@ export function HelpOverlay() {
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      // Esc räumt erst die Suche, erst der zweite Druck schließt die Hilfe
+      if (query) setQuery(''); else setOpen(false);
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, setOpen]);
+  }, [open, setOpen, query]);
 
   if (!open) return null;
 
@@ -57,15 +89,27 @@ export function HelpOverlay() {
       <div className="modal help-modal" role="dialog" aria-modal="true" aria-label="Hilfe" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>❓ Hilfe</h2>
+          <input
+            className="help-search"
+            type="search"
+            placeholder="Hilfe durchsuchen…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Hilfe durchsuchen"
+          />
           <button className="modal-x" onClick={() => setOpen(false)} aria-label="Schließen">✕</button>
         </div>
         <div className="help-layout">
           <nav className="help-nav">
-            {SECTIONS.map((s) => (
+            {SECTIONS.filter((s) => !hits || hits[s.id]).map((s) => (
               <button key={s.id} className={active === s.id ? 'on' : ''} onClick={() => jump(s.id)}>
                 <span>{s.icon}</span> {s.title}
+                {hits?.[s.id] ? <em className="help-count">{hits[s.id]}</em> : null}
               </button>
             ))}
+            {hits && Object.keys(hits).length === 0 && (
+              <div className="help-empty">Nichts gefunden zu „{query.trim()}" — anders formulieren?</div>
+            )}
           </nav>
           <div className="help-body" ref={bodyRef}>
 
