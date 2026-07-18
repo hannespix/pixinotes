@@ -199,6 +199,10 @@ interface BoardState {
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
   /** Kartengröße setzen (Auto-Größe der Diagramm-Karte, M92c) */
   resizeNode: (id: string, width: number, height: number) => void;
+  /** Nur die Höhe setzen — für die Auto-Größe aller Karten (M103) */
+  setNodeHeight: (id: string, height: number) => void;
+  /** Auto-Größe je Karte an/aus (M103) */
+  setAutoFit: (ids: string[], on: boolean) => void;
   setNodePosition: (id: string, x: number, y: number) => void;
   /** Mehrere Positionen in EINEM Store-Update — für den Physik-Loop (60 fps) */
   setNodePositions: (entries: Array<[string, number, number]>) => void;
@@ -1057,6 +1061,20 @@ export const useBoard = create<BoardState>()(
           patchActive((b) => ({
             nodes: b.nodes.map((n) =>
               n.id === id ? ({ ...n, width, height } as AppNode) : n,
+            ),
+          })),
+
+        setNodeHeight: (id, height) =>
+          patchActive((b) => ({
+            nodes: b.nodes.map((n) =>
+              n.id === id ? ({ ...n, height } as AppNode) : n,
+            ),
+          })),
+
+        setAutoFit: (ids, on) =>
+          patchActive((b) => ({
+            nodes: b.nodes.map((n) =>
+              ids.includes(n.id) ? ({ ...n, autoFit: on || undefined } as AppNode) : n,
             ),
           })),
 

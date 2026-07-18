@@ -5,7 +5,7 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IBookmark, ICopy, IDuplicate, IMail, ITag, ITrash, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IBookmark, ICopy, IDuplicate, IFit, IMail, ITag, ITrash, IWand, IX } from './Icons';
 
 const MAILTO_LIMIT = 1800; // konservativ: längere mailto-URLs schlucken manche Clients
 
@@ -18,6 +18,7 @@ export function SelectionToolbar() {
   const board = useBoard(selectActiveBoard);
   const addNode = useBoard((s) => s.addNode);
   const setArchived = useBoard((s) => s.setArchived);
+  const setAutoFit = useBoard((s) => s.setAutoFit);
   const removeNodes = useBoard((s) => s.removeNodes);
   const showToast = useBoard((s) => s.showToast);
   const ai = useBoard((s) => s.ai);
@@ -199,6 +200,18 @@ export function SelectionToolbar() {
           </button>
         </span>
       )}
+      {(() => {
+        const allAuto = selected.every((n) => n.autoFit);
+        return (
+          <button
+            className={allAuto ? 'on' : ''}
+            onClick={() => setAutoFit(selected.map((n) => n.id), !allAuto)}
+            title={allAuto
+              ? 'Auto-Größe ist AN: Karte wächst mit dem Inhalt — manuelles Ziehen an den Griffen schaltet sie ab'
+              : 'Auto-Größe: Karte wächst automatisch mit dem Inhalt (jederzeit per Ziehen übersteuerbar)'}
+          ><IFit size={15} /></button>
+        );
+      })()}
       {selected.every((n) => n.archived) ? (
         <button
           onClick={() => setArchived(selected.map((n) => n.id), false)}

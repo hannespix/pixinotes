@@ -139,8 +139,10 @@ export type CalendarNode = Node<CalendarData, 'calendar'>;
 export type AppNode =
   (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode)
   // Archiv (M87): Karten jedes Typs lassen sich als Ganzes „erledigt" ablegen —
-  // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface
-  & { archived?: boolean };
+  // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface.
+  // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der
+  // Nutzer manuell zieht (das schaltet ab); wieder aktivierbar per Auswahl-Leiste.
+  & { archived?: boolean; autoFit?: boolean };
 
 export const KANBAN_COLS = ['To Do', 'Doing', 'Done'] as const;
 /** Effektive Spalten eines Kanban-Boards — Default für alte Boards ohne `cols` */

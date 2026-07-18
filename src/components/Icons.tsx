@@ -64,6 +64,8 @@ export const IPalette = make(<><circle cx="13.5" cy="6.5" r=".8" fill="currentCo
 
 // Archiv (M87)
 export const IArchive = make(<><rect width="20" height="5" x="2" y="3" rx="1" /><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8" /><path d="M10 12h4" /></>);
+// Auto-Größe (M103): Rahmen mit nach außen weisenden Ecken
+export const IFit = make(<><polyline points="4 9 4 4 9 4" /><polyline points="15 4 20 4 20 9" /><polyline points="20 15 20 20 15 20" /><polyline points="9 20 4 20 4 15" /></>);
 export const IArchiveRestore = make(<><rect width="20" height="5" x="2" y="3" rx="1" /><path d="M4 8v11a2 2 0 0 0 2 2h2" /><path d="M20 8v11a2 2 0 0 1-2 2h-2" /><path d="m9 15 3-3 3 3" /><path d="M12 12v9" /></>);
 
 // Sync-Status (M85): gleiche Formensprache wie der Rest des UI-Chromes
