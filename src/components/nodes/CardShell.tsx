@@ -25,6 +25,8 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     const b = s.boards.find((x) => x.id === s.activeId);
     return b?.nodes.find((n) => n.id === id)?.autoFit ?? false;
   });
+  // Globaler Not-Aus (M107): schaltet Auto-Größe UND ⤢-Hinweise komplett ab
+  const globalAuto = useBoard((s) => s.autoSizeEnabled ?? true);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const resizingRef = useRef(false);
   // Maus/Finger irgendwo auf der Karte gedrückt? Dann fasst KEINE Automatik
@@ -88,6 +90,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   useEffect(() => {
     const body = bodyRef.current;
     if (!body) return;
+    if (!globalAuto) { setOverflowing(false); return; } // Automatik global aus: nichts beobachten
     let t: number | undefined;
     const evalNow = (force = false) => {
       // Absolute Sperre: gedrückte Maus/gehaltener Finger auf der Karte
@@ -118,7 +121,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     body.addEventListener('load', schedule, true); // nachladende Bilder
     return () => { mo.disconnect(); body.removeEventListener('load', schedule, true); window.clearTimeout(t); evalRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoFit, id]);
+  }, [autoFit, globalAuto, id]);
 
   // Wichtig: Lösch-Knopf & Handles liegen AUSSERHALB des card-body,
   // damit dessen overflow:hidden sie nicht abschneidet.
@@ -178,7 +181,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       <Handle id="body" type="source" position={Position.Left} className="pn-handle-body" isConnectableStart={false} />
       {/* Angebots-Chip (M104): Inhalt größer als die Karte → EINMAL einpassen.
           Nur ein Angebot — die manuelle Größe wird nie von selbst geändert. */}
-      {!autoFit && overflowing && (
+      {globalAuto && !autoFit && overflowing && (
         <button
           className="fit-hint nodrag"
           title="Der Inhalt ist größer als die Karte — Klick passt die Höhe einmalig an (dauerhafte Auto-Größe: ⤢ in der Auswahl-Leiste)"

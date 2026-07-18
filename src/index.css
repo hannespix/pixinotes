@@ -660,8 +660,12 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   background: var(--surface) !important;
   border: 1.5px solid var(--muted) !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
+  /* Über dem card-body: sonst verdeckt der Inhalt die innere Hälfte der
+     Greifzone — Ziehen ab der Mittellinie war wirkungslos (M107). Unter den
+     ＋-Verbindungspunkten (5) und Griff/✕/Chip (5-6). */
+  z-index: 4;
 }
-.react-flow__resize-control.line { border-color: var(--border) !important; opacity: 0.8; }
+.react-flow__resize-control.line { border-color: var(--border) !important; opacity: 0.8; z-index: 4; }
 /* Kanten wirklich GREIFBAR machen: die Standard-Linien sind nur 1 px dick —
    Größenändern über die Kanten war damit praktisch unmöglich (M105).
    Sichtbar bleibt die feine Linie (border), die Greifzone wird 10 px. */

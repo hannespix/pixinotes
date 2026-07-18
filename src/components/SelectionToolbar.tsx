@@ -19,6 +19,7 @@ export function SelectionToolbar() {
   const addNode = useBoard((s) => s.addNode);
   const setArchived = useBoard((s) => s.setArchived);
   const setAutoFit = useBoard((s) => s.setAutoFit);
+  const autoSizeEnabled = useBoard((s) => s.autoSizeEnabled ?? true);
   const removeNodes = useBoard((s) => s.removeNodes);
   const showToast = useBoard((s) => s.showToast);
   const ai = useBoard((s) => s.ai);
@@ -200,7 +201,7 @@ export function SelectionToolbar() {
           </button>
         </span>
       )}
-      {(() => {
+      {autoSizeEnabled && (() => {
         const allAuto = selected.every((n) => n.autoFit);
         return (
           <button

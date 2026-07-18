@@ -84,6 +84,8 @@ export function Settings() {
   const setClickZoom = useBoard((s) => s.setClickZoom);
   const wheelZoom = useBoard((s) => s.wheelZoom);
   const setWheelZoom = useBoard((s) => s.setWheelZoom);
+  const autoSizeEnabled = useBoard((s) => s.autoSizeEnabled ?? true);
+  const setAutoSizeEnabled = useBoard((s) => s.setAutoSizeEnabled);
   const ui = useBoard((s) => s.ui);
   const setUiTheme = useBoard((s) => s.setUiTheme);
   const setUiAccent = useBoard((s) => s.setUiAccent);
@@ -734,6 +736,14 @@ export function Settings() {
           <p className="modal-hint">
             Miro-Stil: Rad zoomt direkt (verschieben per Karten-Fläche ziehen).
             Aus = Rad scrollt, Zoomen mit Strg+Rad oder Pinch.
+          </p>
+          <label className="modal-row modal-row-check">
+            <span>Karten-Automatik (Auto-Größe &amp; ⤢-Hinweise)</span>
+            <input type="checkbox" checked={autoSizeEnabled} onChange={(e) => setAutoSizeEnabled(e.target.checked)} />
+          </label>
+          <p className="modal-hint">
+            Aus = Kartengrößen werden ausschließlich manuell über die Griffe geändert —
+            keine Auto-Größe, kein ⤢-Einpass-Hinweis, kein ⤢-Schalter in der Auswahl-Leiste.
           </p>
         </section>
         )}
