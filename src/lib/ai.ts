@@ -126,6 +126,35 @@ export async function askAi(prompt: string): Promise<string> {
   }
 }
 
+/**
+ * Zentraler Formatier-Steckbrief für alle Text-Antworten der KI (M117) —
+ * bewusst kurz gehalten (Token) und überall identisch angehängt.
+ */
+export const MD_HINT = 'Formatiere die Antwort als Markdown: "## " für Zwischenüberschriften, '
+  + '**fett** für Schlüsselbegriffe, "- " für Stichpunkte und für ALLES Abhakbare '
+  + 'Checklisten im Format "- [ ] …". Keine Codeblöcke, kompakt bleiben.';
+
+// Kopfloser BlockNote-Editor NUR zum Markdown-Parsen (wird nie gemountet)
+let mdParser: import('@blocknote/core').BlockNoteEditor | null = null;
+
+/**
+ * KI-Markdown → echte BlockNote-Blöcke (M117): Überschriften, Fett/Kursiv,
+ * Aufzählungen und "- [ ]"-Checklisten werden korrekt umgesetzt — vorher
+ * landeten "**" und "#" als roher Text in der Notiz (User-Screenshot).
+ */
+export async function mdToBlocks(title: string, md: string): Promise<unknown[]> {
+  const src = title ? `### ${title}\n\n${md}` : md;
+  try {
+    if (!mdParser) {
+      const { BlockNoteEditor } = await import('@blocknote/core');
+      mdParser = BlockNoteEditor.create();
+    }
+    const blocks = await mdParser.tryParseMarkdownToBlocks(src);
+    if (blocks.length > 0) return blocks as unknown[];
+  } catch { /* Netz: alter Zeilen-Parser */ }
+  return textToBlocks(title, md);
+}
+
 /** KI-Antwort (Zeilen/Stichpunkte) → BlockNote-Blöcke für eine Notiz-Karte */
 export function textToBlocks(title: string, text: string): unknown[] {
   const blocks: unknown[] = [{ type: 'heading', props: { level: 3 }, content: title }];

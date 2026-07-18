@@ -2,9 +2,9 @@
 // Aufgaben/Termine extrahieren, Prozesse ableiten, Briefings, Verbindungen.
 // Alle Aktionen sind NICHT destruktiv: sie legen neue Karten an bzw. ordnen
 // nur Positionen — und jede läuft über die Undo-History.
-import { askAi, textToBlocks } from './ai';
+import { askAi, MD_HINT, mdToBlocks } from './ai';
 import { nodeToText } from './serialize';
-import { makeKanban, makeMermaid, makeNote, makeShape } from './nodes';
+import { makeGantt, makeKanban, makeMermaid, makeNote, makeShape } from './nodes';
 import { mutedHistory, useBoard } from '../store';
 import { uid, type AppNode, type ShapeKind, type StickyColor } from '../types';
 
@@ -209,10 +209,10 @@ export async function aiBriefing(nodes: AppNode[], pos: { x: number; y: number }
   const items = gather(nodes);
   if (items.length === 0) throw new Error('Keine Inhalte gefunden.');
   const res = await askAi(
-    `Erstelle aus den folgenden Projekt-Karten ein knappes analytisches Briefing auf Deutsch mit genau diesen drei Abschnitten (als Stichpunkte, mit "- " beginnend): Überblick, Offene Punkte, Nächste Schritte. Maximal 12 Zeilen gesamt.\n\nKarten:\n${JSON.stringify(items)}`,
+    `Erstelle aus den folgenden Projekt-Karten ein knappes analytisches Briefing auf Deutsch mit genau diesen drei Abschnitten (als "## "-Überschriften): Überblick, Offene Punkte, Nächste Schritte. Maximal 12 Inhaltszeilen gesamt. ${MD_HINT}\n\nKarten:\n${JSON.stringify(items)}`,
   );
   const st = useBoard.getState();
-  st.addNode(makeNote(pos, { color: 'sky', blocks: textToBlocks('✨ Board-Briefing', res.trim()) }));
+  st.addNode(makeNote(pos, { color: 'sky', blocks: await mdToBlocks('✨ Board-Briefing', res.trim()) }));
   return 'Briefing als Notiz aufs Board gelegt';
 }
 
@@ -231,13 +231,14 @@ export async function aiWeekPlan(
   }));
   const res = await askAi(
     `Heute ist ${new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}. `
-    + 'Erstelle aus den folgenden offenen Aufgaben ein knappes Wochen-Briefing auf Deutsch mit genau diesen Abschnitten '
-    + '(Stichpunkte, mit "- " beginnend): Diese Woche zuerst, Fristen im Blick, Bei anderen nachhaken, Empfehlung. '
-    + 'Priorisiere nach Frist und Priorität, nenne Personen beim Namen. Maximal 16 Zeilen gesamt.\n\nAufgaben:\n'
+    + 'Erstelle aus den folgenden offenen Aufgaben ein knappes Wochen-Briefing auf Deutsch mit genau diesen '
+    + '"## "-Abschnitten: Diese Woche zuerst, Fristen im Blick, Bei anderen nachhaken, Empfehlung. '
+    + 'Alle konkret erledigbaren Aufgaben als Checklisten-Punkte "- [ ] …" (die Empfehlung als normale Stichpunkte). '
+    + `Priorisiere nach Frist und Priorität, nenne Personen beim Namen. Maximal 16 Inhaltszeilen gesamt. ${MD_HINT}\n\nAufgaben:\n`
     + JSON.stringify(items),
   );
   const st = useBoard.getState();
-  st.addNode(makeNote(pos, { color: 'sky', blocks: textToBlocks('🗓️ Wochenplan', res.trim()) }));
+  st.addNode(makeNote(pos, { color: 'sky', blocks: await mdToBlocks('🗓️ Wochenplan', res.trim()) }));
   return 'Wochenplan als Notiz aufs Board gelegt';
 }
 
@@ -274,12 +275,12 @@ export async function aiPolish(nodes: AppNode[]): Promise<string> {
   const text = nodeToText(note);
   if (!text.trim()) throw new Error('Die Notiz ist leer.');
   const answer = await askAi(
-    `Verbessere den folgenden Notiztext: korrigiere Rechtschreibung und Grammatik, straffe Formulierungen, behalte Bedeutung, Sprache (Deutsch) und Aufzählungsstruktur bei. Antworte NUR mit dem verbesserten Text.\n\n${text.slice(0, 6000)}`,
+    `Verbessere den folgenden Notiztext: korrigiere Rechtschreibung und Grammatik, straffe Formulierungen, behalte Bedeutung, Sprache (Deutsch) und Aufzählungsstruktur bei. Du darfst Markdown nutzen (## Überschriften, **fett**, "- " Punkte, "- [ ] " Checklisten). Antworte NUR mit dem verbesserten Text.\n\n${text.slice(0, 6000)}`,
   );
   const st = useBoard.getState();
   st.addNode(makeNote(
     { x: note.position.x + ((note.width as number | undefined) ?? 280) + 40, y: note.position.y },
-    { color: 'mint', blocks: textToBlocks('✨ Vorschlag', answer) },
+    { color: 'mint', blocks: await mdToBlocks('✨ Vorschlag', answer) },
   ));
   return 'Verbesserter Text liegt als Vorschlag daneben — das Original bleibt unangetastet';
 }
@@ -299,13 +300,7 @@ interface AiOp {
   target?: string;
   label?: string;
   items?: Array<{ text?: string; due?: string }>;
-}
-
-/** Freitext → Blöcke: erste Zeile wird Überschrift, Rest Stichpunkte/Absätze */
-function blocksFromText(text: string): unknown[] {
-  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
-  if (lines.length === 0) return [];
-  return textToBlocks(lines[0].replace(/^#+\s*/, ''), lines.slice(1).join('\n'));
+  rows?: Array<{ name?: string; start?: string; end?: string; who?: string }>;
 }
 
 const STICKY = new Set(['yellow', 'pink', 'mint', 'sky', 'white']);
@@ -330,15 +325,17 @@ ${JSON.stringify(items)}
 
 Antworte NUR mit JSON: {"summary":"1 kurzer deutscher Satz, was du getan hast","ops":[...]}
 Erlaubte Operationen (max. 15):
-{"op":"note","title":"...","text":"Zeilen; '- ' für Stichpunkte","color":"yellow|pink|mint|sky|white"}
+{"op":"note","title":"...","text":"Markdown: '## ' Überschriften, **fett**, '- ' Punkte, '- [ ] ' Checklisten","color":"yellow|pink|mint|sky|white"}
 {"op":"kanban","title":"...","items":[{"text":"...","due":"yyyy-mm-dd"}]}
+{"op":"gantt","title":"...","rows":[{"name":"...","start":"yyyy-mm-dd","end":"yyyy-mm-dd","who":"Name"}]}
 {"op":"mermaid","code":"flowchart TD\\n  A[Start] --> B[Ende]"}
 {"op":"shape","shape":"process|decision|terminator","text":"..."}
-{"op":"edit_note","id":"<existierende Notiz-id>","text":"KOMPLETTER neuer Inhalt; erste Zeile = Überschrift"}
+{"op":"edit_note","id":"<existierende Notiz-id>","text":"KOMPLETTER neuer Inhalt als Markdown; erste Zeile = '## Überschrift'"}
 {"op":"edit_title","id":"<id>","title":"..."} (für Kanban/Zeitplan-Titel oder Form-Text)
 {"op":"add_tickets","id":"<Kanban-id>","items":[{"text":"...","due":"yyyy-mm-dd"}]}
 {"op":"edge","source":"<id>","target":"<id>","label":"kurzes Label"}
 {"op":"delete","ids":["<id>"]} (NUR wenn der Nutzer ausdrücklich löschen will)
+Modulwahl: Prozesse/Abläufe → mermaid · Aufgabenlisten → kanban · Phasen/Zeiträume/Termine → gantt · Wissen/Text → note (Markdown voll ausnutzen, erledigbare Punkte als '- [ ] ' Checklisten).
 Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben" nutze edit_note mit dem vollständigen neuen Text; erfinde keine Fakten.`,
   );
 
@@ -347,6 +344,18 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
 
   const st = useBoard.getState();
   const known = new Map(nodes.map((n) => [n.id, n]));
+
+  // Markdown VOR dem synchronen Ausführen parsen (mdToBlocks ist async, M117)
+  const preBlocks = new Map<AiOp, unknown[]>();
+  for (const o of plan) {
+    if (o.op === 'note') {
+      const md = [o.title?.trim() ? `### ${o.title.trim()}` : '', o.text ?? ''].filter(Boolean).join('\n\n');
+      if (md) preBlocks.set(o, await mdToBlocks('', md));
+    } else if (o.op === 'edit_note' && o.text?.trim()) {
+      preBlocks.set(o, await mdToBlocks('', o.text));
+    }
+  }
+
   st.pushHistory();
 
   let done = 0;
@@ -364,10 +373,28 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
   for (const o of plan) {
     switch (o.op) {
       case 'note': {
-        const text = [o.title, o.text].filter(Boolean).join('\n');
-        if (!text) break;
+        const blocks = preBlocks.get(o);
+        if (!blocks || blocks.length === 0) break;
         const color = STICKY.has(o.color ?? '') ? (o.color as StickyColor) : undefined;
-        st.addNode(makeNote(place(180), { color, blocks: blocksFromText(text) }));
+        st.addNode(makeNote(place(180), { color, blocks: blocks as never[] }));
+        done++;
+        break;
+      }
+      case 'gantt': {
+        const iso = /^\d{4}-\d{2}-\d{2}$/;
+        const rows = (o.rows ?? [])
+          .filter((r) => r.name?.trim() && iso.test(r.start ?? '') && iso.test(r.end ?? ''))
+          .slice(0, 20)
+          .map((r) => ({
+            id: uid(), name: r.name!.trim().slice(0, 80),
+            start: r.start!, end: r.end! >= r.start! ? r.end! : r.start!,
+            who: r.who?.trim().slice(0, 40) || undefined,
+          }));
+        if (rows.length === 0) break;
+        const node = makeGantt(place(240));
+        (node.data as { title: string; rows: unknown[] }).title = (o.title ?? '📅 Zeitplan').slice(0, 60);
+        (node.data as { rows: unknown[] }).rows = rows;
+        st.addNode(node);
         done++;
         break;
       }
@@ -402,8 +429,9 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
       }
       case 'edit_note': {
         const target = known.get(o.id ?? '');
-        if (!target || target.type !== 'note' || !o.text?.trim()) break;
-        st.updateNodeData(target.id, { blocks: blocksFromText(o.text) });
+        const blocks = preBlocks.get(o);
+        if (!target || target.type !== 'note' || !blocks || blocks.length === 0) break;
+        st.updateNodeData(target.id, { blocks });
         editedNote = true;
         done++;
         break;
