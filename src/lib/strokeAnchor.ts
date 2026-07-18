@@ -11,8 +11,11 @@ import type { Stroke } from '../store';
 
 const FALLBACK_W = 260;
 const FALLBACK_H = 160;
-/** Mindestanteil der Strich-Fläche, der auf der Karte liegen muss */
-const MIN_SHARE = 0.5;
+/** Mindestanteil der Strich-Fläche auf der Karte — bewusst NIEDRIG (M129):
+ *  schon eine kleine, sichtbare Überlappung weist die Zeichnung der Karte zu;
+ *  frei bleibt nur, was gar keine Karte berührt. Die 2 % filtern lediglich
+ *  Pixel-Streifschüsse an Kartenrändern heraus. */
+const MIN_SHARE = 0.02;
 /** Geraden hätten Fläche 0 — Mindestausdehnung gibt ihnen eine faire Box */
 const MIN_EXTENT = 14;
 
@@ -41,9 +44,8 @@ const overlapArea = (a: Rect, b: Rect) =>
   Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
 
 /**
- * Karte mit der größten Schnittmenge finden — aber nur, wenn mindestens
- * die Hälfte der Strich-Fläche auf ihr liegt (sonst bleibt der Strich frei;
- * ein Pfeil, der zwei Karten nur streift, soll an keiner kleben).
+ * Karte mit der größten Schnittmenge finden — schon eine kleine sichtbare
+ * Überlappung genügt (M129); frei bleibt nur, was keine Karte berührt.
  */
 export function findAnchorNode(points: [number, number][], nodes: AppNode[]): AppNode | null {
   if (points.length === 0) return null;
@@ -87,11 +89,12 @@ const absPoints = (s: Stroke, byId: Map<string, AppNode>): [number, number][] =>
 /**
  * M128: Neuen Strich einfügen — aber GRUPPENWEISE ankern. Striche derselben
  * Zeichensitzung, die sich berühren (z. B. ein Pfeil aus Schaft + Spitze),
- * bilden eine zusammenhängende Zeichnung: Entweder liegt die GESAMTE Gruppe
- * überwiegend auf einer Karte (→ alle ankern), oder sie bleibt komplett
- * frei (→ auch schon geankerte Sitzungs-Striche werden wieder gelöst).
- * So kann eine Kartenbewegung nie eine Zeichnung zerreißen. Striche aus
- * früheren Sitzungen bleiben unangetastet.
+ * bilden eine zusammenhängende Zeichnung: Überlappt die GESAMTE Gruppe eine
+ * Karte sichtbar, ankern alle an der Karte mit der größten Schnittmenge;
+ * berührt sie keine, bleibt sie komplett frei (auch schon geankerte
+ * Sitzungs-Striche werden dann wieder gelöst). So kann eine Kartenbewegung
+ * nie eine Zeichnung zerreißen. Striche aus früheren Sitzungen bleiben
+ * unangetastet.
  */
 export function integrateStroke(
   stroke: Stroke,

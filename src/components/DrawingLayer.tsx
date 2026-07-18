@@ -88,9 +88,9 @@ export function DrawingLayer() {
   };
 
   /**
-   * Fertigen Strich übernehmen — liegt die zusammenhängende Zeichnung
-   * (sich berührende Striche dieser Sitzung) überwiegend auf einer Karte,
-   * wird sie an sie geankert (M127/M128) und wandert fortan mit ihr mit.
+   * Fertigen Strich übernehmen — überlappt die zusammenhängende Zeichnung
+   * (sich berührende Striche dieser Sitzung) eine Karte sichtbar, wird sie
+   * an sie geankert (M127–M129) und wandert fortan mit ihr mit.
    * Die Zielkarte blitzt kurz auf, damit klar ist, wohin sie gehört.
    */
   const commitStroke = (raw: Stroke) => {
