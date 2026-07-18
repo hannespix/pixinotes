@@ -8,8 +8,18 @@ import {
   useInternalNode,
   type EdgeProps,
 } from '@xyflow/react';
-import { useBoard } from '../store';
+import { selectActiveBoard, useBoard } from '../store';
 import { getFloatingEdgeParams } from '../lib/floatingEdge';
+import type { AppNode } from '../types';
+
+/** Karten-Rechteck (leicht aufgebläht) für die Hindernis-Prüfung */
+interface ORect { x1: number; y1: number; x2: number; y2: number }
+const PAD = 10;
+const rectOf = (n: AppNode): ORect => {
+  const w = n.measured?.width ?? (typeof n.width === 'number' ? n.width : 260);
+  const h = n.measured?.height ?? (typeof n.height === 'number' ? n.height : 170);
+  return { x1: n.position.x - PAD, y1: n.position.y - PAD, x2: n.position.x + w + PAD, y2: n.position.y + h + PAD };
+};
 
 /** Verbindungs-Stile für Prozessdiagramme */
 export type EdgeKind = 'arrow' | 'line' | 'dashed' | 'step';
@@ -56,8 +66,56 @@ export function LabeledEdge({
     }
   }
 
-  const [edgePath, labelX, labelY] =
-    kind === 'step'
+  // M132: Kanten-Routing gegen den „Kabelsalat" — (a) laufen mehrere Kanten
+  // zwischen denselben Karten, fächern sie mit Versatz auf; (b) schneidet der
+  // Direktweg FREMDE Karten, weicht die Kante mit einem Bogen darum aus.
+  const allNodes = useBoard((s) => selectActiveBoard(s).nodes);
+  const allEdges = useBoard((s) => selectActiveBoard(s).edges);
+  const routed = (() => {
+    if (kind === 'step') return null; // Winkel-Route bleibt bewusst rechtwinklig
+    // Parallel-Auffächerung: stabile Reihenfolge über sortierte Kanten-IDs
+    const siblings = allEdges
+      .filter((e) => (e.source === source && e.target === target) || (e.source === target && e.target === source))
+      .map((e) => e.id)
+      .sort();
+    const pShift = siblings.length > 1 ? (siblings.indexOf(id) - (siblings.length - 1) / 2) * 26 : 0;
+
+    const obstacles = allNodes
+      .filter((n) => n.id !== source && n.id !== target && !n.archived)
+      .map(rectOf);
+    const mx = (sx + tx) / 2, my = (sy + ty) / 2;
+    const len = Math.hypot(tx - sx, ty - sy) || 1;
+    const nx = -(ty - sy) / len, ny = (tx - sx) / len; // Normale zum Direktweg
+    /** Prüft die Quad-Bezier-Kurve mit Mittel-Versatz o auf Karten-Treffer */
+    const blockedAt = (o: number): boolean => {
+      const cx = mx + nx * 2 * o, cy = my + ny * 2 * o;
+      for (let i = 1; i < 16; i++) {
+        const t = i / 16;
+        const px = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * cx + t * t * tx;
+        const py = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * cy + t * t * ty;
+        if (obstacles.some((r) => px > r.x1 && px < r.x2 && py > r.y1 && py < r.y2)) return true;
+      }
+      return false;
+    };
+    let off = pShift;
+    if (blockedAt(off)) {
+      let found = false;
+      for (const m of [70, 120, 180, 240]) {
+        for (const s of [1, -1]) {
+          if (!blockedAt(pShift + s * m)) { off = pShift + s * m; found = true; break; }
+        }
+        if (found) break;
+      }
+      if (!found && pShift === 0) return null; // kein freier Bogen → Direktweg wie bisher
+    }
+    if (off === 0) return null; // Direktweg ist frei → hübsche Standard-Bezier
+    const cx = mx + nx * 2 * off, cy = my + ny * 2 * off;
+    return { path: `M ${sx},${sy} Q ${cx},${cy} ${tx},${ty}`, lx: mx + nx * off, ly: my + ny * off };
+  })();
+
+  const [edgePath, labelX, labelY] = routed
+    ? [routed.path, routed.lx, routed.ly]
+    : kind === 'step'
       ? getSmoothStepPath({ sourceX: sx, sourceY: sy, sourcePosition: sPos, targetX: tx, targetY: ty, targetPosition: tPos })
       : getBezierPath({ sourceX: sx, sourceY: sy, sourcePosition: sPos, targetX: tx, targetY: ty, targetPosition: tPos });
 
