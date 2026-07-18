@@ -3,6 +3,7 @@ import { useReactFlow, useViewport } from '@xyflow/react';
 import { selectActiveBoard, useBoard, type Stroke } from '../store';
 import { uid } from '../types';
 import { finalizeStroke, recognizeShape } from '../lib/strokeShapes';
+import { anchorStroke } from '../lib/strokeAnchor';
 
 const EMPTY: Stroke[] = [];
 const PEN = { width: 2.5, opacity: 1 };
@@ -27,6 +28,8 @@ export function DrawingLayer() {
   // WICHTIG: kein `?? []` im Selektor — das erzeugt jedes Mal ein neues Array
   // und löst mit useSyncExternalStore eine Endlosschleife aus.
   const drawings = useBoard((s) => selectActiveBoard(s).drawings) ?? EMPTY;
+  const nodes = useBoard((s) => selectActiveBoard(s).nodes);
+  const showArchived = useBoard((s) => s.showArchived);
   const addStroke = useBoard((s) => s.addStroke);
   const showToast = useBoard((s) => s.showToast);
   const eraseStrokesNear = useBoard((s) => s.eraseStrokesNear);
@@ -77,6 +80,26 @@ export function DrawingLayer() {
     if (holdTimer.current !== null) { window.clearTimeout(holdTimer.current); holdTimer.current = null; }
   };
 
+  /**
+   * Fertigen Strich übernehmen — liegt er überwiegend auf einer Karte, wird
+   * er an sie geankert (M127) und wandert fortan mit ihr mit. Die Zielkarte
+   * blitzt kurz auf, damit klar ist, wohin die Markierung gehört.
+   */
+  const commitStroke = (raw: Stroke) => {
+    const done = anchorStroke(raw, nodes);
+    addStroke(done);
+    if (done.anchor) {
+      const el = document.querySelector(`.react-flow__node[data-id="${done.anchor}"]`);
+      if (el) {
+        el.classList.remove('anchor-flash');
+        // Reflow erzwingen, damit die Animation auch bei schnellen Folge-Strichen neu startet
+        void (el as HTMLElement).offsetWidth;
+        el.classList.add('anchor-flash');
+        window.setTimeout(() => el.classList.remove('anchor-flash'), 800);
+      }
+    }
+  };
+
   /** Timer neu aufziehen: feuert nur, wenn der Stift wirklich stillsteht */
   const armHold = () => {
     clearHold();
@@ -86,7 +109,7 @@ export function DrawingLayer() {
       const snapped = recognizeShape(d.points);
       if (snapped) {
         // Form einrasten und Strich sofort abschließen — Finger/Maus kann loslassen
-        addStroke({ ...d, points: snapped });
+        commitStroke({ ...d, points: snapped });
         drawing.current = null;
         showToast('✨ Form eingerastet');
         force((n) => n + 1);
@@ -127,7 +150,7 @@ export function DrawingLayer() {
     const d = drawing.current;
     if (d && d.points.length > 1) {
       // Loslassen: entzittern + fast gerade Striche konservativ begradigen
-      addStroke({ ...d, points: finalizeStroke(d.points) });
+      commitStroke({ ...d, points: finalizeStroke(d.points) });
     }
     drawing.current = null;
     force((n) => n + 1);
@@ -137,6 +160,15 @@ export function DrawingLayer() {
     s.points.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
 
   const all = drawing.current ? [...drawings, drawing.current] : drawings;
+  // Geankerte Striche: Versatz = aktuelle Kartenposition (sie wandern so bei
+  // Drag/Physik/Aufräumen automatisch mit); Karte weg/archiviert → unsichtbar
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const placed = all.flatMap((s) => {
+    if (!s.anchor) return [{ s, dx: 0, dy: 0, dim: false }];
+    const n = nodeById.get(s.anchor);
+    if (!n || (n.archived && !showArchived)) return [];
+    return [{ s, dx: n.position.x, dy: n.position.y, dim: !!n.archived }];
+  });
 
   return (
     <>
@@ -151,16 +183,17 @@ export function DrawingLayer() {
         onPointerUp={onUp}
       >
         <g transform={`translate(${tx},${ty}) scale(${zoom})`}>
-          {all.map((s) => (
+          {placed.map(({ s, dx, dy, dim }) => (
             <path
               key={s.id}
               d={toPath(s)}
+              transform={dx || dy ? `translate(${dx},${dy})` : undefined}
               fill="none"
               stroke={s.color}
               strokeWidth={s.width}
               strokeLinecap="round"
               strokeLinejoin="round"
-              opacity={s.tool === 'marker' ? MARKER.opacity : PEN.opacity}
+              opacity={(s.tool === 'marker' ? MARKER.opacity : PEN.opacity) * (dim ? 0.35 : 1)}
               // Multiply lässt den Text unter dem Marker durchscheinen — wie beim echten Leuchtstift
               style={s.tool === 'marker' ? { mixBlendMode: 'multiply' } : undefined}
             />

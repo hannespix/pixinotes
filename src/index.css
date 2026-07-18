@@ -1692,6 +1692,17 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   display: inline-flex; align-items: center; justify-content: center; padding: 0 3px;
 }
 .sel-toolbar .sel-ai-wrap > button { position: relative; }
+/* M127: Zähler-Badge (z. B. Anzahl geankerter Markierungen) an Toolbar-Buttons */
+.sel-badge {
+  font-size: 9px; font-weight: 700; color: var(--accent);
+  margin-left: 2px; vertical-align: top;
+}
+/* M127: Zielkarte blitzt kurz auf, wenn eine Markierung an ihr angeankert wird */
+@keyframes anchor-flash {
+  0% { box-shadow: 0 0 0 3px var(--accent); }
+  100% { box-shadow: 0 0 0 14px rgba(0, 0, 0, 0); }
+}
+.react-flow__node.anchor-flash { animation: anchor-flash 0.7s ease-out; border-radius: 14px; }
 
 
 .dock-menu-template { position: relative; padding-right: 30px !important; }

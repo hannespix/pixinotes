@@ -5,7 +5,7 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IBookmark, ICopy, IDuplicate, IFit, IMail, ITag, ITrash, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IBookmark, ICopy, IDuplicate, IFit, IMail, IPen, ITag, ITrash, IWand, IX } from './Icons';
 
 const MAILTO_LIMIT = 1800; // konservativ: längere mailto-URLs schlucken manche Clients
 
@@ -20,6 +20,7 @@ export function SelectionToolbar() {
   const setArchived = useBoard((s) => s.setArchived);
   const setAutoFit = useBoard((s) => s.setAutoFit);
   const removeNodes = useBoard((s) => s.removeNodes);
+  const detachStrokes = useBoard((s) => s.detachStrokes);
   const showToast = useBoard((s) => s.showToast);
   const ai = useBoard((s) => s.ai);
   const updateNodeData = useBoard((s) => s.updateNodeData);
@@ -33,6 +34,10 @@ export function SelectionToolbar() {
   const [cmd, setCmd] = useState('');
 
   const selected = board.nodes.filter((n) => n.selected);
+  // Geankerte Markierungen (M127) der ausgewählten Karten — bei Bedarf lösbar
+  const anchoredCount = (board.drawings ?? []).filter(
+    (s) => s.anchor && selected.some((n) => n.id === s.anchor),
+  ).length;
   if (selected.length === 0) return null;
 
   /** KI-Aktion nur auf die ausgewählten Karten */
@@ -213,6 +218,12 @@ export function SelectionToolbar() {
           ><IFit size={15} /></button>
         );
       })()}
+      {anchoredCount > 0 && (
+        <button
+          onClick={() => detachStrokes(selected.map((n) => n.id))}
+          title={`${anchoredCount} Markierung${anchoredCount > 1 ? 'en' : ''} kleben an dieser Karte und wandern mit ihr mit — Klick löst sie und lässt sie frei auf dem Board liegen`}
+        ><IPen size={15} /><span className="sel-badge">{anchoredCount}</span></button>
+      )}
       {selected.every((n) => n.archived) ? (
         <button
           onClick={() => setArchived(selected.map((n) => n.id), false)}

@@ -12,6 +12,7 @@ import {
 } from '@xyflow/react';
 import { buildStarter } from './lib/starter';
 import { uid, type AppNode } from './types';
+import { anchorStroke } from './lib/strokeAnchor';
 
 /** Ein Freihand-Strich (Punkte in Flow-Koordinaten) */
 export interface Stroke {
@@ -20,6 +21,9 @@ export interface Stroke {
   color: string;
   width: number;
   points: [number, number][];
+  /** M127: an diese Karte geankert — die Punkte sind dann RELATIV zur
+   *  Karten-Ecke und der Strich wandert bei jeder Kartenbewegung mit */
+  anchor?: string;
 }
 
 /** Ebene 3: Ein Board = eine Leinwand voller Karten. */
@@ -89,6 +93,8 @@ interface DeletedSnapshot {
   boardId: string;
   nodes: AppNode[];
   edges: Edge[];
+  /** An gelöschte Karten geankerte Striche — kommen beim Wiederherstellen mit */
+  drawings?: Stroke[];
 }
 
 interface BoardState {
@@ -122,6 +128,8 @@ interface BoardState {
   updateAi: (patch: Partial<AiSettings>) => void;
   addStroke: (stroke: Stroke) => void;
   eraseStrokesNear: (x: number, y: number, radius: number) => void;
+  /** Geankerte Striche der Karten wieder freistellen (Punkte werden absolut) */
+  detachStrokes: (nodeIds: string[]) => void;
   /** Radier-Geste beginnt: nächster tatsächlicher Lösch-Treffer macht EINEN History-Eintrag */
   beginEraseGesture: () => void;
 
@@ -643,17 +651,49 @@ export const useBoard = create<BoardState>()(
 
         eraseStrokesNear: (x, y, radius) => {
           const board = get().boards.find((b) => b.id === get().activeId);
-          const hit = (board?.drawings ?? []).some(
-            (s) => s.points.some((p) => Math.hypot(p[0] - x, p[1] - y) < radius),
-          );
-          if (!hit) return;
+          if (!board) return;
+          // Geankerte Striche liegen relativ zur Karte — für den Treffer-Test
+          // ihren Versatz auflösen; unsichtbare (Karte archiviert/weg) schonen
+          const byId = new Map(board.nodes.map((n) => [n.id, n]));
+          const showArchived = get().showArchived;
+          const offsetOf = (s: Stroke): [number, number] | null => {
+            if (!s.anchor) return [0, 0];
+            const n = byId.get(s.anchor);
+            if (!n || (n.archived && !showArchived)) return null;
+            return [n.position.x, n.position.y];
+          };
+          const near = (s: Stroke) => {
+            const o = offsetOf(s);
+            return !!o && s.points.some((p) => Math.hypot(p[0] + o[0] - x, p[1] + o[1] - y) < radius);
+          };
+          if (!(board.drawings ?? []).some(near)) return;
           // pro Radier-Geste genau EIN History-Eintrag (beim ersten Treffer)
           if (eraseSnapPending) { get().pushHistory(); eraseSnapPending = false; }
+          patchActive((b) => ({ drawings: (b.drawings ?? []).filter((s) => !near(s)) }));
+        },
+
+        detachStrokes: (nodeIds) => {
+          const board = get().boards.find((b) => b.id === get().activeId);
+          if (!board) return;
+          const idSet = new Set(nodeIds);
+          const affected = (board.drawings ?? []).filter((s) => s.anchor && idSet.has(s.anchor));
+          if (affected.length === 0) return;
+          const byId = new Map(board.nodes.map((n) => [n.id, n]));
+          get().pushHistory();
           patchActive((b) => ({
-            drawings: (b.drawings ?? []).filter(
-              (s) => !s.points.some((p) => Math.hypot(p[0] - x, p[1] - y) < radius),
-            ),
+            drawings: (b.drawings ?? []).map((s) => {
+              if (!s.anchor || !idSet.has(s.anchor)) return s;
+              const n = byId.get(s.anchor);
+              return {
+                ...s,
+                anchor: undefined,
+                points: n ? s.points.map(([px, py]) => [px + n.position.x, py + n.position.y] as [number, number]) : s.points,
+              };
+            }),
           }));
+          get().showToast(affected.length === 1
+            ? '✍ Markierung von der Karte gelöst — sie bleibt frei auf dem Board.'
+            : `✍ ${affected.length} Markierungen von der Karte gelöst — sie bleiben frei auf dem Board.`);
         },
 
         // ---------- Undo/Redo (Board-Struktur) ----------
@@ -984,12 +1024,15 @@ export const useBoard = create<BoardState>()(
           const removedNodes = board.nodes.filter((n) => idSet.has(n.id));
           const removedEdges = board.edges.filter((e) => idSet.has(e.source) || idSet.has(e.target));
           if (removedNodes.length === 0) return;
+          // Geankerte Markierungen gehören zur Karte — sie gehen (undo-fähig) mit
+          const removedDrawings = (board.drawings ?? []).filter((s) => s.anchor && idSet.has(s.anchor));
           get().pushHistory();
           patchActive((b) => ({
             nodes: b.nodes.filter((n) => !idSet.has(n.id)),
             edges: b.edges.filter((e) => !idSet.has(e.source) && !idSet.has(e.target)),
+            drawings: (b.drawings ?? []).filter((s) => !s.anchor || !idSet.has(s.anchor)),
           }));
-          set({ lastDeleted: { boardId: board.id, nodes: removedNodes, edges: removedEdges } });
+          set({ lastDeleted: { boardId: board.id, nodes: removedNodes, edges: removedEdges, drawings: removedDrawings } });
           get().showToast(
             removedNodes.length === 1 ? 'Karte gelöscht' : `${removedNodes.length} Karten gelöscht`,
             true,
@@ -1028,6 +1071,7 @@ export const useBoard = create<BoardState>()(
                     ...b,
                     nodes: [...b.nodes, ...snap.nodes.map((n) => ({ ...n, selected: false }) as AppNode)],
                     edges: [...b.edges, ...snap.edges],
+                    drawings: snap.drawings?.length ? [...(b.drawings ?? []), ...snap.drawings] : b.drawings,
                   }
                 : b,
             ),
@@ -1107,7 +1151,7 @@ export const useBoard = create<BoardState>()(
     },
     {
       name: 'pixinotes-board',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => debouncedSafeStorage),
       partialize: (s) => ({
         boards: s.boards,
@@ -1125,12 +1169,20 @@ export const useBoard = create<BoardState>()(
       }),
       migrate: (persisted: unknown, version: number) => {
         const p = persisted as Record<string, unknown>;
+        // v3 (M127): bestehende freie Striche EINMALIG nach derselben Regel wie
+        // beim Zeichnen ankern (größte Schnittmenge ≥ 50 % der Strich-Fläche)
+        const anchorLegacyStrokes = <T,>(out: T): T => {
+          if (version >= 3 || !out || !Array.isArray((out as Record<string, unknown>).boards)) return out;
+          const boards = (out as unknown as { boards: BoardDoc[] }).boards.map((b) =>
+            b.drawings?.length ? { ...b, drawings: b.drawings.map((s) => anchorStroke(s, b.nodes ?? [])) } : b);
+          return { ...out, boards };
+        };
         // v0: {nodes, edges} — Einzelboard
         if (version === 0 && p && 'nodes' in p) {
           const boards = [
             { id: 'main', name: '🏠 Mein Schreibtisch', nodes: p.nodes as Node[], edges: p.edges as Edge[] },
           ];
-          return { boards, spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' };
+          return anchorLegacyStrokes({ boards, spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' });
         }
         // v1: {boards, activeId} — flache Boards ohne Hierarchie
         if (version === 1 && p && 'boards' in p) {
@@ -1138,12 +1190,12 @@ export const useBoard = create<BoardState>()(
           if (boards.length === 0) {
             return { boards: [{ id: 'main', name: '🏠 Mein Schreibtisch', nodes: [], edges: [] }], spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' };
           }
-          return {
+          return anchorLegacyStrokes({
             boards,
             spaces: defaultHierarchy(boards.map((b) => b.id)),
             activeId: (p.activeId as string) ?? boards[0]?.id,
             view: 'board',
-          };
+          });
         }
         // v2: defensiv validieren (leeres boards-Array oder tote activeId reparieren)
         if (p && 'boards' in p) {
@@ -1152,10 +1204,10 @@ export const useBoard = create<BoardState>()(
             return { boards: [{ id: 'main', name: '🏠 Mein Schreibtisch', nodes: [], edges: [] }], spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' };
           }
           if (!boards.some((b) => b.id === (p.activeId as string))) {
-            return { ...p, activeId: boards[0].id };
+            return anchorLegacyStrokes({ ...p, activeId: boards[0].id });
           }
         }
-        return p;
+        return anchorLegacyStrokes(p);
       },
     },
   ),

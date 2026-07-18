@@ -216,6 +216,7 @@ export function HelpOverlay() {
               <ul>
                 <li>✎ im Dock: <b>Stift</b>, <b>Neon-Textmarker</b>, <b>Radierer</b> — Esc zurück zur Auswahl.</li>
                 <li><b>Formerkennung:</b> nach dem Zeichnen kurz gedrückt halten — wackelige Linien werden gerade, Kreise rund, Rechtecke eckig.</li>
+                <li><b>Markierungen kleben an Karten:</b> Ein Strich, der überwiegend auf einer Karte liegt, wird beim Absetzen an sie geankert (die Karte blitzt kurz auf) und wandert beim Verschieben, Aufräumen und Archivieren mit; beim Löschen der Karte verschwindet er mit (Strg+Z holt beides zurück). Striche daneben oder quer über mehrere Karten bleiben frei. Lösen: Karte auswählen → ✎-Zähler in der Auswahl-Leiste.</li>
                 <li>Striche werden automatisch geglättet; Radieren wirkt pro Geste als ein Undo-Schritt.</li>
               </ul>
             </section>
