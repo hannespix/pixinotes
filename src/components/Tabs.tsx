@@ -3,7 +3,7 @@ import { useOutsideClose } from '../lib/useOutsideClose';
 import { selectActiveBoard, useBoard } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
 import { InlineName } from './InlineName';
-import { IChevronR, IHistory, IHome, IPalette, IPlus, IShare, IX } from './Icons';
+import { IChevronR, IHome, IPlus, IShare, IX } from './Icons';
 
 /**
  * Kopfleiste mit dreistufiger Gliederung: Die Tab-Reihe zeigt NUR die Boards
@@ -23,24 +23,10 @@ export function Tabs() {
   const removeBoard = useBoard((s) => s.removeBoard);
   const showToast = useBoard((s) => s.showToast);
   const activeBoard = useBoard(selectActiveBoard);
-  // Map selektieren und erst außerhalb indizieren — `?? []` im Selector
-  // würde bei jedem Snapshot ein neues Array liefern (Endlos-Render, React #185)
-  const versionsMap = useBoard((s) => s.versions);
-  const versions = versionsMap[activeId] ?? [];
-  const saveVersion = useBoard((s) => s.saveVersion);
-  const restoreVersion = useBoard((s) => s.restoreVersion);
-  const deleteVersion = useBoard((s) => s.deleteVersion);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
-  const [bgOpen, setBgOpen] = useState(false);
-  const setBoardBg = useBoard((s) => s.setBoardBg);
-  // Klick/Tipp in den Hintergrund schließt Navigator & Verlauf (User-Wunsch)
+  // Klick/Tipp in den Hintergrund schließt den Navigator (User-Wunsch)
   const navRef = useRef<HTMLElement | null>(null);
-  const historyRef = useRef<HTMLElement | null>(null);
-  const bgRef = useRef<HTMLElement | null>(null);
   useOutsideClose(navOpen, navRef, () => setNavOpen(false));
-  useOutsideClose(historyOpen, historyRef, () => setHistoryOpen(false));
-  useOutsideClose(bgOpen, bgRef, () => setBgOpen(false));
 
   const byId = useMemo(() => new Map(boards.map((b) => [b.id, b])), [boards]);
 
@@ -113,7 +99,7 @@ export function Tabs() {
         <button
           className={`tab-nav ${navOpen ? 'active' : ''}`}
           title="Navigator: alle Bereiche, Projekte & Boards"
-          onClick={() => { setNavOpen((o) => !o); setHistoryOpen(false); }}
+          onClick={() => setNavOpen((o) => !o)}
         >
           <span className="tab-nav-space">{context?.space.name ?? '—'}</span>
           <IChevronR size={11} />
@@ -192,35 +178,6 @@ export function Tabs() {
           </div>
         ))}
       </div>
-      <span className="tab-history-wrap" ref={bgRef}>
-        <button
-          className={`tab-share ${bgOpen ? 'active' : ''}`}
-          title="Hintergrund-Tönung des Boards (Nextcloud-Whiteboard-Stil)"
-          aria-label="Board-Hintergrund"
-          onClick={() => setBgOpen((o) => !o)}
-        >
-          <IPalette size={13} />
-        </button>
-        {bgOpen && (
-          <div className="tab-bg-menu">
-            <div className="tab-history-title">Hintergrund „{activeBoard.name}"</div>
-            <div className="tab-bg-swatches">
-              {([
-                [undefined, 'Standard'], ['grau', 'Grau'], ['blau', 'Blau'], ['gelb', 'Gelb'],
-                ['gruen', 'Grün'], ['rosa', 'Rosa'], ['flieder', 'Flieder'],
-              ] as Array<[string | undefined, string]>).map(([key, label]) => (
-                <button
-                  key={label}
-                  className={`tab-bg-swatch bg-${key ?? 'none'} ${activeBoard.bg === key ? 'on' : ''}`}
-                  title={label}
-                  aria-label={`Hintergrund ${label}`}
-                  onClick={() => { setBoardBg(activeBoard.id, key); setBgOpen(false); }}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </span>
       <button
         className="tab-share"
         title="Aktives Board teilen: Link mit komplettem Inhalt kopieren (serverlos)"
@@ -229,45 +186,6 @@ export function Tabs() {
       >
         <IShare size={13} />
       </button>
-      <span className="tab-history-wrap" ref={historyRef}>
-        <button
-          className={`tab-share ${historyOpen ? 'active' : ''}`}
-          title="Board-Verlauf: Versionen sichern & wiederherstellen"
-          aria-label="Board-Verlauf"
-          onClick={() => setHistoryOpen((o) => !o)}
-        >
-          <IHistory size={13} />
-        </button>
-        {historyOpen && (
-          <div className="tab-history">
-            <div className="tab-history-title">Verlauf „{activeBoard.name}"</div>
-            <button
-              className="tab-history-save"
-              onClick={() => saveVersion(activeBoard.id)}
-            >
-              ＋ Version jetzt sichern
-            </button>
-            {versions.length === 0 && (
-              <div className="tab-history-empty">Noch keine Version — sichere einen Stand, bevor du groß umbaust.</div>
-            )}
-            {versions.map((v) => (
-              <div key={v.ts} className="tab-history-row">
-                <span>{new Date(v.ts).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                <em>{v.nodes.length} Karten</em>
-                <button
-                  title="Diesen Stand wiederherstellen (Strg+Z macht es rückgängig)"
-                  onClick={() => { restoreVersion(activeBoard.id, v.ts); setHistoryOpen(false); }}
-                >
-                  Wiederherstellen
-                </button>
-                <button className="tab-history-x" title="Version löschen" onClick={() => deleteVersion(activeBoard.id, v.ts)}>
-                  <IX size={10} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </span>
       <button
         className="tab-add"
         title={`Neues Board in „${context?.project.name ?? 'Allgemein'}"`}

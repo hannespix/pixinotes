@@ -170,7 +170,7 @@ export function HelpOverlay() {
                 <li>Überlappende Karten: Die <b>zuletzt angefasste Karte legt sich automatisch nach vorn</b> und bleibt dort — bis eine andere angeklickt wird (praktisch mit 🧲 Physik AUS).</li>
                 <li><b>Auto-Größe:</b> Karten wachsen automatisch mit ihrem Inhalt (standardmäßig aktiv; gedrosselt, offene Menüs bleiben ungestört, nie schrumpfend). <b>Manuelles Ziehen gewinnt immer:</b> es schaltet die Automatik für diese Karte ab, deine Größe wird nie von selbst geändert. Läuft der Inhalt später über, erscheint nur ein dezenter ⤢-Chip an der Karte als <b>Angebot</b> — ein Klick passt die Höhe einmalig an. Dauerhaft wieder einschalten: Karte auswählen → ⤢ in der Auswahl-Leiste.</li>
                 <li><b>Archivieren:</b> Karte(n) auswählen → 🗃-Symbol in der Auswahl-Leiste — die Karte gilt als erledigt, verschwindet vom Board und aus Aufgaben/Erinnerungen (eingesammelte Tickets werden als erledigt abgeglichen). Das Archiv-Symbol im Dock blendet Archiviertes gedimmt ein; dort auswählen → Zurückholen. Die Suche findet Archiviertes weiterhin.</li>
-                <li><b>Board-Optionen:</b> Die 🎨-Palette neben der Tab-Leiste gibt jedem Board eine eigene <b>Hintergrund-Tönung</b>. Im 🧹-Menü schaltet <b>„Gitter &amp; Raster-Fang"</b> ein Linien-Gitter ein, an dem Karten beim Verschieben einrasten.</li>
+                <li><b>Board-Optionen:</b> Alles im 🧹-Menü des Docks — dort gibt die Farb-Reihe jedem Board eine eigene <b>Hintergrund-Tönung</b>, und <b>„Gitter &amp; Raster-Fang"</b> schaltet ein Linien-Gitter ein, an dem Karten beim Verschieben einrasten.</li>
                 <li><b>Strg+K</b> durchsucht alles — auch Ticket-Personen, Eigenschaften und #Tags.</li>
                 <li><b>Strg+Z / Strg+Y</b>: Struktur-Änderungen rückgängig/wiederholen. Der 🧹-Button räumt das Board automatisch auf.</li>
                 <li>Unter ⚙️ → Daten wartet die <b>Starter-Umgebung „Verwaltung"</b> — 14 Beispiel-Boards, die alles zeigen.</li>
@@ -247,7 +247,6 @@ export function HelpOverlay() {
                 <li><b>↩ Backlinks:</b> das Panel unten rechts zeigt, wer auf das aktuelle Board verweist.</li>
                 <li><b>🏷 Eigenschaften:</b> Karte auswählen → 🏷 → schlüssel = wert (z. B. status = wartet) — durchsuchbar und im Export enthalten.</li>
                 <li><b>🔖 Vorlagen:</b> jede Karte als Vorlage sichern, einfügen über ➕ → Vorlagen.</li>
-                <li><b>🕘 Board-Verlauf:</b> Uhr-Symbol in der Kopfleiste — bis zu 3 Versionen pro Board sichern und wiederherstellen.</li>
               </ul>
             </section>
 

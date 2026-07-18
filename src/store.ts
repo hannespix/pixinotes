@@ -49,15 +49,6 @@ interface HistoryEntry {
 
 const HISTORY_LIMIT = 50;
 
-/** Gesicherter Board-Stand (Trilium-Revisionen light — manuell, max. 3 pro Board) */
-export interface BoardVersion {
-  ts: string;
-  nodes: AppNode[];
-  edges: Edge[];
-  drawings?: Stroke[];
-}
-const VERSION_LIMIT = 3;
-
 /** Wiederverwendbare Karten-Vorlage */
 export interface CardTemplate {
   id: string;
@@ -145,10 +136,6 @@ interface BoardState {
   importSync: (boards: BoardDoc[], spaces: Space[], activeId: string) => void;
 
   // Trilium-Paket: Board-Verlauf (Revisionen) + Karten-Vorlagen
-  versions: Record<string, BoardVersion[]>;
-  saveVersion: (boardId: string) => void;
-  restoreVersion: (boardId: string, ts: string) => void;
-  deleteVersion: (boardId: string, ts: string) => void;
   templates: CardTemplate[];
   saveTemplate: (node: AppNode, name: string) => void;
   removeTemplate: (id: string) => void;
@@ -600,7 +587,6 @@ export const useBoard = create<BoardState>()(
             future: [],
             lastDeleted: null,
             pendingFocus: null,
-            versions: {},
             templates: [],
             importEpoch: get().importEpoch + 1,
           });
@@ -707,47 +693,7 @@ export const useBoard = create<BoardState>()(
           });
         },
 
-        // ---------- Trilium-Paket: Verlauf & Vorlagen ----------
-        versions: {},
-
-        saveVersion: (boardId) => {
-          const board = get().boards.find((b) => b.id === boardId);
-          if (!board) return;
-          const cur = get().versions[boardId] ?? [];
-          set({
-            versions: {
-              ...get().versions,
-              [boardId]: [
-                { ts: new Date().toISOString(), nodes: board.nodes, edges: board.edges, drawings: board.drawings },
-                ...cur,
-              ].slice(0, VERSION_LIMIT),
-            },
-          });
-          get().showToast(`Version gesichert (${Math.min(cur.length + 1, VERSION_LIMIT)}/${VERSION_LIMIT}) — Wiederherstellen über den Verlauf.`);
-        },
-
-        restoreVersion: (boardId, ts) => {
-          const v = (get().versions[boardId] ?? []).find((x) => x.ts === ts);
-          if (!v) return;
-          get().pushHistory();
-          set({
-            boards: get().boards.map((b) =>
-              b.id === boardId ? { ...b, nodes: v.nodes, edges: v.edges, drawings: v.drawings } : b,
-            ),
-            // Editor-Remount erzwingen (BlockNote liest nur beim Mount)
-            importEpoch: get().importEpoch + 1,
-          });
-          get().showToast('Version wiederhergestellt — Strg+Z bringt den vorherigen Stand zurück.');
-        },
-
-        deleteVersion: (boardId, ts) =>
-          set({
-            versions: {
-              ...get().versions,
-              [boardId]: (get().versions[boardId] ?? []).filter((v) => v.ts !== ts),
-            },
-          }),
-
+        // ---------- Trilium-Paket: Vorlagen ----------
         templates: [],
 
         saveTemplate: (node, name) => {
@@ -930,15 +876,10 @@ export const useBoard = create<BoardState>()(
             return;
           }
           const rest = boards.filter((b) => b.id !== id);
-          // Verwaiste Versionen mit entsorgen — sonst wächst der persistierte
-          // State unbegrenzt (localStorage-Quota, Audit R6-S8)
-          const versions = { ...get().versions };
-          delete versions[id];
           set({
             boards: rest,
             spaces: stripBoardFromHierarchy(get().spaces, id),
             activeId: get().activeId === id ? rest[0].id : get().activeId,
-            versions,
           });
         },
 
@@ -1174,7 +1115,6 @@ export const useBoard = create<BoardState>()(
         activeId: s.activeId,
         view: s.view,
         ai: s.ai,
-        versions: s.versions,
         templates: s.templates,
         ui: s.ui,
         physicsEnabled: s.physicsEnabled,

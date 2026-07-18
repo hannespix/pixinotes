@@ -477,12 +477,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 [data-theme='dark'] .board-bg-rosa .react-flow { background: #2b2124; }
 [data-theme='dark'] .board-bg-flieder .react-flow { background: #262130; }
 
-.tab-bg-menu {
-  position: absolute; top: calc(100% + 8px); right: 0; z-index: 60;
-  background: var(--surface); border-radius: 12px; padding: 10px 12px;
-  box-shadow: 0 10px 34px rgba(40, 30, 10, 0.22); min-width: 200px;
-}
-.tab-bg-swatches { display: flex; gap: 7px; margin-top: 8px; }
+/* Hintergrund-Swatches — seit M126 im 🧹-Board-Optionen-Menü des Docks */
+.tab-bg-swatches { display: flex; gap: 7px; padding: 2px 4px 4px; }
 .tab-bg-swatch {
   width: 26px; height: 26px; border-radius: 8px; cursor: pointer;
   border: 1.5px solid var(--border-soft);
@@ -1697,31 +1693,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .sel-toolbar .sel-ai-wrap > button { position: relative; }
 
-.tab-history-wrap { position: relative; display: inline-flex; }
-.tab-history {
-  position: absolute; top: calc(100% + 8px); right: 0; background: var(--surface); z-index: 60;
-  border-radius: 12px; box-shadow: 0 8px 32px rgba(50,40,20,.25); padding: 8px;
-  display: flex; flex-direction: column; gap: 5px; min-width: 270px;
-}
-.tab-history-title { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 2px 4px; }
-.tab-history-save {
-  border: 1px dashed rgba(0,0,0,.2); background: var(--surface-3); border-radius: 8px; cursor: pointer;
-  font-family: inherit; font-size: 12px; padding: 7px 9px; color: var(--ink); text-align: left;
-}
-.tab-history-save:hover { border-color: var(--accent); color: var(--accent); }
-.tab-history-empty { font-size: 11px; color: var(--muted); padding: 3px 5px 5px; line-height: 1.45; max-width: 250px; }
-.tab-history-row {
-  display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 5px 6px;
-  background: var(--surface-3); border-radius: 8px;
-}
-.tab-history-row em { font-style: normal; color: var(--muted); font-size: 10.5px; flex: 1; }
-.tab-history-row > button {
-  border: none; background: var(--surface); border-radius: 6px; cursor: pointer; font-family: inherit;
-  font-size: 11px; padding: 4px 8px; color: var(--accent); box-shadow: 0 1px 3px rgba(50,40,20,.1);
-}
-.tab-history-row > button:hover { background: var(--accent-soft); }
-.tab-history-row > button.tab-history-x { color: var(--muted); box-shadow: none; background: none; padding: 3px; display: inline-flex; }
-.tab-history-row > button.tab-history-x:hover { color: #c0392b; background: rgba(192,57,43,.1); }
 
 .dock-menu-template { position: relative; padding-right: 30px !important; }
 .dock-menu-template-x {
@@ -2138,8 +2109,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   .task-text { flex: 1 1 calc(100% - 40px); }
   .task-due-input { margin-left: 27px; }
   .task-board { margin-left: auto; }
-  /* Verlaufs-Panel: nie breiter als der Viewport */
-  .tab-history { min-width: 0; width: min(300px, calc(100vw - 24px)); }
   /* Netz-Ansicht: Umschalter + Filter passen nicht nebeneinander → stapeln */
   .ov-graph-toggles { top: 158px; max-width: calc(100vw - 24px); }
   .ov-graph { padding-top: 205px; }
@@ -2182,7 +2151,6 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 [data-theme='dark'] .modal-buttons button.danger { color: #ff9a8c; border-color: rgba(255, 154, 140, 0.4); }
 [data-theme='dark'] .task-due-input.urgency-overdue { color: #ff9a8c; border-color: rgba(255, 154, 140, 0.45); }
 [data-theme='dark'] .sel-attr-row button:hover,
-[data-theme='dark'] .tab-history-row > button.tab-history-x:hover,
 [data-theme='dark'] .dock-menu-template-x:hover { color: #ff9a8c; }
 [data-theme='dark'] .sel-toolbar button.danger { color: #ff9a8c; }
 

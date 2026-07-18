@@ -47,6 +47,10 @@ export function Dock() {
   const gridSnap = useBoard((s) => s.gridSnap);
   const setGridSnap = useBoard((s) => s.setGridSnap);
   const archivedCount = useBoard((s) => selectActiveBoard(s).nodes.filter((n) => n.archived).length);
+  // Hintergrund-Tönung des aktiven Boards — seit M126 hier statt in der Tab-Leiste
+  const setBoardBg = useBoard((s) => s.setBoardBg);
+  const activeBoardId = useBoard((s) => s.activeId);
+  const activeBoardBg = useBoard((s) => selectActiveBoard(s).bg);
 
   const arrange = (mode: ArrangeMode) => {
     setArrangeMenu(false);
@@ -316,6 +320,21 @@ export function Dock() {
             >
               ⊞ Gitter &amp; Raster-Fang {gridSnap ? 'AUS' : 'AN'}
             </button>
+            <div className="dock-menu-label">Board-Hintergrund</div>
+            <div className="tab-bg-swatches">
+              {([
+                [undefined, 'Standard'], ['grau', 'Grau'], ['blau', 'Blau'], ['gelb', 'Gelb'],
+                ['gruen', 'Grün'], ['rosa', 'Rosa'], ['flieder', 'Flieder'],
+              ] as Array<[string | undefined, string]>).map(([key, label]) => (
+                <button
+                  key={label}
+                  className={`tab-bg-swatch bg-${key ?? 'none'} ${activeBoardBg === key ? 'on' : ''}`}
+                  title={label}
+                  aria-label={`Hintergrund ${label}`}
+                  onClick={() => setBoardBg(activeBoardId, key)}
+                />
+              ))}
+            </div>
             <div className="dock-menu-foot">Strg+Z stellt die vorherige Anordnung komplett wieder her</div>
           </div>
         )}
