@@ -21,6 +21,17 @@ const TYPE_ICON: Record<string, string> = {
 /** #Tags aus einem Ticket-Text ziehen (Trello-Labels light: einfach #tag tippen) */
 const tagsOf = (text: string): string[] => [...text.matchAll(/#([\p{L}\d_-]{2,20})/gu)].map((m) => m[1].toLowerCase());
 
+/** Alle Tags eines Tickets — Titel UND Beschreibung zählen (M121) */
+const ticketTags = (it: KanbanItem): string[] =>
+  [...new Set(tagsOf(`${it.text} ${it.note ?? ''}`))];
+
+/** Deterministische Label-Farbe je Tag (M121): gleicher Tag = gleiche Farbe */
+const tagHue = (tag: string): number => {
+  let h = 0;
+  for (let i = 0; i < tag.length; i += 1) h = (h * 31 + tag.charCodeAt(i)) % 360;
+  return h;
+};
+
 /**
  * Der eigentliche Kanban-Inhalt — geteilt zwischen Board-Karte und
  * Präsentations-Folie. Spalten sind frei benennbar und in der Anzahl
@@ -335,7 +346,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   // ---------- Filter & Gruppierung ----------
   const allTags = useMemo(() => {
     const t = new Set<string>();
-    for (const it of kanban.items) for (const tag of tagsOf(it.text)) t.add(tag);
+    for (const it of kanban.items) for (const tag of ticketTags(it)) t.add(tag);
     return [...t].sort();
   }, [kanban.items]);
   const linkedBoards = useMemo(() => {
@@ -350,7 +361,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     }
     if (quick === 'faellig' && !it.due) return false;
     if (quick === 'ueberfaellig' && urgencyFor(it.due) !== 'overdue') return false;
-    if (tagFilter && !tagsOf(it.text).includes(tagFilter)) return false;
+    if (tagFilter && !ticketTags(it).includes(tagFilter)) return false;
     if (boardFilter && it.link?.boardId !== boardFilter) return false;
     return true;
   };
@@ -412,6 +423,19 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         )}
         {it.text}
       </span>
+      {ticketTags(it).length > 0 && (
+        <span className="k-labels">
+          {ticketTags(it).map((tag) => (
+            <button
+              key={tag}
+              className="k-label nodrag"
+              style={{ background: `hsl(${tagHue(tag)} 70% 85%)`, color: `hsl(${tagHue(tag)} 65% 24%)` }}
+              title={tagFilter === tag ? `Filter #${tag} aufheben` : `Nur Tickets mit #${tag} zeigen`}
+              onClick={() => { setTagFilter(tagFilter === tag ? '' : tag); setFilterOpen(true); }}
+            >{tag}</button>
+          ))}
+        </span>
+      )}
       {(it.who || it.note || it.link || it.subs?.length || it.deps?.length || it.links?.length) && (
         <span className="kanban-chips">
           {(it.subs?.length ?? 0) > 0 && (
