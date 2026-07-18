@@ -59,6 +59,27 @@ export interface KanbanItem {
   /** Verknüpfung zu einem Board bzw. einer Karte (Sprung-Chip am Ticket);
    *  itemId = Quell-Ticket/-Block/-Vorgang — Basis für den Auto-Abgleich */
   link?: { boardId: string; nodeId?: string; itemId?: string };
+  /** Checkliste im Ticket (Trello-Stil, M118) — Fortschritt x/y am Ticket */
+  subs?: Array<{ id: string; text: string; done?: boolean }>;
+  /** Abhängigkeiten (M118): Diese Ticket-IDs (gleiches Kanban) müssen erledigt
+   *  sein, bevor dieses Ticket eine Spalte weiter darf ("erst Step 1, dann 2") */
+  deps?: string[];
+  /** Verknüpfte Karten/Module (mehrere, M118) — `link` bleibt für Auto-Abgleich */
+  links?: Array<{ boardId: string; nodeId: string }>;
+}
+
+/** Offene Blocker eines Tickets: Titel der unerledigten Abhängigkeiten (M118) */
+export function ticketBlockers(it: KanbanItem, data: KanbanData): string[] {
+  const dc = doneCol(data);
+  return (it.deps ?? [])
+    .map((d) => data.items.find((x) => x.id === d))
+    .filter((x): x is KanbanItem => !!x && x.col < dc)
+    .map((x) => x.text.slice(0, 40));
+}
+
+/** Offene Checklisten-Punkte eines Tickets (M118) */
+export function openSubs(it: KanbanItem): number {
+  return (it.subs ?? []).filter((s) => !s.done).length;
 }
 
 export interface KanbanData {

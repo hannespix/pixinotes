@@ -1,11 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
 import { runDerived, useBoard } from '../../store';
-import { kanbanCols, uid, type GanttData, type KanbanData, type KanbanItem, type KanbanNode } from '../../types';
+import {
+  kanbanCols, openSubs, ticketBlockers, uid,
+  type GanttData, type KanbanData, type KanbanItem, type KanbanNode,
+} from '../../types';
 import { collectTasks, formatDueShort, urgencyFor } from '../../lib/tasks';
+import { nodeToText } from '../../lib/serialize';
 import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, ISearch, ISettings, IX } from '../Icons';
 import { CardShell } from './CardShell';
+
+/** Symbol je Karten-Typ für die Verknüpfungs-Liste im Ticket-Modal (M118) */
+const TYPE_ICON: Record<string, string> = {
+  note: '📝', kanban: '📋', mermaid: '📊', gantt: '📅', calendar: '🗓️',
+  shape: '⬛', image: '🖼️', pdf: '📄', email: '✉️', file: '📎', portal: '🚪',
+};
 
 /** #Tags aus einem Ticket-Text ziehen (Trello-Labels light: einfach #tag tippen) */
 const tagsOf = (text: string): string[] => [...text.matchAll(/#([\p{L}\d_-]{2,20})/gu)].map((m) => m[1].toLowerCase());
@@ -148,6 +159,19 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
 
   const move = (item: KanbanItem, dir: -1 | 1) => {
     const col = Math.max(0, Math.min(done, item.col + dir));
+    // Abhängigkeiten (M118): vorwärts erst, wenn alle Blocker erledigt sind
+    if (dir > 0) {
+      const blockers = ticketBlockers(item, kanban);
+      if (blockers.length > 0) {
+        showToast(`🔒 Erst erledigen: ${blockers.join(' · ')}`);
+        return;
+      }
+      // In die Erledigt-Spalte erst, wenn die Ticket-Checkliste komplett ist
+      if (col === done && openSubs(item) > 0) {
+        showToast(`☑ Noch ${openSubs(item)} Checklisten-Punkt(e) offen — Ticket öffnen und abhaken.`);
+        return;
+      }
+    }
     if (col === done && item.col !== col) {
       confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
     }
@@ -275,8 +299,25 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         )}
         {it.text}
       </span>
-      {(it.who || it.note || it.link) && (
+      {(it.who || it.note || it.link || it.subs?.length || it.deps?.length || it.links?.length) && (
         <span className="kanban-chips">
+          {(it.subs?.length ?? 0) > 0 && (
+            <em
+              className={`k-subs ${openSubs(it) === 0 ? 'done' : ''}`}
+              title={`Checkliste: ${it.subs!.filter((s) => s.done).length}/${it.subs!.length} erledigt — Ticket öffnen`}
+              onClick={() => setDetailId(it.id)}
+            >☑ {it.subs!.filter((s) => s.done).length}/{it.subs!.length}</em>
+          )}
+          {colIdx < done && ticketBlockers(it, kanban).length > 0 && (
+            <em
+              className="k-blocked"
+              title={`Blockiert durch: ${ticketBlockers(it, kanban).join(' · ')}`}
+              onClick={() => setDetailId(it.id)}
+            >🔒</em>
+          )}
+          {(it.links?.length ?? 0) > 0 && (
+            <em className="k-links" title={`${it.links!.length} verknüpfte Karte(n) — Ticket öffnen`} onClick={() => setDetailId(it.id)}>🔗{it.links!.length}</em>
+          )}
           {it.who && <em className="k-who" title={it.who}>{it.who.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}</em>}
           {it.note && <em className="k-note" title="Hat Beschreibung — Ticket öffnen" onClick={() => setDetailId(it.id)}>≡</em>}
           {it.link && (
@@ -495,67 +536,209 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       {(() => {
         const it = kanban.items.find((x) => x.id === detailId);
         if (!it) return null;
-        return (
-          <div
-            className="ticket-detail nodrag"
-            tabIndex={-1}
-            ref={detailRef}
-            onKeyDown={(e) => e.key === 'Escape' && setDetailId(null)}
-          >
-            <div className="ticket-detail-head">
-              <span>Ticket</span>
-              <button title="Schließen" onClick={() => setDetailId(null)}><IX size={12} /></button>
-            </div>
-            <input
-              className="ticket-title"
-              value={it.text}
-              onChange={(e) => patchItem(it.id, { text: e.target.value })}
-            />
-            <textarea
-              className="ticket-note"
-              rows={3}
-              placeholder="Beschreibung / Details / Kontext …"
-              value={it.note ?? ''}
-              onChange={(e) => patchItem(it.id, { note: e.target.value || undefined })}
-            />
-            <div className="ticket-row">
-              <label>Fällig</label>
-              <input
-                type="date"
-                value={it.due ?? ''}
-                onChange={(e) => patchItem(it.id, { due: e.target.value || undefined })}
+        const subs = it.subs ?? [];
+        const subsDone = subs.filter((s) => s.done).length;
+        const blockers = ticketBlockers(it, kanban);
+        const others = kanban.items.filter((x) => x.id !== it.id);
+        // Ticket-Modal (M118, Trello-Vorbild) — als Portal über der ganzen App,
+        // damit es unabhängig von Kartengröße und Zoom immer gut lesbar ist
+        return createPortal(
+          <div className="modal-backdrop ticket-modal-backdrop" onClick={() => setDetailId(null)}>
+            <div
+              className="ticket-modal nodrag"
+              tabIndex={-1}
+              ref={detailRef}
+              onClick={(e) => e.stopPropagation()}
+              onKeyDown={(e) => e.key === 'Escape' && setDetailId(null)}
+              role="dialog"
+              aria-label="Ticket bearbeiten"
+            >
+              <div className="ticket-modal-head">
+                <input
+                  className="ticket-title"
+                  value={it.text}
+                  onChange={(e) => patchItem(it.id, { text: e.target.value })}
+                />
+                <button className="taskhub-x" title="Schließen (Esc)" onClick={() => setDetailId(null)}><IX size={14} /></button>
+              </div>
+              <div className="ticket-meta-row">
+                <select
+                  className="ticket-colsel"
+                  value={Math.min(it.col, done)}
+                  title="Spalte"
+                  onChange={(e) => {
+                    const target = Number(e.target.value);
+                    if (target <= it.col) { patchItem(it.id, { col: target }); return; }
+                    // vorwärts: dieselben Regeln wie die Pfeile (Blocker + Checkliste)
+                    const blk = ticketBlockers(it, kanban);
+                    if (blk.length > 0) { showToast(`🔒 Erst erledigen: ${blk.join(' · ')}`); return; }
+                    if (target === done && openSubs(it) > 0) { showToast(`☑ Noch ${openSubs(it)} Checklisten-Punkt(e) offen.`); return; }
+                    if (target === done) confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
+                    patchItem(it.id, { col: target });
+                  }}
+                >
+                  {cols.map((c, i) => <option key={i} value={i}>{c}</option>)}
+                </select>
+                <label>📅<input type="date" value={it.due ?? ''} onChange={(e) => patchItem(it.id, { due: e.target.value || undefined })} /></label>
+                <label>👤<input type="text" placeholder="Person" value={it.who ?? ''} onChange={(e) => patchItem(it.id, { who: e.target.value || undefined })} /></label>
+                <span className="ticket-prio-row" role="group" aria-label="Priorität">
+                  {([[1, '!!!'], [2, '!!'], [3, '!']] as const).map(([p, label]) => (
+                    <button
+                      key={p}
+                      className={`prio-btn prio-${p} ${it.prio === p ? 'on' : ''}`}
+                      title={p === 1 ? 'hoch' : p === 2 ? 'mittel' : 'niedrig'}
+                      onClick={() => patchItem(it.id, { prio: it.prio === p ? undefined : p })}
+                    >{label}</button>
+                  ))}
+                </span>
+              </div>
+
+              <textarea
+                className="ticket-note"
+                rows={4}
+                placeholder="Beschreibung / Details / Kontext … (#tags werden zu Labels)"
+                value={it.note ?? ''}
+                onChange={(e) => patchItem(it.id, { note: e.target.value || undefined })}
               />
-              <label>Person</label>
-              <input
-                type="text"
-                placeholder="wer?"
-                value={it.who ?? ''}
-                onChange={(e) => patchItem(it.id, { who: e.target.value || undefined })}
-              />
+
+              {/* Checkliste (Trello-Stil) mit Fortschrittsbalken */}
+              <div className="ticket-section">
+                <div className="ticket-section-head">
+                  ☑ Checkliste
+                  {subs.length > 0 && <span className="ticket-progress-label">{subsDone}/{subs.length}</span>}
+                </div>
+                {subs.length > 0 && (
+                  <div className="ticket-progress"><i style={{ width: `${Math.round((subsDone / subs.length) * 100)}%` }} /></div>
+                )}
+                {subs.map((s) => (
+                  <label key={s.id} className="ticket-sub">
+                    <input
+                      type="checkbox"
+                      checked={!!s.done}
+                      onChange={() => patchItem(it.id, { subs: subs.map((x) => (x.id === s.id ? { ...x, done: !x.done } : x)) })}
+                    />
+                    <span className={s.done ? 'done' : ''}>{s.text}</span>
+                    <button title="Punkt entfernen" onClick={() => patchItem(it.id, { subs: subs.filter((x) => x.id !== s.id) })}><IX size={10} /></button>
+                  </label>
+                ))}
+                <input
+                  className="ticket-sub-add"
+                  placeholder="＋ Punkt hinzufügen und Enter …"
+                  onKeyDown={(e) => {
+                    const v = (e.target as HTMLInputElement).value.trim();
+                    if (e.key === 'Enter' && v) {
+                      patchItem(it.id, { subs: [...subs, { id: uid(), text: v.slice(0, 140) }] });
+                      (e.target as HTMLInputElement).value = '';
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Abhängigkeiten: erst wenn alle erledigt sind, darf das Ticket weiter */}
+              <div className="ticket-section">
+                <div className="ticket-section-head">
+                  🔒 Abhängig von
+                  {blockers.length > 0 && <span className="ticket-blocked-label">blockiert</span>}
+                </div>
+                {(it.deps ?? []).map((d) => {
+                  const dep = kanban.items.find((x) => x.id === d);
+                  if (!dep) return null;
+                  const depDone = dep.col >= done;
+                  return (
+                    <div key={d} className="ticket-dep">
+                      <span className={`ticket-dep-state ${depDone ? 'done' : ''}`}>{depDone ? '✓' : '○'}</span>
+                      <span className={depDone ? 'done' : ''}>{dep.text}</span>
+                      <button title="Abhängigkeit lösen" onClick={() => patchItem(it.id, { deps: (it.deps ?? []).filter((x) => x !== d) })}><IX size={10} /></button>
+                    </div>
+                  );
+                })}
+                {others.length > 0 && (
+                  <select
+                    className="ticket-dep-add"
+                    value=""
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v && !(it.deps ?? []).includes(v)) patchItem(it.id, { deps: [...(it.deps ?? []), v] });
+                    }}
+                  >
+                    <option value="">＋ Ticket wählen, das vorher erledigt sein muss …</option>
+                    {others.filter((o) => !(it.deps ?? []).includes(o.id)).map((o) => (
+                      <option key={o.id} value={o.id}>{o.col >= done ? '✓ ' : ''}{o.text.slice(0, 60)}</option>
+                    ))}
+                  </select>
+                )}
+                <div className="ticket-hint">Vorwärts geht es erst, wenn alle Abhängigkeiten erledigt sind.</div>
+              </div>
+
+              {/* Verknüpfte Karten/Module aus allen Boards */}
+              <div className="ticket-section">
+                <div className="ticket-section-head">🔗 Verknüpfte Karten</div>
+                {(it.links ?? []).map((l, i) => {
+                  const b = boards.find((x) => x.id === l.boardId);
+                  const n = b?.nodes.find((x) => x.id === l.nodeId);
+                  const label = n ? `${TYPE_ICON[n.type ?? ''] ?? '🗂️'} ${(nodeToText(n).split('\n')[0] || n.type || 'Karte').slice(0, 44)}` : '⚠ Karte fehlt';
+                  return (
+                    <div key={`${l.nodeId}-${i}`} className="ticket-linkrow">
+                      <button className="ticket-linkjump" title={`Öffnen (${b?.name ?? '?'})`} onClick={() => followLink({ boardId: l.boardId, nodeId: l.nodeId })}>
+                        {label} <em>· {b?.name ?? '?'}</em>
+                      </button>
+                      <button title="Verknüpfung entfernen" onClick={() => patchItem(it.id, { links: (it.links ?? []).filter((_, xi) => xi !== i) })}><IX size={10} /></button>
+                    </div>
+                  );
+                })}
+                <select
+                  className="ticket-link-add"
+                  value=""
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) return;
+                    const [boardId, nodeId] = v.split('::');
+                    if ((it.links ?? []).some((l) => l.nodeId === nodeId)) return;
+                    patchItem(it.id, { links: [...(it.links ?? []), { boardId, nodeId }] });
+                  }}
+                >
+                  <option value="">＋ Vorhandene Karte/Modul verknüpfen …</option>
+                  {boards.map((b) => (
+                    <optgroup key={b.id} label={b.name}>
+                      {b.nodes.filter((n) => n.id !== id && !n.archived).slice(0, 60).map((n) => (
+                        <option key={n.id} value={`${b.id}::${n.id}`}>
+                          {TYPE_ICON[n.type ?? ''] ?? '🗂️'} {(nodeToText(n).split('\n')[0] || n.type || 'Karte').slice(0, 60)}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quell-Verknüpfung (Auto-Abgleich) — bestehendes Verhalten */}
+              <div className="ticket-section">
+                <div className="ticket-section-head"><IFolder size={12} /> Quelle / Board-Verknüpfung</div>
+                <div className="ticket-row">
+                  <select
+                    value={it.link?.boardId ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (!v) return patchItem(it.id, { link: undefined });
+                      // gleiches Board erneut gewählt → nodeId/itemId (Auto-Abgleich!) behalten
+                      if (v === it.link?.boardId) return;
+                      patchItem(it.id, { link: { boardId: v } });
+                    }}
+                  >
+                    <option value="">— kein Board —</option>
+                    {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                  {it.link && (
+                    <button className="ticket-jump" title="Verknüpftes Board öffnen" onClick={() => followLink(it.link!)}>↗ öffnen</button>
+                  )}
+                </div>
+              </div>
+
+              <div className="ticket-detail-foot">
+                Änderungen werden sofort gespeichert · Esc schließt
+              </div>
             </div>
-            <div className="ticket-row">
-              <label><IFolder size={12} /> Verknüpft</label>
-              <select
-                value={it.link?.boardId ?? ''}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (!v) return patchItem(it.id, { link: undefined });
-                  // gleiches Board erneut gewählt → nodeId/itemId (Auto-Abgleich!) behalten
-                  if (v === it.link?.boardId) return;
-                  patchItem(it.id, { link: { boardId: v } });
-                }}
-              >
-                <option value="">— kein Board —</option>
-                {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
-              {it.link && (
-                <button className="ticket-jump" title="Verknüpftes Board öffnen" onClick={() => followLink(it.link!)}>↗ öffnen</button>
-              )}
-            </div>
-            <div className="ticket-detail-foot">
-              Änderungen werden sofort gespeichert · Esc schließt
-            </div>
-          </div>
+          </div>,
+          document.body,
         );
       })()}
     </>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { useBoard } from '../store';
-import { doneCol, kanbanCols, uid, type GanttData, type KanbanData } from '../types';
+import { doneCol, kanbanCols, openSubs, ticketBlockers, uid, type GanttData, type KanbanData } from '../types';
 import { makeKanban } from '../lib/nodes';
 import {
   collectTaskTags, collectTasks, doneLog, downloadTasksIcs, formatDueShort, logDone,
@@ -121,14 +121,22 @@ export function TaskHub() {
     const board = boards.find((b) => b.id === t.boardId);
     const node = board?.nodes.find((n) => n.id === t.nodeId);
     if (!board || !node) return;
-    logDone(t); // „Heute geschafft"-Protokoll (M114)
     if (t.kind === 'kanban') {
       const k = node.data as KanbanData;
+      const item = k.items.find((it) => it.id === t.itemId);
+      // Abhängigkeiten & Ticket-Checkliste (M118): erst erledigen, dann abhaken
+      if (item) {
+        const blk = ticketBlockers(item, k);
+        if (blk.length > 0) { showToast(`🔒 Erst erledigen: ${blk.join(' · ')}`); return; }
+        if (openSubs(item) > 0) { showToast(`☑ Noch ${openSubs(item)} Checklisten-Punkt(e) im Ticket offen.`); return; }
+      }
+      logDone(t); // „Heute geschafft"-Protokoll (M114)
       updateNodeDataOnBoard(t.boardId, t.nodeId, {
         items: k.items.map((it) => (it.id === t.itemId ? { ...it, col: doneCol(k) } : it)),
       });
       confetti({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
     } else if (t.kind === 'gantt') {
+      logDone(t);
       // Gantt-Vorgang erledigen = Fortschritt auf 100 % (M113)
       const g = node.data as GanttData;
       updateNodeDataOnBoard(t.boardId, t.nodeId, {
@@ -136,6 +144,7 @@ export function TaskHub() {
       });
       confetti({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
     } else {
+      logDone(t);
       updateNodeDataOnBoard(t.boardId, t.nodeId, {
         blocks: toggleCheckBlock(node.data.blocks as unknown[] | undefined, t.itemId),
       });
@@ -184,7 +193,13 @@ export function TaskHub() {
     const node = boards.find((b) => b.id === t.boardId)?.nodes.find((n) => n.id === t.nodeId);
     if (!node || t.kind !== 'kanban') return;
     const k = node.data as KanbanData;
-    if (col >= doneCol(k)) { complete(t); return; } // letzte Spalte = erledigt
+    const item = k.items.find((it) => it.id === t.itemId);
+    // Vorwärts gilt die Abhängigkeits-Sperre auch hier (M118)
+    if (item && col > item.col) {
+      const blk = ticketBlockers(item, k);
+      if (blk.length > 0) { showToast(`🔒 Erst erledigen: ${blk.join(' · ')}`); return; }
+    }
+    if (col >= doneCol(k)) { complete(t); return; } // letzte Spalte = erledigt (inkl. Checklisten-Gate)
     updateNodeDataOnBoard(t.boardId, t.nodeId, {
       items: k.items.map((it) => (it.id === t.itemId ? { ...it, col } : it)),
     });
