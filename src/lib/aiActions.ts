@@ -5,8 +5,17 @@
 import { askAi, MD_HINT, mdToBlocks } from './ai';
 import { nodeToText } from './serialize';
 import { makeGantt, makeKanban, makeMermaid, makeNote, makeShape } from './nodes';
-import { mutedHistory, useBoard } from '../store';
+import { mutedHistory, selectActiveBoard, useBoard } from '../store';
 import { uid, type AppNode, type ShapeKind, type StickyColor } from '../types';
+import { findFreeSpot } from './arrange';
+
+/** Kollisionsfreie Zielposition für ein neues KI-Modul (M130): nie einfach
+ *  über bestehende Karten legen — freien Platz nahe der Wunschposition suchen.
+ *  Liest den Board-Stand FRISCH, damit auch gerade erst angelegte Karten
+ *  desselben KI-Plans berücksichtigt werden. */
+function freeSpot(pos: { x: number; y: number }, w: number, h: number): { x: number; y: number } {
+  return findFreeSpot(selectActiveBoard(useBoard.getState()).nodes, pos, { w, h });
+}
 
 interface Ctx { id: string; type: string; text: string }
 
@@ -139,7 +148,13 @@ export async function aiCluster(nodes: AppNode[]): Promise<string> {
   const st = useBoard.getState();
   st.pushHistory();
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const X0 = 80, Y0 = 140, GAP_X = 90, GAP_Y = 44, COLW = 380;
+  // Cluster-Raster nicht über UNBETEILIGTE Karten legen (M130): freien
+  // Ursprung relativ zu den Karten suchen, die nicht mitgeclustert werden
+  const GAP_X = 90, GAP_Y = 44, COLW = 380;
+  const moved = new Set(nodes.map((n) => n.id));
+  const others = selectActiveBoard(useBoard.getState()).nodes.filter((n) => !moved.has(n.id));
+  const origin = findFreeSpot(others, { x: 80, y: 140 }, { w: clusters.length * (COLW + GAP_X), h: 680 });
+  const X0 = origin.x, Y0 = origin.y;
   const moves: Array<[string, number, number]> = [];
   mutedHistory(() => clusters.forEach((c, i) => {
     const x = X0 + i * (COLW + GAP_X);
@@ -177,7 +192,7 @@ export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): 
   if (clean.length === 0) throw new Error('Keine Aufgaben im Inhalt erkannt.');
   const st = useBoard.getState();
   st.addNode({
-    id: uid(), type: 'kanban', width: 430, position: pos,
+    id: uid(), type: 'kanban', width: 430, position: freeSpot(pos, 430, 300),
     data: {
       title: '✨ Extrahierte Aufgaben',
       items: clean.map((t) => ({
@@ -202,7 +217,7 @@ export async function aiProcess(nodes: AppNode[], pos: { x: number; y: number })
   const st = useBoard.getState();
   // fitOnLoad (M122): Karte passt sich nach dem ersten Render der Diagramm-
   // größe an — nichts wird abgeschnitten
-  st.addNode({ id: uid(), type: 'mermaid', width: 420, height: 280, position: pos, data: { code, fitOnLoad: true } } as AppNode);
+  st.addNode({ id: uid(), type: 'mermaid', width: 420, height: 280, position: freeSpot(pos, 420, 280), data: { code, fitOnLoad: true } } as AppNode);
   return 'Workflow als Mermaid-Diagramm aufs Board gelegt';
 }
 
@@ -214,7 +229,7 @@ export async function aiBriefing(nodes: AppNode[], pos: { x: number; y: number }
     `Erstelle aus den folgenden Projekt-Karten ein knappes analytisches Briefing auf Deutsch mit genau diesen drei Abschnitten (als "## "-Überschriften): Überblick, Offene Punkte, Nächste Schritte. Maximal 12 Inhaltszeilen gesamt. ${MD_HINT}\n\nKarten:\n${JSON.stringify(items)}`,
   );
   const st = useBoard.getState();
-  st.addNode(makeNote(pos, { color: 'sky', blocks: await mdToBlocks('✨ Board-Briefing', res.trim()) }));
+  st.addNode(makeNote(freeSpot(pos, 280, 340), { color: 'sky', blocks: await mdToBlocks('✨ Board-Briefing', res.trim()) }));
   return 'Briefing als Notiz aufs Board gelegt';
 }
 
@@ -240,7 +255,7 @@ export async function aiWeekPlan(
     + JSON.stringify(items),
   );
   const st = useBoard.getState();
-  st.addNode(makeNote(pos, { color: 'sky', blocks: await mdToBlocks('🗓️ Wochenplan', res.trim()) }));
+  st.addNode(makeNote(freeSpot(pos, 280, 380), { color: 'sky', blocks: await mdToBlocks('🗓️ Wochenplan', res.trim()) }));
   return 'Wochenplan als Notiz aufs Board gelegt';
 }
 
@@ -281,7 +296,7 @@ export async function aiPolish(nodes: AppNode[]): Promise<string> {
   );
   const st = useBoard.getState();
   st.addNode(makeNote(
-    { x: note.position.x + ((note.width as number | undefined) ?? 280) + 40, y: note.position.y },
+    freeSpot({ x: note.position.x + ((note.width as number | undefined) ?? 280) + 40, y: note.position.y }, 280, 320),
     { color: 'mint', blocks: await mdToBlocks('✨ Vorschlag', answer) },
   ));
   return 'Verbesserter Text liegt als Vorschlag daneben — das Original bleibt unangetastet';
@@ -364,8 +379,10 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
   let editedNote = false;
   let y = pos.y;
   const place = (h: number) => {
-    const p = { x: pos.x, y };
-    y += h + 40;
+    // Kollisionsfrei (M130): freien Platz suchen — dank frischem Store-Stand
+    // stapeln sich auch mehrere Module EINES Plans sauber untereinander
+    const p = freeSpot({ x: pos.x, y }, 420, h);
+    y = p.y + h + 40;
     return p;
   };
 

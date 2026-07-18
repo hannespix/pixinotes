@@ -8,7 +8,7 @@ import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
 import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
-import { computeArrangement, type ArrangeMode } from '../lib/arrange';
+import { computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
   IArchive, IArrange, IBookmark, ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
   IMagnet, IMousePointer, INote, IPen, IPill, IPlay, IPlus, ISquare, ITasks, IWand, IX,
@@ -139,11 +139,12 @@ export function Dock() {
     }
   };
 
-  const centerPos = (w = 260, h = 80) =>
-    screenToFlowPosition({
-      x: window.innerWidth / 2 - w / 2 + (Math.random() * 60 - 30),
-      y: window.innerHeight / 2 - h / 2 + (Math.random() * 60 - 30),
-    });
+  // Wunschposition Bildmitte — aber nie ÜBER bestehende Karten (M130):
+  // findFreeSpot weicht auf die nächste freie Stelle aus
+  const centerPos = (w = 260, h = 80) => {
+    const p = screenToFlowPosition({ x: window.innerWidth / 2 - w / 2, y: window.innerHeight / 2 - h / 2 });
+    return findFreeSpot(selectActiveBoard(useBoard.getState()).nodes, p, { w, h });
+  };
 
   /** Modul anlegen + direkt hinfliegen (Pan & Zoom über die pendingFocus-Mechanik) */
   const add = (make: () => AppNode) => {

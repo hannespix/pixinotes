@@ -66,7 +66,16 @@ function components(nodes: AppNode[], edges: Edge[]): string[][] {
   return out;
 }
 
-/** Verbundener Cluster → Schichten-Layout: Tiefe (längster Pfad) = Spalte */
+/**
+ * Verbundener Cluster → Schichten-Layout nach Sugiyama-Art (M130):
+ * 1. Tiefe (längster Pfad entlang der Pfeilrichtung) = Spalte.
+ * 2. Kreuzungsminimierung: mehrere Barycenter-Durchläufe ordnen jede Spalte
+ *    nach der mittleren Position ihrer Nachbarn in der Vorspalte (vor- und
+ *    rückwärts) — das entwirrt den Großteil sich überkreuzender Linien.
+ * 3. Y-Feinausrichtung: Karten rücken vertikal zu ihren Nachbarn auf, sodass
+ *    Verbindungen möglichst waagerecht laufen (Überlappungen werden dabei
+ *    per Mindestabstand aufgelöst).
+ */
 function layoutComponent(ids: string[], byId: Map<string, AppNode>, edges: Edge[]): Block {
   const inComp = new Set(ids);
   const compEdges = edges.filter((e) => inComp.has(e.source) && inComp.has(e.target));
@@ -85,35 +94,106 @@ function layoutComponent(ids: string[], byId: Map<string, AppNode>, edges: Edge[
     if (!changed) break;
   }
 
-  // Spalten füllen (stabile Reihenfolge: erst nach Tiefe, dann Ursprungs-Y)
-  const cols = new Map<number, AppNode[]>();
+  // Ungerichtete Nachbarschaft (für Ordnung + Y-Ausrichtung)
+  const nbrs = new Map<string, string[]>(ids.map((id) => [id, []]));
+  for (const e of compEdges) {
+    nbrs.get(e.source)!.push(e.target);
+    nbrs.get(e.target)!.push(e.source);
+  }
+
+  // Spalten füllen (Startreihenfolge: Ursprungs-Y — stabil und vertraut)
+  const cols = new Map<number, string[]>();
   for (const id of ids) {
     const d = depth.get(id)!;
     if (!cols.has(d)) cols.set(d, []);
-    cols.get(d)!.push(byId.get(id)!);
+    cols.get(d)!.push(id);
   }
-  for (const col of cols.values()) col.sort((a, b) => a.position.y - b.position.y);
-
+  for (const col of cols.values()) col.sort((a, b) => byId.get(a)!.position.y - byId.get(b)!.position.y);
   const colDepths = [...cols.keys()].sort((a, b) => a - b);
+
+  // 2) Barycenter-Ordnung: abwechselnd vor- und rückwärts über die Spalten
+  const orderIdx = new Map<string, number>();
+  const reindex = () => { for (const col of cols.values()) col.forEach((id, i) => orderIdx.set(id, i)); };
+  reindex();
+  for (let sweep = 0; sweep < 4; sweep++) {
+    const forward = sweep % 2 === 0;
+    const seq = forward ? colDepths : [...colDepths].reverse();
+    for (const d of seq) {
+      const col = cols.get(d)!;
+      if (col.length < 2) continue;
+      const bary = (id: string): number => {
+        const side = nbrs.get(id)!.filter((n) => (forward ? depth.get(n)! < d : depth.get(n)! > d));
+        const list = side.length ? side : nbrs.get(id)!;
+        if (!list.length) return orderIdx.get(id)!;
+        return list.reduce((a, n) => a + orderIdx.get(n)!, 0) / list.length;
+      };
+      const keyed = col.map((id) => [id, bary(id)] as const);
+      keyed.sort((a, b) => a[1] - b[1]);
+      cols.set(d, keyed.map(([id]) => id));
+      cols.get(d)!.forEach((id, i) => orderIdx.set(id, i));
+    }
+  }
+
+  // Spaltenmaße + X-Positionen
   const colDims = colDepths.map((d) => {
     const col = cols.get(d)!;
-    const w = Math.max(...col.map((n) => sizeOf(n).w));
-    const h = col.reduce((a, n) => a + sizeOf(n).h, 0) + GAP_Y * (col.length - 1);
+    const w = Math.max(...col.map((id) => sizeOf(byId.get(id)!).w));
+    const h = col.reduce((a, id) => a + sizeOf(byId.get(id)!).h, 0) + GAP_Y * (col.length - 1);
     return { d, col, w, h };
   });
   const totalH = Math.max(...colDims.map((c) => c.h));
+
+  // Start: Spalten vertikal zentriert stapeln → Karten-MITTELPUNKTE merken
+  const centerY = new Map<string, number>();
+  for (const { col, h } of colDims) {
+    let yCur = (totalH - h) / 2;
+    for (const id of col) {
+      const s = sizeOf(byId.get(id)!);
+      centerY.set(id, yCur + s.h / 2);
+      yCur += s.h + GAP_Y;
+    }
+  }
+
+  // 3) Y-Feinausrichtung: Karten zum Mittel ihrer Nachbarn ziehen, Ordnung
+  // und Mindestabstände innerhalb der Spalte bleiben gewahrt
+  for (let pass = 0; pass < 6; pass++) {
+    const seq = pass % 2 === 0 ? colDepths : [...colDepths].reverse();
+    for (const d of seq) {
+      const col = cols.get(d)!;
+      const sizes = col.map((id) => sizeOf(byId.get(id)!));
+      const want = col.map((id) => {
+        const ns = nbrs.get(id)!;
+        if (!ns.length) return centerY.get(id)!;
+        return ns.reduce((a, n) => a + centerY.get(n)!, 0) / ns.length;
+      });
+      // Von oben nach unten schieben (Mindestabstand), dann von unten zurück —
+      // das mittelt die Wünsche, ohne Kollisionen zuzulassen
+      const c = [...want];
+      for (let i = 1; i < col.length; i++) {
+        const minC = c[i - 1] + sizes[i - 1].h / 2 + GAP_Y + sizes[i].h / 2;
+        if (c[i] < minC) c[i] = minC;
+      }
+      for (let i = col.length - 2; i >= 0; i--) {
+        const maxC = c[i + 1] - sizes[i + 1].h / 2 - GAP_Y - sizes[i].h / 2;
+        if (c[i] > maxC) c[i] = maxC;
+      }
+      col.forEach((id, i) => centerY.set(id, c[i]));
+    }
+  }
+
+  // Ausgabe: auf 0 normalisieren, X wie gehabt spaltenweise
+  const minY = Math.min(...ids.map((id) => centerY.get(id)! - sizeOf(byId.get(id)!).h / 2));
+  const maxY = Math.max(...ids.map((id) => centerY.get(id)! + sizeOf(byId.get(id)!).h / 2));
   const nodes: Placed[] = [];
   let x = 0;
-  for (const { col, w, h } of colDims) {
-    let y = (totalH - h) / 2; // Spalten vertikal zentrieren
-    for (const n of col) {
-      const s = sizeOf(n);
-      nodes.push({ id: n.id, x: x + (w - s.w) / 2, y });
-      y += s.h + GAP_Y;
+  for (const { col, w } of colDims) {
+    for (const id of col) {
+      const s = sizeOf(byId.get(id)!);
+      nodes.push({ id, x: x + (w - s.w) / 2, y: centerY.get(id)! - s.h / 2 - minY });
     }
     x += w + GAP_X;
   }
-  return { w: x - GAP_X, h: totalH, nodes };
+  return { w: x - GAP_X, h: maxY - minY, nodes };
 }
 
 /** Unverbundene Karten eines Typs → kompaktes Raster (≈ 3:2-Blöcke) */
@@ -205,6 +285,40 @@ function layoutStack(group: AppNode[]): Block {
 }
 
 export type ArrangeMode = 'flow' | 'grid' | 'circles' | 'stack';
+
+/**
+ * Freien Platz für eine neue Karte suchen (M130): Wunschposition behalten,
+ * wenn dort nichts liegt — sonst in wachsenden Ringen darum die nächste
+ * kollisionsfreie Stelle finden. So landet kein neues (KI-)Modul mehr
+ * einfach ÜBER bestehenden Karten.
+ */
+export function findFreeSpot(
+  existing: AppNode[],
+  desired: { x: number; y: number },
+  size: { w: number; h: number },
+  gap = 48,
+): { x: number; y: number } {
+  const rects = existing
+    .filter((n) => !n.archived)
+    .map((n) => { const s = sizeOf(n); return { x: n.position.x, y: n.position.y, w: s.w, h: s.h }; });
+  const collides = (x: number, y: number) => rects.some((r) =>
+    x < r.x + r.w + gap && x + size.w + gap > r.x && y < r.y + r.h + gap && y + size.h + gap > r.y);
+  if (!collides(desired.x, desired.y)) return desired;
+  const STEP = 80;
+  for (let ring = 1; ring <= 40; ring++) {
+    const r = ring * STEP;
+    const samples = Math.max(8, ring * 6);
+    for (let i = 0; i < samples; i++) {
+      // Start rechts (Leserichtung), dann im Uhrzeigersinn; leicht gestaucht,
+      // damit die Suche eher in die Breite als in die Tiefe ausweicht
+      const a = (i / samples) * 2 * Math.PI;
+      const x = desired.x + Math.cos(a) * r;
+      const y = desired.y + Math.sin(a) * r * 0.8;
+      if (!collides(x, y)) return { x, y };
+    }
+  }
+  return desired;
+}
 
 /** Komplettes Board anordnen → Ziel-Positionen [id, x, y] */
 export function computeArrangement(nodes: AppNode[], edges: Edge[], mode: ArrangeMode = 'flow'): Array<[string, number, number]> {
