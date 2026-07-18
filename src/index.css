@@ -789,30 +789,53 @@ h3 { font-size: 14px; margin: 0 0 8px; }
    bei Mermaid übernimmt das die gestrichelte Kontur */
 .react-flow__node.selected:has(> .card-shell > .mermaid-card) { outline: none; }
 
-/* Schwebende Werkzeugleiste unterm Diagramm (nur bei Auswahl) */
+/* Schwebende Werkzeugleiste unterm Diagramm (nur bei Auswahl).
+   M99-Polish: mehr Kontrast (Rand + kräftiger Schatten), spürbares
+   Hover-/Druck-Feedback auf allen Bedienelementen. */
 .mm-toolbar {
   display: flex; flex-direction: column; gap: 6px;
-  background: var(--surface); border-radius: 12px; padding: 6px 8px;
-  box-shadow: 0 8px 28px rgba(40, 30, 10, 0.18);
-  max-width: min(560px, 92vw);
+  background: var(--surface); border-radius: 12px; padding: 7px 9px;
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 12px 34px rgba(40, 30, 10, 0.28);
+  max-width: min(600px, 92vw);
 }
 .mm-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .mm-row > button, .mm-pop-wrap > button {
-  border: none; background: var(--surface-dim); border-radius: 7px;
+  border: 1px solid transparent; background: var(--surface-dim); border-radius: 7px;
   font-family: inherit; font-size: 11px; color: var(--ink);
   padding: 4px 9px; cursor: pointer; white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease, box-shadow 0.12s ease;
 }
-.mm-row > button:hover, .mm-row > button.active,
-.mm-pop-wrap > button:hover, .mm-pop-wrap > button.active { background: var(--accent-soft); }
+.mm-row > button:hover, .mm-pop-wrap > button:hover {
+  background: var(--accent-soft); border-color: var(--accent);
+  transform: translateY(-1px); box-shadow: 0 2px 8px rgba(40, 30, 10, 0.18);
+}
+.mm-row > button:active, .mm-pop-wrap > button:active { transform: translateY(0) scale(0.94); box-shadow: none; }
+.mm-row > button.active, .mm-pop-wrap > button.active {
+  background: var(--accent-soft); border-color: var(--accent);
+  color: var(--accent-strong); font-weight: 650;
+}
 .mm-row > button.danger { color: #a4231a; }
+.mm-row > button.danger:hover { background: rgba(164, 35, 26, 0.1); border-color: rgba(164, 35, 26, 0.45); }
 .mm-sel-name { font-size: 11px; font-weight: 750; color: var(--accent-strong); padding: 0 3px; }
-/* Schritt-Zeile: erscheint ZUSÄTZLICH über der Hauptzeile (flaches UI, M98) */
-.mm-step-row { background: var(--accent-soft); border-radius: 9px; padding: 4px 7px; }
+/* Schritt-/Verbindungs-Zeile: erscheint ZUSÄTZLICH über der Hauptzeile */
+.mm-step-row { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 9px; padding: 4px 7px; }
 .mm-step-row > button { background: var(--surface); }
 .mm-row > .mm-dot { flex: none; }
-.mm-sep { width: 1px; height: 16px; background: var(--border-soft); margin: 0 2px; }
+.mm-dot { transition: transform 0.1s ease, box-shadow 0.1s ease; }
+.mm-dot:hover { transform: scale(1.2); box-shadow: 0 0 0 3px var(--accent-soft); }
+.mm-dot:active { transform: scale(1.02); }
+.mm-sep { width: 1px; height: 16px; background: var(--border); margin: 0 3px; }
 .mm-shape { font-size: 12px; padding: 4px 7px; }
 .mm-dot-s { width: 17px; height: 17px; }
+/* Diagramm-Elemente: klares Hover-Feedback (M99) */
+.mermaid-svg g.node:hover, .mermaid-svg g.rough-node:hover {
+  filter: drop-shadow(0 3px 6px rgba(40, 30, 10, 0.32)) brightness(1.04);
+}
+.mermaid-svg g.mm-selected { filter: drop-shadow(0 0 4px var(--accent)); }
+.mermaid-svg path.flowchart-link { cursor: pointer; transition: stroke-width 0.12s ease; }
+.mermaid-svg path.flowchart-link:hover { stroke-width: 3px !important; }
+.mermaid-svg path.mm-selected-edge { stroke: var(--accent-strong) !important; stroke-width: 3px !important; }
 .mm-ai-row input {
   flex: 1; min-width: 200px; border: 1.5px solid var(--border-soft); border-radius: 8px;
   background: var(--surface); color: var(--ink);
@@ -892,7 +915,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .mm-hint {
   position: absolute; left: 8px; bottom: 6px; pointer-events: none;
-  font-size: 9.5px; color: var(--muted); opacity: 0.75;
+  font-size: 10px; color: var(--muted);
+  background: var(--surface-glass); border-radius: 6px; padding: 2px 7px;
 }
 .mermaid-preview { position: relative; flex: 1; min-width: 0; overflow: auto; display: flex; align-items: center; justify-content: center; }
 /* Diagramm füllt die Kartenbreite — sonst rendert z. B. Gantt winzig in

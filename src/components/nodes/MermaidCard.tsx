@@ -44,10 +44,12 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   const [tplOpen, setTplOpen] = useState(false);
   const [pendingTpl, setPendingTpl] = useState<string | null>(null);
   const [selNode, setSelNode] = useState<string | null>(null);
+  // Ausgewählte VERBINDUNG (M99): per Klick auf den Pfeil im Bild
+  const [selEdge, setSelEdge] = useState<{ from: string; to: string; x: number; y: number } | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
   // Inline-Umbenennen: Eingabefeld schwebt direkt ÜBER dem Schritt im Bild —
-  // kein Browser-Dialog (User-Feedback M92)
-  const [rename, setRename] = useState<{ nid: string; x: number; y: number; w: number; value: string } | null>(null);
+  // kein Browser-Dialog (User-Feedback M92). edge=true → Kanten-Beschriftung
+  const [rename, setRename] = useState<{ nid: string; edge?: boolean; x: number; y: number; w: number; value: string } | null>(null);
   const [aiText, setAiText] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const renderKey = useRef(0);
@@ -139,9 +141,20 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     });
   }, [selNode, svg]);
 
-  // Karte abgewählt → Schritt-Auswahl, Verbinden-Modus, Popovers, Umbenennen aufräumen
+  // Ausgewählte Verbindung im SVG markieren
   useEffect(() => {
-    if (!selected) { setSelNode(null); setConnectFrom(null); setTplOpen(false); setPendingTpl(null); setRename(null); }
+    const root = previewRef.current;
+    if (!root) return;
+    root.querySelectorAll('path.mm-selected-edge').forEach((p) => p.classList.remove('mm-selected-edge'));
+    if (!selEdge) return;
+    root.querySelectorAll('path.flowchart-link').forEach((p) => {
+      if (p.id.includes(`-L_${selEdge.from}_${selEdge.to}_`)) p.classList.add('mm-selected-edge');
+    });
+  }, [selEdge, svg]);
+
+  // Karte abgewählt → Schritt-/Kanten-Auswahl, Verbinden-Modus, Popovers, Umbenennen aufräumen
+  useEffect(() => {
+    if (!selected) { setSelNode(null); setSelEdge(null); setConnectFrom(null); setTplOpen(false); setPendingTpl(null); setRename(null); }
   }, [selected]);
 
   /** Vorlage laden — eigenen Code nicht durch einen Fehlklick verlieren.
@@ -222,18 +235,121 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     setSelNode(null);
   };
 
+  // ---------- Verbindungen direkt bearbeiten (M99) ----------
+  /** Kanten-Pfad → {from,to}. Pfad-ID: „<render-id>-L_<von>_<nach>_<n>" —
+   *  aufgelöst gegen die im SVG bekannten Knoten-IDs (IDs können _ enthalten) */
+  const edgeIdsOf = (p: SVGPathElement): { from: string; to: string } | null => {
+    const m = /-L_(.+)_\d+$/.exec(p.id ?? '');
+    if (!m) return null;
+    const known = new Set<string>();
+    previewRef.current?.querySelectorAll('g.node, g.rough-node').forEach((g) => {
+      const nid = nodeIdOf(g as SVGGElement);
+      if (nid) known.add(nid);
+    });
+    for (const f of known) {
+      if (m[1].startsWith(`${f}_`)) {
+        const rest = m[1].slice(f.length + 1);
+        if (known.has(rest)) return { from: f, to: rest };
+      }
+    }
+    return null;
+  };
+
+  const EDGE_DEF = '(?:\\(\\(.*?\\)\\)|\\[.*?\\]|\\{.*?\\}|\\(.*?\\))?';
+  const edgeLineRe = (from: string, to: string) =>
+    new RegExp(`^([ \\t]*)(${escapeRe(from)}${EDGE_DEF})\\s*(={2,}>|-\\.+->|-{2,}>)\\s*(\\|.*?\\|)?\\s*(${escapeRe(to)}${EDGE_DEF})\\s*$`);
+
+  const findEdgeFor = (from: string, to: string) => {
+    const re = edgeLineRe(from, to);
+    const lines = data.code.split('\n');
+    for (let i = 0; i < lines.length; i += 1) {
+      const m = re.exec(lines[i]);
+      if (m) return { i, m, lines };
+    }
+    return null;
+  };
+  const findEdgeLine = () => (selEdge ? findEdgeFor(selEdge.from, selEdge.to) : null);
+  const stripEdgeLabel = (raw?: string) =>
+    (raw ?? '').replace(/^\|/, '').replace(/\|$/, '').replace(/^"/, '').replace(/"$/, '');
+
+  /** Pfeil/Beschriftung einer Verbindung neu schreiben.
+   *  arrow: undefined = beibehalten; label: undefined = beibehalten, '' = entfernen */
+  const rewriteEdge = (arrow?: string, label?: string) => {
+    const f = findEdgeLine();
+    if (!f) return;
+    const [, pre, fromPart, oldArrow, oldLabel, toPart] = f.m;
+    const a = arrow ?? oldArrow;
+    const lbl = label === undefined ? (oldLabel ?? '') : label ? `|${asLabel(label)}|` : '';
+    f.lines[f.i] = `${pre}${fromPart} ${a}${lbl} ${toPart}`;
+    updateNodeData(id, { code: f.lines.join('\n') });
+  };
+
+  const removeEdge = () => {
+    const f = findEdgeLine();
+    if (!f || !selEdge) return;
+    const [, pre, fromPart, , , toPart] = f.m;
+    // Inline-Definitionen (A[Start] --> B{…}) überleben als eigene Zeilen
+    const keep: string[] = [];
+    if (fromPart.length > selEdge.from.length) keep.push(`${pre}${fromPart}`);
+    if (toPart.length > selEdge.to.length) keep.push(`${pre}${toPart}`);
+    f.lines.splice(f.i, 1, ...keep);
+    updateNodeData(id, { code: f.lines.join('\n') });
+    setSelEdge(null);
+  };
+
+  const startEdgeLabel = () => {
+    if (!selEdge) return;
+    setRename({
+      nid: '', edge: true,
+      x: Math.max(4, selEdge.x - 75), y: Math.max(4, selEdge.y - 14), w: 150,
+      value: stripEdgeLabel(findEdgeLine()?.m[4]),
+    });
+  };
+
+  // Aktueller Pfeil der ausgewählten Verbindung (für die aktiven Stil-Knöpfe)
+  const selEdgeArrow = selEdge ? (findEdgeLine()?.m[3] ?? '') : '';
+
+  /** Klickpunkt eines SVG-Elements → lokale Vorschau-Koordinaten (Zoom raus) */
+  const localCenter = (el: Element) => {
+    const root = previewRef.current!;
+    const rootRect = root.getBoundingClientRect();
+    const scale = root.offsetWidth ? rootRect.width / root.offsetWidth : 1;
+    const r = el.getBoundingClientRect();
+    return {
+      x: (r.left + r.width / 2 - rootRect.left) / scale + root.scrollLeft,
+      y: (r.top + r.height / 2 - rootRect.top) / scale + root.scrollTop,
+    };
+  };
+
   const onPreviewClick = (e: React.MouseEvent) => {
     const g = (e.target as Element).closest?.('g.node, g.rough-node') as SVGGElement | null;
-    if (!g || !isFlow) { setSelNode(null); setConnectFrom(null); return; }
-    const nid = nodeIdOf(g);
-    // Verbinden-Modus: zweiter Klick = Ziel → Pfeil ziehen
-    if (connectFrom && nid && nid !== connectFrom) {
-      updateNodeData(id, { code: `${data.code}\n  ${connectFrom} --> ${nid}` });
-      setConnectFrom(null);
+    if (g && isFlow) {
+      const nid = nodeIdOf(g);
+      // Verbinden-Modus: zweiter Klick = Ziel → Pfeil ziehen
+      if (connectFrom && nid && nid !== connectFrom) {
+        updateNodeData(id, { code: `${data.code}\n  ${connectFrom} --> ${nid}` });
+        setConnectFrom(null);
+        setSelNode(nid);
+        return;
+      }
       setSelNode(nid);
+      setSelEdge(null);
       return;
     }
-    setSelNode(nid);
+    // Klick auf einen Pfeil → Verbindung auswählen (M99)
+    const p = (e.target as Element).closest?.('path.flowchart-link') as SVGPathElement | null;
+    if (p && isFlow) {
+      const ids = edgeIdsOf(p);
+      if (ids) {
+        setSelEdge({ ...ids, ...localCenter(p) });
+        setSelNode(null);
+        setConnectFrom(null);
+        return;
+      }
+    }
+    setSelNode(null);
+    setSelEdge(null);
+    setConnectFrom(null);
   };
 
   /** Inline-Umbenennen starten: Eingabefeld exakt über den Schritt legen.
@@ -258,15 +374,37 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   };
 
   const commitRename = () => {
-    if (rename?.value.trim()) renameNode(rename.nid, rename.value.trim());
+    if (rename?.edge) {
+      // Leerer Wert = Beschriftung entfernen (bei Kanten erlaubt)
+      rewriteEdge(undefined, rename.value.trim());
+    } else if (rename?.value.trim()) {
+      renameNode(rename.nid, rename.value.trim());
+    }
     setRename(null);
   };
 
   const onPreviewDblClick = (e: React.MouseEvent) => {
+    if (!isFlow) return;
     const g = (e.target as Element).closest?.('g.node, g.rough-node') as SVGGElement | null;
-    if (!g || !isFlow) return;
-    const nid = nodeIdOf(g);
-    if (nid) startRename(nid);
+    if (g) {
+      const nid = nodeIdOf(g);
+      if (nid) startRename(nid);
+      return;
+    }
+    // Doppelklick auf einen Pfeil → Beschriftung direkt bearbeiten
+    const p = (e.target as Element).closest?.('path.flowchart-link') as SVGPathElement | null;
+    if (p) {
+      const ids = edgeIdsOf(p);
+      if (!ids) return;
+      const c = localCenter(p);
+      setSelEdge({ ...ids, ...c });
+      setSelNode(null);
+      setRename({
+        nid: '', edge: true,
+        x: Math.max(4, c.x - 75), y: Math.max(4, c.y - 14), w: 150,
+        value: stripEdgeLabel(findEdgeFor(ids.from, ids.to)?.m[4]),
+      });
+    }
   };
 
   const renameSelected = () => { if (selNode) startRename(selNode); };
@@ -329,6 +467,19 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             </button>
             <button className="danger" title="Schritt aus dem Diagramm entfernen" onClick={() => removeNode(selNode)}>Entfernen</button>
             <button onClick={() => { setSelNode(null); setConnectFrom(null); }} title="Schritt-Auswahl aufheben">✕</button>
+          </div>
+        )}
+        {selEdge && !selNode && (
+          <div className="mm-row mm-step-row">
+            <span className="mm-sel-name" title="Ausgewählte Verbindung">{selEdge.from} → {selEdge.to}</span>
+            <button onClick={startEdgeLabel}>✎ Beschriften</button>
+            <span className="mm-sep" />
+            <button className={/^-{2,}>$/.test(selEdgeArrow) ? 'active' : ''} title="Linie: durchgezogen" onClick={() => rewriteEdge('-->')}>─</button>
+            <button className={selEdgeArrow.startsWith('-.') ? 'active' : ''} title="Linie: gepunktet" onClick={() => rewriteEdge('-.->')}>┄</button>
+            <button className={selEdgeArrow.startsWith('=') ? 'active' : ''} title="Linie: dick (Betonung)" onClick={() => rewriteEdge('==>')}>━</button>
+            <span className="mm-sep" />
+            <button className="danger" title="Verbindung entfernen (Schritte bleiben)" onClick={removeEdge}>Entfernen</button>
+            <button onClick={() => setSelEdge(null)} title="Auswahl aufheben">✕</button>
           </div>
         )}
         <div className="mm-row">
@@ -415,7 +566,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             <div className="mm-hint mm-hint-connect">→ Ziel-Schritt anklicken, um „{connectFrom}" zu verbinden</div>
           )}
           {isFlow && !error && !connectFrom && selected && (
-            <div className="mm-hint">Klick auf einen Schritt = bearbeiten · Doppelklick = umbenennen</div>
+            <div className="mm-hint">Klick auf Schritt oder Pfeil = bearbeiten · Doppelklick = umbenennen/beschriften</div>
           )}
         </div>
       </div>
