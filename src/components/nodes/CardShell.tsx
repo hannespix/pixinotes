@@ -27,13 +27,41 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   });
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const resizingRef = useRef(false);
+  // Maus/Finger irgendwo auf der Karte gedrückt? Dann fasst KEINE Automatik
+  // die Größe an — unabhängig davon, ob der Resize-Handler feuert (M106,
+  // „manuell gewinnt immer", ohne jede Lücke)
+  const pointerDownRef = useRef(false);
   // Aktueller autoFit-Wert ohne Stale-Closure-Risiko (Resize-Callbacks)
   const autoFitRef = useRef(autoFit);
   autoFitRef.current = autoFit;
   // Schonfrist nach manuellem Ziehen: in dieser Zeit fasst die Automatik
   // die Größe GARANTIERT nicht an (M104 — „manuell gewinnt immer")
   const lastResizeEnd = useRef(0);
+  // Struktur-Erkennung (M106): Layouts mit 100%-Höhen „wachsen mit" — der
+  // Überlauf schrumpft nach dem Wachsen nicht → nicht endlos weiterwachsen
+  const lastDelta = useRef<number | null>(null);
   const evalRef = useRef<(() => void) | null>(null);
+
+  // Pointer-Wache: down auf der Karte → Automatik pausiert; up → Schonfrist
+  useEffect(() => {
+    const shell = bodyRef.current?.parentElement;
+    if (!shell) return;
+    const down = () => { pointerDownRef.current = true; };
+    const up = () => {
+      if (pointerDownRef.current) {
+        pointerDownRef.current = false;
+        lastResizeEnd.current = Date.now();
+      }
+    };
+    shell.addEventListener('pointerdown', down, true);
+    window.addEventListener('pointerup', up, true);
+    window.addEventListener('pointercancel', up, true);
+    return () => {
+      shell.removeEventListener('pointerdown', down, true);
+      window.removeEventListener('pointerup', up, true);
+      window.removeEventListener('pointercancel', up, true);
+    };
+  }, []);
   // Inhalt läuft über die feste Kartengröße hinaus → Einpassen ANBIETEN
   const [overflowing, setOverflowing] = useState(false);
 
@@ -43,6 +71,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     if (!body) return;
     const delta = body.scrollHeight - body.clientHeight;
     if (delta <= 0) { setOverflowing(false); return; }
+    lastDelta.current = delta; // Struktur-Erkennung: erneutes Angebot nur bei echter Änderung
     const shell = body.parentElement as HTMLElement | null;
     const current = shell?.offsetHeight ?? body.clientHeight;
     setNodeHeight(id, Math.min(current + delta + 2, 860));
@@ -60,22 +89,30 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     const body = bodyRef.current;
     if (!body) return;
     let t: number | undefined;
-    const evalNow = () => {
-      if (resizingRef.current || Date.now() - lastResizeEnd.current < 800) return;
+    const evalNow = (force = false) => {
+      // Absolute Sperre: gedrückte Maus/gehaltener Finger auf der Karte
+      if (resizingRef.current || pointerDownRef.current) return;
+      if (!force && Date.now() - lastResizeEnd.current < 800) return;
       const delta = body.scrollHeight - body.clientHeight;
+      // Struktur-Erkennung: Überlauf blieb nach dem letzten Wachsen gleich →
+      // 100%-Layout, das einfach mitwächst — nie endlos vergrößern (M106)
+      const structural = lastDelta.current != null && Math.abs(lastDelta.current - delta) < 3;
       if (autoFitRef.current) {
         setOverflowing(false);
-        if (delta <= 6) return;
+        if (delta <= 6) { lastDelta.current = null; return; }
+        if (structural) return;
+        lastDelta.current = delta;
         const shell = body.parentElement as HTMLElement | null; // .card-shell = Kartenhöhe
         const current = shell?.offsetHeight ?? body.clientHeight;
         runDerived(() => setNodeHeight(id, Math.min(current + delta + 2, 860)));
       } else {
-        setOverflowing(delta > 10);
+        if (delta <= 10) { lastDelta.current = null; setOverflowing(false); return; }
+        setOverflowing(!structural);
       }
     };
     const schedule = () => { window.clearTimeout(t); t = window.setTimeout(evalNow, 300); };
     evalRef.current = schedule;
-    evalNow(); // beim Einschalten sofort einpassen bzw. Überlauf prüfen
+    evalNow(true); // beim Einschalten sofort einpassen bzw. Überlauf prüfen
     const mo = new MutationObserver(schedule);
     mo.observe(body, { subtree: true, childList: true, characterData: true, attributes: true });
     body.addEventListener('load', schedule, true); // nachladende Bilder
