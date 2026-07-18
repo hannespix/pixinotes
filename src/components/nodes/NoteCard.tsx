@@ -7,6 +7,7 @@ import { de as blockNoteDe } from '@blocknote/core/locales';
 import { useBoard } from '../../store';
 import { STICKY_COLORS, type NoteNode } from '../../types';
 import { blocksToText } from '../../lib/serialize';
+import { useAndroidBackspaceFix } from '../../lib/blocknoteAndroidFix';
 import { extractWikilinks, resolveLink } from '../../lib/links';
 import { extractEntities } from '../../lib/entities';
 import { makeNote } from '../../lib/nodes';
@@ -103,6 +104,7 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
   });
 
   const editor = useCreateBlockNote({ initialContent, dictionary: blockNoteDe });
+  useAndroidBackspaceFix(editor);
 
   // Frische, leere Notiz: sofort den Cursor reinsetzen — lostippen ohne Extra-Klick
   useEffect(() => {
