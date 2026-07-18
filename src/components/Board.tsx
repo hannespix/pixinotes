@@ -72,6 +72,82 @@ export function Board() {
 
   const { screenToFlowPosition, setCenter, fitView, getViewport, setViewport } = useReactFlow();
   const wheelZoom = useBoard((s) => s.wheelZoom);
+
+  // ---------- Zoom-Durchgriff ÜBER Modulen (M123) ----------
+  // Karteninhalte (Notiz-Editor, Kanban, Diagramm …) tragen nowheel/eigene
+  // Scroller — Strg+Rad, Trackpad-Pinch (= Rad mit ctrlKey) und der
+  // Zwei-Finger-Pinch sollen trotzdem IMMER das Board zoomen. Normales
+  // Scrollen im Modul bleibt unangetastet. Native Listener (non-passive),
+  // weil React Wheel/Touch am Root passiv registriert.
+  const zoomWrapRef = useRef<HTMLDivElement | null>(null);
+  const wheelZoomRef = useRef(wheelZoom);
+  wheelZoomRef.current = wheelZoom;
+  const pinchRef = useRef<{ dist: number; zoom: number; fx: number; fy: number } | null>(null);
+  useEffect(() => {
+    const wrap = zoomWrapRef.current;
+    if (!wrap) return;
+    const clampZoom = (z: number) => Math.max(0.15, Math.min(2.5, z));
+    const zoomAt = (clientX: number, clientY: number, newZoom: number, fx?: number, fy?: number) => {
+      const rect = wrap.getBoundingClientRect();
+      const px = clientX - rect.left;
+      const py = clientY - rect.top;
+      const { x, y, zoom } = getViewport();
+      const flowX = fx ?? (px - x) / zoom;
+      const flowY = fy ?? (py - y) / zoom;
+      void setViewport({ x: px - flowX * newZoom, y: py - flowY * newZoom, zoom: newZoom });
+      return { flowX, flowY };
+    };
+    const onWheel = (e: WheelEvent) => {
+      const inNode = (e.target as Element | null)?.closest?.('.react-flow__node');
+      if (!inNode) return; // auf der Fläche macht React Flow das selbst
+      if (!e.ctrlKey && !wheelZoomRef.current) return; // Modul-Scroll bleibt
+      e.preventDefault();
+      e.stopPropagation();
+      const factor = Math.pow(2, -e.deltaY * (e.ctrlKey ? 0.01 : 0.0022));
+      zoomAt(e.clientX, e.clientY, clampZoom(getViewport().zoom * factor));
+    };
+    const touchDist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const touchMid = (t: TouchList) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length !== 2) return;
+      const inNode = (e.target as Element | null)?.closest?.('.react-flow__node');
+      if (!inNode) return; // Pinch auf der Fläche gehört React Flow
+      e.preventDefault(); // Modul-Scroll/Textauswahl nicht starten lassen
+      const mid = touchMid(e.touches);
+      const rect = wrap.getBoundingClientRect();
+      const { x, y, zoom } = getViewport();
+      pinchRef.current = {
+        dist: touchDist(e.touches),
+        zoom,
+        fx: (mid.x - rect.left - x) / zoom,
+        fy: (mid.y - rect.top - y) / zoom,
+      };
+    };
+    const onTouchMove = (e: TouchEvent) => {
+      const p = pinchRef.current;
+      if (!p || e.touches.length !== 2) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const mid = touchMid(e.touches);
+      const newZoom = clampZoom(p.zoom * (touchDist(e.touches) / p.dist));
+      zoomAt(mid.x, mid.y, newZoom, p.fx, p.fy);
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) pinchRef.current = null;
+    };
+    wrap.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    wrap.addEventListener('touchstart', onTouchStart, { capture: true, passive: false });
+    wrap.addEventListener('touchmove', onTouchMove, { capture: true, passive: false });
+    wrap.addEventListener('touchend', onTouchEnd, true);
+    wrap.addEventListener('touchcancel', onTouchEnd, true);
+    return () => {
+      wrap.removeEventListener('wheel', onWheel, { capture: true } as EventListenerOptions);
+      wrap.removeEventListener('touchstart', onTouchStart, { capture: true } as EventListenerOptions);
+      wrap.removeEventListener('touchmove', onTouchMove, { capture: true } as EventListenerOptions);
+      wrap.removeEventListener('touchend', onTouchEnd, true);
+      wrap.removeEventListener('touchcancel', onTouchEnd, true);
+    };
+  }, [getViewport, setViewport]);
   const pendingFocus = useBoard((s) => s.pendingFocus);
   const clearPendingFocus = useBoard((s) => s.clearPendingFocus);
 
@@ -538,6 +614,7 @@ export function Board() {
 
   return (
     <div
+      ref={zoomWrapRef}
       className={`board-wrap ${spaceHeld ? 'space-pan' : ''} ${boardBg ? `board-bg-${boardBg}` : ''}`}
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}
