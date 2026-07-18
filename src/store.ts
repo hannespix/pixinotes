@@ -185,6 +185,8 @@ interface BoardState {
   updateEdgeKind: (id: string, kind: string) => void;
   removeEdge: (id: string) => void;
   addNode: (node: AppNode) => void;
+  /** Karte in ein BELIEBIGES Board einfügen (Schnell-Eingabe der Aufgaben-Zentrale, M114) */
+  addNodeToBoard: (boardId: string, node: AppNode) => void;
   removeNode: (id: string) => void;
   removeNodes: (ids: string[]) => void;
   restoreDeleted: () => void;
@@ -994,6 +996,14 @@ export const useBoard = create<BoardState>()(
         addNode: (node) => {
           get().pushHistory();
           patchActive((b) => ({ nodes: [...b.nodes, node] }));
+        },
+
+        addNodeToBoard: (boardId, node) => {
+          get().pushHistory();
+          set({
+            boards: get().boards.map((b) =>
+              b.id === boardId ? { ...b, nodes: [...b.nodes, node] } : b),
+          });
         },
 
         removeNode: (id) => get().removeNodes([id]),

@@ -50,6 +50,8 @@ export interface KanbanItem {
   col: number;
   /** Fälligkeitsdatum (ISO yyyy-mm-dd) — Basis für Erinnerungen & Aufgaben-Zentrale */
   due?: string;
+  /** Priorität (M114): 1 = hoch (!!!), 2 = mittel (!!), 3 = niedrig (!) */
+  prio?: 1 | 2 | 3;
   /** Beschreibung/Details (Ticket-Detailansicht) */
   note?: string;
   /** Verantwortliche Person */

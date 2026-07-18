@@ -23,6 +23,8 @@ export interface TaskRef {
   urgency: TaskUrgency;
   /** Verantwortliche Person (Kanban „who" / Gantt-Ressource) — M113 */
   who?: string;
+  /** Priorität (nur Kanban, M114): 1 = hoch, 2 = mittel, 3 = niedrig */
+  prio?: 1 | 2 | 3;
 }
 
 interface AnyBlock {
@@ -103,6 +105,7 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
             due: item.due,
             urgency: urgencyFor(item.due, now),
             who: item.who?.trim() || undefined,
+            prio: item.prio,
           });
         }
       } else if (node.type === 'gantt') {
@@ -161,9 +164,80 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
   const rank: Record<TaskUrgency, number> = { overdue: 0, soon: 1, ok: 2, none: 3 };
   return out.sort((a, b) =>
     rank[a.urgency] - rank[b.urgency]
+    || (a.prio ?? 9) - (b.prio ?? 9) // Priorität schlägt Datum innerhalb der Dringlichkeit (M114)
     || (a.due ?? '9999').localeCompare(b.due ?? '9999')
     || a.boardName.localeCompare(b.boardName),
   );
+}
+
+// ---------- Schlaue Schnell-Eingabe (M114) ----------
+export interface QuickParse {
+  text: string;
+  who?: string;
+  due?: string;
+  prio?: 1 | 2 | 3;
+}
+
+/**
+ * „Bericht ans RP bis Freitag @Anna #haushalt !!" →
+ * Frist (chrono), Person (@…), Priorität (!=niedrig … !!!=hoch); #Tags
+ * bleiben bewusst im Text — dort liest sie der Kanban-Tag-Filter (M65).
+ */
+export function parseQuickTask(input: string, now: Date = new Date()): QuickParse {
+  let text = input.trim();
+  let prio: 1 | 2 | 3 | undefined;
+  const bang = text.match(/(?:^|\s)(!{1,3})(?=\s|$)/);
+  if (bang) {
+    prio = (4 - bang[1].length) as 1 | 2 | 3;
+    text = text.replace(bang[0], ' ');
+  }
+  let who: string | undefined;
+  const at = text.match(/(?:^|\s)@([\p{L}\p{N}._-]+)/u);
+  if (at) {
+    who = at[1];
+    text = text.replace(at[0], ' ');
+  }
+  let due: string | undefined;
+  const d = detectDates(text, now)[0];
+  if (d) {
+    due = isoLocal(d.date);
+    const esc = d.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Frist-Phrase samt führendem „bis/am/zum/ab" aus dem Titel nehmen
+    text = text.replace(new RegExp(`(?:\\b(?:bis|am|zum|ab)\\s+)?${esc}`, 'i'), ' ');
+  }
+  return { text: text.replace(/\s{2,}/g, ' ').trim(), who, due, prio };
+}
+
+// ---------- „Heute geschafft" (M114): Erledigt-Protokoll ----------
+const DONE_LOG_KEY = 'pixinotes:donelog';
+
+export interface DoneEntry { d: string; text: string; board: string }
+
+export function doneLog(): DoneEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(DONE_LOG_KEY) ?? '[]') as DoneEntry[];
+  } catch {
+    return [];
+  }
+}
+
+/** Erledigung protokollieren (Basis für „Heute geschafft" + Wochen-Balken) */
+export function logDone(t: TaskRef): void {
+  const list = doneLog();
+  list.push({ d: isoLocal(new Date()), text: t.text.slice(0, 120), board: t.boardName });
+  localStorage.setItem(DONE_LOG_KEY, JSON.stringify(list.slice(-400)));
+}
+
+/** #Tags aus Aufgabentexten einsammeln (für den Tag-Filter der Zentrale) */
+export function collectTaskTags(tasks: TaskRef[]): string[] {
+  const seen = new Map<string, number>();
+  for (const t of tasks) {
+    for (const m of t.text.matchAll(/#([\p{L}\p{N}_-]{2,})/gu)) {
+      const tag = m[1].toLowerCase();
+      seen.set(tag, (seen.get(tag) ?? 0) + 1);
+    }
+  }
+  return [...seen.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t).slice(0, 12);
 }
 
 /** Checklisten-Block per ID oder Positionspfad (`pos:2.0`) abhaken — liefert neuen Block-Baum */

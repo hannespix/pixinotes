@@ -226,6 +226,10 @@ export function HelpOverlay() {
                 <li>Aufgaben entstehen überall: Kanban-Tickets, ☐-Checklisten in Notizen und <b>Zeitplan-Vorgänge</b> (alles unter 100 % zählt als offen, Frist = Balken-Ende).</li>
                 <li>Die <b>✅-Zentrale</b> im Dock sammelt alles boardübergreifend, <b>gruppiert nach Frist</b> (Überfällig · Heute · Diese Woche · Später · Ohne Frist, Abschnitte einklappbar): Abhaken (Gantt = Fortschritt 100 %), Fälligkeit ändern, <b>+1T/+1W schlummern</b>, Schnell-Eingabe, Kalender-Export (.ics).</li>
                 <li><b>Wer macht was:</b> Personen aus Tickets und Zeitplan-Ressourcen lassen sich filtern oder per 👥 als Gruppierung anzeigen.</li>
+                <li><b>Schnell-Eingabe versteht Kurzzeichen:</b> „Bericht ans RP <b>bis Freitag @Anna #haushalt !!</b>" setzt Frist, Person und Priorität automatisch (! niedrig · !! mittel · !!! hoch); das Ziel-Board ist wählbar. <b>Prioritäten</b> sortieren vor und lassen sich per Klick auf das !-Zeichen an der Zeile durchschalten.</li>
+                <li><b>Suchen & Filtern:</b> Freitext-Suche und #Tag-Chips direkt in der Zentrale; Kanban-Tickets zeigen ihre Priorität auch auf dem Board.</li>
+                <li><b>Spalte direkt umstellen:</b> „To Do → In Arbeit" gleich aus der Liste — die letzte Spalte erledigt das Ticket.</li>
+                <li><b>Heute geschafft:</b> unten sammelt ein Protokoll alles, was du in der Zentrale abhakst — mit Wochen-Balken der letzten 7 Tage.</li>
                 <li><b>Erinnerungen:</b> Fällige Aufgaben melden sich beim Öffnen und regelmäßig als Hinweis — optional als System-Benachrichtigung.</li>
                 <li>Fälligkeiten am Ticket (📅) steuern alles; „bis Freitag"/Datum im Text zählt auch bei Checklisten-Punkten als Frist.</li>
               </ul>

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { useBoard } from '../store';
-import { doneCol, uid, type GanttData, type KanbanData } from '../types';
+import { doneCol, kanbanCols, uid, type GanttData, type KanbanData } from '../types';
 import { makeKanban } from '../lib/nodes';
 import {
-  collectTasks, downloadTasksIcs, formatDueShort, shiftIso, toggleCheckBlock, type TaskRef,
+  collectTaskTags, collectTasks, doneLog, downloadTasksIcs, formatDueShort, logDone,
+  parseQuickTask, shiftIso, toggleCheckBlock, type TaskRef,
 } from '../lib/tasks';
-import { IBell, ICalendar, IGantt, IKanban, INote, IUsers, IX } from './Icons';
+import { IBell, ICalendar, IGantt, IKanban, INote, ISearch, IUsers, IX } from './Icons';
+
+const PRIO_LABEL: Record<1 | 2 | 3, string> = { 1: '!!!', 2: '!!', 3: '!' };
 
 type Filter = 'all' | 'today' | 'overdue';
 
@@ -49,6 +52,10 @@ export function TaskHub() {
   const [groupByPerson, setGroupByPerson] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [quick, setQuick] = useState('');
+  const [quickBoard, setQuickBoard] = useState(''); // '' = aktives Board
+  const [search, setSearch] = useState('');
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [doneOpen, setDoneOpen] = useState(false);
 
   const todayIso = new Date().toISOString().slice(0, 10);
   const allTasks = useMemo(() => collectTasks(boards), [boards]);
@@ -56,9 +63,12 @@ export function TaskHub() {
     () => [...new Set(allTasks.map((t) => t.who).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b)),
     [allTasks],
   );
+  const tags = useMemo(() => collectTaskTags(allTasks), [allTasks]);
   const tasks = allTasks.filter((t) => {
     if (boardFilter !== 'all' && t.boardId !== boardFilter) return false;
     if (personFilter !== 'all' && t.who !== personFilter) return false;
+    if (tagFilter && !t.text.toLowerCase().includes(`#${tagFilter}`)) return false;
+    if (search && !t.text.toLowerCase().includes(search.toLowerCase())) return false;
     if (filter === 'today') return t.urgency === 'overdue' || t.due === todayIso;
     if (filter === 'overdue') return t.urgency === 'overdue';
     return true;
@@ -102,6 +112,7 @@ export function TaskHub() {
     const board = boards.find((b) => b.id === t.boardId);
     const node = board?.nodes.find((n) => n.id === t.nodeId);
     if (!board || !node) return;
+    logDone(t); // „Heute geschafft"-Protokoll (M114)
     if (t.kind === 'kanban') {
       const k = node.data as KanbanData;
       updateNodeDataOnBoard(t.boardId, t.nodeId, {
@@ -148,21 +159,66 @@ export function TaskHub() {
     setDue(t, shiftIso(base, days));
   };
 
-  /** Schnell-Eingabe: Ticket im Kanban des aktiven Boards anlegen (T3) */
+  /** Priorität durchschalten (M114): hoch → mittel → niedrig → keine */
+  const cyclePrio = (t: TaskRef) => {
+    const node = boards.find((b) => b.id === t.boardId)?.nodes.find((n) => n.id === t.nodeId);
+    if (!node || t.kind !== 'kanban') return;
+    const k = node.data as KanbanData;
+    const next = t.prio === undefined ? 1 : t.prio >= 3 ? undefined : ((t.prio + 1) as 1 | 2 | 3);
+    updateNodeDataOnBoard(t.boardId, t.nodeId, {
+      items: k.items.map((it) => (it.id === t.itemId ? { ...it, prio: next } : it)),
+    });
+  };
+
+  /** Kanban-Spalte direkt aus der Liste umstellen (M114) */
+  const moveToCol = (t: TaskRef, col: number) => {
+    const node = boards.find((b) => b.id === t.boardId)?.nodes.find((n) => n.id === t.nodeId);
+    if (!node || t.kind !== 'kanban') return;
+    const k = node.data as KanbanData;
+    if (col >= doneCol(k)) { complete(t); return; } // letzte Spalte = erledigt
+    updateNodeDataOnBoard(t.boardId, t.nodeId, {
+      items: k.items.map((it) => (it.id === t.itemId ? { ...it, col } : it)),
+    });
+  };
+
+  /** Spaltennamen des Kanbans hinter einer Aufgabe (für das Spalten-Menü) */
+  const colsOf = (t: TaskRef): string[] | null => {
+    if (t.kind !== 'kanban') return null;
+    const node = boards.find((b) => b.id === t.boardId)?.nodes.find((n) => n.id === t.nodeId);
+    return node ? kanbanCols(node.data as KanbanData) : null;
+  };
+  const colOf = (t: TaskRef): number => {
+    const node = boards.find((b) => b.id === t.boardId)?.nodes.find((n) => n.id === t.nodeId);
+    const k = node?.data as KanbanData | undefined;
+    return k?.items.find((it) => it.id === t.itemId)?.col ?? 0;
+  };
+
+  /** Schlaue Schnell-Eingabe (T3/M114): „… bis Freitag @Anna #tag !!" */
   const quickAdd = () => {
-    const text = quick.trim();
-    if (!text) return;
+    if (!quick.trim()) return;
+    const parsed = parseQuickTask(quick);
+    if (!parsed.text) { showToast('Bitte auch einen Aufgabentext angeben.'); return; }
     const st = useBoard.getState();
-    const board = st.boards.find((b) => b.id === st.activeId) ?? st.boards[0];
+    const board = st.boards.find((b) => b.id === (quickBoard || st.activeId)) ?? st.boards[0];
     let kanban = board.nodes.find((n) => n.type === 'kanban') as import('../types').AppNode | undefined;
     if (!kanban) {
       kanban = makeKanban({ x: 140, y: 140 }, 'Aufgaben');
-      st.addNode(kanban);
+      st.addNodeToBoard(board.id, kanban);
     }
     const k = kanban.data as KanbanData;
-    st.updateNodeDataOnBoard(board.id, kanban.id, { items: [...k.items, { id: uid(), text, col: 0 }] });
+    st.updateNodeDataOnBoard(board.id, kanban.id, {
+      items: [...k.items, {
+        id: uid(), text: parsed.text, col: 0,
+        due: parsed.due, who: parsed.who, prio: parsed.prio,
+      }],
+    });
     setQuick('');
-    showToast(`Aufgabe in „${board.name}" angelegt`);
+    const extras = [
+      parsed.due ? `Frist ${formatDueShort(parsed.due)}` : '',
+      parsed.who ? `@${parsed.who}` : '',
+      parsed.prio ? `Prio ${PRIO_LABEL[parsed.prio]}` : '',
+    ].filter(Boolean).join(' · ');
+    showToast(`Aufgabe in „${board.name}" angelegt${extras ? ` (${extras})` : ''}`);
   };
 
   const jumpTo = (t: TaskRef) => {
@@ -232,14 +288,45 @@ export function TaskHub() {
         )}
       </div>
 
-      {/* Schnell-Eingabe (T3) */}
-      <input
-        className="taskhub-quick"
-        placeholder="Neue Aufgabe eingeben und Enter drücken — landet im Kanban des aktiven Boards"
-        value={quick}
-        onChange={(e) => setQuick(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && quickAdd()}
-      />
+      {/* Suche + #Tag-Filter (M114) */}
+      <div className="taskhub-filters th-searchrow">
+        <span className="th-search">
+          <ISearch size={13} />
+          <input
+            placeholder="In Aufgaben suchen …"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </span>
+        {tags.map((tag) => (
+          <button
+            key={tag}
+            className={`th-chip ${tagFilter === tag ? 'on' : ''}`}
+            onClick={() => setTagFilter((t) => (t === tag ? null : tag))}
+            title={`Nur Aufgaben mit #${tag}`}
+          >#{tag}</button>
+        ))}
+      </div>
+
+      {/* Schlaue Schnell-Eingabe (T3/M114) */}
+      <div className="taskhub-quickrow">
+        <input
+          className="taskhub-quick"
+          placeholder={'Neue Aufgabe … — versteht „bis Freitag", @Person, #tag und !/!!/!!! als Priorität'}
+          value={quick}
+          onChange={(e) => setQuick(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && quickAdd()}
+        />
+        <select
+          className="th-board th-quickboard"
+          value={quickBoard}
+          onChange={(e) => setQuickBoard(e.target.value)}
+          title="Ziel-Board der Schnell-Eingabe"
+        >
+          <option value="">→ aktives Board</option>
+          {boards.map((b) => <option key={b.id} value={b.id}>→ {b.name}</option>)}
+        </select>
+      </div>
 
       {tasks.length === 0 ? (
         <div className="taskhub-empty">
@@ -272,7 +359,28 @@ export function TaskHub() {
                         </span>
                         {t.text}
                       </button>
+                      {t.kind === 'kanban' && (
+                        <button
+                          className={`task-prio prio-${t.prio ?? 0}`}
+                          title={t.prio ? `Priorität ${t.prio === 1 ? 'hoch' : t.prio === 2 ? 'mittel' : 'niedrig'} — Klick schaltet weiter` : 'Priorität setzen (Klick: hoch → mittel → niedrig → keine)'}
+                          onClick={() => cyclePrio(t)}
+                        >{t.prio ? PRIO_LABEL[t.prio] : '!'}</button>
+                      )}
                       {t.who && !groupByPerson && <span className="task-who" title="Zuständig">{t.who}</span>}
+                      {t.kind === 'kanban' && (() => {
+                        const cols = colsOf(t);
+                        if (!cols) return null;
+                        return (
+                          <select
+                            className="task-col"
+                            value={colOf(t)}
+                            title="Kanban-Spalte umstellen"
+                            onChange={(e) => moveToCol(t, Number(e.target.value))}
+                          >
+                            {cols.map((c, i) => <option key={i} value={i}>{c}</option>)}
+                          </select>
+                        );
+                      })()}
                       {(t.kind === 'kanban' || t.kind === 'gantt') && (
                         <input
                           type="date"
@@ -298,6 +406,50 @@ export function TaskHub() {
           ))}
         </div>
       )}
+      {/* „Heute geschafft" (M114): Erledigt-Protokoll + Wochen-Balken */}
+      {(() => {
+        const log = doneLog();
+        const today = log.filter((e) => e.d === todayIso);
+        const week = [...Array(7)].map((_, i) => {
+          const d = new Date(); d.setDate(d.getDate() - (6 - i));
+          const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          return { iso, n: log.filter((e) => e.d === iso).length, label: d.toLocaleDateString('de-DE', { weekday: 'short' }) };
+        });
+        const max = Math.max(1, ...week.map((w) => w.n));
+        if (log.length === 0) return null;
+        return (
+          <section className="th-done">
+            <button className="th-group-head" onClick={() => setDoneOpen((o) => !o)} aria-expanded={doneOpen}>
+              <span className="th-group-caret">{doneOpen ? '▾' : '▸'}</span>
+              Heute geschafft
+              <span className="th-group-count">{today.length}</span>
+              <span className="th-week" title="Erledigte Aufgaben der letzten 7 Tage" aria-hidden="true">
+                {week.map((w) => (
+                  <span key={w.iso} className="th-week-bar" title={`${w.label}: ${w.n}`}>
+                    <i style={{ height: `${Math.round((w.n / max) * 100)}%` }} className={w.iso === todayIso ? 'today' : ''} />
+                  </span>
+                ))}
+              </span>
+            </button>
+            {doneOpen && (
+              today.length === 0
+                ? <div className="th-done-empty">Heute noch nichts abgehakt — die Woche zeigt die letzten 7 Tage.</div>
+                : (
+                  <ul>
+                    {today.slice(-30).reverse().map((e, i) => (
+                      <li key={i} className="task-row th-done-row">
+                        <span className="th-done-check">✓</span>
+                        <span className="task-text">{e.text}</span>
+                        <span className="task-board">{e.board}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )
+            )}
+          </section>
+        );
+      })()}
+
       <div className="taskhub-foot">
         Fällige Aufgaben melden sich beim Öffnen der App und danach regelmäßig als Erinnerung.
       </div>

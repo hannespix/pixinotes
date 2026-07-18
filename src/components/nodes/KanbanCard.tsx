@@ -268,6 +268,11 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         title="Ticket öffnen (Details, Person, Verknüpfung)"
         onClick={() => setDetailId(it.id)}
       >
+        {it.prio && colIdx < done && (
+          <b className={`k-prio prio-${it.prio}`} title={`Priorität ${it.prio === 1 ? 'hoch' : it.prio === 2 ? 'mittel' : 'niedrig'}`}>
+            {'!'.repeat(4 - it.prio)}{' '}
+          </b>
+        )}
         {it.text}
       </span>
       {(it.who || it.note || it.link) && (
