@@ -21,12 +21,11 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   const setNodeHeight = useBoard((s) => s.setNodeHeight);
   const setAutoFit = useBoard((s) => s.setAutoFit);
   const showToast = useBoard((s) => s.showToast);
+  // Auto-Größe ist STANDARDMÄSSIG AN (M111) — false heißt: manuell gebrochen
   const autoFit = useBoard((s) => {
     const b = s.boards.find((x) => x.id === s.activeId);
-    return b?.nodes.find((n) => n.id === id)?.autoFit ?? false;
+    return (b?.nodes.find((n) => n.id === id)?.autoFit ?? true) !== false;
   });
-  // Globaler Not-Aus (M107): schaltet Auto-Größe UND ⤢-Hinweise komplett ab
-  const globalAuto = useBoard((s) => s.autoSizeEnabled ?? true);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const resizingRef = useRef(false);
   // Maus/Finger irgendwo auf der Karte gedrückt? Dann fasst KEINE Automatik
@@ -131,7 +130,6 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   useEffect(() => {
     const body = bodyRef.current;
     if (!body) return;
-    if (!globalAuto) { setOverflowing(false); return; } // Automatik global aus: nichts beobachten
     let t: number | undefined;
     const later = (ms: number, force = false) => { window.clearTimeout(t); t = window.setTimeout(() => evalNow(force), ms); };
     const evalNow = (force = false) => {
@@ -174,7 +172,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     body.addEventListener('load', schedule, true); // nachladende Bilder
     return () => { mo.disconnect(); body.removeEventListener('load', schedule, true); window.clearTimeout(t); evalRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoFit, globalAuto, id]);
+  }, [autoFit, id]);
 
   // Wichtig: Lösch-Knopf & Handles liegen AUSSERHALB des card-body,
   // damit dessen overflow:hidden sie nicht abschneidet.
@@ -223,7 +221,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       <Handle id="body" type="source" position={Position.Left} className="pn-handle-body" isConnectableStart={false} />
       {/* Angebots-Chip (M104): Inhalt größer als die Karte → EINMAL einpassen.
           Nur ein Angebot — die manuelle Größe wird nie von selbst geändert. */}
-      {globalAuto && !autoFit && overflowing && (
+      {!autoFit && overflowing && (
         <button
           className="fit-hint nodrag"
           title="Der Inhalt ist größer als die Karte — Klick passt die Höhe einmalig an (dauerhafte Auto-Größe: ⤢ in der Auswahl-Leiste)"

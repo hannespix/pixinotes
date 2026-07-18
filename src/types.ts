@@ -142,6 +142,7 @@ export type AppNode =
   // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface.
   // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der
   // Nutzer manuell zieht (das schaltet ab); wieder aktivierbar per Auswahl-Leiste.
+  // Seit M111 STANDARD AN: undefined = an, false = manuell gebrochen.
   & { archived?: boolean; autoFit?: boolean };
 
 export const KANBAN_COLS = ['To Do', 'Doing', 'Done'] as const;

@@ -196,15 +196,12 @@ interface BoardState {
   /** Mausrad zoomt statt zu scrollen (Miro-Stil) */
   wheelZoom: boolean;
   setWheelZoom: (on: boolean) => void;
-  /** Karten-Automatik global: Auto-Größe + ⤢-Einpass-Hinweise (M107) */
-  autoSizeEnabled: boolean;
-  setAutoSizeEnabled: (on: boolean) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
   /** Kartengröße setzen (Auto-Größe der Diagramm-Karte, M92c) */
   resizeNode: (id: string, width: number, height: number) => void;
   /** Nur die Höhe setzen — für die Auto-Größe aller Karten (M103) */
   setNodeHeight: (id: string, height: number) => void;
-  /** Auto-Größe je Karte an/aus (M103) */
+  /** Auto-Größe je Karte an/aus (M103; seit M111 Standard AN — false = manuell gebrochen) */
   setAutoFit: (ids: string[], on: boolean) => void;
   setNodePosition: (id: string, x: number, y: number) => void;
   /** Mehrere Positionen in EINEM Store-Update — für den Physik-Loop (60 fps) */
@@ -561,8 +558,6 @@ export const useBoard = create<BoardState>()(
         setClickZoom: (on) => set({ clickZoom: on }),
         wheelZoom: false,
         setWheelZoom: (on) => set({ wheelZoom: on }),
-        autoSizeEnabled: true,
-        setAutoSizeEnabled: (on) => set({ autoSizeEnabled: on }),
 
         ui: { theme: 'system', accent: 'blau' },
         setUiTheme: (theme) => set({ ui: { ...get().ui, theme } }),
@@ -1079,7 +1074,7 @@ export const useBoard = create<BoardState>()(
         setAutoFit: (ids, on) =>
           patchActive((b) => ({
             nodes: b.nodes.map((n) =>
-              ids.includes(n.id) ? ({ ...n, autoFit: on || undefined } as AppNode) : n,
+              ids.includes(n.id) ? ({ ...n, autoFit: on ? undefined : false } as AppNode) : n,
             ),
           })),
 
@@ -1137,7 +1132,6 @@ export const useBoard = create<BoardState>()(
         physicsEnabled: s.physicsEnabled,
         clickZoom: s.clickZoom,
         wheelZoom: s.wheelZoom,
-        autoSizeEnabled: s.autoSizeEnabled,
         showArchived: s.showArchived,
         gridSnap: s.gridSnap,
       }),
