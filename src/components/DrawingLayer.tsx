@@ -3,7 +3,6 @@ import { useReactFlow, useViewport } from '@xyflow/react';
 import { selectActiveBoard, useBoard, type Stroke } from '../store';
 import { uid } from '../types';
 import { finalizeStroke, recognizeShape } from '../lib/strokeShapes';
-import { anchorStroke } from '../lib/strokeAnchor';
 
 const EMPTY: Stroke[] = [];
 const PEN = { width: 2.5, opacity: 1 };
@@ -47,8 +46,16 @@ export function DrawingLayer() {
   const drawing = useRef<Stroke | null>(null);
   const holdTimer = useRef<number | null>(null);
   const [, force] = useState(0);
+  // Striche der AKTUELLEN Zeichensitzung: sich berührende entscheiden
+  // gemeinsam über das Ankern (M128) — ältere bleiben unangetastet
+  const sessionIds = useRef<string[]>([]);
 
   const active = tool === 'pen' || tool === 'marker' || tool === 'eraser';
+
+  // Neue Zeichensitzung beginnt mit dem Aktivieren eines Zeichenwerkzeugs
+  useEffect(() => {
+    if (active) sessionIds.current = [];
+  }, [active]);
 
   // Esc beendet den Zeichenmodus (QoL)
   useEffect(() => {
@@ -81,15 +88,17 @@ export function DrawingLayer() {
   };
 
   /**
-   * Fertigen Strich übernehmen — liegt er überwiegend auf einer Karte, wird
-   * er an sie geankert (M127) und wandert fortan mit ihr mit. Die Zielkarte
-   * blitzt kurz auf, damit klar ist, wohin die Markierung gehört.
+   * Fertigen Strich übernehmen — liegt die zusammenhängende Zeichnung
+   * (sich berührende Striche dieser Sitzung) überwiegend auf einer Karte,
+   * wird sie an sie geankert (M127/M128) und wandert fortan mit ihr mit.
+   * Die Zielkarte blitzt kurz auf, damit klar ist, wohin sie gehört.
    */
   const commitStroke = (raw: Stroke) => {
-    const done = anchorStroke(raw, nodes);
-    addStroke(done);
-    if (done.anchor) {
-      const el = document.querySelector(`.react-flow__node[data-id="${done.anchor}"]`);
+    addStroke(raw, sessionIds.current);
+    sessionIds.current.push(raw.id);
+    const anchor = (selectActiveBoard(useBoard.getState()).drawings ?? []).find((s) => s.id === raw.id)?.anchor;
+    if (anchor) {
+      const el = document.querySelector(`.react-flow__node[data-id="${anchor}"]`);
       if (el) {
         el.classList.remove('anchor-flash');
         // Reflow erzwingen, damit die Animation auch bei schnellen Folge-Strichen neu startet

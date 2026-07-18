@@ -12,7 +12,7 @@ import {
 } from '@xyflow/react';
 import { buildStarter } from './lib/starter';
 import { uid, type AppNode } from './types';
-import { anchorStroke } from './lib/strokeAnchor';
+import { anchorStroke, integrateStroke } from './lib/strokeAnchor';
 
 /** Ein Freihand-Strich (Punkte in Flow-Koordinaten) */
 export interface Stroke {
@@ -126,7 +126,9 @@ interface BoardState {
   setPresenting: (on: boolean) => void;
   setTool: (tool: Tool) => void;
   updateAi: (patch: Partial<AiSettings>) => void;
-  addStroke: (stroke: Stroke) => void;
+  /** Strich übernehmen; sessionIds = Striche derselben Zeichensitzung
+   *  (sich berührende entscheiden GEMEINSAM über das Ankern, M128) */
+  addStroke: (stroke: Stroke, sessionIds?: string[]) => void;
   eraseStrokesNear: (x: number, y: number, radius: number) => void;
   /** Geankerte Striche der Karten wieder freistellen (Punkte werden absolut) */
   detachStrokes: (nodeIds: string[]) => void;
@@ -642,9 +644,11 @@ export const useBoard = create<BoardState>()(
         setTool: (tool) => set({ tool }),
         updateAi: (patch) => set({ ai: { ...get().ai, ...patch } }),
 
-        addStroke: (stroke) => {
+        addStroke: (stroke, sessionIds = []) => {
           get().pushHistory();
-          patchActive((b) => ({ drawings: [...(b.drawings ?? []), stroke] }));
+          patchActive((b) => ({
+            drawings: integrateStroke(stroke, b.drawings ?? [], sessionIds, b.nodes).drawings,
+          }));
         },
 
         beginEraseGesture: () => { eraseSnapPending = true; },
