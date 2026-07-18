@@ -22,12 +22,14 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   // damit dessen overflow:hidden sie nicht abschneidet.
   return (
     <div className="card-shell">
+      {/* Resize-Griffe: weiße Quadrate mit neutralem Rand (klassischer
+          Auswahlrahmen) — bewusst ANDERS als die runden Akzent-Verbindungs-
+          punkte, damit beides auf einen Blick unterscheidbar ist (M102).
+          Farben kommen aus dem CSS (theme-fähig), nicht aus der color-Prop. */}
       <NodeResizer
         isVisible={!!selected}
         minWidth={minWidth}
         minHeight={minHeight}
-        color="#4f7cff"
-        handleStyle={{ width: 9, height: 9, borderRadius: 3 }}
       />
       {/* Sichtbarer Griff: hier packt man die Karte IMMER — auch wenn sie
           innen komplett aus Editor/Eingabefeldern besteht */}
@@ -47,7 +49,14 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       {/* Anschlusspunkte an allen 4 Seiten — die Linie selbst dockt dank
           Floating Edges immer automatisch an der zugewandten Seite an */}
       {[Position.Top, Position.Right, Position.Bottom, Position.Left].map((pos) => (
-        <Handle key={pos} id={pos} type="source" position={pos} className="pn-handle" />
+        <Handle
+          key={pos}
+          id={pos}
+          type="source"
+          position={pos}
+          className="pn-handle"
+          title="Verbindung ziehen — auf einer anderen Karte loslassen"
+        />
       ))}
       {/* Ganzkarten-Ziel: während einer Verbindung reicht es, IRGENDWO auf der
           Karte loszulassen (CSS aktiviert diesen Handle nur beim Verbinden) */}
