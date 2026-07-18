@@ -575,9 +575,11 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 
 /* ---------- Touch-Geräte: größere Ziele, Controls immer sichtbar ---------- */
 @media (pointer: coarse) {
-  /* ✕ absichtlich NICHT dabei: erscheint erst, wenn die Karte aktiv
-     (selektiert) ist — dauerhaft sichtbare Lösch-Knöpfe wirken unruhig */
-  .color-dot, .pn-handle, .tab-x, .kanban-item-actions,
+  /* ✕ und ＋-Verbindungspunkte absichtlich NICHT dabei: sie erscheinen erst,
+     wenn die Karte aktiv (selektiert) ist — dauerhaft sichtbare Lösch-Knöpfe
+     und Anschluss-Plusse auf jeder Karte wirken unruhig (M112, User-Wunsch).
+     Beim Ziehen einer Verbindung leuchten die ＋ aller Karten als Ziele auf. */
+  .color-dot, .tab-x, .kanban-item-actions,
   .kanban-addcol, .kanban-col-x { opacity: 1 !important; }
   .card-x { width: 28px; height: 28px; font-size: 13px; top: -13px; right: -13px; }
   .color-dot { width: 22px; height: 22px; top: 6px; right: 8px; }
