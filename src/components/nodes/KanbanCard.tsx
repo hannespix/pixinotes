@@ -235,8 +235,33 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
 
   const move = (item: KanbanItem, dir: -1 | 1) => tryMoveTo(item, item.col + dir);
 
+  /**
+   * Zyklen-Wächter (M120-Audit): Würde „item hängt an candidate" einen Kreis
+   * schließen (A→B→…→A), wären BEIDE Tickets für immer gesperrt. DFS über
+   * die bestehenden Abhängigkeiten des Kandidaten.
+   */
+  const wouldCycle = (itemId: string, candidateId: string): boolean => {
+    const byId = new Map(kanban.items.map((x) => [x.id, x]));
+    const seen = new Set<string>();
+    const stack = [candidateId];
+    while (stack.length > 0) {
+      const cur = stack.pop()!;
+      if (cur === itemId) return true;
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      for (const d of byId.get(cur)?.deps ?? []) stack.push(d);
+    }
+    return false;
+  };
+
   const remove = (item: KanbanItem) => {
-    const items = kanban.items.filter((it) => it.id !== item.id);
+    const items = kanban.items
+      .filter((it) => it.id !== item.id)
+      // Hängende Abhängigkeiten aufräumen (M120-Audit): andere Tickets dürfen
+      // nicht auf ein gelöschtes Ticket zeigen
+      .map((it) => (it.deps?.includes(item.id)
+        ? { ...it, deps: it.deps.filter((d) => d !== item.id) }
+        : it));
     // Eingesammelte Tickets: Entfernen merken — sonst legt der Auto-Abgleich
     // das Ticket beim nächsten Lauf sofort wieder an (User-Report)
     if (item.link?.nodeId && item.link.itemId) {
@@ -253,6 +278,12 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     if (!text) return;
     setItems([...kanban.items, { id: uid(), text, col: 0 }]);
     setNewText('');
+    // WIP-Hinweis (M120-Audit): Anlegen bleibt immer möglich, aber ehrlich
+    // gesagt, wenn die erste Spalte damit über ihrem Limit liegt
+    const lim = wipLimitOf(kanban, 0);
+    if (lim && kanban.items.filter((it) => colOf(it) === 0).length + 1 > lim) {
+      showToast(`🚦 Hinweis: „${cols[0]}" liegt jetzt über dem WIP-Limit (${lim}).`);
+    }
   };
 
   const setTitle = (title: string) => updateNodeData(id, { title });
@@ -358,6 +389,9 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       data-kid={it.id}
       draggable
       onDragStart={(e) => {
+        // Textauswahl in Eingabefeldern (Fristfeld) darf keinen Ticket-Drag
+        // starten (M120-Audit) — Chrome zieht sonst das ganze Ticket mit
+        if ((e.target as HTMLElement).tagName === 'INPUT') { e.preventDefault(); return; }
         e.dataTransfer.setData('text/plain', it.id);
         // Marker-Typ: der Board-Drop-Handler lässt Ticket-Drags in Ruhe (M119)
         e.dataTransfer.setData('application/x-pixinotes-ticket', it.id);
@@ -798,13 +832,17 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     value=""
                     onChange={(e) => {
                       const v = e.target.value;
-                      if (v && !(it.deps ?? []).includes(v)) patchItem(it.id, { deps: [...(it.deps ?? []), v] });
+                      if (!v || (it.deps ?? []).includes(v)) return;
+                      if (wouldCycle(it.id, v)) { showToast('🔁 Das würde einen Abhängigkeits-Kreis schließen — beide Tickets wären für immer gesperrt.'); return; }
+                      patchItem(it.id, { deps: [...(it.deps ?? []), v] });
                     }}
                   >
                     <option value="">＋ Ticket wählen, das vorher erledigt sein muss …</option>
-                    {others.filter((o) => !(it.deps ?? []).includes(o.id)).map((o) => (
-                      <option key={o.id} value={o.id}>{o.col >= done ? '✓ ' : ''}{o.text.slice(0, 60)}</option>
-                    ))}
+                    {others
+                      .filter((o) => !(it.deps ?? []).includes(o.id) && !wouldCycle(it.id, o.id))
+                      .map((o) => (
+                        <option key={o.id} value={o.id}>{o.col >= done ? '✓ ' : ''}{o.text.slice(0, 60)}</option>
+                      ))}
                   </select>
                 )}
                 <div className="ticket-hint">Vorwärts geht es erst, wenn alle Abhängigkeiten erledigt sind.</div>
