@@ -1,8 +1,10 @@
 // Aufgaben-Zentrale: sammelt alle offenen Aufgaben über ALLE Boards ein —
-// Kanban-Tickets (nicht-erledigte Spalten) und unerledigte Checklisten-Punkte
-// aus Notizen. Dazu Fälligkeits-Logik, Erinnerungs-Merkliste und Sammel-ICS.
+// Kanban-Tickets (nicht-erledigte Spalten), unerledigte Checklisten-Punkte
+// aus Notizen und laufende Gantt-Vorgänge (M113). Dazu Fälligkeits-Logik,
+// Erinnerungs-Merkliste und Sammel-ICS.
 import type { BoardDoc } from '../store';
-import { doneCol, type KanbanData } from '../types';
+import { doneCol, type GanttData, type KanbanData } from '../types';
+import { detectDates } from './dates';
 import { triggerDownload } from './download';
 
 export type TaskUrgency = 'none' | 'ok' | 'soon' | 'overdue';
@@ -10,15 +12,17 @@ export type TaskUrgency = 'none' | 'ok' | 'soon' | 'overdue';
 export interface TaskRef {
   /** stabil & eindeutig — auch Schlüssel für „schon erinnert" */
   key: string;
-  kind: 'kanban' | 'check';
+  kind: 'kanban' | 'check' | 'gantt';
   boardId: string;
   boardName: string;
   nodeId: string;
-  /** Kanban-Item-ID bzw. BlockNote-Block-ID */
+  /** Kanban-Item-ID, BlockNote-Block-ID bzw. Gantt-Zeilen-ID */
   itemId: string;
   text: string;
   due?: string;
   urgency: TaskUrgency;
+  /** Verantwortliche Person (Kanban „who" / Gantt-Ressource) — M113 */
+  who?: string;
 }
 
 interface AnyBlock {
@@ -45,6 +49,19 @@ export function urgencyFor(due: string | undefined, now: Date = new Date()): Tas
   if (diffH < 0) return 'overdue';
   if (diffH < 48) return 'soon';
   return 'ok';
+}
+
+/** ISO-Datum (lokal) aus einem Date — toISOString() würde per UTC den Tag verschieben */
+export function isoLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** ISO-Datum um N Tage verschieben (Schlummern, M113) */
+export function shiftIso(iso: string, days: number): string {
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  d.setDate(d.getDate() + days);
+  return isoLocal(d);
 }
 
 export function formatDueShort(due: string, now: Date = new Date()): string {
@@ -85,6 +102,27 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
             text: item.text,
             due: item.due,
             urgency: urgencyFor(item.due, now),
+            who: item.who?.trim() || undefined,
+          });
+        }
+      } else if (node.type === 'gantt') {
+        // Gantt-Vorgänge (M113): alles unter 100 % ist eine offene Aufgabe,
+        // Frist = Ende des Balkens, Person = Ressource
+        const g = node.data as GanttData;
+        for (const row of g.rows ?? []) {
+          if ((row.progress ?? 0) >= 100) continue;
+          if (!row.name?.trim()) continue;
+          out.push({
+            key: `g:${board.id}:${node.id}:${row.id}`,
+            kind: 'gantt',
+            boardId: board.id,
+            boardName: board.name,
+            nodeId: node.id,
+            itemId: row.id,
+            text: row.name,
+            due: row.end,
+            urgency: urgencyFor(row.end, now),
+            who: row.who?.trim() || undefined,
           });
         }
       } else if (node.type === 'note') {
@@ -96,6 +134,10 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
               const text = inlineText(b.content).trim();
               if (text) {
                 const itemId = b.id ?? `pos:${path}`;
+                // Fristen-Erkennung (M113): „bis Freitag", „am 24.07." usw. im
+                // Text zählen als Fälligkeit — wie bei den Fristen-Chips (M3)
+                const detected = detectDates(text, now)[0];
+                const due = detected ? isoLocal(detected.date) : undefined;
                 out.push({
                   key: `c:${board.id}:${node.id}:${itemId}`,
                   kind: 'check',
@@ -104,7 +146,8 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
                   nodeId: node.id,
                   itemId,
                   text,
-                  urgency: 'none',
+                  due,
+                  urgency: urgencyFor(due, now),
                 });
               }
             }

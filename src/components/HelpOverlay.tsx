@@ -223,10 +223,11 @@ export function HelpOverlay() {
             <section id="help-aufgaben">
               <h3>✅ Aufgaben & Erinnerungen</h3>
               <ul>
-                <li>Aufgaben entstehen überall: Kanban-Tickets, ☐-Checklisten in Notizen, Zeitplan-Vorgänge.</li>
-                <li>Die <b>✅-Zentrale</b> im Dock sammelt alles boardübergreifend: Filter (Heute/Überfällig/Board), Abhaken, Fälligkeit ändern, Schnell-Eingabe, Kalender-Export (.ics).</li>
+                <li>Aufgaben entstehen überall: Kanban-Tickets, ☐-Checklisten in Notizen und <b>Zeitplan-Vorgänge</b> (alles unter 100 % zählt als offen, Frist = Balken-Ende).</li>
+                <li>Die <b>✅-Zentrale</b> im Dock sammelt alles boardübergreifend, <b>gruppiert nach Frist</b> (Überfällig · Heute · Diese Woche · Später · Ohne Frist, Abschnitte einklappbar): Abhaken (Gantt = Fortschritt 100 %), Fälligkeit ändern, <b>+1T/+1W schlummern</b>, Schnell-Eingabe, Kalender-Export (.ics).</li>
+                <li><b>Wer macht was:</b> Personen aus Tickets und Zeitplan-Ressourcen lassen sich filtern oder per 👥 als Gruppierung anzeigen.</li>
                 <li><b>Erinnerungen:</b> Fällige Aufgaben melden sich beim Öffnen und regelmäßig als Hinweis — optional als System-Benachrichtigung.</li>
-                <li>Fälligkeiten am Ticket (📅) steuern alles; „morgen"/Datum im Notiztext wird automatisch als Frist-Chip erkannt.</li>
+                <li>Fälligkeiten am Ticket (📅) steuern alles; „bis Freitag"/Datum im Text zählt auch bei Checklisten-Punkten als Frist.</li>
               </ul>
             </section>
 

@@ -1264,6 +1264,30 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   font-size: 11px; color: var(--muted); background: var(--surface-dim);
   border-radius: 999px; padding: 3px 9px; white-space: nowrap; flex: none;
 }
+/* Gruppierte Aufgabenliste (M113): Fristen-Abschnitte bzw. Personen */
+.th-group ul { list-style: none; margin: 0 0 4px; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.th-group-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  border: none; background: none; cursor: pointer; font-family: inherit;
+  font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.4px; padding: 8px 2px 5px;
+}
+.th-group-head:hover { color: var(--accent); }
+.th-group-caret { width: 12px; flex: none; font-size: 10px; }
+.th-group-count {
+  background: var(--surface-dim); border-radius: 999px; padding: 1px 8px;
+  font-size: 11px; font-weight: 600;
+}
+.task-who {
+  font-size: 11px; color: var(--accent-strong); background: var(--accent-soft);
+  border-radius: 999px; padding: 3px 9px; white-space: nowrap; flex: none;
+}
+.task-snooze { display: flex; gap: 3px; flex: none; }
+.task-snooze button {
+  border: 1px solid var(--border); background: var(--surface); border-radius: 6px;
+  font-family: inherit; font-size: 10px; color: var(--muted); cursor: pointer; padding: 2px 6px;
+}
+.task-snooze button:hover { color: var(--accent-strong); border-color: var(--accent); }
 .taskhub-empty { width: min(860px, 100%); color: var(--muted); font-size: 14px; padding: 30px 0; }
 .taskhub-foot { width: min(860px, 100%); color: var(--muted); font-size: 11.5px; margin-top: 16px; }
 
