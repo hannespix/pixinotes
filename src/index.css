@@ -637,6 +637,21 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* Auto-Größe-Schalter in der Auswahl-Leiste (M103) */
 .sel-toolbar button.on { background: var(--accent-soft); color: var(--accent-strong); }
 
+/* ⤢-Angebots-Chip (M104): erscheint dezent, wenn der Inhalt über die feste
+   Kartengröße hinausläuft — nur bei Hover/Auswahl sichtbar, greift NIE selbst */
+.fit-hint {
+  position: absolute; right: 5px; bottom: 5px; z-index: 6;
+  width: 24px; height: 24px; border-radius: 8px;
+  border: 1px solid var(--accent); background: var(--surface); color: var(--accent-strong);
+  cursor: pointer; font-size: 13px; line-height: 1; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(40, 30, 10, 0.22);
+  opacity: 0; transition: opacity 0.15s, transform 0.1s;
+}
+.card-shell:hover .fit-hint, .react-flow__node.selected .fit-hint { opacity: 0.92; }
+.fit-hint:hover { opacity: 1 !important; transform: scale(1.1); background: var(--accent-soft); }
+@media (pointer: coarse) { .fit-hint { opacity: 0.92; width: 30px; height: 30px; font-size: 15px; } }
+
 /* ---------- Resize-Griffe (M102: klar unterscheidbar vom Verbinden) ----------
    Weiße Quadrate mit neutralem Rand = klassischer Auswahlrahmen („Größe").
    Die Verbindungspunkte sind dagegen runde Akzent-Kreise mit ＋ („Aktion"). */
