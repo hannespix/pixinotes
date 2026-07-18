@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Handle, NodeResizer, Position } from '@xyflow/react';
 import { runDerived, useBoard } from '../../store';
 
@@ -88,6 +88,25 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   // Inhalt läuft über die feste Kartengröße hinaus → Einpassen ANBIETEN
   const [overflowing, setOverflowing] = useState(false);
 
+  // Resize-Callbacks MÜSSEN referenzstabil sein (M109): React Flow zerstört
+  // den d3-Drag des Griffs und bindet ihn neu, sobald sich die Callback-Props
+  // ändern. Inline-Funktionen (neue Identität pro Render) killten so beim
+  // ERSTEN Resize-Schritt die laufende Geste — unter Touch fror die Größe
+  // ein („Pixel für Pixel"), unter Maus überlebte sie nur dank Window-Listenern.
+  const onManualResizeStart = useCallback(() => { resizingRef.current = true; }, []);
+  const onManualResizeEnd = useCallback(() => {
+    resizingRef.current = false;
+    lastResizeEnd.current = Date.now(); // Schonfrist gegen jede Automatik
+    // Manuell gezogen schlägt Automatik: Auto-Größe bricht (M103/M104)
+    if (autoFitRef.current) {
+      setAutoFit([id], false);
+      showToast('Auto-Größe aus — deine Größe bleibt. Wieder einschalten: Auswahl-Leiste ⤢');
+    }
+    // Nach der Schonfrist einmal prüfen: läuft der Inhalt jetzt über,
+    // erscheint der ⤢-Angebots-Chip (nur Angebot, kein Eingriff)
+    window.setTimeout(() => evalRef.current?.(), 900);
+  }, [id, setAutoFit, showToast]);
+
   /** Höhe einmalig an den Inhalt anpassen (⤢-Angebots-Chip, M104) */
   const fitOnce = () => {
     const body = bodyRef.current;
@@ -169,19 +188,8 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
         isVisible={!!selected}
         minWidth={minWidth}
         minHeight={minHeight}
-        onResizeStart={() => { resizingRef.current = true; }}
-        onResizeEnd={() => {
-          resizingRef.current = false;
-          lastResizeEnd.current = Date.now(); // Schonfrist gegen jede Automatik
-          // Manuell gezogen schlägt Automatik: Auto-Größe bricht (M103/M104)
-          if (autoFitRef.current) {
-            setAutoFit([id], false);
-            showToast('Auto-Größe aus — deine Größe bleibt. Wieder einschalten: Auswahl-Leiste ⤢');
-          }
-          // Nach der Schonfrist einmal prüfen: läuft der Inhalt jetzt über,
-          // erscheint der ⤢-Angebots-Chip (nur Angebot, kein Eingriff)
-          window.setTimeout(() => evalRef.current?.(), 900);
-        }}
+        onResizeStart={onManualResizeStart}
+        onResizeEnd={onManualResizeEnd}
       />
       {/* Sichtbarer Griff: hier packt man die Karte IMMER — auch wenn sie
           innen komplett aus Editor/Eingabefeldern besteht */}
