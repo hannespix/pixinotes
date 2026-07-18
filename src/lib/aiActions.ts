@@ -200,7 +200,9 @@ export async function aiProcess(nodes: AppNode[], pos: { x: number; y: number })
   const code = res.replace(/```(mermaid)?/g, '').trim();
   if (!/^(flowchart|graph)\s/.test(code)) throw new Error('Die KI hat kein gültiges Flowchart geliefert.');
   const st = useBoard.getState();
-  st.addNode({ id: uid(), type: 'mermaid', width: 420, height: 280, position: pos, data: { code } } as AppNode);
+  // fitOnLoad (M122): Karte passt sich nach dem ersten Render der Diagramm-
+  // größe an — nichts wird abgeschnitten
+  st.addNode({ id: uid(), type: 'mermaid', width: 420, height: 280, position: pos, data: { code, fitOnLoad: true } } as AppNode);
   return 'Workflow als Mermaid-Diagramm aufs Board gelegt';
 }
 
@@ -415,7 +417,8 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
         const code = (o.code ?? '').replace(/```(mermaid)?/g, '').trim();
         if (!code) break;
         const node = makeMermaid(place(260));
-        (node.data as { code: string }).code = code;
+        (node.data as { code: string; fitOnLoad?: boolean }).code = code;
+        (node.data as { fitOnLoad?: boolean }).fitOnLoad = true; // Karte ans Diagramm anpassen (M122)
         st.addNode(node);
         done++;
         break;

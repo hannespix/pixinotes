@@ -173,11 +173,16 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   };
 
   // Einmal-Einpassen nach dem NÄCHSTEN Render — Vorlage/KI setzen das Flag,
-  // gemessen wird erst, wenn das neue SVG im DOM steht
+  // gemessen wird erst, wenn das neue SVG im DOM steht.
+  // fitOnLoad (M122): von KI-Aktionen ERZEUGTE Diagramm-Karten tragen das
+  // Flag in den Daten — nach dem ersten erfolgreichen Render passt sich die
+  // Karte der Diagrammgröße an (nichts abgeschnitten), Flag wird geräumt.
   useEffect(() => {
-    if (!svg || !fitOnRender.current) return;
+    if (!svg) return;
+    if (!fitOnRender.current && !data.fitOnLoad) return;
     fitOnRender.current = false;
     fitToDiagram();
+    if (data.fitOnLoad) runDerived(() => updateNodeData(id, { fitOnLoad: undefined }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [svg]);
 

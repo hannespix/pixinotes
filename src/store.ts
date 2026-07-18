@@ -261,6 +261,14 @@ export function mutedHistory<T>(fn: () => T): T {
   }
 }
 
+// Feingranulare History (M122): Modul-Bearbeitungen (Ticket-Felder, Diagramm-
+// Code, Gantt-Zeilen, Notiz-Tipp-Bursts) werden undo-fähig. Aufeinander-
+// folgende Änderungen am SELBEN Ziel innerhalb von 1,5 s teilen sich einen
+// Eintrag — sonst würde jeder Tastendruck die History fluten.
+let lastEditKey = '';
+let lastEditAt = 0;
+const EDIT_COALESCE_MS = 1500;
+
 /** Haben sich Notiz-INHALTE zwischen zwei Ständen geändert? (Referenzvergleich)
  *  Dann muss Undo/Redo den Board-Remount erzwingen — BlockNote-Editoren lesen
  *  ihre Blöcke nur beim Mount und würden sonst alten Text zurückschreiben. */
@@ -604,7 +612,25 @@ export const useBoard = create<BoardState>()(
         tasksOpen: false,
         setTasksOpen: (open) => set({ tasksOpen: open }),
 
-        updateNodeDataOnBoard: (boardId, nodeId, data) =>
+        updateNodeDataOnBoard: (boardId, nodeId, data) => {
+          // Feingranulare History (M122) — Snapshot des ZIEL-Boards (die
+          // Aufgaben-Zentrale bearbeitet auch fremde Boards); undo() kann
+          // dank boardId im Eintrag boardübergreifend zurückspringen
+          if (!historyMuted && !inDerived()) {
+            const key = `b:${boardId}:${nodeId}`;
+            const now = Date.now();
+            if (key !== lastEditKey || now - lastEditAt > EDIT_COALESCE_MS) {
+              const b = get().boards.find((x) => x.id === boardId);
+              if (b) {
+                set({
+                  past: [...get().past.slice(-(HISTORY_LIMIT - 1)), { boardId, nodes: b.nodes, edges: b.edges, drawings: b.drawings }],
+                  future: [],
+                });
+              }
+            }
+            lastEditKey = key;
+            lastEditAt = now;
+          }
           set({
             boards: get().boards.map((b) =>
               b.id === boardId
@@ -616,7 +642,8 @@ export const useBoard = create<BoardState>()(
                   }
                 : b,
             ),
-          }),
+          });
+        },
         setPresenting: (on) => set({ presenting: on }),
         setTool: (tool) => set({ tool }),
         updateAi: (patch) => set({ ai: { ...get().ai, ...patch } }),
@@ -649,6 +676,7 @@ export const useBoard = create<BoardState>()(
 
         pushHistory: () => {
           if (historyMuted) return; // Sammel-Aktionen (KI-Pläne) sichern EINEN Snapshot selbst
+          lastEditKey = ''; // Struktur-Snapshot beendet jede Tipp-Bündelung (M122)
           const s = get();
           const b = s.boards.find((x) => x.id === s.activeId);
           if (!b) return;
@@ -1088,12 +1116,22 @@ export const useBoard = create<BoardState>()(
             ),
           })),
 
-        updateNodeData: (id, data) =>
+        updateNodeData: (id, data) => {
+          // Feingranulare History (M122): gebündelter Snapshot vor der Änderung —
+          // Automatik (runDerived) und Sammel-Aktionen (mutedHistory) ausgenommen
+          if (!historyMuted && !inDerived()) {
+            const key = `n:${get().activeId}:${id}`;
+            const now = Date.now();
+            if (key !== lastEditKey || now - lastEditAt > EDIT_COALESCE_MS) get().pushHistory();
+            lastEditKey = key;
+            lastEditAt = now;
+          }
           patchActive((b) => ({
             nodes: b.nodes.map((n) =>
               n.id === id ? ({ ...n, data: { ...n.data, ...data } } as AppNode) : n,
             ),
-          })),
+          }));
+        },
 
         setNodePosition: (id, x, y) =>
           patchActive((b) => ({
