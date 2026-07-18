@@ -44,15 +44,35 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   const lastDelta = useRef<number | null>(null);
   const evalRef = useRef<(() => void) | null>(null);
 
-  // Pointer-Wache: down auf der Karte → Automatik pausiert; up → Schonfrist
+  // Begann der aktuelle Druck auf einem Resize-Griff? (M108-Sicherheitsnetz)
+  const resizeGestureRef = useRef(false);
+
+  // Pointer-Wache: down auf der Karte → Automatik pausiert; up → Schonfrist.
+  // WICHTIG (M108): Unter Touch feuert onResizeEnd der Resize-Bibliothek
+  // NICHT zuverlässig — die resizing-Sperre blieb dann für immer gesetzt
+  // (Automatik komplett tot) und Auto-Größe brach beim Finger-Ziehen nicht.
+  // Deshalb wird das Gesten-Ende hier zusätzlich auf Pointer-Ebene erkannt,
+  // unabhängig von der Bibliothek. Doppelt ausgeführt ist alles idempotent.
   useEffect(() => {
     const shell = bodyRef.current?.parentElement;
     if (!shell) return;
-    const down = () => { pointerDownRef.current = true; };
+    const down = (e: PointerEvent) => {
+      pointerDownRef.current = true;
+      resizeGestureRef.current = !!(e.target as Element | null)?.closest?.('.react-flow__resize-control');
+    };
     const up = () => {
       if (pointerDownRef.current) {
         pointerDownRef.current = false;
         lastResizeEnd.current = Date.now();
+        if (resizeGestureRef.current) {
+          resizeGestureRef.current = false;
+          resizingRef.current = false; // Sicherheitsnetz: d3-„end" kann unter Touch ausbleiben
+          if (autoFitRef.current) {
+            setAutoFit([id], false);
+            showToast('Auto-Größe aus — deine Größe bleibt. Wieder einschalten: Auswahl-Leiste ⤢');
+          }
+          window.setTimeout(() => evalRef.current?.(), 900); // danach ggf. ⤢-Chip anbieten
+        }
       }
     };
     shell.addEventListener('pointerdown', down, true);
@@ -63,7 +83,8 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       window.removeEventListener('pointerup', up, true);
       window.removeEventListener('pointercancel', up, true);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
   // Inhalt läuft über die feste Kartengröße hinaus → Einpassen ANBIETEN
   const [overflowing, setOverflowing] = useState(false);
 
@@ -78,6 +99,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     const current = shell?.offsetHeight ?? body.clientHeight;
     setNodeHeight(id, Math.min(current + delta + 2, 860));
     setOverflowing(false);
+    evalRef.current?.(); // Nachkontrolle: lastDelta zurücksetzen, sobald behoben (M108)
   };
 
   // Auto-Größe (M103/M104): Bewusst zurückhaltend —
@@ -92,10 +114,16 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     if (!body) return;
     if (!globalAuto) { setOverflowing(false); return; } // Automatik global aus: nichts beobachten
     let t: number | undefined;
+    const later = (ms: number, force = false) => { window.clearTimeout(t); t = window.setTimeout(() => evalNow(force), ms); };
     const evalNow = (force = false) => {
-      // Absolute Sperre: gedrückte Maus/gehaltener Finger auf der Karte
-      if (resizingRef.current || pointerDownRef.current) return;
-      if (!force && Date.now() - lastResizeEnd.current < 800) return;
+      // Sperren WARTEN statt verwerfen (M108): am Smartphone folgt fast jede
+      // Inhaltsänderung direkt auf eine Berührung der Karte — wurde die
+      // Prüfung hier einfach verworfen, kam nie wieder eine nach und die
+      // Auto-Größe war unter Touch praktisch tot. Manuell gewinnt weiterhin:
+      // gehandelt wird erst NACH Loslassen + Schonfrist.
+      if (resizingRef.current || pointerDownRef.current) { later(400, force); return; }
+      const rest = 800 - (Date.now() - lastResizeEnd.current);
+      if (!force && rest > 0) { later(rest + 60); return; }
       const delta = body.scrollHeight - body.clientHeight;
       // Struktur-Erkennung: Überlauf blieb nach dem letzten Wachsen gleich →
       // 100%-Layout, das einfach mitwächst — nie endlos vergrößern (M106)
@@ -108,12 +136,18 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
         const shell = body.parentElement as HTMLElement | null; // .card-shell = Kartenhöhe
         const current = shell?.offsetHeight ?? body.clientHeight;
         runDerived(() => setNodeHeight(id, Math.min(current + delta + 2, 860)));
+        // Nachkontrolle (M108): hat das Wachsen den Überlauf behoben, wird
+        // lastDelta gleich wieder auf null gesetzt — sonst blockierte die
+        // Struktur-Erkennung die NÄCHSTE, zufällig gleich große Änderung
+        // (z. B. zwei gleich hohe Listenzeilen nacheinander). Bleibt der
+        // Überlauf identisch, greift sie zu Recht (100%-Layout).
+        later(350);
       } else {
         if (delta <= 10) { lastDelta.current = null; setOverflowing(false); return; }
         setOverflowing(!structural);
       }
     };
-    const schedule = () => { window.clearTimeout(t); t = window.setTimeout(evalNow, 300); };
+    const schedule = () => later(300);
     evalRef.current = schedule;
     evalNow(true); // beim Einschalten sofort einpassen bzw. Überlauf prüfen
     const mo = new MutationObserver(schedule);
