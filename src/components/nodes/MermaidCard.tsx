@@ -4,8 +4,33 @@ import { runDerived, useBoard } from '../../store';
 import type { MermaidNode } from '../../types';
 import { aiReady } from '../../lib/ai';
 import { aiMermaid, buildMermaidSource, getMermaid, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES, preloadHandFont } from '../../lib/mermaid';
+import {
+  addGanttSection, addGanttTask, addMindChild, addPie, addSeqActor, addSeqMsg,
+  diagramKind, ganttTasks, mindLines, mindText, pieSlices, removeGanttTask,
+  removeMind, removePie, removeSeqActor, removeSeqMsg, renameGanttTask,
+  renameMind, renamePie, renameSeqActor, seqMessages, setSeqMsg, shiftGanttTask,
+  shiftPie,
+} from '../../lib/mermaidEdit';
 import { useOutsideClose } from '../../lib/useOutsideClose';
 import { CardShell } from './CardShell';
+
+/** Auswahl in Nicht-Flowchart-Diagrammen (M100): Bild-Element ⇄ Code-Zeile */
+type SelOther =
+  | { t: 'actor'; name: string; x: number; y: number }
+  | { t: 'msg'; idx: number; x: number; y: number }
+  | { t: 'task'; idx: number; x: number; y: number }
+  | { t: 'mind'; line: number; x: number; y: number }
+  | { t: 'pie'; idx: number; x: number; y: number };
+
+/** Umbenenn-Ziel des Inline-Eingabefelds */
+type RenameTarget =
+  | { t: 'node'; nid: string }
+  | { t: 'edge' }
+  | { t: 'msg'; idx: number }
+  | { t: 'actor'; name: string }
+  | { t: 'task'; idx: number }
+  | { t: 'mind'; line: number }
+  | { t: 'pie'; idx: number };
 
 /** Form je Schritt: Symbol, Name, Klammern (Mermaid-Syntax) */
 const SHAPES: Array<[string, string, string, string]> = [
@@ -47,9 +72,11 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   // Ausgewählte VERBINDUNG (M99): per Klick auf den Pfeil im Bild
   const [selEdge, setSelEdge] = useState<{ from: string; to: string; x: number; y: number } | null>(null);
   const [connectFrom, setConnectFrom] = useState<string | null>(null);
-  // Inline-Umbenennen: Eingabefeld schwebt direkt ÜBER dem Schritt im Bild —
-  // kein Browser-Dialog (User-Feedback M92). edge=true → Kanten-Beschriftung
-  const [rename, setRename] = useState<{ nid: string; edge?: boolean; x: number; y: number; w: number; value: string } | null>(null);
+  // Auswahl in Sequenz/Gantt/Mindmap/Kreis (M100)
+  const [selOther, setSelOther] = useState<SelOther | null>(null);
+  // Inline-Umbenennen: Eingabefeld schwebt direkt ÜBER dem Element im Bild —
+  // kein Browser-Dialog (User-Feedback M92). target sagt, was es beschreibt.
+  const [rename, setRename] = useState<{ target: RenameTarget; x: number; y: number; w: number; value: string } | null>(null);
   const [aiText, setAiText] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const renderKey = useRef(0);
@@ -59,7 +86,8 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
 
   const style = (data.style as string | undefined) ?? '';
   const look = (data.look as string | undefined) ?? '';
-  const isFlow = /^\s*(flowchart|graph)\b/.test(data.code);
+  const kind = diagramKind(data.code);
+  const isFlow = kind === 'flow';
 
   useEffect(() => {
     let cancelled = false;
@@ -152,9 +180,28 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     });
   }, [selEdge, svg]);
 
-  // Karte abgewählt → Schritt-/Kanten-Auswahl, Verbinden-Modus, Popovers, Umbenennen aufräumen
+  // Auswahl in Sequenz/Gantt/Mindmap/Kreis im SVG markieren (per Index)
   useEffect(() => {
-    if (!selected) { setSelNode(null); setSelEdge(null); setConnectFrom(null); setTplOpen(false); setPendingTpl(null); setRename(null); }
+    const root = previewRef.current;
+    if (!root) return;
+    root.querySelectorAll('.mm-selected-el').forEach((el) => el.classList.remove('mm-selected-el'));
+    if (!selOther) return;
+    const mark = (sel: string, idx: number) => root.querySelectorAll(sel)[idx]?.classList.add('mm-selected-el');
+    if (selOther.t === 'msg') mark('text.messageText', selOther.idx);
+    if (selOther.t === 'task') { mark('rect.task', selOther.idx); mark('text.taskText', selOther.idx); }
+    if (selOther.t === 'mind') mark('g.mindmap-node', mindLines(data.code).indexOf(selOther.line));
+    if (selOther.t === 'pie') { mark('path.pieCircle', selOther.idx); mark('g.legend', selOther.idx); }
+    if (selOther.t === 'actor') {
+      root.querySelectorAll('text.actor').forEach((el) => {
+        if ((el.textContent ?? '').trim() === selOther.name) el.classList.add('mm-selected-el');
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selOther, svg]);
+
+  // Karte abgewählt → alle Auswahlen, Verbinden-Modus, Popovers, Umbenennen aufräumen
+  useEffect(() => {
+    if (!selected) { setSelNode(null); setSelEdge(null); setSelOther(null); setConnectFrom(null); setTplOpen(false); setPendingTpl(null); setRename(null); }
   }, [selected]);
 
   /** Vorlage laden — eigenen Code nicht durch einen Fehlklick verlieren.
@@ -166,6 +213,8 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     setPendingTpl(null);
     setTplOpen(false);
     setSelNode(null);
+    setSelEdge(null);
+    setSelOther(null);
     fitOnRender.current = true; // neue Vorlage → Karte einmalig einpassen
     updateNodeData(id, { code: TEMPLATES[t] });
   };
@@ -300,7 +349,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   const startEdgeLabel = () => {
     if (!selEdge) return;
     setRename({
-      nid: '', edge: true,
+      target: { t: 'edge' },
       x: Math.max(4, selEdge.x - 75), y: Math.max(4, selEdge.y - 14), w: 150,
       value: stripEdgeLabel(findEdgeLine()?.m[4]),
     });
@@ -347,9 +396,74 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
         return;
       }
     }
+    // Sequenz/Gantt/Mindmap/Kreis: Element anklicken = auswählen (M100)
+    const other = hitOther(e.target as Element);
+    if (other) {
+      setSelOther(other);
+      setSelNode(null);
+      setSelEdge(null);
+      return;
+    }
     setSelNode(null);
     setSelEdge(null);
+    setSelOther(null);
     setConnectFrom(null);
+  };
+
+  /** Bild-Element unter dem Klick → Auswahl für Sequenz/Gantt/Mindmap/Kreis.
+   *  Zuordnung über die Dokument-Reihenfolge (n-tes Element = n-te Zeile). */
+  const hitOther = (target: Element): SelOther | null => {
+    const root = previewRef.current;
+    if (!root) return null;
+    const idxOf = (sel: string, el: Element) => Array.prototype.indexOf.call(root.querySelectorAll(sel), el);
+    if (kind === 'seq') {
+      const msg = target.closest?.('text.messageText');
+      if (msg) return { t: 'msg', idx: idxOf('text.messageText', msg), ...localCenter(msg) };
+      const actorEl = target.closest?.('text.actor, rect.actor');
+      if (actorEl) {
+        const name = (actorEl.tagName.toLowerCase() === 'text'
+          ? actorEl.textContent
+          : actorEl.nextElementSibling?.textContent ?? '')?.trim();
+        if (name) return { t: 'actor', name, ...localCenter(actorEl) };
+      }
+    }
+    if (kind === 'gantt') {
+      const bar = target.closest?.('rect.task');
+      if (bar) return { t: 'task', idx: idxOf('rect.task', bar), ...localCenter(bar) };
+      const txt = target.closest?.('text.taskText');
+      if (txt) return { t: 'task', idx: idxOf('text.taskText', txt), ...localCenter(txt) };
+    }
+    if (kind === 'mind') {
+      const n = target.closest?.('g.mindmap-node');
+      if (n) {
+        const line = mindLines(data.code)[idxOf('g.mindmap-node', n)];
+        if (line != null) return { t: 'mind', line, ...localCenter(n) };
+      }
+    }
+    if (kind === 'pie') {
+      const leg = target.closest?.('g.legend');
+      if (leg) return { t: 'pie', idx: idxOf('g.legend', leg), ...localCenter(leg) };
+      const slice = target.closest?.('path.pieCircle');
+      if (slice) return { t: 'pie', idx: idxOf('path.pieCircle', slice), ...localCenter(slice) };
+    }
+    return null;
+  };
+
+  /** Aktueller Text der Auswahl (für das Inline-Eingabefeld) */
+  const otherValue = (o: SelOther): string => {
+    if (o.t === 'msg') return seqMessages(data.code)[o.idx]?.text ?? '';
+    if (o.t === 'actor') return o.name;
+    if (o.t === 'task') return ganttTasks(data.code)[o.idx]?.name ?? '';
+    if (o.t === 'mind') return mindText(data.code, o.line);
+    return pieSlices(data.code)[o.idx]?.label ?? '';
+  };
+
+  /** Inline-Eingabefeld für eine Nicht-Flowchart-Auswahl öffnen */
+  const startOtherRename = (o: SelOther) => {
+    const target: RenameTarget = o.t === 'actor' ? { t: 'actor', name: o.name }
+      : o.t === 'mind' ? { t: 'mind', line: o.line }
+      : { t: o.t, idx: o.idx };
+    setRename({ target, x: Math.max(4, o.x - 75), y: Math.max(4, o.y - 14), w: 160, value: otherValue(o) });
   };
 
   /** Inline-Umbenennen starten: Eingabefeld exakt über den Schritt legen.
@@ -370,40 +484,60 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     const label = ((target as SVGGElement | null)?.textContent ?? '').trim();
     setSelNode(nid);
     setConnectFrom(null);
-    setRename({ nid, x, y, w, value: label });
+    setRename({ target: { t: 'node', nid }, x, y, w, value: label });
   };
 
+  /** Übernahme aus dem Inline-Eingabefeld — je nach Ziel (M100) */
   const commitRename = () => {
-    if (rename?.edge) {
-      // Leerer Wert = Beschriftung entfernen (bei Kanten erlaubt)
-      rewriteEdge(undefined, rename.value.trim());
-    } else if (rename?.value.trim()) {
-      renameNode(rename.nid, rename.value.trim());
+    if (!rename) return;
+    const v = rename.value.trim();
+    const tg = rename.target;
+    const up = (next: string | null) => { if (next != null) updateNodeData(id, { code: next }); };
+    switch (tg.t) {
+      case 'node': if (v) renameNode(tg.nid, v); break;
+      case 'edge': rewriteEdge(undefined, v); break; // leer = Beschriftung weg
+      case 'msg': if (v) up(setSeqMsg(data.code, tg.idx, { text: v })); break;
+      case 'actor':
+        if (v) { up(renameSeqActor(data.code, tg.name, v)); setSelOther(null); }
+        break;
+      case 'task': if (v) up(renameGanttTask(data.code, tg.idx, v)); break;
+      case 'mind': if (v) up(renameMind(data.code, tg.line, v)); break;
+      case 'pie': if (v) up(renamePie(data.code, tg.idx, v)); break;
     }
     setRename(null);
   };
 
   const onPreviewDblClick = (e: React.MouseEvent) => {
-    if (!isFlow) return;
-    const g = (e.target as Element).closest?.('g.node, g.rough-node') as SVGGElement | null;
-    if (g) {
-      const nid = nodeIdOf(g);
-      if (nid) startRename(nid);
+    if (isFlow) {
+      const g = (e.target as Element).closest?.('g.node, g.rough-node') as SVGGElement | null;
+      if (g) {
+        const nid = nodeIdOf(g);
+        if (nid) startRename(nid);
+        return;
+      }
+      // Doppelklick auf einen Pfeil → Beschriftung direkt bearbeiten
+      const p = (e.target as Element).closest?.('path.flowchart-link') as SVGPathElement | null;
+      if (p) {
+        const ids = edgeIdsOf(p);
+        if (!ids) return;
+        const c = localCenter(p);
+        setSelEdge({ ...ids, ...c });
+        setSelNode(null);
+        setRename({
+          target: { t: 'edge' },
+          x: Math.max(4, c.x - 75), y: Math.max(4, c.y - 14), w: 150,
+          value: stripEdgeLabel(findEdgeFor(ids.from, ids.to)?.m[4]),
+        });
+      }
       return;
     }
-    // Doppelklick auf einen Pfeil → Beschriftung direkt bearbeiten
-    const p = (e.target as Element).closest?.('path.flowchart-link') as SVGPathElement | null;
-    if (p) {
-      const ids = edgeIdsOf(p);
-      if (!ids) return;
-      const c = localCenter(p);
-      setSelEdge({ ...ids, ...c });
+    // Sequenz/Gantt/Mindmap/Kreis: Doppelklick = direkt umbenennen (M100)
+    const other = hitOther(e.target as Element);
+    if (other) {
+      setSelOther(other);
       setSelNode(null);
-      setRename({
-        nid: '', edge: true,
-        x: Math.max(4, c.x - 75), y: Math.max(4, c.y - 14), w: 150,
-        value: stripEdgeLabel(findEdgeFor(ids.from, ids.to)?.m[4]),
-      });
+      setSelEdge(null);
+      startOtherRename(other);
     }
   };
 
@@ -428,6 +562,8 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
       updateNodeData(id, { code });
       setAiText('');
       setSelNode(null);
+      setSelEdge(null);
+      setSelOther(null);
       showToast('✨ Diagramm aktualisiert.');
     } catch (e) {
       showToast(`KI-Diagramm fehlgeschlagen: ${String((e as Error).message).slice(0, 120)}`, false, 8000);
@@ -469,6 +605,80 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             <button onClick={() => { setSelNode(null); setConnectFrom(null); }} title="Schritt-Auswahl aufheben">✕</button>
           </div>
         )}
+        {selOther && (
+          <div className="mm-row mm-step-row">
+            {selOther.t === 'msg' && (() => {
+              const m = seqMessages(data.code)[selOther.idx];
+              const up = (next: string | null) => { if (next != null) updateNodeData(id, { code: next }); };
+              return (
+                <>
+                  <span className="mm-sel-name" title="Ausgewählte Nachricht">{m ? `${m.from} → ${m.to}` : 'Nachricht'}</span>
+                  <button onClick={() => startOtherRename(selOther)}>✎ Text</button>
+                  <span className="mm-sep" />
+                  <button className={m && !m.arrow.startsWith('--') ? 'active' : ''} title="Pfeil: durchgezogen" onClick={() => up(setSeqMsg(data.code, selOther.idx, { arrow: '->>' }))}>─</button>
+                  <button className={m?.arrow.startsWith('--') ? 'active' : ''} title="Pfeil: gestrichelt (Antwort)" onClick={() => up(setSeqMsg(data.code, selOther.idx, { arrow: '-->>' }))}>┄</button>
+                  <span className="mm-sep" />
+                  <button title="Nachricht danach einfügen (Gegenrichtung)" onClick={() => { updateNodeData(id, { code: addSeqMsg(data.code, selOther.idx) }); }}>＋ Danach</button>
+                  <button className="danger" onClick={() => { up(removeSeqMsg(data.code, selOther.idx)); setSelOther(null); }}>Entfernen</button>
+                </>
+              );
+            })()}
+            {selOther.t === 'actor' && (
+              <>
+                <span className="mm-sel-name" title="Ausgewählte Person">„{selOther.name}"</span>
+                <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
+                <button className="danger" title="Person samt ihrer Nachrichten entfernen" onClick={() => { updateNodeData(id, { code: removeSeqActor(data.code, selOther.name) }); setSelOther(null); }}>Entfernen</button>
+              </>
+            )}
+            {selOther.t === 'task' && (() => {
+              const t = ganttTasks(data.code)[selOther.idx];
+              const up = (next: string | null) => { if (next != null) updateNodeData(id, { code: next }); };
+              const hasDays = t ? /\d+\s*d\s*$/.test(t.meta) : false;
+              return (
+                <>
+                  <span className="mm-sel-name" title="Ausgewählte Aufgabe">„{t?.name ?? 'Aufgabe'}"</span>
+                  <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
+                  {hasDays && (
+                    <>
+                      <span className="mm-sep" />
+                      <button title="Einen Tag kürzer" onClick={() => up(shiftGanttTask(data.code, selOther.idx, -1))}>−1 Tag</button>
+                      <button title="Einen Tag länger" onClick={() => up(shiftGanttTask(data.code, selOther.idx, 1))}>＋1 Tag</button>
+                    </>
+                  )}
+                  <span className="mm-sep" />
+                  <button title="Neue Aufgabe direkt danach" onClick={() => updateNodeData(id, { code: addGanttTask(data.code, selOther.idx) })}>＋ Danach</button>
+                  <button className="danger" onClick={() => { up(removeGanttTask(data.code, selOther.idx)); setSelOther(null); }}>Entfernen</button>
+                </>
+              );
+            })()}
+            {selOther.t === 'mind' && (
+              <>
+                <span className="mm-sel-name" title="Ausgewählter Punkt">„{mindText(data.code, selOther.line)}"</span>
+                <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
+                <button title="Unterpunkt anfügen" onClick={() => updateNodeData(id, { code: addMindChild(data.code, selOther.line) })}>＋ Unterpunkt</button>
+                {selOther.line !== mindLines(data.code)[0] && (
+                  <button className="danger" title="Punkt samt Unterpunkten entfernen" onClick={() => { const c = removeMind(data.code, selOther.line); if (c != null) updateNodeData(id, { code: c }); setSelOther(null); }}>Entfernen</button>
+                )}
+              </>
+            )}
+            {selOther.t === 'pie' && (() => {
+              const s = pieSlices(data.code)[selOther.idx];
+              const up = (next: string | null) => { if (next != null) updateNodeData(id, { code: next }); };
+              return (
+                <>
+                  <span className="mm-sel-name" title="Ausgewähltes Segment">„{s?.label ?? 'Segment'}" ({s?.value ?? '–'})</span>
+                  <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
+                  <span className="mm-sep" />
+                  <button title="Wert −5" onClick={() => up(shiftPie(data.code, selOther.idx, -5))}>−5</button>
+                  <button title="Wert +5" onClick={() => up(shiftPie(data.code, selOther.idx, 5))}>＋5</button>
+                  <span className="mm-sep" />
+                  <button className="danger" onClick={() => { up(removePie(data.code, selOther.idx)); setSelOther(null); }}>Entfernen</button>
+                </>
+              );
+            })()}
+            <button onClick={() => setSelOther(null)} title="Auswahl aufheben">✕</button>
+          </div>
+        )}
         {selEdge && !selNode && (
           <div className="mm-row mm-step-row">
             <span className="mm-sel-name" title="Ausgewählte Verbindung">{selEdge.from} → {selEdge.to}</span>
@@ -506,6 +716,24 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
           <span className="mm-sep" />
           {isFlow && (
             <button title="Neuen Schritt anfügen (an den ausgewählten, sonst frei)" onClick={() => addStepAfter(selNode)}>＋ Schritt</button>
+          )}
+          {kind === 'seq' && (
+            <>
+              <button title="Neue Person (participant)" onClick={() => updateNodeData(id, { code: addSeqActor(data.code) })}>＋ Person</button>
+              <button title="Neue Nachricht am Ende" onClick={() => updateNodeData(id, { code: addSeqMsg(data.code, selOther?.t === 'msg' ? selOther.idx : null) })}>＋ Nachricht</button>
+            </>
+          )}
+          {kind === 'gantt' && (
+            <>
+              <button title="Neue Aufgabe (nach der ausgewählten, sonst am Ende)" onClick={() => updateNodeData(id, { code: addGanttTask(data.code, selOther?.t === 'task' ? selOther.idx : null) })}>＋ Aufgabe</button>
+              <button title="Neuer Abschnitt (section)" onClick={() => updateNodeData(id, { code: addGanttSection(data.code) })}>＋ Abschnitt</button>
+            </>
+          )}
+          {kind === 'mind' && (
+            <button title="Neuen Punkt anfügen (unter dem ausgewählten, sonst unter der Wurzel)" onClick={() => updateNodeData(id, { code: addMindChild(data.code, selOther?.t === 'mind' ? selOther.line : null) })}>＋ Punkt</button>
+          )}
+          {kind === 'pie' && (
+            <button title="Neues Segment" onClick={() => updateNodeData(id, { code: addPie(data.code) })}>＋ Segment</button>
           )}
           <button title="Kartengröße einmalig an das Diagramm anpassen" onClick={() => fitToDiagram()}>⤢</button>
           <button
@@ -565,8 +793,12 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
           {connectFrom && !error && (
             <div className="mm-hint mm-hint-connect">→ Ziel-Schritt anklicken, um „{connectFrom}" zu verbinden</div>
           )}
-          {isFlow && !error && !connectFrom && selected && (
-            <div className="mm-hint">Klick auf Schritt oder Pfeil = bearbeiten · Doppelklick = umbenennen/beschriften</div>
+          {kind !== 'other' && !error && !connectFrom && selected && (
+            <div className="mm-hint">
+              {isFlow
+                ? 'Klick auf Schritt oder Pfeil = bearbeiten · Doppelklick = umbenennen/beschriften'
+                : 'Klick auf ein Element = bearbeiten · Doppelklick = direkt umbenennen'}
+            </div>
           )}
         </div>
       </div>

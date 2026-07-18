@@ -836,6 +836,18 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .mermaid-svg path.flowchart-link { cursor: pointer; transition: stroke-width 0.12s ease; }
 .mermaid-svg path.flowchart-link:hover { stroke-width: 3px !important; }
 .mermaid-svg path.mm-selected-edge { stroke: var(--accent-strong) !important; stroke-width: 3px !important; }
+/* Klick-Ziele der weiteren Diagrammtypen (M100): Sequenz, Gantt, Mindmap, Kreis */
+.mermaid-svg text.messageText, .mermaid-svg text.actor, .mermaid-svg rect.actor,
+.mermaid-svg rect.task, .mermaid-svg text.taskText,
+.mermaid-svg g.mindmap-node, .mermaid-svg g.legend, .mermaid-svg path.pieCircle { cursor: pointer; }
+.mermaid-svg text.messageText:hover, .mermaid-svg text.actor:hover, .mermaid-svg text.taskText:hover { opacity: 0.7; }
+.mermaid-svg rect.task:hover, .mermaid-svg rect.actor:hover, .mermaid-svg g.mindmap-node:hover,
+.mermaid-svg path.pieCircle:hover, .mermaid-svg g.legend:hover {
+  filter: brightness(1.06) drop-shadow(0 2px 4px rgba(40, 30, 10, 0.25));
+}
+.mermaid-svg .mm-selected-el { filter: drop-shadow(0 0 4px var(--accent)); }
+.mermaid-svg text.mm-selected-el { fill: var(--accent-strong) !important; font-weight: 700; }
+.mermaid-svg rect.mm-selected-el { stroke: var(--accent-strong) !important; stroke-width: 2.5px !important; }
 .mm-ai-row input {
   flex: 1; min-width: 200px; border: 1.5px solid var(--border-soft); border-radius: 8px;
   background: var(--surface); color: var(--ink);
