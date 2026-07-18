@@ -4,7 +4,7 @@
 // Die Zuordnung Bild ⇄ Code läuft über die Dokument-Reihenfolge: n-tes
 // SVG-Element = n-te passende Code-Zeile (per Probe für alle Typen bestätigt).
 
-export type DiagramKind = 'flow' | 'seq' | 'gantt' | 'mind' | 'pie' | 'other';
+export type DiagramKind = 'flow' | 'seq' | 'gantt' | 'mind' | 'pie' | 'state' | 'timeline' | 'quadrant' | 'other';
 
 export function diagramKind(code: string): DiagramKind {
   const head = code.trimStart();
@@ -13,6 +13,9 @@ export function diagramKind(code: string): DiagramKind {
   if (/^gantt\b/.test(head)) return 'gantt';
   if (/^mindmap\b/.test(head)) return 'mind';
   if (/^pie\b/.test(head)) return 'pie';
+  if (/^stateDiagram/.test(head)) return 'state';
+  if (/^timeline\b/.test(head)) return 'timeline';
+  if (/^quadrantChart\b/.test(head)) return 'quadrant';
   return 'other';
 }
 
@@ -271,4 +274,346 @@ export function removePie(code: string, idx: number): string | null {
 
 export function addPie(code: string): string {
   return `${code.trimEnd()}\n  "Neues Segment" : 10`;
+}
+
+// ---------------------------------------------------------------------------
+// Status (stateDiagram-v2) — Kanten-Pfade heißen „…-edge<N>" in Zeilen-Reihenfolge
+const ST_TRANS_RE = /^(\s*)(\S+)\s*-->\s*([^:\n]+?)\s*(?::\s*(.*))?$/;
+
+export interface StateTrans { line: number; from: string; to: string; label: string }
+
+export function stateTransitions(code: string): StateTrans[] {
+  const out: StateTrans[] = [];
+  code.split('\n').forEach((l, i) => {
+    const m = ST_TRANS_RE.exec(l);
+    if (m) out.push({ line: i, from: m[2], to: m[3].trim(), label: m[4] ?? '' });
+  });
+  return out;
+}
+
+export function setStateTransLabel(code: string, idx: number, label: string): string | null {
+  const t = stateTransitions(code)[idx];
+  if (!t) return null;
+  const lines = code.split('\n');
+  const m = ST_TRANS_RE.exec(lines[t.line])!;
+  // ';' beendet in stateDiagram das Statement — Resttext würde zu
+  // Phantom-Zuständen (Review-Befund M101)
+  lines[t.line] = `${m[1]}${m[2]} --> ${m[3].trim()}${label.trim() ? ` : ${label.replace(/[:;\n]/g, ' ').trim()}` : ''}`;
+  return lines.join('\n');
+}
+
+/** Unicode-sichere Wortgrenze: \b ist in JS ASCII-basiert und versagt bei
+ *  Namen, die mit Umlaut/ß beginnen oder enden (Review-Befund M101) */
+const uniWord = (name: string) =>
+  new RegExp(`(?<![\\p{L}\\p{N}_])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}_])`, 'gu');
+
+/** Schlüsselwörter, die als Zustandsname die Grammatik kapern würden */
+const STATE_RESERVED = new Set(['state', 'note', 'end', 'direction', 'as']);
+
+export function removeStateTrans(code: string, idx: number): string | null {
+  const t = stateTransitions(code)[idx];
+  if (!t) return null;
+  const lines = code.split('\n');
+  lines.splice(t.line, 1);
+  return lines.join('\n');
+}
+
+/** Zustand überall umbenennen (Übergänge + state-Zeilen, nicht in Labels) */
+export function renameState(code: string, oldName: string, next: string): string {
+  let safe = next.trim().replace(/[^\p{L}\p{N}_]/gu, '_') || oldName;
+  // Reservierte Wörter würden Übergänge stillschweigend schlucken (Review M101)
+  if (STATE_RESERVED.has(safe.toLowerCase())) safe = `${safe}_`;
+  return code.split('\n').map((l, i) => {
+    if (i === 0) return l;
+    const m = ST_TRANS_RE.exec(l);
+    if (m) {
+      const from = m[2] === oldName ? safe : m[2];
+      const to = m[3].trim() === oldName ? safe : m[3].trim();
+      if (from !== m[2] || to !== m[3].trim()) return `${m[1]}${from} --> ${to}${m[4] ? ` : ${m[4]}` : ''}`;
+      return l;
+    }
+    return l.replace(uniWord(oldName), safe);
+  }).join('\n');
+}
+
+/** Zustand entfernen: Übergänge, Deklarationen (auch `state "…" as X`),
+ *  Beschreibungszeilen `X : …` und komplette Composite-Blöcke `state X { … }` */
+export function removeState(code: string, name: string): string {
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const bareRe = new RegExp(`^\\s*(?:state\\s+)?${esc}(?![\\p{L}\\p{N}_])\\s*(\\{)?\\s*$`, 'u');
+  const aliasRe = new RegExp(`^\\s*state\\s+"[^"\\n]*"\\s+as\\s+${esc}(?![\\p{L}\\p{N}_])\\s*(\\{)?\\s*$`, 'u');
+  const descRe = new RegExp(`^\\s*${esc}(?![\\p{L}\\p{N}_])\\s*:`, 'u');
+  const lines = code.split('\n');
+  const out: string[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    if (i === 0) { out.push(lines[i]); continue; }
+    const l = lines[i];
+    const m = ST_TRANS_RE.exec(l);
+    if (m && (m[2] === name || m[3].trim() === name)) continue;
+    const decl = bareRe.exec(l) ?? aliasRe.exec(l);
+    if (decl) {
+      // Composite-Block samt Rumpf und schließender „}" überspringen —
+      // sonst bleibt eine verwaiste Klammer zurück (Parse-Fehler, M101)
+      if (decl[1] === '{') {
+        let depth = 1;
+        while (i + 1 < lines.length && depth > 0) {
+          i += 1;
+          depth += (lines[i].match(/\{/g) ?? []).length;
+          depth -= (lines[i].match(/\}/g) ?? []).length;
+        }
+      }
+      continue;
+    }
+    if (descRe.test(l)) continue;
+    out.push(l);
+  }
+  return out.join('\n');
+}
+
+export function addState(code: string): string {
+  let n = 1;
+  while (new RegExp(`\\bZustand_${n}\\b`).test(code)) n += 1;
+  return `${code.trimEnd()}\n  Zustand_${n}`;
+}
+
+// ---------------------------------------------------------------------------
+// Zeitstrahl (timeline) — g.timeline-node in Dokument-Reihenfolge entspricht
+// der Token-Reihenfolge: je Zeile erst die Periode, dann ihre Ereignisse
+const TL_META = /^\s*(timeline|title|section)\b/;
+
+export interface TlToken { line: number; part: number; text: string; isPeriod: boolean }
+
+export function timelineTokens(code: string): TlToken[] {
+  const out: TlToken[] = [];
+  code.split('\n').forEach((l, i) => {
+    if (i === 0 || !l.trim() || TL_META.test(l)) return;
+    l.split(':').forEach((p, j) => {
+      if (p.trim()) out.push({ line: i, part: j, text: p.trim(), isPeriod: j === 0 });
+    });
+  });
+  return out;
+}
+
+export function renameTimelineToken(code: string, idx: number, text: string): string | null {
+  const t = timelineTokens(code)[idx];
+  if (!t) return null;
+  const lines = code.split('\n');
+  const parts = lines[t.line].split(':');
+  const indent = /^(\s*)/.exec(parts[0])![1];
+  parts[t.part] = `${t.part === 0 ? indent : ' '}${text.replace(/[:\n]/g, ' ').trim()}${t.part < parts.length - 1 ? ' ' : ''}`;
+  lines[t.line] = parts.join(':');
+  return lines.join('\n');
+}
+
+/** Ereignis entfernen — eine Periode nimmt ihre ganze Zeile mit */
+export function removeTimelineToken(code: string, idx: number): string | null {
+  const t = timelineTokens(code)[idx];
+  if (!t) return null;
+  const lines = code.split('\n');
+  if (t.isPeriod) {
+    // Auch Fortsetzungszeilen („: Ereignis") mitnehmen — verwaist wären sie
+    // ein harter mermaid-Parse-Fehler (Review-Befund M101)
+    let count = 1;
+    while (t.line + count < lines.length && /^\s*:/.test(lines[t.line + count])) count += 1;
+    lines.splice(t.line, count);
+  } else {
+    const parts = lines[t.line].split(':');
+    parts.splice(t.part, 1);
+    lines[t.line] = parts.join(':');
+  }
+  return lines.join('\n');
+}
+
+export function addTimelineEvent(code: string, idx: number | null): string {
+  const toks = timelineTokens(code);
+  const t = idx != null ? toks[idx] : toks[toks.length - 1];
+  if (!t) return `${code.trimEnd()}\n  Neue Periode : Neues Ereignis`;
+  const lines = code.split('\n');
+  lines[t.line] = `${lines[t.line].trimEnd()} : Neues Ereignis`;
+  return lines.join('\n');
+}
+
+export function addTimelinePeriod(code: string): string {
+  return `${code.trimEnd()}\n  Neue Periode : Neues Ereignis`;
+}
+
+// ---------------------------------------------------------------------------
+// Quadrant — Punkt-Reihenfolge im SVG ist SORTIERT, deshalb Zuordnung über
+// den Beschriftungstext; Quadranten-/Achsen-Beschriftungen über ihre Zeilen
+const QUAD_POINT_RE = /^(\s*)"(.*)"\s*:\s*\[\s*([\d.]+)\s*,\s*([\d.]+)\s*\]\s*$/;
+
+export interface QuadPoint { line: number; label: string; x: number; y: number }
+
+export function quadrantPoints(code: string): QuadPoint[] {
+  const out: QuadPoint[] = [];
+  code.split('\n').forEach((l, i) => {
+    const m = QUAD_POINT_RE.exec(l);
+    if (m) out.push({ line: i, label: m[2], x: parseFloat(m[3]), y: parseFloat(m[4]) });
+  });
+  return out;
+}
+
+export function renameQuadrantPoint(code: string, label: string, next: string): string | null {
+  const p = quadrantPoints(code).find((q) => q.label === label);
+  if (!p) return null;
+  // Punkte werden über ihr Label identifiziert — Duplikate wären danach
+  // per Klick nicht mehr unterscheidbar (Review-Befund M101)
+  const others = quadrantPoints(code).filter((q) => q.line !== p.line).map((q) => q.label);
+  const base = next.replace(/"/g, "'").trim();
+  let clean = base;
+  for (let n = 2; others.includes(clean); n += 1) clean = `${base} ${n}`;
+  const lines = code.split('\n');
+  lines[p.line] = lines[p.line].replace(QUAD_POINT_RE, (_m, pre, _l, x, y) => `${pre}"${clean}": [${x}, ${y}]`);
+  return lines.join('\n');
+}
+
+export function nudgeQuadrantPoint(code: string, label: string, dx: number, dy: number): string | null {
+  const p = quadrantPoints(code).find((q) => q.label === label);
+  if (!p) return null;
+  const cl = (v: number) => Math.min(1, Math.max(0, Math.round(v * 100) / 100));
+  const lines = code.split('\n');
+  lines[p.line] = lines[p.line].replace(QUAD_POINT_RE, (_m, pre, l) => `${pre}"${l}": [${cl(p.x + dx)}, ${cl(p.y + dy)}]`);
+  return lines.join('\n');
+}
+
+export function removeQuadrantPoint(code: string, label: string): string | null {
+  const p = quadrantPoints(code).find((q) => q.label === label);
+  if (!p) return null;
+  const lines = code.split('\n');
+  lines.splice(p.line, 1);
+  return lines.join('\n');
+}
+
+export function addQuadrantPoint(code: string): string {
+  const labels = new Set(quadrantPoints(code).map((p) => p.label));
+  let label = 'Neuer Punkt';
+  for (let n = 2; labels.has(label); n += 1) label = `Neuer Punkt ${n}`;
+  return `${code.trimEnd()}\n  "${label}": [0.5, 0.5]`;
+}
+
+export function quadrantLabels(code: string): string[] {
+  const out = ['', '', '', ''];
+  code.split('\n').forEach((l) => {
+    const m = /^\s*quadrant-([1-4])\s+"?(.*?)"?\s*$/.exec(l);
+    if (m) out[parseInt(m[1], 10) - 1] = m[2];
+  });
+  return out;
+}
+
+export function setQuadrantLabel(code: string, n: number, text: string): string | null {
+  const re = new RegExp(`^(\\s*quadrant-${n}\\s+).*$`, 'm');
+  if (!re.test(code)) return null;
+  // Callback statt Ersetzungs-String: $-Zeichen im Nutzertext würden sonst
+  // als Replacement-Muster expandiert (Review-Befund M101)
+  const clean = text.replace(/"/g, "'").trim();
+  return code.replace(re, (_m, pre) => `${pre}"${clean}"`);
+}
+
+/** Achsen-Zeile: zeilengebunden ([^"\n]) und mit optionaler rechter Seite —
+ *  einseitige Achsen (`x-axis "Nur links"`) sind gültige mermaid-Syntax
+ *  und dürfen nicht zu `"" --> …` kaputtgeschrieben werden (Review M101) */
+const axisRe = (axis: string) =>
+  new RegExp(`^(\\s*${axis}-axis\\s+)(?:"([^"\\n]*)"|([^"\\n]+?))(?:\\s*-->\\s*(?:"([^"\\n]*)"|([^"\\n]+?)))?\\s*$`, 'm');
+
+export function axisLabels(code: string): { x: [string, string]; y: [string, string] } {
+  const get = (axis: string): [string, string] => {
+    const m = axisRe(axis).exec(code);
+    return m ? [(m[2] ?? m[3] ?? '').trim(), (m[4] ?? m[5] ?? '').trim()] : ['', ''];
+  };
+  return { x: get('x'), y: get('y') };
+}
+
+export function setAxisLabel(code: string, axis: 'x' | 'y', side: 0 | 1, text: string): string | null {
+  const m = axisRe(axis).exec(code);
+  if (!m) return null;
+  const next: [string, string] = [(m[2] ?? m[3] ?? '').trim(), (m[4] ?? m[5] ?? '').trim()];
+  next[side] = text.replace(/"/g, "'").trim();
+  const left = next[0] || ' ';
+  const right = next[1] ? ` --> "${next[1]}"` : '';
+  return code.replace(axisRe(axis), (_a, pre) => `${pre}"${left}"${right}`);
+}
+
+// ---------------------------------------------------------------------------
+// Titel (gantt, pie, timeline, quadrant) + Gantt-Abschnitte/-Status + Sequenz-Extras
+export function getTitle(code: string): string {
+  const m = /^\s*title\s+(.*)$/m.exec(code);
+  return m ? m[1].trim() : '';
+}
+
+export function setTitle(code: string, text: string): string {
+  const clean = text.replace(/\n/g, ' ').trim();
+  if (/^\s*title\s+/m.test(code)) {
+    if (!clean) return code.split('\n').filter((l) => !/^\s*title\s+/.test(l)).join('\n');
+    // Callback: $-Zeichen im Titel dürfen nicht expandieren (Review M101)
+    return code.replace(/^(\s*title\s+).*$/m, (_m, pre) => `${pre}${clean}`);
+  }
+  if (!clean) return code;
+  const lines = code.split('\n');
+  lines.splice(1, 0, `  title ${clean}`);
+  return lines.join('\n');
+}
+
+export function ganttSections(code: string): Array<{ line: number; name: string }> {
+  const out: Array<{ line: number; name: string }> = [];
+  code.split('\n').forEach((l, i) => {
+    const m = /^\s*section\s+(.*)$/.exec(l);
+    if (m) out.push({ line: i, name: m[1].trim() });
+  });
+  return out;
+}
+
+export function renameGanttSection(code: string, idx: number, name: string): string | null {
+  const s = ganttSections(code)[idx];
+  if (!s) return null;
+  const lines = code.split('\n');
+  const clean = name.replace(/[:\n]/g, ' ').trim();
+  lines[s.line] = lines[s.line].replace(/^(\s*section\s+).*$/, (_m, pre) => `${pre}${clean}`);
+  return lines.join('\n');
+}
+
+export const GANTT_FLAGS = ['done', 'active', 'crit', 'milestone'] as const;
+
+/** Status-Markierung einer Aufgabe umschalten (done/active/crit/milestone) */
+export function toggleGanttFlag(code: string, idx: number, flag: (typeof GANTT_FLAGS)[number]): string | null {
+  const t = ganttTasks(code)[idx];
+  if (!t) return null;
+  const parts = t.meta.split(',').map((p) => p.trim()).filter(Boolean);
+  let flags = parts.filter((p) => (GANTT_FLAGS as readonly string[]).includes(p));
+  const rest = parts.filter((p) => !(GANTT_FLAGS as readonly string[]).includes(p));
+  flags = flags.includes(flag) ? flags.filter((f) => f !== flag) : [...flags, flag];
+  const lines = code.split('\n');
+  const m = GANTT_TASK_RE.exec(lines[t.line])!;
+  lines[t.line] = `${m[1]}${m[2]} :${[...flags, ...rest].join(', ')}`;
+  return lines.join('\n');
+}
+
+/** Aktive Status-Markierungen einer Aufgabe */
+export function ganttFlags(code: string, idx: number): string[] {
+  const t = ganttTasks(code)[idx];
+  if (!t) return [];
+  return t.meta.split(',').map((p) => p.trim()).filter((p) => (GANTT_FLAGS as readonly string[]).includes(p));
+}
+
+/** Sequenz: fortlaufende Nummerierung an/aus (autonumber) */
+export function toggleAutonumber(code: string): string {
+  if (/^\s*autonumber\s*$/m.test(code)) {
+    return code.split('\n').filter((l) => !/^\s*autonumber\s*$/.test(l)).join('\n');
+  }
+  const lines = code.split('\n');
+  lines.splice(1, 0, '  autonumber');
+  return lines.join('\n');
+}
+
+export function hasAutonumber(code: string): boolean {
+  return /^\s*autonumber\s*$/m.test(code);
+}
+
+/** Notiz nach einer Nachricht einfügen (Note over Von,Nach) */
+export function addSeqNote(code: string, msgIdx: number | null): string {
+  const msgs = seqMessages(code);
+  const m = msgIdx != null ? msgs[msgIdx] : msgs[msgs.length - 1];
+  const lines = code.split('\n');
+  const line = m ? `  Note over ${m.from},${m.to}: Notiz` : '  Note over A: Notiz';
+  lines.splice(m ? m.line + 1 : lines.length, 0, line);
+  return lines.join('\n');
 }

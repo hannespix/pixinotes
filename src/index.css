@@ -848,6 +848,16 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .mermaid-svg .mm-selected-el { filter: drop-shadow(0 0 4px var(--accent)); }
 .mermaid-svg text.mm-selected-el { fill: var(--accent-strong) !important; font-weight: 700; }
 .mermaid-svg rect.mm-selected-el { stroke: var(--accent-strong) !important; stroke-width: 2.5px !important; }
+/* Status, Zeitstrahl, Quadrant + Details (M101) */
+.mermaid-svg text.sectionTitle { cursor: pointer; }
+.mermaid-svg text.sectionTitle:hover { opacity: 0.7; }
+[data-kind='timeline'] .mermaid-svg g.timeline-node { cursor: pointer; }
+[data-kind='timeline'] .mermaid-svg g.timeline-node:hover { filter: brightness(1.06) drop-shadow(0 2px 4px rgba(40, 30, 10, 0.25)); }
+[data-kind='quadrant'] .mermaid-svg g.data-point,
+[data-kind='quadrant'] .mermaid-svg text { cursor: pointer; }
+[data-kind='quadrant'] .mermaid-svg g.data-point:hover { filter: brightness(1.1) drop-shadow(0 2px 4px rgba(40, 30, 10, 0.3)); }
+[data-kind='state'] .mermaid-svg .edgePaths path { cursor: pointer; transition: stroke-width 0.12s ease; }
+[data-kind='state'] .mermaid-svg .edgePaths path:hover { stroke-width: 3px !important; }
 .mm-ai-row input {
   flex: 1; min-width: 200px; border: 1.5px solid var(--border-soft); border-radius: 8px;
   background: var(--surface); color: var(--ink);

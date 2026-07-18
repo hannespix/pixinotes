@@ -5,22 +5,35 @@ import type { MermaidNode } from '../../types';
 import { aiReady } from '../../lib/ai';
 import { aiMermaid, buildMermaidSource, getMermaid, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES, preloadHandFont } from '../../lib/mermaid';
 import {
-  addGanttSection, addGanttTask, addMindChild, addPie, addSeqActor, addSeqMsg,
-  diagramKind, ganttTasks, mindLines, mindText, pieSlices, removeGanttTask,
-  removeMind, removePie, removeSeqActor, removeSeqMsg, renameGanttTask,
-  renameMind, renamePie, renameSeqActor, seqMessages, setSeqMsg, shiftGanttTask,
-  shiftPie,
+  addGanttSection, addGanttTask, addMindChild, addPie, addQuadrantPoint,
+  addSeqActor, addSeqMsg, addSeqNote, addState, addTimelineEvent,
+  addTimelinePeriod, axisLabels, diagramKind, ganttFlags, ganttSections,
+  ganttTasks, getTitle, hasAutonumber, mindLines, mindText, nudgeQuadrantPoint,
+  pieSlices, quadrantLabels, quadrantPoints, removeGanttTask, removeMind,
+  removePie, removeQuadrantPoint, removeSeqActor, removeSeqMsg, removeState,
+  removeStateTrans, removeTimelineToken, renameGanttSection, renameGanttTask,
+  renameMind, renamePie, renameQuadrantPoint, renameSeqActor, renameState,
+  renameTimelineToken, seqMessages, setAxisLabel, setQuadrantLabel, setSeqMsg,
+  setStateTransLabel, setTitle, shiftGanttTask, shiftPie, stateTransitions,
+  timelineTokens, toggleAutonumber, toggleGanttFlag,
 } from '../../lib/mermaidEdit';
 import { useOutsideClose } from '../../lib/useOutsideClose';
 import { CardShell } from './CardShell';
 
-/** Auswahl in Nicht-Flowchart-Diagrammen (M100): Bild-Element ⇄ Code-Zeile */
+/** Auswahl in Nicht-Flowchart-Diagrammen (M100/M101): Bild-Element ⇄ Code */
 type SelOther =
   | { t: 'actor'; name: string; x: number; y: number }
   | { t: 'msg'; idx: number; x: number; y: number }
   | { t: 'task'; idx: number; x: number; y: number }
+  | { t: 'gsec'; idx: number; x: number; y: number }
   | { t: 'mind'; line: number; x: number; y: number }
-  | { t: 'pie'; idx: number; x: number; y: number };
+  | { t: 'pie'; idx: number; x: number; y: number }
+  | { t: 'state'; name: string; x: number; y: number }
+  | { t: 'stEdge'; idx: number; x: number; y: number }
+  | { t: 'tl'; idx: number; x: number; y: number }
+  | { t: 'qPoint'; label: string; x: number; y: number }
+  | { t: 'qLabel'; n: number; x: number; y: number }
+  | { t: 'axis'; axis: 'x' | 'y'; side: 0 | 1; x: number; y: number };
 
 /** Umbenenn-Ziel des Inline-Eingabefelds */
 type RenameTarget =
@@ -29,8 +42,16 @@ type RenameTarget =
   | { t: 'msg'; idx: number }
   | { t: 'actor'; name: string }
   | { t: 'task'; idx: number }
+  | { t: 'gsec'; idx: number }
   | { t: 'mind'; line: number }
-  | { t: 'pie'; idx: number };
+  | { t: 'pie'; idx: number }
+  | { t: 'state'; name: string }
+  | { t: 'stEdge'; idx: number }
+  | { t: 'tl'; idx: number }
+  | { t: 'qPoint'; label: string }
+  | { t: 'qLabel'; n: number }
+  | { t: 'axis'; axis: 'x' | 'y'; side: 0 | 1 }
+  | { t: 'title' };
 
 /** Form je Schritt: Symbol, Name, Klammern (Mermaid-Syntax) */
 const SHAPES: Array<[string, string, string, string]> = [
@@ -38,6 +59,8 @@ const SHAPES: Array<[string, string, string, string]> = [
   ['▢', 'Abgerundet', '(', ')'],
   ['◇', 'Entscheidung', '{', '}'],
   ['◯', 'Kreis', '((', '))'],
+  ['⬡', 'Sechseck', '{{', '}}'],
+  ['⧉', 'Unterprozess', '[[', ']]'],
 ];
 
 /** Füllfarben je Schritt (mermaid `style <id> fill:…`) — bewusst kräftige
@@ -185,15 +208,35 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     const root = previewRef.current;
     if (!root) return;
     root.querySelectorAll('.mm-selected-el').forEach((el) => el.classList.remove('mm-selected-el'));
+    // Status-Übergänge nutzen die Kanten-Markierung — hier mit aufräumen
+    // (im Flowchart macht das der selEdge-Effekt, der davor läuft)
+    if (kind === 'state') root.querySelectorAll('path.mm-selected-edge').forEach((p) => p.classList.remove('mm-selected-edge'));
     if (!selOther) return;
     const mark = (sel: string, idx: number) => root.querySelectorAll(sel)[idx]?.classList.add('mm-selected-el');
     if (selOther.t === 'msg') mark('text.messageText', selOther.idx);
     if (selOther.t === 'task') { mark('rect.task', selOther.idx); mark('text.taskText', selOther.idx); }
+    if (selOther.t === 'gsec') mark('text.sectionTitle', selOther.idx);
     if (selOther.t === 'mind') mark('g.mindmap-node', mindLines(data.code).indexOf(selOther.line));
     if (selOther.t === 'pie') { mark('path.pieCircle', selOther.idx); mark('g.legend', selOther.idx); }
     if (selOther.t === 'actor') {
       root.querySelectorAll('text.actor').forEach((el) => {
         if ((el.textContent ?? '').trim() === selOther.name) el.classList.add('mm-selected-el');
+      });
+    }
+    if (selOther.t === 'state') {
+      root.querySelectorAll('g.node, g.rough-node').forEach((el) => {
+        if (new RegExp(`-state-${selOther.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+$`).test(el.id)) el.classList.add('mm-selected-el');
+      });
+    }
+    if (selOther.t === 'stEdge') {
+      root.querySelectorAll('.edgePaths path').forEach((el) => {
+        if (el.id.endsWith(`-edge${selOther.idx}`)) el.classList.add('mm-selected-edge');
+      });
+    }
+    if (selOther.t === 'tl') mark('g.timeline-node', selOther.idx);
+    if (selOther.t === 'qPoint') {
+      root.querySelectorAll('g.data-point').forEach((el) => {
+        if ((el.textContent ?? '').trim() === selOther.label) el.classList.add('mm-selected-el');
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -215,6 +258,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     setSelNode(null);
     setSelEdge(null);
     setSelOther(null);
+    setConnectFrom(null);
     fitOnRender.current = true; // neue Vorlage → Karte einmalig einpassen
     updateNodeData(id, { code: TEMPLATES[t] });
   };
@@ -232,7 +276,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
    *  Label-Gruppe kennt auch die "…"-Form — nur so überleben Beschriftungen
    *  mit Klammern/Sonderzeichen ein erneutes Umbenennen (Audit M97). */
   const defRe = (nid: string) =>
-    new RegExp(`(\\b${escapeRe(nid)})((?:\\(\\(|\\[|\\{|\\())("[^"]*"|[^\\]})]*)((?:\\)\\)|\\]|\\}|\\)))`);
+    new RegExp(`(\\b${escapeRe(nid)})((?:\\(\\(|\\[\\[|\\{\\{|\\[|\\{|\\())("[^"]*"|[^\\]})]*)((?:\\)\\)|\\]\\]|\\}\\}|\\]|\\}|\\)))`);
 
   /** Beschriftung mermaid-sicher machen: Sonderzeichen (Klammern, #, ; …)
    *  brauchen die "…"-Form; innere Anführungszeichen werden zu ' (Audit M97) */
@@ -282,6 +326,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     const kept = lines.filter((l, i) => i === 0 || !re.test(l));
     updateNodeData(id, { code: kept.join('\n') });
     setSelNode(null);
+    setConnectFrom(null); // ein laufender Verbinden-Modus zeigt sonst ins Leere
   };
 
   // ---------- Verbindungen direkt bearbeiten (M99) ----------
@@ -304,7 +349,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     return null;
   };
 
-  const EDGE_DEF = '(?:\\(\\(.*?\\)\\)|\\[.*?\\]|\\{.*?\\}|\\(.*?\\))?';
+  const EDGE_DEF = '(?:\\(\\(.*?\\)\\)|\\[\\[.*?\\]\\]|\\{\\{.*?\\}\\}|\\[.*?\\]|\\{.*?\\}|\\(.*?\\))?';
   const edgeLineRe = (from: string, to: string) =>
     new RegExp(`^([ \\t]*)(${escapeRe(from)}${EDGE_DEF})\\s*(={2,}>|-\\.+->|-{2,}>)\\s*(\\|.*?\\|)?\\s*(${escapeRe(to)}${EDGE_DEF})\\s*$`);
 
@@ -396,9 +441,16 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
         return;
       }
     }
-    // Sequenz/Gantt/Mindmap/Kreis: Element anklicken = auswählen (M100)
+    // Sequenz/Gantt/Mindmap/Kreis/Status/Zeitstrahl/Quadrant: auswählen (M100/M101)
     const other = hitOther(e.target as Element);
     if (other) {
+      // Verbinden-Modus im Statusdiagramm: zweiter Klick = Ziel → Übergang
+      if (other.t === 'state' && connectFrom && other.name !== connectFrom) {
+        updateNodeData(id, { code: `${data.code}\n  ${connectFrom} --> ${other.name}` });
+        setConnectFrom(null);
+        setSelOther(other);
+        return;
+      }
       setSelOther(other);
       setSelNode(null);
       setSelEdge(null);
@@ -432,6 +484,46 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
       if (bar) return { t: 'task', idx: idxOf('rect.task', bar), ...localCenter(bar) };
       const txt = target.closest?.('text.taskText');
       if (txt) return { t: 'task', idx: idxOf('text.taskText', txt), ...localCenter(txt) };
+      const sec = target.closest?.('text.sectionTitle');
+      if (sec) return { t: 'gsec', idx: idxOf('text.sectionTitle', sec), ...localCenter(sec) };
+    }
+    if (kind === 'state') {
+      const g = target.closest?.('g.node, g.rough-node');
+      if (g) {
+        const m = /-state-(.+)-\d+$/.exec(g.id ?? '');
+        // Start-/Endpunkte ([*]) sind nicht bearbeitbar
+        if (m && !m[1].startsWith('root_')) return { t: 'state', name: m[1], ...localCenter(g) };
+        return null;
+      }
+      const p = target.closest?.('.edgePaths path') as SVGPathElement | null;
+      if (p) {
+        const m = /-edge(\d+)$/.exec(p.id ?? '');
+        if (m) return { t: 'stEdge', idx: parseInt(m[1], 10), ...localCenter(p) };
+      }
+    }
+    if (kind === 'timeline') {
+      const n = target.closest?.('g.timeline-node');
+      if (n) return { t: 'tl', idx: idxOf('g.timeline-node', n), ...localCenter(n) };
+    }
+    if (kind === 'quadrant') {
+      const pt = target.closest?.('g.data-point');
+      if (pt) {
+        const label = (pt.textContent ?? '').trim();
+        if (label) return { t: 'qPoint', label, ...localCenter(pt) };
+      }
+      // Quadranten-/Achsen-Beschriftungen: Zuordnung über den Textinhalt
+      const txt = target.closest?.('text');
+      if (txt) {
+        const content = (txt.textContent ?? '').trim();
+        const qn = quadrantLabels(data.code).findIndex((q) => q && q === content);
+        if (qn >= 0) return { t: 'qLabel', n: qn + 1, ...localCenter(txt) };
+        const ax = axisLabels(data.code);
+        for (const axis of ['x', 'y'] as const) {
+          for (const side of [0, 1] as const) {
+            if (ax[axis][side] && ax[axis][side] === content) return { t: 'axis', axis, side, ...localCenter(txt) };
+          }
+        }
+      }
     }
     if (kind === 'mind') {
       const n = target.closest?.('g.mindmap-node');
@@ -451,19 +543,37 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
 
   /** Aktueller Text der Auswahl (für das Inline-Eingabefeld) */
   const otherValue = (o: SelOther): string => {
-    if (o.t === 'msg') return seqMessages(data.code)[o.idx]?.text ?? '';
-    if (o.t === 'actor') return o.name;
-    if (o.t === 'task') return ganttTasks(data.code)[o.idx]?.name ?? '';
-    if (o.t === 'mind') return mindText(data.code, o.line);
-    return pieSlices(data.code)[o.idx]?.label ?? '';
+    switch (o.t) {
+      case 'msg': return seqMessages(data.code)[o.idx]?.text ?? '';
+      case 'actor': return o.name;
+      case 'task': return ganttTasks(data.code)[o.idx]?.name ?? '';
+      case 'gsec': return ganttSections(data.code)[o.idx]?.name ?? '';
+      case 'mind': return mindText(data.code, o.line);
+      case 'pie': return pieSlices(data.code)[o.idx]?.label ?? '';
+      case 'state': return o.name;
+      case 'stEdge': return stateTransitions(data.code)[o.idx]?.label ?? '';
+      case 'tl': return timelineTokens(data.code)[o.idx]?.text ?? '';
+      case 'qPoint': return o.label;
+      case 'qLabel': return quadrantLabels(data.code)[o.n - 1] ?? '';
+      case 'axis': return axisLabels(data.code)[o.axis][o.side] ?? '';
+    }
   };
 
   /** Inline-Eingabefeld für eine Nicht-Flowchart-Auswahl öffnen */
   const startOtherRename = (o: SelOther) => {
     const target: RenameTarget = o.t === 'actor' ? { t: 'actor', name: o.name }
       : o.t === 'mind' ? { t: 'mind', line: o.line }
+      : o.t === 'state' ? { t: 'state', name: o.name }
+      : o.t === 'qPoint' ? { t: 'qPoint', label: o.label }
+      : o.t === 'qLabel' ? { t: 'qLabel', n: o.n }
+      : o.t === 'axis' ? { t: 'axis', axis: o.axis, side: o.side }
       : { t: o.t, idx: o.idx };
     setRename({ target, x: Math.max(4, o.x - 75), y: Math.max(4, o.y - 14), w: 160, value: otherValue(o) });
+  };
+
+  /** Titel-Zeile bearbeiten (gantt, Kreis, Zeitstrahl, Quadrant) */
+  const startTitleRename = () => {
+    setRename({ target: { t: 'title' }, x: 12, y: 8, w: 220, value: getTitle(data.code) });
   };
 
   /** Inline-Umbenennen starten: Eingabefeld exakt über den Schritt legen.
@@ -501,8 +611,22 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
         if (v) { up(renameSeqActor(data.code, tg.name, v)); setSelOther(null); }
         break;
       case 'task': if (v) up(renameGanttTask(data.code, tg.idx, v)); break;
+      case 'gsec': if (v) up(renameGanttSection(data.code, tg.idx, v)); break;
       case 'mind': if (v) up(renameMind(data.code, tg.line, v)); break;
       case 'pie': if (v) up(renamePie(data.code, tg.idx, v)); break;
+      case 'state':
+        // connectFrom zeigt sonst auf den alten Namen und würde beim
+        // nächsten Klick den gelöschten Zustand neu anlegen (Review M101)
+        if (v) { up(renameState(data.code, tg.name, v)); setSelOther(null); setConnectFrom(null); }
+        break;
+      case 'stEdge': up(setStateTransLabel(data.code, tg.idx, v)); break; // leer = Beschriftung weg
+      case 'tl': if (v) up(renameTimelineToken(data.code, tg.idx, v)); break;
+      case 'qPoint':
+        if (v) { up(renameQuadrantPoint(data.code, tg.label, v)); setSelOther(null); }
+        break;
+      case 'qLabel': if (v) up(setQuadrantLabel(data.code, tg.n, v)); break;
+      case 'axis': if (v) up(setAxisLabel(data.code, tg.axis, tg.side, v)); break;
+      case 'title': up(setTitle(data.code, v)); break; // leer = Titel entfernen
     }
     setRename(null);
   };
@@ -564,6 +688,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
       setSelNode(null);
       setSelEdge(null);
       setSelOther(null);
+      setConnectFrom(null);
       showToast('✨ Diagramm aktualisiert.');
     } catch (e) {
       showToast(`KI-Diagramm fehlgeschlagen: ${String((e as Error).message).slice(0, 120)}`, false, 8000);
@@ -619,6 +744,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
                   <button className={m?.arrow.startsWith('--') ? 'active' : ''} title="Pfeil: gestrichelt (Antwort)" onClick={() => up(setSeqMsg(data.code, selOther.idx, { arrow: '-->>' }))}>┄</button>
                   <span className="mm-sep" />
                   <button title="Nachricht danach einfügen (Gegenrichtung)" onClick={() => { updateNodeData(id, { code: addSeqMsg(data.code, selOther.idx) }); }}>＋ Danach</button>
+                  <button title="Notiz unter dieser Nachricht (Note over)" onClick={() => updateNodeData(id, { code: addSeqNote(data.code, selOther.idx) })}>🗒 Notiz</button>
                   <button className="danger" onClick={() => { up(removeSeqMsg(data.code, selOther.idx)); setSelOther(null); }}>Entfernen</button>
                 </>
               );
@@ -646,11 +772,89 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
                     </>
                   )}
                   <span className="mm-sep" />
+                  {(['done', 'active', 'crit'] as const).map((f) => (
+                    <button
+                      key={f}
+                      className={ganttFlags(data.code, selOther.idx).includes(f) ? 'active' : ''}
+                      title={f === 'done' ? 'Erledigt markieren' : f === 'active' ? 'Als laufend markieren' : 'Als kritisch markieren'}
+                      onClick={() => up(toggleGanttFlag(data.code, selOther.idx, f))}
+                    >{f === 'done' ? '✓' : f === 'active' ? '▶' : '⚠'}</button>
+                  ))}
+                  <span className="mm-sep" />
                   <button title="Neue Aufgabe direkt danach" onClick={() => updateNodeData(id, { code: addGanttTask(data.code, selOther.idx) })}>＋ Danach</button>
                   <button className="danger" onClick={() => { up(removeGanttTask(data.code, selOther.idx)); setSelOther(null); }}>Entfernen</button>
                 </>
               );
             })()}
+            {selOther.t === 'gsec' && (
+              <>
+                <span className="mm-sel-name" title="Ausgewählter Abschnitt">Abschnitt „{ganttSections(data.code)[selOther.idx]?.name ?? ''}"</span>
+                <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
+              </>
+            )}
+            {selOther.t === 'state' && (
+              <>
+                <span className="mm-sel-name" title="Ausgewählter Zustand">„{selOther.name}"</span>
+                <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
+                <button className={connectFrom ? 'active' : ''} title="Übergang zu anderem Zustand: danach Ziel anklicken" onClick={() => setConnectFrom(connectFrom ? null : selOther.name)}>
+                  {connectFrom ? 'Ziel anklicken …' : '→ Übergang'}
+                </button>
+                <button className="danger" title="Zustand samt Übergängen entfernen" onClick={() => { updateNodeData(id, { code: removeState(data.code, selOther.name) }); setSelOther(null); setConnectFrom(null); }}>Entfernen</button>
+              </>
+            )}
+            {selOther.t === 'stEdge' && (() => {
+              const tr = stateTransitions(data.code)[selOther.idx];
+              const up = (next: string | null) => { if (next != null) updateNodeData(id, { code: next }); };
+              return (
+                <>
+                  <span className="mm-sel-name" title="Ausgewählter Übergang">{tr ? `${tr.from} → ${tr.to}` : 'Übergang'}</span>
+                  <button onClick={() => startOtherRename(selOther)}>✎ Beschriften</button>
+                  <button className="danger" onClick={() => { up(removeStateTrans(data.code, selOther.idx)); setSelOther(null); }}>Entfernen</button>
+                </>
+              );
+            })()}
+            {selOther.t === 'tl' && (() => {
+              const tk = timelineTokens(data.code)[selOther.idx];
+              const up = (next: string | null) => { if (next != null) updateNodeData(id, { code: next }); };
+              return (
+                <>
+                  <span className="mm-sel-name" title={tk?.isPeriod ? 'Ausgewählte Periode' : 'Ausgewähltes Ereignis'}>
+                    {tk?.isPeriod ? '🕘' : '•'} „{tk?.text ?? ''}"
+                  </span>
+                  <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
+                  <button title="Ereignis in dieser Periode anfügen" onClick={() => updateNodeData(id, { code: addTimelineEvent(data.code, selOther.idx) })}>＋ Ereignis</button>
+                  <button className="danger" title={tk?.isPeriod ? 'Periode samt Ereignissen entfernen' : 'Ereignis entfernen'} onClick={() => { up(removeTimelineToken(data.code, selOther.idx)); setSelOther(null); }}>Entfernen</button>
+                </>
+              );
+            })()}
+            {selOther.t === 'qPoint' && (() => {
+              const up = (next: string | null) => { if (next != null) updateNodeData(id, { code: next }); };
+              return (
+                <>
+                  <span className="mm-sel-name" title="Ausgewählter Punkt">„{selOther.label}"</span>
+                  <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
+                  <span className="mm-sep" />
+                  <button title="Nach links (−0,1)" onClick={() => up(nudgeQuadrantPoint(data.code, selOther.label, -0.1, 0))}>◀</button>
+                  <button title="Nach rechts (+0,1)" onClick={() => up(nudgeQuadrantPoint(data.code, selOther.label, 0.1, 0))}>▶</button>
+                  <button title="Nach oben (+0,1)" onClick={() => up(nudgeQuadrantPoint(data.code, selOther.label, 0, 0.1))}>▲</button>
+                  <button title="Nach unten (−0,1)" onClick={() => up(nudgeQuadrantPoint(data.code, selOther.label, 0, -0.1))}>▼</button>
+                  <span className="mm-sep" />
+                  <button className="danger" onClick={() => { up(removeQuadrantPoint(data.code, selOther.label)); setSelOther(null); }}>Entfernen</button>
+                </>
+              );
+            })()}
+            {selOther.t === 'qLabel' && (
+              <>
+                <span className="mm-sel-name" title="Quadranten-Beschriftung">Quadrant {selOther.n}</span>
+                <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
+              </>
+            )}
+            {selOther.t === 'axis' && (
+              <>
+                <span className="mm-sel-name" title="Achsen-Beschriftung">{selOther.axis === 'x' ? 'X-Achse' : 'Y-Achse'} ({selOther.side === 0 ? 'links/unten' : 'rechts/oben'})</span>
+                <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
+              </>
+            )}
             {selOther.t === 'mind' && (
               <>
                 <span className="mm-sel-name" title="Ausgewählter Punkt">„{mindText(data.code, selOther.line)}"</span>
@@ -721,6 +925,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             <>
               <button title="Neue Person (participant)" onClick={() => updateNodeData(id, { code: addSeqActor(data.code) })}>＋ Person</button>
               <button title="Neue Nachricht am Ende" onClick={() => updateNodeData(id, { code: addSeqMsg(data.code, selOther?.t === 'msg' ? selOther.idx : null) })}>＋ Nachricht</button>
+              <button className={hasAutonumber(data.code) ? 'active' : ''} title="Nachrichten fortlaufend nummerieren (autonumber)" onClick={() => updateNodeData(id, { code: toggleAutonumber(data.code) })}>№</button>
             </>
           )}
           {kind === 'gantt' && (
@@ -734,6 +939,18 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
           )}
           {kind === 'pie' && (
             <button title="Neues Segment" onClick={() => updateNodeData(id, { code: addPie(data.code) })}>＋ Segment</button>
+          )}
+          {kind === 'state' && (
+            <button title="Neuen Zustand anlegen" onClick={() => updateNodeData(id, { code: addState(data.code) })}>＋ Zustand</button>
+          )}
+          {kind === 'timeline' && (
+            <button title="Neue Periode am Ende" onClick={() => updateNodeData(id, { code: addTimelinePeriod(data.code) })}>＋ Periode</button>
+          )}
+          {kind === 'quadrant' && (
+            <button title="Neuen Punkt in der Mitte anlegen" onClick={() => updateNodeData(id, { code: addQuadrantPoint(data.code) })}>＋ Punkt</button>
+          )}
+          {['gantt', 'pie', 'timeline', 'quadrant'].includes(kind) && (
+            <button title={getTitle(data.code) ? `Titel bearbeiten: „${getTitle(data.code)}"` : 'Titel hinzufügen'} onClick={startTitleRename}>✎ Titel</button>
           )}
           <button title="Kartengröße einmalig an das Diagramm anpassen" onClick={() => fitToDiagram()}>⤢</button>
           <button
@@ -764,7 +981,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             onChange={(e) => updateNodeData(id, { code: e.target.value })}
           />
         )}
-        <div className={`mermaid-preview nowheel${look === 'hand' ? ' mm-hand' : ''}`} ref={previewRef} onClick={onPreviewClick} onDoubleClick={onPreviewDblClick}>
+        <div className={`mermaid-preview nowheel${look === 'hand' ? ' mm-hand' : ''}`} data-kind={kind} ref={previewRef} onClick={onPreviewClick} onDoubleClick={onPreviewDblClick}>
           <div className={`mermaid-svg ${error ? 'stale' : ''}`} dangerouslySetInnerHTML={{ __html: svg }} />
           {rename && (
             <input
