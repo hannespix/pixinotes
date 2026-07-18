@@ -95,7 +95,24 @@ export interface KanbanData {
   collectFrom?: string[];
   /** „nodeId|itemId"-Schlüssel entfernter Tickets — werden NICHT erneut eingesammelt */
   ignoreKeys?: string[];
+  /** WIP-Limits je Spaltenindex (M119): 0/undefined = kein Limit; für die
+   *  Erledigt-Spalte wirkungslos. Läuft bei ＋/✕-Spalten parallel zu `cols`. */
+  wip?: Array<number | null>;
   [key: string]: unknown;
+}
+
+/** WIP-Limit einer Spalte (M119) — die Erledigt-Spalte hat nie eines */
+export function wipLimitOf(data: KanbanData, col: number): number | undefined {
+  const w = data.wip?.[col];
+  return typeof w === 'number' && w > 0 && col < doneCol(data) ? w : undefined;
+}
+
+/** Ist die Spalte voll? (WIP-Limit erreicht, M119) */
+export function wipFull(data: KanbanData, col: number): boolean {
+  const lim = wipLimitOf(data, col);
+  if (!lim) return false;
+  const dc = doneCol(data);
+  return data.items.filter((i) => Math.max(0, Math.min(dc, i.col)) === col).length >= lim;
 }
 
 export interface PortalData {

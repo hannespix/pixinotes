@@ -402,6 +402,9 @@ export function Board() {
   const handleDrop = useCallback(
     async (e: React.DragEvent) => {
       e.preventDefault();
+      // Kanban-Ticket-Drags (M119) gehören den Spalten — hier ignorieren,
+      // sonst würde aus dem Ticket-Text eine Notiz-Karte erzeugt
+      if (e.dataTransfer.types.includes('application/x-pixinotes-ticket')) return;
       const basePos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
       const files = Array.from(e.dataTransfer.files);
 

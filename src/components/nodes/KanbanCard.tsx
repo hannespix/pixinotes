@@ -4,7 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
 import { runDerived, useBoard } from '../../store';
 import {
-  kanbanCols, openSubs, ticketBlockers, uid,
+  kanbanCols, openSubs, ticketBlockers, uid, wipFull, wipLimitOf,
   type GanttData, type KanbanData, type KanbanItem, type KanbanNode,
 } from '../../types';
 import { collectTasks, formatDueShort, urgencyFor } from '../../lib/tasks';
@@ -50,6 +50,52 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   useEffect(() => {
     if (detailId) detailRef.current?.focus();
   }, [detailId]);
+
+  // Drag & Drop zwischen Spalten (M119) — HTML5-DnD; die Pfeile bleiben als
+  // Touch-Fallback (HTML5-Drag existiert auf Smartphones nicht zuverlässig)
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<number | null>(null);
+  // WIP-Limit-Inline-Editor (M119): Spaltenindex mit offenem Zahlenfeld
+  const [wipEdit, setWipEdit] = useState<number | null>(null);
+
+  // Abhängigkeits-Pfeile (M119): SVG-Overlay über den Spalten — von jedem
+  // Vorgänger-Ticket zum abhängigen Ticket (rot = blockiert noch, grün = frei)
+  const colsRef = useRef<HTMLDivElement | null>(null);
+  const [depPaths, setDepPaths] = useState<Array<{ d: string; open: boolean }>>([]);
+  const doneIdx = kanbanCols(kanban).length - 1;
+  useEffect(() => {
+    const host = colsRef.current;
+    if (!host) return;
+    const calc = () => {
+      const rect = host.getBoundingClientRect();
+      // React Flow skaliert per CSS-Transform — Bildschirm-Px zurückrechnen
+      const scale = host.offsetWidth > 0 ? rect.width / host.offsetWidth : 1;
+      const paths: Array<{ d: string; open: boolean }> = [];
+      for (const it of kanban.items) {
+        for (const depId of it.deps ?? []) {
+          const from = host.querySelector(`[data-kid="${depId}"]`);
+          const to = host.querySelector(`[data-kid="${it.id}"]`);
+          if (!from || !to) continue;
+          const f = from.getBoundingClientRect();
+          const t = to.getBoundingClientRect();
+          const x1 = (f.right - rect.left) / scale;
+          const y1 = (f.top + f.height / 2 - rect.top) / scale;
+          const x2 = (t.left - rect.left) / scale;
+          const y2 = (t.top + t.height / 2 - rect.top) / scale;
+          const dep = kanban.items.find((x) => x.id === depId);
+          const open = !!dep && dep.col < doneIdx;
+          const bend = Math.max(22, Math.abs(x2 - x1) / 2);
+          paths.push({ d: `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${x2 - bend} ${y2}, ${x2} ${y2}`, open });
+        }
+      }
+      setDepPaths(paths);
+    };
+    calc();
+    const ro = new ResizeObserver(calc);
+    ro.observe(host);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kanban.items, doneIdx, query, quick, tagFilter, boardFilter, kanban.groupBy]);
 
   const cols = kanbanCols(kanban);
   const done = cols.length - 1;
@@ -157,26 +203,37 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boards, kanban]);
 
-  const move = (item: KanbanItem, dir: -1 | 1) => {
-    const col = Math.max(0, Math.min(done, item.col + dir));
-    // Abhängigkeiten (M118): vorwärts erst, wenn alle Blocker erledigt sind
-    if (dir > 0) {
+  /**
+   * Zentrale Spaltenwechsel-Logik (M119) — gilt für Pfeile, Drag & Drop und
+   * die Spalten-Auswahl im Modal gleichermaßen:
+   * vorwärts nur ohne offene Abhängigkeiten (M118), in „Erledigt" nur mit
+   * kompletter Checkliste, und nie in eine volle WIP-Spalte.
+   */
+  const tryMoveTo = (item: KanbanItem, target: number) => {
+    const col = Math.max(0, Math.min(done, target));
+    if (col === item.col) return;
+    if (col > item.col) {
       const blockers = ticketBlockers(item, kanban);
       if (blockers.length > 0) {
         showToast(`🔒 Erst erledigen: ${blockers.join(' · ')}`);
         return;
       }
-      // In die Erledigt-Spalte erst, wenn die Ticket-Checkliste komplett ist
       if (col === done && openSubs(item) > 0) {
         showToast(`☑ Noch ${openSubs(item)} Checklisten-Punkt(e) offen — Ticket öffnen und abhaken.`);
         return;
       }
     }
-    if (col === done && item.col !== col) {
+    if (wipFull(kanban, col)) {
+      showToast(`🚦 WIP-Limit erreicht: „${cols[col]}" fasst höchstens ${wipLimitOf(kanban, col)} Ticket(s) — erst dort Platz schaffen.`);
+      return;
+    }
+    if (col === done) {
       confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
     }
     setItems(kanban.items.map((it) => (it.id === item.id ? { ...it, col } : it)));
   };
+
+  const move = (item: KanbanItem, dir: -1 | 1) => tryMoveTo(item, item.col + dir);
 
   const remove = (item: KanbanItem) => {
     const items = kanban.items.filter((it) => it.id !== item.id);
@@ -211,7 +268,10 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     const next = [...cols];
     next.splice(done, 0, `Spalte ${cols.length}`);
     const items = kanban.items.map((it) => (it.col >= done ? { ...it, col: it.col + 1 } : it));
-    updateNodeData(id, { cols: next, items });
+    // WIP-Limits laufen parallel zu den Spalten mit (M119)
+    const wip = [...(kanban.wip ?? [])];
+    if (wip.length > done) wip.splice(done, 0, null);
+    updateNodeData(id, { cols: next, items, wip });
   };
 
   const removeCol = (idx: number) => {
@@ -226,7 +286,16 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       if (it.col > idx) return { ...it, col: it.col - 1 };
       return it;
     });
-    updateNodeData(id, { cols: next, items });
+    const wip = (kanban.wip ?? []).filter((_, i) => i !== idx);
+    updateNodeData(id, { cols: next, items, wip });
+  };
+
+  /** WIP-Limit einer Spalte setzen (M119) — 0/leer = kein Limit */
+  const setWip = (idx: number, value: number) => {
+    const wip: Array<number | null> = [...(kanban.wip ?? [])];
+    while (wip.length < cols.length) wip.push(null);
+    wip[idx] = value > 0 ? Math.min(99, value) : null;
+    updateNodeData(id, { wip });
   };
 
   // Defensive: Tickets mit Spaltenindex außerhalb des Bereichs landen in der letzten Spalte
@@ -284,8 +353,18 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
 
   const renderItem = (it: KanbanItem, colIdx: number) => (
     <div
-      className={`kanban-item nodrag ${colIdx === done ? 'col-done' : colIdx === 0 ? 'col-first' : 'col-mid'}`}
+      className={`kanban-item nodrag ${colIdx === done ? 'col-done' : colIdx === 0 ? 'col-first' : 'col-mid'} ${dragId === it.id ? 'dragging' : ''}`}
       key={it.id}
+      data-kid={it.id}
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', it.id);
+        // Marker-Typ: der Board-Drop-Handler lässt Ticket-Drags in Ruhe (M119)
+        e.dataTransfer.setData('application/x-pixinotes-ticket', it.id);
+        e.dataTransfer.effectAllowed = 'move';
+        setDragId(it.id);
+      }}
+      onDragEnd={() => { setDragId(null); setDragOverCol(null); }}
     >
       <span
         className={`kanban-item-text ${colIdx === done ? 'done-text' : ''}`}
@@ -437,11 +516,55 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           {filtering && <button className="k-chip" title="Alle Filter zurücksetzen" onClick={resetFilters}>✕</button>}
         </div>
       )}
-      <div className="kanban-cols">
+      <div className="kanban-cols" ref={colsRef}>
+        {depPaths.length > 0 && (
+          <svg className="k-dep-svg" aria-hidden="true">
+            <defs>
+              <marker id={`kdep-open-${id}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 8 4 L 0 8 z" fill="#d84b3d" />
+              </marker>
+              <marker id={`kdep-done-${id}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 8 4 L 0 8 z" fill="#2e9e63" />
+              </marker>
+            </defs>
+            {depPaths.map((p, i) => (
+              <path
+                key={i}
+                d={p.d}
+                className={`k-dep-path ${p.open ? 'open' : 'done'}`}
+                markerEnd={`url(#kdep-${p.open ? 'open' : 'done'}-${id})`}
+              />
+            ))}
+          </svg>
+        )}
         {cols.map((colName, colIdx) => {
           const colItems = visibleItems.filter((it) => colOf(it) === colIdx);
+          const realCount = kanban.items.filter((it) => colOf(it) === colIdx).length;
+          const lim = wipLimitOf(kanban, colIdx);
           return (
-            <div className="kanban-col" key={colIdx}>
+            <div
+              className={`kanban-col ${dragOverCol === colIdx && dragId ? 'drop-target' : ''}`}
+              key={colIdx}
+              onDragOver={(e) => {
+                if (!dragId) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (dragOverCol !== colIdx) setDragOverCol(colIdx);
+              }}
+              onDragLeave={(e) => {
+                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+                if (dragOverCol === colIdx) setDragOverCol(null);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation(); // nie zum Board-Drop-Handler durchreichen
+                const iid = e.dataTransfer.getData('text/plain') || dragId;
+                const item = kanban.items.find((x) => x.id === iid);
+                if (item) tryMoveTo(item, colIdx);
+                setDragId(null);
+                setDragOverCol(null);
+              }}
+            >
               <div className="kanban-col-head">
                 <input
                   className="kanban-col-name nodrag"
@@ -449,7 +572,33 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   title="Spalte umbenennen"
                   onChange={(e) => renameCol(colIdx, e.target.value)}
                 />
-                <span className="kanban-count" title={filtering ? 'sichtbar (gefiltert)' : 'Tickets in der Spalte'}>{colItems.length}</span>
+                {wipEdit === colIdx ? (
+                  <input
+                    className="kanban-wip-input nodrag"
+                    type="number"
+                    min={0}
+                    max={99}
+                    autoFocus
+                    defaultValue={lim ?? ''}
+                    placeholder="∞"
+                    title="WIP-Limit (leer/0 = keins)"
+                    onBlur={(e) => { setWip(colIdx, Number(e.target.value) || 0); setWipEdit(null); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                      if (e.key === 'Escape') setWipEdit(null);
+                    }}
+                  />
+                ) : (
+                  <button
+                    className={`kanban-count nodrag ${lim && realCount >= lim ? 'wip-full' : ''}`}
+                    title={colIdx < done
+                      ? `${realCount} Ticket(s)${lim ? ` · WIP-Limit ${lim}` : ''} — Klick setzt das WIP-Limit (max. Tickets in dieser Spalte)`
+                      : 'Tickets in der Spalte'}
+                    onClick={() => colIdx < done && setWipEdit(colIdx)}
+                  >
+                    {filtering ? colItems.length : realCount}{lim ? `/${lim}` : ''}
+                  </button>
+                )}
                 {cols.length > 2 && (
                   <button
                     className="kanban-col-x nodrag"
@@ -566,16 +715,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   className="ticket-colsel"
                   value={Math.min(it.col, done)}
                   title="Spalte"
-                  onChange={(e) => {
-                    const target = Number(e.target.value);
-                    if (target <= it.col) { patchItem(it.id, { col: target }); return; }
-                    // vorwärts: dieselben Regeln wie die Pfeile (Blocker + Checkliste)
-                    const blk = ticketBlockers(it, kanban);
-                    if (blk.length > 0) { showToast(`🔒 Erst erledigen: ${blk.join(' · ')}`); return; }
-                    if (target === done && openSubs(it) > 0) { showToast(`☑ Noch ${openSubs(it)} Checklisten-Punkt(e) offen.`); return; }
-                    if (target === done) confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
-                    patchItem(it.id, { col: target });
-                  }}
+                  onChange={(e) => tryMoveTo(it, Number(e.target.value))}
                 >
                   {cols.map((c, i) => <option key={i} value={i}>{c}</option>)}
                 </select>
