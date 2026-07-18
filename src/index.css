@@ -764,11 +764,16 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   opacity: 0; transition: opacity 0.15s;
 }
 .edge-label:hover .edge-label-x { opacity: 0.7; }
+.edge-label.selected .edge-label-x { opacity: 0.7; }
 .edge-label-x:hover { background: #ffe3e0; color: #a4231a; opacity: 1; }
+/* Ruhiges Board (M124): Beschriftete Verbindungen zeigen unausgewählt nur
+   ihren Text — Stil-Knopf erst bei Hover (Maus) bzw. Auswahl (Touch) */
+.edge-label:not(.selected):not(:hover) .edge-kind-btn { display: none; }
 
 @media (pointer: coarse) {
-  .edge-label.empty { opacity: 1; }
-  .edge-label-x { opacity: 1; }
+  /* Wie bei den ＋-Verbindungspunkten (M112/M124): Optionen erst, wenn die
+     Verbindung ANGETIPPT (ausgewählt) ist — keine Dauer-Pillen auf dem Board */
+  .edge-label.selected .edge-label-x { opacity: 1; }
 }
 
 .edge-kind-btn {
