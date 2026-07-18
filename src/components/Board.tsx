@@ -83,6 +83,9 @@ export function Board() {
   const wheelZoomRef = useRef(wheelZoom);
   wheelZoomRef.current = wheelZoom;
   const pinchRef = useRef<{ dist: number; zoom: number; fx: number; fy: number } | null>(null);
+  // Ein-Finger-Panning über Modulen (M125): Drag aus „toten" nodrag-Zonen
+  // der Karten schwenkt das Board; pending bis der 8-px-Schwellwert fällt
+  const panRef = useRef<{ x: number; y: number; vx: number; vy: number; zoom: number; active: boolean; el: Element } | null>(null);
   useEffect(() => {
     const wrap = zoomWrapRef.current;
     if (!wrap) return;
@@ -108,32 +111,78 @@ export function Board() {
     };
     const touchDist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
     const touchMid = (t: TouchList) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+    /** Kann irgendein Container zwischen Ziel und Karte in Zugrichtung scrollen? */
+    const canScrollTowards = (from: Element, stopAt: Element, dx: number, dy: number): boolean => {
+      const vertical = Math.abs(dy) >= Math.abs(dx);
+      let cur: Element | null = from;
+      while (cur && cur !== stopAt) {
+        const st = getComputedStyle(cur);
+        if (vertical && /auto|scroll/.test(st.overflowY) && cur.scrollHeight > cur.clientHeight + 4) {
+          if ((dy < 0 && cur.scrollTop + cur.clientHeight < cur.scrollHeight - 1) || (dy > 0 && cur.scrollTop > 0)) return true;
+        }
+        if (!vertical && /auto|scroll/.test(st.overflowX) && cur.scrollWidth > cur.clientWidth + 4) {
+          if ((dx < 0 && cur.scrollLeft + cur.clientWidth < cur.scrollWidth - 1) || (dx > 0 && cur.scrollLeft > 0)) return true;
+        }
+        cur = cur.parentElement;
+      }
+      return false;
+    };
     const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length !== 2) return;
-      const inNode = (e.target as Element | null)?.closest?.('.react-flow__node');
-      if (!inNode) return; // Pinch auf der Fläche gehört React Flow
-      e.preventDefault(); // Modul-Scroll/Textauswahl nicht starten lassen
-      const mid = touchMid(e.touches);
-      const rect = wrap.getBoundingClientRect();
+      const target = e.target as Element | null;
+      const node = target?.closest?.('.react-flow__node');
+      if (e.touches.length === 2) {
+        panRef.current = null; // zweiter Finger: Pinch übernimmt
+        if (!node) return; // Pinch auf der Fläche gehört React Flow
+        e.preventDefault(); // Modul-Scroll/Textauswahl nicht starten lassen
+        const mid = touchMid(e.touches);
+        const rect = wrap.getBoundingClientRect();
+        const { x, y, zoom } = getViewport();
+        pinchRef.current = {
+          dist: touchDist(e.touches),
+          zoom,
+          fx: (mid.x - rect.left - x) / zoom,
+          fy: (mid.y - rect.top - y) / zoom,
+        };
+        return;
+      }
+      if (e.touches.length !== 1 || !node || !target) return;
+      // Panning-Kandidat (M125): nur aus nodrag-Zonen (dort verschiebt React
+      // Flow NICHT die Karte) und nie aus interaktiven Elementen heraus
+      if (!target.closest('.nodrag')) return;
+      if (target.closest('input, textarea, select, button, a, [contenteditable="true"], .react-flow__handle, .react-flow__resize-control')) return;
+      const t = e.touches[0];
       const { x, y, zoom } = getViewport();
-      pinchRef.current = {
-        dist: touchDist(e.touches),
-        zoom,
-        fx: (mid.x - rect.left - x) / zoom,
-        fy: (mid.y - rect.top - y) / zoom,
-      };
+      panRef.current = { x: t.clientX, y: t.clientY, vx: x, vy: y, zoom, active: false, el: target };
     };
     const onTouchMove = (e: TouchEvent) => {
       const p = pinchRef.current;
-      if (!p || e.touches.length !== 2) return;
+      if (p && e.touches.length === 2) {
+        e.preventDefault();
+        e.stopPropagation();
+        const mid = touchMid(e.touches);
+        const newZoom = clampZoom(p.zoom * (touchDist(e.touches) / p.dist));
+        zoomAt(mid.x, mid.y, newZoom, p.fx, p.fy);
+        return;
+      }
+      const pan = panRef.current;
+      if (!pan || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      const dx = t.clientX - pan.x;
+      const dy = t.clientY - pan.y;
+      if (!pan.active) {
+        if (Math.hypot(dx, dy) < 8) return; // Tipp bleibt Tipp
+        // Kann der Modul-Inhalt selbst in diese Richtung scrollen? Dann darf er.
+        const node = pan.el.closest('.react-flow__node');
+        if (node && canScrollTowards(pan.el, node, dx, dy)) { panRef.current = null; return; }
+        pan.active = true;
+      }
       e.preventDefault();
       e.stopPropagation();
-      const mid = touchMid(e.touches);
-      const newZoom = clampZoom(p.zoom * (touchDist(e.touches) / p.dist));
-      zoomAt(mid.x, mid.y, newZoom, p.fx, p.fy);
+      void setViewport({ x: pan.vx + dx, y: pan.vy + dy, zoom: pan.zoom });
     };
     const onTouchEnd = (e: TouchEvent) => {
       if (e.touches.length < 2) pinchRef.current = null;
+      if (e.touches.length === 0) panRef.current = null;
     };
     wrap.addEventListener('wheel', onWheel, { capture: true, passive: false });
     wrap.addEventListener('touchstart', onTouchStart, { capture: true, passive: false });
