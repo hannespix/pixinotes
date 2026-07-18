@@ -216,6 +216,31 @@ export async function aiBriefing(nodes: AppNode[], pos: { x: number; y: number }
   return 'Briefing als Notiz aufs Board gelegt';
 }
 
+/** Wochenbriefing aus den offenen Aufgaben (Aufgaben-Zentrale, M115) */
+export async function aiWeekPlan(
+  tasks: Array<{ text: string; due?: string; who?: string; prio?: number; boardName: string }>,
+  pos: { x: number; y: number },
+): Promise<string> {
+  if (tasks.length === 0) throw new Error('Keine offenen Aufgaben gefunden.');
+  const items = tasks.slice(0, 60).map((t) => ({
+    aufgabe: t.text.slice(0, 160),
+    frist: t.due,
+    person: t.who,
+    prio: t.prio === 1 ? 'hoch' : t.prio === 2 ? 'mittel' : t.prio === 3 ? 'niedrig' : undefined,
+    board: t.boardName,
+  }));
+  const res = await askAi(
+    `Heute ist ${new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}. `
+    + 'Erstelle aus den folgenden offenen Aufgaben ein knappes Wochen-Briefing auf Deutsch mit genau diesen Abschnitten '
+    + '(Stichpunkte, mit "- " beginnend): Diese Woche zuerst, Fristen im Blick, Bei anderen nachhaken, Empfehlung. '
+    + 'Priorisiere nach Frist und Priorität, nenne Personen beim Namen. Maximal 16 Zeilen gesamt.\n\nAufgaben:\n'
+    + JSON.stringify(items),
+  );
+  const st = useBoard.getState();
+  st.addNode(makeNote(pos, { color: 'sky', blocks: textToBlocks('🗓️ Wochenplan', res.trim()) }));
+  return 'Wochenplan als Notiz aufs Board gelegt';
+}
+
 /** Sinnvolle Verbindungen zwischen den Karten vorschlagen und ziehen */
 export async function aiEdges(nodes: AppNode[]): Promise<string> {
   const items = gather(nodes);

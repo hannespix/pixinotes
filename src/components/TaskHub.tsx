@@ -5,13 +5,15 @@ import { doneCol, kanbanCols, uid, type GanttData, type KanbanData } from '../ty
 import { makeKanban } from '../lib/nodes';
 import {
   collectTaskTags, collectTasks, doneLog, downloadTasksIcs, formatDueShort, logDone,
-  parseQuickTask, shiftIso, toggleCheckBlock, type TaskRef,
+  myDayKeys, parseQuickTask, shiftIso, toggleCheckBlock, toggleMyDay, type TaskRef,
 } from '../lib/tasks';
-import { IBell, ICalendar, IGantt, IKanban, INote, ISearch, IUsers, IX } from './Icons';
+import { aiReady } from '../lib/ai';
+import { aiWeekPlan } from '../lib/aiActions';
+import { IBell, ICalendar, IChevronR, IGantt, IKanban, INote, ISearch, IUsers, IWand, IX } from './Icons';
 
 const PRIO_LABEL: Record<1 | 2 | 3, string> = { 1: '!!!', 2: '!!', 3: '!' };
 
-type Filter = 'all' | 'today' | 'overdue';
+type Filter = 'all' | 'myday' | 'today' | 'overdue';
 
 /** Fristen-Gruppen der Aufgabenliste (M113) */
 type Bucket = 'overdue' | 'today' | 'week' | 'later' | 'none';
@@ -56,6 +58,10 @@ export function TaskHub() {
   const [search, setSearch] = useState('');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [doneOpen, setDoneOpen] = useState(false);
+  const [myDay, setMyDay] = useState<Set<string>>(() => myDayKeys());
+  const [detailKey, setDetailKey] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
+  const ai = useBoard((s) => s.ai);
 
   const todayIso = new Date().toISOString().slice(0, 10);
   const allTasks = useMemo(() => collectTasks(boards), [boards]);
@@ -69,10 +75,12 @@ export function TaskHub() {
     if (personFilter !== 'all' && t.who !== personFilter) return false;
     if (tagFilter && !t.text.toLowerCase().includes(`#${tagFilter}`)) return false;
     if (search && !t.text.toLowerCase().includes(search.toLowerCase())) return false;
+    if (filter === 'myday') return myDay.has(t.key);
     if (filter === 'today') return t.urgency === 'overdue' || t.due === todayIso;
     if (filter === 'overdue') return t.urgency === 'overdue';
     return true;
   });
+  const detailTask = detailKey ? allTasks.find((t) => t.key === detailKey) ?? null : null;
   const overdue = allTasks.filter((t) => t.urgency === 'overdue').length;
 
   // Gruppierte Ansicht (M113): nach Frist-Abschnitten oder nach Person
@@ -181,6 +189,48 @@ export function TaskHub() {
     });
   };
 
+  /** Kanban-Ticket hinter einer Aufgabe direkt ändern (Detail-Spalte, M115) */
+  const patchItem = (t: TaskRef, patch: Record<string, unknown>) => {
+    const node = boards.find((b) => b.id === t.boardId)?.nodes.find((n) => n.id === t.nodeId);
+    if (!node || t.kind !== 'kanban') return;
+    const k = node.data as KanbanData;
+    updateNodeDataOnBoard(t.boardId, t.nodeId, {
+      items: k.items.map((it) => (it.id === t.itemId ? { ...it, ...patch } : it)),
+    });
+  };
+  const itemOf = (t: TaskRef) => {
+    const node = boards.find((b) => b.id === t.boardId)?.nodes.find((n) => n.id === t.nodeId);
+    return (node?.data as KanbanData | undefined)?.items.find((it) => it.id === t.itemId);
+  };
+
+  /** Gantt-Zeile hinter einer Aufgabe ändern (Detail-Spalte, M115) */
+  const patchRow = (t: TaskRef, patch: Record<string, unknown>) => {
+    const node = boards.find((b) => b.id === t.boardId)?.nodes.find((n) => n.id === t.nodeId);
+    if (!node || t.kind !== 'gantt') return;
+    const g = node.data as GanttData;
+    updateNodeDataOnBoard(t.boardId, t.nodeId, {
+      rows: g.rows.map((r) => (r.id === t.itemId ? { ...r, ...patch } : r)),
+    });
+  };
+  const rowOf = (t: TaskRef) => {
+    const node = boards.find((b) => b.id === t.boardId)?.nodes.find((n) => n.id === t.nodeId);
+    return (node?.data as GanttData | undefined)?.rows.find((r) => r.id === t.itemId);
+  };
+
+  /** KI-Wochenplan aus den offenen Aufgaben (M115) */
+  const planWeek = async () => {
+    if (aiBusy) return;
+    setAiBusy(true);
+    showToast('✨ KI plant die Woche …');
+    try {
+      showToast(`✨ ${await aiWeekPlan(allTasks, { x: 140, y: 120 })}`);
+    } catch (e) {
+      showToast(`Wochenplan fehlgeschlagen: ${(e as Error).message}`);
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   /** Spaltennamen des Kanbans hinter einer Aufgabe (für das Spalten-Menü) */
   const colsOf = (t: TaskRef): string[] | null => {
     if (t.kind !== 'kanban') return null;
@@ -259,14 +309,17 @@ export function TaskHub() {
           {canAskNotify && (
             <button onClick={enableNotifications} title="Erinnerungen zusätzlich als System-Benachrichtigung"><IBell size={14} /> Benachrichtigungen</button>
           )}
+          {aiReady(ai) && (
+            <button disabled={aiBusy} onClick={planWeek} title="KI erstellt aus den offenen Aufgaben ein Wochen-Briefing als Notiz auf dem aktiven Board"><IWand size={14} /> Woche planen</button>
+          )}
           <button onClick={exportIcs} title="Angezeigte Aufgaben mit Frist als .ics (Outlook-Kalender)"><ICalendar size={14} /> Kalender-Export</button>
           <button className="taskhub-x" onClick={() => setOpen(false)} aria-label="Schließen"><IX size={14} /></button>
         </span>
       </div>
 
-      {/* Filter (T1) */}
+      {/* Filter (T1) — inkl. „Mein Tag"-Fokusliste (M115) */}
       <div className="taskhub-filters">
-        {([['all', 'Alle'], ['today', 'Heute'], ['overdue', 'Überfällig']] as const).map(([f, label]) => (
+        {([['all', 'Alle'], ['myday', `☀ Mein Tag${myDay.size > 0 ? ` (${myDay.size})` : ''}`], ['today', 'Heute'], ['overdue', 'Überfällig']] as const).map(([f, label]) => (
           <button key={f} className={`th-chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>{label}</button>
         ))}
         <select className="th-board" value={boardFilter} onChange={(e) => setBoardFilter(e.target.value)} title="Nach Board filtern">
@@ -397,7 +450,17 @@ export function TaskHub() {
                           <button title="Um 1 Woche verschieben" onClick={() => snooze(t, 7)}>+1W</button>
                         </span>
                       )}
+                      <button
+                        className={`task-myday ${myDay.has(t.key) ? 'on' : ''}`}
+                        title={myDay.has(t.key) ? 'Aus „Mein Tag" entfernen' : 'Für heute vornehmen („Mein Tag")'}
+                        onClick={() => setMyDay(new Set(toggleMyDay(t.key)))}
+                      >☀</button>
                       <span className="task-board">{t.boardName}</span>
+                      <button
+                        className={`task-detail-btn ${detailKey === t.key ? 'on' : ''}`}
+                        title="Details bearbeiten (rechte Spalte)"
+                        onClick={() => setDetailKey(detailKey === t.key ? null : t.key)}
+                      ><IChevronR size={13} /></button>
                     </li>
                   ))}
                 </ul>
@@ -453,6 +516,87 @@ export function TaskHub() {
       <div className="taskhub-foot">
         Fällige Aufgaben melden sich beim Öffnen der App und danach regelmäßig als Erinnerung.
       </div>
+
+      {/* Detail-Spalte (M115): Aufgabe direkt hier bearbeiten */}
+      {detailTask && (() => {
+        const t = detailTask;
+        const item = t.kind === 'kanban' ? itemOf(t) : undefined;
+        const row = t.kind === 'gantt' ? rowOf(t) : undefined;
+        return (
+          <aside className="th-detail" aria-label="Aufgaben-Details">
+            <div className="th-detail-head">
+              <span className="task-kind">
+                {t.kind === 'kanban' ? <IKanban size={14} /> : t.kind === 'gantt' ? <IGantt size={14} /> : <INote size={14} />}
+              </span>
+              <b>{t.kind === 'kanban' ? 'Ticket' : t.kind === 'gantt' ? 'Zeitplan-Vorgang' : 'Checklisten-Punkt'}</b>
+              <button className="taskhub-x" onClick={() => setDetailKey(null)} aria-label="Details schließen"><IX size={13} /></button>
+            </div>
+
+            {t.kind === 'kanban' && item ? (
+              <>
+                <label className="th-field"><span>Titel</span>
+                  <input value={item.text} onChange={(e) => patchItem(t, { text: e.target.value })} />
+                </label>
+                <label className="th-field"><span>Beschreibung</span>
+                  <textarea
+                    rows={4}
+                    placeholder="Details, Kontext, nächste Schritte …"
+                    value={item.note ?? ''}
+                    onChange={(e) => patchItem(t, { note: e.target.value || undefined })}
+                  />
+                </label>
+                <label className="th-field"><span>Person</span>
+                  <input placeholder="z. B. Anna" value={item.who ?? ''} onChange={(e) => patchItem(t, { who: e.target.value || undefined })} />
+                </label>
+                <label className="th-field"><span>Fälligkeit</span>
+                  <input type="date" value={item.due ?? ''} onChange={(e) => patchItem(t, { due: e.target.value || undefined })} />
+                </label>
+                <div className="th-field"><span>Priorität</span>
+                  <div className="th-prio-row">
+                    {([['1', '!!! hoch'], ['2', '!! mittel'], ['3', '! niedrig'], ['', 'keine']] as const).map(([v, label]) => (
+                      <button
+                        key={v || 'none'}
+                        className={`th-chip ${String(item.prio ?? '') === v ? 'on' : ''}`}
+                        onClick={() => patchItem(t, { prio: v ? (Number(v) as 1 | 2 | 3) : undefined })}
+                      >{label}</button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : t.kind === 'gantt' && row ? (
+              <>
+                <label className="th-field"><span>Vorgang</span>
+                  <input value={row.name} onChange={(e) => patchRow(t, { name: e.target.value })} />
+                </label>
+                <label className="th-field"><span>Person/Ressource</span>
+                  <input placeholder="z. B. Anna" value={row.who ?? ''} onChange={(e) => patchRow(t, { who: e.target.value || undefined })} />
+                </label>
+                <div className="th-field th-field-2col">
+                  <label><span>Start</span>
+                    <input type="date" value={row.start} onChange={(e) => e.target.value && patchRow(t, { start: e.target.value, end: row.end < e.target.value ? e.target.value : row.end })} />
+                  </label>
+                  <label><span>Ende</span>
+                    <input type="date" value={row.end} onChange={(e) => e.target.value && patchRow(t, { end: e.target.value, start: row.start > e.target.value ? e.target.value : row.start })} />
+                  </label>
+                </div>
+                <label className="th-field"><span>Fortschritt: {row.progress ?? 0} %</span>
+                  <input type="range" min={0} max={100} step={5} value={row.progress ?? 0} onChange={(e) => patchRow(t, { progress: Number(e.target.value) })} />
+                </label>
+              </>
+            ) : (
+              <p className="th-detail-hint">
+                Checklisten-Punkte werden direkt in ihrer Notiz bearbeitet — unten zur Karte springen.
+                Erkannte Frist: {t.due ? formatDueShort(t.due) : 'keine'}.
+              </p>
+            )}
+
+            <div className="th-detail-foot">
+              <span className="task-board">{t.boardName}</span>
+              <button className="th-chip" onClick={() => jumpTo(t)}>Zur Karte springen ↗</button>
+            </div>
+          </aside>
+        );
+      })()}
     </div>
   );
 }

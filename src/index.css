@@ -1331,6 +1331,42 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .th-week-bar { width: 7px; height: 100%; display: flex; align-items: flex-end; background: var(--surface-dim); border-radius: 2px; overflow: hidden; }
 .th-week-bar i { display: block; width: 100%; background: color-mix(in srgb, var(--accent) 55%, transparent); border-radius: 2px 2px 0 0; min-height: 2px; }
 .th-week-bar i.today { background: var(--accent); }
+/* „Mein Tag" (M115) */
+.task-myday {
+  border: none; background: none; cursor: pointer; font-family: inherit;
+  font-size: 13px; padding: 2px 4px; border-radius: 6px; flex: none;
+  opacity: 0.35; filter: grayscale(1);
+}
+.task-myday:hover { opacity: 0.8; background: var(--surface-dim); }
+.task-myday.on { opacity: 1; filter: none; }
+.task-detail-btn {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 2px 3px; border-radius: 6px; flex: none; display: flex; align-items: center;
+}
+.task-detail-btn:hover, .task-detail-btn.on { color: var(--accent); background: var(--surface-dim); }
+/* Detail-Spalte (M115) */
+.th-detail {
+  position: fixed; top: 96px; right: 14px; bottom: 14px; z-index: 45;
+  width: min(360px, calc(100vw - 28px));
+  background: var(--surface-card); border: 1px solid var(--border-soft);
+  border-radius: 14px; box-shadow: 0 16px 44px rgba(40, 30, 10, 0.28);
+  padding: 14px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 11px;
+}
+.th-detail-head { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.th-detail-head .taskhub-x { margin-left: auto; }
+.th-field { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--muted); }
+.th-field > span { font-weight: 600; }
+.th-field input:not([type='range']), .th-field textarea {
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 9px;
+  font-family: inherit; font-size: 12.5px; color: var(--ink); background: var(--surface);
+  outline: none; resize: vertical;
+}
+.th-field input:focus, .th-field textarea:focus { border-color: var(--accent); }
+.th-field-2col { flex-direction: row; gap: 10px; }
+.th-field-2col label { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.th-prio-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.th-detail-hint { font-size: 12px; color: var(--muted); margin: 0; }
+.th-detail-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; justify-content: space-between; padding-top: 6px; }
 .taskhub-empty { width: min(860px, 100%); color: var(--muted); font-size: 14px; padding: 30px 0; }
 .taskhub-foot { width: min(860px, 100%); color: var(--muted); font-size: 11.5px; margin-top: 16px; }
 

@@ -208,6 +208,26 @@ export function parseQuickTask(input: string, now: Date = new Date()): QuickPars
   return { text: text.replace(/\s{2,}/g, ' ').trim(), who, due, prio };
 }
 
+// ---------- „Mein Tag" (M115): handverlesene Fokusliste, gilt nur heute ----------
+const MYDAY_KEY = 'pixinotes:myday';
+
+export function myDayKeys(): Set<string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(MYDAY_KEY) ?? 'null') as { d: string; keys: string[] } | null;
+    if (!raw || raw.d !== isoLocal(new Date())) return new Set(); // neuer Tag = leere Liste
+    return new Set(raw.keys);
+  } catch {
+    return new Set();
+  }
+}
+
+export function toggleMyDay(key: string): Set<string> {
+  const keys = myDayKeys();
+  if (keys.has(key)) keys.delete(key); else keys.add(key);
+  localStorage.setItem(MYDAY_KEY, JSON.stringify({ d: isoLocal(new Date()), keys: [...keys].slice(0, 100) }));
+  return keys;
+}
+
 // ---------- „Heute geschafft" (M114): Erledigt-Protokoll ----------
 const DONE_LOG_KEY = 'pixinotes:donelog';
 
