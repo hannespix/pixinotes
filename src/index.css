@@ -805,6 +805,9 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .shape-handle { opacity: 0 !important; }
 .shape-wrap:hover .shape-handle, .react-flow__node.selected .shape-handle { opacity: 1 !important; }
+/* Während des Verbindens leuchten auch Form-Anschlüsse als Ziele auf —
+   das !important oben würde die allgemeine M112-Regel sonst ausstechen */
+.react-flow:has(.react-flow__connectionline) .shape-handle { opacity: 1 !important; }
 
 /* ---------- Mermaid-Karte ---------- */
 /* M92 „integral": Das Diagramm liegt RAHMENLOS auf der Fläche — kein
@@ -1061,10 +1064,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .modal-foot { padding: 12px 20px; font-size: 11px; color: var(--muted); text-align: center; }
 
 @media (pointer: coarse) {
-  /* Handles immer sichtbar; die Form-Toolbar erscheint erst bei Auswahl
-     (Tipp auf die Form) — dauerhaft eingeblendet kollidierte sie mit den
-     Verbindungspunkten (User-Screenshot) */
-  .shape-handle { opacity: 1 !important; }
+  /* Form-Anschlüsse NICHT dauerhaft einblenden — wie überall gilt seit
+     M112: sichtbar erst bei Auswahl bzw. während des Verbindens */
   /* feste Chip-Größe — Android rendert Emojis sonst übergroß und die
      Buttons wachsen ineinander */
   .shape-toolbar button { width: 34px; height: 32px; font-size: 15px; }
