@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
-import { useBoard } from '../../store';
+import { mutedHistory, useBoard } from '../../store';
 import type { EmailNode, ParsedAttachment } from '../../types';
 import { enrichText } from '../../lib/entities';
 import { formatBytes, isImageMime } from '../../lib/parseEmail';
@@ -17,7 +17,6 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
   const email = data;
   const [expanded, setExpanded] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
-  const addNode = useBoard((s) => s.addNode);
   const showToast = useBoard((s) => s.showToast);
   const ai = useBoard((s) => s.ai);
 
@@ -44,10 +43,20 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
   // Entity-Erkennung (libphonenumber etc.) nicht bei jedem Render neu (Audit PERF-2)
   const enriched = useMemo(() => enrichText(text), [text]);
 
+  /** Abgeleitetes Modul anlegen UND mit der E-Mail verbinden (M131) — ein History-Eintrag */
+  const addDerived = (node: ReturnType<typeof makeNote>, label: string) => {
+    const st = useBoard.getState();
+    st.pushHistory();
+    mutedHistory(() => {
+      st.addNode(node);
+      st.addLabeledEdge(id, node.id, label);
+    });
+  };
+
   const openAttachment = (att: ParsedAttachment) => {
     if (att.dataUrl && isImageMime(att.mime)) {
       // Bild-Anhang wird eine eigene Bild-Karte neben der E-Mail
-      addNode(makeImage({ x: positionAbsoluteX + 340, y: positionAbsoluteY + 40 }, att.dataUrl, att.name));
+      addDerived(makeImage({ x: positionAbsoluteX + 340, y: positionAbsoluteY + 40 }, att.dataUrl, att.name), 'Anhang');
       showToast(`🖼️ „${att.name}" als eigene Karte herausgelöst`);
     } else if (att.dataUrl) {
       triggerDownload(att.dataUrl, att.name);
@@ -62,10 +71,10 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
       const answer = await askAi(
         `Fasse diese E-Mail in 3-5 kurzen Stichpunkten auf Deutsch zusammen. Nenne konkrete Aufgaben und Fristen zuerst. Antworte NUR mit den Stichpunkten (mit "- " beginnend).\n\nBetreff: ${email.subject}\n\n${email.text.slice(0, 6000)}`,
       );
-      addNode(makeNote(
+      addDerived(makeNote(
         { x: positionAbsoluteX + 340, y: positionAbsoluteY },
         { color: 'yellow', blocks: textToBlocks('✨ Zusammenfassung', answer) },
-      ));
+      ), 'Zusammenfassung');
       showToast('✨ Zusammenfassung als Notiz daneben gelegt');
     } catch (e) {
       showToast(`⚠️ KI-Fehler: ${(e as Error).message}`);

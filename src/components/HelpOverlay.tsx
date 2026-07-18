@@ -256,7 +256,7 @@ export function HelpOverlay() {
               <ul>
                 <li><b>Anbieter</b> unter ⚙️ → KI: „Gratis" (ohne Konto, langsam), OpenRouter (kostenloser Account, flott), eigene Schlüssel (Anthropic/OpenAI) oder <b>Ollama — dann bleibt alles auf deinem Rechner</b>. Schlüssel werden nur lokal gespeichert und gehen nie in Sync/Export/Teilen-Links.</li>
                 <li><b>✨ im Dock</b> (ganzes Board): Freitext-Anweisung („Erstelle einen Wochenplan …"), Themen clustern, Aufgaben extrahieren, Workflow-Diagramm, Briefing, Verbindungen vorschlagen.</li>
-                <li><b>✨ in der Auswahl-Leiste</b> (markierte Karten): dieselben Werkzeuge nur für die Auswahl, plus <b>Text verbessern</b> für Notizen — der Vorschlag erscheint daneben, das Original bleibt.</li>
+                <li><b>✨ in der Auswahl-Leiste</b> (markierte Karten): dieselben Werkzeuge nur für die Auswahl, plus <b>Text verbessern</b> für Notizen — der Vorschlag erscheint daneben, das Original bleibt. <b>Abgeleitete Module werden automatisch verknüpft:</b> Entsteht aus wenigen ausgewählten Karten ein Diagramm, Kanban oder Briefing, zieht das Board Pfeile von den Quell-Karten zum neuen Modul (auch E-Mail → Zusammenfassung/Anhang, Notiz → Vorschlag, und die KI setzt beim Freitext-Kommando Bezüge selbst).</li>
                 <li>Alle KI-Aktionen sind <b>nicht destruktiv</b> und ein einziges Strg+Z macht den kompletten Plan rückgängig.</li>
               </ul>
             </section>

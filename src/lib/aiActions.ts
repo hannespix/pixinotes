@@ -17,6 +17,18 @@ function freeSpot(pos: { x: number; y: number }, w: number, h: number): { x: num
   return findFreeSpot(selectActiveBoard(useBoard.getState()).nodes, pos, { w, h });
 }
 
+/** Abgeleitete Module mit ihren Quell-Karten verbinden (M131): Pfeil
+ *  Quelle → neues Modul. Nur bei kleinen Quellmengen (Auswahl) — bei
+ *  Board-weiten Aktionen entstünde sonst ein Pfeil-Spaghetti. */
+const LINK_MAX_SOURCES = 4;
+function linkSources(sources: AppNode[], targetId: string, label = ''): void {
+  if (sources.length === 0 || sources.length > LINK_MAX_SOURCES) return;
+  const st = useBoard.getState();
+  for (const s of sources) {
+    if (s.id !== targetId) st.addLabeledEdge(s.id, targetId, label);
+  }
+}
+
 interface Ctx { id: string; type: string; text: string }
 
 // Kontext-Deckel: große Boards würden sonst Prompts >100 KB erzeugen
@@ -191,16 +203,21 @@ export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): 
   const clean = (tasks ?? []).filter((t) => t.text?.trim()).slice(0, 30);
   if (clean.length === 0) throw new Error('Keine Aufgaben im Inhalt erkannt.');
   const st = useBoard.getState();
-  st.addNode({
-    id: uid(), type: 'kanban', width: 430, position: freeSpot(pos, 430, 300),
-    data: {
-      title: '✨ Extrahierte Aufgaben',
-      items: clean.map((t) => ({
-        id: uid(), text: t.text.trim().slice(0, 140), col: 0,
-        due: /^\d{4}-\d{2}-\d{2}$/.test(t.due ?? '') ? t.due : undefined,
-      })),
-    },
-  } as AppNode);
+  const kanbanId = uid();
+  st.pushHistory();
+  mutedHistory(() => {
+    st.addNode({
+      id: kanbanId, type: 'kanban', width: 430, position: freeSpot(pos, 430, 300),
+      data: {
+        title: '✨ Extrahierte Aufgaben',
+        items: clean.map((t) => ({
+          id: uid(), text: t.text.trim().slice(0, 140), col: 0,
+          due: /^\d{4}-\d{2}-\d{2}$/.test(t.due ?? '') ? t.due : undefined,
+        })),
+      },
+    } as AppNode);
+    linkSources(nodes, kanbanId);
+  });
   const withDue = clean.filter((t) => t.due).length;
   return `${clean.length} Aufgabe(n) extrahiert${withDue ? `, davon ${withDue} mit Termin` : ''} — als Kanban aufs Board gelegt`;
 }
@@ -217,7 +234,12 @@ export async function aiProcess(nodes: AppNode[], pos: { x: number; y: number })
   const st = useBoard.getState();
   // fitOnLoad (M122): Karte passt sich nach dem ersten Render der Diagramm-
   // größe an — nichts wird abgeschnitten
-  st.addNode({ id: uid(), type: 'mermaid', width: 420, height: 280, position: freeSpot(pos, 420, 280), data: { code, fitOnLoad: true } } as AppNode);
+  const mermaidId = uid();
+  st.pushHistory();
+  mutedHistory(() => {
+    st.addNode({ id: mermaidId, type: 'mermaid', width: 420, height: 280, position: freeSpot(pos, 420, 280), data: { code, fitOnLoad: true } } as AppNode);
+    linkSources(nodes, mermaidId);
+  });
   return 'Workflow als Mermaid-Diagramm aufs Board gelegt';
 }
 
@@ -229,7 +251,12 @@ export async function aiBriefing(nodes: AppNode[], pos: { x: number; y: number }
     `Erstelle aus den folgenden Projekt-Karten ein knappes analytisches Briefing auf Deutsch mit genau diesen drei Abschnitten (als "## "-Überschriften): Überblick, Offene Punkte, Nächste Schritte. Maximal 12 Inhaltszeilen gesamt. ${MD_HINT}\n\nKarten:\n${JSON.stringify(items)}`,
   );
   const st = useBoard.getState();
-  st.addNode(makeNote(freeSpot(pos, 280, 340), { color: 'sky', blocks: await mdToBlocks('✨ Board-Briefing', res.trim()) }));
+  const briefNote = makeNote(freeSpot(pos, 280, 340), { color: 'sky', blocks: await mdToBlocks('✨ Board-Briefing', res.trim()) });
+  st.pushHistory();
+  mutedHistory(() => {
+    st.addNode(briefNote);
+    linkSources(nodes, briefNote.id);
+  });
   return 'Briefing als Notiz aufs Board gelegt';
 }
 
@@ -295,10 +322,15 @@ export async function aiPolish(nodes: AppNode[]): Promise<string> {
     `Verbessere den folgenden Notiztext: korrigiere Rechtschreibung und Grammatik, straffe Formulierungen, behalte Bedeutung, Sprache (Deutsch) und Aufzählungsstruktur bei. Du darfst Markdown nutzen (## Überschriften, **fett**, "- " Punkte, "- [ ] " Checklisten). Antworte NUR mit dem verbesserten Text.\n\n${text.slice(0, 6000)}`,
   );
   const st = useBoard.getState();
-  st.addNode(makeNote(
+  const suggestion = makeNote(
     freeSpot({ x: note.position.x + ((note.width as number | undefined) ?? 280) + 40, y: note.position.y }, 280, 320),
     { color: 'mint', blocks: await mdToBlocks('✨ Vorschlag', answer) },
-  ));
+  );
+  st.pushHistory();
+  mutedHistory(() => {
+    st.addNode(suggestion);
+    st.addLabeledEdge(note.id, suggestion.id, 'Vorschlag');
+  });
   return 'Verbesserter Text liegt als Vorschlag daneben — das Original bleibt unangetastet';
 }
 
@@ -316,6 +348,9 @@ interface AiOp {
   source?: string;
   target?: string;
   label?: string;
+  /** M131: id einer bestehenden Karte, aus der dieses neue Modul abgeleitet
+   *  ist — die App zieht dann automatisch einen Pfeil Quelle → neues Modul */
+  from?: string;
   items?: Array<{ text?: string; due?: string }>;
   rows?: Array<{ name?: string; start?: string; end?: string; who?: string }>;
 }
@@ -342,18 +377,18 @@ ${JSON.stringify(items)}
 
 Antworte NUR mit JSON: {"summary":"1 kurzer deutscher Satz, was du getan hast","ops":[...]}
 Erlaubte Operationen (max. 15):
-{"op":"note","title":"...","text":"Markdown: '## ' Überschriften, **fett**, '- ' Punkte, '- [ ] ' Checklisten","color":"yellow|pink|mint|sky|white"}
-{"op":"kanban","title":"...","items":[{"text":"...","due":"yyyy-mm-dd"}]}
-{"op":"gantt","title":"...","rows":[{"name":"...","start":"yyyy-mm-dd","end":"yyyy-mm-dd","who":"Name"}]}
-{"op":"mermaid","code":"flowchart TD\\n  A[Start] --> B[Ende]"}
-{"op":"shape","shape":"process|decision|terminator","text":"..."}
+{"op":"note","title":"...","text":"Markdown: '## ' Überschriften, **fett**, '- ' Punkte, '- [ ] ' Checklisten","color":"yellow|pink|mint|sky|white","from":"<optional: id der Quell-Karte>"}
+{"op":"kanban","title":"...","items":[{"text":"...","due":"yyyy-mm-dd"}],"from":"<optional>"}
+{"op":"gantt","title":"...","rows":[{"name":"...","start":"yyyy-mm-dd","end":"yyyy-mm-dd","who":"Name"}],"from":"<optional>"}
+{"op":"mermaid","code":"flowchart TD\\n  A[Start] --> B[Ende]","from":"<optional>"}
+{"op":"shape","shape":"process|decision|terminator","text":"...","from":"<optional>"}
 {"op":"edit_note","id":"<existierende Notiz-id>","text":"KOMPLETTER neuer Inhalt als Markdown; erste Zeile = '## Überschrift'"}
 {"op":"edit_title","id":"<id>","title":"..."} (für Kanban/Zeitplan-Titel oder Form-Text)
 {"op":"add_tickets","id":"<Kanban-id>","items":[{"text":"...","due":"yyyy-mm-dd"}]}
 {"op":"edge","source":"<id>","target":"<id>","label":"kurzes Label"}
 {"op":"delete","ids":["<id>"]} (NUR wenn der Nutzer ausdrücklich löschen will)
 Modulwahl: Prozesse/Abläufe → mermaid · Aufgabenlisten → kanban · Phasen/Zeiträume/Termine → gantt · Wissen/Text → note (Markdown voll ausnutzen, erledigbare Punkte als '- [ ] ' Checklisten).
-Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben" nutze edit_note mit dem vollständigen neuen Text; erfinde keine Fakten.`,
+Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben" nutze edit_note mit dem vollständigen neuen Text; erfinde keine Fakten. Leitest du ein neues Modul aus dem Inhalt einer bestehenden Karte ab (oder bezieht es sich klar auf sie), setze deren id als "from" — das Board verbindet beide dann automatisch mit einem Pfeil.`,
   );
 
   const plan = (ops ?? []).slice(0, 15);
@@ -388,6 +423,10 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
 
   // EIN Snapshot für den ganzen Plan (oben gesichert): innere Mutatoren
   // (addNode/removeNodes/addLabeledEdge) pushen keine eigenen Einträge
+  // M131: „from" an Erzeugungs-Ops → Pfeil von der Quell-Karte zum neuen Modul
+  const linkFrom = (o: AiOp, newId: string) => {
+    if (o.from && known.has(o.from)) st.addLabeledEdge(o.from, newId, '');
+  };
   mutedHistory(() => {
   for (const o of plan) {
     switch (o.op) {
@@ -395,7 +434,9 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
         const blocks = preBlocks.get(o);
         if (!blocks || blocks.length === 0) break;
         const color = STICKY.has(o.color ?? '') ? (o.color as StickyColor) : undefined;
-        st.addNode(makeNote(place(180), { color, blocks: blocks as never[] }));
+        const node = makeNote(place(180), { color, blocks: blocks as never[] });
+        st.addNode(node);
+        linkFrom(o, node.id);
         done++;
         break;
       }
@@ -414,6 +455,7 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
         (node.data as { title: string; rows: unknown[] }).title = (o.title ?? '📅 Zeitplan').slice(0, 60);
         (node.data as { rows: unknown[] }).rows = rows;
         st.addNode(node);
+        linkFrom(o, node.id);
         done++;
         break;
       }
@@ -427,6 +469,7 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
             due: /^\d{4}-\d{2}-\d{2}$/.test(t.due ?? '') ? t.due : undefined,
           }));
         st.addNode(node);
+        linkFrom(o, node.id);
         done++;
         break;
       }
@@ -437,6 +480,7 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
         (node.data as { code: string; fitOnLoad?: boolean }).code = code;
         (node.data as { fitOnLoad?: boolean }).fitOnLoad = true; // Karte ans Diagramm anpassen (M122)
         st.addNode(node);
+        linkFrom(o, node.id);
         done++;
         break;
       }
@@ -444,6 +488,7 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
         const node = makeShape(place(90), SHAPES.has(o.shape ?? '') ? (o.shape as ShapeKind) : 'process');
         (node.data as { text: string }).text = (o.text ?? '').slice(0, 60);
         st.addNode(node);
+        linkFrom(o, node.id);
         done++;
         break;
       }
