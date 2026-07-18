@@ -231,6 +231,7 @@ export function HelpOverlay() {
                 <li><b>Spalte direkt umstellen:</b> „To Do → In Arbeit" gleich aus der Liste — die letzte Spalte erledigt das Ticket.</li>
                 <li><b>Heute geschafft:</b> unten sammelt ein Protokoll alles, was du in der Zentrale abhakst — mit Wochen-Balken der letzten 7 Tage.</li>
                 <li><b>☀ Mein Tag:</b> Aufgaben per ☀ handverlesen für heute vornehmen — der Filter „Mein Tag" zeigt nur diese Fokusliste (leert sich am nächsten Tag von selbst).</li>
+                <li><b>Aufgeräumte Zeilen:</b> Jede Aufgabe zeigt kompakt nur Titel, Priorität, Frist und Person — <b>Antippen klappt die Werkzeuge auf</b> (Spalte, Frist, +1T/+1W, ☀ Mein Tag, ↗ Karte, › Details).</li>
                 <li><b>› Details:</b> öffnet die Bearbeiten-Spalte rechts — Titel, Beschreibung, Person, Frist, Priorität (Tickets) bzw. Start/Ende/Fortschritt (Zeitplan) direkt ändern, ohne die Zentrale zu verlassen.</li>
                 <li><b>✨ Woche planen:</b> die KI fasst alle offenen Aufgaben zu einem Wochen-Briefing zusammen (Was zuerst? Welche Fristen? Wo nachhaken?) und legt es als Notiz aufs aktive Board.</li>
                 <li><b>Erinnerungen:</b> Fällige Aufgaben melden sich beim Öffnen und regelmäßig als Hinweis — optional als System-Benachrichtigung.</li>

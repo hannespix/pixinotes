@@ -60,6 +60,7 @@ export function TaskHub() {
   const [doneOpen, setDoneOpen] = useState(false);
   const [myDay, setMyDay] = useState<Set<string>>(() => myDayKeys());
   const [detailKey, setDetailKey] = useState<string | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null); // Accordion-Werkzeuge (M116)
   const [aiBusy, setAiBusy] = useState(false);
   const ai = useBoard((s) => s.ai);
 
@@ -310,9 +311,9 @@ export function TaskHub() {
             <button onClick={enableNotifications} title="Erinnerungen zusätzlich als System-Benachrichtigung"><IBell size={14} /> Benachrichtigungen</button>
           )}
           {aiReady(ai) && (
-            <button disabled={aiBusy} onClick={planWeek} title="KI erstellt aus den offenen Aufgaben ein Wochen-Briefing als Notiz auf dem aktiven Board"><IWand size={14} /> Woche planen</button>
+            <button disabled={aiBusy} onClick={planWeek} title="KI erstellt aus den offenen Aufgaben ein Wochen-Briefing als Notiz auf dem aktiven Board"><IWand size={14} /><span className="th-label"> Woche planen</span></button>
           )}
-          <button onClick={exportIcs} title="Angezeigte Aufgaben mit Frist als .ics (Outlook-Kalender)"><ICalendar size={14} /> Kalender-Export</button>
+          <button onClick={exportIcs} title="Angezeigte Aufgaben mit Frist als .ics (Outlook-Kalender)"><ICalendar size={14} /><span className="th-label"> Kalender-Export</span></button>
           <button className="taskhub-x" onClick={() => setOpen(false)} aria-label="Schließen"><IX size={14} /></button>
         </span>
       </div>
@@ -398,71 +399,95 @@ export function TaskHub() {
               </button>
               {!collapsed.has(name) && (
                 <ul>
-                  {list.map((t) => (
-                    <li key={t.key} className={`task-row urgency-${t.urgency}`}>
-                      <input
-                        type="checkbox"
-                        title={t.kind === 'gantt' ? 'Erledigt (Fortschritt 100 %)' : 'Erledigt'}
-                        onChange={() => complete(t)}
-                        aria-label={`„${t.text}" erledigen`}
-                      />
-                      <button className="task-text" title="Zur Karte springen" onClick={() => jumpTo(t)}>
-                        <span className="task-kind">
-                          {t.kind === 'kanban' ? <IKanban size={13} /> : t.kind === 'gantt' ? <IGantt size={13} /> : <INote size={13} />}
-                        </span>
-                        {t.text}
-                      </button>
-                      {t.kind === 'kanban' && (
-                        <button
-                          className={`task-prio prio-${t.prio ?? 0}`}
-                          title={t.prio ? `Priorität ${t.prio === 1 ? 'hoch' : t.prio === 2 ? 'mittel' : 'niedrig'} — Klick schaltet weiter` : 'Priorität setzen (Klick: hoch → mittel → niedrig → keine)'}
-                          onClick={() => cyclePrio(t)}
-                        >{t.prio ? PRIO_LABEL[t.prio] : '!'}</button>
-                      )}
-                      {t.who && !groupByPerson && <span className="task-who" title="Zuständig">{t.who}</span>}
-                      {t.kind === 'kanban' && (() => {
-                        const cols = colsOf(t);
-                        if (!cols) return null;
-                        return (
-                          <select
-                            className="task-col"
-                            value={colOf(t)}
-                            title="Kanban-Spalte umstellen"
-                            onChange={(e) => moveToCol(t, Number(e.target.value))}
-                          >
-                            {cols.map((c, i) => <option key={i} value={i}>{c}</option>)}
-                          </select>
-                        );
-                      })()}
-                      {(t.kind === 'kanban' || t.kind === 'gantt') && (
-                        <input
-                          type="date"
-                          className={`task-due-input urgency-${t.urgency}`}
-                          value={t.due ?? ''}
-                          title={t.kind === 'gantt' ? 'Ende des Vorgangs ändern' : 'Fälligkeit ändern'}
-                          onChange={(e) => setDue(t, e.target.value)}
-                        />
-                      )}
-                      {t.due && <span className={`task-due urgency-${t.urgency}`}>{formatDueShort(t.due)}</span>}
-                      {(t.kind === 'kanban' || t.kind === 'gantt') && (
-                        <span className="task-snooze" role="group" aria-label="Schlummern">
-                          <button title="Um 1 Tag verschieben" onClick={() => snooze(t, 1)}>+1T</button>
-                          <button title="Um 1 Woche verschieben" onClick={() => snooze(t, 7)}>+1W</button>
-                        </span>
-                      )}
-                      <button
-                        className={`task-myday ${myDay.has(t.key) ? 'on' : ''}`}
-                        title={myDay.has(t.key) ? 'Aus „Mein Tag" entfernen' : 'Für heute vornehmen („Mein Tag")'}
-                        onClick={() => setMyDay(new Set(toggleMyDay(t.key)))}
-                      >☀</button>
-                      <span className="task-board">{t.boardName}</span>
-                      <button
-                        className={`task-detail-btn ${detailKey === t.key ? 'on' : ''}`}
-                        title="Details bearbeiten (rechte Spalte)"
-                        onClick={() => setDetailKey(detailKey === t.key ? null : t.key)}
-                      ><IChevronR size={13} /></button>
-                    </li>
-                  ))}
+                  {list.map((t) => {
+                    const open = expandedKey === t.key;
+                    return (
+                      <li key={t.key} className={`task-row urgency-${t.urgency} ${open ? 'open' : ''}`}>
+                        {/* Kompakte Hauptzeile (M116): Klick klappt die Werkzeuge auf */}
+                        <div
+                          className="task-main"
+                          role="button"
+                          aria-expanded={open}
+                          title={open ? 'Werkzeuge einklappen' : 'Antippen für Werkzeuge (Frist, Spalte, Mein Tag …)'}
+                          onClick={() => setExpandedKey(open ? null : t.key)}
+                        >
+                          <input
+                            type="checkbox"
+                            title={t.kind === 'gantt' ? 'Erledigt (Fortschritt 100 %)' : 'Erledigt'}
+                            onChange={() => complete(t)}
+                            onClick={(e) => e.stopPropagation()}
+                            aria-label={`„${t.text}" erledigen`}
+                          />
+                          <span className="task-kind">
+                            {t.kind === 'kanban' ? <IKanban size={13} /> : t.kind === 'gantt' ? <IGantt size={13} /> : <INote size={13} />}
+                          </span>
+                          <span className="task-text">
+                            {t.prio && <b className={`task-prio-mark prio-${t.prio}`}>{PRIO_LABEL[t.prio]} </b>}
+                            {t.text}
+                          </span>
+                          {myDay.has(t.key) && <span className="task-myday-mark" title={'In „Mein Tag" vorgenommen'}>☀</span>}
+                          {t.who && !groupByPerson && <span className="task-who" title="Zuständig">{t.who}</span>}
+                          {t.due && <span className={`task-due urgency-${t.urgency}`}>{formatDueShort(t.due)}</span>}
+                          <span className="task-board">{t.boardName}</span>
+                          <span className="task-caret" aria-hidden="true">{open ? '▴' : '▾'}</span>
+                        </div>
+
+                        {/* Aufgeklappte Werkzeugleiste (M116) */}
+                        {open && (
+                          <div className="task-tools">
+                            {t.kind === 'kanban' && (() => {
+                              const cols = colsOf(t);
+                              if (!cols) return null;
+                              return (
+                                <select
+                                  className="task-col"
+                                  value={colOf(t)}
+                                  title="Kanban-Spalte umstellen"
+                                  onChange={(e) => moveToCol(t, Number(e.target.value))}
+                                >
+                                  {cols.map((c, i) => <option key={i} value={i}>{c}</option>)}
+                                </select>
+                              );
+                            })()}
+                            {(t.kind === 'kanban' || t.kind === 'gantt') && (
+                              <input
+                                type="date"
+                                className={`task-due-input urgency-${t.urgency}`}
+                                value={t.due ?? ''}
+                                title={t.kind === 'gantt' ? 'Ende des Vorgangs ändern' : 'Fälligkeit ändern'}
+                                onChange={(e) => setDue(t, e.target.value)}
+                              />
+                            )}
+                            {(t.kind === 'kanban' || t.kind === 'gantt') && (
+                              <span className="task-snooze" role="group" aria-label="Schlummern">
+                                <button title="Um 1 Tag verschieben" onClick={() => snooze(t, 1)}>+1T</button>
+                                <button title="Um 1 Woche verschieben" onClick={() => snooze(t, 7)}>+1W</button>
+                              </span>
+                            )}
+                            {t.kind === 'kanban' && (
+                              <button
+                                className={`task-prio prio-${t.prio ?? 0}`}
+                                title={t.prio ? `Priorität ${t.prio === 1 ? 'hoch' : t.prio === 2 ? 'mittel' : 'niedrig'} — Klick schaltet weiter` : 'Priorität setzen (Klick: hoch → mittel → niedrig → keine)'}
+                                onClick={() => cyclePrio(t)}
+                              >{t.prio ? PRIO_LABEL[t.prio] : '!'}</button>
+                            )}
+                            <button
+                              className={`task-myday ${myDay.has(t.key) ? 'on' : ''}`}
+                              title={myDay.has(t.key) ? 'Aus „Mein Tag" entfernen' : 'Für heute vornehmen („Mein Tag")'}
+                              onClick={() => setMyDay(new Set(toggleMyDay(t.key)))}
+                            >☀ Mein Tag</button>
+                            <span className="task-board task-board-tools">{t.boardName}</span>
+                            <button className="task-jump" title="Zur Karte auf dem Board springen" onClick={() => jumpTo(t)}>↗ Karte</button>
+                            <button
+                              className={`task-detail-btn ${detailKey === t.key ? 'on' : ''}`}
+                              title="Details bearbeiten (rechte Spalte)"
+                              onClick={() => setDetailKey(detailKey === t.key ? null : t.key)}
+                            ><IChevronR size={13} /> Details</button>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </section>

@@ -1243,9 +1243,38 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   display: flex; flex-direction: column; gap: 7px;
 }
 .task-row {
-  display: flex; align-items: center; gap: 10px; background: var(--surface-card);
+  display: flex; flex-direction: column; background: var(--surface-card);
   border-radius: 11px; padding: 10px 14px; box-shadow: 0 1px 5px rgba(50,40,20,.1);
   border-left: 4px solid transparent;
+}
+/* Kompakte Hauptzeile (M116): Klick klappt die Werkzeuge auf */
+.task-main { display: flex; align-items: center; gap: 10px; cursor: pointer; min-width: 0; }
+.task-row.open { box-shadow: 0 3px 12px rgba(50,40,20,.16); }
+.task-caret { color: var(--muted); font-size: 10px; flex: none; }
+.task-prio-mark { letter-spacing: 1px; }
+.task-prio-mark.prio-1 { color: #d84b3d; }
+.task-prio-mark.prio-2 { color: #e8a13a; }
+.task-prio-mark.prio-3 { color: #4f7cff; }
+.task-myday-mark { flex: none; font-size: 12px; }
+/* Aufgeklappte Werkzeugleiste (M116) */
+.task-tools {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--border-soft);
+}
+.task-tools .task-myday, .task-jump, .task-tools .task-detail-btn {
+  border: 1px solid var(--border); background: var(--surface); border-radius: 6px;
+  font-family: inherit; font-size: 10.5px; color: var(--muted); cursor: pointer; padding: 3px 8px;
+  display: inline-flex; align-items: center; gap: 4px; opacity: 1; filter: none;
+}
+.task-tools .task-myday:hover, .task-jump:hover, .task-tools .task-detail-btn:hover {
+  color: var(--accent-strong); border-color: var(--accent);
+}
+.task-tools .task-myday.on { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
+.task-board-tools { display: none; }
+@media (max-width: 640px) {
+  .th-label { display: none; } /* Kopf-Knöpfe mobil nur als Icons */
+  .task-main .task-board { display: none; } /* Board-Chip mobil nur in den Werkzeugen */
+  .task-board-tools { display: inline; }
 }
 .task-row.urgency-overdue { border-left-color: #d84b3d; }
 .task-row.urgency-soon { border-left-color: #e8a13a; }
