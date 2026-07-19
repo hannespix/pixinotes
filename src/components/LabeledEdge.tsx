@@ -99,24 +99,34 @@ export function LabeledEdge({
       .filter((n) => n.id !== source && n.id !== target && !n.archived)
       .map(rectOf);
     const mnx = -(ty - sy) / dist, mny = (tx - sx) / dist; // Normale zum Direktweg
-    // M138: TANGENTENSTETIGE Kurve — zwei Kubik-Segmente durch eine (ggf.
-    // seitlich verschobene) Mitte. Die Tangenten an den Stummel-Enden zeigen
-    // IMMER senkrecht aus der Kartenseite, die Mitten-Tangente folgt der
-    // Sehne — dadurch gibt es nirgends Knicke, egal wie stark der Bogen
-    // ausweicht. Fließend wie bei Miro/Lucidchart.
+    // M138/M139: Basis ist EINE einzige Kubik mit Tangenten senkrecht zur
+    // Kartenseite — knickfrei UND wellenfrei (eine Kubik kann höchstens ein
+    // sanftes S bilden, nie eine Doppelwelle). Nur wenn Ausweichen/Auffächern
+    // die Kurvenmitte seitlich verschiebt, wird die Kurve an der Mitte
+    // geteilt — mit der ECHTEN Tangente der Basis-Kurve, nicht der Sehne.
     const chordX = bx - ax, chordY = by - ay;
     const clen = Math.hypot(chordX, chordY) || 1;
-    const cdx = chordX / clen, cdy = chordY / clen; // Tangente in der Kurvenmitte
     const k = Math.min(110, clen / 3, Math.max(24, clen * 0.25)); // Griffweite
+    const c1bx = ax + nsx * k, c1by = ay + nsy * k;
+    const c2bx = bx + ntx * k, c2by = by + nty * k;
+    // Basis-Kurve: Mittelpunkt + Tangentenrichtung bei t = 0,5
+    const baseMidX = (ax + 3 * c1bx + 3 * c2bx + bx) / 8;
+    const baseMidY = (ay + 3 * c1by + 3 * c2by + by) / 8;
+    const tdx0 = (bx - ax) + (c2bx - c1bx);
+    const tdy0 = (by - ay) + (c2by - c1by);
+    const tdl = Math.hypot(tdx0, tdy0) || 1;
+    const tdx = tdx0 / tdl, tdy = tdy0 / tdl;
     const geometry = (o: number) => {
-      const midX = (ax + bx) / 2 + mnx * o;
-      const midY = (ay + by) / 2 + mny * o;
+      const midX = baseMidX + mnx * o;
+      const midY = baseMidY + mny * o;
+      const k1 = Math.min(k, Math.hypot(midX - ax, midY - ay) / 2.5);
+      const k2 = Math.min(k, Math.hypot(bx - midX, by - midY) / 2.5);
       return {
         midX, midY,
-        c1x: ax + nsx * k, c1y: ay + nsy * k,
-        c2x: midX - cdx * k, c2y: midY - cdy * k,
-        c3x: midX + cdx * k, c3y: midY + cdy * k,
-        c4x: bx + ntx * k, c4y: by + nty * k,
+        c1x: ax + nsx * k1, c1y: ay + nsy * k1,
+        c2x: midX - tdx * k1, c2y: midY - tdy * k1,
+        c3x: midX + tdx * k2, c3y: midY + tdy * k2,
+        c4x: bx + ntx * k2, c4y: by + nty * k2,
       };
     };
     const cubicAt = (t: number, x0: number, y0: number, x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) => {
@@ -127,12 +137,17 @@ export function LabeledEdge({
       };
     };
     const blockedAt = (o: number): boolean => {
-      const g = geometry(o);
       for (let i = 1; i < 18; i++) {
-        const t = (i % 9) / 9;
-        const p = i < 9
-          ? cubicAt(t || 0.05, ax, ay, g.c1x, g.c1y, g.c2x, g.c2y, g.midX, g.midY)
-          : cubicAt(t || 0.05, g.midX, g.midY, g.c3x, g.c3y, g.c4x, g.c4y, bx, by);
+        const t = (i % 9) / 9 || 0.05;
+        let p;
+        if (o === 0) {
+          p = cubicAt(i / 18, ax, ay, c1bx, c1by, c2bx, c2by, bx, by);
+        } else {
+          const g = geometry(o);
+          p = i < 9
+            ? cubicAt(t, ax, ay, g.c1x, g.c1y, g.c2x, g.c2y, g.midX, g.midY)
+            : cubicAt(t, g.midX, g.midY, g.c3x, g.c3y, g.c4x, g.c4y, bx, by);
+        }
         if (obstacles.some((r) => p.x > r.x1 && p.x < r.x2 && p.y > r.y1 && p.y < r.y2)) return true;
       }
       return false;
@@ -143,6 +158,14 @@ export function LabeledEdge({
         const cand = [pShift + m, pShift - m].find((o) => !blockedAt(o));
         if (cand !== undefined) { off = cand; break; }
       }
+    }
+    if (off === 0) {
+      // Normalfall: EINE Kurve — maximal harmonisch
+      return {
+        path: `M ${sx},${sy} L ${ax},${ay} C ${c1bx},${c1by} ${c2bx},${c2by} ${bx},${by} L ${tx},${ty}`,
+        lx: baseMidX,
+        ly: baseMidY,
+      };
     }
     const g = geometry(off);
     return {
