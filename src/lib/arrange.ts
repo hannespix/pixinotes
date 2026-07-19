@@ -32,7 +32,7 @@ interface Size { w: number; h: number }
 interface Placed { id: string; x: number; y: number }
 interface Block { w: number; h: number; nodes: Placed[] }
 
-function sizeOf(n: AppNode): Size {
+export function sizeOf(n: AppNode): Size {
   return {
     w: n.measured?.width ?? (typeof n.width === 'number' ? n.width : undefined) ?? DEF_W[n.type ?? ''] ?? 280,
     h: n.measured?.height ?? (typeof n.height === 'number' ? n.height : undefined) ?? DEF_H[n.type ?? ''] ?? 170,
@@ -362,7 +362,139 @@ function layoutStack(group: AppNode[]): Block {
   return { w: maxW, h: (sorted.length - 1) * STEP_Y + last.h, nodes };
 }
 
-export type ArrangeMode = 'flow' | 'flowV' | 'grid' | 'circles' | 'stack';
+export type ArrangeMode =
+  | 'flow' | 'flowV' | 'grid' | 'circles' | 'stack'
+  | 'lanes' | 'timeline' | 'metro' | 'compact' | 'quadrant';
+
+/* ---------- M142: weitere Anordnungen ---------- */
+
+/** Person einer Karte: Eigenschaft wer/who/person, sonst häufigste Person der Einträge */
+function personOf(n: AppNode): string | null {
+  const d = n.data as { attrs?: Record<string, string>; items?: Array<{ who?: string }>; rows?: Array<{ who?: string }> } | undefined;
+  const a = d?.attrs?.wer ?? d?.attrs?.who ?? d?.attrs?.person;
+  if (a?.trim()) return a.trim();
+  const counts = new Map<string, number>();
+  const bump = (w?: string) => { const t = w?.trim(); if (t) counts.set(t, (counts.get(t) ?? 0) + 1); };
+  if (n.type === 'kanban') for (const it of d?.items ?? []) bump(it.who);
+  if (n.type === 'gantt') for (const r of d?.rows ?? []) bump(r.who);
+  const best = [...counts.entries()].sort((x, y) => y[1] - x[1])[0];
+  return best?.[0] ?? null;
+}
+
+/** Früheste Frist / frühester Start einer Karte (ISO-Datum) */
+function dateOf(n: AppNode): string | null {
+  const d = n.data as { items?: Array<{ due?: string }>; rows?: Array<{ start?: string }> } | undefined;
+  const dates: string[] = [];
+  if (n.type === 'kanban') for (const it of d?.items ?? []) if (it.due) dates.push(it.due);
+  if (n.type === 'gantt') for (const r of d?.rows ?? []) if (r.start) dates.push(r.start);
+  return dates.sort()[0] ?? null;
+}
+
+/** Gruppen als umbrechende Reihen untereinander (Schwimmbahnen, Zeitstrahl) */
+function arrangeRows(
+  groups: Array<{ nodes: AppNode[]; keepOrder?: boolean }>,
+  targetW = 2200,
+): Array<[string, number, number]> {
+  const out: Array<[string, number, number]> = [];
+  let y0 = MARGIN_Y;
+  for (const g of groups) {
+    if (g.nodes.length === 0) continue;
+    const list = g.keepOrder
+      ? g.nodes
+      : [...g.nodes].sort((a, b) => a.position.x - b.position.x || a.position.y - b.position.y);
+    let x = MARGIN_X;
+    let lineY = y0;
+    let bottom = y0;
+    for (const n of list) {
+      const s = sizeOf(n);
+      if (x > MARGIN_X && x + s.w > targetW) { x = MARGIN_X; lineY = bottom + GAP_Y; }
+      out.push([n.id, x, lineY]);
+      x += s.w + GAP_Y;
+      bottom = Math.max(bottom, lineY + s.h);
+    }
+    y0 = bottom + ROW_GAP;
+  }
+  return out;
+}
+
+/** Schwimmbahnen: eine Bahn pro Person (Eigenschaft wer/who oder Ticket-Personen) */
+function arrangeLanes(nodes: AppNode[]): { moves: Array<[string, number, number]>; lanes: string[] } {
+  const byLane = new Map<string, AppNode[]>();
+  const rest: AppNode[] = [];
+  for (const n of nodes) {
+    const p = personOf(n);
+    if (p) { if (!byLane.has(p)) byLane.set(p, []); byLane.get(p)!.push(n); }
+    else rest.push(n);
+  }
+  const lanes = [...byLane.keys()].sort((a, b) => a.localeCompare(b, 'de'));
+  const groups = lanes.map((l) => ({ nodes: byLane.get(l)! }));
+  if (rest.length) groups.push({ nodes: rest });
+  return { moves: arrangeRows(groups), lanes: rest.length ? [...lanes, 'Ohne Zuordnung'] : lanes };
+}
+
+/** Zeitstrahl: Karten mit Frist chronologisch in einer Reihe, Undatiertes darunter */
+function arrangeTimeline(nodes: AppNode[]): Array<[string, number, number]> {
+  const dated = nodes
+    .map((n) => ({ n, d: dateOf(n) }))
+    .filter((x): x is { n: AppNode; d: string } => !!x.d)
+    .sort((a, b) => a.d.localeCompare(b.d))
+    .map((x) => x.n);
+  const undated = nodes.filter((n) => !dateOf(n));
+  return arrangeRows([{ nodes: dated, keepOrder: true }, { nodes: undated }], 2600);
+}
+
+/** Kompakt packen: minimale Fläche (Masonry/Shelf, höchste Karten zuerst) */
+function arrangeCompact(nodes: AppNode[]): Array<[string, number, number]> {
+  const GAP = 28;
+  const sorted = [...nodes].sort((a, b) => sizeOf(b).h - sizeOf(a).h);
+  const area = sorted.reduce((s, n) => { const z = sizeOf(n); return s + (z.w + GAP) * (z.h + GAP); }, 0);
+  const targetW = Math.max(1100, Math.sqrt(area * 1.35));
+  const out: Array<[string, number, number]> = [];
+  let x = MARGIN_X;
+  let y = MARGIN_Y;
+  let rowH = 0;
+  for (const n of sorted) {
+    const s = sizeOf(n);
+    if (x > MARGIN_X && x + s.w > targetW) { x = MARGIN_X; y += rowH + GAP; rowH = 0; }
+    out.push([n.id, x, y]);
+    x += s.w + GAP;
+    rowH = Math.max(rowH, s.h);
+  }
+  return out;
+}
+
+/** Eisenhower-Quadrant: wichtig (Prio) × dringend (Frist ≤ 7 Tage) */
+function arrangeQuadrant(nodes: AppNode[]): Array<[string, number, number]> {
+  const soon = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+  const important = (n: AppNode): boolean => {
+    const d = n.data as { attrs?: Record<string, string>; items?: Array<{ prio?: number }> } | undefined;
+    const a = (d?.attrs?.prio ?? d?.attrs?.wichtig ?? '').toLowerCase();
+    if (a === '1' || a === '2' || a === 'hoch' || a === 'ja') return true;
+    return (d?.items ?? []).some((it) => it.prio !== undefined && it.prio <= 2);
+  };
+  const urgent = (n: AppNode): boolean => { const d = dateOf(n); return !!d && d <= soon; };
+  const q: AppNode[][] = [[], [], [], []]; // [wichtig+dringend, wichtig, dringend, Rest]
+  for (const n of nodes) {
+    const i = important(n) ? (urgent(n) ? 0 : 1) : urgent(n) ? 2 : 3;
+    q[i].push(n);
+  }
+  const blocks = q.map((g) => (g.length ? layoutGrid(g) : { w: 0, h: 0, nodes: [] }));
+  const colW = Math.max(blocks[0].w, blocks[2].w);
+  const rowH = Math.max(blocks[0].h, blocks[1].h);
+  const at = (b: Block, ox: number, oy: number): Array<[string, number, number]> =>
+    b.nodes.map((p) => [p.id, MARGIN_X + ox + p.x, MARGIN_Y + oy + p.y]);
+  return [
+    ...at(blocks[0], 0, 0),
+    ...at(blocks[1], colW + BLOCK_GAP, 0),
+    ...at(blocks[2], 0, rowH + BLOCK_GAP),
+    ...at(blocks[3], colW + BLOCK_GAP, rowH + BLOCK_GAP),
+  ];
+}
+
+/** Bahnen-Namen für den Toast der Schwimmbahnen-Anordnung */
+export function laneNames(nodes: AppNode[]): string[] {
+  return arrangeLanes(nodes).lanes;
+}
 
 /**
  * Vertikaler Fluss (M141): derselbe Schichten-Algorithmus, nur transponiert —
@@ -420,6 +552,15 @@ export function computeArrangement(nodes: AppNode[], edges: Edge[], mode: Arrang
   if (mode === 'flowV') {
     return computeArrangement(nodes.map(transposeNode), edges, 'flow').map(([id, x, y]) => [id, y, x]);
   }
+  // Metro-Grid (M142): Fluss-Layout, auf ein 40-px-Raster gerastet — zusammen
+  // mit Winkel-Kanten (setzt der Aufräumen-Knopf) entsteht der U-Bahn-Plan-Look
+  if (mode === 'metro') {
+    return computeArrangement(nodes, edges, 'flow').map(([id, x, y]) => [id, Math.round(x / 40) * 40, Math.round(y / 40) * 40]);
+  }
+  if (mode === 'lanes') return arrangeLanes(nodes).moves;
+  if (mode === 'timeline') return arrangeTimeline(nodes);
+  if (mode === 'compact') return arrangeCompact(nodes);
+  if (mode === 'quadrant') return arrangeQuadrant(nodes);
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const comps = components(nodes, edges);
 

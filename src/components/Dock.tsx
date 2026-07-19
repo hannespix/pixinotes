@@ -83,6 +83,12 @@ export function Dock() {
       mutedHistory(() => st.onEdgesChange(dupes.map((id) => ({ type: 'remove' as const, id }))));
       showToast(`🧹 ${dupes.length} doppelte Verbindung(en) zusammengefasst.`);
     }
+    // Metro-Grid: alle Verbindungen auf die rechtwinklige Winkel-Route stellen
+    if (mode === 'metro') {
+      mutedHistory(() => {
+        for (const e of selectActiveBoard(useBoard.getState()).edges) st.updateEdgeKind(e.id, 'step');
+      });
+    }
     setArranging(true);
     const DUR = 700;
     const STAGGER = 14; // ms pro Karte — wirkt organisch statt mechanisch
@@ -108,6 +114,11 @@ export function Dock() {
         const msg = {
           flow: 'Verbundenes als Fluss (links → rechts), Rest nach Modultyp gruppiert',
           flowV: 'Verbundenes als Fluss (oben ↓ unten), Rest nach Modultyp gruppiert',
+          metro: 'Metro-Grid: Fluss auf festem Raster, Verbindungen rechtwinklig',
+          lanes: 'Schwimmbahnen: eine Bahn pro Person, unten „Ohne Zuordnung"',
+          timeline: 'Zeitstrahl: Fristen chronologisch, Undatiertes darunter',
+          compact: 'Kompakt gepackt — ideal vor dem Bild-Export',
+          quadrant: 'Quadrant: ↖ wichtig+dringend · ↗ wichtig · ↙ dringend · ↘ Rest',
           grid: 'Themen-Cluster bleiben zusammen, Rest als Raster nach Modultyp',
           circles: 'Themen-Cluster als Kreis-Bündel (Titel in der Mitte)',
           stack: 'Stapel je Themen-Cluster & Modultyp (Physik ist jetzt AUS, damit nichts auseinanderrutscht)',
@@ -323,7 +334,12 @@ export function Dock() {
             <div className="dock-menu-label">Anordnungs-Modus</div>
             <button onClick={() => arrange('flow')} title="Verbundene Karten als Prozess von links nach rechts, der Rest als Typ-Gruppen">🌊 Fluss → horizontal</button>
             <button onClick={() => arrange('flowV')} title="Verbundene Karten als Prozess von oben nach unten, der Rest als Typ-Gruppen">🌊 Fluss ↓ vertikal</button>
+            <button onClick={() => arrange('metro')} title="Fluss-Layout auf festem Raster, alle Verbindungen rechtwinklig — U-Bahn-Plan-Look">🚇 Metro-Grid</button>
             <button onClick={() => arrange('grid')} title="Alles in ein sauberes Raster, sortiert nach Modultyp">▦ Raster</button>
+            <button onClick={() => arrange('compact')} title="Minimale Fläche — dicht gepackt, ideal vor dem Bild-Export">🧱 Kompakt packen</button>
+            <button onClick={() => arrange('lanes')} title="Eine Bahn pro Person (Eigenschaft wer/who oder Personen aus Tickets/Zeitplänen)">🏊 Schwimmbahnen (Personen)</button>
+            <button onClick={() => arrange('timeline')} title="Karten mit Fristen chronologisch von links nach rechts, Undatiertes darunter">📅 Zeitstrahl (Fristen)</button>
+            <button onClick={() => arrange('quadrant')} title="Eisenhower: links oben wichtig+dringend · rechts oben wichtig · links unten dringend · rechts unten Rest">🎯 Quadrant (wichtig/dringend)</button>
             <button onClick={() => arrange('circles')} title="Zusammenhängendes und Typ-Gruppen jeweils als Kreis-Bündel">◎ Kreis-Bündel</button>
             <button onClick={() => arrange('stack')} title="Karten pro Modultyp überlappend stapeln — Überschriften bleiben sichtbar; Physik wird dafür ausgeschaltet">🗂 Stapeln (überlappend)</button>
             <div className="dock-menu-label">Raster</div>

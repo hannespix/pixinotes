@@ -708,6 +708,7 @@ export function Board() {
         onMoveEnd={() => { if (performance.now() > flyingUntil.current) returnViewport.current = null; }}
         zoomOnDoubleClick={false}
         deleteKeyCode={['Delete', 'Backspace']}
+        multiSelectionKeyCode={['Meta', 'Shift']}
         minZoom={0.15}
         maxZoom={2.5}
         fitView

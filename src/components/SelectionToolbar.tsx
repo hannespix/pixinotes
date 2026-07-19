@@ -5,7 +5,9 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IBookmark, ICopy, IDuplicate, IFit, IMail, IPen, ITag, ITrash, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, ICopy, IDuplicate, IFit, IMail, IPen, ITag, ITrash, IWand, IX } from './Icons';
+import { ALIGN_LABEL, computeAlign, type AlignOp } from '../lib/align';
+import { mutedHistory } from '../store';
 
 const MAILTO_LIMIT = 1800; // konservativ: längere mailto-URLs schlucken manche Clients
 
@@ -29,6 +31,7 @@ export function SelectionToolbar() {
   const [aiMenu, setAiMenu] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [attrMenu, setAttrMenu] = useState(false);
+  const [alignMenu, setAlignMenu] = useState(false);
   const [attrKey, setAttrKey] = useState('');
   const [attrVal, setAttrVal] = useState('');
   const [cmd, setCmd] = useState('');
@@ -218,6 +221,39 @@ export function SelectionToolbar() {
           ><IFit size={15} /></button>
         );
       })()}
+      {selected.length >= 2 && (
+        <span className="sel-ai-wrap">
+          {alignMenu && (
+            <div className="sel-ai-menu">
+              {(['left', 'centerX', 'top', 'centerY', 'distH', 'distV', 'width'] as AlignOp[]).map((op) => (
+                <button
+                  key={op}
+                  disabled={(op === 'distH' || op === 'distV') && selected.length < 3}
+                  onClick={() => {
+                    const { moves, resizes } = computeAlign(selected, op);
+                    if (moves.length === 0 && resizes.length === 0) return;
+                    const st = useBoard.getState();
+                    st.pushHistory();
+                    mutedHistory(() => {
+                      if (moves.length) st.setNodePositions(moves);
+                      for (const [rid, w, h] of resizes) st.resizeNode(rid, w, h);
+                    });
+                    setAlignMenu(false);
+                    showToast(`📏 ${ALIGN_LABEL[op].slice(2).trim()} — Strg+Z macht es rückgängig`);
+                  }}
+                >
+                  {ALIGN_LABEL[op]}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            className={alignMenu ? 'ai-on' : ''}
+            onClick={() => { setAlignMenu((o) => !o); setAiMenu(false); setAttrMenu(false); }}
+            title="Ausrichten & Verteilen (wie in PowerPoint)"
+          ><IArrange size={15} /></button>
+        </span>
+      )}
       {anchoredCount > 0 && (
         <button
           onClick={() => detachStrokes(selected.map((n) => n.id))}
