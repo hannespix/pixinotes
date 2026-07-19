@@ -31,6 +31,7 @@ import { GanttCard } from './nodes/GanttCard';
 import { CalendarCard } from './nodes/CalendarCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { DrawingLayer } from './DrawingLayer';
+import { CommentLayer } from './CommentLayer';
 import { SelectionToolbar } from './SelectionToolbar';
 
 const nodeTypes: NodeTypes = {
@@ -105,7 +106,7 @@ export function Board() {
     // wird ganz normal gescrollt und navigiert.
     const OVERLAY_SEL = '.bn-suggestion-menu, .bn-side-menu, .mantine-Menu-dropdown, .mantine-Popover-dropdown, '
       + '[role="menu"], [role="listbox"], [role="dialog"], .modal-backdrop, .ticket-modal-backdrop, '
-      + '.dock-menu, .sel-ai-menu, .sel-attr-menu, .tab-tree, .tab-bg-menu, .mm-pop, .draw-palette';
+      + '.dock-menu, .sel-ai-menu, .sel-attr-menu, .tab-tree, .tab-bg-menu, .mm-pop, .draw-palette, .comment-panel';
     const inOverlay = (t: Element | null) => !!t?.closest?.(OVERLAY_SEL);
     const onWheel = (e: WheelEvent) => {
       const target = e.target as Element | null;
@@ -762,6 +763,7 @@ export function Board() {
         <Controls showInteractive={false} />
         <SelectionToolbar />
         <DrawingLayer />
+        <CommentLayer />
       </ReactFlow>
     </div>
   );

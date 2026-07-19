@@ -5,7 +5,7 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, ICopy, IDuplicate, IFit, IMail, IPen, ITag, ITrash, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICopy, IDuplicate, IFit, IMail, IPen, ITag, ITrash, IWand, IX } from './Icons';
 import { ALIGN_LABEL, computeAlign, type AlignOp } from '../lib/align';
 import { mutedHistory } from '../store';
 
@@ -173,6 +173,21 @@ export function SelectionToolbar() {
       )}
       {single && (
         <button onClick={asTemplate} title="Karte als Vorlage speichern (＋-Menü → Vorlagen)"><IBookmark size={15} /></button>
+      )}
+      {single && (
+        <button
+          onClick={() => {
+            // Gibt es schon einen offenen Thread an der Karte, diesen öffnen —
+            // sonst einen neuen Kommentar beginnen (M148)
+            const threads = (useBoard.getState().boards.find((b) => b.id === useBoard.getState().activeId)?.comments ?? [])
+              .filter((c) => c.nodeId === single.id);
+            const open = threads.find((c) => !c.resolved) ?? threads[0];
+            useBoard.getState().setCommentOpen(open ? open.id : `new:${single.id}`);
+          }}
+          title="Kommentar an dieser Karte (für Kollegen im Team-Sync sichtbar)"
+        >
+          <IComment size={15} />
+        </button>
       )}
       {aiReady(ai) && (
         <span className="sel-ai-wrap">

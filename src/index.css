@@ -1082,6 +1082,55 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .dock-menu button:hover { background: var(--surface-2); }
 .dock-menu-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 6px 10px 2px; }
 
+/* ---------- Kommentar-Pins & -Panel (M148) ---------- */
+.comment-pin {
+  position: absolute; z-index: 9; pointer-events: all;
+  width: 26px; height: 26px; border-radius: 50% 50% 50% 4px;
+  border: 2px solid var(--surface); background: var(--accent); color: #fff;
+  font-size: 10px; font-weight: 700; font-family: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(50, 40, 20, 0.28);
+}
+.comment-pin:hover { transform-origin: center; filter: brightness(1.08); }
+.comment-pin.resolved { background: var(--surface-dim); color: var(--muted); box-shadow: none; opacity: .75; }
+.comment-pin.open { outline: 2px solid var(--accent-strong); }
+.comment-pin-count {
+  position: absolute; top: -6px; right: -7px; background: #d05353; color: #fff;
+  border-radius: 999px; font-size: 8.5px; min-width: 14px; height: 14px; padding: 0 3px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.comment-panel {
+  position: fixed; right: 14px; top: 86px; z-index: 70; width: min(320px, calc(100vw - 28px));
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: 13px;
+  box-shadow: 0 8px 32px rgba(50, 40, 20, 0.25);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.comment-panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 12px; font-size: 13px; border-bottom: 1px solid var(--border-soft);
+}
+.comment-panel-tools { display: flex; align-items: center; gap: 4px; }
+.comment-panel-tools button {
+  border: none; background: none; cursor: pointer; color: var(--muted); font-family: inherit;
+  font-size: 11px; padding: 3px 7px; border-radius: 7px; display: inline-flex; align-items: center;
+}
+.comment-panel-tools button:hover { background: var(--surface-2); color: var(--ink); }
+.comment-panel-tools button.danger:hover { background: rgba(192, 57, 43, 0.1); color: #c0392b; }
+.comment-msgs { max-height: 40vh; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
+.comment-msg { display: flex; flex-direction: column; gap: 1px; }
+.comment-msg-meta { font-size: 10.5px; color: var(--muted); }
+.comment-msg-text { font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+.comment-compose { display: flex; flex-direction: column; gap: 6px; padding: 9px 12px; border-top: 1px solid var(--border-soft); }
+.comment-name, .comment-input {
+  border: 1px solid var(--border-soft); border-radius: 8px; background: var(--surface-dim);
+  font-family: inherit; font-size: 12.5px; padding: 6px 8px; color: var(--ink); resize: none;
+}
+.comment-send {
+  align-self: flex-end; border: none; background: var(--accent); color: #fff; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: 8px;
+}
+.comment-send:disabled { opacity: .45; cursor: default; }
+
 /* ---------- Team-Sync: Projekt-Liste (M145) ---------- */
 .psync-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 4px; }
 .psync-row {

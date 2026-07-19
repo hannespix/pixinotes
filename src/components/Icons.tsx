@@ -97,3 +97,4 @@ export const IQuadrant = make(<><rect x="3.5" y="3.5" width="17" height="17" rx=
 export const ICircles = make(<><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3" /></>);
 export const IStack = make(<><path d="m12 3 9 5-9 5-9-5Z" /><path d="m3 12.5 9 5 9-5" /><path d="m3 16.5 9 5 9-5" /></>);
 export const IGridSnap = make(<><rect x="3.5" y="3.5" width="17" height="17" rx="1.5" /><path d="M9.2 3.5v17" /><path d="M14.8 3.5v17" /><path d="M3.5 9.2h17" /><path d="M3.5 14.8h17" /></>);
+export const IComment = make(<><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 8.9 8.9 0 0 1-3.2-.6L3 21l1.8-5.2a8 8 0 0 1-.8-3.3A8.4 8.4 0 0 1 12.5 4.2a8.4 8.4 0 0 1 8.5 7.3Z" /></>);

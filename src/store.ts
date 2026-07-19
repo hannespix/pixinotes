@@ -35,6 +35,17 @@ export interface BoardDoc {
   drawings?: Stroke[];
   /** Dezente Hintergrund-Tönung (Palette-Schlüssel, M88) — fehlt ⇒ Standard */
   bg?: string;
+  /** Kommentar-Threads (M148) — leben IM Board und wandern so automatisch
+   *  im globalen Sync UND im Team-Projekt-Paket mit */
+  comments?: CommentThread[];
+}
+
+/** Ein Kommentar-Pin an einer Karte mit seinem Gesprächsverlauf (M148) */
+export interface CommentThread {
+  id: string;
+  nodeId: string;
+  resolved?: boolean;
+  msgs: Array<{ author: string; text: string; at: string }>;
 }
 
 export type Tool = 'select' | 'pen' | 'marker' | 'eraser';
@@ -182,6 +193,14 @@ interface BoardState {
   onConnect: (connection: Connection) => void;
   /** Verbindung mit Label direkt anlegen (KI-Vorschläge) */
   addLabeledEdge: (source: string, target: string, label: string, kind?: string) => void;
+  /** M148: Kommentar-Panel — offener Thread ('id') bzw. neuer Kommentar ('new:<nodeId>') */
+  commentOpen: string | null;
+  setCommentOpen: (id: string | null) => void;
+  /** Kommentar anhängen: an bestehenden Thread (threadId) oder neuen an einer Karte eröffnen */
+  addCommentMsg: (target: { threadId?: string; nodeId?: string }, author: string, text: string) => string | null;
+  toggleCommentResolved: (threadId: string) => void;
+  removeCommentThread: (threadId: string) => void;
+
   updateEdgeLabel: (id: string, label: string) => void;
   updateEdgeKind: (id: string, kind: string) => void;
   /** M146/M147: feingliedrige Verbindungsoptionen — Spitzen (Ende/Anfang),
@@ -1036,6 +1055,40 @@ export const useBoard = create<BoardState>()(
           }));
         },
 
+        // ---------- Kommentar-Pins (M148) ----------
+        commentOpen: null,
+        setCommentOpen: (id) => set({ commentOpen: id }),
+
+        addCommentMsg: (target, author, text) => {
+          const msg = { author: author.trim().slice(0, 40) || 'Anonym', text: text.trim(), at: new Date().toISOString() };
+          if (!msg.text) return null;
+          let threadId: string | null = null;
+          patchActive((b) => {
+            const comments = [...(b.comments ?? [])];
+            if (target.threadId) {
+              const i = comments.findIndex((c) => c.id === target.threadId);
+              if (i < 0) return {};
+              threadId = target.threadId;
+              comments[i] = { ...comments[i], resolved: false, msgs: [...comments[i].msgs, msg] };
+            } else if (target.nodeId) {
+              threadId = uid();
+              comments.push({ id: threadId, nodeId: target.nodeId, msgs: [msg] });
+            }
+            return { comments };
+          });
+          return threadId;
+        },
+
+        toggleCommentResolved: (threadId) =>
+          patchActive((b) => ({
+            comments: (b.comments ?? []).map((c) => (c.id === threadId ? { ...c, resolved: !c.resolved } : c)),
+          })),
+
+        removeCommentThread: (threadId) => {
+          patchActive((b) => ({ comments: (b.comments ?? []).filter((c) => c.id !== threadId) }));
+          set({ commentOpen: null });
+        },
+
         updateEdgeLabel: (id, label) =>
           patchActive((b) => ({
             edges: b.edges.map((e) =>
@@ -1102,6 +1155,8 @@ export const useBoard = create<BoardState>()(
             nodes: b.nodes.filter((n) => !idSet.has(n.id)),
             edges: b.edges.filter((e) => !idSet.has(e.source) && !idSet.has(e.target)),
             drawings: (b.drawings ?? []).filter((s) => !s.anchor || !idSet.has(s.anchor)),
+            // Kommentar-Pins hängen an der Karte — mit ihr verschwinden sie (M148)
+            comments: (b.comments ?? []).filter((c) => !idSet.has(c.nodeId)),
           }));
           set({ lastDeleted: { boardId: board.id, nodes: removedNodes, edges: removedEdges, drawings: removedDrawings } });
           get().showToast(
