@@ -192,11 +192,15 @@ function baseNodeText(node: AppNode): string {
       return `Bereich: ${node.data.name}`;
     case 'week': {
       const w = node.data;
-      const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+      const cols = w.cols?.length ? w.cols : ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].slice(0, w.days === 7 ? 7 : 5);
       const fmt = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+      const slotName = (m: number) => w.slots?.[m / 60] ?? `Zeile ${m / 60 + 1}`;
+      const when = (e: { start: number; dur: number }) => w.axis === 'slots'
+        ? (e.dur <= 60 ? slotName(e.start) : `${slotName(e.start)}–${slotName(e.start + e.dur - 60)}`)
+        : `${fmt(e.start)}-${fmt(e.start + e.dur)}`;
       const rows = [...w.entries]
         .sort((a, b) => a.day - b.day || a.start - b.start)
-        .map((e) => `${days[e.day] ?? '?'} ${fmt(e.start)}-${fmt(e.start + e.dur)} ${e.text}`);
+        .map((e) => `${cols[e.day] ?? '?'} ${when(e)} ${e.text}${e.who ? ` (${e.who})` : ''}`);
       return `${w.title}\n${rows.join('\n')}`;
     }
     default:
@@ -245,11 +249,16 @@ export function nodeToHtml(node: AppNode): string {
     case 'week': {
       const w = node.data;
       const dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+      const cols = w.cols?.length ? w.cols : dayNames.slice(0, w.days === 7 ? 7 : 5);
       const fmt = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
-      const perDay = dayNames.slice(0, w.days === 7 ? 7 : 5).map((name, day) => {
+      const slotName = (m: number) => w.slots?.[m / 60] ?? `Zeile ${m / 60 + 1}`;
+      const when = (e: { start: number; dur: number }) => w.axis === 'slots'
+        ? (e.dur <= 60 ? slotName(e.start) : `${slotName(e.start)}–${slotName(e.start + e.dur - 60)}`)
+        : `${fmt(e.start)}–${fmt(e.start + e.dur)}`;
+      const perDay = cols.map((name, day) => {
         const items = [...w.entries].filter((e) => e.day === day).sort((a, b) => a.start - b.start)
-          .map((e) => `<li>${fmt(e.start)}–${fmt(e.start + e.dur)} ${esc(e.text)}</li>`).join('');
-        return items ? `<h4>${name}</h4><ul>${items}</ul>` : '';
+          .map((e) => `<li>${esc(when(e))} ${esc(e.text)}${e.who ? ` <i>(${esc(e.who)})</i>` : ''}</li>`).join('');
+        return items ? `<h4>${esc(name)}</h4><ul>${items}</ul>` : '';
       }).join('');
       return `<h3>${esc(w.title)}</h3>${perDay || '<p>—</p>'}`;
     }

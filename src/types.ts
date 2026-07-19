@@ -181,24 +181,32 @@ export type CalendarNode = Node<CalendarData, 'calendar'>;
  *  Dienstplan & Co. ab. */
 export interface WeekEntry {
   id: string;
-  /** 0 = Montag … 6 = Sonntag */
+  /** Spalten-Index (bei Wochentagen: 0 = Montag … 6 = Sonntag) */
   day: number;
-  /** Beginn in Minuten seit Mitternacht */
+  /** Beginn in Minuten seit Mitternacht (bei eigenen Zeilen: Zeilen-Index × 60) */
   start: number;
-  /** Dauer in Minuten */
+  /** Dauer in Minuten (bei eigenen Zeilen: Zeilen-Anzahl × 60) */
   dur: number;
   text: string;
   /** Index in die Farb-Palette der Karte */
   color?: number;
+  /** Optionales Label je Block (Person, Raum, Gruppe …) — als Badge (M154) */
+  who?: string;
 }
 export interface WeekData {
   title: string;
-  /** 5 = Mo–Fr, 7 = Mo–So */
+  /** 5 = Mo–Fr, 7 = Mo–So (nur ohne freie Spalten relevant) */
   days: number;
   /** Raster-Beginn/-Ende in Minuten (z. B. 480 = 8:00) */
   from: number;
   to: number;
   entries: WeekEntry[];
+  /** M154: FREIE Spalten-Labels (Personen, Räume, Phasen …) — überschreibt days */
+  cols?: string[];
+  /** M154: Zeilen-Achse — 'time' = Uhrzeit, 'slots' = eigene Einheiten */
+  axis?: 'time' | 'slots';
+  /** M154: eigene Zeilen-Labels (Schulstunden, Schichten, Sprints …) */
+  slots?: string[];
   [key: string]: unknown;
 }
 export type WeekNode = Node<WeekData, 'week'>;
