@@ -71,8 +71,25 @@ export function LabeledEdge({
   // Direktweg FREMDE Karten, weicht die Kante mit einem Bogen darum aus.
   const allNodes = useBoard((s) => selectActiveBoard(s).nodes);
   const allEdges = useBoard((s) => selectActiveBoard(s).edges);
-  const routed = (() => {
+  // M136/M137 — EINE Geometrie für alle Kurven-Kanten (Profi-Tool-Stil wie
+  // Miro/Lucidchart): kurzer GERADER Stummel senkrecht aus dem Konnektor,
+  // weiche kubische Kurve, GERADER Einlauf in den Ziel-Konnektor. Hindernis-
+  // Ausweichen und Parallel-Auffächern (M132) verschieben dabei nur noch die
+  // Kurvenmitte seitlich — Aus- und Einlauf bleiben IMMER senkrecht.
+  const geo = (() => {
     if (kind === 'step') return null; // Winkel-Route bleibt bewusst rechtwinklig
+    const dist = Math.hypot(tx - sx, ty - sy);
+    if (dist < 4) return null;
+    const normal = (p: typeof sPos): [number, number] =>
+      p === 'left' ? [-1, 0] : p === 'right' ? [1, 0] : p === 'top' ? [0, -1] : [0, 1];
+    const [nsx, nsy] = normal(sPos);
+    const [ntx, nty] = normal(tPos);
+    const stub = Math.min(22, dist / 4);
+    // Moderate Biegung — harmonischer Schwung statt weiter Bögen
+    const bend = Math.min(110, Math.max(30, dist * 0.22));
+    const ax = sx + nsx * stub, ay = sy + nsy * stub;
+    const bx = tx + ntx * stub, by = ty + nty * stub;
+
     // Parallel-Auffächerung: stabile Reihenfolge über sortierte Kanten-IDs
     const siblings = allEdges
       .filter((e) => (e.source === source && e.target === target) || (e.source === target && e.target === source))
@@ -83,64 +100,47 @@ export function LabeledEdge({
     const obstacles = allNodes
       .filter((n) => n.id !== source && n.id !== target && !n.archived)
       .map(rectOf);
-    const mx = (sx + tx) / 2, my = (sy + ty) / 2;
-    const len = Math.hypot(tx - sx, ty - sy) || 1;
-    const nx = -(ty - sy) / len, ny = (tx - sx) / len; // Normale zum Direktweg
-    /** Prüft die Quad-Bezier-Kurve mit Mittel-Versatz o auf Karten-Treffer */
+    const mnx = -(ty - sy) / dist, mny = (tx - sx) / dist; // Normale zum Direktweg
+    // Versatz o der Kurvenmitte → Kontrollpunkte (Mitte einer Kubik wandert
+    // um 0,75·d, wenn beide Kontrollpunkte um d verschoben werden)
+    const ctrl = (o: number) => {
+      const d = (o * 4) / 3;
+      return {
+        c1x: ax + nsx * bend + mnx * d, c1y: ay + nsy * bend + mny * d,
+        c2x: bx + ntx * bend + mnx * d, c2y: by + nty * bend + mny * d,
+      };
+    };
     const blockedAt = (o: number): boolean => {
-      const cx = mx + nx * 2 * o, cy = my + ny * 2 * o;
+      const c = ctrl(o);
       for (let i = 1; i < 16; i++) {
         const t = i / 16;
-        const px = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * cx + t * t * tx;
-        const py = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * cy + t * t * ty;
+        const u = 1 - t;
+        const px = u * u * u * ax + 3 * u * u * t * c.c1x + 3 * u * t * t * c.c2x + t * t * t * bx;
+        const py = u * u * u * ay + 3 * u * u * t * c.c1y + 3 * u * t * t * c.c2y + t * t * t * by;
         if (obstacles.some((r) => px > r.x1 && px < r.x2 && py > r.y1 && py < r.y2)) return true;
       }
       return false;
     };
     let off = pShift;
     if (blockedAt(off)) {
-      let found = false;
       for (const m of [70, 120, 180, 240]) {
-        for (const s of [1, -1]) {
-          if (!blockedAt(pShift + s * m)) { off = pShift + s * m; found = true; break; }
-        }
-        if (found) break;
+        const cand = [pShift + m, pShift - m].find((o) => !blockedAt(o));
+        if (cand !== undefined) { off = cand; break; }
       }
-      if (!found && pShift === 0) return null; // kein freier Bogen → Direktweg wie bisher
     }
-    if (off === 0) return null; // Direktweg ist frei → hübsche Standard-Bezier
-    const cx = mx + nx * 2 * off, cy = my + ny * 2 * off;
-    return { path: `M ${sx},${sy} Q ${cx},${cy} ${tx},${ty}`, lx: mx + nx * off, ly: my + ny * off };
+    const c = ctrl(off);
+    return {
+      path: `M ${sx},${sy} L ${ax},${ay} C ${c.c1x},${c.c1y} ${c.c2x},${c.c2y} ${bx},${by} L ${tx},${ty}`,
+      lx: (ax + 3 * c.c1x + 3 * c.c2x + bx) / 8,
+      ly: (ay + 3 * c.c1y + 3 * c.c2y + by) / 8,
+    };
   })();
 
-  // M136 (Profi-Tool-Stil wie Miro/Lucidchart): Die Linie verlässt den
-  // Konnektor erst mit einem kurzen GERADEN Stummel senkrecht zur Kartenseite,
-  // schwingt dann in einer weichen Kurve und läuft wieder GERADE in den
-  // Ziel-Konnektor ein — so sitzt auch die Pfeilspitze senkrecht auf der Seite.
-  const [edgePath, labelX, labelY] = routed
-    ? [routed.path, routed.lx, routed.ly]
+  const [edgePath, labelX, labelY] = geo
+    ? [geo.path, geo.lx, geo.ly]
     : kind === 'step'
       ? getSmoothStepPath({ sourceX: sx, sourceY: sy, sourcePosition: sPos, targetX: tx, targetY: ty, targetPosition: tPos })
-      : (() => {
-          const normal = (p: typeof sPos): [number, number] =>
-            p === 'left' ? [-1, 0] : p === 'right' ? [1, 0] : p === 'top' ? [0, -1] : [0, 1];
-          const [nsx, nsy] = normal(sPos);
-          const [ntx, nty] = normal(tPos);
-          const dist = Math.hypot(tx - sx, ty - sy);
-          if (dist < 4) return getStraightPath({ sourceX: sx, sourceY: sy, targetX: tx, targetY: ty });
-          const stub = Math.min(22, dist / 4);
-          // Moderate Biegung — harmonischer Schwung statt weiter Bögen
-          const bend = Math.min(110, Math.max(30, dist * 0.22));
-          const ax = sx + nsx * stub, ay = sy + nsy * stub;
-          const bx = tx + ntx * stub, by = ty + nty * stub;
-          const c1x = ax + nsx * bend, c1y = ay + nsy * bend;
-          const c2x = bx + ntx * bend, c2y = by + nty * bend;
-          return [
-            `M ${sx},${sy} L ${ax},${ay} C ${c1x},${c1y} ${c2x},${c2y} ${bx},${by} L ${tx},${ty}`,
-            (ax + 3 * c1x + 3 * c2x + bx) / 8,
-            (ay + 3 * c1y + 3 * c2y + by) / 8,
-          ] as [string, number, number];
-        })();
+      : getStraightPath({ sourceX: sx, sourceY: sy, targetX: tx, targetY: ty });
 
   const stroke = selected ? 'var(--accent)' : 'var(--edge)'; // theme-sensitiv (hell/dunkel)
   const marker = kind === 'line'
