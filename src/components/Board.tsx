@@ -11,7 +11,7 @@ import {
   type Node,
   type NodeTypes,
 } from '@xyflow/react';
-import { selectActiveBoard, useBoard } from '../store';
+import { mutedHistory, selectActiveBoard, useBoard } from '../store';
 import { computePush } from '../lib/physics';
 import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from '../lib/parseEmail';
 import { imageFileToDataUrl, readFileAsDataUrl } from '../lib/image';
@@ -29,6 +29,7 @@ import { ShapeCard } from './nodes/ShapeCard';
 import { MermaidCard } from './nodes/MermaidCard';
 import { GanttCard } from './nodes/GanttCard';
 import { CalendarCard } from './nodes/CalendarCard';
+import { FrameCard } from './nodes/FrameCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { DrawingLayer } from './DrawingLayer';
 import { CommentLayer } from './CommentLayer';
@@ -45,6 +46,7 @@ const nodeTypes: NodeTypes = {
   mermaid: MermaidCard,
   gantt: GanttCard,
   calendar: CalendarCard,
+  frame: FrameCard,
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
@@ -331,6 +333,7 @@ export function Board() {
     for (const other of all) {
       if (other.id === mover.id || dragTrack.current?.id === other.id) continue;
       if ((other as AppNode).archived) continue; // Archivierte stehen still (meist unsichtbar)
+      if (other.type === 'frame') continue; // Rahmen sind Hintergrund — keine Verdrängung (M149)
       const push = computePush(mr, nodeRect(other), PUSH_GAP);
       if (!push) continue;
       const v = vels.current.get(other.id) ?? { vx: 0, vy: 0 };
@@ -388,7 +391,30 @@ export function Board() {
     if (el) el.style.setProperty('--tilt', `${deg.toFixed(2)}deg`);
   };
 
+  // Frame-Mitzug (M149): Beim Greifen eines Rahmens werden alle Karten
+  // eingesammelt, deren MITTELPUNKT im Rahmen liegt — sie folgen dem Rahmen
+  // dann live mit jedem Drag-Delta (eine History-Stufe, keine Physik).
+  const frameDrag = useRef<{ id: string; ids: string[]; x: number; y: number } | null>(null);
+
   const onNodeDragStart = useCallback((_: unknown, node: Node) => {
+    if (node.type === 'frame') {
+      const all = selectActiveBoard(useBoard.getState()).nodes;
+      const fw = node.measured?.width ?? 640;
+      const fh = node.measured?.height ?? 420;
+      const ids = all
+        .filter((n) => {
+          if (n.id === node.id || n.type === 'frame' || n.archived) return false;
+          const w = n.measured?.width ?? 260;
+          const h = n.measured?.height ?? 160;
+          const cx = n.position.x + w / 2;
+          const cy = n.position.y + h / 2;
+          return cx >= node.position.x && cx <= node.position.x + fw && cy >= node.position.y && cy <= node.position.y + fh;
+        })
+        .map((n) => n.id);
+      frameDrag.current = { id: node.id, ids, x: node.position.x, y: node.position.y };
+      useBoard.getState().pushHistory();
+      return;
+    }
     vels.current.delete(node.id); // gegriffene Karte gehorcht der Maus, nicht der Physik
     dragTrack.current = { id: node.id, x: node.position.x, y: node.position.y, t: performance.now(), vx: 0, vy: 0 };
   }, []);
@@ -472,6 +498,23 @@ export function Board() {
   }, []);
 
   const onNodeDrag = useCallback((_: unknown, node: Node) => {
+    if (node.type === 'frame') {
+      const fd = frameDrag.current;
+      if (fd && fd.id === node.id) {
+        const dx = node.position.x - fd.x;
+        const dy = node.position.y - fd.y;
+        fd.x = node.position.x;
+        fd.y = node.position.y;
+        if ((dx || dy) && fd.ids.length > 0) {
+          const st = useBoard.getState();
+          const moves = selectActiveBoard(st).nodes
+            .filter((n) => fd.ids.includes(n.id))
+            .map((n) => [n.id, n.position.x + dx, n.position.y + dy] as [string, number, number]);
+          mutedHistory(() => st.setNodePositions(moves)); // eine History-Stufe: der pushHistory vom Drag-Start
+        }
+      }
+      return; // Rahmen kennen weder Physik noch Neigung
+    }
     const track = dragTrack.current;
     if (!track || track.id !== node.id) return;
     const now = performance.now();
@@ -494,6 +537,7 @@ export function Board() {
 
   const onNodeDragStop = useCallback(
     (_: unknown, node: Node) => {
+      if (node.type === 'frame') { frameDrag.current = null; return; }
       const track = dragTrack.current;
       setTilt(node.id, 0);
       if (!track || track.id !== node.id) return;

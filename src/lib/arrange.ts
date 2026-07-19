@@ -525,7 +525,8 @@ export function findFreeSpot(
   gap = 48,
 ): { x: number; y: number } {
   const rects = existing
-    .filter((n) => !n.archived)
+    // Rahmen zählen nicht als Hindernis — IN einen Frame legen ist erwünscht (M149)
+    .filter((n) => !n.archived && n.type !== 'frame')
     .map((n) => { const s = sizeOf(n); return { x: n.position.x, y: n.position.y, w: s.w, h: s.h }; });
   const collides = (x: number, y: number) => rects.some((r) =>
     x < r.x + r.w + gap && x + size.w + gap > r.x && y < r.y + r.h + gap && y + size.h + gap > r.y);
@@ -547,7 +548,9 @@ export function findFreeSpot(
 }
 
 /** Komplettes Board anordnen → Ziel-Positionen [id, x, y] */
-export function computeArrangement(nodes: AppNode[], edges: Edge[], mode: ArrangeMode = 'flow'): Array<[string, number, number]> {
+export function computeArrangement(allNodes: AppNode[], edges: Edge[], mode: ArrangeMode = 'flow'): Array<[string, number, number]> {
+  // Rahmen (M149) werden vom Aufräumen NIE bewegt — sie sind Hintergrund-Struktur
+  const nodes = allNodes.filter((n) => n.type !== 'frame');
   if (nodes.length === 0) return [];
   if (mode === 'flowV') {
     return computeArrangement(nodes.map(transposeNode), edges, 'flow').map(([id, x, y]) => [id, y, x]);

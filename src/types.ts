@@ -176,8 +176,18 @@ export interface CalendarData {
 }
 export type CalendarNode = Node<CalendarData, 'calendar'>;
 
+/** Frame (M149): benannter Rahmen-Bereich, der Karten optisch gruppiert und
+ *  beim Verschieben (am Titel gefasst) seinen Inhalt mitnimmt */
+export interface FrameData {
+  name: string;
+  /** Pastell-Tönung (Hex) — fehlt ⇒ neutral */
+  color?: string;
+  [key: string]: unknown;
+}
+export type FrameNode = Node<FrameData, 'frame'>;
+
 export type AppNode =
-  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode)
+  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode)
   // Archiv (M87): Karten jedes Typs lassen sich als Ganzes „erledigt" ablegen —
   // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface.
   // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der

@@ -54,7 +54,7 @@ export function findAnchorNode(points: [number, number][], nodes: AppNode[]): Ap
   let best: AppNode | null = null;
   let bestArea = 0;
   for (const n of nodes) {
-    if (n.archived) continue;
+    if (n.archived || n.type === 'frame') continue; // Rahmen ankern keine Striche (M149)
     const a = overlapArea(sr, nodeRect(n));
     if (a > bestArea) { bestArea = a; best = n; }
   }
@@ -129,7 +129,7 @@ export function integrateStroke(
   let best: AppNode | null = null;
   let bestArea = 0;
   for (const n of nodes) {
-    if (n.archived) continue;
+    if (n.archived || n.type === 'frame') continue; // Rahmen ankern keine Striche (M149)
     const nr = nodeRect(n);
     const a = allBoxes.reduce((sum, r) => sum + overlapArea(r, nr), 0);
     if (a > bestArea) { bestArea = a; best = n; }

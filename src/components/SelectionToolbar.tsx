@@ -36,7 +36,10 @@ export function SelectionToolbar() {
   const [attrVal, setAttrVal] = useState('');
   const [cmd, setCmd] = useState('');
 
-  const selected = board.nodes.filter((n) => n.selected);
+  // Rahmen (M149) haben ihre EIGENE Titel-Leiste — die Auswahl-Leiste würde
+  // sie nur überdecken, und ihre Aktionen (KI, Archiv, Kommentar …) passen
+  // nicht zu einem Hintergrund-Bereich
+  const selected = board.nodes.filter((n) => n.selected && n.type !== 'frame');
   // Geankerte Markierungen (M127) der ausgewählten Karten — bei Bedarf lösbar
   const anchoredCount = (board.drawings ?? []).filter(
     (s) => s.anchor && selected.some((n) => n.id === s.anchor),

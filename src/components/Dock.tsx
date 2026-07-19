@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
-import { makeCalendar, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape } from '../lib/nodes';
+import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape } from '../lib/nodes';
 import { collectTasks } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
@@ -11,7 +11,7 @@ import { uid, type AppNode, type ShapeKind } from '../types';
 import { computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
   IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
-  IFolder, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMousePointer, INote,
+  IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMousePointer, INote,
   IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, IWand, IX,
 } from './Icons';
 
@@ -209,6 +209,12 @@ export function Dock() {
               <ICalendar size={16} /> Tagesnotiz
             </button>
             <button onClick={() => add(() => makeKanban(centerPos(420, 200)))}><IKanban size={16} /> Kanban-Board</button>
+            <button
+              onClick={() => add(() => makeFrame(centerPos(640, 420)))}
+              title="Benannter Rahmen-Bereich: gruppiert Karten optisch und nimmt sie beim Verschieben (an der Titel-Leiste) mit"
+            >
+              <IFrame size={16} /> Rahmen (Bereich)
+            </button>
             <div className="dock-menu-label">Planung</div>
             <button onClick={() => add(() => makeGantt(centerPos(560, 240)))}><IGantt size={16} /> Zeitplan (Gantt)</button>
             <button onClick={() => add(() => makeCalendar(centerPos(430, 340)))}><ICalendar size={16} /> Kalender (Monat)</button>

@@ -1169,6 +1169,7 @@ export const useBoard = create<BoardState>()(
           const board = get().boards.find((b) => b.id === get().activeId);
           const node = board?.nodes.find((n) => n.id === id);
           if (!board || !node) return;
+          if (node.type === 'frame') return; // Rahmen bleiben IMMER Hintergrund (M149)
           // zIndex statt Array-Umsortierung: das DOM-Element bleibt an Ort und
           // Stelle, sonst verlöre der Notiz-Editor beim Anklicken den Fokus.
           // Kein pushHistory — das Anfassen ist eine implizite Geste, kein Edit.

@@ -81,6 +81,21 @@ export function makePortal(position: Pos): AppNode {
   return { id: uid(), type: 'portal', width: CARD_WIDTHS.portal, position, data: {} };
 }
 
+/** Frame (M149): startet großzügig, liegt IMMER hinter den Karten und wird
+ *  nur an der Titel-Leiste gezogen (dragHandle) — Klicks auf der Fläche
+ *  innerhalb des Rahmens erreichen weiter das Board */
+export function makeFrame(position: Pos, name = 'Neuer Bereich'): AppNode {
+  return {
+    id: uid(),
+    type: 'frame',
+    width: 640,
+    height: 420,
+    position,
+    dragHandle: '.frame-head',
+    data: { name },
+  };
+}
+
 export function makeShape(position: Pos, shape: ShapeKind = 'process'): AppNode {
   return {
     id: uid(),

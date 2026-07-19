@@ -188,6 +188,8 @@ function baseNodeText(node: AppNode): string {
       return `Kalender (Monatsansicht${node.data.month ? ` ${node.data.month}` : ''})`;
     case 'portal':
       return 'Projekt-Portal';
+    case 'frame':
+      return `Bereich: ${node.data.name}`;
     default:
       return '';
   }
@@ -228,6 +230,9 @@ export function nodeToHtml(node: AppNode): string {
     }
     case 'mermaid':
       return `<pre style="background:#faf8f3;border-radius:8px;padding:10px;font-size:13px;overflow:auto">${esc(node.data.code)}</pre>`;
+    case 'frame':
+      // Abschnitts-Folie im Presenter: der Rahmen-Name als Zwischentitel
+      return `<h2 style="text-align:center;margin-top:1.4em">${esc(node.data.name)}</h2>`;
     default:
       return `<p style="white-space:pre-wrap">${esc(nodeToText(node))}</p>`;
   }
