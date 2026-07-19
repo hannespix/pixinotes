@@ -106,7 +106,8 @@ export function Dock() {
         setArranging(false);
         fitView({ padding: 0.12, duration: 500, maxZoom: 1 });
         const msg = {
-          flow: 'Verbundenes als Fluss, Rest nach Modultyp gruppiert',
+          flow: 'Verbundenes als Fluss (links → rechts), Rest nach Modultyp gruppiert',
+          flowV: 'Verbundenes als Fluss (oben ↓ unten), Rest nach Modultyp gruppiert',
           grid: 'Themen-Cluster bleiben zusammen, Rest als Raster nach Modultyp',
           circles: 'Themen-Cluster als Kreis-Bündel (Titel in der Mitte)',
           stack: 'Stapel je Themen-Cluster & Modultyp (Physik ist jetzt AUS, damit nichts auseinanderrutscht)',
@@ -320,7 +321,8 @@ export function Dock() {
         {arrangeMenu && (
           <div className="dock-menu dock-menu-arrange">
             <div className="dock-menu-label">Anordnungs-Modus</div>
-            <button onClick={() => arrange('flow')} title="Verbundene Karten als Prozess von links nach rechts, der Rest als Typ-Gruppen">🌊 Fluss &amp; Gruppen</button>
+            <button onClick={() => arrange('flow')} title="Verbundene Karten als Prozess von links nach rechts, der Rest als Typ-Gruppen">🌊 Fluss → horizontal</button>
+            <button onClick={() => arrange('flowV')} title="Verbundene Karten als Prozess von oben nach unten, der Rest als Typ-Gruppen">🌊 Fluss ↓ vertikal</button>
             <button onClick={() => arrange('grid')} title="Alles in ein sauberes Raster, sortiert nach Modultyp">▦ Raster</button>
             <button onClick={() => arrange('circles')} title="Zusammenhängendes und Typ-Gruppen jeweils als Kreis-Bündel">◎ Kreis-Bündel</button>
             <button onClick={() => arrange('stack')} title="Karten pro Modultyp überlappend stapeln — Überschriften bleiben sichtbar; Physik wird dafür ausgeschaltet">🗂 Stapeln (überlappend)</button>

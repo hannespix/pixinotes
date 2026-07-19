@@ -362,7 +362,23 @@ function layoutStack(group: AppNode[]): Block {
   return { w: maxW, h: (sorted.length - 1) * STEP_Y + last.h, nodes };
 }
 
-export type ArrangeMode = 'flow' | 'grid' | 'circles' | 'stack';
+export type ArrangeMode = 'flow' | 'flowV' | 'grid' | 'circles' | 'stack';
+
+/**
+ * Vertikaler Fluss (M141): derselbe Schichten-Algorithmus, nur transponiert —
+ * die Karten werden mit vertauschten Achsen layoutet (Spalten → Zeilen,
+ * Anbau rechts statt unten) und das Ergebnis zurückgetauscht.
+ */
+function transposeNode(n: AppNode): AppNode {
+  const s = sizeOf(n);
+  return {
+    ...n,
+    position: { x: n.position.y, y: n.position.x },
+    width: s.h,
+    height: s.w,
+    measured: { width: s.h, height: s.w },
+  } as AppNode;
+}
 
 /**
  * Freien Platz für eine neue Karte suchen (M130): Wunschposition behalten,
@@ -401,6 +417,9 @@ export function findFreeSpot(
 /** Komplettes Board anordnen → Ziel-Positionen [id, x, y] */
 export function computeArrangement(nodes: AppNode[], edges: Edge[], mode: ArrangeMode = 'flow'): Array<[string, number, number]> {
   if (nodes.length === 0) return [];
+  if (mode === 'flowV') {
+    return computeArrangement(nodes.map(transposeNode), edges, 'flow').map(([id, x, y]) => [id, y, x]);
+  }
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const comps = components(nodes, edges);
 

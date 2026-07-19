@@ -206,7 +206,7 @@ export function HelpOverlay() {
               <ul>
                 <li>Karte anklicken/antippen — dann erscheinen die <b>＋-Verbindungspunkte</b> an den Rändern. Von dort ziehen und auf einer beliebigen Stelle der Zielkarte loslassen; während des Ziehens leuchten die Anschlüsse aller Karten als Ziele auf, die Verbindung dockt automatisch an der besten Seite an.</li>
                 <li>Klick auf die Linie: <b>Label</b> vergeben (z. B. „blockiert") oder Pfeilart wechseln. Entf löscht (Strg+Z holt zurück).</li>
-                <li><b>🧹 Aufräumen</b> ordnet das Board: Verbundenes wird als Fluss von links nach rechts gelegt, der Rest nach Modultyp gruppiert — mit Morph-Animation, ein Strg+Z stellt alles wieder her.</li>
+                <li><b>🧹 Aufräumen</b> ordnet das Board: Verbundenes wird als Fluss gelegt — wahlweise <b>→ horizontal</b> (links nach rechts) oder <b>↓ vertikal</b> (oben nach unten) —, der Rest nach Modultyp gruppiert; mit Morph-Animation, ein Strg+Z stellt alles wieder her. Doppelte Verbindungen werden dabei automatisch zusammengefasst.</li>
                 <li><b>▶ Präsentation:</b> jede Karte wird zur Folie, <b>live editierbar</b>. Die Reihenfolge folgt den Verbindungen; ▶ auf Kacheln/Portalen startet direkt beim jeweiligen Board.</li>
               </ul>
             </section>
