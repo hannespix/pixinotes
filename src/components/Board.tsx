@@ -12,6 +12,7 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import { mutedHistory, selectActiveBoard, useBoard } from '../store';
+import { frameMembers } from '../lib/arrange';
 import { computePush } from '../lib/physics';
 import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from '../lib/parseEmail';
 import { imageFileToDataUrl, readFileAsDataUrl } from '../lib/image';
@@ -399,18 +400,9 @@ export function Board() {
   const onNodeDragStart = useCallback((_: unknown, node: Node) => {
     if (node.type === 'frame') {
       const all = selectActiveBoard(useBoard.getState()).nodes;
-      const fw = node.measured?.width ?? 640;
-      const fh = node.measured?.height ?? 420;
-      const ids = all
-        .filter((n) => {
-          if (n.id === node.id || n.type === 'frame' || n.archived) return false;
-          const w = n.measured?.width ?? 260;
-          const h = n.measured?.height ?? 160;
-          const cx = n.position.x + w / 2;
-          const cy = n.position.y + h / 2;
-          return cx >= node.position.x && cx <= node.position.x + fw && cy >= node.position.y && cy <= node.position.y + fh;
-        })
-        .map((n) => n.id);
+      // Mitglieder inkl. verschachtelter (kleinerer) Rahmen — deren Karten
+      // liegen ohnehin im äußeren Rahmen und bewegen sich genau EINMAL (M150)
+      const ids = frameMembers(node as AppNode, all, true).map((n) => n.id);
       frameDrag.current = { id: node.id, ids, x: node.position.x, y: node.position.y };
       useBoard.getState().pushHistory();
       return;

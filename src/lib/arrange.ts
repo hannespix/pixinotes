@@ -547,18 +547,93 @@ export function findFreeSpot(
   return desired;
 }
 
-/** Komplettes Board anordnen → Ziel-Positionen [id, x, y] */
-export function computeArrangement(allNodes: AppNode[], edges: Edge[], mode: ArrangeMode = 'flow'): Array<[string, number, number]> {
-  // Rahmen (M149) werden vom Aufräumen NIE bewegt — sie sind Hintergrund-Struktur
-  const nodes = allNodes.filter((n) => n.type !== 'frame');
+/** Mitglieder eines Rahmens (M150): alle Karten, deren MITTELPUNKT im Rahmen
+ *  liegt — sie gelten als „eingefangen" und wandern mit dem Rahmen mit.
+ *  includeFrames: auch KLEINERE Rahmen einsammeln (verschachtelte Bereiche). */
+export function frameMembers(frame: AppNode, nodes: AppNode[], includeFrames = false): AppNode[] {
+  const fs = sizeOf(frame);
+  const fArea = fs.w * fs.h;
+  return nodes.filter((n) => {
+    if (n.id === frame.id || n.archived) return false;
+    if (n.type === 'frame') {
+      if (!includeFrames) return false;
+      const os = sizeOf(n);
+      if (os.w * os.h >= fArea) return false; // nur kleinere Rahmen sind Mitglieder
+    }
+    const s = sizeOf(n);
+    const cx = n.position.x + s.w / 2;
+    const cy = n.position.y + s.h / 2;
+    return cx >= frame.position.x && cx <= frame.position.x + fs.w
+      && cy >= frame.position.y && cy <= frame.position.y + fs.h;
+  });
+}
+
+/** Komplettes Board anordnen → Ziel-Positionen [id, x, y].
+ *  framesAsUnits (M150): Rahmen gelten SAMT Inhalt als EIN Modul — die innere
+ *  Anordnung bleibt exakt erhalten, nur der Rahmen als Ganzes wird platziert. */
+export function computeArrangement(allNodes: AppNode[], edges: Edge[], mode: ArrangeMode = 'flow', framesAsUnits = true): Array<[string, number, number]> {
+  const frames = allNodes.filter((n) => n.type === 'frame');
+  if (framesAsUnits && frames.length > 0) {
+    // Jede Karte gehört zum KLEINSTEN Rahmen, der ihren Mittelpunkt enthält;
+    // kleinere Rahmen gehören zu größeren (verschachtelte Bereiche)
+    const memberOf = new Map<string, string>();
+    for (const n of allNodes) {
+      if (n.archived) continue;
+      let best: AppNode | null = null;
+      let bestArea = Infinity;
+      for (const f of frames) {
+        if (f.id === n.id) continue;
+        const fs = sizeOf(f);
+        const area = fs.w * fs.h;
+        if (n.type === 'frame') {
+          const os = sizeOf(n);
+          if (os.w * os.h >= area) continue;
+        }
+        const s = sizeOf(n);
+        const cx = n.position.x + s.w / 2;
+        const cy = n.position.y + s.h / 2;
+        const inside = cx >= f.position.x && cx <= f.position.x + fs.w && cy >= f.position.y && cy <= f.position.y + fs.h;
+        if (inside && area < bestArea) { best = f; bestArea = area; }
+      }
+      if (best) memberOf.set(n.id, best.id);
+    }
+    // Oberste Einheit jeder Karte (Rahmen-Kette nach oben verfolgen)
+    const topOf = (id: string): string => {
+      let cur = id;
+      const seen = new Set<string>();
+      while (memberOf.has(cur) && !seen.has(cur)) { seen.add(cur); cur = memberOf.get(cur)!; }
+      return cur;
+    };
+    // Nur die obersten Einheiten layouten; Verbindungen von Mitgliedern zählen
+    // für ihren Rahmen (so ordnen sich verbundene Rahmen sinnvoll zueinander)
+    const virtual = allNodes.filter((n) => !memberOf.has(n.id));
+    const vEdges = edges
+      .map((e) => ({ ...e, source: topOf(e.source), target: topOf(e.target) }))
+      .filter((e) => e.source !== e.target) as Edge[];
+    const placed = computeArrangement(virtual, vEdges, mode, false);
+    const delta = new Map<string, { dx: number; dy: number }>();
+    const posOf = new Map(allNodes.map((n) => [n.id, n.position]));
+    for (const [id, x, y] of placed) {
+      const p = posOf.get(id);
+      if (p) delta.set(id, { dx: x - p.x, dy: y - p.y });
+    }
+    const out = [...placed];
+    for (const n of allNodes) {
+      if (!memberOf.has(n.id)) continue;
+      const d = delta.get(topOf(n.id));
+      if (d) out.push([n.id, n.position.x + d.dx, n.position.y + d.dy] as [string, number, number]);
+    }
+    return out;
+  }
+  const nodes = allNodes; // framesAsUnits=false: Rahmen laufen als normale (große) Module mit
   if (nodes.length === 0) return [];
   if (mode === 'flowV') {
-    return computeArrangement(nodes.map(transposeNode), edges, 'flow').map(([id, x, y]) => [id, y, x]);
+    return computeArrangement(nodes.map(transposeNode), edges, 'flow', false).map(([id, x, y]) => [id, y, x]);
   }
   // Metro-Grid (M142): Fluss-Layout, auf ein 40-px-Raster gerastet — zusammen
   // mit Winkel-Kanten (setzt der Aufräumen-Knopf) entsteht der U-Bahn-Plan-Look
   if (mode === 'metro') {
-    return computeArrangement(nodes, edges, 'flow').map(([id, x, y]) => [id, Math.round(x / 40) * 40, Math.round(y / 40) * 40]);
+    return computeArrangement(nodes, edges, 'flow', false).map(([id, x, y]) => [id, Math.round(x / 40) * 40, Math.round(y / 40) * 40]);
   }
   if (mode === 'lanes') return arrangeLanes(nodes).moves;
   if (mode === 'timeline') return arrangeTimeline(nodes);

@@ -119,7 +119,8 @@ export function LabeledEdge({
     const pShift = siblings.length > 1 ? (siblings.indexOf(id) - (siblings.length - 1) / 2) * 26 : 0;
 
     const obstacles = allNodes
-      .filter((n) => n.id !== source && n.id !== target && !n.archived)
+      // Rahmen sind Hintergrund-Flächen — Kanten dürfen ruhig darüberlaufen (M150)
+      .filter((n) => n.id !== source && n.id !== target && !n.archived && n.type !== 'frame')
       .map(rectOf);
     const mnx = -(ty - sy) / dist, mny = (tx - sx) / dist; // Normale zum Direktweg
     // M138/M139: Basis ist EINE einzige Kubik mit Tangenten senkrecht zur

@@ -1086,6 +1086,13 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* Rahmen liegen IMMER hinter den Karten — auch ausgewählt (React Flow setzt
    inline z-Indizes, deshalb !important) */
 .react-flow__node:has(> .frame-wrap) { z-index: -5 !important; }
+/* Fläche WIRKLICH durchklick-transparent (M150): nur Titel-Leiste, Konnektoren
+   und Resize-Griffe fangen Zeiger-Ereignisse — Doppelklick/Auswahl/Pan wirken
+   im Rahmen weiter aufs Board */
+.react-flow__node:has(> .frame-wrap) { pointer-events: none !important; }
+.react-flow__node:has(> .frame-wrap) .frame-head,
+.react-flow__node:has(> .frame-wrap) .pn-handle,
+.react-flow__node:has(> .frame-wrap) .react-flow__resize-control { pointer-events: all; }
 .frame-wrap { width: 100%; height: 100%; position: relative; }
 .frame-body {
   position: absolute; inset: 0; border-radius: 14px;
@@ -1107,12 +1114,35 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   border: none; outline: none; background: transparent; font-family: inherit;
   font-size: 12px; font-weight: 700; color: var(--ink); width: 160px;
 }
-.frame-tools { display: inline-flex; gap: 2px; }
+.frame-tools { display: inline-flex; gap: 2px; position: relative; }
 .frame-tools button {
   border: none; background: none; cursor: pointer; color: var(--muted);
   padding: 2px 3px; border-radius: 5px; line-height: 0;
 }
-.frame-tools button:hover { background: var(--surface-2); color: var(--ink); }
+.frame-tools button:hover, .frame-tools button.on { background: var(--surface-2); color: var(--ink); }
+/* Mitglieder-Zähler: macht sichtbar, dass die Karten „eingefangen" sind (M150) */
+.frame-count {
+  background: var(--surface-dim); color: var(--muted); border-radius: 999px;
+  font-size: 9.5px; font-weight: 700; min-width: 16px; height: 15px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+/* Anordnen-Menü NUR für den Rahmen-Inhalt (M150) */
+.frame-menu {
+  position: absolute; top: 24px; right: -6px; z-index: 30; min-width: 170px;
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: 11px;
+  box-shadow: 0 6px 24px rgba(50, 40, 20, 0.2); padding: 5px; cursor: default;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.frame-menu button {
+  display: flex; align-items: center; justify-content: flex-start; gap: 8px;
+  width: 100%; border: none; background: none; cursor: pointer; color: var(--ink);
+  font-family: inherit; font-size: 12.5px; padding: 6px 9px; border-radius: 7px;
+  text-align: left; line-height: 1.2;
+}
+.frame-menu button:hover { background: var(--surface-2); }
+.frame-menu button svg { flex: 0 0 auto; color: var(--muted); }
+/* Verbindungspunkte des Rahmens: nur bei Auswahl/Hover sichtbar (wie Karten) */
+.frame-handle { pointer-events: all; }
 
 /* ---------- Kommentar-Pins & -Panel (M148) ---------- */
 .comment-pin {

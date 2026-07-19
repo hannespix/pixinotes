@@ -1,24 +1,43 @@
-import { useState } from 'react';
-import { NodeResizer, type NodeProps } from '@xyflow/react';
-import { useBoard } from '../../store';
+import { useRef, useState } from 'react';
+import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
+import { mutedHistory, selectActiveBoard, useBoard } from '../../store';
 import type { FrameNode } from '../../types';
-import { IPalette, IX } from '../Icons';
+import { computeArrangement, frameMembers, sizeOf, type ArrangeMode } from '../../lib/arrange';
+import { useOutsideClose } from '../../lib/useOutsideClose';
+import { IArrange, ICompact, IFlowH, IFlowV, IGridLayout, IPalette, IX } from '../Icons';
 
 /** Pastell-Tönungen für Rahmen — bewusst blass, der Inhalt bleibt der Star */
 const FRAME_COLORS = ['', '#dbe7f6', '#dcedde', '#f6ead2', '#f4dde3', '#e6def4'];
 
+/** Innenabstände beim Anordnen im Rahmen */
+const PAD = 30;
+const HEAD_CLEAR = 46;
+
 /**
- * Frame (M149): benannter Rahmen-Bereich à la Miro. Liegt hinter allen Karten,
- * wird NUR an der Titel-Leiste gezogen (dragHandle) und nimmt dabei alle
- * Karten mit, deren Mittelpunkt im Rahmen liegt (Logik in Board.tsx).
- * Die Fläche selbst ist durchklick-transparent — Pan/Auswahl/Doppelklick
- * funktionieren im Rahmen weiter wie auf freiem Board.
+ * Frame (M149/M150): benannter Rahmen-Bereich à la Miro. Liegt hinter allen
+ * Karten, wird NUR an der Titel-Leiste gezogen und nimmt dabei seine
+ * Mitglieder mit (Mittelpunkt-Regel, Logik in Board.tsx). Seit M150 eine
+ * echte Struktur-Ebene: eigenes Anordnen-Menü NUR für den Inhalt (der Rahmen
+ * wächst bei Bedarf mit), Verbindungspunkte an den Seiten (Rahmen lassen sich
+ * wie Module verbinden), und das Board-Aufräumen behandelt Rahmen+Inhalt als
+ * EIN Modul.
  */
 export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const removeNode = useBoard((s) => s.removeNode);
+  const showToast = useBoard((s) => s.showToast);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const [menu, setMenu] = useState(false);
+  const menuRef = useRef<HTMLElement | null>(null);
+  useOutsideClose(menu, menuRef, () => setMenu(false));
+
+  // Mitglieder-Zähler in der Titel-Leiste — macht das „Einfangen" sichtbar
+  const memberCount = useBoard((s) => {
+    const b = selectActiveBoard(s);
+    const me = b.nodes.find((n) => n.id === id);
+    return me ? frameMembers(me, b.nodes).length : 0;
+  });
 
   const tint = (data.color as string) || '';
   const commit = () => {
@@ -30,9 +49,62 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
     updateNodeData(id, { color: FRAME_COLORS[(i + 1) % FRAME_COLORS.length] });
   };
 
+  /** Nur den INHALT dieses Rahmens anordnen — alles bleibt im Rahmen,
+   *  der Rahmen wächst bei Bedarf mit (M150) */
+  const arrangeInside = (mode: ArrangeMode) => {
+    setMenu(false);
+    const st = useBoard.getState();
+    const board = selectActiveBoard(st);
+    const frame = board.nodes.find((n) => n.id === id);
+    if (!frame) return;
+    const members = frameMembers(frame, board.nodes);
+    if (members.length < 2) { showToast('Zu wenig Karten im Rahmen zum Anordnen.'); return; }
+    const memberIds = new Set(members.map((m) => m.id));
+    const innerEdges = board.edges.filter((e) => memberIds.has(e.source) && memberIds.has(e.target));
+    const targets = computeArrangement(members, innerEdges, mode);
+    // Ziel-Anordnung bündig in den Rahmen legen (unter die Titel-Leiste)
+    const sizeById = new Map(members.map((m) => [m.id, sizeOf(m)]));
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const [tid, x, y] of targets) {
+      const s = sizeById.get(tid)!;
+      minX = Math.min(minX, x); minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + s.w); maxY = Math.max(maxY, y + s.h);
+    }
+    const offX = frame.position.x + PAD - minX;
+    const offY = frame.position.y + HEAD_CLEAR - minY;
+    st.pushHistory();
+    // Rahmen wachsen lassen, falls der neue Inhalt mehr Platz braucht
+    const fs = sizeOf(frame);
+    const needW = (maxX - minX) + PAD * 2;
+    const needH = (maxY - minY) + HEAD_CLEAR + PAD;
+    if (needW > fs.w || needH > fs.h) {
+      mutedHistory(() => st.resizeNode(id, Math.max(fs.w, needW), Math.max(fs.h, needH)));
+    }
+    // Sanfter Morph an die Zielplätze (wie der Aufräumen-Knopf im Dock)
+    const starts = new Map(members.map((m) => [m.id, { x: m.position.x, y: m.position.y }]));
+    const DUR = 450;
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const t = Math.min(1, (now - t0) / DUR);
+      const k = ease(t);
+      mutedHistory(() => useBoard.getState().setNodePositions(targets.map(([tid, x, y]) => {
+        const s0 = starts.get(tid)!;
+        return [tid, s0.x + (x + offX - s0.x) * k, s0.y + (y + offY - s0.y) * k] as [string, number, number];
+      })));
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+    showToast('Rahmen-Inhalt angeordnet — Strg+Z stellt die alte Ordnung wieder her.');
+  };
+
   return (
     <div className={`frame-wrap ${selected ? 'selected' : ''}`}>
       <NodeResizer isVisible={selected} minWidth={260} minHeight={180} />
+      {/* Verbindungspunkte (M150): Rahmen lassen sich wie Module verbinden */}
+      {[Position.Top, Position.Right, Position.Bottom, Position.Left].map((pos) => (
+        <Handle key={pos} type="source" position={pos} id={pos} className="pn-handle frame-handle" />
+      ))}
       <div className="frame-head" title="Ziehen verschiebt den Rahmen SAMT Inhalt · Doppelklick benennt um">
         {editing ? (
           <input
@@ -48,8 +120,12 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
             {data.name}
           </span>
         )}
+        {memberCount > 0 && <span className="frame-count" title={`${memberCount} Karte(n) in diesem Rahmen — sie wandern mit dem Rahmen mit`}>{memberCount}</span>}
         {selected && !editing && (
-          <span className="frame-tools nodrag">
+          <span className="frame-tools nodrag" ref={menuRef as React.RefObject<HTMLSpanElement>}>
+            <button title="Nur den INHALT dieses Rahmens anordnen" className={menu ? 'on' : ''} onClick={() => setMenu((o) => !o)}>
+              <IArrange size={12} />
+            </button>
             <button title="Rahmen-Tönung wechseln" onClick={cycleColor}><IPalette size={12} /></button>
             <button
               title="Nur den Rahmen löschen — die Karten darin bleiben"
@@ -57,6 +133,14 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
             >
               <IX size={12} />
             </button>
+            {menu && (
+              <div className="frame-menu nodrag">
+                <button onClick={() => arrangeInside('flow')}><IFlowH size={14} /> Fluss horizontal</button>
+                <button onClick={() => arrangeInside('flowV')}><IFlowV size={14} /> Fluss vertikal</button>
+                <button onClick={() => arrangeInside('grid')}><IGridLayout size={14} /> Raster</button>
+                <button onClick={() => arrangeInside('compact')}><ICompact size={14} /> Kompakt packen</button>
+              </div>
+            )}
           </span>
         )}
       </div>
