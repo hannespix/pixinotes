@@ -4,7 +4,6 @@ import {
   EdgeLabelRenderer,
   getSmoothStepPath,
   getStraightPath,
-  MarkerType,
   useInternalNode,
   type EdgeProps,
 } from '@xyflow/react';
@@ -21,16 +20,22 @@ const rectOf = (n: AppNode): ORect => {
   return { x1: n.position.x - PAD, y1: n.position.y - PAD, x2: n.position.x + w + PAD, y2: n.position.y + h + PAD };
 };
 
-/** Verbindungs-Stile für Prozessdiagramme */
+/** Verbindungs-Stile für Prozessdiagramme. 'line' ist ein Altbestand
+ *  (Kurve ohne Spitze) — die Spitze ist seit M146 ein EIGENER Schalter. */
 export type EdgeKind = 'arrow' | 'line' | 'dashed' | 'step';
 
-const KIND_CYCLE: EdgeKind[] = ['arrow', 'step', 'dashed', 'line'];
+const KIND_CYCLE: EdgeKind[] = ['arrow', 'step', 'dashed'];
 const KIND_LABEL: Record<EdgeKind, string> = {
-  arrow: '→ Pfeil',
+  arrow: '→ Kurve',
   step: '⌐ Winkel',
   dashed: '⇢ gestrichelt',
-  line: '— Linie',
+  line: '→ Kurve',
 };
+
+/** Feste Verbindungs-Farben (M146) — kräftig genug für helle wie dunkle Fläche.
+ *  Die Pfeilspitzen-Marker unten sind aus DERSELBEN Liste erzeugt; ein Wert,
+ *  der hier fehlt, hätte keine passende Spitze. */
+export const EDGE_COLORS = ['#5b6470', '#4a7dbd', '#3f8a52', '#dd9a26', '#d05353', '#7d5bb8'];
 
 /**
  * Verbindung mit editierbarem Label und Stil-Umschaltung. Mitte anklicken →
@@ -43,6 +48,7 @@ export function LabeledEdge({
 }: EdgeProps) {
   const updateEdgeLabel = useBoard((s) => s.updateEdgeLabel);
   const updateEdgeKind = useBoard((s) => s.updateEdgeKind);
+  const updateEdgeStyle = useBoard((s) => s.updateEdgeStyle);
   const removeEdge = useBoard((s) => s.removeEdge);
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
@@ -51,6 +57,9 @@ export function LabeledEdge({
 
   const kind = (data?.kind as EdgeKind) ?? 'arrow';
   const label = (data?.label as string) ?? '';
+  // M146: Pfeilspitze unabhängig vom Linienstil — Altbestand 'line' hieß „ohne Spitze"
+  const head = typeof data?.head === 'boolean' ? (data.head as boolean) : kind !== 'line';
+  const custom = (data?.color as string) ?? '';
 
   // Floating: Andockpunkte aus den echten Knoten-Rechtecken berechnen — die
   // Linie tritt immer an der zugewandten Seite aus, keine Schleifen mehr.
@@ -187,10 +196,13 @@ export function LabeledEdge({
       ? getSmoothStepPath({ sourceX: sx, sourceY: sy, sourcePosition: sPos, targetX: tx, targetY: ty, targetPosition: tPos })
       : getStraightPath({ sourceX: sx, sourceY: sy, targetX: tx, targetY: ty });
 
-  const stroke = selected ? 'var(--accent)' : 'var(--edge)'; // theme-sensitiv (hell/dunkel)
-  const marker = kind === 'line'
-    ? undefined
-    : { type: MarkerType.ArrowClosed, width: 18, height: 18, color: stroke };
+  // Eigene Farbe gewinnt auch bei Auswahl (Auswahl zeigt sich dann über die
+  // dickere Linie) — ohne eigene Farbe bleibt alles theme-sensitiv wie bisher
+  const stroke = custom || (selected ? 'var(--accent)' : 'var(--edge)');
+  const colorIdx = EDGE_COLORS.indexOf(custom);
+  const markerId = custom
+    ? (colorIdx >= 0 ? `pn-arrow-c${colorIdx}` : 'pn-arrow-def')
+    : `pn-arrow-${selected ? 'sel' : 'def'}`;
 
   const commit = () => { updateEdgeLabel(id, draft.trim()); setEditing(false); };
 
@@ -199,7 +211,7 @@ export function LabeledEdge({
       <BaseEdge
         id={id}
         path={edgePath}
-        markerEnd={marker ? `url(#pn-arrow-${selected ? 'sel' : 'def'})` : undefined}
+        markerEnd={head ? `url(#${markerId})` : undefined}
         style={{
           stroke,
           strokeWidth: selected ? 2.5 : 2,
@@ -234,17 +246,56 @@ export function LabeledEdge({
             </>
           )}
         </div>
+        {/* M146: feingliedrige Optionen — nur bei ausgewählter Verbindung */}
+        {selected && !editing && (
+          <div
+            className="edge-opts nodrag nopan"
+            style={{ transform: `translate(-50%, 0) translate(${labelX}px, ${labelY + 16}px)` }}
+          >
+            <button
+              className={`edge-opt-head ${head ? 'on' : ''}`}
+              title={head ? 'Pfeilspitze AUS (schlichte Linie)' : 'Pfeilspitze AN (gerichteter Pfeil)'}
+              onClick={() => updateEdgeStyle(id, { head: !head })}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 12h13" />
+                {head && <path d="m12 6 6 6-6 6" />}
+              </svg>
+            </button>
+            <span className="edge-opt-sep" />
+            <button
+              className={`edge-color-dot default ${custom === '' ? 'on' : ''}`}
+              title="Standardfarbe (folgt Hell/Dunkel)"
+              onClick={() => updateEdgeStyle(id, { color: null })}
+            />
+            {EDGE_COLORS.map((c) => (
+              <button
+                key={c}
+                className={`edge-color-dot ${custom === c ? 'on' : ''}`}
+                style={{ background: c }}
+                title="Verbindungsfarbe"
+                onClick={() => updateEdgeStyle(id, { color: c })}
+              />
+            ))}
+          </div>
+        )}
       </EdgeLabelRenderer>
     </>
   );
 }
 
-/** SVG-Pfeilspitzen-Definitionen — einmal im Board gerendert */
+/** SVG-Pfeilspitzen-Definitionen — einmal im Board gerendert. Neben Standard
+ *  und Auswahl gibt es je Palette-Farbe (M146) eine eigene deckende Spitze. */
 export function EdgeMarkerDefs() {
+  const defs: Array<[string, string]> = [
+    ['def', 'var(--edge-head)'],
+    ['sel', 'var(--accent)'],
+    ...EDGE_COLORS.map((c, i) => [`c${i}`, c] as [string, string]),
+  ];
   return (
     <svg style={{ position: 'absolute', width: 0, height: 0 }}>
       <defs>
-        {(['def', 'sel'] as const).map((k) => (
+        {defs.map(([k, fill]) => (
           <marker
             key={k}
             id={`pn-arrow-${k}`}
@@ -257,7 +308,7 @@ export function EdgeMarkerDefs() {
           >
             {/* Deckende Füllung! Halbtransparent ließe die darunterliegende
                 Linie durchscheinen — die „transparente Spitze" aus dem User-Report */}
-            <path d="M1,1 L10,6 L1,11 Z" fill={k === 'sel' ? 'var(--accent)' : 'var(--edge-head)'} />
+            <path d="M1,1 L10,6 L1,11 Z" fill={fill} />
           </marker>
         ))}
       </defs>

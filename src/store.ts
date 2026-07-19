@@ -184,6 +184,8 @@ interface BoardState {
   addLabeledEdge: (source: string, target: string, label: string, kind?: string) => void;
   updateEdgeLabel: (id: string, label: string) => void;
   updateEdgeKind: (id: string, kind: string) => void;
+  /** M146: feingliedrige Verbindungsoptionen — Pfeilspitze an/aus, eigene Farbe */
+  updateEdgeStyle: (id: string, patch: { head?: boolean; color?: string | null }) => void;
   removeEdge: (id: string) => void;
   addNode: (node: AppNode) => void;
   /** Karte in ein BELIEBIGES Board einfügen (Schnell-Eingabe der Aufgaben-Zentrale, M114) */
@@ -1043,6 +1045,21 @@ export const useBoard = create<BoardState>()(
             edges: b.edges.map((e) =>
               e.id === id ? { ...e, data: { ...e.data, kind } } : e,
             ),
+          })),
+
+        updateEdgeStyle: (id, patch) =>
+          patchActive((b) => ({
+            edges: b.edges.map((e) => {
+              if (e.id !== id) return e;
+              const data: Record<string, unknown> = { ...e.data };
+              if (patch.head !== undefined) data.head = patch.head;
+              if (patch.color !== undefined) {
+                // null = zurück zur Standardfarbe (Schlüssel ganz entfernen)
+                if (patch.color === null) delete data.color;
+                else data.color = patch.color;
+              }
+              return { ...e, data };
+            }),
           })),
 
         removeEdge: (id) => {
