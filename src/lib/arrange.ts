@@ -8,7 +8,8 @@
 import type { Edge } from '@xyflow/react';
 import type { AppNode } from '../types';
 
-const GAP_X = 130;   // Abstand zwischen Schicht-Spalten
+const GAP_X = 100;   // Abstand zwischen Schicht-Spalten
+const ANNEX_GAP = 110; // Abstand des „Anbaus" (große Karten) unter dem Prozessband
 const GAP_Y = 56;    // Abstand zwischen Karten in einer Spalte / Rasterzeile
 const BLOCK_GAP = 170; // Abstand zwischen Blöcken (Cluster/Gruppen)
 const ROW_GAP = 190;
@@ -67,36 +68,85 @@ function components(nodes: AppNode[], edges: Edge[]): string[][] {
 }
 
 /**
- * Verbundener Cluster → Schichten-Layout nach Sugiyama-Art (M130):
- * 1. Tiefe (längster Pfad entlang der Pfeilrichtung) = Spalte.
- * 2. Kreuzungsminimierung: mehrere Barycenter-Durchläufe ordnen jede Spalte
- *    nach der mittleren Position ihrer Nachbarn in der Vorspalte (vor- und
- *    rückwärts) — das entwirrt den Großteil sich überkreuzender Linien.
- * 3. Y-Feinausrichtung: Karten rücken vertikal zu ihren Nachbarn auf, sodass
- *    Verbindungen möglichst waagerecht laufen (Überlappungen werden dabei
- *    per Mindestabstand aufgelöst).
+ * Verbundener Cluster → Schichten-Layout nach Sugiyama-Art (M130/M133):
+ * 1. „Anbau"-Trennung: Riesen-Karten (Mermaid, Kanban, Notizen …) mit wenig
+ *    Verbindungen fliegen aus dem Prozessband und kommen ausgerichtet
+ *    DARUNTER — sie blähen sonst die Spalten auf und erzwingen lange Linien.
+ * 2. Zyklus-Behandlung: Rückwärts-Kanten (Prozess-Schleifen wie „Nein →
+ *    zurück") werden per DFS erkannt und verzerren die Schichten nicht mehr.
+ * 3. Tiefe (längster Pfad im azyklischen Teil) = Spalte.
+ * 4. Kreuzungsminimierung: Barycenter-Durchläufe ordnen jede Spalte nach der
+ *    mittleren Position ihrer Nachbarn (vor- und rückwärts).
+ * 5. Y-Feinausrichtung: Karten rücken vertikal zu ihren Nachbarn auf, sodass
+ *    Verbindungen möglichst waagerecht laufen.
  */
-function layoutComponent(ids: string[], byId: Map<string, AppNode>, edges: Edge[]): Block {
-  const inComp = new Set(ids);
+function layoutComponent(allIds: string[], byId: Map<string, AppNode>, edges: Edge[]): Block {
+  const inComp = new Set(allIds);
   const compEdges = edges.filter((e) => inComp.has(e.source) && inComp.has(e.target));
 
-  // Tiefe über Longest-Path-Relaxation (Zyklen durch Pass-Limit abgefangen)
-  const depth = new Map<string, number>(ids.map((id) => [id, 0]));
-  for (let pass = 0; pass < ids.length + 1; pass++) {
-    let changed = false;
-    for (const e of compEdges) {
-      const d = depth.get(e.source)! + 1;
-      if (d > depth.get(e.target)! && d < ids.length) {
-        depth.set(e.target, d);
-        changed = true;
-      }
-    }
-    if (!changed) break;
-  }
-
-  // Ungerichtete Nachbarschaft (für Ordnung + Y-Ausrichtung)
-  const nbrs = new Map<string, string[]>(ids.map((id) => [id, []]));
+  // 1) Anbau-Trennung: groß + wenig verbunden → unter das Band
+  const degree = new Map<string, number>(allIds.map((id) => [id, 0]));
   for (const e of compEdges) {
+    degree.set(e.source, degree.get(e.source)! + 1);
+    degree.set(e.target, degree.get(e.target)! + 1);
+  }
+  const isBig = (id: string) => { const s = sizeOf(byId.get(id)!); return s.w >= 380 || s.h >= 300; };
+  let annex = allIds.filter((id) => isBig(id) && degree.get(id)! <= 2);
+  let ids = allIds.filter((id) => !annex.includes(id));
+  if (ids.length < 2) { annex = []; ids = allIds; } // reine Riesen-Cluster normal layouten
+  const coreSet = new Set(ids);
+  const coreEdges = compEdges.filter((e) => coreSet.has(e.source) && coreSet.has(e.target));
+
+  // 2+3) Feedback-Kanten (Zyklen) + Schichten: Die Leserichtung eines Kreises
+  // hängt vom DFS-Start ab — deshalb werden mehrere Startknoten durchprobiert
+  // und die Orientierung gewählt, die (a) die wenigsten Rückwärts-Kanten und
+  // (b) die längste natürliche Kette ergibt („Antrag → Prüfung → … → zurück").
+  const outAdj = new Map<string, Edge[]>(ids.map((id) => [id, []]));
+  for (const e of coreEdges) outAdj.get(e.source)!.push(e);
+  const startOrder = [...ids].sort((a, b) =>
+    byId.get(a)!.position.x - byId.get(b)!.position.x || byId.get(a)!.position.y - byId.get(b)!.position.y);
+  const layerDepths = (dag: Edge[]): Map<string, number> => {
+    const dep = new Map<string, number>(ids.map((id) => [id, 0]));
+    for (let pass = 0; pass < ids.length + 1; pass++) {
+      let changed = false;
+      for (const e of dag) {
+        const d = dep.get(e.source)! + 1;
+        if (d > dep.get(e.target)! && d < ids.length) { dep.set(e.target, d); changed = true; }
+      }
+      if (!changed) break;
+    }
+    return dep;
+  };
+  const tryStart = (cand: string): { fb: Set<Edge>; score: number } => {
+    const state = new Map<string, number>(ids.map((id) => [id, 0]));
+    const fb = new Set<Edge>();
+    const dfs = (u: string) => {
+      state.set(u, 1);
+      for (const e of outAdj.get(u)!) {
+        const s = state.get(e.target);
+        if (s === 1) fb.add(e);
+        else if (s === 0) dfs(e.target);
+      }
+      state.set(u, 2);
+    };
+    dfs(cand);
+    for (const id of startOrder) if (state.get(id) === 0) dfs(id);
+    const dep = layerDepths(coreEdges.filter((e) => !fb.has(e)));
+    const depthSum = [...dep.values()].reduce((a, b) => a + b, 0);
+    return { fb, score: depthSum - fb.size * 10_000 };
+  };
+  // Perf-Deckel: bei sehr großen Clustern nur eine Handvoll Kandidaten testen
+  const candidates = ids.length <= 40 ? startOrder : startOrder.slice(0, 12);
+  let best = tryStart(candidates[0]);
+  for (const cand of candidates.slice(1)) {
+    const t = tryStart(cand);
+    if (t.score > best.score) best = t;
+  }
+  const depth = layerDepths(coreEdges.filter((e) => !best.fb.has(e)));
+
+  // Ungerichtete Nachbarschaft (für Ordnung + Y-Ausrichtung, inkl. Schleifen)
+  const nbrs = new Map<string, string[]>(ids.map((id) => [id, []]));
+  for (const e of coreEdges) {
     nbrs.get(e.source)!.push(e.target);
     nbrs.get(e.target)!.push(e.source);
   }
@@ -193,7 +243,35 @@ function layoutComponent(ids: string[], byId: Map<string, AppNode>, edges: Edge[
     }
     x += w + GAP_X;
   }
-  return { w: x - GAP_X, h: maxY - minY, nodes };
+  const coreW = x - GAP_X;
+  const coreH = maxY - minY;
+  if (annex.length === 0) return { w: coreW, h: coreH, nodes };
+
+  // 1b) Anbau platzieren: eine Reihe UNTER dem Band, horizontal möglichst
+  // nahe an den Kern-Nachbarn (kurze, senkrechte Verbindungen)
+  const placedX = new Map(nodes.map((p) => [p.id, p.x]));
+  const centerOf = (id: string) => placedX.get(id)! + sizeOf(byId.get(id)!).w / 2;
+  const nbrsAll = new Map<string, string[]>(allIds.map((id) => [id, []]));
+  for (const e of compEdges) {
+    nbrsAll.get(e.source)!.push(e.target);
+    nbrsAll.get(e.target)!.push(e.source);
+  }
+  const desiredX = (id: string): number => {
+    const cs = nbrsAll.get(id)!.filter((n) => coreSet.has(n));
+    if (!cs.length) return 0;
+    return cs.reduce((a, n) => a + centerOf(n), 0) / cs.length;
+  };
+  const annexY = coreH + ANNEX_GAP;
+  let cursor = 0;
+  let rowH = 0;
+  for (const id of [...annex].sort((a, b) => desiredX(a) - desiredX(b))) {
+    const s = sizeOf(byId.get(id)!);
+    const ax = Math.max(cursor, desiredX(id) - s.w / 2);
+    nodes.push({ id, x: ax, y: annexY });
+    cursor = ax + s.w + GAP_Y;
+    rowH = Math.max(rowH, s.h);
+  }
+  return { w: Math.max(coreW, cursor - GAP_Y), h: annexY + rowH, nodes };
 }
 
 /** Unverbundene Karten eines Typs → kompaktes Raster (≈ 3:2-Blöcke) */
