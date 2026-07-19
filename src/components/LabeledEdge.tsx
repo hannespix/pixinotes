@@ -113,14 +113,34 @@ export function LabeledEdge({
     return { path: `M ${sx},${sy} Q ${cx},${cy} ${tx},${ty}`, lx: mx + nx * off, ly: my + ny * off };
   })();
 
-  // M135: Standard sind GERADE Linien von Konnektor zu Konnektor — kein
-  // Radius mehr beim Aus-/Einlaufen. Nur Hindernis-Ausweichen und
-  // Parallel-Auffächern (routed) biegen sanft, der ⌐-Stil bleibt rechtwinklig.
+  // M136 (Profi-Tool-Stil wie Miro/Lucidchart): Die Linie verlässt den
+  // Konnektor erst mit einem kurzen GERADEN Stummel senkrecht zur Kartenseite,
+  // schwingt dann in einer weichen Kurve und läuft wieder GERADE in den
+  // Ziel-Konnektor ein — so sitzt auch die Pfeilspitze senkrecht auf der Seite.
   const [edgePath, labelX, labelY] = routed
     ? [routed.path, routed.lx, routed.ly]
     : kind === 'step'
       ? getSmoothStepPath({ sourceX: sx, sourceY: sy, sourcePosition: sPos, targetX: tx, targetY: ty, targetPosition: tPos })
-      : getStraightPath({ sourceX: sx, sourceY: sy, targetX: tx, targetY: ty });
+      : (() => {
+          const normal = (p: typeof sPos): [number, number] =>
+            p === 'left' ? [-1, 0] : p === 'right' ? [1, 0] : p === 'top' ? [0, -1] : [0, 1];
+          const [nsx, nsy] = normal(sPos);
+          const [ntx, nty] = normal(tPos);
+          const dist = Math.hypot(tx - sx, ty - sy);
+          if (dist < 4) return getStraightPath({ sourceX: sx, sourceY: sy, targetX: tx, targetY: ty });
+          const stub = Math.min(22, dist / 4);
+          // Moderate Biegung — harmonischer Schwung statt weiter Bögen
+          const bend = Math.min(110, Math.max(30, dist * 0.22));
+          const ax = sx + nsx * stub, ay = sy + nsy * stub;
+          const bx = tx + ntx * stub, by = ty + nty * stub;
+          const c1x = ax + nsx * bend, c1y = ay + nsy * bend;
+          const c2x = bx + ntx * bend, c2y = by + nty * bend;
+          return [
+            `M ${sx},${sy} L ${ax},${ay} C ${c1x},${c1y} ${c2x},${c2y} ${bx},${by} L ${tx},${ty}`,
+            (ax + 3 * c1x + 3 * c2x + bx) / 8,
+            (ay + 3 * c1y + 3 * c2y + by) / 8,
+          ] as [string, number, number];
+        })();
 
   const stroke = selected ? 'var(--accent)' : 'var(--edge)'; // theme-sensitiv (hell/dunkel)
   const marker = kind === 'line'
