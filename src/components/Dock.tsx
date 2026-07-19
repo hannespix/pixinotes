@@ -10,8 +10,9 @@ import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
 import { computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
-  IArchive, IArrange, IBookmark, ICalendar, IDiagram, IDiamond, IEraser, IFolder, IGantt, IHighlighter, IKanban,
-  IMagnet, IMousePointer, INote, IPen, IPill, IPlay, IPlus, ISquare, ITasks, IWand, IX,
+  IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
+  IFolder, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMousePointer, INote,
+  IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, IWand, IX,
 } from './Icons';
 
 /**
@@ -302,7 +303,7 @@ export function Dock() {
               disabled={!!aiBusy || !cmd.trim()}
               onClick={() => { const wish = cmd; setCmd(''); runAi('cmd', (n, p) => aiCommand(wish, n, p), wish); }}
             >
-              ✨ Ausführen (erstellen, ändern, verbessern …)
+              <IWand size={14} /> Ausführen (erstellen, ändern, verbessern …)
             </button>
             <div className="dock-menu-label">KI-Assistent (ganzes Board)</div>
             <button disabled={!!aiBusy} onClick={() => runAi('cluster', (n) => aiCluster(n))}>Themen clustern &amp; anordnen</button>
@@ -332,16 +333,16 @@ export function Dock() {
         {arrangeMenu && (
           <div className="dock-menu dock-menu-arrange">
             <div className="dock-menu-label">Anordnungs-Modus</div>
-            <button onClick={() => arrange('flow')} title="Verbundene Karten als Prozess von links nach rechts, der Rest als Typ-Gruppen">🌊 Fluss → horizontal</button>
-            <button onClick={() => arrange('flowV')} title="Verbundene Karten als Prozess von oben nach unten, der Rest als Typ-Gruppen">🌊 Fluss ↓ vertikal</button>
-            <button onClick={() => arrange('metro')} title="Fluss-Layout auf festem Raster, alle Verbindungen rechtwinklig — U-Bahn-Plan-Look">🚇 Metro-Grid</button>
-            <button onClick={() => arrange('grid')} title="Alles in ein sauberes Raster, sortiert nach Modultyp">▦ Raster</button>
-            <button onClick={() => arrange('compact')} title="Minimale Fläche — dicht gepackt, ideal vor dem Bild-Export">🧱 Kompakt packen</button>
-            <button onClick={() => arrange('lanes')} title="Eine Bahn pro Person (Eigenschaft wer/who oder Personen aus Tickets/Zeitplänen)">🏊 Schwimmbahnen (Personen)</button>
-            <button onClick={() => arrange('timeline')} title="Karten mit Fristen chronologisch von links nach rechts, Undatiertes darunter">📅 Zeitstrahl (Fristen)</button>
-            <button onClick={() => arrange('quadrant')} title="Eisenhower: links oben wichtig+dringend · rechts oben wichtig · links unten dringend · rechts unten Rest">🎯 Quadrant (wichtig/dringend)</button>
-            <button onClick={() => arrange('circles')} title="Zusammenhängendes und Typ-Gruppen jeweils als Kreis-Bündel">◎ Kreis-Bündel</button>
-            <button onClick={() => arrange('stack')} title="Karten pro Modultyp überlappend stapeln — Überschriften bleiben sichtbar; Physik wird dafür ausgeschaltet">🗂 Stapeln (überlappend)</button>
+            <button onClick={() => arrange('flow')} title="Verbundene Karten als Prozess von links nach rechts, der Rest als Typ-Gruppen"><IFlowH size={15} /> Fluss horizontal</button>
+            <button onClick={() => arrange('flowV')} title="Verbundene Karten als Prozess von oben nach unten, der Rest als Typ-Gruppen"><IFlowV size={15} /> Fluss vertikal</button>
+            <button onClick={() => arrange('metro')} title="Fluss-Layout auf festem Raster, alle Verbindungen rechtwinklig — U-Bahn-Plan-Look"><IMetro size={15} /> Metro-Grid</button>
+            <button onClick={() => arrange('grid')} title="Alles in ein sauberes Raster, sortiert nach Modultyp"><IGridLayout size={15} /> Raster</button>
+            <button onClick={() => arrange('compact')} title="Minimale Fläche — dicht gepackt, ideal vor dem Bild-Export"><ICompact size={15} /> Kompakt packen</button>
+            <button onClick={() => arrange('lanes')} title="Eine Bahn pro Person (Eigenschaft wer/who oder Personen aus Tickets/Zeitplänen)"><ILanes size={15} /> Schwimmbahnen (Personen)</button>
+            <button onClick={() => arrange('timeline')} title="Karten mit Fristen chronologisch von links nach rechts, Undatiertes darunter"><ITimelineIcon size={15} /> Zeitstrahl (Fristen)</button>
+            <button onClick={() => arrange('quadrant')} title="Eisenhower: links oben wichtig+dringend · rechts oben wichtig · links unten dringend · rechts unten Rest"><IQuadrant size={15} /> Quadrant (wichtig/dringend)</button>
+            <button onClick={() => arrange('circles')} title="Zusammenhängendes und Typ-Gruppen jeweils als Kreis-Bündel"><ICircles size={15} /> Kreis-Bündel</button>
+            <button onClick={() => arrange('stack')} title="Karten pro Modultyp überlappend stapeln — Überschriften bleiben sichtbar; Physik wird dafür ausgeschaltet"><IStack size={15} /> Stapeln (überlappend)</button>
             <div className="dock-menu-label">Raster</div>
             <button
               className={gridSnap ? 'active' : ''}
@@ -353,7 +354,7 @@ export function Dock() {
               }}
               title="Linien-Gitter anzeigen und Karten beim Verschieben am Raster einrasten lassen"
             >
-              ⊞ Gitter &amp; Raster-Fang {gridSnap ? 'AUS' : 'AN'}
+              <IGridSnap size={15} /> Gitter &amp; Raster-Fang {gridSnap ? 'AUS' : 'AN'}
             </button>
             <div className="dock-menu-label">Board-Hintergrund</div>
             <div className="tab-bg-swatches">

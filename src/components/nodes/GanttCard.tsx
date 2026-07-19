@@ -4,7 +4,7 @@ import { useBoard } from '../../store';
 import { uid, type GanttData, type GanttNode, type GanttRow } from '../../types';
 import { collectTasks } from '../../lib/tasks';
 import {
-  IArrowDown, IArrowUp, IDownload, IPlus, ITarget, IUsers, IWand, IX, IZoomIn, IZoomOut,
+  IArrowDown, IArrowUp, IDownload, IPalette, IPlus, ITarget, IUsers, IWand, IX, IZoomIn, IZoomOut,
 } from '../Icons';
 import { CardShell } from './CardShell';
 
@@ -220,7 +220,7 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
       {sel && (
         <div className="gantt-rowbar nodrag">
           <span className="gantt-rowbar-name">{sel.name || 'Vorgang'}</span>
-          <button title="Farbe" onClick={() => patchRow(sel.id, { color: COLORS[(COLORS.indexOf(sel.color ?? COLORS[0]) + 1) % COLORS.length] })}>🎨</button>
+          <button title="Farbe" onClick={() => patchRow(sel.id, { color: COLORS[(COLORS.indexOf(sel.color ?? COLORS[0]) + 1) % COLORS.length] })}><IPalette size={13} /></button>
           <label>Fortschritt
             <select value={sel.progress ?? 0} onChange={(e) => patchRow(sel.id, { progress: Number(e.target.value) })}>
               {[0, 25, 50, 75, 100].map((p) => <option key={p} value={p}>{p}%</option>)}

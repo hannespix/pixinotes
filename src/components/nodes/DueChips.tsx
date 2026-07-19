@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { detectDates, downloadIcs, formatDue } from '../../lib/dates';
 import { useBoard } from '../../store';
+import { ICalendar } from '../Icons';
 
 /**
  * Fristen-Chips unter einer Karte: automatisch erkannte Datumsangaben
@@ -30,7 +31,7 @@ export function DueChips({ text, context }: { text: string; context: string }) {
             showToast('📅 Kalendereintrag erstellt — in Outlook öffnen und speichern');
           }}
         >
-          📅 {formatDue(d)}
+          <ICalendar size={11} /> {formatDue(d)}
         </button>
       ))}
     </div>

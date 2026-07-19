@@ -6,6 +6,7 @@ import { formatBytes } from '../../lib/parseEmail';
 import { triggerDownload } from '../../lib/download';
 import { renderPdfPage } from '../../lib/pdf';
 import { CardShell } from './CardShell';
+import { IDownload } from '../Icons';
 
 const ICONS: Record<string, string> = {
   pdf: '📕',
@@ -102,7 +103,7 @@ function PdfViewer({ dataUrl, name, onClose, onDownload }: {
             <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Vorherige Seite">‹</button>
             <span>{page} / {pages}</span>
             <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} aria-label="Nächste Seite">›</button>
-            <button onClick={onDownload} title="Herunterladen">⬇️</button>
+            <button onClick={onDownload} title="Herunterladen"><IDownload size={14} /></button>
             <button onClick={onClose} aria-label="Schließen">✕</button>
           </span>
         </div>

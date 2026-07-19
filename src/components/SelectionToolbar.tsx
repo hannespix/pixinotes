@@ -172,7 +172,7 @@ export function SelectionToolbar() {
         </span>
       )}
       {single && (
-        <button onClick={asTemplate} title="Karte als Vorlage speichern (➕-Menü → Vorlagen)"><IBookmark size={15} /></button>
+        <button onClick={asTemplate} title="Karte als Vorlage speichern (＋-Menü → Vorlagen)"><IBookmark size={15} /></button>
       )}
       {aiReady(ai) && (
         <span className="sel-ai-wrap">

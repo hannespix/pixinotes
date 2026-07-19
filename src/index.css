@@ -1050,7 +1050,10 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .dock-menu button {
   width: 100%; text-align: left; border: none; background: none; font-family: inherit;
   font-size: 13px; padding: 7px 10px; border-radius: 8px; cursor: pointer; color: var(--ink);
+  /* M144: strikt linksbündig mit Icon-Spalte — kein Zentrierungs-Eindruck mehr */
+  display: flex; align-items: center; justify-content: flex-start; gap: 9px;
 }
+.dock-menu button svg { flex: 0 0 auto; color: var(--muted); }
 .dock-menu button:hover { background: var(--surface-2); }
 .dock-menu-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 6px 10px 2px; }
 
@@ -1529,8 +1532,10 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .dock button { display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
 .dock button:hover { color: var(--ink); }
 .dock button.active { color: var(--accent); }
+/* Menü-Einträge sind Text-Zeilen, keine Werkzeug-Kacheln: das Zentrieren aus
+   ».dock button« (Zeile darüber) muss hier wieder auf linksbündig kippen */
 .dock-menu button {
-  display: flex; align-items: center; gap: 9px;
+  display: flex; align-items: center; gap: 9px; justify-content: flex-start; text-align: left;
 }
 .dock-menu button svg { color: var(--muted); flex: none; }
 .dock-menu button:hover svg { color: var(--accent); }
@@ -2193,9 +2198,13 @@ h3 { font-size: 14px; margin: 0 0 8px; }
    ohne dass das Board mitscrollt oder zoomt */
 .react-flow__node:has(.bn-suggestion-menu) { z-index: 1000 !important; }
 .note-card .bn-suggestion-menu {
-  z-index: 40; max-height: min(420px, 55vh);
+  z-index: 40; max-height: min(420px, 55vh); width: min(360px, 84vw);
   overscroll-behavior: contain; scrollbar-width: thin;
 }
+/* M144: BlockNote gibt den Einträgen eine FIXE Höhe — Titel + Beschreibung +
+   Shortcut-Badge quellen dann in den nächsten Eintrag (Overlap-Report).
+   Höhe freigeben, damit jeder Eintrag so hoch ist wie sein Inhalt. */
+.note-card .bn-suggestion-menu-item { height: auto !important; min-height: 44px; }
 
 /* ---------- Kanban: Filterleiste, Zähler & Board-Gruppen (M65) ---------- */
 .kanban-filter {

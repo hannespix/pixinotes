@@ -167,7 +167,7 @@ export function Settings() {
     saveWebdav(cfg);
     setDavCfg(cfg);
     if (state === 'vorhanden') {
-      showToast('✅ Verbunden — auf dem Server liegt bereits ein Stand. „⬇️ Vom Server laden" holt ihn.');
+      showToast('✅ Verbunden — auf dem Server liegt bereits ein Stand. „Vom Server laden" holt ihn.');
     } else {
       await webdavWrite(cfg);
       showToast('✅ Verbunden — aktueller Stand wurde hochgeladen. Änderungen syncen ab jetzt automatisch.');
@@ -305,7 +305,7 @@ export function Settings() {
 
         {/* Reiter: hält jede Ebene übersichtlich */}
         <div className="modal-tabs">
-          {([['ki', '🤖 KI'], ['sync', '☁️ Synchronisation'], ['kalender', '📅 Kalender'], ['daten', '💾 Daten'], ['export', '📤 Export'], ['design', '🎨 Design']] as const).map(([k, label]) => (
+          {([['ki', 'KI'], ['sync', 'Synchronisation'], ['kalender', 'Kalender'], ['daten', 'Daten'], ['export', 'Export'], ['design', 'Design']] as const).map(([k, label]) => (
             <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>
           ))}
         </div>
@@ -313,7 +313,7 @@ export function Settings() {
         {/* ---- KI ---- */}
         {tab === 'ki' && (
         <section className="modal-section">
-          <h3>🤖 KI-Assistent</h3>
+          <h3>KI-Assistent</h3>
           <p className="modal-hint">
             KI-Funktionen (Textpolitur, E-Mail-Zusammenfassung, Auto-Clustering) laufen über einen
             Anbieter deiner Wahl. Cloud-Dienste nutzen deinen eigenen Schlüssel; mit <b>Ollama</b> oder
@@ -384,7 +384,7 @@ export function Settings() {
         {tab === 'sync' && (
         <>
         <section className="modal-section">
-          <h3>☁️ Synchronisation (Nextcloud, OneDrive, Dropbox …)</h3>
+          <h3>Synchronisation (Nextcloud, OneDrive, Dropbox …)</h3>
           <p className="modal-hint">
             {syncSupported()
               ? <>Verbinde einen Ordner, den dein <b>Nextcloud-/OneDrive-/Dropbox-Client</b> synchronisiert — PixiNotes speichert dort automatisch eine <code>pixinotes-daten.json</code> mit allen Boards. Der Cloud-Client bringt sie auf deine anderen Geräte; dort einfach denselben Ordner verbinden. Kein Server-Setup, KI-Schlüssel bleiben lokal.</>
@@ -395,7 +395,7 @@ export function Settings() {
               <div className="modal-buttons">
                 {!syncHandle ? (
                   <button disabled={!!busy} onClick={() => doExport(connectSync, 'sync')}>
-                    {busy === 'sync' ? '…' : '📁 Sync-Ordner verbinden…'}
+                    {busy === 'sync' ? '…' : 'Sync-Ordner verbinden…'}
                   </button>
                 ) : (
                   <>
@@ -419,17 +419,17 @@ export function Settings() {
                       </button>
                     )}
                     <button disabled={!!busy} onClick={() => doExport(saveToSync, 'syncsave')}>
-                      {busy === 'syncsave' ? '…' : '⬆️ Jetzt speichern'}
+                      {busy === 'syncsave' ? '…' : 'Jetzt speichern'}
                     </button>
                     <button disabled={!!busy} onClick={() => doExport(loadFromSync, 'syncload')}>
-                      {busy === 'syncload' ? '…' : '⬇️ Vom Ordner laden'}
+                      {busy === 'syncload' ? '…' : 'Vom Ordner laden'}
                     </button>
                     <button disabled={!!busy} onClick={() => doExport(async () => {
                       await disconnectSync();
                       setSyncHandle(null);
                       showToast('Sync-Ordner getrennt — Daten bleiben lokal erhalten.');
                     }, 'syncoff')}>
-                      {busy === 'syncoff' ? '…' : '✂️ Trennen'}
+                      {busy === 'syncoff' ? '…' : 'Trennen'}
                     </button>
                   </>
                 )}
@@ -448,7 +448,7 @@ export function Settings() {
         </section>
 
         <section className="modal-section">
-          <h3>🌐 WebDAV direkt (Nextcloud, ownCloud …)</h3>
+          <h3>WebDAV direkt (Nextcloud, ownCloud …)</h3>
           <p className="modal-hint">
             Ohne Desktop-Client: PixiNotes spricht direkt mit dem WebDAV-Server — funktioniert auch am
             Tablet/Handy. Bei Nextcloud: <b>App-Passwort</b> unter Einstellungen → Sicherheit anlegen
@@ -485,16 +485,16 @@ export function Settings() {
               </label>
               <div className="modal-buttons">
                 <button disabled={!davUrl.trim() || !davUser.trim() || !davSecret || busy === 'dav'} onClick={davConnect}>
-                  {busy === 'dav' ? '…' : '🔗 Verbinden & testen'}
+                  {busy === 'dav' ? '…' : 'Verbinden & testen'}
                 </button>
               </div>
             </>
           ) : (
             <>
               <div className="modal-buttons">
-                <button disabled={!!busy} onClick={davPush}>{busy === 'davpush' ? '…' : '⬆️ Jetzt hochladen'}</button>
-                <button disabled={!!busy} onClick={davPull}>{busy === 'davpull' ? '…' : '⬇️ Vom Server laden'}</button>
-                <button disabled={!!busy} onClick={davDisconnect}>✂️ Trennen</button>
+                <button disabled={!!busy} onClick={davPush}>{busy === 'davpush' ? '…' : 'Jetzt hochladen'}</button>
+                <button disabled={!!busy} onClick={davPull}>{busy === 'davpull' ? '…' : 'Vom Server laden'}</button>
+                <button disabled={!!busy} onClick={davDisconnect}>Trennen</button>
               </div>
               <div className="modal-note">
                 ✅ Verbunden mit {davCfg.url.replace(/^https?:\/\//, '').split('/')[0]} — Änderungen werden automatisch hochgeladen
@@ -513,7 +513,7 @@ export function Settings() {
         {/* ---- Kalender-Konten: Google & Microsoft 365 direkt verbinden ---- */}
         {tab === 'kalender' && (
         <section className="modal-section">
-          <h3>📅 Kalender-Konten</h3>
+          <h3>Kalender-Konten</h3>
           <p className="modal-hint">
             Verbinde Google Kalender oder Microsoft 365/Outlook direkt — die Termine erscheinen
             (nur lesend) in den Kalender-Karten. Die Anmeldung läuft ohne PixiNotes-Server direkt
@@ -598,7 +598,7 @@ export function Settings() {
         {tab === 'daten' && (
         <>
         <section className="modal-section">
-          <h3>🧭 Starter-Umgebung „Verwaltung"</h3>
+          <h3>Starter-Umgebung „Verwaltung"</h3>
           <p className="modal-hint">
             Beispiel-Struktur mit <b>3 Bereichen, 6 Projekten und 14 Boards</b> für den Verwaltungsalltag:
             Schreibtisch, Aufgaben-Zentrale, Zeiterfassung, Dienstreise, Dienstwagen, Wissensbasis,
@@ -612,21 +612,21 @@ export function Settings() {
                 setOpen(false);
               }}
             >
-              🧭 Starter-Umgebung hinzufügen
+              Starter-Umgebung hinzufügen
             </button>
           </div>
         </section>
 
         <section className="modal-section">
-          <h3>💾 Als Datei sichern &amp; übertragen</h3>
+          <h3>Als Datei sichern &amp; übertragen</h3>
           <p className="modal-hint">
             Der einfachste Weg ohne Cloud: kompletten Stand als <code>.json</code>-Datei exportieren und
             auf dem anderen Gerät laden — per USB-Stick, Mail-Anhang oder Netzlaufwerk.
             Funktioniert in <b>jedem Browser</b>.
           </p>
           <div className="modal-buttons">
-            <button disabled={!!busy} onClick={exportStateFile}>💾 Datei exportieren</button>
-            <button disabled={!!busy} onClick={() => fileInputRef.current?.click()}>📂 Datei laden…</button>
+            <button disabled={!!busy} onClick={exportStateFile}>Datei exportieren</button>
+            <button disabled={!!busy} onClick={() => fileInputRef.current?.click()}>Datei laden…</button>
             <input
               ref={fileInputRef}
               type="file"
@@ -642,7 +642,7 @@ export function Settings() {
         </section>
 
         <section className="modal-section modal-danger">
-          <h3>🧹 Alles leeren &amp; neu starten</h3>
+          <h3>Alles leeren &amp; neu starten</h3>
           <p className="modal-hint">
             Löscht <b>alle</b> Bereiche, Projekte, Boards, Karten, Versionen und Vorlagen und startet mit
             einem leeren Board. Kein Rückgängig! KI-Einstellungen bleiben erhalten; ein verbundener
@@ -651,7 +651,7 @@ export function Settings() {
           </p>
           <div className="modal-buttons">
             <button className="danger" disabled={!!busy} onClick={() => void resetEverything()}>
-              🧹 Alles leeren…
+              Alles leeren…
             </button>
           </div>
         </section>
@@ -661,7 +661,7 @@ export function Settings() {
         {/* ---- Datenordner & Export ---- */}
         {tab === 'export' && (
         <section className="modal-section">
-          <h3>📁 Datenordner &amp; Export</h3>
+          <h3>Datenordner &amp; Export</h3>
           <p className="modal-hint">
             {hasFolderApi
               ? 'Speichere alle Boards als echte Markdown-Dateien in einem Ordner deiner Wahl (Struktur: Bereich / Projekt / Board.md) — z. B. in OneDrive, versionierbar und in Obsidian lesbar.'
@@ -672,10 +672,10 @@ export function Settings() {
               const r = await exportToFolder(spaces, boards);
               showToast(r === 'ok' ? '📁 In Ordner gespeichert' : '⬇️ Markdown-Dateien heruntergeladen');
             }, 'folder')}>
-              {busy === 'folder' ? '…' : hasFolderApi ? '📂 Ordner wählen & speichern' : '⬇️ Als Markdown exportieren'}
+              {busy === 'folder' ? '…' : hasFolderApi ? 'Ordner wählen & speichern' : 'Als Markdown exportieren'}
             </button>
           </div>
-          <h3 style={{ marginTop: 14 }}>🖼️ Bild-Export (aktuelles Board)</h3>
+          <h3 style={{ marginTop: 14 }}>Bild-Export (aktuelles Board)</h3>
           <p className="modal-hint">
             Automatisch auf den Inhalt zugeschnitten — keine leere Riesenfläche mehr. PDF: öffnet den
             Druckdialog, dort {'„Als PDF speichern"'} wählen.
@@ -722,7 +722,7 @@ export function Settings() {
               });
               showToast(expFormat === 'print' ? '🖨️ Druckdialog geöffnet — dort „Als PDF speichern"' : '⬇️ Export erstellt');
             }, 'img')}>
-              {busy === 'img' ? '…' : '⬇️ Exportieren'}
+              {busy === 'img' ? '…' : 'Exportieren'}
             </button>
           </div>
         </section>
@@ -731,7 +731,7 @@ export function Settings() {
         {/* ---- Design: Hell/Dunkel + Akzentfarbe ---- */}
         {tab === 'design' && (
         <section className="modal-section">
-          <h3>🎨 Design</h3>
+          <h3>Design</h3>
           <p className="modal-hint">
             Erscheinungsbild und Akzentfarbe gelten sofort und werden lokal gespeichert.
             „System" folgt automatisch der Hell/Dunkel-Einstellung deines Geräts.
@@ -740,9 +740,9 @@ export function Settings() {
           <label className="modal-row">
             <span>Erscheinungsbild</span>
             <select value={ui.theme} onChange={(e) => setUiTheme(e.target.value as 'system' | 'light' | 'dark')}>
-              <option value="system">🖥️ System</option>
-              <option value="light">☀️ Hell</option>
-              <option value="dark">🌙 Dunkel</option>
+              <option value="system">System</option>
+              <option value="light">Hell</option>
+              <option value="dark">Dunkel</option>
             </select>
           </label>
           <div className="modal-row">
@@ -767,7 +767,7 @@ export function Settings() {
             </div>
           </div>
 
-          <h3 style={{ marginTop: 16 }}>🖱️ Bedienung</h3>
+          <h3 style={{ marginTop: 16 }}>Bedienung</h3>
           <label className="modal-row modal-row-check">
             <span>Klick-Zoom</span>
             <input type="checkbox" checked={clickZoom} onChange={(e) => setClickZoom(e.target.checked)} />

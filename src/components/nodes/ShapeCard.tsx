@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react';
 import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { ShapeKind, ShapeNode } from '../../types';
+import { IPalette } from '../Icons';
 
 const SHAPE_COLORS = ['#eef2ff', '#e6f7ec', '#fff4e0', '#ffe9ef', '#eef7ff', '#f3eeff', '#ffffff'];
 
@@ -47,7 +48,7 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
       <button className="card-x nodrag" title="Form löschen" onClick={() => removeNode(id)}>✕</button>
       <div className="shape-toolbar nodrag">
         <button title={SHAPE_LABEL[data.shape]} onClick={cycleShape}>◇</button>
-        <button title="Farbe" onClick={cycleColor}>🎨</button>
+        <button title="Farbe" onClick={cycleColor}><IPalette size={13} /></button>
       </div>
       <div
         className="shape-body"

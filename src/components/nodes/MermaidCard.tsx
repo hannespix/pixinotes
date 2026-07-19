@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NodeToolbar, Position, type NodeProps } from '@xyflow/react';
 import { runDerived, useBoard } from '../../store';
 import type { MermaidNode } from '../../types';
+import { IWand } from '../Icons';
 import { aiReady } from '../../lib/ai';
 import { aiMermaid, buildMermaidSource, getMermaid, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES, preloadHandFont } from '../../lib/mermaid';
 import {
@@ -749,7 +750,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
                   <button className={m?.arrow.startsWith('--') ? 'active' : ''} title="Pfeil: gestrichelt (Antwort)" onClick={() => up(setSeqMsg(data.code, selOther.idx, { arrow: '-->>' }))}>┄</button>
                   <span className="mm-sep" />
                   <button title="Nachricht danach einfügen (Gegenrichtung)" onClick={() => { updateNodeData(id, { code: addSeqMsg(data.code, selOther.idx) }); }}>＋ Danach</button>
-                  <button title="Notiz unter dieser Nachricht (Note over)" onClick={() => updateNodeData(id, { code: addSeqNote(data.code, selOther.idx) })}>🗒 Notiz</button>
+                  <button title="Notiz unter dieser Nachricht (Note over)" onClick={() => updateNodeData(id, { code: addSeqNote(data.code, selOther.idx) })}>Notiz</button>
                   <button className="danger" onClick={() => { up(removeSeqMsg(data.code, selOther.idx)); setSelOther(null); }}>Entfernen</button>
                 </>
               );
@@ -973,7 +974,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
               onChange={(e) => setAiText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void runAi(); }}
             />
-            <button disabled={aiBusy || !aiText.trim()} onClick={() => void runAi()}>{aiBusy ? '…' : '✨'}</button>
+            <button disabled={aiBusy || !aiText.trim()} onClick={() => void runAi()}>{aiBusy ? '…' : <IWand size={14} />}</button>
           </div>
         )}
       </NodeToolbar>

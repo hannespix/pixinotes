@@ -9,6 +9,7 @@ import { triggerDownload } from '../../lib/download';
 import { aiReady, askAi, textToBlocks } from '../../lib/ai';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
+import { IMail, IWand } from '../Icons';
 
 const PREVIEW_CHARS = 420;
 
@@ -94,7 +95,7 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
 
   return (
     <CardShell id={id} selected={selected} minWidth={240} minHeight={140} className="email-card">
-      <h3>📧 {email.subject}</h3>
+      <h3><IMail size={14} /> {email.subject}</h3>
       <div className="email-from">
         <div className="avatar">{initials}</div>
         <div>
@@ -140,7 +141,7 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
         <button className="nodrag" onClick={reply}>↩ Antworten</button>
         {aiReady(ai) && (
           <button className="nodrag ai-btn" onClick={summarize} disabled={aiBusy} title="KI fasst die Mail als Notiz zusammen">
-            {aiBusy ? '⏳…' : '✨ Zusammenfassen'}
+            {aiBusy ? '…' : <><IWand size={13} /> Zusammenfassen</>}
           </button>
         )}
       </div>

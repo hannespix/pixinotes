@@ -84,3 +84,16 @@ export const IBookmark = make(<path d="M19 21 12 16 5 21V5a2 2 0 0 1 2-2h10a2 2 
 export const IArrange = make(<><rect width="7" height="7" x="3" y="3" rx="1.5" /><rect width="7" height="7" x="14" y="3" rx="1.5" /><rect width="7" height="7" x="3" y="14" rx="1.5" /><path d="M17.5 14.5v6" /><path d="M14.5 17.5h6" /></>);
 export const IHelp = make(<><circle cx="12" cy="12" r="9" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.4-3 4" /><path d="M12 17.5h.01" /></>);
 export const IMagnet = make(<><path d="M5 3v7a7 7 0 0 0 14 0V3" /><path d="M5 3h4v7a3 3 0 0 0 6 0V3h4" /><path d="M5 8h4" /><path d="M15 8h4" /></>);
+
+/* ---------- M144: Anordnungs- & Export-Icons (statt Emojis in Menüs) ---------- */
+export const IFlowH = make(<><path d="M3 12h14" /><path d="m12 7 5 5-5 5" /></>);
+export const IFlowV = make(<><path d="M12 3v14" /><path d="m7 12 5 5 5-5" /></>);
+export const IMetro = make(<><path d="M4 17h5l6-10h5" /><circle cx="4" cy="17" r="1.8" /><circle cx="20" cy="7" r="1.8" /></>);
+export const IGridLayout = make(<><rect x="3.5" y="3.5" width="7" height="7" rx="1" /><rect x="13.5" y="3.5" width="7" height="7" rx="1" /><rect x="3.5" y="13.5" width="7" height="7" rx="1" /><rect x="13.5" y="13.5" width="7" height="7" rx="1" /></>);
+export const ICompact = make(<><path d="m14 10 6-6" /><path d="M14 4v6h6" /><path d="m10 14-6 6" /><path d="M10 20v-6H4" /></>);
+export const ILanes = make(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9.3h18" /><path d="M3 14.6h18" /></>);
+export const ITimelineIcon = make(<><path d="M3 12h18" /><path d="M7 9.5v5" /><path d="M12 9.5v5" /><path d="M17 9.5v5" /></>);
+export const IQuadrant = make(<><rect x="3.5" y="3.5" width="17" height="17" rx="2" /><path d="M12 3.5v17" /><path d="M3.5 12h17" /></>);
+export const ICircles = make(<><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3" /></>);
+export const IStack = make(<><path d="m12 3 9 5-9 5-9-5Z" /><path d="m3 12.5 9 5 9-5" /><path d="m3 16.5 9 5 9-5" /></>);
+export const IGridSnap = make(<><rect x="3.5" y="3.5" width="17" height="17" rx="1.5" /><path d="M9.2 3.5v17" /><path d="M14.8 3.5v17" /><path d="M3.5 9.2h17" /><path d="M3.5 14.8h17" /></>);

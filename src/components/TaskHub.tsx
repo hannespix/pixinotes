@@ -490,7 +490,7 @@ export function TaskHub() {
                               className={`task-myday ${myDay.has(t.key) ? 'on' : ''}`}
                               title={myDay.has(t.key) ? 'Aus „Mein Tag" entfernen' : 'Für heute vornehmen („Mein Tag")'}
                               onClick={() => setMyDay(new Set(toggleMyDay(t.key)))}
-                            >☀ Mein Tag</button>
+                            >Mein Tag</button>
                             <span className="task-board task-board-tools">{t.boardName}</span>
                             <button className="task-jump" title="Zur Karte auf dem Board springen" onClick={() => jumpTo(t)}>↗ Karte</button>
                             <button
