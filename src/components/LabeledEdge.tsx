@@ -2,8 +2,8 @@ import { useState } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
-  getBezierPath,
   getSmoothStepPath,
+  getStraightPath,
   MarkerType,
   useInternalNode,
   type EdgeProps,
@@ -113,11 +113,14 @@ export function LabeledEdge({
     return { path: `M ${sx},${sy} Q ${cx},${cy} ${tx},${ty}`, lx: mx + nx * off, ly: my + ny * off };
   })();
 
+  // M135: Standard sind GERADE Linien von Konnektor zu Konnektor — kein
+  // Radius mehr beim Aus-/Einlaufen. Nur Hindernis-Ausweichen und
+  // Parallel-Auffächern (routed) biegen sanft, der ⌐-Stil bleibt rechtwinklig.
   const [edgePath, labelX, labelY] = routed
     ? [routed.path, routed.lx, routed.ly]
     : kind === 'step'
       ? getSmoothStepPath({ sourceX: sx, sourceY: sy, sourcePosition: sPos, targetX: tx, targetY: ty, targetPosition: tPos })
-      : getBezierPath({ sourceX: sx, sourceY: sy, sourcePosition: sPos, targetX: tx, targetY: ty, targetPosition: tPos });
+      : getStraightPath({ sourceX: sx, sourceY: sy, targetX: tx, targetY: ty });
 
   const stroke = selected ? 'var(--accent)' : 'var(--edge)'; // theme-sensitiv (hell/dunkel)
   const marker = kind === 'line'
