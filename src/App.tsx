@@ -14,6 +14,7 @@ import {
   singleWriterSupported, takeOverWriter, useBoard, type WriterRole,
 } from './store';
 import { initAutoSync } from './lib/syncFolder';
+import { initProjectAutoSync } from './lib/projectSync';
 import { initWebdavSync } from './lib/webdav';
 import { TaskHub } from './components/TaskHub';
 import { BacklinksPanel } from './components/BacklinksPanel';
@@ -32,7 +33,7 @@ export default function App() {
   const showToast = useBoard((s) => s.showToast);
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initWebdavSync(); }, []);
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); }, []);
 
   // Gesten-Spickzettel: statt Dauer-Pille im Header (kollidierte mit den
   // Bedienelementen) einmal pro Sitzung kurz als Toast beim Start

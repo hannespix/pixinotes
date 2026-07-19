@@ -45,6 +45,8 @@ export interface SyncDirHandle {
   queryPermission?(o: { mode: string }): Promise<PermissionState>;
   requestPermission?(o: { mode: string }): Promise<PermissionState>;
   getFileHandle(name: string, o?: { create?: boolean }): Promise<SyncFileHandle>;
+  /** Verzeichnis auflisten (Team-Sync M145: Projekt-Pakete im Ordner finden) */
+  values?(): AsyncIterable<{ kind: string; name: string }>;
 }
 
 export const syncSupported = (): boolean => 'showDirectoryPicker' in window;
@@ -59,7 +61,7 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-async function idbSet(key: string, value: unknown): Promise<void> {
+export async function idbSet(key: string, value: unknown): Promise<void> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction('kv', 'readwrite');
@@ -69,7 +71,7 @@ async function idbSet(key: string, value: unknown): Promise<void> {
   });
 }
 
-async function idbGet<T>(key: string): Promise<T | undefined> {
+export async function idbGet<T>(key: string): Promise<T | undefined> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const req = db.transaction('kv', 'readonly').objectStore('kv').get(key);
@@ -78,7 +80,7 @@ async function idbGet<T>(key: string): Promise<T | undefined> {
   });
 }
 
-async function idbDel(key: string): Promise<void> {
+export async function idbDel(key: string): Promise<void> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction('kv', 'readwrite');

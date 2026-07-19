@@ -145,6 +145,10 @@ interface BoardState {
   /** Kompletten Stand aus der Sync-Datei übernehmen (ersetzt Boards & Hierarchie) */
   importSync: (boards: BoardDoc[], spaces: Space[], activeId: string) => void;
 
+  /** Team-Sync (M145): EIN Projekt samt Boards aus einem Projekt-Paket übernehmen —
+   *  ersetzt nur dieses Projekt, alle anderen Bereiche/Projekte bleiben unberührt */
+  importProject: (project: { id: string; name: string }, boards: BoardDoc[]) => void;
+
   // Trilium-Paket: Board-Verlauf (Revisionen) + Karten-Vorlagen
   templates: CardTemplate[];
   saveTemplate: (node: AppNode, name: string) => void;
@@ -768,6 +772,46 @@ export const useBoard = create<BoardState>()(
             // liest Inhalt nur beim Mount) nach dem Laden den ALTEN Text und
             // würden ihn beim nächsten Tastendruck sogar zurückschreiben
             importEpoch: get().importEpoch + 1,
+          });
+        },
+
+        importProject: (proj, boards) => {
+          if (!proj?.id || !proj.name || !Array.isArray(boards) || boards.length === 0) return;
+          const s = get();
+          // Bestehendes Projekt (egal in welchem Bereich) ersetzen …
+          let oldIds: string[] = [];
+          let found = false;
+          let spaces = s.spaces.map((sp) => ({
+            ...sp,
+            projects: sp.projects.map((p) => {
+              if (p.id !== proj.id) return p;
+              found = true;
+              oldIds = p.boardIds;
+              return { ...p, name: proj.name, boardIds: boards.map((b) => b.id) };
+            }),
+          }));
+          // … oder als neues Projekt einhängen (erster Bereich; notfalls „Team" anlegen)
+          if (!found) {
+            const entry: Project = { id: proj.id, name: proj.name, boardIds: boards.map((b) => b.id) };
+            spaces = spaces.length === 0
+              ? [{ id: uid(), name: 'Team', projects: [entry] }]
+              : spaces.map((sp, i) => (i === 0 ? { ...sp, projects: [...sp.projects, entry] } : sp));
+          }
+          // Boards des Projekts komplett durch das Paket ersetzen — Boards, die das
+          // Team entfernt hat, verschwinden auch lokal; alle fremden Boards bleiben
+          const incoming = new Set(boards.map((b) => b.id));
+          const kept = s.boards.filter((b) => !incoming.has(b.id) && !oldIds.includes(b.id));
+          const nextBoards = [...kept, ...boards];
+          markImported(nextBoards, spaces);
+          set({
+            boards: nextBoards,
+            spaces,
+            activeId: nextBoards.some((b) => b.id === s.activeId) ? s.activeId : nextBoards[0].id,
+            past: [],
+            future: [],
+            lastDeleted: null,
+            pendingFocus: null,
+            importEpoch: s.importEpoch + 1,
           });
         },
 

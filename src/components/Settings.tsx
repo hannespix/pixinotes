@@ -14,6 +14,10 @@ import {
   applyWebdav, clearWebdav, loadWebdav, saveWebdav, webdavRead, webdavStamp, webdavTest, webdavWrite,
   type WebdavConfig,
 } from '../lib/webdav';
+import {
+  applyProjectPayload, buildInviteMailto, buildInviteText, connectProjectSync, disconnectProjectSync,
+  joinProjectFolder, projectHandle, projectStamp, projectSyncMeta, readProjectFile, writeProjectSync,
+} from '../lib/projectSync';
 
 const MODELS: Record<string, string[]> = {
   free: ['openai'], // anonym gibt es bei Pollinations aktuell nur dieses Modell
@@ -58,6 +62,9 @@ export function Settings() {
   const [busy, setBusy] = useState('');
   const [syncHandle, setSyncHandle] = useState<SyncDirHandle | null>(null);
   const [syncPerm, setSyncPerm] = useState<'granted' | 'prompt'>('granted');
+  // Team-Sync (M145): welche Projekte hängen an welchem Ordner (nur Namen, keine Geheimnisse)
+  const [psMeta, setPsMeta] = useState<Record<string, { folder: string }>>({});
+  useEffect(() => { if (open) setPsMeta(projectSyncMeta()); }, [open]);
   // Reiter-Gliederung: KI / Synchronisation / Daten / Export / Design
   const [tab, setTab] = useState<'ki' | 'sync' | 'kalender' | 'daten' | 'export' | 'design'>('ki');
   // Bild-Export-Optionen (M140)
@@ -221,6 +228,61 @@ export function Settings() {
     if (!syncHandle || !(await ensurePermission(syncHandle, true))) return;
     await writeSync(syncHandle);
     showToast('☁️ In den Sync-Ordner gespeichert');
+  };
+
+  // ---- Team-Sync (M145): einzelne Projekte in eigene Sync-Ordner ----
+  const psConnect = (projectId: string, projectName: string) => doExport(async () => {
+    const res = await connectProjectSync(projectId);
+    setPsMeta(projectSyncMeta());
+    if (res.state === 'vorhanden') {
+      showToast(`Im Ordner „${res.folder}" liegt bereits ein Stand von „${projectName}" — unten „Vom Ordner laden" holt ihn, „Jetzt speichern" überschreibt ihn.`);
+    } else {
+      showToast(`☁️ „${projectName}" wird jetzt nach „${res.folder}" gespiegelt — Team-Mitglieder per Einladung dazuholen.`);
+    }
+  }, `psc-${projectId}`);
+
+  const psSave = (projectId: string) => doExport(async () => {
+    const stamp = await writeProjectSync(projectId);
+    showToast(`☁️ Projekt in den Team-Ordner gespeichert (${new Date(stamp).toLocaleTimeString('de-DE')}).`);
+  }, `pss-${projectId}`);
+
+  const psLoad = (projectId: string, projectName: string) => doExport(async () => {
+    const handle = await projectHandle(projectId);
+    if (!handle || !(await ensurePermission(handle, true))) return;
+    const p = await readProjectFile(handle, projectId);
+    if (!p) { showToast('Im Team-Ordner liegt (noch) kein Paket dieses Projekts.'); return; }
+    if (!window.confirm(`Team-Stand von „${projectName}" vom ${new Date(p.savedAt).toLocaleString('de-DE')} laden? Ersetzt die Boards dieses Projekts (andere Projekte bleiben unberührt).`)) return;
+    setOpen(true, 'sync'); // Import remountet die App — Reiter beibehalten
+    if (!applyProjectPayload(p)) { showToast(QUOTA_IMPORT_MSG); return; }
+    showToast(`☁️ Team-Projekt „${p.project.name}" geladen.`);
+  }, `psl-${projectId}`);
+
+  const psOff = (projectId: string) => doExport(async () => {
+    await disconnectProjectSync(projectId);
+    setPsMeta(projectSyncMeta());
+    showToast('Team-Ordner getrennt — das Projekt bleibt lokal erhalten.');
+  }, `pso-${projectId}`);
+
+  const psJoin = () => doExport(async () => {
+    const res = await joinProjectFolder();
+    // Der Import remountet die App (importEpoch) — ohne Wunsch-Reiter landete
+    // man danach wieder auf „KI" statt in der Synchronisation
+    setOpen(true, 'sync');
+    setPsMeta(projectSyncMeta());
+    if (!res.persisted) { showToast(QUOTA_IMPORT_MSG); return; }
+    showToast(`✅ Beigetreten: ${res.names.map((n) => `„${n}"`).join(', ')} aus Ordner „${res.folder}" — Abgleich läuft ab jetzt automatisch.`);
+  }, 'psjoin');
+
+  const psInvite = (projectId: string, projectName: string) => {
+    const folder = psMeta[projectId]?.folder ?? 'Team-Ordner';
+    window.location.href = buildInviteMailto(projectName, folder);
+  };
+
+  const psCopyInvite = (projectId: string, projectName: string) => {
+    const folder = psMeta[projectId]?.folder ?? 'Team-Ordner';
+    navigator.clipboard?.writeText(buildInviteText(projectName, folder))
+      .then(() => showToast('Einladungstext kopiert — nur noch den Freigabe-Link des Ordners einfügen.'))
+      .catch(() => showToast('Kopieren nicht möglich — bitte „Einladung per E-Mail" nutzen.'));
   };
 
   // ---- Datei-Sync: funktioniert überall (Firefox, file://, USB-Stick, Mail-Anhang) ----
@@ -444,6 +506,59 @@ export function Settings() {
                 </div>
               )}
             </>
+          )}
+        </section>
+
+        <section className="modal-section">
+          <h3>Team-Sync — einzelne Projekte teilen</h3>
+          <p className="modal-hint">
+            Jedes <b>Projekt</b> kann in einen <b>eigenen</b> Sync-Ordner gespiegelt werden — so arbeitest
+            du mit mehreren Teams in einer Umgebung, ohne alles preiszugeben: Pro Team eine Ordner-Freigabe
+            (z. B. Nextcloud „Teilen"), PixiNotes legt dort ein Projekt-Paket ab und gleicht es automatisch ab.
+            <b> Wer mitarbeiten darf, regelt allein die Ordner-Freigabe</b> — Einladungen enthalten keine
+            Passwörter, und KI-Schlüssel/Zugangsdaten landen nie im Paket.
+          </p>
+          {syncSupported() ? (
+            <>
+              <div className="modal-buttons">
+                <button disabled={!!busy} onClick={psJoin} title="Einen freigegebenen Team-Ordner wählen — das darin liegende Projekt wird übernommen und ab dann automatisch abgeglichen">
+                  {busy === 'psjoin' ? '…' : 'Projekt beitreten…'}
+                </button>
+              </div>
+              <div className="psync-list">
+                {spaces.flatMap((sp) => sp.projects.map((p) => (
+                  <div className="psync-row" key={p.id}>
+                    <span className="psync-name" title={`${sp.name} › ${p.name}`}>{sp.name} › <b>{p.name}</b></span>
+                    {psMeta[p.id] ? (
+                      <>
+                        <span className="psync-status">☁ „{psMeta[p.id].folder}"{projectStamp(p.id) ? ` · ${new Date(projectStamp(p.id)!).toLocaleString('de-DE')}` : ''}</span>
+                        <span className="psync-actions">
+                          <button disabled={!!busy} onClick={() => psSave(p.id)}>{busy === `pss-${p.id}` ? '…' : 'Jetzt speichern'}</button>
+                          <button disabled={!!busy} onClick={() => psLoad(p.id, p.name)}>{busy === `psl-${p.id}` ? '…' : 'Vom Ordner laden'}</button>
+                          <button onClick={() => psInvite(p.id, p.name)} title="Öffnet eine E-Mail mit Beitritts-Anleitung — den Freigabe-Link zum Ordner fügst du selbst ein; Passwörter sind nie enthalten">Einladen…</button>
+                          <button onClick={() => psCopyInvite(p.id, p.name)} title="Einladungstext in die Zwischenablage kopieren">Text kopieren</button>
+                          <button disabled={!!busy} onClick={() => psOff(p.id)}>{busy === `pso-${p.id}` ? '…' : 'Trennen'}</button>
+                        </span>
+                      </>
+                    ) : (
+                      <span className="psync-actions">
+                        <button disabled={!!busy} onClick={() => psConnect(p.id, p.name)}>
+                          {busy === `psc-${p.id}` ? '…' : 'Mit Team-Ordner verbinden…'}
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                )))}
+              </div>
+              <div className="modal-note">
+                So funktioniert die Einladung: Ordner im Cloud-Speicher fürs Team freigeben (dort werden
+                die Rechte verwaltet) → „Einladen…" verschickt die Anleitung → die Person tritt über
+                „Projekt beitreten…" bei. Der globale Sync-Ordner oben sichert weiterhin deine GESAMTE
+                Umgebung — beide ergänzen sich.
+              </div>
+            </>
+          ) : (
+            <p className="modal-hint">Dieser Browser unterstützt keine Ordner-Anbindung (Chrome/Edge empfohlen).</p>
           )}
         </section>
 
