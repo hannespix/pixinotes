@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Handle, NodeResizer, Position } from '@xyflow/react';
 import { runDerived, useBoard } from '../../store';
 
@@ -10,13 +10,15 @@ interface Props {
   selected?: boolean;
   minWidth?: number;
   minHeight?: number;
+  /** M155: freie Farben — z. B. eigene Notiz-Tönung überschreibt die Palette */
+  style?: CSSProperties;
 }
 
 /**
  * Gemeinsame Hülle aller Karten: Lösch-Knopf, Verbindungs-Handles und
  * Resize-Griffe an Ecken/Kanten (sichtbar bei Selektion).
  */
-export function CardShell({ id, className, children, selected, minWidth = 170, minHeight = 70 }: Props) {
+export function CardShell({ id, className, children, selected, minWidth = 170, minHeight = 70, style }: Props) {
   const removeNode = useBoard((s) => s.removeNode);
   const setNodeHeight = useBoard((s) => s.setNodeHeight);
   const setAutoFit = useBoard((s) => s.setAutoFit);
@@ -228,7 +230,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
           onClick={(e) => { e.stopPropagation(); fitOnce(); }}
         >⤢</button>
       )}
-      <div ref={bodyRef} className={`card-body ${className ?? ''}`}>{children}</div>
+      <div ref={bodyRef} className={`card-body ${className ?? ''}`} style={style}>{children}</div>
     </div>
   );
 }

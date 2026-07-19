@@ -6,6 +6,8 @@ export type StickyColor = (typeof STICKY_COLORS)[number];
 
 export interface NoteData {
   color: StickyColor;
+  /** M155: freie Notiz-Farbe (Hex) — gesetzt gewinnt sie gegen die Palette */
+  hex?: string;
   /** BlockNote-Dokument (Block[] als JSON) */
   blocks?: unknown[];
   [key: string]: unknown;
@@ -190,6 +192,8 @@ export interface WeekEntry {
   text: string;
   /** Index in die Farb-Palette der Karte */
   color?: number;
+  /** M155: freie Block-Farbe (Hex) — gesetzt gewinnt sie gegen die Palette */
+  colorHex?: string;
   /** Optionales Label je Block (Person, Raum, Gruppe …) — als Badge (M154) */
   who?: string;
 }

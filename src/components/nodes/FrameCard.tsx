@@ -159,7 +159,14 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
             >
               <IArrange size={12} />
             </button>
-            <button title="Rahmen-Tönung wechseln" onClick={cycleColor}><IPalette size={12} /></button>
+            <button title="Rahmen-Tönung wechseln (Palette)" onClick={cycleColor}><IPalette size={12} /></button>
+            <input
+              type="color"
+              className="pn-colorpick nodrag"
+              title="Eigene Tönung"
+              value={tint || '#dbe7f6'}
+              onChange={(e) => updateNodeData(id, { color: e.target.value })}
+            />
             <button
               title="Nur den Rahmen löschen — die Karten darin bleiben"
               onClick={() => removeNode(id)}

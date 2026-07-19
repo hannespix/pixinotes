@@ -244,7 +244,10 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
               >
                 {dayEntries.map((en) => {
                   const l = lanes.get(en.id) ?? { lane: 0, lanes: 1 };
-                  const [bg, strong] = ENTRY_COLORS[(en.color ?? 0) % ENTRY_COLORS.length];
+                  // M155: freie Blockfarbe gewinnt gegen die Palette
+                  const [bg, strong] = en.colorHex
+                    ? [`${en.colorHex}40`, en.colorHex]
+                    : ENTRY_COLORS[(en.color ?? 0) % ENTRY_COLORS.length];
                   return (
                     <button
                       key={en.id}
@@ -343,12 +346,19 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
             {ENTRY_COLORS.map(([bg, strong], i) => (
               <button
                 key={bg}
-                className={`week-color-dot ${(popEntry.color ?? 0) === i ? 'on' : ''}`}
+                className={`week-color-dot ${!popEntry.colorHex && (popEntry.color ?? 0) === i ? 'on' : ''}`}
                 style={{ background: bg, borderColor: strong }}
-                title="Block-Farbe"
-                onClick={() => patchEntry(popEntry.id, { color: i })}
+                title="Block-Farbe (Palette)"
+                onClick={() => patchEntry(popEntry.id, { color: i, colorHex: undefined })}
               />
             ))}
+            <input
+              type="color"
+              className={`pn-colorpick ${popEntry.colorHex ? 'on' : ''}`}
+              title="Eigene Block-Farbe"
+              value={popEntry.colorHex ?? '#3c669c'}
+              onChange={(e) => patchEntry(popEntry.id, { colorHex: e.target.value })}
+            />
             <span style={{ flex: 1 }} />
             <button className="week-pop-del" title="Block löschen" onClick={() => removeEntry(popEntry.id)}><IX size={13} /></button>
           </div>

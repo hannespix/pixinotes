@@ -1147,6 +1147,24 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* Verbindungspunkte des Rahmens: nur bei Auswahl/Hover sichtbar (wie Karten) */
 .frame-handle { pointer-events: all; }
 
+/* ---------- Freier Farbwähler (M155) — überall neben den festen Paletten ---------- */
+.pn-colorpick {
+  width: 18px; height: 18px; padding: 0; border: 1.5px dashed var(--muted);
+  border-radius: 50%; background: none; cursor: pointer; flex: none;
+  -webkit-appearance: none; appearance: none; overflow: hidden;
+}
+.pn-colorpick::-webkit-color-swatch-wrapper { padding: 1px; }
+.pn-colorpick::-webkit-color-swatch { border: none; border-radius: 50%; }
+.pn-colorpick::-moz-color-swatch { border: none; border-radius: 50%; }
+.pn-colorpick.on { border-style: solid; border-color: var(--accent); }
+.pn-colorpick:hover { border-color: var(--accent-strong); }
+/* Notiz: Farbwähler neben dem Palette-Punkt, gleiche Ein-/Ausblend-Logik */
+.note-colorpick {
+  position: absolute; top: 7px; right: 28px; z-index: 6;
+  opacity: 0; transition: opacity 0.15s;
+}
+.card-shell:hover .note-colorpick, .react-flow__node.selected .note-colorpick { opacity: 1; }
+
 /* ---------- Wochenplan: Stundenraster (M153) ---------- */
 .week-card { background: var(--surface); border-radius: 14px; }
 .week-wrap { display: flex; flex-direction: column; height: 100%; padding: 10px 12px 12px; gap: 4px; }

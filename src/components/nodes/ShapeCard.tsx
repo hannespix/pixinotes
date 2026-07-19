@@ -48,7 +48,14 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
       <button className="card-x nodrag" title="Form löschen" onClick={() => removeNode(id)}>✕</button>
       <div className="shape-toolbar nodrag">
         <button title={SHAPE_LABEL[data.shape]} onClick={cycleShape}>◇</button>
-        <button title="Farbe" onClick={cycleColor}><IPalette size={13} /></button>
+        <button title="Farbe (Palette)" onClick={cycleColor}><IPalette size={13} /></button>
+        <input
+          type="color"
+          className="pn-colorpick nodrag"
+          title="Eigene Füllfarbe"
+          value={data.color}
+          onChange={(e) => updateNodeData(id, { color: e.target.value })}
+        />
       </div>
       <div
         className="shape-body"

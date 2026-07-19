@@ -47,6 +47,17 @@ const SHAPE_NAME: Record<HeadShape, string> = {
 /** Linienstärken (M147): fein / normal / kräftig */
 const WIDTHS = [1.4, 2, 3.2];
 
+/** Spitzen-Geometrie je Form — von den statischen Defs UND den dynamischen
+ *  Markern für freie Farben (M155) gemeinsam genutzt */
+export function shapeMarkerEl(shape: HeadShape, c: string) {
+  switch (shape) {
+    case 'open': return <path d="M2,1.5 L9.5,6 L2,10.5" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />;
+    case 'circle': return <circle cx="6" cy="6" r="4" fill={c} />;
+    case 'diamond': return <path d="M6,1 L11,6 L6,11 L1,6 Z" fill={c} />;
+    default: return <path d="M1,1 L10,6 L1,11 Z" fill={c} />;
+  }
+}
+
 /**
  * Verbindung mit editierbarem Label und Stil-Umschaltung. Mitte anklicken →
  * Beziehung benennen (z. B. „blockiert", „ja/nein" im Flowchart); das Stil-
@@ -215,13 +226,31 @@ export function LabeledEdge({
   // dickere Linie) — ohne eigene Farbe bleibt alles theme-sensitiv wie bisher
   const stroke = custom || (selected ? 'var(--accent)' : 'var(--edge)');
   const colorIdx = EDGE_COLORS.indexOf(custom);
+  // M155: FREIE Farbe (nicht in der Palette) → eigener Marker je Verbindung,
+  // damit die Spitze immer exakt zur Linie passt
+  const customMarker = !!custom && colorIdx < 0;
   const colorKey = custom ? (colorIdx >= 0 ? `c${colorIdx}` : 'def') : (selected ? 'sel' : 'def');
-  const markerId = `pn-${shape}-${colorKey}`;
+  const markerId = customMarker ? `pn-cust-${id}` : `pn-${shape}-${colorKey}`;
 
   const commit = () => { updateEdgeLabel(id, draft.trim()); setEditing(false); };
 
   return (
     <>
+      {customMarker && (head || headStart) && (
+        <defs>
+          <marker
+            id={`pn-cust-${id}`}
+            viewBox="0 0 12 12"
+            refX={shape === 'circle' ? 7 : 9}
+            refY="6"
+            markerWidth={shape === 'circle' || shape === 'diamond' ? 7 : 8}
+            markerHeight={shape === 'circle' || shape === 'diamond' ? 7 : 8}
+            orient="auto-start-reverse"
+          >
+            {shapeMarkerEl(shape, custom)}
+          </marker>
+        </defs>
+      )}
       <BaseEdge
         id={id}
         path={edgePath}
@@ -329,6 +358,13 @@ export function LabeledEdge({
                   onClick={() => updateEdgeStyle(id, { color: c })}
                 />
               ))}
+              <input
+                type="color"
+                className={`pn-colorpick ${customMarker ? 'on' : ''}`}
+                title="Eigene Verbindungsfarbe"
+                value={customMarker ? custom : '#5b6470'}
+                onChange={(e) => updateEdgeStyle(id, { color: e.target.value })}
+              />
             </div>
           </div>
         )}
@@ -349,14 +385,7 @@ export function EdgeMarkerDefs() {
   ];
   // Deckende Füllung! Halbtransparent ließe die darunterliegende Linie
   // durchscheinen — die „transparente Spitze" aus dem User-Report (M63)
-  const shapeEl = (shape: HeadShape, c: string) => {
-    switch (shape) {
-      case 'open': return <path d="M2,1.5 L9.5,6 L2,10.5" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />;
-      case 'circle': return <circle cx="6" cy="6" r="4" fill={c} />;
-      case 'diamond': return <path d="M6,1 L11,6 L6,11 L1,6 Z" fill={c} />;
-      default: return <path d="M1,1 L10,6 L1,11 Z" fill={c} />;
-    }
-  };
+  const shapeEl = shapeMarkerEl;
   return (
     <svg style={{ position: 'absolute', width: 0, height: 0 }}>
       <defs>

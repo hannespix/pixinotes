@@ -116,12 +116,19 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
 
   const cycleColor = () => {
     const next = STICKY_COLORS[(STICKY_COLORS.indexOf(data.color) + 1) % STICKY_COLORS.length];
-    updateNodeData(id, { color: next });
+    updateNodeData(id, { color: next, hex: undefined }); // zurück zur Palette
   };
 
   return (
-    <CardShell id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${data.color}`}>
-      <button className="color-dot nodrag" title="Farbe wechseln" onClick={cycleColor} />
+    <CardShell id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${data.color}`} style={data.hex ? { background: data.hex as string } : undefined}>
+      <button className="color-dot nodrag" title="Farbe wechseln (Palette)" onClick={cycleColor} />
+      <input
+        type="color"
+        className="pn-colorpick note-colorpick nodrag"
+        title="Eigene Farbe wählen"
+        value={(data.hex as string) ?? '#fff8c5'}
+        onChange={(e) => updateNodeData(id, { hex: e.target.value })}
+      />
       <div className="nodrag nowheel note-editor">
         <BlockNoteView
           editor={editor}

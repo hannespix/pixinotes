@@ -220,6 +220,13 @@ export function DrawingLayer() {
             aria-label={`Farbe ${c}`}
           />
         ))}
+        <input
+          type="color"
+          className="pn-colorpick nodrag"
+          title="Eigene Stiftfarbe"
+          value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#3c669c'}
+          onChange={(e) => setColor(e.target.value)}
+        />
         <span className="draw-hint">
           {tool === 'eraser' ? 'Radierer' : tool === 'marker' ? 'Textmarker' : 'Stift'}
           <span className="draw-hint-tip"> · am Ende kurz halten = Form einrasten ✨</span>
