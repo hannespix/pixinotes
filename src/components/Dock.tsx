@@ -8,7 +8,7 @@ import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
 import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
-import { computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
+import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
   IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMousePointer, INote,
@@ -61,13 +61,50 @@ export function Dock() {
     if (board.nodes.length < 2) { showToast('Zu wenig Karten zum Anordnen.'); return; }
     // Archivierte Karten bleiben liegen — sie sind meist unsichtbar und sollen
     // beim Aufräumen weder mitmischen noch heimlich verschoben werden
-    const targets = computeArrangement(board.nodes.filter((n) => !n.archived), board.edges, mode);
+    let targets: Array<[string, number, number]>;
+    // M156: Quadrant sortiert die KARTEN neu in vier benannte, umbenennbare
+    // Rahmen — Rahmen selbst bleiben außen vor (die Quadranten-Rahmen werden
+    // unten neu positioniert, fremde Rahmen stehen gelassen)
+    let qBoxes: Array<{ x: number; y: number; w: number; h: number }> | null = null;
+    if (mode === 'quadrant') {
+      const q = arrangeQuadrantFull(board.nodes.filter((n) => !n.archived && n.type !== 'frame'));
+      targets = q.moves;
+      qBoxes = q.boxes;
+    } else {
+      targets = computeArrangement(board.nodes.filter((n) => !n.archived), board.edges, mode);
+    }
     // Stapel-Modus: Physik MUSS aus, sonst drückt der nächste Drag alles wieder auseinander
     if (mode === 'stack' && useBoard.getState().physicsEnabled) {
       setPhysicsEnabled(false);
     }
     const starts = new Map(board.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]));
     st.pushHistory();
+    // M156: Quadranten-Rahmen anlegen bzw. wiederverwenden (Namen bleiben frei
+    // änderbar — beim nächsten Quadrant-Aufräumen werden sie nur neu platziert)
+    if (qBoxes) {
+      const names = ['Wichtig & dringend', 'Nur wichtig', 'Nur dringend', 'Später'];
+      const QP = 30;
+      const QH = 50;
+      mutedHistory(() => {
+        qBoxes.forEach((b, i) => {
+          const fx = b.x - QP;
+          const fy = b.y - QH;
+          const fw = b.w + QP * 2;
+          const fh = b.h + QH + QP;
+          const existing = board.nodes.find(
+            (n) => n.type === 'frame' && (n.data as { quadrant?: number }).quadrant === i + 1);
+          if (existing) {
+            st.setNodePositions([[existing.id, fx, fy]]);
+            st.resizeNode(existing.id, fw, fh);
+          } else {
+            st.addNode({
+              id: uid(), type: 'frame', width: fw, height: fh, position: { x: fx, y: fy },
+              dragHandle: '.frame-head', data: { name: names[i], quadrant: i + 1 },
+            } as AppNode);
+          }
+        });
+      });
+    }
     // M140: Doppelte Verbindungen (gleiche Richtung zwischen denselben Karten)
     // beim Aufräumen zusammenfassen — die beschriftete Fassung überlebt
     const keep = new Map<string, { id: string; hasLabel: boolean }>();
@@ -119,7 +156,7 @@ export function Dock() {
           lanes: 'Schwimmbahnen: eine Bahn pro Person, unten „Ohne Zuordnung"',
           timeline: 'Zeitstrahl: Fristen chronologisch, Undatiertes darunter',
           compact: 'Kompakt gepackt — ideal vor dem Bild-Export',
-          quadrant: 'Quadrant: ↖ wichtig+dringend · ↗ wichtig · ↙ dringend · ↘ Rest',
+          quadrant: 'Quadrant in vier benannten Rahmen (Titel per Doppelklick umbenennbar)',
           grid: 'Themen-Cluster bleiben zusammen, Rest als Raster nach Modultyp',
           circles: 'Themen-Cluster als Kreis-Bündel (Titel in der Mitte)',
           stack: 'Stapel je Themen-Cluster & Modultyp (Physik ist jetzt AUS, damit nichts auseinanderrutscht)',

@@ -464,7 +464,12 @@ function arrangeCompact(nodes: AppNode[]): Array<[string, number, number]> {
 }
 
 /** Eisenhower-Quadrant: wichtig (Prio) × dringend (Frist ≤ 7 Tage) */
-function arrangeQuadrant(nodes: AppNode[]): Array<[string, number, number]> {
+/** Quadrant mit Gruppen-Boxen (M156): liefert zusätzlich die vier Bereichs-
+ *  Rechtecke, damit das Dock benannte (umbenennbare) Rahmen darüberlegen kann */
+export function arrangeQuadrantFull(nodes: AppNode[]): {
+  moves: Array<[string, number, number]>;
+  boxes: Array<{ x: number; y: number; w: number; h: number }>;
+} {
   const soon = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
   const important = (n: AppNode): boolean => {
     const d = n.data as { attrs?: Record<string, string>; items?: Array<{ prio?: number }> } | undefined;
@@ -479,16 +484,29 @@ function arrangeQuadrant(nodes: AppNode[]): Array<[string, number, number]> {
     q[i].push(n);
   }
   const blocks = q.map((g) => (g.length ? layoutGrid(g) : { w: 0, h: 0, nodes: [] }));
-  const colW = Math.max(blocks[0].w, blocks[2].w);
-  const rowH = Math.max(blocks[0].h, blocks[1].h);
-  const at = (b: Block, ox: number, oy: number): Array<[string, number, number]> =>
-    b.nodes.map((p) => [p.id, MARGIN_X + ox + p.x, MARGIN_Y + oy + p.y]);
-  return [
-    ...at(blocks[0], 0, 0),
-    ...at(blocks[1], colW + BLOCK_GAP, 0),
-    ...at(blocks[2], 0, rowH + BLOCK_GAP),
-    ...at(blocks[3], colW + BLOCK_GAP, rowH + BLOCK_GAP),
-  ];
+  // Extra Luft zwischen den Vierteln — dort leben die Rahmen-Ränder (M156)
+  const GAPQ = BLOCK_GAP + 110;
+  const colW = Math.max(320, blocks[0].w, blocks[2].w);
+  const rowH = Math.max(220, blocks[0].h, blocks[1].h);
+  const origin = [
+    [0, 0], [colW + GAPQ, 0], [0, rowH + GAPQ], [colW + GAPQ, rowH + GAPQ],
+  ] as const;
+  const moves: Array<[string, number, number]> = [];
+  const boxes = blocks.map((b, i) => {
+    const [ox, oy] = origin[i];
+    for (const p of b.nodes) moves.push([p.id, MARGIN_X + ox + p.x, MARGIN_Y + oy + p.y]);
+    return {
+      x: MARGIN_X + ox,
+      y: MARGIN_Y + oy,
+      w: Math.max(320, i % 2 === 0 ? colW : b.w),
+      h: Math.max(220, i < 2 ? rowH : b.h),
+    };
+  });
+  return { moves, boxes };
+}
+
+function arrangeQuadrant(nodes: AppNode[]): Array<[string, number, number]> {
+  return arrangeQuadrantFull(nodes).moves;
 }
 
 /** Bahnen-Namen für den Toast der Schwimmbahnen-Anordnung */

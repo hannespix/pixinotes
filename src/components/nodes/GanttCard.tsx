@@ -126,7 +126,22 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   };
 
   const zoom = (dir: -1 | 1) =>
-    updateNodeData(id, { dayWidth: Math.max(10, Math.min(48, dw + dir * 6)) });
+    updateNodeData(id, { dayWidth: Math.max(2, Math.min(48, dw + dir * (dw <= 8 ? 2 : 6))) });
+
+  // M156: Zeit-Skala als Preset — Tage/Wochen/Monate sind nur dayWidth-Stufen,
+  // Kopfzeile und Raster passen sich automatisch an
+  const scale = dw >= 14 ? 'tage' : dw >= 4 ? 'wochen' : 'monate';
+  const setScale = (v: string) =>
+    updateNodeData(id, { dayWidth: v === 'tage' ? 24 : v === 'wochen' ? 6 : 2 });
+
+  /** ISO-Kalenderwoche (für die Wochen-Skala) */
+  const isoWeek = (dt: Date): number => {
+    const d = new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+    const day = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil(((d.getTime() - yearStart.getTime()) / DAY + 1) / 7);
+  };
 
   /** Vorgänger setzen — mit Zyklus-Schutz (A→B→A wäre Endlosschleife) */
   const setDep = (rowId: string, dep: string) => {
@@ -213,6 +228,16 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
           <button title="Konflikte auflösen (Terminkette nachziehen)" onClick={resolveConflicts}><IWand size={14} /></button>
           <button title="Nach Ressource gruppieren" onClick={groupByResource}><IUsers size={14} /></button>
           <button title="Zu heute springen" onClick={scrollToToday}><ITarget size={14} /></button>
+          <select
+            className="gantt-scale"
+            value={scale}
+            title="Zeit-Skala: Tage, Wochen oder Monate"
+            onChange={(e) => setScale(e.target.value)}
+          >
+            <option value="tage">Tage</option>
+            <option value="wochen">Wochen</option>
+            <option value="monate">Monate</option>
+          </select>
           <button title="Rauszoomen" onClick={() => zoom(-1)}><IZoomOut size={14} /></button>
           <button title="Reinzoomen" onClick={() => zoom(1)}><IZoomIn size={14} /></button>
         </div>
@@ -287,12 +312,23 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
                 <path d="M0,0 L8,4 L0,8 Z" fill="#d84b3d" />
               </marker>
             </defs>
-            {/* Wochenenden */}
-            {Array.from({ length: nDays }, (_, i) => {
+            {/* Wochenenden — bei Wochen-/Monats-Skala nur noch Rauschen */}
+            {dw >= 6 && Array.from({ length: nDays }, (_, i) => {
               const dow = new Date((minD + i) * DAY).getDay();
               return dow === 0 || dow === 6 ? (
                 <rect key={i} x={i * dw} y={HEAD_H} width={dw} height={chartH} fill="rgba(0,0,0,.045)" />
               ) : null;
+            })}
+            {/* Wochen-Raster + KW-Beschriftung (M156, Wochen-Skala) */}
+            {dw < 16 && dw >= 3 && Array.from({ length: nDays }, (_, i) => {
+              const dt = new Date((minD + i) * DAY);
+              if (dt.getDay() !== 1) return null;
+              return (
+                <g key={`w${i}`}>
+                  <line x1={i * dw} y1={HEAD_H - 4} x2={i * dw} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.07)" />
+                  {dw * 7 >= 34 && <text x={i * dw + 3} y={HEAD_H - 6} className="gantt-day">KW {isoWeek(dt)}</text>}
+                </g>
+              );
             })}
             {/* Monats-Kopf */}
             {months.map((m, i) => (
