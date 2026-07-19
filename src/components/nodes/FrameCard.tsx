@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
 import { mutedHistory, selectActiveBoard, useBoard } from '../../store';
 import type { FrameNode } from '../../types';
 import { computeArrangement, frameMembers, sizeOf, type ArrangeMode } from '../../lib/arrange';
-import { useOutsideClose } from '../../lib/useOutsideClose';
 import { IArrange, ICompact, IFlowH, IFlowV, IGridLayout, IPalette, IX } from '../Icons';
 
 /** Pastell-Tönungen für Rahmen — bewusst blass, der Inhalt bleibt der Star */
@@ -28,9 +28,19 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
   const showToast = useBoard((s) => s.showToast);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
-  const [menu, setMenu] = useState(false);
-  const menuRef = useRef<HTMLElement | null>(null);
-  useOutsideClose(menu, menuRef, () => setMenu(false));
+  // M151: Das Menü lebt als PORTAL auf oberster Ebene — im Frame-Node säße es
+  // hinter den Karten (der Rahmen liegt bewusst auf z-Index −5, User-Screenshot)
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (!menuPos) return;
+    const close = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest?.('.frame-menu') || t?.closest?.(`[data-fmbtn="${id}"]`)) return;
+      setMenuPos(null);
+    };
+    window.addEventListener('pointerdown', close, true);
+    return () => window.removeEventListener('pointerdown', close, true);
+  }, [menuPos, id]);
 
   // Mitglieder-Zähler in der Titel-Leiste — macht das „Einfangen" sichtbar
   const memberCount = useBoard((s) => {
@@ -52,7 +62,7 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
   /** Nur den INHALT dieses Rahmens anordnen — alles bleibt im Rahmen,
    *  der Rahmen wächst bei Bedarf mit (M150) */
   const arrangeInside = (mode: ArrangeMode) => {
-    setMenu(false);
+    setMenuPos(null);
     const st = useBoard.getState();
     const board = selectActiveBoard(st);
     const frame = board.nodes.find((n) => n.id === id);
@@ -122,8 +132,17 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
         )}
         {memberCount > 0 && <span className="frame-count" title={`${memberCount} Karte(n) in diesem Rahmen — sie wandern mit dem Rahmen mit`}>{memberCount}</span>}
         {selected && !editing && (
-          <span className="frame-tools nodrag" ref={menuRef as React.RefObject<HTMLSpanElement>}>
-            <button title="Nur den INHALT dieses Rahmens anordnen" className={menu ? 'on' : ''} onClick={() => setMenu((o) => !o)}>
+          <span className="frame-tools nodrag">
+            <button
+              title="Nur den INHALT dieses Rahmens anordnen"
+              className={menuPos ? 'on' : ''}
+              data-fmbtn={id}
+              onClick={(e) => {
+                if (menuPos) { setMenuPos(null); return; }
+                const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                setMenuPos({ x: Math.max(8, r.right - 180), y: r.bottom + 8 });
+              }}
+            >
               <IArrange size={12} />
             </button>
             <button title="Rahmen-Tönung wechseln" onClick={cycleColor}><IPalette size={12} /></button>
@@ -133,18 +152,19 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
             >
               <IX size={12} />
             </button>
-            {menu && (
-              <div className="frame-menu nodrag">
-                <button onClick={() => arrangeInside('flow')}><IFlowH size={14} /> Fluss horizontal</button>
-                <button onClick={() => arrangeInside('flowV')}><IFlowV size={14} /> Fluss vertikal</button>
-                <button onClick={() => arrangeInside('grid')}><IGridLayout size={14} /> Raster</button>
-                <button onClick={() => arrangeInside('compact')}><ICompact size={14} /> Kompakt packen</button>
-              </div>
-            )}
           </span>
         )}
       </div>
       <div className="frame-body" style={tint ? { background: `${tint}55` } : undefined} />
+      {menuPos && createPortal(
+        <div className="frame-menu nodrag" style={{ left: menuPos.x, top: menuPos.y }}>
+          <button onClick={() => arrangeInside('flow')}><IFlowH size={14} /> Fluss horizontal</button>
+          <button onClick={() => arrangeInside('flowV')}><IFlowV size={14} /> Fluss vertikal</button>
+          <button onClick={() => arrangeInside('grid')}><IGridLayout size={14} /> Raster</button>
+          <button onClick={() => arrangeInside('compact')}><ICompact size={14} /> Kompakt packen</button>
+        </div>,
+        document.body,
+      )}
     </div>
   );
 }

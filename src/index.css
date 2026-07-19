@@ -1126,9 +1126,10 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   font-size: 9.5px; font-weight: 700; min-width: 16px; height: 15px; padding: 0 4px;
   display: inline-flex; align-items: center; justify-content: center;
 }
-/* Anordnen-Menü NUR für den Rahmen-Inhalt (M150) */
+/* Anordnen-Menü NUR für den Rahmen-Inhalt (M150). Seit M151 ein PORTAL mit
+   fixer Position — im Frame-Node läge es hinter den Karten (z-Index −5) */
 .frame-menu {
-  position: absolute; top: 24px; right: -6px; z-index: 30; min-width: 170px;
+  position: fixed; z-index: 75; min-width: 170px;
   background: var(--surface); border: 1px solid var(--border-soft); border-radius: 11px;
   box-shadow: 0 6px 24px rgba(50, 40, 20, 0.2); padding: 5px; cursor: default;
   display: flex; flex-direction: column; gap: 2px;
