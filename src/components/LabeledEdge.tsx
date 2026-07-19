@@ -154,8 +154,11 @@ export function LabeledEdge({
     };
     let off = pShift;
     if (blockedAt(off)) {
+      // M140: bevorzugt NACH OBEN ausweichen — lange Rückläufer laufen dann
+      // als flacher Bogen ÜBER dem Prozessband statt mitten durchs Bild
+      const upFirst = mny > 0 ? -1 : 1;
       for (const m of [70, 120, 180, 240]) {
-        const cand = [pShift + m, pShift - m].find((o) => !blockedAt(o));
+        const cand = [pShift + upFirst * m, pShift - upFirst * m].find((o) => !blockedAt(o));
         if (cand !== undefined) { off = cand; break; }
       }
     }

@@ -737,7 +737,9 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .edge-label {
   position: absolute; pointer-events: all;
   display: flex; align-items: center; gap: 3px;
-  background: var(--bg); border: 1px solid var(--border-soft); border-radius: 999px;
+  /* Heller Chip mit Schatten — bleibt auch im Export auf jeder Fläche lesbar (M140) */
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(50, 40, 20, 0.12);
   padding: 2px 4px 2px 8px; font-size: 11px; color: var(--muted);
   box-shadow: 0 1px 3px var(--border); max-width: 200px;
 }

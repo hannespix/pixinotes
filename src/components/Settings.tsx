@@ -4,7 +4,7 @@ import {
   connectGoogle, connectMicrosoft, disconnect as disconnectCalAccount,
   invalidateAccountEvents, loadCalAccounts, oauthAvailable, patchCalAccounts, type CalAccounts,
 } from '../lib/calAccounts';
-import { exportToFolder, exportViewport } from '../lib/exporter';
+import { exportBoard, exportToFolder } from '../lib/exporter';
 import {
   applySync, checkSyncRemote, disconnectSync, ensurePermission, getSyncHandle, knownStamp,
   permissionState, pickSyncFolder, readSync, syncSupported, writeSync,
@@ -60,6 +60,12 @@ export function Settings() {
   const [syncPerm, setSyncPerm] = useState<'granted' | 'prompt'>('granted');
   // Reiter-Gliederung: KI / Synchronisation / Daten / Export / Design
   const [tab, setTab] = useState<'ki' | 'sync' | 'kalender' | 'daten' | 'export' | 'design'>('ki');
+  // Bild-Export-Optionen (M140)
+  const [expFormat, setExpFormat] = useState<'png' | 'svg' | 'print'>('png');
+  const [expScale, setExpScale] = useState(2);
+  const [expBg, setExpBg] = useState<'beige' | 'white' | 'transparent'>('beige');
+  const [expHeader, setExpHeader] = useState(true);
+  const [expSelOnly, setExpSelOnly] = useState(false);
   // Direktsprung auf einen Reiter (z. B. „sync" vom Status-Chip in der Kopfleiste)
   const wantTab = useBoard((s) => s.settingsSection);
   useEffect(() => {
@@ -668,14 +674,57 @@ export function Settings() {
             }, 'folder')}>
               {busy === 'folder' ? '…' : hasFolderApi ? '📂 Ordner wählen & speichern' : '⬇️ Als Markdown exportieren'}
             </button>
-            <button disabled={!!busy} onClick={() => doExport(() => exportViewport('png', activeBoard.name), 'png')}>
-              {busy === 'png' ? '…' : '🖼️ Aktuelles Board als PNG'}
-            </button>
-            <button disabled={!!busy} onClick={() => doExport(() => exportViewport('svg', activeBoard.name), 'svg')}>
-              {busy === 'svg' ? '…' : '✏️ Aktuelles Board als SVG'}
+          </div>
+          <h3 style={{ marginTop: 14 }}>🖼️ Bild-Export (aktuelles Board)</h3>
+          <p className="modal-hint">
+            Automatisch auf den Inhalt zugeschnitten — keine leere Riesenfläche mehr. PDF: öffnet den
+            Druckdialog, dort {'„Als PDF speichern"'} wählen.
+          </p>
+          <div className="modal-row export-opts">
+            <label>Format{' '}
+              <select value={expFormat} onChange={(e) => setExpFormat(e.target.value as typeof expFormat)}>
+                <option value="png">PNG</option>
+                <option value="svg">SVG (Vektor)</option>
+                <option value="print">PDF (Druckdialog)</option>
+              </select>
+            </label>
+            <label>Auflösung{' '}
+              <select value={expScale} onChange={(e) => setExpScale(Number(e.target.value))} disabled={expFormat === 'svg'}>
+                <option value={1}>1×</option>
+                <option value={2}>2×</option>
+                <option value={3}>3× (Druck)</option>
+              </select>
+            </label>
+            <label>Hintergrund{' '}
+              <select value={expBg} onChange={(e) => setExpBg(e.target.value as typeof expBg)}>
+                <option value="beige">Beige (wie Board)</option>
+                <option value="white">Weiß</option>
+                <option value="transparent">Transparent</option>
+              </select>
+            </label>
+          </div>
+          <div className="modal-row export-opts">
+            <label className="modal-row-check">
+              <input type="checkbox" checked={expHeader} onChange={(e) => setExpHeader(e.target.checked)} />
+              {' '}Kopfzeile (Board-Name + Datum)
+            </label>
+            <label className="modal-row-check">
+              <input type="checkbox" checked={expSelOnly} onChange={(e) => setExpSelOnly(e.target.checked)} />
+              {' '}Nur ausgewählte Karten
+            </label>
+          </div>
+          <div className="modal-buttons">
+            <button disabled={!!busy} onClick={() => doExport(async () => {
+              const nodes = activeBoard.nodes.filter((n) => !n.archived && (!expSelOnly || n.selected));
+              await exportBoard({
+                format: expFormat, name: activeBoard.name, nodes,
+                scale: expScale, background: expBg, header: expHeader,
+              });
+              showToast(expFormat === 'print' ? '🖨️ Druckdialog geöffnet — dort „Als PDF speichern"' : '⬇️ Export erstellt');
+            }, 'img')}>
+              {busy === 'img' ? '…' : '⬇️ Exportieren'}
             </button>
           </div>
-          <div className="modal-note">💡 Für PDF: PNG/SVG exportieren und über „Drucken → Als PDF speichern" ablegen.</div>
         </section>
         )}
 

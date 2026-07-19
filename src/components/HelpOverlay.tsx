@@ -271,7 +271,7 @@ export function HelpOverlay() {
                 <li><b>Mehrere Fenster:</b> Läuft PixiNotes doppelt (z. B. installierte App + vergessener Browser-Tab), speichert nur <b>ein</b> Fenster — die anderen lesen live mit und zeigen ein Banner mit „Hier weiterarbeiten". So kann kein altes Fenster deine Änderungen überschreiben.</li>
                 <li><b>Teilen:</b> Der ⧉-Button in der Kopfleiste kopiert einen Link, der das <b>komplette Board enthält</b> — serverlos. Große Boards werden als .pixiboard.json-Datei exportiert; Empfänger zieht sie einfach aufs Board.</li>
                 <li><b>PWA:</b> Über „App installieren" im Browser wird PixiNotes zur eigenständigen App — läuft komplett offline.</li>
-                <li><b>Export:</b> Markdown-Ordner (Obsidian-lesbar), PNG/SVG des Boards, .ics für Kalender.</li>
+                <li><b>Export:</b> Markdown-Ordner (Obsidian-lesbar), Bild-Export des Boards (PNG/SVG/PDF-Druck) — automatisch auf den Inhalt zugeschnitten, mit wählbarer Auflösung (1–3×), Hintergrund (Beige/Weiß/Transparent), Kopfzeile (Board + Datum) und optional nur der Auswahl. Dazu .ics für Kalender.</li>
                 <li><b>Frischer Start:</b> ⚙️ → Daten → „Alles leeren" (mit doppelter Bestätigung).</li>
               </ul>
             </section>

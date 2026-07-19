@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
-import { useBoard } from '../store';
+import { mutedHistory, useBoard } from '../store';
 import { makeCalendar, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape } from '../lib/nodes';
 import { collectTasks } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
@@ -67,6 +67,22 @@ export function Dock() {
     }
     const starts = new Map(board.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]));
     st.pushHistory();
+    // M140: Doppelte Verbindungen (gleiche Richtung zwischen denselben Karten)
+    // beim Aufräumen zusammenfassen — die beschriftete Fassung überlebt
+    const keep = new Map<string, { id: string; hasLabel: boolean }>();
+    const dupes: string[] = [];
+    for (const e of board.edges) {
+      const key = `${e.source}>${e.target}`;
+      const hasLabel = !!(e.data as { label?: string } | undefined)?.label;
+      const prev = keep.get(key);
+      if (!prev) keep.set(key, { id: e.id, hasLabel });
+      else if (hasLabel && !prev.hasLabel) { dupes.push(prev.id); keep.set(key, { id: e.id, hasLabel }); }
+      else dupes.push(e.id);
+    }
+    if (dupes.length) {
+      mutedHistory(() => st.onEdgesChange(dupes.map((id) => ({ type: 'remove' as const, id }))));
+      showToast(`🧹 ${dupes.length} doppelte Verbindung(en) zusammengefasst.`);
+    }
     setArranging(true);
     const DUR = 700;
     const STAGGER = 14; // ms pro Karte — wirkt organisch statt mechanisch
