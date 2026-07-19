@@ -1,38 +1,37 @@
 // Floating-Edge-Geometrie: Verbindungen docken immer an der Kartenseite an,
 // die dem anderen Knoten zugewandt ist — egal, an welchem Handle sie erstellt
-// wurden. Mathematik nach dem offiziellen React-Flow-Beispiel „Floating Edges" (MIT).
+// wurden. Seit M134 docken sie dabei GENAU an den ＋-Konnektor-Punkten
+// (Seitenmitten) an, wie man es von Visio & Co. kennt: Mehrere Pfeile auf
+// dieselbe Seite bündeln sich sauber am Konnektor, statt an beliebigen
+// Randpunkten zu zerfasern.
 import { Position, type InternalNode } from '@xyflow/react';
 
-/** Schnittpunkt der Mittellinie beider Knoten mit dem Rand von `node` */
-function getNodeIntersection(node: InternalNode, other: InternalNode): { x: number; y: number } {
-  const w = (node.measured.width ?? 0) / 2;
-  const h = (node.measured.height ?? 0) / 2;
-
-  const x2 = node.internals.positionAbsolute.x + w;
-  const y2 = node.internals.positionAbsolute.y + h;
-  const x1 = other.internals.positionAbsolute.x + (other.measured.width ?? 0) / 2;
-  const y1 = other.internals.positionAbsolute.y + (other.measured.height ?? 0) / 2;
-
-  const xx1 = (x1 - x2) / (2 * w) - (y1 - y2) / (2 * h);
-  const yy1 = (x1 - x2) / (2 * w) + (y1 - y2) / (2 * h);
-  const a = 1 / (Math.abs(xx1) + Math.abs(yy1) || 1);
-  const xx3 = a * xx1;
-  const yy3 = a * yy1;
-
-  return { x: w * (xx3 + yy3) + x2, y: h * (-xx3 + yy3) + y2 };
+/** Zugewandte Seite: dominante Richtung zur Mitte des anderen Knotens */
+function facingSide(node: InternalNode, other: InternalNode): Position {
+  const cx = node.internals.positionAbsolute.x + (node.measured.width ?? 0) / 2;
+  const cy = node.internals.positionAbsolute.y + (node.measured.height ?? 0) / 2;
+  const ox = other.internals.positionAbsolute.x + (other.measured.width ?? 0) / 2;
+  const oy = other.internals.positionAbsolute.y + (other.measured.height ?? 0) / 2;
+  const dx = ox - cx;
+  const dy = oy - cy;
+  // Leichte Bevorzugung von links/rechts: Prozesse fließen meist horizontal,
+  // und die Seiten-Konnektoren liegen dort auch optisch am natürlichsten
+  if (Math.abs(dx) * 1.15 >= Math.abs(dy)) return dx >= 0 ? Position.Right : Position.Left;
+  return dy >= 0 ? Position.Bottom : Position.Top;
 }
 
-/** Auf welcher Seite des Knotens liegt der Schnittpunkt? (steuert die Kurvenrichtung) */
-function getEdgePosition(node: InternalNode, point: { x: number; y: number }): Position {
-  const nx = Math.round(node.internals.positionAbsolute.x);
-  const ny = Math.round(node.internals.positionAbsolute.y);
-  const px = Math.round(point.x);
-  const py = Math.round(point.y);
-
-  if (px <= nx + 1) return Position.Left;
-  if (px >= nx + (node.measured.width ?? 0) - 1) return Position.Right;
-  if (py <= ny + 1) return Position.Top;
-  return Position.Bottom;
+/** ＋-Konnektor-Punkt (Seitenmitte) der gegebenen Seite */
+function sidePoint(node: InternalNode, side: Position): { x: number; y: number } {
+  const x = node.internals.positionAbsolute.x;
+  const y = node.internals.positionAbsolute.y;
+  const w = node.measured.width ?? 0;
+  const h = node.measured.height ?? 0;
+  switch (side) {
+    case Position.Left: return { x, y: y + h / 2 };
+    case Position.Right: return { x: x + w, y: y + h / 2 };
+    case Position.Top: return { x: x + w / 2, y };
+    default: return { x: x + w / 2, y: y + h };
+  }
 }
 
 export interface FloatingEdgeParams {
@@ -46,14 +45,16 @@ export interface FloatingEdgeParams {
 
 /** Start-/Endpunkt + Seiten für eine frei andockende Verbindung zwischen zwei Knoten */
 export function getFloatingEdgeParams(source: InternalNode, target: InternalNode): FloatingEdgeParams {
-  const sourcePoint = getNodeIntersection(source, target);
-  const targetPoint = getNodeIntersection(target, source);
+  const sourceSide = facingSide(source, target);
+  const targetSide = facingSide(target, source);
+  const sourcePoint = sidePoint(source, sourceSide);
+  const targetPoint = sidePoint(target, targetSide);
   return {
     sx: sourcePoint.x,
     sy: sourcePoint.y,
     tx: targetPoint.x,
     ty: targetPoint.y,
-    sourcePos: getEdgePosition(source, sourcePoint),
-    targetPos: getEdgePosition(target, targetPoint),
+    sourcePos: sourceSide,
+    targetPos: targetSide,
   };
 }
