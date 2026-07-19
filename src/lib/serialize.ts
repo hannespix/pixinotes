@@ -190,6 +190,15 @@ function baseNodeText(node: AppNode): string {
       return 'Projekt-Portal';
     case 'frame':
       return `Bereich: ${node.data.name}`;
+    case 'week': {
+      const w = node.data;
+      const days = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+      const fmt = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+      const rows = [...w.entries]
+        .sort((a, b) => a.day - b.day || a.start - b.start)
+        .map((e) => `${days[e.day] ?? '?'} ${fmt(e.start)}-${fmt(e.start + e.dur)} ${e.text}`);
+      return `${w.title}\n${rows.join('\n')}`;
+    }
     default:
       return '';
   }
@@ -233,6 +242,17 @@ export function nodeToHtml(node: AppNode): string {
     case 'frame':
       // Abschnitts-Folie im Presenter: der Rahmen-Name als Zwischentitel
       return `<h2 style="text-align:center;margin-top:1.4em">${esc(node.data.name)}</h2>`;
+    case 'week': {
+      const w = node.data;
+      const dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+      const fmt = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+      const perDay = dayNames.slice(0, w.days === 7 ? 7 : 5).map((name, day) => {
+        const items = [...w.entries].filter((e) => e.day === day).sort((a, b) => a.start - b.start)
+          .map((e) => `<li>${fmt(e.start)}–${fmt(e.start + e.dur)} ${esc(e.text)}</li>`).join('');
+        return items ? `<h4>${name}</h4><ul>${items}</ul>` : '';
+      }).join('');
+      return `<h3>${esc(w.title)}</h3>${perDay || '<p>—</p>'}`;
+    }
     default:
       return `<p style="white-space:pre-wrap">${esc(nodeToText(node))}</p>`;
   }

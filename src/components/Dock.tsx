@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
-import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape } from '../lib/nodes';
+import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape, makeWeek } from '../lib/nodes';
 import { collectTasks } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
@@ -12,7 +12,7 @@ import { computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arran
 import {
   IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMousePointer, INote,
-  IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, IWand, IX,
+  IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, IWand, IWeek, IX,
 } from './Icons';
 
 /**
@@ -218,6 +218,12 @@ export function Dock() {
             <div className="dock-menu-label">Planung</div>
             <button onClick={() => add(() => makeGantt(centerPos(560, 240)))}><IGantt size={16} /> Zeitplan (Gantt)</button>
             <button onClick={() => add(() => makeCalendar(centerPos(430, 340)))}><ICalendar size={16} /> Kalender (Monat)</button>
+            <button
+              onClick={() => add(() => makeWeek(centerPos(620, 440)))}
+              title="Stundenraster: Tage als Spalten, Uhrzeiten als Zeilen — für Stundenplan, Arbeitswoche oder Dienstplan"
+            >
+              <IWeek size={16} /> Wochenplan (Stunden)
+            </button>
             <button onClick={() => add(() => makeMermaid(centerPos(380, 240)))}><IDiagram size={16} /> Diagramm (Mermaid)</button>
             <div className="dock-menu-label">Prozess-Formen</div>
             <button onClick={() => addShape('process')}><ISquare size={16} /> Schritt</button>

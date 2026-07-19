@@ -1147,6 +1147,73 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* Verbindungspunkte des Rahmens: nur bei Auswahl/Hover sichtbar (wie Karten) */
 .frame-handle { pointer-events: all; }
 
+/* ---------- Wochenplan: Stundenraster (M153) ---------- */
+.week-card { background: var(--surface); border-radius: 14px; }
+.week-wrap { display: flex; flex-direction: column; height: 100%; padding: 10px 12px 12px; gap: 4px; }
+.week-head { display: flex; align-items: center; gap: 8px; }
+.week-title {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  font-family: inherit; font-size: 14px; font-weight: 700; color: var(--ink);
+}
+.week-tools { display: inline-flex; align-items: center; gap: 4px; }
+.week-tools select {
+  border: 1px solid var(--border-soft); border-radius: 6px; background: var(--surface-dim);
+  font-family: inherit; font-size: 10.5px; color: var(--ink); padding: 2px 3px;
+}
+.week-sep { font-size: 10.5px; color: var(--muted); }
+.week-daynames { display: flex; gap: 3px; }
+.week-daynames .week-gutter { flex: 0 0 38px; }
+.week-dayname { flex: 1; text-align: center; font-size: 10.5px; font-weight: 700; color: var(--muted); }
+.week-grid { position: relative; flex: 1; min-height: 180px; display: flex; gap: 3px; }
+.week-times { position: relative; flex: 0 0 38px; }
+.week-times span {
+  position: absolute; right: 6px; transform: translateY(-1px);
+  font-size: 9.5px; color: var(--muted);
+}
+.week-day {
+  position: relative; flex: 1; min-width: 0; cursor: copy;
+  background: var(--surface-dim); border-radius: 7px;
+  /* Stunden-Linien: eine Linie je Stunde über die CSS-Variable --week-hour */
+  background-image: repeating-linear-gradient(
+    to bottom, transparent 0, transparent calc(var(--week-hour) - 1px),
+    var(--border-soft) calc(var(--week-hour) - 1px), var(--border-soft) var(--week-hour));
+}
+.week-entry {
+  position: absolute; box-sizing: border-box; overflow: hidden; cursor: pointer;
+  border: none; border-left: 3px solid; border-radius: 5px;
+  font-family: inherit; text-align: left; padding: 2px 4px;
+  display: flex; flex-direction: column; gap: 0; line-height: 1.2;
+  min-height: 14px;
+}
+.week-entry-time { font-size: 8.5px; font-weight: 700; opacity: .8; }
+.week-entry-text { font-size: 10.5px; font-weight: 600; overflow: hidden; }
+.week-pop {
+  position: fixed; z-index: 75; width: 240px;
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: 11px;
+  box-shadow: 0 6px 24px rgba(50, 40, 20, 0.22); padding: 9px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.week-pop-text {
+  border: 1px solid var(--border-soft); border-radius: 8px; background: var(--surface-dim);
+  font-family: inherit; font-size: 12.5px; padding: 6px 8px; color: var(--ink);
+}
+.week-pop-row { display: flex; align-items: center; gap: 6px; }
+.week-pop-row select {
+  flex: 1; border: 1px solid var(--border-soft); border-radius: 7px; background: var(--surface-dim);
+  font-family: inherit; font-size: 12px; color: var(--ink); padding: 4px 5px;
+}
+.week-pop-colors { gap: 5px; }
+.week-color-dot {
+  width: 16px; height: 16px; border-radius: 50%; cursor: pointer; padding: 0;
+  border: 2px solid transparent;
+}
+.week-color-dot.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.week-pop-del {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 3px; border-radius: 6px; line-height: 0;
+}
+.week-pop-del:hover { background: rgba(192, 57, 43, 0.12); color: #c0392b; }
+
 /* ---------- Kommentar-Pins & -Panel (M148) ---------- */
 .comment-pin {
   position: absolute; z-index: 9; pointer-events: all;

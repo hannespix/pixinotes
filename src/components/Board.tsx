@@ -31,6 +31,7 @@ import { MermaidCard } from './nodes/MermaidCard';
 import { GanttCard } from './nodes/GanttCard';
 import { CalendarCard } from './nodes/CalendarCard';
 import { FrameCard } from './nodes/FrameCard';
+import { WeekCard } from './nodes/WeekCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { DrawingLayer } from './DrawingLayer';
 import { CommentLayer } from './CommentLayer';
@@ -48,6 +49,7 @@ const nodeTypes: NodeTypes = {
   gantt: GanttCard,
   calendar: CalendarCard,
   frame: FrameCard,
+  week: WeekCard,
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
@@ -109,7 +111,7 @@ export function Board() {
     // wird ganz normal gescrollt und navigiert.
     const OVERLAY_SEL = '.bn-suggestion-menu, .bn-side-menu, .mantine-Menu-dropdown, .mantine-Popover-dropdown, '
       + '[role="menu"], [role="listbox"], [role="dialog"], .modal-backdrop, .ticket-modal-backdrop, '
-      + '.dock-menu, .sel-ai-menu, .sel-attr-menu, .tab-tree, .tab-bg-menu, .mm-pop, .draw-palette, .comment-panel, .frame-menu';
+      + '.dock-menu, .sel-ai-menu, .sel-attr-menu, .tab-tree, .tab-bg-menu, .mm-pop, .draw-palette, .comment-panel, .frame-menu, .week-pop';
     const inOverlay = (t: Element | null) => !!t?.closest?.(OVERLAY_SEL);
     const onWheel = (e: WheelEvent) => {
       const target = e.target as Element | null;

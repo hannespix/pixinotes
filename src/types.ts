@@ -176,6 +176,33 @@ export interface CalendarData {
 }
 export type CalendarNode = Node<CalendarData, 'calendar'>;
 
+/** Wochenplan (M153): klassisches Stundenraster — Tage als Spalten, Uhrzeiten
+ *  als Zeilen, Blöcke als Einträge. Deckt Stundenplan, Arbeitswoche,
+ *  Dienstplan & Co. ab. */
+export interface WeekEntry {
+  id: string;
+  /** 0 = Montag … 6 = Sonntag */
+  day: number;
+  /** Beginn in Minuten seit Mitternacht */
+  start: number;
+  /** Dauer in Minuten */
+  dur: number;
+  text: string;
+  /** Index in die Farb-Palette der Karte */
+  color?: number;
+}
+export interface WeekData {
+  title: string;
+  /** 5 = Mo–Fr, 7 = Mo–So */
+  days: number;
+  /** Raster-Beginn/-Ende in Minuten (z. B. 480 = 8:00) */
+  from: number;
+  to: number;
+  entries: WeekEntry[];
+  [key: string]: unknown;
+}
+export type WeekNode = Node<WeekData, 'week'>;
+
 /** Frame (M149): benannter Rahmen-Bereich, der Karten optisch gruppiert und
  *  beim Verschieben (am Titel gefasst) seinen Inhalt mitnimmt */
 export interface FrameData {
@@ -187,7 +214,7 @@ export interface FrameData {
 export type FrameNode = Node<FrameData, 'frame'>;
 
 export type AppNode =
-  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode)
+  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode)
   // Archiv (M87): Karten jedes Typs lassen sich als Ganzes „erledigt" ablegen —
   // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface.
   // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der

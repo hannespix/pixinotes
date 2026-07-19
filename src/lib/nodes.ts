@@ -81,6 +81,19 @@ export function makePortal(position: Pos): AppNode {
   return { id: uid(), type: 'portal', width: CARD_WIDTHS.portal, position, data: {} };
 }
 
+/** Wochenplan (M153): Stundenraster Mo–Fr, 8–17 Uhr — Zeitbereich und
+ *  Tage-Anzahl sind in der Karte umschaltbar */
+export function makeWeek(position: Pos): AppNode {
+  return {
+    id: uid(),
+    type: 'week',
+    width: 620,
+    height: 440,
+    position,
+    data: { title: 'Wochenplan', days: 5, from: 8 * 60, to: 17 * 60, entries: [] },
+  };
+}
+
 /** Frame (M149): startet großzügig, liegt IMMER hinter den Karten und wird
  *  nur an der Titel-Leiste gezogen (dragHandle) — Klicks auf der Fläche
  *  innerhalb des Rahmens erreichen weiter das Board */
