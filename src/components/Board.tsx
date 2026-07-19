@@ -100,14 +100,35 @@ export function Board() {
       void setViewport({ x: px - flowX * newZoom, y: py - flowY * newZoom, zoom: newZoom });
       return { flowX, flowY };
     };
+    // M143: Solange ein Menü/Popup offen ist und der Zeiger darüber steht,
+    // pausieren ALLE Board-Gesten (Rad-Zoom, Pinch, Finger-Pan) — im Menü
+    // wird ganz normal gescrollt und navigiert.
+    const OVERLAY_SEL = '.bn-suggestion-menu, .bn-side-menu, .mantine-Menu-dropdown, .mantine-Popover-dropdown, '
+      + '[role="menu"], [role="listbox"], [role="dialog"], .modal-backdrop, .ticket-modal-backdrop, '
+      + '.dock-menu, .sel-ai-menu, .sel-attr-menu, .tab-tree, .tab-bg-menu, .mm-pop, .draw-palette';
+    const inOverlay = (t: Element | null) => !!t?.closest?.(OVERLAY_SEL);
     const onWheel = (e: WheelEvent) => {
-      const inNode = (e.target as Element | null)?.closest?.('.react-flow__node');
+      const target = e.target as Element | null;
+      if (inOverlay(target)) return; // Menü offen → Menü scrollt, Board bleibt ruhig
+      const inNode = target?.closest?.('.react-flow__node');
       if (!inNode) return; // auf der Fläche macht React Flow das selbst
       if (!e.ctrlKey && !wheelZoomRef.current) return; // Modul-Scroll bleibt
       e.preventDefault();
       e.stopPropagation();
       const factor = Math.pow(2, -e.deltaY * (e.ctrlKey ? 0.01 : 0.0022));
       zoomAt(e.clientX, e.clientY, clampZoom(getViewport().zoom * factor));
+    };
+    // M143: Klicks im Slash-Menü (z. B. auf dessen Scrollleiste) dürfen weder
+    // dem Editor den Fokus klauen noch BlockNotes „außerhalb geklickt"-
+    // Schließer erreichen — sonst verschwindet das Menü. window-CAPTURE läuft
+    // vor allen document-Listenern von BlockNote/Mantine.
+    const onMenuPointerDown = (e: Event) => {
+      if ((e.target as Element | null)?.closest?.('.bn-suggestion-menu')) {
+        e.stopPropagation();
+        // Fokus-Klau nur beim mousedown unterbinden — preventDefault auf
+        // pointerdown würde auch die Klick-Erzeugung abwürgen
+        if (e.type === 'mousedown') e.preventDefault();
+      }
     };
     const touchDist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
     const touchMid = (t: TouchList) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
@@ -129,6 +150,7 @@ export function Board() {
     };
     const onTouchStart = (e: TouchEvent) => {
       const target = e.target as Element | null;
+      if (inOverlay(target)) { panRef.current = null; return; } // Menü offen → keine Board-Gesten
       const node = target?.closest?.('.react-flow__node');
       if (e.touches.length === 2) {
         panRef.current = null; // zweiter Finger: Pinch übernimmt
@@ -185,12 +207,18 @@ export function Board() {
       if (e.touches.length === 0) panRef.current = null;
     };
     wrap.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    window.addEventListener('pointerdown', onMenuPointerDown, true);
+    window.addEventListener('mousedown', onMenuPointerDown, true);
+    window.addEventListener('touchstart', onMenuPointerDown, true);
     wrap.addEventListener('touchstart', onTouchStart, { capture: true, passive: false });
     wrap.addEventListener('touchmove', onTouchMove, { capture: true, passive: false });
     wrap.addEventListener('touchend', onTouchEnd, true);
     wrap.addEventListener('touchcancel', onTouchEnd, true);
     return () => {
       wrap.removeEventListener('wheel', onWheel, { capture: true } as EventListenerOptions);
+      window.removeEventListener('pointerdown', onMenuPointerDown, true);
+      window.removeEventListener('mousedown', onMenuPointerDown, true);
+      window.removeEventListener('touchstart', onMenuPointerDown, true);
       wrap.removeEventListener('touchstart', onTouchStart, { capture: true } as EventListenerOptions);
       wrap.removeEventListener('touchmove', onTouchMove, { capture: true } as EventListenerOptions);
       wrap.removeEventListener('touchend', onTouchEnd, true);

@@ -2188,7 +2188,14 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* Slash-Menü („/") ragt über den Kartenrand — solange es offen ist, darf die
    Notiz nicht clippen (die Karte liegt durch Auto-Vordergrund ohnehin oben) */
 .note-card:has(.bn-suggestion-menu) { overflow: visible; }
-.note-card .bn-suggestion-menu { z-index: 40; max-height: 320px; }
+/* M143: Menü „eine Ebene über die Karte" — die Karte mit offenem Menü hebt
+   sich über ALLE Nachbarkarten; das Menü selbst scrollt in sich (contain),
+   ohne dass das Board mitscrollt oder zoomt */
+.react-flow__node:has(.bn-suggestion-menu) { z-index: 1000 !important; }
+.note-card .bn-suggestion-menu {
+  z-index: 40; max-height: min(420px, 55vh);
+  overscroll-behavior: contain; scrollbar-width: thin;
+}
 
 /* ---------- Kanban: Filterleiste, Zähler & Board-Gruppen (M65) ---------- */
 .kanban-filter {
