@@ -37,6 +37,16 @@ const KIND_LABEL: Record<EdgeKind, string> = {
  *  der hier fehlt, hätte keine passende Spitze. */
 export const EDGE_COLORS = ['#5b6470', '#4a7dbd', '#3f8a52', '#dd9a26', '#d05353', '#7d5bb8'];
 
+/** Spitzenformen (M147) — für jede gibt es Marker in allen Farben */
+export type HeadShape = 'arrow' | 'open' | 'circle' | 'diamond';
+const SHAPE_CYCLE: HeadShape[] = ['arrow', 'open', 'circle', 'diamond'];
+const SHAPE_NAME: Record<HeadShape, string> = {
+  arrow: 'geschlossener Pfeil', open: 'offener Pfeil', circle: 'Kreis', diamond: 'Raute',
+};
+
+/** Linienstärken (M147): fein / normal / kräftig */
+const WIDTHS = [1.4, 2, 3.2];
+
 /**
  * Verbindung mit editierbarem Label und Stil-Umschaltung. Mitte anklicken →
  * Beziehung benennen (z. B. „blockiert", „ja/nein" im Flowchart); das Stil-
@@ -60,6 +70,10 @@ export function LabeledEdge({
   // M146: Pfeilspitze unabhängig vom Linienstil — Altbestand 'line' hieß „ohne Spitze"
   const head = typeof data?.head === 'boolean' ? (data.head as boolean) : kind !== 'line';
   const custom = (data?.color as string) ?? '';
+  // M147: Start-Spitze, Spitzenform und Linienstärke je Verbindung
+  const headStart = data?.headStart === true;
+  const shape: HeadShape = SHAPE_CYCLE.includes(data?.shape as HeadShape) ? (data?.shape as HeadShape) : 'arrow';
+  const width = typeof data?.width === 'number' ? (data.width as number) : 2;
 
   // Floating: Andockpunkte aus den echten Knoten-Rechtecken berechnen — die
   // Linie tritt immer an der zugewandten Seite aus, keine Schleifen mehr.
@@ -200,9 +214,8 @@ export function LabeledEdge({
   // dickere Linie) — ohne eigene Farbe bleibt alles theme-sensitiv wie bisher
   const stroke = custom || (selected ? 'var(--accent)' : 'var(--edge)');
   const colorIdx = EDGE_COLORS.indexOf(custom);
-  const markerId = custom
-    ? (colorIdx >= 0 ? `pn-arrow-c${colorIdx}` : 'pn-arrow-def')
-    : `pn-arrow-${selected ? 'sel' : 'def'}`;
+  const colorKey = custom ? (colorIdx >= 0 ? `c${colorIdx}` : 'def') : (selected ? 'sel' : 'def');
+  const markerId = `pn-${shape}-${colorKey}`;
 
   const commit = () => { updateEdgeLabel(id, draft.trim()); setEditing(false); };
 
@@ -212,9 +225,10 @@ export function LabeledEdge({
         id={id}
         path={edgePath}
         markerEnd={head ? `url(#${markerId})` : undefined}
+        markerStart={headStart ? `url(#${markerId})` : undefined}
         style={{
           stroke,
-          strokeWidth: selected ? 2.5 : 2,
+          strokeWidth: selected ? width + 0.5 : width,
           strokeDasharray: kind === 'dashed' ? '7 5' : undefined,
         }}
       />
@@ -246,37 +260,75 @@ export function LabeledEdge({
             </>
           )}
         </div>
-        {/* M146: feingliedrige Optionen — nur bei ausgewählter Verbindung */}
+        {/* M146/M147: feingliedrige Optionen — nur bei ausgewählter Verbindung */}
         {selected && !editing && (
           <div
             className="edge-opts nodrag nopan"
             style={{ transform: `translate(-50%, 0) translate(${labelX}px, ${labelY + 16}px)` }}
           >
-            <button
-              className={`edge-opt-head ${head ? 'on' : ''}`}
-              title={head ? 'Pfeilspitze AUS (schlichte Linie)' : 'Pfeilspitze AN (gerichteter Pfeil)'}
-              onClick={() => updateEdgeStyle(id, { head: !head })}
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 12h13" />
-                {head && <path d="m12 6 6 6-6 6" />}
-              </svg>
-            </button>
-            <span className="edge-opt-sep" />
-            <button
-              className={`edge-color-dot default ${custom === '' ? 'on' : ''}`}
-              title="Standardfarbe (folgt Hell/Dunkel)"
-              onClick={() => updateEdgeStyle(id, { color: null })}
-            />
-            {EDGE_COLORS.map((c) => (
+            <div className="edge-opts-row">
               <button
-                key={c}
-                className={`edge-color-dot ${custom === c ? 'on' : ''}`}
-                style={{ background: c }}
-                title="Verbindungsfarbe"
-                onClick={() => updateEdgeStyle(id, { color: c })}
+                className={`edge-opt-btn ${headStart ? 'on' : ''}`}
+                title={headStart ? 'Spitze am ANFANG entfernen' : 'Spitze auch am ANFANG (beidseitiger Pfeil)'}
+                onClick={() => updateEdgeStyle(id, { headStart: !headStart })}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M8 12h13" />
+                  {headStart && <path d="m9 6-6 6 6 6" />}
+                </svg>
+              </button>
+              <button
+                className={`edge-opt-btn edge-opt-head ${head ? 'on' : ''}`}
+                title={head ? 'Spitze am ENDE entfernen (schlichte Linie)' : 'Spitze am ENDE (gerichteter Pfeil)'}
+                onClick={() => updateEdgeStyle(id, { head: !head })}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12h13" />
+                  {head && <path d="m12 6 6 6-6 6" />}
+                </svg>
+              </button>
+              <button
+                className="edge-opt-btn edge-opt-shape"
+                title={`Spitzenform: ${SHAPE_NAME[shape]} (klicken zum Wechseln)`}
+                onClick={() => updateEdgeStyle(id, { shape: SHAPE_CYCLE[(SHAPE_CYCLE.indexOf(shape) + 1) % SHAPE_CYCLE.length] })}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {shape === 'arrow' && <path d="M6 5l12 7-12 7Z" fill="currentColor" />}
+                  {shape === 'open' && <path d="m8 5 9 7-9 7" />}
+                  {shape === 'circle' && <circle cx="12" cy="12" r="6" fill="currentColor" />}
+                  {shape === 'diamond' && <path d="M12 4l7 8-7 8-7-8Z" fill="currentColor" />}
+                </svg>
+              </button>
+              <span className="edge-opt-sep" />
+              {WIDTHS.map((w, i) => (
+                <button
+                  key={w}
+                  className={`edge-opt-btn edge-opt-width ${width === w ? 'on' : ''}`}
+                  title={['Fein', 'Normal', 'Kräftig'][i]}
+                  onClick={() => updateEdgeStyle(id, { width: w })}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
+                    <path d="M3 12h18" strokeWidth={1 + i * 1.6} />
+                  </svg>
+                </button>
+              ))}
+            </div>
+            <div className="edge-opts-row">
+              <button
+                className={`edge-color-dot default ${custom === '' ? 'on' : ''}`}
+                title="Standardfarbe (folgt Hell/Dunkel)"
+                onClick={() => updateEdgeStyle(id, { color: null })}
               />
-            ))}
+              {EDGE_COLORS.map((c) => (
+                <button
+                  key={c}
+                  className={`edge-color-dot ${custom === c ? 'on' : ''}`}
+                  style={{ background: c }}
+                  title="Verbindungsfarbe"
+                  onClick={() => updateEdgeStyle(id, { color: c })}
+                />
+              ))}
+            </div>
           </div>
         )}
       </EdgeLabelRenderer>
@@ -284,33 +336,44 @@ export function LabeledEdge({
   );
 }
 
-/** SVG-Pfeilspitzen-Definitionen — einmal im Board gerendert. Neben Standard
- *  und Auswahl gibt es je Palette-Farbe (M146) eine eigene deckende Spitze. */
+/** SVG-Pfeilspitzen-Definitionen — einmal im Board gerendert. Je Spitzenform
+ *  (M147) und Farbe (Standard, Auswahl, Palette M146) ein eigener Marker;
+ *  orient="auto-start-reverse" lässt denselben Marker auch am ANFANG der
+ *  Linie korrekt herum sitzen. */
 export function EdgeMarkerDefs() {
-  const defs: Array<[string, string]> = [
+  const colors: Array<[string, string]> = [
     ['def', 'var(--edge-head)'],
     ['sel', 'var(--accent)'],
     ...EDGE_COLORS.map((c, i) => [`c${i}`, c] as [string, string]),
   ];
+  // Deckende Füllung! Halbtransparent ließe die darunterliegende Linie
+  // durchscheinen — die „transparente Spitze" aus dem User-Report (M63)
+  const shapeEl = (shape: HeadShape, c: string) => {
+    switch (shape) {
+      case 'open': return <path d="M2,1.5 L9.5,6 L2,10.5" fill="none" stroke={c} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />;
+      case 'circle': return <circle cx="6" cy="6" r="4" fill={c} />;
+      case 'diamond': return <path d="M6,1 L11,6 L6,11 L1,6 Z" fill={c} />;
+      default: return <path d="M1,1 L10,6 L1,11 Z" fill={c} />;
+    }
+  };
   return (
     <svg style={{ position: 'absolute', width: 0, height: 0 }}>
       <defs>
-        {defs.map(([k, fill]) => (
-          <marker
-            key={k}
-            id={`pn-arrow-${k}`}
-            viewBox="0 0 12 12"
-            refX="9"
-            refY="6"
-            markerWidth="8"
-            markerHeight="8"
-            orient="auto-start-reverse"
-          >
-            {/* Deckende Füllung! Halbtransparent ließe die darunterliegende
-                Linie durchscheinen — die „transparente Spitze" aus dem User-Report */}
-            <path d="M1,1 L10,6 L1,11 Z" fill={fill} />
-          </marker>
-        ))}
+        {(['arrow', 'open', 'circle', 'diamond'] as HeadShape[]).flatMap((shape) =>
+          colors.map(([k, fill]) => (
+            <marker
+              key={`${shape}-${k}`}
+              id={`pn-${shape}-${k}`}
+              viewBox="0 0 12 12"
+              refX={shape === 'circle' ? 7 : 9}
+              refY="6"
+              markerWidth={shape === 'circle' || shape === 'diamond' ? 7 : 8}
+              markerHeight={shape === 'circle' || shape === 'diamond' ? 7 : 8}
+              orient="auto-start-reverse"
+            >
+              {shapeEl(shape, fill)}
+            </marker>
+          )))}
       </defs>
     </svg>
   );

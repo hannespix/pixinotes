@@ -184,8 +184,11 @@ interface BoardState {
   addLabeledEdge: (source: string, target: string, label: string, kind?: string) => void;
   updateEdgeLabel: (id: string, label: string) => void;
   updateEdgeKind: (id: string, kind: string) => void;
-  /** M146: feingliedrige Verbindungsoptionen — Pfeilspitze an/aus, eigene Farbe */
-  updateEdgeStyle: (id: string, patch: { head?: boolean; color?: string | null }) => void;
+  /** M146/M147: feingliedrige Verbindungsoptionen — Spitzen (Ende/Anfang),
+   *  Spitzenform, Linienstärke, eigene Farbe */
+  updateEdgeStyle: (id: string, patch: {
+    head?: boolean; headStart?: boolean; shape?: string; width?: number; color?: string | null;
+  }) => void;
   removeEdge: (id: string) => void;
   addNode: (node: AppNode) => void;
   /** Karte in ein BELIEBIGES Board einfügen (Schnell-Eingabe der Aufgaben-Zentrale, M114) */
@@ -1053,6 +1056,9 @@ export const useBoard = create<BoardState>()(
               if (e.id !== id) return e;
               const data: Record<string, unknown> = { ...e.data };
               if (patch.head !== undefined) data.head = patch.head;
+              if (patch.headStart !== undefined) data.headStart = patch.headStart;
+              if (patch.shape !== undefined) data.shape = patch.shape;
+              if (patch.width !== undefined) data.width = patch.width;
               if (patch.color !== undefined) {
                 // null = zurück zur Standardfarbe (Schlüssel ganz entfernen)
                 if (patch.color === null) delete data.color;
