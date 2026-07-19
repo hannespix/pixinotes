@@ -1100,9 +1100,11 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   /* Fläche ist durchklick-transparent: Pan/Auswahl/Doppelklick wirken im Rahmen weiter */
   pointer-events: none;
 }
-.frame-wrap.selected .frame-body { border-color: var(--accent); border-style: solid; }
+/* Auswahl zeigt der abgerundete Rand SELBST (M152) — die eckigen Resizer-
+   Linien sind aus, sonst ragen sie über die runden Ecken hinaus */
+.frame-wrap.selected .frame-body { border-color: var(--accent); border-style: solid; border-width: 2px; }
 .frame-head {
-  position: absolute; top: -30px; left: 0; height: 26px; max-width: 100%;
+  position: absolute; top: -30px; left: 8px; height: 26px; max-width: calc(100% - 16px);
   display: inline-flex; align-items: center; gap: 6px; padding: 0 11px;
   background: var(--surface); border: 1px solid var(--border-soft); border-radius: 9px;
   font-size: 12px; font-weight: 700; color: var(--muted); cursor: grab;

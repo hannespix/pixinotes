@@ -110,7 +110,21 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
 
   return (
     <div className={`frame-wrap ${selected ? 'selected' : ''}`}>
-      <NodeResizer isVisible={selected} minWidth={260} minHeight={180} />
+      {/* M152: Die Standard-Resizer-LINIEN sind eckig und ragen über die
+          abgerundeten Rahmen-Ecken hinaus (User-Screenshot „Kanten nicht
+          sauber") — unsichtbar schalten (ziehbar bleiben sie), die Auswahl
+          zeigt der abgerundete Akzent-Rand des Rahmens selbst; Griffe als
+          dezente runde Punkte im Karten-Stil */}
+      <NodeResizer
+        isVisible={selected}
+        minWidth={260}
+        minHeight={180}
+        lineStyle={{ border: 'none' }}
+        handleStyle={{
+          width: 11, height: 11, borderRadius: 999,
+          background: '#fff', border: '2px solid var(--accent)', boxShadow: '0 1px 3px rgba(50,40,20,.25)',
+        }}
+      />
       {/* Verbindungspunkte (M150): Rahmen lassen sich wie Module verbinden */}
       {[Position.Top, Position.Right, Position.Bottom, Position.Left].map((pos) => (
         <Handle key={pos} type="source" position={pos} id={pos} className="pn-handle frame-handle" />
