@@ -85,8 +85,6 @@ export function LabeledEdge({
     const [nsx, nsy] = normal(sPos);
     const [ntx, nty] = normal(tPos);
     const stub = Math.min(22, dist / 4);
-    // Moderate Biegung — harmonischer Schwung statt weiter Bögen
-    const bend = Math.min(110, Math.max(30, dist * 0.22));
     const ax = sx + nsx * stub, ay = sy + nsy * stub;
     const bx = tx + ntx * stub, by = ty + nty * stub;
 
@@ -101,23 +99,41 @@ export function LabeledEdge({
       .filter((n) => n.id !== source && n.id !== target && !n.archived)
       .map(rectOf);
     const mnx = -(ty - sy) / dist, mny = (tx - sx) / dist; // Normale zum Direktweg
-    // Versatz o der Kurvenmitte → Kontrollpunkte (Mitte einer Kubik wandert
-    // um 0,75·d, wenn beide Kontrollpunkte um d verschoben werden)
-    const ctrl = (o: number) => {
-      const d = (o * 4) / 3;
+    // M138: TANGENTENSTETIGE Kurve — zwei Kubik-Segmente durch eine (ggf.
+    // seitlich verschobene) Mitte. Die Tangenten an den Stummel-Enden zeigen
+    // IMMER senkrecht aus der Kartenseite, die Mitten-Tangente folgt der
+    // Sehne — dadurch gibt es nirgends Knicke, egal wie stark der Bogen
+    // ausweicht. Fließend wie bei Miro/Lucidchart.
+    const chordX = bx - ax, chordY = by - ay;
+    const clen = Math.hypot(chordX, chordY) || 1;
+    const cdx = chordX / clen, cdy = chordY / clen; // Tangente in der Kurvenmitte
+    const k = Math.min(110, clen / 3, Math.max(24, clen * 0.25)); // Griffweite
+    const geometry = (o: number) => {
+      const midX = (ax + bx) / 2 + mnx * o;
+      const midY = (ay + by) / 2 + mny * o;
       return {
-        c1x: ax + nsx * bend + mnx * d, c1y: ay + nsy * bend + mny * d,
-        c2x: bx + ntx * bend + mnx * d, c2y: by + nty * bend + mny * d,
+        midX, midY,
+        c1x: ax + nsx * k, c1y: ay + nsy * k,
+        c2x: midX - cdx * k, c2y: midY - cdy * k,
+        c3x: midX + cdx * k, c3y: midY + cdy * k,
+        c4x: bx + ntx * k, c4y: by + nty * k,
+      };
+    };
+    const cubicAt = (t: number, x0: number, y0: number, x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) => {
+      const u = 1 - t;
+      return {
+        x: u * u * u * x0 + 3 * u * u * t * x1 + 3 * u * t * t * x2 + t * t * t * x3,
+        y: u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3,
       };
     };
     const blockedAt = (o: number): boolean => {
-      const c = ctrl(o);
-      for (let i = 1; i < 16; i++) {
-        const t = i / 16;
-        const u = 1 - t;
-        const px = u * u * u * ax + 3 * u * u * t * c.c1x + 3 * u * t * t * c.c2x + t * t * t * bx;
-        const py = u * u * u * ay + 3 * u * u * t * c.c1y + 3 * u * t * t * c.c2y + t * t * t * by;
-        if (obstacles.some((r) => px > r.x1 && px < r.x2 && py > r.y1 && py < r.y2)) return true;
+      const g = geometry(o);
+      for (let i = 1; i < 18; i++) {
+        const t = (i % 9) / 9;
+        const p = i < 9
+          ? cubicAt(t || 0.05, ax, ay, g.c1x, g.c1y, g.c2x, g.c2y, g.midX, g.midY)
+          : cubicAt(t || 0.05, g.midX, g.midY, g.c3x, g.c3y, g.c4x, g.c4y, bx, by);
+        if (obstacles.some((r) => p.x > r.x1 && p.x < r.x2 && p.y > r.y1 && p.y < r.y2)) return true;
       }
       return false;
     };
@@ -128,11 +144,14 @@ export function LabeledEdge({
         if (cand !== undefined) { off = cand; break; }
       }
     }
-    const c = ctrl(off);
+    const g = geometry(off);
     return {
-      path: `M ${sx},${sy} L ${ax},${ay} C ${c.c1x},${c.c1y} ${c.c2x},${c.c2y} ${bx},${by} L ${tx},${ty}`,
-      lx: (ax + 3 * c.c1x + 3 * c.c2x + bx) / 8,
-      ly: (ay + 3 * c.c1y + 3 * c.c2y + by) / 8,
+      path: `M ${sx},${sy} L ${ax},${ay}`
+        + ` C ${g.c1x},${g.c1y} ${g.c2x},${g.c2y} ${g.midX},${g.midY}`
+        + ` C ${g.c3x},${g.c3y} ${g.c4x},${g.c4y} ${bx},${by}`
+        + ` L ${tx},${ty}`,
+      lx: g.midX,
+      ly: g.midY,
     };
   })();
 
