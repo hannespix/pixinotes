@@ -11,6 +11,7 @@ import { collectTasks, formatDueShort, urgencyFor } from '../../lib/tasks';
 import { nodeToText } from '../../lib/serialize';
 import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, ISearch, ISettings, IX } from '../Icons';
 import { CardShell } from './CardShell';
+import { DragTitle } from './DragTitle';
 
 /** Symbol je Karten-Typ für die Verknüpfungs-Liste im Ticket-Modal (M118) */
 const TYPE_ICON: Record<string, string> = {
@@ -505,11 +506,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   return (
     <>
       <div className="kanban-head">
-        <input
-          className="kanban-title nodrag"
-          value={kanban.title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
+        <DragTitle className="kanban-title" value={kanban.title} onChange={setTitle} placeholder="Kanban" />
         <button
           className={`kanban-addcol nodrag ${filterOpen || filtering ? 'k-auto-on' : ''}`}
           title="Filtern & Gruppieren: Suche, Frist, #Tags, Quell-Board (Trello-Stil)"

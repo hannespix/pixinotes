@@ -5,6 +5,7 @@ import type { HtmlAppNode } from '../../types';
 import { composeSrcdoc, loadAppState, loadHtml, saveAppState, saveHtml } from '../../lib/htmlStore';
 import { loadAttachment } from '../../lib/attachments';
 import { CardShell } from './CardShell';
+import { DragTitle } from './DragTitle';
 import { IAppWindow, IMaximize, IMinimize, IPlay, IReload, IStopSq } from '../Icons';
 
 /**
@@ -115,17 +116,17 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   const runningUi = srcdoc !== null;
   return (
     <CardShell id={id} selected={selected} minWidth={340} minHeight={260} className="happ-card">
-      {/* KEIN nodrag am Wrapper: die Kopfleiste ist das dragHandle der Karte —
-          nodrag auf einem Vorfahren würde genau dieses Ziehen unterbinden.
-          Stattdessen sind nur die Bedienelemente in der Leiste nodrag. */}
+      {/* M160: kein dragHandle mehr — die ganze Karte zieht normal (Griff,
+          Kopfzeile, Poster); nur echte Bedienelemente sind nodrag, und die
+          laufende App-Fläche (iframe) schluckt ihre Eingaben selbst */}
       <div className={`happ-wrap ${full ? 'happ-full' : ''}`} ref={wrapRef}>
         <div className="happ-head">
           <IAppWindow size={15} />
-          <input
-            className="happ-title nodrag"
+          <DragTitle
+            className="happ-title"
             value={data.name}
-            onChange={(e) => updateNodeData(id, { name: e.target.value })}
-            title="Name der App (zum Ziehen die Kopfleiste greifen)"
+            onChange={(v) => updateNodeData(id, { name: v })}
+            placeholder="App"
           />
           <span className="happ-size">{fmtSize(data.size)}</span>
           {runningUi ? (
@@ -156,16 +157,16 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
               {hasSrc === false ? (
                 <>
                   <p>Der Inhalt dieser App liegt auf diesem Gerät nicht vor — HTML-Dateien bleiben lokal (sie wandern nicht in Sync-Dateien oder Team-Pakete).</p>
-                  <button className="happ-load" onClick={() => fileRef.current?.click()}>HTML-Datei wählen</button>
+                  <button className="happ-load nodrag" onClick={() => fileRef.current?.click()}>HTML-Datei wählen</button>
                 </>
               ) : (
                 <>
                   <IAppWindow size={34} />
                   <p>{hasSrc === null ? 'Inhalt wird geladen …' : 'Bereit — die App startet erst auf Klick und läuft dann als eigene, abgeschottete Instanz.'}</p>
-                  <button className="happ-load happ-go" disabled={hasSrc !== true || starting} onClick={start}>
+                  <button className="happ-load happ-go nodrag" disabled={hasSrc !== true || starting} onClick={start}>
                     <IPlay size={14} /> Starten
                   </button>
-                  <button className="happ-load" onClick={() => fileRef.current?.click()}>Andere Datei laden</button>
+                  <button className="happ-load nodrag" onClick={() => fileRef.current?.click()}>Andere Datei laden</button>
                 </>
               )}
             </div>

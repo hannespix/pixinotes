@@ -107,9 +107,11 @@ export function makeTime(position: Pos): AppNode {
   };
 }
 
-/** Eigene App (M158): eingebettetes HTML-Tool. Ziehen nur an der Kopfleiste
- *  (dragHandle) — die Fläche gehört der laufenden App. Auto-Größe ist aus:
- *  die App füllt die Karte, es gibt keinen „Inhalt", an dem man messen könnte. */
+/** Eigene App (M158): eingebettetes HTML-Tool. KEIN dragHandle (M160): das
+ *  machte die Karte praktisch unverschiebbar (Kopfzeile war vom nodrag-Titel
+ *  bedeckt, der Universal-Griff lag außerhalb des Handles). Die laufende App
+ *  schluckt ihre Eingaben ohnehin selbst (iframe) — der Rest zieht normal.
+ *  Auto-Größe ist aus: die App füllt die Karte, es gibt keinen messbaren Inhalt. */
 export function makeHtmlApp(position: Pos, file: { name: string; size: number }): AppNode {
   return {
     id: uid(),
@@ -117,7 +119,6 @@ export function makeHtmlApp(position: Pos, file: { name: string; size: number })
     width: 560,
     height: 440,
     position,
-    dragHandle: '.happ-head',
     autoFit: false,
     data: { name: file.name, size: file.size },
   };

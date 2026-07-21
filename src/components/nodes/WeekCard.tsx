@@ -4,6 +4,7 @@ import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import { uid, type WeekData, type WeekEntry, type WeekNode } from '../../types';
 import { CardShell } from './CardShell';
+import { DragTitle } from './DragTitle';
 import { IPlus, IX } from '../Icons';
 
 const DAY_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -144,16 +145,18 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
 
   return (
     <CardShell id={id} selected={selected} minWidth={380} minHeight={280} className="week-card">
-      <div className="week-wrap nodrag">
+      {/* M160: KEIN Pauschal-nodrag — Kopfzeile ist ziehbar, nur Raster,
+          Spalten-/Zeilen-Beschriftungen und Werkzeuge sind Bedienfläche */}
+      <div className="week-wrap">
         <div className="week-head">
-          <input
+          <DragTitle
             className="week-title"
             value={data.title}
-            onChange={(e) => patch({ title: e.target.value })}
+            onChange={(v) => patch({ title: v })}
             placeholder="Wochenplan"
           />
           {selected && (
-            <span className="week-tools">
+            <span className="week-tools nodrag">
               <select
                 value={customCols ? 'frei' : String(days)}
                 title="Spalten: Wochentage oder frei benennbar (Personen, Räume …)"
@@ -189,7 +192,7 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
             </span>
           )}
         </div>
-        <div className={`week-daynames ${axis === 'slots' ? 'wide-gutter' : ''}`}>
+        <div className={`week-daynames nodrag ${axis === 'slots' ? 'wide-gutter' : ''}`}>
           <span className="week-gutter" />
           {cols.map((c, i) => (
             <span key={i} className="week-dayname">
@@ -210,7 +213,7 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
             <button className="week-mini-add" title="Spalte hinzufügen" onClick={addCol}><IPlus size={11} /></button>
           )}
         </div>
-        <div className={`week-grid ${axis === 'slots' ? 'wide-gutter' : ''}`} style={{ ['--week-hour' as string]: `${(60 / span) * 100}%` }}>
+        <div className={`week-grid nodrag ${axis === 'slots' ? 'wide-gutter' : ''}`} style={{ ['--week-hour' as string]: `${(60 / span) * 100}%` }}>
           <div className="week-gutter week-times">
             {axis === 'time'
               ? hours.map((m) => (

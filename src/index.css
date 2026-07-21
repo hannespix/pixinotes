@@ -2742,3 +2742,15 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .file-teamload:hover:not(:disabled) { background: var(--surface-2); }
 .file-teamload:disabled { opacity: 0.5; cursor: default; }
+
+/* ---------- Ziehbare Karten-Titel (M160) ---------- */
+/* Als Text (statt dauerhaftem Eingabefeld) ist die Titelzeile ZIEHBAR und
+   damit auf jeder Karte die verlässliche Anfass-Fläche — Doppelklick benennt
+   um (dieselbe Konvention wie bei Rahmen, Formen und Mermaid). */
+.drag-title {
+  cursor: grab; user-select: none; -webkit-user-select: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  display: block;
+}
+.drag-title:active { cursor: grabbing; }
+.drag-title-empty { color: var(--muted); }

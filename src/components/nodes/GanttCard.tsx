@@ -7,6 +7,7 @@ import {
   IArrowDown, IArrowUp, IDownload, IPalette, IPlus, ITarget, IUsers, IWand, IX, IZoomIn, IZoomOut,
 } from '../Icons';
 import { CardShell } from './CardShell';
+import { DragTitle } from './DragTitle';
 
 const DAY = 864e5;
 const ROW_H = 26;
@@ -221,7 +222,7 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   return (
     <div className="gantt-body">
       <div className="gantt-head">
-        <input className="kanban-title nodrag" value={data.title} onChange={(e) => updateNodeData(id, { title: e.target.value })} />
+        <DragTitle className="kanban-title" value={data.title} onChange={(v) => updateNodeData(id, { title: v })} placeholder="Zeitplan" />
         <div className="gantt-tools nodrag">
           <button title="Vorgang hinzufügen" onClick={addRow}><IPlus size={14} /></button>
           <button title="Offene Aufgaben mit Frist als Meilensteine übernehmen" onClick={importTasks}><IDownload size={14} /></button>

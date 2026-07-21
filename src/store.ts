@@ -1278,7 +1278,7 @@ export const useBoard = create<BoardState>()(
     },
     {
       name: 'pixinotes-board',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => debouncedSafeStorage),
       partialize: (s) => ({
         boards: s.boards,
@@ -1302,6 +1302,21 @@ export const useBoard = create<BoardState>()(
           if (version >= 3 || !out || !Array.isArray((out as Record<string, unknown>).boards)) return out;
           const boards = (out as unknown as { boards: BoardDoc[] }).boards.map((b) =>
             b.drawings?.length ? { ...b, drawings: b.drawings.map((s) => anchorStroke(s, b.nodes ?? [])) } : b);
+          return { ...out, boards };
+        };
+        // v4 (M160): App-Karten hatten ein dragHandle auf die Kopfzeile — die
+        // war aber fast komplett vom Titel-Eingabefeld (nodrag) bedeckt und
+        // der Universal-Griff lag AUSSERHALB des Handles: die Karte war
+        // praktisch unverschiebbar. Jetzt ziehen sie wie alle Karten (die
+        // App-Fläche schluckt ihre Eingaben ohnehin selbst) — gespeicherte
+        // dragHandle-Einträge werden hier einmalig entfernt.
+        const stripHappHandle = <T,>(out: T): T => {
+          if (!out || !Array.isArray((out as Record<string, unknown>).boards)) return out;
+          const boards = (out as unknown as { boards: BoardDoc[] }).boards.map((b) => ({
+            ...b,
+            nodes: (b.nodes ?? []).map((n) =>
+              n.type === 'htmlapp' && n.dragHandle ? { ...n, dragHandle: undefined } : n),
+          }));
           return { ...out, boards };
         };
         // v0: {nodes, edges} — Einzelboard
@@ -1331,10 +1346,10 @@ export const useBoard = create<BoardState>()(
             return { boards: [{ id: 'main', name: '🏠 Mein Schreibtisch', nodes: [], edges: [] }], spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' };
           }
           if (!boards.some((b) => b.id === (p.activeId as string))) {
-            return anchorLegacyStrokes({ ...p, activeId: boards[0].id });
+            return stripHappHandle(anchorLegacyStrokes({ ...p, activeId: boards[0].id }));
           }
         }
-        return anchorLegacyStrokes(p);
+        return stripHappHandle(anchorLegacyStrokes(p));
       },
     },
   ),

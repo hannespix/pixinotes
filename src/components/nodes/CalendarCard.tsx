@@ -280,9 +280,10 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
 
   return (
     <div className="cal-body">
-      <div className="cal-head nodrag">
+      {/* M160: Kopfzeile ziehbar — nur die Knopfleiste rechts ist Bedienfläche */}
+      <div className="cal-head">
         <span className="cal-title">{title}</span>
-        <span className="cal-nav">
+        <span className="cal-nav nodrag">
           <button
             className={menu ? 'on' : ''}
             onClick={() => setMenu((o) => !o)}

@@ -3,6 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import { uid, type TimeData, type TimeNode, type TimeSeg } from '../../types';
 import { CardShell } from './CardShell';
+import { DragTitle } from './DragTitle';
 import { IChevronL, IChevronR, IPlus, IX } from '../Icons';
 
 /** Erfassungs-Arten: [Schlüssel, Label, Farbe]. Fahrzeit + Dienstgeschäft
@@ -110,12 +111,14 @@ export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
 
   return (
     <CardShell id={id} selected={selected} minWidth={380} minHeight={300} className="time-card">
-      <div className="time-wrap nodrag">
+      {/* M160: KEIN Pauschal-nodrag mehr — Kopfzeile und Summen sind ziehbar,
+          nur die echten Bedienbereiche (Knöpfe, Navigation, Zeilen) nicht */}
+      <div className="time-wrap">
         <div className="time-head">
-          <input
+          <DragTitle
             className="time-title"
             value={data.title}
-            onChange={(e) => updateNodeData(id, { title: e.target.value })}
+            onChange={(v) => updateNodeData(id, { title: v })}
             placeholder="Zeiterfassung"
           />
           {running && (
@@ -125,7 +128,7 @@ export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
           )}
         </div>
         {/* Live-Erfassung: eine Zeile Knöpfe — die laufende Art pulsiert */}
-        <div className="time-rec">
+        <div className="time-rec nodrag">
           {KINDS.map(([k, label, color]) => (
             <button
               key={k}
@@ -142,7 +145,7 @@ export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
           </button>
         </div>
         {/* Tages-Navigation */}
-        <div className="time-nav">
+        <div className="time-nav nodrag">
           <button title="Vortag" onClick={() => setDay(addDaysIso(day, -1))}><IChevronL size={14} /></button>
           <b>{fmtDay(day)}</b>
           <button title="Folgetag" onClick={() => setDay(addDaysIso(day, 1))}><IChevronR size={14} /></button>
@@ -153,7 +156,7 @@ export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
           </button>
         </div>
         {/* Tages-Liste: alle Zeilen direkt editierbar = Nacherfassen & Korrigieren */}
-        <div className="time-rows">
+        <div className="time-rows nodrag">
           {rows.length === 0 && <div className="time-empty">Noch nichts erfasst — oben starten oder „＋ Eintrag" für die Nacherfassung.</div>}
           {rows.map((s) => (
             <div className="time-row" key={s.id} style={{ borderLeftColor: kindColor(s.kind) }}>
