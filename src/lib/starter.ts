@@ -26,6 +26,16 @@ const shape = (pos: Pos, kind: string, text: string, color = '#eef2ff', w = 170,
 const edge = (source: AppNode, target: AppNode, label = ''): Edge =>
   ({ id: `e-${uid()}`, source: source.id, target: target.id, type: 'labeled', data: { label, kind: 'arrow' } } as Edge);
 
+// Neue Modultypen (M165): Wochenplan, Zeiterfassung, Rahmen
+const week = (pos: Pos, data: Record<string, unknown>, w = 620, hgt = 440): AppNode =>
+  ({ id: uid(), type: 'week', width: w, height: hgt, position: pos, data } as AppNode);
+const timecard = (pos: Pos, title: string, segs: Array<Record<string, unknown>>): AppNode =>
+  ({ id: uid(), type: 'time', width: 500, height: 420, position: pos, data: { title, segs } } as unknown as AppNode);
+const frame = (pos: Pos, w: number, hgt: number, name: string, color?: string): AppNode =>
+  ({ id: uid(), type: 'frame', width: w, height: hgt, position: pos, dragHandle: '.frame-head', data: { name, ...(color ? { color } : {}) } } as AppNode);
+const wentry = (day: number, start: number, dur: number, text: string, color = 0, who?: string): Record<string, unknown> =>
+  ({ id: uid(), day, start, dur, text, color, ...(who ? { who } : {}) });
+
 export interface Starter {
   spaces: Space[];
   boards: BoardDoc[];
@@ -56,7 +66,7 @@ export function buildStarter(): Starter {
     note({ x: 400, y: 100 }, 'sky', [
       h('🧭 So ist alles sortiert'),
       p('Oben links 🏠 öffnet die Übersicht: Bereiche → Projekte → Boards.'),
-      li('Bereich = Lebensbereich (Arbeitsplatz, Wissen, Zusammenarbeit)'),
+      li('Bereich = Lebensbereich (Arbeitsplatz, Wissen, Zusammenarbeit — und 🏡 Privat für Familie & Selbstorganisation)'),
       li('Projekt = Themenbündel'),
       li('Board = eine Arbeitsfläche'),
       p('Doppelte eckige Klammern verlinken Boards: [[Wissen]] oder [[Jour fixe]] — Chips unten an der Notiz springen hin.'),
@@ -98,24 +108,39 @@ export function buildStarter(): Starter {
     { id: uid(), type: 'portal', width: 200, position: { x: 60, y: 470 }, data: { boardId: idTasks } } as AppNode,
   );
 
-  // --- ⏱️ Zeiterfassung & Abwesenheit ---
+  // --- ⏱️ Zeiterfassung & Abwesenheit (M165: mit echter Zeiterfassungs-Karte) ---
   const idTime = board('⏱️ Zeiterfassung & Abwesenheit', [
-    note({ x: 70, y: 110 }, 'white', [
-      h('⏱️ Spielregeln (anpassen!)'),
-      li('Kernzeit: 9:00–15:00 Uhr (Fr bis 13:00)'),
-      li('Gleitzeitrahmen: 6:30–19:00 Uhr'),
-      li('Buchen im Zeiterfassungssystem am selben Tag'),
-      li('Abwesenheiten (Urlaub, Dienstreise, Krank) VOR Monatsabschluss prüfen'),
-      p('Diese Notiz ist ein Platzhalter — ersetze sie durch die Regeln deiner Dienststelle.'),
+    note({ x: 70, y: 110 }, 'sky', [
+      h('⏱️ So erfasst du Arbeitszeit'),
+      p('Die Karte rechts ist eine echte Zeiterfassung: Ein Klick auf Arbeit/Pause/Fahrzeit/Dienstgeschäft startet — ein Klick auf eine andere Art wechselt nahtlos, Stop beendet.'),
+      li('Zeilen sind direkt editierbar = unkompliziertes Nacherfassen'),
+      li('Ansichten: Tag / Woche / Monat / Jahr — Klick springt tiefer'),
+      li('Summen immer ohne Pausen (Fahrzeit + Dienstgeschäft zählen mit)'),
+      p('Gestern ist als Beispiel vorbefüllt — einfach löschen (✕ an der Zeile).'),
     ], { kategorie: 'zeiterfassung' }),
-    note({ x: 70, y: 440 }, 'yellow', [
+    timecard({ x: 430, y: 110 }, 'Meine Arbeitszeit', [
+      { id: uid(), date: iso(-1), start: 465, end: 480, kind: 'fahrt' },
+      { id: uid(), date: iso(-1), start: 480, end: 720, kind: 'arbeit' },
+      { id: uid(), date: iso(-1), start: 720, end: 750, kind: 'pause' },
+      { id: uid(), date: iso(-1), start: 750, end: 870, kind: 'dienst', note: 'Ortstermin (Beispiel)' },
+      { id: uid(), date: iso(-1), start: 870, end: 980, kind: 'arbeit' },
+    ]),
+    note({ x: 70, y: 470 }, 'yellow', [
       h('🗓️ Monatsende-Checkliste'),
-      check('Alle Tage gebucht?'),
-      check('Dienstreisen als Dienstgang/Dienstreise erfasst?'),
+      check('Alle Tage gebucht? (Monats-Ansicht der Karte zeigt Lücken)'),
+      check('Dienstreisen als Fahrzeit + Dienstgeschäft erfasst?'),
       check('Gleitzeitsaldo im Rahmen?'),
       check('Abwesenheiten stimmen mit Kalender überein?'),
     ]),
-    { id: uid(), type: 'calendar', width: 460, height: 360, position: { x: 420, y: 110 }, data: { scope: 'board' } } as AppNode,
+    week({ x: 990, y: 110 }, {
+      title: 'Dienstplan Referat (Beispiel)', days: 5, from: 8 * 60, to: 17 * 60,
+      entries: [
+        wentry(0, 9 * 60, 60, 'Jour fixe', 1),
+        wentry(1, 10 * 60, 90, 'Sprechstunde', 3, 'Fr. K.'),
+        wentry(3, 14 * 60, 60, 'Telefonbereitschaft', 4, 'Hr. M.'),
+        wentry(4, 8 * 60 + 30, 60, 'Wochenabschluss', 0),
+      ],
+    }),
   ]);
 
   // --- ✈️ Dienstreise: Prozess + Kanban + Checkliste ---
@@ -372,13 +397,16 @@ export function buildStarter(): Starter {
   } as AppNode;
   const projNote = note({ x: 720, y: 90 }, 'sky', [
     h('🚀 So liest du dieses Board'),
-    li('Zeitplan: Balken ziehen/resizen, ◆ = Meilenstein, Pfeile = Abhängigkeiten'),
+    li('Zeitplan: Balken ziehen/resizen, ◆ = Meilenstein, Pfeile = Abhängigkeiten; Skala oben: Tage/Wochen/Monate'),
+    li('Der blaue RAHMEN „Umsetzung" hält Kanban + Prozess zusammen: Zieh ihn an der Titel-Leiste — der Inhalt wandert mit'),
     li('Verbindungen zwischen Karten: vom Rand einer Karte ziehen'),
     li('▶ startet die Präsentation — Folienreihenfolge folgt den Verbindungen'),
-    li('Der Kalender unten zeigt NUR dieses Board (Zahnrad → Quelle)'),
+    li('Der Kalender rechts zeigt NUR dieses Board (Zahnrad → Quelle)'),
   ]);
   const projCal: AppNode = { id: uid(), type: 'calendar', width: 460, height: 340, position: { x: 980, y: 380 }, data: { scope: 'board' } } as AppNode;
-  const idProj = board('🚀 Beispielprojekt: E-Akte', [projGantt, projKanban, projMermaid, projNote, projCal], [
+  // M165: Rahmen als Struktur-Ebene zeigen — er fängt Kanban + Prozess ein
+  const projFrame = frame({ x: 30, y: 340 }, 960, 400, 'Umsetzung', '#dbe7f6');
+  const idProj = board('🚀 Beispielprojekt: E-Akte', [projFrame, projGantt, projKanban, projMermaid, projNote, projCal], [
     edge(projGantt, projKanban, 'liefert Aufgaben'),
     edge(projKanban, projMermaid, 'Prozess dazu'),
     edge(projNote, projGantt, 'erklärt'),
@@ -432,6 +460,118 @@ export function buildStarter(): Starter {
     ]),
   ]);
 
+  // --- 🧩 Eigene Apps & Dateien (M165) ---
+  const idApps = board('🧩 Eigene Apps & Dateien', [
+    note({ x: 60, y: 100 }, 'sky', [
+      h('🧩 Eigene HTML-Tools einbetten'),
+      p('Selbst gebaute Ein-Datei-Tools (HTML) laufen als eigene, abgeschottete App direkt auf dem Board — mit Start/Stop, Vollbild und eigenem Speicherstand.'),
+      li('➕ → „Eigene App (HTML)" oder die Datei einfach aufs Board ziehen'),
+      li('➕ → „App von URL": direkt von GitHub & Co. holen'),
+      li('⋮-Menü der App: eigener Browser-Tab, Herunterladen, Speicherstand sichern'),
+      li('Im Team-Projekt wandern App + Speicherstand automatisch in den Sync-Ordner'),
+    ]),
+    note({ x: 400, y: 100 }, 'mint', [
+      h('📎 Dateien aufs Board'),
+      li('➕ → „Datei einfügen" (auch mehrere) — oder Drag & Drop'),
+      li('Bilder, PDFs (mit Vorschau), E-Mails (.eml/.msg), Kalender (.ics)'),
+      li('Team-Projekt verbunden? Dann landet automatisch eine Kopie unter pixinotes-anlagen/<Board>/… im Sync-Ordner'),
+      li('Zu groß fürs Einbetten? „Aus Team-Ordner laden" holt sie bei Bedarf'),
+    ]),
+    note({ x: 740, y: 100 }, 'white', [
+      h('🛡️ Sicherheit in einem Satz'),
+      p('Eingebettete Apps laufen in einer Browser-Sandbox: Sie können rechnen, speichern und bedient werden — aber nie an deine PixiNotes-Daten, Sync-Zugangsdaten oder KI-Schlüssel.'),
+    ]),
+  ]);
+
+  /* ================= Bereich 4: Privat (M165) ================= */
+
+  // --- 👨‍👩‍👧 Familie & Haushalt ---
+  const idFam = board('👨‍👩‍👧 Familienplan', [
+    week({ x: 60, y: 100 }, {
+      title: 'Familienwoche', days: 7, from: 7 * 60, to: 21 * 60,
+      entries: [
+        wentry(0, 17 * 60, 90, 'Fußballtraining', 2, 'Kind'),
+        wentry(1, 18 * 60, 60, 'Musikschule', 4, 'Kind'),
+        wentry(2, 17 * 60 + 30, 60, 'Großeinkauf', 1),
+        wentry(4, 19 * 60, 120, 'Spieleabend', 3),
+        wentry(5, 10 * 60, 180, 'Ausflug', 0),
+        wentry(6, 12 * 60, 90, 'Mittag bei Oma', 5),
+      ],
+    }, 660, 460),
+    {
+      id: uid(), type: 'kanban', width: 400, position: { x: 770, y: 100 },
+      data: {
+        title: '🛒 Einkauf & Erledigungen',
+        cols: ['Besorgen', 'Dran', 'Erledigt'],
+        items: [
+          { id: uid(), text: 'Geschenk Geburtstag Mia', col: 0, due: iso(9) },
+          { id: uid(), text: 'Reifen wechseln lassen', col: 1 },
+          { id: uid(), text: 'Getränkekisten', col: 0 },
+        ],
+      },
+    } as AppNode,
+    note({ x: 770, y: 480 }, 'yellow', [
+      h('🏡 So nutzt ihr das privat'),
+      li('Wochenplan: Klick in eine Zelle = neuer Block, Personen über das Feld „Wer"'),
+      li('Spalten lassen sich frei umbenennen (z. B. Namen statt Wochentage)'),
+      li('Dieses Board bleibt privat, solange du es keinem Team-Projekt zuordnest'),
+    ]),
+  ]);
+
+  // --- 🎯 Selbstorganisation privat ---
+  const idSelf = board('🎯 Routinen & Ziele', [
+    week({ x: 60, y: 100 }, {
+      title: 'Meine Routinen', days: 7, axis: 'slots',
+      slots: ['Morgen', 'Nachmittag', 'Abend'],
+      from: 0, to: 180,
+      entries: [
+        wentry(0, 0, 60, 'Joggen', 2),
+        wentry(2, 0, 60, 'Joggen', 2),
+        wentry(4, 0, 60, 'Joggen', 2),
+        wentry(1, 120, 60, 'Sprachkurs-Lektion', 4),
+        wentry(3, 120, 60, 'Lesen statt Handy', 0),
+        wentry(6, 60, 60, 'Wochenplanung', 1),
+      ],
+    }, 620, 380),
+    {
+      id: uid(), type: 'kanban', width: 400, position: { x: 730, y: 100 },
+      data: {
+        title: '🎯 Ziele dieses Quartal',
+        cols: ['Idee', 'In Arbeit', 'Geschafft'],
+        items: [
+          { id: uid(), text: '10-km-Lauf unter 60 min', col: 1 },
+          { id: uid(), text: 'Keller entrümpeln', col: 0 },
+          { id: uid(), text: 'Erste-Hilfe-Kurs auffrischen', col: 0, due: iso(45) },
+        ],
+      },
+    } as AppNode,
+    note({ x: 730, y: 460 }, 'mint', [
+      h('💡 Idee'),
+      p('Die Zeiterfassungs-Karte (➕ → Zeiterfassung) funktioniert auch privat — z. B. für Lern- oder Sportzeiten mit Wochen-/Monatssummen.'),
+    ]),
+  ]);
+
+  // --- 📄 Verträge & Fristen ---
+  const idContracts = board('📄 Verträge & Fristen', [
+    note({ x: 60, y: 100 }, 'sky', [
+      h('📄 Vertrags-Karten'),
+      p('Eine Notiz pro Vertrag, Eigenschaften über 🏷 (anbieter, kuendigungsfrist, betrag) — Strg+K findet „welche Verträge laufen bei X?" sofort.'),
+    ]),
+    note({ x: 380, y: 100 }, 'white', [h('📱 Mobilfunk'), p('Anbieter: Beispiel-Tel · 24,99 €/Monat'), p('Laufzeit bis 03/2027 · 3 Monate Kündigungsfrist')], { anbieter: 'Beispiel-Tel', kuendigungsfrist: '3 Monate', betrag: '24,99' }),
+    note({ x: 680, y: 100 }, 'white', [h('⚡ Strom'), p('Anbieter: Stadtwerke · Abschlag 95 €'), p('Preisgarantie bis 12/2026 — danach vergleichen!')], { anbieter: 'Stadtwerke', betrag: '95' }),
+    {
+      id: uid(), type: 'kanban', width: 430, position: { x: 380, y: 360 },
+      data: {
+        title: '⏰ Fristen',
+        cols: ['Ansteht', 'In Arbeit', 'Erledigt'],
+        items: [
+          { id: uid(), text: 'Kfz-Versicherung vergleichen (Stichtag 30.11.)', col: 0, due: iso(40) },
+          { id: uid(), text: 'Stromtarif prüfen', col: 0, due: iso(80) },
+        ],
+      },
+    } as AppNode,
+  ]);
+
   /* ================= Hierarchie ================= */
 
   const spaces: Space[] = [
@@ -440,6 +580,7 @@ export function buildStarter(): Starter {
       projects: [
         { id: uid(), name: 'Täglicher Einstieg', boardIds: [idDesk, idTasks] },
         { id: uid(), name: 'Selbstorganisation', boardIds: [idTime, idTravel, idCar] },
+        { id: uid(), name: 'Werkzeugkasten', boardIds: [idApps] },
       ],
     },
     {
@@ -454,6 +595,13 @@ export function buildStarter(): Starter {
       projects: [
         { id: uid(), name: 'Besprechungen', boardIds: [idJf, idMag] },
         { id: uid(), name: 'Projekte & Abläufe', boardIds: [idProj, idOnb, idMind] },
+      ],
+    },
+    {
+      id: uid(), name: '🏡 Privat',
+      projects: [
+        { id: uid(), name: 'Familie & Haushalt', boardIds: [idFam] },
+        { id: uid(), name: 'Selbstorganisation', boardIds: [idSelf, idContracts] },
       ],
     },
   ];

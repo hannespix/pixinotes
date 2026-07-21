@@ -4,7 +4,7 @@
 // nur Positionen — und jede läuft über die Undo-History.
 import { askAi, MD_HINT, mdToBlocks } from './ai';
 import { nodeToText } from './serialize';
-import { makeGantt, makeKanban, makeMermaid, makeNote, makeShape } from './nodes';
+import { makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makeShape, makeTime, makeWeek } from './nodes';
 import { mutedHistory, selectActiveBoard, useBoard } from '../store';
 import { uid, type AppNode, type ShapeKind, type StickyColor } from '../types';
 import { findFreeSpot } from './arrange';
@@ -353,6 +353,12 @@ interface AiOp {
   from?: string;
   items?: Array<{ text?: string; due?: string }>;
   rows?: Array<{ name?: string; start?: string; end?: string; who?: string }>;
+  /** M165: Wochenplan-Blöcke (day 0 = Montag, start/dur in Minuten) */
+  days?: number;
+  entries?: Array<{ day?: number; start?: number; dur?: number; text?: string; who?: string }>;
+  /** M165: Rahmen — Name + ids der Karten, um die er gelegt wird */
+  name?: string;
+  around?: string[];
 }
 
 const STICKY = new Set(['yellow', 'pink', 'mint', 'sky', 'white']);
@@ -382,12 +388,15 @@ Erlaubte Operationen (max. 15):
 {"op":"gantt","title":"...","rows":[{"name":"...","start":"yyyy-mm-dd","end":"yyyy-mm-dd","who":"Name"}],"from":"<optional>"}
 {"op":"mermaid","code":"flowchart TD\\n  A[Start] --> B[Ende]","from":"<optional>"}
 {"op":"shape","shape":"process|decision|terminator","text":"...","from":"<optional>"}
+{"op":"week","title":"...","days":5|7,"entries":[{"day":0,"start":540,"dur":90,"text":"...","who":"optional"}],"from":"<optional>"} (Stunden-/Wochen-/Dienstplan: day 0=Montag … 6=Sonntag, start/dur in MINUTEN seit Mitternacht)
+{"op":"time","title":"...","from":"<optional>"} (Arbeitszeiterfassungs-Karte mit Start/Stop — Einträge macht der Nutzer selbst)
+{"op":"frame","name":"...","around":["<id>","<id>"]} (benannter Rahmen-Bereich UM die genannten vorhandenen Karten — gruppiert sie)
 {"op":"edit_note","id":"<existierende Notiz-id>","text":"KOMPLETTER neuer Inhalt als Markdown; erste Zeile = '## Überschrift'"}
 {"op":"edit_title","id":"<id>","title":"..."} (für Kanban/Zeitplan-Titel oder Form-Text)
 {"op":"add_tickets","id":"<Kanban-id>","items":[{"text":"...","due":"yyyy-mm-dd"}]}
 {"op":"edge","source":"<id>","target":"<id>","label":"kurzes Label"}
 {"op":"delete","ids":["<id>"]} (NUR wenn der Nutzer ausdrücklich löschen will)
-Modulwahl: Prozesse/Abläufe → mermaid · Aufgabenlisten → kanban · Phasen/Zeiträume/Termine → gantt · Wissen/Text → note (Markdown voll ausnutzen, erledigbare Punkte als '- [ ] ' Checklisten).
+Modulwahl: Prozesse/Abläufe → mermaid · Aufgabenlisten → kanban · Phasen/Zeiträume/Termine → gantt · Stundenplan/Wochenplan/Dienstplan → week · Arbeitszeit erfassen → time · Karten thematisch gruppieren → frame · Wissen/Text → note (Markdown voll ausnutzen, erledigbare Punkte als '- [ ] ' Checklisten).
 Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben" nutze edit_note mit dem vollständigen neuen Text; erfinde keine Fakten. Leitest du ein neues Modul aus dem Inhalt einer bestehenden Karte ab (oder bezieht es sich klar auf sie), setze deren id als "from" — das Board verbindet beide dann automatisch mit einem Pfeil.`,
   );
 
@@ -492,6 +501,58 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
         done++;
         break;
       }
+      case 'week': {
+        // Wochen-/Stundenplan (M165): Blöcke validieren, Zeitfenster ableiten
+        const days = o.days === 7 ? 7 : 5;
+        const entries = (o.entries ?? [])
+          .filter((e) => e.text?.trim()
+            && Number.isFinite(e.day) && e.day! >= 0 && e.day! < days
+            && Number.isFinite(e.start) && e.start! >= 0 && e.start! < 1440)
+          .slice(0, 40)
+          .map((e) => ({
+            id: uid(), day: e.day!, start: Math.round(e.start! / 30) * 30,
+            dur: Math.min(720, Math.max(30, Math.round((e.dur ?? 60) / 30) * 30)),
+            text: e.text!.trim().slice(0, 80),
+            who: e.who?.trim().slice(0, 30) || undefined,
+          }));
+        const node = makeWeek(place(440));
+        const minStart = Math.min(8 * 60, ...entries.map((e) => e.start));
+        const maxEnd = Math.max(17 * 60, ...entries.map((e) => e.start + e.dur));
+        Object.assign(node.data, {
+          title: (o.title ?? 'Wochenplan').slice(0, 60),
+          days,
+          from: Math.max(0, Math.floor(minStart / 60) * 60),
+          to: Math.min(24 * 60, Math.ceil(maxEnd / 60) * 60),
+          entries,
+        });
+        st.addNode(node);
+        linkFrom(o, node.id);
+        done++;
+        break;
+      }
+      case 'time': {
+        const node = makeTime(place(380));
+        (node.data as { title: string }).title = (o.title ?? 'Zeiterfassung').slice(0, 60);
+        st.addNode(node);
+        linkFrom(o, node.id);
+        done++;
+        break;
+      }
+      case 'frame': {
+        // Rahmen UM vorhandene Karten legen (M165) — Bounding-Box + Luft
+        const members = (o.around ?? []).map((mid) => known.get(mid)).filter((n): n is AppNode => !!n && n.type !== 'frame');
+        if (members.length === 0) break;
+        const sx = Math.min(...members.map((n) => n.position.x));
+        const sy = Math.min(...members.map((n) => n.position.y));
+        const ex = Math.max(...members.map((n) => n.position.x + (n.width ?? n.measured?.width ?? 260)));
+        const ey = Math.max(...members.map((n) => n.position.y + (n.height ?? n.measured?.height ?? 160)));
+        const node = makeFrame({ x: sx - 30, y: sy - 56 }, (o.name ?? o.title ?? 'Bereich').slice(0, 50));
+        node.width = ex - sx + 60;
+        node.height = ey - sy + 86;
+        st.addNode(node);
+        done++;
+        break;
+      }
       case 'edit_note': {
         const target = known.get(o.id ?? '');
         const blocks = preBlocks.get(o);
@@ -505,8 +566,9 @@ Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben
         const target = known.get(o.id ?? '');
         if (!target || !o.title?.trim()) break;
         const title = o.title.trim().slice(0, 80);
-        if (target.type === 'kanban' || target.type === 'gantt') st.updateNodeData(target.id, { title });
+        if (target.type === 'kanban' || target.type === 'gantt' || target.type === 'week' || target.type === 'time') st.updateNodeData(target.id, { title });
         else if (target.type === 'shape') st.updateNodeData(target.id, { text: title });
+        else if (target.type === 'frame' || target.type === 'htmlapp') st.updateNodeData(target.id, { name: title });
         else break;
         done++;
         break;

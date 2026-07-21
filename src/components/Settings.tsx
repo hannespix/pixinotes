@@ -713,12 +713,14 @@ export function Settings() {
         {tab === 'daten' && (
         <>
         <section className="modal-section">
-          <h3>Starter-Umgebung „Verwaltung"</h3>
+          <h3>Starter-Umgebung „Arbeit & Privat"</h3>
           <p className="modal-hint">
-            Beispiel-Struktur mit <b>3 Bereichen, 6 Projekten und 14 Boards</b> für den Verwaltungsalltag:
-            Schreibtisch, Aufgaben-Zentrale, Zeiterfassung, Dienstreise, Dienstwagen, Wissensbasis,
-            Datenschutz, Ansprechpartner, Jour fixe, Mitarbeitergespräche, Beispielprojekt, Onboarding.
-            Erklärt nebenbei jedes Modul — alles ist Beispielinhalt und frei anpassbar/löschbar.
+            Beispiel-Struktur mit <b>4 Bereichen, 9 Projekten und 18 Boards</b>: Verwaltungsalltag
+            (Schreibtisch, Aufgaben-Zentrale, Zeiterfassung mit echter Erfassungs-Karte, Dienstplan,
+            Dienstreise, Wissensbasis, Datenschutz, Jour fixe, Beispielprojekt mit Rahmen, Eigene Apps
+            &amp; Dateien) <b>plus 🏡 Privat</b> (Familienplan, Einkauf &amp; Erledigungen, Routinen &amp;
+            Ziele, Verträge &amp; Fristen). Erklärt nebenbei jedes Modul — alles ist Beispielinhalt und
+            frei anpassbar/löschbar.
           </p>
           <div className="modal-buttons">
             <button

@@ -56,10 +56,6 @@ export async function importHtmlAppFromUrl(rawUrl: string, pos: { x: number; y: 
     showToast('Nur http(s)-Adressen sind möglich.');
     return null;
   }
-  if (u.origin === window.location.origin) {
-    showToast('Diese Adresse gehört zu PixiNotes selbst — bitte die HTML-Datei über „Datei einfügen" laden.');
-    return null;
-  }
   const last = decodeURIComponent(u.pathname.split('/').pop() ?? '');
   const name = /\.html?$/i.test(last) ? last : (last || u.hostname);
   try {
@@ -75,6 +71,15 @@ export async function importHtmlAppFromUrl(rawUrl: string, pos: { x: number; y: 
     mirror(new File([text], name, { type: 'text/html' }), node.id, { done: false });
     return 'kopie';
   } catch {
+    // M165: GLEICHE Herkunft wie PixiNotes (z. B. eigene GitHub-Pages-Seite
+    // neben der PixiNotes-Instanz) darf zwar KOPIERT werden (oben — dort
+    // greift die strikte Sandbox), aber nie LIVE eingebettet: mit
+    // allow-same-origin sähe sie unseren Speicher. Scheitert hier also
+    // ausgerechnet der Kopier-Weg, gibt es keinen sicheren Live-Ausweg.
+    if (u.origin === window.location.origin) {
+      showToast('Diese Adresse liegt unter derselben Herkunft wie PixiNotes und war nicht kopierbar — Live-Einbettung ist dafür aus Sicherheitsgründen nicht möglich.');
+      return null;
+    }
     const node = makeHtmlApp(pos, { name, size: 0 });
     Object.assign(node.data, { url: u.href, live: true });
     addNode(node);
