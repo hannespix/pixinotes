@@ -2833,3 +2833,66 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   background: none !important; text-decoration: none; pointer-events: auto;
 }
 button.link-dead:disabled { opacity: 0.45; }
+
+/* ---------- Nachschlagen (M168) ---------- */
+.lookup-backdrop {
+  position: fixed; inset: 0; z-index: 80; background: rgba(30, 26, 18, 0.35);
+  display: flex; align-items: flex-start; justify-content: center; padding: 9vh 16px 16px;
+}
+.lookup-panel {
+  width: min(560px, 100%); max-height: 78vh; overflow-y: auto;
+  background: var(--surface); border-radius: 16px; padding: 14px;
+  box-shadow: 0 18px 60px rgba(30, 26, 18, 0.35);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.lookup-head { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.lookup-input {
+  flex: 1; min-width: 0; border: 1px solid var(--border-soft); background: var(--surface-2);
+  color: var(--ink); font: inherit; font-size: 14px; padding: 8px 11px; border-radius: 10px;
+}
+.lookup-input:focus { outline: none; border-color: var(--accent); }
+.lookup-lang { border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; padding: 6px; border-radius: 8px; }
+.lookup-go {
+  border: none; background: var(--accent); color: #fff; font: inherit; font-size: 12.5px;
+  font-weight: 700; padding: 8px 14px; border-radius: 10px; cursor: pointer;
+}
+.lookup-go:disabled { opacity: 0.4; cursor: default; }
+.lookup-x { border: none; background: none; color: var(--muted); cursor: pointer; padding: 6px; border-radius: 8px; }
+.lookup-x:hover { background: var(--surface-2); color: var(--ink); }
+.lookup-section {
+  font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.04em; margin-top: 4px;
+}
+.lookup-hits { display: flex; flex-direction: column; gap: 4px; }
+.lookup-hit {
+  display: flex; flex-direction: column; gap: 1px; text-decoration: none;
+  padding: 7px 10px; border-radius: 10px; border: 1px solid var(--border-soft);
+  background: var(--surface); color: var(--ink);
+}
+.lookup-hit:hover { background: var(--surface-2); }
+.lookup-hit b { font-size: 13px; }
+.lookup-hit span { font-size: 11.5px; color: var(--muted); }
+.lookup-note { font-size: 12px; color: var(--muted); padding: 4px 2px; }
+.lookup-coarse { display: flex; flex-wrap: wrap; gap: 6px; }
+.lookup-src {
+  display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+  font-size: 12px; color: var(--ink); padding: 6px 11px; border-radius: 999px;
+  border: 1px solid var(--border-soft); background: var(--surface);
+}
+.lookup-src:hover { background: var(--surface-2); }
+.lookup-src.off { opacity: 0.4; pointer-events: none; }
+.lookup-src svg { color: var(--muted); }
+.lookup-foot { font-size: 10.5px; color: var(--muted); border-top: 1px solid var(--border-soft); padding-top: 8px; }
+
+/* M168-Fix: Die Popover der Auswahl-Leiste (KI/Attribute/Ausrichten/Verschieben)
+   leben als PORTAL mit fester Bildschirmposition — innerhalb der NodeToolbar
+   deckelt der Stacking-Kontext des Flow-Viewports jeden z-index unter der Kopf-
+   und Tab-Leiste (z-index 50); bei Karten nahe der Oberkante fingen die Leisten
+   dann die Klicks auf die Menüpunkte ab (M151-Muster wie frame-/happ-menu).
+   Steht bewusst NACH dem Responsive-Block: dessen .sel-ai-menu-Zentrierung
+   (left 50% + translateX) gilt nur für die alte In-Toolbar-Variante. */
+.sel-menu-fixed {
+  position: fixed; bottom: auto; right: auto; z-index: 75;
+  max-height: min(420px, calc(100vh - 24px)); overflow-y: auto;
+  max-width: min(320px, calc(100vw - 16px));
+}

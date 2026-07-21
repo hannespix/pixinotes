@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { NodeToolbar, Position, useReactFlow } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICopy, IDuplicate, IFit, IMail, IMoveTo, IPen, ITag, ITrash, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICopy, IDuplicate, IFit, IGlobe, IMail, IMoveTo, IPen, ITag, ITrash, IWand, IX } from './Icons';
 import { ALIGN_LABEL, computeAlign, type AlignOp } from '../lib/align';
 import { mutedHistory } from '../store';
 
@@ -28,12 +29,52 @@ export function SelectionToolbar() {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const saveTemplate = useBoard((s) => s.saveTemplate);
   const { screenToFlowPosition } = useReactFlow();
-  const [aiMenu, setAiMenu] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
-  const [attrMenu, setAttrMenu] = useState(false);
-  const [alignMenu, setAlignMenu] = useState(false);
-  const [moveMenu, setMoveMenu] = useState(false);
+  // M168: Die Popover (KI/Attribute/Ausrichten/Verschieben) leben als PORTAL
+  // mit fester Bildschirmposition — innerhalb der NodeToolbar deckelt der
+  // Stacking-Kontext des Flow-Viewports sie unter Kopf- und Tab-Leiste, bei
+  // Karten nahe der Oberkante fingen die Leisten dann die Klicks ab (M151-Muster)
+  type MenuKind = 'ai' | 'attr' | 'align' | 'move';
+  const [menu, setMenu] = useState<MenuKind | null>(null);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0, down: false });
+  const toggleMenu = (kind: MenuKind) => (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (menu === kind) { setMenu(null); return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    // Zu wenig Platz über der Leiste (Kopf-/Tab-Leiste)? Dann nach unten öffnen
+    const down = r.top < 340;
+    setMenuPos({
+      x: Math.min(Math.max(8, r.right - 210), window.innerWidth - 218),
+      y: down ? r.bottom + 10 : r.top - 10,
+      down,
+    });
+    setMenu(kind);
+  };
+  useEffect(() => {
+    if (!menu) return;
+    const close = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest?.('.sel-menu-fixed') || t?.closest?.('[data-smbtn]')) return;
+      setMenu(null);
+    };
+    window.addEventListener('pointerdown', close, true);
+    return () => window.removeEventListener('pointerdown', close, true);
+  }, [menu]);
+  /** Popover-Inhalt als Portal auf oberster Ebene, am Knopf verankert */
+  const menuPortal = (extraClass: string, content: React.ReactNode) => createPortal(
+    <div
+      className={`sel-ai-menu sel-menu-fixed nodrag ${extraClass}`}
+      style={{
+        left: menuPos.x,
+        top: menuPos.y,
+        transform: menuPos.down ? undefined : 'translateY(-100%)',
+      }}
+    >
+      {content}
+    </div>,
+    document.body,
+  );
   const moveNodesToBoard = useBoard((s) => s.moveNodesToBoard);
+  const setLookup = useBoard((s) => s.setLookup);
   const spaces = useBoard((s) => s.spaces);
   const boards = useBoard((s) => s.boards);
   const [attrKey, setAttrKey] = useState('');
@@ -52,7 +93,7 @@ export function SelectionToolbar() {
 
   /** KI-Aktion nur auf die ausgewählten Karten */
   const runAi = async (fn: (nodes: AppNode[], pos: { x: number; y: number }) => Promise<string>, restoreCmd?: string) => {
-    setAiMenu(false);
+    setMenu(null);
     // GLOBALE Sperre teilt sich die Auswahl-Leiste mit dem Dock (Audit R6-K6)
     if (useBoard.getState().aiBusy) { showToast('Eine KI-Aktion läuft bereits — kurz warten.'); return; }
     useBoard.getState().setAiBusy(true);
@@ -151,8 +192,8 @@ export function SelectionToolbar() {
       <button onClick={duplicate} title="Duplizieren"><IDuplicate size={15} /></button>
       {single && (
         <span className="sel-ai-wrap">
-          {attrMenu && (
-            <div className="sel-ai-menu sel-attr-menu nodrag">
+          {menu === 'attr' && menuPortal('sel-attr-menu', (
+            <>
               <div className="sel-attr-title">Eigenschaften (schlüssel = wert)</div>
               {Object.entries(attrs).map(([k, v]) => (
                 <div key={k} className="sel-attr-row">
@@ -170,9 +211,9 @@ export function SelectionToolbar() {
                 <button onClick={addAttr} title="Hinzufügen">＋</button>
               </div>
               <div className="sel-attr-hint">z. B. status = wartet · kunde = ACME — über Strg+K durchsuchbar</div>
-            </div>
-          )}
-          <button className={attrMenu ? 'ai-on' : ''} onClick={() => { setAttrMenu((o) => !o); setAiMenu(false); }} title="Eigenschaften (Attribute) der Karte">
+            </>
+          ))}
+          <button className={menu === 'attr' ? 'ai-on' : ''} data-smbtn onClick={toggleMenu('attr')} title="Eigenschaften (Attribute) der Karte">
             <ITag size={15} />
             {Object.keys(attrs).length > 0 && <span className="sel-attr-count">{Object.keys(attrs).length}</span>}
           </button>
@@ -198,8 +239,8 @@ export function SelectionToolbar() {
       )}
       {aiReady(ai) && (
         <span className="sel-ai-wrap">
-          {aiMenu && (
-            <div className="sel-ai-menu nodrag">
+          {menu === 'ai' && menuPortal('', (
+            <>
               <input
                 className="ai-cmd-input ai-cmd-small"
                 placeholder="Anweisung für die Auswahl …"
@@ -223,9 +264,9 @@ export function SelectionToolbar() {
               {selected.length >= 2 && (
                 <button disabled={aiBusy} onClick={() => runAi((n) => aiEdges(n))}>Verbindungen vorschlagen</button>
               )}
-            </div>
-          )}
-          <button className={aiMenu || aiBusy ? 'ai-on' : ''} onClick={() => setAiMenu((o) => !o)} title="KI-Aktionen auf die Auswahl">
+            </>
+          ))}
+          <button className={menu === 'ai' || aiBusy ? 'ai-on' : ''} data-smbtn onClick={toggleMenu('ai')} title="KI-Aktionen auf die Auswahl">
             <IWand size={15} />
           </button>
         </span>
@@ -245,8 +286,8 @@ export function SelectionToolbar() {
       })()}
       {selected.length >= 2 && (
         <span className="sel-ai-wrap">
-          {alignMenu && (
-            <div className="sel-ai-menu">
+          {menu === 'align' && menuPortal('', (
+            <>
               {(['left', 'centerX', 'top', 'centerY', 'distH', 'distV', 'width'] as AlignOp[]).map((op) => (
                 <button
                   key={op}
@@ -260,26 +301,27 @@ export function SelectionToolbar() {
                       if (moves.length) st.setNodePositions(moves);
                       for (const [rid, w, h] of resizes) st.resizeNode(rid, w, h);
                     });
-                    setAlignMenu(false);
+                    setMenu(null);
                     showToast(`📏 ${ALIGN_LABEL[op].slice(2).trim()} — Strg+Z macht es rückgängig`);
                   }}
                 >
                   {ALIGN_LABEL[op]}
                 </button>
               ))}
-            </div>
-          )}
+            </>
+          ))}
           <button
-            className={alignMenu ? 'ai-on' : ''}
-            onClick={() => { setAlignMenu((o) => !o); setAiMenu(false); setAttrMenu(false); }}
+            className={menu === 'align' ? 'ai-on' : ''}
+            data-smbtn
+            onClick={toggleMenu('align')}
             title="Ausrichten & Verteilen (wie in PowerPoint)"
           ><IArrange size={15} /></button>
         </span>
       )}
       {boards.length > 1 && (
         <span className="sel-ai-wrap">
-          {moveMenu && (
-            <div className="sel-ai-menu sel-move-menu nodrag">
+          {menu === 'move' && menuPortal('sel-move-menu', (
+            <>
               <div className="sel-move-label">In Board verschieben</div>
               {spaces.map((sp) =>
                 sp.projects.map((p) =>
@@ -290,7 +332,7 @@ export function SelectionToolbar() {
                       <button
                         key={b.id}
                         onClick={() => {
-                          setMoveMenu(false);
+                          setMenu(null);
                           moveNodesToBoard(selected.map((n) => n.id), b.id);
                         }}
                         title={`${sp.name} › ${p.name} › ${b.name}`}
@@ -300,15 +342,23 @@ export function SelectionToolbar() {
                     )),
                 ),
               )}
-            </div>
-          )}
+            </>
+          ))}
           <button
-            className={moveMenu ? 'ai-on' : ''}
-            onClick={() => { setMoveMenu((o) => !o); setAiMenu(false); setAttrMenu(false); setAlignMenu(false); }}
+            className={menu === 'move' ? 'ai-on' : ''}
+            data-smbtn
+            onClick={toggleMenu('move')}
             title="In ein anderes Board verschieben — Verbindungen, Kommentare und geankerte Markierungen wandern mit"
           ><IMoveTo size={15} /></button>
         </span>
       )}
+      <button
+        onClick={() => {
+          const first = nodesToText([selected[0]]).split('\n').find((l) => l.trim())?.trim() ?? '';
+          setLookup(first.replace(/^[#\-*\d.\s☐☑]+/, '').slice(0, 80));
+        }}
+        title="Nachschlagen: Wikipedia fein durchsuchen (mehrere Treffer) + grobe Websuche-Links — Begriff kommt aus der ersten Zeile der Karte und ist im Panel änderbar"
+      ><IGlobe size={15} /></button>
       {anchoredCount > 0 && (
         <button
           onClick={() => detachStrokes(selected.map((n) => n.id))}

@@ -20,6 +20,7 @@ import { initWebdavSync } from './lib/webdav';
 import { TaskHub } from './components/TaskHub';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { HelpOverlay } from './components/HelpOverlay';
+import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
 import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
@@ -188,6 +189,7 @@ export default function App() {
         )}
         <SearchOverlay />
       <HelpOverlay />
+      <LookupPanel />
       <TooltipLayer />
         <Settings />
         <Presenter />

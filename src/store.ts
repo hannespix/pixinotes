@@ -200,6 +200,9 @@ interface BoardState {
   /** M148: Kommentar-Panel — offener Thread ('id') bzw. neuer Kommentar ('new:<nodeId>') */
   commentOpen: string | null;
   setCommentOpen: (id: string | null) => void;
+  /** M168: Nachschlage-Panel — null = zu, sonst der vorbefüllte Suchbegriff */
+  lookup: string | null;
+  setLookup: (q: string | null) => void;
   /** Kommentar anhängen: an bestehenden Thread (threadId) oder neuen an einer Karte eröffnen */
   addCommentMsg: (target: { threadId?: string; nodeId?: string }, author: string, text: string) => string | null;
   toggleCommentResolved: (threadId: string) => void;
@@ -1079,6 +1082,8 @@ export const useBoard = create<BoardState>()(
         // ---------- Kommentar-Pins (M148) ----------
         commentOpen: null,
         setCommentOpen: (id) => set({ commentOpen: id }),
+        lookup: null,
+        setLookup: (q) => set({ lookup: q }),
 
         addCommentMsg: (target, author, text) => {
           const msg = { author: author.trim().slice(0, 40) || 'Anonym', text: text.trim(), at: new Date().toISOString() };
