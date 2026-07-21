@@ -4,7 +4,7 @@ import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
 import { mutedHistory, selectActiveBoard, useBoard } from '../../store';
 import type { FrameNode } from '../../types';
 import { computeArrangement, frameMembers, sizeOf, type ArrangeMode } from '../../lib/arrange';
-import { IArrange, ICompact, IFlowH, IFlowV, IGridLayout, IPalette, IX } from '../Icons';
+import { IArrange, ICompact, IFlowH, IFlowV, IGridLayout, IMoveTo, IPalette, IX } from '../Icons';
 
 /** Pastell-Tönungen für Rahmen — bewusst blass, der Inhalt bleibt der Star */
 const FRAME_COLORS = ['', '#dbe7f6', '#dcedde', '#f6ead2', '#f4dde3', '#e6def4'];
@@ -26,6 +26,12 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const removeNode = useBoard((s) => s.removeNode);
   const showToast = useBoard((s) => s.showToast);
+  const moveNodesToBoard = useBoard((s) => s.moveNodesToBoard);
+  // M163: Ziel-Boards fürs Verschieben (Rahmen fehlt in der Auswahl-Leiste —
+  // er hat seine eigene Titel-Leiste, also wandert die Aktion in SEIN Menü)
+  const allBoards = useBoard((s) => s.boards);
+  const activeBoardId = useBoard((s) => s.activeId);
+  const otherBoards = allBoards.filter((b) => b.id !== activeBoardId);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   // M151: Das Menü lebt als PORTAL auf oberster Ebene — im Frame-Node säße es
@@ -183,6 +189,16 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
           <button onClick={() => arrangeInside('flowV')}><IFlowV size={14} /> Fluss vertikal</button>
           <button onClick={() => arrangeInside('grid')}><IGridLayout size={14} /> Raster</button>
           <button onClick={() => arrangeInside('compact')}><ICompact size={14} /> Kompakt packen</button>
+          {otherBoards.length > 0 && (
+            <>
+              <div className="frame-menu-label">Samt Inhalt verschieben nach …</div>
+              {otherBoards.map((b) => (
+                <button key={b.id} onClick={() => { setMenuPos(null); moveNodesToBoard([id], b.id); }}>
+                  <IMoveTo size={14} /> {b.name}
+                </button>
+              ))}
+            </>
+          )}
         </div>,
         document.body,
       )}

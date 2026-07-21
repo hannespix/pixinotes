@@ -2796,3 +2796,13 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .time-ymonth b { color: var(--ink); font-size: 13px; }
 .time-ymonth:hover { background: var(--surface-2); }
 .time-ymonth.is-today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* ---------- In anderes Board verschieben (M163) ---------- */
+.sel-move-menu { max-height: 300px; overflow-y: auto; min-width: 200px; }
+.sel-move-label, .frame-menu-label {
+  font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 5px 9px 3px; margin-top: 2px;
+  border-top: 1px solid var(--border-soft);
+}
+.sel-move-menu .sel-move-label { border-top: none; margin-top: 0; }
+.sel-move-proj { font-size: 10.5px; color: var(--muted); margin-left: auto; padding-left: 10px; }

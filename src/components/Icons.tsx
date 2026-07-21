@@ -102,6 +102,7 @@ export const IFrame = make(<><rect x="4" y="6.5" width="16" height="13" rx="2" /
 export const IWeek = make(<><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18" /><path d="M9 9.5V20.5" /><path d="M15 9.5V20.5" /></>);
 export const ITimer = make(<><circle cx="12" cy="13.5" r="7.5" /><path d="M12 10v3.5l2.5 2" /><path d="M9.5 2.5h5" /><path d="M12 2.5V6" /></>);
 export const IPaperclip = make(<path d="m21.4 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />);
+export const IMoveTo = make(<><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /><path d="M9 13h6" /><path d="m12.5 10.5 2.5 2.5-2.5 2.5" /></>);
 export const IMore = make(<><circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" /><circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none" /></>);
 export const IAppWindow = make(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 8.5h18" /><path d="M6 6.3h.01" /><path d="M8.6 6.3h.01" /><path d="m10 13 2.2 2.2L10 17.4" /><path d="M13.5 17.4h3.5" /></>);
 export const IMaximize = make(<><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></>);

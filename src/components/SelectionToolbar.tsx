@@ -5,7 +5,7 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICopy, IDuplicate, IFit, IMail, IPen, ITag, ITrash, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICopy, IDuplicate, IFit, IMail, IMoveTo, IPen, ITag, ITrash, IWand, IX } from './Icons';
 import { ALIGN_LABEL, computeAlign, type AlignOp } from '../lib/align';
 import { mutedHistory } from '../store';
 
@@ -32,6 +32,10 @@ export function SelectionToolbar() {
   const [aiBusy, setAiBusy] = useState(false);
   const [attrMenu, setAttrMenu] = useState(false);
   const [alignMenu, setAlignMenu] = useState(false);
+  const [moveMenu, setMoveMenu] = useState(false);
+  const moveNodesToBoard = useBoard((s) => s.moveNodesToBoard);
+  const spaces = useBoard((s) => s.spaces);
+  const boards = useBoard((s) => s.boards);
   const [attrKey, setAttrKey] = useState('');
   const [attrVal, setAttrVal] = useState('');
   const [cmd, setCmd] = useState('');
@@ -270,6 +274,39 @@ export function SelectionToolbar() {
             onClick={() => { setAlignMenu((o) => !o); setAiMenu(false); setAttrMenu(false); }}
             title="Ausrichten & Verteilen (wie in PowerPoint)"
           ><IArrange size={15} /></button>
+        </span>
+      )}
+      {boards.length > 1 && (
+        <span className="sel-ai-wrap">
+          {moveMenu && (
+            <div className="sel-ai-menu sel-move-menu nodrag">
+              <div className="sel-move-label">In Board verschieben</div>
+              {spaces.map((sp) =>
+                sp.projects.map((p) =>
+                  p.boardIds
+                    .map((bid) => boards.find((b) => b.id === bid))
+                    .filter((b): b is typeof boards[number] => !!b && b.id !== board.id)
+                    .map((b) => (
+                      <button
+                        key={b.id}
+                        onClick={() => {
+                          setMoveMenu(false);
+                          moveNodesToBoard(selected.map((n) => n.id), b.id);
+                        }}
+                        title={`${sp.name} › ${p.name} › ${b.name}`}
+                      >
+                        {b.name} <span className="sel-move-proj">{p.name}</span>
+                      </button>
+                    )),
+                ),
+              )}
+            </div>
+          )}
+          <button
+            className={moveMenu ? 'ai-on' : ''}
+            onClick={() => { setMoveMenu((o) => !o); setAiMenu(false); setAttrMenu(false); setAlignMenu(false); }}
+            title="In ein anderes Board verschieben — Verbindungen, Kommentare und geankerte Markierungen wandern mit"
+          ><IMoveTo size={15} /></button>
         </span>
       )}
       {anchoredCount > 0 && (

@@ -13,6 +13,7 @@ import {
 import { buildStarter } from './lib/starter';
 import { uid, type AppNode } from './types';
 import { anchorStroke, integrateStroke } from './lib/strokeAnchor';
+import { findFreeSpot, frameMembers } from './lib/arrange';
 
 /** Ein Freihand-Strich (Punkte in Flow-Koordinaten) */
 export interface Stroke {
@@ -60,6 +61,9 @@ interface HistoryEntry {
   /** Notiz-INHALTE haben sich geändert → Undo/Redo muss den Board-Remount
    *  erzwingen, sonst zeigen BlockNote-Editoren (lesen nur beim Mount) alten Text */
   remount?: boolean;
+  /** M163 (Karten in anderes Board verschieben): der Schritt betrifft ZWEI
+   *  Boards — Undo/Redo stellt Quelle UND Ziel gemeinsam wieder her */
+  second?: { boardId: string; nodes: AppNode[]; edges: Edge[]; drawings?: Stroke[] };
 }
 
 const HISTORY_LIMIT = 50;
@@ -214,6 +218,10 @@ interface BoardState {
   addNodeToBoard: (boardId: string, node: AppNode) => void;
   removeNode: (id: string) => void;
   removeNodes: (ids: string[]) => void;
+  /** M163: Karten in ein anderes Board verschieben — Rahmen nehmen ihre
+   *  Mitglieder mit; interne Verbindungen, Kommentar-Pins und geankerte
+   *  Zeichnungen wandern mit; EIN Undo-Schritt stellt beide Boards her */
+  moveNodesToBoard: (ids: string[], targetBoardId: string) => void;
   restoreDeleted: () => void;
   /** Zuletzt angefasste Karte dauerhaft nach vorn (persistierter zIndex, ohne Undo-Eintrag) */
   touchNode: (id: string) => void;
@@ -753,13 +761,20 @@ export const useBoard = create<BoardState>()(
           // Remount, wenn Notiz-Inhalte betroffen sind — egal woher der Eintrag
           // stammt (Versions-Restore, KI-Edit, Struktur-Undo über Tipp-Grenzen)
           const remount = entry.remount || notesDiffer(board.nodes, entry.nodes);
+          // Zwei-Board-Schritt (M163): auch das zweite Board zurückdrehen
+          const secondBoard = entry.second ? s.boards.find((b) => b.id === entry.second!.boardId) : undefined;
           set({
             past: s.past.slice(0, -1),
-            future: [...s.future, { boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount }],
+            future: [...s.future, {
+              boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount,
+              second: secondBoard ? { boardId: secondBoard.id, nodes: secondBoard.nodes, edges: secondBoard.edges, drawings: secondBoard.drawings } : undefined,
+            }],
             activeId: entry.boardId,
             view: 'board',
             boards: s.boards.map((b) =>
-              b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings } : b,
+              b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings }
+                : entry.second && b.id === entry.second.boardId ? { ...b, nodes: entry.second.nodes, edges: entry.second.edges, drawings: entry.second.drawings }
+                  : b,
             ),
             ...(remount ? { importEpoch: s.importEpoch + 1 } : {}),
           });
@@ -846,13 +861,19 @@ export const useBoard = create<BoardState>()(
           const board = s.boards.find((b) => b.id === entry.boardId);
           if (!board) { set({ future: s.future.slice(0, -1) }); return; }
           const remount = entry.remount || notesDiffer(board.nodes, entry.nodes);
+          const secondBoard = entry.second ? s.boards.find((b) => b.id === entry.second!.boardId) : undefined;
           set({
             future: s.future.slice(0, -1),
-            past: [...s.past, { boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount }],
+            past: [...s.past, {
+              boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount,
+              second: secondBoard ? { boardId: secondBoard.id, nodes: secondBoard.nodes, edges: secondBoard.edges, drawings: secondBoard.drawings } : undefined,
+            }],
             activeId: entry.boardId,
             view: 'board',
             boards: s.boards.map((b) =>
-              b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings } : b,
+              b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings }
+                : entry.second && b.id === entry.second.boardId ? { ...b, nodes: entry.second.nodes, edges: entry.second.edges, drawings: entry.second.drawings }
+                  : b,
             ),
             ...(remount ? { importEpoch: s.importEpoch + 1 } : {}),
           });
@@ -1161,6 +1182,80 @@ export const useBoard = create<BoardState>()(
           set({ lastDeleted: { boardId: board.id, nodes: removedNodes, edges: removedEdges, drawings: removedDrawings } });
           get().showToast(
             removedNodes.length === 1 ? 'Karte gelöscht' : `${removedNodes.length} Karten gelöscht`,
+            true,
+          );
+        },
+
+        moveNodesToBoard: (ids, targetBoardId) => {
+          const s = get();
+          const src = s.boards.find((b) => b.id === s.activeId);
+          const tgt = s.boards.find((b) => b.id === targetBoardId);
+          if (!src || !tgt || src.id === tgt.id) return;
+          const idSet = new Set(ids);
+          // Rahmen nehmen ihre Mitglieder mit (dieselbe Regel wie beim Ziehen)
+          for (const n of src.nodes) {
+            if (n.type === 'frame' && idSet.has(n.id)) {
+              for (const m of frameMembers(n, src.nodes, true)) idSet.add(m.id);
+            }
+          }
+          const moving = src.nodes.filter((n) => idSet.has(n.id));
+          if (moving.length === 0) return;
+
+          // EIN Undo-Schritt für BEIDE Boards (HistoryEntry.second)
+          lastEditKey = '';
+          set({
+            past: [...s.past.slice(-(HISTORY_LIMIT - 1)), {
+              boardId: src.id, nodes: src.nodes, edges: src.edges, drawings: src.drawings,
+              second: { boardId: tgt.id, nodes: tgt.nodes, edges: tgt.edges, drawings: tgt.drawings },
+            }],
+            future: [],
+          });
+
+          // Freie Stelle im Ziel suchen — die RELATIVE Anordnung der Gruppe bleibt
+          const minX = Math.min(...moving.map((n) => n.position.x));
+          const minY = Math.min(...moving.map((n) => n.position.y));
+          const maxX = Math.max(...moving.map((n) => n.position.x + (n.width ?? n.measured?.width ?? 260)));
+          const maxY = Math.max(...moving.map((n) => n.position.y + (n.height ?? n.measured?.height ?? 160)));
+          const spot = findFreeSpot(tgt.nodes, { x: minX, y: minY }, { w: maxX - minX, h: maxY - minY });
+          const dx = spot.x - minX;
+          const dy = spot.y - minY;
+
+          const movedNodes = moving.map((n) => ({
+            ...n,
+            selected: false,
+            position: { x: n.position.x + dx, y: n.position.y + dy },
+          }) as AppNode);
+          // Nur Verbindungen, deren BEIDE Enden mitwandern — Misch-Kanten entfallen
+          const movedEdges = src.edges.filter((e) => idSet.has(e.source) && idSet.has(e.target));
+          // Geankerte Striche sind RELATIV zur Karte (M127) — wandern unverändert mit
+          const movedDrawings = (src.drawings ?? []).filter((d) => d.anchor && idSet.has(d.anchor));
+          const movedComments = (src.comments ?? []).filter((c) => idSet.has(c.nodeId));
+
+          set({
+            boards: get().boards.map((b) => {
+              if (b.id === src.id) {
+                return {
+                  ...b,
+                  nodes: b.nodes.filter((n) => !idSet.has(n.id)),
+                  edges: b.edges.filter((e) => !idSet.has(e.source) && !idSet.has(e.target)),
+                  drawings: (b.drawings ?? []).filter((d) => !d.anchor || !idSet.has(d.anchor)),
+                  comments: (b.comments ?? []).filter((c) => !idSet.has(c.nodeId)),
+                };
+              }
+              if (b.id === tgt.id) {
+                return {
+                  ...b,
+                  nodes: [...b.nodes, ...movedNodes],
+                  edges: [...b.edges, ...movedEdges],
+                  drawings: [...(b.drawings ?? []), ...movedDrawings],
+                  comments: [...(b.comments ?? []), ...movedComments],
+                };
+              }
+              return b;
+            }),
+          });
+          get().showToast(
+            `${moving.length === 1 ? 'Karte' : `${moving.length} Karten`} nach „${tgt.name}" verschoben — Strg+Z holt alles zurück.`,
             true,
           );
         },
