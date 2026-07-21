@@ -32,6 +32,7 @@ import { GanttCard } from './nodes/GanttCard';
 import { CalendarCard } from './nodes/CalendarCard';
 import { FrameCard } from './nodes/FrameCard';
 import { WeekCard } from './nodes/WeekCard';
+import { TimeCard } from './nodes/TimeCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { DrawingLayer } from './DrawingLayer';
 import { CommentLayer } from './CommentLayer';
@@ -50,6 +51,7 @@ const nodeTypes: NodeTypes = {
   calendar: CalendarCard,
   frame: FrameCard,
   week: WeekCard,
+  time: TimeCard,
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };

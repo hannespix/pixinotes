@@ -100,3 +100,4 @@ export const IGridSnap = make(<><rect x="3.5" y="3.5" width="17" height="17" rx=
 export const IComment = make(<><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 8.9 8.9 0 0 1-3.2-.6L3 21l1.8-5.2a8 8 0 0 1-.8-3.3A8.4 8.4 0 0 1 12.5 4.2a8.4 8.4 0 0 1 8.5 7.3Z" /></>);
 export const IFrame = make(<><rect x="4" y="6.5" width="16" height="13" rx="2" /><path d="M4 6.5V5a1.5 1.5 0 0 1 1.5-1.5h5" /></>);
 export const IWeek = make(<><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18" /><path d="M9 9.5V20.5" /><path d="M15 9.5V20.5" /></>);
+export const ITimer = make(<><circle cx="12" cy="13.5" r="7.5" /><path d="M12 10v3.5l2.5 2" /><path d="M9.5 2.5h5" /><path d="M12 2.5V6" /></>);

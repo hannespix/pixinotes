@@ -94,6 +94,19 @@ export function makeWeek(position: Pos): AppNode {
   };
 }
 
+/** Zeiterfassung (M157): Start/Stop-Karte für Arbeitszeit, Pausen und
+ *  Dienstreisen — bewusst schmal, sie soll nebenher laufen */
+export function makeTime(position: Pos): AppNode {
+  return {
+    id: uid(),
+    type: 'time',
+    width: 460,
+    height: 380,
+    position,
+    data: { title: 'Zeiterfassung', segs: [] },
+  };
+}
+
 /** Frame (M149): startet großzügig, liegt IMMER hinter den Karten und wird
  *  nur an der Titel-Leiste gezogen (dragHandle) — Klicks auf der Fläche
  *  innerhalb des Rahmens erreichen weiter das Board */

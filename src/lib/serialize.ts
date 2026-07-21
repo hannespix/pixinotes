@@ -190,6 +190,15 @@ function baseNodeText(node: AppNode): string {
       return 'Projekt-Portal';
     case 'frame':
       return `Bereich: ${node.data.name}`;
+    case 'time': {
+      const t = node.data;
+      const labels: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause', fahrt: 'Fahrzeit', dienst: 'Dienstgeschäft' };
+      const hm = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+      const rows = [...t.segs]
+        .sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start)
+        .map((s) => `${s.date} ${hm(s.start)}-${s.end !== undefined ? hm(s.end) : 'läuft'} ${labels[s.kind] ?? s.kind}${s.note ? ` (${s.note})` : ''}`);
+      return `${t.title}\n${rows.join('\n')}`;
+    }
     case 'week': {
       const w = node.data;
       const cols = w.cols?.length ? w.cols : ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].slice(0, w.days === 7 ? 7 : 5);
@@ -246,6 +255,23 @@ export function nodeToHtml(node: AppNode): string {
     case 'frame':
       // Abschnitts-Folie im Presenter: der Rahmen-Name als Zwischentitel
       return `<h2 style="text-align:center;margin-top:1.4em">${esc(node.data.name)}</h2>`;
+    case 'time': {
+      const t = node.data;
+      const labels: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause', fahrt: 'Fahrzeit', dienst: 'Dienstgeschäft' };
+      const hm = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+      const byDate = new Map<string, typeof t.segs>();
+      for (const s of [...t.segs].sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start)) {
+        if (!byDate.has(s.date)) byDate.set(s.date, []);
+        byDate.get(s.date)!.push(s);
+      }
+      const parts = [...byDate.entries()].map(([date, list]) => {
+        const items = list.map((s) =>
+          `<li>${hm(s.start)}–${s.end !== undefined ? hm(s.end) : 'läuft'} ${labels[s.kind] ?? s.kind}${s.note ? ` <i>(${esc(s.note)})</i>` : ''}</li>`).join('');
+        const work = list.reduce((a, s) => a + (s.kind === 'pause' || s.end === undefined ? 0 : s.end - s.start), 0);
+        return `<h4>${date}</h4><ul>${items}</ul><p><b>Summe (ohne Pausen): ${hm(work)} h</b></p>`;
+      });
+      return `<h3>${esc(t.title)}</h3>${parts.join('') || '<p>—</p>'}`;
+    }
     case 'week': {
       const w = node.data;
       const dayNames = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];

@@ -215,6 +215,28 @@ export interface WeekData {
 }
 export type WeekNode = Node<WeekData, 'week'>;
 
+/** Zeiterfassung (M157): Arbeitszeit so unkompliziert wie möglich — ein
+ *  laufender Abschnitt (end fehlt), Umschalten der Art beendet den alten und
+ *  startet nahtlos den nächsten. Nacherfassen = Zeilen direkt editieren. */
+export interface TimeSeg {
+  id: string;
+  /** ISO yyyy-mm-dd */
+  date: string;
+  /** Beginn in Minuten seit Mitternacht */
+  start: number;
+  /** Ende in Minuten — fehlt ⇒ läuft gerade */
+  end?: number;
+  /** Arbeit / Pause / Fahrzeit (Dienstreise) / Dienstgeschäft */
+  kind: 'arbeit' | 'pause' | 'fahrt' | 'dienst';
+  note?: string;
+}
+export interface TimeData {
+  title: string;
+  segs: TimeSeg[];
+  [key: string]: unknown;
+}
+export type TimeNode = Node<TimeData, 'time'>;
+
 /** Frame (M149): benannter Rahmen-Bereich, der Karten optisch gruppiert und
  *  beim Verschieben (am Titel gefasst) seinen Inhalt mitnimmt */
 export interface FrameData {
@@ -226,7 +248,7 @@ export interface FrameData {
 export type FrameNode = Node<FrameData, 'frame'>;
 
 export type AppNode =
-  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode)
+  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode)
   // Archiv (M87): Karten jedes Typs lassen sich als Ganzes „erledigt" ablegen —
   // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface.
   // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
-import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape, makeWeek } from '../lib/nodes';
+import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape, makeTime, makeWeek } from '../lib/nodes';
 import { collectTasks } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
@@ -12,7 +12,7 @@ import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode
 import {
   IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMousePointer, INote,
-  IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, IWand, IWeek, IX,
+  IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
 } from './Icons';
 
 /**
@@ -260,6 +260,12 @@ export function Dock() {
               title="Stundenraster: Tage als Spalten, Uhrzeiten als Zeilen — für Stundenplan, Arbeitswoche oder Dienstplan"
             >
               <IWeek size={16} /> Wochenplan (Stunden)
+            </button>
+            <button
+              onClick={() => add(() => makeTime(centerPos(460, 380)))}
+              title="Arbeitszeit per Start/Stop erfassen — Arbeit, Pause, Fahrzeit, Dienstgeschäft; Nacherfassen direkt in der Liste"
+            >
+              <ITimer size={16} /> Zeiterfassung
             </button>
             <button onClick={() => add(() => makeMermaid(centerPos(380, 240)))}><IDiagram size={16} /> Diagramm (Mermaid)</button>
             <div className="dock-menu-label">Prozess-Formen</div>
