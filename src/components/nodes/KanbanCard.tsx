@@ -144,33 +144,24 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     // „Quelle erledigt" abgehakt.
     const allowed = (boardId: string) => !kanban.collectFrom || kanban.collectFrom.includes(boardId);
     const ignored = new Set(kanban.ignoreKeys ?? []);
+    // M166: abgewählte EINZEL-Module (feiner als die Board-Auswahl).
+    // WICHTIG: openKeys sieht sie weiterhin — sonst würden vorhandene Tickets
+    // aus einer gerade abgewählten Quelle fälschlich als „erledigt" abgehakt.
+    const excludedNodes = new Set(kanban.collectExcludeNodes ?? []);
     // Kanban-Tickets + Checklisten (Aufgaben-Zentrale-Logik) — ohne dieses Kanban selbst
     for (const t of collectTasks(boards)) {
       if (t.nodeId === id) continue;
       const key = `${t.nodeId}|${t.itemId}`;
       openKeys.add(key);
-      if (!allowed(t.boardId) || ignored.has(key)) continue;
+      if (!allowed(t.boardId) || ignored.has(key) || excludedNodes.has(t.nodeId)) continue;
       if (haveKeys.has(key) || have.has(norm(t.text))) continue;
       have.add(norm(t.text));
       fresh.push({ id: uid(), text: t.text, col: 0, due: t.due, link: { boardId: t.boardId, nodeId: t.nodeId, itemId: t.itemId } });
     }
-    // Zeitplan-Vorgänge (< 100 %) — „diverse Module" liefern mit
-    for (const b of boards) {
-      for (const n of b.nodes) {
-        if (n.type !== 'gantt' || n.id === id) continue;
-        if (n.archived) continue; // archiviert = erledigt (Tickets werden abgeglichen)
-        for (const row of (n.data as GanttData).rows ?? []) {
-          if ((row.progress ?? 0) >= 100) continue;
-          const key = `${n.id}|${row.id}`;
-          openKeys.add(key);
-          if (!allowed(b.id) || ignored.has(key)) continue;
-          const text = `${row.name} (Zeitplan)`;
-          if (haveKeys.has(key) || have.has(norm(text))) continue;
-          have.add(norm(text));
-          fresh.push({ id: uid(), text, col: 0, due: row.end, link: { boardId: b.id, nodeId: n.id, itemId: row.id } });
-        }
-      }
-    }
+    // M166-Aufräumen: Zeitplan-Vorgänge liefert collectTasks seit M113 SELBST
+    // mit (inkl. Person/Frist) — die frühere Extra-Schleife hier erzeugte beim
+    // ERSTEN Einsammeln ein Duplikat je Vorgang („… (Zeitplan)" neben dem
+    // Original, gleicher Link-Schlüssel) und ist deshalb entfernt.
     // Abgleich: Quelle nicht mehr offen → Ticket erledigen (nur vorwärts).
     // pos:-Adressen (Checklisten-Blöcke ohne echte ID) ausgenommen: BlockNote
     // vergibt beim ersten Edit echte IDs, der pos:-Schlüssel würde dann
@@ -381,6 +372,30 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     const all = boards.every((b) => next.includes(b.id));
     updateNodeData(id, { collectFrom: all ? undefined : next });
   };
+  // M166: einzelne Quell-Module je Board an-/abwählen (feiner als Boards)
+  const [openSrcBoard, setOpenSrcBoard] = useState('');
+  const toggleCollectNode = (nid: string) => {
+    const cur = kanban.collectExcludeNodes ?? [];
+    const next = cur.includes(nid) ? cur.filter((x) => x !== nid) : [...cur, nid];
+    updateNodeData(id, { collectExcludeNodes: next.length ? next : undefined });
+  };
+  /** Task-Quellen je Board: Karten, die offene Aufgaben liefern (Notiz-
+   *  Checklisten, Kanbans, Zeitpläne — collectTasks kennt sie ALLE, M113)
+   *  + Zahl der offenen Punkte */
+  const taskSourcesOf = (bid: string): Array<{ nodeId: string; label: string; count: number }> => {
+    const counts = new Map<string, number>();
+    for (const t of collectTasks(boards)) {
+      if (t.boardId !== bid || t.nodeId === id) continue;
+      counts.set(t.nodeId, (counts.get(t.nodeId) ?? 0) + 1);
+    }
+    const b = boards.find((x) => x.id === bid);
+    return [...counts.entries()].map(([nodeId, count]) => {
+      const n = b?.nodes.find((x) => x.id === nodeId);
+      const first = n ? (nodeToText(n).split('\n').find((l) => l.trim())?.trim() ?? '') : '';
+      return { nodeId, count, label: (first || 'Karte').slice(0, 46) };
+    });
+  };
+
   const clearBoardTickets = (bid: string) => {
     const gone = kanban.items.filter((it) => it.link?.boardId === bid);
     if (gone.length === 0) return;
@@ -702,25 +717,57 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             <span>Einsammeln konfigurieren</span>
             <button title="Schließen" onClick={() => setCollectOpen(false)}><IX size={12} /></button>
           </div>
-          <div className="collect-hint">Haken = aus diesem Board sammeln · ✕ räumt dessen Tickets aus dem Kanban</div>
+          <div className="collect-hint">Haken = aus diesem Board sammeln · ▸ zeigt die einzelnen Quellen-Karten · ✕ räumt Tickets aus dem Kanban</div>
           {boards.map((b) => {
             const checked = !kanban.collectFrom || kanban.collectFrom.includes(b.id);
             const cnt = kanban.items.filter((it) => it.link?.boardId === b.id).length;
+            const srcOpen = openSrcBoard === b.id;
+            const sources = srcOpen ? taskSourcesOf(b.id) : [];
             return (
-              <div className="collect-row" key={b.id}>
-                <label title={checked ? 'Wird eingesammelt — Klick schließt dieses Board aus' : 'Ausgeschlossen — Klick sammelt wieder ein'}>
-                  <input type="checkbox" checked={checked} onChange={() => toggleCollectBoard(b.id)} />
-                  <span className="collect-name">{b.name}</span>
-                </label>
-                {cnt > 0 && <span className="kanban-count">{cnt}</span>}
-                {cnt > 0 && (
+              <div key={b.id}>
+                <div className="collect-row">
                   <button
-                    className="collect-clear"
-                    title={`Alle ${cnt} Tickets aus „${b.name}" aus diesem Kanban entfernen (kommen nicht automatisch wieder)`}
-                    onClick={() => clearBoardTickets(b.id)}
+                    className={`collect-expand ${srcOpen ? 'open' : ''}`}
+                    title={srcOpen ? 'Quellen-Karten einklappen' : 'Einzelne Quellen-Karten dieses Boards an-/abwählen'}
+                    onClick={() => setOpenSrcBoard(srcOpen ? '' : b.id)}
                   >
-                    <IX size={10} />
+                    <IChevronR size={11} />
                   </button>
+                  <label title={checked ? 'Wird eingesammelt — Klick schließt dieses Board aus' : 'Ausgeschlossen — Klick sammelt wieder ein'}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleCollectBoard(b.id)} />
+                    <span className="collect-name">{b.name}</span>
+                  </label>
+                  {cnt > 0 && <span className="kanban-count">{cnt}</span>}
+                  {cnt > 0 && (
+                    <button
+                      className="collect-clear"
+                      title={`Alle ${cnt} Tickets aus „${b.name}" aus diesem Kanban entfernen (kommen nicht automatisch wieder)`}
+                      onClick={() => clearBoardTickets(b.id)}
+                    >
+                      <IX size={10} />
+                    </button>
+                  )}
+                </div>
+                {srcOpen && (
+                  /* M166: die einzelnen Quellen-Karten (Checklisten-Notizen,
+                     Kanbans, Zeitpläne) — abwählen überspringt NUR diese Karte */
+                  <div className="collect-subs">
+                    {sources.length === 0 && <div className="collect-sub-empty">Keine offenen Aufgaben-Quellen auf diesem Board.</div>}
+                    {sources.map((s) => {
+                      const on = !(kanban.collectExcludeNodes ?? []).includes(s.nodeId);
+                      return (
+                        <label
+                          className="collect-sub"
+                          key={s.nodeId}
+                          title={on ? 'Wird eingesammelt — Klick überspringt künftig genau diese Karte' : 'Abgewählt — Klick sammelt diese Karte wieder ein'}
+                        >
+                          <input type="checkbox" checked={on} disabled={!checked} onChange={() => toggleCollectNode(s.nodeId)} />
+                          <span className="collect-name">{s.label}</span>
+                          <span className="collect-sub-count">{s.count}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 )}
               </div>
             );

@@ -98,6 +98,9 @@ export interface KanbanData {
   groupBy?: 'board' | 'none';
   /** Nur aus diesen Boards einsammeln (undefined = aus allen) */
   collectFrom?: string[];
+  /** M166: EINZELNE Quell-Module (Karten-Ids), die beim Einsammeln übersprungen
+   *  werden — feiner als die Board-Auswahl (z. B. eine private Checkliste) */
+  collectExcludeNodes?: string[];
   /** „nodeId|itemId"-Schlüssel entfernter Tickets — werden NICHT erneut eingesammelt */
   ignoreKeys?: string[];
   /** WIP-Limits je Spaltenindex (M119): 0/undefined = kein Limit; für die
