@@ -8,7 +8,7 @@ import { loadAppStateFromTeam, loadAttachment, saveAppStateToTeam } from '../../
 import { triggerDownload } from '../../lib/download';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
-import { IAppWindow, ICloud, IDownload, IMaximize, IMinimize, IMore, IPlay, IReload, IStopSq } from '../Icons';
+import { IAppWindow, ICloud, ICopy, IDownload, IMaximize, IMinimize, IMore, IPlay, IReload, IStopSq } from '../Icons';
 
 /**
  * Sandbox OHNE allow-same-origin — die Sicherheits-Grundentscheidung:
@@ -18,6 +18,12 @@ import { IAppWindow, ICloud, IDownload, IMaximize, IMinimize, IMore, IPlay, IRel
  * localStorage stellt der injizierte Shim bereit (htmlStore, pro Karte).
  */
 const SANDBOX = 'allow-scripts allow-forms allow-modals allow-popups allow-pointer-lock allow-downloads';
+/** Live-Modus (M164): FREMDE URLs dürfen allow-same-origin bekommen — sie
+ *  laufen unter IHRER Herkunft, und die Same-Origin-Policy des Browsers hält
+ *  sie von PixiNotes fern. So funktioniert deren eigener localStorage normal.
+ *  Für Inhalte UNSERER Herkunft wäre das gefährlich — deshalb lehnt der
+ *  URL-Import gleichnamige Herkunft ab und die Karte startet sie nicht. */
+const SANDBOX_LIVE = `${SANDBOX} allow-same-origin`;
 
 const fmtSize = (b: number) => (b >= 1_000_000 ? `${(b / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1000))} kB`);
 
@@ -35,7 +41,10 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   const [srcdoc, setSrcdoc] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [full, setFull] = useState(false);
+  const [liveOn, setLiveOn] = useState(false);
+  const [liveKey, setLiveKey] = useState(0); // Neustart der Live-Einbettung
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const isLive = !!data.live && !!data.url;
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   // App-Name ohne Stale-Closure (Team-Speicherstand wird verzögert geschrieben)
@@ -57,6 +66,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
 
   useEffect(() => {
     let alive = true;
+    if (isLive) { setHasSrc(true); return; } // Live: kein lokaler Quelltext nötig
     void (async () => {
       try {
         if (await loadHtml(id)) { if (alive) setHasSrc(true); return; }
@@ -76,7 +86,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
       }
     })();
     return () => { alive = false; };
-  }, [id, data.ref]);
+  }, [id, data.ref, isLive]);
 
   // Speicher-Meldungen der App (localStorage-Shim) entgegennehmen → IndexedDB.
   // Kommt auch aus dem EIGENEN Browser-Tab an (M162): dessen Hüll-Seite
@@ -118,6 +128,17 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   };
 
   const start = async () => {
+    if (isLive) {
+      // Sicherheitsnetz: Live nur für FREMDE Herkunft (s. SANDBOX_LIVE)
+      try {
+        if (new URL(data.url!).origin === window.location.origin) {
+          showToast('Diese Adresse gehört zu PixiNotes selbst — bitte als Datei laden.');
+          return;
+        }
+      } catch { return; }
+      setLiveOn(true);
+      return;
+    }
     setStarting(true);
     try {
       const [html, st] = await Promise.all([loadHtml(id), freshestState()]);
@@ -131,10 +152,32 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   const stop = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
     setSrcdoc(null);
+    setLiveOn(false);
   };
 
   /** Neustart lädt auch den zuletzt GESPEICHERTEN App-Zustand frisch */
-  const restart = async () => { setSrcdoc(null); await start(); };
+  const restart = async () => {
+    if (isLive) { setLiveKey((k) => k + 1); return; }
+    setSrcdoc(null);
+    await start();
+  };
+
+  /** M164: Kopie-Karten mit gemerkter Quelle frisch von der URL laden */
+  const reloadFromUrl = async () => {
+    setMenuPos(null);
+    if (!data.url) return;
+    try {
+      const res = await fetch(data.url, { mode: 'cors' });
+      if (!res.ok) throw new Error(String(res.status));
+      const text = await res.text();
+      await saveHtml(id, text);
+      updateNodeData(id, { size: text.length });
+      showToast('Frisch von der Quelle geladen.');
+      if (srcdoc !== null) { setSrcdoc(null); await start(); }
+    } catch {
+      showToast('Die Quelle war nicht erreichbar (offline oder CORS) — der lokale Stand bleibt.');
+    }
+  };
 
   const toggleFull = () => {
     if (document.fullscreenElement) { void document.exitFullscreen(); return; }
@@ -197,7 +240,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     showToast(`„${f.name}" geladen — mit Start ausführen.`);
   };
 
-  const runningUi = srcdoc !== null;
+  const runningUi = srcdoc !== null || liveOn;
   return (
     <CardShell id={id} selected={selected} minWidth={340} minHeight={260} className="happ-card">
       {/* M160: kein dragHandle mehr — die ganze Karte zieht normal (Griff,
@@ -212,7 +255,9 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
             onChange={(v) => updateNodeData(id, { name: v })}
             placeholder="App"
           />
-          <span className="happ-size">{fmtSize(data.size)}</span>
+          <span className="happ-size" title={isLive ? `Live eingebettet von ${data.url}` : undefined}>
+            {isLive ? 'live' : fmtSize(data.size)}
+          </span>
           {runningUi ? (
             <>
               <button className="happ-btn nodrag" title="Neu starten (lädt die App frisch)" onClick={restart}><IReload size={14} /></button>
@@ -241,7 +286,13 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
         <div className="happ-body">
           {runningUi ? (
             <>
-              <iframe className="happ-frame" title={data.name} sandbox={SANDBOX} srcDoc={srcdoc} />
+              {liveOn ? (
+                /* M164 Live: fremde URL direkt — die Same-Origin-Policy des
+                   Browsers hält sie von PixiNotes fern (s. SANDBOX_LIVE) */
+                <iframe key={liveKey} className="happ-frame" title={data.name} sandbox={SANDBOX_LIVE} src={data.url} />
+              ) : (
+                <iframe className="happ-frame" title={data.name} sandbox={SANDBOX} srcDoc={srcdoc ?? ''} />
+              )}
               {/* Nicht ausgewählt: Klicks gehören dem Board (auswählen/ziehen).
                   Erst die AUSGEWÄHLTE Karte reicht Eingaben an die App durch —
                   sonst könnte man das Board über einer App nie mehr schwenken. */}
@@ -257,11 +308,17 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
               ) : (
                 <>
                   <IAppWindow size={34} />
-                  <p>{hasSrc === null ? 'Inhalt wird geladen …' : 'Bereit — die App startet erst auf Klick und läuft dann als eigene, abgeschottete Instanz.'}</p>
+                  <p>
+                    {hasSrc === null
+                      ? 'Inhalt wird geladen …'
+                      : isLive
+                        ? `Live-App von ${(() => { try { return new URL(data.url!).hostname; } catch { return '?'; } })()} — läuft direkt von der Quelle und braucht dafür Internet.`
+                        : 'Bereit — die App startet erst auf Klick und läuft dann als eigene, abgeschottete Instanz.'}
+                  </p>
                   <button className="happ-load happ-go nodrag" disabled={hasSrc !== true || starting} onClick={start}>
                     <IPlay size={14} /> Starten
                   </button>
-                  <button className="happ-load nodrag" onClick={() => fileRef.current?.click()}>Andere Datei laden</button>
+                  {!isLive && <button className="happ-load nodrag" onClick={() => fileRef.current?.click()}>Andere Datei laden</button>}
                 </>
               )}
             </div>
@@ -278,18 +335,36 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
       {/* Funktions-Menü als Portal (die Karte hat overflow:hidden, M151-Muster) */}
       {menuPos && createPortal(
         <div className="happ-menu nodrag" style={{ left: menuPos.x, top: menuPos.y }}>
-          <button disabled={hasSrc !== true} onClick={() => void openInTab()}>
+          <button
+            disabled={hasSrc !== true}
+            onClick={() => { if (isLive) { setMenuPos(null); window.open(data.url, '_blank'); } else void openInTab(); }}
+          >
             <IAppWindow size={14} /> Im eigenen Browser-Tab öffnen
           </button>
-          <button disabled={hasSrc !== true} onClick={() => void downloadHtml()}>
-            <IDownload size={14} /> HTML-Datei herunterladen
-          </button>
-          <button onClick={() => void teamSaveNow()}>
-            <ICloud size={14} /> Speicherstand im Team-Ordner sichern
-          </button>
-          <button onClick={() => { setMenuPos(null); fileRef.current?.click(); }}>
-            <IReload size={14} /> Andere HTML-Datei laden
-          </button>
+          {isLive ? (
+            <button onClick={() => { setMenuPos(null); void navigator.clipboard?.writeText(data.url ?? '').then(() => showToast('Adresse kopiert.')); }}>
+              <ICopy size={14} /> Adresse (URL) kopieren
+            </button>
+          ) : (
+            <button disabled={hasSrc !== true} onClick={() => void downloadHtml()}>
+              <IDownload size={14} /> HTML-Datei herunterladen
+            </button>
+          )}
+          {!isLive && (
+            <button onClick={() => void teamSaveNow()}>
+              <ICloud size={14} /> Speicherstand im Team-Ordner sichern
+            </button>
+          )}
+          {!isLive && data.url && (
+            <button onClick={() => void reloadFromUrl()} title={`Quelle: ${data.url}`}>
+              <IReload size={14} /> Von der Quelle neu laden
+            </button>
+          )}
+          {!isLive && (
+            <button onClick={() => { setMenuPos(null); fileRef.current?.click(); }}>
+              <IReload size={14} /> Andere HTML-Datei laden
+            </button>
+          )}
         </div>,
         document.body,
       )}

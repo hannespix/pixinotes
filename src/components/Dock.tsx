@@ -3,7 +3,7 @@ import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
 import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape, makeTime, makeWeek } from '../lib/nodes';
-import { importFilesToBoard } from '../lib/importFiles';
+import { importFilesToBoard, importHtmlAppFromUrl } from '../lib/importFiles';
 import { collectTasks } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
@@ -232,6 +232,14 @@ export function Dock() {
     if (placed > 1) showToast(`${placed} Dateien eingefügt.`);
   };
 
+  // App von URL (M164): Kopie laden, wenn die Quelle es erlaubt — sonst live
+  const addHtmlAppUrl = async () => {
+    const url = window.prompt('Adresse (URL) der HTML-App — z. B. ein Tool auf GitHub:');
+    setAddMenu(false);
+    if (!url?.trim()) return;
+    await importHtmlAppFromUrl(url, centerPos(560, 440));
+  };
+
   // Eigene App (M158): HTML-Datei über den Datei-Dialog wählen — läuft seit
   // M159 durch dieselbe Import-Pipeline (inkl. Kopie in den Team-Ordner)
   const happFileRef = useRef<HTMLInputElement | null>(null);
@@ -304,6 +312,12 @@ export function Dock() {
               title="Eine HTML-Datei als lauffähige App-Karte einbetten — sie läuft abgeschottet in der Karte, mit Start/Stop und Vollbild. Geht auch per Drag & Drop aufs Board."
             >
               <IAppWindow size={16} /> Eigene App (HTML)
+            </button>
+            <button
+              onClick={() => void addHtmlAppUrl()}
+              title="HTML-App direkt von einer Internet-Adresse holen: Erlaubt die Quelle das Kopieren (z. B. GitHub), wird sie eine normale lokale App-Karte — sonst wird sie live eingebettet (braucht dann Internet)."
+            >
+              <IAppWindow size={16} /> App von URL
             </button>
             <div className="dock-menu-label">Verknüpfen</div>
             <button onClick={() => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board'); }}><IFolder size={16} /> Portal zu Board</button>

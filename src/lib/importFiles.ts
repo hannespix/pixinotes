@@ -31,6 +31,58 @@ function mirror(file: File, nodeId: string | null, note: { done: boolean }): voi
     .catch(() => {});
 }
 
+/**
+ * M164: HTML-App von einer URL holen. Zwei Wege, automatisch gewählt:
+ * - KOPIE: Die Quelle erlaubt browserübergreifendes Lesen (CORS — z. B.
+ *   GitHub Raw, Gists, CDNs) → die App wird eine ganz normale lokale
+ *   App-Karte (offline, Team-Spiegel, Speicherstand); die URL bleibt als
+ *   Quelle vermerkt („Von der Quelle neu laden").
+ * - LIVE: Die Quelle verweigert das Lesen → die Karte bettet die URL direkt
+ *   ein (iframe). Immer aktuell, braucht aber Internet; die Seite läuft
+ *   unter IHRER Herkunft — die Browser-Same-Origin-Policy hält sie von
+ *   PixiNotes fern. Adressen mit PixiNotes' EIGENER Herkunft werden
+ *   abgelehnt (sie bekämen sonst im Live-Modus unseren Speicher zu sehen).
+ */
+export async function importHtmlAppFromUrl(rawUrl: string, pos: { x: number; y: number }): Promise<'kopie' | 'live' | null> {
+  const { addNode, showToast } = useBoard.getState();
+  let u: URL;
+  try {
+    u = new URL(rawUrl.trim());
+  } catch {
+    showToast('Das ist keine gültige Adresse (URL).');
+    return null;
+  }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') {
+    showToast('Nur http(s)-Adressen sind möglich.');
+    return null;
+  }
+  if (u.origin === window.location.origin) {
+    showToast('Diese Adresse gehört zu PixiNotes selbst — bitte die HTML-Datei über „Datei einfügen" laden.');
+    return null;
+  }
+  const last = decodeURIComponent(u.pathname.split('/').pop() ?? '');
+  const name = /\.html?$/i.test(last) ? last : (last || u.hostname);
+  try {
+    const res = await fetch(u.href, { mode: 'cors' });
+    if (!res.ok) throw new Error(String(res.status));
+    const text = await res.text();
+    if (!/<[a-z!]/i.test(text)) throw new Error('kein HTML');
+    const node = makeHtmlApp(pos, { name, size: text.length });
+    (node.data as { url?: string }).url = u.href;
+    await saveHtml(node.id, text);
+    addNode(node);
+    showToast(`„${name}" von der Adresse kopiert — mit ▶ starten (läuft auch offline).`);
+    mirror(new File([text], name, { type: 'text/html' }), node.id, { done: false });
+    return 'kopie';
+  } catch {
+    const node = makeHtmlApp(pos, { name, size: 0 });
+    Object.assign(node.data, { url: u.href, live: true });
+    addNode(node);
+    showToast('Die Quelle erlaubt kein Kopieren (CORS) — die App wird LIVE eingebettet und braucht dafür Internet.');
+    return 'live';
+  }
+}
+
 /** Dateien importieren; gibt die Zahl der angelegten/verarbeiteten Karten zurück */
 export async function importFilesToBoard(files: File[], basePos: { x: number; y: number }): Promise<number> {
   const { addNode, showToast } = useBoard.getState();

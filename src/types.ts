@@ -251,6 +251,11 @@ export interface HtmlAppData {
   /** M159: Pfad der Kopie im Team-Ordner — fehlender Quelltext wird auf
    *  anderen Geräten von dort automatisch nachgeladen */
   ref?: string;
+  /** M164: Quell-URL. Mit lokalem Quelltext = „Von der Quelle neu laden";
+   *  OHNE lokalen Quelltext = Live-Modus (iframe lädt die URL direkt) */
+  url?: string;
+  /** M164: true = bewusst live einbetten (Quelle erlaubt kein Kopieren/CORS) */
+  live?: boolean;
   [key: string]: unknown;
 }
 export type HtmlAppNode = Node<HtmlAppData, 'htmlapp'>;
