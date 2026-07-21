@@ -2754,3 +2754,45 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 .drag-title:active { cursor: grabbing; }
 .drag-title-empty { color: var(--muted); }
+
+/* ---------- Zeiterfassung: Ansichtsmodi (M161) ---------- */
+.time-views { display: inline-flex; gap: 2px; background: var(--surface-2); border-radius: 8px; padding: 2px; }
+.time-views button {
+  border: none; background: none; font: inherit; font-size: 11px; color: var(--muted);
+  padding: 3px 8px; border-radius: 6px; cursor: pointer;
+}
+.time-views button.on { background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: 0 1px 3px rgba(50, 40, 20, 0.15); }
+/* Woche: eine klickbare Zeile je Tag */
+.time-wday {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border: none; border-left: 3px solid var(--border-soft); border-radius: 8px;
+  background: var(--surface-2); font: inherit; font-size: 12px; color: var(--ink);
+  padding: 6px 10px; margin-bottom: 4px; cursor: pointer; text-align: left;
+}
+.time-wday:hover { filter: brightness(0.97); }
+.time-wday.is-today { border-left-color: var(--accent); }
+.time-wday.is-empty { color: var(--muted); background: none; border: 1px dashed var(--border-soft); border-left-width: 3px; padding: 5px 10px; }
+.time-wday-name { width: 86px; flex: none; font-weight: 700; }
+.time-wday-kinds { flex: 1; display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; }
+.time-wday-total { font-weight: 700; white-space: nowrap; }
+/* Monat: Kalenderraster mit Tagessummen */
+.time-month { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; align-content: start; overflow-y: auto; }
+.time-month-wd { font-size: 10.5px; color: var(--muted); text-align: center; padding-bottom: 2px; }
+.time-mday {
+  border: 1px solid var(--border-soft); border-radius: 7px; background: var(--surface);
+  font: inherit; font-size: 10.5px; color: var(--muted); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 2px; min-height: 38px;
+}
+.time-mday b { color: var(--ink); font-size: 11px; }
+.time-mday:hover { background: var(--surface-2); }
+.time-mday.is-today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* Jahr: 12 Monats-Kacheln */
+.time-year { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; align-content: start; }
+.time-ymonth {
+  border: 1px solid var(--border-soft); border-radius: 9px; background: var(--surface);
+  font: inherit; font-size: 11.5px; color: var(--muted); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 4px;
+}
+.time-ymonth b { color: var(--ink); font-size: 13px; }
+.time-ymonth:hover { background: var(--surface-2); }
+.time-ymonth.is-today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }

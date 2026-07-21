@@ -236,6 +236,8 @@ export interface TimeSeg {
 export interface TimeData {
   title: string;
   segs: TimeSeg[];
+  /** Ansicht (M161): Tag = editierbares Protokoll, sonst verdichtete Summen */
+  view?: 'tag' | 'woche' | 'monat' | 'jahr';
   [key: string]: unknown;
 }
 export type TimeNode = Node<TimeData, 'time'>;
