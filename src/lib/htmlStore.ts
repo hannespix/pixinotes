@@ -10,16 +10,24 @@ import { idbDel, idbGet, idbKeys, idbSet } from './syncFolder';
 
 const SRC = (id: string) => `happ:${id}`;
 const STATE = (id: string) => `happ-state:${id}`;
+/** Zeitstempel des lokalen Speicherstands (M162) — Vergleichsbasis, um beim
+ *  Start zu entscheiden, ob der Team-Speicherstand neuer ist */
+const STATE_AT = (id: string) => `happ-state-at:${id}`;
 
 export const saveHtml = (id: string, html: string) => idbSet(SRC(id), html);
 export const loadHtml = (id: string) => idbGet<string>(SRC(id));
 
-export const saveAppState = (id: string, data: Record<string, string>) => idbSet(STATE(id), data);
+export async function saveAppState(id: string, data: Record<string, string>, at?: string): Promise<void> {
+  await idbSet(STATE(id), data);
+  await idbSet(STATE_AT(id), at ?? new Date().toISOString());
+}
 export const loadAppState = (id: string) => idbGet<Record<string, string>>(STATE(id));
+export const loadAppStateAt = (id: string) => idbGet<string>(STATE_AT(id));
 
 export async function deleteHtmlApp(id: string): Promise<void> {
   await idbDel(SRC(id));
   await idbDel(STATE(id));
+  await idbDel(STATE_AT(id));
 }
 
 /**
@@ -33,7 +41,7 @@ export async function cleanupOrphanHtml(validIds: Set<string>): Promise<void> {
     const keys = await idbKeys();
     for (const key of keys) {
       if (typeof key !== 'string') continue;
-      const m = /^happ(?:-state)?:(.+)$/.exec(key);
+      const m = /^happ(?:-state(?:-at)?)?:(.+)$/.exec(key);
       if (m && !validIds.has(m[1])) await idbDel(key);
     }
   } catch {

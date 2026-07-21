@@ -113,7 +113,7 @@ export function Board() {
     // wird ganz normal gescrollt und navigiert.
     const OVERLAY_SEL = '.bn-suggestion-menu, .bn-side-menu, .mantine-Menu-dropdown, .mantine-Popover-dropdown, '
       + '[role="menu"], [role="listbox"], [role="dialog"], .modal-backdrop, .ticket-modal-backdrop, '
-      + '.dock-menu, .sel-ai-menu, .sel-attr-menu, .tab-tree, .tab-bg-menu, .mm-pop, .draw-palette, .comment-panel, .frame-menu, .week-pop';
+      + '.dock-menu, .sel-ai-menu, .sel-attr-menu, .tab-tree, .tab-bg-menu, .mm-pop, .draw-palette, .comment-panel, .frame-menu, .week-pop, .happ-menu';
     const inOverlay = (t: Element | null) => !!t?.closest?.(OVERLAY_SEL);
     const onWheel = (e: WheelEvent) => {
       const target = e.target as Element | null;
@@ -449,6 +449,10 @@ export function Board() {
 
   const onNodeClick = useCallback((e: React.MouseEvent, node: Node) => {
     if (!useBoard.getState().clickZoom || e.shiftKey) return; // Shift = Mehrfachauswahl
+    // Rahmen NIE per Klick einpassen (User-Report M162): Klicks treffen dort
+    // immer die Titel-Leiste/Werkzeuge — bei großen Rahmen zoomte die Ansicht
+    // so weit heraus, dass genau diese Werkzeuge unlesbar wurden
+    if (node.type === 'frame') return;
     const { x, y, zoom } = getViewport();
     const w = (node.measured?.width ?? 260) * zoom;
     const h = (node.measured?.height ?? 160) * zoom;

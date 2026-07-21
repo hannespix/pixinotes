@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { HtmlAppNode } from '../../types';
-import { composeSrcdoc, loadAppState, loadHtml, saveAppState, saveHtml } from '../../lib/htmlStore';
-import { loadAttachment } from '../../lib/attachments';
+import { composeSrcdoc, loadAppState, loadAppStateAt, loadHtml, saveAppState, saveHtml } from '../../lib/htmlStore';
+import { loadAppStateFromTeam, loadAttachment, saveAppStateToTeam } from '../../lib/attachments';
+import { triggerDownload } from '../../lib/download';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
-import { IAppWindow, IMaximize, IMinimize, IPlay, IReload, IStopSq } from '../Icons';
+import { IAppWindow, ICloud, IDownload, IMaximize, IMinimize, IMore, IPlay, IReload, IStopSq } from '../Icons';
 
 /**
  * Sandbox OHNE allow-same-origin — die Sicherheits-Grundentscheidung:
@@ -33,8 +35,25 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   const [srcdoc, setSrcdoc] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [full, setFull] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  // App-Name ohne Stale-Closure (Team-Speicherstand wird verzögert geschrieben)
+  const nameRef = useRef(data.name);
+  nameRef.current = data.name;
+  const teamSaveT = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Funktions-Menü schließt bei Klick irgendwo anders (Muster frame-menu M151)
+  useEffect(() => {
+    if (!menuPos) return;
+    const close = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (t?.closest?.('.happ-menu') || t?.closest?.(`[data-hmbtn="${id}"]`)) return;
+      setMenuPos(null);
+    };
+    window.addEventListener('pointerdown', close, true);
+    return () => window.removeEventListener('pointerdown', close, true);
+  }, [menuPos, id]);
 
   useEffect(() => {
     let alive = true;
@@ -59,14 +78,21 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     return () => { alive = false; };
   }, [id, data.ref]);
 
-  // Speicher-Meldungen der App (localStorage-Shim) entgegennehmen → IndexedDB
+  // Speicher-Meldungen der App (localStorage-Shim) entgegennehmen → IndexedDB.
+  // Kommt auch aus dem EIGENEN Browser-Tab an (M162): dessen Hüll-Seite
+  // leitet die Meldungen per postMessage an dieses Fenster weiter.
+  // Zusätzlich (M162): Speicherstand verzögert in den Team-Ordner spiegeln.
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       const d = e.data as { __pixiHapp?: string; store?: Record<string, string> } | null;
-      if (d?.__pixiHapp === id && d.store) void saveAppState(id, d.store);
+      if (d?.__pixiHapp !== id || !d.store) return;
+      const store = d.store;
+      void saveAppState(id, store);
+      clearTimeout(teamSaveT.current);
+      teamSaveT.current = setTimeout(() => { void saveAppStateToTeam(id, nameRef.current, store).catch(() => {}); }, 4000);
     };
     window.addEventListener('message', onMsg);
-    return () => window.removeEventListener('message', onMsg);
+    return () => { window.removeEventListener('message', onMsg); clearTimeout(teamSaveT.current); };
   }, [id]);
 
   // Vollbild-Zustand verfolgen (Esc beendet es am Steuerknopf vorbei)
@@ -76,12 +102,27 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     return () => document.removeEventListener('fullscreenchange', onFs);
   }, []);
 
+  /** Aktuellsten Speicherstand wählen: Team-Ordner vs. lokal — der NEUERE
+   *  gewinnt (M162); ein übernommener Team-Stand wird lokal mitgeschrieben */
+  const freshestState = async (): Promise<Record<string, string>> => {
+    const [st, at] = await Promise.all([loadAppState(id), loadAppStateAt(id)]);
+    try {
+      const team = await loadAppStateFromTeam(id);
+      if (team && (!st || !at || team.savedAt > at)) {
+        await saveAppState(id, team.data, team.savedAt);
+        if (st) showToast(`Neuerer Team-Speicherstand geladen (${new Date(team.savedAt).toLocaleString('de-DE')}).`);
+        return team.data;
+      }
+    } catch { /* Team-Ordner nicht erreichbar → lokaler Stand */ }
+    return st ?? {};
+  };
+
   const start = async () => {
     setStarting(true);
     try {
-      const [html, st] = await Promise.all([loadHtml(id), loadAppState(id)]);
+      const [html, st] = await Promise.all([loadHtml(id), freshestState()]);
       if (!html) { setHasSrc(false); return; }
-      setSrcdoc(composeSrcdoc(id, html, st ?? {}));
+      setSrcdoc(composeSrcdoc(id, html, st));
     } finally {
       setStarting(false);
     }
@@ -101,6 +142,49 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     // dabei ERHALTEN (kein Reparenting, kein Reload) — genau deshalb kein
     // Overlay-Portal. Esc oder der Knopf führen zurück aufs Board.
     wrapRef.current?.requestFullscreen?.().catch(() => showToast('Vollbild wird von diesem Browser hier nicht erlaubt.'));
+  };
+
+  /** M162: Im eigenen Browser-Tab öffnen — über eine Hüll-Seite, die die App
+   *  in EXAKT DERSELBEN Sandbox laufen lässt wie die Karte (sonst käme das
+   *  Tool im neuen Tab an den PixiNotes-Speicher!). Die Hülle leitet die
+   *  Speicher-Meldungen des Shims per postMessage an dieses Fenster zurück —
+   *  Spielstand/Zustand aus dem Tab landet also weiter in der Karte. */
+  const openInTab = async () => {
+    setMenuPos(null);
+    const [html, st] = await Promise.all([loadHtml(id), freshestState()]);
+    if (!html) { showToast('Kein Inhalt auf diesem Gerät — zuerst die HTML-Datei laden.'); return; }
+    // „</“ im JSON-Text maskieren, damit kein früher </script> die Hülle sprengt
+    const innerJson = JSON.stringify(composeSrcdoc(id, html, st)).replace(/<\//g, '<\\/');
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const wrapper = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>${esc(data.name)} – PixiNotes App</title>`
+      + '<style>html,body{margin:0;height:100%;background:#fff}iframe{border:0;width:100%;height:100%;display:block}</style></head><body>'
+      + `<iframe sandbox="${SANDBOX}"></iframe>`
+      + '<script>window.addEventListener("message",function(e){if(e.data&&e.data.__pixiHapp&&window.opener){try{window.opener.postMessage(e.data,"*")}catch(_){}}});'
+      + `document.querySelector("iframe").srcdoc=${innerJson};</` + 'script></body></html>';
+    const url = URL.createObjectURL(new Blob([wrapper], { type: 'text/html' }));
+    const win = window.open(url, '_blank');
+    if (!win) showToast('Pop-up blockiert — bitte für diese Seite erlauben.');
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  };
+
+  /** Die Original-HTML-Datei wieder herausgeben (z. B. zum Weitergeben) */
+  const downloadHtml = async () => {
+    setMenuPos(null);
+    const html = await loadHtml(id);
+    if (!html) { showToast('Kein Inhalt auf diesem Gerät.'); return; }
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    triggerDownload(url, /\.html?$/i.test(data.name) ? data.name : `${data.name}.html`);
+    setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  };
+
+  /** Speicherstand SOFORT in den Team-Ordner schreiben (sonst debounced) */
+  const teamSaveNow = async () => {
+    setMenuPos(null);
+    const st = (await loadAppState(id)) ?? {};
+    const savedAt = await saveAppStateToTeam(id, data.name, st);
+    showToast(savedAt
+      ? `Speicherstand im Team-Ordner gesichert (pixinotes-anlagen/…/Apps/).`
+      : 'Kein Team-Ordner verbunden — das Board gehört zu keinem Team-Projekt (⚙️ → Synchronisation).');
   };
 
   const pickFile = async (f: File | undefined) => {
@@ -142,6 +226,17 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
           <button className="happ-btn nodrag" disabled={!runningUi} title={full ? 'Vollbild verlassen (Esc)' : 'Vollbild — die App läuft dabei weiter'} onClick={toggleFull}>
             {full ? <IMinimize size={14} /> : <IMaximize size={14} />}
           </button>
+          <button
+            className="happ-btn nodrag"
+            data-hmbtn={id}
+            title="Weitere Funktionen (eigener Tab, Herunterladen, Speicherstand)"
+            onClick={(e) => {
+              const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              setMenuPos(menuPos ? null : { x: Math.max(8, r.right - 250), y: r.bottom + 6 });
+            }}
+          >
+            <IMore size={14} />
+          </button>
         </div>
         <div className="happ-body">
           {runningUi ? (
@@ -180,6 +275,24 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
           onChange={(e) => { void pickFile(e.target.files?.[0]); e.target.value = ''; }}
         />
       </div>
+      {/* Funktions-Menü als Portal (die Karte hat overflow:hidden, M151-Muster) */}
+      {menuPos && createPortal(
+        <div className="happ-menu nodrag" style={{ left: menuPos.x, top: menuPos.y }}>
+          <button disabled={hasSrc !== true} onClick={() => void openInTab()}>
+            <IAppWindow size={14} /> Im eigenen Browser-Tab öffnen
+          </button>
+          <button disabled={hasSrc !== true} onClick={() => void downloadHtml()}>
+            <IDownload size={14} /> HTML-Datei herunterladen
+          </button>
+          <button onClick={() => void teamSaveNow()}>
+            <ICloud size={14} /> Speicherstand im Team-Ordner sichern
+          </button>
+          <button onClick={() => { setMenuPos(null); fileRef.current?.click(); }}>
+            <IReload size={14} /> Andere HTML-Datei laden
+          </button>
+        </div>,
+        document.body,
+      )}
     </CardShell>
   );
 }

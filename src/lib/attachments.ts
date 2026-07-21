@@ -85,6 +85,70 @@ export async function mirrorAttachment(file: File): Promise<string | null> {
   }
 }
 
+// ---------- App-Speicherstände (M162) ----------
+// Der localStorage-Shim jeder eingebetteten App (M158) sichert seinen Stand
+// lokal in IndexedDB. Gehört das Board zu einem Team-Projekt, wird derselbe
+// Stand zusätzlich als kleine JSON-Datei neben den App-Kopien abgelegt:
+//   pixinotes-anlagen/<Board>/Apps/speicherstand-<kartenId>.json
+// Die Karten-Id ist auf allen Geräten identisch (sie reist im Projekt-Paket
+// mit) und überlebt Umbenennungen der App — beim Start gewinnt der NEUERE
+// Stand (Team vs. lokal). Inhalt ist ausschließlich das, was die App selbst
+// gespeichert hat — PixiNotes-Daten oder Zugangsdaten sind nie dabei.
+
+export interface AppStatePayload {
+  app: 'pixinotes-appzustand';
+  version: 1;
+  savedAt: string;
+  name: string;
+  data: Record<string, string>;
+}
+
+const stateFileName = (cardId: string) => `speicherstand-${cardId}.json`;
+
+export async function saveAppStateToTeam(cardId: string, name: string, data: Record<string, string>): Promise<string | null> {
+  const projectId = activeTeamProjectId();
+  if (!projectId) return null;
+  const handle = await projectHandle(projectId);
+  if (!handle || !(await ensurePermission(handle, false))) return null;
+  const s = useBoard.getState();
+  const board = s.boards.find((b) => b.id === s.activeId);
+  const dir = await descend(handle, [ATT_ROOT, sanitize(board?.name ?? 'Board'), 'Apps'], true);
+  if (!dir) return null;
+  try {
+    const payload: AppStatePayload = { app: 'pixinotes-appzustand', version: 1, savedAt: new Date().toISOString(), name, data };
+    const fh = await dir.getFileHandle(stateFileName(cardId), { create: true });
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify(payload));
+    await w.close();
+    return payload.savedAt;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadAppStateFromTeam(cardId: string): Promise<AppStatePayload | null> {
+  const ids = Object.keys(projectSyncMeta());
+  const active = activeTeamProjectId();
+  if (active) ids.sort((a, b) => (a === active ? -1 : b === active ? 1 : 0));
+  const s = useBoard.getState();
+  const board = s.boards.find((b) => b.id === s.activeId);
+  const segs = [ATT_ROOT, sanitize(board?.name ?? 'Board'), 'Apps'];
+  for (const id of ids) {
+    const handle = await projectHandle(id);
+    if (!handle || !(await ensurePermission(handle, false))) continue;
+    const dir = await descend(handle, segs, false);
+    if (!dir) continue;
+    try {
+      const f = await (await dir.getFileHandle(stateFileName(cardId))).getFile();
+      const p = JSON.parse(await f.text()) as AppStatePayload;
+      if (p?.app === 'pixinotes-appzustand' && p.data && typeof p.data === 'object') return p;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
 /**
  * Anlage über ihren relativen Pfad aus einem der verbundenen Team-Ordner
  * holen — zuerst aus dem Projekt des aktiven Boards, dann aus allen anderen
