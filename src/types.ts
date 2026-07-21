@@ -42,6 +42,9 @@ export interface FileData {
   size: number;
   mime?: string;
   dataUrl?: string;
+  /** M159: relativer Pfad der Kopie im Team-Ordner (pixinotes-anlagen/…) —
+   *  darüber holen Teammitglieder Dateien, die zu groß fürs Einbetten sind */
+  ref?: string;
   [key: string]: unknown;
 }
 
@@ -243,6 +246,9 @@ export type TimeNode = Node<TimeData, 'time'>;
 export interface HtmlAppData {
   name: string;
   size: number;
+  /** M159: Pfad der Kopie im Team-Ordner — fehlender Quelltext wird auf
+   *  anderen Geräten von dort automatisch nachgeladen */
+  ref?: string;
   [key: string]: unknown;
 }
 export type HtmlAppNode = Node<HtmlAppData, 'htmlapp'>;

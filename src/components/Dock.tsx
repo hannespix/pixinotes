@@ -2,8 +2,8 @@ import { useMemo, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
-import { makeCalendar, makeFrame, makeGantt, makeHtmlApp, makeKanban, makeMermaid, makeNote, makePortal, makeShape, makeTime, makeWeek } from '../lib/nodes';
-import { saveHtml } from '../lib/htmlStore';
+import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape, makeTime, makeWeek } from '../lib/nodes';
+import { importFilesToBoard } from '../lib/importFiles';
 import { collectTasks } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
@@ -13,7 +13,7 @@ import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode
 import {
   IAppWindow, IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMousePointer, INote,
-  IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
+  IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
 } from './Icons';
 
 /**
@@ -222,15 +222,23 @@ export function Dock() {
   };
   const addShape = (shape: ShapeKind) => add(() => makeShape(centerPos(150, 70), shape));
 
-  // Eigene App (M158): HTML-Datei über den Datei-Dialog wählen — am
-  // Smartphone gibt es kein Drag & Drop, dieser Weg ist dort der einzige
+  // Datei einfügen (M159): der Dialog-Weg für ALLE integrierbaren Typen —
+  // am Smartphone gibt es kein Drag & Drop, dieser Weg ist dort der einzige
+  const anyFileRef = useRef<HTMLInputElement | null>(null);
+  const addFiles = async (list: FileList | null) => {
+    if (!list || list.length === 0) return;
+    setAddMenu(false);
+    const placed = await importFilesToBoard(Array.from(list), centerPos(320, 200));
+    if (placed > 1) showToast(`${placed} Dateien eingefügt.`);
+  };
+
+  // Eigene App (M158): HTML-Datei über den Datei-Dialog wählen — läuft seit
+  // M159 durch dieselbe Import-Pipeline (inkl. Kopie in den Team-Ordner)
   const happFileRef = useRef<HTMLInputElement | null>(null);
   const addHtmlApp = async (f: File | undefined) => {
     if (!f) return;
-    const node = makeHtmlApp(centerPos(560, 440), { name: f.name, size: f.size });
-    await saveHtml(node.id, await f.text());
-    add(() => node);
-    showToast(`„${f.name}" als App-Karte abgelegt — mit ▶ starten.`);
+    setAddMenu(false);
+    await importFilesToBoard([f], centerPos(560, 440));
   };
   const pickTool = (t: typeof tool) => { setTool(t); setDrawMenu(false); };
   const drawing = tool !== 'select';
@@ -284,14 +292,21 @@ export function Dock() {
             <button onClick={() => addShape('process')}><ISquare size={16} /> Schritt</button>
             <button onClick={() => addShape('decision')}><IDiamond size={16} /> Entscheidung</button>
             <button onClick={() => addShape('terminator')}><IPill size={16} /> Start/Ende</button>
-            <div className="dock-menu-label">Verknüpfen</div>
-            <button onClick={() => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board'); }}><IFolder size={16} /> Portal zu Board</button>
+            <div className="dock-menu-label">Dateien</div>
+            <button
+              onClick={() => anyFileRef.current?.click()}
+              title="Lokale Dateien aufs Board holen (auch mehrere auf einmal): Bilder, PDFs mit Vorschau, E-Mails (.eml/.msg), Kalender (.ics), HTML-Apps, Board-Dateien — alles andere als Datei-Karte. Gehört das Board zu einem Team-Projekt, landet automatisch eine Kopie im Sync-Ordner. Geht auch per Drag & Drop."
+            >
+              <IPaperclip size={16} /> Datei einfügen
+            </button>
             <button
               onClick={() => happFileRef.current?.click()}
               title="Eine HTML-Datei als lauffähige App-Karte einbetten — sie läuft abgeschottet in der Karte, mit Start/Stop und Vollbild. Geht auch per Drag & Drop aufs Board."
             >
               <IAppWindow size={16} /> Eigene App (HTML)
             </button>
+            <div className="dock-menu-label">Verknüpfen</div>
+            <button onClick={() => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board'); }}><IFolder size={16} /> Portal zu Board</button>
             {templates.length > 0 && (
               <>
                 <div className="dock-menu-label">Vorlagen</div>
@@ -505,6 +520,13 @@ export function Dock() {
         accept=".html,.htm,text/html"
         style={{ display: 'none' }}
         onChange={(e) => { void addHtmlApp(e.target.files?.[0]); e.target.value = ''; }}
+      />
+      <input
+        ref={anyFileRef}
+        type="file"
+        multiple
+        style={{ display: 'none' }}
+        onChange={(e) => { void addFiles(e.target.files); e.target.value = ''; }}
       />
     </div>
   );

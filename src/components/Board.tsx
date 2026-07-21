@@ -14,12 +14,9 @@ import {
 import { mutedHistory, selectActiveBoard, useBoard } from '../store';
 import { frameMembers } from '../lib/arrange';
 import { computePush } from '../lib/physics';
-import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from '../lib/parseEmail';
-import { imageFileToDataUrl, readFileAsDataUrl } from '../lib/image';
-import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, makeNote } from '../lib/nodes';
-import { saveHtml } from '../lib/htmlStore';
-import { cloneSharedBoard, parseBoardPayload } from '../lib/share';
-import { mergeEvents, parseIcs, type IcsEvent } from '../lib/ics';
+import { imageFileToDataUrl } from '../lib/image';
+import { canEmbed, makeImage, makeNote } from '../lib/nodes';
+import { importFilesToBoard } from '../lib/importFiles';
 import type { AppNode } from '../types';
 import { NoteCard } from './nodes/NoteCard';
 import { EmailCard } from './nodes/EmailCard';
@@ -614,78 +611,9 @@ export function Board() {
         return;
       }
 
-      let offset = 0;
-      for (const file of files) {
-        const pos = { x: basePos.x + offset, y: basePos.y + offset };
-        offset += 36;
-        const ext = file.name.split('.').pop()?.toLowerCase();
-
-        try {
-          if (ext === 'ics') {
-            // Outlook/Google/Apple-Kalender: Termine in die Kalender-Karte mergen
-            const events = parseIcs(await file.text());
-            if (events.length === 0) { showToast('Keine Termine in der .ics-Datei gefunden.'); continue; }
-            const st = useBoard.getState();
-            let cal: AppNode | undefined = selectActiveBoard(st).nodes.find((n) => n.type === 'calendar');
-            if (!cal) { cal = makeCalendar(pos); st.addNode(cal); }
-            const cur = (cal.data.icsEvents as IcsEvent[] | undefined) ?? [];
-            st.updateNodeData(cal.id, { icsEvents: mergeEvents(cur, events) });
-            showToast(`${events.length} Termin(e) in die Kalender-Karte importiert`);
-            continue;
-          }
-          if (ext === 'json') {
-            // Geteiltes Board (.pixiboard.json) oder Voll-Export per Drop importieren
-            const text = await file.text();
-            const shared = parseBoardPayload(text);
-            if (shared) {
-              useBoard.getState().importBoard(cloneSharedBoard(shared));
-              showToast(`Geteiltes Board „${shared.name}" importiert`);
-              continue;
-            }
-            const full = JSON.parse(text);
-            if (full?.app === 'pixinotes' && Array.isArray(full.boards) && full.boards.length > 0) {
-              if (window.confirm(`Kompletten Stand vom ${full.savedAt ? new Date(full.savedAt).toLocaleString('de-DE') : '?'} laden? Die aktuellen Boards werden ersetzt.`)) {
-                useBoard.getState().importSync(full.boards, full.spaces ?? [], full.activeId ?? full.boards[0].id);
-                showToast('Stand aus Datei geladen');
-              }
-              continue;
-            }
-            showToast('JSON erkannt, aber keine PixiNotes-Datei — als Datei-Karte abgelegt.');
-          }
-          if (ext === 'html' || ext === 'htm') {
-            // Eigene App (M158): Quelltext nach IndexedDB — NICHT ins Board
-            // (mehrere MB würden den localStorage-Stand sprengen, s. canEmbed)
-            const node = makeHtmlApp(pos, { name: file.name, size: file.size });
-            await saveHtml(node.id, await file.text());
-            addNode(node);
-            showToast(`„${file.name}" als App-Karte abgelegt — mit ▶ starten.`);
-            continue;
-          }
-          if (ext === 'eml' || file.type === 'message/rfc822') {
-            const email = await parseEml(await file.arrayBuffer());
-            addNode(makeEmail(pos, email));
-            showToast(`📧 „${email.subject}" importiert — ${email.attachments.length} Anhänge als Chips`);
-          } else if (ext === 'msg') {
-            const email = await parseMsg(await file.arrayBuffer());
-            addNode(makeEmail(pos, email));
-            showToast(`📧 Outlook-Mail „${email.subject}" importiert`);
-          } else if (file.type.startsWith('image/')) {
-            const src = await imageFileToDataUrl(file);
-            if (!canEmbed(src.length)) { showToast('⚠️ Speicher fast voll — Bild nicht eingebettet. Exportiere in den Datenordner (⚙️).'); continue; }
-            addNode(makeImage(pos, src, file.name));
-          } else {
-            let dataUrl = file.size <= MAX_EMBED_BYTES ? await readFileAsDataUrl(file) : undefined;
-            if (dataUrl && !canEmbed(dataUrl.length)) {
-              dataUrl = undefined;
-              showToast('⚠️ Speicher fast voll — Datei nur als Verweis abgelegt. Exportiere in den Datenordner (⚙️).');
-            }
-            addNode(makeFile(pos, { name: file.name, size: file.size, mime: file.type || guessMime(file.name), dataUrl }));
-          }
-        } catch (err) {
-          console.error('Import fehlgeschlagen:', err);
-          showToast(`⚠️ „${file.name}" konnte nicht gelesen werden`);
-        }
-      }
+      // Gemeinsame Import-Pipeline (M159) — dieselbe Weiche bedient auch den
+      // „Datei einfügen"-Dialog im ＋-Menü und spiegelt in den Team-Ordner
+      await importFilesToBoard(files, basePos);
     },
     [addNode, screenToFlowPosition, showToast],
   );

@@ -38,7 +38,7 @@ export interface SyncPayload {
 // Minimale Typen für die File System Access API (nicht in allen TS-Libs)
 interface SyncFileHandle {
   getFile(): Promise<File>;
-  createWritable(): Promise<{ write(d: string): Promise<void>; close(): Promise<void> }>;
+  createWritable(): Promise<{ write(d: string | Blob | ArrayBuffer): Promise<void>; close(): Promise<void> }>;
 }
 export interface SyncDirHandle {
   name: string;
@@ -47,6 +47,8 @@ export interface SyncDirHandle {
   getFileHandle(name: string, o?: { create?: boolean }): Promise<SyncFileHandle>;
   /** Verzeichnis auflisten (Team-Sync M145: Projekt-Pakete im Ordner finden) */
   values?(): AsyncIterable<{ kind: string; name: string }>;
+  /** Unterordner (M159: strukturierte Anlagen-Ablage pixinotes-anlagen/…) */
+  getDirectoryHandle?(name: string, o?: { create?: boolean }): Promise<SyncDirHandle>;
 }
 
 export const syncSupported = (): boolean => 'showDirectoryPicker' in window;

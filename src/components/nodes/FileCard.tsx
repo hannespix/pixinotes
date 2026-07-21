@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
+import { mutedHistory, useBoard } from '../../store';
 import type { FileNode } from '../../types';
-import { formatBytes } from '../../lib/parseEmail';
+import { formatBytes, MAX_EMBED_BYTES } from '../../lib/parseEmail';
 import { triggerDownload } from '../../lib/download';
+import { readFileAsDataUrl } from '../../lib/image';
+import { canEmbed } from '../../lib/nodes';
+import { loadAttachment } from '../../lib/attachments';
 import { renderPdfPage } from '../../lib/pdf';
 import { CardShell } from './CardShell';
 import { IDownload } from '../Icons';
@@ -25,26 +29,63 @@ const ICONS: Record<string, string> = {
  * Seiten-Navigation. Andere Dateien: Icon + Name, Klick lädt herunter.
  */
 export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
+  const showToast = useBoard((s) => s.showToast);
   const file = data;
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
   const icon = ICONS[ext] ?? '📎';
   const isPdf = ext === 'pdf' && !!file.dataUrl;
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const download = () => {
     if (file.dataUrl) triggerDownload(file.dataUrl, file.name);
   };
 
+  /** M159: Datei liegt (nur) als Kopie im Team-Ordner — von dort holen.
+   *  Passt sie ins Speicher-Budget, wird sie dauerhaft eingebettet (PDF-
+   *  Vorschau!), sonst wird sie direkt heruntergeladen. */
+  const loadFromTeam = async () => {
+    if (!file.ref || loading) return;
+    setLoading(true);
+    try {
+      const f = await loadAttachment(file.ref);
+      if (!f) {
+        showToast('Im Team-Ordner nicht gefunden — ist der Ordner verbunden und synchronisiert (⚙️ → Synchronisation)?');
+        return;
+      }
+      if (f.size <= MAX_EMBED_BYTES) {
+        const dataUrl = await readFileAsDataUrl(f);
+        if (canEmbed(dataUrl.length)) {
+          // ohne Undo-Schritt — das Nachladen ist keine inhaltliche Bearbeitung
+          mutedHistory(() => useBoard.getState().updateNodeData(id, { dataUrl, size: f.size }));
+          showToast(`„${file.name}" aus dem Team-Ordner geladen.`);
+          return;
+        }
+      }
+      const url = URL.createObjectURL(f);
+      triggerDownload(url, file.name);
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <CardShell id={id} selected={selected} minWidth={170} minHeight={50} className="file-card">
-      <button className="file-body nodrag" onClick={isPdf ? () => setViewerOpen(true) : download}
-        title={isPdf ? 'Vorschau öffnen' : file.dataUrl ? 'Herunterladen' : undefined}>
+      <button className="file-body nodrag" onClick={isPdf ? () => setViewerOpen(true) : file.dataUrl ? download : loadFromTeam}
+        title={isPdf ? 'Vorschau öffnen' : file.dataUrl ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
         <span className="file-icon">{icon}</span>
         <span>
           <b>{file.name}</b>
           <span className="meta"> {formatBytes(file.size)}</span>
         </span>
       </button>
+      {!file.dataUrl && file.ref && (
+        <button className="file-teamload nodrag" disabled={loading} onClick={loadFromTeam}
+          title={`Kopie liegt im Team-Ordner: ${file.ref}`}>
+          {loading ? 'Lädt …' : 'Aus Team-Ordner laden'}
+        </button>
+      )}
       {isPdf && <PdfThumb dataUrl={file.dataUrl!} onOpen={() => setViewerOpen(true)} />}
       {viewerOpen && <PdfViewer dataUrl={file.dataUrl!} name={file.name} onClose={() => setViewerOpen(false)} onDownload={download} />}
     </CardShell>

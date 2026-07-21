@@ -3,6 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { HtmlAppNode } from '../../types';
 import { composeSrcdoc, loadAppState, loadHtml, saveAppState, saveHtml } from '../../lib/htmlStore';
+import { loadAttachment } from '../../lib/attachments';
 import { CardShell } from './CardShell';
 import { IAppWindow, IMaximize, IMinimize, IPlay, IReload, IStopSq } from '../Icons';
 
@@ -36,9 +37,26 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
 
   useEffect(() => {
     let alive = true;
-    loadHtml(id).then((html) => { if (alive) setHasSrc(!!html); }).catch(() => setHasSrc(false));
+    void (async () => {
+      try {
+        if (await loadHtml(id)) { if (alive) setHasSrc(true); return; }
+        // M159: Quelltext fehlt lokal (anderes Gerät) — liegt eine Kopie im
+        // Team-Ordner, wird sie still nachgeladen (fragt NIE nach Rechten)
+        if (data.ref) {
+          const f = await loadAttachment(data.ref);
+          if (f) {
+            await saveHtml(id, await f.text());
+            if (alive) setHasSrc(true);
+            return;
+          }
+        }
+        if (alive) setHasSrc(false);
+      } catch {
+        if (alive) setHasSrc(false);
+      }
+    })();
     return () => { alive = false; };
-  }, [id]);
+  }, [id, data.ref]);
 
   // Speicher-Meldungen der App (localStorage-Shim) entgegennehmen → IndexedDB
   useEffect(() => {
