@@ -16,7 +16,8 @@ import { frameMembers } from '../lib/arrange';
 import { computePush } from '../lib/physics';
 import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from '../lib/parseEmail';
 import { imageFileToDataUrl, readFileAsDataUrl } from '../lib/image';
-import { canEmbed, makeCalendar, makeEmail, makeFile, makeImage, makeNote } from '../lib/nodes';
+import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, makeNote } from '../lib/nodes';
+import { saveHtml } from '../lib/htmlStore';
 import { cloneSharedBoard, parseBoardPayload } from '../lib/share';
 import { mergeEvents, parseIcs, type IcsEvent } from '../lib/ics';
 import type { AppNode } from '../types';
@@ -33,6 +34,7 @@ import { CalendarCard } from './nodes/CalendarCard';
 import { FrameCard } from './nodes/FrameCard';
 import { WeekCard } from './nodes/WeekCard';
 import { TimeCard } from './nodes/TimeCard';
+import { HtmlAppCard } from './nodes/HtmlAppCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { DrawingLayer } from './DrawingLayer';
 import { CommentLayer } from './CommentLayer';
@@ -52,6 +54,7 @@ const nodeTypes: NodeTypes = {
   frame: FrameCard,
   week: WeekCard,
   time: TimeCard,
+  htmlapp: HtmlAppCard,
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
@@ -648,6 +651,15 @@ export function Board() {
               continue;
             }
             showToast('JSON erkannt, aber keine PixiNotes-Datei — als Datei-Karte abgelegt.');
+          }
+          if (ext === 'html' || ext === 'htm') {
+            // Eigene App (M158): Quelltext nach IndexedDB — NICHT ins Board
+            // (mehrere MB würden den localStorage-Stand sprengen, s. canEmbed)
+            const node = makeHtmlApp(pos, { name: file.name, size: file.size });
+            await saveHtml(node.id, await file.text());
+            addNode(node);
+            showToast(`„${file.name}" als App-Karte abgelegt — mit ▶ starten.`);
+            continue;
           }
           if (ext === 'eml' || file.type === 'message/rfc822') {
             const email = await parseEml(await file.arrayBuffer());

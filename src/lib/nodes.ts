@@ -107,6 +107,22 @@ export function makeTime(position: Pos): AppNode {
   };
 }
 
+/** Eigene App (M158): eingebettetes HTML-Tool. Ziehen nur an der Kopfleiste
+ *  (dragHandle) — die Fläche gehört der laufenden App. Auto-Größe ist aus:
+ *  die App füllt die Karte, es gibt keinen „Inhalt", an dem man messen könnte. */
+export function makeHtmlApp(position: Pos, file: { name: string; size: number }): AppNode {
+  return {
+    id: uid(),
+    type: 'htmlapp',
+    width: 560,
+    height: 440,
+    position,
+    dragHandle: '.happ-head',
+    autoFit: false,
+    data: { name: file.name, size: file.size },
+  };
+}
+
 /** Frame (M149): startet großzügig, liegt IMMER hinter den Karten und wird
  *  nur an der Titel-Leiste gezogen (dragHandle) — Klicks auf der Fläche
  *  innerhalb des Rahmens erreichen weiter das Board */

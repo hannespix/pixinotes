@@ -101,3 +101,8 @@ export const IComment = make(<><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 8.9 8.9 0
 export const IFrame = make(<><rect x="4" y="6.5" width="16" height="13" rx="2" /><path d="M4 6.5V5a1.5 1.5 0 0 1 1.5-1.5h5" /></>);
 export const IWeek = make(<><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18" /><path d="M9 9.5V20.5" /><path d="M15 9.5V20.5" /></>);
 export const ITimer = make(<><circle cx="12" cy="13.5" r="7.5" /><path d="M12 10v3.5l2.5 2" /><path d="M9.5 2.5h5" /><path d="M12 2.5V6" /></>);
+export const IAppWindow = make(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 8.5h18" /><path d="M6 6.3h.01" /><path d="M8.6 6.3h.01" /><path d="m10 13 2.2 2.2L10 17.4" /><path d="M13.5 17.4h3.5" /></>);
+export const IMaximize = make(<><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" /></>);
+export const IMinimize = make(<><path d="M4 14h6v6" /><path d="M20 10h-6V4" /><path d="M14 10l7-7" /><path d="M3 21l7-7" /></>);
+export const IReload = make(<><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>);
+export const IStopSq = make(<rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor" stroke="none" />);

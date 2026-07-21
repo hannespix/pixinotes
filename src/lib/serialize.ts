@@ -190,6 +190,8 @@ function baseNodeText(node: AppNode): string {
       return 'Projekt-Portal';
     case 'frame':
       return `Bereich: ${node.data.name}`;
+    case 'htmlapp':
+      return `Eigene App: ${node.data.name} (${formatBytes(node.data.size)})`;
     case 'time': {
       const t = node.data;
       const labels: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause', fahrt: 'Fahrzeit', dienst: 'Dienstgeschäft' };
@@ -255,6 +257,8 @@ export function nodeToHtml(node: AppNode): string {
     case 'frame':
       // Abschnitts-Folie im Presenter: der Rahmen-Name als Zwischentitel
       return `<h2 style="text-align:center;margin-top:1.4em">${esc(node.data.name)}</h2>`;
+    case 'htmlapp':
+      return `<p>Eigene App: <b>${esc(node.data.name)}</b> (${formatBytes(node.data.size)}) — läuft nur live auf dem Board.</p>`;
     case 'time': {
       const t = node.data;
       const labels: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause', fahrt: 'Fahrzeit', dienst: 'Dienstgeschäft' };

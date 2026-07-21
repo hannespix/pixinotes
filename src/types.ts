@@ -237,6 +237,16 @@ export interface TimeData {
 }
 export type TimeNode = Node<TimeData, 'time'>;
 
+/** Eigene App (M158): eine per Drag & Drop eingebettete HTML-Datei, die in
+ *  einer sandboxten iframe-Instanz läuft. Der Quelltext liegt wegen seiner
+ *  Größe in IndexedDB (htmlStore) — hier stehen nur Name und Größe. */
+export interface HtmlAppData {
+  name: string;
+  size: number;
+  [key: string]: unknown;
+}
+export type HtmlAppNode = Node<HtmlAppData, 'htmlapp'>;
+
 /** Frame (M149): benannter Rahmen-Bereich, der Karten optisch gruppiert und
  *  beim Verschieben (am Titel gefasst) seinen Inhalt mitnimmt */
 export interface FrameData {
@@ -248,7 +258,7 @@ export interface FrameData {
 export type FrameNode = Node<FrameData, 'frame'>;
 
 export type AppNode =
-  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode)
+  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode)
   // Archiv (M87): Karten jedes Typs lassen sich als Ganzes „erledigt" ablegen —
   // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface.
   // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der

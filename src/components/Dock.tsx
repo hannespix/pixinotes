@@ -2,7 +2,8 @@ import { useMemo, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
-import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape, makeTime, makeWeek } from '../lib/nodes';
+import { makeCalendar, makeFrame, makeGantt, makeHtmlApp, makeKanban, makeMermaid, makeNote, makePortal, makeShape, makeTime, makeWeek } from '../lib/nodes';
+import { saveHtml } from '../lib/htmlStore';
 import { collectTasks } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
@@ -10,7 +11,7 @@ import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
 import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
-  IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
+  IAppWindow, IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMousePointer, INote,
   IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
 } from './Icons';
@@ -220,6 +221,17 @@ export function Dock() {
     setAddMenu(false);
   };
   const addShape = (shape: ShapeKind) => add(() => makeShape(centerPos(150, 70), shape));
+
+  // Eigene App (M158): HTML-Datei über den Datei-Dialog wählen — am
+  // Smartphone gibt es kein Drag & Drop, dieser Weg ist dort der einzige
+  const happFileRef = useRef<HTMLInputElement | null>(null);
+  const addHtmlApp = async (f: File | undefined) => {
+    if (!f) return;
+    const node = makeHtmlApp(centerPos(560, 440), { name: f.name, size: f.size });
+    await saveHtml(node.id, await f.text());
+    add(() => node);
+    showToast(`„${f.name}" als App-Karte abgelegt — mit ▶ starten.`);
+  };
   const pickTool = (t: typeof tool) => { setTool(t); setDrawMenu(false); };
   const drawing = tool !== 'select';
 
@@ -274,6 +286,12 @@ export function Dock() {
             <button onClick={() => addShape('terminator')}><IPill size={16} /> Start/Ende</button>
             <div className="dock-menu-label">Verknüpfen</div>
             <button onClick={() => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board'); }}><IFolder size={16} /> Portal zu Board</button>
+            <button
+              onClick={() => happFileRef.current?.click()}
+              title="Eine HTML-Datei als lauffähige App-Karte einbetten — sie läuft abgeschottet in der Karte, mit Start/Stop und Vollbild. Geht auch per Drag & Drop aufs Board."
+            >
+              <IAppWindow size={16} /> Eigene App (HTML)
+            </button>
             {templates.length > 0 && (
               <>
                 <div className="dock-menu-label">Vorlagen</div>
@@ -481,6 +499,13 @@ export function Dock() {
       </button>
       <button onClick={() => setPresenting(true)} title="Präsentationsmodus (Karten als Folien)" aria-label="Präsentieren"><IPlay /></button>
 
+      <input
+        ref={happFileRef}
+        type="file"
+        accept=".html,.htm,text/html"
+        style={{ display: 'none' }}
+        onChange={(e) => { void addHtmlApp(e.target.files?.[0]); e.target.value = ''; }}
+      />
     </div>
   );
 }

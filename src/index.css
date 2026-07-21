@@ -2681,3 +2681,55 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   .top-actions { padding: 2px 3px; }
   .top-actions button { width: 27px; height: 27px; }
 }
+
+/* ---------- Eigene App / HTML-Einbettung (M158) ---------- */
+.happ-card { background: var(--surface); border-radius: 14px; overflow: hidden; }
+.happ-wrap { display: flex; flex-direction: column; height: 100%; }
+.happ-head {
+  display: flex; align-items: center; gap: 7px; padding: 7px 10px;
+  border-bottom: 1px solid var(--border-soft); color: var(--muted);
+  cursor: grab; /* dragHandle: nur hier lässt sich die Karte ziehen */
+}
+.happ-head:active { cursor: grabbing; }
+.happ-title {
+  flex: 1; min-width: 0; border: none; background: none; font: inherit;
+  font-size: 12.5px; font-weight: 700; color: var(--ink); padding: 2px 4px; border-radius: 6px;
+}
+.happ-title:focus { outline: none; background: var(--surface-2); }
+.happ-size { font-size: 10.5px; white-space: nowrap; }
+.happ-btn {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--muted);
+  width: 26px; height: 24px; border-radius: 7px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+}
+.happ-btn:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+.happ-btn:disabled { opacity: 0.35; cursor: default; }
+.happ-startbtn { color: #2e9e63; border-color: rgba(46, 158, 99, 0.5); }
+.happ-stopbtn { color: #d9534f; border-color: rgba(217, 83, 79, 0.45); }
+.happ-body { position: relative; flex: 1; min-height: 0; }
+.happ-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: none; background: #fff; }
+/* Nicht ausgewählt: transparente Wache über der App — Klick wählt die Karte,
+   Ziehen/Schwenken des Boards bleibt möglich; erst die Auswahl reicht durch */
+.happ-guard { position: absolute; inset: 0; cursor: pointer; }
+/* Während irgendeine Karte gezogen/skaliert wird, darf die App keine
+   Zeigereingaben schlucken — sonst reißt die Geste über der iframe ab */
+.react-flow__node.dragging .happ-frame,
+.react-flow__node.resizing .happ-frame { pointer-events: none; }
+.happ-poster {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; padding: 18px;
+  color: var(--muted); text-align: center;
+}
+.happ-poster p { margin: 0; font-size: 12px; line-height: 1.55; max-width: 340px; }
+.happ-load {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 12px; padding: 6px 14px; border-radius: 9px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.happ-load:hover:not(:disabled) { background: var(--surface-2); }
+.happ-load:disabled { opacity: 0.4; cursor: default; }
+.happ-go { border-color: rgba(46, 158, 99, 0.5); color: #2e9e63; font-weight: 700; }
+/* Natives Vollbild: die Karte selbst wird fullscreen — Kopfleiste bleibt
+   als Steuerleiste oben (Stop/Neustart/Verkleinern), die App füllt den Rest */
+.happ-full:fullscreen { background: var(--surface); border-radius: 0; }
+.happ-full:fullscreen .happ-head { cursor: default; }

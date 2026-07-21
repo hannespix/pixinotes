@@ -15,6 +15,7 @@ import {
 } from './store';
 import { initAutoSync } from './lib/syncFolder';
 import { initProjectAutoSync } from './lib/projectSync';
+import { cleanupOrphanHtml } from './lib/htmlStore';
 import { initWebdavSync } from './lib/webdav';
 import { TaskHub } from './components/TaskHub';
 import { BacklinksPanel } from './components/BacklinksPanel';
@@ -34,6 +35,19 @@ export default function App() {
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
   useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); }, []);
+
+  // Eigene Apps (M158): verwaiste HTML-Inhalte in IndexedDB entsorgen —
+  // NUR beim Start (dann kann kein Undo eine gelöschte App-Karte zurückholen,
+  // deren Inhalt hier gerade wegfiele); verzögert, damit der Boot flüssig bleibt
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const ids = new Set(
+        useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'htmlapp').map((n) => n.id)),
+      );
+      void cleanupOrphanHtml(ids);
+    }, 8000);
+    return () => clearTimeout(t);
+  }, []);
 
   // Gesten-Spickzettel: statt Dauer-Pille im Header (kollidierte mit den
   // Bedienelementen) einmal pro Sitzung kurz als Toast beim Start

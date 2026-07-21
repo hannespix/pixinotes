@@ -80,6 +80,15 @@ export async function idbGet<T>(key: string): Promise<T | undefined> {
   });
 }
 
+export async function idbKeys(): Promise<IDBValidKey[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction('kv', 'readonly').objectStore('kv').getAllKeys();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
 export async function idbDel(key: string): Promise<void> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
