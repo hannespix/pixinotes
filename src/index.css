@@ -2826,3 +2826,10 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .collect-sub input:disabled + .collect-name { opacity: 0.45; }
 .collect-sub-count { margin-left: auto; font-size: 10.5px; color: var(--muted); }
 .collect-sub-empty { font-size: 11px; color: var(--muted); padding: 3px 4px; }
+
+/* ---------- Tote Sprung-Links (M167): Ziel wurde gelöscht ---------- */
+.link-dead, .link-dead:hover {
+  opacity: 0.45; cursor: default !important; color: var(--muted) !important;
+  background: none !important; text-decoration: none; pointer-events: auto;
+}
+button.link-dead:disabled { opacity: 0.45; }

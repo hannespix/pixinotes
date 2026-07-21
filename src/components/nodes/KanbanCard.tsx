@@ -123,6 +123,19 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     if (link.nodeId) focusNode(link.boardId, link.nodeId);
   };
 
+  /** M167: Lebt das Sprung-Ziel noch? Tote Links werden ausgegraut statt
+   *  ins Leere zu führen (gelöschtes Board bzw. gelöschte Karte). */
+  const linkState = (link: { boardId: string; nodeId?: string }): 'ok' | 'no-node' | 'no-board' => {
+    const b = boards.find((x) => x.id === link.boardId);
+    if (!b) return 'no-board';
+    if (link.nodeId && !b.nodes.some((n) => n.id === link.nodeId)) return 'no-node';
+    return 'ok';
+  };
+  const DEAD_TITLE: Record<'no-board' | 'no-node', string> = {
+    'no-board': 'Nicht mehr verfügbar — das verknüpfte Board wurde gelöscht',
+    'no-node': 'Nicht mehr verfügbar — die verknüpfte Karte wurde gelöscht',
+  };
+
   /**
    * Offene Aufgaben aus ALLEN Boards einsammeln (mit Quell-Verknüpfung) und
    * bereits eingesammelte Tickets abgleichen: ist die Quelle erledigt oder
@@ -473,15 +486,21 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           )}
           {it.who && <em className="k-who" title={it.who}>{it.who.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}</em>}
           {it.note && <em className="k-note" title="Hat Beschreibung — Ticket öffnen" onClick={() => setDetailId(it.id)}>≡</em>}
-          {it.link && (
-            <button
-              className="k-link"
-              title={`Zur Quelle springen: ${boards.find((b) => b.id === it.link!.boardId)?.name ?? 'Board'}`}
-              onClick={() => followLink(it.link!)}
-            >
-              ↗
-            </button>
-          )}
+          {it.link && (() => {
+            const state = linkState(it.link!);
+            return state === 'ok' ? (
+              <button
+                className="k-link"
+                title={`Zur Quelle springen: ${boards.find((b) => b.id === it.link!.boardId)?.name ?? 'Board'}`}
+                onClick={() => followLink(it.link!)}
+              >
+                ↗
+              </button>
+            ) : (
+              /* M167: totes Ziel → ausgegraut statt Sprung ins Leere */
+              <em className="k-link link-dead" title={DEAD_TITLE[state]}>↗</em>
+            );
+          })()}
         </span>
       )}
       <span className="kanban-item-actions">
@@ -922,11 +941,17 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                 {(it.links ?? []).map((l, i) => {
                   const b = boards.find((x) => x.id === l.boardId);
                   const n = b?.nodes.find((x) => x.id === l.nodeId);
-                  const label = n ? `${TYPE_ICON[n.type ?? ''] ?? '🗂️'} ${(nodeToText(n).split('\n')[0] || n.type || 'Karte').slice(0, 44)}` : '⚠ Karte fehlt';
+                  const label = n ? `${TYPE_ICON[n.type ?? ''] ?? '🗂️'} ${(nodeToText(n).split('\n')[0] || n.type || 'Karte').slice(0, 44)}` : '⚠ Ziel gelöscht';
+                  const dead = !b || !n; // M167: totes Ziel → ausgrauen, ✕ bleibt
                   return (
                     <div key={`${l.nodeId}-${i}`} className="ticket-linkrow">
-                      <button className="ticket-linkjump" title={`Öffnen (${b?.name ?? '?'})`} onClick={() => followLink({ boardId: l.boardId, nodeId: l.nodeId })}>
-                        {label} <em>· {b?.name ?? '?'}</em>
+                      <button
+                        className={`ticket-linkjump ${dead ? 'link-dead' : ''}`}
+                        disabled={dead}
+                        title={dead ? `${DEAD_TITLE[!b ? 'no-board' : 'no-node']} — ✕ entfernt die Verknüpfung` : `Öffnen (${b!.name})`}
+                        onClick={() => followLink({ boardId: l.boardId, nodeId: l.nodeId })}
+                      >
+                        {label} <em>· {b?.name ?? 'gelöschtes Board'}</em>
                       </button>
                       <button title="Verknüpfung entfernen" onClick={() => patchItem(it.id, { links: (it.links ?? []).filter((_, xi) => xi !== i) })}><IX size={10} /></button>
                     </div>
@@ -973,9 +998,11 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     <option value="">— kein Board —</option>
                     {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
-                  {it.link && (
+                  {it.link && (linkState(it.link) === 'ok' ? (
                     <button className="ticket-jump" title="Verknüpftes Board öffnen" onClick={() => followLink(it.link!)}>↗ öffnen</button>
-                  )}
+                  ) : (
+                    <em className="ticket-jump link-dead" title={DEAD_TITLE[linkState(it.link) as 'no-board' | 'no-node']}>↗ nicht verfügbar</em>
+                  ))}
                 </div>
               </div>
 
