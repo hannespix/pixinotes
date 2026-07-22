@@ -7,13 +7,12 @@ import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { IChevronL, IChevronR, IPlus, IX } from '../Icons';
 
-/** Erfassungs-Arten: [Schlüssel, Label, Farbe]. Fahrzeit + Dienstgeschäft
- *  decken die Dienstreise ab; „zählt als Arbeitszeit" = alles außer Pause. */
+/** Erfassungs-Arten: [Schlüssel, Label, Farbe]. Seit M171 bewusst nur noch
+ *  Arbeit & Pause — Besonderheiten (Fahrzeit, Ortstermin …) gehören in die
+ *  Bemerkung der Zeile; „zählt als Arbeitszeit" = alles außer Pause. */
 const KINDS: Array<[TimeSeg['kind'], string, string]> = [
   ['arbeit', 'Arbeit', '#3c669c'],
   ['pause', 'Pause', '#9c6f1c'],
-  ['fahrt', 'Fahrzeit', '#6a4da0'],
-  ['dienst', 'Dienstgeschäft', '#35744a'],
 ];
 const kindLabel = (k: TimeSeg['kind']) => KINDS.find(([key]) => key === k)?.[1] ?? k;
 const kindColor = (k: TimeSeg['kind']) => KINDS.find(([key]) => key === k)?.[2] ?? '#5b6470';
@@ -70,7 +69,7 @@ const durOf = (s: TimeSeg): number => Math.max(0, (s.end ?? (s.date === todayIso
  * - ANSICHTEN (M161): Tag / Woche / Monat / Jahr — Woche zeigt Tageszeilen
  *   mit Arten-Aufteilung, Monat ein Kalenderraster mit Tagessummen, Jahr
  *   die Monatssummen. Klick auf Tag/Monat springt eine Ebene tiefer.
- *   Alle Summen ohne Pausen (Fahrzeit + Dienstgeschäft zählen mit).
+ *   Alle Summen ohne Pausen.
  */
 export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
@@ -287,7 +286,7 @@ export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
                   <span className="time-wday-name">{fmtDayShort(d)}</span>
                   <span className="time-wday-kinds">
                     {KINDS.filter(([k]) => ks.get(k)).map(([k, label, color]) => (
-                      <span key={k} style={{ color }} title={label}>{label.slice(0, label === 'Dienstgeschäft' ? 6 : 5)} {fmtCell(ks.get(k)!)}</span>
+                      <span key={k} style={{ color }} title={label}>{label} {fmtCell(ks.get(k)!)}</span>
                     ))}
                   </span>
                   <span className="time-wday-total">{total ? fmtDur(total) : '—'}</span>
@@ -353,7 +352,7 @@ export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
           <span className="time-flex" />
           {view === 'tag' && (
             <>
-              <span className="time-total" title="Tagessumme ohne Pausen (Arbeit + Fahrzeit + Dienstgeschäft)">Tag: <b>{fmtDur(dayWork)}</b></span>
+              <span className="time-total" title="Tagessumme ohne Pausen">Tag: <b>{fmtDur(dayWork)}</b></span>
               {daySoll !== null && daySoll > 0 && (
                 <span className="time-soll" title="Soll aus dem verbundenen Wochenplan (geplante Blöcke dieses Wochentags) und Differenz zur erfassten Zeit — Pfeil löschen blendet den Vergleich aus">
                   Soll {fmtDur(daySoll)} · Δ <b>{fmtDiff(dayWork - daySoll)}</b>

@@ -232,8 +232,9 @@ export interface TimeSeg {
   start: number;
   /** Ende in Minuten — fehlt ⇒ läuft gerade */
   end?: number;
-  /** Arbeit / Pause / Fahrzeit (Dienstreise) / Dienstgeschäft */
-  kind: 'arbeit' | 'pause' | 'fahrt' | 'dienst';
+  /** Arbeit / Pause (M171: Fahrzeit & Dienstgeschäft entfernt — Altdaten
+   *  werden per Migration v5 zu Arbeit mit Vermerk in der Bemerkung) */
+  kind: 'arbeit' | 'pause';
   note?: string;
 }
 export interface TimeData {

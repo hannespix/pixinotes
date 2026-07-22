@@ -112,23 +112,22 @@ export function buildStarter(): Starter {
   const idTime = board('⏱️ Zeiterfassung & Abwesenheit', [
     note({ x: 70, y: 110 }, 'sky', [
       h('⏱️ So erfasst du Arbeitszeit'),
-      p('Die Karte rechts ist eine echte Zeiterfassung: Ein Klick auf Arbeit/Pause/Fahrzeit/Dienstgeschäft startet — ein Klick auf eine andere Art wechselt nahtlos, Stop beendet.'),
+      p('Die Karte rechts ist eine echte Zeiterfassung: Ein Klick auf Arbeit oder Pause startet — ein Klick auf die andere Art wechselt nahtlos, Stop beendet.'),
       li('Zeilen sind direkt editierbar = unkompliziertes Nacherfassen'),
       li('Ansichten: Tag / Woche / Monat / Jahr — Klick springt tiefer'),
-      li('Summen immer ohne Pausen (Fahrzeit + Dienstgeschäft zählen mit)'),
+      li('Summen immer ohne Pausen · Besonderheiten in die Bemerkung schreiben'),
       p('Gestern ist als Beispiel vorbefüllt — einfach löschen (✕ an der Zeile).'),
     ], { kategorie: 'zeiterfassung' }),
     timecard({ x: 430, y: 110 }, 'Meine Arbeitszeit', [
-      { id: uid(), date: iso(-1), start: 465, end: 480, kind: 'fahrt' },
       { id: uid(), date: iso(-1), start: 480, end: 720, kind: 'arbeit' },
       { id: uid(), date: iso(-1), start: 720, end: 750, kind: 'pause' },
-      { id: uid(), date: iso(-1), start: 750, end: 870, kind: 'dienst', note: 'Ortstermin (Beispiel)' },
+      { id: uid(), date: iso(-1), start: 750, end: 870, kind: 'arbeit', note: 'Ortstermin (Beispiel)' },
       { id: uid(), date: iso(-1), start: 870, end: 980, kind: 'arbeit' },
     ]),
     note({ x: 70, y: 470 }, 'yellow', [
       h('🗓️ Monatsende-Checkliste'),
       check('Alle Tage gebucht? (Monats-Ansicht der Karte zeigt Lücken)'),
-      check('Dienstreisen als Fahrzeit + Dienstgeschäft erfasst?'),
+      check('Dienstreisen erfasst? (mit Bemerkung an der Zeile)'),
       check('Gleitzeitsaldo im Rahmen?'),
       check('Abwesenheiten stimmen mit Kalender überein?'),
     ]),

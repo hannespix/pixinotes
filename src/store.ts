@@ -11,7 +11,7 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import { buildStarter } from './lib/starter';
-import { uid, type AppNode } from './types';
+import { uid, type AppNode, type TimeSeg } from './types';
 import { anchorStroke, integrateStroke } from './lib/strokeAnchor';
 import { findFreeSpot, frameMembers } from './lib/arrange';
 
@@ -1402,7 +1402,7 @@ export const useBoard = create<BoardState>()(
     },
     {
       name: 'pixinotes-board',
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => debouncedSafeStorage),
       partialize: (s) => ({
         boards: s.boards,
@@ -1443,6 +1443,32 @@ export const useBoard = create<BoardState>()(
           }));
           return { ...out, boards };
         };
+        // v5 (M171): Zeiterfassung nur noch Arbeit & Pause — alte Fahrzeit-/
+        // Dienstgeschäft-Abschnitte werden zu Arbeit (sie zählten ohnehin als
+        // Arbeitszeit, die Summen bleiben also identisch); die frühere Art
+        // wandert als Vermerk in die Bemerkung, damit nichts verloren geht.
+        const mergeTimeKinds = <T,>(out: T): T => {
+          if (!out || !Array.isArray((out as Record<string, unknown>).boards)) return out;
+          const LABEL: Record<string, string> = { fahrt: 'Fahrzeit', dienst: 'Dienstgeschäft' };
+          const boards = (out as unknown as { boards: BoardDoc[] }).boards.map((b) => ({
+            ...b,
+            nodes: (b.nodes ?? []).map((n) => {
+              if (n.type !== 'time') return n;
+              const segs = (n.data as { segs?: TimeSeg[] }).segs ?? [];
+              if (!segs.some((s) => LABEL[s.kind as string])) return n;
+              return {
+                ...n,
+                data: {
+                  ...n.data,
+                  segs: segs.map((s) => (LABEL[s.kind as string]
+                    ? { ...s, kind: 'arbeit' as const, note: s.note ? `${LABEL[s.kind as string]} · ${s.note}` : LABEL[s.kind as string] }
+                    : s)),
+                },
+              } as typeof n;
+            }),
+          }));
+          return { ...out, boards };
+        };
         // v0: {nodes, edges} — Einzelboard
         if (version === 0 && p && 'nodes' in p) {
           const boards = [
@@ -1470,10 +1496,10 @@ export const useBoard = create<BoardState>()(
             return { boards: [{ id: 'main', name: '🏠 Mein Schreibtisch', nodes: [], edges: [] }], spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' };
           }
           if (!boards.some((b) => b.id === (p.activeId as string))) {
-            return stripHappHandle(anchorLegacyStrokes({ ...p, activeId: boards[0].id }));
+            return mergeTimeKinds(stripHappHandle(anchorLegacyStrokes({ ...p, activeId: boards[0].id })));
           }
         }
-        return stripHappHandle(anchorLegacyStrokes(p));
+        return mergeTimeKinds(stripHappHandle(anchorLegacyStrokes(p)));
       },
     },
   ),

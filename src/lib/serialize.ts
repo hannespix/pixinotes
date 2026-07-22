@@ -194,7 +194,7 @@ function baseNodeText(node: AppNode): string {
       return `Eigene App: ${node.data.name} (${formatBytes(node.data.size)})`;
     case 'time': {
       const t = node.data;
-      const labels: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause', fahrt: 'Fahrzeit', dienst: 'Dienstgeschäft' };
+      const labels: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause' };
       const hm = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
       const rows = [...t.segs]
         .sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start)
@@ -261,7 +261,7 @@ export function nodeToHtml(node: AppNode): string {
       return `<p>Eigene App: <b>${esc(node.data.name)}</b> (${formatBytes(node.data.size)}) — läuft nur live auf dem Board.</p>`;
     case 'time': {
       const t = node.data;
-      const labels: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause', fahrt: 'Fahrzeit', dienst: 'Dienstgeschäft' };
+      const labels: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause' };
       const hm = (m: number) => `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
       const byDate = new Map<string, typeof t.segs>();
       for (const s of [...t.segs].sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start)) {

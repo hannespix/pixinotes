@@ -291,7 +291,7 @@ export function Dock() {
             </button>
             <button
               onClick={() => add(() => makeTime(centerPos(460, 380)))}
-              title="Arbeitszeit per Start/Stop erfassen — Arbeit, Pause, Fahrzeit, Dienstgeschäft; Nacherfassen direkt in der Liste"
+              title="Arbeitszeit per Start/Stop erfassen — Arbeit und Pause; Besonderheiten in die Bemerkung, Nacherfassen direkt in der Liste"
             >
               <ITimer size={16} /> Zeiterfassung
             </button>
