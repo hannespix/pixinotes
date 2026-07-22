@@ -2971,12 +2971,13 @@ button.link-dead:disabled { opacity: 0.45; }
 .react-flow::before {
   content: '';
   position: absolute; inset: 0; z-index: 0; pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 180px 180px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 220px 220px;
   mix-blend-mode: soft-light;
-  opacity: 0.5;
+  /* M174: kräftiger — auf Phone-Displays war das Korn praktisch unsichtbar */
+  opacity: 0.9;
 }
-[data-theme='dark'] .react-flow::before { opacity: 0.35; }
+[data-theme='dark'] .react-flow::before { opacity: 0.55; }
 
 /* ---------- Glas-Chrome: Leisten & Werkzeuge ---------- */
 .logo, .top-actions, .tabs, .dock, .sel-toolbar, .mm-toolbar, .draw-palette {
@@ -3092,3 +3093,20 @@ button.link-dead:disabled { opacity: 0.45; }
     bottom: calc(78px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* ================= M174: Phone-Konzept + Textur-Nachschärfung ================= */
+/* Auswahl-Leiste auf Phones: feste Aktionsleiste über dem Dock — oben bleibt
+   Platz für Kopf- und Tab-Leiste (Kollisions-Befund aus dem User-Screenshot) */
+.sel-toolbar-dock {
+  position: fixed; left: 50%; translate: -50% 0;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  z-index: 60; max-width: calc(100vw - 10px);
+  flex-wrap: wrap; justify-content: center;
+  animation: pn-fade-in 0.16s ease-out;
+  border-radius: 16px;
+}
+.sel-toolbar-dock .sel-label { display: none; }
+.sel-toolbar-dock button { padding: 9px 11px; }
+/* Portal-Menü der Auswahl-Leiste: die Mobile-Zentrier-Regel für .sel-ai-menu
+   (transform: translateX(-50%)) darf die feste Verankerung nicht verschieben */
+.sel-menu-fixed { transform: none; }

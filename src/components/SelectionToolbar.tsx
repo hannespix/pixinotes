@@ -30,6 +30,16 @@ export function SelectionToolbar() {
   const saveTemplate = useBoard((s) => s.saveTemplate);
   const { screenToFlowPosition } = useReactFlow();
   const [aiBusy, setAiBusy] = useState(false);
+  // M174: Auf Phones schwebt die Leiste NICHT über der Karte (dort kollidierte
+  // sie mit Kopf- und Tab-Leiste, User-Screenshot) — sie wird zur festen
+  // Aktionsleiste über dem Dock (Standard-Muster mobiler Apps)
+  const [phone, setPhone] = useState(() => window.matchMedia('(max-width: 640px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)');
+    const on = () => setPhone(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
   // M168: Die Popover (KI/Attribute/Ausrichten/Verschieben) leben als PORTAL
   // mit fester Bildschirmposition — innerhalb der NodeToolbar deckelt der
   // Stacking-Kontext des Flow-Viewports sie unter Kopf- und Tab-Leiste, bei
@@ -40,11 +50,16 @@ export function SelectionToolbar() {
   const toggleMenu = (kind: MenuKind) => (e: React.MouseEvent<HTMLButtonElement>) => {
     if (menu === kind) { setMenu(null); return; }
     const r = e.currentTarget.getBoundingClientRect();
+    // M174: In der Phone-Bottom-Bar über der GANZEN (ggf. mehrzeiligen) Leiste
+    // öffnen — am Einzelknopf verankert überdeckte das Menü die erste Zeile
+    const barRect = (e.currentTarget as HTMLElement).closest('.sel-toolbar-dock')?.getBoundingClientRect();
+    const top = barRect ? barRect.top : r.top;
+    const bottom = barRect ? barRect.bottom : r.bottom;
     // Zu wenig Platz über der Leiste (Kopf-/Tab-Leiste)? Dann nach unten öffnen
-    const down = r.top < 340;
+    const down = top < 340;
     setMenuPos({
       x: Math.min(Math.max(8, r.right - 210), window.innerWidth - 218),
-      y: down ? r.bottom + 10 : r.top - 10,
+      y: down ? bottom + 10 : top - 10,
       down,
     });
     setMenu(kind);
@@ -63,13 +78,12 @@ export function SelectionToolbar() {
   const menuPortal = (extraClass: string, content: React.ReactNode) => createPortal(
     <div
       className={`sel-ai-menu sel-menu-fixed nodrag ${extraClass}`}
-      style={{
-        left: menuPos.x,
-        top: menuPos.y,
-        // translate statt transform: so kann die Einblende-Animation (M172)
-        // transform nutzen, ohne die Verankerung nach oben zu überschreiben
-        translate: menuPos.down ? undefined : '0 -100%',
-      }}
+      style={menuPos.down
+        // nach unten: normal an der Oberkante ankern
+        ? { left: menuPos.x, top: menuPos.y }
+        // nach oben: über die UNTERKANTE ankern (bottom) — wächst von selbst
+        // nach oben und braucht weder transform noch translate (M174)
+        : { left: menuPos.x, bottom: window.innerHeight - menuPos.y, top: 'auto' }}
     >
       {content}
     </div>,
@@ -180,14 +194,8 @@ export function SelectionToolbar() {
     if (name) saveTemplate(single, name);
   };
 
-  return (
-    <NodeToolbar
-      nodeId={selected.map((n) => n.id)}
-      isVisible
-      position={Position.Top}
-      offset={14}
-      className="sel-toolbar"
-    >
+  const bar = (
+    <>
       <span className="sel-count">{selected.length} ausgewählt</span>
       <button onClick={shareByMail} title="Inhalt als E-Mail-Entwurf öffnen"><IMail size={15} /><span className="sel-label"> E-Mail</span></button>
       <button onClick={copyHtml} title="Formatiert kopieren (Outlook/Word-tauglich)"><ICopy size={15} /><span className="sel-label"> Kopieren</span></button>
@@ -379,6 +387,28 @@ export function SelectionToolbar() {
         ><IArchive size={15} /></button>
       )}
       <button onClick={remove} title="Löschen" className="danger"><ITrash size={15} /></button>
+    </>
+  );
+
+  // Phone: feste Aktionsleiste über dem Dock (Portal — außerhalb des
+  // Flow-Stacking-Kontexts, Menüs öffnen von dort automatisch nach oben)
+  if (phone) {
+    return createPortal(
+      <div className="sel-toolbar sel-toolbar-dock nodrag">{bar}</div>,
+      document.body,
+    );
+  }
+
+  // Desktop: schwebt wie gehabt über der Auswahl und wandert beim Pannen mit
+  return (
+    <NodeToolbar
+      nodeId={selected.map((n) => n.id)}
+      isVisible
+      position={Position.Top}
+      offset={14}
+      className="sel-toolbar"
+    >
+      {bar}
     </NodeToolbar>
   );
 }
