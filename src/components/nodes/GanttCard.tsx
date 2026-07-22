@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
-import { uid, type GanttData, type GanttNode, type GanttRow } from '../../types';
+import { doneCol, uid, type GanttData, type GanttNode, type GanttRow, type KanbanData } from '../../types';
 import { collectTasks } from '../../lib/tasks';
+import { linkedOfType } from '../../lib/moduleFeeds';
 import {
   IArrowDown, IArrowUp, IDownload, IPalette, IPlus, ITarget, IUsers, IWand, IX, IZoomIn, IZoomOut,
 } from '../Icons';
@@ -52,14 +53,37 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   const rows = data.rows;
   const setRows = (next: GanttRow[]) => updateNodeData(id, { rows: next });
 
+  // M170: Abo-Zeilen aus VERBUNDENEN Kanbans — offene Tickets mit Frist als
+  // abgeleitete Meilensteine (id „abo:…"). Reine Anzeige: nicht persistiert,
+  // nicht editierbar; sie verschwinden mit dem Pfeil oder wenn das Ticket
+  // erledigt ist. Bearbeitet wird die Frist am Ticket selbst.
+  const boards = useBoard((s) => s.boards);
+  const aboRows = useMemo<GanttRow[]>(() => {
+    const out: GanttRow[] = [];
+    for (const n of linkedOfType(boards, id, 'kanban')) {
+      const k = n.data as KanbanData;
+      const kDone = doneCol(k);
+      for (const it of k.items) {
+        if (!it.due || it.col === kDone) continue;
+        // Echo-Schutz: Tickets, die das Kanban aus DIESEM Zeitplan eingesammelt
+        // hat, nicht als Abo-Meilenstein zurückspiegeln
+        if (it.link?.nodeId === id) continue;
+        out.push({ id: `abo:${n.id}:${it.id}`, name: it.text.slice(0, 60), start: it.due, end: it.due, color: '#8a8375' });
+      }
+    }
+    return out.slice(0, 40);
+  }, [boards, id]);
+  const allRows = aboRows.length ? [...rows, ...aboRows] : rows;
+  const isAbo = (rowId: string) => rowId.startsWith('abo:');
+
   // Zeitfenster: von frühestem Start bis spätestem Ende, plus Rand
-  const allDays = rows.flatMap((r) => [toDays(r.start), toDays(r.end)]);
+  const allDays = allRows.flatMap((r) => [toDays(r.start), toDays(r.end)]);
   const todayD = Math.round(Date.now() / DAY);
   const minD = (allDays.length ? Math.min(...allDays) : todayD) - PAD_DAYS;
   const maxD = (allDays.length ? Math.max(...allDays) : todayD + 14) + PAD_DAYS;
   const nDays = maxD - minD + 1;
   const chartW = nDays * dw;
-  const chartH = Math.max(1, rows.length) * ROW_H;
+  const chartH = Math.max(1, allRows.length) * ROW_H;
 
   const x = (iso: string) => (toDays(iso) - minD) * dw;
 
@@ -75,6 +99,7 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
 
   // ---------- Drag: verschieben / Enden ziehen ----------
   const startDrag = (e: React.PointerEvent, row: GanttRow, mode: DragState['mode']) => {
+    if (isAbo(row.id)) return; // Abo-Meilensteine: Frist wird am Ticket gepflegt
     e.stopPropagation();
     e.preventDefault();
     const svg = svgRef.current;
@@ -282,15 +307,18 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
       <div className="gantt-scroll nodrag nowheel" ref={scrollRef}>
         {/* Zeilen-Namen (fixe Spalte) */}
         <div className="gantt-labels" style={{ paddingTop: HEAD_H }}>
-          {rows.map((r) => (
+          {allRows.map((r) => (
             <input
               key={r.id}
-              className={`gantt-label ${selected === r.id ? 'sel' : ''}`}
+              className={`gantt-label ${selected === r.id ? 'sel' : ''} ${isAbo(r.id) ? 'abo' : ''}`}
               style={{ height: ROW_H }}
               value={r.name}
-              title={`${fmtShort(r.start)} – ${fmtShort(r.end)}`}
-              onFocus={() => setSelected(r.id)}
-              onChange={(e) => patchRow(r.id, { name: e.target.value })}
+              readOnly={isAbo(r.id)}
+              title={isAbo(r.id)
+                ? `Abo aus verbundenem Kanban: „${r.name}" ist am ${fmtShort(r.start)} fällig — Frist am Ticket ändern, Pfeil löschen beendet das Abo`
+                : `${fmtShort(r.start)} – ${fmtShort(r.end)}`}
+              onFocus={() => { if (!isAbo(r.id)) setSelected(r.id); }}
+              onChange={(e) => { if (!isAbo(r.id)) patchRow(r.id, { name: e.target.value }); }}
             />
           ))}
         </div>
@@ -345,15 +373,17 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
               </text>
             ))}
             {/* Zeilen-Trenner */}
-            {rows.map((_, i) => (
+            {allRows.map((_, i) => (
               <line key={i} x1={0} y1={HEAD_H + (i + 1) * ROW_H} x2={chartW} y2={HEAD_H + (i + 1) * ROW_H} stroke="rgba(0,0,0,.06)" />
             ))}
-            {/* Balken & Meilensteine */}
-            {rows.map((r, i) => {
+            {/* Balken & Meilensteine (inkl. Abo-Meilensteine aus verbundenen Kanbans) */}
+            {allRows.map((r, i) => {
               const y = HEAD_H + i * ROW_H + (ROW_H - BAR_H) / 2;
               const color = r.color ?? COLORS[0];
               const isMile = r.start === r.end;
-              const title = `${r.name}: ${r.start} → ${r.end}`;
+              const title = isAbo(r.id)
+                ? `Abo aus Kanban: „${r.name}" fällig am ${r.start}`
+                : `${r.name}: ${r.start} → ${r.end}`;
               if (isMile) {
                 const cx = x(r.start) + dw / 2;
                 const cy = y + BAR_H / 2;
@@ -362,9 +392,10 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
                     <title>{title}</title>
                     <polygon
                       points={`${cx},${cy - 9} ${cx + 9},${cy} ${cx},${cy + 9} ${cx - 9},${cy}`}
-                      fill={color}
-                      stroke={selected === r.id ? '#2b2a27' : 'none'}
-                      strokeWidth={1.5}
+                      fill={isAbo(r.id) ? 'transparent' : color}
+                      stroke={isAbo(r.id) ? color : selected === r.id ? '#2b2a27' : 'none'}
+                      strokeWidth={isAbo(r.id) ? 2 : 1.5}
+                      strokeDasharray={isAbo(r.id) ? '3 2' : undefined}
                       data-row={r.id}
                       data-start={r.start}
                       data-end={r.end}

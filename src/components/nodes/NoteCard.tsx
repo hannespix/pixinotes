@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
@@ -9,6 +9,9 @@ import { STICKY_COLORS, type NoteNode } from '../../types';
 import { blocksToText } from '../../lib/serialize';
 import { useAndroidBackspaceFix } from '../../lib/blocknoteAndroidFix';
 import { extractWikilinks, resolveLink } from '../../lib/links';
+import { appStateLines, fmtHM, linkedOfType, timeSums } from '../../lib/moduleFeeds';
+import { loadAppState } from '../../lib/htmlStore';
+import type { TimeData } from '../../types';
 import { extractEntities } from '../../lib/entities';
 import { makeNote } from '../../lib/nodes';
 import { aiReady, askAi, textToBlocks } from '../../lib/ai';
@@ -89,6 +92,63 @@ function NoteLinkChips({ blocks }: { blocks?: unknown[] }) {
   );
 }
 
+/** M170: Abo-Fußzeile — Daten aus per Pfeil verbundenen Karten.
+ *  ⏱ Zeiterfassung: Arbeitszeit heute/Woche als Chip.
+ *  📟 Eigene App: lesbarer Auszug aus ihrem Speicherstand (live, sobald die
+ *  App speichert). Reine Anzeige — der Notiz-Text bleibt unberührt. */
+function NoteAboFeeds({ id }: { id: string }) {
+  const boards = useBoard((s) => s.boards);
+  const times = linkedOfType(boards, id, 'time');
+  const apps = linkedOfType(boards, id, 'htmlapp');
+  const [states, setStates] = useState<Record<string, Record<string, string>>>({});
+
+  useEffect(() => {
+    if (apps.length === 0) return;
+    let gone = false;
+    const load = () => {
+      for (const a of apps) {
+        void loadAppState(a.id).then((st) => {
+          if (!gone && st) setStates((cur) => ({ ...cur, [a.id]: st }));
+        });
+      }
+    };
+    load();
+    // Live: die App-Karte meldet jede Speicherung per Event (HtmlAppCard)
+    const onSave = (e: Event) => {
+      const appId = (e as CustomEvent<string>).detail;
+      if (apps.some((a) => a.id === appId)) load();
+    };
+    window.addEventListener('pixinotes:happ-state', onSave);
+    return () => { gone = true; window.removeEventListener('pixinotes:happ-state', onSave); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [apps.map((a) => a.id).join('|')]);
+
+  if (times.length === 0 && apps.length === 0) return null;
+  const sums = times.map((n) => timeSums(n.data as TimeData));
+  const day = sums.reduce((a, s) => a + s.day, 0);
+  const week = sums.reduce((a, s) => a + s.week, 0);
+  return (
+    <div className="abo-feeds nodrag">
+      {times.length > 0 && (
+        <span className="abo-time-chip" title="Aus der verbundenen Zeiterfassung: Arbeitszeit heute · diese Woche (ohne Pausen)">
+          ⏱ {fmtHM(day)} · W {fmtHM(week)}
+        </span>
+      )}
+      {apps.map((a) => {
+        const lines = appStateLines(states[a.id]);
+        return (
+          <div key={a.id} className="abo-extract" title="Speicherstand der verbundenen App (lesbarer Auszug) — aktualisiert sich, sobald die App speichert">
+            <b>📟 {(a.data.name as string) || 'App'}</b>
+            {lines.length === 0
+              ? <span className="abo-extract-empty">noch nichts gespeichert</span>
+              : lines.map((l, i) => <span key={i}>{l}</span>)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /** Haftnotiz mit vollem Notion-artigem Block-Editor (BlockNote, MPL-2.0). */
 export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsoluteY }: NodeProps<NoteNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
@@ -105,6 +165,21 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
 
   const editor = useCreateBlockNote({ initialContent, dictionary: blockNoteDe });
   useAndroidBackspaceFix(editor);
+
+  // M170: Externer Schreiber (Kanban-Rück-Sync) hat die Blöcke geändert —
+  // der lebende Editor liest Inhalt sonst nur beim Mount. extEpoch zählt bei
+  // jedem externen Write hoch; wir übernehmen den Stand in den Editor.
+  const extEpoch = data.extEpoch as number | undefined;
+  const lastEpoch = useRef(extEpoch);
+  useEffect(() => {
+    if (extEpoch === lastEpoch.current) return;
+    lastEpoch.current = extEpoch;
+    const blocks = data.blocks as PartialBlock[] | undefined;
+    if (blocks?.length) {
+      try { editor.replaceBlocks(editor.document, blocks); } catch { /* Editor gerade im Umbau */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extEpoch]);
 
   // Frische, leere Notiz: sofort den Cursor reinsetzen — lostippen ohne Extra-Klick
   useEffect(() => {
@@ -140,6 +215,7 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
       <NoteDueChips blocks={data.blocks} />
       <NoteEntityChips blocks={data.blocks} />
       <NoteLinkChips blocks={data.blocks} />
+      <NoteAboFeeds id={id} />
       {/* KI-Politur wohnt jetzt im ✨-Menü der Auswahl-Leiste (KI-Werkzeuge) —
           kein Dauer-Button mehr auf jeder Notiz (User-Feedback) */}
     </CardShell>

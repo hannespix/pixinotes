@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
-import { uid, type TimeData, type TimeNode, type TimeSeg } from '../../types';
+import { uid, type TimeData, type TimeNode, type TimeSeg, type WeekData } from '../../types';
+import { fmtDiff, linkedOfType, sollForDate } from '../../lib/moduleFeeds';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { IChevronL, IChevronR, IPlus, IX } from '../Icons';
@@ -162,6 +163,24 @@ export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
   const daySums = kindsIn(day, day);
   const dayWork = workIn(day, day);
   const weekWork = workIn(monday, sunday);
+
+  // M170: Soll/Ist aus VERBUNDENEN Wochenplänen — die geplanten Blöcke des
+  // Dienstplans sind das Soll je Wochentag (nur bei Wochentags-Spalten und
+  // Uhrzeit-Zeilen ableitbar). Pfeil löschen blendet den Vergleich aus.
+  const boards = useBoard((s) => s.boards);
+  const linkedWeeks = linkedOfType(boards, id, 'week').map((n) => n.data as WeekData);
+  const sollOf = (iso: string): number | null => (linkedWeeks.length ? sollForDate(linkedWeeks, iso) : null);
+  const daySoll = sollOf(day);
+  const weekSoll = (() => {
+    if (linkedWeeks.length === 0) return null;
+    let sum = 0;
+    let any = false;
+    for (let i = 0; i < 7; i++) {
+      const s = sollOf(addDaysIso(monday, i));
+      if (s !== null) { sum += s; any = true; }
+    }
+    return any ? sum : null;
+  })();
 
   return (
     <CardShell id={id} selected={selected} minWidth={380} minHeight={300} className="time-card">
@@ -335,10 +354,24 @@ export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
           {view === 'tag' && (
             <>
               <span className="time-total" title="Tagessumme ohne Pausen (Arbeit + Fahrzeit + Dienstgeschäft)">Tag: <b>{fmtDur(dayWork)}</b></span>
+              {daySoll !== null && daySoll > 0 && (
+                <span className="time-soll" title="Soll aus dem verbundenen Wochenplan (geplante Blöcke dieses Wochentags) und Differenz zur erfassten Zeit — Pfeil löschen blendet den Vergleich aus">
+                  Soll {fmtDur(daySoll)} · Δ <b>{fmtDiff(dayWork - daySoll)}</b>
+                </span>
+              )}
               <span className="time-total" title="Wochensumme ohne Pausen (Mo–So der angezeigten Woche)">Woche: <b>{fmtDur(weekWork)}</b></span>
             </>
           )}
-          {view === 'woche' && <span className="time-total">Woche: <b>{fmtDur(weekWork)}</b></span>}
+          {view === 'woche' && (
+            <>
+              {weekSoll !== null && weekSoll > 0 && (
+                <span className="time-soll" title="Wochen-Soll aus dem verbundenen Wochenplan und Differenz zur erfassten Zeit">
+                  Soll {fmtDur(weekSoll)} · Δ <b>{fmtDiff(weekWork - weekSoll)}</b>
+                </span>
+              )}
+              <span className="time-total">Woche: <b>{fmtDur(weekWork)}</b></span>
+            </>
+          )}
           {view === 'monat' && <span className="time-total" title="Monatssumme ohne Pausen">Monat: <b>{fmtDur(workIn(`${month}-01`, `${month}-${String(monthDays).padStart(2, '0')}`))}</b></span>}
           {view === 'jahr' && <span className="time-total" title="Jahressumme ohne Pausen">Jahr: <b>{fmtDur(workIn(`${year}-01-01`, `${year}-12-31`))}</b></span>}
         </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { NodeToolbar, Position, type NodeProps } from '@xyflow/react';
 import { runDerived, useBoard } from '../../store';
 import type { MermaidNode } from '../../types';
@@ -19,6 +19,7 @@ import {
   timelineTokens, toggleAutonumber, toggleGanttFlag,
 } from '../../lib/mermaidEdit';
 import { useOutsideClose } from '../../lib/useOutsideClose';
+import { linkedOfType, mermaidFromNote } from '../../lib/moduleFeeds';
 import { CardShell } from './CardShell';
 
 /** Auswahl in Nicht-Flowchart-Diagrammen (M100/M101): Bild-Element ⇄ Code */
@@ -110,7 +111,35 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
 
   const style = (data.style as string | undefined) ?? '';
   const look = (data.look as string | undefined) ?? '';
-  const kind = diagramKind(data.code);
+
+  // M170: Abo aus einer VERBUNDENEN Notiz — deren Checkliste wird als
+  // automatisch aktuelles Flussdiagramm gerendert (Erledigtes grün). Reine
+  // Anzeige: der eigene Code bleibt unangetastet und kommt zurück, sobald
+  // das Abo pausiert wird oder der Pfeil wegfällt. Solange das Abo läuft,
+  // ist die WYSIWYG-Bearbeitung im Bild pausiert (sie gehört zum eigenen Code).
+  // WICHTIG: Automatisch NUR bei leerem/Vorlagen-Diagramm — KI-Diagramme
+  // werden seit M131 mit ihrer Quell-Notiz verbunden und würden sonst vom
+  // Abo überdeckt. Bei eigenem Inhalt schaltet der Chip das Abo bewusst zu.
+  const boards = useBoard((s) => s.boards);
+  const ownPristine = !data.code.trim()
+    || data.code === LEGACY_MERMAID_DEFAULT
+    || Object.values(TEMPLATES).includes(data.code);
+  const aboCode = useMemo(() => {
+    if (data.linkSync === false) return null;
+    if (data.linkSync !== true && !ownPristine) return null;
+    for (const n of linkedOfType(boards, id, 'note')) {
+      const code = mermaidFromNote(n);
+      if (code) return code;
+    }
+    return null;
+  }, [boards, id, data.linkSync, ownPristine]);
+  const aboAvailable = useMemo(
+    () => linkedOfType(boards, id, 'note').some((n) => mermaidFromNote(n) !== null),
+    [boards, id],
+  );
+  const renderCode = aboCode ?? data.code;
+
+  const kind = diagramKind(renderCode);
   const isFlow = kind === 'flow';
 
   useEffect(() => {
@@ -126,7 +155,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
         .then(async (mermaid) => {
           // Handschrift-Look: Scribble-Schrift VOR dem Rendern laden (Messung!)
           if (look === 'hand') await preloadHandFont();
-          return mermaid.render(`pn-mermaid-${id}-${myKey}`, buildMermaidSource(data.code, style, look));
+          return mermaid.render(`pn-mermaid-${id}-${myKey}`, buildMermaidSource(renderCode, style, look));
         })
         .then(({ svg }) => { if (!cancelled && myKey === renderKey.current) { setSvg(svg); setError(''); } })
         // svg NICHT leeren — beim Tippen bleibt das letzte gültige Diagramm
@@ -134,7 +163,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
         .catch((e) => { if (!cancelled && myKey === renderKey.current) setError(String(e?.message ?? e).split('\n')[0]); });
     }, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [data.code, id, uiTheme, style, look]);
+  }, [renderCode, id, uiTheme, style, look]);
 
   // Auto-Größe (M92c, „gantt viel zu klein"): Nach jedem erfolgreichen Render
   // Die dauernde Automatik aus M93 sprang bei jedem Render dazwischen und
@@ -987,8 +1016,26 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             onChange={(e) => updateNodeData(id, { code: e.target.value })}
           />
         )}
-        <div className={`mermaid-preview nowheel${look === 'hand' ? ' mm-hand' : ''}`} data-kind={kind} ref={previewRef} onClick={onPreviewClick} onDoubleClick={onPreviewDblClick}>
+        <div
+          className={`mermaid-preview nowheel${look === 'hand' ? ' mm-hand' : ''}`}
+          data-kind={kind}
+          ref={previewRef}
+          // Abo aktiv: Klick-Bearbeitung pausiert — sie gehört zum EIGENEN Code
+          onClick={aboCode ? undefined : onPreviewClick}
+          onDoubleClick={aboCode ? undefined : onPreviewDblClick}
+        >
           <div className={`mermaid-svg ${error ? 'stale' : ''}`} dangerouslySetInnerHTML={{ __html: svg }} />
+          {aboAvailable && (
+            <button
+              className={`mm-abo-chip nodrag ${aboCode ? 'on' : ''}`}
+              title={aboCode
+                ? 'Abo aktiv: Das Diagramm folgt automatisch der Checkliste der verbundenen Notiz (Erledigtes grün). Klick pausiert das Abo und zeigt wieder den eigenen Code — der bleibt unangetastet.'
+                : 'Abo pausiert — Klick zeigt wieder die Checkliste der verbundenen Notiz als Diagramm.'}
+              onClick={(e) => { e.stopPropagation(); updateNodeData(id, { linkSync: aboCode ? false : true }); }}
+            >
+              ⇢ Abo {aboCode ? 'an' : 'aus'}
+            </button>
+          )}
           {rename && (
             <input
               className="mm-rename nodrag"
@@ -1016,7 +1063,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
           {connectFrom && !error && (
             <div className="mm-hint mm-hint-connect">→ Ziel-Schritt anklicken, um „{connectFrom}" zu verbinden</div>
           )}
-          {kind !== 'other' && !error && !connectFrom && selected && (
+          {kind !== 'other' && !error && !connectFrom && selected && !aboCode && (
             <div className="mm-hint">
               {isFlow
                 ? 'Klick auf Schritt oder Pfeil = bearbeiten · Doppelklick = umbenennen/beschriften'

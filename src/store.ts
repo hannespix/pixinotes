@@ -1073,12 +1073,23 @@ export const useBoard = create<BoardState>()(
           const t1 = b?.nodes.find((n) => n.id === connection.source)?.type;
           const t2 = b?.nodes.find((n) => n.id === connection.target)?.type;
           const src = new Set(['note', 'kanban', 'gantt']);
-          const pair = (consumer: string) =>
-            (t1 === consumer && src.has(t2 ?? '')) || (t2 === consumer && src.has(t1 ?? ''));
-          if (pair('kanban')) {
-            get().showToast('🔗 Aufgaben-Abo aktiv: Offene Punkte der verbundenen Karte landen automatisch in diesem Kanban — abwählbar im Einsammeln-Panel (⚙) oder durch Löschen des Pfeils.');
+          const pair = (consumer: string, sources: Set<string> | string = src) =>
+            (t1 === consumer && (typeof sources === 'string' ? t2 === sources : sources.has(t2 ?? '')))
+            || (t2 === consumer && (typeof sources === 'string' ? t1 === sources : sources.has(t1 ?? '')));
+          if ((t1 === 'kanban' && t2 === 'gantt') || (t1 === 'gantt' && t2 === 'kanban')) {
+            get().showToast('🔗 Abo in beide Richtungen: Tickets mit Frist erscheinen als Meilensteine im Zeitplan, Zeitplan-Vorgänge als Tickets im Kanban.');
+          } else if (pair('kanban')) {
+            get().showToast('🔗 Aufgaben-Abo aktiv: Offene Punkte der verbundenen Karte landen automatisch in diesem Kanban — abwählbar im Einsammeln-Panel (⚙) oder durch Löschen des Pfeils. Erledigte Tickets haken die Quelle zurück ab.');
           } else if (pair('calendar')) {
             get().showToast('🔗 Kalender-Fokus aktiv: Der Kalender zeigt jetzt Termine & Fristen der verbundenen Karten — der Bereich-Schalter in der Kopfzeile stellt jederzeit um.');
+          } else if (pair('time', 'week')) {
+            get().showToast('🔗 Soll/Ist aktiv: Der verbundene Wochenplan liefert die Sollzeit — die Zeiterfassung zeigt in Tag- und Wochenansicht die Differenz.');
+          } else if (pair('time', 'note') || pair('time', 'kanban')) {
+            get().showToast('🔗 ⏱-Chip aktiv: Die verbundene Karte zeigt jetzt Arbeitszeit von heute und dieser Woche aus der Zeiterfassung.');
+          } else if (pair('mermaid', 'note')) {
+            get().showToast('🔗 Diagramm-Abo: Ein leeres bzw. Vorlagen-Diagramm folgt jetzt automatisch der Checkliste der verbundenen Notiz (Erledigtes grün) — bei eigenem Inhalt schaltet der „⇢ Abo"-Chip im Diagramm das Abo bewusst zu.');
+          } else if (pair('note', 'htmlapp')) {
+            get().showToast('🔗 App-Auszug aktiv: Die verbundene Notiz zeigt den Speicherstand der App als lesbaren Auszug — live bei jedem Speichern.');
           }
         },
 

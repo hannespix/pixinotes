@@ -278,6 +278,52 @@ export function toggleCheckBlock(blocks: unknown[] | undefined, blockId: string)
   return walk(blocks as AnyBlock[], '');
 }
 
+/**
+ * M170 Rück-Sync Kanban → Checkliste: den Punkt gezielt abhaken/aufmachen und
+ * einen Spalten-Vermerk „(→ Spalte)" im Text hinterlassen bzw. wieder räumen.
+ * Bewusst SETZEN statt toggeln — der Aufrufer kennt den Zielzustand.
+ */
+export function annotateCheckBlock(
+  blocks: unknown[] | undefined,
+  blockId: string,
+  opts: { checked: boolean; note: string | null },
+): unknown[] | undefined {
+  if (!blocks) return blocks;
+  const byPos = blockId.startsWith('pos:') ? blockId.slice(4) : null;
+  const MARK = /\s*\(→ [^)]{0,40}\)\s*$/;
+  const stamp = (text: string): string => {
+    const clean = text.replace(MARK, '');
+    return opts.note ? `${clean} (→ ${opts.note.slice(0, 30)})` : clean;
+  };
+  const stampContent = (content: unknown): unknown => {
+    if (typeof content === 'string') return stamp(content);
+    if (Array.isArray(content) && content.length > 0) {
+      // Vermerk am LETZTEN Text-Baustein an-/abhängen (Formatierung davor bleibt)
+      const next = content.map((c) => ({ ...(c as Record<string, unknown>) }));
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (typeof next[i].text === 'string') {
+          next[i].text = stamp(next[i].text as string);
+          return next;
+        }
+      }
+    }
+    return content;
+  };
+  const walk = (bs: AnyBlock[], prefix: string): AnyBlock[] =>
+    bs.map((b, i) => {
+      const path = prefix ? `${prefix}.${i}` : String(i);
+      const next: AnyBlock = { ...b };
+      const hit = byPos ? path === byPos : b.id === blockId;
+      if (hit && b.type === 'checkListItem') {
+        next.props = { ...b.props, checked: opts.checked };
+        next.content = stampContent(b.content);
+      }
+      if (b.children?.length) next.children = walk(b.children, path);
+      return next;
+    });
+  return walk(blocks as AnyBlock[], '');
+}
+
 // ---------- Erinnerungen: pro Aufgabe+Fälligkeit nur einmal melden ----------
 const REMINDED_KEY = 'pixinotes:reminded';
 

@@ -97,7 +97,11 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
       const d = e.data as { __pixiHapp?: string; store?: Record<string, string> } | null;
       if (d?.__pixiHapp !== id || !d.store) return;
       const store = d.store;
-      void saveAppState(id, store);
+      void saveAppState(id, store).then(() => {
+        // M170: verbundene Notizen zeigen den Speicherstand als Auszug —
+        // Bescheid geben, damit sie live nachladen
+        window.dispatchEvent(new CustomEvent('pixinotes:happ-state', { detail: id }));
+      });
       clearTimeout(teamSaveT.current);
       teamSaveT.current = setTimeout(() => { void saveAppStateToTeam(id, nameRef.current, store).catch(() => {}); }, 4000);
     };

@@ -5,10 +5,11 @@ import confetti from 'canvas-confetti';
 import { runDerived, useBoard } from '../../store';
 import {
   kanbanCols, openSubs, ticketBlockers, uid, wipFull, wipLimitOf,
-  type GanttData, type KanbanData, type KanbanItem, type KanbanNode,
+  type GanttData, type KanbanData, type KanbanItem, type KanbanNode, type TimeData,
 } from '../../types';
-import { collectTasks, formatDueShort, urgencyFor } from '../../lib/tasks';
+import { annotateCheckBlock, collectTasks, formatDueShort, urgencyFor } from '../../lib/tasks';
 import { linkedNeighborIds } from '../../lib/links';
+import { fmtHM, linkedOfType, timeSums } from '../../lib/moduleFeeds';
 import { nodeToText } from '../../lib/serialize';
 import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, ISearch, ISettings, IX } from '../Icons';
 import { CardShell } from './CardShell';
@@ -260,6 +261,40 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
     }
     setItems(kanban.items.map((it) => (it.id === item.id ? { ...it, col } : it)));
+    writeBackToSource(item, col);
+  };
+
+  /**
+   * M170 Rück-Sync: Ein eingesammeltes Ticket meldet Spaltenwechsel an seine
+   * Quelle zurück — Erledigt hakt den Checklisten-Punkt in der Notiz ab
+   * (bzw. setzt den Gantt-Vorgang auf 100 %), Zwischenspalten hinterlassen
+   * einen Klammer-Vermerk „(→ Spalte)" am Punkt, Rück-Bewegung räumt ihn.
+   */
+  const writeBackToSource = (item: KanbanItem, col: number) => {
+    const link = item.link;
+    if (!link?.nodeId || !link.itemId) return;
+    const st = useBoard.getState();
+    const srcNode = st.boards.find((b) => b.id === link.boardId)?.nodes.find((n) => n.id === link.nodeId);
+    if (!srcNode) return;
+    if (srcNode.type === 'note') {
+      const isDone = col === done;
+      const note = isDone || col === 0 ? null : (cols[col] ?? '').trim() || null;
+      const blocks = annotateCheckBlock(srcNode.data.blocks as unknown[] | undefined, link.itemId, { checked: isDone, note });
+      if (!blocks) return;
+      st.updateNodeDataOnBoard(link.boardId, link.nodeId, {
+        blocks,
+        // extEpoch: geöffnete Notiz-Editoren übernehmen den externen Stand (NoteCard)
+        extEpoch: ((srcNode.data.extEpoch as number | undefined) ?? 0) + 1,
+      });
+      if (isDone) showToast('☑ Auch in der Quell-Notiz abgehakt.');
+    } else if (srcNode.type === 'gantt' && col === done) {
+      const g = srcNode.data as GanttData;
+      if (!g.rows.some((r) => r.id === link.itemId)) return;
+      st.updateNodeDataOnBoard(link.boardId, link.nodeId, {
+        rows: g.rows.map((r) => (r.id === link.itemId ? { ...r, progress: 100 } : r)),
+      });
+      showToast('☑ Zeitplan-Vorgang auf 100 % gesetzt.');
+    }
   };
 
   const move = (item: KanbanItem, dir: -1 | 1) => tryMoveTo(item, item.col + dir);
@@ -553,10 +588,28 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     </div>
   );
 
+  // M170: ⏱-Chip aus verbundenen Zeiterfassungs-Karten — heutige und
+  // Wochen-Arbeitszeit (ohne Pausen) direkt am Kanban-Kopf
+  const timeChip = (() => {
+    const linkedTimes = linkedOfType(boards, id, 'time');
+    if (linkedTimes.length === 0) return null;
+    const sums = linkedTimes.map((n) => timeSums(n.data as TimeData));
+    return {
+      day: sums.reduce((a, s) => a + s.day, 0),
+      week: sums.reduce((a, s) => a + s.week, 0),
+    };
+  })();
+
   return (
     <>
       <div className="kanban-head">
         <DragTitle className="kanban-title" value={kanban.title} onChange={setTitle} placeholder="Kanban" />
+        {timeChip && (
+          <span
+            className="abo-time-chip nodrag"
+            title="Aus der verbundenen Zeiterfassung: Arbeitszeit heute · diese Woche (ohne Pausen) — Pfeil löschen blendet den Chip aus"
+          >⏱ {fmtHM(timeChip.day)} · W {fmtHM(timeChip.week)}</span>
+        )}
         <button
           className={`kanban-addcol nodrag ${filterOpen || filtering ? 'k-auto-on' : ''}`}
           title="Filtern & Gruppieren: Suche, Frist, #Tags, Quell-Board (Trello-Stil)"
