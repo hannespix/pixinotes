@@ -8,6 +8,7 @@ import {
   type GanttData, type KanbanData, type KanbanItem, type KanbanNode,
 } from '../../types';
 import { collectTasks, formatDueShort, urgencyFor } from '../../lib/tasks';
+import { linkedNeighborIds } from '../../lib/links';
 import { nodeToText } from '../../lib/serialize';
 import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, ISearch, ISettings, IX } from '../Icons';
 import { CardShell } from './CardShell';
@@ -141,8 +142,13 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
    * bereits eingesammelte Tickets abgleichen: ist die Quelle erledigt oder
    * verschwunden, wandert das Ticket automatisch in die Erledigt-Spalte.
    */
-  const syncFromBoards = (announce: boolean) => {
+  const syncFromBoards = (announce: boolean, onlyLinked = false) => {
     const norm = (t: string) => t.trim().toLowerCase();
+    // M169: Per Pfeil an dieses Kanban angeschlossene Quell-Karten — die
+    // Verbindung abonniert deren Aufgaben, unabhängig von der Board-Auswahl.
+    // `onlyLinked` sammelt AUSSCHLIESSLICH aus den Verbindungen (Auto-Lauf
+    // ohne ⟳-Schalter); Abwahl per Checkbox (collectExcludeNodes) gewinnt.
+    const linked = linkedNeighborIds(boards, id);
     const have = new Set(kanban.items.map((it) => norm(it.text)));
     // Dedupe zusätzlich über die Link-Identität: ändert sich der Quelltext,
     // entsteht sonst ein Duplikat neben dem alten Ticket (Audit R6-F3)
@@ -166,7 +172,10 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       if (t.nodeId === id) continue;
       const key = `${t.nodeId}|${t.itemId}`;
       openKeys.add(key);
-      if (!allowed(t.boardId) || ignored.has(key) || excludedNodes.has(t.nodeId)) continue;
+      if (ignored.has(key) || excludedNodes.has(t.nodeId)) continue;
+      // Verbundene Quellen sammeln IMMER mit (auch aus abgewählten Boards);
+      // im Nur-Verbindungen-Lauf zählt ausschließlich die Verbindung
+      if (onlyLinked ? !linked.has(t.nodeId) : !(allowed(t.boardId) || linked.has(t.nodeId))) continue;
       if (haveKeys.has(key) || have.has(norm(t.text))) continue;
       have.add(norm(t.text));
       fresh.push({ id: uid(), text: t.text, col: 0, due: t.due, link: { boardId: t.boardId, nodeId: t.nodeId, itemId: t.itemId } });
@@ -210,11 +219,15 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   // (neue data) — ohne die Dep feuerte der Timer mit veralteter Closure und
   // ignorierte frisch geänderte ignoreKeys/collectFrom (M68-Debugging).
   useEffect(() => {
-    if (!kanban.autoCollect) return;
+    // M169: Verbindungen (Pfeile) an dieses Kanban sind Aufgaben-Abos — sie
+    // sammeln auch OHNE den ⟳-Schalter automatisch, aber dann nur aus den
+    // verbundenen Karten (nicht plötzlich aus allen Boards)
+    const hasLinks = linkedNeighborIds(boards, id).size > 0;
+    if (!kanban.autoCollect && !hasLinks) return;
     // runDerived: Auto-Einsammeln ist aus den Boards rekonstruierbar und darf
     // deshalb nicht als „eigene Bearbeitung" zählen — sonst würde es direkt
     // beim Start das automatische Übernehmen eines neueren Sync-Stands blocken
-    const t = setTimeout(() => runDerived(() => syncFromBoards(false)), 900);
+    const t = setTimeout(() => runDerived(() => syncFromBoards(false, !kanban.autoCollect)), 900);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boards, kanban]);
@@ -378,6 +391,9 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
 
   // ---------- Einsammeln konfigurieren (Quell-Boards, board-weise räumen) ----------
   const [collectOpen, setCollectOpen] = useState(false);
+  // M169: per Pfeil verbundene Quell-Karten — im Panel als Abo markiert; ihre
+  // Checkbox bleibt auch bei abgewähltem Board bedienbar (Abwahl gewinnt)
+  const linkedSrc = collectOpen ? linkedNeighborIds(boards, id) : new Set<string>();
   const toggleCollectBoard = (bid: string) => {
     const current = kanban.collectFrom ?? boards.map((b) => b.id);
     const next = current.includes(bid) ? current.filter((x) => x !== bid) : [...current, bid];
@@ -736,7 +752,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             <span>Einsammeln konfigurieren</span>
             <button title="Schließen" onClick={() => setCollectOpen(false)}><IX size={12} /></button>
           </div>
-          <div className="collect-hint">Haken = aus diesem Board sammeln · ▸ zeigt die einzelnen Quellen-Karten · ✕ räumt Tickets aus dem Kanban</div>
+          <div className="collect-hint">Haken = aus diesem Board sammeln · ▸ zeigt die einzelnen Quellen-Karten · ✕ räumt Tickets aus dem Kanban · ⇢ Abo = per Pfeil verbunden, sammelt automatisch</div>
           {boards.map((b) => {
             const checked = !kanban.collectFrom || kanban.collectFrom.includes(b.id);
             const cnt = kanban.items.filter((it) => it.link?.boardId === b.id).length;
@@ -774,14 +790,21 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     {sources.length === 0 && <div className="collect-sub-empty">Keine offenen Aufgaben-Quellen auf diesem Board.</div>}
                     {sources.map((s) => {
                       const on = !(kanban.collectExcludeNodes ?? []).includes(s.nodeId);
+                      const abo = linkedSrc.has(s.nodeId);
                       return (
                         <label
                           className="collect-sub"
                           key={s.nodeId}
                           title={on ? 'Wird eingesammelt — Klick überspringt künftig genau diese Karte' : 'Abgewählt — Klick sammelt diese Karte wieder ein'}
                         >
-                          <input type="checkbox" checked={on} disabled={!checked} onChange={() => toggleCollectNode(s.nodeId)} />
+                          <input type="checkbox" checked={on} disabled={!checked && !abo} onChange={() => toggleCollectNode(s.nodeId)} />
                           <span className="collect-name">{s.label}</span>
+                          {abo && (
+                            <span
+                              className="collect-abo"
+                              title="Per Pfeil mit diesem Kanban verbunden — die Verbindung sammelt diese Karte automatisch ein (unabhängig von der Board-Auswahl). Abwählen per Haken oder den Pfeil löschen."
+                            >⇢ Abo</span>
+                          )}
                           <span className="collect-sub-count">{s.count}</span>
                         </label>
                       );

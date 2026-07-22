@@ -102,6 +102,20 @@ export function collectBacklinks(boards: BoardDoc[], targetBoardId: string): Bac
   return out.slice(0, 40);
 }
 
+/** M169: Verbindungen als Daten-Abos — alle Karten, die auf dem Board der
+ *  Karte `nodeId` per Pfeil an ihr hängen (Richtung egal). Ein Pfeil zwischen
+ *  einem Quell-Modul (Notiz-Checkliste, Zeitplan, Kanban) und einem
+ *  Sammel-Modul (Kanban, Kalender) aktiviert den Datenaustausch automatisch. */
+export function linkedNeighborIds(boards: BoardDoc[], nodeId: string): Set<string> {
+  const out = new Set<string>();
+  const b = boards.find((x) => x.nodes.some((n) => n.id === nodeId));
+  for (const e of b?.edges ?? []) {
+    if (e.source === nodeId && e.target !== nodeId) out.add(e.target);
+    else if (e.target === nodeId && e.source !== nodeId) out.add(e.source);
+  }
+  return out;
+}
+
 export interface GraphNode { id: string; label: string; cards: number }
 export interface GraphLink { a: string; b: string; kind: 'portal' | 'wikilink' }
 

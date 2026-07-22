@@ -1067,6 +1067,19 @@ export const useBoard = create<BoardState>()(
           patchActive((b) => ({
             edges: addEdge({ ...connection, type: 'labeled', data: { label: '', kind: 'arrow' } }, b.edges),
           }));
+          // M169: Verbindungen sind Daten-Abos — beim Andocken an ein
+          // Sammel-Modul einmal kurz erklären, was jetzt automatisch passiert
+          const b = get().boards.find((x) => x.id === get().activeId);
+          const t1 = b?.nodes.find((n) => n.id === connection.source)?.type;
+          const t2 = b?.nodes.find((n) => n.id === connection.target)?.type;
+          const src = new Set(['note', 'kanban', 'gantt']);
+          const pair = (consumer: string) =>
+            (t1 === consumer && src.has(t2 ?? '')) || (t2 === consumer && src.has(t1 ?? ''));
+          if (pair('kanban')) {
+            get().showToast('🔗 Aufgaben-Abo aktiv: Offene Punkte der verbundenen Karte landen automatisch in diesem Kanban — abwählbar im Einsammeln-Panel (⚙) oder durch Löschen des Pfeils.');
+          } else if (pair('calendar')) {
+            get().showToast('🔗 Kalender-Fokus aktiv: Der Kalender zeigt jetzt Termine & Fristen der verbundenen Karten — der Bereich-Schalter in der Kopfzeile stellt jederzeit um.');
+          }
         },
 
         addLabeledEdge: (source, target, label, kind = 'arrow') => {

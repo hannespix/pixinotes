@@ -3,6 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { CalendarData, CalendarNode, GanttData } from '../../types';
 import { collectTasks } from '../../lib/tasks';
+import { linkedNeighborIds } from '../../lib/links';
 import { downloadIcsEvents, fetchIcsUrl, mergeEvents, parseIcs, type IcsEvent } from '../../lib/ics';
 import { anyAccountConnected, fetchAccountEvents, invalidateAccountEvents, type CalAccountEvent } from '../../lib/calAccounts';
 import { IChevronL, IChevronR, ISettings } from '../Icons';
@@ -74,7 +75,14 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   }, []);
 
   const view = (data.view as 'month' | 'week') ?? 'month';
-  const scope = (data.scope as 'all' | 'board') ?? 'all';
+  // M169: Verbindungen (Pfeile) an den Kalender fokussieren ihn automatisch
+  // auf genau diese Quell-Karten (Bereich „Verbunden") — ohne gespeicherte
+  // Wahl gilt: Verbindungen da → verbunden, sonst alle Boards. Der Schalter
+  // in der Kopfzeile übersteuert das jederzeit (Wahl wird gespeichert);
+  // fallen alle Verbindungen weg, greift wieder „Alle Boards".
+  const linkedIds = useMemo(() => linkedNeighborIds(boards, id), [boards, id]);
+  const scopeChoice = (data.scope as 'all' | 'board' | 'linked') ?? (linkedIds.size ? 'linked' : 'all');
+  const scope = scopeChoice === 'linked' && linkedIds.size === 0 ? 'all' : scopeChoice;
   const show = { ...SHOW_DEFAULT, ...(data.show as Partial<ShowFlags> | undefined) };
   const icsEvents = (data.icsEvents as IcsEvent[] | undefined) ?? [];
   const icsUrls = (data.icsUrls as string[] | undefined) ?? [];
@@ -115,12 +123,14 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     };
     if (show.tasks) {
       for (const t of collectTasks(sourceBoards)) {
+        if (scope === 'linked' && !linkedIds.has(t.nodeId)) continue; // M169: nur verbundene Quellen
         if (t.due) push(byDay, t.due, { icon: '☐', text: t.text, boardId: t.boardId, nodeId: t.nodeId, urgent: t.urgency === 'overdue' });
       }
     }
     for (const b of sourceBoards) {
       for (const n of b.nodes) {
         if (n.type !== 'gantt') continue;
+        if (scope === 'linked' && !linkedIds.has(n.id)) continue; // M169
         for (const r of (n.data as GanttData).rows) {
           if (r.start === r.end) {
             if (show.miles) push(byDay, r.start, { icon: '◆', text: r.name, boardId: b.id, nodeId: n.id, color: r.color });
@@ -162,7 +172,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
       }
     }
     return { byDay, stripsByDay };
-  }, [sourceBoards, show.tasks, show.gantt, show.miles, show.ics, show.konto, icsEvents, accEvents]);
+  }, [sourceBoards, scope, linkedIds, show.tasks, show.gantt, show.miles, show.ics, show.konto, icsEvents, accEvents]);
 
   const nav = (delta: number) => {
     if (view === 'week') {
@@ -293,11 +303,20 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
             <ISettings size={13} />
           </button>
           <button
-            className={scope === 'board' ? 'on' : ''}
-            onClick={() => updateNodeData(id, { scope: scope === 'all' ? 'board' : 'all' })}
-            title={scope === 'all' ? 'Zeigt: alle Boards — Klick: nur dieses Board' : 'Zeigt: nur dieses Board — Klick: alle Boards'}
+            className={scope !== 'all' ? 'on' : ''}
+            onClick={() => {
+              // M169: Mit Verbindungen gibt es drei Bereiche (… → Verbunden),
+              // ohne wie bisher zwei — die Wahl wird an der Karte gespeichert
+              const order: Array<'all' | 'board' | 'linked'> = linkedIds.size ? ['all', 'board', 'linked'] : ['all', 'board'];
+              updateNodeData(id, { scope: order[(order.indexOf(scope as never) + 1) % order.length] });
+            }}
+            title={
+              scope === 'all' ? `Zeigt: alle Boards — Klick: nur dieses Board${linkedIds.size ? ' (dann: nur verbundene Karten)' : ''}`
+              : scope === 'board' ? `Zeigt: nur dieses Board — Klick: ${linkedIds.size ? 'nur die per Pfeil verbundenen Karten' : 'alle Boards'}`
+              : 'Zeigt: nur Termine & Fristen der per Pfeil verbundenen Karten — Klick: alle Boards'
+            }
           >
-            {scope === 'all' ? 'Alle Boards' : 'Dieses Board'}
+            {scope === 'all' ? 'Alle Boards' : scope === 'board' ? 'Dieses Board' : `Verbunden (${linkedIds.size})`}
           </button>
           <button
             onClick={() => updateNodeData(id, { view: view === 'month' ? 'week' : 'month', anchor: todayIso })}
