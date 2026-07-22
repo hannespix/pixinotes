@@ -2949,14 +2949,34 @@ button.link-dead:disabled { opacity: 0.45; }
    Spezifität gewinnt die spätere Regel — so übersteuern die Polituren die
    Basisregeln oben, ohne sie anzufassen. */
 
-/* ---------- Fläche: sehr dezenter Verlauf statt flacher Farbe ---------- */
-/* Board-Tönungen (M88) haben höhere Spezifität und gewinnen weiterhin */
+/* ---------- Fläche: moderner Mesh-Verlauf + feine Textur (M173) ---------- */
+/* Board-Tönungen (M88) haben höhere Spezifität und gewinnen weiterhin —
+   die Textur-Ebene (::before) liegt aber bewusst AUCH über den Tönungen */
 .react-flow {
   background:
-    radial-gradient(1100px 700px at 88% -12%, var(--accent-soft) 0%, transparent 55%),
-    radial-gradient(900px 650px at -8% 112%, var(--accent-soft) 0%, transparent 50%),
+    radial-gradient(1100px 700px at 88% -12%, color-mix(in oklab, var(--accent) 14%, transparent) 0%, transparent 58%),
+    radial-gradient(800px 620px at -8% 32%, color-mix(in oklab, var(--accent) 8%, transparent) 0%, transparent 55%),
+    radial-gradient(950px 700px at 55% 116%, rgba(224, 150, 60, 0.07) 0%, transparent 55%),
     linear-gradient(165deg, var(--bg) 0%, var(--surface-3) 100%);
 }
+[data-theme='dark'] .react-flow {
+  background:
+    radial-gradient(1100px 700px at 88% -12%, color-mix(in oklab, var(--accent) 17%, transparent) 0%, transparent 58%),
+    radial-gradient(800px 620px at -8% 32%, color-mix(in oklab, var(--accent) 10%, transparent) 0%, transparent 55%),
+    radial-gradient(950px 700px at 55% 116%, rgba(224, 150, 60, 0.06) 0%, transparent 55%),
+    linear-gradient(165deg, #322e28 0%, var(--bg) 100%);
+}
+/* Feinkörnige Rausch-Textur (SVG-Turbulence, gekachelt): nimmt der Fläche das
+   sterile Flat-Gefühl. soft-light wirkt in Hell UND Dunkel; keine Zeiger-Ziele */
+.react-flow::before {
+  content: '';
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  mix-blend-mode: soft-light;
+  opacity: 0.5;
+}
+[data-theme='dark'] .react-flow::before { opacity: 0.35; }
 
 /* ---------- Glas-Chrome: Leisten & Werkzeuge ---------- */
 .logo, .top-actions, .tabs, .dock, .sel-toolbar, .mm-toolbar, .draw-palette {
