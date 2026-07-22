@@ -160,7 +160,11 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
               onClick={(e) => {
                 if (menuPos) { setMenuPos(null); return; }
                 const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                setMenuPos({ x: Math.max(8, r.right - 180), y: r.bottom + 8 });
+                // M172: Menü immer im Sichtfenster halten (unten/rechts klemmen)
+                setMenuPos({
+                  x: Math.min(Math.max(8, r.right - 180), window.innerWidth - 188),
+                  y: Math.min(r.bottom + 8, Math.max(8, window.innerHeight - 340)),
+                });
               }}
             >
               <IArrange size={12} />

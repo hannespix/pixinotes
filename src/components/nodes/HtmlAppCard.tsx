@@ -281,7 +281,11 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
             title="Weitere Funktionen (eigener Tab, Herunterladen, Speicherstand)"
             onClick={(e) => {
               const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-              setMenuPos(menuPos ? null : { x: Math.max(8, r.right - 250), y: r.bottom + 6 });
+              // M172: Menü immer im Sichtfenster halten (unten/rechts klemmen)
+              setMenuPos(menuPos ? null : {
+                x: Math.min(Math.max(8, r.right - 250), window.innerWidth - 258),
+                y: Math.min(r.bottom + 6, Math.max(8, window.innerHeight - 320)),
+              });
             }}
           >
             <IMore size={14} />

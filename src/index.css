@@ -1,7 +1,7 @@
 :root {
   --bg: #f2efe9;
   --ink: #2b2a27;
-  --muted: #6f6a5b; /* WCAG AA: 4,7:1 auf --bg, 5,3:1 auf Karten */
+  --muted: #605b4c; /* M172: Kontrast angehoben — 5,8:1 auf --bg, 6,5:1 auf Karten */
   --accent: #4f7cff;
   --accent-strong: #3557c9;    /* kräftiges Akzent-Blau für Text/Links */
   --accent-soft: rgba(79, 124, 255, 0.14);
@@ -11,8 +11,12 @@
   --surface-card: #fffdf7;   /* Karten-Papier (Kanban, Gantt, …) */
   --surface-glass: rgba(255, 255, 255, 0.85);
   --surface-dim: rgba(0, 0, 0, 0.05);
-  --border: rgba(0, 0, 0, 0.13);
-  --border-soft: #e7e1d3;
+  --border: rgba(0, 0, 0, 0.2);   /* M172: kräftiger */
+  --border-soft: #ddd6c5;         /* M172: kräftiger */
+  /* M172 Glas-Optik: Leisten/Menüs mit backdrop-blur */
+  --glass: rgba(255, 255, 255, 0.62);
+  --glass-strong: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.7);
   --card-shadow: 0 2px 6px rgba(60, 50, 30, 0.12), 0 10px 24px rgba(60, 50, 30, 0.08);
   --card-shadow-lift: 0 6px 14px rgba(60, 50, 30, 0.18), 0 24px 48px rgba(60, 50, 30, 0.16);
   --edge: rgba(90, 80, 60, 0.5);      /* Verbindungs-Linie */
@@ -30,16 +34,20 @@
   /* native Elemente (Datums-Picker, Scrollbalken, Selects) dunkel rendern */
   color-scheme: dark;
   --bg: #2d2a25;
-  --ink: #efeadd;
-  --muted: #b6ad9b;
+  --ink: #f2ede1;
+  --muted: #c4bba8; /* M172: Kontrast angehoben */
   --surface: #3a362f;
   --surface-2: #474139;
   --surface-3: #332f29;
   --surface-card: #393530;
   --surface-glass: rgba(56, 52, 45, 0.9);
   --surface-dim: rgba(255, 255, 255, 0.09);
-  --border: rgba(255, 255, 255, 0.2);
-  --border-soft: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.26);      /* M172: kräftiger */
+  --border-soft: rgba(255, 255, 255, 0.16); /* M172: kräftiger */
+  /* M172 Glas-Optik */
+  --glass: rgba(48, 44, 38, 0.58);
+  --glass-strong: rgba(45, 41, 35, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.14);
   --card-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 10px 24px rgba(0, 0, 0, 0.3);
   --card-shadow-lift: 0 6px 14px rgba(0, 0, 0, 0.5), 0 24px 48px rgba(0, 0, 0, 0.42);
   --edge: rgba(235, 225, 205, 0.5);
@@ -2934,3 +2942,133 @@ button.link-dead:disabled { opacity: 0.45; }
   border-radius: 999px; padding: 2px 8px;
 }
 .mm-abo-chip.on { color: var(--accent); border-color: currentColor; }
+
+/* ================= M172: Design-Politur =================
+   Glas-Optik (backdrop-blur), dezente Farbverläufe, flüssige Ein-/Ausblendungen
+   und Viewport-feste Menüs. Steht bewusst am DATEIENDE: bei gleicher
+   Spezifität gewinnt die spätere Regel — so übersteuern die Polituren die
+   Basisregeln oben, ohne sie anzufassen. */
+
+/* ---------- Fläche: sehr dezenter Verlauf statt flacher Farbe ---------- */
+/* Board-Tönungen (M88) haben höhere Spezifität und gewinnen weiterhin */
+.react-flow {
+  background:
+    radial-gradient(1100px 700px at 88% -12%, var(--accent-soft) 0%, transparent 55%),
+    radial-gradient(900px 650px at -8% 112%, var(--accent-soft) 0%, transparent 50%),
+    linear-gradient(165deg, var(--bg) 0%, var(--surface-3) 100%);
+}
+
+/* ---------- Glas-Chrome: Leisten & Werkzeuge ---------- */
+.logo, .top-actions, .tabs, .dock, .sel-toolbar, .mm-toolbar, .draw-palette {
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+  border: 1px solid var(--glass-border);
+}
+/* Menüs & Panels: etwas deckender, damit Text darüber ruhig bleibt */
+.dock-menu, .frame-menu, .happ-menu, .sel-menu-fixed, .tab-tree, .tab-bg-menu,
+.cal-menu, .week-pop, .mm-pop, .comment-panel, .lookup-panel, .backlinks-panel {
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  border: 1px solid var(--glass-border);
+}
+.modal, .ticket-modal {
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5);
+  backdrop-filter: blur(22px) saturate(1.5);
+  border: 1px solid var(--glass-border);
+}
+.modal-head { background: transparent; }
+.modal-backdrop { background: rgba(30, 26, 18, 0.35); backdrop-filter: blur(3px); }
+.toast {
+  background: rgba(28, 26, 22, 0.85);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* ---------- Verläufe an Akzent-Stellen ---------- */
+.logo span {
+  background: linear-gradient(115deg, var(--accent), var(--accent-strong));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+[data-theme='dark'] .logo span {
+  /* dunkel: accent-strong == accent — heller Zweitton für sichtbaren Verlauf */
+  background: linear-gradient(115deg, var(--accent), #fff);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.ai-cmd-go { background: linear-gradient(135deg, var(--accent), var(--accent-strong)) !important; }
+.ai-cmd-go:hover { filter: brightness(1.1); }
+.tab.active {
+  background: linear-gradient(135deg, var(--accent-soft), transparent 130%);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+/* ---------- Flüssige Ein-/Ausblendungen ---------- */
+@keyframes pn-pop-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes pn-fade-in { from { opacity: 0; } to { opacity: 1; } }
+/* Elemente OHNE eigenes Basis-transform dürfen die Pop-Animation nutzen —
+   die anderen (Dock-Menü zentriert, Auswahl-Menü mit translate-Anker) faden */
+.frame-menu, .happ-menu, .tab-tree, .tab-bg-menu, .cal-menu, .week-pop,
+.mm-pop, .modal, .ticket-modal, .lookup-panel, .collect-panel {
+  animation: pn-pop-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.dock-menu, .sel-menu-fixed, .comment-panel {
+  animation: pn-fade-in 0.16s ease-out;
+}
+.modal-backdrop, .lookup-backdrop { animation: pn-fade-in 0.2s ease-out; }
+.dock button, .sel-toolbar button, .top-actions button, .tab, .dock-menu button,
+.frame-menu button, .happ-menu button, .modal-buttons button, .taskhub-actions button,
+.time-kind, .time-views button, .lookup-src {
+  transition: background 0.16s ease, color 0.16s ease, transform 0.14s ease,
+    box-shadow 0.16s ease, border-color 0.16s ease;
+}
+.dock > button:hover, .dock-add-wrap > button:hover { transform: translateY(-3px); }
+.dock > button:active, .dock-add-wrap > button:active { transform: translateY(0) scale(0.92); }
+.top-actions button:hover, .sel-toolbar button:hover { transform: translateY(-1px); }
+.dock-menu button:active, .frame-menu button:active, .happ-menu button:active { transform: scale(0.96); }
+.lookup-src:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(40, 30, 10, 0.12); }
+
+/* ---------- Menüs & Popover: immer im Sichtfenster ---------- */
+.frame-menu, .happ-menu {
+  max-width: calc(100vw - 16px);
+  max-height: min(72vh, calc(100vh - 24px));
+  overflow-y: auto;
+}
+.tab-tree { max-height: min(560px, calc(100vh - 130px)); }
+.cal-menu, .week-pop, .mm-pop { max-width: min(460px, 92vw); max-height: 62vh; overflow-y: auto; }
+.dock-menu { max-width: min(320px, calc(100vw - 16px)); }
+
+/* ---------- Responsive-Ausbau: Phone ---------- */
+@media (max-width: 640px) {
+  .topbar { top: 8px; left: 8px; gap: 6px; }
+  .logo { font-size: 15px; padding: 6px 11px; }
+  .tabs { top: 52px; left: 8px; max-width: calc(100vw - 16px); }
+  /* Modals als Vollbild-Blätter — kein Gefummel mit Rändern */
+  .modal-backdrop { padding: 0; align-items: stretch; }
+  .modal { width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; border: none; }
+  .modal-head { border-radius: 0; }
+  .ticket-modal-backdrop { padding: 0; align-items: stretch; }
+  .ticket-modal { width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; border: none; }
+  .comment-panel { max-width: calc(100vw - 16px); }
+  .lookup-backdrop { padding: 10px 8px; }
+  .lookup-panel { max-height: calc(100dvh - 20px); }
+  .taskhub { padding: 14px 10px; }
+  .collect-panel { max-width: calc(100vw - 24px); }
+}
+@media (max-width: 520px) {
+  /* Dock-Menüs auf Phones FEST mittig über dem Dock verankern (fixed +
+     translate statt transform: so bleibt die Einblende-Animation frei) —
+     am Knopf verankert liefen sie links/rechts aus dem Bild */
+  .dock-menu {
+    position: fixed; left: 50%; right: auto; translate: -50% 0;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  }
+}

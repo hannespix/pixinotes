@@ -66,7 +66,9 @@ export function SelectionToolbar() {
       style={{
         left: menuPos.x,
         top: menuPos.y,
-        transform: menuPos.down ? undefined : 'translateY(-100%)',
+        // translate statt transform: so kann die Einblende-Animation (M172)
+        // transform nutzen, ohne die Verankerung nach oben zu überschreiben
+        translate: menuPos.down ? undefined : '0 -100%',
       }}
     >
       {content}
