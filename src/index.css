@@ -580,7 +580,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .search-empty { padding: 18px; font-size: 13px; color: var(--muted); text-align: center; }
 .search-footer {
   font-size: 10.5px; color: var(--muted); padding: 8px 16px;
-  border-top: 1px solid var(--border-soft); background: #faf8f3;
+  border-top: 1px solid var(--border-soft); background: var(--surface-3);
 }
 
 /* ---------- React-Flow-Feintuning ---------- */
@@ -1428,7 +1428,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .modal-note { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
 .modal-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .modal-buttons button {
-  border: 1px solid var(--border-soft); background: #faf8f3; border-radius: 9px; padding: 9px 13px;
+  border: 1px solid var(--border-soft); background: var(--surface-3); border-radius: 9px; padding: 9px 13px;
   font-family: inherit; font-size: 12.5px; cursor: pointer; color: var(--ink);
 }
 .modal-buttons button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
@@ -3110,3 +3110,7 @@ button.link-dead:disabled { opacity: 0.45; }
 /* Portal-Menü der Auswahl-Leiste: die Mobile-Zentrier-Regel für .sel-ai-menu
    (transform: translateX(-50%)) darf die feste Verankerung nicht verschieben */
 .sel-menu-fixed { transform: none; }
+
+/* ---------- M175: Dark-Mode-Lesbarkeit (helle Flächen + helle Schrift) ---------- */
+[data-theme='dark'] .sel-toolbar button.danger:hover { background: rgba(216, 75, 61, 0.32); }
+[data-theme='dark'] .empty-board-hint div { background: rgba(0, 0, 0, 0.35); }
