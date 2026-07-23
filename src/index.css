@@ -2972,12 +2972,15 @@ button.link-dead:disabled { opacity: 0.45; }
   content: '';
   position: absolute; inset: 0; z-index: 0; pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.55' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 220px 220px;
-  mix-blend-mode: soft-light;
-  /* M174: kräftiger — auf Phone-Displays war das Korn praktisch unsichtbar */
-  opacity: 0.9;
+  /* M178: Kachel folgt dem Viewport (Board.tsx setzt die Variablen) —
+     die Textur bewegt und zoomt sich mit dem Board wie echtes Papier */
+  background-position: var(--tex-x, 0px) var(--tex-y, 0px);
+  background-size: var(--tex-s, 220px) var(--tex-s, 220px);
+  /* M178: hell mit multiply — soft-light war auf hellem Grund unsichtbar */
+  mix-blend-mode: multiply;
+  opacity: 0.16;
 }
-[data-theme='dark'] .react-flow::before { opacity: 0.55; }
+[data-theme='dark'] .react-flow::before { mix-blend-mode: soft-light; opacity: 0.55; }
 
 /* ---------- Glas-Chrome: Leisten & Werkzeuge ---------- */
 .logo, .top-actions, .tabs, .dock, .sel-toolbar, .mm-toolbar, .draw-palette {
@@ -3184,3 +3187,15 @@ button.link-dead:disabled { opacity: 0.45; }
 .cal-dayedit-more button:hover { color: var(--accent-strong); border-color: var(--accent); }
 .cal-dayedit-title { border: none; background: none; font-family: inherit; font-size: 12px; color: var(--ink); text-align: left; cursor: pointer; padding: 2px 4px; border-radius: 6px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-dayedit-title:hover { background: var(--surface-2); }
+
+/* ---------- M178: Dark Mode — Tabellen auf hellem Notiz-Papier ---------- */
+/* Notizen bleiben im Dunkeln helles Papier mit dunkler Schrift; BlockNote
+   setzt in Tabellenzellen aber eigene Farb-Variablen, die die helle
+   Theme-Schrift durchreichten (User-Report: weiße Schrift auf heller Zelle) */
+[data-theme='dark'] .note-editor table,
+[data-theme='dark'] .note-editor th,
+[data-theme='dark'] .note-editor td,
+[data-theme='dark'] .note-editor td p,
+[data-theme='dark'] .note-editor th p {
+  color: #2b2a27 !important;
+}

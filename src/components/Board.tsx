@@ -719,6 +719,15 @@ export function Board() {
         zoomOnScroll={wheelZoom}
         panActivationKeyCode="Space"
         onMoveEnd={() => { if (performance.now() > flyingUntil.current) returnViewport.current = null; }}
+        // M178: Die Hintergrund-Textur klebt am BOARD, nicht am Glas — ihre
+        // Kachel-Position/-Größe folgt dem Viewport (CSS-Variablen, ohne Re-Render)
+        onViewportChange={(vp) => {
+          const el = document.querySelector('.react-flow') as HTMLElement | null;
+          if (!el) return;
+          el.style.setProperty('--tex-x', `${vp.x}px`);
+          el.style.setProperty('--tex-y', `${vp.y}px`);
+          el.style.setProperty('--tex-s', `${220 * vp.zoom}px`);
+        }}
         zoomOnDoubleClick={false}
         deleteKeyCode={['Delete', 'Backspace']}
         multiSelectionKeyCode={['Meta', 'Shift']}

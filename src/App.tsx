@@ -69,10 +69,22 @@ export default function App() {
   const ui = useBoard((s) => s.ui);
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    // M178: Browser-/Statusleisten-Farbe (meta theme-color) folgt der
+    // Akzentfarbe — vorher stand sie fest auf Blau, egal welcher Akzent
+    const ACCENT_HEX: Record<string, string> = {
+      blau: '#4f7cff', gruen: '#2e9e63', violett: '#7c5cff', orange: '#e0762e', rosa: '#d44f6e',
+    };
     const apply = () => {
       const dark = ui.theme === 'dark' || (ui.theme === 'system' && mq.matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
       document.documentElement.dataset.accent = ui.accent;
+      let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'theme-color';
+        document.head.appendChild(meta);
+      }
+      meta.content = ACCENT_HEX[ui.accent] ?? ACCENT_HEX.blau;
     };
     apply();
     mq.addEventListener('change', apply);
