@@ -3114,3 +3114,29 @@ button.link-dead:disabled { opacity: 0.45; }
 /* ---------- M175: Dark-Mode-Lesbarkeit (helle Flächen + helle Schrift) ---------- */
 [data-theme='dark'] .sel-toolbar button.danger:hover { background: rgba(216, 75, 61, 0.32); }
 [data-theme='dark'] .empty-board-hint div { background: rgba(0, 0, 0, 0.35); }
+
+/* ---------- M176: eigene Kalender-Termine + Tabellen-Chip ---------- */
+.cal-chip.own { border-left-color: var(--accent); font-weight: 600; }
+.cal-dayedit { max-width: min(340px, 94%); }
+.cal-dayedit-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; }
+.cal-dayedit-head button, .cal-dayedit-row button {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  font-family: inherit; font-size: 11px; padding: 3px 6px; border-radius: 6px; flex: none;
+}
+.cal-dayedit-head button:hover, .cal-dayedit-row button:hover { background: var(--surface-2); color: var(--ink); }
+.cal-dayedit-add { display: flex; gap: 5px; margin: 8px 0 6px; }
+.cal-dayedit-add input[type='time'] { flex: 0 0 auto; width: 86px; }
+.cal-dayedit-add input {
+  flex: 1; min-width: 0; font-family: inherit; font-size: 12.5px; padding: 6px 9px;
+  border: 1px solid var(--border-soft); border-radius: 8px; outline: none;
+  background: var(--surface); color: var(--ink);
+}
+.cal-dayedit-add button {
+  border: 1px solid var(--accent); background: var(--accent); color: #fff;
+  border-radius: 8px; cursor: pointer; padding: 0 11px; font-size: 14px;
+}
+.cal-dayedit-add button:disabled { opacity: 0.4; cursor: default; }
+.cal-dayedit-row { display: flex; align-items: center; gap: 3px; font-size: 12px; padding: 2px 0; }
+.cal-dayedit-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-dayedit-foot { font-size: 10px; color: var(--muted); margin-top: 6px; border-top: 1px solid var(--border-soft); padding-top: 6px; }
+.table-del-chip { color: #a4231a; }

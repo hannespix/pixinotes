@@ -20,6 +20,18 @@ interface CalEntry {
   color?: string;
   urgent?: boolean;
   ext?: boolean;
+  /** M176: eigener, direkt im Kalender eingetragener Termin (Datum = Sprung in den Tages-Editor) */
+  own?: boolean;
+}
+
+/** M176: Eigener Termin — direkt in der Kalender-Karte eingetragen */
+export interface MyEvent {
+  id: string;
+  /** ISO yyyy-mm-dd */
+  date: string;
+  title: string;
+  /** optional HH:MM */
+  time?: string;
 }
 interface CalStrip {
   text: string;
@@ -86,6 +98,11 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   const show = { ...SHOW_DEFAULT, ...(data.show as Partial<ShowFlags> | undefined) };
   const icsEvents = (data.icsEvents as IcsEvent[] | undefined) ?? [];
   const icsUrls = (data.icsUrls as string[] | undefined) ?? [];
+  // M176: eigene Termine — direkt im Kalender eintragbar (Klick auf den Tag)
+  const myEvents = (data.myEvents as MyEvent[] | undefined) ?? [];
+  const [dayEdit, setDayEdit] = useState<string | null>(null);
+  const [evTitle, setEvTitle] = useState('');
+  const [evTime, setEvTime] = useState('');
   const sourceBoards = scope === 'board' ? boards.filter((b) => b.id === activeId) : boards;
 
   const todayIso = isoOf(new Date());
@@ -171,8 +188,12 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
         });
       }
     }
+    // M176: eigene Termine — immer sichtbar, Klick öffnet den Tages-Editor
+    for (const ev of myEvents) {
+      push(byDay, ev.date, { icon: '★', text: ev.time ? `${ev.time} ${ev.title}` : ev.title, own: true });
+    }
     return { byDay, stripsByDay };
-  }, [sourceBoards, scope, linkedIds, show.tasks, show.gantt, show.miles, show.ics, show.konto, icsEvents, accEvents]);
+  }, [sourceBoards, scope, linkedIds, show.tasks, show.gantt, show.miles, show.ics, show.konto, icsEvents, accEvents, myEvents]);
 
   const nav = (delta: number) => {
     if (view === 'week') {
@@ -189,6 +210,45 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     if (presenting) setPresenting(false);
     openBoard(e.boardId);
     focusNode(e.boardId, e.nodeId);
+  };
+
+  // ---------- M176: eigene Termine (Klick auf einen Tag) ----------
+  const addMyEvent = () => {
+    if (!dayEdit || !evTitle.trim()) return;
+    const ev: MyEvent = {
+      id: Math.random().toString(36).slice(2, 10),
+      date: dayEdit,
+      title: evTitle.trim().slice(0, 80),
+      time: /^\d{2}:\d{2}$/.test(evTime) ? evTime : undefined,
+    };
+    updateNodeData(id, { myEvents: [...myEvents, ev] });
+    setEvTitle('');
+    setEvTime('');
+  };
+  const removeMyEvent = (evId: string) =>
+    updateNodeData(id, { myEvents: myEvents.filter((e) => e.id !== evId) });
+
+  /** Termin an Google Kalender ÜBERGEBEN: vorbefüllte Vorlage-URL — der
+   *  Nutzer bestätigt in Google mit einem Klick (kein Schreib-Zugriff nötig) */
+  const toGoogle = (ev: MyEvent) => {
+    const d = ev.date.replace(/-/g, '');
+    let dates: string;
+    if (ev.time) {
+      const start = new Date(`${ev.date}T${ev.time}:00`);
+      const end = new Date(start.getTime() + 36e5);
+      const f = (x: Date) =>
+        `${x.getFullYear()}${String(x.getMonth() + 1).padStart(2, '0')}${String(x.getDate()).padStart(2, '0')}T${String(x.getHours()).padStart(2, '0')}${String(x.getMinutes()).padStart(2, '0')}00`;
+      dates = `${f(start)}/${f(end)}`;
+    } else {
+      const next = new Date(`${ev.date}T12:00:00`);
+      next.setDate(next.getDate() + 1);
+      dates = `${d}/${isoOf(next).replace(/-/g, '')}`;
+    }
+    window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(ev.title)}&dates=${dates}`, '_blank');
+  };
+  const evIcs = (ev: MyEvent) => {
+    downloadIcsEvents([{ title: ev.time ? `${ev.time} ${ev.title}` : ev.title, start: ev.date }]);
+    showToast('.ics erstellt — in Outlook/Apple Kalender öffnen und bestätigen.');
   };
 
   // ---------- ICS: Import, Abo, Export ----------
@@ -385,7 +445,12 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
       <div className={`cal-grid nodrag nowheel ${view === 'week' ? 'week' : ''}`}>
         {WEEKDAYS.map((w) => <div key={w} className="cal-dow">{w}</div>)}
         {cells.map((c) => (
-          <div key={c.iso} className={`cal-cell ${c.inMonth ? '' : 'out'} ${c.iso === todayIso ? 'today' : ''}`}>
+          <div
+            key={c.iso}
+            className={`cal-cell ${c.inMonth ? '' : 'out'} ${c.iso === todayIso ? 'today' : ''}`}
+            title="Klick: eigenen Termin an diesem Tag eintragen"
+            onClick={() => { setDayEdit(c.iso); setEvTitle(''); setEvTime(''); }}
+          >
             <span className="cal-daynum">{c.day}</span>
             {(stripsByDay.get(c.iso) ?? []).slice(0, 3).map((s, i) => (
               <button
@@ -393,7 +458,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
                 className={`cal-strip ${s.ext ? 'ext' : ''}`}
                 style={{ background: s.color }}
                 title={`${s.text}${s.ext ? ' (extern)' : ' — zur Karte springen'}`}
-                onClick={() => jump(s)}
+                onClick={(ev) => { ev.stopPropagation(); jump(s); }}
               >
                 {s.startsHere || cells[0].iso === c.iso ? s.text : ' '}
               </button>
@@ -401,10 +466,14 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
             {(byDay.get(c.iso) ?? []).slice(0, maxEntries).map((e, i) => (
               <button
                 key={i}
-                className={`cal-chip ${e.urgent ? 'urgent' : ''} ${e.ext ? 'ext' : ''}`}
+                className={`cal-chip ${e.urgent ? 'urgent' : ''} ${e.ext ? 'ext' : ''} ${e.own ? 'own' : ''}`}
                 style={e.color ? { borderLeftColor: e.color } : undefined}
-                title={`${e.text}${e.ext ? ' (externer Termin)' : ' — zur Karte springen'}`}
-                onClick={() => jump(e)}
+                title={e.own ? `${e.text} (eigener Termin — Klick öffnet den Tag)` : `${e.text}${e.ext ? ' (externer Termin)' : ' — zur Karte springen'}`}
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  if (e.own) { setDayEdit(c.iso); setEvTitle(''); setEvTime(''); }
+                  else jump(e);
+                }}
               >
                 {e.icon} {e.text}
               </button>
@@ -415,6 +484,43 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
           </div>
         ))}
       </div>
+      {dayEdit && (
+        /* M176: Tages-Editor — eigene Termine anlegen/löschen + Übergabe an
+           Google (Vorlage-URL) bzw. Outlook/Apple (.ics) */
+        <div className="cal-menu cal-dayedit nodrag">
+          <div className="cal-dayedit-head">
+            <b>{new Date(`${dayEdit}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</b>
+            <button title="Schließen" onClick={() => setDayEdit(null)}>✕</button>
+          </div>
+          <div className="cal-dayedit-add">
+            <input
+              autoFocus
+              placeholder="Neuer Termin …"
+              value={evTitle}
+              onChange={(e) => setEvTitle(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') addMyEvent(); if (e.key === 'Escape') setDayEdit(null); }}
+            />
+            <input
+              type="time"
+              value={evTime}
+              title="Uhrzeit (optional)"
+              onChange={(e) => setEvTime(e.target.value)}
+            />
+            <button disabled={!evTitle.trim()} title="Termin eintragen" onClick={addMyEvent}>＋</button>
+          </div>
+          {myEvents.filter((e) => e.date === dayEdit).map((ev) => (
+            <div key={ev.id} className="cal-dayedit-row">
+              <span className="cal-dayedit-title">★ {ev.time ? `${ev.time} · ` : ''}{ev.title}</span>
+              <button title="An Google Kalender übergeben — öffnet Google mit vorausgefülltem Termin, dort mit einem Klick speichern" onClick={() => toGoogle(ev)}>→G</button>
+              <button title="Als .ics-Datei — in Outlook/Apple Kalender öffnen" onClick={() => evIcs(ev)}>.ics</button>
+              <button title="Termin löschen" onClick={() => removeMyEvent(ev.id)}>✕</button>
+            </div>
+          ))}
+          <div className="cal-dayedit-foot">
+            Eintragen hier · „→G"/.ics übergibt an deinen echten Kalender · Rückrichtung: Konto verbinden oder ICS-Abo (⚙)
+          </div>
+        </div>
+      )}
     </div>
   );
 }

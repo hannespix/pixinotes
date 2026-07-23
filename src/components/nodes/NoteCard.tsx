@@ -194,6 +194,29 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
     updateNodeData(id, { color: next, hex: undefined }); // zurück zur Palette
   };
 
+  // M176: Tabellen ließen sich nicht löschen — das Seiten-Menü (Drag-Griff mit
+  // Block-Löschen) ist bewusst aus, und per Tastatur ist eine Tabelle in
+  // BlockNote praktisch unlöschbar. Steht der Cursor in einer Tabelle,
+  // erscheint deshalb unten ein „Tabelle entfernen"-Chip.
+  const [tableSel, setTableSel] = useState<string | null>(null);
+  const trackTable = () => {
+    try {
+      const b = editor.getTextCursorPosition().block;
+      setTableSel(b.type === 'table' ? b.id : null);
+    } catch {
+      setTableSel(null);
+    }
+  };
+  const removeTable = () => {
+    if (!tableSel) return;
+    try {
+      editor.removeBlocks([tableSel]);
+      updateNodeData(id, { blocks: editor.document });
+      setTableSel(null);
+      showToast('Tabelle entfernt — Strg+Z im Text holt sie zurück.');
+    } catch { /* Block schon weg */ }
+  };
+
   return (
     <CardShell id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${data.color}`} style={data.hex ? { background: data.hex as string } : undefined}>
       <button className="color-dot nodrag" title="Farbe wechseln (Palette)" onClick={cycleColor} />
@@ -209,9 +232,21 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
           editor={editor}
           theme="light"
           sideMenu={false}
-          onChange={() => updateNodeData(id, { blocks: editor.document })}
+          onChange={() => { updateNodeData(id, { blocks: editor.document }); trackTable(); }}
+          onSelectionChange={trackTable}
         />
       </div>
+      {tableSel && (
+        <div className="due-chips nodrag">
+          <button
+            className="due-chip table-del-chip"
+            title="Die Tabelle, in der der Cursor steht, komplett aus der Notiz entfernen"
+            onClick={removeTable}
+          >
+            ⌫ Tabelle entfernen
+          </button>
+        </div>
+      )}
       <NoteDueChips blocks={data.blocks} />
       <NoteEntityChips blocks={data.blocks} />
       <NoteLinkChips blocks={data.blocks} />
