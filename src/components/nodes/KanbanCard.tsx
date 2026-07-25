@@ -177,6 +177,15 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       // Verbundene Quellen sammeln IMMER mit (auch aus abgewählten Boards);
       // im Nur-Verbindungen-Lauf zählt ausschließlich die Verbindung
       if (onlyLinked ? !linked.has(t.nodeId) : !(allowed(t.boardId) || linked.has(t.nodeId))) continue;
+      // M179 Echo-Schutz Kanban↔Kanban: Tickets, die das ANDERE Kanban aus
+      // DIESEM eingesammelt hat (Spiegel eigener Tickets), nicht zurückholen —
+      // sonst entsteht bei gegenseitigen Abos ein Duplikat, sobald Texte
+      // auseinanderlaufen (der Text-Dedupe griff dann nicht mehr)
+      if (t.kind === 'kanban') {
+        const srcIt = (boards.find((b) => b.id === t.boardId)?.nodes.find((n) => n.id === t.nodeId)
+          ?.data as KanbanData | undefined)?.items?.find((i) => i.id === t.itemId);
+        if (srcIt?.link?.nodeId === id) continue;
+      }
       if (haveKeys.has(key) || have.has(norm(t.text))) continue;
       have.add(norm(t.text));
       fresh.push({ id: uid(), text: t.text, col: 0, due: t.due, link: { boardId: t.boardId, nodeId: t.nodeId, itemId: t.itemId } });
@@ -294,6 +303,18 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         rows: g.rows.map((r) => (r.id === link.itemId ? { ...r, progress: 100 } : r)),
       });
       showToast('☑ Zeitplan-Vorgang auf 100 % gesetzt.');
+    } else if (srcNode.type === 'kanban' && col === done) {
+      // M179: Kanban-Quelle — das ORIGINAL-Ticket wandert mit in dessen
+      // Erledigt-Spalte (vorher blieb es offen und der Abgleich lief nur
+      // in eine Richtung)
+      const k = srcNode.data as KanbanData;
+      const srcIt = k.items.find((i) => i.id === link.itemId);
+      const srcDone = kanbanCols(k).length - 1;
+      if (!srcIt || srcIt.col === srcDone) return;
+      st.updateNodeDataOnBoard(link.boardId, link.nodeId, {
+        items: k.items.map((i) => (i.id === link.itemId ? { ...i, col: srcDone } : i)),
+      });
+      showToast('☑ Auch im Quell-Kanban erledigt.');
     }
   };
 
@@ -410,12 +431,24 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const matches = (it: KanbanItem): boolean => {
     if (query) {
       const q = query.toLowerCase();
-      if (!it.text.toLowerCase().includes(q) && !(it.who ?? '').toLowerCase().includes(q) && !(it.note ?? '').toLowerCase().includes(q)) return false;
+      // M179: auch die Ticket-Checkliste durchsuchen — Treffer in einem
+      // Unterpunkt ließen das Ticket vorher fälschlich verschwinden
+      const subsText = (it.subs ?? []).map((s) => s.text).join(' ');
+      if (
+        !it.text.toLowerCase().includes(q)
+        && !(it.who ?? '').toLowerCase().includes(q)
+        && !(it.note ?? '').toLowerCase().includes(q)
+        && !subsText.toLowerCase().includes(q)
+      ) return false;
     }
     if (quick === 'faellig' && !it.due) return false;
-    if (quick === 'ueberfaellig' && urgencyFor(it.due) !== 'overdue') return false;
+    // M179: Erledigtes ist nicht mehr „überfällig" — vorher tauchten längst
+    // abgeschlossene Tickets mit alter Frist im Überfällig-Filter auf
+    if (quick === 'ueberfaellig' && (urgencyFor(it.due) !== 'overdue' || colOf(it) === done)) return false;
     if (tagFilter && !ticketTags(it).includes(tagFilter)) return false;
-    if (boardFilter && it.link?.boardId !== boardFilter) return false;
+    // M179: 'local' = nur hier erstellte Tickets (ohne Quell-Verknüpfung)
+    if (boardFilter === 'local' && it.link) return false;
+    if (boardFilter && boardFilter !== 'local' && it.link?.boardId !== boardFilter) return false;
     return true;
   };
   const filtering = !!(query || quick !== 'alle' || tagFilter || boardFilter);
@@ -655,9 +688,13 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           {allTags.map((tag) => (
             <button key={tag} className={`k-chip k-tag ${tagFilter === tag ? 'on' : ''}`} title={`Nur Tickets mit #${tag} — Tags einfach im Ticket-Text tippen`} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}>#{tag}</button>
           ))}
-          {linkedBoards.length > 1 && (
-            <select className="k-filter-board" value={boardFilter} title="Nur Tickets aus einem Quell-Board" onChange={(e) => setBoardFilter(e.target.value)}>
+          {(linkedBoards.length > 0 || boardFilter) && (
+            /* M179: schon ab EINEM Quell-Board sichtbar (plus „hier erstellt")
+               — und solange ein Board-Filter aktiv ist IMMER, sonst klemmte
+               er unsichtbar fest und die Tickets verschwanden „grundlos" */
+            <select className="k-filter-board" value={boardFilter} title="Nur Tickets aus einem Quell-Board (bzw. nur hier erstellte)" onChange={(e) => setBoardFilter(e.target.value)}>
               <option value="">alle Quell-Boards</option>
+              <option value="local">— hier erstellt —</option>
               {linkedBoards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           )}
