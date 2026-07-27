@@ -3199,3 +3199,21 @@ button.link-dead:disabled { opacity: 0.45; }
 [data-theme='dark'] .note-editor th p {
   color: #2b2a27 !important;
 }
+
+/* ---------- M181: Rahmen-Aktionen gebündelt in der Auswahl-Leiste ---------- */
+/* Ein Menü statt zwei (User-Screenshot): Anordnen + Tönung + Umbenennen leben
+   im „Rahmen"-Popover der Auswahl-Leiste; der Rahmenkopf trägt keine eigenen
+   Werkzeuge mehr. Tönungs-Punkte zum direkten Probieren (Menü bleibt offen). */
+.sel-frame-tints { display: flex; align-items: center; gap: 6px; padding: 4px 8px 6px; }
+.sel-frame-tints .tint-dot {
+  width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%; cursor: pointer; padding: 0;
+  border: 1px solid rgba(120, 110, 90, 0.45);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.sel-frame-tints .tint-dot:hover { transform: scale(1.12); border-color: var(--accent-strong); }
+.sel-frame-tints .tint-dot.none {
+  background:
+    linear-gradient(135deg, transparent 44%, #d84b3d 46%, #d84b3d 54%, transparent 56%),
+    #fff;
+}
+.sel-frame-tints .tint-dot.on { border: 2px solid var(--accent); }

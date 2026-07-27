@@ -6,9 +6,11 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICopy, IDuplicate, IFit, IGlobe, IMail, IMoveTo, IPen, ITag, ITrash, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMail, IMoveTo, IPen, ITag, ITrash, IWand, IX } from './Icons';
 import { ALIGN_LABEL, computeAlign, type AlignOp } from '../lib/align';
 import { mutedHistory } from '../store';
+import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
+import type { ArrangeMode } from '../lib/arrange';
 
 const MAILTO_LIMIT = 1800; // konservativ: längere mailto-URLs schlucken manche Clients
 
@@ -44,7 +46,7 @@ export function SelectionToolbar() {
   // mit fester Bildschirmposition — innerhalb der NodeToolbar deckelt der
   // Stacking-Kontext des Flow-Viewports sie unter Kopf- und Tab-Leiste, bei
   // Karten nahe der Oberkante fingen die Leisten dann die Klicks ab (M151-Muster)
-  type MenuKind = 'ai' | 'attr' | 'align' | 'move';
+  type MenuKind = 'ai' | 'attr' | 'align' | 'move' | 'frame';
   const [menu, setMenu] = useState<MenuKind | null>(null);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0, down: false });
   const toggleMenu = (kind: MenuKind) => (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -197,9 +199,69 @@ export function SelectionToolbar() {
     if (name) saveTemplate(single, name);
   };
 
+  // ---------- Rahmen (M181): alle Rahmen-Aktionen leben HIER statt in einem
+  // zweiten Extra-Menü am Rahmenkopf (User-Screenshot „nicht 2 extra") ----------
+  const singleFrame = selFrames.length === 1 ? selFrames[0] : null;
+  const frameTint = ((singleFrame ?? selFrames[0])?.data?.color as string | undefined) || '';
+  const frameArrange = (mode: ArrangeMode) => {
+    setMenu(null);
+    for (const f of selFrames) arrangeFrameInside(f.id, mode);
+  };
+  /** Tönung auf ALLE ausgewählten Rahmen anwenden — Menü bleibt zum Probieren offen */
+  const tintFrames = (color: string) => {
+    for (const f of selFrames) updateNodeData(f.id, { color });
+  };
+  const renameFrame = () => {
+    if (!singleFrame) return;
+    setMenu(null);
+    const name = window.prompt('Name des Rahmens:', (singleFrame.data as { name?: string }).name ?? 'Bereich');
+    if (name?.trim()) updateNodeData(singleFrame.id, { name: name.trim().slice(0, 60) });
+  };
+
   const bar = (
     <>
       <span className="sel-count">{selected.length + selFrames.length} ausgewählt{selFrames.length > 0 ? ` (${selFrames.length} Rahmen)` : ''}</span>
+      {selFrames.length > 0 && (
+        <span className="sel-ai-wrap">
+          {menu === 'frame' && menuPortal('sel-frame-menu', (
+            <>
+              {singleFrame && (
+                <button onClick={renameFrame}><IPen size={14} /> Umbenennen</button>
+              )}
+              <div className="sel-attr-title">Inhalt anordnen</div>
+              <button onClick={() => frameArrange('flow')}><IFlowH size={14} /> Fluss horizontal</button>
+              <button onClick={() => frameArrange('flowV')}><IFlowV size={14} /> Fluss vertikal</button>
+              <button onClick={() => frameArrange('grid')}><IGridLayout size={14} /> Raster</button>
+              <button onClick={() => frameArrange('compact')}><ICompact size={14} /> Kompakt packen</button>
+              <div className="sel-attr-title">Tönung</div>
+              <div className="sel-frame-tints">
+                {FRAME_COLORS.map((c) => (
+                  <button
+                    key={c || 'none'}
+                    className={`tint-dot ${c === '' ? 'none' : ''} ${frameTint === c ? 'on' : ''}`}
+                    style={c ? { background: c } : undefined}
+                    title={c ? 'Rahmen-Tönung' : 'Keine Tönung'}
+                    onClick={() => tintFrames(c)}
+                  />
+                ))}
+                <input
+                  type="color"
+                  className="pn-colorpick nodrag"
+                  title="Eigene Tönung"
+                  value={frameTint || '#dbe7f6'}
+                  onChange={(e) => tintFrames(e.target.value)}
+                />
+              </div>
+            </>
+          ))}
+          <button
+            className={menu === 'frame' ? 'ai-on' : ''}
+            data-smbtn
+            onClick={toggleMenu('frame')}
+            title="Rahmen: Inhalt anordnen · Tönung · Umbenennen"
+          ><IGridLayout size={15} /><span className="sel-label"> Rahmen</span></button>
+        </span>
+      )}
       {!framesOnly && <button onClick={shareByMail} title="Inhalt als E-Mail-Entwurf öffnen"><IMail size={15} /><span className="sel-label"> E-Mail</span></button>}
       {!framesOnly && <button onClick={copyHtml} title="Formatiert kopieren (Outlook/Word-tauglich)"><ICopy size={15} /><span className="sel-label"> Kopieren</span></button>}
       {!framesOnly && <button onClick={duplicate} title="Duplizieren"><IDuplicate size={15} /></button>}
