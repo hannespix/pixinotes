@@ -97,15 +97,18 @@ export function SelectionToolbar() {
   const [attrVal, setAttrVal] = useState('');
   const [cmd, setCmd] = useState('');
 
-  // Rahmen (M149) haben ihre EIGENE Titel-Leiste — die Auswahl-Leiste würde
-  // sie nur überdecken, und ihre Aktionen (KI, Archiv, Kommentar …) passen
-  // nicht zu einem Hintergrund-Bereich
+  // Karten-Aktionen (KI, Kommentar, Attribute …) gelten nur für echte Karten —
+  // Rahmen (M149) laufen getrennt mit: Sie zählen beim VERSCHIEBEN (M180,
+  // samt Inhalt) und beim Löschen mit; bei reiner Rahmen-Auswahl zeigt die
+  // Leiste eine kompakte Variante statt wie früher gar nicht zu erscheinen.
   const selected = board.nodes.filter((n) => n.selected && n.type !== 'frame');
+  const selFrames = board.nodes.filter((n) => n.selected && n.type === 'frame');
+  const framesOnly = selected.length === 0;
   // Geankerte Markierungen (M127) der ausgewählten Karten — bei Bedarf lösbar
   const anchoredCount = (board.drawings ?? []).filter(
     (s) => s.anchor && selected.some((n) => n.id === s.anchor),
   ).length;
-  if (selected.length === 0) return null;
+  if (selected.length === 0 && selFrames.length === 0) return null;
 
   /** KI-Aktion nur auf die ausgewählten Karten */
   const runAi = async (fn: (nodes: AppNode[], pos: { x: number; y: number }) => Promise<string>, restoreCmd?: string) => {
@@ -166,7 +169,7 @@ export function SelectionToolbar() {
     showToast(`${selected.length} Karte${selected.length > 1 ? 'n' : ''} dupliziert`);
   };
 
-  const remove = () => removeNodes(selected.map((n) => n.id));
+  const remove = () => removeNodes([...selected, ...selFrames].map((n) => n.id));
 
   // ---------- Attribute (Trilium-Stil, nur bei EINER Karte) ----------
   const single = selected.length === 1 ? selected[0] : null;
@@ -196,10 +199,10 @@ export function SelectionToolbar() {
 
   const bar = (
     <>
-      <span className="sel-count">{selected.length} ausgewählt</span>
-      <button onClick={shareByMail} title="Inhalt als E-Mail-Entwurf öffnen"><IMail size={15} /><span className="sel-label"> E-Mail</span></button>
-      <button onClick={copyHtml} title="Formatiert kopieren (Outlook/Word-tauglich)"><ICopy size={15} /><span className="sel-label"> Kopieren</span></button>
-      <button onClick={duplicate} title="Duplizieren"><IDuplicate size={15} /></button>
+      <span className="sel-count">{selected.length + selFrames.length} ausgewählt{selFrames.length > 0 ? ` (${selFrames.length} Rahmen)` : ''}</span>
+      {!framesOnly && <button onClick={shareByMail} title="Inhalt als E-Mail-Entwurf öffnen"><IMail size={15} /><span className="sel-label"> E-Mail</span></button>}
+      {!framesOnly && <button onClick={copyHtml} title="Formatiert kopieren (Outlook/Word-tauglich)"><ICopy size={15} /><span className="sel-label"> Kopieren</span></button>}
+      {!framesOnly && <button onClick={duplicate} title="Duplizieren"><IDuplicate size={15} /></button>}
       {single && (
         <span className="sel-ai-wrap">
           {menu === 'attr' && menuPortal('sel-attr-menu', (
@@ -247,7 +250,7 @@ export function SelectionToolbar() {
           <IComment size={15} />
         </button>
       )}
-      {aiReady(ai) && (
+      {aiReady(ai) && !framesOnly && (
         <span className="sel-ai-wrap">
           {menu === 'ai' && menuPortal('', (
             <>
@@ -281,7 +284,7 @@ export function SelectionToolbar() {
           </button>
         </span>
       )}
-      {(() => {
+      {!framesOnly && (() => {
         // Standard AN (M111): nur explizit gebrochene Karten (false) zählen als aus
         const allAuto = selected.every((n) => n.autoFit !== false);
         return (
@@ -343,7 +346,8 @@ export function SelectionToolbar() {
                         key={b.id}
                         onClick={() => {
                           setMenu(null);
-                          moveNodesToBoard(selected.map((n) => n.id), b.id);
+                          // M180: Rahmen wandern samt Inhalt mit (Store zieht Mitglieder)
+                          moveNodesToBoard([...selected, ...selFrames].map((n) => n.id), b.id);
                         }}
                         title={`${sp.name} › ${p.name} › ${b.name}`}
                       >
@@ -358,24 +362,24 @@ export function SelectionToolbar() {
             className={menu === 'move' ? 'ai-on' : ''}
             data-smbtn
             onClick={toggleMenu('move')}
-            title="In ein anderes Board verschieben — Verbindungen, Kommentare und geankerte Markierungen wandern mit"
+            title="In ein anderes Board verschieben — Rahmen nehmen ihren kompletten Inhalt mit; Verbindungen, Kommentare und geankerte Markierungen wandern ebenfalls"
           ><IMoveTo size={15} /></button>
         </span>
       )}
-      <button
+      {!framesOnly && <button
         onClick={() => {
           const first = nodesToText([selected[0]]).split('\n').find((l) => l.trim())?.trim() ?? '';
           setLookup(first.replace(/^[#\-*\d.\s☐☑]+/, '').slice(0, 80));
         }}
         title="Nachschlagen: Wikipedia fein durchsuchen (mehrere Treffer) + grobe Websuche-Links — Begriff kommt aus der ersten Zeile der Karte und ist im Panel änderbar"
-      ><IGlobe size={15} /></button>
+      ><IGlobe size={15} /></button>}
       {anchoredCount > 0 && (
         <button
           onClick={() => detachStrokes(selected.map((n) => n.id))}
           title={`${anchoredCount} Markierung${anchoredCount > 1 ? 'en' : ''} kleben an dieser Karte und wandern mit ihr mit — Klick löst sie und lässt sie frei auf dem Board liegen`}
         ><IPen size={15} /><span className="sel-badge">{anchoredCount}</span></button>
       )}
-      {selected.every((n) => n.archived) ? (
+      {!framesOnly && (selected.every((n) => n.archived) ? (
         <button
           onClick={() => setArchived(selected.map((n) => n.id), false)}
           title="Aus dem Archiv zurückholen — die Karte gilt wieder als aktiv"
@@ -385,8 +389,8 @@ export function SelectionToolbar() {
           onClick={() => setArchived(selected.map((n) => n.id), true)}
           title="Archivieren — Karte gilt als erledigt, wird ausgeblendet und taucht nicht mehr in Aufgaben/Erinnerungen auf"
         ><IArchive size={15} /></button>
-      )}
-      <button onClick={remove} title="Löschen" className="danger"><ITrash size={15} /></button>
+      ))}
+      <button onClick={remove} title={selFrames.length ? 'Löschen (Rahmen: nur der Rahmen — die Karten darin bleiben liegen)' : 'Löschen'} className="danger"><ITrash size={15} /></button>
     </>
   );
 
@@ -402,7 +406,7 @@ export function SelectionToolbar() {
   // Desktop: schwebt wie gehabt über der Auswahl und wandert beim Pannen mit
   return (
     <NodeToolbar
-      nodeId={selected.map((n) => n.id)}
+      nodeId={[...selected, ...selFrames].map((n) => n.id)}
       isVisible
       position={Position.Top}
       offset={14}
