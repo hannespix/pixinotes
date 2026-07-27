@@ -43,6 +43,14 @@ function inlineText(content: unknown): string {
     .join('');
 }
 
+/** M182: Spalten-Vermerk des Rück-Syncs „(→ Spalte)" am Textende — muss beim
+ *  Einsammeln/Text-Folgen wieder RAUS, sonst schwappt der eigene Vermerk als
+ *  Textänderung ins Ticket zurück (Echo). */
+const STATUS_MARK = /\s*\(→ [^)]{0,40}\)\s*$/;
+export function stripStatusMark(text: string): string {
+  return text.replace(STATUS_MARK, '');
+}
+
 export function urgencyFor(due: string | undefined, now: Date = new Date()): TaskUrgency {
   if (!due) return 'none';
   const d = new Date(`${due}T23:59:59`);
@@ -161,6 +169,10 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
       }
     }
   }
+  return sortTasks(out);
+}
+
+function sortTasks(out: TaskRef[]): TaskRef[] {
   const rank: Record<TaskUrgency, number> = { overdue: 0, soon: 1, ok: 2, none: 3 };
   return out.sort((a, b) =>
     rank[a.urgency] - rank[b.urgency]
@@ -168,6 +180,49 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
     || (a.due ?? '9999').localeCompare(b.due ?? '9999')
     || a.boardName.localeCompare(b.boardName),
   );
+}
+
+/**
+ * M182: LISTEN-Punkte (Aufzählung/Nummerierung) einer Notiz als Aufgaben —
+ * gedacht für per Pfeil VERBUNDENE Notizen (Kanban-Abo): Die Verbindung
+ * erklärt die ganze Notiz zum Aufgaben-Lieferanten, nicht nur ihre
+ * Checklisten. Bewusst NICHT Teil von collectTasks: global würde jede
+ * Aufzählung in jeder Notiz die Aufgaben-Zentrale fluten.
+ */
+export function collectListTasks(
+  board: Pick<BoardDoc, 'id' | 'name'>,
+  node: { id: string; archived?: boolean; data: Record<string, unknown> },
+  now: Date = new Date(),
+): TaskRef[] {
+  const out: TaskRef[] = [];
+  if (node.archived) return out;
+  const walk = (blocks: AnyBlock[] | undefined, prefix: string) => {
+    (blocks ?? []).forEach((b, i) => {
+      const path = prefix ? `${prefix}.${i}` : String(i);
+      if (b.type === 'bulletListItem' || b.type === 'numberedListItem') {
+        const text = inlineText(b.content).trim();
+        if (text) {
+          const itemId = b.id ?? `pos:${path}`;
+          const detected = detectDates(text, now)[0];
+          const due = detected ? isoLocal(detected.date) : undefined;
+          out.push({
+            key: `c:${board.id}:${node.id}:${itemId}`,
+            kind: 'check',
+            boardId: board.id,
+            boardName: board.name,
+            nodeId: node.id,
+            itemId,
+            text,
+            due,
+            urgency: urgencyFor(due, now),
+          });
+        }
+      }
+      walk(b.children, path);
+    });
+  };
+  walk(node.data.blocks as AnyBlock[] | undefined, '');
+  return out;
 }
 
 // ---------- Schlaue Schnell-Eingabe (M114) ----------
@@ -282,6 +337,9 @@ export function toggleCheckBlock(blocks: unknown[] | undefined, blockId: string)
  * M170 Rück-Sync Kanban → Checkliste: den Punkt gezielt abhaken/aufmachen und
  * einen Spalten-Vermerk „(→ Spalte)" im Text hinterlassen bzw. wieder räumen.
  * Bewusst SETZEN statt toggeln — der Aufrufer kennt den Zielzustand.
+ * M182: Auch LISTEN-Punkte (Aufzählung/Nummerierung) sind Rück-Sync-Ziele —
+ * sie werden dabei zu Checklisten-Punkten umgewandelt, damit der Haken in der
+ * Notiz sichtbar wird (nur eingesammelte Listen verbundener Notizen).
  */
 export function annotateCheckBlock(
   blocks: unknown[] | undefined,
@@ -290,9 +348,8 @@ export function annotateCheckBlock(
 ): unknown[] | undefined {
   if (!blocks) return blocks;
   const byPos = blockId.startsWith('pos:') ? blockId.slice(4) : null;
-  const MARK = /\s*\(→ [^)]{0,40}\)\s*$/;
   const stamp = (text: string): string => {
-    const clean = text.replace(MARK, '');
+    const clean = stripStatusMark(text);
     return opts.note ? `${clean} (→ ${opts.note.slice(0, 30)})` : clean;
   };
   const stampContent = (content: unknown): unknown => {
@@ -316,6 +373,13 @@ export function annotateCheckBlock(
       const hit = byPos ? path === byPos : b.id === blockId;
       if (hit && b.type === 'checkListItem') {
         next.props = { ...b.props, checked: opts.checked };
+        next.content = stampContent(b.content);
+      } else if (hit && (b.type === 'bulletListItem' || b.type === 'numberedListItem')) {
+        // Umwandlung Liste → Checkliste; listenspezifische Props (z. B. `start`
+        // bei Nummerierungen) fliegen raus, sonst lehnt BlockNote den Block ab
+        const { start: _start, ...rest } = (b.props ?? {}) as Record<string, unknown>;
+        next.type = 'checkListItem';
+        next.props = { ...rest, checked: opts.checked };
         next.content = stampContent(b.content);
       }
       if (b.children?.length) next.children = walk(b.children, path);

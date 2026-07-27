@@ -7,7 +7,7 @@ import {
   kanbanCols, openSubs, ticketBlockers, uid, wipFull, wipLimitOf,
   type GanttData, type KanbanData, type KanbanItem, type KanbanNode, type TimeData,
 } from '../../types';
-import { annotateCheckBlock, collectTasks, formatDueShort, urgencyFor } from '../../lib/tasks';
+import { annotateCheckBlock, collectListTasks, collectTasks, formatDueShort, stripStatusMark, urgencyFor } from '../../lib/tasks';
 import { linkedNeighborIds } from '../../lib/links';
 import { fmtHM, linkedOfType, timeSums } from '../../lib/moduleFeeds';
 import { nodeToText } from '../../lib/serialize';
@@ -168,12 +168,34 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     // WICHTIG: openKeys sieht sie weiterhin — sonst würden vorhandene Tickets
     // aus einer gerade abgewählten Quelle fälschlich als „erledigt" abgehakt.
     const excludedNodes = new Set(kanban.collectExcludeNodes ?? []);
+    // M182: Notizen liefern zusätzlich ihre LISTEN-Punkte (Aufzählung/
+    // Nummerierung) — NEU eingesammelt wird davon nur aus per Pfeil
+    // verbundenen Notizen (die Verbindung erklärt die ganze Notiz zum
+    // Aufgaben-Lieferanten); für den Erledigt-/Wieder-offen-Abgleich zählen
+    // aber ALLE (sonst würde das Kappen der Verbindung die schon
+    // eingesammelten Listen-Tickets fälschlich „erledigen").
+    const listKeys = new Set<string>();
+    const allTasks = [...collectTasks(boards)];
+    for (const b of boards) {
+      for (const n of b.nodes) {
+        if (n.type !== 'note' || n.archived) continue;
+        for (const t of collectListTasks(b, n)) {
+          allTasks.push(t);
+          listKeys.add(`${t.nodeId}|${t.itemId}`);
+        }
+      }
+    }
+    // Quell-Aufgaben je Link-Schlüssel — Basis für Text-/Frist-Folgen (M182)
+    const srcByKey = new Map<string, (typeof allTasks)[number]>();
     // Kanban-Tickets + Checklisten (Aufgaben-Zentrale-Logik) — ohne dieses Kanban selbst
-    for (const t of collectTasks(boards)) {
+    for (const t of allTasks) {
       if (t.nodeId === id) continue;
       const key = `${t.nodeId}|${t.itemId}`;
       openKeys.add(key);
+      srcByKey.set(key, t);
       if (ignored.has(key) || excludedNodes.has(t.nodeId)) continue;
+      // Listen-Punkte NUR über die Verbindung einsammeln (nie global)
+      if (listKeys.has(key) && !linked.has(t.nodeId)) continue;
       // Verbundene Quellen sammeln IMMER mit (auch aus abgewählten Boards);
       // im Nur-Verbindungen-Lauf zählt ausschließlich die Verbindung
       if (onlyLinked ? !linked.has(t.nodeId) : !(allowed(t.boardId) || linked.has(t.nodeId))) continue;
@@ -186,38 +208,72 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           ?.data as KanbanData | undefined)?.items?.find((i) => i.id === t.itemId);
         if (srcIt?.link?.nodeId === id) continue;
       }
-      if (haveKeys.has(key) || have.has(norm(t.text))) continue;
-      have.add(norm(t.text));
-      fresh.push({ id: uid(), text: t.text, col: 0, due: t.due, link: { boardId: t.boardId, nodeId: t.nodeId, itemId: t.itemId } });
+      // M182: Spalten-Vermerk des eigenen Rück-Syncs nicht mit einsammeln
+      const text = t.kind === 'check' ? stripStatusMark(t.text) : t.text;
+      if (haveKeys.has(key) || have.has(norm(text))) continue;
+      have.add(norm(text));
+      // M182: Person & Priorität wandern mit (gingen vorher verloren)
+      fresh.push({ id: uid(), text, col: 0, due: t.due, who: t.who, prio: t.prio, link: { boardId: t.boardId, nodeId: t.nodeId, itemId: t.itemId } });
     }
     // M166-Aufräumen: Zeitplan-Vorgänge liefert collectTasks seit M113 SELBST
     // mit (inkl. Person/Frist) — die frühere Extra-Schleife hier erzeugte beim
     // ERSTEN Einsammeln ein Duplikat je Vorgang („… (Zeitplan)" neben dem
     // Original, gleicher Link-Schlüssel) und ist deshalb entfernt.
-    // Abgleich: Quelle nicht mehr offen → Ticket erledigen (nur vorwärts).
+    // Abgleich in BEIDE Richtungen (M182): Quelle nicht mehr offen → Ticket
+    // erledigen; Quelle WIEDER offen (Punkt aufgehakt, Vorgang < 100 %,
+    // Quell-Ticket zurückgeschoben) → Ticket zurück in die erste Spalte.
+    // Außerdem folgen Abo-Kopien ihrer Quelle: Text (ohne Spalten-Vermerk),
+    // Frist, Person und Priorität — vorher froren sie beim Einsammeln ein.
     // pos:-Adressen (Checklisten-Blöcke ohne echte ID) ausgenommen: BlockNote
     // vergibt beim ersten Edit echte IDs, der pos:-Schlüssel würde dann
     // fälschlich als „erledigt" gelten (Audit R6-S6)
     let moved = 0;
+    let reopened = 0;
+    let updated = 0;
     const items = kanban.items.map((it) => {
-      if (
-        it.link?.nodeId && it.link.itemId && !it.link.itemId.startsWith('pos:')
-        && it.col < done && !openKeys.has(`${it.link.nodeId}|${it.link.itemId}`)
-      ) {
-        moved++;
-        return { ...it, col: done };
+      if (!it.link?.nodeId || !it.link.itemId) return it;
+      const key = `${it.link.nodeId}|${it.link.itemId}`;
+      let next = it;
+      const src = srcByKey.get(key);
+      if (src) {
+        const text = src.kind === 'check' ? stripStatusMark(src.text) : src.text;
+        if (text && text !== next.text) {
+          // Frist folgt beim Text-Wechsel mit (bei Checklisten steckt sie IM Text)
+          next = { ...next, text, due: src.due };
+        } else if (src.kind !== 'check' && (src.due ?? '') !== (next.due ?? '')) {
+          // Kanban/Gantt-Quellen tragen die Frist als eigenes Feld — immer folgen
+          next = { ...next, due: src.due };
+        }
+        if (src.kind === 'kanban' && ((src.who ?? '') !== (next.who ?? '') || src.prio !== next.prio)) {
+          next = { ...next, who: src.who, prio: src.prio };
+        }
+        if (next !== it) updated++;
       }
-      return it;
+      if (!it.link.itemId.startsWith('pos:')) {
+        if (next.col < done && !openKeys.has(key)) {
+          moved++;
+          next = { ...next, col: done };
+        } else if (next.col >= done && openKeys.has(key)) {
+          reopened++;
+          next = { ...next, col: 0 };
+        }
+      }
+      return next;
     });
-    if (fresh.length === 0 && moved === 0) {
+    if (fresh.length === 0 && moved === 0 && reopened === 0 && updated === 0) {
       if (announce) showToast('Nichts Neues gefunden — alle offenen Aufgaben sind schon hier.');
       return;
     }
     setItems([...items, ...fresh]);
+    const parts = [
+      moved ? `${moved} erledigt` : '',
+      reopened ? `${reopened} wieder geöffnet` : '',
+      updated ? `${updated} aktualisiert` : '',
+    ].filter(Boolean).join(', ');
     if (announce) {
-      showToast(`${fresh.length} Aufgabe(n) eingesammelt${moved ? `, ${moved} als erledigt abgeglichen` : ''} — Tickets verlinken auf ihre Quelle (↗).`);
-    } else if (fresh.length > 0 || moved > 0) {
-      showToast(`⟳ Auto-Abgleich: ${fresh.length} neu${moved ? `, ${moved} erledigt` : ''}`);
+      showToast(`${fresh.length} Aufgabe(n) eingesammelt${parts ? ` (${parts})` : ''} — Tickets verlinken auf ihre Quelle (↗).`);
+    } else {
+      showToast(`⟳ Auto-Abgleich: ${fresh.length} neu${parts ? `, ${parts}` : ''}`);
     }
   };
 
