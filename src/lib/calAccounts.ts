@@ -34,6 +34,9 @@ export interface MsAccount {
   tokenExp?: number;
   refreshToken?: string;
   connectedAs?: string;
+  /** M184: Tatsächlich erteilte Berechtigungen. Fehlt der Eintrag, stammt die
+   *  Verbindung aus der Zeit vor dem OneNote-Import und kann nur Kalender. */
+  scopes?: string;
 }
 
 export interface CalAccounts {
@@ -173,6 +176,16 @@ async function googleApi<T>(acc: GoogleAccount, url: string): Promise<T> {
 // reicht handleOAuthRedirect() den Code ans Hauptfenster durch und schließt.
 
 const MS_SCOPE = 'Calendars.Read offline_access';
+/** M184: zusätzlich Lesezugriff auf die eigenen OneNote-Notizbücher.
+ *  Bewusst ein EIGENER Satz: Bestehende Verbindungen behalten ihren alten
+ *  Umfang — würde man ihn global erweitern, verweigerte Microsoft beim nächsten
+ *  stillen Erneuern das Token („consent required") und der Kalender fiele aus. */
+const MS_SCOPE_NOTES = 'Calendars.Read Notes.Read offline_access';
+
+/** Deckt die Verbindung den OneNote-Lesezugriff ab? */
+export function msHasNotes(acc = loadCalAccounts().ms): boolean {
+  return !!acc && /Notes\.Read/i.test(acc.scopes ?? '');
+}
 
 function b64url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -202,9 +215,13 @@ export function handleOAuthRedirect(): boolean {
   return true;
 }
 
-/** Interaktiv mit Microsoft 365 verbinden (Popup, PKCE ohne Client-Secret). */
-export async function connectMicrosoft(clientId: string, tenant = 'common'): Promise<string> {
+/**
+ * Interaktiv mit Microsoft 365 verbinden (Popup, PKCE ohne Client-Secret).
+ * `withNotes` fragt zusätzlich den OneNote-Lesezugriff ab (M184).
+ */
+export async function connectMicrosoft(clientId: string, tenant = 'common', withNotes = false): Promise<string> {
   if (!oauthAvailable()) throw new Error('Anmelden geht nur über die gehostete App (http/https), nicht aus der Einzeldatei.');
+  const scope = withNotes ? MS_SCOPE_NOTES : MS_SCOPE;
   const { verifier, challenge } = await pkcePair();
   const state = `pixinotes-ms-${b64url(crypto.getRandomValues(new Uint8Array(12)))}`;
   const auth = new URL(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize`);
@@ -213,7 +230,7 @@ export async function connectMicrosoft(clientId: string, tenant = 'common'): Pro
     response_type: 'code',
     redirect_uri: redirectUri(),
     response_mode: 'query',
-    scope: MS_SCOPE,
+    scope,
     state,
     code_challenge: challenge,
     code_challenge_method: 'S256',
@@ -239,7 +256,7 @@ export async function connectMicrosoft(clientId: string, tenant = 'common'): Pro
 
   const acc = await msToken(clientId, tenant, {
     grant_type: 'authorization_code', code, redirect_uri: redirectUri(), code_verifier: verifier,
-  });
+  }, scope);
   // Anzeige-Name des Postfachs holen
   try {
     const me = await msApi<{ userPrincipalName?: string; displayName?: string }>(acc, 'https://graph.microsoft.com/v1.0/me');
@@ -249,13 +266,13 @@ export async function connectMicrosoft(clientId: string, tenant = 'common'): Pro
   return acc.connectedAs ?? 'Microsoft 365';
 }
 
-async function msToken(clientId: string, tenant: string, body: Record<string, string>): Promise<MsAccount> {
+async function msToken(clientId: string, tenant: string, body: Record<string, string>, scope = MS_SCOPE): Promise<MsAccount> {
   const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: clientId, scope: MS_SCOPE, ...body }).toString(),
+    body: new URLSearchParams({ client_id: clientId, scope, ...body }).toString(),
   });
-  const data = await res.json() as { access_token?: string; refresh_token?: string; expires_in?: number; error_description?: string };
+  const data = await res.json() as { access_token?: string; refresh_token?: string; expires_in?: number; scope?: string; error_description?: string };
   if (!res.ok || !data.access_token) {
     throw new Error(`Microsoft-Anmeldung fehlgeschlagen: ${data.error_description?.split(/\r?\n/)[0] ?? `HTTP ${res.status}`}`);
   }
@@ -265,6 +282,8 @@ async function msToken(clientId: string, tenant: string, body: Record<string, st
     refreshToken: data.refresh_token,
     tokenExp: Date.now() + ((data.expires_in ?? 3600) - 60) * 1000,
     connectedAs: loadCalAccounts().ms?.connectedAs,
+    // Was Microsoft WIRKLICH erteilt hat (kann weniger sein als angefragt)
+    scopes: data.scope ?? scope,
   };
   patchCalAccounts({ ms: acc });
   return acc;
@@ -272,9 +291,29 @@ async function msToken(clientId: string, tenant: string, body: Record<string, st
 
 async function refreshMicrosoft(acc: MsAccount): Promise<MsAccount> {
   if (!acc.refreshToken) throw new Error('Microsoft-Sitzung abgelaufen — bitte in den Einstellungen neu verbinden.');
+  // WICHTIG: mit dem GESPEICHERTEN Umfang erneuern. Würde hier pauschal der
+  // erweiterte Satz stehen, verweigerte Microsoft bei Konten ohne
+  // OneNote-Zustimmung das Token — und der Kalender fiele mit aus.
   return msToken(acc.clientId, acc.tenant ?? 'common', {
     grant_type: 'refresh_token', refresh_token: acc.refreshToken,
-  });
+  }, acc.scopes ?? MS_SCOPE);
+}
+
+/**
+ * Gültiges Zugriffs-Token für Graph-Aufrufe außerhalb dieses Moduls (M184).
+ * Erneuert still, wenn nötig, und meldet fehlende Berechtigungen im Klartext.
+ */
+export async function msAccessToken(needNotes = false): Promise<string> {
+  const acc = loadCalAccounts().ms;
+  if (!acc || (!acc.token && !acc.refreshToken)) {
+    throw new Error('Kein Microsoft-Konto verbunden — in den Einstellungen unter „Kalender" verbinden.');
+  }
+  if (needNotes && !msHasNotes(acc)) {
+    throw new Error('Die Verbindung hat noch keinen Zugriff auf OneNote — in den Einstellungen einmal „Mit OneNote verbinden" wählen.');
+  }
+  const fresh = acc.token && acc.tokenExp && acc.tokenExp > Date.now() ? acc : await refreshMicrosoft(acc);
+  if (!fresh.token) throw new Error('Microsoft-Sitzung abgelaufen — bitte neu verbinden.');
+  return fresh.token;
 }
 
 async function msApi<T>(acc: MsAccount, url: string): Promise<T> {

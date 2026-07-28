@@ -8,7 +8,11 @@
 import { mutedHistory, useBoard, selectActiveBoard } from '../store';
 import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from './parseEmail';
 import { imageFileToDataUrl, readFileAsDataUrl } from './image';
-import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage } from './nodes';
+import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, makeNote } from './nodes';
+// M184: statisch importiert (kein dynamic import) — vite-plugin-singlefile
+// backt alles in EINE Datei; ein nachgeladener Zusatz-Brocken wäre dort nach
+// dem Deploy nicht auffindbar (dieselbe Falle wie beim Mermaid-Modul, M90).
+import { docxToBlocks } from './docx';
 import { cloneSharedBoard, parseBoardPayload } from './share';
 import { mergeEvents, parseIcs, type IcsEvent } from './ics';
 import { saveHtml } from './htmlStore';
@@ -134,6 +138,25 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           continue;
         }
         showToast('JSON erkannt, aber keine PixiNotes-Datei — als Datei-Karte abgelegt.');
+      }
+      if (ext === 'docx') {
+        // M184: Word-Dokument → Notiz-Karte. Das ist zugleich der kontofreie
+        // OneNote-Weg: „Datei → Exportieren → Word" und die Datei hier ablegen.
+        const res = await docxToBlocks(file);
+        if (res.blocks.length === 0) { showToast(`„${file.name}" enthält keinen lesbaren Text.`); continue; }
+        const note = makeNote(pos, { blocks: res.blocks });
+        note.width = 340;
+        addNode(note);
+        let imgOffset = 0;
+        for (const img of res.images.slice(0, 8)) {
+          imgOffset += 1;
+          if (!canEmbed(img.src.length)) break;
+          addNode(makeImage({ x: pos.x + 380, y: pos.y + (imgOffset - 1) * 220 }, img.src, img.alt ?? file.name));
+        }
+        showToast(`📄 „${res.title || file.name}" als Notiz übernommen${res.images.length ? ` (+ ${Math.min(res.images.length, 8)} Bild(er))` : ''}.`);
+        mirror(file, note.id, mirrorNote);
+        placed++;
+        continue;
       }
       if (ext === 'html' || ext === 'htm') {
         // Eigene App (M158): Quelltext nach IndexedDB — NICHT ins Board

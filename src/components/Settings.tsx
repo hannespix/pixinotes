@@ -5,6 +5,7 @@ import {
   invalidateAccountEvents, loadCalAccounts, oauthAvailable, patchCalAccounts, type CalAccounts,
 } from '../lib/calAccounts';
 import { exportBoard, exportToFolder } from '../lib/exporter';
+import { OneNoteImport } from './OneNoteImport';
 import {
   applySync, checkSyncRemote, disconnectSync, ensurePermission, getSyncHandle, knownStamp,
   permissionState, pickSyncFolder, readSync, syncSupported, writeSync,
@@ -712,6 +713,18 @@ export function Settings() {
         {/* ---- Daten: sichern/laden, Beispieldaten, leeren ---- */}
         {tab === 'daten' && (
         <>
+        <OneNoteImport onClose={() => setOpen(false)} />
+
+        <section className="modal-section">
+          <h3>Word-Dokumente (.docx)</h3>
+          <p className="modal-hint">
+            Ein Word-Dokument einfach <b>aufs Board ziehen</b> (oder über ＋ → „Datei einfügen"
+            auswählen) — Überschriften, Listen, Tabellen und Bilder werden zu einer Notiz-Karte.
+            Ohne Konto und ohne Internet. <b>Auch der Weg für OneNote ohne Microsoft-Anmeldung:</b>{' '}
+            in OneNote „Datei → Exportieren → Word", dann die Datei hier ablegen.
+          </p>
+        </section>
+
         <section className="modal-section">
           <h3>Starter-Umgebung „Arbeit & Privat"</h3>
           <p className="modal-hint">

@@ -15,6 +15,7 @@ import type { TimeData } from '../../types';
 import { extractEntities } from '../../lib/entities';
 import { makeNote } from '../../lib/nodes';
 import { aiReady, askAi, textToBlocks } from '../../lib/ai';
+import { repairBlocks } from '../../lib/htmlBlocks';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
 
@@ -159,8 +160,12 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
 
   // bewusst nur beim Mount gelesen — danach ist der Editor die Quelle der Wahrheit
   const [initialContent] = useState<PartialBlock[] | undefined>(() => {
-    const blocks = data.blocks as PartialBlock[] | undefined;
-    return blocks && blocks.length > 0 ? blocks : undefined;
+    // M184: vor dem Mount schonend prüfen. Ein einziger Block mit unbekanntem
+    // Typ oder unmöglichem Wert (etwa Überschrift-Ebene 9) lässt BlockNote
+    // hart werfen — und ohne Fehlergrenze bliebe ein weißer Bildschirm statt
+    // eines Boards. repairBlocks fasst nur an, was sonst zum Absturz führt.
+    const blocks = repairBlocks(data.blocks) as PartialBlock[];
+    return blocks.length > 0 ? blocks : undefined;
   });
 
   const editor = useCreateBlockNote({ initialContent, dictionary: blockNoteDe });

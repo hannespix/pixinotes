@@ -255,6 +255,13 @@ interface BoardState {
 
   /** Starter-Umgebung „Verwaltung" zusätzlich anlegen (für Bestandsnutzer) */
   addStarter: () => void;
+  /** M184: Ganze Struktur (Bereiche + Boards) in einem Rutsch einhängen —
+   *  für den OneNote-Import. Merkt sich den Stand davor für „Import zurücknehmen". */
+  importStructure: (payload: { spaces: Space[]; boards: BoardDoc[]; activeId?: string }) => void;
+  /** Den letzten Struktur-Import wieder entfernen (Strg+Z kann das nicht) */
+  undoImport: () => boolean;
+  /** Liegt ein zurücknehmbarer Import vor? */
+  canUndoImport: boolean;
   /** ALLES leeren: ein frisches leeres Board, Hierarchie/Versionen/Vorlagen zurückgesetzt */
   resetAll: () => void;
 
@@ -288,6 +295,11 @@ let toastTimer: ReturnType<typeof setTimeout> | undefined;
  *  History-Einträge — der Aufrufer sichert vorher genau einen Snapshot.
  *  So macht wirklich EIN Strg+Z den kompletten Plan rückgängig (Audit R6-K1). */
 let historyMuted = false;
+
+/** M184: Stand vor dem letzten Struktur-Import (OneNote) — bewusst außerhalb
+ *  des persistierten States: Ein Rückgängig gilt nur für die laufende Sitzung
+ *  und soll nicht als riesiger Zweitstand mitgespeichert werden. */
+let importUndo: { boards: BoardDoc[]; spaces: Space[]; activeId: string } | null = null;
 export function mutedHistory<T>(fn: () => T): T {
   historyMuted = true;
   try {
@@ -621,6 +633,42 @@ export const useBoard = create<BoardState>()(
           });
           get().showToast('🧭 Starter-Umgebung „Verwaltung" hinzugefügt: 3 Bereiche, 14 Boards — viel Spaß beim Erkunden!');
         },
+
+        // M184: Struktur-Import (OneNote). Bewusst EIN set() statt vieler
+        // addBoard-Aufrufe: Letztere setzen jedes Mal activeId neu und legen
+        // nutzlose History-Einträge an. Das normale Strg+Z deckt Bereiche und
+        // Boards ohnehin nicht ab — deshalb hier ein eigener Rücknahme-Stand.
+        importStructure: ({ spaces, boards, activeId }) => {
+          claimWriter(); // bewusste Nutzer-Aktion, auch aus einem Mitlese-Fenster
+          const st = get();
+          importUndo = { boards: st.boards, spaces: st.spaces, activeId: st.activeId };
+          set({
+            boards: [...st.boards, ...boards],
+            spaces: [...st.spaces, ...spaces],
+            activeId: activeId ?? boards[0]?.id ?? st.activeId,
+            view: 'overview',
+            canUndoImport: true,
+            // Voll-Remount: Notiz-Karten mit Blöcken sauber mounten (BlockNote
+            // liest seinen Inhalt NUR beim Mount)
+            importEpoch: st.importEpoch + 1,
+          });
+        },
+
+        undoImport: () => {
+          if (!importUndo) return false;
+          const snap = importUndo;
+          importUndo = null;
+          set({
+            boards: snap.boards,
+            spaces: snap.spaces,
+            activeId: snap.activeId,
+            canUndoImport: false,
+            importEpoch: get().importEpoch + 1,
+          });
+          return true;
+        },
+
+        canUndoImport: false,
 
         resetAll: () => {
           // Bewusst KEIN Undo: das ist der „frischer Start"-Schalter.

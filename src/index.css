@@ -3309,3 +3309,29 @@ button.link-dead:disabled { opacity: 0.45; }
   .nav-grid { grid-template-columns: 1fr; }
   .nav-head > b { font-size: 12px; }
 }
+
+/* ---------- M184: OneNote-Import (Einstellungen → Daten) ---------- */
+.on-tree {
+  max-height: 260px; overflow-y: auto; margin: 8px 0 4px;
+  border: 1px solid var(--border-soft); border-radius: 10px; padding: 6px 8px;
+  background: var(--surface-1);
+}
+.on-book + .on-book { margin-top: 8px; border-top: 1px solid var(--border-soft); padding-top: 8px; }
+.on-book-name {
+  display: block; width: 100%; text-align: left; border: none; background: none;
+  cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; color: var(--ink);
+  padding: 3px 4px; border-radius: 7px;
+}
+.on-book-name:hover { background: var(--surface-2); }
+.on-count { font-weight: 400; font-size: 10px; color: var(--muted); margin-left: 6px; }
+.on-sec {
+  display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink);
+  padding: 3px 4px 3px 14px; border-radius: 7px; cursor: pointer;
+}
+.on-sec:hover { background: var(--surface-2); }
+.on-sec input { flex: 0 0 auto; }
+.on-sec span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.on-empty { font-size: 11px; color: var(--muted); padding: 2px 14px; }
+.on-progress { display: flex; align-items: center; gap: 9px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+.on-bar { flex: 1; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.on-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.3s ease; }
