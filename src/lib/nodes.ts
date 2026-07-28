@@ -36,6 +36,7 @@ export const CARD_WIDTHS = {
   portal: 200,
   shape: 150,
   mermaid: 380,
+  minutes: 380,
   gantt: 560,
   calendar: 430,
 } as const;
@@ -83,6 +84,18 @@ export function makePortal(position: Pos): AppNode {
 
 /** Wochenplan (M153): Stundenraster Mo–Fr, 8–17 Uhr — Zeitbereich und
  *  Tage-Anzahl sind in der Karte umschaltbar */
+/** M186: Protokoll-Reihe — startet leer, die erste Sitzung legt der Nutzer an */
+export function makeMinutes(position: Pos): AppNode {
+  return {
+    id: uid(),
+    type: 'minutes',
+    width: CARD_WIDTHS.minutes,
+    height: 420,
+    position,
+    data: { title: 'Besprechungsreihe', entries: [], agenda: [], rhythm: '', carryOpen: true },
+  } as AppNode;
+}
+
 export function makeWeek(position: Pos): AppNode {
   return {
     id: uid(),

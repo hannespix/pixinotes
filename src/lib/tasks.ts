@@ -136,6 +136,41 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
             who: row.who?.trim() || undefined,
           });
         }
+      } else if (node.type === 'minutes') {
+        // M186 Protokoll-Reihe: NUR die neueste Sitzung liefert Aufgaben.
+        // Offene Punkte wandern per Wiedervorlage in die jeweils neue Sitzung —
+        // zählte man alle Sitzungen, stünde derselbe Punkt so oft in der
+        // Zentrale, wie er schon vertagt wurde.
+        const md = node.data as { entries?: Array<{ id: string; date: string; title?: string; blocks?: unknown[] }> };
+        const newest = [...(md.entries ?? [])].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))[0];
+        if (newest) {
+          const walk = (blocks: AnyBlock[] | undefined, prefix: string) => {
+            (blocks ?? []).forEach((b, i) => {
+              const path = prefix ? `${prefix}.${i}` : String(i);
+              if (b.type === 'checkListItem' && !b.props?.checked) {
+                const text = inlineText(b.content).trim();
+                if (text) {
+                  const itemId = b.id ?? `pos:${path}`;
+                  const detected = detectDates(text, now)[0];
+                  const due = detected ? isoLocal(detected.date) : undefined;
+                  out.push({
+                    key: `m:${board.id}:${node.id}:${newest.id}:${itemId}`,
+                    kind: 'check',
+                    boardId: board.id,
+                    boardName: board.name,
+                    nodeId: node.id,
+                    itemId,
+                    text,
+                    due,
+                    urgency: urgencyFor(due, now),
+                  });
+                }
+              }
+              walk(b.children, path);
+            });
+          };
+          walk(newest.blocks as AnyBlock[] | undefined, '');
+        }
       } else if (node.type === 'note') {
         // Blöcke ohne id (Seed-Daten) werden über ihren Positionspfad adressiert
         const walk = (blocks: AnyBlock[] | undefined, prefix: string) => {

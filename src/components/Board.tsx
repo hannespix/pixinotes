@@ -30,6 +30,7 @@ import { GanttCard } from './nodes/GanttCard';
 import { CalendarCard } from './nodes/CalendarCard';
 import { FrameCard } from './nodes/FrameCard';
 import { WeekCard } from './nodes/WeekCard';
+import { MinutesCard } from './nodes/MinutesCard';
 import { TimeCard } from './nodes/TimeCard';
 import { HtmlAppCard } from './nodes/HtmlAppCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
@@ -50,6 +51,7 @@ const nodeTypes: NodeTypes = {
   calendar: CalendarCard,
   frame: FrameCard,
   week: WeekCard,
+  minutes: MinutesCard,
   time: TimeCard,
   htmlapp: HtmlAppCard,
 };

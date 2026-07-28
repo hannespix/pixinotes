@@ -201,6 +201,20 @@ function baseNodeText(node: AppNode): string {
         .map((s) => `${s.date} ${hm(s.start)}-${s.end !== undefined ? hm(s.end) : 'läuft'} ${labels[s.kind] ?? s.kind}${s.note ? ` (${s.note})` : ''}`);
       return `${t.title}\n${rows.join('\n')}`;
     }
+    case 'minutes': {
+      // M186: bewusst ALLE Sitzungen — nur so findet die Suche (Strg+K) auch
+      // ein Protokoll von vor zwei Jahren, obwohl die Karte nur eines zeigt.
+      const mn = node.data as { title?: string; entries?: Array<{ date: string; title?: string; attendees?: string; blocks?: unknown[]; decisions?: Array<{ text: string }> }> };
+      const parts = [...(mn.entries ?? [])]
+        .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
+        .map((e) => {
+          const head = `— ${e.title?.trim() || e.date}${e.attendees ? ` (${e.attendees})` : ''}`;
+          const body = blocksToText(e.blocks);
+          const dec = (e.decisions ?? []).map((d) => `\u00a7 ${d.text}`).join('\n');
+          return [head, body, dec].filter(Boolean).join('\n');
+        });
+      return `${mn.title ?? 'Besprechungsreihe'}\n${parts.join('\n\n')}`;
+    }
     case 'week': {
       const w = node.data;
       const cols = w.cols?.length ? w.cols : ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].slice(0, w.days === 7 ? 7 : 5);
@@ -275,6 +289,19 @@ export function nodeToHtml(node: AppNode): string {
         return `<h4>${date}</h4><ul>${items}</ul><p><b>Summe (ohne Pausen): ${hm(work)} h</b></p>`;
       });
       return `<h3>${esc(t.title)}</h3>${parts.join('') || '<p>—</p>'}`;
+    }
+    case 'minutes': {
+      const mn = node.data as { title?: string; entries?: Array<{ date: string; title?: string; attendees?: string; blocks?: unknown[]; decisions?: Array<{ text: string }> }> };
+      const parts = [...(mn.entries ?? [])]
+        .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
+        .map((e) => {
+          const dec = (e.decisions ?? []).map((d) => `<li>${esc(d.text)}</li>`).join('');
+          return `<h4>${esc(e.title?.trim() || e.date)}</h4>`
+            + (e.attendees ? `<p><i>Teilnehmende: ${esc(e.attendees)}</i></p>` : '')
+            + blocksToHtml(e.blocks)
+            + (dec ? `<p><b>Beschl\u00fcsse</b></p><ul>${dec}</ul>` : '');
+        });
+      return `<h3>${esc(mn.title ?? 'Besprechungsreihe')}</h3>${parts.join('<hr>') || '<p>\u2014</p>'}`;
     }
     case 'week': {
       const w = node.data;

@@ -221,6 +221,51 @@ export interface WeekData {
 }
 export type WeekNode = Node<WeekData, 'week'>;
 
+/**
+ * Protokoll-Reihe (M186): EINE Karte für eine ganze Besprechungsserie.
+ *
+ * Wiederkehrende Meetings sind das klassische Dokumentations-Dilemma: eine
+ * endlose Notiz wird unlesbar, hundert Einzelnotizen zerfasern das Board.
+ * Hier liegen alle Sitzungen IN der Karte, angezeigt wird immer genau eine.
+ *
+ * Der eigentliche Gewinn ist die WIEDERVORLAGE: Beim Anlegen einer neuen
+ * Sitzung wandern die offenen Punkte der letzten automatisch mit — genau der
+ * Handgriff, bei dem sonst per Copy-Paste Punkte verloren gehen.
+ */
+export interface MinutesEntry {
+  id: string;
+  /** ISO yyyy-mm-dd — die Sitzung IST ihr Datum */
+  date: string;
+  /** Abweichender Titel („Sondersitzung"); sonst zählt das Datum */
+  title?: string;
+  /** Teilnehmende als Freitext — ergibt nebenbei eine Anwesenheitsübersicht */
+  attendees?: string;
+  /** Protokolltext als BlockNote-Blöcke (wie die Notiz-Karte) */
+  blocks?: unknown[];
+  /** Beschlüsse: bewusst KEINE Aufgaben, sondern Festlegungen. In der
+   *  Verwaltung ist die Beschlusslage oft wichtiger als das Protokoll. */
+  decisions?: Array<{ id: string; text: string }>;
+  /** Externer Schreiber hat blocks geändert (Rück-Sync) — erzwingt Editor-Refresh */
+  extEpoch?: number;
+}
+
+export interface MinutesData {
+  /** Name der Reihe, z. B. „Jour Fixe Referat 21" */
+  title: string;
+  /** Neueste zuerst — die Reihenfolge hält sortEntries() */
+  entries: MinutesEntry[];
+  /** Gerade angezeigte Sitzung (id); fehlt ⇒ die neueste */
+  current?: string;
+  /** Feste Tagesordnung: erscheint in jeder neuen Sitzung vorstrukturiert */
+  agenda?: string[];
+  /** Rhythmus für den Datumsvorschlag der nächsten Sitzung */
+  rhythm?: 'woche' | 'zweiwochen' | 'monat' | 'quartal' | '';
+  /** Offene Punkte beim Anlegen automatisch übernehmen (Standard: an) */
+  carryOpen?: boolean;
+  [key: string]: unknown;
+}
+export type MinutesNode = Node<MinutesData, 'minutes'>;
+
 /** Zeiterfassung (M157): Arbeitszeit so unkompliziert wie möglich — ein
  *  laufender Abschnitt (end fehlt), Umschalten der Art beendet den alten und
  *  startet nahtlos den nächsten. Nacherfassen = Zeilen direkt editieren. */
@@ -275,7 +320,7 @@ export interface FrameData {
 export type FrameNode = Node<FrameData, 'frame'>;
 
 export type AppNode =
-  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode)
+  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode | MinutesNode)
   // Archiv (M87): Karten jedes Typs lassen sich als Ganzes „erledigt" ablegen —
   // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface.
   // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der

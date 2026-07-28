@@ -26,7 +26,10 @@ export function MiniDock() {
           ? `Aufgaben & Erinnerungen: ${taskStats.open} offen über alle Boards`
             + (taskStats.overdue > 0 ? ` — davon ${taskStats.overdue} überfällig (darum rot)` : ' — nichts überfällig')
           : 'Aufgaben & Erinnerungen (alle Boards) — aktuell nichts offen'}
-        aria-label={taskStats.open > 0 ? `Aufgaben: ${taskStats.open} offen` : 'Aufgaben'}
+        // aria-label bewusst FEST: Die Zahl steht sichtbar im Badge daneben und
+        // wird ohnehin mitgelesen — ein wechselndes Label macht den Knopf für
+        // Screenreader (und für Tests) zu einem beweglichen Ziel.
+        aria-label="Aufgaben"
       >
         <ITasks />
         {taskStats.open > 0 && (

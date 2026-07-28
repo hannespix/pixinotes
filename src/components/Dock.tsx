@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
-import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makePortal, makeShape, makeTime, makeWeek } from '../lib/nodes';
+import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, makeTime, makeWeek } from '../lib/nodes';
 import { importFilesToBoard, importHtmlAppFromUrl } from '../lib/importFiles';
 import { collectTasks } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
@@ -12,7 +12,7 @@ import { uid, type AppNode, type ShapeKind } from '../types';
 import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
   IAppWindow, IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
-  IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMousePointer, INote,
+  IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMinutes, IMousePointer, INote,
   IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
 } from './Icons';
 
@@ -290,6 +290,12 @@ export function Dock() {
               <IWeek size={16} /> Wochenplan (Stunden)
             </button>
             <button
+              onClick={() => add(() => makeMinutes(centerPos(380, 420)))}
+              title="Protokoll-Reihe: alle Sitzungen einer wiederkehrenden Besprechung in EINER Karte — offene Punkte wandern automatisch in die nächste Sitzung"
+            >
+              <IMinutes size={16} /> Protokoll-Reihe
+            </button>
+            <button
               onClick={() => add(() => makeTime(centerPos(460, 380)))}
               title="Arbeitszeit per Start/Stop erfassen — Arbeit und Pause; Besonderheiten in die Bemerkung, Nacherfassen direkt in der Liste"
             >
@@ -528,7 +534,10 @@ export function Dock() {
           ? `Aufgaben & Erinnerungen: ${taskStats.open} offen über alle Boards`
             + (taskStats.overdue > 0 ? ` — davon ${taskStats.overdue} überfällig (darum rot)` : ' — nichts überfällig')
           : 'Aufgaben & Erinnerungen (alle Boards) — aktuell nichts offen'}
-        aria-label={taskStats.open > 0 ? `Aufgaben: ${taskStats.open} offen` : 'Aufgaben'}
+        // aria-label bewusst FEST: Die Zahl steht sichtbar im Badge daneben und
+        // wird ohnehin mitgelesen — ein wechselndes Label macht den Knopf für
+        // Screenreader (und für Tests) zu einem beweglichen Ziel.
+        aria-label="Aufgaben"
       >
         <ITasks />
         {taskStats.open > 0 && (
