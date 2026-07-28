@@ -3217,3 +3217,95 @@ button.link-dead:disabled { opacity: 0.45; }
     #fff;
 }
 .sel-frame-tints .tint-dot.on { border: 2px solid var(--accent); }
+
+/* ---------- M183: Navigator als zentrales Glas-Overlay ---------- */
+/* Body-Portal statt Menü in der Tab-Leiste: Die Leiste ist selbst eine
+   Glas-Fläche (backdrop-filter) — ein Kind darin kann per Spezifikation
+   nichts mehr blurren (Backdrop-Root). Als Portal wirkt der Blur wieder,
+   und das Panel sitzt zentriert über allem (User-Screenshot). */
+.nav-backdrop {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(44, 34, 14, 0.28);
+  animation: pn-fade-in 0.16s ease-out;
+}
+[data-theme='dark'] .nav-backdrop { background: rgba(0, 0, 0, 0.45); }
+.nav-panel {
+  position: fixed; inset: 0; margin: auto; height: fit-content;
+  width: min(780px, calc(100vw - 24px));
+  max-height: min(80vh, 720px);
+  display: flex; flex-direction: column;
+  border-radius: 16px; padding: 14px 16px 10px;
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 22px 70px rgba(40, 30, 10, 0.32);
+  animation: pn-pop-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.nav-head {
+  display: flex; align-items: center; gap: 10px;
+  padding-bottom: 9px; border-bottom: 1px solid var(--border-soft);
+}
+.nav-head > b { flex: 1; font-size: 13px; color: var(--ink); }
+.nav-overview {
+  display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
+  border: 1px solid var(--border-soft); background: none; border-radius: 999px;
+  padding: 5px 12px; font: inherit; font-size: 11.5px; font-weight: 650;
+  color: var(--ink); cursor: pointer;
+}
+.nav-overview:hover { border-color: var(--accent); color: var(--accent-strong); }
+.nav-x {
+  flex: 0 0 auto; border: none; background: none; cursor: pointer;
+  color: var(--muted); padding: 5px; border-radius: 8px; display: inline-flex;
+}
+.nav-x:hover { color: var(--ink); background: var(--surface-2); }
+.nav-grid {
+  overflow-y: auto; padding: 8px 2px 4px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 4px 22px; align-items: start;
+}
+.nav-space { min-width: 0; }
+.nav-space-name {
+  display: block; width: 100%; text-align: left; border: none; background: none;
+  cursor: pointer; font: inherit; font-size: 11px; font-weight: 800;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+  padding: 8px 6px 3px; border-radius: 8px;
+}
+.nav-space-name:hover { color: var(--accent-strong); background: var(--surface-2); }
+.nav-space-static { cursor: default; }
+.nav-space-static:hover { color: var(--muted); background: none; }
+.nav-proj { padding: 0 0 6px 4px; }
+.nav-proj-name {
+  display: block; width: 100%; text-align: left; border: none; background: none;
+  cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 650;
+  color: var(--ink); opacity: 0.8; padding: 4px 6px 2px; border-radius: 8px;
+}
+.nav-proj-name:hover { opacity: 1; background: var(--surface-2); }
+.nav-board-wrap { min-width: 0; }
+.nav-board-row { display: flex; align-items: center; gap: 2px; }
+.nav-board-row .tab-tree-board { flex: 1; min-width: 0; }
+.nav-expand {
+  flex: 0 0 auto; border: none; background: none; cursor: pointer;
+  color: var(--muted); padding: 4px; border-radius: 6px; display: inline-flex;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.nav-expand:hover { color: var(--ink); background: var(--surface-2); }
+.nav-expand.on { transform: rotate(90deg); }
+.nav-cards { padding: 1px 0 4px 16px; }
+.nav-card {
+  display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
+  border: none; background: none; cursor: pointer; font: inherit;
+  font-size: 11px; color: var(--ink); opacity: 0.85; padding: 3px 8px; border-radius: 7px;
+}
+.nav-card:hover { opacity: 1; background: var(--surface-2); }
+.nav-card-type {
+  flex: 0 0 auto; font-size: 9px; font-weight: 700; color: var(--muted);
+  border: 1px solid var(--border-soft); border-radius: 5px; padding: 0 4px;
+}
+.nav-card-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-more { font-size: 10px; color: var(--muted); padding: 2px 8px 3px; }
+@media (max-width: 640px) {
+  .nav-panel { width: calc(100vw - 12px); max-height: 86vh; padding: 12px 10px 8px; }
+  .nav-grid { grid-template-columns: 1fr; }
+  .nav-head > b { font-size: 12px; }
+}

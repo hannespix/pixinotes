@@ -1,9 +1,17 @@
-import { useMemo, useRef, useState } from 'react';
-import { useOutsideClose } from '../lib/useOutsideClose';
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { selectActiveBoard, useBoard } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
+import { nodeToText } from '../lib/serialize';
 import { InlineName } from './InlineName';
 import { IChevronR, IHome, IPlus, IShare, IX } from './Icons';
+
+/** Kurz-Label je Karten-Typ für die Inhalts-Zeilen im Navigator (M183) */
+const NAV_TYPE: Record<string, string> = {
+  note: 'Notiz', kanban: 'Kanban', gantt: 'Zeitplan', calendar: 'Kalender',
+  mermaid: 'Diagramm', shape: 'Form', image: 'Bild', pdf: 'PDF', email: 'E-Mail',
+  file: 'Datei', week: 'Planer', time: 'Zeit', htmlapp: 'App', portal: 'Portal',
+};
 
 /**
  * Kopfleiste mit dreistufiger Gliederung: Die Tab-Reihe zeigt NUR die Boards
@@ -23,10 +31,17 @@ export function Tabs() {
   const removeBoard = useBoard((s) => s.removeBoard);
   const showToast = useBoard((s) => s.showToast);
   const activeBoard = useBoard(selectActiveBoard);
+  const focusNode = useBoard((s) => s.focusNode);
   const [navOpen, setNavOpen] = useState(false);
-  // Klick/Tipp in den Hintergrund schließt den Navigator (User-Wunsch)
-  const navRef = useRef<HTMLElement | null>(null);
-  useOutsideClose(navOpen, navRef, () => setNavOpen(false));
+  // M183: aufgeklappte Boards im Navigator (zeigen ihre Karten)
+  const [navExpanded, setNavExpanded] = useState<Set<string>>(new Set());
+  // Esc schließt den Navigator (der Backdrop fängt Klicks ohnehin ab)
+  useEffect(() => {
+    if (!navOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNavOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [navOpen]);
 
   const byId = useMemo(() => new Map(boards.map((b) => [b.id, b])), [boards]);
 
@@ -73,6 +88,60 @@ export function Tabs() {
     }
   };
 
+  // ---------- M183: Navigator-Helfer ----------
+  const toggleExpand = (id: string) =>
+    setNavExpanded((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  const jumpCard = (boardId: string, nodeId: string) => {
+    openBoard(boardId);
+    focusNode(boardId, nodeId);
+    setNavOpen(false);
+  };
+  const cardLabel = (n: (typeof boards)[number]['nodes'][number]): string => {
+    const first = nodeToText(n).split('\n').find((l) => l.trim())?.trim() ?? '';
+    return first.replace(/^[#\-*\d.\s☐☑]+/, '').slice(0, 48) || (NAV_TYPE[n.type ?? ''] ?? 'Karte');
+  };
+
+  /** Board-Zeile im Navigator — mit ▸ zum Aufklappen der Karten (M183) */
+  const navBoard = (b: (typeof boards)[number]) => {
+    const cards = b.nodes.filter((n) => n.type !== 'frame');
+    const open = navExpanded.has(b.id);
+    return (
+      <div key={b.id} className="nav-board-wrap">
+        <div className="nav-board-row">
+          <button
+            className={`tab-tree-board ${b.id === activeId && view === 'board' ? 'active' : ''}`}
+            onClick={() => { openBoard(b.id); setNavOpen(false); }}
+          >
+            <span className="tab-tree-board-name">{b.name}</span>
+            <span className="tab-count">{b.nodes.length}</span>
+          </button>
+          {cards.length > 0 && (
+            <button
+              className={`nav-expand ${open ? 'on' : ''}`}
+              title={open ? 'Karten einklappen' : 'Karten dieses Boards zeigen'}
+              onClick={() => toggleExpand(b.id)}
+            ><IChevronR size={11} /></button>
+          )}
+        </div>
+        {open && (
+          <div className="nav-cards">
+            {cards.slice(0, 14).map((n) => (
+              <button key={n.id} className="nav-card" title="Zur Karte springen" onClick={() => jumpCard(b.id, n.id)}>
+                <span className="nav-card-type">{NAV_TYPE[n.type ?? ''] ?? n.type}</span>
+                <span className="nav-card-name">{cardLabel(n)}</span>
+              </button>
+            ))}
+            {cards.length > 14 && <div className="nav-more">… und {cards.length - 14} weitere — Board öffnen</div>}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const close = (id: string) => {
     if (boards.length <= 1) {
       showToast('Das letzte Board bleibt offen 🙂');
@@ -94,65 +163,70 @@ export function Tabs() {
       >
         <IHome size={15} />
       </button>
-      {/* Brotkrume „Bereich › Projekt" öffnet den Navigator über ALLE Ebenen */}
-      <span className="tab-nav-wrap" ref={navRef}>
-        <button
-          className={`tab-nav ${navOpen ? 'active' : ''}`}
-          title="Navigator: alle Bereiche, Projekte & Boards"
-          onClick={() => setNavOpen((o) => !o)}
-        >
-          <span className="tab-nav-space">{context?.space.name ?? '—'}</span>
-          <IChevronR size={11} />
-          <span className="tab-nav-proj">{context?.project.name ?? '—'}</span>
-        </button>
-        {navOpen && (
-          <div className="tab-tree">
-            {spaces.map((sp) => (
-              <div key={sp.id} className="tab-tree-space">
-                <div className="tab-tree-space-name">{sp.name}</div>
-                {sp.projects.map((proj) => (
-                  <div key={proj.id} className="tab-tree-proj">
-                    <div className="tab-tree-proj-name">{proj.name}</div>
-                    {proj.boardIds.map((id) => {
-                      const b = byId.get(id);
-                      if (!b) return null;
-                      return (
-                        <button
-                          key={id}
-                          className={`tab-tree-board ${id === activeId && view === 'board' ? 'active' : ''}`}
-                          onClick={() => { openBoard(id); setNavOpen(false); }}
-                        >
-                          <span className="tab-tree-board-name">{b.name}</span>
-                          <span className="tab-count">{b.nodes.length}</span>
-                        </button>
-                      );
-                    })}
-                    {proj.boardIds.length === 0 && <div className="tab-tree-empty">leer</div>}
-                  </div>
-                ))}
-              </div>
-            ))}
-            {orphans.length > 0 && (
-              <div className="tab-tree-space">
-                <div className="tab-tree-space-name">Ohne Projekt</div>
-                <div className="tab-tree-proj">
-                  {orphans.map((b) => (
-                    <button
-                      key={b.id}
-                      className={`tab-tree-board ${b.id === activeId && view === 'board' ? 'active' : ''}`}
-                      onClick={() => { openBoard(b.id); setNavOpen(false); }}
-                    >
-                      <span className="tab-tree-board-name">{b.name}</span>
-                      <span className="tab-count">{b.nodes.length}</span>
-                    </button>
+      {/* Brotkrume „Bereich › Projekt" öffnet den Navigator über ALLE Ebenen.
+          M183: Der Navigator ist ein ZENTRIERTES Glas-Overlay als Body-Portal —
+          in der Tab-Leiste (selbst eine Glas-Fläche) blurte sein backdrop-filter
+          per CSS-Spezifikation nichts mehr (Backdrop-Root), User-Screenshot. */}
+      <button
+        className={`tab-nav ${navOpen ? 'active' : ''}`}
+        title="Navigator: alle Bereiche, Projekte, Boards & Karten"
+        onClick={() => setNavOpen((o) => !o)}
+      >
+        <span className="tab-nav-space">{context?.space.name ?? '—'}</span>
+        <IChevronR size={11} />
+        <span className="tab-nav-proj">{context?.project.name ?? '—'}</span>
+      </button>
+      {navOpen && createPortal(
+        <div className="nav-backdrop" onClick={() => setNavOpen(false)}>
+          <div className="nav-panel nodrag" role="dialog" aria-label="Navigator" onClick={(e) => e.stopPropagation()}>
+            <div className="nav-head">
+              <b>Alle Bereiche, Projekte & Boards</b>
+              <button
+                className="nav-overview"
+                title="Große Übersicht öffnen (alle Bereiche als Fläche)"
+                onClick={() => { setView('overview'); setNavOpen(false); }}
+              ><IHome size={13} /> Große Übersicht</button>
+              <button className="nav-x" title="Schließen (Esc)" onClick={() => setNavOpen(false)}><IX size={13} /></button>
+            </div>
+            <div className="nav-grid">
+              {spaces.map((sp) => (
+                <section key={sp.id} className="nav-space">
+                  <button
+                    className="nav-space-name"
+                    title={`Bereich „${sp.name}" in der großen Übersicht öffnen`}
+                    onClick={() => { setView('overview'); setNavOpen(false); }}
+                  >{sp.name}</button>
+                  {sp.projects.map((proj) => (
+                    <div key={proj.id} className="nav-proj">
+                      <button
+                        className="nav-proj-name"
+                        title={proj.boardIds.length > 0 ? `Projekt „${proj.name}" öffnen (erstes Board)` : 'Projekt ist leer'}
+                        onClick={() => {
+                          const first = proj.boardIds.find((id) => byId.has(id));
+                          if (first) { openBoard(first); setNavOpen(false); }
+                        }}
+                      >{proj.name}</button>
+                      {proj.boardIds.map((id) => {
+                        const b = byId.get(id);
+                        return b ? navBoard(b) : null;
+                      })}
+                      {proj.boardIds.length === 0 && <div className="tab-tree-empty">leer</div>}
+                    </div>
                   ))}
-                </div>
-              </div>
-            )}
-            <div className="tab-tree-foot">🏠 öffnet die große Übersicht · Tabs zeigen nur das aktive Projekt</div>
+                </section>
+              ))}
+              {orphans.length > 0 && (
+                <section className="nav-space">
+                  <div className="nav-space-name nav-space-static">Ohne Projekt</div>
+                  <div className="nav-proj">{orphans.map((b) => navBoard(b))}</div>
+                </section>
+              )}
+            </div>
+            <div className="tab-tree-foot">Bereiche öffnen die große Übersicht · Projekte ihr erstes Board · ▸ zeigt die Karten eines Boards (Klick springt hin)</div>
           </div>
-        )}
-      </span>
+        </div>,
+        document.body,
+      )}
       {/* Nur die Board-Tabs des AKTIVEN Projekts — scrollen bei Bedarf */}
       <div className="tabs-scroll">
         {projectBoards.map((b) => (
