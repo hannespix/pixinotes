@@ -19,7 +19,15 @@ export function MiniDock() {
 
   return (
     <div className="dock dock-mini">
-      <button className="dock-tasks" onClick={() => { setView('board'); setTasksOpen(true); }} title="Aufgaben & Erinnerungen (alle Boards)" aria-label="Aufgaben">
+      <button
+        className="dock-tasks"
+        onClick={() => { setView('board'); setTasksOpen(true); }}
+        title={taskStats.open > 0
+          ? `Aufgaben & Erinnerungen: ${taskStats.open} offen über alle Boards`
+            + (taskStats.overdue > 0 ? ` — davon ${taskStats.overdue} überfällig (darum rot)` : ' — nichts überfällig')
+          : 'Aufgaben & Erinnerungen (alle Boards) — aktuell nichts offen'}
+        aria-label={taskStats.open > 0 ? `Aufgaben: ${taskStats.open} offen` : 'Aufgaben'}
+      >
         <ITasks />
         {taskStats.open > 0 && (
           <span className={`dock-badge ${taskStats.overdue > 0 ? 'red' : ''}`}>{taskStats.open}</span>

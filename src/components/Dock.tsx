@@ -520,7 +520,16 @@ export function Dock() {
         </button>
       )}
       <span className="dock-sep" />
-      <button className="dock-tasks" onClick={() => setTasksOpen(true)} title="Aufgaben & Erinnerungen (alle Boards)" aria-label="Aufgaben">
+      <button
+        className="dock-tasks"
+        onClick={() => setTasksOpen(true)}
+        // M185: Die Zahl am Symbol selbst erklären — sonst rät man, wofür sie steht
+        title={taskStats.open > 0
+          ? `Aufgaben & Erinnerungen: ${taskStats.open} offen über alle Boards`
+            + (taskStats.overdue > 0 ? ` — davon ${taskStats.overdue} überfällig (darum rot)` : ' — nichts überfällig')
+          : 'Aufgaben & Erinnerungen (alle Boards) — aktuell nichts offen'}
+        aria-label={taskStats.open > 0 ? `Aufgaben: ${taskStats.open} offen` : 'Aufgaben'}
+      >
         <ITasks />
         {taskStats.open > 0 && (
           <span className={`dock-badge ${taskStats.overdue > 0 ? 'red' : ''}`}>{taskStats.open}</span>

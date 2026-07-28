@@ -1774,12 +1774,21 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* Aufgaben-Badge am Dock-Button */
 .dock-tasks { position: relative; }
 .dock-badge {
-  position: absolute; top: 2px; right: 0; min-width: 16px; height: 16px;
+  /* M185: Die Zahl sitzt bewusst ETWAS ÜBER dem Symbol statt am äußersten
+     Rand — vorher (right: 0) klebte sie fast am Nachbarknopf und wirkte, als
+     gehöre sie zu diesem (User-Screenshot: die Archiv-Zahl schien zum
+     Abspielen-Knopf zu gehören). Der Ring in Leisten-Farbe schneidet sie
+     zusätzlich sichtbar vom Nachbarn frei. */
+  position: absolute; top: 1px; right: 4px; min-width: 16px; height: 16px;
   background: var(--accent); color: #fff; border-radius: 999px;
   font-size: 9.5px; font-weight: 700; line-height: 16px; padding: 0 4px;
   pointer-events: none;
+  box-shadow: 0 0 0 2px var(--surface);
 }
 .dock-badge.red { background: #d84b3d; }
+/* Die Leiste selbst ist der Bezugspunkt: ein Knopf mit Zahl bekommt etwas
+   mehr Luft nach rechts, damit Symbol und Zahl als EINE Einheit lesbar sind */
+.dock button:has(.dock-badge) { margin-right: 3px; }
 
 /* Fälligkeit am Kanban-Ticket */
 .kanban-due {
