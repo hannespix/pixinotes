@@ -252,6 +252,10 @@ export interface MinutesEntry {
 export interface MinutesData {
   /** Name der Reihe, z. B. „Jour Fixe Referat 21" */
   title: string;
+  /** M187: Kartenfarbe wie bei Notizen — Paletten-Schlüssel … */
+  color?: StickyColor;
+  /** … bzw. freie Farbe (Hex); gesetzt gewinnt sie gegen die Palette */
+  hex?: string;
   /** Neueste zuerst — die Reihenfolge hält sortEntries() */
   entries: MinutesEntry[];
   /** Gerade angezeigte Sitzung (id); fehlt ⇒ die neueste */

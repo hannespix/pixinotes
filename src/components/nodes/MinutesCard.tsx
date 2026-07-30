@@ -5,7 +5,7 @@ import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe } from '@blocknote/core/locales';
 import { useBoard } from '../../store';
-import { uid, type MinutesData, type MinutesNode } from '../../types';
+import { STICKY_COLORS, uid, type MinutesData, type MinutesNode } from '../../types';
 import { allDecisions, buildEntry, currentEntry, entryLabel, nextDate, sortEntries } from '../../lib/minutes';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { useAndroidBackspaceFix } from '../../lib/blocknoteAndroidFix';
@@ -26,6 +26,10 @@ export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
   const [setupOpen, setSetupOpen] = useState(false);
+  // M187: Zugriff auf den LEBENDEN Editor der angezeigten Sitzung. Ein TOP wird
+  // von ihm selbst eingefügt statt über den Speicher — sonst überholt der
+  // Editor beim nächsten Neuaufbau die Änderung mit seinem alten Stand.
+  const editorRef = useRef<{ document: unknown[]; insertBlocks: (b: unknown[], ref: unknown, pos: string) => void } | null>(null);
   const [decisionText, setDecisionText] = useState('');
 
   const sorted = useMemo(() => sortEntries(m.entries ?? []), [m.entries]);
@@ -69,8 +73,58 @@ export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
 
   const decisions = useMemo(() => allDecisions(m), [m]);
 
+  /** M187: Farbe wie bei der Notiz-Karte — Punkt schaltet die Palette weiter */
+  const cycleColor = () => {
+    const cur = m.color ?? 'white';
+    const next = STICKY_COLORS[(STICKY_COLORS.indexOf(cur) + 1) % STICKY_COLORS.length];
+    patch({ color: next, hex: undefined });   // zurück zur Palette
+  };
+
+  /**
+   * M187: Tagesordnungspunkt NUR für diese Sitzung. Der Punkt landet direkt
+   * als Überschrift im Protokoll — bewusst ohne zweite Datenhaltung: Die TOPs
+   * einer Sitzung leben in ihrem Text. So lassen sie sich im Editor frei
+   * umbenennen, verschieben und löschen, ohne dass zwei Listen auseinanderlaufen.
+   */
+  const addTop = () => {
+    if (!entry) return;
+    const name = window.prompt('Tagesordnungspunkt für diese Sitzung:');
+    if (!name?.trim()) return;
+    const fresh = [
+      { type: 'heading', props: { level: 3 }, content: name.trim() },
+      { type: 'paragraph', content: '' },
+    ];
+    const ed = editorRef.current;
+    if (ed && ed.document.length > 0) {
+      // Der Editor fügt selbst ein; sein onChange schreibt in den Speicher
+      ed.insertBlocks(fresh, ed.document[ed.document.length - 1], 'after');
+    } else {
+      patchEntry(entry.id, { blocks: [...((entry.blocks as unknown[]) ?? []), ...fresh] });
+    }
+    showToast(`TOP „${name.trim()}" angelegt — gilt nur für diese Sitzung.`);
+  };
+
+  /** TOPs der laufenden Sitzung: aus den Überschriften abgeleitet (eine Wahrheit) */
+  const tops = useMemo(() => {
+    const out: string[] = [];
+    for (const b of ((entry?.blocks as Array<Record<string, unknown>>) ?? [])) {
+      if (b?.type !== 'heading') continue;
+      const c = b.content;
+      const t = typeof c === 'string' ? c : Array.isArray(c) ? c.map((s) => (s as { text?: string })?.text ?? '').join('') : '';
+      if (t.trim()) out.push(t.trim());
+    }
+    return out;
+  }, [entry]);
+
   return (
-    <CardShell id={id} selected={selected} minWidth={320} minHeight={300} className="minutes-card">
+    <CardShell
+      id={id}
+      selected={selected}
+      minWidth={320}
+      minHeight={300}
+      className={`minutes-card sticky-${m.color ?? 'white'}`}
+      style={m.hex ? { background: m.hex } : undefined}
+    >
       <div className="minutes-head">
         <DragTitle
           value={m.title}
@@ -78,10 +132,18 @@ export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
           className="minutes-title"
           placeholder="Besprechungsreihe"
         />
-        <button className="nodrag" title="Reihe einrichten: Tagesordnung, Rhythmus, Wiedervorlage" onClick={() => setSetupOpen((o) => !o)}>
+        <button className="color-dot minutes-dot nodrag" title="Kartenfarbe wechseln (Palette)" onClick={cycleColor} />
+        <input
+          type="color"
+          className="pn-colorpick minutes-colorpick nodrag"
+          title="Eigene Kartenfarbe wählen"
+          value={m.hex ?? '#ffffff'}
+          onChange={(e) => patch({ hex: e.target.value })}
+        />
+        <button className="minutes-setup-btn nodrag" title="Reihe einrichten: feste Tagesordnung, Rhythmus, Wiedervorlage" onClick={() => setSetupOpen((o) => !o)}>
           <ISettings size={12} />
         </button>
-        <button className="nodrag" title="Neue Sitzung anlegen (übernimmt offene Punkte)" onClick={addEntry}>
+        <button className="minutes-new nodrag" title="Neue Sitzung anlegen (übernimmt offene Punkte)" onClick={addEntry}>
           <IPlus size={12} />
         </button>
       </div>
@@ -174,7 +236,21 @@ export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
             </div>
           )}
 
-          {entry && <EntryEditor key={entry.id} nodeId={id} entryId={entry.id} blocks={entry.blocks} />}
+          {/* M187: Tagesordnung DIESER Sitzung — die feste Reihen-Vorlage im
+              ⚙-Menü gilt für alle künftigen, hier kommt der Punkt dazu, den es
+              nur heute braucht. */}
+          {entry && (
+            <div className="minutes-tops nodrag">
+              {tops.map((t, i) => (
+                <span key={i} className="minutes-top-chip" title="Tagesordnungspunkt dieser Sitzung (Überschrift im Protokoll)">{t}</span>
+              ))}
+              <button className="minutes-top-add" title="Tagesordnungspunkt nur für diese Sitzung anhängen" onClick={addTop}>
+                ＋ TOP
+              </button>
+            </div>
+          )}
+
+          {entry && <EntryEditor key={entry.id} nodeId={id} entryId={entry.id} blocks={entry.blocks} editorRef={editorRef} />}
 
           {entry && (
             <div className="minutes-decisions nodrag">
@@ -221,7 +297,10 @@ export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
  * Protokolltext einer Sitzung. Eigene Komponente, damit der `key`-Wechsel
  * beim Blättern den Editor sauber neu aufbaut (BlockNote liest nur beim Mount).
  */
-function EntryEditor({ nodeId, entryId, blocks }: { nodeId: string; entryId: string; blocks?: unknown[] }) {
+function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
+  nodeId: string; entryId: string; blocks?: unknown[];
+  editorRef?: { current: unknown };
+}) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const [initialContent] = useState<PartialBlock[] | undefined>(() => {
     const safe = repairBlocks(blocks) as PartialBlock[];
@@ -229,6 +308,7 @@ function EntryEditor({ nodeId, entryId, blocks }: { nodeId: string; entryId: str
   });
   const editor = useCreateBlockNote({ initialContent, dictionary: blockNoteDe });
   useAndroidBackspaceFix(editor);
+  if (editorRef) editorRef.current = editor;
 
   // Beim Verlassen der Sitzung (Blättern) den letzten Stand sichern —
   // onChange feuert nicht mehr, wenn die Komponente schon abgebaut wird

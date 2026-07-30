@@ -92,7 +92,7 @@ export function makeMinutes(position: Pos): AppNode {
     width: CARD_WIDTHS.minutes,
     height: 420,
     position,
-    data: { title: 'Besprechungsreihe', entries: [], agenda: [], rhythm: '', carryOpen: true },
+    data: { title: 'Besprechungsreihe', color: 'white', entries: [], agenda: [], rhythm: '', carryOpen: true },
   } as AppNode;
 }
 

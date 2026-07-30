@@ -3435,3 +3435,40 @@ button.link-dead:disabled { opacity: 0.45; }
   border-radius: 8px; padding: 5px 12px; font: inherit; font-size: 12px; color: var(--ink); cursor: pointer;
 }
 .minutes-empty button:hover { border-color: var(--accent); color: var(--accent-strong); }
+
+/* ---------- M187: Protokoll-Reihe — Farbe & Sitzungs-TOPs ---------- */
+/* Die Karte nimmt dieselben Paletten-Töne wie eine Notiz (sticky-*), damit
+   sich Protokolle im Board genauso einordnen lassen wie Haftnotizen. */
+.minutes-card .minutes-dot { position: static; flex: 0 0 auto; margin-right: 1px; }
+.minutes-card .minutes-colorpick { position: static; flex: 0 0 auto; width: 17px; height: 17px; }
+
+/* Innenflächen erben die Kartenfarbe, statt sie mit Grau zu überdecken */
+.minutes-card .minutes-setup,
+.minutes-card .minutes-decision { background: rgba(255, 255, 255, 0.42); }
+[data-theme='dark'] .minutes-card .minutes-setup,
+[data-theme='dark'] .minutes-card .minutes-decision { background: rgba(0, 0, 0, 0.12); }
+.minutes-card .minutes-nav select,
+.minutes-card .minutes-meta input,
+.minutes-card .minutes-nav button { background: rgba(255, 255, 255, 0.62); }
+[data-theme='dark'] .minutes-card .minutes-nav select,
+[data-theme='dark'] .minutes-card .minutes-meta input,
+[data-theme='dark'] .minutes-card .minutes-nav button { background: rgba(0, 0, 0, 0.18); }
+
+/* Tagesordnung der laufenden Sitzung */
+.minutes-tops {
+  display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+  margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px dashed var(--border-soft);
+}
+.minutes-top-chip {
+  font-size: 10px; font-weight: 600; color: var(--ink);
+  background: rgba(255, 255, 255, 0.62); border: 1px solid var(--border-soft);
+  border-radius: 999px; padding: 2px 8px; max-width: 150px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+[data-theme='dark'] .minutes-top-chip { background: rgba(0, 0, 0, 0.2); }
+.minutes-top-add {
+  font: inherit; font-size: 10px; font-weight: 650; color: var(--muted);
+  border: 1px dashed var(--border-soft); background: none; border-radius: 999px;
+  padding: 2px 9px; cursor: pointer;
+}
+.minutes-top-add:hover { color: var(--accent-strong); border-color: var(--accent); border-style: solid; }
