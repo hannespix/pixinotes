@@ -87,14 +87,28 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
 
   const x = (iso: string) => (toDays(iso) - minD) * dw;
 
-  // Monats-Segmente für die Kopfzeile
+  // Kopfzeilen-Segmente: normalerweise Monate — bei der Jahres-Skala (M188)
+  // ganze JAHRE, sonst stünden bei einer Mehrjahres-Planung hundert
+  // Monatskürzel übereinander und die Kopfzeile wäre unlesbar.
+  const yearScale = dw < 1.2;
   const months: Array<{ label: string; x0: number; w: number }> = [];
   for (let d = minD; d <= maxD; d++) {
     const dt = new Date(d * DAY);
-    const label = dt.toLocaleDateString('de-DE', { month: 'short', year: '2-digit' });
+    const label = yearScale
+      ? String(dt.getFullYear())
+      : dt.toLocaleDateString('de-DE', { month: 'short', year: '2-digit' });
     const last = months[months.length - 1];
     if (last && last.label === label) last.w += dw;
     else months.push({ label, x0: (d - minD) * dw, w: dw });
+  }
+  // Quartals-Striche als feine Zwischengliederung der Jahres-Ansicht
+  const quarters: Array<{ x0: number; label: string }> = [];
+  if (yearScale) {
+    for (let d = minD; d <= maxD; d++) {
+      const dt = new Date(d * DAY);
+      if (dt.getDate() !== 1 || dt.getMonth() % 3 !== 0 || dt.getMonth() === 0) continue;
+      quarters.push({ x0: (d - minD) * dw, label: `Q${Math.floor(dt.getMonth() / 3) + 1}` });
+    }
   }
 
   // ---------- Drag: verschieben / Enden ziehen ----------
@@ -152,13 +166,19 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   };
 
   const zoom = (dir: -1 | 1) =>
-    updateNodeData(id, { dayWidth: Math.max(2, Math.min(48, dw + dir * (dw <= 8 ? 2 : 6))) });
+    // Schrittweite folgt der Größenordnung: im Jahres-Bereich sind ganze
+    // Pixel pro Tag ein Riesensprung (ein Jahr = 365 × dayWidth)
+    updateNodeData(id, {
+      dayWidth: Math.max(0.3, Math.min(48, dw + dir * (dw <= 1.2 ? 0.15 : dw <= 8 ? 2 : 6))),
+    });
 
   // M156: Zeit-Skala als Preset — Tage/Wochen/Monate sind nur dayWidth-Stufen,
   // Kopfzeile und Raster passen sich automatisch an
-  const scale = dw >= 14 ? 'tage' : dw >= 4 ? 'wochen' : 'monate';
+  const scale = dw >= 14 ? 'tage' : dw >= 4 ? 'wochen' : dw >= 1.2 ? 'monate' : 'jahre';
   const setScale = (v: string) =>
-    updateNodeData(id, { dayWidth: v === 'tage' ? 24 : v === 'wochen' ? 6 : 2 });
+    updateNodeData(id, {
+      dayWidth: v === 'tage' ? 24 : v === 'wochen' ? 6 : v === 'monate' ? 2 : 0.6,
+    });
 
   /** ISO-Kalenderwoche (für die Wochen-Skala) */
   const isoWeek = (dt: Date): number => {
@@ -257,12 +277,13 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
           <select
             className="gantt-scale"
             value={scale}
-            title="Zeit-Skala: Tage, Wochen oder Monate"
+            title="Zeit-Skala: Tage, Wochen, Monate oder Jahre (Mehrjahres-Planung)"
             onChange={(e) => setScale(e.target.value)}
           >
             <option value="tage">Tage</option>
             <option value="wochen">Wochen</option>
             <option value="monate">Monate</option>
+            <option value="jahre">Jahre</option>
           </select>
           <button title="Rauszoomen" onClick={() => zoom(-1)}><IZoomOut size={14} /></button>
           <button title="Reinzoomen" onClick={() => zoom(1)}><IZoomIn size={14} /></button>
@@ -359,7 +380,14 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
                 </g>
               );
             })}
-            {/* Monats-Kopf */}
+            {/* Quartals-Gliederung (nur Jahres-Skala) */}
+            {quarters.map((q, i) => (
+              <g key={`q${i}`}>
+                <line x1={q.x0} y1={HEAD_H - 4} x2={q.x0} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.06)" />
+                {dw * 91 >= 30 && <text x={q.x0 + 3} y={HEAD_H - 6} className="gantt-day">{q.label}</text>}
+              </g>
+            ))}
+            {/* Monats-Kopf (bei Jahres-Skala: Jahreszahlen) */}
             {months.map((m, i) => (
               <g key={i}>
                 <line x1={m.x0} y1={0} x2={m.x0} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.12)" />
@@ -404,7 +432,10 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
                 );
               }
               const bx = x(r.start);
-              const bw = Math.max(dw, (toDays(r.end) - toDays(r.start) + 1) * dw) - 2;
+              // Mindestbreite 4px: In der Jahres-Skala (M188) ist ein Tag
+              // deutlich schmaler als ein Pixel — kurze Vorgänge wären sonst
+              // unsichtbar und damit auch nicht mehr anklickbar.
+              const bw = Math.max(4, Math.max(dw, (toDays(r.end) - toDays(r.start) + 1) * dw) - 2);
               const prog = Math.max(0, Math.min(100, r.progress ?? 0));
               return (
                 <g key={r.id} className="gantt-bar">
