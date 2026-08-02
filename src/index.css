@@ -21,6 +21,13 @@
   --card-shadow-lift: 0 6px 14px rgba(60, 50, 30, 0.18), 0 24px 48px rgba(60, 50, 30, 0.16);
   --edge: rgba(90, 80, 60, 0.5);      /* Verbindungs-Linie */
   --edge-head: #a59e90;               /* Pfeilspitze: deckend = --edge über --bg gemischt */
+  /* M189 Kopf-Freiraum: Kopf- und Tab-Leiste schweben fixiert über allem.
+     Jede Vollbild-Ansicht muss darunter beginnen — die Zahl hier ist die
+     EINZIGE Wahrheit dafür, damit sie nicht je Ansicht auseinanderläuft.
+     --safe-top fängt die Statusleisten-Kerbe ab (viewport-fit=cover). */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --head-space: calc(110px + var(--safe-top));
 }
 
 /* ---------- Akzentfarben-Themes ---------- */
@@ -73,7 +80,7 @@ body {
 
 /* ---------- Topbar ---------- */
 .topbar {
-  position: fixed; top: 14px; left: 18px; z-index: 50;
+  position: fixed; top: calc(14px + var(--safe-top)); left: 18px; z-index: 50;
   display: flex; align-items: center; gap: 12px; pointer-events: none;
 }
 .logo {
@@ -321,7 +328,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 
 /* ---------- Projekt-Tabs ---------- */
 .tabs {
-  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  position: fixed; top: calc(14px + var(--safe-top)); left: 50%; transform: translateX(-50%);
   display: flex; gap: 4px; z-index: 50; align-items: center;
   background: var(--surface-glass); backdrop-filter: blur(6px);
   padding: 5px; border-radius: 12px; box-shadow: 0 2px 10px rgba(50, 40, 20, 0.1);
@@ -636,11 +643,13 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 @media (max-width: 860px) {
   .hint { display: none; }
   .tabs {
-    top: 62px; left: 12px; transform: none;
+    top: calc(62px + var(--safe-top)); left: 12px; transform: none;
     max-width: calc(100vw - 24px);
   }
   .topbar { left: 12px; }
-  .dock { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+  /* Zwei Zeilen statt einer: Die Tab-Leiste endet erst bei ~104px (M189) */
+  :root { --head-space: calc(118px + var(--safe-top)); }
+  .dock { bottom: calc(12px + var(--safe-bottom)); }
   .react-flow__minimap { display: none; }
 }
 
@@ -1595,7 +1604,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .taskhub {
   position: fixed; inset: 0; z-index: 40; background: var(--bg);
   display: flex; flex-direction: column; align-items: center;
-  padding: 110px 18px 24px; overflow-y: auto;
+  padding: var(--head-space) 18px calc(24px + var(--safe-bottom)); overflow-y: auto;
 }
 .taskhub-head {
   width: min(860px, 100%); display: flex; align-items: center; gap: 12px;
@@ -2108,7 +2117,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .search-tag span { color: var(--muted); font-weight: 400; margin-left: 3px; }
 
 .ov-mode {
-  position: fixed; top: 64px; right: 18px; z-index: 55; display: flex; gap: 2px;
+  position: fixed; top: calc(64px + var(--safe-top)); right: 18px; z-index: 55; display: flex; gap: 2px;
   background: var(--surface); border-radius: 10px; padding: 3px; box-shadow: 0 2px 10px rgba(50,40,20,.12);
 }
 .ov-mode button {
@@ -2116,7 +2125,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   padding: 5px 12px; border-radius: 8px; color: var(--muted);
 }
 .ov-mode button.on { background: var(--accent); color: #fff; }
-.ov-graph { position: fixed; inset: 0; padding: 90px 24px 24px; background: var(--bg); display: flex; flex-direction: column; }
+.ov-graph { position: fixed; inset: 0; padding: calc(90px + var(--safe-top)) 24px calc(24px + var(--safe-bottom)); background: var(--bg); display: flex; flex-direction: column; }
 .ov-graph-svg { flex: 1; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 .ov-graph-svg:active { cursor: grabbing; }
 .ov-graph-zoom {
@@ -2461,9 +2470,9 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 @media (max-width: 860px) {
   /* Übersicht-Bedienelemente unter die (auf 62px gerutschte) Tab-Leiste —
      sonst überlappen sie sich genau dort (R5-1) */
-  .ov-mode { top: 112px; right: 12px; }
-  .ov-graph-toggles { top: 112px; left: 12px; right: auto; max-width: calc(100vw - 160px); flex-wrap: wrap; gap: 8px 12px; }
-  .ov-graph { padding: 156px 12px 12px; }
+  .ov-mode { top: calc(112px + var(--safe-top)); right: 12px; }
+  .ov-graph-toggles { top: calc(112px + var(--safe-top)); left: 12px; right: auto; max-width: calc(100vw - 160px); flex-wrap: wrap; gap: 8px 12px; }
+  .ov-graph { padding: calc(156px + var(--safe-top)) 12px calc(12px + var(--safe-bottom)); }
   .backlinks { right: 12px; bottom: 150px; }
   .backlinks-panel { max-width: calc(100vw - 24px); }
 }
@@ -2484,8 +2493,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   .task-due-input { margin-left: 27px; }
   .task-board { margin-left: auto; }
   /* Netz-Ansicht: Umschalter + Filter passen nicht nebeneinander → stapeln */
-  .ov-graph-toggles { top: 158px; max-width: calc(100vw - 24px); }
-  .ov-graph { padding-top: 205px; }
+  .ov-graph-toggles { top: calc(158px + var(--safe-top)); max-width: calc(100vw - 24px); }
+  .ov-graph { padding-top: calc(205px + var(--safe-top)); }
   .ov-graph-zoom { right: 12px; bottom: 60px; }
   /* Brotkrume kompakt: nur der Projektname, Baum auf Viewport-Breite */
   .tab-nav-space { display: none; }
@@ -3081,9 +3090,11 @@ button.link-dead:disabled { opacity: 0.45; }
 
 /* ---------- Responsive-Ausbau: Phone ---------- */
 @media (max-width: 640px) {
-  .topbar { top: 8px; left: 8px; gap: 6px; }
+  .topbar { top: calc(8px + var(--safe-top)); left: 8px; gap: 6px; }
   .logo { font-size: 15px; padding: 6px 11px; }
-  .tabs { top: 52px; left: 8px; max-width: calc(100vw - 16px); }
+  .tabs { top: calc(52px + var(--safe-top)); left: 8px; max-width: calc(100vw - 16px); }
+  /* Kopf- und Tab-Leiste rücken zusammen — Freiraum entsprechend knapper (M189) */
+  :root { --head-space: calc(106px + var(--safe-top)); }
   /* Modals als Vollbild-Blätter — kein Gefummel mit Rändern */
   .modal-backdrop { padding: 0; align-items: stretch; }
   .modal { width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; border: none; }
@@ -3093,7 +3104,9 @@ button.link-dead:disabled { opacity: 0.45; }
   .comment-panel { max-width: calc(100vw - 16px); }
   .lookup-backdrop { padding: 10px 8px; }
   .lookup-panel { max-height: calc(100dvh - 20px); }
-  .taskhub { padding: 14px 10px; }
+  /* M189: NICHT den Kopf-Freiraum wegkürzen — nur die Seitenränder.
+     Vorher lief die Aufgaben-Zentrale unter Kopf- und Tab-Leiste. */
+  .taskhub { padding-left: 10px; padding-right: 10px; }
   .collect-panel { max-width: calc(100vw - 24px); }
 }
 @media (max-width: 520px) {
