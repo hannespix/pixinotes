@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useBoard } from '../store';
 import { regrantSyncAccess, type SyncState } from '../lib/syncFolder';
-import { ICloud, ICloudAlert, ICloudCheck, ICloudOff } from './Icons';
+import { saveViaFiles } from '../lib/filesSync';
+import { ICloud, ICloudAlert, ICloudCheck, ICloudOff, ICloudUp } from './Icons';
 
 type Entry = { state: SyncState; at?: string };
-const SOURCE_LABEL: Record<string, string> = { ordner: 'Sync-Ordner', webdav: 'WebDAV' };
+const SOURCE_LABEL: Record<string, string> = { ordner: 'Sync-Ordner', webdav: 'WebDAV', dateien: 'Dateien-App' };
 // Der „schlimmste" Zustand gewinnt die Anzeige (Handeln nötig vor Wohlfühlen)
-const RANK: Record<SyncState, number> = { noperm: 0, error: 1, conflict: 2, pending: 3, ok: 4 };
+const RANK: Record<SyncState, number> = { noperm: 0, error: 1, conflict: 2, manual: 3, pending: 4, ok: 5 };
 
 /**
  * Sync-Status als Wolken-Symbol in der Aktionsleiste (M85): gleiche
@@ -51,6 +52,18 @@ export function SyncStatus() {
       tip: `${label}: dort liegt ein anderer Stand — klicken zum Laden oder Überschreiben`,
       icon: <ICloudAlert size={16} />,
       onClick: openSync,
+    },
+    // M190: Auf iPad/iPhone kann nichts automatisch speichern — hier wird die
+    // Wolke zum Sicherungs-Knopf: ein Tipp öffnet direkt das Teilen-Blatt.
+    manual: {
+      cls: 'sync-status sync-warn',
+      tip: 'Ungesicherte Änderungen — tippen, um den Stand in die Dateien-App (Nextcloud-Ordner) zu sichern',
+      icon: <ICloudUp size={16} />,
+      onClick: () => {
+        void saveViaFiles()
+          .then(() => useBoard.getState().showToast('☁️ Stand ausgegeben — im Nextcloud-Ordner die vorhandene pixinotes-daten.json ersetzen.', false, 9000))
+          .catch((e: Error) => { if (e.message !== 'abgebrochen') openSync(); });
+      },
     },
     pending: {
       cls: 'sync-status sync-pending',

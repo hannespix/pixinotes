@@ -1435,6 +1435,22 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   border: 1px solid var(--border-soft); border-radius: 8px; outline: none; background: var(--surface); color: var(--ink);
 }
 .modal-note { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+/* M190: Aufklappbarer Hilfe-Block (z. B. CORS-Freigabe) — steht meist im Weg,
+   wird aber gebraucht, sobald etwas klemmt */
+.modal-details {
+  border: 1px solid var(--border-soft); border-radius: 9px;
+  padding: 8px 12px; margin-bottom: 12px; background: var(--surface-3);
+}
+.modal-details > summary {
+  cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--ink);
+  list-style: none; padding: 2px 0;
+}
+.modal-details > summary::-webkit-details-marker { display: none; }
+.modal-details > summary::before { content: '▸ '; color: var(--muted); }
+.modal-details[open] > summary::before { content: '▾ '; }
+.modal-details[open] > summary { margin-bottom: 8px; }
+.modal-details .modal-hint { margin-bottom: 8px; }
+.modal-details code { word-break: break-all; }
 .modal-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .modal-buttons button {
   border: 1px solid var(--border-soft); background: var(--surface-3); border-radius: 9px; padding: 9px 13px;

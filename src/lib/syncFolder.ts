@@ -5,7 +5,11 @@
 // Das Ordner-Handle wird in IndexedDB gemerkt (übersteht Neustarts in Chrome/Edge).
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
 
-const FILE_NAME = 'pixinotes-daten.json';
+/** Dateiname im Sync-Ordner — auch der Dateien-App-Weg (M190) schreibt GENAU
+ *  diese Datei, damit ein iPad und ein Desktop denselben Nextcloud-Ordner
+ *  benutzen können. */
+export const SYNC_FILE_NAME = 'pixinotes-daten.json';
+const FILE_NAME = SYNC_FILE_NAME;
 const DB_NAME = 'pixinotes-sync';
 const STAMP_KEY = 'pixinotes:sync-stamp';
 
@@ -21,8 +25,12 @@ export const WEBDAV_DIRTY_KEY = 'pixinotes:webdav-dirty';
 // bisher komplett unsichtbar — schlief er (Freigabe nach Neustart weg,
 // Konflikt, Fehler), wirkte das wie „speichert nicht". Jeder Zustandswechsel
 // wird jetzt als Event gemeldet; SyncStatus.tsx zeigt ihn dauerhaft an.
-export type SyncState = 'ok' | 'pending' | 'noperm' | 'conflict' | 'error';
-export function emitSyncStatus(source: 'ordner' | 'webdav', state: SyncState, at?: string): void {
+// 'manual' (M190) ist der Zustand des Dateien-App-Wegs: Es gibt Änderungen,
+// die nur ein bewusster Tipp sichern kann — auf iPad/iPhone darf der Browser
+// keinen Ordner anfassen, also kann NICHTS automatisch laufen.
+export type SyncState = 'ok' | 'pending' | 'noperm' | 'conflict' | 'error' | 'manual';
+export type SyncSource = 'ordner' | 'webdav' | 'dateien';
+export function emitSyncStatus(source: SyncSource, state: SyncState, at?: string): void {
   window.dispatchEvent(new CustomEvent('pixinotes:sync-status', { detail: { source, state, at } }));
 }
 
@@ -154,9 +162,11 @@ export async function readSync(handle: SyncDirHandle): Promise<SyncPayload | nul
   }
 }
 
-export async function writeSync(handle: SyncDirHandle): Promise<string> {
+/** Den zu sichernden Stand zusammenstellen — eine Quelle für Ordner, WebDAV
+ *  und Dateien-App, damit die drei Wege garantiert dasselbe Format schreiben. */
+export function buildSyncPayload(): SyncPayload {
   const s = useBoard.getState();
-  const payload: SyncPayload = {
+  return {
     app: 'pixinotes',
     version: 2,
     savedAt: new Date().toISOString(),
@@ -165,17 +175,25 @@ export async function writeSync(handle: SyncDirHandle): Promise<string> {
     activeId: s.activeId,
     // bewusst OHNE KI-Einstellungen: API-Schlüssel bleiben auf dem Gerät
   };
+}
+
+/** Nach erfolgreichem Sichern buchen: Stempel setzen und „sauber" markieren —
+ *  Letzteres nur, wenn währenddessen nicht weiter editiert wurde. */
+export function markSynced(payload: SyncPayload, source: SyncSource = 'ordner'): string {
+  localStorage.setItem(STAMP_KEY, payload.savedAt);
+  const cur = useBoard.getState();
+  if (cur.boards === payload.boards && cur.spaces === payload.spaces) localStorage.removeItem(SYNC_DIRTY_KEY);
+  emitSyncStatus(source, 'ok', payload.savedAt);
+  return payload.savedAt;
+}
+
+export async function writeSync(handle: SyncDirHandle): Promise<string> {
+  const payload = buildSyncPayload();
   const fh = await handle.getFileHandle(FILE_NAME, { create: true });
   const w = await fh.createWritable();
   await w.write(JSON.stringify(payload));
   await w.close();
-  localStorage.setItem(STAMP_KEY, payload.savedAt);
-  // Lokale Änderungen liegen jetzt im Ordner — aber nur als „sauber" markieren,
-  // wenn währenddessen nicht weiter editiert wurde (sonst nächster Auto-Save)
-  const cur = useBoard.getState();
-  if (cur.boards === s.boards && cur.spaces === s.spaces) localStorage.removeItem(SYNC_DIRTY_KEY);
-  emitSyncStatus('ordner', 'ok', payload.savedAt);
-  return payload.savedAt;
+  return markSynced(payload, 'ordner');
 }
 
 /** Geladenen Stand übernehmen. false = konnte NICHT dauerhaft gespeichert
@@ -185,7 +203,7 @@ export async function writeSync(handle: SyncDirHandle): Promise<string> {
  *  400 ms im Puffer hingen — ein Crash in dem Fenster hinterließ den alten
  *  Stand mit neuem Stempel, und der nächste Auto-Save überschrieb still
  *  den Sync-Ordner). */
-export function applySync(p: SyncPayload): boolean {
+export function applySync(p: SyncPayload, source: SyncSource = 'ordner'): boolean {
   claimWriter(); // Import ist eine bewusste Nutzer-Aktion — dieses Fenster schreibt ab jetzt
   useBoard.getState().importSync(p.boards, p.spaces, p.activeId);
   if (!flushPersist()) return false;
@@ -195,7 +213,7 @@ export function applySync(p: SyncPayload): boolean {
     // Gegenüber einem evtl. verbundenen WebDAV-Server ist der Stand jetzt neu
     localStorage.setItem(WEBDAV_DIRTY_KEY, '1');
   } catch { return false; }
-  emitSyncStatus('ordner', 'ok', p.savedAt);
+  emitSyncStatus(source, 'ok', p.savedAt);
   return true;
 }
 

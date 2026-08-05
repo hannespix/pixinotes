@@ -12,9 +12,13 @@ import {
   SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, type SyncDirHandle,
 } from '../lib/syncFolder';
 import {
-  applyWebdav, clearWebdav, loadWebdav, saveWebdav, webdavRead, webdavStamp, webdavTest, webdavWrite,
-  type WebdavConfig,
+  applyWebdav, clearWebdav, corsRequestText, loadWebdav, saveWebdav, webdavRead, webdavStamp,
+  webdavTest, webdavWrite, type WebdavConfig,
 } from '../lib/webdav';
+import {
+  applyFilesSync, canShareFiles, filesSyncDirty, filesSyncOn, filesSyncStamp, isAppleTouch,
+  isStandalone, readSyncFile, saveViaFiles,
+} from '../lib/filesSync';
 import {
   applyProjectPayload, buildInviteMailto, buildInviteText, connectProjectSync, disconnectProjectSync,
   joinProjectFolder, projectHandle, projectStamp, projectSyncMeta, readProjectFile, writeProjectSync,
@@ -103,6 +107,10 @@ export function Settings() {
   const setUiAccent = useBoard((s) => s.setUiAccent);
   // WICHTIG: vor dem early-return deklarieren (Hook-Reihenfolge!)
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // M190: Dateien-App-Sync (iPad & Co.) — eigener Datei-Dialog, damit er nicht
+  // mit dem allgemeinen Datei-Import im Daten-Reiter kollidiert
+  const filesSyncRef = useRef<HTMLInputElement>(null);
+  const [filesTick, setFilesTick] = useState(0);   // erzwingt Neuanzeige nach Sichern/Laden
 
   // Esc schließt das Panel — wie überall sonst (Suche, TaskHub, Präsentation)
   useEffect(() => {
@@ -200,6 +208,41 @@ export function Settings() {
     setDavCfg(null);
     setDavSecret('');
     showToast('WebDAV getrennt — Zugangsdaten gelöscht, Daten bleiben lokal erhalten.');
+  };
+
+  const copyCorsText = async () => {
+    const text = corsRequestText(davCfg ?? (davUrl.trim() ? { url: davUrl.trim(), user: '', secret: '', auto: false } : null));
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('📋 Text für die IT kopiert — er enthält keine Zugangsdaten.');
+    } catch {
+      // Zwischenablage verweigert (Safari ohne Nutzergeste o. Ä.) → als Mail öffnen
+      const [subject, ...rest] = text.split('\n');
+      location.href = `mailto:?subject=${encodeURIComponent(subject.replace(/^Betreff:\s*/, ''))}&body=${encodeURIComponent(rest.join('\n').trim())}`;
+    }
+  };
+
+  // ---- M190: Sync über die Dateien-App (iPad/iPhone & jeder Browser ohne Ordner-API) ----
+  const filesSave = () => doExport(async () => {
+    try {
+      const way = await saveViaFiles();
+      setFilesTick((n) => n + 1);
+      showToast(way === 'geteilt'
+        ? '☁️ Teilen-Blatt geöffnet — „In Dateien sichern" → den Nextcloud-Ordner wählen und die vorhandene pixinotes-daten.json ersetzen.'
+        : '💾 pixinotes-daten.json gespeichert — in den Nextcloud-Ordner legen (vorhandene Datei ersetzen).', false, 9000);
+    } catch (e) {
+      if ((e as Error).message === 'abgebrochen') { showToast('Nicht gesichert — Vorgang abgebrochen.'); return; }
+      throw e;
+    }
+  }, 'filessave');
+
+  const filesLoad = async (file: File) => {
+    const p = await readSyncFile(file);
+    if (!p) { showToast('Das ist keine gültige pixinotes-daten.json.'); return; }
+    if (!window.confirm(`Stand vom ${new Date(p.savedAt).toLocaleString('de-DE')} laden? Die aktuellen Boards werden ersetzt (Strg+Z geht danach nicht zurück).`)) return;
+    if (!applyFilesSync(p)) { showToast(QUOTA_IMPORT_MSG); return; }
+    setFilesTick((n) => n + 1);
+    showToast('⬇️ Stand aus der Dateien-App geladen.');
   };
 
   const connectSync = async () => {
@@ -451,7 +494,9 @@ export function Settings() {
           <p className="modal-hint">
             {syncSupported()
               ? <>Verbinde einen Ordner, den dein <b>Nextcloud-/OneDrive-/Dropbox-Client</b> synchronisiert — PixiNotes speichert dort automatisch eine <code>pixinotes-daten.json</code> mit allen Boards. Der Cloud-Client bringt sie auf deine anderen Geräte; dort einfach denselben Ordner verbinden. Kein Server-Setup, KI-Schlüssel bleiben lokal.</>
-              : 'Dieser Browser unterstützt keine Ordner-Anbindung (Chrome/Edge empfohlen). Alternative: regelmäßig über den Datenordner-Export sichern.'}
+              : isAppleTouch()
+                ? <><b>Auf iPad und iPhone gibt es keine Ordner-Anbindung.</b> Apple erlaubt keinem Browser (auch nicht Chrome oder Firefox — auf iOS steckt in allen WebKit), dass eine Webseite auf einen Ordner zugreift. Das ist keine Einstellung, die man umlegen kann. <b>Nimm stattdessen den Weg über die Dateien-App</b> — direkt hier darunter. Er schreibt genau dieselbe Datei in denselben Nextcloud-Ordner, den dein Rechner automatisch synchronisiert.</>
+                : <>Dieser Browser unterstützt keine Ordner-Anbindung (Chrome/Edge können das). <b>Alternative:</b> der Weg über die Dateien-Auswahl direkt darunter — gleiche Datei, gleicher Ordner, nur mit einem bewussten Klick statt automatisch.</>}
           </p>
           {syncSupported() && (
             <>
@@ -510,6 +555,60 @@ export function Settings() {
           )}
         </section>
 
+        {/* ---- M190: Sync über die Dateien-App — der Weg, der auf iPad/iPhone geht ---- */}
+        {!syncSupported() && (
+        <section className="modal-section" key={filesTick}>
+          <h3>{isAppleTouch() ? 'Synchronisation über die Dateien-App (iPad/iPhone)' : 'Synchronisation über die Dateiauswahl'}</h3>
+          <p className="modal-hint">
+            PixiNotes schreibt hier <b>exakt dieselbe <code>pixinotes-daten.json</code></b> wie der
+            Sync-Ordner am Rechner. Legst du sie in <b>denselben Nextcloud-Ordner</b>, übernimmt dein
+            Rechner den Stand automatisch — und umgekehrt holst du dir hier, was der Rechner
+            geschrieben hat. Es ist also echte Zwei-Wege-Synchronisation, auf dem Tablet eben
+            <b> mit einem bewussten Tipp</b> statt im Hintergrund. Zugangsdaten und KI-Schlüssel sind
+            wie immer nicht enthalten.
+          </p>
+          {isAppleTouch() && (
+            <div className="modal-note">
+              <b>Einmalig einrichten:</b> die <b>Nextcloud-App</b> aus dem App Store installieren und
+              anmelden — danach erscheint deine Nextcloud in der <b>Dateien-App</b> als Speicherort.
+              Beim Sichern wählst du dort deinen PixiNotes-Ordner und ersetzt die vorhandene Datei.
+            </div>
+          )}
+          <div className="modal-buttons">
+            <button disabled={!!busy} onClick={filesSave}>
+              {busy === 'filessave' ? '…' : canShareFiles() ? 'Stand sichern → Dateien-App' : 'Stand sichern (Datei)'}
+            </button>
+            <button disabled={!!busy} onClick={() => filesSyncRef.current?.click()}>Stand laden…</button>
+            <input
+              ref={filesSyncRef}
+              type="file"
+              accept=".json,application/json"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void filesLoad(f);
+                e.target.value = '';
+              }}
+            />
+          </div>
+          <div className="modal-note">
+            {filesSyncDirty()
+              ? <>⚠️ <b>Es gibt Änderungen, die noch nirgends gesichert sind.</b>{filesSyncStamp() ? ` Zuletzt gesichert: ${new Date(filesSyncStamp()!).toLocaleString('de-DE')}.` : ''} Die Wolke oben in der Kopfleiste erinnert dich daran — ein Tipp darauf sichert sofort.</>
+              : filesSyncStamp()
+                ? <>✅ Gesichert am {new Date(filesSyncStamp()!).toLocaleString('de-DE')} — seitdem keine Änderungen.</>
+                : <>Noch nichts gesichert. <b>Tipp:</b> Nach jeder längeren Arbeitseinheit einmal sichern — der Browser-Speicher allein ist kein Backup.</>}
+          </div>
+          {isAppleTouch() && !isStandalone() && (
+            <div className="modal-note">
+              💡 <b>Wichtig auf dem iPad:</b> Safari löscht die Daten von Webseiten, die man 7 Tage
+              nicht benutzt. Leg PixiNotes über <b>Teilen → „Zum Home-Bildschirm"</b> auf den
+              Startbildschirm — dann gilt diese Löschregel nicht mehr. Zusätzlich regelmäßig oben
+              sichern.
+            </div>
+          )}
+        </section>
+        )}
+
         <section className="modal-section">
           <h3>Team-Sync — einzelne Projekte teilen</h3>
           <p className="modal-hint">
@@ -559,7 +658,11 @@ export function Settings() {
               </div>
             </>
           ) : (
-            <p className="modal-hint">Dieser Browser unterstützt keine Ordner-Anbindung (Chrome/Edge empfohlen).</p>
+            <p className="modal-hint">
+              {isAppleTouch()
+                ? <>Der Team-Sync braucht einen Ordner-Zugriff, den iPadOS/iOS keiner Webseite erlaubt. <b>Am iPad geht das projektweise Teilen daher nicht</b> — deine gesamte Umgebung kannst du aber über die Dateien-App oben sichern und abgleichen. Für Team-Projekte einen Rechner mit Chrome oder Edge nutzen.</>
+                : <>Dieser Browser unterstützt keine Ordner-Anbindung (Chrome/Edge können das). Deine gesamte Umgebung lässt sich trotzdem über die Dateiauswahl oben abgleichen.</>}
+            </p>
           )}
         </section>
 
@@ -569,12 +672,26 @@ export function Settings() {
             Ohne Desktop-Client: PixiNotes spricht direkt mit dem WebDAV-Server — funktioniert auch am
             Tablet/Handy. Bei Nextcloud: <b>App-Passwort</b> unter Einstellungen → Sicherheit anlegen
             (nie das echte Passwort). <b>Zugangsdaten bleiben lokal</b> und landen in keinem Export.
-            <br />
-            ⚠️ <b>Nextcloud blockiert Browser-Zugriffe standardmäßig</b> (CORS): Entweder die
-            Nextcloud-App <b>„WebAppPassword"</b> installieren und dort die PixiNotes-Adresse
-            (z. B. <code>https://hannespix.github.io</code>) als erlaubte Origin eintragen, oder die
-            IT um CORS-Freigabe bitten — ohne Freigabe bitte den Sync-Ordner oben nutzen.
           </p>
+          <details className="modal-details">
+            <summary>⚠️ Wird blockiert? Das liegt am Server (CORS) — so wird es freigegeben</summary>
+            <p className="modal-hint">
+              Nextcloud erlaubt Browser-Zugriffe auf <code>/remote.php/dav</code> standardmäßig
+              nicht. <b>Das betrifft jeden Browser und jedes Gerät gleich</b> — es ist keine
+              iPad-Eigenheit und lässt sich auch nicht in der App umgehen: Die Freigabe muss vom
+              Server kommen, sonst bricht der Browser schon vor der Anmeldung ab.
+              Am schnellsten geht es mit der Nextcloud-App <b>„WebAppPassword"</b>, in der eure IT
+              diese Herkunft einträgt: <code>{location.origin}</code>
+            </p>
+            <div className="modal-buttons">
+              <button onClick={() => void copyCorsText()}>Fertigen Text für die IT kopieren</button>
+            </div>
+            <div className="modal-note">
+              Der Text erklärt die benötigten Header und enthält <b>keine Zugangsdaten</b> —
+              Benutzername und App-Passwort bleiben hier. Bis zur Freigabe:{' '}
+              {isAppleTouch() ? 'auf dem iPad der Weg über die Dateien-App weiter oben' : 'der Sync-Ordner weiter oben'}.
+            </div>
+          </details>
           {!davCfg ? (
             <>
               <label className="modal-row">

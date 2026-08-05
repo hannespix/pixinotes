@@ -60,12 +60,21 @@ const fileUrl = (cfg: WebdavConfig) => `${cfg.url.replace(/\/+$/, '')}/${FILE_NA
  *  Normalfall). Schlägt auch die Probe fehl, stimmt Adresse/Netz nicht. */
 async function friendly(e: unknown, cfg: WebdavConfig): Promise<Error> {
   if (e instanceof TypeError) {
+    // Gemischte Inhalte zuerst: Eine https-Seite darf gar keine http-Adresse
+    // aufrufen — der Browser bricht ab, bevor CORS überhaupt zur Sprache kommt.
+    if (location.protocol === 'https:' && /^http:\/\//i.test(cfg.url.trim())) {
+      return new Error(
+        'Die Server-Adresse beginnt mit http:// — eine über https ausgelieferte Seite darf das nicht aufrufen '
+        + '(„Mixed Content"). Bitte https:// verwenden.',
+      );
+    }
     try {
       await fetch(fileUrl(cfg), { method: 'GET', mode: 'no-cors', cache: 'no-store' });
       return new Error(
-        'Der Server ist erreichbar, blockiert aber Browser-Zugriffe (fehlende CORS-Freigabe). '
-        + 'Nextcloud: die App „WebAppPassword" installieren und dort diese PixiNotes-Adresse als erlaubte Origin eintragen '
-        + '(oder die IT bitten, CORS für WebDAV freizugeben). Ohne Freigabe klappt vom Browser aus nur der Sync-Ordner (Desktop-Client) oder der Datei-Export.',
+        `Der Server ist erreichbar, blockiert aber Browser-Zugriffe (fehlende CORS-Freigabe). Das liegt am Server, nicht am Gerät — ${apple() ? 'auf dem iPad ist es genauso wie auf jedem anderen Browser' : 'jeder Browser verhält sich hier gleich'}. `
+        + 'Nötig ist eine einmalige Freigabe durch die IT (bei Nextcloud z. B. die App „WebAppPassword" mit dieser PixiNotes-Adresse als erlaubte Herkunft). '
+        + 'In ⚙️ → Synchronisation steht ein fertiger Text für die IT zum Kopieren. '
+        + `Ohne Freigabe funktioniert ${apple() ? 'auf dem iPad die Synchronisation über die Dateien-App' : 'der Sync-Ordner oder der Datei-Export'}.`,
       );
     } catch {
       return new Error(
@@ -75,6 +84,48 @@ async function friendly(e: unknown, cfg: WebdavConfig): Promise<Error> {
     }
   }
   return e as Error;
+}
+
+const apple = (): boolean => /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Mac/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+
+/**
+ * Fertiger Text für die IT — nennt die konkrete Herkunft dieser Installation
+ * und exakt die Header, die der Server für PixiNotes liefern muss. Bewusst
+ * OHNE Zugangsdaten: Benutzername und App-Passwort haben in so einer Mail
+ * nichts verloren und stehen deshalb auch nicht drin.
+ */
+export function corsRequestText(cfg: WebdavConfig | null): string {
+  const host = cfg?.url ? cfg.url.replace(/^https?:\/\//, '').split('/')[0] : 'unsere Nextcloud';
+  return [
+    'Betreff: CORS-Freigabe für WebDAV (Browser-Zugriff auf ' + host + ')',
+    '',
+    'Hallo zusammen,',
+    '',
+    'ich nutze die Web-Anwendung PixiNotes und möchte meine Notizen per WebDAV in',
+    `unserer Nextcloud (${host}) ablegen. Der Browser bricht die Verbindung ab, weil der`,
+    'Server keine CORS-Header für /remote.php/dav liefert. Die Anwendung läuft rein im',
+    'Browser, es ist kein zusätzlicher Server beteiligt und es werden keine Daten an',
+    'Dritte übertragen.',
+    '',
+    `Herkunft (Origin), die freigegeben werden müsste: ${location.origin}`,
+    '',
+    'Benötigt werden für /remote.php/dav folgende Antwort-Header:',
+    `  Access-Control-Allow-Origin: ${location.origin}`,
+    '  Access-Control-Allow-Methods: GET, PUT, OPTIONS',
+    '  Access-Control-Allow-Headers: Authorization, Content-Type',
+    '  Access-Control-Max-Age: 600',
+    'Die OPTIONS-Anfrage (Preflight) muss dabei ohne Anmeldung mit 200/204 beantwortet',
+    'werden, sonst schlägt sie fehl, bevor die Anmeldedaten überhaupt gesendet werden.',
+    '',
+    'In Nextcloud lässt sich das auch ohne Eingriff in die Server-Konfiguration über die',
+    'App „WebAppPassword" erledigen: dort wird die oben genannte Herkunft eingetragen.',
+    '',
+    'PixiNotes verwendet nur GET und PUT auf eine einzelne JSON-Datei im angegebenen',
+    'Ordner und meldet sich mit einem App-Passwort an (nicht mit dem Kennwort des',
+    'Kontos). Es werden keine Cookies gesetzt.',
+    '',
+    'Vielen Dank!',
+  ].join('\n');
 }
 
 async function davFetch(cfg: WebdavConfig, init: RequestInit): Promise<Response> {
