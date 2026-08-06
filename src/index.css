@@ -2534,7 +2534,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 [data-theme='dark'] .portal-card { background: linear-gradient(135deg, var(--surface-2) 0%, #453c63 100%); color: var(--ink); }
 [data-theme='dark'] .react-flow__controls button { background: var(--surface); fill: var(--ink); color: var(--ink); border-bottom-color: var(--border-soft); }
 [data-theme='dark'] .react-flow__controls button:hover { background: var(--surface-2); }
-[data-theme='dark'] .toast { background: #3a362e; }
+/* M191: halbtransparent, damit der Glas-Blur des Toasts auch dunkel wirkt */
+[data-theme='dark'] .toast { background: rgba(58, 54, 46, 0.86); }
 
 /* ---------- Dark Mode: Kontrast-Durchgang (Signalfarben aufhellen) ---------- */
 [data-theme='dark'] .task-due.urgency-overdue { color: #ff9a8c; }
@@ -3016,16 +3017,49 @@ button.link-dead:disabled { opacity: 0.45; }
 }
 [data-theme='dark'] .react-flow::before { mix-blend-mode: soft-light; opacity: 0.55; }
 
-/* ---------- Glas-Chrome: Leisten & Werkzeuge ---------- */
-.logo, .top-actions, .tabs, .dock, .sel-toolbar, .mm-toolbar, .draw-palette {
+/* ================= Glas-Chrome (M172, durchgängig gemacht in M191) =========
+   EINE Regel für alles, was über dem Inhalt schwebt — drei Stufen:
+     Leisten & schwebende Werkzeuge  blur 16
+     Menüs & Panels                  blur 18 (etwas deckender: Text bleibt ruhig)
+     Fenster                         blur 22
+   Abdunkler dimmen nur und blurren NICHT — siehe Backdrop-Root unten.
+
+   BACKDROP-ROOT-FALLE: Ein Element mit backdrop-filter wird laut Spezifikation
+   selbst zum Backdrop-Root. Alles DARIN kann dann nichts mehr blurren — der
+   Filter ist zwar gesetzt, bleibt aber wirkungslos. Betrifft zwei Fälle:
+     1) Menü als Kind einer Glas-Leiste (Dock-Menüs, Mermaid-Vorlagen) →
+        gelöst über ::before, siehe unten.
+     2) Fenster in einem blurrenden Abdunkler → deshalb dimmt der Abdunkler
+        nur noch. So blurrt immer genau die Ebene, die man auch sieht.
+   Bewusst OHNE Glas: Vollbild-Ansichten, die den Inhalt ersetzen statt ihn zu
+   überlagern (Aufgaben-Zentrale, Netz-Ansicht, Präsentation) — dahinter ist
+   das Board ausgehängt, es gäbe nichts zu blurren. Ebenso die Karten selbst
+   und Verbindungs-Beschriftungen (winzige Schrift, Lesbarkeit geht vor). */
+.logo, .top-actions, .tabs, .sel-toolbar, .draw-palette,
+.ov-mode, .ov-graph-toggles, .ov-graph-zoom, .ov-add-space-float, .writer-banner {
   background: var(--glass);
   -webkit-backdrop-filter: blur(16px) saturate(1.5);
   backdrop-filter: blur(16px) saturate(1.5);
   border: 1px solid var(--glass-border);
 }
-/* Menüs & Panels: etwas deckender, damit Text darüber ruhig bleibt */
+/* Leisten, die ihre Menüs als KINDER tragen: Glas auf eine Pseudo-Ebene legen,
+   damit die Leiste selbst kein Backdrop-Root wird und die Menüs darin echt
+   blurren (vorher sah man durch sie das Board gestochen scharf). */
+.dock, .mm-toolbar {
+  background: transparent;
+  border: 1px solid var(--glass-border);
+}
+.dock::before, .mm-toolbar::before {
+  content: ''; position: absolute; inset: -1px; z-index: -1;
+  border-radius: inherit; pointer-events: none;
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+}
+/* Menüs & Panels */
 .dock-menu, .frame-menu, .happ-menu, .sel-menu-fixed, .tab-tree, .tab-bg-menu,
-.cal-menu, .week-pop, .mm-pop, .comment-panel, .lookup-panel, .backlinks-panel {
+.cal-menu, .week-pop, .mm-pop, .comment-panel, .lookup-panel, .backlinks-panel,
+.search-box, .ticket-detail, .edge-opts {
   background: var(--glass-strong);
   -webkit-backdrop-filter: blur(18px) saturate(1.5);
   backdrop-filter: blur(18px) saturate(1.5);
@@ -3038,13 +3072,28 @@ button.link-dead:disabled { opacity: 0.45; }
   border: 1px solid var(--glass-border);
 }
 .modal-head { background: transparent; }
-.modal-backdrop { background: rgba(30, 26, 18, 0.35); backdrop-filter: blur(3px); }
-.toast {
+/* Abdunkler: Der Blur gehört auf eine Pseudo-Ebene, NICHT auf den Abdunkler
+   selbst — sonst wäre er Backdrop-Root und das Fenster darin könnte nicht mehr
+   blurren (es sah dann flach aus). So bleibt beides: unscharfe Umgebung UND
+   ein echtes Milchglas-Fenster darüber. */
+.modal-backdrop, .search-backdrop, .lookup-backdrop, .nav-backdrop {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.modal-backdrop::before, .search-backdrop::before,
+.lookup-backdrop::before, .nav-backdrop::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.modal-backdrop { background: rgba(30, 26, 18, 0.35); }
+.toast, .tipbox {
   background: rgba(28, 26, 22, 0.85);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.12);
 }
+[data-theme='dark'] .tipbox { background: rgba(58, 54, 46, 0.86); }
 
 /* ---------- Verläufe an Akzent-Stellen ---------- */
 .logo span {
