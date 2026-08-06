@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
@@ -176,9 +176,24 @@ export function Dock() {
   const [aiMenu, setAiMenu] = useState(false);
   // Hintergrund-Klick/-Tipp schließt alle Dock-Flyouts (User-Wunsch)
   const dockRef = useRef<HTMLDivElement | null>(null);
-  useOutsideClose(addMenu || drawMenu || aiMenu || arrangeMenu, dockRef, () => {
+  const dockMenuOpen = addMenu || drawMenu || aiMenu || arrangeMenu;
+  const closeDockMenus = useCallback(() => {
     setAddMenu(false); setDrawMenu(false); setAiMenu(false); setArrangeMenu(false);
-  });
+  }, []);
+  useOutsideClose(dockMenuOpen, dockRef, closeDockMenus);
+  // M192: Esc schließt sie ebenfalls — überall sonst in der App tut es das.
+  // Capture-Phase, damit das Menü zuerst schließt und Esc nicht schon vorher
+  // die Auswahl aufhebt oder aus dem Board herausfliegt.
+  useEffect(() => {
+    if (!dockMenuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      closeDockMenus();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [dockMenuOpen, closeDockMenus]);
   const [aiBusy, setAiBusy] = useState('');
   const [cmd, setCmd] = useState('');
 
