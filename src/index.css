@@ -2224,6 +2224,20 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ov-graph-hits.none { color: var(--muted); font-weight: 400; }
 
 /* ---------- M195: Physik + manuelles Verknüpfen ---------- */
+/* M196: Die Bubbles dürfen sich NICHT wie Text markieren lassen — auf
+   Touchscreens startete das lange Drücken/Ziehen sonst eine blaue
+   Textauswahl statt des Drags. -webkit-touch-callout unterdrückt zusätzlich
+   das iOS-Kopier-Blatt, das unser Langdruck-Menü überlagert hätte. */
+.ov-graph-svg, .ov-graph-svg * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+/* Baum in der Seitenleiste: gleiche Falle bei langem Drücken auf Board-Namen */
+.side-tree button, .sidepanel-head, .ov-graph-toggles label {
+  user-select: none;
+  -webkit-user-select: none;
+}
 .ov-graph-node.linking circle { stroke-dasharray: 5 4; animation: pn-link-pulse 0.9s ease-in-out infinite; }
 @keyframes pn-link-pulse { 50% { stroke-opacity: 0.35; } }
 .ov-graph-linkhint {
