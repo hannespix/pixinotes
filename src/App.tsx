@@ -20,6 +20,7 @@ import { initWebdavSync } from './lib/webdav';
 import { initFilesSync } from './lib/filesSync';
 import { TaskHub } from './components/TaskHub';
 import { BacklinksPanel } from './components/BacklinksPanel';
+import { SidePanel } from './components/SidePanel';
 import { HelpOverlay } from './components/HelpOverlay';
 import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
@@ -198,6 +199,8 @@ export default function App() {
             <Board />
             <Dock />
             <BacklinksPanel />
+            {/* M194: Überblick als Seitenleiste NEBEN der Arbeit */}
+            <SidePanel />
           </>
         )}
         <SearchOverlay />

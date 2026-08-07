@@ -240,8 +240,12 @@ interface BoardState {
   setOverviewMode: (m: 'hierarchie' | 'netz') => void;
   /** M193: Welche Ebenen das Netz zeigt — bleibt erhalten, statt bei jedem
    *  Öffnen auf „Karten aus" zurückzufallen (User-Wunsch). */
-  graphLayers: { cards: boolean; portals: boolean; wikis: boolean; projectOnly: boolean };
-  setGraphLayer: (key: 'cards' | 'portals' | 'wikis' | 'projectOnly', on: boolean) => void;
+  graphLayers: { cards: boolean; portals: boolean; wikis: boolean; projectOnly: boolean; physik?: boolean };
+  setGraphLayer: (key: 'cards' | 'portals' | 'wikis' | 'projectOnly' | 'physik', on: boolean) => void;
+  /** M194: Ausfahrbare Seitenleiste — der Überblick bleibt neben der Arbeit
+   *  stehen, statt sie zu verdrängen. Zustand komplett persistent. */
+  sidebar: { open: boolean; mode: 'hierarchie' | 'netz'; width: number };
+  setSidebar: (patch: Partial<{ open: boolean; mode: 'hierarchie' | 'netz'; width: number }>) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
   /** Kartengröße setzen (Auto-Größe der Diagramm-Karte, M92c) */
   resizeNode: (id: string, width: number, height: number) => void;
@@ -628,6 +632,12 @@ export const useBoard = create<BoardState>()(
         setOverviewMode: (m) => set({ overviewMode: m }),
         graphLayers: { cards: false, portals: true, wikis: true, projectOnly: false },
         setGraphLayer: (key, on) => set((s) => ({ graphLayers: { ...s.graphLayers, [key]: on } })),
+        sidebar: { open: false, mode: 'hierarchie', width: 330 },
+        setSidebar: (patch) => set((s) => ({
+          // Breite eingrenzen: schmaler wird der Baum unlesbar, breiter frisst
+          // die Leiste die Arbeitsfläche auf
+          sidebar: { ...s.sidebar, ...patch, ...(patch.width != null ? { width: Math.max(240, Math.min(620, patch.width)) } : {}) },
+        })),
 
         ui: { theme: 'system', accent: 'blau' },
         setUiTheme: (theme) => set({ ui: { ...get().ui, theme } }),
@@ -1479,6 +1489,7 @@ export const useBoard = create<BoardState>()(
         gridSnap: s.gridSnap,
         overviewMode: s.overviewMode,
         graphLayers: s.graphLayers,
+        sidebar: s.sidebar,
       }),
       migrate: (persisted: unknown, version: number) => {
         const p = persisted as Record<string, unknown>;

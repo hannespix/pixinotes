@@ -42,6 +42,8 @@ export const IGantt = make(<><path d="M4 6h9" /><path d="M9 12h11" /><path d="M6
 export const INote = make(<><path d="M15.5 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z" /><path d="M15 3v5h5" /></>);
 export const IKanban = make(<><path d="M6 5v11" /><path d="M12 5v6" /><path d="M18 5v14" /></>);
 export const IDiagram = make(<><rect width="6" height="5" x="9" y="3" rx="1" /><rect width="6" height="5" x="3" y="16" rx="1" /><rect width="6" height="5" x="15" y="16" rx="1" /><path d="M12 8v3" /><path d="M12 11H6v5" /><path d="M12 11h6v5" /></>);
+// M194: Seitenleiste rechts (ausfahrbarer Überblick)
+export const IPanelRight = make(<><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M15 3v18" /></>);
 // M193: Netz-Ansicht — Knoten mit Verbindungen (Graph, nicht Baum)
 export const IGraph = make(<><circle cx="12" cy="12" r="3" /><circle cx="5" cy="6" r="2" /><circle cx="19" cy="7" r="2" /><circle cx="6" cy="19" r="2" /><circle cx="18" cy="18" r="2" /><path d="m6.8 7.4 2.8 2.8" /><path d="m17.4 8.4-3 2.4" /><path d="m7.4 17.6 2.8-2.8" /><path d="m16.6 16.6-2.6-2.4" /></>);
 export const IFolder = make(<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />);

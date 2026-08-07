@@ -15,6 +15,7 @@ import { boardGraph, layoutGraph } from '../lib/links';
 import { nodeToText } from '../lib/serialize';
 import { InlineName } from './InlineName';
 import { IPen, IPlay, ITarget, IX, IZoomIn, IZoomOut } from './Icons';
+import { makePortal } from '../lib/nodes';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
 interface ProjectZoneData { project: Project; spaceId: string; [key: string]: unknown }
@@ -122,7 +123,12 @@ const GRAPH_W = 1100, GRAPH_H = 640;
  *  zum Knäuel und die Board-Ebene unlesbar */
 const MAX_SATELLITES = 14;
 
-function GraphView() {
+/**
+ * Board-Netz. Zwei Einsatzorte (M194): als Vollbild-Ansicht in der Übersicht
+ * und eingebettet in die Seitenleiste. `embedded` schaltet nur die Hülle um —
+ * Logik, Gesten und Ebenen sind identisch, damit beide nicht auseinanderlaufen.
+ */
+export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const boards = useBoard((s) => s.boards);
   /** Hover-Vorschau: Board-Name, Kartenzahl + erste Karten-Titel (TooltipLayer zeigt [title]) */
   const previewOf = (boardId: string): string => {
@@ -143,6 +149,8 @@ function GraphView() {
   const setLayer = useBoard((s) => s.setGraphLayer);
   const { cards: showCards, portals: showPortals, wikis: showWikis, projectOnly } = layers;
   const activeId = useBoard((s) => s.activeId);
+  const activeIdRef = useRef(activeId);
+  activeIdRef.current = activeId;
   const spaces = useBoard((s) => s.spaces);
   const [q, setQ] = useState('');
 
@@ -163,10 +171,194 @@ function GraphView() {
   }, [projectOnly, boards, spaces, activeId]);
 
   const W = GRAPH_W, H = GRAPH_H;
-  const { nodes, links, pos } = useMemo(() => {
+  const { nodes, links, pos: seedPos } = useMemo(() => {
     const g = boardGraph(scoped);
     return { ...g, pos: layoutGraph(g.nodes, g.links, W, H) };
   }, [scoped]);
+
+  // ---------- M195: Lebendige Physik (Obsidian-Gefühl) ----------
+  // Kräfte: Abstoßung zwischen allen Boards, Federn entlang der Verbindungen,
+  // sanfte Mitte-Gravitation — und CLUSTERUNG: Boards desselben Projekts
+  // ziehen sich zu ihrem Schwerpunkt, so sortiert sich die Struktur von
+  // selbst in Themen-Inseln. Läuft mit abklingender Energie (kein Dauerlauf,
+  // schont den Akku) und heizt bei Drag/Datenänderung wieder auf.
+  const physicsOn = layers.physik ?? true;
+  const simPos = useRef(new Map<string, { x: number; y: number; vx: number; vy: number; fx?: number; fy?: number }>());
+  const alpha = useRef(1);
+  const [, setFrame] = useState(0);   // Render-Puls — Positionen leben im Ref
+  const projectOf = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const sp of spaces) for (const p of sp.projects) for (const id of p.boardIds) m.set(id, p.id);
+    return m;
+  }, [spaces]);
+
+  // Seed/Sync: neue Boards bekommen ihren Layout-Platz, verschwundene fliegen raus
+  useEffect(() => {
+    const m = simPos.current;
+    for (const [id, p] of seedPos) {
+      if (!m.has(id)) m.set(id, { x: p.x, y: p.y, vx: 0, vy: 0 });
+    }
+    for (const id of [...m.keys()]) if (!seedPos.has(id)) m.delete(id);
+    alpha.current = 1;   // neue Lage → neu einschwingen
+  }, [seedPos]);
+
+  useEffect(() => {
+    if (!physicsOn) return;
+    let raf = 0;
+    const step = () => {
+      const m = simPos.current;
+      const a = alpha.current;
+      if (a > 0.005) {
+        const arr = [...m.entries()];
+        // Abstoßung (alle Paare — Board-Zahlen bleiben klein genug)
+        for (let i = 0; i < arr.length; i += 1) {
+          for (let j = i + 1; j < arr.length; j += 1) {
+            const A = arr[i][1], B = arr[j][1];
+            let dx = A.x - B.x, dy = A.y - B.y;
+            let d2 = dx * dx + dy * dy;
+            if (d2 < 1) { dx = (Math.sin(i * 7 + j) || 0.5); dy = (Math.cos(i + j * 5) || 0.5); d2 = 1; }
+            const f = (14000 / d2) * a;
+            const d = Math.sqrt(d2);
+            A.vx += (dx / d) * f; A.vy += (dy / d) * f;
+            B.vx -= (dx / d) * f; B.vy -= (dy / d) * f;
+          }
+        }
+        // Federn entlang der Verbindungen
+        for (const l of links) {
+          const A = m.get(l.a), B = m.get(l.b);
+          if (!A || !B) continue;
+          const dx = B.x - A.x, dy = B.y - A.y;
+          const d = Math.max(1, Math.hypot(dx, dy));
+          const f = ((d - 190) / d) * 0.04 * a;
+          A.vx += dx * f; A.vy += dy * f;
+          B.vx -= dx * f; B.vy -= dy * f;
+        }
+        // Cluster-Gravitation: zum Schwerpunkt des eigenen Projekts
+        const centroids = new Map<string, { x: number; y: number; n: number }>();
+        for (const [id, p] of m) {
+          const proj = projectOf.get(id);
+          if (!proj) continue;
+          const c = centroids.get(proj) ?? { x: 0, y: 0, n: 0 };
+          c.x += p.x; c.y += p.y; c.n += 1;
+          centroids.set(proj, c);
+        }
+        for (const [id, p] of m) {
+          const proj = projectOf.get(id);
+          const c = proj ? centroids.get(proj) : undefined;
+          if (c && c.n > 1) {
+            p.vx += ((c.x / c.n) - p.x) * 0.015 * a;
+            p.vy += ((c.y / c.n) - p.y) * 0.015 * a;
+          }
+          // sanfte Mitte-Gravitation gegen das Auseinanderdriften
+          p.vx += (GRAPH_W / 2 - p.x) * 0.0022 * a;
+          p.vy += (GRAPH_H / 2 - p.y) * 0.0022 * a;
+        }
+        // Integrieren + Dämpfung; festgehaltene Knoten (Drag) bleiben am Finger
+        for (const p of m.values()) {
+          if (p.fx != null && p.fy != null) { p.x = p.fx; p.y = p.fy; p.vx = 0; p.vy = 0; continue; }
+          p.vx *= 0.82; p.vy *= 0.82;
+          p.x += p.vx; p.y += p.vy;
+        }
+        alpha.current = a * 0.985;   // Energie klingt ab → Ruhe statt Dauerzappeln
+        if (followActive.current) {
+          const ap = m.get(activeIdRef.current);
+          if (ap) setVb((v) => ({ ...v, x: ap.x - v.w / 2, y: ap.y - v.h / 2 }));
+        }
+        setFrame((f) => f + 1);
+      }
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [physicsOn, links, projectOf]);
+
+  /** Effektive Positionen: mit Physik die Simulation, ohne das statische Layout */
+  const pos = useMemo(() => {
+    if (!physicsOn) return seedPos;
+    const out = new Map<string, { x: number; y: number }>();
+    for (const [id, p] of simPos.current) out.set(id, { x: p.x, y: p.y });
+    // Fallback fürs allererste Rendern (Sim noch nicht geseedet)
+    for (const [id, p] of seedPos) if (!out.has(id)) out.set(id, p);
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [physicsOn, seedPos, simPos.current.size, alpha.current]);
+
+  // ---------- M195: Knoten ziehen (stupst die Nachbarn physikalisch an) ----------
+  const dragNode = useRef<string | null>(null);
+  const dragMoved = useRef(false);
+  /** Bildschirm → Graph-Koordinaten (berücksichtigt viewBox + meet-Zentrierung) */
+  const toGraph = (cx: number, cy: number) => {
+    const el = svgRef.current!;
+    const rect = el.getBoundingClientRect();
+    const v = vbRef.current;
+    const scale = Math.min(rect.width / v.w, rect.height / v.h);
+    const ox = (rect.width - v.w * scale) / 2;
+    const oy = (rect.height - v.h * scale) / 2;
+    return { x: v.x + (cx - rect.left - ox) / scale, y: v.y + (cy - rect.top - oy) / scale };
+  };
+  const onNodeDown = (id: string) => (e: React.PointerEvent) => {
+    if (!physicsOn) return;
+    e.stopPropagation();
+    dragNode.current = id;
+    dragMoved.current = false;
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+  };
+  const onNodeMove = (e: React.PointerEvent) => {
+    const id = dragNode.current;
+    if (!id) return;
+    const p = simPos.current.get(id);
+    if (!p) return;
+    const g = toGraph(e.clientX, e.clientY);
+    p.fx = g.x; p.fy = g.y;
+    dragMoved.current = true;
+    alpha.current = Math.max(alpha.current, 0.5);   // Nachbarn wach machen
+    setFrame((f) => f + 1);
+  };
+  const onNodeUp = (id: string) => () => {
+    if (dragNode.current !== id) return;
+    const p = simPos.current.get(id);
+    if (p) { p.fx = undefined; p.fy = undefined; }   // loslassen → weiterschwingen
+    dragNode.current = null;
+  };
+
+  // ---------- M195: Kontextmenü — manuell verknüpfen per Rechtsklick/Langdruck ----------
+  const addNodeToBoard = useBoard((s) => s.addNodeToBoard);
+  const showToast = useBoard((s) => s.showToast);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; boardId: string } | null>(null);
+  const [linkFrom, setLinkFrom] = useState<string | null>(null);
+  const onNodeContext = (id: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setCtxMenu({ x: e.clientX, y: e.clientY, boardId: id });
+  };
+  const boardName = (id: string) => scoped.find((b) => b.id === id)?.name ?? '?';
+  // Esc bricht Verknüpfen/Menü ab; Klick irgendwo schließt das Menü
+  useEffect(() => {
+    if (!ctxMenu && !linkFrom) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setCtxMenu(null); setLinkFrom(null);
+    };
+    const onDown = (e: PointerEvent) => {
+      if (ctxMenu && !(e.target as Element).closest?.('.ov-graph-ctx')) setCtxMenu(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    window.addEventListener('pointerdown', onDown, true);
+    return () => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('pointerdown', onDown, true); };
+  }, [ctxMenu, linkFrom]);
+  /** Ziel angeklickt: Portal-Karte auf dem Quell-Board anlegen — eine ECHTE
+   *  Verbindung im Datenmodell (undo-fähig), nicht nur ein Strich im Bild */
+  const completeLink = (targetId: string) => {
+    if (!linkFrom || linkFrom === targetId) { setLinkFrom(null); return; }
+    const from = linkFrom;
+    const spot = { x: 80 + Math.random() * 240, y: 80 + Math.random() * 160 };
+    const portal = makePortal(spot);
+    portal.data = { boardId: targetId };
+    addNodeToBoard(from, portal);
+    showToast(`🔗 Portal angelegt: „${boardName(from)}" → „${boardName(targetId)}" (Strg+Z macht es rückgängig).`);
+    setLinkFrom(null);
+  };
 
   /** Suche im Netz: hebt HERVOR statt zu filtern — man soll sehen, wo etwas
    *  sitzt, nicht nur was übrig bleibt. Trifft Board-Namen und Karten-Text. */
@@ -193,6 +385,9 @@ function GraphView() {
   // ---------- Pan & Zoom wie auf dem Whiteboard (viewBox-Steuerung) ----------
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [vb, setVb] = useState({ x: 0, y: 0, w: GRAPH_W, h: GRAPH_H });
+  // Ref-Spiegel für Handler, die außerhalb des Render-Zyklus rechnen (M195-Drag)
+  const vbRef = useRef(vb);
+  vbRef.current = vb;
   // Ref statt Closure: der Wheel-Listener wird nur einmal registriert und
   // soll trotzdem immer die aktuellen Knoten-Positionen sehen
   const posRef = useRef(pos);
@@ -203,7 +398,11 @@ function GraphView() {
   const pinchDist = useRef<number | null>(null);
 
   /** Um einen Bildschirmpunkt herum zoomen — der Punkt unterm Cursor bleibt stehen */
+  /** M195: Solange der Nutzer die Ansicht nicht selbst bewegt hat, folgt sie
+   *  dem aktiven Board — die Physik schiebt es sonst aus der Startmitte. */
+  const followActive = useRef(true);
   const zoomAt = (cx: number, cy: number, f: number) => {
+    followActive.current = false;
     setVb((v) => {
       const el = svgRef.current;
       if (!el) return v;
@@ -299,6 +498,7 @@ function GraphView() {
       if (!moved.current && downAt.current
         && Math.abs(e.clientX - downAt.current.x) + Math.abs(e.clientY - downAt.current.y) > 4) {
         moved.current = true;
+        followActive.current = false;
         // Ab jetzt ist es ein Pan — Capture hält die Geste auch außerhalb des SVG
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetische Pointer */ }
       }
@@ -397,12 +597,13 @@ function GraphView() {
   const ui = (px: number) => px / scale;
 
   return (
-    <div className="ov-graph">
+    <div className={`ov-graph ${embedded ? "embedded" : ""}`}>
       <div className="ov-graph-toggles nodrag">
         {([
           ['Karten', 'cards', showCards],
           ['Portale', 'portals', showPortals],
           ['Wikilinks', 'wikis', showWikis],
+          ['Physik', 'physik', physicsOn],
         ] as const).map(([label, key, on]) => (
           <label key={key} className="ov-graph-toggle">
             <input type="checkbox" checked={on} onChange={(e) => setLayer(key, e.target.checked)} /> {label}
@@ -485,9 +686,19 @@ function GraphView() {
           return (
             <g
               key={n.id}
-              className={`ov-graph-node ${n.id === activeId ? 'here' : ''} ${marking ? (hits.boards.has(n.id) ? 'hit' : 'dim') : ''}`}
-              data-tip={previewOf(n.id)}
-              onClick={() => openBoard(n.id)}
+              className={`ov-graph-node ${n.id === activeId ? 'here' : ''} ${marking ? (hits.boards.has(n.id) ? 'hit' : 'dim') : ''} ${linkFrom === n.id ? 'linking' : ''}`}
+              data-tip={linkFrom ? `Klicken: Portal „${boardName(linkFrom)}" → „${n.label}" anlegen` : previewOf(n.id)}
+              onClick={() => {
+                // Nach einem echten Zerren nicht auch noch öffnen (M195)
+                if (dragMoved.current) { dragMoved.current = false; return; }
+                if (linkFrom) { completeLink(n.id); return; }
+                openBoard(n.id);
+              }}
+              onPointerDown={onNodeDown(n.id)}
+              onPointerMove={onNodeMove}
+              onPointerUp={onNodeUp(n.id)}
+              onPointerCancel={onNodeUp(n.id)}
+              onContextMenu={onNodeContext(n.id)}
             >
               {/* M193: „Du bist hier" — ohne diesen Ring verliert man im
                   Gesamtnetz sofort den Bezug zum eigenen Standort */}
@@ -522,9 +733,32 @@ function GraphView() {
           <ITarget size={16} />
         </button>
       </div>
-      <div className="ov-graph-legend">
-        ── Portal · ┄┄ [[Wikilink]] · Kreisgröße = Kartenzahl · <b>Ring = aktuelles Board</b> · Klick öffnet · Rad/Pinch = Zoom · Ziehen = Verschieben · Detailgrad folgt dem Zoom (nah heranzoomen zeigt Kartentitel)
-      </div>
+      {linkFrom && (
+        <div className="ov-graph-linkhint nodrag">
+          🔗 Verknüpfen: Ziel-Board anklicken — Portal entsteht auf „{boardName(linkFrom)}"
+          <button onClick={() => setLinkFrom(null)}>Abbrechen (Esc)</button>
+        </div>
+      )}
+      {ctxMenu && (
+        <div className="ov-graph-ctx nodrag" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
+          <div className="ov-graph-ctx-title">{boardName(ctxMenu.boardId)}</div>
+          <button onClick={() => { openBoard(ctxMenu.boardId); setCtxMenu(null); }}>Board öffnen</button>
+          <button onClick={() => { setLinkFrom(ctxMenu.boardId); setCtxMenu(null); }}>Verknüpfen mit … (Portal)</button>
+          <button onClick={() => {
+            const p = pos.get(ctxMenu.boardId);
+            if (p) setVb({ x: p.x - GRAPH_W / 3.8, y: p.y - GRAPH_H / 3.8, w: GRAPH_W / 1.9, h: GRAPH_H / 1.9 });
+            setCtxMenu(null);
+          }}>Hierher zoomen</button>
+          {physicsOn && (
+            <button onClick={() => { alpha.current = 1; setCtxMenu(null); }}>Netz neu ausschwingen</button>
+          )}
+        </div>
+      )}
+      {!embedded && (
+        <div className="ov-graph-legend">
+          ── Portal · ┄┄ [[Wikilink]] · Kreisgröße = Kartenzahl · <b>Ring = aktuelles Board</b> · Klick öffnet · Rad/Pinch = Zoom · Ziehen = Verschieben · Detailgrad folgt dem Zoom (nah heranzoomen zeigt Kartentitel)
+        </div>
+      )}
     </div>
   );
 }

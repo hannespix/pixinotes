@@ -2222,6 +2222,136 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ov-graph-find input:focus { border-color: var(--accent); }
 .ov-graph-hits { font-size: 11px; color: var(--accent-strong); white-space: nowrap; }
 .ov-graph-hits.none { color: var(--muted); font-weight: 400; }
+
+/* ---------- M195: Physik + manuelles Verknüpfen ---------- */
+.ov-graph-node.linking circle { stroke-dasharray: 5 4; animation: pn-link-pulse 0.9s ease-in-out infinite; }
+@keyframes pn-link-pulse { 50% { stroke-opacity: 0.35; } }
+.ov-graph-linkhint {
+  position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; white-space: nowrap;
+  font-size: 12.5px; color: var(--ink); padding: 8px 14px; border-radius: 999px;
+  background: var(--glass-strong); border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  z-index: 56;
+}
+.ov-graph-linkhint button {
+  border: 1px solid var(--border-soft); background: none; border-radius: 999px;
+  padding: 3px 10px; font: inherit; font-size: 11.5px; cursor: pointer; color: var(--muted);
+}
+.ov-graph-linkhint button:hover { border-color: var(--accent); color: var(--accent-strong); }
+.ov-graph-ctx {
+  position: fixed; z-index: 90; min-width: 190px;
+  display: flex; flex-direction: column; gap: 2px; padding: 5px;
+  border-radius: 11px; background: var(--glass-strong); border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  box-shadow: 0 8px 30px rgba(40, 30, 10, 0.24);
+  animation: pn-fade-in 0.12s ease-out;
+}
+.ov-graph-ctx-title {
+  font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 4px 9px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ov-graph-ctx button {
+  text-align: left; border: none; background: none; font-family: inherit;
+  font-size: 12.5px; padding: 7px 10px; border-radius: 7px; cursor: pointer; color: var(--ink);
+}
+.ov-graph-ctx button:hover { background: var(--accent-soft); }
+
+/* ---------- M194: Seitenleiste — Überblick neben der Arbeit ---------- */
+.sidepanel {
+  position: fixed; top: var(--head-space); right: 10px;
+  bottom: calc(76px + var(--safe-bottom));
+  z-index: 45; display: flex; flex-direction: column;
+  border-radius: 16px; overflow: hidden;
+  background: var(--glass-strong); border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  backdrop-filter: blur(20px) saturate(1.5);
+  box-shadow: 0 14px 46px rgba(40, 30, 10, 0.22);
+  animation: pn-slide-in-right 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes pn-slide-in-right { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.sidepanel-grip {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 8px;
+  cursor: ew-resize; touch-action: none; z-index: 2;
+}
+.sidepanel-grip:hover { background: linear-gradient(90deg, var(--accent-soft), transparent); }
+.sidepanel-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px 8px 14px; border-bottom: 1px solid var(--border-soft);
+  flex: 0 0 auto;
+}
+.sidepanel-tabs { display: flex; gap: 2px; background: var(--surface-dim); border-radius: 999px; padding: 3px; }
+.sidepanel-tabs button {
+  border: none; background: none; font: inherit; font-size: 11.5px; font-weight: 650;
+  padding: 4px 12px; border-radius: 999px; cursor: pointer; color: var(--muted);
+}
+.sidepanel-tabs button.on { background: var(--accent); color: #fff; }
+.sidepanel-x {
+  margin-left: auto; border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 5px; border-radius: 8px; display: inline-flex;
+}
+.sidepanel-x:hover { background: var(--surface-2); color: var(--ink); }
+.sidepanel-body { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
+/* Eingebettetes Netz: aus dem fixed-Vollbild in den Leisten-Körper holen */
+.ov-graph.embedded { position: absolute; inset: 0; padding: 0; background: none; }
+.ov-graph.embedded .ov-graph-toggles {
+  position: static; display: flex; flex-wrap: wrap; gap: 6px 10px;
+  margin: 8px 10px 4px; padding: 6px 10px;
+}
+.ov-graph.embedded .ov-graph-find input { width: 130px; }
+.ov-graph.embedded .ov-graph-zoom { position: absolute; right: 8px; bottom: 8px; }
+.ov-graph.embedded .ov-graph-linkhint { bottom: 10px; max-width: calc(100% - 16px); white-space: normal; }
+/* Baum-Ansicht in der Leiste */
+.side-tree { flex: 1; overflow-y: auto; padding: 8px 10px 10px; font-size: 12.5px; }
+.side-tree-find {
+  width: 100%; box-sizing: border-box; font-family: inherit; font-size: 12px;
+  padding: 6px 10px; margin-bottom: 8px; border: 1px solid var(--border-soft);
+  border-radius: 9px; background: var(--surface); color: var(--ink); outline: none;
+}
+.side-tree-find:focus { border-color: var(--accent); }
+.side-space { margin-bottom: 10px; }
+.side-space-name {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--muted); padding: 4px 2px;
+}
+.side-proj { margin: 2px 0 6px 6px; }
+.side-proj-name { font-size: 12px; font-weight: 700; color: var(--ink); padding: 2px 2px 3px; }
+.side-board {
+  display: flex; align-items: center; gap: 2px; border-radius: 8px; padding: 2px 4px 2px 0;
+}
+.side-board.active { background: var(--accent-soft); }
+.side-board.active .side-board-name { font-weight: 700; }
+.side-board-arrow {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 3px; border-radius: 6px; display: inline-flex; transition: transform 0.15s;
+}
+.side-board-arrow.open { transform: rotate(90deg); }
+.side-board-name {
+  flex: 1; min-width: 0; text-align: left; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 12.5px; color: var(--ink); padding: 4px 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 6px;
+}
+.side-board-name:hover { color: var(--accent-strong); }
+.side-board-count { font-size: 10px; color: var(--muted); background: var(--surface-dim); border-radius: 999px; padding: 1px 6px; flex: 0 0 auto; }
+.side-cards { margin: 1px 0 4px 24px; display: flex; flex-direction: column; }
+.side-card {
+  text-align: left; border: none; background: none; cursor: pointer; font: inherit;
+  font-size: 11.5px; color: var(--muted); padding: 3px 6px; border-radius: 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.side-card:hover { background: var(--surface-2); color: var(--ink); }
+.side-empty { font-size: 11px; color: var(--muted); padding: 2px 6px; font-style: italic; }
+.side-foot {
+  border-top: 1px solid var(--border-soft); margin-top: 8px; padding: 8px 2px 0;
+  font-size: 11px; color: var(--muted);
+}
+.top-actions button.on { background: var(--accent-soft); color: var(--accent-strong); }
+/* Phone: Als Vollflächen-Blatt statt schmaler Spalte */
+@media (max-width: 640px) {
+  .sidepanel { left: 10px; right: 10px; width: auto !important; }
+}
 @media (max-width: 640px) {
   .ov-graph-find input { width: 120px; }
 }
