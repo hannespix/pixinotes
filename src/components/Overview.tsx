@@ -130,17 +130,21 @@ const MAX_SATELLITES = 14;
  */
 export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const boards = useBoard((s) => s.boards);
-  /** Hover-Vorschau: Board-Name, Kartenzahl + erste Karten-Titel (TooltipLayer zeigt [title]) */
-  const previewOf = (boardId: string): string => {
-    const b = boards.find((x) => x.id === boardId);
-    if (!b) return '';
-    const titles = b.nodes
-      .map((n) => (nodeToText(n).split('\n').find((l) => l.trim()) ?? '').slice(0, 44))
-      .filter(Boolean)
-      .slice(0, 4);
-    const more = b.nodes.length - titles.length;
-    return `${b.name} · ${b.nodes.length} Karten\n${titles.map((t) => `• ${t}`).join('\n')}${more > 0 ? `\n… und ${more} weitere` : ''}`;
-  };
+  /** Hover-Vorschau je Board — MEMOISIERT (M197): lief vorher pro Knoten und
+   *  Physik-Frame über alle Karten (nodeToText) und ruckelte am iPhone */
+  const previews = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const b of boards) {
+      const titles = b.nodes
+        .map((n) => (nodeToText(n).split('\n').find((l) => l.trim()) ?? '').slice(0, 44))
+        .filter(Boolean)
+        .slice(0, 4);
+      const more = b.nodes.length - titles.length;
+      m.set(b.id, `${b.name} · ${b.nodes.length} Karten\n${titles.map((t) => `• ${t}`).join('\n')}${more > 0 ? `\n… und ${more} weitere` : ''}`);
+    }
+    return m;
+  }, [boards]);
+  const previewOf = (boardId: string): string => previews.get(boardId) ?? '';
   const openBoard = useBoard((s) => s.openBoard);
   const focusNode = useBoard((s) => s.focusNode);
   // M193: Ebenen liegen im Store und bleiben erhalten — vorher fiel „Karten"
@@ -296,29 +300,53 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     const oy = (rect.height - v.h * scale) / 2;
     return { x: v.x + (cx - rect.left - ox) / scale, y: v.y + (cy - rect.top - oy) / scale };
   };
+  // M197: Der Drag läuft über die SVG-WURZEL, nicht übers winzige g-Element.
+  // setPointerCapture auf SVG-Kindern ist in iOS-Safari unzuverlässig — sobald
+  // der Finger die Bubble verließ, kamen keine pointermove mehr an: Der Knoten
+  // blieb stehen und sprang erst beim Loslassen ans Ziel (User-Report iPhone).
+  const dragStart = useRef({ x: 0, y: 0 });
   const onNodeDown = (id: string) => (e: React.PointerEvent) => {
     if (!physicsOn) return;
+    // Nur Haupttaste/Finger: Der Rechtsklick gehört dem Kontextmenü — sonst
+    // würde sein pointerup als „Tipp" gewertet und öffnete das Board (M197)
+    if (e.button !== 0) return;
     e.stopPropagation();
     dragNode.current = id;
     dragMoved.current = false;
-    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    try { svgRef.current?.setPointerCapture(e.pointerId); } catch { /* synthetische Pointer */ }
   };
-  const onNodeMove = (e: React.PointerEvent) => {
+  /** Wird vom SVG-Move-Handler gerufen, solange ein Knoten am Finger hängt */
+  const moveDraggedNode = (e: React.PointerEvent) => {
     const id = dragNode.current;
     if (!id) return;
     const p = simPos.current.get(id);
     if (!p) return;
+    // Finger zittern: Erst ab ~7px ist es ein Drag, davor bleibt es ein Tipp —
+    // sonst würde auf Touch NIE ein Klick durchkommen (jeder Tipp wackelt)
+    if (!dragMoved.current
+      && Math.abs(e.clientX - dragStart.current.x) + Math.abs(e.clientY - dragStart.current.y) < 7) return;
     const g = toGraph(e.clientX, e.clientY);
     p.fx = g.x; p.fy = g.y;
     dragMoved.current = true;
     alpha.current = Math.max(alpha.current, 0.5);   // Nachbarn wach machen
-    setFrame((f) => f + 1);
+    // KEIN setFrame hier: Die rAF-Schleife rendert ohnehin — ein zweiter
+    // Render je pointermove (bis 120 Hz am iPhone) machte es nur ruckeliger
   };
-  const onNodeUp = (id: string) => () => {
-    if (dragNode.current !== id) return;
+  /** Nach Capture an der SVG-Wurzel feuert der Browser-„click" nicht mehr am
+   *  g-Element — Tipp-ohne-Zerren wird deshalb HIER beim Loslassen behandelt */
+  const clickHandledAt = useRef(0);
+  const releaseDraggedNode = () => {
+    const id = dragNode.current;
+    if (!id) return;
     const p = simPos.current.get(id);
     if (p) { p.fx = undefined; p.fy = undefined; }   // loslassen → weiterschwingen
     dragNode.current = null;
+    if (!dragMoved.current) {
+      clickHandledAt.current = Date.now();
+      if (linkFrom) completeLink(id);
+      else openBoard(id);
+    }
   };
 
   // ---------- M195: Kontextmenü — manuell verknüpfen per Rechtsklick/Langdruck ----------
@@ -487,6 +515,10 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   };
 
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    // M197: Hängt ein Knoten am Finger, gehört die Bewegung ihm — die Events
+    // kommen dank Capture an der SVG-Wurzel zuverlässig hier an (iOS-Safari
+    // verliert sie auf den kleinen g-Elementen)
+    if (dragNode.current) { moveDraggedNode(e); return; }
     const pts = pointers.current;
     const prev = pts.get(e.pointerId);
     if (!prev) return;
@@ -523,6 +555,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   };
 
   const onPointerEnd = (e: React.PointerEvent<SVGSVGElement>) => {
+    releaseDraggedNode();
     pointers.current.delete(e.pointerId);
     pinchDist.current = null;
   };
@@ -538,15 +571,11 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
 
   const r = (cards: number) => 14 + Math.min(26, Math.sqrt(cards) * 5);
 
-  // Karten-Ebene: verbundene Karten als Satelliten-Ring um ihr Board
-  const satellites = useMemo(() => {
-    if (!showCards) return { dots: [] as Array<{ key: string; x: number; y: number; title: string; boardId: string; nodeId: string }>, lines: [] as Array<{ x1: number; y1: number; x2: number; y2: number }> };
-    const dots: Array<{ key: string; x: number; y: number; title: string; boardId: string; nodeId: string }> = [];
-    const lines: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
-    const dotPos = new Map<string, { x: number; y: number }>();
-    for (const b of scoped) {
-      const center = pos.get(b.id);
-      if (!center) continue;
+  // Karten-Ebene, Stufe 1 (M197): Auswahl + TITEL nur bei Datenänderung —
+  // die String-Arbeit (nodeToText) hat in der Frame-Schleife nichts verloren
+  const satelliteMeta = useMemo(() => {
+    if (!showCards) return [];
+    return scoped.map((b) => {
       // M193: Vorher zählten NUR Karten mit Pfeilen — auf Boards ohne
       // Verbindungen blieb die eingeschaltete Ebene komplett leer und wirkte
       // kaputt. Jetzt: verbundene Karten zuerst (sie tragen die Struktur),
@@ -554,27 +583,38 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
       const connected = new Set(b.edges.flatMap((e) => [e.source, e.target]));
       const linked = b.nodes.filter((n) => connected.has(n.id));
       const rest = b.nodes.filter((n) => !connected.has(n.id));
-      const cards = [...linked, ...rest].slice(0, Math.max(linked.length, MAX_SATELLITES));
-      const ring = r(b.nodes.length) + 34;
-      cards.forEach((n, i) => {
-        const angle = (i / Math.max(1, cards.length)) * Math.PI * 2 - Math.PI / 2;
+      const cards = [...linked, ...rest].slice(0, Math.max(linked.length, MAX_SATELLITES)).map((n) => ({
+        nodeId: n.id,
+        title: (nodeToText(n).split('\n').find((l) => l.trim()) ?? n.type ?? 'Karte').slice(0, 40),
+      }));
+      return { boardId: b.id, total: b.nodes.length, cards, edges: b.edges.map((e) => ({ s: e.source, t: e.target })) };
+    });
+  }, [showCards, scoped]);
+
+  // Stufe 2: pro Frame nur noch Trigonometrie um die aktuellen Board-Zentren
+  const satellites = useMemo(() => {
+    const dots: Array<{ key: string; x: number; y: number; title: string; boardId: string; nodeId: string }> = [];
+    const lines: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+    const dotPos = new Map<string, { x: number; y: number }>();
+    for (const b of satelliteMeta) {
+      const center = pos.get(b.boardId);
+      if (!center) continue;
+      const ring = r(b.total) + 34;
+      b.cards.forEach((c, i) => {
+        const angle = (i / Math.max(1, b.cards.length)) * Math.PI * 2 - Math.PI / 2;
         const x = center.x + Math.cos(angle) * ring;
         const y = center.y + Math.sin(angle) * ring;
-        dotPos.set(`${b.id}:${n.id}`, { x, y });
-        dots.push({
-          key: `${b.id}:${n.id}`, x, y,
-          title: (nodeToText(n).split('\n').find((l) => l.trim()) ?? n.type ?? 'Karte').slice(0, 40),
-          boardId: b.id, nodeId: n.id,
-        });
+        dotPos.set(`${b.boardId}:${c.nodeId}`, { x, y });
+        dots.push({ key: `${b.boardId}:${c.nodeId}`, x, y, title: c.title, boardId: b.boardId, nodeId: c.nodeId });
       });
       for (const e of b.edges) {
-        const a = dotPos.get(`${b.id}:${e.source}`);
-        const c = dotPos.get(`${b.id}:${e.target}`);
-        if (a && c) lines.push({ x1: a.x, y1: a.y, x2: c.x, y2: c.y });
+        const a = dotPos.get(`${b.boardId}:${e.s}`);
+        const c2 = dotPos.get(`${b.boardId}:${e.t}`);
+        if (a && c2) lines.push({ x1: a.x, y1: a.y, x2: c2.x, y2: c2.y });
       }
     }
     return { dots, lines };
-  }, [showCards, scoped, pos]);
+  }, [satelliteMeta, pos]);
 
   // ---------- Semantischer Zoom: Detailgrad folgt der Zoomstufe ----------
   // Maßstab = ECHTE Bildschirm-Pixel pro SVG-Einheit (gemessen, nicht relativ
@@ -689,15 +729,15 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
               className={`ov-graph-node ${n.id === activeId ? 'here' : ''} ${marking ? (hits.boards.has(n.id) ? 'hit' : 'dim') : ''} ${linkFrom === n.id ? 'linking' : ''}`}
               data-tip={linkFrom ? `Klicken: Portal „${boardName(linkFrom)}" → „${n.label}" anlegen` : previewOf(n.id)}
               onClick={() => {
-                // Nach einem echten Zerren nicht auch noch öffnen (M195)
+                // Nach einem echten Zerren nicht auch noch öffnen (M195);
+                // und nicht doppelt, wenn das Loslassen den Tipp schon
+                // behandelt hat (M197 — Capture-Pfad, Physik an)
                 if (dragMoved.current) { dragMoved.current = false; return; }
+                if (Date.now() - clickHandledAt.current < 400) return;
                 if (linkFrom) { completeLink(n.id); return; }
                 openBoard(n.id);
               }}
               onPointerDown={onNodeDown(n.id)}
-              onPointerMove={onNodeMove}
-              onPointerUp={onNodeUp(n.id)}
-              onPointerCancel={onNodeUp(n.id)}
               onContextMenu={onNodeContext(n.id)}
             >
               {/* M193: „Du bist hier" — ohne diesen Ring verliert man im
