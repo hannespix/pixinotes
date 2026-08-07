@@ -234,6 +234,14 @@ interface BoardState {
   /** Mausrad zoomt statt zu scrollen (Miro-Stil) */
   wheelZoom: boolean;
   setWheelZoom: (on: boolean) => void;
+  /** M193: Übersicht — Hierarchie oder Netz. Liegt im Store, damit der
+   *  Navigator (und damit JEDE Ansicht) direkt ins Netz springen kann. */
+  overviewMode: 'hierarchie' | 'netz';
+  setOverviewMode: (m: 'hierarchie' | 'netz') => void;
+  /** M193: Welche Ebenen das Netz zeigt — bleibt erhalten, statt bei jedem
+   *  Öffnen auf „Karten aus" zurückzufallen (User-Wunsch). */
+  graphLayers: { cards: boolean; portals: boolean; wikis: boolean; projectOnly: boolean };
+  setGraphLayer: (key: 'cards' | 'portals' | 'wikis' | 'projectOnly', on: boolean) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
   /** Kartengröße setzen (Auto-Größe der Diagramm-Karte, M92c) */
   resizeNode: (id: string, width: number, height: number) => void;
@@ -616,6 +624,10 @@ export const useBoard = create<BoardState>()(
         setClickZoom: (on) => set({ clickZoom: on }),
         wheelZoom: false,
         setWheelZoom: (on) => set({ wheelZoom: on }),
+        overviewMode: 'hierarchie',
+        setOverviewMode: (m) => set({ overviewMode: m }),
+        graphLayers: { cards: false, portals: true, wikis: true, projectOnly: false },
+        setGraphLayer: (key, on) => set((s) => ({ graphLayers: { ...s.graphLayers, [key]: on } })),
 
         ui: { theme: 'system', accent: 'blau' },
         setUiTheme: (theme) => set({ ui: { ...get().ui, theme } }),
@@ -1465,6 +1477,8 @@ export const useBoard = create<BoardState>()(
         wheelZoom: s.wheelZoom,
         showArchived: s.showArchived,
         gridSnap: s.gridSnap,
+        overviewMode: s.overviewMode,
+        graphLayers: s.graphLayers,
       }),
       migrate: (persisted: unknown, version: number) => {
         const p = persisted as Record<string, unknown>;

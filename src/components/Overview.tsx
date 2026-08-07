@@ -34,7 +34,10 @@ interface ProjectRect { id: string; x: number; y: number; w: number; h: number }
  * ziehen = verschieben · Portal-Verknüpfungen erscheinen als Linien.
  */
 export function Overview() {
-  const [mode, setMode] = useState<'hierarchie' | 'netz'>('hierarchie');
+  // M193: Der Modus liegt im Store — so kann der Navigator aus JEDER Ansicht
+  // direkt ins Netz springen, und die Wahl überlebt den Ansichtswechsel
+  const mode = useBoard((s) => s.overviewMode);
+  const setMode = useBoard((s) => s.setOverviewMode);
   return (
     <ReactFlowProvider>
       <div className="ov-mode nodrag">
@@ -115,6 +118,9 @@ function OverviewCanvas() {
 /* ---------- Graph-Ansicht (Obsidian-Netz): Boards als Knoten, Portale & Wikilinks als Kanten ---------- */
 
 const GRAPH_W = 1100, GRAPH_H = 640;
+/** Höchstens so viele Karten-Punkte je Board (M193) — darüber wird der Ring
+ *  zum Knäuel und die Board-Ebene unlesbar */
+const MAX_SATELLITES = 14;
 
 function GraphView() {
   const boards = useBoard((s) => s.boards);
@@ -131,14 +137,58 @@ function GraphView() {
   };
   const openBoard = useBoard((s) => s.openBoard);
   const focusNode = useBoard((s) => s.focusNode);
-  const [showCards, setShowCards] = useState(false);
-  const [showPortals, setShowPortals] = useState(true);
-  const [showWikis, setShowWikis] = useState(true);
+  // M193: Ebenen liegen im Store und bleiben erhalten — vorher fiel „Karten"
+  // bei jedem Öffnen wieder auf „aus" zurück
+  const layers = useBoard((s) => s.graphLayers);
+  const setLayer = useBoard((s) => s.setGraphLayer);
+  const { cards: showCards, portals: showPortals, wikis: showWikis, projectOnly } = layers;
+  const activeId = useBoard((s) => s.activeId);
+  const spaces = useBoard((s) => s.spaces);
+  const [q, setQ] = useState('');
+
+  // M193: „Nur dieses Projekt" — bei vielen Boards ist der Gesamtgraph ein
+  // Knäuel; das Projekt des aktiven Boards ist meist die gesuchte Umgebung
+  const projectName = useMemo(() => {
+    for (const sp of spaces) for (const p of sp.projects) if (p.boardIds.includes(activeId)) return `${sp.name} › ${p.name}`;
+    return null;
+  }, [spaces, activeId]);
+  const scoped = useMemo(() => {
+    if (!projectOnly) return boards;
+    for (const sp of spaces) {
+      for (const p of sp.projects) {
+        if (p.boardIds.includes(activeId)) return boards.filter((b) => p.boardIds.includes(b.id));
+      }
+    }
+    return boards;
+  }, [projectOnly, boards, spaces, activeId]);
+
   const W = GRAPH_W, H = GRAPH_H;
   const { nodes, links, pos } = useMemo(() => {
-    const g = boardGraph(boards);
+    const g = boardGraph(scoped);
     return { ...g, pos: layoutGraph(g.nodes, g.links, W, H) };
-  }, [boards]);
+  }, [scoped]);
+
+  /** Suche im Netz: hebt HERVOR statt zu filtern — man soll sehen, wo etwas
+   *  sitzt, nicht nur was übrig bleibt. Trifft Board-Namen und Karten-Text. */
+  const needle = q.trim().toLowerCase();
+  const hits = useMemo(() => {
+    const boardsHit = new Set<string>();
+    const cardsHit = new Set<string>();
+    if (!needle) return { boards: boardsHit, cards: cardsHit };
+    for (const b of scoped) {
+      if (b.name.toLowerCase().includes(needle)) boardsHit.add(b.id);
+      for (const n of b.nodes) {
+        if (nodeToText(n).toLowerCase().includes(needle)) {
+          cardsHit.add(`${b.id}:${n.id}`);
+          boardsHit.add(b.id);
+        }
+      }
+    }
+    return { boards: boardsHit, cards: cardsHit };
+  }, [needle, scoped]);
+  /** Nur hervorheben, wenn es auch etwas hervorzuheben GIBT — sonst läge das
+   *  ganze Netz blass da und sähe kaputt aus statt „nichts gefunden" */
+  const marking = needle !== '' && hits.boards.size > 0;
 
   // ---------- Pan & Zoom wie auf dem Whiteboard (viewBox-Steuerung) ----------
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -197,6 +247,19 @@ function GraphView() {
     const r = el.getBoundingClientRect();
     zoomAt(r.left + r.width / 2, r.top + r.height / 2, f);
   };
+
+  /** M193: Beim Öffnen dorthin schauen, wo man herkommt. Vorher startete das
+   *  Netz immer links oben — bei vielen Boards wusste man nicht, wo man ist.
+   *  Nur EINMAL beim Mount, danach gehört die Ansicht dem Nutzer. */
+  const centeredOnce = useRef(false);
+  useEffect(() => {
+    if (centeredOnce.current) return;
+    const p = pos.get(activeId);
+    if (!p) return;
+    centeredOnce.current = true;
+    const w = GRAPH_W / 1.9, h = GRAPH_H / 1.9;
+    setVb({ x: p.x - w / 2, y: p.y - h / 2, w, h });
+  }, [pos, activeId]);
 
   // Rad-Zoom braucht preventDefault → nativer non-passive Listener
   // (Reacts onWheel ist am Root passiv registriert)
@@ -281,11 +344,17 @@ function GraphView() {
     const dots: Array<{ key: string; x: number; y: number; title: string; boardId: string; nodeId: string }> = [];
     const lines: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
     const dotPos = new Map<string, { x: number; y: number }>();
-    for (const b of boards) {
+    for (const b of scoped) {
       const center = pos.get(b.id);
       if (!center) continue;
+      // M193: Vorher zählten NUR Karten mit Pfeilen — auf Boards ohne
+      // Verbindungen blieb die eingeschaltete Ebene komplett leer und wirkte
+      // kaputt. Jetzt: verbundene Karten zuerst (sie tragen die Struktur),
+      // danach mit den übrigen auffüllen. Deckel gegen den Knäuel-Effekt.
       const connected = new Set(b.edges.flatMap((e) => [e.source, e.target]));
-      const cards = b.nodes.filter((n) => connected.has(n.id));
+      const linked = b.nodes.filter((n) => connected.has(n.id));
+      const rest = b.nodes.filter((n) => !connected.has(n.id));
+      const cards = [...linked, ...rest].slice(0, Math.max(linked.length, MAX_SATELLITES));
       const ring = r(b.nodes.length) + 34;
       cards.forEach((n, i) => {
         const angle = (i / Math.max(1, cards.length)) * Math.PI * 2 - Math.PI / 2;
@@ -305,7 +374,7 @@ function GraphView() {
       }
     }
     return { dots, lines };
-  }, [showCards, boards, pos]);
+  }, [showCards, scoped, pos]);
 
   // ---------- Semantischer Zoom: Detailgrad folgt der Zoomstufe ----------
   // Maßstab = ECHTE Bildschirm-Pixel pro SVG-Einheit (gemessen, nicht relativ
@@ -331,14 +400,35 @@ function GraphView() {
     <div className="ov-graph">
       <div className="ov-graph-toggles nodrag">
         {([
-          ['Karten', showCards, setShowCards],
-          ['Portale', showPortals, setShowPortals],
-          ['Wikilinks', showWikis, setShowWikis],
-        ] as const).map(([label, on, set]) => (
-          <label key={label} className="ov-graph-toggle">
-            <input type="checkbox" checked={on} onChange={(e) => set(e.target.checked)} /> {label}
+          ['Karten', 'cards', showCards],
+          ['Portale', 'portals', showPortals],
+          ['Wikilinks', 'wikis', showWikis],
+        ] as const).map(([label, key, on]) => (
+          <label key={key} className="ov-graph-toggle">
+            <input type="checkbox" checked={on} onChange={(e) => setLayer(key, e.target.checked)} /> {label}
           </label>
         ))}
+        {projectName && (
+          <label className="ov-graph-toggle" title={`Nur die Boards aus „${projectName}" zeigen`}>
+            <input type="checkbox" checked={projectOnly} onChange={(e) => setLayer('projectOnly', e.target.checked)} /> Nur dieses Projekt
+          </label>
+        )}
+        <span className="ov-graph-find">
+          <input
+            type="search"
+            placeholder="Im Netz suchen …"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            aria-label="Im Netz suchen"
+          />
+          {needle && (
+            <b className={`ov-graph-hits ${marking ? '' : 'none'}`}>
+              {marking
+                ? `${hits.boards.size} Board${hits.boards.size === 1 ? '' : 's'}${showCards ? ` · ${hits.cards.size} Karten` : ''}`
+                : 'keine Treffer'}
+            </b>
+          )}
+        </span>
       </div>
       <svg
         ref={svgRef}
@@ -371,7 +461,11 @@ function GraphView() {
           <line key={`c${i}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="rgba(120,110,90,.3)" strokeWidth={ui(1)} />
         ))}
         {lod >= 1 && satellites.dots.map((d) => (
-          <g key={d.key} className="ov-graph-dot" onClick={() => { openBoard(d.boardId); focusNode(d.boardId, d.nodeId); }}>
+          <g
+            key={d.key}
+            className={`ov-graph-dot ${marking ? (hits.cards.has(d.key) ? 'hit' : 'dim') : ''}`}
+            onClick={() => { openBoard(d.boardId); focusNode(d.boardId, d.nodeId); }}
+          >
             <title>{d.title}</title>
             <circle cx={d.x} cy={d.y} r={ui(5)} strokeWidth={ui(1.5)} />
             {lod === 2 && (
@@ -389,7 +483,15 @@ function GraphView() {
           const p = pos.get(n.id)!;
           const rad = r(n.cards);
           return (
-            <g key={n.id} className="ov-graph-node" data-tip={previewOf(n.id)} onClick={() => openBoard(n.id)}>
+            <g
+              key={n.id}
+              className={`ov-graph-node ${n.id === activeId ? 'here' : ''} ${marking ? (hits.boards.has(n.id) ? 'hit' : 'dim') : ''}`}
+              data-tip={previewOf(n.id)}
+              onClick={() => openBoard(n.id)}
+            >
+              {/* M193: „Du bist hier" — ohne diesen Ring verliert man im
+                  Gesamtnetz sofort den Bezug zum eigenen Standort */}
+              {n.id === activeId && <circle className="ov-graph-here" cx={p.x} cy={p.y} r={rad + ui(7)} strokeWidth={ui(2.5)} />}
               <circle cx={p.x} cy={p.y} r={rad} strokeWidth={ui(2)} />
               <text
                 x={p.x} y={p.y + rad + ui(17)} textAnchor="middle"
@@ -421,7 +523,7 @@ function GraphView() {
         </button>
       </div>
       <div className="ov-graph-legend">
-        ── Portal · ┄┄ [[Wikilink]] · Kreisgröße = Kartenzahl · Klick öffnet · Rad/Pinch = Zoom · Ziehen = Verschieben · Detailgrad folgt dem Zoom (nah heranzoomen zeigt Kartentitel)
+        ── Portal · ┄┄ [[Wikilink]] · Kreisgröße = Kartenzahl · <b>Ring = aktuelles Board</b> · Klick öffnet · Rad/Pinch = Zoom · Ziehen = Verschieben · Detailgrad folgt dem Zoom (nah heranzoomen zeigt Kartentitel)
       </div>
     </div>
   );

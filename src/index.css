@@ -2202,6 +2202,30 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .ov-graph-dot-label { fill: var(--muted); font-family: inherit; pointer-events: none; }
 .ov-graph-dot:hover .ov-graph-dot-label { fill: var(--accent); }
 
+/* ---------- M193: Netz tiefer integriert — Standort, Suche, Projekt-Filter ---------- */
+/* „Du bist hier": Ring um das aktuell geöffnete Board */
+.ov-graph-here { fill: none; stroke: var(--accent); opacity: 0.5; }
+.ov-graph-node.here circle:not(.ov-graph-here) { fill: var(--accent-soft); }
+.ov-graph-node.here text { font-weight: 700; }
+/* Suche hebt HERVOR statt zu filtern — Nicht-Treffer treten zurück,
+   bleiben aber sichtbar, damit der Zusammenhang erhalten bleibt */
+.ov-graph-node.dim, .ov-graph-dot.dim { opacity: 0.22; }
+.ov-graph-node.hit circle:not(.ov-graph-here) { fill: var(--accent); }
+.ov-graph-node.hit text { fill: var(--ink); font-weight: 700; }
+.ov-graph-dot.hit circle { fill: var(--accent); stroke: var(--accent-strong); }
+.ov-graph-find { display: flex; align-items: center; gap: 7px; }
+.ov-graph-find input {
+  font-family: inherit; font-size: 12px; padding: 5px 9px; width: 170px;
+  border: 1px solid var(--border-soft); border-radius: 8px;
+  background: var(--surface); color: var(--ink); outline: none;
+}
+.ov-graph-find input:focus { border-color: var(--accent); }
+.ov-graph-hits { font-size: 11px; color: var(--accent-strong); white-space: nowrap; }
+.ov-graph-hits.none { color: var(--muted); font-weight: 400; }
+@media (max-width: 640px) {
+  .ov-graph-find input { width: 120px; }
+}
+
 /* ---------- Kanban: Ticket-Detail, Chips, klickbarer Text ---------- */
 .kanban-item-text { cursor: pointer; }
 .kanban-item-text:hover { color: var(--accent); }
@@ -3334,13 +3358,13 @@ button.link-dead:disabled { opacity: 0.45; }
   padding-bottom: 9px; border-bottom: 1px solid var(--border-soft);
 }
 .nav-head > b { flex: 1; font-size: 13px; color: var(--ink); }
-.nav-overview {
+.nav-overview, .nav-netz {
   display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
   border: 1px solid var(--border-soft); background: none; border-radius: 999px;
   padding: 5px 12px; font: inherit; font-size: 11.5px; font-weight: 650;
   color: var(--ink); cursor: pointer;
 }
-.nav-overview:hover { border-color: var(--accent); color: var(--accent-strong); }
+.nav-overview:hover, .nav-netz:hover { border-color: var(--accent); color: var(--accent-strong); }
 .nav-x {
   flex: 0 0 auto; border: none; background: none; cursor: pointer;
   color: var(--muted); padding: 5px; border-radius: 8px; display: inline-flex;

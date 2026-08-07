@@ -4,7 +4,7 @@ import { selectActiveBoard, useBoard } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
 import { nodeToText } from '../lib/serialize';
 import { InlineName } from './InlineName';
-import { IChevronR, IHome, IPlus, IShare, IX } from './Icons';
+import { IChevronR, IGraph, IHome, IPlus, IShare, IX } from './Icons';
 
 /** Kurz-Label je Karten-Typ für die Inhalts-Zeilen im Navigator (M183) */
 const NAV_TYPE: Record<string, string> = {
@@ -25,6 +25,7 @@ export function Tabs() {
   const activeId = useBoard((s) => s.activeId);
   const view = useBoard((s) => s.view);
   const setView = useBoard((s) => s.setView);
+  const setOverviewMode = useBoard((s) => s.setOverviewMode);
   const openBoard = useBoard((s) => s.openBoard);
   const addBoard = useBoard((s) => s.addBoard);
   const renameBoard = useBoard((s) => s.renameBoard);
@@ -184,8 +185,15 @@ export function Tabs() {
               <button
                 className="nav-overview"
                 title="Große Übersicht öffnen (alle Bereiche als Fläche)"
-                onClick={() => { setView('overview'); setNavOpen(false); }}
+                onClick={() => { setOverviewMode('hierarchie'); setView('overview'); setNavOpen(false); }}
               ><IHome size={13} /> Große Übersicht</button>
+              {/* M193: Das Netz war bisher nur über die Übersicht erreichbar —
+                  jetzt aus JEDER Ansicht mit einem Tipp */}
+              <button
+                className="nav-netz"
+                title="Netz-Ansicht: Boards als Graph, verbunden über Portale und [[Wikilinks]]"
+                onClick={() => { setOverviewMode('netz'); setView('overview'); setNavOpen(false); }}
+              ><IGraph size={13} /> Netz</button>
               <button className="nav-x" title="Schließen (Esc)" onClick={() => setNavOpen(false)}><IX size={13} /></button>
             </div>
             <div className="nav-grid">
