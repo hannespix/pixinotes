@@ -136,6 +136,9 @@ interface BoardState {
   /** Aufgaben-Zentrale (✅): eigene Ansicht statt Board */
   tasksOpen: boolean;
   setTasksOpen: (open: boolean) => void;
+  /** M202: Teilen-Dialog für ausgewählte Karten (null = zu) — nicht persistiert */
+  shareCards: string[] | null;
+  setShareCards: (ids: string[] | null) => void;
   /** Karten-Daten auf einem BELIEBIGEN Board ändern (Aufgaben-Zentrale arbeitet boardübergreifend) */
   updateNodeDataOnBoard: (boardId: string, nodeId: string, data: Record<string, unknown>) => void;
   setPresenting: (on: boolean) => void;
@@ -718,6 +721,8 @@ export const useBoard = create<BoardState>()(
         setSettingsOpen: (open, section = null) => set({ settingsOpen: open, settingsSection: section }),
         tasksOpen: false,
         setTasksOpen: (open) => set({ tasksOpen: open }),
+        shareCards: null,
+        setShareCards: (ids) => set({ shareCards: ids }),
 
         updateNodeDataOnBoard: (boardId, nodeId, data) => {
           // Feingranulare History (M122) — Snapshot des ZIEL-Boards (die

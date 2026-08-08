@@ -3778,3 +3778,23 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   border-radius: 8px; justify-content: center;
 }
 .sel-font-sizes button.on { border-color: var(--accent) !important; }
+
+/* ================= M202: Teilen-Dialog für Karten ================= */
+.share-cards-modal { max-width: 560px; }
+.share-cards-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px; padding: 4px 2px 2px;
+}
+.share-cards-grid button {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  min-height: 76px; padding: 12px 14px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--border-soft); background: var(--surface-card);
+  font: inherit; color: var(--ink); text-align: left;
+}
+.share-cards-grid button:hover { background: var(--surface-2); border-color: var(--accent); }
+.share-cards-grid button:disabled { opacity: 0.6; cursor: default; }
+.share-cards-grid button b { font-size: 13.5px; }
+.share-cards-grid button span { font-size: 11.5px; color: var(--muted); }
+.share-cards-grid .share-emoji { font-size: 18px; color: inherit; }
+.share-cards-grid button svg { color: var(--muted); }
+.share-cards-foot { margin-top: 12px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }

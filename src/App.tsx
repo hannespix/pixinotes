@@ -21,6 +21,7 @@ import { initFilesSync } from './lib/filesSync';
 import { TaskHub } from './components/TaskHub';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { SidePanel } from './components/SidePanel';
+import { ShareCardsModal } from './components/ShareCardsModal';
 import { HelpOverlay } from './components/HelpOverlay';
 import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
@@ -201,6 +202,8 @@ export default function App() {
             <BacklinksPanel />
             {/* M194: Überblick als Seitenleiste NEBEN der Arbeit */}
             <SidePanel />
+            {/* M202: Teilen-Dialog für ausgewählte Karten */}
+            <ShareCardsModal />
           </>
         )}
         <SearchOverlay />

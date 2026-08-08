@@ -21,8 +21,6 @@ import { mutedHistory } from '../store';
 import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
 import type { ArrangeMode } from '../lib/arrange';
 
-const MAILTO_LIMIT = 1800; // konservativ: längere mailto-URLs schlucken manche Clients
-
 /**
  * Aktionsleiste, die direkt über der Selektion schwebt (NodeToolbar):
  * teilen, kopieren, duplizieren, löschen — verdeckt keine anderen Karten
@@ -154,15 +152,6 @@ export function SelectionToolbar() {
       setAiBusy(false);
       useBoard.getState().setAiBusy(false);
     }
-  };
-
-  const shareByMail = () => {
-    let text = nodesToText(selected);
-    if (text.length > MAILTO_LIMIT) {
-      text = `${text.slice(0, MAILTO_LIMIT)}\n… (gekürzt — vollständigen Inhalt per „HTML kopieren" einfügen)`;
-    }
-    const subject = encodeURIComponent(`Notizen aus PixiNotes (${selected.length} Karte${selected.length > 1 ? 'n' : ''})`);
-    window.open(`mailto:?subject=${subject}&body=${encodeURIComponent(text)}`, '_self');
   };
 
   const copyHtml = async () => {
@@ -458,8 +447,12 @@ export function SelectionToolbar() {
             const allArchived = selected.every((n) => n.archived);
             return (
               <>
-                <button onClick={() => { setMenu(null); shareByMail(); }} title="Inhalt als E-Mail-Entwurf öffnen">
-                  <IMail size={14} /> Als E-Mail-Entwurf
+                <button
+                  onClick={() => { setMenu(null); useBoard.getState().setShareCards([...selected, ...selFrames].map((n) => n.id)); }}
+                  title="Teilen & Export: Übernahme-Link, WhatsApp, E-Mail, Drucken, PDF, Kopieren"
+                  aria-label="Teilen"
+                >
+                  <IMail size={14} /> Teilen &amp; Export …
                 </button>
                 <button
                   onClick={() => {
