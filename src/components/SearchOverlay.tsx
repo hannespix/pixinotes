@@ -3,7 +3,8 @@ import uFuzzy from '@leeoniya/ufuzzy';
 import { useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
 import { collectAllTags } from '../lib/links';
-import { brainSearch, type BrainHit } from '../lib/brain';
+import { askBrain, brainSearch, type BrainHit } from '../lib/brain';
+import { aiReady } from '../lib/ai';
 
 // Fuzzy + Multi-Token: Tippfehler-tolerant (1 Fehler pro Wort), Wörter in
 // beliebiger Reihenfolge, Umlaute korrekt (Unicode-Preset für Deutsch).
@@ -152,6 +153,31 @@ export function SearchOverlay() {
   // Doppelte raus: Was die Fuzzy-Suche schon zeigt, braucht der 🧠-Block nicht
   const semOnly = semHits.filter((h) => !hits.some((x) => x.boardId === h.boardId && x.node.id === h.nodeId));
 
+  // M206: „Frag dein Gehirn" — Antwort aus den EIGENEN Karten, mit Quellen
+  const ai = useBoard((s) => s.ai);
+  const canAsk = brainOn && aiReady(ai);
+  const [answer, setAnswer] = useState<{ text: string; sources: BrainHit[] } | null>(null);
+  const [asking, setAsking] = useState(false);
+  const ask = async () => {
+    const q = query.trim();
+    if (!q || asking) return;
+    setAsking(true);
+    setAnswer(null);
+    try {
+      const res = await askBrain(q);
+      setAnswer({
+        text: res.answer || 'Dazu steht nichts in deinen Karten.',
+        sources: res.sources,
+      });
+    } catch (e) {
+      setAnswer({ text: `Antwort fehlgeschlagen: ${(e as Error).message}`, sources: [] });
+    } finally {
+      setAsking(false);
+    }
+  };
+  // Frage-Ergebnis verwerfen, sobald weitergetippt wird
+  useEffect(() => { setAnswer(null); }, [query]);
+
   if (!open) return null;
 
   return (
@@ -168,9 +194,36 @@ export function SearchOverlay() {
           onKeyDown={(e) => {
             if (e.key === 'ArrowDown') { e.preventDefault(); setCursor((c) => Math.min(c + 1, hits.length - 1)); }
             if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); }
+            // M206: Strg+Enter fragt das Gehirn, statt zum Treffer zu springen
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && canAsk) { e.preventDefault(); void ask(); return; }
             if (e.key === 'Enter' && hits[cursor]) jump(hits[cursor]);
           }}
         />
+        {canAsk && query.trim().length >= 3 && query.trim() !== '#' && (
+          <button className="search-ask" onClick={() => void ask()} disabled={asking}>
+            {asking ? '🧠 denkt nach …' : '🧠 Frag dein Gehirn (Strg+Enter)'}
+          </button>
+        )}
+        {answer && (
+          <div className="search-answer">
+            <div className="search-answer-text">{answer.text}</div>
+            {answer.sources.length > 0 && (
+              <div className="search-answer-src">
+                {answer.sources.map((s, i) => (
+                  <button
+                    key={`${s.boardId}-${s.nodeId}`}
+                    className="search-src-chip"
+                    title={`${s.boardName} · ${s.title}`}
+                    onClick={() => { setOpen(false); focusNode(s.boardId, s.nodeId); }}
+                  >
+                    [{i + 1}] {s.title.slice(0, 26) || s.boardName}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="search-answer-foot">Antwort nur aus deinen Karten — Quellen anklicken springt hin.</div>
+          </div>
+        )}
         {query.trim() === '#' && (
           <div className="search-tags">
             {collectAllTags(useBoard.getState().boards).slice(0, 24).map(({ tag, count }) => (

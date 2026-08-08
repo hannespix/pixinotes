@@ -14,6 +14,7 @@
 //  · cloud    — OpenAI/OpenRouter-Embeddings über die vorhandenen Schlüssel.
 import { idbDel, idbGet, idbKeys, idbSet } from './syncFolder';
 import { nodeToText } from './serialize';
+import { askAi } from './ai';
 import { useBoard } from '../store';
 
 const PREFIX = 'brain:v1:';
@@ -227,6 +228,39 @@ export async function brainSearch(query: string, k = 6): Promise<BrainHit[]> {
     .filter((h) => h.score >= 0.25)
     .sort((a, b) => b.score - a.score)
     .slice(0, k);
+}
+
+/* ---------- M206: „Frag dein Gehirn" (RAG) ----------
+   Die Frage wird semantisch beantwortet: passende Karten aus dem Index holen,
+   sie der KI als KONTEXT geben und um eine Antwort MIT Belegen bitten. Die
+   Belege [1], [2] … verweisen auf die Karten und werden im UI zu Sprung-Chips.
+   Ohne Treffer wird gar nicht erst gefragt — lieber ehrlich „nichts gefunden"
+   als eine frei erfundene Antwort. */
+export interface BrainAnswer { answer: string; sources: BrainHit[] }
+
+/** Volltext einer indexierten Karte für den RAG-Kontext (frisch aus dem Board —
+ *  der Index speichert bewusst nur Vektor + Titel, nicht den ganzen Text) */
+function cardTextOf(h: BrainHit): string {
+  const st = useBoard.getState();
+  const board = st.boards.find((b) => b.id === h.boardId);
+  const node = board?.nodes.find((n) => n.id === h.nodeId);
+  return node ? nodeToText(node).slice(0, 900) : h.title;
+}
+
+export async function askBrain(question: string): Promise<BrainAnswer> {
+  const hits = await brainSearch(question, 8);
+  if (hits.length === 0) return { answer: '', sources: [] };
+  const context = hits
+    .map((h, i) => `[${i + 1}] Board „${h.boardName}" · ${h.title}\n${cardTextOf(h)}`)
+    .join('\n\n');
+  const answer = await askAi(
+    'Beantworte die Frage AUSSCHLIESSLICH aus den folgenden Notiz-Karten des Nutzers. '
+    + 'Erfinde nichts dazu; steht die Antwort nicht in den Karten, sage das offen. '
+    + 'Belege jede Aussage mit der Quellennummer in eckigen Klammern, z. B. [2]. '
+    + 'Antworte auf Deutsch, knapp (höchstens 6 Sätze), ohne Einleitungsfloskel.\n\n'
+    + `Frage: ${question}\n\nKarten:\n${context}`,
+  );
+  return { answer: answer.trim(), sources: hits };
 }
 
 /* ---------- M205: Synapsen — Verknüpfungen, die noch fehlen ----------
