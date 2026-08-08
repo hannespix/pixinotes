@@ -229,6 +229,47 @@ export async function brainSearch(query: string, k = 6): Promise<BrainHit[]> {
     .slice(0, k);
 }
 
+/* ---------- M205: Synapsen — Verknüpfungen, die noch fehlen ----------
+   Das Gehirn vergleicht ALLE Board-Paare: Wo sich Inhalte stark ähneln, aber
+   weder Portal noch Wikilink existiert, entsteht ein VORSCHLAG. Angenommene
+   werden zu echten Portalen, abgelehnte merkt sich der Store dauerhaft. */
+export interface LinkSuggestion { a: string; b: string; score: number; why: string }
+
+export async function suggestBoardLinks(
+  existing: Set<string>,
+  rejected: Set<string>,
+  max = 6,
+): Promise<LinkSuggestion[]> {
+  await loadIndex();
+  if (!mem || mem.size === 0) return [];
+  // Karten nach Board bündeln
+  const byBoard = new Map<string, BrainEntry[]>();
+  for (const e of mem.values()) {
+    const list = byBoard.get(e.boardId) ?? [];
+    list.push(e);
+    byBoard.set(e.boardId, list);
+  }
+  const ids = [...byBoard.keys()];
+  const out: LinkSuggestion[] = [];
+  for (let i = 0; i < ids.length; i += 1) {
+    for (let j = i + 1; j < ids.length; j += 1) {
+      const key = [ids[i], ids[j]].sort().join('|');
+      if (existing.has(key) || rejected.has(key)) continue;
+      // Bestes Kartenpaar zwischen den Boards bestimmt die Nähe
+      let best = 0;
+      let why = '';
+      for (const a of byBoard.get(ids[i])!) {
+        for (const b of byBoard.get(ids[j])!) {
+          const s = dot(a.vec, b.vec);
+          if (s > best) { best = s; why = `„${a.title}" ↔ „${b.title}"`; }
+        }
+      }
+      if (best >= 0.62) out.push({ a: ids[i], b: ids[j], score: best, why });
+    }
+  }
+  return out.sort((x, y) => y.score - x.score).slice(0, max);
+}
+
 /** Verwandte Karten zum aktiven BOARD: Was aus anderen Boards passt inhaltlich? */
 export async function relatedToBoard(boardId: string, k = 5): Promise<BrainHit[]> {
   await loadIndex();

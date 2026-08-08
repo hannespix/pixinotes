@@ -11,7 +11,8 @@ import {
 } from '@xyflow/react';
 import { useBoard, type BoardDoc, type Project, type Space } from '../store';
 import { boardMetaLabel } from '../lib/boardStats';
-import { boardGraph, layoutGraph } from '../lib/links';
+import { boardGraph, layoutGraph, type GraphLink } from '../lib/links';
+import { suggestBoardLinks, type LinkSuggestion } from '../lib/brain';
 import { nodeToText } from '../lib/serialize';
 import { InlineName } from './InlineName';
 import { IPen, IPlay, ITarget, IX, IZoomIn, IZoomOut } from './Icons';
@@ -175,10 +176,37 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   }, [projectOnly, boards, spaces, activeId]);
 
   const W = GRAPH_W, H = GRAPH_H;
-  const { nodes, links, pos: seedPos } = useMemo(() => {
+  const { nodes, links: realLinks, pos: seedPos } = useMemo(() => {
     const g = boardGraph(scoped);
     return { ...g, pos: layoutGraph(g.nodes, g.links, W, H) };
   }, [scoped]);
+
+  // ---------- M205: Synapsen — was das Gehirn zu verknüpfen vorschlägt ----------
+  const brainOn = useBoard((s) => s.brain.on);
+  const rejectedLinks = useBoard((s) => s.rejectedLinks);
+  const rejectLink = useBoard((s) => s.rejectLink);
+  const showSuggest = (layers.vorschlaege ?? true) && brainOn;
+  const [suggestions, setSuggestions] = useState<LinkSuggestion[]>([]);
+  useEffect(() => {
+    if (!showSuggest) { setSuggestions([]); return; }
+    let gone = false;
+    const load = () => {
+      const inScope = new Set(scoped.map((b) => b.id));
+      const existing = new Set(realLinks.map((l) => [l.a, l.b].sort().join('|')));
+      suggestBoardLinks(existing, new Set(rejectedLinks), 8)
+        .then((s) => { if (!gone) setSuggestions(s.filter((x) => inScope.has(x.a) && inScope.has(x.b))); })
+        .catch(() => { if (!gone) setSuggestions([]); });
+    };
+    const t = setTimeout(load, 900);
+    window.addEventListener('pixinotes:brain', load);
+    return () => { gone = true; clearTimeout(t); window.removeEventListener('pixinotes:brain', load); };
+  }, [showSuggest, scoped, realLinks, rejectedLinks]);
+
+  // Vorschläge sind Kanten wie andere auch — nur gestrichelt und annehmbar
+  const links = useMemo<GraphLink[]>(
+    () => [...realLinks, ...suggestions.map((s) => ({ a: s.a, b: s.b, kind: 'vorschlag' as const, score: s.score }))],
+    [realLinks, suggestions],
+  );
 
   // ---------- M195: Lebendige Physik (Obsidian-Gefühl) ----------
   // Kräfte: Abstoßung zwischen allen Boards, Federn entlang der Verbindungen,
@@ -386,6 +414,8 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const showToast = useBoard((s) => s.showToast);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; boardId: string } | null>(null);
   const [linkFrom, setLinkFrom] = useState<string | null>(null);
+  // M205: Menü an einer angeklickten Vorschlags-Kante (annehmen/ablehnen)
+  const [sugMenu, setSugMenu] = useState<{ x: number; y: number; a: string; b: string; score: number } | null>(null);
   const onNodeContext = (id: string) => (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -394,19 +424,33 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const boardName = (id: string) => scoped.find((b) => b.id === id)?.name ?? '?';
   // Esc bricht Verknüpfen/Menü ab; Klick irgendwo schließt das Menü
   useEffect(() => {
-    if (!ctxMenu && !linkFrom) return;
+    if (!ctxMenu && !linkFrom && !sugMenu) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.stopPropagation();
-      setCtxMenu(null); setLinkFrom(null);
+      setCtxMenu(null); setLinkFrom(null); setSugMenu(null);
     };
     const onDown = (e: PointerEvent) => {
-      if (ctxMenu && !(e.target as Element).closest?.('.ov-graph-ctx')) setCtxMenu(null);
+      const t = e.target as Element;
+      if (t.closest?.('.ov-graph-ctx') || t.closest?.('.ov-graph-suggest-hit')) return;
+      setCtxMenu(null); setSugMenu(null);
     };
     window.addEventListener('keydown', onKey, true);
     window.addEventListener('pointerdown', onDown, true);
     return () => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('pointerdown', onDown, true); };
-  }, [ctxMenu, linkFrom]);
+  }, [ctxMenu, linkFrom, sugMenu]);
+
+  /** Vorschlag annehmen: echtes Portal auf BEIDEN Seiten wäre Overkill —
+   *  eines vom aktuell offenen (oder erstgenannten) Board reicht als Brücke */
+  const acceptSuggestion = (a: string, b: string) => {
+    const from = a === activeId ? a : (b === activeId ? b : a);
+    const to = from === a ? b : a;
+    const portal = makePortal({ x: 80 + Math.random() * 240, y: 80 + Math.random() * 160 });
+    portal.data = { boardId: to };
+    addNodeToBoard(from, portal);
+    showToast(`🔗 Vorschlag übernommen: „${boardName(from)}" → „${boardName(to)}" (Strg+Z macht es rückgängig).`);
+    setSugMenu(null);
+  };
   /** Ziel angeklickt: Portal-Karte auf dem Quell-Board anlegen — eine ECHTE
    *  Verbindung im Datenmodell (undo-fähig), nicht nur ein Strich im Bild */
   const completeLink = (targetId: string) => {
@@ -672,6 +716,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           ['Portale', 'portals', showPortals],
           ['Wikilinks', 'wikis', showWikis],
           ['Physik', 'physik', physicsOn],
+          ...(brainOn ? [['🧠 Vorschläge', 'vorschlaege', showSuggest] as const] : []),
         ] as const).map(([label, key, on]) => (
           <label key={key} className="ov-graph-toggle">
             <input type="checkbox" checked={on} onChange={(e) => setLayer(key, e.target.checked)} /> {label}
@@ -716,6 +761,30 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           if (l.kind === 'wikilink' && !showWikis) return null;
           const a = pos.get(l.a), b = pos.get(l.b);
           if (!a || !b) return null;
+          // M205: Vorschlag — gestrichelt in Akzentfarbe, anklickbar (breite
+          // unsichtbare Trefferlinie darunter, sonst trifft man 1,5px nie)
+          if (l.kind === 'vorschlag') {
+            return (
+              <g key={`sug-${l.a}-${l.b}`} className="ov-graph-suggest">
+                <line
+                  ref={(el) => { if (el) linkEls.current.set(i, el); else linkEls.current.delete(i); }}
+                  x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                  strokeWidth={ui(2)} strokeDasharray={`${ui(7)} ${ui(6)}`}
+                />
+                <line
+                  className="ov-graph-suggest-hit"
+                  x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                  strokeWidth={ui(16)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSugMenu({ x: e.clientX, y: e.clientY, a: l.a, b: l.b, score: l.score ?? 0 });
+                  }}
+                >
+                  <title>{`Vorschlag: „${boardName(l.a)}" ↔ „${boardName(l.b)}" (${Math.round((l.score ?? 0) * 100)} % inhaltliche Nähe) — anklicken`}</title>
+                </line>
+              </g>
+            );
+          }
           return (
             <line
               key={i}
@@ -822,6 +891,20 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         <div className="ov-graph-linkhint nodrag">
           🔗 Verknüpfen: Ziel-Board anklicken — Portal entsteht auf „{boardName(linkFrom)}"
           <button onClick={() => setLinkFrom(null)}>Abbrechen (Esc)</button>
+        </div>
+      )}
+      {sugMenu && (
+        <div className="ov-graph-ctx nodrag" style={{ left: sugMenu.x, top: sugMenu.y }}>
+          <div className="ov-graph-ctx-title">
+            🧠 Vorschlag · {Math.round(sugMenu.score * 100)} % Nähe
+          </div>
+          <div className="ov-graph-ctx-sub">
+            „{boardName(sugMenu.a)}" ↔ „{boardName(sugMenu.b)}"
+          </div>
+          <button onClick={() => acceptSuggestion(sugMenu.a, sugMenu.b)}>Verknüpfen (Portal anlegen)</button>
+          <button onClick={() => { openBoard(sugMenu.a); setSugMenu(null); }}>„{boardName(sugMenu.a)}" öffnen</button>
+          <button onClick={() => { openBoard(sugMenu.b); setSugMenu(null); }}>„{boardName(sugMenu.b)}" öffnen</button>
+          <button onClick={() => { rejectLink(sugMenu.a, sugMenu.b); setSugMenu(null); }}>Passt nicht — nicht mehr vorschlagen</button>
         </div>
       )}
       {ctxMenu && (

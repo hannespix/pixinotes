@@ -128,6 +128,9 @@ interface BoardState {
    *  und „Verwandte Karten". 'auto' folgt der KI-Einstellung. */
   brain: { on: boolean; provider: 'auto' | 'ollama' | 'browser' | 'cloud' };
   updateBrain: (patch: Partial<BoardState['brain']>) => void;
+  /** M205: abgelehnte Verknüpfungs-Vorschläge („a|b", sortiert) — nie wieder zeigen */
+  rejectedLinks: string[];
+  rejectLink: (a: string, b: string) => void;
 
   // Navigation
   setView: (view: 'overview' | 'board') => void;
@@ -247,8 +250,8 @@ interface BoardState {
   setOverviewMode: (m: 'hierarchie' | 'netz') => void;
   /** M193: Welche Ebenen das Netz zeigt — bleibt erhalten, statt bei jedem
    *  Öffnen auf „Karten aus" zurückzufallen (User-Wunsch). */
-  graphLayers: { cards: boolean; portals: boolean; wikis: boolean; projectOnly: boolean; physik?: boolean };
-  setGraphLayer: (key: 'cards' | 'portals' | 'wikis' | 'projectOnly' | 'physik', on: boolean) => void;
+  graphLayers: { cards: boolean; portals: boolean; wikis: boolean; projectOnly: boolean; physik?: boolean; vorschlaege?: boolean };
+  setGraphLayer: (key: 'cards' | 'portals' | 'wikis' | 'projectOnly' | 'physik' | 'vorschlaege', on: boolean) => void;
   /** M194: Ausfahrbare Seitenleiste — der Überblick bleibt neben der Arbeit
    *  stehen, statt sie zu verdrängen. Zustand komplett persistent. */
   sidebar: { open: boolean; mode: 'hierarchie' | 'netz'; width: number };
@@ -765,6 +768,12 @@ export const useBoard = create<BoardState>()(
         updateAi: (patch) => set({ ai: { ...get().ai, ...patch } }),
         brain: { on: false, provider: 'auto' },
         updateBrain: (patch) => set({ brain: { ...get().brain, ...patch } }),
+        rejectedLinks: [],
+        rejectLink: (a, b) => {
+          const key = [a, b].sort().join('|');
+          const cur = get().rejectedLinks;
+          if (!cur.includes(key)) set({ rejectedLinks: [...cur, key] });
+        },
 
         addStroke: (stroke, sessionIds = []) => {
           get().pushHistory();
@@ -1509,6 +1518,7 @@ export const useBoard = create<BoardState>()(
         view: s.view,
         ai: s.ai,
         brain: s.brain,
+        rejectedLinks: s.rejectedLinks,
         templates: s.templates,
         ui: s.ui,
         physicsEnabled: s.physicsEnabled,

@@ -117,7 +117,9 @@ export function linkedNeighborIds(boards: BoardDoc[], nodeId: string): Set<strin
 }
 
 export interface GraphNode { id: string; label: string; cards: number }
-export interface GraphLink { a: string; b: string; kind: 'portal' | 'wikilink' }
+// 'vorschlag' (M205): keine echte Verbindung, sondern ein Angebot des Gehirns —
+// zwei Boards sind sich inhaltlich nah, aber noch von niemandem verknüpft
+export interface GraphLink { a: string; b: string; kind: 'portal' | 'wikilink' | 'vorschlag'; score?: number }
 
 /** Board-Netz: Portale (feste Verweise) + Wikilinks (Text-Verweise) als Kanten */
 export function boardGraph(boards: BoardDoc[]): { nodes: GraphNode[]; links: GraphLink[] } {

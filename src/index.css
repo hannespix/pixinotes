@@ -3814,3 +3814,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .search-sem { border-top: 1px solid var(--border-soft); margin-top: 4px; padding-top: 4px; }
 .search-sem-head { font-size: 11px; font-weight: 700; color: var(--muted); padding: 4px 10px 2px; letter-spacing: 0.02em; }
 .backlinks-sub { margin-top: 6px; border-top: 1px solid var(--border-soft); padding-top: 6px; }
+
+/* ================= M205: Synapsen (Verknüpfungs-Vorschläge) ================= */
+.ov-graph-suggest line:first-child {
+  stroke: var(--accent); opacity: 0.55; pointer-events: none;
+  animation: sug-pulse 2.6s ease-in-out infinite;
+}
+.ov-graph-suggest-hit { stroke: transparent; cursor: pointer; }
+.ov-graph-suggest:hover line:first-child { opacity: 0.95; }
+@keyframes sug-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.75; } }
+@media (prefers-reduced-motion: reduce) { .ov-graph-suggest line:first-child { animation: none; } }
+.ov-graph-ctx-sub { font-size: 11px; color: var(--muted); padding: 0 10px 6px; max-width: 240px; }
