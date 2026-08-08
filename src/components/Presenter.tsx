@@ -8,6 +8,7 @@ import { nodeToHtml } from '../lib/serialize';
 import { buildMermaidSource, getMermaid, preloadHandFont } from '../lib/mermaid';
 import { presentationOrder } from '../lib/presentOrder';
 import { useAndroidBackspaceFix } from '../lib/blocknoteAndroidFix';
+import { noteSchema } from './NoteTypo';
 import { KanbanBody } from './nodes/KanbanCard';
 import { GanttBody } from './nodes/GanttCard';
 import { CalendarBody } from './nodes/CalendarCard';
@@ -33,7 +34,7 @@ function NoteSlide({ node }: { node: NoteNode }) {
     const blocks = node.data.blocks as PartialBlock[] | undefined;
     return blocks && blocks.length > 0 ? blocks : undefined;
   });
-  const editor = useCreateBlockNote({ initialContent, dictionary: blockNoteDe });
+  const editor = useCreateBlockNote({ schema: noteSchema, initialContent: initialContent as never, dictionary: blockNoteDe });
   useAndroidBackspaceFix(editor);
   return (
     <div className={`slide-note sticky-${node.data.color} note-editor`}>

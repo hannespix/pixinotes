@@ -9,6 +9,7 @@ import { STICKY_COLORS, uid, type MinutesData, type MinutesNode } from '../../ty
 import { allDecisions, buildEntry, currentEntry, entryLabel, nextDate, sortEntries } from '../../lib/minutes';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { useAndroidBackspaceFix } from '../../lib/blocknoteAndroidFix';
+import { noteSchema } from '../NoteTypo';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { IChevronL, IChevronR, IPlus, ISettings, IX } from '../Icons';
@@ -306,7 +307,7 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
     const safe = repairBlocks(blocks) as PartialBlock[];
     return safe.length > 0 ? safe : undefined;
   });
-  const editor = useCreateBlockNote({ initialContent, dictionary: blockNoteDe });
+  const editor = useCreateBlockNote({ schema: noteSchema, initialContent: initialContent as never, dictionary: blockNoteDe });
   useAndroidBackspaceFix(editor);
   if (editorRef) editorRef.current = editor;
 

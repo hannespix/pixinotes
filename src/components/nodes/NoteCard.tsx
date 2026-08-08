@@ -18,6 +18,7 @@ import { aiReady, askAi, textToBlocks } from '../../lib/ai';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
+import { NoteToolbar, noteSchema } from '../NoteTypo';
 
 
 
@@ -168,7 +169,8 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
     return blocks.length > 0 ? blocks : undefined;
   });
 
-  const editor = useCreateBlockNote({ initialContent, dictionary: blockNoteDe });
+  // M201: gemeinsames Schema mit Inline-Schrift/-Größe (textSize/textFont)
+  const editor = useCreateBlockNote({ schema: noteSchema, initialContent: initialContent as never, dictionary: blockNoteDe });
   useAndroidBackspaceFix(editor);
 
   // M170: Externer Schreiber (Kanban-Rück-Sync) hat die Blöcke geändert —
@@ -237,9 +239,13 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
           editor={editor}
           theme="light"
           sideMenu={false}
+          formattingToolbar={false}
           onChange={() => { updateNodeData(id, { blocks: editor.document }); trackTable(); }}
           onSelectionChange={trackTable}
-        />
+        >
+          {/* M201: Standard-Leiste + A₋/A₊/A₊₊/Aa für den markierten Text */}
+          <NoteToolbar />
+        </BlockNoteView>
       </div>
       {tableSel && (
         <div className="due-chips nodrag">
