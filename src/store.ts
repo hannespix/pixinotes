@@ -124,6 +124,10 @@ interface BoardState {
   settingsOpen: boolean;
   presenting: boolean;
   ai: AiSettings;
+  /** M204: Gehirn — semantischer Index (Embeddings) für Suche nach Bedeutung
+   *  und „Verwandte Karten". 'auto' folgt der KI-Einstellung. */
+  brain: { on: boolean; provider: 'auto' | 'ollama' | 'browser' | 'cloud' };
+  updateBrain: (patch: Partial<BoardState['brain']>) => void;
 
   // Navigation
   setView: (view: 'overview' | 'board') => void;
@@ -759,6 +763,8 @@ export const useBoard = create<BoardState>()(
         setPresenting: (on) => set({ presenting: on }),
         setTool: (tool) => set({ tool }),
         updateAi: (patch) => set({ ai: { ...get().ai, ...patch } }),
+        brain: { on: false, provider: 'auto' },
+        updateBrain: (patch) => set({ brain: { ...get().brain, ...patch } }),
 
         addStroke: (stroke, sessionIds = []) => {
           get().pushHistory();
@@ -1502,6 +1508,7 @@ export const useBoard = create<BoardState>()(
         activeId: s.activeId,
         view: s.view,
         ai: s.ai,
+        brain: s.brain,
         templates: s.templates,
         ui: s.ui,
         physicsEnabled: s.physicsEnabled,

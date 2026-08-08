@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { brainStatus, rebuildBrainIndex, syncBrainIndex } from '../lib/brain';
 import { claimWriter, flushPersist, selectActiveBoard, useBoard } from '../store';
 import {
   connectGoogle, connectMicrosoft, disconnect as disconnectCalAccount,
@@ -60,6 +61,16 @@ export function Settings() {
   const setOpen = useBoard((s) => s.setSettingsOpen);
   const ai = useBoard((s) => s.ai);
   const updateAi = useBoard((s) => s.updateAi);
+  // M204: Gehirn-Einstellungen + Live-Status (Indexer meldet sich per Event)
+  const brain = useBoard((s) => s.brain);
+  const updateBrain = useBoard((s) => s.updateBrain);
+  const [brainInfo, setBrainInfo] = useState(brainStatus());
+  useEffect(() => {
+    const on = () => setBrainInfo(brainStatus());
+    window.addEventListener('pixinotes:brain', on);
+    const t = setInterval(on, 2000);
+    return () => { window.removeEventListener('pixinotes:brain', on); clearInterval(t); };
+  }, []);
   const spaces = useBoard((s) => s.spaces);
   const boards = useBoard((s) => s.boards);
   const activeBoard = useBoard(selectActiveBoard);
@@ -481,6 +492,61 @@ export function Settings() {
                       ? 'Ohne Schlüssel bleiben die KI-Aktionen ausgeblendet.'
                       : '✅ Konfiguriert — KI-Aktionen erscheinen auf den Karten.'}
               </div>
+            </>
+          )}
+        </section>
+        )}
+
+        {/* ---- M204: Gehirn — semantischer Index ---- */}
+        {tab === 'ki' && (
+        <section className="modal-section">
+          <h3>🧠 Gehirn (semantischer Index)</h3>
+          <p className="modal-hint">
+            Das Gehirn übersetzt jede Karte in einen Bedeutungs-Vektor (Embedding). Damit findet
+            die Suche (Strg+K) auch <b>nach Bedeutung</b> („Kita" findet „Betreuungszeiten") und
+            das Backlinks-Panel zeigt <b>verwandte Karten</b> aus anderen Boards.
+            Mit <b>Ollama</b> bleibt alles lokal; <b>„Im Browser"</b> lädt einmalig ein kleines
+            Modell (~30&nbsp;MB, danach offline) — der Weg für iPhone/iPad.
+          </p>
+          <label className="modal-row">
+            <span>Gehirn</span>
+            <select
+              value={brain.on ? 'an' : 'aus'}
+              onChange={(e) => {
+                updateBrain({ on: e.target.value === 'an' });
+                if (e.target.value === 'an') setTimeout(() => void syncBrainIndex(), 300);
+              }}
+            >
+              <option value="aus">— aus —</option>
+              <option value="an">an (Index aufbauen &amp; aktuell halten)</option>
+            </select>
+          </label>
+          {brain.on && (
+            <>
+              <label className="modal-row">
+                <span>Anbieter</span>
+                <select value={brain.provider} onChange={(e) => updateBrain({ provider: e.target.value as typeof brain.provider })}>
+                  <option value="auto">Automatisch (folgt der KI-Einstellung)</option>
+                  <option value="ollama">Ollama (lokal — nomic-embed-text)</option>
+                  <option value="browser">Im Browser (Transformers.js, einmaliger Download)</option>
+                  <option value="cloud">Cloud (OpenAI/OpenRouter-Schlüssel)</option>
+                </select>
+              </label>
+              <div className="modal-hint">
+                {brainInfo.busy
+                  ? `⏳ Indexiere … (${brainInfo.indexed} Karten fertig)`
+                  : brainInfo.error
+                    ? `⚠️ ${brainInfo.error}`
+                    : `✅ ${brainInfo.indexed} Karten im Index · Anbieter: ${brainInfo.provider === 'ollama' ? 'Ollama (lokal)' : brainInfo.provider === 'browser' ? 'im Browser' : 'Cloud'}`}
+              </div>
+              <div className="modal-actions">
+                <button className="btn" onClick={() => void rebuildBrainIndex()}>Index neu aufbauen</button>
+              </div>
+              <p className="modal-hint">
+                Beim Anbieterwechsel bitte „Index neu aufbauen" — Vektoren verschiedener Modelle
+                sind nicht vergleichbar. Der Index bleibt lokal in diesem Browser (IndexedDB) und
+                ist nie Teil von Sync, Export oder Teilen-Links.
+              </p>
             </>
           )}
         </section>

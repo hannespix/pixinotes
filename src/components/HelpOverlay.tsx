@@ -260,6 +260,7 @@ export function HelpOverlay() {
                 <li><b>[[Wikilinks]]</b> im Notiztext verlinken Boards oder Karten — Chips unten an der Notiz springen hin; unbekannte Namen legen per Klick ein neues Board an.</li>
                 <li><b>#Tags</b> einfach in den Text schreiben; Strg+K und „#" listet alle Themen.</li>
                 <li><b>↩ Backlinks:</b> das Panel unten rechts zeigt, wer auf das aktuelle Board verweist.</li>
+                <li><b>🧠 Gehirn (semantischer Index):</b> In ⚙️ → KI einschalten — dann übersetzt PixiNotes jede Karte in einen Bedeutungs-Vektor (Embedding). Die Suche (Strg+K) findet ab dann auch <b>nach Bedeutung</b> („Kita" findet „Betreuungszeiten"), und das ↩-Panel zeigt zusätzlich <b>verwandte Karten</b> aus anderen Boards, die noch niemand verlinkt hat. Drei Wege: <b>Ollama</b> (alles bleibt lokal, Modell: <code>ollama pull nomic-embed-text</code>), <b>„Im Browser"</b> (lädt einmalig ein ~30-MB-Modell, danach offline — der Weg für iPhone/iPad) oder <b>Cloud</b> (OpenAI/OpenRouter-Schlüssel). Der Index bleibt lokal in diesem Browser und ist nie Teil von Sync, Export oder Teilen-Links.</li>
                 <li><b>🏷 Eigenschaften:</b> Karte auswählen → 🏷 → schlüssel = wert (z. B. status = wartet) — durchsuchbar und im Export enthalten.</li>
                 <li><b>🔖 Vorlagen:</b> jede Karte als Vorlage sichern, einfügen über ➕ → Vorlagen.</li>
               </ul>

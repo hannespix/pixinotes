@@ -3,6 +3,7 @@ import uFuzzy from '@leeoniya/ufuzzy';
 import { useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
 import { collectAllTags } from '../lib/links';
+import { brainSearch, type BrainHit } from '../lib/brain';
 
 // Fuzzy + Multi-Token: Tippfehler-tolerant (1 Fehler pro Wort), Wörter in
 // beliebiger Reihenfolge, Umlaute korrekt (Unicode-Preset für Deutsch).
@@ -133,6 +134,24 @@ export function SearchOverlay() {
     focusNode(hit.boardId, hit.node.id);
   };
 
+  // M204: Suche nach BEDEUTUNG — läuft entprellt neben der Fuzzy-Suche her,
+  // sobald das Gehirn (Einstellungen → KI) eingeschaltet ist
+  const brainOn = useBoard((s) => s.brain.on);
+  const [semHits, setSemHits] = useState<BrainHit[]>([]);
+  useEffect(() => {
+    const q = query.trim();
+    if (!open || !brainOn || q.length < 3 || q === '#') { setSemHits([]); return; }
+    let stale = false;
+    const t = setTimeout(() => {
+      brainSearch(q, 6)
+        .then((r) => { if (!stale) setSemHits(r); })
+        .catch(() => { if (!stale) setSemHits([]); });
+    }, 350);
+    return () => { stale = true; clearTimeout(t); };
+  }, [query, open, brainOn]);
+  // Doppelte raus: Was die Fuzzy-Suche schon zeigt, braucht der 🧠-Block nicht
+  const semOnly = semHits.filter((h) => !hits.some((x) => x.boardId === h.boardId && x.node.id === h.nodeId));
+
   if (!open) return null;
 
   return (
@@ -184,7 +203,26 @@ export function SearchOverlay() {
             ))}
           </div>
         )}
-        <div className="search-footer">↑↓ navigieren · Enter springt zur Karte · # zeigt alle Tags · Esc schließt · sucht in allen Boards, tippfehlertolerant</div>
+        {semOnly.length > 0 && query.trim() && query.trim() !== '#' && (
+          <div className="search-results search-sem">
+            <div className="search-sem-head">🧠 Nach Bedeutung</div>
+            {semOnly.map((h) => (
+              <button
+                key={`sem-${h.boardId}-${h.nodeId}`}
+                className="search-hit"
+                onClick={() => { setOpen(false); focusNode(h.boardId, h.nodeId); }}
+              >
+                <span className="hit-icon">🧠</span>
+                <span className="hit-main">
+                  <span className="hit-title">{h.title || '(ohne Titel)'}</span>
+                  <span className="hit-snippet">inhaltlich verwandt · {Math.round(h.score * 100)} %</span>
+                </span>
+                <span className="hit-board">{h.boardName}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="search-footer">↑↓ navigieren · Enter springt zur Karte · # zeigt alle Tags · Esc schließt · sucht in allen Boards, tippfehlertolerant{brainOn ? ' · 🧠 findet auch nach Bedeutung' : ''}</div>
       </div>
     </div>
   );
