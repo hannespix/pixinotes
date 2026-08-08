@@ -2,7 +2,7 @@
 // Aufgaben/Termine extrahieren, Prozesse ableiten, Briefings, Verbindungen.
 // Alle Aktionen sind NICHT destruktiv: sie legen neue Karten an bzw. ordnen
 // nur Positionen — und jede läuft über die Undo-History.
-import { askAi, MD_HINT, mdToBlocks } from './ai';
+import { askAi, MD_HINT, mdToBlocks, prepImageForAi } from './ai';
 import { nodeToText } from './serialize';
 import { makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makeShape, makeTime, makeWeek } from './nodes';
 import { mutedHistory, selectActiveBoard, useBoard } from '../store';
@@ -50,6 +50,24 @@ function gather(nodes: AppNode[]): Ctx[] {
   }
   return out;
 }
+
+/* ---------- Bild-Karten als Foto-Anhänge (M199) ----------
+   Screenshots (Einkaufszettel, Tafelbilder, Whiteboard-Fotos) werden der KI
+   als echte Bilder mitgegeben — sie liest den Inhalt selbst, statt nur den
+   Dateinamen zu sehen. Deckel: die 4 zuerst gefundenen Bilder (Payload/Kosten). */
+const IMG_MAX = 4;
+async function gatherImages(nodes: AppNode[]): Promise<string[]> {
+  const srcs = nodes
+    .filter((n) => n.type === 'image' && !n.archived)
+    .map((n) => (n.data as { src?: string }).src)
+    .filter((s): s is string => !!s)
+    .slice(0, IMG_MAX);
+  const prepped = await Promise.all(srcs.map(prepImageForAi));
+  return prepped.filter((s): s is string => !!s);
+}
+const imgHint = (imgs: string[]): string => (imgs.length
+  ? '\n\nDie angehängten Fotos sind die "image"-Karten (in derselben Reihenfolge). Lies ihren Inhalt (Text, Listen, Termine, Tabellen) direkt aus dem Bild und behandle ihn wie Kartentext.'
+  : '');
 
 /* ---------- Robustes JSON-Parsen ----------
    Gerade Gratis-/kleine Modelle liefern gern kaputtes JSON: Markdown-Zäune,
@@ -131,13 +149,14 @@ function parseJson<T>(raw: string): T {
 }
 
 /** askAi + parseJson mit einem automatischen, strengeren zweiten Versuch */
-async function askJson<T>(prompt: string): Promise<T> {
-  const first = await askAi(prompt);
+async function askJson<T>(prompt: string, images: string[] = []): Promise<T> {
+  const first = await askAi(prompt, images);
   try {
     return parseJson<T>(first);
   } catch { /* einmal strenger nachfragen */ }
   const second = await askAi(
     `${prompt}\n\nWICHTIG: Antworte AUSSCHLIESSLICH mit dem vollständigen, gültigen JSON-Objekt — keine Einleitung, kein Markdown, keine Kommentare, nichts danach.`,
+    images,
   );
   try {
     return parseJson<T>(second);
@@ -196,9 +215,11 @@ export async function aiCluster(nodes: AppNode[]): Promise<string> {
 export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): Promise<string> {
   const items = gather(nodes);
   if (items.length === 0) throw new Error('Keine Inhalte gefunden.');
+  const imgs = await gatherImages(nodes);
   const today = new Date().toISOString().slice(0, 10);
   const { tasks } = await askJson<{ tasks: Array<{ text: string; due?: string }> }>(
-    `Heute ist ${today}. Extrahiere aus den folgenden Karten alle konkreten Aufgaben/TODOs. Erkenne Termine/Fristen und setze sie als ISO-Datum (yyyy-mm-dd). Antworte NUR mit JSON: {"tasks":[{"text":"...","due":"yyyy-mm-dd"}]} — "due" nur, wenn wirklich ein Termin erkennbar ist.\n\nKarten:\n${JSON.stringify(items)}`,
+    `Heute ist ${today}. Extrahiere aus den folgenden Karten alle konkreten Aufgaben/TODOs. Erkenne Termine/Fristen und setze sie als ISO-Datum (yyyy-mm-dd). Antworte NUR mit JSON: {"tasks":[{"text":"...","due":"yyyy-mm-dd"}]} — "due" nur, wenn wirklich ein Termin erkennbar ist.${imgHint(imgs)}\n\nKarten:\n${JSON.stringify(items)}`,
+    imgs,
   );
   const clean = (tasks ?? []).filter((t) => t.text?.trim()).slice(0, 30);
   if (clean.length === 0) throw new Error('Keine Aufgaben im Inhalt erkannt.');
@@ -226,8 +247,10 @@ export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): 
 export async function aiProcess(nodes: AppNode[], pos: { x: number; y: number }): Promise<string> {
   const items = gather(nodes);
   if (items.length === 0) throw new Error('Keine Inhalte gefunden.');
+  const imgs = await gatherImages(nodes);
   const res = await askAi(
-    `Leite aus den folgenden Karten den beschriebenen Ablauf/Workflow ab und modelliere ihn als Mermaid-Flowchart (flowchart TD, deutsche Beschriftung, max. 12 Knoten, Entscheidungen als {Raute}). Antworte NUR mit dem Mermaid-Code, ohne Markdown-Zaun.\n\nKarten:\n${JSON.stringify(items)}`,
+    `Leite aus den folgenden Karten den beschriebenen Ablauf/Workflow ab und modelliere ihn als Mermaid-Flowchart (flowchart TD, deutsche Beschriftung, max. 12 Knoten, Entscheidungen als {Raute}). Antworte NUR mit dem Mermaid-Code, ohne Markdown-Zaun.${imgHint(imgs)}\n\nKarten:\n${JSON.stringify(items)}`,
+    imgs,
   );
   const code = res.replace(/```(mermaid)?/g, '').trim();
   if (!/^(flowchart|graph)\s/.test(code)) throw new Error('Die KI hat kein gültiges Flowchart geliefert.');
@@ -247,8 +270,10 @@ export async function aiProcess(nodes: AppNode[], pos: { x: number; y: number })
 export async function aiBriefing(nodes: AppNode[], pos: { x: number; y: number }): Promise<string> {
   const items = gather(nodes);
   if (items.length === 0) throw new Error('Keine Inhalte gefunden.');
+  const imgs = await gatherImages(nodes);
   const res = await askAi(
-    `Erstelle aus den folgenden Projekt-Karten ein knappes analytisches Briefing auf Deutsch mit genau diesen drei Abschnitten (als "## "-Überschriften): Überblick, Offene Punkte, Nächste Schritte. Maximal 12 Inhaltszeilen gesamt. ${MD_HINT}\n\nKarten:\n${JSON.stringify(items)}`,
+    `Erstelle aus den folgenden Projekt-Karten ein knappes analytisches Briefing auf Deutsch mit genau diesen drei Abschnitten (als "## "-Überschriften): Überblick, Offene Punkte, Nächste Schritte. Maximal 12 Inhaltszeilen gesamt. ${MD_HINT}${imgHint(imgs)}\n\nKarten:\n${JSON.stringify(items)}`,
+    imgs,
   );
   const st = useBoard.getState();
   const briefNote = makeNote(freeSpot(pos, 280, 340), { color: 'sky', blocks: await mdToBlocks('✨ Board-Briefing', res.trim()) });
@@ -373,6 +398,7 @@ export async function aiCommand(instruction: string, nodes: AppNode[], pos: { x:
   const wish = instruction.trim();
   if (!wish) throw new Error('Bitte zuerst eine Anweisung eingeben.');
   const items = gather(nodes);
+  const imgs = await gatherImages(nodes);
   const { summary, ops } = await askJson<{ summary?: string; ops: AiOp[] }>(
     `Du bist der Assistent eines Whiteboard-Tools (Karten auf einer Leinwand). Setze den Wunsch des Nutzers als Operationsplan um.
 
@@ -397,7 +423,8 @@ Erlaubte Operationen (max. 15):
 {"op":"edge","source":"<id>","target":"<id>","label":"kurzes Label"}
 {"op":"delete","ids":["<id>"]} (NUR wenn der Nutzer ausdrücklich löschen will)
 Modulwahl: Prozesse/Abläufe → mermaid · Aufgabenlisten → kanban · Phasen/Zeiträume/Termine → gantt · Stundenplan/Wochenplan/Dienstplan → week · Arbeitszeit erfassen → time · Karten thematisch gruppieren → frame · Wissen/Text → note (Markdown voll ausnutzen, erledigbare Punkte als '- [ ] ' Checklisten).
-Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben" nutze edit_note mit dem vollständigen neuen Text; erfinde keine Fakten. Leitest du ein neues Modul aus dem Inhalt einer bestehenden Karte ab (oder bezieht es sich klar auf sie), setze deren id als "from" — das Board verbindet beide dann automatisch mit einem Pfeil.`,
+Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben" nutze edit_note mit dem vollständigen neuen Text; erfinde keine Fakten. Leitest du ein neues Modul aus dem Inhalt einer bestehenden Karte ab (oder bezieht es sich klar auf sie), setze deren id als "from" — das Board verbindet beide dann automatisch mit einem Pfeil.${imgHint(imgs)}`,
+    imgs,
   );
 
   const plan = (ops ?? []).slice(0, 15);

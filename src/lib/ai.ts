@@ -23,10 +23,64 @@ export function aiReady(ai: AiSettings): boolean {
 
 const TIMEOUT_MS = 60_000;
 
-export async function askAi(prompt: string): Promise<string> {
+/* ---------- Bilder für die KI (M199) ----------
+   Bild-Karten gehen als ECHTE Foto-Anhänge mit (Vision) — vorher wurde nur der
+   Dateiname serialisiert („Bild: IMG-….jpg"), und selbst ein Opus-Modell konnte
+   dann ehrlich nur antworten, dass es nichts lesen kann. Vor dem Versand wird
+   verkleinert und als JPEG kodiert: hält Payload und Kosten klein
+   (Anthropic-Limit 5 MB pro Bild) und beschleunigt die Antwort. */
+const IMG_MAX_DIM = 1400;
+export async function prepImageForAi(src: string): Promise<string | null> {
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('Bild nicht lesbar'));
+      i.src = src;
+    });
+    const k = Math.min(1, IMG_MAX_DIM / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+    const w = Math.max(1, Math.round((img.naturalWidth || 1) * k));
+    const h = Math.max(1, Math.round((img.naturalHeight || 1) * k));
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const g = c.getContext('2d');
+    if (!g) return null;
+    // Weißer Grund: transparente PNG-Bereiche würden als JPEG sonst schwarz
+    g.fillStyle = '#fff';
+    g.fillRect(0, 0, w, h);
+    g.drawImage(img, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', 0.85);
+  } catch {
+    return null;
+  }
+}
+const b64Of = (u: string) => u.slice(u.indexOf(',') + 1);
+const mediaOf = (u: string) => /^data:([^;,]+)/.exec(u)?.[1] ?? 'image/jpeg';
+
+export async function askAi(prompt: string, images: string[] = []): Promise<string> {
   const ai = useBoard.getState().ai;
   if (!aiReady(ai)) throw new Error('KI nicht konfiguriert (⚙️ Einstellungen)');
+  try {
+    return await askOnce(ai, prompt, images);
+  } catch (e) {
+    // Gratis-Dienst/Ollama: das Modell versteht evtl. keine Bilder — einmal
+    // ohne Fotos nachfassen, statt die ganze Aktion scheitern zu lassen
+    if (images.length > 0 && (ai.provider === 'free' || ai.provider === 'ollama')) {
+      return askOnce(ai, `${prompt}\n\n(Hinweis: Die Fotos konnten nicht übertragen werden — arbeite nur mit dem Kartentext.)`, []);
+    }
+    throw e;
+  }
+}
 
+async function askOnce(ai: AiSettings, prompt: string, images: string[]): Promise<string> {
+  // OpenAI-Chat-Format: Text + Bilder als content-Array, sonst schlichter String
+  const openAiContent = images.length
+    ? [
+      ...images.map((u) => ({ type: 'image_url', image_url: { url: u } })),
+      { type: 'text', text: prompt },
+    ]
+    : prompt;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
@@ -45,7 +99,17 @@ export async function askAi(prompt: string): Promise<string> {
           body: JSON.stringify({
             model: ai.model,
             max_tokens: 1024,
-            messages: [{ role: 'user', content: prompt }],
+            messages: [{
+              role: 'user',
+              content: images.length
+                ? [
+                  ...images.map((u) => ({
+                    type: 'image', source: { type: 'base64', media_type: mediaOf(u), data: b64Of(u) },
+                  })),
+                  { type: 'text', text: prompt },
+                ]
+                : prompt,
+            }],
           }),
         });
         if (!res.ok) throw new Error(`Anthropic: HTTP ${res.status}`);
@@ -66,7 +130,7 @@ export async function askAi(prompt: string): Promise<string> {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             model,
-            messages: [{ role: 'user', content: prompt }],
+            messages: [{ role: 'user', content: openAiContent }],
           }),
         });
         let res = await doFetch();
@@ -99,7 +163,7 @@ export async function askAi(prompt: string): Promise<string> {
           },
           body: JSON.stringify({
             model: ai.model,
-            messages: [{ role: 'user', content: prompt }],
+            messages: [{ role: 'user', content: openAiContent }],
           }),
         });
         if (!res.ok) throw new Error(`KI-Server: HTTP ${res.status}`);
@@ -112,7 +176,12 @@ export async function askAi(prompt: string): Promise<string> {
           method: 'POST',
           signal: ctrl.signal,
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ model: ai.model, prompt, stream: false }),
+          // images: multimodale Modelle (llava, moondream …) lesen sie,
+          // reine Textmodelle ignorieren das Feld
+          body: JSON.stringify({
+            model: ai.model, prompt, stream: false,
+            ...(images.length ? { images: images.map(b64Of) } : {}),
+          }),
         });
         if (!res.ok) throw new Error(`Ollama: HTTP ${res.status} — läuft ollama serve? OLLAMA_ORIGINS gesetzt?`);
         const data = await res.json();
