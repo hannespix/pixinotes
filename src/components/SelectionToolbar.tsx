@@ -6,7 +6,7 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMail, IMoveTo, IPen, ITag, ITrash, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMail, IMore, IMoveTo, IPen, ITag, ITrash, IWand, IX } from './Icons';
 import { ALIGN_LABEL, computeAlign, type AlignOp } from '../lib/align';
 import { mutedHistory } from '../store';
 import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
@@ -46,7 +46,9 @@ export function SelectionToolbar() {
   // mit fester Bildschirmposition — innerhalb der NodeToolbar deckelt der
   // Stacking-Kontext des Flow-Viewports sie unter Kopf- und Tab-Leiste, bei
   // Karten nahe der Oberkante fingen die Leisten dann die Klicks ab (M151-Muster)
-  type MenuKind = 'ai' | 'attr' | 'align' | 'move' | 'frame';
+  // M198: 'more' = das ⋯-Menü — bündelt die selteneren Aktionen; 'attr'/'ai'/
+  // 'align' öffnen von dort aus als zweite Ebene am selben Anker
+  type MenuKind = 'ai' | 'attr' | 'align' | 'move' | 'frame' | 'more';
   const [menu, setMenu] = useState<MenuKind | null>(null);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0, down: false });
   const toggleMenu = (kind: MenuKind) => (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -75,6 +77,18 @@ export function SelectionToolbar() {
     };
     window.addEventListener('pointerdown', close, true);
     return () => window.removeEventListener('pointerdown', close, true);
+  }, [menu]);
+  // M198: Esc schließt das offene Menü — wie im Dock (M192) in der Capture-Phase,
+  // damit Esc nicht vorher die Auswahl auflöst und die Leiste mitsamt Menü kippt
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setMenu(null);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [menu]);
   /** Popover-Inhalt als Portal auf oberster Ebene, am Knopf verankert */
   const menuPortal = (extraClass: string, content: React.ReactNode) => createPortal(
@@ -262,7 +276,6 @@ export function SelectionToolbar() {
           ><IGridLayout size={15} /><span className="sel-label"> Rahmen</span></button>
         </span>
       )}
-      {!framesOnly && <button onClick={shareByMail} title="Inhalt als E-Mail-Entwurf öffnen"><IMail size={15} /><span className="sel-label"> E-Mail</span></button>}
       {!framesOnly && <button onClick={copyHtml} title="Formatiert kopieren (Outlook/Word-tauglich)"><ICopy size={15} /><span className="sel-label"> Kopieren</span></button>}
       {!framesOnly && <button onClick={duplicate} title="Duplizieren"><IDuplicate size={15} /></button>}
       {single && (
@@ -288,29 +301,7 @@ export function SelectionToolbar() {
               <div className="sel-attr-hint">z. B. status = wartet · kunde = ACME — über Strg+K durchsuchbar</div>
             </>
           ))}
-          <button className={menu === 'attr' ? 'ai-on' : ''} data-smbtn onClick={toggleMenu('attr')} title="Eigenschaften (Attribute) der Karte">
-            <ITag size={15} />
-            {Object.keys(attrs).length > 0 && <span className="sel-attr-count">{Object.keys(attrs).length}</span>}
-          </button>
         </span>
-      )}
-      {single && (
-        <button onClick={asTemplate} title="Karte als Vorlage speichern (＋-Menü → Vorlagen)"><IBookmark size={15} /></button>
-      )}
-      {single && (
-        <button
-          onClick={() => {
-            // Gibt es schon einen offenen Thread an der Karte, diesen öffnen —
-            // sonst einen neuen Kommentar beginnen (M148)
-            const threads = (useBoard.getState().boards.find((b) => b.id === useBoard.getState().activeId)?.comments ?? [])
-              .filter((c) => c.nodeId === single.id);
-            const open = threads.find((c) => !c.resolved) ?? threads[0];
-            useBoard.getState().setCommentOpen(open ? open.id : `new:${single.id}`);
-          }}
-          title="Kommentar an dieser Karte (für Kollegen im Team-Sync sichtbar)"
-        >
-          <IComment size={15} />
-        </button>
       )}
       {aiReady(ai) && !framesOnly && (
         <span className="sel-ai-wrap">
@@ -341,24 +332,8 @@ export function SelectionToolbar() {
               )}
             </>
           ))}
-          <button className={menu === 'ai' || aiBusy ? 'ai-on' : ''} data-smbtn onClick={toggleMenu('ai')} title="KI-Aktionen auf die Auswahl">
-            <IWand size={15} />
-          </button>
         </span>
       )}
-      {!framesOnly && (() => {
-        // Standard AN (M111): nur explizit gebrochene Karten (false) zählen als aus
-        const allAuto = selected.every((n) => n.autoFit !== false);
-        return (
-          <button
-            className={allAuto ? 'on' : ''}
-            onClick={() => setAutoFit(selected.map((n) => n.id), !allAuto)}
-            title={allAuto
-              ? 'Auto-Größe ist AN: Karte wächst mit dem Inhalt — manuelles Ziehen an den Griffen schaltet sie ab'
-              : 'Auto-Größe: Karte wächst automatisch mit dem Inhalt (jederzeit per Ziehen übersteuerbar)'}
-          ><IFit size={15} /></button>
-        );
-      })()}
       {selected.length >= 2 && (
         <span className="sel-ai-wrap">
           {menu === 'align' && menuPortal('', (
@@ -385,12 +360,6 @@ export function SelectionToolbar() {
               ))}
             </>
           ))}
-          <button
-            className={menu === 'align' ? 'ai-on' : ''}
-            data-smbtn
-            onClick={toggleMenu('align')}
-            title="Ausrichten & Verteilen (wie in PowerPoint)"
-          ><IArrange size={15} /></button>
         </span>
       )}
       {boards.length > 1 && (
@@ -428,30 +397,110 @@ export function SelectionToolbar() {
           ><IMoveTo size={15} /></button>
         </span>
       )}
-      {!framesOnly && <button
-        onClick={() => {
-          const first = nodesToText([selected[0]]).split('\n').find((l) => l.trim())?.trim() ?? '';
-          setLookup(first.replace(/^[#\-*\d.\s☐☑]+/, '').slice(0, 80));
-        }}
-        title="Nachschlagen: Wikipedia fein durchsuchen (mehrere Treffer) + grobe Websuche-Links — Begriff kommt aus der ersten Zeile der Karte und ist im Panel änderbar"
-      ><IGlobe size={15} /></button>}
-      {anchoredCount > 0 && (
-        <button
-          onClick={() => detachStrokes(selected.map((n) => n.id))}
-          title={`${anchoredCount} Markierung${anchoredCount > 1 ? 'en' : ''} kleben an dieser Karte und wandern mit ihr mit — Klick löst sie und lässt sie frei auf dem Board liegen`}
-        ><IPen size={15} /><span className="sel-badge">{anchoredCount}</span></button>
+      {!framesOnly && (
+        <span className="sel-ai-wrap">
+          {menu === 'more' && menuPortal('sel-more-menu', (() => {
+            const allAuto = selected.every((n) => n.autoFit !== false);   // Standard AN (M111)
+            const allArchived = selected.every((n) => n.archived);
+            return (
+              <>
+                <button onClick={() => { setMenu(null); shareByMail(); }} title="Inhalt als E-Mail-Entwurf öffnen">
+                  <IMail size={14} /> Als E-Mail-Entwurf
+                </button>
+                <button
+                  onClick={() => {
+                    setMenu(null);
+                    const first = nodesToText([selected[0]]).split('\n').find((l) => l.trim())?.trim() ?? '';
+                    setLookup(first.replace(/^[#\-*\d.\s☐☑]+/, '').slice(0, 80));
+                  }}
+                  title="Wikipedia fein durchsuchen (mehrere Treffer) + grobe Websuche-Links — Begriff kommt aus der ersten Zeile der Karte"
+                >
+                  <IGlobe size={14} /> Nachschlagen (Wikipedia &amp; Web)
+                </button>
+                {single && (
+                  <>
+                    <div className="sel-attr-title">Karte</div>
+                    <button onClick={() => setMenu('attr')} title="Eigenschaften (schlüssel = wert) — über Strg+K durchsuchbar" aria-label="Eigenschaften">
+                      <ITag size={14} /> Eigenschaften …{Object.keys(attrs).length > 0 ? ` (${Object.keys(attrs).length})` : ''}
+                    </button>
+                    <button onClick={() => { setMenu(null); asTemplate(); }} title="Karte als Vorlage speichern (＋-Menü → Vorlagen)">
+                      <IBookmark size={14} /> Als Vorlage speichern
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenu(null);
+                        // Gibt es schon einen offenen Thread an der Karte, diesen öffnen —
+                        // sonst einen neuen Kommentar beginnen (M148)
+                        const threads = (useBoard.getState().boards.find((b) => b.id === useBoard.getState().activeId)?.comments ?? [])
+                          .filter((c) => c.nodeId === single.id);
+                        const open = threads.find((c) => !c.resolved) ?? threads[0];
+                        useBoard.getState().setCommentOpen(open ? open.id : `new:${single.id}`);
+                      }}
+                      title="Kommentar an dieser Karte (für Kollegen im Team-Sync sichtbar)"
+                      aria-label="Kommentar"
+                    >
+                      <IComment size={14} /> Kommentar
+                    </button>
+                  </>
+                )}
+                <div className="sel-attr-title">Werkzeuge</div>
+                {aiReady(ai) && (
+                  <button onClick={() => setMenu('ai')} title="KI-Aktionen auf die Auswahl" aria-label="KI-Aktionen">
+                    <IWand size={14} /> KI-Aktionen …
+                  </button>
+                )}
+                {selected.length >= 2 && (
+                  <button onClick={() => setMenu('align')} title="Ausrichten & Verteilen (wie in PowerPoint)" aria-label="Ausrichten">
+                    <IArrange size={14} /> Ausrichten &amp; Verteilen …
+                  </button>
+                )}
+                <button
+                  className={allAuto ? 'on' : ''}
+                  onClick={() => setAutoFit(selected.map((n) => n.id), !allAuto)}
+                  title={allAuto
+                    ? 'Auto-Größe ist AN: Karte wächst mit dem Inhalt — manuelles Ziehen an den Griffen schaltet sie ab'
+                    : 'Auto-Größe: Karte wächst automatisch mit dem Inhalt (jederzeit per Ziehen übersteuerbar)'}
+                  aria-label="Auto-Größe"
+                >
+                  <IFit size={14} /> Auto-Größe {allAuto ? 'AUS' : 'AN'}
+                </button>
+                {anchoredCount > 0 && (
+                  <button
+                    onClick={() => { setMenu(null); detachStrokes(selected.map((n) => n.id)); }}
+                    title={`${anchoredCount} Markierung${anchoredCount > 1 ? 'en' : ''} kleben an dieser Karte und wandern mit — Klick löst sie und lässt sie frei auf dem Board liegen`}
+                  >
+                    <IPen size={14} /> Markierungen lösen ({anchoredCount})
+                  </button>
+                )}
+                {allArchived ? (
+                  <button
+                    onClick={() => { setMenu(null); setArchived(selected.map((n) => n.id), false); }}
+                    title="Aus dem Archiv zurückholen — die Karte gilt wieder als aktiv"
+                    aria-label="Zurückholen"
+                  >
+                    <IArchiveRestore size={14} /> Aus dem Archiv zurückholen
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setMenu(null); setArchived(selected.map((n) => n.id), true); }}
+                    title="Archivieren — Karte gilt als erledigt, wird ausgeblendet und taucht nicht mehr in Aufgaben/Erinnerungen auf"
+                    aria-label="Archivieren"
+                  >
+                    <IArchive size={14} /> Archivieren (erledigt)
+                  </button>
+                )}
+              </>
+            );
+          })())}
+          <button
+            className={menu === 'more' || menu === 'attr' || menu === 'ai' || menu === 'align' || aiBusy ? 'ai-on' : ''}
+            data-smbtn
+            onClick={toggleMenu('more')}
+            title="Mehr: E-Mail · Nachschlagen · Eigenschaften · Vorlage · Kommentar · KI · Ausrichten · Auto-Größe · Archiv"
+            aria-label="Mehr"
+          ><IMore size={15} /></button>
+        </span>
       )}
-      {!framesOnly && (selected.every((n) => n.archived) ? (
-        <button
-          onClick={() => setArchived(selected.map((n) => n.id), false)}
-          title="Aus dem Archiv zurückholen — die Karte gilt wieder als aktiv"
-        ><IArchiveRestore size={15} /></button>
-      ) : (
-        <button
-          onClick={() => setArchived(selected.map((n) => n.id), true)}
-          title="Archivieren — Karte gilt als erledigt, wird ausgeblendet und taucht nicht mehr in Aufgaben/Erinnerungen auf"
-        ><IArchive size={15} /></button>
-      ))}
       <button onClick={remove} title={selFrames.length ? 'Löschen (Rahmen: nur der Rahmen — die Karten darin bleiben liegen)' : 'Löschen'} className="danger"><ITrash size={15} /></button>
     </>
   );

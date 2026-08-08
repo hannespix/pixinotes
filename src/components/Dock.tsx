@@ -12,7 +12,7 @@ import { uid, type AppNode, type ShapeKind } from '../types';
 import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
   IAppWindow, IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
-  IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMinutes, IMousePointer, INote,
+  IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMinutes, IMore, IMousePointer, INote,
   IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
 } from './Icons';
 
@@ -174,11 +174,14 @@ export function Dock() {
   const [addMenu, setAddMenu] = useState(false);
   const [drawMenu, setDrawMenu] = useState(false);
   const [aiMenu, setAiMenu] = useState(false);
+  // M198: ⋯-Menü bündelt die selteneren Aktionen (KI, Anordnen, Physik, Archiv) —
+  // sichtbar bleiben nur noch fünf Primärknöpfe: ＋ · ✎ · Aufgaben · ⋯ · ▶
+  const [moreMenu, setMoreMenu] = useState(false);
   // Hintergrund-Klick/-Tipp schließt alle Dock-Flyouts (User-Wunsch)
   const dockRef = useRef<HTMLDivElement | null>(null);
-  const dockMenuOpen = addMenu || drawMenu || aiMenu || arrangeMenu;
+  const dockMenuOpen = addMenu || drawMenu || aiMenu || arrangeMenu || moreMenu;
   const closeDockMenus = useCallback(() => {
-    setAddMenu(false); setDrawMenu(false); setAiMenu(false); setArrangeMenu(false);
+    setAddMenu(false); setDrawMenu(false); setAiMenu(false); setArrangeMenu(false); setMoreMenu(false);
   }, []);
   useOutsideClose(dockMenuOpen, dockRef, closeDockMenus);
   // M192: Esc schließt sie ebenfalls — überall sonst in der App tut es das.
@@ -373,7 +376,7 @@ export function Dock() {
         )}
         <button
           className={addMenu ? 'active' : ''}
-          onClick={() => { setAddMenu((o) => !o); setDrawMenu(false); setAiMenu(false); }}
+          onClick={() => { const o = addMenu; closeDockMenus(); setAddMenu(!o); }}
           title="Objekt hinzufügen"
           aria-label="Objekt hinzufügen"
         >
@@ -393,7 +396,7 @@ export function Dock() {
         )}
         <button
           className={drawing ? 'active' : ''}
-          onClick={() => { setDrawMenu((o) => !o); setAddMenu(false); setAiMenu(false); }}
+          onClick={() => { const o = drawMenu; closeDockMenus(); setDrawMenu(!o); }}
           title="Zeichnen (Stift, Textmarker, Radierer)"
           aria-label="Zeichnen"
         >
@@ -401,8 +404,82 @@ export function Dock() {
         </button>
       </div>
 
-      {/* KI-Assistent: boardweite Aktionen */}
+      <span className="dock-sep" />
+      <button
+        className="dock-tasks"
+        onClick={() => setTasksOpen(true)}
+        // M185: Die Zahl am Symbol selbst erklären — sonst rät man, wofür sie steht
+        title={taskStats.open > 0
+          ? `Aufgaben & Erinnerungen: ${taskStats.open} offen über alle Boards`
+            + (taskStats.overdue > 0 ? ` — davon ${taskStats.overdue} überfällig (darum rot)` : ' — nichts überfällig')
+          : 'Aufgaben & Erinnerungen (alle Boards) — aktuell nichts offen'}
+        // aria-label bewusst FEST: Die Zahl steht sichtbar im Badge daneben und
+        // wird ohnehin mitgelesen — ein wechselndes Label macht den Knopf für
+        // Screenreader (und für Tests) zu einem beweglichen Ziel.
+        aria-label="Aufgaben"
+      >
+        <ITasks />
+        {taskStats.open > 0 && (
+          <span className={`dock-badge ${taskStats.overdue > 0 ? 'red' : ''}`}>{taskStats.open}</span>
+        )}
+      </button>
+
+      {/* M198: ⋯ „Mehr" — KI, Anordnen, Physik und Archiv in EINEM Menü statt
+          vier Einzelknöpfen. Die beiden großen Untermenüs (KI, Anordnen) öffnen
+          als eigene Flyouts am selben Anker — maximal zwei Ebenen. */}
       <div className="dock-add-wrap">
+        {moreMenu && (
+          <div className="dock-menu dock-menu-more">
+            <button
+              onClick={() => { setMoreMenu(false); setAiMenu(true); }}
+              title="KI-Assistent (Clustern, Aufgaben, Briefing …)"
+              aria-label="KI-Assistent"
+            >
+              <IWand size={16} /> KI-Assistent …
+            </button>
+            <button
+              onClick={() => { setMoreMenu(false); setArrangeMenu(true); }}
+              disabled={arranging}
+              title="Board aufräumen & anordnen (Fluss, Raster, Kreise, Stapel) + Gitter & Hintergrund"
+              aria-label="Board aufräumen"
+            >
+              <IArrange size={16} /> Aufräumen &amp; anordnen …
+            </button>
+            <div className="dock-menu-label">Board</div>
+            <button
+              className={physicsEnabled ? 'on' : ''}
+              onClick={() => {
+                setPhysicsEnabled(!physicsEnabled);
+                showToast(physicsEnabled
+                  ? '🧲 Physik AUS — Karten dürfen jetzt überlappen und gestapelt werden.'
+                  : '🧲 Physik AN — Karten verdrängen sich wieder und lassen sich werfen.');
+              }}
+              title={physicsEnabled
+                ? 'Physik ist AN: Karten verdrängen sich und lassen sich werfen — Klick schaltet aus (zum Stapeln/Überlappen)'
+                : 'Physik ist AUS: Karten dürfen überlappen — Klick schaltet die Verdrängung wieder an'}
+              aria-label="Physik umschalten"
+            >
+              <IMagnet size={16} /> Physik {physicsEnabled ? 'AUS' : 'AN'}
+            </button>
+            {archivedCount > 0 && (
+              <button
+                className={showArchived ? 'on' : ''}
+                onClick={() => {
+                  setShowArchived(!showArchived);
+                  showToast(showArchived
+                    ? '🗃 Archiv ausgeblendet — archivierte Karten sind wieder unsichtbar.'
+                    : `🗃 Archiv eingeblendet — ${archivedCount} archivierte Karte${archivedCount > 1 ? 'n' : ''} (gedimmt). Zum Zurückholen Karte auswählen → Archiv-Symbol.`);
+                }}
+                title={showArchived
+                  ? `Archivierte Karten ausblenden (${archivedCount} auf diesem Board)`
+                  : `Archivierte Karten einblenden (${archivedCount} auf diesem Board)`}
+                aria-label="Archiv ein-/ausblenden"
+              >
+                <IArchive size={16} /> Archiv {showArchived ? 'ausblenden' : 'einblenden'} ({archivedCount})
+              </button>
+            )}
+          </div>
+        )}
         {aiMenu && (
           <div className="dock-menu dock-menu-ai">
             <div className="dock-menu-label">Freitext-Anweisung</div>
@@ -441,18 +518,6 @@ export function Dock() {
             </div>
           </div>
         )}
-        <button
-          className={aiMenu || aiBusy ? 'active' : ''}
-          onClick={() => { setAiMenu((o) => !o); setAddMenu(false); setDrawMenu(false); }}
-          title="KI-Assistent (Clustern, Aufgaben, Briefing …)"
-          aria-label="KI-Assistent"
-        >
-          <IWand />
-        </button>
-      </div>
-
-      {/* Aufräumen mit Anordnungs-Modi */}
-      <div className="dock-add-wrap">
         {arrangeMenu && (
           <div className="dock-menu dock-menu-arrange">
             <div className="dock-menu-label">Anordnungs-Modus</div>
@@ -498,67 +563,15 @@ export function Dock() {
           </div>
         )}
         <button
-          onClick={() => { setArrangeMenu((o) => !o); setAddMenu(false); setDrawMenu(false); setAiMenu(false); }}
-          disabled={arranging}
-          className={arrangeMenu || arranging ? 'active' : ''}
-          title="Board aufräumen & anordnen (Fluss, Raster, Kreise, Stapel)"
-          aria-label="Board aufräumen"
+          className={moreMenu || aiMenu || arrangeMenu || arranging || aiBusy ? 'active' : ''}
+          onClick={() => { const o = moreMenu || aiMenu || arrangeMenu; closeDockMenus(); setMoreMenu(!o); }}
+          title="Mehr: KI-Assistent · Aufräumen & Anordnen · Physik · Archiv"
+          aria-label="Mehr"
         >
-          <IArrange />
+          <IMore />
+          {archivedCount > 0 && showArchived && <span className="dock-badge">{archivedCount}</span>}
         </button>
       </div>
-      <button
-        onClick={() => {
-          setPhysicsEnabled(!physicsEnabled);
-          showToast(physicsEnabled
-            ? '🧲 Physik AUS — Karten dürfen jetzt überlappen und gestapelt werden.'
-            : '🧲 Physik AN — Karten verdrängen sich wieder und lassen sich werfen.');
-        }}
-        className={physicsEnabled ? 'active' : ''}
-        title={physicsEnabled
-          ? 'Physik ist AN: Karten verdrängen sich und lassen sich werfen — Klick schaltet aus (zum Stapeln/Überlappen)'
-          : 'Physik ist AUS: Karten dürfen überlappen — Klick schaltet die Verdrängung wieder an'}
-        aria-label="Physik umschalten"
-      >
-        <IMagnet />
-      </button>
-      {archivedCount > 0 && (
-        <button
-          onClick={() => {
-            setShowArchived(!showArchived);
-            showToast(showArchived
-              ? '🗃 Archiv ausgeblendet — archivierte Karten sind wieder unsichtbar.'
-              : `🗃 Archiv eingeblendet — ${archivedCount} archivierte Karte${archivedCount > 1 ? 'n' : ''} (gedimmt). Zum Zurückholen Karte auswählen → Archiv-Symbol.`);
-          }}
-          className={showArchived ? 'active' : ''}
-          title={showArchived
-            ? `Archivierte Karten ausblenden (${archivedCount} auf diesem Board)`
-            : `Archivierte Karten einblenden (${archivedCount} auf diesem Board)`}
-          aria-label="Archiv ein-/ausblenden"
-        >
-          <IArchive />
-          <span className="dock-badge">{archivedCount}</span>
-        </button>
-      )}
-      <span className="dock-sep" />
-      <button
-        className="dock-tasks"
-        onClick={() => setTasksOpen(true)}
-        // M185: Die Zahl am Symbol selbst erklären — sonst rät man, wofür sie steht
-        title={taskStats.open > 0
-          ? `Aufgaben & Erinnerungen: ${taskStats.open} offen über alle Boards`
-            + (taskStats.overdue > 0 ? ` — davon ${taskStats.overdue} überfällig (darum rot)` : ' — nichts überfällig')
-          : 'Aufgaben & Erinnerungen (alle Boards) — aktuell nichts offen'}
-        // aria-label bewusst FEST: Die Zahl steht sichtbar im Badge daneben und
-        // wird ohnehin mitgelesen — ein wechselndes Label macht den Knopf für
-        // Screenreader (und für Tests) zu einem beweglichen Ziel.
-        aria-label="Aufgaben"
-      >
-        <ITasks />
-        {taskStats.open > 0 && (
-          <span className={`dock-badge ${taskStats.overdue > 0 ? 'red' : ''}`}>{taskStats.open}</span>
-        )}
-      </button>
       <button onClick={() => setPresenting(true)} title="Präsentationsmodus (Karten als Folien)" aria-label="Präsentieren"><IPlay /></button>
 
       <input
