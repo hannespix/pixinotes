@@ -8,6 +8,7 @@ import {
   myDayKeys, parseQuickTask, shiftIso, toggleCheckBlock, toggleMyDay, type TaskRef,
 } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
+import { brainDigest, type DigestLine } from '../lib/brain';
 import { aiWeekPlan } from '../lib/aiActions';
 import { IBell, ICalendar, IChevronR, IGantt, IKanban, INote, ISearch, IUsers, IWand, IX } from './Icons';
 
@@ -59,6 +60,19 @@ export function TaskHub() {
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [doneOpen, setDoneOpen] = useState(false);
   const [myDay, setMyDay] = useState<Set<string>>(() => myDayKeys());
+  // M207: Gehirn-Puls — Themen, Knotenpunkte und offene Vorschläge auf einen Blick
+  const brainOn = useBoard((s) => s.brain.on);
+  const rejectedLinks = useBoard((s) => s.rejectedLinks);
+  const [digest, setDigest] = useState<DigestLine[]>([]);
+  const [pulseOpen, setPulseOpen] = useState(false);
+  useEffect(() => {
+    if (!open || !brainOn) { setDigest([]); return; }
+    let gone = false;
+    brainDigest(new Set(rejectedLinks))
+      .then((d) => { if (!gone) setDigest(d); })
+      .catch(() => { if (!gone) setDigest([]); });
+    return () => { gone = true; };
+  }, [open, brainOn, rejectedLinks]);
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null); // Accordion-Werkzeuge (M116)
   const [aiBusy, setAiBusy] = useState(false);
@@ -332,6 +346,42 @@ export function TaskHub() {
           <button className="taskhub-x" onClick={() => setOpen(false)} aria-label="Schließen"><IX size={14} /></button>
         </span>
       </div>
+
+      {/* M207: Gehirn-Puls — was das Gehirn im Wissensnetz sieht */}
+      {brainOn && digest.length > 0 && (
+        <div className="brain-pulse">
+          <button
+            className="brain-pulse-head"
+            onClick={() => setPulseOpen((o) => !o)}
+            aria-expanded={pulseOpen}
+            title="Was das Gehirn gerade in deinem Wissensnetz sieht — Themen, Knotenpunkte, fehlende Verknüpfungen"
+          >
+            🧠 Gehirn-Puls <span className="brain-pulse-count">{digest.length}</span>
+            <span className="brain-pulse-caret">{pulseOpen ? '▾' : '▸'}</span>
+          </button>
+          {pulseOpen && (
+            <div className="brain-pulse-body">
+              {digest.map((d, i) => (
+                <button
+                  key={i}
+                  className={`brain-pulse-row kind-${d.kind}`}
+                  onClick={() => { if (d.boardId) { setOpen(false); openBoard(d.boardId); } }}
+                  title={d.boardId ? 'Zum Board springen' : undefined}
+                >
+                  <span className="brain-pulse-kind">
+                    {d.kind === 'thema' ? 'Thema' : d.kind === 'knoten' ? 'Knoten' : 'Vorschlag'}
+                  </span>
+                  <span className="brain-pulse-text">{d.text}</span>
+                </button>
+              ))}
+              <div className="brain-pulse-foot">
+                Rein rechnerisch aus dem semantischen Index — keine KI-Anfrage, keine Kosten.
+                Vorschläge lassen sich im Netz annehmen oder ablehnen.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Filter (T1) — inkl. „Mein Tag"-Fokusliste (M115) */}
       <div className="taskhub-filters">

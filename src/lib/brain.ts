@@ -230,6 +230,104 @@ export async function brainSearch(query: string, k = 6): Promise<BrainHit[]> {
     .slice(0, k);
 }
 
+/* ---------- M207: Gehirn-Puls — Themen, Knotenpunkte, Digest ----------
+   Drei Auswertungen ÜBER den Index, alle rein rechnerisch (keine KI-Kosten):
+   Themen-Inseln (Clustering), Knotenpunkte (wer hängt mit vielem zusammen)
+   und daraus ein täglicher Kurzbericht. */
+export interface TopicCluster { title: string; cards: BrainHit[]; boards: string[] }
+
+/** Themen-Inseln: gierige Clusterung über Kosinus-Ähnlichkeit — die Karte mit
+ *  den meisten nahen Nachbarn gründet die Insel und gibt ihr den Namen. */
+export async function clusterTopics(minSize = 3, threshold = 0.55): Promise<TopicCluster[]> {
+  await loadIndex();
+  if (!mem || mem.size < minSize) return [];
+  const all = [...mem.values()];
+  const used = new Set<string>();
+  const key = (e: BrainEntry) => `${e.boardId}:${e.nodeId}`;
+  const clusters: TopicCluster[] = [];
+  // Nachbarschaften einmal vorberechnen
+  const near = new Map<string, BrainEntry[]>();
+  for (const a of all) {
+    near.set(key(a), all.filter((b) => b !== a && dot(a.vec, b.vec) >= threshold));
+  }
+  // Immer die dichteste noch freie Karte als Kern nehmen
+  for (;;) {
+    let seed: BrainEntry | null = null;
+    let seedCount = -1;
+    for (const e of all) {
+      if (used.has(key(e))) continue;
+      const n = (near.get(key(e)) ?? []).filter((x) => !used.has(key(x))).length;
+      if (n > seedCount) { seedCount = n; seed = e; }
+    }
+    if (!seed || seedCount + 1 < minSize) break;
+    const members = [seed, ...(near.get(key(seed)) ?? []).filter((x) => !used.has(key(x)))];
+    members.forEach((m) => used.add(key(m)));
+    clusters.push({
+      title: seed.title || 'Thema',
+      cards: members.map((m) => ({ ...m, score: dot(seed!.vec, m.vec) })).sort((a, b) => b.score - a.score),
+      boards: [...new Set(members.map((m) => m.boardName))],
+    });
+  }
+  return clusters;
+}
+
+/** Knotenpunkte: Boards mit den meisten echten Verbindungen (Portale/Wikilinks) */
+export function hubBoards(max = 3): Array<{ boardId: string; name: string; degree: number }> {
+  const st = useBoard.getState();
+  const deg = new Map<string, number>();
+  for (const b of st.boards) {
+    for (const n of b.nodes) {
+      if (n.type !== 'portal') continue;
+      const target = (n.data as { boardId?: string }).boardId;
+      if (!target) continue;
+      deg.set(b.id, (deg.get(b.id) ?? 0) + 1);
+      deg.set(target, (deg.get(target) ?? 0) + 1);
+    }
+  }
+  return [...deg.entries()]
+    .map(([boardId, degree]) => ({ boardId, degree, name: st.boards.find((b) => b.id === boardId)?.name ?? '?' }))
+    .filter((h) => h.degree >= 2)
+    .sort((a, b) => b.degree - a.degree)
+    .slice(0, max);
+}
+
+export interface DigestLine { kind: 'thema' | 'knoten' | 'vorschlag'; text: string; boardId?: string }
+
+/** Kurzbericht fürs Gehirn-Panel: Themen, Knotenpunkte, offene Vorschläge */
+export async function brainDigest(rejected: Set<string>): Promise<DigestLine[]> {
+  const out: DigestLine[] = [];
+  const topics = await clusterTopics();
+  for (const t of topics.slice(0, 3)) {
+    out.push({
+      kind: 'thema',
+      text: `„${t.title}" — ${t.cards.length} Karten aus ${t.boards.length} Board${t.boards.length > 1 ? 's' : ''} (${t.boards.slice(0, 3).join(', ')})`,
+      boardId: t.cards[0]?.boardId,
+    });
+  }
+  for (const h of hubBoards()) {
+    out.push({ kind: 'knoten', text: `„${h.name}" ist ein Knotenpunkt (${h.degree} Verbindungen)`, boardId: h.boardId });
+  }
+  const st = useBoard.getState();
+  const existing = new Set<string>();
+  for (const b of st.boards) {
+    for (const n of b.nodes) {
+      if (n.type !== 'portal') continue;
+      const target = (n.data as { boardId?: string }).boardId;
+      if (target) existing.add([b.id, target].sort().join('|'));
+    }
+  }
+  const sug = await suggestBoardLinks(existing, rejected, 3);
+  const nameOf = (id: string) => st.boards.find((b) => b.id === id)?.name ?? '?';
+  for (const s of sug) {
+    out.push({
+      kind: 'vorschlag',
+      text: `„${nameOf(s.a)}" und „${nameOf(s.b)}" passen zusammen (${Math.round(s.score * 100)} %) — noch nicht verknüpft`,
+      boardId: s.a,
+    });
+  }
+  return out;
+}
+
 /* ---------- M206: „Frag dein Gehirn" (RAG) ----------
    Die Frage wird semantisch beantwortet: passende Karten aus dem Index holen,
    sie der KI als KONTEXT geben und um eine Antwort MIT Belegen bitten. Die
