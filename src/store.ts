@@ -11,7 +11,7 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import { buildStarter } from './lib/starter';
-import { uid, type AppNode, type TimeSeg } from './types';
+import { uid, type AppNode, type CardFont, type CardSize, type TimeSeg } from './types';
 import { anchorStroke, integrateStroke } from './lib/strokeAnchor';
 import { findFreeSpot, frameMembers } from './lib/arrange';
 
@@ -253,6 +253,8 @@ interface BoardState {
   setNodeHeight: (id: string, height: number) => void;
   /** Auto-Größe je Karte an/aus (M103; seit M111 Standard AN — false = manuell gebrochen) */
   setAutoFit: (ids: string[], on: boolean) => void;
+  /** M200: Schrift/Textgröße pro Karte — null setzt auf Standard zurück */
+  setCardTypo: (ids: string[], patch: { font?: CardFont | null; fontSize?: CardSize | null }) => void;
   setNodePosition: (id: string, x: number, y: number) => void;
   /** Mehrere Positionen in EINEM Store-Update — für den Physik-Loop (60 fps) */
   setNodePositions: (entries: Array<[string, number, number]>) => void;
@@ -1421,6 +1423,21 @@ export const useBoard = create<BoardState>()(
               ids.includes(n.id) ? ({ ...n, autoFit: on ? undefined : false } as AppNode) : n,
             ),
           })),
+
+        setCardTypo: (ids, patch) => {
+          if (ids.length === 0) return;
+          get().pushHistory();
+          const idSet = new Set(ids);
+          patchActive((b) => ({
+            nodes: b.nodes.map((n) => {
+              if (!idSet.has(n.id)) return n;
+              const next = { ...n } as AppNode;
+              if (patch.font !== undefined) next.font = patch.font ?? undefined;
+              if (patch.fontSize !== undefined) next.fontSize = patch.fontSize ?? undefined;
+              return next;
+            }),
+          }));
+        },
 
         updateNodeData: (id, data) => {
           // Feingranulare History (M122): gebündelter Snapshot vor der Änderung —

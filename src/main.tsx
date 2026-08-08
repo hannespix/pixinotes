@@ -2,6 +2,10 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import '@xyflow/react/dist/style.css';
 import '@blocknote/mantine/style.css';
+// M200: „Sehr gut lesbar" — Atkinson Hyperlegible (für Sehschwäche entworfen),
+// eingebettet wie Kalam, damit die Ein-Datei-App offline bleibt
+import '@fontsource/atkinson-hyperlegible/400.css';
+import '@fontsource/atkinson-hyperlegible/700.css';
 import './index.css';
 import App from './App';
 import { handleOAuthRedirect } from './lib/calAccounts';

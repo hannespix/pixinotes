@@ -6,7 +6,16 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMail, IMore, IMoveTo, IPen, ITag, ITrash, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMail, IMore, IMoveTo, IPen, ITag, ITrash, IType, IWand, IX } from './Icons';
+import type { CardFont, CardSize } from '../types';
+
+// M200: Vorschau-Stapel fürs Schrift-Menü — muss zu den pn-font-*-Regeln passen
+const FONT_STACKS: Record<CardFont, string> = {
+  serif: "Georgia, 'Iowan Old Style', Cambria, 'Times New Roman', serif",
+  lesbar: "'Atkinson Hyperlegible', system-ui, sans-serif",
+  hand: "'Kalam', 'Segoe Print', 'Comic Sans MS', cursive",
+  mono: "ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace",
+};
 import { ALIGN_LABEL, computeAlign, type AlignOp } from '../lib/align';
 import { mutedHistory } from '../store';
 import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
@@ -47,8 +56,8 @@ export function SelectionToolbar() {
   // Stacking-Kontext des Flow-Viewports sie unter Kopf- und Tab-Leiste, bei
   // Karten nahe der Oberkante fingen die Leisten dann die Klicks ab (M151-Muster)
   // M198: 'more' = das ⋯-Menü — bündelt die selteneren Aktionen; 'attr'/'ai'/
-  // 'align' öffnen von dort aus als zweite Ebene am selben Anker
-  type MenuKind = 'ai' | 'attr' | 'align' | 'move' | 'frame' | 'more';
+  // 'align'/'font' öffnen von dort aus als zweite Ebene am selben Anker
+  type MenuKind = 'ai' | 'attr' | 'align' | 'move' | 'frame' | 'more' | 'font';
   const [menu, setMenu] = useState<MenuKind | null>(null);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0, down: false });
   const toggleMenu = (kind: MenuKind) => (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -106,6 +115,7 @@ export function SelectionToolbar() {
     document.body,
   );
   const moveNodesToBoard = useBoard((s) => s.moveNodesToBoard);
+  const setCardTypo = useBoard((s) => s.setCardTypo);
   const setLookup = useBoard((s) => s.setLookup);
   const spaces = useBoard((s) => s.spaces);
   const boards = useBoard((s) => s.boards);
@@ -399,6 +409,50 @@ export function SelectionToolbar() {
       )}
       {!framesOnly && (
         <span className="sel-ai-wrap">
+          {menu === 'font' && menuPortal('sel-font-menu', (() => {
+            // M200: gemeinsamer Wert der Auswahl (undefined = uneinheitlich)
+            const sameFont = selected.every((n) => (n.font ?? null) === (selected[0]?.font ?? null));
+            const sameSize = selected.every((n) => (n.fontSize ?? null) === (selected[0]?.fontSize ?? null));
+            const curFont = sameFont ? (selected[0]?.font ?? null) : undefined;
+            const curSize = sameSize ? (selected[0]?.fontSize ?? null) : undefined;
+            const ids = selected.map((n) => n.id);
+            const fonts: Array<[CardFont | null, string]> = [
+              [null, 'Standard'],
+              ['serif', 'Serifen (dokumentig)'],
+              ['lesbar', 'Sehr gut lesbar'],
+              ['hand', 'Handschrift'],
+              ['mono', 'Monospace (technisch)'],
+            ];
+            return (
+              <>
+                <div className="sel-attr-title">Schriftart</div>
+                {fonts.map(([key, label]) => (
+                  <button
+                    key={label}
+                    className={curFont === key ? 'on' : ''}
+                    style={key ? { fontFamily: FONT_STACKS[key] } : undefined}
+                    onClick={() => setCardTypo(ids, { font: key })}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <div className="sel-attr-title">Textgröße</div>
+                <div className="sel-font-sizes">
+                  {(([['s', 'S'], [null, 'M'], ['l', 'L'], ['xl', 'XL']]) as Array<[CardSize | null, string]>).map(([key, label]) => (
+                    <button
+                      key={label}
+                      className={curSize === key ? 'on' : ''}
+                      aria-label={`Textgröße ${label}`}
+                      onClick={() => setCardTypo(ids, { fontSize: key })}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="sel-attr-hint">Gilt für die ganze Karte — „Sehr gut lesbar" ist die für Sehschwäche entworfene Atkinson Hyperlegible</div>
+              </>
+            );
+          })())}
           {menu === 'more' && menuPortal('sel-more-menu', (() => {
             const allAuto = selected.every((n) => n.autoFit !== false);   // Standard AN (M111)
             const allArchived = selected.every((n) => n.archived);
@@ -444,6 +498,9 @@ export function SelectionToolbar() {
                   </>
                 )}
                 <div className="sel-attr-title">Werkzeuge</div>
+                <button onClick={() => setMenu('font')} title="Schriftart & Textgröße der Karte(n) ändern" aria-label="Schrift">
+                  <IType size={14} /> Schrift &amp; Größe …
+                </button>
                 {aiReady(ai) && (
                   <button onClick={() => setMenu('ai')} title="KI-Aktionen auf die Auswahl" aria-label="KI-Aktionen">
                     <IWand size={14} /> KI-Aktionen …
@@ -493,7 +550,7 @@ export function SelectionToolbar() {
             );
           })())}
           <button
-            className={menu === 'more' || menu === 'attr' || menu === 'ai' || menu === 'align' || aiBusy ? 'ai-on' : ''}
+            className={menu === 'more' || menu === 'attr' || menu === 'ai' || menu === 'align' || menu === 'font' || aiBusy ? 'ai-on' : ''}
             data-smbtn
             onClick={toggleMenu('more')}
             title="Mehr: E-Mail · Nachschlagen · Eigenschaften · Vorlage · Kommentar · KI · Ausrichten · Auto-Größe · Archiv"

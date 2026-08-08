@@ -246,7 +246,17 @@ export function Board() {
   // bei aktivem Archiv-Schalter gedimmt sichtbar. Anhängende Kanten wandern mit.
   const showArchived = useBoard((s) => s.showArchived);
   const rfNodes = useMemo(
-    () => nodes.map((n) => (n.archived ? { ...n, hidden: !showArchived, className: 'archived-card' } : n)),
+    () => nodes.map((n) => {
+      // M200: Schrift/Größe pro Karte als Klassen am Node-Wrapper — das CSS
+      // erledigt den Rest, kein Durchreichen in jede Karten-Komponente nötig
+      const cls = [
+        n.archived ? 'archived-card' : '',
+        n.font ? `pn-font-${n.font}` : '',
+        n.fontSize ? `pn-size-${n.fontSize}` : '',
+      ].filter(Boolean).join(' ');
+      if (!cls && !n.archived) return n;
+      return { ...n, hidden: n.archived ? !showArchived : undefined, className: cls || undefined };
+    }),
     [nodes, showArchived],
   );
   const rfEdges = useMemo(() => {

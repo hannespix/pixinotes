@@ -3748,3 +3748,33 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 @media (pointer: coarse) and (max-width: 640px) {
   .top-actions button { width: 32px; height: 32px; }
 }
+
+/* ================= M200: Schrift & Textgröße pro Karte ================= */
+/* Kalam global verfügbar machen (bisher nur fürs Mermaid-Rendern injiziert) */
+@font-face {
+  font-family: 'Kalam'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('./assets/kalam-latin.woff2') format('woff2');
+}
+/* Kuratierte Stapel — bewusst wenige, alle offline. Das *-!important ist hier
+   gewollt: Die Karte hat der Nutzer EXPLIZIT umgestellt, also gewinnt seine
+   Wahl auch gegen modulinterne font-family-Regeln (BlockNote, Mermaid …). */
+.react-flow__node.pn-font-serif, .react-flow__node.pn-font-serif * { font-family: Georgia, 'Iowan Old Style', Cambria, 'Times New Roman', serif !important; }
+.react-flow__node.pn-font-lesbar, .react-flow__node.pn-font-lesbar * { font-family: 'Atkinson Hyperlegible', system-ui, sans-serif !important; }
+.react-flow__node.pn-font-hand, .react-flow__node.pn-font-hand * { font-family: 'Kalam', 'Segoe Print', 'Comic Sans MS', cursive !important; }
+.react-flow__node.pn-font-mono, .react-flow__node.pn-font-mono * { font-family: ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace !important; }
+/* Textgröße in Stufen: wirkt auf die Text-Körper der Module (Notiz-Editor,
+   Formen, Kanban-Tickets, Rahmen-Titel, Protokoll) — Überschriften in Notizen
+   skalieren relativ mit (em-basiert). S bleibt bewusst ≥ 12px (Lesbarkeit). */
+.react-flow__node.pn-size-s { --pn-fs: 12px; }
+.react-flow__node.pn-size-l { --pn-fs: 17px; }
+.react-flow__node.pn-size-xl { --pn-fs: 21px; }
+.react-flow__node[class*='pn-size-'] :is(.bn-editor, .shape-body, .shape-input, .kanban-item, .frame-name, .email-body, .file-card, .portal-name) {
+  font-size: var(--pn-fs) !important;
+}
+/* Schrift-Menü: Größen-Reihe als gleichbreite Stufen-Knöpfe */
+.sel-font-sizes { display: flex; gap: 6px; padding: 4px 10px 6px; }
+.sel-font-sizes button {
+  flex: 1; text-align: center; border: 1px solid var(--border-soft) !important;
+  border-radius: 8px; justify-content: center;
+}
+.sel-font-sizes button.on { border-color: var(--accent) !important; }

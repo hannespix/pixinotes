@@ -330,7 +330,13 @@ export type AppNode =
   // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der
   // Nutzer manuell zieht (das schaltet ab); wieder aktivierbar per Auswahl-Leiste.
   // Seit M111 STANDARD AN: undefined = an, false = manuell gebrochen.
-  & { archived?: boolean; autoFit?: boolean };
+  // font/fontSize (M200): Schrift & Textgröße pro Karte — kuratierte Stapel
+  // statt endloser Font-Listen; undefined = Standard/M.
+  & { archived?: boolean; autoFit?: boolean; font?: CardFont; fontSize?: CardSize };
+
+/** M200: kuratierte Schrift-Stapel — alle offline (Kalam + Atkinson eingebettet) */
+export type CardFont = 'serif' | 'lesbar' | 'hand' | 'mono';
+export type CardSize = 's' | 'l' | 'xl';
 
 export const KANBAN_COLS = ['To Do', 'Doing', 'Done'] as const;
 /** Effektive Spalten eines Kanban-Boards — Default für alte Boards ohne `cols` */
