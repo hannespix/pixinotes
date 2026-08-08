@@ -3798,3 +3798,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .share-cards-grid .share-emoji { font-size: 18px; color: inherit; }
 .share-cards-grid button svg { color: var(--muted); }
 .share-cards-foot { margin-top: 12px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+
+/* ================= M203: Netz-Performance ================= */
+/* Während sich das Netz bewegt (Physik/Drag), pausiert das Glas der
+   Seitenleiste: backdrop-filter erzwingt sonst bei JEDEM Frame einen teuren
+   Repaint der komplett verwischten Fläche — das ruckelte selbst auf starken
+   GPUs. Sobald das Netz zur Ruhe kommt, kehrt der Blur zurück. */
+.sidepanel.graph-motion {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background: var(--surface) !important;
+}

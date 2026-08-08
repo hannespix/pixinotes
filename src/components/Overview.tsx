@@ -189,7 +189,14 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const physicsOn = layers.physik ?? true;
   const simPos = useRef(new Map<string, { x: number; y: number; vx: number; vy: number; fx?: number; fy?: number }>());
   const alpha = useRef(1);
-  const [, setFrame] = useState(0);   // Render-Puls — Positionen leben im Ref
+  // M203: Positionen laufen IMPERATIV in den DOM (transform-/Linien-Attribute)
+  // statt über einen setState-Puls pro Frame. Der React-Reconcile über das
+  // komplette SVG (alle Knoten, Satelliten, Kanten — jede Sekunde 60–120×)
+  // war der Haupt-Ruckler beim Drag, auch auf starken Rechnern. React rendert
+  // jetzt nur noch die TOPOLOGIE (Datenänderung, Ebenen, Zoomstufe).
+  const nodeEls = useRef(new Map<string, SVGGElement>());
+  const satEls = useRef(new Map<string, SVGGElement>());
+  const linkEls = useRef(new Map<number, SVGLineElement>());
   const projectOf = useMemo(() => {
     const m = new Map<string, string>();
     for (const sp of spaces) for (const p of sp.projects) for (const id of p.boardIds) m.set(id, p.id);
@@ -268,12 +275,37 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           const ap = m.get(activeIdRef.current);
           if (ap) setVb((v) => ({ ...v, x: ap.x - v.w / 2, y: ap.y - v.h / 2 }));
         }
-        setFrame((f) => f + 1);
+        // Frame direkt in den DOM schreiben — kein React-Render (M203)
+        for (const [id, el] of nodeEls.current) {
+          const p = m.get(id);
+          if (p) el.setAttribute('transform', `translate(${p.x} ${p.y})`);
+        }
+        for (const [id, el] of satEls.current) {
+          const p = m.get(id);
+          if (p) el.setAttribute('transform', `translate(${p.x} ${p.y})`);
+        }
+        for (const [i, el] of linkEls.current) {
+          const l = links[i];
+          if (!l) continue;
+          const A = m.get(l.a), B = m.get(l.b);
+          if (!A || !B) continue;
+          el.setAttribute('x1', String(A.x)); el.setAttribute('y1', String(A.y));
+          el.setAttribute('x2', String(B.x)); el.setAttribute('y2', String(B.y));
+        }
+        // M203: Solange sich das Netz bewegt, pausiert das Glas der Seiten-
+        // leiste — backdrop-filter erzwingt sonst pro Frame einen teuren
+        // Repaint der verwischten Fläche (ruckelte selbst auf Gaming-GPUs)
+        svgRef.current?.closest('.sidepanel')?.classList.add('graph-motion');
+      } else {
+        svgRef.current?.closest('.sidepanel')?.classList.remove('graph-motion');
       }
       raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      svgRef.current?.closest('.sidepanel')?.classList.remove('graph-motion');
+    };
   }, [physicsOn, links, projectOf]);
 
   /** Effektive Positionen: mit Physik die Simulation, ohne das statische Layout */
@@ -330,7 +362,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     p.fx = g.x; p.fy = g.y;
     dragMoved.current = true;
     alpha.current = Math.max(alpha.current, 0.5);   // Nachbarn wach machen
-    // KEIN setFrame hier: Die rAF-Schleife rendert ohnehin — ein zweiter
+    // KEIN Render hier: Die rAF-Schleife schreibt die Frames selbst — ein zweiter
     // Render je pointermove (bis 120 Hz am iPhone) machte es nur ruckeliger
   };
   /** Nach Capture an der SVG-Wurzel feuert der Browser-„click" nicht mehr am
@@ -591,30 +623,26 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     });
   }, [showCards, scoped]);
 
-  // Stufe 2: pro Frame nur noch Trigonometrie um die aktuellen Board-Zentren
-  const satellites = useMemo(() => {
-    const dots: Array<{ key: string; x: number; y: number; title: string; boardId: string; nodeId: string }> = [];
-    const lines: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+  // M203: Satelliten leben RELATIV in einer Gruppe pro Board — die Gruppe wird
+  // pro Frame nur noch verschoben (ein transform), Punkte/Titel/Binnen-Linien
+  // sind statische Kinder. Vorher wurden alle Absolut-Koordinaten je Frame
+  // neu gerechnet und gerendert.
+  const satellites = useMemo(() => satelliteMeta.map((b) => {
+    const ring = r(b.total) + 34;
     const dotPos = new Map<string, { x: number; y: number }>();
-    for (const b of satelliteMeta) {
-      const center = pos.get(b.boardId);
-      if (!center) continue;
-      const ring = r(b.total) + 34;
-      b.cards.forEach((c, i) => {
-        const angle = (i / Math.max(1, b.cards.length)) * Math.PI * 2 - Math.PI / 2;
-        const x = center.x + Math.cos(angle) * ring;
-        const y = center.y + Math.sin(angle) * ring;
-        dotPos.set(`${b.boardId}:${c.nodeId}`, { x, y });
-        dots.push({ key: `${b.boardId}:${c.nodeId}`, x, y, title: c.title, boardId: b.boardId, nodeId: c.nodeId });
-      });
-      for (const e of b.edges) {
-        const a = dotPos.get(`${b.boardId}:${e.s}`);
-        const c2 = dotPos.get(`${b.boardId}:${e.t}`);
-        if (a && c2) lines.push({ x1: a.x, y1: a.y, x2: c2.x, y2: c2.y });
-      }
-    }
-    return { dots, lines };
-  }, [satelliteMeta, pos]);
+    const dots = b.cards.map((c, i) => {
+      const angle = (i / Math.max(1, b.cards.length)) * Math.PI * 2 - Math.PI / 2;
+      const x = Math.cos(angle) * ring;
+      const y = Math.sin(angle) * ring;
+      dotPos.set(c.nodeId, { x, y });
+      return { key: `${b.boardId}:${c.nodeId}`, x, y, title: c.title, nodeId: c.nodeId };
+    });
+    const lines = b.edges.flatMap((e) => {
+      const a = dotPos.get(e.s), c2 = dotPos.get(e.t);
+      return a && c2 ? [{ x1: a.x, y1: a.y, x2: c2.x, y2: c2.y }] : [];
+    });
+    return { boardId: b.boardId, dots, lines };
+  }), [satelliteMeta]);
 
   // ---------- Semantischer Zoom: Detailgrad folgt der Zoomstufe ----------
   // Maßstab = ECHTE Bildschirm-Pixel pro SVG-Einheit (gemessen, nicht relativ
@@ -691,6 +719,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           return (
             <line
               key={i}
+              ref={(el) => { if (el) linkEls.current.set(i, el); else linkEls.current.delete(i); }}
               x1={a.x} y1={a.y} x2={b.x} y2={b.y}
               stroke={l.kind === 'portal' ? 'rgba(79,124,255,.5)' : 'rgba(120,110,90,.45)'}
               strokeWidth={l.kind === 'portal' ? ui(2) : ui(1.5)}
@@ -698,34 +727,50 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
             />
           );
         })}
-        {lod >= 1 && satellites.lines.map((l, i) => (
-          <line key={`c${i}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="rgba(120,110,90,.3)" strokeWidth={ui(1)} />
-        ))}
-        {lod >= 1 && satellites.dots.map((d) => (
-          <g
-            key={d.key}
-            className={`ov-graph-dot ${marking ? (hits.cards.has(d.key) ? 'hit' : 'dim') : ''}`}
-            onClick={() => { openBoard(d.boardId); focusNode(d.boardId, d.nodeId); }}
-          >
-            <title>{d.title}</title>
-            <circle cx={d.x} cy={d.y} r={ui(5)} strokeWidth={ui(1.5)} />
-            {lod === 2 && (
-              <text
-                className="ov-graph-dot-label"
-                x={d.x + ui(9)} y={d.y + ui(4)} fontSize={ui(11.5)}
-                stroke="var(--bg)" strokeWidth={ui(3)} paintOrder="stroke"
-              >
-                {d.title.slice(0, 28)}
-              </text>
-            )}
-          </g>
-        ))}
+        {lod >= 1 && satellites.map((sb) => {
+          const center = pos.get(sb.boardId);
+          if (!center) return null;
+          return (
+            <g
+              key={`sat-${sb.boardId}`}
+              ref={(el) => { if (el) satEls.current.set(sb.boardId, el); else satEls.current.delete(sb.boardId); }}
+              transform={`translate(${center.x} ${center.y})`}
+            >
+              {sb.lines.map((l, i) => (
+                <line key={`c${i}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="rgba(120,110,90,.3)" strokeWidth={ui(1)} />
+              ))}
+              {sb.dots.map((d) => (
+                <g
+                  key={d.key}
+                  className={`ov-graph-dot ${marking ? (hits.cards.has(d.key) ? 'hit' : 'dim') : ''}`}
+                  onClick={() => { openBoard(sb.boardId); focusNode(sb.boardId, d.nodeId); }}
+                >
+                  <title>{d.title}</title>
+                  <circle cx={d.x} cy={d.y} r={ui(5)} strokeWidth={ui(1.5)} />
+                  {lod === 2 && (
+                    <text
+                      className="ov-graph-dot-label"
+                      x={d.x + ui(9)} y={d.y + ui(4)} fontSize={ui(11.5)}
+                      stroke="var(--bg)" strokeWidth={ui(3)} paintOrder="stroke"
+                    >
+                      {d.title.slice(0, 28)}
+                    </text>
+                  )}
+                </g>
+              ))}
+            </g>
+          );
+        })}
         {nodes.map((n) => {
           const p = pos.get(n.id)!;
           const rad = r(n.cards);
           return (
             <g
               key={n.id}
+              // M203: Kinder sitzen im Ursprung, die GRUPPE wird verschoben —
+              // pro Frame ändert sich nur noch dieses eine transform-Attribut
+              ref={(el) => { if (el) nodeEls.current.set(n.id, el); else nodeEls.current.delete(n.id); }}
+              transform={`translate(${p.x} ${p.y})`}
               className={`ov-graph-node ${n.id === activeId ? 'here' : ''} ${marking ? (hits.boards.has(n.id) ? 'hit' : 'dim') : ''} ${linkFrom === n.id ? 'linking' : ''}`}
               data-tip={linkFrom ? `Klicken: Portal „${boardName(linkFrom)}" → „${n.label}" anlegen` : previewOf(n.id)}
               onClick={() => {
@@ -742,10 +787,10 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
             >
               {/* M193: „Du bist hier" — ohne diesen Ring verliert man im
                   Gesamtnetz sofort den Bezug zum eigenen Standort */}
-              {n.id === activeId && <circle className="ov-graph-here" cx={p.x} cy={p.y} r={rad + ui(7)} strokeWidth={ui(2.5)} />}
-              <circle cx={p.x} cy={p.y} r={rad} strokeWidth={ui(2)} />
+              {n.id === activeId && <circle className="ov-graph-here" r={rad + ui(7)} strokeWidth={ui(2.5)} />}
+              <circle r={rad} strokeWidth={ui(2)} />
               <text
-                x={p.x} y={p.y + rad + ui(17)} textAnchor="middle"
+                x={0} y={rad + ui(17)} textAnchor="middle"
                 // Deckel in SVG-Einheiten: weit rausgezoomt schrumpfen Namen,
                 // statt sich gegenseitig zu überlagern
                 fontSize={Math.min(ui(13.5), 30)}
@@ -754,7 +799,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
                 {n.label.slice(0, 24)}
               </text>
               {lod >= 1 && (
-                <text x={p.x} y={p.y + ui(4)} textAnchor="middle" className="ov-graph-count" fontSize={Math.min(ui(10), 20)}>
+                <text x={0} y={ui(4)} textAnchor="middle" className="ov-graph-count" fontSize={Math.min(ui(10), 20)}>
                   {n.cards}
                 </text>
               )}
