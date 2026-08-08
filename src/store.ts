@@ -53,18 +53,29 @@ export type Tool = 'select' | 'pen' | 'marker' | 'eraser';
 
 /** Ein Undo-Schritt: kompletter Struktur-Stand eines Boards (Referenzen, kein Deep-Copy —
  *  alle Mutationen laufen immutabel, alte Objekte bleiben gültig). */
-interface HistoryEntry {
+interface BoardSnap {
   boardId: string;
   nodes: AppNode[];
   edges: Edge[];
   drawings?: Stroke[];
+}
+
+interface HistoryEntry extends BoardSnap {
   /** Notiz-INHALTE haben sich geändert → Undo/Redo muss den Board-Remount
    *  erzwingen, sonst zeigen BlockNote-Editoren (lesen nur beim Mount) alten Text */
   remount?: boolean;
-  /** M163 (Karten in anderes Board verschieben): der Schritt betrifft ZWEI
-   *  Boards — Undo/Redo stellt Quelle UND Ziel gemeinsam wieder her */
-  second?: { boardId: string; nodes: AppNode[]; edges: Edge[]; drawings?: Stroke[] };
+  /** Weitere Boards, die derselbe Schritt verändert hat — Undo/Redo dreht sie
+   *  gemeinsam zurück. M163 verschiebt Karten zwischen zwei Boards, M208 setzt
+   *  Themen-Tags über eine ganze Themen-Insel hinweg. */
+  others?: BoardSnap[];
 }
+
+/** Momentaufnahme aller genannten Boards (für mehrbrettrige Undo-Schritte) */
+const snapBoards = (boards: BoardDoc[], ids: string[]): BoardSnap[] =>
+  ids.flatMap((id) => {
+    const b = boards.find((x) => x.id === id);
+    return b ? [{ boardId: b.id, nodes: b.nodes, edges: b.edges, drawings: b.drawings }] : [];
+  });
 
 const HISTORY_LIMIT = 50;
 
@@ -164,6 +175,8 @@ interface BoardState {
   past: HistoryEntry[];
   future: HistoryEntry[];
   pushHistory: () => void;
+  /** EIN Undo-Schritt, der mehrere Boards umfasst (z. B. Themen-Tags einer Insel) */
+  pushHistoryBoards: (boardIds: string[]) => void;
   undo: () => void;
   redo: () => void;
 
@@ -847,6 +860,21 @@ export const useBoard = create<BoardState>()(
           });
         },
 
+        pushHistoryBoards: (boardIds) => {
+          if (historyMuted) return;
+          lastEditKey = '';
+          const s = get();
+          const b = s.boards.find((x) => x.id === s.activeId);
+          if (!b) return;
+          const others = snapBoards(s.boards, [...new Set(boardIds)].filter((id) => id !== b.id));
+          set({
+            past: [...s.past.slice(-(HISTORY_LIMIT - 1)), {
+              boardId: b.id, nodes: b.nodes, edges: b.edges, drawings: b.drawings, others,
+            }],
+            future: [],
+          });
+        },
+
         undo: () => {
           const s = get();
           const entry = s.past[s.past.length - 1];
@@ -856,21 +884,21 @@ export const useBoard = create<BoardState>()(
           // Remount, wenn Notiz-Inhalte betroffen sind — egal woher der Eintrag
           // stammt (Versions-Restore, KI-Edit, Struktur-Undo über Tipp-Grenzen)
           const remount = entry.remount || notesDiffer(board.nodes, entry.nodes);
-          // Zwei-Board-Schritt (M163): auch das zweite Board zurückdrehen
-          const secondBoard = entry.second ? s.boards.find((b) => b.id === entry.second!.boardId) : undefined;
+          // Mehr-Board-Schritt: alle Mitbetroffenen gemeinsam zurückdrehen
+          const restore = new Map((entry.others ?? []).map((o) => [o.boardId, o]));
           set({
             past: s.past.slice(0, -1),
             future: [...s.future, {
               boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount,
-              second: secondBoard ? { boardId: secondBoard.id, nodes: secondBoard.nodes, edges: secondBoard.edges, drawings: secondBoard.drawings } : undefined,
+              others: snapBoards(s.boards, [...restore.keys()]),
             }],
             activeId: entry.boardId,
             view: 'board',
-            boards: s.boards.map((b) =>
-              b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings }
-                : entry.second && b.id === entry.second.boardId ? { ...b, nodes: entry.second.nodes, edges: entry.second.edges, drawings: entry.second.drawings }
-                  : b,
-            ),
+            boards: s.boards.map((b) => {
+              if (b.id === entry.boardId) return { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings };
+              const o = restore.get(b.id);
+              return o ? { ...b, nodes: o.nodes, edges: o.edges, drawings: o.drawings } : b;
+            }),
             ...(remount ? { importEpoch: s.importEpoch + 1 } : {}),
           });
         },
@@ -956,20 +984,20 @@ export const useBoard = create<BoardState>()(
           const board = s.boards.find((b) => b.id === entry.boardId);
           if (!board) { set({ future: s.future.slice(0, -1) }); return; }
           const remount = entry.remount || notesDiffer(board.nodes, entry.nodes);
-          const secondBoard = entry.second ? s.boards.find((b) => b.id === entry.second!.boardId) : undefined;
+          const restore = new Map((entry.others ?? []).map((o) => [o.boardId, o]));
           set({
             future: s.future.slice(0, -1),
             past: [...s.past, {
               boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount,
-              second: secondBoard ? { boardId: secondBoard.id, nodes: secondBoard.nodes, edges: secondBoard.edges, drawings: secondBoard.drawings } : undefined,
+              others: snapBoards(s.boards, [...restore.keys()]),
             }],
             activeId: entry.boardId,
             view: 'board',
-            boards: s.boards.map((b) =>
-              b.id === entry.boardId ? { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings }
-                : entry.second && b.id === entry.second.boardId ? { ...b, nodes: entry.second.nodes, edges: entry.second.edges, drawings: entry.second.drawings }
-                  : b,
-            ),
+            boards: s.boards.map((b) => {
+              if (b.id === entry.boardId) return { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings };
+              const o = restore.get(b.id);
+              return o ? { ...b, nodes: o.nodes, edges: o.edges, drawings: o.drawings } : b;
+            }),
             ...(remount ? { importEpoch: s.importEpoch + 1 } : {}),
           });
         },
@@ -1322,12 +1350,12 @@ export const useBoard = create<BoardState>()(
           const moving = src.nodes.filter((n) => idSet.has(n.id));
           if (moving.length === 0) return;
 
-          // EIN Undo-Schritt für BEIDE Boards (HistoryEntry.second)
+          // EIN Undo-Schritt für BEIDE Boards (HistoryEntry.others)
           lastEditKey = '';
           set({
             past: [...s.past.slice(-(HISTORY_LIMIT - 1)), {
               boardId: src.id, nodes: src.nodes, edges: src.edges, drawings: src.drawings,
-              second: { boardId: tgt.id, nodes: tgt.nodes, edges: tgt.edges, drawings: tgt.drawings },
+              others: snapBoards(s.boards, [tgt.id]),
             }],
             future: [],
           });

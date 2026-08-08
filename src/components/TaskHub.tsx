@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { useBoard } from '../store';
+import { mutedHistory, useBoard } from '../store';
 import { doneCol, kanbanCols, openSubs, ticketBlockers, uid, type GanttData, type KanbanData } from '../types';
-import { makeKanban } from '../lib/nodes';
+import { makeKanban, makeNote } from '../lib/nodes';
 import {
   collectTaskTags, collectTasks, doneLog, downloadTasksIcs, formatDueShort, logDone,
   myDayKeys, parseQuickTask, shiftIso, toggleCheckBlock, toggleMyDay, type TaskRef,
 } from '../lib/tasks';
-import { aiReady } from '../lib/ai';
-import { brainDigest, type DigestLine } from '../lib/brain';
+import { aiReady, mdToBlocks } from '../lib/ai';
+import { applyTopicTag, brainDigest, buildTopicOverview, type DigestLine, type TopicCluster } from '../lib/brain';
 import { aiWeekPlan } from '../lib/aiActions';
 import { IBell, ICalendar, IChevronR, IGantt, IKanban, INote, ISearch, IUsers, IWand, IX } from './Icons';
 
@@ -73,6 +73,39 @@ export function TaskHub() {
       .catch(() => { if (!gone) setDigest([]); });
     return () => { gone = true; };
   }, [open, brainOn, rejectedLinks]);
+  // M208: Strg+Z/Strg+Y wirken auch hier. Das Board ist ausgehängt, solange die
+  // Zentrale offen ist — ohne diesen Handler ginge das Rückgängig-Versprechen
+  // der Puls-Aktionen ins Leere.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+      const key = e.key.toLowerCase();
+      if (key !== 'z' && key !== 'y') return;
+      e.preventDefault();
+      const st = useBoard.getState();
+      if (key === 'y' || e.shiftKey) st.redo(); else st.undo();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+  /** M209: Übersichts-Notiz aus einer Themen-Insel aufs aktive Board legen */
+  const makeOverview = async (cluster: TopicCluster, label: string) => {
+    const { title, markdown } = buildTopicOverview(cluster, label);
+    const st = useBoard.getState();
+    const note = makeNote({ x: 120, y: 120 }, {
+      color: 'sky',
+      blocks: await mdToBlocks(title, markdown) as never,
+    });
+    st.pushHistory();
+    mutedHistory(() => st.addNode(note));
+    setOpen(false);
+    st.focusNode(st.activeId, note.id);
+    showToast(`📝 Übersichts-Notiz „${label}" angelegt — Strg+Z macht es rückgängig.`);
+  };
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null); // Accordion-Werkzeuge (M116)
   const [aiBusy, setAiBusy] = useState(false);
@@ -362,17 +395,40 @@ export function TaskHub() {
           {pulseOpen && (
             <div className="brain-pulse-body">
               {digest.map((d, i) => (
-                <button
-                  key={i}
-                  className={`brain-pulse-row kind-${d.kind}`}
-                  onClick={() => { if (d.boardId) { setOpen(false); openBoard(d.boardId); } }}
-                  title={d.boardId ? 'Zum Board springen' : undefined}
-                >
-                  <span className="brain-pulse-kind">
-                    {d.kind === 'thema' ? 'Thema' : d.kind === 'knoten' ? 'Knoten' : 'Vorschlag'}
-                  </span>
-                  <span className="brain-pulse-text">{d.text}</span>
-                </button>
+                <div key={i} className={`brain-pulse-item kind-${d.kind}`}>
+                  <button
+                    className={`brain-pulse-row kind-${d.kind}`}
+                    onClick={() => { if (d.boardId) { setOpen(false); openBoard(d.boardId); } }}
+                    title={d.boardId ? 'Zum Board springen' : undefined}
+                  >
+                    <span className="brain-pulse-kind">
+                      {d.kind === 'thema' ? 'Thema' : d.kind === 'knoten' ? 'Knoten' : 'Vorschlag'}
+                    </span>
+                    <span className="brain-pulse-text">{d.text}</span>
+                  </button>
+                  {/* M208/M209: Was man mit einer Themen-Insel direkt tun kann */}
+                  {d.kind === 'thema' && d.cluster && d.label && (
+                    <div className="brain-pulse-acts">
+                      <button
+                        onClick={() => {
+                          const n = applyTopicTag(d.cluster!, d.label!);
+                          showToast(n > 0
+                            ? `🏷 „thema = ${d.label}" auf ${n} Karte(n) gesetzt — über Strg+K findbar, Strg+Z macht es rückgängig.`
+                            : `Alle Karten tragen „thema = ${d.label}" bereits.`);
+                        }}
+                        title={'Allen Karten dieser Themen-Insel die Eigenschaft „thema" geben — danach über Strg+K und Schwimmbahnen nutzbar'}
+                      >
+                        🏷 Als Thema markieren
+                      </button>
+                      <button
+                        onClick={() => void makeOverview(d.cluster!, d.label!)}
+                        title="Eine Übersichts-Notiz anlegen, die alle Karten dieses Themas bündelt (mit Board-Links und Checkliste)"
+                      >
+                        📝 Übersichts-Notiz anlegen
+                      </button>
+                    </div>
+                  )}
+                </div>
               ))}
               <div className="brain-pulse-foot">
                 Rein rechnerisch aus dem semantischen Index — keine KI-Anfrage, keine Kosten.

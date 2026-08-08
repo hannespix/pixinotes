@@ -15,7 +15,7 @@
 import { idbDel, idbGet, idbKeys, idbSet } from './syncFolder';
 import { nodeToText } from './serialize';
 import { askAi } from './ai';
-import { useBoard } from '../store';
+import { mutedHistory, useBoard } from '../store';
 
 const PREFIX = 'brain:v1:';
 const KEY = (boardId: string, nodeId: string) => `${PREFIX}${boardId}:${nodeId}`;
@@ -291,17 +291,100 @@ export function hubBoards(max = 3): Array<{ boardId: string; name: string; degre
     .slice(0, max);
 }
 
-export interface DigestLine { kind: 'thema' | 'knoten' | 'vorschlag'; text: string; boardId?: string }
+/* ---------- M208: Auto-Struktur — Themen-Tag & Entitäten ----------
+   Aus einer Themen-Insel wird ein KURZES Schlagwort abgeleitet (häufigstes
+   inhaltstragendes Wort der Kartentitel, keine KI nötig) und als Eigenschaft
+   `thema` auf die Karten geschrieben. Damit sind Themen über Strg+K, die
+   Eigenschaften-Ansicht und Anordnen („Schwimmbahnen") nutzbar. */
+const STOPP = new Set([
+  'und', 'oder', 'der', 'die', 'das', 'den', 'dem', 'des', 'ein', 'eine', 'einen', 'einer', 'eines',
+  'für', 'mit', 'von', 'vom', 'zum', 'zur', 'bei', 'auf', 'aus', 'nach', 'über', 'unter', 'ist', 'sind',
+  'werden', 'wird', 'wurde', 'haben', 'hat', 'nicht', 'auch', 'noch', 'sich', 'als', 'wie', 'dass',
+  'neue', 'neuer', 'neues', 'alle', 'mehr', 'sehr', 'kann', 'muss', 'soll', 'im', 'am', 'an', 'in',
+]);
+
+/** Kurzes Schlagwort für eine Themen-Insel (aus den Titeln, ohne KI) */
+export function topicLabel(cluster: TopicCluster): string {
+  const freq = new Map<string, number>();
+  for (const c of cluster.cards) {
+    for (const raw of c.title.split(/[^\p{L}\d]+/u)) {
+      const w = raw.trim();
+      if (w.length < 4 || STOPP.has(w.toLowerCase())) continue;
+      const key = w[0].toUpperCase() + w.slice(1).toLowerCase();
+      freq.set(key, (freq.get(key) ?? 0) + 1);
+    }
+  }
+  const best = [...freq.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+  return best?.[0] ?? (cluster.title.split(/\s+/)[0] || 'Thema');
+}
+
+/** Themen-Tag auf alle Karten einer Insel schreiben — EIN History-Schritt
+ *  über ALLE beteiligten Boards (eine Insel spannt sich typischerweise über
+ *  mehrere Boards; ein Undo muss sie komplett zurücknehmen) */
+export function applyTopicTag(cluster: TopicCluster, label: string): number {
+  const st = useBoard.getState();
+  st.pushHistoryBoards(cluster.cards.map((c) => c.boardId));
+  let n = 0;
+  mutedHistory(() => {
+    for (const c of cluster.cards) {
+      const board = st.boards.find((b) => b.id === c.boardId);
+      const node = board?.nodes.find((x) => x.id === c.nodeId);
+      if (!node) continue;
+      const attrs = (node.data?.attrs as Record<string, string> | undefined) ?? {};
+      if (attrs.thema === label) continue;
+      st.updateNodeDataOnBoard(c.boardId, c.nodeId, { attrs: { ...attrs, thema: label } });
+      n += 1;
+    }
+  });
+  return n;
+}
+
+/* ---------- M209: Übersichts-Notiz aus einer Themen-Insel ----------
+   Das klassische „Map of Content"-Muster aus Obsidian: eine Notiz, die ein
+   Thema bündelt und auf alle zugehörigen Karten verweist. Hier entsteht sie
+   automatisch — mit [[Wikilinks]] auf die Boards (die Chips an der Notiz
+   springen dann direkt hin) und einer Checkliste zum Durcharbeiten. */
+export function buildTopicOverview(cluster: TopicCluster, label: string): { title: string; markdown: string } {
+  const byBoard = new Map<string, string[]>();
+  for (const c of cluster.cards) {
+    byBoard.set(c.boardName, [...(byBoard.get(c.boardName) ?? []), c.title || '(ohne Titel)']);
+  }
+  const lines: string[] = [
+    `## 🧠 Übersicht: ${label}`,
+    '',
+    `${cluster.cards.length} Karten aus ${byBoard.size} Board${byBoard.size > 1 ? 's' : ''} — automatisch nach Bedeutung gebündelt.`,
+    '',
+  ];
+  for (const [board, titles] of byBoard) {
+    lines.push(`### [[${board}]]`);
+    for (const t of titles) lines.push(`- [ ] ${t.slice(0, 90)}`);
+    lines.push('');
+  }
+  lines.push('_Erzeugt vom Gehirn-Puls — Karten ergänzen, umformulieren und verlinken wie in jeder anderen Notiz._');
+  return { title: `Übersicht: ${label}`, markdown: lines.join('\n') };
+}
+
+export interface DigestLine {
+  kind: 'thema' | 'knoten' | 'vorschlag';
+  text: string;
+  boardId?: string;
+  /** nur bei 'thema': die Insel selbst, damit das UI Tag/Übersicht anbieten kann */
+  cluster?: TopicCluster;
+  label?: string;
+}
 
 /** Kurzbericht fürs Gehirn-Panel: Themen, Knotenpunkte, offene Vorschläge */
 export async function brainDigest(rejected: Set<string>): Promise<DigestLine[]> {
   const out: DigestLine[] = [];
   const topics = await clusterTopics();
   for (const t of topics.slice(0, 3)) {
+    const label = topicLabel(t);
     out.push({
       kind: 'thema',
-      text: `„${t.title}" — ${t.cards.length} Karten aus ${t.boards.length} Board${t.boards.length > 1 ? 's' : ''} (${t.boards.slice(0, 3).join(', ')})`,
+      text: `${label} — ${t.cards.length} Karten aus ${t.boards.length} Board${t.boards.length > 1 ? 's' : ''} (${t.boards.slice(0, 3).join(', ')})`,
       boardId: t.cards[0]?.boardId,
+      cluster: t,
+      label,
     });
   }
   for (const h of hubBoards()) {

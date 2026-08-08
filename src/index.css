@@ -3872,3 +3872,15 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .brain-pulse-row.kind-vorschlag .brain-pulse-kind { color: var(--accent-strong); border-color: var(--accent); }
 .brain-pulse-text { flex: 1; line-height: 1.45; }
 .brain-pulse-foot { padding: 6px 8px 2px; font-size: 10.5px; color: var(--muted); line-height: 1.5; }
+
+/* ================= M208/M209: Themen-Aktionen im Puls ================= */
+.brain-pulse-item { border-radius: 8px; }
+.brain-pulse-item.kind-thema { background: color-mix(in srgb, var(--accent-soft) 40%, transparent); }
+.brain-pulse-acts { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 8px 8px 10px; }
+.brain-pulse-acts button {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink);
+  border-radius: 999px; padding: 5px 11px; min-height: 32px;
+  font: inherit; font-size: 11.5px; cursor: pointer;
+}
+.brain-pulse-acts button:hover { border-color: var(--accent); color: var(--accent-strong); background: var(--surface-2); }
+@media (pointer: coarse) { .brain-pulse-acts button { min-height: 40px; } }
