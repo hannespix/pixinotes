@@ -205,13 +205,35 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
   // Block-Löschen) ist bewusst aus, und per Tastatur ist eine Tabelle in
   // BlockNote praktisch unlöschbar. Steht der Cursor in einer Tabelle,
   // erscheint deshalb unten ein „Tabelle entfernen"-Chip.
+  //
+  // M229: Dasselbe gilt für ZEILEN und SPALTEN. Die eingebauten Griffe von
+  // BlockNote verweigern die letzte Zeile und die letzte Spalte — eine
+  // Tabelle darf dort nie leer werden. Für den Nutzer heißt das: Ein Rest
+  // bleibt immer stehen, und was er eigentlich wollte („weg damit"), geht
+  // nicht (User-Report). Hier gilt darum: Wer die letzte Zeile oder Spalte
+  // löscht, löscht die Tabelle — das ist die Absicht dahinter.
+  const editorRef = useRef<HTMLDivElement>(null);
   const [tableSel, setTableSel] = useState<string | null>(null);
+  const [tabZelle, setTabZelle] = useState<{ zeile: number; spalte: number } | null>(null);
   const trackTable = () => {
     try {
       const b = editor.getTextCursorPosition().block;
-      setTableSel(b.type === 'table' ? b.id : null);
+      const inTabelle = b.type === 'table';
+      setTableSel(inTabelle ? b.id : null);
+      if (!inTabelle) { setTabZelle(null); return; }
+      // Welche Zelle? Der Editor-Zustand verrät es nicht, das DOM schon.
+      const sel = document.getSelection();
+      const knoten = sel?.anchorNode ?? null;
+      const el = knoten instanceof Element ? knoten : knoten?.parentElement ?? null;
+      const zelle = el?.closest?.('td, th') as HTMLTableCellElement | null;
+      const zeile = zelle?.parentElement as HTMLTableRowElement | null;
+      // Nur Zellen DIESER Karte — auf dem Board liegen viele Editoren
+      if (zelle && zeile && editorRef.current?.contains(zelle)) {
+        setTabZelle({ zeile: zeile.rowIndex, spalte: zelle.cellIndex });
+      } else setTabZelle(null);
     } catch {
       setTableSel(null);
+      setTabZelle(null);
     }
   };
   const removeTable = () => {
@@ -220,8 +242,44 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
       editor.removeBlocks([tableSel]);
       updateNodeData(id, { blocks: editor.document });
       setTableSel(null);
+      setTabZelle(null);
       showToast('Tabelle entfernt — Strg+Z im Text holt sie zurück.');
     } catch { /* Block schon weg */ }
+  };
+  /** Zeile oder Spalte löschen — die letzte nimmt die ganze Tabelle mit */
+  const entferne = (was: 'zeile' | 'spalte') => {
+    if (!tableSel || !tabZelle) return;
+    try {
+      const block = editor.getBlock(tableSel) as unknown as {
+        content?: { rows?: Array<{ cells: unknown[] }>; columnWidths?: unknown[] };
+      } | undefined;
+      const rows = block?.content?.rows;
+      if (!rows) return;
+      const letzte = was === 'zeile'
+        ? rows.length <= 1
+        : rows.every((r) => (r.cells?.length ?? 0) <= 1);
+      if (letzte) { removeTable(); return; }
+      const neu = was === 'zeile'
+        ? rows.filter((_, i) => i !== tabZelle.zeile)
+        : rows.map((r) => ({ ...r, cells: r.cells.filter((_, i) => i !== tabZelle.spalte) }));
+      const breiten = block?.content?.columnWidths;
+      editor.updateBlock(tableSel, {
+        type: 'table',
+        content: {
+          type: 'tableContent',
+          ...(was === 'spalte' && Array.isArray(breiten)
+            ? { columnWidths: breiten.filter((_, i) => i !== tabZelle.spalte) }
+            : {}),
+          rows: neu,
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any);
+      updateNodeData(id, { blocks: editor.document });
+      setTabZelle(null);
+      showToast(was === 'zeile'
+        ? 'Zeile entfernt — Strg+Z im Text holt sie zurück.'
+        : 'Spalte entfernt — Strg+Z im Text holt sie zurück.');
+    } catch { /* Tabelle inzwischen weg */ }
   };
 
   return (
@@ -234,7 +292,7 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
         value={(data.hex as string) ?? '#fff8c5'}
         onChange={(e) => updateNodeData(id, { hex: e.target.value })}
       />
-      <div className="nodrag nowheel note-editor">
+      <div className="nodrag nowheel note-editor" ref={editorRef}>
         <BlockNoteView
           editor={editor}
           theme="light"
@@ -249,12 +307,30 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
       </div>
       {tableSel && (
         <div className="due-chips nodrag">
+          {tabZelle && (
+            <>
+              <button
+                className="due-chip table-del-chip"
+                title="Die Zeile mit dem Cursor löschen — ist es die letzte, verschwindet die Tabelle"
+                onClick={() => entferne('zeile')}
+              >
+                ⌫ Zeile
+              </button>
+              <button
+                className="due-chip table-del-chip"
+                title="Die Spalte mit dem Cursor löschen — ist es die letzte, verschwindet die Tabelle"
+                onClick={() => entferne('spalte')}
+              >
+                ⌫ Spalte
+              </button>
+            </>
+          )}
           <button
             className="due-chip table-del-chip"
             title="Die Tabelle, in der der Cursor steht, komplett aus der Notiz entfernen"
             onClick={removeTable}
           >
-            ⌫ Tabelle entfernen
+            ⌫ Tabelle
           </button>
         </div>
       )}
