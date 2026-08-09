@@ -164,7 +164,7 @@ function baseNodeText(node: AppNode): string {
       // sie weder durchsuchbar noch im E-Mail-/Clipboard-Export (Audit R6-F2)
       const line = (it: (typeof k.items)[number], i: number) =>
         `  ${i === done ? '☑' : '☐'} ${it.text}${it.due ? ` (bis ${it.due})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` — ${it.note}` : ''}`;
-      return `${k.title}\n${cols.map(
+      return `${k.title || 'Kanban'}\n${cols.map(
         (col, i) => `\n${col}:\n${k.items.filter((it) => Math.min(it.col, done) === i).map((it) => line(it, i)).join('\n') || '  —'}`,
       ).join('')}`;
     }
@@ -180,7 +180,7 @@ function baseNodeText(node: AppNode): string {
       return `Diagramm:\n${node.data.code}`;
     case 'gantt': {
       const g = node.data;
-      return `${g.title}\n${g.rows
+      return `${g.title || 'Zeitplan'}\n${g.rows
         .map((r) => `  ${r.start === r.end ? '◆' : '▬'} ${r.name}: ${r.start} → ${r.end}${r.progress ? ` (${r.progress}%)` : ''}${(r as { who?: string }).who ? ` @${(r as { who?: string }).who}` : ''}`)
         .join('\n')}`;
     }
@@ -199,7 +199,7 @@ function baseNodeText(node: AppNode): string {
       const rows = [...t.segs]
         .sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start)
         .map((s) => `${s.date} ${hm(s.start)}-${s.end !== undefined ? hm(s.end) : 'läuft'} ${labels[s.kind] ?? s.kind}${s.note ? ` (${s.note})` : ''}`);
-      return `${t.title}\n${rows.join('\n')}`;
+      return `${t.title || 'Zeiterfassung'}\n${rows.join('\n')}`;
     }
     case 'minutes': {
       // M186: bewusst ALLE Sitzungen — nur so findet die Suche (Strg+K) auch
@@ -226,7 +226,7 @@ function baseNodeText(node: AppNode): string {
       const rows = [...w.entries]
         .sort((a, b) => a.day - b.day || a.start - b.start)
         .map((e) => `${cols[e.day] ?? '?'} ${when(e)} ${e.text}${e.who ? ` (${e.who})` : ''}`);
-      return `${w.title}\n${rows.join('\n')}`;
+      return `${w.title || 'Planer'}\n${rows.join('\n')}`;
     }
     default:
       return '';

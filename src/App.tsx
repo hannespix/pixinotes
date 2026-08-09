@@ -21,6 +21,7 @@ import { initFilesSync } from './lib/filesSync';
 import { initBrain } from './lib/brain';
 import { TaskHub } from './components/TaskHub';
 import { AboutMenu } from './components/AboutMenu';
+import { FocusSheet } from './components/FocusSheet';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { SidePanel } from './components/SidePanel';
 import { ShareCardsModal } from './components/ShareCardsModal';
@@ -36,6 +37,7 @@ export default function App() {
   const importEpoch = useBoard((s) => s.importEpoch);
   const presenting = useBoard((s) => s.presenting);
   const tasksOpen = useBoard((s) => s.tasksOpen);
+  const focusCard = useBoard((s) => s.focusCard);
   const restoreDeleted = useBoard((s) => s.restoreDeleted);
   const showToast = useBoard((s) => s.showToast);
 
@@ -178,7 +180,7 @@ export default function App() {
     // Karten für einen Moment die ALTEN Knoten, und BlockNote (liest Inhalt
     // nur beim Mount) friert den alten Text ein.
     <ReactFlowProvider key={importEpoch}>
-      <div className="app">
+      <div className={`app${focusCard ? ' focus-mode' : ''}`}>
         <div className="topbar">
           <AboutMenu />
           <TopActions />
@@ -204,6 +206,9 @@ export default function App() {
             <SidePanel />
             {/* M202: Teilen-Dialog für ausgewählte Karten */}
             <ShareCardsModal />
+            {/* M212: Karte im Fokus (Handy) — Rahmen und Bedienung; die Karte
+                selbst bleibt im Board-Baum und wird per CSS formatfüllend */}
+            <FocusSheet />
           </>
         )}
         <SearchOverlay />

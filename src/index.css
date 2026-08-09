@@ -3998,3 +3998,93 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 @media (max-width: 640px) {
   .react-flow__controls { display: none; }
 }
+
+/* ================= M212: Karte im Fokus (Handy) =================
+   Die Karte bleibt im React-Flow-Baum — sonst verlören Handle, NodeResizer und
+   useReactFlow ihren Kontext. Stattdessen wird hier die Transform-Kette des
+   Viewports neutralisiert und genau EIN Knoten formatfüllend gestellt.
+   Wichtig: !important schlägt die Inline-Styles, die React Flow schreibt. */
+.focus-mode .react-flow__viewport { transform: none !important; }
+.focus-mode .react-flow__node { display: none !important; }
+.focus-mode .react-flow__edges,
+.focus-mode .react-flow__background,
+.focus-mode .react-flow__minimap,
+.focus-mode .drawing-layer,
+.focus-mode .dock,
+.focus-mode .tabs,
+.focus-mode .backlinks,
+.focus-mode .legal-corner,
+.focus-mode .react-flow__attribution,
+.focus-mode .sel-toolbar-dock { display: none !important; }
+
+.focus-mode .react-flow__node.pn-focused {
+  display: block !important;
+  position: absolute !important;
+  transform: none !important;
+  left: 0 !important;
+  top: var(--focus-top) !important;
+  width: 100vw !important;
+  height: calc(100dvh - var(--focus-top) - var(--focus-bottom) - var(--kb)) !important;
+  max-width: none !important;
+  z-index: 3;
+}
+/* Die Hülle füllt das Blatt aus, statt ihre Board-Maße zu behalten */
+.focus-mode .pn-focused .card-shell,
+.focus-mode .pn-focused .card-body { width: 100% !important; height: 100% !important; }
+/* Board-Werkzeuge an der Karte ergeben im Fokus keinen Sinn: Verschiebe-Griff,
+   Löschen, Verbindungspunkte und Resize sind Sache des Boards. */
+.focus-mode .pn-focused .card-grip,
+.focus-mode .pn-focused .card-x,
+.focus-mode .pn-focused .react-flow__handle,
+.focus-mode .pn-focused .react-flow__resize-control { display: none !important; }
+/* Kein abgesetzter Kartenlook mehr — das Blatt IST die Karte */
+.focus-mode .pn-focused .card-body {
+  border-radius: 0 !important; box-shadow: none !important; border: none !important;
+  overflow: auto !important;
+}
+
+/* Kopfzeile: Zurück · Titel · Mehr */
+.focus-head {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 60;
+  height: var(--focus-top); padding: calc(var(--safe-top)) 6px 0;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--glass); border-bottom: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+  animation: pn-fade-in 0.18s ease-out;
+}
+.focus-head button {
+  flex: none; width: 44px; height: 44px; display: grid; place-items: center;
+  border: none; background: none; color: var(--ink); cursor: pointer; border-radius: 10px;
+}
+.focus-head button:hover { background: var(--surface-2); }
+.focus-title { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.focus-title b {
+  font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.focus-title span { font-size: 11px; color: var(--muted); }
+
+/* Blätter-Leiste unten — die einzige Leiste im Fokus */
+.focus-nav {
+  position: fixed; left: 0; right: 0; bottom: var(--kb); z-index: 60;
+  height: var(--focus-bottom); padding-bottom: env(safe-area-inset-bottom, 0px);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding-inline: 6px;
+  background: var(--glass); border-top: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+  animation: pn-fade-in 0.18s ease-out;
+  transition: bottom 0.18s ease;
+}
+.focus-nav button {
+  width: 56px; height: 44px; display: grid; place-items: center;
+  border: none; background: none; color: var(--ink); cursor: pointer; border-radius: 10px;
+}
+.focus-nav button:hover { background: var(--surface-2); }
+.focus-hint { font-size: 11px; color: var(--muted); }
+/* Tastatur offen: die Blätter-Leiste hilft beim Tippen nicht */
+[data-keyboard='on'] .focus-nav { display: none; }
+:root { --focus-top: 52px; --focus-bottom: 0px; }
+.focus-mode { --focus-bottom: 0px; }
+.focus-mode:has(.focus-nav) { --focus-bottom: 52px; }
+[data-keyboard='on'] .focus-mode:has(.focus-nav) { --focus-bottom: 0px; }

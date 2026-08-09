@@ -111,6 +111,8 @@ export function Settings() {
   const [davSecret, setDavSecret] = useState('');
   const clickZoom = useBoard((s) => s.clickZoom);
   const setClickZoom = useBoard((s) => s.setClickZoom);
+  const cardFocus = useBoard((s) => s.cardFocus);
+  const setCardFocus = useBoard((s) => s.setCardFocus);
   const wheelZoom = useBoard((s) => s.wheelZoom);
   const setWheelZoom = useBoard((s) => s.setWheelZoom);
   const ui = useBoard((s) => s.ui);
@@ -1081,6 +1083,16 @@ export function Settings() {
           </div>
 
           <h3 style={{ marginTop: 16 }}>Bedienung</h3>
+          <label className="modal-row modal-row-check">
+            <span>Karte im Fokus (nur Handy)</span>
+            <input type="checkbox" checked={cardFocus} onChange={(e) => setCardFocus(e.target.checked)} />
+          </label>
+          <p className="modal-hint">
+            Am Handy öffnet ein Tipp die Karte formatfüllend, mit Kopfzeile und Blättern —
+            statt sie im Canvas auf Fingernagelgröße zu bedienen. Wischen wechselt zur
+            nächsten Karte, Wischen nach unten (oder die Zurück-Taste) führt aufs Board.
+            Abgeschaltet bleibt es beim Klick-Zoom wie auf dem Desktop.
+          </p>
           <label className="modal-row modal-row-check">
             <span>Klick-Zoom</span>
             <input type="checkbox" checked={clickZoom} onChange={(e) => setClickZoom(e.target.checked)} />

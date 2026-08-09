@@ -34,6 +34,12 @@ import { MinutesCard } from './nodes/MinutesCard';
 import { TimeCard } from './nodes/TimeCard';
 import { HtmlAppCard } from './nodes/HtmlAppCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
+import { focusable } from './FocusSheet';
+
+/** M212: Fokus-Modus greift nur am Handy — auf Tablet/Desktop ist genug
+ *  Fläche da, um im Canvas zu arbeiten. Dieselbe Schwelle wie im Stylesheet. */
+const isPhoneFocus = () =>
+  window.matchMedia('(max-width: 640px) and (pointer: coarse)').matches;
 import { DrawingLayer } from './DrawingLayer';
 import { CommentLayer } from './CommentLayer';
 import { SelectionToolbar } from './SelectionToolbar';
@@ -245,6 +251,11 @@ export function Board() {
   // Archiv (M87): archivierte Karten sind ausgeblendet (React-Flow `hidden`),
   // bei aktivem Archiv-Schalter gedimmt sichtbar. Anhängende Kanten wandern mit.
   const showArchived = useBoard((s) => s.showArchived);
+  // M212: Die fokussierte Karte bekommt nur eine Klasse — sie BLEIBT im
+  // React-Flow-Baum. Würde man sie woanders neu rendern, verlören Handle,
+  // NodeResizer & Co. ihren Kontext; das CSS stellt sie stattdessen
+  // formatfüllend (siehe .focus-mode im Stylesheet).
+  const focusCard = useBoard((s) => s.focusCard);
   const rfNodes = useMemo(
     () => nodes.map((n) => {
       // M200: Schrift/Größe pro Karte als Klassen am Node-Wrapper — das CSS
@@ -253,11 +264,12 @@ export function Board() {
         n.archived ? 'archived-card' : '',
         n.font ? `pn-font-${n.font}` : '',
         n.fontSize ? `pn-size-${n.fontSize}` : '',
+        n.id === focusCard ? 'pn-focused' : '',
       ].filter(Boolean).join(' ');
       if (!cls && !n.archived) return n;
       return { ...n, hidden: n.archived ? !showArchived : undefined, className: cls || undefined };
     }),
-    [nodes, showArchived],
+    [nodes, showArchived, focusCard],
   );
   const rfEdges = useMemo(() => {
     const arch = new Set(nodes.filter((n) => n.archived).map((n) => n.id));
@@ -460,6 +472,14 @@ export function Board() {
   const flyingUntil = useRef(0);
 
   const onNodeClick = useCallback((e: React.MouseEvent, node: Node) => {
+    const st0 = useBoard.getState();
+    // M212: Am Handy öffnet ein Tipp die Karte formatfüllend. Ziehen löst
+    // keinen Klick aus, Verschieben bleibt also unberührt; und wer schon im
+    // Fokus ist, tippt in der Karte und soll dort nicht erneut auslösen.
+    if (st0.cardFocus && !st0.focusCard && !e.shiftKey && isPhoneFocus()) {
+      const full = selectActiveBoard(st0).nodes.find((n) => n.id === node.id);
+      if (focusable(full)) { st0.setFocusCard(node.id); return; }
+    }
     if (!useBoard.getState().clickZoom || e.shiftKey) return; // Shift = Mehrfachauswahl
     // Rahmen NIE per Klick einpassen (User-Report M162): Klicks treffen dort
     // immer die Titel-Leiste/Werkzeuge — bei großen Rahmen zoomte die Ansicht
