@@ -396,6 +396,47 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     return out.sort((a, b) => (a.kind === 'space' ? -1 : 1) - (b.kind === 'space' ? -1 : 1));
   }, [spaces, pos, showRegions, brainOn, brainOffSpaces]);
 
+  /**
+   * M222: Verbindungen zwischen Bereichen als BAND statt als fünfzig Fäden.
+   *
+   * Zwischen zwei gut verzahnten Bereichen laufen schnell Dutzende Portale und
+   * Wikilinks. Einzeln gezeichnet ergeben sie Rauschen; gebündelt ergeben sie
+   * eine Aussage: „Zwischen Bauleitplanung und Rechtsamt läuft viel." Die
+   * Stärke des Bands zeigt, wie viel — die Beschriftung sagt es genau.
+   */
+  const bundles = useMemo(() => {
+    if (!showRegions) return [];
+    const spaceOf = new Map<string, string>();
+    for (const sp of spaces) for (const p of sp.projects) for (const id of p.boardIds) spaceOf.set(id, sp.id);
+    const zaehler = new Map<string, number>();
+    for (const l of links) {
+      if (l.kind === 'vorschlag') continue; // Vorschläge sind keine echten Wege
+      const a = spaceOf.get(l.a);
+      const b = spaceOf.get(l.b);
+      if (!a || !b || a === b) continue;    // innerhalb eines Bereichs: kein Band
+      const key = [a, b].sort().join('|');
+      zaehler.set(key, (zaehler.get(key) ?? 0) + 1);
+    }
+    // Mittelpunkt je Bereich aus den Board-Positionen
+    const mitte = new Map<string, { x: number; y: number }>();
+    for (const sp of spaces) {
+      const pts = sp.projects.flatMap((p) => p.boardIds.map((id) => pos.get(id))).filter(Boolean) as Array<{ x: number; y: number }>;
+      if (pts.length === 0) continue;
+      mitte.set(sp.id, {
+        x: pts.reduce((t, q) => t + q.x, 0) / pts.length,
+        y: pts.reduce((t, q) => t + q.y, 0) / pts.length,
+      });
+    }
+    const namen = new Map(spaces.map((sp) => [sp.id, sp.name]));
+    return [...zaehler.entries()].flatMap(([key, n]) => {
+      const [a, b] = key.split('|');
+      const pa = mitte.get(a);
+      const pb = mitte.get(b);
+      if (!pa || !pb) return [];
+      return [{ key, a: pa, b: pb, n, label: `${namen.get(a)} ↔ ${namen.get(b)}: ${n}` }];
+    });
+  }, [links, spaces, pos, showRegions]);
+
   // ---------- M195: Knoten ziehen (stupst die Nachbarn physikalisch an) ----------
   const dragNode = useRef<string | null>(null);
   const dragMoved = useRef(false);
@@ -754,6 +795,26 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   // Stufe 0 (zu klein für Details): nur Boards + Namen. Stufe 1: Karten-Punkte.
   // Stufe 2 (nah): Karten-Titel an den Punkten.
   const lod = scale < 0.42 ? 0 : scale <= 1.35 ? 1 : 2;
+  /**
+   * M222: Der Zoom wechselt die GLIEDERUNGS-Ebene.
+   *
+   * Weit draußen interessiert niemanden, wie ein einzelnes Board heißt — dort
+   * zählt, welche Bereiche es überhaupt gibt und wie stark sie zusammenhängen.
+   * Näher heran treten die Projekte hervor, ganz nah die Boards selbst.
+   *
+   * Der Wechsel läuft über eine Klasse am SVG, nicht über bedingtes Rendern:
+   * So blenden CSS-Übergänge die Ebenen ineinander, statt dass Elemente
+   * schlagartig verschwinden — genau das Flackern, das solche Ansichten
+   * unruhig macht.
+   *
+   * Maßstab ist die Zoomstufe (wie viel vom Netz im Bild liegt), NICHT die
+   * Bildschirmgröße: Sonst stünde ein Handy dauerhaft auf Bereichs-Ebene und
+   * ein großer Monitor nie. `zoom` ist 1, wenn alles eingepasst ist, und läuft
+   * von 0,4 (ganz heraus) bis 10 (ganz heran) — die Grenzen aus `zoomAt`.
+   */
+  const zoom = GRAPH_W / vb.w;
+  const geoLevel: 'space' | 'project' | 'board' =
+    zoom < 0.5 ? 'space' : zoom < 0.8 ? 'project' : 'board';
   /** Wunschgröße in Bildschirm-Pixeln → SVG-Einheiten (konstant auf dem Schirm) */
   const ui = (px: number) => px / scale;
 
@@ -797,7 +858,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
       <svg
         ref={svgRef}
         viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
-        className="ov-graph-svg"
+        className={`ov-graph-svg geo-${geoLevel}`}
         role="img"
         aria-label="Board-Netz"
         onPointerDown={onPointerDown}
@@ -824,6 +885,20 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
                 {rg.schlaeft ? `${rg.name} · schläft` : rg.name}
               </text>
             )}
+          </g>
+        ))}
+        {/* M222: Bänder zwischen Bereichen — nur weit draußen, dort ersetzen
+            sie die Einzellinien und machen die Verzahnung erst lesbar */}
+        {bundles.map((bd) => (
+          <g key={`bd-${bd.key}`} className="ov-bundle">
+            <title>{bd.label}</title>
+            <line
+              x1={bd.a.x} y1={bd.a.y} x2={bd.b.x} y2={bd.b.y}
+              strokeWidth={ui(Math.min(22, 4 + bd.n * 2.4))}
+            />
+            <text x={(bd.a.x + bd.b.x) / 2} y={(bd.a.y + bd.b.y) / 2 - ui(9)} fontSize={ui(13)}>
+              {bd.n}
+            </text>
           </g>
         ))}
         {links.map((l, i) => {

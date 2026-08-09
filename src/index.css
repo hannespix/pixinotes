@@ -4235,3 +4235,41 @@ body:has(.app.focus-mode) .sel-menu-fixed { display: none !important; }
   fill-opacity: 0.05; stroke-opacity: 0.3; stroke-dasharray: 3 6;
 }
 .ov-region.schlaeft text { fill: var(--muted); fill-opacity: 0.7; font-weight: 600; }
+
+/* ================= M222: Zoom wechselt die Gliederungs-Ebene =================
+   Der Wechsel läuft über Deckkraft, nicht über Ein-/Ausblenden im DOM: So
+   gleiten die Ebenen ineinander, statt zu springen. Alles bleibt anfassbar,
+   was sichtbar ist — und was unsichtbar ist, fängt keine Klicks ab. */
+.ov-graph-svg .ov-graph-node,
+.ov-graph-svg .ov-region-project,
+.ov-graph-svg .ov-bundle {
+  transition: opacity 0.28s ease;
+}
+
+/* --- Weit draußen: nur die Bereichs-Kontinente und ihre Bänder --- */
+.ov-graph-svg.geo-space .ov-graph-node { opacity: 0.22; pointer-events: none; }
+.ov-graph-svg.geo-space .ov-region-project { opacity: 0; }
+/* Einzelne Verbindungen tragen keine eigene Klasse — sie liegen als direkte
+   <line>-Kinder im SVG. Weit draußen treten sie hinter die Bänder zurück. */
+.ov-graph-svg.geo-space > line,
+.ov-graph-svg.geo-space .ov-graph-suggest { opacity: 0.12; transition: opacity 0.28s ease; }
+.ov-graph-svg > line { transition: opacity 0.28s ease; }
+.ov-graph-svg.geo-space .ov-region-space path { fill-opacity: 0.13; stroke-opacity: 0.45; }
+.ov-graph-svg.geo-space .ov-region-space text { font-size: 1.25em; fill-opacity: 0.85; }
+
+/* --- Mittlere Höhe: Projekte treten hervor, Bänder verblassen --- */
+.ov-graph-svg.geo-project .ov-graph-node { opacity: 0.75; }
+.ov-graph-svg.geo-project .ov-bundle { opacity: 0.35; }
+
+/* --- Ganz nah: die Boards, Bänder stören nicht mehr --- */
+.ov-graph-svg.geo-board .ov-bundle { opacity: 0; pointer-events: none; }
+
+/* Das Band selbst */
+.ov-bundle { pointer-events: none; }
+.ov-bundle line {
+  stroke: var(--accent); stroke-opacity: 0.3; stroke-linecap: round;
+}
+.ov-bundle text {
+  fill: var(--accent-strong); fill-opacity: 0.9; font-weight: 700; text-anchor: middle;
+  paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round;
+}
