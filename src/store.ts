@@ -1,3 +1,6 @@
+// M217: MUSS vor dem persist-Init stehen — danach ist der Speicher belegt
+// und „erster Start" nicht mehr feststellbar
+import './lib/firstRun';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {

@@ -4154,3 +4154,45 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
    Fokus beseitigen soll. */
 body:has(.app.focus-mode) .sel-toolbar-dock,
 body:has(.app.focus-mode) .sel-menu-fixed { display: none !important; }
+
+/* ================= M216: Befehle in der Suche ================= */
+.search-cmds { border-bottom: 1px solid var(--border-soft); padding-bottom: 6px; margin-bottom: 4px; }
+.search-cmd {
+  display: flex; width: 100%; align-items: center; gap: 10px;
+  padding: 9px 12px; min-height: 44px; border: none; background: none;
+  border-radius: 9px; text-align: left; font: inherit; color: var(--ink); cursor: pointer;
+}
+.search-cmd:hover { background: var(--accent-soft); }
+
+/* ================= M217: Begrüßung beim ersten Start ================= */
+.onb-backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  display: grid; place-items: center; padding: 16px;
+  background: rgba(30, 24, 12, 0.42);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  animation: pn-fade-in 0.2s ease-out;
+}
+.onb {
+  width: min(460px, 100%); max-height: calc(100dvh - 32px); overflow: auto;
+  background: var(--surface); border-radius: 18px; padding: 24px 24px 18px;
+  box-shadow: 0 24px 70px rgba(40, 30, 10, 0.3);
+}
+.onb h2 { margin: 0 0 10px; font-size: 21px; letter-spacing: -0.02em; }
+.onb h2 span { color: var(--accent); }
+.onb-lead { margin: 0 0 14px; font-size: 13.5px; line-height: 1.6; color: var(--ink); }
+.onb-steps { margin: 0 0 18px; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; }
+.onb-steps li { font-size: 13px; line-height: 1.55; color: var(--muted); }
+.onb-steps b { color: var(--ink); }
+.onb-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.onb-acts button {
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--ink);
+  border-radius: 10px; padding: 10px 15px; min-height: 44px;
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+.onb-acts button:hover { border-color: var(--accent); color: var(--accent-strong); }
+.onb-primary {
+  border-color: var(--accent) !important;
+  background: var(--accent) !important; color: #fff !important; font-weight: 600;
+}
+.onb-primary:hover { filter: brightness(1.06); color: #fff !important; }
+.onb-foot { margin: 14px 0 0; font-size: 11px; line-height: 1.5; color: var(--muted); }

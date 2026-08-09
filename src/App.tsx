@@ -23,6 +23,7 @@ import { TaskHub } from './components/TaskHub';
 import { AboutMenu } from './components/AboutMenu';
 import { FocusSheet } from './components/FocusSheet';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { Onboarding } from './components/Onboarding';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { SidePanel } from './components/SidePanel';
 import { ShareCardsModal } from './components/ShareCardsModal';
@@ -212,6 +213,7 @@ export default function App() {
             <FocusSheet />
           </>
         )}
+        <Onboarding />
         <SearchOverlay />
       <HelpOverlay />
       <LookupPanel />

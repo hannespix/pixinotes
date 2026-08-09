@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import uFuzzy from '@leeoniya/ufuzzy';
-import { useBoard } from '../store';
+import { mutedHistory, useBoard } from '../store';
+import { makeKanban, makeNote } from '../lib/nodes';
 import { nodeToText } from '../lib/serialize';
 import { collectAllTags } from '../lib/links';
 import { askBrain, brainSearch, type BrainHit } from '../lib/brain';
@@ -43,6 +44,53 @@ interface Hit {
 }
 
 /** Spotlight-Suche (Strg/Cmd+K) über alle Boards — Treffer anklicken fliegt zur Karte. */
+/**
+ * M216: Die Suche kann jetzt auch HANDELN, nicht nur finden.
+ *
+ * Bisher war Strg+K reines Nachschlagen — wer ein Modul anlegen oder die
+ * Ansicht wechseln wollte, musste den passenden Knopf suchen. Die Befehle
+ * stehen als eigener Block ÜBER den Treffern und tauchen nur auf, wenn die
+ * Eingabe zu ihnen passt; ohne Eingabe bleibt die Suche, was sie war.
+ */
+interface Command {
+  label: string;
+  hint: string;
+  /** Zusätzliche Suchwörter, unter denen der Befehl gefunden wird */
+  alias: string;
+  run: () => void;
+}
+
+function buildCommands(): Command[] {
+  const st = () => useBoard.getState();
+  const center = () => ({ x: 160, y: 160 });
+  const add = (make: () => AppNode, was: string) => () => {
+    const s = st();
+    s.pushHistory();
+    const node = make();
+    mutedHistory(() => s.addNode(node));
+    s.focusNode(s.activeId, node.id);
+    s.showToast(`${was} angelegt.`);
+  };
+  return [
+    { label: '＋ Notiz', hint: 'Neue Notiz auf diesem Board', alias: 'note text zettel',
+      run: add(() => makeNote(center()), 'Notiz') },
+    { label: '＋ Kanban', hint: 'Neues Kanban-Board', alias: 'ticket spalten board',
+      run: add(() => makeKanban(center()), 'Kanban') },
+    { label: '🏠 Zur Übersicht', hint: 'Alle Bereiche, Projekte und Boards', alias: 'home start mission',
+      run: () => st().setView('overview') },
+    { label: '🕸 Netz-Ansicht', hint: 'Boards als Graph', alias: 'graph netz verbindungen',
+      run: () => { st().setOverviewMode('netz'); st().setView('overview'); } },
+    { label: '✅ Aufgaben-Zentrale', hint: 'Alle offenen Aufgaben aller Boards', alias: 'tasks todo fristen',
+      run: () => st().setTasksOpen(true) },
+    { label: '▶ Präsentieren', hint: 'Karten als Folien zeigen', alias: 'presenter folien vortrag',
+      run: () => st().setPresenting(true) },
+    { label: '⚙️ Einstellungen', hint: 'KI, Sync, Design, Daten', alias: 'settings optionen ki sync',
+      run: () => st().setSettingsOpen(true) },
+    { label: '❓ Hilfe', hint: 'Anleitung zu allen Funktionen', alias: 'help anleitung',
+      run: () => st().setHelpOpen(true, 'start') },
+  ];
+}
+
 export function SearchOverlay() {
   const boards = useBoard((s) => s.boards);
   const focusNode = useBoard((s) => s.focusNode);
@@ -178,6 +226,14 @@ export function SearchOverlay() {
   // Frage-Ergebnis verwerfen, sobald weitergetippt wird
   useEffect(() => { setAnswer(null); }, [query]);
 
+  // M216: passende Befehle zur Eingabe (nur bei Eingabe, nie im Weg)
+  const commands = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || q === '#' || q.length < 2) return [];
+    return buildCommands().filter((c) =>
+      `${c.label} ${c.hint} ${c.alias}`.toLowerCase().includes(q)).slice(0, 4);
+  }, [query]);
+
   if (!open) return null;
 
   return (
@@ -238,7 +294,25 @@ export function SearchOverlay() {
         )}
         {query.trim() && query.trim() !== '#' && (
           <div className="search-results">
-            {hits.length === 0 && <div className="search-empty">Keine Treffer</div>}
+            {commands.length > 0 && (
+              <div className="search-cmds">
+                <div className="search-sem-head">⌘ Befehle</div>
+                {commands.map((c) => (
+                  <button
+                    key={c.label}
+                    className="search-cmd"
+                    title={c.hint}
+                    onClick={() => { setOpen(false); c.run(); }}
+                  >
+                    <span className="hit-main">
+                      <span className="hit-title">{c.label}</span>
+                      <span className="hit-snippet">{c.hint}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {hits.length === 0 && commands.length === 0 && <div className="search-empty">Keine Treffer</div>}
             {hits.map((h, i) => (
               <button
                 key={`${h.boardId}-${h.node.id}`}
