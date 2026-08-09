@@ -83,11 +83,16 @@ body {
   position: fixed; top: calc(14px + var(--safe-top)); left: 18px; z-index: 50;
   display: flex; align-items: center; gap: 12px; pointer-events: none;
 }
+.logo-wrap { position: relative; pointer-events: auto; }
 .logo {
   font-weight: 800; font-size: 17px; letter-spacing: -0.02em;
   background: var(--surface); padding: 7px 14px; border-radius: 12px;
   box-shadow: 0 2px 10px rgba(50, 40, 20, 0.1); pointer-events: auto;
+  /* M210: vom div zum Knopf — Schriftfarbe/-familie erben statt Browser-Default */
+  font-family: inherit; color: var(--ink); cursor: pointer; display: block;
 }
+.logo:hover { background: var(--surface-2); }
+.logo.active { box-shadow: 0 0 0 2px var(--accent) inset, 0 2px 10px rgba(50, 40, 20, 0.1); }
 .logo span { color: var(--accent); }
 .hint {
   font-size: 12px; color: var(--muted);
@@ -3884,3 +3889,40 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 }
 .brain-pulse-acts button:hover { border-color: var(--accent); color: var(--accent-strong); background: var(--surface-2); }
 @media (pointer: coarse) { .brain-pulse-acts button { min-height: 40px; } }
+
+/* ================= M210: „Über PixiNotes" am Logo ================= */
+.about-menu {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 60;
+  min-width: 268px; max-width: min(320px, calc(100vw - 24px));
+  display: flex; flex-direction: column; padding: 6px;
+  background: var(--glass); border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(16px) saturate(1.5);
+  backdrop-filter: blur(16px) saturate(1.5);
+  border-radius: 14px; box-shadow: 0 14px 40px rgba(40, 32, 16, 0.22);
+}
+.about-head { padding: 8px 12px 10px; display: flex; flex-direction: column; gap: 2px; }
+.about-head b { font-size: 14px; }
+.about-head span { font-size: 11px; color: var(--muted); }
+.about-menu button {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 12px; min-height: 40px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--ink); font: inherit; font-size: 13px;
+  text-align: left; cursor: pointer;
+}
+.about-menu button:hover { background: var(--surface-2); }
+.about-menu button svg { color: var(--muted); flex: none; }
+.about-sep { height: 1px; margin: 5px 8px; background: var(--border-soft); }
+.about-foot {
+  padding: 8px 12px 6px; font-size: 11px; line-height: 1.5; color: var(--muted);
+}
+@media (pointer: coarse) { .about-menu button { min-height: 44px; } }
+
+/* Trefferfläche des Logos am Finger: Die Kopfleiste ist am Handy bewusst
+   flach (M189 — sie überlagerte sonst die Ansichten), sichtbar bleibt das
+   Logo also 32px hoch. Der unsichtbare Streifen NACH OBEN bringt die
+   Trefferhöhe auf 44px, ohne die Leiste wachsen zu lassen. Bewusst nur nach
+   oben: dort liegt freier Rand, nach unten käme die Tab-Leiste in die Quere. */
+@media (pointer: coarse) and (max-width: 640px) {
+  .logo { position: relative; }
+  .logo::after { content: ''; position: absolute; inset: -12px 0 0 0; }
+}

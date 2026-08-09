@@ -20,6 +20,7 @@ import { initWebdavSync } from './lib/webdav';
 import { initFilesSync } from './lib/filesSync';
 import { initBrain } from './lib/brain';
 import { TaskHub } from './components/TaskHub';
+import { AboutMenu } from './components/AboutMenu';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { SidePanel } from './components/SidePanel';
 import { ShareCardsModal } from './components/ShareCardsModal';
@@ -179,9 +180,7 @@ export default function App() {
     <ReactFlowProvider key={importEpoch}>
       <div className="app">
         <div className="topbar">
-          <div className="logo">
-            Pixi<span>Notes</span>
-          </div>
+          <AboutMenu />
           <TopActions />
         </div>
         <Tabs />

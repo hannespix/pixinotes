@@ -8,6 +8,7 @@ import { MailLink } from './MailLink';
  */
 const SECTIONS = [
   { id: 'start', icon: '🚀', title: 'Erste Schritte' },
+  { id: 'neu', icon: '🆕', title: 'Was ist neu' },
   { id: 'ordnung', icon: '🗂️', title: 'Bereiche · Projekte · Boards' },
   { id: 'karten', icon: '🃏', title: 'Karten-Typen' },
   { id: 'verbinden', icon: '🔗', title: 'Verbinden & Präsentieren' },
@@ -180,6 +181,24 @@ export function HelpOverlay() {
                 <li><b>Strg+K</b> durchsucht alles — auch Ticket-Personen, Eigenschaften und #Tags.</li>
                 <li><b>Strg+Z / Strg+Y</b>: Struktur-Änderungen rückgängig/wiederholen. Aufräumen (Dock: ⋯ „Mehr" → „Aufräumen & anordnen") ordnet das Board automatisch an.</li>
                 <li>Unter ⚙️ → Daten wartet die <b>Starter-Umgebung „Verwaltung"</b> — 14 Beispiel-Boards, die alles zeigen.</li>
+              </ul>
+            </section>
+
+            {/* M210: Kurzer Überblick über die jüngsten Ausbaustufen — erreichbar
+                über das Logo („Über PixiNotes" → Was ist neu). Bewusst knapp und
+                in Alltagssprache: wer alle Einzelheiten will, liest die
+                Fachabschnitte darunter. */}
+            <section id="help-neu">
+              <h3>🆕 Was ist neu</h3>
+              <p>Die letzten Ausbaustufen in Kürze. Welche Fassung gerade läuft, steht im <b>Logo-Menü</b> oben links.</p>
+              <ul>
+                <li><b>🧠 Das Gehirn</b> — der größte Umbau: PixiNotes versteht deine Karten jetzt nach <b>Bedeutung</b>, nicht nur nach Wortlaut. Daraus folgen vier Dinge: Die Suche findet Verwandtes („Kita" findet „Betreuungszeiten"), das ↩-Panel zeigt <b>verwandte Karten</b> aus anderen Boards, das Netz <b>schlägt fehlende Verbindungen vor</b>, und du kannst <b>Fragen an deine eigene Wissensbasis</b> stellen (mit Quellenangabe, ohne Erfinden). Einschalten in ⚙️ → KI; alles kann komplett lokal laufen.</li>
+                <li><b>🧠 Gehirn-Puls &amp; Auto-Struktur</b> — die Aufgaben-Zentrale zeigt, was das Gehirn im Wissensnetz sieht: Themen-Inseln über Board-Grenzen, Knotenpunkte, offene Vorschläge. Aus einer Themen-Insel heraus kannst du alle Karten <b>als Thema markieren</b> oder dir eine <b>Übersichts-Notiz</b> bauen lassen.</li>
+                <li><b>🖼️ Die KI sieht Bilder</b> — Screenshots und Fotos gehen jetzt als echte Bild-Anhänge an die KI. Aus einem abfotografierten Zettel wird so direkt eine Einkaufsliste oder ein Kanban.</li>
+                <li><b>🔤 Schrift &amp; Größe</b> — pro Karte und sogar für einzelne markierte Textstellen, inklusive der für Sehschwäche entworfenen Schrift „Sehr gut lesbar".</li>
+                <li><b>📤 Karten einzeln teilen</b> — ein Dialog mit allen Wegen: Übernahme-Link, WhatsApp, E-Mail, Drucken, PDF, formatiertes Kopieren.</li>
+                <li><b>🧹 Weniger Knöpfe</b> — Dock und Auswahl-Leiste zeigen nur noch das Häufigste, alles Weitere liegt im ⋯-Menü. Alle Bedienelemente sind jetzt auch am Finger sicher zu treffen.</li>
+                <li><b>⚡ Netz-Ansicht flüssig</b> — das Ruckeln beim Ziehen ist weg, auch auf dem Handy.</li>
               </ul>
             </section>
 

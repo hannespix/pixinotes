@@ -3,6 +3,9 @@
 // Build-Stempel aus vite.config.ts (define) — angezeigt in den Einstellungen
 declare const __BUILD_STAMP__: string;
 
+// App-Version aus package.json (define) — angezeigt im „Über PixiNotes"-Menü
+declare const __APP_VERSION__: string;
+
 // Mermaid-Vollbundle (IIFE, setzt window.mermaid) — bewusst ohne eigene Typen
 
 // Eingebettete Schriften (?inline liefert eine data:-URL — offline/PWA-sicher)
