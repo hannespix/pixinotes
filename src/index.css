@@ -3926,3 +3926,75 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   .logo { position: relative; }
   .logo::after { content: ''; position: absolute; inset: -12px 0 0 0; }
 }
+
+/* ================= M211: Handy-Ansicht bei offener Tastatur =================
+   Grundlage ist die CSS-Variable --kb (Tastaturhöhe, gesetzt in lib/viewport.ts)
+   und das Merkmal [data-keyboard='on'] am <html>. Auf dem Desktop bleibt --kb
+   immer 0px, alle calc() unten rechnen dort also unverändert. */
+:root { --kb: 0px; }
+
+/* --- 1. Schwebende Leisten weichen der Tastatur --- */
+/* Das Dock hilft beim Tippen nicht und stünde sonst mitten im Restbild:
+   es fährt nach unten weg statt einfach zu verschwinden (kein Sprung). */
+[data-keyboard='on'] .dock {
+  transform: translateX(-50%) translateY(150%);
+  opacity: 0; pointer-events: none;
+}
+.dock { transition: transform 0.18s ease, opacity 0.18s ease; }
+/* Rechtliches und die React-Flow-Attribution kleben am unteren Rand und lägen
+   sonst unter der Tastatur begraben (User-Screenshot) */
+[data-keyboard='on'] .legal-corner,
+[data-keyboard='on'] .react-flow__attribution,
+[data-keyboard='on'] .backlinks { display: none; }
+/* Die Auswahl-Leiste bleibt erreichbar und rückt direkt über die Tastatur */
+[data-keyboard='on'] .sel-toolbar-dock { bottom: calc(10px + var(--kb)); }
+.sel-toolbar-dock { transition: bottom 0.18s ease; }
+/* Toasts ebenso — sonst poppt die Meldung hinter der Tastatur auf */
+[data-keyboard='on'] .toast { bottom: calc(20px + var(--kb)); }
+
+/* --- 2. Eine Leiste statt zwei: die Auswahl übernimmt die Dock-Zeile --- */
+@media (max-width: 640px) {
+  /* :has statt eines neuen Store-Flags — die Auswahl-Leiste steht als Portal
+     im Body, das Dock daneben; wer da ist, gewinnt. */
+  body:has(.sel-toolbar-dock) .dock {
+    transform: translateX(-50%) translateY(150%);
+    opacity: 0; pointer-events: none;
+  }
+  body:has(.sel-toolbar-dock) .sel-toolbar-dock {
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+  /* … außer die Tastatur ist offen: dann gewinnt sie (data-keyboard sitzt am
+     <html>, steht also VOR dem body im Selektor) */
+  [data-keyboard='on'] body:has(.sel-toolbar-dock) .sel-toolbar-dock {
+    bottom: calc(10px + var(--kb));
+  }
+  /* NIE zweireihig: umbrechende Knöpfe kosten doppelte Höhe mitten im Bild.
+     Passt etwas nicht, wird waagerecht geschoben statt gestapelt. */
+  .sel-toolbar-dock {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    max-width: calc(100vw - 12px); justify-content: flex-start;
+  }
+  .sel-toolbar-dock::-webkit-scrollbar { display: none; }
+  .sel-toolbar-dock button { flex: none; padding: 9px 10px; }
+}
+
+/* --- 3. Eingabe-Blasen docken am Handy unten an, statt das Modul zu verdecken --- */
+/* Die Blase wird per Portal auf den Klickpunkt gesetzt (Inline-Style) — am
+   Handy landet sie damit ausgerechnet ÜBER dem Planer, in den man einträgt.
+   Darum hier als Blatt am unteren Rand, über der Tastatur. */
+@media (max-width: 640px) {
+  .week-pop, .cal-dayedit {
+    left: 8px !important; right: 8px; top: auto !important;
+    bottom: calc(10px + var(--kb));
+    width: auto !important; max-width: none !important;
+    max-height: min(52vh, calc(100dvh - var(--kb) - 20px)); overflow-y: auto;
+    transition: bottom 0.18s ease;
+  }
+}
+
+/* --- 4. Zoom-Knöpfe am Handy einklappen --- */
+/* Zwei Finger zoomen dort ohnehin; die Knöpfe sind reine Fläche.
+   Auf Tablets bleiben sie (dort ist Platz und ein Stift im Spiel). */
+@media (max-width: 640px) {
+  .react-flow__controls { display: none; }
+}

@@ -9,10 +9,14 @@ import '@fontsource/atkinson-hyperlegible/700.css';
 import './index.css';
 import App from './App';
 import { handleOAuthRedirect } from './lib/calAccounts';
+import { initViewportInsets } from './lib/viewport';
 
 // OAuth-Popup-Rücksprung (Kalender-Konten): Diese Seite dient dann nur als
 // Redirect-Ziel — Code ans Hauptfenster melden, App gar nicht erst rendern.
 if (!handleOAuthRedirect()) {
+  // M211: Tastaturhöhe als CSS-Variable — VOR dem Rendern, damit die
+  // schwebenden Leisten schon beim ersten Frame richtig sitzen
+  initViewportInsets();
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <App />

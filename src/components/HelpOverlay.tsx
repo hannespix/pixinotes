@@ -199,6 +199,7 @@ export function HelpOverlay() {
                 <li><b>📤 Karten einzeln teilen</b> — ein Dialog mit allen Wegen: Übernahme-Link, WhatsApp, E-Mail, Drucken, PDF, formatiertes Kopieren.</li>
                 <li><b>🧹 Weniger Knöpfe</b> — Dock und Auswahl-Leiste zeigen nur noch das Häufigste, alles Weitere liegt im ⋯-Menü. Alle Bedienelemente sind jetzt auch am Finger sicher zu treffen.</li>
                 <li><b>⚡ Netz-Ansicht flüssig</b> — das Ruckeln beim Ziehen ist weg, auch auf dem Handy.</li>
+                <li><b>📱 Ruhe am Handy, wenn die Tastatur kommt</b> — sobald du tippst, weicht alles, was gerade nicht hilft: Das Dock fährt weg, Zoom-Knöpfe und Fußzeile blenden aus, und die Eingabe-Blasen von Planer und Kalender docken als Blatt direkt über der Tastatur an, statt das Modul zu verdecken, in das du schreibst. Ist etwas ausgewählt, übernimmt die Auswahl-Leiste die Dock-Zeile — eine Leiste statt zweier gestapelter, und nie mehr zweireihig.</li>
               </ul>
             </section>
 
