@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NodeToolbar, Position, useReactFlow } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
@@ -75,6 +75,33 @@ export function SelectionToolbar() {
     });
     setMenu(kind);
   };
+  /**
+   * M226: Das ⋯ in der Fokus-Kopfzeile öffnet DIESES Menü.
+   *
+   * Vorher führte es nur zum Teilen-Dialog — zwei ⋯ mit verschiedenem Inhalt
+   * auf einem Schirm, und das obere ausgerechnet ohne die Werkzeuge, die man
+   * dort sucht (User-Report). Jetzt meldet die Kopfzeile nur „Menü öffnen";
+   * was drinsteht, bleibt an einer Stelle gepflegt.
+   */
+  useEffect(() => {
+    const auf = () => {
+      // Am selben Ort verankern wie das ⋯ der Leiste — so öffnet es in beide
+      // Richtungen dorthin, wo Platz ist
+      const bar = document.querySelector('.sel-toolbar-dock') ?? document.querySelector('.sel-toolbar');
+      const r = bar?.getBoundingClientRect();
+      const oben = r?.top ?? 120;
+      const unten = r?.bottom ?? 160;
+      const down = oben < 340;
+      setMenuPos({
+        x: Math.max(8, window.innerWidth - 218),
+        y: down ? unten + 10 : oben - 10,
+        down,
+      });
+      setMenu((m) => (m === 'more' ? null : 'more'));
+    };
+    window.addEventListener('pixinotes:karten-menue', auf);
+    return () => window.removeEventListener('pixinotes:karten-menue', auf);
+  }, []);
   useEffect(() => {
     if (!menu) return;
     const close = (e: PointerEvent) => {
@@ -98,8 +125,26 @@ export function SelectionToolbar() {
     return () => window.removeEventListener('keydown', onKey, true);
   }, [menu]);
   /** Popover-Inhalt als Portal auf oberster Ebene, am Knopf verankert */
+  /**
+   * M226: Nach dem Öffnen ins Bild rücken.
+   *
+   * Die Ankerrechnung schätzt die Menübreite (218 px); tatsächlich sind es je
+   * nach Inhalt und Anzeigegröße mehr. Am rechten Rand ragte das Menü dadurch
+   * heraus. Statt die Schätzung nachzujustieren wird hier GEMESSEN und einmal
+   * korrigiert — das gilt dann für jeden Öffnungsweg und jede Textgröße.
+   */
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!menu || !el) return;
+    const b = el.getBoundingClientRect();
+    const platz = window.innerWidth - 8;
+    if (b.right > platz) el.style.left = `${Math.max(8, platz - b.width)}px`;
+    else if (b.left < 8) el.style.left = '8px';
+  }, [menu, menuPos]);
   const menuPortal = (extraClass: string, content: React.ReactNode) => createPortal(
     <div
+      ref={menuRef}
       className={`sel-ai-menu sel-menu-fixed nodrag ${extraClass}`}
       style={menuPos.down
         // nach unten: normal an der Oberkante ankern

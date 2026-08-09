@@ -206,9 +206,11 @@ export function FocusSheet() {
         </div>
         <button
           className="focus-more"
-          title="Teilen, Drucken, PDF …"
-          aria-label="Mehr"
-          onClick={() => setShareCards([node.id])}
+          title="Werkzeuge: KI, Nachschlagen, Schrift, Eigenschaften, Teilen …"
+          aria-label="Werkzeuge"
+          // M226: dasselbe Menü wie das ⋯ in der Werkzeugleiste — vorher öffnete
+          // sich hier NUR der Teilen-Dialog, ausgerechnet ohne die Werkzeuge
+          onClick={() => window.dispatchEvent(new Event('pixinotes:karten-menue'))}
         >
           <IMore size={16} />
         </button>

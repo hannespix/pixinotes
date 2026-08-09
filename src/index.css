@@ -4016,6 +4016,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .focus-mode .react-flow__minimap,
 .focus-mode .drawing-layer,
 .focus-mode .dock,
+.focus-mode .logo-wrap,
+.focus-mode .top-actions,
 .focus-mode .tabs,
 .focus-mode .backlinks,
 .focus-mode .legal-corner,
@@ -4369,3 +4371,43 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
 .about-zoom button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); }
 .about-zoom button:disabled { opacity: 0.4; cursor: default; }
 .about-zoom sup { font-size: 11px; }
+
+/* ================= M226: Formatieren am Handy =================
+   Die Formatierungsleiste von BlockNote schwebt normalerweise an der
+   Auswahl. Auf einem Telefon heißt das: Sie legt sich über genau den Satz,
+   den man gerade formatieren will, und läuft rechts aus dem Bild — die
+   letzten Knöpfe (Einrücken, Link) sind gar nicht erreichbar (User-Report).
+
+   Darum dockt sie hier unten an, über der Tastatur — wie in Google Docs
+   und Notion. Der Text bleibt sichtbar, und die Leiste lässt sich quer
+   schieben, statt abgeschnitten zu werden.
+
+   Angefasst wird die UMHÜLLENDE Box: BlockNote positioniert sie per
+   Inline-transform (floating-ui). Ein transform erzeugt einen eigenen
+   Bezugsrahmen — ein position:fixed am Kind allein bliebe wirkungslos. */
+@media (max-width: 700px), (pointer: coarse) and (max-width: 900px) {
+  div:has(> .bn-formatting-toolbar),
+  div:has(> .bn-link-toolbar) {
+    position: fixed !important;
+    left: 0 !important; right: 0 !important; top: auto !important;
+    bottom: calc(var(--kb) + var(--focus-bottom, 0px)) !important;
+    transform: none !important;
+    width: 100% !important; max-width: 100% !important;
+    z-index: 80 !important;
+  }
+  .bn-toolbar.bn-formatting-toolbar,
+  .bn-toolbar.bn-link-toolbar {
+    width: 100%; max-width: none; border-radius: 0;
+    box-sizing: border-box;
+    overflow-x: auto; scrollbar-width: none;
+    flex-wrap: nowrap; justify-content: flex-start;
+    box-shadow: 0 -6px 18px rgba(40, 30, 10, 0.18);
+  }
+  .bn-toolbar.bn-formatting-toolbar::-webkit-scrollbar,
+  .bn-toolbar.bn-link-toolbar::-webkit-scrollbar { display: none; }
+  /* Fingergerecht wie alles andere (M198) */
+  .bn-toolbar.bn-formatting-toolbar button,
+  .bn-toolbar.bn-formatting-toolbar .mantine-Button-root {
+    min-width: 44px; min-height: 44px; flex: none;
+  }
+}
