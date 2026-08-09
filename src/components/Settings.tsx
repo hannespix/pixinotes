@@ -112,6 +112,8 @@ export function Settings() {
   const clickZoom = useBoard((s) => s.clickZoom);
   const setClickZoom = useBoard((s) => s.setClickZoom);
   const cardFocus = useBoard((s) => s.cardFocus);
+  const brainOffSpaces = useBoard((s) => s.brainOffSpaces);
+  const toggleBrainSpace = useBoard((s) => s.toggleBrainSpace);
   const setCardFocus = useBoard((s) => s.setCardFocus);
   const wheelZoom = useBoard((s) => s.wheelZoom);
   const setWheelZoom = useBoard((s) => s.setWheelZoom);
@@ -525,6 +527,29 @@ export function Settings() {
           </label>
           {brain.on && (
             <>
+              {/* M220: Sub-Brains — Bereiche einzeln aus dem Gehirn nehmen */}
+              <div className="brain-scope">
+                <div className="brain-scope-head">Welche Bereiche gehören zum Gehirn?</div>
+                {spaces.map((sp) => {
+                  const an = !brainOffSpaces.includes(sp.id);
+                  const karten = sp.projects
+                    .flatMap((p) => p.boardIds)
+                    .reduce((n, id) => n + (boards.find((b) => b.id === id)?.nodes.length ?? 0), 0);
+                  return (
+                    <label key={sp.id} className={`brain-scope-row ${an ? '' : 'off'}`}>
+                      <input type="checkbox" checked={an} onChange={() => toggleBrainSpace(sp.id)} />
+                      <span className="brain-scope-name">{sp.name}</span>
+                      <span className="brain-scope-count">{karten} Karten</span>
+                    </label>
+                  );
+                })}
+                <p className="modal-hint">
+                  Abgeschaltete Bereiche liefern <b>nichts</b> ans Gehirn: keine Bedeutungssuche,
+                  keine Vorschläge, keine KI-Antworten, kein Puls. Ihre bereits berechneten
+                  Vektoren werden dabei <b>gelöscht</b> — nicht bloß ausgeblendet. Praktisch, um
+                  Privates aus dienstlichen Antworten herauszuhalten.
+                </p>
+              </div>
               <label className="modal-row">
                 <span>Anbieter</span>
                 <select value={brain.provider} onChange={(e) => updateBrain({ provider: e.target.value as typeof brain.provider })}>

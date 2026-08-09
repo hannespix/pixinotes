@@ -4196,3 +4196,16 @@ body:has(.app.focus-mode) .sel-menu-fixed { display: none !important; }
 }
 .onb-primary:hover { filter: brightness(1.06); color: #fff !important; }
 .onb-foot { margin: 14px 0 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
+
+/* ================= M220: Sub-Brains — Bereiche im Gehirn ================= */
+.brain-scope { margin: 10px 0 4px; padding: 10px 12px; border: 1px solid var(--border-soft); border-radius: 11px; }
+.brain-scope-head { font-size: 12px; font-weight: 600; margin-bottom: 7px; }
+.brain-scope-row {
+  display: flex; align-items: center; gap: 9px; padding: 7px 4px; min-height: 40px;
+  font-size: 12.5px; cursor: pointer; border-radius: 8px;
+}
+.brain-scope-row:hover { background: var(--surface-2); }
+.brain-scope-row.off .brain-scope-name { color: var(--muted); text-decoration: line-through; }
+.brain-scope-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brain-scope-count { font-size: 11px; color: var(--muted); flex: none; }
+@media (pointer: coarse) { .brain-scope-row { min-height: 44px; } }

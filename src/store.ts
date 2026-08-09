@@ -141,6 +141,12 @@ interface BoardState {
   /** M204: Gehirn — semantischer Index (Embeddings) für Suche nach Bedeutung
    *  und „Verwandte Karten". 'auto' folgt der KI-Einstellung. */
   brain: { on: boolean; provider: 'auto' | 'ollama' | 'browser' | 'cloud' };
+  /** M220: Bereiche, die NICHT Teil des Gehirns sind (IDs). Ihre Karten
+   *  liefern keine Embeddings, tauchen in keiner Bedeutungssuche, keinem
+   *  Vorschlag, keiner KI-Antwort und keinem Puls auf — und ihre bereits
+   *  berechneten Vektoren werden beim Abschalten aus dem Index gelöscht. */
+  brainOffSpaces: string[];
+  toggleBrainSpace: (spaceId: string) => void;
   updateBrain: (patch: Partial<BoardState['brain']>) => void;
   /** M205: abgelehnte Verknüpfungs-Vorschläge („a|b", sortiert) — nie wieder zeigen */
   rejectedLinks: string[];
@@ -796,6 +802,16 @@ export const useBoard = create<BoardState>()(
         updateAi: (patch) => set({ ai: { ...get().ai, ...patch } }),
         brain: { on: false, provider: 'auto' },
         updateBrain: (patch) => set({ brain: { ...get().brain, ...patch } }),
+
+        brainOffSpaces: [],
+        toggleBrainSpace: (spaceId) => {
+          const off = get().brainOffSpaces;
+          const next = off.includes(spaceId) ? off.filter((x) => x !== spaceId) : [...off, spaceId];
+          set({ brainOffSpaces: next });
+          // Der Index räumt verwaiste Einträge beim nächsten Lauf selbst weg —
+          // abgeschaltete Bereiche verlieren ihre Vektoren also von allein.
+          window.dispatchEvent(new CustomEvent('pixinotes:brain-scope'));
+        },
         rejectedLinks: [],
         rejectLink: (a, b) => {
           const key = [a, b].sort().join('|');
@@ -1561,6 +1577,7 @@ export const useBoard = create<BoardState>()(
         view: s.view,
         ai: s.ai,
         brain: s.brain,
+        brainOffSpaces: s.brainOffSpaces,
         rejectedLinks: s.rejectedLinks,
         templates: s.templates,
         ui: s.ui,

@@ -152,6 +152,38 @@ function cardText(nodeText: string): { title: string; text: string } {
 }
 
 /** Index mit dem Board-Stand abgleichen — nur Neues/Geändertes wird berechnet */
+/**
+ * M220: Welche Boards gehören zum Gehirn?
+ *
+ * Bereiche lassen sich einzeln abschalten („Sub-Brains") — typischer Fall:
+ * Private Notizen sollen nicht in dienstlichen KI-Antworten auftauchen. Ein
+ * abgeschalteter Bereich wird nicht bloß aus den Ergebnissen gefiltert:
+ * syncBrainIndex räumt Einträge weg, die nicht mehr gewünscht sind, also
+ * verschwinden auch die bereits berechneten Vektoren aus dem Speicher.
+ */
+export function brainBoardIds(st = useBoard.getState()): Set<string> {
+  const off = new Set(st.brainOffSpaces ?? []);
+  const drin = new Set<string>();
+  for (const sp of st.spaces) {
+    if (off.has(sp.id)) continue;
+    for (const p of sp.projects) for (const id of p.boardIds) drin.add(id);
+  }
+  // Boards ohne Projekt-Zuordnung (frisch angelegt) bleiben dabei
+  for (const b of st.boards) {
+    const zugeordnet = st.spaces.some((sp) => sp.projects.some((p) => p.boardIds.includes(b.id)));
+    if (!zugeordnet) drin.add(b.id);
+  }
+  return drin;
+}
+
+/** Bereichs-Name eines Boards — für die Anzeige im Puls und in Quellen */
+export function spaceOfBoard(boardId: string, st = useBoard.getState()): string | null {
+  for (const sp of st.spaces) {
+    if (sp.projects.some((p) => p.boardIds.includes(boardId))) return sp.name;
+  }
+  return null;
+}
+
 export async function syncBrainIndex(): Promise<void> {
   const st = useBoard.getState();
   if (!st.brain.on || running) return;
@@ -161,7 +193,9 @@ export async function syncBrainIndex(): Promise<void> {
     await loadIndex();
     const m = mem!;
     const want = new Map<string, { boardId: string; nodeId: string; boardName: string; title: string; text: string; hash: number }>();
+    const imGehirn = brainBoardIds(st);
     for (const b of st.boards) {
+      if (!imGehirn.has(b.id)) continue; // M220: abgeschalteter Bereich
       for (const n of b.nodes) {
         if (n.archived) continue;
         const raw = nodeToText(n).trim();
@@ -213,6 +247,13 @@ export function initBrain(): void {
     if (!s.brain.on || s.boards === prev.boards) return;
     if (dirtyTimer) clearTimeout(dirtyTimer);
     dirtyTimer = setTimeout(() => void syncBrainIndex(), 12_000);
+  });
+  // M220: Ein Bereich wurde zu-/abgeschaltet — SOFORT abgleichen, nicht erst
+  // nach der üblichen Wartezeit. Wer „privat" abschaltet, will nicht zwölf
+  // Sekunden lang hoffen, dass die Vektoren wirklich verschwinden.
+  window.addEventListener('pixinotes:brain-scope', () => {
+    if (dirtyTimer) clearTimeout(dirtyTimer);
+    void syncBrainIndex();
   });
 }
 
@@ -275,7 +316,9 @@ export async function clusterTopics(minSize = 3, threshold = 0.55): Promise<Topi
 export function hubBoards(max = 3): Array<{ boardId: string; name: string; degree: number }> {
   const st = useBoard.getState();
   const deg = new Map<string, number>();
+  const imGehirn = brainBoardIds(st);
   for (const b of st.boards) {
+    if (!imGehirn.has(b.id)) continue; // M220
     for (const n of b.nodes) {
       if (n.type !== 'portal') continue;
       const target = (n.data as { boardId?: string }).boardId;
@@ -392,7 +435,9 @@ export async function brainDigest(rejected: Set<string>): Promise<DigestLine[]> 
   }
   const st = useBoard.getState();
   const existing = new Set<string>();
+  const imGehirn = brainBoardIds(st);
   for (const b of st.boards) {
+    if (!imGehirn.has(b.id)) continue; // M220
     for (const n of b.nodes) {
       if (n.type !== 'portal') continue;
       const target = (n.data as { boardId?: string }).boardId;
