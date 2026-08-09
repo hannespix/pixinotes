@@ -36,6 +36,7 @@ export const IRedo = make(<><path d="M21 7v6h-6" /><path d="M3 17a9 9 0 0 1 9-9 
 export const ITasks = make(<><rect width="18" height="18" x="3" y="3" rx="3" /><path d="m8.5 12 2.5 2.5L16 9" /></>);
 export const IPlay = make(<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none" />);
 export const ISearch = make(<><circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" /></>);
+export const IFilter = make(<path d="M3 4.5h18l-7 8.2V20l-4-2.2v-7.1z" />);
 export const ISettings = make(<><path d="M21 5H11" /><path d="M7 5H3" /><path d="M21 12h-6" /><path d="M9 12H3" /><path d="M21 19h-4" /><path d="M11 19H3" /><path d="M9 3v4" /><path d="M15 10v4" /><path d="M13 17v4" /></>);
 export const ICalendar = make(<><rect width="18" height="17" x="3" y="4.5" rx="2.5" /><path d="M16 2.5v4" /><path d="M8 2.5v4" /><path d="M3 10h18" /></>);
 export const IGantt = make(<><path d="M4 6h9" /><path d="M9 12h11" /><path d="M6 18h8" /></>);

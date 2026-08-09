@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
-import { IChevronL, IChevronR, IMore, IX } from './Icons';
+import { IChevronL, IChevronR, IX } from './Icons';
 
 /**
  * M212: „Karte im Fokus" — am Handy füllt ein angetipptes Modul den Schirm.
@@ -97,8 +97,6 @@ export function FocusSheet() {
   const setFocusCard = useBoard((s) => s.setFocusCard);
   const boards = useBoard((s) => s.boards);
   const activeId = useBoard((s) => s.activeId);
-  const setShareCards = useBoard((s) => s.setShareCards);
-  const showToast = useBoard((s) => s.showToast);
   const touchRef = useRef<{ x: number; y: number } | null>(null);
 
   const board = boards.find((b) => b.id === activeId);
@@ -200,20 +198,15 @@ export function FocusSheet() {
         <button className="focus-x" onClick={close} title="Zurück zum Board (oder nach unten wischen)" aria-label="Zurück zum Board">
           <IX size={16} />
         </button>
+        {/* M227: Hier stand ein zweites ⋮. Es löste seit M226 exakt dasselbe
+            Ereignis aus wie das ⋯ in der Auswahl-Leiste unten und öffnete
+            damit dasselbe Menü an derselben Stelle — zwei Knöpfe, ein
+            Ergebnis. Geblieben ist der untere: Er liegt am Daumen und steht
+            ohnehin bei allen Karten-Werkzeugen. */}
         <div className="focus-title">
           <b>{cardTitle(node)}</b>
           <span>{typeName}{siblings.length > 1 ? ` · ${index + 1} von ${siblings.length}` : ''}</span>
         </div>
-        <button
-          className="focus-more"
-          title="Werkzeuge: KI, Nachschlagen, Schrift, Eigenschaften, Teilen …"
-          aria-label="Werkzeuge"
-          // M226: dasselbe Menü wie das ⋯ in der Werkzeugleiste — vorher öffnete
-          // sich hier NUR der Teilen-Dialog, ausgerechnet ohne die Werkzeuge
-          onClick={() => window.dispatchEvent(new Event('pixinotes:karten-menue'))}
-        >
-          <IMore size={16} />
-        </button>
       </div>
       <div className="focus-nav" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {siblings.length > 1 ? (

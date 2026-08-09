@@ -10,7 +10,7 @@ import {
 import { aiReady, mdToBlocks } from '../lib/ai';
 import { applyTopicTag, brainDigest, buildTopicOverview, type DigestLine, type TopicCluster } from '../lib/brain';
 import { aiWeekPlan } from '../lib/aiActions';
-import { IBell, ICalendar, IChevronR, IGantt, IKanban, INote, ISearch, IUsers, IWand, IX } from './Icons';
+import { IBell, ICalendar, IChevronR, IFilter, IGantt, IKanban, INote, ISearch, IUsers, IWand, IX } from './Icons';
 
 const PRIO_LABEL: Record<1 | 2 | 3, string> = { 1: '!!!', 2: '!!', 3: '!' };
 
@@ -25,6 +25,22 @@ const BUCKETS: Array<[Bucket, string]> = [
   ['later', 'Später'],
   ['none', 'Ohne Frist'],
 ];
+
+/**
+ * M227: Merkzettel für den Gehirn-Puls.
+ *
+ * Bewusst localStorage und nicht der Board-Store: Das ist eine Ansichts-
+ * Vorliebe dieses Geräts, kein Inhalt — sie gehört weder in die Historie
+ * (Strg+Z) noch in einen Export. Zugriffe sind gekapselt, weil `localStorage`
+ * in privaten Fenstern werfen kann.
+ */
+const PULS_KEY = 'pn-puls-auf';
+const pulsStand = (() => {
+  try { return localStorage.getItem(PULS_KEY) === '1'; } catch { return false; }
+})();
+function merkePuls(auf: boolean) {
+  try { localStorage.setItem(PULS_KEY, auf ? '1' : '0'); } catch { /* privates Fenster */ }
+}
 
 function bucketOf(t: TaskRef, todayIso: string): Bucket {
   if (!t.due) return 'none';
@@ -58,13 +74,16 @@ export function TaskHub() {
   const [quickBoard, setQuickBoard] = useState(''); // '' = aktives Board
   const [search, setSearch] = useState('');
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false); // M227: Trichter, nur schmal wirksam
   const [doneOpen, setDoneOpen] = useState(false);
   const [myDay, setMyDay] = useState<Set<string>>(() => myDayKeys());
   // M207: Gehirn-Puls — Themen, Knotenpunkte und offene Vorschläge auf einen Blick
   const brainOn = useBoard((s) => s.brain.on);
   const rejectedLinks = useBoard((s) => s.rejectedLinks);
   const [digest, setDigest] = useState<DigestLine[]>([]);
-  const [pulseOpen, setPulseOpen] = useState(false);
+  // M227: Der Puls merkt sich seinen Zustand. Zugeklappt ist die Voreinstellung —
+  // wer ihn aber täglich liest, soll ihn nicht täglich neu aufklappen müssen.
+  const [pulseOpen, setPulseOpen] = useState(pulsStand);
   useEffect(() => {
     if (!open || !brainOn) { setDigest([]); return; }
     let gone = false;
@@ -118,6 +137,20 @@ export function TaskHub() {
     [allTasks],
   );
   const tags = useMemo(() => collectTaskTags(allTasks), [allTasks]);
+  /**
+   * M227: Wie viele der eingeklappten Filter greifen gerade?
+   *
+   * Das ist der Preis fürs Wegräumen: Eine kurze Liste kann jetzt an einem
+   * Filter liegen, den man nicht sieht. Die Zahl am Trichter ist die Antwort
+   * darauf — sie muss deshalb GENAU die Filter zählen, die hinter ihm liegen
+   * (die vier Zeitchips bleiben ja sichtbar).
+   */
+  const versteckteFilter =
+    (boardFilter !== 'all' ? 1 : 0) +
+    (personFilter !== 'all' ? 1 : 0) +
+    (groupByPerson ? 1 : 0) +
+    (search.trim() ? 1 : 0) +
+    (tagFilter ? 1 : 0);
   const tasks = allTasks.filter((t) => {
     if (boardFilter !== 'all' && t.boardId !== boardFilter) return false;
     if (personFilter !== 'all' && t.who !== personFilter) return false;
@@ -362,7 +395,7 @@ export function TaskHub() {
   const canAskNotify = 'Notification' in window && Notification.permission === 'default';
 
   return (
-    <div className="taskhub" role="dialog" aria-label="Aufgaben">
+    <div className={`taskhub${filtersOpen ? ' filters-open' : ''}`} role="dialog" aria-label="Aufgaben">
       <div className="taskhub-head">
         <h2>Aufgaben</h2>
         <span className="taskhub-meta">
@@ -385,7 +418,7 @@ export function TaskHub() {
         <div className="brain-pulse">
           <button
             className="brain-pulse-head"
-            onClick={() => setPulseOpen((o) => !o)}
+            onClick={() => setPulseOpen((o) => { merkePuls(!o); return !o; })}
             aria-expanded={pulseOpen}
             title="Was das Gehirn gerade in deinem Wissensnetz sieht — Themen, Knotenpunkte, fehlende Verknüpfungen"
           >
@@ -444,19 +477,34 @@ export function TaskHub() {
         {([['all', 'Alle'], ['myday', `☀ Mein Tag${myDay.size > 0 ? ` (${myDay.size})` : ''}`], ['today', 'Heute'], ['overdue', 'Überfällig']] as const).map(([f, label]) => (
           <button key={f} className={`th-chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>{label}</button>
         ))}
-        <select className="th-board" value={boardFilter} onChange={(e) => setBoardFilter(e.target.value)} title="Nach Board filtern">
+        {/* M227: Der Trichter existiert nur auf schmalen Schirmen (CSS, kein JS-
+            Breakpoint) — am Telefon standen hier fünf Bedienelemente in drei
+            Zeilen, bevor die erste Aufgabe zu sehen war. Auf dem Desktop ist
+            er ausgeblendet und alles steht wie bisher offen. */}
+        <button
+          className={`th-chip th-funnel${filtersOpen || versteckteFilter > 0 ? ' on' : ''}`}
+          onClick={() => setFiltersOpen((o) => !o)}
+          aria-expanded={filtersOpen}
+          title={versteckteFilter > 0
+            ? `Filter (${versteckteFilter} aktiv): Board, Person, Gruppieren, Suche, #tags`
+            : 'Weitere Filter: Board, Person, Gruppieren, Suche, #tags'}
+        >
+          <IFilter size={13} />
+          {versteckteFilter > 0 && <span className="th-funnel-n">{versteckteFilter}</span>}
+        </button>
+        <select className="th-board th-adv" value={boardFilter} onChange={(e) => setBoardFilter(e.target.value)} title="Nach Board filtern">
           <option value="all">Alle Boards</option>
           {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
         {persons.length > 0 && (
-          <select className="th-board" value={personFilter} onChange={(e) => setPersonFilter(e.target.value)} title="Nach Person filtern (Ticket-Zuständigkeit / Gantt-Ressource)">
+          <select className="th-board th-adv" value={personFilter} onChange={(e) => setPersonFilter(e.target.value)} title="Nach Person filtern (Ticket-Zuständigkeit / Gantt-Ressource)">
             <option value="all">Alle Personen</option>
             {persons.map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
         )}
         {persons.length > 0 && (
           <button
-            className={`th-chip ${groupByPerson ? 'on' : ''}`}
+            className={`th-chip th-adv ${groupByPerson ? 'on' : ''}`}
             onClick={() => setGroupByPerson((g) => !g)}
             title="Nach Person gruppieren — wer macht was?"
           ><IUsers size={13} /></button>

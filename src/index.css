@@ -1949,6 +1949,49 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   margin-left: auto; font-family: inherit; font-size: 12px; border: none; background: var(--surface);
   border-radius: 8px; padding: 5px 8px; box-shadow: 0 1px 4px rgba(50,40,20,.1); color: var(--ink);
 }
+
+/* ---------- M227: Filter-Trichter (nur schmale Schirme) ----------
+   Am Telefon standen vor der ersten Aufgabe drei Bedienzeilen: vier Zeit-
+   Chips, zwei Auswahllisten samt Gruppieren-Knopf, Suchfeld mit #tag-Chips —
+   dazu Kopf und Schnell-Eingabe. Die Liste, um die es geht, begann erst
+   darunter.
+
+   Der Umbau ist BEWUSST rein visuell: Das Markup bleibt exakt wie zuvor, nur
+   die selteneren Bedienelemente tragen `.th-adv` und werden schmal
+   ausgeblendet. Damit ist die Desktop-Darstellung unverändert — dort ist der
+   Trichter gar nicht da (siehe `display: none` unten) und alles steht offen.
+   Kein JS-Breakpoint, kein zweiter Zustandsbaum. */
+.th-funnel { display: none; align-items: center; gap: 5px; padding: 5px 11px; }
+.th-funnel-n {
+  background: rgba(255,255,255,.25); border-radius: 999px; padding: 0 5px;
+  font-size: 10.5px; font-variant-numeric: tabular-nums; line-height: 1.5;
+}
+@media (max-width: 640px) {
+  /* Zeit-Chips + Trichter passen zusammen in eine Zeile; bei sehr schmalen
+     Geräten darf die Zeile umbrechen statt die Chips zu quetschen. */
+  .taskhub-filters { flex-wrap: wrap; }
+  .th-funnel { display: inline-flex; }
+  /* Zugeklappt: alles Seltenere weg. `.th-searchrow` ist die ganze zweite
+     Zeile (Suche + #tags) und verschwindet als Block. */
+  .taskhub .th-adv,
+  .taskhub .th-searchrow { display: none; }
+  /* Aufgeklappt: exakt der Zustand von vorher — `inline-block` ist die
+     Voreinstellung von <select> UND <button>, hier steht sie nur explizit,
+     weil `display: none` sie überschrieben hat. */
+  .taskhub.filters-open .th-adv { display: inline-block; }
+  .taskhub.filters-open .th-searchrow { display: flex; }
+  /* Ohne die Zeit-Chips davor gehört das erste Auswahlfeld nach LINKS —
+     `margin-left: auto` schöbe es sonst allein an den rechten Rand. */
+  .taskhub.filters-open .th-board { margin-left: 0; }
+  .th-search { flex: 1; }
+  .th-search input { width: 100%; min-width: 0; }
+  /* Der Hinweistext der Schnell-Eingabe passt bei 390 px NIE ganz hinein — er
+     nennt vier Kniffe. Es geht also nur darum, wie viel davon ankommt: vorher
+     brach er nach „— verst" ab, jetzt nach „— versteht „bis F". Bezahlt wird
+     das mit zwei Zeichen an der Board-Auswahl („→ aktives Boa"), die dabei
+     nichts verliert — ihr voller Text steht beim Aufklappen da. */
+  .th-quickboard { max-width: 118px; }
+}
 .taskhub-quick {
   width: min(860px, 100%); border: 1px dashed var(--border-soft); border-radius: 10px; padding: 9px 13px;
   font-family: inherit; font-size: 12.5px; margin-bottom: 12px; background: var(--surface-card); outline: none; color: var(--ink);
