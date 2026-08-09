@@ -4071,7 +4071,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 /* Blätter-Leiste unten — die einzige Leiste im Fokus */
 .focus-nav {
   position: fixed; left: 0; right: 0; bottom: var(--kb); z-index: 60;
-  height: var(--focus-bottom); padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* M225: FESTE Höhe. Vorher stand hier --focus-bottom — seit der Werkzeug-
+     leiste ist das aber der Platz für BEIDE Zeilen, und die Blätter-Leiste
+     legte sich über die Werkzeuge (Tippen auf „Weiter" traf „Löschen"). */
+  height: 52px; padding-bottom: env(safe-area-inset-bottom, 0px);
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding-inline: 6px;
   background: var(--glass); border-top: 1px solid var(--glass-border);
@@ -4091,6 +4094,8 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 :root { --focus-top: 52px; --focus-bottom: 0px; }
 .focus-mode { --focus-bottom: 0px; }
 .focus-mode:has(.focus-nav) { --focus-bottom: 52px; }
+/* Mit Werkzeugleiste braucht der Fuß zwei Zeilen (M225) */
+body:has(.sel-toolbar-dock) .focus-mode:has(.focus-nav) { --focus-bottom: 104px; }
 [data-keyboard='on'] .focus-mode:has(.focus-nav) { --focus-bottom: 0px; }
 
 /* ================= M213: Fehlergrenzen ================= */
@@ -4148,12 +4153,26 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .focus-act:hover { border-color: var(--accent) !important; color: var(--accent-strong); }
 .focus-nav-gap { width: 56px; flex: none; }
 
-/* Die Auswahl-Leiste am Handy ist ein Portal im BODY — ein Nachfahren-
-   Selektor unter .focus-mode erreicht sie nicht. Sie schwebte deshalb
-   weiter über der fokussierten Karte, also genau das Rauschen, das der
-   Fokus beseitigen soll. */
-body:has(.app.focus-mode) .sel-toolbar-dock,
-body:has(.app.focus-mode) .sel-menu-fixed { display: none !important; }
+/* M225: Die Werkzeugleiste der Karte GEHÖRT in den Fokus.
+   In M214 war sie hier ausgeblendet, weil sie über der Karte schwebte. Damit
+   waren aber KI, Nachschlagen, Schrift, Farbe und Eigenschaften am Handy nur
+   noch erreichbar, indem man den Fokus verließ, herauszoomte und die Karte
+   auf dem Board traf — für die Hauptarbeitsweise am Telefon unbrauchbar.
+   Jetzt sitzt sie fest über der Blätter-Zeile, quer scrollbar, und die Karte
+   bekommt den Platz dafür (--focus-bottom). */
+body:has(.app.focus-mode) .sel-toolbar-dock {
+  left: 0; right: 0; bottom: 52px; translate: 0 0;
+  /* Feste Höhe, damit der Platz, den die Karte darüber freilässt
+     (--focus-bottom), exakt passt und nichts überlappt */
+  height: 52px; box-sizing: border-box; align-items: center; padding: 0 8px;
+  width: 100%; max-width: none; border-radius: 0;
+  border-left: none; border-right: none; border-bottom: none;
+  justify-content: flex-start;
+  overflow-x: auto; scrollbar-width: none;
+}
+body:has(.app.focus-mode) .sel-toolbar-dock::-webkit-scrollbar { display: none; }
+body:has(.app.focus-mode) .sel-toolbar-dock button { flex: none; }
+[data-keyboard='on'] body:has(.app.focus-mode) .sel-toolbar-dock { bottom: var(--kb); }
 
 /* ================= M216: Befehle in der Suche ================= */
 .search-cmds { border-bottom: 1px solid var(--border-soft); padding-bottom: 6px; margin-bottom: 4px; }
@@ -4276,3 +4295,77 @@ body:has(.app.focus-mode) .sel-menu-fixed { display: none !important; }
   fill: var(--accent-strong); fill-opacity: 0.9; font-weight: 700; text-anchor: middle;
   paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round;
 }
+
+/* ================= M224: Sehen und Treffen =================
+   Drei unabhängige Stellschrauben für Augen, die nicht mehr die besten sind.
+   Die Anzeigegröße selbst sitzt als `zoom` am Wurzelelement (siehe
+   lib/anzeige.ts) — hier stehen nur Schrift und Kontrast. */
+
+/* Atkinson Hyperlegible überall: eigens dafür entworfen, dass sich ähnliche
+   Buchstaben (I l 1, O 0, a o) auch bei Sehschwäche unterscheiden lassen.
+   Handschrift- und Monospace-Karten behalten ihre bewusst gewählte Schrift. */
+html[data-lesbar='an'] body,
+html[data-lesbar='an'] button,
+html[data-lesbar='an'] input,
+html[data-lesbar='an'] select,
+html[data-lesbar='an'] textarea,
+html[data-lesbar='an'] .react-flow__node:not(.pn-font-hand):not(.pn-font-mono) {
+  font-family: 'Atkinson Hyperlegible', system-ui, -apple-system, sans-serif;
+}
+
+/* Hoher Kontrast: Genau die Mittel, die eine Oberfläche modern wirken lassen —
+   Milchglas, zarte Ränder, gedämpfte Zweitschrift, Papiertextur — kosten
+   Kontrast. Hier fallen sie weg, statt sie allen zuzumuten. */
+html[data-kontrast='hoch'] {
+  --muted: #46403a;
+  --border: #6f675d;
+  --border-soft: #8b8479;
+}
+html[data-kontrast='hoch'][data-theme='dark'] {
+  --muted: #d7d2c8;
+  --border: #9a9388;
+  --border-soft: #7d766b;
+}
+html[data-kontrast='hoch'] .glass,
+html[data-kontrast='hoch'] .dock,
+html[data-kontrast='hoch'] .tabs,
+html[data-kontrast='hoch'] .top-actions,
+html[data-kontrast='hoch'] .logo,
+html[data-kontrast='hoch'] .sel-toolbar,
+html[data-kontrast='hoch'] .focus-head,
+html[data-kontrast='hoch'] .focus-nav,
+html[data-kontrast='hoch'] .sidepanel,
+html[data-kontrast='hoch'] .modal,
+html[data-kontrast='hoch'] .dock-menu,
+html[data-kontrast='hoch'] .sel-ai-menu {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+/* Textur weg: das feine Rauschen legt sich sonst über jeden Buchstaben */
+html[data-kontrast='hoch'] .board-texture,
+html[data-kontrast='hoch'] .react-flow__pane::after { display: none !important; opacity: 0 !important; }
+/* Zweitschrift und Platzhalter dürfen nicht mehr verblassen */
+html[data-kontrast='hoch'] ::placeholder { color: var(--muted); opacity: 1; }
+html[data-kontrast='hoch'] .card-body { border: 1.5px solid var(--border); }
+/* Fokusring kräftiger — Tastaturbedienung soll man SEHEN */
+html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-strong); outline-offset: 2px; }
+
+/* Anzeigegröße direkt im Logo-Menü — A− / Wert / A+ (M224) */
+.about-zoom {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px 8px; border-bottom: 1px solid var(--border-soft);
+}
+.about-zoom > span { font-size: 12px; color: var(--muted); flex: 1; }
+.about-zoom > b { font-size: 12px; min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+.about-zoom button {
+  /* 44 px wie alle Bedienelemente (M198) — gerade hier, wo es um Menschen
+     geht, die schlechter zielen können, wäre kleiner absurd */
+  min-width: 46px; min-height: 44px; padding: 0 8px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--ink);
+  border-radius: 9px; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.about-zoom button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); }
+.about-zoom button:disabled { opacity: 0.4; cursor: default; }
+.about-zoom sup { font-size: 11px; }

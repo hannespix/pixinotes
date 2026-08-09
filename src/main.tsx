@@ -10,6 +10,7 @@ import './index.css';
 import App from './App';
 import { handleOAuthRedirect } from './lib/calAccounts';
 import { initViewportInsets } from './lib/viewport';
+import { initAnzeige } from './lib/anzeige';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 // OAuth-Popup-Rücksprung (Kalender-Konten): Diese Seite dient dann nur als
@@ -18,6 +19,9 @@ if (!handleOAuthRedirect()) {
   // M211: Tastaturhöhe als CSS-Variable — VOR dem Rendern, damit die
   // schwebenden Leisten schon beim ersten Frame richtig sitzen
   initViewportInsets();
+  // M224: Anzeigegröße/Kontrast ebenfalls VOR dem ersten Frame — sonst
+  // springt die Oberfläche beim Start sichtbar auf die eingestellte Größe
+  initAnzeige();
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       {/* M213: letzte Rettungsleine — was hier ankommt, hätte sonst eine

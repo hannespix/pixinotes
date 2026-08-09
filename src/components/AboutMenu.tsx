@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBoard } from '../store';
-import { IExternal, IHelp, IReload, ISettings } from './Icons';
+import { IExternal, IEye, IHelp, IReload, ISettings } from './Icons';
 
 /**
  * M210: Das Logo ist der Zugang zu „Über PixiNotes".
@@ -17,6 +17,8 @@ export function AboutMenu() {
   const wrapRef = useRef<HTMLDivElement>(null);
   const setHelpOpen = useBoard((s) => s.setHelpOpen);
   const setSettingsOpen = useBoard((s) => s.setSettingsOpen);
+  const anzeige = useBoard((s) => s.anzeige);
+  const setAnzeige = useBoard((s) => s.setAnzeige);
 
   // Klick daneben und Esc schließen (gleiches Muster wie die übrigen Menüs)
   useEffect(() => {
@@ -55,6 +57,34 @@ export function AboutMenu() {
                 nach einem Deploy manchmal noch tagelang die alte Fassung aus */}
             <span>Stand {__BUILD_STAMP__}</span>
           </div>
+          {/* M224: Die Anzeigegröße gehört NACH VORN, nicht in eine Einstellungs-
+              Registerkarte. Wer sie braucht, kann die Registerkarte oft gar nicht
+              lesen — deshalb steht sie im Logo-Menü, das von jeder Ansicht aus
+              mit einem Tipp erreichbar ist, und gleich als erstes. */}
+          <div className="about-zoom" role="group" aria-label="Anzeigegröße">
+            <span>Anzeige</span>
+            <button
+              onClick={() => setAnzeige(Number((anzeige - 0.15).toFixed(2)))}
+              disabled={anzeige <= 1.001}
+              title="Alles kleiner anzeigen"
+              aria-label="Alles kleiner anzeigen"
+            >
+              A<sup>−</sup>
+            </button>
+            <b>{Math.round(anzeige * 100)} %</b>
+            <button
+              onClick={() => setAnzeige(Number((anzeige + 0.15).toFixed(2)))}
+              disabled={anzeige >= 1.799}
+              title="Alles größer anzeigen — Schrift, Knöpfe und Karten"
+              aria-label="Alles größer anzeigen"
+            >
+              A<sup>+</sup>
+            </button>
+          </div>
+          <button role="menuitem" onClick={go(() => setSettingsOpen(true, 'design'))}>
+            <IEye size={14} /> Sehen &amp; Bedienen (Schrift, Kontrast)
+          </button>
+          <div className="about-sep" />
           <button role="menuitem" onClick={go(() => setHelpOpen(true, 'neu'))}>
             <IReload size={14} /> Was ist neu
           </button>

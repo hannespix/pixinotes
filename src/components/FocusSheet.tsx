@@ -148,6 +148,27 @@ export function FocusSheet() {
     return () => window.removeEventListener('keydown', onKey);
   }, [focusCard, close]);
 
+  /**
+   * M225: Die fokussierte Karte ist auch die AUSGEWÄHLTE Karte.
+   *
+   * Daran hängt die Auswahl-Leiste mit allem, was eine Karte kann — KI,
+   * Nachschlagen, Schrift, Farbe, Eigenschaften, Teilen. Vorher war sie im
+   * Fokus ausgeblendet: Wer am Handy die KI auf eine Notiz loslassen wollte,
+   * musste erst zurück aufs Board, herauszoomen und die Karte dort treffen.
+   * Genauso wichtig ist die Kopplung beim BLÄTTERN: Ohne sie zeigte die
+   * Leiste weiter auf die vorige Karte und hätte auf der falschen gearbeitet.
+   */
+  useEffect(() => {
+    if (!focusCard) return;
+    const st = useBoard.getState();
+    const board = st.boards.find((b) => b.id === st.activeId);
+    if (!board) return;
+    const aendern = board.nodes
+      .filter((n) => (n.id === focusCard) !== !!n.selected)
+      .map((n) => ({ id: n.id, type: 'select' as const, selected: n.id === focusCard }));
+    if (aendern.length) st.onNodesChange(aendern);
+  }, [focusCard]);
+
   if (!focusCard || !node) return null;
 
   // Wischen: waagerecht blättert, nach unten schließt. Bewusst nur am RAHMEN

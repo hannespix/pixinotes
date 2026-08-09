@@ -267,6 +267,22 @@ interface BoardState {
   restoreDeleted: () => void;
   /** Zuletzt angefasste Karte dauerhaft nach vorn (persistierter zIndex, ohne Undo-Eintrag) */
   touchNode: (id: string) => void;
+  /**
+   * M224: Barrierefreiheit — die ganze Oberfläche größer, lesbarer, kontrastreicher.
+   *
+   * `anzeige` skaliert ALLES (Schrift, Knöpfe, Abstände, Karteninhalte) wie
+   * der Browser-Zoom, nur ohne dass man ihn im Browser suchen muss und über
+   * Neustarts hinweg gemerkt. Bewusst kein reiner Schriftgrad: Wer die Schrift
+   * kaum lesen kann, trifft auch die Knöpfe schlechter.
+   */
+  anzeige: number;
+  setAnzeige: (z: number) => void;
+  /** Durchgehend die für Sehschwäche entworfene Schrift (Atkinson Hyperlegible) */
+  lesbareSchrift: boolean;
+  setLesbareSchrift: (on: boolean) => void;
+  /** Höherer Kontrast: kräftigere Schrift und Ränder, kein Milchglas, keine Textur */
+  hoherKontrast: boolean;
+  setHoherKontrast: (on: boolean) => void;
   /** Klick-Zoom: beim Anklicken sanft zur Karte fliegen (wenn klein/außerhalb) */
   clickZoom: boolean;
   setClickZoom: (on: boolean) => void;
@@ -665,6 +681,12 @@ export const useBoard = create<BoardState>()(
 
         gridSnap: false,
         setGridSnap: (on) => set({ gridSnap: on }),
+        anzeige: 1,
+        setAnzeige: (z) => set({ anzeige: Math.min(1.8, Math.max(1, z)) }),
+        lesbareSchrift: false,
+        setLesbareSchrift: (on) => set({ lesbareSchrift: on }),
+        hoherKontrast: false,
+        setHoherKontrast: (on) => set({ hoherKontrast: on }),
         clickZoom: true,
         setClickZoom: (on) => set({ clickZoom: on }),
         wheelZoom: false,
@@ -1584,6 +1606,9 @@ export const useBoard = create<BoardState>()(
         physicsEnabled: s.physicsEnabled,
         clickZoom: s.clickZoom,
         cardFocus: s.cardFocus,
+        anzeige: s.anzeige,
+        lesbareSchrift: s.lesbareSchrift,
+        hoherKontrast: s.hoherKontrast,
         wheelZoom: s.wheelZoom,
         showArchived: s.showArchived,
         gridSnap: s.gridSnap,

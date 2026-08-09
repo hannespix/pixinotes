@@ -109,6 +109,12 @@ export function Settings() {
   const [davUrl, setDavUrl] = useState('');
   const [davUser, setDavUser] = useState('');
   const [davSecret, setDavSecret] = useState('');
+  const anzeige = useBoard((s) => s.anzeige);
+  const setAnzeige = useBoard((s) => s.setAnzeige);
+  const lesbareSchrift = useBoard((s) => s.lesbareSchrift);
+  const setLesbareSchrift = useBoard((s) => s.setLesbareSchrift);
+  const hoherKontrast = useBoard((s) => s.hoherKontrast);
+  const setHoherKontrast = useBoard((s) => s.setHoherKontrast);
   const clickZoom = useBoard((s) => s.clickZoom);
   const setClickZoom = useBoard((s) => s.setClickZoom);
   const cardFocus = useBoard((s) => s.cardFocus);
@@ -1106,6 +1112,51 @@ export function Settings() {
               ))}
             </div>
           </div>
+
+          {/* ---- M224: Sehen & Bedienen ---- */}
+          <h3 style={{ marginTop: 16 }}>Sehen &amp; Bedienen</h3>
+          <p className="modal-hint">
+            Für Augen, die nicht mehr die besten sind — und für alle, die ohne Brille
+            arbeiten. Die Einstellungen gelten für die ganze App und bleiben gespeichert.
+          </p>
+          <div className="modal-row">
+            <span>Anzeigegröße</span>
+            <div className="seg">
+              {([[1, '100 %'], [1.15, '115 %'], [1.3, '130 %'], [1.5, '150 %'], [1.75, '175 %']] as const).map(([z, label]) => (
+                <button
+                  key={z}
+                  className={Math.abs(anzeige - z) < 0.02 ? 'on' : ''}
+                  onClick={() => setAnzeige(z)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="modal-hint">
+            Vergrößert <b>alles</b> — Schrift, Knöpfe, Abstände und die Karteninhalte.
+            Bewusst nicht nur die Schrift: Wer Text schlecht liest, trifft auch kleine
+            Knöpfe schlecht. Schneller erreichbar ist das über <b>A− / A+</b> im
+            PixiNotes-Menü oben links.
+          </p>
+          <label className="modal-row modal-row-check">
+            <span>Gut lesbare Schrift</span>
+            <input type="checkbox" checked={lesbareSchrift} onChange={(e) => setLesbareSchrift(e.target.checked)} />
+          </label>
+          <p className="modal-hint">
+            Stellt die ganze App auf <b>Atkinson Hyperlegible</b> um — eigens dafür
+            entworfen, dass sich ähnliche Zeichen (I l 1, O 0, a o) auch bei Sehschwäche
+            unterscheiden lassen. Karten mit eigener Schriftwahl behalten ihre.
+          </p>
+          <label className="modal-row modal-row-check">
+            <span>Mehr Kontrast</span>
+            <input type="checkbox" checked={hoherKontrast} onChange={(e) => setHoherKontrast(e.target.checked)} />
+          </label>
+          <p className="modal-hint">
+            Kräftigere Schrift und Ränder, kein Milchglas, keine Papiertextur, deutlicher
+            Fokusrahmen. Genau die Effekte, die modern aussehen, kosten Kontrast — hier
+            lassen sie sich abschalten, ohne dass alle darauf verzichten müssen.
+          </p>
 
           <h3 style={{ marginTop: 16 }}>Bedienung</h3>
           <label className="modal-row modal-row-check">
