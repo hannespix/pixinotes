@@ -4251,9 +4251,12 @@ body:has(.app.focus-mode) .sel-menu-fixed { display: none !important; }
 .ov-graph-svg.geo-space .ov-region-project { opacity: 0; }
 /* Einzelne Verbindungen tragen keine eigene Klasse — sie liegen als direkte
    <line>-Kinder im SVG. Weit draußen treten sie hinter die Bänder zurück. */
-.ov-graph-svg.geo-space > line,
+/* M223: Der Ausschnitt lebt als eigene Ebene — Verschieben und Zoomen sind
+   damit reines Zeichnen statt einer Neuvermessung des SVG. */
+.ov-graph-vp { transform-box: view-box; transform-origin: 0 0; will-change: transform; }
+.ov-graph-svg.geo-space .ov-graph-vp > line,
 .ov-graph-svg.geo-space .ov-graph-suggest { opacity: 0.12; transition: opacity 0.28s ease; }
-.ov-graph-svg > line { transition: opacity 0.28s ease; }
+.ov-graph-svg .ov-graph-vp > line { transition: opacity 0.28s ease; }
 .ov-graph-svg.geo-space .ov-region-space path { fill-opacity: 0.13; stroke-opacity: 0.45; }
 .ov-graph-svg.geo-space .ov-region-space text { font-size: 1.25em; fill-opacity: 0.85; }
 

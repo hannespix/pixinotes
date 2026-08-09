@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -9,7 +9,7 @@ import {
   type NodeProps,
   type NodeTypes,
 } from '@xyflow/react';
-import { hullPath, topAnchor } from '../lib/hull';
+import { hullPath, topAnchor, type Pt } from '../lib/hull';
 import { useBoard, type BoardDoc, type Project, type Space } from '../store';
 import { boardMetaLabel } from '../lib/boardStats';
 import { boardGraph, layoutGraph, type GraphLink } from '../lib/links';
@@ -121,6 +121,55 @@ function OverviewCanvas() {
 /* ---------- Graph-Ansicht (Obsidian-Netz): Boards als Knoten, Portale & Wikilinks als Kanten ---------- */
 
 const GRAPH_W = 1100, GRAPH_H = 640;
+
+/**
+ * M223: Gelände-Geometrie aus den AKTUELLEN Positionen.
+ *
+ * Bewusst als freie Funktion, nicht im Render: Die Hüllen müssen zweimal
+ * gerechnet werden — einmal beim Rendern (Topologie ändert sich) und einmal
+ * pro Frame in der Physik-Schleife. Vorher hing die Fläche in der Luft, während
+ * die Knoten schon weitergezogen waren; das Gelände „hinkte" sichtbar nach.
+ */
+function regionGeo(ids: string[], pad: number, at: (id: string) => Pt | undefined) {
+  const pts: Pt[] = [];
+  for (const id of ids) { const p = at(id); if (p) pts.push({ x: p.x, y: p.y }); }
+  if (pts.length === 0) return null;
+  return { d: hullPath(pts, pad), label: topAnchor(pts, pad) };
+}
+
+/** Detailgrad aus dem Maßstab (M43) — an einer Stelle, damit Render und
+ *  Zoom-Logik nicht auseinanderlaufen */
+const lodOf = (scale: number): 0 | 1 | 2 => (scale < 0.42 ? 0 : scale <= 1.35 ? 1 : 2);
+/** Gliederungs-Ebene aus der Zoomstufe (M222) */
+const geoOf = (zoom: number): 'space' | 'project' | 'board' =>
+  (zoom < 0.5 ? 'space' : zoom < 0.8 ? 'project' : 'board');
+/**
+ * M223: Bildschirmfeste Größen werden GESTUFT nachgezogen, nicht stufenlos.
+ *
+ * Schriftgrößen und Strichstärken sind in SVG-Einheiten angegeben und müssen
+ * beim Zoomen gegengerechnet werden, damit sie auf dem Schirm gleich groß
+ * bleiben. Jede Änderung eines font-size vermisst der Browser den Text neu —
+ * bei 78 Beschriftungen und einem Render pro Frame ging fast die Hälfte der
+ * Rechenzeit ins Layout (gemessen: 1,36 s Layout in 3 s Zoomen).
+ * In Stufen von 20 % gerechnet fällt das fast vollständig weg; dazwischen
+ * skaliert die Schrift höchstens um ein Fünftel mit — das sieht niemand.
+ */
+const sizeStep = (w: number) => Math.round(Math.log(w) / Math.log(1.2));
+
+/** Eine Gelände-Fläche: nur die ZUGEHÖRIGKEIT, nie fertige Koordinaten */
+interface RegionShape {
+  key: string; kind: 'space' | 'project'; name: string; accent: string;
+  ids: string[]; pad: number; spaceId: string; schlaeft: boolean;
+}
+/** Ein Band zwischen zwei Bereichen (M222) */
+interface BundleShape { key: string; aIds: string[]; bIds: string[]; n: number; label: string }
+
+/** Schwerpunkt einer Board-Gruppe — Ankerpunkt der Bereichs-Bänder (M222) */
+function groupMid(ids: string[], at: (id: string) => Pt | undefined): Pt | null {
+  let x = 0, y = 0, n = 0;
+  for (const id of ids) { const p = at(id); if (p) { x += p.x; y += p.y; n += 1; } }
+  return n === 0 ? null : { x: x / n, y: y / n };
+}
 /** Höchstens so viele Karten-Punkte je Board (M193) — darüber wird der Ring
  *  zum Knäuel und die Board-Ebene unlesbar */
 const MAX_SATELLITES = 14;
@@ -230,6 +279,11 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const nodeEls = useRef(new Map<string, SVGGElement>());
   const satEls = useRef(new Map<string, SVGGElement>());
   const linkEls = useRef(new Map<number, SVGLineElement>());
+  // M223: Auch Gelände und Bänder werden pro Frame imperativ nachgezogen
+  const regionEls = useRef(new Map<string, SVGPathElement>());
+  const regionTextEls = useRef(new Map<string, SVGTextElement>());
+  const bundleEls = useRef(new Map<string, SVGLineElement>());
+  const bundleTextEls = useRef(new Map<string, SVGTextElement>());
   const projectOf = useMemo(() => {
     const m = new Map<string, string>();
     for (const sp of spaces) for (const p of sp.projects) for (const id of p.boardIds) m.set(id, p.id);
@@ -244,14 +298,35 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     }
     for (const id of [...m.keys()]) if (!seedPos.has(id)) m.delete(id);
     alpha.current = 1;   // neue Lage → neu einschwingen
+    wake();              // M223: Schleife anwerfen, falls sie gerade ruht
   }, [seedPos]);
+
+  /**
+   * M223: Die Schleife LÄUFT NICHT MEHR EWIG.
+   *
+   * Vorher stand am Ende jedes Frames ein unbedingtes requestAnimationFrame —
+   * auch wenn längst nichts mehr schwang. Der Hauptthread wurde damit 60-mal
+   * pro Sekunde geweckt, ohne etwas zu tun: auf dem Handy spürbar als Wärme
+   * und leerer Akku. Jetzt hält die Schleife an, sobald das Netz ruht, und
+   * `wake()` startet sie wieder — beim Ziehen, bei Datenänderungen, beim
+   * „neu ausschwingen".
+   */
+  const wakeRef = useRef<() => void>(() => {});
+  /** Aktueller Maßstab (Bildschirm-px je SVG-Einheit) für die Frame-Schleife */
+  const scaleRef = useRef(1);
+  const wake = () => wakeRef.current();
+  const regionsRef = useRef<RegionShape[]>([]);
+  const bundlesRef = useRef<BundleShape[]>([]);
 
   useEffect(() => {
     if (!physicsOn) return;
     let raf = 0;
+    let frame = 0;
     const step = () => {
+      raf = 0;
       const m = simPos.current;
       const a = alpha.current;
+      frame += 1;
       if (a > 0.005) {
         const arr = [...m.entries()];
         // Abstoßung (alle Paare — Board-Zahlen bleiben klein genug)
@@ -306,7 +381,13 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         alpha.current = a * 0.985;   // Energie klingt ab → Ruhe statt Dauerzappeln
         if (followActive.current) {
           const ap = m.get(activeIdRef.current);
-          if (ap) setVb((v) => ({ ...v, x: ap.x - v.w / 2, y: ap.y - v.h / 2 }));
+          // M223: NICHT über setVb — das war ein voller React-Durchlauf PRO
+          // FRAME (gemessen: 60 Renders/s im Leerlauf) und hat den ganzen
+          // imperativen Frame-Pfad von M203 wieder zunichtegemacht.
+          if (ap) {
+            const v = vbRef.current;
+            applyVb({ ...v, x: ap.x - v.w / 2, y: ap.y - v.h / 2 });
+          }
         }
         // Frame direkt in den DOM schreiben — kein React-Render (M203)
         for (const [id, el] of nodeEls.current) {
@@ -325,32 +406,75 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           el.setAttribute('x1', String(A.x)); el.setAttribute('y1', String(A.y));
           el.setAttribute('x2', String(B.x)); el.setAttribute('y2', String(B.y));
         }
+        // M223: Gelände und Bänder ziehen mit. Die Hüllen kosten mehr als ein
+        // transform (konvexe Hülle + Kurve + Zeichenkette), darum nur jeden
+        // zweiten Frame — bei 60 Hz sieht das kein Mensch, halbiert aber die
+        // Rechenlast auf schwachen Geräten.
+        if (frame % 2 === 0) {
+          const at = (id: string) => m.get(id);
+          for (const rg of regionsRef.current) {
+            const path = regionEls.current.get(rg.key);
+            const label = regionTextEls.current.get(rg.key);
+            if (!path && !label) continue;
+            const geo = regionGeo(rg.ids, rg.pad, at);
+            if (!geo) continue;
+            path?.setAttribute('d', geo.d);
+            if (label) { label.setAttribute('x', String(geo.label.x)); label.setAttribute('y', String(geo.label.y)); }
+          }
+          for (const bd of bundlesRef.current) {
+            const line = bundleEls.current.get(bd.key);
+            const label = bundleTextEls.current.get(bd.key);
+            if (!line && !label) continue;
+            const A = groupMid(bd.aIds, at);
+            const B = groupMid(bd.bIds, at);
+            if (!A || !B) continue;
+            if (line) {
+              line.setAttribute('x1', String(A.x)); line.setAttribute('y1', String(A.y));
+              line.setAttribute('x2', String(B.x)); line.setAttribute('y2', String(B.y));
+            }
+            if (label) {
+              label.setAttribute('x', String((A.x + B.x) / 2));
+              label.setAttribute('y', String((A.y + B.y) / 2 - 9 / scaleRef.current));
+            }
+          }
+        }
         // M203: Solange sich das Netz bewegt, pausiert das Glas der Seiten-
         // leiste — backdrop-filter erzwingt sonst pro Frame einen teuren
         // Repaint der verwischten Fläche (ruckelte selbst auf Gaming-GPUs)
         svgRef.current?.closest('.sidepanel')?.classList.add('graph-motion');
+        raf = requestAnimationFrame(step);
       } else {
+        // Ruhe: Schleife anhalten statt weiterzulaufen (M223)
         svgRef.current?.closest('.sidepanel')?.classList.remove('graph-motion');
       }
-      raf = requestAnimationFrame(step);
     };
+    wakeRef.current = () => { if (!raf) raf = requestAnimationFrame(step); };
     raf = requestAnimationFrame(step);
     return () => {
-      cancelAnimationFrame(raf);
+      wakeRef.current = () => {};
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
       svgRef.current?.closest('.sidepanel')?.classList.remove('graph-motion');
     };
   }, [physicsOn, links, projectOf]);
 
-  /** Effektive Positionen: mit Physik die Simulation, ohne das statische Layout */
-  const pos = useMemo(() => {
+  /**
+   * Effektive Positionen: mit Physik die Simulation, ohne das statische Layout.
+   *
+   * M223: BEWUSST ohne useMemo. Die Simulation läuft außerhalb von React; eine
+   * Memo hätte nach dem Ausschwingen alte Koordinaten festgehalten, und der
+   * nächste beliebige Render (Ebene umschalten, tippen) hätte alle Knoten an
+   * ihre Startplätze zurückspringen lassen. Die Kopie kostet bei Board-Zahlen
+   * dieser Größenordnung nichts — Renders sind jetzt selten.
+   */
+  const pos = (() => {
     if (!physicsOn) return seedPos;
     const out = new Map<string, { x: number; y: number }>();
     for (const [id, p] of simPos.current) out.set(id, { x: p.x, y: p.y });
     // Fallback fürs allererste Rendern (Sim noch nicht geseedet)
     for (const [id, p] of seedPos) if (!out.has(id)) out.set(id, p);
     return out;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [physicsOn, seedPos, simPos.current.size, alpha.current]);
+  })();
 
   /**
    * M221: Die Gliederung als Gelände.
@@ -363,38 +487,33 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
    * der Zustand wird räumlich begreifbar, statt in einer Einstellungsliste zu
    * verschwinden, und lässt sich hier direkt umschalten.
    */
-  const regions = useMemo(() => {
+  // M223: Die Memo hält nur noch WELCHE Boards zu welcher Fläche gehören —
+  // die Geometrie entsteht daraus beim Rendern UND in der Frame-Schleife.
+  // Vorher hing sie an `pos` und wurde damit bei jedem Render neu gerechnet,
+  // obwohl sich die Gliederung nur bei Strukturänderungen ändert.
+  const regions = useMemo<RegionShape[]>(() => {
     if (!showRegions) return [];
-    const out: Array<{
-      key: string; kind: 'space' | 'project'; name: string; accent: string;
-      d: string; label: { x: number; y: number }; spaceId: string; schlaeft: boolean;
-    }> = [];
+    const out: RegionShape[] = [];
     spaces.forEach((sp, si) => {
       const accent = SPACE_ACCENTS[si % SPACE_ACCENTS.length];
       const schlaeft = brainOn && brainOffSpaces.includes(sp.id);
-      const allePunkte: Array<{ x: number; y: number }> = [];
+      const alle: string[] = [];
       for (const proj of sp.projects) {
-        const pts = proj.boardIds.map((id) => pos.get(id)).filter(Boolean) as Array<{ x: number; y: number }>;
-        if (pts.length === 0) continue;
-        allePunkte.push(...pts);
+        const ids = proj.boardIds.filter((id) => seedPos.has(id));
+        if (ids.length === 0) continue;
+        alle.push(...ids);
         // Projekt-Hüllen nur, wenn der Bereich mehr als eines hat — sonst
         // läge dieselbe Fläche doppelt übereinander
         if (sp.projects.length > 1) {
-          out.push({
-            key: `p-${proj.id}`, kind: 'project', name: proj.name, accent,
-            d: hullPath(pts, 34), label: topAnchor(pts, 34), spaceId: sp.id, schlaeft,
-          });
+          out.push({ key: `p-${proj.id}`, kind: 'project', name: proj.name, accent, ids, pad: 34, spaceId: sp.id, schlaeft });
         }
       }
-      if (allePunkte.length === 0) return;
-      out.push({
-        key: `s-${sp.id}`, kind: 'space', name: sp.name, accent,
-        d: hullPath(allePunkte, 62), label: topAnchor(allePunkte, 62), spaceId: sp.id, schlaeft,
-      });
+      if (alle.length === 0) return;
+      out.push({ key: `s-${sp.id}`, kind: 'space', name: sp.name, accent, ids: alle, pad: 62, spaceId: sp.id, schlaeft });
     });
     // Bereichs-Flächen zuerst zeichnen, Projekte darüber
     return out.sort((a, b) => (a.kind === 'space' ? -1 : 1) - (b.kind === 'space' ? -1 : 1));
-  }, [spaces, pos, showRegions, brainOn, brainOffSpaces]);
+  }, [spaces, seedPos, showRegions, brainOn, brainOffSpaces]);
 
   /**
    * M222: Verbindungen zwischen Bereichen als BAND statt als fünfzig Fäden.
@@ -404,7 +523,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
    * eine Aussage: „Zwischen Bauleitplanung und Rechtsamt läuft viel." Die
    * Stärke des Bands zeigt, wie viel — die Beschriftung sagt es genau.
    */
-  const bundles = useMemo(() => {
+  const bundles = useMemo<BundleShape[]>(() => {
     if (!showRegions) return [];
     const spaceOf = new Map<string, string>();
     for (const sp of spaces) for (const p of sp.projects) for (const id of p.boardIds) spaceOf.set(id, sp.id);
@@ -417,33 +536,68 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
       const key = [a, b].sort().join('|');
       zaehler.set(key, (zaehler.get(key) ?? 0) + 1);
     }
-    // Mittelpunkt je Bereich aus den Board-Positionen
-    const mitte = new Map<string, { x: number; y: number }>();
+    // Wie bei den Hüllen: nur die ZUGEHÖRIGKEIT merken, die Mittelpunkte
+    // rechnet die Frame-Schleife — sonst klebten die Bänder an alten Orten
+    const boardsOf = new Map<string, string[]>();
     for (const sp of spaces) {
-      const pts = sp.projects.flatMap((p) => p.boardIds.map((id) => pos.get(id))).filter(Boolean) as Array<{ x: number; y: number }>;
-      if (pts.length === 0) continue;
-      mitte.set(sp.id, {
-        x: pts.reduce((t, q) => t + q.x, 0) / pts.length,
-        y: pts.reduce((t, q) => t + q.y, 0) / pts.length,
-      });
+      const ids = sp.projects.flatMap((p) => p.boardIds).filter((id) => seedPos.has(id));
+      if (ids.length > 0) boardsOf.set(sp.id, ids);
     }
     const namen = new Map(spaces.map((sp) => [sp.id, sp.name]));
     return [...zaehler.entries()].flatMap(([key, n]) => {
       const [a, b] = key.split('|');
-      const pa = mitte.get(a);
-      const pb = mitte.get(b);
-      if (!pa || !pb) return [];
-      return [{ key, a: pa, b: pb, n, label: `${namen.get(a)} ↔ ${namen.get(b)}: ${n}` }];
+      const ia = boardsOf.get(a);
+      const ib = boardsOf.get(b);
+      if (!ia || !ib) return [];
+      return [{ key, aIds: ia, bIds: ib, n, label: `${namen.get(a)} ↔ ${namen.get(b)}: ${n}` }];
     });
-  }, [links, spaces, pos, showRegions]);
+  }, [links, spaces, seedPos, showRegions]);
+
+  // Die Frame-Schleife liest beides über Refs — so bleibt sie unabhängig
+  // davon, wann React zuletzt gerendert hat (M223)
+  regionsRef.current = regions;
+  bundlesRef.current = bundles;
 
   // ---------- M195: Knoten ziehen (stupst die Nachbarn physikalisch an) ----------
   const dragNode = useRef<string | null>(null);
   const dragMoved = useRef(false);
+  /**
+   * M223: Die Maße des SVG werden HÖCHSTENS EINMAL PRO FRAME gemessen.
+   *
+   * getBoundingClientRect ist ein erzwungenes Layout. Bei jedem Zeiger- oder
+   * Rad-Ereignis gemessen — und dazwischen die viewBox geschrieben — entsteht
+   * das klassische Layout-Thrashing: Lesen erzwingt, was das Schreiben gerade
+   * ungültig gemacht hat. Bei 250 Ereignissen pro Sekunde war das der teuerste
+   * Posten der ganzen Ansicht.
+   */
+  const rectCache = useRef<DOMRect | null>(null);
+  const rectStale = useRef(true);
+  const svgRect = (): DOMRect | null => {
+    const el = svgRef.current;
+    if (!el) return null;
+    if (rectStale.current || !rectCache.current) {
+      rectCache.current = el.getBoundingClientRect();
+      rectStale.current = false;
+    }
+    return rectCache.current;
+  };
+  /** Neu vermessen, wenn sich die Lage GEÄNDERT haben kann — nicht pro Frame:
+   *  Größenwechsel, Scrollen und der Beginn einer neuen Geste. */
+  const rectVeraltet = () => { rectStale.current = true; };
+  useEffect(() => {
+    window.addEventListener('scroll', rectVeraltet, true);
+    window.addEventListener('resize', rectVeraltet);
+    return () => {
+      window.removeEventListener('scroll', rectVeraltet, true);
+      window.removeEventListener('resize', rectVeraltet);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /** Bildschirm → Graph-Koordinaten (berücksichtigt viewBox + meet-Zentrierung) */
   const toGraph = (cx: number, cy: number) => {
-    const el = svgRef.current!;
-    const rect = el.getBoundingClientRect();
+    const rect = svgRect();
+    if (!rect) return { x: 0, y: 0 };
     const v = vbRef.current;
     const scale = Math.min(rect.width / v.w, rect.height / v.h);
     const ox = (rect.width - v.w * scale) / 2;
@@ -457,6 +611,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const dragStart = useRef({ x: 0, y: 0 });
   const onNodeDown = (id: string) => (e: React.PointerEvent) => {
     if (!physicsOn) return;
+    rectVeraltet();   // neue Geste → einmal frisch vermessen (M223)
     // Nur Haupttaste/Finger: Der Rechtsklick gehört dem Kontextmenü — sonst
     // würde sein pointerup als „Tipp" gewertet und öffnete das Board (M197)
     if (e.button !== 0) return;
@@ -480,6 +635,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     p.fx = g.x; p.fy = g.y;
     dragMoved.current = true;
     alpha.current = Math.max(alpha.current, 0.5);   // Nachbarn wach machen
+    wake();                                         // ruhende Schleife starten
     // KEIN Render hier: Die rAF-Schleife schreibt die Frames selbst — ein zweiter
     // Render je pointermove (bis 120 Hz am iPhone) machte es nur ruckeliger
   };
@@ -578,10 +734,90 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
 
   // ---------- Pan & Zoom wie auf dem Whiteboard (viewBox-Steuerung) ----------
   const svgRef = useRef<SVGSVGElement | null>(null);
+  /**
+   * M223: Die viewBox ist KEIN React-Zustand mehr im engeren Sinn.
+   *
+   * Pannen und Zoomen liefen vorher über setVb — ein voller Reconcile des
+   * kompletten SVG (Gelände, Bänder, alle Kanten, Satelliten, Knoten) pro
+   * Zeigerbewegung bzw. pro Rad-Rastung. Bei 250 Ereignissen/s bricht das
+   * jedes Gerät (gemessen: 21 fps beim Rad-Zoom auf Handy-Leistung).
+   *
+   * Jetzt: `vbRef` ist die Wahrheit und wird sofort ins DOM geschrieben —
+   * das ist ein Attribut, kein Layout. React erfährt nur dann davon, wenn
+   * sich etwas SICHTBAR ändert: eine Größenstufe, der Detailgrad oder die
+   * Gliederungs-Ebene — und selbst dann höchstens einmal pro Frame.
+   * Reines Verschieben rendert gar nicht mehr.
+   */
   const [vb, setVb] = useState({ x: 0, y: 0, w: GRAPH_W, h: GRAPH_H });
-  // Ref-Spiegel für Handler, die außerhalb des Render-Zyklus rechnen (M195-Drag)
   const vbRef = useRef(vb);
-  vbRef.current = vb;
+  const rectWRef = useRef(0);
+  /**
+   * M223: Der Ausschnitt bewegt sich als TRANSFORM einer Gruppe, nicht mehr
+   * über die viewBox des SVG.
+   *
+   * Das ist der Unterschied zwischen ruckelig und flüssig: Eine geänderte
+   * viewBox zwingt den Browser, das gesamte SVG NEU ZU VERMESSEN — inklusive
+   * aller Textmetriken. Gemessen waren das beim Zoomen 1,3 von 3 Sekunden
+   * reine Layout-Zeit. Ein transform dagegen ist reines Zeichnen; die Maße
+   * bleiben gültig. (React Flow auf den Boards macht es genauso — deshalb
+   * fühlt sich das Board flüssiger an als das Netz.)
+   */
+  const vpRef = useRef<SVGGElement | null>(null);
+  /** Fingerabdruck der Zoomstufe: nur wenn er sich ändert, muss React ran */
+  const stufe = (w: number) =>
+    `${sizeStep(w)}|${lodOf((rectWRef.current || GRAPH_W) / w)}|${geoOf(GRAPH_W / w)}`;
+  const committedStufe = useRef(stufe(vb.w));
+  const commitRaf = useRef(0);
+  /** Maßstab wie bei preserveAspectRatio="meet": einheitlich, zentriert */
+  const fitScale = (v: { w: number; h: number }, rect: { width: number; height: number }) =>
+    Math.min(rect.width / v.w, rect.height / v.h);
+  const paintVb = (v: { x: number; y: number; w: number; h: number }) => {
+    const g = vpRef.current;
+    const rect = svgRect();
+    if (!g || !rect) return;
+    const k = fitScale(v, rect);
+    const ox = (rect.width - v.w * k) / 2;
+    const oy = (rect.height - v.h * k) / 2;
+    // CSS-transform statt transform-Attribut: Blink kann die Gruppe damit auf
+    // eine eigene Ebene heben (will-change) und schiebt sie beim Zoomen, statt
+    // das SVG neu zu vermessen.
+    g.style.transform = `translate(${ox - v.x * k}px, ${oy - v.y * k}px) scale(${k})`;
+    // Für Tests und Fehlersuche einsehbar — data-Attribute lösen kein Layout aus
+    svgRef.current?.setAttribute('data-view', `${v.x} ${v.y} ${v.w} ${v.h}`);
+  };
+  /**
+   * Der React-Durchlauf, der die bildschirmfesten Größen nachzieht, kommt
+   * höchstens alle 150 ms — mit garantiertem Abschluss-Durchlauf.
+   *
+   * Warum nicht pro Frame: Jeder dieser Durchläufe vermisst 200+ Elemente neu
+   * (auf Handy-Leistung rund 12 ms). Beim Zoomen mit dem Rad oder zwei Fingern
+   * kamen sie 60-mal pro Sekunde und fraßen das Frame-Budget. Dazwischen
+   * skaliert die Schrift kurz mit — am Ende der Geste sitzt wieder alles exakt.
+   */
+  const letzterCommit = useRef(0);
+  const commitTimer = useRef(0);
+  const planeCommit = () => {
+    if (commitTimer.current) return;
+    const seit = performance.now() - letzterCommit.current;
+    commitTimer.current = window.setTimeout(() => {
+      commitTimer.current = 0;
+      letzterCommit.current = performance.now();
+      committedStufe.current = stufe(vbRef.current.w);
+      setVb(vbRef.current);
+    }, Math.max(0, 150 - seit));
+  };
+  const applyVb = (next: { x: number; y: number; w: number; h: number }) => {
+    vbRef.current = next;
+    paintVb(next);
+    if (stufe(next.w) !== committedStufe.current) planeCommit();
+  };
+  useEffect(() => () => {
+    if (commitRaf.current) cancelAnimationFrame(commitRaf.current);
+    if (commitTimer.current) clearTimeout(commitTimer.current);
+  }, []);
+  // Nach JEDEM Render den echten Ausschnitt wiederherstellen: React kennt beim
+  // Commit nur den (nach reinem Pannen veralteten) Zustandswert.
+  useLayoutEffect(() => { paintVb(vbRef.current); });
   // Ref statt Closure: der Wheel-Listener wird nur einmal registriert und
   // soll trotzdem immer die aktuellen Knoten-Positionen sehen
   const posRef = useRef(pos);
@@ -597,14 +833,14 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const followActive = useRef(true);
   const zoomAt = (cx: number, cy: number, f: number) => {
     followActive.current = false;
-    setVb((v) => {
-      const el = svgRef.current;
-      if (!el) return v;
-      const rect = el.getBoundingClientRect();
+    {
+      const v = vbRef.current;
+      const rect = svgRect();
+      if (!rect) return;
       // Zoomstufe begrenzen: 10× rein bis 2,5× raus
       const w = Math.min(GRAPH_W * 2.5, Math.max(GRAPH_W / 10, v.w * f));
       const realF = w / v.w;
-      if (realF === 1) return v;
+      if (realF === 1) return;
       // preserveAspectRatio "meet": einheitlicher Maßstab + zentrierter Versatz
       const scale = Math.min(rect.width / v.w, rect.height / v.h);
       const ox = (rect.width - v.w * scale) / 2;
@@ -630,8 +866,8 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         next.x = best.x - next.w / 2;
         next.y = best.y - next.h / 2;
       }
-      return next;
-    });
+      applyVb(next);
+    }
   };
 
   const zoomButton = (f: number) => {
@@ -651,7 +887,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     if (!p) return;
     centeredOnce.current = true;
     const w = GRAPH_W / 1.9, h = GRAPH_H / 1.9;
-    setVb({ x: p.x - w / 2, y: p.y - h / 2, w, h });
+    applyVb({ x: p.x - w / 2, y: p.y - h / 2, w, h });
   }, [pos, activeId]);
 
   // Rad-Zoom braucht preventDefault → nativer non-passive Listener
@@ -659,8 +895,14 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return;
+    let letztesRad = 0;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
+      // Nur zu Beginn eines Rad-Schubs neu vermessen — dazwischen bleibt die
+      // Lage gleich, und jede Messung wäre ein erzwungenes Layout (M223)
+      const jetzt = e.timeStamp;
+      if (jetzt - letztesRad > 300) rectVeraltet();
+      letztesRad = jetzt;
       zoomAt(e.clientX, e.clientY, e.deltaY > 0 ? 1.12 : 1 / 1.12);
     };
     el.addEventListener('wheel', onWheel, { passive: false });
@@ -670,6 +912,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   }, []);
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    rectVeraltet();   // neue Geste → einmal frisch vermessen (M223)
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 1) {
       downAt.current = { x: e.clientX, y: e.clientY };
@@ -701,13 +944,13 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetische Pointer */ }
       }
       if (!moved.current) return;
-      setVb((v) => {
-        const el = svgRef.current;
-        if (!el) return v;
-        const rect = el.getBoundingClientRect();
-        const scale = Math.min(rect.width / v.w, rect.height / v.h);
-        return { ...v, x: v.x - dx / scale, y: v.y - dy / scale };
-      });
+      // M223: Reines Verschieben ändert den Maßstab nicht — es geht direkt
+      // ins Attribut, ganz ohne React-Durchlauf.
+      const rect = svgRect();
+      if (!rect) return;
+      const v = vbRef.current;
+      const sc = Math.min(rect.width / v.w, rect.height / v.h);
+      applyVb({ ...v, x: v.x - dx / sc, y: v.y - dy / sc });
     } else if (pts.size === 2) {
       const [p1, p2] = [...pts.values()];
       const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
@@ -781,20 +1024,28 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   // ---------- Semantischer Zoom: Detailgrad folgt der Zoomstufe ----------
   // Maßstab = ECHTE Bildschirm-Pixel pro SVG-Einheit (gemessen, nicht relativ
   // zur Graph-Breite — sonst ist auf dem Handy alles ⅓ so groß wie gedacht).
-  const [rectW, setRectW] = useState(0);
+  const [box, setBox] = useState({ w: 0, h: 0 });
   useEffect(() => {
     const el = svgRef.current;
     if (!el) return;
-    const measure = () => setRectW(el.getBoundingClientRect().width);
+    const measure = () => {
+      const r = el.getBoundingClientRect();
+      rectStale.current = true;              // gecachte Maße sind hinfällig
+      setBox((b) => (b.w === r.width && b.h === r.height ? b : { w: r.width, h: r.height }));
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
-  const scale = (rectW || GRAPH_W) / vb.w;
+  const rectW = box.w;
+  rectWRef.current = rectW;
+  // Maßstab EXAKT wie im Transform (meet: der kleinere der beiden Faktoren) —
+  // sonst passen bildschirmfeste Größen nicht zur tatsächlichen Darstellung
+  const scale = box.w > 0 && box.h > 0 ? fitScale(vb, { width: box.w, height: box.h }) : GRAPH_W / vb.w;
   // Stufe 0 (zu klein für Details): nur Boards + Namen. Stufe 1: Karten-Punkte.
   // Stufe 2 (nah): Karten-Titel an den Punkten.
-  const lod = scale < 0.42 ? 0 : scale <= 1.35 ? 1 : 2;
+  const lod = lodOf(scale);
   /**
    * M222: Der Zoom wechselt die GLIEDERUNGS-Ebene.
    *
@@ -812,11 +1063,10 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
    * ein großer Monitor nie. `zoom` ist 1, wenn alles eingepasst ist, und läuft
    * von 0,4 (ganz heraus) bis 10 (ganz heran) — die Grenzen aus `zoomAt`.
    */
-  const zoom = GRAPH_W / vb.w;
-  const geoLevel: 'space' | 'project' | 'board' =
-    zoom < 0.5 ? 'space' : zoom < 0.8 ? 'project' : 'board';
+  const geoLevel = geoOf(GRAPH_W / vb.w);
   /** Wunschgröße in Bildschirm-Pixeln → SVG-Einheiten (konstant auf dem Schirm) */
   const ui = (px: number) => px / scale;
+  scaleRef.current = scale;
 
   return (
     <div className={`ov-graph ${embedded ? "embedded" : ""}`}>
@@ -857,7 +1107,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
       </div>
       <svg
         ref={svgRef}
-        viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
+        data-view={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
         className={`ov-graph-svg geo-${geoLevel}`}
         role="img"
         aria-label="Board-Netz"
@@ -867,40 +1117,63 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         onPointerCancel={onPointerEnd}
         onClickCapture={onClickCapture}
       >
+        {/* M223: EINE Gruppe trägt Verschiebung und Zoom — Pan/Zoom sind damit
+            reines Zeichnen statt einer Neuvermessung des ganzen SVG */}
+        <g className="ov-graph-vp" ref={vpRef}>
         {/* M221: Gelände zuerst — alles Weitere liegt darauf */}
-        {regions.map((rg) => (
-          <g
-            key={rg.key}
-            className={`ov-region ov-region-${rg.kind} ${rg.schlaeft ? 'schlaeft' : ''}`}
-            onClick={() => { if (brainOn) toggleBrainSpace(rg.spaceId); }}
-          >
-            <title>
-              {rg.schlaeft
-                ? `„${rg.name}" ist nicht Teil des Gehirns — klicken zum Einschalten`
-                : `${rg.kind === 'space' ? 'Bereich' : 'Projekt'} „${rg.name}"${brainOn ? ' — klicken, um ihn aus dem Gehirn zu nehmen' : ''}`}
-            </title>
-            <path d={rg.d} style={{ color: rg.accent }} />
-            {rg.kind === 'space' && (
-              <text x={rg.label.x} y={rg.label.y} style={{ color: rg.accent }} fontSize={ui(15)}>
-                {rg.schlaeft ? `${rg.name} · schläft` : rg.name}
-              </text>
-            )}
-          </g>
-        ))}
+        {regions.map((rg) => {
+          const geo = regionGeo(rg.ids, rg.pad, (id) => pos.get(id));
+          if (!geo) return null;
+          return (
+            <g
+              key={rg.key}
+              className={`ov-region ov-region-${rg.kind} ${rg.schlaeft ? 'schlaeft' : ''}`}
+              onClick={() => { if (brainOn) toggleBrainSpace(rg.spaceId); }}
+            >
+              <title>
+                {rg.schlaeft
+                  ? `„${rg.name}" ist nicht Teil des Gehirns — klicken zum Einschalten`
+                  : `${rg.kind === 'space' ? 'Bereich' : 'Projekt'} „${rg.name}"${brainOn ? ' — klicken, um ihn aus dem Gehirn zu nehmen' : ''}`}
+              </title>
+              <path
+                ref={(el) => { if (el) regionEls.current.set(rg.key, el); else regionEls.current.delete(rg.key); }}
+                d={geo.d}
+                style={{ color: rg.accent }}
+              />
+              {rg.kind === 'space' && (
+                <text
+                  ref={(el) => { if (el) regionTextEls.current.set(rg.key, el); else regionTextEls.current.delete(rg.key); }}
+                  x={geo.label.x} y={geo.label.y} style={{ color: rg.accent }} fontSize={ui(15)}
+                >
+                  {rg.schlaeft ? `${rg.name} · schläft` : rg.name}
+                </text>
+              )}
+            </g>
+          );
+        })}
         {/* M222: Bänder zwischen Bereichen — nur weit draußen, dort ersetzen
             sie die Einzellinien und machen die Verzahnung erst lesbar */}
-        {bundles.map((bd) => (
-          <g key={`bd-${bd.key}`} className="ov-bundle">
-            <title>{bd.label}</title>
-            <line
-              x1={bd.a.x} y1={bd.a.y} x2={bd.b.x} y2={bd.b.y}
-              strokeWidth={ui(Math.min(22, 4 + bd.n * 2.4))}
-            />
-            <text x={(bd.a.x + bd.b.x) / 2} y={(bd.a.y + bd.b.y) / 2 - ui(9)} fontSize={ui(13)}>
-              {bd.n}
-            </text>
-          </g>
-        ))}
+        {bundles.map((bd) => {
+          const a = groupMid(bd.aIds, (id) => pos.get(id));
+          const b = groupMid(bd.bIds, (id) => pos.get(id));
+          if (!a || !b) return null;
+          return (
+            <g key={`bd-${bd.key}`} className="ov-bundle">
+              <title>{bd.label}</title>
+              <line
+                ref={(el) => { if (el) bundleEls.current.set(bd.key, el); else bundleEls.current.delete(bd.key); }}
+                x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                strokeWidth={ui(Math.min(22, 4 + bd.n * 2.4))}
+              />
+              <text
+                ref={(el) => { if (el) bundleTextEls.current.set(bd.key, el); else bundleTextEls.current.delete(bd.key); }}
+                x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - ui(9)} fontSize={ui(13)}
+              >
+                {bd.n}
+              </text>
+            </g>
+          );
+        })}
         {links.map((l, i) => {
           if (l.kind === 'portal' && !showPortals) return null;
           if (l.kind === 'wikilink' && !showWikis) return null;
@@ -1020,12 +1293,13 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
             </g>
           );
         })}
+        </g>
       </svg>
       <div className="ov-graph-zoom nodrag">
         <button onClick={() => zoomButton(1 / 1.35)} title="Vergrößern" aria-label="Vergrößern"><IZoomIn size={16} /></button>
         <button onClick={() => zoomButton(1.35)} title="Verkleinern" aria-label="Verkleinern"><IZoomOut size={16} /></button>
         <button
-          onClick={() => setVb({ x: 0, y: 0, w: GRAPH_W, h: GRAPH_H })}
+          onClick={() => { followActive.current = false; applyVb({ x: 0, y: 0, w: GRAPH_W, h: GRAPH_H }); }}
           title="Alles einpassen"
           aria-label="Alles einpassen"
         >
@@ -1059,11 +1333,11 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           <button onClick={() => { setLinkFrom(ctxMenu.boardId); setCtxMenu(null); }}>Verknüpfen mit … (Portal)</button>
           <button onClick={() => {
             const p = pos.get(ctxMenu.boardId);
-            if (p) setVb({ x: p.x - GRAPH_W / 3.8, y: p.y - GRAPH_H / 3.8, w: GRAPH_W / 1.9, h: GRAPH_H / 1.9 });
+            if (p) { followActive.current = false; applyVb({ x: p.x - GRAPH_W / 3.8, y: p.y - GRAPH_H / 3.8, w: GRAPH_W / 1.9, h: GRAPH_H / 1.9 }); }
             setCtxMenu(null);
           }}>Hierher zoomen</button>
           {physicsOn && (
-            <button onClick={() => { alpha.current = 1; setCtxMenu(null); }}>Netz neu ausschwingen</button>
+            <button onClick={() => { alpha.current = 1; wake(); setCtxMenu(null); }}>Netz neu ausschwingen</button>
           )}
         </div>
       )}
