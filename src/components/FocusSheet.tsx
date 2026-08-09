@@ -37,8 +37,59 @@ const TYPE_LABEL: Record<string, string> = {
 /** Karten, die im Fokus nichts gewinnen — sie bleiben Board-Sache */
 const NO_FOCUS = new Set(['portal', 'frame', 'shape']);
 
+/**
+ * M214: Was die Fußleiste je Modultyp anbietet.
+ *
+ * Bewusst EINE Sache pro Typ, nämlich die, die man am Handy am häufigsten
+ * will: etwas hinzufügen. Alles Weitere steht in der Karte selbst (deren
+ * Werkzeuge im Fokus mitlaufen) oder gehört aufs Board.
+ */
+interface FocusAction { label: string; hint: string; key: string }
+const ACTIONS: Record<string, FocusAction[]> = {
+  kanban: [{ label: '＋ Ticket', hint: 'Neues Ticket in der ersten Spalte anlegen', key: 'ticket' }],
+  gantt: [{ label: '＋ Vorgang', hint: 'Neuen Vorgang ab heute anlegen', key: 'gantt-row' }],
+  week: [{ label: '＋ Block', hint: 'Neuen Block anlegen — Zeit und Text danach in der Karte', key: 'week-entry' }],
+  time: [{ label: '＋ Zeit', hint: 'Arbeitszeit für heute nacherfassen', key: 'time-seg' }],
+};
+
 export function focusable(node: AppNode | undefined): boolean {
   return !!node && !NO_FOCUS.has(node.type ?? '') && !node.archived;
+}
+
+/** Fußleisten-Aktion ausführen — schreibt in denselben Datenformen wie die
+ *  Module selbst, damit deren Anzeige und Rück-Sync unverändert greifen. */
+function runAction(node: AppNode, key: string) {
+  const st = useBoard.getState();
+  const d = node.data as Record<string, unknown>;
+  const id = () => Math.random().toString(36).slice(2, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  st.pushHistory();
+  if (key === 'ticket') {
+    const items = (d.items as Array<Record<string, unknown>>) ?? [];
+    st.updateNodeData(node.id, { items: [...items, { id: id(), text: 'Neues Ticket', col: 0 }] });
+    st.showToast('＋ Ticket angelegt — Text antippen zum Ändern.');
+  } else if (key === 'gantt-row') {
+    const rows = (d.rows as Array<Record<string, unknown>>) ?? [];
+    const end = new Date(Date.now() + 4 * 864e5).toISOString().slice(0, 10);
+    st.updateNodeData(node.id, {
+      rows: [...rows, { id: id(), name: `Vorgang ${rows.length + 1}`, start: today, end }],
+    });
+    st.showToast('＋ Vorgang angelegt — Name und Zeitraum in der Karte anpassen.');
+  } else if (key === 'week-entry') {
+    const entries = (d.entries as Array<Record<string, unknown>>) ?? [];
+    // Beginn: Anfang des Rasters, Dauer eine Einheit — Feinheiten in der Karte
+    const from = typeof d.from === 'number' ? d.from : 480;
+    st.updateNodeData(node.id, {
+      entries: [...entries, { id: id(), day: 0, start: from, dur: 60, text: 'Neuer Block' }],
+    });
+    st.showToast('＋ Block angelegt — antippen für Zeit, Tag und Text.');
+  } else if (key === 'time-seg') {
+    const segs = (d.segs as Array<Record<string, unknown>>) ?? [];
+    st.updateNodeData(node.id, {
+      segs: [...segs, { id: id(), date: today, start: 8 * 60, end: 9 * 60, kind: 'arbeit' }],
+    });
+    st.showToast('＋ Stunde für heute erfasst — Zeiten in der Karte anpassen.');
+  }
 }
 
 export function FocusSheet() {
@@ -141,22 +192,34 @@ export function FocusSheet() {
           <IMore size={16} />
         </button>
       </div>
-      {siblings.length > 1 && (
-        <div className="focus-nav" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <div className="focus-nav" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        {siblings.length > 1 ? (
           <button onClick={() => step(-1)} title="Vorige Karte (oder nach rechts wischen)" aria-label="Vorige Karte">
             <IChevronL size={16} />
           </button>
-          <span
-            className="focus-hint"
-            onClick={() => showToast('Wischen blättert · nach unten wischen schließt')}
-          >
-            Wischen blättert
-          </span>
+        ) : <span className="focus-nav-gap" />}
+        {/* M214: Was in der Mitte steht, hängt am Modultyp — beim Planer ein
+            Block, beim Kanban ein Ticket, bei der Notiz das Textformat. Alles,
+            was NICHT zum Modul gehört (Verbinden, Anordnen, Archivieren),
+            bleibt bewusst draußen: Das sind Board-Tätigkeiten. */}
+        <div className="focus-acts">
+          {ACTIONS[node.type ?? '']?.map((a) => (
+            <button
+              key={a.label}
+              className="focus-act"
+              title={a.hint}
+              onClick={() => runAction(node, a.key)}
+            >
+              {a.label}
+            </button>
+          )) ?? <span className="focus-hint">Wischen blättert</span>}
+        </div>
+        {siblings.length > 1 ? (
           <button onClick={() => step(1)} title="Nächste Karte (oder nach links wischen)" aria-label="Nächste Karte">
             <IChevronR size={16} />
           </button>
-        </div>
-      )}
+        ) : <span className="focus-nav-gap" />}
+      </div>
     </>
   );
 }
