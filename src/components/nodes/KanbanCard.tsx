@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
 import { runDerived, useBoard } from '../../store';
+import { makeTicketDrag, type DropTarget } from '../../lib/dragTickets';
 import {
   kanbanCols, openSubs, ticketBlockers, uid, wipFull, wipLimitOf,
   type GanttData, type KanbanData, type KanbanItem, type KanbanNode, type TimeData,
@@ -65,10 +66,12 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     if (detailId) detailRef.current?.focus();
   }, [detailId]);
 
-  // Drag & Drop zwischen Spalten (M119) — HTML5-DnD; die Pfeile bleiben als
-  // Touch-Fallback (HTML5-Drag existiert auf Smartphones nicht zuverlässig)
+  // Ticket-Ziehen (M119, ab M215 auf Pointer-Events): funktioniert an Maus UND
+  // Finger, zwischen Spalten und innerhalb einer Spalte. Die Pfeile bleiben
+  // als barrierefreier Weg ohne Ziehen erhalten.
   const [dragId, setDragId] = useState<string | null>(null);
-  const [dragOverCol, setDragOverCol] = useState<number | null>(null);
+  const [dropAt, setDropAt] = useState<DropTarget | null>(null);
+  const dragOverCol = dropAt?.col ?? null;
   // WIP-Limit-Inline-Editor (M119): Spaltenindex mit offenem Zahlenfeld
   const [wipEdit, setWipEdit] = useState<number | null>(null);
 
@@ -304,9 +307,12 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
    * vorwärts nur ohne offene Abhängigkeiten (M118), in „Erledigt" nur mit
    * kompletter Checkliste, und nie in eine volle WIP-Spalte.
    */
-  const tryMoveTo = (item: KanbanItem, target: number) => {
+  /** Ticket in Spalte `target` legen — optional an Position `at` innerhalb der
+   *  Spalte (M215: Ziehen sortiert jetzt auch INNERHALB einer Spalte um) */
+  const tryMoveTo = (item: KanbanItem, target: number, at?: number) => {
     const col = Math.max(0, Math.min(done, target));
-    if (col === item.col) return;
+    if (col === item.col && at === undefined) return;
+    if (col === item.col && at !== undefined) { reorderInCol(item, col, at); return; }
     if (col > item.col) {
       const blockers = ticketBlockers(item, kanban);
       if (blockers.length > 0) {
@@ -325,8 +331,33 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     if (col === done) {
       confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
     }
-    setItems(kanban.items.map((it) => (it.id === item.id ? { ...it, col } : it)));
+    // Beim Spaltenwechsel zusätzlich an die gewünschte Stelle einsortieren
+    const moved = kanban.items.map((it) => (it.id === item.id ? { ...it, col } : it));
+    setItems(at === undefined ? moved : spliceIntoCol(moved, item.id, col, at));
     writeBackToSource(item, col);
+  };
+
+  /** Reihenfolge innerhalb EINER Spalte ändern (kein Spaltenwechsel, keine
+   *  WIP-/Abhängigkeits-Prüfung nötig — das Ticket bleibt, wo es ist) */
+  const reorderInCol = (item: KanbanItem, col: number, at: number) => {
+    setItems(spliceIntoCol(kanban.items, item.id, col, at));
+  };
+
+  /** Ticket aus der Liste ziehen und an Position `at` seiner Spalte wieder
+   *  einsetzen. Die Spalten-Reihenfolge ergibt sich aus der Array-Reihenfolge,
+   *  darum wird über die Positionen der Spalten-Geschwister gerechnet. */
+  const spliceIntoCol = (list: KanbanItem[], id: string, col: number, at: number): KanbanItem[] => {
+    const item = list.find((x) => x.id === id);
+    if (!item) return list;
+    const rest = list.filter((x) => x.id !== id);
+    const siblings = rest.filter((x) => colOf(x) === col);
+    const before = siblings.slice(0, Math.max(0, Math.min(siblings.length, at)));
+    // Einfügemarke ist die Stelle NACH dem letzten Ticket, das oben bleibt
+    const anchor = before.length === 0
+      ? rest.findIndex((x) => colOf(x) === col)
+      : rest.indexOf(before[before.length - 1]) + 1;
+    const pos = anchor < 0 ? rest.length : anchor;
+    return [...rest.slice(0, pos), item, ...rest.slice(pos)];
   };
 
   /**
@@ -567,18 +598,15 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       className={`kanban-item nodrag ${colIdx === done ? 'col-done' : colIdx === 0 ? 'col-first' : 'col-mid'} ${dragId === it.id ? 'dragging' : ''}`}
       key={it.id}
       data-kid={it.id}
-      draggable
-      onDragStart={(e) => {
-        // Textauswahl in Eingabefeldern (Fristfeld) darf keinen Ticket-Drag
-        // starten (M120-Audit) — Chrome zieht sonst das ganze Ticket mit
-        if ((e.target as HTMLElement).tagName === 'INPUT') { e.preventDefault(); return; }
-        e.dataTransfer.setData('text/plain', it.id);
-        // Marker-Typ: der Board-Drop-Handler lässt Ticket-Drags in Ruhe (M119)
-        e.dataTransfer.setData('application/x-pixinotes-ticket', it.id);
-        e.dataTransfer.effectAllowed = 'move';
-        setDragId(it.id);
-      }}
-      onDragEnd={() => { setDragId(null); setDragOverCol(null); }}
+      onPointerDown={makeTicketDrag(() => colsRef.current, {
+        onStart: () => setDragId(it.id),
+        onMove: (target) => setDropAt(target),
+        onDrop: (target) => {
+          setDragId(null);
+          setDropAt(null);
+          if (target) tryMoveTo(it, target.col, target.index);
+        },
+      })}
     >
       <span
         className={`kanban-item-text ${colIdx === done ? 'done-text' : ''}`}
@@ -796,25 +824,6 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             <div
               className={`kanban-col ${dragOverCol === colIdx && dragId ? 'drop-target' : ''}`}
               key={colIdx}
-              onDragOver={(e) => {
-                if (!dragId) return;
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                if (dragOverCol !== colIdx) setDragOverCol(colIdx);
-              }}
-              onDragLeave={(e) => {
-                if (e.currentTarget.contains(e.relatedTarget as Node)) return;
-                if (dragOverCol === colIdx) setDragOverCol(null);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation(); // nie zum Board-Drop-Handler durchreichen
-                const iid = e.dataTransfer.getData('text/plain') || dragId;
-                const item = kanban.items.find((x) => x.id === iid);
-                if (item) tryMoveTo(item, colIdx);
-                setDragId(null);
-                setDragOverCol(null);
-              }}
             >
               <div className="kanban-col-head">
                 <input
@@ -861,7 +870,15 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                 )}
               </div>
               {!grouped
-                ? colItems.map((it) => renderItem(it, colIdx))
+                ? colItems.flatMap((it, i) => [
+                    // M215: Einfügemarke zeigt, WO das Ticket landet
+                    ...(dropAt?.col === colIdx && dropAt.index === i && dragId !== it.id
+                      ? [<div className="k-drop-mark" key={`m-${i}`} />] : []),
+                    renderItem(it, colIdx),
+                  ]).concat(
+                    dropAt?.col === colIdx && dropAt.index >= colItems.filter((x) => x.id !== dragId).length
+                      ? [<div className="k-drop-mark" key="m-end" />] : [],
+                  )
                 : (() => {
                     const groups = new Map<string, KanbanItem[]>();
                     for (const it of colItems) {

@@ -4116,3 +4116,20 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   background: var(--surface-2); word-break: break-word; font-size: 10.5px;
 }
 @media (pointer: coarse) { .err-acts button { min-height: 44px; } }
+
+/* ================= M215: Ticket-Ziehen an Maus und Finger ================= */
+/* Kein HTML5-Drag mehr: Der Browser darf beim Ziehen weder Text markieren noch
+   die Spalte scrollen — sonst kämpfen Geste und Seite gegeneinander. */
+.kanban-item { touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.kanban-item.dragging {
+  opacity: 0.45; transform: scale(0.98);
+  /* Solange gezogen wird, gehört die Geste dem Ticket */
+  touch-action: none;
+}
+/* Einfügemarke: zeigt, WO das Ticket landet — auch beim Umsortieren
+   innerhalb derselben Spalte */
+.k-drop-mark {
+  height: 3px; margin: 3px 2px; border-radius: 3px;
+  background: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft);
+  animation: pn-fade-in 0.12s ease-out;
+}
