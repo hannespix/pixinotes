@@ -187,9 +187,15 @@ export function Presenter() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, board.nodes, board.edges]);
 
+  /** M228: Aus dem Karten-Fokus heraus startet der Vortrag bei DIESER Karte —
+   *  „ab hier präsentieren" heißt genau das und nicht „von vorn". */
+  const presentFrom = useBoard((s) => s.presentFrom);
+  const setPresentFrom = useBoard((s) => s.setPresentFrom);
   useEffect(() => {
     if (!open) return;
-    setIdx(0);
+    const ab = presentFrom ? slides.findIndex((n) => n.id === presentFrom) : -1;
+    setIdx(ab >= 0 ? ab : 0);
+    if (presentFrom) setPresentFrom(null);
     document.documentElement.requestFullscreen?.().catch(() => {});
     const onKey = (e: KeyboardEvent) => {
       // Tippen in Editor/Eingabefeld: Tasten durchlassen, aber nicht ans Board

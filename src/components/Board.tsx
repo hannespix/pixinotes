@@ -38,10 +38,24 @@ import { focusable } from './FocusSheet';
 import { merkeKasten } from '../lib/fokusFlug';
 import { ErrorBoundary } from './ErrorBoundary';
 
-/** M212: Fokus-Modus greift nur am Handy — auf Tablet/Desktop ist genug
- *  Fläche da, um im Canvas zu arbeiten. Dieselbe Schwelle wie im Stylesheet. */
-const isPhoneFocus = () =>
-  window.matchMedia('(max-width: 640px) and (pointer: coarse)').matches;
+/**
+ * M228: „Karte im Fokus" gilt jetzt auf ALLEN Geräten.
+ *
+ * Vorher gab es zwei Mechanismen für dieselbe Absicht — am Handy öffnete ein
+ * Tipp die Karte formatfüllend, am Desktop flog die Ansicht zu ihr hin. Zwei
+ * Wege zum selben Ziel sind genau die Verwirrung, über die man stolpert
+ * („warum sieht das hier anders aus als dort?"). Geblieben ist der Fokus: Er
+ * hat Kopfzeile, Blättern, alle Karten-Werkzeuge und den Flug, der zeigt,
+ * welche Karte gemeint ist. Am Desktop erscheint er nicht randlos, sondern als
+ * großes Blatt über dem Board (siehe Stylesheet) — dort ist der Zusammenhang
+ * zum Board wertvoll, am Telefon wäre er verschenkter Platz.
+ *
+ * Der Klick-Zoom bleibt als Rückfalloption für alle, die den Fokus abschalten.
+ */
+const isPhoneFocus = () => window.matchMedia('(pointer: coarse)').matches;
+
+/** Mit Maus: Doppelklick öffnet den Fokus (siehe onNodeDoubleClick) */
+const istMaus = () => window.matchMedia('(pointer: fine)').matches;
 import { DrawingLayer } from './DrawingLayer';
 import { CommentLayer } from './CommentLayer';
 import { SelectionToolbar } from './SelectionToolbar';
@@ -486,22 +500,41 @@ export function Board() {
   const returnViewport = useRef<{ x: number; y: number; zoom: number } | null>(null);
   const flyingUntil = useRef(0);
 
+  /**
+   * M228: Wie man den Fokus öffnet, hängt am EINGABEGERÄT, nicht an der Größe.
+   *
+   * Am Finger ist ein Tipp die einzige Geste — dort öffnet er den Fokus.
+   * Mit Maus ist ein Klick etwas anderes: Damit setzt man den Cursor in eine
+   * Notiz und schreibt. Würde jeder Klick das große Blatt öffnen, wäre das
+   * direkte Arbeiten auf dem Board kaputt. Darum dort der DOPPELKLICK — und
+   * auch der nur außerhalb von Textfeldern, wo er Wörter markiert.
+   */
+  const oeffneFokus = useCallback((node: Node): boolean => {
+    const st = useBoard.getState();
+    if (!st.cardFocus || st.focusCard) return false;
+    const full = selectActiveBoard(st).nodes.find((n) => n.id === node.id);
+    if (!focusable(full)) return false;
+    merkeKasten(document.querySelector(`.react-flow__node[data-id="${node.id}"]`));
+    st.setFocusCard(node.id);
+    return true;
+  }, []);
+
+  const onNodeDoubleClick = useCallback((e: React.MouseEvent, node: Node) => {
+    if (!istMaus()) return;
+    const t = e.target as HTMLElement | null;
+    if (t?.closest?.('input, textarea, [contenteditable="true"], .nodrag')) return;
+    oeffneFokus(node);
+  }, [oeffneFokus]);
+
   const onNodeClick = useCallback((e: React.MouseEvent, node: Node) => {
     const st0 = useBoard.getState();
     // M212: Am Handy öffnet ein Tipp die Karte formatfüllend. Ziehen löst
     // keinen Klick aus, Verschieben bleibt also unberührt; und wer schon im
     // Fokus ist, tippt in der Karte und soll dort nicht erneut auslösen.
-    if (st0.cardFocus && !st0.focusCard && !e.shiftKey && isPhoneFocus()) {
-      const full = selectActiveBoard(st0).nodes.find((n) => n.id === node.id);
-      if (focusable(full)) {
-        // M227: Wo liegt die Karte JETZT? Von dort startet der Flug ins Vollbild
-        merkeKasten((e.currentTarget as HTMLElement)?.closest?.('.react-flow__node')
-          ?? document.querySelector(`.react-flow__node[data-id="${node.id}"]`));
-        st0.setFocusCard(node.id);
-        return;
-      }
-    }
-    if (!useBoard.getState().clickZoom || e.shiftKey) return; // Shift = Mehrfachauswahl
+    if (!e.shiftKey && isPhoneFocus() && oeffneFokus(node)) return;
+    // Klick-Zoom nur noch, wenn der Fokus AUS ist — sonst zoomte die Ansicht
+    // zusätzlich zum Fokus, und man landete nach dem Schließen woanders
+    if (st0.cardFocus || !useBoard.getState().clickZoom || e.shiftKey) return;
     // Rahmen NIE per Klick einpassen (User-Report M162): Klicks treffen dort
     // immer die Titel-Leiste/Werkzeuge — bei großen Rahmen zoomte die Ansicht
     // so weit heraus, dass genau diese Werkzeuge unlesbar wurden
@@ -516,7 +549,7 @@ export function Board() {
     returnViewport.current = { x, y, zoom };
     flyingUntil.current = performance.now() + 700;
     void fitView({ nodes: [{ id: node.id }], padding: 0.35, duration: 450, maxZoom: 1.05 });
-  }, [fitView, getViewport]);
+  }, [fitView, getViewport, oeffneFokus]);
 
   /**
    * M227: Nach dem Fokus die Karte GANZ ins Bild holen.
@@ -793,6 +826,7 @@ export function Board() {
         }}
         onNodeDragStart={onNodeDragStart}
         onNodeClick={onNodeClick}
+        onNodeDoubleClick={onNodeDoubleClick}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
         connectionMode={ConnectionMode.Loose}

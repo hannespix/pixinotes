@@ -1160,14 +1160,16 @@ export function Settings() {
 
           <h3 style={{ marginTop: 16 }}>Bedienung</h3>
           <label className="modal-row modal-row-check">
-            <span>Karte im Fokus (nur Handy)</span>
+            <span>Karte im Fokus</span>
             <input type="checkbox" checked={cardFocus} onChange={(e) => setCardFocus(e.target.checked)} />
           </label>
           <p className="modal-hint">
-            Am Handy öffnet ein Tipp die Karte formatfüllend, mit Kopfzeile und Blättern —
-            statt sie im Canvas auf Fingernagelgröße zu bedienen. Wischen wechselt zur
-            nächsten Karte, Wischen nach unten (oder die Zurück-Taste) führt aufs Board.
-            Abgeschaltet bleibt es beim Klick-Zoom wie auf dem Desktop.
+            Ein Klick auf eine Karte öffnet sie groß — mit Kopfzeile, Blättern und allen
+            Karten-Werkzeugen. Am <b>Handy</b> formatfüllend, ab <b>Tablet-Breite</b> als
+            Blatt über dem Board, das abgedunkelt sichtbar bleibt. Wischen (oder ‹ ›)
+            wechselt die Karte, Wischen nach unten, Esc oder die Zurück-Taste führen
+            zurück; die Karte fliegt dabei an ihren Platz und wird ganz ins Bild gerückt.
+            <b> Abgeschaltet</b> gilt wieder der alte Klick-Zoom (unten einstellbar).
           </p>
           <label className="modal-row modal-row-check">
             <span>Klick-Zoom</span>

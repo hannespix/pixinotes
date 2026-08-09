@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
-import { IChevronL, IChevronR, IX } from './Icons';
+import { IChevronL, IChevronR, IPlay, IX } from './Icons';
 import { flaecheVon, fliege, letzterKasten, merkeKasten, type Kasten } from '../lib/fokusFlug';
 
 /**
@@ -279,6 +279,23 @@ export function FocusSheet() {
             was NICHT zum Modul gehört (Verbinden, Anordnen, Archivieren),
             bleibt bewusst draußen: Das sind Board-Tätigkeiten. */}
         <div className="focus-acts">
+          {/* M228: Die Brücke zum Vortrag. Fokus und Präsentation sind bewusst
+              NICHT derselbe Modus — der eine ist zum Arbeiten, der andere zum
+              Zeigen (feste Folienfolge, keine Werkzeuge, Beamer-tauglich).
+              Damit man trotzdem nicht sucht, führt von hier ein Weg dorthin,
+              und zwar ab GENAU dieser Karte. */}
+          <button
+            className="focus-act"
+            title="Ab dieser Karte präsentieren — Vollbild, Folienfolge aus den Verbindungen"
+            onClick={() => {
+              const st = useBoard.getState();
+              st.setPresentFrom(node.id);
+              setFocusCard(null);
+              st.setPresenting(true);
+            }}
+          >
+            <IPlay size={12} /> Präsentieren
+          </button>
           {ACTIONS[node.type ?? '']?.map((a) => (
             <button
               key={a.label}
@@ -288,7 +305,7 @@ export function FocusSheet() {
             >
               {a.label}
             </button>
-          )) ?? <span className="focus-hint">Wischen blättert</span>}
+          ))}
         </div>
         {siblings.length > 1 ? (
           <button onClick={() => step(1)} title="Nächste Karte (oder nach links wischen)" aria-label="Nächste Karte">

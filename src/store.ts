@@ -137,6 +137,10 @@ interface BoardState {
   tool: Tool;
   settingsOpen: boolean;
   presenting: boolean;
+  /** M228: Ab welcher Karte die Präsentation startet (nicht persistiert —
+   *  das ist eine Absicht für den nächsten Moment, kein Dokumentzustand) */
+  presentFrom: string | null;
+  setPresentFrom: (id: string | null) => void;
   ai: AiSettings;
   /** M204: Gehirn — semantischer Index (Embeddings) für Suche nach Bedeutung
    *  und „Verwandte Karten". 'auto' folgt der KI-Einstellung. */
@@ -640,6 +644,8 @@ export const useBoard = create<BoardState>()(
         searchOpen: false,
         settingsOpen: false,
         presenting: false,
+        presentFrom: null,
+        setPresentFrom: (id) => set({ presentFrom: id }),
         tool: 'select',
         ai: { provider: 'none', model: 'claude-opus-4-8', apiKey: '', baseUrl: '' },
         toast: null,
