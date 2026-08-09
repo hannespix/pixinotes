@@ -9,6 +9,7 @@ import {
   type NodeProps,
   type NodeTypes,
 } from '@xyflow/react';
+import { hullPath, topAnchor } from '../lib/hull';
 import { useBoard, type BoardDoc, type Project, type Space } from '../store';
 import { boardMetaLabel } from '../lib/boardStats';
 import { boardGraph, layoutGraph, type GraphLink } from '../lib/links';
@@ -153,6 +154,10 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const layers = useBoard((s) => s.graphLayers);
   const setLayer = useBoard((s) => s.setGraphLayer);
   const { cards: showCards, portals: showPortals, wikis: showWikis, projectOnly } = layers;
+  // M221: Gelände-Ebene — standardmäßig AN, weil sie Struktur zeigt statt sie zu verstecken
+  const showRegions = layers.regionen !== false;
+  const brainOffSpaces = useBoard((s) => s.brainOffSpaces);
+  const toggleBrainSpace = useBoard((s) => s.toggleBrainSpace);
   const activeId = useBoard((s) => s.activeId);
   const activeIdRef = useRef(activeId);
   activeIdRef.current = activeId;
@@ -346,6 +351,50 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [physicsOn, seedPos, simPos.current.size, alpha.current]);
+
+  /**
+   * M221: Die Gliederung als Gelände.
+   *
+   * Bereiche und Projekte werden nicht zu weiteren Knoten, sondern zu weichen
+   * Flächen UNTER den Board-Knoten. Struktur gehört in den Hintergrund, sonst
+   * kämpfen drei Knotenarten um dieselbe Aufmerksamkeit.
+   *
+   * Ein abgeschaltetes Sub-Brain (M220) wird dabei zur ausgegrauten Region —
+   * der Zustand wird räumlich begreifbar, statt in einer Einstellungsliste zu
+   * verschwinden, und lässt sich hier direkt umschalten.
+   */
+  const regions = useMemo(() => {
+    if (!showRegions) return [];
+    const out: Array<{
+      key: string; kind: 'space' | 'project'; name: string; accent: string;
+      d: string; label: { x: number; y: number }; spaceId: string; schlaeft: boolean;
+    }> = [];
+    spaces.forEach((sp, si) => {
+      const accent = SPACE_ACCENTS[si % SPACE_ACCENTS.length];
+      const schlaeft = brainOn && brainOffSpaces.includes(sp.id);
+      const allePunkte: Array<{ x: number; y: number }> = [];
+      for (const proj of sp.projects) {
+        const pts = proj.boardIds.map((id) => pos.get(id)).filter(Boolean) as Array<{ x: number; y: number }>;
+        if (pts.length === 0) continue;
+        allePunkte.push(...pts);
+        // Projekt-Hüllen nur, wenn der Bereich mehr als eines hat — sonst
+        // läge dieselbe Fläche doppelt übereinander
+        if (sp.projects.length > 1) {
+          out.push({
+            key: `p-${proj.id}`, kind: 'project', name: proj.name, accent,
+            d: hullPath(pts, 34), label: topAnchor(pts, 34), spaceId: sp.id, schlaeft,
+          });
+        }
+      }
+      if (allePunkte.length === 0) return;
+      out.push({
+        key: `s-${sp.id}`, kind: 'space', name: sp.name, accent,
+        d: hullPath(allePunkte, 62), label: topAnchor(allePunkte, 62), spaceId: sp.id, schlaeft,
+      });
+    });
+    // Bereichs-Flächen zuerst zeichnen, Projekte darüber
+    return out.sort((a, b) => (a.kind === 'space' ? -1 : 1) - (b.kind === 'space' ? -1 : 1));
+  }, [spaces, pos, showRegions, brainOn, brainOffSpaces]);
 
   // ---------- M195: Knoten ziehen (stupst die Nachbarn physikalisch an) ----------
   const dragNode = useRef<string | null>(null);
@@ -715,6 +764,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           ['Karten', 'cards', showCards],
           ['Portale', 'portals', showPortals],
           ['Wikilinks', 'wikis', showWikis],
+          ['Gliederung', 'regionen', showRegions],
           ['Physik', 'physik', physicsOn],
           ...(brainOn ? [['🧠 Vorschläge', 'vorschlaege', showSuggest] as const] : []),
         ] as const).map(([label, key, on]) => (
@@ -756,6 +806,26 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         onPointerCancel={onPointerEnd}
         onClickCapture={onClickCapture}
       >
+        {/* M221: Gelände zuerst — alles Weitere liegt darauf */}
+        {regions.map((rg) => (
+          <g
+            key={rg.key}
+            className={`ov-region ov-region-${rg.kind} ${rg.schlaeft ? 'schlaeft' : ''}`}
+            onClick={() => { if (brainOn) toggleBrainSpace(rg.spaceId); }}
+          >
+            <title>
+              {rg.schlaeft
+                ? `„${rg.name}" ist nicht Teil des Gehirns — klicken zum Einschalten`
+                : `${rg.kind === 'space' ? 'Bereich' : 'Projekt'} „${rg.name}"${brainOn ? ' — klicken, um ihn aus dem Gehirn zu nehmen' : ''}`}
+            </title>
+            <path d={rg.d} style={{ color: rg.accent }} />
+            {rg.kind === 'space' && (
+              <text x={rg.label.x} y={rg.label.y} style={{ color: rg.accent }} fontSize={ui(15)}>
+                {rg.schlaeft ? `${rg.name} · schläft` : rg.name}
+              </text>
+            )}
+          </g>
+        ))}
         {links.map((l, i) => {
           if (l.kind === 'portal' && !showPortals) return null;
           if (l.kind === 'wikilink' && !showWikis) return null;

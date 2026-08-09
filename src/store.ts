@@ -279,8 +279,8 @@ interface BoardState {
   setOverviewMode: (m: 'hierarchie' | 'netz') => void;
   /** M193: Welche Ebenen das Netz zeigt — bleibt erhalten, statt bei jedem
    *  Öffnen auf „Karten aus" zurückzufallen (User-Wunsch). */
-  graphLayers: { cards: boolean; portals: boolean; wikis: boolean; projectOnly: boolean; physik?: boolean; vorschlaege?: boolean };
-  setGraphLayer: (key: 'cards' | 'portals' | 'wikis' | 'projectOnly' | 'physik' | 'vorschlaege', on: boolean) => void;
+  graphLayers: { cards: boolean; portals: boolean; wikis: boolean; projectOnly: boolean; physik?: boolean; vorschlaege?: boolean; regionen?: boolean };
+  setGraphLayer: (key: 'cards' | 'portals' | 'wikis' | 'projectOnly' | 'physik' | 'vorschlaege' | 'regionen', on: boolean) => void;
   /** M194: Ausfahrbare Seitenleiste — der Überblick bleibt neben der Arbeit
    *  stehen, statt sie zu verdrängen. Zustand komplett persistent. */
   sidebar: { open: boolean; mode: 'hierarchie' | 'netz'; width: number };

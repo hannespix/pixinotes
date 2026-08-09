@@ -4209,3 +4209,29 @@ body:has(.app.focus-mode) .sel-menu-fixed { display: none !important; }
 .brain-scope-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .brain-scope-count { font-size: 11px; color: var(--muted); flex: none; }
 @media (pointer: coarse) { .brain-scope-row { min-height: 44px; } }
+
+/* ================= M221: Gliederung als Gelände ================= */
+/* Bereiche und Projekte sind Untergrund, keine Objekte: sehr leise Füllung,
+   weiche Kontur, nie im Weg. Der Zeiger geht durch — geklickt wird nur der
+   Rand (siehe .ov-region path unten), damit man Knoten weiter frei greift. */
+.ov-region { pointer-events: none; }
+.ov-region path {
+  fill: currentColor; fill-opacity: 0.07;
+  stroke: currentColor; stroke-opacity: 0.28; stroke-width: 1.5;
+  transition: fill-opacity 0.2s ease, stroke-opacity 0.2s ease;
+}
+.ov-region-project path { fill-opacity: 0.05; stroke-dasharray: 6 7; stroke-opacity: 0.22; }
+.ov-region text {
+  fill: currentColor; fill-opacity: 0.66; font-weight: 700;
+  text-anchor: middle; letter-spacing: 0.01em;
+  paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round;
+}
+/* Nur die Kontur ist anfassbar — so bleibt die Fläche für Knoten und Pan frei */
+.ov-region path { pointer-events: stroke; cursor: pointer; }
+.ov-region:hover path { fill-opacity: 0.12; stroke-opacity: 0.5; }
+/* M220-Bezug: abgeschaltetes Sub-Brain = schlafende Region */
+.ov-region.schlaeft path {
+  fill: var(--muted); stroke: var(--muted);
+  fill-opacity: 0.05; stroke-opacity: 0.3; stroke-dasharray: 3 6;
+}
+.ov-region.schlaeft text { fill: var(--muted); fill-opacity: 0.7; font-weight: 600; }
