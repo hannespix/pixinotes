@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
 import { IChevronL, IChevronR, IX } from './Icons';
+import { flaecheVon, fliege, letzterKasten, merkeKasten, type Kasten } from '../lib/fokusFlug';
 
 /**
  * M212: „Karte im Fokus" — am Handy füllt ein angetipptes Modul den Schirm.
@@ -104,7 +105,22 @@ export function FocusSheet() {
   const index = siblings.findIndex((n) => n.id === focusCard);
   const node = index >= 0 ? siblings[index] : undefined;
 
-  const close = useCallback(() => setFocusCard(null), [setFocusCard]);
+  /**
+   * M227: Beim Schließen fliegt die Karte an ihren Platz auf dem Board zurück —
+   * und das Board rückt sie so ins Bild, dass sie GANZ zu sehen ist. Vorher
+   * landete man irgendwo im Canvas und musste erst suchen, wo man war.
+   */
+  const vollbildKasten = useRef<Kasten | null>(null);
+  const close = useCallback(() => {
+    const el = flaecheVon(document.querySelector('.react-flow__node.pn-focused'));
+    if (el) {
+      const b = el.getBoundingClientRect();
+      vollbildKasten.current = { x: b.x, y: b.y, w: b.width, h: b.height };
+    }
+    const id = focusCard;
+    setFocusCard(null);
+    if (id) window.dispatchEvent(new CustomEvent('pixinotes:fokus-zurueck', { detail: id }));
+  }, [setFocusCard, focusCard]);
 
   const step = useCallback((dir: -1 | 1) => {
     if (siblings.length < 2 || index < 0) return;
@@ -132,6 +148,50 @@ export function FocusSheet() {
       if (history.state?.pnFocus) history.back();
     };
   }, [isOpen, setFocusCard]);
+
+  /**
+   * Hinflug: Die Karte startet dort, wo sie auf dem Board lag, und wächst ins
+   * Vollbild. Beim Blättern wird NICHT geflogen — dort wäre die Bewegung eine
+   * Behauptung („kommt von dort"), die nicht stimmt; ein Wisch ist die Geste.
+   */
+  useLayoutEffect(() => {
+    if (!focusCard) return;
+    const von = letzterKasten();
+    if (!von) return;
+    // React Flow führt die Knoten in einem EIGENEN Zustand: Die Klasse
+    // `pn-focused` steht erst nach dessen Durchlauf im DOM, nicht schon in
+    // unserem Layout-Effekt. Darum ein paar Frames lang nachsehen, statt den
+    // Flug stillschweigend ausfallen zu lassen.
+    let versuche = 0;
+    let raf = 0;
+    const suche = () => {
+      const el = flaecheVon(document.querySelector('.react-flow__node.pn-focused'));
+      if (el && el.getBoundingClientRect().width > 2) {
+        fliege(el, von);
+        merkeKasten(null);
+        return;
+      }
+      if (versuche++ < 8) raf = requestAnimationFrame(suche);
+      else merkeKasten(null);
+    };
+    suche();
+    return () => { if (raf) cancelAnimationFrame(raf); };
+  }, [focusCard]);
+
+  /** Rückflug: vom Vollbild auf den Board-Platz — und die Karte ganz ins Bild */
+  useEffect(() => {
+    const zurueck = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      const von = vollbildKasten.current;
+      vollbildKasten.current = null;
+      requestAnimationFrame(() => {
+        const el = flaecheVon(document.querySelector(`.react-flow__node[data-id="${id}"]`));
+        if (el && von) fliege(el, von, 300);
+      });
+    };
+    window.addEventListener('pixinotes:fokus-zurueck', zurueck);
+    return () => window.removeEventListener('pixinotes:fokus-zurueck', zurueck);
+  }, []);
 
   // Esc schließt (Tastatur am iPad)
   useEffect(() => {

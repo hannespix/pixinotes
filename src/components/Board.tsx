@@ -35,6 +35,7 @@ import { TimeCard } from './nodes/TimeCard';
 import { HtmlAppCard } from './nodes/HtmlAppCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { focusable } from './FocusSheet';
+import { merkeKasten } from '../lib/fokusFlug';
 import { ErrorBoundary } from './ErrorBoundary';
 
 /** M212: Fokus-Modus greift nur am Handy — auf Tablet/Desktop ist genug
@@ -492,7 +493,13 @@ export function Board() {
     // Fokus ist, tippt in der Karte und soll dort nicht erneut auslösen.
     if (st0.cardFocus && !st0.focusCard && !e.shiftKey && isPhoneFocus()) {
       const full = selectActiveBoard(st0).nodes.find((n) => n.id === node.id);
-      if (focusable(full)) { st0.setFocusCard(node.id); return; }
+      if (focusable(full)) {
+        // M227: Wo liegt die Karte JETZT? Von dort startet der Flug ins Vollbild
+        merkeKasten((e.currentTarget as HTMLElement)?.closest?.('.react-flow__node')
+          ?? document.querySelector(`.react-flow__node[data-id="${node.id}"]`));
+        st0.setFocusCard(node.id);
+        return;
+      }
     }
     if (!useBoard.getState().clickZoom || e.shiftKey) return; // Shift = Mehrfachauswahl
     // Rahmen NIE per Klick einpassen (User-Report M162): Klicks treffen dort
@@ -509,6 +516,38 @@ export function Board() {
     returnViewport.current = { x, y, zoom };
     flyingUntil.current = performance.now() + 700;
     void fitView({ nodes: [{ id: node.id }], padding: 0.35, duration: 450, maxZoom: 1.05 });
+  }, [fitView, getViewport]);
+
+  /**
+   * M227: Nach dem Fokus die Karte GANZ ins Bild holen.
+   *
+   * Ohne das landet man nach dem Schließen an der Stelle, an der man das Board
+   * verlassen hat — bei einer Karte, die halb außerhalb lag, sucht man sich
+   * dumm. Eingepasst wird nur, wenn nötig; wer die Karte ohnehin vor sich hat,
+   * wird nicht herumgeworfen.
+   */
+  useEffect(() => {
+    const zurueck = (e: Event) => {
+      const id = (e as CustomEvent<string>).detail;
+      const st = useBoard.getState();
+      const n = selectActiveBoard(st).nodes.find((x) => x.id === id);
+      if (!n) return;
+      const { x, y, zoom } = getViewport();
+      const w = (n.measured?.width ?? n.width ?? 260) * zoom;
+      const h = (n.measured?.height ?? n.height ?? 160) * zoom;
+      const sx = n.position.x * zoom + x;
+      const sy = n.position.y * zoom + y;
+      const ganzDrin = sx >= 8 && sy >= 64 && sx + w <= window.innerWidth - 8 && sy + h <= window.innerHeight - 76;
+      if (ganzDrin) return;
+      // Erst wenn der Fokus-Modus wirklich aus dem DOM ist: Solange die Klasse
+      // hängt, steht der Canvas-Transform per !important auf „none" und der
+      // Flug von React Flow liefe gegen eine Wand.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        void fitView({ nodes: [{ id }], padding: 0.3, duration: 380, maxZoom: 1.05 });
+      }));
+    };
+    window.addEventListener('pixinotes:fokus-zurueck', zurueck);
+    return () => window.removeEventListener('pixinotes:fokus-zurueck', zurueck);
   }, [fitView, getViewport]);
 
   useEffect(() => {
