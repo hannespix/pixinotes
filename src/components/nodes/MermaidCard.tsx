@@ -92,6 +92,11 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   const [svg, setSvg] = useState('');
   const [error, setError] = useState('');
   const [tplOpen, setTplOpen] = useState(false);
+  // M218: Das Vorlagen-Menü klappte immer nach unten — die Werkzeugleiste
+  // schwebt aber UNTER der Karte, also lief es bei tief liegenden Karten aus
+  // dem Bild, und die letzten Vorlagen waren unerreichbar. Beim Öffnen prüfen
+  // wir, wo mehr Platz ist.
+  const [tplUp, setTplUp] = useState(false);
   const [pendingTpl, setPendingTpl] = useState<string | null>(null);
   const [selNode, setSelNode] = useState<string | null>(null);
   // Ausgewählte VERBINDUNG (M99): per Klick auf den Pfeil im Bild
@@ -933,9 +938,18 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
         )}
         <div className="mm-row">
           <span className="mm-pop-wrap" ref={tplRef}>
-            <button className={tplOpen ? 'active' : ''} title="Vorlage wählen" onClick={() => setTplOpen((o) => !o)}>Vorlage ▾</button>
+            <button
+              className={tplOpen ? 'active' : ''}
+              title="Vorlage wählen"
+              onClick={(e) => {
+                const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                // Unter dem Knopf weniger als eine Menühöhe frei? Dann nach oben.
+                setTplUp(window.innerHeight - r.bottom < 240 && r.top > 240);
+                setTplOpen((o) => !o);
+              }}
+            >Vorlage ▾</button>
             {tplOpen && (
-              <div className="mm-pop">
+              <div className={`mm-pop${tplUp ? ' mm-pop-up' : ''}`}>
                 {Object.keys(TEMPLATES).map((t) => (
                   <button key={t} className={pendingTpl === t ? 'mm-confirm' : ''} onClick={() => applyTemplate(t)}>
                     {pendingTpl === t ? `„${t}" ersetzt dein Diagramm — sicher?` : t}

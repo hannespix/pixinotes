@@ -1023,7 +1023,12 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   background: var(--surface); border-radius: 10px; padding: 7px;
   box-shadow: 0 10px 30px rgba(40, 30, 10, 0.22);
   display: flex; flex-direction: column; gap: 3px; min-width: 150px;
+  /* M218: Auch nach dem Umklappen kann die Liste länger sein als der Platz —
+     dann wird gescrollt, statt Einträge unerreichbar zu machen. */
+  max-height: min(52vh, 320px); overflow-y: auto; overscroll-behavior: contain;
 }
+/* Kein Platz nach unten (Karte liegt tief)? Dann über dem Knopf aufklappen. */
+.mm-pop.mm-pop-up { top: auto; bottom: calc(100% + 6px); }
 .mm-pop button {
   border: none; background: none; border-radius: 7px; text-align: left;
   font-family: inherit; font-size: 11.5px; color: var(--ink);
