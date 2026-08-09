@@ -35,6 +35,7 @@ import { TimeCard } from './nodes/TimeCard';
 import { HtmlAppCard } from './nodes/HtmlAppCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { focusable } from './FocusSheet';
+import { ErrorBoundary } from './ErrorBoundary';
 
 /** M212: Fokus-Modus greift nur am Handy — auf Tablet/Desktop ist genug
  *  Fläche da, um im Canvas zu arbeiten. Dieselbe Schwelle wie im Stylesheet. */
@@ -44,22 +45,35 @@ import { DrawingLayer } from './DrawingLayer';
 import { CommentLayer } from './CommentLayer';
 import { SelectionToolbar } from './SelectionToolbar';
 
+/** M213: Jede Karte bekommt ihre eigene Fehlergrenze. Stolpert eine — etwa
+ *  über kaputte Daten aus einem Import —, bleibt der Schaden auf sie
+ *  beschränkt, statt das ganze Board weiß werden zu lassen. Der Wrapper wird
+ *  EINMAL auf Modulebene gebaut; täte man das im Render, remounteten bei jeder
+ *  Änderung sämtliche Karten (und BlockNote verlöre den Editor-Zustand). */
+const guard = <P extends object>(C: React.ComponentType<P>): React.ComponentType<P> => {
+  const Guarded = (props: P) => (
+    <ErrorBoundary what="Diese Karte"><C {...props} /></ErrorBoundary>
+  );
+  Guarded.displayName = `Guarded(${C.displayName ?? C.name ?? 'Card'})`;
+  return Guarded;
+};
+
 const nodeTypes: NodeTypes = {
-  note: NoteCard,
-  email: EmailCard,
-  image: ImageCard,
-  file: FileCard,
-  kanban: KanbanCard,
-  portal: PortalCard,
-  shape: ShapeCard,
-  mermaid: MermaidCard,
-  gantt: GanttCard,
-  calendar: CalendarCard,
-  frame: FrameCard,
-  week: WeekCard,
-  minutes: MinutesCard,
-  time: TimeCard,
-  htmlapp: HtmlAppCard,
+  note: guard(NoteCard),
+  email: guard(EmailCard),
+  image: guard(ImageCard),
+  file: guard(FileCard),
+  kanban: guard(KanbanCard),
+  portal: guard(PortalCard),
+  shape: guard(ShapeCard),
+  mermaid: guard(MermaidCard),
+  gantt: guard(GanttCard),
+  calendar: guard(CalendarCard),
+  frame: guard(FrameCard),
+  week: guard(WeekCard),
+  minutes: guard(MinutesCard),
+  time: guard(TimeCard),
+  htmlapp: guard(HtmlAppCard),
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };

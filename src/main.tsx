@@ -10,6 +10,7 @@ import './index.css';
 import App from './App';
 import { handleOAuthRedirect } from './lib/calAccounts';
 import { initViewportInsets } from './lib/viewport';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // OAuth-Popup-Rücksprung (Kalender-Konten): Diese Seite dient dann nur als
 // Redirect-Ziel — Code ans Hauptfenster melden, App gar nicht erst rendern.
@@ -19,7 +20,11 @@ if (!handleOAuthRedirect()) {
   initViewportInsets();
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <App />
+      {/* M213: letzte Rettungsleine — was hier ankommt, hätte sonst eine
+          weiße Seite ergeben */}
+      <ErrorBoundary what="PixiNotes" full>
+        <App />
+      </ErrorBoundary>
     </React.StrictMode>,
   );
 }

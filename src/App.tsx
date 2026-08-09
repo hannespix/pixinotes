@@ -22,6 +22,7 @@ import { initBrain } from './lib/brain';
 import { TaskHub } from './components/TaskHub';
 import { AboutMenu } from './components/AboutMenu';
 import { FocusSheet } from './components/FocusSheet';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { SidePanel } from './components/SidePanel';
 import { ShareCardsModal } from './components/ShareCardsModal';
@@ -187,21 +188,21 @@ export default function App() {
         </div>
         <Tabs />
         {view === 'overview' ? (
-          <>
+          <ErrorBoundary what="Die Übersicht" full>
             <Overview />
             <MiniDock />
-          </>
+          </ErrorBoundary>
         ) : presenting ? null : tasksOpen ? (
-          <TaskHub />
+          <ErrorBoundary what="Die Aufgaben-Zentrale" full><TaskHub /></ErrorBoundary>
         ) : (
           // Während Präsentation/Aufgaben-Zentrale ist das Board ausgehängt:
           // Beide editieren dieselben Karten, und die Karten-Editoren (BlockNote)
           // lesen ihren Inhalt nur beim Mount — so übernimmt das Board die
           // Änderungen beim Zurückkehren garantiert frisch.
           <>
-            <Board />
+            <ErrorBoundary what="Das Board" full><Board /></ErrorBoundary>
             <Dock />
-            <BacklinksPanel />
+            <ErrorBoundary what="Das Backlinks-Panel"><BacklinksPanel /></ErrorBoundary>
             {/* M194: Überblick als Seitenleiste NEBEN der Arbeit */}
             <SidePanel />
             {/* M202: Teilen-Dialog für ausgewählte Karten */}
