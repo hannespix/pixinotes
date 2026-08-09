@@ -225,12 +225,18 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
       const sel = document.getSelection();
       const knoten = sel?.anchorNode ?? null;
       const el = knoten instanceof Element ? knoten : knoten?.parentElement ?? null;
-      const zelle = el?.closest?.('td, th') as HTMLTableCellElement | null;
+      // M230: Liegt die Auswahl gar nicht in DIESEM Editor, ist sie meist auf
+      // einem unserer Chips gelandet (Antippen setzt den Fokus um). Dann den
+      // gemerkten Zellen-Ort BEHALTEN. Vorher wurde er genullt, die Chips
+      // verschwanden mitten im Tippen — und die Tabelle blieb halb stehen.
+      if (!el || !editorRef.current?.contains(el)) return;
+      const zelle = el.closest('td, th') as HTMLTableCellElement | null;
       const zeile = zelle?.parentElement as HTMLTableRowElement | null;
-      // Nur Zellen DIESER Karte — auf dem Board liegen viele Editoren
-      if (zelle && zeile && editorRef.current?.contains(zelle)) {
-        setTabZelle({ zeile: zeile.rowIndex, spalte: zelle.cellIndex });
-      } else setTabZelle(null);
+      if (zelle && zeile) { setTabZelle({ zeile: zeile.rowIndex, spalte: zelle.cellIndex }); return; }
+      // Keine Zelle greifbar, aber der Cursor steckt weiter in DERSELBEN Tabelle:
+      // Nach dem Umbau (updateBlock) steht die Auswahl kurz „zwischen" den
+      // Zellen. Merker behalten — sonst wäre nach jedem Löschen Schluss.
+      if (b.id !== tableSel) setTabZelle(null);
     } catch {
       setTableSel(null);
       setTabZelle(null);
@@ -275,7 +281,18 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
       updateNodeData(id, { blocks: editor.document });
-      setTabZelle(null);
+      // M230: Nach dem Umbau steht der Cursor nicht mehr IN der Tabelle —
+      // BlockNote meldet dann einen anderen Block, die Chips verschwanden
+      // schlagartig. Für den Nutzer sah das aus, als ginge nur ein einziger
+      // Löschschritt und der Rest bleibe „einfach stehen" (User-Report).
+      // Also den Cursor zurück in die Tabelle setzen und den Merker gleich
+      // mit nachziehen — dann löscht jedes weitere Antippen den nächsten
+      // Rest, bis nichts mehr da ist.
+      try { editor.setTextCursorPosition(tableSel, 'start'); } catch { /* gleich weg */ }
+      setTableSel(tableSel);
+      setTabZelle((z) => (z ? (was === 'zeile'
+        ? { ...z, zeile: Math.min(z.zeile, neu.length - 1) }
+        : { ...z, spalte: Math.min(z.spalte, (neu[0]?.cells.length ?? 1) - 1) }) : z));
       showToast(was === 'zeile'
         ? 'Zeile entfernt — Strg+Z im Text holt sie zurück.'
         : 'Spalte entfernt — Strg+Z im Text holt sie zurück.');
@@ -306,7 +323,11 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
         </BlockNoteView>
       </div>
       {tableSel && (
-        <div className="due-chips nodrag">
+        // M230: `onPointerDown` mit preventDefault hält den Cursor in der
+        // Tabelle. Ohne das nimmt der Browser dem Editor beim Antippen den
+        // Fokus, am Telefon fährt zusätzlich die Tastatur ein — die Karte
+        // springt, der Finger landet daneben, und nichts passiert.
+        <div className="due-chips nodrag" onPointerDown={(e) => e.preventDefault()}>
           {tabZelle && (
             <>
               <button

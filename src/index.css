@@ -167,6 +167,15 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* Kompaktere Zeilen — v. a. Checklisten waren zu hoch */
 .note-editor .bn-block-content { padding: 1px 0 !important; }
 .note-editor .bn-block-group .bn-block-group { margin-left: 14px; }
+/* M230: BlockNote zeichnet links neben jedem eingerückten Block eine dünne
+   senkrechte Linie („Verschachtelungs-Hilfslinie"). Die sieht exakt aus wie
+   der Balken einer Zitat-Formatierung — Nutzer lasen sie genau so („beim
+   Einrücken wird immer die Zitat-Formatierung mit eingefügt"). Schlimmer
+   noch: sie sitzt bei -20px, unsere kompaktere Einrückung (14px) schiebt sie
+   damit noch links neben den Aufzählungspunkt der Elternzeile — sie hängt in
+   der Luft. Die Ebene erkennt man ohnehin am Zeichen (• ◦ ▪), die Linie ist
+   reine Störung. Gilt für alle Editoren (Notiz, Protokoll, Präsentation). */
+.bn-block-group .bn-block-group > .bn-block-outer::before { content: none !important; }
 .note-editor [data-content-type='checkListItem'] { margin: 0 !important; }
 .note-editor [data-content-type='checkListItem'] > .bn-block-content { display: flex; align-items: center; }
 
