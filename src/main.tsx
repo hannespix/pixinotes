@@ -11,6 +11,7 @@ import App from './App';
 import { handleOAuthRedirect } from './lib/calAccounts';
 import { initViewportInsets } from './lib/viewport';
 import { initAnzeige } from './lib/anzeige';
+import { initKopfmass } from './lib/kopfmass';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 // OAuth-Popup-Rücksprung (Kalender-Konten): Diese Seite dient dann nur als
@@ -22,6 +23,10 @@ if (!handleOAuthRedirect()) {
   // M224: Anzeigegröße/Kontrast ebenfalls VOR dem ersten Frame — sonst
   // springt die Oberfläche beim Start sichtbar auf die eingestellte Größe
   initAnzeige();
+  // M236: Die Kopfleiste vermisst sich selbst, statt dass das Stylesheet
+  // ihre Breite errät — sonst wandert die Tab-Leiste beim Text-Zoom unter
+  // die Aktionsleiste (User-Screenshot)
+  initKopfmass();
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       {/* M213: letzte Rettungsleine — was hier ankommt, hätte sonst eine

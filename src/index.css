@@ -342,11 +342,14 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 
 /* ---------- Projekt-Tabs ---------- */
 .tabs {
-  position: fixed; top: calc(14px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+  position: fixed; top: calc(14px + var(--safe-top));
+  /* M236: links neben der GEMESSENEN Aktionsleiste, nicht neben einer
+     geschätzten (siehe Media-Block weiter unten und lib/kopfmass.ts) */
+  left: var(--kopf-links, 394px);
   display: flex; gap: 4px; z-index: 50; align-items: center;
   background: var(--surface-glass); backdrop-filter: blur(6px);
   padding: 5px; border-radius: 12px; box-shadow: 0 2px 10px rgba(50, 40, 20, 0.1);
-  max-width: 42vw;
+  max-width: var(--kopf-rest, 42vw);
 }
 /* Nur die Board-Tabs scrollen; Home/Teilen/Verlauf/＋ bleiben immer sichtbar.
    Kein overflow auf .tabs selbst — sonst wird das Verlaufs-Dropdown geclippt. */
@@ -360,7 +363,25 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   cursor: pointer; white-space: nowrap; color: var(--muted);
 }
 .tab:hover { background: var(--surface-2); }
-.tab.active { background: var(--accent-soft); color: var(--ink); font-weight: 600; }
+/**
+ * M236: Das aktive Board bleibt IMMER stehen.
+ *
+ * Vorher scrollte es mit den anderen aus dem Bild — auf schmalen Schirmen
+ * fast immer, weil die Reihe dort nur ein paar Zentimeter breit ist. Man sah
+ * dann nirgends mehr, wo man gerade arbeitet (User-Report). `sticky` klebt
+ * es an den linken Rand der Reihe; die übrigen Tabs ziehen dahinter vorbei.
+ *
+ * Der Hintergrund ist doppelt gebaut: `--accent-soft` ist durchscheinend
+ * (0,14–0,16 Alpha), sonst liefen die vorbeiziehenden Tabs sichtbar
+ * hindurch. Die Farbe liegt darum als Verlaufsbild auf einer deckenden
+ * Fläche — dieselbe Optik, aber blickdicht.
+ */
+.tab.active {
+  background-color: var(--surface);
+  background-image: linear-gradient(var(--accent-soft), var(--accent-soft));
+  color: var(--ink); font-weight: 600;
+  position: sticky; left: 0; z-index: 2;
+}
 .tab-count {
   font-size: 10px; background: var(--surface-dim); border-radius: 999px;
   padding: 1px 6px; color: var(--muted);
@@ -642,15 +663,29 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 }
 
 /* ---------- Schmale Screens (Tablet hochkant / Phone) ---------- */
-/* Mittelbreite (M89): Die zentrierte Tab-Leiste lief in die (seit M77/M85
-   breitere) Aktionsleiste — hier links NACH der Aktionsleiste verankern.
-   Ab ~1360px ist Zentrierung mit max-width 42vw rechnerisch kollisionsfrei
-   ((100vw − 42vw)/2 ≥ 394px), darunter bis 861px gilt diese Regel,
-   noch schmaler übernimmt die Zwei-Zeilen-Lösung unten. */
-@media (max-width: 1360px) and (min-width: 861px) {
+/* M89/M236: Die Tab-Leiste darf nie in die Aktionsleiste laufen.
+ *
+ * M89 löste das mit zwei festen Zahlen: ab 1361px zentriert (dort war die
+ * Rechnung (100vw − 42vw)/2 ≥ 394px erfüllt), darunter links bei 394px
+ * verankert. Die 394 waren die damals gemessene Breite der Aktionsleiste —
+ * und genau daran ging es kaputt, sobald jemand den Text-Zoom benutzt: Die
+ * Leiste wird breiter, die Zahl bleibt, die Tabs schieben sich darunter
+ * (User-Screenshot: die Lupe verschwindet hinter der Brotkrume).
+ *
+ * Jetzt liefert `--kopf-links` die GEMESSENE rechte Kante (lib/kopfmass.ts).
+ * `max()` behält die Zentrierung, wo sie passt, und schiebt die Leiste sonst
+ * genau so weit nach rechts, wie nötig — stufenlos statt in zwei Sprüngen.
+ */
+ * Zentriert wird gar nicht mehr: Eine Leiste, die je nach Fensterbreite mal
+ * mittig und mal links sitzt, ist kein Gewinn — sie wandert beim Verkleinern
+ * unter der Hand weg. Links neben der Aktionsleiste steht sie immer an
+ * derselben Stelle, und der Platz nach rechts gehört ganz den Boards.
+ */
+@media (min-width: 861px) {
   .tabs {
-    left: 394px; transform: none;
-    max-width: calc(100vw - 406px);
+    left: var(--kopf-links, 394px);
+    transform: none;
+    max-width: var(--kopf-rest, 42vw);
   }
 }
 
@@ -658,7 +693,8 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   .hint { display: none; }
   .tabs {
     top: calc(62px + var(--safe-top)); left: 12px; transform: none;
-    max-width: calc(100vw - 24px);
+    /* M236: gemessen statt vw — siehe lib/kopfmass.ts */
+    max-width: var(--kopf-voll, calc(100vw - 24px));
   }
   .topbar { left: 12px; }
   /* Zwei Zeilen statt einer: Die Tab-Leiste endet erst bei ~104px (M189) */
@@ -666,6 +702,22 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   .dock { bottom: calc(12px + var(--safe-bottom)); }
   .react-flow__minimap { display: none; }
 }
+
+/* M236: Zwei Zeilen auch dann, wenn die Media-Query es nicht merkt.
+ *
+ * `@media (max-width: 860px)` sieht die Fensterbreite OHNE den Zoom der
+ * Wurzel. Bei 175 % gilt ein 900 Punkte breites Fenster darum weiter als
+ * „Desktop", obwohl fürs Layout nur 514 Punkte bleiben — und davon frisst
+ * die Aktionsleiste allein 369. Der Marker kommt deshalb aus der Messung
+ * (lib/kopfmass.ts) und schlägt die Media-Query per Spezifität, egal in
+ * welcher Reihenfolge die Regeln stehen. */
+html[data-kopf-eng='an'] .tabs {
+  top: calc(62px + var(--safe-top));
+  left: 12px;
+  max-width: var(--kopf-voll, calc(100vw - 24px));
+}
+html[data-kopf-eng='an'] { --head-space: calc(118px + var(--safe-top)); }
+html[data-kopf-eng='an'] .hint { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
@@ -3387,7 +3439,7 @@ button.link-dead:disabled { opacity: 0.45; }
 @media (max-width: 640px) {
   .topbar { top: calc(8px + var(--safe-top)); left: 8px; gap: 6px; }
   .logo { font-size: 15px; padding: 6px 11px; }
-  .tabs { top: calc(52px + var(--safe-top)); left: 8px; max-width: calc(100vw - 16px); }
+  .tabs { top: calc(52px + var(--safe-top)); left: 8px; max-width: var(--kopf-voll, calc(100vw - 16px)); }
   /* Kopf- und Tab-Leiste rücken zusammen — Freiraum entsprechend knapper (M189) */
   :root { --head-space: calc(106px + var(--safe-top)); }
   /* Modals als Vollbild-Blätter — kein Gefummel mit Rändern */

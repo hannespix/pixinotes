@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { selectActiveBoard, useBoard } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
@@ -34,6 +34,19 @@ export function Tabs() {
   const activeBoard = useBoard(selectActiveBoard);
   const focusNode = useBoard((s) => s.focusNode);
   const [navOpen, setNavOpen] = useState(false);
+  /**
+   * M236: Beim Board-Wechsel den aktiven Tab ins Bild holen.
+   *
+   * Das Kleben (CSS `position: sticky`) sorgt dafür, dass er nie ganz
+   * verschwindet — aber wer über den Navigator oder die Suche auf ein Board
+   * springt, das weit rechts in der Reihe liegt, soll auch die NACHBARN
+   * sehen: Erst dann versteht man, wo man gelandet ist.
+   */
+  const reiheRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = reiheRef.current?.querySelector('.tab.active') as HTMLElement | null;
+    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [activeId, view]);
   // M183: aufgeklappte Boards im Navigator (zeigen ihre Karten)
   const [navExpanded, setNavExpanded] = useState<Set<string>>(new Set());
   // Esc schließt den Navigator (der Backdrop fängt Klicks ohnehin ab)
@@ -236,7 +249,7 @@ export function Tabs() {
         document.body,
       )}
       {/* Nur die Board-Tabs des AKTIVEN Projekts — scrollen bei Bedarf */}
-      <div className="tabs-scroll">
+      <div className="tabs-scroll" ref={reiheRef}>
         {projectBoards.map((b) => (
           <div
             key={b.id}
