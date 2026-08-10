@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
-import { useRandZiehen } from '../lib/randZiehen';
+import { useFahne } from '../lib/fahne';
+import { wurzelZoom } from '../lib/anzeige';
 import { GraphView } from './Overview';
 import { IChevronR, IX } from './Icons';
 
@@ -16,17 +18,20 @@ import { IChevronR, IX } from './Icons';
 export function SidePanel() {
   const sb = useBoard((s) => s.sidebar);
   const setSidebar = useBoard((s) => s.setSidebar);
+  const zone = useRef<HTMLDivElement>(null);
 
-  // M245: Ziehen an der Innenkante ändert die Breite — dieselbe Mechanik wie
-  // beim Navigator links, nur von der anderen Kante aus gemessen
+  // M250: Das Fähnchen ersetzt den unsichtbaren Kanten-Anfasser aus M245 —
+  // es zieht die Breite UND fährt die Leiste per Klick aus und ein
   const setzeBreite = useCallback((px: number) => setSidebar({ width: Math.round(px) }), [setSidebar]);
-  const griff = useRandZiehen('rechts', setzeBreite, 330);
+  const setzeOffen = useCallback((offen: boolean) => setSidebar({ open: offen }), [setSidebar]);
+  const fahne = useFahne({ offen: sb.open, breite: sb.width, setzeBreite, setzeOffen });
+  const hoehe = useHoeheZiehen(zone, setSidebar);
 
   /**
    * M248: Wie breit die Leiste gerade ist, muss das Stylesheet wissen.
    *
-   * Seit sie bis zur Unterkante läuft, würde sie das mittig sitzende Dock
-   * verdecken. Statt das Dock kleiner zu machen, rückt es zur Seite — es soll
+   * Sie belegt die rechte Seite und käme dem mittig sitzenden Dock ins
+   * Gehege. Statt das Dock kleiner zu machen, rückt es zur Seite — es soll
    * in der Mitte des FREIEN Raums stehen, nicht in der Mitte des Fensters.
    * Der Wert wandert deshalb als Variable an die Wurzel; das Dock rechnet
    * damit (`translateX(calc(-50% - var(--seite-rechts) / 2))`).
@@ -38,11 +43,79 @@ export function SidePanel() {
     return () => wurzel.style.setProperty('--seite-rechts', '0px');
   }, [sb.open, sb.width]);
 
-  if (!sb.open) return null;
+  /**
+   * M250: Die Leiste sitzt jetzt vertikal mittig in einer unsichtbaren Zone
+   * (Kopfleiste bis Fensterunterkante). Das Zentrieren übernimmt der Flexbox-
+   * Container statt einer vh-Rechnung — `vh` ignoriert den Wurzel-Zoom und
+   * hätte bei 125 % daneben gelegen (M235).
+   *
+   * Die Zone selbst ist für Zeiger durchlässig, sonst läge ein unsichtbarer
+   * Streifen über dem Board.
+   */
   return (
-    <aside className="sidepanel slideout" style={{ width: sb.width }} aria-label="Überblick">
-      {/* Sichtbarer Anfasser: Ohne ihn ahnt niemand, dass die Kante zieht */}
-      <div className="sidepanel-grip" {...griff}><span /></div>
+    <div className="sidepanel-zone" ref={zone}>
+      <button
+        className={`sidepanel-fahne${sb.open ? ' auf' : ''}`}
+        title={sb.open ? 'Überblick einfahren — oder ziehen für die Breite' : 'Überblick ausfahren — oder ziehen für die Breite'}
+        aria-label="Überblick ein- oder ausfahren"
+        aria-expanded={sb.open}
+        {...fahne}
+      ><span /></button>
+      {sb.open && <Leiste sb={sb} setSidebar={setSidebar} hoehe={hoehe} />}
+    </div>
+  );
+}
+
+/**
+ * M250: Höhe stufenlos ziehen.
+ *
+ * Weil die Leiste mittig sitzt, wächst sie nach oben und unten gleichzeitig.
+ * Die Rechnung `2 × (Zeiger − Mitte)` sorgt dafür, dass die Unterkante trotzdem
+ * exakt am Finger klebt — sonst liefe der Anfasser dem Zeiger davon.
+ */
+function useHoeheZiehen(
+  zone: React.RefObject<HTMLDivElement | null>,
+  setSidebar: (patch: { height: number }) => void,
+) {
+  const zug = useRef<{ mitte: number; platz: number } | null>(null);
+  return {
+    onPointerDown: (e: ReactPointerEvent) => {
+      const r = zone.current?.getBoundingClientRect();
+      if (!r) return;
+      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      zug.current = { mitte: r.top + r.height / 2, platz: r.height };
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    onPointerMove: (e: ReactPointerEvent) => {
+      const z = zug.current;
+      if (!z) return;
+      const zoom = wurzelZoom();
+      const roh = (2 * (e.clientY - z.mitte)) / zoom;
+      setSidebar({ height: Math.min(z.platz / zoom, Math.max(200, roh)) });
+    },
+    onPointerUp: (e: ReactPointerEvent) => {
+      zug.current = null;
+      (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    },
+    onPointerCancel: () => { zug.current = null; },
+    // Zurück auf Standardmaß — beide Achsen, denn wer hier doppelklickt,
+    // will die Leiste aufräumen und nicht nur eine Kante zurücksetzen
+    onDoubleClick: () => setSidebar({ height: 0, width: 330 } as { height: number }),
+  };
+}
+
+function Leiste({ sb, setSidebar, hoehe }: {
+  sb: { open: boolean; mode: 'hierarchie' | 'netz'; width: number; height?: number };
+  setSidebar: (patch: Partial<{ open: boolean; mode: 'hierarchie' | 'netz'; width: number; height: number }>) => void;
+  hoehe: Record<string, unknown>;
+}) {
+  return (
+    <aside
+      className="sidepanel slideout"
+      style={{ width: sb.width, height: sb.height ? `${sb.height}px` : undefined }}
+      aria-label="Überblick"
+    >
       <div className="sidepanel-head">
         <div className="sidepanel-tabs">
           <button
@@ -62,6 +135,9 @@ export function SidePanel() {
       <div className="sidepanel-body">
         {sb.mode === 'netz' ? <GraphView embedded /> : <SideTree />}
       </div>
+      {/* Unterkante als Höhen-Anfasser — sichtbarer Strich, sonst bliebe die
+          Funktion geheim (dieselbe Überlegung wie beim Fähnchen) */}
+      <div className="sidepanel-hoehe" title="Höhe ziehen · Doppelklick: Standardmaß" {...hoehe}><span /></div>
     </aside>
   );
 }

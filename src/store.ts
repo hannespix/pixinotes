@@ -358,8 +358,8 @@ interface BoardState {
   setGraphLayer: (key: 'cards' | 'portals' | 'wikis' | 'projectOnly' | 'physik' | 'vorschlaege' | 'regionen', on: boolean) => void;
   /** M194: Ausfahrbare Seitenleiste — der Überblick bleibt neben der Arbeit
    *  stehen, statt sie zu verdrängen. Zustand komplett persistent. */
-  sidebar: { open: boolean; mode: 'hierarchie' | 'netz'; width: number };
-  setSidebar: (patch: Partial<{ open: boolean; mode: 'hierarchie' | 'netz'; width: number }>) => void;
+  sidebar: { open: boolean; mode: 'hierarchie' | 'netz'; width: number; height?: number };
+  setSidebar: (patch: Partial<{ open: boolean; mode: 'hierarchie' | 'netz'; width: number; height: number }>) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
   /** Kartengröße setzen (Auto-Größe der Diagramm-Karte, M92c) */
   resizeNode: (id: string, width: number, height: number) => void;
@@ -756,11 +756,18 @@ export const useBoard = create<BoardState>()(
         setOverviewMode: (m) => set({ overviewMode: m }),
         graphLayers: { cards: false, portals: true, wikis: true, projectOnly: false },
         setGraphLayer: (key, on) => set((s) => ({ graphLayers: { ...s.graphLayers, [key]: on } })),
-        sidebar: { open: false, mode: 'hierarchie', width: 330 },
+        // M250: height 0 heißt „automatisch" — die Leiste nimmt dann ihre
+        // Standardhöhe ein und bleibt mittig. Erst wer selbst zieht, legt
+        // einen festen Wert fest.
+        sidebar: { open: false, mode: 'hierarchie', width: 330, height: 0 },
         setSidebar: (patch) => set((s) => ({
           // Breite eingrenzen: schmaler wird der Baum unlesbar, breiter frisst
           // die Leiste die Arbeitsfläche auf
-          sidebar: { ...s.sidebar, ...patch, ...(patch.width != null ? { width: Math.max(240, Math.min(620, patch.width)) } : {}) },
+          sidebar: {
+            ...s.sidebar, ...patch,
+            ...(patch.width != null ? { width: Math.max(240, Math.min(620, patch.width)) } : {}),
+            ...(patch.height != null ? { height: patch.height <= 0 ? 0 : Math.max(200, Math.min(4000, patch.height)) } : {}),
+          },
         })),
 
         ui: { theme: 'system', accent: 'blau' },

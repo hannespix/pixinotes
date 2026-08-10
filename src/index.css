@@ -2536,44 +2536,91 @@ html[data-kopf-eng='an'] .hint { display: none; }
  *    die durchscheinende Arbeitsfläche nur Ruhe.
  *  · Der Rand ist ein Anfasser mit sichtbarem Griff.
  */
+/**
+ * M250: Eine unsichtbare Zone vom Kopf bis zur Unterkante — sie zentriert die
+ * Leiste vertikal und hält das Fähnchen an ihrer linken Kante.
+ *
+ * Das Zentrieren macht Flexbox, nicht eine `vh`-Rechnung: `vh` ignoriert den
+ * Wurzel-Zoom und läge bei 125 % Textgröße daneben (M235). Die Zone selbst ist
+ * für Zeiger durchlässig, sonst läge ein toter Streifen über dem Board.
+ */
+.sidepanel-zone {
+  position: fixed; top: var(--head-space); right: var(--app-rand); bottom: var(--app-rand);
+  z-index: 45; pointer-events: none;
+  display: flex; align-items: center; justify-content: flex-end;
+}
+.sidepanel-zone > * { pointer-events: auto; }
+
 .sidepanel {
-  position: fixed; top: var(--head-space); right: var(--app-rand);
-  bottom: var(--app-rand);
-  z-index: 45; display: flex; flex-direction: column;
+  position: relative; display: flex; flex-direction: column;
+  /* Standardmaß: hoch genug für den Baum, niedrig genug, dass die Zentrierung
+     sichtbar bleibt. Wer zieht, überschreibt das per Inline-Höhe. */
+  height: 76%; min-height: min(220px, 100%); max-height: 100%;
   /**
-   * M249: Die Rundung markiert genau die eine Kante, die FREI steht.
+   * M250: Gerundet sind die beiden Kanten, die FREI stehen.
    *
-   * Drei der vier Kanten der Leiste liegen an: rechts und unten am
-   * Fensterrand, oben an der Kopfleiste. Nur die linke grenzt an das Board.
-   * Also bekommt allein die obere linke Ecke einen Radius — dort geht die
-   * Fläche in den freien Raum über. Jede weitere Rundung würde die Leiste
-   * vom Fensterrand abheben und sie wieder wie eine aufgelegte Karte
-   * aussehen lassen statt wie eine Ausstülpung der Seite.
+   * Rechts ist die Leiste angewachsen — dort bleibt sie eckig und bündig.
+   * Oben, unten und links grenzt sie an das Board, also runden die beiden
+   * linken Ecken die Fläche ab. So wirkt sie wie eine Ausstülpung der Seite
+   * und nicht wie ein aufgelegtes Fenster.
    */
-  border-radius: 18px 0 0 0; overflow: hidden;
+  border-radius: 18px 0 0 18px; overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border-soft); border-right: none;
   box-shadow: -10px 0 34px rgba(40, 30, 10, 0.16);
   animation: pn-slide-in-right 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+
+/**
+ * Das Fähnchen — der einzige Teil der Leiste, der immer zu sehen ist.
+ *
+ * Es schaut aus der Seitenkante heraus wie eine Lasche aus einem Register:
+ * links gerundet, rechts bündig mit dem Fensterrand. Beim Überfahren wird es
+ * breiter; weil es links vor der Leiste sitzt, wächst es nach innen und
+ * verschiebt dabei nichts.
+ */
+.sidepanel-fahne {
+  flex: none; width: 15px; height: 66px; padding: 0;
+  border: 1px solid var(--border-soft); border-right: none;
+  border-radius: 11px 0 0 11px;
+  background: var(--surface); color: var(--muted);
+  box-shadow: -6px 0 18px rgba(40, 30, 10, 0.14);
+  cursor: pointer; touch-action: none;
+  display: flex; align-items: center; justify-content: center;
+  transition: width 0.14s ease, color 0.14s ease, background 0.14s ease;
+}
+.sidepanel-fahne > span { width: 3px; height: 26px; border-radius: 999px; background: currentColor; opacity: 0.5; }
+.sidepanel-fahne:hover { width: 20px; background: var(--surface-2); color: var(--accent); }
+.sidepanel-fahne:hover > span { opacity: 1; }
+.sidepanel-fahne:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Bei offener Leiste sitzt das Fähnchen an ihrer Innenkante — dort ist es der
+   Anfasser für die Breite, deshalb der Zieh-Zeiger */
+.sidepanel-fahne.auf { cursor: ew-resize; }
+
+/* Unterkante als Höhen-Anfasser */
+.sidepanel-hoehe {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 11px;
+  cursor: ns-resize; touch-action: none; z-index: 3;
+  display: flex; align-items: center; justify-content: center;
+}
+.sidepanel-hoehe > span { width: 34px; height: 3px; border-radius: 999px; background: var(--border); opacity: 0.7; }
+.sidepanel-hoehe:hover > span { background: var(--accent); opacity: 1; }
 @keyframes pn-slide-in-right { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes pn-slide-in-left { from { transform: translateX(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
 
-/* Gemeinsamer Anfasser beider Slideouts — 10 Punkte breite Fangzone mit einem
+/* Anfasser des Navigators links — 10 Punkte breite Fangzone mit einem
    sichtbaren Griff in der Mitte. Ohne den Griff bliebe die Funktion geheim. */
-.sidepanel-grip, .nav-grip {
-  position: absolute; top: 0; bottom: 0; width: 10px;
+.nav-grip {
+  position: absolute; top: 0; bottom: 0; width: 10px; right: 0;
   cursor: ew-resize; touch-action: none; z-index: 3;
   display: flex; align-items: center; justify-content: center;
 }
-.sidepanel-grip { left: 0; }
-.nav-grip { right: 0; }
-.sidepanel-grip > span, .nav-grip > span {
+.nav-grip > span {
   width: 3px; height: 34px; border-radius: 999px;
   background: var(--border); opacity: .7;
 }
-.sidepanel-grip:hover, .nav-grip:hover { background: var(--surface-2); }
-.sidepanel-grip:hover > span, .nav-grip:hover > span { background: var(--accent); opacity: 1; }
+.nav-grip:hover { background: var(--surface-2); }
+.nav-grip:hover > span { background: var(--accent); opacity: 1; }
 .sidepanel-head {
   display: flex; align-items: center; gap: 8px;
   padding: 9px 10px 8px 14px; border-bottom: 1px solid var(--border-soft);
@@ -2648,9 +2695,14 @@ html[data-kopf-eng='an'] .hint { display: none; }
 /* Phone: Als Vollflächen-Blatt statt schmaler Spalte */
 @media (max-width: 640px) {
   /* Phone: Beide Slideouts füllen die Breite — für zwei Spalten ist kein
-     Platz, und ein 8-Punkte-Anfasser trifft am Finger ohnehin niemand. */
-  .sidepanel { left: 0; right: 0; width: auto !important; border-radius: 18px 18px 0 0; border-right: 1px solid var(--border-soft); }
-  .sidepanel-grip, .nav-grip { display: none; }
+     Platz, und ein 8-Punkte-Anfasser trifft am Finger ohnehin niemand.
+     Die Leiste ist hier ein Blatt von unten, kein seitliches Fähnchen. */
+  .sidepanel-zone { left: 0; display: block; }
+  .sidepanel {
+    width: auto !important; height: 100% !important; max-height: none;
+    border-radius: 18px 18px 0 0; border-right: 1px solid var(--border-soft);
+  }
+  .sidepanel-fahne, .sidepanel-hoehe, .nav-grip { display: none; }
 }
 @media (max-width: 640px) {
   .ov-graph-find input { width: 120px; }
