@@ -227,6 +227,28 @@ export function FocusSheet() {
     if (aendern.length) st.onNodesChange(aendern);
   }, [focusCard]);
 
+  /**
+   * M233: Die Karte im Fokus gibt es nicht mehr — gelöscht, archiviert oder
+   * auf ein anderes Board geschoben.
+   *
+   * Ohne Ausstieg blieb der Fokus-Modus an: Das Blatt rendert nichts mehr,
+   * aber die Klasse hält den Canvas weiter im Vollbild — man saß in einer
+   * leeren Fläche fest, ohne ✕ und ohne Wisch-Ziel (User-Report). Also
+   * zurück aufs Board.
+   *
+   * Bewusst NICHT zur Nachbarkarte weiterblättern: Wer löscht, will die
+   * Karte weghaben, nicht die nächste aufgedrängt bekommen — und ein
+   * stillschweigender Wechsel sähe aus, als wäre die falsche gelöscht worden.
+   *
+   * Kein Rückflug: Er zeigt auf einen Platz, an dem nichts mehr liegt. Das
+   * Board steht ohnehin noch so, wie man es verlassen hat — der Fokus ändert
+   * den Ausschnitt nicht.
+   */
+  useEffect(() => {
+    if (!focusCard || node) return;
+    setFocusCard(null);
+  }, [focusCard, node, setFocusCard]);
+
   if (!focusCard || !node) return null;
 
   // Wischen: waagerecht blättert, nach unten schließt. Bewusst nur am RAHMEN

@@ -646,6 +646,16 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   // blieb stehen und sprang erst beim Loslassen ans Ziel (User-Report iPhone).
   const dragStart = useRef({ x: 0, y: 0 });
   const onNodeDown = (id: string) => (e: React.PointerEvent) => {
+    // M234: Gedrückt halten öffnet das Knoten-Menü — mit Finger UND mit Maus.
+    // Vorher gab es dafür nur den Rechtsklick bzw. das vom Browser aus einem
+    // langen Tipp erzeugte contextmenu-Ereignis. Das ist keine verlässliche
+    // Grundlage: Ob und wann ein Browser aus einem Langdruck ein contextmenu
+    // macht, ist Geschmackssache des Herstellers, und am Notebook-Trackpad
+    // ist der Rechtsklick für viele gar keine geläufige Geste (User-Report:
+    // „funktioniert nur am Touchscreen"). Der Langdruck gehört ohnehin
+    // niemandem: Ziehen beginnt erst ab 7 px, ein Tipp zählt erst beim
+    // Loslassen — halten ohne Bewegung war bis hierher tote Zeit.
+    langdruckStart(id, e);
     if (!physicsOn) return;
     rectVeraltet();   // neue Geste → einmal frisch vermessen (M223)
     // Nur Haupttaste/Finger: Der Rechtsklick gehört dem Kontextmenü — sonst
@@ -701,7 +711,42 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const onNodeContext = (id: string) => (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    langdruckEnde();
     setCtxMenu({ x: e.clientX, y: e.clientY, boardId: id });
+  };
+
+  /**
+   * M234: Langdruck als zweiter, geräteunabhängiger Weg zum Knoten-Menü.
+   *
+   * Maus, Stift und Finger laufen durch dieselbe Zeitmessung — es gibt keinen
+   * Zweig „nur Touch" und keinen „nur Desktop", also auch nichts, was auf
+   * einem der beiden ausfallen kann. 480 ms sind lang genug, dass ein
+   * gewöhnlicher Klick nicht versehentlich auslöst, und kurz genug, dass man
+   * nicht wartend dasteht.
+   */
+  const druckUhr = useRef(0);
+  const druckAb = useRef({ x: 0, y: 0 });
+  const langdruckEnde = () => {
+    if (druckUhr.current) { window.clearTimeout(druckUhr.current); druckUhr.current = 0; }
+  };
+  const langdruckStart = (id: string, e: React.PointerEvent) => {
+    langdruckEnde();
+    if (e.button !== 0 && e.pointerType === 'mouse') return;   // Rechtsklick hat seinen eigenen Weg
+    const x = e.clientX, y = e.clientY;
+    druckAb.current = { x, y };
+    druckUhr.current = window.setTimeout(() => {
+      druckUhr.current = 0;
+      // Aus dem Ziehen aussteigen und das folgende Loslassen entwerten —
+      // sonst öffnete der Finger beim Abheben zusätzlich das Board.
+      dragNode.current = null;
+      dragMoved.current = true;
+      setCtxMenu({ x, y, boardId: id });
+    }, 480);
+  };
+  /** Wer den Zeiger bewegt, will ziehen oder schieben — kein Menü. */
+  const langdruckPruefen = (e: React.PointerEvent) => {
+    if (!druckUhr.current) return;
+    if (Math.abs(e.clientX - druckAb.current.x) + Math.abs(e.clientY - druckAb.current.y) > 8) langdruckEnde();
   };
   const boardName = (id: string) => scoped.find((b) => b.id === id)?.name ?? '?';
   // Esc bricht Verknüpfen/Menü ab; Klick irgendwo schließt das Menü
@@ -960,6 +1005,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   };
 
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    langdruckPruefen(e);   // M234: bewegt = ziehen/schieben, kein Menü
     // M197: Hängt ein Knoten am Finger, gehört die Bewegung ihm — die Events
     // kommen dank Capture an der SVG-Wurzel zuverlässig hier an (iOS-Safari
     // verliert sie auf den kleinen g-Elementen)
@@ -1000,6 +1046,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   };
 
   const onPointerEnd = (e: React.PointerEvent<SVGSVGElement>) => {
+    langdruckEnde();   // M234: losgelassen, bevor die Zeit um war
     releaseDraggedNode();
     pointers.current.delete(e.pointerId);
     pinchDist.current = null;
@@ -1295,7 +1342,11 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
               ref={(el) => { if (el) nodeEls.current.set(n.id, el); else nodeEls.current.delete(n.id); }}
               transform={`translate(${p.x} ${p.y})`}
               className={`ov-graph-node ${n.id === activeId ? 'here' : ''} ${marking ? (hits.boards.has(n.id) ? 'hit' : 'dim') : ''} ${linkFrom === n.id ? 'linking' : ''}`}
-              data-tip={linkFrom ? `Klicken: Portal „${boardName(linkFrom)}" → „${n.label}" anlegen` : previewOf(n.id)}
+              data-tip={linkFrom
+                ? `Klicken: Portal „${boardName(linkFrom)}" → „${n.label}" anlegen`
+                // M234: Der zweite Weg gehört in die Sprechblase — ein Menü,
+                // von dem niemand weiß, gibt es für den Benutzer nicht.
+                : `${previewOf(n.id)}\n— Gedrückt halten oder Rechtsklick: Menü`}
               onClick={() => {
                 // Nach einem echten Zerren nicht auch noch öffnen (M195);
                 // und nicht doppelt, wenn das Loslassen den Tipp schon
