@@ -16,6 +16,15 @@ const PRIO_LABEL: Record<1 | 2 | 3, string> = { 1: '!!!', 2: '!!', 3: '!' };
 
 type Filter = 'all' | 'myday' | 'today' | 'overdue';
 
+/**
+ * M231: Kennung des Board-Filters „nur das gerade offene Board".
+ *
+ * Bewusst KEINE Board-ID: Der Filter soll dem aktiven Board folgen, wenn man
+ * die Zentrale schließt, das Board wechselt und sie wieder öffnet. Eine fest
+ * eingetragene ID würde beim nächsten Mal auf das falsche Board zeigen.
+ */
+const AKTIV = '__aktiv__';
+
 /** Fristen-Gruppen der Aufgabenliste (M113) */
 type Bucket = 'overdue' | 'today' | 'week' | 'later' | 'none';
 const BUCKETS: Array<[Bucket, string]> = [
@@ -60,13 +69,18 @@ export function TaskHub() {
   const open = useBoard((s) => s.tasksOpen);
   const setOpen = useBoard((s) => s.setTasksOpen);
   const boards = useBoard((s) => s.boards);
+  const activeId = useBoard((s) => s.activeId);
   const openBoard = useBoard((s) => s.openBoard);
   const focusNode = useBoard((s) => s.focusNode);
   const updateNodeDataOnBoard = useBoard((s) => s.updateNodeDataOnBoard);
   const showToast = useBoard((s) => s.showToast);
   const [, tick] = useState(0);
   const [filter, setFilter] = useState<Filter>('all');
-  const [boardFilter, setBoardFilter] = useState('all');
+  // M231: Voreinstellung ist das AKTIVE Board, nicht das ganze Werkzeug.
+  // Wer die Zentrale öffnet, arbeitet gerade an einem Board — 56 Aufgaben aus
+  // allen Bereichen sind an der Stelle keine Übersicht, sondern eine Wand
+  // (User-Report). „Alle Boards" steht direkt darunter weiter bereit.
+  const [boardFilter, setBoardFilter] = useState(AKTIV);
   const [personFilter, setPersonFilter] = useState('all');
   const [groupByPerson, setGroupByPerson] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -84,6 +98,10 @@ export function TaskHub() {
   // M227: Der Puls merkt sich seinen Zustand. Zugeklappt ist die Voreinstellung —
   // wer ihn aber täglich liest, soll ihn nicht täglich neu aufklappen müssen.
   const [pulseOpen, setPulseOpen] = useState(pulsStand);
+  // M231: Beim Öffnen zurück auf das aktive Board. Wer während einer Sitzung
+  // bewusst auf „alle Boards" stellt, behält das — beim nächsten Öffnen zählt
+  // aber wieder, woran gerade gearbeitet wird.
+  useEffect(() => { if (open) setBoardFilter(AKTIV); }, [open]);
   useEffect(() => {
     if (!open || !brainOn) { setDigest([]); return; }
     let gone = false;
@@ -145,14 +163,21 @@ export function TaskHub() {
    * darauf — sie muss deshalb GENAU die Filter zählen, die hinter ihm liegen
    * (die vier Zeitchips bleiben ja sichtbar).
    */
+  // M231: Der eingestellte Board-Filter als echte ID — AKTIV zeigt aufs
+  // gerade offene Board, alles andere steht schon direkt drin.
+  const boardId = boardFilter === AKTIV ? activeId : boardFilter;
+  const aktivName = boards.find((b) => b.id === activeId)?.name ?? 'Aktives Board';
   const versteckteFilter =
-    (boardFilter !== 'all' ? 1 : 0) +
+    // Das aktive Board ist seit M231 der Normalfall — es zählt nicht als
+    // „versteckter" Filter, sonst leuchtete der Trichter dauerhaft und die
+    // Zahl sagte nichts mehr aus. Der Kopf nennt den Umfang ohnehin.
+    (boardFilter !== 'all' && boardFilter !== AKTIV ? 1 : 0) +
     (personFilter !== 'all' ? 1 : 0) +
     (groupByPerson ? 1 : 0) +
     (search.trim() ? 1 : 0) +
     (tagFilter ? 1 : 0);
   const tasks = allTasks.filter((t) => {
-    if (boardFilter !== 'all' && t.boardId !== boardFilter) return false;
+    if (boardFilter !== 'all' && t.boardId !== boardId) return false;
     if (personFilter !== 'all' && t.who !== personFilter) return false;
     if (tagFilter && !t.text.toLowerCase().includes(`#${tagFilter}`)) return false;
     if (search && !t.text.toLowerCase().includes(search.toLowerCase())) return false;
@@ -162,7 +187,11 @@ export function TaskHub() {
     return true;
   });
   const detailTask = detailKey ? allTasks.find((t) => t.key === detailKey) ?? null : null;
-  const overdue = allTasks.filter((t) => t.urgency === 'overdue').length;
+  // M231: Überfällig zählt im gewählten Board-Umfang. Vorher stand im Kopf
+  // die Zahl aus dem ganzen Werkzeug — neben „12 angezeigt · Kochen" wirkten
+  // „30 überfällig" wie ein Widerspruch.
+  const overdue = allTasks.filter((t) =>
+    t.urgency === 'overdue' && (boardFilter === 'all' || t.boardId === boardId)).length;
 
   // Gruppierte Ansicht (M113): nach Frist-Abschnitten oder nach Person
   const groups = useMemo(() => {
@@ -398,8 +427,13 @@ export function TaskHub() {
     <div className={`taskhub${filtersOpen ? ' filters-open' : ''}`} role="dialog" aria-label="Aufgaben">
       <div className="taskhub-head">
         <h2>Aufgaben</h2>
+        {/* M231: Der Umfang gehört in den Kopf. Auf schmalen Schirmen liegt die
+            Board-Auswahl hinter dem Trichter — ohne diesen Zusatz wüsste man
+            nicht, dass gerade nur ein Board gezeigt wird. */}
         <span className="taskhub-meta">
-          {tasks.length} angezeigt{overdue > 0 ? ` · ${overdue} überfällig` : ''}
+          {tasks.length} angezeigt{boardFilter !== 'all'
+            ? ` · ${boardFilter === AKTIV ? aktivName : boards.find((b) => b.id === boardFilter)?.name ?? 'Board'}`
+            : ' · alle Boards'}{overdue > 0 ? ` · ${overdue} überfällig` : ''}
         </span>
         <span className="taskhub-actions">
           {canAskNotify && (
@@ -492,8 +526,11 @@ export function TaskHub() {
           <IFilter size={13} />
           {versteckteFilter > 0 && <span className="th-funnel-n">{versteckteFilter}</span>}
         </button>
+        {/* M231: Reihenfolge ist Absicht — erst das aktive Board (Voreinstellung),
+            dann alle, dann die einzelnen. Der häufigste Fall steht oben. */}
         <select className="th-board th-adv" value={boardFilter} onChange={(e) => setBoardFilter(e.target.value)} title="Nach Board filtern">
-          <option value="all">Alle Boards</option>
+          <option value={AKTIV}>Aktives Board — {aktivName}</option>
+          <option value="all">Auf allen Boards</option>
           {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
         {persons.length > 0 && (
@@ -555,7 +592,11 @@ export function TaskHub() {
         <div className="taskhub-empty">
           {filter === 'all' && boardFilter === 'all'
             ? 'Nichts offen! Neue Aufgaben entstehen aus Kanban-Tickets und Checklisten in Notizen — oder oben per Schnell-Eingabe.'
-            : 'Keine Aufgaben in dieser Ansicht.'}
+            : filter === 'all' && boardFilter === AKTIV && allTasks.length > 0
+              // M231: Der häufigste Leerfall seit der neuen Voreinstellung —
+              // hier ist nichts, anderswo schon. Das gehört dazugesagt.
+              ? `Auf „${aktivName}" ist nichts offen. Über die Board-Auswahl siehst du alle Boards (${allTasks.length} Aufgaben).`
+              : 'Keine Aufgaben in dieser Ansicht.'}
         </div>
       ) : (
         <div className="taskhub-list">

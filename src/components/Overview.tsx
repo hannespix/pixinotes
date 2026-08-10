@@ -31,6 +31,29 @@ const BW = 200, BH = 150, GAP = 16, PROJ_HEAD = 44, SPACE_HEAD = 56, SPACE_GAP =
 interface ProjectRect { id: string; x: number; y: number; w: number; h: number }
 
 /**
+ * M232: Archivierte Karten aus den Boards nehmen — es sei denn, das Archiv
+ * ist eingeblendet.
+ *
+ * Boards ohne archivierte Karte werden UNVERÄNDERT durchgereicht (dieselbe
+ * Objekt-Identität). Das ist kein Geiz, sondern Absicht: Die Netz-Ansicht
+ * hängt teure Berechnungen (Graph, Layout, Satelliten-Titel) an der Board-
+ * Referenz. Würde hier jedes Mal ein frisches Objekt entstehen, liefen
+ * Kräfte-Layout und Titel-Arbeit bei jedem Render neu — genau das Ruckeln,
+ * das M223 beseitigt hat.
+ */
+function ohneArchiv<T extends { nodes: Array<{ archived?: boolean }> }>(boards: T[], zeigen: boolean): T[] {
+  if (zeigen) return boards;
+  let geaendert = false;
+  const raus = boards.map((b) => {
+    const nodes = b.nodes.filter((n) => !n.archived);
+    if (nodes.length === b.nodes.length) return b;
+    geaendert = true;
+    return { ...b, nodes };
+  });
+  return geaendert ? raus : boards;
+}
+
+/**
  * Übersicht als Canvas-Navigation: dieselben Gesten wie auf den Boards
  * (pannen, zoomen), Bereiche und Projekte als Zonen, Boards als Kacheln.
  * Kachel anklicken = ins Board springen · Kachel in andere Projekt-Zone
@@ -60,7 +83,12 @@ const nodeTypes: NodeTypes = {
 
 function OverviewCanvas() {
   const spaces = useBoard((s) => s.spaces);
-  const boards = useBoard((s) => s.boards);
+  const alleBoards = useBoard((s) => s.boards);
+  const showArchived = useBoard((s) => s.showArchived);
+  // M232: Dieselbe Regel wie im Netz — Kachel-Zähler („12 Karten") und die
+  // Mini-Vorschau zeigen sonst Karten, die auf dem Board gar nicht zu sehen
+  // sind, und die beiden Übersichten widersprächen sich gegenseitig.
+  const boards = useMemo(() => ohneArchiv(alleBoards, showArchived), [alleBoards, showArchived]);
   const moveBoard = useBoard((s) => s.moveBoard);
   const openBoard = useBoard((s) => s.openBoard);
   const addSpace = useBoard((s) => s.addSpace);
@@ -180,7 +208,15 @@ const MAX_SATELLITES = 14;
  * Logik, Gesten und Ebenen sind identisch, damit beide nicht auseinanderlaufen.
  */
 export function GraphView({ embedded = false }: { embedded?: boolean }) {
-  const boards = useBoard((s) => s.boards);
+  const alleBoards = useBoard((s) => s.boards);
+  const showArchived = useBoard((s) => s.showArchived);
+  // M232: Archivierte Karten gehören auch im Netz ins Archiv (User-Report).
+  // Sie blähten die Board-Kugeln auf, hingen als Satelliten daneben und
+  // zogen über ihre Portale sogar Verbindungslinien — obwohl sie auf dem
+  // Board selbst ausgeblendet sind. Der Archiv-Schalter im Dock gilt jetzt
+  // hier genauso. Gefiltert wird EINMAL an der Quelle: So stimmen Kugelgröße,
+  // Satelliten, Bänder und Suche automatisch überein.
+  const boards = useMemo(() => ohneArchiv(alleBoards, showArchived), [alleBoards, showArchived]);
   /** Hover-Vorschau je Board — MEMOISIERT (M197): lief vorher pro Knoten und
    *  Physik-Frame über alle Karten (nodeToText) und ruckelte am iPhone */
   const previews = useMemo(() => {
