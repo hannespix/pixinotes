@@ -115,6 +115,8 @@ export function Settings() {
   const setLesbareSchrift = useBoard((s) => s.setLesbareSchrift);
   const hoherKontrast = useBoard((s) => s.hoherKontrast);
   const setHoherKontrast = useBoard((s) => s.setHoherKontrast);
+  const milchglas = useBoard((s) => s.milchglas);
+  const setMilchglas = useBoard((s) => s.setMilchglas);
   const clickZoom = useBoard((s) => s.clickZoom);
   const setClickZoom = useBoard((s) => s.setClickZoom);
   const cardFocus = useBoard((s) => s.cardFocus);
@@ -1162,6 +1164,23 @@ export function Settings() {
             Kräftigere Schrift und Ränder, kein Milchglas, keine Papiertextur, deutlicher
             Fokusrahmen. Genau die Effekte, die modern aussehen, kosten Kontrast — hier
             lassen sie sich abschalten, ohne dass alle darauf verzichten müssen.
+          </p>
+          <label className="modal-row modal-row-check">
+            <span>Milchglas</span>
+            <input
+              type="checkbox"
+              checked={milchglas && !hoherKontrast}
+              disabled={hoherKontrast}
+              onChange={(e) => setMilchglas(e.target.checked)}
+            />
+          </label>
+          <p className="modal-hint">
+            Die durchscheinenden Flächen an Leisten und kleinen Menüs. Dort hilft es:
+            Man sieht, wo die Karte darunter weitergeht. Zum <b>Lesen</b> hilft es nicht —
+            Einstellungen, Hilfe, Navigator, Überblick, Aufgaben und Ticket-Fenster sind
+            deshalb immer deckend, egal wie dieser Schalter steht. Aus ist außerdem
+            flotter: Der Weichzeichner kostet auf älteren Geräten spürbar Leistung.
+            {hoherKontrast && <> Mit <b>Mehr Kontrast</b> ist Milchglas ohnehin aus.</>}
           </p>
 
           <h3 style={{ marginTop: 16 }}>Bedienung</h3>

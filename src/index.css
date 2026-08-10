@@ -2467,23 +2467,51 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .ov-graph-ctx button:hover { background: var(--accent-soft); }
 
 /* ---------- M194: Seitenleiste — Überblick neben der Arbeit ---------- */
+/**
+ * M245: Slideout statt schwebender Karte.
+ *
+ * Der Befund war: „Kann man diese Sidebar als Slideout von rechts statt als
+ * Card gestalten? Ohne BG-Blur? Genauso das linke Menü — nicht freischwebende
+ * Fenster, sondern seitliche Ausstülpungen."
+ *
+ * Drei Änderungen machen aus einer Karte eine Ausstülpung:
+ *  · Sie klebt am Rand (`right: 0` statt `right: 10px`) und hat nur an der
+ *    INNEN liegenden Kante Rundungen. Eine allseits gerundete Fläche mit Luft
+ *    ringsum liest sich als eigenes Fenster; eine, die aus der Bildkante
+ *    herauswächst, als Teil des Fensters.
+ *  · Sie ist deckend. Milchglas ist schön, wenn etwas kurz über dem Inhalt
+ *    liegt — bei einer Fläche, in der man liest und Namen vergleicht, kostet
+ *    die durchscheinende Arbeitsfläche nur Ruhe.
+ *  · Der Rand ist ein Anfasser mit sichtbarem Griff.
+ */
 .sidepanel {
-  position: fixed; top: var(--head-space); right: 10px;
+  position: fixed; top: var(--head-space); right: 0;
   bottom: calc(76px + var(--safe-bottom));
   z-index: 45; display: flex; flex-direction: column;
-  border-radius: 16px; overflow: hidden;
-  background: var(--glass-strong); border: 1px solid var(--glass-border);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  backdrop-filter: blur(20px) saturate(1.5);
-  box-shadow: 0 14px 46px rgba(40, 30, 10, 0.22);
+  border-radius: 16px 0 0 16px; overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border-soft); border-right: none;
+  box-shadow: -10px 0 34px rgba(40, 30, 10, 0.16);
   animation: pn-slide-in-right 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @keyframes pn-slide-in-right { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
-.sidepanel-grip {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 8px;
-  cursor: ew-resize; touch-action: none; z-index: 2;
+@keyframes pn-slide-in-left { from { transform: translateX(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Gemeinsamer Anfasser beider Slideouts — 10 Punkte breite Fangzone mit einem
+   sichtbaren Griff in der Mitte. Ohne den Griff bliebe die Funktion geheim. */
+.sidepanel-grip, .nav-grip {
+  position: absolute; top: 0; bottom: 0; width: 10px;
+  cursor: ew-resize; touch-action: none; z-index: 3;
+  display: flex; align-items: center; justify-content: center;
 }
-.sidepanel-grip:hover { background: linear-gradient(90deg, var(--accent-soft), transparent); }
+.sidepanel-grip { left: 0; }
+.nav-grip { right: 0; }
+.sidepanel-grip > span, .nav-grip > span {
+  width: 3px; height: 34px; border-radius: 999px;
+  background: var(--border); opacity: .7;
+}
+.sidepanel-grip:hover, .nav-grip:hover { background: var(--surface-2); }
+.sidepanel-grip:hover > span, .nav-grip:hover > span { background: var(--accent); opacity: 1; }
 .sidepanel-head {
   display: flex; align-items: center; gap: 8px;
   padding: 9px 10px 8px 14px; border-bottom: 1px solid var(--border-soft);
@@ -2557,7 +2585,10 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .top-actions button.on { background: var(--accent-soft); color: var(--accent-strong); }
 /* Phone: Als Vollflächen-Blatt statt schmaler Spalte */
 @media (max-width: 640px) {
-  .sidepanel { left: 10px; right: 10px; width: auto !important; }
+  /* Phone: Beide Slideouts füllen die Breite — für zwei Spalten ist kein
+     Platz, und ein 8-Punkte-Anfasser trifft am Finger ohnehin niemand. */
+  .sidepanel { left: 0; right: 0; width: auto !important; border-radius: 16px 16px 0 0; border-right: 1px solid var(--border-soft); }
+  .sidepanel-grip, .nav-grip { display: none; }
 }
 @media (max-width: 640px) {
   .ov-graph-find input { width: 120px; }
@@ -3426,13 +3457,37 @@ button.link-dead:disabled { opacity: 0.45; }
   backdrop-filter: blur(18px) saturate(1.5);
   border: 1px solid var(--glass-border);
 }
+/**
+ * M246: Fenster, in denen GELESEN wird, sind dauerhaft deckend.
+ *
+ * Das war das Kernergebnis des Glas-Audits. Einstellungen, Hilfe und das
+ * Ticket-Fenster sind keine kurzen Überlagerungen, sondern Flächen, auf denen
+ * man Absätze liest, Zahlen vergleicht und Häkchen setzt — oft minutenlang.
+ * Ein durchscheinendes Board darunter macht dabei nur unruhig: Jede Zeile
+ * bekommt einen anderen Untergrund, und beim Scrollen wandert er auch noch.
+ * Der Milchglas-Schalter lässt diese hier deshalb gar nicht erst zu Wort
+ * kommen — sie sind immer opak. Rand und Schatten heben sie weiterhin ab.
+ */
 .modal, .ticket-modal {
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5);
-  backdrop-filter: blur(22px) saturate(1.5);
-  border: 1px solid var(--glass-border);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
 }
-.modal-head { background: transparent; }
+/**
+ * M246: Die Kopfzeile bleibt DECKEND — und die Reiter kleben mit.
+ *
+ * Aus dem User-Screenshot: „Einstellungen" und das ✕ standen mitten in der
+ * Reiter-Reihe. Grund war ein durchsichtiger `position: sticky`-Kopf: Der
+ * bleibt beim Scrollen oben stehen, der Inhalt fährt darunter durch — und
+ * ohne eigene Fläche sieht man beides übereinander. Mit Milchglas fiel es
+ * kaum auf, weil der Kopf mitblurrte; auf deckendem Grund ist es ein harter
+ * Fehler. Die Reiterreihe klebt gleich mit unter dem Kopf, sonst verschwindet
+ * sie beim Scrollen und man weiß nicht mehr, in welchem Bereich man ist.
+ */
+.modal-head { background: var(--surface); z-index: 2; }
+.modal-tabs {
+  position: sticky; top: 53px; z-index: 2;
+  background: var(--surface);
+}
 /* Abdunkler: Der Blur gehört auf eine Pseudo-Ebene, NICHT auf den Abdunkler
    selbst — sonst wäre er Backdrop-Root und das Fenster darin könnte nicht mehr
    blurren (es sah dann flach aus). So bleibt beides: unscharfe Umgebung UND
@@ -3679,19 +3734,23 @@ button.link-dead:disabled { opacity: 0.45; }
   animation: pn-fade-in 0.16s ease-out;
 }
 [data-theme='dark'] .nav-backdrop { background: rgba(0, 0, 0, 0.45); }
+/* M245: Der Navigator ist die Ausstülpung am LINKEN Rand — dieselbe Bauform
+   wie der Überblick rechts, gespiegelt. Vorher ein zentriertes Glasfenster,
+   das den halben Schirm verdeckte. */
 .nav-panel {
-  position: fixed; inset: 0; margin: auto; height: fit-content;
-  width: min(780px, calc(100vw - 24px));
-  max-height: min(80vh, 720px);
+  position: fixed; left: 0; top: var(--head-space);
+  bottom: calc(76px + var(--safe-bottom));
+  width: 380px; max-width: calc(100vw - 40px);
   display: flex; flex-direction: column;
-  border-radius: 16px; padding: 14px 16px 10px;
-  background: var(--glass-strong);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
-  backdrop-filter: blur(20px) saturate(1.5);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 22px 70px rgba(40, 30, 10, 0.32);
-  animation: pn-pop-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  border-radius: 0 16px 16px 0; padding: 12px 18px 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft); border-left: none;
+  box-shadow: 10px 0 34px rgba(40, 30, 10, 0.16);
+  animation: pn-slide-in-left 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+/* Der Kopf des Navigators darf in der schmalen Spalte umbrechen */
+.nav-panel .nav-head { flex-wrap: wrap; row-gap: 6px; }
+.nav-panel .nav-head > b { flex: 1 0 100%; }
 .nav-head {
   display: flex; align-items: center; gap: 10px;
   padding-bottom: 9px; border-bottom: 1px solid var(--border-soft);
@@ -3755,7 +3814,8 @@ button.link-dead:disabled { opacity: 0.45; }
 .nav-card-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav-more { font-size: 10px; color: var(--muted); padding: 2px 8px 3px; }
 @media (max-width: 640px) {
-  .nav-panel { width: calc(100vw - 12px); max-height: 86vh; padding: 12px 10px 8px; }
+  .nav-panel { width: 100% !important; max-width: none; padding: 12px 10px 8px;
+    border-radius: 16px 16px 0 0; border-left: 1px solid var(--border-soft); }
   .nav-grid { grid-template-columns: 1fr; }
   .nav-head > b { font-size: 12px; }
 }
@@ -4530,6 +4590,104 @@ html[data-kontrast='hoch'] .sel-ai-menu {
   background: var(--surface) !important;
   border-color: var(--border) !important;
 }
+/**
+ * M246: Milchglas global aus (⚙ → Design → „Milchglas").
+ *
+ * Der Auftrag war ein Audit: „Wo macht Transparenz und Liquid Glass Sinn, wo
+ * nicht? Kann man das global ein-/ausschalten — allerdings nur dort, wo es
+ * auch Sinn ergibt?" Das Ergebnis in drei Sätzen:
+ *
+ *  · SINNVOLL bleibt Glas bei allem, was KURZ über der Arbeitsfläche liegt und
+ *    wo der Bezug zum Darunter hilft: Kopf- und Tab-Leiste, Auswahl-Leiste,
+ *    Dock, Zeichen-Palette, kleine Menüs, Toast, Tooltip. Man sieht, wo die
+ *    Karte weitergeht, die man gerade bearbeitet.
+ *  · NICHT SINNVOLL ist es dort, wo man LIEST und VERGLEICHT: Einstellungen,
+ *    Hilfe, Navigator, Überblick, Aufgaben-Zentrale, Ticket-Fenster. Die
+ *    durchscheinende Fläche macht dort nur unruhig. Diese sind seit M245/M246
+ *    dauerhaft deckend — unabhängig vom Schalter.
+ *  · Der Schalter deckt den ersten Fall ab. Aus heißt: derselbe Aufbau, nur
+ *    deckende Flächen statt Blur. Rand und Schatten bleiben, damit die
+ *    Ebenen weiter unterscheidbar sind.
+ *
+ * Technisch: EINE Regel über alle Glasflächen. `backdrop-filter` kostet auf
+ * schwachen Geräten (und im Sitzungsdienst-Notebook) spürbar Leistung —
+ * abschalten macht die Oberfläche also nicht nur ruhiger, sondern flotter.
+ */
+html[data-glas='aus'] .logo,
+html[data-glas='aus'] .top-actions,
+html[data-glas='aus'] .tabs,
+html[data-glas='aus'] .sel-toolbar,
+html[data-glas='aus'] .draw-palette,
+html[data-glas='aus'] .ov-mode,
+html[data-glas='aus'] .ov-graph-toggles,
+html[data-glas='aus'] .ov-graph-zoom,
+html[data-glas='aus'] .ov-add-space-float,
+html[data-glas='aus'] .writer-banner,
+html[data-glas='aus'] .dock-menu,
+html[data-glas='aus'] .happ-menu,
+html[data-glas='aus'] .tab-tree,
+html[data-glas='aus'] .tab-bg-menu,
+html[data-glas='aus'] .cal-menu,
+html[data-glas='aus'] .week-pop,
+html[data-glas='aus'] .mm-pop,
+html[data-glas='aus'] .comment-panel,
+html[data-glas='aus'] .lookup-panel,
+html[data-glas='aus'] .backlinks-panel,
+html[data-glas='aus'] .sel-ai-menu,
+html[data-glas='aus'] .search-box,
+html[data-glas='aus'] .edge-opts,
+html[data-glas='aus'] .ticket-detail,
+html[data-glas='aus'] .modal,
+html[data-glas='aus'] .ticket-modal,
+html[data-glas='aus'] .frame-menu,
+html[data-glas='aus'] .focus-head,
+html[data-glas='aus'] .focus-nav,
+html[data-glas='aus'] .toast,
+html[data-glas='aus'] .tipbox,
+html[data-glas='aus'] .dock::before,
+html[data-glas='aus'] .mm-toolbar::before,
+html[data-glas='aus'] .modal-backdrop::before,
+html[data-glas='aus'] .search-backdrop::before,
+html[data-glas='aus'] .lookup-backdrop::before,
+html[data-glas='aus'] .nav-backdrop::before {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+/* Deckend nachziehen — ohne Blur wäre eine halbtransparente Fläche
+   unleserlich, das Darunter schiene ungefiltert durch */
+html[data-glas='aus'] .logo,
+html[data-glas='aus'] .top-actions,
+html[data-glas='aus'] .tabs,
+html[data-glas='aus'] .sel-toolbar,
+html[data-glas='aus'] .draw-palette,
+html[data-glas='aus'] .ov-mode,
+html[data-glas='aus'] .ov-graph-toggles,
+html[data-glas='aus'] .ov-graph-zoom,
+html[data-glas='aus'] .ov-add-space-float,
+html[data-glas='aus'] .dock-menu,
+html[data-glas='aus'] .happ-menu,
+html[data-glas='aus'] .tab-tree,
+html[data-glas='aus'] .tab-bg-menu,
+html[data-glas='aus'] .cal-menu,
+html[data-glas='aus'] .week-pop,
+html[data-glas='aus'] .mm-pop,
+html[data-glas='aus'] .comment-panel,
+html[data-glas='aus'] .lookup-panel,
+html[data-glas='aus'] .backlinks-panel,
+html[data-glas='aus'] .sel-ai-menu,
+html[data-glas='aus'] .search-box,
+html[data-glas='aus'] .edge-opts,
+html[data-glas='aus'] .ticket-detail,
+html[data-glas='aus'] .modal,
+html[data-glas='aus'] .ticket-modal,
+html[data-glas='aus'] .frame-menu,
+html[data-glas='aus'] .focus-head,
+html[data-glas='aus'] .focus-nav,
+html[data-glas='aus'] .dock::before,
+html[data-glas='aus'] .mm-toolbar::before {
+  background: var(--surface) !important;
+}
+
 /* Textur weg: das feine Rauschen legt sich sonst über jeden Buchstaben */
 html[data-kontrast='hoch'] .board-texture,
 html[data-kontrast='hoch'] .react-flow__pane::after { display: none !important; opacity: 0 !important; }

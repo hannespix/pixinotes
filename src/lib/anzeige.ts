@@ -21,6 +21,10 @@ import { useBoard } from '../store';
  * - hoher Kontrast = kräftigere Schrift und Ränder, kein Milchglas, keine
  *   Papiertextur. Genau die Effekte, die eine Oberfläche schick machen,
  *   kosten Kontrast — hier lassen sie sich abschalten.
+ * - Milchglas (M246) = nur der Glaseffekt, getrennt vom Kontrast. Bisher
+ *   steckte er im Kontrast-Schalter; wer bloß die Transparenz loswerden
+ *   wollte, bekam zwangsweise auch fettere Ränder und keine Textur mit.
+ *   Zwei verschiedene Fragen, jetzt zwei Schalter.
  */
 /**
  * Der aktuell eingestellte Wurzel-Zoom als Zahl (1 = aus).
@@ -42,17 +46,21 @@ export function wurzelZoom(): number {
 
 export function initAnzeige(): () => void {
   const root = document.documentElement;
-  const apply = (z: number, lesbar: boolean, kontrast: boolean) => {
+  const apply = (z: number, lesbar: boolean, kontrast: boolean, glas: boolean) => {
     // 1 = aus. Die Eigenschaft ganz zu entfernen ist sauberer, als "1" zu
     // setzen: Manche Browser legen sonst grundlos eine eigene Ebene an.
     if (z > 1.001) root.style.setProperty('zoom', String(z));
     else root.style.removeProperty('zoom');
     root.dataset.lesbar = lesbar ? 'an' : 'aus';
     root.dataset.kontrast = kontrast ? 'hoch' : 'normal';
+    // M246: Milchglas als eigener Schalter. „Mehr Kontrast" schaltet es
+    // weiterhin mit ab — wer Kontrast braucht, braucht kein durchscheinendes
+    // Menü —, aber nicht mehr umgekehrt.
+    root.dataset.glas = glas && !kontrast ? 'an' : 'aus';
   };
   const s0 = useBoard.getState();
-  apply(s0.anzeige ?? 1, !!s0.lesbareSchrift, !!s0.hoherKontrast);
+  apply(s0.anzeige ?? 1, !!s0.lesbareSchrift, !!s0.hoherKontrast, s0.milchglas !== false);
   return useBoard.subscribe((s) => {
-    apply(s.anzeige ?? 1, !!s.lesbareSchrift, !!s.hoherKontrast);
+    apply(s.anzeige ?? 1, !!s.lesbareSchrift, !!s.hoherKontrast, s.milchglas !== false);
   });
 }

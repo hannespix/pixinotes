@@ -219,6 +219,19 @@ interface BoardState {
    */
   leisteVersatz: { board: { x: number; y: number }; fokus: { x: number; y: number } };
   setLeisteVersatz: (wo: 'board' | 'fokus', v: { x: number; y: number }) => void;
+  /** M245: Breite des linken Slideouts (Navigator) in Punkten */
+  navBreite: number;
+  setNavBreite: (px: number) => void;
+  /**
+   * M246: Milchglas an oder aus — unabhängig vom Kontrast-Schalter.
+   *
+   * Bisher steckte das Glas im Schalter „Mehr Kontrast": Wer die Transparenz
+   * loswerden wollte, bekam zwangsweise auch kräftigere Ränder, fettere
+   * Schrift und keine Papiertextur. Das sind aber zwei verschiedene Fragen —
+   * die eine ist Geschmack, die andere Barrierefreiheit. Also getrennt.
+   */
+  milchglas: boolean;
+  setMilchglas: (on: boolean) => void;
   /** Karten-Daten auf einem BELIEBIGEN Board ändern (Aufgaben-Zentrale arbeitet boardübergreifend) */
   updateNodeDataOnBoard: (boardId: string, nodeId: string, data: Record<string, unknown>) => void;
   setPresenting: (on: boolean) => void;
@@ -846,6 +859,10 @@ export const useBoard = create<BoardState>()(
         setLeisteVersatz: (wo, v) => set((s) => ({
           leisteVersatz: { ...s.leisteVersatz, [wo]: v },
         })),
+        navBreite: 380,
+        setNavBreite: (px) => set({ navBreite: Math.max(280, Math.min(760, Math.round(px))) }),
+        milchglas: true,
+        setMilchglas: (on) => set({ milchglas: on }),
 
         updateNodeDataOnBoard: (boardId, nodeId, data) => {
           // Feingranulare History (M122) — Snapshot des ZIEL-Boards (die
@@ -1670,6 +1687,8 @@ export const useBoard = create<BoardState>()(
         fokusVollbild: s.fokusVollbild,
         navLinks: s.navLinks,
         leisteVersatz: s.leisteVersatz,
+        navBreite: s.navBreite,
+        milchglas: s.milchglas,
         anzeige: s.anzeige,
         lesbareSchrift: s.lesbareSchrift,
         hoherKontrast: s.hoherKontrast,

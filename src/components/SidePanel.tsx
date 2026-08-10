@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
+import { useRandZiehen } from '../lib/randZiehen';
 import { GraphView } from './Overview';
 import { IChevronR, IX } from './Icons';
 
@@ -16,30 +17,16 @@ export function SidePanel() {
   const sb = useBoard((s) => s.sidebar);
   const setSidebar = useBoard((s) => s.setSidebar);
 
-  // Ziehen am linken Rand ändert die Breite (Pointer-Events: Maus + Finger)
-  const dragging = useRef(false);
-  const onGripDown = useCallback((e: React.PointerEvent) => {
-    dragging.current = true;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    e.preventDefault();
-  }, []);
-  const onGripMove = useCallback((e: React.PointerEvent) => {
-    if (!dragging.current) return;
-    setSidebar({ width: Math.round(window.innerWidth - e.clientX) });
-  }, [setSidebar]);
-  const onGripUp = useCallback(() => { dragging.current = false; }, []);
+  // M245: Ziehen an der Innenkante ändert die Breite — dieselbe Mechanik wie
+  // beim Navigator links, nur von der anderen Kante aus gemessen
+  const setzeBreite = useCallback((px: number) => setSidebar({ width: Math.round(px) }), [setSidebar]);
+  const griff = useRandZiehen('rechts', setzeBreite, 330);
 
   if (!sb.open) return null;
   return (
-    <aside className="sidepanel" style={{ width: sb.width }} aria-label="Überblick">
-      <div
-        className="sidepanel-grip"
-        onPointerDown={onGripDown}
-        onPointerMove={onGripMove}
-        onPointerUp={onGripUp}
-        onPointerCancel={onGripUp}
-        title="Breite ziehen"
-      />
+    <aside className="sidepanel slideout" style={{ width: sb.width }} aria-label="Überblick">
+      {/* Sichtbarer Anfasser: Ohne ihn ahnt niemand, dass die Kante zieht */}
+      <div className="sidepanel-grip" {...griff}><span /></div>
       <div className="sidepanel-head">
         <div className="sidepanel-tabs">
           <button

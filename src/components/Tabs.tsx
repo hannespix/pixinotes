@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { selectActiveBoard, useBoard } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
 import { nodeToText } from '../lib/serialize';
+import { useRandZiehen } from '../lib/randZiehen';
 import { InlineName } from './InlineName';
 import { IChevronR, IGraph, IHome, IPlus, IShare, IX } from './Icons';
 
@@ -34,6 +35,11 @@ export function Tabs() {
   const activeBoard = useBoard(selectActiveBoard);
   const focusNode = useBoard((s) => s.focusNode);
   const [navOpen, setNavOpen] = useState(false);
+  // M245: Der Navigator ist eine Ausstülpung am linken Rand — seine Breite
+  // wird gezogen und gemerkt, genau wie beim Überblick rechts
+  const navBreite = useBoard((s) => s.navBreite);
+  const setNavBreite = useBoard((s) => s.setNavBreite);
+  const navGriff = useRandZiehen('links', setNavBreite, 380);
   /**
    * M236: Beim Board-Wechsel den aktiven Tab ins Bild holen.
    *
@@ -192,7 +198,10 @@ export function Tabs() {
       </button>
       {navOpen && createPortal(
         <div className="nav-backdrop" onClick={() => setNavOpen(false)}>
-          <div className="nav-panel nodrag" role="dialog" aria-label="Navigator" onClick={(e) => e.stopPropagation()}>
+          {/* M245: Kein freischwebendes Fenster mehr, sondern eine Ausstülpung
+              am linken Rand — angedockt, in der Breite ziehbar, deckend. */}
+          <div className="nav-panel slideout nodrag" style={{ width: navBreite }} role="dialog" aria-label="Navigator" onClick={(e) => e.stopPropagation()}>
+            <div className="nav-grip" {...navGriff}><span /></div>
             <div className="nav-head">
               <b>Alle Bereiche, Projekte & Boards</b>
               <button
