@@ -1603,7 +1603,13 @@ html[data-kopf-eng='an'] .hint { display: none; }
 }
 .pdf-viewer {
   background: var(--surface); border-radius: 14px; box-shadow: 0 16px 60px rgba(0,0,0,.35);
-  max-width: min(960px, 94vw); max-height: 92vh; display: flex; flex-direction: column; overflow: hidden;
+  /* M242: Prozent des Hintergrunds statt vw/vh. `vw`/`vh` kennen den
+     Anzeige-Zoom (A− / A+) nicht — bei 175 % versprechen sie fast doppelt so
+     viel Platz, wie das Layout hat, und die Fußzeile des Viewers rutschte
+     unter den Bildrand. Der Hintergrund liegt dagegen als `fixed; inset: 0`
+     exakt auf dem Auslauf; sein Innenmaß ist die Wahrheit. */
+  max-width: min(960px, 100%); max-height: 100%;
+  display: flex; flex-direction: column; overflow: hidden;
 }
 .pdf-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;

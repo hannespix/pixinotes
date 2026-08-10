@@ -22,6 +22,24 @@ import { useBoard } from '../store';
  *   Papiertextur. Genau die Effekte, die eine Oberfläche schick machen,
  *   kosten Kontrast — hier lassen sie sich abschalten.
  */
+/**
+ * Der aktuell eingestellte Wurzel-Zoom als Zahl (1 = aus).
+ *
+ * Gelesen wird der Inline-Stil, den `apply()` unten setzt — nicht
+ * `getComputedStyle`. Grund: `zoom` ist erst seit kurzem überall eine echte
+ * CSS-Eigenschaft; ältere Browser kennen sie zwar beim Rendern, geben sie im
+ * berechneten Stil aber nicht zurück. Der Inline-Wert steht dagegen immer da,
+ * weil wir ihn selbst geschrieben haben.
+ *
+ * Gebraucht wird die Zahl überall dort, wo Bildpunkte gezählt werden müssen:
+ * Beim PDF-Rendern (M242) entscheidet sie über die Auflösung des Bitmaps, beim
+ * Vermessen der Kopfleiste (M236) über die Umrechnung Schirm ↔ Layout.
+ */
+export function wurzelZoom(): number {
+  const z = parseFloat(document.documentElement.style.zoom || '1');
+  return Number.isFinite(z) && z > 0 ? z : 1;
+}
+
 export function initAnzeige(): () => void {
   const root = document.documentElement;
   const apply = (z: number, lesbar: boolean, kontrast: boolean) => {
