@@ -66,6 +66,10 @@ export function initKopfmass(): () => void {
     const links = Math.round(bar.offsetLeft + bar.offsetWidth + LUFT);
     const voll = document.body.offsetWidth;
     root.style.setProperty('--kopf-links', `${links}px`);
+    // M238: Unterkante der Aktionsleiste — darunter beginnt in der
+    // Seitenleisten-Anordnung die Board-Liste. Auch das ist gemessen: Die
+    // Leiste wird höher, sobald ihre Knöpfe in der schmalen Spalte umbrechen.
+    root.style.setProperty('--kopf-oben', `${Math.round(bar.offsetTop + bar.offsetHeight + 10)}px`);
     root.style.setProperty('--kopf-voll', `${Math.max(160, voll - 24)}px`);
     root.style.setProperty('--kopf-rest', `${Math.max(160, voll - links - 12)}px`);
     /**

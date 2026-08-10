@@ -41,6 +41,7 @@ export default function App() {
   const tasksOpen = useBoard((s) => s.tasksOpen);
   const focusCard = useBoard((s) => s.focusCard);
   const fokusVollbild = useBoard((s) => s.fokusVollbild);
+  const navLinks = useBoard((s) => s.navLinks);
   const restoreDeleted = useBoard((s) => s.restoreDeleted);
   const showToast = useBoard((s) => s.showToast);
 
@@ -185,7 +186,10 @@ export default function App() {
     <ReactFlowProvider key={importEpoch}>
       {/* M235: `fokus-voll` nimmt am großen Bildschirm die Blatt-Darstellung
           zurück — dann füllt die Karte das Bild wie am Handy (⚙ → Design). */}
-      <div className={`app${focusCard ? ' focus-mode' : ''}${focusCard && fokusVollbild ? ' fokus-voll' : ''}`}>
+      {/* M238: `nav-links` bittet um die linke Spalte — ob sie kommt, entscheidet
+          das Stylesheet: Unterhalb der Tablet-Breite bleibt es bei der
+          Kopfleiste, dort wäre eine Spalte nur verlorene Fläche. */}
+      <div className={`app${focusCard ? ' focus-mode' : ''}${focusCard && fokusVollbild ? ' fokus-voll' : ''}${navLinks ? ' nav-links' : ''}`}>
         <div className="topbar">
           <AboutMenu />
           <TopActions />

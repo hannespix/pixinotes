@@ -399,6 +399,9 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   border: none; background: none; font-size: 16px; color: var(--muted);
   width: 28px; height: 28px; border-radius: 8px; cursor: pointer;
 }
+/* M238: Teilen + ＋ als Gruppe — in der Reihe eine Flex-Zeile in der Flex-Zeile
+   (optisch unverändert), in der linken Spalte der Fuß der Liste. */
+.tabs-foot { display: flex; align-items: center; gap: 4px; }
 .tab-add:hover { background: var(--surface-2); color: var(--ink); }
 
 /* ---------- Portal-Karte ---------- */
@@ -718,6 +721,53 @@ html[data-kopf-eng='an'] .tabs {
 }
 html[data-kopf-eng='an'] { --head-space: calc(118px + var(--safe-top)); }
 html[data-kopf-eng='an'] .hint { display: none; }
+
+/* ---------- M238: Navigation als linke Spalte (optional, ab Tablet) ----------
+ *
+ * Der Grund ist Geometrie, nicht Geschmack: Am großen Schirm ist Platz nach
+ * unten reichlich und nach rechts knapp. Eine Spalte zeigt zwanzig
+ * Board-Namen untereinander, wo die Reihe schon bei fünf überläuft — und
+ * ganz nebenbei kann dort nichts mehr mit der Aktionsleiste kollidieren,
+ * weil beide untereinander stehen statt nebeneinander.
+ *
+ * Am Telefon gilt das Gegenteil: Dort ist die Breite das knappe Gut, eine
+ * feste Spalte fräße ein Drittel davon. Deshalb wirkt die Einstellung erst
+ * ab 861 Punkten — der Schalter darf gesetzt bleiben, das Stylesheet
+ * entscheidet.
+ */
+@media (min-width: 861px) {
+  .app.nav-links { --nav-w: 244px; }
+  .app.nav-links .topbar {
+    flex-direction: column; align-items: stretch;
+    width: var(--nav-w); gap: 8px;
+  }
+  /* Die Aktionsknöpfe brechen in der schmalen Spalte um statt zu quetschen */
+  .app.nav-links .topbar .top-actions { flex-wrap: wrap; justify-content: flex-start; }
+  .app.nav-links .tabs {
+    left: 18px; top: var(--kopf-oben, 78px);
+    width: var(--nav-w); max-width: var(--nav-w);
+    flex-direction: column; align-items: stretch; gap: 2px;
+    /* Nicht bis zum Bildschirmrand: Unten leben Dock und Auswahl-Leiste */
+    max-height: calc(100dvh - var(--kopf-oben, 78px) - 108px - var(--safe-bottom));
+  }
+  .app.nav-links .tabs-scroll {
+    flex-direction: column; align-items: stretch;
+    overflow-x: hidden; overflow-y: auto; min-height: 0;
+  }
+  /* In der Spalte trägt jede Zeile ihren Namen ganz — kein Abschneiden nötig */
+  .app.nav-links .tab { white-space: normal; padding: 7px 10px; }
+  .app.nav-links .tab-name { overflow-wrap: anywhere; }
+  /* Das Kleben aus M236 ist hier gegenstandslos: In einer Spalte scrollt
+     senkrecht, und `left: 0` würde nur einen wirkungslosen Kontext aufmachen. */
+  .app.nav-links .tab.active { position: static; }
+  /* Teilen und ＋ nebeneinander am Fuß der Spalte */
+  .app.nav-links .tabs-foot { justify-content: flex-start; gap: 4px; padding-top: 2px; }
+  /* Heim-Knopf und Brotkrume bilden die Kopfzeile der Spalte */
+  .app.nav-links .tab-nav { justify-content: flex-start; }
+  .app.nav-links .tab-home { align-self: flex-start; }
+  /* Oben wird keine zweite Zeile mehr freigehalten — die Boards stehen links */
+  .app.nav-links { --head-space: calc(74px + var(--safe-top)); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
@@ -4536,7 +4586,11 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
     height: calc(100dvh - var(--focus-top) - var(--focus-bottom) - var(--kb) - 40px) !important;
   }
   .focus-mode:not(.fokus-voll) .pn-focused .card-body {
-    border-radius: 18px !important;
+    /* M239: derselbe Radius wie bei jeder Karte (.react-flow__node: 10px).
+       Vorher 18px — das Blatt IST die Karte, nur größer; ein eigener,
+       runderer Radius ließ sie wie ein fremdes Fenster wirken und stach
+       neben Leisten und Menüs heraus (User-Screenshot). */
+    border-radius: 10px !important;
     box-shadow: 0 28px 80px rgba(30, 22, 8, 0.34) !important;
     border: 1px solid var(--border) !important;
   }

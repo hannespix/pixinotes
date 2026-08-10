@@ -190,6 +190,16 @@ interface BoardState {
   setFokusEinKlick: (on: boolean) => void;
   fokusVollbild: boolean;
   setFokusVollbild: (on: boolean) => void;
+  /**
+   * M238: Navigation links statt oben (nur ab Tablet-Breite wirksam).
+   *
+   * Am großen Schirm ist Platz nach unten reichlich und nach rechts knapp —
+   * eine Spalte kann zwanzig Board-Namen untereinander zeigen, wo die Reihe
+   * schon bei fünf überläuft. Am Telefon gilt das Gegenteil, dort bleibt es
+   * bei der Kopfleiste.
+   */
+  navLinks: boolean;
+  setNavLinks: (on: boolean) => void;
   /** Karten-Daten auf einem BELIEBIGEN Board ändern (Aufgaben-Zentrale arbeitet boardübergreifend) */
   updateNodeDataOnBoard: (boardId: string, nodeId: string, data: Record<string, unknown>) => void;
   setPresenting: (on: boolean) => void;
@@ -811,6 +821,8 @@ export const useBoard = create<BoardState>()(
         setFokusEinKlick: (on) => set({ fokusEinKlick: on }),
         fokusVollbild: false,
         setFokusVollbild: (on) => set({ fokusVollbild: on }),
+        navLinks: false,
+        setNavLinks: (on) => set({ navLinks: on }),
 
         updateNodeDataOnBoard: (boardId, nodeId, data) => {
           // Feingranulare History (M122) — Snapshot des ZIEL-Boards (die
@@ -1633,6 +1645,7 @@ export const useBoard = create<BoardState>()(
         cardFocus: s.cardFocus,
         fokusEinKlick: s.fokusEinKlick,
         fokusVollbild: s.fokusVollbild,
+        navLinks: s.navLinks,
         anzeige: s.anzeige,
         lesbareSchrift: s.lesbareSchrift,
         hoherKontrast: s.hoherKontrast,

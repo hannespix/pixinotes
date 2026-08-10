@@ -273,6 +273,10 @@ export function Tabs() {
           </div>
         ))}
       </div>
+      {/* M238: Teilen und ＋ als eigene Gruppe. In der Reihe ändert das nichts
+          (eine Flex-Zeile in einer Flex-Zeile), in der linken Spalte stehen sie
+          dadurch nebeneinander am Fuß statt untereinander in der Mitte. */}
+      <div className="tabs-foot">
       <button
         className="tab-share"
         title="Aktives Board teilen: Link mit komplettem Inhalt kopieren (serverlos)"
@@ -291,6 +295,7 @@ export function Tabs() {
       >
         <IPlus size={14} />
       </button>
+      </div>
     </div>
   );
 }

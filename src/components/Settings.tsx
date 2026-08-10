@@ -125,6 +125,8 @@ export function Settings() {
   const setFokusEinKlick = useBoard((s) => s.setFokusEinKlick);
   const fokusVollbild = useBoard((s) => s.fokusVollbild);
   const setFokusVollbild = useBoard((s) => s.setFokusVollbild);
+  const navLinks = useBoard((s) => s.navLinks);
+  const setNavLinks = useBoard((s) => s.setNavLinks);
   const wheelZoom = useBoard((s) => s.wheelZoom);
   const setWheelZoom = useBoard((s) => s.setWheelZoom);
   const ui = useBoard((s) => s.ui);
@@ -1163,6 +1165,19 @@ export function Settings() {
           </p>
 
           <h3 style={{ marginTop: 16 }}>Bedienung</h3>
+          <label className="modal-row modal-row-check">
+            <span>Navigation links statt oben</span>
+            <input type="checkbox" checked={navLinks} onChange={(e) => setNavLinks(e.target.checked)} />
+          </label>
+          <p className="modal-hint">
+            Kopfleiste und Board-Auswahl wandern in eine <b>linke Spalte</b>. Das ist eine
+            Platzfrage: Am großen Schirm ist nach unten reichlich Raum und nach rechts
+            wenig — eine Spalte zeigt zwanzig Board-Namen untereinander, wo die Reihe
+            schon bei fünf überläuft, und jeder Name steht ungekürzt da. Nebenbei kann
+            dort nichts mehr mit den Aktionsknöpfen kollidieren, weil beide untereinander
+            stehen. <b>Am Telefon</b> bleibt es bei der Kopfleiste — dort ist die Breite
+            das knappe Gut, eine feste Spalte fräße ein Drittel davon.
+          </p>
           <label className="modal-row modal-row-check">
             <span>Karte im Fokus</span>
             <input type="checkbox" checked={cardFocus} onChange={(e) => setCardFocus(e.target.checked)} />

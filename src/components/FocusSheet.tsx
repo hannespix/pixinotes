@@ -193,17 +193,57 @@ export function FocusSheet() {
     return () => window.removeEventListener('pixinotes:fokus-zurueck', zurueck);
   }, []);
 
-  // Esc schließt (Tastatur am iPad)
+  /**
+   * Esc schließt — und zwar beim ERSTEN Druck.
+   *
+   * M239: Vorher hing der Handler in der Bubble-Phase. Bis er dran war, hatte
+   * schon jemand anderes zugegriffen: Das Board hat einen eigenen Esc (Rückflug
+   * aus dem Klick-Zoom), das Dock einen für seine Menüs. Man drückte zweimal
+   * und wusste nicht, wofür das erste Mal gut war. Jetzt in der Capture-Phase
+   * mit stopPropagation: Solange eine Karte im Fokus steht, gehört Esc IHR.
+   * Nur ein Textfeld darf vorgehen — dort bricht Esc eine Eingabe ab.
+   */
   useEffect(() => {
     if (!focusCard) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       const t = e.target as HTMLElement | null;
       if (t?.closest('input, textarea, [contenteditable="true"]')) return;
+      // Esc räumt IMMER das Oberste ab. Steht ein Menü, ein Dialog oder das
+      // Slash-Menü offen, gehört der Druck dem — sonst verschwände plötzlich
+      // die ganze Karte, obwohl man nur ein Menü wegklicken wollte.
+      if (document.querySelector('.sel-menu-fixed, .modal, .nav-panel, .bn-suggestion-menu, .ov-graph-ctx')) return;
+      e.stopPropagation();
       close();
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [focusCard, close]);
+
+  /**
+   * M239: Ein Klick NEBEN die Karte schließt den Fokus.
+   *
+   * Das ist die Geste, die jeder von Dialogen kennt — und seit die Karte am
+   * PC als Blatt über dem gedimmten Board schwebt, ist der Bereich daneben
+   * sichtbar genug, um ihn zu treffen. Bewusst eng gefasst: Es zählt nur der
+   * Klick auf die Board-Fläche selbst. Werkzeugleisten, Menüs, Dialoge und
+   * die Fokus-Leisten liegen zwar auch „neben" der Karte, sind aber
+   * Bedienung — wer dort klickt, will etwas tun, nicht schließen.
+   */
+  useEffect(() => {
+    if (!focusCard) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.closest('.pn-focused, .focus-head, .focus-nav')) return;
+      // Nur die FREIE Board-Fläche zählt. Bewusst nicht der ganze Renderer:
+      // Der enthält auch die zurückgetretenen Karten und alles, was React Flow
+      // sonst noch aufspannt — ein Treffer dort ist kein „daneben".
+      if (!t.closest('.react-flow__pane')) return;
+      close();
+    };
+    window.addEventListener('pointerdown', onDown, true);
+    return () => window.removeEventListener('pointerdown', onDown, true);
   }, [focusCard, close]);
 
   /**
