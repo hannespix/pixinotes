@@ -2452,7 +2452,13 @@ html[data-kopf-eng='an'] .hint { display: none; }
   transition: left 0.18s ease, max-width 0.18s ease;
   background: var(--surface); border-radius: 10px; padding: 7px 13px; box-shadow: 0 2px 10px rgba(50,40,20,.12);
 }
-.ov-graph-toggle { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink); cursor: pointer; }
+/* M253: Eine Beschriftung bricht NIE mitten im Wort. In der schmal gezogenen
+   Leiste stand „Nur dieses Projekt" sonst über drei Zeilen (User-Screenshot) —
+   die Zeile darf umbrechen, das Wort nicht. */
+.ov-graph-toggle {
+  display: flex; align-items: center; gap: 5px; font-size: 12px;
+  color: var(--ink); cursor: pointer; white-space: nowrap;
+}
 .ov-graph-dot { cursor: pointer; }
 .ov-graph-dot circle { fill: var(--surface); stroke: #a09a8a; stroke-width: 1.5; }
 .ov-graph-dot:hover circle { stroke: var(--accent); fill: var(--accent-soft); }
@@ -2652,11 +2658,29 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .sidepanel-body { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
 /* Eingebettetes Netz: aus dem fixed-Vollbild in den Leisten-Körper holen */
 .ov-graph.embedded { position: absolute; inset: 0; padding: 0; background: none; }
+/**
+ * M253: In der Überblick-Leiste gelten andere Regeln als im Netz-Vollbild.
+ *
+ *  · Die Platzreserve für den Umschalter „Hierarchie · Netz" (M252) gilt hier
+ *    NICHT — der Umschalter steht gar nicht daneben, sondern in der Kopfzeile
+ *    der Leiste. Ohne dieses `max-width: none` schrumpfte der Filter mit jeder
+ *    Verbreiterung des Umschalters weiter zusammen.
+ *  · Die Höhe ist gedeckelt: Wer die Leiste schmal UND niedrig zieht, hätte
+ *    sonst nur noch Filter und kein Netz mehr gesehen. Bleibt kein Platz,
+ *    scrollt der Filter — das Netz behält immer seinen Anteil.
+ */
 .ov-graph.embedded .ov-graph-toggles {
   position: static; display: flex; flex-wrap: wrap; gap: 6px 10px;
   margin: 8px 10px 4px; padding: 6px 10px;
+  max-width: none; max-height: 45%; overflow-y: auto;
 }
-.ov-graph.embedded .ov-graph-find input { width: 130px; }
+/* Das Suchfeld bekommt eine eigene Zeile über die volle Breite. Vorher stand
+   es als schmales Flex-Kind neben den Kästchen und wurde auf 13 Punkte
+   zusammengedrückt — ein Feld, in das man nichts mehr tippen konnte. */
+.ov-graph.embedded .ov-graph-find { flex: 1 0 100%; min-width: 0; }
+.ov-graph.embedded .ov-graph-find input {
+  width: 100%; min-width: 0; box-sizing: border-box;
+}
 .ov-graph.embedded .ov-graph-zoom { position: absolute; right: 8px; bottom: 8px; }
 .ov-graph.embedded .ov-graph-linkhint { bottom: 10px; max-width: calc(100% - 16px); white-space: normal; }
 /* Baum-Ansicht in der Leiste */
