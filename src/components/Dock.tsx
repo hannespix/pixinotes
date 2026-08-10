@@ -397,6 +397,7 @@ export function Dock() {
         <button
           className={drawing ? 'active' : ''}
           onClick={() => { const o = drawMenu; closeDockMenus(); setDrawMenu(!o); }}
+          data-taste="zeichnen"
           title="Zeichnen (Stift, Textmarker, Radierer)"
           aria-label="Zeichnen"
         >
@@ -407,6 +408,7 @@ export function Dock() {
       <span className="dock-sep" />
       <button
         className="dock-tasks"
+        data-taste="aufgaben"
         onClick={() => setTasksOpen(true)}
         // M185: Die Zahl am Symbol selbst erklären — sonst rät man, wofür sie steht
         title={taskStats.open > 0
@@ -457,6 +459,7 @@ export function Dock() {
               title={physicsEnabled
                 ? 'Physik ist AN: Karten verdrängen sich und lassen sich werfen — Klick schaltet aus (zum Stapeln/Überlappen)'
                 : 'Physik ist AUS: Karten dürfen überlappen — Klick schaltet die Verdrängung wieder an'}
+              data-taste="physik"
               aria-label="Physik umschalten"
             >
               <IMagnet size={16} /> Physik {physicsEnabled ? 'AUS' : 'AN'}
@@ -473,6 +476,7 @@ export function Dock() {
                 title={showArchived
                   ? `Archivierte Karten ausblenden (${archivedCount} auf diesem Board)`
                   : `Archivierte Karten einblenden (${archivedCount} auf diesem Board)`}
+                data-taste="archivZeigen"
                 aria-label="Archiv ein-/ausblenden"
               >
                 <IArchive size={16} /> Archiv {showArchived ? 'ausblenden' : 'einblenden'} ({archivedCount})

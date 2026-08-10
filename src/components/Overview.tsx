@@ -64,9 +64,31 @@ export function Overview() {
   // direkt ins Netz springen, und die Wahl überlebt den Ansichtswechsel
   const mode = useBoard((s) => s.overviewMode);
   const setMode = useBoard((s) => s.setOverviewMode);
+  /**
+   * M252: Wie breit der Umschalter oben rechts wirklich ist.
+   *
+   * Die Filterleiste links darf nicht bis unter ihn laufen — bei 150 %
+   * Textgröße tat sie das und verschwand mit ihrer rechten Hälfte unter dem
+   * Umschalter. Eine feste Zahl wäre wieder nur geraten; die Breite wächst mit
+   * Schriftgröße und Sprache mit.
+   */
+  const umschalter = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = umschalter.current;
+    if (!el) return;
+    const messen = () => document.documentElement.style.setProperty(
+      '--ov-mode-breite', `${Math.round(el.offsetWidth)}px`);
+    messen();
+    const beobachter = new ResizeObserver(messen);
+    beobachter.observe(el);
+    return () => {
+      beobachter.disconnect();
+      document.documentElement.style.setProperty('--ov-mode-breite', '0px');
+    };
+  }, []);
   return (
     <ReactFlowProvider>
-      <div className="ov-mode nodrag">
+      <div className="ov-mode nodrag" ref={umschalter}>
         <button className={mode === 'hierarchie' ? 'on' : ''} onClick={() => setMode('hierarchie')}>Hierarchie</button>
         <button className={mode === 'netz' ? 'on' : ''} onClick={() => setMode('netz')} title="Board-Netz: Portale & [[Wikilinks]] als Graph">Netz</button>
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { taste } from '../lib/tasten';
 
 /**
  * Globales Tooltip-System: fängt jedes [title]-Attribut der App ab und zeigt
@@ -10,7 +11,14 @@ import { useEffect, useState } from 'react';
  * Sprechblase — wie bei Android-Symbolleisten. Der nach dem Loslassen fällige
  * Klick wird unterdrückt: Nachschlagen löst die Aktion NICHT aus.
  */
-interface Tip { text: string; x: number; y: number; below: boolean }
+interface Tip { text: string; x: number; y: number; below: boolean; taste?: string }
+
+/**
+ * M251: Trägt das Element ein `data-taste="<Kürzel-Kennung>"`, hängt die
+ * Sprechblase das passende Tastenkürzel an — die Schreibweise kommt aus
+ * tasten.ts, damit sie sich nie von der tatsächlichen Belegung löst.
+ */
+const kuerzelVon = (el: HTMLElement) => (el.dataset.taste ? taste(el.dataset.taste) : undefined);
 
 export function TooltipLayer() {
   const [tip, setTip] = useState<Tip | null>(null);
@@ -25,7 +33,7 @@ export function TooltipLayer() {
       if (!text) return;
       const r = el.getBoundingClientRect();
       const below = r.top < 70; // oben kein Platz → unter dem Element zeigen
-      setTip({ text, x: r.left + r.width / 2, y: below ? r.bottom + 9 : r.top - 9, below });
+      setTip({ text, x: r.left + r.width / 2, y: below ? r.bottom + 9 : r.top - 9, below, taste: kuerzelVon(el) });
     };
 
     const hide = () => {
@@ -183,6 +191,8 @@ export function TooltipLayer() {
       role="tooltip"
     >
       {tip.text}
+      {/* Am Finger bleibt das Kürzel weg — dort gibt es keine Tastatur */}
+      {tip.taste && <kbd className="tip-taste">{tip.taste}</kbd>}
     </div>
   );
 }

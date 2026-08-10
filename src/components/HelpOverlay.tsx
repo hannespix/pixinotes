@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBoard } from '../store';
+import { KUERZEL, taste } from '../lib/tasten';
 import { MailLink } from './MailLink';
 
 /**
@@ -345,21 +346,26 @@ export function HelpOverlay() {
 
             <section id="help-tasten">
               <h3>⌨️ Tastenkürzel</h3>
-              <table className="help-keys">
-                <tbody>
-                  <tr><td><kbd>Strg</kbd>+<kbd>K</kbd></td><td>Suche über alles</td></tr>
-                  <tr><td><kbd>Strg</kbd>+<kbd>Z</kbd> / <kbd>Strg</kbd>+<kbd>Y</kbd></td><td>Rückgängig / Wiederholen</td></tr>
-                  <tr><td><kbd>N</kbd></td><td>Neue Notiz (auf dem Board)</td></tr>
-                  <tr><td><kbd>Strg</kbd>+<kbd>V</kbd></td><td>Screenshot/Bild einfügen</td></tr>
-                  <tr><td><kbd>F</kbd></td><td>Auswahl einpassen (ohne Auswahl: alles)</td></tr>
-                  <tr><td><kbd>Leertaste</kbd> halten + ziehen</td><td>Ansicht verschieben (auch über Karten)</td></tr>
-                  <tr><td><kbd>Esc</kbd> nach Klick-Zoom</td><td>zurück zur vorherigen Position</td></tr>
-                  <tr><td><kbd>Entf</kbd></td><td>Auswahl/Verbindung löschen</td></tr>
-                  <tr><td><kbd>Esc</kbd></td><td>Menüs/Overlays schließen · Zeichenmodus beenden</td></tr>
-                  <tr><td><kbd>←</kbd> <kbd>→</kbd> / <kbd>Leertaste</kbd></td><td>Präsentation blättern</td></tr>
-                  <tr><td><kbd>/</kbd></td><td>Block-Menü im Notiz-Editor</td></tr>
-                </tbody>
-              </table>
+              <p className="legal-hint">
+                Jedes Kürzel steht auch in der Sprechblase des passenden Knopfes — einfach mit der Maus darüber bleiben.
+              </p>
+              {(['Überall', 'Ansichten', 'Board', 'Karten', 'Text & Zeichnen'] as const).map((gruppe) => (
+                <div key={gruppe}>
+                  <h4>{gruppe}</h4>
+                  <table className="help-keys">
+                    <tbody>
+                      {KUERZEL.filter((k) => k.gruppe === gruppe).map((k) => (
+                        <tr key={k.id}>
+                          <td>{taste(k.id).split('+').map((t, i) => (
+                            <span key={i}>{i > 0 && '+'}<kbd>{t}</kbd></span>
+                          ))}</td>
+                          <td>{k.was}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
             </section>
 
             <section id="help-impressum">

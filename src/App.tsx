@@ -30,6 +30,7 @@ import { ShareCardsModal } from './components/ShareCardsModal';
 import { HelpOverlay } from './components/HelpOverlay';
 import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
+import { Tastatur } from './components/Tastatur';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
 import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
 
@@ -225,6 +226,7 @@ export default function App() {
       <HelpOverlay />
       <LookupPanel />
       <TooltipLayer />
+      <Tastatur />
         <Settings />
         <Presenter />
         {/* §5 DDG: Impressum muss leicht erkennbar und unmittelbar erreichbar

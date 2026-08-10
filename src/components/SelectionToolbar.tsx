@@ -589,6 +589,7 @@ export function SelectionToolbar() {
                 ) : (
                   <button
                     onClick={() => { setMenu(null); setArchived(selected.map((n) => n.id), true); }}
+                    data-taste="archivieren"
                     title="Archivieren — Karte gilt als erledigt, wird ausgeblendet und taucht nicht mehr in Aufgaben/Erinnerungen auf"
                     aria-label="Archivieren"
                   >

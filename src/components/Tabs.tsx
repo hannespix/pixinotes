@@ -55,6 +55,52 @@ export function Tabs() {
   }, [activeId, view]);
   // M183: aufgeklappte Boards im Navigator (zeigen ihre Karten)
   const [navExpanded, setNavExpanded] = useState<Set<string>>(new Set());
+  /**
+   * M252: Wie viel Platz die linke Navigation gerade belegt.
+   *
+   * Die schwebende Filterleiste der Netz-Ansicht saß fest bei 18 Punkten von
+   * links — und lag damit hinter dem geöffneten Navigator (User-Screenshot:
+   * „Gliederung/Physik" waren abgeschnitten). Statt sie höher zu stapeln,
+   * weicht sie aus: dieselbe Lösung wie beim Dock, das der Seitenleiste
+   * ausweicht (M248).
+   *
+   * GEMESSEN, nicht geraten: In der linken Spalte hängt die Breite an Schrift
+   * und Text-Zoom, und der Navigator ist frei ziehbar (M236-Lehre).
+   */
+  const navLinks = useBoard((s) => s.navLinks);
+  useEffect(() => {
+    const wurzel = document.documentElement;
+    const messen = () => {
+      const breit = window.matchMedia('(min-width: 861px)').matches;
+      const el = !breit ? null
+        : navOpen ? document.querySelector('.nav-panel')
+          : navLinks ? document.querySelector('.tabs') : null;
+      /* Bewusst offsetLeft/offsetWidth statt getBoundingClientRect: Das Panel
+         fährt mit einer Transformation ein, und während der Animation läge die
+         gemessene Kante 24 Punkte zu weit links. Der Layout-Wert steht sofort
+         richtig — und ist zugleich schon in Layoutpunkten, wie das Stylesheet
+         sie erwartet. */
+      const box = el as HTMLElement | null;
+      wurzel.style.setProperty('--nav-offen',
+        box ? `${Math.round(box.offsetLeft + box.offsetWidth)}px` : '0px');
+    };
+    const id = requestAnimationFrame(messen);
+    window.addEventListener('resize', messen);
+    return () => {
+      cancelAnimationFrame(id);
+      window.removeEventListener('resize', messen);
+      wurzel.style.setProperty('--nav-offen', '0px');
+    };
+  }, [navOpen, navLinks, navBreite, view]);
+
+  // M251: Alt+W schaltet den Navigator um. Der Zustand ist bewusst lokal
+  // geblieben — ein Fenster-Ereignis ist ehrlicher, als ihn nur für ein
+  // Tastenkürzel in den globalen Speicher zu heben.
+  useEffect(() => {
+    const um = () => setNavOpen((o) => !o);
+    window.addEventListener('pixinotes:navigator', um);
+    return () => window.removeEventListener('pixinotes:navigator', um);
+  }, []);
   // Esc schließt den Navigator (der Backdrop fängt Klicks ohnehin ab)
   useEffect(() => {
     if (!navOpen) return;
@@ -189,6 +235,7 @@ export function Tabs() {
           per CSS-Spezifikation nichts mehr (Backdrop-Root), User-Screenshot. */}
       <button
         className={`tab-nav ${navOpen ? 'active' : ''}`}
+        data-taste="navigator"
         title="Navigator: alle Bereiche, Projekte, Boards & Karten"
         onClick={() => setNavOpen((o) => !o)}
       >
