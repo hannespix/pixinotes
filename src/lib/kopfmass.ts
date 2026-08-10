@@ -44,9 +44,25 @@ export function initKopfmass(): () => void {
    * `vw` bleibt vom Zoom unberührt (1920 statt 1097) und verspricht Platz,
    * den es nicht gibt. `document.body.offsetWidth` ist die ehrliche Zahl.
    */
+  /** Aktuell beobachtete Leiste — React kann sie austauschen (s. unten) */
+  let beobachtet: Element | null = null;
+
   const messen = () => {
     const bar = document.querySelector('.topbar') as HTMLElement | null;
     if (!bar) return;
+    /**
+     * M237: Beobachtet wird IMMER die Leiste, die gerade im Dokument steht.
+     *
+     * Nach „Vom Sync-Ordner laden" baut React den ganzen Baum neu auf (der
+     * Provider hängt an einem key). Die alte Kopfleiste ist dann ein
+     * herrenloses Element, der ResizeObserver meldet nie wieder etwas — und
+     * die Tab-Leiste bliebe auf dem Maß von vorher stehen.
+     */
+    if (bar !== beobachtet) {
+      if (beobachtet) ro?.unobserve(beobachtet);
+      ro?.observe(bar);
+      beobachtet = bar;
+    }
     const links = Math.round(bar.offsetLeft + bar.offsetWidth + LUFT);
     const voll = document.body.offsetWidth;
     root.style.setProperty('--kopf-links', `${links}px`);
@@ -68,18 +84,31 @@ export function initKopfmass(): () => void {
 
   // Erst messen, wenn die Kopfleiste im DOM steht (React rendert nach dem Start)
   const start = () => {
-    const bar = document.querySelector('.topbar');
-    if (!bar) { requestAnimationFrame(start); return; }
-    messen();
+    if (!document.querySelector('.topbar')) { requestAnimationFrame(start); return; }
     ro = new ResizeObserver(messen);
-    ro.observe(bar);
+    messen();                    // bindet den Beobachter gleich mit an
     // Der Zoom ändert die Fenstermaße, ohne dass die Leiste ihre Größe meldet
     window.addEventListener('resize', messen);
+    /**
+     * Und wenn React den Baum austauscht (Import: der Provider hängt an einem
+     * key), wechselt genau EIN Element — das Kind von #root. Bewusst nur
+     * dieses beobachten und nicht `subtree`: Das Board ändert sein DOM
+     * dauernd, und ein Messen bei jeder Mutation wäre genau die Sorte
+     * Layout-Arbeit pro Frame, die M223 aus dem Netz entfernt hat.
+     */
+    const wurzel = document.getElementById('root');
+    if (wurzel) {
+      const mo = new MutationObserver(messen);
+      mo.observe(wurzel, { childList: true });
+      stopMo = () => mo.disconnect();
+    }
   };
+  let stopMo: (() => void) | null = null;
   start();
 
   return () => {
     ro?.disconnect();
+    stopMo?.();
     window.removeEventListener('resize', messen);
   };
 }
