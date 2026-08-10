@@ -103,6 +103,27 @@ const PUSH_GAP = 12;
 /** Geschwindigkeits-Deckel für weggeschobene Karten */
 const PUSH_MAX = 22;
 
+/**
+ * M249: Jedes Board merkt sich, wo man zuletzt hingeschaut hat.
+ *
+ * Der Befund: „Sobald man im Netz einen Knoten aktiviert, wird neu geladen und
+ * der Knoten zentriert … das holt den User durch den sprunghaften Reload und
+ * die Neupositionierung aus der Immersion."
+ *
+ * Gemessen wird nichts neu geladen — kein Navigationsvorgang, gesetzte
+ * Variablen überleben den Klick. Was so wirkt, ist der Schlüssel am
+ * React-Flow-Element (`key={activeId}`): Beim Board-Wechsel wird die ganze
+ * Leinwand neu aufgebaut, und die Eigenschaft `fitView` passt dabei JEDES MAL
+ * den kompletten Board-Inhalt neu ein. Ausschnitt und Zoom, die man sich
+ * eingerichtet hatte, sind weg — das ist der Sprung.
+ *
+ * Eine Karte außerhalb der Komponente hält deshalb je Board den zuletzt
+ * gesehenen Ausschnitt fest. Bewusst NICHT im Store: Das ist keine Information
+ * über den Inhalt, sie muss nichts überleben und würde als Zustand nur bei
+ * jedem Schwenk eine Speicher-Runde auslösen.
+ */
+const gemerkteAnsicht = new Map<string, { x: number; y: number; zoom: number }>();
+
 export function Board() {
   const activeId = useBoard((s) => s.activeId);
   const importEpoch = useBoard((s) => s.importEpoch);
@@ -117,6 +138,37 @@ export function Board() {
 
   const { screenToFlowPosition, setCenter, fitView, getViewport, setViewport } = useReactFlow();
   const wheelZoom = useBoard((s) => s.wheelZoom);
+
+  /**
+   * M249: Den gemerkten Ausschnitt greifen, BEVOR die neue Leinwand ihn
+   * überschreibt.
+   *
+   * Das ist der heikle Teil. React Flows eigenes Einpassen läuft beim
+   * Aufbauen und meldet sofort einen neuen Ausschnitt — der landete in der
+   * Karte und überschriebe genau den Wert, den wir wiederherstellen wollen.
+   * Deshalb wird er hier im RENDER gelesen, also vor dem Mounten, und bis
+   * zum Anwenden in einem Ref geparkt.
+   */
+  const letztesBoard = useRef(activeId);
+  const wunschAnsicht = useRef(gemerkteAnsicht.get(activeId) ?? null);
+  if (letztesBoard.current !== activeId) {
+    wunschAnsicht.current = gemerkteAnsicht.get(activeId) ?? null;
+    letztesBoard.current = activeId;
+  }
+  useEffect(() => {
+    const wunsch = wunschAnsicht.current;
+    wunschAnsicht.current = null;
+    if (!wunsch) return;   // Board zum ersten Mal offen → fitView darf einpassen
+    // Ein gezielter Sprung auf eine Karte (Suche, Aufgaben, Backlink) hat
+    // Vorrang: Wer irgendwo hin WILL, soll nicht am alten Ausschnitt landen.
+    if (useBoard.getState().pendingFocus?.boardId === activeId) return;
+    // Zwei Frames: Erst danach hat React Flow gemessen und selbst eingepasst;
+    // vorher gesetzt, würde unser Ausschnitt wieder überschrieben.
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => {
+      void setViewport(wunsch);   // ohne Dauer — kein Flug, kein Sprung
+    }));
+    return () => cancelAnimationFrame(id);
+  }, [activeId, importEpoch, setViewport]);
 
   // ---------- Zoom-Durchgriff ÜBER Modulen (M123) ----------
   // Karteninhalte (Notiz-Editor, Kanban, Diagramm …) tragen nowheel/eigene
@@ -845,6 +897,9 @@ export function Board() {
         // M178: Die Hintergrund-Textur klebt am BOARD, nicht am Glas — ihre
         // Kachel-Position/-Größe folgt dem Viewport (CSS-Variablen, ohne Re-Render)
         onViewportChange={(vp) => {
+          // M249: Ausschnitt je Board festhalten — jede Änderung zählt, auch
+          // Zoom-Knöpfe und Flüge, nicht nur das Schwenken mit der Maus.
+          gemerkteAnsicht.set(activeId, vp);
           const el = document.querySelector('.react-flow') as HTMLElement | null;
           if (!el) return;
           el.style.setProperty('--tex-x', `${vp.x}px`);

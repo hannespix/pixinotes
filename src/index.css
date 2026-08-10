@@ -28,24 +28,19 @@
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   /**
-   * M248: Der App-Rahmen.
+   * M248/M249: Der Abstand der App zur Fensterkante.
    *
-   * „Die rechte Sidebar soll organisch aus der Seite wachsen — quasi rechts
-   * passende Radien und ein leichter App-Rand."
+   * M248 hat die App als gerundete Fläche auf einen eigenen Grund gelegt —
+   * „der Hintergrund der PixiNotes-App (Radius um alles) funde ich noch nicht
+   * so gelungen, kann man das wieder weg machen". Also zurück auf null: Die
+   * Arbeitsfläche läuft wieder bis an den Fensterrand.
    *
-   * Dafür braucht die App zuerst überhaupt eine Kante, aus der etwas
-   * herauswachsen KANN. Bisher lief die Arbeitsfläche randlos bis an den
-   * Fensterrand; eine Leiste daran konnte nur abgeschnitten wirken. Jetzt
-   * liegt die App als gerundete Fläche auf einem eigenen Grund, und die
-   * Leisten laufen in deren Ecken — mit demselben Radius. Konzentrisch heißt
-   * die Regel: Zwei ineinanderliegende Rundungen wirken nur dann wie eine
-   * Form, wenn die innere um genau die Randstärke kleiner ist.
+   * Die Variablen bleiben, weil das ganze schwebende Chrome (Kopfleiste,
+   * Tabs, Dock, Netz-Filter) inzwischen damit rechnet. Auf 0 kosten sie
+   * nichts, und der Rahmen ließe sich mit einer einzigen Zahl wieder
+   * einschalten, falls er doch einmal gewünscht ist.
    */
-  --app-rand: 10px;
-  --app-radius: 20px;
-  --app-radius-innen: 19px;   /* --app-radius minus 1px Rahmenstärke */
-  --grund: #e4dfd5;           /* worauf die App liegt */
-  --app-linie: rgba(90, 80, 60, .17);
+  --app-rand: 0px;
   --head-space: calc(110px + var(--safe-top) + var(--app-rand));
 }
 
@@ -79,10 +74,6 @@
   --edge: rgba(235, 225, 205, 0.5);
   --edge-head: #8c8577;
   --accent-strong: var(--accent);
-  /* M248: Der Grund unter dem App-Rahmen — dunkler als die Arbeitsfläche,
-     sonst verschwindet die Kante und der Rahmen hätte keine Wirkung. */
-  --grund: #0c0b09;
-  --app-linie: rgba(255, 255, 255, .12);
 }
 /* Haftnotizen & Prozess-Formen bleiben helles „Papier" — Text darauf dunkel */
 [data-theme='dark'] .react-flow__node-note,
@@ -95,30 +86,9 @@ body {
   font-family: ui-rounded, 'SF Pro Rounded', 'Segoe UI', system-ui, sans-serif;
   color: var(--ink);
   overflow: hidden;
-  /* M248: der Grund, auf dem der App-Rahmen liegt */
-  background: var(--grund);
 }
 
-/**
- * M248: Die Arbeitsfläche als eigenes Blatt.
- *
- * `overflow: hidden` ist hier nicht Kosmetik, sondern die Bedingung dafür,
- * dass die Rundung überhaupt etwas beschneidet: Ohne sie liefe die Leinwand
- * mit ihren Karten quadratisch über die Ecken hinaus und der Radius wäre
- * unsichtbar.
- *
- * Die schwebenden Leisten (Kopf, Tabs, Dock, Slideouts) bleiben `fixed` und
- * damit am Auslauf ausgerichtet, NICHT an dieser Fläche — deshalb rücken sie
- * weiter unten einzeln um `--app-rand` nach innen. Sie hier einzuhängen wäre
- * verlockend, würde aber jede von ihnen unter die Beschneidung stellen und
- * ihre Menüs an der Kante abschneiden.
- */
-.app {
-  position: fixed; inset: var(--app-rand);
-  border-radius: var(--app-radius);
-  overflow: hidden;
-  box-shadow: 0 0 0 1px var(--app-linie), 0 6px 28px rgba(40, 32, 16, .13);
-}
+.app { height: 100%; position: relative; }
 .board-wrap { height: 100%; }
 .react-flow { background: var(--bg); }
 
@@ -2571,16 +2541,16 @@ html[data-kopf-eng='an'] .hint { display: none; }
   bottom: var(--app-rand);
   z-index: 45; display: flex; flex-direction: column;
   /**
-   * M248: Die Radien erzählen, wo die Leiste hingehört.
+   * M249: Die Rundung markiert genau die eine Kante, die FREI steht.
    *
-   *  · oben rechts 0 — dort läuft sie mitten aus der Kante der Fläche heraus.
-   *    Ein Radius an dieser Stelle würde sie vom Blatt abheben, und genau das
-   *    war der Eindruck vorher: ein aufgeklebter Streifen.
-   *  · unten rechts der INNEN-Radius des App-Rahmens — dort treffen sich beide
-   *    Ecken. Nur wenn die Rundung dieselbe ist, wirkt es wie eine Form.
-   *  · links die Karten-Rundung, denn diese Kante steht frei über dem Board.
+   * Drei der vier Kanten der Leiste liegen an: rechts und unten am
+   * Fensterrand, oben an der Kopfleiste. Nur die linke grenzt an das Board.
+   * Also bekommt allein die obere linke Ecke einen Radius — dort geht die
+   * Fläche in den freien Raum über. Jede weitere Rundung würde die Leiste
+   * vom Fensterrand abheben und sie wieder wie eine aufgelegte Karte
+   * aussehen lassen statt wie eine Ausstülpung der Seite.
    */
-  border-radius: 16px 0 var(--app-radius-innen) 16px; overflow: hidden;
+  border-radius: 18px 0 0 0; overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border-soft); border-right: none;
   box-shadow: -10px 0 34px rgba(40, 30, 10, 0.16);
@@ -2676,16 +2646,10 @@ html[data-kopf-eng='an'] .hint { display: none; }
 }
 .top-actions button.on { background: var(--accent-soft); color: var(--accent-strong); }
 /* Phone: Als Vollflächen-Blatt statt schmaler Spalte */
-/* M248: Am Telefon gibt es keinen Rahmen — dort ist der Schirm die App.
-   Ein 10-Punkte-Rand würde nur Platz kosten, den es nicht gibt. */
-@media (max-width: 640px) {
-  :root { --app-rand: 0px; --app-radius: 0px; --app-radius-innen: 0px; }
-  .app { box-shadow: none; }
-}
 @media (max-width: 640px) {
   /* Phone: Beide Slideouts füllen die Breite — für zwei Spalten ist kein
      Platz, und ein 8-Punkte-Anfasser trifft am Finger ohnehin niemand. */
-  .sidepanel { left: 0; right: 0; width: auto !important; border-radius: 16px 16px 0 0; border-right: 1px solid var(--border-soft); }
+  .sidepanel { left: 0; right: 0; width: auto !important; border-radius: 18px 18px 0 0; border-right: 1px solid var(--border-soft); }
   .sidepanel-grip, .nav-grip { display: none; }
 }
 @media (max-width: 640px) {
@@ -3840,9 +3804,8 @@ button.link-dead:disabled { opacity: 0.45; }
   bottom: var(--app-rand);
   width: 380px; max-width: calc(100vw - 40px);
   display: flex; flex-direction: column;
-  /* M248: dieselbe Regel wie rechts, gespiegelt — oben links läuft sie aus
-     der Kante, unten links trifft sie die Ecke des App-Rahmens */
-  border-radius: 0 16px 16px var(--app-radius-innen);
+  /* M249: gespiegelt — allein die obere RECHTE Ecke steht frei */
+  border-radius: 0 18px 0 0;
   padding: 12px 18px 10px 14px;
   background: var(--surface);
   border: 1px solid var(--border-soft); border-left: none;
@@ -3916,7 +3879,7 @@ button.link-dead:disabled { opacity: 0.45; }
 .nav-more { font-size: 10px; color: var(--muted); padding: 2px 8px 3px; }
 @media (max-width: 640px) {
   .nav-panel { width: 100% !important; max-width: none; padding: 12px 10px 8px;
-    border-radius: 16px 16px 0 0; border-left: 1px solid var(--border-soft); }
+    border-radius: 18px 18px 0 0; border-left: 1px solid var(--border-soft); }
   .nav-grid { grid-template-columns: 1fr; }
   .nav-head > b { font-size: 12px; }
 }
