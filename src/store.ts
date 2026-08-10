@@ -177,6 +177,19 @@ interface BoardState {
   /** Fokus-Modus am Handy überhaupt anbieten? (⚙ → Design → Bedienung) */
   cardFocus: boolean;
   setCardFocus: (on: boolean) => void;
+  /**
+   * M235: Der Handy-Zoom, auf Wunsch auch am großen Bildschirm.
+   *
+   * Am Handy ist der Tipp die einzige Geste und die Karte füllt das Bild.
+   * Am PC gilt beides bewusst NICHT: Ein Klick setzt dort den Cursor in den
+   * Text, und das Board bleibt hinter einem Blatt sichtbar. Wer es lieber
+   * wie am Handy hat, schaltet es hier ein — beides einzeln, weil es zwei
+   * verschiedene Fragen sind (womit öffne ich? wie groß wird es?).
+   */
+  fokusEinKlick: boolean;
+  setFokusEinKlick: (on: boolean) => void;
+  fokusVollbild: boolean;
+  setFokusVollbild: (on: boolean) => void;
   /** Karten-Daten auf einem BELIEBIGEN Board ändern (Aufgaben-Zentrale arbeitet boardübergreifend) */
   updateNodeDataOnBoard: (boardId: string, nodeId: string, data: Record<string, unknown>) => void;
   setPresenting: (on: boolean) => void;
@@ -792,6 +805,12 @@ export const useBoard = create<BoardState>()(
         setFocusCard: (id) => set({ focusCard: id }),
         cardFocus: true,
         setCardFocus: (on) => set({ cardFocus: on, ...(on ? {} : { focusCard: null }) }),
+        // M235: beide AUS voreingestellt — am PC bleibt alles, wie es war,
+        // bis jemand es ausdrücklich anders will
+        fokusEinKlick: false,
+        setFokusEinKlick: (on) => set({ fokusEinKlick: on }),
+        fokusVollbild: false,
+        setFokusVollbild: (on) => set({ fokusVollbild: on }),
 
         updateNodeDataOnBoard: (boardId, nodeId, data) => {
           // Feingranulare History (M122) — Snapshot des ZIEL-Boards (die
@@ -1612,6 +1631,8 @@ export const useBoard = create<BoardState>()(
         physicsEnabled: s.physicsEnabled,
         clickZoom: s.clickZoom,
         cardFocus: s.cardFocus,
+        fokusEinKlick: s.fokusEinKlick,
+        fokusVollbild: s.fokusVollbild,
         anzeige: s.anzeige,
         lesbareSchrift: s.lesbareSchrift,
         hoherKontrast: s.hoherKontrast,

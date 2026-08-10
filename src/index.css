@@ -4469,21 +4469,27 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
    Ab Tablet-Breite wäre randlos verschenkt: Dort erscheint die Karte als
    großes Blatt ÜBER dem Board, das abgedunkelt sichtbar bleibt. Man sieht,
    woher man kommt, und der Weg zurück ist offensichtlich. */
+/* M235: „Formatfüllend statt Blatt" — die Blatt-Darstellung ab Tablet-Breite
+   ist eine Voreinstellung, keine Naturgesetzlichkeit. Mit `fokus-voll` fällt
+   sie weg und es gilt die Handy-Regel: Karte randlos, Board dahinter aus.
+   Umgesetzt als `:not(.fokus-voll)` am selben Block statt als zweiter Block
+   mit Gegen-Regeln — sonst müsste jede der acht Eigenschaften einzeln
+   zurückgenommen werden, und beim nächsten Zusatz vergisst man eine. */
 @media (min-width: 700px) {
-  .focus-mode .react-flow__node.pn-focused {
+  .focus-mode:not(.fokus-voll) .react-flow__node.pn-focused {
     left: 50% !important;
     transform: translateX(-50%) !important;
     width: min(1000px, calc(100vw - 96px)) !important;
     top: calc(var(--focus-top) + 18px) !important;
     height: calc(100dvh - var(--focus-top) - var(--focus-bottom) - var(--kb) - 40px) !important;
   }
-  .focus-mode .pn-focused .card-body {
+  .focus-mode:not(.fokus-voll) .pn-focused .card-body {
     border-radius: 18px !important;
     box-shadow: 0 28px 80px rgba(30, 22, 8, 0.34) !important;
     border: 1px solid var(--border) !important;
   }
   /* Das Board bleibt sichtbar, tritt aber zurück — Zusammenhang ohne Ablenkung */
-  .focus-mode .react-flow__renderer::after {
+  .focus-mode:not(.fokus-voll) .react-flow__renderer::after {
     content: ''; position: fixed; inset: 0; z-index: 2;
     background: rgba(28, 22, 10, 0.42);
     -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px);
@@ -4491,8 +4497,8 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
   }
   /* Auf großen Geräten dürfen die anderen Karten stehen bleiben: Sie liegen
      hinter dem Schleier und zeigen, wo man sich befindet. */
-  .focus-mode .react-flow__node { display: block !important; }
-  .focus-mode .react-flow__edges { display: block !important; }
+  .focus-mode:not(.fokus-voll) .react-flow__node { display: block !important; }
+  .focus-mode:not(.fokus-voll) .react-flow__edges { display: block !important; }
   /* Kopf- und Fußzeile des Fokus liegen über dem Schleier */
   .focus-head, .focus-nav { z-index: 60; }
 }

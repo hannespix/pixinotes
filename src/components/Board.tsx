@@ -531,7 +531,11 @@ export function Board() {
     // M212: Am Handy öffnet ein Tipp die Karte formatfüllend. Ziehen löst
     // keinen Klick aus, Verschieben bleibt also unberührt; und wer schon im
     // Fokus ist, tippt in der Karte und soll dort nicht erneut auslösen.
-    if (!e.shiftKey && isPhoneFocus() && oeffneFokus(node)) return;
+    // M235: … und am PC auf Wunsch genauso (⚙ → Design → „Mit einem Klick
+    // öffnen"). Der Preis steht in der Einstellung: Notizen bearbeitet man
+    // dann im großen Blatt statt direkt auf dem Board — dieselbe Abmachung
+    // wie am Handy. Wer sie nicht will, bleibt beim Doppelklick.
+    if (!e.shiftKey && (isPhoneFocus() || st0.fokusEinKlick) && oeffneFokus(node)) return;
     // Klick-Zoom nur noch, wenn der Fokus AUS ist — sonst zoomte die Ansicht
     // zusätzlich zum Fokus, und man landete nach dem Schließen woanders
     if (st0.cardFocus || !useBoard.getState().clickZoom || e.shiftKey) return;

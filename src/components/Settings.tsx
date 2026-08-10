@@ -121,6 +121,10 @@ export function Settings() {
   const brainOffSpaces = useBoard((s) => s.brainOffSpaces);
   const toggleBrainSpace = useBoard((s) => s.toggleBrainSpace);
   const setCardFocus = useBoard((s) => s.setCardFocus);
+  const fokusEinKlick = useBoard((s) => s.fokusEinKlick);
+  const setFokusEinKlick = useBoard((s) => s.setFokusEinKlick);
+  const fokusVollbild = useBoard((s) => s.fokusVollbild);
+  const setFokusVollbild = useBoard((s) => s.setFokusVollbild);
   const wheelZoom = useBoard((s) => s.wheelZoom);
   const setWheelZoom = useBoard((s) => s.setWheelZoom);
   const ui = useBoard((s) => s.ui);
@@ -1170,6 +1174,42 @@ export function Settings() {
             wechselt die Karte, Wischen nach unten, Esc oder die Zurück-Taste führen
             zurück; die Karte fliegt dabei an ihren Platz und wird ganz ins Bild gerückt.
             <b> Abgeschaltet</b> gilt wieder der alte Klick-Zoom (unten einstellbar).
+          </p>
+          {/* M235: Der Handy-Zoom, auf Wunsch auch am großen Bildschirm.
+              Zwei Schalter statt einem, weil es zwei Fragen sind: womit
+              öffne ich, und wie groß wird es. */}
+          <label className="modal-row modal-row-check">
+            <span>… am PC mit einem Klick öffnen</span>
+            <input
+              type="checkbox"
+              checked={fokusEinKlick}
+              disabled={!cardFocus}
+              onChange={(e) => setFokusEinKlick(e.target.checked)}
+            />
+          </label>
+          <p className="modal-hint">
+            Wie am Handy: Ein einfacher Klick öffnet die Karte groß. Standardmäßig braucht
+            es dafür am PC einen <b>Doppelklick</b> — denn mit der Maus setzt ein Klick den
+            Cursor in den Text, und wer direkt auf dem Board schreiben will, möchte dabei
+            nicht jedes Mal ins große Blatt springen. <b>Eingeschaltet</b> gilt die
+            Handy-Abmachung: Notizen bearbeitest du dann im Blatt statt auf dem Board.
+            Der Doppelklick funktioniert weiterhin.
+          </p>
+          <label className="modal-row modal-row-check">
+            <span>… am PC formatfüllend statt als Blatt</span>
+            <input
+              type="checkbox"
+              checked={fokusVollbild}
+              disabled={!cardFocus}
+              onChange={(e) => setFokusVollbild(e.target.checked)}
+            />
+          </label>
+          <p className="modal-hint">
+            Die Karte nimmt den ganzen Bildschirm ein, das Board tritt komplett zurück —
+            genau wie am Handy. Ohne diesen Schalter schwebt sie ab Tablet-Breite als
+            Blatt über dem abgedunkelten Board, damit man sieht, wo man gerade ist.
+            Geschmackssache: <b>randlos</b> ist konzentrierter, <b>Blatt</b> behält den
+            Zusammenhang.
           </p>
           <label className="modal-row modal-row-check">
             <span>Klick-Zoom</span>

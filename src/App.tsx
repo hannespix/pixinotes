@@ -40,6 +40,7 @@ export default function App() {
   const presenting = useBoard((s) => s.presenting);
   const tasksOpen = useBoard((s) => s.tasksOpen);
   const focusCard = useBoard((s) => s.focusCard);
+  const fokusVollbild = useBoard((s) => s.fokusVollbild);
   const restoreDeleted = useBoard((s) => s.restoreDeleted);
   const showToast = useBoard((s) => s.showToast);
 
@@ -182,7 +183,9 @@ export default function App() {
     // Karten für einen Moment die ALTEN Knoten, und BlockNote (liest Inhalt
     // nur beim Mount) friert den alten Text ein.
     <ReactFlowProvider key={importEpoch}>
-      <div className={`app${focusCard ? ' focus-mode' : ''}`}>
+      {/* M235: `fokus-voll` nimmt am großen Bildschirm die Blatt-Darstellung
+          zurück — dann füllt die Karte das Bild wie am Handy (⚙ → Design). */}
+      <div className={`app${focusCard ? ' focus-mode' : ''}${focusCard && fokusVollbild ? ' fokus-voll' : ''}`}>
         <div className="topbar">
           <AboutMenu />
           <TopActions />
