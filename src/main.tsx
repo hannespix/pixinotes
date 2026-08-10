@@ -11,6 +11,7 @@ import App from './App';
 import { handleOAuthRedirect } from './lib/calAccounts';
 import { initViewportInsets } from './lib/viewport';
 import { initAnzeige } from './lib/anzeige';
+import { initEinstellungen } from './lib/einstellungen';
 import { initKopfmass } from './lib/kopfmass';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -20,6 +21,13 @@ if (!handleOAuthRedirect()) {
   // M211: Tastaturhöhe als CSS-Variable — VOR dem Rendern, damit die
   // schwebenden Leisten schon beim ersten Frame richtig sitzen
   initViewportInsets();
+  /**
+   * M247: Vorlieben aus ihrem eigenen Speicher holen — VOR initAnzeige, sonst
+   * würde die Anzeigegröße noch mit dem Stand aus dem Hauptspeicher gesetzt
+   * und gleich darauf korrigiert (sichtbares Springen). Und vor dem Rendern,
+   * weil ein zweites Fenster sonst kurz im falschen Design aufblitzt.
+   */
+  initEinstellungen();
   // M224: Anzeigegröße/Kontrast ebenfalls VOR dem ersten Frame — sonst
   // springt die Oberfläche beim Start sichtbar auf die eingestellte Größe
   initAnzeige();

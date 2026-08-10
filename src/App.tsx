@@ -240,8 +240,12 @@ export default function App() {
         {writerRole === 'follower' && (
           <div className="writer-banner" role="status">
             <span>
-              👀 PixiNotes ist in einem anderen Fenster/Tab geöffnet — dieses Fenster liest nur
-              mit, damit sich die Stände nicht gegenseitig überschreiben.
+              {/* M247: genauer sagen, WAS hier nicht gespeichert wird. „Liest nur mit"
+                  klang wie „gar nichts geht" — dabei betrifft es nur die Inhalte;
+                  Design und Anzeige werden auch hier dauerhaft gemerkt. */}
+              👀 PixiNotes ist in einem anderen Fenster/Tab geöffnet — <b>Änderungen an Karten
+              werden hier nicht gespeichert</b>, damit sich die Stände nicht gegenseitig
+              überschreiben. Design- und Anzeige-Einstellungen bleiben erhalten.
             </span>
             <button onClick={takeOverWriter}>Hier weiterarbeiten</button>
           </div>
