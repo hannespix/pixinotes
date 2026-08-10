@@ -65,8 +65,12 @@ export function ShareCardsModal() {
     try {
       await cardsToPdf(nodes, `pixinotes-${board.name.replace(/[^\p{L}\d\-_ ]/gu, '').trim().slice(0, 30) || 'karten'}`);
       showToast('📄 PDF-Datei erstellt (Downloads).');
-    } catch {
-      showToast('PDF fehlgeschlagen — der Druck-Weg („Drucken" → als PDF sichern) funktioniert immer.');
+    } catch (e) {
+      // M244: Der Grund gehört dazu. Vorher meldete der Export auch dann
+      // Erfolg, wenn die Seite leer blieb — das kostet mehr Zeit als ein
+      // ehrlicher Fehler, weil man den Fehler erst im PDF-Betrachter sieht.
+      const grund = e instanceof Error && e.message ? ` (${e.message})` : '';
+      showToast(`PDF fehlgeschlagen${grund} — der Druck-Weg („Drucken" → als PDF sichern) funktioniert immer.`);
     } finally { setBusy(''); }
   };
 
