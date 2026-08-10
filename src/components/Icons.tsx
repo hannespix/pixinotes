@@ -122,3 +122,13 @@ export const IMaximize = make(<><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><pa
 export const IMinimize = make(<><path d="M4 14h6v6" /><path d="M20 10h-6V4" /><path d="M14 10l7-7" /><path d="M3 21l7-7" /></>);
 export const IReload = make(<><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>);
 export const IStopSq = make(<rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor" stroke="none" />);
+// M243: Anfasser der Bearbeiten-Leiste — die sechs Punkte sind die
+// eingebürgerte Form für „hier anfassen und schieben" (Trello, Notion, Jira).
+export const IGrip = make(<>
+  <circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none" />
+  <circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none" />
+  <circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none" />
+  <circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none" />
+  <circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none" />
+  <circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none" />
+</>);

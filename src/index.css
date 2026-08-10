@@ -495,6 +495,29 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .sel-toolbar button:hover { background: var(--surface-2); }
 .sel-toolbar button.danger:hover { background: #ffe3e0; }
 
+/* ---------- M243: Anfasser der Bearbeiten-Leiste ---------- */
+/* Der Versatz reist als Variable an; `translate` ist bewusst NICHT `transform`
+   — den belegt bei der schwebenden Leiste React Flow (Verankerung an der
+   Karte). Die eigenständige Eigenschaft legt sich sauber davor. */
+.sel-toolbar { translate: var(--lv-x, 0px) var(--lv-y, 0px); }
+.sel-griff {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; align-self: stretch; margin: -7px 2px -7px -6px;
+  color: var(--muted); opacity: .55; cursor: grab;
+  border-radius: 9px 0 0 9px;
+  /* Der Griff bleibt vom Text-Markieren und vom Seiten-Scrollen ausgenommen —
+     sonst zieht der Finger am Handy die Seite statt der Leiste. */
+  touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.sel-griff:hover { opacity: 1; background: var(--surface-2); }
+.sel-griff:active { cursor: grabbing; }
+/* Verschoben? Dann zeigt der Griff das an — sonst wüsste niemand, warum die
+   Leiste woanders steht, und der Doppelklick zum Zurücksetzen bliebe verborgen. */
+.sel-griff.an { opacity: .9; color: var(--accent-strong); }
+.sel-toolbar.zieht { cursor: grabbing; box-shadow: 0 8px 30px rgba(50, 40, 20, .28); }
+/* Beim Ziehen keine Übergänge — die würden hinter dem Finger herlaufen */
+.sel-toolbar.zieht, .sel-toolbar.zieht * { transition: none !important; }
+
 /* ---------- Toast ---------- */
 .toast {
   position: fixed; bottom: 84px; left: 50%;
@@ -3526,7 +3549,9 @@ button.link-dead:disabled { opacity: 0.45; }
 /* Auswahl-Leiste auf Phones: feste Aktionsleiste über dem Dock — oben bleibt
    Platz für Kopf- und Tab-Leiste (Kollisions-Befund aus dem User-Screenshot) */
 .sel-toolbar-dock {
-  position: fixed; left: 50%; translate: -50% 0;
+  /* M243: die Zentrierung und der gemerkte Versatz in EINER Angabe — zwei
+     `translate`-Regeln würden einander überschreiben, nicht addieren */
+  position: fixed; left: 50%; translate: calc(-50% + var(--lv-x, 0px)) var(--lv-y, 0px);
   bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   z-index: 60; max-width: calc(100vw - 10px);
   flex-wrap: wrap; justify-content: center;

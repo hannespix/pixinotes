@@ -200,6 +200,25 @@ interface BoardState {
    */
   navLinks: boolean;
   setNavLinks: (on: boolean) => void;
+  /**
+   * M243: Wohin die Bearbeiten-Leiste geschoben wurde.
+   *
+   * Gemerkt wird ein VERSATZ, keine Bildschirmposition. Die Leiste hängt an
+   * der ausgewählten Karte und wandert beim Pannen mit — eine feste Position
+   * würde diesen Bezug zerschneiden und die Leiste bei der nächsten Karte an
+   * einer beliebigen Stelle stehen lassen. Der Versatz dagegen überträgt sich
+   * sinnvoll: „etwas höher und weiter rechts" bleibt „etwas höher und weiter
+   * rechts", egal welche Karte gerade dran ist. Genau das war der Wunsch —
+   * „alle entsprechenden Menüs an denselben Fokus-Modulen an der selben
+   * gemerkten Position starten".
+   *
+   * Zwei getrennte Werte, weil es zwei verschiedene Situationen sind: Auf dem
+   * Board schwebt die Leiste über der Karte, im Fokus sitzt sie als feste
+   * Leiste am unteren Rand. Ein gemeinsamer Versatz würde die eine kaputt
+   * machen, sobald man die andere zurechtrückt.
+   */
+  leisteVersatz: { board: { x: number; y: number }; fokus: { x: number; y: number } };
+  setLeisteVersatz: (wo: 'board' | 'fokus', v: { x: number; y: number }) => void;
   /** Karten-Daten auf einem BELIEBIGEN Board ändern (Aufgaben-Zentrale arbeitet boardübergreifend) */
   updateNodeDataOnBoard: (boardId: string, nodeId: string, data: Record<string, unknown>) => void;
   setPresenting: (on: boolean) => void;
@@ -823,6 +842,10 @@ export const useBoard = create<BoardState>()(
         setFokusVollbild: (on) => set({ fokusVollbild: on }),
         navLinks: false,
         setNavLinks: (on) => set({ navLinks: on }),
+        leisteVersatz: { board: { x: 0, y: 0 }, fokus: { x: 0, y: 0 } },
+        setLeisteVersatz: (wo, v) => set((s) => ({
+          leisteVersatz: { ...s.leisteVersatz, [wo]: v },
+        })),
 
         updateNodeDataOnBoard: (boardId, nodeId, data) => {
           // Feingranulare History (M122) — Snapshot des ZIEL-Boards (die
@@ -1646,6 +1669,7 @@ export const useBoard = create<BoardState>()(
         fokusEinKlick: s.fokusEinKlick,
         fokusVollbild: s.fokusVollbild,
         navLinks: s.navLinks,
+        leisteVersatz: s.leisteVersatz,
         anzeige: s.anzeige,
         lesbareSchrift: s.lesbareSchrift,
         hoherKontrast: s.hoherKontrast,

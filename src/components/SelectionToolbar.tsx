@@ -6,7 +6,8 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMail, IMore, IMoveTo, IPen, ITag, ITrash, IType, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGrip, IGridLayout, IMail, IMore, IMoveTo, IPen, ITag, ITrash, IType, IWand, IX } from './Icons';
+import { useLeisteZiehen } from '../lib/leisteZiehen';
 import type { CardFont, CardSize } from '../types';
 
 // M200: Vorschau-Stapel fürs Schrift-Menü — muss zu den pn-font-*-Regeln passen
@@ -49,6 +50,15 @@ export function SelectionToolbar() {
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
+  /**
+   * M243: Die Leiste lässt sich an ihrem Anfasser wegschieben; wohin, wird
+   * gemerkt. Getrennt für Board und Fokus, weil die Leiste dort verschieden
+   * sitzt — im Fokus als feste Zeile unten, auf dem Board schwebend an der
+   * Karte. Ein gemeinsamer Wert würde die eine Situation zerschießen, sobald
+   * man die andere zurechtrückt.
+   */
+  const imFokus = useBoard((s) => !!s.focusCard);
+  const { versatz, anfasser, verschoben, ziehtGerade } = useLeisteZiehen(imFokus ? 'fokus' : 'board', '.sel-toolbar');
   // M168: Die Popover (KI/Attribute/Ausrichten/Verschieben) leben als PORTAL
   // mit fester Bildschirmposition — innerhalb der NodeToolbar deckelt der
   // Stacking-Kontext des Flow-Viewports sie unter Kopf- und Tab-Leiste, bei
@@ -278,6 +288,7 @@ export function SelectionToolbar() {
 
   const bar = (
     <>
+      <span className={`sel-griff${verschoben ? ' an' : ''}`} {...anfasser}><IGrip size={16} /></span>
       <span className="sel-count">{selected.length + selFrames.length} ausgewählt{selFrames.length > 0 ? ` (${selFrames.length} Rahmen)` : ''}</span>
       {selFrames.length > 0 && (
         <span className="sel-ai-wrap">
@@ -600,11 +611,20 @@ export function SelectionToolbar() {
     </>
   );
 
+  // M243: Der gemerkte Versatz reist als CSS-Variable mit. Bewusst NICHT als
+  // `transform`: Den belegt bei der schwebenden Leiste React Flow für die
+  // Verankerung an der Karte, und bei der Dock-Leiste die Zentrierung
+  // (-50 %). Die eigenständige `translate`-Eigenschaft legt sich sauber davor.
+  const versatzStil = {
+    '--lv-x': `${versatz.x}px`,
+    '--lv-y': `${versatz.y}px`,
+  } as React.CSSProperties;
+
   // Phone: feste Aktionsleiste über dem Dock (Portal — außerhalb des
   // Flow-Stacking-Kontexts, Menüs öffnen von dort automatisch nach oben)
   if (phone) {
     return createPortal(
-      <div className="sel-toolbar sel-toolbar-dock nodrag">{bar}</div>,
+      <div className={`sel-toolbar sel-toolbar-dock nodrag${ziehtGerade ? ' zieht' : ''}`} style={versatzStil}>{bar}</div>,
       document.body,
     );
   }
@@ -616,7 +636,10 @@ export function SelectionToolbar() {
       isVisible
       position={Position.Top}
       offset={14}
-      className="sel-toolbar"
+      className={`sel-toolbar${ziehtGerade ? ' zieht' : ''}`}
+      // NodeToolbar mischt `style` NACH seinem eigenen `transform` ein — die
+      // Variablen landen also gefahrlos auf demselben Element.
+      style={versatzStil}
     >
       {bar}
     </NodeToolbar>
