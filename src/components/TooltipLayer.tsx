@@ -57,12 +57,23 @@ export function TooltipLayer() {
       if (currentEl.contains(e.target as Node)) hide();
     };
 
+    /**
+     * M248: Ein Klick nimmt die Sprechblase weg.
+     *
+     * Sonst bleibt sie stehen, während sich unter ihr das Menü öffnet, das
+     * sie gerade erklärt hat — und verdeckt genau dessen erste Zeilen
+     * (User-Screenshot: „Über PixiNotes …" lag über dem geöffneten Menü).
+     * Wer geklickt hat, weiß ohnehin, was der Knopf tut.
+     */
+    const beiKlick = (e: PointerEvent) => { if (e.pointerType !== 'touch') hide(); };
+    document.addEventListener('pointerdown', beiKlick, true);
     document.addEventListener('mouseover', over, true);
     document.addEventListener('mouseout', out, true);
     document.addEventListener('mousedown', hide, true);
     window.addEventListener('scroll', hide, true);
     window.addEventListener('blur', hide);
     return () => {
+      document.removeEventListener('pointerdown', beiKlick, true);
       document.removeEventListener('mouseover', over, true);
       document.removeEventListener('mouseout', out, true);
       document.removeEventListener('mousedown', hide, true);

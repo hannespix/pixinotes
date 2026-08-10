@@ -22,6 +22,22 @@ export function SidePanel() {
   const setzeBreite = useCallback((px: number) => setSidebar({ width: Math.round(px) }), [setSidebar]);
   const griff = useRandZiehen('rechts', setzeBreite, 330);
 
+  /**
+   * M248: Wie breit die Leiste gerade ist, muss das Stylesheet wissen.
+   *
+   * Seit sie bis zur Unterkante läuft, würde sie das mittig sitzende Dock
+   * verdecken. Statt das Dock kleiner zu machen, rückt es zur Seite — es soll
+   * in der Mitte des FREIEN Raums stehen, nicht in der Mitte des Fensters.
+   * Der Wert wandert deshalb als Variable an die Wurzel; das Dock rechnet
+   * damit (`translateX(calc(-50% - var(--seite-rechts) / 2))`).
+   */
+  useEffect(() => {
+    const wurzel = document.documentElement;
+    const breit = window.matchMedia('(min-width: 641px)').matches;
+    wurzel.style.setProperty('--seite-rechts', sb.open && breit ? `${sb.width}px` : '0px');
+    return () => wurzel.style.setProperty('--seite-rechts', '0px');
+  }, [sb.open, sb.width]);
+
   if (!sb.open) return null;
   return (
     <aside className="sidepanel slideout" style={{ width: sb.width }} aria-label="Überblick">

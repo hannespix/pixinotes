@@ -27,7 +27,26 @@
      --safe-top fängt die Statusleisten-Kerbe ab (viewport-fit=cover). */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --head-space: calc(110px + var(--safe-top));
+  /**
+   * M248: Der App-Rahmen.
+   *
+   * „Die rechte Sidebar soll organisch aus der Seite wachsen — quasi rechts
+   * passende Radien und ein leichter App-Rand."
+   *
+   * Dafür braucht die App zuerst überhaupt eine Kante, aus der etwas
+   * herauswachsen KANN. Bisher lief die Arbeitsfläche randlos bis an den
+   * Fensterrand; eine Leiste daran konnte nur abgeschnitten wirken. Jetzt
+   * liegt die App als gerundete Fläche auf einem eigenen Grund, und die
+   * Leisten laufen in deren Ecken — mit demselben Radius. Konzentrisch heißt
+   * die Regel: Zwei ineinanderliegende Rundungen wirken nur dann wie eine
+   * Form, wenn die innere um genau die Randstärke kleiner ist.
+   */
+  --app-rand: 10px;
+  --app-radius: 20px;
+  --app-radius-innen: 19px;   /* --app-radius minus 1px Rahmenstärke */
+  --grund: #e4dfd5;           /* worauf die App liegt */
+  --app-linie: rgba(90, 80, 60, .17);
+  --head-space: calc(110px + var(--safe-top) + var(--app-rand));
 }
 
 /* ---------- Akzentfarben-Themes ---------- */
@@ -60,6 +79,10 @@
   --edge: rgba(235, 225, 205, 0.5);
   --edge-head: #8c8577;
   --accent-strong: var(--accent);
+  /* M248: Der Grund unter dem App-Rahmen — dunkler als die Arbeitsfläche,
+     sonst verschwindet die Kante und der Rahmen hätte keine Wirkung. */
+  --grund: #0c0b09;
+  --app-linie: rgba(255, 255, 255, .12);
 }
 /* Haftnotizen & Prozess-Formen bleiben helles „Papier" — Text darauf dunkel */
 [data-theme='dark'] .react-flow__node-note,
@@ -72,15 +95,52 @@ body {
   font-family: ui-rounded, 'SF Pro Rounded', 'Segoe UI', system-ui, sans-serif;
   color: var(--ink);
   overflow: hidden;
+  /* M248: der Grund, auf dem der App-Rahmen liegt */
+  background: var(--grund);
 }
 
-.app { height: 100%; position: relative; }
+/**
+ * M248: Die Arbeitsfläche als eigenes Blatt.
+ *
+ * `overflow: hidden` ist hier nicht Kosmetik, sondern die Bedingung dafür,
+ * dass die Rundung überhaupt etwas beschneidet: Ohne sie liefe die Leinwand
+ * mit ihren Karten quadratisch über die Ecken hinaus und der Radius wäre
+ * unsichtbar.
+ *
+ * Die schwebenden Leisten (Kopf, Tabs, Dock, Slideouts) bleiben `fixed` und
+ * damit am Auslauf ausgerichtet, NICHT an dieser Fläche — deshalb rücken sie
+ * weiter unten einzeln um `--app-rand` nach innen. Sie hier einzuhängen wäre
+ * verlockend, würde aber jede von ihnen unter die Beschneidung stellen und
+ * ihre Menüs an der Kante abschneiden.
+ */
+.app {
+  position: fixed; inset: var(--app-rand);
+  border-radius: var(--app-radius);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--app-linie), 0 6px 28px rgba(40, 32, 16, .13);
+}
 .board-wrap { height: 100%; }
 .react-flow { background: var(--bg); }
 
 /* ---------- Topbar ---------- */
 .topbar {
-  position: fixed; top: calc(14px + var(--safe-top)); left: 18px; z-index: 50;
+  /* M248: um den App-Rand nach innen — sonst läge die Kopfleiste auf dem
+     Grund statt auf der Arbeitsfläche */
+  /**
+   * M248: z-index 56 statt 50 — über der Tab-Leiste und dem Netz-Filter.
+   *
+   * Das Logo-Menü trägt zwar selbst z-index 60, aber das gilt nur INNERHALB
+   * der Kopfleiste: Deren eigener z-index eröffnet einen Stapel-Kontext, und
+   * nach außen zählt nur dieser eine Wert. Gegen eine gleichrangige Leiste,
+   * die später im Dokument steht, verliert das Menü also — in der linken
+   * Navigation legte sich die Board-Spalte darüber (User-Screenshot).
+   * Dieselbe Falle wie bei der Fokus-Karte in M237.
+   *
+   * Dass die Leiste damit nichts blockiert, sichert `pointer-events: none`:
+   * Klicks gehen hindurch, nur ihre Kinder fangen sie ab.
+   */
+  position: fixed; top: calc(14px + var(--safe-top) + var(--app-rand));
+  left: calc(18px + var(--app-rand)); z-index: 56;
   display: flex; align-items: center; gap: 12px; pointer-events: none;
 }
 .logo-wrap { position: relative; pointer-events: auto; }
@@ -342,7 +402,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 
 /* ---------- Projekt-Tabs ---------- */
 .tabs {
-  position: fixed; top: calc(14px + var(--safe-top));
+  position: fixed; top: calc(14px + var(--safe-top) + var(--app-rand));
   /* M236: links neben der GEMESSENEN Aktionsleiste, nicht neben einer
      geschätzten (siehe Media-Block weiter unten und lib/kopfmass.ts) */
   left: var(--kopf-links, 394px);
@@ -471,7 +531,10 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 
 /* ---------- Dock ---------- */
 .dock {
-  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  /* M248: Das Dock rückt mit dem Rahmen nach oben und weicht einer offenen
+     Seitenleiste aus — sonst stünde es nicht mehr mittig im FREIEN Raum. */
+  position: fixed; left: 50%; bottom: calc(18px + var(--app-rand));
+  transform: translateX(calc(-50% - var(--seite-rechts, 0px) / 2));
   background: var(--surface); border-radius: 16px; box-shadow: 0 4px 24px rgba(50, 40, 20, 0.18);
   display: flex; gap: 4px; padding: 7px; z-index: 50;
 }
@@ -722,10 +785,10 @@ h3 { font-size: 14px; margin: 0 0 8px; }
     /* M236: gemessen statt vw — siehe lib/kopfmass.ts */
     max-width: var(--kopf-voll, calc(100vw - 24px));
   }
-  .topbar { left: 12px; }
+  .topbar { left: calc(12px + var(--app-rand)); }
   /* Zwei Zeilen statt einer: Die Tab-Leiste endet erst bei ~104px (M189) */
-  :root { --head-space: calc(118px + var(--safe-top)); }
-  .dock { bottom: calc(12px + var(--safe-bottom)); }
+  :root { --head-space: calc(118px + var(--safe-top) + var(--app-rand)); }
+  .dock { bottom: calc(12px + var(--safe-bottom) + var(--app-rand)); }
   .react-flow__minimap { display: none; }
 }
 
@@ -742,7 +805,7 @@ html[data-kopf-eng='an'] .tabs {
   left: 12px;
   max-width: var(--kopf-voll, calc(100vw - 24px));
 }
-html[data-kopf-eng='an'] { --head-space: calc(118px + var(--safe-top)); }
+html[data-kopf-eng='an'] { --head-space: calc(118px + var(--safe-top) + var(--app-rand)); }
 html[data-kopf-eng='an'] .hint { display: none; }
 
 /* ---------- M238: Navigation als linke Spalte (optional, ab Tablet) ----------
@@ -789,7 +852,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
   .app.nav-links .tab-nav { justify-content: flex-start; }
   .app.nav-links .tab-home { align-self: flex-start; }
   /* Oben wird keine zweite Zeile mehr freigehalten — die Boards stehen links */
-  .app.nav-links { --head-space: calc(74px + var(--safe-top)); }
+  .app.nav-links { --head-space: calc(74px + var(--safe-top) + var(--app-rand)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2326,7 +2389,10 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .search-tag span { color: var(--muted); font-weight: 400; margin-left: 3px; }
 
 .ov-mode {
-  position: fixed; top: calc(64px + var(--safe-top)); right: 18px; z-index: 55; display: flex; gap: 2px;
+  position: fixed;
+  top: max(var(--head-space), var(--kopf-oben, 0px));
+  right: calc(18px + var(--app-rand));
+  z-index: 55; display: flex; gap: 2px;
   background: var(--surface); border-radius: 10px; padding: 3px; box-shadow: 0 2px 10px rgba(50,40,20,.12);
 }
 .ov-mode button {
@@ -2338,7 +2404,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .ov-graph-svg { flex: 1; width: 100%; height: 100%; touch-action: none; cursor: grab; }
 .ov-graph-svg:active { cursor: grabbing; }
 .ov-graph-zoom {
-  position: fixed; right: 18px; bottom: 52px; z-index: 55;
+  position: fixed; right: calc(18px + var(--app-rand)); bottom: calc(52px + var(--app-rand)); z-index: 55;
   display: flex; flex-direction: column; gap: 2px;
   background: var(--surface); border-radius: 11px; padding: 4px; box-shadow: 0 2px 10px rgba(50,40,20,.14);
 }
@@ -2385,7 +2451,23 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .backlinks-board { font-size: 10px; color: var(--muted); background: var(--surface-dim); border-radius: 999px; padding: 2px 7px; flex: none; }
 
 .ov-graph-toggles {
-  position: fixed; top: 64px; left: 18px; z-index: 55; display: flex; gap: 12px;
+  /* M248: UNTER die Kopfleiste, nicht daneben. Die feste 64 stammt aus einer
+     Zeit mit einreihigem Kopf; sobald er umbricht (schmaler Schirm, Text-Zoom,
+     linke Navigation), stand der Filter mitten in den Aktionsknöpfen
+     (User-Screenshot). `--head-space` ist die eine Wahrheit dafür. */
+  /**
+   * `--kopf-oben` ist die GEMESSENE Unterkante der Aktionsleiste (M236,
+   * lib/kopfmass.ts), `--head-space` der aus dem Layout abgeleitete Wert.
+   * Beide können mal der größere sein: In der linken Navigation ist der
+   * abgeleitete Wert klein (die Boards stehen ja seitlich) — aber bei
+   * Text-Zoom wächst die Leiste über ihn hinaus, und dann stand der Filter
+   * mitten in den Knöpfen. `max()` nimmt immer den, der wirklich reicht.
+   */
+  position: fixed;
+  top: max(var(--head-space), var(--kopf-oben, 0px));
+  left: calc(18px + var(--app-rand));
+  z-index: 55; display: flex; gap: 12px; flex-wrap: wrap;
+  max-width: calc(100% - 36px - 2 * var(--app-rand));
   background: var(--surface); border-radius: 10px; padding: 7px 13px; box-shadow: 0 2px 10px rgba(50,40,20,.12);
 }
 .ov-graph-toggle { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink); cursor: pointer; }
@@ -2485,10 +2567,20 @@ html[data-kopf-eng='an'] .hint { display: none; }
  *  · Der Rand ist ein Anfasser mit sichtbarem Griff.
  */
 .sidepanel {
-  position: fixed; top: var(--head-space); right: 0;
-  bottom: calc(76px + var(--safe-bottom));
+  position: fixed; top: var(--head-space); right: var(--app-rand);
+  bottom: var(--app-rand);
   z-index: 45; display: flex; flex-direction: column;
-  border-radius: 16px 0 0 16px; overflow: hidden;
+  /**
+   * M248: Die Radien erzählen, wo die Leiste hingehört.
+   *
+   *  · oben rechts 0 — dort läuft sie mitten aus der Kante der Fläche heraus.
+   *    Ein Radius an dieser Stelle würde sie vom Blatt abheben, und genau das
+   *    war der Eindruck vorher: ein aufgeklebter Streifen.
+   *  · unten rechts der INNEN-Radius des App-Rahmens — dort treffen sich beide
+   *    Ecken. Nur wenn die Rundung dieselbe ist, wirkt es wie eine Form.
+   *  · links die Karten-Rundung, denn diese Kante steht frei über dem Board.
+   */
+  border-radius: 16px 0 var(--app-radius-innen) 16px; overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--border-soft); border-right: none;
   box-shadow: -10px 0 34px rgba(40, 30, 10, 0.16);
@@ -2584,6 +2676,12 @@ html[data-kopf-eng='an'] .hint { display: none; }
 }
 .top-actions button.on { background: var(--accent-soft); color: var(--accent-strong); }
 /* Phone: Als Vollflächen-Blatt statt schmaler Spalte */
+/* M248: Am Telefon gibt es keinen Rahmen — dort ist der Schirm die App.
+   Ein 10-Punkte-Rand würde nur Platz kosten, den es nicht gibt. */
+@media (max-width: 640px) {
+  :root { --app-rand: 0px; --app-radius: 0px; --app-radius-innen: 0px; }
+  .app { box-shadow: none; }
+}
 @media (max-width: 640px) {
   /* Phone: Beide Slideouts füllen die Breite — für zwei Spalten ist kein
      Platz, und ein 8-Punkte-Anfasser trifft am Finger ohnehin niemand. */
@@ -3738,11 +3836,14 @@ button.link-dead:disabled { opacity: 0.45; }
    wie der Überblick rechts, gespiegelt. Vorher ein zentriertes Glasfenster,
    das den halben Schirm verdeckte. */
 .nav-panel {
-  position: fixed; left: 0; top: var(--head-space);
-  bottom: calc(76px + var(--safe-bottom));
+  position: fixed; left: var(--app-rand); top: var(--head-space);
+  bottom: var(--app-rand);
   width: 380px; max-width: calc(100vw - 40px);
   display: flex; flex-direction: column;
-  border-radius: 0 16px 16px 0; padding: 12px 18px 10px 14px;
+  /* M248: dieselbe Regel wie rechts, gespiegelt — oben links läuft sie aus
+     der Kante, unten links trifft sie die Ecke des App-Rahmens */
+  border-radius: 0 16px 16px var(--app-radius-innen);
+  padding: 12px 18px 10px 14px;
   background: var(--surface);
   border: 1px solid var(--border-soft); border-left: none;
   box-shadow: 10px 0 34px rgba(40, 30, 10, 0.16);
