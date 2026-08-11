@@ -389,8 +389,12 @@ export function Board() {
   // in Editoren gilt deren eigenes Undo)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('input, textarea, [contenteditable="true"]')) return;
+      /* `closest` gibt es nur an Elementen. Kommt das Ereignis von `window`
+         oder `document` — was Bibliotheken und Testwerkzeuge durchaus tun —,
+         warf die alte Zeile einen Fehler und riss den ganzen Handler mit. */
+      const target = e.target as HTMLElement | null;
+      if (typeof target?.closest === 'function'
+        && target.closest('input, textarea, [contenteditable="true"]')) return;
       const st = useBoard.getState();
       if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -530,8 +534,12 @@ export function Board() {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code !== 'Space' || e.repeat) return;
-      const target = e.target as HTMLElement;
-      if (target.closest('input, textarea, [contenteditable="true"]')) return;
+      /* `closest` gibt es nur an Elementen. Kommt das Ereignis von `window`
+         oder `document` — was Bibliotheken und Testwerkzeuge durchaus tun —,
+         warf die alte Zeile einen Fehler und riss den ganzen Handler mit. */
+      const target = e.target as HTMLElement | null;
+      if (typeof target?.closest === 'function'
+        && target.closest('input, textarea, [contenteditable="true"]')) return;
       e.preventDefault(); // Seite darf nicht scrollen
       setSpaceHeld(true);
     };

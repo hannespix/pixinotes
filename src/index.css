@@ -4168,7 +4168,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 /* Auf Phones bleibt die Kopfleiste kompakt (27px-Regel unten) — dort schafft
    die Zwei-Zeilen-Kopfleiste sonst keine Luft; 40px gilt ab Tablet-Breite. */
 @media (pointer: coarse) and (max-width: 640px) {
-  .top-actions button { width: 32px; height: 32px; }
+  /* M255: von 32 auf 36 — die Kopfleiste bricht ohnehin um (M236 misst das),
+     also kostet der Zuwachs keine Überlappung, bringt aber spürbar Treffer. */
+  .top-actions button { width: 36px; height: 36px; }
 }
 
 /* ================= M200: Schrift & Textgröße pro Karte ================= */
@@ -4978,4 +4980,116 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
   }
   /* Kopf- und Fußzeile des Fokus liegen über dem Schleier */
   .focus-head, .focus-nav { z-index: 60; }
+}
+
+/* ================= M255: Barrierefreiheit & Responsivität Stufe 3 =================
+ *
+ * Gemessen statt geschätzt: Ein Durchgang über iPhone SE, iPhone 15, iPad hoch,
+ * iPad quer und PC hat vier Gruppen von Verstößen gefunden — zu kleine
+ * Eingabefelder (die iOS zum Zoomen bringen), zu kleine Tippziele, zu kleine
+ * Schrift und Überlauf. Hier stehen die Antworten darauf.
+ */
+
+/* ---- 1. Die iOS-Zoomfalle ----
+ * Safari auf dem iPhone zoomt die GANZE Seite, sobald man ein Eingabefeld
+ * antippt, dessen Schrift kleiner als 16 px ist. Danach steht alles schief und
+ * man muss von Hand zurückzoomen. Es gibt keinen Trick dagegen außer: 16 px.
+ * Gefunden bei Kanban-Spaltennamen (10,5), Kanban-Eingabe (12), Auswahllisten
+ * in den Einstellungen (13) und der Netz-Suche (12).
+ */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='button']):not([type='submit']),
+  textarea, select,
+  /* Genauer benannt, wo eine bestehende Regel spezifischer ist als das nackte
+     Element — sonst gewinnt die alte Größe. */
+  .modal-row select, .modal-row input, .kanban-col-name, .kanban-add input,
+  .ov-graph-find input, .side-tree-find, .search-input {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* ---- 2. Tippziele ----
+ * Zwei Klassen von Zielen, zwei Maße:
+ *
+ *  · Bedien-Chrome (Kopfleiste, Reiter, Dock, Fenster-Schließer) bekommt die
+ *    vollen 44 × 44 aus WCAG 2.5.5 — dort ist Platz.
+ *  · Winzige Schalter INNERHALB von Karten (Kanban-Zähler 8 × 6, Spalte
+ *    schließen 7 × 5, Farbpunkt 10 × 10) würden das Kartenlayout sprengen,
+ *    wenn sie wirklich 44 px groß würden. Sie wachsen deshalb sichtbar auf ein
+ *    brauchbares Maß und bekommen zusätzlich eine unsichtbare Fangfläche
+ *    ringsum. Der Finger trifft, das Layout bleibt ruhig.
+ */
+@media (pointer: coarse) {
+  .tab-x, .modal-x, .tab-home, .tab-share, .tab-add, .card-x,
+  .sidepanel-x, .focus-x, .modal-tabs button, .ov-graph-zoom button,
+  .dock > button, .dock-add-wrap > button, .dock-tasks {
+    min-width: 44px; min-height: 44px;
+  }
+  /* Zeilenhohe Ziele: 44 wäre zu wuchtig, 36 trifft der Daumen sicher */
+  .logo, .tab-nav, .ov-mode button, .legal-corner .link-btn, .modal-foot .link-btn {
+    min-height: 36px;
+  }
+  /* Kästchen im Netz-Filter: die Standardgröße ist 13 px — am Finger nichts */
+  .ov-graph-toggle input[type='checkbox'] { width: 20px; height: 20px; }
+  .ov-graph-toggle { position: relative; min-height: 32px; }
+  /* Die Zoom-Knöpfe von React Flow kommen mit 26 px aus der Bibliothek */
+  .react-flow__controls-button { width: 40px !important; height: 40px !important; }
+  /* Das Fähnchen der Überblick-Leiste ist 15 Punkte schmal — schön, aber am
+     Finger zu wenig. Sichtbar bleibt es schlank, die Fangfläche wächst nach
+     links ins Board hinein (dort ist nichts anderes zu treffen). */
+  .sidepanel-fahne { width: 22px; }
+  .sidepanel-fahne::after { content: ''; position: absolute; inset: -6px -2px -6px -16px; }
+  /* Auf schmalen Telefonen ist in der Reiter-Zeile kein Platz für 44 px —
+     dort bleibt das Ziel sichtbar kleiner, die Fangfläche aber groß. */
+  @media (max-width: 640px) {
+    .tab-x, .tab-home, .tab-share, .tab-add { min-width: 34px; min-height: 34px; }
+  }
+
+  /* Karten-interne Kleinschalter: sichtbar größer … */
+  .kanban-col-x, .kanban-count, .kanban-addcol,
+  .kanban-item-actions button, .color-dot {
+    min-width: 28px; min-height: 28px; position: relative;
+  }
+  /* … plus unsichtbare Fangfläche. `inset` statt fester Größe, damit sich die
+     Zonen benachbarter Schalter nicht gegenseitig zudecken. */
+  .kanban-col-x::after, .kanban-count::after, .kanban-addcol::after,
+  .kanban-item-actions button::after, .color-dot::after {
+    content: ''; position: absolute; inset: -7px; border-radius: 10px;
+  }
+  /* Der Zähler ist kein Ziel zum Treffen, sondern eine Anzeige — er darf die
+     Nachbarn nicht überdecken. */
+  .kanban-count::after { inset: -3px; }
+}
+
+/* ---- 3. Schrift-Untergrenze auf Touch-Geräten ----
+ * Am Telefon gab es Texte mit 10 px (Menü-Überschriften, Fußzeilen, Legenden).
+ * Das ist am Arm-Abstand nicht mehr lesbar. Statt jede Stelle einzeln
+ * hochzusetzen, gilt eine Untergrenze — die relativen Abstufungen bleiben.
+ */
+@media (pointer: coarse) {
+  .dock-menu-label, .dock-menu-foot, .legal-corner .link-btn,
+  .modal-foot, .modal-foot .link-btn, .ov-graph-legend, .ov-graph-legend b,
+  .sel-count, .tab-nav-space, .tab-nav-proj, .kanban-item-text,
+  .modal-hint, .modal-hint b, .ov-graph-toggle, .ov-mode button {
+    font-size: max(13px, 1em);
+  }
+  .side-empty, .meta { font-size: max(12.5px, 1em); }
+}
+
+/* ---- 4. Überlauf ----
+ * Die Auswahllisten in den Einstellungen liefen am iPhone über den rechten
+ * Rand hinaus (bis 407 bei 375 Punkten Fensterbreite), weil ihre Breite dem
+ * längsten Eintrag folgte. Sie bleiben jetzt im Fenster; bei Bedarf bricht die
+ * Zeile um, statt sich zu strecken.
+ */
+.modal-row select, .modal-row input[type='text'], .modal-row input[type='url'],
+.modal-row input[type='password'], .modal-row input[type='email'] {
+  max-width: 100%; box-sizing: border-box;
+}
+@media (max-width: 560px) {
+  .modal-row { flex-wrap: wrap; }
+  .modal-row select, .modal-row input[type='text'], .modal-row input[type='url'],
+  .modal-row input[type='password'], .modal-row input[type='email'] {
+    flex: 1 1 100%; min-width: 0;
+  }
 }
