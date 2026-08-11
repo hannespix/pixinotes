@@ -25,8 +25,8 @@ import {
   joinProjectFolder, projectHandle, projectStamp, projectSyncMeta, readProjectFile, writeProjectSync,
 } from '../lib/projectSync';
 import {
-  EINBETTUNGS_VORSCHLAEGE, VORSCHLAEGE, holeOllamaModelle, holeOpenAiModelle,
-  istEinbettungsModell, zeigeGroesse, type OllamaModell,
+  EINBETTUNGS_VORSCHLAEGE, VORSCHLAEGE, befrageServer, erlaubnisHilfe,
+  istEinbettungsModell, zeigeGroesse, type Lage, type OllamaModell,
 } from '../lib/ollama';
 
 const MODELS: Record<string, string[]> = {
@@ -75,6 +75,8 @@ export function Settings() {
   const [lokal, setLokal] = useState<OllamaModell[]>([]);
   const [lokalLaedt, setLokalLaedt] = useState(false);
   const [lokalFehler, setLokalFehler] = useState('');
+  /* M258: nicht nur DASS es scheiterte, sondern WORAN */
+  const [lokalLage, setLokalLage] = useState<Lage | 'leer' | ''>('');
   const [lokalGeprueft, setLokalGeprueft] = useState('');
   useEffect(() => {
     const on = () => setBrainInfo(brainStatus());
@@ -107,26 +109,21 @@ export function Settings() {
     const url = ai.baseUrl?.trim();
     if (!url) { setLokalFehler('Erst die Server-URL eintragen.'); return; }
     setLokalLaedt(true);
-    if (!still) setLokalFehler('');
+    if (!still) { setLokalFehler(''); setLokalLage(''); }
     try {
-      const liste = ai.provider === 'ollama'
-        ? await holeOllamaModelle(url)
-        : await holeOpenAiModelle(url, ai.apiKey);
-      setLokal(liste);
-      setLokalFehler(liste.length ? '' : 'Der Server läuft, hat aber kein Modell installiert.');
-      setLokalGeprueft(`${ai.provider}|${url}`);
-      // Nach dem Anbieterwechsel ist das Feld leer. Steht genau EIN taugliches
-      // Modell bereit, wird es eingetragen — sonst wählt der Mensch. Eine
-      // bestehende Wahl wird nie überschrieben.
+      const b = await befrageServer(url, ai.provider === 'ollama' ? 'ollama' : 'openai', ai.apiKey);
+      setLokal(b.modelle);
+      setLokalLage(b.lage === 'ok' && b.modelle.length === 0 ? 'leer' : b.lage);
+      setLokalFehler(b.lage === 'fehler' ? (b.text ?? '') : '');
+      // Nach dem Anbieterwechsel ist das Feld leer. Steht ein taugliches
+      // Modell bereit, wird es eingetragen — eine bestehende Wahl aber nie
+      // überschrieben.
       if (!ai.model?.trim()) {
-        const erstes = liste.find((m) => !istEinbettungsModell(m.name));
+        const erstes = b.modelle.find((m) => !istEinbettungsModell(m.name));
         if (erstes) updateAi({ model: erstes.name });
       }
-    } catch (e) {
-      setLokal([]);
-      setLokalFehler(e instanceof Error ? e.message : String(e));
-      setLokalGeprueft(`${ai.provider}|${url}`);
     } finally {
+      setLokalGeprueft(`${ai.provider}|${url}`);
       setLokalLaedt(false);
     }
   };
@@ -590,6 +587,41 @@ export function Settings() {
                           {' '}— das sind Einbettungs-Modelle fürs Gehirn, sie können nicht antworten.
                         </div>
                       )}
+                    </div>
+                  )}
+                  {/* M258: Für jede Lage genau eine Aussage — und die dazu
+                      passende Anleitung, nicht alle auf einmal. */}
+                  {lokalLage === 'verboten' && (
+                    <div className="modal-note warn ollama-hilfe">
+                      <b>Der Server läuft — aber der Browser darf nicht zugreifen.</b>
+                      <p>
+                        Die Anfrage kommt bei {ai.baseUrl} an; Ollama weist sie ab, weil diese
+                        Seite nicht in seiner Liste erlaubter Herkünfte steht. Das ist kein
+                        Fehler deiner Einrichtung, sondern eine Schutzvorkehrung von Ollama —
+                        sonst könnte jede beliebige Internetseite deine lokalen Modelle benutzen.
+                      </p>
+                      <p>{erlaubnisHilfe().hinweis}</p>
+                      <pre>{erlaubnisHilfe().befehle.join('\n')}</pre>
+                      <p>Danach hier auf <b>⟳ Modelle laden</b> tippen.</p>
+                    </div>
+                  )}
+                  {lokalLage === 'weg' && (
+                    <div className="modal-note warn ollama-hilfe">
+                      <b>Unter {ai.baseUrl} antwortet nichts.</b>
+                      <p>
+                        Dort lauscht kein Dienst. Prüfen mit <code>ollama serve</code> beziehungsweise{' '}
+                        <code>systemctl status ollama</code>; die Voreinstellung ist{' '}
+                        <code>http://127.0.0.1:11434</code>. <b>Von einem anderen Gerät</b>{' '}
+                        (Telefon, Tablet) ist „localhost" immer das Gerät selbst — dort muss die
+                        Netzwerkadresse des Rechners stehen, und Ollama braucht zusätzlich{' '}
+                        <code>OLLAMA_HOST=0.0.0.0</code>.
+                      </p>
+                    </div>
+                  )}
+                  {lokalLage === 'leer' && (
+                    <div className="modal-note warn">
+                      Der Server antwortet, hat aber kein Modell installiert — unten stehen
+                      Vorschläge mit dem passenden Befehl.
                     </div>
                   )}
                   {lokalFehler && <div className="modal-note warn">⚠️ {lokalFehler}</div>}

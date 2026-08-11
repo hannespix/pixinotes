@@ -51,17 +51,97 @@ export function zeigeGroesse(bytes: number): string {
 
 const TIMEOUT_MS = 8000;
 
-/** Gemeinsamer Fehlertext — die drei Ursachen, die es praktisch immer sind */
+/**
+ * M258: „läuft nicht" und „darf nicht" sind zwei verschiedene Dinge.
+ *
+ * Ein blockierter Zugriff sieht im Browser exakt aus wie ein toter Server:
+ * beide Male nur „TypeError: Failed to fetch", ohne Status, ohne Grund. Die
+ * alte Meldung nannte deshalb beide Ursachen in einem Satz — und stellte die
+ * falsche nach vorn. Wer im Terminal gerade nachgewiesen hat, dass Ollama
+ * läuft, sucht dann an der falschen Stelle weiter.
+ *
+ * Die Unterscheidung ist aber möglich: Eine zweite Anfrage mit
+ * `mode: 'no-cors'` verzichtet auf das Lesen der Antwort. Kommt sie durch
+ * (undurchsichtige Antwort), war das Netz in Ordnung und nur die Erlaubnis
+ * fehlte. Scheitert auch sie, lauscht dort wirklich niemand.
+ */
+export type Lage = 'ok' | 'verboten' | 'weg' | 'fehler';
+
+async function erreichbar(url: string): Promise<boolean> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    await fetch(url, { mode: 'no-cors', signal: ctrl.signal });
+    return true;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** Welches Betriebssystem sitzt davor? Für die passende Anleitung. */
+export function system(): 'linux' | 'mac' | 'windows' | 'sonst' {
+  const s = `${navigator.userAgent} ${navigator.platform ?? ''}`.toLowerCase();
+  if (/android/.test(s)) return 'sonst';
+  if (/linux|x11/.test(s)) return 'linux';
+  if (/mac|iphone|ipad/.test(s)) return 'mac';
+  if (/win/.test(s)) return 'windows';
+  return 'sonst';
+}
+
+/**
+ * Die Anleitung, die zu DIESEM Rechner und DIESER Seite passt.
+ *
+ * Statt „*" wird die eigene Herkunft vorgeschlagen: Damit darf genau diese
+ * Seite an Ollama — und nicht jede beliebige, die man später einmal öffnet.
+ * Bei einer lokal geöffneten Datei (file://) meldet der Browser die Herkunft
+ * „null"; dort hilft nur „*", und das steht dann auch so da.
+ */
+export function erlaubnisHilfe(): { herkunft: string; befehle: string[]; hinweis: string } {
+  const herkunft = window.location.origin === 'null' || window.location.protocol === 'file:'
+    ? '*' : window.location.origin;
+  const wert = `OLLAMA_ORIGINS=${herkunft}`;
+  const hinweis = herkunft === '*'
+    ? 'Die Seite wurde als lokale Datei geöffnet — sie hat dann keine benennbare Herkunft, deshalb hier „*".'
+    : 'So darf genau diese Seite an Ollama — keine andere.';
+  switch (system()) {
+    case 'linux':
+      return { herkunft, hinweis, befehle: [
+        'sudo systemctl edit ollama',
+        '# in den Editor eintragen:',
+        '[Service]',
+        `Environment="${wert}"`,
+        'sudo systemctl daemon-reload && sudo systemctl restart ollama',
+        '# ohne systemd stattdessen:  ' + `${wert} ollama serve`,
+      ] };
+    case 'mac':
+      return { herkunft, hinweis, befehle: [
+        `launchctl setenv OLLAMA_ORIGINS "${herkunft}"`,
+        '# danach Ollama beenden und neu starten',
+      ] };
+    case 'windows':
+      return { herkunft, hinweis, befehle: [
+        `setx OLLAMA_ORIGINS "${herkunft}"`,
+        '# danach Ollama komplett beenden (Symbol in der Taskleiste) und neu starten',
+      ] };
+    default:
+      return { herkunft, hinweis, befehle: [`${wert} ollama serve`] };
+  }
+}
+
+/** Fehlertext für alles, was keine Erlaubnisfrage ist */
 function deuteFehler(e: unknown, url: string): string {
   const m = e instanceof Error ? e.message : String(e);
-  if (/abort/i.test(m)) return `Keine Antwort von ${url} (Zeitüberschreitung). Läuft der Server?`;
-  // Ein fehlgeschlagenes fetch ohne HTTP-Status heißt im Browser fast immer:
-  // Server nicht erreichbar ODER CORS verweigert. Beides ist hier lösbar.
-  if (/failed to fetch|networkerror|load failed/i.test(m)) {
-    return `${url} nicht erreichbar. Entweder läuft „ollama serve" nicht — oder der Browser darf nicht zugreifen. `
-      + 'Dann Ollama mit OLLAMA_ORIGINS="*" starten (unter Windows als Systemvariable setzen und Ollama neu starten).';
-  }
+  if (/abort/i.test(m)) return `Keine Antwort von ${url} (Zeitüberschreitung).`;
   return m;
+}
+
+export interface Befund {
+  lage: Lage;
+  modelle: OllamaModell[];
+  /** Nur bei lage === 'fehler' gefüllt */
+  text?: string;
 }
 
 /** Alle installierten Ollama-Modelle — direkt vom Server */
@@ -152,3 +232,29 @@ export const EINBETTUNGS_VORSCHLAEGE: Vorschlag[] = [
   { name: 'bge-m3', platz: '~1,2 GB', zweck: 'ausdrücklich mehrsprachig, gut für deutsche Texte' },
   { name: 'all-minilm', platz: '~45 MB', zweck: 'winzig und schnell, dafür grober' },
 ];
+
+/**
+ * Modelle holen UND im Fehlerfall herausfinden, woran es lag.
+ *
+ * Das ist der Einstiegspunkt für die Einstellungen: Er liefert entweder die
+ * Liste — oder eine Lage, zu der es eine brauchbare Anleitung gibt, statt
+ * eines Fehlertexts, der alle Möglichkeiten aufzählt und keine benennt.
+ */
+export async function befrageServer(
+  baseUrl: string, art: 'ollama' | 'openai', apiKey?: string,
+): Promise<Befund> {
+  const base = baseUrl.replace(/\/$/, '');
+  try {
+    const modelle = art === 'ollama'
+      ? await holeOllamaModelle(base)
+      : await holeOpenAiModelle(base, apiKey);
+    return { lage: 'ok', modelle };
+  } catch (e) {
+    const text = e instanceof Error ? e.message : String(e);
+    // Ein echter HTTP-Status ist eine Antwort — dann lief die Verbindung.
+    if (/^HTTP \d+/.test(text)) return { lage: 'fehler', modelle: [], text };
+    // Sonst: kam überhaupt etwas an? Das trennt „verboten" von „weg".
+    const dran = await erreichbar(`${base}${art === 'ollama' ? '/api/tags' : '/models'}`);
+    return { lage: dran ? 'verboten' : 'weg', modelle: [], text };
+  }
+}

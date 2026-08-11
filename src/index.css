@@ -5221,3 +5221,18 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
   .modell-kopf, .modell-fuss, .modell-tipp, .modell-tipps summary { font-size: max(13px, 1em); }
   .btn-mini { font-size: 14px; min-height: 44px; padding: 8px 12px; }
 }
+/* Anleitung bei blockiertem Zugriff (M258) — der Befehl muss zum Kopieren
+   taugen, deshalb Festbreitenschrift und eigene Zeilen. */
+.ollama-hilfe { color: var(--ink); }
+.ollama-hilfe b { color: #b3502f; }
+[data-theme='dark'] .ollama-hilfe b { color: #ffab8f; }
+.ollama-hilfe p { margin: 5px 0; color: var(--muted); }
+.ollama-hilfe pre {
+  background: var(--surface-dim); border: 1px solid var(--border-soft);
+  border-radius: 7px; padding: 8px 10px; margin: 6px 0;
+  font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all;
+  user-select: all;                     /* ein Klick markiert alles zum Kopieren */
+}
+@media (pointer: coarse) {
+  .ollama-hilfe p, .ollama-hilfe pre { font-size: max(13px, 1em); }
+}
