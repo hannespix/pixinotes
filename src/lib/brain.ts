@@ -80,12 +80,15 @@ async function embed(texts: string[], kind: 'doc' | 'query'): Promise<number[][]
   const ai = useBoard.getState().ai;
   const provider = brainProvider();
   if (provider === 'ollama') {
+    // M257: wählbar statt fest verdrahtet — je nach Sprache und Rechner passt
+    // ein anderes. Ohne Wahl bleibt es beim bewährten nomic-embed-text.
+    const modell = useBoard.getState().brain.embedModel?.trim() || 'nomic-embed-text';
     const res = await fetch(`${ai.baseUrl.replace(/\/$/, '')}/api/embed`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'nomic-embed-text', input: texts }),
+      body: JSON.stringify({ model: modell, input: texts }),
     });
-    if (!res.ok) throw new Error(`Ollama-Embeddings: HTTP ${res.status} — Modell holen mit: ollama pull nomic-embed-text`);
+    if (!res.ok) throw new Error(`Ollama-Embeddings: HTTP ${res.status} — Modell holen mit: ollama pull ${modell}`);
     const data = await res.json();
     return (data.embeddings as number[][]).map(normalize);
   }

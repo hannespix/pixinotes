@@ -144,7 +144,9 @@ interface BoardState {
   ai: AiSettings;
   /** M204: Gehirn — semantischer Index (Embeddings) für Suche nach Bedeutung
    *  und „Verwandte Karten". 'auto' folgt der KI-Einstellung. */
-  brain: { on: boolean; provider: 'auto' | 'ollama' | 'browser' | 'cloud' };
+  /** M257: `embedModel` ist das Ollama-Modell für die Vektoren — wählbar,
+   *  weil je nach Sprache und Rechner ein anderes passt. Leer = Voreinstellung. */
+  brain: { on: boolean; provider: 'auto' | 'ollama' | 'browser' | 'cloud'; embedModel?: string };
   /** M220: Bereiche, die NICHT Teil des Gehirns sind (IDs). Ihre Karten
    *  liefern keine Embeddings, tauchen in keiner Bedeutungssuche, keinem
    *  Vorschlag, keiner KI-Antwort und keinem Puls auf — und ihre bereits
@@ -911,7 +913,7 @@ export const useBoard = create<BoardState>()(
         setPresenting: (on) => set({ presenting: on }),
         setTool: (tool) => set({ tool }),
         updateAi: (patch) => set({ ai: { ...get().ai, ...patch } }),
-        brain: { on: false, provider: 'auto' },
+        brain: { on: false, provider: 'auto', embedModel: 'nomic-embed-text' },
         updateBrain: (patch) => set({ brain: { ...get().brain, ...patch } }),
 
         brainOffSpaces: [],

@@ -5174,3 +5174,50 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
    Leere. Innen liegend ist er auf voller Breite zu treffen. */
 .sheet-breite:hover { background: var(--accent); opacity: .5; }
 @media (pointer: coarse) { .sheet-breite { width: 16px; } }
+
+/* ---------- Modell-Auswahl für lokale Server (M257) ----------
+ * Die Liste kommt vom Server selbst. Sie muss zwei Dinge auf einmal zeigen:
+ * den Namen (den man eintippen könnte) und die Größe (die entscheidet, ob es
+ * auf diesem Rechner überhaupt läuft).
+ */
+.btn-mini {
+  padding: 4px 8px; font-size: 12px; flex: none; white-space: nowrap;
+}
+.modal-note.warn { color: #b3502f; }
+[data-theme='dark'] .modal-note.warn { color: #ffab8f; }
+.modell-liste {
+  border: 1px solid var(--border-soft); border-radius: 9px; margin: 6px 0 2px;
+  background: var(--surface-3); overflow: hidden;
+}
+.modell-kopf, .modell-fuss {
+  font-size: 12px; color: var(--muted); padding: 6px 10px;
+}
+.modell-fuss { border-top: 1px solid var(--border-soft); }
+.modell-zeile {
+  display: flex; align-items: baseline; gap: 8px; width: 100%;
+  padding: 7px 10px; border: none; border-top: 1px solid var(--border-soft);
+  background: none; font-family: inherit; font-size: 13px; color: var(--ink);
+  text-align: left; cursor: pointer;
+}
+.modell-zeile:hover { background: var(--accent-soft); }
+.modell-zeile.aktiv { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.modell-zeile span { margin-left: auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.modell-tipps { margin-top: 8px; }
+.modell-tipps summary { font-size: 13px; cursor: pointer; color: var(--accent-strong); }
+.modell-tipp {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 5px 0; border-top: 1px solid var(--border-soft); font-size: 12.5px;
+}
+.modell-tipp code {
+  background: var(--surface-dim); border-radius: 5px; padding: 2px 6px;
+  font-size: 12px; user-select: all;      /* ein Klick markiert den ganzen Befehl */
+}
+.modell-tipp-platz { color: var(--muted); font-variant-numeric: tabular-nums; }
+.modell-tipp-zweck { color: var(--muted); flex: 1 1 190px; }
+.modell-tipp .btn-mini { margin-left: auto; }
+/* M255: Am Touchgerät bleiben Eingaben bei 16px und Ziele bei 44px */
+@media (pointer: coarse) {
+  .modell-zeile { font-size: 14px; min-height: 44px; }
+  .modell-kopf, .modell-fuss, .modell-tipp, .modell-tipps summary { font-size: max(13px, 1em); }
+  .btn-mini { font-size: 14px; min-height: 44px; padding: 8px 12px; }
+}

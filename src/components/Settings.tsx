@@ -24,6 +24,10 @@ import {
   applyProjectPayload, buildInviteMailto, buildInviteText, connectProjectSync, disconnectProjectSync,
   joinProjectFolder, projectHandle, projectStamp, projectSyncMeta, readProjectFile, writeProjectSync,
 } from '../lib/projectSync';
+import {
+  EINBETTUNGS_VORSCHLAEGE, VORSCHLAEGE, holeOllamaModelle, holeOpenAiModelle,
+  istEinbettungsModell, zeigeGroesse, type OllamaModell,
+} from '../lib/ollama';
 
 const MODELS: Record<string, string[]> = {
   free: ['openai'], // anonym gibt es bei Pollinations aktuell nur dieses Modell
@@ -34,8 +38,10 @@ const MODELS: Record<string, string[]> = {
   ],
   anthropic: ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5'],
   openai: ['gpt-4o', 'gpt-4o-mini'],
-  ollama: ['llama3.1', 'mistral', 'qwen2.5', 'phi3'],
-  custom: [''],
+  // M257: Für Ollama und eigene Server steht hier NICHTS mehr — welche Modelle
+  // es gibt, weiß nur der Server selbst (lib/ollama.ts fragt ihn).
+  ollama: [],
+  custom: [],
   none: [],
 };
 const DEFAULT_BASE: Record<string, string> = {
@@ -65,6 +71,11 @@ export function Settings() {
   const brain = useBoard((s) => s.brain);
   const updateBrain = useBoard((s) => s.updateBrain);
   const [brainInfo, setBrainInfo] = useState(brainStatus());
+  /* M257: Was der lokale Server WIRKLICH kann — Liste, Ladezustand, Fehler */
+  const [lokal, setLokal] = useState<OllamaModell[]>([]);
+  const [lokalLaedt, setLokalLaedt] = useState(false);
+  const [lokalFehler, setLokalFehler] = useState('');
+  const [lokalGeprueft, setLokalGeprueft] = useState('');
   useEffect(() => {
     const on = () => setBrainInfo(brainStatus());
     window.addEventListener('pixinotes:brain', on);
@@ -81,8 +92,61 @@ export function Settings() {
   // Team-Sync (M145): welche Projekte hängen an welchem Ordner (nur Namen, keine Geheimnisse)
   const [psMeta, setPsMeta] = useState<Record<string, { folder: string }>>({});
   useEffect(() => { if (open) setPsMeta(projectSyncMeta()); }, [open]);
+
+
   // Reiter-Gliederung: KI / Synchronisation / Daten / Export / Design
   const [tab, setTab] = useState<'ki' | 'sync' | 'kalender' | 'daten' | 'export' | 'design'>('ki');
+
+  /**
+   * M257: Modelle beim lokalen Server erfragen.
+   *
+   * Der Server ist die einzige verlässliche Quelle — eine Liste im Quelltext
+   * veraltet in dem Moment, in dem jemand `ollama pull` tippt.
+   */
+  const ladeLokaleModelle = async (still = false) => {
+    const url = ai.baseUrl?.trim();
+    if (!url) { setLokalFehler('Erst die Server-URL eintragen.'); return; }
+    setLokalLaedt(true);
+    if (!still) setLokalFehler('');
+    try {
+      const liste = ai.provider === 'ollama'
+        ? await holeOllamaModelle(url)
+        : await holeOpenAiModelle(url, ai.apiKey);
+      setLokal(liste);
+      setLokalFehler(liste.length ? '' : 'Der Server läuft, hat aber kein Modell installiert.');
+      setLokalGeprueft(`${ai.provider}|${url}`);
+      // Nach dem Anbieterwechsel ist das Feld leer. Steht genau EIN taugliches
+      // Modell bereit, wird es eingetragen — sonst wählt der Mensch. Eine
+      // bestehende Wahl wird nie überschrieben.
+      if (!ai.model?.trim()) {
+        const erstes = liste.find((m) => !istEinbettungsModell(m.name));
+        if (erstes) updateAi({ model: erstes.name });
+      }
+    } catch (e) {
+      setLokal([]);
+      setLokalFehler(e instanceof Error ? e.message : String(e));
+      setLokalGeprueft(`${ai.provider}|${url}`);
+    } finally {
+      setLokalLaedt(false);
+    }
+  };
+
+  /* Einmal automatisch nachsehen, sobald der Reiter mit passendem Anbieter
+     offen ist — wer die Einstellungen öffnet, will die Liste sehen, nicht
+     erst einen Knopf suchen. Danach nur noch auf Wunsch (⟳). */
+  useEffect(() => {
+    if (!open || tab !== 'ki') return;
+    if (ai.provider !== 'ollama' && ai.provider !== 'custom') return;
+    if (!ai.baseUrl?.trim()) return;
+    if (lokalGeprueft === `${ai.provider}|${ai.baseUrl.trim()}`) return;
+    // Kurz abwarten: Beim Tippen der Adresse entstünde sonst pro Zeichen eine
+    // Anfrage an eine halbfertige URL — samt Fehlermeldung, die schon wieder
+    // überholt ist, bevor man sie gelesen hat.
+    const t = setTimeout(() => void ladeLokaleModelle(true), 700);
+    return () => clearTimeout(t);
+    // ladeLokaleModelle hängt an denselben Werten wie die Bedingung oben
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, tab, ai.provider, ai.baseUrl, lokalGeprueft]);
   // Bild-Export-Optionen (M140)
   const [expFormat, setExpFormat] = useState<'png' | 'svg' | 'print'>('png');
   const [expScale, setExpScale] = useState(2);
@@ -476,22 +540,89 @@ export function Settings() {
           </label>
           {ai.provider !== 'none' && (
             <>
-              <label className="modal-row">
-                <span>Modell</span>
-                {ai.provider === 'custom' ? (
-                  <input type="text" placeholder="modellname" value={ai.model}
-                    onChange={(e) => updateAi({ model: e.target.value })} />
-                ) : (
+              {/* M257: Bei lokalen Servern kommt die Liste vom Server selbst;
+                  bei Cloud-Diensten bleibt es bei den bekannten Namen. */}
+              {NEEDS_URL.has(ai.provider) ? (
+                <>
+                  <label className="modal-row">
+                    <span>Server-URL</span>
+                    <input type="text" placeholder="http://localhost:11434" value={ai.baseUrl}
+                      onChange={(e) => updateAi({ baseUrl: e.target.value })} />
+                  </label>
+                  <label className="modal-row">
+                    <span>Modell</span>
+                    <input
+                      type="text" list="lokale-modelle" placeholder="z. B. gemma3:12b"
+                      value={ai.model} onChange={(e) => updateAi({ model: e.target.value })}
+                    />
+                    <button
+                      className="btn btn-mini" onClick={() => void ladeLokaleModelle()}
+                      disabled={lokalLaedt}
+                      title="Beim Server nachfragen, welche Modelle dort installiert sind"
+                    >
+                      {lokalLaedt ? '…' : '⟳ Modelle laden'}
+                    </button>
+                  </label>
+                  {/* Freies Feld MIT Vorschlagsliste: Jedes installierte Modell ist
+                      per Klick da — und jeder andere Name lässt sich trotzdem
+                      eintippen, auch wenn der Server gerade nicht antwortet. */}
+                  <datalist id="lokale-modelle">
+                    {lokal.map((m) => <option key={m.name} value={m.name} />)}
+                  </datalist>
+                  {lokal.length > 0 && (
+                    <div className="modell-liste">
+                      <div className="modell-kopf">
+                        {lokal.filter((m) => !istEinbettungsModell(m.name)).length} Modelle auf {ai.baseUrl.replace(/^https?:\/\//, '')} — anklicken zum Übernehmen
+                      </div>
+                      {lokal.filter((m) => !istEinbettungsModell(m.name)).map((m) => (
+                        <button
+                          key={m.name}
+                          className={`modell-zeile ${ai.model === m.name ? 'aktiv' : ''}`}
+                          onClick={() => updateAi({ model: m.name })}
+                        >
+                          <b>{m.name}</b>
+                          <span>{[m.groesse, m.quant, zeigeGroesse(m.bytes)].filter(Boolean).join(' · ')}</span>
+                        </button>
+                      ))}
+                      {lokal.some((m) => istEinbettungsModell(m.name)) && (
+                        <div className="modell-fuss">
+                          Nicht gezeigt: {lokal.filter((m) => istEinbettungsModell(m.name)).map((m) => m.name).join(', ')}
+                          {' '}— das sind Einbettungs-Modelle fürs Gehirn, sie können nicht antworten.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {lokalFehler && <div className="modal-note warn">⚠️ {lokalFehler}</div>}
+                  {ai.provider === 'ollama' && (
+                    <details className="modell-tipps">
+                      <summary>Noch kein Modell? Bewährte Vorschläge zum Nachladen</summary>
+                      <p className="modal-hint">
+                        Das ist eine <b>Starthilfe, keine vollständige Liste</b> — bei Ollama kommt
+                        laufend Neues dazu. Alles aus <b>ollama.com/library</b> funktioniert
+                        genauso: Namen oben eintippen, vorher einmal im Terminal holen.
+                        Faustregel für den Platzbedarf: Ein Modell sollte in den Speicher der
+                        Grafikkarte passen, sonst rechnet der Prozessor mit — das läuft, ist aber
+                        deutlich langsamer.
+                      </p>
+                      {VORSCHLAEGE.map((v) => (
+                        <div key={v.name} className="modell-tipp">
+                          <code>ollama pull {v.name}</code>
+                          <span className="modell-tipp-platz">{v.platz}</span>
+                          <span className="modell-tipp-zweck">{v.zweck}</span>
+                          <button className="btn btn-mini" onClick={() => updateAi({ model: v.name })}>
+                            eintragen
+                          </button>
+                        </div>
+                      ))}
+                    </details>
+                  )}
+                </>
+              ) : (
+                <label className="modal-row">
+                  <span>Modell</span>
                   <select value={ai.model} onChange={(e) => updateAi({ model: e.target.value })}>
                     {MODELS[ai.provider].map((m) => <option key={m} value={m}>{m}</option>)}
                   </select>
-                )}
-              </label>
-              {NEEDS_URL.has(ai.provider) && (
-                <label className="modal-row">
-                  <span>Server-URL</span>
-                  <input type="text" placeholder="http://localhost:11434" value={ai.baseUrl}
-                    onChange={(e) => updateAi({ baseUrl: e.target.value })} />
                 </label>
               )}
               {NEEDS_KEY.has(ai.provider) && (
@@ -570,11 +701,37 @@ export function Settings() {
                 <span>Anbieter</span>
                 <select value={brain.provider} onChange={(e) => updateBrain({ provider: e.target.value as typeof brain.provider })}>
                   <option value="auto">Automatisch (folgt der KI-Einstellung)</option>
-                  <option value="ollama">Ollama (lokal — nomic-embed-text)</option>
+                  <option value="ollama">Ollama (lokal — Modell frei wählbar)</option>
                   <option value="browser">Im Browser (Transformers.js, einmaliger Download)</option>
                   <option value="cloud">Cloud (OpenAI/OpenRouter-Schlüssel)</option>
                 </select>
               </label>
+              {/* M257: Auch das Einbettungs-Modell ist wählbar — bge-m3 versteht
+                  deutsche Texte besser, all-minilm passt auf jeden Rechner. */}
+              {(brain.provider === 'ollama' || (brain.provider === 'auto' && ai.provider === 'ollama')) && (
+                <>
+                  <label className="modal-row">
+                    <span>Einbettungs-Modell</span>
+                    <input
+                      type="text" list="lokale-einbettungen" placeholder="nomic-embed-text"
+                      value={brain.embedModel ?? ''}
+                      onChange={(e) => updateBrain({ embedModel: e.target.value })}
+                    />
+                    <button className="btn btn-mini" onClick={() => void ladeLokaleModelle()} disabled={lokalLaedt}>
+                      {lokalLaedt ? '…' : '⟳'}
+                    </button>
+                  </label>
+                  <datalist id="lokale-einbettungen">
+                    {lokal.filter((m) => istEinbettungsModell(m.name)).map((m) => <option key={m.name} value={m.name} />)}
+                  </datalist>
+                  <div className="modal-hint">
+                    Installiert: {lokal.filter((m) => istEinbettungsModell(m.name)).map((m) => m.name).join(', ') || '— noch keines gefunden'}
+                    {' · '}Zum Nachladen: {EINBETTUNGS_VORSCHLAEGE.map((v) => `${v.name} (${v.platz})`).join(' · ')}
+                    {' — '}mit <code>ollama pull …</code> holen. Nach dem Wechsel bitte den Index neu aufbauen:
+                    Vektoren aus zwei verschiedenen Modellen lassen sich nicht vergleichen.
+                  </div>
+                </>
+              )}
               <div className="modal-hint">
                 {brainInfo.busy
                   ? `⏳ Indexiere … (${brainInfo.indexed} Karten fertig)`
