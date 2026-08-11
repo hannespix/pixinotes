@@ -32,7 +32,7 @@ const TYPE_LABEL: Record<string, string> = {
   note: 'Notiz', kanban: 'Kanban', gantt: 'Zeitplan', calendar: 'Kalender',
   week: 'Planer', minutes: 'Protokoll', time: 'Zeiterfassung', mermaid: 'Diagramm',
   image: 'Bild', file: 'Datei', email: 'E-Mail', htmlapp: 'App', shape: 'Form',
-  portal: 'Portal', frame: 'Rahmen',
+  portal: 'Portal', frame: 'Rahmen', sheet: 'Rechen-Tabelle',
 };
 
 /** Karten, die im Fokus nichts gewinnen — sie bleiben Board-Sache */
@@ -51,6 +51,7 @@ const ACTIONS: Record<string, FocusAction[]> = {
   gantt: [{ label: '＋ Vorgang', hint: 'Neuen Vorgang ab heute anlegen', key: 'gantt-row' }],
   week: [{ label: '＋ Block', hint: 'Neuen Block anlegen — Zeit und Text danach in der Karte', key: 'week-entry' }],
   time: [{ label: '＋ Zeit', hint: 'Arbeitszeit für heute nacherfassen', key: 'time-seg' }],
+  sheet: [{ label: '＋ Zeile', hint: 'Eine Zeile an die Rechen-Tabelle anhängen', key: 'sheet-row' }],
 };
 
 export function focusable(node: AppNode | undefined): boolean {
@@ -84,6 +85,10 @@ function runAction(node: AppNode, key: string) {
       entries: [...entries, { id: id(), day: 0, start: from, dur: 60, text: 'Neuer Block' }],
     });
     st.showToast('＋ Block angelegt — antippen für Zeit, Tag und Text.');
+  } else if (key === 'sheet-row') {
+    const rows = typeof d.rows === 'number' ? d.rows : 8;
+    st.updateNodeData(node.id, { rows: rows + 1 });
+    st.showToast('＋ Zeile angehängt — Zelle antippen zum Ausfüllen.');
   } else if (key === 'time-seg') {
     const segs = (d.segs as Array<Record<string, unknown>>) ?? [];
     st.updateNodeData(node.id, {

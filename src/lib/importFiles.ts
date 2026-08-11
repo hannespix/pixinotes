@@ -8,11 +8,12 @@
 import { mutedHistory, useBoard, selectActiveBoard } from '../store';
 import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from './parseEmail';
 import { imageFileToDataUrl, readFileAsDataUrl } from './image';
-import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, makeNote } from './nodes';
+import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, makeNote, makeSheet } from './nodes';
 // M184: statisch importiert (kein dynamic import) — vite-plugin-singlefile
 // backt alles in EINE Datei; ein nachgeladener Zusatz-Brocken wäre dort nach
 // dem Deploy nicht auffindbar (dieselbe Falle wie beim Mermaid-Modul, M90).
 import { docxToBlocks } from './docx';
+import { blattNamen, leseXlsx } from './xlsx';
 import { cloneSharedBoard, parseBoardPayload } from './share';
 import { mergeEvents, parseIcs, type IcsEvent } from './ics';
 import { saveHtml } from './htmlStore';
@@ -165,6 +166,43 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         }
         showToast(`📄 „${res.title || file.name}" als Notiz übernommen${res.images.length ? ` (+ ${Math.min(res.images.length, 8)} Bild(er))` : ''}.`);
         mirror(file, note.id, mirrorNote);
+        placed++;
+        continue;
+      }
+      if (ext === 'xlsx' || ext === 'xlsm') {
+        /**
+         * M256: Excel-Liste → Rechen-Tabelle, die weiterrechnet.
+         *
+         * Übernommen werden Werte UND Formeln. Wer danach eine Zahl ändert,
+         * sieht die Summe sofort mitwandern — es ist keine tote Momentaufnahme.
+         */
+        const puffer = await file.arrayBuffer();
+        const namen = await blattNamen(puffer);
+        // Jedes Blatt wird eine eigene Karte — nebeneinander abgelegt
+        let erste: string | null = null;
+        let gesetzt = 0;
+        for (let i = 0; i < Math.max(1, Math.min(namen.length || 1, 8)); i += 1) {
+          const blatt = await leseXlsx(puffer, i);
+          if (Object.keys(blatt.zellen).length === 0) continue;
+          const spalten = Math.min(26, blatt.spalten);
+          const node = makeSheet({ x: pos.x + gesetzt * 60, y: pos.y + gesetzt * 60 }, {
+            title: blatt.name || file.name.replace(/\.xls[xm]$/i, ''),
+            cells: blatt.zellen,
+            cols: spalten,
+            rows: blatt.zeilen,
+            quelle: namen.length > 1 ? `${file.name} · ${blatt.name}` : file.name,
+          });
+          node.width = Math.min(920, 90 + spalten * 96);
+          node.height = Math.min(620, 120 + blatt.zeilen * 30);
+          addNode(node);
+          erste = erste ?? node.id;
+          gesetzt += 1;
+        }
+        if (!gesetzt) { showToast(`„${file.name}" enthält keine gefüllten Zellen.`); continue; }
+        showToast(gesetzt > 1
+          ? `📊 ${gesetzt} Blätter aus „${file.name}" übernommen — Formeln inklusive.`
+          : `📊 „${file.name}" als Rechen-Tabelle übernommen — Formeln inklusive.`);
+        mirror(file, erste, mirrorNote);
         placed++;
         continue;
       }

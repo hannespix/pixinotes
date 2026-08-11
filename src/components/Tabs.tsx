@@ -12,6 +12,7 @@ const NAV_TYPE: Record<string, string> = {
   note: 'Notiz', kanban: 'Kanban', gantt: 'Zeitplan', calendar: 'Kalender',
   mermaid: 'Diagramm', shape: 'Form', image: 'Bild', pdf: 'PDF', email: 'E-Mail',
   file: 'Datei', week: 'Planer', time: 'Zeit', htmlapp: 'App', portal: 'Portal',
+  sheet: 'Tabelle',
 };
 
 /**

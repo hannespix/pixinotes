@@ -96,6 +96,22 @@ export function makeMinutes(position: Pos): AppNode {
   } as AppNode;
 }
 
+/**
+ * M256: Rechen-Tabelle. Startet mit einem leeren Raster — bewusst ohne
+ * Beispielzahlen: Wer eine Tabelle anlegt, hat eigene Daten im Kopf, und
+ * fremde Zahlen müsste er erst wegräumen.
+ */
+export function makeSheet(position: Pos, daten: Record<string, unknown> = {}): AppNode {
+  return {
+    id: uid(),
+    type: 'sheet',
+    width: 460,
+    height: 300,
+    position,
+    data: { title: 'Rechen-Tabelle', cells: {}, cols: 5, rows: 8, ...daten },
+  } as AppNode;
+}
+
 export function makeWeek(position: Pos): AppNode {
   return {
     id: uid(),

@@ -222,6 +222,30 @@ export interface WeekData {
 export type WeekNode = Node<WeekData, 'week'>;
 
 /**
+ * Rechen-Tabelle (M256): das Tabellenblatt als Karte.
+ *
+ * Die Zellen liegen als flache Zuordnung „A1" → Rohtext vor, nicht als
+ * verschachteltes Zeilen-Array. Das hat zwei Gründe: Eine Tabelle ist meist
+ * dünn besetzt (fünf gefüllte Zellen in einem 10×20-Raster), und beim
+ * Bearbeiten einer einzelnen Zelle muss so kein ganzes Gitter neu gebaut
+ * werden. Der Rohtext ist das, was man eintippt — inklusive „=SUMME(A1:A5)";
+ * gerechnet wird beim Anzeigen (lib/formel.ts).
+ */
+export interface SheetData {
+  title?: string;
+  /** „A1" → Rohtext, z. B. „12,5" oder „=SUMME(A1:A5)" */
+  cells?: Record<string, string>;
+  cols?: number;
+  rows?: number;
+  /** Breite je Spalte in Punkten — nur abweichende Spalten stehen drin */
+  colW?: Record<string, number>;
+  /** Herkunft, wenn die Tabelle aus einer Excel-Datei kam */
+  quelle?: string;
+  [key: string]: unknown;
+}
+export type SheetNode = Node<SheetData, 'sheet'>;
+
+/**
  * Protokoll-Reihe (M186): EINE Karte für eine ganze Besprechungsserie.
  *
  * Wiederkehrende Meetings sind das klassische Dokumentations-Dilemma: eine
@@ -324,7 +348,7 @@ export interface FrameData {
 export type FrameNode = Node<FrameData, 'frame'>;
 
 export type AppNode =
-  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode | MinutesNode)
+  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode | MinutesNode | SheetNode)
   // Archiv (M87): Karten jedes Typs lassen sich als Ganzes „erledigt" ablegen —
   // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface.
   // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der

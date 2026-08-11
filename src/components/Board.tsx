@@ -30,6 +30,7 @@ import { GanttCard } from './nodes/GanttCard';
 import { CalendarCard } from './nodes/CalendarCard';
 import { FrameCard } from './nodes/FrameCard';
 import { WeekCard } from './nodes/WeekCard';
+import { SheetCard } from './nodes/SheetCard';
 import { MinutesCard } from './nodes/MinutesCard';
 import { TimeCard } from './nodes/TimeCard';
 import { HtmlAppCard } from './nodes/HtmlAppCard';
@@ -86,6 +87,7 @@ const nodeTypes: NodeTypes = {
   calendar: guard(CalendarCard),
   frame: guard(FrameCard),
   week: guard(WeekCard),
+  sheet: guard(SheetCard),
   minutes: guard(MinutesCard),
   time: guard(TimeCard),
   htmlapp: guard(HtmlAppCard),

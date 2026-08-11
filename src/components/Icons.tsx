@@ -135,3 +135,6 @@ export const IGrip = make(<>
 
 /** M254: Bild/Foto — Rahmen mit Bergspitze und Sonne, das übliche Bildsymbol */
 export const IImage = make(<><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="1.6" /><path d="m21 15-4.5-4.5L9 18" /></>);
+
+/** M256: Sigma — das Zeichen für die Auto-Summe */
+export const ISigma = make(<><path d="M18 4H6l6 8-6 8h12" /></>);

@@ -1,7 +1,33 @@
 // Karten → Text / HTML: für „Per E-Mail teilen", Zwischenablage (Outlook-Paste)
 // und die Suche. Bewusst schlicht gehalten — sauberes Office-taugliches HTML.
-import { doneCol, kanbanCols, type AppNode } from '../types';
+import { doneCol, kanbanCols, type AppNode, type SheetData } from '../types';
 import { formatBytes } from './parseEmail';
+import { indexZuAdresse, rechneBlatt, zeigeWert } from './formel';
+
+/**
+ * M256: Rechen-Tabelle als Zeilen — für Suche, Text- und HTML-Export.
+ *
+ * Ausgegeben wird der errechnete Wert, nicht die Formel: In einer E-Mail oder
+ * im PDF nützt „=SUMME(B2:B9)" niemandem, die 12.480 dagegen schon.
+ */
+function sheetZeilen(s: SheetData): string[][] {
+  const zellen = s.cells ?? {};
+  const spalten = Math.max(1, s.cols ?? 5);
+  const zeilen = Math.max(1, s.rows ?? 8);
+  const werte = rechneBlatt(zellen);
+  const aus: string[][] = [];
+  for (let z = 0; z < zeilen; z += 1) {
+    const reihe: string[] = [];
+    for (let sp = 0; sp < spalten; sp += 1) {
+      const adr = indexZuAdresse(sp, z);
+      reihe.push(zeigeWert(werte[adr] ?? null));
+    }
+    // Komplett leere Zeilen am Ende weglassen — sonst besteht der Export
+    // hauptsächlich aus Tabulatoren
+    if (reihe.some((c) => c !== '')) aus.push(reihe);
+  }
+  return aus;
+}
 
 /* ---------- BlockNote-Blöcke → Text/HTML ---------- */
 
@@ -215,6 +241,13 @@ function baseNodeText(node: AppNode): string {
         });
       return `${mn.title ?? 'Besprechungsreihe'}\n${parts.join('\n\n')}`;
     }
+    case 'sheet': {
+      // M256: Ausgegeben werden die ERRECHNETEN Werte — eine Suche nach „1.240"
+      // soll die Summenzeile finden, nicht nur wer „=SUMME(" tippt.
+      const s = node.data;
+      const zeilen = sheetZeilen(s);
+      return `${s.title || 'Rechen-Tabelle'}\n${zeilen.map((r) => r.join('\t')).join('\n')}`;
+    }
     case 'week': {
       const w = node.data;
       const cols = w.cols?.length ? w.cols : ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].slice(0, w.days === 7 ? 7 : 5);
@@ -302,6 +335,15 @@ export function nodeToHtml(node: AppNode): string {
             + (dec ? `<p><b>Beschl\u00fcsse</b></p><ul>${dec}</ul>` : '');
         });
       return `<h3>${esc(mn.title ?? 'Besprechungsreihe')}</h3>${parts.join('<hr>') || '<p>\u2014</p>'}`;
+    }
+    case 'sheet': {
+      const s = node.data;
+      const zeilen = sheetZeilen(s);
+      const tr = zeilen.map((r, i) => `<tr>${r.map((c) => (i === 0
+        ? `<th style="border:1px solid #ccc;padding:4px 7px;background:#f2f2f2;text-align:left">${esc(c)}</th>`
+        : `<td style="border:1px solid #ccc;padding:4px 7px">${esc(c)}</td>`)).join('')}</tr>`).join('');
+      return `<h3>${esc(s.title ?? 'Rechen-Tabelle')}</h3>`
+        + (tr ? `<table style="border-collapse:collapse;font-size:13px">${tr}</table>` : '<p>—</p>');
     }
     case 'week': {
       const w = node.data;

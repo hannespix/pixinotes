@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
-import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, makeTime, makeWeek } from '../lib/nodes';
+import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, makeSheet, makeTime, makeWeek } from '../lib/nodes';
 import { importFilesToBoard, importHtmlAppFromUrl } from '../lib/importFiles';
 import { collectTasks } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
@@ -13,7 +13,7 @@ import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode
 import {
   IAppWindow, IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMinutes, IMore, IMousePointer, INote,
-  ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
+  ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISigma, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
 } from './Icons';
 
 /**
@@ -331,6 +331,12 @@ export function Dock() {
             </button>
             <button onClick={() => add(() => makeKanban(centerPos(420, 200)))}><IKanban size={16} /> Kanban-Board</button>
             <button
+              onClick={() => add(() => makeSheet(centerPos(460, 300)))}
+              title="Tabelle, die rechnet: =SUMME(A1:A5), =MITTELWERT(…), =WENN(…) — mit Σ für Autosummen. Excel-Dateien einfach aufs Board ziehen."
+            >
+              <ISigma size={16} /> Rechen-Tabelle
+            </button>
+            <button
               onClick={() => add(() => makeFrame(centerPos(640, 420)))}
               title="Benannter Rahmen-Bereich: gruppiert Karten optisch und nimmt sie beim Verschieben (an der Titel-Leiste) mit"
             >
@@ -421,7 +427,7 @@ export function Dock() {
                 ))}
               </>
             )}
-            <div className="dock-menu-foot">E-Mails (.eml/.msg), Bilder &amp; PDFs einfach aufs Board ziehen · Strg+V für Screenshots · Karte auswählen → 🔖 macht sie zur Vorlage</div>
+            <div className="dock-menu-foot">E-Mails (.eml/.msg), Excel (.xlsx), Word (.docx), Bilder &amp; PDFs einfach aufs Board ziehen · Strg+V für Screenshots · Karte auswählen → 🔖 macht sie zur Vorlage</div>
           </div>
         )}
         <button

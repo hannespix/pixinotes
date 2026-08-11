@@ -5093,3 +5093,84 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
     flex: 1 1 100%; min-width: 0;
   }
 }
+
+/* ---------- Rechen-Tabelle (M256) ----------
+ * Ein Raster, das rechnet. Angezeigt wird das Ergebnis, beim Hineinklicken
+ * die Formel — deshalb hat die Zelle im Ruhezustand und im Bearbeiten-Zustand
+ * dieselbe Höhe: Sonst springt die ganze Tabelle bei jedem Klick.
+ */
+.sheet-card {
+  background: var(--surface-card); border-radius: 10px; padding: 8px 10px 6px;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.sheet-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.sheet-tools { display: flex; align-items: center; gap: 4px; margin-left: auto; flex: none; }
+.sheet-tools button {
+  display: inline-flex; align-items: center; gap: 3px;
+  border: 1px solid var(--border-soft); background: var(--surface-3);
+  color: var(--muted); border-radius: 7px; padding: 3px 6px;
+  font-family: inherit; font-size: 11px; cursor: pointer; white-space: nowrap;
+}
+.sheet-tools button:hover { border-color: var(--accent); color: var(--accent-strong); }
+.sheet-quelle {
+  font-size: 11px; color: var(--muted); margin-bottom: 5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sheet-scroll { flex: 1; min-height: 0; overflow: auto; border-radius: 7px; }
+.sheet-grid { border-collapse: collapse; width: 100%; table-layout: fixed; }
+.sheet-grid th, .sheet-grid td {
+  border: 1px solid var(--border-soft); padding: 0; height: 26px;
+  font-size: 12.5px; color: var(--ink); overflow: hidden;
+}
+/* Spalten- und Zeilenköpfe bleiben beim Scrollen stehen */
+.sheet-kopf {
+  background: var(--surface-dim); color: var(--muted); font-size: 11px;
+  font-weight: 700; text-align: center; position: sticky; top: 0; z-index: 2;
+}
+.sheet-zeilenkopf { left: 0; top: auto; width: 34px; min-width: 34px; }
+.sheet-eck {
+  background: var(--surface-dim); position: sticky; left: 0; top: 0; z-index: 3;
+  width: 34px; min-width: 34px;
+}
+.sheet-zelle { cursor: text; padding: 0 5px; text-align: left; }
+.sheet-zelle > span {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Zahlen rechtsbündig — so sieht man Größenordnungen auf einen Blick */
+.sheet-zelle.zahl { text-align: right; font-variant-numeric: tabular-nums; }
+.sheet-zelle.fehler { color: #c0392b; font-weight: 600; }
+[data-theme='dark'] .sheet-zelle.fehler { color: #ff8b7a; }
+.sheet-zelle:hover { background: var(--accent-soft); }
+.sheet-eingabe {
+  width: 100%; height: 24px; box-sizing: border-box; border: 2px solid var(--accent);
+  border-radius: 4px; background: var(--surface-2); color: var(--ink);
+  font-family: inherit; font-size: 12.5px; padding: 0 4px; outline: none;
+}
+.sheet-fuss { font-size: 11px; color: var(--muted); margin-top: 5px; }
+.sheet-fuss code {
+  background: var(--surface-dim); border-radius: 4px; padding: 0 3px;
+  font-size: 0.95em;
+}
+/* M255: Am Touchgerät darf keine Eingabe unter 16px liegen — sonst zoomt iOS
+   beim Antippen die ganze Seite. Zeilen und Knöpfe wachsen entsprechend mit. */
+@media (pointer: coarse) {
+  .sheet-eingabe { font-size: 16px; height: 30px; }
+  .sheet-grid th, .sheet-grid td { height: 32px; font-size: 14px; }
+  .sheet-kopf { font-size: 12.5px; }
+  .sheet-tools button { font-size: 13px; padding: 6px 8px; min-height: 32px; }
+  .sheet-quelle, .sheet-fuss { font-size: max(13px, 1em); }
+}
+/* Griff am rechten Rand jedes Spaltenkopfes — schmal, aber gut zu treffen.
+   Ein Bezugspunkt muss nicht gesetzt werden: `position: sticky` am Kopf ist
+   selbst schon einer. Ein zusätzliches `position: relative` würde das Kleben
+   der Kopfzeile beim Scrollen wieder aufheben. */
+.sheet-breite {
+  position: absolute; top: 0; right: 0; width: 8px; height: 100%;
+  cursor: col-resize; touch-action: none;
+}
+/* Bewusst NICHT über den Rand hinaus: Die Kopfzelle schneidet zu langen Text
+   ab (overflow: hidden) — und schnitte damit auch den überstehenden Teil des
+   Griffs weg. Er wäre dann schmaler, als er aussieht, und ginge am Rand ins
+   Leere. Innen liegend ist er auf voller Breite zu treffen. */
+.sheet-breite:hover { background: var(--accent); opacity: .5; }
+@media (pointer: coarse) { .sheet-breite { width: 16px; } }
