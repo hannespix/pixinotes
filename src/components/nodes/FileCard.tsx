@@ -9,6 +9,7 @@ import { readFileAsDataUrl } from '../../lib/image';
 import { canEmbed } from '../../lib/nodes';
 import { loadAttachment } from '../../lib/attachments';
 import { renderPdfPage } from '../../lib/pdf';
+import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/fileStore';
 import { CardShell } from './CardShell';
 import { IDownload } from '../Icons';
 
@@ -33,7 +34,35 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
   const file = data;
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
   const icon = ICONS[ext] ?? '📎';
-  const isPdf = ext === 'pdf' && !!file.dataUrl;
+  /**
+   * M259: Der Inhalt kommt aus der lokalen Ablage (IndexedDB) — oder, bei
+   * kleinen Dateien und alten Ständen, weiterhin aus dem Board.
+   *
+   * Vorher hing JEDE Vorschau an `dataUrl`, und die gab es ab 1,5 MB nicht
+   * mehr. Eine 3-MB-PDF blieb deshalb ein Dateiname mit Größenangabe — genau
+   * die gemeldete Beobachtung. Jetzt entscheidet nicht die Größe, sondern
+   * ob der Browser den Typ darstellen kann.
+   */
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (file.dataUrl || !file.lokal) return;
+    let url: string | null = null;
+    let weg = false;
+    void loadFile(id).then((b) => {
+      if (!b || weg) return;
+      url = URL.createObjectURL(b);
+      setBlobUrl(url);
+    });
+    return () => {
+      weg = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [id, file.dataUrl, file.lokal]);
+
+  /** Die Quelle für Vorschau und Download — egal, wo sie herkommt */
+  const quelle = file.dataUrl ?? blobUrl ?? null;
+  const art = vorschauArt(file.name, file.mime);
+  const isPdf = art === 'pdf' && !!quelle;
   /**
    * M254: Auch eine Datei-KARTE zeigt ein Bild als Bild.
    *
@@ -43,13 +72,12 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
    * gemeldete Fall („wird als Datei eingefügt, aber nicht als Bild angezeigt")
    * ist damit auch dann noch brauchbar, wenn er auftritt.
    */
-  const istBild = !!file.dataUrl && (file.mime?.startsWith('image/')
-    || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'heic', 'heif', 'avif'].includes(ext));
+  const istBild = !!quelle && art === 'bild';
   const [viewerOpen, setViewerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const download = () => {
-    if (file.dataUrl) triggerDownload(file.dataUrl, file.name);
+    if (quelle) triggerDownload(quelle, file.name);
   };
 
   /** M159: Datei liegt (nur) als Kopie im Team-Ordner — von dort holen.
@@ -64,18 +92,23 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
         showToast('Im Team-Ordner nicht gefunden — ist der Ordner verbunden und synchronisiert (⚙️ → Synchronisation)?');
         return;
       }
-      if (f.size <= MAX_EMBED_BYTES) {
-        const dataUrl = await readFileAsDataUrl(f);
-        if (canEmbed(dataUrl.length)) {
-          // ohne Undo-Schritt — das Nachladen ist keine inhaltliche Bearbeitung
-          mutedHistory(() => useBoard.getState().updateNodeData(id, { dataUrl, size: f.size }));
-          showToast(`„${file.name}" aus dem Team-Ordner geladen.`);
-          return;
-        }
-      }
-      const url = URL.createObjectURL(f);
-      triggerDownload(url, file.name);
-      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+      /**
+       * M259: Was aus dem Team-Ordner kommt, bleibt hier — in jeder Größe.
+       *
+       * Vorher landete nur eine kleine Datei im Board und alles darüber ging
+       * direkt in den Download-Ordner: Beim nächsten Öffnen war die Karte
+       * wieder leer. Jetzt geht der Inhalt in die lokale Ablage, und die
+       * Vorschau steht dauerhaft.
+       */
+      await saveFile(id, f);
+      const dataUrl = f.size <= MAX_EMBED_BYTES ? await readFileAsDataUrl(f) : '';
+      // ohne Undo-Schritt — das Nachladen ist keine inhaltliche Bearbeitung
+      mutedHistory(() => useBoard.getState().updateNodeData(id, {
+        size: f.size, lokal: true,
+        ...(dataUrl && canEmbed(dataUrl.length) ? { dataUrl } : {}),
+      }));
+      setBlobUrl((alt) => { if (alt) URL.revokeObjectURL(alt); return URL.createObjectURL(f); });
+      showToast(`„${file.name}" aus dem Team-Ordner geladen.`);
     } finally {
       setLoading(false);
     }
@@ -83,26 +116,47 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
 
   return (
     <CardShell id={id} selected={selected} minWidth={170} minHeight={50} className="file-card">
-      <button className="file-body nodrag" onClick={isPdf ? () => setViewerOpen(true) : file.dataUrl ? download : loadFromTeam}
-        title={isPdf ? 'Vorschau öffnen' : file.dataUrl ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
+      <button className="file-body nodrag" onClick={isPdf ? () => setViewerOpen(true) : quelle ? download : loadFromTeam}
+        title={isPdf ? 'Vorschau öffnen' : quelle ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
         <span className="file-icon">{icon}</span>
         <span>
           <b>{file.name}</b>
           <span className="meta"> {formatBytes(file.size)}</span>
         </span>
       </button>
-      {!file.dataUrl && file.ref && (
+      {/* Nachladen braucht nur, wem der Inhalt fehlt — sonst liegt er schon hier */}
+      {!quelle && file.ref && (
         <button className="file-teamload nodrag" disabled={loading} onClick={loadFromTeam}
           title={`Kopie liegt im Team-Ordner: ${file.ref}`}>
           {loading ? 'Lädt …' : 'Aus Team-Ordner laden'}
         </button>
       )}
-      {istBild && !isPdf && (
-        <img className="file-thumb nodrag" src={file.dataUrl} alt={file.name} draggable={false}
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+      {/* M259: Dass eine Team-Kopie existiert, stand vorher NUR auf dem
+          Nachlade-Knopf. Der entfällt jetzt, sobald der Inhalt lokal liegt —
+          die Auskunft darf dabei nicht mit verschwinden. */}
+      {quelle && file.ref && (
+        <div className="file-teamnote" title={file.ref}>
+          Kopie im Team-Ordner: {file.ref.split('/').slice(-2).join('/')}
+        </div>
       )}
-      {isPdf && <PdfThumb dataUrl={file.dataUrl!} onOpen={() => setViewerOpen(true)} />}
-      {viewerOpen && <PdfViewer dataUrl={file.dataUrl!} name={file.name} onClose={() => setViewerOpen(false)} onDownload={download} />}
+      {istBild && <img className="file-thumb nodrag" src={quelle!} alt={file.name} draggable={false}
+        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />}
+      {isPdf && <PdfThumb dataUrl={quelle!} onOpen={() => setViewerOpen(true)} />}
+      {/* M259: Ton und Bewegtbild kann der Browser selbst — dann soll er auch */}
+      {art === 'audio' && quelle && <audio className="file-media nodrag" src={quelle} controls preload="metadata" />}
+      {art === 'video' && quelle && <video className="file-media nodrag" src={quelle} controls preload="metadata" />}
+      {art === 'text' && quelle && <TextVorschau quelle={quelle} />}
+      {/* Ehrlich sagen, WARUM hier nichts zu sehen ist */}
+      {art === 'keine' && quelle && (
+        <div className="file-nopreview">{warumKeineVorschau(file.name)}</div>
+      )}
+      {!quelle && !file.ref && (
+        <div className="file-nopreview">
+          Der Inhalt liegt nicht auf diesem Gerät — die Karte kam über Sync oder einen Teilen-Link.
+          Die Datei erneut einfügen, dann ist sie auch hier zu sehen.
+        </div>
+      )}
+      {viewerOpen && <PdfViewer dataUrl={quelle!} name={file.name} onClose={() => setViewerOpen(false)} onDownload={download} />}
     </CardShell>
   );
 }
@@ -221,5 +275,42 @@ function PdfViewer({ dataUrl, name, onClose, onDownload }: {
       </div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * Auszug aus einer Textdatei.
+ *
+ * Bewusst nur der Anfang: Eine 200-MB-Protokolldatei komplett in eine Karte zu
+ * legen würde die Ansicht lahmlegen — und beantwortet die Frage „was steckt da
+ * drin?" auch nicht besser als die ersten Zeilen. Die ganze Datei gibt es
+ * weiterhin per Download.
+ */
+const AUSZUG_ZEICHEN = 4000;
+
+function TextVorschau({ quelle }: { quelle: string }) {
+  const [text, setText] = useState<string | null>(null);
+  const [mehr, setMehr] = useState(false);
+
+  useEffect(() => {
+    let weg = false;
+    void fetch(quelle)
+      .then((r) => r.blob())
+      .then((b) => b.slice(0, AUSZUG_ZEICHEN * 4).text())
+      .then((t) => {
+        if (weg) return;
+        setText(t.slice(0, AUSZUG_ZEICHEN));
+        setMehr(t.length > AUSZUG_ZEICHEN);
+      })
+      .catch(() => { if (!weg) setText(null); });
+    return () => { weg = true; };
+  }, [quelle]);
+
+  if (text === null) return null;
+  return (
+    <div className="file-text nodrag">
+      <pre>{text}</pre>
+      {mehr && <div className="file-text-mehr">… weiter geht es in der Datei selbst (Download)</div>}
+    </div>
   );
 }

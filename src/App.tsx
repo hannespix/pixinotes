@@ -16,6 +16,7 @@ import {
 import { initAutoSync } from './lib/syncFolder';
 import { initProjectAutoSync } from './lib/projectSync';
 import { cleanupOrphanHtml } from './lib/htmlStore';
+import { cleanupOrphanFiles } from './lib/fileStore';
 import { initWebdavSync } from './lib/webdav';
 import { initFilesSync } from './lib/filesSync';
 import { initBrain } from './lib/brain';
@@ -58,6 +59,11 @@ export default function App() {
         useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'htmlapp').map((n) => n.id)),
       );
       void cleanupOrphanHtml(ids);
+      // M259: dasselbe für die Inhalte von Datei-Karten
+      const dateiIds = new Set(
+        useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'file').map((n) => n.id)),
+      );
+      void cleanupOrphanFiles(dateiIds);
     }, 8000);
     return () => clearTimeout(t);
   }, []);

@@ -45,6 +45,10 @@ export interface FileData {
   /** M159: relativer Pfad der Kopie im Team-Ordner (pixinotes-anlagen/…) —
    *  darüber holen Teammitglieder Dateien, die zu groß fürs Einbetten sind */
   ref?: string;
+  /** M259: Der vollständige Inhalt liegt auf DIESEM Gerät (IndexedDB, s.
+   *  fileStore.ts). Reist bewusst nicht mit: Ein Teilen-Link trägt den
+   *  Board-Stand, nicht die Festplatte. */
+  lokal?: boolean;
   [key: string]: unknown;
 }
 

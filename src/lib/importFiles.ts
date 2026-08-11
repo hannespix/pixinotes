@@ -17,6 +17,7 @@ import { blattNamen, leseXlsx } from './xlsx';
 import { cloneSharedBoard, parseBoardPayload } from './share';
 import { mergeEvents, parseIcs, type IcsEvent } from './ics';
 import { saveHtml } from './htmlStore';
+import { saveFile } from './fileStore';
 import { mirrorAttachment } from './attachments';
 import type { AppNode } from '../types';
 
@@ -253,12 +254,30 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           mirror(file, node.id, mirrorNote);
         }
       } else {
+        /**
+         * M259: Der Inhalt geht IMMER in die lokale Ablage (IndexedDB) —
+         * daher gibt es die Vorschau jetzt in jeder Größe.
+         *
+         * Im Board-Stand bleibt er nur, solange er klein genug ist: Der
+         * Stand liegt im localStorage und reist über Sync, Export und
+         * Teilen-Links mit; eine 40-MB-PDF darin würde jeden weiteren
+         * Speichervorgang des ganzen Boards zerstören (canEmbed).
+         */
         let dataUrl = file.size <= MAX_EMBED_BYTES ? await readFileAsDataUrl(file) : undefined;
-        if (dataUrl && !canEmbed(dataUrl.length)) {
-          dataUrl = undefined;
-          showToast('⚠️ Speicher fast voll — Datei nur als Verweis abgelegt. Exportiere in den Datenordner (⚙️).');
+        if (dataUrl && !canEmbed(dataUrl.length)) dataUrl = undefined;
+        const node = makeFile(pos, {
+          name: file.name, size: file.size, mime, dataUrl,
+          lokal: true,       // Inhalt liegt auf diesem Gerät — s. fileStore.ts
+        });
+        try {
+          await saveFile(node.id, file);
+        } catch (e) {
+          // Kein Platz mehr oder privater Modus: ehrlich melden statt eine
+          // Karte anzulegen, die eine Vorschau verspricht, die nie kommt.
+          console.error('Datei-Ablage fehlgeschlagen:', e);
+          delete node.data.lokal;
+          showToast(`„${file.name}" konnte nicht abgelegt werden — der Gerätespeicher ist voll.`);
         }
-        const node = makeFile(pos, { name: file.name, size: file.size, mime, dataUrl });
         addNode(node);
         mirror(file, node.id, mirrorNote);
       }

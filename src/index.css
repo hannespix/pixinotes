@@ -5236,3 +5236,37 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
 @media (pointer: coarse) {
   .ollama-hilfe p, .ollama-hilfe pre { font-size: max(13px, 1em); }
 }
+
+/* ---------- Vorschauen auf der Datei-Karte (M259) ----------
+ * Ton, Bewegtbild und Text kann der Browser von Haus aus zeigen — sie brauchen
+ * nur Platz und einen Rahmen, der zur Karte passt.
+ */
+.file-media { display: block; width: 100%; margin-top: 6px; border-radius: 8px; }
+.file-media[src=''] { display: none; }
+video.file-media { max-height: 320px; background: #000; }
+audio.file-media { height: 40px; }
+.file-text {
+  margin-top: 6px; border: 1px solid var(--border-soft); border-radius: 8px;
+  background: var(--surface-3); max-height: 260px; overflow: auto;
+}
+.file-text pre {
+  margin: 0; padding: 8px 10px; font-size: 11.5px; line-height: 1.45;
+  white-space: pre-wrap; word-break: break-word; color: var(--ink);
+}
+.file-text-mehr {
+  padding: 4px 10px 6px; font-size: 11px; color: var(--muted);
+  border-top: 1px solid var(--border-soft);
+}
+/* Warum hier nichts zu sehen ist — kein Rätsel, sondern ein Satz */
+.file-nopreview {
+  margin-top: 6px; font-size: 11.5px; color: var(--muted); line-height: 1.45;
+}
+@media (pointer: coarse) {
+  .file-text pre, .file-text-mehr, .file-nopreview { font-size: max(13px, 1em); }
+  audio.file-media { height: 48px; }
+}
+.file-teamnote {
+  margin-top: 5px; font-size: 11px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@media (pointer: coarse) { .file-teamnote { font-size: max(12.5px, 1em); } }

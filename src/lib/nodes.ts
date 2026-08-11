@@ -69,7 +69,7 @@ export function makeImage(position: Pos, src: string, name?: string): AppNode {
 
 export function makeFile(
   position: Pos,
-  file: { name: string; size: number; mime?: string; dataUrl?: string },
+  file: { name: string; size: number; mime?: string; dataUrl?: string; lokal?: boolean },
 ): AppNode {
   return { id: uid(), type: 'file', width: CARD_WIDTHS.file, position, data: file };
 }
