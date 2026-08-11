@@ -103,6 +103,16 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
     const pos = { x: basePos.x + offset, y: basePos.y + offset };
     offset += 36;
     const ext = file.name.split('.').pop()?.toLowerCase();
+    /**
+     * M254: Der Dateityp aus der Endung, wenn das System keinen mitgibt.
+     *
+     * iOS liefert beim Weg über die Dateien-App (und bei iCloud-Dateien)
+     * regelmäßig einen LEEREN `type`. Die alte Prüfung `file.type.startsWith
+     * ('image/')` schlug dann fehl, und jedes Foto landete als Datei-Karte
+     * statt als Bild — genau der gemeldete Fall.
+     */
+    const mime = file.type || guessMime(file.name);
+    const istBild = mime.startsWith('image/');
 
     try {
       if (ext === 'ics') {
@@ -179,12 +189,23 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         addNode(makeEmail(pos, email));
         showToast(`📧 Outlook-Mail „${email.subject}" importiert`);
         mirror(file, null, mirrorNote);
-      } else if (file.type.startsWith('image/')) {
-        const src = await imageFileToDataUrl(file);
+      } else if (istBild) {
+        const src = await imageFileToDataUrl(file, mime);
+        if (src === null) {
+          // Dieser Browser kann das Format nicht dekodieren (z. B. HEIC außerhalb
+          // von Safari). Lieber eine ehrliche Datei-Karte als ein leerer Rahmen.
+          const node = makeFile(pos, { name: file.name, size: file.size, mime,
+            dataUrl: file.size <= MAX_EMBED_BYTES ? await readFileAsDataUrl(file) : undefined });
+          addNode(node);
+          showToast(`„${file.name}": Dieses Bildformat kann der Browser nicht anzeigen — als Datei abgelegt.`);
+          mirror(file, node.id, mirrorNote);
+          placed++;
+          continue;
+        }
         if (!canEmbed(src.length)) {
           // Zu groß fürs Board: als Datei-Karte MIT Team-Pfad ablegen statt
           // gar nicht (M159) — über den Ordner bleibt das Bild erreichbar
-          const node = makeFile(pos, { name: file.name, size: file.size, mime: file.type });
+          const node = makeFile(pos, { name: file.name, size: file.size, mime: mime, dataUrl: src });
           addNode(node);
           showToast('⚠️ Speicher fast voll — Bild als Datei-Karte abgelegt (nicht eingebettet).');
           mirror(file, node.id, mirrorNote);
@@ -199,7 +220,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           dataUrl = undefined;
           showToast('⚠️ Speicher fast voll — Datei nur als Verweis abgelegt. Exportiere in den Datenordner (⚙️).');
         }
-        const node = makeFile(pos, { name: file.name, size: file.size, mime: file.type || guessMime(file.name), dataUrl });
+        const node = makeFile(pos, { name: file.name, size: file.size, mime, dataUrl });
         addNode(node);
         mirror(file, node.id, mirrorNote);
       }

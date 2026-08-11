@@ -47,7 +47,7 @@ const FELDER = [
   'cardFocus',
   'fokusEinKlick',
   'fokusVollbild',
-  'physicsEnabled',
+  'physicsEnabled', 'stiftZeichnet',
   'gridSnap',
   'showArchived',
   'overviewMode',

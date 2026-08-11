@@ -118,6 +118,8 @@ export function Settings() {
   const milchglas = useBoard((s) => s.milchglas);
   const setMilchglas = useBoard((s) => s.setMilchglas);
   const clickZoom = useBoard((s) => s.clickZoom);
+  const stiftZeichnet = useBoard((s) => s.stiftZeichnet);
+  const setStiftZeichnet = useBoard((s) => s.setStiftZeichnet);
   const setClickZoom = useBoard((s) => s.setClickZoom);
   const cardFocus = useBoard((s) => s.cardFocus);
   const brainOffSpaces = useBoard((s) => s.brainOffSpaces);
@@ -1244,6 +1246,18 @@ export function Settings() {
             Blatt über dem abgedunkelten Board, damit man sieht, wo man gerade ist.
             Geschmackssache: <b>randlos</b> ist konzentrierter, <b>Blatt</b> behält den
             Zusammenhang.
+          </p>
+          <label className="modal-row modal-row-check">
+            <span>Stift zeichnet sofort</span>
+            <input type="checkbox" checked={stiftZeichnet} onChange={(e) => setStiftZeichnet(e.target.checked)} />
+          </label>
+          <p className="modal-hint">
+            Für Apple Pencil und andere Stifte: <b>Stift schreibt, Hand schiebt.</b> Der Stift
+            zeichnet direkt auf der freien Fläche, ohne dass du erst das Zeichenwerkzeug
+            wählst; Finger und Maus verschieben und zoomen weiter wie gewohnt. Der
+            aufliegende Handballen wird ignoriert, solange der Stift zeichnet, und der
+            Druck bestimmt die Strichstärke. Über einer Karte bleibt der Stift ein normaler
+            Zeiger — sonst könntest du damit keine Notiz mehr antippen.
           </p>
           <label className="modal-row modal-row-check">
             <span>Klick-Zoom</span>

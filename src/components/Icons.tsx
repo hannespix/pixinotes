@@ -132,3 +132,6 @@ export const IGrip = make(<>
   <circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none" />
   <circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none" />
 </>);
+
+/** M254: Bild/Foto — Rahmen mit Bergspitze und Sonne, das übliche Bildsymbol */
+export const IImage = make(<><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="1.6" /><path d="m21 15-4.5-4.5L9 18" /></>);

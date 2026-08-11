@@ -100,6 +100,16 @@ export function guessMime(fileName: string): string {
     gif: 'image/gif',
     webp: 'image/webp',
     svg: 'image/svg+xml',
+    // M254: Was ein iPhone tatsächlich liefert. Ohne diese Zeilen landete
+    // jedes Foto aus der Fotomediathek als namenlose Datei-Karte statt als
+    // Bild — die Dateien-App gibt den MIME-Typ nämlich oft gar nicht mit.
+    heic: 'image/heic',
+    heif: 'image/heif',
+    avif: 'image/avif',
+    bmp: 'image/bmp',
+    tif: 'image/tiff',
+    tiff: 'image/tiff',
+    ico: 'image/x-icon',
     xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     xls: 'application/vnd.ms-excel',
     docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

@@ -401,6 +401,9 @@ interface BoardState {
   /** Physik (Verdrängung/Wurf) global an/aus — aus = Karten dürfen überlappen/stapeln */
   physicsEnabled: boolean;
   setPhysicsEnabled: (on: boolean) => void;
+  /** M254: Stift (Apple Pencil & Co.) zeichnet sofort — ohne Zeichenmodus */
+  stiftZeichnet: boolean;
+  setStiftZeichnet: (on: boolean) => void;
 
   /** Archiv (M87): ganze Karten als erledigt ablegen bzw. zurückholen (undo-fähig) */
   setArchived: (ids: string[], archived: boolean) => void;
@@ -715,6 +718,8 @@ export const useBoard = create<BoardState>()(
 
         physicsEnabled: true,
         setPhysicsEnabled: (on) => set({ physicsEnabled: on }),
+        stiftZeichnet: true,
+        setStiftZeichnet: (on) => set({ stiftZeichnet: on }),
 
         setArchived: (ids, archived) => {
           if (ids.length === 0) return;
@@ -1688,6 +1693,7 @@ export const useBoard = create<BoardState>()(
         templates: s.templates,
         ui: s.ui,
         physicsEnabled: s.physicsEnabled,
+        stiftZeichnet: s.stiftZeichnet,
         clickZoom: s.clickZoom,
         cardFocus: s.cardFocus,
         fokusEinKlick: s.fokusEinKlick,

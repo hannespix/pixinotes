@@ -13,7 +13,7 @@ import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode
 import {
   IAppWindow, IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMinutes, IMore, IMousePointer, INote,
-  IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
+  ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
 } from './Icons';
 
 /**
@@ -243,6 +243,15 @@ export function Dock() {
   // Datei einfügen (M159): der Dialog-Weg für ALLE integrierbaren Typen —
   // am Smartphone gibt es kein Drag & Drop, dieser Weg ist dort der einzige
   const anyFileRef = useRef<HTMLInputElement | null>(null);
+  /**
+   * M254: Eigene Eingabe nur für Bilder.
+   *
+   * Auf iPhone und iPad entscheidet `accept` darüber, WAS das System anbietet:
+   * Mit `image/*` erscheinen „Fotomediathek" und „Foto aufnehmen" ganz oben —
+   * ohne dieses Attribut landet man zuerst in der Dateien-App und muss sich
+   * zur Mediathek durchhangeln. Genau daran scheiterte das Einfügen von Fotos.
+   */
+  const fotoRef = useRef<HTMLInputElement | null>(null);
   const addFiles = async (list: FileList | null) => {
     if (!list || list.length === 0) return;
     setAddMenu(false);
@@ -256,6 +265,35 @@ export function Dock() {
     setAddMenu(false);
     if (!url?.trim()) return;
     await importHtmlAppFromUrl(url, centerPos(560, 440));
+  };
+
+  /**
+   * M254: Bild aus der Zwischenablage holen.
+   *
+   * Der Weg für iPhone/iPad, weil iOS Web-Apps NICHT in sein Teilen-Menü
+   * aufnimmt (das kann dort nur eine echte App aus dem Store). In der Fotos-App
+   * „Kopieren" antippen, hier auf den Knopf — fertig. Am PC macht Strg+V
+   * dasselbe; der Knopf ist für alle da, die keine Tastatur haben.
+   */
+  const ausZwischenablage = async () => {
+    closeDockMenus();
+    try {
+      const eintraege = await navigator.clipboard.read();
+      const dateien: File[] = [];
+      for (const e of eintraege) {
+        const typ = e.types.find((t) => t.startsWith('image/'));
+        if (!typ) continue;
+        const blob = await e.getType(typ);
+        dateien.push(new File([blob], `Einfügen.${typ.split('/')[1] || 'png'}`, { type: typ }));
+      }
+      if (!dateien.length) {
+        showToast('In der Zwischenablage liegt gerade kein Bild.');
+        return;
+      }
+      await addFiles(dateien as unknown as FileList);
+    } catch {
+      showToast('Der Browser gibt die Zwischenablage nicht frei — kopiere das Bild und füge es mit Strg+V ein.');
+    }
   };
 
   // Eigene App (M158): HTML-Datei über den Datei-Dialog wählen — läuft seit
@@ -325,6 +363,18 @@ export function Dock() {
             <button onClick={() => addShape('decision')}><IDiamond size={16} /> Entscheidung</button>
             <button onClick={() => addShape('terminator')}><IPill size={16} /> Start/Ende</button>
             <div className="dock-menu-label">Dateien</div>
+            <button
+              onClick={() => fotoRef.current?.click()}
+              title="Foto oder Bild einfügen — am iPhone/iPad öffnet das direkt die Fotomediathek (oder die Kamera). Mehrere auf einmal gehen auch."
+            >
+              <IImage size={16} /> Foto / Bild einfügen
+            </button>
+            <button
+              onClick={() => void ausZwischenablage()}
+              title="Bild aus der Zwischenablage einfügen — der Weg vom iPhone/iPad: in der Fotos-App auf „Kopieren“ tippen und hier einfügen."
+            >
+              <ICopy size={16} /> Aus Zwischenablage einfügen
+            </button>
             <button
               onClick={() => anyFileRef.current?.click()}
               title="Lokale Dateien aufs Board holen (auch mehrere auf einmal): Bilder, PDFs mit Vorschau, E-Mails (.eml/.msg), Kalender (.ics), HTML-Apps, Board-Dateien — alles andere als Datei-Karte. Gehört das Board zu einem Team-Projekt, landet automatisch eine Kopie im Sync-Ordner. Geht auch per Drag & Drop."
@@ -584,6 +634,14 @@ export function Dock() {
         accept=".html,.htm,text/html"
         style={{ display: 'none' }}
         onChange={(e) => { void addHtmlApp(e.target.files?.[0]); e.target.value = ''; }}
+      />
+      <input
+        ref={fotoRef}
+        type="file"
+        accept="image/*"
+        multiple
+        style={{ display: 'none' }}
+        onChange={(e) => { void addFiles(e.target.files); e.target.value = ''; }}
       />
       <input
         ref={anyFileRef}

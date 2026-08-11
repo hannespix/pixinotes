@@ -287,6 +287,13 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .img-name { margin-top: 6px; }
 
 /* ---------- Datei-Karte ---------- */
+/* M254: Bildvorschau auf der Datei-Karte — dieselbe Rolle wie die
+   PDF-Vorschau: sofort sehen, was drinsteckt, statt nur den Dateinamen. */
+.file-thumb {
+  display: block; width: 100%; height: auto; max-height: 320px;
+  object-fit: contain; border-radius: 10px; margin-top: 6px;
+  background: var(--surface-dim);
+}
 .file-card { background: var(--surface-card); border-radius: 10px; padding: 6px; overflow: hidden; }
 .file-body {
   display: flex; align-items: center; gap: 10px; border: none; background: none;

@@ -34,6 +34,17 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
   const icon = ICONS[ext] ?? '📎';
   const isPdf = ext === 'pdf' && !!file.dataUrl;
+  /**
+   * M254: Auch eine Datei-KARTE zeigt ein Bild als Bild.
+   *
+   * Als Datei landet ein Foto in zwei Fällen: Es ist zu groß fürs Einbetten,
+   * oder der Browser kann das Format nicht anzeigen. Im ersten Fall gibt es
+   * die Daten trotzdem — dann ist eine Vorschau selbstverständlich. Der
+   * gemeldete Fall („wird als Datei eingefügt, aber nicht als Bild angezeigt")
+   * ist damit auch dann noch brauchbar, wenn er auftritt.
+   */
+  const istBild = !!file.dataUrl && (file.mime?.startsWith('image/')
+    || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'heic', 'heif', 'avif'].includes(ext));
   const [viewerOpen, setViewerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -85,6 +96,10 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           title={`Kopie liegt im Team-Ordner: ${file.ref}`}>
           {loading ? 'Lädt …' : 'Aus Team-Ordner laden'}
         </button>
+      )}
+      {istBild && !isPdf && (
+        <img className="file-thumb nodrag" src={file.dataUrl} alt={file.name} draggable={false}
+          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
       )}
       {isPdf && <PdfThumb dataUrl={file.dataUrl!} onOpen={() => setViewerOpen(true)} />}
       {viewerOpen && <PdfViewer dataUrl={file.dataUrl!} name={file.name} onClose={() => setViewerOpen(false)} onDownload={download} />}

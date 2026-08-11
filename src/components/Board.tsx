@@ -827,6 +827,7 @@ export function Board() {
       for (const file of files) {
         try {
           const src = await imageFileToDataUrl(file);
+          if (src === null) continue;   // Format nicht dekodierbar (HEIC außerhalb Safari)
           if (!canEmbed(src.length)) {
             showToast('⚠️ Speicher fast voll — Bild nicht eingebettet. Exportiere in den Datenordner (⚙️).');
             break;
