@@ -237,7 +237,7 @@ export function HelpOverlay() {
                 <li>Die <b>Brotkrume</b> „Bereich › Projekt" öffnet den <b>Navigator</b> — ein zentrales Fenster über alle Ebenen: Bereiche (Klick öffnet die große Übersicht), Projekte (Klick öffnet ihr erstes Board), Boards und per ▸ sogar die <b>Karten jedes Boards</b> — ein Klick springt direkt zur Karte.</li>
                 <li><b>🏠</b> öffnet die große Übersicht: Bereiche als farbige Zonen, Boards als Kacheln — Kacheln lassen sich per Drag in andere Projekte verschieben.</li>
                 <li>Der Umschalter <b>Hierarchie ⇄ Netz</b> zeigt alternativ den Verknüpfungs-Graphen (Portale, [[Wikilinks]]) — zoombar wie das Board.</li>
-                <li><b>Portale</b> sind Karten, die auf ein anderes Board verlinken — für Sprungmarken zwischen Themen.</li>
+                <li><b>Portale</b> sind Karten, die auf ein anderes Board verlinken — für Sprungmarken zwischen Themen. Sie gelten in <b>beide Richtungen</b>: Verlinkst du von „A" nach „B", legt PixiNotes in „B" automatisch einen <b>Rückverweis</b> auf „A" an (ein Strg+Z nimmt beide zurück). Liegt drüben schon ein Portal zurück, bleibt es dabei. Ältere, einseitige Portale tragen den Rückverweis auf Klick nach („⇄ Rückverweis anlegen" auf der Karte).</li>
               </ul>
             </section>
 

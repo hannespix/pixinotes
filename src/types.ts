@@ -130,6 +130,8 @@ export function wipFull(data: KanbanData, col: number): boolean {
 export interface PortalData {
   /** Ziel-Board der Portal-Karte */
   boardId?: string;
+  /** M262: automatisch als Rückverweis angelegt (Gegenstück eines Portals) */
+  rueck?: boolean;
   [key: string]: unknown;
 }
 

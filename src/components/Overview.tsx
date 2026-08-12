@@ -17,7 +17,6 @@ import { suggestBoardLinks, type LinkSuggestion } from '../lib/brain';
 import { nodeToText } from '../lib/serialize';
 import { InlineName } from './InlineName';
 import { IPen, IPlay, ITarget, IX, IZoomIn, IZoomOut } from './Icons';
-import { makePortal } from '../lib/nodes';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
 interface ProjectZoneData { project: Project; spaceId: string; [key: string]: unknown }
@@ -724,8 +723,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   };
 
   // ---------- M195: Kontextmenü — manuell verknüpfen per Rechtsklick/Langdruck ----------
-  const addNodeToBoard = useBoard((s) => s.addNodeToBoard);
-  const showToast = useBoard((s) => s.showToast);
+  const portalAnlegen = useBoard((s) => s.portalAnlegen);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; boardId: string } | null>(null);
   const [linkFrom, setLinkFrom] = useState<string | null>(null);
   // M205: Menü an einer angeklickten Vorschlags-Kante (annehmen/ablehnen)
@@ -789,27 +787,19 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     return () => { window.removeEventListener('keydown', onKey, true); window.removeEventListener('pointerdown', onDown, true); };
   }, [ctxMenu, linkFrom, sugMenu]);
 
-  /** Vorschlag annehmen: echtes Portal auf BEIDEN Seiten wäre Overkill —
-   *  eines vom aktuell offenen (oder erstgenannten) Board reicht als Brücke */
+  /** Vorschlag annehmen: Portal vom aktuell offenen (oder erstgenannten) Board
+   *  aus — seit M262 legt der Store drüben den Rückverweis gleich mit an. */
   const acceptSuggestion = (a: string, b: string) => {
     const from = a === activeId ? a : (b === activeId ? b : a);
     const to = from === a ? b : a;
-    const portal = makePortal({ x: 80 + Math.random() * 240, y: 80 + Math.random() * 160 });
-    portal.data = { boardId: to };
-    addNodeToBoard(from, portal);
-    showToast(`🔗 Vorschlag übernommen: „${boardName(from)}" → „${boardName(to)}" (Strg+Z macht es rückgängig).`);
+    portalAnlegen(from, to, { x: 80, y: 80 });
     setSugMenu(null);
   };
-  /** Ziel angeklickt: Portal-Karte auf dem Quell-Board anlegen — eine ECHTE
+  /** Ziel angeklickt: Portal-Karten auf BEIDEN Boards anlegen — eine ECHTE
    *  Verbindung im Datenmodell (undo-fähig), nicht nur ein Strich im Bild */
   const completeLink = (targetId: string) => {
     if (!linkFrom || linkFrom === targetId) { setLinkFrom(null); return; }
-    const from = linkFrom;
-    const spot = { x: 80 + Math.random() * 240, y: 80 + Math.random() * 160 };
-    const portal = makePortal(spot);
-    portal.data = { boardId: targetId };
-    addNodeToBoard(from, portal);
-    showToast(`🔗 Portal angelegt: „${boardName(from)}" → „${boardName(targetId)}" (Strg+Z macht es rückgängig).`);
+    portalAnlegen(linkFrom, targetId, { x: 80, y: 80 });
     setLinkFrom(null);
   };
 

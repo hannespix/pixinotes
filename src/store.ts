@@ -17,6 +17,7 @@ import { buildStarter } from './lib/starter';
 import { uid, type AppNode, type CardFont, type CardSize, type TimeSeg } from './types';
 import { anchorStroke, integrateStroke } from './lib/strokeAnchor';
 import { findFreeSpot, frameMembers } from './lib/arrange';
+import { baueRueckverweis } from './lib/portale';
 
 /** Ein Freihand-Strich (Punkte in Flow-Koordinaten) */
 export interface Stroke {
@@ -319,6 +320,16 @@ interface BoardState {
   addNode: (node: AppNode) => void;
   /** Karte in ein BELIEBIGES Board einfügen (Schnell-Eingabe der Aufgaben-Zentrale, M114) */
   addNodeToBoard: (boardId: string, node: AppNode) => void;
+  /**
+   * M262: Portale sind gegenseitig — beim Verlinken entsteht auf dem
+   * Ziel-Board ein Rückverweis auf das Ausgangs-Board. Beides ist EIN
+   * Undo-Schritt; liegt drüben schon ein Portal zurück, bleibt es dabei.
+   */
+  portalZielSetzen: (nodeId: string, zielBoardId: string) => void;
+  /** Portal von Board zu Board neu anlegen (Netz/Übersicht) — mit Rückverweis */
+  portalAnlegen: (quellBoardId: string, zielBoardId: string, position?: { x: number; y: number }) => void;
+  /** Fehlenden Rückverweis nachtragen (ältere Portale, M262) */
+  rueckverweisNachtragen: (quellBoardId: string, zielBoardId: string) => void;
   removeNode: (id: string) => void;
   removeNodes: (ids: string[]) => void;
   /** M163: Karten in ein anderes Board verschieben — Rahmen nehmen ihre
@@ -1451,6 +1462,75 @@ export const useBoard = create<BoardState>()(
             boards: get().boards.map((b) =>
               b.id === boardId ? { ...b, nodes: [...b.nodes, node] } : b),
           });
+        },
+
+        /**
+         * M262: Portal-Ziel wählen — und drüben den Rückverweis anlegen.
+         *
+         * Beide Änderungen liegen in EINEM Undo-Schritt (pushHistoryBoards):
+         * Ein Portal ist eine Beziehung, kein Objekt auf einem Board; sie in
+         * zwei Schritten zurückzunehmen hieße, kurzzeitig eine halbe Beziehung
+         * zu haben.
+         */
+        portalZielSetzen: (nodeId, zielBoardId) => {
+          const s = get();
+          const quelle = s.boards.find((b) => b.id === s.activeId);
+          const ziel = s.boards.find((b) => b.id === zielBoardId);
+          if (!quelle || !ziel) return;
+          const rueck = baueRueckverweis(ziel, quelle.id);
+          get().pushHistoryBoards([zielBoardId]);
+          set({
+            boards: get().boards.map((b) => {
+              if (b.id === quelle.id) {
+                return { ...b, nodes: b.nodes.map((n) => (n.id === nodeId
+                  ? ({ ...n, data: { ...n.data, boardId: zielBoardId } } as AppNode) : n)) };
+              }
+              if (b.id === ziel.id && rueck) return { ...b, nodes: [...b.nodes, rueck] };
+              return b;
+            }),
+          });
+          get().showToast(rueck
+            ? `🔗 Portal zu „${ziel.name}" — und dort liegt jetzt ein Rückverweis auf „${quelle.name}". Strg+Z macht beides rückgängig.`
+            : `🔗 Portal zu „${ziel.name}" — von dort führt bereits ein Portal zurück.`);
+        },
+
+        portalAnlegen: (quellBoardId, zielBoardId, position) => {
+          const s = get();
+          const quelle = s.boards.find((b) => b.id === quellBoardId);
+          const ziel = s.boards.find((b) => b.id === zielBoardId);
+          if (!quelle || !ziel || quelle.id === ziel.id) return;
+          const wunsch = position ?? { x: 80, y: 80 };
+          const hin: AppNode = {
+            id: uid(), type: 'portal', width: 200,
+            position: findFreeSpot(quelle.nodes, wunsch, { w: 200, h: 140 }),
+            data: { boardId: zielBoardId },
+          };
+          const rueck = baueRueckverweis(ziel, quelle.id);
+          get().pushHistoryBoards([quellBoardId, zielBoardId]);
+          set({
+            boards: get().boards.map((b) => {
+              if (b.id === quelle.id) return { ...b, nodes: [...b.nodes, hin] };
+              if (b.id === ziel.id && rueck) return { ...b, nodes: [...b.nodes, rueck] };
+              return b;
+            }),
+          });
+          get().showToast(rueck
+            ? `🔗 Portal „${quelle.name}" ⇄ „${ziel.name}" — auf beiden Boards liegt jetzt eine Karte. Strg+Z macht beides rückgängig.`
+            : `🔗 Portal „${quelle.name}" → „${ziel.name}" — zurück führte schon eines. Strg+Z macht es rückgängig.`);
+        },
+
+        rueckverweisNachtragen: (quellBoardId, zielBoardId) => {
+          const s = get();
+          const quelle = s.boards.find((b) => b.id === quellBoardId);
+          const ziel = s.boards.find((b) => b.id === zielBoardId);
+          if (!quelle || !ziel) return;
+          const rueck = baueRueckverweis(ziel, quelle.id);
+          if (!rueck) { get().showToast(`„${ziel.name}" verweist bereits zurück.`); return; }
+          get().pushHistoryBoards([zielBoardId]);
+          set({
+            boards: get().boards.map((b) => (b.id === ziel.id ? { ...b, nodes: [...b.nodes, rueck] } : b)),
+          });
+          get().showToast(`🔗 „${ziel.name}" verweist jetzt auf „${quelle.name}" zurück. Strg+Z macht es rückgängig.`);
         },
 
         removeNode: (id) => get().removeNodes([id]),
