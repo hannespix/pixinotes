@@ -10,8 +10,10 @@ import { canEmbed } from '../../lib/nodes';
 import { loadAttachment } from '../../lib/attachments';
 import { renderPdfPage } from '../../lib/pdf';
 import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/fileStore';
+import { useLupe } from '../../lib/lupe';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
+import { BildLupe, ZoomKnoepfe } from './BildLupe';
 import { IDownload } from '../Icons';
 
 const ICONS: Record<string, string> = {
@@ -78,6 +80,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
    */
   const istBild = !!quelle && art === 'bild';
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [bildOffen, setBildOffen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const download = () => {
@@ -156,8 +159,17 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           Kopie im Team-Ordner: {file.ref.split('/').slice(-2).join('/')}
         </div>
       )}
-      {istBild && <img className="file-thumb nodrag" src={quelle!} alt={titel} draggable={false}
-        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />}
+      {/* M264: Auch das Bild lässt sich groß ansehen und vergrößern — der
+          Klick auf die Vorschau öffnet dieselbe Lupe wie beim PDF. */}
+      {istBild && (
+        <button className="file-thumb nodrag" onClick={() => setBildOffen(true)} title="Bild groß ansehen (zoombar)">
+          <img src={quelle!} alt={titel} draggable={false}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+        </button>
+      )}
+      {bildOffen && quelle && (
+        <BildLupe quelle={quelle} name={titel} onClose={() => setBildOffen(false)} onDownload={download} />
+      )}
       {isPdf && <PdfThumb dataUrl={quelle!} onOpen={() => setViewerOpen(true)} />}
       {/* M259: Ton und Bewegtbild kann der Browser selbst — dann soll er auch */}
       {art === 'audio' && quelle && <audio className="file-media nodrag" src={quelle} controls preload="metadata" />}
@@ -250,6 +262,7 @@ function PdfViewer({ dataUrl, name, onClose, onDownload }: {
   const ref = useRef<HTMLCanvasElement>(null);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
+  const { zoom, rein, raus, einpassen, flaecheRef, griffe, maxZoom } = useLupe();
 
   const [breite, setBreite] = useState(() => viewerBreite());
   useEffect(() => {
@@ -258,12 +271,23 @@ function PdfViewer({ dataUrl, name, onClose, onDownload }: {
     return () => window.removeEventListener('resize', nach);
   }, []);
 
+  /**
+   * M264: Beim Zoomen wird die Seite NEU GERENDERT, nicht gestreckt.
+   *
+   * Ein Canvas ist ein Bitmap: Zieht man es per CSS auf 300 %, bekommt man
+   * dreimal so große Pixel — genau die Unschärfe, gegen die M242 angetreten
+   * ist. pdf.js zeichnet die Seite deshalb gleich in der Zielbreite. Die
+   * Deckelung bei 5000 Punkten ist die Sicherung nach oben: Mit
+   * Geräte-Auflösung und Anzeigezoom (M242) kommen darüber schnell
+   * dreistellige Megabyte an Bitmap zusammen.
+   */
+  const zielBreite = Math.min(5000, Math.round(breite * zoom));
   useEffect(() => {
     if (!ref.current) return;
-    const h = renderPdfPage(dataUrl, page, ref.current, breite);
+    const h = renderPdfPage(dataUrl, page, ref.current, zielBreite);
     h.promise.then(setPages).catch(() => {});
     return () => h.cancel();
-  }, [dataUrl, page, breite]);
+  }, [dataUrl, page, zielBreite]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -284,11 +308,17 @@ function PdfViewer({ dataUrl, name, onClose, onDownload }: {
             <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Vorherige Seite">‹</button>
             <span>{page} / {pages}</span>
             <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} aria-label="Nächste Seite">›</button>
+            <ZoomKnoepfe {...{ zoom, rein, raus, einpassen, maxZoom }} />
             <button onClick={onDownload} title="Herunterladen"><IDownload size={14} /></button>
             <button onClick={onClose} aria-label="Schließen">✕</button>
           </span>
         </div>
-        <div className="pdf-page"><canvas ref={ref} /></div>
+        <div
+          className={`pdf-page ${zoom > 1.01 ? 'gezoomt' : ''}`}
+          ref={flaecheRef}
+          {...griffe}
+          title="Doppelklick vergrößert · Strg + Rad zoomt · zwei Finger kneifen"
+        ><canvas ref={ref} /></div>
       </div>
     </div>,
     document.body,

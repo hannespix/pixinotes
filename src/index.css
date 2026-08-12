@@ -319,7 +319,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .card-actions button:hover { background: var(--border); }
 
 /* ---------- Bild-Karte ---------- */
-.image-card { background: var(--surface-card); border-radius: 10px; padding: 8px; overflow: hidden; display: flex; flex-direction: column; }
+.image-card { position: relative; background: var(--surface-card); border-radius: 10px; padding: 8px; overflow: hidden; display: flex; flex-direction: column; }
 .image-card img { width: 100%; min-height: 0; flex: 1; object-fit: contain; border-radius: 6px; display: block; }
 .img-name { margin-top: 6px; }
 
@@ -327,9 +327,13 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* M254: Bildvorschau auf der Datei-Karte — dieselbe Rolle wie die
    PDF-Vorschau: sofort sehen, was drinsteckt, statt nur den Dateinamen. */
 .file-thumb {
-  display: block; width: 100%; height: auto; max-height: 320px;
-  object-fit: contain; border-radius: 10px; margin-top: 6px;
+  /* M264: jetzt ein Knopf um das Bild — er öffnet die zoombare Ansicht */
+  display: block; width: 100%; margin-top: 6px; padding: 0; border: none;
+  border-radius: 10px; overflow: hidden; cursor: zoom-in; line-height: 0;
   background: var(--surface-dim);
+}
+.file-thumb img {
+  display: block; width: 100%; height: auto; max-height: 320px; object-fit: contain;
 }
 .file-card { background: var(--surface-card); border-radius: 10px; padding: 6px; overflow: hidden; }
 /* M263: Titelzeile der Datei-Karte — Symbol plus umbenennbarer Titel */
@@ -1800,8 +1804,56 @@ html[data-kopf-eng='an'] .hint { display: none; }
   font-size: 13px; padding: 3px 9px; font-family: inherit;
 }
 .pdf-nav button:disabled { opacity: .35; cursor: default; }
-.pdf-page { overflow: auto; background: #efece6; padding: 14px; display: flex; justify-content: center; }
-.pdf-page canvas { max-width: 100%; height: auto; box-shadow: 0 2px 12px rgba(0,0,0,.2); border-radius: 4px; }
+/**
+ * M264: Die Vorschaufläche ist zoombar.
+ *
+ * `overflow: auto` erledigt das Schieben im vergrößerten Bild von selbst —
+ * am Finger wie an der Maus. `touch-action: pan-x pan-y` lässt das native
+ * Schieben zu, überlässt das Kneifen aber uns (sonst zoomte der Browser die
+ * ganze Seite statt der Seite im Viewer).
+ * `align-items: flex-start` ist nötig, weil eine zentrierte Flex-Zeile
+ * überstehenden Inhalt oben abschneidet und nicht mehr scrollen lässt.
+ */
+.pdf-page {
+  overflow: auto; background: #efece6; padding: 14px;
+  display: flex; justify-content: center; align-items: flex-start;
+  touch-action: pan-x pan-y; overscroll-behavior: contain; cursor: zoom-in;
+}
+.pdf-page.gezoomt { cursor: grab; }
+.pdf-page.gezoomt:active { cursor: grabbing; }
+.pdf-page canvas, .pdf-page img {
+  max-width: none; height: auto; box-shadow: 0 2px 12px rgba(0,0,0,.2); border-radius: 4px;
+  flex: none; display: block;
+}
+/* Eingepasst bleibt eingepasst — erst darüber darf die Seite überstehen */
+.pdf-page:not(.gezoomt) canvas, .pdf-page:not(.gezoomt) img { max-width: 100%; }
+.lupe-knoepfe { display: inline-flex; align-items: center; gap: 2px; }
+.lupe-knoepfe .lupe-stand {
+  min-width: 52px; text-align: center; font-variant-numeric: tabular-nums;
+}
+@media (pointer: coarse) {
+  .pdf-nav button { min-height: 34px; min-width: 34px; }
+}
+/**
+ * ⤢ auf der Bild-Karte: zurückhaltend, aber immer erreichbar.
+ *
+ * Bewusst LINKS oben statt rechts: Rechts oben sitzt der ✕-Löschknopf der
+ * ausgewählten Karte (er ragt sogar nach außen) und fängt die Tipps ab —
+ * derselbe Fund wie beim Kommentar-Pin in M148, hier von der Prüfreihe
+ * gemeldet, bevor es jemand am Gerät erlebt.
+ */
+.bild-lupe-auf {
+  position: absolute; top: 6px; left: 6px; z-index: 3;
+  border: none; border-radius: 8px; cursor: pointer; font-size: 13px; line-height: 1;
+  padding: 5px 7px; background: rgba(20, 18, 14, 0.5); color: #fff;
+  opacity: 0; transition: opacity 0.15s;
+}
+.image-card:hover .bild-lupe-auf, .react-flow__node.selected .bild-lupe-auf { opacity: 1; }
+.bild-lupe-auf:hover { background: rgba(20, 18, 14, 0.75); }
+@media (pointer: coarse) {
+  /* Am Finger gibt es kein Hovern — dort steht der Knopf dauerhaft da */
+  .bild-lupe-auf { opacity: 0.85; min-height: 32px; min-width: 32px; }
+}
 
 /* ---------- Präsentationsmodus ---------- */
 .presenter {
