@@ -12,7 +12,7 @@ import { uid, type AppNode, type ShapeKind } from '../types';
 import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
   IAppWindow, IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
-  IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMetro, IMinutes, IMore, IMousePointer, INote,
+  IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISigma, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
 } from './Icons';
 
@@ -122,12 +122,6 @@ export function Dock() {
       mutedHistory(() => st.onEdgesChange(dupes.map((id) => ({ type: 'remove' as const, id }))));
       showToast(`🧹 ${dupes.length} doppelte Verbindung(en) zusammengefasst.`);
     }
-    // Metro-Grid: alle Verbindungen auf die rechtwinklige Winkel-Route stellen
-    if (mode === 'metro') {
-      mutedHistory(() => {
-        for (const e of selectActiveBoard(useBoard.getState()).edges) st.updateEdgeKind(e.id, 'step');
-      });
-    }
     setArranging(true);
     const DUR = 700;
     const STAGGER = 14; // ms pro Karte — wirkt organisch statt mechanisch
@@ -153,7 +147,6 @@ export function Dock() {
         const msg = {
           flow: 'Verbundenes als Fluss (links → rechts), Rest nach Modultyp gruppiert',
           flowV: 'Verbundenes als Fluss (oben ↓ unten), Rest nach Modultyp gruppiert',
-          metro: 'Metro-Grid: Fluss auf festem Raster, Verbindungen rechtwinklig',
           lanes: 'Schwimmbahnen: eine Bahn pro Person, unten „Ohne Zuordnung"',
           timeline: 'Zeitstrahl: Fristen chronologisch, Undatiertes darunter',
           compact: 'Kompakt gepackt — ideal vor dem Bild-Export',
@@ -583,7 +576,6 @@ export function Dock() {
             <div className="dock-menu-label">Anordnungs-Modus</div>
             <button onClick={() => arrange('flow')} title="Verbundene Karten als Prozess von links nach rechts, der Rest als Typ-Gruppen"><IFlowH size={15} /> Fluss horizontal</button>
             <button onClick={() => arrange('flowV')} title="Verbundene Karten als Prozess von oben nach unten, der Rest als Typ-Gruppen"><IFlowV size={15} /> Fluss vertikal</button>
-            <button onClick={() => arrange('metro')} title="Fluss-Layout auf festem Raster, alle Verbindungen rechtwinklig — U-Bahn-Plan-Look"><IMetro size={15} /> Metro-Grid</button>
             <button onClick={() => arrange('grid')} title="Alles in ein sauberes Raster, sortiert nach Modultyp"><IGridLayout size={15} /> Raster</button>
             <button onClick={() => arrange('compact')} title="Minimale Fläche — dicht gepackt, ideal vor dem Bild-Export"><ICompact size={15} /> Kompakt packen</button>
             <button onClick={() => arrange('lanes')} title="Eine Bahn pro Person (Eigenschaft wer/who oder Personen aus Tickets/Zeitplänen)"><ILanes size={15} /> Schwimmbahnen (Personen)</button>

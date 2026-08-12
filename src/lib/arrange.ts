@@ -364,7 +364,7 @@ function layoutStack(group: AppNode[]): Block {
 
 export type ArrangeMode =
   | 'flow' | 'flowV' | 'grid' | 'circles' | 'stack'
-  | 'lanes' | 'timeline' | 'metro' | 'compact' | 'quadrant';
+  | 'lanes' | 'timeline' | 'compact' | 'quadrant';
 
 /* ---------- M142: weitere Anordnungen ---------- */
 
@@ -647,11 +647,6 @@ export function computeArrangement(allNodes: AppNode[], edges: Edge[], mode: Arr
   if (nodes.length === 0) return [];
   if (mode === 'flowV') {
     return computeArrangement(nodes.map(transposeNode), edges, 'flow', false).map(([id, x, y]) => [id, y, x]);
-  }
-  // Metro-Grid (M142): Fluss-Layout, auf ein 40-px-Raster gerastet — zusammen
-  // mit Winkel-Kanten (setzt der Aufräumen-Knopf) entsteht der U-Bahn-Plan-Look
-  if (mode === 'metro') {
-    return computeArrangement(nodes, edges, 'flow', false).map(([id, x, y]) => [id, Math.round(x / 40) * 40, Math.round(y / 40) * 40]);
   }
   if (mode === 'lanes') return arrangeLanes(nodes).moves;
   if (mode === 'timeline') return arrangeTimeline(nodes);

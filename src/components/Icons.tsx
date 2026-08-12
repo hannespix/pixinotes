@@ -97,7 +97,6 @@ export const IMagnet = make(<><path d="M5 3v7a7 7 0 0 0 14 0V3" /><path d="M5 3h
 /* ---------- M144: Anordnungs- & Export-Icons (statt Emojis in Menüs) ---------- */
 export const IFlowH = make(<><path d="M3 12h14" /><path d="m12 7 5 5-5 5" /></>);
 export const IFlowV = make(<><path d="M12 3v14" /><path d="m7 12 5 5 5-5" /></>);
-export const IMetro = make(<><path d="M4 17h5l6-10h5" /><circle cx="4" cy="17" r="1.8" /><circle cx="20" cy="7" r="1.8" /></>);
 export const IGridLayout = make(<><rect x="3.5" y="3.5" width="7" height="7" rx="1" /><rect x="13.5" y="3.5" width="7" height="7" rx="1" /><rect x="3.5" y="13.5" width="7" height="7" rx="1" /><rect x="13.5" y="13.5" width="7" height="7" rx="1" /></>);
 export const ICompact = make(<><path d="m14 10 6-6" /><path d="M14 4v6h6" /><path d="m10 14-6 6" /><path d="M10 20v-6H4" /></>);
 export const ILanes = make(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9.3h18" /><path d="M3 14.6h18" /></>);
