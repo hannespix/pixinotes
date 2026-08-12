@@ -508,6 +508,12 @@ export function Settings() {
           ))}
         </div>
 
+        {/* M263: Nur DIESER Bereich läuft über — die Fensterschale bleibt
+            geschlossen (overflow: hidden). Dadurch kann keine Bildlaufleiste
+            mehr über die abgerundeten Ecken laufen, und Kopfzeile samt
+            Reitern bleiben immer stehen. */}
+        <div className="modal-body">
+
         {/* ---- KI ---- */}
         {tab === 'ki' && (
         <section className="modal-section">
@@ -1387,6 +1393,8 @@ export function Settings() {
             dort nichts mehr mit den Aktionsknöpfen kollidieren, weil beide untereinander
             stehen. <b>Am Telefon</b> bleibt es bei der Kopfleiste — dort ist die Breite
             das knappe Gut, eine feste Spalte fräße ein Drittel davon.
+            Seit M263 ist die Spalte am großen Schirm <b>voreingestellt</b>; dieser
+            Schalter nimmt sie wieder zurück.
           </p>
           <label className="modal-row modal-row-check">
             <span>Karte im Fokus</span>
@@ -1466,6 +1474,8 @@ export function Settings() {
           </p>
         </section>
         )}
+
+        </div>
 
         <div className="modal-foot">
           PixiNotes (Stand {__BUILD_STAMP__}) · lokale Daten, kein Konto nötig ·{' '}

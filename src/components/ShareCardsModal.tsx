@@ -81,6 +81,7 @@ export function ShareCardsModal() {
           <h2>Teilen &amp; Export — {title}</h2>
           <button className="modal-x" onClick={close} aria-label="Schließen"><IX size={14} /></button>
         </div>
+        <div className="modal-body">
         <div className="share-cards-grid">
           <button onClick={() => void copyLink()} disabled={busy === 'link'} title="Serverloser Link: die Karten stecken komplett im Link — wer ihn in PixiNotes öffnet, übernimmt sie als eigenes Board">
             <IFolder size={18} />
@@ -122,6 +123,7 @@ export function ShareCardsModal() {
         <div className="share-cards-foot">
           Der Übernahme-Link enthält die Karten selbst (serverlos, nichts wird hochgeladen).
           KI-Schlüssel und Zugangsdaten sind nie Teil geteilter Inhalte.
+        </div>
         </div>
       </div>
     </div>

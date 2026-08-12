@@ -878,7 +878,18 @@ export const useBoard = create<BoardState>()(
         setFokusEinKlick: (on) => set({ fokusEinKlick: on }),
         fokusVollbild: false,
         setFokusVollbild: (on) => set({ fokusVollbild: on }),
-        navLinks: false,
+        /**
+         * M263: Am großen Schirm ist die linke Spalte die Voreinstellung.
+         *
+         * „auf großen Screens bitte die Header-Navigation immer links
+         * vertikal anzeigen! ist einfach besser!" — und das deckt sich mit
+         * der Geometrie aus M238: nach unten ist Platz, nach rechts nicht.
+         * Das Stylesheet lässt die Spalte ohnehin erst ab 861 Punkten
+         * wirken, am Telefon bleibt es bei der Kopfleiste. Wer sie nicht
+         * will, schaltet sie in den Einstellungen ab; diese Wahl wird
+         * gespeichert und überschreibt die Voreinstellung.
+         */
+        navLinks: true,
         setNavLinks: (on) => set({ navLinks: on }),
         leisteVersatz: { board: { x: 0, y: 0 }, fokus: { x: 0, y: 0 } },
         setLeisteVersatz: (wo, v) => set((s) => ({

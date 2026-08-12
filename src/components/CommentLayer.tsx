@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useInternalNode, ViewportPortal } from '@xyflow/react';
+import { useInternalNode, useReactFlow, useStore, ViewportPortal } from '@xyflow/react';
 import { selectActiveBoard, useBoard, type CommentThread } from '../store';
 import { IX } from './Icons';
 
@@ -57,6 +57,45 @@ function CommentPanel() {
   const thread = isNew ? null : (board.comments ?? []).find((c) => c.id === openId);
   const nodeId = isNew ? openId!.slice(4) : thread?.nodeId;
 
+  /**
+   * M263: Die Blase steht AN der Karte, nicht in der Ecke des Fensters.
+   *
+   * Vorher lag das Gespräch fest oben rechts — bei einer Karte unten links
+   * musste man zwischen Fähnchen und Text hin- und herschauen und hatte
+   * keinen Anhaltspunkt, zu welcher Karte der Kommentar gehört
+   * (User-Screenshot). Jetzt wird die Bildschirmposition der Karte
+   * ausgerechnet und die Blase daneben gesetzt — sie folgt beim Schwenken
+   * und Zoomen mit, behält aber ihre Lesegröße (der Text soll nicht
+   * mitzoomen, sonst ist er bei 40 % Zoom unlesbar).
+   */
+  const rf = useReactFlow();
+  const transform = useStore((s) => s.transform);
+  const node = useInternalNode(nodeId ?? '');
+  const blaseRef = useRef<HTMLDivElement | null>(null);
+  const [lage, setLage] = useState<{ left: number; top: number; seite: 'rechts' | 'links' } | null>(null);
+  useLayoutEffect(() => {
+    // Am Telefon ist für eine Blase neben der Karte kein Platz — dort bleibt
+    // es beim festen Blatt am Rand (CSS), also gar nicht erst rechnen.
+    if (!node || document.body.offsetWidth < 620) { setLage(null); return; }
+    const w = node.measured.width ?? 260;
+    const p = node.internals.positionAbsolute;
+    const box = blaseRef.current?.getBoundingClientRect();
+    const bw = box?.width ?? 330;
+    const bh = box?.height ?? 220;
+    const rechtsOben = rf.flowToScreenPosition({ x: p.x + w, y: p.y });
+    const linksOben = rf.flowToScreenPosition({ x: p.x, y: p.y });
+    const rand = 12;
+    let seite: 'rechts' | 'links' = 'rechts';
+    let left = rechtsOben.x + 16;
+    if (left + bw > window.innerWidth - rand) {
+      const alternativ = linksOben.x - bw - 16;
+      if (alternativ >= rand) { left = alternativ; seite = 'links'; }
+      else left = Math.max(rand, window.innerWidth - bw - rand);
+    }
+    const top = Math.min(Math.max(rand, rechtsOben.y - 8), Math.max(rand, window.innerHeight - bh - rand));
+    setLage({ left, top, seite });
+  }, [node, transform, rf, thread?.msgs.length, isNew]);
+
   // Neue Nachrichten: ans Ende scrollen
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
@@ -73,7 +112,14 @@ function CommentPanel() {
   };
 
   return createPortal(
-    <div className="comment-panel" role="dialog" aria-label="Kommentare">
+    <div
+      className={`comment-panel ${lage ? 'an-karte' : 'fest'}`}
+      ref={blaseRef}
+      data-seite={lage?.seite}
+      style={lage ? { left: lage.left, top: lage.top } : undefined}
+      role="dialog"
+      aria-label="Kommentare"
+    >
       <div className="comment-panel-head">
         <b>{isNew ? 'Neuer Kommentar' : 'Kommentare'}</b>
         <span className="comment-panel-tools">

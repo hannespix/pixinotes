@@ -82,6 +82,43 @@
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
+
+/**
+ * M263: Eine Bildlaufleiste für die ganze App — schmal, ohne Rinne, ohne
+ * Pfeilknöpfe.
+ *
+ * Die Vorgabe des Systems ist eine breite, helle Leiste mit Knöpfen an beiden
+ * Enden (User-Screenshot unter Linux/Chromium). Sie liegt wie ein Fremdkörper
+ * auf der Fläche und läuft an den Enden über die Rundungen. `scrollbar-width`
+ * und `scrollbar-color` VERERBEN sich — einmal an der Wurzel gesetzt, gilt
+ * die Optik in jedem Fenster, Menü und Panel.
+ *
+ * Die ::-webkit-Regeln daneben sind für Safari (iPad/iPhone), das die
+ * Standard-Eigenschaften noch nicht kennt. Dort ergibt der durchsichtige
+ * Rand um den Daumen dieselbe schwebende Pille.
+ */
+:root {
+  --lauf-daumen: rgba(90, 80, 60, 0.34);
+  --lauf-daumen-aktiv: rgba(90, 80, 60, 0.55);
+  scrollbar-color: var(--lauf-daumen) transparent;
+}
+/* `scrollbar-color` vererbt sich, `scrollbar-width` NICHT (CSS-Scrollbars-1) —
+   deshalb einmal für alles statt an dreißig einzelnen Behältern. */
+* { scrollbar-width: thin; }
+[data-theme='dark'] {
+  --lauf-daumen: rgba(255, 255, 255, 0.24);
+  --lauf-daumen-aktiv: rgba(255, 255, 255, 0.42);
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: var(--lauf-daumen);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--lauf-daumen-aktiv); }
+::-webkit-scrollbar-corner { background: transparent; }
 body {
   font-family: ui-rounded, 'SF Pro Rounded', 'Segoe UI', system-ui, sans-serif;
   color: var(--ink);
@@ -295,12 +332,28 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   background: var(--surface-dim);
 }
 .file-card { background: var(--surface-card); border-radius: 10px; padding: 6px; overflow: hidden; }
+/* M263: Titelzeile der Datei-Karte — Symbol plus umbenennbarer Titel */
+.file-kopf { display: flex; align-items: center; gap: 8px; padding: 6px 10px 2px; min-width: 0; }
+.file-titel { font-weight: 700; font-size: 13px; flex: 1; min-width: 0; }
+.file-titel.drag-title { line-height: 1.35; }
+input.file-titel {
+  border: 1px solid var(--accent); border-radius: 7px; padding: 3px 7px;
+  background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 700;
+  outline: none; width: 100%;
+}
 .file-body {
   display: flex; align-items: center; gap: 10px; border: none; background: none;
   font-family: inherit; font-size: 12.5px; color: var(--ink);
-  padding: 8px 12px; cursor: pointer; text-align: left;
+  padding: 2px 12px 6px; cursor: pointer; text-align: left;
 }
 .file-icon { font-size: 22px; }
+/* Der Titel der Bild-Karte steht in derselben Zeile wie das Symbol */
+.img-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.img-titel { flex: 1; min-width: 0; }
+input.img-titel {
+  border: 1px solid var(--accent); border-radius: 6px; padding: 2px 6px;
+  background: var(--surface); color: var(--ink); font-size: 12px; outline: none; width: 100%;
+}
 
 /* ---------- Kanban-Karte ---------- */
 .kanban-card { background: var(--surface-card); border-radius: 10px; padding: 12px 14px 12px; overflow: hidden; }
@@ -1578,10 +1631,30 @@ html[data-kopf-eng='an'] .hint { display: none; }
   display: inline-flex; align-items: center; justify-content: center;
 }
 .comment-panel {
-  position: fixed; right: 14px; top: 86px; z-index: 70; width: min(320px, calc(100vw - 28px));
+  position: fixed; z-index: 70; width: min(320px, calc(100vw - 28px));
   background: var(--surface); border: 1px solid var(--border-soft); border-radius: 13px;
   box-shadow: 0 8px 32px rgba(50, 40, 20, 0.25);
   display: flex; flex-direction: column; overflow: hidden;
+}
+/* M263: Am Bildschirmrand geparkt — nur noch am Telefon, wo neben der Karte
+   ohnehin kein Platz für eine Blase ist. */
+.comment-panel.fest { right: 14px; top: 86px; }
+/* … sonst als Sprechblase an der Karte, mit Zipfel zur Karte hin */
+.comment-panel.an-karte { animation: comment-pop 0.14s ease-out; }
+.comment-panel.an-karte::before {
+  content: ''; position: absolute; top: 18px; width: 10px; height: 10px;
+  background: var(--surface); border: 1px solid var(--border-soft);
+  transform: rotate(45deg);
+}
+.comment-panel.an-karte[data-seite='rechts']::before {
+  left: -6px; border-right: none; border-top: none;
+}
+.comment-panel.an-karte[data-seite='links']::before {
+  right: -6px; border-left: none; border-bottom: none;
+}
+@keyframes comment-pop {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: none; }
 }
 .comment-panel-head {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -1631,10 +1704,23 @@ html[data-kopf-eng='an'] .hint { display: none; }
   position: fixed; inset: 0; z-index: 80; background: rgba(40,35,25,.3); backdrop-filter: blur(2px);
   display: flex; align-items: flex-start; justify-content: center; padding: 8vh 16px;
 }
+/**
+ * M263: Die Fensterschale läuft nicht mehr selbst über.
+ *
+ * Vorher scrollte `.modal` als Ganzes. Die Bildlaufleiste des Browsers sitzt
+ * dann am äußersten Rand des Fensters — mitsamt Pfeilknöpfen und heller
+ * Rinne, quer über die abgerundeten Ecken (User-Screenshot). Jetzt ist die
+ * Schale eine geschlossene, abgerundete Fläche (`overflow: hidden`), und nur
+ * `.modal-body` darin läuft über: Was dort gezeichnet wird — auch die
+ * Bildlaufleiste — wird von der Rundung beschnitten. Nebenbei bleiben
+ * Kopfzeile, Reiter und Fußzeile stehen, statt mitzuscrollen.
+ */
 .modal {
-  width: min(560px, 96vw); max-height: 84vh; overflow-y: auto; background: var(--surface);
+  width: min(560px, 96vw); max-height: 84vh; overflow: hidden; background: var(--surface);
   border-radius: 16px; box-shadow: 0 12px 48px rgba(40,30,10,.3);
+  display: flex; flex-direction: column;
 }
+.modal-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; background: var(--surface); border-radius: 16px 16px 0 0; }
 .modal-head h2 { font-size: 17px; margin: 0; }
 .modal-x { border: none; background: none; font-size: 15px; cursor: pointer; color: var(--muted); }

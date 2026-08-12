@@ -195,11 +195,21 @@ function baseNodeText(node: AppNode): string {
       ).join('')}`;
     }
     case 'file': {
+      // M263: Der eigene Titel steht vorn — danach wird gesucht und gefiltert.
+      // Der Dateiname bleibt trotzdem im Text, sonst findet ihn niemand mehr.
       const f = node.data;
-      return `Datei: ${f.name} (${formatBytes(f.size)})`;
+      const t = f.titel?.trim();
+      return t && t !== f.name
+        ? `Datei: ${t} (${f.name}, ${formatBytes(f.size)})`
+        : `Datei: ${f.name} (${formatBytes(f.size)})`;
     }
-    case 'image':
-      return `Bild: ${node.data.name ?? 'Screenshot'}`;
+    case 'image': {
+      const i = node.data;
+      const t = i.titel?.trim();
+      return t && t !== i.name
+        ? `Bild: ${t}${i.name ? ` (${i.name})` : ''}`
+        : `Bild: ${i.name ?? 'Screenshot'}`;
+    }
     case 'shape':
       return node.data.text || '';
     case 'mermaid':

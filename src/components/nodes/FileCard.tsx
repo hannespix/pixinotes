@@ -11,6 +11,7 @@ import { loadAttachment } from '../../lib/attachments';
 import { renderPdfPage } from '../../lib/pdf';
 import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/fileStore';
 import { CardShell } from './CardShell';
+import { DragTitle } from './DragTitle';
 import { IDownload } from '../Icons';
 
 const ICONS: Record<string, string> = {
@@ -34,6 +35,9 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
   const file = data;
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
   const icon = ICONS[ext] ?? '📎';
+  /** M263: „DB_Reservierung_762631109316.pdf" sagt niemandem etwas. */
+  const eigenerTitel = !!file.titel?.trim();
+  const titel = eigenerTitel ? file.titel!.trim() : file.name;
   /**
    * M259: Der Inhalt kommt aus der lokalen Ablage (IndexedDB) — oder, bei
    * kleinen Dateien und alten Ständen, weiterhin aus dem Board.
@@ -116,12 +120,25 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
 
   return (
     <CardShell id={id} selected={selected} minWidth={170} minHeight={50} className="file-card">
+      {/* M263: Der TITEL steht oben und ist umbenennbar (Doppelklick, wie bei
+          Rahmen und Formen). Der Dateiname bleibt daneben stehen, sobald er
+          abweicht — er ist die Wahrheit über die Datei, nicht der Titel. */}
+      <div className="file-kopf">
+        <span className="file-icon">{icon}</span>
+        <DragTitle
+          className="file-titel"
+          value={titel}
+          placeholder="Karte benennen"
+          onChange={(v) => {
+            const neu = v.trim();
+            useBoard.getState().updateNodeData(id, { titel: neu && neu !== file.name ? neu : undefined });
+          }}
+        />
+      </div>
       <button className="file-body nodrag" onClick={isPdf ? () => setViewerOpen(true) : quelle ? download : loadFromTeam}
         title={isPdf ? 'Vorschau öffnen' : quelle ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
-        <span className="file-icon">{icon}</span>
-        <span>
-          <b>{file.name}</b>
-          <span className="meta"> {formatBytes(file.size)}</span>
+        <span className="meta">
+          {eigenerTitel && <>{file.name} · </>}{formatBytes(file.size)}
         </span>
       </button>
       {/* Nachladen braucht nur, wem der Inhalt fehlt — sonst liegt er schon hier */}
@@ -139,7 +156,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           Kopie im Team-Ordner: {file.ref.split('/').slice(-2).join('/')}
         </div>
       )}
-      {istBild && <img className="file-thumb nodrag" src={quelle!} alt={file.name} draggable={false}
+      {istBild && <img className="file-thumb nodrag" src={quelle!} alt={titel} draggable={false}
         onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />}
       {isPdf && <PdfThumb dataUrl={quelle!} onOpen={() => setViewerOpen(true)} />}
       {/* M259: Ton und Bewegtbild kann der Browser selbst — dann soll er auch */}
@@ -156,7 +173,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           Die Datei erneut einfügen, dann ist sie auch hier zu sehen.
         </div>
       )}
-      {viewerOpen && <PdfViewer dataUrl={quelle!} name={file.name} onClose={() => setViewerOpen(false)} onDownload={download} />}
+      {viewerOpen && <PdfViewer dataUrl={quelle!} name={titel} onClose={() => setViewerOpen(false)} onDownload={download} />}
     </CardShell>
   );
 }

@@ -34,11 +34,20 @@ export interface EmailData {
 export interface ImageData {
   src: string;
   name?: string;
+  /** M263: eigener Titel der Karte — Dateinamen sagen selten, was drin ist */
+  titel?: string;
   [key: string]: unknown;
 }
 
 export interface FileData {
   name: string;
+  /**
+   * M263: Eigener Titel der Karte. Der Dateiname bleibt unangetastet — er ist
+   * der Schlüssel zur Datei (Download, Team-Ordner, lokale Ablage) und darf
+   * sich nicht ändern, nur weil jemand die Karte lesbar beschriftet.
+   * Leer/fehlt ⇒ es gilt der Dateiname.
+   */
+  titel?: string;
   size: number;
   mime?: string;
   dataUrl?: string;
