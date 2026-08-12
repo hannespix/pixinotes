@@ -4,6 +4,7 @@ import { selectActiveBoard, useBoard } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
 import { nodeToText } from '../lib/serialize';
 import { useRandZiehen } from '../lib/randZiehen';
+import { useOutsideClose } from '../lib/useOutsideClose';
 import { InlineName } from './InlineName';
 import { IChevronR, IGraph, IHome, IPlus, IShare, IX } from './Icons';
 
@@ -54,6 +55,76 @@ export function Tabs() {
     const el = reiheRef.current?.querySelector('.tab.active') as HTMLElement | null;
     el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   }, [activeId, view]);
+
+  /**
+   * M261: Reihe oder Wähler? Das entscheidet der PLATZ, nicht die Fenstergröße.
+   *
+   * Eine Media-Query wäre hier falsch: Sie kennt weder die Anzeigegröße
+   * (A− / A+ skaliert per CSS-Zoom, M236) noch die linke Navigation, die der
+   * Reihe Platz wegnimmt. Gemessen wird deshalb, was wirklich übrig bleibt.
+   * Unter der Schwelle passt kein einziger Reiter vollständig hinein — dort
+   * ist eine Scrollreihe keine Bedienung, sondern ein Rätsel.
+   */
+  const SCHWELLE = 300;
+  const leisteRef = useRef<HTMLDivElement | null>(null);
+  const [kompakt, setKompakt] = useState(false);
+  /**
+   * M261: Auf schmalen Leisten weicht der Bereichsname aus der Brotkrume.
+   *
+   * „Regierungspräsidium › Referat 21" belegte am Telefon mehr als ein
+   * Drittel der ganzen Leiste — Platz, der dem Board-Titel fehlte. Der
+   * Bereich steht weiterhin in der Sprechblase und im Navigator.
+   *
+   * Bewusst NICHT an `kompakt` gekoppelt: Das Einklappen schafft Platz, und
+   * Platz entscheidet über `kompakt` — die beiden würden sich gegenseitig
+   * aufschaukeln. Beide hängen deshalb an derselben Obergrenze der Leiste.
+   */
+  const [krumeKurz, setKrumeKurz] = useState(false);
+  useEffect(() => {
+    const el = leisteRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const messen = () => {
+      const stil = getComputedStyle(el);
+      /* In der linken Spalte (M238) stehen die Boards untereinander — dort ist
+         Höhe da und Breite egal, der Wähler wäre ein Rückschritt. */
+      if (stil.flexDirection === 'column') { setKompakt(false); setKrumeKurz(false); return; }
+      /**
+       * Gemessen wird der ERLAUBTE Platz, nicht der belegte.
+       *
+       * `.tabs` ist fixiert positioniert und damit inhaltsbreit: Ihre
+       * `clientWidth` sagt, wie breit sie GERADE ist — und das hängt am Modus.
+       * Nach dem Umschalten auf den Wähler schrumpfte sie mit, die Messung
+       * blieb unter der Schwelle hängen und der Weg zurück in die Reihe war
+       * versperrt (gemessen: 1344 px blieben im Wähler-Modus). Die Obergrenze
+       * (--kopf-rest bzw. --kopf-voll) kennt den Modus dagegen nicht.
+       */
+      const grenze = parseFloat(stil.maxWidth);
+      const voll = Number.isFinite(grenze) ? grenze : el.clientWidth;
+      setKrumeKurz(voll < 560);
+      const fest = [...el.children]
+        .filter((c) => !c.classList.contains('tabs-scroll') && !c.classList.contains('tab-picker-wrap'))
+        .reduce((n, c) => n + (c as HTMLElement).offsetWidth + 4, 0);
+      const frei = voll - fest - 10; // Innenabstand der Leiste
+      /* Hysterese gegen Flattern genau an der Kante */
+      setKompakt((war) => (war ? frei < SCHWELLE + 40 : frei < SCHWELLE));
+    };
+    // Nach dem Layout messen: --kopf-rest schreibt lib/kopfmass.ts in seinem
+    // eigenen Beobachter, und dessen Reihenfolge ist nicht zugesichert.
+    let warten = 0;
+    const spaeter = () => { cancelAnimationFrame(warten); warten = requestAnimationFrame(messen); };
+    spaeter();
+    const ro = new ResizeObserver(spaeter);
+    ro.observe(el);
+    ro.observe(document.body);
+    window.addEventListener('resize', spaeter);
+    return () => {
+      cancelAnimationFrame(warten);
+      ro.disconnect();
+      window.removeEventListener('resize', spaeter);
+    };
+  }, []);
+
+
   // M183: aufgeklappte Boards im Navigator (zeigen ihre Karten)
   const [navExpanded, setNavExpanded] = useState<Set<string>>(new Set());
   /**
@@ -131,6 +202,15 @@ export function Tabs() {
     if (!list.some((b) => b.id === activeId) && byId.has(activeId)) list.push(byId.get(activeId)!);
     return list;
   }, [context, byId, activeId]);
+
+  /** Board-Wähler auf schmalen Schirmen (M261) */
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const [pickerOffen, setPickerOffen] = useState(false);
+  useOutsideClose(pickerOffen, pickerRef, () => setPickerOffen(false));
+  const aktivesBoard = useMemo(
+    () => projectBoards.find((b) => b.id === activeId) ?? projectBoards[0],
+    [projectBoards, activeId],
+  );
 
   // Boards ohne Projekt (nach Imports o. Ä.) — im Navigator unter „Ohne Projekt"
   const orphans = useMemo(() => {
@@ -222,7 +302,7 @@ export function Tabs() {
   };
 
   return (
-    <div className="tabs">
+    <div className={`tabs ${kompakt ? 'kompakt' : ''} ${krumeKurz ? 'krume-kurz' : ''}`} ref={leisteRef}>
       <button
         className={`tab-home ${view === 'overview' ? 'active' : ''}`}
         title="Übersicht: alle Bereiche, Projekte & Boards"
@@ -237,7 +317,7 @@ export function Tabs() {
       <button
         className={`tab-nav ${navOpen ? 'active' : ''}`}
         data-taste="navigator"
-        title="Navigator: alle Bereiche, Projekte, Boards & Karten"
+        title={`${context?.space.name ?? '—'} › ${context?.project.name ?? '—'} — Navigator: alle Bereiche, Projekte, Boards & Karten`}
         onClick={() => setNavOpen((o) => !o)}
       >
         <span className="tab-nav-space">{context?.space.name ?? '—'}</span>
@@ -305,7 +385,61 @@ export function Tabs() {
         </div>,
         document.body,
       )}
-      {/* Nur die Board-Tabs des AKTIVEN Projekts — scrollen bei Bedarf */}
+      {/* M261: Unterhalb einer gemessenen Breite trägt der Streifen keinen
+          einzigen Reiter mehr (gemessen: 142 px verfügbar gegen 215 px Bedarf).
+          Dort steht statt der Reihe ein Board-Wähler mit Aufklappliste. */}
+      {kompakt ? (
+        <div className="tab-picker-wrap" ref={pickerRef}>
+          <button
+            className={`tab-picker ${pickerOffen ? 'auf' : ''}`}
+            onClick={() => setPickerOffen((o) => !o)}
+            /* Der Name kann auf 390 Punkten breiten Schirmen abgekürzt sein —
+               dann steht er hier vollständig (Tippen und Halten zeigt ihn,
+               M175) und in der Liste ohnehin. */
+            title={`${aktivesBoard?.name ?? '—'} — Board wechseln`}
+            aria-haspopup="listbox"
+            aria-expanded={pickerOffen}
+          >
+            <span className="tab-picker-name">{aktivesBoard?.name ?? '—'}</span>
+            {/* Die Kartenzahl steht in der Liste; hier gehört der Platz dem
+                Namen — am Telefon bleiben für ihn sonst 104 statt 136 Punkte. */}
+            {!krumeKurz && <span className="tab-count">{aktivesBoard?.nodes.length ?? 0}</span>}
+            <IChevronR size={11} className="tab-picker-pfeil" />
+          </button>
+          {pickerOffen && (
+            <div className="tab-picker-liste" role="listbox">
+              {projectBoards.map((b) => (
+                <button
+                  key={b.id}
+                  role="option"
+                  aria-selected={b.id === activeId && view === 'board'}
+                  className={`tab-picker-eintrag ${b.id === activeId && view === 'board' ? 'aktiv' : ''}`}
+                  onClick={() => { openBoard(b.id); setPickerOffen(false); }}
+                >
+                  <span className="tab-picker-eintrag-name">{b.name}</span>
+                  <span className="tab-count">{b.nodes.length}</span>
+                  <span
+                    className="tab-x"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Board ${b.name} schließen`}
+                    title="Board schließen"
+                    onClick={(e) => { e.stopPropagation(); close(b.id); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); close(b.id); } }}
+                  >
+                    <IX size={11} />
+                  </span>
+                </button>
+              ))}
+              <div className="tab-picker-fuss">
+                {projectBoards.length} Board{projectBoards.length === 1 ? '' : 's'} in
+                {' '}„{context?.project.name ?? '—'}"
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+      /* Nur die Board-Tabs des AKTIVEN Projekts — scrollen bei Bedarf */
       <div className="tabs-scroll" ref={reiheRef}>
         {projectBoards.map((b) => (
           <div
@@ -330,6 +464,7 @@ export function Tabs() {
           </div>
         ))}
       </div>
+      )}
       {/* M238: Teilen und ＋ als eigene Gruppe. In der Reihe ändert das nichts
           (eine Flex-Zeile in einer Flex-Zeile), in der linken Spalte stehen sie
           dadurch nebeneinander am Fuß statt untereinander in der Mitte. */}

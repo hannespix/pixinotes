@@ -233,7 +233,8 @@ export function HelpOverlay() {
               <h3>🗂️ Bereiche · Projekte · Boards</h3>
               <p>Drei Ebenen halten Ordnung: <b>Bereiche</b> (z. B. Arbeitsplatz, Wissen) bündeln <b>Projekte</b>, Projekte bündeln <b>Boards</b>.</p>
               <ul>
-                <li>Die <b>Tab-Leiste</b> zeigt nur die Boards des aktiven Projekts; die <b>Brotkrume</b> „Bereich › Projekt" öffnet den <b>Navigator</b> — ein zentrales Fenster über alle Ebenen: Bereiche (Klick öffnet die große Übersicht), Projekte (Klick öffnet ihr erstes Board), Boards und per ▸ sogar die <b>Karten jedes Boards</b> — ein Klick springt direkt zur Karte.</li>
+                <li>Die <b>Reiterleiste</b> zeigt nur die Boards des aktiven Projekts. Ist die Leiste zu schmal für eine Reihe von Reitern — am Telefon, am hochkant gehaltenen Tablet oder bei starkem Text-Zoom —, steht dort stattdessen ein <b>Board-Wähler</b>: Er trägt den Namen des aktiven Boards und klappt auf Tipp alle Boards des Projekts als Liste auf (mit Kartenzahl und ✕ zum Schließen). Umgeschaltet wird nach dem gemessenen Platz, nicht nach der Fenstergröße.</li>
+                <li>Die <b>Brotkrume</b> „Bereich › Projekt" öffnet den <b>Navigator</b> — ein zentrales Fenster über alle Ebenen: Bereiche (Klick öffnet die große Übersicht), Projekte (Klick öffnet ihr erstes Board), Boards und per ▸ sogar die <b>Karten jedes Boards</b> — ein Klick springt direkt zur Karte.</li>
                 <li><b>🏠</b> öffnet die große Übersicht: Bereiche als farbige Zonen, Boards als Kacheln — Kacheln lassen sich per Drag in andere Projekte verschieben.</li>
                 <li>Der Umschalter <b>Hierarchie ⇄ Netz</b> zeigt alternativ den Verknüpfungs-Graphen (Portale, [[Wikilinks]]) — zoombar wie das Board.</li>
                 <li><b>Portale</b> sind Karten, die auf ein anderes Board verlinken — für Sprungmarken zwischen Themen.</li>
