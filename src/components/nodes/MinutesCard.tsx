@@ -9,7 +9,7 @@ import { STICKY_COLORS, uid, type MinutesData, type MinutesNode } from '../../ty
 import { allDecisions, buildEntry, currentEntry, entryLabel, nextDate, sortEntries } from '../../lib/minutes';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { useAndroidBackspaceFix } from '../../lib/blocknoteAndroidFix';
-import { noteSchema } from '../NoteTypo';
+import { NoteToolbar, noteSchema } from '../NoteTypo';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { IChevronL, IChevronR, IPlus, ISettings, IX } from '../Icons';
@@ -331,10 +331,15 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
 
   return (
     <div className="minutes-body nodrag">
+      {/* M267: dieselbe Formatier-Leiste wie in der Notiz-Karte. Das Schema
+          kennt textSize/textFont schon länger — nur die Knöpfe fehlten hier,
+          also stellte das Protokoll gestylten Text dar, ließ ihn aber nicht
+          setzen oder zurücknehmen. */}
       <BlockNoteView
         editor={editor}
         theme="light"
         className="note-editor"
+        formattingToolbar={false}
         onChange={() => {
           const st = useBoard.getState();
           const board = st.boards.find((b) => b.nodes.some((n) => n.id === nodeId));
@@ -343,7 +348,9 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
             entries: cur.map((e) => (e.id === entryId ? { ...e, blocks: editor.document } : e)),
           });
         }}
-      />
+      >
+        <NoteToolbar />
+      </BlockNoteView>
     </div>
   );
 }

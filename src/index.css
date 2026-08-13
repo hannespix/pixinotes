@@ -625,7 +625,11 @@ input.img-titel {
 /* Der Versatz reist als Variable an; `translate` ist bewusst NICHT `transform`
    — den belegt bei der schwebenden Leiste React Flow (Verankerung an der
    Karte). Die eigenständige Eigenschaft legt sich sauber davor. */
-.sel-toolbar { translate: var(--lv-x, 0px) var(--lv-y, 0px); }
+/* M267: `--lv-typo` schiebt die Karten-Leiste aus dem Weg, solange die
+   Formatier-Leiste des Texts oben an der Karte steht — sonst liegen zwei
+   Leisten übereinander und die vordere verdeckt die hintere. Gesetzt wird die
+   Variable unten am `body`, sobald eine Formatier-Leiste im Bild ist. */
+.sel-toolbar { translate: var(--lv-x, 0px) calc(var(--lv-y, 0px) + var(--lv-typo, 0px)); }
 .sel-griff {
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; align-self: stretch; margin: -7px 2px -7px -6px;
@@ -3977,7 +3981,10 @@ button.link-dead:disabled { opacity: 0.45; }
   /* M243: die Zentrierung und der gemerkte Versatz in EINER Angabe — zwei
      `translate`-Regeln würden einander überschreiben, nicht addieren */
   position: fixed; left: 50%; translate: calc(-50% + var(--lv-x, 0px)) var(--lv-y, 0px);
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  /* M267: Am Telefon dockt die Formatier-Leiste unten an (M226) — genau dort,
+     wo diese Leiste steht. Solange sie im Bild ist, rückt die Karten-Leiste
+     um deren Höhe nach oben, statt sich verdecken zu lassen. */
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px) + var(--lv-typo-dock, 0px));
   z-index: 60; max-width: calc(100vw - 10px);
   flex-wrap: wrap; justify-content: center;
   animation: pn-fade-in 0.16s ease-out;
@@ -4401,12 +4408,31 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   font-size: var(--pn-fs) !important;
 }
 /* Schrift-Menü: Größen-Reihe als gleichbreite Stufen-Knöpfe */
-.sel-font-sizes { display: flex; gap: 6px; padding: 4px 10px 6px; }
+/* M267: Die Stufen heißen jetzt Klein · Standard · Groß · Riesig statt
+   S/M/L/XL — vier volle Wörter passen nicht mehr nebeneinander in ein
+   Popover-Menü, also ein 2×2-Raster. Es bleibt eine EINZIGE Fläche, in der
+   man die aktuelle Stufe auf einen Blick sieht (Rahmen in Akzentfarbe). */
+.sel-font-sizes {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px 10px 6px;
+}
 .sel-font-sizes button {
-  flex: 1; text-align: center; border: 1px solid var(--border-soft) !important;
+  text-align: center; border: 1px solid var(--border-soft) !important;
   border-radius: 8px; justify-content: center;
 }
 .sel-font-sizes button.on { border-color: var(--accent) !important; }
+/* Der Weg zurück steht sichtbar im Menü statt versteckt im „nochmal drücken" */
+.sel-font-menu .sel-typo-reset { margin-top: 4px; color: var(--muted); }
+.sel-font-menu .sel-typo-reset svg { flex: none; }
+
+/* M267: Das Aa-Menü der Formatier-Leiste (markierter Text) — gleiche Ordnung
+   wie das Karten-Menü: Größe, Schriftart, Weg zurück */
+.pn-typo-menu { min-width: 190px; }
+.pn-typo-menu .mantine-Menu-label { font-size: 11px; letter-spacing: .02em; }
+
+/* M267: Solange die Formatier-Leiste steht, macht die Karten-Leiste Platz.
+   Die Werte sind die Höhe der Leiste plus Luft — schwebend nach oben,
+   angedockt (Telefon) nach oben über die untere Leiste hinweg. */
+body[data-formatierleiste='an'] { --lv-typo: -52px; --lv-typo-dock: 56px; }
 
 /* ================= M202: Teilen-Dialog für Karten ================= */
 .share-cards-modal { max-width: 560px; }

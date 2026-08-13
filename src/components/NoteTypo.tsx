@@ -3,13 +3,23 @@
 // Formatier-Leiste. Die Werte sind kuratierte Stufen (keine freien px) —
 // einfach zu bedienen, barrierefrei (relativ, nie unter 0.85em) und stabil
 // über Export/Sync, weil sie als benannte Stile in den Blöcken liegen.
+//
+// M267: Aus vier Knöpfen (A₋ A₊ A₊₊ Aa) werden drei — − ／ ＋ als Leiter DURCH
+// Standard hindurch und ein „Aa"-Menü mit allen Stufen zum direkten Anspringen
+// plus „Formatierung entfernen". Die Wörter und die Reihenfolge sind dieselben
+// wie im Schrift-Menü der Karte (lib/typo.ts), damit man nicht zwei
+// verschiedene Sprachen für dieselbe Sache lernen muss.
+import { useEffect, useState } from 'react';
 import { BlockNoteSchema, defaultStyleSpecs } from '@blocknote/core';
 import {
   createReactStyleSpec, FormattingToolbar, FormattingToolbarController,
   getFormattingToolbarItems, useBlockNoteEditor, useComponentsContext,
+  useEditorContentOrSelectionChange,
 } from '@blocknote/react';
 import type { CardFont } from '../types';
-import { FONT_LABELS, FONT_STACKS, INLINE_SIZE_EM } from '../lib/typo';
+import {
+  FONT_STACKS, GROESSEN_TEXT, INLINE_SIZE_EM, SCHRIFTEN, stufenName, stufeWeiter,
+} from '../lib/typo';
 
 const TextSize = createReactStyleSpec(
   { type: 'textSize', propSchema: 'string' },
@@ -35,55 +45,134 @@ export const noteSchema = BlockNoteSchema.create({
   styleSpecs: { ...defaultStyleSpecs, textSize: TextSize, textFont: TextFont },
 });
 
-const SIZES: Array<[string, string, string]> = [
-  ['klein', 'A₋', 'Markierten Text kleiner (0,85×)'],
-  ['gross', 'A₊', 'Markierten Text größer (1,3×)'],
-  ['riesig', 'A₊₊', 'Markierten Text riesig (1,7×)'],
-];
-const FONTS: CardFont[] = ['serif', 'lesbar', 'hand', 'mono'];
-
 /** Größen-/Schrift-Knöpfe in der Formatier-Leiste (nur bei Textauswahl sichtbar) */
 function TypoButtons() {
   // Der Hook ist default-typisiert — auf unser Schema (mit textSize/textFont) heben
   const editor = useBlockNoteEditor() as unknown as typeof noteSchema.BlockNoteEditor;
   const Components = useComponentsContext()!;
-  const active = editor.getActiveStyles() as { textSize?: string; textFont?: string };
-  const toggleSize = (v: string) => {
+  /**
+   * M267: Zwei Leisten an derselben Kartenoberkante.
+   *
+   * Die Karten-Leiste („1 ausgewählt · Kopieren · …") schwebt 14 Punkte über
+   * der Karte, die Formatier-Leiste über der Textmarkierung — die liegt bei
+   * einer Notiz meist in der ersten Zeile. Beide landeten übereinander, und
+   * die vordere verdeckte die hintere zur Hälfte.
+   *
+   * Diese Komponente lebt genau so lange, wie die Formatier-Leiste im Bild
+   * ist. Also meldet sie ihr Dasein am `body` an; das Stylesheet rückt die
+   * Karten-Leiste dann aus dem Weg. Bewusst kein Store-Feld: Es geht um
+   * reine Darstellung und würde sonst in jedem Undo-Schritt mitreisen.
+   */
+  useEffect(() => {
+    document.body.dataset.formatierleiste = 'an';
+    return () => { delete document.body.dataset.formatierleiste; };
+  }, []);
+  /**
+   * M267: Die aktiven Stile werden ABONNIERT.
+   *
+   * Vorher standen sie in einer normalen Variablen, die nur beim Neuzeichnen
+   * der Leiste neu gelesen wurde. Wer die Markierung von großem auf normalen
+   * Text zog, sah weiter „groß" hervorgehoben — und die Knöpfe rechneten mit
+   * dem falschen Ausgangswert.
+   */
+  const [aktiv, setAktiv] = useState<{ textSize?: string; textFont?: string }>(
+    () => editor.getActiveStyles() as { textSize?: string; textFont?: string },
+  );
+  useEditorContentOrSelectionChange(
+    () => setAktiv(editor.getActiveStyles() as { textSize?: string; textFont?: string }),
+    editor as never,
+  );
+
+  const groesse = aktiv.textSize ?? null;
+  const schrift = (aktiv.textFont as CardFont | undefined) ?? null;
+
+  const setzeGroesse = (v: string | null) => {
     editor.focus();
-    if (active.textSize === v) editor.removeStyles({ textSize: '' });
-    else editor.addStyles({ textSize: v });
+    if (v) editor.addStyles({ textSize: v });
+    else editor.removeStyles({ textSize: '' });
+    setAktiv(editor.getActiveStyles() as { textSize?: string; textFont?: string });
   };
-  const cycleFont = () => {
+  const setzeSchrift = (v: CardFont | null) => {
     editor.focus();
-    const cur = active.textFont as CardFont | undefined;
-    const idx = cur ? FONTS.indexOf(cur) : -1;
-    const next = FONTS[idx + 1];
-    if (next) editor.addStyles({ textFont: next });
+    if (v) editor.addStyles({ textFont: v });
     else editor.removeStyles({ textFont: '' });
+    setAktiv(editor.getActiveStyles() as { textSize?: string; textFont?: string });
   };
+  /** Radiergummi: alles zurück auf Standard — fett, kursiv, Farbe, Größe, Schrift */
+  const allesZurueck = () => {
+    editor.focus();
+    const alle = Object.fromEntries(Object.keys(editor.schema.styleSchema).map((k) => [k, true]));
+    editor.removeStyles(alle as never);
+    setAktiv(editor.getActiveStyles() as { textSize?: string; textFont?: string });
+  };
+
+  const kleiner = stufeWeiter(GROESSEN_TEXT, groesse, -1);
+  const groesser = stufeWeiter(GROESSEN_TEXT, groesse, 1);
+  const jetzt = stufenName(GROESSEN_TEXT, groesse);
+
   return (
     <>
-      {SIZES.map(([val, label, tip]) => (
-        <Components.FormattingToolbar.Button
-          key={val}
-          label={label}
-          mainTooltip={tip}
-          isSelected={active.textSize === val}
-          onClick={() => toggleSize(val)}
-        >
-          {label}
-        </Components.FormattingToolbar.Button>
-      ))}
       <Components.FormattingToolbar.Button
-        label="Aa"
-        mainTooltip={active.textFont
-          ? `Schrift: ${FONT_LABELS[active.textFont as CardFont] ?? active.textFont} — Klick wechselt weiter`
-          : 'Schrift des markierten Texts wechseln (Serifen → Sehr gut lesbar → Handschrift → Monospace → Standard)'}
-        isSelected={!!active.textFont}
-        onClick={cycleFont}
+        className="bn-button"
+        label="A−"
+        mainTooltip={kleiner === undefined
+          ? `Textgröße: ${jetzt} — kleiner geht nicht`
+          : `Eine Stufe kleiner: ${jetzt} → ${stufenName(GROESSEN_TEXT, kleiner)}`}
+        isDisabled={kleiner === undefined}
+        onClick={() => kleiner !== undefined && setzeGroesse(kleiner)}
       >
-        Aa
+        A−
       </Components.FormattingToolbar.Button>
+      <Components.FormattingToolbar.Button
+        className="bn-button"
+        label="A+"
+        mainTooltip={groesser === undefined
+          ? `Textgröße: ${jetzt} — größer geht nicht`
+          : `Eine Stufe größer: ${jetzt} → ${stufenName(GROESSEN_TEXT, groesser)}`}
+        isDisabled={groesser === undefined}
+        onClick={() => groesser !== undefined && setzeGroesse(groesser)}
+      >
+        A+
+      </Components.FormattingToolbar.Button>
+      <Components.Generic.Menu.Root>
+        <Components.Generic.Menu.Trigger>
+          <Components.FormattingToolbar.Button
+            className="bn-button pn-typo-knopf"
+            label="Aa"
+            mainTooltip={`Schrift & Größe des markierten Texts — jetzt: ${jetzt}${schrift ? `, ${stufenName(SCHRIFTEN, schrift)}` : ''}`}
+            isSelected={!!groesse || !!schrift}
+          >
+            Aa
+          </Components.FormattingToolbar.Button>
+        </Components.Generic.Menu.Trigger>
+        <Components.Generic.Menu.Dropdown className="bn-menu-dropdown pn-typo-menu">
+          <Components.Generic.Menu.Label>Textgröße</Components.Generic.Menu.Label>
+          {GROESSEN_TEXT.map((s) => (
+            <Components.Generic.Menu.Item
+              key={s.label}
+              checked={groesse === s.wert}
+              onClick={() => setzeGroesse(s.wert)}
+            >
+              {s.label}
+            </Components.Generic.Menu.Item>
+          ))}
+          <Components.Generic.Menu.Divider />
+          <Components.Generic.Menu.Label>Schriftart</Components.Generic.Menu.Label>
+          {SCHRIFTEN.map((s) => (
+            <Components.Generic.Menu.Item
+              key={s.label}
+              checked={schrift === s.wert}
+              onClick={() => setzeSchrift(s.wert)}
+            >
+              <span style={s.wert ? { fontFamily: FONT_STACKS[s.wert] } : undefined}>{s.label}</span>
+            </Components.Generic.Menu.Item>
+          ))}
+          <Components.Generic.Menu.Divider />
+          <Components.Generic.Menu.Item onClick={allesZurueck}>
+            Formatierung entfernen
+          </Components.Generic.Menu.Item>
+        </Components.Generic.Menu.Dropdown>
+      </Components.Generic.Menu.Root>
     </>
   );
 }
@@ -92,6 +181,29 @@ function TypoButtons() {
 export function NoteToolbar() {
   return (
     <FormattingToolbarController
+      /**
+       * M267: Die Leiste wird am Kartenrand ABGESCHNITTEN.
+       *
+       * Gemessen an einer 300 Punkte breiten Notiz: Die Leiste ist 601 Punkte
+       * breit, die Karte kappt bei 300 — gut die Hälfte lag unsichtbar hinter
+       * dem Rand, und ausgerechnet die hinteren Knöpfe (Größe, Schrift, Link)
+       * waren nicht einmal anklickbar. Wer den Text größer gemacht hatte, fand
+       * den Weg zurück also nicht, weil der Knopf dafür gar nicht auf dem
+       * Schirm war. Das ist der harte Kern von „nicht zurück auf standart".
+       *
+       * Ursache ist `overflow: hidden` an `.card-body` — nötig, damit
+       * Karteninhalt nicht über die abgerundeten Ecken hinausquillt. Statt das
+       * aufzugeben, wird die schwebende Leiste `fixed` gesetzt: Ihr
+       * Bezugsrahmen ist dann der Knoten-Container (er trägt ein transform),
+       * die Karte liegt gar nicht mehr in der Kette — und kann nichts mehr
+       * abschneiden. Die Platzierung an der Auswahl rechnet floating-ui
+       * unverändert weiter.
+       *
+       * Am Telefon greift zusätzlich M226 (angedockt über der Tastatur, quer
+       * scrollbar) — die Regel dort setzt ihre eigenen Werte und bleibt
+       * unberührt.
+       */
+      floatingOptions={{ strategy: 'fixed' }}
       formattingToolbar={() => (
         <FormattingToolbar>
           {getFormattingToolbarItems()}

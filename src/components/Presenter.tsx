@@ -8,7 +8,7 @@ import { nodeToHtml } from '../lib/serialize';
 import { buildMermaidSource, getMermaid, preloadHandFont } from '../lib/mermaid';
 import { presentationOrder } from '../lib/presentOrder';
 import { useAndroidBackspaceFix } from '../lib/blocknoteAndroidFix';
-import { noteSchema } from './NoteTypo';
+import { NoteToolbar, noteSchema } from './NoteTypo';
 import { KanbanBody } from './nodes/KanbanCard';
 import { GanttBody } from './nodes/GanttCard';
 import { CalendarBody } from './nodes/CalendarCard';
@@ -38,12 +38,17 @@ function NoteSlide({ node }: { node: NoteNode }) {
   useAndroidBackspaceFix(editor);
   return (
     <div className={`slide-note sticky-${node.data.color} note-editor`}>
+      {/* M267: auch in der Präsentation dieselbe Formatier-Leiste — wer hier
+          eine Folie nachbessert, soll nicht plötzlich andere Werkzeuge haben */}
       <BlockNoteView
         editor={editor}
         theme="light"
         sideMenu={false}
+        formattingToolbar={false}
         onChange={() => updateNodeData(node.id, { blocks: editor.document })}
-      />
+      >
+        <NoteToolbar />
+      </BlockNoteView>
     </div>
   );
 }

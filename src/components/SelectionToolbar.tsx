@@ -6,17 +6,12 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGrip, IGridLayout, IMail, IMore, IMoveTo, IPen, ITag, ITrash, IType, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGrip, IGridLayout, IMail, IMore, IMoveTo, IPen, ITag, ITrash, IType, IUndo, IWand, IX } from './Icons';
 import { useLeisteZiehen } from '../lib/leisteZiehen';
-import type { CardFont, CardSize } from '../types';
-
-// M200: Vorschau-Stapel fürs Schrift-Menü — muss zu den pn-font-*-Regeln passen
-const FONT_STACKS: Record<CardFont, string> = {
-  serif: "Georgia, 'Iowan Old Style', Cambria, 'Times New Roman', serif",
-  lesbar: "'Atkinson Hyperlegible', system-ui, sans-serif",
-  hand: "'Kalam', 'Segoe Print', 'Comic Sans MS', cursive",
-  mono: "ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace",
-};
+// M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
+// dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
+// von Hand gepflegte Kopie der Schriftliste.
+import { FONT_STACKS, GROESSEN_KARTE, SCHRIFTEN } from '../lib/typo';
 import { ALIGN_LABEL, computeAlign, type AlignOp } from '../lib/align';
 import { mutedHistory } from '../store';
 import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
@@ -461,40 +456,44 @@ export function SelectionToolbar() {
             const curFont = sameFont ? (selected[0]?.font ?? null) : undefined;
             const curSize = sameSize ? (selected[0]?.fontSize ?? null) : undefined;
             const ids = selected.map((n) => n.id);
-            const fonts: Array<[CardFont | null, string]> = [
-              [null, 'Standard'],
-              ['serif', 'Serifen (dokumentig)'],
-              ['lesbar', 'Sehr gut lesbar'],
-              ['hand', 'Handschrift'],
-              ['mono', 'Monospace (technisch)'],
-            ];
             return (
               <>
-                <div className="sel-attr-title">Schriftart</div>
-                {fonts.map(([key, label]) => (
-                  <button
-                    key={label}
-                    className={curFont === key ? 'on' : ''}
-                    style={key ? { fontFamily: FONT_STACKS[key] } : undefined}
-                    onClick={() => setCardTypo(ids, { font: key })}
-                  >
-                    {label}
-                  </button>
-                ))}
+                {/* M267: Größe zuerst und als LEITER mit Standard in der Mitte —
+                    dieselbe Reihenfolge und dieselben Wörter wie im markierten
+                    Text (lib/typo.ts). Vorher hieß es hier S/M/L/XL und dort
+                    A₋/A₊/A₊₊: zwei Sprachen für dieselbe Frage. */}
                 <div className="sel-attr-title">Textgröße</div>
                 <div className="sel-font-sizes">
-                  {(([['s', 'S'], [null, 'M'], ['l', 'L'], ['xl', 'XL']]) as Array<[CardSize | null, string]>).map(([key, label]) => (
+                  {GROESSEN_KARTE.map((s) => (
                     <button
-                      key={label}
-                      className={curSize === key ? 'on' : ''}
-                      aria-label={`Textgröße ${label}`}
-                      onClick={() => setCardTypo(ids, { fontSize: key })}
+                      key={s.label}
+                      className={curSize === s.wert ? 'on' : ''}
+                      aria-label={`Textgröße ${s.label}`}
+                      onClick={() => setCardTypo(ids, { fontSize: s.wert })}
                     >
-                      {label}
+                      {s.label}
                     </button>
                   ))}
                 </div>
-                <div className="sel-attr-hint">Gilt für die ganze Karte — „Sehr gut lesbar" ist die für Sehschwäche entworfene Atkinson Hyperlegible</div>
+                <div className="sel-attr-title">Schriftart</div>
+                {SCHRIFTEN.map((s) => (
+                  <button
+                    key={s.label}
+                    className={curFont === s.wert ? 'on' : ''}
+                    style={s.wert ? { fontFamily: FONT_STACKS[s.wert] } : undefined}
+                    onClick={() => setCardTypo(ids, { font: s.wert })}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+                <button
+                  className="sel-typo-reset"
+                  onClick={() => setCardTypo(ids, { font: null, fontSize: null })}
+                  title="Schriftart und Textgröße dieser Karte(n) zurück auf Standard"
+                >
+                  <IUndo size={13} /> Zurück auf Standard
+                </button>
+                <div className="sel-attr-hint">Gilt für die ganze Karte — einzelne Wörter formatierst du direkt im Text. „Sehr gut lesbar" ist die für Sehschwäche entworfene Atkinson Hyperlegible</div>
               </>
             );
           })())}
@@ -547,9 +546,10 @@ export function SelectionToolbar() {
                   </>
                 )}
                 <div className="sel-attr-title">Werkzeuge</div>
-                <button onClick={() => setMenu('font')} title="Schriftart & Textgröße der Karte(n) ändern" aria-label="Schrift">
-                  <IType size={14} /> Schrift &amp; Größe …
-                </button>
+                {/* M267: „Schrift & Größe" steht NICHT mehr hier drin — es hat
+                    jetzt einen eigenen Knopf direkt in der Leiste. Zwei Wege zu
+                    derselben Sache waren genau der Grund für „zu viel
+                    unterschiedliche bearbeitungs-orte" (User-Befund). */}
                 {aiReady(ai) && (
                   <button onClick={() => setMenu('ai')} title="KI-Aktionen auf die Auswahl" aria-label="KI-Aktionen">
                     <IWand size={14} /> KI-Aktionen …
@@ -599,11 +599,21 @@ export function SelectionToolbar() {
               </>
             );
           })())}
+          {/* M267: Schrift & Größe als eigener Knopf — ein Klick statt ⋯ →
+              Werkzeuge → Schrift & Größe. Textformatierung ist keine seltene
+              Sonderaktion und gehört nicht ins Restemenü. */}
           <button
-            className={menu === 'more' || menu === 'attr' || menu === 'ai' || menu === 'align' || menu === 'font' || aiBusy ? 'ai-on' : ''}
+            className={menu === 'font' ? 'ai-on' : ''}
+            data-smbtn
+            onClick={toggleMenu('font')}
+            title="Schrift & Größe der Karte(n) — Klein · Standard · Groß · Riesig, Schriftart, zurück auf Standard"
+            aria-label="Schrift & Größe"
+          ><IType size={15} /></button>
+          <button
+            className={menu === 'more' || menu === 'attr' || menu === 'ai' || menu === 'align' || aiBusy ? 'ai-on' : ''}
             data-smbtn
             onClick={toggleMenu('more')}
-            title="Mehr: E-Mail · Nachschlagen · Eigenschaften · Vorlage · Kommentar · KI · Ausrichten · Auto-Größe · Archiv"
+            title="Mehr: Teilen · Nachschlagen · Eigenschaften · Vorlage · Kommentar · KI · Ausrichten · Auto-Größe · Archiv"
             aria-label="Mehr"
           ><IMore size={15} /></button>
         </span>
