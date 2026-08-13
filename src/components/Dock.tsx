@@ -143,7 +143,8 @@ export function Dock() {
         requestAnimationFrame(step);
       } else {
         setArranging(false);
-        fitView({ padding: 0.12, duration: 500, maxZoom: 1 });
+        // M268: Einpass-Obergrenze läuft mit dem Anzeige-Faktor (siehe Board.tsx)
+        fitView({ padding: 0.12, duration: 500, maxZoom: useBoard.getState().anzeige ?? 1 });
         const msg = {
           flow: 'Verbundenes als Fluss (links → rechts), Rest nach Modultyp gruppiert',
           flowV: 'Verbundenes als Fluss (oben ↓ unten), Rest nach Modultyp gruppiert',

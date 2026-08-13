@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useInternalNode, useReactFlow, useStore, ViewportPortal } from '@xyflow/react';
 import { selectActiveBoard, useBoard, type CommentThread } from '../store';
 import { IX } from './Icons';
+import { wurzelZoom } from '../lib/anzeige';
 
 /** Verfasser-Name: rein lokal (localStorage), wandert NIE ohne den Kommentar */
 const AUTHOR_KEY = 'pixinotes:author';
@@ -79,20 +80,32 @@ function CommentPanel() {
     if (!node || document.body.offsetWidth < 620) { setLage(null); return; }
     const w = node.measured.width ?? 260;
     const p = node.internals.positionAbsolute;
+    /**
+     * M268: Alles in LAYOUT-Punkten rechnen.
+     *
+     * Die Blase hängt als Portal am `body` — dort zählen Layout-Punkte. Was
+     * hier gemessen wird (Bildschirmposition der Karte, eigene Größe,
+     * Fenstermaße), kommt dagegen in Bildpunkten und trägt bei „Anzeige
+     * 130 %" den Wurzel-Zoom. Ungeteilt stand die Blase mit jedem Prozent
+     * weiter neben ihrer Karte.
+     */
+    const z = wurzelZoom();
     const box = blaseRef.current?.getBoundingClientRect();
-    const bw = box?.width ?? 330;
-    const bh = box?.height ?? 220;
+    const bw = box ? box.width / z : 330;
+    const bh = box ? box.height / z : 220;
     const rechtsOben = rf.flowToScreenPosition({ x: p.x + w, y: p.y });
     const linksOben = rf.flowToScreenPosition({ x: p.x, y: p.y });
+    const schirmB = window.innerWidth / z;
+    const schirmH = window.innerHeight / z;
     const rand = 12;
     let seite: 'rechts' | 'links' = 'rechts';
-    let left = rechtsOben.x + 16;
-    if (left + bw > window.innerWidth - rand) {
-      const alternativ = linksOben.x - bw - 16;
+    let left = rechtsOben.x / z + 16;
+    if (left + bw > schirmB - rand) {
+      const alternativ = linksOben.x / z - bw - 16;
       if (alternativ >= rand) { left = alternativ; seite = 'links'; }
-      else left = Math.max(rand, window.innerWidth - bw - rand);
+      else left = Math.max(rand, schirmB - bw - rand);
     }
-    const top = Math.min(Math.max(rand, rechtsOben.y - 8), Math.max(rand, window.innerHeight - bh - rand));
+    const top = Math.min(Math.max(rand, rechtsOben.y / z - 8), Math.max(rand, schirmH - bh - rand));
     setLage({ left, top, seite });
   }, [node, transform, rf, thread?.msgs.length, isNew]);
 

@@ -3,6 +3,21 @@ import { useBoard } from '../store';
 import { wurzelZoom } from './anzeige';
 
 /**
+ * M268: Wie stark ist DIESES Element vergrößert?
+ *
+ * Bildbreite geteilt durch Layoutbreite. Das deckt jede Verschachtelung ab —
+ * Wurzel-Zoom, der Ausgleich der Leinwand und ein eigener Zoom am Element
+ * multiplizieren sich hier von selbst auf, statt dass man sie einzeln kennen
+ * müsste. Fällt die Messung aus (Breite 0), gilt der Wurzel-Zoom wie bisher.
+ */
+function massstab(el: Element | null): number {
+  const h = el as HTMLElement | null;
+  if (!h || !h.offsetWidth) return wurzelZoom();
+  const v = h.getBoundingClientRect().width / h.offsetWidth;
+  return Number.isFinite(v) && v > 0.05 ? v : wurzelZoom();
+}
+
+/**
  * M243: Die Bearbeiten-Leiste an eine andere Stelle schieben — und dort lassen.
  *
  * Der Befund: „Der Platz des Bearbeiten-Menüs ist immer irgendwie überlagernd,
@@ -44,7 +59,7 @@ export function useLeisteZiehen(ort: LeistenOrt, leiste: string) {
   const showToast = useBoard((s) => s.showToast);
 
   const zug = useRef<{
-    id: number; sx: number; sy: number;
+    id: number; el: HTMLElement; sx: number; sy: number;
     start: { x: number; y: number };
     grenze: { minDx: number; maxDx: number; minDy: number; maxDy: number };
     bewegt: boolean;
@@ -79,7 +94,8 @@ export function useLeisteZiehen(ort: LeistenOrt, leiste: string) {
       const v = useBoard.getState().leisteVersatz[ort];
       if (!v || (v.x === 0 && v.y === 0)) return;
       const r = bar.getBoundingClientRect();
-      const z = wurzelZoom();
+      // M268: Maßstab des Kastens, der den Versatz trägt (siehe massstab)
+      const z = massstab(bar.closest('.sel-toolbar-anker') ?? bar);
       /** Wie weit muss die Kante geschoben werden, damit beide Ränder passen?
        *  Ragt sie links heraus, geht es nach rechts (positiv) — und umgekehrt. */
       const rein = (vorn: number, hinten: number, platz: number) =>
@@ -109,6 +125,8 @@ export function useLeisteZiehen(ort: LeistenOrt, leiste: string) {
        */
       zug.current = {
         id: e.pointerId,
+        // Den Versatz trägt der Anker (Desktop) bzw. die Leiste selbst (Telefon)
+        el: (bar.closest('.sel-toolbar-anker') as HTMLElement | null) ?? (bar as HTMLElement),
         sx: e.clientX, sy: e.clientY,
         start: { x: versatz.x, y: versatz.y },
         grenze: {
@@ -129,12 +147,19 @@ export function useLeisteZiehen(ort: LeistenOrt, leiste: string) {
       if (!z.bewegt && Math.hypot(dx, dy) < SCHWELLE) return;
       z.bewegt = true;
       /**
-       * Geteilt durch den Wurzel-Zoom (Anzeigegröße A− / A+, M224). Die
-       * Zeigerkoordinaten sind Schirmpunkte, `translate` rechnet in
-       * Layout-Punkten. Ohne die Division liefe die Leiste bei 175 % dem
-       * Finger um drei Viertel voraus.
+       * Geteilt durch die Vergrößerung DES KASTENS, der den Versatz trägt.
+       *
+       * Die Zeigerkoordinaten sind Schirmpunkte, `translate` rechnet in den
+       * Punkten dieses Kastens. Ohne die Division liefe die Leiste bei 175 %
+       * dem Finger um drei Viertel voraus (M224).
+       *
+       * M268: Nicht mehr pauschal der Wurzel-Zoom. Die Karten-Leiste hängt
+       * seither im Renderer, der den Anzeige-Zoom ausgleicht — dort ist ein
+       * Punkt wieder ein Bildpunkt. Die angedockte Leiste am Telefon liegt
+       * dagegen weiter am `body` und trägt ihn voll. Gemessen wird deshalb
+       * am Element selbst: Bildbreite geteilt durch Layoutbreite.
        */
-      const z0 = wurzelZoom();
+      const z0 = massstab(z.el);
       setLive({ x: z.start.x + dx / z0, y: z.start.y + dy / z0 });
       e.preventDefault();
     },

@@ -103,6 +103,7 @@ const nodeTypes: NodeTypes = {
 };
 
 function OverviewCanvas() {
+  const anzeige = useBoard((s) => s.anzeige ?? 1);
   const spaces = useBoard((s) => s.spaces);
   const alleBoards = useBoard((s) => s.boards);
   const showArchived = useBoard((s) => s.showArchived);
@@ -134,9 +135,11 @@ function OverviewCanvas() {
         edges={edges}
         nodeTypes={nodeTypes}
         fitView
-        fitViewOptions={{ padding: 0.18, maxZoom: 0.95 }}
-        minZoom={0.08}
-        maxZoom={1.8}
+        /* M268: Auch die Netz-Übersicht rechnet den Anzeige-Zoom aus der
+           Leinwand heraus — ihre Grenzen laufen deshalb mit dem Faktor. */
+        fitViewOptions={{ padding: 0.18, maxZoom: 0.95 * anzeige }}
+        minZoom={0.08 * anzeige}
+        maxZoom={1.8 * anzeige}
         panOnScroll
         zoomOnDoubleClick={false}
         nodesConnectable={false}

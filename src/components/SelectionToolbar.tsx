@@ -8,6 +8,7 @@ import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '..
 import { uid, type AppNode } from '../types';
 import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGrip, IGridLayout, IMail, IMore, IMoveTo, IPen, ITag, ITrash, IType, IUndo, IWand, IX } from './Icons';
 import { useLeisteZiehen } from '../lib/leisteZiehen';
+import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
 // von Hand gepflegte Kopie der Schriftliste.
@@ -63,6 +64,16 @@ export function SelectionToolbar() {
   type MenuKind = 'ai' | 'attr' | 'align' | 'move' | 'frame' | 'more' | 'font';
   const [menu, setMenu] = useState<MenuKind | null>(null);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0, down: false });
+  /**
+   * M268: Gemessen wird in Bildschirm-Punkten, geschrieben in Layout-Punkten.
+   *
+   * Die Menüs liegen als Portal am `body`, und der trägt bei „Anzeige 130 %"
+   * den Wurzel-Zoom. Ein `left: 800px` landet dort also bei 1040 Bildpunkten,
+   * während `getBoundingClientRect()` schon 1040 GELIEFERT hat. Ohne Teilen
+   * rutschte das Menü mit jedem Prozent weiter weg — gemessen bei 130 %:
+   * 317 Punkte nach rechts und oben aus dem Bild heraus (Wert −102).
+   */
+  const inLayout = (v: number) => v / wurzelZoom();
   const toggleMenu = (kind: MenuKind) => (e: React.MouseEvent<HTMLButtonElement>) => {
     if (menu === kind) { setMenu(null); return; }
     const r = e.currentTarget.getBoundingClientRect();
@@ -72,10 +83,11 @@ export function SelectionToolbar() {
     const top = barRect ? barRect.top : r.top;
     const bottom = barRect ? barRect.bottom : r.bottom;
     // Zu wenig Platz über der Leiste (Kopf-/Tab-Leiste)? Dann nach unten öffnen
-    const down = top < 340;
+    const down = inLayout(top) < 340;
+    const breite = inLayout(window.innerWidth);
     setMenuPos({
-      x: Math.min(Math.max(8, r.right - 210), window.innerWidth - 218),
-      y: down ? bottom + 10 : top - 10,
+      x: Math.min(Math.max(8, inLayout(r.right) - 210), breite - 218),
+      y: inLayout(down ? bottom + 10 : top - 10),
       down,
     });
     setMenu(kind);
@@ -94,11 +106,11 @@ export function SelectionToolbar() {
       // Richtungen dorthin, wo Platz ist
       const bar = document.querySelector('.sel-toolbar-dock') ?? document.querySelector('.sel-toolbar');
       const r = bar?.getBoundingClientRect();
-      const oben = r?.top ?? 120;
-      const unten = r?.bottom ?? 160;
+      const oben = inLayout(r?.top ?? 120);
+      const unten = inLayout(r?.bottom ?? 160);
       const down = oben < 340;
       setMenuPos({
-        x: Math.max(8, window.innerWidth - 218),
+        x: Math.max(8, inLayout(window.innerWidth) - 218),
         y: down ? unten + 10 : oben - 10,
         down,
       });
@@ -142,10 +154,11 @@ export function SelectionToolbar() {
   useLayoutEffect(() => {
     const el = menuRef.current;
     if (!menu || !el) return;
+    // M268: gemessen in Bildpunkten, gesetzt in Layout-Punkten — beides trennen
     const b = el.getBoundingClientRect();
-    const platz = window.innerWidth - 8;
-    if (b.right > platz) el.style.left = `${Math.max(8, platz - b.width)}px`;
-    else if (b.left < 8) el.style.left = '8px';
+    const platz = inLayout(window.innerWidth) - 8;
+    if (inLayout(b.right) > platz) el.style.left = `${Math.max(8, platz - inLayout(b.width))}px`;
+    else if (inLayout(b.left) < 8) el.style.left = '8px';
   }, [menu, menuPos]);
   const menuPortal = (extraClass: string, content: React.ReactNode) => createPortal(
     <div
@@ -156,7 +169,7 @@ export function SelectionToolbar() {
         ? { left: menuPos.x, top: menuPos.y }
         // nach oben: über die UNTERKANTE ankern (bottom) — wächst von selbst
         // nach oben und braucht weder transform noch translate (M174)
-        : { left: menuPos.x, bottom: window.innerHeight - menuPos.y, top: 'auto' }}
+        : { left: menuPos.x, bottom: inLayout(window.innerHeight) - menuPos.y, top: 'auto' }}
     >
       {content}
     </div>,
@@ -640,19 +653,28 @@ export function SelectionToolbar() {
     );
   }
 
-  // Desktop: schwebt wie gehabt über der Auswahl und wandert beim Pannen mit
+  /**
+   * Desktop: schwebt über der Auswahl und wandert beim Pannen mit.
+   *
+   * M268: Zwei Kästen statt einem. Den äußeren positioniert React Flow an der
+   * Karte — er muss deshalb in demselben Punkte-Raum liegen wie die Leinwand,
+   * die den Anzeige-Zoom herausrechnet. Der innere trägt das Aussehen und holt
+   * sich den Faktor zurück, damit die Knöpfe bei 130 % auch wirklich größer
+   * sind. Beides an einem Element ginge nicht: Der Zoom würde die Verankerung
+   * gleich mitskalieren, und die Leiste stünde neben ihrer Karte.
+   */
   return (
     <NodeToolbar
       nodeId={[...selected, ...selFrames].map((n) => n.id)}
       isVisible
       position={Position.Top}
       offset={14}
-      className={`sel-toolbar${ziehtGerade ? ' zieht' : ''}`}
+      className="sel-toolbar-anker"
       // NodeToolbar mischt `style` NACH seinem eigenen `transform` ein — die
       // Variablen landen also gefahrlos auf demselben Element.
       style={versatzStil}
     >
-      {bar}
+      <div className={`sel-toolbar nodrag${ziehtGerade ? ' zieht' : ''}`}>{bar}</div>
     </NodeToolbar>
   );
 }

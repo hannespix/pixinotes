@@ -140,6 +140,19 @@ export function Board() {
 
   const { screenToFlowPosition, setCenter, fitView, getViewport, setViewport } = useReactFlow();
   const wheelZoom = useBoard((s) => s.wheelZoom);
+  /**
+   * M268: Der Anzeige-Faktor läuft im Board-Zoom mit.
+   *
+   * Die Leinwand rechnet den Wurzel-Zoom heraus (index.css, `--pn-gegen`) —
+   * sonst stimmt keine einzige Trefferfläche. Damit die Karten bei „Anzeige
+   * 130 %" trotzdem größer sind, wandert der Faktor in den Board-Zoom: Alle
+   * Grenzen und Einpass-Obergrenzen laufen mit ihm. Für die Bedienung ändert
+   * sich dadurch nichts — der Spielraum zum Heraus- und Hineinzoomen bleibt
+   * derselbe, er liegt nur um den Faktor verschoben.
+   */
+  const anzeige = useBoard((s) => s.anzeige ?? 1);
+  const anzRef = useRef(anzeige);
+  anzRef.current = anzeige;
 
   /**
    * M249: Den gemerkten Ausschnitt greifen, BEVOR die neue Leinwand ihn
@@ -151,6 +164,37 @@ export function Board() {
    * Deshalb wird er hier im RENDER gelesen, also vor dem Mounten, und bis
    * zum Anwenden in einem Ref geparkt.
    */
+  /**
+   * M268: Ändert sich der Anzeige-Faktor, wandert der Board-Zoom mit.
+   *
+   * Ohne das würde die Einstellung auf dem offenen Board erst beim nächsten
+   * Einpassen wirken — man stellte 130 % ein und die Karten blieben, wie sie
+   * waren. Skaliert wird um die Mitte des sichtbaren Ausschnitts, damit man
+   * nachher dieselbe Stelle vor sich hat und nicht in einer Ecke landet. Die
+   * gemerkten Ausschnitte der anderen Boards laufen mit, sonst kämen sie beim
+   * nächsten Aufschlagen in der alten Größe zurück.
+   */
+  const anzVorher = useRef(anzeige);
+  useEffect(() => {
+    const k = anzeige / anzVorher.current;
+    anzVorher.current = anzeige;
+    if (Math.abs(k - 1) < 0.001) return;
+    /* Gemessen wird in BILDPUNKTEN (getBoundingClientRect), denn genau darin
+       rechnet die Leinwand, seit der Renderer den Anzeige-Zoom ausgleicht.
+       `clientWidth` gäbe Layout-Punkte — die Mitte läge dann daneben, und das
+       Board rutschte beim Umschalten ein Stück zur Seite. */
+    const kasten = document.querySelector('.react-flow')?.getBoundingClientRect();
+    const cx = (kasten?.width ?? window.innerWidth) / 2;
+    const cy = (kasten?.height ?? window.innerHeight) / 2;
+    const mitte = (v: { x: number; y: number; zoom: number }) => ({
+      x: cx - (cx - v.x) * k,
+      y: cy - (cy - v.y) * k,
+      zoom: v.zoom * k,
+    });
+    for (const [id, v] of gemerkteAnsicht) gemerkteAnsicht.set(id, mitte(v));
+    void setViewport(mitte(getViewport()));
+  }, [anzeige, getViewport, setViewport]);
+
   const letztesBoard = useRef(activeId);
   const wunschAnsicht = useRef(gemerkteAnsicht.get(activeId) ?? null);
   if (letztesBoard.current !== activeId) {
@@ -188,7 +232,7 @@ export function Board() {
   useEffect(() => {
     const wrap = zoomWrapRef.current;
     if (!wrap) return;
-    const clampZoom = (z: number) => Math.max(0.15, Math.min(2.5, z));
+    const clampZoom = (z: number) => Math.max(0.15 * anzRef.current, Math.min(2.5 * anzRef.current, z));
     const zoomAt = (clientX: number, clientY: number, newZoom: number, fx?: number, fy?: number) => {
       const rect = wrap.getBoundingClientRect();
       const px = clientX - rect.left;
@@ -415,7 +459,7 @@ export function Board() {
           nodes: selected.length ? selected.map((n) => ({ id: n.id })) : undefined,
           padding: selected.length ? 0.3 : 0.15,
           duration: 400,
-          maxZoom: 1.2,
+          maxZoom: 1.2 * anzRef.current,
         });
         return;
       }
@@ -611,10 +655,10 @@ export function Board() {
     const sx = node.position.x * zoom + x;
     const sy = node.position.y * zoom + y;
     const fullyVisible = sx >= 8 && sy >= 64 && sx + w <= window.innerWidth - 8 && sy + h <= window.innerHeight - 76;
-    if (fullyVisible && zoom >= 0.65) return; // gut lesbar im Blick → nicht springen
+    if (fullyVisible && zoom >= 0.65 * anzRef.current) return; // gut lesbar im Blick → nicht springen
     returnViewport.current = { x, y, zoom };
     flyingUntil.current = performance.now() + 700;
-    void fitView({ nodes: [{ id: node.id }], padding: 0.35, duration: 450, maxZoom: 1.05 });
+    void fitView({ nodes: [{ id: node.id }], padding: 0.35, duration: 450, maxZoom: 1.05 * anzRef.current });
   }, [fitView, getViewport, oeffneFokus]);
 
   /**
@@ -642,7 +686,7 @@ export function Board() {
       // hängt, steht der Canvas-Transform per !important auf „none" und der
       // Flug von React Flow liefe gegen eine Wand.
       requestAnimationFrame(() => requestAnimationFrame(() => {
-        void fitView({ nodes: [{ id }], padding: 0.3, duration: 380, maxZoom: 1.05 });
+        void fitView({ nodes: [{ id }], padding: 0.3, duration: 380, maxZoom: 1.05 * anzRef.current });
       }));
     };
     window.addEventListener('pixinotes:fokus-zurueck', zurueck);
@@ -746,7 +790,15 @@ export function Board() {
 
   const createNoteAt = useCallback(
     (clientX: number, clientY: number) => {
-      addNote(screenToFlowPosition({ x: clientX - 130, y: clientY - 30 }));
+      /**
+       * M268: Der halbe Kartenversatz gehört in BOARD-Punkte, nicht in
+       * Bildpunkte. Vorher wurden 130 Bildpunkte abgezogen und erst danach
+       * umgerechnet — bei jedem anderen Zoom als 100 % lag die neue Notiz
+       * deshalb verschieden weit neben dem Zeiger. Jetzt liegt sie immer
+       * gleich, denn 130 ist die halbe Kartenbreite auf dem Board.
+       */
+      const p = screenToFlowPosition({ x: clientX, y: clientY });
+      addNote({ x: p.x - 130, y: p.y - 30 });
       showToast('Notiz erstellt — lostippen! „/" öffnet das Block-Menü ✍️');
     },
     [addNote, screenToFlowPosition, showToast],
@@ -920,10 +972,10 @@ export function Board() {
         zoomOnDoubleClick={false}
         deleteKeyCode={['Delete', 'Backspace']}
         multiSelectionKeyCode={['Meta', 'Shift']}
-        minZoom={0.15}
-        maxZoom={2.5}
+        minZoom={0.15 * anzeige}
+        maxZoom={2.5 * anzeige}
         fitView
-        fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
+        fitViewOptions={{ padding: 0.25, maxZoom: anzeige }}
         defaultEdgeOptions={{
           style: { stroke: 'rgba(90,80,60,.45)', strokeWidth: 2 },
           labelStyle: { fontSize: 11, fill: '#7a7263' },

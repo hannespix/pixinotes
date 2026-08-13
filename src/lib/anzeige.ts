@@ -51,6 +51,27 @@ export function initAnzeige(): () => void {
     // setzen: Manche Browser legen sonst grundlos eine eigene Ebene an.
     if (z > 1.001) root.style.setProperty('zoom', String(z));
     else root.style.removeProperty('zoom');
+    /**
+     * M268: Der Faktor UND sein Kehrwert stehen als CSS-Variablen bereit.
+     *
+     * Grund ist ein handfester Fehler: `zoom` vergrößert zwar alles, aber die
+     * Zahlen, mit denen JavaScript rechnet, laufen dabei auseinander. Ein
+     * `getBoundingClientRect()` und ein `event.clientX` kommen in
+     * BILDSCHIRM-Punkten (also mit dem Zoom multipliziert), ein `offsetWidth`
+     * und die Verschiebung der Leinwand dagegen in LAYOUT-Punkten (ohne).
+     * React Flow mischt beides — und rechnet deshalb bei 130 % um genau den
+     * Faktor 1,3 daneben. Gemessen: Ein Doppelklick legte die Notiz 373 Punkte
+     * neben den Zeiger, gezogene Karten liefen der Maus davon, und Anfasser
+     * lagen so weit neben ihrer Karte, dass sich gar nichts mehr verbinden
+     * ließ (User-Befund).
+     *
+     * Die Leinwand nimmt den Zoom deshalb mit `--pn-gegen` wieder heraus; in
+     * ihrem Inneren sind Layout- und Bildschirm-Punkte dann wieder dasselbe.
+     * Was innerhalb der Leinwand trotzdem groß sein soll (Zoom-Knöpfe,
+     * Übersichtskarte …), holt sich `--pn-anz` zurück.
+     */
+    root.style.setProperty('--pn-anz', String(z));
+    root.style.setProperty('--pn-gegen', String(1 / z));
     root.dataset.lesbar = lesbar ? 'an' : 'aus';
     root.dataset.kontrast = kontrast ? 'hoch' : 'normal';
     // M246: Milchglas als eigener Schalter. „Mehr Kontrast" schaltet es

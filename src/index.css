@@ -129,6 +129,30 @@ body {
 .board-wrap { height: 100%; }
 .react-flow { background: var(--bg); }
 
+/* ================= M268: Anzeige-Zoom und die Leinwand =================
+   `zoom` am Wurzelelement (M224) vergrößert alles — aber es spaltet die
+   Zahlen: Bildpunkt-Rechtecke und Zeigerkoordinaten tragen den Faktor,
+   `offsetWidth` und die Verschiebung der Leinwand nicht. React Flow mischt
+   beides und rechnet dann um genau diesen Faktor daneben.
+
+   Der Renderer nimmt den Zoom deshalb wieder heraus. In seinem Inneren sind
+   Layout- und Bildschirm-Punkte wieder dasselbe, und sämtliche Rechnerei —
+   Anfasser, Ziehen, Doppelklick, Verbinden — stimmt wie bei 100 %. Dass die
+   Karten trotzdem größer werden, besorgt der Board-Zoom (Board.tsx: alle
+   Zoom-Grenzen laufen mit dem Faktor).
+
+   Bewusst NICHT an `.react-flow`: Zoom-Knöpfe, Übersichtskarte und Fußzeile
+   hängen daneben und sollen ihre Vergrößerung behalten. Die Zeichenebene
+   liegt zwar außerhalb des Renderers, rechnet aber mit derselben
+   Verschiebung — sie muss deshalb mit. */
+.react-flow__renderer,
+.drawing-layer { zoom: var(--pn-gegen, 1); }
+
+/* Die Karten-Leiste hängt im Renderer (React Flow setzt ihre Position dort).
+   Ihre LAGE muss also im ausgeglichenen Raum bleiben, ihr INHALT aber wieder
+   mitwachsen — darum der innere Kasten mit dem Faktor. */
+.sel-toolbar-anker > .sel-toolbar { zoom: var(--pn-anz, 1); }
+
 /* ---------- Topbar ---------- */
 .topbar {
   /* M248: um den App-Rand nach innen — sonst läge die Kopfleiste auf dem
@@ -629,7 +653,10 @@ input.img-titel {
    Formatier-Leiste des Texts oben an der Karte steht — sonst liegen zwei
    Leisten übereinander und die vordere verdeckt die hintere. Gesetzt wird die
    Variable unten am `body`, sobald eine Formatier-Leiste im Bild ist. */
-.sel-toolbar { translate: var(--lv-x, 0px) calc(var(--lv-y, 0px) + var(--lv-typo, 0px)); }
+/* M268: Der Versatz sitzt am ANKER (dem Kasten, den React Flow positioniert),
+   nicht am sichtbaren Balken — der trägt den Anzeige-Faktor und würde den
+   Versatz sonst mitskalieren. */
+.sel-toolbar-anker { translate: var(--lv-x, 0px) calc(var(--lv-y, 0px) + var(--lv-typo, 0px)); }
 .sel-griff {
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; align-self: stretch; margin: -7px 2px -7px -6px;
@@ -658,8 +685,14 @@ input.img-titel {
      WebDAV-Verbinden müssen auch bei offenen Einstellungen lesbar sein */
   z-index: 120; pointer-events: none; max-width: 80vw;
 }
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+/* M268: Die Blase selbst fängt KEINE Klicks mehr ab — nur noch ihr Knopf.
+   Vorher lag über dem unteren Bilddrittel eine unsichtbare Sperre: Wer dort
+   zeichnen oder eine Karte anfassen wollte, traf die Blase. Bei „Anzeige
+   175 %" wächst sie mit und deckte entsprechend mehr Leinwand zu (gemessen:
+   ein Stiftstrich bei 600/700 kam gar nicht erst an). */
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast-undo {
+  pointer-events: auto;
   margin-left: 12px; border: none; background: rgba(255, 255, 255, 0.16);
   color: #ffd76a; font-family: inherit; font-size: 12.5px; font-weight: 700;
   padding: 3px 11px; border-radius: 7px; cursor: pointer;
