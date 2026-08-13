@@ -909,6 +909,19 @@ html[data-kopf-eng='an'] .hint { display: none; }
   /* Das Kleben aus M236 ist hier gegenstandslos: In einer Spalte scrollt
      senkrecht, und `left: 0` würde nur einen wirkungslosen Kontext aufmachen. */
   .app.nav-links .tab.active { position: static; }
+  /**
+   * M266: … und mit dem Kleben fällt auch sein Schatten weg.
+   *
+   * Der Verlauf aus M261 (`.tab.active::after`) lässt in der REIHE die
+   * vorbeiziehenden Reiter hinter dem festgehaltenen verschwinden. Er ist
+   * absolut positioniert und rechnet damit, dass der Reiter selbst sein
+   * Bezugsrahmen ist — in der Spalte steht der aber auf `static`. Der
+   * Verlauf hängte sich dadurch an die ganze LEISTE: ein rechteckiger,
+   * dunkler Streifen über ihre volle Höhe, rechts außen, ohne Rundung.
+   * Genau der „komische Schatten der linken Bar" (User-Screenshot;
+   * gemessen: 206 statt 241 Helligkeit, über 10 Punkte auslaufend).
+   */
+  .app.nav-links .tab.active::after { content: none; }
   /* Teilen und ＋ nebeneinander am Fuß der Spalte */
   .app.nav-links .tabs-foot { justify-content: flex-start; gap: 4px; padding-top: 2px; }
   /* Heim-Knopf und Brotkrume bilden die Kopfzeile der Spalte */
