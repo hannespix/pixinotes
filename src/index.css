@@ -1816,7 +1816,22 @@ html[data-kopf-eng='an'] .hint { display: none; }
  */
 .pdf-page {
   overflow: auto; background: #efece6; padding: 14px;
-  display: flex; justify-content: center; align-items: flex-start;
+  display: flex; align-items: flex-start;
+  /**
+   * M265: `safe center` statt `center` — sonst ist die linke Hälfte des
+   * vergrößerten Blattes NICHT ERREICHBAR.
+   *
+   * Ein zentriertes Flex-Element, das breiter ist als sein Behälter, ragt auf
+   * BEIDEN Seiten hinaus. Nach links entsteht dabei kein Scrollbereich (der
+   * Bildlauf beginnt bei 0 = linke Kante des Behälters), der Überstand dort
+   * ist damit unerreichbar — gemessen: 2197 Punkte Inhalt, aber nur 1577
+   * erreichbar, 635 Punkte davon fielen hinten runter. Genau die Meldung
+   * „das Scrollen ist nicht sauber". `safe` schaltet in diesem Fall auf
+   * `start` um: zentriert, solange es passt — sobald nicht, oben/links
+   * ausgerichtet und alles erreichbar.
+   */
+  justify-content: center;
+  justify-content: safe center;
   touch-action: pan-x pan-y; overscroll-behavior: contain; cursor: zoom-in;
 }
 .pdf-page.gezoomt { cursor: grab; }
@@ -4612,6 +4627,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .focus-mode .tabs,
 .focus-mode .backlinks,
 .focus-mode .legal-corner,
+/* M265: Der Board-Zoom gehört zum Board. Im Fokus lag er unten links halb
+   unter dem Blatt (User-Screenshot) — und hätte dort ohnehin nur die
+   Ansicht hinter dem Blatt verstellt. Dieselbe Regel wie für Dock,
+   Minimap und Reiterleiste eine Zeile höher. */
+.focus-mode .react-flow__controls,
 .focus-mode .react-flow__attribution { display: none !important; }
 
 .focus-mode .react-flow__node.pn-focused {
