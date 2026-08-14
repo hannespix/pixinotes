@@ -6,6 +6,7 @@ import { collectTasks } from '../../lib/tasks';
 import { linkedNeighborIds } from '../../lib/links';
 import { nodeToText } from '../../lib/serialize';
 import { downloadIcsEvents, fetchIcsUrl, mergeEvents, parseIcs, type IcsEvent } from '../../lib/ics';
+import { notizTermine } from '../../lib/notizTermine';
 import { anyAccountConnected, fetchAccountEvents, invalidateAccountEvents, type CalAccountEvent } from '../../lib/calAccounts';
 import { IChevronL, IChevronR, ISettings } from '../Icons';
 import { CardShell } from './CardShell';
@@ -62,14 +63,15 @@ interface CalStrip {
   ownDate?: string;
 }
 
-interface ShowFlags { tasks: boolean; gantt: boolean; miles: boolean; ics: boolean; konto: boolean }
-const SHOW_DEFAULT: ShowFlags = { tasks: true, gantt: true, miles: true, ics: true, konto: true };
+interface ShowFlags { tasks: boolean; gantt: boolean; miles: boolean; ics: boolean; konto: boolean; notiz: boolean }
+const SHOW_DEFAULT: ShowFlags = { tasks: true, gantt: true, miles: true, ics: true, konto: true, notiz: true };
 const SHOW_LABEL: Record<keyof ShowFlags, string> = {
   tasks: 'Kanban-Fristen',
   gantt: 'Zeitplan-Balken',
   miles: 'Meilensteine',
   ics: 'Externe Termine (ICS)',
   konto: 'Konto-Termine (Google/M365)',
+  notiz: 'Termine aus Notizen',
 };
 /** Anzeigefarben der verbundenen Konten (Google-Blau, Microsoft-Blau) */
 const PROVIDER_COLOR: Record<CalAccountEvent['provider'], string> = { google: '#4285f4', ms: '#0f6cbd' };
@@ -186,6 +188,29 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
         if (t.due) push(byDay, t.due, { icon: '☐', text: t.text, boardId: t.boardId, nodeId: t.nodeId, urgent: t.urgency === 'overdue' });
       }
     }
+    /**
+     * M272: Termine aus NORMALEN Notizen — „Sitzung am 11.11." im Fließtext
+     * erscheint jetzt im Kalender, wie gewünscht besonders bei per Pfeil
+     * VERBUNDENEN Notizen (Bereich „Verbunden"). Checklisten-Punkte sind
+     * bewusst außen vor: Die laufen als Aufgaben (Schalter oben) und stünden
+     * sonst doppelt da. Klick auf den Eintrag springt zur Notiz.
+     */
+    if (show.notiz) {
+      for (const b of sourceBoards) {
+        for (const n of b.nodes) {
+          if (n.type !== 'note' || n.archived) continue;
+          if (scope === 'linked' && !linkedIds.has(n.id)) continue;
+          for (const t of notizTermine((n.data as { blocks?: unknown[] }).blocks)) {
+            push(byDay, t.iso, {
+              icon: '✎',
+              text: t.zeit ? `${t.zeit} ${t.text}` : t.text,
+              boardId: b.id,
+              nodeId: n.id,
+            });
+          }
+        }
+      }
+    }
     for (const b of sourceBoards) {
       for (const n of b.nodes) {
         if (n.type !== 'gantt') continue;
@@ -253,7 +278,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     }
     return { byDay, stripsByDay };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceBoards, scope, linkedIds, show.tasks, show.gantt, show.miles, show.ics, show.konto, icsEvents, accEvents, myEvents]);
+  }, [sourceBoards, scope, linkedIds, show.tasks, show.gantt, show.miles, show.ics, show.konto, show.notiz, icsEvents, accEvents, myEvents]);
 
   const nav = (delta: number) => {
     if (view === 'jahr') {
