@@ -50,8 +50,21 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
    * ob der Browser den Typ darstellen kann.
    */
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  /**
+   * M269: Nach einem Sync trudeln die Dateiinhalte NACH.
+   *
+   * Der Beipack wird geschrieben, wenn die Boards längst stehen (siehe
+   * syncFolder.ts) — ohne diesen Zähler bliebe die Karte beim Platzhalter,
+   * obwohl die Datei inzwischen da ist, und man müsste die Seite neu laden.
+   */
+  const [nachzuegler, setNachzuegler] = useState(0);
   useEffect(() => {
-    if (file.dataUrl || !file.lokal) return;
+    const auf = () => setNachzuegler((n) => n + 1);
+    window.addEventListener('pixinotes:dateien-da', auf);
+    return () => window.removeEventListener('pixinotes:dateien-da', auf);
+  }, []);
+  useEffect(() => {
+    if (file.dataUrl) return;
     let url: string | null = null;
     let weg = false;
     void loadFile(id).then((b) => {
@@ -63,7 +76,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
       weg = true;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [id, file.dataUrl, file.lokal]);
+  }, [id, file.dataUrl, file.lokal, nachzuegler]);
 
   /** Die Quelle für Vorschau und Download — egal, wo sie herkommt */
   const quelle = file.dataUrl ?? blobUrl ?? null;
@@ -181,8 +194,13 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
       )}
       {!quelle && !file.ref && (
         <div className="file-nopreview">
-          Der Inhalt liegt nicht auf diesem Gerät — die Karte kam über Sync oder einen Teilen-Link.
-          Die Datei erneut einfügen, dann ist sie auch hier zu sehen.
+          {/* M269: Dateien reisen jetzt bis zur eingestellten Obergrenze mit.
+              Bleibt eine Karte trotzdem leer, liegt es fast immer an der
+              Größe — das gehört hier hin, nicht ins Handbuch. */}
+          Der Inhalt liegt nicht auf diesem Gerät. Dateien werden bis zur eingestellten
+          Obergrenze mitsynchronisiert (⚙️ → Synchronisation); diese hier ist mit
+          {' '}{formatBytes(file.size)} entweder größer oder wurde vor dieser Neuerung eingefügt.
+          Auf dem Gerät mit der Datei einmal speichern — oder sie hier erneut einfügen.
         </div>
       )}
       {viewerOpen && <PdfViewer dataUrl={quelle!} name={titel} onClose={() => setViewerOpen(false)} onDownload={download} />}

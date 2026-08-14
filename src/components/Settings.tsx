@@ -172,6 +172,8 @@ export function Settings() {
   const [davSecret, setDavSecret] = useState('');
   const anzeige = useBoard((s) => s.anzeige);
   const setAnzeige = useBoard((s) => s.setAnzeige);
+  const syncDateienMb = useBoard((s) => s.syncDateienMb ?? 25);
+  const setSyncDateienMb = useBoard((s) => s.setSyncDateienMb);
   const lesbareSchrift = useBoard((s) => s.lesbareSchrift);
   const setLesbareSchrift = useBoard((s) => s.setLesbareSchrift);
   const hoherKontrast = useBoard((s) => s.hoherKontrast);
@@ -793,6 +795,37 @@ export function Settings() {
         {/* ---- Synchronisation (Nextcloud & Co.) ---- */}
         {tab === 'sync' && (
         <>
+        {/* M269: Gilt für ALLE Wege darunter — deshalb steht es ganz oben und
+            nicht in einem der drei Abschnitte. */}
+        <section className="modal-section">
+          <h3>Dateien mitsynchronisieren</h3>
+          <div className="modal-row">
+            <span>Obergrenze je Sicherung</span>
+            <div className="seg">
+              {([[0, 'aus'], [10, '10 MB'], [25, '25 MB'], [50, '50 MB'], [100, '100 MB']] as const).map(([mb, label]) => (
+                <button
+                  key={mb}
+                  className={syncDateienMb === mb ? 'on' : ''}
+                  onClick={() => setSyncDateienMb(mb)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="modal-hint">
+            Bisher reisten nur Name und Größe einer Datei mit — auf dem zweiten Gerät stand
+            deshalb „Der Inhalt liegt nicht auf diesem Gerät". Jetzt gehen die Inhalte im
+            Sync-Stand mit, auf <b>allen</b> Wegen (Ordner, Dateien-App, WebDAV) und damit auch
+            auf Telefon und Tablet, wo es dafür bisher gar keinen Weg gab.
+            <br />
+            Der Preis ist die Dateigröße: Aus 3,7 MB PDF werden rund 5 MB im Sync-Stand.
+            Gepackt wird von der kleinsten Datei aufwärts, bis die Grenze erreicht ist — so
+            scheitern nicht zwanzig Handzettel an einem einzigen Video. Was nicht mehr
+            hineinpasst, bleibt wie bisher nur lokal, und die Karte sagt das auch.
+            <b> Zugangsdaten und KI-Schlüssel sind nie dabei</b> — daran ändert sich nichts.
+          </p>
+        </section>
         <section className="modal-section">
           <h3>Synchronisation (Nextcloud, OneDrive, Dropbox …)</h3>
           <p className="modal-hint">

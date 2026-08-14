@@ -11,7 +11,7 @@
 //   Nextcloud liefert die standardmäßig NICHT — dann muss die IT die Origin
 //   freigeben, oder man nutzt den Sync-Ordner (Desktop-Client) bzw. Export.
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard } from '../store';
-import { emitSyncStatus, SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, type SyncPayload } from './syncFolder';
+import { buildSyncPayloadMitDateien, DATEI_BUDGET_MB, emitSyncStatus, SYNC_DIRTY_KEY, uebernimmDateien, WEBDAV_DIRTY_KEY, type SyncPayload } from './syncFolder';
 
 const LS_KEY = 'pixinotes-webdav';
 const STAMP_KEY = 'pixinotes:webdav-stamp';
@@ -153,15 +153,9 @@ export async function webdavRead(cfg: WebdavConfig): Promise<SyncPayload | null>
 /** Aktuellen Stand hochladen (Allow-List-Payload — ohne Einstellungen/Schlüssel). */
 export async function webdavWrite(cfg: WebdavConfig): Promise<string> {
   const s = useBoard.getState();
-  const payload: SyncPayload = {
-    app: 'pixinotes',
-    version: 2,
-    savedAt: new Date().toISOString(),
-    boards: s.boards,
-    spaces: s.spaces,
-    activeId: s.activeId,
-    // bewusst OHNE KI-/Konto-Einstellungen: Schlüssel bleiben auf dem Gerät
-  };
+  // M269: eine Quelle für alle drei Wege — samt Dateien im Beipack. Was NICHT
+  // mitgeht, bleibt unverändert: KI-/Konto-Einstellungen und Zugangsdaten.
+  const payload = await buildSyncPayloadMitDateien(s.syncDateienMb ?? DATEI_BUDGET_MB);
   const res = await davFetch(cfg, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -197,6 +191,10 @@ export function applyWebdav(p: SyncPayload): boolean {
     localStorage.setItem(SYNC_DIRTY_KEY, '1');
   } catch { return false; }
   emitSyncStatus('webdav', 'ok', p.savedAt);
+  // M269: Beipack nachgelagert in die lokale Ablage (wie applySync)
+  void uebernimmDateien(p).then((n) => {
+    if (n > 0) window.dispatchEvent(new CustomEvent('pixinotes:dateien-da'));
+  });
   return true;
 }
 

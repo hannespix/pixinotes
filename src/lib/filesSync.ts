@@ -21,8 +21,8 @@
 // und umgekehrt. Echte Zwei-Wege-Synchronisation, auf dem iPad eben mit einem
 // bewussten Tipp statt automatisch.
 import {
-  applySync, buildSyncPayload, emitSyncStatus, knownStamp, markSynced,
-  SYNC_DIRTY_KEY, SYNC_FILE_NAME, syncSupported, type SyncPayload,
+  applySync, buildSyncPayloadMitDateien, DATEI_BUDGET_MB, emitSyncStatus, knownStamp,
+  markSynced, SYNC_DIRTY_KEY, SYNC_FILE_NAME, syncSupported, type SyncPayload,
 } from './syncFolder';
 import { triggerDownload } from './download';
 import { getWriterRole, inDerived, isImportedState, useBoard } from '../store';
@@ -76,7 +76,8 @@ export type SaveWay = 'geteilt' | 'geladen';
  * lieber einmal zu viel erinnern als stillschweigend Daten verlieren.
  */
 export async function saveViaFiles(): Promise<SaveWay> {
-  const payload = buildSyncPayload();
+  // M269: mit Beipack — auf iPad/Telefon der EINZIGE Weg, wie Dateien mitreisen
+  const payload = await buildSyncPayloadMitDateien(useBoard.getState().syncDateienMb ?? DATEI_BUDGET_MB);
   const file = new File([JSON.stringify(payload)], SYNC_FILE_NAME, { type: 'application/json' });
   setFilesSyncOn(true);
   if (canShareFiles()) {

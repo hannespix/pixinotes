@@ -234,6 +234,9 @@ interface BoardState {
    * die eine ist Geschmack, die andere Barrierefreiheit. Also getrennt.
    */
   milchglas: boolean;
+  /** M269: Wie viele Megabyte Dateiinhalte der Sync-Stand mitnimmt (0 = keine) */
+  syncDateienMb: number;
+  setSyncDateienMb: (mb: number) => void;
   setMilchglas: (on: boolean) => void;
   /** Karten-Daten auf einem BELIEBIGEN Board ändern (Aufgaben-Zentrale arbeitet boardübergreifend) */
   updateNodeDataOnBoard: (boardId: string, nodeId: string, data: Record<string, unknown>) => void;
@@ -899,6 +902,16 @@ export const useBoard = create<BoardState>()(
         setNavBreite: (px) => set({ navBreite: Math.max(280, Math.min(760, Math.round(px))) }),
         milchglas: true,
         setMilchglas: (on) => set({ milchglas: on }),
+        /**
+         * M269: Dateiinhalte reisen im Sync-Stand mit — bis zu dieser Grenze.
+         *
+         * 25 MB als Voreinstellung: Das deckt Handouts, Tischvorlagen und
+         * Protokolle ab, für die eine Datei-Karte typischerweise angelegt
+         * wird, und hält die Sync-Datei in einer Größe, die auch über die
+         * Dateien-App und WebDAV noch zügig durchgeht. 0 schaltet es ab.
+         */
+        syncDateienMb: 25,
+        setSyncDateienMb: (mb) => set({ syncDateienMb: Math.max(0, Math.min(500, Math.round(mb))) }),
 
         updateNodeDataOnBoard: (boardId, nodeId, data) => {
           // Feingranulare History (M122) — Snapshot des ZIEL-Boards (die
@@ -1795,6 +1808,7 @@ export const useBoard = create<BoardState>()(
         leisteVersatz: s.leisteVersatz,
         navBreite: s.navBreite,
         milchglas: s.milchglas,
+        syncDateienMb: s.syncDateienMb,
         anzeige: s.anzeige,
         lesbareSchrift: s.lesbareSchrift,
         hoherKontrast: s.hoherKontrast,

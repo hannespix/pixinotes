@@ -34,6 +34,36 @@ export function emitSyncStatus(source: SyncSource, state: SyncState, at?: string
   window.dispatchEvent(new CustomEvent('pixinotes:sync-status', { detail: { source, state, at } }));
 }
 
+/**
+ * M269: Dateien reisen mit.
+ *
+ * Der Befund kam vom Telefon: Auf der Karte stand „Der Inhalt liegt nicht auf
+ * diesem Gerät". Das stimmte auch — der Inhalt einer Datei lag nur in der
+ * lokalen Ablage des Geräts, auf dem sie eingefügt wurde, und der Sync-Stand
+ * trug bloß Name, Größe und Typ. Auf dem Rechner half der Team-Ordner (M159),
+ * am Telefon gibt es den nicht: Kein Browser darf dort einen Ordner anfassen.
+ *
+ * Deshalb nimmt der Sync-Stand die Inhalte jetzt selbst mit — als Beipack
+ * neben den Boards. Das wirkt auf ALLEN Wegen gleichzeitig (Sync-Ordner,
+ * Dateien-App, WebDAV), also auch dort, wo es bisher gar keinen Weg gab.
+ *
+ * Der Preis ist Größe: Aus 3,7 MB PDF werden rund 5 MB in der Datei
+ * (Base64 kostet ein Drittel). Deshalb ein BUDGET statt „alles immer":
+ * Es wird gepackt, bis die Obergrenze erreicht ist — größte Dateien zuletzt,
+ * damit viele kleine nicht an einer einzigen großen scheitern. Was nicht mehr
+ * hineinpasst, bleibt wie bisher lokal, und die Karte sagt das auch.
+ *
+ * Der Beipack ist OPTIONAL im Schema: Ein älterer Stand ohne ihn wird
+ * unverändert gelesen, und ein neuer Stand tut einer älteren Fassung nicht
+ * weh — sie überliest das Feld.
+ */
+export interface SyncDatei {
+  name: string;
+  mime?: string;
+  /** Inhalt als Base64 (ohne data:-Präfix) */
+  b64: string;
+}
+
 export interface SyncPayload {
   app: 'pixinotes';
   version: 2;
@@ -41,6 +71,8 @@ export interface SyncPayload {
   boards: BoardDoc[];
   spaces: Space[];
   activeId: string;
+  /** M269: Dateiinhalte je Karten-Id — fehlt bei älteren Ständen */
+  dateien?: Record<string, SyncDatei>;
 }
 
 // Minimale Typen für die File System Access API (nicht in allen TS-Libs)
@@ -177,6 +209,91 @@ export function buildSyncPayload(): SyncPayload {
   };
 }
 
+/** Voreinstellung des Budgets für mitreisende Dateien (Megabyte) */
+export const DATEI_BUDGET_MB = 25;
+
+/** Base64 aus einem Blob — in Blöcken, damit große Dateien den Aufrufstapel
+ *  nicht sprengen (btoa(String.fromCharCode(...bytes)) knallt ab ~100 kB) */
+async function alsBase64(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let roh = '';
+  const BLOCK = 0x8000;
+  for (let i = 0; i < bytes.length; i += BLOCK) {
+    roh += String.fromCharCode(...bytes.subarray(i, i + BLOCK));
+  }
+  return btoa(roh);
+}
+
+export function base64AlsBlob(b64: string, mime?: string): Blob {
+  const roh = atob(b64);
+  const bytes = new Uint8Array(roh.length);
+  for (let i = 0; i < roh.length; i++) bytes[i] = roh.charCodeAt(i);
+  return new Blob([bytes], mime ? { type: mime } : undefined);
+}
+
+/**
+ * Derselbe Stand, aber mit den Dateiinhalten im Beipack (M269).
+ *
+ * Bewusst eine eigene, asynchrone Fassung: Der Beipack muss aus der lokalen
+ * Ablage gelesen werden, und alle drei Sicherungswege sind ohnehin
+ * asynchron. `buildSyncPayload` bleibt daneben bestehen — es gibt Stellen
+ * (Vergleiche, Stempel), die nur die Boards brauchen und nicht auf Megabyte
+ * warten sollen.
+ *
+ * `budgetMb <= 0` heißt: keine Dateien mitnehmen (der Schalter ist aus).
+ */
+export async function buildSyncPayloadMitDateien(budgetMb = DATEI_BUDGET_MB): Promise<SyncPayload> {
+  const p = buildSyncPayload();
+  if (budgetMb <= 0) return p;
+  // Alle Datei-Karten aller Boards — die kleinsten zuerst, damit ein einzelner
+  // Brocken nicht zwanzig kleine Anhänge verdrängt
+  const karten: Array<{ id: string; name: string; mime?: string; size: number }> = [];
+  for (const b of p.boards) {
+    for (const n of b.nodes) {
+      if (n.type !== 'file') continue;
+      const d = n.data as { name?: string; mime?: string; size?: number };
+      karten.push({ id: n.id, name: d.name ?? 'Datei', mime: d.mime, size: d.size ?? 0 });
+    }
+  }
+  karten.sort((a, b) => a.size - b.size);
+  const dateien: Record<string, SyncDatei> = {};
+  let rest = budgetMb * 1_000_000;
+  for (const k of karten) {
+    if (rest <= 0) break;
+    try {
+      const blob = await idbGet<Blob | ArrayBuffer>(`file:${k.id}`);
+      if (!blob) continue;
+      const b = blob instanceof Blob ? blob : new Blob([blob]);
+      if (b.size > rest) continue;            // passt nicht — nächste probieren
+      dateien[k.id] = { name: k.name, mime: k.mime, b64: await alsBase64(b) };
+      rest -= b.size;
+    } catch {
+      // Eine unlesbare Datei darf das Sichern des ganzen Stands nicht aufhalten
+    }
+  }
+  return Object.keys(dateien).length ? { ...p, dateien } : p;
+}
+
+/**
+ * Beipack aus einem übernommenen Stand in die lokale Ablage schreiben.
+ *
+ * Läuft NACH `applySync` und bewusst ohne Rückmeldung an den Aufrufer: Die
+ * Boards sind da, egal ob eine einzelne Datei klemmt. Vorhandene Inhalte
+ * werden überschrieben — der übernommene Stand ist der neuere.
+ */
+export async function uebernimmDateien(p: SyncPayload): Promise<number> {
+  const d = p.dateien;
+  if (!d) return 0;
+  let n = 0;
+  for (const [id, eintrag] of Object.entries(d)) {
+    try {
+      await idbSet(`file:${id}`, base64AlsBlob(eintrag.b64, eintrag.mime));
+      n += 1;
+    } catch { /* Platte voll oder Eintrag kaputt — der Rest zählt trotzdem */ }
+  }
+  return n;
+}
+
 /** Nach erfolgreichem Sichern buchen: Stempel setzen und „sauber" markieren —
  *  Letzteres nur, wenn währenddessen nicht weiter editiert wurde. */
 export function markSynced(payload: SyncPayload, source: SyncSource = 'ordner'): string {
@@ -188,7 +305,8 @@ export function markSynced(payload: SyncPayload, source: SyncSource = 'ordner'):
 }
 
 export async function writeSync(handle: SyncDirHandle): Promise<string> {
-  const payload = buildSyncPayload();
+  // M269: mit Beipack — die Obergrenze steht in den Einstellungen
+  const payload = await buildSyncPayloadMitDateien(useBoard.getState().syncDateienMb ?? DATEI_BUDGET_MB);
   const fh = await handle.getFileHandle(FILE_NAME, { create: true });
   const w = await fh.createWritable();
   await w.write(JSON.stringify(payload));
@@ -214,6 +332,18 @@ export function applySync(p: SyncPayload, source: SyncSource = 'ordner'): boolea
     localStorage.setItem(WEBDAV_DIRTY_KEY, '1');
   } catch { return false; }
   emitSyncStatus(source, 'ok', p.savedAt);
+  /**
+   * M269: Der Beipack landet in der lokalen Ablage — bewusst NACHGELAGERT.
+   *
+   * Die Boards sind damit sofort da; die Dateien trudeln ein, sobald sie
+   * geschrieben sind. Andersherum müsste man vor jedem Board-Wechsel auf
+   * Megabyte warten, und eine klemmende Datei würde den ganzen Stand
+   * blockieren. Wenn sie da sind, sagt ein Ereignis den Karten Bescheid,
+   * damit sie ihre Vorschau nachziehen, statt beim Platzhalter zu bleiben.
+   */
+  void uebernimmDateien(p).then((n) => {
+    if (n > 0) window.dispatchEvent(new CustomEvent('pixinotes:dateien-da'));
+  });
   return true;
 }
 

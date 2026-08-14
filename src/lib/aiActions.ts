@@ -6,6 +6,7 @@ import { askAi, MD_HINT, mdToBlocks, prepImageForAi } from './ai';
 import { nodeToText } from './serialize';
 import { makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makeShape, makeTime, makeWeek } from './nodes';
 import { mutedHistory, selectActiveBoard, useBoard } from '../store';
+import { dateiTextVonKarte } from './dateiText';
 import { uid, type AppNode, type ShapeKind, type StickyColor } from '../types';
 import { findFreeSpot } from './arrange';
 
@@ -36,9 +37,35 @@ interface Ctx { id: string; type: string; text: string }
 const CTX_MAX_NODES = 80;
 const CTX_MAX_CHARS = 30_000;
 
-function gather(nodes: AppNode[]): Ctx[] {
+/**
+ * M269: Dateien liefern jetzt ihren INHALT mit, nicht nur ihren Namen.
+ *
+ * Vorher wurde aus einer Datei-Karte genau eine Zeile — „Datei: bericht.pdf
+ * (98 KB)". Die KI konnte damit nichts anfangen und sagte das auch
+ * (User-Screenshot: „Der Dateiinhalt liegt mir nicht als Text vor"). Jetzt
+ * wird die Textebene der PDF ausgelesen und angehängt.
+ *
+ * Der Deckel je Karte ist für Dateien bewusst höher als die 400 Zeichen einer
+ * Notiz: Eine Terminliste ist erst dann brauchbar, wenn sie ganz dasteht. Das
+ * Gesamtbudget bleibt unangetastet — passt der Inhalt nicht mehr hinein,
+ * hören wir wie bisher am Ende der Liste auf.
+ */
+const DATEI_MAX_ZEICHEN = 8_000;
+
+async function gather(nodes: AppNode[]): Promise<Ctx[]> {
+  const dateien = await Promise.all(nodes.map((n) => (n.type === 'file' && !n.archived
+    ? dateiTextVonKarte(n).catch(() => null)
+    : Promise.resolve(null))));
   const all = nodes
-    .map((n) => ({ id: n.id, type: n.type ?? '?', text: nodeToText(n).trim().slice(0, 400) }))
+    .map((n, i) => {
+      const kurz = nodeToText(n).trim().slice(0, 400);
+      const inhalt = dateien[i]?.trim();
+      return {
+        id: n.id,
+        type: n.type ?? '?',
+        text: inhalt ? `${kurz}\nInhalt der Datei:\n${inhalt.slice(0, DATEI_MAX_ZEICHEN)}` : kurz,
+      };
+    })
     .filter((c) => c.text)
     .slice(0, CTX_MAX_NODES);
   let budget = CTX_MAX_CHARS;
@@ -169,7 +196,7 @@ const SECTION_COLORS = ['#eef2ff', '#e6f7ec', '#fff4e0', '#ffe9ef', '#f3eeff', '
 
 /** Themen-Cluster: Karten gruppieren, in Spalten anordnen, Sektions-Header setzen */
 export async function aiCluster(nodes: AppNode[]): Promise<string> {
-  const items = gather(nodes);
+  const items = await gather(nodes);
   if (items.length < 3) throw new Error('Zu wenig Inhalt zum Clustern (mind. 3 Karten mit Text).');
   const { clusters } = await askJson<{ clusters: Array<{ title: string; nodeIds: string[] }> }>(
     `Gruppiere die folgenden Whiteboard-Karten in 2-5 thematische Cluster. Jede Karte gehört in genau ein Cluster. Prägnante deutsche Cluster-Titel (max. 4 Wörter). Antworte NUR mit JSON, exakt in dieser Form: {"clusters":[{"title":"...","nodeIds":["..."]}]}\n\nKarten:\n${JSON.stringify(items)}`,
@@ -213,7 +240,7 @@ export async function aiCluster(nodes: AppNode[]): Promise<string> {
 
 /** Aufgaben & Termine aus dem Inhalt ziehen → Kanban mit Fälligkeiten */
 export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): Promise<string> {
-  const items = gather(nodes);
+  const items = await gather(nodes);
   if (items.length === 0) throw new Error('Keine Inhalte gefunden.');
   const imgs = await gatherImages(nodes);
   const today = new Date().toISOString().slice(0, 10);
@@ -245,7 +272,7 @@ export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): 
 
 /** Prozess/Workflow aus dem Inhalt ableiten → Mermaid-Flowchart */
 export async function aiProcess(nodes: AppNode[], pos: { x: number; y: number }): Promise<string> {
-  const items = gather(nodes);
+  const items = await gather(nodes);
   if (items.length === 0) throw new Error('Keine Inhalte gefunden.');
   const imgs = await gatherImages(nodes);
   const res = await askAi(
@@ -268,7 +295,7 @@ export async function aiProcess(nodes: AppNode[], pos: { x: number; y: number })
 
 /** Analytisches Briefing: Überblick, offene Punkte, nächste Schritte */
 export async function aiBriefing(nodes: AppNode[], pos: { x: number; y: number }): Promise<string> {
-  const items = gather(nodes);
+  const items = await gather(nodes);
   if (items.length === 0) throw new Error('Keine Inhalte gefunden.');
   const imgs = await gatherImages(nodes);
   const res = await askAi(
@@ -313,7 +340,7 @@ export async function aiWeekPlan(
 
 /** Sinnvolle Verbindungen zwischen den Karten vorschlagen und ziehen */
 export async function aiEdges(nodes: AppNode[]): Promise<string> {
-  const items = gather(nodes);
+  const items = await gather(nodes);
   if (items.length < 2) throw new Error('Mindestens 2 Karten mit Inhalt nötig.');
   const { edges } = await askJson<{ edges: Array<{ source: string; target: string; label?: string }> }>(
     `Welche der folgenden Karten hängen inhaltlich zusammen? Schlage 1-6 gerichtete Verbindungen vor, jede mit knappem deutschen Beziehungs-Label (z. B. "blockiert", "gehört zu", "liefert Input für"). Antworte NUR mit JSON: {"edges":[{"source":"id","target":"id","label":"..."}]}\n\nKarten:\n${JSON.stringify(items)}`,
@@ -397,7 +424,7 @@ const SHAPES = new Set(['process', 'decision', 'terminator']);
 export async function aiCommand(instruction: string, nodes: AppNode[], pos: { x: number; y: number }): Promise<string> {
   const wish = instruction.trim();
   if (!wish) throw new Error('Bitte zuerst eine Anweisung eingeben.');
-  const items = gather(nodes);
+  const items = await gather(nodes);
   const imgs = await gatherImages(nodes);
   const { summary, ops } = await askJson<{ summary?: string; ops: AiOp[] }>(
     `Du bist der Assistent eines Whiteboard-Tools (Karten auf einer Leinwand). Setze den Wunsch des Nutzers als Operationsplan um.
