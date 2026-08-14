@@ -2424,6 +2424,62 @@ html[data-kopf-eng='an'] .hint { display: none; }
   padding: 0; font-size: 0; opacity: 0.85; flex: none;
 }
 .cal-strip:hover { opacity: 1; }
+/* ================= M270: Jahresansicht =================
+   Zwölf Mini-Monate nebeneinander. Gezeigt wird nicht, WAS an einem Tag liegt
+   (dafür ist kein Platz), sondern DASS etwas liegt — je mehr Einträge, desto
+   kräftiger der Punkt. Das beantwortet die Frage, für die man sonst zwölfmal
+   weiterblättert: „Wann ist eigentlich was los?" */
+.cal-jahr {
+  flex: 1; min-height: 0; overflow: auto;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+  /* Die Kacheln sind so hoch wie ihr Monat — ohne das zieht das Raster sie
+     auf die Zeilenhöhe auf, und unter jedem Februar klafft eine leere Fläche */
+  grid-auto-rows: min-content; align-content: start;
+  gap: 8px; padding: 2px;
+}
+.cal-jahr-monat {
+  background: var(--surface); border: 1px solid var(--surface-dim);
+  border-radius: 8px; padding: 5px 6px 6px; align-self: start;
+}
+.cal-jahr-kopf {
+  display: block; width: 100%; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 700; color: var(--ink);
+  text-align: left; padding: 1px 2px 4px;
+}
+.cal-jahr-kopf:hover { color: var(--accent-strong); }
+.cal-jahr-raster { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; }
+.cal-jahr-dow {
+  font-size: 7.5px; font-weight: 700; color: var(--muted);
+  text-align: center; line-height: 11px;
+}
+.cal-jahr-tag {
+  aspect-ratio: 1; min-width: 0; padding: 0; border: none; background: none;
+  border-radius: 3px; cursor: pointer; font: inherit; font-size: 8.5px;
+  line-height: 1; color: var(--muted); display: flex; align-items: center; justify-content: center;
+}
+.cal-jahr-tag:hover { background: var(--surface-2); color: var(--ink); }
+/* Belegte Tage: drei Stufen, damit man Ballungen auf einen Blick sieht */
+.cal-jahr-tag.voll { color: #fff; font-weight: 700; }
+.cal-jahr-tag.v1 { background: color-mix(in oklab, var(--accent) 45%, transparent); }
+.cal-jahr-tag.v2 { background: color-mix(in oklab, var(--accent) 70%, transparent); }
+.cal-jahr-tag.v3 { background: var(--accent); }
+.cal-jahr-tag.heute { outline: 2px solid var(--accent-strong); outline-offset: -1px; }
+
+/* M270: Export nach Zeitraum — im Kalender-Menü aufklappbar */
+.cal-export {
+  display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid var(--border-soft); border-radius: 8px;
+  padding: 8px; margin-top: 4px; background: var(--surface);
+}
+.cal-export-schnell, .cal-export-spanne { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.cal-export-spanne label { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); }
+.cal-export-spanne input {
+  font: inherit; font-size: 11px; padding: 3px 5px;
+  border: 1px solid var(--border-soft); border-radius: 6px;
+  background: var(--surface-2); color: var(--ink);
+}
+.cal-export-hinweis { font-size: 10.5px; color: var(--muted); line-height: 1.45; }
+
 .cal-grid.week { grid-template-rows: auto 1fr; }
 .cal-grid.week .cal-cell { min-height: 150px; }
 .cal-grid.week .cal-strip { height: 13px; font-size: 8.5px; color: #fff; line-height: 13px; padding: 0 4px; text-align: left; white-space: nowrap; overflow: hidden; }

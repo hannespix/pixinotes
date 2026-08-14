@@ -106,7 +106,15 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     return () => window.removeEventListener('pixinotes-cal-accounts', onAcc);
   }, []);
 
-  const view = (data.view as 'month' | 'week') ?? 'month';
+  /**
+   * M270: Drei Ansichten statt zwei.
+   *
+   * Gewünscht war der Jahresüberblick — „wann ist eigentlich was los?". Der
+   * Monat beantwortet das nicht, und zwölfmal weiterblättern ist keine
+   * Antwort. Die Jahresansicht zeigt alle zwölf Monate nebeneinander und
+   * markiert die Tage, an denen etwas liegt; ein Klick führt in den Monat.
+   */
+  const view = (data.view as 'month' | 'week' | 'jahr') ?? 'month';
   // M169: Verbindungen (Pfeile) an den Kalender fokussieren ihn automatisch
   // auf genau diese Quell-Karten (Bereich „Verbunden") — ohne gespeicherte
   // Wahl gilt: Verbindungen da → verbunden, sonst alle Boards. Der Schalter
@@ -149,12 +157,12 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     if (!showKonto || !anyAccountConnected()) { setAccEvents([]); setAccError(''); return; }
     let cancelled = false;
     // Sichtbarer Bereich plus Puffer (Monat: ±2 Wochen, Woche: −1/+2 Wochen)
-    const from = view === 'week'
-      ? new Date(new Date(`${anchorIso}T12:00:00`).getTime() - 7 * DAY)
-      : new Date(year, month - 1, -7);
-    const to = view === 'week'
-      ? new Date(new Date(`${anchorIso}T12:00:00`).getTime() + 14 * DAY)
-      : new Date(year, month, 14);
+    const from = view === 'jahr' ? new Date(year, 0, 1)
+      : view === 'week' ? new Date(new Date(`${anchorIso}T12:00:00`).getTime() - 7 * DAY)
+        : new Date(year, month - 1, -7);
+    const to = view === 'jahr' ? new Date(year, 11, 31)
+      : view === 'week' ? new Date(new Date(`${anchorIso}T12:00:00`).getTime() + 14 * DAY)
+        : new Date(year, month, 14);
     fetchAccountEvents(from, to)
       .then(({ events, errors }) => {
         if (cancelled) return;
@@ -248,6 +256,10 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   }, [sourceBoards, scope, linkedIds, show.tasks, show.gantt, show.miles, show.ics, show.konto, icsEvents, accEvents, myEvents]);
 
   const nav = (delta: number) => {
+    if (view === 'jahr') {
+      updateNodeData(id, { month: `${year + delta}-${String(month).padStart(2, '0')}` });
+      return;
+    }
     if (view === 'week') {
       const a = new Date(`${anchorIso}T12:00:00`);
       updateNodeData(id, { anchor: isoOf(new Date(a.getTime() + delta * 7 * DAY)) });
@@ -400,6 +412,93 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
       : `${ok} Abo(s) aktualisiert, ${fail} fehlgeschlagen — viele Server erlauben Browser-Zugriff (CORS) nicht; dann die .ics-Datei importieren.`);
   };
 
+  /**
+   * M270: Exportieren, was WIRKLICH gefragt ist — nicht nur das Sichtbare.
+   *
+   * Bisher ging ausschließlich der angezeigte Ausschnitt in die Datei. Wer
+   * alle Termine eines Jahres nach Outlook bringen wollte, musste Monat für
+   * Monat exportieren und zwölf Dateien zusammenführen. Jetzt entscheidet ein
+   * Zeitraum, und „alles" ist ausdrücklich erlaubt.
+   *
+   * Wichtig ist der Unterschied zwischen den Quellen: Aufgaben, Zeitpläne,
+   * importierte ICS-Termine und eigene Termine liegen VOLLSTÄNDIG vor — sie
+   * lassen sich einfach filtern. Die Termine verbundener Konten (Google,
+   * Microsoft 365) werden dagegen immer nur für den gerade sichtbaren
+   * Zeitraum geholt. Für einen größeren Export müssen sie deshalb eigens
+   * nachgeladen werden, sonst fehlten sie stillschweigend — und genau das
+   * wäre der Fehler, den man erst in Outlook bemerkt.
+   */
+  const [exportOffen, setExportOffen] = useState(false);
+  const [exVon, setExVon] = useState(`${new Date().getFullYear()}-01-01`);
+  const [exBis, setExBis] = useState(`${new Date().getFullYear()}-12-31`);
+
+  /** Eigener Termin → ICS-Eintrag (mit Uhrzeit, Ort und Notiz) */
+  const alsIcs = (ev: MyEvent): IcsEvent => ({
+    title: ev.title,
+    start: ev.date,
+    end: ev.endDate,
+    startTime: ev.time,
+    endTime: ev.end,
+    place: ev.place,
+    note: ev.note,
+  });
+
+  /**
+   * Termine für einen Zeitraum einsammeln. `von`/`bis` leer = ohne Grenze.
+   * Gibt zusätzlich zurück, ob Konto-Termine nachgeladen wurden — das gehört
+   * in die Rückmeldung, damit niemand rätselt, was in der Datei steht.
+   */
+  const sammle = async (von?: string, bis?: string): Promise<{ events: IcsEvent[]; konto: number }> => {
+    const drin = (iso: string) => (!von || iso >= von) && (!bis || iso <= bis);
+    const events: IcsEvent[] = [];
+    const eigeneIds = new Set(myEvents.map((e) => e.id));
+
+    // Eigene Termine zuerst — nur sie tragen Uhrzeit, Ort und Notiz
+    for (const ev of myEvents) {
+      if (!drin(ev.date) && !(ev.endDate && drin(ev.endDate))) continue;
+      events.push(alsIcs(ev));
+    }
+    // Aufgaben, Meilensteine, importierte Termine: aus dem Tagesraster,
+    // aber OHNE die eigenen (die stehen schon vollständig oben)
+    for (const [day, entries] of byDay) {
+      if (!drin(day)) continue;
+      for (const e of entries) {
+        if (e.own) continue;
+        events.push({ title: e.text, start: day });
+      }
+    }
+    // Mehrtägiges (Zeitpläne, externe Termine) als EIN Termin mit Zeitspanne
+    const spans = new Map<string, { start: string; end: string }>();
+    for (const [day, strips] of stripsByDay) {
+      if (!drin(day)) continue;
+      for (const st of strips) {
+        if (st.ownDate) continue;   // eigener mehrtägiger Termin — schon dabei
+        const cur = spans.get(st.text);
+        if (!cur) spans.set(st.text, { start: day, end: day });
+        else {
+          if (day < cur.start) cur.start = day;
+          if (day > cur.end) cur.end = day;
+        }
+      }
+    }
+    for (const [t, span] of spans) events.push({ title: t, start: span.start, end: span.end });
+
+    // Konto-Termine für GENAU diesen Zeitraum nachladen
+    let konto = 0;
+    if (show.konto && anyAccountConnected() && von && bis) {
+      try {
+        const { events: acc } = await fetchAccountEvents(new Date(`${von}T00:00:00`), new Date(`${bis}T23:59:59`));
+        for (const ev of acc) {
+          if (!drin(ev.date)) continue;
+          events.push({ title: ev.title, start: ev.date, startTime: ev.time });
+          konto += 1;
+        }
+      } catch { /* ohne Konto-Termine exportieren ist besser als gar nicht */ }
+    }
+    void eigeneIds;
+    return { events, konto };
+  };
+
   const exportVisible = () => {
     // Wirklich nur die SICHTBARE Ansicht exportieren — und mehrtägige
     // Streifen (Zeitpläne, externe Termine) als EINEN Termin mit Zeitspanne
@@ -408,7 +507,10 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     const events: IcsEvent[] = [];
     for (const [day, entries] of byDay) {
       if (!visible.has(day)) continue;
-      for (const e of entries) events.push({ title: e.text, start: day });
+      for (const e of entries) {
+        const eigen = e.own ? myEvents.find((m) => m.date === day && e.text.includes(m.title)) : undefined;
+        events.push(eigen ? alsIcs(eigen) : { title: e.text, start: day });
+      }
     }
     const spans = new Map<string, { start: string; end: string }>();
     for (const [day, strips] of stripsByDay) {
@@ -423,8 +525,28 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
       }
     }
     for (const [title, span] of spans) events.push({ title, start: span.start, end: span.end });
-    const n = downloadIcsEvents(events);
+    const n = downloadIcsEvents(events, 'pixinotes-kalender-sichtbar.ics');
     showToast(n ? `${n} sichtbare Einträge als .ics exportiert — in Outlook importierbar.` : 'Nichts zu exportieren.');
+  };
+
+  /** Export über einen Zeitraum (oder ohne Grenzen: alles) */
+  const exportZeitraum = async (von?: string, bis?: string) => {
+    setBusy(true);
+    try {
+      const { events, konto } = await sammle(von, bis);
+      const name = von && bis
+        ? `pixinotes-kalender-${von}-bis-${bis}.ics`
+        : 'pixinotes-kalender-alle-termine.ics';
+      const n = downloadIcsEvents(events, name);
+      setExportOffen(false);
+      if (!n) { showToast('In diesem Zeitraum liegt kein Termin.'); return; }
+      const spanne = von && bis
+        ? `${new Date(`${von}T12:00:00`).toLocaleDateString('de-DE')} – ${new Date(`${bis}T12:00:00`).toLocaleDateString('de-DE')}`
+        : 'alle Zeiträume';
+      showToast(`📅 ${n} Termine exportiert (${spanne})${konto ? `, davon ${konto} aus verbundenen Konten` : ''} — in Outlook über „Datei → Öffnen & Exportieren → Importieren" einlesen.`, false, 9000);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const clearIcs = () => {
@@ -435,7 +557,18 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   // ---------- Raster ----------
   let cells: Array<{ iso: string; day: number; inMonth: boolean }>;
   let title: string;
-  if (view === 'week') {
+  if (view === 'jahr') {
+    // Das Jahresraster baut sich unten selbst auf (zwölf Mini-Monate) —
+    // `cells` bleibt leer und dient nur noch dem Export „Sichtbares".
+    cells = [];
+    for (let m = 0; m < 12; m++) {
+      const tage = new Date(year, m + 1, 0).getDate();
+      for (let t = 1; t <= tage; t++) {
+        cells.push({ iso: `${year}-${String(m + 1).padStart(2, '0')}-${String(t).padStart(2, '0')}`, day: t, inMonth: true });
+      }
+    }
+    title = String(year);
+  } else if (view === 'week') {
     const a = new Date(`${anchorIso}T12:00:00`);
     const mondayT = a.getTime() - ((a.getDay() + 6) % 7) * DAY;
     cells = Array.from({ length: 7 }, (_, i) => {
@@ -488,10 +621,13 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
             {scope === 'all' ? 'Alle Boards' : scope === 'board' ? 'Dieses Board' : `Verbunden (${linkedIds.size})`}
           </button>
           <button
-            onClick={() => updateNodeData(id, { view: view === 'month' ? 'week' : 'month', anchor: todayIso })}
-            title="Monats-/Wochenansicht umschalten"
+            onClick={() => updateNodeData(id, {
+              view: view === 'month' ? 'week' : view === 'week' ? 'jahr' : 'month',
+              anchor: todayIso,
+            })}
+            title="Ansicht umschalten: Monat → Woche → Jahr"
           >
-            {view === 'month' ? 'Woche' : 'Monat'}
+            {view === 'month' ? 'Woche' : view === 'week' ? 'Jahr' : 'Monat'}
           </button>
           <button onClick={() => nav(-1)} title="Zurück" aria-label="Zurück"><IChevronL size={13} /></button>
           <button onClick={() => updateNodeData(id, { month: undefined, anchor: undefined })} title="Zu heute">heute</button>
@@ -521,6 +657,47 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
               {busy ? 'aktualisiere…' : `Abos aktualisieren (${icsUrls.length})`}
             </button>
             <button disabled={busy} onClick={exportVisible}>Sichtbares als .ics exportieren</button>
+            <button disabled={busy} onClick={() => setExportOffen((o) => !o)}>
+              Alle Termine / Zeitraum exportieren…
+            </button>
+            {exportOffen && (
+              <div className="cal-export">
+                <div className="cal-export-schnell">
+                  <button disabled={busy} onClick={() => void exportZeitraum()}>Alle Termine</button>
+                  <button
+                    disabled={busy}
+                    onClick={() => void exportZeitraum(`${year}-01-01`, `${year}-12-31`)}
+                  >
+                    Jahr {year}
+                  </button>
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      const heute = new Date();
+                      const bis = new Date(heute.getFullYear(), heute.getMonth() + 12, heute.getDate());
+                      void exportZeitraum(isoOf(heute), isoOf(bis));
+                    }}
+                  >
+                    Nächste 12 Monate
+                  </button>
+                </div>
+                <div className="cal-export-spanne">
+                  <label>von <input type="date" value={exVon} onChange={(e) => setExVon(e.target.value)} /></label>
+                  <label>bis <input type="date" value={exBis} onChange={(e) => setExBis(e.target.value)} /></label>
+                  <button
+                    disabled={busy || !exVon || !exBis || exBis < exVon}
+                    onClick={() => void exportZeitraum(exVon, exBis)}
+                  >
+                    Zeitraum exportieren
+                  </button>
+                </div>
+                <div className="cal-export-hinweis">
+                  Nimmt <b>alle</b> Termine des Zeitraums mit, nicht nur die angezeigten — mit
+                  Uhrzeit, Ort und Notiz. Termine verbundener Konten werden für den Zeitraum
+                  eigens nachgeladen (bei „Alle Termine" nicht, dort fehlt die Zeitgrenze).
+                </div>
+              </div>
+            )}
             {(icsEvents.length > 0 || icsUrls.length > 0) && (
               <button disabled={busy} onClick={clearIcs}>Externe Termine entfernen ({icsEvents.length})</button>
             )}
@@ -551,6 +728,56 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
           </div>
         </div>
       )}
+      {/* M270: Jahresansicht — zwölf Mini-Monate. Gezeigt wird nicht der
+          Inhalt jedes Tages (dafür ist kein Platz), sondern WO etwas liegt:
+          Ein Tag mit Einträgen ist gefüllt, je mehr desto kräftiger. Klick auf
+          einen Tag führt in den Monat, Klick auf den Monatsnamen ebenfalls. */}
+      {view === 'jahr' ? (
+        <div className="cal-jahr nodrag nowheel">
+          {Array.from({ length: 12 }, (_, m) => {
+            const erster = new Date(year, m, 1);
+            const versatz = (erster.getDay() + 6) % 7;
+            const tage = new Date(year, m + 1, 0).getDate();
+            const felder = Array.from({ length: versatz + tage }, (_, i) => (i < versatz
+              ? null
+              : `${year}-${String(m + 1).padStart(2, '0')}-${String(i - versatz + 1).padStart(2, '0')}`));
+            return (
+              <div className="cal-jahr-monat" key={m}>
+                <button
+                  className="cal-jahr-kopf"
+                  title={`${erster.toLocaleDateString('de-DE', { month: 'long' })} ${year} öffnen`}
+                  onClick={() => updateNodeData(id, { view: 'month', month: `${year}-${String(m + 1).padStart(2, '0')}` })}
+                >
+                  {erster.toLocaleDateString('de-DE', { month: 'short' })}
+                </button>
+                <div className="cal-jahr-raster">
+                  {WEEKDAYS.map((w) => <span key={w} className="cal-jahr-dow">{w[0]}</span>)}
+                  {felder.map((iso, i) => {
+                    if (!iso) return <span key={`l${i}`} />;
+                    const anzahl = (byDay.get(iso)?.length ?? 0) + (stripsByDay.get(iso)?.length ?? 0);
+                    const namen = [
+                      ...(byDay.get(iso) ?? []).map((e) => e.text),
+                      ...(stripsByDay.get(iso) ?? []).map((x) => x.text),
+                    ].slice(0, 6);
+                    return (
+                      <button
+                        key={iso}
+                        className={`cal-jahr-tag ${anzahl ? `voll v${Math.min(anzahl, 3)}` : ''} ${iso === todayIso ? 'heute' : ''}`}
+                        title={anzahl
+                          ? `${new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE')} — ${anzahl} Eintrag/Einträge:\n${namen.join('\n')}`
+                          : `${new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE')} — Klick öffnet den Monat`}
+                        onClick={() => updateNodeData(id, { view: 'month', month: `${year}-${String(m + 1).padStart(2, '0')}` })}
+                      >
+                        {i - versatz + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
       <div className={`cal-grid nodrag nowheel ${view === 'week' ? 'week' : ''}`}>
         {WEEKDAYS.map((w) => <div key={w} className="cal-dow">{w}</div>)}
         {cells.map((c) => (
@@ -597,6 +824,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
           </div>
         ))}
       </div>
+      )}
       {dayEdit && !evEdit && (
         /* M176: Tages-Editor — Schnell-Eingabe + Terminliste; Klick auf einen
            Termin öffnet den Detail-Editor (M177) */
