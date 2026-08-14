@@ -45,6 +45,10 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
   const [selected, setSelected] = useState<string | null>(null);
+  /** M273: Während des Ziehens zeigt eine kleine Fahne die aktuellen Daten
+   *  — man sieht BEIM Ziehen, wo der Vorgang landet, statt es hinterher am
+   *  Tooltip nachzulesen (Muster aller professionellen Gantt-Werkzeuge). */
+  const [dragRow, setDragRow] = useState<string | null>(null);
   const drag = useRef<DragState | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -65,10 +69,21 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
    * schlicht nicht mehr, in welchem Monat man sich befindet.
    */
   const [scrollX, setScrollX] = useState(0);
+  /**
+   * M273: Auch der SENKRECHTE Scroll-Stand wird verfolgt — die Kopfzeile
+   * (Monate, Tage, KW) fährt als Gruppe mit und bleibt immer im Bild, wie
+   * in jedem professionellen Zeitplan-Werkzeug. Vorher scrollte sie bei
+   * vielen Vorgängen aus dem Fenster, und man wusste nicht mehr, über
+   * welchem Monat man gerade stand.
+   */
+  const [scrollY, setScrollY] = useState(0);
   const scrollRaf = useRef(0);
   const onScroll = () => {
     cancelAnimationFrame(scrollRaf.current);
-    scrollRaf.current = requestAnimationFrame(() => setScrollX(scrollRef.current?.scrollLeft ?? 0));
+    scrollRaf.current = requestAnimationFrame(() => {
+      setScrollX(scrollRef.current?.scrollLeft ?? 0);
+      setScrollY(scrollRef.current?.scrollTop ?? 0);
+    });
   };
   const rows = data.rows;
   const setRows = (next: GanttRow[]) => updateNodeData(id, { rows: next });
@@ -143,6 +158,7 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
     drag.current = { rowId: row.id, mode, originX: e.clientX, origStart: row.start, origEnd: row.end, pxPerDay };
     try { (e.target as Element).setPointerCapture(e.pointerId); } catch { /* synthetische Pointer */ }
     setSelected(row.id);
+    setDragRow(row.id);
   };
 
   const onDragMove = (e: React.PointerEvent) => {
@@ -162,7 +178,7 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
     }));
   };
 
-  const endDrag = () => { drag.current = null; };
+  const endDrag = () => { drag.current = null; setDragRow(null); };
 
   /** M271: Trenner der Namensspalte ziehen */
   const spaltenzug = useRef<{ id: number; x0: number; w0: number } | null>(null);
@@ -184,9 +200,20 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   const spalteLoslassen = () => { spaltenzug.current = null; };
 
   // ---------- Zeilen-Aktionen ----------
-  const addRow = () => {
-    const start = fromDays(todayD);
+  const addRow = (startIso?: string) => {
+    const start = startIso ?? fromDays(todayD);
     setRows([...rows, { id: uid(), name: `Vorgang ${rows.length + 1}`, start, end: addDays(start, 4), color: COLORS[rows.length % COLORS.length] }]);
+  };
+
+  /** M273: Doppelklick auf freie Fläche legt den Vorgang GENAU dort an —
+   *  am angeklickten Tag, statt erst ＋ zu drücken und dann zu schieben. */
+  const chartDoppelklick = (e: React.MouseEvent) => {
+    if ((e.target as Element).closest('.gantt-bar')) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    const r = svg.getBoundingClientRect();
+    const tag = minD + Math.floor(((e.clientX - r.left) / (r.width || 1)) * nDays);
+    addRow(fromDays(Math.max(minD, Math.min(maxD, tag))));
   };
   const patchRow = (rowId: string, patch: Partial<GanttRow>) =>
     setRows(rows.map((r) => (r.id === rowId ? { ...r, ...patch } : r)));
@@ -323,7 +350,7 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
       <div className="gantt-head">
         <DragTitle className="kanban-title" value={data.title} onChange={(v) => updateNodeData(id, { title: v })} placeholder="Zeitplan" />
         <div className="gantt-tools nodrag">
-          <button title="Vorgang hinzufügen" onClick={addRow}><IPlus size={14} /></button>
+          <button title="Vorgang hinzufügen" onClick={() => addRow()}><IPlus size={14} /></button>
           <button title="Offene Aufgaben mit Frist als Meilensteine übernehmen" onClick={importTasks}><IDownload size={14} /></button>
           <button title="Konflikte auflösen (Terminkette nachziehen)" onClick={resolveConflicts}><IWand size={14} /></button>
           <button title="Nach Ressource gruppieren" onClick={groupByResource}><IUsers size={14} /></button>
@@ -416,7 +443,10 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
       )}
       <div className="gantt-scroll nodrag nowheel" ref={scrollRef} onScroll={onScroll}>
         {/* Zeilen-Namen (fixe Spalte, Breite am Griff verstellbar — M271) */}
-        <div className="gantt-labels" style={{ paddingTop: HEAD_H, width: labelW, minWidth: labelW }}>
+        <div className="gantt-labels" style={{ width: labelW, minWidth: labelW }}>
+          {/* M273: Kopfzelle der Namensspalte — klebt oben wie die Zeitleiste,
+              sonst stünden die Namen beim Scrollen über der Kopfzeile */}
+          <div className="gantt-labels-kopf" style={{ height: HEAD_H, minHeight: HEAD_H }}>Vorgang</div>
           {allRows.map((r) => (
             <input
               key={r.id}
@@ -431,6 +461,7 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
               onChange={(e) => { if (!isAbo(r.id)) patchRow(r.id, { name: e.target.value }); }}
             />
           ))}
+          <button className="gantt-addzeile" title="Neuen Vorgang anlegen (oder Doppelklick auf die freie Fläche am Wunschtag)" onClick={() => addRow()}>＋ Vorgang</button>
           <div
             className="gantt-spaltengriff"
             title="Ziehen: Namensspalte breiter oder schmaler"
@@ -450,6 +481,7 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
             onPointerMove={onDragMove}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
+            onDoubleClick={chartDoppelklick}
           >
             <defs>
               <marker id={`gdep-${id}`} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
@@ -466,47 +498,37 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
                 <rect key={i} x={i * dw} y={HEAD_H} width={dw} height={chartH} fill="rgba(0,0,0,.045)" />
               ) : null;
             })}
-            {/* Wochen-Raster + KW-Beschriftung (M156, Wochen-Skala) */}
+            {/* Wochen-Raster (M156) — die KW-Beschriftung lebt in der Kopf-Gruppe */}
             {dw < 16 && dw >= 3 && Array.from({ length: nDays }, (_, i) => {
               const dt = new Date((minD + i) * DAY);
               if (dt.getDay() !== 1) return null;
-              return (
-                <g key={`w${i}`}>
-                  <line x1={i * dw} y1={HEAD_H - 4} x2={i * dw} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.07)" />
-                  {dw * 7 >= 34 && <text x={i * dw + 3} y={HEAD_H - 6} className="gantt-day">KW {isoWeek(dt)}</text>}
-                </g>
-              );
+              return <line key={`w${i}`} x1={i * dw} y1={HEAD_H} x2={i * dw} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.07)" />;
             })}
-            {/* Quartals-Gliederung (nur Jahres-Skala) */}
+            {/* Quartals-Striche (nur Jahres-Skala) */}
             {quarters.map((q, i) => (
-              <g key={`q${i}`}>
-                <line x1={q.x0} y1={HEAD_H - 4} x2={q.x0} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.06)" />
-                {dw * 91 >= 30 && <text x={q.x0 + 3} y={HEAD_H - 6} className="gantt-day">{q.label}</text>}
-              </g>
+              <line key={`q${i}`} x1={q.x0} y1={HEAD_H} x2={q.x0} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.06)" />
             ))}
-            {/* Monats-Kopf (bei Jahres-Skala: Jahreszahlen) */}
-            {months.map((m, i) => {
-              /* M271: Der Monatsname klebt am linken Rand seines sichtbaren
-                 Stücks, solange der Monat im Bild ist — vorher stand nach dem
-                 Scrollen nur noch der Rest („26" statt „Aug. 26"). */
-              const textB = m.label.length * 7 + 8;
-              const tx = Math.min(Math.max(m.x0 + 4, scrollX + 4), Math.max(m.x0 + 4, m.x0 + m.w - textB));
-              return (
-                <g key={i}>
-                  <line x1={m.x0} y1={0} x2={m.x0} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.12)" />
-                  <text x={tx} y={13} className="gantt-month">{m.label}</text>
-                </g>
-              );
-            })}
-            {/* Tages-Kopf (nur wenn genug Platz) */}
-            {dw >= 16 && Array.from({ length: nDays }, (_, i) => (
-              <text key={i} x={i * dw + dw / 2} y={HEAD_H - 6} className="gantt-day" textAnchor="middle">
-                {new Date((minD + i) * DAY).getDate()}
-              </text>
+            {/* Monats-Striche über die volle Höhe */}
+            {months.map((m, i) => (
+              <line key={i} x1={m.x0} y1={HEAD_H} x2={m.x0} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.12)" />
+            ))}
+            {/* M273: Zeilen-Bänder — jede zweite Zeile leicht getönt, die
+                Zeile unter dem Zeiger hebt sich (CSS); Klick wählt den
+                Vorgang auch auf freier Fläche aus. Das Auge hält so die Spur
+                vom Namen bis zum Balken — das Grundmuster jedes
+                professionellen Zeitplans. */}
+            {allRows.map((r, i) => (
+              <rect
+                key={`z${r.id}`}
+                className={`gantt-zeile ${selected === r.id ? 'sel' : ''}`}
+                x={0} y={HEAD_H + i * ROW_H} width={chartW} height={ROW_H}
+                fill={i % 2 ? 'rgba(0,0,0,.02)' : 'transparent'}
+                onClick={() => { if (!isAbo(r.id)) setSelected(r.id); }}
+              />
             ))}
             {/* Zeilen-Trenner */}
             {allRows.map((_, i) => (
-              <line key={i} x1={0} y1={HEAD_H + (i + 1) * ROW_H} x2={chartW} y2={HEAD_H + (i + 1) * ROW_H} stroke="rgba(0,0,0,.06)" />
+              <line key={i} x1={0} y1={HEAD_H + (i + 1) * ROW_H} x2={chartW} y2={HEAD_H + (i + 1) * ROW_H} stroke="rgba(0,0,0,.06)" pointerEvents="none" />
             ))}
             {/* Balken & Meilensteine (inkl. Abo-Meilensteine aus verbundenen Kanbans) */}
             {allRows.map((r, i) => {
@@ -532,6 +554,8 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
                       data-start={r.start}
                       data-end={r.end}
                     />
+                    {/* M273: Name neben der Raute — wie am Balken */}
+                    {r.name && <text x={cx + 13} y={cy + 3.2} className="gantt-barlabel" pointerEvents="none">{r.name}</text>}
                   </g>
                 );
               }
@@ -541,6 +565,16 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
               // unsichtbar und damit auch nicht mehr anklickbar.
               const bw = Math.max(4, Math.max(dw, (toDays(r.end) - toDays(r.start) + 1) * dw) - 2);
               const prog = Math.max(0, Math.min(100, r.progress ?? 0));
+              /**
+               * M273: Der Name steht AM Balken (Miro/TeamGantt-Muster) —
+               * vorher nur in der Spalte links, und wer weit gescrollt
+               * hatte, sah bloß noch bunte Rechtecke. Passt der Name in den
+               * Balken, steht er weiß darin (hinter dem Initialen-Kreis
+               * beginnend); sonst grau daneben.
+               */
+              const nameB = (r.name?.length ?? 0) * 6.4 + 10;
+              const innenX = bx + (r.who ? 22 : 8);
+              const passtRein = bw - (r.who ? 24 : 10) >= nameB;
               return (
                 <g key={r.id} className="gantt-bar">
                   <title>{title}</title>
@@ -552,8 +586,25 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
                     style={{ cursor: 'grab' }}
                     onPointerDown={(e) => startDrag(e, r, 'move')}
                   />
+                  {/* M273: Fortschritt füllt den Balken in voller Höhe — der
+                      4-Punkte-Strich von früher war auf einen Blick nicht von
+                      einem Schatten zu unterscheiden. */}
                   {prog > 0 && (
-                    <rect x={bx + 1} y={y + BAR_H - 4} width={(bw * prog) / 100} height={4} rx={2} fill="rgba(0,0,0,.45)" pointerEvents="none" />
+                    <rect x={bx + 1} y={y} width={(bw * prog) / 100} height={BAR_H} rx={4} fill="rgba(0,0,0,.26)" pointerEvents="none" />
+                  )}
+                  {r.name && (passtRein ? (
+                    <text x={innenX} y={y + BAR_H / 2 + 3.2} className="gantt-barlabel innen" pointerEvents="none">{r.name}</text>
+                  ) : (
+                    <text x={bx + bw + 6} y={y + BAR_H / 2 + 3.2} className="gantt-barlabel" pointerEvents="none">{r.name}</text>
+                  ))}
+                  {/* M273: Beim ausgewählten Vorgang sind die Zieh-Enden
+                      SICHTBAR (kleine Griffleisten) — vorher musste man
+                      wissen, dass die unsichtbaren Ränder ziehbar sind. */}
+                  {selected === r.id && (
+                    <g pointerEvents="none">
+                      <rect x={bx + 2} y={y + 3} width={3} height={BAR_H - 6} rx={1.5} fill="#fff" opacity={0.9} />
+                      <rect x={bx + bw - 5} y={y + 3} width={3} height={BAR_H - 6} rx={1.5} fill="#fff" opacity={0.9} />
+                    </g>
                   )}
                   <rect x={bx - 2} y={y} width={7} height={BAR_H} fill="transparent" style={{ cursor: 'ew-resize' }} onPointerDown={(e) => startDrag(e, r, 'start')} />
                   <rect x={bx + bw - 4} y={y} width={8} height={BAR_H} fill="transparent" style={{ cursor: 'ew-resize' }} onPointerDown={(e) => startDrag(e, r, 'end')} />
@@ -612,10 +663,70 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
             {/* Heute-Linie */}
             {todayD >= minD && todayD <= maxD && (
               <g className="gantt-today">
-                <line x1={(todayD - minD) * dw + dw / 2} y1={HEAD_H - 4} x2={(todayD - minD) * dw + dw / 2} y2={HEAD_H + chartH} stroke="#d84b3d" strokeWidth={1.5} strokeDasharray="4 3" />
+                <line x1={(todayD - minD) * dw + dw / 2} y1={HEAD_H} x2={(todayD - minD) * dw + dw / 2} y2={HEAD_H + chartH} stroke="#d84b3d" strokeWidth={1.5} strokeDasharray="4 3" />
               </g>
             )}
+            {/**
+              * M273: Die Kopfzeile KLEBT. Sie ist die letzte Gruppe im SVG
+              * und fährt mit dem senkrechten Scroll-Stand mit — die Balken
+              * schieben sich beim Scrollen unter sie, Monate/Tage/KW bleiben
+              * immer lesbar. Genau das Verhalten von Miro, MS Project & Co.
+              */}
+            <g className="gantt-kopf" transform={`translate(0, ${scrollY})`}>
+              <rect x={0} y={0} width={chartW} height={HEAD_H} className="gantt-kopfgrund" />
+              <line x1={0} y1={HEAD_H} x2={chartW} y2={HEAD_H} stroke="rgba(0,0,0,.14)" />
+              {months.map((m, i) => {
+                /* M271: Der Monatsname klebt zusätzlich am linken Rand seines
+                   sichtbaren Stücks, solange der Monat im Bild ist. */
+                const textB = m.label.length * 7 + 8;
+                const tx = Math.min(Math.max(m.x0 + 4, scrollX + 4), Math.max(m.x0 + 4, m.x0 + m.w - textB));
+                return (
+                  <g key={i}>
+                    <line x1={m.x0} y1={0} x2={m.x0} y2={HEAD_H} stroke="rgba(0,0,0,.12)" />
+                    <text x={tx} y={13} className="gantt-month">{m.label}</text>
+                  </g>
+                );
+              })}
+              {dw >= 16 && Array.from({ length: nDays }, (_, i) => (
+                <text key={i} x={i * dw + dw / 2} y={HEAD_H - 6} className="gantt-day" textAnchor="middle">
+                  {new Date((minD + i) * DAY).getDate()}
+                </text>
+              ))}
+              {dw < 16 && dw >= 3 && dw * 7 >= 34 && Array.from({ length: nDays }, (_, i) => {
+                const dt = new Date((minD + i) * DAY);
+                if (dt.getDay() !== 1) return null;
+                return <text key={`kw${i}`} x={i * dw + 3} y={HEAD_H - 6} className="gantt-day">KW {isoWeek(dt)}</text>;
+              })}
+              {quarters.map((q, i) => (dw * 91 >= 30
+                ? <text key={`ql${i}`} x={q.x0 + 3} y={HEAD_H - 6} className="gantt-day">{q.label}</text>
+                : null))}
+              {/* M273: Heute-Fahne — die rote Linie hat jetzt einen Namen */}
+              {todayD >= minD && todayD <= maxD && (() => {
+                const hx = (todayD - minD) * dw + dw / 2;
+                return (
+                  <g pointerEvents="none">
+                    <rect x={hx - 21} y={HEAD_H - 15} width={42} height={13} rx={6.5} fill="#d84b3d" />
+                    <text x={hx} y={HEAD_H - 5.5} textAnchor="middle" className="gantt-heute-text">Heute</text>
+                  </g>
+                );
+              })()}
+            </g>
           </svg>
+          {/* M273: Datums-Fahne am Vorgang, solange gezogen wird */}
+          {dragRow && (() => {
+            const r = rows.find((x) => x.id === dragRow);
+            if (!r) return null;
+            const i = rowIndex.get(r.id) ?? 0;
+            const tage = toDays(r.end) - toDays(r.start) + 1;
+            return (
+              <div
+                className="gantt-dragtip"
+                style={{ left: x(r.start), top: HEAD_H + i * ROW_H - 24 }}
+              >
+                {fmtShort(r.start)} – {fmtShort(r.end)} · {tage} Tg.
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

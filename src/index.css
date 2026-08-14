@@ -2284,6 +2284,37 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .gantt-label.sel { background: rgba(79,124,255,.1); }
 .gantt-chartwrap { flex: 1; }
 .gantt-svg { display: block; touch-action: none; }
+/* ================= M273: Gantt nach professionellem Vorbild =================
+   Klebende Kopfzeile, Zeilen-Bänder mit Hover, Namen am Balken, sichtbare
+   Zieh-Griffe, Heute-Fahne, Datums-Fahne beim Ziehen, ＋-Zeile unten. */
+.gantt-kopfgrund { fill: var(--surface); }
+[data-theme='dark'] .gantt-kopfgrund { fill: var(--surface-2, #2d2b26); }
+.gantt-zeile { cursor: default; }
+.gantt-zeile:hover { fill: rgba(79, 124, 255, .06); }
+.gantt-zeile.sel { fill: rgba(79, 124, 255, .09); }
+.gantt-barlabel { font-size: 10px; fill: var(--muted); }
+.gantt-barlabel.innen { fill: #fff; font-weight: 600; }
+.gantt-heute-text { font-size: 8.5px; font-weight: 700; fill: #fff; letter-spacing: .03em; }
+.gantt-labels-kopf {
+  display: flex; align-items: flex-end; padding: 0 8px 5px;
+  position: sticky; top: 0; z-index: 1;
+  background: var(--surface-3); border-bottom: 1px solid rgba(0,0,0,.14);
+  font-size: 9.5px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .05em;
+  box-sizing: border-box;
+}
+.gantt-addzeile {
+  border: none; background: none; cursor: pointer; font: inherit;
+  font-size: 11px; color: var(--muted); text-align: left; padding: 5px 8px;
+}
+.gantt-addzeile:hover { color: var(--accent-strong); background: rgba(79,124,255,.06); }
+.gantt-chartwrap { position: relative; }
+.gantt-dragtip {
+  position: absolute; z-index: 3; pointer-events: none; white-space: nowrap;
+  background: #2b2a27; color: #fff; font-size: 10.5px; font-weight: 600;
+  padding: 2px 8px; border-radius: 7px; box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+
 .gantt-month { font-size: 10px; font-weight: 700; fill: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .gantt-day { font-size: 9px; fill: var(--muted); opacity: 0.75; }
 /* Präsentations-Folie: Zeitplan groß */
