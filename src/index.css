@@ -2273,8 +2273,12 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .gantt-rowbar select { font-size: 11px; margin-left: 3px; border: 1px solid var(--border-soft); border-radius: 5px; background: var(--surface); }
 .gantt-scroll { display: flex; flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
 .gantt-labels { flex: none; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--surface-3); position: sticky; left: 0; z-index: 2; }
+/* M271: Die Bearbeitungsleiste darf umbrechen — mit Datumsfeldern ist sie voller */
+.gantt-rowbar { flex-wrap: wrap; row-gap: 3px; }
 .gantt-label {
-  width: 128px; border: none; background: transparent; outline: none; font-family: inherit;
+  /* M271: volle Spaltenbreite — die Spalte selbst ist jetzt verstellbar,
+     eine feste Feldbreite würde den Gewinn gleich wieder abschneiden */
+  width: 100%; border: none; background: transparent; outline: none; font-family: inherit;
   font-size: 11.5px; color: var(--ink); padding: 0 8px; box-sizing: border-box;
 }
 .gantt-label.sel { background: rgba(79,124,255,.1); }
@@ -2328,6 +2332,20 @@ html[data-kopf-eng='an'] .hint { display: none; }
 
 /* Gantt: Ressourcen & Abhängigkeiten */
 .gantt-who-badge { font-size: 7px; font-weight: 700; fill: #2b2a27; }
+/* M271: Termine als Datum eingeben + Dauer sehen */
+.gantt-datum {
+  font: inherit; font-size: 11px; padding: 1px 3px; margin-left: 3px;
+  border: 1px solid var(--border-soft); border-radius: 5px;
+  background: var(--surface); color: var(--ink); width: 112px;
+}
+.gantt-bis { color: var(--muted); font-size: 11px; }
+.gantt-dauer { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
+/* M271: Griff zum Verstellen der Namensspalte — sitzt auf deren rechtem Rand */
+.gantt-spaltengriff {
+  position: absolute; top: 0; right: -3px; width: 7px; height: 100%;
+  cursor: col-resize; z-index: 3;
+}
+.gantt-spaltengriff:hover { background: color-mix(in oklab, var(--accent) 25%, transparent); }
 .gantt-who { width: 60px; border: 1px solid var(--border-soft); border-radius: 5px; font-family: inherit; font-size: 11px; padding: 1px 4px; margin-left: 3px; }
 .gantt-rowbar label { display: inline-flex; align-items: center; }
 

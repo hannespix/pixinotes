@@ -5,7 +5,7 @@ import { doneCol, uid, type GanttData, type GanttNode, type GanttRow, type Kanba
 import { collectTasks } from '../../lib/tasks';
 import { linkedOfType } from '../../lib/moduleFeeds';
 import {
-  IArrowDown, IArrowUp, IDownload, IPalette, IPlus, ITarget, IUsers, IWand, IX, IZoomIn, IZoomOut,
+  IArrowDown, IArrowUp, IDownload, IFit, IPalette, IPlus, ITarget, IUsers, IWand, IX, IZoomIn, IZoomOut,
 } from '../Icons';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
@@ -50,6 +50,26 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
   const dw = data.dayWidth ?? 24;
+  /**
+   * M271: Die Namensspalte ist verstellbar (Griff am Trenner).
+   *
+   * 128 Punkte fest schnitten jeden echten Vorgangsnamen ab — „Abstimmung
+   * Fachbereich" wurde zu „Abstimmung Fachb…", und verbreitern ging nicht.
+   */
+  const labelW = Math.max(80, Math.min(320, (data.labelW as number | undefined) ?? LABEL_W));
+  /**
+   * M271: Der Scroll-Stand lebt im Zustand, damit die Monatsnamen KLEBEN.
+   *
+   * Vorher scrollten sie mit dem Inhalt weg — in der Tages-Skala stand oben
+   * nur noch „26", weil „Aug. 26" längst links aus dem Bild war. Man wusste
+   * schlicht nicht mehr, in welchem Monat man sich befindet.
+   */
+  const [scrollX, setScrollX] = useState(0);
+  const scrollRaf = useRef(0);
+  const onScroll = () => {
+    cancelAnimationFrame(scrollRaf.current);
+    scrollRaf.current = requestAnimationFrame(() => setScrollX(scrollRef.current?.scrollLeft ?? 0));
+  };
   const rows = data.rows;
   const setRows = (next: GanttRow[]) => updateNodeData(id, { rows: next });
 
@@ -144,6 +164,25 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
 
   const endDrag = () => { drag.current = null; };
 
+  /** M271: Trenner der Namensspalte ziehen */
+  const spaltenzug = useRef<{ id: number; x0: number; w0: number } | null>(null);
+  const spalteAnfassen = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    spaltenzug.current = { id: e.pointerId, x0: e.clientX, w0: labelW };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const spalteZiehen = (e: React.PointerEvent) => {
+    const z = spaltenzug.current;
+    if (!z || z.id !== e.pointerId) return;
+    // Bildschirm-Punkte in Karten-Punkte umrechnen (Board-Zoom!): am eigenen
+    // Element gemessen, wie beim Balken-Ziehen
+    const el = scrollRef.current;
+    const massstab = el ? el.getBoundingClientRect().width / el.offsetWidth : 1;
+    updateNodeData(id, { labelW: Math.max(80, Math.min(320, z.w0 + (e.clientX - z.x0) / (massstab || 1))) });
+  };
+  const spalteLoslassen = () => { spaltenzug.current = null; };
+
   // ---------- Zeilen-Aktionen ----------
   const addRow = () => {
     const start = fromDays(todayD);
@@ -163,6 +202,21 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
     if (fresh.length === 0) { showToast('Keine (neuen) Aufgaben mit Fälligkeitsdatum gefunden.'); return; }
     setRows([...rows, ...fresh]);
     showToast(`📅 ${fresh.length} Frist(en) als Meilensteine übernommen`);
+  };
+
+  /**
+   * M271: Das ganze Projekt ins Fenster einpassen.
+   *
+   * Beim Öffnen sah man in der Tages-Skala anderthalb Vorgänge und musste
+   * quer scrollen; welchen Zoom man für „alles auf einen Blick" braucht,
+   * musste man raten. Ein Klick rechnet ihn aus.
+   */
+  const einpassen = () => {
+    const el = scrollRef.current;
+    if (!el || nDays <= 0) return;
+    const platz = el.clientWidth - labelW - 6;
+    updateNodeData(id, { dayWidth: Math.max(0.3, Math.min(48, platz / nDays)) });
+    el.scrollLeft = 0;
   };
 
   const zoom = (dir: -1 | 1) =>
@@ -256,7 +310,7 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   const scrollToToday = () => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollLeft = Math.max(0, LABEL_W + (todayD - minD) * dw - el.clientWidth * 0.45);
+    el.scrollLeft = Math.max(0, labelW + (todayD - minD) * dw - el.clientWidth * 0.45);
   };
   // beim Öffnen automatisch zu heute springen
   useEffect(() => { scrollToToday(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
@@ -274,6 +328,7 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
           <button title="Konflikte auflösen (Terminkette nachziehen)" onClick={resolveConflicts}><IWand size={14} /></button>
           <button title="Nach Ressource gruppieren" onClick={groupByResource}><IUsers size={14} /></button>
           <button title="Zu heute springen" onClick={scrollToToday}><ITarget size={14} /></button>
+          <button title="Alles einpassen — der ganze Zeitplan auf einen Blick" onClick={einpassen}><IFit size={14} /></button>
           <select
             className="gantt-scale"
             value={scale}
@@ -292,6 +347,40 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
       {sel && (
         <div className="gantt-rowbar nodrag">
           <span className="gantt-rowbar-name">{sel.name || 'Vorgang'}</span>
+          {/* M271: Termine ALS DATUM eingeben — vorher ging Start/Ende nur
+              durch tageweises Ziehen am Balken. Wer den 07.09. wollte, zog
+              und zählte Kästchen. Start ändern VERSCHIEBT den Vorgang (die
+              Dauer bleibt), Ende ändern verlängert/verkürzt ihn. */}
+          <label title="Beginn — Ändern verschiebt den Vorgang, die Dauer bleibt">
+            <input
+              type="date"
+              className="gantt-datum"
+              value={sel.start}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                const dauer = toDays(sel.end) - toDays(sel.start);
+                patchRow(sel.id, { start: v, end: addDays(v, dauer) });
+              }}
+            />
+          </label>
+          <span className="gantt-bis">–</span>
+          <label title="Ende — nie vor dem Beginn">
+            <input
+              type="date"
+              className="gantt-datum"
+              value={sel.end}
+              min={sel.start}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return;
+                patchRow(sel.id, { end: toDays(v) < toDays(sel.start) ? sel.start : v });
+              }}
+            />
+          </label>
+          <span className="gantt-dauer" title="Dauer in Kalendertagen">
+            {toDays(sel.end) - toDays(sel.start) + 1} Tg.
+          </span>
           <button title="Farbe" onClick={() => patchRow(sel.id, { color: COLORS[(COLORS.indexOf(sel.color ?? COLORS[0]) + 1) % COLORS.length] })}><IPalette size={13} /></button>
           <label>Fortschritt
             <select value={sel.progress ?? 0} onChange={(e) => patchRow(sel.id, { progress: Number(e.target.value) })}>
@@ -325,9 +414,9 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
           <button title="Auswahl schließen" onClick={() => setSelected(null)}>—</button>
         </div>
       )}
-      <div className="gantt-scroll nodrag nowheel" ref={scrollRef}>
-        {/* Zeilen-Namen (fixe Spalte) */}
-        <div className="gantt-labels" style={{ paddingTop: HEAD_H }}>
+      <div className="gantt-scroll nodrag nowheel" ref={scrollRef} onScroll={onScroll}>
+        {/* Zeilen-Namen (fixe Spalte, Breite am Griff verstellbar — M271) */}
+        <div className="gantt-labels" style={{ paddingTop: HEAD_H, width: labelW, minWidth: labelW }}>
           {allRows.map((r) => (
             <input
               key={r.id}
@@ -342,6 +431,14 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
               onChange={(e) => { if (!isAbo(r.id)) patchRow(r.id, { name: e.target.value }); }}
             />
           ))}
+          <div
+            className="gantt-spaltengriff"
+            title="Ziehen: Namensspalte breiter oder schmaler"
+            onPointerDown={spalteAnfassen}
+            onPointerMove={spalteZiehen}
+            onPointerUp={spalteLoslassen}
+            onPointerCancel={spalteLoslassen}
+          />
         </div>
         {/* Diagramm */}
         <div className="gantt-chartwrap">
@@ -388,12 +485,19 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
               </g>
             ))}
             {/* Monats-Kopf (bei Jahres-Skala: Jahreszahlen) */}
-            {months.map((m, i) => (
-              <g key={i}>
-                <line x1={m.x0} y1={0} x2={m.x0} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.12)" />
-                <text x={m.x0 + 4} y={13} className="gantt-month">{m.label}</text>
-              </g>
-            ))}
+            {months.map((m, i) => {
+              /* M271: Der Monatsname klebt am linken Rand seines sichtbaren
+                 Stücks, solange der Monat im Bild ist — vorher stand nach dem
+                 Scrollen nur noch der Rest („26" statt „Aug. 26"). */
+              const textB = m.label.length * 7 + 8;
+              const tx = Math.min(Math.max(m.x0 + 4, scrollX + 4), Math.max(m.x0 + 4, m.x0 + m.w - textB));
+              return (
+                <g key={i}>
+                  <line x1={m.x0} y1={0} x2={m.x0} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.12)" />
+                  <text x={tx} y={13} className="gantt-month">{m.label}</text>
+                </g>
+              );
+            })}
             {/* Tages-Kopf (nur wenn genug Platz) */}
             {dw >= 16 && Array.from({ length: nDays }, (_, i) => (
               <text key={i} x={i * dw + dw / 2} y={HEAD_H - 6} className="gantt-day" textAnchor="middle">
