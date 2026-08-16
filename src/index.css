@@ -2256,13 +2256,47 @@ html[data-kopf-eng='an'] .hint { display: none; }
 /* ---------- Gantt / Zeitplan-Karte ---------- */
 .gantt-card { background: var(--surface-card); border-radius: 10px; padding: 10px 12px 12px; overflow: hidden; display: flex; flex-direction: column; }
 .gantt-body { display: flex; flex-direction: column; min-height: 0; height: 100%; }
-.gantt-head { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
-.gantt-tools { display: flex; gap: 3px; flex: none; }
+.gantt-head { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; min-width: 0; }
+/* Der Titel gibt nach, damit die Werkzeuge nicht aus der Karte gedrückt
+   werden — er kürzt mit „…" statt die Leiste hinauszuschieben (M282) */
+.gantt-head > .kanban-title { min-width: 0; flex: 0 1 auto; text-overflow: ellipsis; }
+@media (pointer: coarse) {
+  /* Am Telefon zählt jeder Punkt: Der Titel tritt weit zurück, die
+     Werkzeuge bekommen den Platz (angetippt wird der Titel zum Ändern) */
+  .gantt-head > .kanban-title { flex: 0 1 92px; }
+}
+/* Im Fokus steht der Titel schon in der Kopfzeile darüber — die Zeile in
+   der Karte wäre eine zweite Nennung und nähme den Werkzeugen den Platz */
+.focus-mode .pn-focused .gantt-head > .kanban-title { display: none; }
+/* M282: Die Werkzeuge bleiben IN der Karte.
+   Am Telefon gemessen: Bei 312 Punkten Kartenbreite ragten die beiden
+   Lupen über den Rand hinaus und waren nicht mehr zu treffen. Statt die
+   Leiste umbrechen zu lassen (das fräße eine zweite Zeile Höhe, die auf
+   einem kleinen Schirm fehlt), wird sie quer schiebbar — dasselbe Muster
+   wie bei der Auswahl-Leiste am Handy. */
+.gantt-tools {
+  display: flex; gap: 3px;
+  /* Passt alles, sitzt die Leiste rechts (margin-left: auto); passt es
+     nicht, schrumpft sie und wird schiebbar — und zwar VON VORN. Mit
+     `justify-content: flex-end` stand sie beim Überlauf am Ende, und
+     ausgerechnet „Vorgang hinzufügen" war nach links weggerollt. */
+  flex: 0 1 auto; min-width: 0; margin-left: auto;
+  overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+}
+.gantt-tools::-webkit-scrollbar { display: none; }
+.gantt-tools button, .gantt-tools select { flex: none; }
 .gantt-tools button {
   border: none; background: var(--surface-dim); border-radius: 6px; cursor: pointer;
   font-size: 11px; padding: 3px 7px; line-height: 1.2; font-family: inherit;
 }
 .gantt-tools button:hover { background: var(--border); }
+/* Am Finger gelten die 44 Punkte aus M198 — 19 Punkte hohe Knöpfe waren
+   auf dem Telefon nicht zuverlässig zu treffen. */
+@media (pointer: coarse) {
+  .gantt-tools { gap: 4px; padding-bottom: 2px; }
+  .gantt-tools button, .gantt-tools select { min-height: 40px; min-width: 40px; }
+  .gantt-tools select { font-size: 13px; }
+}
 .gantt-rowbar {
   display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted);
   background: rgba(79,124,255,.08); border-radius: 7px; padding: 3px 8px; margin-bottom: 4px;
