@@ -185,15 +185,26 @@ console.log('\n════ T5: Heute-Fahne ════');
   await P.waitForTimeout(800);
   await P.locator('button[title="Zu heute springen"]').click();
   await P.waitForTimeout(600);
+  /* M281 hat die Regel VERBESSERT: M279 schob die Fahne unter die Kopfzeile,
+     damit sie keine Tageszahl verdeckt — dort lag sie dann aber dauerhaft auf
+     der ersten Vorgangszeile. Jetzt sitzt sie wieder IN der Kopfzeile, und
+     die zwei Zeitschilder, die sie berührt, entfallen stattdessen. Geprüft
+     wird deshalb beides: Fahne im Kopf UND keine Zahl darunter. */
   const f = await P.evaluate(() => {
     const fahne = [...document.querySelectorAll('.gantt-kopf rect')].find((r) => r.getAttribute('fill') === '#d84b3d');
     if (!fahne) return null;
-    const fy = Number(fahne.getAttribute('y'));
-    // Kopfzeile endet bei HEAD_H=34 — die Fahne muss DARUNTER beginnen
-    return { y: fy, unterKopf: fy >= 34 };
+    const fb = fahne.getBoundingClientRect();
+    const kopfUnten = document.querySelector('.gantt-svg').getBoundingClientRect().top + 34;
+    // Überlagert die Fahne irgendein Zeitschild?
+    const kollision = [...document.querySelectorAll('.gantt-kopf .gantt-day')].some((t) => {
+      const b = t.getBoundingClientRect();
+      return b.right > fb.left && b.left < fb.right;
+    });
+    return { y: Number(fahne.getAttribute('y')), imKopf: fb.bottom <= kopfUnten + 1, kollision };
   });
   console.log('   ', JSON.stringify(f));
-  pruefe('T5a die Fahne sitzt unter der Kopfzeile (verdeckt keine Tageszahl)', f?.unterKopf === true, JSON.stringify(f));
+  pruefe('T5a die Fahne sitzt in der Kopfzeile (nicht auf der ersten Zeile)', f?.imKopf === true, JSON.stringify(f));
+  pruefe('T5b und verdeckt dort kein Zeitschild', f?.kollision === false, JSON.stringify(f));
 }
 
 // ══ T6: Innen-Label klemmt am sichtbaren Rand ════════════════════════
