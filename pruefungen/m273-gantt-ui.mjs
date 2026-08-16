@@ -206,10 +206,13 @@ console.log('\n════ T5: Doppelklick auf freie Fläche ════');
 // ══ T6: ＋-Zeile in der Namensspalte ═════════════════════════════════
 console.log('\n════ T6: ＋ Vorgang in der Spalte ════');
 {
-  const vorher = await P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes[0].data.rows.length);
+  /* Gezählt wird im DOM, nicht in localStorage: Der Speicher-Durchschrieb
+     ist gedrosselt und läuft dem Klick manchmal um mehr als 500 ms nach —
+     die Zeile selbst steht sofort da. */
+  const vorher = await P.evaluate(() => document.querySelectorAll('.gantt-label').length);
   await P.evaluate(() => document.querySelector('.gantt-addzeile')?.click());
   await P.waitForTimeout(500);
-  const nachher = await P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes[0].data.rows.length);
+  const nachher = await P.evaluate(() => document.querySelectorAll('.gantt-label').length);
   pruefe('T6a „＋ Vorgang" unten in der Spalte legt eine Zeile an', nachher === vorher + 1, `${vorher} → ${nachher}`);
 }
 

@@ -109,6 +109,11 @@ pruefe('T1e ein Ende vor dem Start wird abgefangen', r2c.end === r2c.start, JSON
 // ══ T2: Der Monatsname bleibt im Bild ═════════════════════════════════
 console.log('\n════ T2: klebende Monatsnamen ════');
 {
+  // M279: Der rechte Auslauf ist größer geworden — der automatische Sprung
+  // zu „heute" steht damit nicht mehr zwangsläufig bei Scroll 0. Für die
+  // „ohne Scroll"-Messung wird der Nullpunkt ausdrücklich hergestellt.
+  await P.evaluate(() => { document.querySelector('.gantt-scroll').scrollLeft = 0; });
+  await P.waitForTimeout(500);
   const vorher = await P.evaluate(() => {
     const el = document.querySelector('.gantt-scroll');
     el.scrollLeft = 0;
@@ -211,11 +216,20 @@ console.log('\n════ T5: Balken ziehen ════');
     sel.dispatchEvent(new Event('change', { bubbles: true }));
   });
   await P.waitForTimeout(700);
+  /* Seit M279 hält der Skalenwechsel das Datum der Fenstermitte fest —
+     der Blick bleibt also mitten im Projekt statt vorn. Für den Griff an
+     r1 (dem ersten Balken) erst an den Anfang rollen. */
+  await P.evaluate(() => { document.querySelector('.gantt-scroll').scrollLeft = 0; });
+  await P.waitForTimeout(400);
   const vor = await zeile('r1');
   const lage = await P.evaluate(() => {
     const r = [...document.querySelectorAll('.gantt-svg rect[data-row]')].find((x) => x.getAttribute('data-row') === 'r1');
     const b = r.getBoundingClientRect();
-    return { x: b.left + b.width / 2, y: b.top + b.height / 2, dw: b.width };
+    /* Greifpunkt RECHTS der klebenden Namensspalte wählen — nach T4 ist sie
+       breiter, und ein Punkt unter ihr träfe die Spalte statt den Balken */
+    const spalte = document.querySelector('.gantt-labels').getBoundingClientRect().right;
+    const gx = Math.max(b.left + b.width / 2, Math.min(spalte + 20, b.right - 8));
+    return { x: gx, y: b.top + b.height / 2 };
   });
   const proTag = await P.evaluate(() => {
     const svg = document.querySelector('.gantt-svg');

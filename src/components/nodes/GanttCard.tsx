@@ -115,10 +115,41 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
   const allDays = allRows.flatMap((r) => [toDays(r.start), toDays(r.end)]);
   const todayD = Math.round(Date.now() / DAY);
   const minD = (allDays.length ? Math.min(...allDays) : todayD) - PAD_DAYS;
-  const maxD = (allDays.length ? Math.max(...allDays) : todayD + 14) + PAD_DAYS;
+  /**
+   * M279: Der rechte Auslauf ist in BILDPUNKTEN bemessen, nicht in Tagen.
+   *
+   * Zwei feste Puffertage sind bei 24 px/Tag genug — in der Jahres-Skala
+   * (unter 1 px/Tag) aber praktisch nichts: Die letzte Raute wurde am Rand
+   * abgeschnitten und die Namen neben den Balken liefen aus dem Bild
+   * (Screenshot-Audit). 160 px reichen für Raute plus Beschriftung.
+   */
+  const maxD = (allDays.length ? Math.max(...allDays) : todayD + 14) + Math.max(PAD_DAYS, Math.ceil(160 / dw));
   const nDays = maxD - minD + 1;
   const chartW = nDays * dw;
-  const chartH = Math.max(1, allRows.length) * ROW_H;
+  /**
+   * M279: Das Raster füllt die Karte.
+   *
+   * Unter der letzten Zeile klaffte eine weiße Fläche ohne Bänder und Linien
+   * (Screenshot-Audit) — sah aus wie ein abgeschnittenes Werkzeug. Jetzt
+   * werden Geisterzeilen bis zur Unterkante gezeichnet: gleiche Bänder,
+   * gleiche Trenner, nur ohne Inhalt. Doppelklick legt dort einen Vorgang an.
+   */
+  const [freiPx, setFreiPx] = useState(0);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const messen = () => setFreiPx(Math.max(0, el.clientHeight - HEAD_H));
+    messen();
+    const ro = new ResizeObserver(messen);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  /* Die Diagrammhöhe ist EXAKT der freie Platz (nie ein angefangenes
+     Zeilen-Vielfaches darüber) — sonst stünde dauerhaft eine senkrechte
+     Rollleiste da, die wiederum die Breite fräße. Das letzte Band wird vom
+     SVG-Rand beschnitten, das ist unsichtbar und gewollt. */
+  const chartH = Math.max(Math.max(1, allRows.length) * ROW_H, freiPx);
+  const zeilenGesamt = Math.ceil(chartH / ROW_H);
 
   const x = (iso: string) => (toDays(iso) - minD) * dw;
 
@@ -137,12 +168,14 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
     else months.push({ label, x0: (d - minD) * dw, w: dw });
   }
   // Quartals-Striche als feine Zwischengliederung der Jahres-Ansicht
-  const quarters: Array<{ x0: number; label: string }> = [];
+  const quarters: Array<{ x0: number; label: string; linie: boolean }> = [];
   if (yearScale) {
     for (let d = minD; d <= maxD; d++) {
       const dt = new Date(d * DAY);
-      if (dt.getDate() !== 1 || dt.getMonth() % 3 !== 0 || dt.getMonth() === 0) continue;
-      quarters.push({ x0: (d - minD) * dw, label: `Q${Math.floor(dt.getMonth() / 3) + 1}` });
+      if (dt.getDate() !== 1 || dt.getMonth() % 3 !== 0) continue;
+      // M279: Q1 bekommt sein LABEL (fehlte im Audit) — nur die Linie bleibt
+      // weg, die zeichnet dort schon die Jahresgrenze
+      quarters.push({ x0: (d - minD) * dw, label: `Q${Math.floor(dt.getMonth() / 3) + 1}`, linie: dt.getMonth() !== 0 });
     }
   }
 
@@ -240,26 +273,63 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
    */
   const einpassen = () => {
     const el = scrollRef.current;
-    if (!el || nDays <= 0) return;
-    const platz = el.clientWidth - labelW - 6;
-    updateNodeData(id, { dayWidth: Math.max(0.3, Math.min(48, platz / nDays)) });
+    if (!el || allDays.length === 0) return;
+    /**
+     * M279: Der rechte Auslauf ist in PIXELN fest (160) — er darf nicht in
+     * die Tagesbreite eingerechnet werden, sonst rechnet man im Kreis
+     * (nDays hängt an dw, dw an nDays) und das Diagramm ragt hinterher doch
+     * über das Fenster hinaus. Gerechnet wird über die reinen DATEN-Tage.
+     */
+    const datenTage = Math.max(...allDays) - Math.min(...allDays) + 1 + PAD_DAYS;
+    const platz = el.clientWidth - labelW - 8 - 165;
+    updateNodeData(id, { dayWidth: Math.max(0.3, Math.min(48, platz / Math.max(1, datenTage))) });
     el.scrollLeft = 0;
+  };
+
+  /**
+   * M279: Zoomen und Skalenwechsel halten den ZEITPUNKT fest.
+   *
+   * Vorher blieb die Bildpunkt-Position stehen: Wer von Tagen auf Monate
+   * schaltete, landete an einem beliebigen Datum irgendwo im Plan
+   * (Screenshot-Audit: Sprung von „heute" mitten in den April des
+   * Folgejahres). Jetzt wird das Datum in der Fenstermitte gemerkt und nach
+   * der Änderung wieder dorthin gescrollt — wie in Miro & Co.
+   */
+  const setzeDw = (neu: number) => {
+    const el = scrollRef.current;
+    const dwNeu = Math.max(0.3, Math.min(48, neu));
+    if (el) {
+      const fenster = Math.max(50, el.clientWidth - labelW);
+      const mitteTag = minD + (el.scrollLeft + fenster / 2) / dw;
+      updateNodeData(id, { dayWidth: dwNeu });
+      requestAnimationFrame(() => {
+        el.scrollLeft = Math.max(0, (mitteTag - minD) * dwNeu - fenster / 2);
+      });
+    } else {
+      updateNodeData(id, { dayWidth: dwNeu });
+    }
   };
 
   const zoom = (dir: -1 | 1) =>
     // Schrittweite folgt der Größenordnung: im Jahres-Bereich sind ganze
     // Pixel pro Tag ein Riesensprung (ein Jahr = 365 × dayWidth)
-    updateNodeData(id, {
-      dayWidth: Math.max(0.3, Math.min(48, dw + dir * (dw <= 1.2 ? 0.15 : dw <= 8 ? 2 : 6))),
-    });
+    setzeDw(dw + dir * (dw <= 1.2 ? 0.15 : dw <= 8 ? 2 : 6));
 
   // M156: Zeit-Skala als Preset — Tage/Wochen/Monate sind nur dayWidth-Stufen,
   // Kopfzeile und Raster passen sich automatisch an
   const scale = dw >= 14 ? 'tage' : dw >= 4 ? 'wochen' : dw >= 1.2 ? 'monate' : 'jahre';
-  const setScale = (v: string) =>
-    updateNodeData(id, {
-      dayWidth: v === 'tage' ? 24 : v === 'wochen' ? 6 : v === 'monate' ? 2 : 0.6,
-    });
+  const setScale = (v: string) => {
+    const preset = v === 'tage' ? 24 : v === 'wochen' ? 6 : v === 'monate' ? 2 : 0.6;
+    /**
+     * M279: Eine Skala ist eine OBERGRENZE der Dichte, kein Zwang zur Lücke.
+     *
+     * Beim Bauprojekt über 2,5 Jahre füllte die Jahres-Skala nur die halbe
+     * Karte, der Rest war weiß (Screenshot-Audit). Ist der Plan kürzer, als
+     * die Skala hergibt, wird mindestens fensterfüllend gerechnet.
+     */
+    const platz = (scrollRef.current?.clientWidth ?? 800) - labelW - 8;
+    setzeDw(Math.max(preset, nDays > 0 ? platz / nDays : preset));
+  };
 
   /** ISO-Kalenderwoche (für die Wochen-Skala) */
   const isoWeek = (dt: Date): number => {
@@ -499,13 +569,15 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
               ) : null;
             })}
             {/* Wochen-Raster (M156) — die KW-Beschriftung lebt in der Kopf-Gruppe */}
-            {dw < 16 && dw >= 3 && Array.from({ length: nDays }, (_, i) => {
+            {/* M279: Schwelle 1.8 statt 3 — in der Monats-Skala (2 px/Tag) gab
+                es sonst GAR KEIN Feinraster zwischen den Monatslinien */}
+            {dw < 16 && dw >= 1.8 && Array.from({ length: nDays }, (_, i) => {
               const dt = new Date((minD + i) * DAY);
               if (dt.getDay() !== 1) return null;
               return <line key={`w${i}`} x1={i * dw} y1={HEAD_H} x2={i * dw} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.07)" />;
             })}
             {/* Quartals-Striche (nur Jahres-Skala) */}
-            {quarters.map((q, i) => (
+            {quarters.filter((q) => q.linie).map((q, i) => (
               <line key={`q${i}`} x1={q.x0} y1={HEAD_H} x2={q.x0} y2={HEAD_H + chartH} stroke="rgba(0,0,0,.06)" />
             ))}
             {/* Monats-Striche über die volle Höhe */}
@@ -517,17 +589,20 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
                 Vorgang auch auf freier Fläche aus. Das Auge hält so die Spur
                 vom Namen bis zum Balken — das Grundmuster jedes
                 professionellen Zeitplans. */}
-            {allRows.map((r, i) => (
-              <rect
-                key={`z${r.id}`}
-                className={`gantt-zeile ${selected === r.id ? 'sel' : ''}`}
-                x={0} y={HEAD_H + i * ROW_H} width={chartW} height={ROW_H}
-                fill={i % 2 ? 'rgba(0,0,0,.02)' : 'transparent'}
-                onClick={() => { if (!isAbo(r.id)) setSelected(r.id); }}
-              />
-            ))}
+            {Array.from({ length: zeilenGesamt }, (_, i) => {
+              const r = allRows[i];
+              return (
+                <rect
+                  key={`z${r?.id ?? `leer${i}`}`}
+                  className={`gantt-zeile ${r && selected === r.id ? 'sel' : ''}`}
+                  x={0} y={HEAD_H + i * ROW_H} width={chartW} height={ROW_H}
+                  fill={i % 2 ? 'rgba(0,0,0,.02)' : 'transparent'}
+                  onClick={() => { if (r && !isAbo(r.id)) setSelected(r.id); }}
+                />
+              );
+            })}
             {/* Zeilen-Trenner */}
-            {allRows.map((_, i) => (
+            {Array.from({ length: zeilenGesamt }, (_, i) => (
               <line key={i} x1={0} y1={HEAD_H + (i + 1) * ROW_H} x2={chartW} y2={HEAD_H + (i + 1) * ROW_H} stroke="rgba(0,0,0,.06)" pointerEvents="none" />
             ))}
             {/* Balken & Meilensteine (inkl. Abo-Meilensteine aus verbundenen Kanbans) */}
@@ -592,8 +667,14 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
                   {prog > 0 && (
                     <rect x={bx + 1} y={y} width={(bw * prog) / 100} height={BAR_H} rx={4} fill="rgba(0,0,0,.26)" pointerEvents="none" />
                   )}
+                  {/* M279: Das Innen-Label klemmt am sichtbaren linken Rand —
+                      bei einem Balken, dessen Anfang aus dem Bild gescrollt
+                      ist, stand der Name sonst unsichtbar weit links */}
                   {r.name && (passtRein ? (
-                    <text x={innenX} y={y + BAR_H / 2 + 3.2} className="gantt-barlabel innen" pointerEvents="none">{r.name}</text>
+                    <text
+                      x={Math.min(Math.max(innenX, scrollX + 6), bx + bw - nameB + 4)}
+                      y={y + BAR_H / 2 + 3.2} className="gantt-barlabel innen" pointerEvents="none"
+                    >{r.name}</text>
                   ) : (
                     <text x={bx + bw + 6} y={y + BAR_H / 2 + 3.2} className="gantt-barlabel" pointerEvents="none">{r.name}</text>
                   ))}
@@ -701,12 +782,14 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
                 ? <text key={`ql${i}`} x={q.x0 + 3} y={HEAD_H - 6} className="gantt-day">{q.label}</text>
                 : null))}
               {/* M273: Heute-Fahne — die rote Linie hat jetzt einen Namen */}
+              {/* M279: Die Fahne sitzt UNTER der Kopfzeile im Raster — in der
+                  Zeile selbst verdeckte sie Tageszahlen und Quartalslabels */}
               {todayD >= minD && todayD <= maxD && (() => {
                 const hx = (todayD - minD) * dw + dw / 2;
                 return (
                   <g pointerEvents="none">
-                    <rect x={hx - 21} y={HEAD_H - 15} width={42} height={13} rx={6.5} fill="#d84b3d" />
-                    <text x={hx} y={HEAD_H - 5.5} textAnchor="middle" className="gantt-heute-text">Heute</text>
+                    <rect x={hx - 21} y={HEAD_H + 2} width={42} height={13} rx={6.5} fill="#d84b3d" />
+                    <text x={hx} y={HEAD_H + 11.5} textAnchor="middle" className="gantt-heute-text">Heute</text>
                   </g>
                 );
               })()}
