@@ -177,6 +177,12 @@ export function GanttBody({ id, data }: { id: string; data: GanttData }) {
       // weg, die zeichnet dort schon die Jahresgrenze
       quarters.push({ x0: (d - minD) * dw, label: `Q${Math.floor(dt.getMonth() / 3) + 1}`, linie: dt.getMonth() !== 0 });
     }
+    // Beginnt das Fenster MITTEN im Quartal, hat das angeschnittene erste
+    // Quartal keinen Anfangstag im Fenster — sein Schild fehlte dann ganz
+    if (!quarters.length || quarters[0].x0 >= 24) {
+      const dt = new Date(minD * DAY);
+      quarters.unshift({ x0: 0, label: `Q${Math.floor(dt.getMonth() / 3) + 1}`, linie: false });
+    }
   }
 
   // ---------- Drag: verschieben / Enden ziehen ----------

@@ -114,6 +114,16 @@ console.log('\n════ T2: Jahres-Skala ════');
   pruefe('T2b Q1 trägt sein Label', j.quartale.includes('Q1'), JSON.stringify(j.quartale));
   pruefe('T2c alle vier Quartale kommen vor',
     ['Q1', 'Q2', 'Q3', 'Q4'].every((q) => j.quartale.includes(q)), JSON.stringify(j.quartale));
+  /* Das Fenster beginnt MITTEN im Quartal (Datenstart minus Vorlauf) —
+     auch das angeschnittene Anfangsquartal braucht sein Schild ganz links */
+  const erstes = await P.evaluate(() => {
+    const t = [...document.querySelectorAll('.gantt-kopf text')]
+      .filter((e) => /^Q[1-4]$/.test(e.textContent))
+      .sort((a, b) => Number(a.getAttribute('x')) - Number(b.getAttribute('x')))[0];
+    return t ? { x: Number(t.getAttribute('x')), label: t.textContent } : null;
+  });
+  pruefe('T2d auch das angeschnittene erste Quartal trägt sein Schild',
+    !!erstes && erstes.x <= 8, JSON.stringify(erstes));
 }
 
 // ══ T3: Nichts läuft rechts aus dem Bild ═════════════════════════════
