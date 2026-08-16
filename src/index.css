@@ -4757,7 +4757,7 @@ body[data-formatierleiste='an'] { --lv-typo: -52px; --lv-typo-dock: 56px; }
 [data-keyboard='on'] .react-flow__attribution,
 [data-keyboard='on'] .backlinks { display: none; }
 /* Die Auswahl-Leiste bleibt erreichbar und rückt direkt über die Tastatur */
-[data-keyboard='on'] .sel-toolbar-dock { bottom: calc(10px + var(--kb)); }
+[data-keyboard='on'] .sel-toolbar-dock { bottom: calc(10px + var(--kb) + var(--lv-typo-dock, 0px)); }
 .sel-toolbar-dock { transition: bottom 0.18s ease; }
 /* Toasts ebenso — sonst poppt die Meldung hinter der Tastatur auf */
 [data-keyboard='on'] .toast { bottom: calc(20px + var(--kb)); }
@@ -4770,13 +4770,16 @@ body[data-formatierleiste='an'] { --lv-typo: -52px; --lv-typo-dock: 56px; }
     transform: translateX(-50%) translateY(150%);
     opacity: 0; pointer-events: none;
   }
+  /* M277: `--lv-typo-dock` reist in JEDE bottom-Rechnung mit — die
+     Formatier-Leiste dockt jetzt auch auf Board-Ebene unten an, und ohne
+     den Versatz stünden beide Leisten übereinander */
   body:has(.sel-toolbar-dock) .sel-toolbar-dock {
-    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px) + var(--lv-typo-dock, 0px));
   }
   /* … außer die Tastatur ist offen: dann gewinnt sie (data-keyboard sitzt am
      <html>, steht also VOR dem body im Selektor) */
   [data-keyboard='on'] body:has(.sel-toolbar-dock) .sel-toolbar-dock {
-    bottom: calc(10px + var(--kb));
+    bottom: calc(10px + var(--kb) + var(--lv-typo-dock, 0px));
   }
   /* NIE zweireihig: umbrechende Knöpfe kosten doppelte Höhe mitten im Bild.
      Passt etwas nicht, wird waagerecht geschoben statt gestapelt. */

@@ -10,6 +10,7 @@
 // wie im Schrift-Menü der Karte (lib/typo.ts), damit man nicht zwei
 // verschiedene Sprachen für dieselbe Sache lernen muss.
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { BlockNoteSchema, defaultStyleSpecs } from '@blocknote/core';
 import {
   createReactStyleSpec, FormattingToolbar, FormattingToolbarController,
@@ -177,8 +178,77 @@ function TypoButtons() {
   );
 }
 
+/**
+ * M277: Am Telefon dockt die Formatier-Leiste als PORTAL am `body` an.
+ *
+ * Die M226-Regel setzt die schwebende Leiste per CSS auf `position: fixed`
+ * unten über die Tastatur. Das funktionierte nur im Fokus. Auf BOARD-Ebene
+ * steckt die Leiste im React-Flow-Knoten, und dessen `transform` macht die
+ * Karte zum Bezugsrahmen von `fixed` — gemessen am Telefon: Die Leiste war
+ * exakt kartenbreit (280 statt 390 Punkte) und klebte mitten im Bild an der
+ * Karte statt unten am Schirm. Dazu skaliert der Board-Zoom sie mit.
+ *
+ * CSS kann einem transform-Bezugsrahmen nicht entkommen — also verlässt die
+ * Leiste den Knoten: Am Telefon rendert sie als Portal direkt am `body`.
+ * Dieselbe M226-Regel (`div:has(> .bn-formatting-toolbar)`) greift weiter
+ * und meint nun wirklich den Schirm. Sichtbar ist sie wie bisher genau
+ * solange, wie Text markiert ist.
+ */
+const TELEFON_ABFRAGE = '(max-width: 700px), ((pointer: coarse) and (max-width: 900px))';
+
+function PhoneFormatDock() {
+  const editor = useBlockNoteEditor() as unknown as typeof noteSchema.BlockNoteEditor;
+  const [auswahl, setAuswahl] = useState(false);
+  useEditorContentOrSelectionChange(
+    () => {
+      let txt = '';
+      try { txt = editor.getSelectedText(); } catch { txt = ''; }
+      setAuswahl(txt.length > 0);
+    },
+    editor as never,
+  );
+  /**
+   * ProseMirror behält seine Auswahl auch ohne Fokus — wer aufs Board tippt,
+   * hätte die Leiste sonst dauerhaft im Bild. Ein Tipp außerhalb von Editor,
+   * Leiste und ihren Menüs (das Aa-Menü lebt als eigenes Portal) blendet aus.
+   */
+  useEffect(() => {
+    if (!auswahl) return;
+    const dom = (editor as unknown as { domElement?: Element }).domElement ?? null;
+    const pruef = (e: PointerEvent) => {
+      const t = e.target as Element | null;
+      if (!t?.closest) return;
+      if (t.closest('.pn-format-dock, .bn-menu-dropdown, [class*="mantine-Menu"], .mantine-Popover-dropdown')) return;
+      if (dom && dom.contains(t)) return;
+      setAuswahl(false);
+    };
+    window.addEventListener('pointerdown', pruef, true);
+    return () => window.removeEventListener('pointerdown', pruef, true);
+  }, [auswahl, editor]);
+  if (!auswahl) return null;
+  return createPortal(
+    <div className="pn-format-dock nodrag">
+      <FormattingToolbar>
+        {getFormattingToolbarItems()}
+        <TypoButtons key="typo" />
+      </FormattingToolbar>
+    </div>,
+    document.body,
+  );
+}
+
 /** Formatier-Leiste = Standard-Knöpfe + Typo-Knöpfe (M201) */
 export function NoteToolbar() {
+  // Dieselbe Abfrage wie die M226-CSS-Regel — beide müssen sich einig sein,
+  // wer die Leiste unten andockt
+  const [telefon, setTelefon] = useState(() => window.matchMedia(TELEFON_ABFRAGE).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(TELEFON_ABFRAGE);
+    const auf = () => setTelefon(mq.matches);
+    mq.addEventListener('change', auf);
+    return () => mq.removeEventListener('change', auf);
+  }, []);
+  if (telefon) return <PhoneFormatDock />;
   return (
     <FormattingToolbarController
       /**
