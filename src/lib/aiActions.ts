@@ -7,6 +7,7 @@ import { nodeToText } from './serialize';
 import { makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makeShape, makeTime, makeWeek } from './nodes';
 import { mutedHistory, selectActiveBoard, useBoard } from '../store';
 import { dateiTextVonKarte } from './dateiText';
+import { loadFile, vorschauArt } from './fileStore';
 import { uid, type AppNode, type ShapeKind, type StickyColor } from '../types';
 import { findFreeSpot } from './arrange';
 
@@ -89,11 +90,39 @@ async function gatherImages(nodes: AppNode[]): Promise<string[]> {
     .map((n) => (n.data as { src?: string }).src)
     .filter((s): s is string => !!s)
     .slice(0, IMG_MAX);
+  /**
+   * M276: Auch Bild-DATEIKARTEN gehen als Foto mit.
+   *
+   * Ein Foto über der Einbett-Grenze (1,5 MB) wird zur Datei-Karte, sein
+   * Inhalt liegt in der lokalen Ablage (M259). Für die KI war so ein Bild
+   * bisher nur ein Dateiname — dabei sind gerade abfotografierte Zettel und
+   * Tafelbilder groß. Der Blob wird zur data:-URL und läuft durch dieselbe
+   * Verkleinerung wie jede Bild-Karte (prepImageForAi).
+   */
+  for (const n of nodes) {
+    if (srcs.length >= IMG_MAX) break;
+    if (n.type !== 'file' || n.archived) continue;
+    const d = n.data as { name?: string; mime?: string; dataUrl?: string };
+    if (vorschauArt(d.name ?? '', d.mime) !== 'bild') continue;
+    let url = d.dataUrl ?? null;
+    if (!url) {
+      const blob = await loadFile(n.id).catch(() => undefined);
+      if (blob) {
+        url = await new Promise<string | null>((res) => {
+          const r = new FileReader();
+          r.onload = () => res(typeof r.result === 'string' ? r.result : null);
+          r.onerror = () => res(null);
+          r.readAsDataURL(blob);
+        });
+      }
+    }
+    if (url) srcs.push(url);
+  }
   const prepped = await Promise.all(srcs.map(prepImageForAi));
   return prepped.filter((s): s is string => !!s);
 }
 const imgHint = (imgs: string[]): string => (imgs.length
-  ? '\n\nDie angehängten Fotos sind die "image"-Karten (in derselben Reihenfolge). Lies ihren Inhalt (Text, Listen, Termine, Tabellen) direkt aus dem Bild und behandle ihn wie Kartentext.'
+  ? '\n\nDie angehängten Fotos sind die Bild-Karten und Bild-Dateien (in derselben Reihenfolge). Lies ihren Inhalt (Text, Listen, Termine, Tabellen) direkt aus dem Bild und behandle ihn wie Kartentext.'
   : '');
 
 /* ---------- Robustes JSON-Parsen ----------

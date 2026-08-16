@@ -24,7 +24,7 @@
  *    eingebetteter Inhalt). Es wird nichts nachgeladen und nichts verschickt,
  *    was nicht ohnehin schon zur Karte gehört.
  */
-import { loadFile } from './fileStore';
+import { loadFile, vorschauArt } from './fileStore';
 import type { AppNode, FileData } from '../types';
 
 /** Höchstens so viele Seiten je Dokument auswerten */
@@ -83,6 +83,58 @@ export function istPdf(d: FileData): boolean {
 }
 
 /**
+ * M276: Word- und Excel-Dateien — die Leser liegen längst im Programm
+ * (docx.ts fürs Umwandeln in Notizen, xlsx.ts für die Rechen-Tabelle).
+ * Hier wird nur der TEXT gebraucht, deshalb je ein schlanker Weg:
+ * Word direkt aus word/document.xml, Excel als CSV-artige Zeilen.
+ */
+const istDocx = (d: FileData): boolean => d.name.toLowerCase().endsWith('.docx');
+const istXlsx = (d: FileData): boolean => d.name.toLowerCase().endsWith('.xlsx');
+const istText = (d: FileData): boolean => vorschauArt(d.name, d.mime) === 'text';
+
+async function docxText(blob: Blob): Promise<string> {
+  const { ZipArchive } = await import('./unzip');
+  const zip = await ZipArchive.open(await blob.arrayBuffer());
+  const xml = await zip.text('word/document.xml');
+  if (!xml) return '';
+  // Absätze als Zeilen; innerhalb eines Absatzes alle Textläufe aneinander
+  const absaetze = [...xml.matchAll(/<w:p\b[\s\S]*?(?:<\/w:p>|\/>)/g)].map((m) => {
+    let t = '';
+    for (const r of m[0].matchAll(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g)) t += r[1];
+    return t
+      .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+  });
+  return absaetze.filter((z) => z.trim()).join('\n').slice(0, MAX_ZEICHEN);
+}
+
+async function xlsxText(blob: Blob): Promise<string> {
+  const { leseXlsx } = await import('./xlsx');
+  const buf = await blob.arrayBuffer();
+  const teile: string[] = [];
+  // höchstens zwei Blätter — mehr sprengt jeden Kontext
+  for (let i = 0; i < 2; i++) {
+    let blatt;
+    try {
+      blatt = await leseXlsx(buf, i);
+    } catch { break; }
+    const zeilen: string[] = [];
+    for (let z = 1; z <= Math.min(blatt.zeilen, 200); z++) {
+      const felder: string[] = [];
+      for (let sp = 0; sp < Math.min(blatt.spalten, 26); sp++) {
+        let name = '';
+        for (let n = sp + 1; n > 0; n = Math.floor((n - 1) / 26)) name = String.fromCharCode(65 + ((n - 1) % 26)) + name;
+        felder.push(blatt.zellen[`${name}${z}`] ?? '');
+      }
+      if (felder.some((f) => f !== '')) zeilen.push(felder.join(' | '));
+    }
+    if (zeilen.length) teile.push(`— Blatt „${blatt.name}" —\n${zeilen.join('\n')}`);
+    if (i === 0 && blatt.zeilen === 0) break;
+  }
+  return teile.join('\n\n').slice(0, MAX_ZEICHEN);
+}
+
+/**
  * Der lesbare Inhalt einer Datei-Karte — oder null, wenn es keinen gibt.
  *
  * Zurückgegeben wird auch ein HINWEIS, wenn nichts zu holen war. Der ist
@@ -92,30 +144,43 @@ export function istPdf(d: FileData): boolean {
 export async function dateiTextVonKarte(node: AppNode): Promise<string | null> {
   if (node.type !== 'file') return null;
   const d = node.data as FileData;
-  if (!istPdf(d)) return null;
+  const art = istPdf(d) ? 'pdf' : istDocx(d) ? 'docx' : istXlsx(d) ? 'xlsx' : istText(d) ? 'text' : null;
+  if (!art) return null;
   const cache = merker.get(node.id);
   if (cache !== undefined) return cache;
 
   let text = '';
   try {
     // Erst die lokale Ablage (jede Größe), sonst der eingebettete Inhalt
-    const blob = await loadFile(node.id);
-    if (blob) text = await pdfText(blob);
-    else if (d.dataUrl) text = await pdfText(d.dataUrl);
-    else {
-      const aus = 'Der Inhalt dieser PDF liegt nicht auf diesem Gerät — nichts daraus ist bekannt.';
+    let blob = await loadFile(node.id);
+    if (!blob && d.dataUrl) {
+      if (art === 'pdf') {
+        text = await pdfText(d.dataUrl);
+      } else {
+        blob = await (await fetch(d.dataUrl)).blob();
+      }
+    }
+    if (!text && blob) {
+      text = art === 'pdf' ? await pdfText(blob)
+        : art === 'docx' ? await docxText(blob)
+          : art === 'xlsx' ? await xlsxText(blob)
+            : (await blob.text()).slice(0, MAX_ZEICHEN);
+    } else if (!text) {
+      const aus = 'Der Inhalt dieser Datei liegt nicht auf diesem Gerät — nichts daraus ist bekannt.';
       merker.set(node.id, aus);
       return aus;
     }
   } catch {
-    const aus = 'Diese PDF ließ sich nicht auslesen.';
+    const aus = 'Diese Datei ließ sich nicht auslesen.';
     merker.set(node.id, aus);
     return aus;
   }
 
   const aus = text.trim()
     ? text
-    : 'Diese PDF enthält keine Textebene (vermutlich ein Scan) — der Inhalt ist ohne Texterkennung nicht lesbar.';
+    : (art === 'pdf'
+      ? 'Diese PDF enthält keine Textebene (vermutlich ein Scan) — der Inhalt ist ohne Texterkennung nicht lesbar.'
+      : 'Diese Datei enthält keinen lesbaren Text.');
   merker.set(node.id, aus);
   return aus;
 }
