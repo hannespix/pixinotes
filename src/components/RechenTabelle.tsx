@@ -27,6 +27,7 @@
  * Umbau.
  */
 import { useMemo, useRef, useState } from 'react';
+import type React from 'react';
 import { createReactBlockSpec } from '@blocknote/react';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from '../lib/formel';
 import { resolveLink } from '../lib/links';
@@ -199,7 +200,15 @@ function Gitter({ zellenRoh, stilRoh, spalten, zeilen, schreibe }: GitterProps) 
                     `aus-${st.aus ?? (zahl ? 'r' : 'l')}`,
                   ].filter(Boolean).join(' ');
                   return (
-                    <td key={s} className={klassen} style={st.bg ? { background: st.bg } : undefined}>
+                    <td
+                      key={s}
+                      className={klassen}
+                      /* M284: als eigene Variable, nicht als `background`.
+                         Die Zelle muss BlockNotes Flächen-Regel mit Nachdruck
+                         überstimmen — und `!important` im Stylesheet sticht
+                         einen einfachen Inline-Stil aus. */
+                      style={st.bg ? ({ '--rt-zellbg': st.bg } as React.CSSProperties) : undefined}
+                    >
                       {edit === adr ? (
                         <input
                           ref={eingabe}

@@ -153,7 +153,13 @@ console.log('\n════ T2: Fett, Ausrichtung, Farbe, Links ════');
       fett: zellen.filter((z) => z.classList.contains('fett')).length,
       mitte: zellen.filter((z) => z.classList.contains('aus-m')).length,
       rechts: zellen.filter((z) => z.classList.contains('aus-r')).length,
-      farbig: zellen.filter((z) => z.style.background).length,
+      /* M284: Die Farbe steht als Variable am Element und wird per CSS zur
+         Fläche — geprüft wird deshalb die BERECHNETE Fläche, nicht das
+         Attribut. Das hält auch, wenn sich die Ablage nochmal ändert. */
+      farbig: zellen.filter((z) => {
+        const bg = getComputedStyle(z).backgroundColor;
+        return bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent';
+      }).length,
       links: [...document.querySelectorAll('.rt-link')].map((a) => a.textContent.trim()),
     };
   });

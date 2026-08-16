@@ -4294,10 +4294,13 @@ button.link-dead:disabled { opacity: 0.45; }
 /* Notizen bleiben im Dunkeln helles Papier mit dunkler Schrift; BlockNote
    setzt in Tabellenzellen aber eigene Farb-Variablen, die die helle
    Theme-Schrift durchreichten (User-Report: weiße Schrift auf heller Zelle) */
-[data-theme='dark'] .note-editor table,
+/* M284: `:not(.rt-zelle)` — die Rechen-Tabelle bringt ihre eigenen Farben
+   mit (Papier- oder Theme-Palette je nach Notizton) und darf hier nicht
+   pauschal auf dunkle Schrift gezwungen werden. */
+[data-theme='dark'] .note-editor table:not(.rt-tabelle),
 [data-theme='dark'] .note-editor th,
-[data-theme='dark'] .note-editor td,
-[data-theme='dark'] .note-editor td p,
+[data-theme='dark'] .note-editor td:not(.rt-zelle),
+[data-theme='dark'] .note-editor td:not(.rt-zelle) p,
 [data-theme='dark'] .note-editor th p {
   color: #2b2a27 !important;
 }
@@ -5789,22 +5792,79 @@ audio.file-media { height: 40px; }
 
 /* ================= M283: Die eine Tabelle — sie rechnet =================
    Ein Raster mitten in der Notiz. Bewusst ruhig gehalten: Es soll wie ein
-   Teil des Textes wirken, nicht wie ein eingebettetes Fremdprogramm. */
+   Teil des Textes wirken, nicht wie ein eingebettetes Fremdprogramm.
+
+   M284: Die Farben kommen aus Variablen, NICHT direkt aus den Theme-Flächen.
+   Grund steht in Zeile 78: „Haftnotizen & Prozess-Formen bleiben helles
+   Papier — Text darauf dunkel." Im Dunkelmodus sind `--surface` & Co. aber
+   dunkel; auf dem hellen Papier ergab das eine graue Platte mit dunkler
+   Schrift darauf — im Bildschirmfoto des Nutzers unlesbar. Auf Papier-Karten
+   gelten deshalb durchscheinende Überlagerungen (dasselbe Muster wie in der
+   Protokoll-Karte), überall sonst die Theme-Flächen. */
 .rt-block {
-  margin: 6px 0; border: 1px solid var(--border); border-radius: 8px;
-  background: var(--surface); overflow: hidden;
+  --rt-flaeche: var(--surface-2);
+  --rt-leiste: var(--surface-3);
+  --rt-knopf: var(--surface-dim);
+  --rt-knopf-hover: var(--border);
+  --rt-rand: var(--border);
+  --rt-linie: var(--border-soft);
+  --rt-text: var(--ink);
+  --rt-leise: var(--muted);
+  --rt-spur: rgba(79, 124, 255, 0.16);
+  --rt-link: var(--accent-strong);
+  margin: 6px 0; border: 1px solid var(--rt-rand); border-radius: 8px;
+  background: var(--rt-flaeche); color: var(--rt-text); overflow: hidden;
+}
+/* Im dunklen Thema ist der Akzent auf dunklem Grund zu dunkel (gemessen:
+   Kontrast 3,4) — der Link bekommt dort einen helleren Ton. */
+[data-theme='dark'] .rt-block { --rt-link: #9db7ff; }
+/* Papier-Karten: die FARBIGEN Haftnotiz-/Protokoll-Töne (#fff3a3 & Co.)
+   bleiben in beiden Themes hell — dort gilt die Papier-Palette.
+   Bewusst NICHT „.sticky-white": Weiß ist `var(--surface-card)` und damit im
+   Dunkelmodus eine dunkle Karte; dort passt die Theme-Palette oben. */
+.sticky-yellow .rt-block,
+.sticky-pink .rt-block,
+.sticky-mint .rt-block,
+.sticky-sky .rt-block,
+.shape-body .rt-block {
+  --rt-flaeche: rgba(255, 255, 255, 0.44);
+  --rt-leiste: rgba(255, 255, 255, 0.62);
+  --rt-knopf: rgba(0, 0, 0, 0.07);
+  --rt-knopf-hover: rgba(0, 0, 0, 0.15);
+  --rt-rand: rgba(0, 0, 0, 0.22);
+  --rt-linie: rgba(0, 0, 0, 0.13);
+  --rt-text: #2b2a27;
+  --rt-leise: #6f6a5b;
+  --rt-spur: rgba(79, 124, 255, 0.14);
+  --rt-link: var(--accent);
 }
 .rt-roller { overflow-x: auto; scrollbar-width: thin; }
 .rt-tabelle { border-collapse: collapse; width: 100%; font-size: 13px; }
 .rt-zelle {
-  border: 1px solid var(--border-soft); padding: 0; min-width: 74px;
+  border: 1px solid var(--rt-linie); padding: 0; min-width: 74px;
   vertical-align: middle;
+  /* M284: Die Schriftfarbe steht AUSDRÜCKLICH hier, nicht geerbt. BlockNote
+     setzt in Tabellenzellen eigene Farbwerte (siehe M172); ohne diese Regel
+     stand im Dunkelmodus helle Schrift auf dem hellen Notizpapier. */
+  color: var(--rt-text) !important;
+  /* M284: BlockNote legt auf jedes `td` im Editor eine eigene helle Fläche
+     (gemessen: rgba(255,255,255,.45)). Auf der dunklen Karte ergab das
+     helles Grau unter heller Schrift — Kontrast 2,5. Ohne Nachdruck gewinnt
+     BlockNotes eigene Regel. Eingefärbte Zellen setzen ihre Farbe direkt am
+     Element und stechen den Nachdruck ohnehin. */
+  background: transparent !important;
 }
 .rt-zelle.aktiv { outline: 2px solid var(--accent); outline-offset: -2px; }
 .rt-zelle.fett { font-weight: 700; }
 .rt-zelle.aus-l { text-align: left; }
 .rt-zelle.aus-m { text-align: center; }
 .rt-zelle.aus-r { text-align: right; }
+/* Eine eingefärbte Zelle trägt immer dunkle Schrift: Die Töne sind hell
+   gewählt (Ampel), und im Dunkelmodus stünde sonst helle Schrift darauf. */
+.rt-zelle[style*="--rt-zellbg"] {
+  background: var(--rt-zellbg) !important;
+  color: #2b2a27 !important;
+}
 /* Wert und Eingabe füllen die Zelle ganz aus — so trifft jeder Klick */
 .rt-wert, .rt-eingabe {
   display: block; width: 100%; box-sizing: border-box;
@@ -5812,49 +5872,73 @@ audio.file-media { height: 40px; }
   text-align: inherit; padding: 5px 8px; min-height: 30px; cursor: cell;
 }
 .rt-eingabe { outline: 2px solid var(--accent); outline-offset: -2px; cursor: text; }
-.rt-wert:hover { background: rgba(79, 124, 255, 0.06); }
+.rt-wert:hover { background: var(--rt-spur); }
 .rt-linkzelle { display: flex; align-items: center; gap: 2px; padding: 0 4px; }
 .rt-link {
   flex: 1; min-width: 0; border: none; background: none; font: inherit;
-  color: var(--accent-strong); text-align: inherit; padding: 5px 4px;
+  color: var(--rt-link); text-align: inherit; padding: 5px 4px;
   cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .rt-link:hover { text-decoration: underline; }
 .rt-linkedit {
-  border: none; background: none; cursor: pointer; color: var(--muted);
+  border: none; background: none; cursor: pointer; color: var(--rt-leise);
   font-size: 11px; padding: 2px 4px; border-radius: 4px; flex: none;
 }
-.rt-linkedit:hover { background: var(--surface-dim); color: var(--ink); }
+.rt-linkedit:hover { background: var(--rt-knopf); color: var(--rt-text); }
 .rt-leiste {
   display: flex; align-items: center; flex-wrap: wrap; gap: 3px;
-  padding: 4px 6px; border-top: 1px solid var(--border-soft);
-  background: var(--surface-3);
+  padding: 4px 6px; border-top: 1px solid var(--rt-linie);
+  background: var(--rt-leiste);
 }
 .rt-leiste button {
   display: inline-flex; align-items: center; gap: 3px;
-  border: none; background: var(--surface-dim); border-radius: 6px;
-  cursor: pointer; font-size: 11px; padding: 3px 7px; font-family: inherit; color: inherit;
+  border: none; background: var(--rt-knopf); border-radius: 6px;
+  cursor: pointer; font-size: 11px; padding: 3px 7px; font-family: inherit;
+  color: var(--rt-text);
 }
-.rt-leiste button:hover:not(:disabled) { background: var(--border); }
+.rt-leiste button:hover:not(:disabled) { background: var(--rt-knopf-hover); }
 .rt-leiste button:disabled { opacity: 0.4; cursor: default; }
 .rt-leiste button.an { background: var(--accent); color: #fff; }
 .rt-leiste .rt-summe { font-weight: 600; }
-.rt-trenner { width: 1px; height: 16px; background: var(--border); margin: 0 3px; }
-.rt-adr { font-size: 11px; color: var(--muted); font-weight: 600; min-width: 26px; }
+.rt-trenner { width: 1px; height: 16px; background: var(--rt-rand); margin: 0 3px; }
+.rt-adr { font-size: 11px; color: var(--rt-leise); font-weight: 600; min-width: 26px; }
 .rt-farbe {
   width: 18px; height: 18px; padding: 0; border-radius: 5px !important;
-  border: 1px solid var(--border) !important;
+  border: 1px solid var(--rt-rand) !important;
 }
-.rt-farbe.ohne { background: repeating-linear-gradient(45deg, #fff, #fff 3px, #e8e2d6 3px, #e8e2d6 6px); }
+.rt-farbe.ohne { background: repeating-linear-gradient(45deg, #fff, #fff 3px, #d9d3c6 3px, #d9d3c6 6px); }
 .rt-farbe.an { outline: 2px solid var(--accent); outline-offset: 1px; }
 .rt-hilfe {
-  padding: 3px 8px 5px; font-size: 10.5px; color: var(--muted);
-  border-top: 1px solid var(--border-soft); background: var(--surface-3);
+  padding: 3px 8px 5px; font-size: 10.5px; color: var(--rt-leise);
+  border-top: 1px solid var(--rt-linie); background: var(--rt-leiste);
 }
-.rt-hilfe code { background: var(--surface-dim); border-radius: 3px; padding: 0 3px; font-size: 10px; }
+.rt-hilfe code { background: var(--rt-knopf); border-radius: 3px; padding: 0 3px; font-size: 10px; }
 /* Am Finger gelten wieder die großzügigen Ziele aus M198/M282 */
 @media (pointer: coarse) {
   .rt-wert, .rt-eingabe { min-height: 38px; }
   .rt-leiste button { min-height: 36px; padding: 4px 9px; }
   .rt-farbe { width: 26px; height: 26px; }
+}
+
+/* ================= M284: Weiße Notizen im Dunkelmodus =================
+   Beim Nachmessen der Tabelle aufgefallen und älter als sie: Eine weiße
+   Haftnotiz ist im Dunkelmodus eine DUNKLE Karte (`--surface-card`), ihr
+   Text stand aber pauschal auf #2b2a27 — gemessen 43,42,39 auf 57,53,48,
+   also praktisch unsichtbar. Die Regel „Papier bleibt hell" gilt eben nur
+   für die farbigen Töne; Weiß folgt dem Theme und braucht helle Schrift. */
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white),
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .bn-editor,
+[data-theme='dark'] .minutes-card.sticky-white { color: var(--ink); }
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .meta,
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .due-chip { color: var(--muted); }
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .due-chip {
+  background: rgba(255, 255, 255, 0.1);
+}
+/* Die Fließtext-Tabelle in einer weißen Notiz ebenso (Gegenstück zu M172) */
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-editor table:not(.rt-tabelle),
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-editor th,
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-editor td:not(.rt-zelle),
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-editor td:not(.rt-zelle) p,
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-editor th p {
+  color: var(--ink) !important;
 }
