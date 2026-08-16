@@ -8,6 +8,7 @@ import { TopActions } from './components/TopActions';
 import { Overview } from './components/Overview';
 import { SearchOverlay } from './components/SearchOverlay';
 import { Settings } from './components/Settings';
+import { RechercheDialog } from './components/RechercheDialog';
 import { Presenter } from './components/Presenter';
 import {
   adoptPersistedState, claimWriter, getWriterRole, reassertPersist,
@@ -234,6 +235,7 @@ export default function App() {
       <TooltipLayer />
       <Tastatur />
         <Settings />
+        <RechercheDialog />
         <Presenter />
         {/* §5 DDG: Impressum muss leicht erkennbar und unmittelbar erreichbar
             sein — darum dauerhaft sichtbare, klar beschriftete Links (1 Klick),

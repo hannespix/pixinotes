@@ -176,7 +176,7 @@ function parseJson<T>(raw: string): T {
 }
 
 /** askAi + parseJson mit einem automatischen, strengeren zweiten Versuch */
-async function askJson<T>(prompt: string, images: string[] = []): Promise<T> {
+export async function askJson<T>(prompt: string, images: string[] = []): Promise<T> {
   const first = await askAi(prompt, images);
   try {
     return parseJson<T>(first);

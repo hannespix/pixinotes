@@ -560,6 +560,13 @@ export function Dock() {
               <IWand size={14} /> Ausführen (erstellen, ändern, verbessern …)
             </button>
             <div className="dock-menu-label">KI-Assistent (ganzes Board)</div>
+            <button
+              disabled={!!aiBusy}
+              onClick={() => { setAiMenu(false); useBoard.getState().setRechercheOpen(true); }}
+              title="Recherche mit echten Quellen: Wikipedia, Wikivoyage, Wetter (Open-Meteo) — mit Rückfragen-Dialog"
+            >
+              🔎 Recherche mit Quellen …
+            </button>
             <button disabled={!!aiBusy} onClick={() => runAi('cluster', (n) => aiCluster(n))}>Themen clustern &amp; anordnen</button>
             <button disabled={!!aiBusy} onClick={() => runAi('tasks', aiTasks)}>Aufgaben &amp; Termine extrahieren</button>
             <button disabled={!!aiBusy} onClick={() => runAi('process', aiProcess)}>Workflow als Diagramm ableiten</button>

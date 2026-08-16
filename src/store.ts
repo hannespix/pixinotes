@@ -137,6 +137,9 @@ interface BoardState {
   lastDeleted: DeletedSnapshot | null;
   tool: Tool;
   settingsOpen: boolean;
+  /** M274: Recherche-Dialog (KI mit echten Quellen) offen? */
+  rechercheOpen: boolean;
+  setRechercheOpen: (open: boolean) => void;
   presenting: boolean;
   /** M228: Ab welcher Karte die Präsentation startet (nicht persistiert —
    *  das ist eine Absicht für den nächsten Moment, kein Dokumentzustand) */
@@ -717,6 +720,8 @@ export const useBoard = create<BoardState>()(
         view: 'board',
         searchOpen: false,
         settingsOpen: false,
+        rechercheOpen: false,
+        setRechercheOpen: (open) => set({ rechercheOpen: open }),
         presenting: false,
         presentFrom: null,
         setPresentFrom: (id) => set({ presentFrom: id }),
