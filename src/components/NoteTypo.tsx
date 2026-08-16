@@ -11,12 +11,14 @@
 // verschiedene Sprachen für dieselbe Sache lernen muss.
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BlockNoteSchema, defaultStyleSpecs } from '@blocknote/core';
+import { BlockNoteSchema, defaultBlockSpecs, defaultStyleSpecs, filterSuggestionItems } from '@blocknote/core';
 import {
   createReactStyleSpec, FormattingToolbar, FormattingToolbarController,
-  getFormattingToolbarItems, useBlockNoteEditor, useComponentsContext,
-  useEditorContentOrSelectionChange,
+  getDefaultReactSlashMenuItems, getFormattingToolbarItems, SuggestionMenuController,
+  useBlockNoteEditor, useComponentsContext, useEditorContentOrSelectionChange,
 } from '@blocknote/react';
+import { RechenTabelleBlock } from './RechenTabelle';
+import { ISigma } from './Icons';
 import type { CardFont } from '../types';
 import {
   FONT_STACKS, GROESSEN_TEXT, INLINE_SIZE_EM, SCHRIFTEN, stufenName, stufeWeiter,
@@ -43,6 +45,14 @@ const TextFont = createReactStyleSpec(
 /** Gemeinsames Schema aller Notiz-Editoren (NoteCard, Protokoll, Presenter) —
  *  damit gestylte Blöcke ÜBERALL valide sind und identisch rendern. */
 export const noteSchema = BlockNoteSchema.create({
+  /**
+   * M283: Die Rechen-Tabelle ist ein Block wie jeder andere.
+   *
+   * Die alte `table` bleibt im Schema — bestehende Notizen sollen weiter
+   * öffnen und drucken. Angeboten wird sie aber nicht mehr (siehe
+   * NoteSlashMenu): Neu eingefügt wird ab jetzt die Tabelle, die rechnen kann.
+   */
+  blockSpecs: { ...defaultBlockSpecs, rechentabelle: RechenTabelleBlock },
   styleSpecs: { ...defaultStyleSpecs, textSize: TextSize, textFont: TextFont },
 });
 
@@ -234,6 +244,45 @@ function PhoneFormatDock() {
       </FormattingToolbar>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * M283: Das Einfügen-Menü („/") bietet EINE Tabelle an — die rechnende.
+ *
+ * Der Eintrag der alten Fließtext-Tabelle fällt heraus. Nicht, weil sie
+ * schlecht wäre, sondern weil zwei Tabellentypen im selben Menü genau die
+ * Frage aufwerfen, die niemand beantworten will: „Welche nehme ich jetzt?"
+ * Bestehende Tabellen bleiben unberührt und lassen sich in der Notiz per
+ * Knopf umwandeln (NoteCard).
+ */
+export function NoteSlashMenu() {
+  const editor = useBlockNoteEditor() as unknown as typeof noteSchema.BlockNoteEditor;
+  return (
+    <SuggestionMenuController
+      triggerCharacter="/"
+      getItems={async (query) => {
+        const standard = getDefaultReactSlashMenuItems(editor as never)
+          // die alte Tabelle aus dem Angebot nehmen (Titel je nach Sprache)
+          .filter((i) => !/^(tabelle|table)$/i.test(i.title ?? ''));
+        const eigene = [{
+          title: 'Tabelle',
+          subtext: 'Rechnet mit „=" — Summen, Prozente, Bedingungen',
+          aliases: ['tabelle', 'table', 'rechnen', 'summe', 'excel', 'kalkulation'],
+          group: 'Basisblöcke',
+          icon: <ISigma size={16} />,
+          onItemClick: () => {
+            const block = editor.getTextCursorPosition().block;
+            editor.insertBlocks(
+              [{ type: 'rechentabelle', props: { zellen: '{}', stil: '{}', spalten: 3, zeilen: 3 } } as never],
+              block,
+              'after',
+            );
+          },
+        }];
+        return filterSuggestionItems([...eigene, ...standard], query);
+      }}
+    />
   );
 }
 

@@ -19,6 +19,11 @@
 /** Die EINZIGEN Blocktypen, die Editor, Export, Suche und Aufgaben verstehen */
 const SAFE_TYPES = new Set([
   'paragraph', 'heading', 'bulletListItem', 'numberedListItem', 'checkListItem', 'table',
+  // M283: die rechnende Tabelle ist ein vollwertiger Block des Notiz-Schemas.
+  // Ohne diesen Eintrag hielte repairBlocks sie für einen Fremdkörper und
+  // machte beim nächsten Öffnen der Notiz einen leeren Absatz daraus — die
+  // Tabelle wäre weg, und zwar dauerhaft.
+  'rechentabelle',
 ]);
 
 export type Block = Record<string, unknown>;

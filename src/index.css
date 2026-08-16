@@ -5786,3 +5786,75 @@ audio.file-media { height: 40px; }
   .tab-picker-eintrag { font-size: 15px; min-height: 44px; }
   .tab-picker-fuss { font-size: max(12.5px, 1em); }
 }
+
+/* ================= M283: Die eine Tabelle — sie rechnet =================
+   Ein Raster mitten in der Notiz. Bewusst ruhig gehalten: Es soll wie ein
+   Teil des Textes wirken, nicht wie ein eingebettetes Fremdprogramm. */
+.rt-block {
+  margin: 6px 0; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); overflow: hidden;
+}
+.rt-roller { overflow-x: auto; scrollbar-width: thin; }
+.rt-tabelle { border-collapse: collapse; width: 100%; font-size: 13px; }
+.rt-zelle {
+  border: 1px solid var(--border-soft); padding: 0; min-width: 74px;
+  vertical-align: middle;
+}
+.rt-zelle.aktiv { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rt-zelle.fett { font-weight: 700; }
+.rt-zelle.aus-l { text-align: left; }
+.rt-zelle.aus-m { text-align: center; }
+.rt-zelle.aus-r { text-align: right; }
+/* Wert und Eingabe füllen die Zelle ganz aus — so trifft jeder Klick */
+.rt-wert, .rt-eingabe {
+  display: block; width: 100%; box-sizing: border-box;
+  border: none; background: none; font: inherit; color: inherit;
+  text-align: inherit; padding: 5px 8px; min-height: 30px; cursor: cell;
+}
+.rt-eingabe { outline: 2px solid var(--accent); outline-offset: -2px; cursor: text; }
+.rt-wert:hover { background: rgba(79, 124, 255, 0.06); }
+.rt-linkzelle { display: flex; align-items: center; gap: 2px; padding: 0 4px; }
+.rt-link {
+  flex: 1; min-width: 0; border: none; background: none; font: inherit;
+  color: var(--accent-strong); text-align: inherit; padding: 5px 4px;
+  cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rt-link:hover { text-decoration: underline; }
+.rt-linkedit {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  font-size: 11px; padding: 2px 4px; border-radius: 4px; flex: none;
+}
+.rt-linkedit:hover { background: var(--surface-dim); color: var(--ink); }
+.rt-leiste {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 3px;
+  padding: 4px 6px; border-top: 1px solid var(--border-soft);
+  background: var(--surface-3);
+}
+.rt-leiste button {
+  display: inline-flex; align-items: center; gap: 3px;
+  border: none; background: var(--surface-dim); border-radius: 6px;
+  cursor: pointer; font-size: 11px; padding: 3px 7px; font-family: inherit; color: inherit;
+}
+.rt-leiste button:hover:not(:disabled) { background: var(--border); }
+.rt-leiste button:disabled { opacity: 0.4; cursor: default; }
+.rt-leiste button.an { background: var(--accent); color: #fff; }
+.rt-leiste .rt-summe { font-weight: 600; }
+.rt-trenner { width: 1px; height: 16px; background: var(--border); margin: 0 3px; }
+.rt-adr { font-size: 11px; color: var(--muted); font-weight: 600; min-width: 26px; }
+.rt-farbe {
+  width: 18px; height: 18px; padding: 0; border-radius: 5px !important;
+  border: 1px solid var(--border) !important;
+}
+.rt-farbe.ohne { background: repeating-linear-gradient(45deg, #fff, #fff 3px, #e8e2d6 3px, #e8e2d6 6px); }
+.rt-farbe.an { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rt-hilfe {
+  padding: 3px 8px 5px; font-size: 10.5px; color: var(--muted);
+  border-top: 1px solid var(--border-soft); background: var(--surface-3);
+}
+.rt-hilfe code { background: var(--surface-dim); border-radius: 3px; padding: 0 3px; font-size: 10px; }
+/* Am Finger gelten wieder die großzügigen Ziele aus M198/M282 */
+@media (pointer: coarse) {
+  .rt-wert, .rt-eingabe { min-height: 38px; }
+  .rt-leiste button { min-height: 36px; padding: 4px 9px; }
+  .rt-farbe { width: 26px; height: 26px; }
+}

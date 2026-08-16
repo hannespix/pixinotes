@@ -7,6 +7,7 @@ import { de as blockNoteDe } from '@blocknote/core/locales';
 import { useBoard } from '../../store';
 import { STICKY_COLORS, type NoteNode } from '../../types';
 import { blocksToText } from '../../lib/serialize';
+import { indexZuAdresse } from '../../lib/formel';
 import { useAndroidBackspaceFix } from '../../lib/blocknoteAndroidFix';
 import { extractWikilinks, resolveLink } from '../../lib/links';
 import { appStateLines, fmtHM, linkedOfType, timeSums } from '../../lib/moduleFeeds';
@@ -18,9 +19,25 @@ import { aiReady, askAi, textToBlocks } from '../../lib/ai';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
-import { NoteToolbar, noteSchema } from '../NoteTypo';
+import { NoteSlashMenu, NoteToolbar, noteSchema } from '../NoteTypo';
 
 
+
+/**
+ * M283: Der reine Text einer Tabellenzelle — für die Umwandlung in die
+ * Rechen-Tabelle. Eine Zelle kann ein Objekt mit `content`, ein Array von
+ * Textstücken oder schlicht eine Zeichenkette sein; alle drei kommen in
+ * gespeicherten Notizen vor.
+ */
+function zelleZuText(zelle: unknown): string {
+  if (zelle == null) return '';
+  if (typeof zelle === 'string') return zelle;
+  if (Array.isArray(zelle)) return zelle.map(zelleZuText).join('');
+  const o = zelle as { text?: unknown; content?: unknown };
+  if (typeof o.text === 'string') return o.text;
+  if (o.content !== undefined) return zelleZuText(o.content);
+  return '';
+}
 
 /** Fristen-Chips für Notizen: Text aus den BlockNote-Blöcken extrahieren */
 function NoteDueChips({ blocks }: { blocks?: unknown[] }) {
@@ -32,7 +49,19 @@ function NoteDueChips({ blocks }: { blocks?: unknown[] }) {
 /** ☎/✉/🔗-Chips: erkannte Telefonnummern, Mails & Links aus dem Notiz-Text
  *  (im BlockNote-Editor selbst können wir keine Links injizieren) */
 function NoteEntityChips({ blocks }: { blocks?: unknown[] }) {
-  const text = useMemo(() => blocksToText(blocks), [blocks]);
+  /**
+   * M283: Zahlen aus der Rechen-Tabelle bleiben hier außen vor.
+   *
+   * Seit die Tabelle IN der Notiz liegt, wandert ihr Inhalt in den Notiz-Text
+   * — und die Rufnummern-Erkennung machte aus „1.200" prompt ein „☎ 1.200"
+   * (im Bildschirmfoto der Probe gleich dreimal). Eine Zahlenspalte ist keine
+   * Prosa: Für die Chips wird die Tabelle deshalb übersprungen. Suche, Export
+   * und KI sehen sie unverändert vollständig.
+   */
+  const text = useMemo(
+    () => blocksToText((blocks ?? []).filter((b) => (b as { type?: string })?.type !== 'rechentabelle')),
+    [blocks],
+  );
   const ents = useMemo(() => extractEntities(text).slice(0, 4), [text]);
   if (ents.length === 0) return null;
   const ICON = { tel: '\u260e', mail: '\u2709', url: '\ud83d\udd17' } as const;
@@ -252,6 +281,51 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
       showToast('Tabelle entfernt — Strg+Z im Text holt sie zurück.');
     } catch { /* Block schon weg */ }
   };
+  /**
+   * M283: Eine bestehende Fließtext-Tabelle in die rechnende umwandeln.
+   *
+   * Neu eingefügt wird ab jetzt nur noch die Rechen-Tabelle. Alte Tabellen
+   * bleiben aber, wo sie sind — niemandem ist gedient, wenn eine Notiz beim
+   * Öffnen anders aussieht als gestern. Wer rechnen WILL, drückt hier: Die
+   * Zellinhalte wandern als Text hinüber, danach steht in jeder Zelle ein
+   * „=" zur Verfügung. Fett und Farben aus der alten Tabelle gehen dabei
+   * verloren — das steht auch so im Hinweis.
+   */
+  const inRechenTabelle = () => {
+    if (!tableSel) return;
+    try {
+      const block = editor.getBlock(tableSel) as unknown as {
+        content?: { rows?: Array<{ cells: unknown[] }> };
+      } | undefined;
+      const rows = block?.content?.rows ?? [];
+      if (!rows.length) return;
+      const zellen: Record<string, string> = {};
+      let spalten = 1;
+      rows.forEach((r, z) => {
+        spalten = Math.max(spalten, r.cells.length);
+        r.cells.forEach((c, s) => {
+          const t = zelleZuText(c).trim();
+          if (t) zellen[indexZuAdresse(s, z)] = t;
+        });
+      });
+      editor.replaceBlocks([tableSel], [{
+        type: 'rechentabelle',
+        props: {
+          zellen: JSON.stringify(zellen),
+          stil: '{}',
+          spalten: Math.min(26, spalten),
+          zeilen: Math.min(200, rows.length),
+        },
+      } as never]);
+      updateNodeData(id, { blocks: editor.document });
+      setTableSel(null);
+      setTabZelle(null);
+      showToast('Umgewandelt — jetzt rechnet die Tabelle: „=SUMME(A1:A3)" in eine Zelle schreiben.');
+    } catch {
+      showToast('Diese Tabelle ließ sich nicht umwandeln.');
+    }
+  };
+
   /** Zeile oder Spalte löschen — die letzte nimmt die ganze Tabelle mit */
   const entferne = (was: 'zeile' | 'spalte') => {
     if (!tableSel || !tabZelle) return;
@@ -315,11 +389,14 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
           theme="light"
           sideMenu={false}
           formattingToolbar={false}
+          slashMenu={false}   /* M283: eigenes Einfügen-Menü (NoteSlashMenu) */
           onChange={() => { updateNodeData(id, { blocks: editor.document }); trackTable(); }}
           onSelectionChange={trackTable}
         >
           {/* M201: Standard-Leiste + A₋/A₊/A₊₊/Aa für den markierten Text */}
           <NoteToolbar />
+          {/* M283: „/" bietet die rechnende Tabelle an */}
+          <NoteSlashMenu />
         </BlockNoteView>
       </div>
       {tableSel && (
@@ -346,6 +423,15 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
               </button>
             </>
           )}
+          {/* M283: der Weg von der alten Tabelle zur rechnenden */}
+          <button
+            className="due-chip"
+            title={'In eine Rechen-Tabelle umwandeln: Danach rechnet „=SUMME(A1:A3)" wirklich. '
+              + 'Texte bleiben erhalten, Fett und Farben der alten Tabelle gehen dabei verloren.'}
+            onClick={inRechenTabelle}
+          >
+            Σ Rechnen lassen
+          </button>
           <button
             className="due-chip table-del-chip"
             title="Die Tabelle, in der der Cursor steht, komplett aus der Notiz entfernen"

@@ -29,6 +29,27 @@ function sheetZeilen(s: SheetData): string[][] {
   return aus;
 }
 
+/**
+ * M283: Dieselbe Ausgabe für die Rechen-Tabelle IN einer Notiz.
+ *
+ * Der Block trägt seine Zellen als JSON-Text in den Eigenschaften — für
+ * Export, Suche und den KI-Kontext wird daraus dieselbe Zeilenform wie bei
+ * der Rechen-Karte, samt errechneter Werte.
+ */
+export function rechenBlockZeilen(props: Record<string, unknown> | undefined): string[][] {
+  if (!props) return [];
+  let zellen: Record<string, string> = {};
+  try {
+    const w = JSON.parse(String(props.zellen ?? '{}'));
+    if (w && typeof w === 'object') zellen = w as Record<string, string>;
+  } catch { /* kaputtes JSON: dann eben leer */ }
+  return sheetZeilen({
+    cells: zellen,
+    cols: Math.max(1, Number(props.spalten) || 3),
+    rows: Math.max(1, Number(props.zeilen) || 3),
+  } as SheetData);
+}
+
 /* ---------- BlockNote-Blöcke → Text/HTML ---------- */
 
 interface AnyBlock {
@@ -96,6 +117,11 @@ export function blocksToText(blocks: unknown[] | undefined): string {
         case 'table':
           lines.push(inlineText(b.content));
           break;
+        case 'rechentabelle':
+          // M283: als Zeilen mit „ | " — dieselbe Form wie die Rechen-Karte,
+          // damit Suche und KI die Zahlen wirklich lesen können
+          for (const r of rechenBlockZeilen(b.props)) lines.push(`${indent}${r.join(' | ')}`);
+          break;
         default:
           if (text) lines.push(`${indent}${text}`);
       }
@@ -143,6 +169,19 @@ export function blocksToHtml(blocks: unknown[] | undefined): string {
         if (content?.rows) {
           const rows = content.rows
             .map((r) => `<tr>${r.cells.map((cell) => `<td style="border:1px solid #ccc;padding:4px 8px">${esc(inlineText(cell))}</td>`).join('')}</tr>`)
+            .join('');
+          parts.push(`<table style="border-collapse:collapse">${rows}</table>`);
+        }
+        break;
+      }
+      case 'rechentabelle': {
+        // M283: mit Werten statt Formeln — in einer E-Mail nützt „=SUMME(B2:B9)"
+        // niemandem, die 12.480 dagegen schon
+        closeList();
+        const zeilen = rechenBlockZeilen(b.props);
+        if (zeilen.length) {
+          const rows = zeilen
+            .map((r) => `<tr>${r.map((c) => `<td style="border:1px solid #ccc;padding:4px 8px">${esc(c)}</td>`).join('')}</tr>`)
             .join('');
           parts.push(`<table style="border-collapse:collapse">${rows}</table>`);
         }

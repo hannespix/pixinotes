@@ -8,7 +8,7 @@ import { nodeToHtml } from '../lib/serialize';
 import { buildMermaidSource, getMermaid, preloadHandFont } from '../lib/mermaid';
 import { presentationOrder } from '../lib/presentOrder';
 import { useAndroidBackspaceFix } from '../lib/blocknoteAndroidFix';
-import { NoteToolbar, noteSchema } from './NoteTypo';
+import { NoteSlashMenu, NoteToolbar, noteSchema } from './NoteTypo';
 import { KanbanBody } from './nodes/KanbanCard';
 import { GanttBody } from './nodes/GanttCard';
 import { CalendarBody } from './nodes/CalendarCard';
@@ -45,9 +45,12 @@ function NoteSlide({ node }: { node: NoteNode }) {
         theme="light"
         sideMenu={false}
         formattingToolbar={false}
+          slashMenu={false}   /* M283: eigenes Einfügen-Menü (NoteSlashMenu) */
         onChange={() => updateNodeData(node.id, { blocks: editor.document })}
       >
         <NoteToolbar />
+        {/* M283: „/" bietet die rechnende Tabelle an */}
+        <NoteSlashMenu />
       </BlockNoteView>
     </div>
   );

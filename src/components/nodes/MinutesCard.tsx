@@ -9,7 +9,7 @@ import { STICKY_COLORS, uid, type MinutesData, type MinutesNode } from '../../ty
 import { allDecisions, buildEntry, currentEntry, entryLabel, nextDate, sortEntries } from '../../lib/minutes';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { useAndroidBackspaceFix } from '../../lib/blocknoteAndroidFix';
-import { NoteToolbar, noteSchema } from '../NoteTypo';
+import { NoteSlashMenu, NoteToolbar, noteSchema } from '../NoteTypo';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { IChevronL, IChevronR, IPlus, ISettings, IX } from '../Icons';
@@ -340,6 +340,7 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
         theme="light"
         className="note-editor"
         formattingToolbar={false}
+          slashMenu={false}   /* M283: eigenes Einfügen-Menü (NoteSlashMenu) */
         onChange={() => {
           const st = useBoard.getState();
           const board = st.boards.find((b) => b.nodes.some((n) => n.id === nodeId));
@@ -350,6 +351,8 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
         }}
       >
         <NoteToolbar />
+        {/* M283: „/" bietet die rechnende Tabelle an */}
+        <NoteSlashMenu />
       </BlockNoteView>
     </div>
   );
