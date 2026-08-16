@@ -12,7 +12,7 @@
  *
  * Das Ergebnis wird eine Notiz-Karte mit Quellenangaben am Ende.
  */
-import { askAi, mdToBlocks } from './ai';
+import { askAi, askAnthropicWebSuche, mdToBlocks, webSucheBereit } from './ai';
 import { askJson } from './aiActions';
 import { nodesToText } from './serialize';
 import { makeNote } from './nodes';
@@ -76,6 +76,22 @@ export async function fuehreRechercheAus(
   const board = selectActiveBoard(st);
   const ausgewaehlt = board.nodes.filter((n) => n.selected && n.type !== 'frame');
   const kontext = ausgewaehlt.length ? nodesToText(ausgewaehlt).slice(0, 3000) : '';
+  const dialogText = plan.fragen
+    .map((f, i) => (antworten[i]?.trim() ? `Rückfrage: ${f}\nAntwort: ${antworten[i].trim()}` : ''))
+    .filter(Boolean)
+    .join('\n');
+
+  /* M278: Mit eigenem Anthropic-Schlüssel sucht das Modell SELBST im Netz
+     (serverseitiges web_search-Tool) — deutlich mehr Reichweite als die
+     Nachschlagewerke, samt Zitaten als Quellenliste. Scheitert die Websuche
+     (kein Zugriff, Kontingent, Netz), geht es unten normal weiter. */
+  if (webSucheBereit(st.ai)) {
+    try {
+      return await rechercheMitWebsuche(auftrag, plan, dialogText, kontext, melde);
+    } catch {
+      melde('Websuche nicht verfügbar — nutze die Nachschlagewerke…');
+    }
+  }
 
   melde(`Hole Quellen (${plan.suchbegriffe.join(', ')})…`);
   const quellen = await sammleQuellen({
@@ -88,10 +104,7 @@ export async function fuehreRechercheAus(
     ? `${quellen.length} Quelle(n) gefunden — schreibe die Antwort…`
     : 'Keine Quellen erreichbar — schreibe eine ehrliche Antwort…');
 
-  const dialog = plan.fragen
-    .map((f, i) => (antworten[i]?.trim() ? `Rückfrage: ${f}\nAntwort: ${antworten[i].trim()}` : ''))
-    .filter(Boolean)
-    .join('\n');
+  const dialog = dialogText;
   const material = quellen
     .map((q, i) => `[${i + 1}] ${ART_LABEL[q.art]} — ${q.titel}\n${q.text}`)
     .join('\n\n---\n\n');
@@ -115,9 +128,47 @@ ${material || '(keine Quelle erreichbar — sage das ehrlich und gib an, was der
     ? `\n\n## Quellen\n${quellen.map((q, i) => `- [${i + 1}] ${ART_LABEL[q.art]}: [${q.titel}](${q.url})`).join('\n')}`
     : '';
   const titel = `🔎 ${auftrag.slice(0, 60)}`;
-  const blocks = await mdToBlocks(titel, `${md.trim()}${fussnoten}`);
-
   melde('Lege die Notiz an…');
+  await legeRechercheNotizAn(titel, `${md.trim()}${fussnoten}`);
+  return { quellen: quellen.length, titel };
+}
+
+/** M278: Recherche über die serverseitige Websuche des Anbieters (Anthropic) */
+async function rechercheMitWebsuche(
+  auftrag: string,
+  plan: RecherchePlan,
+  dialog: string,
+  kontext: string,
+  melde: (schritt: string) => void,
+): Promise<RechercheErgebnis> {
+  melde('Das Modell sucht selbst im Netz…');
+  const heute = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+  const { text, quellen } = await askAnthropicWebSuche(
+    `Heute ist ${heute}. Recherchiere im Netz und beantworte den Auftrag mit AKTUELLEN, belegten Angaben. Regeln:
+- NICHTS erfinden; was sich nicht belegen lässt, benennst du offen als Lücke.
+- Konkret und knapp; Markdown mit "## "-Zwischenüberschriften und "- "-Listen.
+- Sprich Deutsch.
+
+Auftrag: "${auftrag}"
+${plan.suchbegriffe.length ? `Nützliche Suchrichtungen: ${plan.suchbegriffe.join(', ')}\n` : ''}${dialog ? `\nPräzisierungen aus dem Rückfragen-Dialog:\n${dialog}\n` : ''}${kontext ? `\nKontext von den ausgewählten Karten:\n${kontext}\n` : ''}`,
+  );
+
+  melde(quellen.length
+    ? `${quellen.length} Netz-Quelle(n) gelesen — lege die Notiz an…`
+    : 'Antwort da — lege die Notiz an…');
+  const fussnoten = quellen.length
+    ? `\n\n## Quellen\n${quellen.map((q) => `- Web: [${q.titel}](${q.url})`).join('\n')}`
+    : '';
+  const titel = `🔎 ${auftrag.slice(0, 60)}`;
+  await legeRechercheNotizAn(titel, `${text.trim()}${fussnoten}`);
+  return { quellen: quellen.length, titel };
+}
+
+/** Die fertige Recherche als Notiz-Karte aufs Board — für beide Wege gleich */
+async function legeRechercheNotizAn(titel: string, mdMitQuellen: string): Promise<void> {
+  const st = useBoard.getState();
+  const board = selectActiveBoard(st);
+  const blocks = await mdToBlocks(titel, mdMitQuellen);
   const mitte = board.nodes.length
     ? {
       x: board.nodes.reduce((s, n) => s + n.position.x, 0) / board.nodes.length + 380,
@@ -132,5 +183,4 @@ ${material || '(keine Quelle erreichbar — sage das ehrlich und gib an, was der
     } as AppNode;
     st.addNode(note);
   });
-  return { quellen: quellen.length, titel };
 }

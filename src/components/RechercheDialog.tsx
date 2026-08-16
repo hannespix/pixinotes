@@ -11,7 +11,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useBoard } from '../store';
-import { aiReady } from '../lib/ai';
+import { aiReady, webSucheBereit } from '../lib/ai';
 import { fuehreRechercheAus, planeRecherche, type RecherchePlan } from '../lib/recherche';
 import { nodesToText } from '../lib/serialize';
 import { selectActiveBoard } from '../store';
@@ -94,10 +94,19 @@ export function RechercheDialog() {
           {phase === 'eingabe' && (
             <>
               <p className="modal-hint">
-                Die KI plant die Suche, stellt bei Bedarf <b>Rückfragen</b>, holt dann echtes Material
-                aus <b>Wikipedia</b>, <b>Wikivoyage</b> und der <b>Open-Meteo-Wettervorhersage</b> und
-                antwortet nur daraus — mit Quellenliste. Was die Quellen nicht hergeben (z. B.
-                Öffnungszeiten), steht ehrlich als Lücke da. Ausgewählte Karten zählen als Kontext.
+                {webSucheBereit(ai) ? (
+                  /* M278: Mit eigenem Anthropic-Schlüssel sucht das Modell
+                     selbst im Netz — der Hinweis sagt ehrlich, welcher Weg gilt */
+                  <>Die KI plant die Suche, stellt bei Bedarf <b>Rückfragen</b> und recherchiert dann
+                    <b> selbst im Netz</b> (Websuche deines Anthropic-Zugangs) — mit Quellenliste aus
+                    den gelesenen Seiten. Was sich nicht belegen lässt, steht ehrlich als Lücke da.
+                    Ausgewählte Karten zählen als Kontext.</>
+                ) : (
+                  <>Die KI plant die Suche, stellt bei Bedarf <b>Rückfragen</b>, holt dann echtes Material
+                    aus <b>Wikipedia</b>, <b>Wikivoyage</b> und der <b>Open-Meteo-Wettervorhersage</b> und
+                    antwortet nur daraus — mit Quellenliste. Was die Quellen nicht hergeben (z. B.
+                    Öffnungszeiten), steht ehrlich als Lücke da. Ausgewählte Karten zählen als Kontext.</>
+                )}
               </p>
               <textarea
                 autoFocus

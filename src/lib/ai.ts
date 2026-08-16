@@ -195,6 +195,73 @@ async function askOnce(ai: AiSettings, prompt: string, images: string[]): Promis
   }
 }
 
+/* ---------- M278: Websuche über den KI-Anbieter ----------
+   Anthropic führt die Suche SERVERSEITIG aus (web_search-Tool): Das Modell
+   sucht selbst, liest die Treffer und belegt seine Antwort mit Zitaten.
+   Das ist der Recherche-Weg mit der größten Reichweite — er steht aber nur
+   offen, wenn der eigene Anthropic-Schlüssel hinterlegt ist. Alle anderen
+   Anbieter behalten den M274-Weg (Wikipedia/Wikivoyage/Open-Meteo). */
+
+export interface WebSuchErgebnis {
+  text: string;
+  quellen: Array<{ titel: string; url: string }>;
+}
+
+/** Kann der aktuelle Anbieter serverseitig suchen? */
+export function webSucheBereit(ai: AiSettings): boolean {
+  return ai.provider === 'anthropic' && aiReady(ai);
+}
+
+/**
+ * Eine Frage MIT Websuche beantworten (nur Anthropic). Wirft bei jedem
+ * Fehler — der Aufrufer fällt dann auf die Nachschlagewerke (M274) zurück.
+ */
+export async function askAnthropicWebSuche(prompt: string): Promise<WebSuchErgebnis> {
+  const ai = useBoard.getState().ai;
+  if (!webSucheBereit(ai)) throw new Error('Websuche nur mit Anthropic-Schlüssel');
+  const ctrl = new AbortController();
+  // Suchen + Lesen + Schreiben dauert länger als eine reine Antwort
+  const timer = setTimeout(() => ctrl.abort(), 150_000);
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': ai.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: ai.model,
+        max_tokens: 2048,
+        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
+        messages: [{ role: 'user', content: prompt }],
+      }),
+    });
+    if (!res.ok) throw new Error(`Anthropic-Websuche: HTTP ${res.status}`);
+    const data = await res.json();
+    let text = '';
+    const quellen: WebSuchErgebnis['quellen'] = [];
+    const bekannt = new Set<string>();
+    for (const block of data.content ?? []) {
+      if (block.type !== 'text') continue;
+      text += block.text ?? '';
+      // Zitate hängen an den Textblöcken — daraus wird die Quellenliste
+      for (const c of block.citations ?? []) {
+        const url = typeof c?.url === 'string' ? c.url : '';
+        if (!url || bekannt.has(url)) continue;
+        bekannt.add(url);
+        quellen.push({ titel: typeof c?.title === 'string' && c.title.trim() ? c.title : url, url });
+      }
+    }
+    if (!text.trim()) throw new Error('Websuche ohne Antworttext');
+    return { text, quellen };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Zentraler Formatier-Steckbrief für alle Text-Antworten der KI (M117) —
  * bewusst kurz gehalten (Token) und überall identisch angehängt.
