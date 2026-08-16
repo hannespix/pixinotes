@@ -126,6 +126,27 @@ console.log('\n════ T2: Jahres-Skala ════');
     !!erstes && erstes.x <= 8, JSON.stringify(erstes));
 }
 
+// ══ T2e/f: Monatsnamen überlappen nie ════════════════════════════════
+console.log('\n════ T2e: Monatsnamen in der Kopfzeile ════');
+{
+  await P.locator('.gantt-scale').selectOption('monate');
+  await P.waitForTimeout(800);
+  const m = await P.evaluate(() => {
+    const t = [...document.querySelectorAll('.gantt-kopf .gantt-month')]
+      .map((e) => ({ x: Number(e.getAttribute('x')), br: e.getBBox().width, txt: e.textContent }))
+      .sort((a, b) => a.x - b.x);
+    const kollisionen = t.filter((e, i) => i > 0 && t[i - 1].x + t[i - 1].br > e.x + 0.5)
+      .map((e, i) => `${t[i].txt}|${e.txt}`);
+    return { anzahl: t.length, erste: t.slice(0, 3).map((e) => e.txt), kollisionen };
+  });
+  console.log('   ', JSON.stringify(m));
+  pruefe('T2e die Monatsansicht beschriftet ihre Monate', m.anzahl >= 6, String(m.anzahl));
+  pruefe('T2f kein Monatsname läuft in den nächsten hinein',
+    m.kollisionen.length === 0, JSON.stringify(m.kollisionen));
+  await P.locator('.gantt-scale').selectOption('jahre');
+  await P.waitForTimeout(600);
+}
+
 // ══ T3: Nichts läuft rechts aus dem Bild ═════════════════════════════
 console.log('\n════ T3: Rechter Auslauf ════');
 {

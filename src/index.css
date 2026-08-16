@@ -2271,6 +2271,27 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .gantt-rowbar button { border: none; background: none; cursor: pointer; font-size: 11px; padding: 1px 4px; border-radius: 4px; }
 .gantt-rowbar button:hover { background: var(--border); }
 .gantt-rowbar select { font-size: 11px; margin-left: 3px; border: 1px solid var(--border-soft); border-radius: 5px; background: var(--surface); }
+/* M280: Rahmen um den Roller — trägt die weichen Kanten, die zeigen, dass
+   es rechts (oder links) weitergeht. Ohne sie endete das Diagramm mit einem
+   harten Schnitt am Kartenrand und wirkte abgeschnitten statt scrollbar. */
+.gantt-scrollwrap { position: relative; flex: 1; min-height: 0; display: flex; }
+.gantt-scrollwrap::before,
+.gantt-scrollwrap::after {
+  content: ''; position: absolute; top: 1px; bottom: 1px; width: 26px;
+  pointer-events: none; opacity: 0; transition: opacity 0.18s ease; z-index: 3;
+}
+.gantt-scrollwrap::after {
+  right: 1px; border-radius: 0 8px 8px 0;
+  background: linear-gradient(to left, var(--surface), rgba(0, 0, 0, 0));
+}
+.gantt-scrollwrap::before {
+  /* links erst hinter der klebenden Namensspalte — sonst läge der Verlauf
+     auf den Namen statt am Übergang zum Diagramm */
+  left: var(--gantt-labelw, 128px); width: 20px;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.07), rgba(0, 0, 0, 0));
+}
+.gantt-scrollwrap.mehr-rechts::after,
+.gantt-scrollwrap.mehr-links::before { opacity: 1; }
 .gantt-scroll { display: flex; flex: 1; min-height: 0; overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
 .gantt-labels { flex: none; display: flex; flex-direction: column; border-right: 1px solid var(--border); background: var(--surface-3); position: sticky; left: 0; z-index: 2; }
 /* M271: Die Bearbeitungsleiste darf umbrechen — mit Datumsfeldern ist sie voller */
@@ -2280,7 +2301,12 @@ html[data-kopf-eng='an'] .hint { display: none; }
      eine feste Feldbreite würde den Gewinn gleich wieder abschneiden */
   width: 100%; border: none; background: transparent; outline: none; font-family: inherit;
   font-size: 11.5px; color: var(--ink); padding: 0 8px; box-sizing: border-box;
+  /* M280: Ein zu langer Name endet mit „…", nicht mitten im Buchstaben —
+     „Planung Bauabschr" sah aus wie ein Fehler. Beim Bearbeiten (Fokus)
+     fällt die Kürzung weg, damit man das Ende sieht, das man tippt. */
+  text-overflow: ellipsis;
 }
+.gantt-label:focus { text-overflow: clip; }
 .gantt-label.sel { background: rgba(79,124,255,.1); }
 .gantt-chartwrap { flex: 1; }
 .gantt-svg { display: block; touch-action: none; }

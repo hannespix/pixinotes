@@ -117,11 +117,22 @@ console.log('\n════ T2: Balken-Beschriftung & Co. ════');
     // Fortschritt: Overlay in Balkenhöhe (15) statt 4-Punkte-Strich
     const overlays = [...document.querySelectorAll('.gantt-bar rect')].filter((r) =>
       r.getAttribute('fill')?.includes('rgba(0,0,0,.26)'));
-    return { anzahl: labels.length, innen, heutePille,
+    /* M280: Beschriftet werden nur Balken IM Fenster — ein Name weit
+       außerhalb wäre unsichtbar, könnte aber am Rand hervorlugen. Also
+       zählt der Test die sichtbaren Balken, nicht alle Zeilen. */
+    const roller = document.querySelector('.gantt-scroll').getBoundingClientRect();
+    const spalte = document.querySelector('.gantt-labels').getBoundingClientRect();
+    const sichtbareBalken = [...document.querySelectorAll('.gantt-svg rect[data-row]')].filter((r) => {
+      const b = r.getBoundingClientRect();
+      return b.right > Math.max(roller.left, spalte.right) && b.left < roller.right;
+    }).length;
+    return { anzahl: labels.length, innen, heutePille, sichtbareBalken,
       overlayHoehe: overlays[0] ? Number(overlays[0].getAttribute('height')) : null };
   });
   console.log('   ', JSON.stringify(info));
-  pruefe('T2a jeder Vorgang trägt seinen Namen am Balken', info.anzahl >= 14, String(info.anzahl));
+  pruefe('T2a jeder sichtbare Vorgang trägt seinen Namen am Balken',
+    info.anzahl >= info.sichtbareBalken && info.anzahl >= 8,
+    `${info.anzahl} Namen bei ${info.sichtbareBalken} sichtbaren Balken`);
   pruefe('T2b Namen stehen im Balken, wenn sie hineinpassen — sonst daneben',
     info.innen.length >= 10 && info.anzahl > info.innen.length, `${info.innen.length} innen von ${info.anzahl}`);
   pruefe('T2c die Heute-Fahne ist da', info.heutePille);
