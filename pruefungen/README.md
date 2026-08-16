@@ -1,0 +1,40 @@
+# Prüfreihen (E2E)
+
+Ende-zu-Ende-Prüfungen der Meilensteine — jede Reihe startet einen lokalen
+Server über `dist/`, fährt ein echtes Chromium und misst das Verhalten
+(bis hin zu Bildpunkt-Helligkeiten). Sie liegen im Repository, damit sie
+jede Umgebung überleben.
+
+## Ausführen
+
+```bash
+npm run build                      # die Reihen prüfen den dist/-Stand
+node pruefungen/m266-schatten.mjs  # eine einzelne Reihe
+for f in pruefungen/m*.mjs; do node "$f" || break; done   # alle
+```
+
+Chromium: Standardpfad `/opt/pw-browsers/chromium` (Claude-Umgebung) —
+anderswo per Umgebungsvariable `PW_CHROMIUM=/pfad/zu/chromium` setzen.
+`playwright-core` kommt aus den normalen Abhängigkeiten (`npm ci`).
+
+Screenshots und Zwischendateien landen in `pruefungen/ablage/`
+(nicht eingecheckt).
+
+## Reihen
+
+| Reihe | Prüft |
+|---|---|
+| m265 | Zoom-Ansicht: Scrollen im vergrößerten Bild, Board-Zoom im Fokus |
+| m266 | Kein Streifen-Schatten an der linken Leiste (Pixelmessung) |
+| m267 | Textformatierung: Größen-Leiter, Aa-Menü, ein Ort, Kollisionsfreiheit |
+| m268 | Anzeige-Skalierung 100/130/175 %: Verbinden, Ziehen, Menüs, Zeichnen |
+| m269 | Dateien im Sync-Beipack · KI liest PDF-Text (abgefangene Anfrage) |
+| m270 | Kalender: Jahresansicht · Outlook-Export ganzer Zeiträume (RFC 5545) |
+| m271 | Gantt: Datumsfelder, klebende Monatsnamen, Einpassen, Namensspalte |
+| m272 | Notiz-Termine fließen in den Kalender und den Export |
+| m273 | Gantt-UI: klebende Kopfzeile, Balken-Namen, Zieh-Fahne, Doppelklick |
+| m274 | Recherche: Rückfragen-Dialog, echte Quellen-Abrufe, Quellen im Prompt |
+
+Die Reihen sind bewusst GEGEN DAS VERHALTEN geschrieben, nicht gegen die
+Struktur: Wo möglich messen sie Bildpunkte, echte Downloads, abgefangene
+Netz-Anfragen — nicht bloß Klassennamen.
