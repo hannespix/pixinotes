@@ -15,6 +15,7 @@ import { boardMetaLabel } from '../lib/boardStats';
 import { boardGraph, layoutGraph, type GraphLink } from '../lib/links';
 import { suggestBoardLinks, type LinkSuggestion } from '../lib/brain';
 import { nodeToText } from '../lib/serialize';
+import type { AppNode } from '../types';
 import { InlineName } from './InlineName';
 import { IPen, IPlay, ITarget, IX, IZoomIn, IZoomOut } from './Icons';
 
@@ -258,6 +259,8 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const previewOf = (boardId: string): string => previews.get(boardId) ?? '';
   const openBoard = useBoard((s) => s.openBoard);
   const focusNode = useBoard((s) => s.focusNode);
+  /* M285: Auch aus dem Netz heraus wird eine Karte im selben Blatt geöffnet */
+  const oeffneKarte = useBoard((s) => s.oeffneKarte);
   // M193: Ebenen liegen im Store und bleiben erhalten — vorher fiel „Karten"
   // bei jedem Öffnen wieder auf „aus" zurück
   const layers = useBoard((s) => s.graphLayers);
@@ -1432,6 +1435,30 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         <div className="ov-graph-ctx nodrag" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
           <div className="ov-graph-ctx-title">{boardName(ctxMenu.boardId)}</div>
           <button onClick={() => { openBoard(ctxMenu.boardId); setCtxMenu(null); }}>Board öffnen</button>
+          {/* M285: „aus der netzansicht … geht es noch gar nicht" — hier
+              stehen jetzt die Karten selbst. Ein Klick öffnet dieselbe
+              Bearbeitung wie überall und kehrt danach ins Netz zurück. */}
+          {(() => {
+            const brd = useBoard.getState().boards.find((b) => b.id === ctxMenu.boardId);
+            const karten = (brd?.nodes ?? []).filter((n) => !n.archived).slice(0, 8);
+            if (!karten.length) return null;
+            return (
+              <>
+                <div className="ov-graph-ctx-title klein">Karten &amp; Bereiche</div>
+                {karten.map((n) => (
+                  <button
+                    key={n.id}
+                    className="ov-graph-ctx-karte"
+                    title={`„${kartenTitel(n)}" öffnen und bearbeiten`}
+                    onClick={() => { oeffneKarte(ctxMenu.boardId, n.id, 'overview'); setCtxMenu(null); }}
+                  >{kartenTitel(n)}</button>
+                ))}
+                {(brd?.nodes.length ?? 0) > karten.length && (
+                  <div className="ov-graph-ctx-mehr">… weitere im Navigator</div>
+                )}
+              </>
+            );
+          })()}
           <button onClick={() => { setLinkFrom(ctxMenu.boardId); setCtxMenu(null); }}>Verknüpfen mit … (Portal)</button>
           <button onClick={() => {
             const p = pos.get(ctxMenu.boardId);
@@ -1643,29 +1670,76 @@ function BoardTile({ data }: NodeProps<Node<BoardTileData, 'ovBoard'>>) {
   );
 }
 
-/** Mini-Vorschau: Kartenpositionen als Rechtecke — Wiedererkennung auf einen Blick. */
+/**
+ * Mini-Vorschau: Kartenpositionen als Rechtecke — Wiedererkennung auf einen Blick.
+ *
+ * M285: … und ANFASSBAR. Bis hierher war das ein Bild: Man sah, wo Karten
+ * liegen, konnte aber keine davon öffnen — „aus der netzansicht und so weiter
+ * geht es noch gar nicht". Jetzt ist jedes Rechteck ein Ziel: Der Zeiger nennt
+ * die erste Zeile, ein Klick öffnet dieselbe Karten-Bearbeitung wie überall
+ * sonst. Die Vorschau bleibt dabei, was sie war — es kommt kein neues
+ * Bedienelement hinzu, das vorhandene fängt nur endlich Klicks.
+ */
 function BoardMiniMap({ board, accent }: { board: BoardDoc; accent: string }) {
+  const oeffneKarte = useBoard((s) => s.oeffneKarte);
   if (board.nodes.length === 0) return <div className="ov-minimap empty">leer</div>;
+  /* M285: Jede Karte mit ihrem EIGENEN Maß.
+     Vorher bekam jedes Rechteck dieselbe Größe (250 × 150). Solange die
+     Vorschau nur ein Bild war, fiel das nicht auf — sobald man sie anklicken
+     kann, schon: Ein großer Bereich und eine kleine Notiz lagen deckungsgleich
+     übereinander, und der Klick traf die falsche (gemessen: Klick auf
+     „Bereich Planung" wählte „Antrag prüfen"). Mit echten Maßen liegt der
+     Bereich groß im Hintergrund und die Karten darin — wie auf dem Board. */
+  const maß = (n: AppNode) => ({
+    w: Math.max(60, Number(n.width) || 250),
+    h: Math.max(40, Number(n.height) || 150),
+  });
   const xs = board.nodes.map((n) => n.position.x);
   const ys = board.nodes.map((n) => n.position.y);
-  const minX = Math.min(...xs), maxX = Math.max(...xs) + 250;
-  const minY = Math.min(...ys), maxY = Math.max(...ys) + 150;
+  const minX = Math.min(...xs), maxX = Math.max(...board.nodes.map((n) => n.position.x + maß(n).w));
+  const minY = Math.min(...ys), maxY = Math.max(...board.nodes.map((n) => n.position.y + maß(n).h));
   const w = Math.max(1, maxX - minX), h = Math.max(1, maxY - minY);
   return (
-    <svg className="ov-minimap" viewBox="0 0 100 46" preserveAspectRatio="xMidYMid meet">
-      {board.nodes.slice(0, 40).map((n) => (
-        <rect
-          key={n.id}
-          x={((n.position.x - minX) / w) * 88 + 2}
-          y={((n.position.y - minY) / h) * 36 + 2}
-          width={Math.max(4, (250 / w) * 88)}
-          height={Math.max(3, (150 / h) * 36)}
-          rx={1.5}
-          fill={accent}
-          opacity={0.45}
-        />
-      ))}
+    <svg className="ov-minimap nodrag" viewBox="0 0 100 46" preserveAspectRatio="xMidYMid meet">
+      {board.nodes.slice(0, 40).map((n) => {
+        const m = maß(n);
+        return (
+          <rect
+            key={n.id}
+            className="ov-mini-karte"
+            x={((n.position.x - minX) / w) * 88 + 2}
+            y={((n.position.y - minY) / h) * 36 + 2}
+            width={Math.max(3, (m.w / w) * 88)}
+            height={Math.max(2.5, (m.h / h) * 36)}
+            rx={1.5}
+            fill={accent}
+            opacity={n.type === 'frame' ? 0.2 : 0.45}
+            onClick={(e) => { e.stopPropagation(); oeffneKarte(board.id, n.id, 'overview'); }}
+          >
+            <title>{kartenTitel(n)} — öffnen und bearbeiten</title>
+          </rect>
+        );
+      })}
     </svg>
   );
 }
+
+/** Erste Zeile einer Karte als Name — für Zeiger und Listen (M285) */
+export function kartenTitel(n: AppNode): string {
+  const d = (n.data ?? {}) as Record<string, unknown>;
+  const direkt = ['title', 'name', 'text', 'label']
+    .map((k) => (typeof d[k] === 'string' ? (d[k] as string) : ''))
+    .find((v) => v.trim());
+  if (direkt) return direkt.trim().slice(0, 60);
+  const text = nodeToText(n).split('\n').find((z) => z.trim());
+  return (text ?? TYP_NAME[n.type ?? ''] ?? 'Karte').trim().slice(0, 60);
+}
+
+/** Menschliche Namen der Modultypen — für Karten ohne eigene Beschriftung */
+const TYP_NAME: Record<string, string> = {
+  note: 'Notiz', kanban: 'Kanban', gantt: 'Zeitplan', calendar: 'Kalender',
+  sheet: 'Rechen-Tabelle', file: 'Datei', image: 'Bild', frame: 'Bereich',
+  minutes: 'Protokoll', week: 'Wochenplan', time: 'Zeiterfassung',
+  diagram: 'Diagramm', portal: 'Portal', shape: 'Form', htmlapp: 'App',
+};
 

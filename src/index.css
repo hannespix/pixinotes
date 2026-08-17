@@ -5942,3 +5942,18 @@ audio.file-media { height: 40px; }
 [data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-editor th p {
   color: var(--ink) !important;
 }
+
+/* ================= M285: Karten aus jeder Ansicht bearbeiten =================
+   Die Mini-Vorschau war ein Bild; jetzt ist jedes Rechteck ein Ziel. Der
+   Zeiger nennt die Karte, der Klick öffnet dieselbe Bearbeitung wie überall. */
+.ov-mini-karte { cursor: pointer; transition: opacity 0.12s ease; }
+.ov-mini-karte:hover { opacity: 0.85 !important; }
+/* Karten im Netz-Menü — dieselbe Liste wie im Navigator, nur direkt am Knoten */
+.ov-graph-ctx-title.klein {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--muted); margin-top: 4px;
+}
+.ov-graph-ctx-karte {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 230px;
+}
+.ov-graph-ctx-mehr { font-size: 10.5px; color: var(--muted); padding: 2px 8px 4px; }

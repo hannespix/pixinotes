@@ -148,8 +148,11 @@ function SideTree() {
   const boards = useBoard((s) => s.boards);
   const activeId = useBoard((s) => s.activeId);
   const openBoard = useBoard((s) => s.openBoard);
-  const focusNode = useBoard((s) => s.focusNode);
   const setView = useBoard((s) => s.setView);
+  const oeffneKarte = useBoard((s) => s.oeffneKarte);
+  /* M285: Der Navigator steht jetzt auch in der Übersicht — von dort geöffnete
+     Karten sollen nach dem Schließen wieder die Übersicht zeigen. */
+  const herkunft = useBoard((s) => (s.view === 'overview' ? 'overview' as const : 'board' as const));
   const [open, setOpen] = useState<Set<string>>(() => new Set([activeId]));
   const [q, setQ] = useState('');
 
@@ -223,8 +226,11 @@ function SideTree() {
                             <button
                               key={n.id}
                               className="side-card"
-                              title="Zur Karte springen"
-                              onClick={() => { setView('board'); openBoard(b.id); focusNode(b.id, n.id); }}
+                              /* M285: Derselbe Weg wie überall — die Karte
+                                 öffnet sich im Karten-Blatt und kehrt beim
+                                 Schließen dorthin zurück, wo man war. */
+                              title="Karte öffnen und bearbeiten"
+                              onClick={() => oeffneKarte(b.id, n.id, herkunft)}
                             >{cardLabel(n)}</button>
                           ))}
                         </div>

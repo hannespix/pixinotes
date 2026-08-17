@@ -180,6 +180,17 @@ interface BoardState {
    *  Flüchtig: ein Neustart soll immer aufs Board zurückkehren. */
   focusCard: string | null;
   setFocusCard: (id: string | null) => void;
+  /**
+   * M285: Woher wurde die Karte geöffnet? — damit das Blatt dorthin zurückkehrt.
+   *
+   * „überall das gleiche arbeitsfeeling … nicht in jeder Ansicht sich
+   * umgewöhnen": Eine Karte wird IMMER im selben Blatt bearbeitet. Wer sie
+   * aus der Übersicht öffnet, landet nach dem Schließen wieder dort — sonst
+   * wäre jedes Bearbeiten ein Einbahnstraßen-Sprung aufs Board.
+   */
+  focusHerkunft: 'board' | 'overview' | null;
+  /** Eine Karte von überall aus öffnen — derselbe Weg aus jeder Ansicht */
+  oeffneKarte: (boardId: string, nodeId: string, herkunft?: 'board' | 'overview') => void;
   /** Fokus-Modus am Handy überhaupt anbieten? (⚙ → Design → Bedienung) */
   cardFocus: boolean;
   setCardFocus: (on: boolean) => void;
@@ -877,7 +888,30 @@ export const useBoard = create<BoardState>()(
         setShareCards: (ids) => set({ shareCards: ids }),
 
         focusCard: null,
-        setFocusCard: (id) => set({ focusCard: id }),
+        setFocusCard: (id) => set({ focusCard: id, ...(id ? {} : { focusHerkunft: null }) }),
+        focusHerkunft: null,
+        /**
+         * M285: Der eine Weg zur Karte — aus Übersicht, Navigator, Suche
+         * oder Board.
+         *
+         * Ist das Karten-Blatt abgeschaltet (⚙ → Bedienung) oder trägt die
+         * Karte gar keinen Inhalt zum Bearbeiten (Rahmen, Portal, Form), wird
+         * stattdessen wie bisher hingeflogen und ausgewählt. So bleibt die
+         * Zusage „von überall erreichbar" auch dort wahr, wo es kein Blatt gibt.
+         */
+        oeffneKarte: (boardId, nodeId, herkunft = 'board') => {
+          const st = get();
+          const board = st.boards.find((b) => b.id === boardId);
+          const node = board?.nodes.find((n) => n.id === nodeId);
+          const blattfaehig = !!node
+            && !['portal', 'frame', 'shape'].includes(node.type ?? '')
+            && !node.archived;
+          if (st.cardFocus && blattfaehig) {
+            set({ activeId: boardId, view: 'board', focusCard: nodeId, focusHerkunft: herkunft });
+          } else {
+            set({ pendingFocus: { boardId, nodeId }, activeId: boardId, view: 'board', focusCard: null, focusHerkunft: null });
+          }
+        },
         cardFocus: true,
         setCardFocus: (on) => set({ cardFocus: on, ...(on ? {} : { focusCard: null }) }),
         // M235: beide AUS voreingestellt — am PC bleibt alles, wie es war,

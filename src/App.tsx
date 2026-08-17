@@ -207,6 +207,12 @@ export default function App() {
           <ErrorBoundary what="Die Übersicht" full>
             <Overview />
             <MiniDock />
+            {/* M285: Der Navigator gehört in JEDE Ansicht.
+                Bis hierher stand der Baum (Bereich › Projekt › Board › Karte)
+                nur neben dem Board — ausgerechnet in der Übersicht, wo man
+                den Überblick sucht, fehlte er. Jetzt ist er überall derselbe,
+                und die Karte darin öffnet dieselbe Bearbeitung wie sonst. */}
+            <ErrorBoundary what="Der Navigator"><SidePanel /></ErrorBoundary>
           </ErrorBoundary>
         ) : presenting ? null : tasksOpen ? (
           <ErrorBoundary what="Die Aufgaben-Zentrale" full><TaskHub /></ErrorBoundary>

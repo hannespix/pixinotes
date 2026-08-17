@@ -105,6 +105,7 @@ export function FocusSheet() {
   const activeId = useBoard((s) => s.activeId);
   const touchRef = useRef<{ x: number; y: number } | null>(null);
 
+  const zurueckZurUebersicht = useBoard((s) => s.focusHerkunft === 'overview');
   const board = boards.find((b) => b.id === activeId);
   const siblings = (board?.nodes ?? []).filter(focusable);
   const index = siblings.findIndex((n) => n.id === focusCard);
@@ -123,7 +124,17 @@ export function FocusSheet() {
       vollbildKasten.current = { x: b.x, y: b.y, w: b.width, h: b.height };
     }
     const id = focusCard;
+    /**
+     * M285: Zurück, wo man herkam.
+     *
+     * Wer die Karte aus der Übersicht geöffnet hat, will nach dem Schließen
+     * wieder die Übersicht sehen — nicht das Board, das er nie besucht hat.
+     * Damit fühlt sich das eine Blatt in jeder Ansicht wie „an Ort und
+     * Stelle" an, statt wie ein Sprung ins Ungewisse.
+     */
+    const herkunft = useBoard.getState().focusHerkunft;
     setFocusCard(null);
+    if (herkunft === 'overview') useBoard.getState().setView('overview');
     if (id) window.dispatchEvent(new CustomEvent('pixinotes:fokus-zurueck', { detail: id }));
   }, [setFocusCard, focusCard]);
 
@@ -322,7 +333,18 @@ export function FocusSheet() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        <button className="focus-x" onClick={close} title="Zurück zum Board (oder nach unten wischen)" aria-label="Zurück zum Board">
+        {/* M285: Der Knopf sagt, wohin er führt. Seit die Karte auch aus der
+            Übersicht geöffnet werden kann, wäre „Zurück zum Board" dort
+            schlicht falsch — und Beschriftungen, die nicht stimmen, sind
+            schlimmer als gar keine. */}
+        <button
+          className="focus-x"
+          onClick={close}
+          title={zurueckZurUebersicht
+            ? 'Zurück zur Übersicht (oder nach unten wischen)'
+            : 'Zurück zum Board (oder nach unten wischen)'}
+          aria-label={zurueckZurUebersicht ? 'Zurück zur Übersicht' : 'Zurück zum Board'}
+        >
           <IX size={16} />
         </button>
         {/* M227: Hier stand ein zweites ⋮. Es löste seit M226 exakt dasselbe
