@@ -255,6 +255,52 @@ console.log('\n════ T4: Bereiche und Boards ════');
   await ctx.close();
 }
 
+// ══ T5: Keine doppelten Bedienelemente (M286) ═══════════════════════
+console.log('\n════ T5: Ein Umschalter, nicht zwei ════');
+for (const [breite, hoehe, geraet] of [[1440, 900, 'Schreibtisch'], [412, 915, 'Telefon']]) {
+  const ctx = await browser.newContext({ viewport: { width: breite, height: hoehe }, hasTouch: breite < 700, isMobile: breite < 700 });
+  await ctx.addInitScript(() => {
+    if (localStorage.getItem('pixinotes-board')) return;
+    localStorage.setItem('pixinotes-onboarded', '1');
+    const mk = (id, txt) => ({ id, type: 'note', position: { x: 40, y: 40 }, width: 240, height: 150,
+      data: { color: 'yellow', blocks: [{ id: `${id}b`, type: 'paragraph', props: {},
+        content: [{ type: 'text', text: txt, styles: {} }], children: [] }] } });
+    localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state: {
+      boards: [{ id: 'b0', name: 'Amrum 2026', edges: [], drawings: [], comments: [], nodes: [mk('n1', 'Fähre buchen')] }],
+      spaces: [{ id: 's1', name: 'Urlaub', projects: [{ id: 'p1', name: 'Reisen', boardIds: ['b0'] }] }],
+      activeId: 'b0', view: 'overview', cardFocus: true, navLinks: false,
+      // Navigator absichtlich OFFEN — genau so trat der Fehler auf
+      sidebar: { open: true, mode: 'hierarchie', width: 300, height: 0 } } }));
+  });
+  const P = await ctx.newPage();
+  P.on('pageerror', (e) => console.log('    PAGEERROR:', e.message));
+  await P.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle' });
+  await P.waitForTimeout(2300);
+  const schalter = await P.evaluate(() =>
+    [...document.querySelectorAll('button')]
+      .filter((b) => ['Hierarchie', 'Netz'].includes(b.textContent.trim()))
+      .filter((b) => b.getBoundingClientRect().width > 0)
+      .map((b) => ({ text: b.textContent.trim(), wo: b.closest('.sidepanel') ? 'Navigator' : 'Übersicht' })));
+  console.log(`    ${geraet}:`, JSON.stringify(schalter));
+  pruefe(`T5a (${geraet}) „Hierarchie | Netz" steht genau EINMAL da`,
+    schalter.length === 2 && schalter.every((x) => x.wo === 'Übersicht'), JSON.stringify(schalter));
+  if (breite < 700) {
+    pruefe('T5b am Telefon verdeckt der Navigator die Übersicht nicht',
+      await P.evaluate(() => {
+        const p = document.querySelector('.sidepanel');
+        if (!p) return true;
+        const r = p.getBoundingClientRect();
+        return r.width === 0 || r.width < window.innerWidth * 0.9;
+      }));
+  } else {
+    pruefe('T5b am Schreibtisch steht der Baum bis zur Karte bereit',
+      await P.evaluate(() => !!document.querySelector('.sidepanel .side-tree')));
+    pruefe('T5c und trägt eine eigene Überschrift statt der doppelten Tasten',
+      await P.evaluate(() => document.querySelector('.sidepanel-titel')?.textContent?.includes('Karten') === true));
+  }
+  await ctx.close();
+}
+
 console.log(`\n  ${ok} bestanden, ${bad} durchgefallen`);
 await browser.close();
 app.close();

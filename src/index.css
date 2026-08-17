@@ -5957,3 +5957,16 @@ audio.file-media { height: 40px; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 230px;
 }
 .ov-graph-ctx-mehr { font-size: 10.5px; color: var(--muted); padding: 2px 8px 4px; }
+
+/* ================= M286: Navigator in der Übersicht =================
+   Am Telefon füllt die Leiste den Schirm — in der Übersicht deckte sie damit
+   genau das zu, was man sehen wollte. Dort ist die Übersicht selbst schon der
+   Navigator; die Leiste erscheint deshalb erst ab Tablet-Breite. */
+@media (max-width: 699px) {
+  .sidepanel-zone.nur-breit { display: none; }
+}
+/* Statt der (in der Übersicht doppelten) Umschalt-Tasten nur eine Überschrift */
+.sidepanel-titel {
+  font-size: 12px; font-weight: 700; color: var(--ink);
+  padding: 2px 4px; letter-spacing: 0.01em;
+}

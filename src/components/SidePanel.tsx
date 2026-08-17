@@ -18,6 +18,9 @@ import { IChevronR, IX } from './Icons';
 export function SidePanel() {
   const sb = useBoard((s) => s.sidebar);
   const setSidebar = useBoard((s) => s.setSidebar);
+  /* M286: In der Übersicht tritt der Navigator zurück — sie hat ihren eigenen
+     Umschalter und ist selbst schon Überblick (siehe Leiste). */
+  const imUeberblick = useBoard((s) => s.view === 'overview');
   const zone = useRef<HTMLDivElement>(null);
 
   // M250: Das Fähnchen ersetzt den unsichtbaren Kanten-Anfasser aus M245 —
@@ -53,7 +56,11 @@ export function SidePanel() {
    * Streifen über dem Board.
    */
   return (
-    <div className="sidepanel-zone" ref={zone}>
+    /* M286: Am Telefon deckte der Navigator die ganze Übersicht zu — man sah
+       das Netz nicht mehr, das man aufgerufen hatte. Dort IST die Übersicht
+       schon der Navigator; die Leiste erscheint deshalb erst ab Tablet-Breite
+       (Regel im Stylesheet). */
+    <div className={`sidepanel-zone${imUeberblick ? ' nur-breit' : ''}`} ref={zone}>
       <button
         className={`sidepanel-fahne${sb.open ? ' auf' : ''}`}
         title={sb.open ? 'Überblick einfahren — oder ziehen für die Breite' : 'Überblick ausfahren — oder ziehen für die Breite'}
@@ -61,7 +68,7 @@ export function SidePanel() {
         aria-expanded={sb.open}
         {...fahne}
       ><span /></button>
-      {sb.open && <Leiste sb={sb} setSidebar={setSidebar} hoehe={hoehe} />}
+      {sb.open && <Leiste sb={sb} setSidebar={setSidebar} hoehe={hoehe} imUeberblick={imUeberblick} />}
     </div>
   );
 }
@@ -105,10 +112,11 @@ function useHoeheZiehen(
   };
 }
 
-function Leiste({ sb, setSidebar, hoehe }: {
+function Leiste({ sb, setSidebar, hoehe, imUeberblick }: {
   sb: { open: boolean; mode: 'hierarchie' | 'netz'; width: number; height?: number };
   setSidebar: (patch: Partial<{ open: boolean; mode: 'hierarchie' | 'netz'; width: number; height: number }>) => void;
   hoehe: Record<string, unknown>;
+  imUeberblick: boolean;
 }) {
   return (
     <aside
@@ -117,23 +125,36 @@ function Leiste({ sb, setSidebar, hoehe }: {
       aria-label="Überblick"
     >
       <div className="sidepanel-head">
-        <div className="sidepanel-tabs">
-          <button
-            className={sb.mode === 'hierarchie' ? 'on' : ''}
-            onClick={() => setSidebar({ mode: 'hierarchie' })}
-          >Hierarchie</button>
-          <button
-            className={sb.mode === 'netz' ? 'on' : ''}
-            onClick={() => setSidebar({ mode: 'netz' })}
-            title="Board-Netz: Portale & [[Wikilinks]] als Graph"
-          >Netz</button>
-        </div>
+        {/**
+         * M286: In der ÜBERSICHT gibt es diese Wahl schon — dort steht der
+         * Umschalter „Hierarchie | Netz" als Hauptbedienung. Beide zugleich
+         * anzuzeigen brachte zwei gleich aussehende Schalter mit
+         * WIDERSPRÜCHLICHEM Zustand nebeneinander (Bildschirmfoto: links Netz
+         * aktiv, rechts Hierarchie). Hier bleibt deshalb nur der Baum — das
+         * ist ohnehin das, was die Übersicht selbst nicht kann: bis zur
+         * einzelnen Karte hinunter.
+         */}
+        {imUeberblick ? (
+          <div className="sidepanel-titel">Boards &amp; Karten</div>
+        ) : (
+          <div className="sidepanel-tabs">
+            <button
+              className={sb.mode === 'hierarchie' ? 'on' : ''}
+              onClick={() => setSidebar({ mode: 'hierarchie' })}
+            >Hierarchie</button>
+            <button
+              className={sb.mode === 'netz' ? 'on' : ''}
+              onClick={() => setSidebar({ mode: 'netz' })}
+              title="Board-Netz: Portale & [[Wikilinks]] als Graph"
+            >Netz</button>
+          </div>
+        )}
         <button className="sidepanel-x" title="Seitenleiste schließen" aria-label="Seitenleiste schließen" onClick={() => setSidebar({ open: false })}>
           <IX size={13} />
         </button>
       </div>
       <div className="sidepanel-body">
-        {sb.mode === 'netz' ? <GraphView embedded /> : <SideTree />}
+        {!imUeberblick && sb.mode === 'netz' ? <GraphView embedded /> : <SideTree />}
       </div>
       {/* Unterkante als Höhen-Anfasser — sichtbarer Strich, sonst bliebe die
           Funktion geheim (dieselbe Überlegung wie beim Fähnchen) */}
