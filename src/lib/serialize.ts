@@ -264,7 +264,8 @@ function baseNodeText(node: AppNode): string {
     case 'portal':
       return 'Projekt-Portal';
     case 'frame':
-      return `Bereich: ${node.data.name}`;
+      // M287: „Rahmen“, nicht „Bereich“ — siehe makeFrame
+      return `Rahmen: ${node.data.name}`;
     case 'htmlapp':
       return `Eigene App: ${node.data.name} (${formatBytes(node.data.size)})`;
     case 'time': {

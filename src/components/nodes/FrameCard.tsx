@@ -29,7 +29,7 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
 
   const tint = (data.color as string) || '';
   const commit = () => {
-    updateNodeData(id, { name: draft.trim() || 'Bereich' });
+    updateNodeData(id, { name: draft.trim() || 'Rahmen' });
     setEditing(false);
   };
 

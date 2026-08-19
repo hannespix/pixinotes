@@ -89,6 +89,10 @@ export function formatDueShort(due: string, now: Date = new Date()): string {
 export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRef[] {
   const out: TaskRef[] = [];
   for (const board of boards) {
+    // M288: Ein archiviertes BOARD ruht genauso wie eine archivierte Karte —
+    // sonst mahnte die Aufgaben-Zentrale weiter Fristen aus etwas an, das man
+    // bewusst zur Seite gelegt hat.
+    if (board.archived) continue;
     for (const node of board.nodes) {
       // Archivierte Karten gelten als erledigt: ihre Aufgaben tauchen weder in
       // der Aufgaben-Zentrale noch in Erinnerungen oder Sammel-Kanbans auf (M87)

@@ -156,7 +156,10 @@ export function makeHtmlApp(position: Pos, file: { name: string; size: number })
 /** Frame (M149): startet großzügig, liegt IMMER hinter den Karten und wird
  *  nur an der Titel-Leiste gezogen (dragHandle) — Klicks auf der Fläche
  *  innerhalb des Rahmens erreichen weiter das Board */
-export function makeFrame(position: Pos, name = 'Neuer Bereich'): AppNode {
+/* M287: „Neuer Rahmen“ statt „Neuer Bereich“ — „Bereich“ ist in dieser
+   Anwendung die OBERSTE Hierarchie-Ebene (Bereich › Projekt › Board).
+   Beide Dinge so zu nennen, führte prompt zur Verwechslung. */
+export function makeFrame(position: Pos, name = 'Neuer Rahmen'): AppNode {
   return {
     id: uid(),
     type: 'frame',

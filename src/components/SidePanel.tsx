@@ -5,7 +5,9 @@ import { nodeToText } from '../lib/serialize';
 import { useFahne } from '../lib/fahne';
 import { wurzelZoom } from '../lib/anzeige';
 import { GraphView } from './Overview';
-import { IChevronR, IX } from './Icons';
+import { IChevronR, IPen, IX } from './Icons';
+import { InlineName } from './InlineName';
+import { BoardMenu, ProjektMenu } from './EbenenMenu';
 
 /**
  * M194: Ausfahrbare Seitenleiste — der Überblick steht NEBEN der Arbeit,
@@ -171,6 +173,12 @@ function SideTree() {
   const openBoard = useBoard((s) => s.openBoard);
   const setView = useBoard((s) => s.setView);
   const oeffneKarte = useBoard((s) => s.oeffneKarte);
+  const renameBoard = useBoard((s) => s.renameBoard);
+  /* M287: Welches Board wird gerade umbenannt? (null = keins) */
+  const [umbenennen, setUmbenennen] = useState<string | null>(null);
+  /* M288: Archivierte Boards ruhen — derselbe Schalter wie für Karten
+     (Dock → ⋯ „Mehr" → „Archiv einblenden") holt sie hier wieder hervor. */
+  const showArchived = useBoard((s) => s.showArchived);
   /* M285: Der Navigator steht jetzt auch in der Übersicht — von dort geöffnete
      Karten sollen nach dem Schließen wieder die Übersicht zeigen. */
   const herkunft = useBoard((s) => (s.view === 'overview' ? 'overview' as const : 'board' as const));
@@ -202,6 +210,7 @@ function SideTree() {
             list: p.boardIds
               .map((id) => byId.get(id))
               .filter((b): b is NonNullable<typeof b> => !!b)
+              .filter((b) => showArchived || !b.archived)
               .filter((b) => !needle
                 || b.name.toLowerCase().includes(needle)
                 || b.nodes.some((n) => nodeToText(n).toLowerCase().includes(needle))),
@@ -213,7 +222,10 @@ function SideTree() {
             <div className="side-space-name">{sp.name}</div>
             {projects.map(({ p, list }) => (
               <div key={p.id} className="side-proj">
-                <div className="side-proj-name">{p.name}</div>
+                <div className="side-proj-head">
+                  <div className="side-proj-name">{p.name}</div>
+                  <ProjektMenu projectId={p.id} />
+                </div>
                 {list.length === 0 && <div className="side-empty">leer</div>}
                 {list.map((b) => {
                   const isOpen = open.has(b.id);
@@ -222,7 +234,7 @@ function SideTree() {
                     : b.nodes;
                   return (
                     <div key={b.id}>
-                      <div className={`side-board ${b.id === activeId ? 'active' : ''}`}>
+                      <div className={`side-board ${b.id === activeId ? 'active' : ''}${b.archived ? ' archiviert' : ''}`}>
                         <button
                           className={`side-board-arrow ${isOpen ? 'open' : ''}`}
                           title={isOpen ? 'Karten einklappen' : 'Karten zeigen'}
@@ -233,11 +245,39 @@ function SideTree() {
                             return next;
                           })}
                         ><IChevronR size={11} /></button>
+                        {umbenennen === b.id ? (
+                          /* M287: Umbenennen GEHÖRT hierher.
+                             Bisher ging das nur in der Tab-Leiste und auf der
+                             Kachel in der Übersicht. Wer im Navigator stand und
+                             ein Board umbenennen wollte, fand nur das
+                             „Umbenennen" der Auswahl-Leiste — und benannte
+                             damit den RAHMEN auf dem Board um (User-Report:
+                             Board „🏖️ Amrum 2026", Dialog zeigte „Amrum"). */
+                          <InlineName
+                            value={b.name}
+                            className="side-board-name"
+                            editing
+                            onEditingChange={(an) => { if (!an) setUmbenennen(null); }}
+                            onRename={(name) => { renameBoard(b.id, name); setUmbenennen(null); }}
+                          />
+                        ) : (
+                          <button
+                            className="side-board-name"
+                            title={`„${b.name}" öffnen`}
+                            onClick={() => { setView('board'); openBoard(b.id); }}
+                            onDoubleClick={(e) => { e.preventDefault(); setUmbenennen(b.id); }}
+                          >{b.name}</button>
+                        )}
                         <button
-                          className="side-board-name"
-                          title={`„${b.name}" öffnen`}
-                          onClick={() => { setView('board'); openBoard(b.id); }}
-                        >{b.name}</button>
+                          className="side-board-pen"
+                          title={`Board „${b.name}" umbenennen`}
+                          aria-label="Board umbenennen"
+                          onClick={(e) => { e.stopPropagation(); setUmbenennen(b.id); }}
+                        ><IPen size={11} /></button>
+                        {/* M288: … und alles Weitere hinter demselben ⋯ wie in
+                            der Übersicht und im Navigator der Kopfleiste. */}
+                        <BoardMenu boardId={b.id} onRename={() => setUmbenennen(b.id)} />
+                        {b.archived && <span className="archiv-marke">Archiv</span>}
                         <span className="side-board-count">{b.nodes.length}</span>
                       </div>
                       {isOpen && (

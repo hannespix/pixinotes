@@ -3123,7 +3123,21 @@ html[data-kopf-eng='an'] .hint { display: none; }
   color: var(--muted); padding: 4px 2px;
 }
 .side-proj { margin: 2px 0 6px 6px; }
-.side-proj-name { font-size: 12px; font-weight: 700; color: var(--ink); padding: 2px 2px 3px; }
+/* M288: Projektzeile trägt jetzt ihr eigenes ⋯-Menü — Name links, Menü rechts */
+.side-proj-head { display: flex; align-items: center; gap: 4px; }
+.side-proj-head .ebenen-menu-knopf { opacity: 0; transition: opacity 0.12s ease; }
+.side-proj-head:hover .ebenen-menu-knopf,
+.side-proj-head .ebenen-menu-knopf:focus-visible,
+.side-proj-head .ebenen-menu-knopf.auf { opacity: 1; }
+.side-proj-name { flex: 1; min-width: 0; font-size: 12px; font-weight: 700; color: var(--ink); padding: 2px 2px 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* dasselbe Zurückhalten beim Board: erst beim Darüberfahren, am Finger immer */
+.side-board .ebenen-menu-knopf { opacity: 0; transition: opacity 0.12s ease; }
+.side-board:hover .ebenen-menu-knopf,
+.side-board .ebenen-menu-knopf:focus-visible,
+.side-board .ebenen-menu-knopf.auf { opacity: 1; }
+@media (pointer: coarse) {
+  .side-proj-head .ebenen-menu-knopf, .side-board .ebenen-menu-knopf { opacity: 1; }
+}
 .side-board {
   display: flex; align-items: center; gap: 2px; border-radius: 8px; padding: 2px 4px 2px 0;
 }
@@ -4392,6 +4406,9 @@ button.link-dead:disabled { opacity: 0.45; }
   color: var(--ink); opacity: 0.8; padding: 4px 6px 2px; border-radius: 8px;
 }
 .nav-proj-name:hover { opacity: 1; background: var(--surface-2); }
+/* M288: Projekt-Zeile im Kopf-Navigator trägt ihr ⋯-Menü rechts */
+.nav-proj-head { display: flex; align-items: center; gap: 2px; }
+.nav-proj-head .nav-proj-name { flex: 1; min-width: 0; }
 .nav-board-wrap { min-width: 0; }
 .nav-board-row { display: flex; align-items: center; gap: 2px; }
 .nav-board-row .tab-tree-board { flex: 1; min-width: 0; }
@@ -5969,4 +5986,73 @@ audio.file-media { height: 40px; }
 .sidepanel-titel {
   font-size: 12px; font-weight: 700; color: var(--ink);
   padding: 2px 4px; letter-spacing: 0.01em;
+}
+
+/* M287: Umbenennen-Stift im Navigator — Boards heißen dort nicht mehr nur so,
+   sie lassen sich auch dort ändern (vorher nur in der Tab-Leiste und auf der
+   Kachel in der Übersicht). */
+.side-board-pen {
+  flex: none; border: none; background: none; cursor: pointer;
+  color: var(--muted); padding: 3px 5px; border-radius: 5px; line-height: 1;
+  opacity: 0; transition: opacity 0.12s ease;
+}
+.side-board:hover .side-board-pen,
+.side-board-pen:focus-visible { opacity: 1; }
+.side-board-pen:hover { background: var(--surface-dim); color: var(--ink); }
+/* Am Finger gibt es kein „darüberfahren" — dort steht der Stift immer da */
+@media (pointer: coarse) {
+  .side-board-pen { opacity: 1; min-width: 34px; min-height: 34px; }
+}
+
+/* M288: Das gemeinsame ⋯-Menü für Boards und Projekte. Es sieht überall gleich
+   aus — Navigator, Seitenleiste, Übersicht —, damit man beim Ansichtswechsel
+   nichts Neues lernen muss. */
+.ebenen-menu-wrap { display: inline-flex; flex: none; position: relative; }
+.ebenen-menu-knopf {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 3px 4px; border-radius: 5px; line-height: 1; display: inline-flex;
+  align-items: center; justify-content: center;
+}
+.ebenen-menu-knopf:hover, .ebenen-menu-knopf.auf { background: var(--surface-2); color: var(--ink); }
+.ebenen-menu {
+  position: fixed; z-index: 3000; background: var(--surface); border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(50,40,20,.26); padding: 6px; display: flex;
+  flex-direction: column; gap: 2px; min-width: 224px; max-width: 300px;
+  max-height: calc(100vh - 90px); overflow-y: auto;
+}
+.ebenen-menu button {
+  width: 100%; text-align: left; border: none; background: none; font-family: inherit;
+  font-size: 13px; padding: 8px 10px; border-radius: 8px; cursor: pointer; color: var(--ink);
+  display: flex; align-items: center; justify-content: flex-start; gap: 9px;
+}
+.ebenen-menu button svg { flex: 0 0 auto; color: var(--muted); }
+.ebenen-menu button:hover:not(:disabled) { background: var(--surface-2); }
+.ebenen-menu button:disabled { opacity: .45; cursor: default; }
+.ebenen-menu button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ebenen-menu-titel {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); padding: 7px 10px 2px;
+}
+.ebenen-menu-zurueck { color: var(--muted) !important; font-size: 12px !important; }
+.ebenen-menu-gefahr { color: #c0392b !important; }
+.ebenen-menu-gefahr svg { color: #c0392b !important; }
+[data-theme='dark'] .ebenen-menu-gefahr,
+[data-theme='dark'] .ebenen-menu-gefahr svg { color: #ff9a8c !important; }
+/* Am Finger ist „darüberfahren" keine Geste — der Knopf steht dort immer da
+   und ist groß genug (M282: 40 Punkte). */
+@media (pointer: coarse) {
+  .ebenen-menu-knopf { min-width: 34px; min-height: 34px; opacity: 1 !important; }
+  .ebenen-menu button { padding: 11px 12px; font-size: 14px; }
+}
+
+/* Archivierte Boards zeigen sich nur mit „Archiv einblenden" — dann aber
+   sichtbar gedimmt, genau wie archivierte Karten auf dem Board. */
+.side-board.archiviert .side-board-name,
+.nav-board-wrap.archiviert .tab-tree-board,
+.ov-board.archiviert { opacity: .55; }
+.ov-board.archiviert { border-style: dashed; }
+.archiv-marke {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); border: 1px solid var(--border-soft); border-radius: 5px;
+  padding: 1px 4px; flex: none;
 }

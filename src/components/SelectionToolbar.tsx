@@ -290,7 +290,13 @@ export function SelectionToolbar() {
   const renameFrame = () => {
     if (!singleFrame) return;
     setMenu(null);
-    const name = window.prompt('Name des Rahmens:', (singleFrame.data as { name?: string }).name ?? 'Bereich');
+    /* M287: Die Frage nennt das Ding beim Namen. Vorher stand dort nur
+       „Name des Rahmens“ — wer eben noch ein Board vor sich hatte, hielt das
+       für dessen Umbenennung (User-Report). */
+    const name = window.prompt(
+      'Rahmen auf dem Board umbenennen (die Karten darin bleiben unberührt):',
+      (singleFrame.data as { name?: string }).name ?? 'Rahmen',
+    );
     if (name?.trim()) updateNodeData(singleFrame.id, { name: name.trim().slice(0, 60) });
   };
 

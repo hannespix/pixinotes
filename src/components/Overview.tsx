@@ -17,7 +17,8 @@ import { suggestBoardLinks, type LinkSuggestion } from '../lib/brain';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
 import { InlineName } from './InlineName';
-import { IPen, IPlay, ITarget, IX, IZoomIn, IZoomOut } from './Icons';
+import { BoardMenu, ProjektMenu } from './EbenenMenu';
+import { IPlay, ITarget, IZoomIn, IZoomOut } from './Icons';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
 interface ProjectZoneData { project: Project; spaceId: string; [key: string]: unknown }
@@ -41,10 +42,16 @@ interface ProjectRect { id: string; x: number; y: number; w: number; h: number }
  * Kräfte-Layout und Titel-Arbeit bei jedem Render neu — genau das Ruckeln,
  * das M223 beseitigt hat.
  */
-function ohneArchiv<T extends { nodes: Array<{ archived?: boolean }> }>(boards: T[], zeigen: boolean): T[] {
+function ohneArchiv<T extends { archived?: boolean; nodes: Array<{ archived?: boolean }> }>(
+  boards: T[], zeigen: boolean,
+): T[] {
   if (zeigen) return boards;
-  let geaendert = false;
-  const raus = boards.map((b) => {
+  // M288: Ein archiviertes BOARD verschwindet ganz — Kachel wie Netz-Kugel.
+  // Gefiltert wird an derselben Quelle wie die archivierten Karten, damit
+  // Hierarchie, Netz und Zähler nicht auseinanderlaufen.
+  const sichtbar = boards.filter((b) => !b.archived);
+  let geaendert = sichtbar.length !== boards.length;
+  const raus = sichtbar.map((b) => {
     const nodes = b.nodes.filter((n) => !n.archived);
     if (nodes.length === b.nodes.length) return b;
     geaendert = true;
@@ -164,7 +171,11 @@ function OverviewCanvas() {
       >
         <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} color={document.documentElement.dataset.theme === 'dark' ? '#4b453c' : '#d8d3c8'} />
       </ReactFlow>
-      <button className="ov-add-space-float" onClick={() => addSpace()}>
+      <button
+        className="ov-add-space-float"
+        onClick={() => addSpace()}
+        title="Neuen Bereich anlegen — die oberste Ebene über Projekten und Boards (nicht der Rahmen auf einem Board)"
+      >
         + Neuer Bereich
       </button>
     </div>
@@ -1597,7 +1608,6 @@ function SpaceZone({ data }: NodeProps<Node<SpaceZoneData, 'ovSpace'>>) {
 function ProjectZone({ data }: NodeProps<Node<ProjectZoneData, 'ovProject'>>) {
   const { project } = data;
   const renameProject = useBoard((s) => s.renameProject);
-  const removeProject = useBoard((s) => s.removeProject);
   const addBoard = useBoard((s) => s.addBoard);
   return (
     <div className="ovc-project">
@@ -1605,7 +1615,9 @@ function ProjectZone({ data }: NodeProps<Node<ProjectZoneData, 'ovProject'>>) {
         <InlineName value={project.name} className="ov-project-name" onRename={(n) => renameProject(project.id, n)} />
         <div className="ov-head-actions nodrag">
           <button onClick={() => addBoard(undefined, project.id)} title="Board anlegen">+ Board</button>
-          <button onClick={() => removeProject(project.id)} title="Projekt löschen (nur wenn leer)">✕</button>
+          {/* M288: Alles Weitere (Duplizieren, alle Boards archivieren, Löschen)
+              steht hinter demselben ⋯ wie im Navigator — ein Menü, überall. */}
+          <ProjektMenu projectId={project.id} />
         </div>
       </div>
       {project.boardIds.length === 0 && <div className="ov-empty small nodrag">Boards hierher ziehen</div>}
@@ -1616,13 +1628,16 @@ function ProjectZone({ data }: NodeProps<Node<ProjectZoneData, 'ovProject'>>) {
 function BoardTile({ data }: NodeProps<Node<BoardTileData, 'ovBoard'>>) {
   const { board, accent } = data;
   const renameBoard = useBoard((s) => s.renameBoard);
-  const removeBoard = useBoard((s) => s.removeBoard);
   const openBoard = useBoard((s) => s.openBoard);
   const setPresenting = useBoard((s) => s.setPresenting);
   const [editing, setEditing] = useState(false);
 
   return (
-    <div className="ov-board ovc-tile" style={{ borderTopColor: accent }} title="Klick öffnet das Board · Ziehen verschiebt es">
+    <div
+      className={`ov-board ovc-tile${board.archived ? ' archiviert' : ''}`}
+      style={{ borderTopColor: accent }}
+      title="Klick öffnet das Board · Ziehen verschiebt es"
+    >
       <span className="ovc-tile-actions nodrag">
         <button
           title="Board direkt präsentieren"
@@ -1635,28 +1650,13 @@ function BoardTile({ data }: NodeProps<Node<BoardTileData, 'ovBoard'>>) {
         >
           <IPlay size={12} />
         </button>
-        <button
-          title="Umbenennen"
-          aria-label="Board umbenennen"
-          onClick={(e) => {
-            e.stopPropagation();
-            setEditing(true);
-          }}
-        >
-          <IPen size={12} />
-        </button>
-        <button
-          title="Board löschen"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (window.confirm(`Board „${board.name}" mit ${board.nodes.length} Karten wirklich löschen?`)) {
-              removeBoard(board.id);
-            }
-          }}
-        >
-          <IX size={12} />
-        </button>
+        {/* M288: Umbenennen, Duplizieren, Verschieben, Teilen, Archivieren und
+            Löschen liegen jetzt in EINEM Menü — dasselbe wie im Navigator und
+            in der Seitenleiste. Vorher waren es hier drei Einzelknöpfe mit
+            einem anderen Vorrat als anderswo. */}
+        <BoardMenu boardId={board.id} onRename={() => setEditing(true)} />
       </span>
+      {board.archived && <span className="archiv-marke ov-board-archiv">Archiv</span>}
       <InlineName
         value={board.name}
         className="ov-board-name"
@@ -1738,7 +1738,7 @@ export function kartenTitel(n: AppNode): string {
 /** Menschliche Namen der Modultypen — für Karten ohne eigene Beschriftung */
 const TYP_NAME: Record<string, string> = {
   note: 'Notiz', kanban: 'Kanban', gantt: 'Zeitplan', calendar: 'Kalender',
-  sheet: 'Rechen-Tabelle', file: 'Datei', image: 'Bild', frame: 'Bereich',
+  sheet: 'Rechen-Tabelle', file: 'Datei', image: 'Bild', frame: 'Rahmen',
   minutes: 'Protokoll', week: 'Wochenplan', time: 'Zeiterfassung',
   diagram: 'Diagramm', portal: 'Portal', shape: 'Form', htmlapp: 'App',
 };

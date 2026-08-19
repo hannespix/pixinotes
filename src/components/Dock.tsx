@@ -332,9 +332,9 @@ export function Dock() {
             </button>
             <button
               onClick={() => add(() => makeFrame(centerPos(640, 420)))}
-              title="Benannter Rahmen-Bereich: gruppiert Karten optisch und nimmt sie beim Verschieben (an der Titel-Leiste) mit"
+              title="Benannter Rahmen: gruppiert Karten optisch und nimmt sie beim Verschieben (an der Titel-Leiste) mit. Nicht zu verwechseln mit dem Bereich in der Übersicht — das ist die oberste Ebene über Projekten und Boards."
             >
-              <IFrame size={16} /> Rahmen (Bereich)
+              <IFrame size={16} /> Rahmen
             </button>
             <div className="dock-menu-label">Planung</div>
             <button onClick={() => add(() => makeGantt(centerPos(560, 240)))}><IGantt size={16} /> Zeitplan (Gantt)</button>

@@ -6,6 +6,7 @@ import { nodeToText } from '../lib/serialize';
 import { useRandZiehen } from '../lib/randZiehen';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { InlineName } from './InlineName';
+import { BoardMenu, ProjektMenu } from './EbenenMenu';
 import { IChevronR, IGraph, IHome, IPlus, IShare, IX } from './Icons';
 
 /** Kurz-Label je Karten-Typ für die Inhalts-Zeilen im Navigator (M183) */
@@ -34,6 +35,7 @@ export function Tabs() {
   const renameBoard = useBoard((s) => s.renameBoard);
   const removeBoard = useBoard((s) => s.removeBoard);
   const showToast = useBoard((s) => s.showToast);
+  const showArchived = useBoard((s) => s.showArchived);
   const activeBoard = useBoard(selectActiveBoard);
   const focusNode = useBoard((s) => s.focusNode);
   const [navOpen, setNavOpen] = useState(false);
@@ -197,11 +199,16 @@ export function Tabs() {
   // Boards des aktiven Projekts (in Projekt-Reihenfolge) — nur DIE als Tabs
   const projectBoards = useMemo(() => {
     const ids = context?.project.boardIds ?? [];
-    const list = ids.map((id) => byId.get(id)).filter((b): b is NonNullable<typeof b> => !!b);
+    const list = ids.map((id) => byId.get(id))
+      .filter((b): b is NonNullable<typeof b> => !!b)
+      // M288: Archivierte Boards belegen keinen Reiter mehr — genau dafür
+      // archiviert man sie. Sichtbar bleiben sie mit „Archiv einblenden"
+      // (Dock → ⋯ „Mehr") und natürlich, solange man auf einem steht.
+      .filter((b) => showArchived || !b.archived || b.id === activeId);
     // Waisen-Board aktiv? Dann wenigstens dieses zeigen.
     if (!list.some((b) => b.id === activeId) && byId.has(activeId)) list.push(byId.get(activeId)!);
     return list;
-  }, [context, byId, activeId]);
+  }, [context, byId, activeId, showArchived]);
 
   /** Board-Wähler auf schmalen Schirmen (M261) */
   const pickerRef = useRef<HTMLDivElement | null>(null);
@@ -257,15 +264,18 @@ export function Tabs() {
     const cards = b.nodes.filter((n) => n.type !== 'frame');
     const open = navExpanded.has(b.id);
     return (
-      <div key={b.id} className="nav-board-wrap">
+      <div key={b.id} className={`nav-board-wrap${b.archived ? ' archiviert' : ''}`}>
         <div className="nav-board-row">
           <button
             className={`tab-tree-board ${b.id === activeId && view === 'board' ? 'active' : ''}`}
             onClick={() => { openBoard(b.id); setNavOpen(false); }}
           >
             <span className="tab-tree-board-name">{b.name}</span>
+            {b.archived && <span className="archiv-marke">Archiv</span>}
             <span className="tab-count">{b.nodes.length}</span>
           </button>
+          {/* M288: Dieselben Handgriffe wie in Seitenleiste und Übersicht */}
+          <BoardMenu boardId={b.id} />
           {cards.length > 0 && (
             <button
               className={`nav-expand ${open ? 'on' : ''}`}
@@ -356,14 +366,17 @@ export function Tabs() {
                   >{sp.name}</button>
                   {sp.projects.map((proj) => (
                     <div key={proj.id} className="nav-proj">
-                      <button
-                        className="nav-proj-name"
-                        title={proj.boardIds.length > 0 ? `Projekt „${proj.name}" öffnen (erstes Board)` : 'Projekt ist leer'}
-                        onClick={() => {
-                          const first = proj.boardIds.find((id) => byId.has(id));
-                          if (first) { openBoard(first); setNavOpen(false); }
-                        }}
-                      >{proj.name}</button>
+                      <div className="nav-proj-head">
+                        <button
+                          className="nav-proj-name"
+                          title={proj.boardIds.length > 0 ? `Projekt „${proj.name}" öffnen (erstes Board)` : 'Projekt ist leer'}
+                          onClick={() => {
+                            const first = proj.boardIds.find((id) => byId.has(id));
+                            if (first) { openBoard(first); setNavOpen(false); }
+                          }}
+                        >{proj.name}</button>
+                        <ProjektMenu projectId={proj.id} />
+                      </div>
                       {proj.boardIds.map((id) => {
                         const b = byId.get(id);
                         return b ? navBoard(b) : null;

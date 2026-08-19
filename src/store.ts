@@ -43,6 +43,13 @@ export interface BoardDoc {
   /** Kommentar-Threads (M148) — leben IM Board und wandern so automatisch
    *  im globalen Sync UND im Team-Projekt-Paket mit */
   comments?: CommentThread[];
+  /**
+   * M288: Board archiviert — dieselbe Bedeutung wie bei einer Karte, nur eine
+   * Ebene höher: Es ist erledigt, verschwindet aus Reitern, Navigator und
+   * Übersicht und seine Aufgaben ruhen. Gelöscht wird nichts; derselbe
+   * Schalter „Archiv einblenden" holt es überall wieder ins Bild.
+   */
+  archived?: boolean;
 }
 
 /** Ein Kommentar-Pin an einer Karte mit seinem Gesprächsverlauf (M148) */
@@ -308,6 +315,23 @@ interface BoardState {
   removeBoard: (id: string) => void;
   /** Board in ein (anderes) Projekt verschieben, optional vor ein bestimmtes Board */
   moveBoard: (boardId: string, targetProjectId: string, beforeBoardId?: string) => void;
+  /**
+   * M287: Board mit allem Inhalt kopieren — dieselbe Geste wie „Duplizieren"
+   * bei einer Karte, nur eine Ebene höher. Die Kopie landet direkt neben dem
+   * Original im selben Projekt und bekommt FRISCHE Karten-Kennungen: Zwei
+   * Boards mit denselben Kennungen würden sich beim Verschieben von Karten,
+   * bei Pfeilen und beim Sync gegenseitig überschreiben.
+   */
+  duplicateBoard: (boardId: string) => void;
+  /** M287: Projekt samt aller Boards kopieren (auf derselben Ebene) */
+  duplicateProject: (projectId: string) => void;
+  /**
+   * M288: Board archivieren bzw. zurückholen. Archivieren ist das sanfte
+   * Löschen — nichts geht verloren, das Board tritt nur zur Seite. Wer das
+   * gerade offene Board archiviert, wird auf ein sichtbares Nachbar-Board
+   * gesetzt; sonst stünde man vor einem Board, das es „nicht mehr gibt".
+   */
+  archiveBoard: (boardId: string, an?: boolean) => void;
 
   // Karten & Verbindungen (aktives Board)
   onNodesChange: (changes: NodeChange[]) => void;
@@ -1375,6 +1399,112 @@ export const useBoard = create<BoardState>()(
               }),
             })),
           });
+        },
+
+        duplicateBoard: (boardId) => {
+          const st = get();
+          const quelle = st.boards.find((b) => b.id === boardId);
+          if (!quelle) return;
+          const neueId = () => Math.random().toString(36).slice(2, 10);
+          /* Kennungen neu vergeben und die Pfeile mitziehen — sonst zeigten
+             die Verbindungen der Kopie auf die Karten des Originals. */
+          const karte = new Map(quelle.nodes.map((n) => [n.id, neueId()]));
+          const nodes = quelle.nodes.map((n) => ({
+            ...JSON.parse(JSON.stringify(n)),
+            id: karte.get(n.id) as string,
+            selected: false,
+          }));
+          const edges = (quelle.edges ?? [])
+            .filter((e) => karte.has(e.source) && karte.has(e.target))
+            .map((e) => ({
+              ...e,
+              id: neueId(),
+              source: karte.get(e.source) as string,
+              target: karte.get(e.target) as string,
+            }));
+          const drawings = (quelle.drawings ?? []).map((d) => ({
+            ...JSON.parse(JSON.stringify(d)),
+            id: neueId(),
+            anchor: d.anchor ? karte.get(d.anchor) : undefined,
+          }));
+          const kopie = {
+            ...quelle, id: neueId(), name: `${quelle.name} (Kopie)`,
+            nodes, edges, drawings, comments: [],
+          };
+          set({
+            boards: [...st.boards, kopie],
+            spaces: st.spaces.map((sp) => ({
+              ...sp,
+              projects: sp.projects.map((p) => (p.boardIds.includes(boardId)
+                ? { ...p, boardIds: p.boardIds.flatMap((id) => (id === boardId ? [id, kopie.id] : [id])) }
+                : p)),
+            })),
+          });
+          get().showToast(`Board „${quelle.name}" kopiert — die Kopie liegt daneben.`);
+        },
+
+        duplicateProject: (projectId) => {
+          const st = get();
+          const raum = st.spaces.find((sp) => sp.projects.some((p) => p.id === projectId));
+          const projekt = raum?.projects.find((p) => p.id === projectId);
+          if (!raum || !projekt) return;
+          const neueId = () => Math.random().toString(36).slice(2, 10);
+          const neueBoards: BoardDoc[] = [];
+          const ids: string[] = [];
+          for (const bid of projekt.boardIds) {
+            const quelle = st.boards.find((b) => b.id === bid);
+            if (!quelle) continue;
+            const karte = new Map(quelle.nodes.map((n) => [n.id, neueId()]));
+            const kopie: BoardDoc = {
+              ...quelle, id: neueId(), name: quelle.name,
+              nodes: quelle.nodes.map((n) => ({ ...JSON.parse(JSON.stringify(n)), id: karte.get(n.id) as string, selected: false })),
+              edges: (quelle.edges ?? [])
+                .filter((e) => karte.has(e.source) && karte.has(e.target))
+                .map((e) => ({ ...e, id: neueId(), source: karte.get(e.source) as string, target: karte.get(e.target) as string })),
+              drawings: (quelle.drawings ?? []).map((d) => ({ ...JSON.parse(JSON.stringify(d)), id: neueId(), anchor: d.anchor ? karte.get(d.anchor) : undefined })),
+              comments: [],
+            };
+            neueBoards.push(kopie);
+            ids.push(kopie.id);
+          }
+          set({
+            boards: [...st.boards, ...neueBoards],
+            spaces: st.spaces.map((sp) => (sp.id === raum.id
+              ? {
+                ...sp,
+                projects: sp.projects.flatMap((p) => (p.id === projectId
+                  ? [p, { id: neueId(), name: `${p.name} (Kopie)`, boardIds: ids }]
+                  : [p])),
+              }
+              : sp)),
+          });
+          get().showToast(`Projekt „${projekt.name}" mit ${ids.length} Board(s) kopiert.`);
+        },
+
+        archiveBoard: (boardId, an = true) => {
+          const st = get();
+          const board = st.boards.find((b) => b.id === boardId);
+          if (!board) return;
+          const boards = st.boards.map((b) => (b.id === boardId ? { ...b, archived: an } : b));
+          /* Beim Archivieren des aktiven Boards weiterziehen — bevorzugt ins
+             gleiche Projekt, sonst irgendein sichtbares Board. */
+          let activeId = st.activeId;
+          if (an && st.activeId === boardId) {
+            const projekt = st.spaces.flatMap((sp) => sp.projects).find((p) => p.boardIds.includes(boardId));
+            const nachbar = projekt?.boardIds.find((id) => id !== boardId && boards.some((b) => b.id === id && !b.archived))
+              ?? boards.find((b) => b.id !== boardId && !b.archived)?.id;
+            if (nachbar) activeId = nachbar;
+            else {
+              // Das LETZTE sichtbare Board bleibt sichtbar — sonst stünde die
+              // Anwendung ohne Arbeitsfläche da (dieselbe Regel wie beim Löschen)
+              get().showToast('Das letzte Board bleibt offen 🙂');
+              return;
+            }
+          }
+          set({ boards, activeId });
+          get().showToast(an
+            ? `Board „${board.name}" archiviert — im Dock unter ⋯ „Archiv einblenden" wieder sichtbar.`
+            : `Board „${board.name}" zurückgeholt.`);
         },
 
         onNodesChange: (changes) => {

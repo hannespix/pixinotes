@@ -34,6 +34,18 @@ Screenshots und Zwischendateien landen in `pruefungen/ablage/`
 | m272 | Notiz-Termine fließen in den Kalender und den Export |
 | m273 | Gantt-UI: klebende Kopfzeile, Balken-Namen, Zieh-Fahne, Doppelklick |
 | m274 | Recherche: Rückfragen-Dialog, echte Quellen-Abrufe, Quellen im Prompt |
+| m276 | KI liest Word, Excel, Text; Bild-Karten gehen an bildfähige Modelle |
+| m277 | Formatier-Leiste am Telefon: angedockt statt über der Markierung |
+| m278 | Websuche über den KI-Anbieter: Werkzeug, Quellen, Zeitüberschreitung |
+| m279 | Gantt-Zeitskalen: Tage/Wochen/Monate/Jahre, Zeitanker, Quartale |
+| m280 | Gantt: nichts abgeschnitten — Beschriftungen, Ränder, Verläufe |
+| m281 | Gantt: Skalenwechsel greift zuverlässig (alle vier Stufen) |
+| m282 | Gantt am Telefon: scrollbare Werkzeugleiste, 40-Punkt-Trefferflächen |
+| m283 | Rechen-Tabelle in der Notiz: Formeln, Slash-Menü, ein Tabellentyp |
+| m284 | Dunkelmodus: Kontraste in Rechen-Tabelle und hellen Notizen (WCAG) |
+| m285 | Karten aus jeder Ansicht bearbeiten — ein Karten-Blatt, ein Rückweg |
+| m287 | „Rahmen" ≠ „Bereich": Wortwahl, Rückfragen, Board-Umbenennen im Baum |
+| m288 | Board- und Projekt-Menü: überall derselbe Vorrat, Archiv, Duplikate |
 
 Die Reihen sind bewusst GEGEN DAS VERHALTEN geschrieben, nicht gegen die
 Struktur: Wo möglich messen sie Bildpunkte, echte Downloads, abgefangene
