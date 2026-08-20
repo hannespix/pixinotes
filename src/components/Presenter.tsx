@@ -8,7 +8,8 @@ import { nodeToHtml } from '../lib/serialize';
 import { buildMermaidSource, getMermaid, preloadHandFont } from '../lib/mermaid';
 import { presentationOrder } from '../lib/presentOrder';
 import { useAndroidBackspaceFix } from '../lib/blocknoteAndroidFix';
-import { NoteSlashMenu, NoteToolbar, noteSchema } from './NoteTypo';
+import { notizBildHochladen } from '../lib/notizBild';
+import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from './NoteTypo';
 import { KanbanBody } from './nodes/KanbanCard';
 import { GanttBody } from './nodes/GanttCard';
 import { CalendarBody } from './nodes/CalendarCard';
@@ -34,10 +35,22 @@ function NoteSlide({ node }: { node: NoteNode }) {
     const blocks = node.data.blocks as PartialBlock[] | undefined;
     return blocks && blocks.length > 0 ? blocks : undefined;
   });
-  const editor = useCreateBlockNote({ schema: noteSchema, initialContent: initialContent as never, dictionary: blockNoteDe });
+  const editor = useCreateBlockNote({
+    schema: noteSchema,
+    initialContent: initialContent as never,
+    dictionary: blockNoteDe,
+    // M289: Damit Bilder überhaupt in den Text dürfen — Einfügen,
+    // Ablegen und der Dateiwähler des Bild-Blocks laufen hier durch
+    uploadFile: notizBildHochladen,
+  });
   useAndroidBackspaceFix(editor);
+  /* M289: In der Präsentation gibt es kein Board darunter — hier wird eine
+     fremde Datei nur abgewiesen, nicht umgeleitet. */
+  const huelle = useRef<HTMLDivElement>(null);
+  useNurBilderInDenText(huelle);
+
   return (
-    <div className={`slide-note sticky-${node.data.color} note-editor`}>
+    <div className={`slide-note sticky-${node.data.color} note-editor`} ref={huelle}>
       {/* M267: auch in der Präsentation dieselbe Formatier-Leiste — wer hier
           eine Folie nachbessert, soll nicht plötzlich andere Werkzeuge haben */}
       <BlockNoteView

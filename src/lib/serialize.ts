@@ -122,6 +122,15 @@ export function blocksToText(blocks: unknown[] | undefined): string {
           // damit Suche und KI die Zahlen wirklich lesen können
           for (const r of rechenBlockZeilen(b.props)) lines.push(`${indent}${r.join(' | ')}`);
           break;
+        case 'image': {
+          /* M289: Ein Bild im Text hat keinen Text — im Klartext bliebe an
+             seiner Stelle eine Lücke. Bildunterschrift und Dateiname sind das,
+             wonach Menschen später suchen; die Base64-Daten selbst haben in
+             Suche, E-Mail und KI-Anfrage nichts verloren. */
+          const p = b.props as { caption?: string; name?: string } | undefined;
+          lines.push(`${indent}🖼 ${p?.caption || p?.name || 'Bild'}`);
+          break;
+        }
         default:
           if (text) lines.push(`${indent}${text}`);
       }
@@ -171,6 +180,19 @@ export function blocksToHtml(blocks: unknown[] | undefined): string {
             .map((r) => `<tr>${r.cells.map((cell) => `<td style="border:1px solid #ccc;padding:4px 8px">${esc(inlineText(cell))}</td>`).join('')}</tr>`)
             .join('');
           parts.push(`<table style="border-collapse:collapse">${rows}</table>`);
+        }
+        break;
+      }
+      case 'image': {
+        // M289: Das Bild wandert MIT — Ausdruck, PDF und Outlook-Einfügen
+        // zeigen es, weil die Daten in der Adresse selbst stecken.
+        closeList();
+        const p = b.props as { url?: string; caption?: string; name?: string } | undefined;
+        if (p?.url) {
+          const alt = esc(p.caption || p.name || 'Bild');
+          parts.push(`<figure style="margin:6px 0"><img src="${esc(p.url)}" alt="${alt}" style="max-width:100%;height:auto" />${
+            p.caption ? `<figcaption style="font-size:12px;color:#666">${esc(p.caption)}</figcaption>` : ''
+          }</figure>`);
         }
         break;
       }

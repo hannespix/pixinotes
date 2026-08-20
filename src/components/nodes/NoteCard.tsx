@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { NodeProps } from '@xyflow/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useReactFlow, type NodeProps } from '@xyflow/react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
@@ -17,9 +17,11 @@ import { extractEntities } from '../../lib/entities';
 import { makeNote } from '../../lib/nodes';
 import { aiReady, askAi, textToBlocks } from '../../lib/ai';
 import { repairBlocks } from '../../lib/htmlBlocks';
+import { notizBildHochladen } from '../../lib/notizBild';
+import { importFilesToBoard } from '../../lib/importFiles';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
-import { NoteSlashMenu, NoteToolbar, noteSchema } from '../NoteTypo';
+import { bildBlockEinfuegen, NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText, waehleBildDatei } from '../NoteTypo';
 
 
 
@@ -199,7 +201,14 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
   });
 
   // M201: gemeinsames Schema mit Inline-Schrift/-Größe (textSize/textFont)
-  const editor = useCreateBlockNote({ schema: noteSchema, initialContent: initialContent as never, dictionary: blockNoteDe });
+  const editor = useCreateBlockNote({
+    schema: noteSchema,
+    initialContent: initialContent as never,
+    dictionary: blockNoteDe,
+    // M289: Damit Bilder überhaupt in den Text dürfen — Einfügen,
+    // Ablegen und der Dateiwähler des Bild-Blocks laufen hier durch
+    uploadFile: notizBildHochladen,
+  });
   useAndroidBackspaceFix(editor);
 
   // M170: Externer Schreiber (Kanban-Rück-Sync) hat die Blöcke geändert —
@@ -212,7 +221,11 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
     lastEpoch.current = extEpoch;
     const blocks = data.blocks as PartialBlock[] | undefined;
     if (blocks?.length) {
-      try { editor.replaceBlocks(editor.document, blocks); } catch { /* Editor gerade im Umbau */ }
+      // `as never`: Die Blöcke kommen als gespeicherte Daten herein, ihr Typ ist
+      // erst zur Laufzeit bekannt — seit M289 ist das Schema enger als die
+      // Standard-Blöcke (kein video/audio/file), und TypeScript kann die
+      // Zuordnung deshalb nicht mehr selbst herstellen.
+      try { editor.replaceBlocks(editor.document, blocks as never); } catch { /* Editor gerade im Umbau */ }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extEpoch]);
@@ -242,7 +255,19 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
   // nicht (User-Report). Hier gilt darum: Wer die letzte Zeile oder Spalte
   // löscht, löscht die Tabelle — das ist die Absicht dahinter.
   const editorRef = useRef<HTMLDivElement>(null);
+  /**
+   * M289: Nur Bilder dürfen in den Text — alles andere gehört aufs Board.
+   * Eine auf der Notiz abgelegte PDF wird deshalb genau dort zur Datei-Karte,
+   * wo man losgelassen hat (dieselbe Pipeline wie beim Ablegen aufs Board).
+   */
+  const { screenToFlowPosition } = useReactFlow();
+  const aufsBoard = useCallback((dateien: File[], x: number, y: number) => {
+    void importFilesToBoard(dateien, screenToFlowPosition({ x, y }));
+  }, [screenToFlowPosition]);
+  useNurBilderInDenText(editorRef, aufsBoard);
   const [tableSel, setTableSel] = useState<string | null>(null);
+  /* M289: Steht der Cursor gerade in dieser Notiz? (zeigt den Bild-Chip) */
+  const [imText, setImText] = useState(false);
   const [tabZelle, setTabZelle] = useState<{ zeile: number; spalte: number } | null>(null);
   const trackTable = () => {
     try {
@@ -383,7 +408,17 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
         value={(data.hex as string) ?? '#fff8c5'}
         onChange={(e) => updateNodeData(id, { hex: e.target.value })}
       />
-      <div className="nodrag nowheel note-editor" ref={editorRef}>
+      <div
+        className="nodrag nowheel note-editor"
+        ref={editorRef}
+        /* M289: Der Bild-Chip erscheint nur, solange der Cursor wirklich im
+           Text steht — sonst trüge jede Notiz auf dem Board einen Knopf, den
+           sie in diesem Moment nicht braucht. */
+        onFocus={() => setImText(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setImText(false);
+        }}
+      >
         <BlockNoteView
           editor={editor}
           theme="light"
@@ -438,6 +473,26 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
             onClick={removeTable}
           >
             ⌫ Tabelle
+          </button>
+        </div>
+      )}
+      {imText && (
+        /**
+         * M289: Der sichtbare Weg für ein Bild — vor allem am Telefon.
+         *
+         * Dort gibt es kein Strg+V, und wer „/" tippt, muss erst wissen, dass
+         * es das Menü gibt. Der Chip führt direkt in die Fotomediathek bzw.
+         * zur Kamera. `preventDefault` beim Aufsetzen des Fingers hält den
+         * Cursor im Text — sonst landete das Bild nicht dort, wo man stand.
+         */
+        <div className="due-chips nodrag" onPointerDown={(e) => e.preventDefault()}>
+          <button
+            className="due-chip bild-chip"
+            title={'Bild in die Notiz einfügen — am Telefon öffnet das die Fotomediathek oder die Kamera. '
+              + 'Ein kopiertes Bild geht auch mit Strg+V oder über das Einfügen-Menü („/" → „Bild aus Zwischenablage").'}
+            onClick={() => waehleBildDatei((f) => { void bildBlockEinfuegen(editor, f); })}
+          >
+            🖼 Bild
           </button>
         </div>
       )}

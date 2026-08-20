@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { NodeProps } from '@xyflow/react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useReactFlow, type NodeProps } from '@xyflow/react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
@@ -9,7 +9,9 @@ import { STICKY_COLORS, uid, type MinutesData, type MinutesNode } from '../../ty
 import { allDecisions, buildEntry, currentEntry, entryLabel, nextDate, sortEntries } from '../../lib/minutes';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { useAndroidBackspaceFix } from '../../lib/blocknoteAndroidFix';
-import { NoteSlashMenu, NoteToolbar, noteSchema } from '../NoteTypo';
+import { notizBildHochladen } from '../../lib/notizBild';
+import { importFilesToBoard } from '../../lib/importFiles';
+import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from '../NoteTypo';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { IChevronL, IChevronR, IPlus, ISettings, IX } from '../Icons';
@@ -307,7 +309,14 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
     const safe = repairBlocks(blocks) as PartialBlock[];
     return safe.length > 0 ? safe : undefined;
   });
-  const editor = useCreateBlockNote({ schema: noteSchema, initialContent: initialContent as never, dictionary: blockNoteDe });
+  const editor = useCreateBlockNote({
+    schema: noteSchema,
+    initialContent: initialContent as never,
+    dictionary: blockNoteDe,
+    // M289: Damit Bilder überhaupt in den Text dürfen — Einfügen,
+    // Ablegen und der Dateiwähler des Bild-Blocks laufen hier durch
+    uploadFile: notizBildHochladen,
+  });
   useAndroidBackspaceFix(editor);
   if (editorRef) editorRef.current = editor;
 
@@ -329,8 +338,16 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* M289: Auch im Protokoll gilt: Bilder in den Text, alles andere aufs Board */
+  const huelle = useRef<HTMLDivElement>(null);
+  const { screenToFlowPosition } = useReactFlow();
+  const aufsBoard = useCallback((dateien: File[], x: number, y: number) => {
+    void importFilesToBoard(dateien, screenToFlowPosition({ x, y }));
+  }, [screenToFlowPosition]);
+  useNurBilderInDenText(huelle, aufsBoard);
+
   return (
-    <div className="minutes-body nodrag">
+    <div className="minutes-body nodrag" ref={huelle}>
       {/* M267: dieselbe Formatier-Leiste wie in der Notiz-Karte. Das Schema
           kennt textSize/textFont schon länger — nur die Knöpfe fehlten hier,
           also stellte das Protokoll gestylten Text dar, ließ ihn aber nicht

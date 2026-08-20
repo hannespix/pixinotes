@@ -18,7 +18,9 @@ import {
   useBlockNoteEditor, useComponentsContext, useEditorContentOrSelectionChange,
 } from '@blocknote/react';
 import { RechenTabelleBlock } from './RechenTabelle';
-import { ISigma } from './Icons';
+import { IImage, ISigma } from './Icons';
+import { useBoard } from '../store';
+import { bilderAusZwischenablage, notizBildHochladen } from '../lib/notizBild';
 import type { CardFont } from '../types';
 import {
   FONT_STACKS, GROESSEN_TEXT, INLINE_SIZE_EM, SCHRIFTEN, stufenName, stufeWeiter,
@@ -264,8 +266,32 @@ export function NoteSlashMenu() {
       getItems={async (query) => {
         const standard = getDefaultReactSlashMenuItems(editor as never)
           // die alte Tabelle aus dem Angebot nehmen (Titel je nach Sprache)
-          .filter((i) => !/^(tabelle|table)$/i.test(i.title ?? ''));
+          .filter((i) => !/^(tabelle|table)$/i.test(i.title ?? ''))
+          /**
+           * M289: Bild JA, Video/Ton/Datei NEIN.
+           *
+           * Seit die Editoren Dateien annehmen (uploadFile), böte BlockNote
+           * auch Video, Audio und beliebige Dateien an. Die steckten dann als
+           * Base64 IM Text — ein einziges Handyvideo sprengt den Speicher der
+           * Anwendung (~5 MB) und reißt den ganzen Board-Stand mit. Für alles
+           * außer Bildern gibt es die Datei-Karte auf dem Board (Geräte-Ablage,
+           * M269). Gefiltert wird über den sprachunabhängigen Schlüssel.
+           *
+           * Aus dem SCHEMA werden sie bewusst NICHT entfernt: BlockNote greift
+           * beim Einfügen intern auf diese Blöcke zu und stolpert sonst
+           * (gemessen: „Cannot read properties of undefined (reading
+           * 'isInGroup')"). Den Weg dorthin sperrt stattdessen `nurBilder`
+           * unten — vor dem Editor, nicht in ihm.
+           */
+          .filter((i) => !['video', 'audio', 'file'].includes((i as { key?: string }).key ?? ''));
         const eigene = [{
+          title: 'Bild aus Zwischenablage',
+          subtext: 'Screenshot oder kopiertes Foto direkt in den Text',
+          aliases: ['bild', 'foto', 'zwischenablage', 'einfügen', 'screenshot', 'paste', 'clipboard'],
+          group: 'Medien',
+          icon: <IImage size={16} />,
+          onItemClick: () => { void ausZwischenablageInDenText(editor); },
+        }, {
           title: 'Tabelle',
           subtext: 'Rechnet mit „=" — Summen, Prozente, Bedingungen',
           aliases: ['tabelle', 'table', 'rechnen', 'summe', 'excel', 'kalkulation'],
@@ -283,6 +309,109 @@ export function NoteSlashMenu() {
         return filterSuggestionItems([...eigene, ...standard], query);
       }}
     />
+  );
+}
+
+/**
+ * M289: Wächter vor dem Editor — nur Bilder dürfen in den Text.
+ *
+ * Fängt Einfügen und Ablegen in der Erfassungsphase ab und lässt Dateien nur
+ * durch, wenn es Bilder sind. Alles andere (PDF, Word, Tabellen, Videos) wird
+ * gestoppt, bevor BlockNote es sieht:
+ *  - beim EINFÜGEN mit einem Hinweis, wo solche Dateien hingehören,
+ *  - beim ABLEGEN wortlos, weil das Board darunter genau dafür schon eine
+ *    Datei-Karte anlegt — dort ist die Datei richtig aufgehoben.
+ */
+export function useNurBilderInDenText(
+  ref: React.RefObject<HTMLElement | null>,
+  /** Was mit abgelegten Nicht-Bildern geschehen soll (Datei-Karte aufs Board) */
+  aufsBoard?: (dateien: File[], x: number, y: number) => void,
+) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const pruefe = (dt: DataTransfer | null): 'egal' | 'stopp' => {
+      const dateien = Array.from(dt?.files ?? []);
+      if (dateien.length === 0) return 'egal';       // Text, HTML, Bild-Rohdaten
+      return dateien.every((f) => f.type.startsWith('image/')) ? 'egal' : 'stopp';
+    };
+    const beimEinfuegen = (e: ClipboardEvent) => {
+      if (pruefe(e.clipboardData) === 'egal') return;
+      e.preventDefault();
+      e.stopPropagation();
+      useBoard.getState().showToast('In eine Notiz passen Bilder. Andere Dateien aufs Board ziehen — sie werden dort eine Datei-Karte.');
+    };
+    const beimAblegen = (e: DragEvent) => {
+      if (pruefe(e.dataTransfer) === 'egal') return;
+      /* Die Datei gehört aufs Board — aber der Weg dorthin läuft NICHT über
+         „einfach weiterreichen": `stopPropagation` hier hält das Ereignis
+         zwangsläufig auch von der Board-Ebene fern (es hört in der Blasenphase
+         zu). Die Notiz übergibt deshalb selbst — an derselben Stelle, an der
+         der Finger losgelassen hat. */
+      e.preventDefault();
+      e.stopPropagation();
+      const dateien = Array.from(e.dataTransfer?.files ?? []);
+      if (dateien.length) aufsBoard?.(dateien, e.clientX, e.clientY);
+    };
+    el.addEventListener('paste', beimEinfuegen, true);
+    el.addEventListener('drop', beimAblegen, true);
+    return () => {
+      el.removeEventListener('paste', beimEinfuegen, true);
+      el.removeEventListener('drop', beimAblegen, true);
+    };
+  }, [ref, aufsBoard]);
+}
+
+/**
+ * M289: Ein kopiertes Bild an die Cursor-Stelle setzen.
+ *
+ * Der Weg für alles ohne Tastatur: Am iPhone/iPad tippt man in der Fotos-App
+ * auf „Kopieren" und hier auf den Eintrag. Verweigert der Browser die
+ * Zwischenablage (Firefox, fehlende Erlaubnis), bleibt es nicht bei einer
+ * Fehlermeldung — dann öffnet sich der Dateiwähler, der am Telefon direkt in
+ * die Fotomediathek führt.
+ */
+async function ausZwischenablageInDenText(editor: typeof noteSchema.BlockNoteEditor) {
+  const dateien = await bilderAusZwischenablage();
+  if (dateien !== 'verweigert' && dateien.length > 0) {
+    for (const f of dateien) await bildBlockEinfuegen(editor, f);
+    return;
+  }
+  if (dateien !== 'verweigert') {
+    useBoard.getState().showToast('In der Zwischenablage liegt gerade kein Bild.');
+    return;
+  }
+  waehleBildDatei((f) => { void bildBlockEinfuegen(editor, f); });
+}
+
+/** Dateiwähler öffnen — am Telefon die Fotomediathek bzw. die Kamera */
+export function waehleBildDatei(nimm: (f: File) => void) {
+  const feld = document.createElement('input');
+  feld.type = 'file';
+  feld.accept = 'image/*';
+  feld.multiple = true;
+  feld.style.display = 'none';
+  feld.onchange = () => {
+    for (const f of Array.from(feld.files ?? [])) nimm(f);
+    feld.remove();
+  };
+  document.body.appendChild(feld);
+  feld.click();
+}
+
+/** Bild hochladen (verkleinern, Speicher prüfen) und als Block setzen */
+export async function bildBlockEinfuegen(editor: typeof noteSchema.BlockNoteEditor, datei: File) {
+  let url: string;
+  try {
+    url = await notizBildHochladen(datei);
+  } catch {
+    return;   // notizBildHochladen hat den Grund bereits gesagt
+  }
+  const block = editor.getTextCursorPosition().block;
+  editor.insertBlocks(
+    [{ type: 'image', props: { url, name: datei.name || 'Bild' } } as never],
+    block,
+    'after',
   );
 }
 

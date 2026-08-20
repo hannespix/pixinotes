@@ -6056,3 +6056,25 @@ audio.file-media { height: 40px; }
   color: var(--muted); border: 1px solid var(--border-soft); border-radius: 5px;
   padding: 1px 4px; flex: none;
 }
+
+/* M289: Bilder IM Notiztext.
+   BlockNote gibt dem Bild eine Vorschaubreite in Bildpunkten (Standard 512).
+   In einer 270 Punkte breiten Notiz ragte es damit über den Rand hinaus und
+   wurde von `overflow: hidden` der Karte abgeschnitten. Die Breite der Karte
+   gewinnt deshalb immer — im Vollbild-Fokus bleibt trotzdem Platz für ein
+   großes Bild, weil die Karte dort selbst breit ist. */
+.note-editor .bn-visual-media,
+.note-editor img,
+.bn-editor img {
+  max-width: 100%; height: auto; border-radius: 8px;
+}
+.note-editor .bn-visual-media-wrapper,
+.note-editor .bn-file-block-content-wrapper { max-width: 100%; }
+/* Die Bildunterschrift soll wie Text der Karte aussehen, nicht wie Fremdkörper */
+.note-editor .bn-visual-media-caption { font-size: 11.5px; color: var(--muted); }
+/* Der Bild-Chip ist am Telefon der Hauptweg (dort gibt es kein Strg+V) und
+   muss deshalb eine echte Trefferfläche haben — gemessen waren es 20 Punkte,
+   das ist für einen Finger zu wenig (M282: 34 als Untergrenze). */
+@media (pointer: coarse) {
+  .due-chip.bild-chip { min-height: 34px; padding: 8px 14px; font-size: 13px; }
+}
