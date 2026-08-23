@@ -30,6 +30,7 @@ import { BacklinksPanel } from './components/BacklinksPanel';
 import { SidePanel } from './components/SidePanel';
 import { ShareCardsModal } from './components/ShareCardsModal';
 import { HelpOverlay } from './components/HelpOverlay';
+import { GeteiltDialog } from './components/GeteiltDialog';
 import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
 import { Tastatur } from './components/Tastatur';
@@ -237,6 +238,8 @@ export default function App() {
         <Onboarding />
         <SearchOverlay />
       <HelpOverlay />
+      {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
+      <GeteiltDialog />
       <LookupPanel />
       <TooltipLayer />
       <Tastatur />

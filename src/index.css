@@ -6078,3 +6078,62 @@ audio.file-media { height: 40px; }
 @media (pointer: coarse) {
   .due-chip.bild-chip { min-height: 34px; padding: 8px 14px; font-size: 13px; }
 }
+
+/* M290: „Von einer anderen App geteilt" — der Empfangs-Dialog.
+   Er ist die erste Sekunde nach dem Teilen und muss deshalb ohne Nachdenken
+   lesbar sein: was kam an, wohin soll es, in welcher Form. */
+.geteilt-modal { max-width: 460px; width: min(460px, calc(100vw - 24px)); }
+.geteilt-vorschau {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start;
+  background: var(--surface-3); border-radius: 10px; padding: 10px; margin-bottom: 12px;
+  max-height: 210px; overflow-y: auto;
+}
+.geteilt-stueck { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 92px; }
+.geteilt-stueck img {
+  width: 92px; height: 72px; object-fit: cover; border-radius: 8px;
+  border: 1px solid var(--border-soft);
+}
+.geteilt-symbol { font-size: 30px; line-height: 1.6; }
+.geteilt-name {
+  font-size: 10.5px; color: var(--muted); max-width: 92px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.geteilt-text { font-size: 12.5px; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+.geteilt-zeile { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 13px; }
+.geteilt-zeile > span { flex: 0 0 104px; color: var(--muted); }
+.geteilt-zeile select {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 7px 8px;
+  border-radius: 8px; border: 1px solid var(--border-soft); background: var(--surface);
+  color: var(--ink);
+}
+.geteilt-wahl { display: flex; flex-direction: column; gap: 4px; }
+.geteilt-wahl label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.geteilt-wahl label.aus { opacity: .5; cursor: default; }
+.geteilt-hinweis {
+  font-size: 11.5px; color: var(--muted); background: var(--surface-dim);
+  border-radius: 8px; padding: 7px 9px; margin-top: 6px;
+}
+.geteilt-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.geteilt-foot button {
+  font: inherit; font-size: 13px; padding: 9px 16px; border-radius: 9px; cursor: pointer;
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink);
+}
+.geteilt-ok { background: var(--accent) !important; border-color: var(--accent) !important; color: #fff !important; font-weight: 600; }
+.geteilt-ok:disabled { opacity: .6; cursor: default; }
+/* Am Telefon ist das der Normalfall — dort wird es großzügiger */
+@media (pointer: coarse) {
+  .geteilt-zeile select, .geteilt-foot button { min-height: 42px; font-size: 14px; }
+  .geteilt-wahl label { min-height: 34px; }
+}
+/* Am Telefon sind Modals sonst Vollbild-Blätter (Arbeitsflächen). Dieser
+   Dialog ist aber EINE Entscheidung — als Vollbild klaffte in der Mitte eine
+   leere Fläche (Bildschirmfoto der Prüfreihe). Er bleibt deshalb eine Karte,
+   die nur so hoch ist wie ihr Inhalt. */
+@media (max-width: 640px) {
+  .modal-backdrop:has(.geteilt-modal) { padding: 12px; align-items: center; }
+  .modal.geteilt-modal {
+    width: calc(100vw - 24px); height: auto; max-height: 92dvh;
+    border-radius: 16px; overflow: auto;
+  }
+  .modal.geteilt-modal .modal-head { border-radius: 16px 16px 0 0; }
+}

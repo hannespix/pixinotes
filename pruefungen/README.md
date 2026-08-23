@@ -47,6 +47,7 @@ Screenshots und Zwischendateien landen in `pruefungen/ablage/`
 | m287 | „Rahmen" ≠ „Bereich": Wortwahl, Rückfragen, Board-Umbenennen im Baum |
 | m288 | Board- und Projekt-Menü: überall derselbe Vorrat, Archiv, Duplikate |
 | m289 | Bilder in Notizen: einfügen, verkleinern, Chip am Telefon, Export |
+| m290 | Android-Teilen: Manifest, Service Worker, Zielwahl, Übernahme |
 
 Die Reihen sind bewusst GEGEN DAS VERHALTEN geschrieben, nicht gegen die
 Struktur: Wo möglich messen sie Bildpunkte, echte Downloads, abgefangene
