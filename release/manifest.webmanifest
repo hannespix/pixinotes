@@ -21,7 +21,7 @@
         {
           "name": "dateien",
           "accept": ["image/*", "application/pdf", "text/*", "message/rfc822", "text/calendar",
-            ".eml", ".msg", ".ics", ".csv", ".md", ".txt", ".docx", ".xlsx", ".pixinotes.json"]
+            ".eml", ".msg", ".ics", ".csv", ".md", ".txt", ".json", ".docx", ".xlsx"]
         }
       ]
     }
