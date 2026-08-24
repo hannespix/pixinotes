@@ -4841,6 +4841,13 @@ body[data-formatierleiste='an'] { --lv-typo: -52px; --lv-typo-dock: 56px; }
 .sel-toolbar-dock { transition: bottom 0.18s ease; }
 /* Toasts ebenso — sonst poppt die Meldung hinter der Tastatur auf */
 [data-keyboard='on'] .toast { bottom: calc(20px + var(--kb)); }
+/* M291: Im Fokus steht unten bis zu ein dreizeiliger Fuß (Blättern,
+   Formatieren, Karten-Werkzeuge). Die Meldung gehört darüber — gemessen lag
+   sie sonst mitten auf der Werkzeugleiste. */
+html:has(.app.focus-mode) .toast,
+html[data-keyboard='on']:has(.app.focus-mode) .toast {
+  bottom: calc(20px + var(--kb) + var(--focus-bottom, 0px));
+}
 
 /* --- 2. Eine Leiste statt zwei: die Auswahl übernimmt die Dock-Zeile --- */
 @media (max-width: 640px) {
@@ -4986,12 +4993,39 @@ body[data-formatierleiste='an'] { --lv-typo: -52px; --lv-typo-dock: 56px; }
 .focus-hint { font-size: 11px; color: var(--muted); }
 /* Tastatur offen: die Blätter-Leiste hilft beim Tippen nicht */
 [data-keyboard='on'] .focus-nav { display: none; }
-:root { --focus-top: 52px; --focus-bottom: 0px; }
-.focus-mode { --focus-bottom: 0px; }
-.focus-mode:has(.focus-nav) { --focus-bottom: 52px; }
-/* Mit Werkzeugleiste braucht der Fuß zwei Zeilen (M225) */
-body:has(.sel-toolbar-dock) .focus-mode:has(.focus-nav) { --focus-bottom: 104px; }
-[data-keyboard='on'] .focus-mode:has(.focus-nav) { --focus-bottom: 0px; }
+/**
+ * M291: Der Fuß im Fokus — drei Zeilen, EINE Rechnung, an der WURZEL.
+ *
+ * Der Fehler, den das behebt (User-Bildschirmfoto, gemessen): Die
+ * Formatier-Leiste lag exakt über der Blätter-Zeile (beide 792–844).
+ * Der Grund war nicht die Rechnung, sondern ihr ORT: `--focus-bottom` stand
+ * an `.focus-mode`, also am App-Container. Die Formatier-Leiste ist aber ein
+ * Portal am <body> — sie liegt NEBEN diesem Container, nicht darin, und erbte
+ * deshalb die 0 von der Wurzel statt der 104.
+ *
+ * Darum werden die drei Höhen jetzt an der Wurzel geführt, wo sie jeder
+ * sieht: die Blätter-Zeile, die Werkzeugleiste der Karte und die
+ * Formatier-Leiste. Die Stapelung von unten nach oben ist bewusst:
+ *   Blättern (Ortswechsel) · Formatieren (was ich JETZT tue) · Karten-Werkzeuge
+ * Mit offener Tastatur fällt das Blättern weg — dort hilft es nicht.
+ */
+:root {
+  --focus-top: 52px;
+  --focus-nav-h: 0px;      /* Blätter-Zeile („1 von 8") */
+  --focus-tools-h: 0px;    /* Werkzeugleiste der Karte */
+  --focus-format-h: 0px;   /* Formatier-Leiste (Portal am body!) */
+  --focus-bottom: 0px;     /* Summe — so viel Platz lässt die Karte unten frei */
+}
+:root:has(.app.focus-mode .focus-nav) { --focus-nav-h: 52px; }
+:root:has(.app.focus-mode):has(.sel-toolbar-dock) { --focus-tools-h: 52px; }
+:root:has(body[data-formatierleiste='an']) { --focus-format-h: 44px; }
+:root:has(.app.focus-mode) {
+  --focus-bottom: calc(var(--focus-nav-h) + var(--focus-tools-h) + var(--focus-format-h));
+}
+/* Tastatur offen: Die Blätter-Zeile ist ausgeblendet (siehe oben) — sie darf
+   dann auch keinen Platz mehr beanspruchen. Höhere Spezifität als die
+   :has()-Regeln darüber, damit sie wirklich gewinnt. */
+html[data-keyboard='on']:has(.app.focus-mode) { --focus-nav-h: 0px; }
 
 /* ================= M213: Fehlergrenzen ================= */
 .err-box {
@@ -5056,7 +5090,12 @@ body:has(.sel-toolbar-dock) .focus-mode:has(.focus-nav) { --focus-bottom: 104px;
    Jetzt sitzt sie fest über der Blätter-Zeile, quer scrollbar, und die Karte
    bekommt den Platz dafür (--focus-bottom). */
 body:has(.app.focus-mode) .sel-toolbar-dock {
-  left: 0; right: 0; bottom: 52px; translate: 0 0;
+  left: 0; right: 0; translate: 0 0;
+  /* M291: eine Rechnung für beide Fälle — mit und ohne Tastatur, mit und
+     ohne Formatier-Leiste. Vorher standen hier feste 52px und daneben eine
+     zweite Regel für die Tastatur; sobald die Formatier-Leiste dazukam,
+     lagen zwei Leisten aufeinander. */
+  bottom: calc(var(--kb) + var(--focus-nav-h) + var(--focus-format-h));
   /* Feste Höhe, damit der Platz, den die Karte darüber freilässt
      (--focus-bottom), exakt passt und nichts überlappt */
   height: 52px; box-sizing: border-box; align-items: center; padding: 0 8px;
@@ -5067,7 +5106,7 @@ body:has(.app.focus-mode) .sel-toolbar-dock {
 }
 body:has(.app.focus-mode) .sel-toolbar-dock::-webkit-scrollbar { display: none; }
 body:has(.app.focus-mode) .sel-toolbar-dock button { flex: none; }
-[data-keyboard='on'] body:has(.app.focus-mode) .sel-toolbar-dock { bottom: var(--kb); }
+/* M291: Die Rechnung oben deckt die offene Tastatur mit ab (--kb steckt drin) */
 
 /* ================= M216: Befehle in der Suche ================= */
 .search-cmds { border-bottom: 1px solid var(--border-soft); padding-bottom: 6px; margin-bottom: 4px; }
@@ -5381,7 +5420,10 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
   div:has(> .bn-link-toolbar) {
     position: fixed !important;
     left: 0 !important; right: 0 !important; top: auto !important;
-    bottom: calc(var(--kb) + var(--focus-bottom, 0px)) !important;
+    /* M291: NUR die Blätter-Zeile liegt darunter — die Werkzeugleiste der
+       Karte rückt ihrerseits über die Formatier-Leiste (siehe unten). Vorher
+       stand hier --focus-bottom; das ist die SUMME und am body ohnehin 0. */
+    bottom: calc(var(--kb) + var(--focus-nav-h, 0px)) !important;
     transform: none !important;
     width: 100% !important; max-width: 100% !important;
     z-index: 80 !important;
