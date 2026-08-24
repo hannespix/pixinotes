@@ -106,12 +106,24 @@ await markiere(P);
     pruefe('T1c sie sitzt unten am Schirm', Math.abs(m.box[1] + m.box[3] - m.fenster[1]) < 8, JSON.stringify(m.box));
     pruefe('T1d kein transform-Ahne verzerrt sie mehr', m.trans.length === 0, JSON.stringify(m.trans));
   }
+  /* M292: Die Auswahl-Leiste dockt seit M292 an die KARTE an, statt immer
+     unten zu kleben — sie kann also die untere Zeile sein ODER an der Karte
+     stehen. Unverändert gilt aber, worum es hier geht: Sie darf die
+     Formatier-Leiste nicht verdecken. Gemessen wird deshalb die Überlappung,
+     nicht mehr eine bestimmte Bauform. */
   const ueber = await P.evaluate(() => {
-    const s = document.querySelector('.sel-toolbar-dock')?.getBoundingClientRect();
+    const s = document.querySelector('.sel-toolbar')?.getBoundingClientRect();
     const d = document.querySelector('.pn-format-dock')?.getBoundingClientRect();
-    return s && d ? { ueberlappt: s.bottom > d.top + 1, s: Math.round(s.bottom), d: Math.round(d.top) } : null;
+    if (!s || !d) return null;
+    return {
+      ueberlappt: Math.min(s.bottom, d.bottom) - Math.max(s.top, d.top) > 1,
+      wo: document.querySelector('.sel-toolbar-dock') ? 'untere Zeile' : 'an der Karte',
+      s: [Math.round(s.top), Math.round(s.bottom)], d: [Math.round(d.top), Math.round(d.bottom)],
+    };
   });
-  pruefe('T1e die Auswahl-Leiste weicht nach oben aus', !!ueber && !ueber.ueberlappt, JSON.stringify(ueber));
+  console.log('    Auswahl-Leiste:', JSON.stringify(ueber));
+  pruefe('T1e die Auswahl-Leiste verdeckt die Formatier-Leiste nicht',
+    !!ueber && !ueber.ueberlappt, JSON.stringify(ueber));
   await P.screenshot({ path: `${SD}/m277-board.png` });
 }
 

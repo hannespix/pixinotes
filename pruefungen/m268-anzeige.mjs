@@ -338,34 +338,40 @@ console.log('\n════════════ T9: Umschalten bei offenem B
   await ctx.close();
 }
 
-// ════ T11: Die Karten-Leiste wegschieben (M243) bei skalierter Anzeige ════
-console.log('\n════════════ T11: Leiste verschieben ════════════');
+// ════ T11: Die Karten-Leiste bei skalierter Anzeige (M243 → M292) ════
+// Bis M291 ließ sich die Leiste wegschieben, und diese Reihe maß, ob sie dem
+// Finger bei 100 % und 175 % gleich weit folgt. Seit M292 gibt es das freie
+// Verschieben nicht mehr — die Leiste dockt an die Karte an. Geprüft wird
+// deshalb, was bei skalierter Anzeige weiterhin gelten MUSS: Sie sitzt an der
+// Karte, verdeckt sie nicht und bleibt vollständig im Bild. Genau hier ging
+// vor M268 die Rechnerei zwischen Bild- und Layout-Punkten schief.
+console.log('\n════════════ T11: Leiste an der Karte (skaliert) ════════════');
 for (const A of [1, 1.75]) {
   const { ctx, P } = await seite(A);
   await P.locator('.react-flow__node[data-id="a"]').click({ position: { x: 4, y: 4 } });
-  await P.waitForTimeout(600);
-  const griff = await P.evaluate(() => {
-    const g = document.querySelector('.sel-griff');
-    if (!g) return null;
-    const r = g.getBoundingClientRect();
-    const t = document.querySelector('.sel-toolbar').getBoundingClientRect();
-    return { punkt: [r.left + r.width / 2, r.top + r.height / 2], leiste: [Math.round(t.left), Math.round(t.top)] };
+  await P.waitForTimeout(700);
+  const m = await P.evaluate(() => {
+    const l = document.querySelector('.sel-toolbar');
+    const k = document.querySelector('.react-flow__node[data-id="a"]');
+    if (!l || !k) return null;
+    const a = l.getBoundingClientRect(); const b = k.getBoundingClientRect();
+    return {
+      dock: !!document.querySelector('.sel-toolbar-dock'),
+      ueberKarte: Math.round(Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top)),
+      abstand: Math.round(Math.min(Math.abs(b.top - a.bottom), Math.abs(a.top - b.bottom))),
+      imBild: a.left >= -1 && a.top >= -1 && a.right <= window.innerWidth + 1 && a.bottom <= window.innerHeight + 1,
+      griff: !!document.querySelector('.sel-griff'),
+    };
   });
-  if (!griff) { pruefe(`[${Math.round(A * 100)} %] Anfasser der Leiste gefunden`, false); await ctx.close(); continue; }
-  const dx = 140; const dy = -90;
-  await P.mouse.move(griff.punkt[0], griff.punkt[1]);
-  await P.mouse.down();
-  for (let i = 1; i <= 10; i++) { await P.mouse.move(griff.punkt[0] + (dx * i) / 10, griff.punkt[1] + (dy * i) / 10); await P.waitForTimeout(30); }
-  await P.mouse.up();
-  await P.waitForTimeout(600);
-  const nachher = await P.evaluate(() => {
-    const t = document.querySelector('.sel-toolbar').getBoundingClientRect();
-    return [Math.round(t.left), Math.round(t.top)];
-  });
-  const gx = nachher[0] - griff.leiste[0]; const gy = nachher[1] - griff.leiste[1];
-  console.log(`    [${Math.round(A * 100)} %] Maus ${dx}/${dy} → Leiste ${gx}/${gy}`);
-  pruefe(`[${Math.round(A * 100)} %] die Leiste folgt dem Finger eins zu eins`,
-    Math.abs(gx - dx) < 14 && Math.abs(gy - dy) < 14, `${gx}/${gy} statt ${dx}/${dy}`);
+  console.log(`    [${Math.round(A * 100)} %]`, JSON.stringify(m));
+  pruefe(`[${Math.round(A * 100)} %] die Leiste ist da`, !!m);
+  if (m) {
+    pruefe(`[${Math.round(A * 100)} %] sie liegt nicht auf der Karte`, m.dock || m.ueberKarte <= 0, JSON.stringify(m));
+    pruefe(`[${Math.round(A * 100)} %] sie klebt an der Kante (≤ 30 Punkte)`,
+      m.dock || m.abstand <= 30, JSON.stringify(m));
+    pruefe(`[${Math.round(A * 100)} %] und steht vollständig im Bild`, m.imBild, JSON.stringify(m));
+    pruefe(`[${Math.round(A * 100)} %] kein Zieh-Griff mehr (M292)`, !m.griff);
+  }
   await ctx.close();
 }
 

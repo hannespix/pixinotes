@@ -48,6 +48,8 @@ Screenshots und Zwischendateien landen in `pruefungen/ablage/`
 | m288 | Board- und Projekt-Menü: überall derselbe Vorrat, Archiv, Duplikate |
 | m289 | Bilder in Notizen: einfügen, verkleinern, Chip am Telefon, Export |
 | m290 | Android-Teilen: Manifest, Service Worker, Zielwahl, Übernahme |
+| m291 | Karten-Fokus: Blättern, Formatieren und Werkzeuge ohne Überlappung |
+| m292 | Auswahl-Leiste dockt an die Karte (oben/unten/feste Zeile) |
 
 Die Reihen sind bewusst GEGEN DAS VERHALTEN geschrieben, nicht gegen die
 Struktur: Wo möglich messen sie Bildpunkte, echte Downloads, abgefangene

@@ -40,7 +40,6 @@ const FELDER = [
   'milchglas',
   'syncDateienMb',  // wie viele MB Dateien der Sync-Stand mitnimmt
   'navLinks',        // Navigation links statt oben
-  'leisteVersatz',   // wohin die Bearbeiten-Leiste geschoben wurde
   'navBreite',       // Breite des linken Slideouts
   'sidebar',         // offen? welche Ansicht? wie breit?
   'clickZoom',

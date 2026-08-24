@@ -656,24 +656,10 @@ input.img-titel {
 /* M268: Der Versatz sitzt am ANKER (dem Kasten, den React Flow positioniert),
    nicht am sichtbaren Balken — der trägt den Anzeige-Faktor und würde den
    Versatz sonst mitskalieren. */
-.sel-toolbar-anker { translate: var(--lv-x, 0px) calc(var(--lv-y, 0px) + var(--lv-typo, 0px)); }
-.sel-griff {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; align-self: stretch; margin: -7px 2px -7px -6px;
-  color: var(--muted); opacity: .55; cursor: grab;
-  border-radius: 9px 0 0 9px;
-  /* Der Griff bleibt vom Text-Markieren und vom Seiten-Scrollen ausgenommen —
-     sonst zieht der Finger am Handy die Seite statt der Leiste. */
-  touch-action: none; user-select: none; -webkit-user-select: none;
-}
-.sel-griff:hover { opacity: 1; background: var(--surface-2); }
-.sel-griff:active { cursor: grabbing; }
-/* Verschoben? Dann zeigt der Griff das an — sonst wüsste niemand, warum die
-   Leiste woanders steht, und der Doppelklick zum Zurücksetzen bliebe verborgen. */
-.sel-griff.an { opacity: .9; color: var(--accent-strong); }
-.sel-toolbar.zieht { cursor: grabbing; box-shadow: 0 8px 30px rgba(50, 40, 20, .28); }
-/* Beim Ziehen keine Übergänge — die würden hinter dem Finger herlaufen */
-.sel-toolbar.zieht, .sel-toolbar.zieht * { transition: none !important; }
+/* M292: Kein gemerkter Versatz mehr — die Leiste sitzt an der Karte (oben,
+   sonst unten) oder als feste Zeile unten. Geblieben ist nur das Ausweichen
+   vor der Formatier-Leiste (M267). */
+.sel-toolbar-anker { translate: 0 var(--lv-typo, 0px); }
 
 /* ---------- Toast ---------- */
 .toast {
@@ -4212,9 +4198,7 @@ button.link-dead:disabled { opacity: 0.45; }
 /* Auswahl-Leiste auf Phones: feste Aktionsleiste über dem Dock — oben bleibt
    Platz für Kopf- und Tab-Leiste (Kollisions-Befund aus dem User-Screenshot) */
 .sel-toolbar-dock {
-  /* M243: die Zentrierung und der gemerkte Versatz in EINER Angabe — zwei
-     `translate`-Regeln würden einander überschreiben, nicht addieren */
-  position: fixed; left: 50%; translate: calc(-50% + var(--lv-x, 0px)) var(--lv-y, 0px);
+  position: fixed; left: 50%; translate: -50% 0;
   /* M267: Am Telefon dockt die Formatier-Leiste unten an (M226) — genau dort,
      wo diese Leiste steht. Solange sie im Bild ist, rückt die Karten-Leiste
      um deren Höhe nach oben, statt sich verdecken zu lassen. */

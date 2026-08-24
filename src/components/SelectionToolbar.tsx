@@ -1,13 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { NodeToolbar, Position, useReactFlow } from '@xyflow/react';
+import { NodeToolbar, Position, useReactFlow, useStore } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGrip, IGridLayout, IMail, IMore, IMoveTo, IPen, ITag, ITrash, IType, IUndo, IWand, IX } from './Icons';
-import { useLeisteZiehen } from '../lib/leisteZiehen';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMail, IMore, IMoveTo, IPen, ITag, ITrash, IType, IUndo, IWand, IX } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -46,15 +45,31 @@ export function SelectionToolbar() {
     mq.addEventListener('change', on);
     return () => mq.removeEventListener('change', on);
   }, []);
-  /**
-   * M243: Die Leiste lässt sich an ihrem Anfasser wegschieben; wohin, wird
-   * gemerkt. Getrennt für Board und Fokus, weil die Leiste dort verschieden
-   * sitzt — im Fokus als feste Zeile unten, auf dem Board schwebend an der
-   * Karte. Ein gemeinsamer Wert würde die eine Situation zerschießen, sobald
-   * man die andere zurechtrückt.
-   */
   const imFokus = useBoard((s) => !!s.focusCard);
-  const { versatz, anfasser, verschoben, ziehtGerade } = useLeisteZiehen(imFokus ? 'fokus' : 'board', '.sel-toolbar');
+  /**
+   * M292: Wo die Leiste steht, ist keine Geschmacksfrage mehr.
+   *
+   * Vorher (M243) ließ sie sich frei wegschieben, und der Versatz wurde
+   * gemerkt — gedacht als Ausweg, weil „über der Auswahl" mal den Inhalt
+   * verdeckte und mal am Bildrand keinen Platz hatte. In der Praxis stand sie
+   * dadurch überall woanders (User-Bildschirmfoto: mitten auf der Karte).
+   *
+   * Statt Freiheit gibt es jetzt eine Regel, die man nach einmal Sehen kennt:
+   *   1. ÜBER der Karte — die Standardstelle, dort verdeckt sie nichts.
+   *   2. Passt oben nichts mehr hin (Karte klebt unter der Kopfleiste),
+   *      geht sie UNTER die Karte.
+   *   3. Passt auch das nicht (Karte größer als der Schirm, Telefon), wird
+   *      sie zur festen Zeile am unteren Bildrand — dieselbe, die der Fokus
+   *      und das Telefon ohnehin benutzen.
+   *
+   * Gemessen wird in Bildpunkten am echten Layout: Kopfleisten oben, Dock,
+   * Blätter- und Formatier-Leiste unten. Damit gilt dieselbe Regel auf jedem
+   * Schirm — sie fällt nur je nach Platz anders aus.
+   */
+  const leisteRef = useRef<HTMLDivElement | null>(null);
+  // Beim Pannen und Zoomen ändert sich der Platz — die Regel rechnet mit
+  const transform = useStore((z) => z.transform);
+  const [seite, setSeite] = useState<'oben' | 'unten' | 'dock'>('oben');
   // M168: Die Popover (KI/Attribute/Ausrichten/Verschieben) leben als PORTAL
   // mit fester Bildschirmposition — innerhalb der NodeToolbar deckelt der
   // Stacking-Kontext des Flow-Viewports sie unter Kopf- und Tab-Leiste, bei
@@ -195,7 +210,57 @@ export function SelectionToolbar() {
   const anchoredCount = (board.drawings ?? []).filter(
     (s) => s.anchor && selected.some((n) => n.id === s.anchor),
   ).length;
+  /** Unterkante des Kopf-Chromes bzw. Oberkante des Fuß-Chromes — gemessen */
+  const grenzen = () => {
+    const unterkante = (sel: string) => {
+      const e = document.querySelector(sel) as HTMLElement | null;
+      if (!e || e.offsetHeight === 0) return null;
+      return e.getBoundingClientRect().bottom;
+    };
+    const oberkante = (sel: string) => {
+      const e = document.querySelector(sel) as HTMLElement | null;
+      if (!e || e.offsetHeight === 0) return null;
+      return e.getBoundingClientRect().top;
+    };
+    const kopf = ['.focus-head', '.tabs', '.topbar']
+      .map(unterkante).filter((v): v is number => v !== null);
+    const fuss = ['.focus-nav', '.pn-format-dock', '.dock']
+      .map(oberkante).filter((v): v is number => v !== null);
+    return {
+      kopf: kopf.length ? Math.max(...kopf) : 0,
+      fuss: fuss.length ? Math.min(...fuss) : window.innerHeight,
+    };
+  };
+
+  const auswahlIds = [...selected, ...selFrames].map((n) => n.id).join(',');
+  useLayoutEffect(() => {
+    if (!auswahlIds || (phone && imFokus)) return;
+    const kaesten = auswahlIds.split(',')
+      .map((id) => document.querySelector(`.react-flow__node[data-id="${id}"]`)?.getBoundingClientRect())
+      .filter((r): r is DOMRect => !!r && r.height > 0);
+    if (!kaesten.length) return;
+    const oben = Math.min(...kaesten.map((r) => r.top));
+    const unten = Math.max(...kaesten.map((r) => r.bottom));
+    // Höhe der Leiste selbst messen statt zu schätzen — sie wächst mit dem
+    // Anzeige-Zoom und bei mehreren Zeilen
+    const hoch = (leisteRef.current?.getBoundingClientRect().height || 46) + 22;
+    const g = grenzen();
+    /* „Unten" gilt nur, wenn die Unterkante der Karte überhaupt SICHTBAR ist:
+       Ist die Karte nach oben aus dem Bild gescrollt, läge die Leiste dort
+       zwar unter der Karte, aber hinter der Kopfleiste (gemessen: 45 Punkte
+       Überdeckung). Dann ist die feste Zeile unten der ehrlichere Platz. */
+    const naechste = oben - g.kopf >= hoch ? 'oben'
+      : (g.fuss - unten >= hoch && unten >= g.kopf) ? 'unten'
+        : 'dock';
+    setSeite((alt) => (alt === naechste ? alt : naechste));
+  }, [auswahlIds, transform, phone, imFokus]);
+
+
   if (selected.length === 0 && selFrames.length === 0) return null;
+  // Hinweis: Der Platz-Effekt oben steht bewusst VOR dieser Rückgabe — React
+  // verlangt, dass Hooks bei jedem Aufruf in derselben Reihenfolge laufen.
+  // Unterhalb einer bedingten Rückgabe platziert, riss er die ganze
+  // Board-Ansicht in die Fehlergrenze (gemessen in der Prüfreihe m292).
 
   /** KI-Aktion nur auf die ausgewählten Karten */
   const runAi = async (fn: (nodes: AppNode[], pos: { x: number; y: number }) => Promise<string>, restoreCmd?: string) => {
@@ -302,7 +367,6 @@ export function SelectionToolbar() {
 
   const bar = (
     <>
-      <span className={`sel-griff${verschoben ? ' an' : ''}`} {...anfasser}><IGrip size={16} /></span>
       <span className="sel-count">{selected.length + selFrames.length} ausgewählt{selFrames.length > 0 ? ` (${selFrames.length} Rahmen)` : ''}</span>
       {selFrames.length > 0 && (
         <span className="sel-ai-wrap">
@@ -641,27 +705,34 @@ export function SelectionToolbar() {
     </>
   );
 
-  // M243: Der gemerkte Versatz reist als CSS-Variable mit. Bewusst NICHT als
-  // `transform`: Den belegt bei der schwebenden Leiste React Flow für die
-  // Verankerung an der Karte, und bei der Dock-Leiste die Zentrierung
-  // (-50 %). Die eigenständige `translate`-Eigenschaft legt sich sauber davor.
-  const versatzStil = {
-    '--lv-x': `${versatz.x}px`,
-    '--lv-y': `${versatz.y}px`,
-  } as React.CSSProperties;
-
-  // Phone: feste Aktionsleiste über dem Dock (Portal — außerhalb des
-  // Flow-Stacking-Kontexts, Menüs öffnen von dort automatisch nach oben)
-  if (phone) {
+  /**
+   * M292: Im Karten-Fokus bleibt es bei der festen Zeile unten.
+   *
+   * Dort füllt die Karte den Schirm; „über der Karte" gäbe es gar nicht, und
+   * der Fuß ist seit M291 ohnehin fest gestapelt (Blättern · Formatieren ·
+   * Werkzeuge). Am Telefon ist der Fokus der Normalfall.
+   */
+  if (phone && imFokus) {
     return createPortal(
-      <div className={`sel-toolbar sel-toolbar-dock nodrag${ziehtGerade ? ' zieht' : ''}`} style={versatzStil}>{bar}</div>,
+      <div className="sel-toolbar sel-toolbar-dock nodrag" ref={leisteRef}>{bar}</div>,
       document.body,
     );
   }
 
   /**
-   * Desktop: schwebt über der Auswahl und wandert beim Pannen mit.
-   *
+   * M292: Sonst dockt die Leiste an der Karte an — oben, sonst unten, sonst
+   * als feste Zeile am unteren Bildrand. Welche der drei Stellen es wird,
+   * rechnet `seite` aus (siehe oben); frei verschieben lässt sie sich nicht
+   * mehr, damit man sie überall an derselben Stelle sucht und findet.
+   */
+  if (seite === 'dock') {
+    return createPortal(
+      <div className="sel-toolbar sel-toolbar-dock sel-toolbar-frei nodrag" ref={leisteRef}>{bar}</div>,
+      document.body,
+    );
+  }
+
+  /**
    * M268: Zwei Kästen statt einem. Den äußeren positioniert React Flow an der
    * Karte — er muss deshalb in demselben Punkte-Raum liegen wie die Leinwand,
    * die den Anzeige-Zoom herausrechnet. Der innere trägt das Aussehen und holt
@@ -673,14 +744,11 @@ export function SelectionToolbar() {
     <NodeToolbar
       nodeId={[...selected, ...selFrames].map((n) => n.id)}
       isVisible
-      position={Position.Top}
-      offset={14}
+      position={seite === 'unten' ? Position.Bottom : Position.Top}
+      offset={12}
       className="sel-toolbar-anker"
-      // NodeToolbar mischt `style` NACH seinem eigenen `transform` ein — die
-      // Variablen landen also gefahrlos auf demselben Element.
-      style={versatzStil}
     >
-      <div className={`sel-toolbar nodrag${ziehtGerade ? ' zieht' : ''}`}>{bar}</div>
+      <div className="sel-toolbar nodrag" ref={leisteRef}>{bar}</div>
     </NodeToolbar>
   );
 }
