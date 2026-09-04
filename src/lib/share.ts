@@ -71,8 +71,10 @@ export function cloneSharedBoard(board: BoardDoc): BoardDoc {
     // … und Ticket-Verknüpfungen ebenso (nodeIds werden gleich neu vergeben)
     if (clone.type === 'kanban') {
       const data = clone.data as KanbanData;
-      if (data.items?.some((it) => it.link)) {
-        clone.data = { ...data, items: data.items.map((it) => ({ ...it, link: undefined })) };
+      const ohneLink = (list: KanbanData['items']) => list.map((it) => ({ ...it, link: undefined }));
+      // … auch im Ticket-Archiv (M293)
+      if (data.items?.some((it) => it.link) || data.archiv?.some((it) => it.link)) {
+        clone.data = { ...data, items: ohneLink(data.items ?? []), archiv: data.archiv ? ohneLink(data.archiv) : undefined };
       }
     }
     return clone;

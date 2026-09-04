@@ -35,6 +35,7 @@ import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
 import { Tastatur } from './components/Tastatur';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
+import { autoArchivAlleBoards } from './lib/ticketArchiv';
 import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
 
 export default function App() {
@@ -142,6 +143,21 @@ export default function App() {
     };
     const t0 = setTimeout(remind, 2500);
     const iv = setInterval(remind, 5 * 60_000);
+    return () => { clearTimeout(t0); clearInterval(iv); };
+  }, []);
+
+  // M293: Auto-Archivierung erledigter Kanban-Tickets — beim Start und dann
+  // im selben Takt wie die Erinnerungen. Meldet sich nur, wenn wirklich etwas
+  // gewandert ist; das Nachtragen fehlender Erledigt-Stempel bleibt still.
+  useEffect(() => {
+    const lauf = () => {
+      const n = autoArchivAlleBoards();
+      if (n > 0) {
+        useBoard.getState().showToast(`🗃 ${n} erledigte${n === 1 ? 's Ticket' : ' Tickets'} automatisch archiviert — 🗃 am Kanban zeigt das Archiv.`);
+      }
+    };
+    const t0 = setTimeout(lauf, 4000);
+    const iv = setInterval(lauf, 5 * 60_000);
     return () => { clearTimeout(t0); clearInterval(iv); };
   }, []);
 
