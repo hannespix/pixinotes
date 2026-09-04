@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { mutedHistory, useBoard } from '../store';
-import { doneCol, kanbanCols, openSubs, ticketBlockers, uid, type GanttData, type KanbanData } from '../types';
+import { doneCol, kanbanCols, mitSpalte, openSubs, ticketBlockers, uid, type GanttData, type KanbanData } from '../types';
 import { makeKanban, makeNote } from '../lib/nodes';
 import {
   collectTaskTags, collectTasks, doneLog, downloadTasksIcs, formatDueShort, logDone,
@@ -240,8 +240,9 @@ export function TaskHub() {
         if (openSubs(item) > 0) { showToast(`☑ Noch ${openSubs(item)} Checklisten-Punkt(e) im Ticket offen.`); return; }
       }
       logDone(t); // „Heute geschafft"-Protokoll (M114)
+      // mitSpalte stempelt das Erledigt-Datum — Uhr der Auto-Archivierung (M293)
       updateNodeDataOnBoard(t.boardId, t.nodeId, {
-        items: k.items.map((it) => (it.id === t.itemId ? { ...it, col: doneCol(k) } : it)),
+        items: k.items.map((it) => (it.id === t.itemId ? mitSpalte(it, doneCol(k), k) : it)),
       });
       confetti({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
     } else if (t.kind === 'gantt') {
@@ -310,7 +311,7 @@ export function TaskHub() {
     }
     if (col >= doneCol(k)) { complete(t); return; } // letzte Spalte = erledigt (inkl. Checklisten-Gate)
     updateNodeDataOnBoard(t.boardId, t.nodeId, {
-      items: k.items.map((it) => (it.id === t.itemId ? { ...it, col } : it)),
+      items: k.items.map((it) => (it.id === t.itemId ? mitSpalte(it, col, k) : it)),
     });
   };
 

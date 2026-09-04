@@ -251,9 +251,15 @@ function baseNodeText(node: AppNode): string {
       // sie weder durchsuchbar noch im E-Mail-/Clipboard-Export (Audit R6-F2)
       const line = (it: (typeof k.items)[number], i: number) =>
         `  ${i === done ? '☑' : '☐'} ${it.text}${it.due ? ` (bis ${it.due})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` — ${it.note}` : ''}`;
+      // M293: Archivierte Tickets hängen als eigener Abschnitt an — so bleiben
+      // sie durchsuchbar (Strg+K) und fehlen in keinem Export
+      const arch = k.archiv ?? [];
+      const archText = arch.length
+        ? `\n\nArchiv (${arch.length}):\n${arch.map((it) => `  🗃 ${it.text}${it.who ? ` @${it.who}` : ''}`).join('\n')}`
+        : '';
       return `${k.title || 'Kanban'}\n${cols.map(
         (col, i) => `\n${col}:\n${k.items.filter((it) => Math.min(it.col, done) === i).map((it) => line(it, i)).join('\n') || '  —'}`,
-      ).join('')}`;
+      ).join('')}${archText}`;
     }
     case 'file': {
       // M263: Der eigene Titel steht vorn — danach wird gesucht und gefiltert.
@@ -356,7 +362,11 @@ export function nodeToHtml(node: AppNode): string {
         const items = k.items.filter((it) => Math.min(it.col, done) === i);
         return `<h4>${esc(col)}</h4><ul>${items.map((it) => `<li>${i === done ? '☑' : '☐'} ${esc(it.text)}</li>`).join('') || '<li>—</li>'}</ul>`;
       }).join('');
-      return `<h3>${esc(k.title)}</h3>${cols}`;
+      const arch = k.archiv ?? []; // M293
+      const archHtml = arch.length
+        ? `<h4>Archiv (${arch.length})</h4><ul>${arch.map((it) => `<li>🗃 ${esc(it.text)}</li>`).join('')}</ul>`
+        : '';
+      return `<h3>${esc(k.title)}</h3>${cols}${archHtml}`;
     }
     case 'image': {
       const img = node.data;

@@ -5,14 +5,15 @@ import confetti from 'canvas-confetti';
 import { runDerived, useBoard } from '../../store';
 import { makeTicketDrag, type DropTarget } from '../../lib/dragTickets';
 import {
-  kanbanCols, openSubs, ticketBlockers, uid, wipFull, wipLimitOf,
+  kanbanCols, mitSpalte, openSubs, ticketBlockers, uid, wipFull, wipLimitOf,
   type GanttData, type KanbanData, type KanbanItem, type KanbanNode, type TimeData,
 } from '../../types';
 import { annotateCheckBlock, collectListTasks, collectTasks, formatDueShort, stripStatusMark, urgencyFor } from '../../lib/tasks';
 import { linkedNeighborIds } from '../../lib/links';
 import { fmtHM, linkedOfType, timeSums } from '../../lib/moduleFeeds';
 import { nodeToText } from '../../lib/serialize';
-import { ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, ISearch, ISettings, IX } from '../Icons';
+import { AUTO_ARCHIV_STANDARD_TAGE, archiviere, autoArchivLauf, holeZurueck } from '../../lib/ticketArchiv';
+import { IArchive, IArchiveRestore, ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, ISearch, ISettings, IX } from '../Icons';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 
@@ -35,6 +36,16 @@ const tagHue = (tag: string): number => {
   for (let i = 0; i < tag.length; i += 1) h = (h * 31 + tag.charCodeAt(i)) % 360;
   return h;
 };
+
+/** Kurzdatum für Archiv-Zeilen und Ticket-Fenster (M293): „03.09.26" */
+const kurzDatum = (iso?: string): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: '2-digit' });
+};
+
+/** Tage-Eingabe der Automatik bereinigen (M293): 1–365, Unsinn wird zur Voreinstellung */
+const saubereTage = (v: number): number => Math.max(1, Math.min(365, Math.round(v) || AUTO_ARCHIV_STANDARD_TAGE));
 
 /**
  * Der eigentliche Kanban-Inhalt — geteilt zwischen Board-Karte und
@@ -253,12 +264,13 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         if (next !== it) updated++;
       }
       if (!it.link.itemId.startsWith('pos:')) {
+        // mitSpalte pflegt den Erledigt-Stempel — die Uhr der Auto-Archivierung (M293)
         if (next.col < done && !openKeys.has(key)) {
           moved++;
-          next = { ...next, col: done };
+          next = mitSpalte(next, done, kanban);
         } else if (next.col >= done && openKeys.has(key)) {
           reopened++;
-          next = { ...next, col: 0 };
+          next = mitSpalte(next, 0, kanban);
         }
       }
       return next;
@@ -331,8 +343,9 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     if (col === done) {
       confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
     }
-    // Beim Spaltenwechsel zusätzlich an die gewünschte Stelle einsortieren
-    const moved = kanban.items.map((it) => (it.id === item.id ? { ...it, col } : it));
+    // Beim Spaltenwechsel zusätzlich an die gewünschte Stelle einsortieren —
+    // mitSpalte pflegt dabei den Erledigt-Stempel (Uhr der Auto-Archivierung, M293)
+    const moved = kanban.items.map((it) => (it.id === item.id ? mitSpalte(it, col, kanban) : it));
     setItems(at === undefined ? moved : spliceIntoCol(moved, item.id, col, at));
     writeBackToSource(item, col);
   };
@@ -399,7 +412,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       const srcDone = kanbanCols(k).length - 1;
       if (!srcIt || srcIt.col === srcDone) return;
       st.updateNodeDataOnBoard(link.boardId, link.nodeId, {
-        items: k.items.map((i) => (i.id === link.itemId ? { ...i, col: srcDone } : i)),
+        items: k.items.map((i) => (i.id === link.itemId ? mitSpalte(i, srcDone, k) : i)),
       });
       showToast('☑ Auch im Quell-Kanban erledigt.');
     }
@@ -593,6 +606,56 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     showToast(`${gone.length} Ticket(s) aus „${boardName(bid)}" entfernt — werden nicht erneut eingesammelt.`);
   };
 
+  // ---------- Archiv (M293): Erledigtes aus den Spalten nehmen, ohne es zu löschen ----------
+  const [archivOpen, setArchivOpen] = useState(false);
+  const archiv = kanban.archiv ?? [];
+  // Fokus aufs Panel — beim Öffnen und nach jedem Handgriff. Sonst landet der
+  // Fokus auf dem Body, sobald der geklickte Knopf mit seiner Zeile
+  // verschwindet (Zurückholen, Löschen), und Esc erreicht das Panel nicht mehr.
+  const archivRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (archivOpen) archivRef.current?.focus();
+  }, [archivOpen]);
+  const archivFokus = () => setTimeout(() => archivRef.current?.focus(), 0);
+  /** Tage-Wert fürs Eingabefeld — unabhängig davon, ob die Automatik gerade an ist */
+  const anzeigeTage = kanban.autoArchivTage && kanban.autoArchivTage > 0 ? saubereTage(kanban.autoArchivTage) : AUTO_ARCHIV_STANDARD_TAGE;
+  const archiviereTickets = (ids: string[]) => {
+    if (ids.length === 0) return;
+    updateNodeData(id, archiviere(kanban, ids));
+    if (detailId && ids.includes(detailId)) setDetailId(null);
+    showToast(ids.length === 1
+      ? '🗃 Ticket archiviert — 🗃 in der Kopfzeile zeigt das Archiv, Strg+Z holt es sofort zurück.'
+      : `🗃 ${ids.length} erledigte Tickets archiviert — 🗃 in der Kopfzeile zeigt das Archiv, Strg+Z holt sie zurück.`);
+  };
+  /** Die ganze Erledigt-Spalte — bei aktivem Filter nur, was gerade zu sehen ist */
+  const erledigteZumArchivieren = (filtering ? visibleItems : kanban.items).filter((it) => colOf(it) === done);
+  const holeZurueckTickets = (ids: string[]) => {
+    if (ids.length === 0) return;
+    updateNodeData(id, holeZurueck(kanban, ids));
+    archivFokus();
+    showToast(ids.length === 1 ? `↩ Ticket zurück in „${cols[done]}".` : `↩ ${ids.length} Tickets zurück in „${cols[done]}".`);
+  };
+  const loescheArchivierte = (ids: string[]) => {
+    if (ids.length === 0) return;
+    updateNodeData(id, { archiv: archiv.filter((it) => !ids.includes(it.id)) });
+    archivFokus();
+    showToast(`${ids.length === 1 ? 'Archiviertes Ticket' : `${ids.length} archivierte Tickets`} endgültig gelöscht — Strg+Z macht das rückgängig.`);
+  };
+  /** Automatik umstellen — und sofort anwenden, damit die Wirkung zu sehen ist.
+   *  Einstellung und Lauf gehen in EINEM Store-Schritt, Strg+Z nimmt also beides
+   *  zusammen zurück. Der regelmäßige Lauf (App.tsx) übernimmt danach. */
+  const setzeAutoArchiv = (an: boolean, tageNeu: number) => {
+    const tage = saubereTage(tageNeu);
+    const next: KanbanData = { ...kanban, autoArchiv: an || undefined, autoArchivTage: tage };
+    const erg = an ? autoArchivLauf(next) : null;
+    updateNodeData(id, { autoArchiv: next.autoArchiv, autoArchivTage: tage, ...(erg?.patch ?? {}) });
+    if (erg?.archiviert) {
+      showToast(`🗃 ${erg.archiviert} erledigte${erg.archiviert === 1 ? 's Ticket war' : ' Tickets waren'} älter als ${tage} Tag${tage === 1 ? '' : 'e'} — jetzt im Archiv (Strg+Z holt zurück).`);
+    } else if (an) {
+      showToast(`⏱ Automatik an: Erledigtes wandert nach ${tage} Tag${tage === 1 ? '' : 'en'} ins Archiv — geprüft beim Start und alle 5 Minuten.`);
+    }
+  };
+
   const renderItem = (it: KanbanItem, colIdx: number) => (
     <div
       className={`kanban-item nodrag ${colIdx === done ? 'col-done' : colIdx === 0 ? 'col-first' : 'col-mid'} ${dragId === it.id ? 'dragging' : ''}`}
@@ -678,6 +741,10 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         {colIdx < done && (
           <button onClick={() => move(it, 1)} title="Weiter"><IChevronR size={11} /></button>
         )}
+        {colIdx === done && (
+          /* M293: erledigt → ins Archiv (aus der Spalte, nicht aus der Welt) */
+          <button className="k-archiv-btn" onClick={() => archiviereTickets([it.id])} title="Archivieren — verlässt die Spalte, bleibt im Archiv (🗃 in der Kopfzeile)"><IArchive size={11} /></button>
+        )}
         <button onClick={() => setEditingDue(editingDue === it.id ? null : it.id)} title="Fälligkeit setzen (Erinnerung!)"><ICalendar size={11} /></button>
         <button onClick={() => remove(it)} title="Entfernen"><IX size={11} /></button>
       </span>
@@ -756,6 +823,16 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           onClick={() => setCollectOpen((o) => !o)}
         >
           <ISettings size={12} />
+        </button>
+        <button
+          className={`kanban-addcol k-archiv-head nodrag ${archivOpen || kanban.autoArchiv ? 'k-auto-on' : ''}`}
+          title={`Archiv: ${archiv.length} archivierte${archiv.length === 1 ? 's Ticket' : ' Tickets'}${kanban.autoArchiv
+            ? ` · Automatik AN — Erledigtes wandert nach ${anzeigeTage} Tag${anzeigeTage === 1 ? '' : 'en'} ins Archiv`
+            : ' · Auto-Archivierung hier einschalten'}`}
+          onClick={() => setArchivOpen((o) => !o)}
+        >
+          <IArchive size={12} />
+          {archiv.length > 0 && <em className="k-head-count">{archiv.length}</em>}
         </button>
         <button className="kanban-addcol nodrag" title="Spalte hinzufügen" onClick={addCol}><IPlus size={12} /></button>
       </div>
@@ -857,6 +934,16 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     onClick={() => colIdx < done && setWipEdit(colIdx)}
                   >
                     {filtering ? colItems.length : realCount}{lim ? `/${lim}` : ''}
+                  </button>
+                )}
+                {colIdx === done && erledigteZumArchivieren.length > 0 && (
+                  /* M293: die ganze Erledigt-Spalte auf einmal ins Archiv */
+                  <button
+                    className="kanban-col-x kanban-col-archiv nodrag"
+                    title={`Alle ${erledigteZumArchivieren.length} erledigten Tickets archivieren${filtering ? ' (nur die gefilterten)' : ''}`}
+                    onClick={() => archiviereTickets(erledigteZumArchivieren.map((it) => it.id))}
+                  >
+                    <IArchive size={10} />
                   </button>
                 )}
                 {cols.length > 2 && (
@@ -989,6 +1076,68 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           <div className="ticket-detail-foot">Gilt für ⭳ Einsammeln und ⟳ Auto-Abgleich · Esc schließt</div>
         </div>
       )}
+      {archivOpen && (
+        /* M293: Archiv-Panel — Automatik einstellen, Archiviertes zurückholen
+           oder endgültig löschen. Neueste zuerst, wie ein Protokoll. */
+        <div
+          className="ticket-detail collect-panel k-archiv-panel nodrag"
+          tabIndex={-1}
+          ref={archivRef}
+          onKeyDown={(e) => e.key === 'Escape' && setArchivOpen(false)}
+        >
+          <div className="ticket-detail-head">
+            <span>Archiv · {archiv.length} Ticket{archiv.length === 1 ? '' : 's'}</span>
+            <button title="Schließen" onClick={() => setArchivOpen(false)}><IX size={12} /></button>
+          </div>
+          <div className="k-archiv-auto">
+            <label title="Erledigte Tickets nach der eingestellten Zeit von selbst ins Archiv legen — geprüft beim Start und alle 5 Minuten. Die Zeit zählt ab dem Moment, in dem ein Ticket erledigt wurde.">
+              <input type="checkbox" checked={!!kanban.autoArchiv} onChange={(e) => setzeAutoArchiv(e.target.checked, anzeigeTage)} />
+              <span>Erledigte automatisch archivieren nach</span>
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={365}
+              key={anzeigeTage}
+              defaultValue={anzeigeTage}
+              disabled={!kanban.autoArchiv}
+              title="Tage in der Erledigt-Spalte — Enter oder Feld verlassen übernimmt"
+              onBlur={(e) => {
+                const v = saubereTage(Number(e.target.value));
+                e.target.value = String(v);
+                if (v !== anzeigeTage) setzeAutoArchiv(!!kanban.autoArchiv, v);
+              }}
+              onKeyDown={(e) => {
+                const el = e.target as HTMLInputElement;
+                if (e.key === 'Enter') el.blur();
+                if (e.key === 'Escape') { e.stopPropagation(); el.value = String(anzeigeTage); el.blur(); }
+              }}
+            />
+            <span>Tag{anzeigeTage === 1 ? '' : 'en'}</span>
+          </div>
+          <div className="collect-hint">Archivierte Tickets verlassen die Spalten, bleiben aber hier — sie zählen nirgends mehr mit (WIP-Limit, Aufgaben-Zentrale, Einsammeln). ↩ holt ein Ticket zurück nach „{cols[done]}", ✕ löscht es endgültig.</div>
+          {archiv.length === 0 && (
+            <div className="collect-sub-empty">Noch nichts archiviert — erledigte Tickets tragen 🗃, und die Spalte „{cols[done]}" hat „Alle archivieren".</div>
+          )}
+          {[...archiv].reverse().map((it) => (
+            <div className="collect-row k-archiv-row" key={it.id} data-archiv-id={it.id}>
+              <span className="collect-name" title={`${it.text}${it.who ? ` · ${it.who}` : ''}${it.note ? `\n${it.note}` : ''}`}>{it.text}</span>
+              <em className="k-archiv-meta" title={`Erledigt am ${kurzDatum(it.erledigtAm)} · archiviert am ${kurzDatum(it.archiviertAm)}`}>
+                ✓ {kurzDatum(it.erledigtAm)} · 🗃 {kurzDatum(it.archiviertAm)}
+              </em>
+              <button className="collect-clear k-archiv-back" title={`Zurückholen nach „${cols[done]}"`} onClick={() => holeZurueckTickets([it.id])}><IArchiveRestore size={12} /></button>
+              <button className="collect-clear" title="Endgültig löschen" onClick={() => loescheArchivierte([it.id])}><IX size={10} /></button>
+            </div>
+          ))}
+          {archiv.length > 1 && (
+            <div className="k-archiv-foot">
+              <button className="collect-reset" title={`Alle ${archiv.length} zurück nach „${cols[done]}"`} onClick={() => holeZurueckTickets(archiv.map((it) => it.id))}>Alle zurückholen</button>
+              <button className="collect-reset" title="Alle archivierten Tickets endgültig löschen (Strg+Z macht das rückgängig)" onClick={() => loescheArchivierte(archiv.map((it) => it.id))}>Archiv leeren</button>
+            </div>
+          )}
+          <div className="ticket-detail-foot">Esc schließt · Strg+Z nimmt jeden Archiv-Schritt zurück</div>
+        </div>
+      )}
       {(() => {
         const it = kanban.items.find((x) => x.id === detailId);
         if (!it) return null;
@@ -1038,6 +1187,13 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     >{label}</button>
                   ))}
                 </span>
+                {Math.min(it.col, done) === done && (
+                  /* M293: Erledigt-Datum zeigen und von hier aus archivieren */
+                  <span className="ticket-erledigt">
+                    ✓ erledigt{it.erledigtAm ? ` am ${kurzDatum(it.erledigtAm)}` : ''}
+                    <button className="ticket-jump" title="Ins Archiv legen — verlässt die Spalte, bleibt in der Karte" onClick={() => archiviereTickets([it.id])}><IArchive size={11} /> Archivieren</button>
+                  </span>
+                )}
               </div>
 
               <textarea
@@ -1088,9 +1244,10 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   {blockers.length > 0 && <span className="ticket-blocked-label">blockiert</span>}
                 </div>
                 {(it.deps ?? []).map((d) => {
-                  const dep = kanban.items.find((x) => x.id === d);
+                  // M293: ein archivierter Vorgänger ist erledigt — nicht verschwunden
+                  const dep = kanban.items.find((x) => x.id === d) ?? archiv.find((x) => x.id === d);
                   if (!dep) return null;
-                  const depDone = dep.col >= done;
+                  const depDone = dep.col >= done || !!dep.archiviertAm;
                   return (
                     <div key={d} className="ticket-dep">
                       <span className={`ticket-dep-state ${depDone ? 'done' : ''}`}>{depDone ? '✓' : '○'}</span>

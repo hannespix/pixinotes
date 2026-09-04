@@ -84,6 +84,13 @@ export interface KanbanItem {
   deps?: string[];
   /** Verknüpfte Karten/Module (mehrere, M118) — `link` bleibt für Auto-Abgleich */
   links?: Array<{ boardId: string; nodeId: string }>;
+  /** M293: Wann das Ticket in die Erledigt-Spalte kam (ISO-Zeitstempel) —
+   *  die Uhr der Auto-Archivierung. Fehlt bei älteren Ständen; der Archiv-
+   *  Lauf trägt es beim ersten Sehen nach. Die Frist zählt also ab da, nicht
+   *  rückwirkend: Niemand will nach einem Update eine leergefegte Spalte. */
+  erledigtAm?: string;
+  /** M293: Wann das Ticket ins Archiv kam — nur im `archiv`-Bestand gesetzt */
+  archiviertAm?: string;
 }
 
 /** Offene Blocker eines Tickets: Titel der unerledigten Abhängigkeiten (M118) */
@@ -119,6 +126,16 @@ export interface KanbanData {
   /** WIP-Limits je Spaltenindex (M119): 0/undefined = kein Limit; für die
    *  Erledigt-Spalte wirkungslos. Läuft bei ＋/✕-Spalten parallel zu `cols`. */
   wip?: Array<number | null>;
+  /** M293: Archivierte Tickets — aus den Spalten heraus, aber nicht weg.
+   *  Bewusst ein EIGENER Bestand statt eines Flags an jedem Ticket: So lassen
+   *  WIP-Zähler, Abhängigkeiten, Aufgaben-Zentrale, Einsammeln und Export das
+   *  Archiv von selbst in Ruhe, ohne dass jede Stelle daran denken müsste. */
+  archiv?: KanbanItem[];
+  /** M293: Auto-Archivierung an — erledigte Tickets wandern nach
+   *  `autoArchivTage` Tagen von selbst ins Archiv */
+  autoArchiv?: boolean;
+  /** M293: nach wie vielen Tagen in „Erledigt" (Standard 7, siehe ticketArchiv.ts) */
+  autoArchivTage?: number;
   [key: string]: unknown;
 }
 
@@ -387,6 +404,24 @@ export function doneCol(data: KanbanData): number {
   return kanbanCols(data).length - 1;
 }
 export const isOpenItem = (item: KanbanItem, data: KanbanData): boolean => item.col < doneCol(data);
+
+/**
+ * M293: Spalte setzen und dabei das Erledigt-Datum pflegen — hinein in die
+ * Erledigt-Spalte stempelt den Zeitpunkt, heraus löscht ihn wieder. Alle
+ * Wege, auf denen ein Ticket erledigt wird (Pfeil, Ziehen, Ticket-Fenster,
+ * Aufgaben-Zentrale, Auto-Abgleich), laufen hier durch — so hat die
+ * Auto-Archivierung eine verlässliche Uhr statt einer geratenen.
+ */
+export function mitSpalte(it: KanbanItem, col: number, data: KanbanData, now: Date = new Date()): KanbanItem {
+  const dc = doneCol(data);
+  if (col >= dc) {
+    // Schon erledigt und gestempelt (z. B. Umsortieren): Stempel bleibt
+    return { ...it, col, erledigtAm: it.col >= dc && it.erledigtAm ? it.erledigtAm : now.toISOString() };
+  }
+  if (it.erledigtAm === undefined) return { ...it, col };
+  const { erledigtAm: _weg, ...rest } = it;
+  return { ...rest, col };
+}
 
 export function uid(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
