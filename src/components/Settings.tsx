@@ -185,6 +185,11 @@ export function Settings() {
   const setStiftZeichnet = useBoard((s) => s.setStiftZeichnet);
   const setClickZoom = useBoard((s) => s.setClickZoom);
   const cardFocus = useBoard((s) => s.cardFocus);
+  // M294: Bewegung auf der Fläche als Optionen — Physik, Klick-Zoom, Konfetti
+  const physicsEnabled = useBoard((s) => s.physicsEnabled);
+  const setPhysicsEnabled = useBoard((s) => s.setPhysicsEnabled);
+  const konfetti = useBoard((s) => s.konfetti);
+  const setKonfetti = useBoard((s) => s.setKonfetti);
   const brainOffSpaces = useBoard((s) => s.brainOffSpaces);
   const toggleBrainSpace = useBoard((s) => s.toggleBrainSpace);
   const setCardFocus = useBoard((s) => s.setCardFocus);
@@ -1316,11 +1321,7 @@ export function Settings() {
         {tab === 'design' && (
         <section className="modal-section">
           <h3>Design</h3>
-          <p className="modal-hint">
-            Erscheinungsbild und Akzentfarbe gelten sofort und werden lokal gespeichert.
-            „System" folgt automatisch der Hell/Dunkel-Einstellung deines Geräts.
-            Haftnotizen und Formen bleiben bewusst helles „Papier" — auch im dunklen Design.
-          </p>
+          <p className="modal-hint">Gilt sofort. „System" folgt der Hell/Dunkel-Einstellung deines Geräts, Haftnotizen bleiben auch im Dunkeln helles Papier.</p>
           <label className="modal-row">
             <span>Erscheinungsbild</span>
             <select value={ui.theme} onChange={(e) => setUiTheme(e.target.value as 'system' | 'light' | 'dark')}>
@@ -1352,11 +1353,10 @@ export function Settings() {
           </div>
 
           {/* ---- M224: Sehen & Bedienen ---- */}
+          {/* M294: Ein Satz je Schalter. Die Begründungen standen hier als
+              Absätze — Commit-Prosa vor dem Schalter. Wer mehr wissen will,
+              findet es in der Hilfe. */}
           <h3 style={{ marginTop: 16 }}>Sehen &amp; Bedienen</h3>
-          <p className="modal-hint">
-            Für Augen, die nicht mehr die besten sind — und für alle, die ohne Brille
-            arbeiten. Die Einstellungen gelten für die ganze App und bleiben gespeichert.
-          </p>
           <div className="modal-row">
             <span>Anzeigegröße</span>
             <div className="seg">
@@ -1371,30 +1371,17 @@ export function Settings() {
               ))}
             </div>
           </div>
-          <p className="modal-hint">
-            Vergrößert <b>alles</b> — Schrift, Knöpfe, Abstände und die Karteninhalte.
-            Bewusst nicht nur die Schrift: Wer Text schlecht liest, trifft auch kleine
-            Knöpfe schlecht. Schneller erreichbar ist das über <b>A− / A+</b> im
-            PixiNotes-Menü oben links.
-          </p>
+          <p className="modal-hint">Vergrößert alles: Schrift, Knöpfe, Abstände und Karteninhalte. Schneller geht es mit A− / A+ im PixiNotes-Menü.</p>
           <label className="modal-row modal-row-check">
             <span>Gut lesbare Schrift</span>
             <input type="checkbox" checked={lesbareSchrift} onChange={(e) => setLesbareSchrift(e.target.checked)} />
           </label>
-          <p className="modal-hint">
-            Stellt die ganze App auf <b>Atkinson Hyperlegible</b> um — eigens dafür
-            entworfen, dass sich ähnliche Zeichen (I l 1, O 0, a o) auch bei Sehschwäche
-            unterscheiden lassen. Karten mit eigener Schriftwahl behalten ihre.
-          </p>
+          <p className="modal-hint">Atkinson Hyperlegible für die ganze App: ähnliche Zeichen wie I, l und 1 bleiben unterscheidbar.</p>
           <label className="modal-row modal-row-check">
             <span>Mehr Kontrast</span>
             <input type="checkbox" checked={hoherKontrast} onChange={(e) => setHoherKontrast(e.target.checked)} />
           </label>
-          <p className="modal-hint">
-            Kräftigere Schrift und Ränder, kein Milchglas, keine Papiertextur, deutlicher
-            Fokusrahmen. Genau die Effekte, die modern aussehen, kosten Kontrast — hier
-            lassen sie sich abschalten, ohne dass alle darauf verzichten müssen.
-          </p>
+          <p className="modal-hint">Kräftigere Schrift und Ränder, kein Milchglas, keine Papiertextur.</p>
           <label className="modal-row modal-row-check">
             <span>Milchglas</span>
             <input
@@ -1404,46 +1391,22 @@ export function Settings() {
               onChange={(e) => setMilchglas(e.target.checked)}
             />
           </label>
-          <p className="modal-hint">
-            Die durchscheinenden Flächen an Leisten und kleinen Menüs. Dort hilft es:
-            Man sieht, wo die Karte darunter weitergeht. Zum <b>Lesen</b> hilft es nicht —
-            Einstellungen, Hilfe, Navigator, Überblick, Aufgaben und Ticket-Fenster sind
-            deshalb immer deckend, egal wie dieser Schalter steht. Aus ist außerdem
-            flotter: Der Weichzeichner kostet auf älteren Geräten spürbar Leistung.
-            {hoherKontrast && <> Mit <b>Mehr Kontrast</b> ist Milchglas ohnehin aus.</>}
-          </p>
+          <p className="modal-hint">Durchscheinende Leisten und Menüs. Aus ist auf älteren Geräten flotter.</p>
 
           <h3 style={{ marginTop: 16 }}>Bedienung</h3>
           <label className="modal-row modal-row-check">
             <span>Navigation links statt oben</span>
             <input type="checkbox" checked={navLinks} onChange={(e) => setNavLinks(e.target.checked)} />
           </label>
-          <p className="modal-hint">
-            Kopfleiste und Board-Auswahl wandern in eine <b>linke Spalte</b>. Das ist eine
-            Platzfrage: Am großen Schirm ist nach unten reichlich Raum und nach rechts
-            wenig — eine Spalte zeigt zwanzig Board-Namen untereinander, wo die Reihe
-            schon bei fünf überläuft, und jeder Name steht ungekürzt da. Nebenbei kann
-            dort nichts mehr mit den Aktionsknöpfen kollidieren, weil beide untereinander
-            stehen. <b>Am Telefon</b> bleibt es bei der Kopfleiste — dort ist die Breite
-            das knappe Gut, eine feste Spalte fräße ein Drittel davon.
-            Seit M263 ist die Spalte am großen Schirm <b>voreingestellt</b>; dieser
-            Schalter nimmt sie wieder zurück.
-          </p>
+          <p className="modal-hint">Ab Tablet-Breite stehen Bereiche, Projekte und Boards in einer linken Spalte. Am Telefon bleibt es bei der Kopfleiste.</p>
           <label className="modal-row modal-row-check">
             <span>Karte im Fokus</span>
             <input type="checkbox" checked={cardFocus} onChange={(e) => setCardFocus(e.target.checked)} />
           </label>
           <p className="modal-hint">
-            Ein Klick auf eine Karte öffnet sie groß — mit Kopfzeile, Blättern und allen
-            Karten-Werkzeugen. Am <b>Handy</b> formatfüllend, ab <b>Tablet-Breite</b> als
-            Blatt über dem Board, das abgedunkelt sichtbar bleibt. Wischen (oder ‹ ›)
-            wechselt die Karte, Wischen nach unten, Esc oder die Zurück-Taste führen
-            zurück; die Karte fliegt dabei an ihren Platz und wird ganz ins Bild gerückt.
-            <b> Abgeschaltet</b> gilt wieder der alte Klick-Zoom (unten einstellbar).
+            Doppelklick (am Handy ein Tipp) öffnet eine Karte groß, mit Blättern zur Nachbarkarte.{' '}
+            <button className="link-btn" onClick={() => { setOpen(false); useBoard.getState().setHelpOpen(true, 'start'); }}>Mehr dazu</button>
           </p>
-          {/* M235: Der Handy-Zoom, auf Wunsch auch am großen Bildschirm.
-              Zwei Schalter statt einem, weil es zwei Fragen sind: womit
-              öffne ich, und wie groß wird es. */}
           <label className="modal-row modal-row-check">
             <span>… am PC mit einem Klick öffnen</span>
             <input
@@ -1453,14 +1416,7 @@ export function Settings() {
               onChange={(e) => setFokusEinKlick(e.target.checked)}
             />
           </label>
-          <p className="modal-hint">
-            Wie am Handy: Ein einfacher Klick öffnet die Karte groß. Standardmäßig braucht
-            es dafür am PC einen <b>Doppelklick</b> — denn mit der Maus setzt ein Klick den
-            Cursor in den Text, und wer direkt auf dem Board schreiben will, möchte dabei
-            nicht jedes Mal ins große Blatt springen. <b>Eingeschaltet</b> gilt die
-            Handy-Abmachung: Notizen bearbeitest du dann im Blatt statt auf dem Board.
-            Der Doppelklick funktioniert weiterhin.
-          </p>
+          <p className="modal-hint">Wie am Handy. Notizen bearbeitest du dann im großen Blatt statt auf dem Board.</p>
           <label className="modal-row modal-row-check">
             <span>… am PC formatfüllend statt als Blatt</span>
             <input
@@ -1470,41 +1426,36 @@ export function Settings() {
               onChange={(e) => setFokusVollbild(e.target.checked)}
             />
           </label>
-          <p className="modal-hint">
-            Die Karte nimmt den ganzen Bildschirm ein, das Board tritt komplett zurück —
-            genau wie am Handy. Ohne diesen Schalter schwebt sie ab Tablet-Breite als
-            Blatt über dem abgedunkelten Board, damit man sieht, wo man gerade ist.
-            Geschmackssache: <b>randlos</b> ist konzentrierter, <b>Blatt</b> behält den
-            Zusammenhang.
-          </p>
+          <p className="modal-hint">Die Karte nimmt den ganzen Bildschirm ein, das Board tritt zurück.</p>
           <label className="modal-row modal-row-check">
             <span>Stift zeichnet sofort</span>
             <input type="checkbox" checked={stiftZeichnet} onChange={(e) => setStiftZeichnet(e.target.checked)} />
           </label>
-          <p className="modal-hint">
-            Für Apple Pencil und andere Stifte: <b>Stift schreibt, Hand schiebt.</b> Der Stift
-            zeichnet direkt auf der freien Fläche, ohne dass du erst das Zeichenwerkzeug
-            wählst; Finger und Maus verschieben und zoomen weiter wie gewohnt. Der
-            aufliegende Handballen wird ignoriert, solange der Stift zeichnet, und der
-            Druck bestimmt die Strichstärke. Über einer Karte bleibt der Stift ein normaler
-            Zeiger — sonst könntest du damit keine Notiz mehr antippen.
-          </p>
-          <label className="modal-row modal-row-check">
-            <span>Klick-Zoom</span>
-            <input type="checkbox" checked={clickZoom} onChange={(e) => setClickZoom(e.target.checked)} />
-          </label>
-          <p className="modal-hint">
-            Beim Anklicken fliegt die Ansicht sanft zur Karte — aber nur, wenn sie klein
-            oder angeschnitten ist. Wer schon nah dran arbeitet, wird nicht herumgeworfen.
-          </p>
+          <p className="modal-hint">Apple Pencil und andere Stifte zeichnen direkt auf der Fläche, Finger und Maus schieben weiter.</p>
           <label className="modal-row modal-row-check">
             <span>Mausrad zoomt</span>
             <input type="checkbox" checked={wheelZoom} onChange={(e) => setWheelZoom(e.target.checked)} />
           </label>
-          <p className="modal-hint">
-            Miro-Stil: Rad zoomt direkt (verschieben per Karten-Fläche ziehen).
-            Aus = Rad scrollt, Zoomen mit Strg+Rad oder Pinch.
-          </p>
+          <p className="modal-hint">Aus: Rad scrollt, Zoomen mit Strg+Rad oder Pinch. An: Rad zoomt direkt wie in Miro.</p>
+
+          {/* M294: Bewegung ist eine Option. Vorher waren Physik und Klick-Zoom
+              an und Konfetti gar nicht abschaltbar — die Fläche war nie still. */}
+          <h3 style={{ marginTop: 16 }}>Bewegung auf der Fläche</h3>
+          <p className="modal-hint">Alles hier ist aus, damit die Fläche ruhig bleibt. Wer es lebendiger mag, schaltet es ein.</p>
+          <label className="modal-row modal-row-check">
+            <span>Physik: Karten weichen aus</span>
+            <input type="checkbox" checked={physicsEnabled} onChange={(e) => setPhysicsEnabled(e.target.checked)} />
+          </label>
+          <p className="modal-hint">Karten schieben sich beim Ziehen beiseite und lassen sich werfen. Aus dürfen sie überlappen und stapeln.</p>
+          <label className="modal-row modal-row-check">
+            <span>Klick-Zoom</span>
+            <input type="checkbox" checked={clickZoom} onChange={(e) => setClickZoom(e.target.checked)} />
+          </label>
+          <p className="modal-hint">Beim Anklicken fliegt die Ansicht zu kleinen oder angeschnittenen Karten. Esc fliegt zurück.</p>
+          <label className="modal-row modal-row-check">
+            <span>Konfetti beim Erledigen</span>
+            <input type="checkbox" checked={konfetti} onChange={(e) => setKonfetti(e.target.checked)} />
+          </label>
         </section>
         )}
 

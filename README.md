@@ -34,7 +34,7 @@ npm run dev        # → http://localhost:5173
 - 📧 **Outlook-E-Mails per Drag & Drop**: `.eml`- und `.msg`-Dateien werden im Browser geparst (postal-mime / msgreader) und zu strukturierten Karten mit **Anhang-Chips** — Bild-Anhänge lassen sich als eigene Karten herauslösen
 - ☎️ **Smart Layer**: Telefonnummern automatisch klickbar (`tel:`-Link), URLs und E-Mail-Adressen ebenso (libphonenumber-js); 📅 **Fristen-Erkennung** („bis Freitag") mit Countdown-Chips und `.ics`-Kalender-Export (chrono-node)
 - 🖼️ **Strg+V** fügt Screenshots als Bild-Karten ein; beliebige Dateien per Drop als Datei-Karten
-- 📋 **Kanban-Karten** mit frei benennbaren Spalten (Anzahl variabel), Ticket in die letzte Spalte schieben → 🎉 Konfetti; Tickets können ein **Fälligkeitsdatum** (📅) tragen. Erledigte Tickets lassen sich **archivieren** — einzeln, die ganze Spalte auf einmal oder **automatisch nach einstellbaren Tagen**; das Archiv der Karte holt sie jederzeit zurück
+- 📋 **Kanban-Karten** mit frei benennbaren Spalten (Anzahl variabel), Ticket in die letzte Spalte schieben (auf Wunsch mit 🎉 Konfetti); Tickets können ein **Fälligkeitsdatum** (📅) tragen. Erledigte Tickets lassen sich **archivieren** — einzeln, die ganze Spalte auf einmal oder **automatisch nach einstellbaren Tagen**; das Archiv der Karte holt sie jederzeit zurück
 - 🔍 **Zoombare Vorschau**: PDF-Seiten und Bilder lassen sich vergrößern (＋/−, Strg+Rad, Doppelklick, Zwei-Finger-Kneifen, Tasten + − 0) — die PDF-Seite wird dabei neu gerendert und bleibt scharf
 - 👁 **Dateien zeigen ihren Inhalt, unabhängig von der Größe**: PDF (erste Seite + Seiten-Viewer), Bilder, Text/Markdown/CSV/JSON (Auszug), Ton und Video (Abspieler). Der Inhalt liegt in der Geräte-Ablage (IndexedDB) statt im 5-MB-`localStorage`; was der Browser nicht darstellen kann, sagt es im Klartext
 - 🖥 **Lokale KI ohne Modell-Liste im Quelltext**: Bei Ollama (und eigenen OpenAI-kompatiblen Servern) fragt PixiNotes den Server, welche Modelle dort installiert sind — anklickbar mit Größe und Quantisierung, ⟳ nach jedem `ollama pull`. Das Feld bleibt frei beschreibbar, jeder Name aus ollama.com/library funktioniert; Einbettungs-Modelle fürs Gehirn sind getrennt und ebenfalls wählbar
@@ -53,11 +53,11 @@ npm run dev        # → http://localhost:5173
 - ☁️ **Nextcloud/OneDrive/Dropbox-Sync**: Sync-Ordner in den Einstellungen verbinden → PixiNotes speichert alle Boards automatisch als `pixinotes-daten.json` dorthin, der Cloud-Client verteilt sie auf alle Geräte (Konfliktschutz warnt, statt fremde Stände zu überschreiben; KI-Schlüssel bleiben lokal)
 - 📁 **Datenordner-Export**: alle Boards als echte Markdown-Dateien (Bereich/Projekt/Board.md) via File System Access, plus Board-Export als PNG/SVG (→ PDF via Drucken)
 - ↩️ **Undo/Redo**: Karten, Verbindungen und Zeichnungen (Strg+Z / Strg+Y oder ↩️/↪️ im Dock); Texte haben ihr eigenes Editor-Undo
-- 🧲 **Verdrängungs-Physik**: Karten schieben sich beim Ziehen federnd beiseite (inkl. Kettenreaktion), geworfene Karten räumen sich den Weg frei, die gezogene Karte neigt sich in Bewegungsrichtung
+- 🧲 **Verdrängungs-Physik** (Option, standardmäßig aus): Karten schieben sich beim Ziehen federnd beiseite (inkl. Kettenreaktion), geworfene Karten räumen sich den Weg frei, die gezogene Karte neigt sich in Bewegungsrichtung
 - 🔗 **Verbindungen mit Beziehung**: Karten am Rand-Punkt verbinden; auf die Linien-Mitte klicken benennt die Beziehung („blockiert", „gehört zu" …), ✕ löscht sie
 - 🔍 **Spotlight-Suche** (`Strg+K`): findet Karten über alle Boards und fliegt animiert hin
 - 📤 **Teilen**: Auswahl-Toolbar mit „Als E-Mail" (mailto) und „Formatiert kopieren" (HTML für Outlook/Word-Paste), Duplizieren, Löschen mit **Undo**
-- 🚀 **Wurf-Physik**: Karten mit Schwung loslassen — sie gleiten mit Momentum weiter
+- 🚀 **Wurf-Physik** (Option, standardmäßig aus): Karten mit Schwung loslassen — sie gleiten mit Momentum weiter
 - 👆 **Touch & responsiv**: große Hit-Targets und permanente Controls auf Touch-Geräten, Doppel-Tap = Notiz, angepasstes Layout für schmale Screens
 - 💾 **Local-first**: Alles wird automatisch im Browser gespeichert (localStorage), kein Account nötig
 

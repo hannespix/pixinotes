@@ -71,18 +71,17 @@ export default function App() {
     return () => clearTimeout(t);
   }, []);
 
-  // Gesten-Spickzettel: statt Dauer-Pille im Header (kollidierte mit den
-  // Bedienelementen) einmal pro Sitzung kurz als Toast beim Start
+  // M294: Der Gesten-Spickzettel beim Sitzungsstart ist weg — die Begrüßung
+  // beim ersten Start und der Hinweis auf der leeren Fläche sagen dasselbe,
+  // und der Toast lag acht Sekunden über den Dock-Menüs.
+  // Einmalig nach der Umstellung auf die ruhige Fläche (lib/einstellungen.ts):
+  // sagen, was sich geändert hat und wo es wieder anzuschalten ist.
   useEffect(() => {
+    if (!useBoard.getState().ruheHinweis) return;
     const t = setTimeout(() => {
-      if (sessionStorage.getItem('pixinotes-hint-shown')) return;
-      sessionStorage.setItem('pixinotes-hint-shown', '1');
-      useBoard.getState().showToast(
-        '💡 Doppelklick = Notiz · E-Mails & Dateien reinziehen · Strg+V für Screenshots · Karten werfen 🚀',
-        false,
-        8000,
-      );
-    }, 900);
+      useBoard.getState().setRuheHinweis(false);
+      useBoard.getState().showToast('Physik und Klick-Zoom sind jetzt aus. Wieder einschalten: ⚙ → Bedienung.', false, 8000);
+    }, 1500);
     return () => clearTimeout(t);
   }, []);
 
@@ -153,7 +152,7 @@ export default function App() {
     const lauf = () => {
       const n = autoArchivAlleBoards();
       if (n > 0) {
-        useBoard.getState().showToast(`🗃 ${n} erledigte${n === 1 ? 's Ticket' : ' Tickets'} automatisch archiviert — 🗃 am Kanban zeigt das Archiv.`);
+        useBoard.getState().showToast(`🗃 ${n} erledigte${n === 1 ? 's Ticket' : ' Tickets'} automatisch archiviert.`);
       }
     };
     const t0 = setTimeout(lauf, 4000);

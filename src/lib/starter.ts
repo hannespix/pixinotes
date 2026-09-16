@@ -58,7 +58,7 @@ export function buildStarter(): Starter {
     note({ x: 60, y: 100 }, 'yellow', [
       h('👋 Willkommen!'),
       p('Das ist dein Schreibtisch — für alles Schnelle. Klick in eine Notiz und tipp los; „/" öffnet das Block-Menü (Checklisten, Tabellen …).'),
-      check('Karte mit Schwung übers Board werfen 🚀'),
+      check('Karte anfassen und irgendwohin schieben'),
       check('Doppelklick auf die Fläche = neue Notiz'),
       check('E-Mail (.eml/.msg) aus Outlook hierher ziehen'),
       check('Strg+K: alles durchsuchen'),

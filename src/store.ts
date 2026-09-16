@@ -433,9 +433,18 @@ interface BoardState {
   helpSection: string | null;
   setHelpOpen: (open: boolean, section?: string | null) => void;
 
-  /** Physik (Verdrängung/Wurf) global an/aus — aus = Karten dürfen überlappen/stapeln */
+  /** Physik (Verdrängung/Wurf) global an/aus — aus = Karten dürfen überlappen/stapeln.
+   *  M294: Voreinstellung AUS — die ruhige Fläche ist der Normalfall, die
+   *  Physik bleibt als Option (Dock → ⋯ oder ⚙ → Bedienung). */
   physicsEnabled: boolean;
   setPhysicsEnabled: (on: boolean) => void;
+  /** M294: Konfetti beim Erledigen — bewusst eine Option, keine Voreinstellung */
+  konfetti: boolean;
+  setKonfetti: (on: boolean) => void;
+  /** M294: Einmaliger Hinweis nach der Umstellung auf die ruhigen
+   *  Voreinstellungen (gesetzt von lib/einstellungen.ts, nicht persistiert) */
+  ruheHinweis: boolean;
+  setRuheHinweis: (on: boolean) => void;
   /** M254: Stift (Apple Pencil & Co.) zeichnet sofort — ohne Zeichenmodus */
   stiftZeichnet: boolean;
   setStiftZeichnet: (on: boolean) => void;
@@ -753,8 +762,12 @@ export const useBoard = create<BoardState>()(
         helpSection: null,
         setHelpOpen: (open, section = null) => set({ helpOpen: open, helpSection: section }),
 
-        physicsEnabled: true,
+        physicsEnabled: false,
         setPhysicsEnabled: (on) => set({ physicsEnabled: on }),
+        konfetti: false,
+        setKonfetti: (on) => set({ konfetti: on }),
+        ruheHinweis: false,
+        setRuheHinweis: (on) => set({ ruheHinweis: on }),
         stiftZeichnet: true,
         setStiftZeichnet: (on) => set({ stiftZeichnet: on }),
 
@@ -790,7 +803,9 @@ export const useBoard = create<BoardState>()(
         setLesbareSchrift: (on) => set({ lesbareSchrift: on }),
         hoherKontrast: false,
         setHoherKontrast: (on) => set({ hoherKontrast: on }),
-        clickZoom: true,
+        // M294: aus — die Ansicht bleibt, wo sie ist; wer den Flug mag,
+        // schaltet ihn unter ⚙ → Bedienung wieder ein
+        clickZoom: false,
         setClickZoom: (on) => set({ clickZoom: on }),
         wheelZoom: false,
         setWheelZoom: (on) => set({ wheelZoom: on }),
@@ -1945,6 +1960,7 @@ export const useBoard = create<BoardState>()(
         templates: s.templates,
         ui: s.ui,
         physicsEnabled: s.physicsEnabled,
+        konfetti: s.konfetti,
         stiftZeichnet: s.stiftZeichnet,
         clickZoom: s.clickZoom,
         cardFocus: s.cardFocus,

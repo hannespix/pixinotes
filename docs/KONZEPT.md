@@ -59,6 +59,8 @@ Das Board fühlt sich *lebendig* an, ohne zu nerven:
 
 Alle Physik-Effekte sind subtil (Feder-Animationen ~200 ms), abschaltbar und respektieren `prefers-reduced-motion`.
 
+**Seit M294 ist die Physik eine Option und standardmäßig aus.** Die ruhige Fläche ist der Normalfall; wer es lebendiger mag, schaltet Physik, Klick-Zoom und Konfetti unter ⚙ → Bedienung ein (siehe 10a).
+
 ---
 
 ## 3. Objekttypen (alles per Drag & Drop oder `/`-Menü)
@@ -314,6 +316,18 @@ flowchart LR
 - **Ein Werkzeug-Dock, fünf Icons:** Auswählen · Notiz · Stift · Verbinden · Suche. Alles Weitere über `/` in Karten und Rechtsklick. Keine Menüband-Hölle.
 - **Progressive Disclosure:** Tabellen-Spaltentypen, Farb-Legenden, Automationen tauchen erst auf, wenn man sie das erste Mal braucht.
 - **Undo überall:** `Cmd+Z` gilt für *alles*, auch fürs KI-Aufräumen. Der Undo-Toast sagt immer, was passiert ist („12 Karten gruppiert — Rückgängig?").
+
+### 10a. Leitplanken für den Schliff (seit M294)
+
+Nach 293 Schritten war die Oberfläche mitgewachsen: Fast jeder Schritt hatte einen eigenen Knopf, ein Menü oder einen Hinweis hinterlassen. Damit das nicht wieder passiert, gelten fünf Sätze, die jede neue Funktion einhalten muss:
+
+1. **Fester Rahmen.** Es gibt eine Navigation (die linke Spalte), eine Startseite (die Übersicht) und eine Suche. Keine zweite Fassung von etwas, das es schon gibt.
+2. **Ruhige Fläche.** Nichts bewegt sich von selbst. Physik, Klick-Zoom und Konfetti sind Optionen, keine Voreinstellungen.
+3. **Wenig sichtbar.** Ein Menü zeigt höchstens fünf Einträge auf der ersten Ebene, der Rest liegt hinter „Weitere …". Ein Kartenkopf trägt höchstens zwei Symbole und ein ⋯.
+4. **Ein Weg pro Aufgabe.** Neue Funktionen landen hinter einem bestehenden Einstieg (⋯-Menü, Einstellungen, Hilfe), nie als neuer Knopf auf der Fläche oder in einer Leiste.
+5. **Die App schweigt.** Ein Toast ist ein Satz. Ein Tooltip benennt, erklärt nicht. Begründungen und Historie gehören in Commit-Nachrichten und in „Was ist neu", nicht in Einstellungen oder Hilfe.
+
+**Glossar (verbindlich für Oberfläche, Hilfe und Commits):** *Navigation* = die linke Spalte mit Bereichen, Projekten, Boards und Karten. *Übersicht* = die Startseite mit Kacheln (🏠). *Netz* = eine Ansicht innerhalb der Übersicht. *Fokus* = eine Karte groß geöffnet. *Karten-Archiv*, *Board-Archiv* und *Ticket-Archiv* = drei Dinge, die immer mit ihrem Zusatz genannt werden. *Rahmen* = ein benannter Bereich auf dem Board, *Bereich* = die oberste Ebene der Ordnung.
 
 ---
 

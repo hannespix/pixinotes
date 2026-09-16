@@ -340,7 +340,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       showToast(`🚦 WIP-Limit erreicht: „${cols[col]}" fasst höchstens ${wipLimitOf(kanban, col)} Ticket(s) — erst dort Platz schaffen.`);
       return;
     }
-    if (col === done) {
+    if (col === done && useBoard.getState().konfetti) {
       confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
     }
     // Beim Spaltenwechsel zusätzlich an die gewünschte Stelle einsortieren —
