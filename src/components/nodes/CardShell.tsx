@@ -87,7 +87,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
           resizingRef.current = false; // Sicherheitsnetz: d3-„end" kann unter Touch ausbleiben
           if (autoFitRef.current) {
             setAutoFit([id], false);
-            showToast('Auto-Größe aus — deine Größe bleibt. Wieder einschalten: Auswahl-Leiste ⤢');
+            showToast('Auto-Größe aus, deine Größe bleibt.');
           }
           window.setTimeout(() => evalRef.current?.(), 900); // danach ggf. ⤢-Chip anbieten
         }
@@ -118,7 +118,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     // Manuell gezogen schlägt Automatik: Auto-Größe bricht (M103/M104)
     if (autoFitRef.current) {
       setAutoFit([id], false);
-      showToast('Auto-Größe aus — deine Größe bleibt. Wieder einschalten: Auswahl-Leiste ⤢');
+      showToast('Auto-Größe aus, deine Größe bleibt.');
     }
     // Nach der Schonfrist einmal prüfen: läuft der Inhalt jetzt über,
     // erscheint der ⤢-Angebots-Chip (nur Angebot, kein Eingriff)
@@ -246,7 +246,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       {!autoFit && overflowing && (
         <button
           className="fit-hint nodrag"
-          title="Der Inhalt ist größer als die Karte — Klick passt die Höhe einmalig an (dauerhafte Auto-Größe: ⤢ in der Auswahl-Leiste)"
+          title="Höhe einmalig an den Inhalt anpassen"
           onClick={(e) => { e.stopPropagation(); fitOnce(); }}
         >⤢</button>
       )}

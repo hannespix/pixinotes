@@ -145,17 +145,11 @@ export function Dock() {
         // M268: Einpass-Obergrenze läuft mit dem Anzeige-Faktor (siehe Board.tsx)
         fitView({ padding: 0.12, duration: 500, maxZoom: useBoard.getState().anzeige ?? 1 });
         const msg = {
-          flow: 'Verbundenes als Fluss (links → rechts), Rest nach Modultyp gruppiert',
-          flowV: 'Verbundenes als Fluss (oben ↓ unten), Rest nach Modultyp gruppiert',
-          lanes: 'Schwimmbahnen: eine Bahn pro Person, unten „Ohne Zuordnung"',
-          timeline: 'Zeitstrahl: Fristen chronologisch, Undatiertes darunter',
-          compact: 'Kompakt gepackt — ideal vor dem Bild-Export',
-          quadrant: 'Quadrant in vier benannten Rahmen (Titel per Doppelklick umbenennbar)',
-          grid: 'Themen-Cluster bleiben zusammen, Rest als Raster nach Modultyp',
-          circles: 'Themen-Cluster als Kreis-Bündel (Titel in der Mitte)',
-          stack: 'Stapel je Themen-Cluster & Modultyp (Physik ist jetzt AUS, damit nichts auseinanderrutscht)',
+          flow: 'Fluss von links nach rechts', flowV: 'Fluss von oben nach unten', lanes: 'Schwimmbahnen je Person',
+          timeline: 'Zeitstrahl nach Fristen', compact: 'kompakt gepackt', quadrant: 'Quadrant in vier Rahmen',
+          grid: 'Raster nach Modultyp', circles: 'Kreis-Bündel', stack: 'Stapel je Modultyp',
         }[mode];
-        showToast(`🧹 Aufgeräumt: ${msg} — Strg+Z stellt die alte Anordnung wieder her.`);
+        showToast(`🧹 Aufgeräumt: ${msg}.`);
       }
     };
     requestAnimationFrame(step);
@@ -288,7 +282,7 @@ export function Dock() {
       }
       await addFiles(dateien as unknown as FileList);
     } catch {
-      showToast('Der Browser gibt die Zwischenablage nicht frei — kopiere das Bild und füge es mit Strg+V ein.');
+      showToast('Die Zwischenablage ist nicht freigegeben, das Bild mit Strg+V einfügen.');
     }
   };
 

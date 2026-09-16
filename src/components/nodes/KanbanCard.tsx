@@ -304,7 +304,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       return next;
     });
     if (fresh.length === 0 && moved === 0 && reopened === 0 && updated === 0) {
-      if (announce) showToast('Nichts Neues gefunden — alle offenen Aufgaben sind schon hier.');
+      if (announce) showToast('Nichts Neues, alle offenen Aufgaben sind schon hier.');
       return;
     }
     setItems([...items, ...fresh]);
@@ -314,7 +314,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       updated ? `${updated} aktualisiert` : '',
     ].filter(Boolean).join(', ');
     if (announce) {
-      showToast(`${fresh.length} Aufgabe(n) eingesammelt${parts ? ` (${parts})` : ''} — Tickets verlinken auf ihre Quelle (↗).`);
+      showToast(`${fresh.length} Aufgabe(n) eingesammelt${parts ? ` (${parts})` : ''}.`);
     } else {
       showToast(`⟳ Auto-Abgleich: ${fresh.length} neu${parts ? `, ${parts}` : ''}`);
     }
@@ -362,12 +362,12 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         return;
       }
       if (col === done && openSubs(item) > 0) {
-        showToast(`☑ Noch ${openSubs(item)} Checklisten-Punkt(e) offen — Ticket öffnen und abhaken.`);
+        showToast(`☑ Noch ${openSubs(item)} Checklisten-Punkt(e) offen.`);
         return;
       }
     }
     if (wipFull(kanban, col)) {
-      showToast(`🚦 WIP-Limit erreicht: „${cols[col]}" fasst höchstens ${wipLimitOf(kanban, col)} Ticket(s) — erst dort Platz schaffen.`);
+      showToast(`🚦 WIP-Limit: „${cols[col]}" fasst höchstens ${wipLimitOf(kanban, col)} Ticket(s).`);
       return;
     }
     if (col === done && useBoard.getState().konfetti) {
@@ -482,7 +482,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     if (item.link?.nodeId && item.link.itemId) {
       const key = `${item.link.nodeId}|${item.link.itemId}`;
       updateNodeData(id, { items, ignoreKeys: [...new Set([...(kanban.ignoreKeys ?? []), key])] });
-      if (kanban.autoCollect) showToast('Ticket entfernt — wird nicht erneut eingesammelt (⚙ am Kanban macht das rückgängig).');
+      if (kanban.autoCollect) showToast('Ticket entfernt und vom Einsammeln ausgenommen.');
     } else {
       setItems(items);
     }
@@ -638,7 +638,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       items: kanban.items.filter((it) => it.link?.boardId !== bid),
       ignoreKeys: [...new Set([...(kanban.ignoreKeys ?? []), ...keys])],
     });
-    showToast(`${gone.length} Ticket(s) aus „${boardName(bid)}" entfernt — werden nicht erneut eingesammelt.`);
+    showToast(`${gone.length} Ticket(s) aus „${boardName(bid)}" entfernt und vom Einsammeln ausgenommen.`);
   };
 
   // ---------- Archiv (M293): Erledigtes aus den Spalten nehmen, ohne es zu löschen ----------
@@ -683,9 +683,9 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     const erg = an ? autoArchivLauf(next) : null;
     updateNodeData(id, { autoArchiv: next.autoArchiv, autoArchivTage: tage, ...(erg?.patch ?? {}) });
     if (erg?.archiviert) {
-      showToast(`🗃 ${erg.archiviert} erledigte${erg.archiviert === 1 ? 's Ticket war' : ' Tickets waren'} älter als ${tage} Tag${tage === 1 ? '' : 'e'} — jetzt im Archiv (Strg+Z holt zurück).`);
+      showToast(`🗃 ${erg.archiviert} Ticket${erg.archiviert === 1 ? '' : 's'} älter als ${tage} Tag${tage === 1 ? '' : 'e'} archiviert.`);
     } else if (an) {
-      showToast(`⏱ Automatik an: Erledigtes wandert nach ${tage} Tag${tage === 1 ? '' : 'en'} ins Archiv — geprüft beim Start und alle 5 Minuten.`);
+      showToast(`⏱ Automatik an: Erledigtes wandert nach ${tage} Tag${tage === 1 ? '' : 'en'} ins Archiv.`);
     }
   };
 
@@ -900,7 +900,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         {timeChip && (
           <span
             className="abo-time-chip nodrag"
-            title="Aus der verbundenen Zeiterfassung: Arbeitszeit heute · diese Woche (ohne Pausen) — Pfeil löschen blendet den Chip aus"
+            title="Arbeitszeit heute · diese Woche aus der verbundenen Zeiterfassung"
           >⏱ {fmtHM(timeChip.day)} · W {fmtHM(timeChip.week)}</span>
         )}
         <button
@@ -1192,7 +1192,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                           {abo && (
                             <span
                               className="collect-abo"
-                              title="Per Pfeil mit diesem Kanban verbunden — die Verbindung sammelt diese Karte automatisch ein (unabhängig von der Board-Auswahl). Abwählen per Haken oder den Pfeil löschen."
+                              title="Per Pfeil verbunden, wird automatisch eingesammelt"
                             >⇢ Abo</span>
                           )}
                           <span className="collect-sub-count">{s.count}</span>
@@ -1208,7 +1208,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             <button
               className="collect-reset"
               title="Ignorier-Liste leeren — beim nächsten Einsammeln kommen sie zurück"
-              onClick={() => { updateNodeData(id, { ignoreKeys: undefined }); showToast('Entfernte Tickets werden wieder eingesammelt (⭳ bzw. ⟳).'); }}
+              onClick={() => { updateNodeData(id, { ignoreKeys: undefined }); showToast('Entfernte Tickets werden wieder eingesammelt.'); }}
             >
               {kanban.ignoreKeys!.length} dauerhaft entfernte(s) Ticket(s) wieder zulassen
             </button>
@@ -1237,7 +1237,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             <button title="Schließen" onClick={() => setArchivOpen(false)}><IX size={12} /></button>
           </div>
           <div className="k-archiv-auto">
-            <label title="Erledigte Tickets nach der eingestellten Zeit von selbst ins Archiv legen — geprüft beim Start und alle 5 Minuten. Die Zeit zählt ab dem Moment, in dem ein Ticket erledigt wurde.">
+            <label title="Erledigte Tickets nach der eingestellten Zeit automatisch archivieren">
               <input type="checkbox" checked={!!kanban.autoArchiv} onChange={(e) => setzeAutoArchiv(e.target.checked, anzeigeTage)} />
               <span>Erledigte automatisch archivieren nach</span>
             </label>
@@ -1412,7 +1412,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     onChange={(e) => {
                       const v = e.target.value;
                       if (!v || (it.deps ?? []).includes(v)) return;
-                      if (wouldCycle(it.id, v)) { showToast('🔁 Das würde einen Abhängigkeits-Kreis schließen — beide Tickets wären für immer gesperrt.'); return; }
+                      if (wouldCycle(it.id, v)) { showToast('🔁 Das würde einen Abhängigkeits-Kreis schließen.'); return; }
                       patchItem(it.id, { deps: [...(it.deps ?? []), v] });
                     }}
                   >

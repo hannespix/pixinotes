@@ -378,9 +378,9 @@ export function Settings() {
     const res = await connectProjectSync(projectId);
     setPsMeta(projectSyncMeta());
     if (res.state === 'vorhanden') {
-      showToast(`Im Ordner „${res.folder}" liegt bereits ein Stand von „${projectName}" — unten „Vom Ordner laden" holt ihn, „Jetzt speichern" überschreibt ihn.`);
+      showToast(`Im Ordner liegt schon ein Stand von „${projectName}". Unten laden oder überschreiben.`);
     } else {
-      showToast(`☁️ „${projectName}" wird jetzt nach „${res.folder}" gespiegelt — Team-Mitglieder per Einladung dazuholen.`);
+      showToast(`☁️ „${projectName}" wird jetzt nach „${res.folder}" gespiegelt.`);
     }
   }, `psc-${projectId}`);
 
@@ -525,12 +525,7 @@ export function Settings() {
         {tab === 'ki' && (
         <section className="modal-section">
           <h3>KI-Assistent</h3>
-          <p className="modal-hint">
-            KI-Funktionen (Textpolitur, E-Mail-Zusammenfassung, Auto-Clustering) laufen über einen
-            Anbieter deiner Wahl. Cloud-Dienste nutzen deinen eigenen Schlüssel; mit <b>Ollama</b> oder
-            einem selbstgehosteten Server bleibt <b>alles auf deinem Rechner</b>. Zugangsdaten werden
-            nur lokal in diesem Browser gespeichert.
-          </p>
+          <p className="modal-hint">Die KI läuft über einen Anbieter deiner Wahl. Mit <b>Ollama</b> oder einem eigenen Server bleibt alles auf deinem Rechner, Zugangsdaten bleiben immer lokal.</p>
           <label className="modal-row">
             <span>Anbieter</span>
             <select value={ai.provider} onChange={(e) => {
@@ -641,14 +636,7 @@ export function Settings() {
                   {ai.provider === 'ollama' && (
                     <details className="modell-tipps">
                       <summary>Noch kein Modell? Bewährte Vorschläge zum Nachladen</summary>
-                      <p className="modal-hint">
-                        Das ist eine <b>Starthilfe, keine vollständige Liste</b> — bei Ollama kommt
-                        laufend Neues dazu. Alles aus <b>ollama.com/library</b> funktioniert
-                        genauso: Namen oben eintippen, vorher einmal im Terminal holen.
-                        Faustregel für den Platzbedarf: Ein Modell sollte in den Speicher der
-                        Grafikkarte passen, sonst rechnet der Prozessor mit — das läuft, ist aber
-                        deutlich langsamer.
-                      </p>
+                      <p className="modal-hint">Eine Starthilfe, keine vollständige Liste. Jeder Name aus ollama.com/library funktioniert, vorher einmal im Terminal holen.</p>
                       {VORSCHLAEGE.map((v) => (
                         <div key={v.name} className="modell-tipp">
                           <code>ollama pull {v.name}</code>
@@ -697,13 +685,7 @@ export function Settings() {
         {tab === 'ki' && (
         <section className="modal-section">
           <h3>🧠 Gehirn (semantischer Index)</h3>
-          <p className="modal-hint">
-            Das Gehirn übersetzt jede Karte in einen Bedeutungs-Vektor (Embedding). Damit findet
-            die Suche (Strg+K) auch <b>nach Bedeutung</b> („Kita" findet „Betreuungszeiten") und
-            das Backlinks-Panel zeigt <b>verwandte Karten</b> aus anderen Boards.
-            Mit <b>Ollama</b> bleibt alles lokal; <b>„Im Browser"</b> lädt einmalig ein kleines
-            Modell (~30&nbsp;MB, danach offline) — der Weg für iPhone/iPad.
-          </p>
+          <p className="modal-hint">Das Gehirn lässt die Suche nach <b>Bedeutung</b> finden („Kita" findet „Betreuungszeiten") und zeigt verwandte Karten. Mit <b>Ollama</b> bleibt alles lokal, „Im Browser" lädt einmalig ein kleines Modell.</p>
           <label className="modal-row">
             <span>Gehirn</span>
             <select
@@ -735,12 +717,7 @@ export function Settings() {
                     </label>
                   );
                 })}
-                <p className="modal-hint">
-                  Abgeschaltete Bereiche liefern <b>nichts</b> ans Gehirn: keine Bedeutungssuche,
-                  keine Vorschläge, keine KI-Antworten, kein Puls. Ihre bereits berechneten
-                  Vektoren werden dabei <b>gelöscht</b> — nicht bloß ausgeblendet. Praktisch, um
-                  Privates aus dienstlichen Antworten herauszuhalten.
-                </p>
+                <p className="modal-hint">Abgeschaltete Bereiche liefern nichts ans Gehirn, ihre Vektoren werden gelöscht. So bleibt Privates aus dienstlichen Antworten heraus.</p>
               </div>
               <label className="modal-row">
                 <span>Anbieter</span>
@@ -818,28 +795,15 @@ export function Settings() {
               ))}
             </div>
           </div>
-          <p className="modal-hint">
-            Bisher reisten nur Name und Größe einer Datei mit — auf dem zweiten Gerät stand
-            deshalb „Der Inhalt liegt nicht auf diesem Gerät". Jetzt gehen die Inhalte im
-            Sync-Stand mit, auf <b>allen</b> Wegen (Ordner, Dateien-App, WebDAV) und damit auch
-            auf Telefon und Tablet, wo es dafür bisher gar keinen Weg gab.
-            <br />
-            Der Preis ist die Dateigröße: Aus 3,7 MB PDF werden rund 5 MB im Sync-Stand.
-            Gepackt wird von der kleinsten Datei aufwärts, bis die Grenze erreicht ist — so
-            scheitern nicht zwanzig Handzettel an einem einzigen Video. Was nicht mehr
-            hineinpasst, bleibt wie bisher nur lokal, und die Karte sagt das auch.
-            <b> Zugangsdaten und KI-Schlüssel sind nie dabei</b> — daran ändert sich nichts.
-          </p>
+          <p className="modal-hint">Dateiinhalte reisen bis zu dieser Grenze im Sync-Stand mit, von der kleinsten Datei aufwärts. Was nicht hineinpasst, bleibt nur lokal; Zugangsdaten und KI-Schlüssel sind nie dabei.</p>
         </section>
         <section className="modal-section">
           <h3>Synchronisation (Nextcloud, OneDrive, Dropbox …)</h3>
-          <p className="modal-hint">
-            {syncSupported()
-              ? <>Verbinde einen Ordner, den dein <b>Nextcloud-/OneDrive-/Dropbox-Client</b> synchronisiert — PixiNotes speichert dort automatisch eine <code>pixinotes-daten.json</code> mit allen Boards. Der Cloud-Client bringt sie auf deine anderen Geräte; dort einfach denselben Ordner verbinden. Kein Server-Setup, KI-Schlüssel bleiben lokal.</>
+          <p className="modal-hint">{syncSupported()
+              ? <>Verbinde einen Ordner, den dein Cloud-Client synchronisiert. PixiNotes speichert dort automatisch alle Boards, KI-Schlüssel bleiben lokal.</>
               : isAppleTouch()
-                ? <><b>Auf iPad und iPhone gibt es keine Ordner-Anbindung.</b> Apple erlaubt keinem Browser (auch nicht Chrome oder Firefox — auf iOS steckt in allen WebKit), dass eine Webseite auf einen Ordner zugreift. Das ist keine Einstellung, die man umlegen kann. <b>Nimm stattdessen den Weg über die Dateien-App</b> — direkt hier darunter. Er schreibt genau dieselbe Datei in denselben Nextcloud-Ordner, den dein Rechner automatisch synchronisiert.</>
-                : <>Dieser Browser unterstützt keine Ordner-Anbindung (Chrome/Edge können das). <b>Alternative:</b> der Weg über die Dateien-Auswahl direkt darunter — gleiche Datei, gleicher Ordner, nur mit einem bewussten Klick statt automatisch.</>}
-          </p>
+                ? <>Auf iPad und iPhone erlaubt Apple keiner Webseite den Ordner-Zugriff. Nimm den Weg über die Dateien-App direkt darunter.</>
+                : <>Dieser Browser kann keine Ordner anbinden (Chrome und Edge können das). Nimm die Dateiauswahl direkt darunter.</>}</p>
           {syncSupported() && (
             <>
               <div className="modal-buttons">
@@ -901,14 +865,7 @@ export function Settings() {
         {!syncSupported() && (
         <section className="modal-section" key={filesTick}>
           <h3>{isAppleTouch() ? 'Synchronisation über die Dateien-App (iPad/iPhone)' : 'Synchronisation über die Dateiauswahl'}</h3>
-          <p className="modal-hint">
-            PixiNotes schreibt hier <b>exakt dieselbe <code>pixinotes-daten.json</code></b> wie der
-            Sync-Ordner am Rechner. Legst du sie in <b>denselben Nextcloud-Ordner</b>, übernimmt dein
-            Rechner den Stand automatisch — und umgekehrt holst du dir hier, was der Rechner
-            geschrieben hat. Es ist also echte Zwei-Wege-Synchronisation, auf dem Tablet eben
-            <b> mit einem bewussten Tipp</b> statt im Hintergrund. Zugangsdaten und KI-Schlüssel sind
-            wie immer nicht enthalten.
-          </p>
+          <p className="modal-hint">Hier wird dieselbe Datei geschrieben wie vom Sync-Ordner am Rechner. In denselben Cloud-Ordner gelegt, gleichen sich beide Wege ab.</p>
           {isAppleTouch() && (
             <div className="modal-note">
               <b>Einmalig einrichten:</b> die <b>Nextcloud-App</b> aus dem App Store installieren und
@@ -953,17 +910,11 @@ export function Settings() {
 
         <section className="modal-section">
           <h3>Team-Sync — einzelne Projekte teilen</h3>
-          <p className="modal-hint">
-            Jedes <b>Projekt</b> kann in einen <b>eigenen</b> Sync-Ordner gespiegelt werden — so arbeitest
-            du mit mehreren Teams in einer Umgebung, ohne alles preiszugeben: Pro Team eine Ordner-Freigabe
-            (z. B. Nextcloud „Teilen"), PixiNotes legt dort ein Projekt-Paket ab und gleicht es automatisch ab.
-            <b> Wer mitarbeiten darf, regelt allein die Ordner-Freigabe</b> — Einladungen enthalten keine
-            Passwörter, und KI-Schlüssel/Zugangsdaten landen nie im Paket.
-          </p>
+          <p className="modal-hint">Jedes Projekt lässt sich in einen eigenen Sync-Ordner spiegeln, pro Team eine Freigabe. Wer mitarbeiten darf, regelt allein die Ordner-Freigabe.</p>
           {syncSupported() ? (
             <>
               <div className="modal-buttons">
-                <button disabled={!!busy} onClick={psJoin} title="Einen freigegebenen Team-Ordner wählen — das darin liegende Projekt wird übernommen und ab dann automatisch abgeglichen">
+                <button disabled={!!busy} onClick={psJoin} title="Freigegebenen Team-Ordner wählen und das Projekt übernehmen">
                   {busy === 'psjoin' ? '…' : 'Projekt beitreten…'}
                 </button>
               </div>
@@ -977,7 +928,7 @@ export function Settings() {
                         <span className="psync-actions">
                           <button disabled={!!busy} onClick={() => psSave(p.id)}>{busy === `pss-${p.id}` ? '…' : 'Jetzt speichern'}</button>
                           <button disabled={!!busy} onClick={() => psLoad(p.id, p.name)}>{busy === `psl-${p.id}` ? '…' : 'Vom Ordner laden'}</button>
-                          <button onClick={() => psInvite(p.id, p.name)} title="Öffnet eine E-Mail mit Beitritts-Anleitung — den Freigabe-Link zum Ordner fügst du selbst ein; Passwörter sind nie enthalten">Einladen…</button>
+                          <button onClick={() => psInvite(p.id, p.name)} title="E-Mail mit Beitritts-Anleitung öffnen">Einladen…</button>
                           <button onClick={() => psCopyInvite(p.id, p.name)} title="Einladungstext in die Zwischenablage kopieren">Text kopieren</button>
                           <button disabled={!!busy} onClick={() => psOff(p.id)}>{busy === `pso-${p.id}` ? '…' : 'Trennen'}</button>
                         </span>
@@ -1000,21 +951,15 @@ export function Settings() {
               </div>
             </>
           ) : (
-            <p className="modal-hint">
-              {isAppleTouch()
-                ? <>Der Team-Sync braucht einen Ordner-Zugriff, den iPadOS/iOS keiner Webseite erlaubt. <b>Am iPad geht das projektweise Teilen daher nicht</b> — deine gesamte Umgebung kannst du aber über die Dateien-App oben sichern und abgleichen. Für Team-Projekte einen Rechner mit Chrome oder Edge nutzen.</>
-                : <>Dieser Browser unterstützt keine Ordner-Anbindung (Chrome/Edge können das). Deine gesamte Umgebung lässt sich trotzdem über die Dateiauswahl oben abgleichen.</>}
-            </p>
+            <p className="modal-hint">{isAppleTouch()
+                ? <>Team-Sync braucht einen Ordner-Zugriff, den iPadOS keiner Webseite erlaubt. Dafür einen Rechner mit Chrome oder Edge nutzen.</>
+                : <>Dieser Browser kann keine Ordner anbinden (Chrome und Edge können das).</>}</p>
           )}
         </section>
 
         <section className="modal-section">
           <h3>WebDAV direkt (Nextcloud, ownCloud …)</h3>
-          <p className="modal-hint">
-            Ohne Desktop-Client: PixiNotes spricht direkt mit dem WebDAV-Server — funktioniert auch am
-            Tablet/Handy. Bei Nextcloud: <b>App-Passwort</b> unter Einstellungen → Sicherheit anlegen
-            (nie das echte Passwort). <b>Zugangsdaten bleiben lokal</b> und landen in keinem Export.
-          </p>
+          <p className="modal-hint">Ohne Desktop-Client, auch am Tablet und Handy. Bei Nextcloud ein App-Passwort anlegen, Zugangsdaten bleiben lokal.</p>
           <details className="modal-details">
             <summary>⚠️ Wird blockiert? Das liegt am Server (CORS) — so wird es freigegeben</summary>
             <p className="modal-hint">
@@ -1089,14 +1034,7 @@ export function Settings() {
         {tab === 'kalender' && (
         <section className="modal-section">
           <h3>Kalender-Konten</h3>
-          <p className="modal-hint">
-            Verbinde Google Kalender oder Microsoft 365/Outlook direkt — die Termine erscheinen
-            (nur lesend) in den Kalender-Karten. Die Anmeldung läuft ohne PixiNotes-Server direkt
-            zwischen Browser und Anbieter; <b>Zugangsdaten bleiben lokal in diesem Browser</b> und
-            landen nie in Sync-Dateien, Share-Links oder Exporten. Die Client-ID legt eure IT einmalig
-            an (Google Cloud Console → OAuth-Client „Webanwendung" · Azure → App-Registrierung „SPA",
-            jeweils mit dieser Adresse als Redirect-URI).
-          </p>
+          <p className="modal-hint">Termine erscheinen nur lesend in den Kalender-Karten, die Anmeldung läuft direkt zwischen Browser und Anbieter. Die Client-ID legt eure IT einmalig an.</p>
           {!oauthAvailable() && (
             <div className="modal-note">
               ⚠️ Die Einzeldatei (file://) kann kein OAuth — bitte die gehostete App/PWA nutzen.
@@ -1176,12 +1114,7 @@ export function Settings() {
 
         <section className="modal-section">
           <h3>Word-Dokumente (.docx)</h3>
-          <p className="modal-hint">
-            Ein Word-Dokument einfach <b>aufs Board ziehen</b> (oder über ＋ → „Datei einfügen"
-            auswählen) — Überschriften, Listen, Tabellen und Bilder werden zu einer Notiz-Karte.
-            Ohne Konto und ohne Internet. <b>Auch der Weg für OneNote ohne Microsoft-Anmeldung:</b>{' '}
-            in OneNote „Datei → Exportieren → Word", dann die Datei hier ablegen.
-          </p>
+          <p className="modal-hint">Ein Word-Dokument aufs Board ziehen, es wird eine Notiz-Karte. Das ist auch der Weg für OneNote-Exporte ohne Microsoft-Anmeldung.</p>
         </section>
 
         <section className="modal-section">
@@ -1232,12 +1165,7 @@ export function Settings() {
 
         <section className="modal-section modal-danger">
           <h3>Alles leeren &amp; neu starten</h3>
-          <p className="modal-hint">
-            Löscht <b>alle</b> Bereiche, Projekte, Boards, Karten, Versionen und Vorlagen und startet mit
-            einem leeren Board. Kein Rückgängig! KI-Einstellungen bleiben erhalten; ein verbundener
-            Sync-Ordner wird vorher getrennt (seine Dateien bleiben unangetastet).
-            <b> Tipp:</b> vorher oben „Datei exportieren".
-          </p>
+          <p className="modal-hint">Löscht alle Bereiche, Projekte, Boards, Karten und Vorlagen, ohne Rückgängig. Vorher oben „Datei exportieren".</p>
           <div className="modal-buttons">
             <button className="danger" disabled={!!busy} onClick={() => void resetEverything()}>
               Alles leeren…
@@ -1251,11 +1179,9 @@ export function Settings() {
         {tab === 'export' && (
         <section className="modal-section">
           <h3>Datenordner &amp; Export</h3>
-          <p className="modal-hint">
-            {hasFolderApi
-              ? 'Speichere alle Boards als echte Markdown-Dateien in einem Ordner deiner Wahl (Struktur: Bereich / Projekt / Board.md) — z. B. in OneDrive, versionierbar und in Obsidian lesbar.'
-              : 'Dieser Browser unterstützt keine direkte Ordner-Anbindung (Chrome/Edge empfohlen). Der Export lädt stattdessen die Markdown-Dateien einzeln herunter.'}
-          </p>
+          <p className="modal-hint">{hasFolderApi
+              ? 'Speichert alle Boards als Markdown-Dateien in einem Ordner deiner Wahl, lesbar in Obsidian.'
+              : 'Dieser Browser kann keine Ordner anbinden, der Export lädt die Dateien einzeln herunter.'}</p>
           <div className="modal-buttons">
             <button disabled={!!busy} onClick={() => doExport(async () => {
               const r = await exportToFolder(spaces, boards);

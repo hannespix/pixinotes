@@ -54,7 +54,7 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
       {[Position.Top, Position.Right, Position.Bottom, Position.Left].map((pos) => (
         <Handle key={pos} type="source" position={pos} id={pos} className="pn-handle frame-handle" />
       ))}
-      <div className="frame-head" title="Ziehen verschiebt den Rahmen SAMT Inhalt · Doppelklick benennt um · Aktionen (Anordnen, Tönung, Verschieben …) in der Auswahl-Leiste">
+      <div className="frame-head" title="Ziehen verschiebt den Rahmen samt Inhalt, Doppelklick benennt um">
         {editing ? (
           <input
             autoFocus

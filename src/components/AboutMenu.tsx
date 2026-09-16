@@ -42,7 +42,7 @@ export function AboutMenu() {
       <button
         className={`logo ${open ? 'active' : ''}`}
         onClick={() => setOpen((o) => !o)}
-        title="Über PixiNotes — Version, Neuerungen, Impressum & Datenschutz"
+        title="Über PixiNotes"
         aria-label="Über PixiNotes"
         aria-haspopup="menu"
         aria-expanded={open}

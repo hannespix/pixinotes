@@ -242,7 +242,7 @@ async function autoSaveProject(projectId: string): Promise<void> {
   if (remote && remote.savedAt !== projectStamp(projectId)) {
     if (!conflictWarned.has(projectId)) {
       conflictWarned.add(projectId);
-      useBoard.getState().showToast(`⚠️ Im Team-Ordner liegt ein neuerer Stand von „${built.name}" — in ⚙️ → Synchronisation laden oder überschreiben.`);
+      useBoard.getState().showToast(`⚠️ Im Team-Ordner liegt ein neuerer Stand von „${built.name}". Unter ⚙ → Synchronisation entscheiden.`);
     }
     return;
   }
@@ -267,7 +267,7 @@ export async function checkProjectRemotes(): Promise<void> {
       conflictWarned.delete(projectId);
     } else if (!conflictWarned.has(projectId)) {
       conflictWarned.add(projectId);
-      useBoard.getState().showToast(`⚠️ Team-Projekt „${remote.project.name}": im Ordner liegt ein anderer Stand, hier gibt es aber eigene Änderungen — in ⚙️ → Synchronisation entscheiden.`);
+      useBoard.getState().showToast(`⚠️ Team-Projekt „${remote.project.name}": Die Stände weichen ab. Unter ⚙ → Synchronisation entscheiden.`);
     }
   }
 }

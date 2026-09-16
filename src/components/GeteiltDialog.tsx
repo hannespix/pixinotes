@@ -139,7 +139,7 @@ export function GeteiltDialog() {
        auf demselben Board (dieselbe Regel wie beim Ablegen, M289). */
     if (abgelehnt.length) {
       await importFilesToBoard(dateien.filter((d) => abgelehnt.includes(d.name)), platz(zielBoard));
-      showToast(`${bilder} Bild(er) in die Notiz — ${abgelehnt.length} andere Datei(en) als Karte aufs Board.`);
+      showToast(`${bilder} Bild(er) in die Notiz, ${abgelehnt.length} Datei(en) als Karte aufs Board.`);
     } else {
       showToast(`Geteiltes in die Notiz „${(nodeToText(notiz).split('\n')[0] || 'Notiz').slice(0, 30)}" übernommen.`);
     }

@@ -85,10 +85,9 @@ export function OneNoteImport({ onClose }: { onClose: () => void }) {
     <section className="modal-section">
       <h3>OneNote-Notizbücher übernehmen</h3>
       <p className="modal-hint">
-        Holt deine OneNote-Inhalte direkt aus Microsoft 365: <b>Notizbuch → Bereich</b>,{' '}
-        <b>Abschnitt → Board</b>, <b>Seite → Notiz-Karte</b>. Aufgabenkästchen (To-Do-Kategorie)
-        werden zu echten Checklisten und tauchen damit in der Aufgaben-Zentrale auf.
-        Gelesen wird <b>nur</b> — in OneNote ändert sich nichts.
+        Holt Notizbücher aus Microsoft 365: <b>Notizbuch → Bereich</b>, <b>Abschnitt → Board</b>,{' '}
+        <b>Seite → Notiz-Karte</b>, Aufgabenkästchen werden zu Checklisten.
+        Gelesen wird nur, in OneNote ändert sich nichts.
       </p>
 
       {!oauthAvailable() && (

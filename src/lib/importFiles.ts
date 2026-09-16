@@ -83,13 +83,13 @@ export async function importHtmlAppFromUrl(rawUrl: string, pos: { x: number; y: 
     // allow-same-origin sähe sie unseren Speicher. Scheitert hier also
     // ausgerechnet der Kopier-Weg, gibt es keinen sicheren Live-Ausweg.
     if (u.origin === window.location.origin) {
-      showToast('Diese Adresse liegt unter derselben Herkunft wie PixiNotes und war nicht kopierbar — Live-Einbettung ist dafür aus Sicherheitsgründen nicht möglich.');
+      showToast('Diese Adresse lässt sich weder kopieren noch einbetten.');
       return null;
     }
     const node = makeHtmlApp(pos, { name, size: 0 });
     Object.assign(node.data, { url: u.href, live: true });
     addNode(node);
-    showToast('Die Quelle erlaubt kein Kopieren (CORS) — die App wird LIVE eingebettet und braucht dafür Internet.');
+    showToast('Die Quelle erlaubt kein Kopieren, die App wird live eingebettet.');
     return 'live';
   }
 }

@@ -1,27 +1,30 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useBoard } from '../store';
 import { KUERZEL, taste } from '../lib/tasten';
 import { MailLink } from './MailLink';
 
 /**
- * Die Hilfe-Seite (❓ im Dock): erklärt jede Funktion in Alltagssprache,
- * gegliedert mit Anker-Navigation. Vollständig offline — keine externen Links nötig.
+ * Die Hilfe (❓ im Dock): sechs Abschnitte in Alltagssprache, dazu Impressum
+ * und Datenschutz. „Was ist neu" ist eine eigene Seite (Logo-Menü) — die
+ * Hilfe beschreibt, wie die App heute aussieht, die Neu-Seite, was sich
+ * wann geändert hat. Vollständig offline — keine externen Links nötig.
  */
 const SECTIONS = [
   { id: 'start', icon: '🚀', title: 'Erste Schritte' },
-  { id: 'neu', icon: '🆕', title: 'Was ist neu' },
   { id: 'ordnung', icon: '🗂️', title: 'Bereiche · Projekte · Boards' },
-  { id: 'karten', icon: '🃏', title: 'Karten-Typen' },
-  { id: 'verbinden', icon: '🔗', title: 'Verbinden & Präsentieren' },
-  { id: 'zeichnen', icon: '✏️', title: 'Zeichnen' },
+  { id: 'karten', icon: '🃏', title: 'Karten & Module' },
   { id: 'aufgaben', icon: '✅', title: 'Aufgaben & Erinnerungen' },
-  { id: 'wissen', icon: '💡', title: 'Wissen & Verknüpfen' },
-  { id: 'ki', icon: '✨', title: 'KI-Assistent' },
   { id: 'daten', icon: '💾', title: 'Speichern, Sync & Teilen' },
   { id: 'tasten', icon: '⌨️', title: 'Tastenkürzel' },
+] as const;
+
+/** Rechtliches steht unter den sechs Abschnitten — klein, aber immer da */
+const RECHT = [
   { id: 'impressum', icon: '⚖️', title: 'Impressum' },
   { id: 'datenschutz', icon: '🔒', title: 'Datenschutz' },
 ] as const;
+
+const ALLE = [...SECTIONS, ...RECHT];
 
 /** Editierdistanz ≤ max? (bandbegrenztes Levenshtein mit Frühabbruch) */
 function editDistanceAtMost(a: string, b: string, max: number): boolean {
@@ -66,6 +69,8 @@ export function HelpOverlay() {
   const helpSection = useBoard((s) => s.helpSection);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const [active, setActive] = useState<string>('start');
+  // Zwei Seiten in einem Fenster: die Hilfe selbst und „Was ist neu"
+  const [seite, setSeite] = useState<'hilfe' | 'neu'>('hilfe');
   const [query, setQuery] = useState('');
   // Treffer pro Sektion (null = keine Suche aktiv). Der Text wird aus dem
   // gerenderten DOM gelesen — so bleibt die Suche automatisch vollständig,
@@ -73,7 +78,7 @@ export function HelpOverlay() {
   const [hits, setHits] = useState<Record<string, number> | null>(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || seite !== 'hilfe') return;
     const q = query.trim().toLowerCase();
     const body = bodyRef.current;
     if (!body) return;
@@ -86,7 +91,7 @@ export function HelpOverlay() {
     // wörtlich oder mit Tippfehler-Toleranz (fuzzy, s. tokenHits)
     const tokens = q.split(/\s+/).filter(Boolean);
     const res: Record<string, number> = {};
-    for (const s of SECTIONS) {
+    for (const s of ALLE) {
       const el = body.querySelector(`#help-${s.id}`);
       const text = (el?.textContent ?? '').toLowerCase();
       const words = text.split(/[^\p{L}\p{N}#+@-]+/u).filter((w) => w.length > 1);
@@ -102,11 +107,16 @@ export function HelpOverlay() {
     }
     body.classList.add('help-filtering');
     setHits(res);
-  }, [query, open]);
+  }, [query, open, seite]);
 
-  // Direktsprung (z. B. „Impressum" aus dem Einstellungs-Fuß)
-  useEffect(() => {
-    if (!open || !helpSection) return;
+  // Direktsprung beim Öffnen: „Was ist neu" aus dem Logo-Menü, „Impressum"
+  // aus dem Einstellungs-Fuß, sonst die Hilfe dort, wo sie zuletzt stand.
+  // useLayoutEffect, damit nicht erst kurz die falsche Seite aufblitzt.
+  useLayoutEffect(() => {
+    if (!open) return;
+    if (helpSection === 'neu') { setSeite('neu'); return; }
+    setSeite('hilfe');
+    if (!helpSection) return;
     setActive(helpSection);
     const t = setTimeout(() => {
       bodyRef.current?.querySelector(`#help-${helpSection}`)?.scrollIntoView({ block: 'start' });
@@ -132,68 +142,23 @@ export function HelpOverlay() {
     bodyRef.current?.querySelector(`#help-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  return (
-    <div className="modal-backdrop" onClick={() => setOpen(false)}>
-      <div className="modal help-modal" role="dialog" aria-modal="true" aria-label="Hilfe" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <h2>❓ Hilfe</h2>
-          <input
-            className="help-search"
-            type="search"
-            placeholder="Hilfe durchsuchen…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Hilfe durchsuchen"
-          />
-          <button className="modal-x" onClick={() => setOpen(false)} aria-label="Schließen">✕</button>
-        </div>
-        <div className="help-layout">
-          <nav className="help-nav">
-            {SECTIONS.filter((s) => !hits || hits[s.id]).map((s) => (
-              <button key={s.id} className={active === s.id ? 'on' : ''} onClick={() => jump(s.id)}>
-                <span>{s.icon}</span> {s.title}
-                {hits?.[s.id] ? <em className="help-count">{hits[s.id]}</em> : null}
-              </button>
-            ))}
-            {hits && Object.keys(hits).length === 0 && (
-              <div className="help-empty">Nichts gefunden zu „{query.trim()}" — anders formulieren?</div>
-            )}
-          </nav>
-          <div className="help-body" ref={bodyRef}>
-
-            <section id="help-start">
-              <h3>🚀 Erste Schritte</h3>
-              <p>PixiNotes ist ein Whiteboard: eine unendliche Fläche voller Karten. Alles bleibt <b>lokal in deinem Browser</b> — kein Konto, kein Server.</p>
-              <ul>
-                <li><b>Doppelklick</b> auf die Fläche legt eine Notiz an, <b>➕</b> im Dock alle anderen Module.</li>
-                <li>Karten <b>ziehen</b> (Griff-Pill oben oder Karte fassen), am Rand <b>resizen</b>.</li>
-                <li><b>Klick-Zoom:</b> Anklicken fliegt sanft zur Karte, wenn sie klein/angeschnitten ist (⚙ → Design → Bedienung abschaltbar); <b>Esc</b> fliegt zurück. Dort auch „Mausrad zoomt" im Miro-Stil. <b>Zoomen funktioniert auch mitten über einer Karte:</b> Strg+Rad, Trackpad-Pinch und der Zwei-Finger-Pinch greifen aufs Board durch — normales Scrollen im Karteninhalt bleibt davon unberührt. Auch <b>Ein-Finger-Schwenken</b> geht mitten über einer Karte: einfach auf einer freien Stelle des Karteninhalts losziehen (Griff-Pill verschiebt weiter die Karte, ein kurzer Tipp bleibt ein Tipp, scrollbarer Inhalt scrollt zuerst selbst). Klick auf die <b>Minimap</b> springt an die Stelle, <b>F</b> passt die Auswahl ein.</li>
-                <li><b>Strg+V</b> fügt Screenshots &amp; Bilder aus der Zwischenablage ein; E-Mails (.eml/.msg), Bilder, PDFs und Dateien einfach aufs Board ziehen.</li>
-                <li>Überlappende Karten: Die <b>zuletzt angefasste Karte legt sich automatisch nach vorn</b> und bleibt dort — bis eine andere angeklickt wird (praktisch mit 🧲 Physik AUS — im Dock unter ⋯ „Mehr").</li>
-                <li><b>Auto-Größe:</b> Karten wachsen automatisch mit ihrem Inhalt (standardmäßig aktiv; gedrosselt, offene Menüs bleiben ungestört, nie schrumpfend). <b>Manuelles Ziehen gewinnt immer:</b> es schaltet die Automatik für diese Karte ab, deine Größe wird nie von selbst geändert. Läuft der Inhalt später über, erscheint nur ein dezenter ⤢-Chip an der Karte als <b>Angebot</b> — ein Klick passt die Höhe einmalig an. Dauerhaft wieder einschalten: Karte auswählen → ⋯-Menü → „Auto-Größe".</li>
-                <li><b>Einzelne Karten teilen:</b> Karte(n) auswählen → ⋯-Menü → <b>„Teilen &amp; Export"</b> — ein Dialog mit allen Wegen: <b>Übernahme-Link</b> (serverlos, die Karten stecken komplett im Link — wer ihn öffnet, übernimmt sie als eigenes Board in PixiNotes), <b>WhatsApp</b>, <b>E-Mail</b>, <b>Drucken</b> (dort auch „als PDF sichern"), fertige <b>PDF-Datei</b> zum Herunterladen und formatiertes <b>Kopieren</b> für Outlook/Word.</li>
-                <li><b>Wo die Auswahl-Leiste steht:</b> Immer <b>an der Karte</b> — oben an ihrer Kante. Ist dort kein Platz (die Karte klebt unter der Kopfleiste), rutscht sie <b>unter</b> die Karte; passt auch das nicht (Karte größer als der Schirm, Telefon, Karten-Fokus), wird sie zur <b>festen Zeile am unteren Bildrand</b>. Diese Reihenfolge gilt auf jedem Gerät, damit man sie überall an derselben Stelle sucht — <b>frei verschieben lässt sie sich bewusst nicht mehr</b>: Ein gemerkter Versatz galt für jede Karte und stand dann irgendwo im Bild.</li>
-                <li><b>Weniger Knöpfe, alles noch da (⋯ „Mehr"):</b> Auswahl-Leiste und Dock zeigen nur noch die häufigsten Aktionen — alles Weitere bündelt jeweils das <b>⋯-Menü</b>: in der Auswahl-Leiste E-Mail, Nachschlagen, Eigenschaften, Vorlage, Kommentar, KI, Ausrichten, Auto-Größe und Archiv; im Dock KI-Assistent, Aufräumen &amp; Anordnen, Physik und Archiv.</li>
-                <li><b>Schrift &amp; Textgröße pro Karte:</b> Karte(n) auswählen → ⋯-Menü → „Schrift &amp; Größe" — kuratierte Schriften (Standard, Serifen, <b>„Sehr gut lesbar"</b> = die für Sehschwäche entworfene Atkinson Hyperlegible, Handschrift, Monospace) und Textgrößen S/M/L/XL. Gilt für die ganze Karte, funktioniert offline (Schriften sind eingebettet) und lässt sich jederzeit auf Standard zurücksetzen.</li>
-                <li><b>Text in Notizen formatieren:</b> Text markieren → in der schwebenden Leiste gibt es neben Fett/Kursiv/Farben jetzt <b>A₋ / A₊ / A₊₊</b> (Textgröße nur für die Markierung) und <b>Aa</b> (Schrift der Markierung wechseln: Serifen → Sehr gut lesbar → Handschrift → Monospace → Standard).</li>
-                <li><b>📏 Ausrichten &amp; Verteilen:</b> Mehrere Karten auswählen → ⋯-Menü der Auswahl-Leiste → „Ausrichten &amp; Verteilen" — links/oben ausrichten, zentrieren, gleichmäßig verteilen, gleiche Breite (wie in PowerPoint).</li>
-                <li><b>Archivieren:</b> Karte(n) auswählen → ⋯-Menü → „Archivieren" — die Karte gilt als erledigt, verschwindet vom Board und aus Aufgaben/Erinnerungen (eingesammelte Tickets werden als erledigt abgeglichen). Im Dock blendet ⋯ „Mehr" → „Archiv einblenden" Archiviertes gedimmt ein; dort auswählen → Zurückholen. Die Suche findet Archiviertes weiterhin.</li>
-                <li><b>Rahmen:</b> Über ＋ → „Rahmen" — ein benannter Rahmen <b>fängt</b> alle Karten ein, deren Mittelpunkt in ihm liegt (Zähler in der Titel-Leiste). An der <b>Titel-Leiste ziehen</b> verschiebt den Rahmen SAMT Inhalt, Doppelklick benennt um. Alle weiteren Aktionen bündelt der <b>„Rahmen"-Knopf in der Auswahl-Leiste</b> (Rahmen anklicken): Umbenennen, Tönung und <b>Inhalt anordnen</b> — Fluss/Raster/Kompakt sortiert NUR den Inhalt, der Rahmen wächst bei Bedarf mit. Beim <b>Board-Aufräumen</b> gilt der Rahmen samt Inhalt als EIN Modul und die innere Ordnung bleibt erhalten. Rahmen haben eigene Verbindungspunkte und lassen sich wie Karten <b>verbinden</b>; im Präsentationsmodus wird der Name zur Abschnitts-Folie.</li>
-                <li><b>Board-Optionen:</b> Alles im Aufräumen-Menü des Docks (⋯ „Mehr" → „Aufräumen &amp; anordnen") — dort gibt die Farb-Reihe jedem Board eine eigene <b>Hintergrund-Tönung</b>, und <b>„Gitter &amp; Raster-Fang"</b> schaltet ein Linien-Gitter ein, an dem Karten beim Verschieben einrasten.</li>
-                <li><b>Strg+K</b> durchsucht alles — auch Ticket-Personen, Eigenschaften und #Tags.</li>
-                <li><b>Strg+Z / Strg+Y</b>: Struktur-Änderungen rückgängig/wiederholen. Aufräumen (Dock: ⋯ „Mehr" → „Aufräumen & anordnen") ordnet das Board automatisch an.</li>
-                <li>Unter ⚙️ → Daten wartet die <b>Starter-Umgebung „Verwaltung"</b> — 14 Beispiel-Boards, die alles zeigen.</li>
-              </ul>
-            </section>
-
-            {/* M210: Kurzer Überblick über die jüngsten Ausbaustufen — erreichbar
-                über das Logo („Über PixiNotes" → Was ist neu). Bewusst knapp und
-                in Alltagssprache: wer alle Einzelheiten will, liest die
-                Fachabschnitte darunter. */}
+  if (seite === 'neu') {
+    return (
+      <div className="modal-backdrop" onClick={() => setOpen(false)}>
+        <div className="modal help-modal help-neu-modal" role="dialog" aria-modal="true" aria-label="Was ist neu" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-head">
+            <h2>🆕 Was ist neu</h2>
+            <button className="link-btn help-zurueck" onClick={() => setSeite('hilfe')}>Zur Hilfe</button>
+            <button className="modal-x" onClick={() => setOpen(false)} aria-label="Schließen">✕</button>
+          </div>
+          <div className="help-body help-neu">
+            {/* Kurzer Überblick über die jüngsten Ausbaustufen, neueste zuerst —
+                bewusst in Alltagssprache. Hier stehen die Begründungen; die
+                Hilfe daneben beschreibt nur, wie die App heute aussieht. */}
             <section id="help-neu">
-              <h3>🆕 Was ist neu</h3>
-              <p>Die letzten Ausbaustufen in Kürze. Welche Fassung gerade läuft, steht im <b>Logo-Menü</b> oben links.</p>
+              <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht im <b>Logo-Menü</b> oben links.</p>
               <ul>
+                <li><b>🤫 Die App redet weniger (M299):</b> Jeder Hinweis ist ein Satz — Toasts, Sprechblasen und die Erklärtexte in den Einstellungen sind gekürzt; eine Sprechblase nennt, was ein Knopf tut, sie erklärt nicht. Die <b>Hilfe</b> hat sechs Abschnitte statt dreizehn (Erste Schritte · Bereiche, Projekte, Boards · Karten &amp; Module · Aufgaben &amp; Erinnerungen · Speichern, Sync &amp; Teilen · Tastenkürzel), Impressum und Datenschutz stehen darunter, und <b>„Was ist neu"</b> ist diese eigene Seite hinter dem Logo-Menü statt ein Abschnitt in der Hilfe. Die Hilfetexte sind neu geschrieben: kurz, ein Gedanke pro Punkt, ohne Begründungen und Fassungsnummern — und sie beschreiben die Oberfläche von heute (⋯-Menüs, Navigation links, Netz in der Übersicht, Kachel).</li>
                 <li><b>🧩 Kachel-Ansicht für große Module (M298):</b> Kanban, Zeitplan, Wochenplan und Protokoll-Reihe wachsen mit ihrem Inhalt und sprengen den Bildschirm. Jetzt lassen sie sich zur <b>Kachel</b> zusammenklappen (Karte auswählen → ⋯ → „Als Kachel zeigen", beim Kanban auch im ⋯ der Kopfzeile): Typ, Titel und zwei bis drei Zeilen Kennzahlen — Tickets je Spalte und die nächste Frist, laufende Vorgänge und der nächste Endtermin, die Blöcke von heute, Sitzungen und Beschlüsse. „Öffnen" oder Doppelklick zeigt das ganze Modul im Fokus, „Ausklappen" bringt es in der alten Größe zurück aufs Board. Das ist die zweite der „zwei Ansichten" aus dem Konzept.</li>
                 <li><b>🧭 Eine Navigation statt drei (M297):</b> Ab Tablet-Breite ist die linke Spalte ein <b>fester Rahmen</b> — ein Band von oben bis unten mit Logo, Aktionen und dem ganzen Baum <b>Bereich › Projekt › Board › Karte</b>; die Fläche beginnt rechts davon, nichts rutscht mehr darunter. Das aktive Projekt und das aktive Board sind aufgeklappt, alles andere lässt sich aufklappen, die Suche oben findet Boards und Karten. Die <b>rechte Seitenleiste</b> und das <b>Navigator-Popup</b> aus der Brotkrume sind darin aufgegangen; das <b>Netz</b> gibt es nur noch in der Übersicht (🏠). Am Telefon bleibt die Kopfleiste mit Board-Wähler, die Brotkrume öffnet denselben Baum als Ausstülpung. Alt+U blendet die Spalte ein und aus, Alt+W springt in ihre Suche.</li>
                 <li><b>🧰 Dock und Auswahl-Leiste entrümpelt (M296):</b> Das <b>＋-Menü</b> zeigt fünf Dinge (Notiz, Kanban, Rechen-Tabelle, Datei oder Bild, Zeitplan) und dahinter „Weitere Module" — vorher 22 Einträge, länger als der Bildschirm. <b>Aufräumen</b> ist ein Knopf im ⋯ des Docks (Verbundenes als Fluss, der Rest als Raster); die Varianten, das Gitter und der Hintergrund liegen unter „Anordnen &amp; Hintergrund". Der Physik-Schalter steht nur noch unter ⚙ → Bedienung (Alt+O geht weiter). Die <b>Auswahl-Leiste</b> hat sechs Elemente: Duplizieren, Verschieben, <b>Teilen</b>, ⋯, Löschen und den Zähler — „Formatiert kopieren" und „Schrift &amp; Größe" liegen im ⋯. Der Toast weicht nach oben aus, solange ein Dock-Menü offen ist; die <b>Minimap</b> erscheint erst ab zehn Karten; eine Sprechblase verschwindet jetzt auch bei einem Tastendruck; am Telefon liegen Impressum und Datenschutz nicht mehr unter dem Dock (sie stehen im Logo-Menü).</li>
@@ -240,130 +205,206 @@ export function HelpOverlay() {
                 <li><b>📱 Ruhe am Handy, wenn die Tastatur kommt</b> — sobald du tippst, weicht alles, was gerade nicht hilft: Das Dock fährt weg, Zoom-Knöpfe und Fußzeile blenden aus, und die Eingabe-Blasen von Planer und Kalender docken als Blatt direkt über der Tastatur an, statt das Modul zu verdecken, in das du schreibst. Ist etwas ausgewählt, übernimmt die Auswahl-Leiste die Dock-Zeile — eine Leiste statt zweier gestapelter, und nie mehr zweireihig.</li>
               </ul>
             </section>
+            <div className="help-foot">
+              <button className="link-btn" onClick={() => setSeite('hilfe')}>Zur Hilfe</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={() => setOpen(false)}>
+      <div className="modal help-modal" role="dialog" aria-modal="true" aria-label="Hilfe" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>❓ Hilfe</h2>
+          <input
+            className="help-search"
+            type="search"
+            placeholder="Hilfe durchsuchen…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label="Hilfe durchsuchen"
+          />
+          <button className="modal-x" onClick={() => setOpen(false)} aria-label="Schließen">✕</button>
+        </div>
+        <div className="help-layout">
+          <nav className="help-nav">
+            {SECTIONS.filter((s) => !hits || hits[s.id]).map((s) => (
+              <button key={s.id} className={active === s.id ? 'on' : ''} onClick={() => jump(s.id)}>
+                <span>{s.icon}</span> {s.title}
+                {hits?.[s.id] ? <em className="help-count">{hits[s.id]}</em> : null}
+              </button>
+            ))}
+            {hits && Object.keys(hits).length === 0 && (
+              <div className="help-empty">Nichts gefunden zu „{query.trim()}" — anders formulieren?</div>
+            )}
+            <div className="help-nav-recht">
+              {RECHT.filter((s) => !hits || hits[s.id]).map((s) => (
+                <button key={s.id} className={'recht' + (active === s.id ? ' on' : '')} onClick={() => jump(s.id)}>
+                  <span>{s.icon}</span> {s.title}
+                  {hits?.[s.id] ? <em className="help-count">{hits[s.id]}</em> : null}
+                </button>
+              ))}
+            </div>
+          </nav>
+          <div className="help-body" ref={bodyRef}>
+
+            <section id="help-start">
+              <h3>🚀 Erste Schritte</h3>
+              <p>PixiNotes ist ein Whiteboard: eine Fläche voller Karten. Alles bleibt <b>lokal in deinem Browser</b> — kein Konto, kein Server.</p>
+              <h4>Karten anlegen</h4>
+              <ul>
+                <li><b>Doppelklick</b> auf die Fläche legt eine Notiz an.</li>
+                <li><b>＋</b> im Dock zeigt Notiz, Kanban-Board, Rechen-Tabelle, Datei oder Bild und Zeitplan. „Weitere Module" öffnet den Rest samt Vorlagen.</li>
+                <li><b>Strg+V</b> fügt Bilder und Screenshots ein. E-Mails, PDFs, Bilder und Dateien einfach aufs Board ziehen.</li>
+              </ul>
+              <h4>Bewegen, Größe, Zoom</h4>
+              <ul>
+                <li>Karten am <b>Griff</b> über der Oberkante oder an der Titelzeile ziehen, am Rand die Größe ändern.</li>
+                <li>Karten wachsen mit ihrem Inhalt. Wer selbst zieht, bestimmt die Größe; läuft der Inhalt über, bietet ein <b>⤢-Chip</b> einmaliges Anpassen an.</li>
+                <li>Die zuletzt angefasste Karte liegt vorn.</li>
+                <li>Zoomen mit <b>Strg+Rad</b>, Pinch oder Mausrad (⚙ → Design). <b>F</b> passt die Auswahl ein, <b>Esc</b> beendet den Fokus.</li>
+                <li>Die <b>Minimap</b> erscheint ab zehn Karten; ein Klick darauf springt an die Stelle.</li>
+              </ul>
+              <h4>Auswahl-Leiste</h4>
+              <ul>
+                <li>Karte anklicken → die Leiste sitzt an der Karte: <b>Duplizieren · Verschieben · Teilen · ⋯ · Löschen</b>.</li>
+                <li>Im <b>⋯</b>: Formatiert kopieren, Nachschlagen, Eigenschaften, Vorlage, Kommentar, Schrift &amp; Größe, KI, Ausrichten &amp; Verteilen, Als Kachel zeigen, Auto-Größe, Markierungen lösen, Archivieren.</li>
+                <li>Bei einem Rahmen kommt <b>„Rahmen"</b> dazu: Umbenennen, Tönung, Inhalt anordnen.</li>
+              </ul>
+              <h4>Board</h4>
+              <ul>
+                <li>Dock <b>⋯ → „Board aufräumen"</b> ordnet Verbundenes als Fluss und den Rest als Raster; Strg+Z stellt alles wieder her. „Anordnen &amp; Hintergrund" bietet Varianten, Gitter und Tönung.</li>
+                <li><b>Strg+K</b> sucht überall — auch Personen, Eigenschaften und #Tags. <b>Strg+Z / Strg+Y</b> machen rückgängig und wiederholen.</li>
+                <li><b>Archivieren:</b> Karte → ⋯ → „Archivieren". Dock ⋯ → „Archiv einblenden" zeigt Archiviertes gedimmt; dort „Zurückholen".</li>
+                <li>Ruhe ist Voreinstellung: <b>Physik, Klick-Zoom und Konfetti</b> schaltest du unter ⚙ → Design → „Bewegung auf der Fläche" ein.</li>
+                <li>⚙ → Daten → Starter-Umgebung <b>„Verwaltung"</b>: 14 Beispiel-Boards zum Ausprobieren.</li>
+              </ul>
+            </section>
 
             <section id="help-ordnung">
               <h3>🗂️ Bereiche · Projekte · Boards</h3>
-              <p>Drei Ebenen halten Ordnung: <b>Bereiche</b> (z. B. Arbeitsplatz, Wissen) bündeln <b>Projekte</b>, Projekte bündeln <b>Boards</b>.</p>
+              <p>Drei Ebenen: <b>Bereiche</b> bündeln <b>Projekte</b>, Projekte bündeln <b>Boards</b>.</p>
+              <h4>Navigation</h4>
               <ul>
-                <li>Die <b>Reiterleiste</b> zeigt nur die Boards des aktiven Projekts. Ist die Leiste zu schmal für eine Reihe von Reitern — am Telefon, am hochkant gehaltenen Tablet oder bei starkem Text-Zoom —, steht dort stattdessen ein <b>Board-Wähler</b>: Er trägt den Namen des aktiven Boards und klappt auf Tipp alle Boards des Projekts als Liste auf (mit Kartenzahl und ✕ zum Schließen). Umgeschaltet wird nach dem gemessenen Platz, nicht nach der Fenstergröße.</li>
-                <li>Die <b>Brotkrume</b> „Bereich › Projekt" öffnet den <b>Navigator</b> — ein zentrales Fenster über alle Ebenen: Bereiche (Klick öffnet die große Übersicht), Projekte (Klick öffnet ihr erstes Board), Boards und per ▸ sogar die <b>Karten jedes Boards</b> — ein Klick springt direkt zur Karte.</li>
-                <li><b>⋯ Dieselben Handgriffe an jedem Board und jedem Projekt:</b> Überall, wo ein Board oder ein Projekt steht — Navigator, Seitenleiste, Übersichts-Kachel —, liegt hinter dem <b>⋯</b> derselbe Vorrat, in derselben Reihenfolge. Beim <b>Board</b>: Umbenennen · Duplizieren (mit allem Inhalt, aber frischen Karten-Kennungen) · In Projekt verschieben · Teilen-Link kopieren · Als Datei sichern · Präsentieren · Archivieren · Löschen. Beim <b>Projekt</b>: Umbenennen · Neues Board · Duplizieren (mit allen Boards) · Alle Boards archivieren · Löschen.</li>
-                <li><b>🗄 Boards archivieren statt löschen:</b> Ein erledigtes Board muss nicht weg — <b>⋯ → Archivieren</b> legt es zur Seite: Es verschwindet aus der Reiterleiste, dem Navigator, der Seitenleiste und der Übersicht, und seine Fristen ruhen (Aufgaben-Zentrale und Erinnerungen schweigen). Verloren geht nichts. Es gilt derselbe Schalter wie für Karten — <b>Dock → ⋯ „Mehr" → „Archiv einblenden"</b> zeigt archivierte Boards gedimmt mit der Marke „Archiv"; dort <b>⋯ → Zurückholen</b>. Wer das gerade offene Board archiviert, landet automatisch auf einem Nachbar-Board; das letzte sichtbare Board bleibt immer offen.</li>
-                <li><b>🏠</b> öffnet die große Übersicht: Bereiche als farbige Zonen, Boards als Kacheln — Kacheln lassen sich per Drag in andere Projekte verschieben.</li>
-                <li>Der Umschalter <b>Hierarchie ⇄ Netz</b> zeigt alternativ den Verknüpfungs-Graphen (Portale, [[Wikilinks]]) — zoombar wie das Board.</li>
-                <li><b>Portale</b> sind Karten, die auf ein anderes Board verlinken — für Sprungmarken zwischen Themen. Sie gelten in <b>beide Richtungen</b>: Verlinkst du von „A" nach „B", legt PixiNotes in „B" automatisch einen <b>Rückverweis</b> auf „A" an (ein Strg+Z nimmt beide zurück). Liegt drüben schon ein Portal zurück, bleibt es dabei. Ältere, einseitige Portale tragen den Rückverweis auf Klick nach („⇄ Rückverweis anlegen" auf der Karte).</li>
+                <li>Ab Tablet-Breite steht links die <b>Navigation</b> mit dem ganzen Baum <b>Bereich › Projekt › Board › Karte</b>. Klick öffnet, ▸ klappt auf, das Suchfeld findet Boards und Karten.</li>
+                <li><b>Alt+U</b> blendet die Spalte aus und ein, <b>Alt+W</b> springt in ihre Suche.</li>
+                <li>Am Telefon zeigt die Kopfzeile den <b>Board-Wähler</b>; die Brotkrume öffnet denselben Baum.</li>
+                <li><b>🏠 Übersicht:</b> Bereiche als Zonen, Boards als Kacheln — per Drag in andere Projekte verschiebbar. Der Umschalter <b>Hierarchie ⇄ Netz</b> zeigt dort den Verknüpfungs-Graphen (Portale, [[Wikilinks]]).</li>
+              </ul>
+              <h4>⋯ an Board und Projekt</h4>
+              <ul>
+                <li><b>Board:</b> Umbenennen · Duplizieren · In Projekt verschieben · Teilen-Link · Als Datei sichern · Präsentieren · Archivieren · Löschen.</li>
+                <li><b>Projekt:</b> Umbenennen · Neues Board · Duplizieren · Alle Boards archivieren · Löschen.</li>
+                <li>Archivierte Boards verschwinden aus Navigation und Übersicht, ihre Fristen ruhen. Dock ⋯ → „Archiv einblenden" zeigt sie; dort ⋯ → Zurückholen.</li>
+              </ul>
+              <h4>Portale</h4>
+              <ul>
+                <li>Ein <b>Portal</b> ist eine Karte, die auf ein anderes Board springt. PixiNotes legt drüben automatisch den Rückverweis an.</li>
               </ul>
             </section>
 
             <section id="help-karten">
-              <h3>🃏 Karten-Typen</h3>
+              <h3>🃏 Karten &amp; Module</h3>
+              <h4>📝 Notiz</h4>
               <ul>
-                <li><b>📝 Notiz:</b> voller Block-Editor („/" öffnet Checklisten, Tabellen, Überschriften). Farbwechsel über den Punkt oben rechts. <b>Bilder gehören mitten in den Text:</b> mit <b>Strg+V</b> einfügen, per Drag &amp; Drop ablegen, über den Chip <b>🖼 Bild</b> unter der Notiz auswählen (am Telefon öffnet das die Fotomediathek oder die Kamera) oder über „/" → <b>„Bild aus Zwischenablage"</b> — der Weg für iPhone/iPad, wo „Kopieren" in der Fotos-App die Vorlage liefert. Große Fotos werden dabei automatisch verkleinert; Videos, Tonspuren und andere Dateien bleiben bewusst draußen und werden aufs Board gezogen zur <b>Datei-Karte</b> (dort ist Platz, im Notiztext nicht).</li>
-                <li><b>Wochenplan / Planer (Raster):</b> Über ＋ → „Wochenplan (Stunden)" — ein universelles Raster aus Spalten × Zeilen. Spalten sind Wochentage (Mo–Fr/Mo–So) ODER <b>frei benennbar</b> (Personen, Räume, Maschinen — beliebig ergänzen/entfernen); Zeilen sind Uhrzeiten ODER <b>eigene Einheiten</b> (Schulstunden, Schichten …). Klick auf einen freien Slot legt einen Block an, Klick auf einen Block öffnet den Editor: Text, optionales <b>Label/Person als Badge</b>, Spalte, Von/Bis, Farbe, Löschen. Überlappende Blöcke stellen sich automatisch nebeneinander — so wird aus EINER Karte Stundenplan, Arbeitswoche, Dienstplan, Raum- oder Schichtplan.</li>
-                <li><b>Zeiterfassung:</b> Über ＋ → „Zeiterfassung" — Arbeitszeit mit einem Klick: <b>Arbeit / Pause</b> starten, ein Klick auf die andere Art wechselt nahtlos (Arbeit → Pause → Arbeit), „Stop" beendet. Jede Zeile hat Bemerkung und ist <b>direkt editierbar</b> (native Zeitfelder) — so geht auch Nacherfassen und Korrigieren ohne Umwege; Besonderheiten wie Ortstermine oder Fahrten gehören in die Bemerkung. Tages-Navigation mit Summen je Art plus Tages-/Wochensumme ohne Pausen. <b>Ansichten:</b> Tag (Protokoll) / Woche (Tageszeilen mit Aufteilung) / Monat (Kalenderraster mit Tagessummen) / Jahr (Monatssummen) — Klick auf einen Tag oder Monat springt eine Ebene tiefer, die Erfassungs-Knöpfe bleiben überall verfügbar.</li>
-                <li><b>📋 Kanban:</b> Spalten frei benennbar (＋/✕). <b>Klick auf ein Ticket öffnet das große Ticket-Fenster</b> (Trello-Stil): Beschreibung, Frist, Person, Priorität, <b>Checkliste mit Fortschrittsbalken</b>, <b>Abhängigkeiten</b> („erst Schritt 1, dann Schritt 2" — blockierte Tickets zeigen 🔒 und lassen sich erst weiterschieben, wenn alle Vorgänger erledigt sind; in die Erledigt-Spalte erst mit kompletter Checkliste) und <b>Verknüpfungen zu vorhandenen Karten/Modulen</b> aller Boards (🔗, mit Sprung). ⤓ sammelt offene Aufgaben aus allen Boards ein, ⟳ hält das automatisch aktuell — erledigte Quellen haken ihre Tickets selbst ab. Im Einsammel-Panel wählst du die Quell-Boards — und über ▸ an jedem Board sogar die <b>einzelnen Quellen-Karten</b> (bestimmte Checklisten-Notizen, Kanbans, Zeitpläne) einzeln ab, wenn nicht alles mitkommen soll. <b>Archiv:</b> Erledigte Tickets tragen 🗃 (die Erledigt-Spalte auch „Alle archivieren") — sie verlassen die Spalten, bleiben aber in der Karte; 🗃 in der Kopfzeile öffnet das Archiv (zurückholen, endgültig löschen) und die <b>Automatik „nach … Tagen"</b>, die Erledigtes von selbst wegräumt.</li>
-                <li><b>Σ Rechen-Tabelle:</b> Über ＋ → „Rechen-Tabelle" — ein Raster, das <b>wirklich rechnet</b>. Alles, was mit <code>=</code> beginnt, ist eine Formel: <code>=SUMME(B2:B9)</code>, <code>=MITTELWERT(C1:C12)</code>, <code>=B4*1,19</code>, <code>=WENN(A1&gt;100;"über Plan";"im Rahmen")</code>. Angezeigt wird immer das <b>Ergebnis</b>, beim Hineinklicken die <b>Formel</b> — genau wie in Excel. Enter springt eine Zelle nach unten, Tab nach rechts. Der Knopf <b>Σ</b> setzt unter jede Zahlenspalte automatisch eine Summe (Auto-Summe). Verfügbar sind SUMME, MITTELWERT, MIN, MAX, ANZAHL, ANZAHL2, PRODUKT, RUNDEN, ABS, WENN, HEUTE, LÄNGE und VERKETTEN — die englischen Namen (SUM, AVERAGE, IF …) versteht sie ebenso. Zeigt eine Zelle im Kreis auf sich selbst, steht dort <code>#ZYKLUS!</code> statt einer Endlosschleife. <b>Excel-Dateien</b> (<code>.xlsx</code>/<code>.xlsm</code>) einfach aufs Board ziehen: Werte <i>und</i> Formeln werden übernommen, mehrere Blätter werden zu mehreren Karten — danach rechnet die Tabelle hier weiter, ohne Excel und ohne Internet. Der Download-Knopf gibt die Tabelle als <b>CSV</b> zurück (öffnet sich in Excel, LibreOffice und Numbers). Bewusst eine eigene Karte und nicht die Tabelle in der Notiz: Dort ist eine Zelle Fließtext mit Fett, Farbe und Links — ein Raster darf rechnen, ein Textblock nicht.</li>
-                <li><b>📅 Zeitplan (Gantt):</b> Zeit-Skala umschaltbar (Tage / Wochen mit KW-Raster / Monate / <b>Jahre</b>). Die <b>Jahres-Skala</b> ist für Mehrjahres-Vorhaben gedacht: Die Kopfzeile zeigt dann Jahreszahlen statt Monatskürzel, Quartals-Striche gliedern dazwischen, und auch kurze Vorgänge bleiben sichtbar und anklickbar. Der Zoom arbeitet dort in feinen Schritten, weil ein ganzer Pixel pro Tag in dieser Ansicht schon ein Riesensprung wäre. Balken ziehen/resizen, ◆ = Meilenstein (Balken auf Dauer 0), Pfeile = Abhängigkeiten mit Konflikt-Warnung und Ein-Klick-Auflösung, Personen, Zoom, „heute".</li>
-                <li><b>📋 Protokoll-Reihe:</b> Für <b>wiederkehrende Besprechungen</b> — eine einzige Karte hält die ganze Serie, angezeigt wird immer nur eine Sitzung (◀ ▶ oder Datumsliste). Das löst das übliche Dilemma: weder eine meterlange Notiz noch hundert Einzelnotizen. <b>Der Kern ist die Wiedervorlage:</b> „＋ Neue Sitzung" übernimmt automatisch alle noch <b>offenen</b> Punkte der letzten Sitzung — mit Vermerk „(offen seit …)", der das Ursprungsdatum behält und sich beim erneuten Vertagen nicht stapelt. Erledigtes bleibt im alten Protokoll stehen, denn ein Protokoll wird nicht rückwirkend umgeschrieben. Im ⚙-Menü der Karte stellst du <b>Rhythmus</b> (wöchentlich bis vierteljährlich — schlägt das nächste Datum vor) und eine <b>feste Tagesordnung</b> ein, die jede neue Sitzung vorstrukturiert. Braucht eine einzelne Sitzung darüber hinaus einen Punkt, hängt ihn <b>„＋ TOP"</b> über dem Protokoll an — er gilt nur für diese Sitzung und taucht in späteren nicht auf. Die TOP-Chips über dem Text zeigen die Tagesordnung der laufenden Sitzung; sie folgen den Überschriften im Protokoll, lassen sich dort also frei umbenennen oder löschen. Die <b>Kartenfarbe</b> wählst du wie bei einer Notiz — Farbpunkt für die Palette, daneben der Wähler für einen beliebigen Ton. <b>Beschlüsse</b> werden getrennt von Aufgaben festgehalten; aufgeklappt zeigt „Beschlusslage der ganzen Reihe" alle Festlegungen über sämtliche Sitzungen hinweg. Offene Punkte der <b>neuesten</b> Sitzung landen automatisch in der Aufgaben-Zentrale (bewusst nur die neueste — sonst stünde ein vertagter Punkt dort so oft, wie er schon verschoben wurde) und lassen sich per Pfeil in ein Kanban einsammeln. Die Suche (Strg+K) und der Export finden <b>alle</b> Sitzungen, auch die gerade nicht sichtbaren.</li>
-                <li><b>🗓️ Kalender:</b> Monat/Woche, Quellen wählbar (Aufgaben, Zeitpläne, Meilensteine), ICS-Import/-Abo/-Export (Outlook, Google, Apple), .ics-Dateien einfach draufziehen. <b>Eigene Termine:</b> Klick auf einen Tag öffnet den Tages-Editor — Titel (+ optionale Uhrzeit) eintragen, fertig; ★-Einträge erscheinen im Raster und wandern beim Export mit. <b>Klick auf einen Termin = bearbeiten:</b> Von-/Bis-Uhrzeit, Bis-Datum (mehrtägig = farbiger Streifen), Ort, Notiz und Farbe im Detail-Editor — der Tooltip des ★-Chips zeigt die Details. <b>Karten verknüpfen:</b> Im Editor eine Karte oder ein Board suchen und anheften (↗ springt hin); „📎 Karte als Termin" übernimmt den Kartentitel gleich mit. <b>Richtung Google/Outlook:</b> Jeder eigene Termin hat „→G" (öffnet Google Kalender mit vorausgefülltem Termin — ein Klick zum Speichern, ganz ohne Schreib-Zugriff auf dein Konto) und „.ics" für Outlook/Apple. <b>Richtung PixiNotes:</b> Über ⚙ → <b>Kalender</b> in den Einstellungen Google/Microsoft 365 verbinden (liest live) oder eine ICS-URL abonnieren. Einen automatischen Schreib-Sync in dein Konto gibt es bewusst nicht — dafür wären weitreichende Schreibrechte auf deinen kompletten Kalender nötig.</li>
-                <li><b>📊 Diagramm (Mermaid):</b> liegt rahmenlos direkt auf der Fläche — alle Werkzeuge schweben als Leiste unterm Diagramm, sobald die Karte ausgewählt ist. 8 Vorlagen (Flow, Sequenz, Gantt, Mindmap, Kreis, Status, Zeitstrahl, Quadrant); Farbschema-Punkte, ✏️ Handschrift-Look und ⇄ Richtung liegen direkt in der Leiste — die Farbschemata färben alle Diagrammtypen (auch Kreis, Zeitstrahl, Quadrant, Gantt). ALLE Vorlagen bearbeitest du <b>direkt im Bild</b> — Flowchart: Schritte (Form ▭ ▢ ◇ ◯ ⬡ ⧉, Füllfarbe, „→ Verbinden") und Pfeile (beschriften, Linienstil ─ ┄ ━). Sequenz: Nachrichten (Text, Pfeilart, 🗒 Notiz), Personen, № Autonummerierung. Gantt: Balken (±1 Tag, ✓ erledigt / ▶ laufend / ⚠ kritisch), Abschnitte. Mindmap: Punkte (＋ Unterpunkt, Teilbaum entfernen). Kreis: Legende (Wert ±5). Status: Zustände umbenennen, „→ Übergang" ziehen, Übergänge beschriften. Zeitstrahl: Perioden und Ereignisse. Quadrant: Punkte verschieben (◀▶▲▼), Quadranten- und Achsen-Beschriftungen. Titel per „✎ Titel"; Doppelklick = überall direkt umbenennen. Beim Laden einer Vorlage oder eines KI-Diagramms passt sich die Karte einmalig der Diagrammgröße an; „⤢ Einpassen" in der Leiste macht das jederzeit auf Klick — ansonsten bleibt die Größe genau so, wie du sie ziehst. Die ✨-Zeile in der Leiste erzeugt oder ändert das Diagramm aus normaler Sprache; der Code bleibt für Profis hinter ‹/›.</li>
-                <li><b>▢ Prozess-Formen:</b> Schritt, Entscheidung, Start/Ende — Doppelklick beschriftet, Toolbar unter der Form wechselt Form/Farbe.</li>
-                <li><b>📓 OneNote &amp; Word übernehmen:</b> Über <b>⚙ → Daten</b> lassen sich OneNote-Notizbücher direkt aus Microsoft 365 holen: <b>Notizbuch → Bereich</b>, <b>Abschnitt → Board</b>, <b>Seite → Notiz-Karte</b>. Aufgabenkästchen (To-Do-Kategorie) werden zu echten <b>Checklisten</b> und tauchen damit in der Aufgaben-Zentrale und in verbundenen Kanbans auf; Tabellen, Listen und Bilder kommen mit. Gelesen wird nur — in OneNote ändert sich nichts. Da der Import ganze Bereiche anlegt (was Strg+Z nicht abdeckt), gibt es an derselben Stelle <b>„Letzten Import zurücknehmen“</b>. <b>Ohne Microsoft-Konto</b> geht es über Word: in OneNote „Datei → Exportieren → Word“, dann die <code>.docx</code> aufs Board ziehen — Überschriften, Listen (auch verschachtelt), Tabellen und eingebettete Bilder werden übernommen, ganz ohne Internet.</li>
-                <li><b>👁 Vorschau statt Dateiname:</b> Eine eingefügte Datei zeigt, was drinsteckt — <b>PDFs</b> die erste Seite (Klick öffnet den Seiten-Viewer), <b>Bilder</b> das Bild (⤢ öffnet es groß), <b>Text, Markdown, CSV, JSON, Protokolle</b> die ersten Zeilen, <b>Ton und Video</b> einen Abspieler. Das gilt <b>unabhängig von der Größe</b>: Der Inhalt liegt in der Geräte-Ablage (IndexedDB), nicht im Board-Stand — dort stünde er im 5-MB-Limit des Browsers und würde ab etwa 1,5 MB gar nicht erst gespeichert. Was der Browser wirklich nicht darstellen kann (Archive, Programme, alte Office-Formate), sagt es in einem Satz, statt eine Vorschau vorzutäuschen. <b>Zoombar sind beide Ansichten:</b> ＋/− in der Kopfzeile, <b>Strg/⌘ + Mausrad</b>, <b>Doppelklick</b> (heran und wieder einpassen), <b>Zwei-Finger-Kneifen</b> am Touchscreen und die Tasten <b>+ − 0</b>. Im vergrößerten Bild wird geschoben. Die PDF-Seite wird dabei <b>neu gerendert statt gestreckt</b> — sie bleibt also auch bei 400 % scharf, statt zu verpixeln. <b>Wichtig fürs Team:</b> Diese Ablage gehört zu <i>diesem</i> Gerät. Ein Teilen-Link trägt den Board-Stand, nicht die Festplatte — für den Weg zu Kolleginnen und Kollegen gibt es den Anlagen-Ordner (siehe Team-Anlagen weiter unten), aus dem die Karte den Inhalt per Klick nachlädt und dann dauerhaft behält.</li>
-                <li><b>📧 E-Mail/Datei/Bild/PDF:</b> per Drag aufs Board <b>oder über ＋ → „Datei einfügen"</b> (Datei-Dialog, auch mehrere auf einmal — der Weg fürs Smartphone). Termine und Telefonnummern werden automatisch erkannt und klickbar. <b>Team-Anlagen:</b> Gehört das Board zu einem Team-Projekt mit Sync-Ordner, legt PixiNotes von jeder eingefügten Datei automatisch eine Kopie im Ordner ab — sauber strukturiert unter <code>pixinotes-anlagen/&lt;Board&gt;/&lt;Kategorie&gt;/</code> (Bilder, PDFs, E-Mails, Apps, Dokumente …). Dateien, die zu groß fürs Einbetten ins Board sind, holen Teammitglieder per Klick („Aus Team-Ordner laden") direkt von dort; eigene Apps laden ihren Quelltext auf anderen Geräten automatisch nach.</li>
-                <li><b>🔗 Verbindungen als Daten-Abos:</b> Ein Pfeil zwischen Karten transportiert Daten. <b>Notiz/Zeitplan/Kanban → Kanban:</b> Die offenen Punkte der verbundenen Karte werden automatisch als Tickets eingesammelt — auch ohne den ⟳-Schalter und unabhängig von der Board-Auswahl. Bei verbundenen Notizen zählen neben Checklisten auch <b>Aufzählungs- und nummerierte Listen</b> als Aufgaben. Abwählen geht jederzeit: im Einsammeln-Panel (⚙) den Haken der Quelle entfernen (Quellen mit Pfeil tragen dort ein „⇢ Abo"-Kennzeichen) oder einfach den Pfeil löschen. <b>Und zurück:</b> Wanderst du ein eingesammeltes Ticket in die Erledigt-Spalte, wird der Checklisten-Punkt in der Quell-Notiz automatisch abgehakt (Listen-Punkte werden dabei zum abgehakten Checklisten-Punkt, Zeitplan-Vorgänge springen auf 100 %, Quell-Tickets wandern in ihre Erledigt-Spalte); in Zwischenspalten bekommt der Punkt einen Vermerk wie „(→ In Arbeit)", der beim Zurückschieben wieder verschwindet. <b>Der Abgleich läuft in beide Richtungen:</b> Wird die Quelle wieder geöffnet (Punkt aufgehakt, Vorgang unter 100 %, Quell-Ticket zurückgeschoben), kommt auch das eingesammelte Ticket aus „Erledigt" zurück. Eingesammelte Tickets folgen ihrer Quelle außerdem bei Text, Frist, Person und Priorität — sie frieren nicht mehr auf dem Stand des Einsammelns ein. <b>Modul → Kalender:</b> Der Kalender springt auf den Bereich „Verbunden" und zeigt nur noch Termine, Fristen und Zeitplan-Balken der angeschlossenen Karten — der Bereich-Schalter in der Kopfzeile (Alle Boards / Dieses Board / Verbunden) stellt jederzeit um. <b>Kanban → Zeitplan:</b> Tickets mit Frist erscheinen im verbundenen Zeitplan als gestrichelte Abo-Meilensteine (nur Anzeige — die Frist wird am Ticket gepflegt). <b>Wochenplan → Zeiterfassung:</b> Die geplanten Blöcke sind das Soll — Tag- und Wochenansicht zeigen Soll und Differenz zur erfassten Zeit. <b>Zeiterfassung → Notiz/Kanban:</b> Die verbundene Karte trägt einen ⏱-Chip mit der Arbeitszeit von heute und dieser Woche. <b>Notiz → Diagramm:</b> Ein leeres bzw. Vorlagen-Diagramm folgt automatisch der Checkliste der verbundenen Notiz (Erledigtes grün); hat das Diagramm eigenen Inhalt, schaltet der „⇢ Abo"-Chip im Diagramm das Abo bewusst zu — der eigene Code bleibt dabei erhalten und kommt beim Pausieren zurück. <b>Eigene App → Notiz:</b> Die Notiz zeigt den Speicherstand der verbundenen App als lesbaren Auszug, live bei jedem Speichern.</li>
-                <li><b>Nachschlagen:</b> Karte auswählen → ⋯-Menü → „Nachschlagen". <b>Wikipedia wird fein durchsucht</b> (echte Such-API, mehrere Treffer mit Beschreibung, Sprache DE/EN umschaltbar) — die Artikel-Links sind stabil. <b>Andere Quellen bewusst nur grob:</b> Links öffnen deren Suchseite mit deinem Begriff (DuckDuckGo, Google, Bing, OpenStreetMap, Wikipedia-Volltext) — geratene Tief-Links, die oft in 404 enden, gibt es absichtlich nicht. Der Begriff kommt aus der ersten Zeile der Karte und ist im Panel änderbar.</li>
-                <li><b>Verschieben & Umbenennen:</b> Jede Karte lässt sich am schwebenden <b>Griff</b> über der Oberkante ziehen — und zusätzlich an ihrer <b>Titelzeile</b> (bzw. bei Notizen/Bildern an der freien Fläche). <b>Doppelklick auf den Titel benennt um</b> — dieselbe Regel wie bei Rahmen, Formen und Diagrammen. Das gilt jetzt auch für <b>Datei- und Bild-Karten</b>: „DB_Reservierung_762631109316.pdf" wird per Doppelklick zu „Bahnfahrt Hamburg 18.08." Der <b>Dateiname bleibt unverändert</b> (Download, Team-Ordner und lokale Ablage hängen daran) und steht weiterhin klein auf der Karte; ein leeres Feld setzt den Titel wieder auf den Dateinamen zurück. Die Suche (Strg+K) findet beides. <b>In ein anderes Board:</b> Karte(n) auswählen → in der Auswahl-Leiste das Ordner-Symbol mit Pfeil → Ziel-Board wählen. Verbindungen zwischen den verschobenen Karten, Kommentar-Pins und geankerte Markierungen wandern mit; Rahmen nehmen ihren kompletten Inhalt mit — einfach den Rahmen anklicken und über die Auswahl-Leiste verschieben; auch gemischte Auswahl aus Karten und Rahmen wandert komplett. Strg+Z macht den ganzen Umzug rückgängig.</li>
-                <li><b>Eigene App (HTML):</b> Eine HTML-Datei (z. B. ein selbst gebautes Ein-Datei-Tool) aufs Board ziehen oder über ＋ → „Eigene App" wählen — sie läuft als <b>eigene, abgeschottete Instanz</b> direkt in der Karte, mit vollem JavaScript. Gestartet wird bewusst erst per ▶ (so bremsen zehn Apps auf dem Board weder Start noch Akku), Stop hält an, ⟳ startet frisch. Der Vollbild-Knopf nutzt echtes Browser-Vollbild — <b>die App läuft dabei ununterbrochen weiter</b> (Esc führt zurück). Speichert die App etwas (localStorage), landet das in einer eigenen Schublade pro Karte — sie kann PixiNotes-Daten weder lesen noch löschen. Zum Bedienen die Karte zuerst anklicken (vorher gehören Klicks dem Board); ziehen an der Kopfleiste. Die HTML-Datei selbst bleibt auf diesem Gerät (IndexedDB) und wandert nicht in Sync-Dateien oder Team-Pakete — auf einem anderen Gerät bietet die Karte an, die Datei erneut zu laden (bzw. holt sie automatisch aus dem Team-Ordner, siehe Team-Anlagen). Über ＋ → „App von URL" holst du ein Tool direkt von einer Internet-Adresse: Erlaubt die Quelle das Kopieren (z. B. GitHub, Gists, CDNs), wird daraus eine ganz normale lokale App-Karte (läuft offline, „Von der Quelle neu laden" im ⋮-Menü) — sonst wird die Seite <b>live eingebettet</b> (immer aktuell, braucht Internet; sie läuft unter ihrer eigenen Herkunft und kommt nicht an PixiNotes-Daten). Das ⋮-Menü der Karte bietet außerdem: <b>Im eigenen Browser-Tab öffnen</b> (volle Fläche, gleiche Abschottung — Gespeichertes fließt in die Karte zurück, solange PixiNotes offen ist), <b>HTML-Datei herunterladen</b> und <b>Speicherstand im Team-Ordner sichern</b>. Gehört das Board zu einem Team-Projekt, wird der Speicherstand der App (das, was sie selbst speichert) ohnehin automatisch als kleine Datei unter <code>pixinotes-anlagen/…/Apps/</code> abgelegt — beim Start gewinnt der neuere Stand (Team oder lokal), so wandert der App-Fortschritt zwischen deinen Geräten und ins Team.</li>
+                <li>Block-Editor; <b>„/"</b> öffnet Checklisten, Tabellen und Überschriften. Der Farbpunkt oben rechts färbt die Karte.</li>
+                <li>Bilder mitten im Text: <b>Strg+V</b>, Drag &amp; Drop, Chip <b>🖼 Bild</b> oder „/" → „Bild aus Zwischenablage" (iPhone/iPad). Fotos werden verkleinert; Videos und andere Dateien werden zur Datei-Karte.</li>
+                <li>Text markieren → schwebende Leiste: Fett, Kursiv, Farben, <b>A₋ / A₊ / A₊₊</b> und <b>Aa</b> für die Markierung. Schrift für die ganze Karte: ⋯ → „Schrift &amp; Größe".</li>
+                <li><b>[[Wikilinks]]</b> verlinken Boards oder Karten, <b>#Tags</b> gliedern; Strg+K und „#" listet alle Themen.</li>
               </ul>
-            </section>
-
-            <section id="help-verbinden">
-              <h3>🔗 Verbinden & Präsentieren</h3>
+              <h4>📋 Kanban</h4>
               <ul>
-                <li>Karte anklicken/antippen — dann erscheinen die <b>＋-Verbindungspunkte</b> an den Rändern. Von dort ziehen und auf einer beliebigen Stelle der Zielkarte loslassen; während des Ziehens leuchten die Anschlüsse aller Karten als Ziele auf, die Verbindung dockt automatisch an der besten Seite an.</li>
-                <li>Klick auf die Linie: <b>Label</b> vergeben (z. B. „blockiert") oder Pfeilart wechseln. Entf löscht (Strg+Z holt zurück).</li>
-                <li><b>Aufräumen</b> (im Dock: ⋯ „Mehr" → „Aufräumen &amp; anordnen") ordnet das Board — mit Morph-Animation, ein Strg+Z stellt alles wieder her; doppelte Verbindungen werden dabei automatisch zusammengefasst. Modi: <b>Fluss</b> (horizontal oder vertikal), <b>Raster</b>, <b>Kompakt packen</b> (minimale Fläche, ideal vor dem Export), <b>Schwimmbahnen</b> (eine Bahn pro Person — aus der Eigenschaft {'„wer"'} oder den Personen in Tickets/Zeitplänen), <b>Zeitstrahl</b> (Fristen chronologisch), <b>Quadrant</b> (sortiert die Karten in VIER benannte Rahmen — Titel per Doppelklick frei umbenennbar, beim nächsten Quadrant-Aufräumen werden sie wiederverwendet), Kreis-Bündel und Stapeln.</li>
-                <li><b>▶ Präsentation:</b> jede Karte wird zur Folie, <b>live editierbar</b>. Die Reihenfolge folgt den Verbindungen; ▶ auf Kacheln/Portalen startet direkt beim jeweiligen Board.</li>
+                <li>Spalten frei benennbar. Klick auf ein Ticket öffnet das <b>Ticket-Fenster</b>: Beschreibung, Frist, Person, Priorität, Checkliste, Abhängigkeiten (🔒) und Verknüpfungen zu Karten.</li>
+                <li>Kopfzeile: <b>🔍 Filter</b> und <b>⋯</b>. Im ⋯: Einsammeln (offene Aufgaben aus anderen Boards, auch automatisch), Archiv &amp; Automatik, „Erledigte archivieren", kompakte Tickets, Spalte hinzufügen, Als Kachel zeigen.</li>
+                <li><b>Erledigt</b> ordnet nach Heute · Diese Woche · Älter; jede Gruppe lässt sich archivieren. Das Archiv holt Tickets zurück oder löscht sie endgültig; die Automatik räumt Erledigtes nach einer wählbaren Zahl Tage selbst weg.</li>
               </ul>
-            </section>
-
-            <section id="help-zeichnen">
-              <h3>✏️ Zeichnen</h3>
+              <h4>📅 Zeitplan, Wochenplan, Zeiterfassung, Protokoll</h4>
               <ul>
-                <li>✎ im Dock: <b>Stift</b>, <b>Neon-Textmarker</b>, <b>Radierer</b> — Esc zurück zur Auswahl.</li>
-                <li><b>Formerkennung:</b> nach dem Zeichnen kurz gedrückt halten — wackelige Linien werden gerade, Kreise rund, Rechtecke eckig.</li>
-                <li><b>Markierungen kleben an Karten:</b> Ein Strich, der eine Karte überlappt — schon eine kleine Überlappung genügt —, wird beim Absetzen an sie geankert (die Karte blitzt kurz auf) und wandert beim Verschieben, Aufräumen und Archivieren mit; beim Löschen der Karte verschwindet er mit (Strg+Z holt beides zurück). Bei mehreren Karten gewinnt die größte Schnittmenge; sich berührende Striche (z. B. ein Pfeil aus mehreren Zügen) entscheiden gemeinsam, damit nichts zerrissen wird. Nur wer gar keine Karte berührt, bleibt frei. Lösen: Karte auswählen → ⋯-Menü → „Markierungen lösen".</li>
-                <li>Striche werden automatisch geglättet; Radieren wirkt pro Geste als ein Undo-Schritt.</li>
+                <li><b>Zeitplan (Gantt):</b> Balken ziehen, ◆ Meilenstein, Pfeile = Abhängigkeiten mit Konflikt-Warnung; Skala von Tagen bis Jahren.</li>
+                <li><b>Wochenplan:</b> Raster aus Spalten (Wochentage oder frei: Personen, Räume) × Zeilen (Uhrzeiten oder eigene Einheiten). Klick auf einen Slot legt einen Block an.</li>
+                <li><b>Zeiterfassung:</b> Arbeit / Pause mit einem Klick, jede Zeile direkt editierbar; Ansichten Tag, Woche, Monat, Jahr.</li>
+                <li><b>Protokoll-Reihe:</b> eine Karte für eine ganze Besprechungsserie. „＋ Neue Sitzung" nimmt offene Punkte mit; Rhythmus und feste Tagesordnung im ⚙ der Karte; Beschlüsse getrennt von Aufgaben.</li>
+                <li><b>Kachel:</b> ⋯ → „Als Kachel zeigen" klappt diese Module auf Typ, Titel und Kennzahlen zusammen. „Öffnen" zeigt das Modul im Fokus, „Ausklappen" bringt es in alter Größe zurück.</li>
+              </ul>
+              <h4>Weitere Module</h4>
+              <ul>
+                <li><b>Σ Rechen-Tabelle:</b> „=" beginnt eine Formel (<code>=SUMME(B2:B9)</code>, <code>=WENN(A1&gt;100;"über Plan";"im Rahmen")</code>), deutsche und englische Namen. Σ setzt Auto-Summen; <code>.xlsx</code> aufs Board ziehen, CSV zurück.</li>
+                <li><b>🗓️ Kalender:</b> Monat/Woche mit Aufgaben, Zeitplänen und Meilensteinen; eigene Termine per Klick auf den Tag; ICS-Import, -Abo und -Export. Google / Microsoft 365 unter ⚙ → Kalender (nur lesen).</li>
+                <li><b>📊 Diagramm (Mermaid):</b> acht Vorlagen, alles direkt im Bild bearbeiten, die Werkzeuge schweben unter dem Diagramm; ✨ ändert es per Sprache.</li>
+                <li><b>▢ Prozess-Formen:</b> Schritt, Entscheidung, Start/Ende; Doppelklick beschriftet.</li>
+                <li><b>📎 Datei, Bild, PDF, E-Mail:</b> Vorschau statt Dateiname; ＋/−, Strg+Rad und Doppelklick zoomen. Der Inhalt liegt in der Ablage dieses Geräts, im Team-Projekt zusätzlich im Anlagen-Ordner. Doppelklick auf den Titel benennt um, der Dateiname bleibt.</li>
+                <li><b>🧩 Eigene App (HTML):</b> läuft abgeschottet in der Karte, Start per ▶; Vollbild, eigener Tab und Speicherstand ins Team über das ⋮ der Karte. „App von URL" holt ein Tool aus dem Netz.</li>
+                <li><b>📓 OneNote &amp; Word:</b> ⚙ → Daten holt Notizbücher aus Microsoft 365 (Notizbuch → Bereich, Abschnitt → Board, Seite → Notiz). Ohne Konto die <code>.docx</code> aufs Board ziehen.</li>
+                <li><b>Rahmen:</b> ＋ → Weitere Module → Rahmen. Er fängt Karten ein, deren Mittelpunkt in ihm liegt, und nimmt sie beim Ziehen mit.</li>
+              </ul>
+              <h4>🔗 Verbinden &amp; Präsentieren</h4>
+              <ul>
+                <li>Karte anklicken → die <b>＋-Punkte</b> am Rand ziehen und auf der Zielkarte loslassen. Klick auf die Linie: Beschriftung oder Pfeilart; Entf löscht.</li>
+                <li>Verbindungen transportieren Daten: <b>Notiz / Zeitplan / Kanban → Kanban</b> sammelt offene Punkte als Tickets ein und hakt in beide Richtungen ab. <b>Modul → Kalender</b> zeigt nur Verbundenes, <b>Kanban → Zeitplan</b> zeigt Fristen als Meilensteine, <b>Wochenplan → Zeiterfassung</b> liefert das Soll, <b>Notiz → Diagramm</b> folgt der Checkliste.</li>
+                <li><b>▶ Präsentation:</b> jede Karte eine Folie, Reihenfolge nach Verbindungen, live editierbar.</li>
+              </ul>
+              <h4>✏️ Zeichnen</h4>
+              <ul>
+                <li><b>✎</b> im Dock: Stift, Textmarker, Radierer; Esc zurück. Nach dem Zeichnen kurz halten macht Linien gerade und Kreise rund.</li>
+                <li>Striche, die eine Karte überlappen, kleben an ihr und wandern mit. Lösen: ⋯ → „Markierungen lösen".</li>
+              </ul>
+              <h4>💡 Wissen</h4>
+              <ul>
+                <li><b>↩ Backlinks</b> unten rechts zeigen, wer auf dieses Board verweist.</li>
+                <li><b>Eigenschaften</b> (⋯): schlüssel = wert, durchsuchbar und im Export. <b>Vorlagen:</b> jede Karte sichern, einfügen über ＋ → Weitere Module.</li>
+                <li><b>Nachschlagen</b> (⋯): Wikipedia-Treffer zur ersten Zeile der Karte, dazu die Suchseiten von DuckDuckGo, Google, Bing und OpenStreetMap.</li>
+                <li><b>🧠 Gehirn</b> (⚙ → KI): Suche nach Bedeutung, verwandte Karten im ↩-Panel, Themen-Inseln im Gehirn-Puls (✅), Verbindungs-Vorschläge im Netz, „Frag dein Gehirn" in der Suche. Ollama, im Browser oder Cloud — der Index bleibt lokal.</li>
+              </ul>
+              <h4>✨ KI</h4>
+              <ul>
+                <li><b>Anbieter</b> unter ⚙ → KI: Gratis, OpenRouter, eigener Schlüssel oder Ollama (alles lokal). Schlüssel bleiben auf dem Gerät.</li>
+                <li>Dock ⋯ → <b>„KI-Assistent"</b> fürs Board, Auswahl ⋯ → <b>„KI-Aktionen"</b> für markierte Karten: Freitext, Themen clustern, Aufgaben extrahieren, Diagramm, Briefing, Text verbessern. Bild-Karten gehen als Foto mit, wenn das Modell Bilder versteht.</li>
+                <li>Jede KI-Aktion ist ein einziger Strg+Z-Schritt.</li>
+                <li>Bei Ollama liest PixiNotes die installierten Modelle aus. Antwortet der Server nicht, unterscheidet die App „läuft nicht" und „darf nicht" und zeigt die passende <code>OLLAMA_ORIGINS</code>-Anleitung.</li>
               </ul>
             </section>
 
             <section id="help-aufgaben">
-              <h3>✅ Aufgaben & Erinnerungen</h3>
+              <h3>✅ Aufgaben &amp; Erinnerungen</h3>
               <ul>
-                <li>Aufgaben entstehen überall: Kanban-Tickets, ☐-Checklisten in Notizen und <b>Zeitplan-Vorgänge</b> (alles unter 100 % zählt als offen, Frist = Balken-Ende).</li>
-                <li>Die <b>✅-Zentrale</b> im Dock sammelt alles boardübergreifend, <b>gruppiert nach Frist</b> (Überfällig · Heute · Diese Woche · Später · Ohne Frist, Abschnitte einklappbar): Abhaken (Gantt = Fortschritt 100 %), Fälligkeit ändern, <b>+1T/+1W schlummern</b>, Schnell-Eingabe, Kalender-Export (.ics).</li>
-                <li><b>Wer macht was:</b> Personen aus Tickets und Zeitplan-Ressourcen lassen sich filtern oder per 👥 als Gruppierung anzeigen.</li>
-                <li><b>Schnell-Eingabe versteht Kurzzeichen:</b> „Bericht ans RP <b>bis Freitag @Anna #haushalt !!</b>" setzt Frist, Person und Priorität automatisch (! niedrig · !! mittel · !!! hoch); das Ziel-Board ist wählbar. <b>Prioritäten</b> sortieren vor und lassen sich per Klick auf das !-Zeichen an der Zeile durchschalten.</li>
-                <li><b>Suchen & Filtern:</b> Freitext-Suche und #Tag-Chips direkt in der Zentrale; Kanban-Tickets zeigen ihre Priorität auch auf dem Board.</li>
-                <li><b>Spalte direkt umstellen:</b> „To Do → In Arbeit" gleich aus der Liste — die letzte Spalte erledigt das Ticket.</li>
-                <li><b>Heute geschafft:</b> unten sammelt ein Protokoll alles, was du in der Zentrale abhakst — mit Wochen-Balken der letzten 7 Tage.</li>
-                <li><b>☀ Mein Tag:</b> Aufgaben per ☀ handverlesen für heute vornehmen — der Filter „Mein Tag" zeigt nur diese Fokusliste (leert sich am nächsten Tag von selbst).</li>
-                <li><b>Aufgeräumte Zeilen:</b> Jede Aufgabe zeigt kompakt nur Titel, Priorität, Frist und Person — <b>Antippen klappt die Werkzeuge auf</b> (Spalte, Frist, +1T/+1W, ☀ Mein Tag, ↗ Karte, › Details).</li>
-                <li><b>› Details:</b> öffnet die Bearbeiten-Spalte rechts — Titel, Beschreibung, Person, Frist, Priorität (Tickets) bzw. Start/Ende/Fortschritt (Zeitplan) direkt ändern, ohne die Zentrale zu verlassen.</li>
-                <li><b>✨ Woche planen:</b> die KI fasst alle offenen Aufgaben zu einem Wochen-Briefing zusammen (Was zuerst? Welche Fristen? Wo nachhaken?) und legt es als Notiz aufs aktive Board.</li>
-                <li><b>Erinnerungen:</b> Fällige Aufgaben melden sich beim Öffnen und regelmäßig als Hinweis — optional als System-Benachrichtigung.</li>
-                <li>Fälligkeiten am Ticket (📅) steuern alles; „bis Freitag"/Datum im Text zählt auch bei Checklisten-Punkten als Frist.</li>
-              </ul>
-            </section>
-
-            <section id="help-wissen">
-              <h3>💡 Wissen & Verknüpfen</h3>
-              <ul>
-                <li><b>[[Wikilinks]]</b> im Notiztext verlinken Boards oder Karten — Chips unten an der Notiz springen hin; unbekannte Namen legen per Klick ein neues Board an.</li>
-                <li><b>#Tags</b> einfach in den Text schreiben; Strg+K und „#" listet alle Themen.</li>
-                <li><b>↩ Backlinks:</b> das Panel unten rechts zeigt, wer auf das aktuelle Board verweist.</li>
-                <li><b>🧠 Gehirn-Puls:</b> In der <b>Aufgaben-Zentrale</b> (✅ im Dock) zeigt ein aufklappbarer Abschnitt, was das Gehirn gerade im Wissensnetz sieht: <b>Themen-Inseln</b> (Karten, die inhaltlich zusammengehören — auch über Board-Grenzen hinweg), <b>Knotenpunkte</b> (Boards, an denen besonders viel hängt) und offene <b>Verknüpfungs-Vorschläge</b>. Eine Zeile anklicken springt zum Board. Läuft rein rechnerisch aus dem Index — keine KI-Anfrage, keine Kosten.</li>
-                <li><b>🧠 Auto-Struktur (aus einer Themen-Insel heraus):</b> Jede Themen-Zeile im Gehirn-Puls bietet zwei Knöpfe an. <b>🏷 Als Thema markieren</b> schreibt allen Karten der Insel die Eigenschaft <code>thema = &lt;Schlagwort&gt;</code> — danach findet die Suche (Strg+K) sie als Gruppe, und die <b>Schwimmbahnen</b> beim Anordnen können danach sortieren. <b>📝 Übersichts-Notiz anlegen</b> baut auf dem aktuellen Board eine Zusammenfassungs-Karte: Überschrift, ein Abschnitt je beteiligtem Board mit <b>[[Wikilink]]</b> und eine <b>Checkliste</b> aller Karten des Themas — eine ganz normale Notiz, die du beliebig weiterschreiben kannst. Beides ist ein einziger Schritt und mit <b>Strg+Z</b> komplett rückgängig, auch über mehrere Boards hinweg.</li>
-                <li><b>🧠 Frag dein Gehirn:</b> Mit eingeschaltetem Gehirn UND konfigurierter KI erscheint in der Suche (Strg+K) ein Knopf „Frag dein Gehirn" (oder <b>Strg+Enter</b>). Dann wird die Frage <b>aus deinen eigenen Karten</b> beantwortet: Das Gehirn sucht die passenden Karten heraus, die KI formuliert daraus die Antwort — mit nummerierten <b>Quellen-Chips</b>, die per Klick zur Karte springen. Steht die Antwort nirgends, sagt das Tool das ehrlich, statt etwas zu erfinden; ohne Treffer wird die KI gar nicht erst gefragt.</li>
-                <li><b>🧠 Vorschläge (Synapsen):</b> Ist das Gehirn an, schlägt das <b>Netz</b> Verbindungen vor, die noch fehlen: gestrichelte, sanft pulsierende Linien zwischen Boards, die sich inhaltlich sehr nahe sind, aber weder Portal noch Wikilink teilen. Ein Klick auf die Linie zeigt die Nähe in Prozent und bietet <b>„Verknüpfen"</b> (legt ein echtes Portal an — Strg+Z macht es rückgängig) oder <b>„Passt nicht"</b> (dieses Paar wird nie wieder vorgeschlagen). Die Ebene lässt sich oben im Netz abschalten.</li>
-                <li><b>🧠 Gehirn (semantischer Index):</b> In ⚙️ → KI einschalten — dann übersetzt PixiNotes jede Karte in einen Bedeutungs-Vektor (Embedding). Die Suche (Strg+K) findet ab dann auch <b>nach Bedeutung</b> („Kita" findet „Betreuungszeiten"), und das ↩-Panel zeigt zusätzlich <b>verwandte Karten</b> aus anderen Boards, die noch niemand verlinkt hat. Drei Wege: <b>Ollama</b> (alles bleibt lokal; das Einbettungs-Modell ist frei wählbar — <code>nomic-embed-text</code> als Voreinstellung, <code>bge-m3</code> versteht deutsche Texte besser, <code>all-minilm</code> passt auf jeden Rechner), <b>„Im Browser"</b> (lädt einmalig ein ~30-MB-Modell, danach offline — der Weg für iPhone/iPad) oder <b>Cloud</b> (OpenAI/OpenRouter-Schlüssel). Der Index bleibt lokal in diesem Browser und ist nie Teil von Sync, Export oder Teilen-Links.</li>
-                <li><b>🏷 Eigenschaften:</b> Karte auswählen → 🏷 → schlüssel = wert (z. B. status = wartet) — durchsuchbar und im Export enthalten.</li>
-                <li><b>🔖 Vorlagen:</b> jede Karte als Vorlage sichern, einfügen über ➕ → Vorlagen.</li>
-              </ul>
-            </section>
-
-            <section id="help-ki">
-              <h3>✨ KI-Assistent</h3>
-              <ul>
-                <li><b>Anbieter</b> unter ⚙️ → KI: „Gratis" (ohne Konto, langsam), OpenRouter (kostenloser Account, flott), eigene Schlüssel (Anthropic/OpenAI) oder <b>Ollama — dann bleibt alles auf deinem Rechner</b>. Schlüssel werden nur lokal gespeichert und gehen nie in Sync/Export/Teilen-Links.</li>
-                <li><b>Lokale Modelle: die Liste kommt vom Server.</b> Bei <b>Ollama</b> und eigenen OpenAI-kompatiblen Servern (llama.cpp, LM&nbsp;Studio, vLLM) fragt PixiNotes beim Öffnen der Einstellungen nach, <b>welche Modelle dort wirklich installiert sind</b> — mit Größe und Quantisierung, anklickbar. <b>⟳ Modelle laden</b> fragt erneut, etwa nach einem frischen <code>ollama pull</code>. Das Feld daneben bleibt frei beschreibbar: Jeder Name aus <b>ollama.com/library</b> lässt sich eintippen, auch wenn der Server gerade nicht antwortet. Wer noch gar nichts installiert hat, klappt <b>„Bewährte Vorschläge zum Nachladen"</b> auf — vom winzigen <code>llama3.2:3b</code> (~2&nbsp;GB, läuft zur Not ohne Grafikkarte) bis <code>gemma3:27b</code> (~17&nbsp;GB), jeweils mit fertigem <code>ollama pull</code>-Befehl. <b>Einbettungs-Modelle</b> (nomic-embed-text &amp; Co.) werden dabei bewusst getrennt gehalten — sie können nicht antworten, sondern gehören zum Gehirn und sind dort ebenfalls frei wählbar. <b>Antwortet der Server nicht, sagt die App, woran es liegt</b> — und unterscheidet dabei zwei Dinge, die im Browser gleich aussehen: <b>„läuft nicht"</b> (dort lauscht niemand) und <b>„darf nicht"</b> (Ollama läuft, weist diese Seite aber ab). Im zweiten Fall steht die Anleitung für <i>dein</i> Betriebssystem da, mit <code>OLLAMA_ORIGINS</code> und deiner Herkunft statt eines pauschalen „*" — unter Linux also der <code>systemctl edit ollama</code>-Weg, unter macOS <code>launchctl setenv</code>, unter Windows <code>setx</code>.</li>
-                <li><b>✨ KI-Assistent</b> (Dock: ⋯ „Mehr" → „KI-Assistent", ganzes Board): Freitext-Anweisung („Erstelle einen Wochenplan …"), Themen clustern, Aufgaben extrahieren, Workflow-Diagramm, Briefing, Verbindungen vorschlagen.</li>
-                <li><b>✨ in der Auswahl-Leiste</b> (⋯-Menü → „KI-Aktionen", markierte Karten): dieselben Werkzeuge nur für die Auswahl, plus <b>Text verbessern</b> für Notizen — der Vorschlag erscheint daneben, das Original bleibt. <b>Abgeleitete Module werden automatisch verknüpft:</b> Entsteht aus wenigen ausgewählten Karten ein Diagramm, Kanban oder Briefing, zieht das Board Pfeile von den Quell-Karten zum neuen Modul (auch E-Mail → Zusammenfassung/Anhang, Notiz → Vorschlag, und die KI setzt beim Freitext-Kommando Bezüge selbst).</li>
-                <li><b>Die KI sieht Bilder:</b> Bild-Karten (Screenshots, fotografierte Zettel und Tafeln) werden bei Freitext-Kommando, Aufgaben-Extraktion, Workflow und Briefing als <b>Foto mitgeschickt</b> — „extrahiere die Einkaufsliste aus dem Screenshot" funktioniert also direkt. Voraussetzung ist ein Modell mit Bildverständnis (Anthropic, OpenAI, OpenRouter oder ein multimodales Ollama-Modell wie llava); die Gratis-KI kann keine Bilder und arbeitet dann nur mit dem Text. Bilder werden vor dem Versand automatisch verkleinert; es gehen maximal 4 Bilder pro Anfrage mit.</li>
-                <li>Alle KI-Aktionen sind <b>nicht destruktiv</b> und ein einziges Strg+Z macht den kompletten Plan rückgängig.</li>
+                <li>Aufgaben entstehen überall: Kanban-Tickets, ☐-Checklisten in Notizen und Zeitplan-Vorgänge unter 100 %.</li>
+                <li><b>✅ im Dock</b> sammelt alles boardübergreifend nach Frist: Überfällig · Heute · Diese Woche · Später · Ohne Frist. Abhaken, Frist ändern, +1T/+1W, Spalte umstellen, Kalender-Export.</li>
+                <li>Die <b>Schnell-Eingabe</b> versteht „Bericht <b>bis Freitag @Anna #haushalt !!</b>": Frist, Person, Tag und Priorität (! niedrig · !! mittel · !!! hoch).</li>
+                <li>Antippen klappt die Werkzeuge einer Zeile auf; <b>› Details</b> öffnet die Bearbeiten-Spalte.</li>
+                <li><b>☀ Mein Tag:</b> handverlesene Fokusliste für heute. <b>Heute geschafft</b> protokolliert Abgehaktes mit Wochen-Balken.</li>
+                <li><b>👥</b> gruppiert nach Person; Freitext und #Tags filtern.</li>
+                <li><b>✨ Woche planen:</b> die KI fasst offene Aufgaben zu einem Briefing zusammen und legt es als Notiz ab.</li>
+                <li><b>Erinnerungen:</b> Fälliges meldet sich beim Öffnen und regelmäßig, optional als System-Benachrichtigung. Fristen kommen vom Ticket (📅) oder aus „bis Freitag" im Text.</li>
               </ul>
             </section>
 
             <section id="help-daten">
-              <h3>💾 Speichern, Sync & Teilen</h3>
+              <h3>💾 Speichern, Sync &amp; Teilen</h3>
+              <h4>Speichern</h4>
               <ul>
-                <li>Alles speichert <b>automatisch lokal</b> im Browser. Zusätzlich: ⚙️ → Daten → „Datei exportieren" für Backups (USB-Stick, Mail, Netzlaufwerk).</li>
-                <li><b>Seitenleiste (Überblick neben der Arbeit):</b> Der Knopf neben der Suche in der Kopfleiste fährt rechts eine Leiste aus — wahlweise als <b>Hierarchie-Baum</b> (Bereich › Projekt › Board, aufklappbar bis zur einzelnen Karte, mit Suchfeld) oder als <b>Netz</b>. Klick springt direkt hin, die Leiste bleibt dabei offen. Breite am linken Rand ziehbar; offen/zu, Ansicht und Breite bleiben gespeichert.</li>
-                <li><b>Netz lebt (Physik):</b> Das Netz schwingt sich wie in Obsidian von selbst ein — Boards stoßen sich ab, Verbindungen ziehen zusammen, und <b>Boards desselben Projekts clustern</b> sich zu Themen-Inseln. Knoten lassen sich <b>anfassen und werfen</b>, die Nachbarn reagieren. <b>Gedrückt halten</b> auf einem Knoten öffnet ein Menü — mit Finger genauso wie mit der Maus; am PC geht zusätzlich der <b>Rechtsklick</b>. Im Menü: Board öffnen · <b>Verknüpfen mit …</b> (legt ein echtes Portal an, Strg+Z macht es rückgängig) · Hierher zoomen · Netz neu ausschwingen. Wer Ruhe will: Ebenen-Schalter „Physik" aus — die Wahl bleibt gespeichert.</li>
-                <li><b>Netz-Ansicht (Gesamtüberblick):</b> Über den <b>Navigator</b> in der Kopfleiste → „Netz" aus <b>jeder Ansicht</b> erreichbar. Boards sind Kreise (Größe = Kartenzahl), Linien sind Portale und [[Wikilinks]]. Das Board, in dem du gerade bist, trägt einen <b>Ring</b> — und die Ansicht startet dort, statt dich in der Ecke abzusetzen. Die Ebenen <b>Karten · Portale · Wikilinks</b> bleiben eingeschaltet, bis du sie wieder abschaltest (auch nach dem Neustart). <b>Suchfeld:</b> hebt Boards und Karten hervor, statt den Rest wegzuwerfen — so siehst du, <i>wo</i> ein Thema überall auftaucht. <b>„Nur dieses Projekt"</b> reduziert das Netz auf die Umgebung, in der du arbeitest.</li>
-                <li><b>Sync-Ordner:</b> einen von Nextcloud/OneDrive/Dropbox synchronisierten Ordner verbinden — PixiNotes schreibt dort automatisch. Liegt beim Start (oder bei Fenster-Rückkehr) ein neuerer Stand im Ordner und du hast lokal nichts geändert, wird er <b>automatisch übernommen</b>; bei echten Konflikten fragt PixiNotes statt zu überschreiben.</li>
-                <li><b>Sync-Status oben:</b> Das Wolken-Symbol in der Aktionsleiste zeigt live, ob gespeichert wurde (Häkchen-Wolke, Uhrzeit per Hover), gerade gespeichert wird (pulsierend) oder etwas hakt (amber). Eine <b>durchgestrichene Wolke</b> heißt: Der Browser hat die Ordner-Freigabe nach einem Neustart zurückgesetzt — ein Klick darauf genügt, und der Auto-Sync läuft weiter.</li>
-                <li><b>Team-Sync (Projekte teilen):</b> Jedes <b>Projekt</b> lässt sich zusätzlich in einen <b>eigenen</b> Sync-Ordner spiegeln (⚙ → Synchronisation → „Team-Sync") — so arbeitest du mit mehreren Teams in einer Umgebung, ohne alles preiszugeben. Ablauf: Ordner im Cloud-Speicher fürs Team freigeben, Projekt verbinden, Kollegen mit „Einladen…" die Anleitung mailen — sie treten über „Projekt beitreten…" bei. Wer mitmachen darf, regelt <b>allein die Ordner-Freigabe</b>; Einladungen enthalten keine Passwörter, KI-Schlüssel und Zugangsdaten landen nie im Projekt-Paket.</li>
-                <li><b>Kommentare:</b> Karte auswählen → ⋯-Menü → „Kommentar" — Kommentar-Pins hängen an der Karte, zeigen die Initialen des Verfassers und wandern im Sync/Team-Projekt mit. Ein Klick auf das Fähnchen öffnet das Gespräch als <b>Blase direkt neben der Karte</b> (sie folgt beim Schwenken und Zoomen mit und weicht dem Fensterrand aus) — so sieht man auf einen Blick, zu welcher Karte der Kommentar gehört. Antworten, „Erledigt" und Löschen direkt in der Blase; dein Anzeigename wird nur lokal gespeichert. <b>Am Telefon</b> bleibt das Gespräch am Rand angedockt, dort ist neben der Karte kein Platz.</li>
-                <li><b>WebDAV direkt:</b> ohne Desktop-Client (auch am Handy) — Ordner-URL + App-Passwort in ⚙ → Synchronisation. Zugangsdaten bleiben lokal. <b>Wichtig bei Nextcloud:</b> Browser-Zugriffe sind serverseitig erst nach CORS-Freigabe möglich — z. B. über die Nextcloud-App „WebAppPassword" (dort die PixiNotes-Adresse als erlaubte Origin eintragen) oder durch die IT. In ⚙ → Synchronisation liegt dafür ein <b>fertiger Text zum Kopieren</b> (nennt Herkunft und benötigte Header, enthält keine Zugangsdaten). Das betrifft <b>jeden Browser gleich</b> — es ist keine iPad-Eigenheit.</li>
-                <li><b>iPad &amp; iPhone — Sync über die Dateien-App:</b> Auf iOS/iPadOS darf keine Webseite auf Ordner zugreifen (Apple erlaubt es in keinem Browser). Deshalb gibt es dort in ⚙ → Synchronisation <b>„Stand sichern → Dateien-App"</b> und <b>„Stand laden…"</b>. Gesichert wird <b>exakt dieselbe <code>pixinotes-daten.json</code></b> wie beim Sync-Ordner: legst du sie in den Nextcloud-Ordner, den dein Rechner spiegelt, übernimmt der Rechner den Stand automatisch — und umgekehrt. Das <b>Wolken-Symbol</b> oben wird dabei zum Sicherungs-Knopf: Sobald es ungesicherte Änderungen gibt, zeigt es einen Pfeil nach oben, ein Tipp öffnet direkt das Teilen-Blatt. <b>Tipp:</b> PixiNotes über „Teilen → Zum Home-Bildschirm" installieren — sonst löscht Safari die Daten von Webseiten, die 7 Tage nicht benutzt wurden.</li>
-                <li><b>Mehrere Fenster:</b> Läuft PixiNotes doppelt (z. B. installierte App + vergessener Browser-Tab), speichert nur <b>ein</b> Fenster — die anderen lesen live mit und zeigen ein Banner mit „Hier weiterarbeiten". So kann kein altes Fenster deine Änderungen überschreiben.</li>
-                <li><b>Teilen:</b> Der ⧉-Button in der Kopfleiste kopiert einen Link, der das <b>komplette Board enthält</b> — serverlos. Große Boards werden als .pixiboard.json-Datei exportiert; Empfänger zieht sie einfach aufs Board.</li>
-                <li><b>PWA:</b> Über „App installieren" im Browser wird PixiNotes zur eigenständigen App — läuft komplett offline.</li>
-                <li><b>📥 Teilen mit … PixiNotes (Android):</b> Ist PixiNotes auf einem Android-Gerät <b>installiert</b> (Chrome → „App installieren"), steht es in <b>jedem</b> Teilen-Menü: Foto aus der Galerie, Seite aus dem Browser, PDF aus dem Dateimanager, Text aus einer Nachricht. PixiNotes öffnet sich dann mit der Frage <b>wohin</b>: auf welches Board — und ob als <b>Karten</b> (Bild-Karte, PDF mit Vorschau, Termine in den Kalender) oder <b>in eine bestehende Notiz</b>. Was in eine Notiz nicht hineingehört (PDF, Word …), wird automatisch eine Datei-Karte auf demselben Board. Ohne Installation taucht PixiNotes im Teilen-Menü nicht auf — Android bietet dort nur installierte Apps an. <b>Steht es trotz Installation nicht in der Liste?</b> Dann stammt die installierte App aus der Zeit VOR dieser Neuerung: Chrome legt beim Installieren ein echtes Android-Paket an, und welche Einträge es im Teilen-Menü bekommt, wird <b>genau dabei</b> festgelegt. Chrome holt Manifest-Änderungen nur gelegentlich nach (höchstens etwa täglich, das neue Paket kommt danach im Hintergrund). Schneller geht es so: <b>deinstallieren → in Chrome neu öffnen → „App installieren" → einmal starten</b>. Erscheint statt „App installieren" nur „Zum Startbildschirm hinzufügen", entsteht bloß eine Verknüpfung ohne Teilen-Funktion — Seite neu laden und noch einmal versuchen. Firefox und Samsung Internet können das Teilen-Ziel nicht; es braucht Chrome. <b>iPhone/iPad können das nicht:</b> Safari unterstützt das „Web Share Target" nicht, und keine Web-Anwendung kann sich dort selbst eintragen. Auf iOS bleibt der Weg über <b>„Kopieren"</b> in der Fotos-App und danach in PixiNotes ＋ → „Aus Zwischenablage einfügen" (oder in der Notiz „/" → „Bild aus Zwischenablage").</li>
-                <li><b>Export:</b> Markdown-Ordner (Obsidian-lesbar), Bild-Export des Boards (PNG/SVG/PDF-Druck) — automatisch auf den Inhalt zugeschnitten, mit wählbarer Auflösung (1–3×), Hintergrund (Beige/Weiß/Transparent), Kopfzeile (Board + Datum) und optional nur der Auswahl. Dazu .ics für Kalender.</li>
-                <li><b>Frischer Start:</b> ⚙️ → Daten → „Alles leeren" (mit doppelter Bestätigung).</li>
+                <li>Alles speichert <b>automatisch lokal</b>. ⚙ → Daten → „Datei exportieren" für Backups; „Alles leeren" mit doppelter Bestätigung.</li>
+                <li><b>Mehrere Fenster:</b> nur eines speichert, die anderen lesen mit und bieten „Hier weiterarbeiten".</li>
+                <li><b>PWA:</b> „App installieren" macht PixiNotes zur Offline-App.</li>
+              </ul>
+              <h4>Sync</h4>
+              <ul>
+                <li><b>Sync-Ordner</b> (Nextcloud, OneDrive, Dropbox): PixiNotes schreibt dort automatisch; ein neuerer Stand wird übernommen, bei Konflikten fragt die App.</li>
+                <li>Die <b>Wolke</b> oben zeigt den Stand: gespeichert, läuft, hakt. Durchgestrichen: Ordner-Freigabe nach dem Neustart erneut erteilen — ein Klick.</li>
+                <li><b>WebDAV:</b> Ordner-URL und App-Passwort unter ⚙ → Synchronisation, auch am Handy. Nextcloud braucht eine CORS-Freigabe (z. B. App „WebAppPassword"); ein fertiger Text zum Kopieren liegt dort bereit.</li>
+                <li><b>iPad / iPhone:</b> „Stand sichern → Dateien-App" und „Stand laden…" tauschen dieselbe <code>pixinotes-daten.json</code> wie der Sync-Ordner. Zum Home-Bildschirm installieren, sonst löscht Safari nach 7 Tagen.</li>
+                <li><b>Team-Sync:</b> ein Projekt in einen eigenen Ordner spiegeln (⚙ → Synchronisation). „Einladen…" mailt die Anleitung, „Projekt beitreten…" nimmt sie an; die Ordner-Freigabe regelt den Zugang.</li>
+                <li><b>Kommentare</b> (⋯ → Kommentar): Pins an der Karte mit Initialen, das Gespräch als Blase daneben; wandern im Team mit.</li>
+              </ul>
+              <h4>Teilen &amp; Export</h4>
+              <ul>
+                <li>Auswahl → <b>Teilen:</b> Übernahme-Link, WhatsApp, E-Mail, Drucken / PDF, formatiertes Kopieren für Outlook und Word.</li>
+                <li><b>⧉</b> oben kopiert das ganze Board als Link; große Boards werden zur <code>.pixiboard.json</code>-Datei.</li>
+                <li><b>Export:</b> Markdown-Ordner (Obsidian), Bild des Boards (PNG / SVG / PDF), .ics für Kalender.</li>
+                <li><b>Android:</b> das installierte PixiNotes steht im Teilen-Menü jeder App (Foto, Seite, PDF, Text). Fehlt es trotz Installation: deinstallieren und in Chrome neu installieren.</li>
+                <li><b>iPhone / iPad:</b> „Kopieren" in Fotos, dann ＋ → Weitere Module → „Aus Zwischenablage einfügen".</li>
               </ul>
             </section>
 
@@ -465,7 +506,11 @@ export function HelpOverlay() {
               <p className="legal-hint">Dieses Muster ersetzt keine Rechtsberatung.</p>
             </section>
 
-            <div className="help-foot">PixiNotes — lokal, offen, deins. Feedback jederzeit willkommen. 📌</div>
+            <div className="help-foot">
+              PixiNotes — lokal, offen, deins. Feedback jederzeit willkommen. 📌
+              <br />
+              <button className="link-btn help-neu-link" onClick={() => setSeite('neu')}>Was ist neu</button>
+            </div>
           </div>
         </div>
       </div>

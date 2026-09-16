@@ -784,7 +784,7 @@ export const useBoard = create<BoardState>()(
           }));
           get().showToast(
             archived
-              ? `🗃 ${ids.length} Karte${ids.length > 1 ? 'n' : ''} archiviert — über das Archiv-Symbol im Dock wieder einblendbar (Strg+Z macht es rückgängig).`
+              ? `🗃 ${ids.length} Karte${ids.length > 1 ? 'n' : ''} archiviert. Strg+Z holt sie zurück.`
               : `${ids.length} Karte${ids.length > 1 ? 'n' : ''} aus dem Archiv zurückgeholt.`,
           );
         },
@@ -827,7 +827,7 @@ export const useBoard = create<BoardState>()(
             // Voll-Remount: neue Boards mit BlockNote-Inhalten sauber mounten
             importEpoch: get().importEpoch + 1,
           });
-          get().showToast('🧭 Starter-Umgebung „Verwaltung" hinzugefügt: 3 Bereiche, 14 Boards — viel Spaß beim Erkunden!');
+          get().showToast('🧭 Starter-Umgebung hinzugefügt: 3 Bereiche, 14 Boards.');
         },
 
         // M184: Struktur-Import (OneNote). Bewusst EIN set() statt vieler
@@ -1523,19 +1523,19 @@ export const useBoard = create<BoardState>()(
             (t1 === consumer && (typeof sources === 'string' ? t2 === sources : sources.has(t2 ?? '')))
             || (t2 === consumer && (typeof sources === 'string' ? t1 === sources : sources.has(t1 ?? '')));
           if ((t1 === 'kanban' && t2 === 'gantt') || (t1 === 'gantt' && t2 === 'kanban')) {
-            get().showToast('🔗 Abo in beide Richtungen: Tickets mit Frist erscheinen als Meilensteine im Zeitplan, Zeitplan-Vorgänge als Tickets im Kanban.');
+            get().showToast('🔗 Verbunden: Fristen werden Meilensteine, Vorgänge werden Tickets.');
           } else if (pair('kanban')) {
-            get().showToast('🔗 Aufgaben-Abo aktiv: Offene Punkte der verbundenen Karte landen automatisch in diesem Kanban — abwählbar im Einsammeln-Panel (⚙) oder durch Löschen des Pfeils. Erledigte Tickets haken die Quelle zurück ab.');
+            get().showToast('🔗 Verbunden: Offene Punkte der Karte landen als Tickets im Kanban.');
           } else if (pair('calendar')) {
-            get().showToast('🔗 Kalender-Fokus aktiv: Der Kalender zeigt jetzt Termine & Fristen der verbundenen Karten — der Bereich-Schalter in der Kopfzeile stellt jederzeit um.');
+            get().showToast('🔗 Verbunden: Der Kalender zeigt Termine und Fristen der Karte.');
           } else if (pair('time', 'week')) {
-            get().showToast('🔗 Soll/Ist aktiv: Der verbundene Wochenplan liefert die Sollzeit — die Zeiterfassung zeigt in Tag- und Wochenansicht die Differenz.');
+            get().showToast('🔗 Verbunden: Der Wochenplan liefert die Sollzeit für die Zeiterfassung.');
           } else if (pair('time', 'note') || pair('time', 'kanban')) {
-            get().showToast('🔗 ⏱-Chip aktiv: Die verbundene Karte zeigt jetzt Arbeitszeit von heute und dieser Woche aus der Zeiterfassung.');
+            get().showToast('🔗 Verbunden: Die Karte zeigt die Arbeitszeit aus der Zeiterfassung.');
           } else if (pair('mermaid', 'note')) {
-            get().showToast('🔗 Diagramm-Abo: Ein leeres bzw. Vorlagen-Diagramm folgt jetzt automatisch der Checkliste der verbundenen Notiz (Erledigtes grün) — bei eigenem Inhalt schaltet der „⇢ Abo"-Chip im Diagramm das Abo bewusst zu.');
+            get().showToast('🔗 Verbunden: Das Diagramm folgt der Checkliste der Notiz.');
           } else if (pair('note', 'htmlapp')) {
-            get().showToast('🔗 App-Auszug aktiv: Die verbundene Notiz zeigt den Speicherstand der App als lesbaren Auszug — live bei jedem Speichern.');
+            get().showToast('🔗 Verbunden: Die Notiz zeigt den Speicherstand der App.');
           }
         },
 

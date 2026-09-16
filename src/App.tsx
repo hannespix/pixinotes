@@ -187,7 +187,7 @@ export default function App() {
       if (now - lastDefense < 10_000) return; // gedrosselt: kein Toast/Write-Ping-Pong
       lastDefense = now;
       if (singleWriterSupported()) reassertPersist();
-      showToast('⚠️ Ein weiteres PixiNotes-Fenster schreibt in den Speicher (vermutlich mit alter App-Version) — bitte das andere Fenster schließen. Dieses Fenster behält seinen Stand.');
+      showToast('⚠️ Ein zweites PixiNotes-Fenster schreibt mit, bitte das andere Fenster schließen.');
     };
     window.addEventListener('storage', onStorage);
     return () => { window.removeEventListener('storage', onStorage); clearTimeout(adoptTimer); };
@@ -196,7 +196,7 @@ export default function App() {
   // Quota-Warnung aus dem Storage-Layer (Audit K1)
   useEffect(() => {
     const warn = () =>
-      showToast('⚠️ Browser-Speicher voll — Änderungen werden nicht mehr gesichert! Große Bilder löschen oder Inhalte exportieren.');
+      showToast('⚠️ Speicher voll, Änderungen werden nicht gesichert. Große Bilder löschen oder exportieren.');
     window.addEventListener('pixinotes:quota', warn);
     return () => window.removeEventListener('pixinotes:quota', warn);
   }, [showToast]);

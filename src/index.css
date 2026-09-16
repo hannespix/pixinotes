@@ -3269,10 +3269,23 @@ html[data-kopf-eng='an'] .hint { display: none; }
   border-radius: 5px; padding: 1px 6px; font-family: inherit; font-size: 11px;
 }
 .help-foot { text-align: center; font-size: 11px; color: var(--muted); padding: 14px 0 4px; }
+/* Rechtliches: unter den sechs Abschnitten, klein, aber immer da (M299) */
+.help-nav-recht {
+  margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border-soft);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.help-nav button.recht { font-size: 11.5px; color: var(--muted); padding: 5px 10px; }
+.help-nav button.recht.on { color: var(--accent-strong); }
+/* „Was ist neu" als eigene Seite im selben Fenster: kein Menü, nur die Liste */
+.help-zurueck { margin-left: auto; margin-right: 14px; font-size: 12.5px; }
+.help-body.help-neu section { border-bottom: none; padding-top: 4px; }
+.help-body.help-neu li { margin: 8px 0; }
+.help-foot .link-btn { font-size: 11px; }
 @media (max-width: 700px) {
   .help-layout { flex-direction: column; }
   .help-nav { width: 100%; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--border-soft); }
   .help-nav button { font-size: 11.5px; padding: 5px 8px; }
+  .help-nav-recht { margin-top: 0; padding-top: 0; border-top: none; flex-direction: row; width: 100%; }
 }
 
 /* ---------- Tooltip-System (ersetzt native title-Tooltips) ---------- */

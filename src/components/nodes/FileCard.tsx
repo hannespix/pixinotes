@@ -109,7 +109,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
     try {
       const f = await loadAttachment(file.ref);
       if (!f) {
-        showToast('Im Team-Ordner nicht gefunden — ist der Ordner verbunden und synchronisiert (⚙️ → Synchronisation)?');
+        showToast('Im Team-Ordner nicht gefunden. Ist der Ordner verbunden?');
         return;
       }
       /**

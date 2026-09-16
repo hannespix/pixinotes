@@ -354,7 +354,7 @@ export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
             <>
               <span className="time-total" title="Tagessumme ohne Pausen">Tag: <b>{fmtDur(dayWork)}</b></span>
               {daySoll !== null && daySoll > 0 && (
-                <span className="time-soll" title="Soll aus dem verbundenen Wochenplan (geplante Blöcke dieses Wochentags) und Differenz zur erfassten Zeit — Pfeil löschen blendet den Vergleich aus">
+                <span className="time-soll" title="Soll aus dem verbundenen Wochenplan und Differenz zur erfassten Zeit">
                   Soll {fmtDur(daySoll)} · Δ <b>{fmtDiff(dayWork - daySoll)}</b>
                 </span>
               )}

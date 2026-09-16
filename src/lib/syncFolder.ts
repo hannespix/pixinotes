@@ -382,7 +382,7 @@ export async function checkSyncRemote(): Promise<void> {
   emitSyncStatus('ordner', 'conflict');
   if (!staleHintShown) {
     staleHintShown = true;
-    useBoard.getState().showToast('Im Sync-Ordner liegt ein anderer Stand — hier gibt es aber eigene Änderungen, darum wurde nichts überschrieben. In ⚙️ → Synchronisation wählen.');
+    useBoard.getState().showToast('Sync-Ordner und lokaler Stand weichen ab, nichts wurde überschrieben. Unter ⚙ → Synchronisation wählen.');
   }
 }
 
@@ -418,7 +418,7 @@ async function autoSave(): Promise<void> {
       emitSyncStatus('ordner', 'conflict');
       if (!conflictWarned) {
         conflictWarned = true;
-        useBoard.getState().showToast('⚠️ Der Sync-Ordner hat einen neueren Stand (anderes Gerät?). In ⚙️ → Synchronisation laden oder überschreiben.');
+        useBoard.getState().showToast('⚠️ Der Sync-Ordner hat einen neueren Stand. Unter ⚙ → Synchronisation laden oder überschreiben.');
       }
       return;
     }
@@ -459,7 +459,7 @@ export function initAutoSync(): void {
       // statt den Auto-Sync still zu deaktivieren; der Status-Chip bleibt
       // sichtbar und erteilt die Freigabe per Klick
       emitSyncStatus('ordner', 'noperm');
-      useBoard.getState().showToast('Sync-Ordner verbunden, aber der Browser braucht eine neue Freigabe — oben auf die durchgestrichene Wolke klicken.');
+      useBoard.getState().showToast('Der Sync-Ordner braucht eine neue Freigabe: oben auf die Wolke klicken.');
       return;
     }
     await checkSyncRemote();
