@@ -210,9 +210,6 @@ export function Tabs() {
   }, [context, byId, activeId, showArchived]);
 
   /** Board-Wähler auf schmalen Schirmen (M261) */
-  const pickerRef = useRef<HTMLDivElement | null>(null);
-  const [pickerOffen, setPickerOffen] = useState(false);
-  useOutsideClose(pickerOffen, pickerRef, () => setPickerOffen(false));
   const aktivesBoard = useMemo(
     () => projectBoards.find((b) => b.id === activeId) ?? projectBoards[0],
     [projectBoards, activeId],
@@ -258,7 +255,7 @@ export function Tabs() {
         <IHome size={15} />
         <span className="tab-home-label">Übersicht</span>
       </button>
-      {!spalte && (
+      {!spalte && !kompakt && (
         /* Brotkrume „Bereich › Projekt" öffnet den Baum als Ausstülpung von links */
         <button
           className={`tab-nav ${navOpen ? 'active' : ''}`}
@@ -295,54 +292,23 @@ export function Tabs() {
         <NavTree />
       ) : kompakt ? (
         /* M261: Unterhalb einer gemessenen Breite trägt der Streifen keinen
-           einzigen Reiter mehr. Dort steht statt der Reihe ein Board-Wähler. */
-        <div className="tab-picker-wrap" ref={pickerRef}>
-          <button
-            className={`tab-picker ${pickerOffen ? 'auf' : ''}`}
-            onClick={() => setPickerOffen((o) => !o)}
-            /* Der Name kann auf 390 Punkten breiten Schirmen abgekürzt sein —
-               dann steht er hier vollständig (Tippen und Halten zeigt ihn,
-               M175) und in der Liste ohnehin. */
-            title={`${aktivesBoard?.name ?? '—'} — Board wechseln`}
-            aria-haspopup="listbox"
-            aria-expanded={pickerOffen}
-          >
-            <span className="tab-picker-name">{aktivesBoard?.name ?? '—'}</span>
-            {!krumeKurz && <span className="tab-count">{aktivesBoard?.nodes.length ?? 0}</span>}
-            <IChevronR size={11} className="tab-picker-pfeil" />
-          </button>
-          {pickerOffen && (
-            <div className="tab-picker-liste" role="listbox">
-              {projectBoards.map((b) => (
-                <button
-                  key={b.id}
-                  role="option"
-                  aria-selected={b.id === activeId && view === 'board'}
-                  className={`tab-picker-eintrag ${b.id === activeId && view === 'board' ? 'aktiv' : ''}`}
-                  onClick={() => { openBoard(b.id); setPickerOffen(false); }}
-                >
-                  <span className="tab-picker-eintrag-name">{b.name}</span>
-                  <span className="tab-count">{b.nodes.length}</span>
-                  <span
-                    className="tab-x"
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Board ${b.name} schließen`}
-                    title="Board schließen"
-                    onClick={(e) => { e.stopPropagation(); close(b.id); }}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); close(b.id); } }}
-                  >
-                    <IX size={11} />
-                  </span>
-                </button>
-              ))}
-              <div className="tab-picker-fuss">
-                {projectBoards.length} Board{projectBoards.length === 1 ? '' : 's'} in
-                {' '}„{context?.project.name ?? '—'}"
-              </div>
-            </div>
-          )}
-        </div>
+           einzigen Reiter mehr. M301: Dort steht EIN Knopf mit dem Weg
+           „Projekt › Board", und der öffnet denselben Baum wie die Brotkrume —
+           vorher standen Brotkrume und Board-Wähler nebeneinander, zwei Wege
+           zum selben Ziel auf der schmalsten Leiste. */
+        <button
+          className={`tab-nav tab-pfad ${navOpen ? 'active' : ''}`}
+          data-taste="navigator"
+          title={`${context?.space.name ?? '—'} › ${context?.project.name ?? '—'} › ${aktivesBoard?.name ?? '—'} — Navigation öffnen`}
+          aria-haspopup="dialog"
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen((o) => !o)}
+        >
+          <span className="tab-nav-proj tab-pfad-proj">{context?.project.name ?? '—'}</span>
+          <span className="tab-pfad-trenner">›</span>
+          <span className="tab-pfad-board">{aktivesBoard?.name ?? '—'}</span>
+          <IChevronR size={11} className="tab-picker-pfeil" />
+        </button>
       ) : (
       /* Nur die Board-Tabs des AKTIVEN Projekts — scrollen bei Bedarf */
       <div className="tabs-scroll" ref={reiheRef}>

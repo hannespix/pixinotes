@@ -832,9 +832,14 @@ input.img-titel {
 
 /* ---------- Selektierte Karte: Controls auch ohne Hover (Maus & Touch) ---------- */
 .react-flow__node.selected .card-x,
-.react-flow__node.selected .pn-handle,
 .react-flow__node.selected .color-dot {
   opacity: 1;
+}
+/* M301: Die ＋-Verbindungspunkte erscheinen am PC nur beim Zeigen auf die Karte —
+   eine ausgewählte Karte trug sonst dauerhaft vier Kreise. Ohne Maus (Touch)
+   bleibt die Auswahl der einzige Weg, sie zu zeigen. */
+@media (hover: none) {
+  .react-flow__node.selected .pn-handle { opacity: 1; }
 }
 /* M295: Die Ticket-Aktionen NICHT mehr bei ausgewählter Karte an jedem
    Ticket — vier Knöpfe mal vierzehn Tickets waren die unruhigste Stelle der
@@ -1197,7 +1202,8 @@ html[data-kopf-eng='an'] .hint { display: none; }
   justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,.15);
 }
 .shape-handle { opacity: 0 !important; }
-.shape-wrap:hover .shape-handle, .react-flow__node.selected .shape-handle { opacity: 1 !important; }
+.shape-wrap:hover .shape-handle { opacity: 1 !important; }
+@media (hover: none) { .react-flow__node.selected .shape-handle { opacity: 1 !important; } }
 /* Während des Verbindens leuchten auch Form-Anschlüsse als Ziele auf —
    das !important oben würde die allgemeine M112-Regel sonst ausstechen */
 .react-flow:has(.react-flow__connectionline) .shape-handle { opacity: 1 !important; }
@@ -3353,6 +3359,10 @@ html[data-kopf-eng='an'] .hint { display: none; }
   border-radius: 9px 9px 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
 }
 .modal-tabs button:hover { color: var(--ink); background: var(--surface-3); }
+@media (max-width: 480px) {
+  .modal-tabs { gap: 0; padding: 8px 10px 0; flex-wrap: nowrap; }
+  .modal-tabs button { font-size: 12px; padding: 8px 8px; }
+}
 .modal-tabs button.on { color: var(--accent); font-weight: 650; border-bottom-color: var(--accent); background: var(--surface-3); }
 .modal-danger { border: 1px solid rgba(216, 75, 61, .3); border-radius: 12px; background: rgba(216, 75, 61, .04); }
 .modal-danger h3 { color: #a4231a; }
@@ -3384,6 +3394,12 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .tabs.krume-kurz .tab-nav-space,
 .tabs.krume-kurz .tab-nav > svg:first-of-type { display: none; }
 .tabs.krume-kurz .tab-nav { padding: 5px 8px; }
+/* M301: Am Telefon ein Knopf mit dem Weg „Projekt › Board" statt Brotkrume + Wähler */
+.tab-pfad { flex: 1 1 auto; min-width: 0; max-width: none; justify-content: flex-start; }
+.tab-pfad .tab-pfad-proj { font-weight: 400; color: var(--muted); max-width: 40%; flex: none; }
+.tab-pfad-trenner { color: var(--muted); flex: none; }
+.tab-pfad-board { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tab-pfad > svg:first-of-type { display: inline-block !important; }
  
 /* ---------- KI-Freitext-Kommando ---------- */
 .ai-cmd-input {

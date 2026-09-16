@@ -130,8 +130,10 @@ console.log('════ C: „Was ist neu" aus dem Logo-Menü ════');
   pruefe('C1 eigene Seite: Titel „Was ist neu", kein Hilfe-Menü, kein Suchfeld',
     (await P.locator('.help-neu-modal h2').textContent()).includes('Was ist neu') && (await P.locator('.help-nav').count()) === 0 && (await P.locator('.help-search').count()) === 0);
   const eintraege = await P.locator('#help-neu li').allTextContents();
-  pruefe('C2 die Liste ist lang und beginnt mit der neuesten Ausbaustufe (M299)', eintraege.length >= 6 && /\(M299\)/.test(eintraege[0]), (eintraege[0] ?? '').slice(0, 60));
-  pruefe('C3 danach M298, M297, … in absteigender Folge', /\(M298\)/.test(eintraege[1] ?? '') && /\(M297\)/.test(eintraege[2] ?? ''));
+  // Die Liste wächst mit jeder Ausbaustufe — geprüft wird die Ordnung, nicht eine feste Nummer
+  const nummern = eintraege.map((t) => Number((t.match(/\(M(\d+)\)/) ?? [])[1] ?? 0));
+  pruefe('C2 die Liste ist lang und beginnt mit der höchsten Ausbaustufe', eintraege.length >= 6 && nummern[0] >= 299 && nummern[0] === Math.max(...nummern), (eintraege[0] ?? '').slice(0, 60));
+  pruefe('C3 … und fällt danach Stufe um Stufe ab', nummern.slice(0, 4).every((n, i) => i === 0 || n < nummern[i - 1]), nummern.slice(0, 5).join(','));
   await P.waitForTimeout(600); // Einblend-Animation abwarten, sonst zeigt das Bild ein halb durchsichtiges Fenster
   await P.screenshot({ path: `${SD}/m299-c-neu.png` });
   await P.locator('.help-neu-modal .modal-x').click();
