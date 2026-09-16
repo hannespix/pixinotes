@@ -343,7 +343,7 @@ export function Dock() {
                 </button>
                 <button
                   onClick={() => add(() => makeFrame(centerPos(640, 420)))}
-                  title="Benannter Rahmen, der seine Karten beim Verschieben mitnimmt"
+                  title="Benannter Rahmen auf dem Board, nimmt seine Karten mit — nicht der Bereich in der Übersicht"
                 >
                   <IFrame size={16} /> Rahmen
                 </button>

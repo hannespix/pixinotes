@@ -43,9 +43,9 @@ export const KUERZEL: Kuerzel[] = [
   { id: 'schliessen', taste: 'Esc', was: 'Menü, Fenster oder Zeichenmodus schließen', gruppe: 'Überall', fremd: true },
 
   // ── Ansichten ───────────────────────────────────────────────────────────
-  { id: 'ueberblick', taste: 'Alt+U', was: 'Überblick-Leiste aus- und einfahren', gruppe: 'Ansichten' },
-  { id: 'netz', taste: 'Alt+G', was: 'Gliederung/Netz — und zurück zum Board', gruppe: 'Ansichten' },
-  { id: 'navigator', taste: 'Alt+W', was: 'Navigator (Bereiche › Projekte › Boards)', gruppe: 'Ansichten' },
+  { id: 'ueberblick', taste: 'Alt+U', was: 'Navigation links ein- und ausblenden', gruppe: 'Ansichten' },
+  { id: 'netz', taste: 'Alt+G', was: 'Netz-Ansicht — und zurück zum Board', gruppe: 'Ansichten' },
+  { id: 'navigator', taste: 'Alt+W', was: 'Navigation: im Baum suchen (am Telefon: Baum öffnen)', gruppe: 'Ansichten' },
   { id: 'praesentation', taste: 'Alt+P', was: 'Präsentation starten', gruppe: 'Ansichten' },
   { id: 'boardVor', taste: 'Alt+→', was: 'nächstes Board im Projekt', gruppe: 'Ansichten' },
   { id: 'boardZurueck', taste: 'Alt+←', was: 'vorheriges Board im Projekt', gruppe: 'Ansichten' },

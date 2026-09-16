@@ -2,26 +2,28 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { selectActiveBoard, useBoard } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
-import { nodeToText } from '../lib/serialize';
 import { useRandZiehen } from '../lib/randZiehen';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { InlineName } from './InlineName';
-import { BoardMenu, ProjektMenu } from './EbenenMenu';
-import { IChevronR, IGraph, IHome, IPlus, IShare, IX } from './Icons';
-
-/** Kurz-Label je Karten-Typ für die Inhalts-Zeilen im Navigator (M183) */
-const NAV_TYPE: Record<string, string> = {
-  note: 'Notiz', kanban: 'Kanban', gantt: 'Zeitplan', calendar: 'Kalender',
-  mermaid: 'Diagramm', shape: 'Form', image: 'Bild', pdf: 'PDF', email: 'E-Mail',
-  file: 'Datei', week: 'Planer', time: 'Zeit', htmlapp: 'App', portal: 'Portal',
-  sheet: 'Tabelle',
-};
+import { NavTree } from './Navigation';
+import { IChevronR, IHome, IPlus, IShare, IX } from './Icons';
 
 /**
- * Kopfleiste mit dreistufiger Gliederung: Die Tab-Reihe zeigt NUR die Boards
- * des aktiven Projekts (schnelles seitliches Wechseln); davor sitzt die
- * Brotkrume „Bereich › Projekt", die den Navigator-Baum über alle Bereiche,
- * Projekte und Boards aufklappt — so bleibt auch ein großer Bestand geordnet.
+ * Die Navigation der App.
+ *
+ * Ab Tablet-Breite (861 Punkte) und mit „Navigation links" (Voreinstellung
+ * seit M263) ist sie die linke SPALTE: 🏠 Übersicht, darunter der ganze Baum
+ * (Bereich › Projekt › Board › Karte, Navigation.tsx), am Fuß Teilen und ＋.
+ * Die Fläche beginnt rechts davon — nichts rutscht mehr unter die Spalte.
+ *
+ * Am Telefon (und ohne die Spalte) bleibt die Kopfleiste: 🏠, Brotkrume
+ * „Bereich › Projekt", die Boards des Projekts als Reiter oder — wenn kein
+ * Reiter mehr ganz hineinpasst — als Board-Wähler. Die Brotkrume öffnet
+ * denselben Baum als Ausstülpung von links.
+ *
+ * M297: Vorher gab es die Hierarchie dreimal (Spalte, Navigator-Popup, rechte
+ * Seitenleiste) und das Netz zweimal. Jetzt: ein Baum, zwei Orte; das Netz
+ * nur noch in der Übersicht.
  */
 export function Tabs() {
   const boards = useBoard((s) => s.boards);
@@ -37,20 +39,30 @@ export function Tabs() {
   const showToast = useBoard((s) => s.showToast);
   const showArchived = useBoard((s) => s.showArchived);
   const activeBoard = useBoard(selectActiveBoard);
-  const focusNode = useBoard((s) => s.focusNode);
+  const navLinks = useBoard((s) => s.navLinks);
   const [navOpen, setNavOpen] = useState(false);
-  // M245: Der Navigator ist eine Ausstülpung am linken Rand — seine Breite
-  // wird gezogen und gemerkt, genau wie beim Überblick rechts
+  // M245: Die Ausstülpung ist in der Breite ziehbar, die Breite wird gemerkt
   const navBreite = useBoard((s) => s.navBreite);
   const setNavBreite = useBoard((s) => s.setNavBreite);
   const navGriff = useRandZiehen('links', setNavBreite, 380);
   /**
+   * M297: Spalte oder Kopfleiste? Dieselbe Grenze wie im Stylesheet (861
+   * Punkte) — gemessen per Media-Query, damit JS und CSS nie auseinanderlaufen.
+   */
+  const [breit, setBreit] = useState(() => window.matchMedia('(min-width: 861px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 861px)');
+    const on = () => setBreit(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const spalte = navLinks && breit;
+  /**
    * M236: Beim Board-Wechsel den aktiven Tab ins Bild holen.
    *
    * Das Kleben (CSS `position: sticky`) sorgt dafür, dass er nie ganz
-   * verschwindet — aber wer über den Navigator oder die Suche auf ein Board
-   * springt, das weit rechts in der Reihe liegt, soll auch die NACHBARN
-   * sehen: Erst dann versteht man, wo man gelandet ist.
+   * verschwindet — aber wer über die Suche auf ein Board springt, das weit
+   * rechts in der Reihe liegt, soll auch die NACHBARN sehen.
    */
   const reiheRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -72,11 +84,6 @@ export function Tabs() {
   const [kompakt, setKompakt] = useState(false);
   /**
    * M261: Auf schmalen Leisten weicht der Bereichsname aus der Brotkrume.
-   *
-   * „Regierungspräsidium › Referat 21" belegte am Telefon mehr als ein
-   * Drittel der ganzen Leiste — Platz, der dem Board-Titel fehlte. Der
-   * Bereich steht weiterhin in der Sprechblase und im Navigator.
-   *
    * Bewusst NICHT an `kompakt` gekoppelt: Das Einklappen schafft Platz, und
    * Platz entscheidet über `kompakt` — die beiden würden sich gegenseitig
    * aufschaukeln. Beide hängen deshalb an derselben Obergrenze der Leiste.
@@ -87,18 +94,15 @@ export function Tabs() {
     if (!el || typeof ResizeObserver === 'undefined') return;
     const messen = () => {
       const stil = getComputedStyle(el);
-      /* In der linken Spalte (M238) stehen die Boards untereinander — dort ist
-         Höhe da und Breite egal, der Wähler wäre ein Rückschritt. */
+      /* In der linken Spalte stehen die Boards untereinander — dort ist Höhe
+         da und Breite egal, der Wähler wäre ein Rückschritt. */
       if (stil.flexDirection === 'column') { setKompakt(false); setKrumeKurz(false); return; }
       /**
-       * Gemessen wird der ERLAUBTE Platz, nicht der belegte.
-       *
-       * `.tabs` ist fixiert positioniert und damit inhaltsbreit: Ihre
-       * `clientWidth` sagt, wie breit sie GERADE ist — und das hängt am Modus.
-       * Nach dem Umschalten auf den Wähler schrumpfte sie mit, die Messung
-       * blieb unter der Schwelle hängen und der Weg zurück in die Reihe war
-       * versperrt (gemessen: 1344 px blieben im Wähler-Modus). Die Obergrenze
-       * (--kopf-rest bzw. --kopf-voll) kennt den Modus dagegen nicht.
+       * Gemessen wird der ERLAUBTE Platz, nicht der belegte: `.tabs` ist
+       * fixiert positioniert und damit inhaltsbreit. Nach dem Umschalten auf
+       * den Wähler schrumpfte sie mit, die Messung blieb unter der Schwelle
+       * hängen. Die Obergrenze (--kopf-rest bzw. --kopf-voll) kennt den Modus
+       * dagegen nicht.
        */
       const grenze = parseFloat(stil.maxWidth);
       const voll = Number.isFinite(grenze) ? grenze : el.clientWidth;
@@ -126,34 +130,22 @@ export function Tabs() {
     };
   }, []);
 
-
-  // M183: aufgeklappte Boards im Navigator (zeigen ihre Karten)
-  const [navExpanded, setNavExpanded] = useState<Set<string>>(new Set());
   /**
-   * M252: Wie viel Platz die linke Navigation gerade belegt.
-   *
-   * Die schwebende Filterleiste der Netz-Ansicht saß fest bei 18 Punkten von
-   * links — und lag damit hinter dem geöffneten Navigator (User-Screenshot:
-   * „Gliederung/Physik" waren abgeschnitten). Statt sie höher zu stapeln,
-   * weicht sie aus: dieselbe Lösung wie beim Dock, das der Seitenleiste
-   * ausweicht (M248).
-   *
-   * GEMESSEN, nicht geraten: In der linken Spalte hängt die Breite an Schrift
-   * und Text-Zoom, und der Navigator ist frei ziehbar (M236-Lehre).
+   * M252: Wie viel Platz die linke Navigation gerade belegt — als `--nav-offen`
+   * an der Wurzel. Dock, Toast, Zeichen-Palette und die Filterleiste der
+   * Netz-Ansicht rücken damit in die Mitte der FREIEN Fläche.
+   * GEMESSEN, nicht geraten: In der Spalte hängt die Breite an Schrift und
+   * Text-Zoom, die Ausstülpung ist frei ziehbar.
    */
-  const navLinks = useBoard((s) => s.navLinks);
   useEffect(() => {
     const wurzel = document.documentElement;
     const messen = () => {
-      const breit = window.matchMedia('(min-width: 861px)').matches;
       const el = !breit ? null
         : navOpen ? document.querySelector('.nav-panel')
           : navLinks ? document.querySelector('.tabs') : null;
-      /* Bewusst offsetLeft/offsetWidth statt getBoundingClientRect: Das Panel
-         fährt mit einer Transformation ein, und während der Animation läge die
-         gemessene Kante 24 Punkte zu weit links. Der Layout-Wert steht sofort
-         richtig — und ist zugleich schon in Layoutpunkten, wie das Stylesheet
-         sie erwartet. */
+      /* offsetLeft/offsetWidth statt getBoundingClientRect: Das Panel fährt
+         mit einer Transformation ein, der Layout-Wert steht sofort richtig
+         und ist schon in Layoutpunkten, wie das Stylesheet sie erwartet. */
       const box = el as HTMLElement | null;
       wurzel.style.setProperty('--nav-offen',
         box ? `${Math.round(box.offsetLeft + box.offsetWidth)}px` : '0px');
@@ -165,23 +157,30 @@ export function Tabs() {
       window.removeEventListener('resize', messen);
       wurzel.style.setProperty('--nav-offen', '0px');
     };
-  }, [navOpen, navLinks, navBreite, view]);
+  }, [navOpen, navLinks, navBreite, view, breit]);
 
-  // M251: Alt+W schaltet den Navigator um. Der Zustand ist bewusst lokal
-  // geblieben — ein Fenster-Ereignis ist ehrlicher, als ihn nur für ein
-  // Tastenkürzel in den globalen Speicher zu heben.
+  // M251/M297: Alt+W — in der Spalte springt es in die Suche des Baums, sonst
+  // klappt es die Ausstülpung auf und zu.
   useEffect(() => {
-    const um = () => setNavOpen((o) => !o);
+    const um = () => {
+      if (navLinks && window.matchMedia('(min-width: 861px)').matches) {
+        (document.querySelector('.tabs .side-tree-find') as HTMLInputElement | null)?.focus();
+        return;
+      }
+      setNavOpen((o) => !o);
+    };
     window.addEventListener('pixinotes:navigator', um);
     return () => window.removeEventListener('pixinotes:navigator', um);
-  }, []);
-  // Esc schließt den Navigator (der Backdrop fängt Klicks ohnehin ab)
+  }, [navLinks]);
+  // Esc schließt die Ausstülpung (der Backdrop fängt Klicks ohnehin ab)
   useEffect(() => {
     if (!navOpen) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNavOpen(false); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [navOpen]);
+  // In der Spalte gibt es keine Ausstülpung — wer das Fenster verbreitert, hat sie nicht mehr offen
+  useEffect(() => { if (spalte) setNavOpen(false); }, [spalte]);
 
   const byId = useMemo(() => new Map(boards.map((b) => [b.id, b])), [boards]);
 
@@ -219,84 +218,21 @@ export function Tabs() {
     [projectBoards, activeId],
   );
 
-  // Boards ohne Projekt (nach Imports o. Ä.) — im Navigator unter „Ohne Projekt"
-  const orphans = useMemo(() => {
-    const assigned = new Set(spaces.flatMap((sp) => sp.projects.flatMap((p) => p.boardIds)));
-    return boards.filter((b) => !assigned.has(b.id));
-  }, [spaces, boards]);
-
   /** Aktives Board serverlos teilen: Link in die Zwischenablage (Fallback: Datei) */
   const shareActive = async () => {
     try {
       const url = await boardToShareUrl(activeBoard);
       if (url.length > SHARE_URL_LIMIT) {
         downloadBoardFile(activeBoard);
-        showToast('Board ist zu groß für einen Link (Bilder!) — stattdessen als Datei exportiert. Empfänger zieht sie einfach aufs Board.');
+        showToast('Das Board ist zu groß für einen Link und wurde als Datei gesichert.');
         return;
       }
       await navigator.clipboard.writeText(url);
-      showToast('Teilen-Link kopiert! Der Link enthält das komplette Board — einfach verschicken, Empfänger öffnet ihn im Browser.');
+      showToast('Teilen-Link kopiert. Er enthält das komplette Board.');
     } catch {
       downloadBoardFile(activeBoard);
-      showToast('Link konnte nicht kopiert werden — Board stattdessen als Datei exportiert.');
+      showToast('Der Link ließ sich nicht kopieren, das Board wurde als Datei gesichert.');
     }
-  };
-
-  // ---------- M183: Navigator-Helfer ----------
-  const toggleExpand = (id: string) =>
-    setNavExpanded((s) => {
-      const n = new Set(s);
-      if (n.has(id)) n.delete(id); else n.add(id);
-      return n;
-    });
-  const jumpCard = (boardId: string, nodeId: string) => {
-    openBoard(boardId);
-    focusNode(boardId, nodeId);
-    setNavOpen(false);
-  };
-  const cardLabel = (n: (typeof boards)[number]['nodes'][number]): string => {
-    const first = nodeToText(n).split('\n').find((l) => l.trim())?.trim() ?? '';
-    return first.replace(/^[#\-*\d.\s☐☑]+/, '').slice(0, 48) || (NAV_TYPE[n.type ?? ''] ?? 'Karte');
-  };
-
-  /** Board-Zeile im Navigator — mit ▸ zum Aufklappen der Karten (M183) */
-  const navBoard = (b: (typeof boards)[number]) => {
-    const cards = b.nodes.filter((n) => n.type !== 'frame');
-    const open = navExpanded.has(b.id);
-    return (
-      <div key={b.id} className={`nav-board-wrap${b.archived ? ' archiviert' : ''}`}>
-        <div className="nav-board-row">
-          <button
-            className={`tab-tree-board ${b.id === activeId && view === 'board' ? 'active' : ''}`}
-            onClick={() => { openBoard(b.id); setNavOpen(false); }}
-          >
-            <span className="tab-tree-board-name">{b.name}</span>
-            {b.archived && <span className="archiv-marke">Archiv</span>}
-            <span className="tab-count">{b.nodes.length}</span>
-          </button>
-          {/* M288: Dieselben Handgriffe wie in Seitenleiste und Übersicht */}
-          <BoardMenu boardId={b.id} />
-          {cards.length > 0 && (
-            <button
-              className={`nav-expand ${open ? 'on' : ''}`}
-              title={open ? 'Karten einklappen' : 'Karten dieses Boards zeigen'}
-              onClick={() => toggleExpand(b.id)}
-            ><IChevronR size={11} /></button>
-          )}
-        </div>
-        {open && (
-          <div className="nav-cards">
-            {cards.slice(0, 14).map((n) => (
-              <button key={n.id} className="nav-card" title="Zur Karte springen" onClick={() => jumpCard(b.id, n.id)}>
-                <span className="nav-card-type">{NAV_TYPE[n.type ?? ''] ?? n.type}</span>
-                <span className="nav-card-name">{cardLabel(n)}</span>
-              </button>
-            ))}
-            {cards.length > 14 && <div className="nav-more">… und {cards.length - 14} weitere — Board öffnen</div>}
-          </div>
-        )}
-      </div>
-    );
   };
 
   const close = (id: string) => {
@@ -312,96 +248,54 @@ export function Tabs() {
   };
 
   return (
-    <div className={`tabs ${kompakt ? 'kompakt' : ''} ${krumeKurz ? 'krume-kurz' : ''}`} ref={leisteRef}>
+    <div className={`tabs ${kompakt ? 'kompakt' : ''} ${krumeKurz ? 'krume-kurz' : ''} ${spalte ? 'spalte' : ''}`} ref={leisteRef}>
       <button
         className={`tab-home ${view === 'overview' ? 'active' : ''}`}
-        title="Übersicht: alle Bereiche, Projekte & Boards"
-        onClick={() => setView('overview')}
+        title="Übersicht"
+        aria-label="Übersicht"
+        onClick={() => { setOverviewMode('hierarchie'); setView('overview'); }}
       >
         <IHome size={15} />
+        <span className="tab-home-label">Übersicht</span>
       </button>
-      {/* Brotkrume „Bereich › Projekt" öffnet den Navigator über ALLE Ebenen.
-          M183: Der Navigator ist ein ZENTRIERTES Glas-Overlay als Body-Portal —
-          in der Tab-Leiste (selbst eine Glas-Fläche) blurte sein backdrop-filter
-          per CSS-Spezifikation nichts mehr (Backdrop-Root), User-Screenshot. */}
-      <button
-        className={`tab-nav ${navOpen ? 'active' : ''}`}
-        data-taste="navigator"
-        title={`${context?.space.name ?? '—'} › ${context?.project.name ?? '—'} — Navigator: alle Bereiche, Projekte, Boards & Karten`}
-        onClick={() => setNavOpen((o) => !o)}
-      >
-        <span className="tab-nav-space">{context?.space.name ?? '—'}</span>
-        <IChevronR size={11} />
-        <span className="tab-nav-proj">{context?.project.name ?? '—'}</span>
-      </button>
+      {!spalte && (
+        /* Brotkrume „Bereich › Projekt" öffnet den Baum als Ausstülpung von links */
+        <button
+          className={`tab-nav ${navOpen ? 'active' : ''}`}
+          data-taste="navigator"
+          title={`${context?.space.name ?? '—'} › ${context?.project.name ?? '—'} — Navigation öffnen`}
+          onClick={() => setNavOpen((o) => !o)}
+        >
+          <span className="tab-nav-space">{context?.space.name ?? '—'}</span>
+          <IChevronR size={11} />
+          <span className="tab-nav-proj">{context?.project.name ?? '—'}</span>
+        </button>
+      )}
       {navOpen && createPortal(
         <div className="nav-backdrop" onClick={() => setNavOpen(false)}>
-          {/* M245: Kein freischwebendes Fenster mehr, sondern eine Ausstülpung
-              am linken Rand — angedockt, in der Breite ziehbar, deckend. */}
-          <div className="nav-panel slideout nodrag" style={{ width: navBreite }} role="dialog" aria-label="Navigator" onClick={(e) => e.stopPropagation()}>
+          {/* M245: Ausstülpung am linken Rand — angedockt, in der Breite ziehbar, deckend. */}
+          <div className="nav-panel slideout nodrag" style={{ width: navBreite }} role="dialog" aria-label="Navigation" onClick={(e) => e.stopPropagation()}>
             <div className="nav-grip" {...navGriff}><span /></div>
             <div className="nav-head">
-              <b>Alle Bereiche, Projekte & Boards</b>
+              <b>Navigation</b>
               <button
                 className="nav-overview"
-                title="Große Übersicht öffnen (alle Bereiche als Fläche)"
+                title="Übersicht"
                 onClick={() => { setOverviewMode('hierarchie'); setView('overview'); setNavOpen(false); }}
-              ><IHome size={13} /> Große Übersicht</button>
-              {/* M193: Das Netz war bisher nur über die Übersicht erreichbar —
-                  jetzt aus JEDER Ansicht mit einem Tipp */}
-              <button
-                className="nav-netz"
-                title="Netz-Ansicht: Boards als Graph, verbunden über Portale und [[Wikilinks]]"
-                onClick={() => { setOverviewMode('netz'); setView('overview'); setNavOpen(false); }}
-              ><IGraph size={13} /> Netz</button>
-              <button className="nav-x" title="Schließen (Esc)" onClick={() => setNavOpen(false)}><IX size={13} /></button>
+              ><IHome size={13} /> Übersicht</button>
+              <button className="nav-x" title="Schließen (Esc)" aria-label="Schließen" onClick={() => setNavOpen(false)}><IX size={13} /></button>
             </div>
-            <div className="nav-grid">
-              {spaces.map((sp) => (
-                <section key={sp.id} className="nav-space">
-                  <button
-                    className="nav-space-name"
-                    title={`Bereich „${sp.name}" in der großen Übersicht öffnen`}
-                    onClick={() => { setView('overview'); setNavOpen(false); }}
-                  >{sp.name}</button>
-                  {sp.projects.map((proj) => (
-                    <div key={proj.id} className="nav-proj">
-                      <div className="nav-proj-head">
-                        <button
-                          className="nav-proj-name"
-                          title={proj.boardIds.length > 0 ? `Projekt „${proj.name}" öffnen (erstes Board)` : 'Projekt ist leer'}
-                          onClick={() => {
-                            const first = proj.boardIds.find((id) => byId.has(id));
-                            if (first) { openBoard(first); setNavOpen(false); }
-                          }}
-                        >{proj.name}</button>
-                        <ProjektMenu projectId={proj.id} />
-                      </div>
-                      {proj.boardIds.map((id) => {
-                        const b = byId.get(id);
-                        return b ? navBoard(b) : null;
-                      })}
-                      {proj.boardIds.length === 0 && <div className="tab-tree-empty">leer</div>}
-                    </div>
-                  ))}
-                </section>
-              ))}
-              {orphans.length > 0 && (
-                <section className="nav-space">
-                  <div className="nav-space-name nav-space-static">Ohne Projekt</div>
-                  <div className="nav-proj">{orphans.map((b) => navBoard(b))}</div>
-                </section>
-              )}
-            </div>
-            <div className="tab-tree-foot">Bereiche öffnen die große Übersicht · Projekte ihr erstes Board · ▸ zeigt die Karten eines Boards (Klick springt hin)</div>
+            <NavTree onNavigate={() => setNavOpen(false)} />
           </div>
         </div>,
         document.body,
       )}
-      {/* M261: Unterhalb einer gemessenen Breite trägt der Streifen keinen
-          einzigen Reiter mehr (gemessen: 142 px verfügbar gegen 215 px Bedarf).
-          Dort steht statt der Reihe ein Board-Wähler mit Aufklappliste. */}
-      {kompakt ? (
+      {spalte ? (
+        /* M297: Der Baum sitzt fest in der Spalte */
+        <NavTree />
+      ) : kompakt ? (
+        /* M261: Unterhalb einer gemessenen Breite trägt der Streifen keinen
+           einzigen Reiter mehr. Dort steht statt der Reihe ein Board-Wähler. */
         <div className="tab-picker-wrap" ref={pickerRef}>
           <button
             className={`tab-picker ${pickerOffen ? 'auf' : ''}`}
@@ -414,8 +308,6 @@ export function Tabs() {
             aria-expanded={pickerOffen}
           >
             <span className="tab-picker-name">{aktivesBoard?.name ?? '—'}</span>
-            {/* Die Kartenzahl steht in der Liste; hier gehört der Platz dem
-                Namen — am Telefon bleiben für ihn sonst 104 statt 136 Punkte. */}
             {!krumeKurz && <span className="tab-count">{aktivesBoard?.nodes.length ?? 0}</span>}
             <IChevronR size={11} className="tab-picker-pfeil" />
           </button>
@@ -478,13 +370,12 @@ export function Tabs() {
         ))}
       </div>
       )}
-      {/* M238: Teilen und ＋ als eigene Gruppe. In der Reihe ändert das nichts
-          (eine Flex-Zeile in einer Flex-Zeile), in der linken Spalte stehen sie
-          dadurch nebeneinander am Fuß statt untereinander in der Mitte. */}
+      {/* M238: Teilen und ＋ als eigene Gruppe — in der Reihe eine Flex-Zeile in
+          der Flex-Zeile, in der Spalte der Fuß der Liste. */}
       <div className="tabs-foot">
       <button
         className="tab-share"
-        title="Aktives Board teilen: Link mit komplettem Inhalt kopieren (serverlos)"
+        title="Board teilen"
         aria-label="Board teilen"
         onClick={shareActive}
       >
@@ -493,9 +384,10 @@ export function Tabs() {
       <button
         className="tab-add"
         title={`Neues Board in „${context?.project.name ?? 'Allgemein'}"`}
+        aria-label="Neues Board"
         onClick={() => {
           addBoard(undefined, context?.project.id);
-          showToast(`Neues Board in „${context?.project.name ?? 'Allgemein'}" — Doppelklick auf den Tab zum Umbenennen`);
+          showToast(`Neues Board in „${context?.project.name ?? 'Allgemein'}".`);
         }}
       >
         <IPlus size={14} />

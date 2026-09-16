@@ -52,7 +52,7 @@ async function seite({ ansicht = 'board', archivZeigen = false, aktiv = 'b0' } =
   const ctx = await browser.newContext({ viewport, hasTouch: finger, isMobile: finger });
   await ctx.addInitScript(([ansicht, archivZeigen, aktiv]) => {
     localStorage.setItem('pixinotes-onboarded', '1');
-    localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ navLinks: false }));
+    localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ navLinks: true }));
     const mk = (id, txt, x, y) => ({ id, type: 'note', position: { x, y }, width: 240, height: 150,
       data: { color: 'yellow', blocks: [{ id: `${id}b`, type: 'paragraph', props: {},
         content: [{ type: 'text', text: txt, styles: {} }], children: [] }] } });
@@ -70,7 +70,7 @@ async function seite({ ansicht = 'board', archivZeigen = false, aktiv = 'b0' } =
         { id: 'p1', name: 'Laufend', boardIds: ['b0', 'b1'] },
         { id: 'p2', name: 'Archivprojekt', boardIds: ['b2'] },
       ] }],
-      activeId: aktiv, view: ansicht, cardFocus: true, navLinks: false, showArchived: archivZeigen } }));
+      activeId: aktiv, view: ansicht, cardFocus: true, navLinks: true, showArchived: archivZeigen } }));
   }, [ansicht, archivZeigen, aktiv]);
   const P = await ctx.newPage();
   P.on('pageerror', (e) => console.log('    PAGEERROR:', e.message));
@@ -85,8 +85,8 @@ const menuEintraege = (P) => P.evaluate(() =>
 
 /** Seitenleiste ausfahren und den Baum bereitstellen */
 async function seitenleiste(P) {
-  await P.locator('.sidepanel-fahne').click();
-  await P.waitForTimeout(1100);
+  // M297: Der Baum steht fest in der linken Spalte — nur kurz warten
+  await P.waitForTimeout(400);
 }
 
 // ══ T1: Der Vorrat am Board — und er ist überall derselbe ═══════════
@@ -324,7 +324,7 @@ console.log('\n════ T8: Telefon ════');
   const { ctx, P } = await seite({ ansicht: 'board' }, { width: 390, height: 844 }, true);
   await P.locator('[data-taste="navigator"]').click();
   await P.waitForTimeout(900);
-  const knopf = P.locator('.nav-board-row .ebenen-menu-knopf').first();
+  const knopf = P.locator('.nav-panel .side-board .ebenen-menu-knopf').first(); // M297: derselbe Baum in der Ausstülpung
   pruefe('T8d auch der Navigator der Kopfleiste trägt das Menü', await knopf.count() > 0);
   if (await knopf.count()) {
     const box = await knopf.boundingBox();

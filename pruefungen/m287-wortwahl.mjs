@@ -49,7 +49,7 @@ async function seite(ansicht = 'board', viewport = { width: 1440, height: 900 })
   const ctx = await browser.newContext({ viewport });
   await ctx.addInitScript((ansicht) => {
     localStorage.setItem('pixinotes-onboarded', '1');
-    localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ navLinks: false }));
+    localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ navLinks: true }));
     const mk = (id, txt, x, y) => ({ id, type: 'note', position: { x, y }, width: 240, height: 150,
       data: { color: 'yellow', blocks: [{ id: `${id}b`, type: 'paragraph', props: {},
         content: [{ type: 'text', text: txt, styles: {} }], children: [] }] } });
@@ -62,7 +62,7 @@ async function seite(ansicht = 'board', viewport = { width: 1440, height: 900 })
         { id: 'b1', name: 'Dienstplan', edges: [], drawings: [], comments: [], nodes: [] },
       ],
       spaces: [{ id: 's1', name: 'Privat', projects: [{ id: 'p1', name: 'Urlaub', boardIds: ['b0', 'b1'] }] }],
-      activeId: 'b0', view: ansicht, cardFocus: true, navLinks: false } }));
+      activeId: 'b0', view: ansicht, cardFocus: true, navLinks: true } }));
   }, ansicht);
   const P = await ctx.newPage();
   P.on('pageerror', (e) => console.log('    PAGEERROR:', e.message));
@@ -108,8 +108,7 @@ console.log('════ T1: Umbenennen am Rahmen nennt das Ding beim Namen ═
 console.log('\n════ T2: Board umbenennen im Navigator ════');
 {
   const { ctx, P } = await seite('board');
-  await P.locator('.sidepanel-fahne').click();
-  await P.waitForTimeout(1200);
+  await P.waitForTimeout(600); // M297: Der Baum steht fest in der linken Spalte
   pruefe('T2a der Navigator ist offen', await P.evaluate(() => !!document.querySelector('.side-tree')));
   const zeile = P.locator('.side-board', { hasText: 'Amrum 2026' }).first();
   pruefe('T2b das Board steht mit seinem VOLLEN Namen da',
@@ -150,6 +149,9 @@ console.log('\n════ T3: Ein Ding, ein Wort ════');
     return !!b;
   });
   await P.waitForTimeout(700);
+  // M296: Der Rahmen liegt hinter „Weitere Module"
+  await P.evaluate(() => document.querySelector('.dock-menu-mehr')?.click());
+  await P.waitForTimeout(300);
   const eintraege = await P.evaluate(() => [...document.querySelectorAll('.dock-menu button')].map((b) => b.textContent.trim()));
   console.log('    ＋-Menü:', JSON.stringify(eintraege.slice(0, 20)));
   pruefe('T3a das ＋-Menü ist offen', eintraege.length > 3, `geöffnet: ${auf}`);
@@ -173,6 +175,8 @@ console.log('\n════ T4: Vorgabename ════');
       .find((x) => x.getAttribute('aria-label') === 'Objekt hinzufügen')?.click();
   });
   await P.waitForTimeout(600);
+  await P.evaluate(() => document.querySelector('.dock-menu-mehr')?.click()); // M296: hinter „Weitere Module"
+  await P.waitForTimeout(300);
   await P.evaluate(() => [...document.querySelectorAll('.dock-menu button')].find((b) => b.textContent.trim() === 'Rahmen')?.click());
   await P.waitForTimeout(1200);
   const namen = await P.evaluate(() => {

@@ -40,7 +40,14 @@ export function Tastatur() {
       if (passt(e, 'aufgaben')) return tun(() => st.setTasksOpen(!st.tasksOpen));
 
       // ── Ansichten ─────────────────────────────────────────────────────
-      if (passt(e, 'ueberblick')) return tun(() => st.setSidebar({ open: !st.sidebar.open }));
+      // M297: Alt+U schaltet die linke Navigationsspalte — am Telefon (keine
+      // Spalte) öffnet es die Ausstülpung wie Alt+W
+      if (passt(e, 'ueberblick')) {
+        return tun(() => {
+          if (window.matchMedia('(min-width: 861px)').matches) st.setNavLinks(!st.navLinks);
+          else window.dispatchEvent(new CustomEvent('pixinotes:navigator'));
+        });
+      }
       if (passt(e, 'navigator')) {
         // Der Navigator lebt als lokaler Zustand in der Reiter-Leiste — ein
         // Fenster-Ereignis ist hier ehrlicher, als seinen Zustand nur für

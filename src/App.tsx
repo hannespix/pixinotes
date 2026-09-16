@@ -27,7 +27,6 @@ import { FocusSheet } from './components/FocusSheet';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Onboarding } from './components/Onboarding';
 import { BacklinksPanel } from './components/BacklinksPanel';
-import { SidePanel } from './components/SidePanel';
 import { ShareCardsModal } from './components/ShareCardsModal';
 import { HelpOverlay } from './components/HelpOverlay';
 import { GeteiltDialog } from './components/GeteiltDialog';
@@ -223,12 +222,7 @@ export default function App() {
           <ErrorBoundary what="Die Übersicht" full>
             <Overview />
             <MiniDock />
-            {/* M285: Der Navigator gehört in JEDE Ansicht.
-                Bis hierher stand der Baum (Bereich › Projekt › Board › Karte)
-                nur neben dem Board — ausgerechnet in der Übersicht, wo man
-                den Überblick sucht, fehlte er. Jetzt ist er überall derselbe,
-                und die Karte darin öffnet dieselbe Bearbeitung wie sonst. */}
-            <ErrorBoundary what="Der Navigator"><SidePanel /></ErrorBoundary>
+            {/* M297: Der Baum steht in der linken Spalte (Tabs) — in jeder Ansicht. */}
           </ErrorBoundary>
         ) : presenting ? null : tasksOpen ? (
           <ErrorBoundary what="Die Aufgaben-Zentrale" full><TaskHub /></ErrorBoundary>
@@ -241,8 +235,6 @@ export default function App() {
             <ErrorBoundary what="Das Board" full><Board /></ErrorBoundary>
             <Dock />
             <ErrorBoundary what="Das Backlinks-Panel"><BacklinksPanel /></ErrorBoundary>
-            {/* M194: Überblick als Seitenleiste NEBEN der Arbeit */}
-            <SidePanel />
             {/* M202: Teilen-Dialog für ausgewählte Karten */}
             <ShareCardsModal />
             {/* M212: Karte im Fokus (Handy) — Rahmen und Bedienung; die Karte

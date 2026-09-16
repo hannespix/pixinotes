@@ -41,7 +41,6 @@ const FELDER = [
   'syncDateienMb',  // wie viele MB Dateien der Sync-Stand mitnimmt
   'navLinks',        // Navigation links statt oben
   'navBreite',       // Breite des linken Slideouts
-  'sidebar',         // offen? welche Ansicht? wie breit?
   'clickZoom',
   'wheelZoom',
   'cardFocus',
