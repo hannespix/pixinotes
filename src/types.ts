@@ -136,6 +136,8 @@ export interface KanbanData {
   autoArchiv?: boolean;
   /** M293: nach wie vielen Tagen in „Erledigt" (Standard 7, siehe ticketArchiv.ts) */
   autoArchivTage?: number;
+  /** M295: Kompakte Tickets — nur Text, Priorität und Frist; Chips erst beim Zeigen */
+  kompakt?: boolean;
   [key: string]: unknown;
 }
 

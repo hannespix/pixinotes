@@ -78,8 +78,12 @@ async function seite({ automatik } = {}) {
   return { ctx, P };
 }
 
-/** Was steht in den Spalten, was im Archiv, was im Speicher? */
-const lage = (P) => P.evaluate(() => {
+/** Was steht in den Spalten, was im Archiv, was im Speicher?
+ *  M295: Die Erledigt-Spalte klappt „Älter" zu — fürs Messen erst aufklappen. */
+const lage = async (P) => {
+  const zu = P.locator('.k-done-head[data-done-gruppe="aelter"] .k-done-toggle[aria-expanded="false"]');
+  if (await zu.count()) { await zu.first().click(); await P.waitForTimeout(150); }
+  return P.evaluate(() => {
   const inSpalten = [...document.querySelectorAll('.kanban-item')].map((el) => el.dataset.kid);
   const erledigtSpalte = [...document.querySelectorAll('.kanban-item.col-done')].map((el) => el.dataset.kid);
   const badge = document.querySelector('.k-archiv-head .k-head-count')?.textContent ?? '';
@@ -97,9 +101,18 @@ const lage = (P) => P.evaluate(() => {
   } catch { /* noch nicht gespeichert */ }
   const toast = document.querySelector('.toast.show')?.textContent ?? '';
   return { inSpalten, erledigtSpalte, badge, zeilen, gespeichert, toast };
-});
+  });
+};
 
 const gleich = (a, b) => JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
+
+/** M295: Das Archiv liegt hinter dem ⋯ der Kopfzeile (Filter und ⋯ sind die
+ *  einzigen Knöpfe), die Statuszeile darunter trägt den Zähler. */
+const oeffneArchiv = async (P) => {
+  await P.locator('.k-mehr').first().click({ force: true });
+  await P.locator('.k-menu-archiv').click();
+  await P.waitForTimeout(400);
+};
 
 // ══ A: Automatik an (7 Tage) ══════════════════════════════════════════
 console.log('════ A: Automatik räumt beim Start ════');
@@ -136,8 +149,7 @@ console.log('════ A: Automatik räumt beim Start ════');
   pruefe('A12 Zähler steht auf 2', l.badge === '2', l.badge);
 
   // Archiv-Panel: Zeilen, neueste zuerst, zurückholen
-  await P.locator('.k-archiv-head').click();
-  await P.waitForTimeout(400);
+  await oeffneArchiv(P);
   l = await lage(P);
   pruefe('A13 das Archiv listet beide — das zuletzt archivierte oben', JSON.stringify(l.zeilen) === JSON.stringify(['t2', 't1']), JSON.stringify(l.zeilen));
   await P.locator('.k-archiv-row[data-archiv-id="t2"] .k-archiv-back').click();
@@ -201,8 +213,7 @@ console.log('\n════ B: Einstellung der Automatik ════');
   pruefe('B2 … der Altbestand wird trotzdem gestempelt (die Uhr läuft schon)', !!l.gespeichert?.items?.t3?.erledigtAm, JSON.stringify(l.gespeichert?.items));
   pruefe('B3 kein Zähler, kein Archiv', l.badge === '' && (l.gespeichert?.archiv?.length ?? 0) === 0, `badge=${l.badge}`);
 
-  await P.locator('.k-archiv-head').click();
-  await P.waitForTimeout(400);
+  await oeffneArchiv(P);
   const kasten = P.locator('.k-archiv-auto input[type="checkbox"]');
   const tage = P.locator('.k-archiv-auto input[type="number"]');
   pruefe('B4 Automatik ist aus, das Tage-Feld gesperrt und auf 7 vorbelegt',
@@ -250,7 +261,9 @@ console.log('\n════ B: Einstellung der Automatik ════');
   await P.waitForTimeout(700);
   l = await lage(P);
   pruefe('B18 „Alle zurückholen" stellt die Erledigt-Spalte wieder her', gleich(l.erledigtSpalte, ['t1', 't2', 't3']) && l.zeilen.length === 0, JSON.stringify({ e: l.erledigtSpalte, z: l.zeilen }));
-  pruefe('B19 die Reihenfolge der Spalte: Zurückgeholte hängen hinten an', JSON.stringify(l.erledigtSpalte) === JSON.stringify(['t3', 't1', 't2']), JSON.stringify(l.erledigtSpalte));
+  // M295: Die Spalte ordnet nach Erledigt-Datum (Heute · Diese Woche · Älter) —
+  // die Reihenfolge im Speicher ist das, was „hinten anhängen" meint.
+  pruefe('B19 im Speicher hängen die Zurückgeholten hinten an', JSON.stringify(Object.keys(l.gespeichert?.items ?? {}).slice(-2)) === JSON.stringify(['t1', 't2']), JSON.stringify(Object.keys(l.gespeichert?.items ?? {})));
   await P.screenshot({ path: `${SD}/m293-b-zurueck.png` });
   await ctx.close();
 }

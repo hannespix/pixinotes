@@ -13,7 +13,7 @@ import { linkedNeighborIds } from '../../lib/links';
 import { fmtHM, linkedOfType, timeSums } from '../../lib/moduleFeeds';
 import { nodeToText } from '../../lib/serialize';
 import { AUTO_ARCHIV_STANDARD_TAGE, archiviere, autoArchivLauf, holeZurueck } from '../../lib/ticketArchiv';
-import { IArchive, IArchiveRestore, ICalendar, IChevronL, IChevronR, IDownload, IFolder, IPlus, IRedo, ISearch, ISettings, IX } from '../Icons';
+import { IArchive, IArchiveRestore, ICalendar, IChevronL, IChevronR, ICompact, IDownload, IFolder, IMore, IPlus, IRedo, ISearch, ISettings, IX } from '../Icons';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 
@@ -23,8 +23,14 @@ const TYPE_ICON: Record<string, string> = {
   shape: '⬛', image: '🖼️', pdf: '📄', email: '✉️', file: '📎', portal: '🚪',
 };
 
+const TAG_RE = /#([\p{L}\d_-]{2,20})/gu;
+const TAG_MS = 86_400_000;
+
 /** #Tags aus einem Ticket-Text ziehen (Trello-Labels light: einfach #tag tippen) */
-const tagsOf = (text: string): string[] => [...text.matchAll(/#([\p{L}\d_-]{2,20})/gu)].map((m) => m[1].toLowerCase());
+const tagsOf = (text: string): string[] => [...text.matchAll(TAG_RE)].map((m) => m[1].toLowerCase());
+
+/** M295: Zeitgruppen der Erledigt-Spalte */
+type DoneGruppe = 'heute' | 'woche' | 'aelter';
 
 /** Alle Tags eines Tickets — Titel UND Beschreibung zählen (M121) */
 const ticketTags = (it: KanbanItem): string[] =>
@@ -66,6 +72,28 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   // Filterleiste (Trello-Stil): Textsuche, Schnellfilter, #Tag, Quell-Board.
   // Bewusst NICHT persistiert — Filter sind eine Ansicht, kein Zustand.
   const [filterOpen, setFilterOpen] = useState(false);
+  // M295: Das ⋯-Menü der Kopfzeile (Portal, wie das Ebenen-Menü) — sechs
+  // Symbolknöpfe waren zu viele, jetzt sind es Filter und ⋯.
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number; hoch: boolean } | null>(null);
+  const menuKnopf = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!menuPos) return;
+    const zu = (e: PointerEvent) => {
+      const z = e.target;
+      if (!(z instanceof Node)) return;
+      if (menuKnopf.current?.contains(z) || menuRef.current?.contains(z)) return;
+      setMenuPos(null);
+    };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuPos(null); };
+    window.addEventListener('pointerdown', zu, true);
+    window.addEventListener('keydown', esc, true);
+    return () => { window.removeEventListener('pointerdown', zu, true); window.removeEventListener('keydown', esc, true); };
+  }, [menuPos]);
+  // M295: Welche Zeitgruppen der Erledigt-Spalte sind zugeklappt? „Älter"
+  // von Anfang an — das ist der Teil, der die Spalte lang macht. Ansicht,
+  // kein Zustand: nicht persistiert.
+  const [doneZu, setDoneZu] = useState<Set<DoneGruppe>>(() => new Set<DoneGruppe>(['aelter']));
   const [query, setQuery] = useState('');
   const [quick, setQuick] = useState<'alle' | 'faellig' | 'ueberfaellig'>('alle');
   const [tagFilter, setTagFilter] = useState('');
@@ -123,7 +151,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     ro.observe(host);
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kanban.items, doneIdx, query, quick, tagFilter, boardFilter, kanban.groupBy]);
+  }, [kanban.items, doneIdx, query, quick, tagFilter, boardFilter, kanban.groupBy, doneZu, kanban.kompakt]);
 
   const cols = kanbanCols(kanban);
   const done = cols.length - 1;
@@ -321,8 +349,10 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
    */
   /** Ticket in Spalte `target` legen — optional an Position `at` innerhalb der
    *  Spalte (M215: Ziehen sortiert jetzt auch INNERHALB einer Spalte um) */
-  const tryMoveTo = (item: KanbanItem, target: number, at?: number) => {
+  const tryMoveTo = (item: KanbanItem, target: number, position?: number) => {
     const col = Math.max(0, Math.min(done, target));
+    // M295: Die Erledigt-Spalte ordnet nach Zeit — eine Zielposition gibt es dort nicht
+    const at = col === done ? undefined : position;
     if (col === item.col && at === undefined) return;
     if (col === item.col && at !== undefined) { reorderInCol(item, col, at); return; }
     if (col > item.col) {
@@ -559,6 +589,11 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
 
   // ---------- Einsammeln konfigurieren (Quell-Boards, board-weise räumen) ----------
   const [collectOpen, setCollectOpen] = useState(false);
+  // M295: Als Fenster über der App (Portal) — Fokus aufs Fenster, damit Esc greift
+  const collectRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (collectOpen) collectRef.current?.focus();
+  }, [collectOpen]);
   // M169: per Pfeil verbundene Quell-Karten — im Panel als Abo markiert; ihre
   // Checkbox bleibt auch bei abgewähltem Board bedienbar (Abwahl gewinnt)
   const linkedSrc = collectOpen ? linkedNeighborIds(boards, id) : new Set<string>();
@@ -623,9 +658,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     if (ids.length === 0) return;
     updateNodeData(id, archiviere(kanban, ids));
     if (detailId && ids.includes(detailId)) setDetailId(null);
-    showToast(ids.length === 1
-      ? '🗃 Ticket archiviert — 🗃 in der Kopfzeile zeigt das Archiv, Strg+Z holt es sofort zurück.'
-      : `🗃 ${ids.length} erledigte Tickets archiviert — 🗃 in der Kopfzeile zeigt das Archiv, Strg+Z holt sie zurück.`);
+    showToast(ids.length === 1 ? '🗃 Ticket archiviert. Strg+Z holt es zurück.' : `🗃 ${ids.length} Tickets archiviert. Strg+Z holt sie zurück.`);
   };
   /** Die ganze Erledigt-Spalte — bei aktivem Filter nur, was gerade zu sehen ist */
   const erledigteZumArchivieren = (filtering ? visibleItems : kanban.items).filter((it) => colOf(it) === done);
@@ -656,7 +689,12 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     }
   };
 
-  const renderItem = (it: KanbanItem, colIdx: number) => (
+  const renderItem = (it: KanbanItem, colIdx: number) => {
+    const tags = ticketTags(it);
+    // M295: Der Tag steht als Chip unter dem Text — im Text selbst stünde er
+    // doppelt. Bleibt nach dem Entfernen nichts übrig, zeigt der Text den Tag.
+    const anzeige = tags.length > 0 ? (it.text.replace(TAG_RE, '').replace(/\s{2,}/g, ' ').trim() || it.text) : it.text;
+    return (
     <div
       className={`kanban-item nodrag ${colIdx === done ? 'col-done' : colIdx === 0 ? 'col-first' : 'col-mid'} ${dragId === it.id ? 'dragging' : ''}`}
       key={it.id}
@@ -681,11 +719,25 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             {'!'.repeat(4 - it.prio)}{' '}
           </b>
         )}
-        {it.text}
+        {anzeige}
       </span>
-      {ticketTags(it).length > 0 && (
+      <span className="kanban-item-actions">
+        {colIdx > 0 && (
+          <button onClick={() => move(it, -1)} title="Zurück"><IChevronL size={11} /></button>
+        )}
+        {colIdx < done && (
+          <button onClick={() => move(it, 1)} title="Weiter"><IChevronR size={11} /></button>
+        )}
+        {colIdx === done && (
+          /* M293: erledigt → ins Archiv (aus der Spalte, nicht aus der Welt) */
+          <button className="k-archiv-btn" onClick={() => archiviereTickets([it.id])} title="Archivieren"><IArchive size={11} /></button>
+        )}
+        <button onClick={() => setEditingDue(editingDue === it.id ? null : it.id)} title="Frist"><ICalendar size={11} /></button>
+        <button onClick={() => remove(it)} title="Entfernen"><IX size={11} /></button>
+      </span>
+      {tags.length > 0 && (
         <span className="k-labels">
-          {ticketTags(it).map((tag) => (
+          {tags.map((tag) => (
             <button
               key={tag}
               className="k-label nodrag"
@@ -734,20 +786,6 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           })()}
         </span>
       )}
-      <span className="kanban-item-actions">
-        {colIdx > 0 && (
-          <button onClick={() => move(it, -1)} title="Zurück"><IChevronL size={11} /></button>
-        )}
-        {colIdx < done && (
-          <button onClick={() => move(it, 1)} title="Weiter"><IChevronR size={11} /></button>
-        )}
-        {colIdx === done && (
-          /* M293: erledigt → ins Archiv (aus der Spalte, nicht aus der Welt) */
-          <button className="k-archiv-btn" onClick={() => archiviereTickets([it.id])} title="Archivieren — verlässt die Spalte, bleibt im Archiv (🗃 in der Kopfzeile)"><IArchive size={11} /></button>
-        )}
-        <button onClick={() => setEditingDue(editingDue === it.id ? null : it.id)} title="Fälligkeit setzen (Erinnerung!)"><ICalendar size={11} /></button>
-        <button onClick={() => remove(it)} title="Entfernen"><IX size={11} /></button>
-      </span>
       {editingDue === it.id ? (
         <input
           type="date"
@@ -770,7 +808,58 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         </button>
       ) : null}
     </div>
-  );
+    );
+  };
+
+  /**
+   * M295: Die Erledigt-Spalte nach Zeit — Heute · Diese Woche · Älter.
+   *
+   * Das Archiv räumt nach Tagen; bis dahin stand alles Erledigte gleich groß
+   * da, ob von heute oder von vor sechs Tagen. Jetzt ordnet die Spalte nach
+   * dem Erledigt-Stempel, neueste oben, und „Älter" ist zugeklappt: Man sieht
+   * die Zahl, nicht die Zeilen. Jede Gruppe lässt sich mit einem Griff
+   * archivieren. Ohne Stempel (der Auto-Lauf trägt ihn beim Start nach)
+   * gilt ein Ticket als von heute.
+   */
+  const renderDoneGroups = (items: KanbanItem[]) => {
+    const now = new Date();
+    const heute0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const woche0 = heute0 - ((now.getDay() + 6) % 7) * TAG_MS; // Montag 0 Uhr
+    const gruppen: Array<{ key: DoneGruppe; name: string; items: KanbanItem[] }> = [
+      { key: 'heute', name: 'Heute', items: [] },
+      { key: 'woche', name: 'Diese Woche', items: [] },
+      { key: 'aelter', name: 'Älter', items: [] },
+    ];
+    for (const it of items) {
+      const t = it.erledigtAm ? Date.parse(it.erledigtAm) : Number.NaN;
+      gruppen[Number.isNaN(t) || t >= heute0 ? 0 : t >= woche0 ? 1 : 2].items.push(it);
+    }
+    for (const g of gruppen) g.items.sort((a, b) => (Date.parse(b.erledigtAm ?? '') || 0) - (Date.parse(a.erledigtAm ?? '') || 0));
+    const voll = gruppen.filter((g) => g.items.length > 0);
+    // Eine einzige Gruppe von heute oder dieser Woche braucht keine Überschrift
+    if (voll.length === 1 && voll[0].key !== 'aelter') return voll[0].items.map((it) => renderItem(it, done));
+    return voll.flatMap((g) => {
+      const zu = doneZu.has(g.key);
+      return [
+        <div className="k-group-head k-done-head" key={`dg-${g.key}`} data-done-gruppe={g.key}>
+          <button
+            className="k-done-toggle nodrag"
+            aria-expanded={!zu}
+            title={zu ? 'Aufklappen' : 'Zuklappen'}
+            onClick={() => setDoneZu((s) => { const n = new Set(s); if (n.has(g.key)) n.delete(g.key); else n.add(g.key); return n; })}
+          >
+            <IChevronR size={10} className={zu ? '' : 'auf'} /> {g.name} <em>{g.items.length}</em>
+          </button>
+          <button
+            className="k-done-archiv nodrag"
+            title={`${g.items.length === 1 ? 'Dieses Ticket' : `Diese ${g.items.length} Tickets`} archivieren`}
+            onClick={() => archiviereTickets(g.items.map((it) => it.id))}
+          ><IArchive size={10} /></button>
+        </div>,
+        ...(zu ? [] : g.items.map((it) => renderItem(it, done))),
+      ];
+    });
+  };
 
   // M170: ⏱-Chip aus verbundenen Zeiterfassungs-Karten — heutige und
   // Wochen-Arbeitszeit (ohne Pausen) direkt am Kanban-Kopf
@@ -784,8 +873,28 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     };
   })();
 
+  // M295: Statuszeile — nur, wenn eine Automatik läuft oder das Archiv gefüllt
+  // ist. Vorher zeigten eingefärbte Knöpfe den Zustand, ohne zu sagen welchen.
+  const statusChips: React.ReactNode[] = [];
+  if (kanban.autoCollect) {
+    statusChips.push(
+      <button key="auto" className="k-status-chip nodrag" title="Auto-Einsammeln ist an" onClick={() => setCollectOpen(true)}>
+        <IRedo size={10} /> Auto-Einsammeln
+      </button>,
+    );
+  }
+  if (kanban.autoArchiv || archiv.length > 0) {
+    statusChips.push(
+      <button key="archiv" className="k-status-chip k-archiv-head nodrag" title="Archiv öffnen" onClick={() => setArchivOpen(true)}>
+        <IArchive size={10} />
+        {archiv.length > 0 && <em className="k-head-count">{archiv.length}</em>}
+        {' '}{kanban.autoArchiv ? `Archiv nach ${anzeigeTage} Tag${anzeigeTage === 1 ? '' : 'en'}` : 'im Archiv'}
+      </button>,
+    );
+  }
+
   return (
-    <>
+    <div className={`kanban-body${kanban.kompakt ? ' k-kompakt' : ''}`}>
       <div className="kanban-head">
         <DragTitle className="kanban-title" value={kanban.title} onChange={setTitle} placeholder="Kanban" />
         {timeChip && (
@@ -796,46 +905,65 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         )}
         <button
           className={`kanban-addcol nodrag ${filterOpen || filtering ? 'k-auto-on' : ''}`}
-          title="Filtern & Gruppieren: Suche, Frist, #Tags, Quell-Board (Trello-Stil)"
+          title="Filtern"
+          aria-label="Filtern"
           onClick={() => { setFilterOpen((o) => !o); if (filterOpen) resetFilters(); }}
         >
           <ISearch size={12} />
         </button>
+        {/* M295: Ein ⋯ statt fünf Symbolknöpfen — Einsammeln, Automatiken,
+            Archiv, Spalten und Ansicht liegen dahinter, wie überall in der App */}
         <button
-          className="kanban-addcol nodrag"
-          title="Offene Aufgaben aus ALLEN Boards einsammeln (Kanbans, Checklisten, Zeitpläne)"
-          onClick={() => syncFromBoards(true)}
+          ref={menuKnopf}
+          className={`kanban-addcol k-mehr nodrag ${menuPos ? 'k-auto-on' : ''}`}
+          title="Mehr"
+          aria-label="Mehr"
+          aria-haspopup="menu"
+          aria-expanded={!!menuPos}
+          onClick={(e) => {
+            if (menuPos) { setMenuPos(null); return; }
+            const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            const hoch = r.bottom + 340 > window.innerHeight;
+            setMenuPos({ x: Math.min(r.left, window.innerWidth - 260), y: hoch ? r.top : r.bottom + 4, hoch });
+          }}
         >
-          <IDownload size={12} />
+          <IMore size={12} />
         </button>
-        <button
-          className={`kanban-addcol nodrag ${kanban.autoCollect ? 'k-auto-on' : ''}`}
-          title={kanban.autoCollect
-            ? 'Auto-Einsammeln AN: neue Aufgaben erscheinen automatisch, erledigte Quellen haken ihre Tickets ab — Klick schaltet aus'
-            : 'Auto-Einsammeln: dieses Kanban hält sich selbst mit den offenen Aufgaben aller Boards aktuell'}
-          onClick={() => updateNodeData(id, { autoCollect: !kanban.autoCollect })}
-        >
-          <IRedo size={12} />
-        </button>
-        <button
-          className={`kanban-addcol nodrag ${collectOpen || kanban.collectFrom ? 'k-auto-on' : ''}`}
-          title="Einsammeln konfigurieren: Quell-Boards wählen · Tickets board-weise entfernen · entfernte Tickets wieder zulassen"
-          onClick={() => setCollectOpen((o) => !o)}
-        >
-          <ISettings size={12} />
-        </button>
-        <button
-          className={`kanban-addcol k-archiv-head nodrag ${archivOpen || kanban.autoArchiv ? 'k-auto-on' : ''}`}
-          title={`Archiv: ${archiv.length} archivierte${archiv.length === 1 ? 's Ticket' : ' Tickets'}${kanban.autoArchiv
-            ? ` · Automatik AN — Erledigtes wandert nach ${anzeigeTage} Tag${anzeigeTage === 1 ? '' : 'en'} ins Archiv`
-            : ' · Auto-Archivierung hier einschalten'}`}
-          onClick={() => setArchivOpen((o) => !o)}
-        >
-          <IArchive size={12} />
-          {archiv.length > 0 && <em className="k-head-count">{archiv.length}</em>}
-        </button>
-        <button className="kanban-addcol nodrag" title="Spalte hinzufügen" onClick={addCol}><IPlus size={12} /></button>
       </div>
+      {statusChips.length > 0 && <div className="kanban-status nodrag">{statusChips}</div>}
+      {menuPos && createPortal(
+        <div
+          ref={menuRef}
+          className="ebenen-menu k-menu"
+          role="menu"
+          style={menuPos.hoch
+            ? { left: menuPos.x, bottom: window.innerHeight - menuPos.y + 4, top: 'auto' }
+            : { left: menuPos.x, top: menuPos.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="ebenen-menu-titel">Aufgaben</div>
+          <button onClick={() => { setMenuPos(null); syncFromBoards(true); }}><IDownload size={14} /><span>Aus allen Boards einsammeln</span></button>
+          <button className={kanban.autoCollect ? 'on' : ''} onClick={() => { setMenuPos(null); updateNodeData(id, { autoCollect: !kanban.autoCollect || undefined }); }}>
+            <IRedo size={14} /><span>Auto-Einsammeln {kanban.autoCollect ? 'ausschalten' : 'einschalten'}</span>
+          </button>
+          <button onClick={() => { setMenuPos(null); setCollectOpen(true); }}><ISettings size={14} /><span>Einsammeln konfigurieren …</span></button>
+          <div className="ebenen-menu-titel">Archiv</div>
+          <button className="k-menu-archiv" onClick={() => { setMenuPos(null); setArchivOpen(true); }}>
+            <IArchive size={14} /><span>Archiv{archiv.length > 0 ? ` (${archiv.length})` : ''} und Automatik …</span>
+          </button>
+          {erledigteZumArchivieren.length > 0 && (
+            <button onClick={() => { setMenuPos(null); archiviereTickets(erledigteZumArchivieren.map((it) => it.id)); }}>
+              <IArchive size={14} /><span>Erledigte archivieren ({erledigteZumArchivieren.length})</span>
+            </button>
+          )}
+          <div className="ebenen-menu-titel">Ansicht</div>
+          <button className={kanban.kompakt ? 'on' : ''} onClick={() => { setMenuPos(null); updateNodeData(id, { kompakt: !kanban.kompakt || undefined }); }}>
+            <ICompact size={14} /><span>Kompakte Tickets {kanban.kompakt ? 'aus' : 'an'}</span>
+          </button>
+          <button onClick={() => { setMenuPos(null); addCol(); }}><IPlus size={14} /><span>Spalte hinzufügen</span></button>
+        </div>,
+        document.body,
+      )}
       {filterOpen && (
         <div className="kanban-filter nodrag">
           <input
@@ -956,7 +1084,9 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   </button>
                 )}
               </div>
-              {!grouped
+              {colIdx === done && !grouped
+                ? renderDoneGroups(colItems)
+                : !grouped
                 ? colItems.flatMap((it, i) => [
                     // M215: Einfügemarke zeigt, WO das Ticket landet
                     ...(dropAt?.col === colIdx && dropAt.index === i && dragId !== it.id
@@ -992,10 +1122,17 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           onKeyDown={(e) => e.key === 'Enter' && addItem()}
         />
       </div>
-      {collectOpen && (
+      {collectOpen && createPortal(
+        /* M295: als Fenster über der App, wie das Ticket-Fenster — das Panel
+           klappte in der Karte auf und verdeckte die Spalten */
+        <div className="modal-backdrop ticket-modal-backdrop" onClick={() => setCollectOpen(false)}>
         <div
-          className="ticket-detail collect-panel nodrag"
+          className="ticket-modal k-panel-modal collect-panel nodrag"
           tabIndex={-1}
+          ref={collectRef}
+          role="dialog"
+          aria-label="Einsammeln konfigurieren"
+          onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.key === 'Escape' && setCollectOpen(false)}
         >
           <div className="ticket-detail-head">
@@ -1073,16 +1210,23 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
               {kanban.ignoreKeys!.length} dauerhaft entfernte(s) Ticket(s) wieder zulassen
             </button>
           )}
-          <div className="ticket-detail-foot">Gilt für ⭳ Einsammeln und ⟳ Auto-Abgleich · Esc schließt</div>
+          <div className="ticket-detail-foot">Gilt für Einsammeln und Auto-Abgleich · Esc schließt</div>
         </div>
+        </div>,
+        document.body,
       )}
-      {archivOpen && (
+      {archivOpen && createPortal(
         /* M293: Archiv-Panel — Automatik einstellen, Archiviertes zurückholen
-           oder endgültig löschen. Neueste zuerst, wie ein Protokoll. */
+           oder endgültig löschen. Neueste zuerst, wie ein Protokoll.
+           M295: als Fenster über der App statt in der Karte. */
+        <div className="modal-backdrop ticket-modal-backdrop" onClick={() => setArchivOpen(false)}>
         <div
-          className="ticket-detail collect-panel k-archiv-panel nodrag"
+          className="ticket-modal k-panel-modal collect-panel k-archiv-panel nodrag"
           tabIndex={-1}
           ref={archivRef}
+          role="dialog"
+          aria-label="Archiv"
+          onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.key === 'Escape' && setArchivOpen(false)}
         >
           <div className="ticket-detail-head">
@@ -1115,9 +1259,9 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             />
             <span>Tag{anzeigeTage === 1 ? '' : 'en'}</span>
           </div>
-          <div className="collect-hint">Archivierte Tickets verlassen die Spalten, bleiben aber hier — sie zählen nirgends mehr mit (WIP-Limit, Aufgaben-Zentrale, Einsammeln). ↩ holt ein Ticket zurück nach „{cols[done]}", ✕ löscht es endgültig.</div>
+          <div className="collect-hint">Archivierte Tickets verlassen die Spalten und zählen nirgends mehr mit. ↩ holt ein Ticket zurück nach „{cols[done]}", ✕ löscht es endgültig.</div>
           {archiv.length === 0 && (
-            <div className="collect-sub-empty">Noch nichts archiviert — erledigte Tickets tragen 🗃, und die Spalte „{cols[done]}" hat „Alle archivieren".</div>
+            <div className="collect-sub-empty">Noch nichts archiviert.</div>
           )}
           {[...archiv].reverse().map((it) => (
             <div className="collect-row k-archiv-row" key={it.id} data-archiv-id={it.id}>
@@ -1137,6 +1281,8 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           )}
           <div className="ticket-detail-foot">Esc schließt · Strg+Z nimmt jeden Archiv-Schritt zurück</div>
         </div>
+        </div>,
+        document.body,
       )}
       {(() => {
         const it = kanban.items.find((x) => x.id === detailId);
@@ -1357,7 +1503,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           document.body,
         );
       })()}
-    </>
+    </div>
   );
 }
 
