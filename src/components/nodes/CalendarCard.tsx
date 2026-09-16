@@ -744,8 +744,8 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
               </>
             ) : (
               <button
-                title="Google Kalender oder Microsoft 365 direkt verbinden — Einrichtung in den Einstellungen"
-                onClick={() => useBoard.getState().setSettingsOpen(true)}
+                title="Google oder Microsoft 365 verbinden (⚙ → Dienste)"
+                onClick={() => useBoard.getState().setSettingsOpen(true, 'dienste')}
               >
                 Konto verbinden… (Einstellungen)
               </button>

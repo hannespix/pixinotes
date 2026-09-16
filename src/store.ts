@@ -432,6 +432,9 @@ interface BoardState {
   helpOpen: boolean;
   helpSection: string | null;
   setHelpOpen: (open: boolean, section?: string | null) => void;
+  /** M300: Bild-Export des aktuellen Boards — ein Fenster aus dem Dock (⋯) */
+  bildExportOpen: boolean;
+  setBildExportOpen: (open: boolean) => void;
 
   /** Physik (Verdrängung/Wurf) global an/aus — aus = Karten dürfen überlappen/stapeln.
    *  M294: Voreinstellung AUS — die ruhige Fläche ist der Normalfall, die
@@ -761,6 +764,8 @@ export const useBoard = create<BoardState>()(
         helpOpen: false,
         helpSection: null,
         setHelpOpen: (open, section = null) => set({ helpOpen: open, helpSection: section }),
+        bildExportOpen: false,
+        setBildExportOpen: (open) => set({ bildExportOpen: open }),
 
         physicsEnabled: false,
         setPhysicsEnabled: (on) => set({ physicsEnabled: on }),

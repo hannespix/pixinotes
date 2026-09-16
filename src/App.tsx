@@ -29,6 +29,7 @@ import { Onboarding } from './components/Onboarding';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { ShareCardsModal } from './components/ShareCardsModal';
 import { HelpOverlay } from './components/HelpOverlay';
+import { BildExport } from './components/BildExport';
 import { GeteiltDialog } from './components/GeteiltDialog';
 import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
@@ -245,6 +246,7 @@ export default function App() {
         <Onboarding />
         <SearchOverlay />
       <HelpOverlay />
+      <BildExport />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
       <GeteiltDialog />
       <LookupPanel />

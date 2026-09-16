@@ -158,6 +158,7 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht im <b>Logo-Menü</b> oben links.</p>
               <ul>
+                <li><b>⚙️ Einstellungen entrümpelt (M300):</b> Vier Reiter statt sechs — <b>Design · Daten · Synchronisation · Dienste</b>, das Alltägliche zuerst. Design ist in Aussehen, Lesbarkeit, Bedienung und Bewegung gegliedert, Erscheinungsbild und die Fokus-Optionen sind Umschalter statt Listen und Häkchen. Unter Daten steht Sichern &amp; Laden ganz oben, der Word-Hinweis ohne Knopf ist weg, die Starter-Umgebung erklärt sich in einem Satz. Die Synchronisation zeigt <b>einen Weg zur Zeit</b> (Ordner, WebDAV oder Dateien-App) statt drei Abschnitte übereinander; Team-Sync verbindet Projekte über einen Wähler statt neun Knöpfe, „Einladen" kopiert den Text und öffnet die E-Mail in einem Schritt, die Dateien-Obergrenze steht als Option am Ende. Dienste bündelt KI, Gehirn (jetzt ein Häkchen) und die Konten — das Microsoft-Konto gilt für Kalender <i>und</i> OneNote, das zweite Formular im OneNote-Import ist weg. Der <b>Bild-Export</b> ist eine Aktion am Board (Dock ⋯ → „Als Bild exportieren") und keine Einstellung mehr; der Fuß mit Version und Rechtlichem entfällt (steht im Logo-Menü), und die Seg-Schalter zeigen endlich, was gewählt ist.</li>
                 <li><b>🤫 Die App redet weniger (M299):</b> Jeder Hinweis ist ein Satz — Toasts, Sprechblasen und die Erklärtexte in den Einstellungen sind gekürzt; eine Sprechblase nennt, was ein Knopf tut, sie erklärt nicht. Die <b>Hilfe</b> hat sechs Abschnitte statt dreizehn (Erste Schritte · Bereiche, Projekte, Boards · Karten &amp; Module · Aufgaben &amp; Erinnerungen · Speichern, Sync &amp; Teilen · Tastenkürzel), Impressum und Datenschutz stehen darunter, und <b>„Was ist neu"</b> ist diese eigene Seite hinter dem Logo-Menü statt ein Abschnitt in der Hilfe. Die Hilfetexte sind neu geschrieben: kurz, ein Gedanke pro Punkt, ohne Begründungen und Fassungsnummern — und sie beschreiben die Oberfläche von heute (⋯-Menüs, Navigation links, Netz in der Übersicht, Kachel).</li>
                 <li><b>🧩 Kachel-Ansicht für große Module (M298):</b> Kanban, Zeitplan, Wochenplan und Protokoll-Reihe wachsen mit ihrem Inhalt und sprengen den Bildschirm. Jetzt lassen sie sich zur <b>Kachel</b> zusammenklappen (Karte auswählen → ⋯ → „Als Kachel zeigen", beim Kanban auch im ⋯ der Kopfzeile): Typ, Titel und zwei bis drei Zeilen Kennzahlen — Tickets je Spalte und die nächste Frist, laufende Vorgänge und der nächste Endtermin, die Blöcke von heute, Sitzungen und Beschlüsse. „Öffnen" oder Doppelklick zeigt das ganze Modul im Fokus, „Ausklappen" bringt es in der alten Größe zurück aufs Board. Das ist die zweite der „zwei Ansichten" aus dem Konzept.</li>
                 <li><b>🧭 Eine Navigation statt drei (M297):</b> Ab Tablet-Breite ist die linke Spalte ein <b>fester Rahmen</b> — ein Band von oben bis unten mit Logo, Aktionen und dem ganzen Baum <b>Bereich › Projekt › Board › Karte</b>; die Fläche beginnt rechts davon, nichts rutscht mehr darunter. Das aktive Projekt und das aktive Board sind aufgeklappt, alles andere lässt sich aufklappen, die Suche oben findet Boards und Karten. Die <b>rechte Seitenleiste</b> und das <b>Navigator-Popup</b> aus der Brotkrume sind darin aufgegangen; das <b>Netz</b> gibt es nur noch in der Übersicht (🏠). Am Telefon bleibt die Kopfleiste mit Board-Wähler, die Brotkrume öffnet denselben Baum als Ausstülpung. Alt+U blendet die Spalte ein und aus, Alt+W springt in ihre Suche.</li>
@@ -332,12 +333,12 @@ export function HelpOverlay() {
               <h4>Weitere Module</h4>
               <ul>
                 <li><b>Σ Rechen-Tabelle:</b> „=" beginnt eine Formel (<code>=SUMME(B2:B9)</code>, <code>=WENN(A1&gt;100;"über Plan";"im Rahmen")</code>), deutsche und englische Namen. Σ setzt Auto-Summen; <code>.xlsx</code> aufs Board ziehen, CSV zurück.</li>
-                <li><b>🗓️ Kalender:</b> Monat/Woche mit Aufgaben, Zeitplänen und Meilensteinen; eigene Termine per Klick auf den Tag; ICS-Import, -Abo und -Export. Google / Microsoft 365 unter ⚙ → Kalender (nur lesen).</li>
+                <li><b>🗓️ Kalender:</b> Monat/Woche mit Aufgaben, Zeitplänen und Meilensteinen; eigene Termine per Klick auf den Tag; ICS-Import, -Abo und -Export. Google / Microsoft 365 unter ⚙ → Dienste (nur lesen).</li>
                 <li><b>📊 Diagramm (Mermaid):</b> acht Vorlagen, alles direkt im Bild bearbeiten, die Werkzeuge schweben unter dem Diagramm; ✨ ändert es per Sprache.</li>
                 <li><b>▢ Prozess-Formen:</b> Schritt, Entscheidung, Start/Ende; Doppelklick beschriftet.</li>
                 <li><b>📎 Datei, Bild, PDF, E-Mail:</b> Vorschau statt Dateiname; ＋/−, Strg+Rad und Doppelklick zoomen. Der Inhalt liegt in der Ablage dieses Geräts, im Team-Projekt zusätzlich im Anlagen-Ordner. Doppelklick auf den Titel benennt um, der Dateiname bleibt.</li>
                 <li><b>🧩 Eigene App (HTML):</b> läuft abgeschottet in der Karte, Start per ▶; Vollbild, eigener Tab und Speicherstand ins Team über das ⋮ der Karte. „App von URL" holt ein Tool aus dem Netz.</li>
-                <li><b>📓 OneNote &amp; Word:</b> ⚙ → Daten holt Notizbücher aus Microsoft 365 (Notizbuch → Bereich, Abschnitt → Board, Seite → Notiz). Ohne Konto die <code>.docx</code> aufs Board ziehen.</li>
+                <li><b>📓 OneNote &amp; Word:</b> ⚙ → Daten holt Notizbücher aus Microsoft 365 (Notizbuch → Bereich, Abschnitt → Board, Seite → Notiz), das Konto steht unter ⚙ → Dienste. Ohne Konto die <code>.docx</code> aufs Board ziehen.</li>
                 <li><b>Rahmen:</b> ＋ → Weitere Module → Rahmen. Er fängt Karten ein, deren Mittelpunkt in ihm liegt, und nimmt sie beim Ziehen mit.</li>
               </ul>
               <h4>🔗 Verbinden &amp; Präsentieren</h4>
@@ -356,11 +357,11 @@ export function HelpOverlay() {
                 <li><b>↩ Backlinks</b> unten rechts zeigen, wer auf dieses Board verweist.</li>
                 <li><b>Eigenschaften</b> (⋯): schlüssel = wert, durchsuchbar und im Export. <b>Vorlagen:</b> jede Karte sichern, einfügen über ＋ → Weitere Module.</li>
                 <li><b>Nachschlagen</b> (⋯): Wikipedia-Treffer zur ersten Zeile der Karte, dazu die Suchseiten von DuckDuckGo, Google, Bing und OpenStreetMap.</li>
-                <li><b>🧠 Gehirn</b> (⚙ → KI): Suche nach Bedeutung, verwandte Karten im ↩-Panel, Themen-Inseln im Gehirn-Puls (✅), Verbindungs-Vorschläge im Netz, „Frag dein Gehirn" in der Suche. Ollama, im Browser oder Cloud — der Index bleibt lokal.</li>
+                <li><b>🧠 Gehirn</b> (⚙ → Dienste): Suche nach Bedeutung, verwandte Karten im ↩-Panel, Themen-Inseln im Gehirn-Puls (✅), Verbindungs-Vorschläge im Netz, „Frag dein Gehirn" in der Suche. Ollama, im Browser oder Cloud — der Index bleibt lokal.</li>
               </ul>
               <h4>✨ KI</h4>
               <ul>
-                <li><b>Anbieter</b> unter ⚙ → KI: Gratis, OpenRouter, eigener Schlüssel oder Ollama (alles lokal). Schlüssel bleiben auf dem Gerät.</li>
+                <li><b>Anbieter</b> unter ⚙ → Dienste: Gratis, OpenRouter, eigener Schlüssel oder Ollama (alles lokal). Schlüssel bleiben auf dem Gerät.</li>
                 <li>Dock ⋯ → <b>„KI-Assistent"</b> fürs Board, Auswahl ⋯ → <b>„KI-Aktionen"</b> für markierte Karten: Freitext, Themen clustern, Aufgaben extrahieren, Diagramm, Briefing, Text verbessern. Bild-Karten gehen als Foto mit, wenn das Modell Bilder versteht.</li>
                 <li>Jede KI-Aktion ist ein einziger Strg+Z-Schritt.</li>
                 <li>Bei Ollama liest PixiNotes die installierten Modelle aus. Antwortet der Server nicht, unterscheidet die App „läuft nicht" und „darf nicht" und zeigt die passende <code>OLLAMA_ORIGINS</code>-Anleitung.</li>
@@ -402,7 +403,7 @@ export function HelpOverlay() {
               <ul>
                 <li>Auswahl → <b>Teilen:</b> Übernahme-Link, WhatsApp, E-Mail, Drucken / PDF, formatiertes Kopieren für Outlook und Word.</li>
                 <li><b>⧉</b> oben kopiert das ganze Board als Link; große Boards werden zur <code>.pixiboard.json</code>-Datei.</li>
-                <li><b>Export:</b> Markdown-Ordner (Obsidian), Bild des Boards (PNG / SVG / PDF), .ics für Kalender.</li>
+                <li><b>Export:</b> ⚙ → Daten schreibt alle Boards als Markdown-Ordner (Obsidian). Dock ⋯ → „Als Bild exportieren" gibt das aktuelle Board als PNG, SVG oder PDF aus; .ics kommt aus Aufgaben und Kalender.</li>
                 <li><b>Android:</b> das installierte PixiNotes steht im Teilen-Menü jeder App (Foto, Seite, PDF, Text). Fehlt es trotz Installation: deinstallieren und in Chrome neu installieren.</li>
                 <li><b>iPhone / iPad:</b> „Kopieren" in Fotos, dann ＋ → Weitere Module → „Aus Zwischenablage einfügen".</li>
               </ul>

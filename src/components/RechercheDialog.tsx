@@ -89,7 +89,7 @@ export function RechercheDialog() {
         </div>
         <div className="modal-body">
           {!aiReady(ai) && (
-            <div className="modal-note">Zuerst in ⚙️ → KI einen Anbieter wählen — „Gratis" geht ohne Schlüssel.</div>
+            <div className="modal-note">Zuerst in ⚙ → Dienste einen Anbieter wählen — „Gratis" geht ohne Schlüssel.</div>
           )}
           {phase === 'eingabe' && (
             <>

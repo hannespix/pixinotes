@@ -11,7 +11,7 @@ import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
 import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
-  IAppWindow, IArchive, IArrange, IBookmark, ICalendar, IChevronR, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
+  IAppWindow, IArchive, IArrange, IBookmark, ICalendar, IChevronR, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISigma, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
 } from './Icons';
@@ -489,6 +489,15 @@ export function Dock() {
               <IGridLayout size={16} /> Anordnen &amp; Hintergrund …
             </button>
             <div className="dock-menu-label">Board</div>
+            {/* M300: Der Bild-Export gehört zum Board, nicht in die Einstellungen —
+                er braucht das Board auf dem Schirm (er fotografiert die Fläche). */}
+            <button
+              onClick={() => { setMoreMenu(false); useBoard.getState().setBildExportOpen(true); }}
+              title="Als Bild exportieren"
+              aria-label="Als Bild exportieren"
+            >
+              <IDownload size={16} /> Als Bild exportieren …
+            </button>
             {archivedCount > 0 && (
               <button
                 className={showArchived ? 'on' : ''}

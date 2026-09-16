@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useBoard } from '../store';
-import { IExternal, IEye, IHelp, IReload, ISettings } from './Icons';
+import { IExternal, IEye, IHelp, IReload } from './Icons';
 
 /**
  * M210: Das Logo ist der Zugang zu „Über PixiNotes".
@@ -90,9 +90,6 @@ export function AboutMenu() {
           </button>
           <button role="menuitem" onClick={go(() => setHelpOpen(true, 'start'))}>
             <IHelp size={14} /> Hilfe & Anleitung
-          </button>
-          <button role="menuitem" onClick={go(() => setSettingsOpen(true, 'sync'))}>
-            <ISettings size={14} /> Deine Daten & Synchronisation
           </button>
           <div className="about-sep" />
           <button role="menuitem" onClick={go(() => setHelpOpen(true, 'impressum'))}>
