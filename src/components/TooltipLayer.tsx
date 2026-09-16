@@ -30,7 +30,9 @@ export function TooltipLayer() {
 
     const show = (el: HTMLElement) => {
       const text = el.dataset.tip;
-      if (!text) return;
+      // M296: Ist das Element inzwischen weg (Leiste verschwunden, Fenster
+      // aufgegangen), gibt es nichts mehr zu erklären
+      if (!text || !el.isConnected) return;
       const r = el.getBoundingClientRect();
       const below = r.top < 70; // oben kein Platz → unter dem Element zeigen
       setTip({ text, x: r.left + r.width / 2, y: below ? r.bottom + 9 : r.top - 9, below, taste: kuerzelVon(el) });
@@ -75,6 +77,10 @@ export function TooltipLayer() {
      */
     const beiKlick = (e: PointerEvent) => { if (e.pointerType !== 'touch') hide(); };
     document.addEventListener('pointerdown', beiKlick, true);
+    // M296: Auch ein Tastendruck nimmt sie weg — Alt+T öffnete die
+    // Aufgaben-Zentrale, und die Sprechblase der Auswahl-Leiste blieb stehen,
+    // obwohl die Leiste längst weg war (Bildschirmfoto der UI-Durchsicht).
+    document.addEventListener('keydown', hide, true);
     document.addEventListener('mouseover', over, true);
     document.addEventListener('mouseout', out, true);
     document.addEventListener('mousedown', hide, true);
@@ -82,6 +88,7 @@ export function TooltipLayer() {
     window.addEventListener('blur', hide);
     return () => {
       document.removeEventListener('pointerdown', beiKlick, true);
+      document.removeEventListener('keydown', hide, true);
       document.removeEventListener('mouseover', over, true);
       document.removeEventListener('mouseout', out, true);
       document.removeEventListener('mousedown', hide, true);

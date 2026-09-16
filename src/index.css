@@ -3712,6 +3712,14 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .k-panel-modal.collect-panel { max-height: 84vh; }
 @media (pointer: coarse) { .k-done-archiv { opacity: 1; } }
 
+/* ---------- Dock- und Leisten-Schliff (M296) ---------- */
+.dock-menu-mehr { color: var(--muted) !important; }
+.dock-menu-mehr svg { transition: transform 0.12s; }
+.dock-menu-mehr.auf svg { transform: rotate(90deg); }
+/* Der Toast weicht nach oben aus, solange ein Dock-Menü offen ist — er lag
+   genau über dessen unteren Einträgen (Bildschirmfoto der UI-Durchsicht) */
+body:has(.dock-menu) .toast { bottom: auto; top: calc(16px + var(--safe-top, 0px)); transform: translateX(-50%); }
+
 /* ---------- Präsentation: weniger Totraum auf kleinen Screens (M69) ---------- */
 @media (max-width: 860px) {
   .presenter-slide { margin: 0 10px 8px; padding: 18px 20px; font-size: 15px; }
@@ -6243,4 +6251,11 @@ audio.file-media { height: 40px; }
     border-radius: 16px; overflow: auto;
   }
   .modal.geteilt-modal .modal-head { border-radius: 16px 16px 0 0; }
+}
+
+/* ---------- M296: Telefon — Rechtliches liegt im Logo-Menü, nicht unter dem Dock ---------- */
+/* Steht am Ende des Stylesheets, damit es die Grundregel von .legal-corner sicher überschreibt. */
+@media (max-width: 640px) {
+  .legal-corner { display: none; }
+  .react-flow__attribution { bottom: 84px; }
 }

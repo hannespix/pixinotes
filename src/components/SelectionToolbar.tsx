@@ -6,7 +6,7 @@ import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMail, IMore, IMoveTo, IPen, ITag, ITrash, IType, IUndo, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMore, IMoveTo, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -409,8 +409,9 @@ export function SelectionToolbar() {
           ><IGridLayout size={15} /><span className="sel-label"> Rahmen</span></button>
         </span>
       )}
-      {!framesOnly && <button onClick={copyHtml} title="Formatiert kopieren (Outlook/Word-tauglich)"><ICopy size={15} /><span className="sel-label"> Kopieren</span></button>}
-      {!framesOnly && <button onClick={duplicate} title="Duplizieren"><IDuplicate size={15} /></button>}
+      {/* M296: Sechs Elemente — Duplizieren, Verschieben, Teilen, ⋯, Löschen und
+          der Zähler. „Formatiert kopieren" und „Schrift & Größe" liegen im ⋯. */}
+      {!framesOnly && <button onClick={duplicate} title="Duplizieren" aria-label="Duplizieren"><IDuplicate size={15} /></button>}
       {single && (
         <span className="sel-ai-wrap">
           {menu === 'attr' && menuPortal('sel-attr-menu', (
@@ -526,9 +527,17 @@ export function SelectionToolbar() {
             className={menu === 'move' ? 'ai-on' : ''}
             data-smbtn
             onClick={toggleMenu('move')}
-            title="In ein anderes Board verschieben — Rahmen nehmen ihren kompletten Inhalt mit; Verbindungen, Kommentare und geankerte Markierungen wandern ebenfalls"
+            title="In ein anderes Board verschieben"
+            aria-label="Verschieben"
           ><IMoveTo size={15} /></button>
         </span>
+      )}
+      {!framesOnly && (
+        <button
+          onClick={() => useBoard.getState().setShareCards([...selected, ...selFrames].map((n) => n.id))}
+          title="Teilen"
+          aria-label="Teilen"
+        ><IShare size={15} /></button>
       )}
       {!framesOnly && (
         <span className="sel-ai-wrap">
@@ -585,12 +594,8 @@ export function SelectionToolbar() {
             const allArchived = selected.every((n) => n.archived);
             return (
               <>
-                <button
-                  onClick={() => { setMenu(null); useBoard.getState().setShareCards([...selected, ...selFrames].map((n) => n.id)); }}
-                  title="Teilen & Export: Übernahme-Link, WhatsApp, E-Mail, Drucken, PDF, Kopieren"
-                  aria-label="Teilen"
-                >
-                  <IMail size={14} /> Teilen &amp; Export …
+                <button onClick={() => { setMenu(null); void copyHtml(); }} title="Formatiert kopieren, für Outlook und Word">
+                  <ICopy size={14} /> Formatiert kopieren
                 </button>
                 <button
                   onClick={() => {
@@ -598,7 +603,7 @@ export function SelectionToolbar() {
                     const first = nodesToText([selected[0]]).split('\n').find((l) => l.trim())?.trim() ?? '';
                     setLookup(first.replace(/^[#\-*\d.\s☐☑]+/, '').slice(0, 80));
                   }}
-                  title="Wikipedia fein durchsuchen (mehrere Treffer) + grobe Websuche-Links — Begriff kommt aus der ersten Zeile der Karte"
+                  title="Wikipedia und Websuche zur ersten Zeile der Karte"
                 >
                   <IGlobe size={14} /> Nachschlagen (Wikipedia &amp; Web)
                 </button>
@@ -629,10 +634,12 @@ export function SelectionToolbar() {
                   </>
                 )}
                 <div className="sel-attr-title">Werkzeuge</div>
-                {/* M267: „Schrift & Größe" steht NICHT mehr hier drin — es hat
-                    jetzt einen eigenen Knopf direkt in der Leiste. Zwei Wege zu
-                    derselben Sache waren genau der Grund für „zu viel
-                    unterschiedliche bearbeitungs-orte" (User-Befund). */}
+                {/* M296: „Schrift & Größe" liegt hier — und NUR hier. M267 hatte
+                    ihm einen eigenen Knopf in der Leiste gegeben; die Leiste soll
+                    aber sechs Elemente haben, und ein Weg reicht. */}
+                <button onClick={() => setMenu('font')} title="Schrift & Größe" aria-label="Schrift & Größe">
+                  <IType size={14} /> Schrift &amp; Größe …
+                </button>
                 {aiReady(ai) && (
                   <button onClick={() => setMenu('ai')} title="KI-Aktionen auf die Auswahl" aria-label="KI-Aktionen">
                     <IWand size={14} /> KI-Aktionen …
@@ -682,21 +689,11 @@ export function SelectionToolbar() {
               </>
             );
           })())}
-          {/* M267: Schrift & Größe als eigener Knopf — ein Klick statt ⋯ →
-              Werkzeuge → Schrift & Größe. Textformatierung ist keine seltene
-              Sonderaktion und gehört nicht ins Restemenü. */}
           <button
-            className={menu === 'font' ? 'ai-on' : ''}
-            data-smbtn
-            onClick={toggleMenu('font')}
-            title="Schrift & Größe der Karte(n) — Klein · Standard · Groß · Riesig, Schriftart, zurück auf Standard"
-            aria-label="Schrift & Größe"
-          ><IType size={15} /></button>
-          <button
-            className={menu === 'more' || menu === 'attr' || menu === 'ai' || menu === 'align' || aiBusy ? 'ai-on' : ''}
+            className={menu === 'more' || menu === 'attr' || menu === 'ai' || menu === 'align' || menu === 'font' || aiBusy ? 'ai-on' : ''}
             data-smbtn
             onClick={toggleMenu('more')}
-            title="Mehr: Teilen · Nachschlagen · Eigenschaften · Vorlage · Kommentar · KI · Ausrichten · Auto-Größe · Archiv"
+            title="Mehr"
             aria-label="Mehr"
           ><IMore size={15} /></button>
         </span>

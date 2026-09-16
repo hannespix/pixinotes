@@ -11,8 +11,8 @@ import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
 import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
-  IAppWindow, IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
-  IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMagnet, IMinutes, IMore, IMousePointer, INote,
+  IAppWindow, IArchive, IArrange, IBookmark, ICalendar, IChevronR, ICircles, ICompact, IDiagram, IDiamond, IEraser, IFlowH, IFlowV,
+  IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISigma, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
 } from './Icons';
 
@@ -42,7 +42,6 @@ export function Dock() {
    * morphen animiert (cubic-out, leicht gestaffelt) an ihre Zielplätze.
    */
   const [arrangeMenu, setArrangeMenu] = useState(false);
-  const physicsEnabled = useBoard((s) => s.physicsEnabled);
   const setPhysicsEnabled = useBoard((s) => s.setPhysicsEnabled);
   const showArchived = useBoard((s) => s.showArchived);
   const setShowArchived = useBoard((s) => s.setShowArchived);
@@ -166,6 +165,9 @@ export function Dock() {
   const removeTemplate = useBoard((s) => s.removeTemplate);
   const focusNode = useBoard((s) => s.focusNode);
   const [addMenu, setAddMenu] = useState(false);
+  // M296: Das ＋-Menü zeigt fünf Dinge; der Rest liegt hinter „Weitere Module".
+  // Bleibt in der Sitzung aufgeklappt, wenn man es einmal aufgeklappt hat.
+  const [mehrModule, setMehrModule] = useState(false);
   const [drawMenu, setDrawMenu] = useState(false);
   const [aiMenu, setAiMenu] = useState(false);
   // M198: ⋯-Menü bündelt die selteneren Aktionen (KI, Anordnen, Physik, Archiv) —
@@ -306,95 +308,78 @@ export function Dock() {
       <div className="dock-add-wrap">
         {addMenu && (
           <div className="dock-menu">
-            <div className="dock-menu-label">Notizen &amp; Boards</div>
+            {/* M296: Fünf Dinge zuerst, der Rest hinter „Weitere Module". Vorher
+                standen 22 Einträge in sechs Gruppen untereinander, länger als
+                der Bildschirm — jede neue Modulart war unten angehängt worden. */}
             <button onClick={() => add(() => makeNote(centerPos()))}><INote size={16} /> Notiz</button>
-            <button
-              onClick={() => add(() => {
-                const heading = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-                return makeNote(centerPos(), {
-                  color: 'white',
-                  blocks: [
-                    { type: 'heading', props: { level: 3 }, content: heading },
-                    { type: 'paragraph', content: '' },
-                  ],
-                });
-              })}
-              title="Notiz mit heutigem Datum als Überschrift (Daily Note)"
-            >
-              <ICalendar size={16} /> Tagesnotiz
-            </button>
             <button onClick={() => add(() => makeKanban(centerPos(420, 200)))}><IKanban size={16} /> Kanban-Board</button>
-            <button
-              onClick={() => add(() => makeSheet(centerPos(460, 300)))}
-              title="Tabelle, die rechnet: =SUMME(A1:A5), =MITTELWERT(…), =WENN(…) — mit Σ für Autosummen. Excel-Dateien einfach aufs Board ziehen."
-            >
-              <ISigma size={16} /> Rechen-Tabelle
-            </button>
-            <button
-              onClick={() => add(() => makeFrame(centerPos(640, 420)))}
-              title="Benannter Rahmen: gruppiert Karten optisch und nimmt sie beim Verschieben (an der Titel-Leiste) mit. Nicht zu verwechseln mit dem Bereich in der Übersicht — das ist die oberste Ebene über Projekten und Boards."
-            >
-              <IFrame size={16} /> Rahmen
-            </button>
-            <div className="dock-menu-label">Planung</div>
+            <button onClick={() => add(() => makeSheet(centerPos(460, 300)))} title="Tabelle, die rechnet — Excel-Dateien lassen sich auch aufs Board ziehen"><ISigma size={16} /> Rechen-Tabelle</button>
+            <button onClick={() => anyFileRef.current?.click()} title="Bilder, PDFs, E-Mails, Excel, Word und mehr"><IPaperclip size={16} /> Datei oder Bild</button>
             <button onClick={() => add(() => makeGantt(centerPos(560, 240)))}><IGantt size={16} /> Zeitplan (Gantt)</button>
-            <button onClick={() => add(() => makeCalendar(centerPos(430, 340)))}><ICalendar size={16} /> Kalender (Monat)</button>
             <button
-              onClick={() => add(() => makeWeek(centerPos(620, 440)))}
-              title="Stundenraster: Tage als Spalten, Uhrzeiten als Zeilen — für Stundenplan, Arbeitswoche oder Dienstplan"
+              className={`dock-menu-mehr ${mehrModule ? 'auf' : ''}`}
+              aria-expanded={mehrModule}
+              onClick={() => setMehrModule((o) => !o)}
             >
-              <IWeek size={16} /> Wochenplan (Stunden)
+              <IChevronR size={14} /> Weitere Module
             </button>
-            <button
-              onClick={() => add(() => makeMinutes(centerPos(380, 420)))}
-              title="Protokoll-Reihe: alle Sitzungen einer wiederkehrenden Besprechung in EINER Karte — offene Punkte wandern automatisch in die nächste Sitzung"
-            >
-              <IMinutes size={16} /> Protokoll-Reihe
-            </button>
-            <button
-              onClick={() => add(() => makeTime(centerPos(460, 380)))}
-              title="Arbeitszeit per Start/Stop erfassen — Arbeit und Pause; Besonderheiten in die Bemerkung, Nacherfassen direkt in der Liste"
-            >
-              <ITimer size={16} /> Zeiterfassung
-            </button>
-            <button onClick={() => add(() => makeMermaid(centerPos(380, 240)))}><IDiagram size={16} /> Diagramm (Mermaid)</button>
-            <div className="dock-menu-label">Prozess-Formen</div>
-            <button onClick={() => addShape('process')}><ISquare size={16} /> Schritt</button>
-            <button onClick={() => addShape('decision')}><IDiamond size={16} /> Entscheidung</button>
-            <button onClick={() => addShape('terminator')}><IPill size={16} /> Start/Ende</button>
-            <div className="dock-menu-label">Dateien</div>
-            <button
-              onClick={() => fotoRef.current?.click()}
-              title="Foto oder Bild einfügen — am iPhone/iPad öffnet das direkt die Fotomediathek (oder die Kamera). Mehrere auf einmal gehen auch."
-            >
-              <IImage size={16} /> Foto / Bild einfügen
-            </button>
-            <button
-              onClick={() => void ausZwischenablage()}
-              title="Bild aus der Zwischenablage einfügen — der Weg vom iPhone/iPad: in der Fotos-App auf „Kopieren“ tippen und hier einfügen."
-            >
-              <ICopy size={16} /> Aus Zwischenablage einfügen
-            </button>
-            <button
-              onClick={() => anyFileRef.current?.click()}
-              title="Lokale Dateien aufs Board holen (auch mehrere auf einmal): Bilder, PDFs mit Vorschau, E-Mails (.eml/.msg), Kalender (.ics), HTML-Apps, Board-Dateien — alles andere als Datei-Karte. Gehört das Board zu einem Team-Projekt, landet automatisch eine Kopie im Sync-Ordner. Geht auch per Drag & Drop."
-            >
-              <IPaperclip size={16} /> Datei einfügen
-            </button>
-            <button
-              onClick={() => happFileRef.current?.click()}
-              title="Eine HTML-Datei als lauffähige App-Karte einbetten — sie läuft abgeschottet in der Karte, mit Start/Stop und Vollbild. Geht auch per Drag & Drop aufs Board."
-            >
-              <IAppWindow size={16} /> Eigene App (HTML)
-            </button>
-            <button
-              onClick={() => void addHtmlAppUrl()}
-              title="HTML-App direkt von einer Internet-Adresse holen: Erlaubt die Quelle das Kopieren (z. B. GitHub), wird sie eine normale lokale App-Karte — sonst wird sie live eingebettet (braucht dann Internet)."
-            >
-              <IAppWindow size={16} /> App von URL
-            </button>
-            <div className="dock-menu-label">Verknüpfen</div>
-            <button onClick={() => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board'); }}><IFolder size={16} /> Portal zu Board</button>
+            {mehrModule && (
+              <>
+                <div className="dock-menu-label">Notizen &amp; Boards</div>
+                <button
+                  onClick={() => add(() => {
+                    const heading = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+                    return makeNote(centerPos(), {
+                      color: 'white',
+                      blocks: [
+                        { type: 'heading', props: { level: 3 }, content: heading },
+                        { type: 'paragraph', content: '' },
+                      ],
+                    });
+                  })}
+                  title="Notiz mit dem heutigen Datum als Überschrift"
+                >
+                  <ICalendar size={16} /> Tagesnotiz
+                </button>
+                <button
+                  onClick={() => add(() => makeFrame(centerPos(640, 420)))}
+                  title="Benannter Rahmen, der seine Karten beim Verschieben mitnimmt"
+                >
+                  <IFrame size={16} /> Rahmen
+                </button>
+                <div className="dock-menu-label">Planung</div>
+                <button onClick={() => add(() => makeCalendar(centerPos(430, 340)))}><ICalendar size={16} /> Kalender (Monat)</button>
+                <button onClick={() => add(() => makeWeek(centerPos(620, 440)))} title="Stundenraster: Tage als Spalten, Uhrzeiten als Zeilen">
+                  <IWeek size={16} /> Wochenplan (Stunden)
+                </button>
+                <button onClick={() => add(() => makeMinutes(centerPos(380, 420)))} title="Alle Sitzungen einer Besprechung in einer Karte">
+                  <IMinutes size={16} /> Protokoll-Reihe
+                </button>
+                <button onClick={() => add(() => makeTime(centerPos(460, 380)))} title="Arbeitszeit per Start/Stop erfassen">
+                  <ITimer size={16} /> Zeiterfassung
+                </button>
+                <button onClick={() => add(() => makeMermaid(centerPos(380, 240)))}><IDiagram size={16} /> Diagramm (Mermaid)</button>
+                <div className="dock-menu-label">Prozess-Formen</div>
+                <button onClick={() => addShape('process')}><ISquare size={16} /> Schritt</button>
+                <button onClick={() => addShape('decision')}><IDiamond size={16} /> Entscheidung</button>
+                <button onClick={() => addShape('terminator')}><IPill size={16} /> Start/Ende</button>
+                <div className="dock-menu-label">Dateien &amp; Apps</div>
+                <button onClick={() => fotoRef.current?.click()} title="Am iPhone/iPad öffnet das die Fotomediathek oder die Kamera">
+                  <IImage size={16} /> Foto aufnehmen oder wählen
+                </button>
+                <button onClick={() => void ausZwischenablage()} title="Bild aus der Zwischenablage — am iPhone/iPad der Weg aus der Fotos-App">
+                  <ICopy size={16} /> Aus Zwischenablage einfügen
+                </button>
+                <button onClick={() => happFileRef.current?.click()} title="Eine HTML-Datei als lauffähige App-Karte">
+                  <IAppWindow size={16} /> Eigene App (HTML)
+                </button>
+                <button onClick={() => void addHtmlAppUrl()} title="HTML-App von einer Internet-Adresse">
+                  <IAppWindow size={16} /> App von URL
+                </button>
+                <div className="dock-menu-label">Verknüpfen</div>
+                <button onClick={() => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board.'); }}><IFolder size={16} /> Portal zu Board</button>
+              </>
+            )}
             {templates.length > 0 && (
               <>
                 <div className="dock-menu-label">Vorlagen</div>
@@ -421,7 +406,7 @@ export function Dock() {
                 ))}
               </>
             )}
-            <div className="dock-menu-foot">E-Mails (.eml/.msg), Excel (.xlsx), Word (.docx), Bilder &amp; PDFs einfach aufs Board ziehen · Strg+V für Screenshots · Karte auswählen → 🔖 macht sie zur Vorlage</div>
+            <div className="dock-menu-foot">Dateien und E-Mails einfach aufs Board ziehen · Strg+V für Screenshots</div>
           </div>
         )}
         <button
@@ -489,31 +474,27 @@ export function Dock() {
             >
               <IWand size={16} /> KI-Assistent …
             </button>
+            {/* M296: „Aufräumen" ist EIN Knopf mit der Voreinstellung (Verbundenes
+                als Fluss, der Rest als Raster nach Modultyp). Die neun Varianten,
+                Gitter und Hintergrund liegen dahinter. Der Physik-Schalter steht
+                seit M294 in ⚙ → Bedienung (Alt+O bleibt). */}
+            <button
+              onClick={() => { setMoreMenu(false); arrange('flow'); }}
+              disabled={arranging}
+              title="Aufräumen"
+              aria-label="Board aufräumen"
+            >
+              <IArrange size={16} /> Aufräumen
+            </button>
             <button
               onClick={() => { setMoreMenu(false); setArrangeMenu(true); }}
               disabled={arranging}
-              title="Board aufräumen & anordnen (Fluss, Raster, Kreise, Stapel) + Gitter & Hintergrund"
-              aria-label="Board aufräumen"
+              title="Anordnung wählen, Gitter, Hintergrund"
+              aria-label="Anordnen"
             >
-              <IArrange size={16} /> Aufräumen &amp; anordnen …
+              <IGridLayout size={16} /> Anordnen &amp; Hintergrund …
             </button>
             <div className="dock-menu-label">Board</div>
-            <button
-              className={physicsEnabled ? 'on' : ''}
-              onClick={() => {
-                setPhysicsEnabled(!physicsEnabled);
-                showToast(physicsEnabled
-                  ? '🧲 Physik AUS — Karten dürfen jetzt überlappen und gestapelt werden.'
-                  : '🧲 Physik AN — Karten verdrängen sich wieder und lassen sich werfen.');
-              }}
-              title={physicsEnabled
-                ? 'Physik ist AN: Karten verdrängen sich und lassen sich werfen — Klick schaltet aus (zum Stapeln/Überlappen)'
-                : 'Physik ist AUS: Karten dürfen überlappen — Klick schaltet die Verdrängung wieder an'}
-              data-taste="physik"
-              aria-label="Physik umschalten"
-            >
-              <IMagnet size={16} /> Physik {physicsEnabled ? 'AUS' : 'AN'}
-            </button>
             {archivedCount > 0 && (
               <button
                 className={showArchived ? 'on' : ''}
@@ -625,7 +606,7 @@ export function Dock() {
         <button
           className={moreMenu || aiMenu || arrangeMenu || arranging || aiBusy ? 'active' : ''}
           onClick={() => { const o = moreMenu || aiMenu || arrangeMenu; closeDockMenus(); setMoreMenu(!o); }}
-          title="Mehr: KI-Assistent · Aufräumen & Anordnen · Physik · Archiv"
+          title="Mehr"
           aria-label="Mehr"
         >
           <IMore />

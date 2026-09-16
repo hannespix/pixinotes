@@ -55,6 +55,9 @@ import { ErrorBoundary } from './ErrorBoundary';
  */
 const isPhoneFocus = () => window.matchMedia('(pointer: coarse)').matches;
 
+/** M296: Ab so vielen Karten zeigt das Board seine Minimap */
+const MINIMAP_AB = 10;
+
 /** Mit Maus: Doppelklick öffnet den Fokus (siehe onNodeDoubleClick) */
 const istMaus = () => window.matchMedia('(pointer: fine)').matches;
 import { DrawingLayer } from './DrawingLayer';
@@ -990,10 +993,14 @@ export function Board() {
           lineWidth={0.6}
           color={document.documentElement.dataset.theme === 'dark' ? '#4b453c' : '#d8d3c8'}
         />
-        <MiniMap
-          pannable zoomable className="pn-minimap"
-          onClick={(_, pos) => { void setCenter(pos.x, pos.y, { duration: 350, zoom: getViewport().zoom }); }}
-        />
+        {/* M296: Die Minimap erst, wenn das Board groß genug ist, um sich darin
+            zu verlaufen — bei fünf Karten ist sie nur ein grauer Kasten. */}
+        {nodes.length >= MINIMAP_AB && (
+          <MiniMap
+            pannable zoomable className="pn-minimap"
+            onClick={(_, pos) => { void setCenter(pos.x, pos.y, { duration: 350, zoom: getViewport().zoom }); }}
+          />
+        )}
         <Controls showInteractive={false} />
         <SelectionToolbar />
         <DrawingLayer />
