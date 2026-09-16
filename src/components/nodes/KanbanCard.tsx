@@ -961,6 +961,9 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             <ICompact size={14} /><span>Kompakte Tickets {kanban.kompakt ? 'aus' : 'an'}</span>
           </button>
           <button onClick={() => { setMenuPos(null); addCol(); }}><IPlus size={14} /><span>Spalte hinzufügen</span></button>
+          <button className="k-menu-kachel" onClick={() => { setMenuPos(null); useBoard.getState().setKachel([id], true); }}>
+            <ICompact size={14} /><span>Als Kachel zeigen</span>
+          </button>
         </div>,
         document.body,
       )}

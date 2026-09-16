@@ -5,7 +5,7 @@ import { selectActiveBoard, useBoard } from '../store';
 import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
-import { uid, type AppNode } from '../types';
+import { KACHEL_TYPEN, uid, type AppNode } from '../types';
 import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMore, IMoveTo, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
@@ -650,6 +650,19 @@ export function SelectionToolbar() {
                     <IArrange size={14} /> Ausrichten &amp; Verteilen …
                   </button>
                 )}
+                {selected.every((n) => KACHEL_TYPEN.has(n.type ?? '')) && (() => {
+                  // M298: Große Module als Kachel — nur, wenn die ganze Auswahl das kann
+                  const alle = selected.every((n) => n.kachel);
+                  return (
+                    <button
+                      onClick={() => { setMenu(null); useBoard.getState().setKachel(selected.map((n) => n.id), !alle); }}
+                      title={alle ? 'Kachel ausklappen' : 'Als Kachel zeigen'}
+                      aria-label={alle ? 'Kachel ausklappen' : 'Als Kachel zeigen'}
+                    >
+                      <ICompact size={14} /> {alle ? 'Kachel ausklappen' : 'Als Kachel zeigen'}
+                    </button>
+                  );
+                })()}
                 <button
                   className={allAuto ? 'on' : ''}
                   onClick={() => setAutoFit(selected.map((n) => n.id), !allAuto)}

@@ -14,7 +14,7 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import { buildStarter } from './lib/starter';
-import { uid, type AppNode, type CardFont, type CardSize, type TimeSeg } from './types';
+import { KACHEL_TYPEN, uid, type AppNode, type CardFont, type CardSize, type TimeSeg } from './types';
 import { anchorStroke, integrateStroke } from './lib/strokeAnchor';
 import { findFreeSpot, frameMembers } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
@@ -400,6 +400,8 @@ interface BoardState {
   setNodeHeight: (id: string, height: number) => void;
   /** Auto-Größe je Karte an/aus (M103; seit M111 Standard AN — false = manuell gebrochen) */
   setAutoFit: (ids: string[], on: boolean) => void;
+  /** M298: Große Module als Kachel zusammenklappen (on) oder wieder ausklappen */
+  setKachel: (ids: string[], on: boolean) => void;
   /** M200: Schrift/Textgröße pro Karte — null setzt auf Standard zurück */
   setCardTypo: (ids: string[], patch: { font?: CardFont | null; fontSize?: CardSize | null }) => void;
   setNodePosition: (id: string, x: number, y: number) => void;
@@ -1864,6 +1866,27 @@ export const useBoard = create<BoardState>()(
               ids.includes(n.id) ? ({ ...n, autoFit: on ? undefined : false } as AppNode) : n,
             ),
           })),
+
+        setKachel: (ids, on) => {
+          if (ids.length === 0) return;
+          get().pushHistory();
+          const idSet = new Set(ids);
+          patchActive((b) => ({
+            nodes: b.nodes.map((n) => {
+              if (!idSet.has(n.id) || !KACHEL_TYPEN.has(n.type ?? '')) return n;
+              if (on) {
+                if (n.kachel) return n;
+                // Größe merken, damit „Ausklappen" die Karte so zurückbringt, wie sie war
+                const w = (typeof n.width === 'number' ? n.width : n.measured?.width) ?? 420;
+                const h = (typeof n.height === 'number' ? n.height : n.measured?.height) ?? 260;
+                return { ...n, kachel: true, kachelMass: { w, h }, width: 300, height: undefined, autoFit: undefined } as AppNode;
+              }
+              if (!n.kachel) return n;
+              const m = n.kachelMass;
+              return { ...n, kachel: undefined, kachelMass: undefined, width: m?.w ?? n.width, height: m?.h ?? n.height } as AppNode;
+            }),
+          }));
+        },
 
         setCardTypo: (ids, patch) => {
           if (ids.length === 0) return;

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Handle, NodeResizer, Position } from '@xyflow/react';
-import { runDerived, useBoard } from '../../store';
+import { runDerived, selectActiveBoard, useBoard } from '../../store';
+import { kachelInfo } from '../../lib/kachel';
+import type { AppNode } from '../../types';
 
 interface Props {
   id: string;
@@ -28,6 +30,21 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     const b = s.boards.find((x) => x.id === s.activeId);
     return (b?.nodes.find((n) => n.id === id)?.autoFit ?? true) !== false;
   });
+  /**
+   * M298: Als Kachel zeigt die Karte nur ihre Kennzahlen (lib/kachel.ts) —
+   * außer im Fokus, dort steht das ganze Modul. Der Node bleibt derselbe,
+   * nur der Inhalt der Hülle wechselt.
+   */
+  const kachelNode = useBoard((s) => {
+    const n = selectActiveBoard(s)?.nodes.find((x) => x.id === id);
+    return n?.kachel ? n : null;
+  });
+  const imFokus = useBoard((s) => s.focusCard === id);
+  const alsKachel = !!kachelNode && !imFokus;
+  const kachelRef = useRef(alsKachel);
+  kachelRef.current = alsKachel || !!kachelNode;
+  const setKachel = useBoard((s) => s.setKachel);
+  const oeffneKarte = useBoard((s) => s.oeffneKarte);
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const resizingRef = useRef(false);
   // Maus/Finger irgendwo auf der Karte gedrückt? Dann fasst KEINE Automatik
@@ -135,6 +152,9 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     let t: number | undefined;
     const later = (ms: number, force = false) => { window.clearTimeout(t); t = window.setTimeout(() => evalNow(force), ms); };
     const evalNow = (force = false) => {
+      // M298: Eine Kachel wächst nie — und im Fokus stellt das Stylesheet die
+      // Größe; ein Wachsen dort bliebe nach dem Schließen an der Kachel hängen
+      if (kachelRef.current) return;
       // Sperren WARTEN statt verwerfen (M108): am Smartphone folgt fast jede
       // Inhaltsänderung direkt auf eine Berührung der Karte — wurde die
       // Prüfung hier einfach verworfen, kam nie wieder eine nach und die
@@ -230,7 +250,30 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
           onClick={(e) => { e.stopPropagation(); fitOnce(); }}
         >⤢</button>
       )}
-      <div ref={bodyRef} className={`card-body ${className ?? ''}`} style={style}>{children}</div>
+      <div ref={bodyRef} className={`card-body ${className ?? ''}${alsKachel ? ' kachel' : ''}`} style={style}>
+        {alsKachel && kachelNode
+          ? <Kachel node={kachelNode} onAuf={() => setKachel([id], false)} onOeffnen={() => oeffneKarte(useBoard.getState().activeId, id)} />
+          : children}
+      </div>
+    </div>
+  );
+}
+
+/** M298: Die Kachel — Typ, Titel, zwei bis drei Zeilen Kennzahlen, zwei Knöpfe */
+function Kachel({ node, onAuf, onOeffnen }: { node: AppNode; onAuf: () => void; onOeffnen: () => void }) {
+  const info = kachelInfo(node);
+  if (!info) return null;
+  return (
+    <div className="kachel">
+      <div className="kachel-typ">{info.typ}</div>
+      <div className="kachel-titel">{info.titel}</div>
+      {info.zeilen.filter((z) => z.text).map((z, i) => (
+        <div key={i} className={`kachel-zeile${z.warn ? ' warn' : ''}`}>{z.text}</div>
+      ))}
+      <div className="kachel-fuss">
+        <button className="kachel-knopf nodrag" title="Im Fokus öffnen" onClick={(e) => { e.stopPropagation(); onOeffnen(); }}>Öffnen</button>
+        <button className="kachel-knopf nodrag" title="Auf dem Board ausklappen" onClick={(e) => { e.stopPropagation(); onAuf(); }}>⤢ Ausklappen</button>
+      </div>
     </div>
   );
 }

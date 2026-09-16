@@ -3586,6 +3586,24 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .k-panel-modal.collect-panel { max-height: 84vh; }
 @media (pointer: coarse) { .k-done-archiv { opacity: 1; } }
 
+/* ---------- Kachel-Ansicht großer Module (M298) ---------- */
+.card-body.kachel {
+  display: flex !important; flex-direction: column; gap: 4px; padding: 12px 14px 10px;
+  background: var(--surface-card); border-radius: 10px; overflow: hidden;
+}
+.kachel { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kachel-typ { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.kachel-titel { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.25; overflow-wrap: anywhere; }
+.kachel-zeile { font-size: 11.5px; color: var(--muted); line-height: 1.35; overflow-wrap: anywhere; }
+.kachel-zeile.warn { color: #a4231a; font-weight: 600; }
+[data-theme='dark'] .kachel-zeile.warn { color: #ff9a8c; }
+.kachel-fuss { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.kachel-knopf {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--muted); border-radius: 999px;
+  padding: 3px 10px; font-size: 10.5px; font-family: inherit; cursor: pointer;
+}
+.kachel-knopf:hover { color: var(--ink); border-color: var(--accent); }
+
 /* ---------- Dock- und Leisten-Schliff (M296) ---------- */
 .dock-menu-mehr { color: var(--muted) !important; }
 .dock-menu-mehr svg { transition: transform 0.12s; }
