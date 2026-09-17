@@ -192,14 +192,17 @@ await P.mouse.click(1100, 700);
 await P.waitForTimeout(400);
 await P.locator('.note-card').first().click({ position: { x: 4, y: 4 } });
 await P.waitForTimeout(600);
+// M296: „Schrift & Größe" liegt im ⋯ der Leiste — der einzige Weg. Der
+// eigene Knopf aus M267 ist weg, die Leiste hat sechs Elemente.
 const direkt = await P.evaluate(() => {
   const t = document.querySelector('.sel-toolbar');
-  const b = [...(t?.querySelectorAll('button') ?? [])].find((x) => x.getAttribute('aria-label') === 'Schrift & Größe');
-  if (!b) return null;
-  b.click();
-  return true;
+  const inLeiste = [...(t?.querySelectorAll('button') ?? [])].some((x) => x.getAttribute('aria-label') === 'Schrift & Größe');
+  [...(t?.querySelectorAll('button') ?? [])].find((x) => x.getAttribute('aria-label') === 'Mehr')?.click();
+  return inLeiste ? 'doppelt' : true;
 });
-pruefe('T4a die Auswahl-Leiste hat einen eigenen Knopf „Schrift & Größe"', direkt === true);
+await P.waitForTimeout(400);
+await P.evaluate(() => document.querySelector('.sel-more-menu [aria-label="Schrift & Größe"]')?.click());
+pruefe('T4a „Schrift & Größe" liegt im ⋯ der Auswahl-Leiste (nicht als eigener Knopf)', direkt === true, String(direkt));
 await P.waitForTimeout(500);
 const kartenMenue = await P.evaluate(() => {
   const m = document.querySelector('.sel-font-menu');
@@ -262,8 +265,8 @@ const mehr = await P.evaluate(() => {
 });
 console.log('    ⋯-Menü:', JSON.stringify(mehr));
 pruefe('T5a das ⋯-Menü öffnet', !!mehr);
-pruefe('T5b „Schrift & Größe" steht dort NICHT mehr doppelt',
-  !mehr?.some((e) => e.includes('Schrift')), JSON.stringify(mehr));
+pruefe('T5b „Schrift & Größe" steht genau dort — einmal, nicht zusätzlich in der Leiste',
+  mehr?.some((e) => e.includes('Schrift')), JSON.stringify(mehr));
 
 await P.screenshot({ path: `${SD}/m267-karte.png` });
 

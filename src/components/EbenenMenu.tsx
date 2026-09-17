@@ -119,14 +119,14 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
       const url = await boardToShareUrl(board);
       if (url.length > SHARE_URL_LIMIT) {
         downloadBoardFile(board);
-        showToast('Board ist zu groß für einen Link (Bilder!) — stattdessen als Datei gesichert.');
+        showToast('Board zu groß für einen Link, als Datei gesichert.');
         return;
       }
       await navigator.clipboard.writeText(url);
-      showToast('Teilen-Link kopiert — er enthält das komplette Board (serverlos).');
+      showToast('Teilen-Link kopiert, er enthält das komplette Board.');
     } catch {
       downloadBoardFile(board);
-      showToast('Link ging nicht in die Zwischenablage — Board stattdessen als Datei gesichert.');
+      showToast('Link nicht kopierbar, Board als Datei gesichert.');
     }
   };
 

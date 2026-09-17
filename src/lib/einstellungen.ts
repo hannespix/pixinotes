@@ -41,13 +41,13 @@ const FELDER = [
   'syncDateienMb',  // wie viele MB Dateien der Sync-Stand mitnimmt
   'navLinks',        // Navigation links statt oben
   'navBreite',       // Breite des linken Slideouts
-  'sidebar',         // offen? welche Ansicht? wie breit?
   'clickZoom',
   'wheelZoom',
   'cardFocus',
   'fokusEinKlick',
   'fokusVollbild',
   'physicsEnabled', 'stiftZeichnet',
+  'konfetti',        // M294: Konfetti beim Erledigen (Option)
   'gridSnap',
   'showArchived',
   'overviewMode',
@@ -55,7 +55,14 @@ const FELDER = [
 ] as const;
 
 type Feld = (typeof FELDER)[number];
-type Vorlieben = Partial<Record<Feld, unknown>>;
+/**
+ * M294: `schliff` ist eine Versionsmarke der Vorlieben. Fehlt sie oder ist
+ * sie älter, werden Physik und Klick-Zoom EINMAL auf die ruhigen
+ * Voreinstellungen gestellt — die meisten hatten sie nie bewusst gewählt,
+ * sie waren schlicht an. Danach gilt wieder: Was gespeichert ist, bleibt.
+ */
+const SCHLIFF = 1;
+type Vorlieben = Partial<Record<Feld, unknown>> & { schliff?: number };
 
 function lies(): Vorlieben | null {
   try {
@@ -70,7 +77,7 @@ function lies(): Vorlieben | null {
 
 function schreibe(v: Vorlieben): void {
   try {
-    localStorage.setItem(SCHLUESSEL, JSON.stringify(v));
+    localStorage.setItem(SCHLUESSEL, JSON.stringify({ ...v, schliff: SCHLIFF }));
   } catch {
     /* Speicher voll oder gesperrt: Vorlieben sind es nicht wert, dass die App
        deswegen stehen bleibt. Die Karten haben ihre eigene Quota-Meldung. */
@@ -97,9 +104,20 @@ export function initEinstellungen(): () => void {
     const patch: Record<string, unknown> = {};
     for (const f of FELDER) if (gespeichert[f] !== undefined) patch[f] = gespeichert[f];
     if (Object.keys(patch).length > 0) useBoard.setState(patch);
-  } else {
+  }
+  // M294: Ruhige Fläche — einmalig. Gilt für gespeicherte Vorlieben ohne
+  // Marke UND für Stände von vor M247 (dort steckt Physik im Hauptstand).
+  if ((gespeichert?.schliff ?? 0) < SCHLIFF) {
+    const st = useBoard.getState();
+    if (st.physicsEnabled || st.clickZoom) {
+      useBoard.setState({ physicsEnabled: false, clickZoom: false, ruheHinweis: true });
+    }
+  }
+  if (!gespeichert) {
     // Erster Start mit dieser Fassung: den vorhandenen Stand übernehmen,
     // damit bereits eingestellte Vorlieben nicht beim nächsten Mal fehlen.
+    schreibe(auszug(useBoard.getState() as unknown as Record<string, unknown>));
+  } else if ((gespeichert.schliff ?? 0) < SCHLIFF) {
     schreibe(auszug(useBoard.getState() as unknown as Record<string, unknown>));
   }
 

@@ -228,7 +228,7 @@ export async function checkWebdavRemote(): Promise<void> {
   emitSyncStatus('webdav', 'conflict');
   if (!staleHintShown) {
     staleHintShown = true;
-    useBoard.getState().showToast('☁️ Auf dem WebDAV-Server liegt ein anderer Stand — hier gibt es aber eigene Änderungen, darum wurde nichts überschrieben. In ⚙️ → Synchronisation wählen.');
+    useBoard.getState().showToast('☁️ Server und lokaler Stand weichen ab, nichts wurde überschrieben. Unter ⚙ → Synchronisation wählen.');
   }
 }
 
@@ -244,7 +244,7 @@ async function autoPush(): Promise<void> {
       emitSyncStatus('webdav', 'conflict');
       if (!conflictWarned) {
         conflictWarned = true;
-        useBoard.getState().showToast('⚠️ Auf dem WebDAV-Server liegt ein neuerer Stand (anderes Gerät?). In ⚙️ → Synchronisation laden oder überschreiben.');
+        useBoard.getState().showToast('⚠️ Auf dem WebDAV-Server liegt ein neuerer Stand. Unter ⚙ → Synchronisation laden oder überschreiben.');
       }
       return;
     }

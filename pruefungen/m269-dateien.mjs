@@ -211,8 +211,9 @@ console.log('\n════ T3: Dateien reisen im Sync-Stand mit ════');
   await P.locator('.modal button', { hasText: 'Synchronisation' }).first().click();
   await P.waitForTimeout(600);
   const budget = await P.evaluate(() => {
-    const knoepfe = [...document.querySelectorAll('.modal-row .seg button')].map((b) => b.textContent.trim());
-    const an = [...document.querySelectorAll('.modal-row .seg button.on')].map((b) => b.textContent.trim());
+    // M300: Im Reiter stehen jetzt zwei Seg-Schalter (Sync-Weg, Obergrenze) — gezielt den zweiten lesen
+    const knoepfe = [...document.querySelectorAll('.seg-obergrenze button')].map((b) => b.textContent.trim());
+    const an = [...document.querySelectorAll('.seg-obergrenze button.on')].map((b) => b.textContent.trim());
     return { knoepfe: knoepfe.slice(0, 5), an: an[0] };
   });
   console.log('    Budget-Schalter:', JSON.stringify(budget));

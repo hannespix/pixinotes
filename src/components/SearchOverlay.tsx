@@ -185,7 +185,7 @@ export function SearchOverlay() {
   };
 
   // M204: Suche nach BEDEUTUNG — läuft entprellt neben der Fuzzy-Suche her,
-  // sobald das Gehirn (Einstellungen → KI) eingeschaltet ist
+  // sobald das Gehirn (Einstellungen → Dienste) eingeschaltet ist
   const brainOn = useBoard((s) => s.brain.on);
   const [semHits, setSemHits] = useState<BrainHit[]>([]);
   useEffect(() => {

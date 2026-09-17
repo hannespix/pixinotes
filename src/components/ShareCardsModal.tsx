@@ -30,10 +30,10 @@ export function ShareCardsModal() {
       const doc = cardsToBoardDoc(nodes, board, `Karten aus „${board.name}"`);
       const url = await cardsShareUrl(doc);
       if (!url) {
-        showToast('Zu groß für einen Link (Bilder?) — stattdessen als .pixiboard.json heruntergeladen. Die Datei einfach aufs Board des Empfängers ziehen.');
+        showToast('Zu groß für einen Link, stattdessen als Datei heruntergeladen. Der Empfänger zieht sie aufs Board.');
       } else {
         await navigator.clipboard.writeText(url);
-        showToast('🔗 Übernahme-Link kopiert — wer ihn öffnet, bekommt die Karten als eigenes Board in PixiNotes angeboten.');
+        showToast('🔗 Übernahme-Link kopiert, er enthält die Karten komplett.');
       }
     } catch {
       showToast('Link konnte nicht kopiert werden.');
@@ -70,7 +70,7 @@ export function ShareCardsModal() {
       // Erfolg, wenn die Seite leer blieb — das kostet mehr Zeit als ein
       // ehrlicher Fehler, weil man den Fehler erst im PDF-Betrachter sieht.
       const grund = e instanceof Error && e.message ? ` (${e.message})` : '';
-      showToast(`PDF fehlgeschlagen${grund} — der Druck-Weg („Drucken" → als PDF sichern) funktioniert immer.`);
+      showToast(`PDF fehlgeschlagen${grund}. Alternative: Drucken und als PDF sichern.`);
     } finally { setBusy(''); }
   };
 
@@ -83,7 +83,7 @@ export function ShareCardsModal() {
         </div>
         <div className="modal-body">
         <div className="share-cards-grid">
-          <button onClick={() => void copyLink()} disabled={busy === 'link'} title="Serverloser Link: die Karten stecken komplett im Link — wer ihn in PixiNotes öffnet, übernimmt sie als eigenes Board">
+          <button onClick={() => void copyLink()} disabled={busy === 'link'} title="Link, der die Karten komplett enthält">
             <IFolder size={18} />
             <b>Übernahme-Link</b>
             <span>für andere PixiNotes-Nutzer</span>

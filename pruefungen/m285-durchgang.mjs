@@ -52,7 +52,7 @@ async function seite(ansicht) {
   await ctx.addInitScript((ansicht) => {
     if (localStorage.getItem('pixinotes-board')) return;
     localStorage.setItem('pixinotes-onboarded', '1');
-    localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ navLinks: false }));
+    localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ navLinks: true }));
     const mk = (id, txt, x, y) => ({ id, type: 'note', position: { x, y }, width: 240, height: 150,
       data: { color: 'yellow', blocks: [{ id: `${id}b`, type: 'paragraph', props: {},
         content: [{ type: 'text', text: txt, styles: {} }], children: [] }] } });
@@ -65,7 +65,7 @@ async function seite(ansicht) {
         { id: 'b1', name: 'Projekt B', edges: [], drawings: [], comments: [], nodes: [mk('m1', 'Konzept B', 40, 40)] },
       ],
       spaces: [{ id: 's1', name: 'Dienst', projects: [{ id: 'p1', name: 'Vorgänge', boardIds: ['b0', 'b1'] }] }],
-      activeId: 'b0', view: ansicht, cardFocus: true, navLinks: false } }));
+      activeId: 'b0', view: ansicht, cardFocus: true, navLinks: true } }));
   }, ansicht);
   const P = await ctx.newPage();
   P.on('pageerror', (e) => console.log('    PAGEERROR:', e.message));
@@ -77,7 +77,7 @@ async function seite(ansicht) {
 const stand = (P) => P.evaluate(() => ({
   ansicht: document.querySelector('.ov-canvas') || document.querySelector('.ov-graph') ? 'uebersicht' : 'board',
   blattOffen: !!document.querySelector('.app.focus-mode'),
-  navigatorDa: !!document.querySelector('.sidepanel') || !!document.querySelector('.sidepanel-fahne'),
+  navigatorDa: !!document.querySelector('.side-tree'), // M297: der Baum steht in der linken Spalte
 }));
 
 // ══ T1: Übersicht (Hierarchie) — die Vorschau ist anfassbar ══════════
@@ -180,9 +180,8 @@ console.log('\n════ T2: Netzansicht ════');
 console.log('\n════ T3: Navigator in beiden Ansichten ════');
 for (const ansicht of ['overview', 'board']) {
   const { ctx, P } = await seite(ansicht);
-  // Navigator aufklappen — echter Klick, das Fähnchen hört auf Zeiger-Ereignisse
-  await P.locator('.sidepanel-fahne').click();
-  await P.waitForTimeout(1200);
+  // M297: Der Baum steht fest in der linken Spalte — nichts aufzuklappen
+  await P.waitForTimeout(600);
   const offen = await P.evaluate(() => !!document.querySelector('.side-tree'));
   pruefe(`T3a (${ansicht}) der Navigator lässt sich öffnen`, offen);
   if (offen) {
@@ -268,7 +267,7 @@ for (const [breite, hoehe, geraet] of [[1440, 900, 'Schreibtisch'], [412, 915, '
     localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state: {
       boards: [{ id: 'b0', name: 'Amrum 2026', edges: [], drawings: [], comments: [], nodes: [mk('n1', 'Fähre buchen')] }],
       spaces: [{ id: 's1', name: 'Urlaub', projects: [{ id: 'p1', name: 'Reisen', boardIds: ['b0'] }] }],
-      activeId: 'b0', view: 'overview', cardFocus: true, navLinks: false,
+      activeId: 'b0', view: 'overview', cardFocus: true, navLinks: true,
       // Navigator absichtlich OFFEN — genau so trat der Fehler auf
       sidebar: { open: true, mode: 'hierarchie', width: 300, height: 0 } } }));
   });
@@ -280,7 +279,7 @@ for (const [breite, hoehe, geraet] of [[1440, 900, 'Schreibtisch'], [412, 915, '
     [...document.querySelectorAll('button')]
       .filter((b) => ['Hierarchie', 'Netz'].includes(b.textContent.trim()))
       .filter((b) => b.getBoundingClientRect().width > 0)
-      .map((b) => ({ text: b.textContent.trim(), wo: b.closest('.sidepanel') ? 'Navigator' : 'Übersicht' })));
+      .map((b) => ({ text: b.textContent.trim(), wo: b.closest('.tabs') ? 'Navigator' : 'Übersicht' })));
   console.log(`    ${geraet}:`, JSON.stringify(schalter));
   pruefe(`T5a (${geraet}) „Hierarchie | Netz" steht genau EINMAL da`,
     schalter.length === 2 && schalter.every((x) => x.wo === 'Übersicht'), JSON.stringify(schalter));
@@ -294,9 +293,9 @@ for (const [breite, hoehe, geraet] of [[1440, 900, 'Schreibtisch'], [412, 915, '
       }));
   } else {
     pruefe('T5b am Schreibtisch steht der Baum bis zur Karte bereit',
-      await P.evaluate(() => !!document.querySelector('.sidepanel .side-tree')));
-    pruefe('T5c und trägt eine eigene Überschrift statt der doppelten Tasten',
-      await P.evaluate(() => document.querySelector('.sidepanel-titel')?.textContent?.includes('Karten') === true));
+      await P.evaluate(() => !!document.querySelector('.tabs .side-tree')));
+    pruefe('T5c und die Spalte führt mit „Übersicht" statt doppelter Tasten',
+      await P.evaluate(() => document.querySelector('.tabs .tab-home-label')?.textContent === 'Übersicht'));
   }
   await ctx.close();
 }

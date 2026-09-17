@@ -32,7 +32,7 @@ import { canEmbed } from './nodes';
 export async function notizBildHochladen(file: File): Promise<string> {
   const { showToast } = useBoard.getState();
   if (!file.type.startsWith('image/')) {
-    showToast('In eine Notiz passen Bilder. Andere Dateien einfach aufs Board ziehen — sie werden dort eine Datei-Karte.');
+    showToast('In eine Notiz passen nur Bilder, andere Dateien aufs Board ziehen.');
     throw new Error('kein Bild');
   }
   const src = await imageFileToDataUrl(file);

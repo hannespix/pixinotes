@@ -13,7 +13,7 @@ export const seedNodes: AppNode[] = [
       blocks: [
         { type: 'heading', props: { level: 3 }, content: '👋 Willkommen bei PixiNotes!' },
         { type: 'paragraph', content: 'Das hier ist eine Haftnotiz — klick rein und tipp los. Mit „/" öffnest du das Block-Menü (Checklisten, Tabellen, …).' },
-        { type: 'checkListItem', content: 'Karte mit Schwung übers Board werfen 🚀' },
+        { type: 'checkListItem', content: 'Karte anfassen und irgendwohin schieben' },
         { type: 'checkListItem', content: 'Doppelklick auf die Fläche = neue Notiz' },
         { type: 'checkListItem', content: 'Screenshot mit Strg+V einfügen' },
         { type: 'checkListItem', content: 'E-Mail (.eml/.msg) aus Outlook hierher ziehen' },

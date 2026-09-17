@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { connectMicrosoft, loadCalAccounts, msHasNotes, oauthAvailable } from '../lib/calAccounts';
+import { loadCalAccounts, msHasNotes, oauthAvailable } from '../lib/calAccounts';
 import { fetchNotebooks, runOneNoteImport, type OnNotebook } from '../lib/onenote';
 import { useBoard } from '../store';
 
@@ -9,10 +9,12 @@ import { useBoard } from '../store';
  * mehrere Stufen (verbinden → Notizbücher laden → auswählen → holen) und
  * würde die ohnehin große Einstellungs-Datei sonst unübersichtlich machen.
  */
-export function OneNoteImport({ onClose }: { onClose: () => void }) {
+/** M300: Das Microsoft-Konto wird unter ⚙ → Dienste verbunden — hier gibt es
+ *  kein zweites Formular dafür mehr, nur den Sprung dorthin. */
+export function OneNoteImport({ onClose, onDienste }: { onClose: () => void; onDienste: () => void }) {
   const showToast = useBoard((s) => s.showToast);
   const canUndoImport = useBoard((s) => s.canUndoImport);
-  const [acc, setAcc] = useState(() => loadCalAccounts().ms);
+  const [acc] = useState(() => loadCalAccounts().ms);
   const [books, setBooks] = useState<OnNotebook[] | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [withImages, setWithImages] = useState(true);
@@ -20,8 +22,6 @@ export function OneNoteImport({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState('');
   const [progress, setProgress] = useState<{ msg: string; done: number; total: number } | null>(null);
   const [error, setError] = useState('');
-  const [clientId, setClientId] = useState(acc?.clientId ?? '');
-  const [tenant, setTenant] = useState(acc?.tenant ?? '');
 
   const hasNotes = msHasNotes(acc);
 
@@ -37,12 +37,6 @@ export function OneNoteImport({ onClose }: { onClose: () => void }) {
       setProgress(null);
     }
   };
-
-  const connect = () => run('connect', async () => {
-    const name = await connectMicrosoft(clientId.trim(), tenant.trim() || 'common', true);
-    setAcc(loadCalAccounts().ms);
-    showToast(`✅ OneNote verbunden: ${name}`);
-  });
 
   const load = () => run('load', async () => {
     const list = await fetchNotebooks();
@@ -85,45 +79,22 @@ export function OneNoteImport({ onClose }: { onClose: () => void }) {
     <section className="modal-section">
       <h3>OneNote-Notizbücher übernehmen</h3>
       <p className="modal-hint">
-        Holt deine OneNote-Inhalte direkt aus Microsoft 365: <b>Notizbuch → Bereich</b>,{' '}
-        <b>Abschnitt → Board</b>, <b>Seite → Notiz-Karte</b>. Aufgabenkästchen (To-Do-Kategorie)
-        werden zu echten Checklisten und tauchen damit in der Aufgaben-Zentrale auf.
-        Gelesen wird <b>nur</b> — in OneNote ändert sich nichts.
+        Holt Notizbücher aus Microsoft 365: <b>Notizbuch → Bereich</b>, <b>Abschnitt → Board</b>,{' '}
+        <b>Seite → Notiz-Karte</b>, Aufgabenkästchen werden zu Checklisten.
+        Gelesen wird nur, in OneNote ändert sich nichts.
       </p>
 
       {!oauthAvailable() && (
         <div className="modal-note">
-          Das Anmelden braucht die gehostete App (http/https). Aus der Einzeldatei heraus geht es nicht —
-          dort bleibt der Weg über „Datei → Exportieren → Word" und die .docx aufs Board ziehen.
+          Das Anmelden braucht die gehostete App (http/https). Ohne Anmeldung: in OneNote „Datei → Exportieren → Word" und die .docx aufs Board ziehen.
         </div>
       )}
 
       {!hasNotes ? (
-        <>
-          <div className="modal-note">
-            {acc ? 'Die bestehende Microsoft-Verbindung deckt nur den Kalender ab. Ein einmaliges Bestätigen schaltet den Lesezugriff auf OneNote frei.'
-              : 'Noch kein Microsoft-Konto verbunden.'}
-          </div>
-          <label className="modal-row">
-            <span>App-ID (Client)</span>
-            <input
-              type="text" placeholder="00000000-0000-0000-0000-000000000000"
-              value={clientId} onChange={(e) => setClientId(e.target.value)}
-            />
-          </label>
-          <label className="modal-row">
-            <span>Tenant (optional)</span>
-            <input
-              type="text" placeholder="common (oder eure Tenant-ID)"
-              value={tenant} onChange={(e) => setTenant(e.target.value)}
-            />
-          </label>
-          <div className="modal-buttons">
-            <button disabled={!clientId.trim() || !oauthAvailable() || !!busy} onClick={connect}>
-              {busy === 'connect' ? '…' : 'Mit OneNote verbinden'}
-            </button>
-          </div>
-        </>
+        <div className="modal-note on-konto">
+          {acc ? 'Das Microsoft-Konto ist verbunden, aber ohne OneNote-Zugriff.' : 'Noch kein Microsoft-Konto verbunden.'}{' '}
+          <button className="link-btn" onClick={onDienste}>Unter „Dienste" einrichten</button>
+        </div>
       ) : (
         <>
           <div className="modal-note">✅ OneNote-Zugriff steht{acc?.connectedAs ? ` (${acc.connectedAs})` : ''}.</div>

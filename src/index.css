@@ -438,10 +438,29 @@ input.img-titel {
   background: var(--surface); border-radius: 6px; padding: 6px 8px; font-size: 11.5px;
   box-shadow: 0 1px 3px var(--border); margin-bottom: 6px;
   border-left: 3px solid #f5b53f;
-  display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px;
+  /* M295: Raster statt umbrechender Zeile — der Text teilte sich die Zeile
+     mit Chips und Aktionen und wurde auf wenige Buchstaben gequetscht
+     („Sitzungsra um buchen"). Jetzt: Text links in voller Breite, Aktionen
+     rechts daneben, Labels, Chips und Frist in eigenen Zeilen darunter. */
+  display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 4px; align-items: start; position: relative;
 }
-.kanban-item > span:first-child { word-break: break-word; min-width: 0; flex: 1 1 60px; }
-.kanban-item .kanban-item-actions { margin-left: auto; }
+.kanban-item > .kanban-item-text { min-width: 0; overflow-wrap: anywhere; }
+/* Die Aktionen schweben beim Zeigen als Pille an der Unterkante des Tickets,
+   statt dem Text dauerhaft Platz wegzunehmen — unsichtbar nahmen sie ihn
+   vorher auch. An der Unterkante verdecken sie keinen Text; oben rechts
+   lagen sie bei kurzen Tickets genau über dem Wort, das man anklicken will. */
+.kanban-item > .kanban-item-actions {
+  position: absolute; right: 6px; bottom: -9px; margin-left: 0; z-index: 2;
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: 999px;
+  padding: 1px 3px; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+@media (pointer: coarse) {
+  /* Am Touch-Gerät sind sie immer sichtbar — dann gehören sie in den Fluss, sonst verdecken sie Text */
+  .kanban-item > .kanban-item-actions { position: static; justify-self: end; background: none; box-shadow: none; padding: 0; }
+}
+.kanban-item > .k-labels, .kanban-item > .kanban-chips,
+.kanban-item > .kanban-due, .kanban-item > .kanban-due-input { grid-column: 1 / -1; justify-self: start; }
+.kanban-item > .kanban-chips { margin-left: 0; flex-wrap: wrap; }
 .kanban-item.col-mid { border-left-color: var(--accent); }
 .kanban-item.col-done { border-left-color: #55b96a; opacity: 0.75; }
 .done-text { text-decoration: line-through; }
@@ -611,6 +630,12 @@ input.img-titel {
 }
 .tab-home:hover { background: var(--surface-2); }
 .tab-home.active { background: var(--accent-soft); }
+.tab-home-label { display: none; }
+/* M297: DER Baum (Navigation.tsx) — in der Spalte und in der Ausstülpung */
+.nav-tree .side-proj-name { border: none; background: none; text-align: left; cursor: pointer; font-family: inherit; }
+.nav-tree .side-proj-name:hover { color: var(--accent-strong); }
+.nav-tree .side-proj { margin-left: 0; }
+.nav-panel .nav-tree { flex: 1; min-height: 0; margin-top: 4px; }
 
 @media (pointer: coarse) {
   .ov-head-actions { opacity: 1 !important; }
@@ -807,11 +832,19 @@ input.img-titel {
 
 /* ---------- Selektierte Karte: Controls auch ohne Hover (Maus & Touch) ---------- */
 .react-flow__node.selected .card-x,
-.react-flow__node.selected .pn-handle,
-.react-flow__node.selected .color-dot,
-.react-flow__node.selected .kanban-item-actions {
+.react-flow__node.selected .color-dot {
   opacity: 1;
 }
+/* M301: Die ＋-Verbindungspunkte erscheinen am PC nur beim Zeigen auf die Karte —
+   eine ausgewählte Karte trug sonst dauerhaft vier Kreise. Ohne Maus (Touch)
+   bleibt die Auswahl der einzige Weg, sie zu zeigen. */
+@media (hover: none) {
+  .react-flow__node.selected .pn-handle { opacity: 1; }
+}
+/* M295: Die Ticket-Aktionen NICHT mehr bei ausgewählter Karte an jedem
+   Ticket — vier Knöpfe mal vierzehn Tickets waren die unruhigste Stelle der
+   App. Sie erscheinen beim Zeigen aufs Ticket; Touch-Geräte (unten) zeigen
+   sie weiterhin immer, dort gibt es kein Zeigen. */
 
 /* ---------- Touch-Geräte: größere Ziele, Controls immer sichtbar ---------- */
 @media (pointer: coarse) {
@@ -850,7 +883,7 @@ input.img-titel {
  * Jetzt liefert `--kopf-links` die GEMESSENE rechte Kante (lib/kopfmass.ts).
  * `max()` behält die Zentrierung, wo sie passt, und schiebt die Leiste sonst
  * genau so weit nach rechts, wie nötig — stufenlos statt in zwei Sprüngen.
- */
+ *
  * Zentriert wird gar nicht mehr: Eine Leiste, die je nach Fensterbreite mal
  * mittig und mal links sitzt, ist kein Gewinn — sie wandert beim Verkleinern
  * unter der Hand weg. Links neben der Aktionsleiste steht sie immer an
@@ -908,7 +941,17 @@ html[data-kopf-eng='an'] .hint { display: none; }
  * entscheidet.
  */
 @media (min-width: 861px) {
-  .app.nav-links { --nav-w: 244px; }
+  .app.nav-links { --nav-w: 268px; --nav-band: calc(var(--nav-w) + 36px + var(--app-rand)); }
+  /* M297: Die Spalte ist ein RAHMEN, kein Kasten auf der Fläche — ein Band von
+     oben bis unten, und die Fläche beginnt rechts davon. Vorher schwebten
+     Logo, Aktionen und Board-Liste als drei Kästen über dem Board, und Karten
+     gerieten darunter (am Tablet ganze Notizen). */
+  .app.nav-links::before {
+    content: ''; position: fixed; top: 0; bottom: 0; left: 0; width: var(--nav-band);
+    background: var(--surface-dim); border-right: 1px solid var(--border-soft);
+    z-index: 40; pointer-events: none;
+  }
+  .app.nav-links .board-wrap { margin-left: var(--nav-band); }
   .app.nav-links .topbar {
     flex-direction: column; align-items: stretch;
     width: var(--nav-w); gap: 8px;
@@ -917,41 +960,31 @@ html[data-kopf-eng='an'] .hint { display: none; }
   .app.nav-links .topbar .top-actions { flex-wrap: wrap; justify-content: flex-start; }
   .app.nav-links .tabs {
     left: 18px; top: var(--kopf-oben, 78px);
-    width: var(--nav-w); max-width: var(--nav-w);
+    bottom: calc(14px + var(--app-rand) + var(--safe-bottom));
+    width: var(--nav-w); max-width: var(--nav-w); max-height: none;
     flex-direction: column; align-items: stretch; gap: 2px;
-    /* Nicht bis zum Bildschirmrand: Unten leben Dock und Auswahl-Leiste */
-    max-height: calc(100dvh - var(--kopf-oben, 78px) - 108px - var(--safe-bottom));
+    background: var(--surface); backdrop-filter: none; -webkit-backdrop-filter: none;
   }
-  .app.nav-links .tabs-scroll {
-    flex-direction: column; align-items: stretch;
-    overflow-x: hidden; overflow-y: auto; min-height: 0;
+  .app.nav-links .tabs .nav-tree { flex: 1; min-height: 0; padding: 4px 2px 8px; }
+  /* 🏠 wird zur ersten Zeile des Baums: Symbol und Wort */
+  .app.nav-links .tab-home {
+    align-self: stretch; width: auto; height: 32px; display: flex; align-items: center; gap: 8px;
+    padding: 0 8px; justify-content: flex-start; font-size: 12.5px; font-weight: 600; color: var(--ink);
   }
-  /* In der Spalte trägt jede Zeile ihren Namen ganz — kein Abschneiden nötig */
-  .app.nav-links .tab { white-space: normal; padding: 7px 10px; }
-  .app.nav-links .tab-name { overflow-wrap: anywhere; }
-  /* Das Kleben aus M236 ist hier gegenstandslos: In einer Spalte scrollt
-     senkrecht, und `left: 0` würde nur einen wirkungslosen Kontext aufmachen. */
+  .app.nav-links .tab-home-label { display: inline; }
+  /* Das Kleben aus M236 ist hier gegenstandslos (M266: samt Schatten) */
   .app.nav-links .tab.active { position: static; }
-  /**
-   * M266: … und mit dem Kleben fällt auch sein Schatten weg.
-   *
-   * Der Verlauf aus M261 (`.tab.active::after`) lässt in der REIHE die
-   * vorbeiziehenden Reiter hinter dem festgehaltenen verschwinden. Er ist
-   * absolut positioniert und rechnet damit, dass der Reiter selbst sein
-   * Bezugsrahmen ist — in der Spalte steht der aber auf `static`. Der
-   * Verlauf hängte sich dadurch an die ganze LEISTE: ein rechteckiger,
-   * dunkler Streifen über ihre volle Höhe, rechts außen, ohne Rundung.
-   * Genau der „komische Schatten der linken Bar" (User-Screenshot;
-   * gemessen: 206 statt 241 Helligkeit, über 10 Punkte auslaufend).
-   */
   .app.nav-links .tab.active::after { content: none; }
   /* Teilen und ＋ nebeneinander am Fuß der Spalte */
-  .app.nav-links .tabs-foot { justify-content: flex-start; gap: 4px; padding-top: 2px; }
-  /* Heim-Knopf und Brotkrume bilden die Kopfzeile der Spalte */
-  .app.nav-links .tab-nav { justify-content: flex-start; }
-  .app.nav-links .tab-home { align-self: flex-start; }
+  .app.nav-links .tabs-foot { justify-content: flex-start; gap: 4px; padding-top: 4px; border-top: 1px solid var(--border-soft); }
   /* Oben wird keine zweite Zeile mehr freigehalten — die Boards stehen links */
   .app.nav-links { --head-space: calc(74px + var(--safe-top) + var(--app-rand)); }
+  /* Was unten mittig steht, steht mittig über der FLÄCHE, nicht über dem Fenster.
+     `--nav-offen` misst Tabs.tsx (rechte Kante der Spalte). */
+  .app.nav-links .dock, .app.nav-links .toast, .app.nav-links .draw-palette,
+  body:has(.app.nav-links) .sel-toolbar-dock {
+    left: calc(50% + var(--nav-offen, 0px) / 2);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1169,7 +1202,8 @@ html[data-kopf-eng='an'] .hint { display: none; }
   justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,.15);
 }
 .shape-handle { opacity: 0 !important; }
-.shape-wrap:hover .shape-handle, .react-flow__node.selected .shape-handle { opacity: 1 !important; }
+.shape-wrap:hover .shape-handle { opacity: 1 !important; }
+@media (hover: none) { .react-flow__node.selected .shape-handle { opacity: 1 !important; } }
 /* Während des Verbindens leuchten auch Form-Anschlüsse als Ziele auf —
    das !important oben würde die allgemeine M112-Regel sonst ausstechen */
 .react-flow:has(.react-flow__connectionline) .shape-handle { opacity: 1 !important; }
@@ -1798,6 +1832,28 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .modal-buttons button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
 .modal-buttons button:disabled { opacity: .5; cursor: default; }
 .modal-foot { padding: 12px 20px; font-size: 11px; color: var(--muted); text-align: center; }
+/* M300: Seg-Schalter (Erscheinungsbild, Anzeigegröße, Sync-Weg, Obergrenze …) —
+   vorher trugen die Knöpfe die Klasse, aber keine Regel: Der aktive Zustand
+   war unsichtbar. */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; background: var(--surface); }
+.seg button {
+  border: none; border-left: 1px solid var(--border-soft); background: none; color: var(--muted);
+  font-family: inherit; font-size: 12px; padding: 5px 10px; cursor: pointer; white-space: nowrap;
+}
+.seg button:first-child { border-left: none; }
+.seg button:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+.seg button.on { background: var(--accent-soft); color: var(--accent-strong); font-weight: 650; }
+.seg button:disabled { opacity: .45; cursor: default; }
+.modal-section h4 { font-size: 13px; margin: 14px 0 6px; }
+.psync-neu select { flex: 1 1 auto; min-width: 0; }
+.psync-neu button {
+  flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+  font-family: inherit; font-size: 12.5px; padding: 6px 12px; border-radius: 9px; cursor: pointer;
+}
+.psync-neu button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.psync-neu button:disabled { opacity: .5; cursor: default; }
+.bild-export { width: min(460px, 94vw); }
+.on-konto .link-btn { font-size: inherit; }
 
 @media (pointer: coarse) {
   /* Form-Anschlüsse NICHT dauerhaft einblenden — wie überall gilt seit
@@ -2909,7 +2965,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
   -webkit-touch-callout: none;
 }
 /* Baum in der Seitenleiste: gleiche Falle bei langem Drücken auf Board-Namen */
-.side-tree button, .sidepanel-head, .ov-graph-toggles label {
+.side-tree button, .ov-graph-toggles label {
   user-select: none;
   -webkit-user-select: none;
 }
@@ -2966,108 +3022,6 @@ html[data-kopf-eng='an'] .hint { display: none; }
  *    die durchscheinende Arbeitsfläche nur Ruhe.
  *  · Der Rand ist ein Anfasser mit sichtbarem Griff.
  */
-/**
- * M250: Eine unsichtbare Zone vom Kopf bis zur Unterkante — sie zentriert die
- * Leiste vertikal und hält das Fähnchen an ihrer linken Kante.
- *
- * Das Zentrieren macht Flexbox, nicht eine `vh`-Rechnung: `vh` ignoriert den
- * Wurzel-Zoom und läge bei 125 % Textgröße daneben (M235). Die Zone selbst ist
- * für Zeiger durchlässig, sonst läge ein toter Streifen über dem Board.
- */
-.sidepanel-zone {
-  position: fixed; top: var(--head-space); right: var(--app-rand); bottom: var(--app-rand);
-  z-index: 45; pointer-events: none;
-  display: flex; align-items: center; justify-content: flex-end;
-}
-.sidepanel-zone > * { pointer-events: auto; }
-
-.sidepanel {
-  position: relative; display: flex; flex-direction: column;
-  /* Standardmaß: hoch genug für den Baum, niedrig genug, dass die Zentrierung
-     sichtbar bleibt. Wer zieht, überschreibt das per Inline-Höhe. */
-  height: 76%; min-height: min(220px, 100%); max-height: 100%;
-  /**
-   * M250: Gerundet sind die beiden Kanten, die FREI stehen.
-   *
-   * Rechts ist die Leiste angewachsen — dort bleibt sie eckig und bündig.
-   * Oben, unten und links grenzt sie an das Board, also runden die beiden
-   * linken Ecken die Fläche ab. So wirkt sie wie eine Ausstülpung der Seite
-   * und nicht wie ein aufgelegtes Fenster.
-   */
-  border-radius: 18px 0 0 18px; overflow: hidden;
-  background: var(--surface);
-  border: 1px solid var(--border-soft); border-right: none;
-  box-shadow: -10px 0 34px rgba(40, 30, 10, 0.16);
-  animation: pn-slide-in-right 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-/**
- * Das Fähnchen — der einzige Teil der Leiste, der immer zu sehen ist.
- *
- * Es schaut aus der Seitenkante heraus wie eine Lasche aus einem Register:
- * links gerundet, rechts bündig mit dem Fensterrand. Beim Überfahren wird es
- * breiter; weil es links vor der Leiste sitzt, wächst es nach innen und
- * verschiebt dabei nichts.
- */
-.sidepanel-fahne {
-  flex: none; width: 15px; height: 66px; padding: 0;
-  border: 1px solid var(--border-soft); border-right: none;
-  border-radius: 11px 0 0 11px;
-  background: var(--surface); color: var(--muted);
-  box-shadow: -6px 0 18px rgba(40, 30, 10, 0.14);
-  cursor: pointer; touch-action: none;
-  display: flex; align-items: center; justify-content: center;
-  transition: width 0.14s ease, color 0.14s ease, background 0.14s ease;
-}
-.sidepanel-fahne > span { width: 3px; height: 26px; border-radius: 999px; background: currentColor; opacity: 0.5; }
-.sidepanel-fahne:hover { width: 20px; background: var(--surface-2); color: var(--accent); }
-.sidepanel-fahne:hover > span { opacity: 1; }
-.sidepanel-fahne:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* Bei offener Leiste sitzt das Fähnchen an ihrer Innenkante — dort ist es der
-   Anfasser für die Breite, deshalb der Zieh-Zeiger */
-.sidepanel-fahne.auf { cursor: ew-resize; }
-
-/* Unterkante als Höhen-Anfasser */
-.sidepanel-hoehe {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 11px;
-  cursor: ns-resize; touch-action: none; z-index: 3;
-  display: flex; align-items: center; justify-content: center;
-}
-.sidepanel-hoehe > span { width: 34px; height: 3px; border-radius: 999px; background: var(--border); opacity: 0.7; }
-.sidepanel-hoehe:hover > span { background: var(--accent); opacity: 1; }
-@keyframes pn-slide-in-right { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
-@keyframes pn-slide-in-left { from { transform: translateX(-24px); opacity: 0; } to { transform: none; opacity: 1; } }
-
-/* Anfasser des Navigators links — 10 Punkte breite Fangzone mit einem
-   sichtbaren Griff in der Mitte. Ohne den Griff bliebe die Funktion geheim. */
-.nav-grip {
-  position: absolute; top: 0; bottom: 0; width: 10px; right: 0;
-  cursor: ew-resize; touch-action: none; z-index: 3;
-  display: flex; align-items: center; justify-content: center;
-}
-.nav-grip > span {
-  width: 3px; height: 34px; border-radius: 999px;
-  background: var(--border); opacity: .7;
-}
-.nav-grip:hover { background: var(--surface-2); }
-.nav-grip:hover > span { background: var(--accent); opacity: 1; }
-.sidepanel-head {
-  display: flex; align-items: center; gap: 8px;
-  padding: 9px 10px 8px 14px; border-bottom: 1px solid var(--border-soft);
-  flex: 0 0 auto;
-}
-.sidepanel-tabs { display: flex; gap: 2px; background: var(--surface-dim); border-radius: 999px; padding: 3px; }
-.sidepanel-tabs button {
-  border: none; background: none; font: inherit; font-size: 11.5px; font-weight: 650;
-  padding: 4px 12px; border-radius: 999px; cursor: pointer; color: var(--muted);
-}
-.sidepanel-tabs button.on { background: var(--accent); color: #fff; }
-.sidepanel-x {
-  margin-left: auto; border: none; background: none; cursor: pointer; color: var(--muted);
-  padding: 5px; border-radius: 8px; display: inline-flex;
-}
-.sidepanel-x:hover { background: var(--surface-2); color: var(--ink); }
-.sidepanel-body { flex: 1; min-height: 0; position: relative; display: flex; flex-direction: column; }
 /* Eingebettetes Netz: aus dem fixed-Vollbild in den Leisten-Körper holen */
 .ov-graph.embedded { position: absolute; inset: 0; padding: 0; background: none; }
 /**
@@ -3156,15 +3110,9 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .top-actions button.on { background: var(--accent-soft); color: var(--accent-strong); }
 /* Phone: Als Vollflächen-Blatt statt schmaler Spalte */
 @media (max-width: 640px) {
-  /* Phone: Beide Slideouts füllen die Breite — für zwei Spalten ist kein
-     Platz, und ein 8-Punkte-Anfasser trifft am Finger ohnehin niemand.
-     Die Leiste ist hier ein Blatt von unten, kein seitliches Fähnchen. */
-  .sidepanel-zone { left: 0; display: block; }
-  .sidepanel {
-    width: auto !important; height: 100% !important; max-height: none;
-    border-radius: 18px 18px 0 0; border-right: 1px solid var(--border-soft);
-  }
-  .sidepanel-fahne, .sidepanel-hoehe, .nav-grip { display: none; }
+  /* Phone: Die Ausstülpung füllt die Breite — ein 8-Punkte-Anfasser trifft
+     am Finger ohnehin niemand. */
+  .nav-grip { display: none; }
 }
 @media (max-width: 640px) {
   .ov-graph-find input { width: 120px; }
@@ -3349,10 +3297,23 @@ html[data-kopf-eng='an'] .hint { display: none; }
   border-radius: 5px; padding: 1px 6px; font-family: inherit; font-size: 11px;
 }
 .help-foot { text-align: center; font-size: 11px; color: var(--muted); padding: 14px 0 4px; }
+/* Rechtliches: unter den sechs Abschnitten, klein, aber immer da (M299) */
+.help-nav-recht {
+  margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border-soft);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.help-nav button.recht { font-size: 11.5px; color: var(--muted); padding: 5px 10px; }
+.help-nav button.recht.on { color: var(--accent-strong); }
+/* „Was ist neu" als eigene Seite im selben Fenster: kein Menü, nur die Liste */
+.help-zurueck { margin-left: auto; margin-right: 14px; font-size: 12.5px; }
+.help-body.help-neu section { border-bottom: none; padding-top: 4px; }
+.help-body.help-neu li { margin: 8px 0; }
+.help-foot .link-btn { font-size: 11px; }
 @media (max-width: 700px) {
   .help-layout { flex-direction: column; }
   .help-nav { width: 100%; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--border-soft); }
   .help-nav button { font-size: 11.5px; padding: 5px 8px; }
+  .help-nav-recht { margin-top: 0; padding-top: 0; border-top: none; flex-direction: row; width: 100%; }
 }
 
 /* ---------- Tooltip-System (ersetzt native title-Tooltips) ---------- */
@@ -3398,6 +3359,10 @@ html[data-kopf-eng='an'] .hint { display: none; }
   border-radius: 9px 9px 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
 }
 .modal-tabs button:hover { color: var(--ink); background: var(--surface-3); }
+@media (max-width: 480px) {
+  .modal-tabs { gap: 0; padding: 8px 10px 0; flex-wrap: nowrap; }
+  .modal-tabs button { font-size: 12px; padding: 8px 8px; }
+}
 .modal-tabs button.on { color: var(--accent); font-weight: 650; border-bottom-color: var(--accent); background: var(--surface-3); }
 .modal-danger { border: 1px solid rgba(216, 75, 61, .3); border-radius: 12px; background: rgba(216, 75, 61, .04); }
 .modal-danger h3 { color: #a4231a; }
@@ -3429,30 +3394,13 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .tabs.krume-kurz .tab-nav-space,
 .tabs.krume-kurz .tab-nav > svg:first-of-type { display: none; }
 .tabs.krume-kurz .tab-nav { padding: 5px 8px; }
-.tab-tree {
-  position: absolute; top: calc(100% + 8px); left: 0; z-index: 60;
-  background: var(--surface); border-radius: 12px; box-shadow: 0 8px 32px rgba(50,40,20,.25);
-  padding: 8px; width: 320px; max-height: min(560px, 70vh); overflow-y: auto;
-}
-.tab-tree-space { padding: 4px 2px 2px; }
-.tab-tree-space + .tab-tree-space { border-top: 1px solid var(--border-soft); margin-top: 4px; }
-.tab-tree-space-name {
-  font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
-  color: var(--muted); padding: 4px 6px 2px;
-}
-.tab-tree-proj { padding: 1px 0 4px 6px; }
-.tab-tree-proj-name { font-size: 11px; font-weight: 650; color: var(--ink); padding: 4px 6px 2px; opacity: .75; }
-.tab-tree-board {
-  display: flex; align-items: center; gap: 8px; width: 100%; border: none; background: none;
-  font-family: inherit; font-size: 12.5px; color: var(--ink); text-align: left;
-  padding: 6px 8px 6px 14px; border-radius: 7px; cursor: pointer;
-}
-.tab-tree-board:hover { background: var(--surface-2); }
-.tab-tree-board.active { background: var(--accent-soft); font-weight: 650; }
-.tab-tree-board-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tab-tree-empty { font-size: 11px; color: var(--muted); padding: 2px 14px 4px; }
-.tab-tree-foot { font-size: 10px; color: var(--muted); text-align: center; padding: 7px 4px 2px; border-top: 1px solid var(--border-soft); margin-top: 4px; }
-
+/* M301: Am Telefon ein Knopf mit dem Weg „Projekt › Board" statt Brotkrume + Wähler */
+.tab-pfad { flex: 1 1 auto; min-width: 0; max-width: none; justify-content: flex-start; }
+.tab-pfad .tab-pfad-proj { font-weight: 400; color: var(--muted); max-width: 40%; flex: none; }
+.tab-pfad-trenner { color: var(--muted); flex: none; }
+.tab-pfad-board { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tab-pfad > svg:first-of-type { display: inline-block !important; }
+ 
 /* ---------- KI-Freitext-Kommando ---------- */
 .ai-cmd-input {
   width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px;
@@ -3506,7 +3454,6 @@ html[data-kopf-eng='an'] .hint { display: none; }
   .tab-nav-space { display: none; }
   .tab-nav > svg { display: none; }
   .tab-nav-proj { max-width: 110px; }
-  .tab-tree { width: min(320px, calc(100vw - 24px)); }
 }
 
 @media (max-width: 860px) {
@@ -3650,6 +3597,71 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .k-archiv-foot .collect-reset { flex: 1; }
 .ticket-erledigt { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #1f7a4a; font-weight: 600; }
 .ticket-erledigt .ticket-jump { display: inline-flex; align-items: center; gap: 4px; }
+
+/* ---------- Kanban-Schliff (M295) ---------- */
+.kanban-body { min-width: 0; }
+/* Statuszeile: nur was gerade läuft — Automatiken und ein gefülltes Archiv */
+.kanban-status { display: flex; flex-wrap: wrap; gap: 4px; margin: -2px 0 7px; }
+.k-status-chip {
+  border: none; background: var(--surface-dim); color: var(--muted); border-radius: 999px;
+  padding: 2px 8px; font-size: 10px; font-family: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px; line-height: 1.3;
+}
+.k-status-chip:hover { color: var(--ink); background: var(--border); }
+.k-status-chip em { font-style: normal; font-weight: 800; }
+/* ⋯-Menü der Kopfzeile: dieselbe Hülle wie das Ebenen-Menü */
+.k-menu { min-width: 236px; }
+.k-menu button.on { color: var(--accent-strong); font-weight: 600; }
+.k-menu button.on svg { color: var(--accent-strong); }
+/* Zeitgruppen der Erledigt-Spalte */
+.k-done-head { justify-content: space-between; padding-right: 0; }
+.k-done-toggle {
+  border: none; background: none; font: inherit; color: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px; padding: 0; text-transform: inherit; letter-spacing: inherit;
+}
+.k-done-toggle svg { transition: transform 0.12s; }
+.k-done-toggle svg.auf { transform: rotate(90deg); }
+.k-done-toggle:hover { color: var(--ink); }
+.k-done-archiv {
+  border: none; background: none; color: var(--muted); cursor: pointer; padding: 1px 4px; border-radius: 4px;
+  opacity: 0; transition: opacity 0.15s; display: inline-flex;
+}
+.k-done-head:hover .k-done-archiv, .k-done-archiv:focus-visible { opacity: 1; }
+.k-done-archiv:hover { background: var(--border); color: var(--ink); }
+/* Kompakte Tickets: nur Text, Priorität und Frist — Chips erst beim Zeigen */
+.k-kompakt .kanban-item { padding: 4px 7px; row-gap: 2px; }
+.k-kompakt .kanban-item > .k-labels, .k-kompakt .kanban-item > .kanban-chips { display: none; }
+.k-kompakt .kanban-item:hover > .kanban-chips { display: inline-flex; }
+/* Archiv- und Einsammel-Fenster (Portal) — die Karten-Regeln des alten Inline-Panels gelten nicht mehr */
+.k-panel-modal { width: min(560px, 96vw); gap: 8px; }
+.k-panel-modal.collect-panel { max-height: 84vh; }
+@media (pointer: coarse) { .k-done-archiv { opacity: 1; } }
+
+/* ---------- Kachel-Ansicht großer Module (M298) ---------- */
+.card-body.kachel {
+  display: flex !important; flex-direction: column; gap: 4px; padding: 12px 14px 10px;
+  background: var(--surface-card); border-radius: 10px; overflow: hidden;
+}
+.kachel { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kachel-typ { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.kachel-titel { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.25; overflow-wrap: anywhere; }
+.kachel-zeile { font-size: 11.5px; color: var(--muted); line-height: 1.35; overflow-wrap: anywhere; }
+.kachel-zeile.warn { color: #a4231a; font-weight: 600; }
+[data-theme='dark'] .kachel-zeile.warn { color: #ff9a8c; }
+.kachel-fuss { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.kachel-knopf {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--muted); border-radius: 999px;
+  padding: 3px 10px; font-size: 10.5px; font-family: inherit; cursor: pointer;
+}
+.kachel-knopf:hover { color: var(--ink); border-color: var(--accent); }
+
+/* ---------- Dock- und Leisten-Schliff (M296) ---------- */
+.dock-menu-mehr { color: var(--muted) !important; }
+.dock-menu-mehr svg { transition: transform 0.12s; }
+.dock-menu-mehr.auf svg { transform: rotate(90deg); }
+/* Der Toast weicht nach oben aus, solange ein Dock-Menü offen ist — er lag
+   genau über dessen unteren Einträgen (Bildschirmfoto der UI-Durchsicht) */
+body:has(.dock-menu) .toast { bottom: auto; top: calc(16px + var(--safe-top, 0px)); transform: translateX(-50%); }
 
 /* ---------- Präsentation: weniger Totraum auf kleinen Screens (M69) ---------- */
 @media (max-width: 860px) {
@@ -4067,7 +4079,7 @@ button.link-dead:disabled { opacity: 0.45; }
   backdrop-filter: blur(16px) saturate(1.5);
 }
 /* Menüs & Panels */
-.dock-menu, .frame-menu, .happ-menu, .sel-menu-fixed, .tab-tree, .tab-bg-menu,
+.dock-menu, .frame-menu, .happ-menu, .sel-menu-fixed, .tab-bg-menu,
 .cal-menu, .week-pop, .mm-pop, .comment-panel, .lookup-panel, .backlinks-panel,
 .search-box, .ticket-detail, .edge-opts {
   background: var(--glass-strong);
@@ -4153,7 +4165,7 @@ button.link-dead:disabled { opacity: 0.45; }
 @keyframes pn-fade-in { from { opacity: 0; } to { opacity: 1; } }
 /* Elemente OHNE eigenes Basis-transform dürfen die Pop-Animation nutzen —
    die anderen (Dock-Menü zentriert, Auswahl-Menü mit translate-Anker) faden */
-.frame-menu, .happ-menu, .tab-tree, .tab-bg-menu, .cal-menu, .week-pop,
+.frame-menu, .happ-menu, .tab-bg-menu, .cal-menu, .week-pop,
 .mm-pop, .modal, .ticket-modal, .lookup-panel, .collect-panel {
   animation: pn-pop-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -4179,7 +4191,6 @@ button.link-dead:disabled { opacity: 0.45; }
   max-height: min(72vh, calc(100vh - 24px));
   overflow-y: auto;
 }
-.tab-tree { max-height: min(560px, calc(100vh - 130px)); }
 .cal-menu, .week-pop, .mm-pop { max-width: min(460px, 92vw); max-height: 62vh; overflow-y: auto; }
 .dock-menu { max-width: min(320px, calc(100vw - 16px)); }
 
@@ -4388,58 +4399,9 @@ button.link-dead:disabled { opacity: 0.45; }
   color: var(--muted); padding: 5px; border-radius: 8px; display: inline-flex;
 }
 .nav-x:hover { color: var(--ink); background: var(--surface-2); }
-.nav-grid {
-  overflow-y: auto; padding: 8px 2px 4px;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 4px 22px; align-items: start;
-}
-.nav-space { min-width: 0; }
-.nav-space-name {
-  display: block; width: 100%; text-align: left; border: none; background: none;
-  cursor: pointer; font: inherit; font-size: 11px; font-weight: 800;
-  letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
-  padding: 8px 6px 3px; border-radius: 8px;
-}
-.nav-space-name:hover { color: var(--accent-strong); background: var(--surface-2); }
-.nav-space-static { cursor: default; }
-.nav-space-static:hover { color: var(--muted); background: none; }
-.nav-proj { padding: 0 0 6px 4px; }
-.nav-proj-name {
-  display: block; width: 100%; text-align: left; border: none; background: none;
-  cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 650;
-  color: var(--ink); opacity: 0.8; padding: 4px 6px 2px; border-radius: 8px;
-}
-.nav-proj-name:hover { opacity: 1; background: var(--surface-2); }
-/* M288: Projekt-Zeile im Kopf-Navigator trägt ihr ⋯-Menü rechts */
-.nav-proj-head { display: flex; align-items: center; gap: 2px; }
-.nav-proj-head .nav-proj-name { flex: 1; min-width: 0; }
-.nav-board-wrap { min-width: 0; }
-.nav-board-row { display: flex; align-items: center; gap: 2px; }
-.nav-board-row .tab-tree-board { flex: 1; min-width: 0; }
-.nav-expand {
-  flex: 0 0 auto; border: none; background: none; cursor: pointer;
-  color: var(--muted); padding: 4px; border-radius: 6px; display: inline-flex;
-  transition: transform 0.15s ease, background 0.15s ease;
-}
-.nav-expand:hover { color: var(--ink); background: var(--surface-2); }
-.nav-expand.on { transform: rotate(90deg); }
-.nav-cards { padding: 1px 0 4px 16px; }
-.nav-card {
-  display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
-  border: none; background: none; cursor: pointer; font: inherit;
-  font-size: 11px; color: var(--ink); opacity: 0.85; padding: 3px 8px; border-radius: 7px;
-}
-.nav-card:hover { opacity: 1; background: var(--surface-2); }
-.nav-card-type {
-  flex: 0 0 auto; font-size: 9px; font-weight: 700; color: var(--muted);
-  border: 1px solid var(--border-soft); border-radius: 5px; padding: 0 4px;
-}
-.nav-card-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-more { font-size: 10px; color: var(--muted); padding: 2px 8px 3px; }
 @media (max-width: 640px) {
   .nav-panel { width: 100% !important; max-width: none; padding: 12px 10px 8px;
     border-radius: 18px 18px 0 0; border-left: 1px solid var(--border-soft); }
-  .nav-grid { grid-template-columns: 1fr; }
   .nav-head > b { font-size: 12px; }
 }
 
@@ -4618,7 +4580,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   .sel-toolbar button { min-width: 44px; min-height: 44px; }
   .dock-menu button, .sel-ai-menu button { min-height: 44px; }
   .top-actions button { width: 40px; height: 40px; }
-  .sidepanel-tabs button { min-height: 40px; }
   .side-tree button { min-height: 44px; }
 }
 /* Auf Phones bleibt die Kopfleiste kompakt (27px-Regel unten) — dort schafft
@@ -4703,11 +4664,6 @@ body[data-formatierleiste='an'] { --lv-typo: -52px; --lv-typo-dock: 56px; }
    Seitenleiste: backdrop-filter erzwingt sonst bei JEDEM Frame einen teuren
    Repaint der komplett verwischten Fläche — das ruckelte selbst auf starken
    GPUs. Sobald das Netz zur Ruhe kommt, kehrt der Blur zurück. */
-.sidepanel.graph-motion {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
-  background: var(--surface) !important;
-}
 
 /* ================= M204: Gehirn (semantischer Index) ================= */
 .search-sem { border-top: 1px solid var(--border-soft); margin-top: 4px; padding-top: 4px; }
@@ -5272,7 +5228,6 @@ html[data-kontrast='hoch'] .logo,
 html[data-kontrast='hoch'] .sel-toolbar,
 html[data-kontrast='hoch'] .focus-head,
 html[data-kontrast='hoch'] .focus-nav,
-html[data-kontrast='hoch'] .sidepanel,
 html[data-kontrast='hoch'] .modal,
 html[data-kontrast='hoch'] .dock-menu,
 html[data-kontrast='hoch'] .sel-ai-menu {
@@ -5316,7 +5271,6 @@ html[data-glas='aus'] .ov-add-space-float,
 html[data-glas='aus'] .writer-banner,
 html[data-glas='aus'] .dock-menu,
 html[data-glas='aus'] .happ-menu,
-html[data-glas='aus'] .tab-tree,
 html[data-glas='aus'] .tab-bg-menu,
 html[data-glas='aus'] .cal-menu,
 html[data-glas='aus'] .week-pop,
@@ -5357,7 +5311,6 @@ html[data-glas='aus'] .ov-graph-zoom,
 html[data-glas='aus'] .ov-add-space-float,
 html[data-glas='aus'] .dock-menu,
 html[data-glas='aus'] .happ-menu,
-html[data-glas='aus'] .tab-tree,
 html[data-glas='aus'] .tab-bg-menu,
 html[data-glas='aus'] .cal-menu,
 html[data-glas='aus'] .week-pop,
@@ -5546,7 +5499,7 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
  */
 @media (pointer: coarse) {
   .tab-x, .modal-x, .tab-home, .tab-share, .tab-add, .card-x,
-  .sidepanel-x, .focus-x, .modal-tabs button, .ov-graph-zoom button,
+  .focus-x, .modal-tabs button, .ov-graph-zoom button,
   .dock > button, .dock-add-wrap > button, .dock-tasks {
     min-width: 44px; min-height: 44px;
   }
@@ -5559,11 +5512,6 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
   .ov-graph-toggle { position: relative; min-height: 32px; }
   /* Die Zoom-Knöpfe von React Flow kommen mit 26 px aus der Bibliothek */
   .react-flow__controls-button { width: 40px !important; height: 40px !important; }
-  /* Das Fähnchen der Überblick-Leiste ist 15 Punkte schmal — schön, aber am
-     Finger zu wenig. Sichtbar bleibt es schlank, die Fangfläche wächst nach
-     links ins Board hinein (dort ist nichts anderes zu treffen). */
-  .sidepanel-fahne { width: 22px; }
-  .sidepanel-fahne::after { content: ''; position: absolute; inset: -6px -2px -6px -16px; }
   /* Auf schmalen Telefonen ist in der Reiter-Zeile kein Platz für 44 px —
      dort bleibt das Ziel sichtbar kleiner, die Fangfläche aber groß. */
   @media (max-width: 640px) {
@@ -6025,14 +5973,6 @@ audio.file-media { height: 40px; }
    Am Telefon füllt die Leiste den Schirm — in der Übersicht deckte sie damit
    genau das zu, was man sehen wollte. Dort ist die Übersicht selbst schon der
    Navigator; die Leiste erscheint deshalb erst ab Tablet-Breite. */
-@media (max-width: 699px) {
-  .sidepanel-zone.nur-breit { display: none; }
-}
-/* Statt der (in der Übersicht doppelten) Umschalt-Tasten nur eine Überschrift */
-.sidepanel-titel {
-  font-size: 12px; font-weight: 700; color: var(--ink);
-  padding: 2px 4px; letter-spacing: 0.01em;
-}
 
 /* M287: Umbenennen-Stift im Navigator — Boards heißen dort nicht mehr nur so,
    sie lassen sich auch dort ändern (vorher nur in der Tab-Leiste und auf der
@@ -6094,7 +6034,6 @@ audio.file-media { height: 40px; }
 /* Archivierte Boards zeigen sich nur mit „Archiv einblenden" — dann aber
    sichtbar gedimmt, genau wie archivierte Karten auf dem Board. */
 .side-board.archiviert .side-board-name,
-.nav-board-wrap.archiviert .tab-tree-board,
 .ov-board.archiviert { opacity: .55; }
 .ov-board.archiviert { border-style: dashed; }
 .archiv-marke {
@@ -6182,4 +6121,11 @@ audio.file-media { height: 40px; }
     border-radius: 16px; overflow: auto;
   }
   .modal.geteilt-modal .modal-head { border-radius: 16px 16px 0 0; }
+}
+
+/* ---------- M296: Telefon — Rechtliches liegt im Logo-Menü, nicht unter dem Dock ---------- */
+/* Steht am Ende des Stylesheets, damit es die Grundregel von .legal-corner sicher überschreibt. */
+@media (max-width: 640px) {
+  .legal-corner { display: none; }
+  .react-flow__attribution { bottom: 84px; }
 }

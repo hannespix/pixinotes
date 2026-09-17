@@ -244,7 +244,7 @@ export function TaskHub() {
       updateNodeDataOnBoard(t.boardId, t.nodeId, {
         items: k.items.map((it) => (it.id === t.itemId ? mitSpalte(it, doneCol(k), k) : it)),
       });
-      confetti({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
+      if (useBoard.getState().konfetti) confetti({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
     } else if (t.kind === 'gantt') {
       logDone(t);
       // Gantt-Vorgang erledigen = Fortschritt auf 100 % (M113)
@@ -252,7 +252,7 @@ export function TaskHub() {
       updateNodeDataOnBoard(t.boardId, t.nodeId, {
         rows: g.rows.map((r) => (r.id === t.itemId ? { ...r, progress: 100 } : r)),
       });
-      confetti({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
+      if (useBoard.getState().konfetti) confetti({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
     } else {
       logDone(t);
       updateNodeDataOnBoard(t.boardId, t.nodeId, {

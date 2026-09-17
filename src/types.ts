@@ -136,6 +136,8 @@ export interface KanbanData {
   autoArchiv?: boolean;
   /** M293: nach wie vielen Tagen in „Erledigt" (Standard 7, siehe ticketArchiv.ts) */
   autoArchivTage?: number;
+  /** M295: Kompakte Tickets — nur Text, Priorität und Frist; Chips erst beim Zeigen */
+  kompakt?: boolean;
   [key: string]: unknown;
 }
 
@@ -388,7 +390,14 @@ export type AppNode =
   // Seit M111 STANDARD AN: undefined = an, false = manuell gebrochen.
   // font/fontSize (M200): Schrift & Textgröße pro Karte — kuratierte Stapel
   // statt endloser Font-Listen; undefined = Standard/M.
-  & { archived?: boolean; autoFit?: boolean; font?: CardFont; fontSize?: CardSize };
+  // kachel (M298): Große Module (Kanban, Zeitplan, Wochenplan, Protokoll)
+  // liegen als KACHEL mit Kennzahlen auf dem Board und öffnen sich im Fokus —
+  // das Board hört auf, mit jedem Modul zu wachsen. kachelMass merkt sich die
+  // Größe vor dem Zusammenklappen fürs Ausklappen.
+  & { archived?: boolean; autoFit?: boolean; font?: CardFont; fontSize?: CardSize; kachel?: boolean; kachelMass?: { w: number; h: number } };
+
+/** M298: Modultypen, die sich zur Kachel zusammenklappen lassen */
+export const KACHEL_TYPEN: ReadonlySet<string> = new Set(['kanban', 'gantt', 'week', 'minutes']);
 
 /** M200: kuratierte Schrift-Stapel — alle offline (Kalam + Atkinson eingebettet) */
 export type CardFont = 'serif' | 'lesbar' | 'hand' | 'mono';

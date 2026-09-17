@@ -339,7 +339,7 @@ export function useNurBilderInDenText(
       if (pruefe(e.clipboardData) === 'egal') return;
       e.preventDefault();
       e.stopPropagation();
-      useBoard.getState().showToast('In eine Notiz passen Bilder. Andere Dateien aufs Board ziehen — sie werden dort eine Datei-Karte.');
+      useBoard.getState().showToast('In eine Notiz passen nur Bilder, andere Dateien aufs Board ziehen.');
     };
     const beimAblegen = (e: DragEvent) => {
       if (pruefe(e.dataTransfer) === 'egal') return;

@@ -14,7 +14,7 @@ import {
   type NodeChange,
 } from '@xyflow/react';
 import { buildStarter } from './lib/starter';
-import { uid, type AppNode, type CardFont, type CardSize, type TimeSeg } from './types';
+import { KACHEL_TYPEN, uid, type AppNode, type CardFont, type CardSize, type TimeSeg } from './types';
 import { anchorStroke, integrateStroke } from './lib/strokeAnchor';
 import { findFreeSpot, frameMembers } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
@@ -393,8 +393,6 @@ interface BoardState {
   setGraphLayer: (key: 'cards' | 'portals' | 'wikis' | 'projectOnly' | 'physik' | 'vorschlaege' | 'regionen', on: boolean) => void;
   /** M194: Ausfahrbare Seitenleiste — der Überblick bleibt neben der Arbeit
    *  stehen, statt sie zu verdrängen. Zustand komplett persistent. */
-  sidebar: { open: boolean; mode: 'hierarchie' | 'netz'; width: number; height?: number };
-  setSidebar: (patch: Partial<{ open: boolean; mode: 'hierarchie' | 'netz'; width: number; height: number }>) => void;
   updateNodeData: (id: string, data: Record<string, unknown>) => void;
   /** Kartengröße setzen (Auto-Größe der Diagramm-Karte, M92c) */
   resizeNode: (id: string, width: number, height: number) => void;
@@ -402,6 +400,8 @@ interface BoardState {
   setNodeHeight: (id: string, height: number) => void;
   /** Auto-Größe je Karte an/aus (M103; seit M111 Standard AN — false = manuell gebrochen) */
   setAutoFit: (ids: string[], on: boolean) => void;
+  /** M298: Große Module als Kachel zusammenklappen (on) oder wieder ausklappen */
+  setKachel: (ids: string[], on: boolean) => void;
   /** M200: Schrift/Textgröße pro Karte — null setzt auf Standard zurück */
   setCardTypo: (ids: string[], patch: { font?: CardFont | null; fontSize?: CardSize | null }) => void;
   setNodePosition: (id: string, x: number, y: number) => void;
@@ -432,10 +432,22 @@ interface BoardState {
   helpOpen: boolean;
   helpSection: string | null;
   setHelpOpen: (open: boolean, section?: string | null) => void;
+  /** M300: Bild-Export des aktuellen Boards — ein Fenster aus dem Dock (⋯) */
+  bildExportOpen: boolean;
+  setBildExportOpen: (open: boolean) => void;
 
-  /** Physik (Verdrängung/Wurf) global an/aus — aus = Karten dürfen überlappen/stapeln */
+  /** Physik (Verdrängung/Wurf) global an/aus — aus = Karten dürfen überlappen/stapeln.
+   *  M294: Voreinstellung AUS — die ruhige Fläche ist der Normalfall, die
+   *  Physik bleibt als Option (Dock → ⋯ oder ⚙ → Bedienung). */
   physicsEnabled: boolean;
   setPhysicsEnabled: (on: boolean) => void;
+  /** M294: Konfetti beim Erledigen — bewusst eine Option, keine Voreinstellung */
+  konfetti: boolean;
+  setKonfetti: (on: boolean) => void;
+  /** M294: Einmaliger Hinweis nach der Umstellung auf die ruhigen
+   *  Voreinstellungen (gesetzt von lib/einstellungen.ts, nicht persistiert) */
+  ruheHinweis: boolean;
+  setRuheHinweis: (on: boolean) => void;
   /** M254: Stift (Apple Pencil & Co.) zeichnet sofort — ohne Zeichenmodus */
   stiftZeichnet: boolean;
   setStiftZeichnet: (on: boolean) => void;
@@ -752,9 +764,15 @@ export const useBoard = create<BoardState>()(
         helpOpen: false,
         helpSection: null,
         setHelpOpen: (open, section = null) => set({ helpOpen: open, helpSection: section }),
+        bildExportOpen: false,
+        setBildExportOpen: (open) => set({ bildExportOpen: open }),
 
-        physicsEnabled: true,
+        physicsEnabled: false,
         setPhysicsEnabled: (on) => set({ physicsEnabled: on }),
+        konfetti: false,
+        setKonfetti: (on) => set({ konfetti: on }),
+        ruheHinweis: false,
+        setRuheHinweis: (on) => set({ ruheHinweis: on }),
         stiftZeichnet: true,
         setStiftZeichnet: (on) => set({ stiftZeichnet: on }),
 
@@ -771,7 +789,7 @@ export const useBoard = create<BoardState>()(
           }));
           get().showToast(
             archived
-              ? `🗃 ${ids.length} Karte${ids.length > 1 ? 'n' : ''} archiviert — über das Archiv-Symbol im Dock wieder einblendbar (Strg+Z macht es rückgängig).`
+              ? `🗃 ${ids.length} Karte${ids.length > 1 ? 'n' : ''} archiviert. Strg+Z holt sie zurück.`
               : `${ids.length} Karte${ids.length > 1 ? 'n' : ''} aus dem Archiv zurückgeholt.`,
           );
         },
@@ -790,7 +808,9 @@ export const useBoard = create<BoardState>()(
         setLesbareSchrift: (on) => set({ lesbareSchrift: on }),
         hoherKontrast: false,
         setHoherKontrast: (on) => set({ hoherKontrast: on }),
-        clickZoom: true,
+        // M294: aus — die Ansicht bleibt, wo sie ist; wer den Flug mag,
+        // schaltet ihn unter ⚙ → Bedienung wieder ein
+        clickZoom: false,
         setClickZoom: (on) => set({ clickZoom: on }),
         wheelZoom: false,
         setWheelZoom: (on) => set({ wheelZoom: on }),
@@ -798,20 +818,6 @@ export const useBoard = create<BoardState>()(
         setOverviewMode: (m) => set({ overviewMode: m }),
         graphLayers: { cards: false, portals: true, wikis: true, projectOnly: false },
         setGraphLayer: (key, on) => set((s) => ({ graphLayers: { ...s.graphLayers, [key]: on } })),
-        // M250: height 0 heißt „automatisch" — die Leiste nimmt dann ihre
-        // Standardhöhe ein und bleibt mittig. Erst wer selbst zieht, legt
-        // einen festen Wert fest.
-        sidebar: { open: false, mode: 'hierarchie', width: 330, height: 0 },
-        setSidebar: (patch) => set((s) => ({
-          // Breite eingrenzen: schmaler wird der Baum unlesbar, breiter frisst
-          // die Leiste die Arbeitsfläche auf
-          sidebar: {
-            ...s.sidebar, ...patch,
-            ...(patch.width != null ? { width: Math.max(240, Math.min(620, patch.width)) } : {}),
-            ...(patch.height != null ? { height: patch.height <= 0 ? 0 : Math.max(200, Math.min(4000, patch.height)) } : {}),
-          },
-        })),
-
         ui: { theme: 'system', accent: 'blau' },
         setUiTheme: (theme) => set({ ui: { ...get().ui, theme } }),
         setUiAccent: (accent) => set({ ui: { ...get().ui, accent } }),
@@ -826,7 +832,7 @@ export const useBoard = create<BoardState>()(
             // Voll-Remount: neue Boards mit BlockNote-Inhalten sauber mounten
             importEpoch: get().importEpoch + 1,
           });
-          get().showToast('🧭 Starter-Umgebung „Verwaltung" hinzugefügt: 3 Bereiche, 14 Boards — viel Spaß beim Erkunden!');
+          get().showToast('🧭 Starter-Umgebung hinzugefügt: 3 Bereiche, 14 Boards.');
         },
 
         // M184: Struktur-Import (OneNote). Bewusst EIN set() statt vieler
@@ -1522,19 +1528,19 @@ export const useBoard = create<BoardState>()(
             (t1 === consumer && (typeof sources === 'string' ? t2 === sources : sources.has(t2 ?? '')))
             || (t2 === consumer && (typeof sources === 'string' ? t1 === sources : sources.has(t1 ?? '')));
           if ((t1 === 'kanban' && t2 === 'gantt') || (t1 === 'gantt' && t2 === 'kanban')) {
-            get().showToast('🔗 Abo in beide Richtungen: Tickets mit Frist erscheinen als Meilensteine im Zeitplan, Zeitplan-Vorgänge als Tickets im Kanban.');
+            get().showToast('🔗 Verbunden: Fristen werden Meilensteine, Vorgänge werden Tickets.');
           } else if (pair('kanban')) {
-            get().showToast('🔗 Aufgaben-Abo aktiv: Offene Punkte der verbundenen Karte landen automatisch in diesem Kanban — abwählbar im Einsammeln-Panel (⚙) oder durch Löschen des Pfeils. Erledigte Tickets haken die Quelle zurück ab.');
+            get().showToast('🔗 Verbunden: Offene Punkte der Karte landen als Tickets im Kanban.');
           } else if (pair('calendar')) {
-            get().showToast('🔗 Kalender-Fokus aktiv: Der Kalender zeigt jetzt Termine & Fristen der verbundenen Karten — der Bereich-Schalter in der Kopfzeile stellt jederzeit um.');
+            get().showToast('🔗 Verbunden: Der Kalender zeigt Termine und Fristen der Karte.');
           } else if (pair('time', 'week')) {
-            get().showToast('🔗 Soll/Ist aktiv: Der verbundene Wochenplan liefert die Sollzeit — die Zeiterfassung zeigt in Tag- und Wochenansicht die Differenz.');
+            get().showToast('🔗 Verbunden: Der Wochenplan liefert die Sollzeit für die Zeiterfassung.');
           } else if (pair('time', 'note') || pair('time', 'kanban')) {
-            get().showToast('🔗 ⏱-Chip aktiv: Die verbundene Karte zeigt jetzt Arbeitszeit von heute und dieser Woche aus der Zeiterfassung.');
+            get().showToast('🔗 Verbunden: Die Karte zeigt die Arbeitszeit aus der Zeiterfassung.');
           } else if (pair('mermaid', 'note')) {
-            get().showToast('🔗 Diagramm-Abo: Ein leeres bzw. Vorlagen-Diagramm folgt jetzt automatisch der Checkliste der verbundenen Notiz (Erledigtes grün) — bei eigenem Inhalt schaltet der „⇢ Abo"-Chip im Diagramm das Abo bewusst zu.');
+            get().showToast('🔗 Verbunden: Das Diagramm folgt der Checkliste der Notiz.');
           } else if (pair('note', 'htmlapp')) {
-            get().showToast('🔗 App-Auszug aktiv: Die verbundene Notiz zeigt den Speicherstand der App als lesbaren Auszug — live bei jedem Speichern.');
+            get().showToast('🔗 Verbunden: Die Notiz zeigt den Speicherstand der App.');
           }
         },
 
@@ -1866,6 +1872,27 @@ export const useBoard = create<BoardState>()(
             ),
           })),
 
+        setKachel: (ids, on) => {
+          if (ids.length === 0) return;
+          get().pushHistory();
+          const idSet = new Set(ids);
+          patchActive((b) => ({
+            nodes: b.nodes.map((n) => {
+              if (!idSet.has(n.id) || !KACHEL_TYPEN.has(n.type ?? '')) return n;
+              if (on) {
+                if (n.kachel) return n;
+                // Größe merken, damit „Ausklappen" die Karte so zurückbringt, wie sie war
+                const w = (typeof n.width === 'number' ? n.width : n.measured?.width) ?? 420;
+                const h = (typeof n.height === 'number' ? n.height : n.measured?.height) ?? 260;
+                return { ...n, kachel: true, kachelMass: { w, h }, width: 300, height: undefined, autoFit: undefined } as AppNode;
+              }
+              if (!n.kachel) return n;
+              const m = n.kachelMass;
+              return { ...n, kachel: undefined, kachelMass: undefined, width: m?.w ?? n.width, height: m?.h ?? n.height } as AppNode;
+            }),
+          }));
+        },
+
         setCardTypo: (ids, patch) => {
           if (ids.length === 0) return;
           get().pushHistory();
@@ -1945,6 +1972,7 @@ export const useBoard = create<BoardState>()(
         templates: s.templates,
         ui: s.ui,
         physicsEnabled: s.physicsEnabled,
+        konfetti: s.konfetti,
         stiftZeichnet: s.stiftZeichnet,
         clickZoom: s.clickZoom,
         cardFocus: s.cardFocus,
@@ -1962,7 +1990,6 @@ export const useBoard = create<BoardState>()(
         gridSnap: s.gridSnap,
         overviewMode: s.overviewMode,
         graphLayers: s.graphLayers,
-        sidebar: s.sidebar,
       }),
       migrate: (persisted: unknown, version: number) => {
         const p = persisted as Record<string, unknown>;

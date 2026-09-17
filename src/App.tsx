@@ -27,9 +27,9 @@ import { FocusSheet } from './components/FocusSheet';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Onboarding } from './components/Onboarding';
 import { BacklinksPanel } from './components/BacklinksPanel';
-import { SidePanel } from './components/SidePanel';
 import { ShareCardsModal } from './components/ShareCardsModal';
 import { HelpOverlay } from './components/HelpOverlay';
+import { BildExport } from './components/BildExport';
 import { GeteiltDialog } from './components/GeteiltDialog';
 import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
@@ -71,18 +71,17 @@ export default function App() {
     return () => clearTimeout(t);
   }, []);
 
-  // Gesten-Spickzettel: statt Dauer-Pille im Header (kollidierte mit den
-  // Bedienelementen) einmal pro Sitzung kurz als Toast beim Start
+  // M294: Der Gesten-Spickzettel beim Sitzungsstart ist weg — die Begrüßung
+  // beim ersten Start und der Hinweis auf der leeren Fläche sagen dasselbe,
+  // und der Toast lag acht Sekunden über den Dock-Menüs.
+  // Einmalig nach der Umstellung auf die ruhige Fläche (lib/einstellungen.ts):
+  // sagen, was sich geändert hat und wo es wieder anzuschalten ist.
   useEffect(() => {
+    if (!useBoard.getState().ruheHinweis) return;
     const t = setTimeout(() => {
-      if (sessionStorage.getItem('pixinotes-hint-shown')) return;
-      sessionStorage.setItem('pixinotes-hint-shown', '1');
-      useBoard.getState().showToast(
-        '💡 Doppelklick = Notiz · E-Mails & Dateien reinziehen · Strg+V für Screenshots · Karten werfen 🚀',
-        false,
-        8000,
-      );
-    }, 900);
+      useBoard.getState().setRuheHinweis(false);
+      useBoard.getState().showToast('Physik und Klick-Zoom sind jetzt aus. Wieder einschalten: ⚙ → Bedienung.', false, 8000);
+    }, 1500);
     return () => clearTimeout(t);
   }, []);
 
@@ -153,7 +152,7 @@ export default function App() {
     const lauf = () => {
       const n = autoArchivAlleBoards();
       if (n > 0) {
-        useBoard.getState().showToast(`🗃 ${n} erledigte${n === 1 ? 's Ticket' : ' Tickets'} automatisch archiviert — 🗃 am Kanban zeigt das Archiv.`);
+        useBoard.getState().showToast(`🗃 ${n} erledigte${n === 1 ? 's Ticket' : ' Tickets'} automatisch archiviert.`);
       }
     };
     const t0 = setTimeout(lauf, 4000);
@@ -189,7 +188,7 @@ export default function App() {
       if (now - lastDefense < 10_000) return; // gedrosselt: kein Toast/Write-Ping-Pong
       lastDefense = now;
       if (singleWriterSupported()) reassertPersist();
-      showToast('⚠️ Ein weiteres PixiNotes-Fenster schreibt in den Speicher (vermutlich mit alter App-Version) — bitte das andere Fenster schließen. Dieses Fenster behält seinen Stand.');
+      showToast('⚠️ Ein zweites PixiNotes-Fenster schreibt mit, bitte das andere Fenster schließen.');
     };
     window.addEventListener('storage', onStorage);
     return () => { window.removeEventListener('storage', onStorage); clearTimeout(adoptTimer); };
@@ -198,7 +197,7 @@ export default function App() {
   // Quota-Warnung aus dem Storage-Layer (Audit K1)
   useEffect(() => {
     const warn = () =>
-      showToast('⚠️ Browser-Speicher voll — Änderungen werden nicht mehr gesichert! Große Bilder löschen oder Inhalte exportieren.');
+      showToast('⚠️ Speicher voll, Änderungen werden nicht gesichert. Große Bilder löschen oder exportieren.');
     window.addEventListener('pixinotes:quota', warn);
     return () => window.removeEventListener('pixinotes:quota', warn);
   }, [showToast]);
@@ -224,12 +223,7 @@ export default function App() {
           <ErrorBoundary what="Die Übersicht" full>
             <Overview />
             <MiniDock />
-            {/* M285: Der Navigator gehört in JEDE Ansicht.
-                Bis hierher stand der Baum (Bereich › Projekt › Board › Karte)
-                nur neben dem Board — ausgerechnet in der Übersicht, wo man
-                den Überblick sucht, fehlte er. Jetzt ist er überall derselbe,
-                und die Karte darin öffnet dieselbe Bearbeitung wie sonst. */}
-            <ErrorBoundary what="Der Navigator"><SidePanel /></ErrorBoundary>
+            {/* M297: Der Baum steht in der linken Spalte (Tabs) — in jeder Ansicht. */}
           </ErrorBoundary>
         ) : presenting ? null : tasksOpen ? (
           <ErrorBoundary what="Die Aufgaben-Zentrale" full><TaskHub /></ErrorBoundary>
@@ -242,8 +236,6 @@ export default function App() {
             <ErrorBoundary what="Das Board" full><Board /></ErrorBoundary>
             <Dock />
             <ErrorBoundary what="Das Backlinks-Panel"><BacklinksPanel /></ErrorBoundary>
-            {/* M194: Überblick als Seitenleiste NEBEN der Arbeit */}
-            <SidePanel />
             {/* M202: Teilen-Dialog für ausgewählte Karten */}
             <ShareCardsModal />
             {/* M212: Karte im Fokus (Handy) — Rahmen und Bedienung; die Karte
@@ -254,6 +246,7 @@ export default function App() {
         <Onboarding />
         <SearchOverlay />
       <HelpOverlay />
+      <BildExport />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
       <GeteiltDialog />
       <LookupPanel />
