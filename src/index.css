@@ -6061,7 +6061,6 @@ audio.file-media { height: 40px; }
    muss deshalb eine echte Trefferfläche haben — gemessen waren es 20 Punkte,
    das ist für einen Finger zu wenig (M282: 34 als Untergrenze). */
 @media (pointer: coarse) {
-  .due-chip.bild-chip { min-height: 34px; padding: 8px 14px; font-size: 13px; }
 }
 
 /* M290: „Von einer anderen App geteilt" — der Empfangs-Dialog.

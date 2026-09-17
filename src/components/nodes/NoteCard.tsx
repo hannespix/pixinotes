@@ -21,7 +21,7 @@ import { notizBildHochladen } from '../../lib/notizBild';
 import { importFilesToBoard } from '../../lib/importFiles';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
-import { bildBlockEinfuegen, NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText, waehleBildDatei } from '../NoteTypo';
+import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from '../NoteTypo';
 
 
 
@@ -260,14 +260,19 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
    * Eine auf der Notiz abgelegte PDF wird deshalb genau dort zur Datei-Karte,
    * wo man losgelassen hat (dieselbe Pipeline wie beim Ablegen aufs Board).
    */
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, getNode } = useReactFlow();
   const aufsBoard = useCallback((dateien: File[], x: number, y: number) => {
     void importFilesToBoard(dateien, screenToFlowPosition({ x, y }));
   }, [screenToFlowPosition]);
   useNurBilderInDenText(editorRef, aufsBoard);
+  /** M302: Aus dem „/"-Menü — Dateien werden zu Karten rechts neben dieser Notiz */
+  const dateienNebenDieNotiz = useCallback((dateien: File[]) => {
+    const n = getNode(id);
+    const breite = n?.measured?.width ?? (typeof n?.width === 'number' ? n.width : 320);
+    const pos = n?.position ?? { x: 0, y: 0 };
+    void importFilesToBoard(dateien, { x: pos.x + breite + 40, y: pos.y });
+  }, [getNode, id]);
   const [tableSel, setTableSel] = useState<string | null>(null);
-  /* M289: Steht der Cursor gerade in dieser Notiz? (zeigt den Bild-Chip) */
-  const [imText, setImText] = useState(false);
   const [tabZelle, setTabZelle] = useState<{ zeile: number; spalte: number } | null>(null);
   const trackTable = () => {
     try {
@@ -411,13 +416,6 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
       <div
         className="nodrag nowheel note-editor"
         ref={editorRef}
-        /* M289: Der Bild-Chip erscheint nur, solange der Cursor wirklich im
-           Text steht — sonst trüge jede Notiz auf dem Board einen Knopf, den
-           sie in diesem Moment nicht braucht. */
-        onFocus={() => setImText(true)}
-        onBlur={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setImText(false);
-        }}
       >
         <BlockNoteView
           editor={editor}
@@ -430,8 +428,8 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
         >
           {/* M201: Standard-Leiste + A₋/A₊/A₊₊/Aa für den markierten Text */}
           <NoteToolbar />
-          {/* M283: „/" bietet die rechnende Tabelle an */}
-          <NoteSlashMenu />
+          {/* M283: „/" bietet die rechnende Tabelle an; M302: Bilder und Dateien */}
+          <NoteSlashMenu dateienAufsBoard={dateienNebenDieNotiz} />
         </BlockNoteView>
       </div>
       {tableSel && (
@@ -476,26 +474,9 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
           </button>
         </div>
       )}
-      {imText && (
-        /**
-         * M289: Der sichtbare Weg für ein Bild — vor allem am Telefon.
-         *
-         * Dort gibt es kein Strg+V, und wer „/" tippt, muss erst wissen, dass
-         * es das Menü gibt. Der Chip führt direkt in die Fotomediathek bzw.
-         * zur Kamera. `preventDefault` beim Aufsetzen des Fingers hält den
-         * Cursor im Text — sonst landete das Bild nicht dort, wo man stand.
-         */
-        <div className="due-chips nodrag" onPointerDown={(e) => e.preventDefault()}>
-          <button
-            className="due-chip bild-chip"
-            title={'Bild in die Notiz einfügen — am Telefon öffnet das die Fotomediathek oder die Kamera. '
-              + 'Ein kopiertes Bild geht auch mit Strg+V oder über das Einfügen-Menü („/" → „Bild aus Zwischenablage").'}
-            onClick={() => waehleBildDatei((f) => { void bildBlockEinfuegen(editor, f); })}
-          >
-            🖼 Bild
-          </button>
-        </div>
-      )}
+      {/* M302: Der 🖼-Chip unter der Notiz ist weg — Bild aus Datei und Datei als
+          Karte liegen im „/"-Menü, Strg+V und Ablegen bleiben. Ein Knopf, den
+          jede Notiz beim Tippen trug, für etwas, das selten vorkommt. */}
       <NoteDueChips blocks={data.blocks} />
       <NoteEntityChips blocks={data.blocks} />
       <NoteLinkChips blocks={data.blocks} />

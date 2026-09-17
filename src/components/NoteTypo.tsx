@@ -18,7 +18,7 @@ import {
   useBlockNoteEditor, useComponentsContext, useEditorContentOrSelectionChange,
 } from '@blocknote/react';
 import { RechenTabelleBlock } from './RechenTabelle';
-import { IImage, ISigma } from './Icons';
+import { IImage, IPaperclip, ISigma } from './Icons';
 import { useBoard } from '../store';
 import { bilderAusZwischenablage, notizBildHochladen } from '../lib/notizBild';
 import type { CardFont } from '../types';
@@ -258,7 +258,10 @@ function PhoneFormatDock() {
  * Bestehende Tabellen bleiben unberührt und lassen sich in der Notiz per
  * Knopf umwandeln (NoteCard).
  */
-export function NoteSlashMenu() {
+export function NoteSlashMenu({ dateienAufsBoard }: {
+  /** M302: Was mit gewählten Nicht-Bildern geschieht — die Notiz legt sie als Karten neben sich */
+  dateienAufsBoard?: (dateien: File[]) => void;
+} = {}) {
   const editor = useBlockNoteEditor() as unknown as typeof noteSchema.BlockNoteEditor;
   return (
     <SuggestionMenuController
@@ -292,6 +295,22 @@ export function NoteSlashMenu() {
           icon: <IImage size={16} />,
           onItemClick: () => { void ausZwischenablageInDenText(editor); },
         }, {
+          /* M302: der frühere 🖼-Chip — jetzt ein Eintrag im Menü */
+          title: 'Bild aus Datei',
+          subtext: 'Fotomediathek, Kamera oder Dateiwähler',
+          aliases: ['bild', 'foto', 'datei', 'kamera', 'mediathek', 'hochladen', 'upload'],
+          group: 'Medien',
+          icon: <IImage size={16} />,
+          onItemClick: () => { waehleBildDatei((f) => { void bildBlockEinfuegen(editor, f); }); },
+        }, ...(dateienAufsBoard ? [{
+          /* M302: Alles, was nicht in den Text gehört, wird zur Karte neben der Notiz */
+          title: 'Datei als Karte daneben',
+          subtext: 'PDF, Word, Tabelle … als Datei-Karte neben der Notiz',
+          aliases: ['datei', 'pdf', 'anhang', 'anlage', 'word', 'excel', 'file'],
+          group: 'Medien',
+          icon: <IPaperclip size={16} />,
+          onItemClick: () => { waehleDateien(dateienAufsBoard); },
+        }] : []), {
           title: 'Tabelle',
           subtext: 'Rechnet mit „=" — Summen, Prozente, Bedingungen',
           aliases: ['tabelle', 'table', 'rechnen', 'summe', 'excel', 'kalkulation'],
@@ -384,19 +403,29 @@ async function ausZwischenablageInDenText(editor: typeof noteSchema.BlockNoteEdi
   waehleBildDatei((f) => { void bildBlockEinfuegen(editor, f); });
 }
 
-/** Dateiwähler öffnen — am Telefon die Fotomediathek bzw. die Kamera */
-export function waehleBildDatei(nimm: (f: File) => void) {
+/** Dateiwähler öffnen — `accept` leer heißt: alle Dateien */
+function oeffneDateiwaehler(accept: string, nimm: (dateien: File[]) => void) {
   const feld = document.createElement('input');
   feld.type = 'file';
-  feld.accept = 'image/*';
+  if (accept) feld.accept = accept;
   feld.multiple = true;
   feld.style.display = 'none';
   feld.onchange = () => {
-    for (const f of Array.from(feld.files ?? [])) nimm(f);
+    nimm(Array.from(feld.files ?? []));
     feld.remove();
   };
   document.body.appendChild(feld);
   feld.click();
+}
+
+/** Dateiwähler für Bilder — am Telefon die Fotomediathek bzw. die Kamera */
+export function waehleBildDatei(nimm: (f: File) => void) {
+  oeffneDateiwaehler('image/*', (dateien) => { for (const f of dateien) nimm(f); });
+}
+
+/** M302: Dateiwähler für alles — die Dateien werden zu Karten auf dem Board */
+export function waehleDateien(nimm: (dateien: File[]) => void) {
+  oeffneDateiwaehler('', (dateien) => { if (dateien.length) nimm(dateien); });
 }
 
 /** Bild hochladen (verkleinern, Speicher prüfen) und als Block setzen */
