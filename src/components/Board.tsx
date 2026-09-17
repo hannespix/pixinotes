@@ -889,18 +889,21 @@ export function Board() {
       e.preventDefault();
 
       let placed = 0;
+      let ausgewichen = 0;
       for (const file of files) {
         try {
           const src = await imageFileToDataUrl(file);
           if (src === null) continue;   // Format nicht dekodierbar (HEIC außerhalb Safari)
-          if (!canEmbed(src.length)) {
-            showToast('⚠️ Speicher fast voll — Bild nicht eingebettet. Exportiere in den Datenordner (⚙️).');
-            break;
-          }
           const pos = screenToFlowPosition({
-            x: window.innerWidth / 2 - 130 + placed * 34,
-            y: window.innerHeight / 2 - 90 + placed * 34,
+            x: window.innerWidth / 2 - 130 + (placed + ausgewichen) * 34,
+            y: window.innerHeight / 2 - 90 + (placed + ausgewichen) * 34,
           });
+          if (!canEmbed(src.length)) {
+            // M303: nicht verwerfen — als Datei-Karte in die Geräte-Ablage
+            // (importFilesToBoard legt sie an und sagt Bescheid)
+            ausgewichen += await importFilesToBoard([file], pos);
+            continue;
+          }
           addNode(makeImage(pos, src, file.name && file.name !== 'image.png' ? file.name : 'Screenshot'));
           placed++;
         } catch (err) {

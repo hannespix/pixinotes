@@ -263,6 +263,8 @@ export function NoteSlashMenu({ dateienAufsBoard }: {
   dateienAufsBoard?: (dateien: File[]) => void;
 } = {}) {
   const editor = useBlockNoteEditor() as unknown as typeof noteSchema.BlockNoteEditor;
+  // M303: Passt ein Bild nicht mehr in den Stand, wird es zur Karte neben der Notiz
+  const ausweich = dateienAufsBoard ? (f: File) => dateienAufsBoard([f]) : undefined;
   return (
     <SuggestionMenuController
       triggerCharacter="/"
@@ -293,7 +295,7 @@ export function NoteSlashMenu({ dateienAufsBoard }: {
           aliases: ['bild', 'foto', 'zwischenablage', 'einfügen', 'screenshot', 'paste', 'clipboard'],
           group: 'Medien',
           icon: <IImage size={16} />,
-          onItemClick: () => { void ausZwischenablageInDenText(editor); },
+          onItemClick: () => { void ausZwischenablageInDenText(editor, ausweich); },
         }, {
           /* M302: der frühere 🖼-Chip — jetzt ein Eintrag im Menü */
           title: 'Bild aus Datei',
@@ -301,7 +303,7 @@ export function NoteSlashMenu({ dateienAufsBoard }: {
           aliases: ['bild', 'foto', 'datei', 'kamera', 'mediathek', 'hochladen', 'upload'],
           group: 'Medien',
           icon: <IImage size={16} />,
-          onItemClick: () => { waehleBildDatei((f) => { void bildBlockEinfuegen(editor, f); }); },
+          onItemClick: () => { waehleBildDatei((f) => { void bildBlockEinfuegen(editor, f, ausweich); }); },
         }, ...(dateienAufsBoard ? [{
           /* M302: Alles, was nicht in den Text gehört, wird zur Karte neben der Notiz */
           title: 'Datei als Karte daneben',
@@ -390,17 +392,17 @@ export function useNurBilderInDenText(
  * Fehlermeldung — dann öffnet sich der Dateiwähler, der am Telefon direkt in
  * die Fotomediathek führt.
  */
-async function ausZwischenablageInDenText(editor: typeof noteSchema.BlockNoteEditor) {
+async function ausZwischenablageInDenText(editor: typeof noteSchema.BlockNoteEditor, ausweichen?: (f: File) => void) {
   const dateien = await bilderAusZwischenablage();
   if (dateien !== 'verweigert' && dateien.length > 0) {
-    for (const f of dateien) await bildBlockEinfuegen(editor, f);
+    for (const f of dateien) await bildBlockEinfuegen(editor, f, ausweichen);
     return;
   }
   if (dateien !== 'verweigert') {
     useBoard.getState().showToast('In der Zwischenablage liegt gerade kein Bild.');
     return;
   }
-  waehleBildDatei((f) => { void bildBlockEinfuegen(editor, f); });
+  waehleBildDatei((f) => { void bildBlockEinfuegen(editor, f, ausweichen); });
 }
 
 /** Dateiwähler öffnen — `accept` leer heißt: alle Dateien */
@@ -428,13 +430,15 @@ export function waehleDateien(nimm: (dateien: File[]) => void) {
   oeffneDateiwaehler('', (dateien) => { if (dateien.length) nimm(dateien); });
 }
 
-/** Bild hochladen (verkleinern, Speicher prüfen) und als Block setzen */
-export async function bildBlockEinfuegen(editor: typeof noteSchema.BlockNoteEditor, datei: File) {
+/** Bild hochladen (verkleinern, Speicher prüfen) und als Block setzen.
+ *  M303: Reicht der Speicher nicht, nimmt `ausweichen` das Bild (Karte daneben). */
+export async function bildBlockEinfuegen(editor: typeof noteSchema.BlockNoteEditor, datei: File, ausweichen?: (f: File) => void) {
   let url: string;
   try {
-    url = await notizBildHochladen(datei);
-  } catch {
-    return;   // notizBildHochladen hat den Grund bereits gesagt
+    url = await notizBildHochladen(datei, !!ausweichen);
+  } catch (e) {
+    if ((e as Error).message === 'Speicherbudget' && ausweichen) ausweichen(datei);
+    return;   // sonst hat notizBildHochladen den Grund bereits gesagt
   }
   const block = editor.getTextCursorPosition().block;
   editor.insertBlocks(

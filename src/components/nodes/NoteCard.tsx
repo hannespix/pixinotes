@@ -17,7 +17,7 @@ import { extractEntities } from '../../lib/entities';
 import { makeNote } from '../../lib/nodes';
 import { aiReady, askAi, textToBlocks } from '../../lib/ai';
 import { repairBlocks } from '../../lib/htmlBlocks';
-import { notizBildHochladen } from '../../lib/notizBild';
+import { editorUpload } from '../../lib/notizBild';
 import { importFilesToBoard } from '../../lib/importFiles';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
@@ -200,14 +200,25 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
     return blocks.length > 0 ? blocks : undefined;
   });
 
+  /** M302/M303: Dateien (und Bilder, die nicht mehr in den Stand passen)
+   *  werden zu Karten rechts neben dieser Notiz. Steht vor dem Editor, weil
+   *  der seinen Anschluss beim Anlegen bekommt. */
+  const { screenToFlowPosition, getNode } = useReactFlow();
+  const dateienNebenDieNotiz = useCallback((dateien: File[]) => {
+    const n = getNode(id);
+    const breite = n?.measured?.width ?? (typeof n?.width === 'number' ? n.width : 320);
+    const pos = n?.position ?? { x: 0, y: 0 };
+    void importFilesToBoard(dateien, { x: pos.x + breite + 40, y: pos.y });
+  }, [getNode, id]);
   // M201: gemeinsames Schema mit Inline-Schrift/-Größe (textSize/textFont)
   const editor = useCreateBlockNote({
     schema: noteSchema,
     initialContent: initialContent as never,
     dictionary: blockNoteDe,
     // M289: Damit Bilder überhaupt in den Text dürfen — Einfügen,
-    // Ablegen und der Dateiwähler des Bild-Blocks laufen hier durch
-    uploadFile: notizBildHochladen,
+    // Ablegen und der Dateiwähler des Bild-Blocks laufen hier durch.
+    // M303: Passt ein Bild nicht mehr in den Stand, wird es zur Karte daneben.
+    uploadFile: editorUpload((f) => dateienNebenDieNotiz([f])),
   });
   useAndroidBackspaceFix(editor);
 
@@ -260,18 +271,10 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
    * Eine auf der Notiz abgelegte PDF wird deshalb genau dort zur Datei-Karte,
    * wo man losgelassen hat (dieselbe Pipeline wie beim Ablegen aufs Board).
    */
-  const { screenToFlowPosition, getNode } = useReactFlow();
   const aufsBoard = useCallback((dateien: File[], x: number, y: number) => {
     void importFilesToBoard(dateien, screenToFlowPosition({ x, y }));
   }, [screenToFlowPosition]);
   useNurBilderInDenText(editorRef, aufsBoard);
-  /** M302: Aus dem „/"-Menü — Dateien werden zu Karten rechts neben dieser Notiz */
-  const dateienNebenDieNotiz = useCallback((dateien: File[]) => {
-    const n = getNode(id);
-    const breite = n?.measured?.width ?? (typeof n?.width === 'number' ? n.width : 320);
-    const pos = n?.position ?? { x: 0, y: 0 };
-    void importFilesToBoard(dateien, { x: pos.x + breite + 40, y: pos.y });
-  }, [getNode, id]);
   const [tableSel, setTableSel] = useState<string | null>(null);
   const [tabZelle, setTabZelle] = useState<{ zeile: number; spalte: number } | null>(null);
   const trackTable = () => {

@@ -242,11 +242,20 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           continue;
         }
         if (!canEmbed(src.length)) {
-          // Zu groß fürs Board: als Datei-Karte MIT Team-Pfad ablegen statt
-          // gar nicht (M159) — über den Ordner bleibt das Bild erreichbar
-          const node = makeFile(pos, { name: file.name, size: file.size, mime: mime, dataUrl: src });
+          // M303: Zu groß fürs Board — als Datei-Karte in der Geräte-Ablage
+          // (IndexedDB, M259), NICHT als Base64 im Stand: Der hätte danach
+          // jeden Speichervorgang scheitern lassen, genau das, was canEmbed
+          // verhindern soll. Über den Team-Ordner bleibt das Bild außerdem
+          // erreichbar (M159).
+          const node = makeFile(pos, { name: file.name, size: file.size, mime, lokal: true });
+          try {
+            await saveFile(node.id, file);
+          } catch (e) {
+            console.error('Datei-Ablage fehlgeschlagen:', e);
+            delete node.data.lokal;
+          }
           addNode(node);
-          showToast('⚠️ Speicher fast voll — Bild als Datei-Karte abgelegt (nicht eingebettet).');
+          showToast('⚠️ Speicher fast voll — Bild als Datei-Karte abgelegt, nicht eingebettet.');
           mirror(file, node.id, mirrorNote);
         } else {
           const node = makeImage(pos, src, file.name);
