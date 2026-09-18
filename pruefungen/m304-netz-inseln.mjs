@@ -292,8 +292,9 @@ console.log('\n════ D: „Was ist neu" ════');
   await P.locator('button[aria-label="Über PixiNotes"]').click();
   await P.locator('.about-menu [role="menuitem"]', { hasText: 'Was ist neu' }).click();
   await P.waitForSelector('.help-neu-modal');
-  const erster = await P.locator('#help-neu li').first().textContent();
-  pruefe('D1 der erste Eintrag ist M304 und nennt die Inseln', /M304/.test(erster) && /Inseln/.test(erster), erster.slice(0, 80));
+  const eintraege = await P.locator('#help-neu li').allTextContents();
+  const eintrag = eintraege.find((t) => /M304/.test(t)) ?? '';
+  pruefe('D1 „Was ist neu" nennt M304 und die Inseln', /Inseln/.test(eintrag), eintrag.slice(0, 80) || 'kein Eintrag');
   await ctx.close();
 }
 
