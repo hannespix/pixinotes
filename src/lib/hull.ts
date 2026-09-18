@@ -57,9 +57,21 @@ function smoothPath(pts: Pt[]): string {
     const p1 = at(i);
     const p2 = at(i + 1);
     const p3 = at(i + 2);
-    // Catmull-Rom mit Spannung 1/6 — genug Rundung, ohne auszubeulen
-    const c1 = { x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 };
-    const c2 = { x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 };
+    // Catmull-Rom mit Spannung 1/6 — genug Rundung, ohne auszubeulen.
+    // M306: Die Tangente wird an der Länge des eigenen Segments gedeckelt.
+    // Folgt auf eine lange Kante eine kurze (scharfe Ecke der Hülle), zeigte
+    // die Tangente aus der langen Kante über die kurze hinaus, und die Kurve
+    // schlug einen kleinen Haken. Gedeckelt bleibt sie innerhalb des Segments.
+    const seg = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const deckel = (tx: number, ty: number) => {
+      const l = Math.hypot(tx, ty);
+      const max = seg * 0.4;
+      return l > max ? { x: (tx / l) * max, y: (ty / l) * max } : { x: tx, y: ty };
+    };
+    const t1 = deckel((p2.x - p0.x) / 6, (p2.y - p0.y) / 6);
+    const t2 = deckel((p3.x - p1.x) / 6, (p3.y - p1.y) / 6);
+    const c1 = { x: p1.x + t1.x, y: p1.y + t1.y };
+    const c2 = { x: p2.x - t2.x, y: p2.y - t2.y };
     d += ` C ${c1.x.toFixed(1)} ${c1.y.toFixed(1)}, ${c2.x.toFixed(1)} ${c2.y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
   }
   return `${d} Z`;
@@ -103,9 +115,12 @@ export function centroid(points: Pt[]): Pt {
   };
 }
 
-/** Oberster Punkt — dort sitzt die Beschriftung, damit sie nichts verdeckt */
+/** Über dem obersten Punkt sitzt die Beschriftung: dort, wo die Hülle
+ *  wirklich ist — nicht über der Schwerpunkt-Spalte, die bei einer länglichen
+ *  Fläche ins Leere zeigte (M304). */
 export function topAnchor(points: Pt[], pad = 46): Pt {
-  const c = centroid(points);
-  const top = Math.min(...points.map((p) => p.y));
-  return { x: c.x, y: top - pad - 10 };
+  if (points.length === 0) return { x: 0, y: 0 };
+  let top = points[0];
+  for (const p of points) if (p.y < top.y) top = p;
+  return { x: top.x, y: top.y - pad - 10 };
 }

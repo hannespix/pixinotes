@@ -154,36 +154,38 @@ console.log('\n════ T3: „/"-Menü ════');
   pruefe('T3a „Bild" steht im Menü', eintraege.some((t) => /^Bild/i.test(t)), JSON.stringify(eintraege));
   pruefe('T3b „Bild aus Zwischenablage" ebenfalls',
     eintraege.some((t) => /Zwischenablage/i.test(t)), JSON.stringify(eintraege));
-  pruefe('T3c Video, Ton und Datei werden NICHT angeboten (sie sprengen den Speicher)',
-    !eintraege.some((t) => /^(video|audio|ton|datei|file)/i.test(t)), JSON.stringify(eintraege));
+  // M302: „Datei als Karte daneben" legt eine Karte aufs Board, nichts in den Text — der darf bleiben
+  pruefe('T3c Video, Ton und Datei-Blöcke werden NICHT angeboten (sie sprengen den Speicher)',
+    !eintraege.some((t) => /^(video|audio|ton|file)/i.test(t) || (/^datei/i.test(t) && !/Karte/i.test(t))), JSON.stringify(eintraege));
   await P.screenshot({ path: `${SD}/m289-slash.png` });
   await ctx.close();
 }
 
-// ══ T4: Der sichtbare Weg — der Bild-Chip ═══════════════════════════
-console.log('\n════ T4: Bild-Chip an der Notiz ════');
+// ══ T4: Der Weg über das Menü — kein Chip mehr an der Notiz (M302) ══
+console.log('\n════ T4: „Bild aus Datei" im „/"-Menü ════');
 {
   const { ctx, P } = await seite();
-  pruefe('T4a ohne Cursor im Text trägt die Notiz keinen Bild-Chip',
-    await P.locator('.due-chip', { hasText: 'Bild' }).count() === 0);
   await P.locator('.note-editor .bn-block-content').first().click();
   await P.waitForTimeout(600);
-  const chip = P.locator('.due-chip', { hasText: 'Bild' }).first();
-  pruefe('T4b sobald der Cursor im Text steht, ist er da', await chip.count() > 0);
-  if (await chip.count()) {
-    const titel = await chip.getAttribute('title');
-    console.log('    Zeiger:', JSON.stringify(titel));
-    pruefe('T4c und erklärt den Weg am Telefon (Fotomediathek/Kamera)',
-      /Fotomediathek|Kamera/.test(titel ?? ''), String(titel));
-    // Der Chip öffnet einen Dateiwähler für Bilder
-    await chip.click();
+  pruefe('T4a auch mit Cursor im Text trägt die Notiz keinen Bild-Chip mehr',
+    await P.locator('.due-chip', { hasText: 'Bild' }).count() === 0);
+  await P.keyboard.press('End');
+  await P.keyboard.press('Enter');
+  await P.keyboard.type('/');
+  await P.waitForTimeout(900);
+  const menue = '.bn-suggestion-menu-item, [class*="suggestion-menu"] [role="option"]';
+  const eintrag = P.locator(menue, { hasText: 'Bild aus Datei' }).first();
+  pruefe('T4b „/" bietet „Bild aus Datei" an', await eintrag.count() > 0);
+  pruefe('T4c … und „Datei als Karte daneben"', await P.locator(menue, { hasText: 'Datei als Karte' }).count() > 0);
+  if (await eintrag.count()) {
+    await eintrag.click();
     await P.waitForTimeout(500);
     const feld = await P.evaluate(() => {
       const i = document.querySelector('input[type="file"][accept="image/*"]');
       return i ? { accept: i.accept, mehrere: i.multiple } : null;
     });
     console.log('    Dateiwähler:', JSON.stringify(feld));
-    pruefe('T4d ein Klick öffnet den Bild-Wähler', !!feld, JSON.stringify(feld));
+    pruefe('T4d der Eintrag öffnet den Bild-Wähler (am Telefon Fotomediathek/Kamera)', !!feld, JSON.stringify(feld));
   }
   await ctx.close();
 }
@@ -199,14 +201,15 @@ console.log('\n════ T5: Telefon ════');
   pruefe('T5a die Notiz öffnet sich formatfüllend', imBlatt);
   await P.locator('.note-editor .bn-block-content').first().click({ force: true });
   await P.waitForTimeout(600);
-  const chip = P.locator('.due-chip', { hasText: 'Bild' }).first();
-  pruefe('T5b der Bild-Chip ist auch dort erreichbar', await chip.count() > 0);
-  if (await chip.count()) {
-    const box = await chip.boundingBox();
-    console.log('    Trefferfläche:', JSON.stringify(box && { w: Math.round(box.width), h: Math.round(box.height) }));
-    pruefe('T5c und mit dem Finger sicher zu treffen (≥ 30 Punkte hoch)',
-      !!box && box.height >= 30, JSON.stringify(box));
-  }
+  pruefe('T5b kein Bild-Chip mehr unter der Notiz (M302)', await P.locator('.due-chip', { hasText: 'Bild' }).count() === 0);
+  await P.keyboard.press('End');
+  await P.keyboard.type('/');
+  await P.waitForTimeout(900);
+  pruefe('T5c das „/"-Menü bietet auch dort „Bild aus Datei"',
+    await P.locator('.bn-suggestion-menu-item, [class*="suggestion-menu"] [role="option"]', { hasText: 'Bild aus Datei' }).count() > 0);
+  await P.keyboard.press('Escape');
+  await P.keyboard.press('Backspace');
+  await P.waitForTimeout(200);
   // … und das Einfügen aus der Zwischenablage funktioniert dort genauso
   const roh = await einfuegen(P, '.note-editor [contenteditable="true"]');
   pruefe('T5d das Einfügen erreicht den Text', roh.ok);
@@ -231,7 +234,10 @@ console.log('\n════ T6: Export ════');
   // Karte auswählen und „Kopieren" (formatiertes HTML) drücken
   await P.locator('.note-card').first().click({ position: { x: 5, y: 5 } });
   await P.waitForTimeout(600);
-  const knopf = P.locator('.sel-toolbar button', { hasText: 'Kopieren' }).first();
+  // M296: „Formatiert kopieren" liegt im ⋯ der Auswahl-Leiste
+  await P.locator('.sel-toolbar [aria-label="Mehr"]').first().click();
+  await P.waitForTimeout(300);
+  const knopf = P.locator('.sel-more-menu button', { hasText: 'Formatiert kopieren' }).first();
   if (await knopf.count()) {
     await knopf.click();
     await P.waitForTimeout(900);

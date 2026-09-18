@@ -9,7 +9,7 @@ import { STICKY_COLORS, uid, type MinutesData, type MinutesNode } from '../../ty
 import { allDecisions, buildEntry, currentEntry, entryLabel, nextDate, sortEntries } from '../../lib/minutes';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { useAndroidBackspaceFix } from '../../lib/blocknoteAndroidFix';
-import { notizBildHochladen } from '../../lib/notizBild';
+import { editorUpload } from '../../lib/notizBild';
 import { importFilesToBoard } from '../../lib/importFiles';
 import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from '../NoteTypo';
 import { CardShell } from './CardShell';
@@ -315,7 +315,7 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
     dictionary: blockNoteDe,
     // M289: Damit Bilder überhaupt in den Text dürfen — Einfügen,
     // Ablegen und der Dateiwähler des Bild-Blocks laufen hier durch
-    uploadFile: notizBildHochladen,
+    uploadFile: editorUpload(),   // M303: nie eine abgewiesene Zusage
   });
   useAndroidBackspaceFix(editor);
   if (editorRef) editorRef.current = editor;

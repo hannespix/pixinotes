@@ -8,7 +8,7 @@ import { nodeToHtml } from '../lib/serialize';
 import { buildMermaidSource, getMermaid, preloadHandFont } from '../lib/mermaid';
 import { presentationOrder } from '../lib/presentOrder';
 import { useAndroidBackspaceFix } from '../lib/blocknoteAndroidFix';
-import { notizBildHochladen } from '../lib/notizBild';
+import { editorUpload } from '../lib/notizBild';
 import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from './NoteTypo';
 import { KanbanBody } from './nodes/KanbanCard';
 import { GanttBody } from './nodes/GanttCard';
@@ -41,7 +41,7 @@ function NoteSlide({ node }: { node: NoteNode }) {
     dictionary: blockNoteDe,
     // M289: Damit Bilder überhaupt in den Text dürfen — Einfügen,
     // Ablegen und der Dateiwähler des Bild-Blocks laufen hier durch
-    uploadFile: notizBildHochladen,
+    uploadFile: editorUpload(),   // M303: nie eine abgewiesene Zusage
   });
   useAndroidBackspaceFix(editor);
   /* M289: In der Präsentation gibt es kein Board darunter — hier wird eine

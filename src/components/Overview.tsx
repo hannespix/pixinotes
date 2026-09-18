@@ -12,7 +12,8 @@ import {
 import { hullPath, topAnchor, type Pt } from '../lib/hull';
 import { useBoard, type BoardDoc, type Project, type Space } from '../store';
 import { boardMetaLabel } from '../lib/boardStats';
-import { boardGraph, layoutGraph, type GraphLink } from '../lib/links';
+import { boardGraph, type GraphLink } from '../lib/links';
+import { gliederungAus, netzStartlage, netzSchritt, netzGrenzen, HUELLE_PROJEKT, HUELLE_BEREICH } from '../lib/netzLayout';
 import { suggestBoardLinks, type LinkSuggestion } from '../lib/brain';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
@@ -194,9 +195,20 @@ const GRAPH_W = 1100, GRAPH_H = 640;
  * pro Frame in der Physik-Schleife. Vorher hing die Fläche in der Luft, während
  * die Knoten schon weitergezogen waren; das Gelände „hinkte" sichtbar nach.
  */
-function regionGeo(ids: string[], pad: number, at: (id: string) => Pt | undefined) {
+function regionGeo(ids: string[], pad: number, at: (id: string) => Pt | undefined, fuss: (id: string) => number) {
   const pts: Pt[] = [];
-  for (const id of ids) { const p = at(id); if (p) pts.push({ x: p.x, y: p.y }); }
+  for (const id of ids) {
+    const p = at(id);
+    if (!p) continue;
+    // M304: Nicht der Mittelpunkt zählt, sondern der Fußabdruck (Kugel,
+    // Satelliten, Beschriftung): acht Punkte drumherum, so umschließt die
+    // Hülle auch die Karten-Punkte, statt sie zu schneiden.
+    const f = fuss(id);
+    for (let k = 0; k < 8; k += 1) {
+      const w = (k / 8) * Math.PI * 2;
+      pts.push({ x: p.x + Math.cos(w) * f, y: p.y + Math.sin(w) * f });
+    }
+  }
   if (pts.length === 0) return null;
   return { d: hullPath(pts, pad), label: topAnchor(pts, pad) };
 }
@@ -237,6 +249,10 @@ function groupMid(ids: string[], at: (id: string) => Pt | undefined): Pt | null 
 /** Höchstens so viele Karten-Punkte je Board (M193) — darüber wird der Ring
  *  zum Knäuel und die Board-Ebene unlesbar */
 const MAX_SATELLITES = 14;
+/** Radius der Board-Kugel aus der Kartenzahl (SVG-Einheiten) */
+const kugelRadius = (cards: number) => 14 + Math.min(26, Math.sqrt(cards) * 5);
+/** Mitte der Startfläche: dort hält die Physik das Netz */
+const MITTE = { x: GRAPH_W / 2, y: GRAPH_H / 2 };
 
 /**
  * Board-Netz. Zwei Einsatzorte (M194): als Vollbild-Ansicht in der Übersicht
@@ -303,11 +319,23 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     return boards;
   }, [projectOnly, boards, spaces, activeId]);
 
-  const W = GRAPH_W, H = GRAPH_H;
-  const { nodes, links: realLinks, pos: seedPos } = useMemo(() => {
+  /**
+   * M304: Die Startlage kennt die Gliederung. Vorher lagen die Boards auf
+   * einem Kreis in Speicher-Reihenfolge, und Wikilinks quer über Bereiche
+   * zogen ein Urlaubs-Board mitten in die Arbeit; die Bereichs-Hüllen lagen
+   * als lange Sicheln übereinander. Jetzt baut netzStartlage Inseln (Boards
+   * im Ring ums Projekt, Projekte im Ring um den Bereich) und lässt dieselbe
+   * Physik wie die Live-Schleife ausschwingen. Der Fußabdruck eines Boards
+   * (Kugel, Satelliten, Beschriftung) bestimmt den Abstand: nichts liegt
+   * übereinander, mit oder ohne Karten-Ebene.
+   */
+  const gliederung = useMemo(() => gliederungAus(spaces, scoped.map((b) => b.id)), [spaces, scoped]);
+  const { nodes, links: realLinks, pos: seedPos, fuss } = useMemo(() => {
     const g = boardGraph(scoped);
-    return { ...g, pos: layoutGraph(g.nodes, g.links, W, H) };
-  }, [scoped]);
+    const fussVon = new Map(g.nodes.map((n) => [n.id, kugelRadius(n.cards) + (showCards ? 44 : 30)]));
+    const fuss = (id: string) => fussVon.get(id) ?? 40;
+    return { ...g, fuss, pos: netzStartlage(g.nodes.map((n) => n.id), g.links, gliederung, { fuss, mitte: MITTE }) };
+  }, [scoped, gliederung, showCards]);
 
   // ---------- M205: Synapsen — was das Gehirn zu verknüpfen vorschlägt ----------
   const brainOn = useBoard((s) => s.brain.on);
@@ -342,7 +370,9 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   // ziehen sich zu ihrem Schwerpunkt, so sortiert sich die Struktur von
   // selbst in Themen-Inseln. Läuft mit abklingender Energie (kein Dauerlauf,
   // schont den Akku) und heizt bei Drag/Datenänderung wieder auf.
-  const physicsOn = layers.physik ?? true;
+  // M304: Aus, bis man sie einschaltet — Leitplanke „ruhige Fläche" (10a).
+  // Die Startlage ist bereits ausgeschwungen; es gibt nichts zu zappeln.
+  const physicsOn = layers.physik ?? false;
   const simPos = useRef(new Map<string, { x: number; y: number; vx: number; vy: number; fx?: number; fy?: number }>());
   const alpha = useRef(1);
   // M203: Positionen laufen IMPERATIV in den DOM (transform-/Linien-Attribute)
@@ -358,11 +388,8 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const regionTextEls = useRef(new Map<string, SVGTextElement>());
   const bundleEls = useRef(new Map<string, SVGLineElement>());
   const bundleTextEls = useRef(new Map<string, SVGTextElement>());
-  const projectOf = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const sp of spaces) for (const p of sp.projects) for (const id of p.boardIds) m.set(id, p.id);
-    return m;
-  }, [spaces]);
+  /** Breite des Netzes samt Hüllen (M304): Bezug für Zoomstufe und -grenze */
+  const netzBreiteRef = useRef(GRAPH_W);
 
   // Seed/Sync: neue Boards bekommen ihren Layout-Platz, verschwundene fliegen raus
   useEffect(() => {
@@ -371,7 +398,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
       if (!m.has(id)) m.set(id, { x: p.x, y: p.y, vx: 0, vy: 0 });
     }
     for (const id of [...m.keys()]) if (!seedPos.has(id)) m.delete(id);
-    alpha.current = 1;   // neue Lage → neu einschwingen
+    alpha.current = 0.4; // M304: schon ausgeschwungen — nur nachfedern, nicht neu aufheizen
     wake();              // M223: Schleife anwerfen, falls sie gerade ruht
   }, [seedPos]);
 
@@ -402,56 +429,10 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
       const a = alpha.current;
       frame += 1;
       if (a > 0.005) {
-        const arr = [...m.entries()];
-        // Abstoßung (alle Paare — Board-Zahlen bleiben klein genug)
-        for (let i = 0; i < arr.length; i += 1) {
-          for (let j = i + 1; j < arr.length; j += 1) {
-            const A = arr[i][1], B = arr[j][1];
-            let dx = A.x - B.x, dy = A.y - B.y;
-            let d2 = dx * dx + dy * dy;
-            if (d2 < 1) { dx = (Math.sin(i * 7 + j) || 0.5); dy = (Math.cos(i + j * 5) || 0.5); d2 = 1; }
-            const f = (14000 / d2) * a;
-            const d = Math.sqrt(d2);
-            A.vx += (dx / d) * f; A.vy += (dy / d) * f;
-            B.vx -= (dx / d) * f; B.vy -= (dy / d) * f;
-          }
-        }
-        // Federn entlang der Verbindungen
-        for (const l of links) {
-          const A = m.get(l.a), B = m.get(l.b);
-          if (!A || !B) continue;
-          const dx = B.x - A.x, dy = B.y - A.y;
-          const d = Math.max(1, Math.hypot(dx, dy));
-          const f = ((d - 190) / d) * 0.04 * a;
-          A.vx += dx * f; A.vy += dy * f;
-          B.vx -= dx * f; B.vy -= dy * f;
-        }
-        // Cluster-Gravitation: zum Schwerpunkt des eigenen Projekts
-        const centroids = new Map<string, { x: number; y: number; n: number }>();
-        for (const [id, p] of m) {
-          const proj = projectOf.get(id);
-          if (!proj) continue;
-          const c = centroids.get(proj) ?? { x: 0, y: 0, n: 0 };
-          c.x += p.x; c.y += p.y; c.n += 1;
-          centroids.set(proj, c);
-        }
-        for (const [id, p] of m) {
-          const proj = projectOf.get(id);
-          const c = proj ? centroids.get(proj) : undefined;
-          if (c && c.n > 1) {
-            p.vx += ((c.x / c.n) - p.x) * 0.015 * a;
-            p.vy += ((c.y / c.n) - p.y) * 0.015 * a;
-          }
-          // sanfte Mitte-Gravitation gegen das Auseinanderdriften
-          p.vx += (GRAPH_W / 2 - p.x) * 0.0022 * a;
-          p.vy += (GRAPH_H / 2 - p.y) * 0.0022 * a;
-        }
-        // Integrieren + Dämpfung; festgehaltene Knoten (Drag) bleiben am Finger
-        for (const p of m.values()) {
-          if (p.fx != null && p.fy != null) { p.x = p.fx; p.y = p.fy; p.vx = 0; p.vy = 0; continue; }
-          p.vx *= 0.82; p.vy *= 0.82;
-          p.x += p.vx; p.y += p.vy;
-        }
+        // M304: EIN Schritt für Startlage und Live-Schleife — Abstoßung,
+        // Federn nach Verwandtschaft, Schwerkraft zu Projekt und Bereich,
+        // Kollision der Fußabdrücke, Abstand der Inseln (src/lib/netzLayout.ts)
+        netzSchritt(m, links, gliederung, { fuss, mitte: MITTE }, a);
         alpha.current = a * 0.985;   // Energie klingt ab → Ruhe statt Dauerzappeln
         if (followActive.current) {
           const ap = m.get(activeIdRef.current);
@@ -490,7 +471,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
             const path = regionEls.current.get(rg.key);
             const label = regionTextEls.current.get(rg.key);
             if (!path && !label) continue;
-            const geo = regionGeo(rg.ids, rg.pad, at);
+            const geo = regionGeo(rg.ids, rg.pad, at, fuss);
             if (!geo) continue;
             path?.setAttribute('d', geo.d);
             if (label) { label.setAttribute('x', String(geo.label.x)); label.setAttribute('y', String(geo.label.y)); }
@@ -530,7 +511,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
       raf = 0;
       svgRef.current?.closest('.sidepanel')?.classList.remove('graph-motion');
     };
-  }, [physicsOn, links, projectOf]);
+  }, [physicsOn, links, gliederung, fuss]);
 
   /**
    * Effektive Positionen: mit Physik die Simulation, ohne das statische Layout.
@@ -549,6 +530,10 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     for (const [id, p] of seedPos) if (!out.has(id)) out.set(id, p);
     return out;
   })();
+  /** M304: Umriss des Netzes selbst. Die Inseln brauchen mehr Platz als die
+   *  Startfläche, und „Alles einpassen" soll alles zeigen, nicht 1100 × 640. */
+  const ganzesNetz = () => netzGrenzen(physicsOn ? simPos.current : seedPos, fuss) ?? { x: 0, y: 0, w: GRAPH_W, h: GRAPH_H };
+  netzBreiteRef.current = Math.max(GRAPH_W, ganzesNetz().w);
 
   /**
    * M221: Die Gliederung als Gelände.
@@ -579,11 +564,11 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         // Projekt-Hüllen nur, wenn der Bereich mehr als eines hat — sonst
         // läge dieselbe Fläche doppelt übereinander
         if (sp.projects.length > 1) {
-          out.push({ key: `p-${proj.id}`, kind: 'project', name: proj.name, accent, ids, pad: 34, spaceId: sp.id, schlaeft });
+          out.push({ key: `p-${proj.id}`, kind: 'project', name: proj.name, accent, ids, pad: HUELLE_PROJEKT, spaceId: sp.id, schlaeft });
         }
       }
       if (alle.length === 0) return;
-      out.push({ key: `s-${sp.id}`, kind: 'space', name: sp.name, accent, ids: alle, pad: 62, spaceId: sp.id, schlaeft });
+      out.push({ key: `s-${sp.id}`, kind: 'space', name: sp.name, accent, ids: alle, pad: HUELLE_BEREICH, spaceId: sp.id, schlaeft });
     });
     // Bereichs-Flächen zuerst zeichnen, Projekte darüber
     return out.sort((a, b) => (a.kind === 'space' ? -1 : 1) - (b.kind === 'space' ? -1 : 1));
@@ -875,7 +860,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const vpRef = useRef<SVGGElement | null>(null);
   /** Fingerabdruck der Zoomstufe: nur wenn er sich ändert, muss React ran */
   const stufe = (w: number) =>
-    `${sizeStep(w)}|${lodOf((rectWRef.current || GRAPH_W) / w)}|${geoOf(GRAPH_W / w)}`;
+    `${sizeStep(w)}|${lodOf((rectWRef.current || GRAPH_W) / w)}|${geoOf(netzBreiteRef.current / w)}`;
   const committedStufe = useRef(stufe(vb.w));
   const commitRaf = useRef(0);
   /** Maßstab wie bei preserveAspectRatio="meet": einheitlich, zentriert */
@@ -948,7 +933,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
       const rect = svgRect();
       if (!rect) return;
       // Zoomstufe begrenzen: 10× rein bis 2,5× raus
-      const w = Math.min(GRAPH_W * 2.5, Math.max(GRAPH_W / 10, v.w * f));
+      const w = Math.min(netzBreiteRef.current * 2.5, Math.max(GRAPH_W / 10, v.w * f));
       const realF = w / v.w;
       if (realF === 1) return;
       // preserveAspectRatio "meet": einheitlicher Maßstab + zentrierter Versatz
@@ -987,17 +972,40 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     zoomAt(r.left + r.width / 2, r.top + r.height / 2, f);
   };
 
-  /** M193: Beim Öffnen dorthin schauen, wo man herkommt. Vorher startete das
-   *  Netz immer links oben — bei vielen Boards wusste man nicht, wo man ist.
-   *  Nur EINMAL beim Mount, danach gehört die Ansicht dem Nutzer. */
+  /**
+   * M193: Beim Öffnen dorthin schauen, wo man herkommt. Vorher startete das
+   * Netz immer links oben — bei vielen Boards wusste man nicht, wo man ist.
+   * Nur EINMAL beim Mount, danach gehört die Ansicht dem Nutzer.
+   *
+   * M305: …aber als Karte, nicht als Nahaufnahme. Der feste Ausschnitt von
+   * 1100/1,9 Einheiten war auf einem großen Schirm eine Lupe: drei Bildpunkte
+   * je Einheit, Detailstufe 2 mit jedem Kartentitel — das Gewimmel, das beim
+   * Laden „chaotisch" wirkte (User-Screenshot). Jetzt ist der MASSSTAB die
+   * Konstante (ein Bildpunkt je Einheit, höchstens 1,3: Detailstufe 1 mit
+   * Kugeln und Punkten, ohne Titel), und der Ausschnitt folgt dem Schirm:
+   * Ein großer zeigt das ganze Netz, ein Telefon die Umgebung des aktiven
+   * Boards. Passt das Netz hinein, liegt es als Ganzes in der Mitte, sonst
+   * das aktive Board.
+   */
   const centeredOnce = useRef(false);
   useEffect(() => {
     if (centeredOnce.current) return;
     const p = pos.get(activeId);
     if (!p) return;
+    const rect = svgRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;   // noch nicht vermessen — nächster Render
     centeredOnce.current = true;
-    const w = GRAPH_W / 1.9, h = GRAPH_H / 1.9;
-    applyVb({ x: p.x - w / 2, y: p.y - h / 2, w, h });
+    const g = ganzesNetz();
+    const rand = 40;
+    // Ein Bildpunkt je Einheit — aber nie weiter draußen als „Alles einpassen"
+    // und nie näher heran als Detailstufe 1 erlaubt
+    const passend = Math.max(g.w + rand, (g.h + rand) * (rect.width / rect.height));
+    const w = Math.max(Math.min(rect.width, passend), rect.width / 1.3);
+    const h = w * (rect.height / rect.width);
+    const ganz = g.w + rand <= w && g.h + rand <= h;
+    const cx = ganz ? g.x + g.w / 2 : p.x;
+    const cy = ganz ? g.y + g.h / 2 : p.y;
+    applyVb({ x: cx - w / 2, y: cy - h / 2, w, h });
   }, [pos, activeId]);
 
   // Rad-Zoom braucht preventDefault → nativer non-passive Listener
@@ -1090,8 +1098,6 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     }
   };
 
-  const r = (cards: number) => 14 + Math.min(26, Math.sqrt(cards) * 5);
-
   // Karten-Ebene, Stufe 1 (M197): Auswahl + TITEL nur bei Datenänderung —
   // die String-Arbeit (nodeToText) hat in der Frame-Schleife nichts verloren
   const satelliteMeta = useMemo(() => {
@@ -1117,7 +1123,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   // sind statische Kinder. Vorher wurden alle Absolut-Koordinaten je Frame
   // neu gerechnet und gerendert.
   const satellites = useMemo(() => satelliteMeta.map((b) => {
-    const ring = r(b.total) + 34;
+    const ring = kugelRadius(b.total) + 34;
     const dotPos = new Map<string, { x: number; y: number }>();
     const dots = b.cards.map((c, i) => {
       const angle = (i / Math.max(1, b.cards.length)) * Math.PI * 2 - Math.PI / 2;
@@ -1175,7 +1181,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
    * ein großer Monitor nie. `zoom` ist 1, wenn alles eingepasst ist, und läuft
    * von 0,4 (ganz heraus) bis 10 (ganz heran) — die Grenzen aus `zoomAt`.
    */
-  const geoLevel = geoOf(GRAPH_W / vb.w);
+  const geoLevel = geoOf(netzBreiteRef.current / vb.w);
   /** Wunschgröße in Bildschirm-Pixeln → SVG-Einheiten (konstant auf dem Schirm) */
   const ui = (px: number) => px / scale;
   scaleRef.current = scale;
@@ -1234,12 +1240,13 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         <g className="ov-graph-vp" ref={vpRef}>
         {/* M221: Gelände zuerst — alles Weitere liegt darauf */}
         {regions.map((rg) => {
-          const geo = regionGeo(rg.ids, rg.pad, (id) => pos.get(id));
+          const geo = regionGeo(rg.ids, rg.pad, (id) => pos.get(id), fuss);
           if (!geo) return null;
           return (
             <g
               key={rg.key}
               className={`ov-region ov-region-${rg.kind} ${rg.schlaeft ? 'schlaeft' : ''}`}
+              data-region={rg.key}
               onClick={() => { if (brainOn) toggleBrainSpace(rg.spaceId); }}
             >
               <title>
@@ -1362,7 +1369,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         })}
         {nodes.map((n) => {
           const p = pos.get(n.id)!;
-          const rad = r(n.cards);
+          const rad = kugelRadius(n.cards);
           return (
             <g
               key={n.id}
@@ -1370,6 +1377,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
               // pro Frame ändert sich nur noch dieses eine transform-Attribut
               ref={(el) => { if (el) nodeEls.current.set(n.id, el); else nodeEls.current.delete(n.id); }}
               transform={`translate(${p.x} ${p.y})`}
+              data-board={n.id}
               className={`ov-graph-node ${n.id === activeId ? 'here' : ''} ${marking ? (hits.boards.has(n.id) ? 'hit' : 'dim') : ''} ${linkFrom === n.id ? 'linking' : ''}`}
               data-tip={linkFrom
                 ? `Klicken: Portal „${boardName(linkFrom)}" → „${n.label}" anlegen`
@@ -1415,7 +1423,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         <button onClick={() => zoomButton(1 / 1.35)} title="Vergrößern" aria-label="Vergrößern"><IZoomIn size={16} /></button>
         <button onClick={() => zoomButton(1.35)} title="Verkleinern" aria-label="Verkleinern"><IZoomOut size={16} /></button>
         <button
-          onClick={() => { followActive.current = false; applyVb({ x: 0, y: 0, w: GRAPH_W, h: GRAPH_H }); }}
+          onClick={() => { followActive.current = false; applyVb(ganzesNetz()); }}
           title="Alles einpassen"
           aria-label="Alles einpassen"
         >

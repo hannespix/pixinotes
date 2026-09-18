@@ -29,7 +29,7 @@ import { canEmbed } from './nodes';
  *    eingebettet — sonst scheiterte ab da jeder Schreibvorgang und der ganze
  *    Board-Stand ginge beim nächsten Laden verloren.
  */
-export async function notizBildHochladen(file: File): Promise<string> {
+export async function notizBildHochladen(file: File, stillBeiBudget = false): Promise<string> {
   const { showToast } = useBoard.getState();
   if (!file.type.startsWith('image/')) {
     showToast('In eine Notiz passen nur Bilder, andere Dateien aufs Board ziehen.');
@@ -41,10 +41,31 @@ export async function notizBildHochladen(file: File): Promise<string> {
     throw new Error('Format nicht lesbar');
   }
   if (!canEmbed(src.length)) {
-    showToast('⚠️ Speicher fast voll — Bild nicht eingebettet. Exportiere in den Datenordner (⚙️).');
+    if (!stillBeiBudget) showToast('⚠️ Speicher fast voll — Bild nicht eingebettet. Exportiere in den Datenordner (⚙️).');
     throw new Error('Speicherbudget');
   }
   return src;
+}
+
+/**
+ * M303: Der Anschluss für den Editor — nie eine abgewiesene Zusage.
+ *
+ * BlockNote setzt beim Einfügen und Ablegen ZUERST einen leeren Bild-Block
+ * und wartet dann auf die Adresse. Wies die Funktion oben ab, blieb der
+ * leere Block stehen, und die Abweisung landete unbehandelt in der Konsole
+ * („Uncaught (in promise) Error: Speicherbudget"). Jetzt bekommt der Editor
+ * in diesem Fall einen leeren Absatz zurück — der Platzhalter verschwindet —
+ * und das Bild geht, wo es einen Ausweichweg gibt, als Karte aufs Board.
+ */
+export function editorUpload(ausweichen?: (f: File) => void) {
+  return async (file: File): Promise<string | Record<string, unknown>> => {
+    try {
+      return await notizBildHochladen(file, !!ausweichen);
+    } catch (e) {
+      if ((e as Error).message === 'Speicherbudget' && ausweichen) ausweichen(file);
+      return { type: 'paragraph', props: {}, content: [] };
+    }
+  };
 }
 
 /**
