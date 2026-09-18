@@ -972,17 +972,40 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     zoomAt(r.left + r.width / 2, r.top + r.height / 2, f);
   };
 
-  /** M193: Beim Öffnen dorthin schauen, wo man herkommt. Vorher startete das
-   *  Netz immer links oben — bei vielen Boards wusste man nicht, wo man ist.
-   *  Nur EINMAL beim Mount, danach gehört die Ansicht dem Nutzer. */
+  /**
+   * M193: Beim Öffnen dorthin schauen, wo man herkommt. Vorher startete das
+   * Netz immer links oben — bei vielen Boards wusste man nicht, wo man ist.
+   * Nur EINMAL beim Mount, danach gehört die Ansicht dem Nutzer.
+   *
+   * M305: …aber als Karte, nicht als Nahaufnahme. Der feste Ausschnitt von
+   * 1100/1,9 Einheiten war auf einem großen Schirm eine Lupe: drei Bildpunkte
+   * je Einheit, Detailstufe 2 mit jedem Kartentitel — das Gewimmel, das beim
+   * Laden „chaotisch" wirkte (User-Screenshot). Jetzt ist der MASSSTAB die
+   * Konstante (ein Bildpunkt je Einheit, höchstens 1,3: Detailstufe 1 mit
+   * Kugeln und Punkten, ohne Titel), und der Ausschnitt folgt dem Schirm:
+   * Ein großer zeigt das ganze Netz, ein Telefon die Umgebung des aktiven
+   * Boards. Passt das Netz hinein, liegt es als Ganzes in der Mitte, sonst
+   * das aktive Board.
+   */
   const centeredOnce = useRef(false);
   useEffect(() => {
     if (centeredOnce.current) return;
     const p = pos.get(activeId);
     if (!p) return;
+    const rect = svgRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;   // noch nicht vermessen — nächster Render
     centeredOnce.current = true;
-    const w = GRAPH_W / 1.9, h = GRAPH_H / 1.9;
-    applyVb({ x: p.x - w / 2, y: p.y - h / 2, w, h });
+    const g = ganzesNetz();
+    const rand = 40;
+    // Ein Bildpunkt je Einheit — aber nie weiter draußen als „Alles einpassen"
+    // und nie näher heran als Detailstufe 1 erlaubt
+    const passend = Math.max(g.w + rand, (g.h + rand) * (rect.width / rect.height));
+    const w = Math.max(Math.min(rect.width, passend), rect.width / 1.3);
+    const h = w * (rect.height / rect.width);
+    const ganz = g.w + rand <= w && g.h + rand <= h;
+    const cx = ganz ? g.x + g.w / 2 : p.x;
+    const cy = ganz ? g.y + g.h / 2 : p.y;
+    applyVb({ x: cx - w / 2, y: cy - h / 2, w, h });
   }, [pos, activeId]);
 
   // Rad-Zoom braucht preventDefault → nativer non-passive Listener
