@@ -59,7 +59,7 @@ Das Board fühlt sich *lebendig* an, ohne zu nerven:
 
 Alle Physik-Effekte sind subtil (Feder-Animationen ~200 ms), abschaltbar und respektieren `prefers-reduced-motion`.
 
-**Seit M294 ist die Physik eine Option und standardmäßig aus.** Die ruhige Fläche ist der Normalfall; wer es lebendiger mag, schaltet Physik, Klick-Zoom und Konfetti unter ⚙ → Bedienung ein (siehe 10a).
+**Seit M294 ist die Physik eine Option und standardmäßig aus.** Die ruhige Fläche ist der Normalfall; wer es lebendiger mag, schaltet Physik, Klick-Zoom und Konfetti unter ⚙ → Bedienung ein (siehe 10a). Das Netz in der Übersicht ist die Ausnahme (M307): Seine Physik ist an, weil sich sonst kein Board ziehen lässt; sie startet aus der ausgeschwungenen Startlage (M304) und sortiert beim Laden nichts um.
 
 ---
 
