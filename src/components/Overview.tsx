@@ -370,9 +370,11 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   // ziehen sich zu ihrem Schwerpunkt, so sortiert sich die Struktur von
   // selbst in Themen-Inseln. Läuft mit abklingender Energie (kein Dauerlauf,
   // schont den Akku) und heizt bei Drag/Datenänderung wieder auf.
-  // M304: Aus, bis man sie einschaltet — Leitplanke „ruhige Fläche" (10a).
-  // Die Startlage ist bereits ausgeschwungen; es gibt nichts zu zappeln.
-  const physicsOn = layers.physik ?? false;
+  // M304 hatte sie abgeschaltet (Leitplanke „ruhige Fläche"); M307 schaltet
+  // sie auf Wunsch wieder an: Ohne Physik lässt sich kein Board ziehen, und
+  // das Ziehen ist der halbe Reiz des Netzes. Ruhig bleibt es trotzdem —
+  // die Startlage ist ausgeschwungen, die Schleife federt nur nach.
+  const physicsOn = layers.physik ?? true;
   const simPos = useRef(new Map<string, { x: number; y: number; vx: number; vy: number; fx?: number; fy?: number }>());
   const alpha = useRef(1);
   // M203: Positionen laufen IMPERATIV in den DOM (transform-/Linien-Attribute)
@@ -398,7 +400,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
       if (!m.has(id)) m.set(id, { x: p.x, y: p.y, vx: 0, vy: 0 });
     }
     for (const id of [...m.keys()]) if (!seedPos.has(id)) m.delete(id);
-    alpha.current = 0.4; // M304: schon ausgeschwungen — nur nachfedern, nicht neu aufheizen
+    alpha.current = 0.3; // M304: schon ausgeschwungen — nur nachfedern, nicht neu aufheizen
     wake();              // M223: Schleife anwerfen, falls sie gerade ruht
   }, [seedPos]);
 
@@ -1005,6 +1007,10 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     const ganz = g.w + rand <= w && g.h + rand <= h;
     const cx = ganz ? g.x + g.w / 2 : p.x;
     const cy = ganz ? g.y + g.h / 2 : p.y;
+    // M307: Der Physik-Schleife folgen (M195) nur, wenn das aktive Board die
+    // Mitte ist — liegt das ganze Netz im Bild, bleibt es dort, statt beim
+    // ersten Nachfedern auf das Board zu springen.
+    followActive.current = !ganz;
     applyVb({ x: cx - w / 2, y: cy - h / 2, w, h });
   }, [pos, activeId]);
 

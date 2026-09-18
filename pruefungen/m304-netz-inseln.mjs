@@ -147,12 +147,16 @@ console.log('════ A: Physik aus — die Landkarte liegt still ═══�
   const n = await P.locator('.ov-graph-node[data-board]').count();
   pruefe('A1 alle 13 Boards stehen im Netz', n === 13, String(n));
   const physik = P.locator('.ov-graph-toggle', { hasText: 'Physik' }).locator('input');
-  pruefe('A2 Physik ist aus, bis man sie einschaltet', !(await physik.isChecked()));
+  pruefe('A2 Physik ist an (M307: auf Wunsch wieder Voreinstellung)', await physik.isChecked());
+  const lStart = await lagen(P);
+  await P.waitForTimeout(4500);
   const l0 = await lagen(P);
+  const bewegt = Math.max(...Object.keys(lStart).map((id) => abstand(lStart[id], l0[id])));
+  pruefe('A3 beim Laden federt das Netz nur nach, es sortiert sich nicht um', bewegt < 40, `größte Bewegung ${bewegt.toFixed(1)}`);
   await P.waitForTimeout(1500);
-  const l1 = await lagen(P);
-  const bewegt = Math.max(...Object.keys(l0).map((id) => abstand(l0[id], l1[id])));
-  pruefe('A3 nichts bewegt sich von selbst', bewegt < 0.5, `größte Bewegung ${bewegt.toFixed(2)}`);
+  const lRuhe = await lagen(P);
+  const zappelt = Math.max(...Object.keys(l0).map((id) => abstand(l0[id], lRuhe[id])));
+  pruefe('A3b und kommt zur Ruhe', zappelt < 0.5, `Bewegung danach ${zappelt.toFixed(2)}`);
   const fremd = heimisch(l0);
   pruefe('A4 jedes Board liegt bei seinem Bereich, auch „Amrum 2026" trotz Wikilinks in die Arbeit', fremd.length === 0, fremd.join(','));
   const s12 = await getrennt(P, 's-s1', 's-s2');
@@ -188,10 +192,10 @@ console.log('════ A: Physik aus — die Landkarte liegt still ═══�
   await P.waitForTimeout(1200);
   await P.locator('.ov-mode button', { hasText: 'Netz' }).click();
   await P.waitForSelector('.ov-graph-node[data-board]');
-  await P.waitForTimeout(600);
+  await P.waitForTimeout(6000);
   const l2 = await lagen(P);
   const abw = Math.max(...Object.keys(l0).map((id) => abstand(l0[id], l2[id])));
-  pruefe('A9 nach dem Neuladen liegt alles genau dort wie vorher', abw < 0.01, `Abweichung ${abw.toFixed(2)}`);
+  pruefe('A9 nach dem Neuladen liegt alles dort wie vorher (deterministisch)', abw < 0.5, `Abweichung ${abw.toFixed(2)}`);
   // Alles einpassen zeigt das ganze Netz
   await P.locator('button[aria-label="Alles einpassen"]').click();
   await P.waitForTimeout(400);
@@ -210,17 +214,15 @@ console.log('════ A: Physik aus — die Landkarte liegt still ═══�
   await ctx.close();
 }
 
-console.log('\n════ B: Physik an — ruhiger Start, Heimkehr nach dem Ziehen ════');
+console.log('\n════ B: Physik — ruhiger Start, Heimkehr nach dem Ziehen ════');
 {
   const { ctx, P } = await seite();
-  await P.locator('button[aria-label="Alles einpassen"]').click();
-  await P.waitForTimeout(300);
   const l0 = await lagen(P);
-  await P.locator('.ov-graph-toggle', { hasText: 'Physik' }).locator('input').click();
-  await P.waitForTimeout(3500);
+  await P.locator('button[aria-label="Alles einpassen"]').click();
+  await P.waitForTimeout(4500);
   const l1 = await lagen(P);
   const bewegt = Math.max(...Object.keys(l0).map((id) => abstand(l0[id], l1[id])));
-  pruefe('B1 mit Physik federt das Netz nur nach, statt sich neu zu sortieren', bewegt < 80, `größte Bewegung ${bewegt.toFixed(0)}`);
+  pruefe('B1 die Physik federt nur nach, statt sich neu zu sortieren', bewegt < 40, `größte Bewegung ${bewegt.toFixed(0)}`);
   pruefe('B2 danach liegt weiter jedes Board bei seinem Bereich', heimisch(l1).length === 0, heimisch(l1).join(','));
   const s12 = await getrennt(P, 's-s1', 's-s2');
   pruefe('B3 die Bereichs-Hüllen bleiben getrennt', s12.gut, s12.info);
@@ -257,7 +259,8 @@ console.log('\n════ C: Karten-Ebene — die Hüllen umschließen die Pun
 {
   const { ctx, P } = await seite();
   await P.locator('.ov-graph-toggle', { hasText: 'Karten' }).locator('input').click();
-  await P.waitForTimeout(800);
+  // Größere Fußabdrücke: Die Physik rückt die Boards auseinander — ausschwingen lassen
+  await P.waitForTimeout(5000);
   await P.locator('button[aria-label="Alles einpassen"]').click();
   await P.waitForTimeout(500);
   const punkte = await P.locator('.ov-graph-dot').count();
