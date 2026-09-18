@@ -103,9 +103,12 @@ export function centroid(points: Pt[]): Pt {
   };
 }
 
-/** Oberster Punkt — dort sitzt die Beschriftung, damit sie nichts verdeckt */
+/** Über dem obersten Punkt sitzt die Beschriftung: dort, wo die Hülle
+ *  wirklich ist — nicht über der Schwerpunkt-Spalte, die bei einer länglichen
+ *  Fläche ins Leere zeigte (M304). */
 export function topAnchor(points: Pt[], pad = 46): Pt {
-  const c = centroid(points);
-  const top = Math.min(...points.map((p) => p.y));
-  return { x: c.x, y: top - pad - 10 };
+  if (points.length === 0) return { x: 0, y: 0 };
+  let top = points[0];
+  for (const p of points) if (p.y < top.y) top = p;
+  return { x: top.x, y: top.y - pad - 10 };
 }
