@@ -227,6 +227,9 @@ interface BoardState {
   /** M245: Breite des linken Slideouts (Navigator) in Punkten */
   navBreite: number;
   setNavBreite: (px: number) => void;
+  /** M308: Breite der linken Spalte in Punkten — am Griff ziehbar */
+  spalteBreite: number;
+  setSpalteBreite: (px: number) => void;
   /**
    * M246: Milchglas an oder aus — unabhängig vom Kontrast-Schalter.
    *
@@ -946,6 +949,8 @@ export const useBoard = create<BoardState>()(
         setNavLinks: (on) => set({ navLinks: on }),
         navBreite: 380,
         setNavBreite: (px) => set({ navBreite: Math.max(280, Math.min(760, Math.round(px))) }),
+        spalteBreite: 268,
+        setSpalteBreite: (px) => set({ spalteBreite: Math.max(200, Math.min(480, Math.round(px))) }),
         milchglas: true,
         setMilchglas: (on) => set({ milchglas: on }),
         /**
@@ -1980,6 +1985,7 @@ export const useBoard = create<BoardState>()(
         fokusVollbild: s.fokusVollbild,
         navLinks: s.navLinks,
         navBreite: s.navBreite,
+        spalteBreite: s.spalteBreite,
         milchglas: s.milchglas,
         syncDateienMb: s.syncDateienMb,
         anzeige: s.anzeige,

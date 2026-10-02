@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
-import { IChevronR, IPen } from './Icons';
+import { IArchive, IChevronR, IPen } from './Icons';
 import { InlineName } from './InlineName';
 import { BoardMenu, ProjektMenu } from './EbenenMenu';
 
@@ -29,10 +29,23 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
   const oeffneKarte = useBoard((s) => s.oeffneKarte);
   const renameBoard = useBoard((s) => s.renameBoard);
   const showArchived = useBoard((s) => s.showArchived);
+  const setShowArchived = useBoard((s) => s.setShowArchived);
   const herkunft = useBoard((s) => (s.view === 'overview' ? 'overview' as const : 'board' as const));
   const [umbenennen, setUmbenennen] = useState<string | null>(null);
   const [q, setQ] = useState('');
   const byId = useMemo(() => new Map(boards.map((b) => [b.id, b])), [boards]);
+  /**
+   * M309: Archivierte Karten sind im Baum verborgen, bis man das Archiv
+   * einblendet — wie auf dem Board (Dock) und in Kacheln und Netz (M232).
+   * Vorher listete und zählte der Baum sie mit, und in der Übersicht gab es
+   * keinen Schalter dagegen. Der Schalter steht am Fuß des Baums, nur wenn
+   * es überhaupt Archiviertes gibt; er flippt denselben Stand wie das Dock.
+   */
+  const lebt = (n: { archived?: boolean }) => showArchived || !n.archived;
+  const archivZahl = useMemo(
+    () => boards.reduce((n, b) => n + (b.archived ? 1 : 0) + b.nodes.filter((x) => x.archived).length, 0),
+    [boards],
+  );
 
   // Das Projekt des aktiven Boards ist immer aufgeklappt, das aktive Board auch
   const aktivesProjekt = useMemo(() => {
@@ -68,7 +81,7 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
   const boardZeile = (b: (typeof boards)[number]) => {
     const auf = needle ? true : offeneBoards.has(b.id);
     const karten = (needle ? b.nodes.filter((n) => nodeToText(n).toLowerCase().includes(needle)) : b.nodes)
-      .filter((n) => n.type !== 'frame');
+      .filter((n) => n.type !== 'frame' && lebt(n));
     return (
       <div key={b.id}>
         <div className={`side-board ${b.id === activeId ? 'active' : ''}${b.archived ? ' archiviert' : ''}`}>
@@ -103,7 +116,7 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
           ><IPen size={11} /></button>
           <BoardMenu boardId={b.id} onRename={() => setUmbenennen(b.id)} />
           {b.archived && <span className="archiv-marke">Archiv</span>}
-          <span className="side-board-count">{b.nodes.length}</span>
+          <span className="side-board-count">{b.nodes.filter(lebt).length}</span>
         </div>
         {auf && (
           <div className="side-cards">
@@ -111,8 +124,8 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
             {karten.map((n) => (
               <button
                 key={n.id}
-                className="side-card"
-                title="Karte öffnen und bearbeiten"
+                className={`side-card${n.archived ? ' archiviert' : ''}`}
+                title={n.archived ? 'Archivierte Karte öffnen' : 'Karte öffnen und bearbeiten'}
                 onClick={() => { oeffneKarte(b.id, n.id, herkunft); onNavigate?.(); }}
               >{cardLabel(n)}</button>
             ))}
@@ -180,6 +193,15 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
           <div className="side-space-name">Ohne Projekt</div>
           <div className="side-proj auf">{waisen.filter(passt).map(boardZeile)}</div>
         </section>
+      )}
+      {archivZahl > 0 && (
+        <button
+          className={`side-archiv ${showArchived ? 'on' : ''}`}
+          title={showArchived ? 'Archivierte Karten und Boards ausblenden' : 'Archivierte Karten und Boards einblenden'}
+          onClick={() => setShowArchived(!showArchived)}
+        >
+          <IArchive size={12} /> {showArchived ? 'Archiv ausblenden' : `Archiv einblenden (${archivZahl})`}
+        </button>
       )}
     </div>
   );

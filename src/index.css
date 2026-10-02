@@ -552,6 +552,25 @@ input.img-titel {
 /* M238: Teilen + ＋ als Gruppe — in der Reihe eine Flex-Zeile in der Flex-Zeile
    (optisch unverändert), in der linken Spalte der Fuß der Liste. */
 .tabs-foot { display: flex; align-items: center; gap: 4px; }
+/* M308: Die Spalte ist ziehbar (Griff am rechten Rand) und per Knopf
+   ausblendbar — vorher gab es dafür nur Alt+U und die Einstellungen. */
+.spalte-griff { display: none; }
+.app.nav-links .tabs.spalte .spalte-griff {
+  display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 10px;
+  cursor: col-resize; touch-action: none; z-index: 3;
+}
+.spalte-griff span {
+  position: absolute; top: 10px; bottom: 10px; right: 0; width: 3px; border-radius: 3px;
+  background: transparent; transition: background 0.15s;
+}
+.spalte-griff:hover span, .spalte-griff:active span { background: var(--accent); }
+@media (pointer: coarse) { .app.nav-links .tabs.spalte .spalte-griff { width: 18px; } }
+.tab-spalte-zu {
+  border: none; background: none; color: var(--muted); cursor: pointer;
+  width: 28px; height: 28px; border-radius: 8px; margin-left: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.tab-spalte-zu:hover { background: var(--surface-2); color: var(--ink); }
 .tab-add:hover { background: var(--surface-2); color: var(--ink); }
 
 /* ---------- Portal-Karte ---------- */
@@ -3107,6 +3126,15 @@ html[data-kopf-eng='an'] .hint { display: none; }
 }
 .side-card:hover { background: var(--surface-2); color: var(--ink); }
 .side-empty { font-size: 11px; color: var(--muted); padding: 2px 6px; font-style: italic; }
+/* M309: Archivierte Karten sind im Baum verborgen, bis man das Archiv
+   einblendet — dann stehen sie gedimmt da, der Schalter sitzt am Fuß. */
+.side-card.archiviert { opacity: 0.55; font-style: italic; }
+.side-archiv {
+  display: inline-flex; align-items: center; gap: 6px; margin: 10px 4px 4px;
+  border: 1px solid var(--border-soft); background: none; border-radius: 999px;
+  padding: 4px 10px; font: inherit; font-size: 11px; color: var(--muted); cursor: pointer;
+}
+.side-archiv:hover, .side-archiv.on { border-color: var(--accent); color: var(--accent-strong); }
 .side-foot {
   border-top: 1px solid var(--border-soft); margin-top: 8px; padding: 8px 2px 0;
   font-size: 11px; color: var(--muted);

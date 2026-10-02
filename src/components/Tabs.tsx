@@ -6,7 +6,7 @@ import { useRandZiehen } from '../lib/randZiehen';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { InlineName } from './InlineName';
 import { NavTree } from './Navigation';
-import { IChevronR, IHome, IPlus, IShare, IX } from './Icons';
+import { IChevronL, IChevronR, IHome, IPanelLeft, IPlus, IShare, IX } from './Icons';
 
 /**
  * Die Navigation der App.
@@ -45,6 +45,17 @@ export function Tabs() {
   const navBreite = useBoard((s) => s.navBreite);
   const setNavBreite = useBoard((s) => s.setNavBreite);
   const navGriff = useRandZiehen('links', setNavBreite, 380);
+  /**
+   * M308: Die Spalte ist in der Breite ziehbar und per Knopf ausblendbar.
+   * Vorher gab es dafür nur Alt+U und den Schalter in den Einstellungen —
+   * beides findet niemand, der es nicht schon kennt. Der Griff sitzt am
+   * rechten Rand der Spalte; sie beginnt 18 Punkte vom Fensterrand, darum
+   * zieht der Zeiger die Breite „minus 18" (Doppelklick: Ausgangsbreite).
+   */
+  const spalteBreite = useBoard((s) => s.spalteBreite);
+  const setSpalteBreite = useBoard((s) => s.setSpalteBreite);
+  const setNavLinks = useBoard((s) => s.setNavLinks);
+  const spalteGriff = useRandZiehen('links', (px) => setSpalteBreite(px - 18), 268 + 18);
   /**
    * M297: Spalte oder Kopfleiste? Dieselbe Grenze wie im Stylesheet (861
    * Punkte) — gemessen per Media-Query, damit JS und CSS nie auseinanderlaufen.
@@ -157,7 +168,7 @@ export function Tabs() {
       window.removeEventListener('resize', messen);
       wurzel.style.setProperty('--nav-offen', '0px');
     };
-  }, [navOpen, navLinks, navBreite, view, breit]);
+  }, [navOpen, navLinks, navBreite, spalteBreite, view, breit]);
 
   // M251/M297: Alt+W — in der Spalte springt es in die Suche des Baums, sonst
   // klappt es die Ausstülpung auf und zu.
@@ -246,6 +257,7 @@ export function Tabs() {
 
   return (
     <div className={`tabs ${kompakt ? 'kompakt' : ''} ${krumeKurz ? 'krume-kurz' : ''} ${spalte ? 'spalte' : ''}`} ref={leisteRef}>
+      {spalte && <div className="spalte-griff" {...spalteGriff}><span /></div>}
       <button
         className={`tab-home ${view === 'overview' ? 'active' : ''}`}
         title="Übersicht"
@@ -280,6 +292,14 @@ export function Tabs() {
                 title="Übersicht"
                 onClick={() => { setOverviewMode('hierarchie'); setView('overview'); setNavOpen(false); }}
               ><IHome size={13} /> Übersicht</button>
+              {breit && (
+                /* M308: Der Weg zurück zur Spalte — ab Tablet-Breite, am Telefon gibt es keine */
+                <button
+                  className="nav-overview nav-anheften"
+                  title="Als Spalte links anheften (Alt+U)"
+                  onClick={() => { setNavLinks(true); setNavOpen(false); }}
+                ><IPanelLeft size={13} /> Anheften</button>
+              )}
               <button className="nav-x" title="Schließen (Esc)" aria-label="Schließen" onClick={() => setNavOpen(false)}><IX size={13} /></button>
             </div>
             <NavTree onNavigate={() => setNavOpen(false)} />
@@ -320,7 +340,7 @@ export function Tabs() {
             title="Klick = wechseln · Doppelklick auf den Namen = umbenennen"
           >
             <InlineName value={b.name} className="tab-name" onRename={(name) => renameBoard(b.id, name)} />
-            <span className="tab-count">{b.nodes.length}</span>
+            <span className="tab-count">{b.nodes.filter((n) => showArchived || !n.archived).length}</span>
             <button
               className="tab-x"
               title="Board schließen"
@@ -358,6 +378,16 @@ export function Tabs() {
       >
         <IPlus size={14} />
       </button>
+      {spalte && (
+        <button
+          className="tab-spalte-zu"
+          title="Spalte ausblenden (Alt+U)"
+          aria-label="Spalte ausblenden"
+          onClick={() => setNavLinks(false)}
+        >
+          <IChevronL size={14} />
+        </button>
+      )}
       </div>
     </div>
   );
