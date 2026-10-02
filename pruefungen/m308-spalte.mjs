@@ -75,20 +75,24 @@ console.log('════ A: Griff — Breite ziehen ════');
   console.log('    vorher', JSON.stringify(vorher));
   pruefe('A2 Ausgangsbreite 268', vorher.spalte === 268, String(vorher.spalte));
   const g = await griff.boundingBox();
-  await P.mouse.move(g.x + g.width / 2, g.y + 300);
+  // Die Kante folgt dem Zeiger: Die Spalte beginnt 18 Punkte vom Rand, also
+  // ist die Breite am Ende „Zeiger minus 18"
+  const start = g.x + g.width / 2;
+  const erwartet = Math.round(start + 120 - 18);
+  await P.mouse.move(start, g.y + 300);
   await P.mouse.down();
-  for (let i = 1; i <= 8; i += 1) { await P.mouse.move(g.x + g.width / 2 + (120 * i) / 8, g.y + 300); await P.waitForTimeout(20); }
+  for (let i = 1; i <= 8; i += 1) { await P.mouse.move(start + (120 * i) / 8, g.y + 300); await P.waitForTimeout(20); }
   await P.mouse.up();
   await P.waitForTimeout(400);
   const nachher = await masse(P);
-  console.log('    nachher', JSON.stringify(nachher));
-  pruefe('A3 um 120 Punkte breiter gezogen', Math.abs(nachher.spalte - 388) <= 3, String(nachher.spalte));
-  pruefe('A4 die Fläche rückt mit (Rand der Fläche wächst um dieselben 120)', Math.abs((nachher.rand - vorher.rand) - 120) <= 3, `${vorher.rand} → ${nachher.rand}`);
+  console.log('    nachher', JSON.stringify(nachher), 'erwartet', erwartet);
+  pruefe('A3 die Kante folgt dem Zeiger: rund 120 Punkte breiter', Math.abs(nachher.spalte - erwartet) <= 3, `${nachher.spalte} statt ${erwartet}`);
+  pruefe('A4 die Fläche rückt um dasselbe Maß mit', Math.abs((nachher.rand - vorher.rand) - (nachher.spalte - vorher.spalte)) <= 3, `${vorher.rand} → ${nachher.rand}`);
   await P.screenshot({ path: `${SD}/m308-breit.png` });
   await P.reload({ waitUntil: 'networkidle' });
   await P.waitForTimeout(1500);
   const geladen = await masse(P);
-  pruefe('A5 die Breite überlebt das Neuladen', Math.abs(geladen.spalte - 388) <= 3, String(geladen.spalte));
+  pruefe('A5 die Breite überlebt das Neuladen (Vorliebe, nicht Stand)', Math.abs(geladen.spalte - erwartet) <= 3, String(geladen.spalte));
   await P.locator('.tabs.spalte .spalte-griff').dblclick();
   await P.waitForTimeout(400);
   const zurueck = await masse(P);
