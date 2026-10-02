@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Board } from './components/Board';
 import { Dock } from './components/Dock';
@@ -47,6 +47,8 @@ export default function App() {
   const focusCard = useBoard((s) => s.focusCard);
   const fokusVollbild = useBoard((s) => s.fokusVollbild);
   const navLinks = useBoard((s) => s.navLinks);
+  // M308: Die Spalte ist ziehbar — ihre Breite kommt aus dem Stand, nicht aus dem Stylesheet
+  const spalteBreite = useBoard((s) => s.spalteBreite);
   const restoreDeleted = useBoard((s) => s.restoreDeleted);
   const showToast = useBoard((s) => s.showToast);
 
@@ -213,7 +215,10 @@ export default function App() {
       {/* M238: `nav-links` bittet um die linke Spalte — ob sie kommt, entscheidet
           das Stylesheet: Unterhalb der Tablet-Breite bleibt es bei der
           Kopfleiste, dort wäre eine Spalte nur verlorene Fläche. */}
-      <div className={`app${focusCard ? ' focus-mode' : ''}${focusCard && fokusVollbild ? ' fokus-voll' : ''}${navLinks ? ' nav-links' : ''}`}>
+      <div
+        className={`app${focusCard ? ' focus-mode' : ''}${focusCard && fokusVollbild ? ' fokus-voll' : ''}${navLinks ? ' nav-links' : ''}`}
+        style={{ '--nav-w': `${spalteBreite}px` } as CSSProperties}
+      >
         <div className="topbar">
           <AboutMenu />
           <TopActions />

@@ -552,6 +552,25 @@ input.img-titel {
 /* M238: Teilen + ＋ als Gruppe — in der Reihe eine Flex-Zeile in der Flex-Zeile
    (optisch unverändert), in der linken Spalte der Fuß der Liste. */
 .tabs-foot { display: flex; align-items: center; gap: 4px; }
+/* M308: Die Spalte ist ziehbar (Griff am rechten Rand) und per Knopf
+   ausblendbar — vorher gab es dafür nur Alt+U und die Einstellungen. */
+.spalte-griff { display: none; }
+.app.nav-links .tabs.spalte .spalte-griff {
+  display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 10px;
+  cursor: col-resize; touch-action: none; z-index: 3;
+}
+.spalte-griff span {
+  position: absolute; top: 10px; bottom: 10px; right: 0; width: 3px; border-radius: 3px;
+  background: transparent; transition: background 0.15s;
+}
+.spalte-griff:hover span, .spalte-griff:active span { background: var(--accent); }
+@media (pointer: coarse) { .app.nav-links .tabs.spalte .spalte-griff { width: 18px; } }
+.tab-spalte-zu {
+  border: none; background: none; color: var(--muted); cursor: pointer;
+  width: 28px; height: 28px; border-radius: 8px; margin-left: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.tab-spalte-zu:hover { background: var(--surface-2); color: var(--ink); }
 .tab-add:hover { background: var(--surface-2); color: var(--ink); }
 
 /* ---------- Portal-Karte ---------- */
