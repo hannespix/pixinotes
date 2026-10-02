@@ -3126,6 +3126,15 @@ html[data-kopf-eng='an'] .hint { display: none; }
 }
 .side-card:hover { background: var(--surface-2); color: var(--ink); }
 .side-empty { font-size: 11px; color: var(--muted); padding: 2px 6px; font-style: italic; }
+/* M309: Archivierte Karten sind im Baum verborgen, bis man das Archiv
+   einblendet — dann stehen sie gedimmt da, der Schalter sitzt am Fuß. */
+.side-card.archiviert { opacity: 0.55; font-style: italic; }
+.side-archiv {
+  display: inline-flex; align-items: center; gap: 6px; margin: 10px 4px 4px;
+  border: 1px solid var(--border-soft); background: none; border-radius: 999px;
+  padding: 4px 10px; font: inherit; font-size: 11px; color: var(--muted); cursor: pointer;
+}
+.side-archiv:hover, .side-archiv.on { border-color: var(--accent); color: var(--accent-strong); }
 .side-foot {
   border-top: 1px solid var(--border-soft); margin-top: 8px; padding: 8px 2px 0;
   font-size: 11px; color: var(--muted);

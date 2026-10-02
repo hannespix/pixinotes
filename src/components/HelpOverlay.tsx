@@ -158,6 +158,7 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht im <b>Logo-Menü</b> oben links.</p>
               <ul>
+                <li><b>🗃 Archivierte Karten bleiben im Baum verborgen (M309):</b> Der Baum in Spalte und Übersicht listete und zählte archivierte Karten mit. Jetzt sind sie verborgen wie auf dem Board; am Fuß des Baums steht „Archiv einblenden", wenn es Archiviertes gibt — eingeblendet erscheinen sie gedimmt, derselbe Schalter wie im Dock.</li>
                 <li><b>↔️ Die Spalte lässt sich ziehen und ausblenden (M308):</b> Am rechten Rand der linken Spalte sitzt ein Griff — ziehen ändert die Breite, Doppelklick stellt sie zurück. Der ‹-Knopf am Fuß blendet die Spalte aus; in der Ausstülpung hinter der Brotkrume holt „Anheften" sie zurück. Alt+U tut dasselbe, die Einstellung bleibt gemerkt.</li>
                 <li><b>🧲 Physik im Netz wieder an (M307):</b> Ohne Physik ließ sich kein Board ziehen. Sie ist darum wieder die Voreinstellung, startet aber aus der fertigen Karte und federt nur nach; liegt das ganze Netz im Bild, bleibt es dort. Wer es still mag, schaltet „Physik" in der Leiste des Netzes aus.</li>
                 <li><b>🫧 Hüllen ohne Haken (M306):</b> An scharfen Ecken schlug die Kontur einer Bereichs-Hülle einen kleinen Haken nach außen. Die Rundung bleibt jetzt innerhalb ihrer Kante; die Hüllen sind glatt und schneiden sich nicht selbst.</li>

@@ -340,7 +340,7 @@ export function Tabs() {
             title="Klick = wechseln · Doppelklick auf den Namen = umbenennen"
           >
             <InlineName value={b.name} className="tab-name" onRename={(name) => renameBoard(b.id, name)} />
-            <span className="tab-count">{b.nodes.length}</span>
+            <span className="tab-count">{b.nodes.filter((n) => showArchived || !n.archived).length}</span>
             <button
               className="tab-x"
               title="Board schließen"
