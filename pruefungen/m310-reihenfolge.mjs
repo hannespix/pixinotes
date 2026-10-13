@@ -46,6 +46,8 @@ const state = {
 async function seite() {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   await ctx.addInitScript((st) => {
+    // Nur beim ERSTEN Laden setzen — ein Neuladen soll den gespeicherten Stand zeigen (A8)
+    if (localStorage.getItem('pixinotes-board')) return;
     localStorage.setItem('pixinotes-onboarded', '1');
     localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state: st }));
   }, state);
