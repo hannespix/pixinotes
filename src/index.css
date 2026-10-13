@@ -3126,6 +3126,13 @@ html[data-kopf-eng='an'] .hint { display: none; }
 }
 .side-card:hover { background: var(--surface-2); color: var(--ink); }
 .side-empty { font-size: 11px; color: var(--muted); padding: 2px 6px; font-style: italic; }
+/* M310: Boards im Baum ziehen — Linie über oder unter der Zielzeile */
+.side-board[draggable="true"] { cursor: grab; }
+.side-board.zieht { opacity: 0.45; }
+.side-board.ziel-vor { box-shadow: inset 0 2px 0 0 var(--accent); }
+.side-board.ziel-nach { box-shadow: inset 0 -2px 0 0 var(--accent); }
+.ebenen-menu button.aktiv { color: var(--accent-strong); font-weight: 600; }
+.ebenen-menu-leer { display: inline-block; width: 14px; }
 /* M309: Archivierte Karten sind im Baum verborgen, bis man das Archiv
    einblendet — dann stehen sie gedimmt da, der Schalter sitzt am Fuß. */
 .side-card.archiviert { opacity: 0.55; font-style: italic; }

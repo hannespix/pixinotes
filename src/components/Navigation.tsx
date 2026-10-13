@@ -28,11 +28,32 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
   const setView = useBoard((s) => s.setView);
   const oeffneKarte = useBoard((s) => s.oeffneKarte);
   const renameBoard = useBoard((s) => s.renameBoard);
+  const moveBoard = useBoard((s) => s.moveBoard);
+  const setProjektSortierung = useBoard((s) => s.setProjektSortierung);
   const showArchived = useBoard((s) => s.showArchived);
   const setShowArchived = useBoard((s) => s.setShowArchived);
   const herkunft = useBoard((s) => (s.view === 'overview' ? 'overview' as const : 'board' as const));
   const [umbenennen, setUmbenennen] = useState<string | null>(null);
   const [q, setQ] = useState('');
+  /**
+   * M310: Boards im Baum ziehen — innerhalb des Projekts umsortieren oder in
+   * ein anderes Projekt legen. Die Zielzeile zeigt eine Linie oben oder
+   * unten, je nachdem, in welcher Hälfte der Zeiger steht. Wer in einem
+   * automatisch sortierten Projekt zieht, schaltet es damit auf „manuell":
+   * Eine Reihenfolge, die beim nächsten Umbenennen wieder zerfällt, wäre
+   * eine Falle.
+   */
+  const [zieht, setZieht] = useState<string | null>(null);
+  const [ziel, setZiel] = useState<{ id: string; seite: 'vor' | 'nach' } | null>(null);
+  const ablegen = (boardId: string, projektId: string | null, liste: ReadonlyArray<{ id: string }>, zielId: string, seite: 'vor' | 'nach') => {
+    if (!projektId || boardId === zielId) return;
+    const i = liste.findIndex((b) => b.id === zielId);
+    const vor = seite === 'vor' ? zielId : liste[i + 1]?.id;
+    if (vor === boardId) return;
+    const projekt = spaces.flatMap((sp) => sp.projects).find((p) => p.id === projektId);
+    if (projekt?.sortierung && projekt.sortierung !== 'manuell') setProjektSortierung(projektId, 'manuell');
+    moveBoard(boardId, projektId, vor);
+  };
   const byId = useMemo(() => new Map(boards.map((b) => [b.id, b])), [boards]);
   /**
    * M309: Archivierte Karten sind im Baum verborgen, bis man das Archiv
@@ -78,13 +99,38 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
     || b.name.toLowerCase().includes(needle)
     || b.nodes.some((n) => nodeToText(n).toLowerCase().includes(needle));
 
-  const boardZeile = (b: (typeof boards)[number]) => {
+  const boardZeile = (b: (typeof boards)[number], projektId: string | null = null, liste: ReadonlyArray<{ id: string }> = []) => {
     const auf = needle ? true : offeneBoards.has(b.id);
+    const zielKlasse = ziel?.id === b.id ? ` ziel-${ziel.seite}` : '';
     const karten = (needle ? b.nodes.filter((n) => nodeToText(n).toLowerCase().includes(needle)) : b.nodes)
       .filter((n) => n.type !== 'frame' && lebt(n));
     return (
       <div key={b.id}>
-        <div className={`side-board ${b.id === activeId ? 'active' : ''}${b.archived ? ' archiviert' : ''}`}>
+        <div
+          className={`side-board ${b.id === activeId ? 'active' : ''}${b.archived ? ' archiviert' : ''}${zieht === b.id ? ' zieht' : ''}${zielKlasse}`}
+          draggable={!!projektId && umbenennen !== b.id && !needle}
+          onDragStart={(e) => {
+            e.dataTransfer.setData('text/x-pixinotes-board', b.id);
+            e.dataTransfer.effectAllowed = 'move';
+            setZieht(b.id);
+          }}
+          onDragEnd={() => { setZieht(null); setZiel(null); }}
+          onDragOver={(e) => {
+            if (!zieht || zieht === b.id || !projektId) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            const r = e.currentTarget.getBoundingClientRect();
+            const seite = e.clientY < r.top + r.height / 2 ? 'vor' : 'nach';
+            if (ziel?.id !== b.id || ziel.seite !== seite) setZiel({ id: b.id, seite });
+          }}
+          onDragLeave={() => { if (ziel?.id === b.id) setZiel(null); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            const id = e.dataTransfer.getData('text/x-pixinotes-board') || zieht;
+            if (id && ziel?.id === b.id) ablegen(id, projektId, liste, b.id, ziel.seite);
+            setZieht(null); setZiel(null);
+          }}
+        >
           <button
             className={`side-board-arrow ${auf ? 'open' : ''}`}
             title={auf ? 'Karten einklappen' : 'Karten zeigen'}
@@ -181,7 +227,7 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
                     <ProjektMenu projectId={p.id} />
                   </div>
                   {auf && liste.length === 0 && <div className="side-empty">leer</div>}
-                  {auf && liste.map(boardZeile)}
+                  {auf && liste.map((b) => boardZeile(b, p.id, liste))}
                 </div>
               );
             })}
@@ -191,7 +237,7 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
       {waisen.filter(passt).length > 0 && (
         <section className="side-space">
           <div className="side-space-name">Ohne Projekt</div>
-          <div className="side-proj auf">{waisen.filter(passt).map(boardZeile)}</div>
+          <div className="side-proj auf">{waisen.filter(passt).map((b) => boardZeile(b))}</div>
         </section>
       )}
       {archivZahl > 0 && (

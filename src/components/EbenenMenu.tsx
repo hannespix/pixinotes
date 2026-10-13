@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useBoard } from '../store';
+import { useBoard, type BoardSortierung } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
 import {
   IArchive, IArchiveRestore, ICopy, IDownload, IDuplicate, IMore, IMoveTo,
-  IPen, IPlay, IPlus, IShare, ITrash,
+  IPen, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck,
 } from './Icons';
 
 /**
@@ -205,12 +205,38 @@ export function ProjektMenu({ projectId, onRename, klasse = '' }: {
   const addBoard = useBoard((s) => s.addBoard);
   const archiveBoard = useBoard((s) => s.archiveBoard);
   const showToast = useBoard((s) => s.showToast);
+  const setProjektSortierung = useBoard((s) => s.setProjektSortierung);
+  // M310: Unteransicht „Reihenfolge" — wie „In Projekt verschieben" beim Board
+  const [ordnen, setOrdnen] = useState(false);
   const projekt = spaces.flatMap((sp) => sp.projects).find((p) => p.id === projectId);
   if (!projekt) return null;
   const offen = projekt.boardIds.filter((id) => boards.some((b) => b.id === id && !b.archived));
+  const sortierung = projekt.sortierung ?? 'manuell';
+  const SORTIERUNGEN: ReadonlyArray<readonly [BoardSortierung, string, string]> = [
+    ['manuell', 'Manuell', 'Boards im Baum oder in der Übersicht ziehen'],
+    ['alphabetisch', 'Alphabetisch', 'A bis Z nach Name'],
+    ['erstellt', 'Nach Erstellung', 'das älteste Board zuerst'],
+  ];
+  const sortName = SORTIERUNGEN.find(([k]) => k === sortierung)?.[1] ?? 'Manuell';
 
   return (
-    <MenuHuelle titel={`Projekt „${projekt.name}": umbenennen, Board anlegen, duplizieren, archivieren, löschen`} klasse={klasse} kinder={(zu) => (
+    <MenuHuelle titel={`Projekt „${projekt.name}": umbenennen, Board anlegen, sortieren, duplizieren, archivieren, löschen`} klasse={klasse} kinder={(zu) => (
+      ordnen ? (
+        <>
+          <div className="ebenen-menu-titel">Reihenfolge der Boards</div>
+          {SORTIERUNGEN.map(([art, label, hinweis]) => (
+            <button
+              key={art}
+              role="menuitemradio"
+              aria-checked={art === sortierung}
+              className={art === sortierung ? 'aktiv' : ''}
+              title={hinweis}
+              onClick={() => { setProjektSortierung(projectId, art); setOrdnen(false); zu(); }}
+            >{art === sortierung ? <ICheck size={14} /> : <span className="ebenen-menu-leer" />} {label}</button>
+          ))}
+          <button role="menuitem" className="ebenen-menu-zurueck" onClick={() => setOrdnen(false)}>← Zurück</button>
+        </>
+      ) : (
       <>
         <button role="menuitem" onClick={() => { zu(); if (onRename) onRename(); else {
           const n = window.prompt('Projekt umbenennen:', projekt.name);
@@ -221,6 +247,9 @@ export function ProjektMenu({ projectId, onRename, klasse = '' }: {
         </button>
         <button role="menuitem" onClick={() => { duplicateProject(projectId); zu(); }}>
           <ICopy size={14} /> Duplizieren (mit allen Boards)
+        </button>
+        <button role="menuitem" className="ebenen-menu-reihenfolge" onClick={() => setOrdnen(true)}>
+          <IReihenfolge size={14} /> Reihenfolge: {sortName} …
         </button>
         <div className="ebenen-menu-titel">Aufräumen</div>
         <button
@@ -247,6 +276,7 @@ export function ProjektMenu({ projectId, onRename, klasse = '' }: {
           }}
         ><ITrash size={14} /> Löschen</button>
       </>
+      )
     )} />
   );
 }
