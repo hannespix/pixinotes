@@ -121,6 +121,7 @@ function OverviewCanvas() {
   // sind, und die beiden Übersichten widersprächen sich gegenseitig.
   const boards = useMemo(() => ohneArchiv(alleBoards, showArchived), [alleBoards, showArchived]);
   const moveBoard = useBoard((s) => s.moveBoard);
+  const setProjektSortierung = useBoard((s) => s.setProjektSortierung);
   const openBoard = useBoard((s) => s.openBoard);
   const addSpace = useBoard((s) => s.addSpace);
   // tick erzwingt Neu-Layout nach einem Drag (Kacheln rasten in die Zonen zurück)
@@ -166,7 +167,29 @@ function OverviewCanvas() {
           const hit = projectRects.find(
             (r) => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h,
           );
-          if (hit && hit.id !== data.projectId) moveBoard(data.board.id, hit.id);
+          if (hit && hit.id !== data.projectId) {
+            moveBoard(data.board.id, hit.id);
+          } else if (hit) {
+            /* M310: Innerhalb des Projekts abgelegt — die Kachel rückt an den
+               Platz, über dem sie losgelassen wurde. Der Platz ergibt sich aus
+               dem Raster der Kacheln (Spalten × Zeilen); ein automatisch
+               sortiertes Projekt wird dadurch manuell. */
+            const projekt = spaces.flatMap((sp) => sp.projects).find((p) => p.id === hit.id);
+            if (projekt) {
+              const andere = projekt.boardIds.filter((id) => id !== data.board.id && boards.some((b) => b.id === id));
+              const cols = Math.max(1, Math.min(3, projekt.boardIds.filter((id) => boards.some((b) => b.id === id)).length));
+              const col = Math.max(0, Math.min(cols - 1, Math.round((node.position.x - (hit.x + GAP)) / (BW + GAP))));
+              const row = Math.max(0, Math.round((node.position.y - (hit.y + PROJ_HEAD)) / (BH + GAP)));
+              const platz = Math.min(andere.length, row * cols + col);
+              const vor = andere[platz];
+              const neu = [...andere];
+              neu.splice(platz, 0, data.board.id);
+              if (neu.some((id, i) => id !== projekt.boardIds[i])) {
+                if (projekt.sortierung && projekt.sortierung !== 'manuell') setProjektSortierung(hit.id, 'manuell');
+                moveBoard(data.board.id, hit.id, vor);
+              }
+            }
+          }
           setTick((t) => t + 1);
         }}
       >

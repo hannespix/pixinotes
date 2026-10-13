@@ -158,6 +158,7 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht im <b>Logo-Menü</b> oben links.</p>
               <ul>
+                <li><b>↕️ Boards sortieren (M310):</b> Je Projekt bestimmt das ⋯-Menü die <b>Reihenfolge der Boards</b>: <b>Manuell</b> (Boards im Baum oder als Kachel in der Übersicht ziehen), <b>Alphabetisch</b> oder <b>Nach Erstellung</b>. Umbenennen und neue Boards fügen sich in eine automatische Reihenfolge von selbst ein; wer in einem sortierten Projekt zieht, macht es manuell.</li>
                 <li><b>🗃 Archivierte Karten bleiben im Baum verborgen (M309):</b> Der Baum in Spalte und Übersicht listete und zählte archivierte Karten mit. Jetzt sind sie verborgen wie auf dem Board; am Fuß des Baums steht „Archiv einblenden", wenn es Archiviertes gibt — eingeblendet erscheinen sie gedimmt, derselbe Schalter wie im Dock.</li>
                 <li><b>↔️ Die Spalte lässt sich ziehen und ausblenden (M308):</b> Am rechten Rand der linken Spalte sitzt ein Griff — ziehen ändert die Breite, Doppelklick stellt sie zurück. Der ‹-Knopf am Fuß blendet die Spalte aus; in der Ausstülpung hinter der Brotkrume holt „Anheften" sie zurück. Alt+U tut dasselbe, die Einstellung bleibt gemerkt.</li>
                 <li><b>🧲 Physik im Netz wieder an (M307):</b> Ohne Physik ließ sich kein Board ziehen. Sie ist darum wieder die Voreinstellung, startet aber aus der fertigen Karte und federt nur nach; liegt das ganze Netz im Bild, bleibt es dort. Wer es still mag, schaltet „Physik" in der Leiste des Netzes aus.</li>
@@ -307,7 +308,7 @@ export function HelpOverlay() {
               <h4>⋯ an Board und Projekt</h4>
               <ul>
                 <li><b>Board:</b> Umbenennen · Duplizieren · In Projekt verschieben · Teilen-Link · Als Datei sichern · Präsentieren · Archivieren · Löschen.</li>
-                <li><b>Projekt:</b> Umbenennen · Neues Board · Duplizieren · Alle Boards archivieren · Löschen.</li>
+                <li><b>Projekt:</b> Umbenennen · Neues Board · Duplizieren · Reihenfolge (manuell, alphabetisch, nach Erstellung) · Alle Boards archivieren · Löschen. Manuell heißt: Boards im Baum oder als Kachel ziehen.</li>
                 <li>Archivierte Boards verschwinden aus Navigation und Übersicht, ihre Fristen ruhen. Dock ⋯ → „Archiv einblenden" zeigt sie; dort ⋯ → Zurückholen.</li>
               </ul>
               <h4>Portale</h4>

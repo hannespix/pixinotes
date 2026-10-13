@@ -111,7 +111,11 @@ export interface Project {
   id: string;
   name: string;
   boardIds: string[];
+  /** M310: Reihenfolge der Boards — fehlt ⇒ manuell (so, wie boardIds steht) */
+  sortierung?: BoardSortierung;
 }
+/** M310: manuell = gezogene Reihenfolge; alphabetisch nach Name; erstellt = Reihenfolge des Anlegens */
+export type BoardSortierung = 'manuell' | 'alphabetisch' | 'erstellt';
 
 /** Ebene 1: Ein Bereich bündelt Projekte (z. B. „Arbeit", „Privat", „Team"). */
 export interface Space {
@@ -299,6 +303,8 @@ interface BoardState {
   removeBoard: (id: string) => void;
   /** Board in ein (anderes) Projekt verschieben, optional vor ein bestimmtes Board */
   moveBoard: (boardId: string, targetProjectId: string, beforeBoardId?: string) => void;
+  /** M310: Sortierart eines Projekts setzen; „manuell" friert die aktuelle Reihenfolge ein */
+  setProjektSortierung: (projectId: string, art: BoardSortierung) => void;
   /**
    * M287: Board mit allem Inhalt kopieren — dieselbe Geste wie „Duplizieren"
    * bei einer Karte, nur eine Ebene höher. Die Kopie landet direkt neben dem
@@ -727,6 +733,37 @@ export const useBoard = create<BoardState>()(
             b.id === active.id ? { ...b, ...fn(b) } : b,
           ),
         });
+      };
+
+      /**
+       * M310: Projekte mit automatischer Reihenfolge sortieren — alphabetisch
+       * nach Name (deutsch, Zahlen natürlich) oder in der Reihenfolge des
+       * Anlegens (die Stellung im Board-Stand: addBoard und duplizieren hängen
+       * hinten an). Manuelle Projekte bleiben unberührt; unveränderte Projekte
+       * behalten ihre Objekt-Identität, damit nichts umsonst neu rendert.
+       * Wird überall angewandt, wo sich Boards oder Namen ändern — so stimmt
+       * die Reihenfolge in Baum, Reitern, Übersicht und Netz von selbst.
+       */
+      const sortiereProjekte = (spaces: Space[], boards: BoardDoc[]): Space[] => {
+        const name = new Map(boards.map((b) => [b.id, b.name]));
+        const stelle = new Map(boards.map((b, i) => [b.id, i]));
+        let geaendert = false;
+        const out = spaces.map((sp) => {
+          const projects = sp.projects.map((p) => {
+            if (!p.sortierung || p.sortierung === 'manuell') return p;
+            const ids = [...p.boardIds];
+            if (p.sortierung === 'alphabetisch') {
+              ids.sort((a, b) => (name.get(a) ?? '').localeCompare(name.get(b) ?? '', 'de', { numeric: true, sensitivity: 'base' }));
+            } else {
+              ids.sort((a, b) => (stelle.get(a) ?? 0) - (stelle.get(b) ?? 0));
+            }
+            if (ids.every((id, i) => id === p.boardIds[i])) return p;
+            geaendert = true;
+            return { ...p, boardIds: ids };
+          });
+          return projects.some((p, i) => p !== sp.projects[i]) ? { ...sp, projects } : sp;
+        });
+        return geaendert ? out : spaces;
       };
 
       /** Board-ID aus allen Projekten entfernen (Hilfsfunktion für move/delete) */
@@ -1327,14 +1364,15 @@ export const useBoard = create<BoardState>()(
               target = newSpaces[0].projects[0]?.id ?? pid;
             }
           }
+          const boards = [...get().boards, { id, name: name ?? nextName('✨ Board', get().boards.map((b) => b.name)), nodes: [], edges: [] }];
           set({
-            boards: [...get().boards, { id, name: name ?? nextName('✨ Board', get().boards.map((b) => b.name)), nodes: [], edges: [] }],
-            spaces: newSpaces.map((sp) => ({
+            boards,
+            spaces: sortiereProjekte(newSpaces.map((sp) => ({
               ...sp,
               projects: sp.projects.map((p) =>
                 p.id === target ? { ...p, boardIds: [...p.boardIds, id] } : p,
               ),
-            })),
+            })), boards),
             activeId: id,
           });
           return id;
@@ -1352,8 +1390,11 @@ export const useBoard = create<BoardState>()(
           });
         },
 
-        renameBoard: (id, name) =>
-          set({ boards: get().boards.map((b) => (b.id === id ? { ...b, name } : b)) }),
+        renameBoard: (id, name) => {
+          const boards = get().boards.map((b) => (b.id === id ? { ...b, name } : b));
+          // M310: Ein alphabetisch sortiertes Projekt rückt das Board an seinen neuen Platz
+          set({ boards, spaces: sortiereProjekte(get().spaces, boards) });
+        },
 
         removeBoard: (id) => {
           const boards = get().boards;
@@ -1375,7 +1416,7 @@ export const useBoard = create<BoardState>()(
           if (!targetExists) return;
           const stripped = stripBoardFromHierarchy(get().spaces, boardId);
           set({
-            spaces: stripped.map((sp) => ({
+            spaces: sortiereProjekte(stripped.map((sp) => ({
               ...sp,
               projects: sp.projects.map((p) => {
                 if (p.id !== targetProjectId) return p;
@@ -1385,8 +1426,18 @@ export const useBoard = create<BoardState>()(
                 else ids.push(boardId);
                 return { ...p, boardIds: ids };
               }),
-            })),
+            })), get().boards),
           });
+        },
+
+        setProjektSortierung: (projectId, art) => {
+          const spaces = get().spaces.map((sp) => ({
+            ...sp,
+            projects: sp.projects.map((p) => (p.id === projectId
+              ? { ...p, sortierung: art === 'manuell' ? undefined : art }
+              : p)),
+          }));
+          set({ spaces: sortiereProjekte(spaces, get().boards) });
         },
 
         duplicateBoard: (boardId) => {
@@ -1419,14 +1470,15 @@ export const useBoard = create<BoardState>()(
             ...quelle, id: neueId(), name: `${quelle.name} (Kopie)`,
             nodes, edges, drawings, comments: [],
           };
+          const boards = [...st.boards, kopie];
           set({
-            boards: [...st.boards, kopie],
-            spaces: st.spaces.map((sp) => ({
+            boards,
+            spaces: sortiereProjekte(st.spaces.map((sp) => ({
               ...sp,
               projects: sp.projects.map((p) => (p.boardIds.includes(boardId)
                 ? { ...p, boardIds: p.boardIds.flatMap((id) => (id === boardId ? [id, kopie.id] : [id])) }
                 : p)),
-            })),
+            })), boards),
           });
           get().showToast(`Board „${quelle.name}" kopiert — die Kopie liegt daneben.`);
         },
@@ -1461,7 +1513,7 @@ export const useBoard = create<BoardState>()(
               ? {
                 ...sp,
                 projects: sp.projects.flatMap((p) => (p.id === projectId
-                  ? [p, { id: neueId(), name: `${p.name} (Kopie)`, boardIds: ids }]
+                  ? [p, { id: neueId(), name: `${p.name} (Kopie)`, boardIds: ids, sortierung: p.sortierung }]
                   : [p])),
               }
               : sp)),

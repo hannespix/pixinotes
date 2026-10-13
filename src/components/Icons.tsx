@@ -52,6 +52,10 @@ export const IFolder = make(<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9
 export const IHome = make(<><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /><path d="M9 22V12h6v10" /></>);
 export const IChevronL = make(<path d="m15 18-6-6 6-6" />);
 export const IChevronR = make(<path d="m9 18 6-6-6-6" />);
+/** M310: Häkchen — die gewählte Sortierart */
+export const ICheck = make(<path d="m5 12 5 5L20 7" />);
+/** M310: Reihenfolge (Liste mit Pfeil) */
+export const IReihenfolge = make(<><path d="M3 6h11" /><path d="M3 12h8" /><path d="M3 18h5" /><path d="m16 10 3-3 3 3" /><path d="M19 7v14" /></>);
 export const IArrowUp = make(<><path d="M12 19V5" /><path d="m5 12 7-7 7 7" /></>);
 export const IArrowDown = make(<><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></>);
 export const IMail = make(<><rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></>);
