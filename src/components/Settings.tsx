@@ -771,7 +771,7 @@ export function Settings() {
 
           {syncWeg === 'ordner' && (
             <>
-              <p className="modal-hint">Ein Ordner, den dein Cloud-Client (Nextcloud, OneDrive, Dropbox …) synchronisiert. PixiNotes speichert dort automatisch.</p>
+              <p className="modal-hint">Ein Ordner, den dein Cloud-Client (Nextcloud, OneDrive, Dropbox …) synchronisiert. PixiNotes speichert dort automatisch und gleicht in beide Richtungen ab.</p>
               <div className="modal-buttons">
                 {!syncHandle ? (
                   <button disabled={!!busy} onClick={() => doExport(connectSync, 'sync')}>
@@ -820,7 +820,7 @@ export function Settings() {
                     ? `⚠️ Verbunden mit „${syncHandle.name}", aber der Browser hat den Zugriff nach dem Neustart zurückgesetzt — bitte oben „Zugriff erlauben" klicken, sonst pausiert der Auto-Sync.`
                     : <>✅ Verbunden mit Ordner „{syncHandle.name}" — Änderungen werden automatisch gespeichert
                       {knownStamp() ? ` (letzter Sync: ${new Date(knownStamp()!).toLocaleString('de-DE')})` : ''}.
-                      Schreibt ein anderes Gerät zwischenzeitlich, warnt PixiNotes statt zu überschreiben.</>}
+                      Schreibt ein anderes Gerät zwischenzeitlich, werden beide Stände zusammengeführt.</>}
                 </div>
               )}
             </>

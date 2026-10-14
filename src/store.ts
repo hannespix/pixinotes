@@ -270,8 +270,10 @@ interface BoardState {
   undo: () => void;
   redo: () => void;
 
-  /** Kompletten Stand aus der Sync-Datei übernehmen (ersetzt Boards & Hierarchie) */
-  importSync: (boards: BoardDoc[], spaces: Space[], activeId: string) => void;
+  /** Kompletten Stand aus der Sync-Datei übernehmen (ersetzt Boards & Hierarchie).
+   *  M311 `sanft`: Zusammenführung im Hintergrund — nur die genannten Boards
+   *  weichen ab; Undo-Verlauf und Ansicht bleiben, wo sich nichts geändert hat. */
+  importSync: (boards: BoardDoc[], spaces: Space[], activeId: string, sanft?: { geaendert: string[] }) => void;
 
   /** Team-Sync (M145): EIN Projekt samt Boards aus einem Projekt-Paket übernehmen —
    *  ersetzt nur dieses Projekt, alle anderen Bereiche/Projekte bleiben unberührt */
@@ -1184,11 +1186,35 @@ export const useBoard = create<BoardState>()(
 
         importEpoch: 0,
 
-        importSync: (boards, spaces, activeId) => {
+        importSync: (boards, spaces, activeId, sanft) => {
           if (!Array.isArray(boards) || boards.length === 0 || !Array.isArray(spaces)) return;
           // Auto-Sync-Bremse: dieser Stand kam von außen — nicht gleich wieder
           // mit neuem Zeitstempel hochladen (falsche Konflikte auf anderen Geräten)
           markImported(boards, spaces);
+          if (sanft) {
+            // M311: Hintergrund-Abgleich mit dem Sync-Ordner. Undo-Schritte zu
+            // Boards, die drüben anders geworden sind, fallen weg — ein Undo
+            // würde sonst still die Änderung des anderen Geräts zurückdrehen.
+            // Die Ansicht wird nur neu aufgebaut, wenn sich auf dem AKTIVEN
+            // Board Notiz-Inhalte geändert haben (Editoren lesen ihren Text
+            // nur beim Aufbau); alles andere zeichnet React Flow selbst nach.
+            const s = get();
+            const betroffen = new Set(sanft.geaendert);
+            const frei = (e: HistoryEntry) => !betroffen.has(e.boardId) && !(e.others ?? []).some((o) => betroffen.has(o.boardId));
+            const aktiv = boards.some((b) => b.id === s.activeId) ? s.activeId : boards[0].id;
+            const alt = s.boards.find((b) => b.id === aktiv);
+            const neu = boards.find((b) => b.id === aktiv);
+            const remount = betroffen.has(aktiv) && (!alt || !neu || notesDiffer(alt.nodes, neu.nodes));
+            set({
+              boards,
+              spaces,
+              activeId: aktiv,
+              past: s.past.filter(frei),
+              future: s.future.filter(frei),
+              importEpoch: remount ? s.importEpoch + 1 : s.importEpoch,
+            });
+            return;
+          }
           set({
             boards,
             spaces,
