@@ -11,7 +11,10 @@
 //   Nextcloud liefert die standardmäßig NICHT — dann muss die IT die Origin
 //   freigeben, oder man nutzt den Sync-Ordner (Desktop-Client) bzw. Export.
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard } from '../store';
-import { buildSyncPayloadMitDateien, DATEI_BUDGET_MB, emitSyncStatus, SYNC_DIRTY_KEY, uebernimmDateien, WEBDAV_DIRTY_KEY, type SyncPayload } from './syncFolder';
+import {
+  basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB, emitSyncStatus, fremdStandEinarbeiten,
+  notiereAenderung, SYNC_DIRTY_KEY, uebernimmDateien, WEBDAV_DIRTY_KEY, type SyncPayload, type SyncWeg,
+} from './syncFolder';
 
 const LS_KEY = 'pixinotes-webdav';
 const STAMP_KEY = 'pixinotes:webdav-stamp';
@@ -40,6 +43,7 @@ export function saveWebdav(cfg: WebdavConfig) {
 export function clearWebdav() {
   localStorage.removeItem(LS_KEY);
   localStorage.removeItem(STAMP_KEY);
+  void basisVergessen('webdav');
 }
 
 export const webdavStamp = (): string | null => localStorage.getItem(STAMP_KEY);
@@ -164,6 +168,7 @@ export async function webdavWrite(cfg: WebdavConfig): Promise<string> {
   if (res.status === 401 || res.status === 403) throw new Error('Anmeldung abgelehnt — Benutzername/App-Passwort prüfen.');
   if (!res.ok && res.status !== 201 && res.status !== 204) throw new Error(`WebDAV: HTTP ${res.status}`);
   localStorage.setItem(STAMP_KEY, payload.savedAt);
+  await basisMerken('webdav', payload); // M311: gemeinsamer Stand für die Zusammenführung
   // Nur „sauber" markieren, wenn währenddessen nicht weiter editiert wurde
   const cur = useBoard.getState();
   if (cur.boards === s.boards && cur.spaces === s.spaces) localStorage.removeItem(WEBDAV_DIRTY_KEY);
@@ -191,6 +196,7 @@ export function applyWebdav(p: SyncPayload): boolean {
     localStorage.setItem(SYNC_DIRTY_KEY, '1');
   } catch { return false; }
   emitSyncStatus('webdav', 'ok', p.savedAt);
+  void basisMerken('webdav', p); // M311
   // M269: Beipack nachgelagert in die lokale Ablage (wie applySync)
   void uebernimmDateien(p).then((n) => {
     if (n > 0) window.dispatchEvent(new CustomEvent('pixinotes:dateien-da'));
@@ -198,15 +204,23 @@ export function applyWebdav(p: SyncPayload): boolean {
   return true;
 }
 
-// ---------- Auto-Sync (gleiches Konfliktschema wie der Sync-Ordner) ----------
+// ---------- Auto-Sync (gleiche Zusammenführung wie der Sync-Ordner, M311) ----------
 let started = false;
 let conflictWarned = false;
 let lastRemoteCheck = 0;
 let staleHintShown = false;
 
-/** Server prüfen und einen neueren Fremd-Stand GEFAHRLOS automatisch übernehmen
- *  (Fast-Forward, M82) — gleiche Regeln wie beim Sync-Ordner: nur als Schreiber
- *  und nur ohne eigene lokale Änderungen seit dem letzten Sync. */
+const webdavWeg = (cfg: WebdavConfig): SyncWeg => ({
+  source: 'webdav',
+  stampKey: STAMP_KEY,
+  dirtyKey: WEBDAV_DIRTY_KEY,
+  schreiben: () => webdavWrite(cfg),
+  uebernehmen: applyWebdav,
+});
+
+/** Server prüfen und einen fremden Stand einarbeiten — mit Basis (M311)
+ *  zusammengeführt, ohne Basis wie früher: nur ohne eigene Änderungen
+ *  übernehmen, sonst ehrlicher Hinweis. */
 export async function checkWebdavRemote(): Promise<void> {
   const now = Date.now();
   if (now - lastRemoteCheck < 60_000) return; // Netz-Zugriff: sparsamer prüfen
@@ -220,15 +234,20 @@ export async function checkWebdavRemote(): Promise<void> {
     if (remote) emitSyncStatus('webdav', 'ok', remote.savedAt); // in sync
     return;
   }
-  if (!localStorage.getItem(WEBDAV_DIRTY_KEY) && applyWebdav(remote)) {
+  const r = await fremdStandEinarbeiten(remote, webdavWeg(cfg));
+  if (r === 'uebernommen') {
     useBoard.getState().showToast(`☁️ Neuerer Stand vom WebDAV-Server übernommen (${new Date(remote.savedAt).toLocaleString('de-DE')}).`);
     staleHintShown = false;
-    return;
-  }
-  emitSyncStatus('webdav', 'conflict');
-  if (!staleHintShown) {
-    staleHintShown = true;
-    useBoard.getState().showToast('☁️ Server und lokaler Stand weichen ab, nichts wurde überschrieben. Unter ⚙ → Synchronisation wählen.');
+  } else if (r === 'konflikt') {
+    emitSyncStatus('webdav', 'conflict');
+    if (!staleHintShown) {
+      staleHintShown = true;
+      useBoard.getState().showToast('☁️ Server und lokaler Stand weichen ab, nichts wurde überschrieben. Unter ⚙ → Synchronisation wählen.');
+    }
+  } else if (r === 'fehler') {
+    emitSyncStatus('webdav', 'error');
+  } else {
+    staleHintShown = false;
   }
 }
 
@@ -239,13 +258,21 @@ async function autoPush(): Promise<void> {
   emitSyncStatus('webdav', 'pending');
   try {
     const remote = await webdavRead(cfg);
-    // Fremder/neuerer Stand auf dem Server → warnen statt überschreiben
+    // Fremder Stand auf dem Server → zusammenführen (M311) statt warnen;
+    // geschrieben wird dann das Ergebnis mit beiden Anteilen
     if (remote && remote.savedAt !== webdavStamp()) {
-      emitSyncStatus('webdav', 'conflict');
-      if (!conflictWarned) {
-        conflictWarned = true;
-        useBoard.getState().showToast('⚠️ Auf dem WebDAV-Server liegt ein neuerer Stand. Unter ⚙ → Synchronisation laden oder überschreiben.');
+      const r = await fremdStandEinarbeiten(remote, webdavWeg(cfg));
+      if (r === 'konflikt') {
+        emitSyncStatus('webdav', 'conflict');
+        if (!conflictWarned) {
+          conflictWarned = true;
+          useBoard.getState().showToast('⚠️ Auf dem WebDAV-Server liegt ein anderer Stand. Unter ⚙ → Synchronisation laden oder überschreiben.');
+        }
+        return;
       }
+      if (r === 'fehler') { emitSyncStatus('webdav', 'error'); return; }
+      if (r === 'spaeter') { setTimeout(() => { void autoPush().catch(() => {}); }, 3000); return; }
+      conflictWarned = false;
       return;
     }
     await webdavWrite(cfg); // meldet bei Erfolg selbst 'ok'
@@ -270,6 +297,7 @@ export function initWebdavSync(): void {
     // der syncFolder-Subscribe nicht, WebDAV aber sehr wohl. Abgeleitete
     // Änderungen (Auto-Einsammeln) zählen nicht als eigene Bearbeitung.
     if (!inDerived()) {
+      notiereAenderung();
       try { localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); localStorage.setItem(SYNC_DIRTY_KEY, '1'); } catch { /* voll → sicherer ohne Fast-Forward */ }
     }
     if (!loadWebdav()?.auto) return;
