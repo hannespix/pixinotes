@@ -234,10 +234,10 @@ console.log('\n════ T6: Export ════');
   // Karte auswählen und „Kopieren" (formatiertes HTML) drücken
   await P.locator('.note-card').first().click({ position: { x: 5, y: 5 } });
   await P.waitForTimeout(600);
-  // M296: „Formatiert kopieren" liegt im ⋯ der Auswahl-Leiste
-  await P.locator('.sel-toolbar [aria-label="Mehr"]').first().click();
-  await P.waitForTimeout(300);
-  const knopf = P.locator('.sel-more-menu button', { hasText: 'Formatiert kopieren' }).first();
+  // M313: „Formatiert kopieren" liegt im Teilen-Dialog
+  await P.locator('.sel-toolbar [aria-label="Teilen"]').first().click();
+  await P.waitForTimeout(400);
+  const knopf = P.locator('.share-cards-modal button', { hasText: /Kopieren/ }).first();
   if (await knopf.count()) {
     await knopf.click();
     await P.waitForTimeout(900);

@@ -4,7 +4,7 @@
  *   A  ＋-Menü: fünf Einträge und „Weitere Module"; aufgeklappt kommt der Rest.
  *   B  ⋯-Menü: „Anordnen & Hintergrund" bündelt die Varianten (M312: kein zweites „Aufräumen"),
  *      der Physik-Schalter ist weg (⚙ → Bedienung).
- *   C  Auswahl-Leiste: sechs Elemente; Kopieren und Schrift liegen im ⋯.
+ *   C  Auswahl-Leiste: fünf Elemente (M313); Schrift liegt im ⋯, Kopieren im Teilen-Dialog.
  *   D  Sprechblase verschwindet bei einem Tastendruck.
  *   E  Minimap erst ab zehn Karten; Rechtliches am Telefon nicht mehr unter dem Dock.
  */
@@ -106,12 +106,12 @@ console.log('════ C: Auswahl-Leiste ════');
   await P.locator('.react-flow__node').first().click({ position: { x: 30, y: 6 } });
   await P.waitForTimeout(500);
   const knoepfe = await P.locator('.sel-toolbar button:not(.sel-menu-fixed button)').evaluateAll((els) => els.map((e) => e.getAttribute('aria-label') || e.textContent.trim()));
-  pruefe('C1 sechs Elemente: Duplizieren, Verschieben, Teilen, Mehr, Löschen + Zähler', JSON.stringify(knoepfe) === JSON.stringify(['Duplizieren', 'Verschieben', 'Teilen', 'Mehr', '']), JSON.stringify(knoepfe));
+  pruefe('C1 fünf Elemente (M313): Duplizieren, Teilen, Mehr, Löschen + Zähler', JSON.stringify(knoepfe) === JSON.stringify(['Duplizieren', 'Teilen', 'Mehr', '']), JSON.stringify(knoepfe));
   pruefe('C2 kein „Kopieren" und keine Schrift-Taste in der Leiste', !knoepfe.some((k) => /Kopieren|Schrift/.test(k)));
   await P.locator('.sel-toolbar [aria-label="Mehr"]').click();
   await P.waitForTimeout(300);
   const mehr = await P.locator('.sel-more-menu').textContent();
-  pruefe('C3 im ⋯ liegen „Formatiert kopieren" und „Schrift & Größe"', /Formatiert kopieren/.test(mehr) && /Schrift & Größe/.test(mehr), mehr);
+  pruefe('C3 im ⋯ liegt „Schrift & Größe", „Formatiert kopieren" nicht mehr (Teilen-Dialog)', !/Formatiert kopieren/.test(mehr) && /Schrift & Größe/.test(mehr), mehr);
   await P.locator('.sel-more-menu [aria-label="Schrift & Größe"]').click();
   await P.waitForTimeout(300);
   pruefe('C4 „Schrift & Größe" öffnet das Schrift-Menü', (await P.locator('.sel-font-menu').count()) === 1);

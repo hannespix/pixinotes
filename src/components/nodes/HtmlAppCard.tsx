@@ -262,19 +262,15 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
           <span className="happ-size" title={isLive ? `Live eingebettet von ${data.url}` : undefined}>
             {isLive ? 'live' : fmtSize(data.size)}
           </span>
+          {/* M313: Ein Knopf zum Starten/Anhalten, alles andere (Neustart,
+              Vollbild, Tab, Herunterladen, Speicherstand) im ⋯ */}
           {runningUi ? (
-            <>
-              <button className="happ-btn nodrag" title="Neu starten (lädt die App frisch)" onClick={restart}><IReload size={14} /></button>
-              <button className="happ-btn happ-stopbtn nodrag" title="App anhalten (gibt Speicher & Rechenzeit frei)" onClick={stop}><IStopSq size={14} /></button>
-            </>
+            <button className="happ-btn happ-stopbtn nodrag" title="App anhalten (gibt Speicher & Rechenzeit frei)" onClick={stop}><IStopSq size={14} /></button>
           ) : (
             <button className="happ-btn happ-startbtn nodrag" disabled={hasSrc !== true || starting} title="App starten" onClick={start}>
               <IPlay size={14} />
             </button>
           )}
-          <button className="happ-btn nodrag" disabled={!runningUi} title={full ? 'Vollbild verlassen (Esc)' : 'Vollbild — die App läuft dabei weiter'} onClick={toggleFull}>
-            {full ? <IMinimize size={14} /> : <IMaximize size={14} />}
-          </button>
           <button
             className="happ-btn nodrag"
             data-hmbtn={id}
@@ -343,6 +339,14 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
       {/* Funktions-Menü als Portal (die Karte hat overflow:hidden, M151-Muster) */}
       {menuPos && createPortal(
         <div className="happ-menu nodrag" style={{ left: menuPos.x, top: menuPos.y }}>
+          {runningUi && (
+            <>
+              <button onClick={() => { setMenuPos(null); toggleFull(); }}>
+                {full ? <><IMinimize size={14} /> Vollbild verlassen</> : <><IMaximize size={14} /> Vollbild</>}
+              </button>
+              <button onClick={() => { setMenuPos(null); restart(); }}><IReload size={14} /> Neu starten</button>
+            </>
+          )}
           <button
             disabled={hasSrc !== true}
             onClick={() => { if (isLive) { setMenuPos(null); window.open(data.url, '_blank'); } else void openInTab(); }}

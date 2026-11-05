@@ -67,10 +67,13 @@ einpassen).
 ### Karte
 Kartenkopf: Griff und Verbindungs-Punkte, kein ✕ (Löschen: Leiste oder Entf).  
 Auswahl-Leiste: `Duplizieren · Teilen · ⋯ · Löschen`.  
-⋯: Kommentar · Eigenschaften … (Farbe, Schrift & Größe, Auto-Größe, Schlüssel=Wert)
-· In Board verschieben … · Nachschlagen · Als Vorlage speichern · KI … ·
-Ausrichten … (ab 2) · Als Kachel (Module) · Archivieren.  
-„Formatiert kopieren" lebt nur noch im Teilen-Dialog.  
+⋯ (immer dieselbe Dramaturgie): Kommentar · Eigenschaften … · In Board verschieben …
+— Werkzeuge: Schrift & Größe … · KI … · Ausrichten … (ab 2) · Als Kachel (Module) ·
+Auto-Größe — Weitergeben: Nachschlagen · Als Vorlage speichern — Aufräumen:
+Markierungen lösen · Archivieren.  
+„Formatiert kopieren" lebt nur noch im Teilen-Dialog. Die Textleiste in der Notiz
+behält A− / A+ neben „Aa": Stufen für den markierten Text sind kein zweiter Weg,
+sondern die schnelle Form desselben.  
 Modul-Köpfe (Kanban, Zeitplan, Kalender, Tabelle, Diagramm) tragen höchstens
 zwei Symbole und ein ⋯; alles Weitere liegt im ⋯ des Moduls.
 

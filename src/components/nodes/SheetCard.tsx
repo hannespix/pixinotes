@@ -7,6 +7,7 @@ import { DragTitle } from './DragTitle';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from '../../lib/formel';
 import { alsCsv } from '../../lib/xlsx';
 import { IPlus, ISigma, IDownload, IX } from '../Icons';
+import { MenuHuelle } from '../EbenenMenu';
 
 /**
  * M256: Rechen-Tabelle — „Autosummen direkt in den Notizen".
@@ -144,18 +145,24 @@ export function SheetCard({ id, data, selected }: NodeProps<SheetNode>) {
           onChange={(t) => updateNodeData(id, { title: t })}
         />
         <div className="sheet-tools nodrag">
-          <button onClick={autoSumme} title="Auto-Summe: schreibt unter jede Zahlenspalte =SUMME(…)" aria-label="Auto-Summe">
-            <ISigma size={14} />
-          </button>
+          {/* M313: Das Häufigste sichtbar (Zeile), der Rest im ⋯ */}
           <button onClick={() => updateNodeData(id, { rows: rows + 1 })} title="Zeile anhängen" aria-label="Zeile anhängen">
             <IPlus size={13} /> Zeile
           </button>
-          <button onClick={() => updateNodeData(id, { cols: Math.min(26, cols + 1) })} title="Spalte anhängen" aria-label="Spalte anhängen">
-            <IPlus size={13} /> Spalte
-          </button>
-          <button onClick={csv} title="Als CSV speichern — öffnet sich in Excel, LibreOffice und Numbers" aria-label="Als CSV speichern">
-            <IDownload size={14} />
-          </button>
+          <MenuHuelle titel="Mehr: Spalte, Auto-Summe, CSV" klasse="kopf-mehr" kinder={(zu) => (
+            <>
+              <button role="menuitem" onClick={() => { updateNodeData(id, { cols: Math.min(26, cols + 1) }); zu(); }} aria-label="Spalte anhängen">
+                <IPlus size={14} /> Spalte anhängen
+              </button>
+              <button role="menuitem" onClick={() => { autoSumme(); zu(); }} title="Schreibt unter jede Zahlenspalte =SUMME(…)" aria-label="Auto-Summe">
+                <ISigma size={14} /> Auto-Summe
+              </button>
+              <div className="ebenen-menu-titel">Weitergeben</div>
+              <button role="menuitem" onClick={() => { csv(); zu(); }} title="Öffnet sich in Excel, LibreOffice und Numbers" aria-label="Als CSV speichern">
+                <IDownload size={14} /> Als CSV speichern
+              </button>
+            </>
+          )} />
         </div>
       </div>
 

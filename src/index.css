@@ -6233,3 +6233,11 @@ audio.file-media { height: 40px; }
 .tabs.spalte .tab-tasks:hover { background: var(--surface-2); }
 .tabs.spalte .tab-tasks.active { background: var(--accent-soft); }
 .tabs.spalte .tab-tasks .tab-home-label { display: inline; }
+
+/* ===== M313: Karte — Auswahl-Leiste und Modulköpfe ===== */
+.kopf-mehr { color: var(--muted); }
+.gantt-tools .ebenen-menu-wrap, .sheet-tools .ebenen-menu-wrap, .mm-row .ebenen-menu-wrap { display: inline-flex; align-items: center; }
+.kopf-menu-dots { display: flex; gap: 6px; padding: 4px 12px 6px; align-items: center; }
+.kopf-menu-dots .mm-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.kopf-menu-dots .mm-dot.on { border-color: var(--ink); }
+.kopf-menu-dots .mm-dot-none { background: var(--surface-dim); }

@@ -24,7 +24,7 @@ import {
 
 /** Gemeinsame Hülle: Knopf + schwebendes Menü (Portal, damit es aus jeder
  *  Leiste, Kachel und Baumzeile herausragen darf) */
-function MenuHuelle({ titel, klasse, kinder }: {
+export function MenuHuelle({ titel, klasse, kinder }: {
   titel: string;
   klasse: string;
   kinder: (schliessen: () => void) => React.ReactNode;

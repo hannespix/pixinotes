@@ -149,7 +149,8 @@ console.log('\n════ T2: klebende Monatsnamen ════');
 console.log('\n════ T3: Alles einpassen ════');
 {
   await P.evaluate(() => {
-    [...document.querySelectorAll('.gantt-tools button')].find((b) => (b.getAttribute('title') ?? '').startsWith('Alles einpassen'))?.click();
+    document.querySelector('.gantt-tools .ebenen-menu-knopf')?.click();
+    setTimeout(() => [...document.querySelectorAll('.ebenen-menu button')].find((b) => (b.getAttribute('title') ?? '').startsWith('Alles einpassen'))?.click(), 150);
   });
   await P.waitForTimeout(700);
   const mass = await P.evaluate(() => {
@@ -210,8 +211,14 @@ console.log('\n════ T4: Namensspalte ════');
 console.log('\n════ T5: Balken ziehen ════');
 {
   // Auf Tages-Skala zurück, damit ein Tag messbar breit ist
+  // M313: Die Zeit-Skala liegt im ⋯ des Zeitplans
+  await P.evaluate(() => { document.querySelector('.gantt-tools .ebenen-menu-knopf')?.click(); });
+  await P.waitForTimeout(250);
+  await P.evaluate(() => { document.querySelector('.ebenen-menu button[data-skala="tage"]')?.click(); });
+  await P.waitForTimeout(400);
   await P.evaluate(() => {
     const sel = document.querySelector('.gantt-scale');
+    if (!sel) return;
     sel.value = 'tage';
     sel.dispatchEvent(new Event('change', { bubbles: true }));
   });
