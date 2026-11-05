@@ -219,13 +219,6 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
           <circle cx="3" cy="6" r="1.3" /><circle cx="9" cy="6" r="1.3" /><circle cx="15" cy="6" r="1.3" />
         </svg>
       </div>
-      <button
-        className="card-x nodrag"
-        title="Karte löschen (oder Entf-Taste)"
-        onClick={() => removeNode(id)}
-      >
-        ✕
-      </button>
       {/* Anschlusspunkte an allen 4 Seiten — die Linie selbst dockt dank
           Floating Edges immer automatisch an der zugewandten Seite an */}
       {[Position.Top, Position.Right, Position.Bottom, Position.Left].map((pos) => (

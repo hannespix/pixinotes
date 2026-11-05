@@ -45,7 +45,6 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
         <Handle key={pos} type="source" position={pos} id={pos} className="pn-handle shape-handle" />
       ))}
       <Handle id="body" type="source" position={Position.Left} className="pn-handle-body" isConnectableStart={false} />
-      <button className="card-x nodrag" title="Form löschen" onClick={() => removeNode(id)}>✕</button>
       <div className="shape-toolbar nodrag">
         <button title={SHAPE_LABEL[data.shape]} onClick={cycleShape}>◇</button>
         <button title="Farbe (Palette)" onClick={cycleColor}><IPalette size={13} /></button>

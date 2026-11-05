@@ -191,6 +191,45 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
   );
 }
 
+/**
+ * M312: Und noch eine Ebene höher: am Bereich. Vorher gab es dafür nur
+ * „+ Projekt" und „✕" als offene Knöpfe in der Übersicht — und im Baum gar
+ * nichts. Jetzt dasselbe ⋯ wie bei Board und Projekt, an beiden Orten.
+ */
+export function BereichMenu({ spaceId, onRename, klasse = '' }: {
+  spaceId: string;
+  onRename?: () => void;
+  klasse?: string;
+}) {
+  const space = useBoard((s) => s.spaces.find((sp) => sp.id === spaceId));
+  const renameSpace = useBoard((s) => s.renameSpace);
+  const addProject = useBoard((s) => s.addProject);
+  const removeSpace = useBoard((s) => s.removeSpace);
+  if (!space) return null;
+  const leer = space.projects.length === 0;
+  return (
+    <MenuHuelle titel={`Bereich „${space.name}": umbenennen, Projekt anlegen, löschen`} klasse={klasse} kinder={(zu) => (
+      <>
+        <button role="menuitem" onClick={() => { zu(); if (onRename) onRename(); else {
+          const n = window.prompt('Bereich umbenennen:', space.name);
+          if (n?.trim()) renameSpace(spaceId, n.trim());
+        } }}><IPen size={14} /> Umbenennen</button>
+        <button role="menuitem" onClick={() => { addProject(spaceId); zu(); }}>
+          <IPlus size={14} /> Neues Projekt
+        </button>
+        <div className="ebenen-menu-titel">Aufräumen</div>
+        <button
+          role="menuitem"
+          className="ebenen-menu-gefahr"
+          disabled={!leer}
+          title={leer ? undefined : 'Erst die Projekte verschieben oder löschen'}
+          onClick={() => { removeSpace(spaceId); zu(); }}
+        ><ITrash size={14} /> Löschen{leer ? '' : ' (nur wenn leer)'}</button>
+      </>
+    )} />
+  );
+}
+
 /** Dieselben Handgriffe eine Ebene höher: am Projekt */
 export function ProjektMenu({ projectId, onRename, klasse = '' }: {
   projectId: string;

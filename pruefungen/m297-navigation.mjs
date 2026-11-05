@@ -96,13 +96,19 @@ console.log('════ A: Die Spalte als Rahmen ════');
   pruefe('A9 Klick auf ein Board öffnet es', (await P.locator('.tabs .side-board.active', { hasText: 'Wissen' }).count()) === 1
     && (await P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.activeId)) === 'b3');
 
-  // Suche
-  await P.locator('.tabs .side-tree-find').fill('Antrag');
+  // Suche — M312: das Feld im Baum öffnet DIE Suche (Strg+K), die Karten UND Boards findet
+  await P.locator('.tabs .side-tree-find').click();
   await P.waitForTimeout(400);
-  const treffer = await P.locator('.tabs .side-card').allTextContents();
-  pruefe('A10 die Suche zeigt nur passende Karten — über alle Projekte', treffer.length === 2 && treffer.every((t) => /Antrag/.test(t)), JSON.stringify(treffer));
-  pruefe('A11 … und ein Board ohne Treffer verschwindet', (await P.locator('.tabs .side-board', { hasText: 'Kontakte' }).count()) === 0);
-  await P.locator('.tabs .side-tree-find').fill('');
+  await P.keyboard.type('Antrag');
+  await P.waitForTimeout(500);
+  const treffer = await P.locator('.search-box .search-hit .hit-title').allTextContents();
+  pruefe('A10 die Suche zeigt passende Karten — über alle Projekte', treffer.length === 2 && treffer.every((t) => /Antrag/.test(t)), JSON.stringify(treffer));
+  await P.keyboard.press('Control+A');
+  await P.keyboard.type('Kontakte');
+  await P.waitForTimeout(500);
+  pruefe('A11 … und findet Boards nach Namen', (await P.locator('.search-box .search-cmds .hit-title', { hasText: 'Kontakte' }).count()) >= 1);
+  await P.keyboard.press('Escape');
+  await P.waitForTimeout(300);
 
   // Alt+U / Alt+W
   await P.mouse.click(900, 700);
@@ -114,7 +120,8 @@ console.log('════ A: Die Spalte als Rahmen ════');
   pruefe('A13 Alt+U holt sie zurück', (await P.locator('.tabs.spalte .side-tree').count()) === 1);
   await P.keyboard.press('Alt+W');
   await P.waitForTimeout(300);
-  pruefe('A14 Alt+W springt in die Suche des Baums', await P.evaluate(() => document.activeElement?.classList.contains('side-tree-find') === true));
+  pruefe('A14 Alt+W öffnet die Suche', (await P.locator('.search-box').count()) === 1);
+  await P.keyboard.press('Escape');
   await ctx.close();
 }
 

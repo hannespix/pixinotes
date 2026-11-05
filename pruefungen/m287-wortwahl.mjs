@@ -114,9 +114,12 @@ console.log('\n════ T2: Board umbenennen im Navigator ════');
   pruefe('T2b das Board steht mit seinem VOLLEN Namen da',
     (await zeile.locator('.side-board-name').first().textContent())?.includes('🏖️') === true,
     String(await zeile.locator('.side-board-name').first().textContent()));
-  const stift = zeile.locator('.side-board-pen');
-  pruefe('T2c es gibt einen Weg zum Umbenennen — direkt hier', await stift.count() > 0);
-  await stift.click({ force: true });
+  // M312: kein Stift mehr in der Zeile — Umbenennen über ⋯ (oder Doppelklick)
+  const mehr = zeile.locator('.ebenen-menu-knopf');
+  pruefe('T2c es gibt einen Weg zum Umbenennen — direkt hier (⋯)', await mehr.count() > 0);
+  await mehr.click({ force: true });
+  await P.waitForTimeout(300);
+  await P.locator('.ebenen-menu button', { hasText: 'Umbenennen' }).first().click();
   await P.waitForTimeout(500);
   const feld = P.locator('.side-board-name input, input.side-board-name').first();
   const wert = await feld.inputValue();
@@ -195,10 +198,14 @@ console.log('\n════ T4: Vorgabename ════');
 console.log('\n════ T5: Bereich in der Übersicht ════');
 {
   const { ctx, P } = await seite('overview');
-  const t = await P.locator('.ov-add-space-float').getAttribute('title');
-  console.log('    Zeiger:', JSON.stringify(t));
-  pruefe('T5a „+ Neuer Bereich" sagt, welche Ebene gemeint ist',
-    /oberste Ebene/.test(t ?? '') && /Rahmen/.test(t ?? ''), String(t));
+  // M312: Anlegen geht über ＋ Neu am Fuß der Navigation — Board, Projekt, Bereich
+  await P.locator('.tabs-foot .tab-add').click();
+  await P.waitForTimeout(300);
+  const t = (await P.locator('.neu-menu [role="menuitem"]').allTextContents()).join(' | ');
+  console.log('    Neu-Menü:', JSON.stringify(t));
+  pruefe('T5a ＋ Neu nennt die Ebenen beim Namen: Board, Projekt, Bereich',
+    /Board/.test(t) && /Projekt/.test(t) && /Bereich/.test(t), t);
+  await P.keyboard.press('Escape');
   await ctx.close();
 }
 

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
-import { IArchive, IChevronR, IPen } from './Icons';
+import { IArchive, IChevronR, ISearch } from './Icons';
 import { InlineName } from './InlineName';
-import { BoardMenu, ProjektMenu } from './EbenenMenu';
+import { BereichMenu, BoardMenu, ProjektMenu } from './EbenenMenu';
 
 /**
  * M297: DER Baum der App — Bereich › Projekt › Board › Karte.
@@ -17,8 +17,12 @@ import { BoardMenu, ProjektMenu } from './EbenenMenu';
  *
  * Was zu sehen ist, folgt OneNotes Seitenliste: alle Bereiche und Projekte,
  * die Boards nur des aufgeklappten Projekts (das aktive ist es immer), die
- * Karten nur des aufgeklappten Boards (das aktive ist es immer). Die Suche
- * oben klappt alles auf, was passt.
+ * Karten nur des aufgeklappten Boards (das aktive ist es immer).
+ *
+ * M312: Das Feld oben ist DIE Suche der App (Strg+K) — vorher filterte es nur
+ * den Baum, und die Kopfleiste hatte daneben eine zweite Suche mit anderem
+ * Vorrat. Jede Zeile trägt nur Name und Zahl; das ⋯ erscheint beim Zeigen,
+ * der Stift zum Umbenennen ist weg (Doppelklick oder ⋯ → Umbenennen).
  */
 export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
   const spaces = useBoard((s) => s.spaces);
@@ -32,9 +36,9 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
   const setProjektSortierung = useBoard((s) => s.setProjektSortierung);
   const showArchived = useBoard((s) => s.showArchived);
   const setShowArchived = useBoard((s) => s.setShowArchived);
+  const setSearchOpen = useBoard((s) => s.setSearchOpen);
   const herkunft = useBoard((s) => (s.view === 'overview' ? 'overview' as const : 'board' as const));
   const [umbenennen, setUmbenennen] = useState<string | null>(null);
-  const [q, setQ] = useState('');
   /**
    * M310: Boards im Baum ziehen — innerhalb des Projekts umsortieren oder in
    * ein anderes Projekt legen. Die Zielzeile zeigt eine Linie oben oder
@@ -83,7 +87,6 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
   const toggle = (setter: (f: (s: Set<string>) => Set<string>) => void, id: string) =>
     setter((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
-  const needle = q.trim().toLowerCase();
   const cardLabel = (n: { type?: string }) =>
     (nodeToText(n as Parameters<typeof nodeToText>[0]).split('\n').find((l) => l.trim()) ?? n.type ?? 'Karte')
       .replace(/^[#\-*\d.\s☐☑]+/, '').slice(0, 60);
@@ -95,20 +98,15 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
     return boards.filter((b) => !zugeordnet.has(b.id));
   }, [spaces, boards]);
 
-  const passt = (b: (typeof boards)[number]) => !needle
-    || b.name.toLowerCase().includes(needle)
-    || b.nodes.some((n) => nodeToText(n).toLowerCase().includes(needle));
-
   const boardZeile = (b: (typeof boards)[number], projektId: string | null = null, liste: ReadonlyArray<{ id: string }> = []) => {
-    const auf = needle ? true : offeneBoards.has(b.id);
+    const auf = offeneBoards.has(b.id);
     const zielKlasse = ziel?.id === b.id ? ` ziel-${ziel.seite}` : '';
-    const karten = (needle ? b.nodes.filter((n) => nodeToText(n).toLowerCase().includes(needle)) : b.nodes)
-      .filter((n) => n.type !== 'frame' && lebt(n));
+    const karten = b.nodes.filter((n) => n.type !== 'frame' && lebt(n));
     return (
       <div key={b.id}>
         <div
           className={`side-board ${b.id === activeId ? 'active' : ''}${b.archived ? ' archiviert' : ''}${zieht === b.id ? ' zieht' : ''}${zielKlasse}`}
-          draggable={!!projektId && umbenennen !== b.id && !needle}
+          draggable={!!projektId && umbenennen !== b.id}
           onDragStart={(e) => {
             e.dataTransfer.setData('text/x-pixinotes-board', b.id);
             e.dataTransfer.effectAllowed = 'move';
@@ -154,12 +152,6 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
               onDoubleClick={(e) => { e.preventDefault(); setUmbenennen(b.id); }}
             >{b.name}</button>
           )}
-          <button
-            className="side-board-pen"
-            title="Umbenennen"
-            aria-label="Board umbenennen"
-            onClick={(e) => { e.stopPropagation(); setUmbenennen(b.id); }}
-          ><IPen size={11} /></button>
           <BoardMenu boardId={b.id} onRename={() => setUmbenennen(b.id)} />
           {b.archived && <span className="archiv-marke">Archiv</span>}
           <span className="side-board-count">{b.nodes.filter(lebt).length}</span>
@@ -183,31 +175,30 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div className="side-tree nav-tree">
-      <input
+      <button
         className="side-tree-find"
-        type="search"
-        placeholder="Board oder Karte suchen …"
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        aria-label="Navigation durchsuchen"
-      />
+        onClick={() => setSearchOpen(true)}
+        data-taste="suche"
+        aria-label="Suche öffnen"
+      >
+        <ISearch size={13} /><span>Suchen …</span><kbd>Strg K</kbd>
+      </button>
       {spaces.map((sp) => {
-        const projekte = sp.projects
-          .map((p) => ({
-            p,
-            liste: p.boardIds
-              .map((id) => byId.get(id))
-              .filter((b): b is NonNullable<typeof b> => !!b)
-              .filter((b) => showArchived || !b.archived || b.id === activeId)
-              .filter(passt),
-          }))
-          .filter((x) => x.liste.length > 0 || !needle);
-        if (needle && projekte.every((x) => x.liste.length === 0)) return null;
+        const projekte = sp.projects.map((p) => ({
+          p,
+          liste: p.boardIds
+            .map((id) => byId.get(id))
+            .filter((b): b is NonNullable<typeof b> => !!b)
+            .filter((b) => showArchived || !b.archived || b.id === activeId),
+        }));
         return (
           <section key={sp.id} className="side-space">
-            <div className="side-space-name">{sp.name}</div>
+            <div className="side-space-head">
+              <div className="side-space-name">{sp.name}</div>
+              <BereichMenu spaceId={sp.id} />
+            </div>
             {projekte.map(({ p, liste }) => {
-              const auf = needle ? true : offeneProjekte.has(p.id);
+              const auf = offeneProjekte.has(p.id);
               return (
                 <div key={p.id} className={`side-proj ${auf ? 'auf' : ''}`}>
                   <div className="side-proj-head">
@@ -234,15 +225,16 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
           </section>
         );
       })}
-      {waisen.filter(passt).length > 0 && (
+      {waisen.length > 0 && (
         <section className="side-space">
-          <div className="side-space-name">Ohne Projekt</div>
-          <div className="side-proj auf">{waisen.filter(passt).map((b) => boardZeile(b))}</div>
+          <div className="side-space-head"><div className="side-space-name">Ohne Projekt</div></div>
+          <div className="side-proj auf">{waisen.map((b) => boardZeile(b))}</div>
         </section>
       )}
       {archivZahl > 0 && (
         <button
           className={`side-archiv ${showArchived ? 'on' : ''}`}
+          data-taste="archivZeigen"
           title={showArchived ? 'Archivierte Karten und Boards ausblenden' : 'Archivierte Karten und Boards einblenden'}
           onClick={() => setShowArchived(!showArchived)}
         >

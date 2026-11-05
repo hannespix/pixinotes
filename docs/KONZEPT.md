@@ -327,6 +327,10 @@ Nach 293 Schritten war die Oberfläche mitgewachsen: Fast jeder Schritt hatte ei
 4. **Ein Weg pro Aufgabe.** Neue Funktionen landen hinter einem bestehenden Einstieg (⋯-Menü, Einstellungen, Hilfe), nie als neuer Knopf auf der Fläche oder in einer Leiste.
 5. **Die App schweigt.** Ein Toast ist ein Satz. Ein Tooltip benennt, erklärt nicht. Begründungen und Historie gehören in Commit-Nachrichten und in „Was ist neu", nicht in Einstellungen oder Hilfe.
 
+Seit M312 gilt zusätzlich der Umbau „Weniger ist mehr" ([`UMBAU.md`](UMBAU.md)): drei
+Orte (Kopfleiste, Spalte, Dock), ein Weg pro Aufgabe, ⋯ beim Zeigen, Einstellungen nur
+als Ausnahme.
+
 **Glossar (verbindlich für Oberfläche, Hilfe und Commits):** *Navigation* = die linke Spalte mit Bereichen, Projekten, Boards und Karten. *Übersicht* = die Startseite mit Kacheln (🏠). *Netz* = eine Ansicht innerhalb der Übersicht. *Fokus* = eine Karte groß geöffnet. *Karten-Archiv*, *Board-Archiv* und *Ticket-Archiv* = drei Dinge, die immer mit ihrem Zusatz genannt werden. *Rahmen* = ein benannter Bereich auf dem Board, *Bereich* = die oberste Ebene der Ordnung.
 
 ---

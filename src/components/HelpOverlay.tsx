@@ -156,8 +156,9 @@ export function HelpOverlay() {
                 bewusst in Alltagssprache. Hier stehen die Begründungen; die
                 Hilfe daneben beschreibt nur, wie die App heute aussieht. */}
             <section id="help-neu">
-              <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht im <b>Logo-Menü</b> oben links.</p>
+              <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht am Fuß der Hilfe.</p>
               <ul>
+                <li><b>🧹 Weniger ist mehr, Etappe 1 (M312):</b> Die Oberfläche hatte mit jedem Schritt einen Knopf dazubekommen — Präsentieren war an sieben Stellen erreichbar, Board umbenennen an sechs, die Übersicht trug 185 Bedienelemente. Jetzt gibt es <b>drei Orte</b>: die Kopfleiste (Rückgängig · Wiederholen · Einstellungen; das <b>Logo öffnet die Hilfe</b>, in deren Fuß Fassung und „Was ist neu" stehen), die <b>Spalte</b> (Suchfeld = die eine Suche, Übersicht, <b>Aufgaben</b> mit Zahl, der Baum mit ⋯ beim Zeigen, am Fuß <b>＋ Neu</b> für Board · Projekt · Bereich · Beispiele) und das <b>Dock</b> mit drei Knöpfen: ＋ · ✎ · ⋯ (Anordnen &amp; Hintergrund, KI, Präsentieren, Bild-Export, Alles einpassen). Weg sind das Logo-Menü, der Hilfe-Knopf, „Teilen" und der Stift im Baum, das ✕ an Reitern und Karten (Löschen: Leiste oder Entf), „Aufräumen" als zweite Fassung von „Fluss horizontal", die Zoom-Knöpfe unten links (Mausrad, Pinch, Taste F) und alle offenen „+"- und „✕"-Knöpfe der Übersicht — Bereiche haben jetzt dasselbe ⋯ wie Projekte und Boards. Kein Handgriff fehlt, jeder hat nur noch einen Ort. Der Plan dahinter steht in <code>docs/UMBAU.md</code>.</li>
                 <li><b>☁️ Sync in beide Richtungen (M311):</b> Der Sync-Ordner — etwa der lokale Nextcloud-Ordner — ist jetzt ein echter Abgleich statt „laden oder überschreiben". Jedes Gerät merkt sich den zuletzt getauschten Stand; damit ist für jedes Board, jede Karte, jeden Pfeil, Strich und Kommentar entscheidbar, wer etwas geändert hat: <b>Nur eine Seite</b> → ihre Fassung gilt. <b>Beide auf demselben Board</b> → beide Karten bleiben; nur bei derselben Karte gilt die hiesige. <b>Drüben gelöscht</b> → hier auch weg, außer es wurde hier bearbeitet. Der Ordner wird alle zehn Sekunden auf Änderungen geschaut (nur die Datei-Signatur, kein Lesen) statt nur beim Fensterwechsel, und <b>Konfliktkopien</b> des Cloud-Clients („conflicted copy") werden eingearbeitet und entfernt. Der Abgleich fällt nicht ins Tippen: Betrifft er das offene Board, wartet er, bis die Hände ruhen, und baut die Ansicht nur neu auf, wenn sich dort Notiz-Texte geändert haben; Undo bleibt für alles, was der Abgleich nicht angefasst hat. Der WebDAV-Weg führt genauso zusammen. Ohne gemeinsamen Stand (erster Abgleich nach dem Umstieg) bleibt es beim vorsichtigen Verhalten von früher.</li>
                 <li><b>↕️ Boards sortieren (M310):</b> Je Projekt bestimmt das ⋯-Menü die <b>Reihenfolge der Boards</b>: <b>Manuell</b> (Boards im Baum oder als Kachel in der Übersicht ziehen), <b>Alphabetisch</b> oder <b>Nach Erstellung</b>. Umbenennen und neue Boards fügen sich in eine automatische Reihenfolge von selbst ein; wer in einem sortierten Projekt zieht, macht es manuell.</li>
                 <li><b>🗃 Archivierte Karten bleiben im Baum verborgen (M309):</b> Der Baum in Spalte und Übersicht listete und zählte archivierte Karten mit. Jetzt sind sie verborgen wie auf dem Board; am Fuß des Baums steht „Archiv einblenden", wenn es Archiviertes gibt — eingeblendet erscheinen sie gedimmt, derselbe Schalter wie im Dock.</li>
@@ -310,7 +311,7 @@ export function HelpOverlay() {
               <ul>
                 <li><b>Board:</b> Umbenennen · Duplizieren · In Projekt verschieben · Teilen-Link · Als Datei sichern · Präsentieren · Archivieren · Löschen.</li>
                 <li><b>Projekt:</b> Umbenennen · Neues Board · Duplizieren · Reihenfolge (manuell, alphabetisch, nach Erstellung) · Alle Boards archivieren · Löschen. Manuell heißt: Boards im Baum oder als Kachel ziehen.</li>
-                <li>Archivierte Boards verschwinden aus Navigation und Übersicht, ihre Fristen ruhen. Dock ⋯ → „Archiv einblenden" zeigt sie; dort ⋯ → Zurückholen.</li>
+                <li>Archivierte Boards verschwinden aus Navigation und Übersicht, ihre Fristen ruhen. „Archiv einblenden" am Fuß der Navigation zeigt sie; dort ⋯ → Zurückholen.</li>
               </ul>
               <h4>Portale</h4>
               <ul>
@@ -356,7 +357,7 @@ export function HelpOverlay() {
               <ul>
                 <li>Mit der Maus auf eine Karte zeigen (am Touchscreen: antippen) → die <b>＋-Punkte</b> am Rand ziehen und auf der Zielkarte loslassen. Klick auf die Linie: Beschriftung oder Pfeilart; Entf löscht.</li>
                 <li>Verbindungen transportieren Daten: <b>Notiz / Zeitplan / Kanban → Kanban</b> sammelt offene Punkte als Tickets ein und hakt in beide Richtungen ab. <b>Modul → Kalender</b> zeigt nur Verbundenes, <b>Kanban → Zeitplan</b> zeigt Fristen als Meilensteine, <b>Wochenplan → Zeiterfassung</b> liefert das Soll, <b>Notiz → Diagramm</b> folgt der Checkliste.</li>
-                <li><b>▶ Präsentation:</b> jede Karte eine Folie, Reihenfolge nach Verbindungen, live editierbar.</li>
+                <li><b>Präsentation</b> (Dock ⋯ oder ⋯ am Board): jede Karte eine Folie, Reihenfolge nach Verbindungen, live editierbar.</li>
               </ul>
               <h4>✏️ Zeichnen</h4>
               <ul>
@@ -522,6 +523,10 @@ export function HelpOverlay() {
               PixiNotes — lokal, offen, deins. Feedback jederzeit willkommen. 📌
               <br />
               <button className="link-btn help-neu-link" onClick={() => setSeite('neu')}>Was ist neu</button>
+              {/* M312: Fassung und Build-Stempel standen im Logo-Menü; das gibt es
+                  nicht mehr. Der Stempel ist beim Support Gold wert: PWA-Caches
+                  liefern nach einem Deploy manchmal tagelang die alte Fassung aus. */}
+              <span className="help-fassung">PixiNotes {__APP_VERSION__} · Stand {__BUILD_STAMP__}</span>
             </div>
           </div>
         </div>

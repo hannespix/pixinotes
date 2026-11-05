@@ -87,7 +87,7 @@ console.log('════ A: Sortierart im Projekt-Menü ════');
   await P.screenshot({ path: `${SD}/m310-alphabetisch.png` });
   // Umbenennen fügt neu ein: Apfel → Zypresse
   const zeile = P.locator('.tabs.spalte .side-board', { hasText: 'Apfel' }).first();
-  await zeile.locator('.side-board-pen').click();
+  await zeile.locator('.side-board-name').dblclick();
   const feld = P.locator('.tabs.spalte .side-board input').first();
   await feld.fill('Zypresse');
   await feld.press('Enter');
@@ -161,8 +161,8 @@ console.log('\n════ C: Kachel in der Übersicht ziehen ════');
 console.log('\n════ D: „Was ist neu" ════');
 {
   const { ctx, P } = await seite();
-  await P.locator('button[aria-label="Über PixiNotes"]').click();
-  await P.locator('.about-menu [role="menuitem"]', { hasText: 'Was ist neu' }).click();
+  await P.locator('button.logo').click();
+  await P.locator('.help-neu-link').click();
   await P.waitForSelector('.help-neu-modal');
   const eintraege = await P.locator('#help-neu li').allTextContents();
   const eintrag = eintraege.find((t) => /M310/.test(t)) ?? '';

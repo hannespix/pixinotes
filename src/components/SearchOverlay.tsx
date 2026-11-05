@@ -95,6 +95,8 @@ function buildCommands(): Command[] {
 export function SearchOverlay() {
   const boards = useBoard((s) => s.boards);
   const focusNode = useBoard((s) => s.focusNode);
+  const openBoard = useBoard((s) => s.openBoard);
+  const setView = useBoard((s) => s.setView);
   const open = useBoard((s) => s.searchOpen);
   const setOpen = useBoard((s) => s.setSearchOpen);
   const [query, setQuery] = useState('');
@@ -235,6 +237,14 @@ export function SearchOverlay() {
       `${c.label} ${c.hint} ${c.alias}`.toLowerCase().includes(q)).slice(0, 4);
   }, [query]);
 
+  // M312: Das Suchfeld im Baum öffnet diese Suche — also muss sie auch Boards
+  // nach Namen finden, nicht nur Karten (vorher filterte der Baum selbst).
+  const boardHits = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q || q === '#') return [];
+    return boards.filter((b) => b.name.toLowerCase().includes(q)).slice(0, 5);
+  }, [query, boards]);
+
   if (!open) return null;
 
   return (
@@ -242,7 +252,7 @@ export function SearchOverlay() {
       <div className="search-box" role="dialog" aria-modal="true" aria-label="Kartensuche" onClick={(e) => e.stopPropagation()}>
         <input
           ref={inputRef}
-          placeholder="Karten durchsuchen…"
+          placeholder="Karten, Boards und Befehle suchen …"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -313,7 +323,25 @@ export function SearchOverlay() {
                 ))}
               </div>
             )}
-            {hits.length === 0 && commands.length === 0 && <div className="search-empty">Keine Treffer</div>}
+            {boardHits.length > 0 && (
+              <div className="search-cmds">
+                <div className="search-sem-head">🗂 Boards</div>
+                {boardHits.map((b) => (
+                  <button
+                    key={b.id}
+                    className="search-cmd"
+                    title="Board öffnen"
+                    onClick={() => { setOpen(false); setView('board'); openBoard(b.id); }}
+                  >
+                    <span className="hit-main">
+                      <span className="hit-title">{b.name}</span>
+                      <span className="hit-snippet">{b.nodes.length} Karten · Board öffnen</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {hits.length === 0 && commands.length === 0 && boardHits.length === 0 && <div className="search-empty">Keine Treffer</div>}
             {hits.map((h, i) => (
               <button
                 key={`${h.boardId}-${h.node.id}`}
