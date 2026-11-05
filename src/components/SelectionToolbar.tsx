@@ -222,7 +222,10 @@ export function SelectionToolbar() {
       if (!e || e.offsetHeight === 0) return null;
       return e.getBoundingClientRect().top;
     };
-    const kopf = ['.focus-head', '.tabs', '.topbar']
+    // M318: Die linke Spalte (.tabs.spalte) ist KEINE Kopfleiste — sie reicht bis
+    // unten; mit ihr als „Kopf" war nie Platz an der Karte, und die Leiste
+    // dockte am PC immer unten an (zweite Leiste über dem Dock).
+    const kopf = ['.focus-head', '.tabs:not(.spalte)', '.topbar']
       .map(unterkante).filter((v): v is number => v !== null);
     const fuss = ['.focus-nav', '.pn-format-dock', '.dock']
       .map(oberkante).filter((v): v is number => v !== null);

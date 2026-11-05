@@ -4757,16 +4757,24 @@ html[data-keyboard='on']:has(.app.focus-mode) .toast {
 }
 
 /* --- 2. Eine Leiste statt zwei: die Auswahl übernimmt die Dock-Zeile --- */
+/* M318: auf JEDER Breite, nicht nur am Telefon. Sobald die Auswahl-Leiste
+   unten andockt (kein Platz an der Karte), fährt das Dock weg und die Leiste
+   nimmt seine Zeile — vorher standen am PC zwei Leisten mit zwei ⋯
+   übereinander. :has statt eines neuen Store-Flags — die Auswahl-Leiste steht
+   als Portal im Body, das Dock daneben; wer da ist, gewinnt. */
+body:has(.sel-toolbar-dock) .dock {
+  transform: translateX(calc(-50% - var(--seite-rechts, 0px) / 2)) translateY(150%);
+  opacity: 0; pointer-events: none;
+}
+/* M277: `--lv-typo-dock` reist in JEDE bottom-Rechnung mit — die
+   Formatier-Leiste dockt auch auf Board-Ebene unten an, und ohne den Versatz
+   stünden beide Leisten übereinander. Seitlich folgt die Leiste dem Dock
+   (rechte Seitenleiste: --seite-rechts). */
+body:has(.sel-toolbar-dock) .sel-toolbar-dock {
+  bottom: calc(18px + var(--app-rand) + var(--lv-typo-dock, 0px));
+  translate: calc(-50% - var(--seite-rechts, 0px) / 2) 0;
+}
 @media (max-width: 640px) {
-  /* :has statt eines neuen Store-Flags — die Auswahl-Leiste steht als Portal
-     im Body, das Dock daneben; wer da ist, gewinnt. */
-  body:has(.sel-toolbar-dock) .dock {
-    transform: translateX(-50%) translateY(150%);
-    opacity: 0; pointer-events: none;
-  }
-  /* M277: `--lv-typo-dock` reist in JEDE bottom-Rechnung mit — die
-     Formatier-Leiste dockt jetzt auch auf Board-Ebene unten an, und ohne
-     den Versatz stünden beide Leisten übereinander */
   body:has(.sel-toolbar-dock) .sel-toolbar-dock {
     bottom: calc(14px + env(safe-area-inset-bottom, 0px) + var(--lv-typo-dock, 0px));
   }
