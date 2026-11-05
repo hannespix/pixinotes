@@ -10,15 +10,16 @@ import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
 import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
-  IAppWindow, IArchive, IArrange, IBookmark, ICalendar, IChevronR, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
+  IAppWindow, IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
-  ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISigma, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
+  ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
 } from './Icons';
 
 /**
- * Das Werkzeug-Dock — drei Knöpfe: ＋ bündelt alle Kartentypen in einem
- * strukturierten Menü, ✎ die Zeichenwerkzeuge, ⋯ alles, was das Board als
- * Ganzes betrifft (KI, Anordnen, Präsentieren, Bild-Export, Einpassen).
+ * Das Werkzeug-Dock — drei Knöpfe: ＋ öffnet die Modul-Palette (M316: alle
+ * Module auf einen Blick, gruppiert, mit Suche — kein zweites Menü mehr),
+ * ✎ die Zeichenwerkzeuge, ⋯ alles, was das Board als Ganzes betrifft (KI,
+ * Anordnen, Präsentieren, Bild-Export, Einpassen).
  *
  * M312: „Aufgaben" steht in der Navigation (es ist keine Board-Aktion),
  * „Präsentieren" im ⋯ (selten genug), „Aufräumen" war „Fluss horizontal" ein
@@ -154,9 +155,11 @@ export function Dock() {
   const removeTemplate = useBoard((s) => s.removeTemplate);
   const focusNode = useBoard((s) => s.focusNode);
   const [addMenu, setAddMenu] = useState(false);
-  // M296: Das ＋-Menü zeigt fünf Dinge; der Rest liegt hinter „Weitere Module".
-  // Bleibt in der Sitzung aufgeklappt, wenn man es einmal aufgeklappt hat.
-  const [mehrModule, setMehrModule] = useState(false);
+  // M316: Die Modul-Palette — alle Module auf einen Blick, gruppiert, mit
+  // Suchfeld. Kein zweites Menü mehr („Weitere Module" aus M296).
+  const [suche, setSuche] = useState('');
+  const sucheRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => { if (!addMenu) setSuche(''); }, [addMenu]);
   const [drawMenu, setDrawMenu] = useState(false);
   const [aiMenu, setAiMenu] = useState(false);
   // M198: ⋯-Menü bündelt die selteneren Aktionen (KI, Anordnen, Physik, Archiv) —
@@ -177,11 +180,13 @@ export function Dock() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       e.stopPropagation();
+      // M316: In der Palette leert Esc zuerst die Suche
+      if (addMenu && suche) { setSuche(''); return; }
       closeDockMenus();
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
-  }, [dockMenuOpen, closeDockMenus]);
+  }, [dockMenuOpen, closeDockMenus, addMenu, suche]);
   const [aiBusy, setAiBusy] = useState('');
   const [cmd, setCmd] = useState('');
 
@@ -292,112 +297,131 @@ export function Dock() {
   const pickTool = (t: typeof tool) => { setTool(t); setDrawMenu(false); };
   const drawing = tool !== 'select';
 
+  /**
+   * M316: Die Modul-Palette. Jedes Modul hat genau einen Platz in einer von
+   * fünf Gruppen — nach dem, was man damit TUT, nicht nach Technik. Die Suche
+   * findet über Name, Hinweis und Stichwörter (z. B. „Excel" → Rechen-Tabelle).
+   */
+  type Modul = { id: string; name: string; gruppe: string; hinweis?: string; suchwort?: string; icon: JSX.Element; tun: () => void };
+  const module: Modul[] = [
+    { id: 'notiz', gruppe: 'Notieren & Rechnen', name: 'Notiz', suchwort: 'text schreiben markdown checkliste', icon: <INote size={18} />, tun: () => add(() => makeNote(centerPos())) },
+    {
+      id: 'tagesnotiz', gruppe: 'Notieren & Rechnen', name: 'Tagesnotiz', hinweis: 'Notiz mit dem heutigen Datum als Überschrift', suchwort: 'heute datum journal tagebuch',
+      icon: <ICalendar size={18} />,
+      tun: () => add(() => {
+        const heading = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+        return makeNote(centerPos(), {
+          color: 'white',
+          blocks: [
+            { type: 'heading', props: { level: 3 }, content: heading },
+            { type: 'paragraph', content: '' },
+          ],
+        });
+      }),
+    },
+    { id: 'protokoll', gruppe: 'Notieren & Rechnen', name: 'Protokoll-Reihe', hinweis: 'Alle Sitzungen einer Besprechung in einer Karte', suchwort: 'besprechung sitzung meeting minutes', icon: <IMinutes size={18} />, tun: () => add(() => makeMinutes(centerPos(380, 420))) },
+    { id: 'tabelle', gruppe: 'Notieren & Rechnen', name: 'Rechen-Tabelle', hinweis: 'Tabelle, die rechnet — Excel-Dateien lassen sich auch aufs Board ziehen', suchwort: 'excel csv summe zahlen', icon: <ISigma size={18} />, tun: () => add(() => makeSheet(centerPos(460, 300))) },
+    { id: 'kanban', gruppe: 'Planen', name: 'Kanban-Board', hinweis: 'Spalten und Karten: Offen, In Arbeit, Erledigt', suchwort: 'aufgaben todo spalten tickets', icon: <IKanban size={18} />, tun: () => add(() => makeKanban(centerPos(420, 200))) },
+    { id: 'zeitplan', gruppe: 'Planen', name: 'Zeitplan', hinweis: 'Zeitplan (Gantt): Vorgänge als Balken auf der Zeitachse', suchwort: 'gantt projekt termine balken', icon: <IGantt size={18} />, tun: () => add(() => makeGantt(centerPos(560, 240))) },
+    { id: 'kalender', gruppe: 'Planen', name: 'Kalender', hinweis: 'Kalender (Monat), auch mit Google- und Microsoft-Terminen', suchwort: 'monat termine', icon: <ICalendar size={18} />, tun: () => add(() => makeCalendar(centerPos(430, 340))) },
+    { id: 'woche', gruppe: 'Planen', name: 'Wochenplan', hinweis: 'Stundenraster: Tage als Spalten, Uhrzeiten als Zeilen', suchwort: 'stunden woche stundenplan', icon: <IWeek size={18} />, tun: () => add(() => makeWeek(centerPos(620, 440))) },
+    { id: 'zeit', gruppe: 'Planen', name: 'Zeiterfassung', hinweis: 'Arbeitszeit per Start/Stop erfassen', suchwort: 'stoppuhr timer arbeitszeit', icon: <ITimer size={18} />, tun: () => add(() => makeTime(centerPos(460, 380))) },
+    { id: 'diagramm', gruppe: 'Ablauf', name: 'Diagramm', hinweis: 'Diagramm (Mermaid): Flussdiagramm, Mindmap, Sequenz …', suchwort: 'mermaid mindmap fluss sequenz chart', icon: <IDiagram size={18} />, tun: () => add(() => makeMermaid(centerPos(380, 240))) },
+    { id: 'schritt', gruppe: 'Ablauf', name: 'Schritt', hinweis: 'Prozess-Schritt (Rechteck) — verbinden per Ziehen am Rand', suchwort: 'prozess form rechteck kasten', icon: <ISquare size={18} />, tun: () => addShape('process') },
+    { id: 'entscheidung', gruppe: 'Ablauf', name: 'Entscheidung', hinweis: 'Entscheidung (Raute): ja / nein', suchwort: 'raute ja nein verzweigung', icon: <IDiamond size={18} />, tun: () => addShape('decision') },
+    { id: 'start', gruppe: 'Ablauf', name: 'Start/Ende', hinweis: 'Start oder Ende eines Ablaufs', suchwort: 'terminator anfang schluss', icon: <IPill size={18} />, tun: () => addShape('terminator') },
+    { id: 'datei', gruppe: 'Einfügen', name: 'Datei oder Bild', hinweis: 'Bilder, PDFs, E-Mails, Excel, Word und mehr', suchwort: 'pdf upload anhang dokument foto', icon: <IPaperclip size={18} />, tun: () => anyFileRef.current?.click() },
+    { id: 'foto', gruppe: 'Einfügen', name: 'Foto', hinweis: 'Foto aufnehmen oder aus der Mediathek wählen (iPhone/iPad)', suchwort: 'kamera mediathek bild aufnehmen', icon: <IImage size={18} />, tun: () => fotoRef.current?.click() },
+    { id: 'zwischenablage', gruppe: 'Einfügen', name: 'Zwischen\u00adablage', hinweis: 'Bild aus der Zwischenablage einfügen (am PC: Strg+V)', suchwort: 'einfügen paste screenshot kopiert', icon: <ICopy size={18} />, tun: () => void ausZwischenablage() },
+    { id: 'app', gruppe: 'Einfügen', name: 'Eigene App', hinweis: 'Eine HTML-Datei als lauffähige App-Karte', suchwort: 'html widget programm', icon: <IAppWindow size={18} />, tun: () => happFileRef.current?.click() },
+    { id: 'appurl', gruppe: 'Einfügen', name: 'App von URL', hinweis: 'HTML-App von einer Internet-Adresse', suchwort: 'link einbetten web adresse', icon: <IAppWindow size={18} />, tun: () => void addHtmlAppUrl() },
+    { id: 'rahmen', gruppe: 'Ordnen', name: 'Rahmen', hinweis: 'Benannter Rahmen auf dem Board, nimmt seine Karten mit — nicht der Bereich in der Übersicht', suchwort: 'gruppe bereich zusammenfassen', icon: <IFrame size={18} />, tun: () => add(() => makeFrame(centerPos(640, 420))) },
+    { id: 'portal', gruppe: 'Ordnen', name: 'Portal', hinweis: 'Portal zu einem anderen Board', suchwort: 'link verweis board sprung', icon: <IFolder size={18} />, tun: () => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board.'); } },
+  ];
+  const GRUPPEN = ['Notieren & Rechnen', 'Planen', 'Ablauf', 'Einfügen', 'Ordnen'];
+  const q = suche.trim().toLowerCase();
+  const passt = (m: Modul) => !q || `${m.name} ${m.hinweis ?? ''} ${m.suchwort ?? ''}`.toLowerCase().includes(q);
+  const treffer = module.filter(passt);
+  const vorlagenTreffer = templates.filter((t) => !q || t.name.toLowerCase().includes(q));
+  const vorlageEinfuegen = (t: (typeof templates)[number]) => add(() => {
+    const clone = JSON.parse(JSON.stringify(t.node)) as AppNode;
+    const size = { w: clone.width ?? 260, h: clone.height ?? 120 };
+    return { ...clone, id: uid(), position: centerPos(size.w, size.h), selected: false };
+  });
+  const grobeZeiger = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+
   return (
     <div className="dock" ref={dockRef}>
-      <div className="dock-add-wrap">
-        {addMenu && (
-          <div className="dock-menu">
-            {/* M296: Fünf Dinge zuerst, der Rest hinter „Weitere Module". Vorher
-                standen 22 Einträge in sechs Gruppen untereinander, länger als
-                der Bildschirm — jede neue Modulart war unten angehängt worden. */}
-            <button onClick={() => add(() => makeNote(centerPos()))}><INote size={16} /> Notiz</button>
-            <button onClick={() => add(() => makeKanban(centerPos(420, 200)))}><IKanban size={16} /> Kanban-Board</button>
-            <button onClick={() => add(() => makeSheet(centerPos(460, 300)))} title="Tabelle, die rechnet — Excel-Dateien lassen sich auch aufs Board ziehen"><ISigma size={16} /> Rechen-Tabelle</button>
-            <button onClick={() => anyFileRef.current?.click()} title="Bilder, PDFs, E-Mails, Excel, Word und mehr"><IPaperclip size={16} /> Datei oder Bild</button>
-            <button onClick={() => add(() => makeGantt(centerPos(560, 240)))}><IGantt size={16} /> Zeitplan (Gantt)</button>
-            <button
-              className={`dock-menu-mehr ${mehrModule ? 'auf' : ''}`}
-              aria-expanded={mehrModule}
-              onClick={() => setMehrModule((o) => !o)}
-            >
-              <IChevronR size={14} /> Weitere Module
-            </button>
-            {mehrModule && (
-              <>
-                <div className="dock-menu-label">Notizen &amp; Boards</div>
-                <button
-                  onClick={() => add(() => {
-                    const heading = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
-                    return makeNote(centerPos(), {
-                      color: 'white',
-                      blocks: [
-                        { type: 'heading', props: { level: 3 }, content: heading },
-                        { type: 'paragraph', content: '' },
-                      ],
-                    });
-                  })}
-                  title="Notiz mit dem heutigen Datum als Überschrift"
-                >
-                  <ICalendar size={16} /> Tagesnotiz
-                </button>
-                <button
-                  onClick={() => add(() => makeFrame(centerPos(640, 420)))}
-                  title="Benannter Rahmen auf dem Board, nimmt seine Karten mit — nicht der Bereich in der Übersicht"
-                >
-                  <IFrame size={16} /> Rahmen
-                </button>
-                <div className="dock-menu-label">Planung</div>
-                <button onClick={() => add(() => makeCalendar(centerPos(430, 340)))}><ICalendar size={16} /> Kalender (Monat)</button>
-                <button onClick={() => add(() => makeWeek(centerPos(620, 440)))} title="Stundenraster: Tage als Spalten, Uhrzeiten als Zeilen">
-                  <IWeek size={16} /> Wochenplan (Stunden)
-                </button>
-                <button onClick={() => add(() => makeMinutes(centerPos(380, 420)))} title="Alle Sitzungen einer Besprechung in einer Karte">
-                  <IMinutes size={16} /> Protokoll-Reihe
-                </button>
-                <button onClick={() => add(() => makeTime(centerPos(460, 380)))} title="Arbeitszeit per Start/Stop erfassen">
-                  <ITimer size={16} /> Zeiterfassung
-                </button>
-                <button onClick={() => add(() => makeMermaid(centerPos(380, 240)))}><IDiagram size={16} /> Diagramm (Mermaid)</button>
-                <div className="dock-menu-label">Prozess-Formen</div>
-                <button onClick={() => addShape('process')}><ISquare size={16} /> Schritt</button>
-                <button onClick={() => addShape('decision')}><IDiamond size={16} /> Entscheidung</button>
-                <button onClick={() => addShape('terminator')}><IPill size={16} /> Start/Ende</button>
-                <div className="dock-menu-label">Dateien &amp; Apps</div>
-                <button onClick={() => fotoRef.current?.click()} title="Am iPhone/iPad öffnet das die Fotomediathek oder die Kamera">
-                  <IImage size={16} /> Foto aufnehmen oder wählen
-                </button>
-                <button onClick={() => void ausZwischenablage()} title="Bild aus der Zwischenablage — am iPhone/iPad der Weg aus der Fotos-App">
-                  <ICopy size={16} /> Aus Zwischenablage einfügen
-                </button>
-                <button onClick={() => happFileRef.current?.click()} title="Eine HTML-Datei als lauffähige App-Karte">
-                  <IAppWindow size={16} /> Eigene App (HTML)
-                </button>
-                <button onClick={() => void addHtmlAppUrl()} title="HTML-App von einer Internet-Adresse">
-                  <IAppWindow size={16} /> App von URL
-                </button>
-                <div className="dock-menu-label">Verknüpfen</div>
-                <button onClick={() => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board.'); }}><IFolder size={16} /> Portal zu Board</button>
-              </>
-            )}
-            {templates.length > 0 && (
-              <>
-                <div className="dock-menu-label">Vorlagen</div>
-                {templates.map((t) => (
-                  <button
-                    key={t.id}
-                    className="dock-menu-template"
-                    title="Vorlage als neue Karte einfügen"
-                    onClick={() => add(() => {
-                      const clone = JSON.parse(JSON.stringify(t.node)) as AppNode;
-                      const size = { w: clone.width ?? 260, h: clone.height ?? 120 };
-                      return { ...clone, id: uid(), position: centerPos(size.w, size.h), selected: false };
-                    })}
-                  >
-                    <IBookmark size={16} /> {t.name}
+      {addMenu && (
+        <div className="dock-menu modul-palette" role="dialog" aria-label="Modul hinzufügen">
+          <div className="modul-suche">
+            <ISearch size={14} />
+            <input
+              ref={sucheRef}
+              type="search"
+              value={suche}
+              placeholder="Modul suchen …"
+              aria-label="Modul suchen"
+              autoFocus={!grobeZeiger}
+              onChange={(e) => setSuche(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (treffer[0]) treffer[0].tun();
+                  else if (vorlagenTreffer[0]) vorlageEinfuegen(vorlagenTreffer[0]);
+                } else if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  (e.currentTarget.closest('.modul-palette')?.querySelector('.modul-kachel') as HTMLElement | null)?.focus();
+                }
+              }}
+            />
+          </div>
+          {GRUPPEN.map((g) => {
+            const liste = treffer.filter((m) => m.gruppe === g);
+            if (liste.length === 0) return null;
+            return (
+              <div key={g} className="modul-gruppe">
+                <div className="dock-menu-label">{g}</div>
+                <div className="modul-raster">
+                  {liste.map((m) => (
+                    <button key={m.id} className="modul-kachel" data-modul={m.id} title={m.hinweis} onClick={m.tun}>
+                      {m.icon}
+                      <span>{m.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          {vorlagenTreffer.length > 0 && (
+            <div className="modul-gruppe">
+              <div className="dock-menu-label">Vorlagen</div>
+              <div className="modul-raster">
+                {vorlagenTreffer.map((t) => (
+                  <button key={t.id} className="modul-kachel modul-vorlage" title="Vorlage als neue Karte einfügen" onClick={() => vorlageEinfuegen(t)}>
+                    <IBookmark size={18} />
+                    <span>{t.name}</span>
                     <span
                       className="dock-menu-template-x"
+                      role="button"
                       title="Vorlage löschen"
+                      aria-label={`Vorlage „${t.name}" löschen`}
                       onClick={(e) => { e.stopPropagation(); removeTemplate(t.id); }}
                     >
                       <IX size={11} />
                     </span>
                   </button>
                 ))}
-              </>
-            )}
-            <div className="dock-menu-foot">Dateien und E-Mails einfach aufs Board ziehen · Strg+V für Screenshots</div>
-          </div>
-        )}
+              </div>
+            </div>
+          )}
+          {treffer.length === 0 && vorlagenTreffer.length === 0 && (
+            <div className="modul-leer">Nichts gefunden. Dateien lassen sich auch direkt aufs Board ziehen.</div>
+          )}
+          <div className="dock-menu-foot">Dateien und E-Mails einfach aufs Board ziehen · Strg+V für Screenshots</div>
+        </div>
+      )}
+      <div className="dock-add-wrap">
         <button
           className={addMenu ? 'active' : ''}
           onClick={() => { const o = addMenu; closeDockMenus(); setAddMenu(!o); }}
