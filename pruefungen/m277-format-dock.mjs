@@ -50,6 +50,9 @@ const pruefe = (n, gut, info = '') => {
 const seed = () => {
   if (localStorage.getItem('pixinotes-board')) return;
   localStorage.setItem('pixinotes-onboarded', '1');
+  // M318: schliff 2 — sonst stellt die M314-Angleichung „Karte im Fokus" an, und am
+  // Telefon öffnet der Tipp in den Text den Fokus (Formatier-Leiste über der Blätter-Zeile)
+  localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ schliff: 2 }));
   const blocks = [{ id: 'b1', type: 'paragraph', props: {}, content: [{ type: 'text', text: 'Hallo Welt dies ist ein Beispieltext für die Formatprobe', styles: {} }], children: [] }];
   const nodes = [{ id: 'n1', type: 'note', position: { x: 20, y: 120 }, width: 280, height: 200,
     data: { blocks, color: 'amber' } }];

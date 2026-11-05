@@ -130,6 +130,7 @@ Eine Schicht Tokens in `src/index.css`, an der alles hängt:
 | 4 | Gestalt: Tokens für Farbe, Radius, Schatten; kein Milchglas, keine Textur, kein Verlauf | M315 |
 | 5 | Modul-Palette: ＋ zeigt alle Module auf einen Blick, gruppiert, mit Suche — kein zweites Menü | M316 |
 | 6 | Konto-Sync: Anmeldung mit Google oder Microsoft, Daten im App-Ordner des eigenen Drive/OneDrive | M317 |
+| 7 | Eine Leiste unten: dockt die Auswahl-Leiste an, weicht das Dock — auf jeder Breite | M318 |
 
 Jede Etappe wird einzeln geprüft (Playwright-Reihe), gebündelt und in den
 Hauptzweig gemergt.

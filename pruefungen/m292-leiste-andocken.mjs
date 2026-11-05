@@ -118,7 +118,8 @@ const lage = (P) => P.evaluate(() => {
     karte: { top: Math.round(b.top), bottom: Math.round(b.bottom) },
     angedockt: document.querySelector('.sel-toolbar-dock') ? 'dock' : (a.bottom <= b.top + 2 ? 'oben' : (a.top >= b.bottom - 2 ? 'unten' : 'ÜBER DER KARTE')),
     aufKarte: ueber(leiste, { top: Math.round(b.top), bottom: Math.round(b.bottom) }),
-    aufKopf: ueber(leiste, chrome('.tabs')),
+    // M318: Die linke Spalte (.tabs.spalte) reicht bis unten und ist keine Kopfleiste
+    aufKopf: Math.max(ueber(leiste, chrome('.tabs:not(.spalte)')), ueber(leiste, chrome('.topbar'))),
     aufDock: ueber(leiste, chrome('.dock')),
     griffDa: !!document.querySelector('.sel-griff'),
   };
