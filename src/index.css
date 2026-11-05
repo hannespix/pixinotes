@@ -6241,3 +6241,11 @@ audio.file-media { height: 40px; }
 .kopf-menu-dots .mm-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
 .kopf-menu-dots .mm-dot.on { border-color: var(--ink); }
 .kopf-menu-dots .mm-dot-none { background: var(--surface-dim); }
+
+/* ===== M314: Einstellungen — Erweitertes eingeklappt ===== */
+.modal-details { margin-top: 10px; border-top: 1px solid var(--border-soft); padding-top: 8px; }
+.modal-details > summary { cursor: pointer; font-size: 12.5px; color: var(--muted); padding: 4px 0; list-style: none; }
+.modal-details > summary::-webkit-details-marker { display: none; }
+.modal-details > summary::before { content: '›'; display: inline-block; width: 14px; transition: transform 0.15s; }
+.modal-details[open] > summary::before { transform: rotate(90deg); }
+.modal-details > summary:hover { color: var(--ink); }

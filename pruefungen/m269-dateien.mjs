@@ -208,7 +208,7 @@ console.log('\n════ T3: Dateien reisen im Sync-Stand mit ════');
   const dl = P.waitForEvent('download', { timeout: 20000 }).catch(() => null);
   await P.locator('button[title^="Einstellungen"]').click();
   await P.waitForTimeout(700);
-  await P.locator('.modal button', { hasText: 'Synchronisation' }).first().click();
+  await P.locator('.modal button', { hasText: 'Daten' }).first().click();
   await P.waitForTimeout(600);
   const budget = await P.evaluate(() => {
     // M300: Im Reiter stehen jetzt zwei Seg-Schalter (Sync-Weg, Obergrenze) — gezielt den zweiten lesen
@@ -217,8 +217,8 @@ console.log('\n════ T3: Dateien reisen im Sync-Stand mit ════');
     return { knoepfe: knoepfe.slice(0, 5), an: an[0] };
   });
   console.log('    Budget-Schalter:', JSON.stringify(budget));
-  pruefe('T3b die Obergrenze ist einstellbar und steht auf 25 MB',
-    budget.knoepfe.includes('25 MB') && budget.an === '25 MB', JSON.stringify(budget));
+  // M314: Die Obergrenze ist keine Einstellung mehr (fest 25 MB) — der Schalter ist weg
+  pruefe('T3b keine Obergrenze mehr einstellbar (fest 25 MB)', budget.knoepfe.length === 0 && budget.an === undefined, JSON.stringify(budget));
 
   const gespeichert = await P.evaluate(() => {
     const b = [...document.querySelectorAll('.modal button')]
@@ -263,7 +263,7 @@ console.log('\n════ T3: Dateien reisen im Sync-Stand mit ════');
     await Z.waitForTimeout(1800);
     await Z.locator('button[title^="Einstellungen"]').click();
     await Z.waitForTimeout(700);
-    await Z.locator('.modal button', { hasText: 'Synchronisation' }).first().click();
+    await Z.locator('.modal button', { hasText: 'Daten' }).first().click();
     await Z.waitForTimeout(600);
     // Das Eingabefeld für „Stand laden" füttern
     const felder = Z.locator('.modal input[type="file"]');

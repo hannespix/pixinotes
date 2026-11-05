@@ -62,7 +62,7 @@ type Feld = (typeof FELDER)[number];
  * Voreinstellungen gestellt — die meisten hatten sie nie bewusst gewählt,
  * sie waren schlicht an. Danach gilt wieder: Was gespeichert ist, bleibt.
  */
-const SCHLIFF = 1;
+const SCHLIFF = 2;
 type Vorlieben = Partial<Record<Feld, unknown>> & { schliff?: number };
 
 function lies(): Vorlieben | null {
@@ -108,11 +108,18 @@ export function initEinstellungen(): () => void {
   }
   // M294: Ruhige Fläche — einmalig. Gilt für gespeicherte Vorlieben ohne
   // Marke UND für Stände von vor M247 (dort steckt Physik im Hauptstand).
-  if ((gespeichert?.schliff ?? 0) < SCHLIFF) {
+  if ((gespeichert?.schliff ?? 0) < 1) {
     const st = useBoard.getState();
     if (st.physicsEnabled || st.clickZoom) {
       useBoard.setState({ physicsEnabled: false, clickZoom: false, ruheHinweis: true });
     }
+  }
+  // M314: Optionen, die es nicht mehr gibt, einmalig auf ihre automatischen
+  // Werte — sonst hinge jemand in einem Zustand fest, den kein Schalter mehr
+  // erreicht (Stift schiebt, Fokus formatfüllend …). Die Spalte bleibt, wie
+  // sie ist: ‹ und „Anheften" erreichen sie weiterhin.
+  if ((gespeichert?.schliff ?? 0) < 2) {
+    useBoard.setState({ milchglas: true, cardFocus: true, fokusEinKlick: false, fokusVollbild: false, stiftZeichnet: true });
   }
   if (!gespeichert) {
     // Erster Start mit dieser Fassung: den vorhandenen Stand übernehmen,

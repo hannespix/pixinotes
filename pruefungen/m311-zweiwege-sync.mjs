@@ -123,7 +123,7 @@ async function warteBis(P, fn, ms = 16000) {
 async function verbinden(P) {
   await P.locator('button[title^="Einstellungen"]').click();
   await P.waitForTimeout(600);
-  await P.locator('.modal button', { hasText: 'Synchronisation' }).first().click();
+  await P.locator('.modal button', { hasText: 'Daten' }).first().click();
   await P.waitForTimeout(500);
   await P.locator('.modal button', { hasText: 'Sync-Ordner verbinden' }).click();
   await P.waitForTimeout(1500);
@@ -261,7 +261,7 @@ console.log('\n════ G: Texte ════');
 {
   await A.P.locator('button[title^="Einstellungen"]').click();
   await A.P.waitForTimeout(600);
-  await A.P.locator('.modal button', { hasText: 'Synchronisation' }).first().click();
+  await A.P.locator('.modal button', { hasText: 'Daten' }).first().click();
   await A.P.waitForTimeout(500);
   const t = await A.P.locator('.modal').innerText();
   pruefe('G1 Einstellungen: Ordner-Weg sagt „in beide Richtungen"', t.includes('in beide Richtungen'));

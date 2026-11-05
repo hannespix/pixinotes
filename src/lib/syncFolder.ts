@@ -559,7 +559,7 @@ export async function checkSyncRemote(erzwingen = false): Promise<EinarbeitenErg
         emitSyncStatus('ordner', 'conflict');
         if (!staleHintShown) {
           staleHintShown = true;
-          useBoard.getState().showToast('Sync-Ordner und lokaler Stand weichen ab, nichts wurde überschrieben. Unter ⚙ → Synchronisation wählen.');
+          useBoard.getState().showToast('Sync-Ordner und lokaler Stand weichen ab, nichts wurde überschrieben. Unter ⚙ → Daten → Synchronisation wählen.');
         }
       } else if (r === 'fehler') {
         emitSyncStatus('ordner', 'error');
@@ -611,7 +611,7 @@ async function autoSave(): Promise<void> {
           emitSyncStatus('ordner', 'conflict');
           if (!conflictWarned) {
             conflictWarned = true;
-            useBoard.getState().showToast('⚠️ Der Sync-Ordner hat einen anderen Stand. Unter ⚙ → Synchronisation laden oder überschreiben.');
+            useBoard.getState().showToast('⚠️ Der Sync-Ordner hat einen anderen Stand. Unter ⚙ → Daten → Synchronisation laden oder überschreiben.');
           }
           return;
         }

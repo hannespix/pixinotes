@@ -198,7 +198,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
               Bleibt eine Karte trotzdem leer, liegt es fast immer an der
               Größe — das gehört hier hin, nicht ins Handbuch. */}
           Der Inhalt liegt nicht auf diesem Gerät. Dateien werden bis zur eingestellten
-          Obergrenze mitsynchronisiert (⚙️ → Synchronisation); diese hier ist mit
+          Obergrenze mitsynchronisiert (⚙ → Daten → Synchronisation); diese hier ist mit
           {' '}{formatBytes(file.size)} entweder größer oder wurde vor dieser Neuerung eingefügt.
           Auf dem Gerät mit der Datei einmal speichern — oder sie hier erneut einfügen.
         </div>

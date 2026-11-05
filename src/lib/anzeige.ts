@@ -46,6 +46,9 @@ export function wurzelZoom(): number {
 
 export function initAnzeige(): () => void {
   const root = document.documentElement;
+  /** M314: Milchglas ist keine Option mehr — an, außer das System wünscht
+   *  weniger Transparenz (der Kontrast-Modus schaltet es ohnehin ab). */
+  const glasAuto = () => !(window.matchMedia?.('(prefers-reduced-transparency: reduce)').matches ?? false);
   const apply = (z: number, lesbar: boolean, kontrast: boolean, glas: boolean) => {
     // 1 = aus. Die Eigenschaft ganz zu entfernen ist sauberer, als "1" zu
     // setzen: Manche Browser legen sonst grundlos eine eigene Ebene an.
@@ -80,8 +83,8 @@ export function initAnzeige(): () => void {
     root.dataset.glas = glas && !kontrast ? 'an' : 'aus';
   };
   const s0 = useBoard.getState();
-  apply(s0.anzeige ?? 1, !!s0.lesbareSchrift, !!s0.hoherKontrast, s0.milchglas !== false);
+  apply(s0.anzeige ?? 1, !!s0.lesbareSchrift, !!s0.hoherKontrast, glasAuto());
   return useBoard.subscribe((s) => {
-    apply(s.anzeige ?? 1, !!s.lesbareSchrift, !!s.hoherKontrast, s.milchglas !== false);
+    apply(s.anzeige ?? 1, !!s.lesbareSchrift, !!s.hoherKontrast, glasAuto());
   });
 }

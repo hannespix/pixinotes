@@ -287,7 +287,7 @@ console.log('\n════════════ T9: Umschalten bei offenem B
   // Einstellungen öffnen und 130 % wählen
   await P.locator('button[title^="Einstellungen"]').click();
   await P.waitForTimeout(700);
-  await P.locator('.modal button', { hasText: 'Design' }).first().click();   // Reiter „Design"
+  await P.locator('.modal button', { hasText: 'Darstellung' }).first().click();   // Reiter „Design"
   await P.waitForTimeout(600);
   await P.locator('.modal button', { hasText: '130 %' }).first().click();
   await P.waitForTimeout(900);
