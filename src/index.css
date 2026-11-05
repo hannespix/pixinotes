@@ -6056,3 +6056,48 @@ audio.file-media { height: 40px; }
 .modal-details > summary::before { content: '›'; display: inline-block; width: 14px; transition: transform 0.15s; }
 .modal-details[open] > summary::before { transform: rotate(90deg); }
 .modal-details > summary:hover { color: var(--ink); }
+
+/* ===== M316: Modul-Palette — alle Module auf einen Blick ===== */
+/* Die Palette steht mittig ÜBER dem Dock (das Dock ist der Bezugsrahmen:
+   fixed + transform), nicht links am ＋ wie die übrigen Flyouts. Zentriert
+   wird mit `translate` — dieselbe Eigenschaft wie in der Phone-Regel für
+   .dock-menu (M174), sonst verschöben beide zusammen doppelt. */
+.dock-menu.modul-palette {
+  left: 50%; right: auto; translate: -50% 0; transform: none; bottom: calc(100% + 8px);
+  width: min(470px, calc(100vw - 16px)); max-width: none; padding: 8px; gap: 2px;
+}
+.modul-suche {
+  display: flex; align-items: center; gap: 6px; padding: 0 8px; margin-bottom: 2px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface-3);
+}
+.modul-suche:focus-within { border-color: var(--accent); }
+.modul-suche svg { color: var(--muted); flex: none; }
+.modul-suche input {
+  flex: 1; min-width: 0; border: none; background: none; font: inherit; font-size: 13px;
+  padding: 7px 0; color: var(--ink); outline: none;
+}
+.modul-suche input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.modul-palette .modul-gruppe .dock-menu-label { padding: 5px 4px 2px; font-size: 10px; }
+.modul-raster { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; }
+/* `.dock button` setzt 42 × 42 — die Kachel wächst mit ihrem Namen (zwei Zeilen) */
+.dock-menu .modul-kachel {
+  width: auto; height: auto; min-height: 56px; flex-direction: column; justify-content: center; align-items: center; gap: 5px;
+  padding: 7px 3px 6px; text-align: center; font-size: 11px; line-height: 1.2; letter-spacing: -0.01em;
+  border: 1px solid transparent; position: relative; hyphens: manual;
+}
+.dock-menu .modul-kachel:hover { background: var(--surface-2); border-color: var(--border-soft); }
+.dock-menu .modul-kachel:focus-visible { border-color: var(--accent); outline: none; }
+.dock-menu .modul-kachel > svg { color: var(--ink); }
+.dock-menu .modul-kachel:hover > svg { color: var(--accent); }
+.modul-kachel > span:first-of-type {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 100%;
+}
+.dock-menu .modul-vorlage { padding-right: 4px !important; }
+.modul-vorlage .dock-menu-template-x { top: 3px; right: 3px; transform: none; opacity: 0; }
+.modul-vorlage:hover .dock-menu-template-x, .modul-vorlage:focus-within .dock-menu-template-x { opacity: 1; }
+@media (pointer: coarse) { .modul-vorlage .dock-menu-template-x { opacity: 1; } }
+.modul-leer { font-size: 12px; color: var(--muted); padding: 10px 6px; }
+@media (max-width: 640px) {
+  .modul-raster { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dock-menu.modul-palette { max-height: calc(100vh - 150px - var(--safe-top)); }
+}

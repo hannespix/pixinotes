@@ -56,7 +56,9 @@ Board-⋯), das ✕ an Reitern am Handy.
 
 ### Dock (nur auf dem Board)
 `＋ · ✎ · ⋯` — drei Knöpfe.  
-**＋** bleibt wie in M296 (fünf Einträge, „Weitere Module", Vorlagen).  
+**＋** öffnet die Modul-Palette (M316): alle Module als Kacheln in fünf Gruppen
+(Notieren & Rechnen · Planen · Ablauf · Einfügen · Ordnen) plus Vorlagen, mit
+Suchfeld. Kein „Weitere Module", keine zweite Ebene — jedes Modul hat genau einen Platz.  
 **⋯** ist das Board-Menü: Anordnen … · Hintergrund … · KI-Assistent … ·
 Präsentieren · Als Bild exportieren · Alles einpassen.  
 Weg: „Aufgaben" (steht in der Spalte), „Präsentieren" als eigener Knopf,
@@ -126,35 +128,41 @@ Eine Schicht Tokens in `src/index.css`, an der alles hängt:
 | 2 | Karte: Auswahl-Leiste und ⋯ neu geordnet, Modul-Köpfe ≤ 2 Symbole + ⋯ | M313 |
 | 3 | Einstellungen auf drei Reiter, Optionen automatisiert, Hilfe/Begrüßung angepasst | M314 |
 | 4 | Gestalt: Tokens für Farbe, Radius, Schatten; kein Milchglas, keine Textur, kein Verlauf | M315 |
-| 5 | Sync über Firebase als vierter Weg | M316 |
+| 5 | Modul-Palette: ＋ zeigt alle Module auf einen Blick, gruppiert, mit Suche — kein zweites Menü | M316 |
+| 6 | Konto-Sync: Anmeldung mit Google oder Microsoft, Daten im App-Ordner des eigenen Drive/OneDrive | M317 |
 
 Jede Etappe wird einzeln geprüft (Playwright-Reihe), gebündelt und in den
 Hauptzweig gemergt.
 
-## 5. Firebase als Sync-Weg (Antwort auf „geht das?")
+## 5. Sync über ein Konto (Antwort auf „Firebase?" und „so wenig Einrichtung wie möglich")
 
-Ja, als **wählbarer Weg neben Ordner und WebDAV**, mit derselben
-Drei-Wege-Zusammenführung aus M311.
+Gewählt wird **nicht Firebase**, sondern der **Konto-Sync** (M317): Anmeldung mit
+**Google** oder **Microsoft** per OAuth, die Daten liegen im **App-Ordner des
+eigenen Google Drive bzw. OneDrive** (`appDataFolder` / `approot`). Gründe:
 
-- **Speicher**: Cloud Firestore. Je Nutzer ein Dokument `umgebungen/{uid}` mit
-  Bereichen/Projekten und je Board ein Dokument `umgebungen/{uid}/boards/{boardId}`
-  (Firestore-Grenze 1 MB je Dokument; ein Board passt, die ganze Umgebung nicht).
-  Dateiinhalte (PDF, Bilder) in Cloud Storage unter `dateien/{uid}/{kartenId}`.
-- **Anmeldung**: Firebase Auth, Google-Konto oder E-Mail-Link; anonyme Anmeldung
-  für „nur dieses Gerät" ist möglich, aber kein Sync.
-- **Live statt Abfrage**: `onSnapshot` liefert Änderungen anderer Geräte sofort;
-  der Offline-Cache von Firestore puffert ohne Netz. Schreiben je Board, nicht als
-  Ganzes — das halbiert Konflikte von vornherein; Konflikte derselben Karte löst
-  `dreiWegeMerge` mit dem zuletzt gesehenen Serverstand als Basis.
-- **Regeln**: `allow read, write: if request.auth.uid == uid` — jeder sieht nur
-  seine Umgebung. Team-Sync je Projekt wäre später eine Mitgliederliste am
-  Projekt-Dokument.
-- **Einrichtung**: PixiNotes braucht die Web-Konfiguration eines Firebase-Projekts
-  (apiKey, projectId …). Die ist kein Geheimnis, aber je Betreiber verschieden;
-  sie wird unter Daten → Synchronisation → Firebase eingetragen (oder als
-  Voreinstellung in den Build gelegt). Kostenlos im Spark-Tarif bis 1 GB /
-  50 000 Lesevorgänge am Tag — für Notizen weit ausreichend.
-- **Grenzen, ehrlich**: Die Daten liegen bei Google (Region wählbar, z. B.
-  europe-west3). Für dienstliche Notizen ist das eine Datenschutz-Entscheidung,
-  die Nextcloud nicht hat. Deshalb bleibt der Ordner-Weg die Voreinstellung;
-  Firebase ist die Wahl für „überall, auch am Handy, ohne Client".
+- **Null Einrichtung für Nutzer**: ein Klick „Mit Google anmelden" — kein Projekt,
+  keine Regeln, keine Adresse, kein App-Passwort.
+- **Daten bleiben beim Nutzer**: im eigenen Cloud-Konto, nicht in einer Datenbank
+  des Betreibers. Keine Speicherkosten, keine Quoten, keine Datenschutz-Last für
+  den Betreiber. Das passt zu „alles bleibt bei dir".
+- **Die Anmeldung gibt es schon**: Die Kalender-Konten (`src/lib/calAccounts.ts`)
+  melden sich bereits bei Google (GIS-Token) und Microsoft (PKCE mit Refresh-Token)
+  an. Der Sync nutzt dieselben Client-IDs mit einer zusätzlichen Berechtigung
+  (`drive.appdata` bzw. `Files.ReadWrite.AppFolder`) — beides „nicht sensibel",
+  also ohne Google-Verifizierung veröffentlichbar.
+- **Dieselbe Zusammenführung**: `SyncWeg` + `fremdStandEinarbeiten` aus M311.
+  Ablage je Board (`board-<id>.json`) plus `umgebung.json` (Bereiche, Reihenfolge,
+  Stempel je Board); Dateien (PDF, Bilder) als echte Binärdateien im App-Ordner.
+  Abgleich: alle 10 s ein Mini-Abruf der Metadaten von `umgebung.json`
+  (modifiedTime / eTag), erst eine Änderung lädt die betroffenen Boards.
+
+**Firebase** bleibt zweite Wahl: eigenes Projekt, Auth-Provider, autorisierte
+Domains, Sicherheitsregeln — und alle Notizen aller Nutzer in einem Projekt des
+Betreibers. Mehr Einrichtung, mehr Verantwortung, kein Gewinn für den Zweck.
+Sollte später ein Echtzeit-Team-Board gewünscht sein, wäre ein Dienst mit
+Live-Abonnements (Firestore, Supabase) der richtige Ort — als Ergänzung, nicht
+als Ersatz.
+
+**Grenzen, ehrlich**: Die portable Einzeldatei (`file://`) kann keine OAuth-
+Anmeldung — dort bleiben Ordner, WebDAV und Datei. Google-Tokens leben eine
+Stunde; die Verlängerung läuft still beim nächsten Klick in der App.

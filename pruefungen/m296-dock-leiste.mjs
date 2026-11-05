@@ -1,7 +1,7 @@
 /**
  * M296 — Dock, Menüs und Auswahl-Leiste entrümpelt.
  *
- *   A  ＋-Menü: fünf Einträge und „Weitere Module"; aufgeklappt kommt der Rest.
+ *   A  ＋-Menü: seit M316 eine Modul-Palette (20 Kacheln, fünf Gruppen).
  *   B  ⋯-Menü: „Anordnen & Hintergrund" bündelt die Varianten (M312: kein zweites „Aufräumen"),
  *      der Physik-Schalter ist weg (⚙ → Bedienung).
  *   C  Auswahl-Leiste: fünf Elemente (M313); Schrift liegt im ⋯, Kopieren im Teilen-Dialog.
@@ -61,22 +61,20 @@ async function seite({ karten = 3, viewport = { width: 1440, height: 900 }, mobi
   return { ctx, P };
 }
 
-console.log('════ A: ＋-Menü ════');
+console.log('════ A: ＋-Menü (M316: eine Modul-Palette) ════');
 {
   const { ctx, P } = await seite();
   await P.locator('[aria-label="Objekt hinzufügen"]').click();
   await P.waitForTimeout(300);
-  const eintraege = await P.locator('.dock-menu > button').count();
-  const labels = await P.locator('.dock-menu .dock-menu-label').count();
-  pruefe('A1 fünf Einträge plus „Weitere Module", keine Gruppen-Überschriften', eintraege === 6 && labels === 0, `eintraege=${eintraege} labels=${labels}`);
-  const texte = await P.locator('.dock-menu > button').allTextContents();
-  pruefe('A2 die fünf: Notiz, Kanban, Rechen-Tabelle, Datei oder Bild, Zeitplan', ['Notiz', 'Kanban', 'Rechen-Tabelle', 'Datei oder Bild', 'Zeitplan'].every((t) => texte.some((x) => x.includes(t))), JSON.stringify(texte));
-  const hoehe = await P.evaluate(() => document.querySelector('.dock-menu').getBoundingClientRect().height);
-  pruefe('A3 das Menü ist kürzer als der halbe Bildschirm', hoehe < 450, `hoehe=${hoehe}`);
-  await P.locator('.dock-menu-mehr').click();
-  await P.waitForTimeout(300);
-  const mehr = await P.locator('.dock-menu > button').count();
-  pruefe('A4 „Weitere Module" klappt den Rest auf', mehr > 18 && (await P.locator('.dock-menu .dock-menu-label').count()) >= 4, `mehr=${mehr}`);
+  // M316: Statt fünf Einträgen + „Weitere Module" steht EINE Palette mit allen
+  // Modulen als Kacheln in Gruppen — die Prüfung folgt der neuen Gestalt.
+  const kacheln = await P.locator('.modul-palette .modul-kachel').count();
+  const labels = await P.locator('.modul-palette .dock-menu-label').count();
+  pruefe('A1 eine Palette: 20 Kacheln in fünf Gruppen, kein „Weitere Module"', kacheln === 20 && labels === 5 && (await P.locator('.dock-menu-mehr').count()) === 0, `kacheln=${kacheln} labels=${labels}`);
+  const texte = await P.locator('.modul-palette .modul-kachel').allTextContents();
+  pruefe('A2 die Kernmodule sind da: Notiz, Kanban, Rechen-Tabelle, Datei oder Bild, Zeitplan', ['Notiz', 'Kanban', 'Rechen-Tabelle', 'Datei oder Bild', 'Zeitplan'].every((t) => texte.some((x) => x.includes(t))), JSON.stringify(texte));
+  const hoehe = await P.evaluate(() => document.querySelector('.modul-palette').getBoundingClientRect().height);
+  pruefe('A3 die Palette passt in den Bildschirm', hoehe < 900 - 170, `hoehe=${hoehe}`);
   await P.screenshot({ path: `${SD}/m296-a-plus.png` });
   await P.keyboard.press('Escape');
   await ctx.close();
