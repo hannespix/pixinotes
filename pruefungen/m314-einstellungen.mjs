@@ -111,7 +111,7 @@ console.log('\n════ A: Reiter ════');
   console.log('\n════ D: Dienste ════');
   await reiter(P, 'Dienste');
   const s = await h3s(P);
-  pruefe('D1 Dienste: KI-Assistent · Gehirn · Konten', s.length === 3 && /KI/.test(s[0]) && /Gehirn/.test(s[1]) && /Konten/.test(s[2]), s.join(' | '));
+  pruefe('D1 Dienste: KI-Assistent · Gehirn · Handschrift (M320) · Konten', s.length === 4 && /KI/.test(s[0]) && /Gehirn/.test(s[1]) && /Handschrift/.test(s[2]) && /Konten/.test(s[3]), s.join(' | '));
   await P.locator('.modal-row-check', { hasText: 'Gehirn einschalten' }).locator('input').check();
   await P.waitForTimeout(500);
   pruefe('D2 eingeschaltet zeigt das Gehirn „Erweitert" eingeklappt', (await P.locator('.modal-details summary').count()) === 1 && !(await P.locator('.modal-details').evaluate((d) => d.open)));

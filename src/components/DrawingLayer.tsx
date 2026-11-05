@@ -4,6 +4,9 @@ import { getStroke } from 'perfect-freehand';
 import { selectActiveBoard, useBoard, type Stroke } from '../store';
 import { uid } from '../types';
 import { finalizeStroke, recognizeShapes } from '../lib/strokeShapes';
+import { handschriftErkennen } from '../lib/handschrift';
+import { makeNote } from '../lib/nodes';
+import { IType } from './Icons';
 
 const EMPTY: Stroke[] = [];
 const PEN = { width: 2.5, opacity: 1 };
@@ -76,6 +79,9 @@ export function DrawingLayer() {
   const showToast = useBoard((s) => s.showToast);
   const eraseStrokesNear = useBoard((s) => s.eraseStrokesNear);
   const beginEraseGesture = useBoard((s) => s.beginEraseGesture);
+  const removeStrokes = useBoard((s) => s.removeStrokes);
+  const addNode = useBoard((s) => s.addNode);
+  const [erkennt, setErkennt] = useState(false);
   const { screenToFlowPosition } = useReactFlow();
   const { x: tx, y: ty, zoom } = useViewport();
   const uiTheme = useBoard((s) => s.ui.theme);
@@ -371,6 +377,41 @@ export function DrawingLayer() {
     };
   });
 
+  /**
+   * M320: Handschrift → Text. Nimmt die Striche dieser Zeichensitzung (das,
+   * was gerade geschrieben wurde), lässt sie erkennen, legt an ihrer Stelle
+   * eine Notiz mit dem Text an und entfernt die Striche. Strg+Z holt beides
+   * zurück.
+   */
+  const handschriftUebernehmen = async () => {
+    const ids = sessionIds.current;
+    const eigene = drawings.filter((s) => ids.includes(s.id) && s.tool === 'pen');
+    if (eigene.length === 0) { showToast('Erst mit dem Stift schreiben, dann „Text".'); return; }
+    setErkennt(true);
+    try {
+      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+      const punkte = eigene.map((s) => {
+        const n = s.anchor ? nodeMap.get(s.anchor) : undefined;
+        const dx = n?.position.x ?? 0, dy = n?.position.y ?? 0;
+        return s.points.map((p) => [p[0] + dx, p[1] + dy] as [number, number]);
+      });
+      const text = await handschriftErkennen(punkte);
+      if (!text) { showToast('Keine Schrift erkannt — deutlicher schreiben oder größer.'); return; }
+      let minX = Infinity, minY = Infinity;
+      for (const s of punkte) for (const [x, y] of s) { minX = Math.min(minX, x); minY = Math.min(minY, y); }
+      const absaetze = text.split(/\n+/).filter(Boolean).map((z) => ({ type: 'paragraph', content: z }));
+      addNode(makeNote({ x: minX, y: minY }, { color: 'white', blocks: absaetze.length ? absaetze : [{ type: 'paragraph', content: text }] }));
+      removeStrokes(eigene.map((s) => s.id));
+      sessionIds.current = sessionIds.current.filter((id) => !eigene.some((s) => s.id === id));
+      showToast(`✍️ Handschrift übernommen: „${text.length > 40 ? `${text.slice(0, 40)}…` : text}"`);
+    } catch (e) {
+      showToast((e as Error).message, false, 7000);
+    } finally {
+      setErkennt(false);
+    }
+  };
+  const schriftDa = sessionIds.current.some((id) => drawings.some((s) => s.id === id && s.tool === 'pen'));
+
   const toPath = (s: Stroke) =>
     s.points.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
 
@@ -452,6 +493,11 @@ export function DrawingLayer() {
           {tool === 'eraser' ? 'Radierer' : tool === 'marker' ? 'Textmarker' : 'Stift'}
           <span className="draw-hint-tip">{durchgriff ? ' · Hand schiebt, Stift zeichnet' : ''} · am Ende kurz halten = Form einrasten ✨</span>
         </span>
+        {schriftDa && (
+          <button className="draw-text" disabled={erkennt} onClick={() => void handschriftUebernehmen()} title="Geschriebenes in eine Notiz mit Text umwandeln (Striche dieser Sitzung)" aria-label="Handschrift in Text umwandeln">
+            <IType size={14} /> {erkennt ? '…' : 'Text'}
+          </button>
+        )}
         <button className="draw-done" onClick={() => setTool('select')}>Fertig</button>
       </div>
       )}

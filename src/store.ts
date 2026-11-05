@@ -259,6 +259,8 @@ interface BoardState {
    *  (sich berührende entscheiden GEMEINSAM über das Ankern, M128) */
   addStroke: (stroke: Stroke, sessionIds?: string[]) => void;
   eraseStrokesNear: (x: number, y: number, radius: number) => void;
+  /** M320: Striche nach Id entfernen (Handschrift wurde zu Text) — ein History-Eintrag */
+  removeStrokes: (ids: string[]) => void;
   /** Geankerte Striche der Karten wieder freistellen (Punkte werden absolut) */
   detachStrokes: (nodeIds: string[]) => void;
   /** Radier-Geste beginnt: nächster tatsächlicher Lösch-Treffer macht EINEN History-Eintrag */
@@ -396,6 +398,9 @@ interface BoardState {
   setClickZoom: (on: boolean) => void;
   /** Mausrad zoomt statt zu scrollen (Miro-Stil) */
   wheelZoom: boolean;
+  /** M320: Handschrift online erkennen lassen (Google Input Tools) — Opt-in, Striche verlassen das Gerät */
+  handschriftOnline: boolean;
+  setHandschriftOnline: (on: boolean) => void;
   setWheelZoom: (on: boolean) => void;
   /** M193: Übersicht — Hierarchie oder Netz. Liegt im Store, damit der
    *  Navigator (und damit JEDE Ansicht) direkt ins Netz springen kann. */
@@ -859,6 +864,8 @@ export const useBoard = create<BoardState>()(
         setClickZoom: (on) => set({ clickZoom: on }),
         wheelZoom: false,
         setWheelZoom: (on) => set({ wheelZoom: on }),
+        handschriftOnline: false,
+        setHandschriftOnline: (on) => set({ handschriftOnline: on }),
         overviewMode: 'hierarchie',
         setOverviewMode: (m) => set({ overviewMode: m }),
         graphLayers: { cards: false, portals: true, wikis: true, projectOnly: false },
@@ -1065,6 +1072,14 @@ export const useBoard = create<BoardState>()(
           patchActive((b) => ({
             drawings: integrateStroke(stroke, b.drawings ?? [], sessionIds, b.nodes).drawings,
           }));
+        },
+
+        removeStrokes: (ids) => {
+          const idSet = new Set(ids);
+          const board = get().boards.find((b) => b.id === get().activeId);
+          if (!board || !(board.drawings ?? []).some((s) => idSet.has(s.id))) return;
+          get().pushHistory();
+          patchActive((b) => ({ drawings: (b.drawings ?? []).filter((s) => !idSet.has(s.id)) }));
         },
 
         beginEraseGesture: () => { eraseSnapPending = true; },
@@ -2073,6 +2088,7 @@ export const useBoard = create<BoardState>()(
         lesbareSchrift: s.lesbareSchrift,
         hoherKontrast: s.hoherKontrast,
         wheelZoom: s.wheelZoom,
+        handschriftOnline: s.handschriftOnline,
         showArchived: s.showArchived,
         gridSnap: s.gridSnap,
         overviewMode: s.overviewMode,
