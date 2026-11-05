@@ -19,6 +19,7 @@ import { cleanupOrphanHtml } from './lib/htmlStore';
 import { cleanupOrphanFiles } from './lib/fileStore';
 import { initWebdavSync } from './lib/webdav';
 import { initFilesSync } from './lib/filesSync';
+import { initKontoSync } from './lib/kontoSync';
 import { initBrain } from './lib/brain';
 import { TaskHub } from './components/TaskHub';
 import { AboutMenu } from './components/AboutMenu';
@@ -52,7 +53,7 @@ export default function App() {
   const showToast = useBoard((s) => s.showToast);
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initBrain(); }, []);
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initBrain(); }, []);
 
   // Eigene Apps (M158): verwaiste HTML-Inhalte in IndexedDB entsorgen —
   // NUR beim Start (dann kann kein Undo eine gelöschte App-Karte zurückholen,

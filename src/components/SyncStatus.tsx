@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useBoard } from '../store';
 import { regrantSyncAccess, type SyncState } from '../lib/syncFolder';
 import { saveViaFiles } from '../lib/filesSync';
+import { kontoLabel, kontoNeuAnmelden } from '../lib/kontoSync';
 import { ICloud, ICloudAlert, ICloudCheck, ICloudOff, ICloudUp } from './Icons';
 
 type Entry = { state: SyncState; at?: string };
@@ -31,11 +32,17 @@ export function SyncStatus() {
   const entries = Object.entries(map);
   if (entries.length === 0) return null;
   const [source, st] = entries.sort((a, b) => RANK[a[1].state] - RANK[b[1].state])[0];
-  const label = SOURCE_LABEL[source] ?? source;
+  const label = source === 'konto' ? kontoLabel() : (SOURCE_LABEL[source] ?? source);
   const openSync = () => useBoard.getState().setSettingsOpen(true, 'sync');
 
   const byState = {
-    noperm: {
+    noperm: source === 'konto' ? {
+      // M317: Google-Token abgelaufen und still nicht erneuerbar — ein Klick holt es nach
+      cls: 'sync-status sync-warn sync-noperm',
+      tip: `${label}: Anmeldung abgelaufen — klicken, um sie zu erneuern`,
+      icon: <ICloudOff size={16} />,
+      onClick: () => { void kontoNeuAnmelden().then((ok) => { if (!ok) openSync(); }); },
+    } : {
       cls: 'sync-status sync-warn sync-noperm',
       tip: 'Auto-Sync pausiert: Der Browser hat die Ordner-Freigabe nach dem Neustart zurückgesetzt — klicken, um sie neu zu erteilen',
       icon: <ICloudOff size={16} />,

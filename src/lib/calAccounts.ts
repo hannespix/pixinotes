@@ -88,6 +88,7 @@ declare global {
             scope: string;
             prompt?: string;
             callback: (resp: { access_token?: string; expires_in?: number; error?: string }) => void;
+            error_callback?: (err: { type?: string; message?: string }) => void;
           }) => { requestAccessToken: (over?: { prompt?: string }) => void };
         };
       };
@@ -112,6 +113,31 @@ function loadGis(): Promise<void> {
 }
 
 const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
+
+/**
+ * M317: Google-Zugriffs-Token für einen Berechtigungs-Satz — interaktiv (Popup)
+ * oder still (`still`: prompt ''). Baustein für Kalender UND Konto-Sync.
+ * Kann GIS das Popup nicht öffnen (außerhalb einer Geste geblockt), meldet
+ * `error_callback` — sonst hinge das Versprechen für immer.
+ */
+export async function googleTokenFuer(clientId: string, scope: string, still: boolean): Promise<{ token: string; exp: number }> {
+  if (!oauthAvailable()) throw new Error('Anmelden geht nur über die gehostete App (http/https), nicht aus der Einzeldatei.');
+  await loadGis();
+  const t = await new Promise<{ access_token: string; expires_in: number }>((resolve, reject) => {
+    const client = window.google!.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope,
+      ...(still ? { prompt: '' } : {}),
+      callback: (resp) => {
+        if (resp.error || !resp.access_token) reject(new Error(still ? 'Google-Sitzung abgelaufen — bitte neu anmelden.' : `Google-Anmeldung abgebrochen (${resp.error ?? 'kein Token'})`));
+        else resolve({ access_token: resp.access_token, expires_in: resp.expires_in ?? 3600 });
+      },
+      error_callback: (err) => reject(new Error(still ? 'Google-Sitzung abgelaufen — bitte neu anmelden.' : `Google-Anmeldung abgebrochen (${err.type ?? err.message ?? 'Popup'})`)),
+    });
+    client.requestAccessToken(still ? { prompt: '' } : undefined);
+  });
+  return { token: t.access_token, exp: Date.now() + (t.expires_in - 60) * 1000 };
+}
 
 /** Interaktiv mit Google verbinden (Popup). Speichert Token + Kalenderliste. */
 export async function connectGoogle(clientId: string): Promise<string> {
@@ -220,8 +246,32 @@ export function handleOAuthRedirect(): boolean {
  * `withNotes` fragt zusätzlich den OneNote-Lesezugriff ab (M184).
  */
 export async function connectMicrosoft(clientId: string, tenant = 'common', withNotes = false): Promise<string> {
-  if (!oauthAvailable()) throw new Error('Anmelden geht nur über die gehostete App (http/https), nicht aus der Einzeldatei.');
   const scope = withNotes ? MS_SCOPE_NOTES : MS_SCOPE;
+  const roh = await msAnmeldung(clientId, tenant, scope);
+  const acc: MsAccount = {
+    clientId, tenant, token: roh.token, refreshToken: roh.refreshToken, tokenExp: roh.exp,
+    connectedAs: loadCalAccounts().ms?.connectedAs, scopes: roh.scopes,
+  };
+  patchCalAccounts({ ms: acc });
+  // Anzeige-Name des Postfachs holen
+  try {
+    const me = await msApi<{ userPrincipalName?: string; displayName?: string }>(acc, 'https://graph.microsoft.com/v1.0/me');
+    acc.connectedAs = me.displayName || me.userPrincipalName;
+    patchCalAccounts({ ms: acc });
+  } catch { /* Anzeige-Name ist optional */ }
+  return acc.connectedAs ?? 'Microsoft 365';
+}
+
+/** Rohes Token-Paket — für Kalender UND Konto-Sync (M317) */
+export interface MsRohToken { token: string; refreshToken?: string; exp: number; scopes: string }
+
+/**
+ * M317: Microsoft-Anmeldung als Baustein — Popup (PKCE ohne Client-Secret) plus
+ * Code-Tausch, OHNE die Kalender-Konten anzufassen. `connectMicrosoft` baut
+ * darauf auf; der Konto-Sync ebenso, mit seinem eigenen Berechtigungs-Satz.
+ */
+export async function msAnmeldung(clientId: string, tenant = 'common', scope = MS_SCOPE): Promise<MsRohToken> {
+  if (!oauthAvailable()) throw new Error('Anmelden geht nur über die gehostete App (http/https), nicht aus der Einzeldatei.');
   const { verifier, challenge } = await pkcePair();
   const state = `pixinotes-ms-${b64url(crypto.getRandomValues(new Uint8Array(12)))}`;
   const auth = new URL(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize`);
@@ -254,19 +304,17 @@ export async function connectMicrosoft(clientId: string, tenant = 'common', with
     window.addEventListener('message', onMsg);
   });
 
-  const acc = await msToken(clientId, tenant, {
+  return msTokenAnfrage(clientId, tenant, {
     grant_type: 'authorization_code', code, redirect_uri: redirectUri(), code_verifier: verifier,
   }, scope);
-  // Anzeige-Name des Postfachs holen
-  try {
-    const me = await msApi<{ userPrincipalName?: string; displayName?: string }>(acc, 'https://graph.microsoft.com/v1.0/me');
-    acc.connectedAs = me.displayName || me.userPrincipalName;
-    patchCalAccounts({ ms: acc });
-  } catch { /* Anzeige-Name ist optional */ }
-  return acc.connectedAs ?? 'Microsoft 365';
 }
 
-async function msToken(clientId: string, tenant: string, body: Record<string, string>, scope = MS_SCOPE): Promise<MsAccount> {
+/** M317: Token mit dem Refresh-Token erneuern — ohne die Kalender-Konten anzufassen. */
+export function msTokenErneuern(clientId: string, tenant: string, refreshToken: string, scope: string): Promise<MsRohToken> {
+  return msTokenAnfrage(clientId, tenant, { grant_type: 'refresh_token', refresh_token: refreshToken }, scope);
+}
+
+async function msTokenAnfrage(clientId: string, tenant: string, body: Record<string, string>, scope: string): Promise<MsRohToken> {
   const res = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -276,14 +324,24 @@ async function msToken(clientId: string, tenant: string, body: Record<string, st
   if (!res.ok || !data.access_token) {
     throw new Error(`Microsoft-Anmeldung fehlgeschlagen: ${data.error_description?.split(/\r?\n/)[0] ?? `HTTP ${res.status}`}`);
   }
-  const acc: MsAccount = {
-    clientId, tenant,
+  return {
     token: data.access_token,
     refreshToken: data.refresh_token,
-    tokenExp: Date.now() + ((data.expires_in ?? 3600) - 60) * 1000,
-    connectedAs: loadCalAccounts().ms?.connectedAs,
+    exp: Date.now() + ((data.expires_in ?? 3600) - 60) * 1000,
     // Was Microsoft WIRKLICH erteilt hat (kann weniger sein als angefragt)
     scopes: data.scope ?? scope,
+  };
+}
+
+async function msToken(clientId: string, tenant: string, body: Record<string, string>, scope = MS_SCOPE): Promise<MsAccount> {
+  const roh = await msTokenAnfrage(clientId, tenant, body, scope);
+  const acc: MsAccount = {
+    clientId, tenant,
+    token: roh.token,
+    refreshToken: roh.refreshToken,
+    tokenExp: roh.exp,
+    connectedAs: loadCalAccounts().ms?.connectedAs,
+    scopes: roh.scopes,
   };
   patchCalAccounts({ ms: acc });
   return acc;

@@ -122,7 +122,8 @@ console.log('════ D: Synchronisation (im Reiter Daten) ════');
   const g = await h3s(P);
   pruefe('D1 Synchronisation und Team-Sync stehen im Reiter Daten, keine Dateien-Obergrenze mehr', g.some((t) => /^Synchronisation/.test(t)) && g.some((t) => /Team-Sync/.test(t)) && !g.some((t) => /Dateien mitsynchronisieren/.test(t)), g.join(' | '));
   const wege = await P.locator('.seg-weg button').allTextContents();
-  pruefe('D2 der Weg-Umschalter bietet Ordner und WebDAV (Chrome am PC)', wege.join(',') === 'Ordner,WebDAV', wege.join(','));
+  // M317: Konto (Google Drive / OneDrive) steht als erster Weg davor
+  pruefe('D2 der Weg-Umschalter bietet Konto, Ordner und WebDAV (Chrome am PC)', wege.join(',') === 'Konto,Ordner,WebDAV', wege.join(','));
   pruefe('D3 „Ordner" ist vorgewählt und zeigt seinen Knopf', (await P.locator('.seg-weg button.on').textContent()) === 'Ordner' && (await P.locator('.modal-buttons button', { hasText: 'Sync-Ordner verbinden' }).count()) === 1);
   pruefe('D4 die WebDAV-Felder sind dabei nicht zu sehen', (await P.locator('input[placeholder^="https://cloud"]').count()) === 0);
   await P.locator('.seg-weg button', { hasText: 'WebDAV' }).click();
