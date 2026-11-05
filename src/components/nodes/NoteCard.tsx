@@ -14,8 +14,8 @@ import { appStateLines, fmtHM, linkedOfType, timeSums } from '../../lib/moduleFe
 import { loadAppState } from '../../lib/htmlStore';
 import type { TimeData } from '../../types';
 import { extractEntities } from '../../lib/entities';
-import { makeNote } from '../../lib/nodes';
-import { aiReady, askAi, textToBlocks } from '../../lib/ai';
+import confetti from 'canvas-confetti';
+import { checklistStand, FARB_NAMEN, noteTitle } from '../../lib/notiz';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { editorUpload } from '../../lib/notizBild';
 import { importFilesToBoard } from '../../lib/importFiles';
@@ -41,29 +41,14 @@ function zelleZuText(zelle: unknown): string {
   return '';
 }
 
-/** Fristen-Chips für Notizen: Text aus den BlockNote-Blöcken extrahieren */
-function NoteDueChips({ blocks }: { blocks?: unknown[] }) {
-  const text = useMemo(() => blocksToText(blocks), [blocks]);
-  const title = text.split('\n')[0]?.slice(0, 60) || 'Notiz';
+/** Fristen-Chips für Notizen (M323: der Text kommt EINMAL berechnet von der Karte) */
+function NoteDueChips({ text, title }: { text: string; title: string }) {
   return <DueChips text={text} context={title} />;
 }
 
 /** ☎/✉/🔗-Chips: erkannte Telefonnummern, Mails & Links aus dem Notiz-Text
  *  (im BlockNote-Editor selbst können wir keine Links injizieren) */
-function NoteEntityChips({ blocks }: { blocks?: unknown[] }) {
-  /**
-   * M283: Zahlen aus der Rechen-Tabelle bleiben hier außen vor.
-   *
-   * Seit die Tabelle IN der Notiz liegt, wandert ihr Inhalt in den Notiz-Text
-   * — und die Rufnummern-Erkennung machte aus „1.200" prompt ein „☎ 1.200"
-   * (im Bildschirmfoto der Probe gleich dreimal). Eine Zahlenspalte ist keine
-   * Prosa: Für die Chips wird die Tabelle deshalb übersprungen. Suche, Export
-   * und KI sehen sie unverändert vollständig.
-   */
-  const text = useMemo(
-    () => blocksToText((blocks ?? []).filter((b) => (b as { type?: string })?.type !== 'rechentabelle')),
-    [blocks],
-  );
+function NoteEntityChips({ text }: { text: string }) {
   const ents = useMemo(() => extractEntities(text).slice(0, 4), [text]);
   if (ents.length === 0) return null;
   const ICON = { tel: '\u260e', mail: '\u2709', url: '\ud83d\udd17' } as const;
@@ -85,16 +70,20 @@ function NoteEntityChips({ blocks }: { blocks?: unknown[] }) {
   );
 }
 
-/** [[Wikilinks]] als Sprung-Chips (Obsidian-Gefühl): Board/Karte öffnen, sonst Board anlegen */
-function NoteLinkChips({ blocks }: { blocks?: unknown[] }) {
+/** [[Wikilinks]] als Sprung-Chips (Obsidian-Gefühl): Board/Karte öffnen, sonst Board anlegen.
+ *  M323: Die äußere Hülle prüft nur den Text; erst wenn es Links gibt, hört die
+ *  innere auf ALLE Boards (vorher tat das jede Notiz, bei jeder Änderung irgendwo). */
+function NoteLinkChips({ text }: { text: string }) {
+  const links = useMemo(() => extractWikilinks(text), [text]);
+  if (links.length === 0) return null;
+  return <NoteLinkChipsInnen links={links} />;
+}
+function NoteLinkChipsInnen({ links }: { links: string[] }) {
   const boards = useBoard((s) => s.boards);
   const openBoard = useBoard((s) => s.openBoard);
   const focusNode = useBoard((s) => s.focusNode);
   const addBoard = useBoard((s) => s.addBoard);
   const showToast = useBoard((s) => s.showToast);
-  const text = useMemo(() => blocksToText(blocks), [blocks]);
-  const links = useMemo(() => extractWikilinks(text), [text]);
-  if (links.length === 0) return null;
 
   const follow = (name: string) => {
     const target = resolveLink(name, boards);
@@ -183,12 +172,36 @@ function NoteAboFeeds({ id }: { id: string }) {
 }
 
 /** Haftnotiz mit vollem Notion-artigem Block-Editor (BlockNote, MPL-2.0). */
-export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsoluteY }: NodeProps<NoteNode>) {
+export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
-  const addNode = useBoard((s) => s.addNode);
   const showToast = useBoard((s) => s.showToast);
-  const ai = useBoard((s) => s.ai);
-  const [aiBusy, setAiBusy] = useState(false);
+  const konfetti = useBoard((s) => s.konfetti);
+
+  // M323: EIN Klartext je Notiz — Fristen, Chips und Wikilinks lasen ihn
+  // vorher je dreimal pro Änderung
+  const text = useMemo(() => blocksToText(data.blocks), [data.blocks]);
+  const titel = useMemo(() => noteTitle(data.blocks), [data.blocks]);
+  /** M283: Zahlen aus der Rechen-Tabelle bleiben bei den ☎-Chips außen vor
+   *  („1.200" ist keine Rufnummer); Suche, Export und KI sehen sie vollständig. */
+  const chipText = useMemo(() => {
+    const bs = data.blocks ?? [];
+    return bs.some((b) => (b as { type?: string })?.type === 'rechentabelle')
+      ? blocksToText(bs.filter((b) => (b as { type?: string })?.type !== 'rechentabelle'))
+      : text;
+  }, [data.blocks, text]);
+  // M323: Checklisten-Stand — Fortschritt unter der Notiz, Konfetti beim letzten Haken
+  const stand = useMemo(() => checklistStand(data.blocks), [data.blocks]);
+  const vorherOffen = useRef(stand.gesamt - stand.erledigt);
+  useEffect(() => {
+    const offen = stand.gesamt - stand.erledigt;
+    if (stand.gesamt > 0 && offen === 0 && vorherOffen.current > 0 && konfetti) {
+      confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
+    }
+    vorherOffen.current = offen;
+  }, [stand.gesamt, stand.erledigt, konfetti]);
+  // M323: Farbwahl als kleine Palette statt Durchblättern
+  const [farbenOffen, setFarbenOffen] = useState(false);
+  useEffect(() => { if (!selected) setFarbenOffen(false); }, [selected]);
 
   // bewusst nur beim Mount gelesen — danach ist der Editor die Quelle der Wahrheit
   const [initialContent] = useState<PartialBlock[] | undefined>(() => {
@@ -249,9 +262,9 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
     }
   }, [editor, initialContent]);
 
-  const cycleColor = () => {
-    const next = STICKY_COLORS[(STICKY_COLORS.indexOf(data.color) + 1) % STICKY_COLORS.length];
-    updateNodeData(id, { color: next, hex: undefined }); // zurück zur Palette
+  const waehleFarbe = (farbe: (typeof STICKY_COLORS)[number]) => {
+    updateNodeData(id, { color: farbe, hex: undefined }); // zurück zur Palette
+    setFarbenOffen(false);
   };
 
   // M176: Tabellen ließen sich nicht löschen — das Seiten-Menü (Drag-Griff mit
@@ -407,15 +420,37 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
   };
 
   return (
-    <CardShell id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${data.color}`} style={data.hex ? { background: data.hex as string } : undefined}>
-      <button className="color-dot nodrag" title="Farbe wechseln (Palette)" onClick={cycleColor} />
-      <input
-        type="color"
-        className="pn-colorpick note-colorpick nodrag"
-        title="Eigene Farbe wählen"
-        value={(data.hex as string) ?? '#fff8c5'}
-        onChange={(e) => updateNodeData(id, { hex: e.target.value })}
+    <CardShell id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${data.color}`} style={data.hex ? { background: data.hex as string } : undefined} schrumpft>
+      {/* M323: Der Farbpunkt öffnet eine Palette — fünf Farben auf einen Blick
+          plus eigene Farbe, statt blind durchzublättern */}
+      <button
+        className={`color-dot nodrag ${farbenOffen ? 'on' : ''}`}
+        title="Farbe der Notiz"
+        aria-label="Farbe der Notiz"
+        aria-expanded={farbenOffen}
+        onClick={() => setFarbenOffen((o) => !o)}
       />
+      {farbenOffen && (
+        <div className="note-farben nodrag nowheel" role="group" aria-label="Notizfarbe" onPointerDown={(e) => e.stopPropagation()}>
+          {STICKY_COLORS.map((c) => (
+            <button
+              key={c}
+              className={`note-farbe note-farbe-${c} ${data.color === c && !data.hex ? 'on' : ''}`}
+              title={FARB_NAMEN[c]}
+              aria-label={`Farbe ${FARB_NAMEN[c]}`}
+              onClick={() => waehleFarbe(c)}
+            />
+          ))}
+          <input
+            type="color"
+            className="pn-colorpick note-colorpick nodrag"
+            title="Eigene Farbe wählen"
+            aria-label="Eigene Farbe"
+            value={(data.hex as string) ?? '#fff8c5'}
+            onChange={(e) => updateNodeData(id, { hex: e.target.value })}
+          />
+        </div>
+      )}
       <div
         className="nodrag nowheel note-editor"
         ref={editorRef}
@@ -480,9 +515,19 @@ export function NoteCard({ id, data, selected, positionAbsoluteX, positionAbsolu
       {/* M302: Der 🖼-Chip unter der Notiz ist weg — Bild aus Datei und Datei als
           Karte liegen im „/"-Menü, Strg+V und Ablegen bleiben. Ein Knopf, den
           jede Notiz beim Tippen trug, für etwas, das selten vorkommt. */}
-      <NoteDueChips blocks={data.blocks} />
-      <NoteEntityChips blocks={data.blocks} />
-      <NoteLinkChips blocks={data.blocks} />
+      {/* M323: Checklisten-Fortschritt — ab zwei Punkten, mit Balken */}
+      {stand.gesamt >= 2 && (
+        <div
+          className={`note-fortschritt nodrag ${stand.erledigt === stand.gesamt ? 'fertig' : ''}`}
+          title={stand.erledigt === stand.gesamt ? 'Alles erledigt' : `${stand.gesamt - stand.erledigt} offen`}
+        >
+          <span className="note-fortschritt-balken" aria-hidden="true"><i style={{ width: `${Math.round((stand.erledigt / stand.gesamt) * 100)}%` }} /></span>
+          <span className="note-fortschritt-text">{stand.erledigt}/{stand.gesamt} erledigt</span>
+        </div>
+      )}
+      <NoteDueChips text={text} title={titel} />
+      <NoteEntityChips text={chipText} />
+      <NoteLinkChips text={text} />
       <NoteAboFeeds id={id} />
       {/* KI-Politur wohnt jetzt im ✨-Menü der Auswahl-Leiste (KI-Werkzeuge) —
           kein Dauer-Button mehr auf jeder Notiz (User-Feedback) */}

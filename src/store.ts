@@ -1032,13 +1032,22 @@ export const useBoard = create<BoardState>()(
             lastEditKey = key;
             lastEditAt = now;
           }
+          // M323: Wer von außen die BLÖCKE einer Notiz schreibt (Aufgaben-
+          // Zentrale, Kanban-Rücksync, Teilen-Ziel), muss den lebenden Editor
+          // erreichen — der liest seinen Inhalt sonst nur beim Mount und
+          // schrieb beim nächsten Tastendruck den alten Stand zurück. extEpoch
+          // zählt deshalb automatisch hoch, wenn der Aufrufer es nicht selbst tut.
+          const patch = data as Record<string, unknown>;
+          const bumpt = 'blocks' in patch && !('extEpoch' in patch);
           set({
             boards: get().boards.map((b) =>
               b.id === boardId
                 ? {
                     ...b,
                     nodes: b.nodes.map((n) =>
-                      n.id === nodeId ? ({ ...n, data: { ...n.data, ...data } } as AppNode) : n,
+                      n.id === nodeId
+                        ? ({ ...n, data: { ...n.data, ...data, ...(bumpt ? { extEpoch: (((n.data as { extEpoch?: number }).extEpoch) ?? 0) + 1 } : {}) } } as AppNode)
+                        : n,
                     ),
                   }
                 : b,
