@@ -158,6 +158,7 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht am Fuß der Hilfe.</p>
               <ul>
+                <li><b>✒️ Stift wie auf Papier (M319):</b> Striche sind jetzt druckempfindliche, geglättete Konturen (perfect-freehand) — mit Apple Pencil oder Surface Pen wandert der Druck je Punkt mit, mit Maus oder Finger macht die Geschwindigkeit die Strichstärke. Kurz halten am Ende rastet mehr ein: Linie, <b>Pfeil</b>, <b>Kreis</b>, Ellipse, Rechteck (auch gedreht) und <b>Dreieck</b>. Auf Geräten mit Stift gilt auch im Zeichenmodus: <b>Hand schiebt, Stift zeichnet</b> — ein oder zwei Finger schwenken und zoomen, ohne Striche zu hinterlassen; ein zweiter Finger bricht einen Finger-Strich ab. Der Handballen wird weiter ignoriert.</li>
                 <li><b>🧱 Eine Leiste unten, nie zwei (M318):</b> Wenn die Auswahl-Leiste einer Karte keinen Platz an der Karte findet und unten andockt, fährt das Dock weg und die Leiste nimmt seine Zeile — auf jeder Bildschirmbreite, nicht mehr nur am Telefon. Vorher standen am PC zwei Leisten mit zwei ⋯ übereinander. Klick auf die Fläche: Auswahl weg, Dock wieder da.</li>
                 <li><b>☁️ Konto-Sync — anmelden, fertig (M317):</b> Unter ⚙ → Daten → Synchronisation → <b>Konto</b> genügt „Mit Google anmelden" oder „Mit Microsoft anmelden". PixiNotes legt seinen Stand im App-Ordner deines eigenen Google Drive bzw. OneDrive ab — je Board eine Datei, Anhänge bis 4 MB dazu — und gleicht ihn auf allen Geräten alle zehn Sekunden ab; gleichzeitige Änderungen werden zusammengeführt wie beim Sync-Ordner. Kein Server, keine Datenbank, nichts einzurichten: Nur der Betreiber hinterlegt einmal die Client-IDs (dieselben wie für die Kalender-Konten).</li>
                 <li><b>🧩 Die Modul-Palette (M316):</b> ＋ im Dock öffnet keine Liste mit zweitem Menü mehr, sondern EINE Palette mit allen Modulen auf einen Blick — als Kacheln in fünf Gruppen: <b>Notieren &amp; Rechnen · Planen · Ablauf · Einfügen · Ordnen</b>, darunter deine Vorlagen. Oben ein Suchfeld: „excel" findet die Rechen-Tabelle, „gantt" den Zeitplan, Enter legt den ersten Treffer an, Esc leert erst die Suche. Jedes Modul hat genau einen Platz; „Weitere Module" gibt es nicht mehr.</li>
@@ -367,7 +368,7 @@ export function HelpOverlay() {
               </ul>
               <h4>✏️ Zeichnen</h4>
               <ul>
-                <li><b>✎</b> im Dock: Stift, Textmarker, Radierer; Esc zurück. Nach dem Zeichnen kurz halten macht Linien gerade und Kreise rund.</li>
+                <li><b>✎</b> im Dock: Stift, Textmarker, Radierer; Esc zurück. Der Stift zeichnet druckempfindlich; am Ende kurz halten rastet Linien, Pfeile, Kreise, Rechtecke und Dreiecke sauber ein. Mit Stift am Gerät schiebt und zoomt die Hand, der Stift zeichnet — auch ohne Zeichenmodus auf der freien Fläche.</li>
                 <li>Striche, die eine Karte überlappen, kleben an ihr und wandern mit. Lösen: ⋯ → „Markierungen lösen".</li>
               </ul>
               <h4>💡 Wissen</h4>
