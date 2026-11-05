@@ -1617,11 +1617,8 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .pn-colorpick.on { border-style: solid; border-color: var(--accent); }
 .pn-colorpick:hover { border-color: var(--accent-strong); }
 /* Notiz: Farbwähler neben dem Palette-Punkt, gleiche Ein-/Ausblend-Logik */
-.note-colorpick {
-  position: absolute; top: 7px; right: 28px; z-index: 6;
-  opacity: 0; transition: opacity 0.15s;
-}
-.card-shell:hover .note-colorpick, .react-flow__node.selected .note-colorpick { opacity: 1; }
+/* M323: Die eigene Farbe steht IN der Palette (note-farben), nicht mehr lose neben dem Farbpunkt */
+.note-farben .note-colorpick { position: static; opacity: 1; }
 
 /* ---------- Wochenplan: Stundenraster (M153) ---------- */
 .week-card { background: var(--surface); border-radius: var(--r-lg); }
