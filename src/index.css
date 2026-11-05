@@ -6109,3 +6109,12 @@ audio.file-media { height: 40px; }
   .modul-raster { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dock-menu.modul-palette { max-height: calc(100vh - 150px - var(--safe-top)); }
 }
+
+/* ===== M320: Handschrift → Text in der Zeichen-Palette ===== */
+.draw-palette .draw-text {
+  display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border-soft);
+  background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; font-weight: 600;
+  padding: 4px 9px; border-radius: var(--r-sm); cursor: pointer; margin-left: 4px;
+}
+.draw-palette .draw-text:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); }
+.draw-palette .draw-text:disabled { opacity: 0.5; cursor: default; }

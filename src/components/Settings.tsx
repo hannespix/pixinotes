@@ -20,6 +20,7 @@ import {
   applyKonto, bekannteClientId, bekannterTenant, kontoAbmelden, kontoAnmelden, kontoLabel, kontoLesen, kontoStamp,
   kontoVerbinden, kontoWrite, loadKonto, type Anbieter, type KontoSitzung,
 } from '../lib/kontoSync';
+import { browserErkenntHandschrift } from '../lib/handschrift';
 import {
   applyFilesSync, canShareFiles, filesSyncDirty, filesSyncOn, filesSyncStamp, isAppleTouch,
   isStandalone, readSyncFile, saveViaFiles,
@@ -223,6 +224,8 @@ export function Settings() {
   const navLinks = useBoard((s) => s.navLinks);
   const setNavLinks = useBoard((s) => s.setNavLinks);
   const wheelZoom = useBoard((s) => s.wheelZoom);
+  const handschriftOnline = useBoard((s) => s.handschriftOnline);
+  const setHandschriftOnline = useBoard((s) => s.setHandschriftOnline);
   const setWheelZoom = useBoard((s) => s.setWheelZoom);
   const ui = useBoard((s) => s.ui);
   const setUiTheme = useBoard((s) => s.setUiTheme);
@@ -1302,6 +1305,21 @@ export function Settings() {
               </details>
             </>
           )}
+        </section>
+
+        {/* ---- M320: Handschrift → Text ---- */}
+        <section className="modal-section">
+          <h3>Handschrift</h3>
+          <p className="modal-hint">
+            {browserErkenntHandschrift()
+              ? '„Text" in der Zeichen-Palette wandelt Geschriebenes in eine Notiz — dein Browser erkennt die Schrift selbst, nichts verlässt das Gerät.'
+              : '„Text" in der Zeichen-Palette wandelt Geschriebenes in eine Notiz — das kann dein Browser nicht selbst (Chrome auf ChromeOS, Windows und Mac kann es). Am iPad schreibt der Pencil mit Scribble direkt in die Textfelder.'}
+          </p>
+          <label className="modal-row modal-row-check">
+            <span>Online-Erkennung (Google)</span>
+            <input type="checkbox" checked={handschriftOnline} onChange={(e) => setHandschriftOnline(e.target.checked)} data-taste="handschrift-online" />
+          </label>
+          <p className="modal-hint">Ersatz, wenn der Browser es nicht kann: Die Striche gehen dann an Googles Handschrift-Dienst — ohne Konto, aber außer Haus. Standard: aus.</p>
         </section>
 
         {/* ---- Konten: Google & Microsoft 365 — Kalender, bei Microsoft auch OneNote ---- */}
