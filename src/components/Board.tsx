@@ -15,6 +15,7 @@ import { frameMembers } from '../lib/arrange';
 import { computePush } from '../lib/physics';
 import { imageFileToDataUrl } from '../lib/image';
 import { canEmbed, makeImage, makeNote } from '../lib/nodes';
+import { textZuBloecken } from '../lib/notiz';
 import { importFilesToBoard } from '../lib/importFiles';
 import type { AppNode } from '../types';
 import { NoteCard } from './nodes/NoteCard';
@@ -884,7 +885,17 @@ export function Board() {
           .map((it) => it.getAsFile())
           .filter((f): f is File => !!f);
       }
-      if (files.length === 0) return;
+      if (files.length === 0) {
+        // M323: Text aus der Zwischenablage wird zur Notiz — mitten im Blick,
+        // mit Überschriften, Aufzählungen und Haken aus leichtem Markdown
+        const text = (dt.getData('text/plain') ?? '').trim();
+        if (!text || text.length > 20000) return;
+        e.preventDefault();
+        const pos = screenToFlowPosition({ x: window.innerWidth / 2 - 135, y: window.innerHeight / 2 - 60 });
+        addNode(makeNote(pos, { blocks: textZuBloecken(text) }));
+        showToast('📝 Notiz aus der Zwischenablage');
+        return;
+      }
       e.preventDefault();
 
       let placed = 0;

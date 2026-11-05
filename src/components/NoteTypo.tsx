@@ -18,7 +18,16 @@ import {
   useBlockNoteEditor, useComponentsContext, useEditorContentOrSelectionChange,
 } from '@blocknote/react';
 import { RechenTabelleBlock } from './RechenTabelle';
-import { IImage, IPaperclip, ISigma } from './Icons';
+import { IBookmark, ICalendar, IImage, IPaperclip, ISigma } from './Icons';
+import { heuteText, NOTIZ_VORLAGEN } from '../lib/notiz';
+
+/** M323: Vorlage einsetzen — ein leerer Absatz wird ersetzt, sonst kommt sie dahinter */
+function vorlageEinsetzen(editor: typeof noteSchema.BlockNoteEditor, bloecke: unknown[]) {
+  const block = editor.getTextCursorPosition().block;
+  const leer = block.type === 'paragraph' && Array.isArray(block.content) && block.content.length === 0;
+  if (leer) editor.replaceBlocks([block], bloecke as never);
+  else editor.insertBlocks(bloecke as never, block, 'after');
+}
 import { useBoard } from '../store';
 import { bilderAusZwischenablage, notizBildHochladen } from '../lib/notizBild';
 import type { CardFont } from '../types';
@@ -327,7 +336,24 @@ export function NoteSlashMenu({ dateienAufsBoard }: {
             );
           },
         }];
-        return filterSuggestionItems([...eigene, ...standard], query);
+        // M323: Vorlagen, die im Alltag immer gleich anfangen — und das Datum
+        const vorlagen = NOTIZ_VORLAGEN.map((v) => ({
+          title: v.title,
+          subtext: v.subtext,
+          aliases: v.aliases,
+          group: 'Vorlagen',
+          icon: <IBookmark size={16} />,
+          onItemClick: () => { vorlageEinsetzen(editor, v.blocks()); },
+        }));
+        const heute = {
+          title: 'Heute',
+          subtext: `Datum einfügen: ${heuteText()}`,
+          aliases: ['heute', 'datum', 'today', 'date'],
+          group: 'Vorlagen',
+          icon: <ICalendar size={16} />,
+          onItemClick: () => { editor.insertInlineContent(`${heuteText()} `); },
+        };
+        return filterSuggestionItems([...eigene, ...standard, ...vorlagen, heute], query);
       }}
     />
   );

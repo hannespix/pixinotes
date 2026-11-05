@@ -27,6 +27,17 @@ const DATE_LIKE_RE = /^\s*(\d{1,2}[.\-/]\s?\d{1,2}[.\-/]\s?\d{2,4}|\d{4}[.\-/]\d
 const REF_BEFORE_RE = /(?:\baz|\bnr|\baktenzeichen|\bkassenzeichen|\bzimmer|\braum|\bkd|\brg)\W{0,3}$/i;
 const isReference = (text: string, start: number) => REF_BEFORE_RE.test(text.slice(Math.max(0, start - 16), start));
 
+/**
+ * M323: Keine Rufnummer — zu kurz (aus „12.11." machte libphonenumber ein
+ * „☎ 12.11", vier Ziffern) oder ein Datum, auch das deutsche Kurzdatum ohne
+ * Jahr („12.11." vor einem Leerzeichen oder Satzende).
+ */
+function keineRufnummer(display: string, context: string): boolean {
+  if (display.replace(/\D/g, '').length < 6) return true;
+  if (DATE_LIKE_RE.test(display)) return true;
+  return /\d{1,2}[.\-/]\d{1,2}(?:[.\-/]\d{2,4}|\.(?!\d))/.test(context);
+}
+
 interface Match {
   start: number;
   end: number;
@@ -77,7 +88,7 @@ export function extractEntities(text: string): EntityHit[] {
       if (inZone(p.startsAt, p.endsAt)) continue;
       const display = text.slice(p.startsAt, p.endsAt);
       const context = text.slice(Math.max(0, p.startsAt - 3), Math.min(text.length, p.endsAt + 3));
-      if (DATE_LIKE_RE.test(display) || /\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(context)) continue;
+      if (keineRufnummer(display, context)) continue;
       if (isReference(text, p.startsAt)) continue;
       hits.push({ kind: 'tel', display, href: `tel:${p.number.number}` });
     }
@@ -163,7 +174,7 @@ export function enrichText(text: string): ReactNode[] {
       // Datum statt Rufnummer? Auch den unmittelbaren Kontext prüfen, falls
       // libphonenumber nur einen Teil des Datums erwischt hat (z. B. „07.2026").
       const context = text.slice(Math.max(0, p.startsAt - 3), Math.min(text.length, p.endsAt + 3));
-      if (DATE_LIKE_RE.test(display) || /\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}/.test(context)) continue;
+      if (keineRufnummer(display, context)) continue;
       if (isReference(text, p.startsAt)) continue;
       matches.push({
         start: p.startsAt,

@@ -5,8 +5,9 @@ import { selectActiveBoard, useBoard } from '../store';
 import { nodesToHtml, nodesToText } from '../lib/serialize';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
-import { KACHEL_TYPEN, uid, type AppNode } from '../types';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMore, IMoveTo, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX } from './Icons';
+import { KACHEL_TYPEN, STICKY_COLORS, uid, type AppNode } from '../types';
+import { FARB_NAMEN } from '../lib/notiz';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -622,6 +623,22 @@ export function SelectionToolbar() {
                   </button>
                 )}
                 <div className="sel-attr-title">Werkzeuge</div>
+                {/* M323: Farbe für Notizen — auch für mehrere auf einmal, und am
+                    Telefon ohne Zeigen auf die Karte erreichbar */}
+                {selected.every((n) => n.type === 'note') && (
+                  <div className="sel-farben" role="group" aria-label="Farbe">
+                    <span className="sel-farben-label"><IPalette size={14} /> Farbe</span>
+                    {STICKY_COLORS.map((c) => (
+                      <button
+                        key={c}
+                        className={`sel-farbe note-farbe-${c} ${selected.every((n) => (n.data as { color?: string }).color === c && !(n.data as { hex?: string }).hex) ? 'on' : ''}`}
+                        title={FARB_NAMEN[c]}
+                        aria-label={`Farbe ${FARB_NAMEN[c]}`}
+                        onClick={() => { for (const n of selected) updateNodeData(n.id, { color: c, hex: undefined }); }}
+                      />
+                    ))}
+                  </div>
+                )}
                 {/* M296: „Schrift & Größe" liegt hier — und NUR hier. M267 hatte
                     ihm einen eigenen Knopf in der Leiste gegeben; die Leiste soll
                     aber sechs Elemente haben, und ein Weg reicht. */}

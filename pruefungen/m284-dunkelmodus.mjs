@@ -168,7 +168,9 @@ console.log('\n════ Palette richtig gewählt ════');
   const weiss = await P2.evaluate(() => getComputedStyle(document.querySelector('.rt-block')).getPropertyValue('--rt-text').trim());
   await c2.close();
   console.log(`    gelb → ${gelb} · weiß → ${weiss}`);
-  pruefe('auf farbigem Papier gilt die Papier-Palette (dunkle Schrift)', gelb === '#2b2a27', gelb);
+  // M315 hat die Tinte von #2b2a27 auf #16191e gestellt — entscheidend ist: dunkel auf farbigem Papier
+  const dunkel = (hex) => /^#[0-9a-f]{6}$/i.test(hex) && [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)).reduce((a, b) => a + b, 0) < 200;
+  pruefe('auf farbigem Papier gilt die Papier-Palette (dunkle Schrift)', dunkel(gelb), gelb);
   pruefe('auf der weißen (im Dunkeln dunklen) Karte gilt die Theme-Palette', weiss !== '#2b2a27', weiss);
 }
 

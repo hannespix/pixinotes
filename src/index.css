@@ -6118,3 +6118,45 @@ audio.file-media { height: 40px; }
 }
 .draw-palette .draw-text:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); }
 .draw-palette .draw-text:disabled { opacity: 0.5; cursor: default; }
+
+/* ===== M323: Notiz nachgeschärft ===== */
+/* Titelzeile: der erste Absatz einer MEHRZEILIGEN Notiz liest sich als Titel */
+.note-editor .bn-editor > .bn-block-group:has(> .bn-block-outer:nth-child(2)) > .bn-block-outer:first-child > .bn-block > .bn-block-content[data-content-type="paragraph"] > p {
+  font-weight: 650; font-size: 1.14em; letter-spacing: -0.005em;
+}
+/* Farbpunkt zeigt die aktuelle Farbe statt eines Regenbogens; Palette darunter */
+.note-card .color-dot { background: rgba(255,255,255,.55); border-color: rgba(0,0,0,.3); }
+.note-card .color-dot.on { border-color: var(--ink); }
+.note-farben {
+  position: absolute; top: 28px; right: 8px; z-index: 7;
+  display: flex; align-items: center; gap: 6px; padding: 6px;
+  background: var(--surface-pop, var(--surface-card)); border: 1px solid var(--border-soft);
+  border-radius: var(--r); box-shadow: var(--pop-shadow);
+}
+.note-farbe, .sel-farbe {
+  width: 22px; height: 22px; border-radius: 50%; padding: 0; cursor: pointer;
+  border: 2px solid rgba(0, 0, 0, .18);
+}
+.note-farbe.on, .sel-farbe.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface-card); }
+.note-farbe-yellow { background: #fff3a3; }
+.note-farbe-pink   { background: #ffd6e0; }
+.note-farbe-mint   { background: #d2f5dd; }
+.note-farbe-sky    { background: #d9ecff; }
+.note-farbe-white  { background: #ffffff; }
+.note-farben .pn-colorpick { width: 22px; height: 22px; }
+.sel-farben { display: flex; align-items: center; gap: 6px; padding: 6px 12px; }
+.sel-farben-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); margin-right: 2px; }
+.sel-farbe { width: 18px; height: 18px; }
+/* Checklisten-Fortschritt */
+.note-fortschritt {
+  display: flex; align-items: center; gap: 8px; margin: 4px 10px 0;
+  font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.note-fortschritt-balken { flex: 1; height: 3px; background: rgba(0, 0, 0, .12); border-radius: 2px; overflow: hidden; }
+.note-fortschritt-balken > i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
+.note-fortschritt.fertig { color: #2f7a3d; }
+.note-fortschritt.fertig .note-fortschritt-balken > i { background: #3d9a4e; }
+/* Fokus: Lesetypografie für Notizen */
+.focus-mode .react-flow__node-note.pn-focused .note-editor .bn-editor {
+  font-size: 16px !important; line-height: 1.55; max-width: 72ch; margin-inline: auto; padding-block: 14px !important;
+}

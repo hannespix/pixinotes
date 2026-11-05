@@ -359,7 +359,8 @@ console.log('\n════ T8: Telefon ════');
   await T.waitForTimeout(1800);
   /* Am Telefon öffnet EIN Tipper die Karte im Fokus (Board.tsx, isPhoneFocus) —
      das ist der echte Weg zum Schreiben, und nur dort greift M226. */
-  await T.locator('.note-card').first().click({ position: { x: 4, y: 40 } });
+  // Oben im Rand tippen — fern vom linken Verbindungspunkt in der Kartenmitte
+  await T.locator('.note-card').first().click({ position: { x: 4, y: 14 } });
   await T.waitForTimeout(1200);
   pruefe('T8-0 ein Tipper öffnet die Karte im Fokus',
     await T.evaluate(() => !!document.querySelector('.app.focus-mode')));

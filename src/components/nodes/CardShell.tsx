@@ -14,13 +14,15 @@ interface Props {
   minHeight?: number;
   /** M155: freie Farben — z. B. eigene Notiz-Tönung überschreibt die Palette */
   style?: CSSProperties;
+  /** M323: Darf die Auto-Größe auch SCHRUMPFEN, wenn Inhalt wegfällt? (Notizen) */
+  schrumpft?: boolean;
 }
 
 /**
  * Gemeinsame Hülle aller Karten: Lösch-Knopf, Verbindungs-Handles und
  * Resize-Griffe an Ecken/Kanten (sichtbar bei Selektion).
  */
-export function CardShell({ id, className, children, selected, minWidth = 170, minHeight = 70, style }: Props) {
+export function CardShell({ id, className, children, selected, minWidth = 170, minHeight = 70, style, schrumpft = false }: Props) {
   const removeNode = useBoard((s) => s.removeNode);
   const setNodeHeight = useBoard((s) => s.setNodeHeight);
   const setAutoFit = useBoard((s) => s.setAutoFit);
@@ -40,6 +42,14 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     return n?.kachel ? n : null;
   });
   const imFokus = useBoard((s) => s.focusCard === id);
+  const imFokusRef = useRef(imFokus);
+  imFokusRef.current = imFokus;
+  const schrumpftRef = useRef(schrumpft);
+  schrumpftRef.current = schrumpft;
+  // M323: Geschrumpft wird erst, nachdem jemand IN dieser Karte geschrieben hat —
+  // nie beim bloßen Laden (Vorlagen, geteilte Boards und Beispiele behalten
+  // ihre gesetzten Höhen, bis man sie anfasst)
+  const bearbeitetRef = useRef(false);
   const alsKachel = !!kachelNode && !imFokus;
   const kachelRef = useRef(alsKachel);
   kachelRef.current = alsKachel || !!kachelNode;
@@ -163,7 +173,35 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       if (resizingRef.current || pointerDownRef.current) { later(400, force); return; }
       const rest = 800 - (Date.now() - lastResizeEnd.current);
       if (!force && rest > 0) { later(rest + 60); return; }
+      // M323: Das offene „/"-Menü liegt IM Kartenkörper und blähte die Messung
+      // auf — die Karte wuchs um die Menühöhe und blieb so (User-Screenshot).
+      // Solange es offen ist, wird nicht gemessen.
+      if (body.querySelector('.bn-suggestion-menu')) { later(400, force); return; }
       const delta = body.scrollHeight - body.clientHeight;
+      /**
+       * M323: Schrumpfen — nur für Karten, die es erlauben (Notizen), nur wenn
+       * niemand gerade darin schreibt (sonst springt der Text unter dem Cursor
+       * weg) und nicht im Fokus (dort stellt das Stylesheet die Größe).
+       * scrollHeight sinkt nie unter clientHeight, deshalb wird der Inhalt
+       * selbst vermessen: Unterkante des letzten Kindes, bereinigt um den Zoom.
+       */
+      if (autoFitRef.current && schrumpftRef.current && bearbeitetRef.current && !imFokusRef.current && !body.contains(document.activeElement)) {
+        const shell = body.parentElement as HTMLElement | null;
+        const rb = body.getBoundingClientRect();
+        const massstab = body.clientHeight > 0 ? rb.height / body.clientHeight : 1;
+        let unten = rb.top;
+        for (const k of Array.from(body.children)) unten = Math.max(unten, k.getBoundingClientRect().bottom);
+        const inhalt = (unten - rb.top) / (massstab || 1) + 10;
+        const rahmen = (shell?.offsetHeight ?? body.clientHeight) - body.clientHeight;
+        const ziel = Math.max(minHeight, Math.ceil(inhalt + rahmen));
+        const jetzt = shell?.offsetHeight ?? 0;
+        if (delta <= 6 && jetzt - ziel > 40) {
+          lastDelta.current = null;
+          runDerived(() => setNodeHeight(id, ziel));
+          later(350);
+          return;
+        }
+      }
       // Struktur-Erkennung: Überlauf blieb nach dem letzten Wachsen gleich →
       // 100%-Layout, das einfach mitwächst — nie endlos vergrößern (M106)
       const structural = lastDelta.current != null && Math.abs(lastDelta.current - delta) < 3;
@@ -192,7 +230,13 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     const mo = new MutationObserver(schedule);
     mo.observe(body, { subtree: true, childList: true, characterData: true, attributes: true });
     body.addEventListener('load', schedule, true); // nachladende Bilder
-    return () => { mo.disconnect(); body.removeEventListener('load', schedule, true); window.clearTimeout(t); evalRef.current = null; };
+    // M323: Verlässt der Cursor die Karte, darf sie schrumpfen (Notizen) —
+    // aber nur, wenn vorher darin geschrieben wurde (focusin)
+    const rein = () => { bearbeitetRef.current = true; };
+    const raus = () => later(450);
+    body.addEventListener('focusin', rein);
+    body.addEventListener('focusout', raus);
+    return () => { mo.disconnect(); body.removeEventListener('load', schedule, true); body.removeEventListener('focusin', rein); body.removeEventListener('focusout', raus); window.clearTimeout(t); evalRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFit, id]);
 
