@@ -184,7 +184,8 @@ console.log('\n════ T4: Datei-Karte im Fokus ════');
 {
   // „am PC mit einem Klick öffnen" — sonst müsste man doppelklicken, und der
   // Doppelklick auf den Titel benennt um (M263).
-  const { ctx, P } = await seite([], 820, 1120, { fokusEinKlick: true });
+  // M315: schliff 2, sonst stellt die M314-Angleichung fokusEinKlick wieder auf aus.
+  const { ctx, P } = await seite([], 820, 1120, { fokusEinKlick: true, schliff: 2 });
   await P.click('.dock button[aria-label="Objekt hinzufügen"]');
   await P.waitForTimeout(400);
   const [ch] = await Promise.all([
