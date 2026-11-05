@@ -99,6 +99,25 @@ leeren. Die Dateien-Obergrenze ist fest (25 MB).
 Begrüßung mit zwei Knöpfen (Loslegen · Beispiele ansehen). Die Hilfe trägt die
 Fassung und „Was ist neu" im Fuß.
 
+### Gestalt (M315)
+Eine Schicht Tokens in `src/index.css`, an der alles hängt:
+
+- **Farbe**: kühle Neutraltöne (`--bg #f3f4f6`, `--ink #16191e`, `--muted #5a616d`,
+  5,7:1 auf der Fläche), Weiß für Flächen, eine 1-px-Kante `--border-soft`.
+  Dunkel: `#141618` / `#1d2024` / `#e9ebee`. Der Akzent bleibt wählbar.
+- **Radius**: `--r-xs 2` (Chips, Felder) · `--r-sm 3` (Knöpfe) · `--r 4` (Karten,
+  Menüeinträge) · `--r-lg 6` (Fenster, Leisten). Keine Pillen; echte Kreise
+  (Punkte, Avatare, Pins) bleiben 50 %.
+- **Schatten**: `--card-shadow` (1-px-Ring + 2 px), `--chrome-shadow` (Leisten),
+  `--pop-shadow` (Menüs, Fenster). Flach, kühl, kein Weichzeichner.
+- **Flächen**: deckend. Kein `backdrop-filter`, kein Mesh-Verlauf, keine
+  Papiertextur — die Fläche ist `--bg` mit Punktraster. Das spart auf jedem
+  Schwenk Rechenzeit.
+- **Schrift**: Systemschrift (`system-ui, Segoe UI, Roboto, Helvetica Neue`),
+  keine gerundete Variante.
+- **Bewegung**: Knöpfe hüpfen nicht beim Zeigen; Druck ist `scale(0.96)`;
+  Menüs blenden in 140 ms ein.
+
 ## 4. Etappen
 
 | Etappe | Inhalt | Nummer |
@@ -106,7 +125,8 @@ Fassung und „Was ist neu" im Fuß.
 | 1 | Rahmen: Kopfleiste, Spalte, Dock, Übersicht, Kartenkopf ohne ✕, Zoom-Knöpfe weg | M312 |
 | 2 | Karte: Auswahl-Leiste und ⋯ neu geordnet, Modul-Köpfe ≤ 2 Symbole + ⋯ | M313 |
 | 3 | Einstellungen auf drei Reiter, Optionen automatisiert, Hilfe/Begrüßung angepasst | M314 |
-| 4 | Sync über Firebase als vierter Weg | M315 |
+| 4 | Gestalt: Tokens für Farbe, Radius, Schatten; kein Milchglas, keine Textur, kein Verlauf | M315 |
+| 5 | Sync über Firebase als vierter Weg | M316 |
 
 Jede Etappe wird einzeln geprüft (Playwright-Reihe), gebündelt und in den
 Hauptzweig gemergt.

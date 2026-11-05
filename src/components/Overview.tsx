@@ -192,7 +192,7 @@ function OverviewCanvas() {
           setTick((t) => t + 1);
         }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} color={document.documentElement.dataset.theme === 'dark' ? '#4b453c' : '#d8d3c8'} />
+        <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} color={document.documentElement.dataset.theme === 'dark' ? '#2e3238' : '#d3d6dc'} />
       </ReactFlow>
       {/* M312: „+ Neuer Bereich" schwebte hier als eigener Knopf — Anlegen geht
           jetzt überall gleich über ＋ Neu am Fuß der Navigation. */}

@@ -955,25 +955,18 @@ export function Board() {
         onNodeDragStop={onNodeDragStop}
         connectionMode={ConnectionMode.Loose}
         connectionRadius={42}
-        connectionLineStyle={{ stroke: '#4f7cff', strokeWidth: 2.5 }}
+        connectionLineStyle={{ stroke: 'var(--accent)', strokeWidth: 2.5 }}
         panOnScroll={!wheelZoom}
         snapToGrid={gridSnap}
         snapGrid={[20, 20]}
         zoomOnScroll={wheelZoom}
         panActivationKeyCode="Space"
         onMoveEnd={() => { if (performance.now() > flyingUntil.current) returnViewport.current = null; }}
-        // M178: Die Hintergrund-Textur klebt am BOARD, nicht am Glas — ihre
-        // Kachel-Position/-Größe folgt dem Viewport (CSS-Variablen, ohne Re-Render)
-        onViewportChange={(vp) => {
-          // M249: Ausschnitt je Board festhalten — jede Änderung zählt, auch
-          // Zoom-Knöpfe und Flüge, nicht nur das Schwenken mit der Maus.
-          gemerkteAnsicht.set(activeId, vp);
-          const el = document.querySelector('.react-flow') as HTMLElement | null;
-          if (!el) return;
-          el.style.setProperty('--tex-x', `${vp.x}px`);
-          el.style.setProperty('--tex-y', `${vp.y}px`);
-          el.style.setProperty('--tex-s', `${220 * vp.zoom}px`);
-        }}
+        // M249: Ausschnitt je Board festhalten — jede Änderung zählt, auch
+        // Zoom-Knöpfe und Flüge, nicht nur das Schwenken mit der Maus.
+        // (M315: Die Papiertextur ist weg — und mit ihr die Kachel-Variablen,
+        // die hier bei jedem Schwenk ins DOM geschrieben wurden.)
+        onViewportChange={(vp) => { gemerkteAnsicht.set(activeId, vp); }}
         zoomOnDoubleClick={false}
         deleteKeyCode={['Delete', 'Backspace']}
         multiSelectionKeyCode={['Meta', 'Shift']}
@@ -982,9 +975,9 @@ export function Board() {
         fitView
         fitViewOptions={{ padding: 0.25, maxZoom: anzeige }}
         defaultEdgeOptions={{
-          style: { stroke: 'rgba(90,80,60,.45)', strokeWidth: 2 },
-          labelStyle: { fontSize: 11, fill: '#7a7263' },
-          labelBgStyle: { fill: '#f2efe9', fillOpacity: 0.9 },
+          style: { stroke: 'var(--edge)', strokeWidth: 2 },
+          labelStyle: { fontSize: 11, fill: 'var(--muted)' },
+          labelBgStyle: { fill: 'var(--bg)', fillOpacity: 0.9 },
         }}
         proOptions={{ hideAttribution: false }}
       >
@@ -993,7 +986,7 @@ export function Board() {
           gap={gridSnap ? 20 : 26}
           size={1.6}
           lineWidth={0.6}
-          color={document.documentElement.dataset.theme === 'dark' ? '#4b453c' : '#d8d3c8'}
+          color={document.documentElement.dataset.theme === 'dark' ? '#2e3238' : '#d3d6dc'}
         />
         {/* M296: Die Minimap erst, wenn das Board groß genug ist, um sich darin
             zu verlaufen — bei fünf Karten ist sie nur ein grauer Kasten. */}

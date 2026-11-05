@@ -47,7 +47,7 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
         lineStyle={{ border: 'none' }}
         handleStyle={{
           width: 11, height: 11, borderRadius: 999,
-          background: '#fff', border: '2px solid var(--accent)', boxShadow: '0 1px 3px rgba(50,40,20,.25)',
+          background: '#fff', border: '2px solid var(--accent)', boxShadow: '0 1px 3px rgba(22,25,30,.25)',
         }}
       />
       {/* Verbindungspunkte (M150): Rahmen lassen sich wie Module verbinden */}
