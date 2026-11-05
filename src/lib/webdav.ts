@@ -13,7 +13,7 @@
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard } from '../store';
 import {
   basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB, emitSyncStatus, fremdStandEinarbeiten,
-  notiereAenderung, SYNC_DIRTY_KEY, uebernimmDateien, WEBDAV_DIRTY_KEY, type SyncPayload, type SyncWeg,
+  KONTO_DIRTY_KEY, notiereAenderung, SYNC_DIRTY_KEY, uebernimmDateien, WEBDAV_DIRTY_KEY, type SyncPayload, type SyncWeg,
 } from './syncFolder';
 
 const LS_KEY = 'pixinotes-webdav';
@@ -194,6 +194,7 @@ export function applyWebdav(p: SyncPayload): boolean {
     localStorage.removeItem(WEBDAV_DIRTY_KEY); // deckungsgleich mit dem Server
     // Gegenüber einem evtl. verbundenen Sync-Ordner ist der Stand jetzt neu
     localStorage.setItem(SYNC_DIRTY_KEY, '1');
+    localStorage.setItem(KONTO_DIRTY_KEY, '1');
   } catch { return false; }
   emitSyncStatus('webdav', 'ok', p.savedAt);
   void basisMerken('webdav', p); // M311
@@ -298,7 +299,7 @@ export function initWebdavSync(): void {
     // Änderungen (Auto-Einsammeln) zählen nicht als eigene Bearbeitung.
     if (!inDerived()) {
       notiereAenderung();
-      try { localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); localStorage.setItem(SYNC_DIRTY_KEY, '1'); } catch { /* voll → sicherer ohne Fast-Forward */ }
+      try { localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); localStorage.setItem(SYNC_DIRTY_KEY, '1'); localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll → sicherer ohne Fast-Forward */ }
     }
     if (!loadWebdav()?.auto) return;
     clearTimeout(timer);

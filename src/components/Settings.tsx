@@ -17,6 +17,10 @@ import {
   webdavTest, webdavWrite, type WebdavConfig,
 } from '../lib/webdav';
 import {
+  applyKonto, bekannteClientId, bekannterTenant, kontoAbmelden, kontoAnmelden, kontoLabel, kontoLesen, kontoStamp,
+  kontoVerbinden, kontoWrite, loadKonto, type Anbieter, type KontoSitzung,
+} from '../lib/kontoSync';
+import {
   applyFilesSync, canShareFiles, filesSyncDirty, filesSyncOn, filesSyncStamp, isAppleTouch,
   isStandalone, readSyncFile, saveViaFiles,
 } from '../lib/filesSync';
@@ -67,7 +71,7 @@ const TABS: ReadonlyArray<readonly [Reiter, string]> = [
 ];
 /** Alte Reiter-Namen aus Verweisen (Toasts, Menüs, Karten) landen im passenden neuen Reiter */
 const ALT_REITER: Record<string, Reiter> = { ki: 'dienste', kalender: 'dienste', export: 'daten', sync: 'daten' };
-type SyncWeg = 'ordner' | 'webdav' | 'datei';
+type SyncWeg = 'konto' | 'ordner' | 'webdav' | 'datei';
 
 /**
  * Einstellungen: Design, Daten, Synchronisation, Dienste (KI, Gehirn, Konten).
@@ -183,6 +187,12 @@ export function Settings() {
   const [davUrl, setDavUrl] = useState('');
   const [davUser, setDavUser] = useState('');
   const [davSecret, setDavSecret] = useState('');
+  // M317: Konto-Sync (Google Drive / OneDrive) — Sitzung im eigenen localStorage-Schlüssel
+  const [kontoSitz, setKontoSitz] = useState<KontoSitzung | null>(null);
+  const [kontoError, setKontoError] = useState('');
+  const [kontoGid, setKontoGid] = useState('');
+  const [kontoMsid, setKontoMsid] = useState('');
+  const [kontoTenant, setKontoTenant] = useState('common');
   const anzeige = useBoard((s) => s.anzeige);
   const setAnzeige = useBoard((s) => s.setAnzeige);
   const syncDateienMb = useBoard((s) => s.syncDateienMb ?? 25);
@@ -241,7 +251,7 @@ export function Settings() {
       .then(async (h) => {
         setSyncHandle(h ?? null);
         if (h) setSyncPerm(await permissionState(h));
-        if (h && !wegManuell.current) setSyncWeg('ordner');
+        if (h && !wegManuell.current && !loadKonto() && !loadWebdav()) setSyncWeg('ordner');
       })
       .catch(() => {});
   }, [open]);
@@ -259,9 +269,14 @@ export function Settings() {
     setDavUrl(dav?.url ?? '');
     setDavUser(dav?.user ?? '');
     setDavSecret(dav?.secret ?? '');
-    // Weg-Vorwahl: ein verbundener WebDAV-Server gewinnt, sonst der Ordner (wo möglich), sonst die Datei
+    const konto = loadKonto();
+    setKontoSitz(konto);
+    setKontoGid(bekannteClientId('google'));
+    setKontoMsid(bekannteClientId('ms'));
+    setKontoTenant(bekannterTenant());
+    // Weg-Vorwahl: ein angemeldetes Konto gewinnt, dann WebDAV, sonst der Ordner (wo möglich), sonst die Datei
     wegManuell.current = false;
-    setSyncWeg(dav ? 'webdav' : syncSupported() ? 'ordner' : 'datei');
+    setSyncWeg(konto ? 'konto' : dav ? 'webdav' : syncSupported() ? 'ordner' : 'datei');
   }, [open]);
 
   if (!open) return null;
@@ -333,6 +348,43 @@ export function Settings() {
     setDavCfg(null);
     setDavSecret('');
     showToast('WebDAV getrennt — Zugangsdaten gelöscht, Daten bleiben lokal erhalten.');
+  };
+
+  // ---- M317: Konto-Sync ----
+  const doKonto = (label: string, fn: () => Promise<unknown>) => doExport(async () => {
+    setKontoError('');
+    try { await fn(); } catch (e) { setKontoError(String((e as Error).message)); throw e; }
+  }, label);
+
+  const kontoConnect = (anbieter: Anbieter) => doKonto('konto', async () => {
+    const sitz = await kontoAnmelden(anbieter, anbieter === 'google' ? kontoGid : kontoMsid, kontoTenant.trim() || 'common');
+    setKontoSitz(sitz);
+    const r = await kontoVerbinden();
+    const wo = kontoLabel(sitz);
+    if (r === 'hochgeladen') showToast(`✅ Angemeldet — der aktuelle Stand liegt jetzt in ${wo}. Änderungen gleichen sich ab jetzt automatisch ab.`);
+    else if (r === 'uebernommen') showToast(`✅ Angemeldet — der Stand aus ${wo} wurde übernommen.`);
+    else if (r === 'zusammengefuehrt') showToast(`✅ Angemeldet — Stand mit ${wo} zusammengeführt.`);
+    else if (r === 'konflikt') showToast(`In ${wo} liegt schon ein Stand und hier Eigenes. Unten „Vom Konto laden" oder „Jetzt hochladen" wählen.`, false, 9000);
+    else showToast(`✅ Angemeldet bei ${wo} — alles auf dem gleichen Stand.`);
+  });
+
+  const kontoPush = () => doKonto('kontopush', async () => {
+    const st = await kontoWrite();
+    showToast(`⬆️ Hochgeladen (${new Date(st).toLocaleTimeString('de-DE')}).`);
+  });
+
+  const kontoPull = () => doKonto('kontopull', async () => {
+    const r = await kontoLesen();
+    if (!r) { showToast(`In ${kontoLabel()} liegt (noch) kein PixiNotes-Stand.`); return; }
+    if (!window.confirm(`Stand vom ${new Date(r.payload.savedAt).toLocaleString('de-DE')} laden? Der lokale Stand wird ersetzt (Strg+Z geht danach nicht zurück).`)) return;
+    if (!applyKonto(r.payload)) { showToast(QUOTA_IMPORT_MSG); return; }
+    showToast(`⬇️ Stand aus ${kontoLabel()} geladen.`);
+  });
+
+  const kontoLogout = () => {
+    kontoAbmelden();
+    setKontoSitz(null);
+    showToast('Abgemeldet — die Daten bleiben lokal und im Konto erhalten.');
   };
 
   const copyCorsText = async () => {
@@ -525,6 +577,10 @@ export function Settings() {
       clearWebdav();
       setDavCfg(null);
     }
+    if (loadKonto()) {
+      kontoAbmelden();
+      setKontoSitz(null);
+    }
     useBoard.getState().resetAll();
     setOpen(false);
   };
@@ -665,6 +721,7 @@ export function Settings() {
           <div className="modal-row">
             <span>Weg</span>
             <div className="seg seg-weg" role="group" aria-label="Sync-Weg">
+              <button className={syncWeg === 'konto' ? 'on' : ''} onClick={() => waehleWeg('konto')}>Konto{kontoSitz ? ' ✓' : ''}</button>
               {syncSupported() && (
                 <button className={syncWeg === 'ordner' ? 'on' : ''} onClick={() => waehleWeg('ordner')}>Ordner{syncHandle ? ' ✓' : ''}</button>
               )}
@@ -676,6 +733,72 @@ export function Settings() {
               )}
             </div>
           </div>
+
+          {/* M317: Konto-Sync — Anmeldung mit Google oder Microsoft, Daten im App-Ordner des eigenen Drive/OneDrive */}
+          {syncWeg === 'konto' && (
+            <>
+              <p className="modal-hint">Mit Google oder Microsoft anmelden — PixiNotes legt seinen Stand im App-Ordner deines eigenen Google Drive bzw. OneDrive ab und gleicht ihn auf allen Geräten ab. Kein Server, nichts einzurichten.</p>
+              {!oauthAvailable() && (
+                <div className="modal-note">⚠️ Die Einzeldatei (file://) kann keine Anmeldung — dafür die gehostete App nutzen. Hier bleiben Ordner, WebDAV und Datei.</div>
+              )}
+              {!kontoSitz ? (
+                <>
+                  <div className="modal-buttons">
+                    <button disabled={!oauthAvailable() || !kontoGid.trim() || busy === 'konto'} onClick={() => kontoConnect('google')} data-taste="konto-google">
+                      {busy === 'konto' ? '…' : 'Mit Google anmelden'}
+                    </button>
+                    <button disabled={!oauthAvailable() || !kontoMsid.trim() || busy === 'konto'} onClick={() => kontoConnect('ms')} data-taste="konto-ms">
+                      {busy === 'konto' ? '…' : 'Mit Microsoft anmelden'}
+                    </button>
+                  </div>
+                  <div className="modal-note">Beim ersten Mal fragt der Anbieter einmal nach der Erlaubnis für den App-Ordner. Mehr sieht PixiNotes nicht.</div>
+                  {(!kontoGid.trim() || !kontoMsid.trim()) && (
+                    <details className="modal-details" open={!kontoGid.trim() && !kontoMsid.trim()}>
+                      <summary>Einmalig vom Betreiber: Client-IDs hinterlegen</summary>
+                      <p className="modal-hint">
+                        Nutzer tippen hier nichts. Der Betreiber legt je Anbieter eine App an und trägt die ID in den Build ein
+                        (Repository-Variablen <code>VITE_GOOGLE_CLIENT_ID</code>, <code>VITE_MS_CLIENT_ID</code>) — oder hier. Dieselben IDs gelten für die Kalender-Konten unter Dienste.
+                      </p>
+                      <label className="modal-row">
+                        <span>Google Client-ID</span>
+                        <input type="text" placeholder="xxxxx.apps.googleusercontent.com" value={kontoGid} onChange={(e) => setKontoGid(e.target.value)} />
+                      </label>
+                      <div className="modal-note">
+                        Google Cloud Console → APIs &amp; Dienste → Anmeldedaten → OAuth-Client „Webanwendung", autorisierte JavaScript-Quelle <code>{location.origin}</code>.
+                        Berechtigung <code>drive.appdata</code> gilt als nicht sensibel — keine Prüfung durch Google nötig.
+                      </div>
+                      <label className="modal-row">
+                        <span>Microsoft App-ID</span>
+                        <input type="text" placeholder="00000000-0000-0000-0000-000000000000" value={kontoMsid} onChange={(e) => setKontoMsid(e.target.value)} />
+                      </label>
+                      <label className="modal-row">
+                        <span>Tenant</span>
+                        <input type="text" placeholder="common" value={kontoTenant} onChange={(e) => setKontoTenant(e.target.value)} />
+                      </label>
+                      <div className="modal-note">
+                        Microsoft Entra → App-Registrierung „Single-Page-Anwendung", Umleitungs-URI <code>{location.origin + location.pathname}</code>, Berechtigung <code>Files.ReadWrite.AppFolder</code>.
+                      </div>
+                    </details>
+                  )}
+                </>
+              ) : (
+                <>
+                  <div className="modal-buttons">
+                    <button disabled={!!busy} onClick={kontoPush}>{busy === 'kontopush' ? '…' : 'Jetzt hochladen'}</button>
+                    <button disabled={!!busy} onClick={kontoPull}>{busy === 'kontopull' ? '…' : 'Vom Konto laden'}</button>
+                    <button disabled={!!busy} onClick={kontoLogout}>Abmelden</button>
+                  </div>
+                  <div className="modal-note">
+                    ✅ Angemeldet bei {kontoLabel(kontoSitz)}{kontoSitz.name ? ` als „${kontoSitz.name}"` : ''} — Änderungen werden automatisch abgeglichen
+                    {kontoStamp() ? ` (letzter Abgleich: ${new Date(kontoStamp()!).toLocaleString('de-DE')})` : ''}. Dateien bis 4 MB wandern mit.
+                  </div>
+                </>
+              )}
+              {kontoError && (
+                <div className="modal-error" role="alert">⚠️ {kontoError}</div>
+              )}
+            </>
+          )}
 
           {syncWeg === 'ordner' && (
             <>

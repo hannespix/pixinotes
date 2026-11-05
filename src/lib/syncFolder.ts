@@ -21,6 +21,8 @@ const STAMP_KEY = 'pixinotes:sync-stamp';
 // (Geräte-Uhren gehen auseinander), nur gesetzt/gelöscht.
 export const SYNC_DIRTY_KEY = 'pixinotes:sync-dirty';
 export const WEBDAV_DIRTY_KEY = 'pixinotes:webdav-dirty';
+/** M317: Konto-Sync (Google Drive / OneDrive) — eigener Dirty-Schlüssel wie bei WebDAV */
+export const KONTO_DIRTY_KEY = 'pixinotes:konto-dirty';
 
 // Sync-Status für die Kopfleisten-Anzeige (M85): Der Auto-Sync arbeitete
 // bisher komplett unsichtbar — schlief er (Freigabe nach Neustart weg,
@@ -30,7 +32,7 @@ export const WEBDAV_DIRTY_KEY = 'pixinotes:webdav-dirty';
 // die nur ein bewusster Tipp sichern kann — auf iPad/iPhone darf der Browser
 // keinen Ordner anfassen, also kann NICHTS automatisch laufen.
 export type SyncState = 'ok' | 'pending' | 'noperm' | 'conflict' | 'error' | 'manual';
-export type SyncSource = 'ordner' | 'webdav' | 'dateien';
+export type SyncSource = 'ordner' | 'webdav' | 'dateien' | 'konto';
 export function emitSyncStatus(source: SyncSource, state: SyncState, at?: string): void {
   window.dispatchEvent(new CustomEvent('pixinotes:sync-status', { detail: { source, state, at } }));
 }
@@ -243,7 +245,7 @@ export const DATEI_BUDGET_MB = 25;
 
 /** Base64 aus einem Blob — in Blöcken, damit große Dateien den Aufrufstapel
  *  nicht sprengen (btoa(String.fromCharCode(...bytes)) knallt ab ~100 kB) */
-async function alsBase64(blob: Blob): Promise<string> {
+export async function alsBase64(blob: Blob): Promise<string> {
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let roh = '';
   const BLOCK = 0x8000;
@@ -362,7 +364,7 @@ export function applySync(p: SyncPayload, source: SyncSource = 'ordner'): boolea
     localStorage.setItem(STAMP_KEY, p.savedAt);
     localStorage.removeItem(SYNC_DIRTY_KEY); // deckungsgleich mit dem Ordner
     // Gegenüber einem evtl. verbundenen WebDAV-Server ist der Stand jetzt neu
-    localStorage.setItem(WEBDAV_DIRTY_KEY, '1');
+    localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); localStorage.setItem(KONTO_DIRTY_KEY, '1');
   } catch { return false; }
   emitSyncStatus(source, 'ok', p.savedAt);
   void basisMerken(source, p); // M311: ab hier ist das der gemeinsame Stand
@@ -673,7 +675,7 @@ export function initAutoSync(): void {
     // rekonstruierbar und dürfen die Übernahme eines Sync-Stands nicht blocken.
     if (!inDerived()) {
       notiereAenderung();
-      try { localStorage.setItem(SYNC_DIRTY_KEY, '1'); localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); } catch { /* voll → sicherer ohne Fast-Forward */ }
+      try { localStorage.setItem(SYNC_DIRTY_KEY, '1'); localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll → sicherer ohne Fast-Forward */ }
     }
     clearTimeout(timer);
     timer = setTimeout(() => { void autoSave().catch(() => {}); }, 1800);

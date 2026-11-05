@@ -164,6 +164,28 @@ Sollte später ein Echtzeit-Team-Board gewünscht sein, wäre ein Dienst mit
 Live-Abonnements (Firestore, Supabase) der richtige Ort — als Ergänzung, nicht
 als Ersatz.
 
+**Einrichtung durch den Betreiber (einmalig)**:
+
+1. Google Cloud Console → APIs & Dienste → Anmeldedaten → OAuth-Client
+   „Webanwendung"; autorisierte JavaScript-Quelle = die Adresse der App
+   (GitHub Pages). Berechtigung `drive.appdata` ist „nicht sensibel".
+2. Microsoft Entra → App-Registrierung „Single-Page-Anwendung"; Umleitungs-URI =
+   Adresse der App; API-Berechtigung `Files.ReadWrite.AppFolder` (delegiert).
+3. Beide IDs als Repository-Variablen setzen (`VITE_GOOGLE_CLIENT_ID`,
+   `VITE_MS_CLIENT_ID`, optional `VITE_MS_TENANT`); der Pages-Workflow reicht sie
+   in den Build. Ohne Variablen zeigt die App das Feld „Einmalig vom Betreiber".
+
+**Ablage im App-Ordner**: `umgebung.json` (Bereiche, Reihenfolge, Stempel je
+Board, Dateiliste) · `board-<id>.json` je Board · `datei-<id>` je Anhang (≤ 4 MB).
+Lokal merkt sich PixiNotes die zuletzt gesehene Server-Kenntnis (`konto:kenn`
+in IndexedDB); geschrieben wird nur Geändertes, gelesen nur Fremdes. OneDrive
+prüft beim Schreiben der Umgebung den eTag (If-Match). Drive kennt keine
+Vorbedingung — deshalb nennt jede `umgebung.json` den Stand, auf dem sie
+aufbaute (`basisEtag`), und jedes Gerät hält einen kleinen Ring der zuletzt
+gesehenen Server-Stände (`konto:basen`). Überschreiben sich zwei Geräte, wählt
+der Leser den genannten Vorfahren als Basis der Drei-Wege-Zusammenführung;
+nichts geht verloren, beide Anteile landen beim nächsten Takt wieder im Konto.
+
 **Grenzen, ehrlich**: Die portable Einzeldatei (`file://`) kann keine OAuth-
 Anmeldung — dort bleiben Ordner, WebDAV und Datei. Google-Tokens leben eine
 Stunde; die Verlängerung läuft still beim nächsten Klick in der App.
