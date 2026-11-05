@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useReactFlow, useViewport } from '@xyflow/react';
+import { getStroke } from 'perfect-freehand';
 import { selectActiveBoard, useBoard, type Stroke } from '../store';
 import { uid } from '../types';
-import { finalizeStroke, recognizeShape } from '../lib/strokeShapes';
+import { finalizeStroke, recognizeShapes } from '../lib/strokeShapes';
 
 const EMPTY: Stroke[] = [];
 const PEN = { width: 2.5, opacity: 1 };
@@ -10,29 +11,58 @@ const MARKER = { width: 16, opacity: 0.5 };
 const PEN_COLORS = ['#16191e', '#e0392b', '#e8a13a', '#3fa564', '#4f7cff', '#a05fd4'];
 /** Textmarker: echte Neon-Töne wie beim Leuchtstift (gelb/grün/orange/pink/cyan/lila) */
 const MARKER_COLORS = ['#fff200', '#aaff00', '#ff9100', '#ff2d95', '#00e5ff', '#c45fff'];
-/** Stillhalten am Strich-Ende so lange → Form einrasten (Linie/Rechteck/Ellipse) */
+/** Stillhalten am Strich-Ende so lange → Form einrasten (Linie/Pfeil/Kreis/Rechteck/Dreieck) */
 const HOLD_MS = 550;
+/** Hat dieses Gerät je einen Stift gemeldet? Dann gilt: Stift schreibt, Hand schiebt. */
+const STIFT_KEY = 'pixinotes-stift';
+/** Bedienelemente, die auch im Zeichenmodus Bedienelemente bleiben */
+const CHROME = '.draw-palette, .dock, .sel-toolbar, .modal-backdrop, .ebenen-menu, .topbar, .tabs, .react-flow__minimap, .toast';
+
 /**
- * M254: Druckstärke des Stifts auf einen Breitenfaktor abbilden.
- *
- * Apple Pencil und Wacom melden 0…1, Finger und Maus melden auf vielen
- * Geräten konstant 0.5 (oder 0). Nur bei ECHTEM Stiftdruck darf die Breite
- * wandern — sonst zappelte die Linie am Finger ohne Grund.
+ * M319: Strichkontur mit perfect-freehand — druckempfindlich, geglättet,
+ * sauber verjüngt. `size` ist der Durchmesser bei mittlerem Druck; dünne
+ * Stellen bei leichtem Druck, kräftige bei festem. Ohne Drucksensor (Maus,
+ * Finger) simuliert die Geschwindigkeit den Druck: schnell = dünn.
  */
-const druckFaktor = (e: { pointerType?: string; pressure?: number }): number => {
-  if (e.pointerType !== 'pen') return 1;
-  const p = e.pressure ?? 0;
-  if (!p) return 1;                       // kein Drucksensor → gleichmäßig
-  return 0.55 + Math.min(1, p) * 0.95;    // 0.55 … 1.5
+function strichKontur(s: Stroke, laufend: boolean): string {
+  const punkte = s.druck && s.druck.length === s.points.length
+    ? s.points.map((p, i) => [p[0], p[1], s.druck![i]])
+    : s.points.map((p) => [p[0], p[1], 0.5]);
+  const kontur = getStroke(punkte, {
+    size: s.width * 1.4,
+    thinning: 0.55,
+    smoothing: 0.55,
+    streamline: 0.45,
+    simulatePressure: !s.druck,
+    start: { taper: 2, cap: true },
+    end: { taper: s.points.length > 6 ? 8 : 0, cap: true },
+    last: !laufend,
+  });
+  if (kontur.length === 0) return '';
+  const d: string[] = ['M', kontur[0][0].toFixed(1), kontur[0][1].toFixed(1), 'Q'];
+  for (let i = 0; i < kontur.length; i += 1) {
+    const [x0, y0] = kontur[i];
+    const [x1, y1] = kontur[(i + 1) % kontur.length];
+    d.push(x0.toFixed(1), y0.toFixed(1), ((x0 + x1) / 2).toFixed(1), ((y0 + y1) / 2).toFixed(1));
+  }
+  d.push('Z');
+  return d.join(' ');
+}
+/** Fertige Striche ändern sich nie — ihre Kontur wird einmal gerechnet */
+const konturCache = new WeakMap<Stroke, string>();
+const konturFuer = (s: Stroke): string => {
+  let k = konturCache.get(s);
+  if (!k) { k = strichKontur(s, false); konturCache.set(s, k); }
+  return k;
 };
 
 /**
- * Freihand-Zeichnen über dem Board: Stift (deckend) und Textmarker (breit,
- * transparent) in mehreren Farben, plus Radierer. Striche werden in
- * Flow-Koordinaten gespeichert und wandern mit Pan/Zoom mit.
+ * Freihand-Zeichnen über dem Board: Stift (deckend, druckempfindlich) und
+ * Textmarker (breit, transparent) in mehreren Farben, plus Radierer. Striche
+ * werden in Flow-Koordinaten gespeichert und wandern mit Pan/Zoom mit.
  * Beim Loslassen werden Striche entzittert (fast gerade → schnurgerade);
- * wer am Ende kurz stillhält, bekommt Linien/Rechtecke/Ellipsen sauber
- * eingerastet — wie man es von OneNote & Co. kennt.
+ * wer am Ende kurz stillhält, bekommt Linien, Pfeile, Kreise, Ellipsen,
+ * Rechtecke und Dreiecke sauber eingerastet — wie in Apple Notes & OneNote.
  */
 export function DrawingLayer() {
   const tool = useBoard((s) => s.tool);
@@ -57,6 +87,25 @@ export function DrawingLayer() {
   const [penColor, setPenColor] = useState(PEN_COLORS[0]);
   const [markerColor, setMarkerColor] = useState(MARKER_COLORS[0]);
   const stiftZeichnet = useBoard((s) => s.stiftZeichnet);
+  /**
+   * M319: Sobald dieses Gerät einmal einen Stift gemeldet hat, gilt auch im
+   * Zeichenmodus die Papier-Regel: Stift (und Maus) zeichnen, Finger schieben
+   * und zoomen — auch mit zwei Fingern mitten im Zeichnen. Ohne Stift bleibt
+   * der Finger der Stift (Handy ohne Pencil).
+   */
+  const [stiftGesehen, setStiftGesehen] = useState(() => {
+    try { return localStorage.getItem(STIFT_KEY) === '1'; } catch { return false; }
+  });
+  useEffect(() => {
+    if (stiftGesehen) return;
+    const merken = (e: PointerEvent) => {
+      if (e.pointerType !== 'pen') return;
+      try { localStorage.setItem(STIFT_KEY, '1'); } catch { /* egal */ }
+      setStiftGesehen(true);
+    };
+    window.addEventListener('pointerdown', merken, true);
+    return () => window.removeEventListener('pointerdown', merken, true);
+  }, [stiftGesehen]);
   const drawing = useRef<Stroke | null>(null);
   const holdTimer = useRef<number | null>(null);
   /**
@@ -71,21 +120,22 @@ export function DrawingLayer() {
    */
   const fuehrend = useRef<{ id: number; art: string } | null>(null);
   /**
-   * Läuft gerade ein Stift-Direktzug?
+   * Läuft gerade ein Zug über den Fenster-Zuhörer (Stift-Direktzug oder
+   * Durchgriff im Zeichenmodus)?
    *
    * Bewusst eine Ref und keine lokale Variable im Effekt: Der Effekt meldet
    * sich bei jedem Bild neu an (er muss die frischen Farben und den frischen
    * Ausschnitt kennen), und jedes aufgenommene Punktepaar löst ein Bild aus.
-   * Eine lokale Variable stünde danach wieder auf „nein" — der Strich bräche
-   * nach dem ersten Punkt ab.
    */
-  const stiftZug = useRef(false);
+  const stiftZug = useRef<'strich' | 'radierer' | null>(null);
   const [, force] = useState(0);
   // Striche der AKTUELLEN Zeichensitzung: sich berührende entscheiden
   // gemeinsam über das Ankern (M128) — ältere bleiben unangetastet
   const sessionIds = useRef<string[]>([]);
 
   const active = tool === 'pen' || tool === 'marker' || tool === 'eraser';
+  /** Ebene lässt Finger durch (Schieben/Zoomen); Stift und Maus zeichnen über den Fenster-Zuhörer */
+  const durchgriff = active && stiftGesehen && stiftZeichnet;
 
   // Neue Zeichensitzung beginnt mit dem Aktivieren eines Zeichenwerkzeugs
   useEffect(() => {
@@ -105,12 +155,6 @@ export function DrawingLayer() {
   /**
    * Striche sind Board-Inhalt: IMMER sichtbar, nicht nur im Zeichenmodus.
    * Ohne aktives Werkzeug ist der Layer nur durchklick-transparent.
-   *
-   * M254: Früher stieg die Komponente hier aus, wenn es nichts zu zeigen gab.
-   * Das ging nicht mehr, seit der Stift auch OHNE Zeichenmodus zeichnet: Der
-   * Zuhörer dafür ist ein Effekt, und ein Effekt hinter einem `return` wird nie
-   * angemeldet. Jetzt wird bis zum Schluss gerechnet und erst die Ausgabe
-   * unterdrückt.
    */
   const nichtsZuZeigen = !active && drawings.length === 0 && !drawing.current;
 
@@ -121,7 +165,7 @@ export function DrawingLayer() {
   const color = isMarker ? markerColor : effPenColor;
   const setColor = isMarker ? setMarkerColor : setPenColor;
 
-  const toFlow = (e: React.PointerEvent): [number, number] => {
+  const toFlow = (e: { clientX: number; clientY: number }): [number, number] => {
     const p = screenToFlowPosition({ x: e.clientX, y: e.clientY });
     return [p.x, p.y];
   };
@@ -158,53 +202,69 @@ export function DrawingLayer() {
     holdTimer.current = window.setTimeout(() => {
       const d = drawing.current;
       if (!d || d.points.length < 8) return;
-      const snapped = recognizeShape(d.points);
-      if (snapped) {
-        // Form einrasten und Strich sofort abschließen — Finger/Maus kann loslassen
-        commitStroke({ ...d, points: snapped });
+      const formen = recognizeShapes(d.points);
+      if (formen) {
+        // Form einrasten und Strich sofort abschließen — Finger/Maus kann loslassen.
+        // Eingerastete Formen sind gleichmäßig breit (kein Druckverlauf).
+        formen.forEach((pts, i) => commitStroke({ ...d, id: i === 0 ? d.id : uid(), points: pts, druck: undefined }));
         drawing.current = null;
-        showToast('✨ Form eingerastet');
+        showToast(formen.length > 1 ? '✨ Pfeil eingerastet' : '✨ Form eingerastet');
         force((n) => n + 1);
       }
     }, HOLD_MS);
   };
 
   /** Einen Punkt aufnehmen — Mikro-Zittern wird gar nicht erst gespeichert */
-  const punktAufnehmen = (x: number, y: number) => {
+  const punktAufnehmen = (x: number, y: number, druck?: number) => {
     const d = drawing.current;
     if (!d) return false;
     const p = screenToFlowPosition({ x, y });
     const last = d.points[d.points.length - 1];
     if (Math.hypot(p.x - last[0], p.y - last[1]) < 1.5 / zoom) return false;
     d.points.push([p.x, p.y]);
+    if (d.druck) d.druck.push(druck && druck > 0 ? Math.min(1, druck) : d.druck[d.druck.length - 1] ?? 0.5);
     return true;
   };
 
-  /** Strich beginnen (gemeinsam für Layer-Zeichnen und Stift-Direktzug) */
+  /** Strich beginnen (gemeinsam für Layer-Zeichnen und Fenster-Zuhörer) */
   const strichStarten = (e: { clientX: number; clientY: number; pointerType?: string; pressure?: number },
     werkzeug: 'pen' | 'marker') => {
     const p = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    // M319: Druck je Punkt — nur bei echtem Stift mit Sensor. Maus und Finger
+    // bekommen den simulierten Druck aus der Geschwindigkeit (perfect-freehand).
+    const sensor = werkzeug === 'pen' && e.pointerType === 'pen' && !!e.pressure;
     drawing.current = {
       id: uid(),
       tool: werkzeug,
       color: werkzeug === 'marker' ? markerColor : effPenColor,
-      // Druck wirkt auf die Strichbreite — bewusst EINMAL beim Ansetzen und
-      // nicht laufend: Ein Strich mit wandernder Breite bräuchte eine gefüllte
-      // Kontur statt einer Linie, also ein anderes Datenmodell.
-      width: (werkzeug === 'marker' ? MARKER.width : PEN.width) * druckFaktor(e),
+      width: werkzeug === 'marker' ? MARKER.width : PEN.width,
       points: [[p.x, p.y]],
+      ...(sensor ? { druck: [Math.min(1, e.pressure ?? 0.5)] } : {}),
     };
     armHold();
     force((n) => n + 1);
   };
 
+  /** Zwischenpunkte auslesen: Ein iPad tastet den Stift mit 120 Hz ab, liefert
+   *  aber nur ~60 pointermove je Sekunde. Ohne die zusammengefassten Punkte
+   *  fehlt jeder zweite — schnelle Bögen bekommen dadurch Ecken. */
+  const punkteAufnehmen = (roh: PointerEvent): boolean => {
+    const r = roh as PointerEvent & { getCoalescedEvents?: () => PointerEvent[] };
+    const punkte = typeof r.getCoalescedEvents === 'function' ? r.getCoalescedEvents() : [];
+    let neu = false;
+    for (const p of punkte.length ? punkte : [roh]) neu = punktAufnehmen(p.clientX, p.clientY, p.pressure) || neu;
+    return neu;
+  };
+
   const onDown = (e: React.PointerEvent) => {
     // Handballen-Abweisung: Solange der Stift zeichnet, sind Finger tabu
     if (fuehrend.current?.art === 'pen' && e.pointerType !== 'pen') return;
+    // Ein zweiter Finger beendet den Strich des ersten — das ist eine Geste, keine Zeichnung
+    if (e.pointerType === 'touch' && fuehrend.current?.art === 'touch') { drawing.current = null; clearHold(); fuehrend.current = null; force((n) => n + 1); return; }
     // Capture kann bei exotischen/synthetischen Pointern fehlschlagen — Zeichnen geht trotzdem
     try { (e.target as Element).setPointerCapture(e.pointerId); } catch { /* ignorieren */ }
     const pt = toFlow(e);
-    if (tool === 'eraser') { beginEraseGesture(); eraseStrokesNear(pt[0], pt[1], 12 / zoom); return; }
+    if (tool === 'eraser') { fuehrend.current = { id: e.pointerId, art: e.pointerType }; beginEraseGesture(); eraseStrokesNear(pt[0], pt[1], 12 / zoom); return; }
     if (tool !== 'pen' && tool !== 'marker') return; // passiver Layer (pointer-events: none)
     fuehrend.current = { id: e.pointerId, art: e.pointerType };
     strichStarten(e, tool);
@@ -217,16 +277,7 @@ export function DrawingLayer() {
       return;
     }
     if (!drawing.current) return;
-    /**
-     * Zwischenpunkte auslesen: Ein iPad tastet den Stift mit 120 Hz ab, liefert
-     * aber nur ~60 pointermove je Sekunde. Ohne die zusammengefassten Punkte
-     * fehlt jeder zweite — schnelle Bögen bekommen dadurch Ecken.
-     */
-    const roh = e.nativeEvent as PointerEvent & { getCoalescedEvents?: () => PointerEvent[] };
-    const punkte = typeof roh.getCoalescedEvents === 'function' ? roh.getCoalescedEvents() : [roh];
-    let neu = false;
-    for (const p of punkte.length ? punkte : [roh]) neu = punktAufnehmen(p.clientX, p.clientY) || neu;
-    if (!neu) return;
+    if (!punkteAufnehmen(e.nativeEvent)) return;
     armHold();
     force((n) => n + 1);
   };
@@ -236,60 +287,74 @@ export function DrawingLayer() {
     const d = drawing.current;
     if (d && d.points.length > 1) {
       // Loslassen: entzittern + fast gerade Striche konservativ begradigen
-      commitStroke({ ...d, points: finalizeStroke(d.points) });
+      const points = finalizeStroke(d.points);
+      commitStroke({ ...d, points, druck: d.druck && d.druck.length === points.length ? d.druck : undefined });
     }
     drawing.current = null;
     force((n) => n + 1);
   };
 
   /**
-   * M254: Der Stift zeichnet sofort — ohne vorher in den Zeichenmodus zu gehen.
+   * M254/M319: Der Fenster-Zuhörer in der Erfassungsphase.
    *
-   * Das ist der eigentliche Grund, warum sich die App am iPad mit dem Pencil
-   * bisher zäh anfühlte: Man musste erst das Werkzeug umschalten, und dann
-   * zeichnete auch der Finger — Schieben und Zoomen ging nur nach dem
-   * Zurückschalten. Jetzt gilt die Aufteilung, die man vom Papier kennt:
-   * **Stift schreibt, Hand schiebt.**
-   *
-   * Umgesetzt als Zuhörer in der Erfassungsphase am Fenster. Er greift NUR bei
-   * `pointerType === 'pen'` und nur, wenn der Zug auf der freien Fläche
-   * beginnt — über einer Karte bleibt der Stift ein normaler Zeiger, sonst
-   * könnte man mit ihm keine Notiz mehr antippen oder scrollen. Einmal
-   * begonnen, darf der Strich selbstverständlich über Karten hinwegziehen.
-   *
-   * `stopPropagation` in der Erfassungsphase hält das Ereignis von React Flow
-   * fern — sonst würde die Fläche gleichzeitig mitgeschoben.
+   * Zwei Aufgaben. Erstens der Stift-Direktzug (M254): Der Stift zeichnet
+   * sofort, ohne vorher in den Zeichenmodus zu gehen — nur auf der freien
+   * Fläche, über einer Karte bleibt er ein normaler Zeiger. Zweitens der
+   * Durchgriff im Zeichenmodus (M319): Auf Geräten mit Stift lässt die Ebene
+   * Finger durch (eine Hand schiebt und zoomt — auch mit zwei Fingern mitten
+   * im Zeichnen), während Stift und Maus über diesen Zuhörer zeichnen oder
+   * radieren. `stopPropagation` hält das Ereignis von React Flow fern.
    */
   useEffect(() => {
     if (!stiftZeichnet) return;
 
     const runter = (e: PointerEvent) => {
-      if (e.pointerType !== 'pen' || !e.isPrimary) return;
-      // Im Zeichenmodus macht der Layer selbst weiter (samt Radierer)
-      if (useBoard.getState().tool !== 'select') return;
+      if (!e.isPrimary && e.pointerType !== 'touch') return;
+      const werkzeug = useBoard.getState().tool;
       const ziel = e.target as HTMLElement | null;
-      if (!ziel?.closest('.react-flow__pane')) return;
-      e.preventDefault();
-      e.stopPropagation();
-      stiftZug.current = true;
-      fuehrend.current = { id: e.pointerId, art: 'pen' };
-      strichStarten(e, 'pen');
+      if (!ziel?.closest) return;
+      if (ziel.closest(CHROME)) return;
+      if (werkzeug === 'select') {
+        // Direktzug: nur Stift, nur freie Fläche
+        if (e.pointerType !== 'pen' || !ziel.closest('.react-flow__pane')) return;
+        e.preventDefault(); e.stopPropagation();
+        stiftZug.current = 'strich';
+        fuehrend.current = { id: e.pointerId, art: 'pen' };
+        strichStarten(e, 'pen');
+        return;
+      }
+      // Zeichenmodus mit Durchgriff: Finger schieben (React Flow), Stift und Maus zeichnen
+      if (!durchgriff || e.pointerType === 'touch' || !ziel.closest('.react-flow')) return;
+      e.preventDefault(); e.stopPropagation();
+      fuehrend.current = { id: e.pointerId, art: e.pointerType };
+      if (werkzeug === 'eraser') {
+        stiftZug.current = 'radierer';
+        beginEraseGesture();
+        const pt = toFlow(e);
+        eraseStrokesNear(pt[0], pt[1], 12 / zoom);
+        return;
+      }
+      stiftZug.current = 'strich';
+      strichStarten(e, werkzeug === 'marker' ? 'marker' : 'pen');
     };
     const bewegen = (e: PointerEvent) => {
       if (!stiftZug.current || e.pointerId !== fuehrend.current?.id) return;
       e.preventDefault();
       e.stopPropagation();
-      const roh = e as PointerEvent & { getCoalescedEvents?: () => PointerEvent[] };
-      const punkte = typeof roh.getCoalescedEvents === 'function' ? roh.getCoalescedEvents() : [];
-      let neu = false;
-      for (const p of punkte.length ? punkte : [e]) neu = punktAufnehmen(p.clientX, p.clientY) || neu;
-      if (!neu) return;
+      if (stiftZug.current === 'radierer') {
+        const pt = toFlow(e);
+        eraseStrokesNear(pt[0], pt[1], 12 / zoom);
+        return;
+      }
+      if (!punkteAufnehmen(e)) return;
       armHold();
       force((n) => n + 1);
     };
     const hoch = (e: PointerEvent) => {
       if (!stiftZug.current || e.pointerId !== fuehrend.current?.id) return;
-      stiftZug.current = false;
+      const art = stiftZug.current;
+      stiftZug.current = null;
+      if (art === 'radierer') { fuehrend.current = null; return; }
       onUp();
     };
 
@@ -327,7 +392,8 @@ export function DrawingLayer() {
         className="drawing-layer"
         style={{
           cursor: tool === 'eraser' ? 'cell' : 'crosshair',
-          pointerEvents: active ? 'auto' : 'none',
+          // Durchgriff: Finger erreichen React Flow (Schieben, Zoomen); Stift & Maus zeichnen über den Fenster-Zuhörer
+          pointerEvents: active && !durchgriff ? 'auto' : 'none',
         }}
         onPointerDown={onDown}
         onPointerMove={onMove}
@@ -335,7 +401,9 @@ export function DrawingLayer() {
         onPointerCancel={onUp}
       >
         <g transform={`translate(${tx},${ty}) scale(${zoom})`}>
-          {placed.map(({ s, dx, dy, dim }) => (
+          {/* Eingerastete Formen (Linie, Pfeil, Rechteck, Dreieck: wenige Punkte) bleiben
+              scharfkantige Linien — die Freihand-Kontur würde ihre Ecken runden. */}
+          {placed.map(({ s, dx, dy, dim }) => (s.tool === 'marker' || s.points.length <= 6 ? (
             <path
               key={s.id}
               d={toPath(s)}
@@ -349,7 +417,17 @@ export function DrawingLayer() {
               // Multiply lässt den Text unter dem Marker durchscheinen — wie beim echten Leuchtstift
               style={s.tool === 'marker' ? { mixBlendMode: 'multiply' } : undefined}
             />
-          ))}
+          ) : (
+            <path
+              key={s.id}
+              className="strich"
+              d={s === drawing.current ? strichKontur(s, true) : konturFuer(s)}
+              transform={dx || dy ? `translate(${dx},${dy})` : undefined}
+              fill={s.color}
+              stroke="none"
+              opacity={PEN.opacity * (dim ? 0.35 : 1)}
+            />
+          )))}
         </g>
       </svg>
       {active && (
@@ -372,7 +450,7 @@ export function DrawingLayer() {
         />
         <span className="draw-hint">
           {tool === 'eraser' ? 'Radierer' : tool === 'marker' ? 'Textmarker' : 'Stift'}
-          <span className="draw-hint-tip"> · am Ende kurz halten = Form einrasten ✨</span>
+          <span className="draw-hint-tip">{durchgriff ? ' · Hand schiebt, Stift zeichnet' : ''} · am Ende kurz halten = Form einrasten ✨</span>
         </span>
         <button className="draw-done" onClick={() => setTool('select')}>Fertig</button>
       </div>

@@ -26,6 +26,9 @@ export interface Stroke {
   color: string;
   width: number;
   points: [number, number][];
+  /** M319: Druck je Punkt (0…1) bei echtem Stift — fehlt bei Maus, Finger und
+   *  eingerasteten Formen; dann simuliert die Geschwindigkeit den Druck */
+  druck?: number[];
   /** M127: an diese Karte geankert — die Punkte sind dann RELATIV zur
    *  Karten-Ecke und der Strich wandert bei jeder Kartenbewegung mit */
   anchor?: string;
