@@ -3,7 +3,6 @@ import {
   Background,
   BackgroundVariant,
   ConnectionMode,
-  Controls,
   MiniMap,
   ReactFlow,
   useReactFlow,
@@ -1004,7 +1003,6 @@ export function Board() {
             onClick={(_, pos) => { void setCenter(pos.x, pos.y, { duration: 350, zoom: getViewport().zoom }); }}
           />
         )}
-        <Controls showInteractive={false} />
         <SelectionToolbar />
         <DrawingLayer />
         <CommentLayer />

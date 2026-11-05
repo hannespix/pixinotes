@@ -1,20 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { selectActiveBoard, useBoard } from '../store';
-import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
+import { useBoard } from '../store';
 import { useRandZiehen } from '../lib/randZiehen';
 import { useOutsideClose } from '../lib/useOutsideClose';
+import { collectTasks } from '../lib/tasks';
 import { InlineName } from './InlineName';
 import { NavTree } from './Navigation';
-import { IChevronL, IChevronR, IHome, IPanelLeft, IPlus, IShare, IX } from './Icons';
+import { IChevronL, IChevronR, IHome, IPanelLeft, IPlus, ITasks, IX } from './Icons';
 
 /**
  * Die Navigation der App.
  *
  * Ab Tablet-Breite (861 Punkte) und mit „Navigation links" (Voreinstellung
- * seit M263) ist sie die linke SPALTE: 🏠 Übersicht, darunter der ganze Baum
- * (Bereich › Projekt › Board › Karte, Navigation.tsx), am Fuß Teilen und ＋.
- * Die Fläche beginnt rechts davon — nichts rutscht mehr unter die Spalte.
+ * seit M263) ist sie die linke SPALTE: Suche, 🏠 Übersicht, ✓ Aufgaben,
+ * darunter der ganze Baum (Bereich › Projekt › Board › Karte, Navigation.tsx),
+ * am Fuß ＋ Neu und ‹. Die Fläche beginnt rechts davon.
+ *
+ * M312: „Aufgaben" ist hier zu Hause (es ist keine Board-Aktion, also nicht
+ * im Dock); ＋ ist ein Menü (Board · Projekt · Bereich · Beispiele) statt nur
+ * „Board im aktuellen Projekt"; „Teilen" am Fuß und das ✕ an Reitern sind weg —
+ * beides steht im ⋯ des Boards.
  *
  * Am Telefon (und ohne die Spalte) bleibt die Kopfleiste: 🏠, Brotkrume
  * „Bereich › Projekt", die Boards des Projekts als Reiter oder — wenn kein
@@ -34,13 +39,25 @@ export function Tabs() {
   const setOverviewMode = useBoard((s) => s.setOverviewMode);
   const openBoard = useBoard((s) => s.openBoard);
   const addBoard = useBoard((s) => s.addBoard);
+  const addProject = useBoard((s) => s.addProject);
+  const addSpace = useBoard((s) => s.addSpace);
+  const addStarter = useBoard((s) => s.addStarter);
   const renameBoard = useBoard((s) => s.renameBoard);
-  const removeBoard = useBoard((s) => s.removeBoard);
   const showToast = useBoard((s) => s.showToast);
   const showArchived = useBoard((s) => s.showArchived);
-  const activeBoard = useBoard(selectActiveBoard);
+  const tasksOpen = useBoard((s) => s.tasksOpen);
+  const setTasksOpen = useBoard((s) => s.setTasksOpen);
   const navLinks = useBoard((s) => s.navLinks);
   const [navOpen, setNavOpen] = useState(false);
+  // M312: ＋ Neu als kleines Menü am Fuß (Board · Projekt · Bereich · Beispiele)
+  const [neuMenu, setNeuMenu] = useState(false);
+  const neuRef = useRef<HTMLDivElement | null>(null);
+  useOutsideClose(neuMenu, neuRef, () => setNeuMenu(false));
+  // Offene Aufgaben über alle Boards — die Zahl am Eintrag „Aufgaben"
+  const taskStats = useMemo(() => {
+    const ts = collectTasks(boards);
+    return { open: ts.length, overdue: ts.filter((t) => t.urgency === 'overdue').length };
+  }, [boards]);
   // M245: Die Ausstülpung ist in der Breite ziehbar, die Breite wird gemerkt
   const navBreite = useBoard((s) => s.navBreite);
   const setNavBreite = useBoard((s) => s.setNavBreite);
@@ -170,12 +187,12 @@ export function Tabs() {
     };
   }, [navOpen, navLinks, navBreite, spalteBreite, view, breit]);
 
-  // M251/M297: Alt+W — in der Spalte springt es in die Suche des Baums, sonst
-  // klappt es die Ausstülpung auf und zu.
+  // M251/M297: Alt+W — in der Spalte öffnet es die Suche (M312: das Feld im
+  // Baum IST die Suche), sonst klappt es die Ausstülpung auf und zu.
   useEffect(() => {
     const um = () => {
       if (navLinks && window.matchMedia('(min-width: 861px)').matches) {
-        (document.querySelector('.tabs .side-tree-find') as HTMLInputElement | null)?.focus();
+        useBoard.getState().setSearchOpen(true);
         return;
       }
       setNavOpen((o) => !o);
@@ -226,34 +243,22 @@ export function Tabs() {
     [projectBoards, activeId],
   );
 
-  /** Aktives Board serverlos teilen: Link in die Zwischenablage (Fallback: Datei) */
-  const shareActive = async () => {
-    try {
-      const url = await boardToShareUrl(activeBoard);
-      if (url.length > SHARE_URL_LIMIT) {
-        downloadBoardFile(activeBoard);
-        showToast('Das Board ist zu groß für einen Link und wurde als Datei gesichert.');
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      showToast('Teilen-Link kopiert. Er enthält das komplette Board.');
-    } catch {
-      downloadBoardFile(activeBoard);
-      showToast('Der Link ließ sich nicht kopieren, das Board wurde als Datei gesichert.');
-    }
-  };
-
-  const close = (id: string) => {
-    if (boards.length <= 1) {
-      showToast('Das letzte Board bleibt offen 🙂');
-      return;
-    }
-    const board = boards.find((b) => b.id === id);
-    if (board && board.nodes.length > 0) {
-      if (!window.confirm(`Board „${board.name}" mit ${board.nodes.length} Karten wirklich löschen?`)) return;
-    }
-    removeBoard(id);
-  };
+  /** Eintrag „Aufgaben" — in der Spalte unter Übersicht, am Handy im Kopf der Ausstülpung */
+  const aufgabenKnopf = (klasse: string, danach?: () => void) => (
+    <button
+      className={`${klasse} tab-tasks ${tasksOpen && view !== 'overview' ? 'active' : ''}`}
+      data-taste="aufgaben"
+      title={taskStats.open > 0
+        ? `Aufgaben & Erinnerungen: ${taskStats.open} offen über alle Boards${taskStats.overdue > 0 ? `, ${taskStats.overdue} überfällig` : ''}`
+        : 'Aufgaben & Erinnerungen aller Boards'}
+      aria-label="Aufgaben"
+      onClick={() => { setView('board'); setTasksOpen(true); danach?.(); }}
+    >
+      <ITasks size={15} />
+      <span className="tab-home-label">Aufgaben</span>
+      {taskStats.open > 0 && <span className={`tab-badge ${taskStats.overdue > 0 ? 'red' : ''}`}>{taskStats.open}</span>}
+    </button>
+  );
 
   return (
     <div className={`tabs ${kompakt ? 'kompakt' : ''} ${krumeKurz ? 'krume-kurz' : ''} ${spalte ? 'spalte' : ''}`} ref={leisteRef}>
@@ -262,11 +267,12 @@ export function Tabs() {
         className={`tab-home ${view === 'overview' ? 'active' : ''}`}
         title="Übersicht"
         aria-label="Übersicht"
-        onClick={() => { setOverviewMode('hierarchie'); setView('overview'); }}
+        onClick={() => { setOverviewMode('hierarchie'); setTasksOpen(false); setView('overview'); }}
       >
         <IHome size={15} />
         <span className="tab-home-label">Übersicht</span>
       </button>
+      {spalte && aufgabenKnopf('tab-tasks')}
       {!spalte && !kompakt && (
         /* Brotkrume „Bereich › Projekt" öffnet den Baum als Ausstülpung von links */
         <button
@@ -290,8 +296,9 @@ export function Tabs() {
               <button
                 className="nav-overview"
                 title="Übersicht"
-                onClick={() => { setOverviewMode('hierarchie'); setView('overview'); setNavOpen(false); }}
+                onClick={() => { setOverviewMode('hierarchie'); setTasksOpen(false); setView('overview'); setNavOpen(false); }}
               ><IHome size={13} /> Übersicht</button>
+              {aufgabenKnopf('nav-overview', () => setNavOpen(false))}
               {breit && (
                 /* M308: Der Weg zurück zur Spalte — ab Tablet-Breite, am Telefon gibt es keine */
                 <button
@@ -341,43 +348,45 @@ export function Tabs() {
           >
             <InlineName value={b.name} className="tab-name" onRename={(name) => renameBoard(b.id, name)} />
             <span className="tab-count">{b.nodes.filter((n) => showArchived || !n.archived).length}</span>
-            <button
-              className="tab-x"
-              title="Board schließen"
-              aria-label={`Board ${b.name} schließen`}
-              onClick={(e) => {
-                e.stopPropagation();
-                close(b.id);
-              }}
-            >
-              <IX size={11} />
-            </button>
           </div>
         ))}
       </div>
       )}
-      {/* M238: Teilen und ＋ als eigene Gruppe — in der Reihe eine Flex-Zeile in
-          der Flex-Zeile, in der Spalte der Fuß der Liste. */}
+      {/* M238/M312: ＋ Neu und ‹ als eigene Gruppe — in der Reihe eine Flex-Zeile
+          in der Flex-Zeile, in der Spalte der Fuß der Liste. */}
       <div className="tabs-foot">
-      <button
-        className="tab-share"
-        title="Board teilen"
-        aria-label="Board teilen"
-        onClick={shareActive}
-      >
-        <IShare size={13} />
-      </button>
-      <button
-        className="tab-add"
-        title={`Neues Board in „${context?.project.name ?? 'Allgemein'}"`}
-        aria-label="Neues Board"
-        onClick={() => {
-          addBoard(undefined, context?.project.id);
-          showToast(`Neues Board in „${context?.project.name ?? 'Allgemein'}".`);
-        }}
-      >
-        <IPlus size={14} />
-      </button>
+      <div className="neu-wrap" ref={neuRef}>
+        {neuMenu && (
+          <div className="ebenen-menu neu-menu" role="menu" aria-label="Neu anlegen">
+            <button role="menuitem" onClick={() => {
+              setNeuMenu(false);
+              addBoard(undefined, context?.project.id);
+              showToast(`Neues Board in „${context?.project.name ?? 'Allgemein'}".`);
+            }}><IPlus size={14} /> Board <small>in „{context?.project.name ?? 'Allgemein'}"</small></button>
+            <button role="menuitem" onClick={() => {
+              setNeuMenu(false);
+              if (context) addProject(context.space.id); else addSpace();
+            }}><IPlus size={14} /> Projekt <small>in „{context?.space.name ?? 'Allgemein'}"</small></button>
+            <button role="menuitem" onClick={() => { setNeuMenu(false); addSpace(); }}>
+              <IPlus size={14} /> Bereich
+            </button>
+            <div className="ebenen-menu-titel">Zum Ausprobieren</div>
+            <button role="menuitem" onClick={() => { setNeuMenu(false); addStarter(); }}>
+              ✨ Beispiel-Umgebung hinzufügen
+            </button>
+          </div>
+        )}
+        <button
+          className={`tab-add ${neuMenu ? 'active' : ''}`}
+          title="Neu: Board, Projekt, Bereich"
+          aria-label="Neu"
+          aria-haspopup="menu"
+          aria-expanded={neuMenu}
+          onClick={() => setNeuMenu((o) => !o)}
+        >
+          <IPlus size={14} />
+        </button>
+      </div>
       {spalte && (
         <button
           className="tab-spalte-zu"

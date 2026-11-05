@@ -158,9 +158,10 @@ console.log('════ F: Fuß und Logo-Menü ════');
 {
   pruefe('F1 kein Fuß mit Version und Rechtlichem mehr im Fenster', (await P.locator('.modal .modal-foot').count()) === 0);
   await P.locator('.modal-x').click();
-  await P.locator('button[aria-label="Über PixiNotes"]').click();
-  const eintraege = await P.locator('.about-menu [role="menuitem"]').allTextContents();
-  pruefe('F2 Logo-Menü ohne „Deine Daten & Synchronisation" (⚙ ist einen Klick entfernt)', !eintraege.some((t) => /Deine Daten/.test(t)) && eintraege.some((t) => /Sehen/.test(t)), eintraege.join(' | '));
+  await P.locator('button.logo').click();
+  await P.waitForTimeout(400);
+  // M312: Das Logo-Menü ist aufgelöst — das Logo öffnet die Hilfe, Einstellungen bleiben beim Zahnrad
+  pruefe('F2 das Logo öffnet die Hilfe (kein Logo-Menü mehr)', (await P.locator('.help-modal').count()) === 1 && (await P.locator('.about-menu').count()) === 0);
   await P.keyboard.press('Escape');
 }
 

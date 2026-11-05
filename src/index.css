@@ -6167,3 +6167,69 @@ audio.file-media { height: 40px; }
   .legal-corner { display: none; }
   .react-flow__attribution { bottom: 84px; }
 }
+
+/* ===== M312: Weniger ist mehr — Rahmen (Kopfleiste, Spalte, Dock, Übersicht) ===== */
+/* Suche-Knopf oben nur, wenn keine Spalte mit Suchfeld zu sehen ist */
+@media (min-width: 861px) {
+  .app.nav-links .top-actions .ta-suche { display: none; }
+}
+/* Das Suchfeld im Baum ist ein Knopf: öffnet die eine Suche (Strg+K) */
+.side-tree-find {
+  display: flex; align-items: center; gap: 7px; text-align: left; cursor: pointer;
+  color: var(--muted);
+}
+.side-tree-find span { flex: 1; }
+.side-tree-find kbd {
+  font-family: inherit; font-size: 9.5px; color: var(--muted); border: 1px solid var(--border-soft);
+  border-radius: 5px; padding: 1px 5px; background: var(--surface-dim);
+}
+.side-tree-find:hover { border-color: var(--border); color: var(--ink); }
+/* Bereichs-Zeile mit ⋯ beim Zeigen */
+.side-space-head { display: flex; align-items: center; gap: 4px; }
+.side-space-head .side-space-name { flex: 1; }
+.side-space-head:hover .ebenen-menu-knopf, .side-space-head .ebenen-menu-knopf.auf,
+.side-space-head .ebenen-menu-knopf:focus-visible { opacity: 1; }
+/* Aufgaben in der Spalte: wie Übersicht, mit Zahl rechts */
+.tab-badge {
+  margin-left: auto; min-width: 18px; height: 18px; padding: 0 6px; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10.5px; font-weight: 700; background: var(--surface-dim); color: var(--muted);
+}
+.tab-badge.red { background: #d84b3d; color: #fff; }
+.tabs:not(.spalte) .tab-tasks { display: none; }
+.nav-head .tab-tasks .tab-home-label { display: inline; }
+.nav-head .tab-tasks .tab-badge { margin-left: 2px; height: 16px; min-width: 16px; font-size: 10px; }
+/* ＋ Neu als Menü am Fuß */
+.neu-wrap { position: relative; display: inline-flex; }
+.ebenen-menu.neu-menu {
+  position: absolute; left: 0; bottom: calc(100% + 6px); top: auto; min-width: 230px; z-index: 60;
+}
+.tabs:not(.spalte) .ebenen-menu.neu-menu { bottom: auto; top: calc(100% + 6px); left: auto; right: 0; }
+.neu-menu small { color: var(--muted); font-size: 11px; margin-left: 4px; font-weight: 400; }
+/* Übersicht: Zeilen und Kacheln tragen nur ein ⋯, sichtbar beim Zeigen */
+.ov-head-actions { opacity: 0; }
+.ovc-space:hover .ov-head-actions, .ovc-project:hover .ov-head-actions,
+.ov-head-actions:focus-within, .ov-head-actions:has(.ebenen-menu-knopf.auf) { opacity: 1; }
+.ov-head-actions .ebenen-menu-knopf { opacity: 1; }
+.ovc-tile-actions .ebenen-menu-knopf { opacity: 1; }
+.ovc-tile .ov-board-name { padding-right: 28px; }
+@media (hover: none) {
+  .ov-head-actions, .ovc-tile-actions, .side-space-head .ebenen-menu-knopf { opacity: 1; }
+}
+/* Fassung im Fuß der Hilfe */
+.help-fassung { display: block; margin-top: 6px; font-size: 11px; color: var(--muted); }
+
+/* Bereichs-⋯ im Baum erst beim Zeigen — wie bei Projekt und Board */
+.side-space-head .ebenen-menu-knopf { opacity: 0; transition: opacity 0.15s; }
+.side-space-head:hover .ebenen-menu-knopf, .side-space-head .ebenen-menu-knopf.auf,
+.side-space-head .ebenen-menu-knopf:focus-visible { opacity: 1; }
+@media (hover: none) { .side-space-head .ebenen-menu-knopf { opacity: 1; } }
+
+/* M312: Der Eintrag Aufgaben in der Spalte sieht aus wie Übersicht, ist aber eine eigene Klasse */
+.tabs.spalte .tab-tasks {
+  border: none; background: none; font-size: 15px; width: 30px; height: 30px;
+  border-radius: 8px; cursor: pointer; flex: none;
+}
+.tabs.spalte .tab-tasks:hover { background: var(--surface-2); }
+.tabs.spalte .tab-tasks.active { background: var(--accent-soft); }
+.tabs.spalte .tab-tasks .tab-home-label { display: inline; }

@@ -3,7 +3,6 @@ import { ReactFlowProvider } from '@xyflow/react';
 import { Board } from './components/Board';
 import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
-import { MiniDock } from './components/MiniDock';
 import { TopActions } from './components/TopActions';
 import { Overview } from './components/Overview';
 import { SearchOverlay } from './components/SearchOverlay';
@@ -227,7 +226,6 @@ export default function App() {
         {view === 'overview' ? (
           <ErrorBoundary what="Die Übersicht" full>
             <Overview />
-            <MiniDock />
             {/* M297: Der Baum steht in der linken Spalte (Tabs) — in jeder Ansicht. */}
           </ErrorBoundary>
         ) : presenting ? null : tasksOpen ? (

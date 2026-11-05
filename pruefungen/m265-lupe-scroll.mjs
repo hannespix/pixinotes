@@ -169,9 +169,13 @@ console.log('\n════ T3: auf dem Board unverändert erreichbar ═══�
     };
   });
   console.log('   ', JSON.stringify(b));
-  pruefe('T3a der Board-Zoom ist da', !!b);
-  pruefe('T3b vollständig im Bild', !!b && b.imBild, JSON.stringify(b));
-  pruefe('T3c und nichts liegt darüber', b?.darueber === 'frei', String(b?.darueber));
+  // M312: Die Zoom-Knöpfe sind von der Fläche verschwunden (Mausrad, Pinch, Taste F);
+  // „Alles einpassen" steht im ⋯ des Docks.
+  pruefe('T3a keine Zoom-Knöpfe mehr auf der Fläche', b === null, JSON.stringify(b));
+  await P.locator('.dock [aria-label="Mehr"]').click();
+  await P.waitForTimeout(300);
+  pruefe('T3b „Alles einpassen" steht im Dock ⋯', (await P.locator('.dock-menu-more [aria-label="Alles einpassen"]').count()) === 1);
+  await P.keyboard.press('Escape');
   await ctx.close();
 }
 
@@ -185,7 +189,7 @@ console.log('\n════ T4: Datei-Karte im Fokus ════');
   await P.waitForTimeout(400);
   const [ch] = await Promise.all([
     P.waitForEvent('filechooser'),
-    P.click('.dock-menu button:has-text("Datei einfügen")'),
+    P.click('.dock-menu button:has-text("Datei oder Bild")'),
   ]);
   await ch.setFiles(`${SD}/ticket.pdf`);
   await P.waitForTimeout(2500);

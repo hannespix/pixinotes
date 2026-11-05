@@ -2,7 +2,7 @@
  * M296 — Dock, Menüs und Auswahl-Leiste entrümpelt.
  *
  *   A  ＋-Menü: fünf Einträge und „Weitere Module"; aufgeklappt kommt der Rest.
- *   B  ⋯-Menü: „Aufräumen" ist ein Knopf, die Varianten liegen dahinter,
+ *   B  ⋯-Menü: „Anordnen & Hintergrund" bündelt die Varianten (M312: kein zweites „Aufräumen"),
  *      der Physik-Schalter ist weg (⚙ → Bedienung).
  *   C  Auswahl-Leiste: sechs Elemente; Kopieren und Schrift liegen im ⋯.
  *   D  Sprechblase verschwindet bei einem Tastendruck.
@@ -88,13 +88,15 @@ console.log('════ B: ⋯-Menü des Docks ════');
   await P.locator('.dock [aria-label="Mehr"]').click();
   await P.waitForTimeout(300);
   const text = await P.locator('.dock-menu-more').textContent();
-  pruefe('B1 „Aufräumen" ist ein Knopf', (await P.locator('.dock-menu-more [aria-label="Board aufräumen"]').count()) === 1 && /Aufräumen/.test(text));
-  pruefe('B2 die Varianten liegen dahinter', /Anordnen & Hintergrund/.test(text), text);
+  pruefe('B1 kein zweites „Aufräumen" neben „Anordnen" (M312)', (await P.locator('.dock-menu-more [aria-label="Board aufräumen"]').count()) === 0 && !/Aufräumen/.test(text), text);
+  pruefe('B2 die Varianten liegen hinter „Anordnen & Hintergrund"', /Anordnen & Hintergrund/.test(text), text);
   pruefe('B3 kein Physik-Schalter mehr im Dock', !/Physik/.test(text), text);
-  await P.locator('.dock-menu-more [aria-label="Board aufräumen"]').click();
+  await P.locator('.dock-menu-more [aria-label="Anordnen"]').click();
+  await P.waitForTimeout(300);
+  await P.locator('.dock-menu-arrange button', { hasText: 'Fluss horizontal' }).click();
   await P.waitForTimeout(1600);
   const toast = await P.locator('.toast.show').textContent().catch(() => '');
-  pruefe('B4 Aufräumen ordnet sofort mit der Voreinstellung', /Aufgeräumt/.test(toast), toast);
+  pruefe('B4 die Voreinstellung (Fluss horizontal) ordnet sofort', /Aufgeräumt|angeordnet|Anordnung/i.test(toast), toast);
   await ctx.close();
 }
 

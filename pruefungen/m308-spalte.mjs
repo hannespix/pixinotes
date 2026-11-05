@@ -136,8 +136,8 @@ console.log('\n════ C: Telefon ════');
 console.log('\n════ D: „Was ist neu" ════');
 {
   const { ctx, P } = await seite();
-  await P.locator('button[aria-label="Über PixiNotes"]').click();
-  await P.locator('.about-menu [role="menuitem"]', { hasText: 'Was ist neu' }).click();
+  await P.locator('button.logo').click();
+  await P.locator('.help-neu-link').click();
   await P.waitForSelector('.help-neu-modal');
   const eintraege = await P.locator('#help-neu li').allTextContents();
   const eintrag = eintraege.find((t) => /M308/.test(t)) ?? '';

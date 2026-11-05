@@ -18,7 +18,7 @@ import { suggestBoardLinks, type LinkSuggestion } from '../lib/brain';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
 import { InlineName } from './InlineName';
-import { BoardMenu, ProjektMenu } from './EbenenMenu';
+import { BereichMenu, BoardMenu, ProjektMenu } from './EbenenMenu';
 import { IPlay, ITarget, IZoomIn, IZoomOut } from './Icons';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
@@ -123,7 +123,6 @@ function OverviewCanvas() {
   const moveBoard = useBoard((s) => s.moveBoard);
   const setProjektSortierung = useBoard((s) => s.setProjektSortierung);
   const openBoard = useBoard((s) => s.openBoard);
-  const addSpace = useBoard((s) => s.addSpace);
   // tick erzwingt Neu-Layout nach einem Drag (Kacheln rasten in die Zonen zurück)
   const [tick, setTick] = useState(0);
 
@@ -195,13 +194,8 @@ function OverviewCanvas() {
       >
         <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} color={document.documentElement.dataset.theme === 'dark' ? '#4b453c' : '#d8d3c8'} />
       </ReactFlow>
-      <button
-        className="ov-add-space-float"
-        onClick={() => addSpace()}
-        title="Neuen Bereich anlegen — die oberste Ebene über Projekten und Boards (nicht der Rahmen auf einem Board)"
-      >
-        + Neuer Bereich
-      </button>
+      {/* M312: „+ Neuer Bereich" schwebte hier als eigener Knopf — Anlegen geht
+          jetzt überall gleich über ＋ Neu am Fuß der Navigation. */}
     </div>
   );
 }
@@ -1627,15 +1621,15 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[]) {
 function SpaceZone({ data }: NodeProps<Node<SpaceZoneData, 'ovSpace'>>) {
   const { space, accent } = data;
   const renameSpace = useBoard((s) => s.renameSpace);
-  const removeSpace = useBoard((s) => s.removeSpace);
-  const addProject = useBoard((s) => s.addProject);
+  const [editing, setEditing] = useState(false);
   return (
     <div className="ovc-space" style={{ borderColor: accent }}>
       <div className="ovc-space-head">
-        <InlineName value={space.name} className="ovc-space-name" style={{ color: accent }} onRename={(n) => renameSpace(space.id, n)} />
+        <InlineName value={space.name} className="ovc-space-name" style={{ color: accent }} editing={editing} onEditingChange={setEditing} onRename={(n) => renameSpace(space.id, n)} />
+        {/* M312: „+ Projekt" und „✕" standen hier offen in jeder Zeile — jetzt
+            dasselbe ⋯ wie an Projekt und Board, sichtbar beim Zeigen. */}
         <div className="ov-head-actions nodrag">
-          <button onClick={() => addProject(space.id)} title="Projekt anlegen">+ Projekt</button>
-          <button onClick={() => removeSpace(space.id)} title="Bereich löschen (nur wenn leer)">✕</button>
+          <BereichMenu spaceId={space.id} onRename={() => setEditing(true)} />
         </div>
       </div>
     </div>
@@ -1645,16 +1639,15 @@ function SpaceZone({ data }: NodeProps<Node<SpaceZoneData, 'ovSpace'>>) {
 function ProjectZone({ data }: NodeProps<Node<ProjectZoneData, 'ovProject'>>) {
   const { project } = data;
   const renameProject = useBoard((s) => s.renameProject);
-  const addBoard = useBoard((s) => s.addBoard);
+  const [editing, setEditing] = useState(false);
   return (
     <div className="ovc-project">
       <div className="ovc-project-head">
-        <InlineName value={project.name} className="ov-project-name" onRename={(n) => renameProject(project.id, n)} />
+        <InlineName value={project.name} className="ov-project-name" editing={editing} onEditingChange={setEditing} onRename={(n) => renameProject(project.id, n)} />
         <div className="ov-head-actions nodrag">
-          <button onClick={() => addBoard(undefined, project.id)} title="Board anlegen">+ Board</button>
-          {/* M288: Alles Weitere (Duplizieren, alle Boards archivieren, Löschen)
-              steht hinter demselben ⋯ wie im Navigator — ein Menü, überall. */}
-          <ProjektMenu projectId={project.id} />
+          {/* M288/M312: Neues Board, Duplizieren, Reihenfolge, Archivieren und
+              Löschen stehen hinter demselben ⋯ wie im Baum — ein Menü, überall. */}
+          <ProjektMenu projectId={project.id} onRename={() => setEditing(true)} />
         </div>
       </div>
       {project.boardIds.length === 0 && <div className="ov-empty small nodrag">Boards hierher ziehen</div>}
@@ -1665,8 +1658,6 @@ function ProjectZone({ data }: NodeProps<Node<ProjectZoneData, 'ovProject'>>) {
 function BoardTile({ data }: NodeProps<Node<BoardTileData, 'ovBoard'>>) {
   const { board, accent } = data;
   const renameBoard = useBoard((s) => s.renameBoard);
-  const openBoard = useBoard((s) => s.openBoard);
-  const setPresenting = useBoard((s) => s.setPresenting);
   const [editing, setEditing] = useState(false);
 
   return (
@@ -1676,21 +1667,9 @@ function BoardTile({ data }: NodeProps<Node<BoardTileData, 'ovBoard'>>) {
       title="Klick öffnet das Board · Ziehen verschiebt es"
     >
       <span className="ovc-tile-actions nodrag">
-        <button
-          title="Board direkt präsentieren"
-          aria-label={`Board ${board.name} präsentieren`}
-          onClick={(e) => {
-            e.stopPropagation();
-            openBoard(board.id);
-            setPresenting(true);
-          }}
-        >
-          <IPlay size={12} />
-        </button>
-        {/* M288: Umbenennen, Duplizieren, Verschieben, Teilen, Archivieren und
-            Löschen liegen jetzt in EINEM Menü — dasselbe wie im Navigator und
-            in der Seitenleiste. Vorher waren es hier drei Einzelknöpfe mit
-            einem anderen Vorrat als anderswo. */}
+        {/* M288/M312: Umbenennen, Duplizieren, Verschieben, Teilen, Präsentieren,
+            Archivieren und Löschen liegen in EINEM Menü — dasselbe wie im Baum.
+            Der ▶-Knopf daneben war Präsentieren zum zweiten Mal. */}
         <BoardMenu boardId={board.id} onRename={() => setEditing(true)} />
       </span>
       {board.archived && <span className="archiv-marke ov-board-archiv">Archiv</span>}

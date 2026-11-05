@@ -19,8 +19,8 @@ const SEEN_KEY = 'pixinotes-onboarded';
 
 export function Onboarding() {
   const [open, setOpen] = useState(false);
-  const addStarter = useBoard((s) => s.addStarter);
-  const setHelpOpen = useBoard((s) => s.setHelpOpen);
+  const setView = useBoard((s) => s.setView);
+  const setOverviewMode = useBoard((s) => s.setOverviewMode);
 
   useEffect(() => {
     try {
@@ -54,16 +54,17 @@ export function Onboarding() {
         </ul>
         <div className="onb-acts">
           <button className="onb-primary" onClick={close}>Loslegen</button>
-          <button onClick={() => { close(); addStarter(); }}>
+          {/* M312: Die Beispiel-Umgebung liegt beim ersten Start schon da —
+              vorher legte dieser Knopf sie ein ZWEITES Mal an (alles doppelt).
+              Jetzt führt er in die Übersicht, wo man sie sieht. */}
+          <button onClick={() => { close(); setOverviewMode('hierarchie'); setView('overview'); }}>
             Beispiele ansehen
           </button>
-          <button onClick={() => { close(); setHelpOpen(true, 'start'); }}>
-            Zur Anleitung
-          </button>
         </div>
+        {/* M312: zwei Knöpfe statt drei — die Anleitung hängt ohnehin am Logo */}
         <p className="onb-foot">
-          Die Einführung erscheint nur einmal. Alles Weitere steht jederzeit in der
-          Hilfe — erreichbar über das Logo oben links.
+          Die Einführung erscheint nur einmal. Alles Weitere steht in der Hilfe:
+          ein Klick auf das Logo oben links.
         </p>
       </div>
     </div>

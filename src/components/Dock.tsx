@@ -4,7 +4,6 @@ import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
 import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, makeSheet, makeTime, makeWeek } from '../lib/nodes';
 import { importFilesToBoard, importHtmlAppFromUrl } from '../lib/importFiles';
-import { collectTasks } from '../lib/tasks';
 import { aiReady } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
 import { selectActiveBoard } from '../store';
@@ -17,8 +16,13 @@ import {
 } from './Icons';
 
 /**
- * Das Werkzeug-Dock — bewusst schlank: ➕ bündelt alle Kartentypen in einem
- * strukturierten Menü, ✎ bündelt die Zeichenwerkzeuge in einem Flyout.
+ * Das Werkzeug-Dock — drei Knöpfe: ＋ bündelt alle Kartentypen in einem
+ * strukturierten Menü, ✎ die Zeichenwerkzeuge, ⋯ alles, was das Board als
+ * Ganzes betrifft (KI, Anordnen, Präsentieren, Bild-Export, Einpassen).
+ *
+ * M312: „Aufgaben" steht in der Navigation (es ist keine Board-Aktion),
+ * „Präsentieren" im ⋯ (selten genug), „Aufräumen" war „Fluss horizontal" ein
+ * zweites Mal, und „Archiv einblenden" lebt am Fuß des Baums.
  */
 export function Dock() {
   const addNode = useBoard((s) => s.addNode);
@@ -27,12 +31,6 @@ export function Dock() {
   const setPresenting = useBoard((s) => s.setPresenting);
   const tool = useBoard((s) => s.tool);
   const setTool = useBoard((s) => s.setTool);
-  const setTasksOpen = useBoard((s) => s.setTasksOpen);
-  const boards = useBoard((s) => s.boards);
-  const taskStats = useMemo(() => {
-    const ts = collectTasks(boards);
-    return { open: ts.length, overdue: ts.filter((t) => t.urgency === 'overdue').length };
-  }, [boards]);
   const { screenToFlowPosition, fitView } = useReactFlow();
   const [arranging, setArranging] = useState(false);
 
@@ -43,11 +41,8 @@ export function Dock() {
    */
   const [arrangeMenu, setArrangeMenu] = useState(false);
   const setPhysicsEnabled = useBoard((s) => s.setPhysicsEnabled);
-  const showArchived = useBoard((s) => s.showArchived);
-  const setShowArchived = useBoard((s) => s.setShowArchived);
   const gridSnap = useBoard((s) => s.gridSnap);
   const setGridSnap = useBoard((s) => s.setGridSnap);
-  const archivedCount = useBoard((s) => selectActiveBoard(s).nodes.filter((n) => n.archived).length);
   // Hintergrund-Tönung des aktiven Boards — seit M126 hier statt in der Tab-Leiste
   const setBoardBg = useBoard((s) => s.setBoardBg);
   const activeBoardId = useBoard((s) => s.activeId);
@@ -434,30 +429,8 @@ export function Dock() {
         </button>
       </div>
 
-      <span className="dock-sep" />
-      <button
-        className="dock-tasks"
-        data-taste="aufgaben"
-        onClick={() => setTasksOpen(true)}
-        // M185: Die Zahl am Symbol selbst erklären — sonst rät man, wofür sie steht
-        title={taskStats.open > 0
-          ? `Aufgaben & Erinnerungen: ${taskStats.open} offen über alle Boards`
-            + (taskStats.overdue > 0 ? ` — davon ${taskStats.overdue} überfällig (darum rot)` : ' — nichts überfällig')
-          : 'Aufgaben & Erinnerungen (alle Boards) — aktuell nichts offen'}
-        // aria-label bewusst FEST: Die Zahl steht sichtbar im Badge daneben und
-        // wird ohnehin mitgelesen — ein wechselndes Label macht den Knopf für
-        // Screenreader (und für Tests) zu einem beweglichen Ziel.
-        aria-label="Aufgaben"
-      >
-        <ITasks />
-        {taskStats.open > 0 && (
-          <span className={`dock-badge ${taskStats.overdue > 0 ? 'red' : ''}`}>{taskStats.open}</span>
-        )}
-      </button>
-
-      {/* M198: ⋯ „Mehr" — KI, Anordnen, Physik und Archiv in EINEM Menü statt
-          vier Einzelknöpfen. Die beiden großen Untermenüs (KI, Anordnen) öffnen
-          als eigene Flyouts am selben Anker — maximal zwei Ebenen. */}
+      {/* M198: ⋯ „Mehr" — das Board-Menü. Die beiden großen Untermenüs (KI,
+          Anordnen) öffnen als eigene Flyouts am selben Anker — maximal zwei Ebenen. */}
       <div className="dock-add-wrap">
         {moreMenu && (
           <div className="dock-menu dock-menu-more">
@@ -468,27 +441,25 @@ export function Dock() {
             >
               <IWand size={16} /> KI-Assistent …
             </button>
-            {/* M296: „Aufräumen" ist EIN Knopf mit der Voreinstellung (Verbundenes
-                als Fluss, der Rest als Raster nach Modultyp). Die neun Varianten,
-                Gitter und Hintergrund liegen dahinter. Der Physik-Schalter steht
-                seit M294 in ⚙ → Bedienung (Alt+O bleibt). */}
-            <button
-              onClick={() => { setMoreMenu(false); arrange('flow'); }}
-              disabled={arranging}
-              title="Aufräumen"
-              aria-label="Board aufräumen"
-            >
-              <IArrange size={16} /> Aufräumen
-            </button>
+            {/* Die neun Anordnungen, Gitter und Hintergrund liegen in einem Flyout;
+                die Voreinstellung (Fluss horizontal) steht dort an erster Stelle. */}
             <button
               onClick={() => { setMoreMenu(false); setArrangeMenu(true); }}
               disabled={arranging}
               title="Anordnung wählen, Gitter, Hintergrund"
               aria-label="Anordnen"
             >
-              <IGridLayout size={16} /> Anordnen &amp; Hintergrund …
+              <IArrange size={16} /> Anordnen &amp; Hintergrund …
             </button>
             <div className="dock-menu-label">Board</div>
+            <button
+              onClick={() => { setMoreMenu(false); setPresenting(true); }}
+              data-taste="praesentieren"
+              title="Präsentationsmodus (Karten als Folien)"
+              aria-label="Präsentieren"
+            >
+              <IPlay size={16} /> Präsentieren
+            </button>
             {/* M300: Der Bild-Export gehört zum Board, nicht in die Einstellungen —
                 er braucht das Board auf dem Schirm (er fotografiert die Fläche). */}
             <button
@@ -498,24 +469,13 @@ export function Dock() {
             >
               <IDownload size={16} /> Als Bild exportieren …
             </button>
-            {archivedCount > 0 && (
-              <button
-                className={showArchived ? 'on' : ''}
-                onClick={() => {
-                  setShowArchived(!showArchived);
-                  showToast(showArchived
-                    ? '🗃 Archiv ausgeblendet — archivierte Karten sind wieder unsichtbar.'
-                    : `🗃 Archiv eingeblendet — ${archivedCount} archivierte Karte${archivedCount > 1 ? 'n' : ''} (gedimmt). Zum Zurückholen Karte auswählen → Archiv-Symbol.`);
-                }}
-                title={showArchived
-                  ? `Archivierte Karten ausblenden (${archivedCount} auf diesem Board)`
-                  : `Archivierte Karten einblenden (${archivedCount} auf diesem Board)`}
-                data-taste="archivZeigen"
-                aria-label="Archiv ein-/ausblenden"
-              >
-                <IArchive size={16} /> Archiv {showArchived ? 'ausblenden' : 'einblenden'} ({archivedCount})
-              </button>
-            )}
+            <button
+              onClick={() => { setMoreMenu(false); void fitView({ padding: 0.2, duration: 350 }); }}
+              title="Alle Karten ins Bild holen (Taste F)"
+              aria-label="Alles einpassen"
+            >
+              <ICompact size={16} /> Alles einpassen
+            </button>
           </div>
         )}
         {aiMenu && (
@@ -613,10 +573,8 @@ export function Dock() {
           aria-label="Mehr"
         >
           <IMore />
-          {archivedCount > 0 && showArchived && <span className="dock-badge">{archivedCount}</span>}
         </button>
       </div>
-      <button onClick={() => setPresenting(true)} title="Präsentationsmodus (Karten als Folien)" aria-label="Präsentieren"><IPlay /></button>
 
       <input
         ref={happFileRef}
