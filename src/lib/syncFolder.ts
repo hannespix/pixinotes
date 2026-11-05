@@ -559,7 +559,7 @@ export async function checkSyncRemote(erzwingen = false): Promise<EinarbeitenErg
         emitSyncStatus('ordner', 'conflict');
         if (!staleHintShown) {
           staleHintShown = true;
-          useBoard.getState().showToast('Sync-Ordner und lokaler Stand weichen ab, nichts wurde überschrieben. Unter ⚙ → Daten → Synchronisation wählen.');
+          useBoard.getState().showToast('Sync-Ordner und lokaler Stand weichen ab, nichts überschrieben. Unter ⚙ → Daten → Synchronisation wählen.');
         }
       } else if (r === 'fehler') {
         emitSyncStatus('ordner', 'error');

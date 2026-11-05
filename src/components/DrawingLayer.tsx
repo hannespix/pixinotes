@@ -7,7 +7,7 @@ import { finalizeStroke, recognizeShape } from '../lib/strokeShapes';
 const EMPTY: Stroke[] = [];
 const PEN = { width: 2.5, opacity: 1 };
 const MARKER = { width: 16, opacity: 0.5 };
-const PEN_COLORS = ['#2b2a27', '#e0392b', '#e8a13a', '#3fa564', '#4f7cff', '#a05fd4'];
+const PEN_COLORS = ['#16191e', '#e0392b', '#e8a13a', '#3fa564', '#4f7cff', '#a05fd4'];
 /** Textmarker: echte Neon-Töne wie beim Leuchtstift (gelb/grün/orange/pink/cyan/lila) */
 const MARKER_COLORS = ['#fff200', '#aaff00', '#ff9100', '#ff2d95', '#00e5ff', '#c45fff'];
 /** Stillhalten am Strich-Ende so lange → Form einrasten (Linie/Rechteck/Ellipse) */

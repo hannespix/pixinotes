@@ -46,7 +46,7 @@ export async function exportBoard(o: BoardExportOptions): Promise<void> {
   const w = Math.round(bw * zoom);
   const h = Math.round(bh * zoom);
 
-  const bg = o.background === 'white' ? '#ffffff' : o.background === 'transparent' ? undefined : '#f2efe9';
+  const bg = o.background === 'white' ? '#ffffff' : o.background === 'transparent' ? undefined : '#f3f4f6';
   const scale = Math.min(3, Math.max(1, o.scale ?? 2));
   const opts = {
     width: w,

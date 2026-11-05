@@ -552,8 +552,8 @@ export function Settings() {
         <div className="modal-body">
 
         {/* ---- Darstellung (M314: sechs Zeilen statt fünfzehn) ----
-            Automatisch statt Option: Milchglas (aus bei Kontrast oder System-
-            wunsch), Navigation links (Fuß ‹), Karte im Fokus samt Öffnen-/
+            Automatisch statt Option (Milchglas gibt es seit M315 gar nicht
+            mehr): Navigation links (Fuß ‹), Karte im Fokus samt Öffnen-/
             Zeigen-Art (Handy: Tipp, PC: Doppelklick, Blatt), Stift zeichnet
             sofort (an). Zusammengelegt: Lesbarkeit (Schrift + Kontrast) und
             Lebendige Fläche (Physik + Klick-Zoom + Konfetti). */}
@@ -612,7 +612,7 @@ export function Settings() {
               onChange={(e) => { setLesbareSchrift(e.target.checked); setHoherKontrast(e.target.checked); }}
             />
           </label>
-          <p className="modal-hint">Klare Schrift (Atkinson Hyperlegible) und kräftige Kontraste, ohne Milchglas und Papiertextur.</p>
+          <p className="modal-hint">Klare Schrift (Atkinson Hyperlegible), kräftigere Ränder und Zweitschrift.</p>
         </section>
 
         <section className="modal-section">
