@@ -58,14 +58,15 @@ const QUOTA_IMPORT_MSG =
   '⚠️ Geladen, aber NICHT dauerhaft gespeichert — der Browser-Speicher ist voll! '
   + 'Bitte Platz schaffen (z. B. große Bilder löschen) und erneut laden, sonst ist der Stand nach dem Schließen weg.';
 
-type Reiter = 'design' | 'daten' | 'sync' | 'dienste';
-/** M300: Vier Reiter statt sechs — Design zuerst, weil es jeder braucht;
- *  Dienste zuletzt, weil KI, Gehirn und Konten Einrichtungssache sind. */
+type Reiter = 'design' | 'daten' | 'dienste';
+/** M300/M314: Drei Reiter — Darstellung zuerst, weil es jeder braucht; Daten
+ *  (Sichern, Synchronisation, Import/Export) in der Mitte; Dienste zuletzt,
+ *  weil KI, Gehirn und Konten Einrichtungssache sind. */
 const TABS: ReadonlyArray<readonly [Reiter, string]> = [
-  ['design', 'Design'], ['daten', 'Daten'], ['sync', 'Synchronisation'], ['dienste', 'Dienste'],
+  ['design', 'Darstellung'], ['daten', 'Daten'], ['dienste', 'Dienste'],
 ];
 /** Alte Reiter-Namen aus Verweisen (Toasts, Menüs, Karten) landen im passenden neuen Reiter */
-const ALT_REITER: Record<string, Reiter> = { ki: 'dienste', kalender: 'dienste', export: 'daten' };
+const ALT_REITER: Record<string, Reiter> = { ki: 'dienste', kalender: 'dienste', export: 'daten', sync: 'daten' };
 type SyncWeg = 'ordner' | 'webdav' | 'datei';
 
 /**
@@ -420,7 +421,7 @@ export function Settings() {
     const p = await readProjectFile(handle, projectId);
     if (!p) { showToast('Im Team-Ordner liegt (noch) kein Paket dieses Projekts.'); return; }
     if (!window.confirm(`Team-Stand von „${projectName}" vom ${new Date(p.savedAt).toLocaleString('de-DE')} laden? Ersetzt die Boards dieses Projekts (andere Projekte bleiben unberührt).`)) return;
-    setOpen(true, 'sync'); // Import remountet die App — Reiter beibehalten
+    setOpen(true, 'daten'); // Import remountet die App — Reiter beibehalten
     if (!applyProjectPayload(p)) { showToast(QUOTA_IMPORT_MSG); return; }
     showToast(`☁️ Team-Projekt „${p.project.name}" geladen.`);
   }, `psl-${projectId}`);
@@ -435,7 +436,7 @@ export function Settings() {
     const res = await joinProjectFolder();
     // Der Import remountet die App (importEpoch) — ohne Wunsch-Reiter landete
     // man danach wieder auf „KI" statt in der Synchronisation
-    setOpen(true, 'sync');
+    setOpen(true, 'daten');
     setPsMeta(projectSyncMeta());
     if (!res.persisted) { showToast(QUOTA_IMPORT_MSG); return; }
     showToast(`✅ Beigetreten: ${res.names.map((n) => `„${n}"`).join(', ')} aus Ordner „${res.folder}" — Abgleich läuft ab jetzt automatisch.`);
@@ -550,7 +551,12 @@ export function Settings() {
             Reitern bleiben immer stehen. */}
         <div className="modal-body">
 
-        {/* ---- Design ---- */}
+        {/* ---- Darstellung (M314: sechs Zeilen statt fünfzehn) ----
+            Automatisch statt Option: Milchglas (aus bei Kontrast oder System-
+            wunsch), Navigation links (Fuß ‹), Karte im Fokus samt Öffnen-/
+            Zeigen-Art (Handy: Tipp, PC: Doppelklick, Blatt), Stift zeichnet
+            sofort (an). Zusammengelegt: Lesbarkeit (Schrift + Kontrast) und
+            Lebendige Fläche (Physik + Klick-Zoom + Konfetti). */}
         {tab === 'design' && (
         <>
         <section className="modal-section">
@@ -585,16 +591,6 @@ export function Settings() {
               ))}
             </div>
           </div>
-          <label className="modal-row modal-row-check">
-            <span>Milchglas</span>
-            <input
-              type="checkbox"
-              checked={milchglas && !hoherKontrast}
-              disabled={hoherKontrast}
-              onChange={(e) => setMilchglas(e.target.checked)}
-            />
-          </label>
-          <p className="modal-hint">Durchscheinende Leisten und Menüs. Aus ist auf älteren Geräten flotter.</p>
         </section>
 
         <section className="modal-section">
@@ -607,75 +603,34 @@ export function Settings() {
               ))}
             </div>
           </div>
-          <p className="modal-hint">Vergrößert alles: Schrift, Knöpfe, Abstände und Karteninhalte. Schneller geht es mit A− / A+ im PixiNotes-Menü.</p>
+          <p className="modal-hint">Vergrößert alles: Schrift, Knöpfe, Abstände und Karteninhalte.</p>
           <label className="modal-row modal-row-check">
-            <span>Gut lesbare Schrift</span>
-            <input type="checkbox" checked={lesbareSchrift} onChange={(e) => setLesbareSchrift(e.target.checked)} />
+            <span>Besser lesbar</span>
+            <input
+              type="checkbox"
+              checked={lesbareSchrift || hoherKontrast}
+              onChange={(e) => { setLesbareSchrift(e.target.checked); setHoherKontrast(e.target.checked); }}
+            />
           </label>
-          <p className="modal-hint">Atkinson Hyperlegible für die ganze App: ähnliche Zeichen wie I, l und 1 bleiben unterscheidbar.</p>
-          <label className="modal-row modal-row-check">
-            <span>Mehr Kontrast</span>
-            <input type="checkbox" checked={hoherKontrast} onChange={(e) => setHoherKontrast(e.target.checked)} />
-          </label>
-          <p className="modal-hint">Kräftigere Schrift und Ränder, kein Milchglas, keine Papiertextur.</p>
+          <p className="modal-hint">Klare Schrift (Atkinson Hyperlegible) und kräftige Kontraste, ohne Milchglas und Papiertextur.</p>
         </section>
 
         <section className="modal-section">
           <h3>Bedienung</h3>
           <label className="modal-row modal-row-check">
-            <span>Navigation links</span>
-            <input type="checkbox" checked={navLinks} onChange={(e) => setNavLinks(e.target.checked)} />
-          </label>
-          <p className="modal-hint">Ab Tablet-Breite stehen Bereiche, Projekte und Boards in einer linken Spalte. Am Telefon bleibt es bei der Kopfleiste.</p>
-          <label className="modal-row modal-row-check">
-            <span>Karte im Fokus</span>
-            <input type="checkbox" checked={cardFocus} onChange={(e) => setCardFocus(e.target.checked)} />
-          </label>
-          <p className="modal-hint">Doppelklick (am Handy ein Tipp) öffnet eine Karte groß, mit Blättern zur Nachbarkarte.</p>
-          <div className="modal-row">
-            <span>Am PC öffnen mit</span>
-            <div className="seg" role="group" aria-label="Fokus am PC öffnen mit">
-              <button className={!fokusEinKlick ? 'on' : ''} disabled={!cardFocus} onClick={() => setFokusEinKlick(false)}>Doppelklick</button>
-              <button className={fokusEinKlick ? 'on' : ''} disabled={!cardFocus} onClick={() => setFokusEinKlick(true)}>Klick</button>
-            </div>
-          </div>
-          <div className="modal-row">
-            <span>Am PC zeigen als</span>
-            <div className="seg" role="group" aria-label="Fokus am PC zeigen als">
-              <button className={!fokusVollbild ? 'on' : ''} disabled={!cardFocus} onClick={() => setFokusVollbild(false)}>Blatt</button>
-              <button className={fokusVollbild ? 'on' : ''} disabled={!cardFocus} onClick={() => setFokusVollbild(true)}>Formatfüllend</button>
-            </div>
-          </div>
-          <p className="modal-hint">Mit „Klick" bearbeitest du Notizen im großen Blatt statt auf dem Board, „Formatfüllend" nimmt den ganzen Bildschirm.</p>
-          <label className="modal-row modal-row-check">
-            <span>Stift zeichnet sofort</span>
-            <input type="checkbox" checked={stiftZeichnet} onChange={(e) => setStiftZeichnet(e.target.checked)} />
-          </label>
-          <p className="modal-hint">Apple Pencil und andere Stifte zeichnen direkt auf der Fläche, Finger und Maus schieben weiter.</p>
-          <label className="modal-row modal-row-check">
             <span>Mausrad zoomt</span>
             <input type="checkbox" checked={wheelZoom} onChange={(e) => setWheelZoom(e.target.checked)} />
           </label>
-          <p className="modal-hint">Aus: Rad scrollt, Zoomen mit Strg+Rad oder Pinch. An: Rad zoomt direkt wie in Miro.</p>
-        </section>
-
-        <section className="modal-section">
-          <h3>Bewegung auf der Fläche</h3>
-          <p className="modal-hint">Alles hier ist aus, damit die Fläche ruhig bleibt.</p>
+          <p className="modal-hint">Aus: Rad scrollt, Zoomen mit Strg+Rad oder Pinch. An: Rad zoomt direkt.</p>
           <label className="modal-row modal-row-check">
-            <span>Physik: Karten weichen aus</span>
-            <input type="checkbox" checked={physicsEnabled} onChange={(e) => setPhysicsEnabled(e.target.checked)} />
+            <span>Lebendige Fläche</span>
+            <input
+              type="checkbox"
+              checked={physicsEnabled || clickZoom || konfetti}
+              onChange={(e) => { setPhysicsEnabled(e.target.checked); setClickZoom(e.target.checked); setKonfetti(e.target.checked); }}
+            />
           </label>
-          <p className="modal-hint">Karten schieben sich beim Ziehen beiseite und lassen sich werfen. Aus dürfen sie überlappen und stapeln.</p>
-          <label className="modal-row modal-row-check">
-            <span>Klick-Zoom</span>
-            <input type="checkbox" checked={clickZoom} onChange={(e) => setClickZoom(e.target.checked)} />
-          </label>
-          <p className="modal-hint">Beim Anklicken fliegt die Ansicht zu kleinen oder angeschnittenen Karten. Esc fliegt zurück.</p>
-          <label className="modal-row modal-row-check">
-            <span>Konfetti beim Erledigen</span>
-            <input type="checkbox" checked={konfetti} onChange={(e) => setKonfetti(e.target.checked)} />
-          </label>
+          <p className="modal-hint">Karten weichen aus und lassen sich werfen, die Ansicht fliegt zu angeklickten Karten, Konfetti beim Erledigen. Aus bleibt die Fläche ruhig.</p>
         </section>
         </>
         )}
@@ -703,56 +658,9 @@ export function Settings() {
           </div>
         </section>
 
+        {/* ---- Synchronisation (M314: hier statt in einem eigenen Reiter; die Dateien-Obergrenze ist fest 25 MB) ---- */}
         <section className="modal-section">
-          <h3>Als Markdown exportieren</h3>
-          <p className="modal-hint">{hasFolderApi
-              ? 'Alle Boards als Markdown-Dateien in einen Ordner deiner Wahl, lesbar in Obsidian.'
-              : 'Alle Boards als Markdown-Dateien; dieser Browser lädt sie einzeln herunter.'}</p>
-          <div className="modal-buttons">
-            <button disabled={!!busy} onClick={() => doExport(async () => {
-              const r = await exportToFolder(spaces, boards);
-              showToast(r === 'ok' ? '📁 In Ordner gespeichert' : '⬇️ Markdown-Dateien heruntergeladen');
-            }, 'folder')}>
-              {busy === 'folder' ? '…' : hasFolderApi ? 'Ordner wählen & speichern' : 'Als Markdown exportieren'}
-            </button>
-          </div>
-          <div className="modal-note">Das aktuelle Board als Bild (PNG, SVG, PDF): Dock ⋯ → „Als Bild exportieren".</div>
-        </section>
-
-        <OneNoteImport onClose={() => setOpen(false)} onDienste={() => setTab('dienste')} />
-
-        <section className="modal-section">
-          <h3>Starter-Umgebung „Arbeit &amp; Privat"</h3>
-          <p className="modal-hint">Vier Bereiche mit 18 Beispiel-Boards, die jedes Modul zeigen — alles frei anpassbar oder löschbar.</p>
-          <div className="modal-buttons">
-            <button
-              onClick={() => {
-                useBoard.getState().addStarter();
-                setOpen(false);
-              }}
-            >
-              Starter-Umgebung hinzufügen
-            </button>
-          </div>
-        </section>
-
-        <section className="modal-section modal-danger">
-          <h3>Alles leeren &amp; neu starten</h3>
-          <p className="modal-hint">Löscht alle Bereiche, Projekte, Boards, Karten und Vorlagen, ohne Rückgängig. Vorher oben „Datei exportieren".</p>
-          <div className="modal-buttons">
-            <button className="danger" disabled={!!busy} onClick={() => void resetEverything()}>
-              Alles leeren…
-            </button>
-          </div>
-        </section>
-        </>
-        )}
-
-        {/* ---- Synchronisation: ein Weg für die Umgebung, Team-Sync je Projekt, Optionen ---- */}
-        {tab === 'sync' && (
-        <>
-        <section className="modal-section">
-          <h3>Deine Umgebung synchronisieren</h3>
+          <h3>Synchronisation</h3>
           <p className="modal-hint">Ein Weg genügt: PixiNotes legt seinen Stand dort ab und holt ihn auf dem nächsten Gerät wieder. Zugangsdaten und KI-Schlüssel bleiben lokal.</p>
           <div className="modal-row">
             <span>Weg</span>
@@ -991,28 +899,38 @@ export function Settings() {
           )}
         </section>
 
-        {/* M269: Gilt für alle Wege oben — deshalb ein eigener Abschnitt, als Option am Ende */}
+
         <section className="modal-section">
-          <h3>Dateien mitsynchronisieren</h3>
-          <div className="modal-row">
-            <span>Obergrenze je Sicherung</span>
-            <div className="seg seg-obergrenze" role="group" aria-label="Obergrenze je Sicherung">
-              {([[0, 'aus'], [10, '10 MB'], [25, '25 MB'], [50, '50 MB'], [100, '100 MB']] as const).map(([mb, label]) => (
-                <button
-                  key={mb}
-                  className={syncDateienMb === mb ? 'on' : ''}
-                  onClick={() => setSyncDateienMb(mb)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+          <h3>Als Markdown exportieren</h3>
+          <p className="modal-hint">{hasFolderApi
+              ? 'Alle Boards als Markdown-Dateien in einen Ordner deiner Wahl, lesbar in Obsidian.'
+              : 'Alle Boards als Markdown-Dateien; dieser Browser lädt sie einzeln herunter.'}</p>
+          <div className="modal-buttons">
+            <button disabled={!!busy} onClick={() => doExport(async () => {
+              const r = await exportToFolder(spaces, boards);
+              showToast(r === 'ok' ? '📁 In Ordner gespeichert' : '⬇️ Markdown-Dateien heruntergeladen');
+            }, 'folder')}>
+              {busy === 'folder' ? '…' : hasFolderApi ? 'Ordner wählen & speichern' : 'Als Markdown exportieren'}
+            </button>
           </div>
-          <p className="modal-hint">Dateiinhalte reisen bis zu dieser Grenze im Sync-Stand mit, von der kleinsten Datei aufwärts. Größere bleiben nur auf diesem Gerät.</p>
+          <div className="modal-note">Das aktuelle Board als Bild (PNG, SVG, PDF): Dock ⋯ → „Als Bild exportieren".</div>
+        </section>
+
+        <OneNoteImport onClose={() => setOpen(false)} onDienste={() => setTab('dienste')} />
+
+        <section className="modal-section modal-danger">
+          <h3>Alles leeren &amp; neu starten</h3>
+          <p className="modal-hint">Löscht alle Bereiche, Projekte, Boards, Karten und Vorlagen, ohne Rückgängig. Vorher oben „Datei exportieren".</p>
+          <div className="modal-buttons">
+            <button className="danger" disabled={!!busy} onClick={() => void resetEverything()}>
+              Alles leeren…
+            </button>
+          </div>
         </section>
         </>
         )}
 
+        {/* ---- Synchronisation: ein Weg für die Umgebung, Team-Sync je Projekt, Optionen ---- */}
         {/* ---- Dienste: KI, Gehirn, Konten ---- */}
         {tab === 'dienste' && (
         <>
@@ -1186,6 +1104,14 @@ export function Settings() {
           </label>
           {brain.on && (
             <>
+              <p className="modal-hint">
+                {brainInfo.busy
+                  ? `⏳ Indexiere … (${brainInfo.indexed} Karten fertig)`
+                  : brainInfo.error ? `⚠️ ${brainInfo.error}` : `✅ ${brainInfo.indexed} Karten im Index`}
+              </p>
+              {/* M314: Bereiche, Anbieter und Modell braucht man einmal — eingeklappt */}
+              <details className="modal-details">
+              <summary>Erweitert: Bereiche, Anbieter, Index</summary>
               {/* M220: Sub-Brains — Bereiche einzeln aus dem Gehirn nehmen */}
               <div className="brain-scope">
                 <div className="brain-scope-head">Welche Bereiche gehören zum Gehirn?</div>
@@ -1250,6 +1176,7 @@ export function Settings() {
               <p className="modal-hint">
                 Nach einem Wechsel von Anbieter oder Modell „Index neu aufbauen" — Vektoren verschiedener Modelle sind nicht vergleichbar.
               </p>
+              </details>
             </>
           )}
         </section>

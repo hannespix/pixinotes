@@ -81,7 +81,7 @@ export default function App() {
     if (!useBoard.getState().ruheHinweis) return;
     const t = setTimeout(() => {
       useBoard.getState().setRuheHinweis(false);
-      useBoard.getState().showToast('Physik und Klick-Zoom sind jetzt aus. Wieder einschalten: ⚙ → Bedienung.', false, 8000);
+      useBoard.getState().showToast('Physik und Klick-Zoom sind jetzt aus. Wieder einschalten: ⚙ → Darstellung.', false, 8000);
     }, 1500);
     return () => clearTimeout(t);
   }, []);

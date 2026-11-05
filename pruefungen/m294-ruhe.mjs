@@ -79,7 +79,7 @@ console.log('════ A: Frischer Start ════');
   pruefe('A1 Physik ist aus', l.physik === false, JSON.stringify(l));
   pruefe('A2 Klick-Zoom ist aus', l.klickZoom === false);
   pruefe('A3 Konfetti ist aus', l.konfetti === false);
-  pruefe('A4 die Vorlieben tragen die Marke schliff', l.schliff === 1, String(l.schliff));
+  pruefe('A4 die Vorlieben tragen die Marke schliff', l.schliff === 2, String(l.schliff));
   pruefe('A5 kein Spickzettel-Toast mehr beim Start', !/Doppelklick = Notiz/.test(l.toast), l.toast);
   pruefe('A6 kein Umstellungs-Hinweis, es gab nichts umzustellen', !/jetzt aus/.test(l.toast), l.toast);
   await P.screenshot({ path: `${SD}/m294-a-start.png` });
@@ -92,8 +92,8 @@ console.log('════ B: Alter Stand mit Physik an, ohne Marke ════'
   const l = await lage(P);
   pruefe('B1 Physik wurde ausgeschaltet', l.physik === false && l.vPhysik === false, JSON.stringify(l));
   pruefe('B2 Klick-Zoom wurde ausgeschaltet', l.klickZoom === false && l.vKlick === false);
-  pruefe('B3 die Marke ist jetzt gesetzt', l.schliff === 1, String(l.schliff));
-  pruefe('B4 der Hinweis sagt, was passiert ist und wo es wieder anzuschalten ist', /Physik und Klick-Zoom sind jetzt aus/.test(l.toast) && /Bedienung/.test(l.toast), l.toast);
+  pruefe('B3 die Marke ist jetzt gesetzt', l.schliff === 2, String(l.schliff));
+  pruefe('B4 der Hinweis sagt, was passiert ist und wo es wieder anzuschalten ist', /Physik und Klick-Zoom sind jetzt aus/.test(l.toast) && /Darstellung/.test(l.toast), l.toast);
   await P.screenshot({ path: `${SD}/m294-b-umstellung.png` });
   await ctx.close();
 }
@@ -102,7 +102,7 @@ console.log('════ B2: Stand von vor M247 (Physik nur im Hauptstand) ═�
 {
   const { ctx, P } = await seite({ physikImHauptstand: true });
   const l = await lage(P);
-  pruefe('B5 auch dort: Physik aus, Marke gesetzt', l.physik === false && l.schliff === 1, JSON.stringify(l));
+  pruefe('B5 auch dort: Physik aus, Marke gesetzt', l.physik === false && l.schliff === 2, JSON.stringify(l));
   pruefe('B6 … mit Hinweis', /jetzt aus/.test(l.toast), l.toast);
   await ctx.close();
 }
@@ -116,21 +116,20 @@ console.log('════ C: Bewusste Wahl mit Marke bleibt ════');
   await ctx.close();
 }
 
-console.log('════ D: Die Schalter unter ⚙ → Design ════');
+console.log('════ D: Der Schalter unter ⚙ → Darstellung (M314: Lebendige Fläche) ════');
 {
   const { ctx, P } = await seite();
   await P.locator('[data-taste="einstellungen"]').click();
-  await P.locator('.modal-tabs button', { hasText: 'Design' }).click();
+  await P.locator('.modal-tabs button', { hasText: 'Darstellung' }).click();
   await P.waitForTimeout(300);
   const zeile = (text) => P.locator('.modal-row-check', { hasText: text }).locator('input[type="checkbox"]');
-  pruefe('D1 „Physik: Karten weichen aus" steht da und ist aus', (await zeile('Physik').count()) === 1 && !(await zeile('Physik').isChecked()));
-  pruefe('D2 „Klick-Zoom" steht da und ist aus', (await zeile('Klick-Zoom').count()) === 1 && !(await zeile('Klick-Zoom').isChecked()));
-  pruefe('D3 „Konfetti beim Erledigen" steht da und ist aus', (await zeile('Konfetti').count()) === 1 && !(await zeile('Konfetti').isChecked()));
-  await zeile('Konfetti').check();
-  await zeile('Physik').check();
+  pruefe('D1 „Lebendige Fläche" steht da und ist aus', (await zeile('Lebendige Fläche').count()) === 1 && !(await zeile('Lebendige Fläche').isChecked()));
+  pruefe('D2 keine Einzelschalter mehr für Physik und Klick-Zoom', (await zeile('Physik').count()) === 0 && (await zeile('Klick-Zoom').count()) === 0);
+  pruefe('D3 kein Einzelschalter mehr für Konfetti', (await zeile('Konfetti').count()) === 0);
+  await zeile('Lebendige Fläche').check();
   await P.waitForTimeout(600);
   const l = await lage(P);
-  pruefe('D4 Konfetti und Physik landen in den Vorlieben', l.vKonfetti === true && l.vPhysik === true, JSON.stringify(l));
+  pruefe('D4 ein Häkchen schaltet Konfetti, Physik und Klick-Zoom zusammen ein', l.vKonfetti === true && l.vPhysik === true && l.vKlick === true, JSON.stringify(l));
   // Ein Satz je Schalter: keine Erklär-Absätze mit mehr als zwei Sätzen im Reiter Design
   const lang = await P.evaluate(() => [...document.querySelectorAll('.modal-section .modal-hint')]
     .map((el) => el.textContent.trim()).filter((t) => (t.match(/[.!?](\s|$)/g) ?? []).length > 2));

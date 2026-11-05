@@ -231,7 +231,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     const savedAt = await saveAppStateToTeam(id, data.name, st);
     showToast(savedAt
       ? `Speicherstand im Team-Ordner gesichert (pixinotes-anlagen/…/Apps/).`
-      : 'Kein Team-Ordner verbunden — das Board gehört zu keinem Team-Projekt (⚙️ → Synchronisation).');
+      : 'Kein Team-Ordner verbunden — das Board gehört zu keinem Team-Projekt (⚙ → Daten → Synchronisation).');
   };
 
   const pickFile = async (f: File | undefined) => {

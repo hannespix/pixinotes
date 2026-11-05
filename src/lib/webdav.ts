@@ -77,7 +77,7 @@ async function friendly(e: unknown, cfg: WebdavConfig): Promise<Error> {
       return new Error(
         `Der Server ist erreichbar, blockiert aber Browser-Zugriffe (fehlende CORS-Freigabe). Das liegt am Server, nicht am Gerät — ${apple() ? 'auf dem iPad ist es genauso wie auf jedem anderen Browser' : 'jeder Browser verhält sich hier gleich'}. `
         + 'Nötig ist eine einmalige Freigabe durch die IT (bei Nextcloud z. B. die App „WebAppPassword" mit dieser PixiNotes-Adresse als erlaubte Herkunft). '
-        + 'In ⚙️ → Synchronisation steht ein fertiger Text für die IT zum Kopieren. '
+        + 'In ⚙ → Daten → Synchronisation steht ein fertiger Text für die IT zum Kopieren. '
         + `Ohne Freigabe funktioniert ${apple() ? 'auf dem iPad die Synchronisation über die Dateien-App' : 'der Sync-Ordner oder der Datei-Export'}.`,
       );
     } catch {
@@ -242,7 +242,7 @@ export async function checkWebdavRemote(): Promise<void> {
     emitSyncStatus('webdav', 'conflict');
     if (!staleHintShown) {
       staleHintShown = true;
-      useBoard.getState().showToast('☁️ Server und lokaler Stand weichen ab, nichts wurde überschrieben. Unter ⚙ → Synchronisation wählen.');
+      useBoard.getState().showToast('☁️ Server und lokaler Stand weichen ab, nichts wurde überschrieben. Unter ⚙ → Daten → Synchronisation wählen.');
     }
   } else if (r === 'fehler') {
     emitSyncStatus('webdav', 'error');
@@ -266,7 +266,7 @@ async function autoPush(): Promise<void> {
         emitSyncStatus('webdav', 'conflict');
         if (!conflictWarned) {
           conflictWarned = true;
-          useBoard.getState().showToast('⚠️ Auf dem WebDAV-Server liegt ein anderer Stand. Unter ⚙ → Synchronisation laden oder überschreiben.');
+          useBoard.getState().showToast('⚠️ Auf dem WebDAV-Server liegt ein anderer Stand. Unter ⚙ → Daten → Synchronisation laden oder überschreiben.');
         }
         return;
       }
