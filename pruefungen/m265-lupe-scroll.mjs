@@ -224,7 +224,7 @@ console.log('\n════ T5: PDF-Seite zoomen und ganz ansehen ════')
   await P.waitForTimeout(400);
   const [ch] = await Promise.all([
     P.waitForEvent('filechooser'),
-    P.click('.dock-menu button:has-text("Datei einfügen")'),
+    P.click('.dock-menu button:has-text("Datei oder Bild")'),
   ]);
   await ch.setFiles(`${SD}/ticket.pdf`);
   await P.waitForTimeout(2500);
