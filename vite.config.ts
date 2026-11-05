@@ -28,5 +28,23 @@ export default defineConfig(({ mode }) => ({
   build:
     mode === 'single'
       ? { outDir: 'release', chunkSizeWarningLimit: 10000 }
-      : undefined,
+      : {
+          chunkSizeWarningLimit: 1500,
+          rollupOptions: {
+            output: {
+              // M321: Fremdcode in stabile Pakete, getrennt vom eigenen Code.
+              // Ein Deploy ändert meist nur den App-Teil — React, Editor und
+              // Fluss bleiben dann im Browser-Cache (und im Service Worker),
+              // statt dass eine 6-MB-Datei komplett neu kommt. Schwergewichte
+              // (Mermaid-Rohtext, PDF, XLSX, MSG) bleiben eigene Nachlade-Teile.
+              manualChunks(id) {
+                if (!id.includes('node_modules/')) return undefined;
+                if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
+                if (/node_modules\/(@blocknote|@tiptap|prosemirror-[a-z-]+|y-prosemirror|yjs|lib0|@mantine|@floating-ui|emoji-mart|@emoji-mart|linkifyjs|micromark[a-z-]*|mdast-[a-z-]+|hast-[a-z-]+|hastscript|unified|remark-[a-z-]+|rehype-[a-z-]+|parse5|vfile[a-z-]*|unist-[a-z-]+|property-information|@ungap)\//.test(id)) return 'editor';
+                if (/node_modules\/(@xyflow|d3-[a-z-]+|classcat|zustand)\//.test(id)) return 'fluss';
+                return undefined;
+              },
+            },
+          },
+        },
 }));

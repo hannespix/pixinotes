@@ -133,6 +133,7 @@ Eine Schicht Tokens in `src/index.css`, an der alles hängt:
 | 7 | Eine Leiste unten: dockt die Auswahl-Leiste an, weicht das Dock — auf jeder Breite | M318 |
 | 8 | Stift & Touch: perfect-freehand-Konturen mit Druck, Formen (Pfeil, Kreis, Dreieck, gedrehtes Rechteck), Hand schiebt / Stift zeichnet | M319 |
 | 9 | Handschrift → Text: Browser-API, Scribble am iPad, Online-Erkennung nur als Opt-in | M320 |
+| 10 | Start & Leistung: Mermaid-Rohtext (3,5 MB) und E-Mail-Parser erst bei Bedarf, Fremdcode in stabile Pakete (react · editor · fluss), einmaliges Neuladen bei veralteten Chunk-Namen; Start-JS 6,3 MB → 3,4 MB | M321 |
 
 Jede Etappe wird einzeln geprüft (Playwright-Reihe), gebündelt und in den
 Hauptzweig gemergt.

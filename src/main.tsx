@@ -17,6 +17,20 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 
 // OAuth-Popup-Rücksprung (Kalender-Konten): Diese Seite dient dann nur als
 // Redirect-Ziel — Code ans Hauptfenster melden, App gar nicht erst rendern.
+// M321: Die App kommt in Teilen — Diagramme, PDF, Tabellen, E-Mail-Parser
+// laden erst bei Bedarf. Nach einem Deploy tragen diese Teile neue Namen; eine
+// Sitzung, die noch die alte Seite offen hat, bekäme beim ersten Bedarf ein
+// „Failed to fetch dynamically imported module". Dann EINMAL neu laden (der
+// Stand liegt im Speicher), nicht in Schleife: Stempel merken.
+window.addEventListener('vite:preloadError', () => {
+  try {
+    const k = 'pixinotes-neu-geladen';
+    if (sessionStorage.getItem(k) === __BUILD_STAMP__) return;
+    sessionStorage.setItem(k, __BUILD_STAMP__);
+  } catch { /* privates Fenster o. ä. — trotzdem einmal versuchen */ }
+  location.reload();
+});
+
 if (!handleOAuthRedirect()) {
   // M211: Tastaturhöhe als CSS-Variable — VOR dem Rendern, damit die
   // schwebenden Leisten schon beim ersten Frame richtig sitzen
