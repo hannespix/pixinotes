@@ -9,37 +9,50 @@
 // Das IIFE endet mit `globalThis.__esbuild_esm_mermaid_nm…` — als ES-Modul
 // gebündelt ist diese var aber modul-scoped statt global und der Zugriff
 // crasht. Als klassisches Script sind var-Deklarationen global, genau wie
-// vom Bundle erwartet. Bonus: geparst wird erst, wenn wirklich ein Diagramm
-// gebraucht wird — Boards ohne Diagramme zahlen nichts.
-import mermaidSource from 'mermaid/dist/mermaid.min.js?raw';
+// vom Bundle erwartet.
+//
+// M321: Der Rohtext (3,5 MB — mehr als die halbe App) kommt erst, wenn
+// wirklich ein Diagramm gebraucht wird: EIN dynamischer Import, EINE Datei,
+// die nach dem Laden wie bisher synchron ausgeführt wird. Boards ohne
+// Diagramme laden so beim Start weniger als die Hälfte. Fehlt die Datei nach
+// einem Deploy (alte Sitzung, neue Chunk-Namen), lädt main.tsx die Seite
+// einmal neu (vite:preloadError) — der Stand liegt ohnehin im Speicher.
+// In der Ein-Datei-Fassung ist der Import eingebettet, nichts wird nachgeladen.
 import kalamWoff2 from '../assets/kalam-latin.woff2?inline';
 import { askAi } from './ai';
 
 type MermaidApi = typeof import('mermaid').default;
 
 let initializedTheme: string | null = null;
+let laden: Promise<MermaidApi> | null = null;
 
-function ensureLoaded(): MermaidApi {
+function ensureLoaded(): Promise<MermaidApi> {
   const w = globalThis as unknown as { mermaid?: MermaidApi };
-  if (!w.mermaid) {
-    const s = document.createElement('script');
-    s.textContent = mermaidSource;
-    document.head.appendChild(s); // führt synchron aus und setzt globalThis.mermaid
-    s.remove();
+  if (w.mermaid) return Promise.resolve(w.mermaid);
+  if (!laden) {
+    laden = import('mermaid/dist/mermaid.min.js?raw').then(({ default: mermaidSource }) => {
+      if (!w.mermaid) {
+        const s = document.createElement('script');
+        s.textContent = mermaidSource;
+        document.head.appendChild(s); // führt synchron aus und setzt globalThis.mermaid
+        s.remove();
+      }
+      return w.mermaid!;
+    }).catch((e) => { laden = null; throw e; });
   }
-  return w.mermaid!;
+  return laden;
 }
 
 /** Promise-API beibehalten (Karte + Presenter-Folien nutzen sie bereits) */
-export function getMermaid(): Promise<MermaidApi> {
-  const m = ensureLoaded();
+export async function getMermaid(): Promise<MermaidApi> {
+  const m = await ensureLoaded();
   // Theme folgt dem App-Design; bei Wechsel neu initialisieren (dark ⇄ neutral)
   const theme = document.documentElement.dataset.theme === 'dark' ? 'dark' : 'neutral';
   if (theme !== initializedTheme) {
     m.initialize({ startOnLoad: false, theme, securityLevel: 'strict' });
     initializedTheme = theme;
   }
-  return Promise.resolve(m);
+  return m;
 }
 
 // ---------------------------------------------------------------------------

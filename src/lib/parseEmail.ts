@@ -1,6 +1,5 @@
 // E-Mail-Parsing komplett im Browser — keine Daten verlassen den Rechner.
 // .eml über postal-mime (postalsys), .msg über @kenjiuno/msgreader (Apache-2.0).
-import PostalMime from 'postal-mime';
 import type { EmailData, ParsedAttachment } from '../types';
 
 /** Anhänge nur bis zu dieser Größe als data:-URL einbetten (localStorage-Budget!) */
@@ -24,6 +23,8 @@ function bytesToDataUrl(bytes: Uint8Array, mime = 'application/octet-stream'): s
 }
 
 export async function parseEml(buffer: ArrayBuffer): Promise<EmailData> {
+  // M321: der Parser kommt erst, wenn wirklich eine .eml geöffnet wird
+  const { default: PostalMime } = await import('postal-mime');
   const email = await PostalMime.parse(buffer);
 
   const attachments: ParsedAttachment[] = (email.attachments ?? []).map((a) => {
