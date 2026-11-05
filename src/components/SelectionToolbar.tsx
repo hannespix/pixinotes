@@ -409,8 +409,10 @@ export function SelectionToolbar() {
           ><IGridLayout size={15} /><span className="sel-label"> Rahmen</span></button>
         </span>
       )}
-      {/* M296: Sechs Elemente — Duplizieren, Verschieben, Teilen, ⋯, Löschen und
-          der Zähler. „Formatiert kopieren" und „Schrift & Größe" liegen im ⋯. */}
+      {/* M296/M313: Fünf Elemente — Duplizieren, Teilen, ⋯, Löschen und der
+          Zähler. Verschieben, Schrift & Größe, KI, Ausrichten, Nachschlagen,
+          Vorlage, Kommentar, Eigenschaften und Archivieren liegen im ⋯;
+          „Formatiert kopieren" lebt nur noch im Teilen-Dialog. */}
       {!framesOnly && <button onClick={duplicate} title="Duplizieren" aria-label="Duplizieren"><IDuplicate size={15} /></button>}
       {single && (
         <span className="sel-ai-wrap">
@@ -523,13 +525,6 @@ export function SelectionToolbar() {
               )}
             </>
           ))}
-          <button
-            className={menu === 'move' ? 'ai-on' : ''}
-            data-smbtn
-            onClick={toggleMenu('move')}
-            title="In ein anderes Board verschieben"
-            aria-label="Verschieben"
-          ><IMoveTo size={15} /></button>
         </span>
       )}
       {!framesOnly && (
@@ -594,28 +589,10 @@ export function SelectionToolbar() {
             const allArchived = selected.every((n) => n.archived);
             return (
               <>
-                <button onClick={() => { setMenu(null); void copyHtml(); }} title="Formatiert kopieren, für Outlook und Word">
-                  <ICopy size={14} /> Formatiert kopieren
-                </button>
-                <button
-                  onClick={() => {
-                    setMenu(null);
-                    const first = nodesToText([selected[0]]).split('\n').find((l) => l.trim())?.trim() ?? '';
-                    setLookup(first.replace(/^[#\-*\d.\s☐☑]+/, '').slice(0, 80));
-                  }}
-                  title="Wikipedia und Websuche zur ersten Zeile der Karte"
-                >
-                  <IGlobe size={14} /> Nachschlagen (Wikipedia &amp; Web)
-                </button>
+                {/* M313: Reihenfolge wie in jedem ⋯ der App — Tun · Werkzeuge ·
+                    Weitergeben · Aufräumen. Verschieben kam aus der Leiste hierher. */}
                 {single && (
                   <>
-                    <div className="sel-attr-title">Karte</div>
-                    <button onClick={() => setMenu('attr')} title="Eigenschaften (schlüssel = wert) — über Strg+K durchsuchbar" aria-label="Eigenschaften">
-                      <ITag size={14} /> Eigenschaften …{Object.keys(attrs).length > 0 ? ` (${Object.keys(attrs).length})` : ''}
-                    </button>
-                    <button onClick={() => { setMenu(null); asTemplate(); }} title="Karte als Vorlage speichern (＋-Menü → Vorlagen)">
-                      <IBookmark size={14} /> Als Vorlage speichern
-                    </button>
                     <button
                       onClick={() => {
                         setMenu(null);
@@ -631,7 +608,15 @@ export function SelectionToolbar() {
                     >
                       <IComment size={14} /> Kommentar
                     </button>
+                    <button onClick={() => setMenu('attr')} title="Eigenschaften (schlüssel = wert) — über Strg+K durchsuchbar" aria-label="Eigenschaften">
+                      <ITag size={14} /> Eigenschaften …{Object.keys(attrs).length > 0 ? ` (${Object.keys(attrs).length})` : ''}
+                    </button>
                   </>
+                )}
+                {boards.length > 1 && (
+                  <button onClick={() => setMenu('move')} title="In ein anderes Board verschieben" aria-label="Verschieben">
+                    <IMoveTo size={14} /> In Board verschieben …
+                  </button>
                 )}
                 <div className="sel-attr-title">Werkzeuge</div>
                 {/* M296: „Schrift & Größe" liegt hier — und NUR hier. M267 hatte
@@ -673,6 +658,23 @@ export function SelectionToolbar() {
                 >
                   <IFit size={14} /> Auto-Größe {allAuto ? 'AUS' : 'AN'}
                 </button>
+                <div className="sel-attr-title">Weitergeben</div>
+                <button
+                  onClick={() => {
+                    setMenu(null);
+                    const first = nodesToText([selected[0]]).split('\n').find((l) => l.trim())?.trim() ?? '';
+                    setLookup(first.replace(/^[#\-*\d.\s☐☑]+/, '').slice(0, 80));
+                  }}
+                  title="Wikipedia und Websuche zur ersten Zeile der Karte"
+                >
+                  <IGlobe size={14} /> Nachschlagen (Wikipedia &amp; Web)
+                </button>
+                {single && (
+                  <button onClick={() => { setMenu(null); asTemplate(); }} title="Karte als Vorlage speichern (＋-Menü → Vorlagen)">
+                    <IBookmark size={14} /> Als Vorlage speichern
+                  </button>
+                )}
+                <div className="sel-attr-title">Aufräumen</div>
                 {anchoredCount > 0 && (
                   <button
                     onClick={() => { setMenu(null); detachStrokes(selected.map((n) => n.id)); }}

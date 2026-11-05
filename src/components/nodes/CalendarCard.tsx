@@ -8,7 +8,7 @@ import { nodeToText } from '../../lib/serialize';
 import { downloadIcsEvents, fetchIcsUrl, mergeEvents, parseIcs, type IcsEvent } from '../../lib/ics';
 import { notizTermine } from '../../lib/notizTermine';
 import { anyAccountConnected, fetchAccountEvents, invalidateAccountEvents, type CalAccountEvent } from '../../lib/calAccounts';
-import { IChevronL, IChevronR, ISettings } from '../Icons';
+import { IChevronL, IChevronR, IMore } from '../Icons';
 import { CardShell } from './CardShell';
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -621,30 +621,8 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
       <div className="cal-head">
         <span className="cal-title">{title}</span>
         <span className="cal-nav nodrag">
-          <button
-            className={menu ? 'on' : ''}
-            onClick={() => setMenu((o) => !o)}
-            title="Anzeige & ICS-Import/-Abo/-Export"
-            aria-label="Kalender-Optionen"
-          >
-            <ISettings size={13} />
-          </button>
-          <button
-            className={scope !== 'all' ? 'on' : ''}
-            onClick={() => {
-              // M169: Mit Verbindungen gibt es drei Bereiche (… → Verbunden),
-              // ohne wie bisher zwei — die Wahl wird an der Karte gespeichert
-              const order: Array<'all' | 'board' | 'linked'> = linkedIds.size ? ['all', 'board', 'linked'] : ['all', 'board'];
-              updateNodeData(id, { scope: order[(order.indexOf(scope as never) + 1) % order.length] });
-            }}
-            title={
-              scope === 'all' ? `Zeigt: alle Boards — Klick: nur dieses Board${linkedIds.size ? ' (dann: nur verbundene Karten)' : ''}`
-              : scope === 'board' ? `Zeigt: nur dieses Board — Klick: ${linkedIds.size ? 'nur die per Pfeil verbundenen Karten' : 'alle Boards'}`
-              : 'Zeigt: nur Termine & Fristen der per Pfeil verbundenen Karten — Klick: alle Boards'
-            }
-          >
-            {scope === 'all' ? 'Alle Boards' : scope === 'board' ? 'Dieses Board' : `Verbunden (${linkedIds.size})`}
-          </button>
+          {/* M313: Ein Umschalter für die Ansicht, die Navigation, ein ⋯ — die
+              Quelle (alle Boards · dieses Board · Verbunden) liegt im ⋯ */}
           <button
             onClick={() => updateNodeData(id, {
               view: view === 'month' ? 'week' : view === 'week' ? 'jahr' : 'month',
@@ -657,11 +635,30 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
           <button onClick={() => nav(-1)} title="Zurück" aria-label="Zurück"><IChevronL size={13} /></button>
           <button onClick={() => updateNodeData(id, { month: undefined, anchor: undefined })} title="Zu heute">heute</button>
           <button onClick={() => nav(1)} title="Weiter" aria-label="Weiter"><IChevronR size={13} /></button>
+          <button
+            className={menu ? 'on' : ''}
+            onClick={() => setMenu((o) => !o)}
+            title="Mehr: Quelle, Anzeige, ICS-Import/-Abo/-Export, Konto"
+            aria-label="Mehr"
+            aria-haspopup="menu"
+            aria-expanded={menu}
+          >
+            <IMore size={13} />
+          </button>
         </span>
       </div>
       {menu && (
         <div className="cal-menu nodrag">
           <div className="cal-menu-col">
+            <div className="cal-menu-label">Quelle</div>
+            {/* M169/M313: Mit Verbindungen gibt es drei Quellen (… → Verbunden),
+                ohne zwei — die Wahl wird an der Karte gespeichert */}
+            {([['all', 'Alle Boards'], ['board', 'Nur dieses Board'], ...(linkedIds.size ? [['linked', `Nur verbundene Karten (${linkedIds.size})`]] : [])] as Array<['all' | 'board' | 'linked', string]>).map(([k, label]) => (
+              <label key={k} className="cal-menu-check">
+                <input type="radio" name={`cal-scope-${id}`} checked={scope === k} onChange={() => updateNodeData(id, { scope: k })} />
+                {label}
+              </label>
+            ))}
             <div className="cal-menu-label">Anzeigen</div>
             {(Object.keys(SHOW_LABEL) as Array<keyof ShowFlags>).map((k) => (
               <label key={k} className="cal-menu-check">

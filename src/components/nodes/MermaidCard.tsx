@@ -3,6 +3,7 @@ import { NodeToolbar, Position, type NodeProps } from '@xyflow/react';
 import { runDerived, useBoard } from '../../store';
 import type { MermaidNode } from '../../types';
 import { IWand } from '../Icons';
+import { MenuHuelle } from '../EbenenMenu';
 import { aiReady } from '../../lib/ai';
 import { aiMermaid, buildMermaidSource, getMermaid, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES, preloadHandFont } from '../../lib/mermaid';
 import {
@@ -91,7 +92,6 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   const [edit, setEdit] = useState(false);
   const [svg, setSvg] = useState('');
   const [error, setError] = useState('');
-  const [tplOpen, setTplOpen] = useState(false);
   // M218: Das Vorlagen-Menü klappte immer nach unten — die Werkzeugleiste
   // schwebt aber UNTER der Karte, also lief es bei tief liegenden Karten aus
   // dem Bild, und die letzten Vorlagen waren unerreichbar. Beim Öffnen prüfen
@@ -110,9 +110,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   const [aiText, setAiText] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
   const renderKey = useRef(0);
-  const tplRef = useRef<HTMLElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
-  useOutsideClose(tplOpen, tplRef, () => { setTplOpen(false); setPendingTpl(null); });
 
   const style = (data.style as string | undefined) ?? '';
   const look = (data.look as string | undefined) ?? '';
@@ -284,7 +282,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
 
   // Karte abgewählt → alle Auswahlen, Verbinden-Modus, Popovers, Umbenennen aufräumen
   useEffect(() => {
-    if (!selected) { setSelNode(null); setSelEdge(null); setSelOther(null); setConnectFrom(null); setTplOpen(false); setPendingTpl(null); setRename(null); }
+    if (!selected) { setSelNode(null); setSelEdge(null); setSelOther(null); setConnectFrom(null); setPendingTpl(null); setRename(null); }
   }, [selected]);
 
   /** Vorlage laden — eigenen Code nicht durch einen Fehlklick verlieren.
@@ -294,7 +292,6 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
     const isPristine = !data.code.trim() || data.code === LEGACY_MERMAID_DEFAULT || Object.values(TEMPLATES).includes(data.code);
     if (!isPristine && pendingTpl !== t) { setPendingTpl(t); return; }
     setPendingTpl(null);
-    setTplOpen(false);
     setSelNode(null);
     setSelEdge(null);
     setSelOther(null);
@@ -937,36 +934,8 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
           </div>
         )}
         <div className="mm-row">
-          <span className="mm-pop-wrap" ref={tplRef}>
-            <button
-              className={tplOpen ? 'active' : ''}
-              title="Vorlage wählen"
-              onClick={(e) => {
-                const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                // Unter dem Knopf weniger als eine Menühöhe frei? Dann nach oben.
-                setTplUp(window.innerHeight - r.bottom < 240 && r.top > 240);
-                setTplOpen((o) => !o);
-              }}
-            >Vorlage ▾</button>
-            {tplOpen && (
-              <div className={`mm-pop${tplUp ? ' mm-pop-up' : ''}`}>
-                {Object.keys(TEMPLATES).map((t) => (
-                  <button key={t} className={pendingTpl === t ? 'mm-confirm' : ''} onClick={() => applyTemplate(t)}>
-                    {pendingTpl === t ? `„${t}" ersetzt dein Diagramm — sicher?` : t}
-                  </button>
-                ))}
-              </div>
-            )}
-          </span>
-          <span className="mm-sep" />
-          <button className={`mm-dot mm-dot-none ${!style ? 'on' : ''}`} title="Standardfarben" onClick={() => updateNodeData(id, { style: undefined })} />
-          {Object.entries(MERMAID_STYLES).map(([k, s]) => (
-            <button key={k} className={`mm-dot ${style === k ? 'on' : ''}`} style={{ background: s.dot }} title={`Farbschema ${s.label}`} onClick={() => updateNodeData(id, { style: k })} />
-          ))}
-          <span className="mm-sep" />
-          <button className={look === 'hand' ? 'active' : ''} title={look === 'hand' ? 'Handgezeichneter Look ist AN (Kritzel-Formen + Handschrift)' : 'Handgezeichneter Look: Kritzel-Formen + Handschrift'} onClick={() => updateNodeData(id, { look: look === 'hand' ? undefined : 'hand' })}>✏️</button>
-          {isFlow && <button title="Richtung wechseln: oben/unten ⇄ links/rechts" onClick={toggleDirection}>⇄</button>}
-          <span className="mm-sep" />
+          {/* M313: Sichtbar nur die ＋-Knöpfe des Diagrammtyps; Vorlage, Farbschema,
+              Look, Richtung, Nummerierung, Titel, Einpassen und Code liegen im ⋯ */}
           {isFlow && (
             <button title="Neuen Schritt anfügen (an den ausgewählten, sonst frei)" onClick={() => addStepAfter(selNode)}>＋ Schritt</button>
           )}
@@ -974,7 +943,6 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             <>
               <button title="Neue Person (participant)" onClick={() => updateNodeData(id, { code: addSeqActor(data.code) })}>＋ Person</button>
               <button title="Neue Nachricht am Ende" onClick={() => updateNodeData(id, { code: addSeqMsg(data.code, selOther?.t === 'msg' ? selOther.idx : null) })}>＋ Nachricht</button>
-              <button className={hasAutonumber(data.code) ? 'active' : ''} title="Nachrichten fortlaufend nummerieren (autonumber)" onClick={() => updateNodeData(id, { code: toggleAutonumber(data.code) })}>№</button>
             </>
           )}
           {kind === 'gantt' && (
@@ -998,15 +966,40 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
           {kind === 'quadrant' && (
             <button title="Neuen Punkt in der Mitte anlegen" onClick={() => updateNodeData(id, { code: addQuadrantPoint(data.code) })}>＋ Punkt</button>
           )}
-          {['gantt', 'pie', 'timeline', 'quadrant'].includes(kind) && (
-            <button title={getTitle(data.code) ? `Titel bearbeiten: „${getTitle(data.code)}"` : 'Titel hinzufügen'} onClick={startTitleRename}>✎ Titel</button>
-          )}
-          <button title="Kartengröße einmalig an das Diagramm anpassen" onClick={() => fitToDiagram()}>⤢</button>
-          <button
-            className={edit ? 'active' : ''}
-            title="Mermaid-Code anzeigen/bearbeiten (für Profis)"
-            onClick={() => { const next = !edit; setEdit(next); fitToDiagram(next); }}
-          >‹/›</button>
+          <MenuHuelle titel="Mehr: Vorlage, Farbschema, Look, Richtung, Titel, Einpassen, Code" klasse="kopf-mehr mm-mehr" kinder={(zu) => (
+            <>
+              <div className="ebenen-menu-titel">Vorlage</div>
+              {Object.keys(TEMPLATES).map((t) => (
+                <button key={t} role="menuitem" className={pendingTpl === t ? 'mm-confirm' : ''} onClick={() => { const war = pendingTpl; applyTemplate(t); if (war === t || !data.code.trim()) zu(); }}>
+                  {pendingTpl === t ? `„${t}" ersetzt dein Diagramm — sicher?` : t}
+                </button>
+              ))}
+              <div className="ebenen-menu-titel">Farbschema</div>
+              <div className="kopf-menu-dots">
+                <button className={`mm-dot mm-dot-none ${!style ? 'on' : ''}`} title="Standardfarben" onClick={() => updateNodeData(id, { style: undefined })} />
+                {Object.entries(MERMAID_STYLES).map(([k, s]) => (
+                  <button key={k} className={`mm-dot ${style === k ? 'on' : ''}`} style={{ background: s.dot }} title={`Farbschema ${s.label}`} onClick={() => updateNodeData(id, { style: k })} />
+                ))}
+              </div>
+              <div className="ebenen-menu-titel">Darstellung</div>
+              <button role="menuitem" className={look === 'hand' ? 'aktiv' : ''} onClick={() => { updateNodeData(id, { look: look === 'hand' ? undefined : 'hand' }); zu(); }} title="Kritzel-Formen + Handschrift">
+                ✏️ Handgezeichneter Look {look === 'hand' ? 'aus' : 'an'}
+              </button>
+              {isFlow && <button role="menuitem" onClick={() => { toggleDirection(); zu(); }} title="oben/unten ⇄ links/rechts">⇄ Richtung wechseln</button>}
+              {kind === 'seq' && (
+                <button role="menuitem" className={hasAutonumber(data.code) ? 'aktiv' : ''} onClick={() => { updateNodeData(id, { code: toggleAutonumber(data.code) }); zu(); }}>
+                  № Nachrichten nummerieren {hasAutonumber(data.code) ? 'aus' : 'an'}
+                </button>
+              )}
+              {['gantt', 'pie', 'timeline', 'quadrant'].includes(kind) && (
+                <button role="menuitem" onClick={() => { zu(); startTitleRename(); }}>✎ {getTitle(data.code) ? 'Titel bearbeiten' : 'Titel hinzufügen'}</button>
+              )}
+              <button role="menuitem" onClick={() => { zu(); fitToDiagram(); }} title="Kartengröße einmalig an das Diagramm anpassen">⤢ Ans Diagramm anpassen</button>
+              <button role="menuitem" className={edit ? 'aktiv' : ''} onClick={() => { const next = !edit; setEdit(next); fitToDiagram(next); zu(); }} title="Mermaid-Code anzeigen/bearbeiten (für Profis)">
+                ‹/› Code {edit ? 'ausblenden' : 'anzeigen'}
+              </button>
+            </>
+          )} />
         </div>
         {aiReady(ai) && (
           <div className="mm-row mm-ai-row">

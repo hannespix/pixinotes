@@ -100,7 +100,10 @@ const zerschnitten = () => P.evaluate(() => {
 // ══ T1–T4: alle vier Zeitskalen, jeweils vorn und weit gescrollt ═════
 for (const skala of ['tage', 'wochen', 'monate', 'jahre']) {
   console.log(`\n════ Skala „${skala}" ════`);
-  await P.locator('.gantt-scale').selectOption(skala);
+  // M313: Die Zeit-Skala liegt im ⋯ des Zeitplans
+  await P.evaluate(() => { document.querySelector('.gantt-tools .ebenen-menu-knopf')?.click(); });
+  await P.waitForTimeout(250);
+  await P.evaluate((s) => { document.querySelector(`.ebenen-menu button[data-skala="${s}"]`)?.click(); }, skala);
   await P.waitForTimeout(800);
   await P.evaluate(() => { document.querySelector('.gantt-scroll').scrollLeft = 0; });
   await P.waitForTimeout(500);
@@ -130,7 +133,10 @@ for (const skala of ['tage', 'wochen', 'monate', 'jahre']) {
 // ══ T5: Gekürzt wird mit „…" ═════════════════════════════════════════
 console.log('\n════ T5: Kürzen statt abhacken ════');
 {
-  await P.locator('.gantt-scale').selectOption('monate');
+  // M313: Zeit-Skala über das ⋯ des Zeitplans
+  await P.evaluate(() => { document.querySelector('.gantt-tools .ebenen-menu-knopf')?.click(); });
+  await P.waitForTimeout(250);
+  await P.evaluate(() => { document.querySelector('.ebenen-menu button[data-skala="monate"]')?.click(); });
   await P.waitForTimeout(700);
   /* Eine Stelle suchen, an der ein langer Name am rechten Rand ANSTEHT —
      nur dort muss überhaupt gekürzt werden. Ohne dieses Suchen prüfte der
@@ -184,8 +190,8 @@ console.log('\n════ T6: Weiche Kanten am Rollrand ════');
   pruefe('T6b am Ende nur links eine Kante', ende.links && !ende.rechts, JSON.stringify(ende));
   // Alles eingepasst: gar keine Kante
   await P.evaluate(() => {
-    [...document.querySelectorAll('.gantt-tools button')]
-      .find((b) => (b.getAttribute('title') ?? '').startsWith('Alles einpassen'))?.click();
+    document.querySelector('.gantt-tools .ebenen-menu-knopf')?.click();
+    setTimeout(() => [...document.querySelectorAll('.ebenen-menu button')].find((b) => (b.getAttribute('title') ?? '').startsWith('Alles einpassen'))?.click(), 150);
   });
   await P.waitForTimeout(800);
   const passt = await P.evaluate(() => {
