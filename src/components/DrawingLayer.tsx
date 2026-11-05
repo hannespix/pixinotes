@@ -134,6 +134,8 @@ export function DrawingLayer() {
    * Ausschnitt kennen), und jedes aufgenommene Punktepaar löst ein Bild aus.
    */
   const stiftZug = useRef<'strich' | 'radierer' | null>(null);
+  /** M322: Touch-Kennungen, die zu einem laufenden Stift-Zug gehören (Stift selbst, Handballen) */
+  const geschluckt = useRef<Set<number>>(new Set());
   const [, force] = useState(0);
   // Striche der AKTUELLEN Zeichensitzung: sich berührende entscheiden
   // gemeinsam über das Ankern (M128) — ältere bleiben unangetastet
@@ -321,8 +323,12 @@ export function DrawingLayer() {
       if (!ziel?.closest) return;
       if (ziel.closest(CHROME)) return;
       if (werkzeug === 'select') {
-        // Direktzug: nur Stift, nur freie Fläche
+        // Direktzug: nur Stift, nur freie Fläche. Die Fläche (.react-flow__pane)
+        // UMSCHLIESST in React Flow 12 auch Karten und Kanten — die müssen
+        // ausdrücklich raus, sonst zeichnet der Stift statt die Karte zu ziehen
+        // oder anzutippen (M322).
         if (e.pointerType !== 'pen' || !ziel.closest('.react-flow__pane')) return;
+        if (ziel.closest('.react-flow__node, .react-flow__edge, .react-flow__handle, .react-flow__edgelabel-renderer, .react-flow__viewport-portal')) return;
         e.preventDefault(); e.stopPropagation();
         stiftZug.current = 'strich';
         fuehrend.current = { id: e.pointerId, art: 'pen' };
@@ -364,16 +370,53 @@ export function DrawingLayer() {
       onUp();
     };
 
+    /**
+     * M322: React Flow schwenkt (d3-zoom) und zieht Karten (d3-drag) nicht über
+     * Pointer-, sondern über TOUCH-Ereignisse. iPadOS und Android melden den
+     * Stift zusätzlich als Touch — `stopPropagation` am pointerdown erreicht
+     * die nicht, und seit die Ebene bei Stift-Geräten durchlässig ist (M319),
+     * schwenkte die Seite unter jedem Strich weg (User-Meldung). Deshalb: Jeder
+     * Touch, der beginnt, während ein Stift-Zug läuft (der Stift selbst — das
+     * pointerdown kommt vor dem touchstart — und der Handballen), wird samt
+     * seiner Folge-Ereignisse hier geschluckt, bevor React Flow ihn sieht.
+     * Finger ohne laufenden Stift-Zug gehen weiter durch: Schieben und Zoomen
+     * bleiben, auch mit dem Stift als normalem Zeiger über einer Karte.
+     */
+    const beruehren = (e: TouchEvent) => {
+      const kennungen = geschluckt.current;
+      let treffer = false;
+      for (const t of Array.from(e.changedTouches)) {
+        if (e.type === 'touchstart') {
+          if (stiftZug.current) { kennungen.add(t.identifier); treffer = true; }
+        } else if (kennungen.has(t.identifier)) {
+          treffer = true;
+          if (e.type !== 'touchmove') kennungen.delete(t.identifier);
+        }
+      }
+      if (!treffer) return;
+      e.stopPropagation();
+      if (e.cancelable) e.preventDefault();
+    };
+
     window.addEventListener('pointerdown', runter, true);
     window.addEventListener('pointermove', bewegen, true);
     window.addEventListener('pointerup', hoch, true);
     // Bricht iOS den Zeiger ab (Systemgeste, App-Wechsel), kommt KEIN pointerup
     window.addEventListener('pointercancel', hoch, true);
+    // passive: false — sonst darf touchstart/touchmove am Fenster kein preventDefault
+    window.addEventListener('touchstart', beruehren, { capture: true, passive: false });
+    window.addEventListener('touchmove', beruehren, { capture: true, passive: false });
+    window.addEventListener('touchend', beruehren, true);
+    window.addEventListener('touchcancel', beruehren, true);
     return () => {
       window.removeEventListener('pointerdown', runter, true);
       window.removeEventListener('pointermove', bewegen, true);
       window.removeEventListener('pointerup', hoch, true);
       window.removeEventListener('pointercancel', hoch, true);
+      window.removeEventListener('touchstart', beruehren, true);
+      window.removeEventListener('touchmove', beruehren, true);
+      window.removeEventListener('touchend', beruehren, true);
+      window.removeEventListener('touchcancel', beruehren, true);
     };
   });
 
