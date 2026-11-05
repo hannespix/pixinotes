@@ -106,7 +106,7 @@ console.log('\n════ B: Diagramm lädt nach ════');
   await P.waitForTimeout(500);
   const geladen = js(anfragen);
   pruefe('B1 mit Diagramm auf dem Board kommt der Mermaid-Teil nach', geladen.some((f) => /^mermaid\.min-/.test(f)), geladen.join(', '));
-  const svg = await P.evaluate(() => { const alle = [...document.querySelectorAll('.mermaid-card svg')].map((s) => ({ text: s.textContent.replace(/\s+/g, ' ').slice(0, 80), w: s.getBoundingClientRect().width })).sort((a, b) => b.w - a.w); return alle[0] ?? null; });
+  const svg = await P.evaluate(() => { const alle = [...document.querySelectorAll('.mermaid-card svg')].map((s) => ({ text: [...s.querySelectorAll('.nodeLabel, text, foreignObject')].map((e) => e.textContent).join(' ').replace(/\s+/g, ' ').slice(0, 80), w: s.getBoundingClientRect().width })).sort((a, b) => b.w - a.w); return alle[0] ?? null; });
   pruefe('B2 das Diagramm ist gerendert (SVG mit Start → Ende)', !!svg && /Start/.test(svg.text) && /Ende/.test(svg.text) && svg.w > 50, JSON.stringify(svg));
   pruefe('B3 das Mermaid-Bundle läuft als globales Script (window.mermaid)', await P.evaluate(() => typeof window.mermaid?.render === 'function'));
   await P.screenshot({ path: path.join(SD, 'm321-diagramm.png') });
