@@ -39,16 +39,18 @@ jobs:
       # M317: Konto-Sync — die OAuth-Client-IDs kommen aus den Repository-
       # Variablen (Settings → Secrets and variables → Actions → Variables).
       # Fehlen sie, fragt die App in den Einstellungen danach.
-      # M328: Eigenes Konto — VITE_SUPABASE_URL und VITE_SUPABASE_ANON_KEY
-      # (der Anon-Key ist öffentlich; die Daten schützt Row Level Security).
+      # M328: Eigenes Konto — VITE_SUPABASE_URL und VITE_SUPABASE_ANON_KEY.
+      # Vorgabe: das Projekt „pixinotes" (Frankfurt) des Betreibers; eine
+      # Repository-Variable gleichen Namens hätte Vorrang. Der Anon-Key ist
+      # öffentlich; die Daten schützt Row Level Security.
       - name: Portable Single-File bauen (Download-Variante)
         run: npm run build:single
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
           VITE_MS_CLIENT_ID: ${{ vars.VITE_MS_CLIENT_ID }}
           VITE_MS_TENANT: ${{ vars.VITE_MS_TENANT }}
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://dckzqvbrffmemdzamtqr.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRja3pxdmJyZmZtZW1kemFtdHFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5ODc2NDIsImV4cCI6MjEwOTU2MzY0Mn0.KWHKi9w2CSrszq3xtQlMOCnyFlwO26QTXwnLWwUKBHs' }}
 
       - name: Web-Version bauen
         run: npm run build
@@ -56,8 +58,8 @@ jobs:
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
           VITE_MS_CLIENT_ID: ${{ vars.VITE_MS_CLIENT_ID }}
           VITE_MS_TENANT: ${{ vars.VITE_MS_TENANT }}
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://dckzqvbrffmemdzamtqr.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRja3pxdmJyZmZtZW1kemFtdHFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5ODc2NDIsImV4cCI6MjEwOTU2MzY0Mn0.KWHKi9w2CSrszq3xtQlMOCnyFlwO26QTXwnLWwUKBHs' }}
 
       - name: Single-File zum Download in die Site legen
         run: cp release/pixinotes.html dist/pixinotes.html
