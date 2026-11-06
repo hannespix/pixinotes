@@ -81,7 +81,8 @@ console.log('\n════ A: Reiter ════');
   const g = await h3s(P);
   pruefe('B1 drei Gruppen: Aussehen, Lesbarkeit, Bedienung', JSON.stringify(g) === JSON.stringify(['Aussehen', 'Lesbarkeit', 'Bedienung']), g.join(' | '));
   const z = await zeilen(P);
-  pruefe('B2 genau sechs Zeilen', JSON.stringify(z) === JSON.stringify(['Erscheinungsbild', 'Akzentfarbe', 'Anzeigegröße', 'Besser lesbar', 'Mausrad zoomt', 'Lebendige Fläche']), JSON.stringify(z));
+  // M326 ergänzte „Finger-Gesten (wie Procreate)" als siebte Zeile
+  pruefe('B2 genau sieben Zeilen', JSON.stringify(z) === JSON.stringify(['Erscheinungsbild', 'Akzentfarbe', 'Anzeigegröße', 'Besser lesbar', 'Mausrad zoomt', 'Lebendige Fläche', 'Finger-Gesten (wie Procreate)']), JSON.stringify(z));
   pruefe('B3 keine Zeilen mehr für Milchglas, Navigation, Fokus, Stift, Physik, Klick-Zoom, Konfetti', !z.some((t) => /Milchglas|Navigation|Fokus|Stift|Physik|Klick|Konfetti|Kontrast|lesbare Schrift/.test(t)));
   const check = (text) => P.locator('.modal-row-check', { hasText: text }).locator('input[type="checkbox"]');
   await check('Besser lesbar').check();

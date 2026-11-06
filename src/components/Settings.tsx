@@ -17,9 +17,10 @@ import {
   webdavTest, webdavWrite, type WebdavConfig,
 } from '../lib/webdav';
 import {
-  applyKonto, bekannteClientId, bekannterTenant, kontoAbmelden, kontoAnmelden, kontoLabel, kontoLesen, kontoStamp,
-  kontoVerbinden, kontoWrite, loadKonto, type Anbieter, type KontoSitzung,
+  applyKonto, bekannteClientId, bekannterTenant, kontoAbmelden, kontoAnmelden, kontoAnmeldenSupabase, kontoIstEigenes, kontoLabel, kontoLesen, kontoLiveVerbunden, kontoLoeschen, kontoStamp,
+  kontoVerbinden, kontoWrite, loadKonto, type Anbieter, type KontoSitzung, type VerbindenErgebnis,
 } from '../lib/kontoSync';
+import { sbLinkSenden, sbPasswortAnmelden, sbRegistrieren, supabaseKonfig, supabaseKonfigSpeichern, supabaseKonfiguriert, type SbSitzung } from '../lib/kontoSupabase';
 import { browserErkenntHandschrift } from '../lib/handschrift';
 import { aiReady } from '../lib/ai';
 import {
@@ -195,6 +196,12 @@ export function Settings() {
   const [kontoGid, setKontoGid] = useState('');
   const [kontoMsid, setKontoMsid] = useState('');
   const [kontoTenant, setKontoTenant] = useState('common');
+  // M328: Eigenes PixiNotes-Konto — E-Mail-Link oder Passwort; Backend-Konfiguration vom Betreiber
+  const [kontoMail, setKontoMail] = useState('');
+  const [kontoPass, setKontoPass] = useState('');
+  const [kontoLinkWeg, setKontoLinkWeg] = useState(false);
+  const [sbUrl, setSbUrl] = useState('');
+  const [sbKey, setSbKey] = useState('');
   const anzeige = useBoard((s) => s.anzeige);
   const setAnzeige = useBoard((s) => s.setAnzeige);
   const syncDateienMb = useBoard((s) => s.syncDateienMb ?? 25);
@@ -284,10 +291,19 @@ export function Settings() {
     setKontoGid(bekannteClientId('google'));
     setKontoMsid(bekannteClientId('ms'));
     setKontoTenant(bekannterTenant());
+    const sb = supabaseKonfig();
+    setSbUrl(sb.url); setSbKey(sb.key); setKontoLinkWeg(false);
     // Weg-Vorwahl: ein angemeldetes Konto gewinnt, dann WebDAV, sonst der Ordner (wo möglich), sonst die Datei
     wegManuell.current = false;
     setSyncWeg(konto ? 'konto' : dav ? 'webdav' : syncSupported() ? 'ordner' : 'datei');
   }, [open]);
+
+  // M328: Rückkehr vom E-Mail-Link meldet an, während das Blatt vielleicht offen ist
+  useEffect(() => {
+    const auf = () => setKontoSitz(loadKonto());
+    window.addEventListener('pixinotes:konto', auf);
+    return () => window.removeEventListener('pixinotes:konto', auf);
+  }, []);
 
   if (!open) return null;
 
@@ -366,16 +382,46 @@ export function Settings() {
     try { await fn(); } catch (e) { setKontoError(String((e as Error).message)); throw e; }
   }, label);
 
-  const kontoConnect = (anbieter: Anbieter) => doKonto('konto', async () => {
-    const sitz = await kontoAnmelden(anbieter, anbieter === 'google' ? kontoGid : kontoMsid, kontoTenant.trim() || 'common');
-    setKontoSitz(sitz);
-    const r = await kontoVerbinden();
-    const wo = kontoLabel(sitz);
+  const kontoMeldung = (r: VerbindenErgebnis, wo: string) => {
     if (r === 'hochgeladen') showToast(`✅ Angemeldet — der aktuelle Stand liegt jetzt in ${wo}. Änderungen gleichen sich ab jetzt automatisch ab.`);
     else if (r === 'uebernommen') showToast(`✅ Angemeldet — der Stand aus ${wo} wurde übernommen.`);
     else if (r === 'zusammengefuehrt') showToast(`✅ Angemeldet — Stand mit ${wo} zusammengeführt.`);
     else if (r === 'konflikt') showToast(`In ${wo} liegt schon ein Stand und hier Eigenes. Unten „Vom Konto laden" oder „Jetzt hochladen" wählen.`, false, 9000);
     else showToast(`✅ Angemeldet bei ${wo} — alles auf dem gleichen Stand.`);
+  };
+  const kontoConnect = (anbieter: Anbieter) => doKonto('konto', async () => {
+    const sitz = await kontoAnmelden(anbieter, anbieter === 'google' ? kontoGid : kontoMsid, kontoTenant.trim() || 'common');
+    setKontoSitz(sitz);
+    kontoMeldung(await kontoVerbinden(), kontoLabel(sitz));
+  });
+  // M328: Eigenes Konto — E-Mail-Link (kein Passwort) oder Passwort; Registrieren
+  const mailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(kontoMail.trim());
+  const kontoSbFertig = async (sitz: SbSitzung) => {
+    const s = await kontoAnmeldenSupabase(sitz);
+    setKontoSitz(s);
+    setKontoPass('');
+    kontoMeldung(await kontoVerbinden(), kontoLabel(s));
+  };
+  const kontoMailLink = () => doKonto('konto', async () => {
+    await sbLinkSenden(kontoMail);
+    setKontoLinkWeg(true);
+    showToast(`✉️ Link an ${kontoMail.trim()} geschickt — ein Tipp darauf meldet dieses Gerät an.`, false, 8000);
+  });
+  const kontoMailPasswort = () => doKonto('konto', async () => kontoSbFertig(await sbPasswortAnmelden(kontoMail, kontoPass)));
+  const kontoMailRegistrieren = () => doKonto('konto', async () => {
+    const s = await sbRegistrieren(kontoMail, kontoPass);
+    if (!s) { setKontoLinkWeg(true); showToast('✉️ Konto angelegt — bitte den Bestätigungs-Link aus der Mail öffnen, dann ist dieses Gerät angemeldet.', false, 9000); return; }
+    await kontoSbFertig(s);
+  });
+  const sbKonfigSichern = () => {
+    supabaseKonfigSpeichern({ url: sbUrl, key: sbKey });
+    showToast(supabaseKonfiguriert() ? '✅ Konto-Backend hinterlegt — Nutzer können sich jetzt mit E-Mail anmelden.' : 'Konto-Backend entfernt.');
+  };
+  const kontoEigenesLoeschen = () => doKonto('kontoweg', async () => {
+    if (!window.confirm('Das PixiNotes-Konto und alle dort gespeicherten Boards endgültig löschen? Die Daten auf diesem Gerät bleiben erhalten.')) return;
+    await kontoLoeschen();
+    setKontoSitz(null);
+    showToast('Konto gelöscht — die Daten bleiben nur noch auf diesem Gerät.');
   });
 
   const kontoPush = () => doKonto('kontopush', async () => {
@@ -753,12 +799,42 @@ export function Settings() {
           {/* M317: Konto-Sync — Anmeldung mit Google oder Microsoft, Daten im App-Ordner des eigenen Drive/OneDrive */}
           {syncWeg === 'konto' && (
             <>
-              <p className="modal-hint">Mit Google oder Microsoft anmelden — PixiNotes legt seinen Stand im App-Ordner deines eigenen Google Drive bzw. OneDrive ab und gleicht ihn auf allen Geräten ab. Kein Server, nichts einzurichten.</p>
+              <p className="modal-hint">
+                {supabaseKonfiguriert()
+                  ? 'Mit E-Mail anmelden — ein PixiNotes-Konto, das auf jedem Gerät geht, auch ohne Google Drive oder OneDrive. Oder mit Google bzw. Microsoft: dann liegt der Stand im App-Ordner deines eigenen Drive/OneDrive.'
+                  : 'Mit Google oder Microsoft anmelden — PixiNotes legt seinen Stand im App-Ordner deines eigenen Google Drive bzw. OneDrive ab und gleicht ihn auf allen Geräten ab. Kein Server, nichts einzurichten.'}
+              </p>
               {!oauthAvailable() && (
-                <div className="modal-note">⚠️ Die Einzeldatei (file://) kann keine Anmeldung — dafür die gehostete App nutzen. Hier bleiben Ordner, WebDAV und Datei.</div>
+                <div className="modal-note">⚠️ Die Einzeldatei (file://) kann keine Anmeldung per Google, Microsoft oder E-Mail-Link — dafür die gehostete App nutzen. Hier bleiben E-Mail mit Passwort, Ordner, WebDAV und Datei.</div>
               )}
               {!kontoSitz ? (
                 <>
+                  {/* M328: Eigenes Konto — E-Mail-Link als Standard, Passwort darunter */}
+                  {supabaseKonfiguriert() && (
+                    <div className="konto-mail" data-taste="konto-mail">
+                      <label className="modal-row">
+                        <span>E-Mail</span>
+                        <input type="email" autoComplete="email" placeholder="du@example.de" value={kontoMail} onChange={(e) => { setKontoMail(e.target.value); setKontoLinkWeg(false); }} data-taste="konto-email" />
+                      </label>
+                      <div className="modal-buttons">
+                        <button disabled={!oauthAvailable() || !mailOk || busy === 'konto'} onClick={kontoMailLink} data-taste="konto-link">
+                          {busy === 'konto' ? '…' : 'Anmelde-Link per E-Mail'}
+                        </button>
+                      </div>
+                      {kontoLinkWeg && <div className="modal-note">✉️ Link verschickt — ein Tipp darauf meldet dieses Gerät an. Kein Passwort nötig.</div>}
+                      <details className="modal-details">
+                        <summary>Mit Passwort anmelden oder Konto erstellen</summary>
+                        <label className="modal-row">
+                          <span>Passwort</span>
+                          <input type="password" autoComplete="current-password" placeholder="mindestens 6 Zeichen" value={kontoPass} onChange={(e) => setKontoPass(e.target.value)} data-taste="konto-pass" />
+                        </label>
+                        <div className="modal-buttons">
+                          <button disabled={!mailOk || kontoPass.length < 6 || busy === 'konto'} onClick={kontoMailPasswort} data-taste="konto-passwort">{busy === 'konto' ? '…' : 'Anmelden'}</button>
+                          <button disabled={!mailOk || kontoPass.length < 6 || busy === 'konto'} onClick={kontoMailRegistrieren} data-taste="konto-neu">{busy === 'konto' ? '…' : 'Konto erstellen'}</button>
+                        </div>
+                      </details>
+                    </div>
+                  )}
                   <div className="modal-buttons">
                     <button disabled={!oauthAvailable() || !kontoGid.trim() || busy === 'konto'} onClick={() => kontoConnect('google')} data-taste="konto-google">
                       {busy === 'konto' ? '…' : 'Mit Google anmelden'}
@@ -767,14 +843,32 @@ export function Settings() {
                       {busy === 'konto' ? '…' : 'Mit Microsoft anmelden'}
                     </button>
                   </div>
-                  <div className="modal-note">Beim ersten Mal fragt der Anbieter einmal nach der Erlaubnis für den App-Ordner. Mehr sieht PixiNotes nicht.</div>
-                  {(!kontoGid.trim() || !kontoMsid.trim()) && (
-                    <details className="modal-details" open={!kontoGid.trim() && !kontoMsid.trim()}>
-                      <summary>Einmalig vom Betreiber: Client-IDs hinterlegen</summary>
+                  <div className="modal-note">Google und Microsoft fragen beim ersten Mal einmal nach der Erlaubnis für den App-Ordner. Mehr sieht PixiNotes nicht.</div>
+                  {(!supabaseKonfiguriert() || !kontoGid.trim() || !kontoMsid.trim()) && (
+                    <details className="modal-details" open={!supabaseKonfiguriert() && !kontoGid.trim() && !kontoMsid.trim()}>
+                      <summary>Einmalig vom Betreiber: Konto-Backend und Client-IDs hinterlegen</summary>
                       <p className="modal-hint">
-                        Nutzer tippen hier nichts. Der Betreiber legt je Anbieter eine App an und trägt die ID in den Build ein
-                        (Repository-Variablen <code>VITE_GOOGLE_CLIENT_ID</code>, <code>VITE_MS_CLIENT_ID</code>) — oder hier. Dieselben IDs gelten für die Kalender-Konten unter Dienste.
+                        Nutzer tippen hier nichts. Der Betreiber hinterlegt einmal das Konto-Backend (Supabase-Projekt) und je Anbieter eine App-ID im Build
+                        (Repository-Variablen <code>VITE_SUPABASE_URL</code>, <code>VITE_SUPABASE_ANON_KEY</code>, <code>VITE_GOOGLE_CLIENT_ID</code>, <code>VITE_MS_CLIENT_ID</code>) — oder hier. Dieselben IDs gelten für die Kalender-Konten unter Dienste.
                       </p>
+                      {!supabaseKonfiguriert() && (
+                        <>
+                          <label className="modal-row">
+                            <span>Supabase-URL</span>
+                            <input type="url" placeholder="https://xxxx.supabase.co" value={sbUrl} onChange={(e) => setSbUrl(e.target.value)} data-taste="sb-url" />
+                          </label>
+                          <label className="modal-row">
+                            <span>Anon-Key</span>
+                            <input type="text" placeholder="eyJ… (öffentlicher Schlüssel)" value={sbKey} onChange={(e) => setSbKey(e.target.value)} data-taste="sb-key" />
+                          </label>
+                          <div className="modal-buttons">
+                            <button disabled={!sbUrl.trim() || !sbKey.trim()} onClick={sbKonfigSichern} data-taste="sb-sichern">Konto-Backend hinterlegen</button>
+                          </div>
+                          <div className="modal-note">
+                            Supabase → neues Projekt (Region Frankfurt) → SQL Editor: die Migration aus <code>supabase/migrations</code> ausführen → Authentication → E-Mail-Anmeldung an, Site-URL <code>{location.origin + location.pathname}</code>. Der Anon-Key ist öffentlich; die Daten schützt Row Level Security.
+                          </div>
+                        </>
+                      )}
                       <label className="modal-row">
                         <span>Google Client-ID</span>
                         <input type="text" placeholder="xxxxx.apps.googleusercontent.com" value={kontoGid} onChange={(e) => setKontoGid(e.target.value)} />
@@ -803,10 +897,14 @@ export function Settings() {
                     <button disabled={!!busy} onClick={kontoPush}>{busy === 'kontopush' ? '…' : 'Jetzt hochladen'}</button>
                     <button disabled={!!busy} onClick={kontoPull}>{busy === 'kontopull' ? '…' : 'Vom Konto laden'}</button>
                     <button disabled={!!busy} onClick={kontoLogout}>Abmelden</button>
+                    {kontoIstEigenes(kontoSitz) && (
+                      <button disabled={!!busy} onClick={kontoEigenesLoeschen} className="danger" data-taste="konto-loeschen">{busy === 'kontoweg' ? '…' : 'Konto löschen'}</button>
+                    )}
                   </div>
-                  <div className="modal-note">
+                  <div className="modal-note" data-taste="konto-stand">
                     ✅ Angemeldet bei {kontoLabel(kontoSitz)}{kontoSitz.name ? ` als „${kontoSitz.name}"` : ''} — Änderungen werden automatisch abgeglichen
-                    {kontoStamp() ? ` (letzter Abgleich: ${new Date(kontoStamp()!).toLocaleString('de-DE')})` : ''}. Dateien bis 4 MB wandern mit.
+                    {kontoStamp() ? ` (letzter Abgleich: ${new Date(kontoStamp()!).toLocaleString('de-DE')})` : ''}
+                    {kontoIstEigenes(kontoSitz) ? (kontoLiveVerbunden() ? ', live verbunden' : ', Abgleich alle zehn Sekunden') : ''}. Dateien bis 4 MB wandern mit.
                   </div>
                 </>
               )}
