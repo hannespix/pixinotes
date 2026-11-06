@@ -61,6 +61,7 @@ const MINIMAP_AB = 10;
 /** Mit Maus: Doppelklick öffnet den Fokus (siehe onNodeDoubleClick) */
 const istMaus = () => window.matchMedia('(pointer: fine)').matches;
 import { DrawingLayer } from './DrawingLayer';
+import { FingerGesten } from './FingerGesten';
 import { CommentLayer } from './CommentLayer';
 import { SelectionToolbar } from './SelectionToolbar';
 
@@ -1014,6 +1015,7 @@ export function Board() {
         )}
         <SelectionToolbar />
         <DrawingLayer />
+        <FingerGesten />
         <CommentLayer />
       </ReactFlow>
     </div>

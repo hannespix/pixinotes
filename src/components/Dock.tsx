@@ -160,6 +160,12 @@ export function Dock() {
   const [suche, setSuche] = useState('');
   const sucheRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => { if (!addMenu) setSuche(''); }, [addMenu]);
+  // M326: Drei Finger nach unten (ohne Auswahl) öffnen die Palette
+  useEffect(() => {
+    const auf = () => { setDrawMenu(false); setAiMenu(false); setArrangeMenu(false); setMoreMenu(false); setAddMenu(true); };
+    window.addEventListener('pixinotes:palette', auf);
+    return () => window.removeEventListener('pixinotes:palette', auf);
+  }, []);
   const [drawMenu, setDrawMenu] = useState(false);
   const [aiMenu, setAiMenu] = useState(false);
   // M198: ⋯-Menü bündelt die selteneren Aktionen (KI, Anordnen, Physik, Archiv) —

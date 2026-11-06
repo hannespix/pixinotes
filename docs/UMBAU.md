@@ -133,6 +133,7 @@ Eine Schicht Tokens in `src/index.css`, an der alles hängt:
 | 7 | Eine Leiste unten: dockt die Auswahl-Leiste an, weicht das Dock — auf jeder Breite | M318 |
 | 8 | Stift & Touch: perfect-freehand-Konturen mit Druck, Formen (Pfeil, Kreis, Dreieck, gedrehtes Rechteck), Hand schiebt / Stift zeichnet | M319 |
 | 9 | Handschrift → Text: Browser-API, Scribble am iPad, Online-Erkennung nur als Opt-in | M320 |
+| 14 | Finger-Gesten überall (Procreate): Zwei-/Drei-Finger-Tipp = Rückgängig/Wiederholen, halten = schnell, Quick-Pinch = Alles einpassen / zurück, Vier-Finger-Tipp = Vollbild, drei Finger nach unten = Duplizieren oder ＋-Palette; Schalter. Ohne Stift-Gerät zoomen zwei Finger und das Mausrad auch auf der Zeichenebene | M326 |
 | 13 | Stift wie auf Surface und iPad: Stift schreibt, Finger bedient (auch im Auswahlmodus, auf Fläche und Notizen), Tipp = Klick, Radierer-Ende radiert immer, Seitentaste greift Karten, Teil-/Strich-Radierer, getippten Text per Kritzel/Durchstreichen löschen und per Schleife markieren, Handschrift inline zwischen Wörtern, Zwei-/Drei-Finger-Tipp = Rückgängig/Wiederholen, zweiter Finger rastet Form ein (Procreate) | M325 |
 | 12 | Stift & Handschrift 2: Vorschlag nach Schreibpause, Ziel-Logik (in die Notiz darunter an passender Stelle / neue Notiz), KI-Korrektur mit Kontext, Umkreisen markiert, Durchstreichen löscht, schnelleres Einrasten, Strichstärke | M324 |
 | 11 | Notiz nachgeschärft: Titelzeile (ein Helfer statt sechs), Farbpalette, Checklisten-Fortschritt, Auto-Größe schrumpft und ignoriert das „/"-Menü, deutsche Kurzdaten, Vorlagen und Heute im „/", Strg+V-Text → Notiz, extEpoch bei externen Block-Schreibern, Lesetypografie im Fokus | M323 |
@@ -210,10 +211,11 @@ Quellen: Procreate-Handbuch (Gesten, Gesture Controls, Undo/Redo), Microsoft One
 | Stift + Seitentaste | normaler Zeiger | greift die Karte (ziehen) | greift die Karte | — |
 | Radierer-Ende | radiert | radiert | radiert | — |
 | Finger zieht | schwenkt | zieht die Karte | zieht/bedient | bedient |
-| Zwei Finger | zoomt/schwenkt; kurzer Tipp = Rückgängig (Zeichenmodus) | | | |
-| Drei Finger | kurzer Tipp = Wiederholen (Zeichenmodus) | | | |
+| Zwei Finger | zoomt/schwenkt; kurzer Tipp = Rückgängig, halten = schnell zurück; schnelles Zusammenziehen = Alles einpassen (M326: überall) | | | |
+| Drei Finger | kurzer Tipp = Wiederholen, halten = schnell vor; nach unten wischen = Duplizieren / ＋-Palette (M326) | | | |
+| Vier Finger | kurzer Tipp = Vollbild an/aus (M326) | | | |
 
-Bewusst **nicht** übernommen: Drei-Finger-Wischen (Kopieren/Einfügen), Vier-Finger-Tipp (Vollbild), Pinch-Drehen — sie kollidieren mit Browser- und Systemgesten. Nebos senkrechter Trenn-/Verbinde-Strich: zu leicht mit einem „l" oder „I" zu verwechseln.
+Seit M326 übernommen: Zwei-/Drei-Finger halten (schnelles Zurück/Vor), Quick-Pinch (Einpassen, zurück), Vier-Finger-Tipp (Vollbild), Drei-Finger-Wischen nach unten (hier: Duplizieren bzw. ＋-Palette statt Kopieren/Einfügen). Bewusst **nicht** übernommen: Pinch-Drehen (die Fläche hat keine Drehung) und das Drei-Finger-Scrubben (Ebene leeren). Nebos senkrechter Trenn-/Verbinde-Strich: zu leicht mit einem „l" oder „I" zu verwechseln.
 
 **Radierer**: Teil-Radierer als Standard (nimmt nur die berührten Punkte, der Strich zerfällt in Teilstücke), Strich-Radierer als zweite Art (OneNote). Eingerastete Formen verschwinden immer ganz.
 
