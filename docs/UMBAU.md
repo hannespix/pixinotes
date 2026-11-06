@@ -198,6 +198,44 @@ nichts geht verloren, beide Anteile landen beim nächsten Takt wieder im Konto.
 Anmeldung — dort bleiben Ordner, WebDAV und Datei. Google-Tokens leben eine
 Stunde; die Verlängerung läuft still beim nächsten Klick in der App.
 
+### 5a. Eigenes Konto mit E-Mail (M328)
+
+Der Wunsch: „mich mit einem Account anmelden, auch auf Geräten ohne Nextcloud,
+Google Drive etc. — ein richtiges Online-Tool." Antwort: **Supabase als dritter
+Anbieter des Konto-Syncs**, kein Umbau.
+
+- **Für Nutzer**: unter ⚙ → Daten → Konto eine E-Mail eintippen → „Anmelde-Link
+  per E-Mail" (Magic Link, kein Passwort) oder darunter „Mit Passwort". Die
+  Rückkehr über den Link liest `#access_token=…` aus der Adresse
+  (`sbRueckkehrLesen`) und meldet das Gerät an. „Konto löschen" entfernt Konto
+  und Daten (RPC `konto_loeschen`, security definer).
+- **Ablage**: eine Tabelle `konto_dateien` (user_id, name, inhalt, mime,
+  groesse, version, updated_at), je Zeile eine „Datei" — exakt die Struktur des
+  App-Ordners (`umgebung.json`, `board-<id>.json`, `datei-<id>` als Base64).
+  Deshalb laufen `kontoLesen`/`kontoWrite`/`kontoVerbinden` und die Drei-Wege-
+  Zusammenführung unverändert; neu ist nur das Laufwerk (`supabaseLaufwerk`,
+  PostgREST ohne SDK). `version` zählt per Trigger hoch und ist der eTag:
+  bedingtes Schreiben = PATCH mit `version=eq.N`, leere Antwort = Vorbedingung
+  verletzt; Erstanlage = INSERT, 409 = ein anderes Gerät war schneller.
+- **Sicherheit**: Row Level Security auf `user_id = auth.uid()`; im Browser nur
+  der öffentliche Anon-Key (Repository-Variablen `VITE_SUPABASE_URL`,
+  `VITE_SUPABASE_ANON_KEY`, sonst einmalig in den Einstellungen).
+- **Live**: ein minimaler Phoenix-Kanal (`sbRealtime`, WebSocket) auf die
+  eigenen Zeilen; eine Änderung an `umgebung.json` stößt den Abgleich nach
+  400 ms an. Fällt der Kanal aus, bleibt der 10-Sekunden-Takt; Wiederverbinden
+  mit wachsender Pause bis 60 s.
+- **Token**: Access-Token eine Stunde, stille Erneuerung über den Refresh-Token
+  (`sbErneuern`) in `tokenHolen`; Realtime bekommt das neue Token nachgereicht.
+- **Betreiber, einmalig**: Supabase-Projekt (Region Frankfurt), Migration
+  `supabase/migrations/20261106120000_konto_dateien.sql` im SQL-Editor
+  ausführen, Authentication → E-Mail an, Site-URL = Adresse der App, beide
+  Variablen setzen. Gratis-Tarif: 500 MB Datenbank, 50.000 aktive Nutzer/Monat.
+  Datenschutz: Auftragsverarbeitungsvertrag mit Supabase (Dashboard), Hinweis
+  in der Hilfe (Datenschutz-Abschnitt).
+- **Später möglich**: Anhänge in einen Storage-Bucket statt Base64 (1 GB frei),
+  Google/Microsoft-Login über Supabase, Einladungen und geteilte Boards über
+  dieselbe Tabelle mit einer zweiten Policy.
+
 
 ## Stift-Konzept (M325) — was wir von Procreate, OneNote, Nebo und Scribble übernehmen
 
