@@ -629,7 +629,9 @@ export function Board() {
   }, []);
 
   const onNodeDoubleClick = useCallback((e: React.MouseEvent, node: Node) => {
-    if (!istMaus()) return;
+    // M325: Der Stift ist so präzise wie die Maus — Doppeltipp öffnet den Fokus auch am Tablet
+    const stift = (e.nativeEvent as PointerEvent).pointerType === 'pen';
+    if (!istMaus() && !stift) return;
     const t = e.target as HTMLElement | null;
     if (t?.closest?.('input, textarea, [contenteditable="true"], .nodrag')) return;
     oeffneFokus(node);
@@ -644,7 +646,10 @@ export function Board() {
     // öffnen"). Der Preis steht in der Einstellung: Notizen bearbeitet man
     // dann im großen Blatt statt direkt auf dem Board — dieselbe Abmachung
     // wie am Handy. Wer sie nicht will, bleibt beim Doppelklick.
-    if (!e.shiftKey && (isPhoneFocus() || st0.fokusEinKlick) && oeffneFokus(node)) return;
+    // M325: Ein STIFT-Tipp ist ein Klick wie mit der Maus (Cursor setzen, Haken,
+    // Karte wählen) — nicht der Finger-Tipp, der am Tablet das Blatt öffnet.
+    const stift = (e.nativeEvent as PointerEvent).pointerType === 'pen';
+    if (!e.shiftKey && !stift && (isPhoneFocus() || st0.fokusEinKlick) && oeffneFokus(node)) return;
     // Klick-Zoom nur noch, wenn der Fokus AUS ist — sonst zoomte die Ansicht
     // zusätzlich zum Fokus, und man landete nach dem Schließen woanders
     if (st0.cardFocus || !useBoard.getState().clickZoom || e.shiftKey) return;

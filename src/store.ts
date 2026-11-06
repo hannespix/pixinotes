@@ -259,6 +259,8 @@ interface BoardState {
    *  (sich berührende entscheiden GEMEINSAM über das Ankern, M128) */
   addStroke: (stroke: Stroke, sessionIds?: string[]) => void;
   eraseStrokesNear: (x: number, y: number, radius: number) => void;
+  /** M325: Teil-Radierer — nimmt nur die Punkte im Radius, der Rest bleibt als Teilstücke */
+  eraseStrokesPartial: (x: number, y: number, radius: number) => void;
   /** M320: Striche nach Id entfernen (Handschrift wurde zu Text) — ein History-Eintrag */
   removeStrokes: (ids: string[]) => void;
   /** Geankerte Striche der Karten wieder freistellen (Punkte werden absolut) */
@@ -1102,6 +1104,42 @@ export const useBoard = create<BoardState>()(
         },
 
         beginEraseGesture: () => { eraseSnapPending = true; },
+
+        eraseStrokesPartial: (x, y, radius) => {
+          const board = get().boards.find((b) => b.id === get().activeId);
+          if (!board) return;
+          const byId = new Map(board.nodes.map((n) => [n.id, n]));
+          const showArchived = get().showArchived;
+          const offsetOf = (s: Stroke): [number, number] | null => {
+            if (!s.anchor) return [0, 0];
+            const n = byId.get(s.anchor);
+            if (!n || (n.archived && !showArchived)) return null;
+            return [n.position.x, n.position.y];
+          };
+          let geaendert = false;
+          const neu: Stroke[] = [];
+          for (const s of board.drawings ?? []) {
+            const o = offsetOf(s);
+            if (!o) { neu.push(s); continue; }
+            const drin = s.points.map((p) => Math.hypot(p[0] + o[0] - x, p[1] + o[1] - y) < radius);
+            if (!drin.some(Boolean)) { neu.push(s); continue; }
+            geaendert = true;
+            // Eingerastete Formen (wenige Punkte) verschwinden ganz — ein halbes Rechteck will niemand
+            if (s.points.length <= 6) continue;
+            let seg: number[] = [];
+            const ablegen = () => {
+              if (seg.length >= 2) {
+                neu.push({ ...s, id: uid(), points: seg.map((i) => s.points[i]), druck: s.druck ? seg.map((i) => s.druck![i]) : undefined });
+              }
+              seg = [];
+            };
+            drin.forEach((d, i) => { if (d) ablegen(); else seg.push(i); });
+            ablegen();
+          }
+          if (!geaendert) return;
+          if (eraseSnapPending) { get().pushHistory(); eraseSnapPending = false; }
+          patchActive(() => ({ drawings: neu }));
+        },
 
         eraseStrokesNear: (x, y, radius) => {
           const board = get().boards.find((b) => b.id === get().activeId);

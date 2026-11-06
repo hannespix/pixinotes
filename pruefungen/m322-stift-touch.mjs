@@ -12,8 +12,8 @@
  *   B  Finger ohne Stift-Zug: Touches erreichen React Flow weiterhin, der
  *      Ausschnitt schwenkt (Hand schiebt).
  *   C  Direktzug (Auswahlmodus, Stift auf freier Fläche): ebenfalls dicht.
- *   D  Stift über einer Karte im Auswahlmodus: normaler Zeiger, kein Direktzug,
- *      sein Touch wird nicht abgebrochen (Karte ziehen/antippen bleibt).
+ *   D  Stift über einer Notiz im Auswahlmodus: schreibt (M325), geankert; sein
+ *      Touch-Doppel bleibt vor React Flow.
  *   E  „Was ist neu" nennt M322.
  */
 // Läuft aus dem Repository: `node pruefungen/m322-stift-touch.mjs`
@@ -182,8 +182,11 @@ console.log('\n════ D: Stift über Karte ════');
   const b = await zug(P, [[x, y], [x + 10, y + 5], [x + 30, y + 10]], { art: 'pen', id: 41 });
   await P.waitForTimeout(500);
   const z = await zaehler(P);
-  pruefe('D1 über einer Karte bleibt der Stift normaler Zeiger: sein touchstart wird nicht abgebrochen (Karte ziehen/antippen bleibt)', b.touchstartDefaultPrevented === false && /card|react-flow__node/.test(b.ziel), JSON.stringify({ z, b }));
-  pruefe('D2 dabei entsteht kein Strich', (await striche(P)).length === 0);
+  // M325: „Der Stift schreibt, der Finger bedient" — auf einer Notiz schreibt der Stift auch im Auswahlmodus;
+  // sein Touch-Doppel darf React Flow dann ebenfalls nicht erreichen (sonst zöge die Karte mit)
+  pruefe('D1 über einer Notiz schreibt der Stift (M325): sein touchstart bleibt vor React Flow', b.touchstartDefaultPrevented === true && z.touchstart === 0 && /card|react-flow__node/.test(b.ziel), JSON.stringify({ z, b }));
+  const d = await striche(P);
+  pruefe('D2 dabei entsteht ein an die Karte geankerter Strich', d.length === 1 && d[0].anchor === 'n1', JSON.stringify(d.map((s) => s.anchor)));
   await ctx.close();
 }
 

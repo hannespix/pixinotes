@@ -21,10 +21,10 @@ function weglaenge(pts: Pt[]): number {
  * der Weglänge), der Weg ist lang genug und umschließt eine echte Fläche —
  * ein „o" beim Schreiben ist klein, eine Lasso-Schleife um eine Karte groß.
  */
-export function istSchleife(pts: Pt[], mindestFlaeche = 2500): boolean {
+export function istSchleife(pts: Pt[], mindestFlaeche = 2500, mindestLaenge = 160): boolean {
   if (pts.length < 12) return false;
   const l = weglaenge(pts);
-  if (l < 160) return false;
+  if (l < mindestLaenge) return false;
   const a = pts[0], e = pts[pts.length - 1];
   const luecke = Math.hypot(e[0] - a[0], e[1] - a[1]);
   if (luecke > Math.max(24, l * 0.18)) return false;
@@ -78,6 +78,24 @@ export function istKritzel(pts: Pt[]): boolean {
   }
   // flach und dicht: mindestens fünf Kehren, und der Weg ist viel länger als die Box breit
   return wechsel >= 5 && weglaenge(pts) > b.w * 2.5;
+}
+
+/**
+ * Gerader, waagerechter Strich (Durchstreichen von getipptem Text)? Alle
+ * Punkte liegen nah an der Verbindungsgeraden, die Gerade ist flach.
+ */
+export function istWaagerechteLinie(pts: Pt[]): boolean {
+  if (pts.length < 2) return false;
+  const a = pts[0], b = pts[pts.length - 1];
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const len = Math.hypot(dx, dy);
+  if (len < 24 || Math.abs(dy) > Math.abs(dx) * 0.25) return false;
+  let maxAb = 0;
+  for (const p of pts) {
+    const ab = Math.abs(dy * p[0] - dx * p[1] + b[0] * a[1] - b[1] * a[0]) / len;
+    if (ab > maxAb) maxAb = ab;
+  }
+  return maxAb < Math.max(4, len * 0.08);
 }
 
 /** Welcher Anteil der Fläche von b liegt in a? (0 … 1) */

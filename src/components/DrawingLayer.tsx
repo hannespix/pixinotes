@@ -5,7 +5,8 @@ import { selectActiveBoard, useBoard, type Stroke } from '../store';
 import { uid } from '../types';
 import { finalizeStroke, recognizeShapes, type Pt } from '../lib/strokeShapes';
 import { handschriftKandidaten, handschriftWeg, kiKorrektur, textAufraeumen, type SchriftKontext } from '../lib/handschrift';
-import { bboxVon, istKritzel, istSchleife, punktInPolygon, ueberdeckung } from '../lib/stiftGesten';
+import { bboxVon, istKritzel, istSchleife, istWaagerechteLinie, punktInPolygon, ueberdeckung, type Box } from '../lib/stiftGesten';
+import { inhaltMitEinfuegung, inhaltOhneBereiche, offsetUnterPunkt, woerterImBlock, woerterMarkieren, type BlockInhalt, type Wort } from '../lib/stiftText';
 import { aiReady } from '../lib/ai';
 import { noteTitle, textZuBloecken } from '../lib/notiz';
 import { blocksToText } from '../lib/serialize';
@@ -27,6 +28,18 @@ const HOLD_MS = 320;
 const PEN_WIDTHS = [1.8, 2.5, 4] as const;
 /** M324: Nach dem Absetzen so lange Ruhe → erkannter Text als Vorschlag */
 const VORSCHLAG_MS = 900;
+/** M325: Kürzer und stiller als das → der Stift hat getippt, nicht geschrieben (Tipp = Klick) */
+const TIPP_MS = 220;
+const TIPP_PX = 6;
+/** M325: Zwei-/Drei-Finger-Tipp (Procreate): so kurz, so still */
+const FINGER_TIPP_MS = 300;
+const FINGER_TIPP_PX = 12;
+/** Radierer-Art bleibt am Gerät gespeichert */
+const RADIERER_KEY = 'pixinotes-radierer';
+/** Worauf der Stift im Auswahlmodus schreibt: freie Fläche und Notizen — Module bedient er */
+const SCHREIBFLAECHE = '.react-flow__pane, .react-flow__node-note';
+/** Was auch auf einer Notiz ein Bedienelement bleibt (Tipp klickt, Ziehen zieht) */
+const KARTEN_BEDIENUNG = '.card-grip, .react-flow__resize-control, .react-flow__handle, .react-flow__edge, .react-flow__edgelabel-renderer, .react-flow__viewport-portal, button, a, input, select, textarea, .due-chips, .note-farben, .color-dot, .note-fortschritt, .abo-feeds';
 /** Hat dieses Gerät je einen Stift gemeldet? Dann gilt: Stift schreibt, Hand schiebt. */
 const STIFT_KEY = 'pixinotes-stift';
 /** Bedienelemente, die auch im Zeichenmodus Bedienelemente bleiben */
@@ -93,6 +106,19 @@ export function DrawingLayer() {
   const removeStrokes = useBoard((s) => s.removeStrokes);
   const addNode = useBoard((s) => s.addNode);
   const onNodesChange = useBoard((s) => s.onNodesChange);
+  const eraseStrokesPartial = useBoard((s) => s.eraseStrokesPartial);
+  const undo = useBoard((s) => s.undo);
+  const redo = useBoard((s) => s.redo);
+  /** M325: Teil-Radierer (Punkte im Radius) oder Strich-Radierer (ganzer Strich) */
+  const [radiererArt, setRadiererArt] = useState<'teil' | 'strich'>(() => {
+    try { return localStorage.getItem(RADIERER_KEY) === 'strich' ? 'strich' : 'teil'; } catch { return 'teil'; }
+  });
+  const radiererWaehlen = (art: 'teil' | 'strich') => { setRadiererArt(art); try { localStorage.setItem(RADIERER_KEY, art); } catch { /* egal */ } };
+  /** M325: Beginn des aktuellen Stift-Zugs — für „Tipp oder Strich?" */
+  const tipp = useRef<{ t: number; x: number; y: number; weit: boolean } | null>(null);
+  /** M325: Finger-Tipps (Procreate): wann begann welcher Finger, wie viele gleichzeitig */
+  const fingerTipps = useRef<Map<number, { t: number; x: number; y: number; weit: boolean }>>(new Map());
+  const fingerMax = useRef(0);
   const updateNodeDataOnBoard = useBoard((s) => s.updateNodeDataOnBoard);
   const activeId = useBoard((s) => s.activeId);
   const boardName = useBoard((s) => selectActiveBoard(s)?.name ?? '');
@@ -156,7 +182,9 @@ export function DrawingLayer() {
    * sich bei jedem Bild neu an (er muss die frischen Farben und den frischen
    * Ausschnitt kennen), und jedes aufgenommene Punktepaar löst ein Bild aus.
    */
-  const stiftZug = useRef<'strich' | 'radierer' | null>(null);
+  const stiftZug = useRef<'strich' | 'radierer' | 'griff' | null>(null);
+  /** M325: Seitentaste greift — welche Karte, wo begann der Zug (Flow), wo stand sie */
+  const griff = useRef<{ id: string; start: Pt; pos: { x: number; y: number } } | null>(null);
   /** M322: Touch-Kennungen, die zu einem laufenden Stift-Zug gehören (Stift selbst, Handballen) */
   const geschluckt = useRef<Set<number>>(new Set());
   const [, force] = useState(0);
@@ -228,23 +256,125 @@ export function DrawingLayer() {
   };
 
   /** Timer neu aufziehen: feuert nur, wenn der Stift wirklich stillsteht */
+  /** Laufenden Strich als Form einrasten (Halten am Ende — oder zweiter Finger tippt, M325/Procreate) */
+  const formEinrasten = () => {
+    const d = drawing.current;
+    if (!d || d.points.length < 8) return;
+    // M324: Eine Schleife um Karten ist ein Lasso, keine Kreis-Form
+    if (gesteAusfuehren(d)) { drawing.current = null; force((n) => n + 1); return; }
+    const formen = recognizeShapes(d.points);
+    if (formen) {
+      // Form einrasten und Strich sofort abschließen — Finger/Maus kann loslassen.
+      // Eingerastete Formen sind gleichmäßig breit (kein Druckverlauf).
+      formen.forEach((pts, i) => commitStroke({ ...d, id: i === 0 ? d.id : uid(), points: pts, druck: undefined }));
+      drawing.current = null;
+      tipp.current = null;
+      showToast(formen.length > 1 ? '✨ Pfeil eingerastet' : '✨ Form eingerastet');
+      force((n) => n + 1);
+    }
+  };
   const armHold = () => {
     clearHold();
-    holdTimer.current = window.setTimeout(() => {
-      const d = drawing.current;
-      if (!d || d.points.length < 8) return;
-      // M324: Eine Schleife um Karten ist ein Lasso, keine Kreis-Form
-      if (gesteAusfuehren(d)) { drawing.current = null; force((n) => n + 1); return; }
-      const formen = recognizeShapes(d.points);
-      if (formen) {
-        // Form einrasten und Strich sofort abschließen — Finger/Maus kann loslassen.
-        // Eingerastete Formen sind gleichmäßig breit (kein Druckverlauf).
-        formen.forEach((pts, i) => commitStroke({ ...d, id: i === 0 ? d.id : uid(), points: pts, druck: undefined }));
-        drawing.current = null;
-        showToast(formen.length > 1 ? '✨ Pfeil eingerastet' : '✨ Form eingerastet');
-        force((n) => n + 1);
-      }
-    }, HOLD_MS);
+    holdTimer.current = window.setTimeout(formEinrasten, HOLD_MS);
+  };
+
+  /* ───────────── M325: Tipp = Klick, Radierer, Finger-Tipps ───────────── */
+
+  /**
+   * Seitentaste greift (OneNote: „Taste halten = Auswahl/Verschieben"): Mit
+   * gedrückter Seitentaste zieht der Stift die Karte unter sich — React Flow
+   * ignoriert die rechte Taste, deshalb bewegt die Ebene die Karte selbst.
+   */
+  const griffStarten = (e: PointerEvent, ziel: HTMLElement) => {
+    const nodeEl = ziel.closest('.react-flow__node') as HTMLElement | null;
+    const id = nodeEl?.dataset.id;
+    const n = id ? nodes.find((k) => k.id === id) : undefined;
+    if (!n) return; // freie Fläche: normaler Zeiger (Kontextmenü, Schwenken)
+    e.preventDefault(); e.stopPropagation();
+    fuehrend.current = { id: e.pointerId, art: 'pen' };
+    stiftZug.current = 'griff';
+    griff.current = { id: n.id, start: toFlow(e), pos: { ...n.position } };
+    onNodesChange([{ id: n.id, type: 'select', selected: true }]);
+  };
+  const griffBewegen = (e: PointerEvent) => {
+    const g = griff.current;
+    if (!g) return;
+    const p = toFlow(e);
+    onNodesChange([{ id: g.id, type: 'position', position: { x: g.pos.x + p[0] - g.start[0], y: g.pos.y + p[1] - g.start[1] }, dragging: true }]);
+  };
+  const griffEnde = () => {
+    const g = griff.current;
+    griff.current = null;
+    if (!g) return;
+    const n = nodes.find((k) => k.id === g.id) ?? (getNodes() as AppNode[]).find((k) => k.id === g.id);
+    if (n) onNodesChange([{ id: g.id, type: 'position', position: n.position, dragging: false }]);
+  };
+  /** Radieren an einem Flow-Punkt — Teil (Punkte im Radius) oder ganzer Strich */
+  const radieren = (x: number, y: number) => {
+    if (radiererArt === 'teil') eraseStrokesPartial(x, y, 10 / zoom);
+    else eraseStrokesNear(x, y, 12 / zoom);
+  };
+  const tippMerken = (e: { clientX: number; clientY: number }) => { tipp.current = { t: Date.now(), x: e.clientX, y: e.clientY, weit: false }; };
+  const tippPruefen = (e: { clientX: number; clientY: number }) => {
+    const t = tipp.current;
+    if (t && !t.weit && Math.hypot(e.clientX - t.x, e.clientY - t.y) > TIPP_PX) t.weit = true;
+  };
+  const tippIst = (e?: { clientX: number; clientY: number }): boolean => {
+    const t = tipp.current;
+    if (!t || t.weit || !e) return false;
+    return Date.now() - t.t < TIPP_MS && Math.hypot(e.clientX - t.x, e.clientY - t.y) <= TIPP_PX;
+  };
+  /**
+   * Ein Stift-Tipp klickt, was unter ihm liegt — Karte wählen, Haken setzen,
+   * Fläche abwählen erledigt der Browser selbst: Das abgefangene pointerdown
+   * unterdrückt zwar mousedown/mouseup, den `click` schickt er trotzdem. Was
+   * fehlt, ist der Cursor im Text (den setzt sonst das mousedown): den holt
+   * die Ebene hier nach, samt Fokus für den Editor.
+   */
+  const tippAusfuehren = (x: number, y: number) => {
+    const el = document.elementFromPoint(x, y) as HTMLElement | null;
+    const editor = el?.closest('[contenteditable="true"]') as HTMLElement | null;
+    if (!editor) return;
+    const doc = document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null };
+    let r: Range | null = null;
+    if (typeof document.caretRangeFromPoint === 'function') r = document.caretRangeFromPoint(x, y);
+    else if (typeof doc.caretPositionFromPoint === 'function') { const p = doc.caretPositionFromPoint(x, y); if (p) { r = document.createRange(); r.setStart(p.offsetNode, p.offset); r.collapse(true); } }
+    editor.focus({ preventScroll: true });
+    if (r) { const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(r); }
+  };
+  /**
+   * Finger-Tipps wie in Procreate: zwei Finger = Rückgängig, drei = Wiederholen —
+   * im Zeichenmodus, wenn gerade kein Stift schreibt. Und: Tippt ein zweiter
+   * Finger, WÄHREND der Stift einen Strich hält, rastet die Form sofort ein.
+   */
+  const fingerTippBuchen = (e: TouchEvent) => {
+    const jetzt = Date.now();
+    const m = fingerTipps.current;
+    if (e.type === 'touchstart') {
+      for (const t of Array.from(e.changedTouches)) m.set(t.identifier, { t: jetzt, x: t.clientX, y: t.clientY, weit: false });
+      fingerMax.current = Math.max(fingerMax.current, e.touches.length);
+      return;
+    }
+    if (e.type === 'touchmove') {
+      for (const t of Array.from(e.changedTouches)) { const f = m.get(t.identifier); if (f && Math.hypot(t.clientX - f.x, t.clientY - f.y) > FINGER_TIPP_PX) f.weit = true; }
+      return;
+    }
+    // touchend / touchcancel
+    const beendet = Array.from(e.changedTouches).map((t) => m.get(t.identifier)).filter(Boolean) as Array<{ t: number; weit: boolean }>;
+    for (const t of Array.from(e.changedTouches)) m.delete(t.identifier);
+    const kurz = e.type === 'touchend' && beendet.length > 0 && beendet.every((f) => !f.weit && jetzt - f.t < FINGER_TIPP_MS);
+    if (e.touches.length === 0) {
+      const n = fingerMax.current;
+      fingerMax.current = 0;
+      if (!kurz) return;
+      if (drawing.current && drawing.current.tool !== 'marker' && stiftZug.current === 'strich' && n === 1) { formEinrasten(); return; }
+      if (!active || stiftZug.current) return;
+      if (n === 2) { undo(); showToast('↶ Rückgängig (Zwei-Finger-Tipp)'); }
+      else if (n === 3) { redo(); showToast('↷ Wiederholen (Drei-Finger-Tipp)'); }
+    } else if (kurz && drawing.current && stiftZug.current === 'strich' && drawing.current.tool !== 'marker') {
+      // Zweiter Finger tippt, während der Stift noch unten ist → sofort einrasten
+      formEinrasten();
+    }
   };
 
   /** Einen Punkt aufnehmen — Mikro-Zittern wird gar nicht erst gespeichert */
@@ -297,27 +427,41 @@ export function DrawingLayer() {
     // Capture kann bei exotischen/synthetischen Pointern fehlschlagen — Zeichnen geht trotzdem
     try { (e.target as Element).setPointerCapture(e.pointerId); } catch { /* ignorieren */ }
     const pt = toFlow(e);
-    if (tool === 'eraser') { fuehrend.current = { id: e.pointerId, art: e.pointerType }; beginEraseGesture(); eraseStrokesNear(pt[0], pt[1], 12 / zoom); return; }
+    // M325: Das Radierer-Ende des Stifts radiert immer — egal, welches Werkzeug gewählt ist
+    const radierEnde = e.pointerType === 'pen' && ((e.buttons & 32) !== 0 || e.button === 5);
+    if (tool === 'eraser' || radierEnde) { fuehrend.current = { id: e.pointerId, art: e.pointerType }; stiftZug.current = radierEnde ? 'radierer' : stiftZug.current; beginEraseGesture(); radieren(pt[0], pt[1]); return; }
     if (tool !== 'pen' && tool !== 'marker') return; // passiver Layer (pointer-events: none)
     fuehrend.current = { id: e.pointerId, art: e.pointerType };
+    tippMerken(e);
     strichStarten(e, tool);
   };
   const onMove = (e: React.PointerEvent) => {
     if (fuehrend.current && e.pointerId !== fuehrend.current.id) return;
-    if (tool === 'eraser') {
+    if (tool === 'eraser' || (fuehrend.current && stiftZug.current === 'radierer')) {
       const pt = toFlow(e);
-      if (e.buttons) eraseStrokesNear(pt[0], pt[1], 12 / zoom);
+      if (e.buttons) radieren(pt[0], pt[1]);
       return;
     }
+    tippPruefen(e);
     if (!drawing.current) return;
     if (!punkteAufnehmen(e.nativeEvent)) return;
     armHold();
     force((n) => n + 1);
   };
-  const onUp = () => {
+  const onUp = (e?: { clientX: number; clientY: number }) => {
     clearHold();
     fuehrend.current = null;
+    stiftZug.current = null;
     const d = drawing.current;
+    // M325: Ein kurzer, stiller Stift-Kontakt ist ein Tipp — er klickt, was darunter liegt
+    if (d && d.tool === 'pen' && tippIst(e)) {
+      drawing.current = null;
+      tipp.current = null;
+      force((n) => n + 1);
+      if (e) tippAusfuehren(e.clientX, e.clientY);
+      return;
+    }
+    tipp.current = null;
     if (d && d.points.length > 1) {
       // M324: Gesten zuerst — Umkreisen markiert, Durchstreichen löscht
       if (gesteAusfuehren(d)) {
@@ -354,31 +498,54 @@ export function DrawingLayer() {
       const ziel = e.target as HTMLElement | null;
       if (!ziel?.closest) return;
       if (ziel.closest(CHROME)) return;
+      if (!ziel.closest('.react-flow')) return;
+      const stift = e.pointerType === 'pen';
+      /**
+       * M325: Das Radierer-Ende des Stifts (Surface Pen, Wacom: buttons 32)
+       * radiert immer — in jedem Werkzeug, auch in der Auswahl.
+       */
+      if (stift && ((e.buttons & 32) !== 0 || e.button === 5)) {
+        e.preventDefault(); e.stopPropagation();
+        fuehrend.current = { id: e.pointerId, art: 'pen' };
+        stiftZug.current = 'radierer';
+        beginEraseGesture();
+        const pt = toFlow(e);
+        radieren(pt[0], pt[1]);
+        return;
+      }
       if (werkzeug === 'select') {
-        // Direktzug: nur Stift, nur freie Fläche. Die Fläche (.react-flow__pane)
-        // UMSCHLIESST in React Flow 12 auch Karten und Kanten — die müssen
-        // ausdrücklich raus, sonst zeichnet der Stift statt die Karte zu ziehen
-        // oder anzutippen (M322).
-        if (e.pointerType !== 'pen' || !ziel.closest('.react-flow__pane')) return;
-        if (ziel.closest('.react-flow__node, .react-flow__edge, .react-flow__handle, .react-flow__edgelabel-renderer, .react-flow__viewport-portal')) return;
+        /**
+         * M325: „Der Stift schreibt, der Finger bedient" (Procreate, OneNote,
+         * Apple). Im Auswahlmodus schreibt der Stift auf der freien Fläche UND
+         * auf Notizen — ein Tipp klickt (Cursor setzen, Haken, Karte wählen),
+         * die Seitentaste (buttons 2) macht ihn zum normalen Zeiger (Karte
+         * ziehen, Text markieren), der Griff und die Bedienelemente bleiben
+         * Bedienelemente. Module (Kanban, Tabellen …) bedient der Stift weiter.
+         */
+        if (!stift) return;
+        if ((e.buttons & 2) !== 0) { griffStarten(e, ziel); return; }
+        if (!ziel.closest(SCHREIBFLAECHE) || ziel.closest(KARTEN_BEDIENUNG)) return;
         e.preventDefault(); e.stopPropagation();
         stiftZug.current = 'strich';
         fuehrend.current = { id: e.pointerId, art: 'pen' };
+        tippMerken(e);
         strichStarten(e, 'pen');
         return;
       }
       // Zeichenmodus mit Durchgriff: Finger schieben (React Flow), Stift und Maus zeichnen
-      if (!durchgriff || e.pointerType === 'touch' || !ziel.closest('.react-flow')) return;
+      if (!durchgriff || e.pointerType === 'touch') return;
+      if (stift && (e.buttons & 2) !== 0) { griffStarten(e, ziel); return; } // Seitentaste greift — auch im Zeichenmodus
       e.preventDefault(); e.stopPropagation();
       fuehrend.current = { id: e.pointerId, art: e.pointerType };
       if (werkzeug === 'eraser') {
         stiftZug.current = 'radierer';
         beginEraseGesture();
         const pt = toFlow(e);
-        eraseStrokesNear(pt[0], pt[1], 12 / zoom);
+        radieren(pt[0], pt[1]);
         return;
       }
       stiftZug.current = 'strich';
+      if (stift) tippMerken(e);
       strichStarten(e, werkzeug === 'marker' ? 'marker' : 'pen');
     };
     const bewegen = (e: PointerEvent) => {
@@ -387,9 +554,11 @@ export function DrawingLayer() {
       e.stopPropagation();
       if (stiftZug.current === 'radierer') {
         const pt = toFlow(e);
-        eraseStrokesNear(pt[0], pt[1], 12 / zoom);
+        radieren(pt[0], pt[1]);
         return;
       }
+      if (stiftZug.current === 'griff') { griffBewegen(e); return; }
+      tippPruefen(e);
       if (!punkteAufnehmen(e)) return;
       armHold();
       force((n) => n + 1);
@@ -399,8 +568,12 @@ export function DrawingLayer() {
       const art = stiftZug.current;
       stiftZug.current = null;
       if (art === 'radierer') { fuehrend.current = null; return; }
-      onUp();
+      if (art === 'griff') { griffEnde(); fuehrend.current = null; return; }
+      onUp(e);
     };
+    // Seitentaste = rechte Taste: das Kontextmenü des Browsers hat beim Greifen nichts verloren
+    const kontext = (e: MouseEvent) => { if (stiftZug.current === 'griff' || griff.current) e.preventDefault(); };
+    window.addEventListener('contextmenu', kontext, true);
 
     /**
      * M322: React Flow schwenkt (d3-zoom) und zieht Karten (d3-drag) nicht über
@@ -417,6 +590,7 @@ export function DrawingLayer() {
     const beruehren = (e: TouchEvent) => {
       const kennungen = geschluckt.current;
       let treffer = false;
+      fingerTippBuchen(e);
       for (const t of Array.from(e.changedTouches)) {
         if (e.type === 'touchstart') {
           if (stiftZug.current) { kennungen.add(t.identifier); treffer = true; }
@@ -441,6 +615,7 @@ export function DrawingLayer() {
     window.addEventListener('touchend', beruehren, true);
     window.addEventListener('touchcancel', beruehren, true);
     return () => {
+      window.removeEventListener('contextmenu', kontext, true);
       window.removeEventListener('pointerdown', runter, true);
       window.removeEventListener('pointermove', bewegen, true);
       window.removeEventListener('pointerup', hoch, true);
@@ -479,6 +654,8 @@ export function DrawingLayer() {
   const gesteAusfuehren = (d: Stroke): boolean => {
     if (d.tool !== 'pen') return false;
     const pts = d.points;
+    // M325: Getippten Text bearbeiten — Kritzel/Durchstreichen löscht Wörter, kleine Schleife markiert
+    if (textGesteAusfuehren(pts)) return true;
     // Lasso: eine geschlossene Schleife, in deren Mitte Karten liegen
     if (istSchleife(pts)) {
       const alle = getNodes() as AppNode[];
@@ -506,6 +683,92 @@ export function DrawingLayer() {
         vorschlagVerwerfen();
         showToast(opfer.length === 1 ? '✂️ Durchgestrichen — Strich gelöscht (↶ holt ihn zurück)' : `✂️ Durchgestrichen — ${opfer.length} Striche gelöscht (↶ holt sie zurück)`);
         return true;
+      }
+    }
+    return false;
+  };
+
+  /** Flow → Bildschirm (für DOM-Treffer) */
+  const zumSchirm = (p: Pt): [number, number] => {
+    const rf = document.querySelector('.react-flow')?.getBoundingClientRect();
+    return [(rf?.left ?? 0) + p[0] * zoom + tx, (rf?.top ?? 0) + p[1] * zoom + ty];
+  };
+  /** Bildschirm → Flow */
+  const zumFlow = (x: number, y: number): Pt => {
+    const p = screenToFlowPosition({ x, y });
+    return [p.x, p.y];
+  };
+  /** Alle Wörter einer Notiz mit Block-Element und Block-Id (Bildschirm-Rechtecke) */
+  const woerterDerNotiz = (noteEl: Element): Array<Wort & { blockId: string; blockEl: HTMLElement }> => {
+    const out: Array<Wort & { blockId: string; blockEl: HTMLElement }> = [];
+    for (const b of Array.from(noteEl.querySelectorAll('.bn-editor .bn-block[data-id]')) as HTMLElement[]) {
+      const typ = (b.querySelector('.bn-block-content') as HTMLElement | null)?.dataset.contentType ?? '';
+      if (typ === 'rechentabelle' || typ === 'table' || typ === 'image') continue;
+      for (const w of woerterImBlock(b)) out.push({ ...w, blockId: b.dataset.id!, blockEl: b });
+    }
+    return out;
+  };
+  /** Bereiche je Block aus dem Inhalt löschen und die Notiz schreiben */
+  const woerterLoeschen = (noteId: string, treffer: Array<Wort & { blockId: string }>) => {
+    const node = nodes.find((n) => n.id === noteId);
+    if (!node) return;
+    const proBlock = new Map<string, Array<[number, number]>>();
+    for (const w of treffer) proBlock.set(w.blockId, [...(proBlock.get(w.blockId) ?? []), [w.start, w.end]]);
+    const alt = ((node.data as { blocks?: unknown[] }).blocks ?? []) as Array<{ id?: string; content?: BlockInhalt }>;
+    const neu = alt.map((b) => (b.id && proBlock.has(b.id) ? { ...b, content: inhaltOhneBereiche(b.content, proBlock.get(b.id)!) } : b));
+    updateNodeDataOnBoard(activeId, noteId, { blocks: neu });
+  };
+  /**
+   * Getippten Text mit dem Stift bearbeiten (Nebo, Scribble): Ein Kritzel oder
+   * ein waagerechter Strich durch Wörter löscht sie; eine kleine Schleife um
+   * Wörter markiert sie (Formatierleiste erscheint). Nur über einer Notiz.
+   */
+  const textGesteAusfuehren = (pts: Pt[]): boolean => {
+    const box = bboxVon(pts);
+    const [mx, my] = zumSchirm([box.minX + box.w / 2, box.minY + box.h / 2]);
+    const noteEl = (document.elementFromPoint(mx, my) as HTMLElement | null)?.closest('.react-flow__node-note');
+    if (!noteEl) return false;
+    const noteId = (noteEl as HTMLElement).dataset.id;
+    if (!noteId) return false;
+    const woerter = woerterDerNotiz(noteEl);
+    if (woerter.length === 0) return false;
+    const [l, t] = zumSchirm([box.minX, box.minY]);
+    const [r, b] = zumSchirm([box.maxX, box.maxY]);
+    const schirmBox: Box = { minX: l, minY: t, maxX: r, maxY: b, w: r - l, h: b - t };
+    const wortBox = (w: Wort): Box => ({ minX: w.rect.left, minY: w.rect.top, maxX: w.rect.right, maxY: w.rect.bottom, w: w.rect.width, h: w.rect.height });
+    // Kritzel über Wörtern → löschen
+    if (istKritzel(pts)) {
+      const treffer = woerter.filter((w) => ueberdeckung(schirmBox, wortBox(w)) >= 0.5);
+      if (treffer.length > 0) {
+        woerterLoeschen(noteId, treffer);
+        showToast(treffer.length === 1 ? `✂️ „${treffer[0].text}" gelöscht (↶ holt es zurück)` : `✂️ ${treffer.length} Wörter gelöscht (↶ holt sie zurück)`);
+        return true;
+      }
+    }
+    // Waagerechter Strich MITTEN durch Wörter → durchgestrichen = gelöscht; unter der Zeile bleibt er eine Unterstreichung
+    if (istWaagerechteLinie(pts)) {
+      const y = (t + b) / 2;
+      const treffer = woerter.filter((w) => {
+        const band = y > w.rect.top + w.rect.height * 0.3 && y < w.rect.top + w.rect.height * 0.72;
+        const ueber = Math.max(0, Math.min(r, w.rect.right) - Math.max(l, w.rect.left)) / Math.max(1, w.rect.width);
+        return band && ueber >= 0.6;
+      });
+      if (treffer.length > 0) {
+        woerterLoeschen(noteId, treffer);
+        showToast(treffer.length === 1 ? `✂️ „${treffer[0].text}" durchgestrichen — gelöscht (↶)` : `✂️ ${treffer.length} Wörter durchgestrichen — gelöscht (↶)`);
+        return true;
+      }
+    }
+    // Kleine Schleife um Wörter → markieren (eine Schleife um die ganze Karte ist ein Karten-Lasso, M324)
+    const kr = noteEl.getBoundingClientRect();
+    const umKarte = punktInPolygon(zumFlow(kr.left + kr.width / 2, kr.top + kr.height / 2), pts);
+    if (!umKarte && istSchleife(pts, 600, 90)) {
+      const drin = woerter.filter((w) => punktInPolygon(zumFlow(w.rect.left + w.rect.width / 2, w.rect.top + w.rect.height / 2), pts));
+      if (drin.length > 0 && drin.every((w) => w.blockId === drin[0].blockId)) {
+        if (woerterMarkieren(drin[0].blockEl, drin[0], drin[drin.length - 1])) {
+          showToast(drin.length === 1 ? `◯ „${drin[0].text}" markiert` : `◯ ${drin.length} Wörter markiert`);
+          return true;
+        }
       }
     }
     return false;
@@ -555,10 +818,53 @@ export function DrawingLayer() {
     return null;
   };
 
-  /** Text in die Notiz einfügen — nach dem Block unter der Schrift, sonst ans Ende; neben einer Liste als Listenpunkt */
+  /**
+   * Text in die Notiz einfügen. M325: Steht die Schrift IN einer Zeile (links
+   * am Zeilenanfang, zwischen zwei Wörtern oder hinter dem Zeilenende), wird
+   * sie dort eingefügt — mitten in den getippten Text. Sonst wie M324: als
+   * Block nach dem Block unter der Schrift (neben einer Liste als Listenpunkt),
+   * ohne Bezug ans Ende.
+   */
   const inNotizEinfuegen = (ziel: AppNode, text: string, box: { minX: number; minY: number; h: number }) => {
     const alt = ((ziel.data as { blocks?: unknown[] }).blocks ?? []) as Array<{ id?: string; type?: string; content?: unknown }>;
-    const bezug = blockUnter(ziel.id, box);
+    let bezug = blockUnter(ziel.id, box);
+    // Links im Rand oder rechts hinter dem Zeilenende trifft der Punkt keinen Block — dann zählt die Zeilenhöhe
+    if (!bezug) {
+      const [, sy] = zumSchirm([box.minX, box.minY + Math.min(box.h, 18) / 2]);
+      const treffer = (Array.from(document.querySelectorAll(`.react-flow__node[data-id="${ziel.id}"] .bn-editor .bn-block[data-id]`)) as HTMLElement[])
+        .find((b) => { const r = b.getBoundingClientRect(); return sy >= r.top && sy <= r.bottom; });
+      if (treffer?.dataset.id) bezug = { id: treffer.dataset.id, type: (treffer.querySelector('.bn-block-content') as HTMLElement | null)?.dataset.contentType ?? 'paragraph' };
+    }
+    if (bezug && !text.includes('\n')) {
+      const blockEl = document.querySelector(`.react-flow__node[data-id="${ziel.id}"] .bn-block[data-id="${bezug.id}"]`) as HTMLElement | null;
+      const typ = (blockEl?.querySelector('.bn-block-content') as HTMLElement | null)?.dataset.contentType ?? '';
+      const woerter = blockEl && !['rechentabelle', 'table', 'image'].includes(typ) ? woerterImBlock(blockEl) : [];
+      if (blockEl && woerter.length > 0) {
+        const [sx, sy] = zumSchirm([box.minX, box.minY + Math.min(box.h, 18) / 2]);
+        const zeile = woerter.filter((w) => sy >= w.rect.top - 2 && sy <= w.rect.bottom + 2);
+        if (zeile.length > 0) {
+          const rechts = Math.max(...zeile.map((w) => w.rect.right));
+          const links = Math.min(...zeile.map((w) => w.rect.left));
+          let offset: number | null = null;
+          if (sx >= rechts - 4) offset = zeile[zeile.length - 1].end;            // hinter dem Zeilenende
+          else if (sx <= links + 4) offset = zeile[0].start;                      // vor dem Zeilenanfang
+          else offset = offsetUnterPunkt(blockEl, sx, sy);                        // zwischen zwei Wörtern
+          // Mitten in einem Wort gelandet → an die nähere Wortgrenze
+          if (offset !== null) {
+            const mitten = zeile.find((w) => offset! > w.start && offset! < w.end);
+            if (mitten) offset = sx - mitten.rect.left < mitten.rect.right - sx ? mitten.start : mitten.end;
+          }
+          if (offset !== null) {
+            const i = alt.findIndex((b) => b.id === bezug.id);
+            if (i >= 0) {
+              const neu = alt.map((b, k) => (k === i ? { ...b, content: inhaltMitEinfuegung(b.content as BlockInhalt, offset!, text) } : b));
+              updateNodeDataOnBoard(activeId, ziel.id, { blocks: neu });
+              return;
+            }
+          }
+        }
+      }
+    }
     const listenTyp = bezug && ['checkListItem', 'bulletListItem', 'numberedListItem'].includes(bezug.type) ? bezug.type : null;
     const neue = (textZuBloecken(text) as Array<{ type: string }>).map((b) => (listenTyp && b.type === 'paragraph' ? { ...b, type: listenTyp } : b));
     // Ein leerer Schluss-Absatz (BlockNote hält ihn bereit) soll nicht zwischen Text und Schrift stehen
@@ -740,6 +1046,22 @@ export function DrawingLayer() {
       )}
       {active && (
       <div className="draw-palette">
+        {tool === 'eraser' && (
+          <>
+            {(['teil', 'strich'] as const).map((art) => (
+              <button
+                key={art}
+                className={`draw-radierer-art ${radiererArt === art ? 'on' : ''}`}
+                title={art === 'teil' ? 'Teil-Radierer: nimmt nur weg, was der Stift berührt' : 'Strich-Radierer: ein ganzer Strich auf einmal'}
+                aria-label={art === 'teil' ? 'Teil-Radierer' : 'Strich-Radierer'}
+                onClick={() => radiererWaehlen(art)}
+              >
+                {art === 'teil' ? 'Teil' : 'Strich'}
+              </button>
+            ))}
+            <span className="draw-trenner" aria-hidden="true" />
+          </>
+        )}
         {!isMarker && tool !== 'eraser' && (
           <>
             {PEN_WIDTHS.map((w, i) => (
@@ -774,7 +1096,7 @@ export function DrawingLayer() {
         />
         <span className="draw-hint">
           {tool === 'eraser' ? 'Radierer' : tool === 'marker' ? 'Textmarker' : 'Stift'}
-          <span className="draw-hint-tip">{durchgriff ? ' · Hand schiebt, Stift zeichnet' : ''} · am Ende kurz halten = Form einrasten ✨</span>
+          <span className="draw-hint-tip">{durchgriff ? ' · Stift schreibt, Finger bedient, Seitentaste greift' : ''} · kurz halten = Form ✨</span>
         </span>
         {schriftDa && (
           <button className="draw-text" disabled={erkennt} onClick={() => void handschriftUebernehmen()} title="Geschriebenes in eine Notiz mit Text umwandeln (Striche dieser Sitzung)" aria-label="Handschrift in Text umwandeln">

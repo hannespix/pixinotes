@@ -158,10 +158,11 @@ console.log('\n════ B: Schrift über einer Notiz landet in der Notiz ═
   const n1 = (await knoten(P)).find((k) => k.id === 'n1');
   const tx = texte(n1.data.blocks);
   const idx = tx.findIndex((t) => t[1] === 'Käse');
-  pruefe('B2 „Käse" steht als Listenpunkt direkt hinter „Brot" (gleicher Typ wie der Nachbar)', idx === 3 && tx[idx][0] === 'checkListItem' && tx[2][1] === 'Brot' && tx[4][1] === 'Butter', JSON.stringify(tx));
+  // M325: Schrift in derselben Zeile wird INLINE eingefügt („Brot Käse"), kein eigener Punkt mehr
+  pruefe('B2 „Käse" steht in der Zeile hinter „Brot" (inline, M325)', idx === -1 && tx[2][1] === 'Brot Käse' && tx[2][0] === 'checkListItem' && tx[3][1] === 'Butter', JSON.stringify(tx));
   pruefe('B3 keine neue Karte, Striche weg, extEpoch hochgezählt', (await knoten(P)).length === 2 && (await striche(P)).length === 0 && typeof n1.data.extEpoch === 'number');
   const imEditor = await P.evaluate(() => [...document.querySelectorAll('.react-flow__node[data-id="n1"] [data-content-type="checkListItem"]')].map((e) => e.textContent.trim()));
-  pruefe('B4 der offene Editor zeigt den neuen Punkt', imEditor.join(',') === 'Milch,Brot,Käse,Butter', imEditor.join(','));
+  pruefe('B4 der offene Editor zeigt die Einfügung', imEditor.join(',') === 'Milch,Brot Käse,Butter', imEditor.join(','));
   pruefe('B5 Hinweis nennt die Zielnotiz', /In „Einkauf Wochenende" eingefügt/.test(await toast(P)), await toast(P));
   // Unterhalb des Textes, im leeren Bereich der Notiz → ans Ende
   const karte = await P.locator('.react-flow__node[data-id="n1"]').boundingBox();
@@ -174,7 +175,7 @@ console.log('\n════ B: Schrift über einer Notiz landet in der Notiz ═
   const tb = texte(n1b.data.blocks);
   // BlockNote hält am Ende einen leeren Absatz bereit — der letzte Block MIT Text zählt
   const letzterText = [...tb].reverse().find((t) => t[1])?.[1];
-  pruefe('B6 Schrift im leeren Bereich der Notiz hängt sich ans Ende', letzterText === 'Noch Eier' && tb.filter((t) => t[1]).length === 6, JSON.stringify(tb));
+  pruefe('B6 Schrift im leeren Bereich der Notiz hängt sich ans Ende', letzterText === 'Noch Eier' && tb.filter((t) => t[1]).length === 5, JSON.stringify(tb));
   await P.screenshot({ path: path.join(SD, 'm324-in-notiz.png') });
   await ctx.close();
 }
