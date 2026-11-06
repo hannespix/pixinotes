@@ -130,6 +130,7 @@ export async function kiKorrektur(roh: string, alternativen: string[], kontext: 
     'Gib NUR den korrigierten Text zurück — ohne Anführungszeichen, ohne Erklärung, ohne Einleitung.',
     'Regeln: Nur offensichtliche Lesefehler beheben (ähnliche Buchstaben wie rn/m, l/1, O/0; fehlende Umlaute und ß; Groß-/Kleinschreibung am Satzanfang; Zahlen, Uhrzeiten und Datumsformate wie 12.11. oder 14:30).',
     'Nichts hinzufügen, nichts weglassen, nichts umformulieren, Zeilenumbrüche genau beibehalten. Ist der Text schon richtig, gib ihn unverändert zurück.',
+    'Zeichen am Zeilenanfang wie „- ", „• ", „1. ", „[ ] ", „[x] " oder „# " sind Aufzählungs- und Strukturmarker: genau so stehen lassen.',
     'Namen, Orte und Fachwörter aus dem Kontext haben Vorrang vor ähnlich aussehenden Wörtern.',
     kontext.board ? `Board: „${kontext.board}"` : '',
     kontext.notiz ? `Zielnotiz (Auszug):\n${kontext.notiz}` : '',

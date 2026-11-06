@@ -5,10 +5,11 @@ import { selectActiveBoard, useBoard, type Stroke } from '../store';
 import { uid } from '../types';
 import { finalizeStroke, recognizeShapes, type Pt } from '../lib/strokeShapes';
 import { handschriftKandidaten, handschriftWeg, kiKorrektur, textAufraeumen, type SchriftKontext } from '../lib/handschrift';
+import { TEXT_ARTEN, artSetzen, artVorsatz, hauptArt, istListe, markerAusStrichen, zeilenMitArt, zeilenZuBloecken, type BlockArt, type ZeileMitArt } from '../lib/handschriftStruktur';
 import { bboxVon, istKritzel, istSchleife, istWaagerechteLinie, punktInPolygon, ueberdeckung, type Box } from '../lib/stiftGesten';
 import { inhaltMitEinfuegung, inhaltOhneBereiche, offsetUnterPunkt, woerterImBlock, woerterMarkieren, type BlockInhalt, type Wort } from '../lib/stiftText';
 import { aiReady } from '../lib/ai';
-import { noteTitle, textZuBloecken } from '../lib/notiz';
+import { noteTitle } from '../lib/notiz';
 import { blocksToText } from '../lib/serialize';
 import { makeNote } from '../lib/nodes';
 import type { AppNode } from '../types';
@@ -126,7 +127,7 @@ export function DrawingLayer() {
   const [erkennt, setErkennt] = useState(false);
   const [penWidth, setPenWidth] = useState<number>(PEN.width);
   /** M324: Vorschlag nach der Schreibpause — Text (oder „erkenne…"), Lage in Flow-Koordinaten */
-  const [vorschlag, setVorschlag] = useState<{ ids: string[]; text: string; x: number; y: number; status: 'erkennt' | 'ki' | 'fertig' } | null>(null);
+  const [vorschlag, setVorschlag] = useState<{ ids: string[]; text: string; zeilen: ZeileMitArt[]; x: number; y: number; status: 'erkennt' | 'ki' | 'fertig' } | null>(null);
   const vorschlagTimer = useRef<number | null>(null);
   const vorschlagLauf = useRef(0);
   const { screenToFlowPosition, getNodes, getViewport, setViewport } = useReactFlow();
@@ -857,15 +858,8 @@ export function DrawingLayer() {
     return null;
   };
 
-  /**
-   * Text in die Notiz einfügen. M325: Steht die Schrift IN einer Zeile (links
-   * am Zeilenanfang, zwischen zwei Wörtern oder hinter dem Zeilenende), wird
-   * sie dort eingefügt — mitten in den getippten Text. Sonst wie M324: als
-   * Block nach dem Block unter der Schrift (neben einer Liste als Listenpunkt),
-   * ohne Bezug ans Ende.
-   */
-  const inNotizEinfuegen = (ziel: AppNode, text: string, box: { minX: number; minY: number; h: number }) => {
-    const alt = ((ziel.data as { blocks?: unknown[] }).blocks ?? []) as Array<{ id?: string; type?: string; content?: unknown }>;
+  /** M325/M327: Der Block der Notiz, auf den sich die Schrift bezieht — unter ihr oder in derselben Zeile */
+  const bezugFinden = (ziel: AppNode, box: { minX: number; minY: number; h: number }): { id: string; type: string } | null => {
     let bezug = blockUnter(ziel.id, box);
     // Links im Rand oder rechts hinter dem Zeilenende trifft der Punkt keinen Block — dann zählt die Zeilenhöhe
     if (!bezug) {
@@ -874,7 +868,79 @@ export function DrawingLayer() {
         .find((b) => { const r = b.getBoundingClientRect(); return sy >= r.top && sy <= r.bottom; });
       if (treffer?.dataset.id) bezug = { id: treffer.dataset.id, type: (treffer.querySelector('.bn-block-content') as HTMLElement | null)?.dataset.contentType ?? 'paragraph' };
     }
-    if (bezug && !text.includes('\n')) {
+    return bezug;
+  };
+
+  /**
+   * M327: Welche Textart legt die Notiz nahe? Die des Blocks, neben dem
+   * geschrieben wird; unterhalb des letzten Blocks die des letzten Blocks mit
+   * Inhalt. Nur Listenarten setzen sich fort (eine Überschrift nicht). Beginnt
+   * die Schrift links der Listen-Einrückung — unter dem Punkt statt unter dem
+   * Text —, will der Schreiber zurück zu normalem Text, wie auf Papier.
+   */
+  const kontextArt = (ziel: AppNode | null, box: { minX: number; minY: number; h: number }): BlockArt | null => {
+    if (!ziel) return null;
+    const bezug = bezugFinden(ziel, box);
+    let art: string | null = bezug?.type ?? null;
+    let blockEl: HTMLElement | null = bezug ? (document.querySelector(`.react-flow__node[data-id="${ziel.id}"] .bn-block[data-id="${bezug.id}"]`) as HTMLElement | null) : null;
+    if (!bezug) {
+      const bloecke = Array.from(document.querySelectorAll(`.react-flow__node[data-id="${ziel.id}"] .bn-editor .bn-block[data-id]`)) as HTMLElement[];
+      const [, sy] = zumSchirm([box.minX, box.minY]);
+      // Der letzte Block mit Inhalt — der leere Schluss-Absatz von BlockNote zählt nicht
+      const letzter = [...bloecke].reverse().find((b) => (b.querySelector('.bn-inline-content')?.textContent ?? '').trim() !== '');
+      if (letzter && sy >= letzter.getBoundingClientRect().top) { art = (letzter.querySelector('.bn-block-content') as HTMLElement | null)?.dataset.contentType ?? null; blockEl = letzter; }
+    }
+    if (!istListe(art)) return null;
+    // Nur unterhalb der Liste: Schrift auf einer bestehenden Zeile wird dort eingefügt (M325), auch vor dem Zeilenanfang
+    const inhalt = !bezug ? (blockEl?.querySelector('.bn-inline-content') as HTMLElement | null) : null;
+    if (inhalt) {
+      const [sx] = zumSchirm([box.minX, box.minY]);
+      if (sx < inhalt.getBoundingClientRect().left - 8) return 'paragraph';
+    }
+    return art;
+  };
+
+  /**
+   * M327: Die Schrift dieser Sitzung erkennen — erst die Form-Marker lesen
+   * (Kästchen, Punkt, Strich, Unterstreichung, Größe), dann den Rest erkennen
+   * lassen, dann Text-Marker („- ", „1. ", „[ ] ", „# ") und den Kontext der
+   * Zielnotiz anwenden. `ki`: die KI-korrigierten Zeilen, wenn eine KI läuft.
+   */
+  const schriftErkennen = async (eigene: Stroke[], mitKi: boolean): Promise<{ zeilen: ZeileMitArt[]; ki: Promise<ZeileMitArt[]> | null }> => {
+    const punkte = eigene.map(absolut);
+    const box = bboxVon(punkte.flat());
+    const ziel = zielNotiz(eigene);
+    const form = markerAusStrichen(punkte);
+    const k = await handschriftKandidaten(form.ohneMarker.length > 0 ? form.ohneMarker : punkte);
+    const text = textAufraeumen(k.text);
+    if (!text) return { zeilen: [], ki: null };
+    const kontext = kontextArt(ziel, box);
+    const zeilen = zeilenMitArt(text.split('\n'), form.zeilen, kontext);
+    let ki: Promise<ZeileMitArt[]> | null = null;
+    if (mitKi) {
+      ki = kiKorrektur(text, k.alternativen, kontextFuer(ziel)).then((besser) => {
+        const neu = zeilenMitArt(besser.split('\n'), form.zeilen, kontext);
+        if (neu.length !== zeilen.length) return neu;
+        // Die KI korrigiert Lesefehler, nicht die Struktur — Form und Kontext bleiben
+        return neu.map((z, i) => (z.quelle === 'text' ? z : { ...z, art: zeilen[i].art, checked: zeilen[i].checked, level: zeilen[i].level, quelle: zeilen[i].quelle }));
+      });
+    }
+    return { zeilen, ki };
+  };
+
+  /**
+   * Text in die Notiz einfügen. M325: Steht die Schrift IN einer Zeile (links
+   * am Zeilenanfang, zwischen zwei Wörtern oder hinter dem Zeilenende), wird
+   * sie dort eingefügt — mitten in den getippten Text. Sonst wie M324: als
+   * Block nach dem Block unter der Schrift (neben einer Liste als Listenpunkt),
+   * ohne Bezug ans Ende.
+   */
+  const inNotizEinfuegen = (ziel: AppNode, zeilen: ZeileMitArt[], box: { minX: number; minY: number; h: number }) => {
+    const alt = ((ziel.data as { blocks?: unknown[] }).blocks ?? []) as Array<{ id?: string; type?: string; content?: unknown }>;
+    const bezug = bezugFinden(ziel, box);
+    const text = zeilen.map((z) => z.text).join('\n');
+    // M327: Nur eine Zeile ohne eigenen Marker darf mitten in den getippten Text — mit Marker wird sie ein eigener Block
+    if (bezug && zeilen.length === 1 && (zeilen[0].quelle === 'keine' || zeilen[0].quelle === 'kontext')) {
       const blockEl = document.querySelector(`.react-flow__node[data-id="${ziel.id}"] .bn-block[data-id="${bezug.id}"]`) as HTMLElement | null;
       const typ = (blockEl?.querySelector('.bn-block-content') as HTMLElement | null)?.dataset.contentType ?? '';
       const woerter = blockEl && !['rechentabelle', 'table', 'image'].includes(typ) ? woerterImBlock(blockEl) : [];
@@ -904,8 +970,8 @@ export function DrawingLayer() {
         }
       }
     }
-    const listenTyp = bezug && ['checkListItem', 'bulletListItem', 'numberedListItem'].includes(bezug.type) ? bezug.type : null;
-    const neue = (textZuBloecken(text) as Array<{ type: string }>).map((b) => (listenTyp && b.type === 'paragraph' ? { ...b, type: listenTyp } : b));
+    // M327: Die Zeilen tragen ihre Art schon (Form, Text-Marker oder Kontext der Notiz)
+    const neue = zeilenZuBloecken(zeilen);
     // Ein leerer Schluss-Absatz (BlockNote hält ihn bereit) soll nicht zwischen Text und Schrift stehen
     const leer = (b: { type?: string; content?: unknown }) => b.type === 'paragraph' && Array.isArray(b.content) && b.content.length === 0;
     let out: unknown[];
@@ -925,7 +991,7 @@ export function DrawingLayer() {
    * neue Notiz an Ort und Stelle. Die Striche verschwinden; ↶ holt beides zurück.
    * `fertig`: schon erkannter Text (vom Vorschlag) — dann keine zweite Erkennung.
    */
-  const handschriftUebernehmen = async (fertig?: string) => {
+  const handschriftUebernehmen = async (fertig?: ZeileMitArt[]) => {
     const eigene = sessionStriche();
     if (eigene.length === 0) { showToast('Erst mit dem Stift schreiben, dann „Text".'); return; }
     setErkennt(true);
@@ -934,19 +1000,19 @@ export function DrawingLayer() {
       const punkte = eigene.map(absolut);
       const box = bboxVon(punkte.flat());
       const ziel = zielNotiz(eigene);
-      let text = fertig ?? '';
-      if (!text) {
-        const k = await handschriftKandidaten(punkte);
-        text = textAufraeumen(k.text);
-        if (text && handschriftKi && aiReady(ai)) text = await kiKorrektur(text, k.alternativen, kontextFuer(ziel));
+      let zeilen = fertig ?? [];
+      if (zeilen.length === 0) {
+        const e = await schriftErkennen(eigene, handschriftKi && aiReady(ai));
+        zeilen = e.ki ? await e.ki : e.zeilen;
       }
+      const text = zeilen.map((z) => z.text).join('\n');
       if (!text) { showToast('Keine Schrift erkannt — deutlicher schreiben oder größer.'); return; }
       const kurz = text.length > 40 ? `${text.slice(0, 40)}…` : text;
       if (ziel) {
-        inNotizEinfuegen(ziel, text, box);
+        inNotizEinfuegen(ziel, zeilen, box);
         showToast(`✍️ In „${noteTitle((ziel.data as { blocks?: unknown[] }).blocks)}" eingefügt: „${kurz}"`);
       } else {
-        addNode(makeNote({ x: box.minX, y: box.minY }, { color: 'white', blocks: textZuBloecken(text) }));
+        addNode(makeNote({ x: box.minX, y: box.minY }, { color: 'white', blocks: zeilenZuBloecken(zeilen) }));
         showToast(`✍️ Neue Notiz: „${kurz}"`);
       }
       removeStrokes(eigene.map((s) => s.id));
@@ -972,18 +1038,20 @@ export function DrawingLayer() {
     const box = bboxVon(punkte.flat());
     const ids = eigene.map((s) => s.id);
     const lage = { ids, x: box.minX, y: box.maxY };
-    setVorschlag({ ...lage, text: '', status: 'erkennt' });
+    setVorschlag({ ...lage, text: '', zeilen: [], status: 'erkennt' });
     try {
-      const k = await handschriftKandidaten(punkte);
+      const e = await schriftErkennen(eigene, handschriftKi && aiReady(ai));
       if (lauf !== vorschlagLauf.current) return;
-      const text = textAufraeumen(k.text);
-      if (!text) { setVorschlag(null); return; }
-      const mitKi = handschriftKi && aiReady(ai);
-      setVorschlag({ ...lage, text, status: mitKi ? 'ki' : 'fertig' });
-      if (mitKi) {
-        const besser = await kiKorrektur(text, k.alternativen, kontextFuer(zielNotiz(eigene)));
+      if (e.zeilen.length === 0) { setVorschlag(null); return; }
+      const textVon = (z: ZeileMitArt[]) => z.map((x) => x.text).join('\n');
+      setVorschlag({ ...lage, text: textVon(e.zeilen), zeilen: e.zeilen, status: e.ki ? 'ki' : 'fertig' });
+      if (e.ki) {
+        const besser = await e.ki;
         if (lauf !== vorschlagLauf.current) return;
-        setVorschlag({ ...lage, text: besser, status: 'fertig' });
+        // Hat der Nutzer die Textart inzwischen umgeschaltet, bleibt seine Wahl
+        setVorschlag((v) => (v && v.ids === ids
+          ? { ...v, text: textVon(besser), status: 'fertig', zeilen: besser.map((z, i) => (v.zeilen.length === besser.length ? { ...z, art: v.zeilen[i].art, checked: v.zeilen[i].checked, level: v.zeilen[i].level } : z)) }
+          : v));
       }
     } catch {
       if (lauf === vorschlagLauf.current) setVorschlag(null);
@@ -1080,12 +1148,27 @@ export function DrawingLayer() {
           ) : (
             <button
               className="vorschlag-text"
-              title={vorschlag.status === 'ki' ? 'Erkannt — die KI prüft noch; Tipp übernimmt sofort' : 'Tipp: Text übernehmen (in die Notiz darunter oder als neue Notiz)'}
+              title={vorschlag.status === 'ki' ? 'Erkannt — die KI prüft noch; Tipp übernimmt sofort' : 'Tipp: Text übernehmen (in die Notiz darunter oder als neue Notiz) — rechts die Textart wechseln'}
               aria-label="Erkannten Text übernehmen"
-              onClick={() => void handschriftUebernehmen(vorschlag.text)}
+              onClick={() => void handschriftUebernehmen(vorschlag.zeilen)}
             >
-              <b>{vorschlag.status === 'ki' ? '✍️…' : '✍️'}</b>{vorschlag.text}
+              <b>{vorschlag.status === 'ki' ? '✍️…' : '✍️'}</b>{vorschlag.zeilen.map((z) => artVorsatz(z) + z.text).join('\n')}
             </button>
+          )}
+          {vorschlag.status !== 'erkennt' && (
+            // M327: Textart umschalten — Text, Aufzählung, Nummern, Kästchen, Überschrift
+            <span className="vorschlag-arten" role="group" aria-label="Textart">
+              {TEXT_ARTEN.map((a) => (
+                <button
+                  key={a.art}
+                  className={`vorschlag-art ${hauptArt(vorschlag.zeilen) === a.art ? 'on' : ''}`}
+                  title={`Als ${a.name} übernehmen`}
+                  aria-label={`Als ${a.name} übernehmen`}
+                  aria-pressed={hauptArt(vorschlag.zeilen) === a.art}
+                  onClick={() => setVorschlag((v) => (v ? { ...v, zeilen: artSetzen(v.zeilen, a.art) } : v))}
+                >{a.kurz}</button>
+              ))}
+            </span>
           )}
           <button className="vorschlag-weg" title="Vorschlag ausblenden (Esc)" aria-label="Vorschlag ausblenden" onClick={vorschlagVerwerfen}><IX size={13} /></button>
         </div>
