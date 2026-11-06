@@ -168,7 +168,8 @@ console.log('\n════ C: Durchgriff ════');
   const ebene = await P.evaluate(() => getComputedStyle(document.querySelector('.drawing-layer')).pointerEvents);
   pruefe('C1 mit bekanntem Stift lässt die Ebene Finger durch (pointer-events none)', ebene === 'none', ebene);
   const hinweis = await P.locator('.draw-hint').textContent();
-  pruefe('C2 die Palette sagt es: Hand schiebt, Stift zeichnet', /Hand schiebt, Stift zeichnet/.test(hinweis ?? ''), hinweis ?? '');
+  // M325: Der Hinweis heißt jetzt „Stift schreibt, Finger bedient, Seitentaste greift"
+  pruefe('C2 die Palette sagt es: Stift schreibt, Finger bedient', /Stift schreibt, Finger bedient/.test(hinweis ?? ''), hinweis ?? '');
   const vp0 = await P.evaluate(() => document.querySelector('.react-flow__viewport').style.transform);
   await zug(P, strecke([700, 500], [700, 380], 12), { art: 'touch', id: 21 }); await warte(P, 500);
   let d = await striche(P);

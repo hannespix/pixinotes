@@ -6182,3 +6182,11 @@ audio.file-media { height: 40px; }
 .draw-palette .draw-dicke.on { box-shadow: inset 0 0 0 1.5px var(--ink); }
 .draw-palette .draw-dicke:hover { background: rgba(0,0,0,.05); }
 .draw-palette .draw-trenner { width: 1px; height: 18px; background: var(--border-soft); margin: 0 2px; }
+
+/* ===== M325: Stift wie auf Surface und iPad ===== */
+.draw-palette .draw-radierer-art {
+  all: unset; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; padding: 4px 9px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); color: var(--muted); background: var(--surface);
+}
+.draw-palette .draw-radierer-art + .draw-radierer-art { margin-left: 4px; }
+.draw-palette .draw-radierer-art.on { color: var(--ink); border-color: var(--ink); }
