@@ -153,7 +153,8 @@ console.log('\n════ B: Schrift über einer Notiz landet in der Notiz ═
   await zug(P, welle(x0, y0, 16, 5), { id: 31 }); await warte(P, 100);
   await zug(P, welle(x0 + 50, y0, 16, 5), { id: 32 });
   await warte(P, 1600);
-  pruefe('B1 Vorschlag erscheint auch über der Notiz', (await chipText(P)) === 'Käse', String(await chipText(P)));
+  // M327: neben einem Kästchen-Punkt trägt der Vorschlag den Vorsatz „☐" (Kontext der Notiz)
+  pruefe('B1 Vorschlag erscheint auch über der Notiz (M327: als Kästchen-Punkt)', (await chipText(P)) === '☐ Käse', String(await chipText(P)));
   await P.locator('.schrift-vorschlag .vorschlag-text').click(); await warte(P, 1000);
   const n1 = (await knoten(P)).find((k) => k.id === 'n1');
   const tx = texte(n1.data.blocks);
