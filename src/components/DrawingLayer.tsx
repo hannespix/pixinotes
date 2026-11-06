@@ -3,10 +3,15 @@ import { useReactFlow, useViewport } from '@xyflow/react';
 import { getStroke } from 'perfect-freehand';
 import { selectActiveBoard, useBoard, type Stroke } from '../store';
 import { uid } from '../types';
-import { finalizeStroke, recognizeShapes } from '../lib/strokeShapes';
-import { handschriftErkennen } from '../lib/handschrift';
+import { finalizeStroke, recognizeShapes, type Pt } from '../lib/strokeShapes';
+import { handschriftKandidaten, handschriftWeg, kiKorrektur, textAufraeumen, type SchriftKontext } from '../lib/handschrift';
+import { bboxVon, istKritzel, istSchleife, punktInPolygon, ueberdeckung } from '../lib/stiftGesten';
+import { aiReady } from '../lib/ai';
+import { noteTitle, textZuBloecken } from '../lib/notiz';
+import { blocksToText } from '../lib/serialize';
 import { makeNote } from '../lib/nodes';
-import { IType } from './Icons';
+import type { AppNode } from '../types';
+import { IType, IX } from './Icons';
 
 const EMPTY: Stroke[] = [];
 const PEN = { width: 2.5, opacity: 1 };
@@ -14,8 +19,14 @@ const MARKER = { width: 16, opacity: 0.5 };
 const PEN_COLORS = ['#16191e', '#e0392b', '#e8a13a', '#3fa564', '#4f7cff', '#a05fd4'];
 /** Textmarker: echte Neon-Töne wie beim Leuchtstift (gelb/grün/orange/pink/cyan/lila) */
 const MARKER_COLORS = ['#fff200', '#aaff00', '#ff9100', '#ff2d95', '#00e5ff', '#c45fff'];
-/** Stillhalten am Strich-Ende so lange → Form einrasten (Linie/Pfeil/Kreis/Rechteck/Dreieck) */
-const HOLD_MS = 550;
+/** Stillhalten am Strich-Ende so lange → Form einrasten (Linie/Pfeil/Kreis/Rechteck/Dreieck).
+ *  M324: 550 → 320 ms — „Formen einrasten schneller". Kürzer wäre riskant: beim
+ *  Schreiben setzt der Stift zwischen Buchstaben ähnlich kurz ab. */
+const HOLD_MS = 320;
+/** M324: Strichstärken fein · normal · dick */
+const PEN_WIDTHS = [1.8, 2.5, 4] as const;
+/** M324: Nach dem Absetzen so lange Ruhe → erkannter Text als Vorschlag */
+const VORSCHLAG_MS = 900;
 /** Hat dieses Gerät je einen Stift gemeldet? Dann gilt: Stift schreibt, Hand schiebt. */
 const STIFT_KEY = 'pixinotes-stift';
 /** Bedienelemente, die auch im Zeichenmodus Bedienelemente bleiben */
@@ -81,8 +92,20 @@ export function DrawingLayer() {
   const beginEraseGesture = useBoard((s) => s.beginEraseGesture);
   const removeStrokes = useBoard((s) => s.removeStrokes);
   const addNode = useBoard((s) => s.addNode);
+  const onNodesChange = useBoard((s) => s.onNodesChange);
+  const updateNodeDataOnBoard = useBoard((s) => s.updateNodeDataOnBoard);
+  const activeId = useBoard((s) => s.activeId);
+  const boardName = useBoard((s) => selectActiveBoard(s)?.name ?? '');
+  const handschriftAuto = useBoard((s) => s.handschriftAuto);
+  const handschriftKi = useBoard((s) => s.handschriftKi);
+  const ai = useBoard((s) => s.ai);
   const [erkennt, setErkennt] = useState(false);
-  const { screenToFlowPosition } = useReactFlow();
+  const [penWidth, setPenWidth] = useState<number>(PEN.width);
+  /** M324: Vorschlag nach der Schreibpause — Text (oder „erkenne…"), Lage in Flow-Koordinaten */
+  const [vorschlag, setVorschlag] = useState<{ ids: string[]; text: string; x: number; y: number; status: 'erkennt' | 'ki' | 'fertig' } | null>(null);
+  const vorschlagTimer = useRef<number | null>(null);
+  const vorschlagLauf = useRef(0);
+  const { screenToFlowPosition, getNodes } = useReactFlow();
   const { x: tx, y: ty, zoom } = useViewport();
   const uiTheme = useBoard((s) => s.ui.theme);
   // Im dunklen Design wäre die Tinten-Farbe unsichtbar → helle „Kreide" anbieten
@@ -210,6 +233,8 @@ export function DrawingLayer() {
     holdTimer.current = window.setTimeout(() => {
       const d = drawing.current;
       if (!d || d.points.length < 8) return;
+      // M324: Eine Schleife um Karten ist ein Lasso, keine Kreis-Form
+      if (gesteAusfuehren(d)) { drawing.current = null; force((n) => n + 1); return; }
       const formen = recognizeShapes(d.points);
       if (formen) {
         // Form einrasten und Strich sofort abschließen — Finger/Maus kann loslassen.
@@ -245,7 +270,7 @@ export function DrawingLayer() {
       id: uid(),
       tool: werkzeug,
       color: werkzeug === 'marker' ? markerColor : effPenColor,
-      width: werkzeug === 'marker' ? MARKER.width : PEN.width,
+      width: werkzeug === 'marker' ? MARKER.width : penWidth,
       points: [[p.x, p.y]],
       ...(sensor ? { druck: [Math.min(1, e.pressure ?? 0.5)] } : {}),
     };
@@ -294,9 +319,16 @@ export function DrawingLayer() {
     fuehrend.current = null;
     const d = drawing.current;
     if (d && d.points.length > 1) {
+      // M324: Gesten zuerst — Umkreisen markiert, Durchstreichen löscht
+      if (gesteAusfuehren(d)) {
+        drawing.current = null;
+        force((n) => n + 1);
+        return;
+      }
       // Loslassen: entzittern + fast gerade Striche konservativ begradigen
       const points = finalizeStroke(d.points);
       commitStroke({ ...d, points, druck: d.druck && d.druck.length === points.length ? d.druck : undefined });
+      if (d.tool === 'pen') vorschlagPlanen();
     }
     drawing.current = null;
     force((n) => n + 1);
@@ -420,40 +452,211 @@ export function DrawingLayer() {
     };
   });
 
-  /**
-   * M320: Handschrift → Text. Nimmt die Striche dieser Zeichensitzung (das,
-   * was gerade geschrieben wurde), lässt sie erkennen, legt an ihrer Stelle
-   * eine Notiz mit dem Text an und entfernt die Striche. Strg+Z holt beides
-   * zurück.
-   */
-  const handschriftUebernehmen = async () => {
+  /* ───────────── M324: Gesten, Ziel-Logik, Vorschlag, KI-Korrektur ───────────── */
+
+  /** Vorschlag verwerfen — samt laufender Erkennung, damit sie nicht nachträglich wieder auftaucht */
+  const vorschlagVerwerfen = () => {
+    if (vorschlagTimer.current !== null) { window.clearTimeout(vorschlagTimer.current); vorschlagTimer.current = null; }
+    vorschlagLauf.current += 1;
+    setVorschlag(null);
+  };
+  /** Absolute Flow-Punkte eines Strichs (geankerte liegen relativ zur Karte) */
+  const absolut = (s: Stroke): Pt[] => {
+    const n = s.anchor ? nodes.find((k) => k.id === s.anchor) : undefined;
+    const dx = n?.position.x ?? 0, dy = n?.position.y ?? 0;
+    return dx || dy ? s.points.map((p) => [p[0] + dx, p[1] + dy] as Pt) : s.points;
+  };
+  /** Die Stift-Striche dieser Schreibsitzung — das, was gerade geschrieben wurde */
+  const sessionStriche = (): Stroke[] => {
     const ids = sessionIds.current;
-    const eigene = drawings.filter((s) => ids.includes(s.id) && s.tool === 'pen');
+    return (selectActiveBoard(useBoard.getState()).drawings ?? []).filter((s) => ids.includes(s.id) && s.tool === 'pen');
+  };
+
+  /**
+   * Umkreisen markiert, Durchstreichen löscht. Läuft VOR dem Speichern eines
+   * Strichs; liefert true, wenn der Strich eine Geste war (und nicht gespeichert wird).
+   */
+  const gesteAusfuehren = (d: Stroke): boolean => {
+    if (d.tool !== 'pen') return false;
+    const pts = d.points;
+    // Lasso: eine geschlossene Schleife, in deren Mitte Karten liegen
+    if (istSchleife(pts)) {
+      const alle = getNodes() as AppNode[];
+      const treffer = alle.filter((n) => !n.hidden && !n.archived && n.type !== 'frame').filter((n) => {
+        const w = n.measured?.width ?? (typeof n.width === 'number' ? n.width : 200);
+        const h = n.measured?.height ?? (typeof n.height === 'number' ? n.height : 100);
+        return punktInPolygon([n.position.x + w / 2, n.position.y + h / 2], pts);
+      });
+      if (treffer.length > 0) {
+        const ids = new Set(treffer.map((n) => n.id));
+        onNodesChange(alle.map((n) => ({ id: n.id, type: 'select' as const, selected: ids.has(n.id) })));
+        setTool('select');
+        showToast(treffer.length === 1 ? '◯ 1 Karte markiert' : `◯ ${treffer.length} Karten markiert`);
+        return true;
+      }
+    }
+    // Durchstreichen: ein Kritzel, der andere Striche überdeckt
+    if (istKritzel(pts)) {
+      const box = bboxVon(pts);
+      const opfer = (selectActiveBoard(useBoard.getState()).drawings ?? [])
+        .filter((s) => s.id !== d.id && ueberdeckung(box, bboxVon(absolut(s))) >= 0.5);
+      if (opfer.length > 0) {
+        removeStrokes(opfer.map((s) => s.id));
+        sessionIds.current = sessionIds.current.filter((id) => !opfer.some((s) => s.id === id));
+        vorschlagVerwerfen();
+        showToast(opfer.length === 1 ? '✂️ Durchgestrichen — Strich gelöscht (↶ holt ihn zurück)' : `✂️ Durchgestrichen — ${opfer.length} Striche gelöscht (↶ holt sie zurück)`);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  /** Wohin gehört die Schrift? In die Notiz, über der (die meisten) Striche liegen — sonst ins Leere */
+  const zielNotiz = (striche: Stroke[]): AppNode | null => {
+    const zaehler = new Map<string, number>();
+    for (const s of striche) if (s.anchor) zaehler.set(s.anchor, (zaehler.get(s.anchor) ?? 0) + 1);
+    const [best] = [...zaehler.entries()].sort((a, b) => b[1] - a[1]);
+    if (!best || best[1] * 2 < striche.length) return null;
+    const n = nodes.find((k) => k.id === best[0]);
+    return n && n.type === 'note' && !n.archived ? n : null;
+  };
+
+  /** Kontext für die KI-Korrektur: Zielnotiz, Board, Begriffe der anderen Karten */
+  const kontextFuer = (ziel: AppNode | null): SchriftKontext => {
+    const begriffe = nodes
+      .filter((n) => n.id !== ziel?.id && !n.archived)
+      .map((n) => noteTitle((n.data as { blocks?: unknown[] }).blocks, (n.data as { name?: string; title?: string }).name ?? (n.data as { title?: string }).title ?? ''))
+      .filter((t) => t && t !== 'Notiz')
+      .slice(0, 12);
+    const bloecke = (ziel?.data as { blocks?: unknown[] } | undefined)?.blocks;
+    return {
+      board: boardName || undefined,
+      notiz: ziel ? blocksToText(bloecke).slice(0, 600) : undefined,
+      begriffe,
+    };
+  };
+
+  /** Welcher Block der Notiz liegt unter der linken oberen Ecke der Schrift? (DOM) */
+  const blockUnter = (nodeId: string, box: { minX: number; minY: number; h: number }): { id: string; type: string } | null => {
+    const rf = document.querySelector('.react-flow')?.getBoundingClientRect();
+    if (!rf) return null;
+    const sx = rf.left + (box.minX + 6) * zoom + tx;
+    const sy = rf.top + (box.minY + Math.min(box.h, 18) / 2) * zoom + ty;
+    const wurzel = document.querySelector(`.react-flow__node[data-id="${nodeId}"] .bn-editor`);
+    if (!wurzel) return null;
+    for (const el of document.elementsFromPoint(sx, sy)) {
+      if (!wurzel.contains(el)) continue;
+      const block = (el as HTMLElement).closest('[data-id][data-node-type="blockContainer"], .bn-block[data-id]') as HTMLElement | null;
+      if (block?.dataset.id) {
+        const inhalt = block.querySelector('.bn-block-content') as HTMLElement | null;
+        return { id: block.dataset.id, type: inhalt?.dataset.contentType ?? 'paragraph' };
+      }
+    }
+    return null;
+  };
+
+  /** Text in die Notiz einfügen — nach dem Block unter der Schrift, sonst ans Ende; neben einer Liste als Listenpunkt */
+  const inNotizEinfuegen = (ziel: AppNode, text: string, box: { minX: number; minY: number; h: number }) => {
+    const alt = ((ziel.data as { blocks?: unknown[] }).blocks ?? []) as Array<{ id?: string; type?: string; content?: unknown }>;
+    const bezug = blockUnter(ziel.id, box);
+    const listenTyp = bezug && ['checkListItem', 'bulletListItem', 'numberedListItem'].includes(bezug.type) ? bezug.type : null;
+    const neue = (textZuBloecken(text) as Array<{ type: string }>).map((b) => (listenTyp && b.type === 'paragraph' ? { ...b, type: listenTyp } : b));
+    // Ein leerer Schluss-Absatz (BlockNote hält ihn bereit) soll nicht zwischen Text und Schrift stehen
+    const leer = (b: { type?: string; content?: unknown }) => b.type === 'paragraph' && Array.isArray(b.content) && b.content.length === 0;
+    let out: unknown[];
+    const i = bezug ? alt.findIndex((b) => b.id === bezug.id) : -1;
+    if (i >= 0) out = [...alt.slice(0, i + 1), ...neue, ...alt.slice(i + 1)];
+    else {
+      const basis = alt.length > 1 && leer(alt[alt.length - 1]) ? alt.slice(0, -1) : alt;
+      out = [...basis, ...neue];
+    }
+    updateNodeDataOnBoard(activeId, ziel.id, { blocks: out });
+  };
+
+  /**
+   * M320/M324: Handschrift → Text. Nimmt die Striche dieser Schreibsitzung,
+   * lässt sie erkennen (mit KI-Korrektur, wenn eingerichtet) und bringt den
+   * Text dahin, wo er hingehört: in die Notiz unter der Schrift oder in eine
+   * neue Notiz an Ort und Stelle. Die Striche verschwinden; ↶ holt beides zurück.
+   * `fertig`: schon erkannter Text (vom Vorschlag) — dann keine zweite Erkennung.
+   */
+  const handschriftUebernehmen = async (fertig?: string) => {
+    const eigene = sessionStriche();
     if (eigene.length === 0) { showToast('Erst mit dem Stift schreiben, dann „Text".'); return; }
     setErkennt(true);
+    vorschlagVerwerfen();
     try {
-      const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-      const punkte = eigene.map((s) => {
-        const n = s.anchor ? nodeMap.get(s.anchor) : undefined;
-        const dx = n?.position.x ?? 0, dy = n?.position.y ?? 0;
-        return s.points.map((p) => [p[0] + dx, p[1] + dy] as [number, number]);
-      });
-      const text = await handschriftErkennen(punkte);
+      const punkte = eigene.map(absolut);
+      const box = bboxVon(punkte.flat());
+      const ziel = zielNotiz(eigene);
+      let text = fertig ?? '';
+      if (!text) {
+        const k = await handschriftKandidaten(punkte);
+        text = textAufraeumen(k.text);
+        if (text && handschriftKi && aiReady(ai)) text = await kiKorrektur(text, k.alternativen, kontextFuer(ziel));
+      }
       if (!text) { showToast('Keine Schrift erkannt — deutlicher schreiben oder größer.'); return; }
-      let minX = Infinity, minY = Infinity;
-      for (const s of punkte) for (const [x, y] of s) { minX = Math.min(minX, x); minY = Math.min(minY, y); }
-      const absaetze = text.split(/\n+/).filter(Boolean).map((z) => ({ type: 'paragraph', content: z }));
-      addNode(makeNote({ x: minX, y: minY }, { color: 'white', blocks: absaetze.length ? absaetze : [{ type: 'paragraph', content: text }] }));
+      const kurz = text.length > 40 ? `${text.slice(0, 40)}…` : text;
+      if (ziel) {
+        inNotizEinfuegen(ziel, text, box);
+        showToast(`✍️ In „${noteTitle((ziel.data as { blocks?: unknown[] }).blocks)}" eingefügt: „${kurz}"`);
+      } else {
+        addNode(makeNote({ x: box.minX, y: box.minY }, { color: 'white', blocks: textZuBloecken(text) }));
+        showToast(`✍️ Neue Notiz: „${kurz}"`);
+      }
       removeStrokes(eigene.map((s) => s.id));
       sessionIds.current = sessionIds.current.filter((id) => !eigene.some((s) => s.id === id));
-      showToast(`✍️ Handschrift übernommen: „${text.length > 40 ? `${text.slice(0, 40)}…` : text}"`);
     } catch (e) {
       showToast((e as Error).message, false, 7000);
     } finally {
       setErkennt(false);
     }
   };
+
+  /** Nach jedem Stift-Strich: Vorschlag neu planen — Ruhe von VORSCHLAG_MS → erkennen */
+  const vorschlagPlanen = () => {
+    vorschlagVerwerfen();
+    if (!handschriftAuto || handschriftWeg() === 'keine') return;
+    vorschlagTimer.current = window.setTimeout(() => { void vorschlagErmitteln(); }, VORSCHLAG_MS);
+  };
+  const vorschlagErmitteln = async () => {
+    const eigene = sessionStriche();
+    if (eigene.length === 0) return;
+    const lauf = ++vorschlagLauf.current;
+    const punkte = eigene.map(absolut);
+    const box = bboxVon(punkte.flat());
+    const ids = eigene.map((s) => s.id);
+    const lage = { ids, x: box.minX, y: box.maxY };
+    setVorschlag({ ...lage, text: '', status: 'erkennt' });
+    try {
+      const k = await handschriftKandidaten(punkte);
+      if (lauf !== vorschlagLauf.current) return;
+      const text = textAufraeumen(k.text);
+      if (!text) { setVorschlag(null); return; }
+      const mitKi = handschriftKi && aiReady(ai);
+      setVorschlag({ ...lage, text, status: mitKi ? 'ki' : 'fertig' });
+      if (mitKi) {
+        const besser = await kiKorrektur(text, k.alternativen, kontextFuer(zielNotiz(eigene)));
+        if (lauf !== vorschlagLauf.current) return;
+        setVorschlag({ ...lage, text: besser, status: 'fertig' });
+      }
+    } catch {
+      if (lauf === vorschlagLauf.current) setVorschlag(null);
+    }
+  };
+  // Zeichenmodus verlassen oder Esc: Vorschlag weg
+  useEffect(() => {
+    if (!active) vorschlagVerwerfen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+  useEffect(() => {
+    if (!vorschlag) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); vorschlagVerwerfen(); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [vorschlag]);
   const schriftDa = sessionIds.current.some((id) => drawings.some((s) => s.id === id && s.tool === 'pen'));
+  const rfRect = vorschlag ? document.querySelector('.react-flow')?.getBoundingClientRect() : null;
 
   const toPath = (s: Stroke) =>
     s.points.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
@@ -514,8 +717,45 @@ export function DrawingLayer() {
           )))}
         </g>
       </svg>
+      {vorschlag && rfRect && (
+        <div
+          className="schrift-vorschlag nodrag"
+          style={{ left: Math.max(8, rfRect.left + vorschlag.x * zoom + tx), top: Math.min(window.innerHeight - 60, rfRect.top + vorschlag.y * zoom + ty + 8) }}
+          role="status"
+        >
+          {vorschlag.status === 'erkennt' ? (
+            <span className="vorschlag-text erkennt">erkenne …</span>
+          ) : (
+            <button
+              className="vorschlag-text"
+              title={vorschlag.status === 'ki' ? 'Erkannt — die KI prüft noch; Tipp übernimmt sofort' : 'Tipp: Text übernehmen (in die Notiz darunter oder als neue Notiz)'}
+              aria-label="Erkannten Text übernehmen"
+              onClick={() => void handschriftUebernehmen(vorschlag.text)}
+            >
+              <b>{vorschlag.status === 'ki' ? '✍️…' : '✍️'}</b>{vorschlag.text}
+            </button>
+          )}
+          <button className="vorschlag-weg" title="Vorschlag ausblenden (Esc)" aria-label="Vorschlag ausblenden" onClick={vorschlagVerwerfen}><IX size={13} /></button>
+        </div>
+      )}
       {active && (
       <div className="draw-palette">
+        {!isMarker && tool !== 'eraser' && (
+          <>
+            {PEN_WIDTHS.map((w, i) => (
+              <button
+                key={w}
+                className={`draw-dicke ${penWidth === w ? 'on' : ''}`}
+                title={['Fein', 'Normal', 'Dick'][i]}
+                aria-label={`Strichstärke ${['fein', 'normal', 'dick'][i]}`}
+                onClick={() => setPenWidth(w)}
+              >
+                <i style={{ width: 4 + i * 3, height: 4 + i * 3 }} />
+              </button>
+            ))}
+            <span className="draw-trenner" aria-hidden="true" />
+          </>
+        )}
         {palette.map((c) => (
           <button
             key={c}

@@ -130,7 +130,8 @@ console.log('\n════ B: Formen ════');
   const { ctx, P } = await seite();
   await werkzeug(P, 'Stift');
   const vorher = (await striche(P)).length;
-  await zug(P, kreis(700, 400, 70), { halten: 800 }); await warte(P);
+  // M324: Ein Kreis UM eine Karte ist jetzt ein Lasso (markiert) — die Form-Probe zeichnet neben der Karte
+  await zug(P, kreis(1000, 450, 70), { halten: 800 }); await warte(P);
   let d = await striche(P);
   const k = d[d.length - 1];
   const xs = k ? k.points.map((p) => p[0]) : [0], ys = k ? k.points.map((p) => p[1]) : [0];

@@ -401,6 +401,12 @@ interface BoardState {
   /** M320: Handschrift online erkennen lassen (Google Input Tools) — Opt-in, Striche verlassen das Gerät */
   handschriftOnline: boolean;
   setHandschriftOnline: (on: boolean) => void;
+  /** M324: Nach einer Schreibpause den erkannten Text als Vorschlag anbieten */
+  handschriftAuto: boolean;
+  setHandschriftAuto: (on: boolean) => void;
+  /** M324: Eine eingerichtete KI verbessert die Erkennung mit dem Kontext der Notiz */
+  handschriftKi: boolean;
+  setHandschriftKi: (on: boolean) => void;
   setWheelZoom: (on: boolean) => void;
   /** M193: Übersicht — Hierarchie oder Netz. Liegt im Store, damit der
    *  Navigator (und damit JEDE Ansicht) direkt ins Netz springen kann. */
@@ -866,6 +872,10 @@ export const useBoard = create<BoardState>()(
         setWheelZoom: (on) => set({ wheelZoom: on }),
         handschriftOnline: false,
         setHandschriftOnline: (on) => set({ handschriftOnline: on }),
+        handschriftAuto: true,
+        setHandschriftAuto: (on) => set({ handschriftAuto: on }),
+        handschriftKi: true,
+        setHandschriftKi: (on) => set({ handschriftKi: on }),
         overviewMode: 'hierarchie',
         setOverviewMode: (m) => set({ overviewMode: m }),
         graphLayers: { cards: false, portals: true, wikis: true, projectOnly: false },
@@ -2098,6 +2108,8 @@ export const useBoard = create<BoardState>()(
         hoherKontrast: s.hoherKontrast,
         wheelZoom: s.wheelZoom,
         handschriftOnline: s.handschriftOnline,
+        handschriftAuto: s.handschriftAuto,
+        handschriftKi: s.handschriftKi,
         showArchived: s.showArchived,
         gridSnap: s.gridSnap,
         overviewMode: s.overviewMode,
