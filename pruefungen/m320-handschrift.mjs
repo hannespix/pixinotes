@@ -104,7 +104,8 @@ const knoten = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinote
 const toast = (P) => P.evaluate(() => document.querySelector('.toast')?.textContent ?? '');
 const warte = (P, ms = 900) => P.waitForTimeout(ms);
 /** Drei „Buchstaben": Wellenlinien nebeneinander — bewusst krumm, damit keine Form einrastet */
-const schreiben = async (P, x0 = 600, y0 = 450) => {
+// M324: Schrift ÜBER einer Notiz landet in dieser Notiz — die Proben hier schreiben ins Leere (neue Notiz)
+const schreiben = async (P, x0 = 900, y0 = 600) => {
   for (let k = 0; k < 3; k += 1) {
     await zug(P, Array.from({ length: 18 }, (_, i) => [x0 + k * 70 + i * 3, y0 + Math.sin(i / 1.7) * 22 + (i % 3) * 4]), { art: 'pen', id: 11 + k });
     await P.waitForTimeout(150);
@@ -127,7 +128,7 @@ console.log('\n════ A: Browser erkennt selbst ════');
   await knopf.click();
   await warte(P, 1200);
   const hw = await P.evaluate(() => window.__hw);
-  pruefe('A4 der Browser-Erkenner bekam alle drei Striche mit allen Punkten (Deutsch, Text, Stift)', hw.aufrufe === 1 && hw.striche === 3 && hw.punkte === vorher.reduce((a, s) => a + s.points.length, 0) && hw.sprachen?.[0] === 'de' && hw.hints?.recognitionType === 'text' && hw.hints?.inputType === 'pen', JSON.stringify(hw));
+  pruefe('A4 der Browser-Erkenner bekam alle drei Striche mit allen Punkten (Deutsch, Text, Stift)', hw.aufrufe >= 1 && hw.striche === 3 && hw.punkte === vorher.reduce((a, s) => a + s.points.length, 0) && hw.sprachen?.[0] === 'de' && hw.hints?.recognitionType === 'text' && hw.hints?.inputType === 'pen', JSON.stringify(hw));
   pruefe('A5 Striche normiert: kleine positive Koordinaten (Rand 10)', hw.min >= 9 && hw.min <= 11, String(hw.min));
   const nachher = await striche(P);
   const n = await knoten(P);
@@ -140,7 +141,7 @@ console.log('\n════ A: Browser erkennt selbst ════');
   const minX = Math.min(...vorher.flatMap((s) => abs(s).map((p) => p[0])));
   const minY = Math.min(...vorher.flatMap((s) => abs(s).map((p) => p[1])));
   pruefe('A7 Notiz sitzt an der linken oberen Ecke des Geschriebenen', !!neu && Math.abs(neu.position.x - minX) < 2 && Math.abs(neu.position.y - minY) < 2, JSON.stringify({ pos: neu?.position, minX, minY }));
-  pruefe('A8 Toast nennt den übernommenen Text', /Handschrift übernommen/.test(await toast(P)) && /Hallo Welt/.test(await toast(P)), await toast(P));
+  pruefe('A8 Toast nennt den übernommenen Text', /Neue Notiz/.test(await toast(P)) && /Hallo Welt/.test(await toast(P)), await toast(P));
   pruefe('A9 der „Text"-Knopf ist danach wieder weg (nichts Ungelesenes mehr)', (await P.locator('.draw-palette .draw-text').count()) === 0);
   await P.screenshot({ path: path.join(SD, 'm320-notiz.png') });
   // Rückgängig: Striche wieder da, Notiz weg
@@ -203,7 +204,7 @@ console.log('\n════ C: Schalter in den Diensten, Online-Weg ════
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(['SUCCESS', [['', ['Einkaufen', 'Einkaufer'], [], { is_html_escaped: false }]]]) });
   });
   await werkzeug(P, 'Stift');
-  await schreiben(P, 700, 500);
+  await schreiben(P, 900, 600);
   const vorher = await striche(P);
   await P.locator('.draw-palette .draw-text').click();
   await warte(P, 1200);
@@ -216,7 +217,7 @@ console.log('\n════ C: Schalter in den Diensten, Online-Weg ════
   // Fehlerfall: Dienst nicht erreichbar → Klartext, Striche bleiben
   await ctx.unroute('https://inputtools.google.com/**');
   await ctx.route('https://inputtools.google.com/**', (route) => route.fulfill({ status: 503, body: 'nope' }));
-  await schreiben(P, 700, 650);
+  await schreiben(P, 900, 700);
   await P.locator('.draw-palette .draw-text').click();
   await warte(P, 1200);
   const t = await toast(P);

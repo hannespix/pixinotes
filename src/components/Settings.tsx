@@ -21,6 +21,7 @@ import {
   kontoVerbinden, kontoWrite, loadKonto, type Anbieter, type KontoSitzung,
 } from '../lib/kontoSync';
 import { browserErkenntHandschrift } from '../lib/handschrift';
+import { aiReady } from '../lib/ai';
 import {
   applyFilesSync, canShareFiles, filesSyncDirty, filesSyncOn, filesSyncStamp, isAppleTouch,
   isStandalone, readSyncFile, saveViaFiles,
@@ -226,6 +227,10 @@ export function Settings() {
   const wheelZoom = useBoard((s) => s.wheelZoom);
   const handschriftOnline = useBoard((s) => s.handschriftOnline);
   const setHandschriftOnline = useBoard((s) => s.setHandschriftOnline);
+  const handschriftAuto = useBoard((s) => s.handschriftAuto);
+  const setHandschriftAuto = useBoard((s) => s.setHandschriftAuto);
+  const handschriftKi = useBoard((s) => s.handschriftKi);
+  const setHandschriftKi = useBoard((s) => s.setHandschriftKi);
   const setWheelZoom = useBoard((s) => s.setWheelZoom);
   const ui = useBoard((s) => s.ui);
   const setUiTheme = useBoard((s) => s.setUiTheme);
@@ -1320,6 +1325,21 @@ export function Settings() {
             <input type="checkbox" checked={handschriftOnline} onChange={(e) => setHandschriftOnline(e.target.checked)} data-taste="handschrift-online" />
           </label>
           <p className="modal-hint">Ersatz, wenn der Browser es nicht kann: Die Striche gehen dann an Googles Handschrift-Dienst — ohne Konto, aber außer Haus. Standard: aus.</p>
+          {/* M324: Vorschlag nach der Schreibpause und KI-Korrektur */}
+          <label className="modal-row modal-row-check">
+            <span>Vorschlag nach dem Schreiben</span>
+            <input type="checkbox" checked={handschriftAuto} onChange={(e) => setHandschriftAuto(e.target.checked)} data-taste="handschrift-auto" />
+          </label>
+          <p className="modal-hint">Kurz nach dem Absetzen erscheint der erkannte Text unter dem Geschriebenen — ein Tipp übernimmt ihn in die Notiz darunter oder in eine neue.</p>
+          {aiReady(ai) && (
+            <>
+              <label className="modal-row modal-row-check">
+                <span>KI verbessert die Erkennung</span>
+                <input type="checkbox" checked={handschriftKi} onChange={(e) => setHandschriftKi(e.target.checked)} data-taste="handschrift-ki" />
+              </label>
+              <p className="modal-hint">Deine eingerichtete KI korrigiert Lesefehler und kennt dabei Namen und Begriffe aus der Notiz und dem Board. Sie ergänzt nichts und lässt nichts weg.</p>
+            </>
+          )}
         </section>
 
         {/* ---- Konten: Google & Microsoft 365 — Kalender, bei Microsoft auch OneNote ---- */}

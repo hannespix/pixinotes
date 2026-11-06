@@ -50,6 +50,7 @@ const FELDER = [
   'physicsEnabled', 'stiftZeichnet',
   'konfetti',        // M294: Konfetti beim Erledigen (Option)
   'handschriftOnline', // M320: Handschrift online erkennen (Opt-in)
+  'handschriftAuto', 'handschriftKi', // M324: Vorschlag nach Schreibpause, KI-Korrektur
   'gridSnap',
   'showArchived',
   'overviewMode',

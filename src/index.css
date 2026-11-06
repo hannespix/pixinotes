@@ -6157,3 +6157,28 @@ audio.file-media { height: 40px; }
 .focus-mode .react-flow__node-note.pn-focused .note-editor .bn-editor {
   font-size: 16px !important; line-height: 1.55; max-width: 72ch; margin-inline: auto; padding-block: 14px !important;
 }
+
+/* ===== M324: Stift & Handschrift 2 ===== */
+/* Vorschlag nach der Schreibpause: unter dem Geschriebenen, ein Tipp übernimmt */
+.schrift-vorschlag {
+  position: fixed; z-index: 60; display: inline-flex; align-items: center; gap: 2px;
+  max-width: min(420px, 80vw); padding: 2px 2px 2px 4px;
+  background: var(--surface-pop, var(--surface-card)); color: var(--ink);
+  border: 1px solid var(--border-soft); border-radius: var(--r); box-shadow: var(--pop-shadow);
+  font-size: 13px; line-height: 1.3; pointer-events: auto;
+}
+.schrift-vorschlag .vorschlag-text {
+  all: unset; cursor: pointer; padding: 5px 8px; border-radius: var(--r-xs);
+  white-space: pre-line; overflow: hidden; text-overflow: ellipsis; max-height: 4.2em;
+}
+.schrift-vorschlag .vorschlag-text:hover { background: var(--surface-hover, rgba(0,0,0,.05)); }
+.schrift-vorschlag .vorschlag-text b { font-weight: 600; color: var(--accent); margin-right: 6px; }
+.schrift-vorschlag .vorschlag-text.erkennt { color: var(--muted); font-style: italic; cursor: default; }
+.schrift-vorschlag .vorschlag-weg { all: unset; cursor: pointer; width: 26px; height: 26px; display: grid; place-items: center; border-radius: var(--r-xs); color: var(--muted); }
+.schrift-vorschlag .vorschlag-weg:hover { background: var(--surface-hover, rgba(0,0,0,.05)); color: var(--ink); }
+/* Strichstärke in der Palette: drei Punkte, der gewählte dunkel umrandet */
+.draw-palette .draw-dicke { all: unset; cursor: pointer; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; }
+.draw-palette .draw-dicke i { display: block; border-radius: 50%; background: var(--ink); }
+.draw-palette .draw-dicke.on { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.draw-palette .draw-dicke:hover { background: rgba(0,0,0,.05); }
+.draw-palette .draw-trenner { width: 1px; height: 18px; background: var(--border-soft); margin: 0 2px; }
