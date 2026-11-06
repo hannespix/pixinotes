@@ -215,6 +215,8 @@ export function Settings() {
   const setPhysicsEnabled = useBoard((s) => s.setPhysicsEnabled);
   const konfetti = useBoard((s) => s.konfetti);
   const setKonfetti = useBoard((s) => s.setKonfetti);
+  const fingerGesten = useBoard((s) => s.fingerGesten);
+  const setFingerGesten = useBoard((s) => s.setFingerGesten);
   const brainOffSpaces = useBoard((s) => s.brainOffSpaces);
   const toggleBrainSpace = useBoard((s) => s.toggleBrainSpace);
   const setCardFocus = useBoard((s) => s.setCardFocus);
@@ -695,6 +697,12 @@ export function Settings() {
             />
           </label>
           <p className="modal-hint">Karten weichen aus und lassen sich werfen, die Ansicht fliegt zu angeklickten Karten, Konfetti beim Erledigen. Aus bleibt die Fläche ruhig.</p>
+          {/* M326: Finger-Gesten nach Procreate */}
+          <label className="modal-row modal-row-check">
+            <span>Finger-Gesten (wie Procreate)</span>
+            <input type="checkbox" checked={fingerGesten} onChange={(e) => setFingerGesten(e.target.checked)} data-taste="finger-gesten" />
+          </label>
+          <p className="modal-hint">Zwei-Finger-Tipp = Rückgängig, Drei-Finger-Tipp = Wiederholen (halten = schnell), schnelles Zusammenziehen = Alles einpassen, Vier-Finger-Tipp = Vollbild, drei Finger nach unten = Duplizieren oder ＋.</p>
         </section>
         </>
         )}

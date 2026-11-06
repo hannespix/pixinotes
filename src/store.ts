@@ -403,6 +403,9 @@ interface BoardState {
   /** M320: Handschrift online erkennen lassen (Google Input Tools) — Opt-in, Striche verlassen das Gerät */
   handschriftOnline: boolean;
   setHandschriftOnline: (on: boolean) => void;
+  /** M326: Finger-Gesten nach Procreate (Zwei-Finger-Tipp = Rückgängig …) */
+  fingerGesten: boolean;
+  setFingerGesten: (on: boolean) => void;
   /** M324: Nach einer Schreibpause den erkannten Text als Vorschlag anbieten */
   handschriftAuto: boolean;
   setHandschriftAuto: (on: boolean) => void;
@@ -876,6 +879,8 @@ export const useBoard = create<BoardState>()(
         setHandschriftOnline: (on) => set({ handschriftOnline: on }),
         handschriftAuto: true,
         setHandschriftAuto: (on) => set({ handschriftAuto: on }),
+        fingerGesten: true,
+        setFingerGesten: (on) => set({ fingerGesten: on }),
         handschriftKi: true,
         setHandschriftKi: (on) => set({ handschriftKi: on }),
         overviewMode: 'hierarchie',
@@ -2147,6 +2152,7 @@ export const useBoard = create<BoardState>()(
         wheelZoom: s.wheelZoom,
         handschriftOnline: s.handschriftOnline,
         handschriftAuto: s.handschriftAuto,
+        fingerGesten: s.fingerGesten,
         handschriftKi: s.handschriftKi,
         showArchived: s.showArchived,
         gridSnap: s.gridSnap,

@@ -107,8 +107,6 @@ export function DrawingLayer() {
   const addNode = useBoard((s) => s.addNode);
   const onNodesChange = useBoard((s) => s.onNodesChange);
   const eraseStrokesPartial = useBoard((s) => s.eraseStrokesPartial);
-  const undo = useBoard((s) => s.undo);
-  const redo = useBoard((s) => s.redo);
   /** M325: Teil-Radierer (Punkte im Radius) oder Strich-Radierer (ganzer Strich) */
   const [radiererArt, setRadiererArt] = useState<'teil' | 'strich'>(() => {
     try { return localStorage.getItem(RADIERER_KEY) === 'strich' ? 'strich' : 'teil'; } catch { return 'teil'; }
@@ -131,7 +129,10 @@ export function DrawingLayer() {
   const [vorschlag, setVorschlag] = useState<{ ids: string[]; text: string; x: number; y: number; status: 'erkennt' | 'ki' | 'fertig' } | null>(null);
   const vorschlagTimer = useRef<number | null>(null);
   const vorschlagLauf = useRef(0);
-  const { screenToFlowPosition, getNodes } = useReactFlow();
+  const { screenToFlowPosition, getNodes, getViewport, setViewport } = useReactFlow();
+  /** M326: Ohne Stift-Gerät nimmt die Ebene alle Zeiger — zwei Finger zoomen und schwenken dann hier selbst */
+  const fingerZeiger = useRef<Map<number, [number, number]>>(new Map());
+  const pinch = useRef<{ d0: number; mitte0: [number, number]; vp0: { x: number; y: number; zoom: number } } | null>(null);
   const { x: tx, y: ty, zoom } = useViewport();
   const uiTheme = useBoard((s) => s.ui.theme);
   // Im dunklen Design wäre die Tinten-Farbe unsichtbar → helle „Kreide" anbieten
@@ -293,6 +294,7 @@ export function DrawingLayer() {
     e.preventDefault(); e.stopPropagation();
     fuehrend.current = { id: e.pointerId, art: 'pen' };
     stiftZug.current = 'griff';
+    stiftZugMelden(true);
     griff.current = { id: n.id, start: toFlow(e), pos: { ...n.position } };
     onNodesChange([{ id: n.id, type: 'select', selected: true }]);
   };
@@ -367,10 +369,8 @@ export function DrawingLayer() {
       const n = fingerMax.current;
       fingerMax.current = 0;
       if (!kurz) return;
+      // Zwei-/Drei-Finger-Tipp (Rückgängig/Wiederholen) übernimmt seit M326 FingerGesten — überall auf dem Board
       if (drawing.current && drawing.current.tool !== 'marker' && stiftZug.current === 'strich' && n === 1) { formEinrasten(); return; }
-      if (!active || stiftZug.current) return;
-      if (n === 2) { undo(); showToast('↶ Rückgängig (Zwei-Finger-Tipp)'); }
-      else if (n === 3) { redo(); showToast('↷ Wiederholen (Drei-Finger-Tipp)'); }
     } else if (kurz && drawing.current && stiftZug.current === 'strich' && drawing.current.tool !== 'marker') {
       // Zweiter Finger tippt, während der Stift noch unten ist → sofort einrasten
       formEinrasten();
@@ -390,8 +390,11 @@ export function DrawingLayer() {
   };
 
   /** Strich beginnen (gemeinsam für Layer-Zeichnen und Fenster-Zuhörer) */
+  /** M326: Die Finger-Gesten (FingerGesten.tsx) pausieren, solange ein Stift-Zug läuft */
+  const stiftZugMelden = (an: boolean) => { if (an) document.body.dataset.stiftZug = '1'; else delete document.body.dataset.stiftZug; };
   const strichStarten = (e: { clientX: number; clientY: number; pointerType?: string; pressure?: number },
     werkzeug: 'pen' | 'marker') => {
+    stiftZugMelden(true);
     const p = screenToFlowPosition({ x: e.clientX, y: e.clientY });
     // M319: Druck je Punkt — nur bei echtem Stift mit Sensor. Maus und Finger
     // bekommen den simulierten Druck aus der Geschwindigkeit (perfect-freehand).
@@ -419,11 +422,36 @@ export function DrawingLayer() {
     return neu;
   };
 
+  /** Zwei Finger auf der Ebene: Zoom um die Fingermitte, Schwenken mit der Mitte (M326) */
+  const pinchBewegen = () => {
+    const p = pinch.current;
+    const [a, b] = Array.from(fingerZeiger.current.values());
+    if (!p || !a || !b) return;
+    const rf = document.querySelector('.react-flow')?.getBoundingClientRect();
+    const ox = rf?.left ?? 0, oy = rf?.top ?? 0;
+    const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const mitte: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const zoom = Math.max(0.1, Math.min(4, p.vp0.zoom * (d / Math.max(1, p.d0))));
+    // Der Flow-Punkt unter der Anfangs-Mitte bleibt unter der aktuellen Mitte
+    const fx = (p.mitte0[0] - ox - p.vp0.x) / p.vp0.zoom;
+    const fy = (p.mitte0[1] - oy - p.vp0.y) / p.vp0.zoom;
+    void setViewport({ x: mitte[0] - ox - fx * zoom, y: mitte[1] - oy - fy * zoom, zoom });
+  };
   const onDown = (e: React.PointerEvent) => {
     // Handballen-Abweisung: Solange der Stift zeichnet, sind Finger tabu
     if (fuehrend.current?.art === 'pen' && e.pointerType !== 'pen') return;
-    // Ein zweiter Finger beendet den Strich des ersten — das ist eine Geste, keine Zeichnung
-    if (e.pointerType === 'touch' && fuehrend.current?.art === 'touch') { drawing.current = null; clearHold(); fuehrend.current = null; force((n) => n + 1); return; }
+    if (e.pointerType === 'touch') {
+      fingerZeiger.current.set(e.pointerId, [e.clientX, e.clientY]);
+      // Ein zweiter Finger beendet den Strich des ersten — und ab jetzt zoomen und schwenken die zwei (M326)
+      if (fingerZeiger.current.size >= 2) {
+        drawing.current = null; clearHold(); fuehrend.current = null;
+        const [a, b] = Array.from(fingerZeiger.current.values());
+        pinch.current = { d0: Math.hypot(b[0] - a[0], b[1] - a[1]), mitte0: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], vp0: getViewport() };
+        try { (e.target as Element).setPointerCapture(e.pointerId); } catch { /* egal */ }
+        force((n) => n + 1);
+        return;
+      }
+    }
     // Capture kann bei exotischen/synthetischen Pointern fehlschlagen — Zeichnen geht trotzdem
     try { (e.target as Element).setPointerCapture(e.pointerId); } catch { /* ignorieren */ }
     const pt = toFlow(e);
@@ -436,6 +464,10 @@ export function DrawingLayer() {
     strichStarten(e, tool);
   };
   const onMove = (e: React.PointerEvent) => {
+    if (e.pointerType === 'touch' && fingerZeiger.current.has(e.pointerId)) {
+      fingerZeiger.current.set(e.pointerId, [e.clientX, e.clientY]);
+      if (pinch.current && fingerZeiger.current.size >= 2) { pinchBewegen(); return; }
+    }
     if (fuehrend.current && e.pointerId !== fuehrend.current.id) return;
     if (tool === 'eraser' || (fuehrend.current && stiftZug.current === 'radierer')) {
       const pt = toFlow(e);
@@ -448,10 +480,16 @@ export function DrawingLayer() {
     armHold();
     force((n) => n + 1);
   };
+  const fingerWeg = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'touch') return;
+    fingerZeiger.current.delete(e.pointerId);
+    if (fingerZeiger.current.size < 2) pinch.current = null;
+  };
   const onUp = (e?: { clientX: number; clientY: number }) => {
     clearHold();
     fuehrend.current = null;
     stiftZug.current = null;
+    stiftZugMelden(false);
     const d = drawing.current;
     // M325: Ein kurzer, stiller Stift-Kontakt ist ein Tipp — er klickt, was darunter liegt
     if (d && d.tool === 'pen' && tippIst(e)) {
@@ -508,6 +546,7 @@ export function DrawingLayer() {
         e.preventDefault(); e.stopPropagation();
         fuehrend.current = { id: e.pointerId, art: 'pen' };
         stiftZug.current = 'radierer';
+        stiftZugMelden(true);
         beginEraseGesture();
         const pt = toFlow(e);
         radieren(pt[0], pt[1]);
@@ -567,8 +606,8 @@ export function DrawingLayer() {
       if (!stiftZug.current || e.pointerId !== fuehrend.current?.id) return;
       const art = stiftZug.current;
       stiftZug.current = null;
-      if (art === 'radierer') { fuehrend.current = null; return; }
-      if (art === 'griff') { griffEnde(); fuehrend.current = null; return; }
+      if (art === 'radierer') { fuehrend.current = null; stiftZugMelden(false); return; }
+      if (art === 'griff') { griffEnde(); fuehrend.current = null; stiftZugMelden(false); return; }
       onUp(e);
     };
     // Seitentaste = rechte Taste: das Kontextmenü des Browsers hat beim Greifen nichts verloren
@@ -990,8 +1029,15 @@ export function DrawingLayer() {
         }}
         onPointerDown={onDown}
         onPointerMove={onMove}
-        onPointerUp={onUp}
-        onPointerCancel={onUp}
+        onPointerUp={(e) => { const war = pinch.current; fingerWeg(e); if (war) { force((n) => n + 1); return; } onUp(e); }}
+        onPointerCancel={(e) => { const war = pinch.current; fingerWeg(e); if (war) { force((n) => n + 1); return; } onUp(e); }}
+        // M326: Das Mausrad zoomt und scrollt auch beim Zeichnen — die Ebene reicht es an die Fläche durch
+        onWheel={(e) => {
+          const pane = document.querySelector('.react-flow__pane');
+          if (!pane) return;
+          const n = e.nativeEvent;
+          pane.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: n.clientX, clientY: n.clientY, deltaX: n.deltaX, deltaY: n.deltaY, deltaMode: n.deltaMode, ctrlKey: n.ctrlKey, metaKey: n.metaKey, shiftKey: n.shiftKey }));
+        }}
       >
         <g transform={`translate(${tx},${ty}) scale(${zoom})`}>
           {/* Eingerastete Formen (Linie, Pfeil, Rechteck, Dreieck: wenige Punkte) bleiben

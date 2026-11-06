@@ -51,6 +51,7 @@ const FELDER = [
   'konfetti',        // M294: Konfetti beim Erledigen (Option)
   'handschriftOnline', // M320: Handschrift online erkennen (Opt-in)
   'handschriftAuto', 'handschriftKi', // M324: Vorschlag nach Schreibpause, KI-Korrektur
+  'fingerGesten',    // M326: Finger-Gesten nach Procreate
   'gridSnap',
   'showArchived',
   'overviewMode',
