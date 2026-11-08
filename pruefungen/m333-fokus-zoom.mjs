@@ -47,7 +47,7 @@ const stand = () => ({
   spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['b1'] }] }],
   activeId: 'b1', view: 'board',
 });
-async function seite({ breite = 1024, hoehe = 768, touch = true, stift = true, einKlick = false } = {}) {
+async function seite({ breite = 1024, hoehe = 768, touch = true, stift = true, einKlick = false, extra = [] } = {}) {
   const ctx = await browser.newContext({ viewport: { width: breite, height: hoehe }, deviceScaleFactor: 1, hasTouch: touch });
   await ctx.addInitScript(({ st, stift, einKlick }) => {
     if (localStorage.getItem('pixinotes-board')) return;
@@ -55,7 +55,7 @@ async function seite({ breite = 1024, hoehe = 768, touch = true, stift = true, e
     localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ schliff: 2, navLinks: false, stiftZeichnet: true, ...(einKlick ? { fokusEinKlick: true } : {}) }));
     if (stift) localStorage.setItem('pixinotes-stift', '1');
     localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state: st }));
-  }, { st: stand(), stift, einKlick });
+  }, { st: (() => { const st = stand(); st.boards[0].nodes.push(...extra); return st; })(), stift, einKlick });
   const P = await ctx.newPage();
   P.on('pageerror', (e) => console.log('    PAGEERROR:', e.message));
   P.on('dialog', (d) => d.accept());
@@ -171,6 +171,86 @@ console.log('\n════ E: Mit der Maus — Doppelklick öffnet, Esc schlie�
   pruefe('E3 Esc schließt, Kamera und Kartenbreite wie vorher', !n.fokus && Math.abs(n.breite - vorher.breite) <= 3 && Math.abs(n.links - vorher.links) <= 3, JSON.stringify({ vorher, n }));
   const js = readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.js')).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8')).join('\n');
   pruefe('E4 „Was ist neu" nennt M333', js.includes('Fokus ist jetzt ein Zoom (M333)'));
+  await ctx.close();
+}
+
+// ══ F: Lange Notiz scrollen (M334) ══════════════════════════════════
+console.log('\n════ F: Lange Notiz im Fokus — Rad, Finger und Cursor rollen die Kamera ════');
+const lang = { id: 'n3', type: 'note', width: 300, position: { x: 900, y: 0 }, data: { color: 'white', blocks: Array.from({ length: 70 }, (_, i) => ({ type: 'paragraph', content: `Absatz ${i + 1} — genug Text, damit die Notiz weit über den Schirm hinausragt.` })) } };
+const letzterBlock = (P) => P.evaluate(() => {
+  const bl = [...document.querySelectorAll('.react-flow__node.pn-focused .bn-block-content')];
+  const r = bl[bl.length - 1]?.getBoundingClientRect();
+  return r ? { top: Math.round(r.top), bottom: Math.round(r.bottom), fenster: window.innerHeight } : null;
+});
+{
+  const { ctx, P } = await seite({ breite: 1440, hoehe: 900, touch: false, stift: false, einKlick: true, extra: [lang] });
+  const box = await P.locator('.react-flow__node[data-id="n3"]').boundingBox();
+  await P.mouse.click(box.x + box.width / 2, box.y + 6);
+  await P.waitForTimeout(1000);
+  const start = await lage(P, 'n3');
+  pruefe('F1 Fokus auf der langen Notiz, Karte ragt unten über den Schirm', start.fokus && start.hoehe > 900 && start.oben >= 40 && start.oben <= 90, JSON.stringify(start));
+  await P.mouse.move(720, 450);
+  await P.mouse.wheel(0, 600);
+  await P.waitForTimeout(400);
+  const nachRad = await lage(P, 'n3');
+  pruefe('F2 Mausrad über der Notiz rollt sie nach oben', start.oben - nachRad.oben >= 300, JSON.stringify({ vorher: start.oben, nachher: nachRad.oben }));
+  await P.mouse.wheel(0, 100000);
+  await P.waitForTimeout(500);
+  const ende = await lage(P, 'n3');
+  pruefe('F3 am Ende klemmt die Kamera: Kartenende bleibt am unteren Schirmrand', ende.oben + ende.hoehe <= 902 && ende.oben + ende.hoehe >= 760, JSON.stringify({ unten: ende.oben + ende.hoehe }));
+  await P.mouse.wheel(0, -100000);
+  await P.waitForTimeout(500);
+  const oben = await lage(P, 'n3');
+  pruefe('F4 zurück nach oben klemmt am Anfang', Math.abs(oben.oben - start.oben) <= 2, JSON.stringify({ start: start.oben, jetzt: oben.oben }));
+  // Cursor ans Ende setzen → die Kamera folgt
+  await P.evaluate(() => {
+    const ed = document.querySelector('.react-flow__node.pn-focused [contenteditable="true"]');
+    ed?.focus();
+    const bl = [...document.querySelectorAll('.react-flow__node.pn-focused .bn-block-content')];
+    const ziel = bl[bl.length - 1];
+    const r = document.createRange(); r.selectNodeContents(ziel); r.collapse(false);
+    const sel = document.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+  });
+  await P.waitForTimeout(600);
+  const lb = await letzterBlock(P);
+  pruefe('F5 Cursor im letzten Absatz: die Kamera rollt ihn ins Bild', lb && lb.bottom <= lb.fenster && lb.top >= 0, JSON.stringify(lb));
+  await P.keyboard.press('End');
+  for (let i = 0; i < 6; i++) { await P.keyboard.press('Enter'); await P.keyboard.type(`Neue Zeile ${i + 1}`); }
+  await P.waitForTimeout(900);
+  const lb2 = await letzterBlock(P);
+  const k2 = await lage(P, 'n3');
+  pruefe('F6 beim Schreiben am Ende wächst die Notiz, ohne zum Anfang zu springen; der Cursor bleibt sichtbar', lb2 && lb2.bottom <= lb2.fenster + 2 && k2.oben < 0, JSON.stringify({ lb2, oben: k2.oben }));
+  const knoten = await P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes.find((n) => n.id === 'n3'));
+  pruefe('F7 der Text ist angekommen', JSON.stringify(knoten.data.blocks).includes('Neue Zeile 6'));
+  // Im Textfeld gehört Esc dem Editor (FocusSheet) — erst außerhalb schließt es den Fokus
+  await P.evaluate(() => document.activeElement?.blur());
+  await P.keyboard.press('Escape'); await P.waitForTimeout(600);
+  pruefe('F8 Esc schließt den Fokus auch nach dem Scrollen', !(await lage(P, 'n3')).fokus);
+  await ctx.close();
+}
+{
+  const { ctx, P } = await seite({ breite: 820, hoehe: 1100, touch: true, stift: false, extra: [lang] });
+  const box = await P.locator('.react-flow__node[data-id="n3"]').boundingBox();
+  await P.touchscreen.tap(box.x + box.width / 2, box.y + 6);
+  await P.waitForTimeout(1000);
+  const start = await lage(P, 'n3');
+  pruefe('F9 am Tablet: Fokus auf der langen Notiz', start.fokus && start.hoehe > 1100, JSON.stringify(start));
+  const fingerZug = (P, x, y0, y1) => P.evaluate(async ({ x, y0, y1 }) => {
+    const el = document.elementFromPoint(x, y0) ?? document.body;
+    const mk = (typ, y) => { const t = new Touch({ identifier: 1, target: el, clientX: x, clientY: y, pageX: x, pageY: y }); return new TouchEvent(typ, { bubbles: true, cancelable: true, composed: true, touches: typ === 'touchend' ? [] : [t], targetTouches: typ === 'touchend' ? [] : [t], changedTouches: [t] }); };
+    el.dispatchEvent(mk('touchstart', y0));
+    const n = 12;
+    for (let i = 1; i <= n; i++) { el.dispatchEvent(mk('touchmove', y0 + (y1 - y0) * i / n)); await new Promise((r) => setTimeout(r, 16)); }
+    el.dispatchEvent(mk('touchend', y1));
+  }, { x, y0, y1 });
+  await fingerZug(P, 410, 800, 300);
+  await P.waitForTimeout(400);
+  const nach = await lage(P, 'n3');
+  pruefe('F10 ein Finger im Text zieht die Notiz nach oben', start.oben - nach.oben >= 300, JSON.stringify({ vorher: start.oben, nachher: nach.oben }));
+  await fingerZug(P, 410, 300, 800);
+  await P.waitForTimeout(400);
+  const zurueck = await lage(P, 'n3');
+  pruefe('F11 zurück nach unten klemmt am Anfang', Math.abs(zurueck.oben - start.oben) <= 2, JSON.stringify({ start: start.oben, jetzt: zurueck.oben }));
   await ctx.close();
 }
 

@@ -231,7 +231,42 @@ export function Board() {
   const pinchRef = useRef<{ dist: number; zoom: number; fx: number; fy: number } | null>(null);
   // Ein-Finger-Panning über Modulen (M125): Drag aus „toten" nodrag-Zonen
   // der Karten schwenkt das Board; pending bis der 8-px-Schwellwert fällt
-  const panRef = useRef<{ x: number; y: number; vx: number; vy: number; zoom: number; active: boolean; el: Element } | null>(null);
+  const panRef = useRef<{ x: number; y: number; vx: number; vy: number; zoom: number; active: boolean; el: Element; fokus?: boolean; ly?: number } | null>(null);
+  /**
+   * M334: Scrollen im Fokus. Eine Notiz, die länger als der Schirm ist, ließ
+   * sich im Fokus nicht nach unten bewegen: Der Editor trägt nowheel (React
+   * Flow ignoriert das Rad dort), wächst selbst statt zu scrollen, und der
+   * Finger auf contenteditable galt nicht als Schwenk-Kandidat. Jetzt rollt
+   * das Rad bzw. der Finger die Kamera senkrecht über die Karte — geklemmt,
+   * damit die Karte nie den Schirm verlässt; passt sie ganz hinein, bewegt
+   * sich nichts. Der Kamera-Effekt (unten) hält die Maße hier aktuell.
+   */
+  const fokusRef = useRef<{ id: string; oben: number; hoehe: number; rand: number } | null>(null);
+  const fokusGrenzen = useCallback((): { min: number; max: number; passt: boolean } | null => {
+    const f = fokusRef.current;
+    if (!f) return null;
+    const el = document.querySelector(`.react-flow__node[data-id="${f.id}"]`) as HTMLElement | null;
+    if (!el) return null;
+    const { zoom } = getViewport();
+    const fy = getInternalNode(f.id)?.internals.positionAbsolute.y ?? 0;
+    const h = el.offsetHeight;
+    const passt = h * zoom <= f.hoehe - 2 * f.rand;
+    if (passt) {
+      const y = f.oben + (f.hoehe - h * zoom) / 2 - fy * zoom;
+      return { min: y, max: y, passt };
+    }
+    return { min: f.oben + f.hoehe - f.rand - (fy + h) * zoom, max: f.oben + f.rand - fy * zoom, passt };
+  }, [getInternalNode, getViewport]);
+  /** Kamera um dy Bildpunkte rollen (positiv = Inhalt nach oben, wie ein Scroll nach unten) */
+  const fokusScroll = useCallback((dy: number): boolean => {
+    const g = fokusGrenzen();
+    if (!g) return false;
+    const v = getViewport();
+    const y = Math.max(g.min, Math.min(g.max, v.y - dy));
+    if (Math.abs(y - v.y) < 0.5) return false;
+    void setViewport({ x: v.x, y, zoom: v.zoom });
+    return true;
+  }, [fokusGrenzen, getViewport, setViewport]);
   useEffect(() => {
     const wrap = zoomWrapRef.current;
     if (!wrap) return;
@@ -253,11 +288,38 @@ export function Board() {
       + '[role="menu"], [role="listbox"], [role="dialog"], .modal-backdrop, .ticket-modal-backdrop, '
       + '.dock-menu, .sel-ai-menu, .sel-attr-menu, .tab-tree, .tab-bg-menu, .mm-pop, .draw-palette, .comment-panel, .frame-menu, .week-pop, .happ-menu';
     const inOverlay = (t: Element | null) => !!t?.closest?.(OVERLAY_SEL);
+    /** Kann irgendein Container zwischen Ziel und Karte in Zugrichtung scrollen? */
+    const canScrollTowards = (from: Element, stopAt: Element, dx: number, dy: number): boolean => {
+      const vertical = Math.abs(dy) >= Math.abs(dx);
+      let cur: Element | null = from;
+      while (cur && cur !== stopAt) {
+        const st = getComputedStyle(cur);
+        if (vertical && /auto|scroll/.test(st.overflowY) && cur.scrollHeight > cur.clientHeight + 4) {
+          if ((dy < 0 && cur.scrollTop + cur.clientHeight < cur.scrollHeight - 1) || (dy > 0 && cur.scrollTop > 0)) return true;
+        }
+        if (!vertical && /auto|scroll/.test(st.overflowX) && cur.scrollWidth > cur.clientWidth + 4) {
+          if ((dx < 0 && cur.scrollLeft + cur.clientWidth < cur.scrollWidth - 1) || (dx > 0 && cur.scrollLeft > 0)) return true;
+        }
+        cur = cur.parentElement;
+      }
+      return false;
+    };
     const onWheel = (e: WheelEvent) => {
       const target = e.target as Element | null;
       if (inOverlay(target)) return; // Menü offen → Menü scrollt, Board bleibt ruhig
       const inNode = target?.closest?.('.react-flow__node');
       if (!inNode) return; // auf der Fläche macht React Flow das selbst
+      // M334: Im Fokus rollt das Rad über der Karte die Kamera — außer ein
+      // Inhalt (Code-Feld, Tabelle) kann selbst noch in diese Richtung scrollen
+      if (fokusRef.current && !e.ctrlKey && !e.metaKey && inNode.classList.contains('pn-focused') && target) {
+        const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+        if (!canScrollTowards(target, inNode, -e.deltaX, -dy)) {
+          e.preventDefault();
+          e.stopPropagation();
+          fokusScroll(dy);
+          return;
+        }
+      }
       if (!e.ctrlKey && !wheelZoomRef.current) return; // Modul-Scroll bleibt
       e.preventDefault();
       e.stopPropagation();
@@ -278,22 +340,6 @@ export function Board() {
     };
     const touchDist = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
     const touchMid = (t: TouchList) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
-    /** Kann irgendein Container zwischen Ziel und Karte in Zugrichtung scrollen? */
-    const canScrollTowards = (from: Element, stopAt: Element, dx: number, dy: number): boolean => {
-      const vertical = Math.abs(dy) >= Math.abs(dx);
-      let cur: Element | null = from;
-      while (cur && cur !== stopAt) {
-        const st = getComputedStyle(cur);
-        if (vertical && /auto|scroll/.test(st.overflowY) && cur.scrollHeight > cur.clientHeight + 4) {
-          if ((dy < 0 && cur.scrollTop + cur.clientHeight < cur.scrollHeight - 1) || (dy > 0 && cur.scrollTop > 0)) return true;
-        }
-        if (!vertical && /auto|scroll/.test(st.overflowX) && cur.scrollWidth > cur.clientWidth + 4) {
-          if ((dx < 0 && cur.scrollLeft + cur.clientWidth < cur.scrollWidth - 1) || (dx > 0 && cur.scrollLeft > 0)) return true;
-        }
-        cur = cur.parentElement;
-      }
-      return false;
-    };
     const onTouchStart = (e: TouchEvent) => {
       const target = e.target as Element | null;
       if (inOverlay(target)) { panRef.current = null; return; } // Menü offen → keine Board-Gesten
@@ -314,12 +360,19 @@ export function Board() {
         return;
       }
       if (e.touches.length !== 1 || !node || !target) return;
+      const t = e.touches[0];
+      const { x, y, zoom } = getViewport();
+      // M334: Im Fokus rollt EIN Finger die lange Karte — auch aus dem Text heraus
+      // (ein Tipp setzt weiter den Cursor, erst der Zug über 8 px scrollt)
+      if (fokusRef.current && node.classList.contains('pn-focused')) {
+        if (target.closest('input, textarea, select, button, a, .react-flow__handle, .react-flow__resize-control')) return;
+        panRef.current = { x: t.clientX, y: t.clientY, vx: x, vy: y, zoom, active: false, el: target, fokus: true, ly: t.clientY };
+        return;
+      }
       // Panning-Kandidat (M125): nur aus nodrag-Zonen (dort verschiebt React
       // Flow NICHT die Karte) und nie aus interaktiven Elementen heraus
       if (!target.closest('.nodrag')) return;
       if (target.closest('input, textarea, select, button, a, [contenteditable="true"], .react-flow__handle, .react-flow__resize-control')) return;
-      const t = e.touches[0];
-      const { x, y, zoom } = getViewport();
       panRef.current = { x: t.clientX, y: t.clientY, vx: x, vy: y, zoom, active: false, el: target };
     };
     const onTouchMove = (e: TouchEvent) => {
@@ -342,10 +395,17 @@ export function Board() {
         // Kann der Modul-Inhalt selbst in diese Richtung scrollen? Dann darf er.
         const node = pan.el.closest('.react-flow__node');
         if (node && canScrollTowards(pan.el, node, dx, dy)) { panRef.current = null; return; }
+        // Im Fokus nur senkrecht; ein waagerechter Zug im Text bleibt dem Editor
+        if (pan.fokus && Math.abs(dx) > Math.abs(dy) * 1.5) { panRef.current = null; return; }
         pan.active = true;
       }
       e.preventDefault();
       e.stopPropagation();
+      if (pan.fokus) {
+        fokusScroll((pan.ly ?? t.clientY) - t.clientY);
+        pan.ly = t.clientY;
+        return;
+      }
       void setViewport({ x: pan.vx + dx, y: pan.vy + dy, zoom: pan.zoom });
     };
     const onTouchEnd = (e: TouchEvent) => {
@@ -370,7 +430,7 @@ export function Board() {
       wrap.removeEventListener('touchend', onTouchEnd, true);
       wrap.removeEventListener('touchcancel', onTouchEnd, true);
     };
-  }, [getViewport, setViewport]);
+  }, [getViewport, setViewport, fokusScroll]);
   const pendingFocus = useBoard((s) => s.pendingFocus);
   const clearPendingFocus = useBoard((s) => s.clearPendingFocus);
 
@@ -643,7 +703,7 @@ export function Board() {
       let beobachter: ResizeObserver | null = null;
       let zuletzt = { w: 0, h: 0 };
       let timer: ReturnType<typeof setTimeout> | undefined;
-      const fahren = (dauer = 320) => {
+      const fahren = (dauer = 320, nachfahren = false) => {
         const el = document.querySelector(`.react-flow__node[data-id="${focusCard}"]`) as HTMLElement | null;
         const pane = document.querySelector('.react-flow') as HTMLElement | null;
         const n = useBoard.getState().boards.find((b) => b.id === useBoard.getState().activeId)?.nodes.find((k) => k.id === focusCard);
@@ -653,7 +713,7 @@ export function Board() {
           beobachter = new ResizeObserver(() => {
             if (Math.abs(el.offsetWidth - zuletzt.w) < 4 && Math.abs(el.offsetHeight - zuletzt.h) < 4) return;
             clearTimeout(timer);
-            timer = setTimeout(() => fahren(220), 120);
+            timer = setTimeout(() => fahren(220, true), 120);
           });
           beobachter.observe(el);
         }
@@ -682,6 +742,14 @@ export function Board() {
         // der Grund für den alten Fokus (M212), und bleibt.
         const text = ['note', 'image', 'file', 'email', 'shape'].includes(n.type ?? '');
         const zoom = text ? Math.min(grob ? 2.2 : 1.25, Math.max(1, passt)) : 1;
+        fokusRef.current = { id: focusCard, oben, hoehe, rand };
+        // M334: Wächst eine Karte, die ohnehin länger als der Schirm ist (Tippen am
+        // Ende), bleibt die Kamera, wo der Nutzer sie hingerollt hat — nur klemmen,
+        // nicht zurück an den Anfang springen
+        if (nachfahren && h * zoom > hoehe - 2 * rand && Math.abs(getViewport().zoom - zoom) < 0.001) {
+          fokusScroll(0);
+          return;
+        }
         document.documentElement.style.setProperty('--fokus-zoom', String(zoom));
         document.documentElement.style.setProperty('--fokus-rand', `${2 * rand}px`);
         document.documentElement.style.setProperty('--fokus-max', text ? '720px' : '1200px');
@@ -693,8 +761,35 @@ export function Board() {
         void setViewport({ x, y, zoom }, { duration: dauer });
       };
       fahren();
-      return () => { if (raf) cancelAnimationFrame(raf); clearTimeout(timer); beobachter?.disconnect(); };
+      // M334: Der Schreib-Cursor bleibt im Bild. Der Browser kann ihn nicht
+      // selbst nachscrollen (die Karte liegt in einer Transform-Ebene, nicht in
+      // einem Scroller) — also rollt die Kamera nach, sobald die Auswahl unter
+      // die Fußleiste oder über die Kopfzeile wandert.
+      let cursorTimer: ReturnType<typeof setTimeout> | undefined;
+      const cursorFolgen = () => {
+        clearTimeout(cursorTimer);
+        cursorTimer = setTimeout(() => {
+          const f = fokusRef.current;
+          const sel = document.getSelection();
+          if (!f || !sel || sel.rangeCount === 0 || !sel.isCollapsed || performance.now() < flyingUntil.current) return;
+          const knoten = sel.anchorNode;
+          const el = (knoten?.nodeType === 1 ? knoten as Element : knoten?.parentElement) ?? null;
+          if (!el?.closest('.react-flow__node.pn-focused')) return;
+          let r = sel.getRangeAt(0).getBoundingClientRect();
+          if (!r.height) { const rs = sel.getRangeAt(0).getClientRects(); if (rs.length) r = rs[0]; else { const b = el.getBoundingClientRect(); if (!b.height) return; r = b; } }
+          const pane = document.querySelector('.react-flow') as HTMLElement | null;
+          if (!pane) return;
+          const top = pane.getBoundingClientRect().top;
+          const sichtOben = top + f.oben + 12;
+          const sichtUnten = top + f.oben + f.hoehe - 12;
+          if (r.bottom > sichtUnten) fokusScroll(r.bottom - sichtUnten + 48);
+          else if (r.top < sichtOben) fokusScroll(r.top - sichtOben - 48);
+        }, 60);
+      };
+      document.addEventListener('selectionchange', cursorFolgen);
+      return () => { if (raf) cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(cursorTimer); beobachter?.disconnect(); document.removeEventListener('selectionchange', cursorFolgen); };
     }
+    fokusRef.current = null;
     document.documentElement.style.removeProperty('--fokus-zoom');
     document.documentElement.style.removeProperty('--fokus-max');
     document.documentElement.style.removeProperty('--fokus-rand');
@@ -1053,6 +1148,7 @@ export function Board() {
         connectionRadius={42}
         connectionLineStyle={{ stroke: 'var(--accent)', strokeWidth: 2.5 }}
         panOnScroll={!wheelZoom}
+        nodesDraggable={!focusCard}
         snapToGrid={gridSnap}
         snapGrid={[20, 20]}
         zoomOnScroll={wheelZoom}
