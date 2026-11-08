@@ -4811,55 +4811,40 @@ body:has(.sel-toolbar-dock) .sel-toolbar-dock {
   .react-flow__controls { display: none; }
 }
 
-/* ================= M212: Karte im Fokus (Handy) =================
-   Die Karte bleibt im React-Flow-Baum — sonst verlören Handle, NodeResizer und
-   useReactFlow ihren Kontext. Stattdessen wird hier die Transform-Kette des
-   Viewports neutralisiert und genau EIN Knoten formatfüllend gestellt.
-   Wichtig: !important schlägt die Inline-Styles, die React Flow schreibt. */
-.focus-mode .react-flow__viewport { transform: none !important; }
-.focus-mode .react-flow__node { display: none !important; }
-.focus-mode .react-flow__edges,
-.focus-mode .react-flow__background,
+/* ================= M212 → M333: Karte im Fokus = Zoom auf dem Board =================
+   M333: Kein zweiter Editor und keine Vollbild-Position mehr. Die Kamera fährt im
+   Board auf die Karte (Board.tsx, fokusZoomen), der Rest tritt zurück. Stift,
+   Finger, Handschrift, Radierer und Gesten arbeiten auf derselben Fläche weiter —
+   genau das ging im alten Blatt nicht, weil die Zeichenebene darunter lag. */
+.focus-mode .react-flow__node:not(.pn-focused) {
+  opacity: .22; pointer-events: none; filter: saturate(.5);
+  transition: opacity .25s ease;
+}
+.focus-mode .react-flow__edges { opacity: .25; }
 .focus-mode .react-flow__minimap,
-.focus-mode .drawing-layer,
 .focus-mode .dock,
 .focus-mode .logo-wrap,
 .focus-mode .top-actions,
 .focus-mode .tabs,
 .focus-mode .backlinks,
 .focus-mode .legal-corner,
-/* M265: Der Board-Zoom gehört zum Board. Im Fokus lag er unten links halb
-   unter dem Blatt (User-Screenshot) — und hätte dort ohnehin nur die
-   Ansicht hinter dem Blatt verstellt. Dieselbe Regel wie für Dock,
-   Minimap und Reiterleiste eine Zeile höher. */
 .focus-mode .react-flow__controls,
 .focus-mode .react-flow__attribution { display: none !important; }
-
 .focus-mode .react-flow__node.pn-focused {
-  display: block !important;
-  position: absolute !important;
-  transform: none !important;
-  left: 0 !important;
-  top: var(--focus-top) !important;
-  width: 100vw !important;
-  height: calc(100dvh - var(--focus-top) - var(--focus-bottom) - var(--kb)) !important;
-  max-width: none !important;
-  z-index: 3;
+  z-index: 3 !important;
+  /* Breite statt Pixel: Die Karte wird im Fokus so breit wie der Schirm (abzüglich Rand),
+     gedeckelt auf Text 720 / Module 1200 Layout-Punkte — eine FESTE Breite, unabhängig vom
+     Zoom, damit Kamera und Kartenmaß sich nicht gegenseitig aufschaukeln. Die Kamera-
+     Stufe (Board.tsx) richtet sich dann nach dieser Breite. */
+  min-width: min(calc(100vw - var(--fokus-rand, 32px)), var(--fokus-max, 720px)) !important;
 }
-/* Die Hülle füllt das Blatt aus, statt ihre Board-Maße zu behalten */
 .focus-mode .pn-focused .card-shell,
-.focus-mode .pn-focused .card-body { width: 100% !important; height: 100% !important; }
-/* Board-Werkzeuge an der Karte ergeben im Fokus keinen Sinn: Verschiebe-Griff,
-   Löschen, Verbindungspunkte und Resize sind Sache des Boards. */
+.focus-mode .pn-focused .card-body { width: 100% !important; }
+/* Board-Werkzeuge an der Karte treten im Fokus zurück: Verschiebe-Griff, Löschen, Verbindungspunkte */
 .focus-mode .pn-focused .card-grip,
 .focus-mode .pn-focused .card-x,
-.focus-mode .pn-focused .react-flow__handle,
-.focus-mode .pn-focused .react-flow__resize-control { display: none !important; }
-/* Kein abgesetzter Kartenlook mehr — das Blatt IST die Karte */
-.focus-mode .pn-focused .card-body {
-  border-radius: 0 !important; box-shadow: none !important; border: none !important;
-  overflow: auto !important;
-}
+.focus-mode .pn-focused .react-flow__handle { display: none !important; }
+.focus-mode .pn-focused .card-body { box-shadow: 0 14px 44px rgba(0, 0, 0, .26) !important; }
 
 /* Kopfzeile: Zurück · Titel · Mehr */
 .focus-head {
@@ -5251,63 +5236,13 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
   }
 }
 
-/* ================= M228: Der Fokus gilt überall =================
-   Am Telefon füllt die Karte den Schirm — dort ist jeder Punkt Fläche kostbar.
-   Ab Tablet-Breite wäre randlos verschenkt: Dort erscheint die Karte als
-   großes Blatt ÜBER dem Board, das abgedunkelt sichtbar bleibt. Man sieht,
-   woher man kommt, und der Weg zurück ist offensichtlich. */
-/* M235: „Formatfüllend statt Blatt" — die Blatt-Darstellung ab Tablet-Breite
-   ist eine Voreinstellung, keine Naturgesetzlichkeit. Mit `fokus-voll` fällt
-   sie weg und es gilt die Handy-Regel: Karte randlos, Board dahinter aus.
-   Umgesetzt als `:not(.fokus-voll)` am selben Block statt als zweiter Block
-   mit Gegen-Regeln — sonst müsste jede der acht Eigenschaften einzeln
-   zurückgenommen werden, und beim nächsten Zusatz vergisst man eine. */
-@media (min-width: 700px) {
-  .focus-mode:not(.fokus-voll) .react-flow__node.pn-focused {
-    left: 50% !important;
-    transform: translateX(-50%) !important;
-    width: min(1000px, calc(100vw - 96px)) !important;
-    top: calc(var(--focus-top) + 18px) !important;
-    height: calc(100dvh - var(--focus-top) - var(--focus-bottom) - var(--kb) - 40px) !important;
-  }
-  .focus-mode:not(.fokus-voll) .pn-focused .card-body {
-    /* M239: derselbe Radius wie bei jeder Karte (.react-flow__node: 10px).
-       Vorher 18px — das Blatt IST die Karte, nur größer; ein eigener,
-       runderer Radius ließ sie wie ein fremdes Fenster wirken und stach
-       neben Leisten und Menüs heraus (User-Screenshot). */
-    border-radius: var(--r) !important;
-    box-shadow: var(--pop-shadow) !important;
-    border: 1px solid var(--border) !important;
-  }
-  /**
-   * Das Board bleibt sichtbar, tritt aber zurück — Zusammenhang ohne Ablenkung.
-   *
-   * M237: Vorher lag dafür ein Schleier über allem (`::after` am Renderer).
-   * Der traf aber auch die Karte, um die es geht: Sie steckt im Viewport von
-   * React Flow, und weil der ein eigenes transform hat, bildet er einen
-   * eigenen Stapel-Kontext — die 1001 des Knotens gelten nur INNERHALB. Gegen
-   * die 2 des Schleiers, der eine Ebene höher liegt, kommt sie nicht an. Die
-   * fokussierte Karte lag damit unter Milchglas: unscharf und blass, obwohl
-   * sie das Einzige ist, was man gerade lesen will (User-Screenshot).
-   *
-   * Statt eines Overlays werden jetzt die ÜBRIGEN Karten gedimmt. Das ist
-   * auch inhaltlich richtiger: Zurücktreten sollen sie, nicht die Karte im
-   * Fokus — und ganz nebenbei fällt eine Ebene weg, die sich mit allem
-   * anlegen konnte, was noch über dem Board liegt.
-   */
-  .focus-mode:not(.fokus-voll) .react-flow__node { display: block !important; }
-  .focus-mode:not(.fokus-voll) .react-flow__edges { display: block !important; }
-  .focus-mode:not(.fokus-voll) .react-flow__node:not(.pn-focused),
-  .focus-mode:not(.fokus-voll) .react-flow__edges,
-  .focus-mode:not(.fokus-voll) .react-flow__background {
-    opacity: 0.2 !important;
-    filter: blur(1.5px);
-    transition: opacity 0.18s ease-out;
-    pointer-events: none !important;
-  }
-  /* Kopf- und Fußzeile des Fokus liegen über dem Schleier */
-  .focus-head, .focus-nav { z-index: 60; }
-}
+/* ================= M228 → M333: Der Fokus gilt überall =================
+   M228 stellte die Karte ab Tablet-Breite als Blatt über das Board (left 50 %,
+   feste Breite und Höhe). M333 ersetzt das durch den Zoom im Board: Die Regeln
+   zur Lage der Karte sind weg, das Zurücktreten der übrigen Karten steht im
+   M333-Block oben. `fokus-voll` (M235) ist damit ohne Wirkung und bleibt nur als
+   Klasse erhalten. */
+.focus-head, .focus-nav { z-index: 60; }
 
 /* ================= M255: Barrierefreiheit & Responsivität Stufe 3 =================
  *
