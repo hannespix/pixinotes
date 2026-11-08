@@ -21,6 +21,7 @@ import { initWebdavSync } from './lib/webdav';
 import { initFilesSync } from './lib/filesSync';
 import { initKontoSync } from './lib/kontoSync';
 import { initBrain } from './lib/brain';
+import { kiAbbrechen } from './lib/ai';
 import { TaskHub } from './components/TaskHub';
 import { AboutMenu } from './components/AboutMenu';
 import { FocusSheet } from './components/FocusSheet';
@@ -287,6 +288,11 @@ export default function App() {
           {toast?.undo && (
             <button className="toast-undo" onClick={restoreDeleted}>
               Rückgängig
+            </button>
+          )}
+          {toast?.abbruch && (
+            <button className="toast-undo" data-taste="ki-abbrechen" onClick={() => { kiAbbrechen(); useBoard.getState().showToast('⏹ Abbruch angefordert — die laufende Portion wird noch beendet …', false, 8000); }}>
+              Abbrechen
             </button>
           )}
         </div>

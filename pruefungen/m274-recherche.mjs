@@ -114,7 +114,7 @@ await P.waitForTimeout(2000);
 
 // ══ T1: Der Weg zum Dialog ═══════════════════════════════════════════
 console.log('════ T1: Einstieg über das KI-Menü ════');
-await P.locator('button[aria-label="Mehr: KI-Assistent · Aufräumen & Anordnen · Physik · Archiv"], button[title^="Mehr:"]').first().click();
+await P.locator('.dock button[aria-label="Mehr"]').first().click(); // M198/M332: der ⋯-Knopf heißt schlicht „Mehr"
 await P.waitForTimeout(500);
 await P.locator('button[aria-label="KI-Assistent"]').click();
 await P.waitForTimeout(500);

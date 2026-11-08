@@ -4,7 +4,7 @@ import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
 import { makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, makeSheet, makeTime, makeWeek } from '../lib/nodes';
 import { importFilesToBoard, importHtmlAppFromUrl } from '../lib/importFiles';
-import { aiReady } from '../lib/ai';
+import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
 import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
@@ -197,21 +197,24 @@ export function Dock() {
   const [cmd, setCmd] = useState('');
 
   /** KI-Aktion aufs ganze Board ausführen (mit Fortschritts-Toast + Fehlerbehandlung) */
-  const runAi = async (label: string, fn: (nodes: import('../types').AppNode[], pos: { x: number; y: number }) => Promise<string>, restoreCmd?: string) => {
+  const runAi = async (label: string, fn: (nodes: import('../types').AppNode[], pos: { x: number; y: number }, fortschritt: (m: string) => void) => Promise<string>, restoreCmd?: string) => {
     setAiMenu(false);
     if (!aiReady(ai)) { showToast('Zuerst die KI in den Einstellungen konfigurieren (Ollama, Anthropic, OpenAI …).'); setSettingsOpen(true); return; }
     // GLOBALE Sperre: auch die Auswahl-Leiste darf währenddessen nichts starten
     if (useBoard.getState().aiBusy) { showToast('Eine KI-Aktion läuft bereits — kurz warten.'); return; }
     useBoard.getState().setAiBusy(true);
+    kiAbbruchZuruecksetzen();
     setAiBusy(label);
-    showToast('✨ KI analysiert das Board …');
+    showToast('✨ KI analysiert das Board …', false, 120000, true);
     try {
       const st = useBoard.getState();
       const nodes = selectActiveBoard(st).nodes;
-      const msg = await fn(nodes, screenToFlowPosition({ x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 120 }));
-      showToast(`✨ ${msg}`);
+      // M332: Stapel-Aktionen melden ihren Fortschritt; der Toast bietet „Abbrechen"
+      const fortschritt = (m: string) => showToast(`✨ KI: ${m}`, false, 180000, true);
+      const msg = await fn(nodes, screenToFlowPosition({ x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 120 }), fortschritt);
+      showToast(`✨ ${msg}`, false, msg.includes('⚠️') || msg.startsWith('Abgebrochen') ? 12000 : 5000);
     } catch (e) {
-      showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`);
+      showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`, false, 8000);
       // Freitext-Eingabe bei Fehler zurückgeben — nicht neu tippen müssen
       if (restoreCmd) setCmd(restoreCmd);
     } finally {
@@ -522,14 +525,14 @@ export function Dock() {
                   e.preventDefault();
                   const wish = cmd;
                   setCmd('');
-                  runAi('cmd', (n, p) => aiCommand(wish, n, p), wish);
+                  runAi('cmd', (n, p, f) => aiCommand(wish, n, p, f), wish);
                 }
               }}
             />
             <button
               className="ai-cmd-go"
               disabled={!!aiBusy || !cmd.trim()}
-              onClick={() => { const wish = cmd; setCmd(''); runAi('cmd', (n, p) => aiCommand(wish, n, p), wish); }}
+              onClick={() => { const wish = cmd; setCmd(''); runAi('cmd', (n, p, f) => aiCommand(wish, n, p, f), wish); }}
             >
               <IWand size={14} /> Ausführen (erstellen, ändern, verbessern …)
             </button>

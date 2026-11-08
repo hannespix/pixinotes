@@ -2,6 +2,7 @@
 // dem Browser auf. Cloud (eigener Key) oder lokal (Ollama/kompatibel) —
 // es gibt keinen Zwischenserver, Inhalte gehen nur an den gewählten Endpunkt.
 import { useBoard, type AiSettings } from '../store';
+import { textZuBloecken } from './notiz';
 
 export function aiReady(ai: AiSettings): boolean {
   switch (ai.provider) {
@@ -21,7 +22,7 @@ export function aiReady(ai: AiSettings): boolean {
   }
 }
 
-const TIMEOUT_MS = 60_000;
+const TIMEOUT_MS = 120_000;
 
 /* ---------- Bilder für die KI (M199) ----------
    Bild-Karten gehen als ECHTE Foto-Anhänge mit (Vision) — vorher wurde nur der
@@ -58,22 +59,60 @@ export async function prepImageForAi(src: string): Promise<string | null> {
 const b64Of = (u: string) => u.slice(u.indexOf(',') + 1);
 const mediaOf = (u: string) => /^data:([^;,]+)/.exec(u)?.[1] ?? 'image/jpeg';
 
-export async function askAi(prompt: string, images: string[] = []): Promise<string> {
+/**
+ * M332: Laufende Anfragen, damit „Abbrechen" sie wirklich beendet — und ein
+ * Merker, den Stapel-Aktionen zwischen zwei Portionen abfragen.
+ */
+const laufende = new Set<AbortController>();
+let abgebrochen = false;
+export function kiAbbrechen(): void {
+  abgebrochen = true;
+  for (const c of laufende) c.abort();
+}
+export function kiAbgebrochen(): boolean { return abgebrochen; }
+/** Vor jeder neuen Aktion aufrufen — der Abbruch gilt nur für die laufende */
+export function kiAbbruchZuruecksetzen(): void { abgebrochen = false; }
+
+export interface KiAntwort {
+  text: string;
+  /** Das Modell hat an seiner Ausgabegrenze aufgehört — die Antwort ist unvollständig */
+  abgeschnitten: boolean;
+}
+export interface KiOptionen {
+  /** Obergrenze der Antwortlänge (Token); Vorgabe 4096 */
+  maxTokens?: number;
+}
+
+export async function askAi(prompt: string, images: string[] = [], opt: KiOptionen = {}): Promise<string> {
+  return (await askAiVoll(prompt, images, opt)).text;
+}
+
+/**
+ * M332: Antwort MIT der Information, ob sie abgeschnitten wurde. Vorher stand
+ * die Anthropic-Grenze fest auf 1024 Token — ein Operationsplan für acht
+ * Notizen brach nach der zweiten mitten im JSON ab, die Reparatur schloss die
+ * Klammern, und die App meldete fröhlich „2 Schritte". Jetzt sind 4096 Token
+ * die Vorgabe, und wer fragt, erfährt vom Abschneiden.
+ */
+export async function askAiVoll(prompt: string, images: string[] = [], opt: KiOptionen = {}): Promise<KiAntwort> {
   const ai = useBoard.getState().ai;
   if (!aiReady(ai)) throw new Error('KI nicht konfiguriert (⚙️ Einstellungen)');
+  if (abgebrochen) throw new Error('abgebrochen');
   try {
-    return await askOnce(ai, prompt, images);
+    return await askOnce(ai, prompt, images, opt);
   } catch (e) {
+    if (abgebrochen) throw new Error('abgebrochen');
     // Gratis-Dienst/Ollama: das Modell versteht evtl. keine Bilder — einmal
     // ohne Fotos nachfassen, statt die ganze Aktion scheitern zu lassen
     if (images.length > 0 && (ai.provider === 'free' || ai.provider === 'ollama')) {
-      return askOnce(ai, `${prompt}\n\n(Hinweis: Die Fotos konnten nicht übertragen werden — arbeite nur mit dem Kartentext.)`, []);
+      return askOnce(ai, `${prompt}\n\n(Hinweis: Die Fotos konnten nicht übertragen werden — arbeite nur mit dem Kartentext.)`, [], opt);
     }
     throw e;
   }
 }
 
-async function askOnce(ai: AiSettings, prompt: string, images: string[]): Promise<string> {
+async function askOnce(ai: AiSettings, prompt: string, images: string[], opt: KiOptionen): Promise<KiAntwort> {
+  const maxTokens = opt.maxTokens ?? 4096;
   // OpenAI-Chat-Format: Text + Bilder als content-Array, sonst schlichter String
   const openAiContent = images.length
     ? [
@@ -82,6 +121,7 @@ async function askOnce(ai: AiSettings, prompt: string, images: string[]): Promis
     ]
     : prompt;
   const ctrl = new AbortController();
+  laufende.add(ctrl);
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
     switch (ai.provider) {
@@ -98,7 +138,7 @@ async function askOnce(ai: AiSettings, prompt: string, images: string[]): Promis
           },
           body: JSON.stringify({
             model: ai.model,
-            max_tokens: 1024,
+            max_tokens: maxTokens,
             messages: [{
               role: 'user',
               content: images.length
@@ -114,7 +154,7 @@ async function askOnce(ai: AiSettings, prompt: string, images: string[]): Promis
         });
         if (!res.ok) throw new Error(`Anthropic: HTTP ${res.status}`);
         const data = await res.json();
-        return data.content?.[0]?.text ?? '';
+        return { text: data.content?.[0]?.text ?? '', abgeschnitten: data.stop_reason === 'max_tokens' };
       }
       case 'free': {
         // Pollinations.ai: kostenloser, OpenAI-kompatibler Endpunkt ohne
@@ -130,6 +170,7 @@ async function askOnce(ai: AiSettings, prompt: string, images: string[]): Promis
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             model,
+            max_tokens: maxTokens,
             messages: [{ role: 'user', content: openAiContent }],
           }),
         });
@@ -144,7 +185,7 @@ async function askOnce(ai: AiSettings, prompt: string, images: string[]): Promis
         const data = await res.json();
         const msg = data.choices?.[0]?.message;
         // Reasoning-Modell: manchmal steht die Antwort nur im reasoning-Feld
-        return msg?.content || msg?.reasoning || '';
+        return { text: msg?.content || msg?.reasoning || '', abgeschnitten: data.choices?.[0]?.finish_reason === 'length' };
       }
       case 'openai':
       case 'openrouter':
@@ -163,12 +204,13 @@ async function askOnce(ai: AiSettings, prompt: string, images: string[]): Promis
           },
           body: JSON.stringify({
             model: ai.model,
+            max_tokens: maxTokens,
             messages: [{ role: 'user', content: openAiContent }],
           }),
         });
         if (!res.ok) throw new Error(`KI-Server: HTTP ${res.status}`);
         const data = await res.json();
-        return data.choices?.[0]?.message?.content ?? '';
+        return { text: data.choices?.[0]?.message?.content ?? '', abgeschnitten: data.choices?.[0]?.finish_reason === 'length' };
       }
       case 'ollama': {
         const base = ai.baseUrl.replace(/\/$/, '');
@@ -180,18 +222,24 @@ async function askOnce(ai: AiSettings, prompt: string, images: string[]): Promis
           // reine Textmodelle ignorieren das Feld
           body: JSON.stringify({
             model: ai.model, prompt, stream: false,
+            options: { num_predict: maxTokens },
             ...(images.length ? { images: images.map(b64Of) } : {}),
           }),
         });
         if (!res.ok) throw new Error(`Ollama: HTTP ${res.status} — läuft ollama serve? OLLAMA_ORIGINS gesetzt?`);
         const data = await res.json();
-        return data.response ?? '';
+        return { text: data.response ?? '', abgeschnitten: data.done_reason === 'length' };
       }
       default:
         throw new Error('Unbekannter Anbieter');
     }
+  } catch (e) {
+    if (abgebrochen) throw new Error('abgebrochen');
+    if ((e as Error).name === 'AbortError') throw new Error('Zeitüberschreitung — der KI-Dienst hat nicht rechtzeitig geantwortet.');
+    throw e;
   } finally {
     clearTimeout(timer);
+    laufende.delete(ctrl);
   }
 }
 
@@ -283,12 +331,40 @@ export async function mdToBlocks(title: string, md: string): Promise<unknown[]> 
   try {
     if (!mdParser) {
       const { BlockNoteEditor } = await import('@blocknote/core');
-      mdParser = BlockNoteEditor.create();
+      mdParser = BlockNoteEditor.create({ _headless: true } as never);
     }
-    const blocks = await mdParser.tryParseMarkdownToBlocks(src);
-    if (blocks.length > 0) return blocks as unknown[];
-  } catch { /* Netz: alter Zeilen-Parser */ }
-  return textToBlocks(title, md);
+    // M332: GFM-Checklisten („- [ ] …") bringen BlockNotes Parser zu Fall
+    // (Fehler „blockContainer … blockContent" — der Haken wird ein eigener
+    // Knoten). Vorher wurde deshalb JEDE Antwort mit Checkliste stumm zum
+    // Rohtext. Die Haken werden als Marker durchgeschleust und danach
+    // wieder zu echten checkListItem-Blöcken — Fett/Kursiv bleiben erhalten.
+    const vor = src.replace(/^(\s*)[-*+]\s+\[( |x|X)\]\s+/gm, (_m, ind: string, x: string) => `${ind}- ${x === ' ' ? '☐' : '☑'} `);
+    const blocks = await mdParser.tryParseMarkdownToBlocks(vor);
+    if (blocks.length > 0) return hakenZurueck(blocks as unknown[]);
+  } catch (e) {
+    // M332: nicht mehr stumm — der Zeilen-Parser unten kennt Überschriften,
+    // Punkte, Haken, Nummern und Zitate; nur Fett/Kursiv bleiben dann roh
+    console.warn('Markdown-Parser nicht verfügbar, Zeilen-Parser übernimmt:', e);
+  }
+  return textZuBloecken(src);
+}
+
+/** Marker-Punkte („- ☐ Text") wieder zu Checklisten-Blöcken machen (rekursiv) */
+function hakenZurueck(blocks: unknown[]): unknown[] {
+  return blocks.map((b) => {
+    const blk = b as { type?: string; props?: Record<string, unknown>; content?: unknown; children?: unknown[] };
+    const kinder = Array.isArray(blk.children) ? hakenZurueck(blk.children) : blk.children;
+    if (blk.type === 'bulletListItem' && Array.isArray(blk.content) && blk.content.length > 0) {
+      const erst = blk.content[0] as { type?: string; text?: string };
+      const m = erst.type === 'text' && typeof erst.text === 'string' ? /^([☐☑])\s?/.exec(erst.text) : null;
+      if (m) {
+        const rest = erst.text!.slice(m[0].length);
+        const content = rest ? [{ ...erst, text: rest }, ...blk.content.slice(1)] : blk.content.slice(1);
+        return { ...blk, type: 'checkListItem', props: { ...(blk.props ?? {}), checked: m[1] === '☑' }, content, children: kinder };
+      }
+    }
+    return kinder === blk.children ? b : { ...blk, children: kinder };
+  });
 }
 
 /** KI-Antwort (Zeilen/Stichpunkte) → BlockNote-Blöcke für eine Notiz-Karte */
