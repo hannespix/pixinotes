@@ -12,6 +12,8 @@
  *      meldet Gerät C ohne Klick an und räumt die Adresse auf.
  *   E  Abgelaufenes Token wird still über den Refresh-Token erneuert.
  *   F  Bedingtes Schreiben: ein fremder Stand dazwischen → Zusammenführung, nichts verloren.
+ *   H  M329: Anhänge über 4 MB wandern in den Dateispeicher (Bucket), nicht in die
+ *      Tabelle; ≤ 8 MB kommt sofort, größere holt die Karte beim Öffnen.
  *   G  Konto löschen räumt Zeilen und Nutzer weg; Abmelden; Texte.
  */
 // Läuft aus dem Repository: `node pruefungen/m328-konto-email.mjs`
@@ -51,9 +53,10 @@ const sb = {
   zeilen: new Map(),      // `${uid}/${name}` → { user_id, name, inhalt, mime, groesse, version, updated_at }
   otp: [],                // verschickte Links (E-Mails)
   sockets: [],            // Realtime-Kanäle { ws, uid }
+  objekte: new Map(),     // Storage: `${uid}/${name}` → { buffer, mime }
   bestaetigen: false,     // Registrieren ohne Sitzung (Mail-Bestätigung an)
   n: 0,
-  aufrufe: { refresh: 0, patch: 0, post: 0 },
+  aufrufe: { refresh: 0, patch: 0, post: 0, storagePost: 0, storageGet: {} },
 };
 const b64url = (s) => Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 const jwt = (uid, bis) => `${b64url('{"alg":"HS256"}')}.${b64url(JSON.stringify({ sub: uid, exp: Math.floor(bis / 1000) }))}.sig`;
@@ -166,10 +169,38 @@ async function dienste(ctx) {
         melden(uid, name, z ? 'UPDATE' : 'INSERT');
         return neu;
       };
+      if ('p_loeschen' in b) return json(route, 404, { code: 'PGRST202', message: 'Could not find the function public.konto_schreiben(p_dateien, p_loeschen, p_umgebung, p_wenn_version)' });
       for (const d of b.p_dateien ?? []) schreib(d.name, d.inhalt ?? '', d.mime ?? 'application/json', d.groesse ?? 0);
-      for (const n of b.p_loeschen ?? []) { if (sb.zeilen.delete(`${uid}/${n}`)) melden(uid, n, 'DELETE'); }
       const u = schreib('umgebung.json', b.p_umgebung, 'application/json', String(b.p_umgebung ?? '').length);
       return json(route, 200, u.version);
+    }
+    // ---- Storage: Bucket pixinotes, Pfad <uid>/<name> ----
+    const st = /^\/storage\/v1\/object\/(authenticated\/)?pixinotes\/([^/]+)\/([^/]+)$/.exec(pfad);
+    if (st) {
+      const uid = uidAus(req);
+      if (!uid) return json(route, 401, { message: 'JWT expired' });
+      const [, lesen, ordner, name] = st;
+      if (decodeURIComponent(ordner) !== uid) return json(route, 403, { message: 'new row violates row-level security policy' });
+      const key = `${uid}/${decodeURIComponent(name)}`;
+      if (m === 'POST' && !lesen) {
+        const buf = req.postDataBuffer();
+        if (!buf) return json(route, 400, { message: 'leer' });
+        if (buf.length > 52428800) return json(route, 413, { statusCode: '413', error: 'Payload too large', message: 'The object exceeded the maximum allowed size' });
+        if (sb.objekte.has(key) && (req.headers()['x-upsert'] ?? '') !== 'true') return json(route, 400, { statusCode: '409', error: 'Duplicate', message: 'The resource already exists' });
+        sb.objekte.set(key, { buffer: buf, mime: req.headers()['content-type'] ?? 'application/octet-stream' });
+        sb.aufrufe.storagePost += 1;
+        return json(route, 200, { Key: `pixinotes/${key}`, Id: key });
+      }
+      if (m === 'GET') {
+        const o = sb.objekte.get(key);
+        sb.aufrufe.storageGet[key] = (sb.aufrufe.storageGet[key] ?? 0) + 1;
+        if (!o) return json(route, 400, { statusCode: '404', error: 'not_found', message: 'Object not found' });
+        return route.fulfill({ status: 200, contentType: o.mime, body: o.buffer });
+      }
+      if (m === 'DELETE') {
+        sb.objekte.delete(key);
+        return json(route, 200, { message: 'Successfully deleted' });
+      }
     }
     // ---- PostgREST: konto_dateien ----
     if (pfad === '/rest/v1/konto_dateien') {
@@ -411,6 +442,47 @@ console.log('\n════ F: Zwei Geräte zugleich — Vorbedingung, Zusammenf
   pruefe('F4 fremder Stand genau beim Schreiben: Vorbedingung schlägt an, A führt zusammen — beide Karten lokal und in der Tabelle', nF && beide && tabelle && (sb.aufrufe.vorbedingung ?? 0) > vorher && !sb.stoerung, `vorbedingung ${(sb.aufrufe.vorbedingung ?? 0) - vorher}, lokal ${beide}, tabelle ${tabelle}`);
 }
 
+// ══ H: Große Anhänge (M329) ═════════════════════════════════════════
+console.log('\n════ H: Anhänge über 4 MB wandern in den Dateispeicher ════');
+{
+  const MB = 1024 * 1024;
+  // Zwei Datei-Karten auf B: 6 MB (kommt sofort mit) und 10 MB (holt die Karte beim Öffnen)
+  await B.P.evaluate(async ({ MB }) => {
+    const db = await new Promise((ok, nein) => { const r = indexedDB.open('pixinotes-sync', 1); r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => ok(r.result); r.onerror = () => nein(r.error); });
+    const put = (k, v) => new Promise((ok, nein) => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(v, k); tx.oncomplete = ok; tx.onerror = () => nein(tx.error); });
+    const fuelle = (n, byte) => { const a = new Uint8Array(n); a.fill(byte); return new Blob([a], { type: 'application/octet-stream' }); };
+    await put('file:f6', fuelle(6 * MB, 65));
+    await put('file:f10', fuelle(10 * MB, 66));
+    const st = JSON.parse(localStorage.getItem('pixinotes-board'));
+    const bx = st.state.boards.find((b) => b.id === 'bx');
+    bx.nodes.push({ id: 'f6', type: 'file', width: 240, position: { x: 1300, y: 700 }, data: { name: 'sechs.bin', size: 6 * MB, mime: 'application/octet-stream' } });
+    bx.nodes.push({ id: 'f10', type: 'file', width: 240, position: { x: 1300, y: 900 }, data: { name: 'zehn.bin', size: 10 * MB, mime: 'application/octet-stream' } });
+    localStorage.setItem('pixinotes-board', JSON.stringify(st));
+    localStorage.setItem('pixinotes:konto-dirty', '1');
+  }, { MB });
+  await B.P.reload({ waitUntil: 'networkidle' }); await B.P.waitForTimeout(1500);
+  const hoch = await warteBis(B.P, () => sb.objekte.has(`${uidA}/datei-f6`) && sb.objekte.has(`${uidA}/datei-f10`), 30000);
+  pruefe('H1 beide Anhänge liegen im Dateispeicher (Ordner des Nutzers), nicht in der Tabelle', hoch && !zeile(uidA, 'datei-f6') && !zeile(uidA, 'datei-f10') && sb.objekte.get(`${uidA}/datei-f10`)?.buffer.length === 10 * MB, `objekte ${[...sb.objekte.keys()].join(',')}`);
+  const u = JSON.parse(zeileText(uidA, 'umgebung.json'));
+  pruefe('H2 die Umgebung nennt beide mit Größe', u.dateien?.f6?.groesse === 6 * MB && u.dateien?.f10?.groesse === 10 * MB && u.dateien.f10.name === 'zehn.bin', JSON.stringify(u.dateien));
+  const idbGroesse = (P, id) => P.evaluate(async (id) => {
+    const db = await new Promise((ok, nein) => { const r = indexedDB.open('pixinotes-sync', 1); r.onsuccess = () => ok(r.result); r.onerror = () => nein(r.error); });
+    return new Promise((ok) => { const rq = db.transaction('kv', 'readonly').objectStore('kv').get('file:' + id); rq.onsuccess = () => ok(rq.result ? rq.result.size : 0); rq.onerror = () => ok(-1); });
+  }, id);
+  const daA = await warteBis(A.P, async () => (await texte(A.P)).includes('zehn.bin'), 20000);
+  pruefe('H3 Gerät A hat die Datei-Karten übernommen', daA);
+  const f6 = await warteBis(A.P, async () => (await idbGroesse(A.P, 'f6')) === 6 * MB, 20000);
+  pruefe('H4 6 MB kamen mit dem Abgleich sofort an (≤ 8 MB)', f6, String(await idbGroesse(A.P, 'f6')));
+  const f10 = await warteBis(A.P, async () => (await idbGroesse(A.P, 'f10')) === 10 * MB, 30000);
+  pruefe('H5 10 MB holt die offene Karte vom Konto nach (Nachladen beim Öffnen)', f10 && (sb.aufrufe.storageGet[`${uidA}/datei-f10`] ?? 0) >= 1, `größe ${await idbGroesse(A.P, 'f10')}, gets ${JSON.stringify(sb.aufrufe.storageGet)}`);
+  pruefe('H6 Hochgeladen wurde jede Datei genau einmal (kein erneutes Kodieren je Abgleich)', sb.aufrufe.storagePost === 2, `posts ${sb.aufrufe.storagePost}`);
+  const postsVorher = sb.aufrufe.storagePost;
+  await notiz(B.P, 'Nach den Dateien', 1250, 300);
+  await warteBis(B.P, () => zeileText(uidA, 'board-bx.json').includes('Nach den Dateien'), 10000);
+  pruefe('H7 ein weiterer Abgleich lädt die Anhänge nicht noch einmal hoch', sb.aufrufe.storagePost === postsVorher, `posts ${sb.aufrufe.storagePost}`);
+  await B.P.screenshot({ path: path.join(SD, 'm328-dateien.png') });
+}
+
 // ══ G: Löschen, Abmelden, Texte ═════════════════════════════════════
 console.log('\n════ G: Konto löschen, Abmelden, Texte ════');
 {
@@ -436,6 +508,7 @@ console.log('\n════ G: Konto löschen, Abmelden, Texte ════');
   const js = readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.js')).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8')).join('\n');
   pruefe('G6 „Was ist neu" nennt M328', js.includes('Eigenes PixiNotes-Konto — mit E-Mail auf jedem Gerät (M328)'));
   pruefe('G7 die Hilfe erklärt den Datenschutz des PixiNotes-Kontos', js.includes('PixiNotes-Konto (E-Mail):') && js.includes('Row Level Security'));
+  pruefe('G8 „Was ist neu" nennt M329 (Anhänge bis 50 MB)', js.includes('Große Anhänge im PixiNotes-Konto (M329)'));
 }
 
 await A.ctx.close(); await B.ctx.close();

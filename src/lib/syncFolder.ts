@@ -273,7 +273,7 @@ export function base64AlsBlob(b64: string, mime?: string): Blob {
  *
  * `budgetMb <= 0` heißt: keine Dateien mitnehmen (der Schalter ist aus).
  */
-export async function buildSyncPayloadMitDateien(budgetMb = DATEI_BUDGET_MB): Promise<SyncPayload> {
+export async function buildSyncPayloadMitDateien(budgetMb = DATEI_BUDGET_MB, nur?: (id: string) => boolean): Promise<SyncPayload> {
   const p = buildSyncPayload();
   if (budgetMb <= 0) return p;
   // Alle Datei-Karten aller Boards — die kleinsten zuerst, damit ein einzelner
@@ -282,6 +282,7 @@ export async function buildSyncPayloadMitDateien(budgetMb = DATEI_BUDGET_MB): Pr
   for (const b of p.boards) {
     for (const n of b.nodes) {
       if (n.type !== 'file') continue;
+      if (nur && !nur(n.id)) continue;   // M329: nur die noch nicht hochgeladenen — große Dateien nicht jedes Mal neu kodieren
       const d = n.data as { name?: string; mime?: string; size?: number };
       karten.push({ id: n.id, name: d.name ?? 'Datei', mime: d.mime, size: d.size ?? 0 });
     }

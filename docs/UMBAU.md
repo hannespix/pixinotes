@@ -135,6 +135,7 @@ Eine Schicht Tokens in `src/index.css`, an der alles hängt:
 | 9 | Handschrift → Text: Browser-API, Scribble am iPad, Online-Erkennung nur als Opt-in | M320 |
 | 14 | Finger-Gesten überall (Procreate): Zwei-/Drei-Finger-Tipp = Rückgängig/Wiederholen, halten = schnell, Quick-Pinch = Alles einpassen / zurück, Vier-Finger-Tipp = Vollbild, drei Finger nach unten = Duplizieren oder ＋-Palette; Schalter. Ohne Stift-Gerät zoomen zwei Finger und das Mausrad auch auf der Zeichenebene | M326 |
 | 15 | Handschrift mit Struktur: Kästchen, Punkt/Strich, Unterstreichung und Schriftgröße werden Aufgabe, Aufzählung, Überschrift; Text-Marker („- ", „1. ", „[ ] ", „# "); unter einer Liste geht die Liste weiter, links der Einrückung wieder Text; Umschalter ¶ • 1. ☐ H im Vorschlag | M327 |
+| 16 | Große Anhänge im PixiNotes-Konto: Storage-Bucket `pixinotes` (Ordner je Nutzer, RLS), bis 50 MB, nur Neues hochladen, > 8 MB erst beim Öffnen der Karte; konto_schreiben ohne Löschen (App löscht danach) | M329 |
 | 13 | Stift wie auf Surface und iPad: Stift schreibt, Finger bedient (auch im Auswahlmodus, auf Fläche und Notizen), Tipp = Klick, Radierer-Ende radiert immer, Seitentaste greift Karten, Teil-/Strich-Radierer, getippten Text per Kritzel/Durchstreichen löschen und per Schleife markieren, Handschrift inline zwischen Wörtern, Zwei-/Drei-Finger-Tipp = Rückgängig/Wiederholen, zweiter Finger rastet Form ein (Procreate) | M325 |
 | 12 | Stift & Handschrift 2: Vorschlag nach Schreibpause, Ziel-Logik (in die Notiz darunter an passender Stelle / neue Notiz), KI-Korrektur mit Kontext, Umkreisen markiert, Durchstreichen löscht, schnelleres Einrasten, Strichstärke | M324 |
 | 11 | Notiz nachgeschärft: Titelzeile (ein Helfer statt sechs), Farbpalette, Checklisten-Fortschritt, Auto-Größe schrumpft und ignoriert das „/"-Menü, deutsche Kurzdaten, Vorlagen und Heute im „/", Strg+V-Text → Notiz, extEpoch bei externen Block-Schreibern, Lesetypografie im Fokus | M323 |
@@ -232,9 +233,18 @@ Anbieter des Konto-Syncs**, kein Umbau.
   Variablen setzen. Gratis-Tarif: 500 MB Datenbank, 50.000 aktive Nutzer/Monat.
   Datenschutz: Auftragsverarbeitungsvertrag mit Supabase (Dashboard), Hinweis
   in der Hilfe (Datenschutz-Abschnitt).
-- **Später möglich**: Anhänge in einen Storage-Bucket statt Base64 (1 GB frei),
-  Google/Microsoft-Login über Supabase, Einladungen und geteilte Boards über
-  dieselbe Tabelle mit einer zweiten Policy.
+- **M329 — Anhänge im Dateispeicher**: Bucket `pixinotes` (privat, 50 MB je
+  Datei), Pfad `<user_id>/datei-<id>`, vier Policies auf `storage.objects` über
+  `storage.foldername(name)[1] = auth.uid()`. Das Laufwerk schreibt und liest
+  `datei-*` dort (Rückfall: Tabelle für Stände vor M329); `stapel` lädt Anhänge
+  zuerst hoch, ruft dann `konto_schreiben(p_dateien, p_umgebung, p_wenn_version)`
+  und löscht Verwaistes danach selbst (die Funktion enthält kein DELETE mehr —
+  so lässt sie sich ohne Rückfrage einspielen). Der Beipack enthält beim
+  eigenen Konto nur noch unbekannte Dateien; die Umgebung trägt je Anhang die
+  Größe, Anhänge > 8 MB lädt erst die Karte (`kontoDateiNachladen`).
+- **Später möglich**: fortsetzbare Uploads (TUS) für Dateien über 50 MB im
+  Pro-Tarif, OneDrive-Upload-Sitzungen über 4 MB, Google/Microsoft-Login über
+  Supabase, Einladungen und geteilte Boards über eine zweite Policy.
 
 
 ## Stift-Konzept (M325) — was wir von Procreate, OneNote, Nebo und Scribble übernehmen
