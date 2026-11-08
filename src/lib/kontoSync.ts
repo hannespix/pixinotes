@@ -45,8 +45,15 @@ const KENN_KEY = 'konto:kenn';
 const UMGEBUNG = 'umgebung.json';
 const BOARD_PREFIX = 'board-';
 const DATEI_PREFIX = 'datei-';
-/** Einfacher Upload (ohne Sitzung) — bis hierhin reisen Dateien mit */
+/** Einfacher Upload (ohne Sitzung) — bis hierhin reisen Dateien bei Google Drive und OneDrive mit */
 export const DATEI_MAX_BYTES = 4 * 1024 * 1024;
+/** M329: Beim PixiNotes-Konto liegen Anhänge im Dateispeicher (Storage-Bucket) — bis 50 MB */
+export const DATEI_MAX_BYTES_KONTO = 50 * 1024 * 1024;
+/** M329: Bis hierhin lädt der Abgleich Anhänge sofort mit; größere holt die Karte beim Öffnen */
+export const DATEI_SOFORT_BYTES = 8 * 1024 * 1024;
+export const dateiMaxBytes = (s: KontoSitzung | null = loadKonto()): number => (s?.anbieter === 'supabase' ? DATEI_MAX_BYTES_KONTO : DATEI_MAX_BYTES);
+export const kontoDateiMaxMb = (s: KontoSitzung | null = loadKonto()): number => Math.round(dateiMaxBytes(s) / (1024 * 1024));
+const BUCKET = 'pixinotes';
 export const GOOGLE_SCOPE_DRIVE = 'https://www.googleapis.com/auth/drive.appdata';
 export const MS_SCOPE_DRIVE = 'Files.ReadWrite.AppFolder User.Read offline_access';
 
@@ -425,6 +432,22 @@ function supabaseLaufwerk(): Laufwerk {
     return (await res.json()) as Zeile[];
   };
   const json = { 'Content-Type': 'application/json' };
+  // M329: Anhänge (datei-<id>) liegen im Dateispeicher, Pfad <user_id>/<name>; Boards und Umgebung in der Tabelle
+  const istAnhang = (name: string) => name.startsWith(DATEI_PREFIX);
+  const objekt = (name: string, lesen = false): string => {
+    const s = loadKonto();
+    return `${s?.url ?? ''}/storage/v1/object/${lesen ? 'authenticated/' : ''}${BUCKET}/${encodeURIComponent(s?.userId ?? '')}/${encodeURIComponent(name)}`;
+  };
+  const anhangSchreiben = async (name: string, body: string | Blob, mime: string): Promise<string> => {
+    const res = await anfrage(objekt(name), { method: 'POST', headers: { 'Content-Type': mime, 'x-upsert': 'true' }, body });
+    if (!res.ok) {
+      const t = await res.text().catch(() => '');
+      if (/exceeded|maximum size|too large|Payload/i.test(t) || res.status === 413) throw new Error('PixiNotes-Konto: Die Datei ist größer als der Dateispeicher erlaubt (50 MB).');
+      if (res.status === 404 || res.status === 400 && /[Bb]ucket not found/.test(t)) throw new Error('PixiNotes-Konto: Der Dateispeicher (Bucket „pixinotes") fehlt noch — Migration M329 beim Betreiber einspielen.');
+      throw new Error(`PixiNotes-Konto: Datei-Upload fehlgeschlagen (HTTP ${res.status}).`);
+    }
+    return res.headers.get('etag') ?? '';
+  };
   return {
     async liste() {
       const z = await zeilen(await anfrage(`${basis()}?select=name,version,groesse,updated_at&order=name`, { cache: 'no-store' }));
@@ -439,11 +462,22 @@ function supabaseLaufwerk(): Laufwerk {
       return z.length ? (z[0].inhalt ?? '') : null;
     },
     async lesenBlob(name) {
+      if (istAnhang(name)) {
+        const res = await anfrage(objekt(name, true), { cache: 'no-store' });
+        if (res.status === 404 || res.status === 400) {
+          // Ältere Stände (vor M329) hatten den Anhang noch in der Tabelle
+          const z = await zeilen(await anfrage(`${basis()}?select=inhalt,mime&${eq(name)}`, { cache: 'no-store' }));
+          return z.length ? base64AlsBlob(z[0].inhalt ?? '', z[0].mime || undefined) : null;
+        }
+        if (!res.ok) throw new Error(`PixiNotes-Konto: HTTP ${res.status}`);
+        return res.blob();
+      }
       const z = await zeilen(await anfrage(`${basis()}?select=inhalt,mime&${eq(name)}`, { cache: 'no-store' }));
       if (!z.length) return null;
       return base64AlsBlob(z[0].inhalt ?? '', z[0].mime || undefined);
     },
     async schreiben(name, body, mime, wennEtag) {
+      if (istAnhang(name)) return anhangSchreiben(name, body, mime);
       const inhalt = typeof body === 'string' ? body : await alsBase64(body);
       const groesse = typeof body === 'string' ? body.length : body.size;
       const satz = JSON.stringify({ name, inhalt, mime, groesse });
@@ -467,27 +501,39 @@ function supabaseLaufwerk(): Laufwerk {
       return String(z[0]?.version ?? 1);
     },
     async loeschen(name) {
+      if (istAnhang(name)) {
+        const res = await anfrage(objekt(name), { method: 'DELETE' });
+        if (!res.ok && res.status !== 404 && res.status !== 400) throw new Error(`PixiNotes-Konto: Löschen fehlgeschlagen (HTTP ${res.status}).`);
+        // Ein Rest aus der Zeit vor M329 in der Tabelle darf mit
+        await anfrage(`${basis()}?${eq(name)}`, { method: 'DELETE' }).catch(() => {});
+        return;
+      }
       const res = await anfrage(`${basis()}?${eq(name)}`, { method: 'DELETE' });
       if (!res.ok && res.status !== 404) throw new Error(`PixiNotes-Konto: Löschen fehlgeschlagen (HTTP ${res.status}).`);
     },
-    /** Ein Zug, eine Transaktion: die Funktion konto_schreiben prüft die Version der Umgebung
-     *  und schreibt dann alles — oder nichts. So überschreibt kein Gerät halbfertig das andere. */
+    /** Ein Zug, eine Transaktion: Anhänge wandern zuerst in den Dateispeicher (sie gelten erst,
+     *  wenn die Umgebung sie nennt); dann prüft konto_schreiben die Version der Umgebung und
+     *  schreibt Boards und Umgebung — oder nichts. Verwaistes wird danach gelöscht (Fehler egal:
+     *  eine Leiche in der Tabelle schadet nicht, der nächste Lauf räumt sie auf). */
     async stapel(schreiben, loeschen, umgebung, wennEtag) {
       const dateien = [];
       for (const d of schreiben) {
+        if (istAnhang(d.name)) { await anhangSchreiben(d.name, d.body, d.mime); continue; }
         const inhalt = typeof d.body === 'string' ? d.body : await alsBase64(d.body);
         dateien.push({ name: d.name, inhalt, mime: d.mime, groesse: typeof d.body === 'string' ? d.body.length : d.body.size });
       }
       const res = await anfrage(`${loadKonto()?.url ?? ''}/rest/v1/rpc/konto_schreiben`, {
         method: 'POST', headers: json,
-        body: JSON.stringify({ p_dateien: dateien, p_loeschen: loeschen, p_umgebung: umgebung, p_wenn_version: wennEtag === null ? null : Number(wennEtag) }),
+        body: JSON.stringify({ p_dateien: dateien, p_umgebung: umgebung, p_wenn_version: wennEtag === null ? null : Number(wennEtag) }),
       });
       if (!res.ok) {
         const t = await res.text().catch(() => '');
         if (/vorbedingung/i.test(t)) throw new VorbedingungFehler();
+        if (res.status === 404) throw new Error('PixiNotes-Konto: Die Datenbank ist noch nicht eingerichtet (Funktion konto_schreiben fehlt) — Migration beim Betreiber einspielen.');
         throw new Error(`PixiNotes-Konto: Schreiben fehlgeschlagen (HTTP ${res.status}).`);
       }
       const v = (await res.json()) as number | string;
+      for (const name of loeschen) await this.loeschen(name).catch(() => {});
       return String(v);
     },
   };
@@ -501,6 +547,19 @@ function laufwerk(): Laufwerk {
     laufwerkCache = { anbieter: s.anbieter, lw: s.anbieter === 'google' ? googleLaufwerk() : s.anbieter === 'ms' ? msLaufwerk() : supabaseLaufwerk() };
   }
   return laufwerkCache.lw;
+}
+
+/**
+ * M329: Einen Anhang, der nur im Konto liegt, auf dieses Gerät holen (die Karte
+ * ruft das beim Öffnen). Liefert den Blob und legt ihn in der lokalen Ablage ab.
+ */
+export async function kontoDateiNachladen(id: string): Promise<Blob | null> {
+  const s = loadKonto();
+  if (!s || s.anbieter !== 'supabase' || getWriterRole() !== 'writer') return null;
+  const blob = await laufwerk().lesenBlob(`${DATEI_PREFIX}${id}`);
+  if (!blob) return null;
+  try { await idbSet(`file:${id}`, blob); } catch { /* Platte voll — die Karte zeigt den Blob trotzdem */ }
+  return blob;
 }
 
 // ---------- M328: Realtime — Änderungen anderer Geräte sofort ----------
@@ -542,7 +601,7 @@ interface Umgebung {
   spaces: Space[];
   reihe: string[];                   // Board-Ids in Reihenfolge
   boards: Record<string, string>;    // Board-Id → Stempel (Hash des Inhalts)
-  dateien: Record<string, { name: string; mime?: string }>;
+  dateien: Record<string, { name: string; mime?: string; groesse?: number }>;
   /** eTag/Version des Server-Stands, auf dem dieser Schreibvorgang aufbaute —
    *  damit ein Leser den RICHTIGEN gemeinsamen Vorfahren für die Zusammen-
    *  führung wählt, auch wenn zwei Geräte sich gegenseitig überschrieben haben */
@@ -608,6 +667,8 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
   const dateien: Record<string, SyncDatei> = {};
   for (const [id, meta] of Object.entries(u.dateien ?? {})) {
     if (await dateiLokal(id)) continue;
+    // M329: Große Anhänge holt die Karte beim Öffnen (kontoDateiNachladen) — nicht jeder Abgleich
+    if ((meta.groesse ?? 0) > DATEI_SOFORT_BYTES) continue;
     try {
       const blob = await lw.lesenBlob(`${DATEI_PREFIX}${id}`);
       if (blob) dateien[id] = { name: meta.name, mime: meta.mime ?? (blob.type || undefined), b64: await alsBase64(blob) };
@@ -640,8 +701,13 @@ export async function kontoWrite(): Promise<string> {
 async function kontoWriteRoh(nochmal: boolean): Promise<string> {
   const lw = laufwerk();
   const s = useBoard.getState();
-  const payload = await buildSyncPayloadMitDateien(s.syncDateienMb ?? DATEI_BUDGET_MB);
   const kenn = await kennLesen();
+  const sitz = loadKonto();
+  // M329: Beim PixiNotes-Konto reisen nur NEUE Anhänge (bis 50 MB) — bekannte liegen schon im Dateispeicher
+  const bekanntVorab = new Set(kenn.dateien);
+  const payload = sitz?.anbieter === 'supabase'
+    ? await buildSyncPayloadMitDateien(Math.max(s.syncDateienMb ?? DATEI_BUDGET_MB, 256), (id) => !bekanntVorab.has(id))
+    : await buildSyncPayloadMitDateien(s.syncDateienMb ?? DATEI_BUDGET_MB);
   const stempelNeu: Record<string, string> = {};
   const texte = new Map<string, string>();
   for (const b of payload.boards) {
@@ -660,22 +726,32 @@ async function kontoWriteRoh(nochmal: boolean): Promise<string> {
     for (const id of Object.keys(kenn.boards)) {
       if (!stempelNeu[id]) plan.loeschen.push(`${BOARD_PREFIX}${id}.json`);
     }
-    // 3) Dateien: neue hinauf (bis 4 MB), verwaiste weg
-    const dateienMeta: Record<string, { name: string; mime?: string }> = {};
+    // 3) Dateien: neue hinauf (Drive/OneDrive bis 4 MB, PixiNotes-Konto bis 50 MB), verwaiste weg
+    const dateienMeta: Record<string, { name: string; mime?: string; groesse?: number }> = {};
     const bekannt = new Set(kenn.dateien);
+    const maxBytes = dateiMaxBytes(sitz);
+    // Name, Typ und Größe jeder Datei-Karte — damit bekannte Dateien ihre Angaben behalten, auch ohne Beipack
+    const kartenMeta = new Map<string, { name: string; mime?: string; groesse?: number }>();
+    for (const b of payload.boards) {
+      for (const n of b.nodes) {
+        if (n.type !== 'file') continue;
+        const d = n.data as { name?: string; mime?: string; size?: number };
+        kartenMeta.set(n.id, { name: d.name ?? 'Datei', mime: d.mime, groesse: d.size });
+      }
+    }
     for (const [id, d] of Object.entries(payload.dateien ?? {})) {
       const blob = base64AlsBlob(d.b64, d.mime);
-      if (blob.size > DATEI_MAX_BYTES) continue;
-      dateienMeta[id] = { name: d.name, mime: d.mime };
+      if (blob.size > maxBytes) continue;
+      dateienMeta[id] = { name: d.name, mime: d.mime, groesse: blob.size };
       if (bekannt.has(id)) continue;
       plan.schreiben.push({ name: `${DATEI_PREFIX}${id}`, body: blob, mime: d.mime ?? 'application/octet-stream' });
     }
-    // Bekannte Dateien, die diesmal nicht im Beipack sind (Budget), bleiben erhalten,
-    // solange ihre Karte noch existiert
-    const kartenIds = new Set(payload.boards.flatMap((b) => b.nodes.filter((n) => n.type === 'file').map((n) => n.id)));
+    // Bekannte Dateien, die diesmal nicht im Beipack sind (Budget oder schon hochgeladen),
+    // bleiben erhalten, solange ihre Karte noch existiert
     for (const id of kenn.dateien) {
       if (dateienMeta[id]) continue;
-      if (kartenIds.has(id)) { dateienMeta[id] = { name: (payload.dateien?.[id]?.name) ?? 'Datei' }; continue; }
+      const meta = kartenMeta.get(id);
+      if (meta) { dateienMeta[id] = meta; continue; }
       plan.loeschen.push(`${DATEI_PREFIX}${id}`);
     }
     // 4) Die Umgebung zuletzt — sie macht den neuen Stand gültig

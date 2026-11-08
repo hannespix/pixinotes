@@ -94,13 +94,13 @@ revoke all on function public.konto_loeschen() from public;
 grant execute on function public.konto_loeschen() to authenticated;
 
 -- Alles in einem Zug: prüft die Version der Umgebung (p_wenn_version; null =
--- es darf noch keine geben), schreibt dann Dateien, löscht, schreibt die
--- Umgebung — in EINER Transaktion. Passt die Version nicht, bricht alles mit
--- „vorbedingung" ab, und kein Gerät überschreibt ein anderes halbfertig.
--- Läuft als Aufrufer (security invoker): Row Level Security gilt.
+-- es darf noch keine geben), schreibt dann Dateien und die Umgebung — in EINER
+-- Transaktion. Passt die Version nicht, bricht alles mit „vorbedingung" ab,
+-- und kein Gerät überschreibt ein anderes halbfertig. Verwaiste Zeilen löscht
+-- die App danach selbst (M329). Läuft als Aufrufer: Row Level Security gilt.
+drop function if exists public.konto_schreiben(jsonb, text[], text, bigint);
 create or replace function public.konto_schreiben(
   p_dateien jsonb,
-  p_loeschen text[],
   p_umgebung text,
   p_wenn_version bigint
 )
@@ -131,9 +131,6 @@ begin
     on conflict (user_id, name) do update
       set inhalt = excluded.inhalt, mime = excluded.mime, groesse = excluded.groesse;
   end loop;
-  if p_loeschen is not null then
-    delete from public.konto_dateien where user_id = auth.uid() and name = any(p_loeschen);
-  end if;
   insert into public.konto_dateien (user_id, name, inhalt, mime, groesse)
   values (auth.uid(), 'umgebung.json', p_umgebung, 'application/json', length(p_umgebung))
   on conflict (user_id, name) do update
@@ -143,5 +140,30 @@ begin
 end;
 $$;
 
-revoke all on function public.konto_schreiben(jsonb, text[], text, bigint) from public;
-grant execute on function public.konto_schreiben(jsonb, text[], text, bigint) to authenticated;
+revoke all on function public.konto_schreiben(jsonb, text, bigint) from public;
+grant execute on function public.konto_schreiben(jsonb, text, bigint) to authenticated;
+
+-- M329: Dateispeicher — privater Bucket, je Nutzer ein Ordner (<user_id>/datei-<id>), bis 50 MB je Datei
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('pixinotes', 'pixinotes', false, 52428800)
+on conflict (id) do update set public = false, file_size_limit = 52428800;
+
+drop policy if exists "pixinotes eigene Dateien lesen"    on storage.objects;
+drop policy if exists "pixinotes eigene Dateien anlegen"  on storage.objects;
+drop policy if exists "pixinotes eigene Dateien aendern"  on storage.objects;
+drop policy if exists "pixinotes eigene Dateien loeschen" on storage.objects;
+
+create policy "pixinotes eigene Dateien lesen" on storage.objects for select to authenticated
+  using (bucket_id = 'pixinotes' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "pixinotes eigene Dateien anlegen" on storage.objects for insert to authenticated
+  with check (bucket_id = 'pixinotes' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "pixinotes eigene Dateien aendern" on storage.objects for update to authenticated
+  using (bucket_id = 'pixinotes' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'pixinotes' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "pixinotes eigene Dateien loeschen" on storage.objects for delete to authenticated
+  using (bucket_id = 'pixinotes' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Nur angemeldete Nutzer: anonyme Zugriffe bekommen nicht einmal die leere Liste
+revoke all on table public.konto_dateien from anon;
+revoke execute on function public.konto_schreiben(jsonb, text, bigint) from anon;
+revoke execute on function public.konto_loeschen() from anon;

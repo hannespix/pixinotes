@@ -17,7 +17,7 @@ import {
   webdavTest, webdavWrite, type WebdavConfig,
 } from '../lib/webdav';
 import {
-  applyKonto, bekannteClientId, bekannterTenant, kontoAbmelden, kontoAnmelden, kontoAnmeldenSupabase, kontoIstEigenes, kontoLabel, kontoLesen, kontoLiveVerbunden, kontoLoeschen, kontoStamp,
+  applyKonto, bekannteClientId, bekannterTenant, kontoAbmelden, kontoAnmelden, kontoAnmeldenSupabase, kontoDateiMaxMb, kontoIstEigenes, kontoLabel, kontoLesen, kontoLiveVerbunden, kontoLoeschen, kontoStamp,
   kontoVerbinden, kontoWrite, loadKonto, type Anbieter, type KontoSitzung, type VerbindenErgebnis,
 } from '../lib/kontoSync';
 import { sbLinkSenden, sbPasswortAnmelden, sbRegistrieren, supabaseKonfig, supabaseKonfigSpeichern, supabaseKonfiguriert, type SbSitzung } from '../lib/kontoSupabase';
@@ -904,7 +904,7 @@ export function Settings() {
                   <div className="modal-note" data-taste="konto-stand">
                     ✅ Angemeldet bei {kontoLabel(kontoSitz)}{kontoSitz.name ? ` als „${kontoSitz.name}"` : ''} — Änderungen werden automatisch abgeglichen
                     {kontoStamp() ? ` (letzter Abgleich: ${new Date(kontoStamp()!).toLocaleString('de-DE')})` : ''}
-                    {kontoIstEigenes(kontoSitz) ? (kontoLiveVerbunden() ? ', live verbunden' : ', Abgleich alle zehn Sekunden') : ''}. Dateien bis 4 MB wandern mit.
+                    {kontoIstEigenes(kontoSitz) ? (kontoLiveVerbunden() ? ', live verbunden' : ', Abgleich alle zehn Sekunden') : ''}. Anhänge bis {kontoDateiMaxMb(kontoSitz)} MB wandern mit{kontoIstEigenes(kontoSitz) ? ' — große laden beim Öffnen der Karte nach' : ''}.
                   </div>
                 </>
               )}

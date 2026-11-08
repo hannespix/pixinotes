@@ -10,6 +10,7 @@ import { canEmbed } from '../../lib/nodes';
 import { loadAttachment } from '../../lib/attachments';
 import { renderPdfPage } from '../../lib/pdf';
 import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/fileStore';
+import { kontoDateiNachladen } from '../../lib/kontoSync';
 import { useLupe } from '../../lib/lupe';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
@@ -63,11 +64,19 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
     window.addEventListener('pixinotes:dateien-da', auf);
     return () => window.removeEventListener('pixinotes:dateien-da', auf);
   }, []);
+  const [kontoLaedt, setKontoLaedt] = useState(false);
   useEffect(() => {
     if (file.dataUrl) return;
     let url: string | null = null;
     let weg = false;
-    void loadFile(id).then((b) => {
+    void loadFile(id).then(async (b) => {
+      if (weg) return;
+      // M329: Nicht hier, aber im PixiNotes-Konto? Dann jetzt holen (große Anhänge reisen erst beim Öffnen)
+      if (!b) {
+        setKontoLaedt(true);
+        try { b = (await kontoDateiNachladen(id)) ?? undefined; } catch { b = undefined; }
+        setKontoLaedt(false);
+      }
       if (!b || weg) return;
       url = URL.createObjectURL(b);
       setBlobUrl(url);
@@ -197,7 +206,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           {/* M269: Dateien reisen jetzt bis zur eingestellten Obergrenze mit.
               Bleibt eine Karte trotzdem leer, liegt es fast immer an der
               Größe — das gehört hier hin, nicht ins Handbuch. */}
-          Der Inhalt liegt nicht auf diesem Gerät. Dateien werden bis zur eingestellten
+          {kontoLaedt ? 'Wird gerade aus dem PixiNotes-Konto geladen … ' : ''}Der Inhalt liegt nicht auf diesem Gerät. Dateien werden bis zur eingestellten
           Obergrenze mitsynchronisiert (⚙ → Daten → Synchronisation); diese hier ist mit
           {' '}{formatBytes(file.size)} entweder größer oder wurde vor dieser Neuerung eingefügt.
           Auf dem Gerät mit der Datei einmal speichern — oder sie hier erneut einfügen.

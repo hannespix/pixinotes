@@ -132,6 +132,7 @@ export async function sbKontoLoeschen(token: string, k = supabaseKonfig()): Prom
   try {
     res = await fetch(`${k.url}/rest/v1/rpc/konto_loeschen`, { method: 'POST', headers: { apikey: k.key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: '{}' });
   } catch { throw new Error('PixiNotes-Konto: nicht erreichbar — Internetverbindung prüfen.'); }
+  if (res.status === 404) throw new Error('PixiNotes-Konto: Das Löschen ist beim Betreiber noch nicht freigeschaltet (Funktion konto_loeschen fehlt). Bis dahin: Abmelden — oder dem Betreiber schreiben.');
   if (!res.ok) throw new Error(`PixiNotes-Konto: Löschen fehlgeschlagen (HTTP ${res.status}).`);
 }
 
