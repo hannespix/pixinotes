@@ -158,6 +158,8 @@ export function sbRueckkehrLesen(): SbSitzung | null {
 /* ───────────── Realtime (Phoenix-Kanal, minimal) ───────────── */
 
 export interface RealtimeGriff { stop(): void; token(neu: string): void; readonly verbunden: boolean }
+/** Was der Kanal meldet: Tabelle, Dateiname (bei konto_dateien), Besitzer der Zeile, Art der Änderung */
+export interface RealtimeEreignis { tabelle: string; name: string; userId: string; typ: string }
 
 /**
  * Lauscht auf Änderungen der eigenen Zeilen in `konto_dateien`. Ruft `onChange`
@@ -165,7 +167,7 @@ export interface RealtimeGriff { stop(): void; token(neu: string): void; readonl
  * sich nach einem Abbruch mit wachsender Pause neu (bis 60 s). Kein Fehler
  * nach außen: ohne Realtime bleibt der Takt.
  */
-export function sbRealtime(k: SupabaseKonfig, token: string, userId: string, onChange: (name: string) => void): RealtimeGriff {
+export function sbRealtime(k: SupabaseKonfig, token: string, userId: string, onChange: (ev: RealtimeEreignis) => void, besitzer: string[] = [], email = ''): RealtimeGriff {
   let ws: WebSocket | null = null;
   let aktiv = true, verbunden = false, ref = 0, pause = 1000;
   let herz: ReturnType<typeof setInterval> | undefined;
@@ -183,20 +185,27 @@ export function sbRealtime(k: SupabaseKonfig, token: string, userId: string, onC
     try { ws = new WebSocket(url); } catch { return; }
     ws.onopen = () => {
       pause = 1000;
-      senden('phx_join', {
-        config: { broadcast: { self: false }, presence: { key: '' }, postgres_changes: [{ event: '*', schema: 'public', table: 'konto_dateien', filter: `user_id=eq.${userId}` }] },
-        access_token: jwt,
-      });
+      // Eigene Zeilen, die Zeilen der Besitzer geteilter Boards (RLS lässt nur die freigegebenen durch) und die Freigaben selbst
+      const aenderungen = [
+        { event: '*', schema: 'public', table: 'konto_dateien', filter: `user_id=eq.${userId}` },
+        ...besitzer.filter((b) => b && b !== userId).map((b) => ({ event: '*', schema: 'public', table: 'konto_dateien', filter: `user_id=eq.${b}` })),
+        { event: '*', schema: 'public', table: 'board_freigaben', filter: `gast_id=eq.${userId}` },
+        { event: '*', schema: 'public', table: 'board_freigaben', filter: `besitzer=eq.${userId}` },
+        // Eine neue Einladung trägt noch keine gast_id — sie kommt über die E-Mail (RLS lässt sie durch)
+        ...(email ? [{ event: '*', schema: 'public', table: 'board_freigaben', filter: `gast_email=eq.${email.toLowerCase()}` }] : []),
+      ];
+      senden('phx_join', { config: { broadcast: { self: false }, presence: { key: '' }, postgres_changes: aenderungen }, access_token: jwt });
       clearInterval(herz);
       herz = setInterval(() => senden('heartbeat', {}, 'phoenix'), 30_000);
     };
     ws.onmessage = (m) => {
       try {
-        const j = JSON.parse(String(m.data)) as { event?: string; payload?: { status?: string; data?: { record?: { name?: string }; old_record?: { name?: string } } } };
+        const j = JSON.parse(String(m.data)) as { event?: string; payload?: { status?: string; data?: { type?: string; table?: string; record?: { name?: string; user_id?: string; besitzer?: string }; old_record?: { name?: string; user_id?: string; besitzer?: string } } } };
         if (j.event === 'phx_reply' && j.payload?.status === 'ok') verbunden = true;
         if (j.event === 'postgres_changes') {
-          const name = j.payload?.data?.record?.name ?? j.payload?.data?.old_record?.name ?? '';
-          onChange(name);
+          const d = j.payload?.data;
+          const r = d?.record ?? d?.old_record ?? {};
+          onChange({ tabelle: d?.table ?? 'konto_dateien', name: r.name ?? '', userId: r.user_id ?? r.besitzer ?? '', typ: d?.type ?? '' });
         }
       } catch { /* egal */ }
     };

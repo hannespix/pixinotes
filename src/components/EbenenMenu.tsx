@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoard, type BoardSortierung } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
+import { kontoIstEigenes } from '../lib/kontoSync';
+import { FreigabeDialog } from './FreigabeDialog';
 import {
   IArchive, IArchiveRestore, ICopy, IDownload, IDuplicate, IMore, IMoveTo,
   IPen, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck,
@@ -108,6 +110,8 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
   const setPresenting = useBoard((s) => s.setPresenting);
   const showToast = useBoard((s) => s.showToast);
   const [verschieben, setVerschieben] = useState(false);
+  // M330: Freigabe-Dialog (Konto) — lebt neben dem Menü, damit er offen bleibt, wenn das Menü zugeht
+  const [freigabe, setFreigabe] = useState(false);
   if (!board) return null;
 
   const eigenesProjekt = spaces
@@ -131,6 +135,8 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
   };
 
   return (
+    <>
+    {freigabe && createPortal(<FreigabeDialog boardId={boardId} onClose={() => setFreigabe(false)} />, document.body)}
     <MenuHuelle titel={`Board „${board.name}": umbenennen, duplizieren, verschieben, archivieren, teilen, löschen`} klasse={klasse} kinder={(zu) => (
       verschieben ? (
         <>
@@ -161,6 +167,11 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
             <IMoveTo size={14} /> In Projekt verschieben …
           </button>
           <div className="ebenen-menu-titel">Weitergeben</div>
+          {kontoIstEigenes() && (
+            <button role="menuitem" onClick={() => { setFreigabe(true); zu(); }} data-taste="board-freigeben">
+              <IShare size={14} /> {board.geteiltVon ? 'Geteilt mit mir …' : 'Für ein Konto freigeben …'}
+            </button>
+          )}
           <button role="menuitem" onClick={() => { teilen(); zu(); }}>
             <IShare size={14} /> Teilen-Link kopieren
           </button>
@@ -188,6 +199,7 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
         </>
       )
     )} />
+    </>
   );
 }
 
