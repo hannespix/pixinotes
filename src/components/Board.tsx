@@ -36,7 +36,6 @@ import { TimeCard } from './nodes/TimeCard';
 import { HtmlAppCard } from './nodes/HtmlAppCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { focusable } from './FocusSheet';
-import { merkeKasten } from '../lib/fokusFlug';
 import { ErrorBoundary } from './ErrorBoundary';
 
 /**
@@ -142,7 +141,7 @@ export function Board() {
   const removeNodes = useBoard((s) => s.removeNodes);
   const showToast = useBoard((s) => s.showToast);
 
-  const { screenToFlowPosition, setCenter, fitView, getViewport, setViewport } = useReactFlow();
+  const { screenToFlowPosition, setCenter, fitView, getViewport, setViewport, getInternalNode } = useReactFlow();
   const wheelZoom = useBoard((s) => s.wheelZoom);
   /**
    * M268: Der Anzeige-Faktor läuft im Board-Zoom mit.
@@ -624,10 +623,90 @@ export function Board() {
     if (!st.cardFocus || st.focusCard) return false;
     const full = selectActiveBoard(st).nodes.find((n) => n.id === node.id);
     if (!focusable(full)) return false;
-    merkeKasten(document.querySelector(`.react-flow__node[data-id="${node.id}"]`));
     st.setFocusCard(node.id);
     return true;
   }, []);
+
+  /**
+   * M333: Fokus = Zoom. Die Karte bleibt, wo sie ist; die Kamera fährt so, dass
+   * sie den Schirm zwischen Kopf- und Fußleiste füllt. Beim Schließen fährt sie
+   * zur vorherigen Ansicht zurück. Blättern fährt weiter, ohne den Rückweg zu
+   * vergessen. Kein zweiter Editor, keine Vollbild-Position — Stift, Finger und
+   * Gesten arbeiten auf derselben Fläche weiter.
+   */
+  const fokusRueckkehr = useRef<{ x: number; y: number; zoom: number } | null>(null);
+  useEffect(() => {
+    if (focusCard) {
+      if (!fokusRueckkehr.current) fokusRueckkehr.current = getViewport();
+      let versuche = 0;
+      let raf = 0;
+      let beobachter: ResizeObserver | null = null;
+      let zuletzt = { w: 0, h: 0 };
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const fahren = (dauer = 320) => {
+        const el = document.querySelector(`.react-flow__node[data-id="${focusCard}"]`) as HTMLElement | null;
+        const pane = document.querySelector('.react-flow') as HTMLElement | null;
+        const n = useBoard.getState().boards.find((b) => b.id === useBoard.getState().activeId)?.nodes.find((k) => k.id === focusCard);
+        if (!el || !pane || !n || el.offsetWidth < 2) { if (versuche++ < 10) raf = requestAnimationFrame(() => fahren(dauer)); return; }
+        // Wächst die Karte nach dem Einpassen (Bild oder PDF lädt, Text wird länger), zieht die Kamera nach
+        if (!beobachter && typeof ResizeObserver !== 'undefined') {
+          beobachter = new ResizeObserver(() => {
+            if (Math.abs(el.offsetWidth - zuletzt.w) < 4 && Math.abs(el.offsetHeight - zuletzt.h) < 4) return;
+            clearTimeout(timer);
+            timer = setTimeout(() => fahren(220), 120);
+          });
+          beobachter.observe(el);
+        }
+        zuletzt = { w: el.offsetWidth, h: el.offsetHeight };
+        const css = getComputedStyle(document.documentElement);
+        const oben = parseFloat(css.getPropertyValue('--focus-top')) || 52;
+        const unten = parseFloat(css.getPropertyValue('--focus-bottom')) || 0;
+        const tastatur = parseFloat(css.getPropertyValue('--kb')) || 0;
+        const breite = pane.clientWidth;
+        const hoehe = Math.max(160, pane.clientHeight - oben - unten - tastatur);
+        // Lage (absolut, auch in Rahmen) aus React Flow, Größe als Layout-Maß aus dem DOM —
+        // beides unabhängig von der gerade laufenden Kamerafahrt (ein animiertes Rechteck
+        // gegen den Ziel-Zoom gerechnet ergab sonst falsche Maße und eine Rückkopplung)
+        const intern = getInternalNode(focusCard);
+        const fx = intern?.internals.positionAbsolute.x ?? n.position.x;
+        const fy = intern?.internals.positionAbsolute.y ?? n.position.y;
+        const w = el.offsetWidth, h = el.offsetHeight;
+        // Am Finger fast randlos (jeder Punkt zählt für Spalten und Zellen), mit Maus etwas Luft
+        const grob = window.matchMedia('(pointer: coarse)').matches;
+        const rand = grob ? 4 : 16;
+        const passt = Math.min((breite - 2 * rand) / w, (hoehe - 2 * rand) / h);
+        // Die Karte ist im Fokus schon verbreitert (CSS min-width: Schirmbreite, Text bis 720,
+        // Module bis 1200). TEXT (Notiz, Bild, Datei, Mail) wird zusätzlich hochskaliert, bis es
+        // den Schirm füllt — am Finger kräftig, mit Maus maßvoll. MODULE (Zeitplan, Kanban,
+        // Planer …) bleiben bei Zoom 1: mehr Spalten und Zellen statt größerer Pixel — das war
+        // der Grund für den alten Fokus (M212), und bleibt.
+        const text = ['note', 'image', 'file', 'email', 'shape'].includes(n.type ?? '');
+        const zoom = text ? Math.min(grob ? 2.2 : 1.25, Math.max(1, passt)) : 1;
+        document.documentElement.style.setProperty('--fokus-zoom', String(zoom));
+        document.documentElement.style.setProperty('--fokus-rand', `${2 * rand}px`);
+        document.documentElement.style.setProperty('--fokus-max', text ? '720px' : '1200px');
+        // Waagerecht mittig, sobald die Karte in die Breite passt — sonst bündig links (schwenken)
+        const x = (w * zoom <= breite - 2 * rand ? (breite - w * zoom) / 2 : rand) - fx * zoom;
+        const frei = hoehe - h * zoom;
+        const y = oben + Math.max(rand, frei / 2) - fy * zoom;
+        flyingUntil.current = performance.now() + dauer + 180;
+        void setViewport({ x, y, zoom }, { duration: dauer });
+      };
+      fahren();
+      return () => { if (raf) cancelAnimationFrame(raf); clearTimeout(timer); beobachter?.disconnect(); };
+    }
+    document.documentElement.style.removeProperty('--fokus-zoom');
+    document.documentElement.style.removeProperty('--fokus-max');
+    document.documentElement.style.removeProperty('--fokus-rand');
+    if (fokusRueckkehr.current) {
+      const prev = fokusRueckkehr.current;
+      fokusRueckkehr.current = null;
+      flyingUntil.current = performance.now() + 500;
+      void setViewport(prev, { duration: 300 });
+    }
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusCard]);
 
   const onNodeDoubleClick = useCallback((e: React.MouseEvent, node: Node) => {
     // M325: Der Stift ist so präzise wie die Maus — Doppeltipp öffnet den Fokus auch am Tablet

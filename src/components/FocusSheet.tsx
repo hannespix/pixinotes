@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
 import { IChevronL, IChevronR, IPlay, IX } from './Icons';
-import { flaecheVon, fliege, letzterKasten, merkeKasten, type Kasten } from '../lib/fokusFlug';
 
 /**
  * M212: „Karte im Fokus" — am Handy füllt ein angetipptes Modul den Schirm.
@@ -16,9 +15,10 @@ import { flaecheVon, fliege, letzterKasten, merkeKasten, type Kasten } from '../
  * das ließ die Ansicht so voll wirken.
  *
  * Diese Komponente rendert die Karte NICHT selbst — sie bleibt im
- * React-Flow-Baum (sonst verlören Handle/NodeResizer ihren Kontext) und wird
- * per CSS formatfüllend gestellt. Hier liegen nur Rahmen und Bedienung:
- * Kopfzeile, Blättern, Schließen.
+ * React-Flow-Baum. M333: Sie wird auch nicht mehr formatfüllend gestellt;
+ * die Kamera fährt auf sie (Board.tsx, fokusZoomen), der Rest des Boards
+ * tritt zurück. Hier liegen nur Rahmen und Bedienung: Kopfzeile, Blättern,
+ * Schließen. Stift und Finger erreichen die Karte wie jede andere.
  */
 
 /** Kurzer, sprechender Name der Karte für die Kopfzeile */
@@ -112,31 +112,15 @@ export function FocusSheet() {
   const node = index >= 0 ? siblings[index] : undefined;
 
   /**
-   * M227: Beim Schließen fliegt die Karte an ihren Platz auf dem Board zurück —
-   * und das Board rückt sie so ins Bild, dass sie GANZ zu sehen ist. Vorher
-   * landete man irgendwo im Canvas und musste erst suchen, wo man war.
+   * M227/M333: Beim Schließen fährt die Kamera zur vorherigen Ansicht zurück
+   * (Board.tsx) — die Karte selbst hat sich nie bewegt.
+   * M285: Zurück, wo man herkam: aus der Übersicht geöffnet → Übersicht.
    */
-  const vollbildKasten = useRef<Kasten | null>(null);
   const close = useCallback(() => {
-    const el = flaecheVon(document.querySelector('.react-flow__node.pn-focused'));
-    if (el) {
-      const b = el.getBoundingClientRect();
-      vollbildKasten.current = { x: b.x, y: b.y, w: b.width, h: b.height };
-    }
-    const id = focusCard;
-    /**
-     * M285: Zurück, wo man herkam.
-     *
-     * Wer die Karte aus der Übersicht geöffnet hat, will nach dem Schließen
-     * wieder die Übersicht sehen — nicht das Board, das er nie besucht hat.
-     * Damit fühlt sich das eine Blatt in jeder Ansicht wie „an Ort und
-     * Stelle" an, statt wie ein Sprung ins Ungewisse.
-     */
     const herkunft = useBoard.getState().focusHerkunft;
     setFocusCard(null);
     if (herkunft === 'overview') useBoard.getState().setView('overview');
-    if (id) window.dispatchEvent(new CustomEvent('pixinotes:fokus-zurueck', { detail: id }));
-  }, [setFocusCard, focusCard]);
+  }, [setFocusCard]);
 
   const step = useCallback((dir: -1 | 1) => {
     if (siblings.length < 2 || index < 0) return;
@@ -164,50 +148,6 @@ export function FocusSheet() {
       if (history.state?.pnFocus) history.back();
     };
   }, [isOpen, setFocusCard]);
-
-  /**
-   * Hinflug: Die Karte startet dort, wo sie auf dem Board lag, und wächst ins
-   * Vollbild. Beim Blättern wird NICHT geflogen — dort wäre die Bewegung eine
-   * Behauptung („kommt von dort"), die nicht stimmt; ein Wisch ist die Geste.
-   */
-  useLayoutEffect(() => {
-    if (!focusCard) return;
-    const von = letzterKasten();
-    if (!von) return;
-    // React Flow führt die Knoten in einem EIGENEN Zustand: Die Klasse
-    // `pn-focused` steht erst nach dessen Durchlauf im DOM, nicht schon in
-    // unserem Layout-Effekt. Darum ein paar Frames lang nachsehen, statt den
-    // Flug stillschweigend ausfallen zu lassen.
-    let versuche = 0;
-    let raf = 0;
-    const suche = () => {
-      const el = flaecheVon(document.querySelector('.react-flow__node.pn-focused'));
-      if (el && el.getBoundingClientRect().width > 2) {
-        fliege(el, von);
-        merkeKasten(null);
-        return;
-      }
-      if (versuche++ < 8) raf = requestAnimationFrame(suche);
-      else merkeKasten(null);
-    };
-    suche();
-    return () => { if (raf) cancelAnimationFrame(raf); };
-  }, [focusCard]);
-
-  /** Rückflug: vom Vollbild auf den Board-Platz — und die Karte ganz ins Bild */
-  useEffect(() => {
-    const zurueck = (e: Event) => {
-      const id = (e as CustomEvent<string>).detail;
-      const von = vollbildKasten.current;
-      vollbildKasten.current = null;
-      requestAnimationFrame(() => {
-        const el = flaecheVon(document.querySelector(`.react-flow__node[data-id="${id}"]`));
-        if (el && von) fliege(el, von, 300);
-      });
-    };
-    window.addEventListener('pixinotes:fokus-zurueck', zurueck);
-    return () => window.removeEventListener('pixinotes:fokus-zurueck', zurueck);
-  }, []);
 
   /**
    * Esc schließt — und zwar beim ERSTEN Druck.
@@ -248,18 +188,26 @@ export function FocusSheet() {
    */
   useEffect(() => {
     if (!focusCard) return;
+    // M333: Nur ein kurzer TIPP neben die Karte schließt. Ein Stift-Strich, ein
+    // Schwenken oder ein Pinch auf der Fläche gehört zum Arbeiten im Zoom.
+    let start: { x: number; y: number; t: number } | null = null;
     const onDown = (e: PointerEvent) => {
+      start = null;
       const t = e.target as HTMLElement | null;
-      if (!t) return;
-      if (t.closest('.pn-focused, .focus-head, .focus-nav')) return;
-      // Nur die FREIE Board-Fläche zählt. Bewusst nicht der ganze Renderer:
-      // Der enthält auch die zurückgetretenen Karten und alles, was React Flow
-      // sonst noch aufspannt — ein Treffer dort ist kein „daneben".
+      if (!t || t.closest('.pn-focused, .focus-head, .focus-nav')) return;
       if (!t.closest('.react-flow__pane')) return;
+      start = { x: e.clientX, y: e.clientY, t: performance.now() };
+    };
+    const onUp = (e: PointerEvent) => {
+      const s0 = start; start = null;
+      if (!s0) return;
+      if (performance.now() - s0.t > 450 || Math.hypot(e.clientX - s0.x, e.clientY - s0.y) > 8) return;
+      if (document.body.dataset.stiftZug === '1') return;
       close();
     };
     window.addEventListener('pointerdown', onDown, true);
-    return () => window.removeEventListener('pointerdown', onDown, true);
+    window.addEventListener('pointerup', onUp, true);
+    return () => { window.removeEventListener('pointerdown', onDown, true); window.removeEventListener('pointerup', onUp, true); };
   }, [focusCard, close]);
 
   /**
