@@ -135,6 +135,8 @@ interface Toast {
   message: string;
   /** true → Toast zeigt einen „Rückgängig"-Knopf */
   undo?: boolean;
+  /** M332: true → Toast zeigt „Abbrechen" für die laufende KI-Stapelaktion */
+  abbruch?: boolean;
 }
 
 interface DeletedSnapshot {
@@ -444,7 +446,7 @@ interface BoardState {
   focusNode: (boardId: string, nodeId: string) => void;
   clearPendingFocus: () => void;
 
-  showToast: (message: string, undo?: boolean, durationMs?: number) => void;
+  showToast: (message: string, undo?: boolean, durationMs?: number, abbruch?: boolean) => void;
 
   /** Globale KI-Sperre: verhindert parallele KI-Aktionen aus Dock UND Auswahl-Leiste */
   aiBusy: boolean;
@@ -2116,9 +2118,9 @@ export const useBoard = create<BoardState>()(
 
         clearPendingFocus: () => set({ pendingFocus: null }),
 
-        showToast: (message, undo, durationMs) => {
+        showToast: (message, undo, durationMs, abbruch) => {
           if (toastTimer) clearTimeout(toastTimer);
-          set({ toast: { message, undo } });
+          set({ toast: { message, undo, abbruch } });
           toastTimer = setTimeout(() => set({ toast: null }), durationMs ?? (undo ? 6000 : 3000));
         },
       };

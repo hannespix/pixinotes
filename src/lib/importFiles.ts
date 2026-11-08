@@ -2,7 +2,8 @@
 // aufs Board UND vom „Datei einfügen"-Dialog im ＋-Menü (am Smartphone gibt es
 // kein Drag & Drop). Die Weiche kennt alle integrierbaren Typen: Kalender
 // (.ics), Board-/Voll-Exporte (.json), E-Mails (.eml/.msg), eigene Apps
-// (.html), Bilder — und alles andere als Datei-Karte (PDF mit Vorschau).
+// (.html), Markdown/Text als Notiz (M332), Bilder — und alles andere als
+// Datei-Karte (PDF mit Vorschau).
 // Jede LOKALE Datei wird zusätzlich in den Team-Ordner gespiegelt, wenn das
 // aktive Board zu einem verbundenen Team-Projekt gehört (attachments.ts).
 import { mutedHistory, useBoard, selectActiveBoard } from '../store';
@@ -19,6 +20,7 @@ import { mergeEvents, parseIcs, type IcsEvent } from './ics';
 import { saveHtml } from './htmlStore';
 import { saveFile } from './fileStore';
 import { mirrorAttachment } from './attachments';
+import { textZuBloecken, wirdNotiz } from './textNotiz';
 import type { AppNode } from '../types';
 
 /** Kopie in den Team-Ordner legen und den Pfad an der Karte vermerken —
@@ -204,6 +206,20 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           ? `📊 ${gesetzt} Blätter aus „${file.name}" übernommen — Formeln inklusive.`
           : `📊 „${file.name}" als Rechen-Tabelle übernommen — Formeln inklusive.`);
         mirror(file, erste, mirrorNote);
+        placed++;
+        continue;
+      }
+      if (wirdNotiz(file.name, file.size)) {
+        // M332: Markdown und kurze Textdateien werden formatierte Notizen —
+        // Überschriften, Listen und Checklisten bleiben, was sie sind. Vorher
+        // lagen sie als Datei-Karten mit rohen „##" und „- [ ]" im Text.
+        const blocks = await textZuBloecken(file.name, await file.text());
+        if (blocks.length === 0) { showToast(`„${file.name}" enthält keinen Text.`); continue; }
+        const note = makeNote(pos, { blocks });
+        note.width = 340;
+        addNode(note);
+        showToast(`📝 „${file.name}" als Notiz übernommen — formatiert, nicht als Rohtext.`);
+        mirror(file, note.id, mirrorNote);
         placed++;
         continue;
       }

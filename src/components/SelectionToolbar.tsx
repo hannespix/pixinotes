@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { NodeToolbar, Position, useReactFlow, useStore } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodesToHtml, nodesToText } from '../lib/serialize';
-import { aiReady } from '../lib/ai';
+import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
+import { textDateienAlsNotizen, textKarte } from '../lib/textNotiz';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { KACHEL_TYPEN, STICKY_COLORS, uid, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
@@ -267,18 +268,22 @@ export function SelectionToolbar() {
   // Board-Ansicht in die Fehlergrenze (gemessen in der Prüfreihe m292).
 
   /** KI-Aktion nur auf die ausgewählten Karten */
-  const runAi = async (fn: (nodes: AppNode[], pos: { x: number; y: number }) => Promise<string>, restoreCmd?: string) => {
+  const runAi = async (fn: (nodes: AppNode[], pos: { x: number; y: number }, fortschritt: (m: string) => void) => Promise<string>, restoreCmd?: string) => {
     setMenu(null);
     // GLOBALE Sperre teilt sich die Auswahl-Leiste mit dem Dock (Audit R6-K6)
     if (useBoard.getState().aiBusy) { showToast('Eine KI-Aktion läuft bereits — kurz warten.'); return; }
     useBoard.getState().setAiBusy(true);
+    kiAbbruchZuruecksetzen();
     setAiBusy(true);
-    showToast(`✨ KI analysiert ${selected.length} Karte(n) …`);
+    showToast(`✨ KI analysiert ${selected.length} Karte(n) …`, false, 120000, true);
     try {
       const pos = screenToFlowPosition({ x: window.innerWidth / 2 + 160, y: window.innerHeight / 2 - 80 });
-      showToast(`✨ ${await fn(selected, pos)}`);
+      // M332: Stapel-Aktionen melden ihren Fortschritt; der Toast bietet „Abbrechen"
+      const fortschritt = (m: string) => showToast(`✨ KI: ${m}`, false, 180000, true);
+      const msg = await fn(selected, pos, fortschritt);
+      showToast(`✨ ${msg}`, false, msg.includes('⚠️') || msg.startsWith('Abgebrochen') ? 12000 : 5000);
     } catch (e) {
-      showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`);
+      showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`, false, 8000);
       if (restoreCmd) setCmd(restoreCmd);
     } finally {
       setAiBusy(false);
@@ -456,13 +461,15 @@ export function SelectionToolbar() {
                   if (e.key === 'Enter' && cmd.trim() && !aiBusy) {
                     const wish = cmd;
                     setCmd('');
-                    runAi((n, p) => aiCommand(wish, n, p), wish);
+                    runAi((n, p, f) => aiCommand(wish, n, p, f), wish);
                   }
                 }}
               />
               <div className="sel-attr-title">KI-Werkzeuge</div>
-              {single?.type === 'note' && (
-                <button disabled={aiBusy} onClick={() => runAi((n) => aiPolish(n))} title="Verbesserte Fassung als neue Notiz daneben — das Original bleibt">✨ Text verbessern</button>
+              {selected.some((n) => n.type === 'note') && (
+                <button disabled={aiBusy} onClick={() => runAi((n, _p, f) => aiPolish(n, f))} title="Verbesserte Fassung als neue Notiz daneben — das Original bleibt" data-taste="ki-verbessern">
+                  ✨ {selected.filter((n) => n.type === 'note').length > 1 ? `Texte verbessern (${selected.filter((n) => n.type === 'note').length})` : 'Text verbessern'}
+                </button>
               )}
               <button disabled={aiBusy} onClick={() => runAi(aiTasks)}>Aufgaben extrahieren</button>
               <button disabled={aiBusy} onClick={() => runAi(aiProcess)}>Als Workflow-Diagramm</button>
@@ -701,6 +708,23 @@ export function SelectionToolbar() {
                     title={`${anchoredCount} Markierung${anchoredCount > 1 ? 'en' : ''} kleben an dieser Karte und wandern mit — Klick löst sie und lässt sie frei auf dem Board liegen`}
                   >
                     <IPen size={14} /> Markierungen lösen ({anchoredCount})
+                  </button>
+                )}
+                {selected.some(textKarte) && (
+                  // M332: Markdown-/Textdatei → formatierte Notiz, ohne KI, an derselben Stelle
+                  <button
+                    onClick={async () => {
+                      setMenu(null);
+                      const { fertig, fehler } = await textDateienAlsNotizen(selected);
+                      showToast(fertig
+                        ? `📝 ${fertig} Textdatei${fertig > 1 ? 'en' : ''} als Notiz übernommen${fehler.length ? ` — nicht geschafft: ${fehler.join(' · ')}` : ''}`
+                        : `Keine Textdatei ließ sich übernehmen: ${fehler.join(' · ')}`, false, fehler.length ? 9000 : 4000);
+                    }}
+                    data-taste="als-notiz"
+                    title="Markdown-/Textdatei als formatierte Notiz übernehmen — Überschriften, Listen und Checklisten bleiben erhalten; die Datei-Karte wird ersetzt"
+                    aria-label="Als Notiz übernehmen"
+                  >
+                    📝 Als Notiz übernehmen ({selected.filter(textKarte).length})
                   </button>
                 )}
                 {allArchived ? (

@@ -131,14 +131,14 @@ async function dateiRein(P, pfad) {
     try {
       await felder.nth(i).setInputFiles(pfad);
       await P.waitForTimeout(1600);
-      if (await P.locator('.file-card, .image-card').count()) return true;
+      if (await P.locator('.file-card, .image-card, .note-card').count()) return true;
     } catch { /* nächstes Feld */ }
   }
   return false;
 }
 
 async function zusammenfassen(P) {
-  await P.locator('.file-card, .image-card').first().click({ position: { x: 6, y: 6 } });
+  await P.locator('.file-card, .image-card, .note-card').first().click({ position: { x: 6, y: 6 } });
   await P.waitForTimeout(700);
   await P.evaluate(() => {
     [...document.querySelectorAll('.sel-toolbar button')].find((b) => b.getAttribute('aria-label') === 'Mehr')?.click();
@@ -159,7 +159,8 @@ async function zusammenfassen(P) {
 console.log('════ T1: Textdatei ════');
 {
   const { ctx, P, holePrompt } = await seite();
-  pruefe('T1a die .txt liegt als Karte', await dateiRein(P, txtPfad));
+  // M332: eine kurze .txt wird beim Import eine Notiz — ihr Text steht damit ohnehin im Kontext
+  pruefe('T1a die .txt liegt als Karte (seit M332 als Notiz)', await dateiRein(P, txtPfad));
   await zusammenfassen(P);
   for (let i = 0; i < 25 && !holePrompt(); i++) await P.waitForTimeout(400);
   pruefe('T1b der Textinhalt steht im KI-Kontext', holePrompt().includes('TEXTMARKER-BUDGET'),
