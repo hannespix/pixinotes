@@ -43,6 +43,10 @@ export interface BoardDoc {
   drawings?: Stroke[];
   /** Dezente Hintergrund-Tönung (Palette-Schlüssel, M88) — fehlt ⇒ Standard */
   bg?: string;
+  /** M330: Das Board gehört einem anderen PixiNotes-Konto (Nutzer-Id des Besitzers) und ist mit mir geteilt */
+  geteiltVon?: string;
+  /** M330: E-Mail des Besitzers — nur zur Anzeige */
+  geteiltVonName?: string;
   /** Kommentar-Threads (M148) — leben IM Board und wandern so automatisch
    *  im globalen Sync UND im Team-Projekt-Paket mit */
   comments?: CommentThread[];

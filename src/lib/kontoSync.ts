@@ -17,10 +17,10 @@ import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, u
 import {
   alsBase64, base64AlsBlob, basisLesen, basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB,
   emitSyncStatus, fremdStandEinarbeiten, idbDel, idbGet, idbSet, KONTO_DIRTY_KEY, notiereAenderung, SYNC_DIRTY_KEY,
-  uebernimmDateien, WEBDAV_DIRTY_KEY, type SyncDatei, type SyncPayload, type SyncWeg,
+  uebernimmDateien, WEBDAV_DIRTY_KEY, type EinarbeitenErgebnis, type SyncDatei, type SyncPayload, type SyncWeg,
 } from './syncFolder';
 import { googleTokenFuer, loadCalAccounts, msAnmeldung, msTokenErneuern, oauthAvailable } from './calAccounts';
-import { sbAbmelden, sbErneuern, sbKontoLoeschen, sbNutzer, sbRealtime, sbRueckkehrLesen, supabaseKonfig, type RealtimeGriff, type SbSitzung } from './kontoSupabase';
+import { sbAbmelden, sbErneuern, sbKontoLoeschen, sbNutzer, sbRealtime, sbRueckkehrLesen, supabaseKonfig, type RealtimeEreignis, type RealtimeGriff, type SbSitzung } from './kontoSupabase';
 
 /** M328: 'supabase' = das eigene PixiNotes-Konto (E-Mail), Ablage beim Betreiber */
 export type Anbieter = 'google' | 'ms' | 'supabase';
@@ -96,6 +96,7 @@ export function kontoAbmelden(): void {
   void idbDel(KENN_KEY);
   void idbDel(BASEN_KEY);
   anmeldungNoetig = false;
+  angewandtEtag = null;
 }
 
 // ---------- Anmeldung ----------
@@ -571,20 +572,28 @@ function realtimeStarten(): void {
   realtimeStoppen();
   const s = loadKonto();
   if (!s || s.anbieter !== 'supabase' || !s.token || !s.userId) return;
-  realtime = sbRealtime({ url: s.url ?? '', key: s.clientId }, s.token, s.userId, (name) => {
-    // Erst die Umgebung macht einen neuen Stand gültig — Board-Dateien allein sind noch im Fluss
-    if (name && name !== UMGEBUNG) return;
-    if (getWriterRole() !== 'writer' || anmeldungNoetig || !loadKonto()) return;
+  const uid = s.userId;
+  const besitzer = [...new Set(fremdeFreigaben.map((f) => f.besitzer))].sort();
+  realtimeBesitzer = besitzer.join(',');
+  const planen = (fn: () => Promise<unknown>) => {
     clearTimeout(realtimeTimer);
-    realtimeTimer = setTimeout(() => {
-      void (async () => {
-        const kenn = await kennLesen();
-        const kopf = await laufwerk().kopf(UMGEBUNG);
-        if (kopf === null || kopf === kenn.etag) return; // die eigene Änderung
-        await checkKontoRemote(true);
-      })().catch(() => {});
-    }, 400);
-  });
+    realtimeTimer = setTimeout(() => { void fn().catch(() => {}); }, 400);
+  };
+  realtime = sbRealtime({ url: s.url ?? '', key: s.clientId }, s.token, uid, (ev: RealtimeEreignis) => {
+    if (getWriterRole() !== 'writer' || anmeldungNoetig || !loadKonto()) return;
+    // M330: Eine Freigabe kam dazu oder fiel weg — Liste neu holen, Boards nachziehen (Realtime startet bei Bedarf neu)
+    if (ev.tabelle === 'board_freigaben') { planen(() => checkKontoRemote(true)); return; }
+    // M330: Zeile eines Besitzers, dessen Board mit mir geteilt ist — sofort lesen
+    if (ev.userId && ev.userId !== uid) { if (ev.name.startsWith(BOARD_PREFIX)) planen(() => checkKontoRemote(true)); return; }
+    // Eigene Zeilen: erst die Umgebung macht einen neuen Stand gültig — Board-Dateien allein sind noch im Fluss
+    if (ev.name && ev.name !== UMGEBUNG) return;
+    planen(async () => {
+      const kenn = await kennLesen();
+      const kopf = await laufwerk().kopf(UMGEBUNG);
+      if (kopf === null || kopf === kenn.etag) return; // die eigene Änderung
+      await checkKontoRemote(true);
+    });
+  }, besitzer, s.name ?? '');
 }
 function realtimeStoppen(): void {
   clearTimeout(realtimeTimer);
@@ -621,7 +630,11 @@ async function basisFinden(etag: string | null | undefined): Promise<BasisEintra
   return ((await idbGet<BasisEintrag[]>(BASEN_KEY)) ?? []).find((b) => b.etag === etag) ?? null;
 }
 /** Was wir zuletzt vom Konto wissen — damit nur Geändertes reist */
-interface Kenn { boards: Record<string, string>; dateien: string[]; etag: string | null; savedAt: string | null; kern?: string }
+interface Kenn {
+  boards: Record<string, string>; dateien: string[]; etag: string | null; savedAt: string | null; kern?: string;
+  /** M330: geteilte Boards anderer Konten — Besitzer, zuletzt gesehene Zeilen-Version und Stempel */
+  fremd?: Record<string, { besitzer: string; version: string; stempel: string }>;
+}
 const leereKenn = (): Kenn => ({ boards: {}, dateien: [], etag: null, savedAt: null });
 /** M328: Der Inhalt der Umgebung ohne Zeitstempel und aktives Board — gleicher Kern = nichts zu schreiben */
 const umgebungKern = (u: { spaces: Space[]; reihe: string[]; boards: Record<string, string>; dateien: Record<string, unknown> }): string =>
@@ -639,6 +652,8 @@ async function dateiLokal(id: string): Promise<boolean> {
   try { return !!(await idbGet(`file:${id}`)); } catch { return false; }
 }
 
+/** Zuletzt gelesene Board-Inhalte je Stempel (nur Arbeitsspeicher) — spart das erneute Laden unveränderter Boards */
+const gelesen = new Map<string, { st: string; board: BoardDoc }>();
 /** Stand aus dem Konto lesen — null, wenn dort noch nichts liegt. Merkt sich die Server-Kenntnis. */
 export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn } | null> {
   const lw = laufwerk();
@@ -650,20 +665,47 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
   try { u = JSON.parse(text) as Umgebung; } catch { throw new Error(`${kontoLabel()}: umgebung.json ist beschädigt.`); }
   if (u.app !== 'pixinotes' || !Array.isArray(u.spaces) || !u.boards) throw new Error(`${kontoLabel()}: umgebung.json ist kein PixiNotes-Stand.`);
   const alt = await kennLesen();
-  const basis = await basisLesen('konto');
-  const basisBoards = new Map((basis?.boards ?? []).map((b) => [b.id, b] as const));
   const boards: BoardDoc[] = [];
   const reihe = Array.isArray(u.reihe) && u.reihe.length ? u.reihe : Object.keys(u.boards);
   for (const id of reihe) {
     const st = u.boards[id];
     if (!st) continue;
-    const bekannt = basisBoards.get(id);
-    if (bekannt && alt.boards[id] === st) { boards.push(bekannt); continue; }
+    // Unverändert seit dem letzten Lesen? Dann aus dem Lese-Speicher — NICHT aus der Basis:
+    // Die Basis trägt nur eingearbeitete Stände; nach einem „später" (der Nutzer tippte)
+    // hielte sie den alten Inhalt und die Zusammenführung sähe fremde Karten als gelöscht.
+    const c = gelesen.get(id);
+    if (c && c.st === st) { boards.push(c.board); continue; }
     const t = await lw.lesenText(`${BOARD_PREFIX}${id}.json`);
     if (!t) continue; // gerade gelöscht — der nächste Takt holt den passenden Stand
-    try { boards.push(JSON.parse(t) as BoardDoc); } catch { /* kaputte Datei überlesen */ }
+    try { const b = JSON.parse(t) as BoardDoc; gelesen.set(id, { st, board: b }); boards.push(b); } catch { /* kaputte Datei überlesen */ }
   }
   if (boards.length === 0) return null;
+  // M330: Boards, die andere Konten mit mir geteilt haben — aus deren Zeilen, mit Besitzer-Kennung
+  let savedAt = u.savedAt;
+  const fremd: NonNullable<Kenn['fremd']> = {};
+  let spaces = u.spaces;
+  const sitzLesen = loadKonto();
+  if (sitzLesen?.anbieter === 'supabase') {
+    let liste: FremdFreigabe[] = fremdeFreigaben;
+    try { liste = await freigabenLaden(); } catch { /* ohne Netz: die zuletzt bekannten */ }
+    for (const f of liste) {
+      if (boards.some((b) => b.id === f.board_id && !b.geteiltVon)) continue;
+      try {
+        const z = await fremdZeile(f.besitzer, f.board_id);
+        if (!z) continue;
+        const altF = alt.fremd?.[f.board_id];
+        const c = gelesen.get(f.board_id);
+        let b: BoardDoc | null = null;
+        if (c && altF && c.st === `v${z.version}` && altF.version === String(z.version)) b = c.board;
+        else { try { b = JSON.parse(z.inhalt) as BoardDoc; gelesen.set(f.board_id, { st: `v${z.version}`, board: b }); } catch { continue; } }
+        b = { ...b, geteiltVon: f.besitzer, geteiltVonName: f.besitzer_email };
+        boards.push(b);
+        fremd[f.board_id] = { besitzer: f.besitzer, version: String(z.version), stempel: stempel(z.inhalt) };
+        if (z.updated_at && z.updated_at > savedAt) savedAt = z.updated_at;
+      } catch { /* ein fremdes Board darf den Abgleich nicht aufhalten */ }
+    }
+    spaces = mitGeteiltBereich(u.spaces, boards.filter((b) => b.geteiltVon));
+  }
   const dateien: Record<string, SyncDatei> = {};
   for (const [id, meta] of Object.entries(u.dateien ?? {})) {
     if (await dateiLokal(id)) continue;
@@ -674,17 +716,129 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
       if (blob) dateien[id] = { name: meta.name, mime: meta.mime ?? (blob.type || undefined), b64: await alsBase64(blob) };
     } catch { /* eine Datei darf den Abgleich nicht aufhalten */ }
   }
-  const kenn: Kenn = { boards: { ...u.boards }, dateien: Object.keys(u.dateien ?? {}), etag, savedAt: u.savedAt, kern: umgebungKern({ spaces: u.spaces, reihe, boards: u.boards, dateien: u.dateien ?? {} }) };
+  const kenn: Kenn = { boards: { ...u.boards }, dateien: Object.keys(u.dateien ?? {}), etag, savedAt, kern: umgebungKern({ spaces: u.spaces, reihe, boards: u.boards, dateien: u.dateien ?? {} }), fremd };
   await idbSet(KENN_KEY, kenn);
-  const payload: SyncPayload = { app: 'pixinotes', version: 2, savedAt: u.savedAt, boards, spaces: u.spaces, activeId: u.activeId, ...(Object.keys(dateien).length ? { dateien } : {}) };
+  const payload: SyncPayload = { app: 'pixinotes', version: 2, savedAt, boards, spaces, activeId: u.activeId, ...(Object.keys(dateien).length ? { dateien } : {}) };
   // Zwei Geräte, die sich überschrieben haben (Drive kennt keine Vorbedingung):
   // Der Schreiber nennt den Stand, auf dem er aufbaute. Haben wir den noch,
   // ist ER der gemeinsame Vorfahre — nicht unser letzter eigener Stand, der
   // sonst eine fremde Lücke als „gelöscht" deuten ließe.
   const vorfahre = await basisFinden(u.basisEtag);
   if (vorfahre && vorfahre.etag !== etag) await basisMerken('konto', { boards: vorfahre.boards, spaces: vorfahre.spaces });
-  await basenMerken(etag, { boards, spaces: u.spaces });
+  await basenMerken(etag, { boards, spaces });
   return { payload, kenn };
+}
+
+// ---------- M330: Geteilte Boards ----------
+export interface Freigabe { id: string; besitzer: string; board_id: string; gast_email: string; gast_id: string | null; rolle: string; created_at: string }
+interface FremdFreigabe { besitzer: string; besitzer_email: string; board_id: string; rolle: string }
+/** Die zuletzt geladenen Freigaben anderer Konten für mich */
+let fremdeFreigaben: FremdFreigabe[] = [];
+/** Besitzer, auf deren Zeilen Realtime gerade lauscht (um einen Neustart zu erkennen) */
+let realtimeBesitzer = '';
+const restUrl = (): string => `${loadKonto()?.url ?? ''}/rest/v1`;
+const JSON_KOPF = { 'Content-Type': 'application/json' };
+async function rpc<T>(name: string, body: unknown): Promise<T> {
+  const res = await anfrage(`${restUrl()}/rpc/${name}`, { method: 'POST', headers: JSON_KOPF, body: JSON.stringify(body) });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    if (res.status === 404) throw new Error('PixiNotes-Konto: Freigaben sind beim Betreiber noch nicht eingerichtet (Migration M330 fehlt).');
+    throw new Error(/vorbedingung/i.test(t) ? 'vorbedingung' : /keine freigabe/i.test(t) ? 'keine freigabe' : `PixiNotes-Konto: ${name} fehlgeschlagen (HTTP ${res.status}).`);
+  }
+  return (await res.json()) as T;
+}
+const nurEigenesKonto = (): void => { if (loadKonto()?.anbieter !== 'supabase') throw new Error('Freigaben gibt es nur mit dem PixiNotes-Konto (E-Mail-Anmeldung).'); };
+/** Offene Einladungen annehmen und die Liste der mit mir geteilten Boards holen; startet Realtime neu, wenn Besitzer dazukommen */
+async function freigabenLaden(): Promise<FremdFreigabe[]> {
+  await rpc<number>('freigaben_annehmen', {}).catch(() => 0);
+  const liste = await rpc<FremdFreigabe[]>('freigaben_fuer_mich', {});
+  fremdeFreigaben = Array.isArray(liste) ? liste : [];
+  const schluessel = [...new Set(fremdeFreigaben.map((f) => f.besitzer))].sort().join(',');
+  if (schluessel !== realtimeBesitzer && realtime) setTimeout(() => realtimeStarten(), 0);
+  return fremdeFreigaben;
+}
+/** Die Board-Zeile eines Besitzers (RLS: nur, wenn er sie mit mir geteilt hat) */
+async function fremdZeile(besitzer: string, boardId: string): Promise<{ inhalt: string; version: number; updated_at?: string } | null> {
+  const res = await anfrage(`${restUrl()}/konto_dateien?select=inhalt,version,updated_at&user_id=eq.${encodeURIComponent(besitzer)}&name=eq.${encodeURIComponent(`${BOARD_PREFIX}${boardId}.json`)}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`PixiNotes-Konto: HTTP ${res.status}`);
+  const z = (await res.json()) as Array<{ inhalt: string; version: number; updated_at?: string }>;
+  return z[0] ?? null;
+}
+/** Geteilte Boards, die in keinem Projekt stehen, landen unter „Geteilt mit mir" → ein Projekt je Besitzer */
+function mitGeteiltBereich(spaces: Space[], geteilt: BoardDoc[]): Space[] {
+  const fehlt = geteilt.filter((b) => !spaces.some((sp) => sp.projects.some((p) => p.boardIds.includes(b.id))));
+  if (fehlt.length === 0) return spaces;
+  const aus = spaces.map((sp) => ({ ...sp, projects: sp.projects.map((p) => ({ ...p, boardIds: [...p.boardIds] })) }));
+  let bereich = aus.find((sp) => sp.id === 'geteilt');
+  if (!bereich) { bereich = { id: 'geteilt', name: 'Geteilt mit mir', projects: [] }; aus.push(bereich); }
+  for (const b of fehlt) {
+    const pid = `geteilt-${b.geteiltVon}`;
+    let p = bereich.projects.find((x) => x.id === pid);
+    if (!p) { p = { id: pid, name: b.geteiltVonName ?? 'Freigaben', boardIds: [] }; bereich.projects.push(p); }
+    if (!p.boardIds.includes(b.id)) p.boardIds.push(b.id);
+  }
+  return aus;
+}
+/** Ein Board ohne Freigabe weiterführen: als eigene Kopie (die Kennung des Besitzers fällt weg) */
+function alsEigeneKopie(boardId: string): void {
+  useBoard.setState((s) => ({ boards: s.boards.map((b) => (b.id === boardId ? (({ geteiltVon: _g, geteiltVonName: _n, ...rest }) => rest)(b) as BoardDoc : b)) }));
+  fremdeFreigaben = fremdeFreigaben.filter((f) => f.board_id !== boardId);
+}
+/** Freigaben eines eigenen Boards (Besitzer-Sicht) */
+export async function freigabenDesBoards(boardId: string): Promise<Freigabe[]> {
+  nurEigenesKonto();
+  const s = loadKonto()!;
+  const res = await anfrage(`${restUrl()}/board_freigaben?select=*&board_id=eq.${encodeURIComponent(boardId)}&besitzer=eq.${encodeURIComponent(s.userId ?? '')}&order=created_at`, { cache: 'no-store' });
+  if (res.status === 404) throw new Error('PixiNotes-Konto: Freigaben sind beim Betreiber noch nicht eingerichtet (Migration M330 fehlt).');
+  if (!res.ok) throw new Error(`PixiNotes-Konto: Freigaben nicht lesbar (HTTP ${res.status}).`);
+  return (await res.json()) as Freigabe[];
+}
+/** Ein eigenes Board für eine E-Mail freigeben. Das Board muss schon im Konto liegen — notfalls jetzt schreiben. */
+export async function freigabeAnlegen(boardId: string, email: string): Promise<Freigabe> {
+  nurEigenesKonto();
+  const s = loadKonto()!;
+  if (s.name && s.name.toLowerCase() === email.trim().toLowerCase()) throw new Error('Das ist deine eigene E-Mail.');
+  if (localStorage.getItem(KONTO_DIRTY_KEY)) await kontoWrite().catch(() => {});
+  const res = await anfrage(`${restUrl()}/board_freigaben?on_conflict=besitzer,board_id,gast_email`, {
+    method: 'POST', headers: { ...JSON_KOPF, Prefer: 'resolution=merge-duplicates,return=representation' },
+    body: JSON.stringify({ board_id: boardId, gast_email: email.trim().toLowerCase(), rolle: 'bearbeiten' }),
+  });
+  if (res.status === 404) throw new Error('PixiNotes-Konto: Freigaben sind beim Betreiber noch nicht eingerichtet (Migration M330 fehlt).');
+  if (!res.ok) throw new Error(`PixiNotes-Konto: Freigabe nicht gespeichert (HTTP ${res.status}).`);
+  const z = (await res.json()) as Freigabe[];
+  return z[0];
+}
+export async function freigabeEntfernen(id: string): Promise<void> {
+  nurEigenesKonto();
+  const res = await anfrage(`${restUrl()}/board_freigaben?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) throw new Error(`PixiNotes-Konto: Freigabe nicht entfernt (HTTP ${res.status}).`);
+}
+/** Als Gast eine Freigabe verlassen — das Board bleibt als eigene Kopie */
+export async function freigabeVerlassen(boardId: string): Promise<void> {
+  nurEigenesKonto();
+  const s = loadKonto()!;
+  const res = await anfrage(`${restUrl()}/board_freigaben?board_id=eq.${encodeURIComponent(boardId)}&gast_id=eq.${encodeURIComponent(s.userId ?? '')}`, { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) throw new Error(`PixiNotes-Konto: Freigabe nicht verlassen (HTTP ${res.status}).`);
+  alsEigeneKopie(boardId);
+  const kenn = await kennLesen();
+  if (kenn.fremd?.[boardId]) { delete kenn.fremd[boardId]; await idbSet(KENN_KEY, kenn); }
+  try { localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll */ }
+}
+/** Ein geteiltes Board in die Zeile des Besitzers schreiben (RPC mit Vorbedingung) */
+async function fremdSchreiben(besitzer: string, boardId: string, text: string, st: string, wennVersion: string | null): Promise<string> {
+  try {
+    const v = await rpc<number | string>('freigabe_schreiben', { p_besitzer: besitzer, p_board_id: boardId, p_inhalt: text, p_stempel: st, p_wenn_version: wennVersion === null ? null : Number(wennVersion) });
+    return String(v);
+  } catch (e) {
+    const msg = (e as Error).message;
+    if (msg === 'vorbedingung') throw new VorbedingungFehler();
+    if (msg === 'keine freigabe') {
+      alsEigeneKopie(boardId);
+      useBoard.getState().showToast('Die Freigabe für dieses Board wurde beendet — es bleibt als eigene Kopie bei dir.', false, 8000);
+      throw new SpaeterFehler();
+    }
+    throw e;
+  }
 }
 
 let kette: Promise<unknown> = Promise.resolve();
@@ -698,8 +852,24 @@ function exklusiv<T>(fn: () => Promise<T>): Promise<T> {
 export async function kontoWrite(): Promise<string> {
   return exklusiv(() => kontoWriteRoh(true));
 }
-async function kontoWriteRoh(nochmal: boolean): Promise<string> {
+async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<string> {
   const lw = laufwerk();
+  const vorab = await kennLesen();
+  if (!nachMerge && vorab.etag && vorab.etag !== angewandtEtag) {
+    // Der zuletzt gelesene Stand steckt noch nicht im lokalen (der Nutzer tippte, Konflikt,
+    // Neustart): erst einarbeiten — sonst überschriebe die Vorbedingung fremde Karten.
+    const r = await kontoLesen();
+    if (r) {
+      const erg = await einarbeiten(r.payload);
+      if (erg === 'spaeter') throw new SpaeterFehler();
+      if (erg === 'konflikt') { emitSyncStatus('konto', 'conflict'); throw new Error(`${kontoLabel()} und lokaler Stand weichen ab, nichts überschrieben. Unter ⚙ → Daten → Synchronisation wählen.`); }
+      if (erg === 'fehler') throw new Error('Der Stand aus dem Konto konnte nicht gespeichert werden (Browser-Speicher voll?).');
+      // zusammengeführt/geschrieben: die Zusammenführung hat selbst geschrieben; gleich/übernommen: jetzt der eigene Anteil
+      if (erg === 'zusammengefuehrt' || erg === 'geschrieben') return kontoStamp() ?? new Date().toISOString();
+    } else {
+      angewandtEtag = null;
+    }
+  }
   const s = useBoard.getState();
   const kenn = await kennLesen();
   const sitz = loadKonto();
@@ -708,17 +878,28 @@ async function kontoWriteRoh(nochmal: boolean): Promise<string> {
   const payload = sitz?.anbieter === 'supabase'
     ? await buildSyncPayloadMitDateien(Math.max(s.syncDateienMb ?? DATEI_BUDGET_MB, 256), (id) => !bekanntVorab.has(id))
     : await buildSyncPayloadMitDateien(s.syncDateienMb ?? DATEI_BUDGET_MB);
+  // M330: Geteilte Boards gehören einem anderen Konto — sie gehen über freigabe_schreiben, nicht in die eigene Umgebung
+  const eigene = payload.boards.filter((b) => !b.geteiltVon);
+  const fremde = sitz?.anbieter === 'supabase' ? payload.boards.filter((b) => b.geteiltVon) : [];
   const stempelNeu: Record<string, string> = {};
   const texte = new Map<string, string>();
-  for (const b of payload.boards) {
+  for (const b of eigene) {
     const t = JSON.stringify(b);
     texte.set(b.id, t);
     stempelNeu[b.id] = stempel(t);
   }
+  const fremdPlan: Array<{ b: BoardDoc; text: string; st: string }> = [];
+  for (const b of fremde) {
+    const { geteiltVon: _g, geteiltVonName: _n, ...rein } = b;
+    const text = JSON.stringify(rein);
+    const st = stempel(text);
+    if (kenn.fremd?.[b.id]?.stempel === st) continue;
+    fremdPlan.push({ b, text, st });
+  }
   try {
     const plan: Schreibplan = { schreiben: [], loeschen: [] };
     // 1) Boards, die sich geändert haben
-    for (const b of payload.boards) {
+    for (const b of eigene) {
       if (kenn.boards[b.id] === stempelNeu[b.id]) continue;
       plan.schreiben.push({ name: `${BOARD_PREFIX}${b.id}.json`, body: texte.get(b.id)!, mime: 'application/json' });
     }
@@ -757,12 +938,20 @@ async function kontoWriteRoh(nochmal: boolean): Promise<string> {
     // 4) Die Umgebung zuletzt — sie macht den neuen Stand gültig
     const u: Umgebung = {
       app: 'pixinotes', version: 1, savedAt: payload.savedAt, activeId: payload.activeId, spaces: payload.spaces,
-      reihe: payload.boards.map((b) => b.id), boards: stempelNeu, dateien: dateienMeta, basisEtag: kenn.etag,
+      reihe: eigene.map((b) => b.id), boards: stempelNeu, dateien: dateienMeta, basisEtag: kenn.etag,
     };
     const kern = umgebungKern(u);
-    // M328: Nichts geändert (gleiche Boards, Bereiche, Reihe, Dateien)? Dann nicht schreiben —
+    // M330: Erst die geteilten Boards in die Zeilen ihrer Besitzer (jedes mit Vorbedingung auf seine Version)
+    const fremdNeu: NonNullable<Kenn['fremd']> = { ...(kenn.fremd ?? {}) };
+    for (const f of fremdPlan) {
+      const v = await fremdSchreiben(f.b.geteiltVon!, f.b.id, f.text, f.st, kenn.fremd?.[f.b.id]?.version ?? null);
+      fremdNeu[f.b.id] = { besitzer: f.b.geteiltVon!, version: v, stempel: f.st };
+      await idbSet(KENN_KEY, { ...kenn, fremd: fremdNeu } satisfies Kenn);
+    }
+    // M328: Nichts Eigenes geändert (gleiche Boards, Bereiche, Reihe, Dateien)? Dann die Umgebung nicht schreiben —
     // jeder Schreibvorgang bumpt sonst die Version und lässt andere Geräte unnötig zusammenführen.
     if (kenn.etag && kenn.kern === kern && plan.schreiben.length === 0 && plan.loeschen.length === 0 && kenn.savedAt) {
+      angewandtEtag = kenn.etag;
       localStorage.setItem(STAMP_KEY, kenn.savedAt);
       await basisMerken('konto', payload);
       const jetzt = useBoard.getState();
@@ -778,7 +967,8 @@ async function kontoWriteRoh(nochmal: boolean): Promise<string> {
       for (const name of plan.loeschen) await lw.loeschen(name);
       etag = await lw.schreiben(UMGEBUNG, JSON.stringify(u), 'application/json', kenn.etag);
     }
-    await idbSet(KENN_KEY, { boards: stempelNeu, dateien: Object.keys(dateienMeta), etag, savedAt: payload.savedAt, kern } satisfies Kenn);
+    await idbSet(KENN_KEY, { boards: stempelNeu, dateien: Object.keys(dateienMeta), etag, savedAt: payload.savedAt, kern, fremd: fremdNeu } satisfies Kenn);
+    angewandtEtag = etag;
     await basenMerken(etag, { boards: payload.boards, spaces: payload.spaces });
   } catch (e) {
     if (e instanceof VorbedingungFehler && nochmal) {
@@ -786,7 +976,7 @@ async function kontoWriteRoh(nochmal: boolean): Promise<string> {
       // das schreibt selbst mit beiden Anteilen, wenn es Eigenes gab
       const r = await kontoLesen();
       if (r && r.payload.savedAt !== kontoStamp()) {
-        const erg = await fremdStandEinarbeiten(r.payload, kontoWeg());
+        const erg = await einarbeiten(r.payload);
         if (erg === 'spaeter') throw new SpaeterFehler();
         if (erg === 'konflikt') { emitSyncStatus('konto', 'conflict'); throw new Error(`${kontoLabel()} und lokaler Stand weichen ab, nichts überschrieben. Unter ⚙ → Daten → Synchronisation wählen.`); }
         if (erg === 'fehler') throw new Error('Der Stand aus dem Konto konnte nicht gespeichert werden (Browser-Speicher voll?).');
@@ -809,6 +999,7 @@ export function applyKonto(p: SyncPayload): boolean {
   claimWriter();
   useBoard.getState().importSync(p.boards, p.spaces, p.activeId);
   if (!flushPersist()) return false;
+  void kennLesen().then((k) => { angewandtEtag = k.etag; });
   try {
     localStorage.setItem(STAMP_KEY, p.savedAt);
     localStorage.removeItem(KONTO_DIRTY_KEY);
@@ -832,10 +1023,26 @@ const kontoWeg = (): SyncWeg => ({
   source: 'konto',
   stampKey: STAMP_KEY,
   dirtyKey: KONTO_DIRTY_KEY,
-  schreiben: () => kontoWriteRoh(true),
+  schreiben: () => kontoWriteRoh(true, true),
   uebernehmen: applyKonto,
 });
 class SpaeterFehler extends Error { constructor() { super('Der Nutzer tippt gerade — gleich noch einmal.'); } }
+
+/**
+ * M330: Welcher Server-Stand (eTag) ist wirklich im lokalen Stand eingearbeitet?
+ * kontoLesen schreibt die Kenntnis (etag) schon beim Lesen fort — auch wenn die
+ * Zusammenführung danach mit „später" (der Nutzer tippt) oder „konflikt" endet.
+ * Ein eigener Schreibvorgang bestünde dann die Vorbedingung und überführe den
+ * fremden Stand mit dem alten lokalen: Karten anderer Geräte gingen verloren
+ * (im Wettlauf mit 1 s Tipp-Pause reproduziert). Darum zählt fürs Schreiben
+ * nur dieser Wert; weicht die Kenntnis ab, wird erst eingearbeitet.
+ */
+let angewandtEtag: string | null = null;
+async function einarbeiten(p: SyncPayload, nebenkopie = false): Promise<EinarbeitenErgebnis> {
+  const e = await fremdStandEinarbeiten(p, kontoWeg(), nebenkopie);
+  if (e === 'gleich' || e === 'uebernommen' || e === 'zusammengefuehrt' || e === 'geschrieben') angewandtEtag = (await kennLesen()).etag;
+  return e;
+}
 
 // ---------- Abgleich ----------
 let started = false;
@@ -848,8 +1055,19 @@ export type VerbindenErgebnis = 'hochgeladen' | 'uebernommen' | 'zusammengefuehr
 export async function kontoVerbinden(): Promise<VerbindenErgebnis> {
   return exklusiv(async () => {
     const r = await kontoLesen();
-    if (!r) { await kontoWriteRoh(true); return 'hochgeladen'; }
-    const e = await fremdStandEinarbeiten(r.payload, kontoWeg());
+    if (!r) {
+      await kontoWriteRoh(true);
+      // M330: Ein frisches Konto kann schon Einladungen haben — jetzt, mit eigener Umgebung, holen
+      if (loadKonto()?.anbieter === 'supabase') {
+        const liste = await freigabenLaden().catch(() => [] as FremdFreigabe[]);
+        if (liste.length > 0) {
+          const r2 = await kontoLesen();
+          if (r2) await einarbeiten(r2.payload);
+        }
+      }
+      return 'hochgeladen';
+    }
+    const e = await einarbeiten(r.payload);
     if (e === 'konflikt') { emitSyncStatus('konto', 'conflict'); return 'konflikt'; }
     if (e === 'fehler') throw new Error('Der Stand aus dem Konto konnte nicht gespeichert werden (Browser-Speicher voll?).');
     if (e === 'uebernommen') return 'uebernommen';
@@ -859,17 +1077,18 @@ export async function kontoVerbinden(): Promise<VerbindenErgebnis> {
 }
 
 /** Konto prüfen und einen fremden Stand einarbeiten. */
-export async function checkKontoRemote(erzwingen = false): Promise<void> {
+/** Liefert das Ergebnis der Zusammenführung — `null`, wenn nichts zu tun war oder nicht geprüft wurde. */
+export async function checkKontoRemote(erzwingen = false): Promise<EinarbeitenErgebnis | null> {
   const now = Date.now();
-  if (!erzwingen && now - lastRemoteCheck < 20_000) return;
-  if (getWriterRole() !== 'writer') return;
-  if (!loadKonto()) return;
+  if (!erzwingen && now - lastRemoteCheck < 20_000) return null;
+  if (getWriterRole() !== 'writer') return null;
+  if (!loadKonto()) return null;
   lastRemoteCheck = now;
-  await exklusiv(async () => {
+  return exklusiv(async (): Promise<EinarbeitenErgebnis | null> => {
     const r = await kontoLesen();
-    if (!r) return;
-    if (r.payload.savedAt === kontoStamp()) { staleHintShown = false; emitSyncStatus('konto', 'ok', r.payload.savedAt); return; }
-    const e = await fremdStandEinarbeiten(r.payload, kontoWeg());
+    if (!r) return null;
+    if (r.payload.savedAt === kontoStamp()) { staleHintShown = false; emitSyncStatus('konto', 'ok', r.payload.savedAt); return 'gleich'; }
+    const e = await einarbeiten(r.payload);
     if (e === 'uebernommen') {
       useBoard.getState().showToast(`☁️ Neuerer Stand aus ${kontoLabel()} übernommen (${new Date(r.payload.savedAt).toLocaleString('de-DE')}).`);
       staleHintShown = false;
@@ -886,6 +1105,7 @@ export async function checkKontoRemote(erzwingen = false): Promise<void> {
     } else {
       staleHintShown = false;
     }
+    return e;
   });
 }
 
@@ -898,8 +1118,13 @@ async function autoPush(): Promise<void> {
     const kenn = await kennLesen();
     const kopf = await lw.kopf(UMGEBUNG);
     if (kopf !== null && kopf !== kenn.etag) {
-      // Fremder Stand: erst einarbeiten (schreibt selbst mit beiden Anteilen)
-      await checkKontoRemote(true);
+      // Fremder Stand: erst einarbeiten (schreibt selbst mit beiden Anteilen).
+      // Konnte er NICHT eingearbeitet werden (der Nutzer tippt gerade, Konflikt, Fehler),
+      // darf jetzt nichts geschrieben werden — die Kenntnis trägt schon den fremden
+      // Stand, ein Schreiben überführe ihn mit dem alten lokalen (M330: verlor im
+      // Wettlauf mit 1 s Tipp-Pause eine Karte). checkKontoRemote holt es später nach.
+      const erg = await checkKontoRemote(true);
+      if (erg === 'spaeter' || erg === 'konflikt' || erg === 'fehler') { setTimeout(() => { void autoPush(); }, 3000); return; }
       if (localStorage.getItem(KONTO_DIRTY_KEY)) await kontoWrite();
       return;
     }
@@ -947,7 +1172,8 @@ export function initKontoSync(): void {
     }
     if (!loadKonto()) return;
     clearTimeout(timer);
-    timer = setTimeout(() => { void autoPush(); }, 2500);
+    // M330: Mit Live-Verbindung reicht eine Sekunde Tipp-Pause — die anderen Geräte warten
+    timer = setTimeout(() => { void autoPush(); }, kontoLiveVerbunden() ? 1000 : 2500);
   });
   if (loadKonto()) {
     realtimeStarten();
@@ -956,10 +1182,28 @@ export function initKontoSync(): void {
     }).catch(() => {});
   }
   // Takt: nur der Mini-Abruf (eTag / Version); erst eine Änderung lädt
+  let takt = 0;
   setInterval(() => {
     void (async () => {
       if (document.visibilityState !== 'visible' || getWriterRole() !== 'writer' || !loadKonto() || anmeldungNoetig) return;
+      takt += 1;
       const kenn = await kennLesen();
+      // M330: Alle 60 s die Freigaben prüfen — neue Einladungen oder fremde Änderungen ohne Realtime
+      if (loadKonto()?.anbieter === 'supabase' && takt % 6 === 0) {
+        const liste = await freigabenLaden().catch(() => null);
+        if (liste) {
+          const bekannt = Object.keys(kenn.fremd ?? {}).sort().join(',');
+          const jetzt = liste.map((f) => f.board_id).sort().join(',');
+          let fremdNeu = bekannt !== jetzt;
+          if (!fremdNeu) {
+            for (const f of liste) {
+              const z = await fremdZeile(f.besitzer, f.board_id).catch(() => null);
+              if (z && String(z.version) !== kenn.fremd?.[f.board_id]?.version) { fremdNeu = true; break; }
+            }
+          }
+          if (fremdNeu) { await checkKontoRemote(true); return; }
+        }
+      }
       const kopf = await laufwerk().kopf(UMGEBUNG);
       if (kopf === null || kopf === kenn.etag) return;
       await checkKontoRemote(true);

@@ -136,6 +136,7 @@ Eine Schicht Tokens in `src/index.css`, an der alles hängt:
 | 14 | Finger-Gesten überall (Procreate): Zwei-/Drei-Finger-Tipp = Rückgängig/Wiederholen, halten = schnell, Quick-Pinch = Alles einpassen / zurück, Vier-Finger-Tipp = Vollbild, drei Finger nach unten = Duplizieren oder ＋-Palette; Schalter. Ohne Stift-Gerät zoomen zwei Finger und das Mausrad auch auf der Zeichenebene | M326 |
 | 15 | Handschrift mit Struktur: Kästchen, Punkt/Strich, Unterstreichung und Schriftgröße werden Aufgabe, Aufzählung, Überschrift; Text-Marker („- ", „1. ", „[ ] ", „# "); unter einer Liste geht die Liste weiter, links der Einrückung wieder Text; Umschalter ¶ • 1. ☐ H im Vorschlag | M327 |
 | 16 | Große Anhänge im PixiNotes-Konto: Storage-Bucket `pixinotes` (Ordner je Nutzer, RLS), bis 50 MB, nur Neues hochladen, > 8 MB erst beim Öffnen der Karte; konto_schreiben ohne Löschen (App löscht danach) | M329 |
+| 17 | Geteilte Boards zwischen Konten (board_freigaben, Gast schreibt per freigabe_schreiben in die Zeile des Besitzers, Realtime auf fremde Boards, Bereich „Geteilt mit mir", Freigabe-Dialog im Board-Menü) und Tipp-Pause 1 s bei Live-Verbindung | M330 |
 | 13 | Stift wie auf Surface und iPad: Stift schreibt, Finger bedient (auch im Auswahlmodus, auf Fläche und Notizen), Tipp = Klick, Radierer-Ende radiert immer, Seitentaste greift Karten, Teil-/Strich-Radierer, getippten Text per Kritzel/Durchstreichen löschen und per Schleife markieren, Handschrift inline zwischen Wörtern, Zwei-/Drei-Finger-Tipp = Rückgängig/Wiederholen, zweiter Finger rastet Form ein (Procreate) | M325 |
 | 12 | Stift & Handschrift 2: Vorschlag nach Schreibpause, Ziel-Logik (in die Notiz darunter an passender Stelle / neue Notiz), KI-Korrektur mit Kontext, Umkreisen markiert, Durchstreichen löscht, schnelleres Einrasten, Strichstärke | M324 |
 | 11 | Notiz nachgeschärft: Titelzeile (ein Helfer statt sechs), Farbpalette, Checklisten-Fortschritt, Auto-Größe schrumpft und ignoriert das „/"-Menü, deutsche Kurzdaten, Vorlagen und Heute im „/", Strg+V-Text → Notiz, extEpoch bei externen Block-Schreibern, Lesetypografie im Fokus | M323 |
@@ -242,9 +243,26 @@ Anbieter des Konto-Syncs**, kein Umbau.
   so lässt sie sich ohne Rückfrage einspielen). Der Beipack enthält beim
   eigenen Konto nur noch unbekannte Dateien; die Umgebung trägt je Anhang die
   Größe, Anhänge > 8 MB lädt erst die Karte (`kontoDateiNachladen`).
-- **Später möglich**: fortsetzbare Uploads (TUS) für Dateien über 50 MB im
-  Pro-Tarif, OneDrive-Upload-Sitzungen über 4 MB, Google/Microsoft-Login über
-  Supabase, Einladungen und geteilte Boards über eine zweite Policy.
+- **M330 — Geteilte Boards**: Tabelle `board_freigaben` (besitzer, board_id,
+  gast_email, gast_id, rolle). Der Besitzer legt eine Zeile mit der E-Mail an;
+  `freigaben_annehmen()` übernimmt sie beim Gast, sobald er sich mit dieser
+  E-Mail anmeldet (Abgleich jedes `kontoLesen`). Der Gast liest die Board-Zeile
+  des Besitzers (Policy „Gast liest freigegebene Boards") und schreibt sie über
+  `freigabe_schreiben` (security definer: prüft die Freigabe, Vorbedingung auf
+  die Version der Board-Zeile, trägt Stempel und `savedAt` in die Umgebung des
+  Besitzers ein, dessen Geräte sehen den Stand wie eine eigene Änderung).
+  Client: `BoardDoc.geteiltVon`, `kenn.fremd` je Board (Version, Stempel),
+  `kontoLesen` hängt fremde Boards an und legt sie unter „Geteilt mit mir"
+  (ein Projekt je Besitzer) ab, `kontoWriteRoh` hält sie aus der eigenen
+  Umgebung heraus; Realtime lauscht zusätzlich auf die Zeilen der Besitzer
+  (RLS filtert) und auf `board_freigaben`. Verlorene Freigabe = eigene Kopie.
+  Tipp-Pause 1 s bei verbundenem Realtime. Grenze: Anhänge geteilter Boards
+  liegen im Ordner des Besitzers und reisen (noch) nicht mit.
+- **Später möglich**: Anwesenheit und Cursor (Realtime Presence/Broadcast),
+  gemeinsames Tippen in einer Notiz (Yjs über Broadcast; BlockNote kann Yjs),
+  Lese-Rolle in der Oberfläche, Anhänge geteilter Boards (Storage-Policy über
+  die Freigabe), fortsetzbare Uploads (TUS) über 50 MB, OneDrive-Upload-
+  Sitzungen über 4 MB, Google/Microsoft-Login über Supabase.
 
 
 ## Stift-Konzept (M325) — was wir von Procreate, OneNote, Nebo und Scribble übernehmen
