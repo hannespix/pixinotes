@@ -21,6 +21,9 @@ import { saveHtml } from './htmlStore';
 import { saveFile } from './fileStore';
 import { mirrorAttachment } from './attachments';
 import { textZuBloecken, wirdNotiz } from './textNotiz';
+
+/** M337: Word beim Import als Notiz statt als Dokument-Karte? Nein — die Umwandlung gibt es auf Wunsch (textNotiz.ts) */
+const WORD_ALS_NOTIZ = false;
 import type { AppNode } from '../types';
 
 /** Kopie in den Team-Ordner legen und den Pfad an der Karte vermerken —
@@ -153,9 +156,11 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         }
         showToast('JSON erkannt, aber keine PixiNotes-Datei — als Datei-Karte abgelegt.');
       }
-      if (ext === 'docx') {
+      if (ext === 'docx' && WORD_ALS_NOTIZ) {
         // M184: Word-Dokument → Notiz-Karte. Das ist zugleich der kontofreie
         // OneNote-Weg: „Datei → Exportieren → Word" und die Datei hier ablegen.
+        // M337: Standard ist jetzt die DOKUMENT-Karte (Datei-Karte mit Seiten,
+        // wie PDF); die Notiz gibt es per Auswahl → ⋯ → „Als Notiz übernehmen".
         const res = await docxToBlocks(file);
         if (res.blocks.length === 0) { showToast(`„${file.name}" enthält keinen lesbaren Text.`); continue; }
         const note = makeNote(pos, { blocks: res.blocks });

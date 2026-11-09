@@ -90,6 +90,9 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
   const quelle = file.dataUrl ?? blobUrl ?? null;
   const art = vorschauArt(file.name, file.mime);
   const isPdf = art === 'pdf' && !!quelle;
+  /** M337: Word-Dokument — Seitenkarte wie die PDF (docx-preview rendert Seiten im Browser) */
+  const isWord = ext === 'docx' && !!quelle;
+  const istDokument = isPdf || isWord;
   /**
    * M254: Auch eine Datei-KARTE zeigt ein Bild als Bild.
    *
@@ -183,13 +186,13 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           }}
         />
       </div>
-      <button className="file-body nodrag" onClick={isPdf ? () => aufklappen(!(auf || imFokus)) : quelle ? download : loadFromTeam}
-        title={isPdf ? (auf || imFokus ? 'Zuklappen' : 'Aufklappen — Seite für Seite lesen und anmerken') : quelle ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
+      <button className="file-body nodrag" onClick={istDokument ? () => aufklappen(!(auf || imFokus)) : quelle ? download : loadFromTeam}
+        title={istDokument ? (auf || imFokus ? 'Zuklappen' : 'Aufklappen — Seite für Seite lesen und anmerken') : quelle ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
         <span className="meta">
           {eigenerTitel && <>{file.name} · </>}{formatBytes(file.size)}
-          {isPdf && seitenZahl > 0 && <> · {seitenZahl} Seite{seitenZahl === 1 ? '' : 'n'}</>}
-          {isPdf && seitenStriche > 0 && <> · ✎ {seitenStriche}</>}
-          {isPdf && seitenKommentare > 0 && <> · 💬 {seitenKommentare}</>}
+          {istDokument && seitenZahl > 0 && <> · {seitenZahl} Seite{seitenZahl === 1 ? '' : 'n'}</>}
+          {istDokument && seitenStriche > 0 && <> · ✎ {seitenStriche}</>}
+          {istDokument && seitenKommentare > 0 && <> · 💬 {seitenKommentare}</>}
         </span>
       </button>
       {/* Nachladen braucht nur, wem der Inhalt fehlt — sonst liegt er schon hier */}
@@ -218,9 +221,9 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
       {bildOffen && quelle && (
         <BildLupe quelle={quelle} name={titel} onClose={() => setBildOffen(false)} onDownload={download} />
       )}
-      {isPdf && !(auf || imFokus) && (
+      {istDokument && !(auf || imFokus) && (
         <>
-          <PdfThumb dataUrl={quelle!} onOpen={() => aufklappen(true)} onSeiten={setSeitenZahl} />
+          {isPdf && <PdfThumb dataUrl={quelle!} onOpen={() => aufklappen(true)} onSeiten={setSeitenZahl} />}
           <button className="pdf-aufklappen nodrag" onClick={() => aufklappen(true)} data-taste="pdf-aufklappen"
             title="Aufklappen: eine Seite in Kartenbreite, blättern, mit Stift und Kommentaren anmerken">
             ⤢ Aufklappen{seitenStriche + seitenKommentare > 0 ? ` · ${seitenStriche + seitenKommentare} Anmerkung${seitenStriche + seitenKommentare === 1 ? '' : 'en'}` : ''}
@@ -231,12 +234,16 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
         <PdfSeite id={id} dataUrl={quelle!} onSeiten={setSeitenZahl} onDownload={download}
           zuklappen={imFokus ? undefined : () => aufklappen(false)} />
       )}
+      {isWord && (auf || imFokus) && (
+        <WordSeite id={id} quelle={quelle!} onSeiten={setSeitenZahl} onDownload={download}
+          zuklappen={imFokus ? undefined : () => aufklappen(false)} />
+      )}
       {/* M259: Ton und Bewegtbild kann der Browser selbst — dann soll er auch */}
       {art === 'audio' && quelle && <audio className="file-media nodrag" src={quelle} controls preload="metadata" />}
       {art === 'video' && quelle && <video className="file-media nodrag" src={quelle} controls preload="metadata" />}
       {art === 'text' && quelle && <TextVorschau quelle={quelle} />}
       {/* Ehrlich sagen, WARUM hier nichts zu sehen ist */}
-      {art === 'keine' && quelle && (
+      {art === 'keine' && quelle && !isWord && (
         <div className="file-nopreview">{warumKeineVorschau(file.name)}</div>
       )}
       {!quelle && !file.ref && (
@@ -307,6 +314,100 @@ function PdfThumb({ dataUrl, onOpen, onSeiten }: { dataUrl: string; onOpen: () =
 }
 
 /**
+ * M336/M337: Gemeinsame Bausteine der Dokument-Karten (PDF und Word).
+ * Blätterleiste (‹ Seite / n ›, 💬 Kommentar an Stelle, Herunterladen,
+ * Zuklappen) und die Kommentarliste unter der Seite — nummeriert wie die
+ * Pins, mit Sprung zu anderen Seiten mit Kommentaren.
+ */
+function SeitenLeiste({ seite, seiten, blaettern, pinModus, setPinModus, anzahlHier, onDownload, zuklappen }: {
+  seite: number; seiten: number; blaettern: (zu: number) => void; pinModus: boolean; setPinModus: (f: (p: boolean) => boolean) => void;
+  anzahlHier: number; onDownload: () => void; zuklappen?: () => void;
+}) {
+  const [eingabe, setEingabe] = useState('');
+  return (
+    <div className="pdf-seite-bar nowheel">
+      <button onClick={() => blaettern(seite - 1)} disabled={seite <= 1} aria-label="Vorherige Seite" data-taste="pdf-zurueck">‹</button>
+      <input
+        className="pdf-seite-nr" inputMode="numeric" aria-label="Seite" data-taste="pdf-seite-nr"
+        value={eingabe || String(seite)}
+        onFocus={() => setEingabe(String(seite))}
+        onChange={(e) => setEingabe(e.target.value.replace(/[^0-9]/g, ''))}
+        onBlur={() => { const z = parseInt(eingabe, 10); if (z) blaettern(z); setEingabe(''); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      />
+      <span className="pdf-seite-von">/ {seiten}</span>
+      <button onClick={() => blaettern(seite + 1)} disabled={seite >= seiten} aria-label="Nächste Seite" data-taste="pdf-vor">›</button>
+      <span className="pdf-seite-luft" />
+      <button className={pinModus ? 'on' : ''} onClick={() => setPinModus((p) => !p)} data-taste="pdf-kommentar"
+        title={pinModus ? 'Abbrechen' : 'Kommentar an eine Stelle der Seite setzen — danach auf die Stelle tippen'} aria-pressed={pinModus} aria-label="Kommentar an Stelle">
+        💬{anzahlHier > 0 && <span className="pdf-kommentar-zahl" data-taste="pdf-seite-kommentare">{anzahlHier}</span>}
+      </button>
+      <button onClick={onDownload} title="Herunterladen" aria-label="Herunterladen"><IDownload size={13} /></button>
+      {zuklappen && <button onClick={zuklappen} title="Zuklappen" aria-label="Zuklappen" data-taste="pdf-zuklappen"><IX size={13} /></button>}
+    </div>
+  );
+}
+
+function SeitenKommentare({ id, seite, blaettern }: { id: string; seite: number; blaettern: (zu: number) => void }) {
+  // Stabile Referenz aus dem Store (ein neues Array je Aufruf ließe die Karte endlos neu rendern)
+  const alleKommentare = useBoard((s) => selectActiveBoard(s).comments);
+  const kommentare = (alleKommentare ?? []).filter((c) => c.nodeId === id);
+  const aufDieserSeite = seitenKommentare(kommentare, id, seite);
+  const anderSeiten = [...new Set(kommentare.filter((c) => c.seite != null && c.seite !== seite).map((c) => c.seite as number))].sort((a, b) => a - b);
+  const ohneSeite = kommentare.filter((c) => c.seite == null);
+  const [blasen, setBlasen] = useState(() => blasenAn());
+  const setCommentOpen = useBoard((s) => s.setCommentOpen);
+  const offenerThread = useBoard((s) => s.commentOpen);
+  if (aufDieserSeite.length === 0 && anderSeiten.length === 0 && ohneSeite.length === 0) return null;
+  return (
+    <div className="pdf-kommentare nowheel" data-taste="pdf-kommentare">
+      <div className="pdf-kommentare-kopf">
+        <span>{aufDieserSeite.length === 0 ? 'Keine Kommentare auf dieser Seite' : `Kommentare auf Seite ${seite} (${aufDieserSeite.length})`}</span>
+        <button className={blasen ? 'on' : ''} onClick={() => { blasenSetzen(!blasen); setBlasen(!blasen); }} aria-pressed={blasen}
+          title="Textblasen neben den Pins auf der Seite ein- oder ausblenden" data-taste="pdf-blasen">Blasen</button>
+      </div>
+      {aufDieserSeite.map((c, i) => (
+        <button key={c.id} className={`pdf-kommentar ${c.resolved ? 'resolved' : ''} ${offenerThread === c.id ? 'open' : ''}`}
+          onClick={() => setCommentOpen(c.id)} title="Kommentar öffnen" data-taste="pdf-kommentar-eintrag">
+          <span className="pdf-kommentar-nr">{c.resolved ? '✓' : i + 1}</span>
+          <span className="pdf-kommentar-text"><b>{c.msgs[0]?.author}</b> {c.msgs[0]?.text}{c.msgs.length > 1 ? ` · ${c.msgs.length} Beiträge` : ''}</span>
+        </button>
+      ))}
+      {anderSeiten.length > 0 && (
+        <div className="pdf-kommentare-andere">
+          Weitere auf Seite{anderSeiten.length > 1 ? 'n' : ''}{' '}
+          {anderSeiten.map((n) => (
+            <button key={n} onClick={() => blaettern(n)} title={`Zu Seite ${n} blättern`} data-taste="pdf-kommentar-seite">{n}</button>
+          ))}
+        </div>
+      )}
+      {ohneSeite.length > 0 && (
+        <div className="pdf-kommentare-andere">
+          {ohneSeite.length} an der Karte (ohne Seite){' '}
+          <button onClick={() => setCommentOpen(ohneSeite[0].id)} title="Kommentar an der Karte öffnen">öffnen</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Anzahl Kommentare der Karte auf dieser Seite — für den Zähler in der Leiste */
+function useKommentareAufSeite(id: string, seite: number): number {
+  const alle = useBoard((s) => selectActiveBoard(s).comments);
+  return seitenKommentare(alle, id, seite).length;
+}
+
+/** Lage eines Seiten-Elements in der Karte melden: Versatz über die offsetParent-Kette bis zum Knoten */
+function seitenLageMelden(id: string, el: HTMLElement, seite: number, seiten: number, breitePt: number, hoehePt: number, breitePx: number): void {
+  const knoten = el.closest('.react-flow__node') as HTMLElement | null;
+  if (!knoten || breitePx <= 0 || breitePt <= 0) return;
+  let dx = 0; let dy = 0;
+  let cur: HTMLElement | null = el;
+  while (cur && cur !== knoten) { dx += cur.offsetLeft; dy += cur.offsetTop; cur = cur.offsetParent as HTMLElement | null; }
+  seiteMelden(id, { seite, seiten, dx, dy, k: breitePx / breitePt, breite: breitePt, hoehe: hoehePt });
+}
+
+/**
  * M335: Eine Seite der PDF in der Karte — aufgeklappt.
  *
  * Gerendert wird genau die aufgeschlagene Seite in Kartenbreite (scharf, s.
@@ -326,22 +427,8 @@ function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
   const [masse, setMasse] = useState<{ breite: number; hoehe: number } | null>(null);
   const [breite, setBreite] = useState(300);
   const [pinModus, setPinModus] = useState(false);
-  const [eingabe, setEingabe] = useState('');
   const [failed, setFailed] = useState(false);
-  /**
-   * M336: Kommentare je Seite — nachvollziehbar. Unter der Seite steht die Liste
-   * der Kommentare DIESER Seite (nummeriert wie die Pins), die Blätterleiste
-   * zählt sie, andere Seiten mit Kommentaren sind einen Tipp entfernt.
-   */
-  // Stabile Referenz aus dem Store (ein neues Array je Aufruf ließe die Karte endlos neu rendern)
-  const alleKommentare = useBoard((s) => selectActiveBoard(s).comments);
-  const kommentare = (alleKommentare ?? []).filter((c) => c.nodeId === id);
-  const aufDieserSeite = seitenKommentare(kommentare, id, seite);
-  const anderSeiten = [...new Set(kommentare.filter((c) => c.seite != null && c.seite !== seite).map((c) => c.seite as number))].sort((a, b) => a - b);
-  const ohneSeite = kommentare.filter((c) => c.seite == null);
-  const [blasen, setBlasen] = useState(() => blasenAn());
-  const setCommentOpen = useBoard((s) => s.setCommentOpen);
-  const offenerThread = useBoard((s) => s.commentOpen);
+  const anzahlHier = useKommentareAufSeite(id, seite);
 
   // Kartenbreite verfolgen — entprellt, wie bei der Miniatur (M242)
   useEffect(() => {
@@ -371,18 +458,10 @@ function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUrl, seite]);
 
-  /** Lage der Seite in der Karte melden: Versatz über die offsetParent-Kette bis zum Knoten, Maßstab aus der Breite */
   const melden = useCallback(() => {
     const canvas = ref.current;
     if (!canvas || !masse) return;
-    const knoten = canvas.closest('.react-flow__node') as HTMLElement | null;
-    if (!knoten) return;
-    let dx = 0; let dy = 0;
-    let el: HTMLElement | null = canvas;
-    while (el && el !== knoten) { dx += el.offsetLeft; dy += el.offsetTop; el = el.offsetParent as HTMLElement | null; }
-    const w = canvas.clientWidth || breite;
-    if (w <= 0) return;
-    seiteMelden(id, { seite, seiten, dx, dy, k: w / masse.breite, breite: masse.breite, hoehe: masse.hoehe });
+    seitenLageMelden(id, canvas, seite, seiten, masse.breite, masse.hoehe, canvas.clientWidth || breite);
   }, [id, seite, seiten, masse, breite]);
 
   useEffect(() => {
@@ -417,60 +496,146 @@ function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
   if (failed) return <div className="file-nopreview">Diese PDF lässt sich nicht darstellen.</div>;
   return (
     <div className="pdf-seite-wrap nodrag" ref={wrapRef} data-taste="pdf-seite-wrap">
-      <div className="pdf-seite-bar nowheel">
-        <button onClick={() => blaettern(seite - 1)} disabled={seite <= 1} aria-label="Vorherige Seite" data-taste="pdf-zurueck">‹</button>
-        <input
-          className="pdf-seite-nr" inputMode="numeric" aria-label="Seite" data-taste="pdf-seite-nr"
-          value={eingabe || String(seite)}
-          onFocus={() => setEingabe(String(seite))}
-          onChange={(e) => setEingabe(e.target.value.replace(/[^0-9]/g, ''))}
-          onBlur={() => { const z = parseInt(eingabe, 10); if (z) blaettern(z); setEingabe(''); }}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-        />
-        <span className="pdf-seite-von">/ {seiten}</span>
-        <button onClick={() => blaettern(seite + 1)} disabled={seite >= seiten} aria-label="Nächste Seite" data-taste="pdf-vor">›</button>
-        <span className="pdf-seite-luft" />
-        <button className={pinModus ? 'on' : ''} onClick={() => setPinModus((p) => !p)} data-taste="pdf-kommentar"
-          title={pinModus ? 'Abbrechen' : 'Kommentar an eine Stelle der Seite setzen — danach auf die Stelle tippen'} aria-pressed={pinModus} aria-label="Kommentar an Stelle">
-          💬{aufDieserSeite.length > 0 && <span className="pdf-kommentar-zahl" data-taste="pdf-seite-kommentare">{aufDieserSeite.length}</span>}
-        </button>
-        <button onClick={onDownload} title="Herunterladen" aria-label="Herunterladen"><IDownload size={13} /></button>
-        {zuklappen && <button onClick={zuklappen} title="Zuklappen" aria-label="Zuklappen" data-taste="pdf-zuklappen"><IX size={13} /></button>}
-      </div>
+      <SeitenLeiste seite={seite} seiten={seiten} blaettern={blaettern} pinModus={pinModus} setPinModus={setPinModus}
+        anzahlHier={anzahlHier} onDownload={onDownload} zuklappen={zuklappen} />
       {pinModus && <div className="pdf-pin-hinweis">Auf die Stelle tippen, zu der der Kommentar gehört</div>}
       <div className={`pdf-seite ${pinModus ? 'pin-modus' : ''}`} onClick={aufSeiteTippen} data-seite={seite}>
         <canvas ref={ref} />
       </div>
-      {(aufDieserSeite.length > 0 || anderSeiten.length > 0 || ohneSeite.length > 0) && (
-        <div className="pdf-kommentare nowheel" data-taste="pdf-kommentare">
-          <div className="pdf-kommentare-kopf">
-            <span>{aufDieserSeite.length === 0 ? 'Keine Kommentare auf dieser Seite' : `Kommentare auf Seite ${seite} (${aufDieserSeite.length})`}</span>
-            <button className={blasen ? 'on' : ''} onClick={() => { blasenSetzen(!blasen); setBlasen(!blasen); }} aria-pressed={blasen}
-              title="Textblasen neben den Pins auf der Seite ein- oder ausblenden" data-taste="pdf-blasen">Blasen</button>
-          </div>
-          {aufDieserSeite.map((c, i) => (
-            <button key={c.id} className={`pdf-kommentar ${c.resolved ? 'resolved' : ''} ${offenerThread === c.id ? 'open' : ''}`}
-              onClick={() => setCommentOpen(c.id)} title="Kommentar öffnen" data-taste="pdf-kommentar-eintrag">
-              <span className="pdf-kommentar-nr">{c.resolved ? '✓' : i + 1}</span>
-              <span className="pdf-kommentar-text"><b>{c.msgs[0]?.author}</b> {c.msgs[0]?.text}{c.msgs.length > 1 ? ` · ${c.msgs.length} Beiträge` : ''}</span>
-            </button>
-          ))}
-          {anderSeiten.length > 0 && (
-            <div className="pdf-kommentare-andere">
-              Weitere auf Seite{anderSeiten.length > 1 ? 'n' : ''}{' '}
-              {anderSeiten.map((n) => (
-                <button key={n} onClick={() => blaettern(n)} title={`Zu Seite ${n} blättern`} data-taste="pdf-kommentar-seite">{n}</button>
-              ))}
-            </div>
-          )}
-          {ohneSeite.length > 0 && (
-            <div className="pdf-kommentare-andere">
-              {ohneSeite.length} an der Karte (ohne Seite){' '}
-              <button onClick={() => setCommentOpen(ohneSeite[0].id)} title="Kommentar an der Karte öffnen">öffnen</button>
-            </div>
-          )}
-        </div>
-      )}
+      <SeitenKommentare id={id} seite={seite} blaettern={blaettern} />
+    </div>
+  );
+}
+
+/**
+ * M337: Ein Word-Dokument als Seitenkarte — wie die PDF, nur gerendert aus
+ * dem .docx selbst (docx-preview, im Browser). Alle Seiten werden einmal
+ * aufgebaut, sichtbar ist genau eine; Seitenpunkte sind die CSS-Punkte (pt)
+ * der Word-Seite, so dass Striche und Pins wie bei der PDF an der Stelle
+ * bleiben. Ein Dokument ohne Seitenumbrüche ist eine lange Seite.
+ */
+function WordSeite({ id, quelle, zuklappen, onSeiten, onDownload }: {
+  id: string; quelle: string; zuklappen?: () => void; onSeiten?: (n: number) => void; onDownload: () => void;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const inhaltRef = useRef<HTMLDivElement>(null);
+  const stilRef = useRef<HTMLDivElement>(null);
+  const [seite, setSeite] = useState(1);
+  const [seiten, setSeiten] = useState(1);
+  const [status, setStatus] = useState<'laedt' | 'fertig' | 'fehler'>('laedt');
+  const [breite, setBreite] = useState(300);
+  const [pinModus, setPinModus] = useState(false);
+  const [masse, setMasse] = useState<{ breitePt: number; hoehePt: number; breitePx: number } | null>(null);
+  const anzahlHier = useKommentareAufSeite(id, seite);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    let t: number | undefined;
+    const ro = new ResizeObserver(() => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => { const w = Math.round(el.clientWidth); if (w > 0) setBreite((alt) => (Math.abs(alt - w) > 6 ? w : alt)); }, 60);
+    });
+    ro.observe(el);
+    const w = Math.round(el.clientWidth);
+    if (w > 0) setBreite(w);
+    return () => { ro.disconnect(); window.clearTimeout(t); };
+  }, []);
+
+  // Dokument einmal rendern (alle Abschnitte/Seiten), danach nur noch blättern
+  useEffect(() => {
+    let weg = false;
+    (async () => {
+      try {
+        const [{ renderAsync }, blob] = await Promise.all([import('docx-preview'), (await fetch(quelle)).blob()]);
+        if (weg || !inhaltRef.current) return;
+        inhaltRef.current.innerHTML = '';
+        await renderAsync(blob, inhaltRef.current, stilRef.current ?? undefined, {
+          inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false, useBase64URL: true,
+          renderHeaders: true, renderFooters: true, renderFootnotes: true, renderComments: false, className: 'docx',
+        });
+        if (weg) return;
+        const abschnitte = inhaltRef.current.querySelectorAll<HTMLElement>('section.docx');
+        setSeiten(Math.max(1, abschnitte.length)); onSeiten?.(Math.max(1, abschnitte.length));
+        setStatus('fertig');
+      } catch (e) {
+        console.warn('Word-Dokument lässt sich nicht darstellen:', e);
+        if (!weg) setStatus('fehler');
+      }
+    })();
+    return () => { weg = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quelle]);
+
+  // Sichtbare Seite setzen, Maßstab an die Kartenbreite anpassen, Lage melden
+  const auslegen = useCallback(() => {
+    const inhalt = inhaltRef.current;
+    if (!inhalt || status !== 'fertig') return;
+    const abschnitte = [...inhalt.querySelectorAll<HTMLElement>('section.docx')];
+    if (abschnitte.length === 0) return;
+    const nr = Math.min(seite, abschnitte.length);
+    abschnitte.forEach((a, i) => { a.style.display = i === nr - 1 ? '' : 'none'; });
+    const akt = abschnitte[nr - 1];
+    // Seitenbreite in CSS-Punkten (Word-Seitenmaß) — ohne Angabe A4
+    const breitePt = parseFloat(akt.style.width) || 595.3;
+    inhalt.style.transform = 'none';
+    const roh = akt.offsetWidth || breitePt * (96 / 72);
+    // Die Seite ist mindestens so hoch wie ihr Seitenmaß (min-height in pt) — auch wenn der
+    // Browser den Abschnitt gerade erst aufbaut und noch zu klein meldet
+    const minHoehePx = (parseFloat(akt.style.minHeight) || 0) * (96 / 72);
+    const rohHoehe = Math.max(akt.offsetHeight || 0, minHoehePx) || breitePt * (96 / 72) * 1.414;
+    const s = breite / roh;
+    inhalt.style.transform = `scale(${s})`;
+    inhalt.style.transformOrigin = '0 0';
+    inhalt.style.width = `${roh}px`;
+    if (wrapRef.current) {
+      const seiteEl = wrapRef.current.querySelector<HTMLElement>('.pdf-seite');
+      if (seiteEl) seiteEl.style.height = `${Math.round(rohHoehe * s)}px`;
+    }
+    const hoehePt = rohHoehe * (breitePt / roh);
+    setMasse({ breitePt, hoehePt, breitePx: breite });
+    const seiteEl = wrapRef.current?.querySelector<HTMLElement>('.pdf-seite');
+    if (seiteEl) seitenLageMelden(id, seiteEl, nr, abschnitte.length, breitePt, hoehePt, breite);
+  }, [id, seite, status, breite]);
+  useEffect(() => {
+    auslegen();
+    // Zweiter Durchgang, sobald Layout und Schriften stehen — die erste Messung kann zu früh kommen
+    const raf = requestAnimationFrame(() => requestAnimationFrame(auslegen));
+    const schriften = typeof document !== 'undefined' && 'fonts' in document ? document.fonts.ready.then(() => auslegen()).catch(() => {}) : null;
+    void schriften;
+    return () => cancelAnimationFrame(raf);
+  }, [auslegen]);
+  useEffect(() => () => seiteMelden(id, null), [id]);
+  useEffect(() => {
+    const knoten = wrapRef.current?.closest('.react-flow__node');
+    if (!knoten || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => auslegen());
+    ro.observe(knoten);
+    return () => ro.disconnect();
+  }, [auslegen]);
+
+  const blaettern = (zu: number) => { setSeite(Math.min(seiten, Math.max(1, zu))); setPinModus(false); };
+  const aufSeiteTippen = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!pinModus || !masse) return;
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const px = ((e.clientX - r.left) / r.width) * masse.breitePt;
+    const py = ((e.clientY - r.top) / r.height) * masse.hoehePt;
+    setPinModus(false);
+    useBoard.getState().setCommentOpen(`new:${id}`, { seite, px: Math.round(px * 10) / 10, py: Math.round(py * 10) / 10 });
+  };
+
+  if (status === 'fehler') return <div className="file-nopreview">Dieses Word-Dokument lässt sich nicht darstellen — „Als Notiz übernehmen" (Auswahl → ⋯) holt den Text.</div>;
+  return (
+    <div className="pdf-seite-wrap nodrag" ref={wrapRef} data-taste="pdf-seite-wrap" data-art="word">
+      <SeitenLeiste seite={seite} seiten={seiten} blaettern={blaettern} pinModus={pinModus} setPinModus={setPinModus}
+        anzahlHier={anzahlHier} onDownload={onDownload} zuklappen={zuklappen} />
+      {pinModus && <div className="pdf-pin-hinweis">Auf die Stelle tippen, zu der der Kommentar gehört</div>}
+      <div className={`pdf-seite word-seite ${pinModus ? 'pin-modus' : ''}`} onClick={aufSeiteTippen} data-seite={seite}>
+        {status === 'laedt' && <div className="word-laedt">Dokument wird aufgebaut …</div>}
+        <div ref={stilRef} className="word-stile" />
+        <div ref={inhaltRef} className="word-inhalt" />
+      </div>
+      <SeitenKommentare id={id} seite={seite} blaettern={blaettern} />
     </div>
   );
 }
