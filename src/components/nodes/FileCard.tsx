@@ -1,21 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
-import { mutedHistory, useBoard } from '../../store';
+import { mutedHistory, selectActiveBoard, useBoard } from '../../store';
 import type { FileNode } from '../../types';
 import { formatBytes, MAX_EMBED_BYTES } from '../../lib/parseEmail';
 import { triggerDownload } from '../../lib/download';
 import { readFileAsDataUrl } from '../../lib/image';
 import { canEmbed } from '../../lib/nodes';
 import { loadAttachment } from '../../lib/attachments';
-import { renderPdfPage } from '../../lib/pdf';
+import { pdfSeiteMasse, renderPdfPage } from '../../lib/pdf';
+import { pdfAufgeklappt, pdfAufklappen, seiteMelden } from '../../lib/pdfSeiten';
 import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/fileStore';
 import { kontoDateiNachladen } from '../../lib/kontoSync';
-import { useLupe } from '../../lib/lupe';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
-import { BildLupe, ZoomKnoepfe } from './BildLupe';
-import { IDownload } from '../Icons';
+import { BildLupe } from './BildLupe';
+import { IDownload, IX } from '../Icons';
 
 const ICONS: Record<string, string> = {
   pdf: '📕',
@@ -101,7 +100,31 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
    * ist damit auch dann noch brauchbar, wenn er auftritt.
    */
   const istBild = !!quelle && art === 'bild';
-  const [viewerOpen, setViewerOpen] = useState(false);
+  /**
+   * M335: PDF zugeklappt oder aufgeklappt. Zugeklappt (Standard) zeigt die
+   * Karte die erste Seite klein, Seitenzahl und Anmerkungszähler; aufgeklappt
+   * genau EINE Seite in Kartenbreite mit Blätterleiste — Stift, Textmarker
+   * und Kommentar-Pins liegen dann seitenbezogen darauf. Der Zustand ist
+   * Geräte-Ansicht (localStorage), kein Inhalt: Er wandert nicht in den Sync.
+   * Im Fokus ist die Karte immer aufgeklappt.
+   */
+  const [auf, setAuf] = useState(() => pdfAufgeklappt(id));
+  const imFokus = useBoard((s) => s.focusCard === id);
+  const seitenStriche = useBoard((s) => (selectActiveBoard(s).drawings ?? []).reduce((n, d) => n + (d.anchor === id && d.seite != null ? 1 : 0), 0));
+  const seitenKommentare = useBoard((s) => (selectActiveBoard(s).comments ?? []).reduce((n, c) => n + (c.nodeId === id ? 1 : 0), 0));
+  const [seitenZahl, setSeitenZahl] = useState(0);
+  const aufklappen = useCallback((wert: boolean) => {
+    setAuf(wert);
+    pdfAufklappen(id, wert);
+    if (wert) {
+      // Eine Seite in 240 Punkten ist zu klein zum Lesen — die Karte wird auf 420 verbreitert (nur, wenn sie schmaler ist)
+      mutedHistory(() => useBoard.setState((st) => ({
+        boards: st.boards.map((b) => (b.id === st.activeId
+          ? { ...b, nodes: b.nodes.map((n) => (n.id === id && ((n.width as number | undefined) ?? 0) < 420 ? { ...n, width: 420 } : n)) }
+          : b)),
+      })));
+    }
+  }, [id]);
   const [bildOffen, setBildOffen] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -160,10 +183,13 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           }}
         />
       </div>
-      <button className="file-body nodrag" onClick={isPdf ? () => setViewerOpen(true) : quelle ? download : loadFromTeam}
-        title={isPdf ? 'Vorschau öffnen' : quelle ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
+      <button className="file-body nodrag" onClick={isPdf ? () => aufklappen(!(auf || imFokus)) : quelle ? download : loadFromTeam}
+        title={isPdf ? (auf || imFokus ? 'Zuklappen' : 'Aufklappen — Seite für Seite lesen und anmerken') : quelle ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
         <span className="meta">
           {eigenerTitel && <>{file.name} · </>}{formatBytes(file.size)}
+          {isPdf && seitenZahl > 0 && <> · {seitenZahl} Seite{seitenZahl === 1 ? '' : 'n'}</>}
+          {isPdf && seitenStriche > 0 && <> · ✎ {seitenStriche}</>}
+          {isPdf && seitenKommentare > 0 && <> · 💬 {seitenKommentare}</>}
         </span>
       </button>
       {/* Nachladen braucht nur, wem der Inhalt fehlt — sonst liegt er schon hier */}
@@ -192,7 +218,19 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
       {bildOffen && quelle && (
         <BildLupe quelle={quelle} name={titel} onClose={() => setBildOffen(false)} onDownload={download} />
       )}
-      {isPdf && <PdfThumb dataUrl={quelle!} onOpen={() => setViewerOpen(true)} />}
+      {isPdf && !(auf || imFokus) && (
+        <>
+          <PdfThumb dataUrl={quelle!} onOpen={() => aufklappen(true)} onSeiten={setSeitenZahl} />
+          <button className="pdf-aufklappen nodrag" onClick={() => aufklappen(true)} data-taste="pdf-aufklappen"
+            title="Aufklappen: eine Seite in Kartenbreite, blättern, mit Stift und Kommentaren anmerken">
+            ⤢ Aufklappen{seitenStriche + seitenKommentare > 0 ? ` · ${seitenStriche + seitenKommentare} Anmerkung${seitenStriche + seitenKommentare === 1 ? '' : 'en'}` : ''}
+          </button>
+        </>
+      )}
+      {isPdf && (auf || imFokus) && (
+        <PdfSeite id={id} dataUrl={quelle!} onSeiten={setSeitenZahl} onDownload={download}
+          zuklappen={imFokus ? undefined : () => aufklappen(false)} />
+      )}
       {/* M259: Ton und Bewegtbild kann der Browser selbst — dann soll er auch */}
       {art === 'audio' && quelle && <audio className="file-media nodrag" src={quelle} controls preload="metadata" />}
       {art === 'video' && quelle && <video className="file-media nodrag" src={quelle} controls preload="metadata" />}
@@ -212,7 +250,6 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           Auf dem Gerät mit der Datei einmal speichern — oder sie hier erneut einfügen.
         </div>
       )}
-      {viewerOpen && <PdfViewer dataUrl={quelle!} name={titel} onClose={() => setViewerOpen(false)} onDownload={download} />}
     </CardShell>
   );
 }
@@ -226,7 +263,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
  * Bitmap auf das Dreifache gestreckt. Das ist genau die Unschärfe aus dem
  * Screenshot.
  */
-function PdfThumb({ dataUrl, onOpen }: { dataUrl: string; onOpen: () => void }) {
+function PdfThumb({ dataUrl, onOpen, onSeiten }: { dataUrl: string; onOpen: () => void; onSeiten?: (n: number) => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState(false);
   const [breite, setBreite] = useState(220);
@@ -253,102 +290,142 @@ function PdfThumb({ dataUrl, onOpen }: { dataUrl: string; onOpen: () => void }) 
     if (!ref.current) return;
     // letztes Argument false: Die Miniatur behält `width: 100 %` aus dem
     // Stylesheet und wächst mit der Karte; nur die Auflösung folgt hier nach.
+    let aktiv = true;
     const h = renderPdfPage(dataUrl, 1, ref.current, breite, false);
-    h.promise.catch(() => setFailed(true));
-    return () => h.cancel();
+    // Ein abgebrochener Render (neue Breite kam dazwischen) ist kein Fehler
+    h.promise.then((n) => { if (aktiv) onSeiten?.(n); }).catch(() => { if (aktiv) setFailed(true); });
+    return () => { aktiv = false; h.cancel(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUrl, breite]);
 
   if (failed) return null;
   return (
-    <button className="pdf-thumb nodrag" onClick={onOpen} title="PDF-Vorschau öffnen">
+    <button className="pdf-thumb nodrag" onClick={onOpen} title="Aufklappen — Seite für Seite lesen und anmerken">
       <canvas ref={ref} />
     </button>
   );
 }
 
 /**
- * Nutzbare Breite der Viewer-Seite in CSS-Punkten.
+ * M335: Eine Seite der PDF in der Karte — aufgeklappt.
  *
- * `window.innerWidth` wäre hier falsch: Das ist ein Schirm-Maß. Die
- * Anzeigegröße (A− / A+, M224) skaliert die Wurzel per CSS `zoom`, damit stehen
- * fürs Layout nur `innerWidth / zoom` Punkte zur Verfügung — bei 175 % auf
- * einem 1920er Schirm also 1097 statt 1920. `document.body.offsetWidth` misst
- * das direkt und ist deshalb die ehrliche Zahl (dieselbe Lehre wie M236).
- * Abgezogen werden die Ränder: 24 Hintergrund- plus 14 Seiten-Polsterung
- * beidseits, dazu etwas Luft für die Bildlaufleiste.
+ * Gerendert wird genau die aufgeschlagene Seite in Kartenbreite (scharf, s.
+ * M242); beim Blättern wechselt nur die Seite, die Karte bleibt so hoch wie
+ * eine Seite. Nach jedem Rendern meldet die Karte, wo die Seite in ihr liegt
+ * (pdfSeiten.ts) — Zeichen- und Kommentar-Ebene legen die seitenbezogenen
+ * Anmerkungen dann exakt darüber. 💬 setzt einen Kommentar an eine STELLE
+ * der Seite: nächster Tipp auf die Seite öffnet die Blase dort.
  */
-function viewerBreite(): number {
-  const voll = document.body.offsetWidth || 900;
-  return Math.max(240, Math.min(900, voll - 100));
-}
-
-/** Inline-Viewer als Overlay (Portal — React-Flow-Transformationen brechen sonst position:fixed) */
-function PdfViewer({ dataUrl, name, onClose, onDownload }: {
-  dataUrl: string; name: string; onClose: () => void; onDownload: () => void;
+function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
+  id: string; dataUrl: string; zuklappen?: () => void; onSeiten?: (n: number) => void; onDownload: () => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const [page, setPage] = useState(1);
-  const [pages, setPages] = useState(1);
-  const { zoom, rein, raus, einpassen, flaecheRef, griffe, maxZoom } = useLupe();
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [seite, setSeite] = useState(1);
+  const [seiten, setSeiten] = useState(1);
+  const [masse, setMasse] = useState<{ breite: number; hoehe: number } | null>(null);
+  const [breite, setBreite] = useState(300);
+  const [pinModus, setPinModus] = useState(false);
+  const [eingabe, setEingabe] = useState('');
+  const [failed, setFailed] = useState(false);
 
-  const [breite, setBreite] = useState(() => viewerBreite());
+  // Kartenbreite verfolgen — entprellt, wie bei der Miniatur (M242)
   useEffect(() => {
-    const nach = () => setBreite(viewerBreite());
-    window.addEventListener('resize', nach);
-    return () => window.removeEventListener('resize', nach);
+    const el = wrapRef.current;
+    if (!el) return;
+    let t: number | undefined;
+    const ro = new ResizeObserver(() => {
+      window.clearTimeout(t);
+      t = window.setTimeout(() => {
+        const w = Math.round(el.clientWidth);
+        if (w > 0) setBreite((alt) => (Math.abs(alt - w) > 6 ? w : alt));
+      }, 150);
+    });
+    ro.observe(el);
+    const w = Math.round(el.clientWidth);
+    if (w > 0) setBreite(w);
+    return () => { ro.disconnect(); window.clearTimeout(t); };
   }, []);
 
-  /**
-   * M264: Beim Zoomen wird die Seite NEU GERENDERT, nicht gestreckt.
-   *
-   * Ein Canvas ist ein Bitmap: Zieht man es per CSS auf 300 %, bekommt man
-   * dreimal so große Pixel — genau die Unschärfe, gegen die M242 angetreten
-   * ist. pdf.js zeichnet die Seite deshalb gleich in der Zielbreite. Die
-   * Deckelung bei 5000 Punkten ist die Sicherung nach oben: Mit
-   * Geräte-Auflösung und Anzeigezoom (M242) kommen darüber schnell
-   * dreistellige Megabyte an Bitmap zusammen.
-   */
-  const zielBreite = Math.min(5000, Math.round(breite * zoom));
+  useEffect(() => {
+    let weg = false;
+    pdfSeiteMasse(dataUrl, seite).then((m) => {
+      if (weg) return;
+      setSeiten(m.seiten); setMasse({ breite: m.breite, hoehe: m.hoehe }); onSeiten?.(m.seiten);
+    }).catch(() => setFailed(true));
+    return () => { weg = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataUrl, seite]);
+
+  /** Lage der Seite in der Karte melden: Versatz über die offsetParent-Kette bis zum Knoten, Maßstab aus der Breite */
+  const melden = useCallback(() => {
+    const canvas = ref.current;
+    if (!canvas || !masse) return;
+    const knoten = canvas.closest('.react-flow__node') as HTMLElement | null;
+    if (!knoten) return;
+    let dx = 0; let dy = 0;
+    let el: HTMLElement | null = canvas;
+    while (el && el !== knoten) { dx += el.offsetLeft; dy += el.offsetTop; el = el.offsetParent as HTMLElement | null; }
+    const w = canvas.clientWidth || breite;
+    if (w <= 0) return;
+    seiteMelden(id, { seite, seiten, dx, dy, k: w / masse.breite, breite: masse.breite, hoehe: masse.hoehe });
+  }, [id, seite, seiten, masse, breite]);
+
   useEffect(() => {
     if (!ref.current) return;
-    const h = renderPdfPage(dataUrl, page, ref.current, zielBreite);
-    h.promise.then(setPages).catch(() => {});
-    return () => h.cancel();
-  }, [dataUrl, page, zielBreite]);
-
+    let aktiv = true;
+    const h = renderPdfPage(dataUrl, seite, ref.current, breite, true);
+    // Ein abgebrochener Render (Blättern oder neue Breite kam dazwischen) ist kein Fehler
+    h.promise.then(() => { if (aktiv) melden(); }).catch(() => { if (aktiv) setFailed(true); });
+    return () => { aktiv = false; h.cancel(); };
+  }, [dataUrl, seite, breite, melden]);
+  // Beim Zuklappen/Abbauen: keine offene Seite mehr — Anmerkungen verschwinden, der Zähler bleibt
+  useEffect(() => () => seiteMelden(id, null), [id]);
+  // Kopfzeile oder Titel ändern die Lage der Seite in der Karte — nachmelden
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowRight') setPage((p) => Math.min(pages, p + 1));
-      if (e.key === 'ArrowLeft') setPage((p) => Math.max(1, p - 1));
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [pages, onClose]);
+    const knoten = ref.current?.closest('.react-flow__node');
+    if (!knoten || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => melden());
+    ro.observe(knoten);
+    return () => ro.disconnect();
+  }, [melden]);
 
-  return createPortal(
-    <div className="pdf-backdrop nodrag" onClick={onClose}>
-      <div className="pdf-viewer" onClick={(e) => e.stopPropagation()}>
-        <div className="pdf-bar">
-          <b>{name}</b>
-          <span className="pdf-nav">
-            <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} aria-label="Vorherige Seite">‹</button>
-            <span>{page} / {pages}</span>
-            <button onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages} aria-label="Nächste Seite">›</button>
-            <ZoomKnoepfe {...{ zoom, rein, raus, einpassen, maxZoom }} />
-            <button onClick={onDownload} title="Herunterladen"><IDownload size={14} /></button>
-            <button onClick={onClose} aria-label="Schließen">✕</button>
-          </span>
-        </div>
-        <div
-          className={`pdf-page ${zoom > 1.01 ? 'gezoomt' : ''}`}
-          ref={flaecheRef}
-          {...griffe}
-          title="Doppelklick vergrößert · Strg + Rad zoomt · zwei Finger kneifen"
-        ><canvas ref={ref} /></div>
+  const blaettern = (zu: number) => { setSeite(Math.min(seiten, Math.max(1, zu))); setPinModus(false); };
+  const aufSeiteTippen = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!pinModus || !masse || !ref.current) return;
+    const r = ref.current.getBoundingClientRect();
+    const px = ((e.clientX - r.left) / r.width) * masse.breite;
+    const py = ((e.clientY - r.top) / r.height) * masse.hoehe;
+    setPinModus(false);
+    useBoard.getState().setCommentOpen(`new:${id}`, { seite, px: Math.round(px * 10) / 10, py: Math.round(py * 10) / 10 });
+  };
+
+  if (failed) return <div className="file-nopreview">Diese PDF lässt sich nicht darstellen.</div>;
+  return (
+    <div className="pdf-seite-wrap nodrag" ref={wrapRef} data-taste="pdf-seite-wrap">
+      <div className="pdf-seite-bar nowheel">
+        <button onClick={() => blaettern(seite - 1)} disabled={seite <= 1} aria-label="Vorherige Seite" data-taste="pdf-zurueck">‹</button>
+        <input
+          className="pdf-seite-nr" inputMode="numeric" aria-label="Seite" data-taste="pdf-seite-nr"
+          value={eingabe || String(seite)}
+          onFocus={() => setEingabe(String(seite))}
+          onChange={(e) => setEingabe(e.target.value.replace(/[^0-9]/g, ''))}
+          onBlur={() => { const z = parseInt(eingabe, 10); if (z) blaettern(z); setEingabe(''); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        />
+        <span className="pdf-seite-von">/ {seiten}</span>
+        <button onClick={() => blaettern(seite + 1)} disabled={seite >= seiten} aria-label="Nächste Seite" data-taste="pdf-vor">›</button>
+        <span className="pdf-seite-luft" />
+        <button className={pinModus ? 'on' : ''} onClick={() => setPinModus((p) => !p)} data-taste="pdf-kommentar"
+          title={pinModus ? 'Abbrechen' : 'Kommentar an eine Stelle der Seite setzen — danach auf die Stelle tippen'} aria-pressed={pinModus} aria-label="Kommentar an Stelle">💬</button>
+        <button onClick={onDownload} title="Herunterladen" aria-label="Herunterladen"><IDownload size={13} /></button>
+        {zuklappen && <button onClick={zuklappen} title="Zuklappen" aria-label="Zuklappen" data-taste="pdf-zuklappen"><IX size={13} /></button>}
       </div>
-    </div>,
-    document.body,
+      {pinModus && <div className="pdf-pin-hinweis">Auf die Stelle tippen, zu der der Kommentar gehört</div>}
+      <div className={`pdf-seite ${pinModus ? 'pin-modus' : ''}`} onClick={aufSeiteTippen} data-seite={seite}>
+        <canvas ref={ref} />
+      </div>
+    </div>
   );
 }
 

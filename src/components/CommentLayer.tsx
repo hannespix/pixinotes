@@ -4,6 +4,7 @@ import { useInternalNode, useReactFlow, useStore, ViewportPortal } from '@xyflow
 import { selectActiveBoard, useBoard, type CommentThread } from '../store';
 import { IX } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
+import { SEITEN_EREIGNIS, seiteVon } from '../lib/pdfSeiten';
 
 /** Verfasser-Name: rein lokal (localStorage), wandert NIE ohne den Kommentar */
 const AUTHOR_KEY = 'pixinotes:author';
@@ -27,12 +28,20 @@ function CommentPin({ thread }: { thread: CommentThread }) {
   if (!node) return null; // Karte existiert (noch) nicht — Pin bleibt stumm
   const w = node.measured.width ?? 260;
   const last = thread.msgs[thread.msgs.length - 1];
+  // M335: Pin an einer STELLE auf einer PDF-Seite — nur sichtbar, wenn die Seite offen liegt
+  let lage = { x: node.internals.positionAbsolute.x + w + 3, y: node.internals.positionAbsolute.y - 13 };
+  if (thread.seite != null && thread.px != null && thread.py != null) {
+    const g = seiteVon(thread.nodeId);
+    if (!g || g.seite !== thread.seite) return null;
+    lage = { x: node.internals.positionAbsolute.x + g.dx + thread.px * g.k - 13, y: node.internals.positionAbsolute.y + g.dy + thread.py * g.k - 13 };
+  }
   return (
     <button
-      className={`comment-pin nodrag nopan ${thread.resolved ? 'resolved' : ''} ${openId === thread.id ? 'open' : ''}`}
+      className={`comment-pin nodrag nopan ${thread.resolved ? 'resolved' : ''} ${openId === thread.id ? 'open' : ''} ${thread.seite != null ? 'auf-seite' : ''}`}
+      data-seite={thread.seite}
       // BEWUSST rechts AUSSERHALB der Ecke: genau auf der Ecke säße der Pin
       // über dem ✕-Löschknopf der ausgewählten Karte (E2E-Fund M148)
-      style={{ transform: `translate(${node.internals.positionAbsolute.x + w + 3}px, ${node.internals.positionAbsolute.y - 13}px)` }}
+      style={{ transform: `translate(${lage.x}px, ${lage.y}px)` }}
       title={thread.resolved ? 'Erledigter Kommentar (Klick zum Öffnen)' : `Kommentar von ${last?.author ?? '?'} (Klick zum Öffnen)`}
       onClick={(e) => { e.stopPropagation(); setCommentOpen(thread.id); }}
     >
@@ -119,7 +128,8 @@ function CommentPanel() {
   const send = () => {
     if (!text.trim()) return;
     setAuthor(name);
-    const tid = addCommentMsg(thread ? { threadId: thread.id } : { nodeId }, name, text);
+    const ort = useBoard.getState().commentOrt; // M335: Stelle auf einer PDF-Seite, wenn von der Karte gesetzt
+    const tid = addCommentMsg(thread ? { threadId: thread.id } : { nodeId, ...(ort ?? {}) }, name, text);
     setText('');
     if (isNew && tid) setCommentOpen(tid); // frisch eröffneter Thread bleibt offen
   };
@@ -197,6 +207,13 @@ function CommentPanel() {
 export function CommentLayer() {
   const board = useBoard(selectActiveBoard);
   const threads = board.comments ?? [];
+  // M335: Blättert eine PDF-Karte, wandern oder verschwinden ihre Seiten-Pins
+  const [, seitenTakt] = useState(0);
+  useEffect(() => {
+    const auf = () => seitenTakt((n) => n + 1);
+    window.addEventListener(SEITEN_EREIGNIS, auf);
+    return () => window.removeEventListener(SEITEN_EREIGNIS, auf);
+  }, []);
   return (
     <>
       <ViewportPortal>

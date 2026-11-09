@@ -217,10 +217,10 @@ console.log('\n════ T4: Datei-Karte im Fokus ════');
   await ctx.close();
 }
 
-// ══ T5: Dasselbe für die PDF-Seite (M264 bleibt heil) ════════════════
-console.log('\n════ T5: PDF-Seite zoomen und ganz ansehen ════');
+// ══ T5: Die PDF-Seite in der Karte (M335: kein Fenster mehr — aufklappen, Fokus vergrößert) ══
+console.log('\n════ T5: PDF-Seite aufklappen und im Fokus groß ansehen ════');
 {
-  const { ctx, P } = await seite([], 1200, 900, { cardFocus: false });
+  const { ctx, P } = await seite([], 1200, 900, { cardFocus: true });
   await P.click('.dock button[aria-label="Objekt hinzufügen"]');
   await P.waitForTimeout(400);
   const [ch] = await Promise.all([
@@ -230,27 +230,26 @@ console.log('\n════ T5: PDF-Seite zoomen und ganz ansehen ════')
   await ch.setFiles(`${SD}/ticket.pdf`);
   await P.waitForTimeout(2500);
   await P.click('.pdf-thumb');
-  await P.waitForTimeout(1500);
+  await P.waitForTimeout(1800);
   const vor = await P.evaluate(() => {
-    const c = document.querySelector('.pdf-page canvas');
-    return { breite: Math.round(c.getBoundingClientRect().width), bitmap: c.width };
+    const c = document.querySelector('.pdf-seite canvas');
+    return c ? { breite: Math.round(c.getBoundingClientRect().width), bitmap: c.width } : null;
   });
-  for (let i = 0; i < 4; i++) await P.click('.lupe-knoepfe button[aria-label="Vergrößern"]');
-  await P.waitForTimeout(2000);
+  pruefe('T5a der Klick auf die Miniatur klappt die Seite in der Karte auf (≥ 400 Punkte breit)', !!vor && vor.breite >= 380, JSON.stringify(vor));
+  // Fokus (Doppelklick auf die Kopfzeile) macht die Karte 720 breit — die Seite wird neu gerendert
+  const kopf = await P.locator('.file-card .file-kopf').first().boundingBox();
+  await P.mouse.dblclick(kopf.x + 8, kopf.y + kopf.height / 2);
+  await P.waitForTimeout(1800);
   const nach = await P.evaluate(() => {
-    const f = document.querySelector('.pdf-page');
-    const c = f.querySelector('canvas');
-    f.scrollLeft = 0;
-    const links = Math.round(c.getBoundingClientRect().left - f.getBoundingClientRect().left);
-    return { breite: Math.round(c.getBoundingClientRect().width), bitmap: c.width, links,
-      scrollWidth: Math.round(f.scrollWidth) };
+    const c = document.querySelector('.pdf-seite canvas');
+    const r = c?.getBoundingClientRect();
+    return c ? { breite: Math.round(r.width), bitmap: c.width, links: Math.round(r.left), rechts: Math.round(r.right), fenster: window.innerWidth, fokus: !!document.querySelector('.app.focus-mode') } : null;
   });
   console.log('   ', JSON.stringify(vor), '→', JSON.stringify(nach));
-  pruefe('T5a die PDF-Seite wird größer', nach.breite > vor.breite * 1.8, `${vor.breite} → ${nach.breite}`);
-  pruefe('T5b und dabei neu gerendert (scharf)', nach.bitmap > vor.bitmap * 1.8, `${vor.bitmap} → ${nach.bitmap}`);
-  pruefe('T5c die linke Kante der Seite ist erreichbar', nach.links >= -1, `${nach.links}px`);
-  pruefe('T5d der Scrollbereich deckt die ganze Seite ab',
-    nach.scrollWidth >= nach.breite - 2, `${nach.scrollWidth} < ${nach.breite}`);
+  pruefe('T5b im Fokus wird die PDF-Seite größer', !!nach && nach.fokus && nach.breite > vor.breite * 1.3, `${vor?.breite} → ${nach?.breite}`);
+  pruefe('T5c und dabei neu gerendert (scharf)', !!nach && nach.bitmap > vor.bitmap * 1.3, `${vor?.bitmap} → ${nach?.bitmap}`);
+  pruefe('T5d die Seite liegt ganz im Bild', !!nach && nach.links >= 0 && nach.rechts <= nach.fenster, JSON.stringify(nach));
+  await P.keyboard.press('Escape');
   await ctx.close();
 }
 

@@ -1,5 +1,6 @@
 import type { AppNode } from '../types';
 import type { Stroke } from '../store';
+import { aufSeite, offeneSeite, strichRelativ } from './pdfSeiten';
 
 /**
  * M127: Freihand-Striche an Karten ankern. Ein Strich, der beim Absetzen
@@ -66,11 +67,19 @@ export function anchorStroke(stroke: Stroke, nodes: AppNode[]): Stroke {
   if (stroke.anchor) return stroke;
   const n = findAnchorNode(stroke.points, nodes);
   if (!n) return stroke;
-  return {
+  return anSeite({
     ...stroke,
     anchor: n.id,
     points: stroke.points.map(([x, y]) => [x - n.position.x, y - n.position.y] as [number, number]),
-  };
+  });
+}
+
+/** M335: Liegt die Karte als aufgeklappte PDF-Seite vor, gehört der Strich zur Seite (Seitenpunkte) */
+function anSeite(s: Stroke): Stroke {
+  if (!s.anchor) return s;
+  const g = offeneSeite(s.anchor);
+  if (!g) return s.seite != null ? { ...s, seite: undefined } : s;
+  return { ...s, seite: g.seite, points: aufSeite(s.points, g) };
 }
 
 /** Zwei Strich-Boxen gelten als „berührend", wenn sie sich (aufgebläht) schneiden */
@@ -83,7 +92,8 @@ const rectsTouch = (a: Rect, b: Rect) => overlapArea(inflate(a, TOUCH_DIST / 2),
 const absPoints = (s: Stroke, byId: Map<string, AppNode>): [number, number][] => {
   if (!s.anchor) return s.points;
   const n = byId.get(s.anchor);
-  return n ? s.points.map(([x, y]) => [x + n.position.x, y + n.position.y] as [number, number]) : s.points;
+  const rel = strichRelativ(s); // M335: Seitenstriche in Kartenpunkte (leer, wenn verdeckt)
+  return n ? rel.map(([x, y]) => [x + n.position.x, y + n.position.y] as [number, number]) : rel;
 };
 
 /**
@@ -104,7 +114,7 @@ export function integrateStroke(
 ): { drawings: Stroke[]; anchor: string | null } {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const session = new Set(sessionIds);
-  const candidates = drawings.filter((s) => session.has(s.id));
+  const candidates = drawings.filter((s) => session.has(s.id) && absPoints(s, byId).length > 0);
 
   // Zusammenhangskomponente des neuen Strichs unter den Sitzungs-Strichen
   const boxes = new Map<string, Rect>(candidates.map((s) => [s.id, strokeRect(absPoints(s, byId))]));
@@ -138,8 +148,8 @@ export function integrateStroke(
 
   const componentIds = new Set(component.map((s) => s.id));
   const place = (s: Stroke, abs: [number, number][]): Stroke => target
-    ? { ...s, anchor: target.id, points: abs.map(([x, y]) => [x - target.position.x, y - target.position.y] as [number, number]) }
-    : { ...s, anchor: undefined, points: abs };
+    ? anSeite({ ...s, anchor: target.id, seite: undefined, points: abs.map(([x, y]) => [x - target.position.x, y - target.position.y] as [number, number]) })
+    : { ...s, anchor: undefined, seite: undefined, points: abs };
   return {
     drawings: [
       ...drawings.map((s) => (componentIds.has(s.id) ? place(s, absPoints(s, byId)) : s)),
