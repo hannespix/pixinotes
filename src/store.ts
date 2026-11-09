@@ -16,7 +16,7 @@ import {
 import { buildStarter } from './lib/starter';
 import { KACHEL_TYPEN, uid, type AppNode, type CardFont, type CardSize, type TimeSeg } from './types';
 import { anchorStroke, integrateStroke } from './lib/strokeAnchor';
-import { strichRelativ } from './lib/pdfSeiten';
+import { offeneSeite, strichRelativ } from './lib/pdfSeiten';
 import { findFreeSpot, frameMembers } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
 
@@ -1758,7 +1758,15 @@ export const useBoard = create<BoardState>()(
               comments[i] = { ...comments[i], resolved: false, msgs: [...comments[i].msgs, msg] };
             } else if (target.nodeId) {
               threadId = uid();
-              const ort = target.seite != null && target.px != null && target.py != null ? { seite: target.seite, px: target.px, py: target.py } : {};
+              let ort: { seite: number; px: number; py: number } | Record<string, never> = target.seite != null && target.px != null && target.py != null
+                ? { seite: target.seite, px: target.px, py: target.py } : {};
+              // M336: Liegt die Karte als PDF-Seite offen, gehört auch ein Kommentar ohne Stelle zu DIESER
+              // Seite — am rechten Rand, untereinander gestapelt, damit er beim Blättern mitgeht
+              const g = !('seite' in ort) ? offeneSeite(target.nodeId) : undefined;
+              if (g) {
+                const dort = comments.filter((c) => c.nodeId === target.nodeId && c.seite === g.seite).length;
+                ort = { seite: g.seite, px: Math.round(g.breite - 40), py: Math.round(Math.min(g.hoehe - 30, 36 + dort * 34)) };
+              }
               comments.push({ id: threadId, nodeId: target.nodeId, ...ort, msgs: [msg] });
             }
             return { comments };

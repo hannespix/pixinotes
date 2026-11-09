@@ -8,7 +8,7 @@ import { readFileAsDataUrl } from '../../lib/image';
 import { canEmbed } from '../../lib/nodes';
 import { loadAttachment } from '../../lib/attachments';
 import { pdfSeiteMasse, renderPdfPage } from '../../lib/pdf';
-import { pdfAufgeklappt, pdfAufklappen, seiteMelden } from '../../lib/pdfSeiten';
+import { blasenAn, blasenSetzen, pdfAufgeklappt, pdfAufklappen, seiteMelden, seitenKommentare } from '../../lib/pdfSeiten';
 import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/fileStore';
 import { kontoDateiNachladen } from '../../lib/kontoSync';
 import { CardShell } from './CardShell';
@@ -328,6 +328,20 @@ function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
   const [pinModus, setPinModus] = useState(false);
   const [eingabe, setEingabe] = useState('');
   const [failed, setFailed] = useState(false);
+  /**
+   * M336: Kommentare je Seite — nachvollziehbar. Unter der Seite steht die Liste
+   * der Kommentare DIESER Seite (nummeriert wie die Pins), die Blätterleiste
+   * zählt sie, andere Seiten mit Kommentaren sind einen Tipp entfernt.
+   */
+  // Stabile Referenz aus dem Store (ein neues Array je Aufruf ließe die Karte endlos neu rendern)
+  const alleKommentare = useBoard((s) => selectActiveBoard(s).comments);
+  const kommentare = (alleKommentare ?? []).filter((c) => c.nodeId === id);
+  const aufDieserSeite = seitenKommentare(kommentare, id, seite);
+  const anderSeiten = [...new Set(kommentare.filter((c) => c.seite != null && c.seite !== seite).map((c) => c.seite as number))].sort((a, b) => a - b);
+  const ohneSeite = kommentare.filter((c) => c.seite == null);
+  const [blasen, setBlasen] = useState(() => blasenAn());
+  const setCommentOpen = useBoard((s) => s.setCommentOpen);
+  const offenerThread = useBoard((s) => s.commentOpen);
 
   // Kartenbreite verfolgen — entprellt, wie bei der Miniatur (M242)
   useEffect(() => {
@@ -417,7 +431,9 @@ function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
         <button onClick={() => blaettern(seite + 1)} disabled={seite >= seiten} aria-label="Nächste Seite" data-taste="pdf-vor">›</button>
         <span className="pdf-seite-luft" />
         <button className={pinModus ? 'on' : ''} onClick={() => setPinModus((p) => !p)} data-taste="pdf-kommentar"
-          title={pinModus ? 'Abbrechen' : 'Kommentar an eine Stelle der Seite setzen — danach auf die Stelle tippen'} aria-pressed={pinModus} aria-label="Kommentar an Stelle">💬</button>
+          title={pinModus ? 'Abbrechen' : 'Kommentar an eine Stelle der Seite setzen — danach auf die Stelle tippen'} aria-pressed={pinModus} aria-label="Kommentar an Stelle">
+          💬{aufDieserSeite.length > 0 && <span className="pdf-kommentar-zahl" data-taste="pdf-seite-kommentare">{aufDieserSeite.length}</span>}
+        </button>
         <button onClick={onDownload} title="Herunterladen" aria-label="Herunterladen"><IDownload size={13} /></button>
         {zuklappen && <button onClick={zuklappen} title="Zuklappen" aria-label="Zuklappen" data-taste="pdf-zuklappen"><IX size={13} /></button>}
       </div>
@@ -425,6 +441,36 @@ function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
       <div className={`pdf-seite ${pinModus ? 'pin-modus' : ''}`} onClick={aufSeiteTippen} data-seite={seite}>
         <canvas ref={ref} />
       </div>
+      {(aufDieserSeite.length > 0 || anderSeiten.length > 0 || ohneSeite.length > 0) && (
+        <div className="pdf-kommentare nowheel" data-taste="pdf-kommentare">
+          <div className="pdf-kommentare-kopf">
+            <span>{aufDieserSeite.length === 0 ? 'Keine Kommentare auf dieser Seite' : `Kommentare auf Seite ${seite} (${aufDieserSeite.length})`}</span>
+            <button className={blasen ? 'on' : ''} onClick={() => { blasenSetzen(!blasen); setBlasen(!blasen); }} aria-pressed={blasen}
+              title="Textblasen neben den Pins auf der Seite ein- oder ausblenden" data-taste="pdf-blasen">Blasen</button>
+          </div>
+          {aufDieserSeite.map((c, i) => (
+            <button key={c.id} className={`pdf-kommentar ${c.resolved ? 'resolved' : ''} ${offenerThread === c.id ? 'open' : ''}`}
+              onClick={() => setCommentOpen(c.id)} title="Kommentar öffnen" data-taste="pdf-kommentar-eintrag">
+              <span className="pdf-kommentar-nr">{c.resolved ? '✓' : i + 1}</span>
+              <span className="pdf-kommentar-text"><b>{c.msgs[0]?.author}</b> {c.msgs[0]?.text}{c.msgs.length > 1 ? ` · ${c.msgs.length} Beiträge` : ''}</span>
+            </button>
+          ))}
+          {anderSeiten.length > 0 && (
+            <div className="pdf-kommentare-andere">
+              Weitere auf Seite{anderSeiten.length > 1 ? 'n' : ''}{' '}
+              {anderSeiten.map((n) => (
+                <button key={n} onClick={() => blaettern(n)} title={`Zu Seite ${n} blättern`} data-taste="pdf-kommentar-seite">{n}</button>
+              ))}
+            </div>
+          )}
+          {ohneSeite.length > 0 && (
+            <div className="pdf-kommentare-andere">
+              {ohneSeite.length} an der Karte (ohne Seite){' '}
+              <button onClick={() => setCommentOpen(ohneSeite[0].id)} title="Kommentar an der Karte öffnen">öffnen</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
