@@ -4,7 +4,7 @@ import { useInternalNode, useReactFlow, useStore, ViewportPortal } from '@xyflow
 import { selectActiveBoard, useBoard, type CommentThread } from '../store';
 import { IX } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
-import { SEITEN_EREIGNIS, seiteVon } from '../lib/pdfSeiten';
+import { blasenAn, SEITEN_EREIGNIS, seiteVon, seitenKommentare } from '../lib/pdfSeiten';
 
 /** Verfasser-Name: rein lokal (localStorage), wandert NIE ohne den Kommentar */
 const AUTHOR_KEY = 'pixinotes:author';
@@ -21,33 +21,53 @@ const timeOf = (iso: string) => {
 };
 
 /** Ein Pin am oberen rechten Kartenrand — folgt der Karte live (M148) */
-function CommentPin({ thread }: { thread: CommentThread }) {
+function CommentPin({ thread, nr }: { thread: CommentThread; nr?: number }) {
   const node = useInternalNode(thread.nodeId);
   const setCommentOpen = useBoard((s) => s.setCommentOpen);
   const openId = useBoard((s) => s.commentOpen);
   if (!node) return null; // Karte existiert (noch) nicht — Pin bleibt stumm
   const w = node.measured.width ?? 260;
   const last = thread.msgs[thread.msgs.length - 1];
+  const erste = thread.msgs[0];
   // M335: Pin an einer STELLE auf einer PDF-Seite — nur sichtbar, wenn die Seite offen liegt
   let lage = { x: node.internals.positionAbsolute.x + w + 3, y: node.internals.positionAbsolute.y - 13 };
-  if (thread.seite != null && thread.px != null && thread.py != null) {
+  const aufSeite = thread.seite != null && thread.px != null && thread.py != null;
+  if (aufSeite) {
     const g = seiteVon(thread.nodeId);
     if (!g || g.seite !== thread.seite) return null;
-    lage = { x: node.internals.positionAbsolute.x + g.dx + thread.px * g.k - 13, y: node.internals.positionAbsolute.y + g.dy + thread.py * g.k - 13 };
+    lage = { x: node.internals.positionAbsolute.x + g.dx + thread.px! * g.k - 13, y: node.internals.positionAbsolute.y + g.dy + thread.py! * g.k - 13 };
   }
+  const oeffnen = (e: React.MouseEvent) => { e.stopPropagation(); setCommentOpen(thread.id); };
   return (
-    <button
-      className={`comment-pin nodrag nopan ${thread.resolved ? 'resolved' : ''} ${openId === thread.id ? 'open' : ''} ${thread.seite != null ? 'auf-seite' : ''}`}
-      data-seite={thread.seite}
-      // BEWUSST rechts AUSSERHALB der Ecke: genau auf der Ecke säße der Pin
-      // über dem ✕-Löschknopf der ausgewählten Karte (E2E-Fund M148)
-      style={{ transform: `translate(${lage.x}px, ${lage.y}px)` }}
-      title={thread.resolved ? 'Erledigter Kommentar (Klick zum Öffnen)' : `Kommentar von ${last?.author ?? '?'} (Klick zum Öffnen)`}
-      onClick={(e) => { e.stopPropagation(); setCommentOpen(thread.id); }}
-    >
-      {thread.resolved ? '✓' : initials(last?.author ?? '?')}
-      {!thread.resolved && thread.msgs.length > 1 && <span className="comment-pin-count">{thread.msgs.length}</span>}
-    </button>
+    <>
+      <button
+        className={`comment-pin nodrag nopan ${thread.resolved ? 'resolved' : ''} ${openId === thread.id ? 'open' : ''} ${aufSeite ? 'auf-seite' : ''}`}
+        data-seite={thread.seite}
+        data-nr={nr}
+        // BEWUSST rechts AUSSERHALB der Ecke: genau auf der Ecke säße der Pin
+        // über dem ✕-Löschknopf der ausgewählten Karte (E2E-Fund M148)
+        style={{ transform: `translate(${lage.x}px, ${lage.y}px)` }}
+        title={thread.resolved ? 'Erledigter Kommentar (Klick zum Öffnen)' : `Kommentar von ${last?.author ?? '?'} (Klick zum Öffnen)`}
+        onClick={oeffnen}
+      >
+        {/* M336: Auf einer Seite zählt der Pin durch (1, 2, 3 …) — dieselbe Nummer steht in der Liste unter der Seite */}
+        {thread.resolved ? '✓' : aufSeite && nr ? nr : initials(last?.author ?? '?')}
+        {!thread.resolved && thread.msgs.length > 1 && <span className="comment-pin-count">{thread.msgs.length}</span>}
+      </button>
+      {/* M336: Textblase neben dem Seiten-Pin — Verfasser und Anfang des Kommentars, ohne Klick lesbar */}
+      {aufSeite && blasenAn() && erste && (
+        <div
+          className={`comment-blase nodrag nopan ${thread.resolved ? 'resolved' : ''} ${openId === thread.id ? 'open' : ''}`}
+          style={{ transform: `translate(${lage.x + 28}px, ${lage.y - 2}px)` }}
+          onClick={oeffnen}
+          role="button"
+          title="Kommentar öffnen"
+        >
+          <b>{erste.author}</b>{thread.msgs.length > 1 ? ` · ${thread.msgs.length} Beiträge` : ''}
+          <span className="comment-blase-text">{erste.text.length > 80 ? `${erste.text.slice(0, 78)}…` : erste.text}</span>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -145,6 +165,10 @@ function CommentPanel() {
     >
       <div className="comment-panel-head">
         <b>{isNew ? 'Neuer Kommentar' : 'Kommentare'}</b>
+        {/* M336: Zu welcher Seite gehört das Gespräch? */}
+        {(thread?.seite ?? useBoard.getState().commentOrt?.seite) != null && (
+          <span className="comment-seite" data-taste="kommentar-seite">Seite {thread?.seite ?? useBoard.getState().commentOrt?.seite}</span>
+        )}
         <span className="comment-panel-tools">
           {thread && (
             <>
@@ -217,7 +241,10 @@ export function CommentLayer() {
   return (
     <>
       <ViewportPortal>
-        {threads.map((t) => <CommentPin key={t.id} thread={t} />)}
+        {threads.map((t) => (
+          <CommentPin key={t.id} thread={t}
+            nr={t.seite != null ? seitenKommentare(threads, t.nodeId, t.seite).findIndex((c) => c.id === t.id) + 1 : undefined} />
+        ))}
       </ViewportPortal>
       <CommentPanel />
     </>

@@ -9,7 +9,7 @@
 // (Versatz zur Kartenecke und Maßstab); Zeichen- und Kommentar-Ebene rechnen
 // damit um. Ohne Meldung (Karte zugeklappt, andere Seite) bleiben die
 // Anmerkungen unsichtbar — der Zähler auf der Karte sagt, dass es sie gibt.
-import type { Stroke } from '../store';
+import type { CommentThread, Stroke } from '../store';
 
 export interface SeitenGeometrie {
   /** Angezeigte Seite (1-basiert) */
@@ -86,4 +86,22 @@ export function pdfAufklappen(nodeId: string, auf: boolean): void {
   const m = aufLesen();
   if (auf) m[nodeId] = true; else delete m[nodeId];
   try { localStorage.setItem(AUF_KEY, JSON.stringify(m)); } catch { /* Sitzung reicht */ }
+}
+
+/* ---------- M336: Kommentare je Seite ---------- */
+/** Kommentare einer Karte auf einer Seite, in Entstehungsreihenfolge — die Nummer ist der Index + 1 (Pin, Liste, Blase stimmen überein) */
+export function seitenKommentare(threads: CommentThread[] | undefined, nodeId: string, seite: number): CommentThread[] {
+  return (threads ?? [])
+    .filter((c) => c.nodeId === nodeId && c.seite === seite)
+    .sort((a, b) => (a.msgs[0]?.at ?? '').localeCompare(b.msgs[0]?.at ?? '') || a.id.localeCompare(b.id));
+}
+
+/** Textblasen neben den Seiten-Pins — Geräte-Einstellung, Vorgabe an */
+const BLASEN_KEY = 'pixinotes-pdf-blasen';
+export function blasenAn(): boolean {
+  try { return localStorage.getItem(BLASEN_KEY) !== '0'; } catch { return true; }
+}
+export function blasenSetzen(an: boolean): void {
+  try { localStorage.setItem(BLASEN_KEY, an ? '1' : '0'); } catch { /* Sitzung reicht */ }
+  window.dispatchEvent(new CustomEvent(SEITEN_EREIGNIS, { detail: 'blasen' }));
 }

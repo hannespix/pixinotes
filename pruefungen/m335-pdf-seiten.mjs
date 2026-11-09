@@ -187,12 +187,62 @@ await P.locator('[data-taste="pdf-vor"]').click(); await P.waitForTimeout(700);
 z = await zustand(P);
 pruefe('F5 auf Seite 2 ist der Pin wieder da', z.pins.some((p) => p.seite));
 
+console.log('\n════ J: Kommentare je Seite (M336) ════');
+z = await zustand(P);
+const liste = await P.evaluate(() => ({
+  kopf: document.querySelector('.pdf-kommentare-kopf span')?.textContent ?? '',
+  eintraege: [...document.querySelectorAll('[data-taste="pdf-kommentar-eintrag"]')].map((e) => e.textContent),
+  zahl: document.querySelector('[data-taste="pdf-seite-kommentare"]')?.textContent ?? '',
+  pinNr: document.querySelector('.comment-pin.auf-seite')?.textContent ?? '',
+  blasen: [...document.querySelectorAll('.comment-blase')].map((b) => b.textContent),
+}));
+pruefe('J1 unter der Seite steht die Liste der Kommentare dieser Seite', /Kommentare auf Seite 2 \(1\)/.test(liste.kopf) && liste.eintraege.length === 1 && /Hier fehlt eine Quelle/.test(liste.eintraege[0]), JSON.stringify(liste));
+pruefe('J2 der Pin trägt die Nummer 1, die Blätterleiste zählt „1"', liste.pinNr === '1' && liste.zahl === '1', JSON.stringify({ pin: liste.pinNr, zahl: liste.zahl }));
+pruefe('J3 die Textblase neben dem Pin zeigt Verfasser und Text', liste.blasen.length === 1 && /Tester/.test(liste.blasen[0]) && /Hier fehlt eine Quelle/.test(liste.blasen[0]), JSON.stringify(liste.blasen));
+await P.locator('[data-taste="pdf-blasen"]').click(); await P.waitForTimeout(300);
+const ohne = await P.evaluate(() => ({ blasen: document.querySelectorAll('.comment-blase').length, pins: document.querySelectorAll('.comment-pin.auf-seite').length, speicher: localStorage.getItem('pixinotes-pdf-blasen') }));
+pruefe('J4 „Blasen" aus: keine Blase, der Pin bleibt, Einstellung gemerkt', ohne.blasen === 0 && ohne.pins === 1 && ohne.speicher === '0', JSON.stringify(ohne));
+await P.locator('[data-taste="pdf-blasen"]').click(); await P.waitForTimeout(300);
+pruefe('J5 „Blasen" wieder an', (await P.locator('.comment-blase').count()) === 1);
+// Auswahl-Leiste: ⋯ → Kommentar öffnet das vorhandene Gespräch — der Kopf nennt die Seite
+await P.locator('.react-flow__node[data-id="f1"] .file-kopf').click({ position: { x: 6, y: 6 } });
+await P.waitForTimeout(600);
+await P.evaluate(() => [...document.querySelectorAll('.sel-toolbar button')].find((b) => b.getAttribute('aria-label') === 'Mehr')?.click());
+await P.waitForTimeout(400);
+const kommentarKnopf = await P.evaluate(() => { const b = [...(document.querySelector('.sel-more-menu')?.querySelectorAll('button') ?? [])].find((x) => x.getAttribute('aria-label') === 'Kommentar'); b?.click(); return !!b; });
+await P.waitForTimeout(500);
+const kopfText = await P.evaluate(() => document.querySelector('.comment-panel-head')?.textContent ?? '');
+pruefe('J6 ⋯ → Kommentar öffnet das Gespräch, der Kopf nennt „Seite 2"', kommentarKnopf && /Seite 2/.test(kopfText), JSON.stringify({ knopf: kommentarKnopf, kopf: kopfText }));
+await P.keyboard.press('Escape'); await P.waitForTimeout(200);
+// Zweiter Kommentar an einer anderen Stelle derselben Seite
+await P.locator('[data-taste="pdf-kommentar"]').click();
+await P.waitForTimeout(200);
+await P.mouse.click(z.canvas.l + z.canvas.w * 0.2, z.canvas.t + z.canvas.h * 0.7);
+await P.waitForTimeout(400);
+await P.locator('.comment-input').fill('Zweiter Punkt auf Seite 2');
+await P.keyboard.press('Enter');
+await P.waitForTimeout(700);
+await P.keyboard.press('Escape'); await P.waitForTimeout(200);
+z = await zustand(P);
+const nummern = await P.evaluate(() => [...document.querySelectorAll('.comment-pin.auf-seite')].map((p) => p.textContent).sort());
+pruefe('J7 zwei Kommentare auf Seite 2: Pins 1 und 2, zwei Listeneinträge', z.kommentare.filter((c) => c.seite === 2).length === 2 && nummern.join(',') === '1,2' && (await P.locator('[data-taste="pdf-kommentar-eintrag"]').count()) === 2, JSON.stringify({ nummern, n: z.kommentare.length }));
+await P.locator('[data-taste="pdf-zurueck"]').click(); await P.waitForTimeout(600);
+const andere = await P.evaluate(() => ({ kopf: document.querySelector('.pdf-kommentare-kopf span')?.textContent ?? '', seiten: [...document.querySelectorAll('[data-taste="pdf-kommentar-seite"]')].map((b) => b.textContent) }));
+pruefe('J8 auf Seite 1: „Keine Kommentare auf dieser Seite" und „Weitere auf Seite 2"', /Keine Kommentare/.test(andere.kopf) && andere.seiten.join(',') === '2', JSON.stringify(andere));
+await P.locator('[data-taste="pdf-kommentar-seite"]').click(); await P.waitForTimeout(700);
+z = await zustand(P);
+pruefe('J9 der Sprung öffnet Seite 2 mit beiden Pins', z.seiteNr === '2' && z.pins.filter((p) => p.seite).length === 2, JSON.stringify({ nr: z.seiteNr, pins: z.pins.length }));
+await P.locator('[data-taste="pdf-kommentar-eintrag"]').nth(1).click(); await P.waitForTimeout(400);
+const offen = await P.evaluate(() => ({ kopf: document.querySelector('.comment-panel-head')?.textContent ?? '', text: document.querySelector('.comment-msgs')?.textContent ?? '' }));
+pruefe('J10 ein Listeneintrag öffnet das Gespräch mit „Seite 2"', /Seite 2/.test(offen.kopf) && /Zweiter Punkt/.test(offen.text), JSON.stringify(offen));
+await P.keyboard.press('Escape'); await P.waitForTimeout(200);
+
 console.log('\n════ G: zuklappen ════');
 await P.locator('[data-taste="pdf-zuklappen"]').click();
 await P.waitForTimeout(800);
 z = await zustand(P);
 pruefe('G1 zugeklappt: Miniatur statt Seite, kein Strich, kein Seiten-Pin', z.thumb && !z.seiteOffen && z.pfade.length === 0 && !z.pins.some((p) => p.seite), JSON.stringify({ thumb: z.thumb, offen: z.seiteOffen, pfade: z.pfade.length }));
-pruefe('G2 der Knopf nennt „2 Anmerkungen", der Zustand ist gelöscht', /2 Anmerkungen/.test(z.aufKnopf ?? '') && !JSON.parse(z.auf ?? '{}').f1, JSON.stringify({ knopf: z.aufKnopf, auf: z.auf }));
+pruefe('G2 der Knopf nennt „3 Anmerkungen", der Zustand ist gelöscht', /3 Anmerkungen/.test(z.aufKnopf ?? '') && !JSON.parse(z.auf ?? '{}').f1, JSON.stringify({ knopf: z.aufKnopf, auf: z.auf }));
 
 console.log('\n════ H: Fokus klappt auf ════');
 const kopf = await P.locator('.react-flow__node[data-id="f1"] .file-kopf').boundingBox();
