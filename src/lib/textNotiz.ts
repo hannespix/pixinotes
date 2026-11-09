@@ -7,6 +7,7 @@
 // Notiz ohnehin spricht (mdToBlocks, M117) — der Weg Datei → Notiz ist
 // deshalb deterministisch, ohne KI und ohne Netz.
 import { mdToBlocks } from './ai';
+import { docxToBlocks } from './docx';
 import { loadFile, vorschauArt } from './fileStore';
 import { makeNote } from './nodes';
 import { mutedHistory, selectActiveBoard, useBoard } from '../store';
@@ -49,6 +50,7 @@ export async function textZuBloecken(name: string, text: string): Promise<unknow
 export function textKarte(node: AppNode): boolean {
   if (node.type !== 'file') return false;
   const d = node.data as FileData;
+  if (d.name.toLowerCase().endsWith('.docx')) return true; // M337: Word-Dokument → Notiz (docxToBlocks)
   if (vorschauArt(d.name, d.mime) !== 'text') return false;
   const ext = d.name.split('.').pop()?.toLowerCase() ?? '';
   return MARKDOWN.has(ext) || ext === 'txt' || ext === 'text' || (d.mime ?? '').startsWith('text/plain') || (d.mime ?? '') === 'text/markdown';
@@ -74,9 +76,17 @@ export async function textDateienAlsNotizen(nodes: AppNode[]): Promise<{ fertig:
   for (const alt of kandidaten) {
     const d = alt.data as FileData;
     try {
-      const text = await dateiText(alt);
-      if (text === null) { fehler.push(`„${d.name}": Inhalt liegt nicht auf diesem Gerät`); continue; }
-      const blocks = await textZuBloecken(d.name, text);
+      let blocks: unknown[];
+      if (d.name.toLowerCase().endsWith('.docx')) {
+        // M337: Word → Notiz-Blöcke über den bestehenden Word-Leser (M184)
+        const blob = (await loadFile(alt.id).catch(() => undefined)) ?? (d.dataUrl ? await (await fetch(d.dataUrl)).blob() : undefined);
+        if (!blob) { fehler.push(`„${d.name}": Inhalt liegt nicht auf diesem Gerät`); continue; }
+        blocks = (await docxToBlocks(await blob.arrayBuffer())).blocks;
+      } else {
+        const text = await dateiText(alt);
+        if (text === null) { fehler.push(`„${d.name}": Inhalt liegt nicht auf diesem Gerät`); continue; }
+        blocks = await textZuBloecken(d.name, text);
+      }
       if (blocks.length === 0) { fehler.push(`„${d.name}": enthält keinen Text`); continue; }
       const neu = makeNote({ ...alt.position }, { blocks });
       neu.width = Math.max(280, Math.min(560, (alt.width as number | undefined) ?? 340));

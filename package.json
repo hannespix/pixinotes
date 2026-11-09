@@ -19,6 +19,7 @@
     "@xyflow/react": "^12.6.0",
     "canvas-confetti": "^1.9.3",
     "chrono-node": "^2.10.0",
+    "docx-preview": "^0.4.1",
     "html-to-image": "^1.11.13",
     "libphonenumber-js": "^1.11.0",
     "mermaid": "^11.16.0",
