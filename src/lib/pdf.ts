@@ -32,6 +32,14 @@ async function getDoc(dataUrl: string): Promise<PDFDocumentProxy> {
   return p;
 }
 
+/** M335: Seitenzahl und Seitengröße (PDF-Punkte, Maßstab 1) — für seitenbezogene Anmerkungen */
+export async function pdfSeiteMasse(dataUrl: string, pageNo = 1): Promise<{ seiten: number; breite: number; hoehe: number }> {
+  const doc = await getDoc(dataUrl);
+  const page = await doc.getPage(Math.min(Math.max(1, pageNo), doc.numPages));
+  const vp = page.getViewport({ scale: 1 });
+  return { seiten: doc.numPages, breite: vp.width, hoehe: vp.height };
+}
+
 /** Läuft ein Render noch, kann der Aufrufer ihn hierüber abbrechen. */
 export interface RenderHandle {
   promise: Promise<number>;

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useReactFlow, useViewport } from '@xyflow/react';
 import { getStroke } from 'perfect-freehand';
 import { selectActiveBoard, useBoard, type Stroke } from '../store';
+import { SEITEN_EREIGNIS, seiteVon, strichRelativ } from '../lib/pdfSeiten';
 import { uid } from '../types';
 import { finalizeStroke, recognizeShapes, type Pt } from '../lib/strokeShapes';
 import { handschriftKandidaten, handschriftWeg, kiKorrektur, textAufraeumen, type SchriftKontext } from '../lib/handschrift';
@@ -38,7 +39,7 @@ const FINGER_TIPP_PX = 12;
 /** Radierer-Art bleibt am Gerät gespeichert */
 const RADIERER_KEY = 'pixinotes-radierer';
 /** Worauf der Stift im Auswahlmodus schreibt: freie Fläche und Notizen — Module bedient er */
-const SCHREIBFLAECHE = '.react-flow__pane, .react-flow__node-note';
+const SCHREIBFLAECHE = '.react-flow__pane, .react-flow__node-note, .pdf-seite';
 /** Was auch auf einer Notiz ein Bedienelement bleibt (Tipp klickt, Ziehen zieht) */
 const KARTEN_BEDIENUNG = '.card-grip, .react-flow__resize-control, .react-flow__handle, .react-flow__edge, .react-flow__edgelabel-renderer, .react-flow__viewport-portal, button, a, input, select, textarea, .due-chips, .note-farben, .color-dot, .note-fortschritt, .abo-feeds';
 /** Hat dieses Gerät je einen Stift gemeldet? Dann gilt: Stift schreibt, Hand schiebt. */
@@ -78,6 +79,8 @@ function strichKontur(s: Stroke, laufend: boolean): string {
 }
 /** Fertige Striche ändern sich nie — ihre Kontur wird einmal gerechnet */
 const konturCache = new WeakMap<Stroke, string>();
+/** M335: Seitenstriche werden je Seitenlage einmal in Kartenpunkte umgerechnet (gleiches Objekt → Kontur aus dem Cache) */
+const seitenStrichCache = new WeakMap<Stroke, { g: object; s: Stroke }>();
 const konturFuer = (s: Stroke): string => {
   let k = konturCache.get(s);
   if (!k) { k = strichKontur(s, false); konturCache.set(s, k); }
@@ -98,6 +101,13 @@ export function DrawingLayer() {
   // WICHTIG: kein `?? []` im Selektor — das erzeugt jedes Mal ein neues Array
   // und löst mit useSyncExternalStore eine Endlosschleife aus.
   const drawings = useBoard((s) => selectActiveBoard(s).drawings) ?? EMPTY;
+  // M335: Blättert oder wächst eine PDF-Karte, liegen ihre Seitenstriche woanders — neu zeichnen
+  const [, seitenTakt] = useState(0);
+  useEffect(() => {
+    const auf = () => seitenTakt((n) => n + 1);
+    window.addEventListener(SEITEN_EREIGNIS, auf);
+    return () => window.removeEventListener(SEITEN_EREIGNIS, auf);
+  }, []);
   const nodes = useBoard((s) => selectActiveBoard(s).nodes);
   const showArchived = useBoard((s) => s.showArchived);
   const addStroke = useBoard((s) => s.addStroke);
@@ -679,7 +689,8 @@ export function DrawingLayer() {
   const absolut = (s: Stroke): Pt[] => {
     const n = s.anchor ? nodes.find((k) => k.id === s.anchor) : undefined;
     const dx = n?.position.x ?? 0, dy = n?.position.y ?? 0;
-    return dx || dy ? s.points.map((p) => [p[0] + dx, p[1] + dy] as Pt) : s.points;
+    const rel = s.seite != null ? strichRelativ(s) : s.points; // M335: Seitenstriche umgerechnet (leer, wenn verdeckt)
+    return dx || dy ? rel.map((p) => [p[0] + dx, p[1] + dy] as Pt) : rel;
   };
   /** Die Stift-Striche dieser Schreibsitzung — das, was gerade geschrieben wurde */
   const sessionStriche = (): Stroke[] => {
@@ -1082,6 +1093,15 @@ export function DrawingLayer() {
     if (!s.anchor) return [{ s, dx: 0, dy: 0, dim: false }];
     const n = nodeById.get(s.anchor);
     if (!n || (n.archived && !showArchived)) return [];
+    // M335: Seitenstriche nur, wenn ihre Seite offen liegt — in Kartenpunkte umgerechnet
+    if (s.seite != null) {
+      const g = seiteVon(s.anchor);
+      if (!g || g.seite !== s.seite) return [];
+      const t = seitenStrichCache.get(s);
+      const abgeleitet = t && t.g === g ? t.s : { ...s, points: strichRelativ(s) };
+      if (!t || t.g !== g) seitenStrichCache.set(s, { g, s: abgeleitet });
+      return [{ s: abgeleitet, dx: n.position.x, dy: n.position.y, dim: !!n.archived }];
+    }
     return [{ s, dx: n.position.x, dy: n.position.y, dim: !!n.archived }];
   });
 

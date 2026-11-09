@@ -16,6 +16,7 @@ import {
 import { buildStarter } from './lib/starter';
 import { KACHEL_TYPEN, uid, type AppNode, type CardFont, type CardSize, type TimeSeg } from './types';
 import { anchorStroke, integrateStroke } from './lib/strokeAnchor';
+import { strichRelativ } from './lib/pdfSeiten';
 import { findFreeSpot, frameMembers } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
 
@@ -32,6 +33,9 @@ export interface Stroke {
   /** M127: an diese Karte geankert — die Punkte sind dann RELATIV zur
    *  Karten-Ecke und der Strich wandert bei jeder Kartenbewegung mit */
   anchor?: string;
+  /** M335: auf dieser SEITE einer PDF-Karte — die Punkte sind dann Seitenpunkte
+   *  (PDF-Punkte, Ursprung Seitenecke); sichtbar nur, wenn die Seite offen ist */
+  seite?: number;
 }
 
 /** Ebene 3: Ein Board = eine Leinwand voller Karten. */
@@ -63,6 +67,10 @@ export interface BoardDoc {
 export interface CommentThread {
   id: string;
   nodeId: string;
+  /** M335: Pin an einer Stelle auf einer PDF-Seite (Seitennummer + Seitenpunkte) statt an der Kartenecke */
+  seite?: number;
+  px?: number;
+  py?: number;
   resolved?: boolean;
   msgs: Array<{ author: string; text: string; at: string }>;
 }
@@ -346,12 +354,14 @@ interface BoardState {
   addLabeledEdge: (source: string, target: string, label: string, kind?: string) => void;
   /** M148: Kommentar-Panel — offener Thread ('id') bzw. neuer Kommentar ('new:<nodeId>') */
   commentOpen: string | null;
-  setCommentOpen: (id: string | null) => void;
+  /** M335: Ort für einen NEUEN Kommentar auf einer PDF-Seite (gesetzt von der Karte, gelesen vom Panel) */
+  commentOrt: { seite: number; px: number; py: number } | null;
+  setCommentOpen: (id: string | null, ort?: { seite: number; px: number; py: number } | null) => void;
   /** M168: Nachschlage-Panel — null = zu, sonst der vorbefüllte Suchbegriff */
   lookup: string | null;
   setLookup: (q: string | null) => void;
   /** Kommentar anhängen: an bestehenden Thread (threadId) oder neuen an einer Karte eröffnen */
-  addCommentMsg: (target: { threadId?: string; nodeId?: string }, author: string, text: string) => string | null;
+  addCommentMsg: (target: { threadId?: string; nodeId?: string; seite?: number; px?: number; py?: number }, author: string, text: string) => string | null;
   toggleCommentResolved: (threadId: string) => void;
   removeCommentThread: (threadId: string) => void;
 
@@ -1132,7 +1142,8 @@ export const useBoard = create<BoardState>()(
           for (const s of board.drawings ?? []) {
             const o = offsetOf(s);
             if (!o) { neu.push(s); continue; }
-            const drin = s.points.map((p) => Math.hypot(p[0] + o[0] - x, p[1] + o[1] - y) < radius);
+            const rel = strichRelativ(s); // M335: Seitenstriche umgerechnet, verdeckte leer
+            const drin = rel.map((p) => Math.hypot(p[0] + o[0] - x, p[1] + o[1] - y) < radius);
             if (!drin.some(Boolean)) { neu.push(s); continue; }
             geaendert = true;
             // Eingerastete Formen (wenige Punkte) verschwinden ganz — ein halbes Rechteck will niemand
@@ -1167,7 +1178,7 @@ export const useBoard = create<BoardState>()(
           };
           const near = (s: Stroke) => {
             const o = offsetOf(s);
-            return !!o && s.points.some((p) => Math.hypot(p[0] + o[0] - x, p[1] + o[1] - y) < radius);
+            return !!o && strichRelativ(s).some((p) => Math.hypot(p[0] + o[0] - x, p[1] + o[1] - y) < radius);
           };
           if (!(board.drawings ?? []).some(near)) return;
           // pro Radier-Geste genau EIN History-Eintrag (beim ersten Treffer)
@@ -1187,10 +1198,14 @@ export const useBoard = create<BoardState>()(
             drawings: (b.drawings ?? []).map((s) => {
               if (!s.anchor || !idSet.has(s.anchor)) return s;
               const n = byId.get(s.anchor);
+              // M335: Seitenstriche kommen in Kartenpunkten zurück — verdeckte (Seite nicht offen) bleiben, wie sie sind
+              const rel = s.seite != null ? strichRelativ(s) : s.points;
+              if (s.seite != null && rel.length === 0) return s;
               return {
                 ...s,
                 anchor: undefined,
-                points: n ? s.points.map(([px, py]) => [px + n.position.x, py + n.position.y] as [number, number]) : s.points,
+                seite: undefined,
+                points: n ? rel.map(([px, py]) => [px + n.position.x, py + n.position.y] as [number, number]) : rel,
               };
             }),
           }));
@@ -1725,7 +1740,8 @@ export const useBoard = create<BoardState>()(
 
         // ---------- Kommentar-Pins (M148) ----------
         commentOpen: null,
-        setCommentOpen: (id) => set({ commentOpen: id }),
+        commentOrt: null,
+        setCommentOpen: (id, ort) => set({ commentOpen: id, commentOrt: ort ?? null }),
         lookup: null,
         setLookup: (q) => set({ lookup: q }),
 
@@ -1742,7 +1758,8 @@ export const useBoard = create<BoardState>()(
               comments[i] = { ...comments[i], resolved: false, msgs: [...comments[i].msgs, msg] };
             } else if (target.nodeId) {
               threadId = uid();
-              comments.push({ id: threadId, nodeId: target.nodeId, msgs: [msg] });
+              const ort = target.seite != null && target.px != null && target.py != null ? { seite: target.seite, px: target.px, py: target.py } : {};
+              comments.push({ id: threadId, nodeId: target.nodeId, ...ort, msgs: [msg] });
             }
             return { comments };
           });
