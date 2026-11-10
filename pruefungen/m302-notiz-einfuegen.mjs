@@ -97,7 +97,8 @@ console.log('════ B: Datei als Karte daneben ════');
   await P.waitForTimeout(400);
   const feld = P.locator('input[type="file"]:not([accept])').last();
   pruefe('B1 der Eintrag öffnet einen Wähler ohne Bild-Beschränkung', (await feld.count()) > 0 && await feld.evaluate((i) => i.multiple));
-  await feld.setInputFiles({ name: 'Vermerk.txt', mimeType: 'text/plain', buffer: Buffer.from('Hallo Akte') });
+  // (Text- und Markdown-Dateien werden seit M332 gleich zur formatierten Notiz — geprüft wird eine echte Datei-Karte)
+  await feld.setInputFiles({ name: 'Vermerk.zip', mimeType: 'application/zip', buffer: Buffer.from('PK\u0005\u0006' + '\u0000'.repeat(18), 'latin1') });
   await P.waitForTimeout(2500);
   const b = await stand(P);
   const datei = (b?.nodes ?? []).find((n) => n.id !== 'n1');

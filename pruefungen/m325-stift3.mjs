@@ -209,6 +209,14 @@ console.log('\n════ D: Text mit dem Stift bearbeiten ════');
   await zug(P, Array.from({ length: 30 }, (_, i) => { const t = (i / 28) * Math.PI * 2; return [cx + rx * Math.cos(t), cy + ry * Math.sin(t)]; }), { id: 44 }); await warte(P, 700);
   const auswahl = await P.evaluate(() => getSelection()?.toString() ?? '');
   pruefe('D5 eine kleine Schleife um „Milch" markiert das Wort (Formatierleiste kann kommen)', auswahl === 'Milch' && (await striche(P)).length === 1, JSON.stringify(auswahl));
+  // M338: Notiz ohne Block-Ids (KI, Import) — sie ruht ohne Editor, die Geste findet den Block über seine Pfad-Id
+  let n2 = (await knoten(P)).find((k) => k.id === 'n2');
+  pruefe('D6 Ansehen allein hat der Notiz ohne Ids nichts eingeschrieben', n2.data.blocks.every((b) => !b.id), JSON.stringify(n2.data.blocks.map((b) => b.id ?? null)));
+  const idee = await wortRect(P, 'n2', 'Idee');
+  await zug(P, Array.from({ length: 14 }, (_, i) => [idee.x - 3 + i * ((idee.w + 6) / 13), idee.y + idee.h * 0.5 + (i % 2)]), { id: 45 }); await warte(P, 900);
+  n2 = (await knoten(P)).find((k) => k.id === 'n2');
+  const t2 = n2.data.blocks.map((b) => (Array.isArray(b.content) ? b.content.map((c) => c.text).join('') : (b.content ?? ''))).join('|');
+  pruefe('D7 Durchstreichen wirkt auch dort — und die Blöcke tragen danach feste Ids', t2 === 'Kurze' && n2.data.blocks.every((b) => typeof b.id === 'string' && !b.id.startsWith('_r')), JSON.stringify({ t2, ids: n2.data.blocks.map((b) => b.id ?? null) }));
   await P.screenshot({ path: path.join(SD, 'm325-textgesten.png') });
   await ctx.close();
 }

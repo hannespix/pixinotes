@@ -721,7 +721,7 @@ export function SelectionToolbar() {
                         : `Keine Textdatei ließ sich übernehmen: ${fehler.join(' · ')}`, false, fehler.length ? 9000 : 4000);
                     }}
                     data-taste="als-notiz"
-                    title="Markdown-/Textdatei als formatierte Notiz übernehmen — Überschriften, Listen und Checklisten bleiben erhalten; die Datei-Karte wird ersetzt"
+                    title="Als formatierte Notiz übernehmen — Überschriften und Listen bleiben; die Datei-Karte wird ersetzt"
                     aria-label="Als Notiz übernehmen"
                   >
                     📝 Als Notiz übernehmen ({selected.filter(textKarte).length})

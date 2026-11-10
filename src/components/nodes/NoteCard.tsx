@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { useReactFlow, type NodeProps } from '@xyflow/react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
@@ -20,6 +20,8 @@ import { repairBlocks } from '../../lib/htmlBlocks';
 import { editorUpload } from '../../lib/notizBild';
 import { importFilesToBoard } from '../../lib/importFiles';
 import { CardShell } from './CardShell';
+import { NotizRuhend } from './NotizRuhend';
+import { hakenUmlegen, notizEinfach, type RuheBlock } from '../../lib/notizRuhend';
 import { DueChips } from './DueChips';
 import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from '../NoteTypo';
 
@@ -171,37 +173,13 @@ function NoteAboFeeds({ id }: { id: string }) {
   );
 }
 
-/** Haftnotiz mit vollem Notion-artigem Block-Editor (BlockNote, MPL-2.0). */
-export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
+/**
+ * Der lebende Editor einer Notiz (BlockNote, MPL-2.0) — entsteht erst bei Bedarf (M338).
+ * `startPunkt`: Bildschirmstelle des Klicks, der ihn geweckt hat; dort landet der Cursor.
+ */
+function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['data']; startPunkt: MutableRefObject<{ x: number; y: number } | null> }) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
-  const konfetti = useBoard((s) => s.konfetti);
-
-  // M323: EIN Klartext je Notiz — Fristen, Chips und Wikilinks lasen ihn
-  // vorher je dreimal pro Änderung
-  const text = useMemo(() => blocksToText(data.blocks), [data.blocks]);
-  const titel = useMemo(() => noteTitle(data.blocks), [data.blocks]);
-  /** M283: Zahlen aus der Rechen-Tabelle bleiben bei den ☎-Chips außen vor
-   *  („1.200" ist keine Rufnummer); Suche, Export und KI sehen sie vollständig. */
-  const chipText = useMemo(() => {
-    const bs = data.blocks ?? [];
-    return bs.some((b) => (b as { type?: string })?.type === 'rechentabelle')
-      ? blocksToText(bs.filter((b) => (b as { type?: string })?.type !== 'rechentabelle'))
-      : text;
-  }, [data.blocks, text]);
-  // M323: Checklisten-Stand — Fortschritt unter der Notiz, Konfetti beim letzten Haken
-  const stand = useMemo(() => checklistStand(data.blocks), [data.blocks]);
-  const vorherOffen = useRef(stand.gesamt - stand.erledigt);
-  useEffect(() => {
-    const offen = stand.gesamt - stand.erledigt;
-    if (stand.gesamt > 0 && offen === 0 && vorherOffen.current > 0 && konfetti) {
-      confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
-    }
-    vorherOffen.current = offen;
-  }, [stand.gesamt, stand.erledigt, konfetti]);
-  // M323: Farbwahl als kleine Palette statt Durchblättern
-  const [farbenOffen, setFarbenOffen] = useState(false);
-  useEffect(() => { if (!selected) setFarbenOffen(false); }, [selected]);
 
   // bewusst nur beim Mount gelesen — danach ist der Editor die Quelle der Wahrheit
   const [initialContent] = useState<PartialBlock[] | undefined>(() => {
@@ -261,11 +239,6 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
       return () => clearTimeout(t);
     }
   }, [editor, initialContent]);
-
-  const waehleFarbe = (farbe: (typeof STICKY_COLORS)[number]) => {
-    updateNodeData(id, { color: farbe, hex: undefined }); // zurück zur Palette
-    setFarbenOffen(false);
-  };
 
   // M176: Tabellen ließen sich nicht löschen — das Seiten-Menü (Drag-Griff mit
   // Block-Löschen) ist bewusst aus, und per Tastatur ist eine Tabelle in
@@ -419,38 +392,30 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
     } catch { /* Tabelle inzwischen weg */ }
   };
 
+  // M338: Der Klick, der den Editor geweckt hat, setzt auch den Cursor — an genau der Stelle
+  // (die ruhende Ansicht hat denselben Umbruch, die Koordinaten stimmen also)
+  useLayoutEffect(() => {
+    const p = startPunkt.current;
+    startPunkt.current = null;
+    if (!p) return;
+    let n = 0; let raf = 0;
+    const setzen = () => {
+      const el = editorRef.current?.querySelector('[contenteditable="true"]') as HTMLElement | null;
+      if (!el) { if (n++ < 30) raf = requestAnimationFrame(setzen); return; }
+      const doc = document as Document & { caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null };
+      let r: Range | null = null;
+      if (typeof document.caretRangeFromPoint === 'function') r = document.caretRangeFromPoint(p.x, p.y);
+      else if (typeof doc.caretPositionFromPoint === 'function') { const c = doc.caretPositionFromPoint(p.x, p.y); if (c) { r = document.createRange(); r.setStart(c.offsetNode, c.offset); r.collapse(true); } }
+      el.focus({ preventScroll: true });
+      if (r && el.contains(r.startContainer)) { const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(r); }
+    };
+    setzen();
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
-    <CardShell id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${data.color}`} style={data.hex ? { background: data.hex as string } : undefined} schrumpft>
-      {/* M323: Der Farbpunkt öffnet eine Palette — fünf Farben auf einen Blick
-          plus eigene Farbe, statt blind durchzublättern */}
-      <button
-        className={`color-dot nodrag ${farbenOffen ? 'on' : ''}`}
-        title="Farbe der Notiz"
-        aria-label="Farbe der Notiz"
-        aria-expanded={farbenOffen}
-        onClick={() => setFarbenOffen((o) => !o)}
-      />
-      {farbenOffen && (
-        <div className="note-farben nodrag nowheel" role="group" aria-label="Notizfarbe" onPointerDown={(e) => e.stopPropagation()}>
-          {STICKY_COLORS.map((c) => (
-            <button
-              key={c}
-              className={`note-farbe note-farbe-${c} ${data.color === c && !data.hex ? 'on' : ''}`}
-              title={FARB_NAMEN[c]}
-              aria-label={`Farbe ${FARB_NAMEN[c]}`}
-              onClick={() => waehleFarbe(c)}
-            />
-          ))}
-          <input
-            type="color"
-            className="pn-colorpick note-colorpick nodrag"
-            title="Eigene Farbe wählen"
-            aria-label="Eigene Farbe"
-            value={(data.hex as string) ?? '#fff8c5'}
-            onChange={(e) => updateNodeData(id, { hex: e.target.value })}
-          />
-        </div>
-      )}
+    <>
       <div
         className="nodrag nowheel note-editor"
         ref={editorRef}
@@ -510,6 +475,138 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
           >
             ⌫ Tabelle
           </button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Haftnotiz: ruhend als schlichtes HTML, mit vollem Block-Editor, sobald jemand schreibt (M338). */
+export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
+  const updateNodeData = useBoard((s) => s.updateNodeData);
+  const showToast = useBoard((s) => s.showToast);
+  const konfetti = useBoard((s) => s.konfetti);
+
+  // M323: EIN Klartext je Notiz — Fristen, Chips und Wikilinks lasen ihn
+  // vorher je dreimal pro Änderung
+  const text = useMemo(() => blocksToText(data.blocks), [data.blocks]);
+  const titel = useMemo(() => noteTitle(data.blocks), [data.blocks]);
+  /** M283: Zahlen aus der Rechen-Tabelle bleiben bei den ☎-Chips außen vor
+   *  („1.200" ist keine Rufnummer); Suche, Export und KI sehen sie vollständig. */
+  const chipText = useMemo(() => {
+    const bs = data.blocks ?? [];
+    return bs.some((b) => (b as { type?: string })?.type === 'rechentabelle')
+      ? blocksToText(bs.filter((b) => (b as { type?: string })?.type !== 'rechentabelle'))
+      : text;
+  }, [data.blocks, text]);
+  // M323: Checklisten-Stand — Fortschritt unter der Notiz, Konfetti beim letzten Haken
+  const stand = useMemo(() => checklistStand(data.blocks), [data.blocks]);
+  const vorherOffen = useRef(stand.gesamt - stand.erledigt);
+  useEffect(() => {
+    const offen = stand.gesamt - stand.erledigt;
+    if (stand.gesamt > 0 && offen === 0 && vorherOffen.current > 0 && konfetti) {
+      confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
+    }
+    vorherOffen.current = offen;
+  }, [stand.gesamt, stand.erledigt, konfetti]);
+  // M323: Farbwahl als kleine Palette statt Durchblättern
+  const [farbenOffen, setFarbenOffen] = useState(false);
+  useEffect(() => { if (!selected) setFarbenOffen(false); }, [selected]);
+
+  const waehleFarbe = (farbe: (typeof STICKY_COLORS)[number]) => {
+    updateNodeData(id, { color: farbe, hex: undefined }); // zurück zur Palette
+    setFarbenOffen(false);
+  };
+
+  /**
+   * M338: Die Notiz ruht, bis jemand in ihr schreibt.
+   *
+   * Solange `aktiv` falsch ist, steht der Inhalt als schlichtes HTML da
+   * (NotizRuhend) — kein Editor, keine 150 ms Aufbauzeit, kein eigener
+   * Stil-Block je Karte. Der Editor entsteht beim Klick in den Text (der
+   * Cursor landet an der Klickstelle), im Fokus, beim Verweilen mit der Maus
+   * (dann ist er schon da, wenn man klickt oder Text markiert) und wenn die
+   * Zeichenebene ihn ruft (Stift-Schleife markiert Wörter). Einmal wach, bleibt er wach.
+   * Stift-Gesten und Handschrift arbeiten auch auf der ruhenden Notiz — sie lesen dieselben Klassen.
+   */
+  const einfach = useMemo(() => notizEinfach(data.blocks), [data.blocks]);
+  const imFokus = useBoard((s) => s.focusCard === id);
+  const [aktiv, setAktiv] = useState(() => !einfach);
+  const startPunkt = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => { if (!einfach || imFokus) setAktiv(true); }, [einfach, imFokus]);
+  useEffect(() => {
+    if (aktiv) return;
+    const auf = (e: Event) => {
+      const d = (e as CustomEvent<{ id?: string; x?: number; y?: number }>).detail;
+      if (d?.id !== id) return;
+      if (typeof d.x === 'number' && typeof d.y === 'number') startPunkt.current = { x: d.x, y: d.y };
+      setAktiv(true);
+    };
+    window.addEventListener('pixinotes:notiz-aktiv', auf);
+    return () => window.removeEventListener('pixinotes:notiz-aktiv', auf);
+  }, [aktiv, id]);
+  const verweilen = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(verweilen.current), []);
+  const hakenSetzen = useCallback((pfad: number[], an: boolean) => {
+    const st = useBoard.getState();
+    const n = st.boards.find((b) => b.id === st.activeId)?.nodes.find((k) => k.id === id);
+    const bs = ((n?.data as { blocks?: RuheBlock[] } | undefined)?.blocks ?? []);
+    updateNodeData(id, { blocks: hakenUmlegen(bs, pfad, an) });
+  }, [id, updateNodeData]);
+
+  return (
+    <CardShell id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${data.color}`} style={data.hex ? { background: data.hex as string } : undefined} schrumpft>
+      {/* M323: Der Farbpunkt öffnet eine Palette — fünf Farben auf einen Blick
+          plus eigene Farbe, statt blind durchzublättern */}
+      <button
+        className={`color-dot nodrag ${farbenOffen ? 'on' : ''}`}
+        title="Farbe der Notiz"
+        aria-label="Farbe der Notiz"
+        aria-expanded={farbenOffen}
+        onClick={() => setFarbenOffen((o) => !o)}
+      />
+      {farbenOffen && (
+        <div className="note-farben nodrag nowheel" role="group" aria-label="Notizfarbe" onPointerDown={(e) => e.stopPropagation()}>
+          {STICKY_COLORS.map((c) => (
+            <button
+              key={c}
+              className={`note-farbe note-farbe-${c} ${data.color === c && !data.hex ? 'on' : ''}`}
+              title={FARB_NAMEN[c]}
+              aria-label={`Farbe ${FARB_NAMEN[c]}`}
+              onClick={() => waehleFarbe(c)}
+            />
+          ))}
+          <input
+            type="color"
+            className="pn-colorpick note-colorpick nodrag"
+            title="Eigene Farbe wählen"
+            aria-label="Eigene Farbe"
+            value={(data.hex as string) ?? '#fff8c5'}
+            onChange={(e) => updateNodeData(id, { hex: e.target.value })}
+          />
+        </div>
+      )}
+      {aktiv ? (
+        <NotizEditor id={id} data={data} startPunkt={startPunkt} />
+      ) : (
+        <div
+          className="nodrag nowheel note-editor"
+          // Klick in den Text weckt den Editor; der Cursor landet an der Klickstelle
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest('input')) return;
+            startPunkt.current = { x: e.clientX, y: e.clientY };
+            setAktiv(true);
+          }}
+          // Maus ruht auf der Notiz: Editor vorwärmen — dann ist er da, bevor man klickt oder markiert
+          onPointerEnter={(e) => {
+            if (e.pointerType !== 'mouse' || e.buttons !== 0) return;
+            window.clearTimeout(verweilen.current);
+            verweilen.current = window.setTimeout(() => setAktiv(true), 260);
+          }}
+          onPointerLeave={() => window.clearTimeout(verweilen.current)}
+          onPointerDown={() => window.clearTimeout(verweilen.current)}
+        >
+          <NotizRuhend blocks={data.blocks as RuheBlock[]} onHaken={hakenSetzen} />
         </div>
       )}
       {/* M302: Der 🖼-Chip unter der Notiz ist weg — Bild aus Datei und Datei als
