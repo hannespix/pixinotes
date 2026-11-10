@@ -36,7 +36,7 @@ export function BildExport() {
     setBusy(true);
     try {
       const nodes = activeBoard.nodes.filter((n) => !n.archived && (!nurAuswahl || n.selected));
-      await exportBoard({ format, name: activeBoard.name, nodes, scale, background: bg, header });
+      await exportBoard({ format, name: activeBoard.name, nodes, scale, background: bg, header, nurDiese: nurAuswahl, edges: activeBoard.edges });
       showToast(format === 'print' ? '🖨️ Druckdialog geöffnet — dort „Als PDF speichern".' : '⬇️ Bild erstellt.');
       setOpen(false);
     } catch (e) {
@@ -74,7 +74,7 @@ export function BildExport() {
             <label className="modal-row">
               <span>Hintergrund</span>
               <select value={bg} onChange={(e) => setBg(e.target.value as typeof bg)}>
-                <option value="beige">Beige (wie Board)</option>
+                <option value="beige">Wie das Board</option>
                 <option value="white">Weiß</option>
                 <option value="transparent">Transparent</option>
               </select>

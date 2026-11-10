@@ -70,6 +70,11 @@ function inlineText(content: unknown): string {
         if (c && typeof c === 'object') {
           const obj = c as Record<string, unknown>;
           if (typeof obj.text === 'string') return obj.text;
+          if (obj.type === 'link' && typeof obj.href === 'string') {
+            // M340: Ein Link ohne Adresse ist im Klartext wertlos — sie steht dahinter (außer sie IST der Text)
+            const t = inlineText(obj.content);
+            return !t || t === obj.href || `https://${t}` === obj.href ? obj.href : `${t} (${obj.href})`;
+          }
           if (obj.content) return inlineText(obj.content);
         }
         return '';
@@ -98,9 +103,11 @@ export function blocksToText(blocks: unknown[] | undefined): string {
   if (!blocks) return '';
   const lines: string[] = [];
   const walk = (bs: AnyBlock[], depth: number) => {
+    let nummer = 0; // M340: nummerierte Punkte tragen ihre Nummer (vorher „- ")
     for (const b of bs) {
       const text = inlineText(b.content);
       const indent = '  '.repeat(depth);
+      if (b.type === 'numberedListItem') nummer = nummer === 0 ? (Number(b.props?.start) || 1) : nummer + 1; else nummer = 0;
       switch (b.type) {
         case 'heading':
           lines.push(`${indent}${text}`);
@@ -112,7 +119,10 @@ export function blocksToText(blocks: unknown[] | undefined): string {
           lines.push(`${indent}• ${text}`);
           break;
         case 'numberedListItem':
-          lines.push(`${indent}- ${text}`);
+          lines.push(`${indent}${nummer}. ${text}`);
+          break;
+        case 'quote':
+          lines.push(`${indent}„${text}“`);
           break;
         case 'table':
           lines.push(inlineText(b.content));
@@ -141,45 +151,126 @@ export function blocksToText(blocks: unknown[] | undefined): string {
   return lines.join('\n');
 }
 
+/* M340: Farben der Notiz (BlockNote-Namen) als feste Werte — Outlook, Word und das PDF kennen die Namen nicht */
+const TEXT_FARBE: Record<string, string> = { gray: '#9b9a97', brown: '#64473a', red: '#e03e3e', orange: '#d9730d', yellow: '#dfab01', green: '#4d6461', blue: '#0b6e99', purple: '#6940a5', pink: '#ad1a72' };
+const GRUND_FARBE: Record<string, string> = { gray: '#ebeced', brown: '#e9e5e3', red: '#fbe4e4', orange: '#f6e9d9', yellow: '#fbf3db', green: '#ddedea', blue: '#ddebf1', purple: '#eae4f2', pink: '#f4dfeb' };
+const farbe = (v: unknown, t: Record<string, string>): string | null => {
+  if (typeof v !== 'string' || !v || v === 'default') return null;
+  if (t[v]) return t[v];
+  return /^#[0-9a-f]{3,8}$/i.test(v) || /^rgba?\([\d\s.,%]+\)$/i.test(v) ? v : null;
+};
+/** Nur Adressen, die man gefahrlos anklickbar weitergeben kann */
+const sichereAdresse = (h: unknown): string | null =>
+  (typeof h === 'string' && /^(https?:|mailto:|tel:)/i.test(h.trim()) ? h.trim() : null);
+
+/** Inline-Inhalt MIT Formatierung: fett, kursiv, unterstrichen, durchgestrichen, Code, Farben, Links */
+function inlineHtml(content: unknown): string {
+  if (!content) return '';
+  if (typeof content === 'string') return esc(content);
+  if (!Array.isArray(content)) {
+    const o = content as { content?: unknown };
+    return o && typeof o === 'object' && o.content ? inlineHtml(o.content) : esc(inlineText(content));
+  }
+  return content.map((c) => {
+    if (typeof c === 'string') return esc(c);
+    if (!c || typeof c !== 'object') return '';
+    const o = c as { type?: string; text?: unknown; styles?: Record<string, unknown>; href?: unknown; content?: unknown };
+    if (o.type === 'link') {
+      const innen = inlineHtml(o.content) || esc(String(o.href ?? ''));
+      const h = sichereAdresse(o.href);
+      return h ? `<a href="${esc(h)}" style="color:#3557c9">${innen}</a>` : innen;
+    }
+    if (typeof o.text !== 'string') return o.content ? inlineHtml(o.content) : '';
+    let h = esc(o.text).replace(/\n/g, '<br>');
+    const st = o.styles ?? {};
+    if (st.code) h = `<code style="background:#f1f1ef;border-radius:3px;padding:0 3px;font-family:Consolas,Menlo,monospace;font-size:.92em">${h}</code>`;
+    if (st.bold) h = `<b>${h}</b>`;
+    if (st.italic) h = `<i>${h}</i>`;
+    if (st.underline) h = `<u>${h}</u>`;
+    if (st.strike) h = `<s>${h}</s>`;
+    const tc = farbe(st.textColor, TEXT_FARBE); const bc = farbe(st.backgroundColor, GRUND_FARBE);
+    if (tc || bc) h = `<span style="${tc ? `color:${tc};` : ''}${bc ? `background:${bc};` : ''}">${h}</span>`;
+    return h;
+  }).join('');
+}
+
+/** Stil eines Blocks aus seinen Eigenschaften: Ausrichtung, Text- und Grundfarbe */
+function blockStil(b: AnyBlock, basis = ''): string {
+  const p = b.props ?? {};
+  const a = typeof p.textAlignment === 'string' && ['center', 'right', 'justify'].includes(p.textAlignment) ? `text-align:${p.textAlignment};` : '';
+  const tc = farbe(p.textColor, TEXT_FARBE); const bc = farbe(p.backgroundColor, GRUND_FARBE);
+  const st = `${basis}${a}${tc ? `color:${tc};` : ''}${bc ? `background:${bc};` : ''}`;
+  return st ? ` style="${st}"` : '';
+}
+
+const istLeererAbsatz = (b: AnyBlock): boolean =>
+  (b.type === 'paragraph' || !b.type) && !inlineText(b.content) && !(b.children?.length);
+
+/**
+ * Blöcke einer Notiz als HTML — für Zwischenablage (Outlook/Word), Druck und PDF.
+ * M340: mit allem, was die Notiz zeigt. Vorher fielen Unterpunkte ganz weg, Fett/Kursiv/Farben
+ * und Links gingen verloren, Zitate und Code waren schlichte Absätze.
+ */
 export function blocksToHtml(blocks: unknown[] | undefined): string {
   if (!blocks) return '';
+  const alle = [...(blocks as AnyBlock[])];
+  while (alle.length && istLeererAbsatz(alle[alle.length - 1])) alle.pop(); // der leere Schluss-Absatz des Editors
+  return blocksHtml(alle);
+}
+
+function blocksHtml(bs: AnyBlock[]): string {
   const parts: string[] = [];
   let listOpen: string | null = null;
   const closeList = () => {
     if (listOpen) {
-      parts.push(`</${listOpen}>`);
+      parts.push(`</${listOpen === 'check' ? 'ul' : listOpen}>`);
       listOpen = null;
     }
   };
-  for (const b of blocks as AnyBlock[]) {
-    const text = esc(inlineText(b.content));
+  const kinder = (b: AnyBlock) => (b.children?.length ? blocksHtml(b.children) : '');
+  const eingerueckt = (b: AnyBlock) => { const k = kinder(b); return k ? `<div style="margin-left:24px">${k}</div>` : ''; };
+  for (const b of bs) {
+    const text = inlineHtml(b.content);
     switch (b.type) {
       case 'heading': {
         closeList();
         const level = Math.min(4, Math.max(1, Number(b.props?.level ?? 3)));
-        parts.push(`<h${level}>${text}</h${level}>`);
+        parts.push(`<h${level}${blockStil(b, 'margin:10px 0 4px;')}>${text}</h${level}>${eingerueckt(b)}`);
         break;
       }
       case 'checkListItem':
-        closeList();
-        parts.push(`<p style="margin:2px 0">${b.props?.checked ? '☑' : '☐'} ${text}</p>`);
+        if (listOpen !== 'check') { closeList(); parts.push('<ul style="list-style:none;padding-left:2px;margin:4px 0">'); listOpen = 'check'; }
+        parts.push(`<li${blockStil(b, 'margin:2px 0;')}>${b.props?.checked ? '☑' : '☐'} ${text}${kinder(b) ? `<div style="margin-left:22px">${kinder(b)}</div>` : ''}</li>`);
         break;
       case 'bulletListItem':
-        if (listOpen !== 'ul') { closeList(); parts.push('<ul>'); listOpen = 'ul'; }
-        parts.push(`<li>${text}</li>`);
+        if (listOpen !== 'ul') { closeList(); parts.push('<ul style="margin:4px 0">'); listOpen = 'ul'; }
+        parts.push(`<li${blockStil(b)}>${text}${kinder(b)}</li>`);
         break;
       case 'numberedListItem':
-        if (listOpen !== 'ol') { closeList(); parts.push('<ol>'); listOpen = 'ol'; }
-        parts.push(`<li>${text}</li>`);
+        if (listOpen !== 'ol') {
+          closeList();
+          const start = Number(b.props?.start);
+          parts.push(`<ol style="margin:4px 0"${start > 1 ? ` start="${Math.floor(start)}"` : ''}>`);
+          listOpen = 'ol';
+        }
+        parts.push(`<li${blockStil(b)}>${text}${kinder(b)}</li>`);
+        break;
+      case 'quote':
+        closeList();
+        parts.push(`<blockquote${blockStil(b, 'margin:6px 0;padding:2px 12px;border-left:3px solid #c9c6bd;color:#555;')}>${text}</blockquote>${eingerueckt(b)}`);
+        break;
+      case 'codeBlock':
+        closeList();
+        parts.push(`<pre style="background:#f4f3ef;border-radius:6px;padding:8px 10px;font-family:Consolas,Menlo,monospace;font-size:13px;white-space:pre-wrap">${esc(inlineText(b.content))}</pre>`);
         break;
       case 'table': {
         closeList();
         const content = b.content as { rows?: { cells: unknown[] }[] } | undefined;
         if (content?.rows) {
           const rows = content.rows
-            .map((r) => `<tr>${r.cells.map((cell) => `<td style="border:1px solid #ccc;padding:4px 8px">${esc(inlineText(cell))}</td>`).join('')}</tr>`)
+            .map((r) => `<tr>${r.cells.map((cell) => `<td style="border:1px solid #ccc;padding:4px 8px;vertical-align:top">${inlineHtml(cell)}</td>`).join('')}</tr>`)
             .join('');
-          parts.push(`<table style="border-collapse:collapse">${rows}</table>`);
+          parts.push(`<table style="border-collapse:collapse;margin:6px 0">${rows}</table>`);
         }
         break;
       }
@@ -205,17 +296,100 @@ export function blocksToHtml(blocks: unknown[] | undefined): string {
           const rows = zeilen
             .map((r) => `<tr>${r.map((c) => `<td style="border:1px solid #ccc;padding:4px 8px">${esc(c)}</td>`).join('')}</tr>`)
             .join('');
-          parts.push(`<table style="border-collapse:collapse">${rows}</table>`);
+          parts.push(`<table style="border-collapse:collapse;margin:6px 0">${rows}</table>`);
         }
         break;
       }
       default:
         closeList();
-        if (text) parts.push(`<p style="margin:4px 0">${text}</p>`);
+        // ein leerer Absatz ist eine gewollte Leerzeile
+        parts.push(`<p${blockStil(b, 'margin:4px 0;')}>${text || '&nbsp;'}</p>${eingerueckt(b)}`);
     }
   }
   closeList();
   return parts.join('\n');
+}
+
+/* ---------- M340: Blöcke → Markdown (Ordner-Export, „Als Markdown") ---------- */
+function inlineMd(content: unknown): string {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return inlineText(content);
+  return content.map((c) => {
+    if (typeof c === 'string') return c;
+    if (!c || typeof c !== 'object') return '';
+    const o = c as { type?: string; text?: unknown; styles?: Record<string, unknown>; href?: unknown; content?: unknown };
+    if (o.type === 'link') { const t = inlineMd(o.content) || String(o.href ?? ''); return typeof o.href === 'string' ? `[${t}](${o.href})` : t; }
+    if (typeof o.text !== 'string') return o.content ? inlineMd(o.content) : '';
+    const st = o.styles ?? {};
+    // Leerraum bleibt AUSSEN — „** fett**" liest kein Markdown-Programm als fett
+    const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(o.text) ?? ['', '', o.text, ''];
+    let t = m[2];
+    if (!t) return o.text;
+    if (st.code) t = `\`${t}\``;
+    if (st.bold) t = `**${t}**`;
+    if (st.italic) t = `*${t}*`;
+    if (st.strike) t = `~~${t}~~`;
+    return `${m[1]}${t}${m[3]}`;
+  }).join('');
+}
+
+export function blocksToMarkdown(blocks: unknown[] | undefined): string {
+  if (!blocks) return '';
+  const alle = [...(blocks as AnyBlock[])];
+  while (alle.length && istLeererAbsatz(alle[alle.length - 1])) alle.pop();
+  const lines: string[] = [];
+  const istListe = (t?: string) => t === 'bulletListItem' || t === 'numberedListItem' || t === 'checkListItem';
+  const walk = (bs: AnyBlock[], depth: number) => {
+    let nummer = 0;
+    let vorher: string | undefined;
+    for (const b of bs) {
+      const ein = '  '.repeat(depth);
+      const text = inlineMd(b.content);
+      if (b.type === 'numberedListItem') nummer = nummer === 0 ? (Number(b.props?.start) || 1) : nummer + 1; else nummer = 0;
+      // Leerzeile zwischen Blöcken — außer innerhalb einer Liste
+      // (ein Wechsel zwischen Punkten und Nummern beginnt eine neue Liste)
+      const gleicheListe = istListe(b.type) && istListe(vorher) && (b.type === 'numberedListItem') === (vorher === 'numberedListItem');
+      if (lines.length && depth === 0 && !gleicheListe) lines.push('');
+      switch (b.type) {
+        case 'heading': lines.push(`${ein}${'#'.repeat(Math.min(6, Math.max(1, Number(b.props?.level ?? 3))))} ${text}`); break;
+        case 'checkListItem': lines.push(`${ein}- [${b.props?.checked ? 'x' : ' '}] ${text}`); break;
+        case 'bulletListItem': lines.push(`${ein}- ${text}`); break;
+        case 'numberedListItem': lines.push(`${ein}${nummer}. ${text}`); break;
+        case 'quote': lines.push(`${ein}> ${text}`); break;
+        case 'codeBlock': lines.push(`${ein}\`\`\``, ...inlineText(b.content).split('\n').map((z) => `${ein}${z}`), `${ein}\`\`\``); break;
+        case 'table': {
+          const rows = (b.content as { rows?: { cells: unknown[] }[] } | undefined)?.rows ?? [];
+          const zelle = (c: unknown) => inlineMd((c as { content?: unknown })?.content ?? c).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+          rows.forEach((r, i) => {
+            lines.push(`${ein}| ${r.cells.map(zelle).join(' | ')} |`);
+            if (i === 0) lines.push(`${ein}| ${r.cells.map(() => '---').join(' | ')} |`);
+          });
+          break;
+        }
+        case 'rechentabelle': {
+          const z = rechenBlockZeilen(b.props);
+          z.forEach((r, i) => {
+            lines.push(`${ein}| ${r.map((c) => c.replace(/\|/g, '\\|')).join(' | ')} |`);
+            if (i === 0) lines.push(`${ein}| ${r.map(() => '---').join(' | ')} |`);
+          });
+          break;
+        }
+        case 'image': {
+          const p = b.props as { caption?: string; name?: string; url?: string } | undefined;
+          // die Bilddaten selbst (data:…) gehören nicht in eine Textdatei
+          const ziel = p?.url && !p.url.startsWith('data:') ? p.url : (p?.name || 'bild');
+          lines.push(`${ein}![${p?.caption || p?.name || 'Bild'}](${ziel})`);
+          break;
+        }
+        default: lines.push(text ? `${ein}${text}` : '');
+      }
+      vorher = b.type;
+      if (b.children?.length) walk(b.children, depth + 1);
+    }
+  };
+  walk(alle, 0);
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n');
 }
 
 /* ---------- Karten → Text/HTML ---------- */
@@ -360,7 +534,9 @@ export function nodeToHtml(node: AppNode): string {
       const done = doneCol(k);
       const cols = kanbanCols(k).map((col, i) => {
         const items = k.items.filter((it) => Math.min(it.col, done) === i);
-        return `<h4>${esc(col)}</h4><ul>${items.map((it) => `<li>${i === done ? '☑' : '☐'} ${esc(it.text)}</li>`).join('') || '<li>—</li>'}</ul>`;
+        // M340: Frist, Person und Beschreibung gehören dazu — im Text standen sie schon, im HTML fehlten sie
+        const zeile = (it: (typeof k.items)[number]) => `<li>${i === done ? '☑' : '☐'} ${esc(it.text)}${it.due ? ` <span style="color:#777">(bis ${esc(it.due)})</span>` : ''}${it.who ? ` <span style="color:#777">@${esc(it.who)}</span>` : ''}${it.note ? `<br><span style="color:#555;font-size:.93em">${esc(it.note)}</span>` : ''}</li>`;
+        return `<h4>${esc(col)}</h4><ul style="list-style:none;padding-left:2px">${items.map(zeile).join('') || '<li>—</li>'}</ul>`;
       }).join('');
       const arch = k.archiv ?? []; // M293
       const archHtml = arch.length
@@ -381,8 +557,18 @@ export function nodeToHtml(node: AppNode): string {
         .join('');
       return `<h3>${esc(g.title)}</h3><ul>${items || '<li>—</li>'}</ul>`;
     }
-    case 'mermaid':
-      return `<pre style="background:#faf8f3;border-radius:8px;padding:10px;font-size:13px;overflow:auto">${esc(node.data.code)}</pre>`;
+    case 'mermaid': {
+      // M340: das Diagramm als BILD, wenn es gerade auf dem Board steht — der Quelltext allein hilft im Ausdruck niemandem
+      const bild = diagrammBild(node.id);
+      return bild
+        ? `<img src="${bild.src}" alt="Diagramm" style="max-width:100%;height:auto" width="${bild.w}" />`
+        : `<pre style="background:#faf8f3;border-radius:8px;padding:10px;font-size:13px;overflow:auto;white-space:pre-wrap">${esc(node.data.code)}</pre>`;
+    }
+    case 'file': {
+      const f = node.data;
+      const t = f.titel?.trim();
+      return `<p>📎 <b>${esc(t && t !== f.name ? t : f.name)}</b>${t && t !== f.name ? ` — ${esc(f.name)}` : ''} <span style="color:#777">(${formatBytes(f.size)})</span></p>`;
+    }
     case 'frame':
       // Abschnitts-Folie im Presenter: der Rahmen-Name als Zwischentitel
       return `<h2 style="text-align:center;margin-top:1.4em">${esc(node.data.name)}</h2>`;
@@ -445,6 +631,65 @@ export function nodeToHtml(node: AppNode): string {
     }
     default:
       return `<p style="white-space:pre-wrap">${esc(nodeToText(node))}</p>`;
+  }
+}
+
+/** Das gerenderte Diagramm einer Karte als SVG-Bildadresse (nur im Browser, nur wenn es auf dem Board steht) */
+function diagrammBild(nodeId: string): { src: string; w: number } | null {
+  if (typeof document === 'undefined') return null;
+  for (const n of Array.from(document.querySelectorAll('.react-flow__node-mermaid')) as HTMLElement[]) {
+    if (n.dataset.id !== nodeId) continue;
+    const svg = n.querySelector('svg[id^="pn-mermaid"], svg[id^="mermaid"]') as SVGSVGElement | null;
+    if (!svg) return null;
+    const klon = svg.cloneNode(true) as SVGSVGElement;
+    const r = svg.getBoundingClientRect();
+    const vb = svg.viewBox?.baseVal;
+    const w = Math.round(vb && vb.width ? vb.width : r.width) || 600;
+    const h = Math.round(vb && vb.height ? vb.height : r.height) || 400;
+    klon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    klon.setAttribute('width', String(w)); klon.setAttribute('height', String(h));
+    klon.removeAttribute('style');
+    return { src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(klon))}`, w: Math.min(w, 700) };
+  }
+  return null;
+}
+
+/** M340: Eine Karte als Markdown — Notizen mit Formatierung, Listen und Tabellen; Module in lesbarer Form */
+export function nodeToMarkdown(node: AppNode): string {
+  const attrs = node.data?.attrs as Record<string, string> | undefined;
+  const anhang = attrs && Object.keys(attrs).length ? `\n\n${Object.entries(attrs).map(([k, v]) => `- ${k}: ${v}`).join('\n')}` : '';
+  const tabelle = (z: string[][]) => z.map((r, i) => `| ${r.map((c) => c.replace(/\|/g, '\\|')).join(' | ')} |${i === 0 ? `\n| ${r.map(() => '---').join(' | ')} |` : ''}`).join('\n');
+  switch (node.type) {
+    case 'note':
+      return blocksToMarkdown(node.data.blocks) + anhang;
+    case 'kanban': {
+      const k = node.data;
+      const done = doneCol(k);
+      const cols = kanbanCols(k).map((col, i) => {
+        const items = k.items.filter((it) => Math.min(it.col, done) === i);
+        return `**${col}**\n\n${items.map((it) => `- [${i === done ? 'x' : ' '}] ${it.text}${it.due ? ` (bis ${it.due})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` — ${it.note}` : ''}`).join('\n') || '- —'}`;
+      });
+      return `### ${k.title || 'Kanban'}\n\n${cols.join('\n\n')}${anhang}`;
+    }
+    case 'sheet': {
+      const z = sheetZeilen(node.data);
+      return `### ${node.data.title || 'Rechen-Tabelle'}\n\n${z.length ? tabelle(z) : '—'}${anhang}`;
+    }
+    case 'minutes': {
+      const mn = node.data as { title?: string; entries?: Array<{ date: string; title?: string; attendees?: string; blocks?: unknown[]; decisions?: Array<{ text: string }> }> };
+      const parts = [...(mn.entries ?? [])].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')).map((e) =>
+        [`#### ${e.title?.trim() || e.date}`, e.attendees ? `*Teilnehmende: ${e.attendees}*` : '', blocksToMarkdown(e.blocks),
+          (e.decisions ?? []).length ? `**Beschlüsse**\n\n${(e.decisions ?? []).map((d) => `- ${d.text}`).join('\n')}` : ''].filter(Boolean).join('\n\n'));
+      return `### ${mn.title ?? 'Besprechungsreihe'}\n\n${parts.join('\n\n')}${anhang}`;
+    }
+    case 'mermaid':
+      return `\`\`\`mermaid\n${node.data.code}\n\`\`\`${anhang}`;
+    case 'frame':
+      return `## ${node.data.name}`;
+    case 'email':
+      return `### 📧 ${node.data.subject}\n\n*Von: ${node.data.fromName}${node.data.fromAddress ? ` <${node.data.fromAddress}>` : ''}*\n\n${node.data.text}${anhang}`;
+    default:
+      return nodeToText(node);
   }
 }
 

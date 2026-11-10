@@ -4,7 +4,7 @@ import { getNodesBounds } from '@xyflow/react';
 import { allesZeigen } from './fernRuhe';
 import type { BoardDoc, Space } from '../store';
 import type { AppNode } from '../types';
-import { nodeToText } from './serialize';
+import { nodeToMarkdown } from './serialize';
 import { triggerDownload } from './download';
 
 export interface BoardExportOptions {
@@ -17,6 +17,10 @@ export interface BoardExportOptions {
   background?: 'beige' | 'white' | 'transparent';
   /** Kopfzeile mit Board-Name + Datum */
   header?: boolean;
+  /** M340: NUR diese Karten zeigen (Auswahl-Export) — Nachbarn im Ausschnitt, fremde Linien und Striche bleiben draußen */
+  nurDiese?: boolean;
+  /** Linien zwischen den Karten (für den Auswahl-Export: nur die zwischen gewählten Karten) */
+  edges?: Array<{ id: string; source: string; target: string }>;
 }
 
 const PAD = 60;       // Rand um den Inhalt
@@ -35,6 +39,14 @@ export async function exportBoard(o: BoardExportOptions): Promise<void> {
   const el = document.querySelector('.react-flow__viewport') as HTMLElement | null;
   if (!el) throw new Error('Kein Board sichtbar');
   if (o.nodes.length === 0) throw new Error('Keine Karten zum Exportieren (Auswahl leer?)');
+  /**
+   * M340: Das Druckfenster entsteht SOFORT, noch im Klick. Vorher wurde es erst nach dem Rendern
+   * geöffnet (ein, zwei Sekunden später) — für den Browser kein Klick mehr, also ein Pop-up, das
+   * er blockiert. Der Druck-Export meldete dann „Popup blockiert", obwohl niemand etwas falsch machte.
+   */
+  const druck = o.format === 'print' ? window.open('', '_blank') : null;
+  if (o.format === 'print' && !druck) throw new Error('Popup blockiert — bitte Popups für diese Seite erlauben.');
+  if (druck) druck.document.write('<title>PixiNotes</title><p style="font:14px system-ui;color:#666;padding:24px">Bild wird erstellt …</p>');
 
   // Zuschnitt: Bounding-Box der Karten + Rand (+ Platz für die Kopfzeile)
   const b = getNodesBounds(o.nodes as unknown as Parameters<typeof getNodesBounds>[0]);
@@ -47,7 +59,22 @@ export async function exportBoard(o: BoardExportOptions): Promise<void> {
   const w = Math.round(bw * zoom);
   const h = Math.round(bh * zoom);
 
-  const bg = o.background === 'white' ? '#ffffff' : o.background === 'transparent' ? undefined : '#f3f4f6';
+  // Vorgabe: die Fläche, wie man sie sieht (auch im dunklen Design) — vorher immer hellgrau
+  const flaeche = getComputedStyle(document.querySelector('.react-flow') ?? document.body).backgroundColor;
+  const bg = o.background === 'white' ? '#ffffff' : o.background === 'transparent' ? undefined
+    : (flaeche && flaeche !== 'rgba(0, 0, 0, 0)' && flaeche !== 'transparent' ? flaeche : '#f3f4f6');
+  // Auswahl-Export: nur die gewählten Karten und die Linien zwischen ihnen
+  const ids = new Set(o.nodes.map((n) => n.id));
+  const linien = new Set((o.edges ?? []).filter((e) => ids.has(e.source) && ids.has(e.target)).map((e) => e.id));
+  const filter = (n: HTMLElement): boolean => {
+    if (!o.nurDiese || !n.classList) return true;
+    if (n.classList.contains('react-flow__node')) return ids.has(n.dataset?.id ?? n.getAttribute('data-id') ?? '');
+    // Linien: Die Bildbibliothek übernimmt ein <svg> samt Inhalt am Stück (der Filter sieht dessen Kinder nie) —
+    // entschieden wird deshalb am <svg>, das die Linie umschließt.
+    const kanten = n.tagName?.toLowerCase() === 'svg' && typeof n.querySelectorAll === 'function' ? Array.from(n.querySelectorAll('.react-flow__edge')) : [];
+    if (kanten.length) return kanten.some((k) => linien.has(k.getAttribute('data-id') ?? (k.getAttribute('data-testid') ?? '').replace('rf__edge-', '')));
+    return true;
+  };
   const scale = Math.min(3, Math.max(1, o.scale ?? 2));
   const opts = {
     width: w,
@@ -55,6 +82,7 @@ export async function exportBoard(o: BoardExportOptions): Promise<void> {
     backgroundColor: bg,
     pixelRatio: scale,
     cacheBust: true,
+    filter,
     // Viewport-Transform überschreiben: Ausschnitt = Inhalts-Box (React-Flow-Muster)
     style: { width: `${w}px`, height: `${h}px`, transform: `translate(${-bx * zoom}px, ${-by * zoom}px) scale(${zoom})` },
   };
@@ -64,6 +92,12 @@ export async function exportBoard(o: BoardExportOptions): Promise<void> {
 
   // M338: Fern ruhende Karten (lib/fernRuhe.ts) für die Aufnahme wecken — sonst wären sie im Bild leer
   const ruheWieder = await allesZeigen();
+  /**
+   * M340: Stift- und Textmarker-Striche gehören ins Bild. Sie liegen in einer eigenen Ebene ÜBER
+   * dem Board (nicht in der Fläche, die hier aufgenommen wird) und fehlten deshalb in jedem
+   * Export. Für die Aufnahme wandert eine Kopie in die Fläche — in Board-Koordinaten.
+   */
+  const strichKopie = stricheInDieFlaeche(el, o.nurDiese ? ids : null);
   let png: string;
   try {
     if (o.format === 'svg') {
@@ -73,12 +107,16 @@ export async function exportBoard(o: BoardExportOptions): Promise<void> {
       return;
     }
     png = await toPng(el, opts);
+  } catch (e) {
+    druck?.close();
+    throw e;
   } finally {
+    strichKopie?.remove();
     ruheWieder();
   }
   if (headerText) png = await pngWithHeader(png, headerText, scale);
-  if (o.format === 'print') {
-    openPrint(png, o.name);
+  if (druck) {
+    openPrint(druck, png, o.name);
     return;
   }
   triggerDownload(png, `${sanitize(o.name)}.png`);
@@ -114,9 +152,8 @@ function svgWithHeader(dataUrl: string, text: string): string {
 }
 
 /** PNG in einem Druckfenster öffnen — „Als PDF speichern" macht daraus das PDF */
-function openPrint(png: string, name: string): void {
-  const win = window.open('', '_blank');
-  if (!win) throw new Error('Popup blockiert — bitte Popups für diese Seite erlauben.');
+function openPrint(win: Window, png: string, name: string): void {
+  win.document.open();
   win.document.write(
     `<html><head><title>${escapeXml(name)}</title>`
     + '<style>body{margin:0;display:flex;justify-content:center}img{max-width:100%;height:auto}</style></head>'
@@ -125,14 +162,31 @@ function openPrint(png: string, name: string): void {
   win.document.close();
 }
 
+/** Kopie der Strich-Ebene in die Board-Fläche hängen (nur für die Aufnahme) — `nur`: Striche an diesen Karten */
+function stricheInDieFlaeche(flaeche: HTMLElement, nur: Set<string> | null): SVGSVGElement | null {
+  const gruppe = document.querySelector('.drawing-layer > g');
+  if (!gruppe || gruppe.childElementCount === 0) return null;
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg') as SVGSVGElement;
+  svg.setAttribute('class', 'export-striche');
+  svg.setAttribute('style', 'position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none;z-index:3000');
+  for (const p of Array.from(gruppe.children)) {
+    if (nur && !nur.has(p.getAttribute('data-anker') ?? '')) continue;
+    svg.appendChild(p.cloneNode(true));
+  }
+  if (svg.childElementCount === 0) return null;
+  flaeche.appendChild(svg);
+  return svg;
+}
+
 /** Ein Board als Markdown (Karten als Abschnitte). */
 export function boardToMarkdown(board: BoardDoc): string {
-  const lines = [`# ${board.name}`, ''];
-  for (const n of board.nodes) {
-    const text = nodeToText(n);
-    if (text) lines.push(text, '');
-  }
-  return lines.join('\n');
+  // M340: echtes Markdown (Überschriften, Listen, Kästchen, Tabellen, Links) statt Klartext mit .md-Endung;
+  // archivierte Karten bleiben draußen, die Karten folgen der Lesereihenfolge (oben nach unten, links nach rechts)
+  const karten = board.nodes.filter((n) => !n.archived)
+    .sort((a, b) => (Math.round(a.position.y / 80) - Math.round(b.position.y / 80)) || (a.position.x - b.position.x));
+  const teile = karten.map((n) => nodeToMarkdown(n).trim()).filter(Boolean);
+  return `# ${board.name}\n\n${teile.join('\n\n---\n\n')}\n`;
 }
 
 function sanitize(s: string): string {
@@ -153,13 +207,21 @@ export async function exportToFolder(spaces: Space[], boards: BoardDoc[]): Promi
   const picker = (window as unknown as { showDirectoryPicker?: () => Promise<DirHandle> }).showDirectoryPicker;
 
   if (!picker) {
-    // Fallback (Firefox/Safari/file://): alle Boards als Einzeldownloads
-    for (const b of boards) {
-      triggerDownload(
-        `data:text/markdown;charset=utf-8,${encodeURIComponent(boardToMarkdown(b))}`,
-        `${sanitize(b.name)}.md`,
-      );
+    /**
+     * Fallback (Firefox/Safari/file://): EINE Datei mit allen Boards, gegliedert nach Bereich und Projekt.
+     * M340: Vorher je Board ein eigener Download — Browser lassen von mehreren Downloads hintereinander
+     * nur den ersten durch, der Rest verschwand ohne Meldung.
+     */
+    const teile: string[] = [];
+    const drin = new Set<string>();
+    for (const space of spaces) for (const project of space.projects) for (const bid of project.boardIds) {
+      const b = boardById.get(bid);
+      if (!b) continue;
+      drin.add(bid);
+      teile.push(`<!-- ${space.name} / ${project.name} -->\n\n${boardToMarkdown(b)}`);
     }
+    for (const b of boards) if (!drin.has(b.id)) teile.push(boardToMarkdown(b));
+    triggerDownload(URL.createObjectURL(new Blob([teile.join('\n\n')], { type: 'text/markdown;charset=utf-8' })), 'pixinotes-export.md');
     return 'fallback';
   }
 

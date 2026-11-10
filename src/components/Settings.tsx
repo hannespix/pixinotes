@@ -1141,11 +1141,11 @@ export function Settings() {
           <h3>Als Markdown exportieren</h3>
           <p className="modal-hint">{hasFolderApi
               ? 'Alle Boards als Markdown-Dateien in einen Ordner deiner Wahl, lesbar in Obsidian.'
-              : 'Alle Boards als Markdown-Dateien; dieser Browser lädt sie einzeln herunter.'}</p>
+              : 'Alle Boards in einer Markdown-Datei, gegliedert nach Bereich und Projekt.'}</p>
           <div className="modal-buttons">
             <button disabled={!!busy} onClick={() => doExport(async () => {
               const r = await exportToFolder(spaces, boards);
-              showToast(r === 'ok' ? '📁 In Ordner gespeichert' : '⬇️ Markdown-Dateien heruntergeladen');
+              showToast(r === 'ok' ? '📁 In Ordner gespeichert' : '⬇️ Markdown-Datei heruntergeladen');
             }, 'folder')}>
               {busy === 'folder' ? '…' : hasFolderApi ? 'Ordner wählen & speichern' : 'Als Markdown exportieren'}
             </button>

@@ -19,6 +19,8 @@ export function cardsToBoardDoc(nodes: AppNode[], board: BoardDoc, name: string)
     nodes: nodes.map((n) => ({ ...n, selected: false })),
     edges: (board.edges ?? []).filter((e) => ids.has(e.source) && ids.has(e.target)),
     drawings: ((board.drawings ?? []) as Stroke[]).filter((s) => s.anchor && ids.has(s.anchor)),
+    // M340: auch die Kommentare an diesen Karten
+    ...((board.comments ?? []).some((c) => c.nodeId && ids.has(c.nodeId)) ? { comments: (board.comments ?? []).filter((c) => c.nodeId && ids.has(c.nodeId)) } : {}),
   };
 }
 
@@ -38,11 +40,15 @@ const PRINT_CSS = `
   h1, h2, h3 { line-height: 1.25; }
   img { max-width: 100%; height: auto; }
   table { border-collapse: collapse; } td, th { border: 1px solid #bbb; padding: 4px 8px; }
+  /* M340: Überschriften bleiben bei ihrem Text, Listenpunkte, Bilder und Tabellenzeilen werden nicht zerschnitten */
+  h1, h2, h3, h4 { break-after: avoid; } li, tr, img, figure, blockquote, pre { break-inside: avoid; }
+  a { color: #3557c9; } @page { margin: 16mm 14mm; }
   .pn-print-foot { margin-top: 28px; font-size: 11px; color: #888; border-top: 1px solid #ddd; padding-top: 8px; }
 `;
 
 function cardsHtmlDoc(nodes: AppNode[], title: string): string {
-  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>${title}</title>`
+  const titel = title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); // ein Board darf „<Entwurf>" heißen
+  return `<!doctype html><html lang="de"><head><meta charset="utf-8"><title>${titel}</title>`
     + `<style>${PRINT_CSS}</style></head><body>${nodesToHtml(nodes)}`
     + `<div class="pn-print-foot">Aus PixiNotes geteilt · ${new Date().toLocaleDateString('de-DE')}</div>`
     + '</body></html>';
@@ -187,8 +193,31 @@ export async function cardsToPdf(nodes: AppNode[], title = 'pixinotes-karten'): 
      */
     const proSeite = Math.max(1, Math.floor(cv.width * ((A4_H - 2 * RAND) / (A4_B - 2 * RAND))));
     const seiten: PdfBild[] = [];
-    for (let oben = 0; oben < cv.height; oben += proSeite) {
-      const hoch = Math.min(proSeite, cv.height - oben);
+    /**
+     * M340: Der Schnitt fällt in eine LEERE Zeile. Vorher lag er stur auf der Seitenhöhe und ging
+     * mitten durch Textzeilen — die obere Hälfte der Buchstaben auf Seite 1, die untere auf Seite 2.
+     * Gesucht wird von der Seitengrenze nach oben (höchstens ein Fünftel der Seite) nach einer
+     * durchgehend weißen Bildzeile; findet sich keine (ein hohes Bild), bleibt es bei der Grenze.
+     */
+    const ctxAlle = cv.getContext('2d');
+    const zeileLeer = (y: number): boolean => {
+      if (!ctxAlle) return false;
+      const d = ctxAlle.getImageData(0, y, cv.width, 1).data;
+      for (let i = 0; i < d.length; i += 16) if (d[i] < 246 || d[i + 1] < 246 || d[i + 2] < 246) return false;
+      return true;
+    };
+    const schnitt = (oben: number): number => {
+      const grenze = oben + proSeite;
+      if (grenze >= cv.height) return cv.height;
+      for (let y = grenze; y > grenze - proSeite / 5; y -= 1) {
+        // drei leere Zeilen übereinander: sicher ein Zwischenraum, kein Loch in einem Buchstaben
+        if (zeileLeer(y) && zeileLeer(y - 2) && zeileLeer(y - 4)) return y - 2;
+      }
+      return grenze;
+    };
+    for (let oben = 0, bis = 0; oben < cv.height; oben = bis) {
+      bis = schnitt(oben);
+      const hoch = bis - oben;
       const teil = document.createElement('canvas');
       teil.width = cv.width;
       teil.height = hoch;

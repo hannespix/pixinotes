@@ -228,6 +228,11 @@ body {
    gerechnet und nicht gezeichnet; die gemerkten Innenmaße halten ihre Größe. Export und Druck zeigen alles. */
 .card-shell[data-fern] > .card-body { content-visibility: hidden; contain-intrinsic-size: var(--fern-w, auto) var(--fern-h, auto); }
 html[data-alles-zeigen] .card-shell[data-fern] > .card-body { content-visibility: visible; }
+/* M340: Für die Bild-Aufnahme verschwindet die Bedienung — Auswahlrahmen, Griffe, Anschlusspunkte, Scrollbalken.
+   Die Aufnahme zeigt eine gescrollte Notiz von oben (ein Bild kennt keinen Scrollstand): Schatten nur unten. */
+html[data-alles-zeigen] .react-flow__node.selected { outline: none !important; }
+html[data-alles-zeigen] :is(.react-flow__resize-control, .pn-handle, .card-grip, .color-dot, .note-farben, .fit-hint, .card-x, .note-spur, .note-mehr.oben, .react-flow__nodesselection, .react-flow__selection) { visibility: hidden !important; }
+html[data-alles-zeigen] .card-shell[data-rollt] > .note-mehr.unten { opacity: 1; }
 @media print { .card-shell[data-fern] > .card-body { content-visibility: visible; } }
 /* M338: Griff, Anschlusspunkte und Farbpunkt sind ohne Zeiger auf der Karte unsichtbar — „durchsichtig“
    (opacity 0) ließ den Browser sie trotzdem bei jedem Schwenk mitführen: sechs Ebenen je Karte.
