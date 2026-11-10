@@ -59,6 +59,7 @@ export const StrichPfad = memo(function StrichPfad({ s, dx = 0, dy = 0, dim = fa
     return (
       <path
         d={toPath(s)}
+        data-anker={s.anchor}
         transform={transform}
         fill="none"
         stroke={s.color}
@@ -74,6 +75,7 @@ export const StrichPfad = memo(function StrichPfad({ s, dx = 0, dy = 0, dim = fa
   return (
     <path
       className="strich"
+      data-anker={s.anchor}
       d={laufend ? strichKontur(s, true) : konturFuer(s)}
       transform={transform}
       fill={s.color}

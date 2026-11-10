@@ -32,11 +32,16 @@ export function ShareCardsModal() {
       if (!url) {
         showToast('Zu groß für einen Link, stattdessen als Datei heruntergeladen. Der Empfänger zieht sie aufs Board.');
       } else {
-        await navigator.clipboard.writeText(url);
-        showToast('🔗 Übernahme-Link kopiert, er enthält die Karten komplett.');
+        try {
+          await navigator.clipboard.writeText(url);
+          showToast('🔗 Übernahme-Link kopiert, er enthält die Karten komplett.');
+        } catch {
+          // M340: Zwischenablage gesperrt (Safari nach kurzer Wartezeit, eingebettete Ansicht) — der Link ist trotzdem da
+          window.prompt('Link zum Kopieren (Strg+C):', url);
+        }
       }
     } catch {
-      showToast('Link konnte nicht kopiert werden.');
+      showToast('Link konnte nicht erstellt werden.');
     } finally { setBusy(''); }
   };
 

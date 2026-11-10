@@ -82,12 +82,30 @@ export function cloneSharedBoard(board: BoardDoc): BoardDoc {
   const edges = (board.edges ?? [])
     .filter((e) => idMap.has(e.source) && idMap.has(e.target))
     .map((e) => ({ ...e, id: `e-${uid()}`, source: idMap.get(e.source)!, target: idMap.get(e.target)! }));
+  /**
+   * M340: Zeichnungen und Kommentare mitnehmen — an den NEUEN Karten.
+   * Vorher wanderten die Striche unverändert mit: Ihr Anker zeigte auf die Karten-Id des Absenders,
+   * die es nach dem Klonen nicht mehr gibt. Jede Markierung auf einer Karte war beim Empfänger
+   * unsichtbar. Freie Striche bleiben frei; Striche an Karten, die nicht mitkamen, entfallen.
+   */
+  const drawings = (board.drawings ?? []).flatMap((s) => {
+    if (!s.anchor) return [{ ...s, id: uid() }];
+    const ziel = idMap.get(s.anchor);
+    return ziel ? [{ ...s, id: uid(), anchor: ziel }] : [];
+  });
+  const comments = (board.comments ?? []).flatMap((c) => {
+    if (!c.nodeId) return [{ ...c, id: uid() }];
+    const ziel = idMap.get(c.nodeId);
+    return ziel ? [{ ...c, id: uid(), nodeId: ziel }] : [];
+  });
   return {
     id: uid(),
     name: `${board.name ?? 'Board'} (geteilt)`,
     nodes,
     edges,
-    drawings: board.drawings,
+    drawings,
+    ...(comments.length ? { comments } : {}),
+    ...(board.bg ? { bg: board.bg } : {}),
   };
 }
 

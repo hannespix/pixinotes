@@ -126,8 +126,12 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
         showToast('Board zu groß für einen Link, als Datei gesichert.');
         return;
       }
-      await navigator.clipboard.writeText(url);
-      showToast('Teilen-Link kopiert, er enthält das komplette Board.');
+      try {
+        await navigator.clipboard.writeText(url);
+        showToast('Teilen-Link kopiert, er enthält das komplette Board.');
+      } catch {
+        window.prompt('Link zum Kopieren (Strg+C):', url); // M340: Zwischenablage gesperrt — der Link ist trotzdem da
+      }
     } catch {
       downloadBoardFile(board);
       showToast('Link nicht kopierbar, Board als Datei gesichert.');
