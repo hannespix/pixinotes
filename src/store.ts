@@ -16,6 +16,7 @@ import {
 import { buildStarter } from './lib/starter';
 import { KACHEL_TYPEN, uid, type AppNode, type CardFont, type CardSize, type TimeSeg } from './types';
 import { anchorStroke, integrateStroke } from './lib/strokeAnchor';
+import { istAmText } from './lib/notizText';
 import { offeneSeite, strichRelativ } from './lib/pdfSeiten';
 import { findFreeSpot, frameMembers } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
@@ -36,6 +37,13 @@ export interface Stroke {
   /** M335: auf dieser SEITE einer PDF-Karte — die Punkte sind dann Seitenpunkte
    *  (PDF-Punkte, Ursprung Seitenecke); sichtbar nur, wenn die Seite offen ist */
   seite?: number;
+  /** M339: liegt auf dem TEXT einer Notiz (lib/notizText.ts) — die Punkte sind dann Inhaltspunkte
+   *  (Kartenecke bei Scrollstand 0), der Strich scrollt mit dem Text. false = hängt am Kartenrahmen.
+   *  Fehlt bei Strichen von vor M339: dann entscheidet die Lage (ganz auf der Karte = am Text). */
+  amText?: boolean;
+  /** M339: Absatz unter dem Strich und dessen Oberkante beim Zeichnen — rückt der Absatz, rückt der Strich mit */
+  block?: string;
+  blockY?: number;
 }
 
 /** Ebene 3: Ein Board = eine Leinwand voller Karten. */
@@ -446,6 +454,8 @@ interface BoardState {
   setNodeHeight: (id: string, height: number) => void;
   /** Auto-Größe je Karte an/aus (M103; seit M111 Standard AN — false = manuell gebrochen) */
   setAutoFit: (ids: string[], on: boolean) => void;
+  /** M339: Vor dem Verkleinern einer Notiz festschreiben, welche älteren Striche zum Text gehören */
+  textStricheFestschreiben: (nodeId: string) => void;
   /** M298: Große Module als Kachel zusammenklappen (on) oder wieder ausklappen */
   setKachel: (ids: string[], on: boolean) => void;
   /** M200: Schrift/Textgröße pro Karte — null setzt auf Standard zurück */
@@ -1199,12 +1209,15 @@ export const useBoard = create<BoardState>()(
               if (!s.anchor || !idSet.has(s.anchor)) return s;
               const n = byId.get(s.anchor);
               // M335: Seitenstriche kommen in Kartenpunkten zurück — verdeckte (Seite nicht offen) bleiben, wie sie sind
-              const rel = s.seite != null ? strichRelativ(s) : s.points;
+              const rel = strichRelativ(s); // M339: Text-Striche dort, wo man sie gerade sieht
               if (s.seite != null && rel.length === 0) return s;
               return {
                 ...s,
                 anchor: undefined,
                 seite: undefined,
+                amText: undefined,
+                block: undefined,
+                blockY: undefined,
                 points: n ? rel.map(([px, py]) => [px + n.position.x, py + n.position.y] as [number, number]) : rel,
               };
             }),
@@ -2058,6 +2071,21 @@ export const useBoard = create<BoardState>()(
               n.id === id ? ({ ...n, height } as AppNode) : n,
             ),
           })),
+
+        textStricheFestschreiben: (nodeId) => {
+          const board = get().boards.find((b) => b.id === get().activeId);
+          const n = board?.nodes.find((k) => k.id === nodeId);
+          if (!board || !n || n.type !== 'note') return;
+          const offen = (board.drawings ?? []).filter((s) => s.anchor === nodeId && s.seite == null && s.amText == null);
+          if (offen.length === 0) return;
+          const w = n.width ?? n.measured?.width ?? 260;
+          const h = n.height ?? undefined; // ohne feste Höhe reichte die Karte bis zum Ende ihres Inhalts
+          const ids = new Set(offen.map((s) => s.id));
+          // gehört zur folgenden Größenänderung — kein eigener Rückgängig-Schritt
+          mutedHistory(() => patchActive((b) => ({
+            drawings: (b.drawings ?? []).map((s) => (ids.has(s.id) ? { ...s, amText: istAmText(s, true, w, h) } : s)),
+          })));
+        },
 
         setAutoFit: (ids, on) =>
           patchActive((b) => ({

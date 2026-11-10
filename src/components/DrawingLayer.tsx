@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useReactFlow, useViewport } from '@xyflow/react';
-import { getStroke } from 'perfect-freehand';
 import { selectActiveBoard, useBoard, type Stroke } from '../store';
 import { SEITEN_EREIGNIS, seiteVon, strichRelativ } from '../lib/pdfSeiten';
 import { uid } from '../types';
@@ -14,12 +13,12 @@ import { noteTitle } from '../lib/notiz';
 import { blocksToText } from '../lib/serialize';
 import { makeNote } from '../lib/nodes';
 import { mitFestenIds, mitPfadIds } from '../lib/notizRuhend';
+import { MARKER, PEN, StrichPfad } from './StrichPfad';
+import { istAmText } from '../lib/notizText';
 import type { AppNode } from '../types';
 import { IType, IX } from './Icons';
 
 const EMPTY: Stroke[] = [];
-const PEN = { width: 2.5, opacity: 1 };
-const MARKER = { width: 16, opacity: 0.5 };
 const PEN_COLORS = ['#16191e', '#e0392b', '#e8a13a', '#3fa564', '#4f7cff', '#a05fd4'];
 /** Textmarker: echte Neon-Töne wie beim Leuchtstift (gelb/grün/orange/pink/cyan/lila) */
 const MARKER_COLORS = ['#fff200', '#aaff00', '#ff9100', '#ff2d95', '#00e5ff', '#c45fff'];
@@ -48,45 +47,8 @@ const STIFT_KEY = 'pixinotes-stift';
 /** Bedienelemente, die auch im Zeichenmodus Bedienelemente bleiben */
 const CHROME = '.draw-palette, .dock, .sel-toolbar, .modal-backdrop, .ebenen-menu, .topbar, .tabs, .react-flow__minimap, .toast';
 
-/**
- * M319: Strichkontur mit perfect-freehand — druckempfindlich, geglättet,
- * sauber verjüngt. `size` ist der Durchmesser bei mittlerem Druck; dünne
- * Stellen bei leichtem Druck, kräftige bei festem. Ohne Drucksensor (Maus,
- * Finger) simuliert die Geschwindigkeit den Druck: schnell = dünn.
- */
-function strichKontur(s: Stroke, laufend: boolean): string {
-  const punkte = s.druck && s.druck.length === s.points.length
-    ? s.points.map((p, i) => [p[0], p[1], s.druck![i]])
-    : s.points.map((p) => [p[0], p[1], 0.5]);
-  const kontur = getStroke(punkte, {
-    size: s.width * 1.4,
-    thinning: 0.55,
-    smoothing: 0.55,
-    streamline: 0.45,
-    simulatePressure: !s.druck,
-    start: { taper: 2, cap: true },
-    end: { taper: s.points.length > 6 ? 8 : 0, cap: true },
-    last: !laufend,
-  });
-  if (kontur.length === 0) return '';
-  const d: string[] = ['M', kontur[0][0].toFixed(1), kontur[0][1].toFixed(1), 'Q'];
-  for (let i = 0; i < kontur.length; i += 1) {
-    const [x0, y0] = kontur[i];
-    const [x1, y1] = kontur[(i + 1) % kontur.length];
-    d.push(x0.toFixed(1), y0.toFixed(1), ((x0 + x1) / 2).toFixed(1), ((y0 + y1) / 2).toFixed(1));
-  }
-  d.push('Z');
-  return d.join(' ');
-}
-/** Fertige Striche ändern sich nie — ihre Kontur wird einmal gerechnet */
-const konturCache = new WeakMap<Stroke, string>();
 /** M335: Seitenstriche werden je Seitenlage einmal in Kartenpunkte umgerechnet (gleiches Objekt → Kontur aus dem Cache) */
 const seitenStrichCache = new WeakMap<Stroke, { g: object; s: Stroke }>();
-const konturFuer = (s: Stroke): string => {
-  let k = konturCache.get(s);
-  if (!k) { k = strichKontur(s, false); konturCache.set(s, k); }
-  return k;
-};
 
 /**
  * Freihand-Zeichnen über dem Board: Stift (deckend, druckempfindlich) und
@@ -690,7 +652,7 @@ export function DrawingLayer() {
   const absolut = (s: Stroke): Pt[] => {
     const n = s.anchor ? nodes.find((k) => k.id === s.anchor) : undefined;
     const dx = n?.position.x ?? 0, dy = n?.position.y ?? 0;
-    const rel = s.seite != null ? strichRelativ(s) : s.points; // M335: Seitenstriche umgerechnet (leer, wenn verdeckt)
+    const rel = strichRelativ(s); // M335: Seitenstriche umgerechnet (leer, wenn verdeckt) · M339: Text-Striche, wo man sie sieht
     return dx || dy ? rel.map((p) => [p[0] + dx, p[1] + dy] as Pt) : rel;
   };
   /** Die Stift-Striche dieser Schreibsitzung — das, was gerade geschrieben wurde */
@@ -1101,9 +1063,6 @@ export function DrawingLayer() {
   const schriftDa = sessionIds.current.some((id) => drawings.some((s) => s.id === id && s.tool === 'pen'));
   const rfRect = vorschlag ? document.querySelector('.react-flow')?.getBoundingClientRect() : null;
 
-  const toPath = (s: Stroke) =>
-    s.points.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
-
   const all = drawing.current ? [...drawings, drawing.current] : drawings;
   // Geankerte Striche: Versatz = aktuelle Kartenposition (sie wandern so bei
   // Drag/Physik/Aufräumen automatisch mit); Karte weg/archiviert → unsichtbar
@@ -1121,6 +1080,8 @@ export function DrawingLayer() {
       if (!t || t.g !== g) seitenStrichCache.set(s, { g, s: abgeleitet });
       return [{ s: abgeleitet, dx: n.position.x, dy: n.position.y, dim: !!n.archived }];
     }
+    // M339: Was auf dem Text einer Notiz liegt, zeichnet die Notiz selbst (scrollt mit) — hier nur der laufende Strich
+    if (n.type === 'note' && s !== drawing.current && !n.kachel && istAmText(s, true, n.width ?? n.measured?.width ?? 260, n.height ?? undefined)) return [];
     return [{ s, dx: n.position.x, dy: n.position.y, dim: !!n.archived }];
   });
 
@@ -1143,37 +1104,24 @@ export function DrawingLayer() {
           const pane = document.querySelector('.react-flow__pane');
           if (!pane) return;
           const n = e.nativeEvent;
+          // M339: Über einer scrollbaren Notiz rollt das Rad auch beim Zeichnen den Text — man will weiter unten markieren
+          if (!n.ctrlKey && !n.metaKey && Math.abs(n.deltaY) >= Math.abs(n.deltaX)) {
+            const rolle = document.elementsFromPoint(n.clientX, n.clientY).find((el) => el.matches('.card-body.note-card')) as HTMLElement | undefined;
+            const max = rolle ? rolle.scrollHeight - rolle.clientHeight : 0;
+            if (rolle && max > 4 && ((n.deltaY > 0 && rolle.scrollTop < max - 1) || (n.deltaY < 0 && rolle.scrollTop > 0))) {
+              rolle.scrollTop += n.deltaMode === 1 ? n.deltaY * 16 : n.deltaY;
+              return;
+            }
+          }
           pane.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: n.clientX, clientY: n.clientY, deltaX: n.deltaX, deltaY: n.deltaY, deltaMode: n.deltaMode, ctrlKey: n.ctrlKey, metaKey: n.metaKey, shiftKey: n.shiftKey }));
         }}
       >
         <g transform={`translate(${tx},${ty}) scale(${zoom})`}>
           {/* Eingerastete Formen (Linie, Pfeil, Rechteck, Dreieck: wenige Punkte) bleiben
               scharfkantige Linien — die Freihand-Kontur würde ihre Ecken runden. */}
-          {placed.map(({ s, dx, dy, dim }) => (s.tool === 'marker' || s.points.length <= 6 ? (
-            <path
-              key={s.id}
-              d={toPath(s)}
-              transform={dx || dy ? `translate(${dx},${dy})` : undefined}
-              fill="none"
-              stroke={s.color}
-              strokeWidth={s.width}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              opacity={(s.tool === 'marker' ? MARKER.opacity : PEN.opacity) * (dim ? 0.35 : 1)}
-              // Multiply lässt den Text unter dem Marker durchscheinen — wie beim echten Leuchtstift
-              style={s.tool === 'marker' ? { mixBlendMode: 'multiply' } : undefined}
-            />
-          ) : (
-            <path
-              key={s.id}
-              className="strich"
-              d={s === drawing.current ? strichKontur(s, true) : konturFuer(s)}
-              transform={dx || dy ? `translate(${dx},${dy})` : undefined}
-              fill={s.color}
-              stroke="none"
-              opacity={PEN.opacity * (dim ? 0.35 : 1)}
-            />
-          )))}
+          {placed.map(({ s, dx, dy, dim }) => (
+            <StrichPfad key={s.id} s={s} dx={dx} dy={dy} dim={dim} laufend={s === drawing.current} />
+          ))}
         </g>
       </svg>
       {vorschlag && rfRect && (

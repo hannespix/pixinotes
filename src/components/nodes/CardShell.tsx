@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Reac
 import { Handle, NodeResizer, Position } from '@xyflow/react';
 import { runDerived, selectActiveBoard, useBoard } from '../../store';
 import { fernBeobachten } from '../../lib/fernRuhe';
+import { rolleMelden } from '../../lib/notizText';
 import { kachelInfo } from '../../lib/kachel';
 import type { AppNode } from '../../types';
 
@@ -17,13 +18,20 @@ interface Props {
   style?: CSSProperties;
   /** M323: Darf die Auto-Größe auch SCHRUMPFEN, wenn Inhalt wegfällt? (Notizen) */
   schrumpft?: boolean;
+  /** M339: Der Kartenkörper scrollt, wenn der Inhalt nicht hineinpasst (Notizen) — mit schlankem Balken */
+  rollt?: boolean;
+  /** M339: Bedienelemente AUF der Karte, die nicht mitscrollen (Farbpunkt der Notiz) */
+  aussen?: ReactNode;
 }
+
+/** M339: So hoch wächst eine Notiz von selbst — darüber scrollt sie (von Hand lässt sie sich größer ziehen) */
+const NOTIZ_MAX = 640;
 
 /**
  * Gemeinsame Hülle aller Karten: Lösch-Knopf, Verbindungs-Handles und
  * Resize-Griffe an Ecken/Kanten (sichtbar bei Selektion).
  */
-export function CardShell({ id, className, children, selected, minWidth = 170, minHeight = 70, style, schrumpft = false }: Props) {
+export function CardShell({ id, className, children, selected, minWidth = 170, minHeight = 70, style, schrumpft = false, rollt = false, aussen }: Props) {
   const removeNode = useBoard((s) => s.removeNode);
   const setNodeHeight = useBoard((s) => s.setNodeHeight);
   const setAutoFit = useBoard((s) => s.setAutoFit);
@@ -38,6 +46,8 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
    * außer im Fokus, dort steht das ganze Modul. Der Node bleibt derselbe,
    * nur der Inhalt der Hülle wechselt.
    */
+  // M339: Notiz ohne feste Höhe (wächst mit dem Inhalt) — das Stylesheet deckelt sie bei NOTIZ_MAX
+  const ohneHoehe = useBoard((s) => rollt && selectActiveBoard(s)?.nodes.find((x) => x.id === id)?.height == null);
   const kachelNode = useBoard((s) => {
     const n = selectActiveBoard(s)?.nodes.find((x) => x.id === id);
     return n?.kachel ? n : null;
@@ -47,6 +57,8 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   imFokusRef.current = imFokus;
   const schrumpftRef = useRef(schrumpft);
   schrumpftRef.current = schrumpft;
+  const rolltRef = useRef(rollt);
+  rolltRef.current = rollt;
   // M323: Geschrumpft wird erst, nachdem jemand IN dieser Karte geschrieben hat —
   // nie beim bloßen Laden (Vorlagen, geteilte Boards und Beispiele behalten
   // ihre gesetzten Höhen, bis man sie anfasst)
@@ -88,6 +100,8 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     const down = (e: PointerEvent) => {
       pointerDownRef.current = true;
       resizeGestureRef.current = !!(e.target as Element | null)?.closest?.('.react-flow__resize-control');
+      // M339: Gleich wird die Größe geändert — vorher festhalten, welche älteren Striche zum Text gehören
+      if (resizeGestureRef.current && rolltRef.current) useBoard.getState().textStricheFestschreiben(id);
     };
     const up = () => {
       if (pointerDownRef.current) {
@@ -114,6 +128,80 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+  /**
+   * M339: Überlauf mit Scrollbalken. Der Kartenkörper scrollt selbst (CSS); hier entsteht der
+   * schlanke Balken dazu — eigener Daumen statt der Leiste des Browsers, weil ein Zug an der
+   * Browser-Leiste zugleich die Karte verschöbe. Lage und Größe werden direkt am Element gesetzt
+   * (kein Render je Scrollschritt). Zwei Schatten zeigen, dass oben bzw. unten noch Text folgt.
+   */
+  const daumenRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!rollt) return;
+    const body = bodyRef.current;
+    const shell = body?.parentElement;
+    const daumen = daumenRef.current;
+    if (!body || !shell || !daumen) return;
+    rolleMelden(id, body);
+    let raf = 0;
+    let merk = 0; // letzter Scrollstand — die Fern-Ruhe setzt ihn zurück, beim Wiederkommen wird er hergestellt
+    const stand = () => {
+      raf = 0;
+      if (shell.hasAttribute('data-fern')) return;
+      const max = body.scrollHeight - body.clientHeight;
+      const an = max > 4;
+      shell.toggleAttribute('data-rollt', an);
+      if (!an) { merk = 0; shell.removeAttribute('data-mehr-oben'); shell.removeAttribute('data-mehr-unten'); return; }
+      if (merk > 0 && body.scrollTop === 0) body.scrollTop = Math.min(merk, max);
+      merk = body.scrollTop;
+      const spur = body.clientHeight - 8;
+      const hoehe = Math.max(28, Math.round((spur * body.clientHeight) / body.scrollHeight));
+      daumen.style.height = `${hoehe}px`;
+      daumen.style.transform = `translateY(${Math.round(4 + (spur - hoehe) * (body.scrollTop / max))}px)`;
+      shell.toggleAttribute('data-mehr-oben', body.scrollTop > 2);
+      shell.toggleAttribute('data-mehr-unten', body.scrollTop < max - 2);
+    };
+    const plan = () => { if (!raf) raf = requestAnimationFrame(stand); };
+    const beimScrollen = () => { if (!shell.hasAttribute('data-fern')) merk = body.scrollTop; plan(); };
+    body.addEventListener('scroll', beimScrollen, { passive: true });
+    const ro = new ResizeObserver(plan);
+    ro.observe(body);
+    const mo = new MutationObserver(plan);
+    mo.observe(body, { subtree: true, childList: true, characterData: true });
+    const moFern = new MutationObserver(plan);
+    moFern.observe(shell, { attributes: true, attributeFilter: ['data-fern'] });
+    // Daumen ziehen: Zeigerweg → Scrollweg, im Maßstab des Boards
+    let zug: { y: number; top: number } | null = null;
+    const runter = (e: PointerEvent) => {
+      e.preventDefault(); e.stopPropagation();
+      daumen.setPointerCapture(e.pointerId);
+      zug = { y: e.clientY, top: body.scrollTop };
+      shell.setAttribute('data-rollzug', '');
+    };
+    const zieh = (e: PointerEvent) => {
+      if (!zug) return;
+      const k = body.clientHeight > 0 ? body.getBoundingClientRect().height / body.clientHeight : 1;
+      const max = body.scrollHeight - body.clientHeight;
+      const weg = Math.max(1, body.clientHeight - 8 - daumen.offsetHeight);
+      body.scrollTop = zug.top + ((e.clientY - zug.y) / (k || 1)) * (max / weg);
+    };
+    const los = () => { zug = null; shell.removeAttribute('data-rollzug'); };
+    daumen.addEventListener('pointerdown', runter);
+    daumen.addEventListener('pointermove', zieh);
+    daumen.addEventListener('pointerup', los);
+    daumen.addEventListener('pointercancel', los);
+    plan();
+    return () => {
+      rolleMelden(id, null);
+      cancelAnimationFrame(raf);
+      body.removeEventListener('scroll', beimScrollen);
+      ro.disconnect(); mo.disconnect(); moFern.disconnect();
+      daumen.removeEventListener('pointerdown', runter);
+      daumen.removeEventListener('pointermove', zieh);
+      daumen.removeEventListener('pointerup', los);
+      daumen.removeEventListener('pointercancel', los);
+      shell.removeAttribute('data-rollt');
+    };
+  }, [rollt, id, alsKachel]);
   // M338: Fern-Ruhe — weit außerhalb des Bildes wird der Inhalt nicht gerechnet (lib/fernRuhe.ts)
   useEffect(() => {
     const shell = bodyRef.current?.parentElement;
@@ -150,7 +238,8 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     lastDelta.current = delta; // Struktur-Erkennung: erneutes Angebot nur bei echter Änderung
     const shell = body.parentElement as HTMLElement | null;
     const current = shell?.offsetHeight ?? body.clientHeight;
-    setNodeHeight(id, Math.min(current + delta + 2, 860));
+    // (ausdrücklicher Wunsch: hier gilt der alte Deckel, auch für Notizen — und nie kleiner als jetzt)
+    setNodeHeight(id, Math.max(current, Math.min(current + delta + 2, 860)));
     setOverflowing(false);
     evalRef.current?.(); // Nachkontrolle: lastDelta zurücksetzen, sobald behoben (M108)
   };
@@ -220,7 +309,9 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
         lastDelta.current = delta;
         const shell = body.parentElement as HTMLElement | null; // .card-shell = Kartenhöhe
         const current = shell?.offsetHeight ?? body.clientHeight;
-        runDerived(() => setNodeHeight(id, Math.min(current + delta + 2, 860)));
+        // M339: Eine Notiz am Deckel scrollt — nicht weiter wachsen (und keine Höhe festschreiben)
+        if (rolltRef.current && current >= NOTIZ_MAX - 2) { lastDelta.current = null; return; }
+        runDerived(() => setNodeHeight(id, Math.min(current + delta + 2, rolltRef.current ? NOTIZ_MAX : 860)));
         // Nachkontrolle (M108): hat das Wachsen den Überlauf behoben, wird
         // lastDelta gleich wieder auf null gesetzt — sonst blockierte die
         // Struktur-Erkennung die NÄCHSTE, zufällig gleich große Änderung
@@ -251,7 +342,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   // Wichtig: Lösch-Knopf & Handles liegen AUSSERHALB des card-body,
   // damit dessen overflow:hidden sie nicht abschneidet.
   return (
-    <div className="card-shell">
+    <div className="card-shell" data-ohne-hoehe={ohneHoehe ? '' : undefined} style={rollt ? ({ '--notiz-max': `${NOTIZ_MAX}px` } as CSSProperties) : undefined}>
       {/* Resize-Griffe: weiße Quadrate mit neutralem Rand (klassischer
           Auswahlrahmen) — bewusst ANDERS als die runden Akzent-Verbindungs-
           punkte, damit beides auf einen Blick unterscheidbar ist (M102).
@@ -300,6 +391,16 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
           ? <Kachel node={kachelNode} onAuf={() => setKachel([id], false)} onOeffnen={() => oeffneKarte(useBoard.getState().activeId, id)} />
           : children}
       </div>
+      {rollt && (
+        <>
+          <div className="note-mehr oben" aria-hidden="true" />
+          <div className="note-mehr unten" aria-hidden="true" />
+          <div className="note-spur" aria-hidden="true">
+            <div ref={daumenRef} className="note-daumen nodrag nopan" title="Ziehen zum Scrollen" />
+          </div>
+        </>
+      )}
+      {!alsKachel && aussen}
     </div>
   );
 }

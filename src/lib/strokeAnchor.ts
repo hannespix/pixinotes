@@ -1,6 +1,7 @@
 import type { AppNode } from '../types';
 import type { Stroke } from '../store';
 import { aufSeite, offeneSeite, strichRelativ } from './pdfSeiten';
+import { blockBei, kastenInnen, strichKasten, textLage } from './notizText';
 
 /**
  * M127: Freihand-Striche an Karten ankern. Ein Strich, der beim Absetzen
@@ -147,12 +148,40 @@ export function integrateStroke(
   const target = best && bestArea >= totalArea * MIN_SHARE ? best : null;
 
   const componentIds = new Set(component.map((s) => s.id));
-  const place = (s: Stroke, abs: [number, number][]): Stroke => target
-    ? anSeite({ ...s, anchor: target.id, seite: undefined, points: abs.map(([x, y]) => [x - target.position.x, y - target.position.y] as [number, number]) })
-    : { ...s, anchor: undefined, seite: undefined, points: abs };
+  // Absolute Punkte der ganzen Gruppe — VOR dem Umhängen gelesen (danach gelten neue Bezüge)
+  const gruppe: Array<{ s: Stroke; abs: [number, number][] }> = [
+    ...component.map((s) => ({ s, abs: absPoints(s, byId) })),
+    { s: stroke, abs: stroke.points },
+  ];
+  /**
+   * M339: Liegt die ganze Gruppe auf dem sichtbaren Text einer Notiz, gehört sie zum TEXT:
+   * Inhaltspunkte (Scrollstand eingerechnet) und der Absatz unter ihrer Mitte als Bezug —
+   * für alle Striche der Gruppe derselbe, damit ein Pfeil nicht auseinanderläuft.
+   */
+  let text: { scroll: number; block?: string; blockY?: number } | null = null;
+  let notizDa = false; // Notiz mit vermessbarem Scrollbereich — nur dann ist „nicht am Text" eine Aussage
+  if (target && target.type === 'note') {
+    const lage = textLage(target.id);
+    if (lage) {
+      notizDa = true;
+      const rel = gruppe.map((g) => strichKasten(g.abs.map(([x, y]) => [x - target.position.x, y - target.position.y] as [number, number]), g.s.width / 2));
+      if (rel.every((k) => kastenInnen(k, lage.w, lage.h))) {
+        const mitte = (Math.min(...rel.map((k) => k.minY)) + Math.max(...rel.map((k) => k.maxY))) / 2 + lage.scroll;
+        const b = blockBei(target.id, mitte);
+        text = { scroll: lage.scroll, block: b?.id, blockY: b?.oben };
+      }
+    }
+  }
+  const frei = { amText: undefined, block: undefined, blockY: undefined };
+  const place = (s: Stroke, abs: [number, number][]): Stroke => {
+    if (!target) return { ...s, ...frei, anchor: undefined, seite: undefined, points: abs };
+    const rel = abs.map(([x, y]) => [x - target.position.x, y - target.position.y + (text ? text.scroll : 0)] as [number, number]);
+    if (text) return { ...s, anchor: target.id, seite: undefined, amText: true, block: text.block, blockY: text.blockY, points: rel };
+    return anSeite({ ...s, ...frei, anchor: target.id, seite: undefined, amText: notizDa ? false : undefined, points: rel });
+  };
   return {
     drawings: [
-      ...drawings.map((s) => (componentIds.has(s.id) ? place(s, absPoints(s, byId)) : s)),
+      ...drawings.map((s) => { const g = gruppe.find((x) => x.s === s); return g && componentIds.has(s.id) ? place(s, g.abs) : s; }),
       place(stroke, stroke.points),
     ],
     anchor: target?.id ?? null,

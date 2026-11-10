@@ -231,7 +231,9 @@ export function Board() {
   const pinchRef = useRef<{ dist: number; zoom: number; fx: number; fy: number } | null>(null);
   // Ein-Finger-Panning über Modulen (M125): Drag aus „toten" nodrag-Zonen
   // der Karten schwenkt das Board; pending bis der 8-px-Schwellwert fällt
-  const panRef = useRef<{ x: number; y: number; vx: number; vy: number; zoom: number; active: boolean; el: Element; fokus?: boolean; ly?: number } | null>(null);
+  const panRef = useRef<{ x: number; y: number; vx: number; vy: number; zoom: number; active: boolean; el: Element; fokus?: boolean; ly?: number; rolle?: HTMLElement; kandidat?: boolean; lt?: number; v?: number } | null>(null);
+  // M339: Nachlauf beim Finger-Scrollen in einer langen Notiz
+  const schwungRef = useRef(0);
   /**
    * M334: Scrollen im Fokus. Eine Notiz, die länger als der Schirm ist, ließ
    * sich im Fokus nicht nach unten bewegen: Der Editor trägt nowheel (React
@@ -320,6 +322,14 @@ export function Board() {
           return;
         }
       }
+      // M339: Eine ausgewählte (oder gerade beschriebene) lange Notiz scrollt mit dem Rad ihren Text —
+      // auch wenn das Rad sonst zoomt. Unausgewählt zoomt es weiter: Wer über das Board zoomt,
+      // soll nicht an jeder langen Notiz hängen bleiben.
+      if (!e.ctrlKey && !e.metaKey && wheelZoomRef.current && target && inNode.classList.contains('react-flow__node-note')
+        && (inNode.classList.contains('selected') || inNode.contains(document.activeElement))) {
+        const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+        if (canScrollTowards(target, inNode, -e.deltaX, -dy)) return;
+      }
       if (!e.ctrlKey && !wheelZoomRef.current) return; // Modul-Scroll bleibt
       e.preventDefault();
       e.stopPropagation();
@@ -369,10 +379,25 @@ export function Board() {
         panRef.current = { x: t.clientX, y: t.clientY, vx: x, vy: y, zoom, active: false, el: target, fokus: true, ly: t.clientY };
         return;
       }
+      const kandidat = !!target.closest('.nodrag')
+        && !target.closest('input, textarea, select, button, a, [contenteditable="true"], .react-flow__handle, .react-flow__resize-control');
+      /**
+       * M339: Der Finger rollt eine lange Notiz. Bewusst von Hand statt nativ: Der Scrollbereich
+       * trägt touch-action none, damit der STIFT darauf schreibt statt zu scrollen (unter Windows
+       * scrollt ein Stift sonst wie ein Finger). Ein Tipp bleibt Tipp; kann die Notiz in die
+       * Zugrichtung nicht weiter, schwenkt der Zug wie bisher das Board.
+       */
+      const rolle = target.closest('.card-body.note-card') as HTMLElement | null;
+      if (rolle && rolle.scrollHeight > rolle.clientHeight + 4 && !document.body.dataset.stiftZug
+        && (t as Touch & { touchType?: string }).touchType !== 'stylus'
+        && !target.closest('input, select, button, a, .react-flow__handle, .react-flow__resize-control, .note-daumen')) {
+        cancelAnimationFrame(schwungRef.current);
+        panRef.current = { x: t.clientX, y: t.clientY, vx: x, vy: y, zoom, active: false, el: target, rolle, kandidat, ly: t.clientY, lt: performance.now(), v: 0 };
+        return;
+      }
       // Panning-Kandidat (M125): nur aus nodrag-Zonen (dort verschiebt React
       // Flow NICHT die Karte) und nie aus interaktiven Elementen heraus
-      if (!target.closest('.nodrag')) return;
-      if (target.closest('input, textarea, select, button, a, [contenteditable="true"], .react-flow__handle, .react-flow__resize-control')) return;
+      if (!kandidat) return;
       panRef.current = { x: t.clientX, y: t.clientY, vx: x, vy: y, zoom, active: false, el: target };
     };
     const onTouchMove = (e: TouchEvent) => {
@@ -392,15 +417,34 @@ export function Board() {
       const dy = t.clientY - pan.y;
       if (!pan.active) {
         if (Math.hypot(dx, dy) < 8) return; // Tipp bleibt Tipp
+        if (pan.rolle) {
+          const max = pan.rolle.scrollHeight - pan.rolle.clientHeight;
+          const kann = Math.abs(dy) > Math.abs(dx) && ((dy < 0 && pan.rolle.scrollTop < max - 1) || (dy > 0 && pan.rolle.scrollTop > 0));
+          if (!kann) {
+            // am Anschlag oder quer: das Board schwenkt, wenn die Stelle das erlaubt
+            if (!pan.kandidat) { panRef.current = null; return; }
+            pan.rolle = undefined;
+          }
+        }
         // Kann der Modul-Inhalt selbst in diese Richtung scrollen? Dann darf er.
         const node = pan.el.closest('.react-flow__node');
-        if (node && canScrollTowards(pan.el, node, dx, dy)) { panRef.current = null; return; }
+        if (!pan.rolle && node && canScrollTowards(pan.el, node, dx, dy)) { panRef.current = null; return; }
         // Im Fokus nur senkrecht; ein waagerechter Zug im Text bleibt dem Editor
         if (pan.fokus && Math.abs(dx) > Math.abs(dy) * 1.5) { panRef.current = null; return; }
         pan.active = true;
       }
       e.preventDefault();
       e.stopPropagation();
+      if (pan.rolle) {
+        const k = pan.rolle.clientHeight > 0 ? pan.rolle.getBoundingClientRect().height / pan.rolle.clientHeight : 1;
+        const weg = ((pan.ly ?? t.clientY) - t.clientY) / (k || 1);
+        const jetzt = performance.now();
+        const dt = Math.max(1, jetzt - (pan.lt ?? jetzt));
+        pan.v = 0.7 * (weg / dt) + 0.3 * (pan.v ?? 0); // geglättete Geschwindigkeit (Inhaltspunkte je ms)
+        pan.ly = t.clientY; pan.lt = jetzt;
+        pan.rolle.scrollTop += weg;
+        return;
+      }
       if (pan.fokus) {
         fokusScroll((pan.ly ?? t.clientY) - t.clientY);
         pan.ly = t.clientY;
@@ -410,7 +454,24 @@ export function Board() {
     };
     const onTouchEnd = (e: TouchEvent) => {
       if (e.touches.length < 2) pinchRef.current = null;
-      if (e.touches.length === 0) panRef.current = null;
+      if (e.touches.length === 0) {
+        const pan = panRef.current;
+        // Nachlauf: der Schwung des Fingers rollt aus (nur nach einem frischen Zug)
+        if (pan?.rolle && pan.active && Math.abs(pan.v ?? 0) > 0.25 && performance.now() - (pan.lt ?? 0) < 90) {
+          const el = pan.rolle;
+          let v = Math.max(-4, Math.min(4, pan.v ?? 0));
+          let zuletzt = performance.now();
+          const lauf = (jetzt: number) => {
+            const dt = Math.min(32, jetzt - zuletzt); zuletzt = jetzt;
+            const vorher = el.scrollTop;
+            el.scrollTop += v * dt;
+            v *= Math.pow(0.995, dt);
+            if (Math.abs(v) > 0.02 && el.scrollTop !== vorher) schwungRef.current = requestAnimationFrame(lauf);
+          };
+          schwungRef.current = requestAnimationFrame(lauf);
+        }
+        panRef.current = null;
+      }
     };
     wrap.addEventListener('wheel', onWheel, { capture: true, passive: false });
     window.addEventListener('pointerdown', onMenuPointerDown, true);

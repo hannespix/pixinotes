@@ -22,6 +22,7 @@ import { importFilesToBoard } from '../../lib/importFiles';
 import { CardShell } from './CardShell';
 import { NotizRuhend } from './NotizRuhend';
 import { hakenUmlegen, notizEinfach, type RuheBlock } from '../../lib/notizRuhend';
+import { NotizStriche } from './NotizStriche';
 import { DueChips } from './DueChips';
 import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from '../NoteTypo';
 
@@ -555,7 +556,11 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
   }, [id, updateNodeData]);
 
   return (
-    <CardShell id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${data.color}`} style={data.hex ? { background: data.hex as string } : undefined} schrumpft>
+    <CardShell
+      id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${data.color}`} style={data.hex ? { background: data.hex as string } : undefined} schrumpft
+      // M339: Lange Notizen scrollen in der Karte; der Farbpunkt liegt auf der Hülle und scrollt nicht mit
+      rollt
+      aussen={<>
       {/* M323: Der Farbpunkt öffnet eine Palette — fünf Farben auf einen Blick
           plus eigene Farbe, statt blind durchzublättern */}
       <button
@@ -586,6 +591,8 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
           />
         </div>
       )}
+      </>}
+    >
       {aktiv ? (
         <NotizEditor id={id} data={data} startPunkt={startPunkt} />
       ) : (
@@ -626,6 +633,8 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
       <NoteEntityChips text={chipText} />
       <NoteLinkChips text={text} />
       <NoteAboFeeds id={id} />
+      {/* M339: Stift- und Textmarker-Striche auf dem Text — scrollen mit, haften am Absatz */}
+      <NotizStriche id={id} />
       {/* KI-Politur wohnt jetzt im ✨-Menü der Auswahl-Leiste (KI-Werkzeuge) —
           kein Dauer-Button mehr auf jeder Notiz (User-Feedback) */}
     </CardShell>

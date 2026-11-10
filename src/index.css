@@ -273,7 +273,43 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .note-card {
   min-height: 90px; padding: 10px 6px 10px;
   border-radius: var(--r); overflow: hidden;
+  /* M339: Passt der Inhalt nicht in die Karte, scrollt er — die Leiste des Browsers bleibt aus,
+     ein eigener schlanker Daumen (CardShell) zeigt und bewegt den Stand. */
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
 }
+.note-card::-webkit-scrollbar { display: none; }
+/* Eine Notiz ohne feste Höhe wächst mit dem Inhalt — aber nicht endlos: darüber scrollt sie.
+   Im Fokus zeigt sie alles, dort rollt die Kamera (M334). */
+.card-shell[data-ohne-hoehe] > .note-card { max-height: var(--notiz-max, 640px); }
+.focus-mode .pn-focused .card-shell[data-ohne-hoehe] > .note-card { max-height: none; }
+/* Der Stift schreibt auf der Notiz, statt sie zu scrollen (unter Windows scrollt ein Stift wie ein
+   Finger); den Finger-Zug übernimmt das Board von Hand (Board.tsx). */
+.card-shell[data-rollt] > .note-card { touch-action: none; }
+.note-spur { position: absolute; top: 0; bottom: 0; right: 2px; width: 10px; z-index: 5; pointer-events: none; display: none; }
+.card-shell[data-rollt] > .note-spur { display: block; }
+.note-daumen {
+  position: absolute; top: 0; right: 0; width: 10px; min-height: 28px; pointer-events: auto; cursor: default;
+  opacity: 0; transition: opacity .18s ease; touch-action: none;
+}
+/* schmaler Strich, der beim Zeigen breiter wird — die Trefferfläche ist die ganze Spur */
+.note-daumen::after {
+  content: ''; position: absolute; top: 0; bottom: 0; right: 1px; width: 4px; border-radius: 3px;
+  background: rgba(22, 25, 30, .34); transition: width .12s ease, background .12s ease;
+}
+.note-daumen:hover::after, .card-shell[data-rollzug] .note-daumen::after { width: 7px; background: rgba(22, 25, 30, .55); }
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-daumen::after { background: rgba(255, 255, 255, .38); }
+.card-shell:hover > .note-spur .note-daumen, .react-flow__node.selected .note-daumen, .card-shell[data-rollzug] .note-daumen { opacity: 1; }
+@media (hover: none) { .note-daumen { opacity: .8; } }
+/* Oben bzw. unten folgt noch Text: ein weicher Schatten an der Kante */
+.note-mehr { position: absolute; left: 0; right: 0; height: 14px; z-index: 4; pointer-events: none; opacity: 0; transition: opacity .18s ease; }
+.note-mehr.oben { top: 0; border-radius: var(--r) var(--r) 0 0; background: linear-gradient(to bottom, rgba(22, 25, 30, .13), transparent); }
+.note-mehr.unten { bottom: 0; border-radius: 0 0 var(--r) var(--r); background: linear-gradient(to top, rgba(22, 25, 30, .13), transparent); }
+.card-shell[data-mehr-oben] > .note-mehr.oben, .card-shell[data-mehr-unten] > .note-mehr.unten { opacity: 1; }
+/* Striche auf dem Text: im Scrollbereich, über dem Text, nie im Weg */
+.notiz-striche { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; z-index: 3; }
+/* Der Einpassen-Knopf weicht dem Balken aus */
+.card-shell[data-rollt] > .fit-hint { right: 16px; }
+@media print { .note-spur, .note-mehr { display: none !important; } }
 .sticky-yellow { background: #fff3a3; }
 .sticky-pink   { background: #ffd6e0; }
 .sticky-mint   { background: #d2f5dd; }
@@ -6180,8 +6216,8 @@ audio.file-media { height: 40px; }
   font-weight: 650; font-size: 1.14em; letter-spacing: -0.005em;
 }
 /* Farbpunkt zeigt die aktuelle Farbe statt eines Regenbogens; Palette darunter */
-.note-card .color-dot { background: rgba(255,255,255,.55); border-color: rgba(0,0,0,.3); }
-.note-card .color-dot.on { border-color: var(--ink); }
+.react-flow__node-note .color-dot { background: rgba(255,255,255,.55); border-color: rgba(0,0,0,.3); }
+.react-flow__node-note .color-dot.on { border-color: var(--ink); }
 .note-farben {
   position: absolute; top: 28px; right: 8px; z-index: 7;
   display: flex; align-items: center; gap: 6px; padding: 6px;
