@@ -192,13 +192,20 @@ console.log('════ B: Datei-Karten → Notizen ohne KI ════');
 console.log('════ C: 8 große Dateien → Portionen mit Fortschritt ════');
 {
   const { ctx, P, aufrufe } = await seite({ nodes: dateiKarten(8) });
+  // Jeden Toast-Text in der Seite mitschreiben — die Antworten der Attrappe kommen schneller, als ein Abfragen im Takt hinsieht
+  await P.evaluate(() => {
+    window.__toasts = [];
+    new MutationObserver(() => { const t = document.querySelector('.toast')?.textContent ?? ''; if (t && window.__toasts[window.__toasts.length - 1] !== t) window.__toasts.push(t); })
+      .observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
   await dockAnweisung(P, 'Wandle alle Dateien in schön formatierte Notizkarten um');
   const toasts = await wartenBisFertig(P);
+  const alleToasts = await P.evaluate(() => window.__toasts);
   pruefe('C1 mehrere Aufrufe statt einem (Portionen)', aufrufe.length >= 3, `${aufrufe.length} Aufrufe`);
   pruefe('C2 jeder Aufruf sieht nur seinen Teil der Karten', aufrufe.every((a) => a.items.length <= 4 && a.items.length >= 1) && new Set(aufrufe.flatMap((a) => a.items)).size === 8, JSON.stringify(aufrufe.map((a) => a.items)));
   pruefe('C3 Prompt nennt „Teil x von y"', aufrufe.every((a) => a.teil), JSON.stringify(aufrufe.map((a) => a.teil)));
   pruefe('C4 Antwortgrenze 4096 Token statt 1024', aufrufe[0].maxTokens === 4096, String(aufrufe[0].maxTokens));
-  pruefe('C5 Fortschritts-Toast „Teil … von …"', toasts.some((t) => /Teil \d+ von \d+/.test(t)), toasts.join(' | ').slice(0, 300));
+  pruefe('C5 Fortschritts-Toast „Teil … von …"', alleToasts.some((t) => /Teil \d+ von \d+/.test(t)), alleToasts.join(' | ').slice(0, 300));
   const ks = await knoten(P);
   pruefe('C6 acht neue Notizen, je eine pro Datei', ks.filter((k) => k.type === 'note').length === 8, String(ks.filter((k) => k.type === 'note').length));
   const ende = toasts[toasts.length - 1];

@@ -13,6 +13,7 @@ import { aiReady } from '../lib/ai';
 import { noteTitle } from '../lib/notiz';
 import { blocksToText } from '../lib/serialize';
 import { makeNote } from '../lib/nodes';
+import { mitFestenIds, mitPfadIds } from '../lib/notizRuhend';
 import type { AppNode } from '../types';
 import { IType, IX } from './Icons';
 
@@ -765,9 +766,10 @@ export function DrawingLayer() {
     if (!node) return;
     const proBlock = new Map<string, Array<[number, number]>>();
     for (const w of treffer) proBlock.set(w.blockId, [...(proBlock.get(w.blockId) ?? []), [w.start, w.end]]);
-    const alt = ((node.data as { blocks?: unknown[] }).blocks ?? []) as Array<{ id?: string; content?: BlockInhalt }>;
+    // M338: Blöcke ohne Id finden sich über ihre Pfad-Id (wie die ruhende Ansicht sie zeigt); gespeichert werden feste
+    const alt = mitPfadIds(((node.data as { blocks?: unknown[] }).blocks ?? []) as Array<{ id?: string; content?: BlockInhalt; children?: unknown[] }>);
     const neu = alt.map((b) => (b.id && proBlock.has(b.id) ? { ...b, content: inhaltOhneBereiche(b.content, proBlock.get(b.id)!) } : b));
-    updateNodeDataOnBoard(activeId, noteId, { blocks: neu });
+    updateNodeDataOnBoard(activeId, noteId, { blocks: mitFestenIds(neu) });
   };
   /**
    * Getippten Text mit dem Stift bearbeiten (Nebo, Scribble): Ein Kritzel oder
@@ -816,8 +818,25 @@ export function DrawingLayer() {
     if (!umKarte && istSchleife(pts, 600, 90)) {
       const drin = woerter.filter((w) => punktInPolygon(zumFlow(w.rect.left + w.rect.width / 2, w.rect.top + w.rect.height / 2), pts));
       if (drin.length > 0 && drin.every((w) => w.blockId === drin[0].blockId)) {
-        if (woerterMarkieren(drin[0].blockEl, drin[0], drin[drin.length - 1])) {
-          showToast(drin.length === 1 ? `◯ „${drin[0].text}" markiert` : `◯ ${drin.length} Wörter markiert`);
+        const von = drin[0], bis = drin[drin.length - 1];
+        const meldung = drin.length === 1 ? `◯ „${von.text}" markiert` : `◯ ${drin.length} Wörter markiert`;
+        // M338: Die Notiz ruht (kein Editor) — eine Markierung braucht ihn. Wecken, dann im lebenden Text markieren.
+        if (!von.blockEl.closest('[contenteditable="true"]')) {
+          window.dispatchEvent(new CustomEvent('pixinotes:notiz-aktiv', { detail: { id: noteId } }));
+          let versuche = 0;
+          const dann = () => {
+            const el = Array.from(document.querySelectorAll(`.react-flow__node[data-id="${noteId}"] [contenteditable="true"] .bn-block[data-id]`))
+              .find((b) => (b as HTMLElement).dataset.id === von.blockId) as HTMLElement | undefined;
+            if (el) { woerterMarkieren(el, von, bis); return; }
+            versuche += 1;
+            if (versuche < 90) requestAnimationFrame(dann);
+          };
+          requestAnimationFrame(dann);
+          showToast(meldung);
+          return true;
+        }
+        if (woerterMarkieren(von.blockEl, von, bis)) {
+          showToast(meldung);
           return true;
         }
       }
@@ -947,7 +966,7 @@ export function DrawingLayer() {
    * ohne Bezug ans Ende.
    */
   const inNotizEinfuegen = (ziel: AppNode, zeilen: ZeileMitArt[], box: { minX: number; minY: number; h: number }) => {
-    const alt = ((ziel.data as { blocks?: unknown[] }).blocks ?? []) as Array<{ id?: string; type?: string; content?: unknown }>;
+    const alt = mitPfadIds(((ziel.data as { blocks?: unknown[] }).blocks ?? []) as Array<{ id?: string; type?: string; content?: unknown; children?: unknown[] }>);
     const bezug = bezugFinden(ziel, box);
     const text = zeilen.map((z) => z.text).join('\n');
     // M327: Nur eine Zeile ohne eigenen Marker darf mitten in den getippten Text — mit Marker wird sie ein eigener Block
@@ -974,7 +993,7 @@ export function DrawingLayer() {
             const i = alt.findIndex((b) => b.id === bezug.id);
             if (i >= 0) {
               const neu = alt.map((b, k) => (k === i ? { ...b, content: inhaltMitEinfuegung(b.content as BlockInhalt, offset!, text) } : b));
-              updateNodeDataOnBoard(activeId, ziel.id, { blocks: neu });
+              updateNodeDataOnBoard(activeId, ziel.id, { blocks: mitFestenIds(neu) });
               return;
             }
           }
@@ -992,7 +1011,7 @@ export function DrawingLayer() {
       const basis = alt.length > 1 && leer(alt[alt.length - 1]) ? alt.slice(0, -1) : alt;
       out = [...basis, ...neue];
     }
-    updateNodeDataOnBoard(activeId, ziel.id, { blocks: out });
+    updateNodeDataOnBoard(activeId, ziel.id, { blocks: mitFestenIds(out as Array<{ id?: string; children?: unknown[] }>) });
   };
 
   /**

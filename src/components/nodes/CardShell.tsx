@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Handle, NodeResizer, Position } from '@xyflow/react';
 import { runDerived, selectActiveBoard, useBoard } from '../../store';
+import { fernBeobachten } from '../../lib/fernRuhe';
 import { kachelInfo } from '../../lib/kachel';
 import type { AppNode } from '../../types';
 
@@ -113,6 +114,11 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+  // M338: Fern-Ruhe — weit außerhalb des Bildes wird der Inhalt nicht gerechnet (lib/fernRuhe.ts)
+  useEffect(() => {
+    const shell = bodyRef.current?.parentElement;
+    return shell ? fernBeobachten(shell) : undefined;
+  }, []);
   // Inhalt läuft über die feste Kartengröße hinaus → Einpassen ANBIETEN
   const [overflowing, setOverflowing] = useState(false);
 
@@ -165,6 +171,8 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       // M298: Eine Kachel wächst nie — und im Fokus stellt das Stylesheet die
       // Größe; ein Wachsen dort bliebe nach dem Schließen an der Kachel hängen
       if (kachelRef.current) return;
+      // M338: Ruht die Karte fern vom Bild, ist ihr Inhalt nicht vermessbar — nichts anfassen
+      if (body.parentElement?.hasAttribute('data-fern')) return;
       // Sperren WARTEN statt verwerfen (M108): am Smartphone folgt fast jede
       // Inhaltsänderung direkt auf eine Berührung der Karte — wurde die
       // Prüfung hier einfach verworfen, kam nie wieder eine nach und die

@@ -216,6 +216,33 @@ body {
   font-size: 13px;
 }
 .react-flow__node:hover, .react-flow__node.dragging { box-shadow: var(--card-shadow-lift); }
+/* M338: Die ruhende Notiz braucht die Grundregeln des Editors, auch wenn auf dem Board noch KEIN Editor
+   lebt — die Bibliothek trägt sie erst beim ersten Editor nach, und ohne sie bräche Text anders um. */
+.notiz-ruhend .ProseMirror {
+  position: relative; word-wrap: break-word; white-space: pre-wrap; white-space: break-spaces;
+  -webkit-font-variant-ligatures: none; font-variant-ligatures: none; font-feature-settings: "liga" 0;
+}
+.notiz-ruhend .ProseMirror [contenteditable="false"] { white-space: normal; }
+.notiz-ruhend .bn-editor { outline: none; }
+/* M338: Fern-Ruhe (lib/fernRuhe.ts) — der Inhalt einer Karte weit außerhalb des Bildes wird nicht
+   gerechnet und nicht gezeichnet; die gemerkten Innenmaße halten ihre Größe. Export und Druck zeigen alles. */
+.card-shell[data-fern] > .card-body { content-visibility: hidden; contain-intrinsic-size: var(--fern-w, auto) var(--fern-h, auto); }
+html[data-alles-zeigen] .card-shell[data-fern] > .card-body { content-visibility: visible; }
+@media print { .card-shell[data-fern] > .card-body { content-visibility: visible; } }
+/* M338: Griff, Anschlusspunkte und Farbpunkt sind ohne Zeiger auf der Karte unsichtbar — „durchsichtig“
+   (opacity 0) ließ den Browser sie trotzdem bei jedem Schwenk mitführen: sechs Ebenen je Karte.
+   Die vier Anschlusspunkte und der Farbpunkt sind jetzt wirklich weg (gemessen: ein Drittel weniger
+   Zeichenarbeit beim Schwenken); der Griff bleibt als leere Fläche greifbar — er ragt über die Karte
+   hinaus, und wer von oben kommt, soll ihn treffen. Nur für Maus-Geräte; am Finger gelten die eigenen
+   Regeln (immer sichtbar bzw. an der Auswahl). */
+@media (hover: hover) and (pointer: fine) {
+  .react-flow__node:not(.selected):not(:hover) .card-grip { opacity: 1; transition: none; background: transparent; box-shadow: none; }
+  .react-flow__node:not(.selected):not(:hover) .card-grip > *,
+  .react-flow__node:not(.selected):not(:hover) .pn-handle,
+  .react-flow__node:not(.selected):not(:hover) .color-dot { visibility: hidden; }
+  /* beim Verbinden zeigen sich die Anschlusspunkte aller Karten (wie bisher) */
+  .react-flow:has(.react-flow__connectionline) .react-flow__node .pn-handle { visibility: visible; }
+}
 .react-flow__node.selected { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r); }
 /* Prozess-Formen zeichnen sich selbst (Raute/Stadion/…) — der rechteckige
    Node-Container bleibt unsichtbar, sonst liegt eine Schatten-„Pille" um die Form */
@@ -252,10 +279,20 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .sticky-mint   { background: #d2f5dd; }
 .sticky-sky    { background: #d9ecff; }
 .sticky-white  { background: var(--surface-card); }
+/* M338: Im Dunkeln bleiben Haftnotizen helles Papier — aber eine Stufe ruhiger. Die vollen Pastelltöne
+   waren auf fast schwarzem Grund die hellsten Flächen des ganzen Schirms und blendeten abends. */
+[data-theme='dark'] .sticky-yellow { background: #e9dc8c; }
+[data-theme='dark'] .sticky-pink   { background: #e8bcc8; }
+[data-theme='dark'] .sticky-mint   { background: #b6dcc2; }
+[data-theme='dark'] .sticky-sky    { background: #bdd3ea; }
+/* Der Hinweis „React Flow" unten rechts trägt die Farben der Oberfläche statt eines weißen Kästchens */
+.react-flow__attribution { background: transparent !important; }
+.react-flow__attribution a { color: var(--muted) !important; opacity: .7; }
 
 .color-dot {
   position: absolute; top: 8px; right: 10px; z-index: 4;
-  width: 14px; height: 14px; border-radius: 50%; cursor: pointer;
+  /* padding 0: der Knopf-Innenabstand des Browsers (1px 6px) zog den Punkt zum Oval (M338) */
+  width: 14px; height: 14px; padding: 0; border-radius: 50%; cursor: pointer;
   border: 2px solid rgba(0, 0, 0, 0.25);
   background: conic-gradient(#fff3a3, #ffd6e0, #d2f5dd, #d9ecff, #fff3a3);
   opacity: 0; transition: opacity 0.15s;
@@ -986,12 +1023,15 @@ html[data-kopf-eng='an'] .hint { display: none; }
     z-index: 40; pointer-events: none;
   }
   .app.nav-links .board-wrap { margin-left: var(--nav-band); }
+  /* M338: Logo und Aktionen stehen in EINER Zeile (vorher zwei Kästen übereinander, der zweite
+     zu zwei Dritteln leer) — die Board-Liste rückt um eine Zeile nach oben. Wird die Spalte sehr
+     schmal gezogen, bricht die Zeile um, und die gemessene Kopfhöhe (lib/kopfmass.ts) folgt. */
   .app.nav-links .topbar {
-    flex-direction: column; align-items: stretch;
+    flex-direction: row; flex-wrap: wrap; align-items: stretch;
     width: var(--nav-w); gap: 8px;
   }
-  /* Die Aktionsknöpfe brechen in der schmalen Spalte um statt zu quetschen */
-  .app.nav-links .topbar .top-actions { flex-wrap: wrap; justify-content: flex-start; }
+  .app.nav-links .topbar .logo { height: 100%; display: inline-flex; align-items: center; }
+  .app.nav-links .topbar .top-actions { flex: 1; flex-wrap: wrap; justify-content: flex-end; }
   .app.nav-links .tabs {
     left: 18px; top: var(--kopf-oben, 78px);
     bottom: calc(14px + var(--app-rand) + var(--safe-bottom));
@@ -3193,6 +3233,8 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .side-board-arrow {
   border: none; background: none; cursor: pointer; color: var(--muted);
   padding: 3px; border-radius: var(--r-sm); display: inline-flex; transition: transform 0.15s;
+  /* M338: mittig — sonst sitzt das Symbol oben im hohen Finger-Knopf und dreht sich beim Aufklappen in den Namen */
+  align-items: center; justify-content: center; flex: none;
 }
 .side-board-arrow.open { transform: rotate(90deg); }
 .side-board-name {
@@ -5380,9 +5422,12 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
 
   /* Karten-interne Kleinschalter: sichtbar größer … */
   .kanban-col-x, .kanban-count, .kanban-addcol,
-  .kanban-item-actions button, .color-dot {
+  .kanban-item-actions button {
     min-width: 28px; min-height: 28px; position: relative;
   }
+  /* M338: Der Farbpunkt bleibt in der Kartenecke — `position: relative` holte ihn in den Textfluss,
+     und jede Notiz bekam am Tablet oben einen leeren Streifen mit einem Kreis davor. */
+  .color-dot { min-width: 28px; min-height: 28px; }
   /* … plus unsichtbare Fangfläche. `inset` statt fester Größe, damit sich die
      Zonen benachbarter Schalter nicht gegenseitig zudecken. */
   .kanban-col-x::after, .kanban-count::after, .kanban-addcol::after,
@@ -5707,7 +5752,9 @@ audio.file-media { height: 40px; }
   --rt-text: #16191e;
   --rt-leise: #5a616d;
   --rt-spur: rgba(79, 124, 255, 0.14);
-  --rt-link: var(--accent);
+  /* fester, kräftiger Ton statt var(--accent): auf den ruhigeren Papiertönen des dunklen Designs (M338)
+     fiel der helle Akzent unter Kontrast 3 */
+  --rt-link: #3557c9;
 }
 .rt-roller { overflow-x: auto; scrollbar-width: thin; }
 .rt-tabelle { border-collapse: collapse; width: 100%; font-size: 13px; }

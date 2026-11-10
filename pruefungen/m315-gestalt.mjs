@@ -152,7 +152,8 @@ console.log('\n════ C: Dunkel ════');
   const bgImg = await stil(P, '.react-flow', 'backgroundImage');
   pruefe('C4 auch dunkel kein Verlauf', bgImg === 'none', bgImg);
   const papier = await stil(P, '.react-flow__node-note .note-card', 'backgroundColor');
-  pruefe('C5 Haftnotiz bleibt helles Papier', papier === 'rgb(255, 243, 163)', papier);
+  // M338: im Dunkeln eine Stufe ruhiger (#e9dc8c statt #fff3a3) — weiter helles Papier mit dunkler Schrift
+  pruefe('C5 Haftnotiz bleibt helles Papier (im Dunkeln eine Stufe ruhiger)', papier === 'rgb(233, 220, 140)', papier);
   await P.screenshot({ path: path.join(SD, 'm315-dunkel.png') });
   await ctx.close();
 }

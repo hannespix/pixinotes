@@ -108,8 +108,12 @@ for (const A of [1, 1.3, 1.75]) {
     const hs = [...a.querySelectorAll('.react-flow__handle')];
     const rechts = hs.sort((x, y) => y.getBoundingClientRect().left - x.getBoundingClientRect().left)[0];
     const r = rechts.getBoundingClientRect(); const br = b.getBoundingClientRect();
-    return { von: [r.left + r.width / 2, r.top + r.height / 2], nach: [br.left + br.width / 2, br.top + br.height / 2] };
+    const ar = a.getBoundingClientRect();
+    return { von: [r.left + r.width / 2, r.top + r.height / 2], nach: [br.left + br.width / 2, br.top + br.height / 2], mitte: [ar.left + ar.width / 2, ar.top + ar.height / 2] };
   });
+  // M338: Die Anschlusspunkte erscheinen erst mit dem Zeiger auf der Karte — erst auf die Karte, dann zum Punkt
+  await P.mouse.move(pk.mitte[0], pk.mitte[1]);
+  await P.waitForTimeout(80);
   await P.mouse.move(pk.von[0], pk.von[1]);
   await P.mouse.down();
   for (let i = 1; i <= 12; i++) {
@@ -122,6 +126,8 @@ for (const A of [1, 1.3, 1.75]) {
   pruefe(`[${stufe}] zwei Karten lassen sich verbinden`, e.kanten === 1, `Kanten: ${e.kanten}`);
 
   // --- 2. Anfasser-Trefferfläche: liegt der Anfasser dort, wo er gezeichnet wird? ---
+  await P.mouse.move(pk.mitte[0], pk.mitte[1]); // Zeiger auf der Karte: die Punkte sind gezeichnet
+  await P.waitForTimeout(80);
   e.treffer = await P.evaluate(() => {
     const a = document.querySelector('.react-flow__node[data-id="a"]');
     /* Nur die SICHTBAREN Punkte prüfen: React Flow legt zusätzlich eine
@@ -320,9 +326,12 @@ console.log('\n════════════ T9: Umschalten bei offenem B
     const hs = [...a.querySelectorAll('.react-flow__handle')].filter((h) => h.getBoundingClientRect().width <= 40);
     const rechts = hs.sort((x, y) => y.getBoundingClientRect().left - x.getBoundingClientRect().left)[0];
     const r = rechts.getBoundingClientRect(); const br = b.getBoundingClientRect();
-    return { von: [r.left + r.width / 2, r.top + r.height / 2], nach: [br.left + br.width / 2, br.top + br.height / 2] };
+    const ar = a.getBoundingClientRect();
+    return { von: [r.left + r.width / 2, r.top + r.height / 2], nach: [br.left + br.width / 2, br.top + br.height / 2], mitte: [ar.left + ar.width / 2, ar.top + ar.height / 2] };
   });
   if (pk2) {
+    await P.mouse.move(pk2.mitte[0], pk2.mitte[1]); // erst auf die Karte — dann sind die Punkte da (M338)
+    await P.waitForTimeout(80);
     await P.mouse.move(pk2.von[0], pk2.von[1]);
     await P.mouse.down();
     for (let i = 1; i <= 12; i++) {

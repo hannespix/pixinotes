@@ -1,6 +1,7 @@
 // Export: Board als PNG/SVG/PDF, Boards als Markdown-Dateien in einen Ordner.
 import { toPng, toSvg } from 'html-to-image';
 import { getNodesBounds } from '@xyflow/react';
+import { allesZeigen } from './fernRuhe';
 import type { BoardDoc, Space } from '../store';
 import type { AppNode } from '../types';
 import { nodeToText } from './serialize';
@@ -61,13 +62,20 @@ export async function exportBoard(o: BoardExportOptions): Promise<void> {
     ? `${o.name} · ${new Date().toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })}`
     : '';
 
-  if (o.format === 'svg') {
-    let dataUrl = await toSvg(el, opts);
-    if (headerText) dataUrl = svgWithHeader(dataUrl, headerText);
-    triggerDownload(dataUrl, `${sanitize(o.name)}.svg`);
-    return;
+  // M338: Fern ruhende Karten (lib/fernRuhe.ts) für die Aufnahme wecken — sonst wären sie im Bild leer
+  const ruheWieder = await allesZeigen();
+  let png: string;
+  try {
+    if (o.format === 'svg') {
+      let dataUrl = await toSvg(el, opts);
+      if (headerText) dataUrl = svgWithHeader(dataUrl, headerText);
+      triggerDownload(dataUrl, `${sanitize(o.name)}.svg`);
+      return;
+    }
+    png = await toPng(el, opts);
+  } finally {
+    ruheWieder();
   }
-  let png = await toPng(el, opts);
   if (headerText) png = await pngWithHeader(png, headerText, scale);
   if (o.format === 'print') {
     openPrint(png, o.name);
