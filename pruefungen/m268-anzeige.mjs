@@ -245,7 +245,8 @@ for (const A of [1, 1.3, 1.75]) {
     await P.mouse.up();
     await P.waitForTimeout(600);
     e.strich = await P.evaluate(() => {
-      const p = document.querySelector('.drawing-layer path');
+      // M339: Liegt der Strich ganz auf einer Notiz, zeichnet sie ihn selbst (er scrollt mit dem Text)
+      const p = document.querySelector('.drawing-layer path, .notiz-striche path');
       if (!p) return null;
       const r = p.getBoundingClientRect();
       return { start: [Math.round(r.left), Math.round(r.top)], breite: Math.round(r.width) };

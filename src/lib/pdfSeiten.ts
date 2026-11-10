@@ -10,6 +10,7 @@
 // damit um. Ohne Meldung (Karte zugeklappt, andere Seite) bleiben die
 // Anmerkungen unsichtbar — der Zähler auf der Karte sagt, dass es sie gibt.
 import type { CommentThread, Stroke } from '../store';
+import { textVersatz } from './notizText';
 
 export interface SeitenGeometrie {
   /** Angezeigte Seite (1-basiert) */
@@ -63,7 +64,12 @@ export function vonSeite(points: [number, number][], g: SeitenGeometrie): [numbe
  * nicht zu sehen ist (Karte zugeklappt oder andere Seite aufgeschlagen).
  */
 export function strichRelativ(s: Stroke): [number, number][] {
-  if (s.seite == null || !s.anchor) return s.points;
+  if (!s.anchor) return s.points;
+  if (s.seite == null) {
+    // M339: Striche auf dem Text einer Notiz — mit dem Absatz gerückt, mit der Notiz gescrollt
+    const dy = textVersatz(s);
+    return dy === 0 ? s.points : s.points.map(([x, y]) => [x, y + dy] as [number, number]);
+  }
   const g = geometrien.get(s.anchor);
   if (!g || g.seite !== s.seite) return [];
   return vonSeite(s.points, g);
