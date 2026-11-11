@@ -126,6 +126,8 @@ console.log('\n════ A: herausgezoomt, Griffe in Bildschirm-Größe ═�
   console.log('\n════ C: zurück bei 100 % ════');
   await zoomeAuf(P, 1);
   await P.mouse.click(1380, 860); await P.waitForTimeout(200);
+  // alles ins Bild holen (F), damit die Notiz nicht unter der Kopfleiste liegt
+  await P.keyboard.press('f'); await P.waitForTimeout(900);
   const c = await karte(P, 'n1');
   pruefe('C1 „weit" ist aus, der Inhalt ist wieder bedienbar', !(await weit(P)) && c.koerper !== 'none');
   const wort = await P.evaluate(() => { const r = document.querySelector('.react-flow__node[data-id="n1"] .bn-inline-content').getBoundingClientRect(); return [r.left + 20, r.top + r.height / 2]; });

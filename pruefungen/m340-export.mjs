@@ -51,7 +51,7 @@ const reich = [
 const lang = Array.from({ length: 90 }, (_, i) => ({ id: `l${i}`, type: 'paragraph', content: `Zeile ${i + 1}: Der schnelle braune Fuchs springt über den faulen Hund und zurück.` }));
 const stand = () => ({
   boards: [{ id: 'b1', name: 'Export <Test>', comments: [],
-    edges: [{ id: 'e1', source: 'n1', target: 'n2' }, { id: 'e2', source: 'n2', target: 'n3' }],
+    edges: [{ id: 'e1', source: 'n1', target: 'n2', type: 'floating' }, { id: 'e2', source: 'n2', target: 'n3', type: 'floating' }],
     drawings: [
       { id: 's1', tool: 'marker', color: '#ff2d95', width: 16, anchor: 'n1', amText: false, points: [[20, -30], [80, -30], [140, -30], [200, -30], [260, -30], [300, -30], [330, -30], [350, -30]] },
       { id: 's2', tool: 'marker', color: '#00e5ff', width: 16, points: [[40, 760], [120, 760], [200, 760], [280, 760], [360, 760], [440, 760], [520, 760], [600, 760]] },
@@ -95,6 +95,15 @@ const bildpunkte = (P, datei, punkte) => P.evaluate(async ({ b64, punkte }) => {
   const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0);
   return { w: img.width, h: img.height, farben: punkte.map(([px, py]) => Array.from(x.getImageData(px, py, 1, 1).data)) };
 }, { b64: readFileSync(datei).toString('base64'), punkte });
+
+/** Zahl der nicht weißen Bildpunkte in einem senkrechten Streifen der PNG */
+const streifen = (P, datei, x0, x1) => P.evaluate(async ({ b64, x0, x1 }) => {
+  const img = new Image(); img.src = `data:image/png;base64,${b64}`; await img.decode();
+  const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0);
+  const d = x.getImageData(x0, 0, Math.max(1, Math.min(img.width, x1) - x0), img.height).data;
+  let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 240 || d[i + 1] < 240 || d[i + 2] < 240) n += 1;
+  return n;
+}, { b64: readFileSync(datei).toString('base64'), x0, x1 });
 
 // ══ A: Kopieren ════════════════════════════════════════════════════════
 console.log('\n════ A: Formatiert kopieren ════');
@@ -185,12 +194,14 @@ console.log('\n════ D: Bild-Export ════');
   d = await exportieren({ auswahl: true });
   [dl] = await Promise.all([P.waitForEvent('download', { timeout: 90000 }), d.locator('button', { hasText: 'Exportieren' }).click()]);
   ziel = path.join(SD, 'm340-auswahl.png'); await dl.saveAs(ziel);
-  px = await bildpunkte(P, ziel, [[60 + 200, 60 - 30], [60 + 100, 60 + 30], [4, 4], [60 + 340 + 3, 60 + 50], [60 - 2, 60 + 60], [60 + 300, 49], [60 + 700, 49], [60 + 700, 48]]);
+  px = await bildpunkte(P, ziel, [[60 + 200, 60 - 30], [60 + 100, 60 + 30], [4, 4], [60 + 340 + 3, 60 + 50], [60 - 2, 60 + 60]]);
   console.log('    Auswahl', px.w, 'x', px.h, JSON.stringify(px.farben));
   pruefe('D4 Auswahl-Bild ist auf die zwei Karten zugeschnitten (ohne Nachbar und lange Notiz)', px.w === 740 + 120 && px.h < 900, `${px.w}x${px.h}`);
   pruefe('D5 der Strich an der gewählten Karte ist dabei', px.farben[0][0] > 200 && px.farben[0][1] < 200);
   pruefe('D6 kein Auswahlrahmen, keine Griffe im Bild (direkt neben der Karte ist es weiß)', ist(px.farben[3], 255, 255, 255, 14) && ist(px.farben[4], 255, 255, 255, 14), JSON.stringify([px.farben[3], px.farben[4]]));
-  pruefe('D6b die Linie zwischen den gewählten Karten ist da, die zur nicht gewählten Karte nicht', !ist(px.farben[5], 255, 255, 255, 30) && ist(px.farben[6], 255, 255, 255, 8) && ist(px.farben[7], 255, 255, 255, 8), JSON.stringify(px.farben.slice(5)));
+  // zwischen den beiden gewählten Karten (Lücke x 340…420) verläuft ihre Linie; rechts vom Kanban (ab x 745) keine
+  const zwischen = await streifen(P, ziel, 60 + 366, 60 + 414); const rechts = await streifen(P, ziel, 60 + 746, 60 + 800);
+  pruefe('D6b die Linie zwischen den gewählten Karten ist da, die zur nicht gewählten Karte nicht', zwischen > 20 && rechts === 0, JSON.stringify({ zwischen, rechts }));
   void n4;
   // SVG
   d = await exportieren({ format: 'svg' });
