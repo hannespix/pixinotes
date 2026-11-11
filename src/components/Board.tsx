@@ -965,9 +965,11 @@ export function Board() {
         /* M353: Eine aufgeschlagene PDF-/Word-Seite passt GANZ zwischen Kopfzeile und Leisten — wie „ganze
            Seite" im PDF-Programm. Bisher galt auch hier „nie kleiner als 1": Eine Seite, die etwas höher war als
            der freie Platz, lief unter Werkzeug- und Blätter-Leiste weiter, und man sah ihr unteres Ende nicht.
-           Nur bis 0,55 — darunter (lange Word-Seite ohne Umbrüche) wird wie bisher in voller Breite gerollt. */
+           Nur wenn sie dafür wenig schrumpfen muss (bis 0,75): Eine A4-Seite im Hochformat am Querformat-Schirm
+           würde sonst kaum größer als auf dem Board — sie bleibt lesbar breit, und ihr unteres Ende lässt sich
+           bis über die Leisten rollen (seit `fokusUnten` stimmt der Platz dafür). */
         const dokument = n.type === 'file' && !!el.querySelector('.pdf-seite');
-        const zoom = dokument && passt < 1 && passt >= 0.55
+        const zoom = dokument && passt < 1 && passt >= 0.75
           ? passt
           : text ? Math.min(grob ? 2.2 : 1.25, Math.max(1, passt)) : 1;
         fokusRef.current = { id: focusCard, oben, hoehe, rand };

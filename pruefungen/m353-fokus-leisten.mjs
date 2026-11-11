@@ -3,7 +3,8 @@
  *
  *   A  Breite Karte mit Querformat-Seite (Bildschirmfoto-Fall, 1920×1140): Unterkante der Karte über
  *      Werkzeug- und Blätter-Leiste, Oberkante unter der Kopfzeile.
- *   B  Hochformat (A4) im 1400×900-Fenster: ebenso.
+ *   B  Hochformat (A4) im 1400×900-Fenster: zu hoch zum Einpassen — bleibt lesbar breit, und ihr unteres
+ *      Ende lässt sich bis über die Leisten rollen.
  *   C  Blättern (M352) hält die Seite im freien Bereich.
  *   D  Notiz im Fokus: wie bisher nicht verkleinert (Zoom ≥ 1).
  *   E  „Was ist neu" nennt M353.
@@ -125,8 +126,14 @@ console.log('\n════ B: Hochformat A4, 1400×900 ════');
   const { ctx, P } = await geraet({ breite: 1400, hoehe: 900, B: 595, H: 842, kartenBreite: 420 });
   await fokus(P, 'f1');
   const z = await lage(P, 'f1');
-  pruefe('B1 die A4-Seite liegt ganz zwischen Kopfzeile und Leisten', innen(z), JSON.stringify(z));
-  pruefe('B2 und bleibt lesbar groß (Zoom ≥ 0,55)', z.zoom >= 0.55, String(z.zoom));
+  pruefe('B1 die A4-Seite bleibt lesbar breit (Zoom ≥ 1, oben unter der Kopfzeile)', z.zoom >= 1 && z.oben >= z.kopf, JSON.stringify(z));
+  // ganz hinunterrollen: das Ende der Karte kommt über den Leisten zum Stehen
+  const cv = await P.locator('.react-flow__node[data-id="f1"] .pdf-seite canvas').boundingBox();
+  await P.mouse.move(cv.x + cv.width / 2, cv.y + 200);
+  for (let i = 0; i < 12; i++) { await P.mouse.wheel(0, 400); await P.waitForTimeout(60); }
+  await P.waitForTimeout(500);
+  const g = await lage(P, 'f1');
+  pruefe('B2 ganz gerollt liegt das Ende der Seite über den Leisten (nichts verdeckt)', g.unten <= g.frei && g.unten > g.frei - 80, JSON.stringify(g));
   await P.keyboard.press('Escape'); await P.waitForTimeout(900);
 
   console.log('\n════ D: Notiz ════');
