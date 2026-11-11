@@ -43,6 +43,7 @@ export const KUERZEL: Kuerzel[] = [
   // M345 — ausgeführt in components/pfeilTasten.ts (liest die Ziele aus dem, was gerade zu sehen ist)
   { id: 'bereich', taste: 'F6', was: 'zum nächsten Bereich: Navigation, Kopfleiste, Fläche, Leiste unten (Umschalt+F6 zurück)', gruppe: 'Überall', fremd: true },
   { id: 'pfeileGruppe', taste: 'Pfeiltasten', was: 'in Menüs, Leisten und Listen weitergehen; ↓ führt vom Knopf ins offene Menü', gruppe: 'Überall', fremd: true },
+  { id: 'kontextmenue', taste: 'Rechtsklick', was: 'Menü für Karte, Fläche, Verbindung oder Board; Umschalt+Rechtsklick: Menü des Browsers', gruppe: 'Überall', fremd: true },
   { id: 'schliessen', taste: 'Esc', was: 'Menü, Fenster oder Zeichenmodus schließen', gruppe: 'Überall', fremd: true },
 
   // ── Ansichten ───────────────────────────────────────────────────────────

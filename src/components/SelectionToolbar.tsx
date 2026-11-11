@@ -8,7 +8,7 @@ import { textDateienAlsNotizen, textKarte } from '../lib/textNotiz';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { KACHEL_TYPEN, STICKY_COLORS, uid, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -18,6 +18,7 @@ import { ALIGN_LABEL, computeAlign, type AlignOp } from '../lib/align';
 import { mutedHistory } from '../store';
 import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
 import type { ArrangeMode } from '../lib/arrange';
+import { KARTEN_EREIGNIS, kartenWunschNehmen } from '../lib/kontextmenue';
 
 /**
  * Aktionsleiste, die direkt über der Selektion schwebt (NodeToolbar):
@@ -81,6 +82,9 @@ export function SelectionToolbar() {
   type MenuKind = 'ai' | 'attr' | 'align' | 'move' | 'frame' | 'more' | 'font';
   const [menu, setMenu] = useState<MenuKind | null>(null);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0, down: false });
+  /** M350: per Rechtsklick geöffnet — dann am Zeiger und mit den Knöpfen der Leiste dazu */
+  const [amZeiger, setAmZeiger] = useState(false);
+  useEffect(() => { if (!menu) setAmZeiger(false); }, [menu]);
   /**
    * M268: Gemessen wird in Bildschirm-Punkten, geschrieben in Layout-Punkten.
    *
@@ -91,6 +95,22 @@ export function SelectionToolbar() {
    * 317 Punkte nach rechts und oben aus dem Bild heraus (Wert −102).
    */
   const inLayout = (v: number) => v / wurzelZoom();
+  // M350: Rechtsklick auf eine Karte öffnet das „Mehr"-Menü am Zeiger (Kontextmenue.tsx wählt die Karte vorher).
+  // Die Leiste entsteht evtl. erst mit dieser Auswahl — darum liegt der Wunsch zwischengespeichert bereit.
+  useEffect(() => {
+    const auf = () => {
+      const w = kartenWunschNehmen();
+      if (!w) return;
+      const nurRahmen = selectActiveBoard(useBoard.getState()).nodes.filter((n) => n.selected).every((n) => n.type === 'frame');
+      setMenuPos({ x: inLayout(w.x), y: inLayout(w.y), down: true });
+      setAmZeiger(true);
+      setMenu(nurRahmen ? 'frame' : 'more');
+    };
+    auf();
+    window.addEventListener(KARTEN_EREIGNIS, auf);
+    return () => window.removeEventListener(KARTEN_EREIGNIS, auf);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const toggleMenu = (kind: MenuKind) => (e: React.MouseEvent<HTMLButtonElement>) => {
     if (menu === kind) { setMenu(null); return; }
     const r = e.currentTarget.getBoundingClientRect();
@@ -176,7 +196,10 @@ export function SelectionToolbar() {
     const platz = inLayout(window.innerWidth) - 8;
     if (inLayout(b.right) > platz) el.style.left = `${Math.max(8, platz - inLayout(b.width))}px`;
     else if (inLayout(b.left) < 8) el.style.left = '8px';
-  }, [menu, menuPos]);
+    // M350: am Zeiger geöffnet kann es unten aus dem Bild ragen — dann nach oben verankern
+    const unten = inLayout(window.innerHeight) - 8;
+    if (inLayout(b.bottom) > unten) { el.style.top = `${Math.max(8, unten - inLayout(b.height))}px`; el.style.bottom = 'auto'; }
+  }, [menu, menuPos, amZeiger]);
   const menuPortal = (extraClass: string, content: React.ReactNode) => createPortal(
     <div
       ref={menuRef}
@@ -595,11 +618,25 @@ export function SelectionToolbar() {
               </>
             );
           })())}
-          {menu === 'more' && menuPortal('sel-more-menu', (() => {
+          {menu === 'more' && menuPortal(amZeiger ? 'sel-more-menu am-zeiger' : 'sel-more-menu', (() => {
             const allAuto = selected.every((n) => n.autoFit !== false);   // Standard AN (M111)
             const allArchived = selected.every((n) => n.archived);
             return (
               <>
+                {/* M350: per Rechtsklick geöffnet — die Knöpfe der Leiste stehen mit drin */}
+                {amZeiger && (
+                  <>
+                    {single && (
+                      <button onClick={() => { setMenu(null); useBoard.getState().setFocusCard(single.id); }} title="Karte im Fokus öffnen (Enter)">
+                        <IMaximize size={14} /> Öffnen
+                      </button>
+                    )}
+                    <button onClick={() => { setMenu(null); duplicate(); }} title="Duplizieren (Strg+D)"><IDuplicate size={14} /> Duplizieren</button>
+                    <button onClick={() => { setMenu(null); useBoard.getState().setShareCards([...selected, ...selFrames].map((n) => n.id)); }} title="Teilen und exportieren">
+                      <IShare size={14} /> Teilen …
+                    </button>
+                  </>
+                )}
                 {/* M313: Reihenfolge wie in jedem ⋯ der App — Tun · Werkzeuge ·
                     Weitergeben · Aufräumen. Verschieben kam aus der Leiste hierher. */}
                 {single && (
@@ -743,6 +780,11 @@ export function SelectionToolbar() {
                     aria-label="Archivieren"
                   >
                     <IArchive size={14} /> Archivieren (erledigt)
+                  </button>
+                )}
+                {amZeiger && (
+                  <button className="sel-menu-gefahr" onClick={() => { setMenu(null); remove(); }} title="Löschen (Entf)">
+                    <ITrash size={14} /> Löschen
                   </button>
                 )}
               </>

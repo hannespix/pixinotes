@@ -14,6 +14,7 @@ import {
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
 } from './Icons';
+import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
 
 /**
  * Das Werkzeug-Dock — drei Knöpfe: ＋ öffnet die Modul-Palette (M316: alle
@@ -155,6 +156,8 @@ export function Dock() {
   const removeTemplate = useBoard((s) => s.removeTemplate);
   const focusNode = useBoard((s) => s.focusNode);
   const [addMenu, setAddMenu] = useState(false);
+  // M350: Palette ohne Wahl geschlossen — der Ablage-Wunsch vom Rechtsklick verfällt
+  useEffect(() => { if (!addMenu) ablageVerwerfen(); }, [addMenu]);
   // M316: Die Modul-Palette — alle Module auf einen Blick, gruppiert, mit
   // Suchfeld. Kein zweites Menü mehr („Weitere Module" aus M296).
   const [suche, setSuche] = useState('');
@@ -226,7 +229,9 @@ export function Dock() {
   // Wunschposition Bildmitte — aber nie ÜBER bestehende Karten (M130):
   // findFreeSpot weicht auf die nächste freie Stelle aus
   const centerPos = (w = 260, h = 80) => {
-    const p = screenToFlowPosition({ x: window.innerWidth / 2 - w / 2, y: window.innerHeight / 2 - h / 2 });
+    // M350: ‚Modul hier einfügen‘ (Rechtsklick) legt es dorthin, wo geklickt wurde
+    const hier = ablageNehmen();
+    const p = screenToFlowPosition(hier ? { x: hier.x - 12, y: hier.y - 12 } : { x: window.innerWidth / 2 - w / 2, y: window.innerHeight / 2 - h / 2 });
     return findFreeSpot(selectActiveBoard(useBoard.getState()).nodes, p, { w, h });
   };
 

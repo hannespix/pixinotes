@@ -8,6 +8,7 @@ import {
   IArchive, IArchiveRestore, ICopy, IDownload, IDuplicate, IMore, IMoveTo,
   IPen, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck,
 } from './Icons';
+import { MENUE_HIER } from '../lib/kontextmenue';
 
 /**
  * M288: Ein Menü für die Ebenen ÜBER der Karte.
@@ -59,6 +60,19 @@ export function MenuHuelle({ titel, klasse, kinder }: {
    * schon beim Aufsetzen des Zeigers, und der Klick erreichte den Eintrag nie.
    */
   useLayoutEffect(() => { if (pos) insBild(menu.current); }, [pos]);
+  // M350: Rechtsklick auf die Zeile (Kontextmenue.tsx) öffnet dieses Menü am Zeiger
+  const knopfRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    const k = knopfRef.current;
+    if (!k) return;
+    const hier = (e: Event) => {
+      const o = (e as CustomEvent<{ x: number; y: number }>).detail;
+      if (!o) return;
+      setPos({ x: o.x, y: o.y, hoch: false });
+    };
+    k.addEventListener(MENUE_HIER, hier);
+    return () => k.removeEventListener(MENUE_HIER, hier);
+  }, []);
   useEffect(() => {
     if (!pos) return;
     const zu = (e: PointerEvent) => {
@@ -73,6 +87,7 @@ export function MenuHuelle({ titel, klasse, kinder }: {
   return (
     <span className="ebenen-menu-wrap" ref={box}>
       <button
+        ref={knopfRef}
         className={`ebenen-menu-knopf ${klasse}${pos ? ' auf' : ''}`}
         title={titel}
         aria-label={titel}

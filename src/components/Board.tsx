@@ -68,6 +68,7 @@ import { DrawingLayer } from './DrawingLayer';
 import { FingerGesten } from './FingerGesten';
 import { CommentLayer } from './CommentLayer';
 import { SelectionToolbar } from './SelectionToolbar';
+import { BoardKontextmenue } from './Kontextmenue';
 
 /** M213: Jede Karte bekommt ihre eigene Fehlergrenze. Stolpert eine — etwa
  *  über kaputte Daten aus einem Import —, bleibt der Schaden auf sie
@@ -1412,6 +1413,7 @@ export function Board() {
           />
         )}
         <SelectionToolbar />
+        <BoardKontextmenue />
         <DrawingLayer />
         <FingerGesten />
         <CommentLayer />
