@@ -233,6 +233,18 @@ export async function readSync(handle: SyncDirHandle): Promise<SyncPayload | nul
 /** Aus welchem Speicher-Stand eine Sicherung gebaut wurde — sie selbst trägt die Boards ohne Auswahl */
 const herkunft = new WeakMap<BoardDoc[], BoardDoc[]>();
 
+/**
+ * M351: Der Zeitstempel ist zugleich die Kennung eines Stands — an ihm erkennt jedes Gerät „das habe ich
+ * geschrieben". Speichern zwei Geräte in derselben Millisekunde, trugen beide Dateien denselben Stempel,
+ * und jedes hielt die Datei des anderen für die eigene: keines übernahm die Karte des anderen (m311 D).
+ * Drei zufällige Stellen hinter der Millisekunde (ISO 8601 erlaubt beliebig viele, Date liest sie) machen
+ * den Stempel eindeutig; Zeit und Anzeige bleiben dieselben.
+ */
+export function standStempel(jetzt = new Date()): string {
+  const fein = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+  return jetzt.toISOString().replace(/Z$/, `${fein}Z`);
+}
+
 export function buildSyncPayload(): SyncPayload {
   const s = useBoard.getState();
   // M345: ohne Auswahl- und Zieh-Zustand — der gehört dem Gerät, nicht dem Dokument
@@ -241,7 +253,7 @@ export function buildSyncPayload(): SyncPayload {
   return {
     app: 'pixinotes',
     version: 2,
-    savedAt: new Date().toISOString(),
+    savedAt: standStempel(),
     boards,
     spaces: s.spaces,
     activeId: s.activeId,
@@ -357,7 +369,7 @@ export async function writeSync(handle: SyncDirHandle): Promise<string> {
   await w.write(JSON.stringify(payload));
   await w.close();
   await basisMerken('ordner', payload);
-  letzteSignatur = await dateiSignatur(handle); // eigenes Schreiben ist kein Fremd-Stand
+  letzteSignatur = await signaturFuer(handle, payload.savedAt); // eigenes Schreiben ist kein Fremd-Stand — wenn es noch da ist
   return markSynced(payload, 'ordner');
 }
 
@@ -544,6 +556,24 @@ async function dateiSignatur(handle: SyncDirHandle): Promise<string | null> {
   }
 }
 let letzteSignatur: string | null | undefined;
+/**
+ * M351: Signatur nur merken, wenn die Datei GERADE den erwarteten Stand trägt. Nach dem eigenen Schreiben
+ * (oder Abgleichen) wurde die Signatur bisher blind gelesen — schrieb ein anderes Gerät genau dazwischen,
+ * galt seine Datei als „eigene", die Überwachung meldete nie eine Änderung, und dieses Gerät blieb stehen,
+ * bis hier wieder etwas bearbeitet wurde (m311 D2–D4). Geprüft wird am Zeitstempel im Dateikopf; passt er
+ * nicht, bleibt die Signatur leer und der nächste Takt schaut nach.
+ */
+async function signaturFuer(handle: SyncDirHandle, erwartet: string | null): Promise<string | null> {
+  try {
+    const f = await (await handle.getFileHandle(FILE_NAME)).getFile();
+    const kopf = await f.slice(0, 400).text();
+    const m = /"savedAt":"([^"]+)"/.exec(kopf);
+    if (!erwartet || !m || m[1] !== erwartet) return null;
+    return `${f.lastModified}:${f.size}`;
+  } catch {
+    return null;
+  }
+}
 
 /** Ordner prüfen und einen fremden Stand einarbeiten. Mit Basis (M311) wird
  *  zusammengeführt — in beide Richtungen, ohne Nachfrage. Ohne Basis gilt
@@ -582,7 +612,7 @@ export async function checkSyncRemote(erzwingen = false): Promise<EinarbeitenErg
         staleHintShown = false;
       }
     }
-    if (r !== 'spaeter') letzteSignatur = await dateiSignatur(handle);
+    if (r !== 'spaeter') letzteSignatur = await signaturFuer(handle, knownStamp());
     await konfliktkopienEinarbeiten(handle);
     return r;
   });
@@ -637,7 +667,7 @@ async function autoSave(): Promise<void> {
           nachzuegler = setTimeout(() => { void autoSave().catch(() => {}); }, 3000);
           return;
         }
-        letzteSignatur = await dateiSignatur(handle);
+        letzteSignatur = await signaturFuer(handle, knownStamp());
         conflictWarned = false;
         return;
       }
