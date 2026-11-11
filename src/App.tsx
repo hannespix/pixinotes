@@ -38,6 +38,7 @@ import { Tastatur } from './components/Tastatur';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
 import { autoArchivAlleBoards } from './lib/ticketArchiv';
 import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
+import { initGrabsteine } from './lib/grabsteine';
 
 export default function App() {
   const toast = useBoard((s) => s.toast);
@@ -54,7 +55,7 @@ export default function App() {
   const showToast = useBoard((s) => s.showToast);
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initBrain(); }, []);
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initBrain(); initGrabsteine(); }, []);
 
   // Eigene Apps (M158): verwaiste HTML-Inhalte in IndexedDB entsorgen —
   // NUR beim Start (dann kann kein Undo eine gelöschte App-Karte zurückholen,

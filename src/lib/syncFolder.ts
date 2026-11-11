@@ -5,6 +5,7 @@
 // Das Ordner-Handle wird in IndexedDB gemerkt (übersteht Neustarts in Chrome/Edge).
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
 import { berichtAlsSatz, dreiWegeMerge, nurAuswahlAnders, ohneAuswahl, type SyncStand } from './syncMerge';
+import { grabsteineFuer, grabsteineVereinigen } from './grabsteine';
 
 /** Dateiname im Sync-Ordner — auch der Dateien-App-Weg (M190) schreibt GENAU
  *  diese Datei, damit ein iPad und ein Desktop denselben Nextcloud-Ordner
@@ -76,6 +77,8 @@ export interface SyncPayload {
   activeId: string;
   /** M269: Dateiinhalte je Karten-Id — fehlt bei älteren Ständen */
   dateien?: Record<string, SyncDatei>;
+  /** M351: Grabsteine — was dieses Gerät gelöscht hat (lib/grabsteine.ts) */
+  geloescht?: Record<string, string>;
 }
 
 // Minimale Typen für die File System Access API (nicht in allen TS-Libs)
@@ -242,6 +245,7 @@ export function buildSyncPayload(): SyncPayload {
     boards,
     spaces: s.spaces,
     activeId: s.activeId,
+    geloescht: grabsteineFuer(s.boards, s.spaces),
     // bewusst OHNE KI-Einstellungen: API-Schlüssel bleiben auf dem Gerät
   };
 }
@@ -434,6 +438,7 @@ const tippt = (): boolean => Date.now() - letzteAenderung < 2500;
  */
 export async function fremdStandEinarbeiten(remote: SyncPayload, weg: SyncWeg, nebenkopie = false): Promise<EinarbeitenErgebnis> {
   const basis = await basisLesen(weg.source);
+  grabsteineVereinigen(remote.geloescht); // M351: Löschungen reisen über mehrere Geräte weiter
   if (!basis) {
     if (nebenkopie || localStorage.getItem(weg.dirtyKey)) return 'konflikt';
     return weg.uebernehmen(remote) ? 'uebernommen' : 'fehler';

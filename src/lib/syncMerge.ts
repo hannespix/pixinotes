@@ -29,7 +29,11 @@ import type { Edge } from '@xyflow/react';
 import type { BoardDoc, CommentThread, Project, Space, Stroke } from '../store';
 import type { AppNode } from '../types';
 
-export interface SyncStand { boards: BoardDoc[]; spaces: Space[] }
+export interface SyncStand {
+  boards: BoardDoc[]; spaces: Space[];
+  /** M351: was die Seite gelöscht hat (Kennung → Zeitpunkt) — fehlt bei älteren Ständen */
+  geloescht?: Record<string, string>;
+}
 
 export interface MergeBericht {
   /** Boards, die eine Fassung von drüben (ganz oder teilweise) übernommen haben */
@@ -52,11 +56,29 @@ export interface MergeErgebnis extends SyncStand {
   fremdNeu: boolean;
 }
 
-interface Zaehler { konflikte: number }
+interface Zaehler {
+  konflikte: number;
+  /** M351: Hat die fremde Seite dieses Objekt gelöscht (oder führt sie es woanders)? Fehlt bei alten Ständen */
+  kennt?: (id: string) => boolean;
+}
 
 const str = (x: unknown): string | undefined => (x === undefined ? undefined : JSON.stringify(x));
 
 const byId = <T extends { id: string }>(xs: T[]): Map<string, T> => new Map(xs.map((x) => [x.id, x]));
+
+/** Alle Kennungen eines Stands: Boards, Karten, Pfeile, Striche, Kommentare, Bereiche, Projekte */
+export function alleIds(boards: BoardDoc[], spaces: Space[] = []): Set<string> {
+  const ids = new Set<string>();
+  for (const b of boards) {
+    ids.add(b.id);
+    for (const n of b.nodes) ids.add(n.id);
+    for (const e of b.edges ?? []) ids.add(e.id);
+    for (const s of b.drawings ?? []) ids.add(s.id);
+    for (const c of b.comments ?? []) ids.add(c.id);
+  }
+  for (const sp of spaces) { ids.add(sp.id); for (const p of sp.projects) ids.add(p.id); }
+  return ids;
+}
 
 /**
  * Drei-Wege-Entscheid für EIN Objekt mit Kennung. `tief` führt zwei geänderte
@@ -70,13 +92,18 @@ function entscheide<T>(
   tief: ((basis: T | undefined, lokal: T, fremd: T) => T) | undefined,
   z: Zaehler,
   vermerk?: (was: 'fremd' | 'neu' | 'entfernt') => void,
+  /** M351: auch „nur drüben geändert" eine Ebene tiefer entscheiden (Boards: drüben fehlende Karten prüfen) */
+  immerTief = false,
 ): T | undefined {
   if (lokal !== undefined && fremd !== undefined) {
     const sL = str(lokal);
     const sF = str(fremd);
     if (sL === sF) return lokal;
     const sB = str(basis);
-    if (sB !== undefined && sL === sB) { vermerk?.('fremd'); return fremd; }   // nur drüben geändert
+    if (sB !== undefined && sL === sB) {                                        // nur drüben geändert
+      vermerk?.('fremd');
+      return immerTief && tief ? tief(basis, lokal, fremd) : fremd;
+    }
     if (sB !== undefined && sF === sB) return lokal;                            // nur hier geändert
     if (tief) { vermerk?.('fremd'); return tief(basis, lokal, fremd); }        // beide → eine Ebene tiefer
     z.konflikte += 1;
@@ -84,7 +111,12 @@ function entscheide<T>(
   }
   if (lokal !== undefined) {
     if (basis === undefined) return lokal;                                      // hier neu (oder Basis unbekannt)
-    if (str(lokal) === str(basis)) { vermerk?.('entfernt'); return undefined; } // drüben gelöscht, hier unverändert
+    if (str(lokal) === str(basis)) {
+      // M351: Drüben fehlt es — gelöscht oder nur nie gesehen (die Datei wurde überschrieben)?
+      const id = (lokal as { id?: unknown }).id;
+      if (z.kennt && typeof id === 'string' && !z.kennt(id)) return lokal;   // nie gesehen: bleibt
+      vermerk?.('entfernt'); return undefined;                                  // drüben gelöscht, hier unverändert
+    }
     return lokal;                                                               // Bearbeitung schlägt Löschen
   }
   if (fremd !== undefined) {
@@ -348,6 +380,12 @@ export function dreiWegeMerge(basis0: SyncStand | null, lokal0: SyncStand, fremd
   const lokal = { ...lokal0, boards: lokal0.boards.map((b) => ohneAuswahl(b, zurueck)) };
   const fremd = { ...fremd0, boards: fremd0.boards.map((b) => ohneAuswahl(b)) };
   const z: Zaehler = { konflikte: 0 };
+  // M351: Mit Grabsteinen löscht nur, was drüben ausdrücklich gelöscht ist oder woanders liegt
+  const g = fremd0.geloescht;
+  if (g) {
+    const drueben = alleIds(fremd0.boards, fremd0.spaces);
+    z.kennt = (id) => !!g[id] || drueben.has(id);
+  }
   const bericht: MergeBericht = { aktualisiert: 0, neu: 0, entfernt: 0, konflikte: 0 };
   const mB = basis ? byId(basis.boards) : undefined;
   const mL = byId(lokal.boards);
@@ -361,7 +399,7 @@ export function dreiWegeMerge(basis0: SyncStand | null, lokal0: SyncStand, fremd
       if (was === 'fremd') bericht.aktualisiert += 1;
       else if (was === 'neu') bericht.neu += 1;
       else bericht.entfernt += 1;
-    });
+    }, !!z.kennt);   // M351: mit Grabsteinen jede Karte einzeln — die fremde Datei kann eigene Neue nie gesehen haben
     if (w !== undefined) boards.push(w);
     // Abweichung vom lokalen Stand merken (für Undo-Verlauf und Neuaufbau der Ansicht)
     if ((w === undefined) !== (l === undefined) || (w !== undefined && l !== undefined && w !== l && str(w) !== str(l))) geaendert.push(id);
