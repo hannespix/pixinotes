@@ -133,7 +133,8 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
         });
       }
       // ── Pos1 / Ende: erste und letzte Karte in Lesereihenfolge (M345) ───────────────────
-      if ((e.key === 'Home' || e.key === 'End') && aufFlaeche && !e.shiftKey && !st.focusCard && sichtbar.length) {
+      // M352: in einer PDF-/Word-Seite mit Tastatur-Fokus blättern Pos1/Ende (FileCard) — die Fläche umfasst auch die Karten
+      if ((e.key === 'Home' || e.key === 'End') && aufFlaeche && !e.shiftKey && !st.focusCard && sichtbar.length && !closest('.pdf-seite-wrap')) {
         return tun(() => { const folge = lesefolge(sichtbar); waehle(e.key === 'Home' ? folge[0] : folge[folge.length - 1]); });
       }
       // ── Zoom ────────────────────────────────────────────────────────────────────────────

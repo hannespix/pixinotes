@@ -319,14 +319,61 @@ function PdfThumb({ dataUrl, onOpen, onSeiten }: { dataUrl: string; onOpen: () =
  * Zuklappen) und die Kommentarliste unter der Seite — nummeriert wie die
  * Pins, mit Sprung zu anderen Seiten mit Kommentaren.
  */
-function SeitenLeiste({ seite, seiten, blaettern, pinModus, setPinModus, anzahlHier, onDownload, zuklappen }: {
-  seite: number; seiten: number; blaettern: (zu: number) => void; pinModus: boolean; setPinModus: (f: (p: boolean) => boolean) => void;
+/**
+ * M352: Blättern mit der Tastatur — wie in jedem PDF-Programm.
+ *
+ * Welche Karte gemeint ist:
+ *   · die Karte im Fokus (Zoom auf die Karte) oder die, in der der Tastatur-Fokus steht (nach einem Klick
+ *     auf Seite oder Leiste): Bild↓/Bild↑, →/←, Leertaste/Umschalt+Leertaste, Pos1/Ende;
+ *   · eine auf dem Board GEWÄHLTE, aufgeklappte Karte: nur Bild↓/Bild↑ — Pfeile verschieben dort die Karte,
+ *     Pos1/Ende springen zur ersten/letzten Karte, Leertaste schwenkt die Ansicht (alles wie bisher).
+ * Textfelder (Seitennummer, Kommentar), Menüs und Dialoge behalten ihre Tasten.
+ */
+function useBlaetterTasten(id: string, barRef: React.RefObject<HTMLDivElement | null>, seite: number, seiten: number, blaettern: (zu: number) => void): void {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+      const st = useBoard.getState();
+      if (st.view !== 'board' || st.presenting || st.searchOpen || st.settingsOpen || st.helpOpen || st.tasksOpen) return;
+      const t = e.target as HTMLElement | null;
+      if (t && typeof t.closest === 'function' && t.closest('input, textarea, select, [contenteditable="true"], .modal, [role="dialog"], [role="menu"]')) return;
+      if (document.querySelector('.modal-backdrop, .sel-menu-fixed, .kontext-menue, .bn-suggestion-menu')) return;
+      const wrap = barRef.current?.closest('.pdf-seite-wrap');
+      if (!wrap) return;
+      const voll = st.focusCard === id || (!!t && wrap.contains(t));
+      if (!voll) {
+        const gewaehlt = selectActiveBoard(st).nodes.filter((n) => n.selected);
+        if (gewaehlt.length !== 1 || gewaehlt[0].id !== id) return;
+      }
+      let zu: number | null = null;
+      if (e.key === 'PageDown') zu = seite + 1;
+      else if (e.key === 'PageUp') zu = seite - 1;
+      else if (voll && !e.shiftKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) zu = seite + (e.key === 'ArrowRight' ? 1 : -1);
+      else if (voll && e.key === ' ') zu = seite + (e.shiftKey ? -1 : 1);
+      else if (voll && !e.shiftKey && e.key === 'Home') zu = 1;
+      else if (voll && !e.shiftKey && e.key === 'End') zu = seiten;
+      if (zu === null) return;
+      // Die Taste gehört jetzt dem Blättern — auch am Anfang/Ende (sonst schwenkte die Leertaste los
+      // oder Pos1 spränge zur ersten Karte)
+      e.preventDefault(); e.stopPropagation();
+      const ziel = Math.min(seiten, Math.max(1, zu));
+      if (ziel !== seite) blaettern(ziel);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [id, barRef, seite, seiten, blaettern]);
+}
+
+function SeitenLeiste({ id, seite, seiten, blaettern, pinModus, setPinModus, anzahlHier, onDownload, zuklappen }: {
+  id: string; seite: number; seiten: number; blaettern: (zu: number) => void; pinModus: boolean; setPinModus: (f: (p: boolean) => boolean) => void;
   anzahlHier: number; onDownload: () => void; zuklappen?: () => void;
 }) {
   const [eingabe, setEingabe] = useState('');
+  const barRef = useRef<HTMLDivElement>(null);
+  useBlaetterTasten(id, barRef, seite, seiten, blaettern);
   return (
-    <div className="pdf-seite-bar nowheel">
-      <button onClick={() => blaettern(seite - 1)} disabled={seite <= 1} aria-label="Vorherige Seite" data-taste="pdf-zurueck">‹</button>
+    <div className="pdf-seite-bar nowheel" ref={barRef}>
+      <button onClick={() => blaettern(seite - 1)} disabled={seite <= 1} aria-label="Vorherige Seite" title="Vorherige Seite" data-taste="pdf-zurueck">‹</button>
       <input
         className="pdf-seite-nr" inputMode="numeric" aria-label="Seite" data-taste="pdf-seite-nr"
         value={eingabe || String(seite)}
@@ -336,7 +383,7 @@ function SeitenLeiste({ seite, seiten, blaettern, pinModus, setPinModus, anzahlH
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
       />
       <span className="pdf-seite-von">/ {seiten}</span>
-      <button onClick={() => blaettern(seite + 1)} disabled={seite >= seiten} aria-label="Nächste Seite" data-taste="pdf-vor">›</button>
+      <button onClick={() => blaettern(seite + 1)} disabled={seite >= seiten} aria-label="Nächste Seite" title="Nächste Seite" data-taste="pdf-vor">›</button>
       <span className="pdf-seite-luft" />
       <button className={pinModus ? 'on' : ''} onClick={() => setPinModus((p) => !p)} data-taste="pdf-kommentar"
         title={pinModus ? 'Abbrechen' : 'Kommentar an eine Stelle der Seite setzen — danach auf die Stelle tippen'} aria-pressed={pinModus} aria-label="Kommentar an Stelle">
@@ -496,10 +543,10 @@ function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
   if (failed) return <div className="file-nopreview">Diese PDF lässt sich nicht darstellen.</div>;
   return (
     <div className="pdf-seite-wrap nodrag" ref={wrapRef} data-taste="pdf-seite-wrap">
-      <SeitenLeiste seite={seite} seiten={seiten} blaettern={blaettern} pinModus={pinModus} setPinModus={setPinModus}
+      <SeitenLeiste id={id} seite={seite} seiten={seiten} blaettern={blaettern} pinModus={pinModus} setPinModus={setPinModus}
         anzahlHier={anzahlHier} onDownload={onDownload} zuklappen={zuklappen} />
       {pinModus && <div className="pdf-pin-hinweis">Auf die Stelle tippen, zu der der Kommentar gehört</div>}
-      <div className={`pdf-seite ${pinModus ? 'pin-modus' : ''}`} onClick={aufSeiteTippen} data-seite={seite}>
+      <div className={`pdf-seite ${pinModus ? 'pin-modus' : ''}`} onClick={aufSeiteTippen} data-seite={seite} tabIndex={-1}>
         <canvas ref={ref} />
       </div>
       <SeitenKommentare id={id} seite={seite} blaettern={blaettern} />
@@ -627,10 +674,10 @@ function WordSeite({ id, quelle, zuklappen, onSeiten, onDownload }: {
   if (status === 'fehler') return <div className="file-nopreview">Dieses Word-Dokument lässt sich nicht darstellen — „Als Notiz übernehmen" (Auswahl → ⋯) holt den Text.</div>;
   return (
     <div className="pdf-seite-wrap nodrag" ref={wrapRef} data-taste="pdf-seite-wrap" data-art="word">
-      <SeitenLeiste seite={seite} seiten={seiten} blaettern={blaettern} pinModus={pinModus} setPinModus={setPinModus}
+      <SeitenLeiste id={id} seite={seite} seiten={seiten} blaettern={blaettern} pinModus={pinModus} setPinModus={setPinModus}
         anzahlHier={anzahlHier} onDownload={onDownload} zuklappen={zuklappen} />
       {pinModus && <div className="pdf-pin-hinweis">Auf die Stelle tippen, zu der der Kommentar gehört</div>}
-      <div className={`pdf-seite word-seite ${pinModus ? 'pin-modus' : ''}`} onClick={aufSeiteTippen} data-seite={seite}>
+      <div className={`pdf-seite word-seite ${pinModus ? 'pin-modus' : ''}`} onClick={aufSeiteTippen} data-seite={seite} tabIndex={-1}>
         {status === 'laedt' && <div className="word-laedt">Dokument wird aufgebaut …</div>}
         <div ref={stilRef} className="word-stile" />
         <div ref={inhaltRef} className="word-inhalt" />
