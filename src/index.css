@@ -6310,3 +6310,76 @@ audio.file-media { height: 40px; }
 .freigabe-dialog .freigabe-stand.an { color: var(--accent); }
 .freigabe-dialog .freigabe-weg { all: unset; cursor: pointer; width: 26px; height: 26px; display: grid; place-items: center; border-radius: var(--r-xs); color: var(--muted); }
 .freigabe-dialog .freigabe-weg:hover { background: var(--surface-hover, rgba(0,0,0,.05)); color: var(--ink); }
+
+/* ================= M343: Karten greifen in jeder Zoomstufe =================
+   Griff, Anschlusspunkte, Auswahlrahmen und Größen-Kanten liegen in der gezoomten Fläche und
+   schrumpften mit ihr — bei 15 % war der Griff 7 × 3 Bildpunkte groß. Jetzt behalten sie ihre
+   BILDSCHIRM-Größe: `--pn-inv` (Kehrwert des Zooms, von Board.tsx gesetzt, sobald der Zoom ruht)
+   rechnet die Verkleinerung der Fläche wieder heraus — so, wie es tldraw, Miro und Figma machen.
+   Und im weiten Zoom (`data-weit`, unter ~45 %) ist die ganze Karte der Griff: Text ist dort
+   ohnehin nicht zu lesen, also fasst man die Karte überall an. */
+.card-grip {
+  /* Lage ohne translate, damit die Skalierung um die Unterkante-Mitte nichts verschiebt */
+  left: calc(50% - 40px * var(--pn-inv, 1)); margin-left: -23px; transform: none;
+  transform-origin: 50% 100%; scale: var(--pn-inv, 1);
+}
+@media (pointer: coarse) {
+  .card-grip { left: calc(50% - 50px * var(--pn-inv, 1)); margin-left: -28px; }
+}
+.pn-handle {
+  width: calc(22px * var(--pn-inv, 1)) !important; height: calc(22px * var(--pn-inv, 1)) !important;
+}
+.pn-handle::after {
+  inset: calc(4px * var(--pn-inv, 1)); font-size: calc(11px * var(--pn-inv, 1)); border-width: calc(1.5px * var(--pn-inv, 1));
+}
+@media (pointer: coarse) {
+  .react-flow__handle.pn-handle { width: calc(28px * var(--pn-inv, 1)) !important; height: calc(28px * var(--pn-inv, 1)) !important; }
+  .react-flow__handle.pn-handle::after { inset: calc(5px * var(--pn-inv, 1)); font-size: calc(13px * var(--pn-inv, 1)); }
+}
+/* Der Auswahlrahmen — auch, solange die Karte den Fokus hat: React Flow nimmt fokussierten Karten den
+   Umriss (`.selectable:focus { outline: none }`, stärker als unsere Regel). Direkt nach dem Anklicken
+   hatte eine Karte deshalb gar keinen Rahmen; er erschien erst, wenn der Fokus woanders lag. */
+.react-flow__node.selected,
+.react-flow__node.selectable.selected:focus,
+.react-flow__node.selectable.selected:focus-visible {
+  outline: calc(2px * var(--pn-inv, 1)) solid var(--accent); outline-offset: calc(2px * var(--pn-inv, 1));
+}
+.ov-canvas .react-flow__node.selectable.selected,
+.ov-canvas .react-flow__node.selectable.selected:focus,
+.ov-canvas .react-flow__node.selectable.selected:focus-visible { outline: none; }
+html[data-alles-zeigen] .react-flow__node.selectable.selected:focus,
+html[data-alles-zeigen] .react-flow__node.selectable.selected:focus-visible { outline: none !important; }
+/* Größen-Kanten (die Ecken skaliert React Flow selbst) */
+.react-flow__resize-control.line.left,
+.react-flow__resize-control.line.right { width: calc(10px * var(--pn-inv, 1)) !important; }
+.react-flow__resize-control.line.top,
+.react-flow__resize-control.line.bottom { height: calc(10px * var(--pn-inv, 1)) !important; }
+@media (pointer: coarse) {
+  .react-flow__resize-control.line.left,
+  .react-flow__resize-control.line.right { width: calc(16px * var(--pn-inv, 1)) !important; }
+  .react-flow__resize-control.line.top,
+  .react-flow__resize-control.line.bottom { height: calc(16px * var(--pn-inv, 1)) !important; }
+}
+/* Bedienelemente AUF der Karte wachsen mit, aber gedeckelt — sie sollen die Karte nicht zudecken */
+.color-dot { transform-origin: 100% 0; scale: min(var(--pn-inv, 1), 2.2); }
+.fit-hint { transform-origin: 100% 100%; scale: min(var(--pn-inv, 1), 2.2); }
+.note-spur { transform-origin: 100% 50%; scale: min(var(--pn-inv, 1), 2.5) 1; }
+
+/* Weiter Zoom: die ganze Karte ist der Griff */
+[data-weit] .react-flow__node > .card-shell > .card-body { pointer-events: none; }
+[data-weit] .react-flow__node { cursor: grab; }
+[data-weit] .react-flow__node.dragging { cursor: grabbing; }
+[data-weit] .react-flow__node :is(.card-grip, .color-dot, .note-farben, .fit-hint, .note-spur, .card-x) { visibility: hidden !important; }
+/* Anschlusspunkte nur an der gewählten Karte — an jeder Karte unter dem Zeiger wären sie im Weg */
+[data-weit] .react-flow__node:not(.selected) .pn-handle { visibility: hidden !important; }
+[data-weit] .react-flow__node.selected .pn-handle { opacity: 1; visibility: visible; }
+@media (hover: hover) and (pointer: fine) {
+  /* „Die kann ich greifen": ein dünner Rahmen unter dem Zeiger */
+  [data-weit] .react-flow__node:hover:not(.selected):not(.dragging) {
+    outline: calc(1.5px * var(--pn-inv, 1)) solid color-mix(in srgb, var(--accent) 55%, transparent);
+    outline-offset: calc(2px * var(--pn-inv, 1));
+  }
+}
+/* Verbindungslinien bleiben sichtbar (2 Flächenpunkte wären bei 15 % ein Drittel Bildpunkt) */
+[data-weit] .react-flow__edge-path { stroke-width: calc(2px * var(--pn-inv, 1)) !important; }
+html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important; }
