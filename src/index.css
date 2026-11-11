@@ -6517,3 +6517,25 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
   .help-modal .modal-head h2 { white-space: nowrap; flex: none; }
   .help-modal .help-search { min-width: 0; flex: 1; width: auto; }
 }
+
+/* ================= M349: Abstandsmarken beim Fangen — mittig zwischen zwei Karten, gleiche Abstände =================
+   Magenta wie die Fanglinien; Strich und Endmarken in Bildschirm-Größe, das Maß als kleine Plakette. */
+.fang-abstand { position: absolute; pointer-events: none; z-index: 4000; }
+.fang-abstand.h { height: 0; border-top: calc(1px * var(--pn-inv, 1)) solid #ff2d87; }
+.fang-abstand.v { width: 0; border-left: calc(1px * var(--pn-inv, 1)) solid #ff2d87; }
+.fang-abstand::before, .fang-abstand::after { content: ''; position: absolute; background: #ff2d87; }
+.fang-abstand.h::before, .fang-abstand.h::after {
+  top: calc(-5px * var(--pn-inv, 1)); width: calc(1px * var(--pn-inv, 1)); height: calc(9px * var(--pn-inv, 1));
+}
+.fang-abstand.h::before { left: 0; } .fang-abstand.h::after { right: 0; }
+.fang-abstand.v::before, .fang-abstand.v::after {
+  left: calc(-5px * var(--pn-inv, 1)); height: calc(1px * var(--pn-inv, 1)); width: calc(9px * var(--pn-inv, 1));
+}
+.fang-abstand.v::before { top: 0; } .fang-abstand.v::after { bottom: 0; }
+.fang-mass {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%; scale: var(--pn-inv, 1);
+  background: #ff2d87; color: #fff; font: 600 10.5px/1 var(--font, system-ui, sans-serif);
+  font-variant-numeric: tabular-nums; padding: 3px 5px; border-radius: 4px; white-space: nowrap;
+}
+.fang-abstand.h .fang-mass { top: calc(-1px * var(--pn-inv, 1)); }
+.fang-abstand.v .fang-mass { left: calc(-1px * var(--pn-inv, 1)); }
