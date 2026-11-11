@@ -895,6 +895,12 @@ export function Board() {
    * vergessen. Kein zweiter Editor, keine Vollbild-Position — Stift, Finger und
    * Gesten arbeiten auf derselben Fläche weiter.
    */
+  /* M353: Platz der Leisten unten im Fokus. `--focus-bottom` ist eine calc()-Summe — als nicht registrierte
+     Eigenschaft liefert getComputedStyle sie als TEXT („calc(var(--focus-nav-h) + …)"), parseFloat ergab NaN → 0.
+     Die Kamera ließ darum nie Platz für Blätter-, Werkzeug- und Formatier-Leiste. Die drei Summanden sind
+     schlichte Pixelwerte und lassen sich lesen. */
+  const fokusUnten = (css: CSSStyleDeclaration) =>
+    ['--focus-nav-h', '--focus-tools-h', '--focus-format-h'].reduce((s, v) => s + (parseFloat(css.getPropertyValue(v)) || 0), 0);
   const fokusRueckkehr = useRef<{ x: number; y: number; zoom: number } | null>(null);
   useEffect(() => {
     if (focusCard) {
@@ -904,6 +910,7 @@ export function Board() {
       let beobachter: ResizeObserver | null = null;
       let zuletzt = { w: 0, h: 0 };
       let timer: ReturnType<typeof setTimeout> | undefined;
+      let platzUnten = -1;
       const fahren = (dauer = 320, nachfahren = false) => {
         const el = document.querySelector(`.react-flow__node[data-id="${focusCard}"]`) as HTMLElement | null;
         const pane = document.querySelector('.react-flow') as HTMLElement | null;
@@ -921,8 +928,9 @@ export function Board() {
         zuletzt = { w: el.offsetWidth, h: el.offsetHeight };
         const css = getComputedStyle(document.documentElement);
         const oben = parseFloat(css.getPropertyValue('--focus-top')) || 52;
-        const unten = parseFloat(css.getPropertyValue('--focus-bottom')) || 0;
+        const unten = fokusUnten(css);
         const tastatur = parseFloat(css.getPropertyValue('--kb')) || 0;
+        platzUnten = unten + tastatur;
         const breite = pane.clientWidth;
         const hoehe = Math.max(160, pane.clientHeight - oben - unten - tastatur);
         // Lage (absolut, auch in Rahmen) aus React Flow, Größe als Layout-Maß aus dem DOM —
@@ -954,7 +962,16 @@ export function Board() {
         // Planer …) bleiben bei Zoom 1: mehr Spalten und Zellen statt größerer Pixel — das war
         // der Grund für den alten Fokus (M212), und bleibt.
         const text = ['note', 'image', 'file', 'email', 'shape'].includes(n.type ?? '');
-        const zoom = text ? Math.min(grob ? 2.2 : 1.25, Math.max(1, passt)) : 1;
+        /* M353: Eine aufgeschlagene PDF-/Word-Seite passt GANZ zwischen Kopfzeile und Leisten — wie „ganze
+           Seite" im PDF-Programm. Bisher galt auch hier „nie kleiner als 1": Eine Seite, die etwas höher war als
+           der freie Platz, lief unter Werkzeug- und Blätter-Leiste weiter, und man sah ihr unteres Ende nicht.
+           Nur wenn sie dafür wenig schrumpfen muss (bis 0,75): Eine A4-Seite im Hochformat am Querformat-Schirm
+           würde sonst kaum größer als auf dem Board — sie bleibt lesbar breit, und ihr unteres Ende lässt sich
+           bis über die Leisten rollen (seit `fokusUnten` stimmt der Platz dafür). */
+        const dokument = n.type === 'file' && !!el.querySelector('.pdf-seite');
+        const zoom = dokument && passt < 1 && passt >= 0.75
+          ? passt
+          : text ? Math.min(grob ? 2.2 : 1.25, Math.max(1, passt)) : 1;
         fokusRef.current = { id: focusCard, oben, hoehe, rand };
         requestAnimationFrame(() => fokusBalken());
         // M334: Wächst eine Karte, die ohnehin länger als der Schirm ist (Tippen am
@@ -975,6 +992,16 @@ export function Board() {
         void setViewport({ x, y, zoom }, { duration: dauer });
       };
       fahren();
+      /* M353: Die Leisten unten kommen oft NACH der ersten Kamerafahrt — die Werkzeugleiste dockt erst an, wenn
+         über der eingepassten Karte kein Platz mehr ist, die Formatier-Leiste erscheint beim Schreiben. Dann
+         lag die Karte unter ihnen. Ändert sich der Platz unten, passt die Kamera neu ein (CSS-:has() meldet
+         keine Ereignisse, darum ein leiser Blick alle 200 ms, nur solange der Fokus offen ist). */
+      const platzWacht = setInterval(() => {
+        if (platzUnten < 0 || performance.now() < flyingUntil.current) return;
+        const css = getComputedStyle(document.documentElement);
+        const jetzt = fokusUnten(css) + (parseFloat(css.getPropertyValue('--kb')) || 0);
+        if (Math.abs(jetzt - platzUnten) > 1) fahren(220, true);
+      }, 200);
       // M334: Der Schreib-Cursor bleibt im Bild. Der Browser kann ihn nicht
       // selbst nachscrollen (die Karte liegt in einer Transform-Ebene, nicht in
       // einem Scroller) — also rollt die Kamera nach, sobald die Auswahl unter
@@ -1001,7 +1028,7 @@ export function Board() {
         }, 60);
       };
       document.addEventListener('selectionchange', cursorFolgen);
-      return () => { if (raf) cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(cursorTimer); beobachter?.disconnect(); document.removeEventListener('selectionchange', cursorFolgen); };
+      return () => { if (raf) cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(cursorTimer); clearInterval(platzWacht); beobachter?.disconnect(); document.removeEventListener('selectionchange', cursorFolgen); };
     }
     fokusRef.current = null;
     fokusBalken();
