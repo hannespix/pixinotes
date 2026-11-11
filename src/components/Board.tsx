@@ -372,6 +372,18 @@ export function Board() {
       if (e.touches.length !== 1 || !node || !target) return;
       const t = e.touches[0];
       const { x, y, zoom } = getViewport();
+      /**
+       * M343: Weiter Zoom am Finger. Die ganze Karte ist dort der Griff — damit ein Wisch über die
+       * (dicht stehenden) Karten nicht ständig eine davon verschiebt, gilt wie in Miro: Erst antippen
+       * (auswählen), dann ziehen. Auf einer nicht gewählten Karte schwenkt der Finger das Board.
+       */
+      if (weitRef.current && !fokusRef.current) {
+        if (target.closest('.react-flow__resize-control, .react-flow__handle')) return;
+        if (node.classList.contains('selected')) return; // React Flow zieht die Karte
+        e.stopPropagation(); // React Flow beginnt keinen Karten-Zug; der Tipp (click) wählt weiterhin aus
+        panRef.current = { x: t.clientX, y: t.clientY, vx: x, vy: y, zoom, active: false, el: target };
+        return;
+      }
       // M334: Im Fokus rollt EIN Finger die lange Karte — auch aus dem Text heraus
       // (ein Tipp setzt weiter den Cursor, erst der Zug über 8 px scrollt)
       if (fokusRef.current && node.classList.contains('pn-focused')) {
@@ -701,6 +713,34 @@ export function Board() {
   // React Flow startet den Flächen-Pan nur auf der Fläche selbst — deshalb werden
   // Karten während gehaltener Leertaste durchklick-transparent (CSS .space-pan).
   const [spaceHeld, setSpaceHeld] = useState(false);
+  /**
+   * M343: Bedienung in jeder Zoomstufe. Die Griffe der Karten liegen in der gezoomten Fläche; damit
+   * sie ihre Bildschirm-Größe behalten, bekommt das Stylesheet den Kehrwert des Zooms (`--pn-inv`).
+   * Gesetzt wird er erst, wenn der Zoom kurz ruht — eine Variable an der Wurzel der Fläche lässt den
+   * Browser alle Karten neu bewerten, und während des Zoomens greift ohnehin niemand nach einem Griff.
+   * Unter ~45 % gilt „weit": Die ganze Karte ist der Griff (noDragClassName aus), ihr Inhalt ruht.
+   */
+  const [weit, setWeit] = useState(false);
+  const weitRef = useRef(false);
+  const zoomZeit = useRef<number | undefined>(undefined);
+  const zoomMelden = useCallback((zoom: number, sofort = false) => {
+    window.clearTimeout(zoomZeit.current);
+    const setzen = () => {
+      const wrap = zoomWrapRef.current;
+      if (!wrap) return;
+      const rel = zoom / (anzRef.current || 1);
+      const inv = String(Math.round(Math.max(0.6, Math.min(7, 1 / rel)) * 20) / 20);
+      if (wrap.style.getPropertyValue('--pn-inv') !== inv) wrap.style.setProperty('--pn-inv', inv);
+      // mit Spielraum, damit die Grenze beim Zoomen nicht flattert
+      const jetzt = weitRef.current ? rel < 0.5 : rel < 0.45;
+      if (jetzt !== weitRef.current) { weitRef.current = jetzt; setWeit(jetzt); }
+    };
+    if (sofort) setzen(); else zoomZeit.current = window.setTimeout(setzen, 90);
+  }, []);
+  useEffect(() => {
+    const id = requestAnimationFrame(() => zoomMelden(getViewport().zoom, true));
+    return () => { cancelAnimationFrame(id); window.clearTimeout(zoomZeit.current); };
+  }, [activeId, anzeige, getViewport, zoomMelden]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code !== 'Space' || e.repeat) return;
@@ -1171,6 +1211,7 @@ export function Board() {
   return (
     <div
       ref={zoomWrapRef}
+      data-weit={weit && !focusCard ? '' : undefined}
       className={`board-wrap ${spaceHeld ? 'space-pan' : ''} ${boardBg ? `board-bg-${boardBg}` : ''}`}
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}
@@ -1219,7 +1260,10 @@ export function Board() {
         // Zoom-Knöpfe und Flüge, nicht nur das Schwenken mit der Maus.
         // (M315: Die Papiertextur ist weg — und mit ihr die Kachel-Variablen,
         // die hier bei jedem Schwenk ins DOM geschrieben wurden.)
-        onViewportChange={(vp) => { gemerkteAnsicht.set(activeId, vp); }}
+        onViewportChange={(vp) => { gemerkteAnsicht.set(activeId, vp); zoomMelden(vp.zoom); }}
+        // M343: im weiten Zoom gibt es keine „nicht ziehen"-Zonen — die ganze Karte ist der Griff, das Rad gehört dem Board
+        noDragClassName={weit && !focusCard ? 'nodrag-aus' : 'nodrag'}
+        noWheelClassName={weit && !focusCard ? 'nowheel-aus' : 'nowheel'}
         zoomOnDoubleClick={false}
         deleteKeyCode={['Delete', 'Backspace']}
         multiSelectionKeyCode={['Meta', 'Shift']}
