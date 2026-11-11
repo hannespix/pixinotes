@@ -2257,11 +2257,11 @@ html[data-kopf-eng='an'] .hint { display: none; }
 /* ---------- Physik-Effekte: natürliches Drag-Gefühl ---------- */
 /* Beim Ablegen federt die Karte mit leichtem Overshoot zurück */
 .react-flow__node > * { transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
-/* Beim Ziehen: leicht angehoben und in Bewegungsrichtung geneigt (--tilt setzt das Board) */
-.react-flow__node.dragging > * {
-  transform: rotate(var(--tilt, 0deg)) scale(1.035);
-  transition: transform 0.09s ease;
-}
+/* M344: Beim Ziehen bleibt die Karte, wie sie ist — vorher wurde sie um 3,5 % vergrößert und in
+   Bewegungsrichtung geneigt. Das sah lebendig aus, aber ihre Kanten standen dann nicht mehr dort,
+   wo sie nach dem Ablegen liegen: Ausrichten an einer Oberkante war Glückssache. Der angehobene
+   Schatten (oben) zeigt weiterhin, dass sie in der Hand ist. */
+.react-flow__node.dragging > * { transform: none; transition: none; }
 
 /* Undo/Redo im Dock */
 .dock button:disabled { opacity: 0.32; cursor: default; }
@@ -6383,3 +6383,8 @@ html[data-alles-zeigen] .react-flow__node.selectable.selected:focus-visible { ou
 /* Verbindungslinien bleiben sichtbar (2 Flächenpunkte wären bei 15 % ein Drittel Bildpunkt) */
 [data-weit] .react-flow__edge-path { stroke-width: calc(2px * var(--pn-inv, 1)) !important; }
 html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important; }
+
+/* M344: Fanglinien beim Ziehen — magenta wie in Figma, Strichstärke in Bildschirm-Größe */
+.fanglinie { position: absolute; background: #ff2d87; pointer-events: none; z-index: 4000; }
+.fanglinie.v { width: calc(1px * var(--pn-inv, 1)); margin-left: calc(-0.5px * var(--pn-inv, 1)); }
+.fanglinie.h { height: calc(1px * var(--pn-inv, 1)); margin-top: calc(-0.5px * var(--pn-inv, 1)); }

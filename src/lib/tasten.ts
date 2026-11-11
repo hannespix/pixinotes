@@ -57,6 +57,15 @@ export const KUERZEL: Kuerzel[] = [
   { id: 'archivZeigen', taste: 'Alt+Umschalt+A', was: 'Archiv ein- und ausblenden', gruppe: 'Karten' },
   { id: 'fokus', taste: 'Alt+F', was: 'ausgewählte Karte im Fokus öffnen und schließen', gruppe: 'Karten' },
   { id: 'alleWaehlen', taste: 'Strg+A', was: 'alle Karten des Boards auswählen', gruppe: 'Karten' },
+  // M344 — ausgeführt in components/boardTasten.ts (brauchen die Kamera) bzw. FocusSheet
+  { id: 'karteWeiter', taste: 'Tab', was: 'nächste Karte auswählen (Umschalt+Tab: vorige)', gruppe: 'Karten', fremd: true },
+  { id: 'karteAlt', taste: 'Alt+↓ / Alt+↑', was: 'nächste / vorige Karte — auch beim Schreiben und im Fokus', gruppe: 'Karten', fremd: true },
+  { id: 'karteRichtung', taste: 'Strg+Pfeiltaste', was: 'zur Karte in dieser Richtung springen', gruppe: 'Karten', fremd: true },
+  { id: 'karteOeffnen', taste: 'Enter', was: 'in die gewählte Karte: Notiz schreiben, Modul im Fokus öffnen', gruppe: 'Karten', fremd: true },
+  { id: 'karteVerlassen', taste: 'Esc', was: 'aus dem Notiz-Text zurück zur Karte (sie bleibt gewählt)', gruppe: 'Karten', fremd: true },
+  { id: 'karteSchieben', taste: 'Pfeiltasten', was: 'gewählte Karte verschieben (Umschalt: größere Schritte)', gruppe: 'Karten', fremd: true },
+  { id: 'duplizieren', taste: 'Strg+D', was: 'Auswahl duplizieren', gruppe: 'Karten', fremd: true },
+  { id: 'freiAblegen', taste: 'Strg beim Ziehen', was: 'ohne Fanglinien frei ablegen', gruppe: 'Karten', fremd: true },
   { id: 'loeschen', taste: 'Entf', was: 'Auswahl oder Verbindung löschen', gruppe: 'Karten', fremd: true },
   { id: 'einfuegen', taste: 'Strg+V', was: 'Screenshot, Bild oder Text einfügen', gruppe: 'Karten', fremd: true },
 
@@ -64,6 +73,7 @@ export const KUERZEL: Kuerzel[] = [
   { id: 'rueckgaengig', taste: 'Strg+Z', was: 'rückgängig', gruppe: 'Board' },
   { id: 'wiederholen', taste: 'Strg+Y', was: 'wiederholen', gruppe: 'Board' },
   { id: 'einpassen', taste: 'F', was: 'Auswahl einpassen — ohne Auswahl das ganze Board', gruppe: 'Board' },
+  { id: 'zoomTasten', taste: '+ / − / 0', was: 'hinein- und herauszoomen, 0 = 100 %', gruppe: 'Board', fremd: true },
   { id: 'raster', taste: 'Alt+R', was: 'Raster-Fang ein- und ausschalten', gruppe: 'Board' },
   { id: 'physik', taste: 'Alt+O', was: 'Physik (Karten weichen aus) ein- und ausschalten', gruppe: 'Board' },
   { id: 'schwenken', taste: 'Leertaste halten', was: 'Ansicht verschieben, auch über Karten', gruppe: 'Board', fremd: true },
@@ -71,6 +81,7 @@ export const KUERZEL: Kuerzel[] = [
 
   // ── Text & Zeichnen ─────────────────────────────────────────────────────
   { id: 'zeichnen', taste: 'Alt+Z', was: 'Zeichnen (Stift) ein- und ausschalten', gruppe: 'Text & Zeichnen' },
+  { id: 'werkzeuge', taste: 'V / P / M / E', was: 'Werkzeug: Auswahl, Stift, Textmarker, Radierer', gruppe: 'Text & Zeichnen', fremd: true },
   { id: 'blockMenue', taste: '/', was: 'Block-Menü im Notiz-Editor', gruppe: 'Text & Zeichnen', fremd: true },
   { id: 'blaettern', taste: '← → / Leertaste', was: 'in der Präsentation blättern', gruppe: 'Text & Zeichnen', fremd: true },
 ];
