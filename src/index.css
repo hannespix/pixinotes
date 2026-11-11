@@ -6445,3 +6445,75 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 }
 .fokus-daumen:hover::after, .fokus-daumen[data-zug]::after { width: 9px; background: color-mix(in srgb, var(--ink) 55%, transparent); }
 @media print { .fokus-spur { display: none !important; } }
+
+/* ================= M347: Überschriften kleiner; Menüs und Einstellungen nachgemessen =================
+   Überschriften: BlockNote setzt H1/H2/H3 auf 3em/2em/1.3em — in einer 13-Punkt-Notiz 39/26/17 Punkte,
+   eine H1 sprengte jede Karte. Jetzt eine ruhige Stufung; alle anderen Titel eine Stufe kleiner. */
+.bn-block-content[data-content-type="heading"] { --level: 1.5em; }
+.bn-block-content[data-content-type="heading"][data-level="2"] { --level: 1.28em; }
+.bn-block-content[data-content-type="heading"][data-level="3"] { --level: 1.12em; }
+.note-editor .bn-editor > .bn-block-group:has(> .bn-block-outer:nth-child(2)) > .bn-block-outer:first-child > .bn-block > .bn-block-content[data-content-type="paragraph"] > p { font-size: 1.08em; }
+.modal-head h2 { font-size: 15.5px; }
+.taskhub-head h2 { font-size: 17px; }
+.onb h2 { font-size: 18px; }
+.help-body h3 { font-size: 14px; }
+.ovc-space-name { font-size: 16px; }
+.presenter-slide h3 { font-size: 1.25em; }
+.slide-kanban .kanban-title, .slide-gantt .kanban-title { font-size: 17px; }
+.slide-cal .cal-title { font-size: 16px; }
+
+/* Einstellungen: Häkchen rechtsbündig wie Umschalter und Farbpunkte (die allgemeine flex:1-Regel
+   für Eingabefelder streckte sie, das Häkchen saß mitten in der Zeile) */
+.modal-row-check input[type='checkbox'] { flex: none; margin: 0 2px 0 auto; }
+
+/* Auswahl-Menü: Die Farbfelder erbten Breite, Innenabstand und „kein Hintergrund" der Menü-Einträge —
+   zu sehen war ein leeres Kästchen statt fünf Farben */
+.sel-ai-menu .sel-farbe {
+  flex: none; width: 20px; height: 20px; min-height: 0; padding: 0; border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, .18);
+}
+.sel-ai-menu .sel-farbe.note-farbe-yellow { background: #fff3a3; }
+.sel-ai-menu .sel-farbe.note-farbe-pink { background: #ffd6e0; }
+.sel-ai-menu .sel-farbe.note-farbe-mint { background: #d2f5dd; }
+.sel-ai-menu .sel-farbe.note-farbe-sky { background: #d9ecff; }
+.sel-ai-menu .sel-farbe.note-farbe-white { background: #ffffff; }
+.sel-ai-menu .sel-farbe.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface); }
+
+
+/* Am Finger: Ziele mindestens 36 Punkte, Gruppentitel klein statt größer als die Einträge */
+@media (pointer: coarse) {
+  .dock-menu .dock-menu-label, .modul-palette .modul-gruppe .dock-menu-label { font-size: 11px; }
+  .modul-palette .dock-menu-foot { font-size: 12px; }
+  .seg button { min-height: 36px; padding-inline: 12px; }
+  .modal .akzent-wahl button, .modal button[aria-label^="Akzentfarbe"] { min-width: 36px; min-height: 36px; }
+  .modal-row { min-height: 36px; }
+  .modal-row span { font-size: 14px; }
+  .modal-hint { font-size: 13px; }
+  /* :where — ohne Gewicht: gilt nur, wo kein Knopf seine eigene (größere) Höhe hat (m290: „Übernehmen“ 44) */
+  :where(.modal) :where(button, select) { min-height: 36px; }
+  .modal-row-check input[type='checkbox'] { width: 22px; height: 22px; }
+  .note-farben { top: 40px; gap: 8px; padding: 8px; }
+  .note-farbe { width: 32px; height: 32px; }
+  .sel-ai-menu .sel-farbe { width: 30px; height: 30px; }
+  .sel-farben { gap: 8px; flex-wrap: wrap; }
+  .side-board-arrow { min-width: 32px; }
+  .nav-overview, .nav-netz { min-height: 38px; }
+  .nav-x { min-width: 38px; min-height: 38px; }
+  .ov-graph-ctx button { min-height: 42px; }
+  .help-nav button { min-height: 36px; }
+  .taskhub-actions button, .th-chip { min-height: 36px; }
+  .taskhub select, .th-group-head { min-height: 36px; }
+}
+
+/* Telefon: Aufgaben-Schnelleingabe untereinander statt abgeschnitten nebeneinander */
+@media (max-width: 640px) {
+  .taskhub-quickrow { flex-wrap: wrap; }
+  .taskhub-quickrow .taskhub-quick { flex: 1 1 100%; font-size: 15px; }
+  .taskhub-quickrow .th-quickboard { max-width: none; flex: 1 1 100%; }
+}
+/* M347: Hilfe am Telefon — Titel, Suchfeld und Schließen in einer Zeile, ohne über den Rand zu ragen */
+@media (max-width: 640px) {
+  .help-modal .modal-head { gap: 10px; padding: 12px 14px; }
+  .help-modal .modal-head h2 { white-space: nowrap; flex: none; }
+  .help-modal .help-search { min-width: 0; flex: 1; width: auto; }
+}

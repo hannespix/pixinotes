@@ -13,7 +13,7 @@ import { noteTitle } from '../lib/notiz';
 import { blocksToText } from '../lib/serialize';
 import { makeNote } from '../lib/nodes';
 import { mitFestenIds, mitPfadIds } from '../lib/notizRuhend';
-import { MARKER, PEN, StrichPfad } from './StrichPfad';
+import { linienPfad, MARKER, PEN, StrichPfad, strichKontur } from './StrichPfad';
 import { istAmText } from '../lib/notizText';
 import type { AppNode } from '../types';
 import { IType, IX } from './Icons';
@@ -137,6 +137,29 @@ export function DrawingLayer() {
     return () => window.removeEventListener('pointerdown', merken, true);
   }, [stiftGesehen]);
   const drawing = useRef<Stroke | null>(null);
+  /**
+   * M348: Der laufende Strich wird DIREKT gezeichnet — im Zeiger-Ereignis, am eigenen Pfad, ohne React.
+   * Seit M339 lief er über die gespeicherte (memo) StrichPfad-Komponente; die zeichnet nur neu, wenn
+   * sich ihr Strich-OBJEKT ändert — beim Schreiben wächst aber dasselbe Objekt. Gemessen: Der Pfad
+   * blieb vom ersten Punkt bis zum Absetzen stehen, die Schrift erschien erst danach. Dazu rendete jede
+   * Bewegung die ganze Ebene mit allen Strichen neu. Jetzt: ein Pfad, dessen `d` jede Bewegung setzt,
+   * plus die vom Browser vorhergesagten nächsten Stiftpunkte (getPredictedEvents) — die Spitze läuft
+   * dem Stift so nicht hinterher; die Vorhersage wird nie gespeichert.
+   */
+  const liveRef = useRef<SVGPathElement | null>(null);
+  const vorhersage = useRef<[number, number][]>([]);
+  const liveD = (d: Stroke): string => {
+    const vor = vorhersage.current;
+    const s: Stroke = vor.length
+      ? { ...d, points: [...d.points, ...vor], ...(d.druck ? { druck: [...d.druck, ...vor.map(() => d.druck![d.druck!.length - 1] ?? 0.5)] } : {}) }
+      : d;
+    return d.tool === 'marker' ? linienPfad(s) : strichKontur(s, true);
+  };
+  const liveZeichnen = () => {
+    const d = drawing.current;
+    const el = liveRef.current;
+    if (d && el) el.setAttribute('d', liveD(d));
+  };
   const holdTimer = useRef<number | null>(null);
   /**
    * M254: Welcher Zeiger führt gerade den Strich?
@@ -373,6 +396,7 @@ export function DrawingLayer() {
     // M319: Druck je Punkt — nur bei echtem Stift mit Sensor. Maus und Finger
     // bekommen den simulierten Druck aus der Geschwindigkeit (perfect-freehand).
     const sensor = werkzeug === 'pen' && e.pointerType === 'pen' && !!e.pressure;
+    vorhersage.current = [];
     drawing.current = {
       id: uid(),
       tool: werkzeug,
@@ -393,7 +417,12 @@ export function DrawingLayer() {
     const punkte = typeof r.getCoalescedEvents === 'function' ? r.getCoalescedEvents() : [];
     let neu = false;
     for (const p of punkte.length ? punkte : [roh]) neu = punktAufnehmen(p.clientX, p.clientY, p.pressure) || neu;
-    return neu;
+    // M348: höchstens zwei vorhergesagte Punkte — genug, um die Verzögerung eines Bildes aufzuholen
+    const v = roh as PointerEvent & { getPredictedEvents?: () => PointerEvent[] };
+    const vor = typeof v.getPredictedEvents === 'function' ? v.getPredictedEvents().slice(0, 2) : [];
+    const alt = vorhersage.current.length;
+    vorhersage.current = vor.map((p) => { const f = screenToFlowPosition({ x: p.clientX, y: p.clientY }); return [f.x, f.y]; });
+    return neu || alt > 0 || vor.length > 0;
   };
 
   /** Zwei Finger auf der Ebene: Zoom um die Fingermitte, Schwenken mit der Mitte (M326) */
@@ -452,7 +481,7 @@ export function DrawingLayer() {
     if (!drawing.current) return;
     if (!punkteAufnehmen(e.nativeEvent)) return;
     armHold();
-    force((n) => n + 1);
+    liveZeichnen();
   };
   const fingerWeg = (e: React.PointerEvent) => {
     if (e.pointerType !== 'touch') return;
@@ -574,7 +603,7 @@ export function DrawingLayer() {
       tippPruefen(e);
       if (!punkteAufnehmen(e)) return;
       armHold();
-      force((n) => n + 1);
+      liveZeichnen();
     };
     const hoch = (e: PointerEvent) => {
       if (!stiftZug.current || e.pointerId !== fuehrend.current?.id) return;
@@ -1063,7 +1092,9 @@ export function DrawingLayer() {
   const schriftDa = sessionIds.current.some((id) => drawings.some((s) => s.id === id && s.tool === 'pen'));
   const rfRect = vorschlag ? document.querySelector('.react-flow')?.getBoundingClientRect() : null;
 
-  const all = drawing.current ? [...drawings, drawing.current] : drawings;
+  // M348: der laufende Strich hat seinen eigenen Pfad (unten), er läuft nicht über die Liste
+  const all = drawings;
+  const lauf = drawing.current;
   // Geankerte Striche: Versatz = aktuelle Kartenposition (sie wandern so bei
   // Drag/Physik/Aufräumen automatisch mit); Karte weg/archiviert → unsichtbar
   const nodeById = new Map(nodes.map((n) => [n.id, n]));
@@ -1081,7 +1112,7 @@ export function DrawingLayer() {
       return [{ s: abgeleitet, dx: n.position.x, dy: n.position.y, dim: !!n.archived }];
     }
     // M339: Was auf dem Text einer Notiz liegt, zeichnet die Notiz selbst (scrollt mit) — hier nur der laufende Strich
-    if (n.type === 'note' && s !== drawing.current && !n.kachel && istAmText(s, true, n.width ?? n.measured?.width ?? 260, n.height ?? undefined)) return [];
+    if (n.type === 'note' && !n.kachel && istAmText(s, true, n.width ?? n.measured?.width ?? 260, n.height ?? undefined)) return [];
     return [{ s, dx: n.position.x, dy: n.position.y, dim: !!n.archived }];
   });
 
@@ -1120,8 +1151,25 @@ export function DrawingLayer() {
           {/* Eingerastete Formen (Linie, Pfeil, Rechteck, Dreieck: wenige Punkte) bleiben
               scharfkantige Linien — die Freihand-Kontur würde ihre Ecken runden. */}
           {placed.map(({ s, dx, dy, dim }) => (
-            <StrichPfad key={s.id} s={s} dx={dx} dy={dy} dim={dim} laufend={s === drawing.current} />
+            <StrichPfad key={s.id} s={s} dx={dx} dy={dy} dim={dim} />
           ))}
+          {lauf && (lauf.tool === 'marker'
+            ? (
+              <path
+                key={lauf.id}
+                ref={liveRef}
+                className="strich-laufend"
+                d={liveD(lauf)}
+                fill="none"
+                stroke={lauf.color}
+                strokeWidth={lauf.width}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                opacity={MARKER.opacity}
+                style={{ mixBlendMode: 'multiply' }}
+              />
+            )
+            : <path key={lauf.id} ref={liveRef} className="strich strich-laufend" d={liveD(lauf)} fill={lauf.color} stroke="none" opacity={PEN.opacity} />)}
         </g>
       </svg>
       {vorschlag && rfRect && (

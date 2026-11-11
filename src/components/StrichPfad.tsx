@@ -46,7 +46,7 @@ export const konturFuer = (s: Stroke): string => {
   return k;
 };
 
-const toPath = (s: Stroke) =>
+export const linienPfad = (s: Stroke) =>
   s.points.map((p, i) => `${i ? 'L' : 'M'}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
 
 /**
@@ -58,7 +58,7 @@ export const StrichPfad = memo(function StrichPfad({ s, dx = 0, dy = 0, dim = fa
   if (s.tool === 'marker' || s.points.length <= 6) {
     return (
       <path
-        d={toPath(s)}
+        d={linienPfad(s)}
         data-anker={s.anchor}
         transform={transform}
         fill="none"
