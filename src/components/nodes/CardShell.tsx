@@ -48,6 +48,8 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
    */
   // M339: Notiz ohne feste Höhe (wächst mit dem Inhalt) — das Stylesheet deckelt sie bei NOTIZ_MAX
   const ohneHoehe = useBoard((s) => rollt && selectActiveBoard(s)?.nodes.find((x) => x.id === id)?.height == null);
+  // M346: die feste Höhe als Maß für den Fokus — dort zeigt die Notiz ihren ganzen Text, wird aber nie kleiner als auf dem Board
+  const festeHoehe = useBoard((s) => (rollt ? selectActiveBoard(s)?.nodes.find((x) => x.id === id)?.height ?? null : null));
   const kachelNode = useBoard((s) => {
     const n = selectActiveBoard(s)?.nodes.find((x) => x.id === id);
     return n?.kachel ? n : null;
@@ -154,7 +156,10 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       if (merk > 0 && body.scrollTop === 0) body.scrollTop = Math.min(merk, max);
       merk = body.scrollTop;
       const spur = body.clientHeight - 8;
-      const hoehe = Math.max(28, Math.round((spur * body.clientHeight) / body.scrollHeight));
+      // M346: mindestens 28 Bildpunkte am SCHIRM — herausgezoomt sonst zu klein zum Greifen
+      const k = body.clientHeight > 0 ? body.getBoundingClientRect().height / body.clientHeight : 1;
+      const mind = Math.min(spur * 0.6, 28 / Math.min(1, Math.max(k, 0.15)));
+      const hoehe = Math.max(mind, Math.round((spur * body.clientHeight) / body.scrollHeight));
       daumen.style.height = `${hoehe}px`;
       daumen.style.transform = `translateY(${Math.round(4 + (spur - hoehe) * (body.scrollTop / max))}px)`;
       shell.toggleAttribute('data-mehr-oben', body.scrollTop > 2);
@@ -185,6 +190,14 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       body.scrollTop = zug.top + ((e.clientY - zug.y) / (k || 1)) * (max / weg);
     };
     const los = () => { zug = null; shell.removeAttribute('data-rollzug'); };
+    // M346: Im weiten Zoom ist die ganze Karte der Griff (`nodrag` gilt dort nicht) — der Balken bleibt trotzdem
+    // ein Balken: Der Zug daran darf React Flow nicht erreichen, sonst verschöbe er die Karte.
+    const halt = (e: Event) => e.stopPropagation();
+    daumen.addEventListener('mousedown', halt);
+    daumen.addEventListener('touchstart', halt, { passive: true });
+    // Nach einem Zoom stimmt die Mindestgröße des Daumens nicht mehr — nur überlaufende Notizen rechnen neu
+    const nachZoom = () => { if (shell.hasAttribute('data-rollt')) plan(); };
+    window.addEventListener('pixinotes:zoom-ruht', nachZoom);
     daumen.addEventListener('pointerdown', runter);
     daumen.addEventListener('pointermove', zieh);
     daumen.addEventListener('pointerup', los);
@@ -195,6 +208,9 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
       cancelAnimationFrame(raf);
       body.removeEventListener('scroll', beimScrollen);
       ro.disconnect(); mo.disconnect(); moFern.disconnect();
+      daumen.removeEventListener('mousedown', halt);
+      daumen.removeEventListener('touchstart', halt);
+      window.removeEventListener('pixinotes:zoom-ruht', nachZoom);
       daumen.removeEventListener('pointerdown', runter);
       daumen.removeEventListener('pointermove', zieh);
       daumen.removeEventListener('pointerup', los);
@@ -342,7 +358,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   // Wichtig: Lösch-Knopf & Handles liegen AUSSERHALB des card-body,
   // damit dessen overflow:hidden sie nicht abschneidet.
   return (
-    <div className="card-shell" data-ohne-hoehe={ohneHoehe ? '' : undefined} style={rollt ? ({ '--notiz-max': `${NOTIZ_MAX}px` } as CSSProperties) : undefined}>
+    <div className="card-shell" data-ohne-hoehe={ohneHoehe ? '' : undefined} style={rollt ? ({ '--notiz-max': `${NOTIZ_MAX}px`, ...(typeof festeHoehe === 'number' ? { '--karte-h': `${festeHoehe}px` } : {}) } as CSSProperties) : undefined}>
       {/* Resize-Griffe: weiße Quadrate mit neutralem Rand (klassischer
           Auswahlrahmen) — bewusst ANDERS als die runden Akzent-Verbindungs-
           punkte, damit beides auf einen Blick unterscheidbar ist (M102).

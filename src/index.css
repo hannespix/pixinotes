@@ -6369,7 +6369,7 @@ html[data-alles-zeigen] .react-flow__node.selectable.selected:focus-visible { ou
 [data-weit] .react-flow__node > .card-shell > .card-body { pointer-events: none; }
 [data-weit] .react-flow__node { cursor: grab; }
 [data-weit] .react-flow__node.dragging { cursor: grabbing; }
-[data-weit] .react-flow__node :is(.card-grip, .color-dot, .note-farben, .fit-hint, .note-spur, .card-x) { visibility: hidden !important; }
+[data-weit] .react-flow__node :is(.card-grip, .color-dot, .note-farben, .fit-hint, .card-x) { visibility: hidden !important; }
 /* Anschlusspunkte nur an der gewählten Karte — an jeder Karte unter dem Zeiger wären sie im Weg */
 [data-weit] .react-flow__node:not(.selected) .pn-handle { visibility: hidden !important; }
 [data-weit] .react-flow__node.selected .pn-handle { opacity: 1; visibility: visible; }
@@ -6410,3 +6410,38 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+
+/* ================= M346: Scrollbalken der Notiz — sichtbar und greifbar, auch ohne Zoom-Modus =================
+   Bisher erschien der Balken erst unter dem Zeiger, war herausgezoomt wenige Bildpunkte schmal und im
+   weiten Zoom ganz ausgeblendet: Dass eine Notiz mehr Text hat, sah man nur im Fokus. Jetzt steht er an
+   jeder überlaufenden Notiz, behält (über --pn-inv) seine Bildschirm-Breite und lässt sich in jeder
+   Zoomstufe ziehen; über einer gewählten Notiz rollt zusätzlich das Rad (Board.tsx). */
+.card-shell[data-rollt] > .note-spur .note-daumen { opacity: .62; }
+.card-shell[data-rollt]:hover > .note-spur .note-daumen,
+.react-flow__node.selected .card-shell[data-rollt] > .note-spur .note-daumen,
+.card-shell[data-rollt][data-rollzug] > .note-spur .note-daumen { opacity: 1; }
+.note-daumen { cursor: grab; }
+.card-shell[data-rollzug] .note-daumen { cursor: grabbing; }
+.note-daumen::after { width: 5px; }
+.note-daumen:hover::after, .card-shell[data-rollzug] .note-daumen::after { width: 7px; }
+.note-spur { scale: min(var(--pn-inv, 1), 4.5) 1; }
+@media (pointer: coarse) { .note-spur { width: 16px; } .note-daumen { width: 16px; } }
+
+/* M346: Im Fokus zeigt auch die Notiz mit fester Höhe ihren ganzen Text (wie die ohne feste Höhe seit
+   M334 — die Kamera rollt), wird aber nie kleiner, als sie auf dem Board ist. */
+.focus-mode .react-flow__node-note.pn-focused { height: auto !important; }
+.focus-mode .pn-focused .card-shell > .note-card { max-height: none; min-height: max(90px, var(--karte-h, 0px)); }
+/* Was unter der vergrößerten Karte läge, tritt ganz zurück (Board.tsx setzt die Marke) */
+.focus-mode .react-flow__node[data-fokus-weg] { opacity: 0 !important; }
+
+/* M346: Scrollbalken des Fokus — die Kamera rollt über die lange Karte, der Balken zeigt und bewegt den Stand */
+.fokus-spur { position: fixed; right: 3px; width: 16px; z-index: 40; display: none; pointer-events: none; }
+.focus-mode .fokus-spur[data-an] { display: block; }
+.fokus-daumen { position: absolute; top: 0; right: 0; width: 16px; pointer-events: auto; touch-action: none; cursor: grab; }
+.fokus-daumen[data-zug] { cursor: grabbing; }
+.fokus-daumen::after {
+  content: ''; position: absolute; top: 0; bottom: 0; right: 3px; width: 6px; border-radius: 4px;
+  background: color-mix(in srgb, var(--ink) 30%, transparent); transition: width .12s ease, background .12s ease;
+}
+.fokus-daumen:hover::after, .fokus-daumen[data-zug]::after { width: 9px; background: color-mix(in srgb, var(--ink) 55%, transparent); }
+@media print { .fokus-spur { display: none !important; } }
