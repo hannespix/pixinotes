@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { passt } from '../lib/tasten';
+import { usePfeilTasten } from './pfeilTasten';
 
 /**
  * M251: Die globalen Tastenkürzel an einer Stelle.
@@ -25,6 +26,7 @@ import { passt } from '../lib/tasten';
  * Board (sie brauchen dessen Kamera), Esc bei den jeweiligen Fenstern.
  */
 export function Tastatur() {
+  usePfeilTasten();   // M345: Pfeiltasten in Menüs, Leisten, Baum, Übersicht, Aufgaben
   useEffect(() => {
     const imText = (e: KeyboardEvent) =>
       !!(e.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable="true"]');

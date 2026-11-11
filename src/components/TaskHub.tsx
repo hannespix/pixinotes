@@ -618,6 +618,7 @@ export function TaskHub() {
                         <div
                           className="task-main"
                           role="button"
+                          tabIndex={0}
                           aria-expanded={open}
                           title={open ? 'Werkzeuge einklappen' : 'Antippen für Werkzeuge (Frist, Spalte, Mein Tag …)'}
                           onClick={() => setExpandedKey(open ? null : t.key)}

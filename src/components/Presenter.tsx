@@ -232,7 +232,8 @@ export function Presenter() {
         setIdx((i) => Math.min(slides.length - 1, i + 1));
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
         setIdx((i) => Math.max(0, i - 1));
-      }
+      } else if (e.key === 'Home') setIdx(0);          // M345
+      else if (e.key === 'End') setIdx(Math.max(0, slides.length - 1));
       e.preventDefault();
       e.stopPropagation();
     };

@@ -128,6 +128,19 @@ export function FocusSheet() {
     setFocusCard(siblings[next].id);
   }, [siblings, index, setFocusCard]);
 
+  // M344: Alt+↓ / Alt+↑ blättert zur nächsten bzw. vorigen Karte — auch mitten im Schreiben
+  useEffect(() => {
+    if (!focusCard) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault(); e.stopPropagation();
+      step(e.key === 'ArrowDown' ? 1 : -1);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [focusCard, step]);
+
   // Android-Zurücktaste: Ohne eigenen History-Eintrag schlösse die Systemgeste
   // die ganze PWA statt nur das Blatt — genau das erwartet dort niemand.
   // WICHTIG: nur am OFFEN/ZU hängen, nicht an der Karten-ID. Sonst räumt das

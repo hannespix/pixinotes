@@ -1401,6 +1401,9 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
               ref={(el) => { if (el) nodeEls.current.set(n.id, el); else nodeEls.current.delete(n.id); }}
               transform={`translate(${p.x} ${p.y})`}
               data-board={n.id}
+              tabIndex={0}
+              role="button"
+              aria-label={`Board „${n.label}“ öffnen`}
               className={`ov-graph-node ${n.id === activeId ? 'here' : ''} ${marking ? (hits.boards.has(n.id) ? 'hit' : 'dim') : ''} ${linkFrom === n.id ? 'linking' : ''}`}
               data-tip={linkFrom
                 ? `Klicken: Portal „${boardName(linkFrom)}" → „${n.label}" anlegen`
@@ -1658,11 +1661,12 @@ function ProjectZone({ data }: NodeProps<Node<ProjectZoneData, 'ovProject'>>) {
 function BoardTile({ data }: NodeProps<Node<BoardTileData, 'ovBoard'>>) {
   const { board, accent } = data;
   const renameBoard = useBoard((s) => s.renameBoard);
+  const hier = useBoard((s) => s.activeId === board.id);
   const [editing, setEditing] = useState(false);
 
   return (
     <div
-      className={`ov-board ovc-tile${board.archived ? ' archiviert' : ''}`}
+      className={`ov-board ovc-tile${board.archived ? ' archiviert' : ''}${hier ? ' hier' : ''}`}
       style={{ borderTopColor: accent }}
       title="Klick öffnet das Board · Ziehen verschiebt es"
     >

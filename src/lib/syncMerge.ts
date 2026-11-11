@@ -274,7 +274,79 @@ function mergeHierarchie(basis: Space[] | undefined, lokal: Space[], fremd: Spac
  * Drei Stände zusammenführen. `basis` = null, wenn dieses Gerät noch keinen
  * gemeinsamen Stand kennt — dann wird nur vereinigt, nie gelöscht.
  */
-export function dreiWegeMerge(basis: SyncStand | null, lokal: SyncStand, fremd: SyncStand): MergeErgebnis {
+/* ---------- Auswahl ist Sache des Geräts (M345) ----------
+   React Flow hält `selected` und `dragging` AN der Karte. Beides reiste bisher mit: Was auf einem
+   Gerät gewählt war, war es nach dem Abgleich auch auf dem anderen — „Entf" traf dort Karten, die
+   niemand angeklickt hatte —, und bloßes Anklicken galt als Bearbeitung (lud hoch, schlug Löschen).
+   Darum: ohne diese beiden Felder hochladen und zusammenführen; die Auswahl bleibt, wo sie ist. */
+type Fluechtig = { id: string; selected?: boolean; dragging?: boolean };
+const fluechtig = (x: Fluechtig): boolean => 'selected' in x || 'dragging' in x;
+function reinListe<T extends Fluechtig>(xs: T[], zurueck?: WeakMap<object, object>): T[] {
+  if (!xs.some(fluechtig)) return xs;
+  return xs.map((x) => {
+    if (!fluechtig(x)) return x;
+    const { selected: _s, dragging: _d, ...rest } = x;
+    zurueck?.set(rest, x);
+    return rest as unknown as T;
+  });
+}
+/** Board ohne Auswahl- und Zieh-Zustand seiner Karten und Pfeile; unverändert dasselbe Objekt */
+export function ohneAuswahl(b: BoardDoc, zurueck?: WeakMap<object, object>): BoardDoc {
+  const nodes = reinListe(b.nodes as unknown as Fluechtig[], zurueck) as unknown as AppNode[];
+  const edges = b.edges ? (reinListe(b.edges as unknown as Fluechtig[], zurueck) as unknown as Edge[]) : b.edges;
+  if (nodes === b.nodes && edges === b.edges) return b;
+  const out: BoardDoc = { ...b, nodes, edges };
+  zurueck?.set(out, b);
+  return out;
+}
+/** Unterscheiden sich zwei Stände nur in Auswahl- und Zieh-Zustand? Dann gibt es nichts zu sichern. */
+export function nurAuswahlAnders(vor: BoardDoc[], nach: BoardDoc[]): boolean {
+  if (vor === nach) return true;
+  if (vor.length !== nach.length) return false;
+  type Satz = Record<string, unknown>;
+  const gleichBis = (a: Satz, b: Satz, ohne: (k: string) => boolean): boolean => {
+    for (const k in a) if (!ohne(k) && a[k] !== b[k]) return false;
+    for (const k in b) if (!ohne(k) && !(k in a)) return false;
+    return true;
+  };
+  const wahl = (k: string) => k === 'selected' || k === 'dragging';
+  const liste = (a: unknown[] | undefined, b: unknown[] | undefined): boolean =>
+    a === b || (!!a && !!b && a.length === b.length && a.every((x, i) => x === b[i] || gleichBis(x as Satz, b[i] as Satz, wahl)));
+  return vor.every((b, i) => {
+    const n = nach[i];
+    if (b === n) return true;
+    if (!gleichBis(b as unknown as Satz, n as unknown as Satz, (k) => k === 'nodes' || k === 'edges')) return false;
+    return liste(b.nodes, n.nodes) && liste(b.edges, n.edges);
+  });
+}
+/** Dem zusammengeführten Board die hiesige Auswahl zurückgeben (unveränderte Objekte: genau die hiesigen) */
+function mitAuswahl(b: BoardDoc, hier: BoardDoc | undefined, zurueck: WeakMap<object, object>): BoardDoc {
+  const original = zurueck.get(b) as BoardDoc | undefined;
+  if (original) return original;
+  if (!hier) return b;
+  const gewaehlt = (xs: Fluechtig[] | undefined) => new Set((xs ?? []).filter((x) => x.selected).map((x) => x.id));
+  const kn = gewaehlt(hier.nodes as unknown as Fluechtig[]);
+  const ka = gewaehlt(hier.edges as unknown as Fluechtig[]);
+  const mit = <T extends { id: string }>(xs: T[], m: Set<string>): T[] => {
+    let anders = false;
+    const out = xs.map((x) => {
+      const o = zurueck.get(x) as T | undefined;
+      if (o) { anders = true; return o; }
+      if (m.has(x.id)) { anders = true; return { ...x, selected: true }; }
+      return x;
+    });
+    return anders ? out : xs;
+  };
+  const nodes = mit(b.nodes, kn);
+  const edges = b.edges ? mit(b.edges, ka) : b.edges;
+  return nodes === b.nodes && edges === b.edges ? b : { ...b, nodes, edges };
+}
+
+export function dreiWegeMerge(basis0: SyncStand | null, lokal0: SyncStand, fremd0: SyncStand): MergeErgebnis {
+  const zurueck = new WeakMap<object, object>();
+  const basis = basis0 ? { ...basis0, boards: basis0.boards.map((b) => ohneAuswahl(b)) } : null;
+  const lokal = { ...lokal0, boards: lokal0.boards.map((b) => ohneAuswahl(b, zurueck)) };
+  const fremd = { ...fremd0, boards: fremd0.boards.map((b) => ohneAuswahl(b)) };
   const z: Zaehler = { konflikte: 0 };
   const bericht: MergeBericht = { aktualisiert: 0, neu: 0, entfernt: 0, konflikte: 0 };
   const mB = basis ? byId(basis.boards) : undefined;
@@ -299,9 +371,12 @@ export function dreiWegeMerge(basis: SyncStand | null, lokal: SyncStand, fremd: 
 
   const gleicheBoards = (a: BoardDoc[], b: BoardDoc[]) =>
     a.length === b.length && a.every((x, i) => x === b[i] || (x.id === b[i].id && str(x) === str(b[i])));
-  const lokalNeu = !gleicheBoards(boards, lokal.boards) || str(spaces) !== str(lokal.spaces);
   const fremdNeu = !gleicheBoards(boards, fremd.boards) || str(spaces) !== str(fremd.spaces);
-  return { boards, spaces, bericht, geaendert, lokalNeu, fremdNeu };
+  // die Auswahl dieses Geräts kommt zurück — verglichen wird danach mit dem Stand, wie er hier im Speicher liegt
+  const hier = byId(lokal0.boards);
+  const mitWahl = boards.map((b) => mitAuswahl(b, hier.get(b.id), zurueck));
+  const lokalNeu = !gleicheBoards(mitWahl, lokal0.boards) || str(spaces) !== str(lokal.spaces);
+  return { boards: mitWahl, spaces, bericht, geaendert, lokalNeu, fremdNeu };
 }
 
 /** Ein Satz für den Toast: was der Abgleich gebracht hat */

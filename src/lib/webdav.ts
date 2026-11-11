@@ -15,6 +15,7 @@ import {
   basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB, emitSyncStatus, fremdStandEinarbeiten,
   KONTO_DIRTY_KEY, notiereAenderung, SYNC_DIRTY_KEY, uebernimmDateien, WEBDAV_DIRTY_KEY, type SyncPayload, type SyncWeg,
 } from './syncFolder';
+import { nurAuswahlAnders } from './syncMerge';
 
 const LS_KEY = 'pixinotes-webdav';
 const STAMP_KEY = 'pixinotes:webdav-stamp';
@@ -171,7 +172,7 @@ export async function webdavWrite(cfg: WebdavConfig): Promise<string> {
   await basisMerken('webdav', payload); // M311: gemeinsamer Stand für die Zusammenführung
   // Nur „sauber" markieren, wenn währenddessen nicht weiter editiert wurde
   const cur = useBoard.getState();
-  if (cur.boards === s.boards && cur.spaces === s.spaces) localStorage.removeItem(WEBDAV_DIRTY_KEY);
+  if (cur.spaces === s.spaces && nurAuswahlAnders(s.boards, cur.boards)) localStorage.removeItem(WEBDAV_DIRTY_KEY);
   emitSyncStatus('webdav', 'ok', payload.savedAt);
   return payload.savedAt;
 }
@@ -290,7 +291,7 @@ export function initWebdavSync(): void {
   started = true;
   let timer: ReturnType<typeof setTimeout> | undefined;
   useBoard.subscribe((s, prev) => {
-    if (s.boards === prev.boards && s.spaces === prev.spaces) return;
+    if (s.spaces === prev.spaces && nurAuswahlAnders(prev.boards, s.boards)) return;   // M345: Auswählen ist keine Änderung
     // Frisch importierter Stand: kein Re-Upload mit neuem savedAt (s. syncFolder)
     if (isImportedState(s.boards, s.spaces)) return;
     if (getWriterRole() !== 'writer') return;

@@ -26,6 +26,7 @@ import {
 } from './syncFolder';
 import { triggerDownload } from './download';
 import { getWriterRole, inDerived, isImportedState, useBoard } from '../store';
+import { nurAuswahlAnders } from './syncMerge';
 
 const ON_KEY = 'pixinotes:files-sync';
 
@@ -134,7 +135,7 @@ export function initFilesSync(): void {
   };
   let timer: ReturnType<typeof setTimeout> | undefined;
   useBoard.subscribe((s, prev) => {
-    if (s.boards === prev.boards && s.spaces === prev.spaces) return;
+    if (s.spaces === prev.spaces && nurAuswahlAnders(prev.boards, s.boards)) return;   // M345: Auswählen ist keine Änderung
     if (isImportedState(s.boards, s.spaces)) return;
     if (getWriterRole() !== 'writer') return;
     // Ohne Ordner-API läuft der Subscribe aus syncFolder.ts nicht — das

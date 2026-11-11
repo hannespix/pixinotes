@@ -5,11 +5,16 @@ import {
   ConnectionMode,
   MiniMap,
   ReactFlow,
+  ViewportPortal,
   useReactFlow,
   type EdgeTypes,
   type Node,
+  type NodeChange,
   type NodeTypes,
 } from '@xyflow/react';
+import { fangen, fangLinien, fangSetzen, type Kasten } from '../lib/fang';
+import { Fanglinien } from './Fanglinien';
+import { useBoardTasten } from './boardTasten';
 import { mutedHistory, selectActiveBoard, useBoard } from '../store';
 import { frameMembers } from '../lib/arrange';
 import { computePush } from '../lib/physics';
@@ -141,7 +146,7 @@ export function Board() {
   const removeNodes = useBoard((s) => s.removeNodes);
   const showToast = useBoard((s) => s.showToast);
 
-  const { screenToFlowPosition, setCenter, fitView, getViewport, setViewport, getInternalNode } = useReactFlow();
+  const { screenToFlowPosition, setCenter, fitView, getViewport, setViewport, getInternalNode, zoomIn, zoomOut, zoomTo } = useReactFlow();
   const wheelZoom = useBoard((s) => s.wheelZoom);
   /**
    * M268: Der Anzeige-Faktor läuft im Board-Zoom mit.
@@ -692,6 +697,57 @@ export function Board() {
   // dann live mit jedem Drag-Delta (eine History-Stufe, keine Physik).
   const frameDrag = useRef<{ id: string; ids: string[]; x: number; y: number } | null>(null);
 
+  /**
+   * M344: Fanglinien. Beim Ziehen rastet die Karte (bzw. der Kasten um alle gezogenen Karten) an
+   * Kanten und Mitten der übrigen Karten ein — 6 Bildpunkte Fangweite, in jeder Zoomstufe gleich.
+   * Strg/⌘ gedrückt: frei ablegen. Mit Raster-Fang hat das Raster Vorrang; Rahmen ziehen ihre
+   * Karten über eigene Deltas mit und bleiben außen vor.
+   */
+  const strgRef = useRef(false);
+  const ziehtRef = useRef(false);
+  useEffect(() => {
+    const taste = (e: KeyboardEvent) => { strgRef.current = e.ctrlKey || e.metaKey; };
+    const weg = () => { strgRef.current = false; };
+    window.addEventListener('keydown', taste, true); window.addEventListener('keyup', taste, true); window.addEventListener('blur', weg);
+    return () => { window.removeEventListener('keydown', taste, true); window.removeEventListener('keyup', taste, true); window.removeEventListener('blur', weg); };
+  }, []);
+  const onNodesChangeFang = useCallback((changes: NodeChange[]) => {
+    // Auch die LETZTE Meldung eines Zugs (dragging: false) trägt die ungefangene Lage — sie muss genauso
+    // einrasten, sonst springt die Karte beim Loslassen zurück. Pfeiltasten melden ebenfalls dragging: false,
+    // gehören aber zu keinem Zug: Sie sollen aus einer Fangstelle herausschieben können.
+    const laeuft = changes.some((c) => c.type === 'position' && !!c.dragging);
+    const ende = !laeuft && ziehtRef.current && changes.some((c) => c.type === 'position' && c.dragging === false);
+    if (laeuft) ziehtRef.current = true;
+    const zieh = changes.filter((c): c is Extract<NodeChange, { type: 'position' }> => c.type === 'position' && !!c.position && (!!c.dragging || ende));
+    if (ende) ziehtRef.current = false;
+    if (zieh.length) {
+      const st = useBoard.getState();
+      const alle = selectActiveBoard(st).nodes;
+      const ids = new Set(zieh.map((c) => c.id));
+      const mass = (n: AppNode) => ({ w: n.measured?.width ?? n.width ?? 260, h: n.measured?.height ?? n.height ?? 120 });
+      const bewegt = alle.filter((n) => ids.has(n.id));
+      if (st.gridSnap || strgRef.current || bewegt.some((n) => n.type === 'frame') || bewegt.length === 0) fangSetzen([]);
+      else {
+        let x1 = Infinity; let y1 = Infinity; let x2 = -Infinity; let y2 = -Infinity;
+        for (const c of zieh) {
+          const n = bewegt.find((k) => k.id === c.id);
+          if (!n || !c.position) continue;
+          const m = mass(n);
+          x1 = Math.min(x1, c.position.x); y1 = Math.min(y1, c.position.y);
+          x2 = Math.max(x2, c.position.x + m.w); y2 = Math.max(y2, c.position.y + m.h);
+        }
+        const andere: Kasten[] = alle
+          .filter((n) => !ids.has(n.id) && !n.selected && (!n.archived || st.showArchived))
+          .map((n) => ({ x: n.position.x, y: n.position.y, ...mass(n) }));
+        const f = fangen({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 }, andere, 6 / (getViewport().zoom || 1));
+        if (f.dx || f.dy) for (const c of zieh) if (c.position) c.position = { x: c.position.x + f.dx, y: c.position.y + f.dy };
+        fangSetzen(ende ? [] : f.linien);
+      }
+    }
+    onNodesChange(changes as Parameters<typeof onNodesChange>[0]);
+  }, [onNodesChange, getViewport]);
+  useBoardTasten({ getViewport, setCenter, zoomIn, zoomOut, zoomTo }, anzRef);
+
   const onNodeDragStart = useCallback((_: unknown, node: Node) => {
     if (node.type === 'frame') {
       const all = selectActiveBoard(useBoard.getState()).nodes;
@@ -1049,13 +1105,16 @@ export function Board() {
 
   const onNodeDragStop = useCallback(
     (_: unknown, node: Node) => {
+      // M344: eingerastet abgelegt heißt genau dort — kein Wurf hinterher
+      const gefangen = fangLinien().length > 0;
+      fangSetzen([]);
       if (node.type === 'frame') { frameDrag.current = null; return; }
       const track = dragTrack.current;
       setTilt(node.id, 0);
       if (!track || track.id !== node.id) return;
       const { vx, vy } = track;
       dragTrack.current = null;
-      if (Math.hypot(vx, vy) >= MIN_SPEED * 2 && useBoard.getState().physicsEnabled) {
+      if (!gefangen && Math.hypot(vx, vy) >= MIN_SPEED * 2 && useBoard.getState().physicsEnabled) {
         // Wurf: Karte gleitet mit Momentum weiter (und räumt sich den Weg frei)
         vels.current.set(node.id, { vx, vy });
       }
@@ -1232,7 +1291,7 @@ export function Board() {
         edges={rfEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        onNodesChange={onNodesChange}
+        onNodesChange={onNodesChangeFang}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
         onBeforeDelete={async ({ nodes: delNodes }) => {
@@ -1278,6 +1337,7 @@ export function Board() {
         }}
         proOptions={{ hideAttribution: false }}
       >
+        <ViewportPortal><Fanglinien /></ViewportPortal>
         <Background
           variant={gridSnap ? BackgroundVariant.Lines : BackgroundVariant.Dots}
           gap={gridSnap ? 20 : 26}

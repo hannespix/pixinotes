@@ -280,7 +280,9 @@ console.log('\n════ H: Ruhe ohne Änderung ════');
   pruefe('H1 ohne Änderung bleibt die Datei 25 s unangetastet', ordner.get(HAUPT)?.lastModified === vorher,
     `geschrieben um ${ordner.get(HAUPT)?.lastModified} (vorher ${vorher})`);
   const zA = await zustand(A.P); const zB = await zustand(B.P);
-  pruefe('H2 beide Geräte zeigen denselben Stand', JSON.stringify(zA.boards) === JSON.stringify(zB.boards) && JSON.stringify(zA.spaces) === JSON.stringify(zB.spaces));
+  // M345: Auswahl und Zieh-Zustand gehören dem Gerät — sie reisen nicht mehr mit und zählen hier nicht
+  const ohneWahl = (boards) => JSON.stringify(boards, (k, v) => (k === 'selected' || k === 'dragging' ? undefined : v));
+  pruefe('H2 beide Geräte zeigen denselben Stand', ohneWahl(zA.boards) === ohneWahl(zB.boards) && JSON.stringify(zA.spaces) === JSON.stringify(zB.spaces));
   pruefe('H3 beide gelten als synchron (kein Dirty-Rest)',
     !(await A.P.evaluate(() => localStorage.getItem('pixinotes:sync-dirty'))) && !(await B.P.evaluate(() => localStorage.getItem('pixinotes:sync-dirty'))));
 }
