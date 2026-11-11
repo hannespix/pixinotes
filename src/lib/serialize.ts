@@ -693,6 +693,134 @@ export function nodeToMarkdown(node: AppNode): string {
   }
 }
 
+/* ---------- M341: Karten → WhatsApp-Nachricht ----------
+   WhatsApp kennt eine eigene, kleine Auszeichnung: *fett*, _kursiv_, ~durchgestrichen~, `Code`,
+   Listen mit „- " und „1. ", Zitate mit „> ". Vorher ging roher Klartext hinaus — Überschriften
+   waren nicht zu erkennen, Hervorhebungen weg. */
+function inlineWa(content: unknown): string {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return inlineText(content);
+  return content.map((c) => {
+    if (typeof c === 'string') return c;
+    if (!c || typeof c !== 'object') return '';
+    const o = c as { type?: string; text?: unknown; styles?: Record<string, unknown>; href?: unknown; content?: unknown };
+    if (o.type === 'link') {
+      // WhatsApp macht aus der nackten Adresse selbst einen Link — „[Text](…)" versteht es nicht
+      const t = inlineText(o.content);
+      const h = typeof o.href === 'string' ? o.href : '';
+      return !h ? t : (!t || t === h || `https://${t}` === h ? h : `${t}: ${h}`);
+    }
+    if (typeof o.text !== 'string') return o.content ? inlineWa(o.content) : '';
+    const st = o.styles ?? {};
+    // die Zeichen müssen direkt am Wort stehen, Leerraum bleibt außen
+    const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(o.text);
+    let t = m ? m[2] : o.text;
+    if (!t) return o.text;
+    if (st.code) t = `\`${t}\``;
+    else {
+      if (st.bold) t = `*${t}*`;
+      if (st.italic) t = `_${t}_`;
+      if (st.strike) t = `~${t}~`;
+    }
+    return `${m ? m[1] : ''}${t}${m ? m[3] : ''}`;
+  }).join('');
+}
+/** Eine ganze Zeile fett — ohne doppelte Sternchen, wenn Teile schon fett waren */
+const waFett = (zeile: string): string => {
+  const t = zeile.replace(/\*/g, '').trim();
+  return t ? `*${t}*` : '';
+};
+
+export function blocksToWhatsapp(blocks: unknown[] | undefined): string {
+  if (!blocks) return '';
+  const alle = [...(blocks as AnyBlock[])];
+  while (alle.length && istLeererAbsatz(alle[alle.length - 1])) alle.pop();
+  const lines: string[] = [];
+  const istListe = (t?: string) => t === 'bulletListItem' || t === 'numberedListItem' || t === 'checkListItem';
+  // wie auf der Karte: der erste Absatz einer mehrzeiligen Notiz ist ihr Titel
+  const titelZeile = alle.length > 1 && (alle[0].type === 'paragraph' || !alle[0].type) ? alle[0] : null;
+  const walk = (bs: AnyBlock[], depth: number) => {
+    let nummer = 0;
+    let vorher: string | undefined;
+    for (const b of bs) {
+      // WhatsApp kennt keine verschachtelten Listen: Unterpunkte bekommen ein eigenes Zeichen und stehen eingerückt
+      const ein = '   '.repeat(depth);
+      const text = inlineWa(b.content);
+      if (b.type === 'numberedListItem') nummer = nummer === 0 ? (Number(b.props?.start) || 1) : nummer + 1; else nummer = 0;
+      // (ein Wechsel zwischen Punkten und Nummern beginnt eine neue Liste)
+      const gleicheListe = istListe(b.type) && istListe(vorher) && (b.type === 'numberedListItem') === (vorher === 'numberedListItem');
+      const hatInhalt = !!text || b.type === 'table' || b.type === 'image' || b.type === 'rechentabelle';
+      if (lines.length && depth === 0 && !gleicheListe && hatInhalt) lines.push('');
+      switch (b.type) {
+        case 'heading': lines.push(`${ein}${waFett(text)}`); break;
+        case 'checkListItem': lines.push(`${ein}${b.props?.checked ? '✅' : '⬜'} ${b.props?.checked && text ? `~${text.replace(/~/g, '')}~` : text}`); break;
+        case 'bulletListItem': lines.push(depth === 0 ? `- ${text}` : `${ein}◦ ${text}`); break;
+        case 'numberedListItem': lines.push(`${ein}${nummer}. ${text}`); break;
+        case 'quote': lines.push(`${ein}> ${text}`); break;
+        case 'codeBlock': lines.push(`\`\`\`${inlineText(b.content)}\`\`\``); break;
+        case 'table': {
+          const rows = (b.content as { rows?: { cells: unknown[] }[] } | undefined)?.rows ?? [];
+          for (const r of rows) lines.push(`${ein}${r.cells.map((c) => inlineWa((c as { content?: unknown })?.content ?? c).replace(/\n/g, ' ')).join(' | ')}`);
+          break;
+        }
+        case 'rechentabelle': for (const r of rechenBlockZeilen(b.props)) lines.push(`${ein}${r.join(' | ')}`); break;
+        case 'image': { const p = b.props as { caption?: string; name?: string } | undefined; lines.push(`${ein}🖼 ${p?.caption || p?.name || 'Bild'}`); break; }
+        default: if (text) lines.push(b === titelZeile ? waFett(text) : `${ein}${text}`);
+      }
+      vorher = b.type;
+      if (b.children?.length) walk(b.children, depth + 1);
+    }
+  };
+  walk(alle, 0);
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+export function nodeToWhatsapp(node: AppNode): string {
+  if (node.type === 'note') {
+    const attrs = node.data?.attrs as Record<string, string> | undefined;
+    const anhang = attrs && Object.keys(attrs).length ? `\n\n${Object.entries(attrs).map(([k, v]) => `${k}: ${v}`).join('\n')}` : '';
+    return blocksToWhatsapp(node.data.blocks) + anhang;
+  }
+  if (node.type === 'frame') return waFett(node.data.name);
+  if (node.type === 'kanban') {
+    // Spalten kursiv, leere Spalten bleiben weg — in einer Nachricht ist „Doing: —" nur Rauschen
+    const k = node.data;
+    const done = doneCol(k);
+    const spalten = kanbanCols(k).map((col, i) => {
+      const items = k.items.filter((it) => Math.min(it.col, done) === i);
+      if (!items.length) return '';
+      return `_${col}_\n${items.map((it) => `${i === done ? '✅' : '⬜'} ${it.text}${it.due ? ` (bis ${it.due})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` — ${it.note}` : ''}`).join('\n')}`;
+    }).filter(Boolean);
+    return `${waFett(k.title || 'Kanban')}\n\n${spalten.join('\n\n') || '—'}`;
+  }
+  // Module: wie im Klartext, die Titelzeile fett, Haken als gut lesbare Zeichen
+  const text = nodeToText(node).replace(/☑/g, '✅').replace(/☐/g, '⬜');
+  const nl = text.indexOf('\n');
+  const kopf = nl < 0 ? text : text.slice(0, nl);
+  const titel = ['kanban', 'gantt', 'time', 'minutes', 'sheet', 'week', 'email'].includes(node.type ?? '');
+  return titel && kopf.trim() ? `${waFett(kopf)}${nl < 0 ? '' : text.slice(nl)}` : text;
+}
+
+export function nodesToWhatsapp(nodes: AppNode[]): string {
+  return nodes.map(nodeToWhatsapp).filter(Boolean).join('\n\n———\n\n');
+}
+
+/**
+ * Text auf höchstens `max` Zeichen kürzen — an einem Zeilenende, wenn eines in der Nähe liegt, und nie
+ * mitten in einem Emoji: Ein halbes Zeichenpaar lässt `encodeURIComponent` mit einem Fehler abbrechen,
+ * der Knopf tat dann einfach nichts.
+ */
+export function sicherKuerzen(text: string, max: number): string {
+  if (text.length <= max) return text;
+  let ende = max;
+  const c = text.charCodeAt(ende - 1);
+  if (c >= 0xd800 && c <= 0xdbff) ende -= 1;
+  const zeile = text.lastIndexOf('\n', ende);
+  if (zeile > ende * 0.8) ende = zeile;
+  return text.slice(0, ende).trimEnd();
+}
+
 export function nodesToText(nodes: AppNode[]): string {
   return nodes.map(nodeToText).filter(Boolean).join('\n\n———\n\n');
 }

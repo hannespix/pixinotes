@@ -4750,16 +4750,17 @@ body[data-formatierleiste='an'] { --lv-typo: -52px; --lv-typo-dock: 56px; }
   display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 10px; padding: 4px 2px 2px;
 }
-.share-cards-grid button {
+.share-cards-grid button, .share-cards-grid a.share-ziel {
   display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
   min-height: 76px; padding: 12px 14px; border-radius: var(--r-lg); cursor: pointer;
   border: 1px solid var(--border-soft); background: var(--surface-card);
   font: inherit; color: var(--ink); text-align: left;
 }
-.share-cards-grid button:hover { background: var(--surface-2); border-color: var(--accent); }
+.share-cards-grid button:hover, .share-cards-grid a.share-ziel:hover { background: var(--surface-2); border-color: var(--accent); }
 .share-cards-grid button:disabled { opacity: 0.6; cursor: default; }
-.share-cards-grid button b { font-size: 13.5px; }
-.share-cards-grid button span { font-size: 11.5px; color: var(--muted); }
+.share-cards-grid a.share-ziel { text-decoration: none; box-sizing: border-box; }
+.share-cards-grid button b, .share-cards-grid a.share-ziel b { font-size: 13.5px; }
+.share-cards-grid button span, .share-cards-grid a.share-ziel span { font-size: 11.5px; color: var(--muted); }
 .share-cards-grid .share-emoji { font-size: 18px; color: inherit; }
 .share-cards-grid button svg { color: var(--muted); }
 .share-cards-foot { margin-top: 12px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }

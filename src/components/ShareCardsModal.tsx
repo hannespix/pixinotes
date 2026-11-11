@@ -3,8 +3,8 @@
 // formatiertes Kopieren. Große Ziele (min. 44px), Esc/Außenklick schließt.
 import { useMemo, useState } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
-import { nodesToHtml, nodesToText } from '../lib/serialize';
-import { cardsShareUrl, cardsToBoardDoc, cardsToPdf, printCards, whatsappUrl } from '../lib/shareCards';
+import { nodesToHtml, nodesToText, sicherKuerzen } from '../lib/serialize';
+import { cardsShareUrl, cardsToBoardDoc, cardsToPdf, printCards, whatsappNachricht } from '../lib/shareCards';
 import { ICopy, IDownload, IFolder, IMail, IX } from './Icons';
 
 const MAILTO_LIMIT = 1800;
@@ -19,6 +19,8 @@ export function ShareCardsModal() {
     () => (ids ? board.nodes.filter((n) => ids.includes(n.id)) : []),
     [ids, board.nodes],
   );
+  // M341: Die WhatsApp-Nachricht steht fest, sobald der Dialog offen ist — der Knopf ist ein echter Link
+  const wa = useMemo(() => (nodes.length ? whatsappNachricht(nodes) : null), [nodes]);
   if (!ids) return null;
   const close = () => setShareCards(null);
   if (nodes.length === 0) { close(); return null; }
@@ -47,9 +49,28 @@ export function ShareCardsModal() {
 
   const mail = () => {
     let text = nodesToText(nodes);
-    if (text.length > MAILTO_LIMIT) text = `${text.slice(0, MAILTO_LIMIT)}\n… (gekürzt — vollständigen Inhalt per „Kopieren" einfügen)`;
+    if (text.length > MAILTO_LIMIT) text = `${sicherKuerzen(text, MAILTO_LIMIT)}\n… (gekürzt — vollständigen Inhalt per „Kopieren" einfügen)`;
     const subject = encodeURIComponent(`Notizen aus PixiNotes (${title})`);
     window.open(`mailto:?subject=${subject}&body=${encodeURIComponent(text)}`, '_self');
+  };
+
+  /**
+   * WhatsApp. Kurze Nachrichten gehen direkt über den Link. Lange passen nicht in eine Adresse:
+   * Am Handy/Tablet übernimmt das Teilen-Blatt des Geräts den GANZEN Text (dort WhatsApp wählen);
+   * am PC geht der Anfang über den Link und der ganze Text liegt in der Zwischenablage.
+   */
+  const whatsapp = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!wa || !wa.gekuerzt) return; // der Link erledigt es
+    const grob = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+    if (grob && typeof navigator.share === 'function') {
+      e.preventDefault();
+      void navigator.share({ text: wa.text }).catch(() => { /* abgebrochen: nichts zu tun */ });
+      return;
+    }
+    void navigator.clipboard?.writeText(wa.text).then(
+      () => showToast('💬 Lange Nachricht: WhatsApp bekommt den Anfang, der ganze Text liegt in der Zwischenablage.', false, 12000),
+      () => showToast('💬 Lange Nachricht: WhatsApp bekommt nur den Anfang. Für alles: „Kopieren" und in WhatsApp einfügen.', false, 12000),
+    );
   };
 
   const copyHtml = async () => {
@@ -93,14 +114,20 @@ export function ShareCardsModal() {
             <b>Übernahme-Link</b>
             <span>für andere PixiNotes-Nutzer</span>
           </button>
-          <button
-            onClick={() => { window.open(whatsappUrl(nodes), '_blank', 'noopener'); }}
-            title="Inhalt als Text über WhatsApp teilen (öffnet WhatsApp bzw. WhatsApp Web)"
+          {/* M341: ein echter Link — Handy und Tablet öffnen bei einem Link-Tipp direkt die WhatsApp-App,
+              bei einem per Skript geöffneten Fenster nur eine Zwischenseite */}
+          <a
+            className="share-ziel"
+            href={wa?.url ?? 'https://wa.me/'}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={whatsapp}
+            title="Inhalt als Nachricht über WhatsApp teilen (öffnet WhatsApp bzw. WhatsApp Web)"
           >
             <span className="share-emoji" aria-hidden>💬</span>
             <b>WhatsApp</b>
-            <span>Inhalt als Nachricht</span>
-          </button>
+            <span>{wa?.gekuerzt ? 'lange Nachricht — siehe Hinweis' : 'Inhalt als Nachricht'}</span>
+          </a>
           <button onClick={mail} title="Inhalt als E-Mail-Entwurf im Mail-Programm öffnen">
             <IMail size={18} />
             <b>E-Mail</b>

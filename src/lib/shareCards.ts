@@ -5,7 +5,7 @@
 import { toCanvas } from 'html-to-image';
 import { uid, type AppNode } from '../types';
 import type { BoardDoc, Stroke } from '../store';
-import { nodesToHtml, nodesToText } from './serialize';
+import { nodesToHtml, nodesToWhatsapp, sicherKuerzen } from './serialize';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from './share';
 
 /** Auswahl als Mini-Board fürs Teilen: Karten + Verbindungen dazwischen +
@@ -243,9 +243,28 @@ export async function cardsToPdf(nodes: AppNode[], title = 'pixinotes-karten'): 
   }
 }
 
-/** WhatsApp: Text-Teilen über den offiziellen wa.me-Weg (App ODER Web) */
-export function whatsappUrl(nodes: AppNode[]): string {
-  let text = nodesToText(nodes);
-  if (text.length > 3500) text = `${text.slice(0, 3500)}\n… (gekürzt)`;
-  return `https://wa.me/?text=${encodeURIComponent(text)}`;
+/**
+ * WhatsApp: Text-Teilen über den offiziellen wa.me-Weg (App ODER Web).
+ *
+ * M341: Die Nachricht trägt WhatsApps eigene Auszeichnung (fett, kursiv, Listen, Zitate). Die Grenze
+ * gilt der ADRESSE, nicht dem Text: Umlaute und Emoji zählen in einer Adresse drei- bis zwölffach,
+ * und lange Adressen lehnen WhatsApp Web und mancher Browser ab. Passt die Nachricht nicht hinein,
+ * wird an einem Zeilenende gekürzt (nie mitten in einem Emoji) und `gekuerzt` gemeldet — der Dialog
+ * legt dann den ganzen Text in die Zwischenablage bzw. übergibt ihn dem Teilen-Blatt des Geräts.
+ */
+export const WHATSAPP_ADRESSE_MAX = 6000;
+export function whatsappNachricht(nodes: AppNode[]): { text: string; url: string; gekuerzt: boolean } {
+  const text = nodesToWhatsapp(nodes);
+  const basis = 'https://wa.me/?text=';
+  const voll = encodeURIComponent(text);
+  if (basis.length + voll.length <= WHATSAPP_ADRESSE_MAX) return { text, url: basis + voll, gekuerzt: false };
+  const hinweis = '\n… (gekürzt)';
+  // Zeichenzahl schätzen, dann nachmessen — die Adresse wächst je Zeichen unterschiedlich stark
+  let n = Math.floor(text.length * ((WHATSAPP_ADRESSE_MAX - basis.length - 60) / voll.length));
+  let teil = encodeURIComponent(sicherKuerzen(text, n) + hinweis);
+  while (basis.length + teil.length > WHATSAPP_ADRESSE_MAX && n > 50) {
+    n = Math.floor(n * 0.92);
+    teil = encodeURIComponent(sicherKuerzen(text, n) + hinweis);
+  }
+  return { text, url: basis + teil, gekuerzt: true };
 }
