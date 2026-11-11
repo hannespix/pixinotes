@@ -21,6 +21,7 @@ import {
 } from './syncFolder';
 import { googleTokenFuer, loadCalAccounts, msAnmeldung, msTokenErneuern, oauthAvailable } from './calAccounts';
 import { sbAbmelden, sbErneuern, sbKontoLoeschen, sbNutzer, sbRealtime, sbRueckkehrLesen, supabaseKonfig, type RealtimeEreignis, type RealtimeGriff, type SbSitzung } from './kontoSupabase';
+import { nurAuswahlAnders } from './syncMerge';
 
 /** M328: 'supabase' = das eigene PixiNotes-Konto (E-Mail), Ablage beim Betreiber */
 export type Anbieter = 'google' | 'ms' | 'supabase';
@@ -955,7 +956,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
       localStorage.setItem(STAMP_KEY, kenn.savedAt);
       await basisMerken('konto', payload);
       const jetzt = useBoard.getState();
-      if (jetzt.boards === s.boards && jetzt.spaces === s.spaces) localStorage.removeItem(KONTO_DIRTY_KEY);
+      if (jetzt.spaces === s.spaces && nurAuswahlAnders(s.boards, jetzt.boards)) localStorage.removeItem(KONTO_DIRTY_KEY);
       emitSyncStatus('konto', 'ok', kenn.savedAt);
       return kenn.savedAt;
     }
@@ -989,7 +990,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
   localStorage.setItem(STAMP_KEY, payload.savedAt);
   await basisMerken('konto', payload);
   const cur = useBoard.getState();
-  if (cur.boards === s.boards && cur.spaces === s.spaces) localStorage.removeItem(KONTO_DIRTY_KEY);
+  if (cur.spaces === s.spaces && nurAuswahlAnders(s.boards, cur.boards)) localStorage.removeItem(KONTO_DIRTY_KEY);
   emitSyncStatus('konto', 'ok', payload.savedAt);
   return payload.savedAt;
 }
@@ -1163,7 +1164,7 @@ export function initKontoSync(): void {
     useBoard.getState().showToast(`⚠️ ${(e as Error).message}`, false, 8000);
   }
   useBoard.subscribe((s, prev) => {
-    if (s.boards === prev.boards && s.spaces === prev.spaces) return;
+    if (s.spaces === prev.spaces && nurAuswahlAnders(prev.boards, s.boards)) return;   // M345: Auswählen ist keine Änderung
     if (isImportedState(s.boards, s.spaces)) return;
     if (getWriterRole() !== 'writer') return;
     if (!inDerived()) {

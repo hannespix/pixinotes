@@ -4,7 +4,7 @@
 // kein CORS, keine App-Passwörter — funktioniert überall, wo der Sync-Client läuft.
 // Das Ordner-Handle wird in IndexedDB gemerkt (übersteht Neustarts in Chrome/Edge).
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
-import { berichtAlsSatz, dreiWegeMerge, ohneAuswahl, type SyncStand } from './syncMerge';
+import { berichtAlsSatz, dreiWegeMerge, nurAuswahlAnders, ohneAuswahl, type SyncStand } from './syncMerge';
 
 /** Dateiname im Sync-Ordner — auch der Dateien-App-Weg (M190) schreibt GENAU
  *  diese Datei, damit ein iPad und ein Desktop denselben Nextcloud-Ordner
@@ -227,14 +227,19 @@ export async function readSync(handle: SyncDirHandle): Promise<SyncPayload | nul
 
 /** Den zu sichernden Stand zusammenstellen — eine Quelle für Ordner, WebDAV
  *  und Dateien-App, damit die drei Wege garantiert dasselbe Format schreiben. */
+/** Aus welchem Speicher-Stand eine Sicherung gebaut wurde — sie selbst trägt die Boards ohne Auswahl */
+const herkunft = new WeakMap<BoardDoc[], BoardDoc[]>();
+
 export function buildSyncPayload(): SyncPayload {
   const s = useBoard.getState();
+  // M345: ohne Auswahl- und Zieh-Zustand — der gehört dem Gerät, nicht dem Dokument
+  const boards = s.boards.map((b) => ohneAuswahl(b));
+  herkunft.set(boards, s.boards);
   return {
     app: 'pixinotes',
     version: 2,
     savedAt: new Date().toISOString(),
-    // M345: ohne Auswahl- und Zieh-Zustand — der gehört dem Gerät, nicht dem Dokument
-    boards: s.boards.map((b) => ohneAuswahl(b)),
+    boards,
     spaces: s.spaces,
     activeId: s.activeId,
     // bewusst OHNE KI-Einstellungen: API-Schlüssel bleiben auf dem Gerät
@@ -332,7 +337,8 @@ export async function uebernimmDateien(p: SyncPayload): Promise<number> {
 export function markSynced(payload: SyncPayload, source: SyncSource = 'ordner'): string {
   localStorage.setItem(STAMP_KEY, payload.savedAt);
   const cur = useBoard.getState();
-  if (cur.boards === payload.boards && cur.spaces === payload.spaces) localStorage.removeItem(SYNC_DIRTY_KEY);
+  const gebautAus = herkunft.get(payload.boards) ?? payload.boards;
+  if (cur.spaces === payload.spaces && nurAuswahlAnders(gebautAus, cur.boards)) localStorage.removeItem(SYNC_DIRTY_KEY);
   emitSyncStatus(source, 'ok', payload.savedAt);
   return payload.savedAt;
 }
@@ -666,7 +672,7 @@ export function initAutoSync(): void {
   started = true;
   let timer: ReturnType<typeof setTimeout> | undefined;
   useBoard.subscribe((s, prev) => {
-    if (s.boards === prev.boards && s.spaces === prev.spaces) return;
+    if (s.spaces === prev.spaces && nurAuswahlAnders(prev.boards, s.boards)) return;   // M345: Auswählen ist keine Änderung
     // Frisch importierter Stand (Sync/Datei/anderes Fenster): nichts Neues zu
     // sichern — ein Re-Upload mit neuem savedAt würde auf allen anderen
     // Geräten nur falsche „fremder Stand"-Warnungen auslösen

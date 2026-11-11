@@ -299,6 +299,26 @@ export function ohneAuswahl(b: BoardDoc, zurueck?: WeakMap<object, object>): Boa
   zurueck?.set(out, b);
   return out;
 }
+/** Unterscheiden sich zwei Stände nur in Auswahl- und Zieh-Zustand? Dann gibt es nichts zu sichern. */
+export function nurAuswahlAnders(vor: BoardDoc[], nach: BoardDoc[]): boolean {
+  if (vor === nach) return true;
+  if (vor.length !== nach.length) return false;
+  type Satz = Record<string, unknown>;
+  const gleichBis = (a: Satz, b: Satz, ohne: (k: string) => boolean): boolean => {
+    for (const k in a) if (!ohne(k) && a[k] !== b[k]) return false;
+    for (const k in b) if (!ohne(k) && !(k in a)) return false;
+    return true;
+  };
+  const wahl = (k: string) => k === 'selected' || k === 'dragging';
+  const liste = (a: unknown[] | undefined, b: unknown[] | undefined): boolean =>
+    a === b || (!!a && !!b && a.length === b.length && a.every((x, i) => x === b[i] || gleichBis(x as Satz, b[i] as Satz, wahl)));
+  return vor.every((b, i) => {
+    const n = nach[i];
+    if (b === n) return true;
+    if (!gleichBis(b as unknown as Satz, n as unknown as Satz, (k) => k === 'nodes' || k === 'edges')) return false;
+    return liste(b.nodes, n.nodes) && liste(b.edges, n.edges);
+  });
+}
 /** Dem zusammengeführten Board die hiesige Auswahl zurückgeben (unveränderte Objekte: genau die hiesigen) */
 function mitAuswahl(b: BoardDoc, hier: BoardDoc | undefined, zurueck: WeakMap<object, object>): BoardDoc {
   const original = zurueck.get(b) as BoardDoc | undefined;

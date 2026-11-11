@@ -9,7 +9,7 @@
 // Board-Stores und werden hier gar nicht erst angefasst.
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc } from '../store';
 import { ensurePermission, idbDel, idbGet, idbSet, syncSupported, type SyncDirHandle } from './syncFolder';
-import { ohneAuswahl } from './syncMerge';
+import { nurAuswahlAnders, ohneAuswahl } from './syncMerge';
 
 export interface ProjectPayload {
   app: 'pixinotes-projekt';
@@ -282,7 +282,7 @@ export function initProjectAutoSync(): void {
     for (const id of Object.keys(projectSyncMeta())) void autoSaveProject(id).catch(() => {});
   };
   useBoard.subscribe((s, prev) => {
-    if (s.boards === prev.boards && s.spaces === prev.spaces) return;
+    if (s.spaces === prev.spaces && nurAuswahlAnders(prev.boards, s.boards)) return;   // M345: Auswählen ist keine Änderung
     if (isImportedState(s.boards, s.spaces)) return; // kam von außen — nicht zurückspiegeln
     if (getWriterRole() !== 'writer') return;
     if (!inDerived()) {
