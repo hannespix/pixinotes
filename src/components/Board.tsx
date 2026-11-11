@@ -274,6 +274,31 @@ export function Board() {
     void setViewport({ x: v.x, y, zoom: v.zoom });
     return true;
   }, [fokusGrenzen, getViewport, setViewport]);
+  /**
+   * M346: Scrollbalken des Fokus. Dort rollt nicht die Karte, sondern die Kamera über sie (M334) —
+   * dass es weitergeht und wo man steht, sah man bisher nicht. Der Balken am rechten Rand zeigt es
+   * und lässt sich ziehen. Lage und Größe direkt am Element (kein Render je Kamerabild).
+   */
+  const fokusSpurRef = useRef<HTMLDivElement | null>(null);
+  const fokusZug = useRef<{ y: number; vy: number; k: number } | null>(null);
+  const fokusBalken = useCallback((kameraY?: number) => {
+    const spur = fokusSpurRef.current;
+    const daumen = spur?.firstElementChild as HTMLElement | null;
+    if (!spur || !daumen) return;
+    const f = fokusRef.current;
+    const g = f ? fokusGrenzen() : null;
+    if (!f || !g || g.passt || g.max - g.min < 4) { spur.removeAttribute('data-an'); return; }
+    const spurH = Math.max(60, f.hoehe - 16);
+    const weg = g.max - g.min;
+    const dh = Math.max(40, Math.round((spurH * f.hoehe) / (f.hoehe + weg)));
+    // `kameraY`: React Flow meldet die neue Kamera, BEVOR getViewport() sie kennt
+    const pos = Math.max(0, Math.min(1, (g.max - (kameraY ?? getViewport().y)) / weg));
+    spur.style.top = `${f.oben + 8}px`;
+    spur.style.height = `${spurH}px`;
+    daumen.style.height = `${dh}px`;
+    daumen.style.transform = `translateY(${Math.round((spurH - dh) * pos)}px)`;
+    spur.setAttribute('data-an', '');
+  }, [fokusGrenzen, getViewport]);
   useEffect(() => {
     const wrap = zoomWrapRef.current;
     if (!wrap) return;
@@ -335,6 +360,19 @@ export function Board() {
         const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
         if (canScrollTowards(target, inNode, -e.deltaX, -dy)) return;
       }
+      // M346: Im weiten Zoom nimmt der Kartenkörper keine Zeiger an (die ganze Karte ist der Griff) — das Rad
+      // käme nie beim Text an. Über einer GEWÄHLTEN langen Notiz rollt es darum von Hand ihren Text.
+      if (!e.ctrlKey && !e.metaKey && weitRef.current && inNode.classList.contains('react-flow__node-note') && inNode.classList.contains('selected')) {
+        const text = inNode.querySelector('.card-body.note-card') as HTMLElement | null;
+        const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+        if (text && text.scrollHeight > text.clientHeight + 4
+          && ((dy > 0 && text.scrollTop + text.clientHeight < text.scrollHeight - 1) || (dy < 0 && text.scrollTop > 0))) {
+          e.preventDefault();
+          e.stopPropagation();
+          text.scrollTop += dy / (getViewport().zoom || 1);
+          return;
+        }
+      }
       if (!e.ctrlKey && !wheelZoomRef.current) return; // Modul-Scroll bleibt
       e.preventDefault();
       e.stopPropagation();
@@ -383,7 +421,7 @@ export function Board() {
        * (auswählen), dann ziehen. Auf einer nicht gewählten Karte schwenkt der Finger das Board.
        */
       if (weitRef.current && !fokusRef.current) {
-        if (target.closest('.react-flow__resize-control, .react-flow__handle')) return;
+        if (target.closest('.react-flow__resize-control, .react-flow__handle, .note-daumen')) return;   // M346: der Scrollbalken bleibt bedienbar
         if (node.classList.contains('selected')) return; // React Flow zieht die Karte
         e.stopPropagation(); // React Flow beginnt keinen Karten-Zug; der Tipp (click) wählt weiterhin aus
         panRef.current = { x: t.clientX, y: t.clientY, vx: x, vy: y, zoom, active: false, el: target };
@@ -786,7 +824,10 @@ export function Board() {
       if (!wrap) return;
       const rel = zoom / (anzRef.current || 1);
       const inv = String(Math.round(Math.max(0.6, Math.min(7, 1 / rel)) * 20) / 20);
-      if (wrap.style.getPropertyValue('--pn-inv') !== inv) wrap.style.setProperty('--pn-inv', inv);
+      if (wrap.style.getPropertyValue('--pn-inv') !== inv) {
+        wrap.style.setProperty('--pn-inv', inv);
+        window.dispatchEvent(new Event('pixinotes:zoom-ruht'));   // M346: Scrollbalken passen ihre Größe an
+      }
       // mit Spielraum, damit die Grenze beim Zoomen nicht flattert
       const jetzt = weitRef.current ? rel < 0.5 : rel < 0.45;
       if (jetzt !== weitRef.current) { weitRef.current = jetzt; setWeit(jetzt); }
@@ -888,6 +929,18 @@ export function Board() {
         const fx = intern?.internals.positionAbsolute.x ?? n.position.x;
         const fy = intern?.internals.positionAbsolute.y ?? n.position.y;
         const w = el.offsetWidth, h = el.offsetHeight;
+        /* M346: Die Karte ist im Fokus breiter (und als Notiz länger) als auf dem Board — sie legte sich über
+           ihre Nachbarn, die abgedunkelt durchschienen: ein Überlappen, das es auf dem Board nicht gibt.
+           Was unter der vergrößerten Karte läge, tritt darum ganz zurück; der Rest bleibt als Umgebung. */
+        const luft = 16;
+        for (const k of Array.from(document.querySelectorAll('.react-flow__node')) as HTMLElement[]) {
+          const kid = k.dataset.id;
+          const i = kid && kid !== focusCard ? getInternalNode(kid) : null;
+          if (!i) { k.removeAttribute('data-fokus-weg'); continue; }
+          const kx = i.internals.positionAbsolute.x, ky = i.internals.positionAbsolute.y;
+          const kw = i.measured?.width ?? k.offsetWidth, kh = i.measured?.height ?? k.offsetHeight;
+          k.toggleAttribute('data-fokus-weg', kx < fx + w + luft && kx + kw > fx - luft && ky < fy + h + luft && ky + kh > fy - luft);
+        }
         // Am Finger fast randlos (jeder Punkt zählt für Spalten und Zellen), mit Maus etwas Luft
         const grob = window.matchMedia('(pointer: coarse)').matches;
         const rand = grob ? 4 : 16;
@@ -900,6 +953,7 @@ export function Board() {
         const text = ['note', 'image', 'file', 'email', 'shape'].includes(n.type ?? '');
         const zoom = text ? Math.min(grob ? 2.2 : 1.25, Math.max(1, passt)) : 1;
         fokusRef.current = { id: focusCard, oben, hoehe, rand };
+        requestAnimationFrame(() => fokusBalken());
         // M334: Wächst eine Karte, die ohnehin länger als der Schirm ist (Tippen am
         // Ende), bleibt die Kamera, wo der Nutzer sie hingerollt hat — nur klemmen,
         // nicht zurück an den Anfang springen
@@ -947,6 +1001,8 @@ export function Board() {
       return () => { if (raf) cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(cursorTimer); beobachter?.disconnect(); document.removeEventListener('selectionchange', cursorFolgen); };
     }
     fokusRef.current = null;
+    fokusBalken();
+    document.querySelectorAll('.react-flow__node[data-fokus-weg]').forEach((k) => k.removeAttribute('data-fokus-weg'));
     document.documentElement.style.removeProperty('--fokus-zoom');
     document.documentElement.style.removeProperty('--fokus-max');
     document.documentElement.style.removeProperty('--fokus-rand');
@@ -1319,7 +1375,7 @@ export function Board() {
         // Zoom-Knöpfe und Flüge, nicht nur das Schwenken mit der Maus.
         // (M315: Die Papiertextur ist weg — und mit ihr die Kachel-Variablen,
         // die hier bei jedem Schwenk ins DOM geschrieben wurden.)
-        onViewportChange={(vp) => { gemerkteAnsicht.set(activeId, vp); zoomMelden(vp.zoom); }}
+        onViewportChange={(vp) => { gemerkteAnsicht.set(activeId, vp); zoomMelden(vp.zoom); if (fokusRef.current) fokusBalken(vp.y); }}
         // M343: im weiten Zoom gibt es keine „nicht ziehen"-Zonen — die ganze Karte ist der Griff, das Rad gehört dem Board
         noDragClassName={weit && !focusCard ? 'nodrag-aus' : 'nodrag'}
         noWheelClassName={weit && !focusCard ? 'nowheel-aus' : 'nowheel'}
@@ -1358,6 +1414,32 @@ export function Board() {
         <FingerGesten />
         <CommentLayer />
       </ReactFlow>
+      <div className="fokus-spur" ref={fokusSpurRef} aria-hidden="true">
+        <div
+          className="fokus-daumen"
+          title="Ziehen zum Scrollen"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => {
+            const g = fokusGrenzen();
+            const spur = fokusSpurRef.current;
+            if (!g || !spur) return;
+            e.preventDefault(); e.stopPropagation();
+            e.currentTarget.setPointerCapture(e.pointerId);
+            e.currentTarget.setAttribute('data-zug', '');
+            fokusZug.current = { y: e.clientY, vy: getViewport().y, k: (g.max - g.min) / Math.max(1, spur.clientHeight - e.currentTarget.offsetHeight) };
+          }}
+          onPointerMove={(e) => {
+            const z = fokusZug.current;
+            const g = z ? fokusGrenzen() : null;
+            if (!z || !g) return;
+            const v = getViewport();
+            const y = Math.max(g.min, Math.min(g.max, z.vy - ((e.clientY - z.y) / (anzRef.current || 1)) * z.k));
+            void setViewport({ x: v.x, y, zoom: v.zoom });
+          }}
+          onPointerUp={(e) => { fokusZug.current = null; e.currentTarget.removeAttribute('data-zug'); }}
+          onPointerCancel={(e) => { fokusZug.current = null; e.currentTarget.removeAttribute('data-zug'); }}
+        />
+      </div>
     </div>
   );
 }
