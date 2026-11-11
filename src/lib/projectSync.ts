@@ -9,6 +9,7 @@
 // Board-Stores und werden hier gar nicht erst angefasst.
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc } from '../store';
 import { ensurePermission, idbDel, idbGet, idbSet, syncSupported, type SyncDirHandle } from './syncFolder';
+import { ohneAuswahl } from './syncMerge';
 
 export interface ProjectPayload {
   app: 'pixinotes-projekt';
@@ -104,7 +105,7 @@ function buildPayloadBody(projectId: string): { body: string; boards: BoardDoc[]
   for (const sp of s.spaces) {
     for (const p of sp.projects) {
       if (p.id !== projectId) continue;
-      const boards = s.boards.filter((b) => p.boardIds.includes(b.id));
+      const boards = s.boards.filter((b) => p.boardIds.includes(b.id)).map((b) => ohneAuswahl(b));   // M345: Auswahl bleibt am Gerät
       if (boards.length === 0) return null; // leeres Projekt → nichts zu teilen
       return { body: JSON.stringify({ project: { id: p.id, name: p.name }, boards }), boards, name: p.name };
     }

@@ -4,7 +4,7 @@
 // kein CORS, keine App-Passwörter — funktioniert überall, wo der Sync-Client läuft.
 // Das Ordner-Handle wird in IndexedDB gemerkt (übersteht Neustarts in Chrome/Edge).
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
-import { berichtAlsSatz, dreiWegeMerge, type SyncStand } from './syncMerge';
+import { berichtAlsSatz, dreiWegeMerge, ohneAuswahl, type SyncStand } from './syncMerge';
 
 /** Dateiname im Sync-Ordner — auch der Dateien-App-Weg (M190) schreibt GENAU
  *  diese Datei, damit ein iPad und ein Desktop denselben Nextcloud-Ordner
@@ -233,7 +233,8 @@ export function buildSyncPayload(): SyncPayload {
     app: 'pixinotes',
     version: 2,
     savedAt: new Date().toISOString(),
-    boards: s.boards,
+    // M345: ohne Auswahl- und Zieh-Zustand — der gehört dem Gerät, nicht dem Dokument
+    boards: s.boards.map((b) => ohneAuswahl(b)),
     spaces: s.spaces,
     activeId: s.activeId,
     // bewusst OHNE KI-Einstellungen: API-Schlüssel bleiben auf dem Gerät
