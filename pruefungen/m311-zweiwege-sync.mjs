@@ -210,6 +210,12 @@ console.log('\n════ D: Gleichzeitig auf demselben Board ════');
   pruefe('D2 Gerät A hat beide Karten', beideA);
   pruefe('D3 Gerät B hat beide Karten', beideB);
   pruefe('D4 beide zeigen 5 Karten auf „Planung"', (await knoten(A.P)) === 5 && (await knoten(B.P)) === 5, `${await knoten(A.P)} / ${await knoten(B.P)}`);
+{
+  // M351: Der Stempel ist die Kennung eines Stands — auch in derselben Millisekunde eindeutig, und lesbar
+  const st = lies(HAUPT).savedAt;
+  const ms = await A.P.evaluate((x) => [Date.parse(x), new Date(x).toLocaleString('de-DE')], st);
+  pruefe('D5 Stempel mit Stellen unter der Millisekunde, als Datum lesbar', /\.\d{6}Z$/.test(st) && Math.abs(ms[0] - Date.now()) < 120000 && !/Invalid/.test(ms[1]), `${st} ${ms}`);
+}
   await A.P.screenshot({ path: `${SD}/m311-d-gerät-a.png` });
   await B.P.screenshot({ path: `${SD}/m311-d-gerät-b.png` });
 }
@@ -259,7 +265,7 @@ console.log('\n════ F: Konfliktkopie wird eingearbeitet ════');
 // ══ G: Texte ══════════════════════════════════════════════════════════
 console.log('\n════ G: Texte ════');
 {
-  await A.P.locator('button[title^="Einstellungen"]').click();
+  await A.P.locator('button[aria-label="Einstellungen"], button[title^="Einstellungen"]').first().click();
   await A.P.waitForTimeout(600);
   await A.P.locator('.modal button', { hasText: 'Daten' }).first().click();
   await A.P.waitForTimeout(500);

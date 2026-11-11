@@ -75,6 +75,9 @@ export const KUERZEL: Kuerzel[] = [
   { id: 'karteSchieben', taste: 'Pfeiltasten', was: 'gewählte Karte verschieben (Umschalt: größere Schritte)', gruppe: 'Karten', fremd: true },
   { id: 'duplizieren', taste: 'Strg+D', was: 'Auswahl duplizieren', gruppe: 'Karten', fremd: true },
   { id: 'freiAblegen', taste: 'Strg beim Ziehen', was: 'ohne Fanglinien und Abstände frei ablegen', gruppe: 'Karten', fremd: true },
+  { id: 'pdf-vor', taste: 'Bild↓', mac: 'fn+↓', was: 'PDF/Word: nächste Seite der gewählten Karte — im Fokus oder nach Klick auf die Seite auch → und Leertaste', gruppe: 'Karten', fremd: true },
+  { id: 'pdf-zurueck', taste: 'Bild↑', mac: 'fn+↑', was: 'PDF/Word: vorige Seite — im Fokus oder nach Klick auf die Seite auch ← und Umschalt+Leertaste', gruppe: 'Karten', fremd: true },
+  { id: 'pdfRand', taste: 'Pos1 / Ende', mac: 'fn+← / fn+→', was: 'PDF/Word im Fokus: erste bzw. letzte Seite', gruppe: 'Karten', fremd: true },
   { id: 'loeschen', taste: 'Entf', was: 'Auswahl oder Verbindung löschen', gruppe: 'Karten', fremd: true },
   { id: 'einfuegen', taste: 'Strg+V', was: 'Screenshot, Bild oder Text einfügen', gruppe: 'Karten', fremd: true },
 
