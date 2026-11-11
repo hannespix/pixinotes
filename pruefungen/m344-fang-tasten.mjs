@@ -167,7 +167,7 @@ console.log('\n════ C: Tastatur ════');
 
 console.log('\n════ E: Texte ════');
 const js = readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.js')).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8')).join('\n');
-pruefe('E1 „Was ist neu" nennt M344, die Tabelle kennt die neuen Kürzel', js.includes('(M344)') && js.includes('zur Karte in dieser Richtung springen') && js.includes('ohne Fanglinien frei ablegen'));
+pruefe('E1 „Was ist neu" nennt M344, die Tabelle kennt die neuen Kürzel', js.includes('(M344)') && js.includes('zur Karte in dieser Richtung springen') && js.includes('ohne Fanglinien und Abstände frei ablegen'));
 
 await browser.close();
 app.close();

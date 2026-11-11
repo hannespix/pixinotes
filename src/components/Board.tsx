@@ -12,7 +12,7 @@ import {
   type NodeChange,
   type NodeTypes,
 } from '@xyflow/react';
-import { fangen, fangLinien, fangSetzen, type Kasten } from '../lib/fang';
+import { fangAktiv, fangen, fangSetzen, type Kasten } from '../lib/fang';
 import { Fanglinien } from './Fanglinien';
 import { useBoardTasten } from './boardTasten';
 import { mutedHistory, selectActiveBoard, useBoard } from '../store';
@@ -778,8 +778,10 @@ export function Board() {
           .filter((n) => !ids.has(n.id) && !n.selected && (!n.archived || st.showArchived))
           .map((n) => ({ x: n.position.x, y: n.position.y, ...mass(n) }));
         const f = fangen({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 }, andere, 6 / (getViewport().zoom || 1));
-        if (f.dx || f.dy) for (const c of zieh) if (c.position) c.position = { x: c.position.x + f.dx, y: c.position.y + f.dy };
-        fangSetzen(ende ? [] : f.linien);
+        // eingerastet = exakt dort (Rundungsreste der Gleitkommarechnung weg, sonst läge 0 bei 8,9e-16)
+        const glatt = (v: number) => Math.round(v * 1e6) / 1e6;
+        if (f.dx || f.dy) for (const c of zieh) if (c.position) c.position = { x: f.dx ? glatt(c.position.x + f.dx) : c.position.x, y: f.dy ? glatt(c.position.y + f.dy) : c.position.y };
+        fangSetzen(ende ? [] : { linien: f.linien, abstaende: f.abstaende });
       }
     }
     onNodesChange(changes as Parameters<typeof onNodesChange>[0]);
@@ -1162,7 +1164,7 @@ export function Board() {
   const onNodeDragStop = useCallback(
     (_: unknown, node: Node) => {
       // M344: eingerastet abgelegt heißt genau dort — kein Wurf hinterher
-      const gefangen = fangLinien().length > 0;
+      const gefangen = fangAktiv();
       fangSetzen([]);
       if (node.type === 'frame') { frameDrag.current = null; return; }
       const track = dragTrack.current;

@@ -73,7 +73,7 @@ export const KUERZEL: Kuerzel[] = [
   { id: 'karteVerlassen', taste: 'Esc', was: 'aus dem Notiz-Text zurück zur Karte (sie bleibt gewählt)', gruppe: 'Karten', fremd: true },
   { id: 'karteSchieben', taste: 'Pfeiltasten', was: 'gewählte Karte verschieben (Umschalt: größere Schritte)', gruppe: 'Karten', fremd: true },
   { id: 'duplizieren', taste: 'Strg+D', was: 'Auswahl duplizieren', gruppe: 'Karten', fremd: true },
-  { id: 'freiAblegen', taste: 'Strg beim Ziehen', was: 'ohne Fanglinien frei ablegen', gruppe: 'Karten', fremd: true },
+  { id: 'freiAblegen', taste: 'Strg beim Ziehen', was: 'ohne Fanglinien und Abstände frei ablegen', gruppe: 'Karten', fremd: true },
   { id: 'loeschen', taste: 'Entf', was: 'Auswahl oder Verbindung löschen', gruppe: 'Karten', fremd: true },
   { id: 'einfuegen', taste: 'Strg+V', was: 'Screenshot, Bild oder Text einfügen', gruppe: 'Karten', fremd: true },
 
