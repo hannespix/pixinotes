@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { passt } from '../lib/tasten';
 import { usePfeilTasten } from './pfeilTasten';
+import { useKontextSperre } from './Kontextmenue';
 
 /**
  * M251: Die globalen Tastenkürzel an einer Stelle.
@@ -27,6 +28,7 @@ import { usePfeilTasten } from './pfeilTasten';
  */
 export function Tastatur() {
   usePfeilTasten();   // M345: Pfeiltasten in Menüs, Leisten, Baum, Übersicht, Aufgaben
+  useKontextSperre(); // M350: eigenes Rechtsklick-Menü statt des Browser-Menüs
   useEffect(() => {
     const imText = (e: KeyboardEvent) =>
       !!(e.target as HTMLElement | null)?.closest?.('input, textarea, select, [contenteditable="true"]');

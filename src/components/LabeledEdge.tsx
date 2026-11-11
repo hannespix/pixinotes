@@ -266,6 +266,7 @@ export function LabeledEdge({
       <EdgeLabelRenderer>
         <div
           className={`edge-label nodrag nopan ${label ? '' : 'empty'} ${selected ? 'selected' : ''}`}
+          data-edge-id={id}
           style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
         >
           {editing ? (

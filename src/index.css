@@ -6539,3 +6539,16 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 }
 .fang-abstand.h .fang-mass { top: calc(-1px * var(--pn-inv, 1)); }
 .fang-abstand.v .fang-mass { left: calc(-1px * var(--pn-inv, 1)); }
+
+/* ================= M350: Eigenes Rechtsklick-Menü ================= */
+.kontext-menue button > span { flex: 1; }
+.kontext-taste {
+  margin-left: auto; padding-left: 14px; font: 500 11px/1 var(--font, system-ui, sans-serif);
+  color: var(--muted); background: none; border: none;
+}
+@media (pointer: coarse) { .kontext-taste { display: none; } }
+.sel-ai-menu button.sel-menu-gefahr { color: #c0392b; }
+.sel-ai-menu button.sel-menu-gefahr svg { color: #c0392b; }
+[data-theme='dark'] .sel-ai-menu button.sel-menu-gefahr, [data-theme='dark'] .sel-ai-menu button.sel-menu-gefahr svg { color: #ff9a8c; }
+/* Am Zeiger geöffnet (Rechtsklick) darf das Karten-Menü die ganze Höhe nutzen — sonst lag „Löschen" hinter einem Rollbalken */
+.sel-menu-fixed.am-zeiger { max-height: calc(100vh - 16px); }
