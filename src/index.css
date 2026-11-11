@@ -6489,7 +6489,8 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
   .modal-row { min-height: 36px; }
   .modal-row span { font-size: 14px; }
   .modal-hint { font-size: 13px; }
-  .modal button, .modal select { min-height: 36px; }
+  /* :where — ohne Gewicht: gilt nur, wo kein Knopf seine eigene (größere) Höhe hat (m290: „Übernehmen“ 44) */
+  :where(.modal) :where(button, select) { min-height: 36px; }
   .modal-row-check input[type='checkbox'] { width: 22px; height: 22px; }
   .note-farben { top: 40px; gap: 8px; padding: 8px; }
   .note-farbe { width: 32px; height: 32px; }
