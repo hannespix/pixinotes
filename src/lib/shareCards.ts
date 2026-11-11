@@ -38,6 +38,8 @@ const PRINT_CSS = `
   body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
          color: #222; max-width: 760px; margin: 24px auto; padding: 0 16px; line-height: 1.45; }
   h1, h2, h3 { line-height: 1.25; }
+  /* M347: Überschriften maßvoll — wie in der Notiz */
+  h1 { font-size: 1.5em; } h2 { font-size: 1.28em; } h3 { font-size: 1.12em; } h4 { font-size: 1em; }
   img { max-width: 100%; height: auto; }
   table { border-collapse: collapse; } td, th { border: 1px solid #bbb; padding: 4px 8px; }
   /* M340: Überschriften bleiben bei ihrem Text, Listenpunkte, Bilder und Tabellenzeilen werden nicht zerschnitten */

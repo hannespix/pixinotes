@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
@@ -15,6 +15,7 @@ import { nodeToText } from '../../lib/serialize';
 import { AUTO_ARCHIV_STANDARD_TAGE, archiviere, autoArchivLauf, holeZurueck } from '../../lib/ticketArchiv';
 import { IArchive, IArchiveRestore, ICalendar, IChevronL, IChevronR, ICompact, IDownload, IFolder, IMore, IPlus, IRedo, ISearch, ISettings, IX } from '../Icons';
 import { CardShell } from './CardShell';
+import { insBild } from '../EbenenMenu';
 import { DragTitle } from './DragTitle';
 
 /** Symbol je Karten-Typ für die Verknüpfungs-Liste im Ticket-Modal (M118) */
@@ -75,6 +76,8 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   // M295: Das ⋯-Menü der Kopfzeile (Portal, wie das Ebenen-Menü) — sechs
   // Symbolknöpfe waren zu viele, jetzt sind es Filter und ⋯.
   const [menuPos, setMenuPos] = useState<{ x: number; y: number; hoch: boolean } | null>(null);
+  // M347: ganz ins Bild — die geschätzte Breite (260) passte am Finger nicht
+  useLayoutEffect(() => { if (menuPos) insBild(menuRef.current); }, [menuPos]);
   const menuKnopf = useRef<HTMLButtonElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {

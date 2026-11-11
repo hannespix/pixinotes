@@ -18,7 +18,7 @@ import { suggestBoardLinks, type LinkSuggestion } from '../lib/brain';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
 import { InlineName } from './InlineName';
-import { BereichMenu, BoardMenu, ProjektMenu } from './EbenenMenu';
+import { BereichMenu, BoardMenu, ProjektMenu, insBild } from './EbenenMenu';
 import { IPlay, ITarget, IZoomIn, IZoomOut } from './Icons';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
@@ -1463,7 +1463,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
       {sugMenu && (
-        <div className="ov-graph-ctx nodrag" style={{ left: sugMenu.x, top: sugMenu.y }}>
+        <div className="ov-graph-ctx nodrag" ref={insBild} style={{ left: sugMenu.x, top: sugMenu.y }}>
           <div className="ov-graph-ctx-title">
             🧠 Vorschlag · {Math.round(sugMenu.score * 100)} % Nähe
           </div>
@@ -1477,7 +1477,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         </div>
       )}
       {ctxMenu && (
-        <div className="ov-graph-ctx nodrag" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
+        <div className="ov-graph-ctx nodrag" ref={insBild} style={{ left: ctxMenu.x, top: ctxMenu.y }}>
           <div className="ov-graph-ctx-title">{boardName(ctxMenu.boardId)}</div>
           <button onClick={() => { openBoard(ctxMenu.boardId); setCtxMenu(null); }}>Board öffnen</button>
           {/* M285: „aus der netzansicht … geht es noch gar nicht" — hier

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoard, type BoardSortierung } from '../store';
 import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
@@ -26,6 +26,22 @@ import {
 
 /** Gemeinsame Hülle: Knopf + schwebendes Menü (Portal, damit es aus jeder
  *  Leiste, Kachel und Baumzeile herausragen darf) */
+
+/** M347: Ein aufgeklapptes Menü ganz ins Bild holen — mit 8 Punkten Rand, nach seiner wirklichen Größe */
+export function insBild(el: HTMLElement | null): void {
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  const rand = 8;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  // Am Rand VERANKERN statt hinschieben: wächst das Menü danach noch (Schrift lädt), bleibt es im Bild
+  if (r.right > vw - rand) { el.style.left = 'auto'; el.style.right = `${rand}px`; }
+  else if (r.left < rand) el.style.left = `${rand}px`;
+  if (r.bottom > vh - rand) { el.style.top = 'auto'; el.style.bottom = `${rand}px`; }
+  else if (r.top < rand) { el.style.top = `${rand}px`; el.style.bottom = 'auto'; }
+  el.style.maxHeight = `${vh - 2 * rand}px`;
+  el.style.overflowY = 'auto';
+}
+
 export function MenuHuelle({ titel, klasse, kinder }: {
   titel: string;
   klasse: string;
@@ -42,6 +58,7 @@ export function MenuHuelle({ titel, klasse, kinder }: {
    * Gemessen: Jeder Klick im Menü galt so als „draußen", das Menü schloss
    * schon beim Aufsetzen des Zeigers, und der Klick erreichte den Eintrag nie.
    */
+  useLayoutEffect(() => { if (pos) insBild(menu.current); }, [pos]);
   useEffect(() => {
     if (!pos) return;
     const zu = (e: PointerEvent) => {
