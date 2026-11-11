@@ -732,14 +732,74 @@ const waFett = (zeile: string): string => {
   return t ? `*${t}*` : '';
 };
 
-export function blocksToWhatsapp(blocks: unknown[] | undefined): string {
+/**
+ * M342: Eine Tabelle für WhatsApp.
+ *
+ * WhatsApp hat keine Tabellen und schreibt in Proportionalschrift — „a | b | c" verrutscht in jeder
+ * Zeile anders. Zwei Formen, je nach Breite:
+ *  · Schmale Tabellen (passen auf einen Handy-Schirm) stehen in Festbreitenschrift, die Spalten
+ *    mit Leerzeichen ausgerichtet, Zahlen rechtsbündig.
+ *  · Breite Tabellen werden zu „Karteikarten": je Zeile die erste Zelle fett, darunter
+ *    „Spaltenkopf: Wert". Das bleibt auf jedem Schirm lesbar, statt wild umzubrechen.
+ * Leere Zeilen und Spalten fallen weg. `reich` sind dieselben Zellen mit Auszeichnung (für die
+ * Karteikarten-Form; in Festbreitenschrift zeigt WhatsApp Sternchen wörtlich).
+ */
+const WA_FESTBREITE = 30;
+function waTabelle(roh: string[][], kopfzeile: boolean, reich?: string[][]): string[] {
+  const putzen = (c: unknown) => String(c ?? '').replace(/\s*\n\s*/g, ' ').trim();
+  const alle = roh.map((r) => r.map(putzen));
+  const spalten = Math.max(0, ...alle.map((r) => r.length));
+  const belegt = Array.from({ length: spalten }, (_, i) => alle.some((r) => (r[i] ?? '') !== ''));
+  const waehle = (r: string[]) => belegt.flatMap((b, i) => (b ? [r[i] ?? ''] : []));
+  const behalten = alle.map((r) => r.some((c) => c !== ''));
+  const z = alle.filter((_, k) => behalten[k]).map(waehle);
+  const R = reich ? reich.filter((_, k) => behalten[k]).map((r) => waehle(r.map(putzen))) : z;
+  if (z.length === 0) return [];
+  const n = z[0].length;
+  if (n === 1) return R.map((r) => r[0]);
+  const lang = (s: string) => Array.from(s).length;
+  const breiten = Array.from({ length: n }, (_, i) => Math.max(...z.map((r) => lang(r[i]))));
+  const gesamt = breiten.reduce((a, b) => a + b, 0) + 2 * (n - 1);
+  const istZahl = (s: string) => /\d/.test(s) && /^[-+]?[\d.,\s]+\s?(%|€|\$|[A-Za-z]{1,3})?$/.test(s);
+  if (gesamt <= WA_FESTBREITE && !z.some((r) => r.some((c) => c.includes('`')))) {
+    const zeilen = z.map((r) => r.map((c, i) => {
+      const luft = ' '.repeat(breiten[i] - lang(c));
+      return i > 0 && istZahl(c) ? luft + c : c + luft;
+    }).join('  ').trimEnd());
+    if (kopfzeile && zeilen.length > 1) zeilen.splice(1, 0, '-'.repeat(gesamt));
+    return [`\`\`\`${zeilen.join('\n')}\`\`\``];
+  }
+  if (kopfzeile && z.length > 1) {
+    const kopf = z[0];
+    return z.slice(1).flatMap((r, k) => {
+      const karte = [waFett(r[0]) || `*Zeile ${k + 1}*`];
+      for (let i = 1; i < n; i += 1) if (r[i] !== '') karte.push(`${kopf[i] || `Spalte ${i + 1}`}: ${R[k + 1][i]}`);
+      return k ? ['', ...karte] : karte;
+    });
+  }
+  // ohne Kopfzeile: erste Zelle fett, der Rest dahinter
+  return z.map((r, k) => {
+    const rest = R[k].slice(1).filter((c) => c !== '').join(' · ');
+    return `${waFett(r[0]) || '—'}${rest ? ` — ${rest}` : ''}`;
+  });
+}
+
+/** 2026-12-01 → 01.12. (mit Jahr, wenn es nicht das laufende ist) */
+const waDatum = (iso: unknown): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(typeof iso === 'string' ? iso : '');
+  if (!m) return typeof iso === 'string' ? iso : '';
+  return `${m[3]}.${m[2]}.${Number(m[1]) === new Date().getFullYear() ? '' : m[1]}`;
+};
+const waZeit = (min: number) => `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}`;
+
+export function blocksToWhatsapp(blocks: unknown[] | undefined, mitTitel = true): string {
   if (!blocks) return '';
   const alle = [...(blocks as AnyBlock[])];
   while (alle.length && istLeererAbsatz(alle[alle.length - 1])) alle.pop();
   const lines: string[] = [];
   const istListe = (t?: string) => t === 'bulletListItem' || t === 'numberedListItem' || t === 'checkListItem';
   // wie auf der Karte: der erste Absatz einer mehrzeiligen Notiz ist ihr Titel
-  const titelZeile = alle.length > 1 && (alle[0].type === 'paragraph' || !alle[0].type) ? alle[0] : null;
+  const titelZeile = mitTitel && alle.length > 1 && (alle[0].type === 'paragraph' || !alle[0].type) ? alle[0] : null;
   const walk = (bs: AnyBlock[], depth: number) => {
     let nummer = 0;
     let vorher: string | undefined;
@@ -760,11 +820,15 @@ export function blocksToWhatsapp(blocks: unknown[] | undefined): string {
         case 'quote': lines.push(`${ein}> ${text}`); break;
         case 'codeBlock': lines.push(`\`\`\`${inlineText(b.content)}\`\`\``); break;
         case 'table': {
-          const rows = (b.content as { rows?: { cells: unknown[] }[] } | undefined)?.rows ?? [];
-          for (const r of rows) lines.push(`${ein}${r.cells.map((c) => inlineWa((c as { content?: unknown })?.content ?? c).replace(/\n/g, ' ')).join(' | ')}`);
+          const inhalt = b.content as { rows?: { cells: unknown[] }[]; headerRows?: number } | undefined;
+          const rows = inhalt?.rows ?? [];
+          const zelle = (c: unknown) => (c as { content?: unknown })?.content ?? c;
+          // Kopfzeile: ausdrücklich gesetzt — sonst gilt die erste Zeile ab drei Spalten als Kopf
+          const kopf = (inhalt?.headerRows ?? 0) >= 1 || (rows[0]?.cells.length ?? 0) >= 3;
+          lines.push(...waTabelle(rows.map((r) => r.cells.map((c) => inlineText(zelle(c)))), kopf, rows.map((r) => r.cells.map((c) => inlineWa(zelle(c))))));
           break;
         }
-        case 'rechentabelle': for (const r of rechenBlockZeilen(b.props)) lines.push(`${ein}${r.join(' | ')}`); break;
+        case 'rechentabelle': lines.push(...waTabelle(rechenBlockZeilen(b.props), true)); break;
         case 'image': { const p = b.props as { caption?: string; name?: string } | undefined; lines.push(`${ein}🖼 ${p?.caption || p?.name || 'Bild'}`); break; }
         default: if (text) lines.push(b === titelZeile ? waFett(text) : `${ein}${text}`);
       }
@@ -777,29 +841,99 @@ export function blocksToWhatsapp(blocks: unknown[] | undefined): string {
 }
 
 export function nodeToWhatsapp(node: AppNode): string {
-  if (node.type === 'note') {
-    const attrs = node.data?.attrs as Record<string, string> | undefined;
-    const anhang = attrs && Object.keys(attrs).length ? `\n\n${Object.entries(attrs).map(([k, v]) => `${k}: ${v}`).join('\n')}` : '';
-    return blocksToWhatsapp(node.data.blocks) + anhang;
+  const attrs = node.data?.attrs as Record<string, string> | undefined;
+  const anhang = attrs && Object.keys(attrs).length ? `\n\n${Object.entries(attrs).map(([k, v]) => `${k}: ${v}`).join('\n')}` : '';
+  switch (node.type) {
+    case 'note':
+      return blocksToWhatsapp(node.data.blocks) + anhang;
+    case 'frame':
+      return waFett(node.data.name);
+    case 'kanban': {
+      // Spalten kursiv, leere Spalten bleiben weg — in einer Nachricht ist „Doing: —" nur Rauschen
+      const k = node.data;
+      const done = doneCol(k);
+      const spalten = kanbanCols(k).map((col, i) => {
+        const items = k.items.filter((it) => Math.min(it.col, done) === i);
+        if (!items.length) return '';
+        return `_${col}_\n${items.map((it) => `${i === done ? '✅' : '⬜'} ${it.text}${it.due ? ` (bis ${waDatum(it.due)})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` — ${it.note}` : ''}`).join('\n')}`;
+      }).filter(Boolean);
+      return `${waFett(k.title || 'Kanban')}\n\n${spalten.join('\n\n') || '—'}${anhang}`;
+    }
+    case 'sheet': {
+      const t = waTabelle(sheetZeilen(node.data), true);
+      return `${waFett(node.data.title || 'Rechen-Tabelle')}\n\n${t.join('\n') || '—'}${anhang}`;
+    }
+    case 'gantt': {
+      // M342: ein Vorgang je Zeile mit lesbarem Datum — Meilensteine (ein Tag) als ◆
+      const g = node.data;
+      const zeilen = g.rows.map((r) => {
+        const wer = (r as { who?: string }).who;
+        const wann = r.start === r.end ? waDatum(r.start) : `${waDatum(r.start)}–${waDatum(r.end)}`;
+        return `${r.start === r.end ? '◆' : '▬'} ${r.name}: ${wann}${r.progress ? ` · ${r.progress} %` : ''}${wer ? ` · @${wer}` : ''}`;
+      });
+      return `${waFett(g.title || 'Zeitplan')}\n\n${zeilen.join('\n') || '—'}${anhang}`;
+    }
+    case 'week': {
+      // M342: nach Tagen gegliedert statt einer langen Zeilenliste; leere Tage bleiben weg
+      const w = node.data;
+      const namen = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
+      const cols = w.cols?.length ? w.cols : namen.slice(0, w.days === 7 ? 7 : 5);
+      const slot = (m: number) => w.slots?.[m / 60] ?? `Zeile ${m / 60 + 1}`;
+      const wann = (e: { start: number; dur: number }) => (w.axis === 'slots'
+        ? (e.dur <= 60 ? slot(e.start) : `${slot(e.start)}–${slot(e.start + e.dur - 60)}`)
+        : `${waZeit(e.start)}–${waZeit(e.start + e.dur)}`);
+      const tage = cols.map((name, tag) => {
+        const eintraege = [...w.entries].filter((e) => e.day === tag).sort((a, b) => a.start - b.start);
+        return eintraege.length ? `_${name}_\n${eintraege.map((e) => `${wann(e)} ${e.text}${e.who ? ` (${e.who})` : ''}`).join('\n')}` : '';
+      }).filter(Boolean);
+      return `${waFett(w.title || 'Planer')}\n\n${tage.join('\n\n') || '—'}${anhang}`;
+    }
+    case 'time': {
+      // M342: je Tag ein Abschnitt mit Summe (ohne Pausen)
+      const t = node.data;
+      const namen: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause' };
+      const jeTag = new Map<string, typeof t.segs>();
+      for (const s of [...t.segs].sort((a, b) => a.date.localeCompare(b.date) || a.start - b.start)) jeTag.set(s.date, [...(jeTag.get(s.date) ?? []), s]);
+      const tage = [...jeTag.entries()].map(([datum, liste]) => {
+        const arbeit = liste.reduce((a, s) => a + (s.kind === 'pause' || s.end === undefined ? 0 : s.end - s.start), 0);
+        return `_${waDatum(datum)}_ · ${waZeit(arbeit)} h\n${liste.map((s) => `${waZeit(s.start)}–${s.end !== undefined ? waZeit(s.end) : 'läuft'} ${namen[s.kind] ?? s.kind}${s.note ? ` (${s.note})` : ''}`).join('\n')}`;
+      });
+      return `${waFett(t.title || 'Zeiterfassung')}\n\n${tage.join('\n\n') || '—'}${anhang}`;
+    }
+    case 'minutes': {
+      const mn = node.data as { title?: string; entries?: Array<{ date: string; title?: string; attendees?: string; blocks?: unknown[]; decisions?: Array<{ text: string }> }> };
+      const teile = [...(mn.entries ?? [])].sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '')).map((e) => [
+        `_${e.title?.trim() || waDatum(e.date)}_${e.title?.trim() && e.date ? ` · ${waDatum(e.date)}` : ''}`,
+        e.attendees ? `Teilnehmende: ${e.attendees}` : '',
+        blocksToWhatsapp(e.blocks, false),
+        (e.decisions ?? []).length ? `Beschlüsse:\n${(e.decisions ?? []).map((d) => `§ ${d.text}`).join('\n')}` : '',
+      ].filter(Boolean).join('\n'));
+      return `${waFett(mn.title ?? 'Besprechungsreihe')}\n\n${teile.join('\n\n') || '—'}${anhang}`;
+    }
+    case 'email': {
+      const e = node.data;
+      return `${waFett(`📧 ${e.subject}`)}\nVon: ${e.fromName}${e.fromAddress ? ` <${e.fromAddress}>` : ''}\n\n${e.text.trim()}${e.attachments.length ? `\n\n📎 ${e.attachments.map((a) => a.name).join(', ')}` : ''}${anhang}`;
+    }
+    case 'mermaid':
+      // Der Quelltext in Festbreitenschrift — ein Bild kann der Link nicht mitnehmen
+      return `${waFett('Diagramm')}\n\`\`\`${node.data.code.trim()}\`\`\`${anhang}`;
+    case 'file': {
+      const f = node.data;
+      const t = f.titel?.trim();
+      return `📎 ${t && t !== f.name ? `${t} (${f.name}, ${formatBytes(f.size)})` : `${f.name} (${formatBytes(f.size)})`}${anhang}`;
+    }
+    case 'image': {
+      const i = node.data;
+      const t = i.titel?.trim();
+      return `🖼 ${t || i.name || 'Bild'}${anhang}`;
+    }
+    case 'calendar':
+      return `📅 Kalender${node.data.month ? ` ${node.data.month}` : ''}`;
+    default: {
+      const text = nodeToText(node).replace(/☑/g, '✅').replace(/☐/g, '⬜');
+      return text;
+    }
   }
-  if (node.type === 'frame') return waFett(node.data.name);
-  if (node.type === 'kanban') {
-    // Spalten kursiv, leere Spalten bleiben weg — in einer Nachricht ist „Doing: —" nur Rauschen
-    const k = node.data;
-    const done = doneCol(k);
-    const spalten = kanbanCols(k).map((col, i) => {
-      const items = k.items.filter((it) => Math.min(it.col, done) === i);
-      if (!items.length) return '';
-      return `_${col}_\n${items.map((it) => `${i === done ? '✅' : '⬜'} ${it.text}${it.due ? ` (bis ${it.due})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` — ${it.note}` : ''}`).join('\n')}`;
-    }).filter(Boolean);
-    return `${waFett(k.title || 'Kanban')}\n\n${spalten.join('\n\n') || '—'}`;
-  }
-  // Module: wie im Klartext, die Titelzeile fett, Haken als gut lesbare Zeichen
-  const text = nodeToText(node).replace(/☑/g, '✅').replace(/☐/g, '⬜');
-  const nl = text.indexOf('\n');
-  const kopf = nl < 0 ? text : text.slice(0, nl);
-  const titel = ['kanban', 'gantt', 'time', 'minutes', 'sheet', 'week', 'email'].includes(node.type ?? '');
-  return titel && kopf.trim() ? `${waFett(kopf)}${nl < 0 ? '' : text.slice(nl)}` : text;
 }
 
 export function nodesToWhatsapp(nodes: AppNode[]): string {
