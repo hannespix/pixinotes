@@ -6388,3 +6388,25 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 .fanglinie { position: absolute; background: #ff2d87; pointer-events: none; z-index: 4000; }
 .fanglinie.v { width: calc(1px * var(--pn-inv, 1)); margin-left: calc(-0.5px * var(--pn-inv, 1)); }
 .fanglinie.h { height: calc(1px * var(--pn-inv, 1)); margin-top: calc(-0.5px * var(--pn-inv, 1)); }
+
+/* ================= M345: Pfeiltasten überall — sichtbarer Tastatur-Fokus =================
+   Wer mit den Pfeilen durch Baum, Übersicht, Netz und Aufgaben geht, muss sehen, wo er steht. */
+.ov-canvas .react-flow__node-ovBoard:focus-visible { outline: none; }
+.ov-canvas .react-flow__node-ovBoard:focus-visible > .ov-board {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.ov-graph-node:focus { outline: none; }
+.ov-graph-node:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 50%; }
+.ov-graph-node:focus-visible > circle:not(.ov-graph-here) { stroke: var(--accent); }
+.ov-graph-node:focus-visible text { font-weight: 700; }
+.task-main:focus { outline: none; }
+.task-main:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+.nav-tree :is(.side-proj-name, .side-board-name, .side-card, .side-tree-find, .side-archiv):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}

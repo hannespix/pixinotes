@@ -38,8 +38,10 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
       const tun = (fn: () => void) => { e.preventDefault(); e.stopPropagation(); fn(); };
 
       /** Genau diese Karte wählen, ins Bild holen und ihr den Tastatur-Fokus geben (dann verschieben die Pfeile sie) */
-      const waehle = (n: AppNode) => {
-        st.onNodesChange(board.nodes.map((k) => ({ id: k.id, type: 'select' as const, selected: k.id === n.id })));
+      const waehle = (n: AppNode, dazu = false) => {
+        st.onNodesChange(dazu
+          ? [{ id: n.id, type: 'select' as const, selected: true }]
+          : board.nodes.map((k) => ({ id: k.id, type: 'select' as const, selected: k.id === n.id })));
         const vp = kamera.getViewport();
         const fl = document.querySelector('.react-flow')?.getBoundingClientRect();
         const m = mass(n);
@@ -79,15 +81,21 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
       if (imText) return;
 
       // ── Strg+Pfeil: zur Karte in dieser Richtung ────────────────────────────────────────
-      if (strg && !e.altKey && !e.shiftKey && /^Arrow/.test(e.key) && !st.focusCard && sichtbar.length) {
+      // M345: mit Umschalt kommt die Karte zur Auswahl dazu
+      if (strg && !e.altKey && /^Arrow/.test(e.key) && !st.focusCard && sichtbar.length) {
+        const dazu = e.shiftKey;
+        // Ausgangspunkt: die Karte mit dem Tastatur-Fokus (die zuletzt erreichte), sonst die erste gewählte
+        const fokusId = (closest('.react-flow__node') as HTMLElement | null)?.dataset.id;
+        const start = gewaehlt.find((n) => n.id === fokusId) ?? gewaehlt[0];
         return tun(() => {
           const vp = kamera.getViewport();
           const fl = document.querySelector('.react-flow')?.getBoundingClientRect();
-          const von = gewaehlt.length ? mitte(gewaehlt[0]) : { x: ((fl?.width ?? 1200) / 2 - vp.x) / vp.zoom, y: ((fl?.height ?? 800) / 2 - vp.y) / vp.zoom };
+          const von = start ? mitte(start) : { x: ((fl?.width ?? 1200) / 2 - vp.x) / vp.zoom, y: ((fl?.height ?? 800) / 2 - vp.y) / vp.zoom };
           const [rx, ry] = e.key === 'ArrowRight' ? [1, 0] : e.key === 'ArrowLeft' ? [-1, 0] : e.key === 'ArrowDown' ? [0, 1] : [0, -1];
           let best: AppNode | null = null; let bestWert = Infinity;
           for (const n of sichtbar) {
-            if (gewaehlt.length && n.id === gewaehlt[0].id) continue;
+            if (start && n.id === start.id) continue;
+            if (dazu && n.selected) continue;
             const m = mitte(n);
             const laengs = (m.x - von.x) * rx + (m.y - von.y) * ry;
             const quer = Math.abs((m.x - von.x) * ry) + Math.abs((m.y - von.y) * rx);
@@ -95,7 +103,7 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
             const wert = laengs + quer * 2.2;        // geradeaus zählt mehr als schräg
             if (wert < bestWert) { bestWert = wert; best = n; }
           }
-          if (best) waehle(best);
+          if (best) waehle(best, dazu);
         });
       }
       if (strg && !e.altKey && !e.shiftKey && e.code === 'KeyD' && gewaehlt.length) {
@@ -123,6 +131,10 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
           };
           requestAnimationFrame(hinein);
         });
+      }
+      // ── Pos1 / Ende: erste und letzte Karte in Lesereihenfolge (M345) ───────────────────
+      if ((e.key === 'Home' || e.key === 'End') && aufFlaeche && !e.shiftKey && !st.focusCard && sichtbar.length) {
+        return tun(() => { const folge = lesefolge(sichtbar); waehle(e.key === 'Home' ? folge[0] : folge[folge.length - 1]); });
       }
       // ── Zoom ────────────────────────────────────────────────────────────────────────────
       if (e.key === '+' || e.key === '=') return tun(() => { void kamera.zoomIn({ duration: 140 }); });
