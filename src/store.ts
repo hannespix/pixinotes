@@ -17,7 +17,7 @@ import { buildStarter } from './lib/starter';
 import { KACHEL_TYPEN, uid, type AppNode, type CardFont, type CardSize, type TimeSeg } from './types';
 import { anchorStroke, integrateStroke } from './lib/strokeAnchor';
 import { istAmText } from './lib/notizText';
-import { offeneSeite, strichRelativ } from './lib/pdfSeiten';
+import { offeneSeite, seiteVon, strichRelativ } from './lib/pdfSeiten';
 import { findFreeSpot, frameMembers } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
 
@@ -37,6 +37,8 @@ export interface Stroke {
   /** M335: auf dieser SEITE einer PDF-Karte — die Punkte sind dann Seitenpunkte
    *  (PDF-Punkte, Ursprung Seitenecke); sichtbar nur, wenn die Seite offen ist */
   seite?: number;
+  /** M354: `width` ist in Seitenpunkten (wächst mit der Seite). Fehlt bei Seitenstrichen von vor M354 (Board-Punkte). */
+  seitenBreite?: boolean;
   /** M339: liegt auf dem TEXT einer Notiz (lib/notizText.ts) — die Punkte sind dann Inhaltspunkte
    *  (Kartenecke bei Scrollstand 0), der Strich scrollt mit dem Text. false = hängt am Kartenrahmen.
    *  Fehlt bei Strichen von vor M339: dann entscheidet die Lage (ganz auf der Karte = am Text). */
@@ -1211,8 +1213,11 @@ export const useBoard = create<BoardState>()(
               // M335: Seitenstriche kommen in Kartenpunkten zurück — verdeckte (Seite nicht offen) bleiben, wie sie sind
               const rel = strichRelativ(s); // M339: Text-Striche dort, wo man sie gerade sieht
               if (s.seite != null && rel.length === 0) return s;
+              const g = s.seitenBreite && s.anchor ? seiteVon(s.anchor) : undefined;
               return {
                 ...s,
+                width: g ? s.width * g.k : s.width,
+                seitenBreite: undefined,
                 anchor: undefined,
                 seite: undefined,
                 amText: undefined,

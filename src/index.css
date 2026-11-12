@@ -6555,3 +6555,12 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 
 /* M352: Die Seite nimmt beim Klick den Tastatur-Fokus (Pfeile/Leertaste blättern) — ohne Rahmen bei Maus und Stift */
 .pdf-seite:focus:not(:focus-visible) { outline: none; }
+
+/* ===== M354: Stärken für Stift, Textmarker und Radierer — Stufen und Regler; Vorschlag über dem Geschriebenen ===== */
+.draw-palette .draw-dicke i.balken { border-radius: 2px; opacity: .55; }
+.draw-palette .draw-dicke i.ring { background: none; border: 1.5px solid var(--ink); box-sizing: border-box; }
+.draw-palette .draw-regler { width: 92px; accent-color: var(--accent); cursor: pointer; margin: 0 2px; }
+.draw-palette .draw-staerke-wert { min-width: 2.2em; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+@media (pointer: coarse) { .draw-palette .draw-regler { width: 120px; height: 28px; } }
+.schrift-vorschlag.oben { transform: translateY(-100%); }
+@media (max-width: 700px) { .draw-palette .draw-regler { width: 72px; } .draw-palette .draw-staerke-wert { display: none; } }

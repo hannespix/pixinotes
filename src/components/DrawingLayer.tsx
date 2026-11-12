@@ -26,8 +26,32 @@ const MARKER_COLORS = ['#fff200', '#aaff00', '#ff9100', '#ff2d95', '#00e5ff', '#
  *  M324: 550 → 320 ms — „Formen einrasten schneller". Kürzer wäre riskant: beim
  *  Schreiben setzt der Stift zwischen Buchstaben ähnlich kurz ab. */
 const HOLD_MS = 320;
-/** M324: Strichstärken fein · normal · dick */
-const PEN_WIDTHS = [1.8, 2.5, 4] as const;
+/**
+ * M354: Stärken in BILDSCHIRM-Punkten — so dick, wie man es beim Zeichnen sieht, gleich ob die Karte
+ * gerade groß oder klein im Bild ist. Bisher galten feste Board-Punkte: Im Fokus (Zoom 1,25) oder auf
+ * einer klein gezogenen PDF wirkte selbst „fein" fett. Je Werkzeug drei Stufen zum schnellen Wechseln
+ * und ein Regler für alles dazwischen; die Wahl bleibt am Gerät gespeichert.
+ */
+export const STAERKEN = {
+  pen: { stufen: [{ name: 'Fein', w: 1.2 }, { name: 'Mittel', w: 2.2 }, { name: 'Dick', w: 4 }], min: 0.4, max: 10, schritt: 0.1, vorgabe: 1.2 },
+  marker: { stufen: [{ name: 'Schmal', w: 8 }, { name: 'Mittel', w: 14 }, { name: 'Breit', w: 22 }], min: 4, max: 40, schritt: 1, vorgabe: 14 },
+  eraser: { stufen: [{ name: 'Klein', w: 6 }, { name: 'Mittel', w: 12 }, { name: 'Groß', w: 24 }], min: 3, max: 48, schritt: 1, vorgabe: 12 },
+} as const;
+type StaerkeWerkzeug = keyof typeof STAERKEN;
+const STAERKEN_KEY = 'pixinotes-stift-staerken';
+function staerkenLesen(): Record<StaerkeWerkzeug, number> {
+  const v = { pen: STAERKEN.pen.vorgabe as number, marker: STAERKEN.marker.vorgabe as number, eraser: STAERKEN.eraser.vorgabe as number };
+  try {
+    const g = JSON.parse(localStorage.getItem(STAERKEN_KEY) ?? '{}') as Partial<Record<StaerkeWerkzeug, number>>;
+    for (const k of Object.keys(v) as StaerkeWerkzeug[]) {
+      const x = g[k];
+      if (typeof x === 'number' && x >= STAERKEN[k].min && x <= STAERKEN[k].max) v[k] = x;
+    }
+  } catch { /* Vorgaben */ }
+  return v;
+}
+/** Board-Breite aus Bildschirm-Punkten — der Zoom wird begrenzt, damit ein Strich aus der Vogelschau nicht riesig wird */
+const aufBoard = (bild: number, zoom: number) => Math.round((bild / Math.min(4, Math.max(0.25, zoom))) * 100) / 100;
 /** M324: Nach dem Absetzen so lange Ruhe → erkannter Text als Vorschlag */
 const VORSCHLAG_MS = 900;
 /** M325: Kürzer und stiller als das → der Stift hat getippt, nicht geschrieben (Tipp = Klick) */
@@ -98,9 +122,14 @@ export function DrawingLayer() {
   const handschriftKi = useBoard((s) => s.handschriftKi);
   const ai = useBoard((s) => s.ai);
   const [erkennt, setErkennt] = useState(false);
-  const [penWidth, setPenWidth] = useState<number>(PEN.width);
+  const [staerken, setStaerken] = useState(staerkenLesen);
+  const staerkeSetzen = (w: StaerkeWerkzeug, x: number) => setStaerken((alt) => {
+    const neu = { ...alt, [w]: Math.min(STAERKEN[w].max, Math.max(STAERKEN[w].min, x)) };
+    try { localStorage.setItem(STAERKEN_KEY, JSON.stringify(neu)); } catch { /* egal */ }
+    return neu;
+  });
   /** M324: Vorschlag nach der Schreibpause — Text (oder „erkenne…"), Lage in Flow-Koordinaten */
-  const [vorschlag, setVorschlag] = useState<{ ids: string[]; text: string; zeilen: ZeileMitArt[]; x: number; y: number; status: 'erkennt' | 'ki' | 'fertig' } | null>(null);
+  const [vorschlag, setVorschlag] = useState<{ ids: string[]; text: string; zeilen: ZeileMitArt[]; x: number; y: number; oben: number; status: 'erkennt' | 'ki' | 'fertig' } | null>(null);
   const vorschlagTimer = useRef<number | null>(null);
   const vorschlagLauf = useRef(0);
   const { screenToFlowPosition, getNodes, getViewport, setViewport } = useReactFlow();
@@ -310,8 +339,9 @@ export function DrawingLayer() {
   };
   /** Radieren an einem Flow-Punkt — Teil (Punkte im Radius) oder ganzer Strich */
   const radieren = (x: number, y: number) => {
-    if (radiererArt === 'teil') eraseStrokesPartial(x, y, 10 / zoom);
-    else eraseStrokesNear(x, y, 12 / zoom);
+    // M354: Radius in Bildschirm-Punkten (wählbar); der Strich-Radierer greift etwas großzügiger
+    if (radiererArt === 'teil') eraseStrokesPartial(x, y, staerken.eraser / zoom);
+    else eraseStrokesNear(x, y, (staerken.eraser * 1.2) / zoom);
   };
   const tippMerken = (e: { clientX: number; clientY: number }) => { tipp.current = { t: Date.now(), x: e.clientX, y: e.clientY, weit: false }; };
   const tippPruefen = (e: { clientX: number; clientY: number }) => {
@@ -401,7 +431,7 @@ export function DrawingLayer() {
       id: uid(),
       tool: werkzeug,
       color: werkzeug === 'marker' ? markerColor : effPenColor,
-      width: werkzeug === 'marker' ? MARKER.width : penWidth,
+      width: aufBoard(werkzeug === 'marker' ? staerken.marker : staerken.pen, zoom),
       points: [[p.x, p.y]],
       ...(sensor ? { druck: [Math.min(1, e.pressure ?? 0.5)] } : {}),
     };
@@ -1058,7 +1088,8 @@ export function DrawingLayer() {
     const punkte = eigene.map(absolut);
     const box = bboxVon(punkte.flat());
     const ids = eigene.map((s) => s.id);
-    const lage = { ids, x: box.minX, y: box.maxY };
+    // M354: Lage OBEN am Geschriebenen (unten nur, wenn oben kein Platz ist) — darunter versperrte der Vorschlag die nächste Zeile
+    const lage = { ids, x: box.minX, y: box.maxY, oben: box.minY };
     setVorschlag({ ...lage, text: '', zeilen: [], status: 'erkennt' });
     try {
       const e = await schriftErkennen(eigene, handschriftKi && aiReady(ai));
@@ -1091,6 +1122,8 @@ export function DrawingLayer() {
   }, [vorschlag]);
   const schriftDa = sessionIds.current.some((id) => drawings.some((s) => s.id === id && s.tool === 'pen'));
   const rfRect = vorschlag ? document.querySelector('.react-flow')?.getBoundingClientRect() : null;
+  /** M354: Der Vorschlag steht über dem Geschriebenen — außer ganz oben am Rand (Kopfzeile, Fokus-Kopf) */
+  const vorschlagOben = !!vorschlag && !!rfRect && rfRect.top + vorschlag.oben * zoom + ty - 8 > rfRect.top + Math.max(56, parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--focus-top')) || 0) + 44;
 
   // M348: der laufende Strich hat seinen eigenen Pfad (unten), er läuft nicht über die Liste
   const all = drawings;
@@ -1107,7 +1140,8 @@ export function DrawingLayer() {
       const g = seiteVon(s.anchor);
       if (!g || g.seite !== s.seite) return [];
       const t = seitenStrichCache.get(s);
-      const abgeleitet = t && t.g === g ? t.s : { ...s, points: strichRelativ(s) };
+      // M354: Breite in Seitenpunkten mit der Seite skaliert (ältere Seitenstriche: Board-Punkte, wie sie sind)
+      const abgeleitet = t && t.g === g ? t.s : { ...s, points: strichRelativ(s), width: s.seitenBreite ? s.width * g.k : s.width, seitenBreite: undefined };
       if (!t || t.g !== g) seitenStrichCache.set(s, { g, s: abgeleitet });
       return [{ s: abgeleitet, dx: n.position.x, dy: n.position.y, dim: !!n.archived }];
     }
@@ -1174,8 +1208,8 @@ export function DrawingLayer() {
       </svg>
       {vorschlag && rfRect && (
         <div
-          className="schrift-vorschlag nodrag"
-          style={{ left: Math.max(8, rfRect.left + vorschlag.x * zoom + tx), top: Math.min(window.innerHeight - 60, rfRect.top + vorschlag.y * zoom + ty + 8) }}
+          className={`schrift-vorschlag nodrag ${vorschlagOben ? 'oben' : ''}`}
+          style={{ left: Math.max(8, rfRect.left + vorschlag.x * zoom + tx), top: vorschlagOben ? rfRect.top + vorschlag.oben * zoom + ty - 8 : Math.min(window.innerHeight - 60, rfRect.top + vorschlag.y * zoom + ty + 8) }}
           role="status"
         >
           {vorschlag.status === 'erkennt' ? (
@@ -1226,22 +1260,37 @@ export function DrawingLayer() {
             <span className="draw-trenner" aria-hidden="true" />
           </>
         )}
-        {!isMarker && tool !== 'eraser' && (
-          <>
-            {PEN_WIDTHS.map((w, i) => (
-              <button
-                key={w}
-                className={`draw-dicke ${penWidth === w ? 'on' : ''}`}
-                title={['Fein', 'Normal', 'Dick'][i]}
-                aria-label={`Strichstärke ${['fein', 'normal', 'dick'][i]}`}
-                onClick={() => setPenWidth(w)}
-              >
-                <i style={{ width: 4 + i * 3, height: 4 + i * 3 }} />
-              </button>
-            ))}
-            <span className="draw-trenner" aria-hidden="true" />
-          </>
-        )}
+        {(() => {
+          // M354: Stärke für Stift, Textmarker UND Radierer — drei Stufen und stufenlos
+          const w: StaerkeWerkzeug = tool === 'eraser' ? 'eraser' : isMarker ? 'marker' : 'pen';
+          const def = STAERKEN[w];
+          const jetzt = staerken[w];
+          const was = w === 'eraser' ? 'Radierergröße' : w === 'marker' ? 'Markerbreite' : 'Strichstärke';
+          return (
+            <>
+              {def.stufen.map((st, i) => (
+                <button
+                  key={st.name}
+                  className={`draw-dicke ${Math.abs(jetzt - st.w) < 0.05 ? 'on' : ''}`}
+                  title={`${st.name} (${st.w} Pt.)`}
+                  aria-label={`${was} ${st.name.toLowerCase()}`}
+                  data-staerke={st.w}
+                  onClick={() => staerkeSetzen(w, st.w)}
+                >
+                  <i className={w === 'eraser' ? 'ring' : w === 'marker' ? 'balken' : ''} style={{ width: 4 + i * 3.5, height: w === 'marker' ? 3 + i * 2.5 : 4 + i * 3.5 }} />
+                </button>
+              ))}
+              <input
+                type="range" className="draw-regler nodrag" aria-label={`${was} stufenlos`}
+                title={`${was}: ${jetzt} Pt. — stufenlos`}
+                min={def.min} max={def.max} step={def.schritt} value={jetzt}
+                onChange={(e) => staerkeSetzen(w, Number(e.target.value))}
+              />
+              <span className="draw-staerke-wert" aria-hidden="true">{jetzt < 10 ? jetzt.toFixed(1).replace('.', ',') : Math.round(jetzt)}</span>
+              <span className="draw-trenner" aria-hidden="true" />
+            </>
+          );
+        })()}
         {palette.map((c) => (
           <button
             key={c}
@@ -1258,9 +1307,9 @@ export function DrawingLayer() {
           value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#3c669c'}
           onChange={(e) => setColor(e.target.value)}
         />
-        <span className="draw-hint">
-          {tool === 'eraser' ? 'Radierer' : tool === 'marker' ? 'Textmarker' : 'Stift'}
-          <span className="draw-hint-tip">{durchgriff ? ' · Stift schreibt, Finger bedient, Seitentaste greift' : ''} · kurz halten = Form ✨</span>
+        {/* M354: Der lange Hinweis steht jetzt im Tooltip — mit Stärke-Regler passte die Leiste sonst nicht mehr in eine Zeile */}
+        <span className="draw-hint" title={`${durchgriff ? 'Stift schreibt, Finger bedient, Seitentaste greift · ' : ''}kurz halten = Form`}>
+          {tool === 'eraser' ? 'Radierer' : tool === 'marker' ? 'Textmarker' : 'Stift'} ✨
         </span>
         {schriftDa && (
           <button className="draw-text" disabled={erkennt} onClick={() => void handschriftUebernehmen()} title="Geschriebenes in eine Notiz mit Text umwandeln (Striche dieser Sitzung)" aria-label="Handschrift in Text umwandeln">
