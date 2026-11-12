@@ -174,7 +174,19 @@ export function integrateStroke(
     }
   }
   const frei = { amText: undefined, block: undefined, blockY: undefined };
-  const place = (s: Stroke, abs: [number, number][]): Stroke => {
+  /**
+   * M355: Breite zurück in Board-Punkte, bevor ein Strich neu geankert wird. Seit M354 steht die Breite eines
+   * Seitenstrichs in Seitenpunkten (÷ Maßstab). Die Gruppe wird aber bei JEDEM neuen Strich der Sitzung neu
+   * geankert — und `anSeite` teilte die schon umgerechnete Breite noch einmal: Auf einer PDF wurde die Schrift
+   * mit jedem Absetzen dicker. Die Punkte wurden schon immer erst absolut gemacht (`absPoints`); die Breite jetzt auch.
+   */
+  const brett = (s: Stroke): Stroke => {
+    if (!s.seitenBreite) return s;
+    const g = s.anchor ? offeneSeite(s.anchor) : undefined;
+    return { ...s, width: g ? Math.round(s.width * g.k * 100) / 100 : s.width, seitenBreite: undefined };
+  };
+  const place = (roh: Stroke, abs: [number, number][]): Stroke => {
+    const s = brett(roh);
     if (!target) return { ...s, ...frei, anchor: undefined, seite: undefined, points: abs };
     const rel = abs.map(([x, y]) => [x - target.position.x, y - target.position.y + (text ? text.scroll : 0)] as [number, number]);
     if (text) return { ...s, anchor: target.id, seite: undefined, amText: true, block: text.block, blockY: text.blockY, points: rel };

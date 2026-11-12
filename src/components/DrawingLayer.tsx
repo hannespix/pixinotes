@@ -524,6 +524,11 @@ export function DrawingLayer() {
     stiftZug.current = null;
     stiftZugMelden(false);
     const d = drawing.current;
+    // M355: Ein kurzer, stiller Kontakt beim Schreiben ist ein i-Punkt (oder Umlaut-Punkt), kein Klick
+    if (d && d.tool === 'pen' && (d.points.length === 1 || tippIst(e)) && punktStattTipp(e)) {
+      punktSetzen(d);
+      return;
+    }
     // M325: Ein kurzer, stiller Stift-Kontakt ist ein Tipp — er klickt, was darunter liegt
     if (d && d.tool === 'pen' && tippIst(e)) {
       drawing.current = null;
@@ -543,6 +548,7 @@ export function DrawingLayer() {
       // Loslassen: entzittern + fast gerade Striche konservativ begradigen
       const points = finalizeStroke(d.points);
       commitStroke({ ...d, points, druck: d.druck && d.druck.length === points.length ? d.druck : undefined });
+      letzterStrich.current = Date.now();
       if (d.tool === 'pen') vorschlagPlanen();
     }
     drawing.current = null;
@@ -715,6 +721,57 @@ export function DrawingLayer() {
     return dx || dy ? rel.map((p) => [p[0] + dx, p[1] + dy] as Pt) : rel;
   };
   /** Die Stift-Striche dieser Schreibsitzung — das, was gerade geschrieben wurde */
+  /**
+   * M355: i-Punkte und Umlaut-Punkte. Ein Punkt ist ein kurzer, stiller Stift-Kontakt — genau das, was seit
+   * M325 als Tipp (= Klick) galt. Er wurde deshalb verworfen; ein stillstehender Kontakt (ein einziger
+   * Messpunkt) ebenso, und zwei schnelle Tipps für ein „ü" lösten obendrein einen Doppelklick aus.
+   * Jetzt ist er ein Punkt, wenn
+   *   · kurz davor (4 s) in der Nähe geschrieben wurde — dicht am Geschriebenen (bis ~1,5 Zeilen darüber), oder
+   *   · der Stift-/Marker-Modus an ist und darunter nichts Bedienbares liegt (Knopf, Haken, Feld, Text im Editor).
+   * Ein Tipp auf Bedienbares oder in Text ohne frisches Schreiben bleibt ein Klick (Cursor setzen, Haken).
+   */
+  const letzterStrich = useRef(0);
+  const klickSchlucken = useRef(0);
+  const punktStattTipp = (e?: { clientX: number; clientY: number }): boolean => {
+    if (!e) return false;
+    const unter = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+    if (unter?.closest('button, a[href], input, select, textarea, label, [role="checkbox"], [role="button"], [role="menuitem"], .card-grip, .ebenen-menu-knopf')) return false;
+    if (Date.now() - letzterStrich.current < 4000) {
+      const eigene = sessionStriche().slice(-12);
+      if (eigene.length) {
+        const box = bboxVon(eigene.map(absolut).flat());
+        const [l, t] = zumSchirm([box.minX, box.minY]);
+        const [r, b] = zumSchirm([box.maxX, box.maxY]);
+        const zeile = Math.max(24, Math.min(80, b - t));
+        if (e.clientX > l - 60 && e.clientX < r + 60 && e.clientY > t - zeile * 1.5 && e.clientY < b + 16) return true;
+      }
+    }
+    const werkzeug = useBoard.getState().tool;
+    return (werkzeug === 'pen' || werkzeug === 'marker') && !unter?.closest('[contenteditable="true"]');
+  };
+  const punktSetzen = (d: Stroke) => {
+    const [x, y] = d.points[0];
+    // Zwei Punkte, kaum auseinander: eine Linie der Länge ~0 mit runden Enden — ein runder Punkt.
+    // Etwas kräftiger als der Strich (wie ein aufgesetzter Stift), damit er neben „fein" sichtbar bleibt.
+    commitStroke({ ...d, points: [[x, y], [x + 0.1, y + 0.1]], druck: undefined, width: Math.round(d.width * 1.6 * 100) / 100 });
+    drawing.current = null;
+    tipp.current = null;
+    letzterStrich.current = Date.now();
+    klickSchlucken.current = Date.now();
+    vorschlagPlanen();
+    force((n) => n + 1);
+  };
+  // Der Browser schickt nach dem abgefangenen pointerdown trotzdem click und dblclick — nach einem Punkt
+  // darf das nichts auslösen (zwei Umlaut-Punkte = Doppelklick = neue Notiz / Fokus)
+  useEffect(() => {
+    const schlucken = (ev: MouseEvent) => {
+      if (Date.now() - klickSchlucken.current < 450) { ev.preventDefault(); ev.stopPropagation(); }
+    };
+    window.addEventListener('click', schlucken, true);
+    window.addEventListener('dblclick', schlucken, true);
+    return () => { window.removeEventListener('click', schlucken, true); window.removeEventListener('dblclick', schlucken, true); };
+  }, []);
+
   const sessionStriche = (): Stroke[] => {
     const ids = sessionIds.current;
     return (selectActiveBoard(useBoard.getState()).drawings ?? []).filter((s) => ids.includes(s.id) && s.tool === 'pen');
