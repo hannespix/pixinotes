@@ -169,6 +169,11 @@ await zug(P, [[cv.x + 100, y0], [cv.x + 130, y0 + 1], [cv.x + 160, y0], [cv.x + 
 const s1 = await letzter(P);
 const k = await P.evaluate(() => { const c = document.querySelector('.react-flow__node[data-id="f1"] .pdf-seite canvas'); return c.getBoundingClientRect().width / 612; });
 pruefe('F1 der Strich gehört zur Seite, Breite in Seitenpunkten (1,2 ÷ Maßstab)', s1?.seite === 1 && s1.seitenBreite === true && Math.abs(s1.width - 1.2 / k) < 0.05, JSON.stringify({ w: s1?.width, k, seite: s1?.seite }));
+// M355: weiterschreiben — die Gruppe wird bei jedem Strich neu geankert; die Breite darf dabei nicht wachsen
+for (let i = 0; i < 4; i++) { await zug(P, [[cv.x + 100 + i * 8, y0 + 12], [cv.x + 130, y0 + 13 + i], [cv.x + 160, y0 + 12], [cv.x + 190, y0 + 13], [cv.x + 220, y0 + 12 + i]], { id: 60 + i }); await warte(P, 250); }
+await warte(P, 500);
+const breiten = (await striche(P)).map((x) => x.width);
+pruefe('F1b fünf Striche nacheinander auf der Seite: alle gleich breit (wurde mit jedem Absetzen dicker)', breiten.length === 5 && breiten.every((w) => Math.abs(w - 1.2 / k) < 0.05), JSON.stringify(breiten));
 const bild = () => P.evaluate(() => Number(document.querySelector('.drawing-layer path[data-anker="f1"]')?.getAttribute('stroke-width') ?? NaN));
 const vorF = await bild();
 pruefe('F2 gezeichnet wird er so dick, wie gewählt (1,2)', Math.abs(vorF - 1.2) < 0.05, String(vorF));
