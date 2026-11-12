@@ -171,6 +171,14 @@ function stricheInDieFlaeche(flaeche: HTMLElement, nur: Set<string> | null): SVG
   svg.setAttribute('class', 'export-striche');
   svg.setAttribute('style', 'position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none;z-index:3000');
   for (const p of Array.from(gruppe.children)) {
+    // M356: Textmarker liegen je Farbe in einer Gruppe (sie trägt Deckkraft und Mischung) — bei „nur Auswahl"
+    // kommt die Gruppe mit, aber nur mit den Strichen der gewählten Karten
+    if (p.classList.contains('marker-gruppe')) {
+      const g = p.cloneNode(false) as Element;
+      for (const k of Array.from(p.children)) if (!nur || nur.has(k.getAttribute('data-anker') ?? '')) g.appendChild(k.cloneNode(true));
+      if (g.childElementCount > 0) svg.appendChild(g);
+      continue;
+    }
     if (nur && !nur.has(p.getAttribute('data-anker') ?? '')) continue;
     svg.appendChild(p.cloneNode(true));
   }

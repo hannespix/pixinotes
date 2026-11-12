@@ -7,7 +7,8 @@ import { triggerDownload } from '../../lib/download';
 import { readFileAsDataUrl } from '../../lib/image';
 import { canEmbed } from '../../lib/nodes';
 import { loadAttachment } from '../../lib/attachments';
-import { pdfSeiteMasse, renderPdfPage } from '../../lib/pdf';
+import { pdfSeiteMasse, pdfSeiteText, renderPdfPage } from '../../lib/pdf';
+import { seitenTextMelden } from '../../lib/markerZeile';
 import { blasenAn, blasenSetzen, pdfAufgeklappt, pdfAufklappen, seiteMelden, seitenKommentare } from '../../lib/pdfSeiten';
 import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/fileStore';
 import { kontoDateiNachladen } from '../../lib/kontoSync';
@@ -500,8 +501,10 @@ function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
     pdfSeiteMasse(dataUrl, seite).then((m) => {
       if (weg) return;
       setSeiten(m.seiten); setMasse({ breite: m.breite, hoehe: m.hoehe }); onSeiten?.(m.seiten);
+      // M356: Textlage der Seite — darauf rastet der Textmarker ein (fehlt sie, wird nur begradigt)
+      pdfSeiteText(dataUrl, seite).then((rects) => { if (!weg) seitenTextMelden(id, { seite, breite: m.breite, rects }); }).catch(() => {});
     }).catch(() => setFailed(true));
-    return () => { weg = true; };
+    return () => { weg = true; seitenTextMelden(id, null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUrl, seite]);
 
