@@ -122,7 +122,8 @@ console.log('\n════ A: Vorschlag nach Schreibpause — neue Notiz ══
   const t = await chipText(P);
   pruefe('A2 nach der Pause steht der erkannte Text als Vorschlag (Satzanfang groß)', t === 'Hallo welt', String(t));
   const box = await P.locator('.schrift-vorschlag').boundingBox();
-  pruefe('A3 der Vorschlag sitzt unter dem Geschriebenen', !!box && box.x > 850 && box.x < 980 && box.y > 650 && box.y < 760, JSON.stringify(box));
+  // M354: ÜBER dem Geschriebenen — darunter versperrte er die nächste Zeile
+  pruefe('A3 der Vorschlag sitzt über dem Geschriebenen', !!box && box.x > 850 && box.x < 980 && box.y + box.height <= 642 && box.y > 540, JSON.stringify(box));
   await P.screenshot({ path: path.join(SD, 'm324-vorschlag.png') });
   const vorher = (await knoten(P)).length;
   await P.locator('.schrift-vorschlag .vorschlag-text').click(); await warte(P, 900);
@@ -265,12 +266,14 @@ console.log('\n════ G: Strichstärke ════');
   const { ctx, P } = await seite({ auto: false });
   await werkzeug(P, 'Stift');
   const dicken = P.locator('.draw-palette .draw-dicke');
-  pruefe('G1 drei Strichstärken in der Palette, „normal" gewählt', (await dicken.count()) === 3 && (await dicken.nth(1).evaluate((e) => e.classList.contains('on'))));
+  // M354: Vorgabe ist jetzt „fein"
+  pruefe('G1 drei Strichstärken in der Palette, „fein" gewählt', (await dicken.count()) === 3 && (await dicken.nth(0).evaluate((e) => e.classList.contains('on'))));
   await dicken.nth(2).click(); await warte(P, 200);
   await zug(P, welle(900, 650), { id: 71 }); await warte(P, 400);
   pruefe('G2 „dick" zeichnet mit Breite 4', (await striche(P))[0]?.width === 4, String((await striche(P))[0]?.width));
   await werkzeug(P, 'Textmarker');
-  pruefe('G3 beim Textmarker gibt es keine Stärken-Wahl', (await P.locator('.draw-palette .draw-dicke').count()) === 0);
+  // M354: auch der Textmarker hat jetzt Breiten (schmal · mittel · breit)
+  pruefe('G3 beim Textmarker gibt es eigene Breiten', (await P.locator('.draw-palette .draw-dicke[aria-label^="Markerbreite"]').count()) === 3);
   await ctx.close();
 }
 

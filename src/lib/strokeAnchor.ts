@@ -80,7 +80,8 @@ function anSeite(s: Stroke): Stroke {
   if (!s.anchor) return s;
   const g = offeneSeite(s.anchor);
   if (!g) return s.seite != null ? { ...s, seite: undefined } : s;
-  return { ...s, seite: g.seite, points: aufSeite(s.points, g) };
+  // M354: auch die Breite in Seitenpunkten — zieht man die Karte größer, wird der Strich mit der Seite dicker
+  return { ...s, seite: g.seite, points: aufSeite(s.points, g), width: Math.round((s.width / g.k) * 100) / 100, seitenBreite: true };
 }
 
 /** Zwei Strich-Boxen gelten als „berührend", wenn sie sich (aufgebläht) schneiden */

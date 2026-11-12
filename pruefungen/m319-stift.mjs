@@ -119,7 +119,7 @@ console.log('\n════ A: Striche ════');
   await zug(P, strecke([600, 720], [900, 722], 20));
   await warte(P);
   const m = await P.evaluate(() => { const ps = [...document.querySelectorAll('.drawing-layer path')]; const p = ps[ps.length - 1]; return { fill: p.getAttribute('fill'), sw: p.getAttribute('stroke-width'), blend: p.style.mixBlendMode }; });
-  pruefe('A6 Textmarker bleibt eine breite, gleichmäßige Multiply-Linie', m.fill === 'none' && m.sw === '16' && m.blend === 'multiply', JSON.stringify(m));
+  pruefe('A6 Textmarker bleibt eine breite, gleichmäßige Multiply-Linie', m.fill === 'none' && m.sw === '14' && m.blend === 'multiply' /* M354: Markerbreite „Mittel“ 14 */, JSON.stringify(m));
   await P.screenshot({ path: path.join(SD, 'm319-striche.png') });
   await ctx.close();
 }
@@ -167,7 +167,8 @@ console.log('\n════ C: Durchgriff ════');
   await werkzeug(P, 'Stift');
   const ebene = await P.evaluate(() => getComputedStyle(document.querySelector('.drawing-layer')).pointerEvents);
   pruefe('C1 mit bekanntem Stift lässt die Ebene Finger durch (pointer-events none)', ebene === 'none', ebene);
-  const hinweis = await P.locator('.draw-hint').textContent();
+  // M354: der Hinweis steht im Tooltip der Palette (sonst passte sie mit dem Stärke-Regler nicht in eine Zeile)
+  const hinweis = await P.locator('.draw-hint').getAttribute('title');
   // M325: Der Hinweis heißt jetzt „Stift schreibt, Finger bedient, Seitentaste greift"
   pruefe('C2 die Palette sagt es: Stift schreibt, Finger bedient', /Stift schreibt, Finger bedient/.test(hinweis ?? ''), hinweis ?? '');
   const vp0 = await P.evaluate(() => document.querySelector('.react-flow__viewport').style.transform);
