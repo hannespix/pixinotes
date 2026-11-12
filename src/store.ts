@@ -39,6 +39,8 @@ export interface Stroke {
   seite?: number;
   /** M354: `width` ist in Seitenpunkten (wächst mit der Seite). Fehlt bei Seitenstrichen von vor M354 (Board-Punkte). */
   seitenBreite?: boolean;
+  /** M356: Textmarker, der auf eine Textzeile eingerastet ist — ein Balken mit geraden Kanten */
+  gerade?: boolean;
   /** M339: liegt auf dem TEXT einer Notiz (lib/notizText.ts) — die Punkte sind dann Inhaltspunkte
    *  (Kartenecke bei Scrollstand 0), der Strich scrollt mit dem Text. false = hängt am Kartenrahmen.
    *  Fehlt bei Strichen von vor M339: dann entscheidet die Lage (ganz auf der Karte = am Text). */

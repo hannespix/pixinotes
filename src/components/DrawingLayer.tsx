@@ -13,7 +13,8 @@ import { noteTitle } from '../lib/notiz';
 import { blocksToText } from '../lib/serialize';
 import { makeNote } from '../lib/nodes';
 import { mitFestenIds, mitPfadIds } from '../lib/notizRuhend';
-import { linienPfad, MARKER, PEN, StrichPfad, strichKontur } from './StrichPfad';
+import { linienPfad, MARKER, MarkerGruppen, PEN, StrichPfad, strichKontur } from './StrichPfad';
+import { markerEinrasten } from '../lib/markerZeile';
 import { istAmText } from '../lib/notizText';
 import type { AppNode } from '../types';
 import { IType, IX } from './Icons';
@@ -545,6 +546,14 @@ export function DrawingLayer() {
         force((n) => n + 1);
         return;
       }
+      // M356: Der Textmarker wird zum geraden Balken — auf einer Textzeile in Zeilenhöhe
+      if (d.tool === 'marker') {
+        commitStroke(markerFertig(d));
+        letzterStrich.current = Date.now();
+        drawing.current = null;
+        force((n) => n + 1);
+        return;
+      }
       // Loslassen: entzittern + fast gerade Striche konservativ begradigen
       const points = finalizeStroke(d.points);
       commitStroke({ ...d, points, druck: d.druck && d.druck.length === points.length ? d.druck : undefined });
@@ -771,6 +780,33 @@ export function DrawingLayer() {
     window.addEventListener('dblclick', schlucken, true);
     return () => { window.removeEventListener('click', schlucken, true); window.removeEventListener('dblclick', schlucken, true); };
   }, []);
+
+  /**
+   * M356: Markerstrich fertig machen. Annähernd waagerecht → gerade gezogen (auf mittlerer Höhe, von ganz
+   * links bis ganz rechts). Liegt er auf einer Textzeile, wird er zum Balken in Zeilenhöhe mit geraden
+   * Kanten, von Wortanfang bis Wortende (lib/markerZeile.ts). Alles andere bleibt Freihand (entzittert).
+   * Die Zwischenpunkte sind für den Radierer da: Er trifft Punkte, und ein Balken soll sich teilen lassen.
+   */
+  const markerFertig = (d: Stroke): Stroke => {
+    const box = bboxVon(d.points);
+    const waagerecht = box.w >= 24 / zoom && box.h <= Math.max(d.width * 0.9, box.w * 0.2);
+    if (!waagerecht) return { ...d, points: finalizeStroke(d.points), druck: undefined };
+    let x1 = box.minX; let x2 = box.maxX;
+    let y = d.points.reduce((s, p) => s + p[1], 0) / d.points.length;
+    let breite = d.width; let gerade = false;
+    const [sx1, sy] = zumSchirm([x1, y]); const [sx2] = zumSchirm([x2, y]);
+    const z = markerEinrasten(sx1, sx2, sy);
+    if (z) {
+      const a = zumFlow(z.l, z.y); const b = zumFlow(z.r, z.y);
+      x1 = a[0]; x2 = b[0]; y = a[1];
+      breite = Math.round((z.h / zoom) * 100) / 100;
+      gerade = true;
+    }
+    const schritt = Math.max(4, 8 / zoom);
+    const n = Math.max(1, Math.ceil((x2 - x1) / schritt));
+    const points: Pt[] = Array.from({ length: n + 1 }, (_, i) => [x1 + ((x2 - x1) * i) / n, y] as Pt);
+    return { ...d, points, druck: undefined, width: breite, ...(gerade ? { gerade: true } : {}) };
+  };
 
   const sessionStriche = (): Stroke[] => {
     const ids = sessionIds.current;
@@ -1241,7 +1277,9 @@ export function DrawingLayer() {
         <g transform={`translate(${tx},${ty}) scale(${zoom})`}>
           {/* Eingerastete Formen (Linie, Pfeil, Rechteck, Dreieck: wenige Punkte) bleiben
               scharfkantige Linien — die Freihand-Kontur würde ihre Ecken runden. */}
-          {placed.map(({ s, dx, dy, dim }) => (
+          {/* M356: Textmarker zuerst und je Farbe als eine Fläche (kein Nachdunkeln), Stift darüber */}
+          <MarkerGruppen eintraege={placed.filter((p) => p.s.tool === 'marker')} />
+          {placed.filter((p) => p.s.tool !== 'marker').map(({ s, dx, dy, dim }) => (
             <StrichPfad key={s.id} s={s} dx={dx} dy={dy} dim={dim} />
           ))}
           {lauf && (lauf.tool === 'marker'

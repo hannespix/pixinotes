@@ -53,7 +53,7 @@ export const linienPfad = (s: Stroke) =>
  * Eingerastete Formen (Linie, Pfeil, Rechteck, Dreieck: wenige Punkte) und Textmarker bleiben
  * Linien — die Freihand-Kontur würde ihre Ecken runden. Alles andere ist eine gefüllte Kontur.
  */
-export const StrichPfad = memo(function StrichPfad({ s, dx = 0, dy = 0, dim = false, laufend = false }: { s: Stroke; dx?: number; dy?: number; dim?: boolean; laufend?: boolean }) {
+export const StrichPfad = memo(function StrichPfad({ s, dx = 0, dy = 0, dim = false, laufend = false, inGruppe = false }: { s: Stroke; dx?: number; dy?: number; dim?: boolean; laufend?: boolean; inGruppe?: boolean }) {
   const transform = dx || dy ? `translate(${dx},${dy})` : undefined;
   if (s.tool === 'marker' || s.points.length <= 6) {
     return (
@@ -64,11 +64,13 @@ export const StrichPfad = memo(function StrichPfad({ s, dx = 0, dy = 0, dim = fa
         fill="none"
         stroke={s.color}
         strokeWidth={s.width}
-        strokeLinecap="round"
+        // M356: auf die Zeile eingerastete Marker sind Balken mit geraden Kanten
+        strokeLinecap={s.gerade ? 'butt' : 'round'}
         strokeLinejoin="round"
-        opacity={(s.tool === 'marker' ? MARKER.opacity : PEN.opacity) * (dim ? 0.35 : 1)}
+        // In einer Marker-Gruppe trägt die GRUPPE Deckkraft und Mischung (siehe MarkerGruppen)
+        opacity={inGruppe ? undefined : (s.tool === 'marker' ? MARKER.opacity : PEN.opacity) * (dim ? 0.35 : 1)}
         // Multiply lässt den Text unter dem Marker durchscheinen — wie beim echten Leuchtstift
-        style={s.tool === 'marker' ? { mixBlendMode: 'multiply' } : undefined}
+        style={s.tool === 'marker' && !inGruppe ? { mixBlendMode: 'multiply' } : undefined}
       />
     );
   }
@@ -84,3 +86,29 @@ export const StrichPfad = memo(function StrichPfad({ s, dx = 0, dy = 0, dim = fa
     />
   );
 });
+
+/**
+ * M356: Textmarker einer Farbe als EINE Fläche. Bisher trug jeder Strich seine eigene Deckkraft — wo zwei
+ * sich überlappten (zweimal über dieselbe Stelle, Zeile an Zeile), wurde es dunkler und fleckig, der Text
+ * darunter schlechter lesbar. Jetzt mischt die Gruppe: Die Striche darin sind deckend, Deckkraft und
+ * Multiply gelten für die ganze Gruppe — Überlappungen bleiben gleich hell. Verschiedene Farben mischen
+ * sich weiter wie auf Papier.
+ */
+export function MarkerGruppen({ eintraege }: { eintraege: Array<{ s: Stroke; dx?: number; dy?: number; dim?: boolean }> }) {
+  if (eintraege.length === 0) return null;
+  const gruppen = new Map<string, typeof eintraege>();
+  for (const e of eintraege) {
+    const k = `${e.s.color}|${e.dim ? 1 : 0}`;
+    const g = gruppen.get(k);
+    if (g) g.push(e); else gruppen.set(k, [e]);
+  }
+  return (
+    <>
+      {Array.from(gruppen, ([k, g]) => (
+        <g key={k} className="marker-gruppe" opacity={MARKER.opacity * (g[0].dim ? 0.35 : 1)} style={{ mixBlendMode: 'multiply' }}>
+          {g.map((e) => <StrichPfad key={e.s.id} s={e.s} dx={e.dx} dy={e.dy} inGruppe />)}
+        </g>
+      ))}
+    </>
+  );
+}

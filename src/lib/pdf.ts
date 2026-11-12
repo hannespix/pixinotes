@@ -40,6 +40,29 @@ export async function pdfSeiteMasse(dataUrl: string, pageNo = 1): Promise<{ seit
   return { seiten: doc.numPages, breite: vp.width, hoehe: vp.height };
 }
 
+/**
+ * M356: Wo auf der Seite Text steht — Kästen der Textläufe in Seitenpunkten (Ursprung oben links).
+ * Der Textmarker rastet darauf ein. Gedrehter Text bleibt außen vor; eine gescannte PDF liefert nichts.
+ */
+export async function pdfSeiteText(dataUrl: string, pageNo: number): Promise<Array<{ x: number; y: number; w: number; h: number }>> {
+  const [pdfjs, doc] = await Promise.all([getPdfjs(), getDoc(dataUrl)]);
+  const page = await doc.getPage(Math.min(Math.max(1, pageNo), doc.numPages));
+  const vp = page.getViewport({ scale: 1 });
+  const inhalt = await page.getTextContent();
+  const out: Array<{ x: number; y: number; w: number; h: number }> = [];
+  for (const roh of inhalt.items) {
+    const it = roh as { str?: string; transform?: number[]; width?: number };
+    if (typeof it.str !== 'string' || !it.str.trim() || !it.transform || !it.width) continue;
+    const t = pdfjs.Util.transform(vp.transform, it.transform) as number[];
+    if (Math.abs(t[1]) > 0.01 || Math.abs(t[2]) > 0.01) continue;   // gedreht
+    const h = Math.hypot(t[2], t[3]);
+    if (h < 2) continue;
+    // t[5] ist die Grundlinie: Oberlänge ~0,82 der Schrifthöhe, Unterlänge ~0,24
+    out.push({ x: t[4], y: t[5] - h * 0.82, w: it.width, h: h * 1.06 });
+  }
+  return out;
+}
+
 /** Läuft ein Render noch, kann der Aufrufer ihn hierüber abbrechen. */
 export interface RenderHandle {
   promise: Promise<number>;

@@ -6,7 +6,7 @@ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'rea
 import { useShallow } from 'zustand/react/shallow';
 import { useBoard, type Stroke } from '../../store';
 import { absatzVersatz, istAmText, rolleMelden, rolleVon } from '../../lib/notizText';
-import { StrichPfad } from '../StrichPfad';
+import { MarkerGruppen, StrichPfad } from '../StrichPfad';
 
 const LEER: Stroke[] = [];
 /** Striche je Karte — einmal je Strich-Liste sortiert, nicht einmal je Notiz */
@@ -74,7 +74,9 @@ function Ebene({ id, alle }: { id: string; alle: Stroke[] }) {
   if (striche.length === 0) return null;
   return (
     <svg ref={svg} className="notiz-striche" aria-hidden="true">
-      {striche.map((s) => <StrichPfad key={s.id} s={s} dy={versatz[s.id] ?? 0} />)}
+      {/* M356: Textmarker je Farbe als eine Fläche (kein Nachdunkeln), Stift darüber */}
+      <MarkerGruppen eintraege={striche.filter((s) => s.tool === 'marker').map((s) => ({ s, dy: versatz[s.id] ?? 0 }))} />
+      {striche.filter((s) => s.tool !== 'marker').map((s) => <StrichPfad key={s.id} s={s} dy={versatz[s.id] ?? 0} />)}
     </svg>
   );
 }

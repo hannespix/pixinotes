@@ -118,7 +118,8 @@ console.log('\n════ A: Striche ════');
   await werkzeug(P, 'Textmarker');
   await zug(P, strecke([600, 720], [900, 722], 20));
   await warte(P);
-  const m = await P.evaluate(() => { const ps = [...document.querySelectorAll('.drawing-layer path')]; const p = ps[ps.length - 1]; return { fill: p.getAttribute('fill'), sw: p.getAttribute('stroke-width'), blend: p.style.mixBlendMode }; });
+  // M356: Deckkraft und Multiply trägt jetzt die Marker-Gruppe (je Farbe eine Fläche, kein Nachdunkeln)
+  const m = await P.evaluate(() => { const p = document.querySelector('.drawing-layer .marker-gruppe path'); return { fill: p?.getAttribute('fill'), sw: p?.getAttribute('stroke-width'), blend: p?.closest('.marker-gruppe')?.style.mixBlendMode }; });
   pruefe('A6 Textmarker bleibt eine breite, gleichmäßige Multiply-Linie', m.fill === 'none' && m.sw === '14' && m.blend === 'multiply' /* M354: Markerbreite „Mittel“ 14 */, JSON.stringify(m));
   await P.screenshot({ path: path.join(SD, 'm319-striche.png') });
   await ctx.close();
