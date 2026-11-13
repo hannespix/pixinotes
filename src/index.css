@@ -6572,3 +6572,10 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 .link-dialog .link-weg { color: #b3502f; }
 [data-theme='dark'] .link-dialog .link-weg { color: #ffab8f; }
 @media (max-width: 520px) { .link-dialog .link-zeile { flex-wrap: wrap; } .link-dialog .link-zeile input { flex-basis: 100%; } }
+
+/* ===== M359: Kommentar-Pins und -Blasen liegen ÜBER den Karten — auch über gewählten =====
+   Sie leben in derselben Ebene wie die Karten (ViewportPortal). React Flow hebt eine gewählte oder gezogene
+   Karte auf z-index 1000 + eigene Ebene; mit 9 und 8 lagen Pin und Blase dann DARUNTER: Sobald man die PDF
+   anklickte, verschwand der Teil der Blase, der über der Karte lag. */
+.comment-pin { z-index: 3001; }
+.comment-blase { z-index: 3000; }
