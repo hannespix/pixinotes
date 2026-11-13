@@ -6674,8 +6674,8 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
   /* Unter dem Blatt, nicht darüber: Die Leiste verdeckt keine Zeile der Seite */
   align-self: center; flex: none; margin-top: 8px;
   display: flex; align-items: center; gap: 4px; padding: 4px;
-  background: rgba(26, 24, 20, .88); color: #e9ebee; border: 1px solid rgba(255,255,255,.14);
-  border-radius: 999px; box-shadow: 0 4px 18px rgba(0,0,0,.4); backdrop-filter: blur(8px);
+  background: #24211c; color: #e9ebee; border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px; box-shadow: 0 4px 18px rgba(0,0,0,.4);
   font-size: 13px; white-space: nowrap; max-width: calc(100% - 16px);
 }
 .folie-dok-leiste button {
