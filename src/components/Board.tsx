@@ -16,6 +16,7 @@ import { fangAktiv, fangen, fangSetzen, type Kasten } from '../lib/fang';
 import { Fanglinien } from './Fanglinien';
 import { useBoardTasten } from './boardTasten';
 import { mutedHistory, selectActiveBoard, selectNurLesen, useBoard } from '../store';
+import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon } from '../lib/pdfSeiten';
 import { frameMembers } from '../lib/arrange';
 import { computePush } from '../lib/physics';
 import { imageFileToDataUrl } from '../lib/image';
@@ -237,7 +238,7 @@ export function Board() {
   const pinchRef = useRef<{ dist: number; zoom: number; fx: number; fy: number } | null>(null);
   // Ein-Finger-Panning über Modulen (M125): Drag aus „toten" nodrag-Zonen
   // der Karten schwenkt das Board; pending bis der 8-px-Schwellwert fällt
-  const panRef = useRef<{ x: number; y: number; vx: number; vy: number; zoom: number; active: boolean; el: Element; fokus?: boolean; ly?: number; rolle?: HTMLElement; kandidat?: boolean; lt?: number; v?: number } | null>(null);
+  const panRef = useRef<{ x: number; y: number; vx: number; vy: number; zoom: number; active: boolean; el: Element; fokus?: boolean; ly?: number; lx?: number; rolle?: HTMLElement; kandidat?: boolean; lt?: number; v?: number; dok?: boolean; wisch?: boolean; t0?: number } | null>(null);
   // M339: Nachlauf beim Finger-Scrollen in einer langen Notiz
   const schwungRef = useRef(0);
   /**
@@ -249,7 +250,14 @@ export function Board() {
    * damit die Karte nie den Schirm verlässt; passt sie ganz hinein, bewegt
    * sich nichts. Der Kamera-Effekt (unten) hält die Maße hier aktuell.
    */
-  const fokusRef = useRef<{ id: string; oben: number; hoehe: number; rand: number } | null>(null);
+  const fokusRef = useRef<{ id: string; oben: number; hoehe: number; rand: number; breite: number; fit: number } | null>(null);
+  /**
+   * M363: Im Fokus frei gezoomt (zwei Finger, Doppeltipp, Strg+Rad). Solange das gilt, passt die Kamera nicht
+   * von selbst neu ein — wer in eine PDF-Seite hineingezoomt hat, bleibt dort, auch beim Blättern.
+   */
+  const fokusFrei = useRef(false);
+  const fokusEinpassen = useRef<() => void>(() => {});
+  const letzterTipp = useRef<{ x: number; y: number; t: number } | null>(null);
   const fokusGrenzen = useCallback((): { min: number; max: number; passt: boolean } | null => {
     const f = fokusRef.current;
     if (!f) return null;
@@ -265,6 +273,33 @@ export function Board() {
     }
     return { min: f.oben + f.hoehe - f.rand - (fy + h) * zoom, max: f.oben + f.rand - fy * zoom, passt };
   }, [getInternalNode, getViewport]);
+  /** M363: dasselbe waagerecht — passt die Karte in die Breite, steht sie mittig fest; sonst lässt sie sich bis an ihre Kanten schieben */
+  const fokusGrenzenX = useCallback((): { min: number; max: number; passt: boolean } | null => {
+    const f = fokusRef.current;
+    if (!f) return null;
+    const el = document.querySelector(`.react-flow__node[data-id="${f.id}"]`) as HTMLElement | null;
+    if (!el) return null;
+    const { zoom } = getViewport();
+    const fx = getInternalNode(f.id)?.internals.positionAbsolute.x ?? 0;
+    const w = el.offsetWidth;
+    const passt = w * zoom <= f.breite - 2 * f.rand + 0.5;
+    if (passt) {
+      const x = (f.breite - w * zoom) / 2 - fx * zoom;
+      return { min: x, max: x, passt };
+    }
+    return { min: f.breite - f.rand - (fx + w) * zoom, max: f.rand - fx * zoom, passt };
+  }, [getInternalNode, getViewport]);
+  /** M363: Kamera im Fokus in beide Richtungen schieben (geklemmt). (0, 0) klemmt nur — nach einem Zoom. */
+  const fokusSchieben = useCallback((dx: number, dy: number): boolean => {
+    const gy = fokusGrenzen(); const gx = fokusGrenzenX();
+    if (!gy || !gx) return false;
+    const v = getViewport();
+    const x = Math.max(gx.min, Math.min(gx.max, v.x - dx));
+    const y = Math.max(gy.min, Math.min(gy.max, v.y - dy));
+    if (Math.abs(x - v.x) < 0.5 && Math.abs(y - v.y) < 0.5) return false;
+    void setViewport({ x, y, zoom: v.zoom });
+    return true;
+  }, [fokusGrenzen, fokusGrenzenX, getViewport, setViewport]);
   /** Kamera um dy Bildpunkte rollen (positiv = Inhalt nach oben, wie ein Scroll nach unten) */
   const fokusScroll = useCallback((dy: number): boolean => {
     const g = fokusGrenzen();
@@ -349,7 +384,9 @@ export function Board() {
         if (!canScrollTowards(target, inNode, -e.deltaX, -dy)) {
           e.preventDefault();
           e.stopPropagation();
-          fokusScroll(dy);
+          // M363: hineingezoomt rollt das Rad auch seitwärts (Umschalt+Rad oder Zwei-Finger-Wisch am Trackpad)
+          if (fokusFrei.current) fokusSchieben(e.shiftKey && !e.deltaX ? dy : e.deltaX, e.shiftKey && !e.deltaX ? 0 : dy);
+          else fokusScroll(dy);
           return;
         }
       }
@@ -378,7 +415,10 @@ export function Board() {
       e.preventDefault();
       e.stopPropagation();
       const factor = Math.pow(2, -e.deltaY * (e.ctrlKey ? 0.01 : 0.0022));
-      zoomAt(e.clientX, e.clientY, clampZoom(getViewport().zoom * factor));
+      // M363: Im Fokus nie kleiner als eingepasst; danach an die Kartenkanten klemmen
+      const f = fokusRef.current;
+      zoomAt(e.clientX, e.clientY, f ? Math.max(f.fit, clampZoom(getViewport().zoom * factor)) : clampZoom(getViewport().zoom * factor));
+      if (f) { fokusFrei.current = getViewport().zoom > f.fit * 1.02; requestAnimationFrame(() => { fokusSchieben(0, 0); fokusBalken(); }); }
     };
     // M143: Klicks im Slash-Menü (z. B. auf dessen Scrollleiste) dürfen weder
     // dem Editor den Fokus klauen noch BlockNotes „außerhalb geklickt"-
@@ -432,7 +472,8 @@ export function Board() {
       // (ein Tipp setzt weiter den Cursor, erst der Zug über 8 px scrollt)
       if (fokusRef.current && node.classList.contains('pn-focused')) {
         if (target.closest('input, textarea, select, button, a, .react-flow__handle, .react-flow__resize-control')) return;
-        panRef.current = { x: t.clientX, y: t.clientY, vx: x, vy: y, zoom, active: false, el: target, fokus: true, ly: t.clientY };
+        panRef.current = { x: t.clientX, y: t.clientY, vx: x, vy: y, zoom, active: false, el: target, fokus: true, ly: t.clientY, lx: t.clientX,
+          dok: !!target.closest('.pdf-seite'), t0: performance.now() };
         return;
       }
       const kandidat = !!target.closest('.nodrag')
@@ -462,8 +503,11 @@ export function Board() {
         e.preventDefault();
         e.stopPropagation();
         const mid = touchMid(e.touches);
-        const newZoom = clampZoom(p.zoom * (touchDist(e.touches) / p.dist));
+        const f = fokusRef.current;
+        const roh = clampZoom(p.zoom * (touchDist(e.touches) / p.dist));
+        const newZoom = f ? Math.max(f.fit, roh) : roh;
         zoomAt(mid.x, mid.y, newZoom, p.fx, p.fy);
+        if (f) fokusFrei.current = newZoom > f.fit * 1.02;
         return;
       }
       const pan = panRef.current;
@@ -485,8 +529,14 @@ export function Board() {
         // Kann der Modul-Inhalt selbst in diese Richtung scrollen? Dann darf er.
         const node = pan.el.closest('.react-flow__node');
         if (!pan.rolle && node && canScrollTowards(pan.el, node, dx, dy)) { panRef.current = null; return; }
-        // Im Fokus nur senkrecht; ein waagerechter Zug im Text bleibt dem Editor
-        if (pan.fokus && Math.abs(dx) > Math.abs(dy) * 1.5) { panRef.current = null; return; }
+        // Im Fokus nur senkrecht; ein waagerechter Zug im Text bleibt dem Editor.
+        // M363: Auf einer Dokument-Seite schiebt er das hineingezoomte Blatt — passt es in die Breite, blättert der Wisch.
+        if (pan.fokus && Math.abs(dx) > Math.abs(dy) * 1.5) {
+          const gx = pan.dok ? fokusGrenzenX() : null;
+          if (!gx) { panRef.current = null; return; }
+          if (gx.passt) { pan.wisch = true; return; }
+        }
+        if (pan.wisch) return;
         pan.active = true;
       }
       e.preventDefault();
@@ -502,16 +552,46 @@ export function Board() {
         return;
       }
       if (pan.fokus) {
-        fokusScroll((pan.ly ?? t.clientY) - t.clientY);
-        pan.ly = t.clientY;
+        fokusSchieben((pan.lx ?? t.clientX) - t.clientX, (pan.ly ?? t.clientY) - t.clientY);
+        pan.ly = t.clientY; pan.lx = t.clientX;
         return;
       }
       void setViewport({ x: pan.vx + dx, y: pan.vy + dy, zoom: pan.zoom });
     };
     const onTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length < 2) pinchRef.current = null;
+      if (e.touches.length < 2 && pinchRef.current) {
+        pinchRef.current = null;
+        // M363: nach dem Zoomen im Fokus an die Kartenkanten klemmen
+        if (fokusRef.current) requestAnimationFrame(() => { fokusSchieben(0, 0); fokusBalken(); });
+      }
       if (e.touches.length === 0) {
         const pan = panRef.current;
+        const t = e.changedTouches[0];
+        // M363: Dokument im Fokus — Wischen blättert, Doppeltipp zoomt heran und wieder zurück
+        if (pan?.fokus && pan.dok && t && useBoard.getState().tool === 'select' && !pan.el.closest('.pin-modus')) {
+          const dx = t.clientX - pan.x; const dy = t.clientY - pan.y;
+          if (pan.wisch) {
+            if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4 && performance.now() - (pan.t0 ?? 0) < 800) {
+              window.dispatchEvent(new CustomEvent(DOKUMENT_BEFEHL, { detail: { id: fokusRef.current?.id, was: dx < 0 ? 'vor' : 'zurueck' } }));
+            }
+          } else if (!pan.active && Math.hypot(dx, dy) < 10) {
+            const vor = letzterTipp.current;
+            const jetzt = performance.now();
+            if (vor && jetzt - vor.t < 320 && Math.hypot(vor.x - t.clientX, vor.y - t.clientY) < 40) {
+              letzterTipp.current = null;
+              e.preventDefault();
+              const f = fokusRef.current;
+              if (f) {
+                if (fokusFrei.current) { fokusFrei.current = false; fokusEinpassen.current(); }
+                else {
+                  fokusFrei.current = true;
+                  zoomAt(t.clientX, t.clientY, clampZoom(f.fit * 2.4));
+                  requestAnimationFrame(() => { fokusSchieben(0, 0); fokusBalken(); });
+                }
+              }
+            } else letzterTipp.current = { x: t.clientX, y: t.clientY, t: jetzt };
+          }
+        }
         // Nachlauf: der Schwung des Fingers rollt aus (nur nach einem frischen Zug)
         if (pan?.rolle && pan.active && Math.abs(pan.v ?? 0) > 0.25 && performance.now() - (pan.lt ?? 0) < 90) {
           const el = pan.rolle;
@@ -547,7 +627,7 @@ export function Board() {
       wrap.removeEventListener('touchend', onTouchEnd, true);
       wrap.removeEventListener('touchcancel', onTouchEnd, true);
     };
-  }, [getViewport, setViewport, fokusScroll]);
+  }, [getViewport, setViewport, fokusScroll, fokusSchieben, fokusGrenzenX, fokusBalken]);
   const pendingFocus = useBoard((s) => s.pendingFocus);
   const clearPendingFocus = useBoard((s) => s.clearPendingFocus);
 
@@ -978,10 +1058,22 @@ export function Board() {
            würde sonst kaum größer als auf dem Board — sie bleibt lesbar breit, und ihr unteres Ende lässt sich
            bis über die Leisten rollen (seit `fokusUnten` stimmt der Platz dafür). */
         const dokument = n.type === 'file' && !!el.querySelector('.pdf-seite');
+        /* M363: Ein Dokument ist nie breiter als der Schirm. Am Telefon war die Karte (520 breit auf 390) rechts
+           abgeschnitten und ließ sich nicht seitlich schieben. Jetzt gilt „Seitenbreite": Die Seite füllt die
+           Breite und rollt senkrecht; am Finger wird eine schmale Karte dafür auch vergrößert. Hineinzoomen
+           geht mit zwei Fingern, Doppeltipp oder Strg+Rad. */
+        const inBreite = (breite - 2 * rand) / w;
         const zoom = dokument && passt < 1 && passt >= 0.75
           ? passt
-          : text ? Math.min(grob ? 2.2 : 1.25, Math.max(1, passt)) : 1;
-        fokusRef.current = { id: focusCard, oben, hoehe, rand };
+          : dokument && inBreite < 1 ? Math.max(0.3, inBreite)
+            : dokument && grob ? Math.min(2.2, inBreite)
+              : text ? Math.min(grob ? 2.2 : 1.25, Math.max(1, passt)) : 1;
+        fokusRef.current = { id: focusCard, oben, hoehe, rand, breite, fit: zoom };
+        // Frei gezoomt: nicht zurück auf „eingepasst" springen (Seite blättert, Leiste dockt an) — nur klemmen
+        if (nachfahren && fokusFrei.current) {
+          requestAnimationFrame(() => { fokusSchieben(0, 0); fokusBalken(); });
+          return;
+        }
         requestAnimationFrame(() => fokusBalken());
         // M334: Wächst eine Karte, die ohnehin länger als der Schirm ist (Tippen am
         // Ende), bleibt die Kamera, wo der Nutzer sie hingerollt hat — nur klemmen,
@@ -1000,7 +1092,30 @@ export function Board() {
         flyingUntil.current = performance.now() + dauer + 180;
         void setViewport({ x, y, zoom }, { duration: dauer });
       };
+      fokusFrei.current = false;
+      fokusEinpassen.current = () => fahren(220);
       fahren();
+      // M363: Eine neue Seite beginnt oben — auch wenn die vorige bis ans Ende gerollt war
+      let seiteZuletzt = seiteVon(focusCard)?.seite;
+      const neueSeite = (e: Event) => {
+        if ((e as CustomEvent).detail !== focusCard) return;
+        const jetzt = seiteVon(focusCard)?.seite;
+        if (jetzt == null || jetzt === seiteZuletzt) { seiteZuletzt = jetzt; return; }
+        seiteZuletzt = jetzt;
+        requestAnimationFrame(() => { const g = fokusGrenzen(); if (g && !g.passt) { const v = getViewport(); void setViewport({ x: v.x, y: g.max, zoom: v.zoom }); fokusSchieben(0, 0); } fokusBalken(); });
+      };
+      window.addEventListener(SEITEN_EREIGNIS, neueSeite);
+      // M363: Telefon gedreht (oder Fenster deutlich schmaler/breiter): neu einpassen. Nur die BREITE zählt —
+      // die Bildschirmtastatur ändert die Höhe und soll die Karte nicht hin- und herzoomen.
+      let breiteZuletzt = window.innerWidth;
+      let drehTimer: ReturnType<typeof setTimeout> | undefined;
+      const gedreht = () => {
+        if (Math.abs(window.innerWidth - breiteZuletzt) < 24) return;
+        breiteZuletzt = window.innerWidth;
+        clearTimeout(drehTimer);
+        drehTimer = setTimeout(() => { fokusFrei.current = false; fahren(200); }, 180);
+      };
+      window.addEventListener('resize', gedreht);
       /* M353: Die Leisten unten kommen oft NACH der ersten Kamerafahrt — die Werkzeugleiste dockt erst an, wenn
          über der eingepassten Karte kein Platz mehr ist, die Formatier-Leiste erscheint beim Schreiben. Dann
          lag die Karte unter ihnen. Ändert sich der Platz unten, passt die Kamera neu ein (CSS-:has() meldet
@@ -1037,9 +1152,10 @@ export function Board() {
         }, 60);
       };
       document.addEventListener('selectionchange', cursorFolgen);
-      return () => { if (raf) cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(cursorTimer); clearInterval(platzWacht); beobachter?.disconnect(); document.removeEventListener('selectionchange', cursorFolgen); };
+      return () => { if (raf) cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(cursorTimer); clearInterval(platzWacht); beobachter?.disconnect(); document.removeEventListener('selectionchange', cursorFolgen); window.removeEventListener(SEITEN_EREIGNIS, neueSeite); window.removeEventListener('resize', gedreht); clearTimeout(drehTimer); };
     }
     fokusRef.current = null;
+    fokusFrei.current = false;
     fokusBalken();
     document.querySelectorAll('.react-flow__node[data-fokus-weg]').forEach((k) => k.removeAttribute('data-fokus-weg'));
     document.documentElement.style.removeProperty('--fokus-zoom');

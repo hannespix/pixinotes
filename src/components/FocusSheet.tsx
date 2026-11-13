@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef } from 'react';
-import { useBoard } from '../store';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useBoard, type Tool } from '../store';
+import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon, type DokumentBefehl } from '../lib/pdfSeiten';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
-import { IChevronL, IChevronR, IPlay, IX } from './Icons';
+import { IChevronL, IChevronR, IComment, IEraser, IHighlighter, IPen, IPlay, IX } from './Icons';
 
 /**
  * M212: „Karte im Fokus" — am Handy füllt ein angetipptes Modul den Schirm.
@@ -53,6 +54,25 @@ const ACTIONS: Record<string, FocusAction[]> = {
   time: [{ label: '＋ Zeit', hint: 'Arbeitszeit für heute nacherfassen', key: 'time-seg' }],
   sheet: [{ label: '＋ Zeile', hint: 'Eine Zeile an die Rechen-Tabelle anhängen', key: 'sheet-row' }],
 };
+
+/**
+ * M363: Die offene Seite eines Dokuments (PDF, Word) im Fokus — oder nichts. Die Fußleiste wird damit zur
+ * Dokument-Leiste: Die Pfeile an den Rändern blättern SEITEN (statt Karten), dazwischen liegen Stift, Textmarker,
+ * Radierer und „Kommentar an eine Stelle" in Daumen-Größe. Auf der Karte selbst sind diese Knöpfe am Telefon
+ * winzig (die Seite ist auf Schirmbreite verkleinert), und Zeichenwerkzeuge gab es im Fokus gar nicht.
+ */
+function useOffeneSeite(id: string | null): { seite: number; seiten: number } | null {
+  const [, takt] = useState(0);
+  useEffect(() => {
+    const auf = () => takt((n) => n + 1);
+    window.addEventListener(SEITEN_EREIGNIS, auf);
+    return () => window.removeEventListener(SEITEN_EREIGNIS, auf);
+  }, []);
+  const g = id ? seiteVon(id) : undefined;
+  return g ? { seite: g.seite, seiten: g.seiten } : null;
+}
+const dokumentBefehl = (id: string, was: DokumentBefehl['was'], zu?: number) =>
+  window.dispatchEvent(new CustomEvent<DokumentBefehl>(DOKUMENT_BEFEHL, { detail: { id, was, zu } }));
 
 export function focusable(node: AppNode | undefined): boolean {
   return !!node && !NO_FOCUS.has(node.type ?? '') && !node.archived;
@@ -266,7 +286,20 @@ export function FocusSheet() {
     setFocusCard(null);
   }, [focusCard, node, setFocusCard]);
 
+  const dok = useOffeneSeite(focusCard);
+  const tool = useBoard((s) => s.tool);
+  const setTool = useBoard((s) => s.setTool);
+  // Der Kommentar-Modus lebt in der Karte — hier nur gespiegelt, damit der Knopf zeigt, dass er an ist
+  const [pinAn, setPinAn] = useState(false);
+  const [seitenEingabe, setSeitenEingabe] = useState('');
+  useEffect(() => {
+    if (!focusCard) { setPinAn(false); return; }
+    const t = setInterval(() => setPinAn(!!document.querySelector(`.react-flow__node[data-id="${focusCard}"] .pdf-seite.pin-modus`)), 250);
+    return () => clearInterval(t);
+  }, [focusCard]);
+
   if (!focusCard || !node) return null;
+  const werkzeug = (t: Tool) => setTool(tool === t ? 'select' : t);
 
   // Wischen: waagerecht blättert, nach unten schließt. Bewusst nur am RAHMEN
   // ausgewertet (Kopf/Fuß), nicht auf der Karte — dort scrollt und tippt man.
@@ -315,11 +348,15 @@ export function FocusSheet() {
             ohnehin bei allen Karten-Werkzeugen. */}
         <div className="focus-title">
           <b>{cardTitle(node)}</b>
-          <span>{typeName}{siblings.length > 1 ? ` · ${index + 1} von ${siblings.length}` : ''}</span>
+          <span>{typeName}{dok ? ` · Seite ${dok.seite} von ${dok.seiten}` : siblings.length > 1 ? ` · ${index + 1} von ${siblings.length}` : ''}</span>
         </div>
       </div>
-      <div className="focus-nav" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        {siblings.length > 1 ? (
+      <div className={`focus-nav ${dok ? 'dokument' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        {dok ? (
+          <button onClick={() => dokumentBefehl(node.id, 'zurueck')} aria-disabled={dok.seite <= 1} title="Vorherige Seite (oder über die Seite wischen)" aria-label="Vorherige Seite" data-taste="fokus-seite-zurueck">
+            <IChevronL size={18} />
+          </button>
+        ) : siblings.length > 1 ? (
           <button onClick={() => step(-1)} title="Vorige Karte (oder nach rechts wischen)" aria-label="Vorige Karte">
             <IChevronL size={16} />
           </button>
@@ -329,13 +366,32 @@ export function FocusSheet() {
             was NICHT zum Modul gehört (Verbinden, Anordnen, Archivieren),
             bleibt bewusst draußen: Das sind Board-Tätigkeiten. */}
         <div className="focus-acts">
+          {dok && (
+            <>
+              {/* Seitenzahl zum Antippen: direkt zu einer Seite springen (das Feld auf der Karte ist am Telefon winzig) */}
+              <label className="focus-seite" data-taste="fokus-seite">
+                <input inputMode="numeric" aria-label={`Seite (${dok.seite} von ${dok.seiten})`} value={seitenEingabe || String(dok.seite)} data-taste="fokus-seite-nr"
+                  onFocus={(e) => { setSeitenEingabe(String(dok.seite)); e.currentTarget.select(); }}
+                  onChange={(e) => setSeitenEingabe(e.target.value.replace(/[^0-9]/g, ''))}
+                  onBlur={() => { const zu = parseInt(seitenEingabe, 10); setSeitenEingabe(''); if (zu) dokumentBefehl(node.id, 'gehe', Math.min(dok.seiten, Math.max(1, zu))); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+                <span>/ {dok.seiten}</span>
+              </label>
+              <button className={`focus-werkzeug ${tool === 'pen' ? 'on' : ''}`} onClick={() => werkzeug('pen')} aria-pressed={tool === 'pen'} title="Stift — auf die Seite schreiben" aria-label="Stift" data-taste="fokus-stift"><IPen size={18} /></button>
+              <button className={`focus-werkzeug ${tool === 'marker' ? 'on' : ''}`} onClick={() => werkzeug('marker')} aria-pressed={tool === 'marker'} title="Textmarker" aria-label="Textmarker" data-taste="fokus-marker"><IHighlighter size={18} /></button>
+              <button className={`focus-werkzeug ${tool === 'eraser' ? 'on' : ''}`} onClick={() => werkzeug('eraser')} aria-pressed={tool === 'eraser'} title="Radierer" aria-label="Radierer" data-taste="fokus-radierer"><IEraser size={18} /></button>
+              <button className={`focus-werkzeug ${pinAn ? 'on' : ''}`} onClick={() => { setTool('select'); dokumentBefehl(node.id, 'pin'); }} aria-pressed={pinAn}
+                title="Kommentar an eine Stelle — danach auf die Stelle tippen" aria-label="Kommentar an eine Stelle" data-taste="fokus-kommentar"><IComment size={18} /></button>
+            </>
+          )}
           {/* M228: Die Brücke zum Vortrag. Fokus und Präsentation sind bewusst
               NICHT derselbe Modus — der eine ist zum Arbeiten, der andere zum
               Zeigen (feste Folienfolge, keine Werkzeuge, Beamer-tauglich).
               Damit man trotzdem nicht sucht, führt von hier ein Weg dorthin,
               und zwar ab GENAU dieser Karte. */}
           <button
-            className="focus-act"
+            className={`focus-act ${dok ? 'nur-zeichen' : ''}`}
+            aria-label="Ab dieser Karte präsentieren"
             title="Ab dieser Karte präsentieren — Vollbild, Folienfolge aus den Verbindungen"
             onClick={() => {
               const st = useBoard.getState();
@@ -344,7 +400,7 @@ export function FocusSheet() {
               st.setPresenting(true);
             }}
           >
-            <IPlay size={12} /> Präsentieren
+            <IPlay size={dok ? 16 : 12} /> {dok ? null : 'Präsentieren'}
           </button>
           {ACTIONS[node.type ?? '']?.map((a) => (
             <button
@@ -357,7 +413,11 @@ export function FocusSheet() {
             </button>
           ))}
         </div>
-        {siblings.length > 1 ? (
+        {dok ? (
+          <button onClick={() => dokumentBefehl(node.id, 'vor')} aria-disabled={dok.seite >= dok.seiten} title="Nächste Seite (oder über die Seite wischen)" aria-label="Nächste Seite" data-taste="fokus-seite-vor">
+            <IChevronR size={18} />
+          </button>
+        ) : siblings.length > 1 ? (
           <button onClick={() => step(1)} title="Nächste Karte (oder nach links wischen)" aria-label="Nächste Karte">
             <IChevronR size={16} />
           </button>

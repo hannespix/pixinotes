@@ -29,6 +29,13 @@ export interface SeitenGeometrie {
 
 const geometrien = new Map<string, SeitenGeometrie>();
 export const SEITEN_EREIGNIS = 'pixinotes:pdf-seite';
+/**
+ * M363: Befehl an eine offene Dokument-Karte — von außerhalb der Karte (Fokus-Leiste am Telefon, Wisch-Geste).
+ * `detail`: { id: Karten-Kennung, was: 'vor' | 'zurueck' | 'gehe' (mit `zu`) | 'pin' }. Die Karte hält Seite und
+ * Kommentar-Modus selbst.
+ */
+export const DOKUMENT_BEFEHL = 'pixinotes:dokument-befehl';
+export type DokumentBefehl = { id?: string; was: 'vor' | 'zurueck' | 'gehe' | 'pin'; zu?: number };
 
 /** Die Karte meldet ihre sichtbare Seite — oder null beim Zuklappen/Abbauen */
 export function seiteMelden(nodeId: string, g: SeitenGeometrie | null): void {
