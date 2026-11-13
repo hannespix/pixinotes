@@ -159,9 +159,10 @@ pruefe('D2 zurück auf Seite 2 ist er wieder da', z.seiteNr === '2' && z.pfade.l
 
 console.log('\n════ E: Karte verbreitern ════');
 await P.evaluate(() => { const s = JSON.parse(localStorage.getItem('pixinotes-board')); s.state.boards[0].nodes[0].width = 640; localStorage.setItem('pixinotes-board', JSON.stringify(s)); });
-await P.reload({ waitUntil: 'networkidle' }); await P.waitForTimeout(1800);
-await P.locator('[data-taste="pdf-vor"]').click(); await P.waitForTimeout(1000);
+await P.reload({ waitUntil: 'networkidle' }); await P.waitForTimeout(2800);
+// M358: Nach dem Neuladen ist Seite 2 wieder offen (die zuletzt offene Seite bleibt gemerkt) — kein Blättern nötig
 z = await zustand(P);
+pruefe('E0 nach dem Neuladen ist wieder Seite 2 offen (M358)', z.seiteNr === '2', String(z.seiteNr));
 const lageNachher = relativ(z);
 pruefe('E1 nach dem Verbreitern sitzt der Strich an derselben Stelle der Seite', z.canvas.w > 600 && lageNachher && Math.abs(lageNachher.x - lageVorher.x) < 0.02 && Math.abs(lageNachher.y - lageVorher.y) < 0.02 && Math.abs(lageNachher.w - lageVorher.w) < 0.02, JSON.stringify({ vorher: lageVorher, nachher: lageNachher, breite: z.canvas.w }));
 

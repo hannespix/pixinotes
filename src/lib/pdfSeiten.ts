@@ -94,6 +94,29 @@ export function pdfAufklappen(nodeId: string, auf: boolean): void {
   try { localStorage.setItem(AUF_KEY, JSON.stringify(m)); } catch { /* Sitzung reicht */ }
 }
 
+/* ---------- M358: zuletzt offene Seite — Geräte-Ansicht, nicht Inhalt ---------- */
+// Nach Neuladen, Zu- und Aufklappen oder dem Weg in den Fokus stand jedes Dokument wieder auf Seite 1 —
+// wer auf Seite 14 eines Skripts mitschreibt, blätterte jedes Mal neu. Die Seite je Karte bleibt jetzt am
+// Gerät gemerkt (wie auf/zu): Lesestand ist Ansicht, kein Inhalt — er wandert nicht in den Sync.
+const SEITE_KEY = 'pixinotes-pdf-seite';
+const SEITE_MAX = 400; // so viele Karten merkt sich ein Gerät; die ältesten Einträge fallen heraus
+function seitenLesen(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(SEITE_KEY) ?? '{}') as Record<string, number>; } catch { return {}; }
+}
+export function letzteSeite(nodeId: string): number {
+  const n = seitenLesen()[nodeId];
+  return typeof n === 'number' && Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1;
+}
+export function seiteMerken(nodeId: string, seite: number): void {
+  const m = seitenLesen();
+  if ((m[nodeId] ?? 1) === seite) return;
+  delete m[nodeId];                       // neu ans Ende: zuletzt Benutztes überlebt die Obergrenze
+  if (seite > 1) m[nodeId] = seite;       // Seite 1 ist die Vorgabe und braucht keinen Eintrag
+  const schluessel = Object.keys(m);
+  for (const k of schluessel.slice(0, Math.max(0, schluessel.length - SEITE_MAX))) delete m[k];
+  try { localStorage.setItem(SEITE_KEY, JSON.stringify(m)); } catch { /* Sitzung reicht */ }
+}
+
 /* ---------- M336: Kommentare je Seite ---------- */
 /** Kommentare einer Karte auf einer Seite, in Entstehungsreihenfolge — die Nummer ist der Index + 1 (Pin, Liste, Blase stimmen überein) */
 export function seitenKommentare(threads: CommentThread[] | undefined, nodeId: string, seite: number): CommentThread[] {

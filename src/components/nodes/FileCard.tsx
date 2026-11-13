@@ -9,7 +9,7 @@ import { canEmbed } from '../../lib/nodes';
 import { loadAttachment } from '../../lib/attachments';
 import { pdfSeiteMasse, pdfSeiteText, renderPdfPage } from '../../lib/pdf';
 import { seitenTextMelden } from '../../lib/markerZeile';
-import { blasenAn, blasenSetzen, pdfAufgeklappt, pdfAufklappen, seiteMelden, seitenKommentare } from '../../lib/pdfSeiten';
+import { blasenAn, blasenSetzen, letzteSeite, pdfAufgeklappt, pdfAufklappen, seiteMelden, seiteMerken, seitenKommentare } from '../../lib/pdfSeiten';
 import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/fileStore';
 import { kontoDateiNachladen } from '../../lib/kontoSync';
 import { CardShell } from './CardShell';
@@ -470,7 +470,9 @@ function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [seite, setSeite] = useState(1);
+  // M358: dort weiter, wo man zuletzt war (am Gerät gemerkt)
+  const [seite, setSeite] = useState(() => letzteSeite(id));
+  useEffect(() => { seiteMerken(id, seite); }, [id, seite]);
   const [seiten, setSeiten] = useState(1);
   const [masse, setMasse] = useState<{ breite: number; hoehe: number } | null>(null);
   const [breite, setBreite] = useState(300);
@@ -501,6 +503,7 @@ function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
     pdfSeiteMasse(dataUrl, seite).then((m) => {
       if (weg) return;
       setSeiten(m.seiten); setMasse({ breite: m.breite, hoehe: m.hoehe }); onSeiten?.(m.seiten);
+      if (seite > m.seiten) setSeite(m.seiten);   // M358: gemerkte Seite gibt es nicht (mehr) — auf die letzte
       // M356: Textlage der Seite — darauf rastet der Textmarker ein (fehlt sie, wird nur begradigt)
       pdfSeiteText(dataUrl, seite).then((rects) => { if (!weg) seitenTextMelden(id, { seite, breite: m.breite, rects }); }).catch(() => {});
     }).catch(() => setFailed(true));
@@ -570,7 +573,9 @@ function WordSeite({ id, quelle, zuklappen, onSeiten, onDownload }: {
   const wrapRef = useRef<HTMLDivElement>(null);
   const inhaltRef = useRef<HTMLDivElement>(null);
   const stilRef = useRef<HTMLDivElement>(null);
-  const [seite, setSeite] = useState(1);
+  // M358: dort weiter, wo man zuletzt war (am Gerät gemerkt)
+  const [seite, setSeite] = useState(() => letzteSeite(id));
+  useEffect(() => { seiteMerken(id, seite); }, [id, seite]);
   const [seiten, setSeiten] = useState(1);
   const [status, setStatus] = useState<'laedt' | 'fertig' | 'fehler'>('laedt');
   const [breite, setBreite] = useState(300);
@@ -607,6 +612,7 @@ function WordSeite({ id, quelle, zuklappen, onSeiten, onDownload }: {
         if (weg) return;
         const abschnitte = inhaltRef.current.querySelectorAll<HTMLElement>('section.docx');
         setSeiten(Math.max(1, abschnitte.length)); onSeiten?.(Math.max(1, abschnitte.length));
+        setSeite((alt) => Math.min(alt, Math.max(1, abschnitte.length)));   // M358: gemerkte Seite begrenzen
         setStatus('fertig');
       } catch (e) {
         console.warn('Word-Dokument lässt sich nicht darstellen:', e);
