@@ -227,6 +227,10 @@ await doppeltipp(200, 350); z = await lage();
 pruefe('C6 Doppeltipp: heran', z.zoom > fit * 2 && z.seite === 3, z);
 await kneifen(195, 320, 140, 20); z = await lage();
 pruefe('C7 zusammenkneifen: nie kleiner als eingepasst', Math.abs(z.zoom - fit) < 0.02 && z.links >= 0, z);
+await P.setViewportSize({ width: 750, height: 342 }); await P.waitForTimeout(1400); z = await lage();
+pruefe('C8 Telefon gedreht: die Seite füllt die neue Breite (und ragt nicht hinaus)', z.links >= 0 && z.rechts <= z.b + 1 && z.seiteB >= z.b * 0.85, z);
+await P.setViewportSize({ width: 390, height: 664 }); await P.waitForTimeout(1400); z = await lage();
+pruefe('C9 zurückgedreht: wieder auf Schirmbreite', z.links >= 0 && z.rechts <= z.b + 1 && Math.abs(z.zoom - fit) < 0.02, z);
 
 console.log('\n════ D: Annotieren ════');
 await P.locator('[data-taste="fokus-marker"]').tap(); await P.waitForTimeout(500);
