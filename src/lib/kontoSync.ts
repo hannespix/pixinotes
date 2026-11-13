@@ -270,6 +270,9 @@ async function anfrage(url: string, init: RequestInit = {}, nochmal = true): Pro
   return res;
 }
 
+/** M357: angemeldete Anfrage ans Konto — für Bausteine außerhalb dieser Datei (Link-Freigabe) */
+export const kontoAnfrage = (url: string, init: RequestInit = {}): Promise<Response> => anfrage(url, init);
+
 interface Laufwerk {
   liste(): Promise<Eintrag[]>;
   /** eTag/Version einer Datei — null, wenn es sie nicht gibt (der Mini-Abruf für den Takt) */

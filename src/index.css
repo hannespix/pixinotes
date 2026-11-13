@@ -6564,3 +6564,11 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 @media (pointer: coarse) { .draw-palette .draw-regler { width: 120px; height: 28px; } }
 .schrift-vorschlag.oben { transform: translateY(-100%); }
 @media (max-width: 700px) { .draw-palette .draw-regler { width: 72px; } .draw-palette .draw-staerke-wert { display: none; } }
+
+/* ===== M357: Per Link teilen ===== */
+.link-dialog .link-zeile { display: flex; gap: 6px; align-items: stretch; margin: 6px 0 2px; }
+.link-dialog .link-zeile input { flex: 1; min-width: 0; font: inherit; font-size: 12.5px; padding: 7px 9px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink); }
+.link-dialog .link-zeile button { white-space: nowrap; }
+.link-dialog .link-weg { color: #b3502f; }
+[data-theme='dark'] .link-dialog .link-weg { color: #ffab8f; }
+@media (max-width: 520px) { .link-dialog .link-zeile { flex-wrap: wrap; } .link-dialog .link-zeile input { flex-basis: 100%; } }
