@@ -4,7 +4,7 @@ import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe } from '@blocknote/core/locales';
-import { useBoard } from '../../store';
+import { useBoard, useNurLesen } from '../../store';
 import { STICKY_COLORS, type NoteNode } from '../../types';
 import { blocksToText } from '../../lib/serialize';
 import { indexZuAdresse } from '../../lib/formel';
@@ -203,6 +203,7 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
     void importFilesToBoard(dateien, { x: pos.x + breite + 40, y: pos.y });
   }, [getNode, id]);
   // M201: gemeinsames Schema mit Inline-Schrift/-Größe (textSize/textFont)
+  const nurLesen = useNurLesen(); // M360: nur lesend geteiltes Board — der Editor zeigt, nimmt aber nichts an
   const editor = useCreateBlockNote({
     schema: noteSchema,
     initialContent: initialContent as never,
@@ -423,6 +424,7 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
       >
         <BlockNoteView
           editor={editor}
+          editable={!nurLesen}
           theme="light"
           sideMenu={false}
           formattingToolbar={false}

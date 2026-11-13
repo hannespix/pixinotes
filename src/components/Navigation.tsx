@@ -154,7 +154,7 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
           )}
           <BoardMenu boardId={b.id} onRename={() => setUmbenennen(b.id)} />
           {b.archived && <span className="archiv-marke">Archiv</span>}
-          {b.geteiltVon && <span className="side-board-geteilt" title={`Geteilt von ${b.geteiltVonName ?? 'einem anderen Konto'}`} aria-label="geteiltes Board">👥</span>}
+          {b.geteiltVon && <span className="side-board-geteilt" title={`Geteilt von ${b.geteiltVonName ?? 'einem anderen Konto'}${b.geteiltRolle === 'lesen' ? ' — nur lesen' : ''}`} aria-label={b.geteiltRolle === 'lesen' ? 'geteiltes Board, nur lesen' : 'geteiltes Board'}>{b.geteiltRolle === 'lesen' ? '🔒' : '👥'}</span>}
           <span className="side-board-count">{b.nodes.filter(lebt).length}</span>
         </div>
         {auf && (

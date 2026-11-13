@@ -703,10 +703,20 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
         if (c && altF && c.st === `v${z.version}` && altF.version === String(z.version)) b = c.board;
         else { try { b = JSON.parse(z.inhalt) as BoardDoc; gelesen.set(f.board_id, { st: `v${z.version}`, board: b }); } catch { continue; } }
         b = { ...b, geteiltVon: f.besitzer, geteiltVonName: f.besitzer_email };
+        // M360: nur lesend geteilt — die Oberfläche ändert das Board nicht (Leseschutz im Speicher)
+        if (f.rolle === 'lesen') b.geteiltRolle = 'lesen'; else delete b.geteiltRolle;
         boards.push(b);
         fremd[f.board_id] = { besitzer: f.besitzer, version: String(z.version), stempel: stempel(z.inhalt) };
         if (z.updated_at && z.updated_at > savedAt) savedAt = z.updated_at;
-      } catch { /* ein fremdes Board darf den Abgleich nicht aufhalten */ }
+      } catch {
+        // Ein fremdes Board darf den Abgleich nicht aufhalten. M360: Ließ sich seine Zeile gerade nicht lesen
+        // (Netz), gilt der hiesige Stand weiter — sonst hielte die Zusammenführung das Board für entfernt.
+        const hier = useBoard.getState().boards.find((x) => x.id === f.board_id && x.geteiltVon === f.besitzer);
+        if (hier && !boards.some((x) => x.id === hier.id)) {
+          boards.push(hier);
+          if (alt.fremd?.[f.board_id]) fremd[f.board_id] = alt.fremd[f.board_id];
+        }
+      }
     }
     spaces = mitGeteiltBereich(u.spaces, boards.filter((b) => b.geteiltVon));
   }
@@ -738,6 +748,8 @@ export interface Freigabe { id: string; besitzer: string; board_id: string; gast
 interface FremdFreigabe { besitzer: string; besitzer_email: string; board_id: string; rolle: string }
 /** Die zuletzt geladenen Freigaben anderer Konten für mich */
 let fremdeFreigaben: FremdFreigabe[] = [];
+/** M360: Die Liste oben stammt aus einer geglückten Abfrage dieser Sitzung (nicht nur der leere Anfangswert) */
+let freigabenGeladen = false;
 /** Besitzer, auf deren Zeilen Realtime gerade lauscht (um einen Neustart zu erkennen) */
 let realtimeBesitzer = '';
 const restUrl = (): string => `${loadKonto()?.url ?? ''}/rest/v1`;
@@ -757,9 +769,30 @@ async function freigabenLaden(): Promise<FremdFreigabe[]> {
   await rpc<number>('freigaben_annehmen', {}).catch(() => 0);
   const liste = await rpc<FremdFreigabe[]>('freigaben_fuer_mich', {});
   fremdeFreigaben = Array.isArray(liste) ? liste : [];
+  freigabenGeladen = true;
   const schluessel = [...new Set(fremdeFreigaben.map((f) => f.besitzer))].sort().join(',');
   if (schluessel !== realtimeBesitzer && realtime) setTimeout(() => realtimeStarten(), 0);
   return fremdeFreigaben;
+}
+/**
+ * M360: Weicht bei den geteilten Boards etwas ab, das kein Zeitstempel verrät? Eine neue Freigabe für ein
+ * Board, das der Besitzer länger nicht angefasst hat (es fehlt hier noch), oder ein Rollenwechsel
+ * (bearbeiten ↔ nur lesen). Ohne diese Prüfung galt der Stand als „gleich" und das Board erschien erst,
+ * wenn der Besitzer es das nächste Mal änderte.
+ */
+function rollenAnders(fremd: Array<Pick<BoardDoc, 'id' | 'geteiltVon' | 'geteiltRolle'>>): boolean {
+  const hier = new Map(useBoard.getState().boards.map((b) => [b.id, b]));
+  if (fremd.some((f) => {
+    if (!f.geteiltVon) return false;
+    const b = hier.get(f.id);
+    if (!b) return true;
+    return !!b.geteiltVon && (b.geteiltRolle ?? '') !== (f.geteiltRolle ?? '');
+  })) return true;
+  // Eine beendete Freigabe „nur lesen": Das Board darf hier nicht gesperrt und veraltet liegen bleiben.
+  // Maßgeblich ist die zuletzt erfolgreich geladene Liste — ein Netzfehler beim Lesen einer Zeile zählt nicht.
+  if (!freigabenGeladen) return false;
+  return [...hier.values()].some((b) => b.geteiltRolle === 'lesen' && !!b.geteiltVon
+    && !fremdeFreigaben.some((f) => f.board_id === b.id && f.besitzer === b.geteiltVon));
 }
 /** Die Board-Zeile eines Besitzers (RLS: nur, wenn er sie mit mir geteilt hat) */
 async function fremdZeile(besitzer: string, boardId: string): Promise<{ inhalt: string; version: number; updated_at?: string } | null> {
@@ -785,7 +818,7 @@ function mitGeteiltBereich(spaces: Space[], geteilt: BoardDoc[]): Space[] {
 }
 /** Ein Board ohne Freigabe weiterführen: als eigene Kopie (die Kennung des Besitzers fällt weg) */
 function alsEigeneKopie(boardId: string): void {
-  useBoard.setState((s) => ({ boards: s.boards.map((b) => (b.id === boardId ? (({ geteiltVon: _g, geteiltVonName: _n, ...rest }) => rest)(b) as BoardDoc : b)) }));
+  useBoard.setState((s) => ({ boards: s.boards.map((b) => (b.id === boardId ? (({ geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, ...rest }) => rest)(b) as BoardDoc : b)) }));
   fremdeFreigaben = fremdeFreigaben.filter((f) => f.board_id !== boardId);
 }
 /** Freigaben eines eigenen Boards (Besitzer-Sicht) */
@@ -798,19 +831,26 @@ export async function freigabenDesBoards(boardId: string): Promise<Freigabe[]> {
   return (await res.json()) as Freigabe[];
 }
 /** Ein eigenes Board für eine E-Mail freigeben. Das Board muss schon im Konto liegen — notfalls jetzt schreiben. */
-export async function freigabeAnlegen(boardId: string, email: string): Promise<Freigabe> {
+export type FreigabeRolle = 'bearbeiten' | 'lesen';
+export async function freigabeAnlegen(boardId: string, email: string, rolle: FreigabeRolle = 'bearbeiten'): Promise<Freigabe> {
   nurEigenesKonto();
   const s = loadKonto()!;
   if (s.name && s.name.toLowerCase() === email.trim().toLowerCase()) throw new Error('Das ist deine eigene E-Mail.');
   if (localStorage.getItem(KONTO_DIRTY_KEY)) await kontoWrite().catch(() => {});
   const res = await anfrage(`${restUrl()}/board_freigaben?on_conflict=besitzer,board_id,gast_email`, {
     method: 'POST', headers: { ...JSON_KOPF, Prefer: 'resolution=merge-duplicates,return=representation' },
-    body: JSON.stringify({ board_id: boardId, gast_email: email.trim().toLowerCase(), rolle: 'bearbeiten' }),
+    body: JSON.stringify({ board_id: boardId, gast_email: email.trim().toLowerCase(), rolle }),
   });
   if (res.status === 404) throw new Error('PixiNotes-Konto: Freigaben sind beim Betreiber noch nicht eingerichtet (Migration M330 fehlt).');
   if (!res.ok) throw new Error(`PixiNotes-Konto: Freigabe nicht gespeichert (HTTP ${res.status}).`);
   const z = (await res.json()) as Freigabe[];
   return z[0];
+}
+/** M360: Rolle einer bestehenden Freigabe ändern — der Gast sieht den Wechsel live (Realtime auf board_freigaben) */
+export async function freigabeRolleSetzen(id: string, rolle: FreigabeRolle): Promise<void> {
+  nurEigenesKonto();
+  const res = await anfrage(`${restUrl()}/board_freigaben?id=eq.${encodeURIComponent(id)}`, { method: 'PATCH', headers: { ...JSON_KOPF, Prefer: 'return=minimal' }, body: JSON.stringify({ rolle }) });
+  if (!res.ok) throw new Error(`PixiNotes-Konto: Rolle nicht gespeichert (HTTP ${res.status}).`);
 }
 export async function freigabeEntfernen(id: string): Promise<void> {
   nurEigenesKonto();
@@ -837,6 +877,24 @@ async function fremdSchreiben(besitzer: string, boardId: string, text: string, s
     const msg = (e as Error).message;
     if (msg === 'vorbedingung') throw new VorbedingungFehler();
     if (msg === 'keine freigabe') {
+      // M360: Vielleicht hat der Besitzer nur die Rolle auf „Nur lesen" gestellt — dann bleibt das Board geteilt,
+      // der Stand des Besitzers gilt und die eigene, nicht mehr annehmbare Änderung fällt weg.
+      const liste = await freigabenLaden().catch(() => null);
+      if (liste?.some((f) => f.board_id === boardId && f.besitzer === besitzer && f.rolle === 'lesen')) {
+        useBoard.setState((s) => ({ boards: s.boards.map((b) => (b.id === boardId ? { ...b, geteiltRolle: 'lesen' as const } : b)) }));
+        const z = await fremdZeile(besitzer, boardId).catch(() => null);
+        if (z) {
+          try {
+            const frisch = { ...(JSON.parse(z.inhalt) as BoardDoc), geteiltVon: besitzer, geteiltVonName: liste.find((f) => f.board_id === boardId)?.besitzer_email, geteiltRolle: 'lesen' as const };
+            const st = useBoard.getState();
+            st.importSync(st.boards.map((b) => (b.id === boardId ? frisch : b)), st.spaces, st.activeId, { geaendert: [boardId] });
+            const kenn = await kennLesen();
+            await idbSet(KENN_KEY, { ...kenn, fremd: { ...(kenn.fremd ?? {}), [boardId]: { besitzer, version: String(z.version), stempel: stempel(z.inhalt) } } } satisfies Kenn);
+          } catch { /* der nächste Abgleich holt den Stand */ }
+        }
+        useBoard.getState().showToast('🔒 Der Besitzer hat dieses Board auf „Nur lesen" gestellt — deine letzte Änderung wurde nicht übernommen.', false, 8000);
+        throw new SpaeterFehler();
+      }
       alsEigeneKopie(boardId);
       useBoard.getState().showToast('Die Freigabe für dieses Board wurde beendet — es bleibt als eigene Kopie bei dir.', false, 8000);
       throw new SpaeterFehler();
@@ -884,7 +942,8 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
     : await buildSyncPayloadMitDateien(s.syncDateienMb ?? DATEI_BUDGET_MB);
   // M330: Geteilte Boards gehören einem anderen Konto — sie gehen über freigabe_schreiben, nicht in die eigene Umgebung
   const eigene = payload.boards.filter((b) => !b.geteiltVon);
-  const fremde = sitz?.anbieter === 'supabase' ? payload.boards.filter((b) => b.geteiltVon) : [];
+  // M360: nur lesend geteilte Boards reisen nie zurück — sie ändern sich hier nicht
+  const fremde = sitz?.anbieter === 'supabase' ? payload.boards.filter((b) => b.geteiltVon && b.geteiltRolle !== 'lesen') : [];
   const stempelNeu: Record<string, string> = {};
   const texte = new Map<string, string>();
   for (const b of eigene) {
@@ -894,7 +953,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
   }
   const fremdPlan: Array<{ b: BoardDoc; text: string; st: string }> = [];
   for (const b of fremde) {
-    const { geteiltVon: _g, geteiltVonName: _n, ...rein } = b;
+    const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, ...rein } = b;
     const text = JSON.stringify(rein);
     const st = stempel(text);
     if (kenn.fremd?.[b.id]?.stempel === st) continue;
@@ -1057,6 +1116,12 @@ let staleHintShown = false;
 export type VerbindenErgebnis = 'hochgeladen' | 'uebernommen' | 'zusammengefuehrt' | 'gleich' | 'konflikt';
 /** Nach der Anmeldung: Was liegt im Konto? Leer → hochladen; fremd → einarbeiten; eigenes UND fremdes ohne Basis → der Nutzer entscheidet. */
 export async function kontoVerbinden(): Promise<VerbindenErgebnis> {
+  const r = await kontoVerbindenRoh();
+  // M360: Eine wartende Einladung (Link vor der Anmeldung geöffnet) kann jetzt angenommen werden
+  window.dispatchEvent(new CustomEvent('pixinotes:konto-verbunden'));
+  return r;
+}
+function kontoVerbindenRoh(): Promise<VerbindenErgebnis> {
   return exklusiv(async () => {
     const r = await kontoLesen();
     if (!r) {
@@ -1091,7 +1156,8 @@ export async function checkKontoRemote(erzwingen = false): Promise<EinarbeitenEr
   return exklusiv(async (): Promise<EinarbeitenErgebnis | null> => {
     const r = await kontoLesen();
     if (!r) return null;
-    if (r.payload.savedAt === kontoStamp()) { staleHintShown = false; emitSyncStatus('konto', 'ok', r.payload.savedAt); return 'gleich'; }
+    // M360: Ein Rollenwechsel (bearbeiten ↔ nur lesen) ändert keinen Inhalt und keinen Zeitstempel — er zählt trotzdem
+    if (r.payload.savedAt === kontoStamp() && !rollenAnders(r.payload.boards)) { staleHintShown = false; emitSyncStatus('konto', 'ok', r.payload.savedAt); return 'gleich'; }
     const e = await einarbeiten(r.payload);
     if (e === 'uebernommen') {
       useBoard.getState().showToast(`☁️ Neuerer Stand aus ${kontoLabel()} übernommen (${new Date(r.payload.savedAt).toLocaleString('de-DE')}).`);
@@ -1198,7 +1264,7 @@ export function initKontoSync(): void {
         if (liste) {
           const bekannt = Object.keys(kenn.fremd ?? {}).sort().join(',');
           const jetzt = liste.map((f) => f.board_id).sort().join(',');
-          let fremdNeu = bekannt !== jetzt;
+          let fremdNeu = bekannt !== jetzt || rollenAnders(liste.map((f) => ({ id: f.board_id, geteiltVon: f.besitzer, geteiltRolle: f.rolle === 'lesen' ? 'lesen' as const : undefined })));
           if (!fremdNeu) {
             for (const f of liste) {
               const z = await fremdZeile(f.besitzer, f.board_id).catch(() => null);

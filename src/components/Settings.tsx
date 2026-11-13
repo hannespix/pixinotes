@@ -73,7 +73,7 @@ const TABS: ReadonlyArray<readonly [Reiter, string]> = [
   ['design', 'Darstellung'], ['daten', 'Daten'], ['dienste', 'Dienste'],
 ];
 /** Alte Reiter-Namen aus Verweisen (Toasts, Menüs, Karten) landen im passenden neuen Reiter */
-const ALT_REITER: Record<string, Reiter> = { ki: 'dienste', kalender: 'dienste', export: 'daten', sync: 'daten' };
+const ALT_REITER: Record<string, Reiter> = { ki: 'dienste', kalender: 'dienste', export: 'daten', sync: 'daten', konto: 'daten' };
 type SyncWeg = 'konto' | 'ordner' | 'webdav' | 'datei';
 
 /**
@@ -295,7 +295,8 @@ export function Settings() {
     setSbUrl(sb.url); setSbKey(sb.key); setKontoLinkWeg(false);
     // Weg-Vorwahl: ein angemeldetes Konto gewinnt, dann WebDAV, sonst der Ordner (wo möglich), sonst die Datei
     wegManuell.current = false;
-    setSyncWeg(konto ? 'konto' : dav ? 'webdav' : syncSupported() ? 'ordner' : 'datei');
+    // M360: Wer einer Einladung folgt, landet direkt bei der Anmeldung (Sprung „konto")
+    setSyncWeg(konto || useBoard.getState().settingsSection === 'konto' ? 'konto' : dav ? 'webdav' : syncSupported() ? 'ordner' : 'datei');
   }, [open]);
 
   // M328: Rückkehr vom E-Mail-Link meldet an, während das Blatt vielleicht offen ist

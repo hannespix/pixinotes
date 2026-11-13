@@ -116,7 +116,7 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
             {mitKonto && (
               <div className="modal-note">
                 Jeder, der den Link kennt, kann diese Fassung lesen — sie liegt dafür auf dem PixiNotes-Server, bis du den Link löschst.
-                Empfänger arbeiten an ihrer eigenen Kopie. Zum gemeinsamen Arbeiten in Echtzeit: Board-Menü → <b>Für ein Konto freigeben</b>.
+                Empfänger arbeiten an ihrer eigenen Kopie. Zum gemeinsamen Arbeiten in Echtzeit (oder live mitlesen lassen): Board-Menü → <b>Gemeinsam bearbeiten</b>.
               </div>
             )}
             {fehler && <div className="modal-error" role="alert">⚠️ {fehler}</div>}

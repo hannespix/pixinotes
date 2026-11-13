@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useReactFlow, useViewport } from '@xyflow/react';
-import { selectActiveBoard, useBoard, type Stroke } from '../store';
+import { selectNurLesen, selectActiveBoard, useBoard, type Stroke } from '../store';
 import { SEITEN_EREIGNIS, seiteVon, strichRelativ } from '../lib/pdfSeiten';
 import { uid } from '../types';
 import { finalizeStroke, recognizeShapes, type Pt } from '../lib/strokeShapes';
@@ -146,7 +146,10 @@ export function DrawingLayer() {
   // Stift und Textmarker merken sich ihre Farbe getrennt — der Marker startet neongelb
   const [penColor, setPenColor] = useState(PEN_COLORS[0]);
   const [markerColor, setMarkerColor] = useState(MARKER_COLORS[0]);
-  const stiftZeichnet = useBoard((s) => s.stiftZeichnet);
+  // M360: Auf einem nur lesend geteilten Board zeichnet auch der Stift nicht
+  const nurLesen = useBoard(selectNurLesen);
+  const stiftZeichnet = useBoard((s) => s.stiftZeichnet) && !nurLesen;
+  useEffect(() => { if (nurLesen && tool !== 'select') useBoard.setState({ tool: 'select' }); }, [nurLesen, tool]);
   /**
    * M319: Sobald dieses Gerät einmal einen Stift gemeldet hat, gilt auch im
    * Zeichenmodus die Papier-Regel: Stift (und Maus) zeichnen, Finger schieben

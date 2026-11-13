@@ -330,7 +330,33 @@ function PdfThumb({ dataUrl, onOpen, onSeiten }: { dataUrl: string; onOpen: () =
  *     Pos1/Ende springen zur ersten/letzten Karte, Leertaste schwenkt die Ansicht (alles wie bisher).
  * Textfelder (Seitennummer, Kommentar), Menüs und Dialoge behalten ihre Tasten.
  */
+/**
+ * M361: Das Dokument, in dem zuletzt gearbeitet wurde — Klick auf die Seite, Stift- oder Markerstrich, Blätter-Knopf.
+ * Ihm gehören ← / →, Leertaste, Pos1/Ende, auch wenn der Tastatur-Fokus inzwischen woanders liegt: Im Stift- und
+ * Marker-Modus bekommt die Seite ihn nie (die Zeichenebene fängt den Griff ab), ein Werkzeug-Knopf nimmt ihn mit,
+ * ein geschlossener Kommentar lässt ihn fallen. Vorher blätterten dann nur noch die Knöpfe. Ein Griff aufs Board
+ * außerhalb des Dokuments (freie Fläche, Kopfzeile, andere Karte) oder Esc gibt die Pfeile wieder der Karte.
+ */
+let aktivesDokument: string | null = null;
+/** Bedienflächen über dem Board — ein Griff dorthin (Werkzeug wählen, Farbe wechseln) beendet das Blättern nicht */
+const BEDIENUNG = '.draw-palette, .dock, .dock-menu, .sel-toolbar, .sel-toolbar-dock, .modal-backdrop, .ebenen-menu, .topbar, .top-actions, .tabs, .react-flow__minimap, .toast, .focus-head, .focus-nav, .schrift-vorschlag, .lese-band';
+
 function useBlaetterTasten(id: string, barRef: React.RefObject<HTMLDivElement | null>, seite: number, seiten: number, blaettern: (zu: number) => void): void {
+  useEffect(() => {
+    const onZeiger = (e: PointerEvent) => {
+      const wrap = barRef.current?.closest('.pdf-seite-wrap');
+      if (!wrap) return;
+      const t = e.target as HTMLElement | null;
+      const r = wrap.getBoundingClientRect();
+      const drin = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      const bedienung = !!t?.closest?.(BEDIENUNG);
+      // Auch wenn die Zeichenebene den Griff abfängt (Stift, Marker, Radierer): Er lag auf diesem Dokument
+      if (drin && (wrap.contains(t) || !bedienung)) { aktivesDokument = id; return; }
+      if (aktivesDokument === id && !bedienung && t?.closest?.('.react-flow')) aktivesDokument = null;
+    };
+    window.addEventListener('pointerdown', onZeiger, true);
+    return () => { window.removeEventListener('pointerdown', onZeiger, true); if (aktivesDokument === id) aktivesDokument = null; };
+  }, [id, barRef]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
@@ -339,9 +365,15 @@ function useBlaetterTasten(id: string, barRef: React.RefObject<HTMLDivElement | 
       const t = e.target as HTMLElement | null;
       if (t && typeof t.closest === 'function' && t.closest('input, textarea, select, [contenteditable="true"], .modal, [role="dialog"], [role="menu"]')) return;
       if (document.querySelector('.modal-backdrop, .sel-menu-fixed, .kontext-menue, .bn-suggestion-menu')) return;
+      // Esc (nicht in einem Textfeld oder Menü) gibt die Pfeile wieder der Karte
+      if (e.key === 'Escape') { if (aktivesDokument === id) aktivesDokument = null; return; }
       const wrap = barRef.current?.closest('.pdf-seite-wrap');
       if (!wrap) return;
-      const voll = st.focusCard === id || (!!t && wrap.contains(t));
+      // Liegt der Tastatur-Fokus in einem ANDEREN Dokument, gehören die Tasten jenem
+      const fremd = t && typeof t.closest === 'function' ? t.closest('.pdf-seite-wrap') : null;
+      const zuletztHier = aktivesDokument === id && !st.focusCard && !(fremd && fremd !== wrap)
+        && !selectActiveBoard(st).nodes.some((n) => n.selected && n.id !== id);
+      const voll = st.focusCard === id || (!!t && wrap.contains(t)) || zuletztHier;
       if (!voll) {
         const gewaehlt = selectActiveBoard(st).nodes.filter((n) => n.selected);
         if (gewaehlt.length !== 1 || gewaehlt[0].id !== id) return;
@@ -374,7 +406,8 @@ function SeitenLeiste({ id, seite, seiten, blaettern, pinModus, setPinModus, anz
   useBlaetterTasten(id, barRef, seite, seiten, blaettern);
   return (
     <div className="pdf-seite-bar nowheel" ref={barRef}>
-      <button onClick={() => blaettern(seite - 1)} disabled={seite <= 1} aria-label="Vorherige Seite" title="Vorherige Seite" data-taste="pdf-zurueck">‹</button>
+      {/* M361: aria-disabled statt disabled — wird ein Knopf mit Tastatur-Fokus „disabled", verschluckt der Browser danach ALLE Tasten */}
+      <button onClick={() => { if (seite > 1) blaettern(seite - 1); }} aria-disabled={seite <= 1} aria-label="Vorherige Seite" title="Vorherige Seite" data-taste="pdf-zurueck">‹</button>
       <input
         className="pdf-seite-nr" inputMode="numeric" aria-label="Seite" data-taste="pdf-seite-nr"
         value={eingabe || String(seite)}
@@ -384,7 +417,7 @@ function SeitenLeiste({ id, seite, seiten, blaettern, pinModus, setPinModus, anz
         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
       />
       <span className="pdf-seite-von">/ {seiten}</span>
-      <button onClick={() => blaettern(seite + 1)} disabled={seite >= seiten} aria-label="Nächste Seite" title="Nächste Seite" data-taste="pdf-vor">›</button>
+      <button onClick={() => { if (seite < seiten) blaettern(seite + 1); }} aria-disabled={seite >= seiten} aria-label="Nächste Seite" title="Nächste Seite" data-taste="pdf-vor">›</button>
       <span className="pdf-seite-luft" />
       <button className={pinModus ? 'on' : ''} onClick={() => setPinModus((p) => !p)} data-taste="pdf-kommentar"
         title={pinModus ? 'Abbrechen' : 'Kommentar an eine Stelle der Seite setzen — danach auf die Stelle tippen'} aria-pressed={pinModus} aria-label="Kommentar an Stelle">

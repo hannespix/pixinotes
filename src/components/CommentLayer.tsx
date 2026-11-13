@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useInternalNode, useReactFlow, useStore, ViewportPortal } from '@xyflow/react';
 import { selectActiveBoard, useBoard, type CommentThread } from '../store';
-import { IX } from './Icons';
+import { IPen, ITrash, IX } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 import { blasenAn, SEITEN_EREIGNIS, seiteVon, seitenKommentare } from '../lib/pdfSeiten';
 
@@ -82,6 +82,12 @@ function CommentPanel() {
   const [name, setName] = useState(getAuthor());
   const [text, setText] = useState('');
   const listRef = useRef<HTMLDivElement | null>(null);
+  // M362: Beitrag, der gerade bearbeitet wird (Verfasser + Zeitpunkt), und sein Entwurf
+  const editCommentMsg = useBoard((s) => s.editCommentMsg);
+  const removeCommentMsg = useBoard((s) => s.removeCommentMsg);
+  const [bearbeite, setBearbeite] = useState<string | null>(null);
+  const [entwurf, setEntwurf] = useState('');
+  useEffect(() => { setBearbeite(null); }, [openId]);
 
   const isNew = openId?.startsWith('new:') ?? false;
   const thread = isNew ? null : (board.comments ?? []).find((c) => c.id === openId);
@@ -189,12 +195,44 @@ function CommentPanel() {
       </div>
       {thread && (
         <div className="comment-msgs" ref={listRef}>
-          {thread.msgs.map((m, i) => (
-            <div className="comment-msg" key={i}>
-              <span className="comment-msg-meta"><b>{m.author}</b> · {timeOf(m.at)}</span>
-              <span className="comment-msg-text">{m.text}</span>
-            </div>
-          ))}
+          {thread.msgs.map((m) => {
+            const k = `${m.author}\u0000${m.at}`;
+            const speichern = () => { if (entwurf.trim()) editCommentMsg(thread.id, m.at, m.author, entwurf); setBearbeite(null); };
+            return (
+              <div className={`comment-msg ${bearbeite === k ? 'bearbeiten' : ''}`} key={k}>
+                <span className="comment-msg-meta">
+                  <span><b>{m.author}</b> · {timeOf(m.at)}{m.bearbeitet ? <span title={`Bearbeitet am ${new Date(m.bearbeitet).toLocaleString('de-DE')}`}> · bearbeitet</span> : null}</span>
+                  {bearbeite !== k && (
+                    <span className="comment-msg-tools">
+                      <button onClick={() => { setBearbeite(k); setEntwurf(m.text); }} title="Kommentar bearbeiten" aria-label="Kommentar bearbeiten" data-taste="kommentar-bearbeiten"><IPen size={12} /></button>
+                      <button className="danger" title="Diesen Beitrag löschen" aria-label="Diesen Beitrag löschen" data-taste="kommentar-beitrag-loeschen"
+                        onClick={() => { if (window.confirm(thread.msgs.length === 1 ? 'Diesen Kommentar löschen?' : 'Diesen Beitrag löschen?')) removeCommentMsg(thread.id, m.at, m.author); }}><ITrash size={12} /></button>
+                    </span>
+                  )}
+                </span>
+                {bearbeite === k ? (
+                  <>
+                    <textarea
+                      className="comment-input" autoFocus value={entwurf} rows={Math.min(8, Math.max(2, entwurf.split('\n').length))}
+                      aria-label="Kommentar bearbeiten" data-taste="kommentar-entwurf"
+                      onFocus={(e) => { const n = e.currentTarget.value.length; e.currentTarget.setSelectionRange(n, n); }}
+                      onChange={(e) => setEntwurf(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); speichern(); }
+                        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setBearbeite(null); }
+                      }}
+                    />
+                    <span className="comment-msg-knoepfe">
+                      <button onClick={() => setBearbeite(null)}>Abbrechen</button>
+                      <button className="comment-send" disabled={!entwurf.trim()} onClick={speichern} data-taste="kommentar-speichern">Speichern</button>
+                    </span>
+                  </>
+                ) : (
+                  <span className="comment-msg-text" onDoubleClick={() => { setBearbeite(k); setEntwurf(m.text); }}>{m.text}</span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       <div className="comment-compose">

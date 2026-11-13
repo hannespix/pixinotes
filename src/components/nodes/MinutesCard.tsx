@@ -4,7 +4,7 @@ import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe } from '@blocknote/core/locales';
-import { useBoard } from '../../store';
+import { useBoard, useNurLesen } from '../../store';
 import { STICKY_COLORS, uid, type MinutesData, type MinutesNode } from '../../types';
 import { allDecisions, buildEntry, currentEntry, entryLabel, nextDate, sortEntries } from '../../lib/minutes';
 import { repairBlocks } from '../../lib/htmlBlocks';
@@ -309,6 +309,7 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
     const safe = repairBlocks(blocks) as PartialBlock[];
     return safe.length > 0 ? safe : undefined;
   });
+  const nurLesen = useNurLesen(); // M360
   const editor = useCreateBlockNote({
     schema: noteSchema,
     initialContent: initialContent as never,
@@ -354,6 +355,7 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
           setzen oder zurücknehmen. */}
       <BlockNoteView
         editor={editor}
+        editable={!nurLesen}
         theme="light"
         className="note-editor"
         formattingToolbar={false}

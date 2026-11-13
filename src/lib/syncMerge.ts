@@ -175,10 +175,22 @@ function mergeListe<T extends { id: string }>(
 
 /** Zwei geänderte Fassungen eines Kommentar-Gesprächs: Beiträge vereinigen */
 function mergeThread(basis: CommentThread | undefined, lokal: CommentThread, fremd: CommentThread): CommentThread {
-  const key = (m: CommentThread['msgs'][number]) => `${m.author}\u0000${m.at}\u0000${m.text}`;
-  const drin = new Set(lokal.msgs.map(key));
-  const msgs = [...lokal.msgs];
-  for (const m of fremd.msgs) if (!drin.has(key(m))) msgs.push(m);
+  // M362: Beiträge lassen sich bearbeiten und einzeln löschen. Ein Beitrag ist darum über Verfasser + Zeitpunkt
+  // bestimmt (nicht mehr über seinen Text — sonst stünde nach einer Korrektur die alte Fassung daneben). Von zwei
+  // Fassungen gilt die zuletzt bearbeitete; fehlt ein Beitrag auf einer Seite, den der gemeinsame Vorfahre noch
+  // hatte, wurde er dort gelöscht — außer die andere Seite hat ihn inzwischen geändert.
+  type Msg = CommentThread['msgs'][number];
+  const key = (m: Msg) => `${m.author}\u0000${m.at}`;
+  const B = new Map((basis?.msgs ?? []).map((m) => [key(m), m]));
+  const L = new Map(lokal.msgs.map((m) => [key(m), m]));
+  const F = new Map(fremd.msgs.map((m) => [key(m), m]));
+  const msgs: Msg[] = [];
+  for (const k of new Set([...L.keys(), ...F.keys()])) {
+    const b = B.get(k); const l = L.get(k); const f = F.get(k);
+    if (l && f) msgs.push((f.bearbeitet ?? '') > (l.bearbeitet ?? '') ? f : l);
+    else if (l) { if (!b || b.text !== l.text) msgs.push(l); }
+    else if (f) { if (!b || b.text !== f.text) msgs.push(f); }
+  }
   msgs.sort((a, b) => a.at.localeCompare(b.at));
   const resolved = basis && lokal.resolved === basis.resolved ? fremd.resolved : lokal.resolved;
   return { ...lokal, msgs, ...(resolved === undefined ? {} : { resolved }) };
@@ -186,6 +198,8 @@ function mergeThread(basis: CommentThread | undefined, lokal: CommentThread, fre
 
 /** Zwei geänderte Fassungen EINES Boards: Felder dreiwegig, Inhalte je Kennung */
 function mergeBoard(basis: BoardDoc | undefined, lokal: BoardDoc, fremd: BoardDoc, z: Zaehler): BoardDoc {
+  // M360: Nur lesend geteilt — es gilt allein der Stand des Besitzers
+  if (fremd.geteiltVon && fremd.geteiltRolle === 'lesen') return fremd;
   const feld = <K extends keyof BoardDoc>(k: K): BoardDoc[K] =>
     (basis && str(lokal[k]) === str(basis[k]) ? fremd[k] : lokal[k]);
   const nodes = mergeListe<AppNode>(basis?.nodes, lokal.nodes, fremd.nodes, z);
@@ -205,6 +219,8 @@ function mergeBoard(basis: BoardDoc | undefined, lokal: BoardDoc, fremd: BoardDo
   if (archived === undefined) delete out.archived; else out.archived = archived;
   if (lokal.drawings || fremd.drawings) out.drawings = drawings;
   if (lokal.comments || fremd.comments) out.comments = comments;
+  // M360: Mit welcher Rolle ein fremdes Board geteilt ist, sagt das Konto — nicht der hiesige Stand
+  if (fremd.geteiltVon) { if (fremd.geteiltRolle) out.geteiltRolle = fremd.geteiltRolle; else delete out.geteiltRolle; }
   return out;
 }
 
