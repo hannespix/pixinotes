@@ -63,6 +63,9 @@ export interface BoardDoc {
   geteiltVon?: string;
   /** M330: E-Mail des Besitzers — nur zur Anzeige */
   geteiltVonName?: string;
+  /** M360: Der Besitzer hat das Board nur zum Lesen freigegeben — die Oberfläche ändert es nicht,
+   *  nur der Abgleich bringt neue Stände (lib/kontoSync.ts) */
+  geteiltRolle?: 'lesen';
   /** Kommentar-Threads (M148) — leben IM Board und wandern so automatisch
    *  im globalen Sync UND im Team-Projekt-Paket mit */
   comments?: CommentThread[];
@@ -84,7 +87,8 @@ export interface CommentThread {
   px?: number;
   py?: number;
   resolved?: boolean;
-  msgs: Array<{ author: string; text: string; at: string }>;
+  /** M362: `bearbeitet` = Zeitpunkt der letzten nachträglichen Änderung des Textes (fehlt bei unveränderten Beiträgen) */
+  msgs: Array<{ author: string; text: string; at: string; bearbeitet?: string }>;
 }
 
 export type Tool = 'select' | 'pen' | 'marker' | 'eraser';
@@ -374,6 +378,10 @@ interface BoardState {
   setLookup: (q: string | null) => void;
   /** Kommentar anhängen: an bestehenden Thread (threadId) oder neuen an einer Karte eröffnen */
   addCommentMsg: (target: { threadId?: string; nodeId?: string; seite?: number; px?: number; py?: number }, author: string, text: string) => string | null;
+  /** M362: Text eines Beitrags nachträglich ändern — der Beitrag ist über Verfasser + Zeitpunkt bestimmt */
+  editCommentMsg: (threadId: string, at: string, author: string, text: string) => void;
+  /** M362: einen einzelnen Beitrag löschen; der letzte Beitrag nimmt den ganzen Thread mit */
+  removeCommentMsg: (threadId: string, at: string, author: string) => void;
   toggleCommentResolved: (threadId: string) => void;
   removeCommentThread: (threadId: string) => void;
 
@@ -526,8 +534,88 @@ interface BoardState {
 
 export const selectActiveBoard = (s: BoardState): BoardDoc =>
   s.boards.find((b) => b.id === s.activeId) ?? s.boards[0];
+/** M360: Das offene Board ist nur zum Lesen geteilt */
+export const selectNurLesen = (s: BoardState): boolean => selectActiveBoard(s)?.geteiltRolle === 'lesen';
+export const useNurLesen = (): boolean => useBoard(selectNurLesen);
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+
+// ---------- M360: Leseschutz für nur lesend geteilte Boards ----------
+// Ein Board mit geteiltRolle 'lesen' gehört einem anderen Konto und darf hier
+// nicht verändert werden: Der Server nähme die Änderung ohnehin nicht an, und
+// lokal stünde dann ein Stand, den es nirgends sonst gibt. Der Schutz sitzt an
+// EINER Stelle — am set() des Speichers —, damit keine der vielen Karten-Arten
+// und Werkzeuge vergessen wird. Auswahl und gemessene Größen (Ansicht, kein
+// Inhalt) gehen durch; der Abgleich schreibt über ohneLeseschutz().
+let leseschutzAus = 0;
+export function ohneLeseschutz<T>(fn: () => T): T {
+  leseschutzAus += 1;
+  try { return fn(); } finally { leseschutzAus -= 1; }
+}
+/** Zeitpunkt der letzten Eingabe — nur dann lohnt der Hinweis (nicht bei stillen Selbst-Korrekturen der Karten) */
+let letzteEingabe = 0;
+if (typeof window !== 'undefined') {
+  const merken = () => { letzteEingabe = performance.now(); };
+  for (const ev of ['pointerdown', 'pointerup', 'keydown', 'drop', 'paste'] as const) window.addEventListener(ev, merken, true);
+}
+let leseHinweisAm = 0;
+export const LESE_HINWEIS = '🔒 Dieses Board ist nur zum Lesen freigegeben. Für eigene Änderungen: oben „Eigene Kopie anlegen".';
+function leseHinweis(): void {
+  const jetzt = performance.now();
+  if (jetzt - letzteEingabe > 1500 || jetzt - leseHinweisAm < 4000) return;
+  leseHinweisAm = jetzt;
+  queueMicrotask(() => useBoard.getState().showToast(LESE_HINWEIS, false, 5000));
+}
+const ANSICHT_FELDER = new Set(['selected', 'measured', 'dragging', 'resizing']);
+/** Felder, deren verworfene Änderung einen Hinweis wert ist — also das, was ein Mensch bewusst tut (schreiben,
+ *  schieben, archivieren, verbinden). Stilles Beiwerk fällt ohne Meldung weg: Ein Klick hebt die Karte nach vorn
+ *  (zIndex), eine Notiz misst ihre Höhe nach — das ist keine Bearbeitung. */
+const MELDE_FELDER = ['data', 'position', 'archived', 'parentId', 'type', 'source', 'target', 'label'];
+function inhaltAnders(a: object, b: object): boolean {
+  const x = a as Record<string, unknown>; const y = b as Record<string, unknown>;
+  return MELDE_FELDER.some((k) => x[k] !== y[k]);
+}
+/** Vom neuen Stand nur die Ansicht (Auswahl, Maße) übernehmen; meldet, ob Inhalt verworfen wurde */
+function nurAnsicht(alt: BoardDoc, neu: BoardDoc): { board: BoardDoc; verworfen: boolean } {
+  let verworfen = neu.name !== alt.name || neu.bg !== alt.bg || neu.archived !== alt.archived
+    || neu.drawings !== alt.drawings || neu.comments !== alt.comments
+    || neu.nodes.length !== alt.nodes.length || neu.edges.length !== alt.edges.length;
+  const ansicht = <T extends { id: string }>(liste: T[], neue: T[]): T[] => {
+    const nach = new Map(neue.map((n) => [n.id, n]));
+    let anders = false;
+    const aus = liste.map((n) => {
+      const m = nach.get(n.id);
+      if (!m) { verworfen = true; return n; }
+      if (m === n) return n;
+      if (inhaltAnders(n, m)) verworfen = true;
+      const a = n as Record<string, unknown>; const b = m as Record<string, unknown>;
+      if ([...ANSICHT_FELDER].every((k) => a[k] === b[k])) return n;
+      anders = true;
+      const kopie: Record<string, unknown> = { ...a };
+      for (const k of ANSICHT_FELDER) { if (b[k] === undefined) delete kopie[k]; else kopie[k] = b[k]; }
+      return kopie as T;
+    });
+    return anders ? aus : liste;
+  };
+  const nodes = ansicht(alt.nodes, neu.nodes);
+  const edges = ansicht(alt.edges, neu.edges);
+  return { board: nodes === alt.nodes && edges === alt.edges ? alt : { ...alt, nodes, edges }, verworfen };
+}
+/** Die Board-Liste eines set(): nur lesend geteilte Boards behalten ihren Inhalt */
+function leseschutz(alt: BoardDoc[], neu: BoardDoc[]): BoardDoc[] {
+  const vorher = new Map(alt.map((b) => [b.id, b]));
+  let geschuetzt = false; let verworfen = false;
+  const aus = neu.map((b) => {
+    const a = vorher.get(b.id);
+    if (!a || a === b || a.geteiltRolle !== 'lesen') return b;
+    const r = nurAnsicht(a, b);
+    geschuetzt = true;
+    if (r.verworfen) verworfen = true;
+    return r.board;
+  });
+  if (verworfen) leseHinweis();
+  return geschuetzt ? aus : neu;
+}
 
 /** Sammel-Aktionen (z. B. KI-Pläne): innere Mutatoren pushen KEINE eigenen
  *  History-Einträge — der Aufrufer sichert vorher genau einen Snapshot.
@@ -775,7 +863,16 @@ const defaultHierarchy = (boardIds: string[]): Space[] => [
 
 export const useBoard = create<BoardState>()(
   persist(
-    (set, get) => {
+    (setRoh, get) => {
+      // M360: jeder Schreibzugriff der Oberfläche läuft durch den Leseschutz (siehe oben)
+      const set: typeof setRoh = ((teil: unknown, ersetzen?: boolean) => {
+        if (leseschutzAus > 0) return (setRoh as (t: unknown, e?: boolean) => void)(teil, ersetzen);
+        const vor = get();
+        if (!vor.boards.some((b) => b.geteiltRolle === 'lesen')) return (setRoh as (t: unknown, e?: boolean) => void)(teil, ersetzen);
+        let neu = (typeof teil === 'function' ? (teil as (s: BoardState) => Partial<BoardState>)(vor) : teil) as Partial<BoardState>;
+        if (neu.boards && neu.boards !== vor.boards) neu = { ...neu, boards: leseschutz(vor.boards, neu.boards) };
+        return (setRoh as (t: unknown, e?: boolean) => void)(neu, ersetzen);
+      }) as typeof setRoh;
       const patchActive = (fn: (b: BoardDoc) => Partial<BoardDoc>) => {
         const active = selectActiveBoard(get());
         if (!active) return;
@@ -1102,7 +1199,11 @@ export const useBoard = create<BoardState>()(
           });
         },
         setPresenting: (on) => set({ presenting: on }),
-        setTool: (tool) => set({ tool }),
+        setTool: (tool) => {
+          // M360: Auf einem nur lesend geteilten Board gibt es nichts zu zeichnen
+          if (tool !== 'select' && selectNurLesen(get())) { get().showToast(LESE_HINWEIS, false, 5000); return; }
+          set({ tool });
+        },
         updateAi: (patch) => set({ ai: { ...get().ai, ...patch } }),
         brain: { on: false, provider: 'auto', embedModel: 'nomic-embed-text' },
         updateBrain: (patch) => set({ brain: { ...get().brain, ...patch } }),
@@ -1307,7 +1408,7 @@ export const useBoard = create<BoardState>()(
 
         importEpoch: 0,
 
-        importSync: (boards, spaces, activeId, sanft) => {
+        importSync: (boards, spaces, activeId, sanft) => ohneLeseschutz(() => {
           if (!Array.isArray(boards) || boards.length === 0 || !Array.isArray(spaces)) return;
           // Auto-Sync-Bremse: dieser Stand kam von außen — nicht gleich wieder
           // mit neuem Zeitstempel hochladen (falsche Konflikte auf anderen Geräten)
@@ -1349,7 +1450,7 @@ export const useBoard = create<BoardState>()(
             // würden ihn beim nächsten Tastendruck sogar zurückschreiben
             importEpoch: get().importEpoch + 1,
           });
-        },
+        }),
 
         importProject: (proj, boards) => {
           if (!proj?.id || !proj.name || !Array.isArray(boards) || boards.length === 0) return;
@@ -1613,20 +1714,31 @@ export const useBoard = create<BoardState>()(
             id: neueId(),
             anchor: d.anchor ? karte.get(d.anchor) : undefined,
           }));
+          // M360: Die Kopie eines geteilten Boards gehört mir — ohne Besitzer-Kennung und ohne Leseschutz
+          const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, ...eigen } = quelle;
           const kopie = {
-            ...quelle, id: neueId(), name: `${quelle.name} (Kopie)`,
+            ...eigen, id: neueId(), name: `${quelle.name} (Kopie)`,
             nodes, edges, drawings, comments: [],
           };
           const boards = [...st.boards, kopie];
+          // M360: Die Kopie eines fremden Boards gehört nicht unter „Geteilt mit mir" — sie kommt ins erste eigene Projekt und geht auf
+          const eigenes = quelle.geteiltVon ? st.spaces.filter((sp) => sp.id !== 'geteilt').flatMap((sp) => sp.projects)[0] : undefined;
           set({
             boards,
             spaces: sortiereProjekte(st.spaces.map((sp) => ({
               ...sp,
-              projects: sp.projects.map((p) => (p.boardIds.includes(boardId)
-                ? { ...p, boardIds: p.boardIds.flatMap((id) => (id === boardId ? [id, kopie.id] : [id])) }
-                : p)),
+              projects: sp.projects.map((p) => (eigenes
+                ? (p.id === eigenes.id ? { ...p, boardIds: [...p.boardIds, kopie.id] } : p)
+                : p.boardIds.includes(boardId)
+                  ? { ...p, boardIds: p.boardIds.flatMap((id) => (id === boardId ? [id, kopie.id] : [id])) }
+                  : p)),
             })), boards),
           });
+          if (eigenes) {
+            get().openBoard(kopie.id);
+            get().showToast(`Kopie von „${quelle.name}" angelegt — sie gehört dir und liegt in „${eigenes.name}".`, false, 6000);
+            return;
+          }
           get().showToast(`Board „${quelle.name}" kopiert — die Kopie liegt daneben.`);
         },
 
@@ -1642,8 +1754,9 @@ export const useBoard = create<BoardState>()(
             const quelle = st.boards.find((b) => b.id === bid);
             if (!quelle) continue;
             const karte = new Map(quelle.nodes.map((n) => [n.id, neueId()]));
+            const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, ...eigen } = quelle; // M360: Kopien gehören mir
             const kopie: BoardDoc = {
-              ...quelle, id: neueId(), name: quelle.name,
+              ...eigen, id: neueId(), name: quelle.name,
               nodes: quelle.nodes.map((n) => ({ ...JSON.parse(JSON.stringify(n)), id: karte.get(n.id) as string, selected: false })),
               edges: (quelle.edges ?? [])
                 .filter((e) => karte.has(e.source) && karte.has(e.target))
@@ -1792,6 +1905,29 @@ export const useBoard = create<BoardState>()(
             return { comments };
           });
           return threadId;
+        },
+
+        editCommentMsg: (threadId, at, author, text) => {
+          const neu = text.trim();
+          if (!neu) return;
+          patchActive((b) => {
+            const alt = (b.comments ?? []).find((c) => c.id === threadId)?.msgs.find((m) => m.at === at && m.author === author);
+            if (!alt || alt.text === neu) return {};
+            return {
+              comments: (b.comments ?? []).map((c) => (c.id === threadId
+                ? { ...c, msgs: c.msgs.map((m) => (m === alt ? { ...m, text: neu, bearbeitet: new Date().toISOString() } : m)) }
+                : c)),
+            };
+          });
+        },
+
+        removeCommentMsg: (threadId, at, author) => {
+          const thread = (selectActiveBoard(get()).comments ?? []).find((c) => c.id === threadId);
+          if (!thread) return;
+          const rest = thread.msgs.filter((m) => !(m.at === at && m.author === author));
+          if (rest.length === thread.msgs.length) return;
+          if (rest.length === 0) { get().removeCommentThread(threadId); return; }
+          patchActive((b) => ({ comments: (b.comments ?? []).map((c) => (c.id === threadId ? { ...c, msgs: rest } : c)) }));
         },
 
         toggleCommentResolved: (threadId) =>

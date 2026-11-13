@@ -15,7 +15,7 @@ import {
 import { fangAktiv, fangen, fangSetzen, type Kasten } from '../lib/fang';
 import { Fanglinien } from './Fanglinien';
 import { useBoardTasten } from './boardTasten';
-import { mutedHistory, selectActiveBoard, useBoard } from '../store';
+import { mutedHistory, selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { frameMembers } from '../lib/arrange';
 import { computePush } from '../lib/physics';
 import { imageFileToDataUrl } from '../lib/image';
@@ -553,6 +553,15 @@ export function Board() {
 
   // Board-Optionen (M88): Hintergrund-Tönung + Gitter/Raster-Fang
   const boardBg = useBoard((s) => selectActiveBoard(s).bg);
+  // M360: Nur lesend geteiltes Board — nichts ziehen, verbinden oder tippen (der Speicher verwirft Änderungen ohnehin)
+  const nurLesen = useBoard(selectNurLesen);
+  useEffect(() => {
+    if (!nurLesen) return;
+    const imBoard = (e: Event) => !!(e.target as HTMLElement | null)?.closest?.('.board-wrap');
+    const stopp = (e: Event) => { if (imBoard(e)) e.preventDefault(); };
+    for (const ev of ['beforeinput', 'cut'] as const) document.addEventListener(ev, stopp, true);
+    return () => { for (const ev of ['beforeinput', 'cut'] as const) document.removeEventListener(ev, stopp, true); };
+  }, [nurLesen]);
   const gridSnap = useBoard((s) => s.gridSnap);
 
   // Archiv (M87): archivierte Karten sind ausgeblendet (React-Flow `hidden`),
@@ -1357,14 +1366,14 @@ export function Board() {
     <div
       ref={zoomWrapRef}
       data-weit={weit && !focusCard ? '' : undefined}
-      className={`board-wrap ${spaceHeld ? 'space-pan' : ''} ${boardBg ? `board-bg-${boardBg}` : ''}`}
+      className={`board-wrap ${spaceHeld ? 'space-pan' : ''} ${boardBg ? `board-bg-${boardBg}` : ''} ${nurLesen ? 'nur-lesen' : ''}`}
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}
       onDoubleClick={handleDoubleClick}
       onTouchEnd={handleTouchEnd}
     >
       <EdgeMarkerDefs />
-      {nodes.length === 0 && (
+      {nodes.length === 0 && !nurLesen && (
         <div className="empty-board-hint">
           <div>📝 Doppelklick (oder N) = neue Notiz</div>
           <div>📧 E-Mails (.eml/.msg) &amp; Dateien hierher ziehen</div>
@@ -1395,7 +1404,8 @@ export function Board() {
         connectionRadius={42}
         connectionLineStyle={{ stroke: 'var(--accent)', strokeWidth: 2.5 }}
         panOnScroll={!wheelZoom}
-        nodesDraggable={!focusCard}
+        nodesDraggable={!focusCard && !nurLesen}
+        nodesConnectable={!nurLesen}
         snapToGrid={gridSnap}
         snapGrid={[20, 20]}
         zoomOnScroll={wheelZoom}

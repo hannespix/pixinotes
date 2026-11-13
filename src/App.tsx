@@ -11,7 +11,7 @@ import { RechercheDialog } from './components/RechercheDialog';
 import { Presenter } from './components/Presenter';
 import {
   adoptPersistedState, claimWriter, getWriterRole, reassertPersist,
-  singleWriterSupported, takeOverWriter, useBoard, type WriterRole,
+  selectActiveBoard, selectNurLesen, singleWriterSupported, takeOverWriter, useBoard, type WriterRole,
 } from './store';
 import { initAutoSync } from './lib/syncFolder';
 import { initProjectAutoSync } from './lib/projectSync';
@@ -40,6 +40,8 @@ import { autoArchivAlleBoards } from './lib/ticketArchiv';
 import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
 import { initGrabsteine } from './lib/grabsteine';
 import { linkOeffnen, linkTokenAbholen } from './lib/linkTeilen';
+import { einladungAnnehmen, einladungOffen, einladungTokenAbholen } from './lib/einladung';
+import { loadKonto } from './lib/kontoSync';
 import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick gespeicherte Seitenstriche (M354-Fehler) einmal richten
 
 export default function App() {
@@ -55,6 +57,10 @@ export default function App() {
   const spalteBreite = useBoard((s) => s.spalteBreite);
   const restoreDeleted = useBoard((s) => s.restoreDeleted);
   const showToast = useBoard((s) => s.showToast);
+  // M360: Ist das offene Board nur zum Lesen geteilt? (Kennung und Besitzer für das Hinweisband)
+  const nurLesenId = useBoard((s) => (selectNurLesen(s) ? s.activeId : ''));
+  const nurLesenVon = useBoard((s) => (selectNurLesen(s) ? selectActiveBoard(s).geteiltVonName ?? '' : ''));
+  const nurLesenBoard = nurLesenId ? { id: nurLesenId, von: nurLesenVon } : null;
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
   useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); }, []);
@@ -145,6 +151,44 @@ export default function App() {
         ? 'Geteiltes Board geöffnet — du hattest es schon.'
         : 'Geteiltes Board geöffnet — es ist jetzt dein eigenes; Änderungen bleiben bei dir.', false, 6000))
       .catch((e: Error) => useBoard.getState().showToast(`⚠️ ${e.message}`, false, 9000));
+  }, []);
+
+  // M360: Einladungslink (#e=<token>) — als Gast beitreten und das gemeinsame Board öffnen. Ohne Anmeldung
+  // bleibt die Einladung gemerkt; nach der Anmeldung (auch per E-Mail-Link, also nach einem Neuladen) geht es weiter.
+  useEffect(() => {
+    let laeuft = false;
+    const annehmen = (token: string, vomLink: boolean) => {
+      if (laeuft) return;
+      laeuft = true;
+      claimWriter(); // der Abgleich läuft nur im schreibenden Fenster
+      if (vomLink && loadKonto()) useBoard.getState().showToast('Einladung wird angenommen …');
+      einladungAnnehmen(token).then((r) => {
+        const st = useBoard.getState();
+        if (r.art === 'anmelden') {
+          if (!vomLink) return;
+          st.showToast('👥 Einladung zu einem gemeinsamen Board: Melde dich mit E-Mail an — danach öffnet es sich von selbst.', false, 14000);
+          st.setSettingsOpen(true, 'konto');
+        } else if (r.art === 'eigen') {
+          st.showToast('Das ist der Einladungslink zu deinem eigenen Board — gib ihn an die anderen weiter.', false, 7000);
+        } else {
+          const von = r.von ? ` von ${r.von}` : '';
+          st.showToast(r.rolle === 'lesen'
+            ? `👥 Geteiltes Board${von} geöffnet — du liest live mit (nur lesen).`
+            : `👥 Geteiltes Board${von} geöffnet — ihr arbeitet jetzt gemeinsam daran.`, false, 8000);
+        }
+      }).catch((e: Error) => useBoard.getState().showToast(`⚠️ ${e.message}`, false, 9000))
+        .finally(() => { laeuft = false; });
+    };
+    const token = einladungTokenAbholen();
+    const offen = einladungOffen();
+    if (token) annehmen(token, true);
+    else if (offen && loadKonto()) annehmen(offen, false);
+    const nach = () => { const t = einladungOffen(); if (t) annehmen(t, false); };
+    // Link in die Adresszeile der offenen App eingefügt: nur der Anker ändert sich, die Seite lädt nicht neu
+    const anker = () => { const t = einladungTokenAbholen(); if (t) annehmen(t, true); };
+    window.addEventListener('pixinotes:konto-verbunden', nach);
+    window.addEventListener('hashchange', anker);
+    return () => { window.removeEventListener('pixinotes:konto-verbunden', nach); window.removeEventListener('hashchange', anker); };
   }, []);
 
   // Erinnerungen: beim Start und dann alle 5 Minuten fällige Aufgaben melden
@@ -286,6 +330,13 @@ export default function App() {
             <button className="link-btn" onClick={() => useBoard.getState().setHelpOpen(true, 'impressum')}>Impressum</button>
             <span aria-hidden="true">·</span>
             <button className="link-btn" onClick={() => useBoard.getState().setHelpOpen(true, 'datenschutz')}>Datenschutz</button>
+          </div>
+        )}
+        {/* M360: Nur lesend geteiltes Board — sagen, warum nichts geht, und den Ausweg anbieten */}
+        {nurLesenBoard && view === 'board' && !presenting && !focusCard && (
+          <div className="lese-band" role="status" data-taste="lese-band">
+            <span>🔒 <b>Nur lesen</b> · {nurLesenBoard.von ? `geteilt von ${nurLesenBoard.von}` : 'geteiltes Board'}</span>
+            <button onClick={() => useBoard.getState().duplicateBoard(nurLesenBoard.id)} data-taste="lese-kopie">Eigene Kopie anlegen</button>
           </div>
         )}
         {writerRole === 'follower' && (

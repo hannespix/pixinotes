@@ -1999,7 +1999,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
   border-radius: var(--r-sm); min-width: 26px; height: 26px; padding: 0 6px; cursor: pointer; font: inherit; font-size: 13px;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.pdf-seite-bar button:disabled { opacity: .35; cursor: default; }
+.pdf-seite-bar button:disabled, .pdf-seite-bar button[aria-disabled='true'] { opacity: .35; cursor: default; }
 .pdf-seite-bar button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
 .pdf-seite-nr {
   width: 40px; height: 26px; text-align: center; font: inherit; font-size: 12.5px;
@@ -6566,12 +6566,12 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 @media (max-width: 700px) { .draw-palette .draw-regler { width: 72px; } .draw-palette .draw-staerke-wert { display: none; } }
 
 /* ===== M357: Per Link teilen ===== */
-.link-dialog .link-zeile { display: flex; gap: 6px; align-items: stretch; margin: 6px 0 2px; }
-.link-dialog .link-zeile input { flex: 1; min-width: 0; font: inherit; font-size: 12.5px; padding: 7px 9px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink); }
-.link-dialog .link-zeile button { white-space: nowrap; }
-.link-dialog .link-weg { color: #b3502f; }
-[data-theme='dark'] .link-dialog .link-weg { color: #ffab8f; }
-@media (max-width: 520px) { .link-dialog .link-zeile { flex-wrap: wrap; } .link-dialog .link-zeile input { flex-basis: 100%; } }
+.freigabe-dialog .link-zeile { display: flex; gap: 6px; align-items: stretch; margin: 6px 0 2px; }
+.freigabe-dialog .link-zeile input { flex: 1; min-width: 0; font: inherit; font-size: 12.5px; padding: 7px 9px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink); }
+.freigabe-dialog .link-zeile button { white-space: nowrap; }
+.freigabe-dialog .link-weg { color: #b3502f; }
+[data-theme='dark'] .freigabe-dialog .link-weg { color: #ffab8f; }
+@media (max-width: 520px) { .freigabe-dialog .link-zeile { flex-wrap: wrap; } .freigabe-dialog .link-zeile input { flex-basis: 100%; } }
 
 /* ===== M359: Kommentar-Pins und -Blasen liegen ÜBER den Karten — auch über gewählten =====
    Sie leben in derselben Ebene wie die Karten (ViewportPortal). React Flow hebt eine gewählte oder gezogene
@@ -6579,3 +6579,70 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
    anklickte, verschwand der Teil der Blase, der über der Karte lag. */
 .comment-pin { z-index: 3001; }
 .comment-blase { z-index: 3000; }
+
+/* ---------- M360: Freigabe mit Rollen, Einladungslink, nur lesend geteilte Boards ---------- */
+.freigabe-dialog .freigabe-block { border: 1px solid var(--border-soft); border-radius: var(--r); padding: 10px 12px; margin: 0 0 10px; background: var(--surface-3); }
+.freigabe-dialog .freigabe-titel { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+.freigabe-dialog .freigabe-zeile { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.freigabe-dialog .freigabe-zeile input {
+  flex: 1 1 170px; min-width: 0; font: inherit; font-size: 13px; padding: 7px 10px;
+  border: 1px solid var(--border-soft); border-radius: var(--r); outline: none; background: var(--surface); color: var(--ink);
+}
+.freigabe-dialog .freigabe-zeile input:focus-visible, .freigabe-dialog .freigabe-rolle:focus-visible { border-color: var(--accent); }
+.freigabe-dialog .freigabe-zeile button, .freigabe-dialog .link-zeile button {
+  border: 1px solid var(--border-soft); background: var(--surface); border-radius: var(--r); padding: 7px 11px;
+  font-family: inherit; font-size: 12.5px; cursor: pointer; color: var(--ink); white-space: nowrap;
+}
+.freigabe-dialog .freigabe-zeile button:hover:not(:disabled), .freigabe-dialog .link-zeile button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.freigabe-dialog .freigabe-zeile button:disabled { opacity: .5; cursor: default; }
+.freigabe-dialog .freigabe-zeile .link-weg { margin-left: auto; }
+.freigabe-dialog .freigabe-rolle {
+  font: inherit; font-size: 12.5px; padding: 6px 8px; border: 1px solid var(--border-soft); border-radius: var(--r);
+  background: var(--surface); color: var(--ink); cursor: pointer;
+}
+.freigabe-dialog .freigabe-liste li { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+.freigabe-dialog .freigabe-liste .freigabe-rolle { padding: 3px 6px; font-size: 12px; }
+@media (max-width: 520px) {
+  .freigabe-dialog .freigabe-liste li { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .freigabe-dialog .freigabe-liste .freigabe-stand { display: none; }
+}
+/* Hinweisband über einem nur lesend geteilten Board */
+.lese-band {
+  position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface-card); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 999px;
+  box-shadow: var(--pop-shadow);
+  font-size: 12.5px; line-height: 1.3; padding: 5px 6px 5px 14px;
+  z-index: 60; max-width: min(560px, 92vw); white-space: nowrap;
+}
+.lese-band span { overflow: hidden; text-overflow: ellipsis; }
+.lese-band button {
+  flex: none; border: none; cursor: pointer; background: var(--accent); color: #fff;
+  font-family: inherit; font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 999px; white-space: nowrap;
+}
+.lese-band button:hover { filter: brightness(1.08); }
+/* Nichts zum Anfassen, was ändern würde: Größen-Griffe und Verbindungs-Punkte */
+.board-wrap.nur-lesen .react-flow__resize-control,
+.board-wrap.nur-lesen .react-flow__handle { visibility: hidden; pointer-events: none; }
+.board-wrap.nur-lesen .bn-editor { cursor: default; }
+
+/* ---------- M362: Kommentare bearbeiten ---------- */
+.comment-msg-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 20px; }
+.comment-msg-tools { display: inline-flex; gap: 2px; opacity: .55; }
+.comment-msg:hover .comment-msg-tools, .comment-msg-tools:focus-within { opacity: 1; }
+.comment-msg-tools button {
+  border: none; background: none; cursor: pointer; color: var(--muted); padding: 3px; border-radius: var(--r-xs);
+  display: inline-grid; place-items: center; width: 22px; height: 22px;
+}
+.comment-msg-tools button:hover { background: var(--surface-2); color: var(--ink); }
+.comment-msg-tools button.danger:hover { background: rgba(192, 57, 43, 0.1); color: #c0392b; }
+.comment-msg.bearbeiten { gap: 5px; }
+.comment-msg.bearbeiten .comment-input { width: 100%; box-sizing: border-box; }
+.comment-msg-knoepfe { display: flex; justify-content: flex-end; gap: 6px; }
+.comment-msg-knoepfe button:not(.comment-send) {
+  border: 1px solid var(--border-soft); background: none; color: var(--ink); cursor: pointer;
+  font-family: inherit; font-size: 12px; padding: 4px 10px; border-radius: var(--r);
+}
+.comment-msg-knoepfe .comment-send { align-self: auto; }
+@media (hover: none) { .comment-msg-tools { opacity: 1; } .comment-msg-tools button { width: 28px; height: 28px; } }

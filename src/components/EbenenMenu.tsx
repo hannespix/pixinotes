@@ -209,7 +209,7 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
           <div className="ebenen-menu-titel">Weitergeben</div>
           {kontoIstEigenes() && (
             <button role="menuitem" onClick={() => { setFreigabe(true); zu(); }} data-taste="board-freigeben">
-              <IShare size={14} /> {board.geteiltVon ? 'Geteilt mit mir …' : 'Für ein Konto freigeben …'}
+              <IShare size={14} /> {board.geteiltVon ? 'Geteilt mit mir …' : 'Gemeinsam bearbeiten …'}
             </button>
           )}
           <button role="menuitem" onClick={() => { setLinkOffen(true); zu(); }} data-taste="board-link">
