@@ -39,6 +39,7 @@ import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
 import { autoArchivAlleBoards } from './lib/ticketArchiv';
 import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
 import { initGrabsteine } from './lib/grabsteine';
+import { linkOeffnen, linkTokenAbholen } from './lib/linkTeilen';
 import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick gespeicherte Seitenstriche (M354-Fehler) einmal richten
 
 export default function App() {
@@ -129,6 +130,21 @@ export default function App() {
         st.showToast('Geteiltes Board übernommen — liegt als eigenes Board in deiner Tab-Leiste.');
       }
     })();
+  }, []);
+
+  // M357: Kurzer Link (#l=<token>) — die geteilte Fassung holen und DIREKT öffnen, ohne Rückfrage:
+  // Wer auf einen Link klickt, will das Board sehen; es kommt als eigenes Board dazu und ersetzt nichts.
+  useEffect(() => {
+    const token = linkTokenAbholen();
+    if (!token) return;
+    const st = useBoard.getState();
+    st.showToast('Geteiltes Board wird geladen …');
+    claimWriter(); // bewusster Import — auch aus einem Mitlese-Fenster wirksam
+    linkOeffnen(token, (name) => window.confirm(`Von „${name}" gibt es eine neuere Fassung.\n\nOK = neue Fassung laden (als weiteres Board, dein bisheriges bleibt)\nAbbrechen = dein bisheriges öffnen`))
+      .then((wie) => useBoard.getState().showToast(wie === 'vorhanden'
+        ? 'Geteiltes Board geöffnet — du hattest es schon.'
+        : 'Geteiltes Board geöffnet — es ist jetzt dein eigenes; Änderungen bleiben bei dir.', false, 6000))
+      .catch((e: Error) => useBoard.getState().showToast(`⚠️ ${e.message}`, false, 9000));
   }, []);
 
   // Erinnerungen: beim Start und dann alle 5 Minuten fällige Aufgaben melden

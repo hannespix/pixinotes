@@ -57,8 +57,8 @@ export function downloadBoardFile(board: BoardDoc): void {
 }
 
 /** Board aus geteiltem Payload klonen: frische IDs, damit nichts kollidiert */
-export function cloneSharedBoard(board: BoardDoc): BoardDoc {
-  const idMap = new Map<string, string>();
+export function cloneSharedBoard(board: BoardDoc, idMap: Map<string, string> = new Map()): BoardDoc {
+  // M357: Wer die Zuordnung alte → neue Karten-Id braucht (Anhänge liegen unter der Karten-Id), reicht die Karte herein
   const nodes = (board.nodes ?? []).map((n) => {
     const nid = uid();
     idMap.set(n.id, nid);

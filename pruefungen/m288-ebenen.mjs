@@ -100,7 +100,7 @@ let vorratSeite = null;
   await P.waitForTimeout(500);
   vorratSeite = await menuEintraege(P);
   console.log('    Seitenleiste:', JSON.stringify(vorratSeite));
-  for (const wort of ['Umbenennen', 'Duplizieren', 'In Projekt verschieben', 'Teilen-Link kopieren',
+  for (const wort of ['Umbenennen', 'Duplizieren', 'In Projekt verschieben', 'Per Link teilen',
     'Als Datei sichern', 'Präsentieren', 'Archivieren', 'Löschen']) {
     pruefe(`T1 „${wort}" steht im Board-Menü`, vorratSeite.some((t) => t.includes(wort)), JSON.stringify(vorratSeite));
   }

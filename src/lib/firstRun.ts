@@ -15,7 +15,9 @@
 export const isFirstRun: boolean = (() => {
   try {
     return !localStorage.getItem('pixinotes-board')
-      && !localStorage.getItem('pixinotes-onboarded');
+      && !localStorage.getItem('pixinotes-onboarded')
+      // M357: Wer über einen geteilten Link kommt, will das Board sehen — keine Einführung davor
+      && !/^#[lb]=/.test(location.hash);
   } catch {
     return false; // privates Fenster ohne Speicher: lieber nicht stören
   }
