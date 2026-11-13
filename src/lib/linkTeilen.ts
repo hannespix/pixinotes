@@ -33,8 +33,10 @@ function neuesToken(): string {
 }
 const basis = (): string => loadKonto()?.url ?? '';
 const pfad = (token: string, name: string): string => `${encodeURIComponent(loadKonto()?.userId ?? '')}/link-${token}/${encodeURIComponent(name)}`;
+/** Der Server kennt die Link-Freigabe noch nicht (Tabelle `board_links` fehlt) — der Dialog bietet dann den Weg ohne Konto */
+export class LinkNichtEingerichtet extends Error { constructor() { super('Kurze Links sind auf dem Server noch nicht eingerichtet.'); } }
 const eingerichtet = (res: Response): void => {
-  if (res.status === 404) throw new Error('Link-Freigaben sind beim Betreiber noch nicht eingerichtet (Migration M357 fehlt).');
+  if (res.status === 404) throw new LinkNichtEingerichtet();
 };
 
 async function hochladen(token: string, name: string, body: Blob | string, mime: string): Promise<string> {

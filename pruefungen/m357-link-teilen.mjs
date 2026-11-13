@@ -12,6 +12,7 @@
  *      die Rückfrage und lädt die neue Fassung als weiteres Board.
  *   E  Besitzerin löscht den Link → Zeile und Dateien weg; der Empfänger bekommt eine klare Meldung.
  *   F  Ohne Konto: der Dialog erklärt es und bietet „Board im Link kopieren" (bisheriger Weg).
+ *   H  Kennt der Server die Tabelle noch nicht, bietet der Dialog ohne Fehlermeldung den bisherigen Weg.
  *   G  Texte.
  */
 // Läuft aus dem Repository: `node pruefungen/m357-link-teilen.mjs`
@@ -66,7 +67,7 @@ const SB_KEY = 'anon-test-key';
 const UID = 'uid-anna';
 const b64url = (s) => Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_');
 const TOKEN = `${b64url('{"alg":"HS256"}')}.${b64url(JSON.stringify({ sub: UID, email: 'anna@example.de', exp: Math.floor(Date.now() / 1000) + 7200 }))}.sig`;
-const sb = { objekte: new Map(), links: new Map(), signiert: new Map(), n: 0, anonRpc: 0, ohneAnmeldung: [] };
+const sb = { objekte: new Map(), links: new Map(), signiert: new Map(), n: 0, anonRpc: 0, ohneAnmeldung: [], ohneTabelle: false };
 async function dienste(ctx) {
   const json = (route, status, obj) => route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(obj) });
   await ctx.route(`${SB_URL}/**`, async (route) => {
@@ -108,6 +109,7 @@ async function dienste(ctx) {
     }
     // ---- board_links ----
     if (pfad === '/rest/v1/board_links') {
+      if (sb.ohneTabelle) return json(route, 404, { code: 'PGRST205', message: "Could not find the table 'public.board_links' in the schema cache" });
       if (m === 'GET') return json(route, 200, [...sb.links.values()].filter((l) => l.besitzer === UID && (!eq('board_id') || l.board_id === eq('board_id'))));
       if (m === 'POST') {
         const b = body();
@@ -279,6 +281,17 @@ await ohne.P.locator('[data-taste="link-ohne-konto"]').click(); await ohne.P.wai
 const alt = await ohne.P.evaluate(() => navigator.clipboard.readText()).catch(() => '');
 pruefe('F2 „Board im Link kopieren" legt den #b=-Link in die Zwischenablage', /#b=[A-Za-z0-9_-]{50,}$/.test(alt), alt.slice(0, 80));
 await ohne.ctx.close();
+
+console.log('\n════ H: Server noch ohne Tabelle (Migration fehlt) ════');
+{
+  sb.ohneTabelle = true;
+  const g = await geraet({ stand: standAnna, konto: { anbieter: 'supabase', clientId: SB_KEY, url: SB_URL, userId: UID, name: 'anna@example.de', token: TOKEN, tokenExp: Date.now() + 3600_000, refreshToken: 'rt-1' } });
+  await menue(g.P);
+  await g.P.locator('[data-taste="board-link"]').click(); await g.P.waitForTimeout(900);
+  pruefe('H1 kein Fehler: der Dialog sagt es und bietet „Board im Link kopieren"', (await g.P.locator('[data-taste="link-fehlt"]').count()) === 1 && (await g.P.locator('[data-taste="link-ohne-konto"]').count()) === 1 && (await g.P.locator('.modal-error').count()) === 0, await g.P.locator('.link-dialog').textContent());
+  sb.ohneTabelle = false;
+  await g.ctx.close();
+}
 
 console.log('\n════ G ════');
 const js = readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.js')).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8')).join('\n');

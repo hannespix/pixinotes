@@ -1,7 +1,7 @@
 // M357: Ein Board per Link teilen — der Empfänger öffnet es direkt, ohne Konto (lib/linkTeilen.ts).
 import { useEffect, useState } from 'react';
 import { useBoard } from '../store';
-import { linkDesBoards, linkErstellen, linkLoeschen, linkMoeglich, linkUrl, type LinkZeile } from '../lib/linkTeilen';
+import { linkDesBoards, linkErstellen, linkLoeschen, linkMoeglich, LinkNichtEingerichtet, linkUrl, type LinkZeile } from '../lib/linkTeilen';
 import { IX } from './Icons';
 
 export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId: string; onClose: () => void; ohneKonto: () => void; alsDatei: () => void }) {
@@ -10,10 +10,12 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
   const [zeile, setZeile] = useState<LinkZeile | null | undefined>(undefined);
   const [busy, setBusy] = useState('');
   const [fehler, setFehler] = useState('');
-  const mitKonto = linkMoeglich();
+  // Der Server kennt kurze Links noch nicht → derselbe Dialog wie ohne Konto, mit passendem Hinweis (kein Fehler)
+  const [fehlt, setFehlt] = useState(false);
+  const mitKonto = linkMoeglich() && !fehlt;
 
   useEffect(() => {
-    if (mitKonto) linkDesBoards(boardId).then(setZeile).catch((e: Error) => { setFehler(e.message); setZeile(null); });
+    if (mitKonto) linkDesBoards(boardId).then(setZeile).catch((e: Error) => { if (e instanceof LinkNichtEingerichtet) setFehlt(true); else setFehler(e.message); setZeile(null); });
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -35,7 +37,7 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
       setZeile(z);
       if (neu) await kopieren(linkUrl(z.token));
       else showToast('Die geteilte Fassung ist auf dem heutigen Stand.');
-    } catch (e) { setFehler((e as Error).message); } finally { setBusy(''); }
+    } catch (e) { if (e instanceof LinkNichtEingerichtet) setFehlt(true); else setFehler((e as Error).message); } finally { setBusy(''); }
   };
   const loeschen = async () => {
     if (busy) return;
@@ -58,16 +60,25 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
           <section className="modal-section">
             {!mitKonto ? (
               <>
-                <p className="modal-hint">
-                  Ein <b>kurzer Link</b>, den jeder direkt öffnen kann — samt PDFs und anderen Anhängen — braucht das PixiNotes-Konto
-                  (⚙ → Daten → Konto, Anmeldung mit E-Mail). Nur du brauchst es; wer den Link bekommt, nicht.
-                </p>
-                <div className="modal-buttons">
-                  <button onClick={() => { onClose(); useBoard.getState().setSettingsOpen(true); }} data-taste="link-konto">Konto einrichten …</button>
-                </div>
-                <div className="modal-note">
-                  Ohne Konto geht es so: Das Board steckt dann im Link selbst — ohne Anhänge, und nur, solange es klein genug ist.
-                </div>
+                {fehlt ? (
+                  <p className="modal-hint" data-taste="link-fehlt">
+                    Kurze Links (samt Anhängen) sind auf dem PixiNotes-Server noch nicht eingerichtet. Bis dahin geht es so:
+                    Das Board steckt im Link selbst — ohne Anhänge, und nur, solange es klein genug ist.
+                  </p>
+                ) : (
+                  <>
+                    <p className="modal-hint">
+                      Ein <b>kurzer Link</b>, den jeder direkt öffnen kann — samt PDFs und anderen Anhängen — braucht das PixiNotes-Konto
+                      (⚙ → Daten → Konto, Anmeldung mit E-Mail). Nur du brauchst es; wer den Link bekommt, nicht.
+                    </p>
+                    <div className="modal-buttons">
+                      <button onClick={() => { onClose(); useBoard.getState().setSettingsOpen(true); }} data-taste="link-konto">Konto einrichten …</button>
+                    </div>
+                    <div className="modal-note">
+                      Ohne Konto geht es so: Das Board steckt dann im Link selbst — ohne Anhänge, und nur, solange es klein genug ist.
+                    </div>
+                  </>
+                )}
                 <div className="modal-buttons">
                   <button onClick={() => { ohneKonto(); onClose(); }} data-taste="link-ohne-konto">Board im Link kopieren</button>
                   <button onClick={() => { alsDatei(); onClose(); }}>Als Datei sichern</button>
