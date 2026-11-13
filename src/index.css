@@ -2177,7 +2177,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
   border: none; background: rgba(255,255,255,.12); color: #e9ebee; border-radius: var(--r);
   cursor: pointer; font-size: 14px; padding: 9px 18px; font-family: inherit;
 }
-.presenter-foot > button:disabled { opacity: .35; cursor: default; }
+.presenter-foot > button:disabled, .presenter-foot > button[aria-disabled='true'] { opacity: .35; cursor: default; }
 .presenter-dots { display: flex; gap: 6px; }
 .presenter-dots button { width: 9px; height: 9px; border-radius: 50%; border: none; background: rgba(255,255,255,.28); cursor: pointer; padding: 0; }
 .presenter-dots button.on { background: #e9ebee; }
@@ -6646,3 +6646,86 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 }
 .comment-msg-knoepfe .comment-send { align-self: auto; }
 @media (hover: none) { .comment-msg-tools { opacity: 1; } .comment-msg-tools button { width: 28px; height: 28px; } }
+
+/* ---------- M363: Dokument-Folie in der Präsentation (PDF, Word, großes Bild) ---------- */
+/* Das Blatt bekommt den ganzen Platz: kein Folienrahmen, kein Innenabstand — die Seite ist die Folie */
+.presenter-slide.dokument {
+  margin: 0 12px 8px; padding: 0; background: none; box-shadow: none; overflow: hidden;
+  display: flex; min-height: 0; font-size: 14px; line-height: 1.4;
+}
+.folie-dok { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.folie-dok.leer { align-items: center; justify-content: center; color: #e9ebee; text-align: center; font-size: 16px; }
+.folie-dok-hinweis { color: #b8b2a4; font-size: 13px; }
+.folie-dok-flaeche {
+  flex: 1; min-height: 0; overflow: auto; display: grid; outline: none;
+  /* Ein Finger rollt (nativ, mit Schwung); zwei Finger zoomen — das rechnet die Folie selbst */
+  touch-action: pan-x pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  scrollbar-color: rgba(255,255,255,.35) transparent;
+}
+/* margin:auto zentriert, solange Platz ist — ein größeres Blatt bleibt bis zur Kante rollbar */
+.folie-dok-seite {
+  position: relative; margin: auto; background: #fff; color: #000; border-radius: 2px;
+  box-shadow: 0 6px 28px rgba(0,0,0,.45); overflow: hidden; min-height: 80px;
+}
+.folie-dok-seite canvas, .folie-dok-seite > img { display: block; width: 100%; height: 100%; border-radius: 0; max-width: none; }
+.folie-dok-seite .folie-word { position: absolute; inset: 0; overflow: hidden; }
+.folie-dok-striche { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.folie-dok-leiste {
+  /* Unter dem Blatt, nicht darüber: Die Leiste verdeckt keine Zeile der Seite */
+  align-self: center; flex: none; margin-top: 8px;
+  display: flex; align-items: center; gap: 4px; padding: 4px;
+  background: #24211c; color: #e9ebee; border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px; box-shadow: 0 4px 18px rgba(0,0,0,.4);
+  font-size: 13px; white-space: nowrap; max-width: calc(100% - 16px);
+}
+.folie-dok-leiste button {
+  border: none; background: none; color: inherit; cursor: pointer; font-family: inherit; font-size: 15px;
+  min-width: 36px; height: 36px; padding: 0 10px; border-radius: 999px; display: inline-grid; place-items: center;
+}
+.folie-dok-leiste button:hover { background: rgba(255,255,255,.14); }
+.folie-dok-leiste button:focus-visible, .folie-dok-nr input:focus-visible { outline: 2px solid #8fb4ff; outline-offset: 1px; }
+.folie-dok-leiste button[aria-disabled='true'] { opacity: .35; cursor: default; }
+.folie-dok-leiste .folie-dok-modus { font-size: 12.5px; min-width: 96px; }
+.folie-dok-nr { display: inline-flex; align-items: center; gap: 5px; padding: 0 4px; color: #b8b2a4; font-variant-numeric: tabular-nums; }
+.folie-dok-nr input {
+  width: 3.2em; height: 28px; text-align: center; font: inherit; color: #fff; background: rgba(255,255,255,.12);
+  border: 1px solid transparent; border-radius: 8px; padding: 0 4px;
+}
+.folie-dok-trenner { width: 1px; height: 20px; background: rgba(255,255,255,.18); margin: 0 2px; }
+@media (max-width: 860px) {
+  .presenter-slide.dokument { margin: 0 0 6px; }
+  .folie-dok-leiste { margin-top: 6px; }
+  /* Am Telefon zählt jede Zeile: Die Leiste des Dokuments blättert schon (auch über das Dokument hinaus) —
+     die Fußleiste der Präsentation weicht, die Seite bekommt ihren Platz */
+  .presenter.mit-dokument .presenter-foot { display: none; }
+  .presenter.mit-dokument .presenter-slide.dokument { margin-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .folie-dok-nr > span:first-child { display: none; }
+  .folie-dok-leiste .folie-dok-modus { min-width: 0; }
+}
+@media (pointer: coarse) {
+  .folie-dok-leiste button { min-width: 44px; height: 44px; font-size: 18px; }
+  .folie-dok-leiste .folie-dok-modus { font-size: 13px; }
+  .folie-dok-nr input { height: 34px; font-size: 15px; }
+  .presenter-foot > button { padding: 12px 18px; }
+  .presenter-head button { padding: 9px 14px; }
+}
+
+/* ---------- M363: Dokument im Fokus — Fußleiste blättert Seiten und trägt die Zeichenwerkzeuge ---------- */
+.focus-nav.dokument { gap: 2px; }
+.focus-nav.dokument .focus-acts { gap: 2px; align-items: center; overflow-x: auto; scrollbar-width: none; justify-content: safe center; }
+.focus-nav.dokument .focus-acts::-webkit-scrollbar { display: none; }
+.focus-nav.dokument > button { width: 48px; flex: none; }
+.focus-nav button[aria-disabled='true'] { opacity: .3; cursor: default; }
+.focus-seite { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); padding: 0 6px; white-space: nowrap; }
+.focus-seite input {
+  width: 2.6em; height: 34px; text-align: center; font: inherit; font-size: 14px; color: var(--ink);
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--r-sm); padding: 0 2px;
+}
+.focus-seite input:focus-visible { outline: none; border-color: var(--accent); }
+.focus-nav .focus-werkzeug { width: 44px; height: 44px; flex: none; border-radius: var(--r); color: var(--ink); }
+.focus-nav .focus-werkzeug.on { background: var(--accent); color: #fff; }
+.focus-nav .focus-werkzeug.on:hover { background: var(--accent); filter: brightness(1.06); }
+.focus-nav .focus-act.nur-zeichen { width: 44px !important; padding: 0; flex: none; border-color: transparent !important; background: none !important; }
+.focus-nav .focus-act.nur-zeichen:hover { background: var(--surface-2) !important; }
+/* Die Seitenzahl in der Fußleiste wird getippt — dann bleibt die Leiste über der Tastatur stehen */
+[data-keyboard='on'] .focus-nav.dokument:has(.focus-seite input:focus) { display: flex; }

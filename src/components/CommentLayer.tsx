@@ -246,7 +246,7 @@ function CommentPanel() {
         )}
         <textarea
           className="comment-input"
-          placeholder={isNew ? 'Kommentar zur Karte…' : 'Antworten…'}
+          placeholder={isNew ? (useBoard.getState().commentOrt ? 'Kommentar zu dieser Stelle…' : 'Kommentar zur Karte…') : 'Antworten…'}
           value={text}
           rows={2}
           onChange={(e) => setText(e.target.value)}

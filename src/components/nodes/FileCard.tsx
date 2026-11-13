@@ -9,7 +9,7 @@ import { canEmbed } from '../../lib/nodes';
 import { loadAttachment } from '../../lib/attachments';
 import { pdfSeiteMasse, pdfSeiteText, renderPdfPage } from '../../lib/pdf';
 import { seitenTextMelden } from '../../lib/markerZeile';
-import { blasenAn, blasenSetzen, letzteSeite, pdfAufgeklappt, pdfAufklappen, seiteMelden, seiteMerken, seitenKommentare } from '../../lib/pdfSeiten';
+import { blasenAn, blasenSetzen, DOKUMENT_BEFEHL, letzteSeite, pdfAufgeklappt, pdfAufklappen, seiteMelden, seiteMerken, seitenKommentare, type DokumentBefehl } from '../../lib/pdfSeiten';
 import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/fileStore';
 import { kontoDateiNachladen } from '../../lib/kontoSync';
 import { CardShell } from './CardShell';
@@ -392,8 +392,17 @@ function useBlaetterTasten(id: string, barRef: React.RefObject<HTMLDivElement | 
       const ziel = Math.min(seiten, Math.max(1, zu));
       if (ziel !== seite) blaettern(ziel);
     };
+    // M363: Blättern von außerhalb der Karte (Fokus-Leiste, Wisch über die Seite)
+    const onBefehl = (e: Event) => {
+      const d = (e as CustomEvent<DokumentBefehl>).detail;
+      if (d?.id !== id) return;
+      if (d.was === 'vor' && seite < seiten) blaettern(seite + 1);
+      else if (d.was === 'zurueck' && seite > 1) blaettern(seite - 1);
+      else if (d.was === 'gehe' && d.zu) blaettern(d.zu);
+    };
     window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
+    window.addEventListener(DOKUMENT_BEFEHL, onBefehl);
+    return () => { window.removeEventListener('keydown', onKey, true); window.removeEventListener(DOKUMENT_BEFEHL, onBefehl); };
   }, [id, barRef, seite, seiten, blaettern]);
 }
 
@@ -404,6 +413,12 @@ function SeitenLeiste({ id, seite, seiten, blaettern, pinModus, setPinModus, anz
   const [eingabe, setEingabe] = useState('');
   const barRef = useRef<HTMLDivElement>(null);
   useBlaetterTasten(id, barRef, seite, seiten, blaettern);
+  // M363: „Kommentar an eine Stelle" lässt sich auch von der Fokus-Leiste aus einschalten
+  useEffect(() => {
+    const onBefehl = (e: Event) => { const d = (e as CustomEvent<DokumentBefehl>).detail; if (d?.id === id && d.was === 'pin') setPinModus((p) => !p); };
+    window.addEventListener(DOKUMENT_BEFEHL, onBefehl);
+    return () => window.removeEventListener(DOKUMENT_BEFEHL, onBefehl);
+  }, [id, setPinModus]);
   return (
     <div className="pdf-seite-bar nowheel" ref={barRef}>
       {/* M361: aria-disabled statt disabled — wird ein Knopf mit Tastatur-Fokus „disabled", verschluckt der Browser danach ALLE Tasten */}
