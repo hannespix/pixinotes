@@ -49,7 +49,7 @@ export function ich(): Teilnehmer {
   return { id, name: getAuthor().trim() || loadKonto()?.name?.split('@')[0] || 'Gast', farbe: FARBEN[h % FARBEN.length] };
 }
 
-class GastFehler extends Error { constructor(public art: 'vorbedingung' | 'keine-freigabe' | 'netz' | 'fehlt', text: string) { super(text); } }
+class GastFehler extends Error { constructor(public art: 'vorbedingung' | 'keine-freigabe' | 'netz' | 'fehlt' | 'abgelehnt', text: string) { super(text); } }
 /** Server-Funktion mit dem öffentlichen Schlüssel aufrufen — kein Konto nötig */
 async function rpc<T>(name: string, body: unknown): Promise<T> {
   const k = supabaseKonfig();
@@ -63,6 +63,8 @@ async function rpc<T>(name: string, body: unknown): Promise<T> {
     });
   } catch { throw new GastFehler('netz', 'Keine Verbindung.'); }
   if (res.status === 404) throw new GastFehler('fehlt', 'Gäste ohne Konto sind auf dem Server noch nicht eingerichtet.');
+  // Der Server lässt Unangemeldete an diese Funktion nicht heran (ältere Einrichtung): wie „gibt es nicht"
+  if (res.status === 401 || res.status === 403) throw new GastFehler('abgelehnt', `HTTP ${res.status}`);
   if (!res.ok) {
     const t = await res.text().catch(() => '');
     if (/vorbedingung/i.test(t)) throw new GastFehler('vorbedingung', 'vorbedingung');
@@ -554,7 +556,7 @@ export type GastErgebnis = { art: 'beigetreten' | 'vorhanden'; boardId: string; 
 export async function gastBeitreten(token: string): Promise<GastErgebnis> {
   let g: Gelesen | null;
   try { g = await rpc<Gelesen | null>('gast_lesen', { p_token: token }); } catch (f) {
-    if (f instanceof GastFehler && f.art === 'fehlt') return null;
+    if (f instanceof GastFehler && (f.art === 'fehlt' || f.art === 'abgelehnt')) return null;
     throw new Error('Die Einladung ließ sich nicht laden — Internetverbindung prüfen.');
   }
   if (!g?.inhalt) return null;
