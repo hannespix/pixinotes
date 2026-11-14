@@ -37,31 +37,59 @@ export function LiveLeiste() {
   const boardId = useBoard((s) => s.activeId);
   useTakt(TEILNEHMER_EREIGNIS);
   useTakt(GRUPPE_EREIGNIS);
+  // M366: Bei vielen Teilnehmern zeigt die Leiste wenige Kürzel und die Zahl; die ganze Liste klappt auf
+  const [offen, setOffen] = useState(false);
+  useEffect(() => {
+    if (!offen) return;
+    const zu = (e: Event) => { if (!(e.target as HTMLElement | null)?.closest?.('.live-leiste')) setOffen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOffen(false); };
+    window.addEventListener('pointerdown', zu, true);
+    window.addEventListener('keydown', esc);
+    return () => { window.removeEventListener('pointerdown', zu, true); window.removeEventListener('keydown', esc); };
+  }, [offen]);
   if (!liveAuf(boardId)) return null;
   const selbst = ich();
   // M365: Als Gast sehen, was der Besitzer hier erlaubt
   const g = gruppeVon(boardId);
   const recht = g?.gast && g.recht !== 'alles' ? g.recht : null;
   const andere = teilnehmerVon(boardId).filter((t) => t.id !== selbst.id);
-  const sichtbar = andere.slice(0, 5);
-  const rest = andere.slice(5);
+  // wer gerade schreibt, steht vorn
+  const sortiert = [...andere].sort((a, b) => Number(!!b.karte) - Number(!!a.karte));
+  const sichtbar = sortiert.slice(0, andere.length > 4 ? 3 : 4);
+  const rest = andere.length - sichtbar.length;
   const verbunden = liveVerbunden(boardId);
+  const schreiben = andere.filter((t) => t.karte).length;
   return (
-    <div className="live-leiste" role="group" aria-label="Gerade in diesem Board" data-taste="live-leiste">
+    <div className={`live-leiste${offen ? ' offen' : ''}`} role="group" aria-label="Gerade in diesem Board" data-taste="live-leiste">
       <button className="live-chip ich" style={farbe(selbst.farbe)} title={`Du (${selbst.name}) — Namen ändern`} data-taste="live-ich"
         onClick={() => window.dispatchEvent(new CustomEvent(NAME_FRAGEN))}>{kuerzel(selbst.name)}</button>
-      {sichtbar.map((t) => (
-        <span key={t.id} className={`live-chip${t.karte ? ' schreibt' : ''}`} style={farbe(t.farbe)} data-taste="live-chip" data-name={t.name}
-          title={t.karte ? `${t.name} — bearbeitet gerade eine Karte` : t.name}>{kuerzel(t.name)}</span>
-      ))}
-      {rest.length > 0 && <span className="live-chip mehr" title={rest.map((t) => t.name).join(', ').slice(0, 100)}>+{rest.length}</span>}
+      <button className="live-mehr" aria-expanded={offen} aria-label="Alle Teilnehmer zeigen" data-taste="live-auf" disabled={andere.length === 0}
+        onClick={() => setOffen((o) => !o)}>
+        {sichtbar.map((t) => (
+          <span key={t.id} className={`live-chip${t.karte ? ' schreibt' : ''}`} style={farbe(t.farbe)} data-taste="live-chip" data-name={t.name}
+            title={t.karte ? `${t.name} — bearbeitet gerade eine Karte` : t.name}>{kuerzel(t.name)}</span>
+        ))}
+        {rest > 0 && <span className="live-chip mehr" data-taste="live-rest">+{rest}</span>}
+        <span className="live-zahl" data-taste="live-zahl">{!verbunden ? 'verbindet …' : andere.length === 0 ? 'nur du' : `${andere.length + 1} dabei`}</span>
+      </button>
       {recht && (
         <span className="live-recht" data-taste="live-recht"
           title={recht === 'eigenes' ? 'Du kannst hier nur deine eigenen Karten ändern und löschen — neue anlegen geht immer.' : 'Du kannst hier alles bearbeiten, aber nur löschen, was du selbst angelegt hast.'}>
           🔒 {recht === 'eigenes' ? 'nur Eigenes ändern' : 'nur Eigenes löschen'}
         </span>
       )}
-      <span className="live-zahl" data-taste="live-zahl">{!verbunden ? 'verbindet …' : andere.length === 0 ? 'nur du' : `${andere.length + 1} dabei`}</span>
+      {offen && (
+        <div className="live-liste" role="list" data-taste="live-liste">
+          <div className="live-liste-kopf">{andere.length + 1} im Board{schreiben ? ` · ${schreiben} ${schreiben === 1 ? 'schreibt' : 'schreiben'} gerade` : ''}</div>
+          <div className="live-liste-zeile" role="listitem"><span className="live-punkt" style={farbe(selbst.farbe)} /> <span className="live-name">{selbst.name}</span> <span className="live-neben">du</span></div>
+          {sortiert.map((t) => (
+            <div key={t.id} className="live-liste-zeile" role="listitem" data-name={t.name}>
+              <span className="live-punkt" style={farbe(t.farbe)} /> <span className="live-name">{t.name}</span>
+              {t.karte && <span className="live-neben">schreibt</span>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

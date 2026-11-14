@@ -13,12 +13,13 @@
 // Maße der Karten (`measured`) misst jedes Gerät selbst — ein Telefon anders als ein Laptop. Sie reisen darum
 // nicht als Änderung: Verglichen und geschrieben wird mit den Maßen des letzten gemeinsamen Stands, sonst
 // schickten sich zwei verschiedene Geräte endlos „Änderungen" zu.
-import { flushPersist, NOTIZ_EXTERN, ohneLeseschutz, runDerived, setzeGruppe, setzeKartenSperren, useBoard, verlaufAbgrenzen, type BoardDoc, type GastRecht, type Space } from '../store';
+import { flushPersist, isImportedState, NOTIZ_EXTERN, ohneLeseschutz, runDerived, setzeGruppe, setzeKartenSperren, useBoard, verlaufAbgrenzen, type BoardDoc, type GastRecht, type Space } from '../store';
 import { getAuthor } from '../components/CommentLayer';
 import { loadFile, saveFile } from './fileStore';
 import { supabaseKonfig } from './kontoSupabase';
 import { checkKontoRemote, kontoAnfrage, loadKonto, mitGeteiltBereich, stempel } from './kontoSync';
 import { liveKanal, type LiveKanal, type Teilnehmer } from './liveKanal';
+import { istPatch, patchAnwenden, patchAus, type Patch } from './gastPatch';
 import { idbDel, idbGet, idbSet, liveHaken } from './syncFolder';
 import { berichtAlsSatz, dreiWegeMerge, ohneAuswahl } from './syncMerge';
 import type { AppNode } from '../types';
@@ -26,7 +27,10 @@ import type { AppNode } from '../types';
 const KEY = 'pixinotes-gast';
 const ICH_KEY = 'pixinotes-gast-ich';
 const BLICK_MS = 3500;
-const TIPP_PAUSE_MS = 800;
+/** M366: Mit stehendem Live-Kanal kommen Änderungen von selbst — der Blick ist dann nur noch die Kontrolle */
+const BLICK_MIT_KANAL_MS = 20_000;
+/** Größer wird eine Änderung nicht über den Kanal geschickt (dann holen die anderen den Stand) */
+const DELTA_MAX_ZEICHEN = 60_000;
 export const GAST_NAME = 'Per Link';
 export const TEILNEHMER_EREIGNIS = 'pixinotes:teilnehmer';
 
@@ -112,6 +116,45 @@ function mitMassenVon(b: BoardDoc, quelle: BoardDoc | undefined): BoardDoc {
 }
 const kern = (b: BoardDoc): string => JSON.stringify(ohneAuswahl(rein(b)));
 
+// ---------- Der letzte gemeinsame Stand („Basis") je Board ----------
+// Liegt in IndexedDB; gelesen und geschrieben wird über einen Zwischenspeicher — bei vielen Teilnehmern ändert
+// sich die Basis mehrmals je Sekunde, und jedes Mal ein ganzes Board in die Datenbank zu legen, bremste.
+const basisCache = new Map<string, BoardDoc>();
+const basisTimer = new Map<string, ReturnType<typeof setTimeout>>();
+async function basisLesen(boardId: string): Promise<BoardDoc | undefined> {
+  const c = basisCache.get(boardId);
+  if (c) return c;
+  const b = await idbGet<BoardDoc>(basisKey(boardId)).catch(() => undefined);
+  if (b && !basisCache.has(boardId)) basisCache.set(boardId, b);
+  return basisCache.get(boardId) ?? b;
+}
+function basisSichern(boardId: string): void {
+  clearTimeout(basisTimer.get(boardId));
+  basisTimer.delete(boardId);
+  const b = basisCache.get(boardId);
+  if (b) void idbSet(basisKey(boardId), b).catch(() => {});
+}
+function basisSetzen(boardId: string, b: BoardDoc): void {
+  basisCache.set(boardId, b);
+  if (!basisTimer.has(boardId)) basisTimer.set(boardId, setTimeout(() => basisSichern(boardId), 1200));
+}
+function basisWeg(boardId: string): void {
+  clearTimeout(basisTimer.get(boardId));
+  basisTimer.delete(boardId);
+  basisCache.delete(boardId);
+  void idbDel(basisKey(boardId)).catch(() => {});
+}
+/** Den Speicher des Browsers schreiben — gebündelt: bei vielen Änderungen je Sekunde nicht jedes Mal */
+let flushTimer: ReturnType<typeof setTimeout> | undefined;
+function flushBald(): void {
+  if (flushTimer) return;
+  flushTimer = setTimeout(() => { flushTimer = undefined; flushPersist(); }, 1500);
+}
+/** Wie viele sind gerade in diesem Board? (für Takt und Streuung) */
+const groesse = (boardId: string): number => Math.max(1, anwesend.get(boardId)?.length ?? 1);
+/** Zufällige Streuung, damit viele Geräte nicht im selben Augenblick dasselbe tun */
+const streuung = (boardId: string, jeKopfMs: number): number => Math.random() * (300 + groesse(boardId) * jeKopfMs);
+
 // ---------- Laufender Abgleich ----------
 const kanaele = new Map<string, LiveKanal>();                 // boardId → Kanal
 const anwesend = new Map<string, Teilnehmer[]>();             // boardId → wer ist dabei
@@ -141,6 +184,7 @@ function kanalOeffnen(boardId: string, kanalName: string, beiStand: () => void):
   kanaele.set(boardId, liveKanal(k, kanalName, { ...ich(), ...meineKarte(boardId) }, {
     nachricht: (ereignis, inhalt) => {
       if (ereignis === 'stand') beiStand();
+      else if (ereignis === 'delta') deltaEmpfangen(boardId, inhalt, beiStand);
       else if (ereignis === 'karte') karteVonAussen(boardId, inhalt);
       else if (ereignis === 'optionen') {
         // Nur ein Anstoß — die Rechte selbst kommen vom Server
@@ -148,9 +192,15 @@ function kanalOeffnen(boardId: string, kanalName: string, beiStand: () => void):
       }
       else window.dispatchEvent(new CustomEvent(LIVE_NACHRICHT, { detail: { boardId, ereignis, inhalt } }));
     },
-    teilnehmer: (liste) => { anwesend.set(boardId, liste); sperrenRechnen(boardId); if (liste.some((t) => t.id !== ich().id)) void sichern(boardId); window.dispatchEvent(new CustomEvent(TEILNEHMER_EREIGNIS, { detail: boardId })); },
+    teilnehmer: (liste) => { anwesend.set(boardId, liste); sperrenRechnen(boardId); if (liste.some((t) => t.id !== ich().id)) void sichern(boardId); teilnehmerMelden(boardId); },
   }));
   window.dispatchEvent(new CustomEvent(TEILNEHMER_EREIGNIS, { detail: boardId }));
+}
+/** Die Anzeige „wer ist dabei" höchstens viermal je Sekunde auffrischen — bei 50 Leuten kommt sonst Meldung auf Meldung */
+const meldeTimer = new Map<string, ReturnType<typeof setTimeout>>();
+function teilnehmerMelden(boardId: string): void {
+  if (meldeTimer.has(boardId)) return;
+  meldeTimer.set(boardId, setTimeout(() => { meldeTimer.delete(boardId); window.dispatchEvent(new CustomEvent(TEILNEHMER_EREIGNIS, { detail: boardId })); }, 250));
 }
 function kanalSchliessen(boardId: string): void {
   if (!kanaele.has(boardId)) return;
@@ -286,7 +336,7 @@ function karteSenden(boardId: string): void {
     if (!m || !node) return;
     const { selected: _s, dragging: _d, measured: _m, ...rest } = node as AppNode & { selected?: boolean; dragging?: boolean; measured?: unknown };
     kanaele.get(boardId)?.senden('karte', { von: ich().id, node: rest });
-  }, 220));
+  }, groesse(boardId) <= 8 ? 220 : groesse(boardId) <= 20 ? 400 : 700));
 }
 /** Live-Stand einer Karte, die ein anderer gerade bearbeitet — nur vom Halter der Karte angenommen */
 function karteVonAussen(boardId: string, inhalt: unknown): void {
@@ -410,10 +460,34 @@ function beendet(boardId: string): void {
   schreiben(m);
   setzeGruppe(boardId, null);
   kanalSchliessen(boardId);
-  void idbDel(basisKey(boardId)).catch(() => {});
+  basisWeg(boardId);
   ohneLeseschutz(() => useBoard.setState((s) => ({ boards: s.boards.map((b) => (b.id === boardId ? alsKopie(b) : b)) })));
   flushPersist();
   useBoard.getState().showToast('Der Link zu diesem Board wurde beendet — es bleibt als eigene Kopie bei dir.', false, 8000);
+}
+
+/**
+ * Einen fremden Stand in das hiesige Board einarbeiten (dreiwegig, kartenweise). Liefert das Ergebnis mit den
+ * Maßen des fremden Stands — zum Vergleich „ist hier etwas, das der Server noch nicht hat?" — oder null, wenn
+ * es das Board hier nicht (mehr) als gemeinsames gibt.
+ */
+function mischen(boardId: string, basis: BoardDoc | undefined, fremd: BoardDoc): BoardDoc | null {
+  const st = useBoard.getState();
+  const lokal = st.boards.find((b) => b.id === boardId);
+  if (!lokal || !lokal.gastLink) return null;
+  // Verglichen wird mit den Maßen des letzten gemeinsamen Stands (siehe Kopf der Datei)
+  const lokalV = mitMassenVon(liveHaken.vor(lokal), basis);
+  const erg = dreiWegeMerge(basis ? { boards: [basis], spaces: [] } : null, { boards: [lokalV], spaces: [] }, { boards: [fremd], spaces: [] });
+  const neu = erg.boards.find((b) => b.id === boardId) ?? fremd;
+  // In den Speicher mit den HIESIGEN Maßen — sonst blitzte jede Karte kurz weg, bis sie neu gemessen ist;
+  // Karten, die gerade ein anderer schreibt, behalten dessen Live-Stand (liveHaken.nach)
+  const fuerHier = liveHaken.nach(mitMassenVon(neu, lokal));
+  if (kern(fuerHier) !== kern(lokal) || fuerHier.geteiltRolle !== lokal.geteiltRolle) {
+    ohneLeseschutz(() => st.importSync(st.boards.map((b) => (b.id === boardId ? fuerHier : b)), st.spaces, st.activeId, { geaendert: [boardId] }));
+    flushBald();   // der neue Stand soll einen Absturz oder ein schnelles Schließen überstehen
+    if (erg.bericht.konflikte) st.showToast(`👥 Abgeglichen: ${berichtAlsSatz(erg.bericht)}.`, false, 6000);
+  }
+  return mitMassenVon(neu, fremd);
 }
 
 /** Server-Stand holen und einarbeiten; schreibt danach, wenn hier Eigenes dazukam */
@@ -429,31 +503,21 @@ async function holen(boardId: string): Promise<void> {
   if (!g) { beendet(boardId); return; }
   let fremd: BoardDoc;
   try { fremd = gezeichnet(JSON.parse(g.inhalt) as BoardDoc, g, e.token); } catch { return; }
-  const basis = await idbGet<BoardDoc>(basisKey(boardId)).catch(() => undefined);
+  const basis = await basisLesen(boardId);
   const st = useBoard.getState();
   const lokal = st.boards.find((b) => b.id === boardId);
   // Kein Board oder eines, das hier nicht (mehr) als gemeinsames liegt: nichts abgleichen — eine eigene Kopie
   // darf nie von selbst auf den Server des Besitzers wandern. Der Link lässt sich jederzeit neu öffnen.
   if (!lokal || !lokal.gastLink) { beendetStill(boardId); return; }
-  // Verglichen wird mit den Maßen des letzten gemeinsamen Stands (siehe Kopf der Datei)
-  const lokalV = mitMassenVon(liveHaken.vor(lokal), basis);
-  const erg = dreiWegeMerge(basis ? { boards: [basis], spaces: [] } : null, { boards: [lokalV], spaces: [] }, { boards: [fremd], spaces: [] });
-  const neu = erg.boards.find((b) => b.id === boardId) ?? fremd;
-  // In den Speicher mit den HIESIGEN Maßen — sonst blitzte jede Karte kurz weg, bis sie neu gemessen ist;
-  // Karten, die gerade ein anderer schreibt, behalten dessen Live-Stand (liveHaken.nach)
-  const fuerHier = liveHaken.nach(mitMassenVon(neu, lokal));
-  if (kern(fuerHier) !== kern(lokal) || fuerHier.geteiltRolle !== lokal.geteiltRolle) {
-    ohneLeseschutz(() => st.importSync(st.boards.map((b) => (b.id === boardId ? fuerHier : b)), st.spaces, st.activeId, { geaendert: [boardId] }));
-    flushPersist();   // der neue Stand soll einen Absturz oder ein schnelles Schließen überstehen
-    if (erg.bericht.konflikte) st.showToast(`👥 Abgeglichen: ${berichtAlsSatz(erg.bericht)}.`, false, 6000);
-  }
-  await idbSet(basisKey(boardId), fremd).catch(() => {});
+  const neu = mischen(boardId, basis, fremd) ?? fremd;
+  { const k = kette(boardId); k.wartend.clear(); k.ohneVersion.length = 0; k.hinterherSeit = 0; k.spruenge = 0; k.abgleichAm = Date.now(); }
+  basisSetzen(boardId, fremd);
   const m = lesen();
   if (m[boardId]) { m[boardId] = { ...m[boardId], version: g.version, rolle: g.rolle, recht: rechtAus(g.optionen), ...(g.kanal ? { kanal: g.kanal } : {}) }; schreiben(m); }
   setzeGruppe(boardId, { ich: meineKennung(true), recht: rechtAus(g.optionen), gast: true });
   void dateienHolen(fremd, g.dateien);
   // Hier ist etwas dazugekommen, das der Server noch nicht hat → hinaus
-  if (g.rolle === 'bearbeiten' && kern(mitMassenVon(neu, fremd)) !== kern(fremd)) await hinaus(boardId);
+  if (g.rolle === 'bearbeiten' && kern(neu) !== kern(fremd)) await hinaus(boardId);
 }
 /** Board lokal nicht mehr da (gelöscht): Eintrag still entfernen */
 function beendetStill(boardId: string): void {
@@ -464,12 +528,127 @@ function beendetStill(boardId: string): void {
 }
 
 /** Eigene Änderungen zum Server; bei einem fremden Stand dazwischen erst einarbeiten */
-async function hinaus(boardId: string, versuch = 0): Promise<void> {
+// ---------- M366: Änderungen kartenweise, Versionen als Kette ----------
+// Jede Änderung auf dem Server hat eine Nummer und nennt ihre Vorgängerin (`v`, `vor`). Das Gerät hält fest, bis
+// zu welcher Nummer sein letzter gemeinsamer Stand (die Basis) reicht, und hängt an, was lückenlos anschließt —
+// die eigenen Änderungen (aus der Antwort des Servers) wie die der anderen (aus dem Live-Kanal). Kommt etwas
+// außer der Reihe, wartet es kurz auf das fehlende Glied; bleibt die Lücke, holt ein voller Abgleich den Stand.
+interface Glied { v: number; vor: number; p?: Patch; eigen?: boolean }
+interface Kette {
+  wartend: Map<number, Glied>; ohneVersion: Patch[]; hinterherSeit: number; blickAm: number;
+  /** Änderungen ohne Nummer, die seit dem letzten vollen Abgleich gezeigt wurden (Geräte mit Konto schreiben das
+   *  ganze Board und kennen die Nummer nicht). So viele Nummern darf die Kette überspringen. */
+  spruenge: number;
+  /** wann zuletzt voll abgeglichen wurde — die Kontrolle „stimmt noch alles?" läuft bei vielen Teilnehmern seltener */
+  abgleichAm: number;
+  laufTimer?: ReturnType<typeof setTimeout>; holTimer?: ReturnType<typeof setTimeout> }
+const ketten = new Map<string, Kette>();
+function kette(boardId: string): Kette {
+  let k = ketten.get(boardId);
+  if (!k) { k = { wartend: new Map(), ohneVersion: [], hinterherSeit: 0, blickAm: 0, spruenge: 0, abgleichAm: 0 }; ketten.set(boardId, k); }
+  return k;
+}
+/** Der Server kennt gast_aendern nicht (ältere Einrichtung) → wie bisher das ganze Board schreiben */
+let ohnePatch = false;
+/** Voller Abgleich, bald — gestreut (viele Geräte) und zusammengefasst (mehrere Anlässe) */
+function abgleichBald(boardId: string, mindestensMs = 200): void {
+  const k = kette(boardId);
+  if (k.holTimer) return;
+  k.holTimer = setTimeout(() => { k.holTimer = undefined; void abgleichen(boardId); }, mindestensMs + streuung(boardId, 40));
+}
+/** Was aus dem Kanal oder vom eigenen Schreiben ansteht, an die Basis hängen und Fremdes ins Board einarbeiten */
+async function kettenLauf(boardId: string): Promise<void> {
+  const k = kette(boardId);
+  const e = lesen()[boardId];
+  if (!e) { k.wartend.clear(); k.ohneVersion.length = 0; return; }
+  const basisAlt = await basisLesen(boardId);
+  if (!basisAlt) { abgleichBald(boardId); return; }
+  let basis = basisAlt; let version = e.version; let fremdes = false; let zuGross = false;
+  // Änderungen ohne Nummer (von Geräten mit Konto): gleich zeigen; die Kette darf entsprechend viele Nummern überspringen
+  for (const p of k.ohneVersion.splice(0)) { basis = patchAnwenden(basis, p); fremdes = true; k.spruenge += 1; }
+  for (;;) {
+    let g: Glied | undefined;
+    for (const x of k.wartend.values()) if (x.vor === version) { g = x; break; }
+    if (!g && k.spruenge > 0) {
+      // das nächste Glied schließt nicht an — liegen genau die gezeigten nummernlosen Änderungen dazwischen?
+      for (const x of k.wartend.values()) if (x.vor > version && x.vor - version <= k.spruenge && (!g || x.vor < g.vor)) g = x;
+      if (g) { k.spruenge -= g.vor - version; version = g.vor; }
+    }
+    if (!g) break;
+    if (!g.p) { zuGross = true; break; }   // die Änderung war zu groß für den Kanal → der Abgleich holt sie
+    k.wartend.delete(g.v);
+    basis = patchAnwenden(basis, g.p); version = g.v;
+    if (!g.eigen) fremdes = true;
+  }
+  for (const v of [...k.wartend.keys()]) if (v <= version) k.wartend.delete(v);
+  if (basis !== basisAlt) {
+    const neu = fremdes ? mischen(boardId, basisAlt, basis) : null;
+    basisSetzen(boardId, basis);
+    if (version !== e.version) { const m = lesen(); if (m[boardId]) { m[boardId] = { ...m[boardId], version }; schreiben(m); } }
+    // Beim Einarbeiten kann Eigenes übrig bleiben (zwei haben dasselbe Gespräch ergänzt) → nachreichen
+    if (neu && e.rolle === 'bearbeiten' && kern(neu) !== kern(basis)) schreibenBald(boardId);
+  }
+  if (zuGross || k.wartend.size) abgleichBald(boardId, zuGross ? 200 : 1500);
+}
+function laufBald(boardId: string): void {
+  const k = kette(boardId);
+  if (k.laufTimer) return;
+  // kurz sammeln: Kommen zehn Änderungen in einem Augenblick, wird das Board einmal aufgefrischt, nicht zehnmal
+  k.laufTimer = setTimeout(() => { k.laufTimer = undefined; void exklusiv(boardId, () => kettenLauf(boardId)); }, 90);
+}
+/** Eine Änderung eines anderen aus dem Live-Kanal */
+function deltaEmpfangen(boardId: string, inhalt: unknown, sonst: () => void): void {
+  const d = inhalt as { v?: unknown; vor?: unknown; p?: unknown } | undefined;
+  const p = istPatch(d?.p) ? d.p : undefined;
+  const e = lesen()[boardId];
+  if (!e) { deltaFuerKonto(boardId, sonst); return; }
+  const k = kette(boardId);
+  if (typeof d?.v === 'number' && typeof d.vor === 'number') {
+    if (d.v > e.version) k.wartend.set(d.v, { v: d.v, vor: d.vor, ...(p ? { p } : {}) });
+  } else if (p) k.ohneVersion.push(p);
+  else { abgleichBald(boardId); return; }
+  laufBald(boardId);
+}
+
+/** Eigene Änderungen zum Server: nur, was sich geändert hat (M366) */
+async function hinaus(boardId: string): Promise<void> {
+  if (ohnePatch) { await hinausGanz(boardId); return; }
   const e = lesen()[boardId];
   if (!e || e.rolle !== 'bearbeiten') return;
   const lokal = useBoard.getState().boards.find((b) => b.id === boardId);
   if (!lokal) return;
-  const basis = await idbGet<BoardDoc>(basisKey(boardId)).catch(() => undefined);
+  const basis = await basisLesen(boardId);
+  if (!basis) { await holen(boardId); return; }
+  // Was schon unterwegs oder bestätigt, aber noch nicht in der Basis ist, zählt als geschrieben
+  const k = kette(boardId);
+  let stand = basis;
+  for (const g of [...k.wartend.values()].sort((a, b) => a.v - b.v)) if (g.eigen && g.p) stand = patchAnwenden(stand, g.p);
+  const zuSchreiben = ohneAuswahl(rein(mitMassenVon(liveHaken.vor(lokal), basis)));
+  const p = patchAus(ohneAuswahl(rein(stand)), zuSchreiben);
+  if (!p) return;
+  try {
+    const r = await rpc<{ version: number; vor: number }>('gast_aendern', { p_token: e.token, p_patch: p });
+    const v = Number(r.version); const vor = Number(r.vor);
+    kanaele.get(boardId)?.senden('delta', JSON.stringify(p).length <= DELTA_MAX_ZEICHEN ? { v, vor, p } : { v, vor });
+    k.wartend.set(v, { v, vor, p, eigen: true });
+    await kettenLauf(boardId);
+  } catch (f) {
+    const art = f instanceof GastFehler ? f.art : 'netz';
+    // Der Server kennt die Funktion nicht (oder lässt Unangemeldete nicht heran): der bisherige Weg
+    if (art === 'fehlt' || art === 'abgelehnt') { ohnePatch = true; await hinausGanz(boardId); return; }
+    if (art === 'keine-freigabe') { await holen(boardId); return; }   // Rolle geändert oder Link beendet — der Blick klärt es
+    if (art === 'nicht-erlaubt') { await serverGilt(boardId); return; }
+    // Netz: der nächste Blick oder die nächste Änderung versucht es wieder
+  }
+}
+
+/** Das ganze Board schreiben, mit Vorbedingung (M364) — für Server ohne gast_aendern */
+async function hinausGanz(boardId: string, versuch = 0): Promise<void> {
+  const e = lesen()[boardId];
+  if (!e || e.rolle !== 'bearbeiten') return;
+  const lokal = useBoard.getState().boards.find((b) => b.id === boardId);
+  if (!lokal) return;
+  const basis = await basisLesen(boardId);
   const zuSchreiben = mitMassenVon(liveHaken.vor(lokal), basis);
   const text = kern(zuSchreiben);
   if (basis && text === kern(basis)) return;
@@ -477,7 +656,7 @@ async function hinaus(boardId: string, versuch = 0): Promise<void> {
     const v = await rpc<number | string>('gast_schreiben', { p_token: e.token, p_inhalt: text, p_stempel: stempel(text), p_wenn_version: e.version });
     const m = lesen();
     if (m[boardId]) { m[boardId] = { ...m[boardId], version: Number(v) }; schreiben(m); }
-    await idbSet(basisKey(boardId), ohneAuswahl(zuSchreiben)).catch(() => {});
+    basisSetzen(boardId, ohneAuswahl(zuSchreiben));
     kanaele.get(boardId)?.senden('stand', { v: Number(v) });
   } catch (f) {
     const art = f instanceof GastFehler ? f.art : 'netz';
@@ -506,16 +685,25 @@ async function serverGilt(boardId: string): Promise<void> {
   if (!lokal) return;
   ohneLeseschutz(() => st.importSync(st.boards.map((b) => (b.id === boardId ? mitMassenVon(fremd, lokal) : b)), st.spaces, st.activeId, { geaendert: [boardId] }));
   flushPersist();
-  await idbSet(basisKey(boardId), fremd).catch(() => {});
+  basisSetzen(boardId, fremd);
   const m = lesen();
   if (m[boardId]) { m[boardId] = { ...m[boardId], version: g.version, rolle: g.rolle, recht: rechtAus(g.optionen) }; schreiben(m); }
   setzeGruppe(boardId, { ich: meineKennung(true), recht: rechtAus(g.optionen), gast: true });
   st.showToast('🔒 Der Besitzer hat festgelegt, was Gäste ändern dürfen — deine letzte Änderung wurde nicht übernommen.', false, 8000);
 }
 const abgleichen = (boardId: string): Promise<void> => exklusiv(boardId, () => holen(boardId));
+/**
+ * Bald schreiben. Wer gerade tippt, schreibt nach einer Tipp-Pause (die anderen lesen ohnehin live mit); alles
+ * andere — Karte angelegt, verschoben, gelöscht — geht fast sofort hinaus. Je mehr Leute im Board sind, desto
+ * länger die Pausen: So bleibt die Zahl der Schreibvorgänge je Sekunde überschaubar.
+ */
 const schreibenBald = (boardId: string): void => {
   clearTimeout(schreibTimer.get(boardId));
-  schreibTimer.set(boardId, setTimeout(() => void exklusiv(boardId, () => hinaus(boardId)), TIPP_PAUSE_MS));
+  const n = groesse(boardId);
+  const el = document.activeElement as HTMLElement | null;
+  const tippt = !!el && (el.isContentEditable || ['INPUT', 'TEXTAREA'].includes(el.tagName)) && !!el.closest('.react-flow__node');
+  const pause = tippt ? (n <= 8 ? 800 : n <= 25 ? 1200 : 1600) : (n <= 25 ? 250 : 450);
+  schreibTimer.set(boardId, setTimeout(() => void exklusiv(boardId, () => hinaus(boardId)), pause));
 };
 
 /** Hat sich drüben etwas getan? (billiger Blick — nur Version und Rolle) */
@@ -532,11 +720,27 @@ async function blick(boardId: string): Promise<void> {
     setzeGruppe(boardId, { ich: meineKennung(true), recht: rechtAus(s.optionen), gast: true });
     window.dispatchEvent(new CustomEvent(TEILNEHMER_EREIGNIS, { detail: boardId }));
   }
-  if (Number(s.version) !== e.version || s.rolle !== e.rolle) await abgleichen(boardId);
+  if (s.rolle !== e.rolle) { await abgleichen(boardId); return; }
+  const k = kette(boardId);
+  const sv = Number(s.version);
+  const hier = lesen()[boardId]?.version ?? e.version;
+  if (sv === hier) { k.hinterherSeit = 0; return; }
+  // Der Server ist weiter. Mit Live-Kanal sind die Änderungen meist schon unterwegs — geholt wird erst, wenn der
+  // Rückstand anhält (eine Nachricht ging verloren, oder jemand hat ohne Kanal geschrieben).
+  if (liveVerbunden(boardId) && sv > hier) {
+    // Der Rückstand ist genau das, was als nummernlose Änderung schon gezeigt wurde → nur noch die Kontrolle,
+    // und die bei vielen Teilnehmern selten (sonst lüden nach jeder Änderung des Besitzers alle das ganze Board)
+    const n = groesse(boardId);
+    if (sv - hier <= k.spruenge && Date.now() - k.abgleichAm < (n <= 8 ? 8_000 : n <= 25 ? 20_000 : 45_000)) return;
+    if (!k.hinterherSeit) { k.hinterherSeit = Date.now(); setTimeout(() => void blick(boardId), 2600); return; }
+    if (Date.now() - k.hinterherSeit < 2000) return;
+  }
+  k.hinterherSeit = 0;
+  abgleichBald(boardId, 0);
 }
 
 function gastBoardStarten(boardId: string, kanalName: string): void {
-  kanalOeffnen(boardId, kanalName, () => void abgleichen(boardId));
+  kanalOeffnen(boardId, kanalName, () => abgleichBald(boardId));
 }
 
 // ---------- Mit Konto: Kanäle der geteilten Boards (Besitzer und Gäste mit Konto) ----------
@@ -573,7 +777,7 @@ export async function kontoKanaele(): Promise<void> {
     for (const l of eigeneLinks) if (eigen(l.board_id)) ziel.set(l.board_id, s.userId);
     if (rf.ok) for (const f of (await rf.json()) as Array<{ board_id: string }>) if (eigen(f.board_id)) ziel.set(f.board_id, s.userId);
     for (const b of st.boards) if (b.geteiltVon && !b.gastLink) ziel.set(b.id, b.geteiltVon);
-    for (const id of [...kontoKanal.keys()]) if (ziel.get(id) !== kontoKanal.get(id)) { kanalSchliessen(id); kontoKanal.delete(id); setzeGruppe(id, null); }
+    for (const id of [...kontoKanal.keys()]) if (ziel.get(id) !== kontoKanal.get(id)) { kanalSchliessen(id); kontoKanal.delete(id); letzterStand.delete(id); setzeGruppe(id, null); }
     for (const [id, besitzer] of ziel) {
       // M365: Der Besitzer darf immer alles; Gäste mit Konto erfahren die Rechte unten mit dem Kanal
       if (besitzer === s.userId) setzeGruppe(id, { ich: meineKennung(false), recht: 'alles', gast: false });
@@ -587,11 +791,65 @@ export async function kontoKanaele(): Promise<void> {
       if (besitzer !== s.userId) setzeGruppe(id, { ich: meineKennung(false), recht: rechtAus(antwort?.optionen), gast: true });
       if (typeof name !== 'string' || !name || kanaele.has(id)) continue;
       kontoKanal.set(id, besitzer);
-      kanalOeffnen(id, name, () => void checkKontoRemote(true).catch(() => null));
+      const jetzt = kontoStand(id);
+      if (jetzt) letzterStand.set(id, jetzt);
+      kanalOeffnen(id, name, () => kontoPruefenBald(id));
     }
     void anhaengeFreigeben();
   } catch { /* ohne Netz: beim nächsten Mal */ }
 }
+// ---------- M366: Änderungen sofort zeigen und weitergeben — für Geräte mit Konto ----------
+// Der Abgleich dieser Geräte läuft über das Konto (lib/kontoSync.ts) und bleibt die Wahrheit. Damit bei vielen
+// Teilnehmern trotzdem alles sofort sichtbar ist: (1) Was über den Kanal hereinkommt, wird gleich ins Board
+// gelegt — der Konto-Abgleich folgt gebündelt und findet dann nichts Neues mehr. (2) Nach jedem eigenen Schreiben
+// geht die Änderung (nicht nur ein „hat sich geändert") in den Kanal; die Gäste zeigen sie, ohne das Board neu
+// zu laden.
+const letzterStand = new Map<string, BoardDoc>();   // boardId → zuletzt geschriebener bzw. gezeigter Stand
+/** Ohne Auswahl und ohne Maße: Die misst jedes Gerät selbst — neu gemessene Karten sind keine Änderung */
+const ohneMass = new WeakMap<object, AppNode>();
+const kontoStand = (boardId: string): BoardDoc | undefined => {
+  const b = useBoard.getState().boards.find((x) => x.id === boardId);
+  if (!b) return undefined;
+  const c = ohneAuswahl(rein(liveHaken.vor(b)));
+  return {
+    ...c,
+    nodes: c.nodes.map((n) => {
+      if ((n as Mass).measured === undefined) return n;
+      let o = ohneMass.get(n);
+      if (!o) { const { measured: _m, ...rest } = n as Mass; o = rest as AppNode; ohneMass.set(n, o); }
+      return o;
+    }),
+  };
+};
+let kontoPruefTimer: ReturnType<typeof setTimeout> | undefined;
+/** Das Konto prüfen — gebündelt und gestreut (nicht je Nachricht) */
+function kontoPruefenBald(boardId: string): void {
+  if (kontoPruefTimer) return;
+  kontoPruefTimer = setTimeout(() => { kontoPruefTimer = undefined; void checkKontoRemote(true).catch(() => null); }, 500 + streuung(boardId, 20));
+}
+/**
+ * Eine Änderung aus dem Kanal auf einem Gerät MIT Konto: Der Konto-Abgleich holt sie — gebündelt, kurz darauf.
+ * (Nicht direkt ins Board legen: Der Abgleich dieses Geräts rechnet mit dem, was es zuletzt vom Konto gelesen
+ * hat; ein Vorgriff ließe es das ganze Board zurückschreiben wollen.)
+ */
+function deltaFuerKonto(boardId: string, sonst: () => void): void {
+  if (!kontoKanal.has(boardId)) { sonst(); return; }
+  kontoPruefenBald(boardId);
+}
+/** Nach dem eigenen Schreiben ins Konto: Was sich an den geteilten Boards geändert hat, in den Kanal geben */
+function kontoAenderungenSenden(): void {
+  for (const id of kontoKanal.keys()) {
+    const jetzt = kontoStand(id);
+    if (!jetzt) continue;
+    const vorher = letzterStand.get(id);
+    letzterStand.set(id, jetzt);
+    if (!vorher) { kanaele.get(id)?.senden('stand', {}); continue; }
+    const p = patchAus(vorher, jetzt);
+    if (!p) continue;
+    kanaele.get(id)?.senden(JSON.stringify(p).length <= DELTA_MAX_ZEICHEN ? 'delta' : 'stand', JSON.stringify(p).length <= DELTA_MAX_ZEICHEN ? { p } : {});
+  }
+}
+
 /** Boards, deren Rechte der Besitzer gerade geändert hat (Nachricht „optionen" im Kanal) — beim nächsten Lauf neu fragen */
 const rechteNeu = new Set<string>();
 /** Der Besitzer hat die Rechte am Link geändert: allen im Kanal Bescheid geben (sie fragen den Server neu) */
@@ -678,7 +936,7 @@ export async function gastBeitreten(token: string): Promise<GastErgebnis> {
   setzeGruppe(board.id, { ich: meineKennung(true), recht: rechtAus(g.optionen), gast: true });
   ohneLeseschutz(() => st.importSync(boards, spaces, aktiv, { geaendert: [board.id] }));
   flushPersist();
-  await idbSet(basisKey(board.id), board).catch(() => {});
+  basisSetzen(board.id, board);
   const s2 = useBoard.getState();
   s2.setView('board'); s2.openBoard(board.id);
   kanalSchliessen(board.id);
@@ -695,7 +953,7 @@ export function gastVerlassen(boardId: string): void {
   schreiben(m);
   setzeGruppe(boardId, null);
   kanalSchliessen(boardId);
-  void idbDel(basisKey(boardId)).catch(() => {});
+  basisWeg(boardId);
   ohneLeseschutz(() => useBoard.setState((s) => ({ boards: s.boards.map((b) => (b.id === boardId ? alsKopie(b) : b)) })));
   flushPersist();
 }
@@ -731,6 +989,11 @@ export function initGastSync(): void {
     }
     if (kanaele.size) anfassenPruefen();   // Ziehen beginnt/endet
     if (geteiltKennung(s.boards) !== geteiltKennung(prev.boards)) kontoKanaeleBald();
+    // M366: Was der Konto-Abgleich gerade von außen gebracht hat, ist nicht meine Änderung — es geht nicht
+    // noch einmal in den Kanal (sonst reichte das Gerät des Besitzers jede Änderung der Gäste an alle weiter)
+    if (kontoKanal.size && isImportedState(s.boards, s.spaces)) {
+      for (const id of kontoKanal.keys()) { const jetzt = kontoStand(id); if (jetzt) letzterStand.set(id, jetzt); }
+    }
     // Eine mitgeschriebene Karte wurde hier anders ersetzt (Abgleich, eigene Bearbeitung) → ab jetzt gilt das
     for (const [boardId, l] of liveStaende) {
       if (l.size === 0) continue;
@@ -759,15 +1022,25 @@ export function initGastSync(): void {
   // Regelmäßiger Blick (auch ohne Live-Kanal aktuell) — nur im sichtbaren Fenster
   setInterval(() => {
     if (document.visibilityState !== 'visible') return;
-    for (const id of Object.keys(lesen())) void blick(id);
+    for (const id of Object.keys(lesen())) {
+      const k = kette(id);
+      if (liveVerbunden(id) && Date.now() - k.blickAm < BLICK_MIT_KANAL_MS) continue;
+      k.blickAm = Date.now() + streuung(id, 60);
+      void blick(id);
+    }
     if (kontoKanal.size && !loadKonto()) void kontoKanaele();   // abgemeldet → Kanäle zu
   }, BLICK_MS);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') for (const id of Object.keys(lesen())) void blick(id); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') { for (const id of Object.keys(lesen())) void blick(id); return; }
+    for (const id of [...basisTimer.keys()]) basisSichern(id);   // verborgen oder zu: den Stand jetzt sichern
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = undefined; flushPersist(); }
+  });
+  window.addEventListener('pagehide', () => { for (const id of [...basisTimer.keys()]) basisSichern(id); });
   // Mit Konto: Kanäle der geteilten Boards; nach jedem eigenen Schreiben den anderen Bescheid geben
   void kontoKanaele();
   window.addEventListener('pixinotes:konto-verbunden', () => void kontoKanaele());
   window.addEventListener('pixinotes:konto-geschrieben', () => {
-    for (const id of kontoKanal.keys()) kanaele.get(id)?.senden('stand', {});
+    kontoAenderungenSenden();
     void anhaengeFreigeben();
   });
 }

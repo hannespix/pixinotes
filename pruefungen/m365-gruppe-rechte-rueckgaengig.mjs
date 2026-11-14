@@ -453,14 +453,16 @@ const heraus = async (P) => { await P.keyboard.press('Escape'); await P.waitForT
 async function notizPlatz(P, text) {
   const [x, y] = await P.evaluate(() => {
     const karten = [...document.querySelectorAll('.react-flow__node')].map((n) => n.getBoundingClientRect());
-    for (let yy = 200; yy <= 700; yy += 30) {
-      for (let xx = 1150; xx >= 480; xx -= 30) {
-        if (karten.some((r) => xx + 300 > r.left && xx - 60 < r.right && yy + 150 > r.top && yy - 50 < r.bottom)) continue;
-        const el = document.elementFromPoint(xx, yy);
-        if (el?.classList.contains('react-flow__pane')) return [xx, yy];
+    for (const [rechts, hoch] of [[300, 150], [60, 60]]) {   // erst mit Platz für die ganze Karte, sonst wenigstens neben den anderen
+      for (let yy = 200; yy <= 800; yy += 30) {
+        for (let xx = 1150; xx >= 480; xx -= 30) {   // nicht zu weit außen: Auf dem anderen Gerät läge die Karte sonst unter der Spalte
+          if (karten.some((r) => xx + rechts > r.left && xx - 60 < r.right && yy + hoch > r.top && yy - 50 < r.bottom)) continue;
+          const el = document.elementFromPoint(xx, yy);
+          if (el?.classList.contains('react-flow__pane')) return [xx, yy];
+        }
       }
     }
-    return [1150, 220];
+    return [1150, 800];
   });
   return notiz(P, text, x, y);
 }

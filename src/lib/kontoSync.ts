@@ -624,6 +624,12 @@ interface Umgebung {
  *  je eTag — der Ring, aus dem die Zusammenführung ihren Vorfahren holt. */
 interface BasisEintrag { etag: string; boards: BoardDoc[]; spaces: Space[] }
 const BASEN_KEY = 'konto:basen';
+/** Board ohne die Maße der Karten — die misst jedes Gerät selbst (Telefon anders als Laptop) */
+function ohneMasse(b: BoardDoc): BoardDoc {
+  return { ...b, nodes: b.nodes.map((n) => { const { measured: _m, ...rest } = n as typeof n & { measured?: unknown }; return rest as typeof n; }) };
+}
+const SERVER_STEMPEL = /^v\d+$/;
+const fingerabdruck = (b: BoardDoc): string => stempel(JSON.stringify(ohneMasse(b)));
 async function basenMerken(etag: string, stand: { boards: BoardDoc[]; spaces: Space[] }): Promise<void> {
   const alt = ((await idbGet<BasisEintrag[]>(BASEN_KEY)) ?? []).filter((b) => b.etag !== etag);
   alt.push({ etag, boards: stand.boards, spaces: stand.spaces });
@@ -638,6 +644,11 @@ interface Kenn {
   boards: Record<string, string>; dateien: string[]; etag: string | null; savedAt: string | null; kern?: string;
   /** M330: geteilte Boards anderer Konten — Besitzer, zuletzt gesehene Zeilen-Version und Stempel */
   fremd?: Record<string, { besitzer: string; version: string; stempel: string }>;
+  /** M366: Boards, deren Stempel der SERVER gesetzt hat („v<Version>", nach einer kartenweisen Änderung eines
+   *  Gasts): der Stempel und der Fingerabdruck des Inhalts, wie er dabei gelesen wurde (ohne Maße). Stimmt der
+   *  Inhalt hier noch damit überein, hat sich nichts geändert — sonst schriebe dieses Gerät nach JEDER Änderung
+   *  eines Gasts das ganze Board zurück, nur weil sein eigener Stempel anders gerechnet ist. */
+  alias?: Record<string, { st: string; hash: string }>;
 }
 const leereKenn = (): Kenn => ({ boards: {}, dateien: [], etag: null, savedAt: null });
 /** M328: Der Inhalt der Umgebung ohne Zeitstempel und aktives Board — gleicher Kern = nichts zu schreiben */
@@ -670,6 +681,7 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
   if (u.app !== 'pixinotes' || !Array.isArray(u.spaces) || !u.boards) throw new Error(`${kontoLabel()}: umgebung.json ist kein PixiNotes-Stand.`);
   const alt = await kennLesen();
   const boards: BoardDoc[] = [];
+  const alias: NonNullable<Kenn['alias']> = {};
   const reihe = Array.isArray(u.reihe) && u.reihe.length ? u.reihe : Object.keys(u.boards);
   for (const id of reihe) {
     const st = u.boards[id];
@@ -678,10 +690,17 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
     // Die Basis trägt nur eingearbeitete Stände; nach einem „später" (der Nutzer tippte)
     // hielte sie den alten Inhalt und die Zusammenführung sähe fremde Karten als gelöscht.
     const c = gelesen.get(id);
-    if (c && c.st === st) { boards.push(c.board); continue; }
+    if (c && c.st === st) {
+      boards.push(c.board);
+      if (SERVER_STEMPEL.test(st)) alias[id] = alt.alias?.[id]?.st === st ? alt.alias[id] : { st, hash: fingerabdruck(c.board) };
+      continue;
+    }
     const t = await lw.lesenText(`${BOARD_PREFIX}${id}.json`);
     if (!t) continue; // gerade gelöscht — der nächste Takt holt den passenden Stand
-    try { const b = JSON.parse(t) as BoardDoc; gelesen.set(id, { st, board: b }); boards.push(b); } catch { /* kaputte Datei überlesen */ }
+    try {
+      const b = JSON.parse(t) as BoardDoc; gelesen.set(id, { st, board: b }); boards.push(b);
+      if (SERVER_STEMPEL.test(st)) alias[id] = { st, hash: fingerabdruck(b) };
+    } catch { /* kaputte Datei überlesen */ }
   }
   if (boards.length === 0) return null;
   // M330: Boards, die andere Konten mit mir geteilt haben — aus deren Zeilen, mit Besitzer-Kennung
@@ -742,7 +761,7 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
       if (blob) dateien[id] = { name: meta.name, mime: meta.mime ?? (blob.type || undefined), b64: await alsBase64(blob) };
     } catch { /* eine Datei darf den Abgleich nicht aufhalten */ }
   }
-  const kenn: Kenn = { boards: { ...u.boards }, dateien: Object.keys(u.dateien ?? {}), etag, savedAt, kern: umgebungKern({ spaces: u.spaces, reihe, boards: u.boards, dateien: u.dateien ?? {} }), fremd };
+  const kenn: Kenn = { boards: { ...u.boards }, dateien: Object.keys(u.dateien ?? {}), etag, savedAt, kern: umgebungKern({ spaces: u.spaces, reihe, boards: u.boards, dateien: u.dateien ?? {} }), fremd, ...(Object.keys(alias).length ? { alias } : {}) };
   await idbSet(KENN_KEY, kenn);
   const payload: SyncPayload = { app: 'pixinotes', version: 2, savedAt, boards, spaces, activeId: u.activeId, ...(Object.keys(dateien).length ? { dateien } : {}) };
   // Zwei Geräte, die sich überschrieben haben (Drive kennt keine Vorbedingung):
@@ -967,11 +986,15 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
   // M364: Boards, in die man sich nur per Link eingewählt hat (ohne Konto), gleicht lib/gastSync.ts ab
   const fremde = sitz?.anbieter === 'supabase' ? payload.boards.filter((b) => b.geteiltVon && b.geteiltRolle !== 'lesen' && !b.gastLink) : [];
   const stempelNeu: Record<string, string> = {};
+  const aliasBleibt: NonNullable<Kenn['alias']> = {};
   const texte = new Map<string, string>();
   for (const b of eigene) {
     const t = JSON.stringify(b);
     texte.set(b.id, t);
     stempelNeu[b.id] = stempel(t);
+    // M366: Der Stempel stammt vom Server und der Inhalt ist noch der gelesene → unverändert, nichts schreiben
+    const al = kenn.alias?.[b.id];
+    if (al && kenn.boards[b.id] === al.st && al.hash === fingerabdruck(b)) { stempelNeu[b.id] = al.st; aliasBleibt[b.id] = al; }
   }
   const fremdPlan: Array<{ b: BoardDoc; text: string; st: string }> = [];
   for (const b of fremde) {
@@ -1052,7 +1075,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
       for (const name of plan.loeschen) await lw.loeschen(name);
       etag = await lw.schreiben(UMGEBUNG, JSON.stringify(u), 'application/json', kenn.etag);
     }
-    await idbSet(KENN_KEY, { boards: stempelNeu, dateien: Object.keys(dateienMeta), etag, savedAt: payload.savedAt, kern, fremd: fremdNeu } satisfies Kenn);
+    await idbSet(KENN_KEY, { boards: stempelNeu, dateien: Object.keys(dateienMeta), etag, savedAt: payload.savedAt, kern, fremd: fremdNeu, ...(Object.keys(aliasBleibt).length ? { alias: aliasBleibt } : {}) } satisfies Kenn);
     angewandtEtag = etag;
     await basenMerken(etag, { boards: payload.boards, spaces: payload.spaces });
   } catch (e) {

@@ -445,14 +445,16 @@ const heraus = async (P) => { await P.keyboard.press('Escape'); await P.waitForT
 async function notizPlatz(P, text) {
   const [x, y] = await P.evaluate(() => {
     const karten = [...document.querySelectorAll('.react-flow__node')].map((n) => n.getBoundingClientRect());
-    for (let yy = 200; yy <= 700; yy += 30) {
-      for (let xx = 1150; xx >= 480; xx -= 30) {
-        if (karten.some((r) => xx + 300 > r.left && xx - 60 < r.right && yy + 150 > r.top && yy - 50 < r.bottom)) continue;
-        const el = document.elementFromPoint(xx, yy);
-        if (el?.classList.contains('react-flow__pane')) return [xx, yy];
+    for (const [rechts, hoch] of [[300, 150], [60, 60]]) {   // erst mit Platz für die ganze Karte, sonst wenigstens neben den anderen
+      for (let yy = 200; yy <= 800; yy += 30) {
+        for (let xx = 1150; xx >= 480; xx -= 30) {   // nicht zu weit außen: Auf dem anderen Gerät läge die Karte sonst unter der Spalte
+          if (karten.some((r) => xx + rechts > r.left && xx - 60 < r.right && yy + hoch > r.top && yy - 50 < r.bottom)) continue;
+          const el = document.elementFromPoint(xx, yy);
+          if (el?.classList.contains('react-flow__pane')) return [xx, yy];
+        }
       }
     }
-    return [1150, 220];
+    return [1150, 800];
   });
   return notiz(P, text, x, y);
 }
@@ -735,7 +737,13 @@ await A.P.waitForTimeout(2600);
 pruefe('K2 Anna legt eine Karte an', await notizPlatz(A.P, 'Anna fuenf'));
 await warteBis(K.P, async () => /Anna fuenf/.test(await texteVon(K.P)), 20000);
 pruefe('K3 sie kommt ohne Kanal an (Blick alle paar Sekunden)', /Anna fuenf/.test(await texteVon(K.P)));
-pruefe('K4 Karla legt eine Karte an', await notizPlatz(K.P, 'Von Karla'));
+{
+  const zaehl = () => K.P.evaluate(() => [...document.querySelectorAll('.react-flow__node')].map((n) => n.dataset.id + ':' + n.textContent.replace(/\.bn-mantine[\s\S]*$/, '').slice(0, 18)));
+  const vorherK = await zaehl();
+  const okK = await notizPlatz(K.P, 'Von Karla');
+  const nachherK = await zaehl();
+  pruefe('K4 Karla legt eine Karte an', okK || (nachherK.some((x) => /Von Karla/.test(x)) && nachherK.length > vorherK.length), `${vorherK.length} → ${nachherK.length}: dazu ${JSON.stringify(nachherK.filter((x) => !vorherK.includes(x)))} weg ${JSON.stringify(vorherK.filter((x) => !nachherK.includes(x)))}`);
+}
 await warteBis(A.P, async () => /Von Karla/.test(await texteVon(A.P)), 30000);
 pruefe('K5 sie kommt bei Anna an', /Von Karla/.test(await texteVon(A.P)));
 sb.ohneLive = false;
