@@ -41,6 +41,7 @@ import { SheetCard } from './nodes/SheetCard';
 import { MinutesCard } from './nodes/MinutesCard';
 import { TimeCard } from './nodes/TimeCard';
 import { HtmlAppCard } from './nodes/HtmlAppCard';
+import { BubblesCard } from './nodes/BubblesCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { focusable } from './FocusSheet';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -102,6 +103,7 @@ const nodeTypes: NodeTypes = {
   minutes: guard(MinutesCard),
   time: guard(TimeCard),
   htmlapp: guard(HtmlAppCard),
+  bubbles: guard(BubblesCard),
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
@@ -1568,7 +1570,8 @@ export function Board() {
           labelStyle: { fontSize: 11, fill: 'var(--muted)' },
           labelBgStyle: { fill: 'var(--bg)', fillOpacity: 0.9 },
         }}
-        proOptions={{ hideAttribution: false }}
+        // M373: der „React Flow"-Schriftzug unten rechts ist ausgeblendet (Nutzerwunsch); die Bibliothek ist in der Hilfe genannt
+        proOptions={{ hideAttribution: true }}
       >
         <ViewportPortal><Fanglinien /></ViewportPortal>
         {/* M364: Karten, die gerade ein anderer bearbeitet — Rahmen mit Namen */}

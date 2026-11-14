@@ -15,13 +15,14 @@ import { GanttBody } from './nodes/GanttCard';
 import { CalendarBody } from './nodes/CalendarCard';
 import { DokumentFolie, dokumentArt } from './DokumentFolie';
 import { letzteSeite } from '../lib/pdfSeiten';
-import type { AppNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, NoteNode, ShapeNode } from '../types';
+import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, NoteNode, ShapeNode } from '../types';
 import { HtmlAppSlide } from './nodes/HtmlAppCard';
+import { BubblesBody } from './nodes/BubblesCard';
 import { folgeIch, folgenSetzen, ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenStart, vorfuehrenStopp, vortragMelden, werFuehrtVor } from '../lib/vorfuehren';
 import { ich, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
 
 /** Kartentypen, die auf der Folie LIVE editierbar sind */
-const EDITABLE = new Set(['note', 'shape', 'mermaid', 'kanban', 'gantt', 'calendar']);
+const EDITABLE = new Set(['note', 'shape', 'mermaid', 'kanban', 'gantt', 'calendar', 'bubbles']);
 
 /** Bedient der Nutzer gerade ein Eingabe-/Bedienelement? Dann keine Folien-Navigation.
  *  SELECT/BUTTON gehören dazu: Pfeiltasten/Leertaste wählen dort Werte (Audit R6-F4) */
@@ -182,6 +183,14 @@ function SlideContent({ node }: { node: AppNode }) {
       return (
         <div className="slide-cal cal-card">
           <CalendarBody id={node.id} data={(node as CalendarNode).data} />
+        </div>
+      );
+    case 'bubbles':
+      // M373: die Blasen leben auch auf der Folie — beitragen, abstimmen, auswerten vor Publikum
+      return (
+        <div className="slide-bubbles bubbles-card">
+          <h3 className="slide-bubbles-titel" translate="no">{(node as BubblesNode).data.title || 'Ideen'}</h3>
+          <BubblesBody id={node.id} data={(node as BubblesNode).data} gross />
         </div>
       );
     case 'htmlapp':

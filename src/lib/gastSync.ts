@@ -296,7 +296,7 @@ function angefassteKarte(boardId: string): string | null {
   const st = useBoard.getState();
   if (st.activeId !== boardId || st.view !== 'board') return null;
   const el = document.activeElement as HTMLElement | null;
-  if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) && !el.closest('.pdf-seite-bar, .comment-panel')) {
+  if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) && !el.closest('.pdf-seite-bar, .comment-panel, [data-ohne-sperre]')) {   // M373: an Bubbles arbeiten alle zugleich
     const k = el.closest('.react-flow__node') as HTMLElement | null;
     // Nur, wenn der Mensch an diesem Gerät gerade etwas getan hat (Klick, Taste) — ein Cursor, den das Programm
     // gesetzt hat, nimmt keine Karte. Wer sie schon hält, behält sie, solange der Cursor drin bleibt.

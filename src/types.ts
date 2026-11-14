@@ -381,8 +381,11 @@ export interface FrameData {
 }
 export type FrameNode = Node<FrameData, 'frame'>;
 
+/** M373: Entscheidungs-Bubbles — Ideen als Blasen, Gruppen, Punkte-Abstimmung (Daten: lib/bubbles.ts) */
+export type BubblesNode = Node<import('./lib/bubbles').BubblesData, 'bubbles'>;
+
 export type AppNode =
-  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode | MinutesNode | SheetNode)
+  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode | MinutesNode | SheetNode | BubblesNode)
   // Archiv (M87): Karten jedes Typs lassen sich als Ganzes „erledigt" ablegen —
   // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface.
   // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der

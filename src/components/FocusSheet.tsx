@@ -33,7 +33,7 @@ const TYPE_LABEL: Record<string, string> = {
   note: 'Notiz', kanban: 'Kanban', gantt: 'Zeitplan', calendar: 'Kalender',
   week: 'Planer', minutes: 'Protokoll', time: 'Zeiterfassung', mermaid: 'Diagramm',
   image: 'Bild', file: 'Datei', email: 'E-Mail', htmlapp: 'App', shape: 'Form',
-  portal: 'Portal', frame: 'Rahmen', sheet: 'Rechen-Tabelle',
+  portal: 'Portal', frame: 'Rahmen', sheet: 'Rechen-Tabelle', bubbles: 'Bubbles',
 };
 
 /** Karten, die im Fokus nichts gewinnen — sie bleiben Board-Sache */
