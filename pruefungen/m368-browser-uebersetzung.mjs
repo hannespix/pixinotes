@@ -155,7 +155,8 @@ const FOLGE = [
   ['Rechtsklick-Menü auf', async (P) => { const f = await frei(P); await P.mouse.click(f.x, f.y, { button: 'right' }); }],
   ['Rechtsklick-Menü zu', async (P) => { await P.keyboard.press('Escape'); }],
   ['neue Notiz', async (P) => { const f = await frei(P); await P.mouse.dblclick(f.x, f.y); await P.waitForTimeout(500); await P.keyboard.type('Neue Notiz mit Inhalt', { delay: 25 }); }],
-  ['Notiz verlassen', async (P) => { const f = await frei(P); await P.mouse.click(f.x - 320, f.y + 380); }],
+  // die Meldung „Notiz erstellt …" steht drei Sekunden — abwarten, sonst ist sie beim Vergleich mal da, mal weg
+  ['Notiz verlassen', async (P) => { const f = await frei(P); await P.mouse.click(f.x - 320, f.y + 380); await P.locator('.toast').waitFor({ state: 'detached', timeout: 9000 }).catch(() => {}); }],
   ['Zeichnen an', async (P) => { await P.click('[data-taste="zeichnen"]'); }],
   ['Zeichnen aus', async (P) => { await P.keyboard.press('Escape'); }],
   ['anderes Board', async (P) => { await P.click('.side-board-name:has-text("Einkauf")'); }],
