@@ -44,6 +44,7 @@ function CommentPin({ thread, nr }: { thread: CommentThread; nr?: number }) {
         className={`comment-pin nodrag nopan ${thread.resolved ? 'resolved' : ''} ${openId === thread.id ? 'open' : ''} ${aufSeite ? 'auf-seite' : ''}`}
         data-seite={thread.seite}
         data-nr={nr}
+        translate="no"
         // BEWUSST rechts AUSSERHALB der Ecke: genau auf der Ecke säße der Pin
         // über dem ✕-Löschknopf der ausgewählten Karte (E2E-Fund M148)
         style={{ transform: `translate(${lage.x}px, ${lage.y}px)` }}
@@ -63,8 +64,8 @@ function CommentPin({ thread, nr }: { thread: CommentThread; nr?: number }) {
           role="button"
           title="Kommentar öffnen"
         >
-          <b>{erste.author}</b>{thread.msgs.length > 1 ? ` · ${thread.msgs.length} Beiträge` : ''}
-          <span className="comment-blase-text">{erste.text.length > 80 ? `${erste.text.slice(0, 78)}…` : erste.text}</span>
+          <b translate="no">{erste.author}</b>{thread.msgs.length > 1 ? ` · ${thread.msgs.length} Beiträge` : ''}
+          <span className="comment-blase-text" translate="no">{erste.text.length > 80 ? `${erste.text.slice(0, 78)}…` : erste.text}</span>
         </div>
       )}
     </>
@@ -201,7 +202,7 @@ function CommentPanel() {
             return (
               <div className={`comment-msg ${bearbeite === k ? 'bearbeiten' : ''}`} key={k}>
                 <span className="comment-msg-meta">
-                  <span><b>{m.author}</b> · {timeOf(m.at)}{m.bearbeitet ? <span title={`Bearbeitet am ${new Date(m.bearbeitet).toLocaleString('de-DE')}`}> · bearbeitet</span> : null}</span>
+                  <span><b translate="no">{m.author}</b> · {timeOf(m.at)}{m.bearbeitet ? <span title={`Bearbeitet am ${new Date(m.bearbeitet).toLocaleString('de-DE')}`}> · bearbeitet</span> : null}</span>
                   {bearbeite !== k && (
                     <span className="comment-msg-tools">
                       <button onClick={() => { setBearbeite(k); setEntwurf(m.text); }} title="Kommentar bearbeiten" aria-label="Kommentar bearbeiten" data-taste="kommentar-bearbeiten"><IPen size={12} /></button>
@@ -228,7 +229,7 @@ function CommentPanel() {
                     </span>
                   </>
                 ) : (
-                  <span className="comment-msg-text" onDoubleClick={() => { setBearbeite(k); setEntwurf(m.text); }}>{m.text}</span>
+                  <span className="comment-msg-text" translate="no" onDoubleClick={() => { setBearbeite(k); setEntwurf(m.text); }}>{m.text}</span>
                 )}
               </div>
             );

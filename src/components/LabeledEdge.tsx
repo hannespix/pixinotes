@@ -277,7 +277,7 @@ export function LabeledEdge({
             />
           ) : (
             <>
-              <span className="edge-label-text" onClick={() => { setDraft(label); setEditing(true); }} title="Klick: Beziehung benennen">
+              <span className="edge-label-text" translate="no" onClick={() => { setDraft(label); setEditing(true); }} title="Klick: Beziehung benennen">
                 {label || '+'}
               </span>
               <button

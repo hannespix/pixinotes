@@ -142,7 +142,7 @@ function MermaidSlide({ node }: { node: MermaidNode }) {
         <div className={`mermaid-preview${look === 'hand' ? ' mm-hand' : ''}`}>
           {/* Wie in der Karte (M90): letztes gültiges Diagramm bleibt sichtbar,
               der Fehler erscheint nur als Overlay-Chip */}
-          <div className={`mermaid-svg ${error ? 'stale' : ''}`} dangerouslySetInnerHTML={{ __html: svg }} />
+          <div className={`mermaid-svg ${error ? 'stale' : ''}`} translate="no" dangerouslySetInnerHTML={{ __html: svg }} />
           {error && (
             <div className="mermaid-error" title={error}>
               ⚠️ {svg ? 'Code unvollständig — letztes gültiges Diagramm bleibt sichtbar' : error}
@@ -183,7 +183,7 @@ function SlideContent({ node }: { node: AppNode }) {
       );
     default:
       // E-Mail/Bild/Datei: Rendering über den escapenden Serializer — fremde Inhalte bleiben inert
-      return <div dangerouslySetInnerHTML={{ __html: nodeToHtml(node) }} />;
+      return <div translate="no" dangerouslySetInnerHTML={{ __html: nodeToHtml(node) }} />;
   }
 }
 
@@ -293,7 +293,7 @@ export function Presenter() {
   return (
     <div className={`presenter ${art ? 'mit-dokument' : ''}`} role="dialog" aria-modal="true" aria-label="Präsentation">
       <div className="presenter-head">
-        <span>{board.name}</span>
+        <span translate="no">{board.name}</span>
         <span className="presenter-hint-edit">{art ? 'Doppelklick oder + / − vergrößert · B = Seitenbreite' : 'Folien sind direkt editierbar'}</span>
         <span className="presenter-count">{slides.length ? safeIdx + 1 : 0} / {slides.length}</span>
         <button onClick={() => setOpen(false)} aria-label="Präsentation beenden">✕</button>

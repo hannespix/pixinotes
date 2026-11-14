@@ -1467,18 +1467,18 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           <div className="ov-graph-ctx-title">
             🧠 Vorschlag · {Math.round(sugMenu.score * 100)} % Nähe
           </div>
-          <div className="ov-graph-ctx-sub">
+          <div className="ov-graph-ctx-sub" translate="no">
             „{boardName(sugMenu.a)}" ↔ „{boardName(sugMenu.b)}"
           </div>
           <button onClick={() => acceptSuggestion(sugMenu.a, sugMenu.b)}>Verknüpfen (Portal anlegen)</button>
-          <button onClick={() => { openBoard(sugMenu.a); setSugMenu(null); }}>„{boardName(sugMenu.a)}" öffnen</button>
-          <button onClick={() => { openBoard(sugMenu.b); setSugMenu(null); }}>„{boardName(sugMenu.b)}" öffnen</button>
+          <button onClick={() => { openBoard(sugMenu.a); setSugMenu(null); }}>„<span translate="no">{boardName(sugMenu.a)}</span>" öffnen</button>
+          <button onClick={() => { openBoard(sugMenu.b); setSugMenu(null); }}>„<span translate="no">{boardName(sugMenu.b)}</span>" öffnen</button>
           <button onClick={() => { rejectLink(sugMenu.a, sugMenu.b); setSugMenu(null); }}>Passt nicht — nicht mehr vorschlagen</button>
         </div>
       )}
       {ctxMenu && (
         <div className="ov-graph-ctx nodrag" ref={insBild} style={{ left: ctxMenu.x, top: ctxMenu.y }}>
-          <div className="ov-graph-ctx-title">{boardName(ctxMenu.boardId)}</div>
+          <div className="ov-graph-ctx-title" translate="no">{boardName(ctxMenu.boardId)}</div>
           <button onClick={() => { openBoard(ctxMenu.boardId); setCtxMenu(null); }}>Board öffnen</button>
           {/* M285: „aus der netzansicht … geht es noch gar nicht" — hier
               stehen jetzt die Karten selbst. Ein Klick öffnet dieselbe
@@ -1494,6 +1494,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
                   <button
                     key={n.id}
                     className="ov-graph-ctx-karte"
+                    translate="no"
                     title={`„${kartenTitel(n)}" öffnen und bearbeiten`}
                     onClick={() => { oeffneKarte(ctxMenu.boardId, n.id, 'overview'); setCtxMenu(null); }}
                   >{kartenTitel(n)}</button>

@@ -54,7 +54,7 @@ export function BildExport() {
         </div>
         <div className="modal-body">
           <section className="modal-section">
-            <p className="modal-hint">Das Board „{activeBoard.name}", zugeschnitten auf den Inhalt.</p>
+            <p className="modal-hint">Das Board „<span translate="no">{activeBoard.name}</span>", zugeschnitten auf den Inhalt.</p>
             <label className="modal-row">
               <span>Format</span>
               <select value={format} onChange={(e) => setFormat(e.target.value as typeof format)}>

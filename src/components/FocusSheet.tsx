@@ -347,7 +347,7 @@ export function FocusSheet() {
             Ergebnis. Geblieben ist der untere: Er liegt am Daumen und steht
             ohnehin bei allen Karten-Werkzeugen. */}
         <div className="focus-title">
-          <b>{cardTitle(node)}</b>
+          <b translate="no">{cardTitle(node)}</b>
           <span>{typeName}{dok ? ` · Seite ${dok.seite} von ${dok.seiten}` : siblings.length > 1 ? ` · ${index + 1} von ${siblings.length}` : ''}</span>
         </div>
       </div>

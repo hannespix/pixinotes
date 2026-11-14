@@ -69,7 +69,7 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
             onKeyDown={(e) => { if (e.key === 'Escape') setEditing(false); }}
           />
         ) : (
-          <span className="shape-text">{data.text || <span className="shape-ph">Doppelklick…</span>}</span>
+          <span className="shape-text" translate={data.text ? 'no' : undefined}>{data.text || <span className="shape-ph">Doppelklick…</span>}</span>
         )}
       </div>
     </div>

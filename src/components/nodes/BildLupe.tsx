@@ -29,7 +29,7 @@ export function BildLupe({ quelle, name, onClose, onDownload }: {
     <div className="pdf-backdrop nodrag" onClick={onClose}>
       <div className="pdf-viewer" onClick={(e) => e.stopPropagation()}>
         <div className="pdf-bar">
-          <b>{name}</b>
+          <b translate="no">{name}</b>
           <span className="pdf-nav">
             <ZoomKnoepfe {...{ zoom, rein, raus, einpassen, maxZoom }} />
             {onDownload && <button onClick={onDownload} title="Herunterladen"><IDownload size={14} /></button>}

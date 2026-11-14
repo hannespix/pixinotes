@@ -28,6 +28,7 @@ export function InlineName({ value, onRename, className, style, editing, onEditi
     return (
       <span
         className={`${className ?? ''} nodrag`}
+        translate="no"
         style={style}
         title="Doppelklick zum Umbenennen"
         onDoubleClick={(e) => {

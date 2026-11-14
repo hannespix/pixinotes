@@ -281,9 +281,9 @@ export function Tabs() {
           title={`${context?.space.name ?? '—'} › ${context?.project.name ?? '—'} — Navigation öffnen`}
           onClick={() => setNavOpen((o) => !o)}
         >
-          <span className="tab-nav-space">{context?.space.name ?? '—'}</span>
+          <span className="tab-nav-space" translate="no">{context?.space.name ?? '—'}</span>
           <IChevronR size={11} />
-          <span className="tab-nav-proj">{context?.project.name ?? '—'}</span>
+          <span className="tab-nav-proj" translate="no">{context?.project.name ?? '—'}</span>
         </button>
       )}
       {navOpen && createPortal(
@@ -331,9 +331,9 @@ export function Tabs() {
           aria-expanded={navOpen}
           onClick={() => setNavOpen((o) => !o)}
         >
-          <span className="tab-nav-proj tab-pfad-proj">{context?.project.name ?? '—'}</span>
+          <span className="tab-nav-proj tab-pfad-proj" translate="no">{context?.project.name ?? '—'}</span>
           <span className="tab-pfad-trenner">›</span>
-          <span className="tab-pfad-board">{aktivesBoard?.name ?? '—'}</span>
+          <span className="tab-pfad-board" translate="no">{aktivesBoard?.name ?? '—'}</span>
           <IChevronR size={11} className="tab-picker-pfeil" />
         </button>
       ) : (

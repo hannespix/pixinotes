@@ -159,10 +159,10 @@ export function GeteiltDialog() {
                 {(d.type || '').startsWith('image/')
                   ? <img src={URL.createObjectURL(d)} alt="" />
                   : <span className="geteilt-symbol" aria-hidden>📄</span>}
-                <span className="geteilt-name">{d.name}</span>
+                <span className="geteilt-name" translate="no">{d.name}</span>
               </div>
             ))}
-            {textTeil && <div className="geteilt-text">{textTeil}</div>}
+            {textTeil && <div className="geteilt-text" translate="no">{textTeil}</div>}
             {!dateien.length && !textTeil && <div className="geteilt-text">Es ist nichts angekommen.</div>}
           </div>
 
@@ -170,7 +170,7 @@ export function GeteiltDialog() {
             <span>Wohin?</span>
             <select value={zielBoard} onChange={(e) => setZielBoard(e.target.value)}>
               {spaces.flatMap((sp) => sp.projects.map((p) => (
-                <optgroup key={p.id} label={`${sp.name} › ${p.name}`}>
+                <optgroup key={p.id} label={`${sp.name} › ${p.name}`} translate="no">
                   {p.boardIds
                     .map((id) => boards.find((b) => b.id === id))
                     .filter((b): b is NonNullable<typeof b> => !!b && !b.archived)
@@ -204,7 +204,7 @@ export function GeteiltDialog() {
               <span>Welche Notiz?</span>
               <select value={zielNotiz} onChange={(e) => setZielNotiz(e.target.value)}>
                 {notizen.map((n) => (
-                  <option key={n.id} value={n.id}>
+                  <option key={n.id} value={n.id} translate="no">
                     {(nodeToText(n).split('\n').find((z) => z.trim()) ?? 'Leere Notiz').slice(0, 50)}
                   </option>
                 ))}

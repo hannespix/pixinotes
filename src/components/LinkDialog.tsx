@@ -88,7 +88,7 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
               <div className="modal-note">Lade …</div>
             ) : zeile ? (
               <>
-                <p className="modal-hint">Wer diesen Link öffnet, bekommt „{board.name}" direkt als eigenes Board — ohne Konto, samt Anhängen.</p>
+                <p className="modal-hint">Wer diesen Link öffnet, bekommt „<span translate="no">{board.name}</span>" direkt als eigenes Board — ohne Konto, samt Anhängen.</p>
                 <div className="link-zeile">
                   <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label="Link" data-taste="link-adresse" />
                   <button onClick={() => void kopieren()} data-taste="link-kopieren">Kopieren</button>
@@ -106,7 +106,7 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
             ) : (
               <>
                 <p className="modal-hint">
-                  Einen Link zu „{board.name}" anlegen: Wer ihn öffnet, bekommt das Board direkt als eigenes Board — ohne Konto, samt PDFs und anderen Anhängen.
+                  Einen Link zu „<span translate="no">{board.name}</span>" anlegen: Wer ihn öffnet, bekommt das Board direkt als eigenes Board — ohne Konto, samt PDFs und anderen Anhängen.
                 </p>
                 <div className="modal-buttons">
                   <button disabled={!!busy} onClick={erstellen} data-taste="link-erstellen">{busy || 'Link erstellen und kopieren'}</button>

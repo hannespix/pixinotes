@@ -61,6 +61,7 @@ function NoteEntityChips({ text }: { text: string }) {
         <a
           key={e.href}
           className={`due-chip ent-chip ent-chip-${e.kind}`}
+          translate="no"
           href={e.href}
           target={e.kind === 'url' ? '_blank' : undefined}
           rel="noreferrer"
@@ -106,6 +107,7 @@ function NoteLinkChipsInnen({ links }: { links: string[] }) {
           <button
             key={name}
             className={`due-chip link-chip ${resolved ? '' : 'unresolved'}`}
+            translate="no"
             title={resolved ? `Zu „${name}" springen` : `Board „${name}" anlegen`}
             onClick={() => follow(name)}
           >
@@ -163,10 +165,10 @@ function NoteAboFeeds({ id }: { id: string }) {
         const lines = appStateLines(states[a.id]);
         return (
           <div key={a.id} className="abo-extract" title="Speicherstand der verbundenen App (lesbarer Auszug) — aktualisiert sich, sobald die App speichert">
-            <b>📟 {(a.data.name as string) || 'App'}</b>
+            <b translate="no">📟 {(a.data.name as string) || 'App'}</b>
             {lines.length === 0
               ? <span className="abo-extract-empty">noch nichts gespeichert</span>
-              : lines.map((l, i) => <span key={i}>{l}</span>)}
+              : lines.map((l, i) => <span key={i} translate="no">{l}</span>)}
           </div>
         );
       })}
@@ -630,6 +632,7 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
       ) : (
         <div
           className="nodrag nowheel note-editor"
+          translate="no"
           // Klick in den Text weckt den Editor; der Cursor landet an der Klickstelle
           onClick={(e) => {
             if ((e.target as HTMLElement).closest('input')) return;

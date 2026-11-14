@@ -814,6 +814,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
               <button
                 key={`s${i}`}
                 className={`cal-strip ${s.ext ? 'ext' : ''}`}
+                translate="no"
                 style={{ background: s.color }}
                 title={s.ownDate ? `${s.text} (eigener Termin — Klick öffnet ihn)` : `${s.text}${s.ext ? ' (extern)' : ' — zur Karte springen'}`}
                 onClick={(ev) => {
@@ -829,6 +830,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
               <button
                 key={i}
                 className={`cal-chip ${e.urgent ? 'urgent' : ''} ${e.ext ? 'ext' : ''} ${e.own ? 'own' : ''}`}
+                translate="no"
                 style={e.color ? { borderLeftColor: e.color } : undefined}
                 title={e.own ? (e.tip ?? e.text) : `${e.text}${e.ext ? ' (externer Termin)' : ' — zur Karte springen'}`}
                 onClick={(ev) => {
@@ -875,6 +877,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
             <div key={ev.id} className="cal-dayedit-row">
               <button
                 className="cal-dayedit-title"
+                translate="no"
                 style={ev.color ? { color: ev.color } : undefined}
                 title={`${ownTip(ev)} — Klick: bearbeiten`}
                 onClick={() => { setEvEdit({ ...ev }); setEvIsNew(false); setLinkQuery(''); }}
@@ -967,6 +970,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
               🔗
               <button
                 className="cal-dayedit-title"
+                translate={linkLabel(evEdit.link) ? 'no' : undefined}
                 title={linkLabel(evEdit.link) ? 'Zur verknüpften Karte springen' : 'Ziel wurde gelöscht'}
                 onClick={() => linkLabel(evEdit.link!) && jumpLink(evEdit.link!)}
               >
@@ -985,6 +989,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
                 <button
                   key={`${r.boardId}|${r.nodeId ?? ''}`}
                   className="cal-evform-hit"
+                  translate="no"
                   onClick={() => {
                     setEvEdit({
                       ...evEdit,

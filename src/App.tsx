@@ -44,6 +44,7 @@ import { einladungAnnehmen, einladungOffen, einladungTokenAbholen } from './lib/
 import { initGastSync } from './lib/gastSync';
 import { initVorfuehren } from './lib/vorfuehren';
 import { Vorfuehren } from './components/Vorfuehren';
+import { SprachHinweis } from './components/SprachHinweis';
 import { GastNameDialog, LiveLeiste, NAME_FRAGEN } from './components/LiveLeiste';
 import { getAuthor } from './components/CommentLayer';
 import { loadKonto } from './lib/kontoSync';
@@ -348,6 +349,8 @@ export default function App() {
         {/* M367: „Folgt mir" — wer vorführt, wer folgt */}
         {view === 'board' && !presenting && !tasksOpen && <Vorfuehren />}
         <GastNameDialog />
+        {/* M368: anderssprachigen Nutzern sagen, dass der Browser die Oberfläche übersetzen kann */}
+        {!presenting && <SprachHinweis />}
         {/* M360: Nur lesend geteiltes Board — sagen, warum nichts geht, und den Ausweg anbieten */}
         {nurLesenBoard && view === 'board' && !presenting && !focusCard && (
           <div className="lese-band" role="status" data-taste="lese-band">

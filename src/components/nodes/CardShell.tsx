@@ -428,7 +428,7 @@ function Kachel({ node, onAuf, onOeffnen }: { node: AppNode; onAuf: () => void; 
   return (
     <div className="kachel">
       <div className="kachel-typ">{info.typ}</div>
-      <div className="kachel-titel">{info.titel}</div>
+      <div className="kachel-titel" translate="no">{info.titel}</div>
       {info.zeilen.filter((z) => z.text).map((z, i) => (
         <div key={i} className={`kachel-zeile${z.warn ? ' warn' : ''}`}>{z.text}</div>
       ))}

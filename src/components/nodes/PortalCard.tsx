@@ -33,7 +33,7 @@ export function PortalCard({ id, data, selected }: NodeProps<PortalNode>) {
       <div className="portal-icon">🗂️</div>
       {target ? (
         <>
-          <div className="portal-name">{target.name}</div>
+          <div className="portal-name" translate="no">{target.name}</div>
           <div className="meta">{boardMetaLabel(target)}</div>
           {target.id !== activeId && (
             gegenseitig ? (
@@ -77,7 +77,7 @@ export function PortalCard({ id, data, selected }: NodeProps<PortalNode>) {
               Board wählen…
             </option>
             {boards.filter((b) => b.id !== activeId).map((b) => (
-              <option key={b.id} value={b.id}>
+              <option key={b.id} value={b.id} translate="no">
                 {b.name}
               </option>
             ))}

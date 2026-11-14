@@ -714,6 +714,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     >
       <span
         className={`kanban-item-text ${colIdx === done ? 'done-text' : ''}`}
+        translate="no"
         title="Ticket öffnen (Details, Person, Verknüpfung)"
         onClick={() => setDetailId(it.id)}
       >
@@ -744,6 +745,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             <button
               key={tag}
               className="k-label nodrag"
+              translate="no"
               style={{ background: `hsl(${tagHue(tag)} 70% 85%)`, color: `hsl(${tagHue(tag)} 65% 24%)` }}
               title={tagFilter === tag ? `Filter #${tag} aufheben` : `Nur Tickets mit #${tag} zeigen`}
               onClick={() => { setTagFilter(tagFilter === tag ? '' : tag); setFilterOpen(true); }}
@@ -770,7 +772,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           {(it.links?.length ?? 0) > 0 && (
             <em className="k-links" title={`${it.links!.length} verknüpfte Karte(n) — Ticket öffnen`} onClick={() => setDetailId(it.id)}>🔗{it.links!.length}</em>
           )}
-          {it.who && <em className="k-who" title={it.who}>{it.who.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}</em>}
+          {it.who && <em className="k-who" translate="no" title={it.who}>{it.who.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}</em>}
           {it.note && <em className="k-note" title="Hat Beschreibung — Ticket öffnen" onClick={() => setDetailId(it.id)}>≡</em>}
           {it.link && (() => {
             const state = linkState(it.link!);
@@ -981,7 +983,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           <button className={`k-chip ${quick === 'faellig' ? 'on' : ''}`} title="Nur Tickets mit Frist" onClick={() => setQuick(quick === 'faellig' ? 'alle' : 'faellig')}>Frist</button>
           <button className={`k-chip ${quick === 'ueberfaellig' ? 'on' : ''}`} title="Nur überfällige Tickets" onClick={() => setQuick(quick === 'ueberfaellig' ? 'alle' : 'ueberfaellig')}>Überfällig</button>
           {allTags.map((tag) => (
-            <button key={tag} className={`k-chip k-tag ${tagFilter === tag ? 'on' : ''}`} title={`Nur Tickets mit #${tag} — Tags einfach im Ticket-Text tippen`} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}>#{tag}</button>
+            <button key={tag} className={`k-chip k-tag ${tagFilter === tag ? 'on' : ''}`} translate="no" title={`Nur Tickets mit #${tag} — Tags einfach im Ticket-Text tippen`} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}>#{tag}</button>
           ))}
           {(linkedBoards.length > 0 || boardFilter) && (
             /* M179: schon ab EINEM Quell-Board sichtbar (plus „hier erstellt")
@@ -990,7 +992,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             <select className="k-filter-board" value={boardFilter} title="Nur Tickets aus einem Quell-Board (bzw. nur hier erstellte)" onChange={(e) => setBoardFilter(e.target.value)}>
               <option value="">alle Quell-Boards</option>
               <option value="local">— hier erstellt —</option>
-              {linkedBoards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              {linkedBoards.map((b) => <option key={b.id} value={b.id} translate="no">{b.name}</option>)}
             </select>
           )}
           {linkedBoards.length > 0 && (
@@ -1112,7 +1114,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     return [...groups.entries()]
                       .sort((a, b) => boardName(a[0] || undefined).localeCompare(boardName(b[0] || undefined), 'de'))
                       .flatMap(([bid, items]) => [
-                        <div className="k-group-head" key={`g-${bid}`}>{boardName(bid || undefined)} <em>{items.length}</em></div>,
+                        <div className="k-group-head" key={`g-${bid}`} translate={bid ? 'no' : undefined}>{boardName(bid || undefined)} <em>{items.length}</em></div>,
                         ...items.map((it) => renderItem(it, colIdx)),
                       ]);
                   })()}
@@ -1163,7 +1165,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   </button>
                   <label title={checked ? 'Wird eingesammelt — Klick schließt dieses Board aus' : 'Ausgeschlossen — Klick sammelt wieder ein'}>
                     <input type="checkbox" checked={checked} onChange={() => toggleCollectBoard(b.id)} />
-                    <span className="collect-name">{b.name}</span>
+                    <span className="collect-name" translate="no">{b.name}</span>
                   </label>
                   {cnt > 0 && <span className="kanban-count">{cnt}</span>}
                   {cnt > 0 && (
@@ -1191,7 +1193,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                           title={on ? 'Wird eingesammelt — Klick überspringt künftig genau diese Karte' : 'Abgewählt — Klick sammelt diese Karte wieder ein'}
                         >
                           <input type="checkbox" checked={on} disabled={!checked && !abo} onChange={() => toggleCollectNode(s.nodeId)} />
-                          <span className="collect-name">{s.label}</span>
+                          <span className="collect-name" translate="no">{s.label}</span>
                           {abo && (
                             <span
                               className="collect-abo"
@@ -1265,13 +1267,13 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             />
             <span>Tag{anzeigeTage === 1 ? '' : 'en'}</span>
           </div>
-          <div className="collect-hint">Archivierte Tickets verlassen die Spalten und zählen nirgends mehr mit. ↩ holt ein Ticket zurück nach „{cols[done]}", ✕ löscht es endgültig.</div>
+          <div className="collect-hint">Archivierte Tickets verlassen die Spalten und zählen nirgends mehr mit. ↩ holt ein Ticket zurück nach „<span translate="no">{cols[done]}</span>", ✕ löscht es endgültig.</div>
           {archiv.length === 0 && (
             <div className="collect-sub-empty">Noch nichts archiviert.</div>
           )}
           {[...archiv].reverse().map((it) => (
             <div className="collect-row k-archiv-row" key={it.id} data-archiv-id={it.id}>
-              <span className="collect-name" title={`${it.text}${it.who ? ` · ${it.who}` : ''}${it.note ? `\n${it.note}` : ''}`}>{it.text}</span>
+              <span className="collect-name" translate="no" title={`${it.text}${it.who ? ` · ${it.who}` : ''}${it.note ? `\n${it.note}` : ''}`}>{it.text}</span>
               <em className="k-archiv-meta" title={`Erledigt am ${kurzDatum(it.erledigtAm)} · archiviert am ${kurzDatum(it.archiviertAm)}`}>
                 ✓ {kurzDatum(it.erledigtAm)} · 🗃 {kurzDatum(it.archiviertAm)}
               </em>
@@ -1325,7 +1327,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   title="Spalte"
                   onChange={(e) => tryMoveTo(it, Number(e.target.value))}
                 >
-                  {cols.map((c, i) => <option key={i} value={i}>{c}</option>)}
+                  {cols.map((c, i) => <option key={i} value={i} translate="no">{c}</option>)}
                 </select>
                 <label>📅<input type="date" value={it.due ?? ''} onChange={(e) => patchItem(it.id, { due: e.target.value || undefined })} /></label>
                 <label>👤<input type="text" placeholder="Person" value={it.who ?? ''} onChange={(e) => patchItem(it.id, { who: e.target.value || undefined })} /></label>
@@ -1372,7 +1374,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                       checked={!!s.done}
                       onChange={() => patchItem(it.id, { subs: subs.map((x) => (x.id === s.id ? { ...x, done: !x.done } : x)) })}
                     />
-                    <span className={s.done ? 'done' : ''}>{s.text}</span>
+                    <span className={s.done ? 'done' : ''} translate="no">{s.text}</span>
                     <button title="Punkt entfernen" onClick={() => patchItem(it.id, { subs: subs.filter((x) => x.id !== s.id) })}><IX size={10} /></button>
                   </label>
                 ))}
@@ -1403,7 +1405,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   return (
                     <div key={d} className="ticket-dep">
                       <span className={`ticket-dep-state ${depDone ? 'done' : ''}`}>{depDone ? '✓' : '○'}</span>
-                      <span className={depDone ? 'done' : ''}>{dep.text}</span>
+                      <span className={depDone ? 'done' : ''} translate="no">{dep.text}</span>
                       <button title="Abhängigkeit lösen" onClick={() => patchItem(it.id, { deps: (it.deps ?? []).filter((x) => x !== d) })}><IX size={10} /></button>
                     </div>
                   );
@@ -1423,7 +1425,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     {others
                       .filter((o) => !(it.deps ?? []).includes(o.id) && !wouldCycle(it.id, o.id))
                       .map((o) => (
-                        <option key={o.id} value={o.id}>{o.col >= done ? '✓ ' : ''}{o.text.slice(0, 60)}</option>
+                        <option key={o.id} value={o.id} translate="no">{o.col >= done ? '✓ ' : ''}{o.text.slice(0, 60)}</option>
                       ))}
                   </select>
                 )}
@@ -1442,6 +1444,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     <div key={`${l.nodeId}-${i}`} className="ticket-linkrow">
                       <button
                         className={`ticket-linkjump ${dead ? 'link-dead' : ''}`}
+                        translate={dead ? undefined : 'no'}
                         disabled={dead}
                         title={dead ? `${DEAD_TITLE[!b ? 'no-board' : 'no-node']} — ✕ entfernt die Verknüpfung` : `Öffnen (${b!.name})`}
                         onClick={() => followLink({ boardId: l.boardId, nodeId: l.nodeId })}
@@ -1465,7 +1468,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                 >
                   <option value="">＋ Vorhandene Karte/Modul verknüpfen …</option>
                   {boards.map((b) => (
-                    <optgroup key={b.id} label={b.name}>
+                    <optgroup key={b.id} label={b.name} translate="no">
                       {b.nodes.filter((n) => n.id !== id && !n.archived).slice(0, 60).map((n) => (
                         <option key={n.id} value={`${b.id}::${n.id}`}>
                           {TYPE_ICON[n.type ?? ''] ?? '🗂️'} {(nodeToText(n).split('\n')[0] || n.type || 'Karte').slice(0, 60)}
@@ -1491,7 +1494,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     }}
                   >
                     <option value="">— kein Board —</option>
-                    {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    {boards.map((b) => <option key={b.id} value={b.id} translate="no">{b.name}</option>)}
                   </select>
                   {it.link && (linkState(it.link) === 'ok' ? (
                     <button className="ticket-jump" title="Verknüpftes Board öffnen" onClick={() => followLink(it.link!)}>↗ öffnen</button>

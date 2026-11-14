@@ -532,12 +532,12 @@ export function TaskHub() {
         <select className="th-board th-adv" value={boardFilter} onChange={(e) => setBoardFilter(e.target.value)} title="Nach Board filtern">
           <option value={AKTIV}>Aktives Board — {aktivName}</option>
           <option value="all">Auf allen Boards</option>
-          {boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          {boards.map((b) => <option key={b.id} value={b.id} translate="no">{b.name}</option>)}
         </select>
         {persons.length > 0 && (
           <select className="th-board th-adv" value={personFilter} onChange={(e) => setPersonFilter(e.target.value)} title="Nach Person filtern (Ticket-Zuständigkeit / Gantt-Ressource)">
             <option value="all">Alle Personen</option>
-            {persons.map((p) => <option key={p} value={p}>{p}</option>)}
+            {persons.map((p) => <option key={p} value={p} translate="no">{p}</option>)}
           </select>
         )}
         {persons.length > 0 && (
@@ -563,6 +563,7 @@ export function TaskHub() {
           <button
             key={tag}
             className={`th-chip ${tagFilter === tag ? 'on' : ''}`}
+            translate="no"
             onClick={() => setTagFilter((t) => (t === tag ? null : tag))}
             title={`Nur Aufgaben mit #${tag}`}
           >#{tag}</button>
@@ -585,7 +586,7 @@ export function TaskHub() {
           title="Ziel-Board der Schnell-Eingabe"
         >
           <option value="">→ aktives Board</option>
-          {boards.map((b) => <option key={b.id} value={b.id}>→ {b.name}</option>)}
+          {boards.map((b) => <option key={b.id} value={b.id} translate="no">→ {b.name}</option>)}
         </select>
       </div>
 
@@ -633,14 +634,14 @@ export function TaskHub() {
                           <span className="task-kind">
                             {t.kind === 'kanban' ? <IKanban size={13} /> : t.kind === 'gantt' ? <IGantt size={13} /> : <INote size={13} />}
                           </span>
-                          <span className="task-text">
+                          <span className="task-text" translate="no">
                             {t.prio && <b className={`task-prio-mark prio-${t.prio}`}>{PRIO_LABEL[t.prio]} </b>}
                             {t.text}
                           </span>
                           {myDay.has(t.key) && <span className="task-myday-mark" title={'In „Mein Tag" vorgenommen'}>☀</span>}
-                          {t.who && !groupByPerson && <span className="task-who" title="Zuständig">{t.who}</span>}
+                          {t.who && !groupByPerson && <span className="task-who" translate="no" title="Zuständig">{t.who}</span>}
                           {t.due && <span className={`task-due urgency-${t.urgency}`}>{formatDueShort(t.due)}</span>}
-                          <span className="task-board">{t.boardName}</span>
+                          <span className="task-board" translate="no">{t.boardName}</span>
                           <span className="task-caret" aria-hidden="true">{open ? '▴' : '▾'}</span>
                         </div>
 
@@ -657,7 +658,7 @@ export function TaskHub() {
                                   title="Kanban-Spalte umstellen"
                                   onChange={(e) => moveToCol(t, Number(e.target.value))}
                                 >
-                                  {cols.map((c, i) => <option key={i} value={i}>{c}</option>)}
+                                  {cols.map((c, i) => <option key={i} value={i} translate="no">{c}</option>)}
                                 </select>
                               );
                             })()}
@@ -688,7 +689,7 @@ export function TaskHub() {
                               title={myDay.has(t.key) ? 'Aus „Mein Tag" entfernen' : 'Für heute vornehmen („Mein Tag")'}
                               onClick={() => setMyDay(new Set(toggleMyDay(t.key)))}
                             >Mein Tag</button>
-                            <span className="task-board task-board-tools">{t.boardName}</span>
+                            <span className="task-board task-board-tools" translate="no">{t.boardName}</span>
                             <button className="task-jump" title="Zur Karte auf dem Board springen" onClick={() => jumpTo(t)}>↗ Karte</button>
                             <button
                               className={`task-detail-btn ${detailKey === t.key ? 'on' : ''}`}
@@ -739,8 +740,8 @@ export function TaskHub() {
                     {today.slice(-30).reverse().map((e, i) => (
                       <li key={i} className="task-row th-done-row">
                         <span className="th-done-check">✓</span>
-                        <span className="task-text">{e.text}</span>
-                        <span className="task-board">{e.board}</span>
+                        <span className="task-text" translate="no">{e.text}</span>
+                        <span className="task-board" translate="no">{e.board}</span>
                       </li>
                     ))}
                   </ul>
@@ -828,7 +829,7 @@ export function TaskHub() {
             )}
 
             <div className="th-detail-foot">
-              <span className="task-board">{t.boardName}</span>
+              <span className="task-board" translate="no">{t.boardName}</span>
               <button className="th-chip" onClick={() => jumpTo(t)}>Zur Karte springen ↗</button>
             </div>
           </aside>

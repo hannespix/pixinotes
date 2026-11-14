@@ -112,12 +112,12 @@ export function OneNoteImport({ onClose, onDienste }: { onClose: () => void; onD
             {books.map((b) => (
               <div key={b.id} className="on-book">
                 <button className="on-book-name" onClick={() => toggleBook(b)}>
-                  📓 {b.name} <span className="on-count">{b.sections.length} Abschnitt(e)</span>
+                  📓 <span translate="no">{b.name}</span> <span className="on-count">{b.sections.length} Abschnitt(e)</span>
                 </button>
                 {b.sections.map((s) => (
                   <label key={s.id} className="on-sec">
                     <input type="checkbox" checked={picked.has(s.id)} onChange={() => toggle(s.id)} />
-                    <span>{s.group ? `${s.group} › ` : ''}{s.name}</span>
+                    <span translate="no">{s.group ? `${s.group} › ` : ''}{s.name}</span>
                   </label>
                 ))}
                 {b.sections.length === 0 && <div className="on-empty">keine Abschnitte</div>}

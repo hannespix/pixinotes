@@ -65,7 +65,7 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
             onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
           />
         ) : (
-          <span className="frame-name" onDoubleClick={() => { setDraft(data.name); setEditing(true); }}>
+          <span className="frame-name" translate="no" onDoubleClick={() => { setDraft(data.name); setEditing(true); }}>
             {data.name}
           </span>
         )}

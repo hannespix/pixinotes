@@ -195,7 +195,7 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
         <div className={`week-daynames nodrag ${axis === 'slots' ? 'wide-gutter' : ''}`}>
           <span className="week-gutter" />
           {cols.map((c, i) => (
-            <span key={i} className="week-dayname">
+            <span key={i} className="week-dayname" translate={customCols ? 'no' : undefined}>
               {selected ? (
                 <input
                   className="week-col-input"
@@ -220,7 +220,7 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
                 <span key={m} style={{ top: `${((m - from) / span) * 100}%` }}>{fmtTime(m)}</span>
               ))
               : slots.map((s, i) => (
-                <span key={i} className="week-slot-label" style={{ top: `${((i * 60 + 30) / span) * 100}%` }}>
+                <span key={i} className="week-slot-label" translate="no" style={{ top: `${((i * 60 + 30) / span) * 100}%` }}>
                   {selected ? (
                     <>
                       <input className="week-slot-input" value={s} onChange={(e) => renameSlot(i, e.target.value)} />
@@ -269,9 +269,9 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
                     >
                       <span className="week-entry-time">
                         {axis === 'time' ? fmtTime(en.start) : ''}
-                        {en.who && <span className="week-entry-who">{en.who}</span>}
+                        {en.who && <span className="week-entry-who" translate="no">{en.who}</span>}
                       </span>
-                      <span className="week-entry-text">{en.text || '…'}</span>
+                      <span className="week-entry-text" translate="no">{en.text || '…'}</span>
                     </button>
                   );
                 })}
@@ -301,7 +301,7 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
           />
           <div className="week-pop-row">
             <select value={popEntry.day} onChange={(e) => patchEntry(popEntry.id, { day: Number(e.target.value) })}>
-              {(customCols ? cols : DAY_LONG.slice(0, days)).map((d, i) => <option key={i} value={i}>{d}</option>)}
+              {(customCols ? cols : DAY_LONG.slice(0, days)).map((d, i) => <option key={i} value={i} translate={customCols ? 'no' : undefined}>{d}</option>)}
             </select>
           </div>
           <div className="week-pop-row">
@@ -333,14 +333,14 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
                     patchEntry(popEntry.id, { start, dur: Math.min(popEntry.dur, to - start) });
                   }}
                 >
-                  {slots.map((s, i) => <option key={i} value={i * 60}>{s}</option>)}
+                  {slots.map((s, i) => <option key={i} value={i * 60} translate="no">{s}</option>)}
                 </select>
                 <span className="week-sep">bis</span>
                 <select
                   value={popEntry.start + popEntry.dur}
                   onChange={(e) => patchEntry(popEntry.id, { dur: Number(e.target.value) - popEntry.start })}
                 >
-                  {slots.map((s, i) => ((i + 1) * 60 > popEntry.start ? <option key={i} value={(i + 1) * 60}>{s}</option> : null))}
+                  {slots.map((s, i) => ((i + 1) * 60 > popEntry.start ? <option key={i} value={(i + 1) * 60} translate="no">{s}</option> : null))}
                 </select>
               </>
             )}

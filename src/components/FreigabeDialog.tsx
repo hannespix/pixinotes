@@ -167,14 +167,14 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
             {gast ? (
               <>
                 {perLink ? (
-                  <p className="modal-hint" data-taste="freigabe-per-link">Du bist per <b>Einladungslink</b> in „{board.name}" — ohne Konto. {nurLesen
+                  <p className="modal-hint" data-taste="freigabe-per-link">Du bist per <b>Einladungslink</b> in „<span translate="no">{board.name}</span>" — ohne Konto. {nurLesen
                     ? <>Du liest live mit, kannst aber nichts ändern.</>
                     : <>Alle arbeiten live im selben Board. Eine Karte gehört dem, der sie gerade bearbeitet — die anderen lesen mit und kommen dran, sobald sie frei ist.</>} {gruppeVon(boardId)?.recht === 'eigenes' ? 'Der Besitzer hat festgelegt: Ändern und löschen kannst du nur deine eigenen Karten — neue anlegen geht immer. '
                     : gruppeVon(boardId)?.recht === 'eigenes-loeschen' ? 'Der Besitzer hat festgelegt: Löschen kannst du nur, was du selbst angelegt hast. ' : ''}Strg+Z nimmt nur deine eigenen Schritte zurück. Deinen Namen änderst du oben rechts am ersten Kürzel.</p>
                 ) : nurLesen ? (
-                  <p className="modal-hint" data-taste="freigabe-nur-lesen">„{board.name}" gehört <b>{board.geteiltVonName ?? 'einem anderen Konto'}</b> und ist für dich <b>zum Lesen</b> freigegeben. Du siehst Änderungen live, kannst aber selbst nichts ändern. Für eigene Notizen: Board-Menü → <b>Duplizieren</b> — die Kopie gehört dir.</p>
+                  <p className="modal-hint" data-taste="freigabe-nur-lesen">„<span translate="no">{board.name}</span>" gehört <b translate={board.geteiltVonName ? 'no' : undefined}>{board.geteiltVonName ?? 'einem anderen Konto'}</b> und ist für dich <b>zum Lesen</b> freigegeben. Du siehst Änderungen live, kannst aber selbst nichts ändern. Für eigene Notizen: Board-Menü → <b>Duplizieren</b> — die Kopie gehört dir.</p>
                 ) : (
-                  <p className="modal-hint">„{board.name}" gehört <b>{board.geteiltVonName ?? 'einem anderen Konto'}</b> und ist für dich freigegeben. Ihr arbeitet live auf demselben Stand; gleichzeitige Änderungen werden zusammengeführt.</p>
+                  <p className="modal-hint">„<span translate="no">{board.name}</span>" gehört <b translate={board.geteiltVonName ? 'no' : undefined}>{board.geteiltVonName ?? 'einem anderen Konto'}</b> und ist für dich freigegeben. Ihr arbeitet live auf demselben Stand; gleichzeitige Änderungen werden zusammengeführt.</p>
                 )}
                 <div className="modal-buttons">
                   <button disabled={busy} onClick={verlassen} data-taste="freigabe-verlassen">{busy ? '…' : perLink ? 'Board verlassen' : 'Freigabe verlassen'}</button>
@@ -183,7 +183,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
             ) : (
               <>
                 <p className="modal-hint">
-                  Gemeinsam an „{board.name}" arbeiten: Alle sehen Änderungen live, und eine Karte gehört dem, der sie gerade bearbeitet.
+                  Gemeinsam an „<span translate="no">{board.name}</span>" arbeiten: Alle sehen Änderungen live, und eine Karte gehört dem, der sie gerade bearbeitet.
                   Mit dem Einladungslink ist man <b>mit Konto</b> dabei (das Board liegt dann unter <b>Geteilt mit mir</b>) — oder, wenn du es erlaubst,
                   <b> ganz ohne Konto</b>: Link öffnen, Namen sagen, mitmachen. Du legst fest, wer bearbeiten und wer nur lesen darf.
                 </p>
@@ -247,7 +247,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                   <ul className="freigabe-liste" data-taste="freigabe-liste">
                     {liste.map((f) => (
                       <li key={f.id}>
-                        <span className="freigabe-mail">{f.gast_email}</span>
+                        <span className="freigabe-mail" translate="no">{f.gast_email}</span>
                         <span className={`freigabe-stand ${f.gast_id ? 'an' : ''}`}>{f.gast_id ? 'angenommen' : 'wartet auf Anmeldung'}</span>
                         <RollenWahl wert={f.rolle === 'lesen' ? 'lesen' : 'bearbeiten'} disabled={busy} label={`Rolle von ${f.gast_email}`} onChange={(r) => void rolleAendern(f, r)} />
                         <button className="freigabe-weg" disabled={busy} onClick={() => void entfernen(f)} title="Freigabe entfernen" aria-label={`Freigabe für ${f.gast_email} entfernen`}><IX size={13} /></button>

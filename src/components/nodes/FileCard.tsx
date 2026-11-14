@@ -190,7 +190,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
       <button className="file-body nodrag" onClick={istDokument ? () => aufklappen(!(auf || imFokus)) : quelle ? download : loadFromTeam}
         title={istDokument ? (auf || imFokus ? 'Zuklappen' : 'Aufklappen — Seite für Seite lesen und anmerken') : quelle ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
         <span className="meta">
-          {eigenerTitel && <>{file.name} · </>}{formatBytes(file.size)}
+          {eigenerTitel && <><span translate="no">{file.name}</span> · </>}{formatBytes(file.size)}
           {istDokument && seitenZahl > 0 && <> · {seitenZahl} Seite{seitenZahl === 1 ? '' : 'n'}</>}
           {istDokument && seitenStriche > 0 && <> · ✎ {seitenStriche}</>}
           {istDokument && seitenKommentare > 0 && <> · 💬 {seitenKommentare}</>}
@@ -208,7 +208,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           die Auskunft darf dabei nicht mit verschwinden. */}
       {quelle && file.ref && (
         <div className="file-teamnote" title={file.ref}>
-          Kopie im Team-Ordner: {file.ref.split('/').slice(-2).join('/')}
+          Kopie im Team-Ordner: <span translate="no">{file.ref.split('/').slice(-2).join('/')}</span>
         </div>
       )}
       {/* M264: Auch das Bild lässt sich groß ansehen und vergrößern — der
@@ -466,7 +466,7 @@ function SeitenKommentare({ id, seite, blaettern }: { id: string; seite: number;
         <button key={c.id} className={`pdf-kommentar ${c.resolved ? 'resolved' : ''} ${offenerThread === c.id ? 'open' : ''}`}
           onClick={() => setCommentOpen(c.id)} title="Kommentar öffnen" data-taste="pdf-kommentar-eintrag">
           <span className="pdf-kommentar-nr">{c.resolved ? '✓' : i + 1}</span>
-          <span className="pdf-kommentar-text"><b>{c.msgs[0]?.author}</b> {c.msgs[0]?.text}{c.msgs.length > 1 ? ` · ${c.msgs.length} Beiträge` : ''}</span>
+          <span className="pdf-kommentar-text"><b translate="no">{c.msgs[0]?.author}</b> <span translate="no">{c.msgs[0]?.text}</span>{c.msgs.length > 1 ? ` · ${c.msgs.length} Beiträge` : ''}</span>
         </button>
       ))}
       {anderSeiten.length > 0 && (
@@ -737,7 +737,7 @@ function WordSeite({ id, quelle, zuklappen, onSeiten, onDownload }: {
       <div className={`pdf-seite word-seite ${pinModus ? 'pin-modus' : ''}`} onClick={aufSeiteTippen} data-seite={seite} tabIndex={-1}>
         {status === 'laedt' && <div className="word-laedt">Dokument wird aufgebaut …</div>}
         <div ref={stilRef} className="word-stile" />
-        <div ref={inhaltRef} className="word-inhalt" />
+        <div ref={inhaltRef} className="word-inhalt" translate="no" />
       </div>
       <SeitenKommentare id={id} seite={seite} blaettern={blaettern} />
     </div>
@@ -775,7 +775,7 @@ function TextVorschau({ quelle }: { quelle: string }) {
   if (text === null) return null;
   return (
     <div className="file-text nodrag">
-      <pre>{text}</pre>
+      <pre translate="no">{text}</pre>
       {mehr && <div className="file-text-mehr">… weiter geht es in der Datei selbst (Download)</div>}
     </div>
   );

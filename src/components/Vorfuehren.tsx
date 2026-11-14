@@ -62,12 +62,12 @@ export function Vorfuehren() {
         </>
       ) : folge ? (
         <>
-          <span>📣 <b>{z.name}</b> führt vor — du folgst</span>
+          <span>📣 <b translate="no">{z.name}</b> führt vor — du folgst</span>
           <button className="leise" onClick={() => folgenSetzen(boardId, false)} data-taste="zeig-loesen">Lösen</button>
         </>
       ) : (
         <>
-          <span>📣 <b>{z.name}</b> führt vor</span>
+          <span>📣 <b translate="no">{z.name}</b> führt vor</span>
           <button onClick={() => folgenSetzen(boardId, true)} data-taste="zeig-folgen">Wieder folgen</button>
         </>
       )}

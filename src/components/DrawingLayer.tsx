@@ -1315,6 +1315,7 @@ export function DrawingLayer() {
           ) : (
             <button
               className="vorschlag-text"
+              translate="no"
               title={vorschlag.status === 'ki' ? 'Erkannt — die KI prüft noch; Tipp übernimmt sofort' : 'Tipp: Text übernehmen (in die Notiz darunter oder als neue Notiz) — rechts die Textart wechseln'}
               aria-label="Erkannten Text übernehmen"
               onClick={() => void handschriftUebernehmen(vorschlag.zeilen)}

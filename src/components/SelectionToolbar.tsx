@@ -453,7 +453,7 @@ export function SelectionToolbar() {
               <div className="sel-attr-title">Eigenschaften (schlüssel = wert)</div>
               {Object.entries(attrs).map(([k, v]) => (
                 <div key={k} className="sel-attr-row">
-                  <b>{k}</b><span>{v}</span>
+                  <b translate="no">{k}</b><span translate="no">{v}</span>
                   <button title="Eigenschaft entfernen" onClick={() => removeAttr(k)}><IX size={10} /></button>
                 </div>
               ))}
@@ -550,6 +550,7 @@ export function SelectionToolbar() {
                           // M180: Rahmen wandern samt Inhalt mit (Store zieht Mitglieder)
                           moveNodesToBoard([...selected, ...selFrames].map((n) => n.id), b.id);
                         }}
+                        translate="no"
                         title={`${sp.name} › ${p.name} › ${b.name}`}
                       >
                         {b.name} <span className="sel-move-proj">{p.name}</span>

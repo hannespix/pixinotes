@@ -331,7 +331,7 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
   if (fehlt || fehler) {
     return (
       <div className="folie-dok leer">
-        <p>📎 <b>{node.data.titel?.trim() || node.data.name}</b></p>
+        <p>📎 <b translate="no">{node.data.titel?.trim() || node.data.name}</b></p>
         <p className="folie-dok-hinweis">{fehlt ? 'Der Inhalt dieser Datei liegt nicht auf diesem Gerät.' : 'Diese Datei lässt sich hier nicht darstellen.'}</p>
       </div>
     );
@@ -348,7 +348,7 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
             <div className="word-seite folie-word">
               {!wordFertig && <div className="word-laedt">Dokument wird aufgebaut …</div>}
               <div ref={wordStilRef} className="word-stile" />
-              <div ref={wordRef} className="word-inhalt" style={{ transform: `scale(${wordS})`, transformOrigin: '0 0', width: wordRoh?.w }} />
+              <div ref={wordRef} className="word-inhalt" translate="no" style={{ transform: `scale(${wordS})`, transformOrigin: '0 0', width: wordRoh?.w }} />
             </div>
           )}
           {art === 'bild' && quelle && (

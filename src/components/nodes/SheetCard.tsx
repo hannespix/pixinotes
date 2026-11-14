@@ -168,7 +168,7 @@ export function SheetCard({ id, data, selected }: NodeProps<SheetNode>) {
 
       {data.quelle && (
         <div className="sheet-quelle">
-          aus <b>{data.quelle}</b> — Formeln übernommen, Änderungen bleiben hier
+          aus <b translate="no">{data.quelle}</b> — Formeln übernommen, Änderungen bleiben hier
         </div>
       )}
 
@@ -231,7 +231,7 @@ export function SheetCard({ id, data, selected }: NodeProps<SheetNode>) {
                           autoFocus
                         />
                       ) : (
-                        <span title={roh.startsWith('=') ? roh : undefined}>{anzeige}</span>
+                        <span translate="no" title={roh.startsWith('=') ? roh : undefined}>{anzeige}</span>
                       )}
                     </td>
                   );
