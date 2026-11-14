@@ -748,7 +748,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
       <NodeToolbar isVisible={!!selected} position={Position.Bottom} offset={14} className="mm-toolbar nodrag">
         {selNode && (
           <div className="mm-row mm-step-row">
-            <span className="mm-sel-name" title="Ausgewählter Schritt">„{selNode}"</span>
+            <span className="mm-sel-name" translate="no" title="Ausgewählter Schritt">„{selNode}"</span>
             <button onClick={renameSelected}>✎ Umbenennen</button>
             <span className="mm-sep" />
             {SHAPES.map(([sym, name, o, c]) => (
@@ -774,7 +774,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
               const up = (next: string | null) => { if (next != null) updateNodeData(id, { code: next }); };
               return (
                 <>
-                  <span className="mm-sel-name" title="Ausgewählte Nachricht">{m ? `${m.from} → ${m.to}` : 'Nachricht'}</span>
+                  <span className="mm-sel-name" translate={m ? 'no' : undefined} title="Ausgewählte Nachricht">{m ? `${m.from} → ${m.to}` : 'Nachricht'}</span>
                   <button onClick={() => startOtherRename(selOther)}>✎ Text</button>
                   <span className="mm-sep" />
                   <button className={m && !m.arrow.startsWith('--') ? 'active' : ''} title="Pfeil: durchgezogen" onClick={() => up(setSeqMsg(data.code, selOther.idx, { arrow: '->>' }))}>─</button>
@@ -788,7 +788,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             })()}
             {selOther.t === 'actor' && (
               <>
-                <span className="mm-sel-name" title="Ausgewählte Person">„{selOther.name}"</span>
+                <span className="mm-sel-name" translate="no" title="Ausgewählte Person">„{selOther.name}"</span>
                 <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
                 <button className="danger" title="Person samt ihrer Nachrichten entfernen" onClick={() => { updateNodeData(id, { code: removeSeqActor(data.code, selOther.name) }); setSelOther(null); }}>Entfernen</button>
               </>
@@ -799,7 +799,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
               const hasDays = t ? /\d+\s*d\s*$/.test(t.meta) : false;
               return (
                 <>
-                  <span className="mm-sel-name" title="Ausgewählte Aufgabe">„{t?.name ?? 'Aufgabe'}"</span>
+                  <span className="mm-sel-name" translate={t ? 'no' : undefined} title="Ausgewählte Aufgabe">„{t?.name ?? 'Aufgabe'}"</span>
                   <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
                   {hasDays && (
                     <>
@@ -825,13 +825,13 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             })()}
             {selOther.t === 'gsec' && (
               <>
-                <span className="mm-sel-name" title="Ausgewählter Abschnitt">Abschnitt „{ganttSections(data.code)[selOther.idx]?.name ?? ''}"</span>
+                <span className="mm-sel-name" title="Ausgewählter Abschnitt">Abschnitt „<span translate="no">{ganttSections(data.code)[selOther.idx]?.name ?? ''}</span>"</span>
                 <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
               </>
             )}
             {selOther.t === 'state' && (
               <>
-                <span className="mm-sel-name" title="Ausgewählter Zustand">„{selOther.name}"</span>
+                <span className="mm-sel-name" translate="no" title="Ausgewählter Zustand">„{selOther.name}"</span>
                 <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
                 <button className={connectFrom ? 'active' : ''} title="Übergang zu anderem Zustand: danach Ziel anklicken" onClick={() => setConnectFrom(connectFrom ? null : selOther.name)}>
                   {connectFrom ? 'Ziel anklicken …' : '→ Übergang'}
@@ -844,7 +844,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
               const up = (next: string | null) => { if (next != null) updateNodeData(id, { code: next }); };
               return (
                 <>
-                  <span className="mm-sel-name" title="Ausgewählter Übergang">{tr ? `${tr.from} → ${tr.to}` : 'Übergang'}</span>
+                  <span className="mm-sel-name" translate={tr ? 'no' : undefined} title="Ausgewählter Übergang">{tr ? `${tr.from} → ${tr.to}` : 'Übergang'}</span>
                   <button onClick={() => startOtherRename(selOther)}>✎ Beschriften</button>
                   <button className="danger" onClick={() => { up(removeStateTrans(data.code, selOther.idx)); setSelOther(null); }}>Entfernen</button>
                 </>
@@ -855,7 +855,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
               const up = (next: string | null) => { if (next != null) updateNodeData(id, { code: next }); };
               return (
                 <>
-                  <span className="mm-sel-name" title={tk?.isPeriod ? 'Ausgewählte Periode' : 'Ausgewähltes Ereignis'}>
+                  <span className="mm-sel-name" translate="no" title={tk?.isPeriod ? 'Ausgewählte Periode' : 'Ausgewähltes Ereignis'}>
                     {tk?.isPeriod ? '🕘' : '•'} „{tk?.text ?? ''}"
                   </span>
                   <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
@@ -868,7 +868,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
               const up = (next: string | null) => { if (next != null) updateNodeData(id, { code: next }); };
               return (
                 <>
-                  <span className="mm-sel-name" title="Ausgewählter Punkt">„{selOther.label}"</span>
+                  <span className="mm-sel-name" translate="no" title="Ausgewählter Punkt">„{selOther.label}"</span>
                   <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
                   <span className="mm-sep" />
                   <button title="Nach links (−0,1)" onClick={() => up(nudgeQuadrantPoint(data.code, selOther.label, -0.1, 0))}>◀</button>
@@ -894,7 +894,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             )}
             {selOther.t === 'mind' && (
               <>
-                <span className="mm-sel-name" title="Ausgewählter Punkt">„{mindText(data.code, selOther.line)}"</span>
+                <span className="mm-sel-name" translate="no" title="Ausgewählter Punkt">„{mindText(data.code, selOther.line)}"</span>
                 <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
                 <button title="Unterpunkt anfügen" onClick={() => updateNodeData(id, { code: addMindChild(data.code, selOther.line) })}>＋ Unterpunkt</button>
                 {selOther.line !== mindLines(data.code)[0] && (
@@ -907,7 +907,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
               const up = (next: string | null) => { if (next != null) updateNodeData(id, { code: next }); };
               return (
                 <>
-                  <span className="mm-sel-name" title="Ausgewähltes Segment">„{s?.label ?? 'Segment'}" ({s?.value ?? '–'})</span>
+                  <span className="mm-sel-name" translate={s ? 'no' : undefined} title="Ausgewähltes Segment">„{s?.label ?? 'Segment'}" ({s?.value ?? '–'})</span>
                   <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
                   <span className="mm-sep" />
                   <button title="Wert −5" onClick={() => up(shiftPie(data.code, selOther.idx, -5))}>−5</button>
@@ -922,7 +922,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
         )}
         {selEdge && !selNode && (
           <div className="mm-row mm-step-row">
-            <span className="mm-sel-name" title="Ausgewählte Verbindung">{selEdge.from} → {selEdge.to}</span>
+            <span className="mm-sel-name" translate="no" title="Ausgewählte Verbindung">{selEdge.from} → {selEdge.to}</span>
             <button onClick={startEdgeLabel}>✎ Beschriften</button>
             <span className="mm-sep" />
             <button className={/^-{2,}>$/.test(selEdgeArrow) ? 'active' : ''} title="Linie: durchgezogen" onClick={() => rewriteEdge('-->')}>─</button>
@@ -1031,7 +1031,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
           onClick={aboCode ? undefined : onPreviewClick}
           onDoubleClick={aboCode ? undefined : onPreviewDblClick}
         >
-          <div className={`mermaid-svg ${error ? 'stale' : ''}`} dangerouslySetInnerHTML={{ __html: svg }} />
+          <div className={`mermaid-svg ${error ? 'stale' : ''}`} translate="no" dangerouslySetInnerHTML={{ __html: svg }} />
           {aboAvailable && (
             <button
               className={`mm-abo-chip nodrag ${aboCode ? 'on' : ''}`}
@@ -1068,7 +1068,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             </div>
           )}
           {connectFrom && !error && (
-            <div className="mm-hint mm-hint-connect">→ Ziel-Schritt anklicken, um „{connectFrom}" zu verbinden</div>
+            <div className="mm-hint mm-hint-connect">→ Ziel-Schritt anklicken, um „<span translate="no">{connectFrom}</span>" zu verbinden</div>
           )}
           {kind !== 'other' && !error && !connectFrom && selected && !aboCode && (
             <div className="mm-hint">

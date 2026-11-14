@@ -64,12 +64,12 @@ export function LiveLeiste() {
   const schreiben = andere.filter((t) => t.karte).length;
   return (
     <div className={`live-leiste${offen ? ' offen' : ''}`} role="group" aria-label="Gerade in diesem Board" data-taste="live-leiste">
-      <button className="live-chip ich" style={farbe(selbst.farbe)} title={`Du (${selbst.name}) — Namen ändern`} data-taste="live-ich"
+      <button className="live-chip ich" translate="no" style={farbe(selbst.farbe)} title={`Du (${selbst.name}) — Namen ändern`} data-taste="live-ich"
         onClick={() => window.dispatchEvent(new CustomEvent(NAME_FRAGEN))}>{kuerzel(selbst.name)}</button>
       <button className="live-mehr" aria-expanded={offen} aria-label="Alle Teilnehmer zeigen" data-taste="live-auf" disabled={andere.length === 0}
         onClick={() => setOffen((o) => !o)}>
         {sichtbar.map((t) => (
-          <span key={t.id} className={`live-chip${t.karte ? ' schreibt' : ''}`} style={farbe(t.farbe)} data-taste="live-chip" data-name={t.name}
+          <span key={t.id} className={`live-chip${t.karte ? ' schreibt' : ''}`} translate="no" style={farbe(t.farbe)} data-taste="live-chip" data-name={t.name}
             title={t.karte ? `${t.name} — bearbeitet gerade eine Karte` : t.name}>{kuerzel(t.name)}</span>
         ))}
         {rest > 0 && <span className="live-chip mehr" data-taste="live-rest">+{rest}</span>}
@@ -90,10 +90,10 @@ export function LiveLeiste() {
       {offen && (
         <div className="live-liste" role="list" data-taste="live-liste">
           <div className="live-liste-kopf">{andere.length + 1} im Board{schreiben ? ` · ${schreiben} ${schreiben === 1 ? 'schreibt' : 'schreiben'} gerade` : ''}</div>
-          <div className="live-liste-zeile" role="listitem"><span className="live-punkt" style={farbe(selbst.farbe)} /> <span className="live-name">{selbst.name}</span> <span className="live-neben">du</span></div>
+          <div className="live-liste-zeile" role="listitem"><span className="live-punkt" style={farbe(selbst.farbe)} /> <span className="live-name" translate="no">{selbst.name}</span> <span className="live-neben">du</span></div>
           {sortiert.map((t) => (
             <div key={t.id} className="live-liste-zeile" role="listitem" data-name={t.name}>
-              <span className="live-punkt" style={farbe(t.farbe)} /> <span className="live-name">{t.name}</span>
+              <span className="live-punkt" style={farbe(t.farbe)} /> <span className="live-name" translate="no">{t.name}</span>
               {t.karte && <span className="live-neben">schreibt</span>}
             </div>
           ))}
@@ -113,7 +113,7 @@ function Sperre({ id, t }: { id: string; t: Teilnehmer }) {
   return (
     <div className="live-sperre" data-taste="live-sperre" data-karte={id}
       style={{ ...farbe(t.farbe), transform: `translate(${p.x}px, ${p.y}px)`, width: w, height: h }}>
-      <span className="live-sperre-name">✎ {t.name}</span>
+      <span className="live-sperre-name" translate="no">✎ {t.name}</span>
     </div>
   );
 }

@@ -55,8 +55,8 @@ export function BacklinksPanel() {
           {backlinks.map((b, i) => (
             <button key={i} className="backlinks-row" onClick={() => jump(b.boardId, b.nodeId)} title="Zur Quelle springen">
               <span className="backlinks-icon">{b.kind === 'portal' ? <IFolder size={12} /> : <INote size={12} />}</span>
-              <span className="backlinks-label">{b.label}</span>
-              <span className="backlinks-board">{b.boardName}</span>
+              <span className="backlinks-label" translate="no">{b.label}</span>
+              <span className="backlinks-board" translate="no">{b.boardName}</span>
             </button>
           ))}
           {related.length > 0 && backlinks.length > 0 && (
@@ -70,8 +70,8 @@ export function BacklinksPanel() {
               title={`Inhaltlich verwandt (${Math.round(r.score * 100)} % Ähnlichkeit) — noch nicht verlinkt`}
             >
               <span className="backlinks-icon">🧠</span>
-              <span className="backlinks-label">{r.title || '(ohne Titel)'}</span>
-              <span className="backlinks-board">{r.boardName}</span>
+              <span className="backlinks-label" translate={r.title ? 'no' : undefined}>{r.title || '(ohne Titel)'}</span>
+              <span className="backlinks-board" translate="no">{r.boardName}</span>
             </button>
           ))}
         </div>

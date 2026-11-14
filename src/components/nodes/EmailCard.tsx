@@ -95,19 +95,19 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
 
   return (
     <CardShell id={id} selected={selected} minWidth={240} minHeight={140} className="email-card">
-      <h3><IMail size={14} /> {email.subject}</h3>
+      <h3 translate="no"><IMail size={14} /> {email.subject}</h3>
       <div className="email-from">
-        <div className="avatar">{initials}</div>
+        <div className="avatar" translate="no">{initials}</div>
         <div>
-          <b>{email.fromName}</b>
+          <b translate="no">{email.fromName}</b>
           <div className="meta">
             {dateLabel}
-            {email.fromAddress ? ` · ${email.fromAddress}` : ''}
+            {email.fromAddress ? <> · <span translate="no">{email.fromAddress}</span></> : ''}
           </div>
         </div>
       </div>
       <p className="email-body nodrag">
-        {enriched}
+        <span translate="no">{enriched}</span>
         {truncated && !expanded ? '… ' : ' '}
         {truncated && (
           <button className="link-btn nodrag" onClick={() => setExpanded(!expanded)}>
@@ -121,6 +121,7 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
             <button
               key={i}
               className="chip nodrag"
+              translate="no"
               title={
                 isImageMime(att.mime)
                   ? 'Als eigene Karte aufs Board legen'

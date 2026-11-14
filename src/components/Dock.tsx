@@ -414,7 +414,7 @@ export function Dock() {
                 {vorlagenTreffer.map((t) => (
                   <button key={t.id} className="modul-kachel modul-vorlage" title="Vorlage als neue Karte einfügen" onClick={() => vorlageEinfuegen(t)}>
                     <IBookmark size={18} />
-                    <span>{t.name}</span>
+                    <span translate="no">{t.name}</span>
                     <span
                       className="dock-menu-template-x"
                       role="button"

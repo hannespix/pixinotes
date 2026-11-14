@@ -1315,6 +1315,7 @@ export function DrawingLayer() {
           ) : (
             <button
               className="vorschlag-text"
+              translate="no"
               title={vorschlag.status === 'ki' ? 'Erkannt — die KI prüft noch; Tipp übernimmt sofort' : 'Tipp: Text übernehmen (in die Notiz darunter oder als neue Notiz) — rechts die Textart wechseln'}
               aria-label="Erkannten Text übernehmen"
               onClick={() => void handschriftUebernehmen(vorschlag.zeilen)}
@@ -1385,11 +1386,13 @@ export function DrawingLayer() {
                 onChange={(e) => staerkeSetzen(w, Number(e.target.value))}
               />
               <span className="draw-staerke-wert" aria-hidden="true">{jetzt < 10 ? jetzt.toFixed(1).replace('.', ',') : Math.round(jetzt)}</span>
-              <span className="draw-trenner" aria-hidden="true" />
+              {/* M369: Der Radierer hat keine Farbe — nach der Größe kommt bei ihm nichts mehr, was abzutrennen wäre */}
+              {w !== 'eraser' && <span className="draw-trenner" aria-hidden="true" />}
             </>
           );
         })()}
-        {palette.map((c) => (
+        {/* M369: Farben nur für Werkzeuge, die malen. Beim Radierer standen sie auch da und taten nichts. */}
+        {tool !== 'eraser' && palette.map((c) => (
           <button
             key={c}
             className={`draw-swatch ${color === c ? 'active' : ''}`}
@@ -1398,17 +1401,24 @@ export function DrawingLayer() {
             aria-label={`Farbe ${c}`}
           />
         ))}
-        <input
-          type="color"
-          className="pn-colorpick nodrag"
-          title="Eigene Stiftfarbe"
-          value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#3c669c'}
-          onChange={(e) => setColor(e.target.value)}
-        />
+        {tool !== 'eraser' && (
+          <input
+            type="color"
+            className="pn-colorpick nodrag"
+            title={isMarker ? 'Eigene Markerfarbe' : 'Eigene Stiftfarbe'}
+            value={/^#[0-9a-fA-F]{6}$/.test(color) ? color : '#3c669c'}
+            onChange={(e) => setColor(e.target.value)}
+          />
+        )}
         {/* M354: Der lange Hinweis steht jetzt im Tooltip — mit Stärke-Regler passte die Leiste sonst nicht mehr in eine Zeile */}
-        <span className="draw-hint" title={`${durchgriff ? 'Stift schreibt, Finger bedient, Seitentaste greift · ' : ''}kurz halten = Form`}>
-          {tool === 'eraser' ? 'Radierer' : tool === 'marker' ? 'Textmarker' : 'Stift'} ✨
-        </span>
+        {tool === 'eraser' ? (
+          // M369: kein ✨ und kein „kurz halten = Form" — der Radierer erkennt keine Formen
+          <span className="draw-hint" title={radiererArt === 'teil' ? 'Nimmt weg, was der Stift berührt' : 'Nimmt ganze Striche auf einmal weg'}>Radierer</span>
+        ) : (
+          <span className="draw-hint" title={`${durchgriff ? 'Stift schreibt, Finger bedient, Seitentaste greift · ' : ''}kurz halten = Form`}>
+            {tool === 'marker' ? 'Textmarker' : 'Stift'} ✨
+          </span>
+        )}
         {schriftDa && (
           <button className="draw-text" disabled={erkennt} onClick={() => void handschriftUebernehmen()} title="Geschriebenes in eine Notiz mit Text umwandeln (Striche dieser Sitzung)" aria-label="Handschrift in Text umwandeln">
             <IType size={14} /> {erkennt ? '…' : 'Text'}

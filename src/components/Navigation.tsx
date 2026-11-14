@@ -147,6 +147,7 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
           ) : (
             <button
               className="side-board-name"
+              translate="no"
               title={b.name}
               onClick={() => geheZu(b.id)}
               onDoubleClick={(e) => { e.preventDefault(); setUmbenennen(b.id); }}
@@ -164,6 +165,7 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
               <button
                 key={n.id}
                 className={`side-card${n.archived ? ' archiviert' : ''}`}
+                translate="no"
                 title={n.archived ? 'Archivierte Karte öffnen' : 'Karte öffnen und bearbeiten'}
                 onClick={() => { oeffneKarte(b.id, n.id, herkunft); onNavigate?.(); }}
               >{cardLabel(n)}</button>
@@ -195,7 +197,7 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
         return (
           <section key={sp.id} className="side-space">
             <div className="side-space-head">
-              <div className="side-space-name">{sp.name}</div>
+              <div className="side-space-name" translate="no">{sp.name}</div>
               <BereichMenu spaceId={sp.id} />
             </div>
             {projekte.map(({ p, liste }) => {
@@ -212,6 +214,7 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
                     ><IChevronR size={11} /></button>
                     <button
                       className="side-proj-name"
+                      translate="no"
                       title={liste.length > 0 ? `${p.name} öffnen` : 'Projekt ist leer'}
                       onClick={() => { if (liste.length > 0) geheZu(liste[0].id); else toggle(setOffeneProjekte, p.id); }}
                     >{p.name}</button>

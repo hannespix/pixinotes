@@ -245,7 +245,7 @@ export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
           {entry && (
             <div className="minutes-tops nodrag">
               {tops.map((t, i) => (
-                <span key={i} className="minutes-top-chip" title="Tagesordnungspunkt dieser Sitzung (Überschrift im Protokoll)">{t}</span>
+                <span key={i} className="minutes-top-chip" translate="no" title="Tagesordnungspunkt dieser Sitzung (Überschrift im Protokoll)">{t}</span>
               ))}
               <button className="minutes-top-add" title="Tagesordnungspunkt nur für diese Sitzung anhängen" onClick={addTop}>
                 ＋ TOP
@@ -262,7 +262,7 @@ export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
               </b>
               {(entry.decisions ?? []).map((d) => (
                 <div key={d.id} className="minutes-decision">
-                  <span>§ {d.text}</span>
+                  <span translate="no">§ {d.text}</span>
                   <button
                     title="Beschluss entfernen"
                     onClick={() => patchEntry(entry.id, { decisions: (entry.decisions ?? []).filter((x) => x.id !== d.id) })}
@@ -282,7 +282,7 @@ export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
                   <summary>Beschlusslage der ganzen Reihe ({decisions.length})</summary>
                   {decisions.map((d, i) => (
                     <div key={i} className="minutes-decision old">
-                      <span>§ {d.text}</span>
+                      <span translate="no">§ {d.text}</span>
                       <em>{d.date}</em>
                     </div>
                   ))}

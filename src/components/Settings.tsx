@@ -903,7 +903,7 @@ export function Settings() {
                     )}
                   </div>
                   <div className="modal-note" data-taste="konto-stand">
-                    ✅ Angemeldet bei {kontoLabel(kontoSitz)}{kontoSitz.name ? ` als „${kontoSitz.name}"` : ''} — Änderungen werden automatisch abgeglichen
+                    ✅ Angemeldet bei {kontoLabel(kontoSitz)}{kontoSitz.name ? <> als „<span translate="no">{kontoSitz.name}</span>"</> : ''} — Änderungen werden automatisch abgeglichen
                     {kontoStamp() ? ` (letzter Abgleich: ${new Date(kontoStamp()!).toLocaleString('de-DE')})` : ''}
                     {kontoIstEigenes(kontoSitz) ? (kontoLiveVerbunden() ? ', live verbunden' : ', Abgleich alle zehn Sekunden') : ''}. Anhänge bis {kontoDateiMaxMb(kontoSitz)} MB wandern mit{kontoIstEigenes(kontoSitz) ? ' — große laden beim Öffnen der Karte nach' : ''}.
                   </div>
@@ -963,8 +963,8 @@ export function Settings() {
               {syncHandle && (
                 <div className="modal-note">
                   {syncPerm === 'prompt'
-                    ? `⚠️ Verbunden mit „${syncHandle.name}", aber der Browser hat den Zugriff nach dem Neustart zurückgesetzt — bitte oben „Zugriff erlauben" klicken, sonst pausiert der Auto-Sync.`
-                    : <>✅ Verbunden mit Ordner „{syncHandle.name}" — Änderungen werden automatisch gespeichert
+                    ? <>⚠️ Verbunden mit „<span translate="no">{syncHandle.name}</span>", aber der Browser hat den Zugriff nach dem Neustart zurückgesetzt — bitte oben „Zugriff erlauben" klicken, sonst pausiert der Auto-Sync.</>
+                    : <>✅ Verbunden mit Ordner „<span translate="no">{syncHandle.name}</span>" — Änderungen werden automatisch gespeichert
                       {knownStamp() ? ` (letzter Sync: ${new Date(knownStamp()!).toLocaleString('de-DE')})` : ''}.
                       Schreibt ein anderes Gerät zwischenzeitlich, werden beide Stände zusammengeführt.</>}
                 </div>
@@ -1028,7 +1028,7 @@ export function Settings() {
                     <button disabled={!!busy} onClick={davDisconnect}>Trennen</button>
                   </div>
                   <div className="modal-note">
-                    ✅ Verbunden mit {davCfg.url.replace(/^https?:\/\//, '').split('/')[0]} — Änderungen werden automatisch hochgeladen
+                    ✅ Verbunden mit <span translate="no">{davCfg.url.replace(/^https?:\/\//, '').split('/')[0]}</span> — Änderungen werden automatisch hochgeladen
                     {webdavStamp() ? ` (letzter Sync: ${new Date(webdavStamp()!).toLocaleString('de-DE')})` : ''}.
                     Schreibt ein anderes Gerät zwischenzeitlich, warnt PixiNotes statt zu überschreiben.
                   </div>
@@ -1096,7 +1096,7 @@ export function Settings() {
                 <select value={psWahl} onChange={(e) => setPsPick(e.target.value)} disabled={freieProjekte.length === 0} aria-label="Projekt">
                   {freieProjekte.length === 0
                     ? <option value="">Alle Projekte sind verbunden</option>
-                    : freieProjekte.map(({ sp, p }) => <option key={p.id} value={p.id}>{sp.name} › {p.name}</option>)}
+                    : freieProjekte.map(({ sp, p }) => <option key={p.id} value={p.id} translate="no">{sp.name} › {p.name}</option>)}
                 </select>
                 <button
                   disabled={!!busy || !psWahl}
@@ -1114,8 +1114,8 @@ export function Settings() {
                 <div className="psync-list">
                   {verbundene.map(({ sp, p }) => (
                     <div className="psync-row" key={p.id}>
-                      <span className="psync-name" title={`${sp.name} › ${p.name}`}>{sp.name} › <b>{p.name}</b></span>
-                      <span className="psync-status">☁ „{psMeta[p.id].folder}"{projectStamp(p.id) ? ` · ${new Date(projectStamp(p.id)!).toLocaleString('de-DE')}` : ''}</span>
+                      <span className="psync-name" translate="no" title={`${sp.name} › ${p.name}`}>{sp.name} › <b>{p.name}</b></span>
+                      <span className="psync-status" translate="no">☁ „{psMeta[p.id].folder}"{projectStamp(p.id) ? ` · ${new Date(projectStamp(p.id)!).toLocaleString('de-DE')}` : ''}</span>
                       <span className="psync-actions">
                         <button disabled={!!busy} onClick={() => psSave(p.id)}>{busy === `pss-${p.id}` ? '…' : 'Jetzt speichern'}</button>
                         <button disabled={!!busy} onClick={() => psLoad(p.id, p.name)}>{busy === `psl-${p.id}` ? '…' : 'Vom Ordner laden'}</button>
@@ -1361,7 +1361,7 @@ export function Settings() {
                   return (
                     <label key={sp.id} className={`brain-scope-row ${an ? '' : 'off'}`}>
                       <input type="checkbox" checked={an} onChange={() => toggleBrainSpace(sp.id)} />
-                      <span className="brain-scope-name">{sp.name}</span>
+                      <span className="brain-scope-name" translate="no">{sp.name}</span>
                       <span className="brain-scope-count">{karten} Karten</span>
                     </label>
                   );
@@ -1462,11 +1462,11 @@ export function Settings() {
           <h4>Google</h4>
           {calAcc.google?.token ? (
             <>
-              <div className="modal-note">✅ Verbunden{calAcc.google.connectedAs ? ` als „${calAcc.google.connectedAs}"` : ''} — Kalender wählen:</div>
+              <div className="modal-note">✅ Verbunden{calAcc.google.connectedAs ? <> als „<span translate="no">{calAcc.google.connectedAs}</span>"</> : ''} — Kalender wählen:</div>
               {(calAcc.google.calendars ?? []).map((c) => (
                 <label key={c.id} className="cal-menu-check" style={{ display: 'flex', gap: 6 }}>
                   <input type="checkbox" checked={c.enabled} onChange={(e) => toggleGoogleCalendar(c.id, e.target.checked)} />
-                  {c.name}
+                  <span translate="no">{c.name}</span>
                 </label>
               ))}
               <div className="modal-buttons">
@@ -1494,7 +1494,7 @@ export function Settings() {
           {(calAcc.ms?.token || calAcc.ms?.refreshToken) ? (
             <>
               <div className="modal-note">
-                ✅ Verbunden{calAcc.ms.connectedAs ? ` als „${calAcc.ms.connectedAs}"` : ''} · Kalender ✓ · OneNote {msHasNotes(calAcc.ms) ? '✓' : '—'}
+                ✅ Verbunden{calAcc.ms.connectedAs ? <> als „<span translate="no">{calAcc.ms.connectedAs}</span>"</> : ''} · Kalender ✓ · OneNote {msHasNotes(calAcc.ms) ? '✓' : '—'}
               </div>
               <div className="modal-buttons">
                 {!msHasNotes(calAcc.ms) && (

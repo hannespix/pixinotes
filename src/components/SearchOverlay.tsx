@@ -280,6 +280,7 @@ export function SearchOverlay() {
                   <button
                     key={`${s.boardId}-${s.nodeId}`}
                     className="search-src-chip"
+                    translate="no"
                     title={`${s.boardName} · ${s.title}`}
                     onClick={() => { setOpen(false); focusNode(s.boardId, s.nodeId); }}
                   >
@@ -294,7 +295,7 @@ export function SearchOverlay() {
         {query.trim() === '#' && (
           <div className="search-tags">
             {collectAllTags(useBoard.getState().boards).slice(0, 24).map(({ tag, count }) => (
-              <button key={tag} className="search-tag" onClick={() => { setQuery(tag); setCursor(0); }}>
+              <button key={tag} className="search-tag" translate="no" onClick={() => { setQuery(tag); setCursor(0); }}>
                 {tag} <span>{count}</span>
               </button>
             ))}
@@ -334,7 +335,7 @@ export function SearchOverlay() {
                     onClick={() => { setOpen(false); setView('board'); openBoard(b.id); }}
                   >
                     <span className="hit-main">
-                      <span className="hit-title">{b.name}</span>
+                      <span className="hit-title" translate="no">{b.name}</span>
                       <span className="hit-snippet">{b.nodes.length} Karten · Board öffnen</span>
                     </span>
                   </button>
@@ -351,10 +352,10 @@ export function SearchOverlay() {
               >
                 <span className="hit-icon">{TYPE_ICON[h.node.type ?? ''] ?? '🗒️'}</span>
                 <span className="hit-main">
-                  <span className="hit-title">{h.title || '(ohne Titel)'}</span>
-                  <span className="hit-snippet">{h.snippet}</span>
+                  <span className="hit-title" translate={h.title ? 'no' : undefined}>{h.title || '(ohne Titel)'}</span>
+                  <span className="hit-snippet" translate="no">{h.snippet}</span>
                 </span>
-                <span className="hit-board">{h.boardName}</span>
+                <span className="hit-board" translate="no">{h.boardName}</span>
               </button>
             ))}
           </div>
@@ -370,10 +371,10 @@ export function SearchOverlay() {
               >
                 <span className="hit-icon">🧠</span>
                 <span className="hit-main">
-                  <span className="hit-title">{h.title || '(ohne Titel)'}</span>
+                  <span className="hit-title" translate={h.title ? 'no' : undefined}>{h.title || '(ohne Titel)'}</span>
                   <span className="hit-snippet">inhaltlich verwandt · {Math.round(h.score * 100)} %</span>
                 </span>
-                <span className="hit-board">{h.boardName}</span>
+                <span className="hit-board" translate="no">{h.boardName}</span>
               </button>
             ))}
           </div>

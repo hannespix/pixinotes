@@ -101,7 +101,7 @@ export function LookupPanel() {
           {state === 'fehler' && <div className="lookup-note">Wikipedia nicht erreichbar (offline?) — die groben Quellen unten funktionieren als Links trotzdem.</div>}
           {state === 'ok' && hits.length === 0 && <div className="lookup-note">Keine Artikel gefunden — Begriff anpassen oder unten grob suchen.</div>}
           {hits.map((h) => (
-            <a key={h.url} className="lookup-hit" href={h.url} target="_blank" rel="noopener noreferrer" title={h.url}>
+            <a key={h.url} className="lookup-hit" translate="no" href={h.url} target="_blank" rel="noopener noreferrer" title={h.url}>
               <b>{h.title}</b>
               {h.desc && <span>{h.desc}</span>}
             </a>

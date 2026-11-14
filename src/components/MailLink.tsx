@@ -15,6 +15,7 @@ export function MailLink() {
   return (
     <a
       className="ent-link"
+      translate="no"
       href={href}
       onMouseEnter={arm}
       onFocus={arm}

@@ -33,6 +33,7 @@ export function DragTitle({ value, onChange, className, placeholder }: {
   return (
     <span
       className={`${className ?? ''} drag-title ${value ? '' : 'drag-title-empty'}`}
+      translate={value ? 'no' : undefined}
       title="Ziehen verschiebt die Karte · Doppelklick benennt um"
       onDoubleClick={(e) => { e.stopPropagation(); setDraft(value); setEditing(true); }}
     >

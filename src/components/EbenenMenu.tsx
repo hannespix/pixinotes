@@ -189,7 +189,7 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
               onClick={() => { moveBoard(boardId, p.id); showToast(`„${board.name}" liegt jetzt in „${p.name}".`); zu(); }}
             >
               <IMoveTo size={14} />
-              <span>{sp.name} › {p.name}{p.id === eigenesProjekt?.p.id ? ' (hier)' : ''}</span>
+              <span><span translate="no">{sp.name} › {p.name}</span>{p.id === eigenesProjekt?.p.id ? ' (hier)' : ''}</span>
             </button>
           )))}
           <button role="menuitem" className="ebenen-menu-zurueck" onClick={() => setVerschieben(false)}>← Zurück</button>

@@ -14,6 +14,7 @@ import { initAnzeige } from './lib/anzeige';
 import { initEinstellungen } from './lib/einstellungen';
 import { initKopfmass } from './lib/kopfmass';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { initUebersetzung } from './lib/uebersetzung';
 
 // OAuth-Popup-Rücksprung (Kalender-Konten): Diese Seite dient dann nur als
 // Redirect-Ziel — Code ans Hauptfenster melden, App gar nicht erst rendern.
@@ -49,6 +50,9 @@ if (!handleOAuthRedirect()) {
   // ihre Breite errät — sonst wandert die Tab-Leiste beim Text-Zoom unter
   // die Aktionsleiste (User-Screenshot)
   initKopfmass();
+  // M368: Die Übersetzung des Browsers darf die Oberfläche nicht zum Absturz bringen — vor dem ersten
+  // Rendern, damit jeder Knoten, den React anlegt, schon unter dem Schutz steht
+  initUebersetzung();
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       {/* M213: letzte Rettungsleine — was hier ankommt, hätte sonst eine

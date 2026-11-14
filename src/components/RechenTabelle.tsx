@@ -182,7 +182,7 @@ function Gitter({ zellenRoh, stilRoh, spalten, zeilen, schreibe }: GitterProps) 
   return (
     <div className="rt-block" contentEditable={false}>
       <div className="rt-roller">
-        <table className="rt-tabelle">
+        <table className="rt-tabelle" translate="no">
           <tbody>
             {Array.from({ length: zeilen }, (_, z) => (
               <tr key={z}>
