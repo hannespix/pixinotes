@@ -27,6 +27,15 @@ export interface BubbleIdee {
 export interface BubbleStimme { n: number; t: number }
 export interface BubbleGruppe { name: string; farbe: number; t: number; weg?: boolean }
 export interface BubbleAbstimmung { phase: 'aus' | 'offen' | 'fertig'; punkte: number; t: number }
+/**
+ * M378: Regeln der Moderation — gelten für alle, die jüngste Fassung gewinnt als Ganzes.
+ *   zu       – die Sammlung ist geschlossen (Schritt „Gruppieren"): nur wer leitet, trägt noch ein
+ *   anonym   – Namen werden weder gezeigt noch an neuen Ideen vermerkt
+ *   verdeckt – solange gesammelt wird, sieht jeder nur seine eigenen Ideen im Wortlaut
+ *   still    – beim Abstimmen sieht jeder nur seine eigenen Punkte; der Stand erscheint mit dem Auswerten
+ */
+export interface BubbleRegeln { zu?: boolean; anonym?: boolean; verdeckt?: boolean; still?: boolean; t: number }
+export type BubbleSchritt = 'sammeln' | 'gruppieren' | 'abstimmen' | 'ergebnis';
 
 export interface BubblesData {
   title: string;
@@ -37,6 +46,7 @@ export interface BubblesData {
   stimmen: Record<string, BubbleStimme>;
   gruppen: Record<string, BubbleGruppe>;
   abstimmung: BubbleAbstimmung;
+  regeln?: BubbleRegeln;
   [key: string]: unknown;
 }
 
@@ -59,7 +69,23 @@ export function bubblesDaten(d: Partial<BubblesData> | undefined): BubblesData {
     abstimmung: a && (a.phase === 'aus' || a.phase === 'offen' || a.phase === 'fertig')
       ? { phase: a.phase, punkte: Math.min(10, Math.max(1, Math.round(Number(a.punkte) || 3))), t: Number(a.t) || 0 }
       : { phase: 'aus', punkte: 3, t: 0 },
+    regeln: regelnVon(d?.regeln),
   };
+}
+function regelnVon(r: Partial<BubbleRegeln> | undefined): BubbleRegeln {
+  return { ...(r?.zu ? { zu: true } : {}), ...(r?.anonym ? { anonym: true } : {}), ...(r?.verdeckt ? { verdeckt: true } : {}), ...(r?.still ? { still: true } : {}), t: Number(r?.t) || 0 };
+}
+/** Wo steht die Runde? Sammeln → Gruppieren → Abstimmen → Ergebnis */
+export function bubblesSchritt(d0: Partial<BubblesData> | undefined): BubbleSchritt {
+  const d = bubblesDaten(d0);
+  if (d.abstimmung.phase === 'offen') return 'abstimmen';
+  if (d.abstimmung.phase === 'fertig') return 'ergebnis';
+  return d.regeln?.zu ? 'gruppieren' : 'sammeln';
+}
+/** Wie viele Personen haben beigetragen? (über die lebenden Ideen) */
+export function beteiligte(d0: Partial<BubblesData> | undefined): number {
+  const d = bubblesDaten(d0);
+  return new Set(Object.values(d.ideen).filter((i) => i && !i.weg && typeof i.text === 'string' && i.text.trim()).map((i) => i.von)).size;
 }
 
 /** Tabelle mit sortierten Schlüsseln — so schreibt jedes Gerät dieselbe Fassung gleich auf (kein Hin und Her wegen der Reihenfolge) */
@@ -88,13 +114,16 @@ function tabelleMischen<T extends { t: number }>(a: Record<string, T> | undefine
  * Zwei Fassungen der Inhalte einer Bubbles-Karte verlustfrei vereinigen. Kommutativ, assoziativ, idempotent:
  * mischen(a, b) = mischen(b, a), und mischen(a, a) = a.
  */
-export function bubblesMischen(a0: Partial<BubblesData> | undefined, b0: Partial<BubblesData> | undefined): Pick<BubblesData, 'ideen' | 'stimmen' | 'gruppen' | 'abstimmung'> {
+export function bubblesMischen(a0: Partial<BubblesData> | undefined, b0: Partial<BubblesData> | undefined): Pick<BubblesData, 'ideen' | 'stimmen' | 'gruppen' | 'abstimmung'> & { regeln?: BubbleRegeln } {
   const a = bubblesDaten(a0); const b = bubblesDaten(b0);
+  const regeln = juenger(a.regeln, b.regeln)!;
   return {
     ideen: tabelleMischen(a.ideen, b.ideen),
     stimmen: tabelleMischen(a.stimmen, b.stimmen),
     gruppen: tabelleMischen(a.gruppen, b.gruppen),
     abstimmung: juenger(a.abstimmung, b.abstimmung)!,
+    // Regeln nur mitführen, wenn je welche gesetzt wurden (alte Karten bleiben, wie sie sind)
+    ...(regeln.t > 0 ? { regeln } : {}),
   };
 }
 /** Sind die vereinigbaren Inhalte zweier Fassungen gleich? */
@@ -123,13 +152,14 @@ export interface Blase {
 const norm = (s: string): string => s.toLowerCase().replace(/\s+/g, ' ').trim();
 
 /** Die sichtbaren Blasen: lebende Ideen, gleiche Texte verschmolzen, Stimmen zusammengezählt */
-export function blasenVon(d0: Partial<BubblesData> | undefined, ich: string): Blase[] {
+export function blasenVon(d0: Partial<BubblesData> | undefined, ich: string, opt: { jeAutor?: boolean } = {}): Blase[] {
   const d = bubblesDaten(d0);
   const nachText = new Map<string, Blase & { t0: number }>();
   const zuBlase = new Map<string, string>();     // Idee → Schlüssel der Blase
   const lebend = Object.entries(d.ideen).filter(([, i]) => i && !i.weg && typeof i.text === 'string' && i.text.trim()).sort((a, b) => a[1].t - b[1].t || a[0].localeCompare(b[0]));
   for (const [id, i] of lebend) {
-    const k = norm(i.text);
+    // M378 (verdeckt sammeln): gleiche Texte verschiedener Personen bleiben getrennt — sonst verriete die Zahl, dass ein anderer dasselbe schrieb
+    const k = opt.jeAutor ? `${norm(i.text)}\u0000${i.von}` : norm(i.text);
     const gruppe = i.g && d.gruppen[i.g] && !d.gruppen[i.g].weg ? i.g : null;
     const b = nachText.get(k);
     if (b) {
@@ -191,4 +221,27 @@ export function bubblesAlsText(d0: Partial<BubblesData> | undefined): string {
   const frei = blasen.filter((b) => !b.gruppe);
   if (frei.length) teile.push(`Ohne Gruppe:\n${frei.map(zeile).join('\n')}`);
   return `${kopf}\n${teile.join('\n\n')}`.trim();
+}
+
+/** M378: Das Ergebnis als Blöcke einer Notiz (Überschrift, Frage, je Gruppe eine Liste nach Punkten) */
+export function bubblesAlsBloecke(d0: Partial<BubblesData> | undefined): Array<{ type: string; props?: Record<string, unknown>; content: string }> {
+  const d = bubblesDaten(d0);
+  const blasen = rangfolge(blasenVon(d, ''));
+  const zeile = (b: Blase) => `${b.text}${b.mal > 1 ? ` (${b.mal}×)` : ''}${b.punkte ? ` — ${b.punkte} ${b.punkte === 1 ? 'Punkt' : 'Punkte'}` : ''}`;
+  const aus: Array<{ type: string; props?: Record<string, unknown>; content: string }> = [{ type: 'heading', props: { level: 2 }, content: d.title || 'Ideen' }];
+  if (d.frage) aus.push({ type: 'paragraph', content: d.frage });
+  const n = beteiligte(d);
+  aus.push({ type: 'paragraph', content: `${blasen.length} ${blasen.length === 1 ? 'Idee' : 'Ideen'}${n > 1 ? ` von ${n} Personen` : ''}` });
+  const gruppen = Object.entries(d.gruppen).filter(([, g]) => g && !g.weg).sort((a, b) => a[1].t - b[1].t);
+  if (!gruppen.length) { for (const b of blasen) aus.push({ type: 'bulletListItem', content: zeile(b) }); return aus; }
+  for (const [id, g] of gruppen) {
+    const drin = blasen.filter((b) => b.gruppe === id);
+    if (!drin.length) continue;
+    const summe = drin.reduce((s, b) => s + b.punkte, 0);
+    aus.push({ type: 'heading', props: { level: 3 }, content: `${g.name}${summe ? ` — ${summe} ${summe === 1 ? 'Punkt' : 'Punkte'}` : ''}` });
+    for (const b of drin) aus.push({ type: 'bulletListItem', content: zeile(b) });
+  }
+  const frei = blasen.filter((b) => !b.gruppe);
+  if (frei.length) { aus.push({ type: 'heading', props: { level: 3 }, content: 'Ohne Gruppe' }); for (const b of frei) aus.push({ type: 'bulletListItem', content: zeile(b) }); }
+  return aus;
 }
