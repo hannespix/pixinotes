@@ -6861,3 +6861,9 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
   .zeig-band.im-vortrag { left: 50%; transform: translateX(-50%); bottom: calc(64px + var(--safe-bottom, 0px)); max-width: 92vw; }
 }
 .presenter-slide.app { margin: 0 2vw 10px; }
+
+/* M372: Der Schreibhinweis des Editors („Text eingeben oder '/' für Befehle tippen") gehört dem, der gerade in
+   der Notiz schreibt. Der Editor hängt ihn an die Stelle seiner Schreibmarke — die gibt es aber auch, wenn
+   niemand in der Notiz steht. So trug jede Karte, die ein anderer angelegt hatte, bei allen übrigen nur diesen
+   blassen Satz, und unter fertigem Text blieb er als graue Zeile stehen. Jetzt nur noch mit Tastatur-Fokus. */
+.note-editor .bn-editor:not(:focus-within) .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before { content: none !important; }
