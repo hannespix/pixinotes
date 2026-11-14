@@ -6774,3 +6774,9 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 .freigabe-schalter input { margin-top: 2px; flex: none; }
 .gast-name-dialog { max-width: 420px; }
 .gast-name-dialog .freigabe-zeile input { flex: 1; min-width: 0; }
+/* M365: Rechte der Gäste und Sicherung im Freigabe-Dialog */
+.freigabe-schalter.recht { align-items: center; cursor: default; }
+.freigabe-schalter.recht select { flex: 1; min-width: 0; }
+.freigabe-zeile.sicherung { margin-top: 8px; justify-content: space-between; }
+.live-recht { margin-left: 6px; padding: 2px 7px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border-soft); color: var(--ink); font-size: 11px; }
+@media (max-width: 520px) { .live-recht { display: none; } }

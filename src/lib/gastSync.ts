@@ -13,7 +13,7 @@
 // Maße der Karten (`measured`) misst jedes Gerät selbst — ein Telefon anders als ein Laptop. Sie reisen darum
 // nicht als Änderung: Verglichen und geschrieben wird mit den Maßen des letzten gemeinsamen Stands, sonst
 // schickten sich zwei verschiedene Geräte endlos „Änderungen" zu.
-import { flushPersist, NOTIZ_EXTERN, ohneLeseschutz, runDerived, setzeKartenSperren, useBoard, type BoardDoc, type Space } from '../store';
+import { flushPersist, NOTIZ_EXTERN, ohneLeseschutz, runDerived, setzeGruppe, setzeKartenSperren, useBoard, verlaufAbgrenzen, type BoardDoc, type GastRecht, type Space } from '../store';
 import { getAuthor } from '../components/CommentLayer';
 import { loadFile, saveFile } from './fileStore';
 import { supabaseKonfig } from './kontoSupabase';
@@ -31,9 +31,12 @@ export const GAST_NAME = 'Per Link';
 export const TEILNEHMER_EREIGNIS = 'pixinotes:teilnehmer';
 
 type Rolle = 'bearbeiten' | 'lesen';
-interface Eintrag { token: string; rolle: Rolle; version: number; kanal?: string }
+interface Eintrag { token: string; rolle: Rolle; version: number; kanal?: string; recht?: GastRecht }
+interface Optionen { gastRecht?: string }
+/** M365: Was Gäste dürfen (Option des Besitzers am Einladungslink) — unbekannte Werte gelten als „alles" */
+export const rechtAus = (o: Optionen | null | undefined): GastRecht => (o?.gastRecht === 'eigenes' || o?.gastRecht === 'eigenes-loeschen' ? o.gastRecht : 'alles');
 interface GastDatei { id: string; name: string; mime?: string; groesse?: number; url: string }
-interface Gelesen { board_id: string; rolle: Rolle; besitzer: string; inhalt: string; version: number; dateien?: GastDatei[]; kanal?: string }
+interface Gelesen { board_id: string; rolle: Rolle; besitzer: string; inhalt: string; version: number; dateien?: GastDatei[]; kanal?: string; optionen?: Optionen }
 
 const lesen = (): Record<string, Eintrag> => { try { return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, Eintrag>; } catch { return {}; } };
 const schreiben = (m: Record<string, Eintrag>): void => { try { localStorage.setItem(KEY, JSON.stringify(m)); } catch { /* voll */ } };
@@ -49,7 +52,9 @@ export function ich(): Teilnehmer {
   return { id, name: getAuthor().trim() || loadKonto()?.name?.split('@')[0] || 'Gast', farbe: FARBEN[h % FARBEN.length] };
 }
 
-class GastFehler extends Error { constructor(public art: 'vorbedingung' | 'keine-freigabe' | 'netz' | 'fehlt' | 'abgelehnt', text: string) { super(text); } }
+/** M365: Kennung, unter der dieses Gerät Karten anlegt — Gäste per Link „g:…", Konten „k:…" (der Server prüft das Präfix) */
+export const meineKennung = (alsGast: boolean): string => (alsGast ? `g:${ich().id}` : `k:${loadKonto()?.userId ?? ich().id}`);
+class GastFehler extends Error { constructor(public art: 'vorbedingung' | 'keine-freigabe' | 'netz' | 'fehlt' | 'abgelehnt' | 'nicht-erlaubt', text: string) { super(text); } }
 /** Server-Funktion mit dem öffentlichen Schlüssel aufrufen — kein Konto nötig */
 async function rpc<T>(name: string, body: unknown): Promise<T> {
   const k = supabaseKonfig();
@@ -69,6 +74,7 @@ async function rpc<T>(name: string, body: unknown): Promise<T> {
     const t = await res.text().catch(() => '');
     if (/vorbedingung/i.test(t)) throw new GastFehler('vorbedingung', 'vorbedingung');
     if (/keine freigabe/i.test(t)) throw new GastFehler('keine-freigabe', 'keine freigabe');
+    if (/nicht erlaubt/i.test(t)) throw new GastFehler('nicht-erlaubt', 'nicht erlaubt');
     throw new GastFehler('netz', `HTTP ${res.status}`);
   }
   return (await res.json()) as T;
@@ -136,9 +142,13 @@ function kanalOeffnen(boardId: string, kanalName: string, beiStand: () => void):
     nachricht: (ereignis, inhalt) => {
       if (ereignis === 'stand') beiStand();
       else if (ereignis === 'karte') karteVonAussen(boardId, inhalt);
+      else if (ereignis === 'optionen') {
+        // Nur ein Anstoß — die Rechte selbst kommen vom Server
+        if (lesen()[boardId]) void blick(boardId); else if (kontoKanal.has(boardId)) { rechteNeu.add(boardId); kontoKanaeleBald(); }
+      }
       else window.dispatchEvent(new CustomEvent(LIVE_NACHRICHT, { detail: { boardId, ereignis, inhalt } }));
     },
-    teilnehmer: (liste) => { anwesend.set(boardId, liste); sperrenRechnen(boardId); window.dispatchEvent(new CustomEvent(TEILNEHMER_EREIGNIS, { detail: boardId })); },
+    teilnehmer: (liste) => { anwesend.set(boardId, liste); sperrenRechnen(boardId); if (liste.some((t) => t.id !== ich().id)) void sichern(boardId); window.dispatchEvent(new CustomEvent(TEILNEHMER_EREIGNIS, { detail: boardId })); },
   }));
   window.dispatchEvent(new CustomEvent(TEILNEHMER_EREIGNIS, { detail: boardId }));
 }
@@ -150,6 +160,39 @@ function kanalSchliessen(boardId: string): void {
   anwesend.delete(boardId);
   sperrenRechnen(boardId);   // löst alle Sperren dieses Boards (und beendet das Mitlesen)
   window.dispatchEvent(new CustomEvent(TEILNEHMER_EREIGNIS, { detail: boardId }));
+}
+
+// ---------- M365: Sicherung für den Besitzer — der Stand von vor der Gruppenarbeit ----------
+// Kommt der erste andere ins Board, legt das Gerät des Besitzers den Stand beiseite (höchstens alle 30 Minuten
+// neu). Geht in der Gruppe etwas gründlich schief, holt „Wiederherstellen" im Freigabe-Dialog ihn zurück.
+const sicherungKey = (boardId: string): string => `gruppe:sicherung:${boardId}`;
+interface Sicherung { zeit: number; nodes: BoardDoc['nodes']; edges: BoardDoc['edges']; drawings?: BoardDoc['drawings']; comments?: BoardDoc['comments'] }
+async function sichern(boardId: string): Promise<void> {
+  const b = useBoard.getState().boards.find((x) => x.id === boardId);
+  if (!b || b.geteiltVon) return;   // nur der Besitzer
+  const alt = await idbGet<Sicherung>(sicherungKey(boardId)).catch(() => undefined);
+  if (alt && Date.now() - alt.zeit < 30 * 60_000) return;
+  const o = originale.get(boardId);   // mitgelesene Karten mit ihrem gesicherten Stand
+  const nodes = o?.size ? b.nodes.map((n) => o.get(n.id) ?? n) : b.nodes;
+  await idbSet(sicherungKey(boardId), { zeit: Date.now(), nodes, edges: b.edges, drawings: b.drawings, comments: b.comments } satisfies Sicherung).catch(() => {});
+}
+/** Zeitpunkt der Sicherung eines eigenen Boards — oder null */
+export async function sicherungVon(boardId: string): Promise<number | null> {
+  const z = await idbGet<Sicherung>(sicherungKey(boardId)).catch(() => undefined);
+  return z?.zeit ?? null;
+}
+/** Den Stand von vor der Gruppenarbeit zurückholen (ein Rückgängig-Schritt) */
+export async function sicherungZurueck(boardId: string): Promise<boolean> {
+  const z = await idbGet<Sicherung>(sicherungKey(boardId)).catch(() => undefined);
+  const st = useBoard.getState();
+  if (!z || !st.boards.some((b) => b.id === boardId && !b.geteiltVon)) return false;
+  if (st.activeId !== boardId) st.openBoard(boardId);
+  useBoard.getState().pushHistory();
+  useBoard.setState((s) => ({
+    boards: s.boards.map((b) => (b.id === boardId ? { ...b, nodes: z.nodes, edges: z.edges, drawings: z.drawings, comments: z.comments } : b)),
+    importEpoch: s.importEpoch + 1,
+  }));
+  return true;
 }
 
 // ---------- Karten-Sperre: Wer zuerst anfasst, hat die Karte ----------
@@ -204,11 +247,14 @@ function angefassteKarte(boardId: string): string | null {
   const el = document.activeElement as HTMLElement | null;
   if (el && (el.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) && !el.closest('.pdf-seite-bar, .comment-panel')) {
     const k = el.closest('.react-flow__node') as HTMLElement | null;
-    if (k?.dataset.id) return k.dataset.id;
+    // Nur, wenn der Mensch an diesem Gerät gerade etwas getan hat (Klick, Taste) — ein Cursor, den das Programm
+    // gesetzt hat, nimmt keine Karte. Wer sie schon hält, behält sie, solange der Cursor drin bleibt.
+    if (k?.dataset.id && (performance.now() - eingabeAm < 1500 || meine.get(boardId)?.karte === k.dataset.id)) return k.dataset.id;
   }
   const gezogen = st.boards.find((b) => b.id === boardId)?.nodes.find((n) => (n as { dragging?: boolean }).dragging);
   return gezogen?.id ?? null;
 }
+let eingabeAm = 0;
 let anfassTimer: ReturnType<typeof setTimeout> | undefined;
 function anfassenPruefen(): void {
   clearTimeout(anfassTimer);
@@ -269,6 +315,7 @@ function mitAnsichtVon(node: AppNode, hier: AppNode): AppNode {
 function einspielen(boardId: string, neu: AppNode, alt: AppNode): void {
   const bl = (n: AppNode): unknown => (n.data as { blocks?: unknown }).blocks;
   const notiz = neu.type === 'note' && bl(neu) !== bl(alt) && JSON.stringify(bl(neu)) !== JSON.stringify(bl(alt));
+  verlaufAbgrenzen(boardId, [neu.id]);   // M365: Rückgängig nimmt danach nur noch Eigenes zurück
   liveEinspielung = true;
   try {
     runDerived(() => ohneLeseschutz(() => useBoard.setState((s) => ({
@@ -361,6 +408,7 @@ function beendet(boardId: string): void {
   if (!m[boardId]) return;
   delete m[boardId];
   schreiben(m);
+  setzeGruppe(boardId, null);
   kanalSchliessen(boardId);
   void idbDel(basisKey(boardId)).catch(() => {});
   ohneLeseschutz(() => useBoard.setState((s) => ({ boards: s.boards.map((b) => (b.id === boardId ? alsKopie(b) : b)) })));
@@ -401,13 +449,15 @@ async function holen(boardId: string): Promise<void> {
   }
   await idbSet(basisKey(boardId), fremd).catch(() => {});
   const m = lesen();
-  if (m[boardId]) { m[boardId] = { ...m[boardId], version: g.version, rolle: g.rolle, ...(g.kanal ? { kanal: g.kanal } : {}) }; schreiben(m); }
+  if (m[boardId]) { m[boardId] = { ...m[boardId], version: g.version, rolle: g.rolle, recht: rechtAus(g.optionen), ...(g.kanal ? { kanal: g.kanal } : {}) }; schreiben(m); }
+  setzeGruppe(boardId, { ich: meineKennung(true), recht: rechtAus(g.optionen), gast: true });
   void dateienHolen(fremd, g.dateien);
   // Hier ist etwas dazugekommen, das der Server noch nicht hat → hinaus
   if (g.rolle === 'bearbeiten' && kern(mitMassenVon(neu, fremd)) !== kern(fremd)) await hinaus(boardId);
 }
 /** Board lokal nicht mehr da (gelöscht): Eintrag still entfernen */
 function beendetStill(boardId: string): void {
+  setzeGruppe(boardId, null);
   const m = lesen();
   if (m[boardId]) { delete m[boardId]; schreiben(m); }
   kanalSchliessen(boardId);
@@ -433,10 +483,35 @@ async function hinaus(boardId: string, versuch = 0): Promise<void> {
     const art = f instanceof GastFehler ? f.art : 'netz';
     if (art === 'vorbedingung' && versuch < 3) { await holen(boardId); return; }
     if (art === 'keine-freigabe') { await holen(boardId); return; }   // Rolle geändert oder Link beendet — der Blick klärt es
+    if (art === 'nicht-erlaubt') { await serverGilt(boardId); return; }
     // Netz: der nächste Blick oder die nächste Änderung versucht es wieder
   }
 }
 
+/**
+ * M365: Der Server hat das Schreiben abgelehnt, weil es gegen die Rechte der Gäste verstößt (das Gerät hält sie
+ * sonst selbst ein — etwa wenn der Besitzer sie gerade enger gestellt hat). Dann gilt der Stand des Servers;
+ * eigene, erlaubte Änderungen aus diesem Augenblick muss man noch einmal machen.
+ */
+async function serverGilt(boardId: string): Promise<void> {
+  const e = lesen()[boardId];
+  if (!e) return;
+  let g: Gelesen | null;
+  try { g = await rpc<Gelesen | null>('gast_lesen', { p_token: e.token }); } catch { return; }
+  if (!g) { beendet(boardId); return; }
+  let fremd: BoardDoc;
+  try { fremd = gezeichnet(JSON.parse(g.inhalt) as BoardDoc, g, e.token); } catch { return; }
+  const st = useBoard.getState();
+  const lokal = st.boards.find((b) => b.id === boardId);
+  if (!lokal) return;
+  ohneLeseschutz(() => st.importSync(st.boards.map((b) => (b.id === boardId ? mitMassenVon(fremd, lokal) : b)), st.spaces, st.activeId, { geaendert: [boardId] }));
+  flushPersist();
+  await idbSet(basisKey(boardId), fremd).catch(() => {});
+  const m = lesen();
+  if (m[boardId]) { m[boardId] = { ...m[boardId], version: g.version, rolle: g.rolle, recht: rechtAus(g.optionen) }; schreiben(m); }
+  setzeGruppe(boardId, { ich: meineKennung(true), recht: rechtAus(g.optionen), gast: true });
+  st.showToast('🔒 Der Besitzer hat festgelegt, was Gäste ändern dürfen — deine letzte Änderung wurde nicht übernommen.', false, 8000);
+}
 const abgleichen = (boardId: string): Promise<void> => exklusiv(boardId, () => holen(boardId));
 const schreibenBald = (boardId: string): void => {
   clearTimeout(schreibTimer.get(boardId));
@@ -447,9 +522,16 @@ const schreibenBald = (boardId: string): void => {
 async function blick(boardId: string): Promise<void> {
   const e = lesen()[boardId];
   if (!e) return;
-  let s: { version: number; rolle: Rolle } | null;
-  try { s = await rpc<{ version: number; rolle: Rolle } | null>('gast_stand', { p_token: e.token }); } catch { return; }
+  let s: { version: number; rolle: Rolle; optionen?: Optionen } | null;
+  try { s = await rpc<{ version: number; rolle: Rolle; optionen?: Optionen } | null>('gast_stand', { p_token: e.token }); } catch { return; }
   if (!s) { beendet(boardId); return; }
+  if (rechtAus(s.optionen) !== (e.recht ?? 'alles')) {
+    // Der Besitzer hat die Rechte umgestellt — gilt sofort
+    const m = lesen();
+    if (m[boardId]) { m[boardId] = { ...m[boardId], recht: rechtAus(s.optionen) }; schreiben(m); }
+    setzeGruppe(boardId, { ich: meineKennung(true), recht: rechtAus(s.optionen), gast: true });
+    window.dispatchEvent(new CustomEvent(TEILNEHMER_EREIGNIS, { detail: boardId }));
+  }
   if (Number(s.version) !== e.version || s.rolle !== e.rolle) await abgleichen(boardId);
 }
 
@@ -458,7 +540,7 @@ function gastBoardStarten(boardId: string, kanalName: string): void {
 }
 
 // ---------- Mit Konto: Kanäle der geteilten Boards (Besitzer und Gäste mit Konto) ----------
-interface EigenerLink { token: string; board_id: string; ohne_konto?: boolean; dateien?: GastDatei[] }
+interface EigenerLink { token: string; board_id: string; ohne_konto?: boolean; dateien?: GastDatei[]; optionen?: Optionen }
 let eigeneLinks: EigenerLink[] = [];
 const kontoKanal = new Map<string, string>();   // boardId → Besitzer (Kanäle, die über das Konto laufen)
 let kontoLauf = 0;
@@ -491,14 +573,18 @@ export async function kontoKanaele(): Promise<void> {
     for (const l of eigeneLinks) if (eigen(l.board_id)) ziel.set(l.board_id, s.userId);
     if (rf.ok) for (const f of (await rf.json()) as Array<{ board_id: string }>) if (eigen(f.board_id)) ziel.set(f.board_id, s.userId);
     for (const b of st.boards) if (b.geteiltVon && !b.gastLink) ziel.set(b.id, b.geteiltVon);
-    for (const id of [...kontoKanal.keys()]) if (ziel.get(id) !== kontoKanal.get(id)) { kanalSchliessen(id); kontoKanal.delete(id); }
+    for (const id of [...kontoKanal.keys()]) if (ziel.get(id) !== kontoKanal.get(id)) { kanalSchliessen(id); kontoKanal.delete(id); setzeGruppe(id, null); }
     for (const [id, besitzer] of ziel) {
-      if (kontoKanal.has(id) || kanaele.has(id)) continue;
+      // M365: Der Besitzer darf immer alles; Gäste mit Konto erfahren die Rechte unten mit dem Kanal
+      if (besitzer === s.userId) setzeGruppe(id, { ich: meineKennung(false), recht: 'alles', gast: false });
+      if ((kontoKanal.has(id) || kanaele.has(id)) && (besitzer === s.userId || !rechteNeu.has(id))) continue;
       const res = await kontoAnfrage(`${basisUrl}/rpc/board_kanal`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p_besitzer: besitzer, p_board_id: id }) });
       if (lauf !== kontoLauf) return;
       if (!res.ok) continue;   // 404: Der Server kennt Live-Kanäle noch nicht — dann bleibt es beim Abgleich
-      const antwort = (await res.json()) as { kanal?: unknown } | null;
+      const antwort = (await res.json()) as { kanal?: unknown; optionen?: Optionen } | null;
       const name = antwort?.kanal;
+      rechteNeu.delete(id);
+      if (besitzer !== s.userId) setzeGruppe(id, { ich: meineKennung(false), recht: rechtAus(antwort?.optionen), gast: true });
       if (typeof name !== 'string' || !name || kanaele.has(id)) continue;
       kontoKanal.set(id, besitzer);
       kanalOeffnen(id, name, () => void checkKontoRemote(true).catch(() => null));
@@ -506,6 +592,10 @@ export async function kontoKanaele(): Promise<void> {
     void anhaengeFreigeben();
   } catch { /* ohne Netz: beim nächsten Mal */ }
 }
+/** Boards, deren Rechte der Besitzer gerade geändert hat (Nachricht „optionen" im Kanal) — beim nächsten Lauf neu fragen */
+const rechteNeu = new Set<string>();
+/** Der Besitzer hat die Rechte am Link geändert: allen im Kanal Bescheid geben (sie fragen den Server neu) */
+export function optionenGeaendert(boardId: string): void { kanaele.get(boardId)?.senden('optionen', {}); }
 let kontoKanalTimer: ReturnType<typeof setTimeout> | undefined;
 const kontoKanaeleBald = (): void => { clearTimeout(kontoKanalTimer); kontoKanalTimer = setTimeout(() => void kontoKanaele(), 600); };
 /** Welche Boards sind (von mir aus gesehen) mit einem Konto geteilt? — ändert sich das, die Kanäle neu ordnen */
@@ -584,7 +674,8 @@ export async function gastBeitreten(token: string): Promise<GastErgebnis> {
   const boards = da ? boardsVor.map((b) => (b.id === board.id ? mitMassenVon(board, da!) : b)) : [...boardsVor, board];
   const spaces: Space[] = mitGeteiltBereich(spacesVor, boards.filter((b) => b.geteiltVon));
   // Erst der Eintrag, dann das Board, beides sofort fest — wird die Seite genau jetzt geschlossen, passt es zusammen
-  schreiben({ ...lesen(), [board.id]: { token, rolle: g.rolle, version: g.version, ...(g.kanal ? { kanal: g.kanal } : {}) } });
+  schreiben({ ...lesen(), [board.id]: { token, rolle: g.rolle, version: g.version, recht: rechtAus(g.optionen), ...(g.kanal ? { kanal: g.kanal } : {}) } });
+  setzeGruppe(board.id, { ich: meineKennung(true), recht: rechtAus(g.optionen), gast: true });
   ohneLeseschutz(() => st.importSync(boards, spaces, aktiv, { geaendert: [board.id] }));
   flushPersist();
   await idbSet(basisKey(board.id), board).catch(() => {});
@@ -602,6 +693,7 @@ export function gastVerlassen(boardId: string): void {
   if (!m[boardId]) return;
   delete m[boardId];
   schreiben(m);
+  setzeGruppe(boardId, null);
   kanalSchliessen(boardId);
   void idbDel(basisKey(boardId)).catch(() => {});
   ohneLeseschutz(() => useBoard.setState((s) => ({ boards: s.boards.map((b) => (b.id === boardId ? alsKopie(b) : b)) })));
@@ -622,6 +714,7 @@ export function initGastSync(): void {
     if (neu) schreiben(m);
   }
   for (const [boardId, e] of Object.entries(lesen())) {
+    setzeGruppe(boardId, { ich: meineKennung(true), recht: e.recht ?? 'alles', gast: true });
     if (e.kanal) gastBoardStarten(boardId, e.kanal);
     void abgleichen(boardId).then(() => { const k = lesen()[boardId]; if (k && !kanaele.has(boardId)) gastBoardStarten(boardId, k.kanal ?? k.token); });
   }
@@ -660,6 +753,9 @@ export function initGastSync(): void {
   // Schreib-Cursor wandert in eine Karte oder heraus → Sperre nehmen bzw. lösen
   document.addEventListener('focusin', anfassenPruefen, true);
   document.addEventListener('focusout', anfassenPruefen, true);
+  const eingabe = () => { eingabeAm = performance.now(); if (kanaele.size) anfassenPruefen(); };
+  document.addEventListener('pointerdown', eingabe, true);
+  document.addEventListener('keydown', eingabe, true);
   // Regelmäßiger Blick (auch ohne Live-Kanal aktuell) — nur im sichtbaren Fenster
   setInterval(() => {
     if (document.visibilityState !== 'visible') return;

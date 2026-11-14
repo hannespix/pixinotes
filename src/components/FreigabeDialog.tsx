@@ -9,7 +9,8 @@ import { useEffect, useState } from 'react';
 import { useBoard } from '../store';
 import { freigabeAnlegen, freigabeEntfernen, freigabenDesBoards, freigabeRolleSetzen, freigabeVerlassen, loadKonto, type Freigabe, type FreigabeRolle } from '../lib/kontoSync';
 import { einladungDesBoards, einladungLoeschen, EinladungNichtEingerichtet, einladungSetzen, einladungUrl, type Einladung } from '../lib/einladung';
-import { gastVerlassen, kontoKanaele } from '../lib/gastSync';
+import { gastVerlassen, kontoKanaele, rechtAus, sicherungVon, sicherungZurueck } from '../lib/gastSync';
+import { gruppeVon, type GastRecht } from '../store';
 import { IX } from './Icons';
 
 /** M360: Rolle wählen — überall dieselben zwei Wörter */
@@ -34,6 +35,9 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
   const [linkRolle, setLinkRolle] = useState<FreigabeRolle>('bearbeiten');
   // M364: Der Link lässt auch Leute ohne Konto mitarbeiten
   const [ohneKonto, setOhneKonto] = useState(false);
+  // M365: Was Gäste dürfen; Sicherung von vor der Gruppenarbeit (Zeitpunkt)
+  const [recht, setRecht] = useState<GastRecht>('alles');
+  const [sicherung, setSicherung] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState('');
   const eigenesKonto = loadKonto();
@@ -48,7 +52,8 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
   useEffect(() => {
     if (!gast) {
       void laden();
-      einladungDesBoards(boardId).then((e) => { setLink(e); if (e) { setLinkRolle(e.rolle === 'lesen' ? 'lesen' : 'bearbeiten'); setOhneKonto(!!e.ohne_konto); } })
+      void sicherungVon(boardId).then((z) => setSicherung(z));
+      einladungDesBoards(boardId).then((e) => { setLink(e); if (e) { setLinkRolle(e.rolle === 'lesen' ? 'lesen' : 'bearbeiten'); setOhneKonto(!!e.ohne_konto); setRecht(rechtAus(e.optionen)); } })
         .catch((e) => setLink(e instanceof EinladungNichtEingerichtet ? 'fehlt' : null));
     }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -89,7 +94,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
     if (busy) return;
     setBusy(true); setFehler('');
     try {
-      const e = await einladungSetzen(boardId, r, neu ? ohneKonto : undefined);
+      const e = await einladungSetzen(boardId, r, neu ? ohneKonto : undefined, neu ? recht : undefined);
       setLink(e); setLinkRolle(r);
       if (neu) await kopieren(einladungUrl(e.token));
       else showToast(`Wer dem Link ab jetzt folgt, ${r === 'lesen' ? 'darf nur lesen' : 'darf bearbeiten'}.`);
@@ -106,6 +111,33 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
       showToast(an ? 'Wer den Link öffnet, ist jetzt sofort dabei — auch ohne Konto.' : 'Der Link verlangt jetzt wieder ein PixiNotes-Konto. Gäste ohne Konto sind draußen.', false, 7000);
     } catch (e) { setFehler((e as Error).message); } finally { setBusy(false); }
   };
+  // M365: Rechte der Gäste umstellen — wirkt sofort bei allen, die über den Link dabei sind
+  const rechtSetzen = async (r: GastRecht) => {
+    if (!link || link === 'fehlt') { setRecht(r); return; }
+    if (busy || r === recht) return;
+    setBusy(true); setFehler('');
+    try {
+      const e = await einladungSetzen(boardId, linkRolle, undefined, r);
+      setLink(e); setRecht(rechtAus(e.optionen));
+      showToast(r === 'alles' ? 'Gäste dürfen jetzt alles bearbeiten und löschen.' : r === 'eigenes-loeschen' ? 'Gäste dürfen jetzt alles bearbeiten, aber nur Eigenes löschen.' : 'Gäste dürfen jetzt nur noch ihre eigenen Karten ändern und löschen.', false, 6000);
+    } catch (e) { setFehler((e as Error).message); } finally { setBusy(false); }
+  };
+  const zurueckZurSicherung = async () => {
+    if (!window.confirm('Den Stand von vor der Gruppenarbeit wiederherstellen? Alles, was seitdem dazukam oder geändert wurde, fällt weg — für alle. Mit Strg+Z holst du es zurück.')) return;
+    if (await sicherungZurueck(boardId)) { showToast('🛟 Stand von vor der Gruppenarbeit wiederhergestellt — Strg+Z nimmt das zurück.', false, 8000); onClose(); }
+    else setFehler('Die Sicherung ließ sich nicht laden.');
+  };
+  const rechtWahl = (
+    <label className="freigabe-schalter recht">
+      <span>Gäste dürfen</span>
+      <select className="freigabe-rolle" value={recht} disabled={busy || linkRolle === 'lesen'} aria-label="Was Gäste dürfen" data-taste="einladung-recht"
+        onChange={(e) => void rechtSetzen(e.target.value as GastRecht)}>
+        <option value="alles">alles bearbeiten und löschen</option>
+        <option value="eigenes-loeschen">alles bearbeiten, nur Eigenes löschen</option>
+        <option value="eigenes">nur eigene Karten ändern und löschen</option>
+      </select>
+    </label>
+  );
   const linkWeg = async () => {
     if (busy) return;
     if (!window.confirm('Den Einladungslink widerrufen? Er funktioniert danach nicht mehr. Wer mit Konto beigetreten ist, bleibt in der Liste und lässt sich dort entfernen; Gäste ohne Konto sind sofort draußen.')) return;
@@ -137,7 +169,8 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                 {perLink ? (
                   <p className="modal-hint" data-taste="freigabe-per-link">Du bist per <b>Einladungslink</b> in „{board.name}" — ohne Konto. {nurLesen
                     ? <>Du liest live mit, kannst aber nichts ändern.</>
-                    : <>Alle arbeiten live im selben Board. Eine Karte gehört dem, der sie gerade bearbeitet — die anderen lesen mit und kommen dran, sobald sie frei ist.</>} Deinen Namen änderst du oben rechts am ersten Kürzel.</p>
+                    : <>Alle arbeiten live im selben Board. Eine Karte gehört dem, der sie gerade bearbeitet — die anderen lesen mit und kommen dran, sobald sie frei ist.</>} {gruppeVon(boardId)?.recht === 'eigenes' ? 'Der Besitzer hat festgelegt: Ändern und löschen kannst du nur deine eigenen Karten — neue anlegen geht immer. '
+                    : gruppeVon(boardId)?.recht === 'eigenes-loeschen' ? 'Der Besitzer hat festgelegt: Löschen kannst du nur, was du selbst angelegt hast. ' : ''}Strg+Z nimmt nur deine eigenen Schritte zurück. Deinen Namen änderst du oben rechts am ersten Kürzel.</p>
                 ) : nurLesen ? (
                   <p className="modal-hint" data-taste="freigabe-nur-lesen">„{board.name}" gehört <b>{board.geteiltVonName ?? 'einem anderen Konto'}</b> und ist für dich <b>zum Lesen</b> freigegeben. Du siehst Änderungen live, kannst aber selbst nichts ändern. Für eigene Notizen: Board-Menü → <b>Duplizieren</b> — die Kopie gehört dir.</p>
                 ) : (
@@ -175,6 +208,13 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                           <input type="checkbox" checked={ohneKonto} disabled={busy} onChange={(e) => void ohneKontoSetzen(e.target.checked)} data-taste="einladung-ohne-konto" />
                           <span><b>Auch ohne Konto</b> — wer den Link öffnet, ist sofort dabei (Gruppenarbeit, Unterricht, Workshop)</span>
                         </label>
+                        {rechtWahl}
+                        {sicherung && (
+                          <div className="freigabe-zeile sicherung" data-taste="sicherung">
+                            <span>🛟 Stand von vor der Gruppenarbeit ({new Date(sicherung).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })})</span>
+                            <button disabled={busy} onClick={() => void zurueckZurSicherung()} data-taste="sicherung-zurueck">Wiederherstellen</button>
+                          </div>
+                        )}
                       </>
                     ) : (
                       <div className="freigabe-zeile">
@@ -185,6 +225,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                           <input type="checkbox" checked={ohneKonto} disabled={busy} onChange={(e) => setOhneKonto(e.target.checked)} data-taste="einladung-ohne-konto" />
                           <span><b>Auch ohne Konto</b> — wer den Link öffnet, ist sofort dabei (Gruppenarbeit, Unterricht, Workshop)</span>
                         </label>
+                        {rechtWahl}
                       </div>
                     )}
                   </div>
@@ -217,6 +258,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                 <div className="modal-note">
                   Gäste ohne Konto bekommen auch die Anhänge des Boards (PDF, Bilder) zum Ansehen; bei Gästen mit Konto wandern Anhänge noch nicht mit —
                   Notizen, Karten, Verbindungen und Zeichnungen immer. Wer den Link ohne Konto hat, kann ihn weitergeben: Widerrufen beendet den Zugang für alle.
+                  „Eigenes" ist, was jemand in der Gruppenarbeit selbst angelegt hat; was vorher da war, gehört dir. Strg+Z nimmt bei allen nur die eigenen Schritte zurück.
                   Bei der E-Mail-Einladung braucht die Person ein PixiNotes-Konto mit genau dieser E-Mail. Eine Kopie ohne Konto weitergeben: Board-Menü → <b>Per Link teilen</b>.
                 </div>
               </>

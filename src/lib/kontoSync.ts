@@ -691,7 +691,19 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
   const sitzLesen = loadKonto();
   if (sitzLesen?.anbieter === 'supabase') {
     let liste: FremdFreigabe[] = fremdeFreigaben;
-    try { liste = await freigabenLaden(); } catch { /* ohne Netz: die zuletzt bekannten */ }
+    let listeFrisch = false;
+    try { liste = await freigabenLaden(); listeFrisch = true; } catch { /* ohne Netz: die zuletzt bekannten */ }
+    // M364: Der Besitzer hat eine Freigabe zum Bearbeiten beendet → das Board bleibt hier als eigene Kopie, mit
+    // Hinweis. (Bisher ergab sich das nur nebenbei — über einen veralteten Vorfahren in der Zusammenführung;
+    // ohne ihn wäre das Board still verschwunden. Nur lesend geteilte Boards verschwinden weiterhin, M360.)
+    if (listeFrisch) {
+      for (const b of useBoard.getState().boards) {
+        if (!b.geteiltVon || b.gastLink || b.geteiltRolle === 'lesen') continue;
+        if (liste.some((f) => f.board_id === b.id && f.besitzer === b.geteiltVon)) continue;
+        alsEigeneKopie(b.id);
+        useBoard.getState().showToast('Die Freigabe für dieses Board wurde beendet — es bleibt als eigene Kopie bei dir.', false, 8000);
+      }
+    }
     for (const f of liste) {
       if (boards.some((b) => b.id === f.board_id && !b.geteiltVon)) continue;
       try {

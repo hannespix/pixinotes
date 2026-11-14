@@ -6,7 +6,7 @@
 //   · GastNameDialog – „Wie heißt du?" beim Einwählen ohne Konto
 import { useEffect, useState, type CSSProperties } from 'react';
 import { useInternalNode } from '@xyflow/react';
-import { useBoard } from '../store';
+import { GRUPPE_EREIGNIS, gruppeVon, useBoard } from '../store';
 import { ich, liveAuf, liveVerbunden, nameGeaendert, SPERREN_EREIGNIS, sperrenVon, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
 import type { Teilnehmer } from '../lib/liveKanal';
 import { getAuthor, setAuthor } from './CommentLayer';
@@ -36,8 +36,12 @@ const farbe = (f: string): CSSProperties => ({ '--farbe': f } as CSSProperties);
 export function LiveLeiste() {
   const boardId = useBoard((s) => s.activeId);
   useTakt(TEILNEHMER_EREIGNIS);
+  useTakt(GRUPPE_EREIGNIS);
   if (!liveAuf(boardId)) return null;
   const selbst = ich();
+  // M365: Als Gast sehen, was der Besitzer hier erlaubt
+  const g = gruppeVon(boardId);
+  const recht = g?.gast && g.recht !== 'alles' ? g.recht : null;
   const andere = teilnehmerVon(boardId).filter((t) => t.id !== selbst.id);
   const sichtbar = andere.slice(0, 5);
   const rest = andere.slice(5);
@@ -51,6 +55,12 @@ export function LiveLeiste() {
           title={t.karte ? `${t.name} — bearbeitet gerade eine Karte` : t.name}>{kuerzel(t.name)}</span>
       ))}
       {rest.length > 0 && <span className="live-chip mehr" title={rest.map((t) => t.name).join(', ').slice(0, 100)}>+{rest.length}</span>}
+      {recht && (
+        <span className="live-recht" data-taste="live-recht"
+          title={recht === 'eigenes' ? 'Du kannst hier nur deine eigenen Karten ändern und löschen — neue anlegen geht immer.' : 'Du kannst hier alles bearbeiten, aber nur löschen, was du selbst angelegt hast.'}>
+          🔒 {recht === 'eigenes' ? 'nur Eigenes ändern' : 'nur Eigenes löschen'}
+        </span>
+      )}
       <span className="live-zahl" data-taste="live-zahl">{!verbunden ? 'verbindet …' : andere.length === 0 ? 'nur du' : `${andere.length + 1} dabei`}</span>
     </div>
   );

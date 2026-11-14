@@ -879,6 +879,7 @@ export function Board() {
   }, [onNodesChange, getViewport]);
   useBoardTasten({ getViewport, setCenter, zoomIn, zoomOut, zoomTo }, anzRef);
 
+  const zugSchritt = useRef<{ eintrag: unknown; x: number; y: number } | null>(null);
   const onNodeDragStart = useCallback((_: unknown, node: Node) => {
     if (node.type === 'frame') {
       const all = selectActiveBoard(useBoard.getState()).nodes;
@@ -891,6 +892,11 @@ export function Board() {
     }
     vels.current.delete(node.id); // gegriffene Karte gehorcht der Maus, nicht der Physik
     dragTrack.current = { id: node.id, x: node.position.x, y: node.position.y, t: performance.now(), vx: 0, vy: 0 };
+    // M365: Auch das Verschieben ist ein Schritt, den Strg+Z zurücknimmt (bisher nur bei Rahmen) — in der
+    // Gruppenarbeit holt man so eine versehentlich weggezogene Karte zurück, ohne anderen etwas zu nehmen.
+    useBoard.getState().pushHistory();
+    const past = useBoard.getState().past;
+    zugSchritt.current = { eintrag: past[past.length - 1], x: node.position.x, y: node.position.y };
   }, []);
 
   // Klick-Zoom (optional, ⚙ → Design → Bedienung): fliegt NUR, wenn die Karte
@@ -1321,6 +1327,12 @@ export function Board() {
       const gefangen = fangAktiv();
       fangSetzen([]);
       if (node.type === 'frame') { frameDrag.current = null; return; }
+      // M365: Nichts bewegt (nur gezuckt)? Dann ist es kein Schritt.
+      const zug = zugSchritt.current;
+      zugSchritt.current = null;
+      if (zug && node.position.x === zug.x && node.position.y === zug.y) {
+        useBoard.setState((s) => (s.past[s.past.length - 1] === zug.eintrag ? { past: s.past.slice(0, -1) } : {}));
+      }
       const track = dragTrack.current;
       setTilt(node.id, 0);
       if (!track || track.id !== node.id) return;

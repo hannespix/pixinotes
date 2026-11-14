@@ -10,12 +10,13 @@
 // Abgrenzung: „Per Link teilen" (M357, #l=) gibt eine KOPIE weiter, ohne Konto. Dieser Link führt aufs ORIGINAL.
 import { useBoard } from '../store';
 import { checkKontoRemote, kontoAnfrage, loadKonto, type FreigabeRolle } from './kontoSync';
-import { gastBeitreten, kontoKanaele } from './gastSync';
+import { gastBeitreten, kontoKanaele, optionenGeaendert } from './gastSync';
+import type { GastRecht } from '../store';
 
 const OFFEN_KEY = 'pixinotes-einladung-offen';
 
 /** `ohne_konto` (M364): Wer den Link öffnet, arbeitet sofort mit — ohne Anmeldung. Fehlt das Feld, kennt der Server es noch nicht. */
-export interface Einladung { token: string; board_id: string; rolle: FreigabeRolle; created_at: string; ohne_konto?: boolean }
+export interface Einladung { token: string; board_id: string; rolle: FreigabeRolle; created_at: string; ohne_konto?: boolean; optionen?: { gastRecht?: string } }
 
 export const einladungUrl = (token: string): string => `${location.origin}${location.pathname}#e=${token}`;
 const rest = (): string => `${loadKonto()?.url ?? ''}/rest/v1`;
@@ -41,18 +42,19 @@ export async function einladungDesBoards(boardId: string): Promise<Einladung | n
 }
 
 /** Link anlegen oder Rolle bzw. „ohne Konto" ändern (das Token bleibt — schon verschickte Links gelten weiter) */
-export async function einladungSetzen(boardId: string, rolle: FreigabeRolle, ohneKonto?: boolean): Promise<Einladung> {
+export async function einladungSetzen(boardId: string, rolle: FreigabeRolle, ohneKonto?: boolean, gastRecht?: GastRecht): Promise<Einladung> {
   if (loadKonto()?.anbieter !== 'supabase') throw new Error('Einladungslinks gibt es mit dem PixiNotes-Konto (E-Mail-Anmeldung).');
   const alt = await einladungDesBoards(boardId);
   const res = await kontoAnfrage(`${rest()}/board_einladungen?on_conflict=besitzer,board_id`, {
     method: 'POST', headers: { ...KOPF, Prefer: 'resolution=merge-duplicates,return=representation' },
-    body: JSON.stringify({ token: alt?.token ?? neuesToken(), board_id: boardId, rolle, ...(ohneKonto === undefined ? {} : { ohne_konto: ohneKonto }) }),
+    body: JSON.stringify({ token: alt?.token ?? neuesToken(), board_id: boardId, rolle, ...(ohneKonto === undefined ? {} : { ohne_konto: ohneKonto }), ...(gastRecht === undefined ? {} : { optionen: { gastRecht } }) }),
   });
   if (res.status === 404) throw new EinladungNichtEingerichtet();
-  if (res.status === 400 && ohneKonto !== undefined) throw new Error('Gäste ohne Konto sind auf dem Server noch nicht eingerichtet.');
+  if (res.status === 400 && (ohneKonto !== undefined || gastRecht !== undefined)) throw new Error('Diese Einstellung ist auf dem Server noch nicht eingerichtet.');
   if (!res.ok) throw new Error(`Einladungslink nicht gespeichert (HTTP ${res.status}).`);
   const z = (await res.json()) as Einladung[];
   void kontoKanaele();   // M364: Live-Kanal dieses Boards öffnen
+  if (gastRecht !== undefined) optionenGeaendert(boardId);   // M365: Die Gäste fragen ihre Rechte neu ab
   return z[0];
 }
 

@@ -4,7 +4,7 @@ import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe } from '@blocknote/core/locales';
-import { NOTIZ_EXTERN, selectActiveBoard, useBoard, useNurLesen } from '../../store';
+import { kamVonAussen, NOTIZ_EXTERN, selectActiveBoard, useBoard, useKarteFest } from '../../store';
 import { STICKY_COLORS, type NoteNode } from '../../types';
 import { blocksToText } from '../../lib/serialize';
 import { indexZuAdresse } from '../../lib/formel';
@@ -203,7 +203,9 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
     void importFilesToBoard(dateien, { x: pos.x + breite + 40, y: pos.y });
   }, [getNode, id]);
   // M201: gemeinsames Schema mit Inline-Schrift/-Größe (textSize/textFont)
-  const nurLesen = useNurLesen(); // M360: nur lesend geteiltes Board — der Editor zeigt, nimmt aber nichts an
+  // M360: nur lesend geteiltes Board — der Editor zeigt, nimmt aber nichts an; M365: ebenso eine fremde Karte,
+  // wenn Gäste hier nur Eigenes ändern dürfen
+  const nurLesen = useKarteFest((data as { von?: string }).von);
   const editor = useCreateBlockNote({
     schema: noteSchema,
     initialContent: initialContent as never,
@@ -242,6 +244,16 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
       if (!(e as CustomEvent<string[]>).detail?.includes(id)) return;
       const blocks = selectActiveBoard(useBoard.getState()).nodes.find((n) => n.id === id)?.data.blocks as PartialBlock[] | undefined;
       externRef.current = true;
+      // M365: Der Cursor bleibt, wo er war — der fremde Inhalt darf ihn nicht in diese Karte holen
+      const vorher = document.activeElement as HTMLElement | null;
+      const eigener = (): HTMLElement | null => editorRef.current?.querySelector('[contenteditable="true"]') ?? null;
+      const hatteFokus = !!vorher && !!eigener()?.contains(vorher);
+      setTimeout(() => {
+        const jetzt = document.activeElement as HTMLElement | null;
+        if (hatteFokus || !jetzt || !eigener()?.contains(jetzt)) return;
+        jetzt.blur();
+        if (vorher?.isConnected && vorher !== document.body) vorher.focus({ preventScroll: true });
+      }, 0);
       try { editor.replaceBlocks(editor.document, (blocks?.length ? blocks : [{ type: 'paragraph' }]) as never); }
       catch { useBoard.setState((s) => ({ importEpoch: s.importEpoch + 1 })); }   // Editor im Umbau: sicherer Weg, Board neu aufbauen
       finally { setTimeout(() => { externRef.current = false; }, 60); }
@@ -251,12 +263,14 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
   }, [id, editor]);
 
   // Frische, leere Notiz: sofort den Cursor reinsetzen — lostippen ohne Extra-Klick
+  // M365: … aber nur in der selbst angelegten. Eine leere Notiz, die jemand anderes gerade angelegt hat und die
+  // per Abgleich hier ankommt, nähme sonst jedem den Cursor weg.
   useEffect(() => {
-    if (!initialContent) {
+    if (!initialContent && !kamVonAussen(id)) {
       const t = setTimeout(() => editor.focus(), 60);
       return () => clearTimeout(t);
     }
-  }, [editor, initialContent]);
+  }, [editor, initialContent, id]);
 
   // M176: Tabellen ließen sich nicht löschen — das Seiten-Menü (Drag-Griff mit
   // Block-Löschen) ist bewusst aus, und per Tastatur ist eine Tabelle in
