@@ -10,6 +10,7 @@
 // angemeldet sein. Dieser Link ist zum Weitergeben gedacht.
 import { useBoard, type BoardDoc } from '../store';
 import { loadFile, saveFile } from './fileStore';
+import { anhangInhalt, anhangKarte } from './syncFolder';
 import { kontoAnfrage, kontoDateiNachladen, loadKonto } from './kontoSync';
 import { supabaseKonfig } from './kontoSupabase';
 import { ohneAuswahl } from './syncMerge';
@@ -79,16 +80,18 @@ export async function linkErstellen(boardId: string, fortschritt?: (text: string
   const alt = await linkDesBoards(boardId);
   const token = alt?.token ?? neuesToken();
   // Anhänge: Datei-Karten, deren Inhalt in der Geräte-Ablage liegt (kleine stecken als dataUrl in der Karte selbst)
-  const karten = board.nodes.filter((n) => n.type === 'file' && !n.archived);
+  // M371: … und eigene HTML-Tools, deren Quelltext ebenfalls in der Geräte-Ablage liegt
+  const karten = board.nodes.filter((n) => !!anhangKarte(n) && !n.archived);
   const dateien: LinkDatei[] = [];
   const fehlend: string[] = [];
   let nr = 0;
   for (const n of karten) {
-    const d = n.data as { name?: string; mime?: string; size?: number; dataUrl?: string };
+    const karte = anhangKarte(n)!;
+    const d = { name: karte.name, mime: karte.mime, dataUrl: (n.data as { dataUrl?: string }).dataUrl };
     if (d.dataUrl) continue;
     nr += 1;
     fortschritt?.(`Anhang ${nr}: ${d.name ?? 'Datei'} …`);
-    let blob = await loadFile(n.id).catch(() => undefined);
+    let blob: Blob | undefined = karte.tool ? (await anhangInhalt(n.id, true).catch(() => null)) ?? undefined : await loadFile(n.id).catch(() => undefined);
     // Große Dateien liegen manchmal nur im Konto (werden erst beim Öffnen geladen) — jetzt holen
     if (!blob) blob = (await kontoDateiNachladen(n.id).catch(() => null)) ?? undefined;
     if (!blob) { fehlend.push(d.name ?? 'Datei'); continue; }

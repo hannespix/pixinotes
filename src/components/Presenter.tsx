@@ -15,7 +15,10 @@ import { GanttBody } from './nodes/GanttCard';
 import { CalendarBody } from './nodes/CalendarCard';
 import { DokumentFolie, dokumentArt } from './DokumentFolie';
 import { letzteSeite } from '../lib/pdfSeiten';
-import type { AppNode, CalendarNode, FileNode, GanttNode, KanbanNode, MermaidNode, NoteNode, ShapeNode } from '../types';
+import type { AppNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, NoteNode, ShapeNode } from '../types';
+import { HtmlAppSlide } from './nodes/HtmlAppCard';
+import { folgeIch, folgenSetzen, ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenStart, vorfuehrenStopp, vortragMelden, werFuehrtVor } from '../lib/vorfuehren';
+import { ich, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
 
 /** Kartentypen, die auf der Folie LIVE editierbar sind */
 const EDITABLE = new Set(['note', 'shape', 'mermaid', 'kanban', 'gantt', 'calendar']);
@@ -181,6 +184,9 @@ function SlideContent({ node }: { node: AppNode }) {
           <CalendarBody id={node.id} data={(node as CalendarNode).data} />
         </div>
       );
+    case 'htmlapp':
+      // M371: Tools und Webseiten laufen auf der Folie wirklich (vorher: ein Standbild mit dem Namen)
+      return <HtmlAppSlide node={node as HtmlAppNode} />;
     default:
       // E-Mail/Bild/Datei: Rendering über den escapenden Serializer — fremde Inhalte bleiben inert
       return <div translate="no" dangerouslySetInnerHTML={{ __html: nodeToHtml(node) }} />;
@@ -204,6 +210,17 @@ export function Presenter() {
   const seitenRef = useRef(seitenJe);
   seitenRef.current = seitenJe;
   const schrittRef = useRef<(d: 1 | -1) => void>(() => {});
+  // M371: Vorführen im Team — die Präsentation gehört zur Ansicht, die der Vorführende mitnimmt
+  const [, vorfuehrTakt] = useState(0);
+  useEffect(() => {
+    const auf = () => vorfuehrTakt((n) => n + 1);
+    window.addEventListener(VORFUEHR_EREIGNIS, auf);
+    window.addEventListener(TEILNEHMER_EREIGNIS, auf);
+    return () => { window.removeEventListener(VORFUEHR_EREIGNIS, auf); window.removeEventListener(TEILNEHMER_EREIGNIS, auf); };
+  }, []);
+  /** Diese Präsentation hat sich geöffnet, weil ich dem Vorführenden folge — dann schließt sie sich auch mit ihm */
+  const gefolgt = useRef(false);
+  const selbstRef = useRef<() => void>(() => {});
   /** Die Dokument-Folie meldet, ob auf der Seite noch etwas zu rollen ist — dann rollt der Schritt, statt zu blättern */
   const rollRef = useRef<((d: 1 | -1) => boolean) | null>(null);
   const ansichtMerker = useRef<Record<string, 'seite' | 'breite'>>({});
@@ -240,11 +257,11 @@ export function Presenter() {
         e.stopPropagation();
         return;
       }
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') { selbstRef.current(); setOpen(false); }
       else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') schrittRef.current(1);
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') schrittRef.current(-1);
-      else if (e.key === 'Home') setPos({ idx: 0, seite: 1 });          // M345
-      else if (e.key === 'End') setPos({ idx: Math.max(0, slides.length - 1), seite: -1 });
+      else if (e.key === 'Home') { selbstRef.current(); setPos({ idx: 0, seite: 1 }); }          // M345
+      else if (e.key === 'End') { selbstRef.current(); setPos({ idx: Math.max(0, slides.length - 1), seite: -1 }); }
       e.preventDefault();
       e.stopPropagation();
     };
@@ -273,20 +290,52 @@ export function Presenter() {
     return { idx: i + d, seite: d === 1 ? 1 : -1 };
   }), [slides]);
   /** Schritt per Taste oder Fußleiste: erst die Seite zu Ende rollen, dann blättern */
-  const weiter = (d: 1 | -1) => { if (!rollRef.current?.(d)) schritt(d); };
+  const weiter = (d: 1 | -1) => { selbst(); if (!rollRef.current?.(d)) schritt(d); };
   schrittRef.current = weiter;
   // Wischen blättert auf Folien ohne eigene Bedienung (Bild, Mail, Text) — editierbare Folien und
   // Dokumente regeln das selbst (dort gehört der waagerechte Zug dem Inhalt)
   const wisch = useRef<{ x: number; y: number; t: number } | null>(null);
 
-  if (!open) return null;
-
   // idx robust klemmen — board.nodes kann während der Präsentation schrumpfen
   const safeIdx = Math.max(0, Math.min(idx, slides.length - 1));
-  const current = slides[safeIdx];
+  const current = slides[safeIdx] as AppNode | undefined;
   const art = current ? dokumentArt(current) : null;
   const seitenHier = current && art && art !== 'bild' ? seitenJe[current.id] ?? 1 : 1;
   const seiteHier = pos.seite < 0 ? seitenHier : Math.min(Math.max(1, pos.seite), seitenHier);
+
+  // ───── M371: Vorführen im Team ─────
+  const zeigt = werFuehrtVor(board.id);
+  const ichZeige = ichFuehreVor(board.id);
+  const folge = folgeIch(board.id);
+  /** Wer selbst blättert oder schließt, löst sich vom Vorführenden (wie beim Schwenken auf dem Board) */
+  const selbst = () => { if (folgeIch(board.id)) folgenSetzen(board.id, false); };
+  selbstRef.current = selbst;
+  // Meine Stelle im Vortrag bekanntgeben (gemerkt wird sie immer; gesendet, solange ich vorführe)
+  const stelle = open && current ? `${current.id}|${seiteHier}` : '';
+  useEffect(() => {
+    if (folgeIch(board.id)) return;      // wer folgt, meldet nichts
+    vortragMelden(board.id, stelle ? { karte: stelle.split('|')[0], seite: Number(stelle.split('|')[1]) } : null);
+  }, [board.id, stelle, folge]);
+  // Ich folge: Die Präsentation des Vorführenden öffnet sich hier, blättert mit und schließt sich mit ihm
+  const dort = folge && zeigt?.vortrag ? `${zeigt.vortrag.karte}|${zeigt.vortrag.seite}` : '';
+  useEffect(() => {
+    if (!folge) { gefolgt.current = false; return; }
+    if (dort) {
+      gefolgt.current = true;      // auch nach „Wieder folgen" in einer schon offenen Präsentation
+      if (!open) { setOpen(true); return; }
+      const [karte, seite] = dort.split('|');
+      const i = slides.findIndex((n) => n.id === karte);
+      if (i >= 0) setPos((p) => (p.idx === i && p.seite === Number(seite) ? p : { idx: i, seite: Number(seite) }));
+    } else if (open && gefolgt.current) { gefolgt.current = false; setOpen(false); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folge, dort, open, slides]);
+  /** Lässt sich hier etwas ans Team zeigen? (gemeinsames Board mit Live-Verbindung) */
+  const teamDa = liveVerbunden(board.id) && teilnehmerVon(board.id).some((t) => t.id !== ich().id);
+
+  if (!open) return null;
+  /** im Folien-Zweig unten gibt es die Folie sicher (slides.length > 0) */
+  const cur = current as AppNode;
+
   const amAnfang = safeIdx <= 0 && seiteHier <= 1;
   const amEnde = safeIdx >= slides.length - 1 && seiteHier >= seitenHier;
 
@@ -294,30 +343,38 @@ export function Presenter() {
     <div className={`presenter ${art ? 'mit-dokument' : ''}`} role="dialog" aria-modal="true" aria-label="Präsentation">
       <div className="presenter-head">
         <span translate="no">{board.name}</span>
-        <span className="presenter-hint-edit">{art ? 'Doppelklick oder + / − vergrößert · B = Seitenbreite' : 'Folien sind direkt editierbar'}</span>
+        <span className="presenter-hint-edit">{art ? 'Doppelklick oder + / − vergrößert · B = Seitenbreite' : current?.type === 'htmlapp' ? 'Läuft auf der Folie · blättern mit ‹ ›' : 'Folien sind direkt editierbar'}</span>
         <span className="presenter-count">{slides.length ? safeIdx + 1 : 0} / {slides.length}</span>
-        <button onClick={() => setOpen(false)} aria-label="Präsentation beenden">✕</button>
+        {/* M371: Die Präsentation dem Team zeigen — dieselbe Folie, dieselbe Seite, bei allen */}
+        {(teamDa || ichZeige) && !folge && board.geteiltRolle !== 'lesen' && (
+          <button className={`presenter-team ${ichZeige ? 'an' : ''}`} data-taste="vortrag-team"
+            title={ichZeige ? 'Vorführen beenden — die anderen blättern wieder selbst' : 'Alle im Board sehen diese Präsentation und blättern mit dir'}
+            onClick={() => (ichZeige ? vorfuehrenStopp() : vorfuehrenStart(board.id))}>
+            📣 {ichZeige ? 'Team folgt' : 'Team mitnehmen'}
+          </button>
+        )}
+        <button onClick={() => { selbst(); setOpen(false); }} aria-label="Präsentation beenden">✕</button>
       </div>
       {slides.length === 0 ? (
         <div className="presenter-slide"><p>Keine präsentierbaren Karten auf diesem Board.</p></div>
       ) : (
         art ? (
           <div className="presenter-slide dokument">
-            <DokumentFolie key={current.id} node={current as FileNode} art={art} seite={pos.seite}
-              onSeiten={(n) => setSeitenJe((m) => (m[current.id] === n ? m : { ...m, [current.id]: n }))}
-              schritt={schritt} geheZu={(s) => setPos({ idx: safeIdx, seite: s })} rollRef={rollRef} ansichtMerker={ansichtMerker} />
+            <DokumentFolie key={cur.id} node={cur as FileNode} art={art} seite={pos.seite}
+              onSeiten={(n) => setSeitenJe((m) => (m[cur.id] === n ? m : { ...m, [cur.id]: n }))}
+              schritt={(d) => { selbst(); schritt(d); }} geheZu={(s) => { selbst(); setPos({ idx: safeIdx, seite: s }); }} rollRef={rollRef} ansichtMerker={ansichtMerker} />
           </div>
         ) : (
-          <div className={`presenter-slide ${EDITABLE.has(current.type) ? 'editable' : ''}`}
-            onTouchStart={(e) => { wisch.current = EDITABLE.has(current.type) || e.touches.length !== 1 ? null : { x: e.touches[0].clientX, y: e.touches[0].clientY, t: performance.now() }; }}
+          <div className={`presenter-slide ${EDITABLE.has(cur.type) ? 'editable' : ''} ${cur.type === 'htmlapp' ? 'app' : ''}`}
+            onTouchStart={(e) => { wisch.current = EDITABLE.has(cur.type) || e.touches.length !== 1 ? null : { x: e.touches[0].clientX, y: e.touches[0].clientY, t: performance.now() }; }}
             onTouchEnd={(e) => {
               const w = wisch.current; wisch.current = null;
               const t = e.changedTouches[0];
               if (!w || !t) return;
               const dx = t.clientX - w.x; const dy = t.clientY - w.y;
-              if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4 && performance.now() - w.t < 700) schritt(dx < 0 ? 1 : -1);
+              if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4 && performance.now() - w.t < 700) { selbst(); schritt(dx < 0 ? 1 : -1); }
             }}>
-            <SlideContent key={current.id} node={current} />
+            <SlideContent key={cur.id} node={cur} />
           </div>
         )
       )}
@@ -326,7 +383,7 @@ export function Presenter() {
         <button onClick={() => weiter(-1)} aria-disabled={amAnfang} data-taste="vortrag-zurueck">‹ Zurück</button>
         <span className="presenter-dots">
           {slides.slice(0, 24).map((s, i) => (
-            <button key={s.id} className={i === safeIdx ? 'on' : ''} onClick={() => setPos({ idx: i, seite: 1 })} aria-label={`Folie ${i + 1}`} />
+            <button key={s.id} className={i === safeIdx ? 'on' : ''} onClick={() => { selbst(); setPos({ idx: i, seite: 1 }); }} aria-label={`Folie ${i + 1}`} />
           ))}
         </span>
         <button onClick={() => weiter(1)} aria-disabled={amEnde} data-taste="vortrag-weiter">Weiter ›</button>

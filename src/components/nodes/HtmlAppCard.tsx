@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { HtmlAppNode } from '../../types';
-import { composeSrcdoc, loadAppState, loadAppStateAt, loadHtml, saveAppState, saveHtml } from '../../lib/htmlStore';
+import { composeSrcdoc, htmlUebernehmen, loadAppState, loadAppStateAt, loadHtml, saveAppState, saveHtml } from '../../lib/htmlStore';
+import { kontoDateiNachladen } from '../../lib/kontoSync';
+import { appMelden, folgeIch, ROLL_EREIGNIS, rollMelden, rollVergessen, VORFUEHR_EREIGNIS, werFuehrtVor, type Roll } from '../../lib/vorfuehren';
 import { loadAppStateFromTeam, loadAttachment, saveAppStateToTeam } from '../../lib/attachments';
 import { triggerDownload } from '../../lib/download';
 import { CardShell } from './CardShell';
@@ -24,6 +26,69 @@ const SANDBOX = 'allow-scripts allow-forms allow-modals allow-popups allow-point
  *  Für Inhalte UNSERER Herkunft wäre das gefährlich — deshalb lehnt der
  *  URL-Import gleichnamige Herkunft ab und die Karte startet sie nicht. */
 const SANDBOX_LIVE = `${SANDBOX} allow-same-origin`;
+
+/**
+ * M371: Den Quelltext eines eigenen Tools auf dieses Gerät holen. Er reist seit M371 mit dem Board — über das
+ * Konto, über den Link eines Gastes, über den kurzen Link — und liegt dann als Anhang in der Datei-Ablage
+ * (oder, wenn er groß ist, noch im Konto). Davor: die Kopie im Team-Ordner (M159).
+ */
+async function quelleHolen(id: string, teamRef?: string): Promise<boolean> {
+  try {
+    if (await htmlUebernehmen(id)) return true;
+    if (teamRef) {
+      const f = await loadAttachment(teamRef);
+      if (f) { await saveHtml(id, await f.text()); return true; }
+    }
+    if (await kontoDateiNachladen(id).catch(() => null)) return htmlUebernehmen(id);
+  } catch { /* fehlt */ }
+  return false;
+}
+
+/** Alle Bauteile, die am Vorführen hängen, zeichnen neu, wenn sich dort etwas tut */
+function useVorfuehrTakt(): void {
+  const [, takt] = useState(0);
+  useEffect(() => {
+    const auf = () => takt((n) => n + 1);
+    window.addEventListener(VORFUEHR_EREIGNIS, auf);
+    return () => window.removeEventListener(VORFUEHR_EREIGNIS, auf);
+  }, []);
+}
+
+/**
+ * M371: Mitrollen. Das laufende Tool meldet (über die Brücke in lib/htmlStore.ts), wohin gerollt wurde — führe
+ * ich vor, geht das ans Team; folge ich, rollt mein Tool dorthin, wohin der Vorführende gerollt hat.
+ */
+function useMitrollen(boardId: string, id: string, frame: RefObject<HTMLIFrameElement | null>, laeuft: boolean): void {
+  useEffect(() => {
+    if (!laeuft) return;
+    const vomTool = (e: MessageEvent) => {
+      const d = e.data as { __pixiHapp?: string; roll?: Partial<Roll> } | null;
+      const r = d?.roll;
+      if (d?.__pixiHapp !== id || !r || e.source !== frame.current?.contentWindow) return;
+      if (typeof r.p !== 'string' || r.p.length > 200 || !(typeof r.x === 'number' && r.x >= 0 && r.x <= 1) || !(typeof r.y === 'number' && r.y >= 0 && r.y <= 1)) return;
+      rollMelden(boardId, id, { p: r.p, x: r.x, y: r.y });
+    };
+    const vomTeam = (e: Event) => {
+      const d = (e as CustomEvent<{ boardId: string; karte: string; roll: Roll }>).detail;
+      if (d?.boardId !== boardId || d.karte !== id) return;
+      frame.current?.contentWindow?.postMessage({ __pixiRoll: id, roll: d.roll }, '*');
+    };
+    window.addEventListener('message', vomTool);
+    window.addEventListener(ROLL_EREIGNIS, vomTeam);
+    return () => { window.removeEventListener('message', vomTool); window.removeEventListener(ROLL_EREIGNIS, vomTeam); };
+  }, [boardId, id, frame, laeuft]);
+}
+/** Wer dazukommt, während schon gerollt ist: Das frisch geladene Tool fährt an die Stelle des Vorführenden */
+function rollNachLaden(boardId: string, id: string, frame: HTMLIFrameElement | null): void {
+  if (!frame) return;
+  // Bei mir (ich führe vor) beginnt ein frisch geladenes Tool oben — der Stand von vorhin gilt nicht mehr
+  rollVergessen(boardId, id);
+  window.setTimeout(() => {
+    // erst jetzt nachsehen: Bis das Tool steht, kann der Vorführende schon weitergerollt haben
+    const r = folgeIch(boardId) ? werFuehrtVor(boardId)?.rollen[id] : undefined;
+    if (r) frame.contentWindow?.postMessage({ __pixiRoll: id, roll: r }, '*');
+  }, 350);
+}
 
 const fmtSize = (b: number) => (b >= 1_000_000 ? `${(b / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1000))} kB`);
 
@@ -47,6 +112,8 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   const isLive = !!data.live && !!data.url;
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const boardId = useBoard((st) => st.activeId);
   // App-Name ohne Stale-Closure (Team-Speicherstand wird verzögert geschrieben)
   const nameRef = useRef(data.name);
   nameRef.current = data.name;
@@ -67,25 +134,12 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   useEffect(() => {
     let alive = true;
     if (isLive) { setHasSrc(true); return; } // Live: kein lokaler Quelltext nötig
-    void (async () => {
-      try {
-        if (await loadHtml(id)) { if (alive) setHasSrc(true); return; }
-        // M159: Quelltext fehlt lokal (anderes Gerät) — liegt eine Kopie im
-        // Team-Ordner, wird sie still nachgeladen (fragt NIE nach Rechten)
-        if (data.ref) {
-          const f = await loadAttachment(data.ref);
-          if (f) {
-            await saveHtml(id, await f.text());
-            if (alive) setHasSrc(true);
-            return;
-          }
-        }
-        if (alive) setHasSrc(false);
-      } catch {
-        if (alive) setHasSrc(false);
-      }
-    })();
-    return () => { alive = false; };
+    // M159: Kopie im Team-Ordner · M371: der Quelltext reist mit dem Board (Konto, Gast-Link, kurzer Link)
+    const pruefen = () => { void quelleHolen(id, data.ref).then((da) => { if (alive) setHasSrc(da); }); };
+    pruefen();
+    // Anhänge trudeln nach dem Board ein — dann noch einmal nachsehen
+    window.addEventListener('pixinotes:dateien-da', pruefen);
+    return () => { alive = false; window.removeEventListener('pixinotes:dateien-da', pruefen); };
   }, [id, data.ref, isLive]);
 
   // Speicher-Meldungen der App (localStorage-Shim) entgegennehmen → IndexedDB.
@@ -158,6 +212,33 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     setSrcdoc(null);
     setLiveOn(false);
   };
+
+  // ───── M371: Vorführen — das Tool läuft bei allen, und in eigenen Tools rollt das Team mit ─────
+  useVorfuehrTakt();
+  const laeuft = srcdoc !== null || liveOn;
+  // Ich führe vor: bekanntgeben, dass dieses Tool läuft
+  useEffect(() => {
+    appMelden(boardId, id, laeuft);
+    return () => appMelden(boardId, id, false);
+  }, [boardId, id, laeuft]);
+  // Ich folge: Startet der Vorführende das Tool, startet es hier; hält er es an, hält es hier an.
+  // Wer es selbst anhält, behält das letzte Wort, bis der Vorführende es neu startet.
+  const zeigt = werFuehrtVor(boardId);
+  const folge = folgeIch(boardId);
+  const dortAn = folge && !!zeigt?.apps.includes(id);
+  const dortAus = folge && !!zeigt && !zeigt.apps.includes(id);
+  const vonFolgen = useRef(false);
+  const selbstAus = useRef(false);
+  useEffect(() => {
+    if (dortAn && !laeuft && hasSrc === true && !starting && !selbstAus.current) { vonFolgen.current = true; void start(); }
+    if (dortAus) {
+      selbstAus.current = false;
+      if (vonFolgen.current) { vonFolgen.current = false; if (laeuft) stop(); }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dortAn, dortAus, laeuft, hasSrc, starting]);
+  const stopSelbst = () => { if (dortAn) selbstAus.current = true; vonFolgen.current = false; stop(); };
+  useMitrollen(boardId, id, frameRef, srcdoc !== null);
 
   /** Neustart lädt auch den zuletzt GESPEICHERTEN App-Zustand frisch */
   const restart = async () => {
@@ -238,6 +319,8 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     if (!f) return;
     const html = await f.text();
     await saveHtml(id, html);
+    // M371: ersetzter Quelltext — die Fassung im Konto (und bei den Gästen) ist damit überholt
+    window.dispatchEvent(new CustomEvent('pixinotes:anhang-neu', { detail: id }));
     updateNodeData(id, { name: f.name, size: f.size });
     setHasSrc(true);
     setSrcdoc(null);
@@ -265,7 +348,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
           {/* M313: Ein Knopf zum Starten/Anhalten, alles andere (Neustart,
               Vollbild, Tab, Herunterladen, Speicherstand) im ⋯ */}
           {runningUi ? (
-            <button className="happ-btn happ-stopbtn nodrag" title="App anhalten (gibt Speicher & Rechenzeit frei)" onClick={stop}><IStopSq size={14} /></button>
+            <button className="happ-btn happ-stopbtn nodrag" title="App anhalten (gibt Speicher & Rechenzeit frei)" onClick={stopSelbst}><IStopSq size={14} /></button>
           ) : (
             <button className="happ-btn happ-startbtn nodrag" disabled={hasSrc !== true || starting} title="App starten" onClick={start}>
               <IPlay size={14} />
@@ -295,7 +378,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
                    Browsers hält sie von PixiNotes fern (s. SANDBOX_LIVE) */
                 <iframe key={liveKey} className="happ-frame" title={data.name} sandbox={SANDBOX_LIVE} src={data.url} />
               ) : (
-                <iframe className="happ-frame" title={data.name} sandbox={SANDBOX} srcDoc={srcdoc ?? ''} />
+                <iframe ref={frameRef} className="happ-frame" title={data.name} sandbox={SANDBOX} srcDoc={srcdoc ?? ''} onLoad={() => rollNachLaden(boardId, id, frameRef.current)} />
               )}
               {/* Nicht ausgewählt: Klicks gehören dem Board (auswählen/ziehen).
                   Erst die AUSGEWÄHLTE Karte reicht Eingaben an die App durch —
@@ -306,7 +389,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
             <div className="happ-poster">
               {hasSrc === false ? (
                 <>
-                  <p>Der Inhalt dieser App liegt auf diesem Gerät nicht vor — HTML-Dateien bleiben lokal (sie wandern nicht in Sync-Dateien oder Team-Pakete).</p>
+                  <p>Der Inhalt dieser App liegt auf diesem Gerät (noch) nicht vor. Mit dem PixiNotes-Konto und in geteilten Boards reist er mit; sonst die HTML-Datei hier laden.</p>
                   <button className="happ-load nodrag" onClick={() => fileRef.current?.click()}>HTML-Datei wählen</button>
                 </>
               ) : (
@@ -381,5 +464,65 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
         document.body,
       )}
     </CardShell>
+  );
+}
+
+/**
+ * M371: Ein Tool oder eine Webseite als Folie. In der Präsentation läuft die Karte wirklich — nicht mehr als
+ * Standbild: Sie startet von selbst, füllt die Folie und lässt sich bedienen. Führt jemand vor, sehen die
+ * Folgenden dieselbe Folie; in eigenen Tools rollt ihre Ansicht mit (useMitrollen), eine fremde Webseite rollt
+ * jeder selbst — in sie lässt der Browser nicht hineinsehen.
+ */
+export function HtmlAppSlide({ node }: { node: HtmlAppNode }) {
+  const { id, data } = node;
+  const boardId = useBoard((st) => st.activeId);
+  const isLive = !!data.live && !!data.url;
+  const [srcdoc, setSrcdoc] = useState<string | null>(null);
+  const [fehlt, setFehlt] = useState(false);
+  const frame = useRef<HTMLIFrameElement | null>(null);
+  useVorfuehrTakt();
+  useEffect(() => {
+    if (isLive) return;
+    let alive = true;
+    void (async () => {
+      const html = (await quelleHolen(id, data.ref)) ? await loadHtml(id) : null;
+      if (!alive) return;
+      if (!html) { setFehlt(true); return; }
+      const st = (await loadAppState(id).catch(() => undefined)) ?? {};
+      if (alive) setSrcdoc(composeSrcdoc(id, html, st));
+    })();
+    return () => { alive = false; };
+  }, [id, data.ref, isLive]);
+  // Was das Tool speichert, landet wie bei der Karte in seiner Schublade
+  useEffect(() => {
+    const onMsg = (e: MessageEvent) => {
+      const d = e.data as { __pixiHapp?: string; store?: Record<string, string> } | null;
+      if (d?.__pixiHapp !== id || !d.store || e.source !== frame.current?.contentWindow) return;
+      void saveAppState(id, d.store).then(() => window.dispatchEvent(new CustomEvent('pixinotes:happ-state', { detail: id })));
+    };
+    window.addEventListener('message', onMsg);
+    return () => window.removeEventListener('message', onMsg);
+  }, [id]);
+  useMitrollen(boardId, id, frame, srcdoc !== null);
+  // Folie zu: der Rollstand dieser Folie gilt nicht weiter (auf dem Board beginnt das Tool wieder oben)
+  useEffect(() => () => rollVergessen(boardId, id), [boardId, id]);
+  const fremd = (() => { try { return new URL(data.url ?? '').origin !== window.location.origin; } catch { return false; } })();
+  const adresse = (() => { try { return new URL(data.url ?? '').hostname; } catch { return ''; } })();
+  const vorfuehrung = !!werFuehrtVor(boardId);
+  return (
+    <div className="slide-app" data-taste="folie-app">
+      {isLive ? (
+        fremd
+          ? <iframe ref={frame} className="slide-app-frame" title={data.name} sandbox={SANDBOX_LIVE} src={data.url} />
+          : <p className="slide-app-hinweis">Diese Adresse gehört zu PixiNotes selbst und wird nicht eingebettet.</p>
+      ) : srcdoc !== null ? (
+        <iframe ref={frame} className="slide-app-frame" title={data.name} sandbox={SANDBOX} srcDoc={srcdoc} onLoad={() => rollNachLaden(boardId, id, frame.current)} />
+      ) : (
+        <p className="slide-app-hinweis">{fehlt ? 'Der Inhalt dieses Tools liegt auf diesem Gerät nicht vor.' : 'Tool startet …'}</p>
+      )}
+      {isLive && fremd && vorfuehrung && (
+        <div className="slide-app-fuss" data-taste="folie-app-fremd">Webseite von <span translate="no">{adresse}</span> — sie öffnet sich bei allen; rollen und klicken muss darin jeder selbst.</div>
+      )}
+    </div>
   );
 }

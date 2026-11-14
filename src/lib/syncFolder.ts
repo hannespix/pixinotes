@@ -302,18 +302,47 @@ export function base64AlsBlob(b64: string, mime?: string): Blob {
  *
  * `budgetMb <= 0` heißt: keine Dateien mitnehmen (der Schalter ist aus).
  */
+/**
+ * M371: Welche Karten bringen einen Anhang mit, der neben dem Board reisen muss? Datei-Karten — und eigene
+ * HTML-Tools: Ihr Quelltext liegt (wie große Dateien) nicht im Board, sondern in der Geräte-Ablage. Ohne ihn
+ * steht beim Kollegen nur eine leere Hülle. Live eingebettete Adressen brauchen nichts.
+ */
+export function anhangKarte(n: { id: string; type?: string; data: unknown }): { id: string; name: string; mime?: string; size: number; tool?: boolean } | null {
+  if (n.type === 'file') {
+    const d = n.data as { name?: string; mime?: string; size?: number };
+    return { id: n.id, name: d.name ?? 'Datei', mime: d.mime, size: d.size ?? 0 };
+  }
+  if (n.type === 'htmlapp') {
+    const d = n.data as { name?: string; size?: number; live?: boolean };
+    if (d.live) return null;
+    const name = d.name ?? 'Tool';
+    return { id: n.id, name: /\.html?$/i.test(name) ? name : `${name}.html`, mime: 'text/html', size: d.size ?? 0, tool: true };
+  }
+  return null;
+}
+/** Der Inhalt zu einer solchen Karte aus der Geräte-Ablage — oder null, wenn er hier nicht liegt */
+export async function anhangInhalt(id: string, tool: boolean): Promise<Blob | null> {
+  if (tool) {
+    const text = await idbGet<string>(`happ:${id}`);
+    if (text) return new Blob([text], { type: 'text/html' });
+  }
+  const blob = await idbGet<Blob | ArrayBuffer>(`file:${id}`);
+  if (!blob) return null;
+  return blob instanceof Blob ? blob : new Blob([blob]);
+}
+
 export async function buildSyncPayloadMitDateien(budgetMb = DATEI_BUDGET_MB, nur?: (id: string) => boolean): Promise<SyncPayload> {
   const p = buildSyncPayload();
   if (budgetMb <= 0) return p;
   // Alle Datei-Karten aller Boards — die kleinsten zuerst, damit ein einzelner
   // Brocken nicht zwanzig kleine Anhänge verdrängt
-  const karten: Array<{ id: string; name: string; mime?: string; size: number }> = [];
+  const karten: Array<{ id: string; name: string; mime?: string; size: number; tool?: boolean }> = [];
   for (const b of p.boards) {
     for (const n of b.nodes) {
-      if (n.type !== 'file') continue;
+      const k = anhangKarte(n);
+      if (!k) continue;
       if (nur && !nur(n.id)) continue;   // M329: nur die noch nicht hochgeladenen — große Dateien nicht jedes Mal neu kodieren
-      const d = n.data as { name?: string; mime?: string; size?: number };
-      karten.push({ id: n.id, name: d.name ?? 'Datei', mime: d.mime, size: d.size ?? 0 });
+      karten.push(k);
     }
   }
   karten.sort((a, b) => a.size - b.size);
@@ -322,9 +351,9 @@ export async function buildSyncPayloadMitDateien(budgetMb = DATEI_BUDGET_MB, nur
   for (const k of karten) {
     if (rest <= 0) break;
     try {
-      const blob = await idbGet<Blob | ArrayBuffer>(`file:${k.id}`);
+      const blob = await anhangInhalt(k.id, !!k.tool);
       if (!blob) continue;
-      const b = blob instanceof Blob ? blob : new Blob([blob]);
+      const b = blob;
       if (b.size > rest) continue;            // passt nicht — nächste probieren
       dateien[k.id] = { name: k.name, mime: k.mime, b64: await alsBase64(b) };
       rest -= b.size;
@@ -348,7 +377,10 @@ export async function uebernimmDateien(p: SyncPayload): Promise<number> {
   let n = 0;
   for (const [id, eintrag] of Object.entries(d)) {
     try {
-      await idbSet(`file:${id}`, base64AlsBlob(eintrag.b64, eintrag.mime));
+      const blob = base64AlsBlob(eintrag.b64, eintrag.mime);
+      // M371: Ist das hier schon ein Tool (Quelltext liegt vor), kommt die neue Fassung an dessen Platz
+      if (await idbGet(`happ:${id}`)) await idbSet(`happ:${id}`, await blob.text());
+      else await idbSet(`file:${id}`, blob);
       n += 1;
     } catch { /* Platte voll oder Eintrag kaputt — der Rest zählt trotzdem */ }
   }

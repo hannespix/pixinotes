@@ -15,13 +15,14 @@
 //   Mini-Abruf (eTag / Version von umgebung.json); erst eine Änderung lädt.
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
 import {
-  alsBase64, base64AlsBlob, basisLesen, basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB,
+  alsBase64, anhangKarte, base64AlsBlob, basisLesen, basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB,
   emitSyncStatus, fremdStandEinarbeiten, idbDel, idbGet, idbSet, KONTO_DIRTY_KEY, notiereAenderung, SYNC_DIRTY_KEY,
   uebernimmDateien, WEBDAV_DIRTY_KEY, type EinarbeitenErgebnis, type SyncDatei, type SyncPayload, type SyncWeg,
 } from './syncFolder';
 import { googleTokenFuer, loadCalAccounts, msAnmeldung, msTokenErneuern, oauthAvailable } from './calAccounts';
 import { sbAbmelden, sbErneuern, sbKontoLoeschen, sbNutzer, sbRealtime, sbRueckkehrLesen, supabaseKonfig, type RealtimeEreignis, type RealtimeGriff, type SbSitzung } from './kontoSupabase';
 import { nurAuswahlAnders } from './syncMerge';
+import { anhangGroesse, anhangLokal } from './htmlStore';
 
 /** M328: 'supabase' = das eigene PixiNotes-Konto (E-Mail), Ablage beim Betreiber */
 export type Anbieter = 'google' | 'ms' | 'supabase';
@@ -663,9 +664,7 @@ export function stempel(text: string): string {
   return `${h.toString(16)}:${text.length}`;
 }
 
-async function dateiLokal(id: string): Promise<boolean> {
-  try { return !!(await idbGet(`file:${id}`)); } catch { return false; }
-}
+const dateiLokal = anhangLokal;   // M371: Datei-Anhang oder Tool-Quelltext
 
 /** Zuletzt gelesene Board-Inhalte je Stempel (nur Arbeitsspeicher) — spart das erneute Laden unveränderter Boards */
 const gelesen = new Map<string, { st: string; board: BoardDoc }>();
@@ -753,7 +752,9 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
   }
   const dateien: Record<string, SyncDatei> = {};
   for (const [id, meta] of Object.entries(u.dateien ?? {})) {
-    if (await dateiLokal(id)) continue;
+    // M371: Ein Tool, dessen Quelltext im Konto inzwischen ein anderer ist (Datei ersetzt), wird neu geholt
+    const veraltet = meta.mime === 'text/html' && !!meta.groesse && !!(await idbGet(`happ:${id}`)) && (await anhangGroesse(id)) !== meta.groesse;
+    if (!veraltet && await dateiLokal(id)) continue;
     // M329: Große Anhänge holt die Karte beim Öffnen (kontoDateiNachladen) — nicht jeder Abgleich
     if ((meta.groesse ?? 0) > DATEI_SOFORT_BYTES) continue;
     try {
@@ -1023,9 +1024,8 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
     const kartenMeta = new Map<string, { name: string; mime?: string; groesse?: number }>();
     for (const b of payload.boards) {
       for (const n of b.nodes) {
-        if (n.type !== 'file') continue;
-        const d = n.data as { name?: string; mime?: string; size?: number };
-        kartenMeta.set(n.id, { name: d.name ?? 'Datei', mime: d.mime, groesse: d.size });
+        const k = anhangKarte(n);   // M371: auch eigene HTML-Tools
+        if (k) kartenMeta.set(n.id, { name: k.name, mime: k.mime, groesse: k.size });
       }
     }
     for (const [id, d] of Object.entries(payload.dateien ?? {})) {
@@ -1260,6 +1260,17 @@ const TAKT_MS = 10_000;
 export function initKontoSync(): void {
   if (started) return;
   started = true;
+  // M371: Der Quelltext eines Tools wurde ersetzt — die Fassung im Konto gilt nicht mehr als bekannt, der
+  // nächste Abgleich lädt die neue hinauf
+  window.addEventListener('pixinotes:anhang-neu', (e) => {
+    const id = (e as CustomEvent<string>).detail;
+    if (typeof id !== 'string') return;
+    void exklusiv(async () => {
+      const kenn = await kennLesen();
+      if (!kenn.dateien.includes(id)) return;
+      await idbSet(KENN_KEY, { ...kenn, dateien: kenn.dateien.filter((d) => d !== id) });
+    }).then(() => { try { localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll */ } }).catch(() => {});
+  });
   let timer: ReturnType<typeof setTimeout> | undefined;
   // M328: Rückkehr vom E-Mail-Link — die Sitzung hängt an der Adresse
   try {
