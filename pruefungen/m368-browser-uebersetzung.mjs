@@ -109,6 +109,8 @@ const seite = async ({ locale = 'de-DE', sprachen = null, ohneSchutz = false } =
   const ctx = await browser.newContext({ viewport: { width: 1400, height: 1000 }, deviceScaleFactor: 1, locale });
   await ctx.addInitScript(([st, sp, os]) => {
     if (os) window.__pnOhneUebersetzungsschutz = true;
+    // Der Hinweis hält sich in ferngesteuerten Browsern zurück — hier soll er sich zeigen wie bei einem Menschen
+    Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false });
     if (sp) Object.defineProperty(navigator, 'languages', { get: () => sp });
     if (localStorage.getItem('pixinotes-board')) return;
     localStorage.setItem('pixinotes-onboarded', '1');
@@ -254,6 +256,8 @@ for (const [kenn, bauart] of [['B', 'ersetzt'], ['C', 'verpackt']]) {
 console.log('════ E: Gegenversuch ohne Schutz ════');
 {
   const P = await seite({ ohneSchutz: true });
+  // Ohne Schutz kann die ganze Oberfläche wegbrechen — dann nicht bei jedem Schritt eine halbe Minute warten
+  P.setDefaultTimeout(3000);
   await P.evaluate(UEBERSETZER, 'ersetzt');
   await P.waitForTimeout(300);
   const ist = await lauf(P);

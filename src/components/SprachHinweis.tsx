@@ -37,7 +37,8 @@ const merken = () => { try { localStorage.setItem(MERKER, '1'); } catch { /* pri
 
 export function SprachHinweis() {
   const [sprache, setSprache] = useState<string | null>(() => {
-    if (typeof navigator === 'undefined' || gemerkt()) return null;
+    // Ferngesteuerte Browser (Prüfreihen, Vorschau-Dienste) lesen keinen Hinweis — er läge nur im Weg
+    if (typeof navigator === 'undefined' || navigator.webdriver || gemerkt()) return null;
     return hinweisSprache(navigator.languages?.length ? navigator.languages : [navigator.language ?? '']);
   });
   // Wird übersetzt, hat sich der Hinweis erledigt — für immer
