@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Board } from './components/Board';
 import { Dock } from './components/Dock';
@@ -29,7 +29,6 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Onboarding } from './components/Onboarding';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { ShareCardsModal } from './components/ShareCardsModal';
-import { HelpOverlay } from './components/HelpOverlay';
 import { BildExport } from './components/BildExport';
 import { GeteiltDialog } from './components/GeteiltDialog';
 import { LookupPanel } from './components/LookupPanel';
@@ -53,6 +52,19 @@ import { GastNameDialog, LiveLeiste, NAME_FRAGEN } from './components/LiveLeiste
 import { getAuthor } from './components/CommentLayer';
 import { loadKonto } from './lib/kontoSync';
 import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick gespeicherte Seitenstriche (M354-Fehler) einmal richten
+
+/**
+ * M377: Die Hilfe ist der größte Textblock der App (gut 100 KB) und wird selten geöffnet — sie lädt erst, wenn
+ * jemand sie aufruft. So bleibt der eigene App-Teil unter seiner Grenze (m321), obwohl Funktionen dazukommen.
+ * Einmal geladen, bleibt sie da (Suchbegriff und Stelle bleiben beim Schließen erhalten).
+ */
+const HelpOverlayLazy = lazy(() => import('./components/HelpOverlay').then((m) => ({ default: m.HelpOverlay })));
+function Hilfe() {
+  const offen = useBoard((s) => s.helpOpen);
+  const [geladen, setGeladen] = useState(false);
+  useEffect(() => { if (offen) setGeladen(true); }, [offen]);
+  return offen || geladen ? <Suspense fallback={null}><HelpOverlayLazy /></Suspense> : null;
+}
 
 export default function App() {
   const toast = useBoard((s) => s.toast);
@@ -328,7 +340,7 @@ export default function App() {
         )}
         <Onboarding />
         <SearchOverlay />
-      <HelpOverlay />
+      <Hilfe />
       <BildExport />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
       <GeteiltDialog />
