@@ -347,7 +347,8 @@ export default function App() {
         {/* M364: Gruppenarbeit — wer ist gerade im Board */}
         {view === 'board' && !presenting && !focusCard && !tasksOpen && <LiveLeiste />}
         {/* M367: „Folgt mir" — wer vorführt, wer folgt */}
-        {view === 'board' && !presenting && !tasksOpen && <Vorfuehren />}
+        {/* M371: auch während der Präsentation — sie gehört jetzt zur Ansicht, die der Vorführende mitnimmt */}
+        {view === 'board' && !tasksOpen && <Vorfuehren />}
         <GastNameDialog />
         {/* M368: anderssprachigen Nutzern sagen, dass der Browser die Oberfläche übersetzen kann */}
         {!presenting && <SprachHinweis />}

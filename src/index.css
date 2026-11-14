@@ -6845,3 +6845,19 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 }
 .empty-board-hint .empty-beispiele small { font-weight: 400; font-size: 11.5px; color: var(--muted); }
 .empty-board-hint .empty-beispiele:hover, .empty-board-hint .empty-beispiele:focus-visible { background: var(--accent-soft); }
+
+/* M371: Tools und Webseiten als Folie — sie füllen die Folie, ohne Rand, und laufen wirklich */
+.presenter-slide.app { padding: 0; overflow: hidden; display: flex; }
+.slide-app { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #fff; }
+.slide-app-frame { flex: 1; min-height: 0; width: 100%; border: 0; display: block; background: #fff; }
+.slide-app-hinweis { margin: auto; padding: 24px; color: var(--muted); font-size: 16px; text-align: center; }
+.slide-app-fuss { flex: none; padding: 6px 14px; font-size: 12px; line-height: 1.35; color: #5b6472; background: #f1f3f6; border-top: 1px solid #dfe3ea; }
+.presenter-head .presenter-team { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.presenter-head .presenter-team.an { background: var(--accent); color: #fff; }
+/* das Vorführ-Band über der Präsentation: unten links neben der Fußleiste — dort verdeckt es keine Folie;
+   auf schmalen Schirmen ist daneben kein Platz, dann sitzt es mittig über der Fußleiste */
+.zeig-band.im-vortrag { z-index: 97; top: auto; left: 22px; transform: none; bottom: calc(14px + var(--safe-bottom, 0px)); max-width: min(360px, 30vw); }
+@media (max-width: 900px) {
+  .zeig-band.im-vortrag { left: 50%; transform: translateX(-50%); bottom: calc(64px + var(--safe-bottom, 0px)); max-width: 92vw; }
+}
+.presenter-slide.app { margin: 0 2vw 10px; }

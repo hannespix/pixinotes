@@ -20,7 +20,8 @@ import { supabaseKonfig } from './kontoSupabase';
 import { checkKontoRemote, kontoAnfrage, loadKonto, mitGeteiltBereich, stempel } from './kontoSync';
 import { liveKanal, type LiveKanal, type Teilnehmer } from './liveKanal';
 import { istPatch, patchAnwenden, patchAus, type Patch } from './gastPatch';
-import { idbDel, idbGet, idbSet, liveHaken } from './syncFolder';
+import { anhangKarte, idbDel, idbGet, idbSet, liveHaken } from './syncFolder';
+import { anhangGroesse, loadHtml, saveHtml } from './htmlStore';
 import { berichtAlsSatz, dreiWegeMerge, ohneAuswahl } from './syncMerge';
 import type { AppNode } from '../types';
 
@@ -436,16 +437,26 @@ export function nameGeaendert(): void {
 /** Anhänge des Besitzers nachladen, die hier noch fehlen (die Karten zeigen sie, sobald sie liegen) */
 async function dateienHolen(board: BoardDoc, dateien: GastDatei[] | undefined): Promise<void> {
   if (!dateien?.length) return;
-  const gebraucht = new Set(board.nodes.filter((n) => n.type === 'file' && !(n.data as { dataUrl?: string }).dataUrl).map((n) => n.id));
+  // M371: neben den Datei-Karten auch eigene HTML-Tools — ohne ihren Quelltext stünde hier nur eine leere Hülle
+  const gebraucht = new Map<string, boolean>();
+  for (const k of board.nodes) {
+    const a = anhangKarte(k);
+    if (a && !(k.data as { dataUrl?: string }).dataUrl) gebraucht.set(k.id, !!a.tool);
+  }
   let n = 0;
   for (const d of dateien) {
-    if (!gebraucht.has(d.id) || !/^https:\/\//.test(d.url)) continue;
+    const tool = gebraucht.get(d.id);
+    if (tool === undefined || !/^https:\/\//.test(d.url)) continue;
     try {
-      if (await loadFile(d.id)) continue;
+      if (tool) {
+        // liegt der Quelltext schon hier und ist es noch derselbe (gleiche Größe), bleibt er
+        if (await loadHtml(d.id) && (!d.groesse || (await anhangGroesse(d.id)) === d.groesse)) continue;
+      } else if (await loadFile(d.id)) continue;
       const r = await fetch(d.url);
       if (!r.ok) continue;
       const blob = await r.blob();
-      await saveFile(d.id, d.mime && blob.type !== d.mime ? new Blob([blob], { type: d.mime }) : blob);
+      if (tool) await saveHtml(d.id, await blob.text());
+      else await saveFile(d.id, d.mime && blob.type !== d.mime ? new Blob([blob], { type: d.mime }) : blob);
       n += 1;
     } catch { /* eine klemmende Datei hält die anderen nicht auf */ }
   }
@@ -869,13 +880,16 @@ async function anhaengeFreigeben(): Promise<void> {
     if (!l.ohne_konto) continue;   // Gäste mit Konto holen Anhänge nicht über den Link
     const board = useBoard.getState().boards.find((b) => b.id === l.board_id && !b.geteiltVon);
     if (!board) continue;
-    const karten = board.nodes.filter((n) => n.type === 'file' && !n.archived && !(n.data as { dataUrl?: string }).dataUrl);
-    const bekannt = new Set((l.dateien ?? []).map((d) => d.id));
-    if (karten.length === bekannt.size && karten.every((n) => bekannt.has(n.id))) continue;
+    // M371: Datei-Karten und eigene HTML-Tools (deren Quelltext liegt wie ein Anhang im Konto)
+    const karten = board.nodes.filter((n) => !!anhangKarte(n) && !n.archived && !(n.data as { dataUrl?: string }).dataUrl);
+    const kenn = (liste: Array<{ id: string; groesse?: number }>) => JSON.stringify(liste.map((d) => [d.id, d.groesse ?? 0]));
+    const soll = kenn(karten.map((n) => ({ id: n.id, groesse: anhangKarte(n)!.size })));
+    if (soll === kenn(l.dateien ?? [])) continue;
     const dateien: GastDatei[] = [];
     for (const n of karten) {
       const alt = (l.dateien ?? []).find((d) => d.id === n.id);
-      if (alt) { dateien.push(alt); continue; }
+      // dieselbe Adresse, aber ein ersetzter Quelltext hat eine andere Größe — die Gäste holen ihn daran neu
+      if (alt) { dateien.push({ ...alt, groesse: anhangKarte(n)!.size }); continue; }
       try {
         const pfad = `${encodeURIComponent(s.userId)}/${encodeURIComponent(`datei-${n.id}`)}`;
         const sig = await kontoAnfrage(`${s.url ?? ''}/storage/v1/object/sign/pixinotes/${pfad}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 10 * 365 * 24 * 3600 }) });
@@ -883,11 +897,11 @@ async function anhaengeFreigeben(): Promise<void> {
         const j = (await sig.json()) as { signedURL?: string; signedUrl?: string };
         const relativ = j.signedURL ?? j.signedUrl ?? '';
         if (!relativ) continue;
-        const d = n.data as { name?: string; mime?: string; size?: number };
-        dateien.push({ id: n.id, name: d.name ?? 'Datei', mime: d.mime, groesse: d.size, url: /^https?:/.test(relativ) ? relativ : `${s.url ?? ''}/storage/v1${relativ.startsWith('/') ? '' : '/'}${relativ}` });
+        const d = anhangKarte(n)!;
+        dateien.push({ id: n.id, name: d.name, mime: d.mime, groesse: d.size, url: /^https?:/.test(relativ) ? relativ : `${s.url ?? ''}/storage/v1${relativ.startsWith('/') ? '' : '/'}${relativ}` });
       } catch { /* diese Datei beim nächsten Mal */ }
     }
-    if (JSON.stringify(dateien.map((d) => d.id)) === JSON.stringify((l.dateien ?? []).map((d) => d.id))) continue;
+    if (kenn(dateien) === kenn(l.dateien ?? [])) continue;
     try {
       const res = await kontoAnfrage(`${s.url ?? ''}/rest/v1/board_einladungen?token=eq.${encodeURIComponent(l.token)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ dateien }) });
       if (res.ok) l.dateien = dateien;
