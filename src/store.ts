@@ -1199,6 +1199,41 @@ const defaultHierarchy = (boardIds: string[]): Space[] => [
   },
 ];
 
+/**
+ * M370: Der leere Start. Wer PixiNotes zum ersten Mal öffnet, bekommt ein leeres Board — nicht mehr die
+ * Beispiel-Umgebung mit ihren vielen Boards. Die verwirrte vor allem dort, wo jemand über einen geteilten Link kam:
+ * neben dem einen Board, um das es ging, stand eine fremde Welt. Beispiele gibt es weiter, aber auf Wunsch
+ * (Begrüßung, leeres Board, ＋ Neu).
+ */
+export const START_BOARD_NAME = '🏠 Mein Board';
+function leererStart(): { boards: BoardDoc[]; spaces: Space[]; activeId: string } {
+  const boardId = uid();
+  return {
+    boards: [{ id: boardId, name: START_BOARD_NAME, nodes: [], edges: [], drawings: [] }],
+    spaces: [{ id: uid(), name: '🏢 Arbeit', projects: [{ id: uid(), name: 'Allgemein', boardIds: [boardId] }] }],
+    activeId: boardId,
+  };
+}
+/**
+ * Das unberührte Startboard — oder null. „Unberührt" heißt: Es ist das einzige Board, trägt noch seinen Namen
+ * und ist leer. Dann darf es Platz machen, wenn ein Board von außen kommt (geteilter Link, Einladung,
+ * Beispiele): Wer nichts Eigenes hat, soll danach genau das sehen, was er geöffnet hat.
+ */
+export function leeresStartboard(boards: BoardDoc[]): BoardDoc | null {
+  if (boards.length !== 1) return null;
+  const b = boards[0];
+  const leer = b.name === START_BOARD_NAME && !b.nodes.length && !b.edges.length && !(b.drawings?.length) && !(b.comments?.length)
+    && !b.geteiltVon && !b.gastLink;
+  return leer ? b : null;
+}
+/** Boards und Hierarchie ohne das Startboard (Bereich und Projekt bleiben — dort ist Platz für Eigenes) */
+export function ohneStartboard<T extends { boards: BoardDoc[]; spaces: Space[] }>(stand: T, startId: string): { boards: BoardDoc[]; spaces: Space[] } {
+  return {
+    boards: stand.boards.filter((b) => b.id !== startId),
+    spaces: stand.spaces.map((sp) => ({ ...sp, projects: sp.projects.map((pr) => ({ ...pr, boardIds: pr.boardIds.filter((id) => id !== startId) })) })),
+  };
+}
+
 export const useBoard = create<BoardState>()(
   persist(
     (setRoh, get) => {
@@ -1262,15 +1297,15 @@ export const useBoard = create<BoardState>()(
           })),
         }));
 
-      // Erststart: komplette Starter-Umgebung „Verwaltung" (Bereiche → Projekte
-      // → Boards) — erklärt jedes Modul im echten Einsatz. Wird bei vorhandenem
-      // persistierten Stand vollständig überschrieben (rehydrate).
-      const starter = buildStarter();
+      // M370: Erststart mit EINEM leeren Board. (Bis M369 lag hier die Starter-Umgebung „Verwaltung" —
+      // mehrere Bereiche, viele Boards; sie kommt jetzt nur noch auf Wunsch, siehe addStarter.) Wird bei
+      // vorhandenem persistierten Stand vollständig überschrieben (rehydrate).
+      const start = leererStart();
 
       return {
-        boards: starter.boards,
-        spaces: starter.spaces,
-        activeId: starter.firstBoardId,
+        boards: start.boards,
+        spaces: start.spaces,
+        activeId: start.activeId,
         view: 'board',
         searchOpen: false,
         settingsOpen: false,
@@ -1358,15 +1393,17 @@ export const useBoard = create<BoardState>()(
 
         addStarter: () => {
           const fresh = buildStarter();
+          // M370: Steht nur das unberührte Startboard da, ersetzen die Beispiele es samt seinem leeren Bereich
+          const nurStart = !!leeresStartboard(get().boards) && get().spaces.length === 1 && get().spaces[0].projects.length === 1;
           set({
-            boards: [...get().boards, ...fresh.boards],
-            spaces: [...get().spaces, ...fresh.spaces],
+            boards: [...(nurStart ? [] : get().boards), ...fresh.boards],
+            spaces: [...(nurStart ? [] : get().spaces), ...fresh.spaces],
             activeId: fresh.firstBoardId,
             view: 'overview',
             // Voll-Remount: neue Boards mit BlockNote-Inhalten sauber mounten
             importEpoch: get().importEpoch + 1,
           });
-          get().showToast('🧭 Starter-Umgebung hinzugefügt: 3 Bereiche, 14 Boards.');
+          get().showToast(`🧭 Beispiele geladen: ${fresh.spaces.length} Bereiche, ${fresh.boards.length} Boards zum Ausprobieren.`);
         },
 
         // M184: Struktur-Import (OneNote). Bewusst EIN set() statt vieler
@@ -1409,11 +1446,8 @@ export const useBoard = create<BoardState>()(
           // Bewusst KEIN Undo: das ist der „frischer Start"-Schalter.
           // KI-Einstellungen bleiben erhalten (nur Inhalte werden geleert).
           claimWriter(); // bewusste Aktion — auch aus einem Mitlese-Fenster wirksam
-          const boardId = uid();
           set({
-            boards: [{ id: boardId, name: '🏠 Mein Board', nodes: [], edges: [], drawings: [] }],
-            spaces: [{ id: uid(), name: '🏢 Arbeit', projects: [{ id: uid(), name: 'Allgemein', boardIds: [boardId] }] }],
-            activeId: boardId,
+            ...leererStart(),
             view: 'board',
             past: [],
             future: [],
@@ -1422,7 +1456,7 @@ export const useBoard = create<BoardState>()(
             templates: [],
             importEpoch: get().importEpoch + 1,
           });
-          get().showToast('🧹 Alles geleert — frischer Start. Die Starter-Umgebung gibt es jederzeit unter ⚙️ → Daten.');
+          get().showToast('🧹 Alles geleert — frischer Start. Beispiele gibt es jederzeit unter ＋ Neu.');
         },
 
         settingsSection: null,
@@ -1986,13 +2020,17 @@ export const useBoard = create<BoardState>()(
         },
 
         importBoard: (doc) => {
+          // M370: Wer nichts Eigenes hat, sieht danach nur das Board, das er geöffnet hat
+          const start = leeresStartboard(get().boards);
           // leeres Board über addBoard anlegen (kümmert sich um die Hierarchie) …
           const id = get().addBoard(doc.name);
           // … und mit dem geteilten Inhalt füllen
+          const boards = get().boards.map((b) =>
+            b.id === id ? { ...b, nodes: doc.nodes, edges: doc.edges, drawings: doc.drawings } : b,
+          );
           set({
-            boards: get().boards.map((b) =>
-              b.id === id ? { ...b, nodes: doc.nodes, edges: doc.edges, drawings: doc.drawings } : b,
-            ),
+            ...(start ? ohneStartboard({ boards, spaces: get().spaces }, start.id) : { boards }),
+            activeId: id,
             view: 'board',
           });
         },

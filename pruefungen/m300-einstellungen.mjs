@@ -52,6 +52,15 @@ async function seite() {
   P.on('pageerror', (e) => console.log('    PAGEERROR:', e.message));
   await P.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle' });
   await P.waitForTimeout(1500);
+  // M370: Der Start ist leer. Diese Reihe prüft an den Beispielen — also laden (wie früher beim ersten Start
+  // von selbst) und mit offenem Board neu laden.
+  { const bsp = P.locator('[data-taste="leer-beispiele"]');
+    if (await bsp.count()) {
+      await bsp.click(); await P.waitForTimeout(1500);
+      const mitBoard = await P.evaluate(() => { const j = JSON.parse(localStorage.getItem('pixinotes-board')); j.state.view = 'board'; return JSON.stringify(j); });
+      await ctx.addInitScript((j) => { if (sessionStorage.getItem('pn-bsp')) return; sessionStorage.setItem('pn-bsp', '1'); localStorage.setItem('pixinotes-board', j); }, mitBoard);
+      await P.reload({ waitUntil: 'networkidle' }); await P.waitForTimeout(1500);
+    } }
   return { ctx, P };
 }
 const oeffne = async (P) => { await P.locator('[data-taste="einstellungen"]').click(); await P.waitForSelector('.modal-tabs'); };
