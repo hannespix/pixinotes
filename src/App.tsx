@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Board } from './components/Board';
 import { Dock } from './components/Dock';
@@ -29,7 +29,6 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Onboarding } from './components/Onboarding';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { ShareCardsModal } from './components/ShareCardsModal';
-import { HelpOverlay } from './components/HelpOverlay';
 import { BildExport } from './components/BildExport';
 import { GeteiltDialog } from './components/GeteiltDialog';
 import { LookupPanel } from './components/LookupPanel';
@@ -43,12 +42,29 @@ import { linkOeffnen, linkTokenAbholen } from './lib/linkTeilen';
 import { einladungAnnehmen, einladungOffen, einladungTokenAbholen } from './lib/einladung';
 import { initGastSync } from './lib/gastSync';
 import { initVorfuehren } from './lib/vorfuehren';
+import { initMauszeiger } from './lib/mauszeiger';
+import { initGruppenraum } from './lib/gruppenraum';
+import { GruppenraumSchicht } from './components/Gruppenraum';
+import { PunkteLeiste } from './components/Punkte';
 import { Vorfuehren } from './components/Vorfuehren';
 import { SprachHinweis } from './components/SprachHinweis';
 import { GastNameDialog, LiveLeiste, NAME_FRAGEN } from './components/LiveLeiste';
 import { getAuthor } from './components/CommentLayer';
 import { loadKonto } from './lib/kontoSync';
 import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick gespeicherte Seitenstriche (M354-Fehler) einmal richten
+
+/**
+ * M377: Die Hilfe ist der größte Textblock der App (gut 100 KB) und wird selten geöffnet — sie lädt erst, wenn
+ * jemand sie aufruft. So bleibt der eigene App-Teil unter seiner Grenze (m321), obwohl Funktionen dazukommen.
+ * Einmal geladen, bleibt sie da (Suchbegriff und Stelle bleiben beim Schließen erhalten).
+ */
+const HelpOverlayLazy = lazy(() => import('./components/HelpOverlay').then((m) => ({ default: m.HelpOverlay })));
+function Hilfe() {
+  const offen = useBoard((s) => s.helpOpen);
+  const [geladen, setGeladen] = useState(false);
+  useEffect(() => { if (offen) setGeladen(true); }, [offen]);
+  return offen || geladen ? <Suspense fallback={null}><HelpOverlayLazy /></Suspense> : null;
+}
 
 export default function App() {
   const toast = useBoard((s) => s.toast);
@@ -69,7 +85,7 @@ export default function App() {
   const nurLesenBoard = nurLesenId ? { id: nurLesenId, von: nurLesenVon } : null;
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initVorfuehren(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); }, []);
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); }, []);
 
   // Eigene Apps (M158): verwaiste HTML-Inhalte in IndexedDB entsorgen —
   // NUR beim Start (dann kann kein Undo eine gelöschte App-Karte zurückholen,
@@ -324,7 +340,7 @@ export default function App() {
         )}
         <Onboarding />
         <SearchOverlay />
-      <HelpOverlay />
+      <Hilfe />
       <BildExport />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
       <GeteiltDialog />
@@ -349,6 +365,10 @@ export default function App() {
         {/* M367: „Folgt mir" — wer vorführt, wer folgt */}
         {/* M371: auch während der Präsentation — sie gehört jetzt zur Ansicht, die der Vorführende mitnimmt */}
         {view === 'board' && !tasksOpen && <Vorfuehren />}
+        {/* M376: aufsteigende Reaktionen und die gemeinsame Uhr — über Board und Präsentation */}
+        {view === 'board' && !tasksOpen && <GruppenraumSchicht />}
+        {/* M377: Punkte-Modus — Karten antippen statt auswählen */}
+        {view === 'board' && !tasksOpen && !presenting && <PunkteLeiste />}
         <GastNameDialog />
         {/* M368: anderssprachigen Nutzern sagen, dass der Browser die Oberfläche übersetzen kann */}
         {!presenting && <SprachHinweis />}

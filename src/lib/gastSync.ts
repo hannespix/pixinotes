@@ -13,7 +13,7 @@
 // Maße der Karten (`measured`) misst jedes Gerät selbst — ein Telefon anders als ein Laptop. Sie reisen darum
 // nicht als Änderung: Verglichen und geschrieben wird mit den Maßen des letzten gemeinsamen Stands, sonst
 // schickten sich zwei verschiedene Geräte endlos „Änderungen" zu.
-import { flushPersist, isImportedState, leeresStartboard, NOTIZ_EXTERN, ohneLeseschutz, ohneStartboard, runDerived, setzeGruppe, setzeKartenSperren, useBoard, verlaufAbgrenzen, type BoardDoc, type GastRecht, type Space } from '../store';
+import { flushPersist, inDerived, isImportedState, leeresStartboard, NOTIZ_EXTERN, ohneLeseschutz, ohneStartboard, runDerived, setzeGruppe, setzeKartenSperren, useBoard, verlaufAbgrenzen, type BoardDoc, type GastRecht, type Space } from '../store';
 import { getAuthor } from '../components/CommentLayer';
 import { loadFile, saveFile } from './fileStore';
 import { supabaseKonfig } from './kontoSupabase';
@@ -818,8 +818,8 @@ export async function kontoKanaele(): Promise<void> {
 const letzterStand = new Map<string, BoardDoc>();   // boardId → zuletzt geschriebener bzw. gezeigter Stand
 /** Ohne Auswahl und ohne Maße: Die misst jedes Gerät selbst — neu gemessene Karten sind keine Änderung */
 const ohneMass = new WeakMap<object, AppNode>();
-const kontoStand = (boardId: string): BoardDoc | undefined => {
-  const b = useBoard.getState().boards.find((x) => x.id === boardId);
+const kontoStand = (boardId: string): BoardDoc | undefined => kontoStandVon(useBoard.getState().boards.find((x) => x.id === boardId));
+const kontoStandVon = (b: BoardDoc | undefined): BoardDoc | undefined => {
   if (!b) return undefined;
   const c = ohneAuswahl(rein(liveHaken.vor(b)));
   return {
@@ -832,6 +832,60 @@ const kontoStand = (boardId: string): BoardDoc | undefined => {
     }),
   };
 };
+/**
+ * Der Konto-Abgleich hat etwas von außen gebracht: Das gilt als „den anderen bekannt" — aber NUR das. Was hier
+ * gerade selbst geändert und noch nicht geschrieben wurde, steckt im selben Stand; nähme man ihn als Ganzes als
+ * bekannt, ginge die eigene Änderung nach dem Schreiben nie in den Kanal (die Gäste sähen sie erst beim nächsten
+ * Kontrollblick, eine Viertelminute später).
+ *
+ * Was „selbst geändert" heißt, wird mitgeschrieben (eigenOffen): jede Änderung eines Menschen an diesem Gerät
+ * seit dem letzten Schreiben — NICHT, was das Programm von selbst nachzieht (Kartenhöhen der Auto-Größe) oder
+ * was von außen kam. Ein bloßer Vergleich „Stand vorher ≠ zuletzt bekannter" reicht nicht: Er hielte auch das
+ * Nachgezogene für Eigenes und gäbe es als Änderung ohne Nummer in den Kanal — und die bringt bei den Gästen die
+ * Erkennung verlorener Nachrichten durcheinander (m366 E).
+ *   alt = zuletzt bekannter Stand · neu = Stand nach dem Abgleich · offen = Kennungen mit eigener, offener Änderung
+ */
+const eigenOffen = new Map<string, Set<string>>();     // boardId → „n:<Karte>", „e:<Kante>", „d:<Strich>", „c:<Kommentar>"
+const ohneAnsicht = (x: unknown): string => {
+  const { selected: _s, dragging: _d, measured: _m, ...rest } = x as Record<string, unknown>;
+  return JSON.stringify(rest);
+};
+/** Ein Mensch hat hier etwas geändert: merken, was */
+function eigenesMerken(boardId: string, vor: BoardDoc, neu: BoardDoc): void {
+  let offen = eigenOffen.get(boardId);
+  const liste = <T extends { id: string }>(a: T[] | undefined, n: T[] | undefined, art: string): void => {
+    if (a === n) return;
+    const mA = new Map((a ?? []).map((x) => [x.id, x]));
+    for (const x of n ?? []) {
+      const y = mA.get(x.id); mA.delete(x.id);
+      if (y === x || (y && ohneAnsicht(x) === ohneAnsicht(y))) continue;     // nur ausgewählt, gemessen, gezogen: keine Änderung
+      if (!offen) { offen = new Set(); eigenOffen.set(boardId, offen); }
+      offen.add(art + x.id);
+    }
+    for (const id of mA.keys()) { if (!offen) { offen = new Set(); eigenOffen.set(boardId, offen); } offen.add(art + id); }   // gelöscht
+  };
+  liste(vor.nodes, neu.nodes, 'n:'); liste(vor.edges, neu.edges, 'e:'); liste(vor.drawings, neu.drawings, 'd:'); liste(vor.comments, neu.comments, 'c:');
+}
+function fremdesAlsBekannt(alt: BoardDoc, neu: BoardDoc, offen: Set<string> | undefined): BoardDoc {
+  if (!offen?.size) return neu;
+  const liste = <T extends { id: string }>(a: T[] | undefined, n: T[] | undefined, art: string): T[] => {
+    const mA = new Map((a ?? []).map((x) => [x.id, x]));
+    const aus: T[] = []; const gesehen = new Set<string>();
+    for (const x of n ?? []) {
+      gesehen.add(x.id);
+      if (!offen.has(art + x.id)) { aus.push(x); continue; }     // nichts Eigenes offen → der neue Stand ist bekannt
+      const xa = mA.get(x.id);
+      if (xa) aus.push(xa);                                        // Eigenes offen → der zuletzt bekannte bleibt
+      // (hier neu angelegt und noch nicht geschrieben: fehlt weiter)
+    }
+    // hier gelöscht, aber noch nicht geschrieben: bleibt als bekannt stehen, bis das Löschen hinausgeht
+    for (const [id, xa] of mA) if (!gesehen.has(id) && offen.has(art + id)) aus.push(xa);
+    return aus;
+  };
+  return { ...neu, nodes: liste(alt.nodes, neu.nodes, 'n:'), edges: liste(alt.edges, neu.edges, 'e:'),
+    ...(neu.drawings || alt.drawings ? { drawings: liste(alt.drawings, neu.drawings, 'd:') } : {}),
+    ...(neu.comments || alt.comments ? { comments: liste(alt.comments, neu.comments, 'c:') } : {}) };
+}
 let kontoPruefTimer: ReturnType<typeof setTimeout> | undefined;
 /** Das Konto prüfen — gebündelt und gestreut (nicht je Nachricht) */
 function kontoPruefenBald(boardId: string): void {
@@ -1009,7 +1063,19 @@ export function initGastSync(): void {
     // M366: Was der Konto-Abgleich gerade von außen gebracht hat, ist nicht meine Änderung — es geht nicht
     // noch einmal in den Kanal (sonst reichte das Gerät des Besitzers jede Änderung der Gäste an alle weiter)
     if (kontoKanal.size && isImportedState(s.boards, s.spaces)) {
-      for (const id of kontoKanal.keys()) { const jetzt = kontoStand(id); if (jetzt) letzterStand.set(id, jetzt); }
+      for (const id of kontoKanal.keys()) {
+        const jetzt = kontoStand(id);
+        if (!jetzt) continue;
+        // M377: nur das Fremde gilt als bekannt — Eigenes, das noch nicht geschrieben ist, geht danach noch hinaus
+        const alt = letzterStand.get(id);
+        letzterStand.set(id, alt ? fremdesAlsBekannt(alt, jetzt, eigenOffen.get(id)) : jetzt);
+      }
+    } else if (kontoKanal.size && !inDerived() && !liveEinspielung) {
+      // Ein Mensch hat hier etwas geändert (nicht die Auto-Größe, nicht das Mitlesen): bis zum Schreiben merken
+      for (const id of kontoKanal.keys()) {
+        const b = s.boards.find((x) => x.id === id); const a = prev.boards.find((x) => x.id === id);
+        if (b && a && b !== a) eigenesMerken(id, a, b);
+      }
     }
     // Eine mitgeschriebene Karte wurde hier anders ersetzt (Abgleich, eigene Bearbeitung) → ab jetzt gilt das
     for (const [boardId, l] of liveStaende) {
@@ -1058,6 +1124,7 @@ export function initGastSync(): void {
   window.addEventListener('pixinotes:konto-verbunden', () => void kontoKanaele());
   window.addEventListener('pixinotes:konto-geschrieben', () => {
     kontoAenderungenSenden();
+    eigenOffen.clear();       // was offen war, ist jetzt geschrieben und im Kanal
     void anhaengeFreigeben();
   });
 }

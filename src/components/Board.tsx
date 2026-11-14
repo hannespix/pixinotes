@@ -15,6 +15,8 @@ import {
 import { fangAktiv, fangen, fangSetzen, type Kasten } from '../lib/fang';
 import { Fanglinien } from './Fanglinien';
 import { LiveSperren } from './LiveLeiste';
+import { LiveZeiger } from './Mauszeiger';
+import { PunkteMarken } from './Punkte';
 import { useBoardTasten } from './boardTasten';
 import { leeresStartboard, mutedHistory, selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon } from '../lib/pdfSeiten';
@@ -1576,6 +1578,10 @@ export function Board() {
         <ViewportPortal><Fanglinien /></ViewportPortal>
         {/* M364: Karten, die gerade ein anderer bearbeitet — Rahmen mit Namen */}
         <ViewportPortal><LiveSperren /></ViewportPortal>
+        {/* M375: Zeiger der anderen (und der Laser des Vorführenden) — in Board-Koordinaten */}
+        {/* M377: Punkte an den Karten */}
+        <ViewportPortal><PunkteMarken /></ViewportPortal>
+        <ViewportPortal><LiveZeiger /></ViewportPortal>
         <Background
           variant={gridSnap ? BackgroundVariant.Lines : BackgroundVariant.Dots}
           gap={gridSnap ? 20 : 26}

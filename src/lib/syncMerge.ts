@@ -27,6 +27,7 @@
 // geändert hat.
 import type { Edge } from '@xyflow/react';
 import { bubblesMischen, type BubblesData } from './bubbles';
+import { punkteMischen } from './punkte';
 import type { BoardDoc, CommentThread, Project, Space, Stroke } from '../store';
 import type { AppNode } from '../types';
 
@@ -204,20 +205,44 @@ function mergeThread(basis: CommentThread | undefined, lokal: CommentThread, fre
  * (A hat seine Idee schon gesichert, dann überschreibt B mit einer Fassung, die sie nie gesehen hat).
  */
 function bubblesVereinen(nodes: AppNode[], lokal: AppNode[], fremd: AppNode[]): AppNode[] {
-  if (!nodes.some((n) => n.type === 'bubbles')) return nodes;
+  const mitPunkten = (n: AppNode | undefined): boolean => !!(n?.data as { punkte?: unknown } | undefined)?.punkte;
+  if (!nodes.some((n) => n.type === 'bubbles') && !lokal.some(mitPunkten) && !fremd.some(mitPunkten)) return nodes;
+  const mL = new Map(lokal.map((n) => [n.id, n])); const mF = new Map(fremd.map((n) => [n.id, n]));
   let geaendert = false;
-  const aus = nodes.map((n) => {
-    if (n.type !== 'bubbles') return n;
-    const l = lokal.find((x) => x.id === n.id); const f = fremd.find((x) => x.id === n.id);
-    if (!l || !f || l.type !== 'bubbles' || f.type !== 'bubbles') return n;
-    const m = bubblesMischen(l.data as Partial<BubblesData>, f.data as Partial<BubblesData>);
-    const d = n.data as Partial<BubblesData>;
-    if (JSON.stringify([d.ideen, d.stimmen, d.gruppen, d.abstimmung]) === JSON.stringify([m.ideen, m.stimmen, m.gruppen, m.abstimmung])) return n;
-    geaendert = true;
-    return { ...n, data: { ...n.data, ...m } } as AppNode;
+  const aus = nodes.map((n0) => {
+    let n = n0;
+    const l = mL.get(n.id); const f = mF.get(n.id);
+    if (!l || !f) return n;
+    if (n.type === 'bubbles' && l.type === 'bubbles' && f.type === 'bubbles') {
+      const m = bubblesMischen(l.data as Partial<BubblesData>, f.data as Partial<BubblesData>);
+      const d = n.data as Partial<BubblesData>;
+      if (JSON.stringify([d.ideen, d.stimmen, d.gruppen, d.abstimmung]) !== JSON.stringify([m.ideen, m.stimmen, m.gruppen, m.abstimmung])) {
+        geaendert = true;
+        n = { ...n, data: { ...n.data, ...m } } as AppNode;
+      }
+    }
+    // M377: Punkte gehören je einer Person — die Tabellen beider Seiten werden vereinigt, nie gegeneinander entschieden
+    if (mitPunkten(l) || mitPunkten(f)) {
+      const m = punkteMischen((l.data as { punkte?: unknown }).punkte, (f.data as { punkte?: unknown }).punkte);
+      if (JSON.stringify((n.data as { punkte?: unknown }).punkte ?? {}) !== JSON.stringify(m)) {
+        geaendert = true;
+        n = { ...n, data: { ...n.data, punkte: m } } as AppNode;
+      }
+    }
+    return n;
   });
   return geaendert ? aus : nodes;
 }
+/**
+ * M377: die Karte ohne ihre Punkte — für die Frage, ob zwei Fassungen sich sonst unterscheiden. Ohne das, was nur
+ * dem Gerät gehört (Maße, Auswahl, Zug): Die hiesige Fassung trägt es, die vom Server nie — sonst gälte jede Karte
+ * mit einem eigenen Punkt als „doppelt bearbeitet", sobald drüben jemand ihren Text geändert hat.
+ */
+const ohnePunkte = (n: AppNode): string => {
+  const { punkte: _p, ...daten } = n.data as Record<string, unknown>;
+  const { measured: _m, selected: _s, dragging: _d, ...karte } = n as AppNode & { measured?: unknown; selected?: unknown; dragging?: unknown };
+  return str({ ...karte, data: daten }) ?? '';
+};
 
 /** Zwei geänderte Fassungen EINES Boards: Felder dreiwegig, Inhalte je Kennung */
 function mergeBoard(basis: BoardDoc | undefined, lokal: BoardDoc, fremd: BoardDoc, z: Zaehler): BoardDoc {
@@ -226,7 +251,14 @@ function mergeBoard(basis: BoardDoc | undefined, lokal: BoardDoc, fremd: BoardDo
   const feld = <K extends keyof BoardDoc>(k: K): BoardDoc[K] =>
     (basis && str(lokal[k]) === str(basis[k]) ? fremd[k] : lokal[k]);
   const nodes = bubblesVereinen(
-    mergeListe<AppNode>(basis?.nodes, lokal.nodes, fremd.nodes, z, (_b, l, f) => { if (!(l.type === 'bubbles' && f.type === 'bubbles')) z.konflikte += 1; return l; }),
+    mergeListe<AppNode>(basis?.nodes, lokal.nodes, fremd.nodes, z, (b, l, f) => {
+      if (l.type === 'bubbles' && f.type === 'bubbles') return l;
+      // M377: Hat eine Seite nur Punkte vergeben, gilt der Inhalt der anderen — die Punkte werden danach vereinigt
+      const lo = ohnePunkte(l); const fo = ohnePunkte(f);
+      if (lo === fo) return l;
+      if (b) { const bo = ohnePunkte(b); if (bo === lo) return f; if (bo === fo) return l; }
+      z.konflikte += 1; return l;
+    }),
     lokal.nodes, fremd.nodes);
   const da = new Set(nodes.map((n) => n.id));
   const edges = mergeListe<Edge>(basis?.edges, lokal.edges, fremd.edges, z)
