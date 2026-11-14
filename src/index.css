@@ -6827,6 +6827,76 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 }
 .live-zeig:hover, .live-zeig:focus-visible { border-color: var(--accent); }
 .live-zeig.an { background: var(--accent); border-color: var(--accent); }
+/* M376: Reaktionen und gemeinsamer Timer */
+.reakt-wrap, .timer-wrap { position: relative; display: inline-flex; }
+.live-zeig.timer-knopf { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+.live-zeig.timer-knopf.an, .live-zeig.reakt-knopf.an { background: var(--surface); border-color: var(--accent); color: var(--accent); }
+.reakt-wahl, .timer-wahl {
+  position: absolute; top: calc(100% + 8px); right: -6px; z-index: 60; display: flex; align-items: center; gap: 2px;
+  background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--pop-shadow); padding: 4px;
+}
+.reakt-wahl button {
+  width: 34px; height: 34px; border: none; background: none; border-radius: var(--r-sm); cursor: pointer; font-size: 19px; line-height: 1; padding: 0;
+  transition: transform .12s ease, background .12s ease;
+}
+.reakt-wahl button:hover, .reakt-wahl button:focus-visible { background: var(--surface-3); transform: scale(1.18); outline: none; }
+.reakt-wahl button:active { transform: scale(.92); }
+.timer-wahl { flex-wrap: wrap; width: 196px; gap: 4px; padding: 8px; }
+.timer-wahl-titel { flex-basis: 100%; font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: .02em; padding: 0 2px 2px; }
+.timer-wahl button {
+  flex: 1 0 54px; height: 30px; border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink); border-radius: var(--r-sm);
+  cursor: pointer; font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; padding: 0 4px;
+}
+.timer-wahl button:hover, .timer-wahl button:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
+.timer-wahl button.stopp { flex-basis: 100%; color: #c92a2a; }
+.presenter-head .reakt-wahl { right: 0; }
+/* Die laufende Uhr — oben in der Mitte, bei allen */
+.gruppen-timer {
+  position: fixed; top: calc(58px + var(--safe-top) + var(--app-rand)); left: 50%; transform: translateX(-50%); z-index: 96;
+  display: flex; align-items: center; gap: 8px; overflow: hidden;
+  background: var(--surface-card); color: var(--ink); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--pop-shadow);
+  padding: 6px 8px 6px 12px; font-size: 12.5px; white-space: nowrap;
+}
+.gruppen-timer::after {
+  content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--anteil, 0%); background: var(--accent); transition: width .25s linear;
+}
+.gruppen-timer.im-vortrag { top: calc(10px + var(--safe-top)); }
+.gruppen-timer-zeit { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 2.6em; }
+.gruppen-timer-von { color: var(--muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.gruppen-timer button {
+  width: 22px; height: 22px; flex: none; border: none; border-radius: 50%; background: var(--surface-3); color: var(--muted);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+}
+.gruppen-timer button:hover { color: var(--ink); }
+.gruppen-timer.knapp .gruppen-timer-zeit { color: #e8590c; }
+.gruppen-timer.knapp::after { background: #e8590c; }
+.gruppen-timer.um { border-color: #e03131; animation: timer-um 1s ease-in-out infinite; }
+.gruppen-timer.um .gruppen-timer-zeit { color: #e03131; }
+@keyframes timer-um { 0%, 100% { box-shadow: var(--pop-shadow), 0 0 0 0 rgba(224, 49, 49, .5); } 50% { box-shadow: var(--pop-shadow), 0 0 0 8px rgba(224, 49, 49, 0); } }
+/* Reaktionen steigen von unten auf */
+.reakt-schicht { position: fixed; inset: 0; z-index: 97; pointer-events: none; overflow: hidden; }
+.reakt-flug {
+  position: absolute; bottom: 92px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transform: translateX(-50%); animation: reakt-steigen 2.8s cubic-bezier(.2, .7, .3, 1) forwards;
+}
+.reakt-zeichen { font-size: 38px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .25)); }
+.reakt-name {
+  background: var(--farbe, #6b7280); color: #fff; font-size: 10.5px; font-weight: 700; line-height: 1; padding: 3px 6px; border-radius: var(--r-xs);
+  max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@keyframes reakt-steigen {
+  0% { opacity: 0; transform: translate(-50%, 20px) scale(.5); }
+  12% { opacity: 1; transform: translate(-50%, 0) scale(1.15); }
+  22% { transform: translate(-50%, -24px) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--drift, 0px)), -46vh) scale(.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reakt-flug { animation: reakt-ruhig 2.8s linear forwards; }
+  .gruppen-timer.um { animation: none; }
+  @keyframes reakt-ruhig { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
+}
+html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !important; }
 /* M375: Live-Mauszeiger (Board-Koordinaten, im ViewportPortal) und Laserpointer */
 .live-zeig.maus { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
 .live-zeig.maus.an { background: var(--surface); border-color: var(--accent); color: var(--accent); }

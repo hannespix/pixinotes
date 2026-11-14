@@ -13,6 +13,7 @@ import { getAuthor, setAuthor } from './CommentLayer';
 import { ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenStart, vorfuehrenStopp } from '../lib/vorfuehren';
 import { ZEIGER_EREIGNIS, zeigerAn, zeigerSetzen } from '../lib/mauszeiger';
 import { IMousePointer, IX } from './Icons';
+import { ReaktionsKnopf, TimerKnopf } from './Gruppenraum';
 
 export const NAME_FRAGEN = 'pixinotes:gast-name';
 
@@ -83,6 +84,9 @@ export function LiveLeiste() {
           title={ichFuehreVor(boardId) ? 'Vorführen beenden' : 'Vorführen: Alle folgen deiner Ansicht (Schwenken, Zoomen, Fokus)'}
           onClick={() => (ichFuehreVor(boardId) ? vorfuehrenStopp() : vorfuehrenStart(boardId))}>📣</button>
       )}
+      {/* M376: Reagieren und Timer für alle */}
+      {andere.length > 0 && <ReaktionsKnopf boardId={boardId} />}
+      {!nurLesen && <TimerKnopf boardId={boardId} />}
       {/* M375: Mauszeiger der anderen sehen und den eigenen zeigen — je Gerät abschaltbar */}
       {andere.length > 0 && (
         <button className={`live-zeig maus${zeigerAn() ? ' an' : ''}`} data-taste="live-maus" aria-pressed={zeigerAn()}

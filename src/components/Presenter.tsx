@@ -19,6 +19,7 @@ import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNo
 import { HtmlAppSlide } from './nodes/HtmlAppCard';
 import { BubblesBody } from './nodes/BubblesCard';
 import { FolienLaser } from './Mauszeiger';
+import { ReaktionsKnopf } from './Gruppenraum';
 import { folgeIch, folgenSetzen, ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenStart, vorfuehrenStopp, vortragMelden, werFuehrtVor } from '../lib/vorfuehren';
 import { ich, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
 
@@ -367,6 +368,8 @@ export function Presenter() {
             📣 {ichZeige ? 'Team folgt' : 'Team mitnehmen'}
           </button>
         )}
+        {/* M376: Das Publikum reagiert — der Vortragende sieht es aufsteigen */}
+        {teamDa && <ReaktionsKnopf boardId={board.id} klasse="presenter-team" />}
         {slides.length > 0 && (
           <button className={`presenter-team presenter-laser ${laser ? 'an' : ''}`} data-taste="vortrag-laser" aria-pressed={laser}
             title={laser ? 'Laserpointer ausschalten (L)' : 'Laserpointer: ein roter Punkt statt des Mauszeigers (L)'}

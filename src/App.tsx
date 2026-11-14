@@ -44,6 +44,8 @@ import { einladungAnnehmen, einladungOffen, einladungTokenAbholen } from './lib/
 import { initGastSync } from './lib/gastSync';
 import { initVorfuehren } from './lib/vorfuehren';
 import { initMauszeiger } from './lib/mauszeiger';
+import { initGruppenraum } from './lib/gruppenraum';
+import { GruppenraumSchicht } from './components/Gruppenraum';
 import { Vorfuehren } from './components/Vorfuehren';
 import { SprachHinweis } from './components/SprachHinweis';
 import { GastNameDialog, LiveLeiste, NAME_FRAGEN } from './components/LiveLeiste';
@@ -70,7 +72,7 @@ export default function App() {
   const nurLesenBoard = nurLesenId ? { id: nurLesenId, von: nurLesenVon } : null;
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initVorfuehren(); initMauszeiger(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); }, []);
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); }, []);
 
   // Eigene Apps (M158): verwaiste HTML-Inhalte in IndexedDB entsorgen —
   // NUR beim Start (dann kann kein Undo eine gelöschte App-Karte zurückholen,
@@ -350,6 +352,8 @@ export default function App() {
         {/* M367: „Folgt mir" — wer vorführt, wer folgt */}
         {/* M371: auch während der Präsentation — sie gehört jetzt zur Ansicht, die der Vorführende mitnimmt */}
         {view === 'board' && !tasksOpen && <Vorfuehren />}
+        {/* M376: aufsteigende Reaktionen und die gemeinsame Uhr — über Board und Präsentation */}
+        {view === 'board' && !tasksOpen && <GruppenraumSchicht />}
         <GastNameDialog />
         {/* M368: anderssprachigen Nutzern sagen, dass der Browser die Oberfläche übersetzen kann */}
         {!presenting && <SprachHinweis />}
