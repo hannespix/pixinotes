@@ -233,8 +233,16 @@ function bubblesVereinen(nodes: AppNode[], lokal: AppNode[], fremd: AppNode[]): 
   });
   return geaendert ? aus : nodes;
 }
-/** M377: die Karte ohne ihre Punkte — für die Frage, ob zwei Fassungen sich sonst unterscheiden */
-const ohnePunkte = (n: AppNode): string => { const { punkte: _p, ...rest } = n.data as Record<string, unknown>; return str({ ...n, data: rest }) ?? ''; };
+/**
+ * M377: die Karte ohne ihre Punkte — für die Frage, ob zwei Fassungen sich sonst unterscheiden. Ohne das, was nur
+ * dem Gerät gehört (Maße, Auswahl, Zug): Die hiesige Fassung trägt es, die vom Server nie — sonst gälte jede Karte
+ * mit einem eigenen Punkt als „doppelt bearbeitet", sobald drüben jemand ihren Text geändert hat.
+ */
+const ohnePunkte = (n: AppNode): string => {
+  const { punkte: _p, ...daten } = n.data as Record<string, unknown>;
+  const { measured: _m, selected: _s, dragging: _d, ...karte } = n as AppNode & { measured?: unknown; selected?: unknown; dragging?: unknown };
+  return str({ ...karte, data: daten }) ?? '';
+};
 
 /** Zwei geänderte Fassungen EINES Boards: Felder dreiwegig, Inhalte je Kennung */
 function mergeBoard(basis: BoardDoc | undefined, lokal: BoardDoc, fremd: BoardDoc, z: Zaehler): BoardDoc {
