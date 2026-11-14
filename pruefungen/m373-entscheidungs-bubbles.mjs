@@ -826,8 +826,12 @@ await blase(G.P, 'Gerd 8', W).click(); await G.P.waitForTimeout(300);
 await G.P.locator(`${W} [data-taste="bub-loeschen"]`).click();
 await idee(A.P, 'Anna 9', W);   // im selben Zug schreibt Anna weiter
 const ohne8 = [...alle.filter((t) => t !== 'Gerd 8'), 'Anna 9'].sort();
-await warteBis(A.P, async () => JSON.stringify(await texteDer(A.P, W)) === JSON.stringify(ohne8) && JSON.stringify(await texteDer(G.P, W)) === JSON.stringify(ohne8), 20000);
-pruefe('G2 Gerd löscht eine Idee, Anna schreibt zugleich eine neue: beides gilt bei beiden', JSON.stringify(await texteDer(A.P, W)) === JSON.stringify(ohne8) && JSON.stringify(await texteDer(G.P, W)) === JSON.stringify(ohne8), `${JSON.stringify(await texteDer(A.P, W))}`);
+// M377: Das muss über den Live-Kanal gehen, nicht erst über den Kontrollblick (~15 s). Annas Gerät hielt ihre eigene,
+// noch ungeschriebene Idee für „den anderen bekannt", sobald Gerds Löschung hereinkam — sie ging dann nie in den Kanal.
+const tG2 = Date.now();
+await warteBis(A.P, async () => JSON.stringify(await texteDer(A.P, W)) === JSON.stringify(ohne8) && JSON.stringify(await texteDer(G.P, W)) === JSON.stringify(ohne8), 11000);
+console.log(`    beide gleich nach ${Date.now() - tG2} ms`);
+pruefe('G2 Gerd löscht eine Idee, Anna schreibt zugleich eine neue: beides gilt bei beiden — binnen Sekunden', JSON.stringify(await texteDer(A.P, W)) === JSON.stringify(ohne8) && JSON.stringify(await texteDer(G.P, W)) === JSON.stringify(ohne8), `${JSON.stringify(await texteDer(A.P, W))}`);
 await A.P.waitForTimeout(4000);
 pruefe('G3 … und die gelöschte kommt nicht wieder', !(await texteDer(A.P, W)).includes('Gerd 8') && !(await texteDer(G.P, W)).includes('Gerd 8') && !aufServer().includes('Gerd 8'));
 const schreiben0 = sb.aufrufe?.gastAendern ?? 0;

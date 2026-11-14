@@ -818,8 +818,8 @@ export async function kontoKanaele(): Promise<void> {
 const letzterStand = new Map<string, BoardDoc>();   // boardId → zuletzt geschriebener bzw. gezeigter Stand
 /** Ohne Auswahl und ohne Maße: Die misst jedes Gerät selbst — neu gemessene Karten sind keine Änderung */
 const ohneMass = new WeakMap<object, AppNode>();
-const kontoStand = (boardId: string): BoardDoc | undefined => {
-  const b = useBoard.getState().boards.find((x) => x.id === boardId);
+const kontoStand = (boardId: string): BoardDoc | undefined => kontoStandVon(useBoard.getState().boards.find((x) => x.id === boardId));
+const kontoStandVon = (b: BoardDoc | undefined): BoardDoc | undefined => {
   if (!b) return undefined;
   const c = ohneAuswahl(rein(liveHaken.vor(b)));
   return {
@@ -832,6 +832,35 @@ const kontoStand = (boardId: string): BoardDoc | undefined => {
     }),
   };
 };
+/**
+ * Der Konto-Abgleich hat etwas von außen gebracht: Das gilt als „den anderen bekannt" — aber NUR das. Was hier
+ * gerade selbst geändert und noch nicht geschrieben wurde, steckt im selben Stand; nähme man ihn als Ganzes
+ * als bekannt, ginge die eigene Änderung nach dem Schreiben nie in den Kanal (die Gäste sähen sie erst beim
+ * nächsten Kontrollblick, eine Viertelminute später). Darum je Eintrag: War vor dem Abgleich nichts Eigenes
+ * offen (Stand von eben = zuletzt bekannter), gilt der neue als bekannt; sonst bleibt der zuletzt bekannte
+ * stehen, und die Änderung geht mit dem nächsten Schreiben hinaus.
+ *   alt = zuletzt bekannter Stand · vor = Stand unmittelbar vor dem Abgleich · neu = Stand danach
+ */
+function fremdesAlsBekannt(alt: BoardDoc, vor: BoardDoc, neu: BoardDoc): BoardDoc {
+  const liste = <T extends { id: string }>(a: T[] | undefined, v: T[] | undefined, n: T[] | undefined): T[] => {
+    const mA = new Map((a ?? []).map((x) => [x.id, x])); const mV = new Map((v ?? []).map((x) => [x.id, x]));
+    const gleich = (x: T | undefined, y: T | undefined): boolean => x === y || (!!x && !!y && JSON.stringify(x) === JSON.stringify(y));
+    const aus: T[] = []; const gesehen = new Set<string>();
+    for (const x of n ?? []) {
+      gesehen.add(x.id);
+      const xa = mA.get(x.id);
+      if (gleich(xa, mV.get(x.id))) aus.push(x);     // nichts Eigenes offen → der neue Stand ist bekannt
+      else if (xa) aus.push(xa);                      // Eigenes offen → der zuletzt bekannte bleibt
+      // (hier neu angelegt und noch nicht geschrieben: fehlt weiter)
+    }
+    // hier gelöscht, aber noch nicht geschrieben: bleibt als bekannt stehen, bis das Löschen hinausgeht
+    for (const [id, xa] of mA) if (!gesehen.has(id) && !mV.has(id)) aus.push(xa);
+    return aus;
+  };
+  return { ...neu, nodes: liste(alt.nodes, vor.nodes, neu.nodes), edges: liste(alt.edges, vor.edges, neu.edges),
+    ...(neu.drawings || alt.drawings ? { drawings: liste(alt.drawings, vor.drawings, neu.drawings) } : {}),
+    ...(neu.comments || alt.comments ? { comments: liste(alt.comments, vor.comments, neu.comments) } : {}) };
+}
 let kontoPruefTimer: ReturnType<typeof setTimeout> | undefined;
 /** Das Konto prüfen — gebündelt und gestreut (nicht je Nachricht) */
 function kontoPruefenBald(boardId: string): void {
@@ -1009,7 +1038,13 @@ export function initGastSync(): void {
     // M366: Was der Konto-Abgleich gerade von außen gebracht hat, ist nicht meine Änderung — es geht nicht
     // noch einmal in den Kanal (sonst reichte das Gerät des Besitzers jede Änderung der Gäste an alle weiter)
     if (kontoKanal.size && isImportedState(s.boards, s.spaces)) {
-      for (const id of kontoKanal.keys()) { const jetzt = kontoStand(id); if (jetzt) letzterStand.set(id, jetzt); }
+      for (const id of kontoKanal.keys()) {
+        const jetzt = kontoStand(id);
+        if (!jetzt) continue;
+        // M377: nur das Fremde gilt als bekannt — Eigenes, das noch nicht geschrieben ist, geht danach noch hinaus
+        const alt = letzterStand.get(id); const vor = kontoStandVon(prev.boards.find((x) => x.id === id));
+        letzterStand.set(id, alt && vor ? fremdesAlsBekannt(alt, vor, jetzt) : jetzt);
+      }
     }
     // Eine mitgeschriebene Karte wurde hier anders ersetzt (Abgleich, eigene Bearbeitung) → ab jetzt gilt das
     for (const [boardId, l] of liveStaende) {
