@@ -42,6 +42,8 @@ import { initGrabsteine } from './lib/grabsteine';
 import { linkOeffnen, linkTokenAbholen } from './lib/linkTeilen';
 import { einladungAnnehmen, einladungOffen, einladungTokenAbholen } from './lib/einladung';
 import { initGastSync } from './lib/gastSync';
+import { initVorfuehren } from './lib/vorfuehren';
+import { Vorfuehren } from './components/Vorfuehren';
 import { GastNameDialog, LiveLeiste, NAME_FRAGEN } from './components/LiveLeiste';
 import { getAuthor } from './components/CommentLayer';
 import { loadKonto } from './lib/kontoSync';
@@ -66,7 +68,7 @@ export default function App() {
   const nurLesenBoard = nurLesenId ? { id: nurLesenId, von: nurLesenVon } : null;
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); }, []);
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initVorfuehren(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); }, []);
 
   // Eigene Apps (M158): verwaiste HTML-Inhalte in IndexedDB entsorgen —
   // NUR beim Start (dann kann kein Undo eine gelöschte App-Karte zurückholen,
@@ -343,6 +345,8 @@ export default function App() {
         )}
         {/* M364: Gruppenarbeit — wer ist gerade im Board */}
         {view === 'board' && !presenting && !focusCard && !tasksOpen && <LiveLeiste />}
+        {/* M367: „Folgt mir" — wer vorführt, wer folgt */}
+        {view === 'board' && !presenting && !tasksOpen && <Vorfuehren />}
         <GastNameDialog />
         {/* M360: Nur lesend geteiltes Board — sagen, warum nichts geht, und den Ausweg anbieten */}
         {nurLesenBoard && view === 'board' && !presenting && !focusCard && (

@@ -6,10 +6,11 @@
 //   · GastNameDialog – „Wie heißt du?" beim Einwählen ohne Konto
 import { useEffect, useState, type CSSProperties } from 'react';
 import { useInternalNode } from '@xyflow/react';
-import { GRUPPE_EREIGNIS, gruppeVon, useBoard } from '../store';
+import { GRUPPE_EREIGNIS, gruppeVon, useBoard, useNurLesen } from '../store';
 import { ich, liveAuf, liveVerbunden, nameGeaendert, SPERREN_EREIGNIS, sperrenVon, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
 import type { Teilnehmer } from '../lib/liveKanal';
 import { getAuthor, setAuthor } from './CommentLayer';
+import { ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenStart, vorfuehrenStopp } from '../lib/vorfuehren';
 import { IX } from './Icons';
 
 export const NAME_FRAGEN = 'pixinotes:gast-name';
@@ -37,8 +38,10 @@ export function LiveLeiste() {
   const boardId = useBoard((s) => s.activeId);
   useTakt(TEILNEHMER_EREIGNIS);
   useTakt(GRUPPE_EREIGNIS);
+  useTakt(VORFUEHR_EREIGNIS);
   // M366: Bei vielen Teilnehmern zeigt die Leiste wenige Kürzel und die Zahl; die ganze Liste klappt auf
   const [offen, setOffen] = useState(false);
+  const nurLesen = useNurLesen();   // wer nur liest, führt nicht vor
   useEffect(() => {
     if (!offen) return;
     const zu = (e: Event) => { if (!(e.target as HTMLElement | null)?.closest?.('.live-leiste')) setOffen(false); };
@@ -72,6 +75,12 @@ export function LiveLeiste() {
         {rest > 0 && <span className="live-chip mehr" data-taste="live-rest">+{rest}</span>}
         <span className="live-zahl" data-taste="live-zahl">{!verbunden ? 'verbindet …' : andere.length === 0 ? 'nur du' : `${andere.length + 1} dabei`}</span>
       </button>
+      {/* M367: Vorführen — alle folgen meiner Ansicht */}
+      {andere.length > 0 && !nurLesen && (
+        <button className={`live-zeig${ichFuehreVor(boardId) ? ' an' : ''}`} data-taste="vorfuehren" aria-pressed={ichFuehreVor(boardId)}
+          title={ichFuehreVor(boardId) ? 'Vorführen beenden' : 'Vorführen: Alle folgen deiner Ansicht (Schwenken, Zoomen, Fokus)'}
+          onClick={() => (ichFuehreVor(boardId) ? vorfuehrenStopp() : vorfuehrenStart(boardId))}>📣</button>
+      )}
       {recht && (
         <span className="live-recht" data-taste="live-recht"
           title={recht === 'eigenes' ? 'Du kannst hier nur deine eigenen Karten ändern und löschen — neue anlegen geht immer.' : 'Du kannst hier alles bearbeiten, aber nur löschen, was du selbst angelegt hast.'}>
