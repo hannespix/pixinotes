@@ -54,7 +54,7 @@ export async function einladungSetzen(boardId: string, rolle: FreigabeRolle, ohn
   if (!res.ok) throw new Error(`Einladungslink nicht gespeichert (HTTP ${res.status}).`);
   const z = (await res.json()) as Einladung[];
   void kontoKanaele();   // M364: Live-Kanal dieses Boards öffnen
-  if (gastRecht !== undefined) optionenGeaendert(boardId);   // M365: Die Gäste fragen ihre Rechte neu ab
+  optionenGeaendert(boardId);   // M365/M366: Rolle, Rechte, „ohne Konto" — die Gäste fragen sofort neu nach
   return z[0];
 }
 
@@ -64,6 +64,7 @@ export async function einladungLoeschen(boardId: string): Promise<void> {
   if (s?.anbieter !== 'supabase') return;
   const res = await kontoAnfrage(`${rest()}/board_einladungen?board_id=eq.${encodeURIComponent(boardId)}&besitzer=eq.${encodeURIComponent(s.userId ?? '')}`, { method: 'DELETE' });
   if (!res.ok && res.status !== 404) throw new Error(`Einladungslink nicht gelöscht (HTTP ${res.status}).`);
+  optionenGeaendert(boardId);   // M366: Gäste per Link erfahren sofort, dass der Link nicht mehr gilt
   void kontoKanaele();
 }
 
