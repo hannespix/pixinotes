@@ -14,6 +14,7 @@ import {
 } from '@xyflow/react';
 import { fangAktiv, fangen, fangSetzen, type Kasten } from '../lib/fang';
 import { Fanglinien } from './Fanglinien';
+import { LiveSperren } from './LiveLeiste';
 import { useBoardTasten } from './boardTasten';
 import { mutedHistory, selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon } from '../lib/pdfSeiten';
@@ -1550,6 +1551,8 @@ export function Board() {
         proOptions={{ hideAttribution: false }}
       >
         <ViewportPortal><Fanglinien /></ViewportPortal>
+        {/* M364: Karten, die gerade ein anderer bearbeitet — Rahmen mit Namen */}
+        <ViewportPortal><LiveSperren /></ViewportPortal>
         <Background
           variant={gridSnap ? BackgroundVariant.Lines : BackgroundVariant.Dots}
           gap={gridSnap ? 20 : 26}

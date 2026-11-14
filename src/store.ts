@@ -66,6 +66,10 @@ export interface BoardDoc {
   /** M360: Der Besitzer hat das Board nur zum Lesen freigegeben — die Oberfläche ändert es nicht,
    *  nur der Abgleich bringt neue Stände (lib/kontoSync.ts) */
   geteiltRolle?: 'lesen';
+  /** M364: Per Einladungslink OHNE Konto eingewählt — das Token; den Abgleich macht lib/gastSync.ts */
+  gastLink?: string;
+  /** M364: Eigene Kopie aus einer beendeten Einwahl per Link — wählt man sich wieder ein, bleibt sie daneben stehen */
+  gastWar?: boolean;
   /** Kommentar-Threads (M148) — leben IM Board und wandern so automatisch
    *  im globalen Sync UND im Team-Projekt-Paket mit */
   comments?: CommentThread[];
@@ -601,13 +605,73 @@ function nurAnsicht(alt: BoardDoc, neu: BoardDoc): { board: BoardDoc; verworfen:
   const edges = ansicht(alt.edges, neu.edges);
   return { board: nodes === alt.nodes && edges === alt.edges ? alt : { ...alt, nodes, edges }, verworfen };
 }
-/** Die Board-Liste eines set(): nur lesend geteilte Boards behalten ihren Inhalt */
+// ---------- M364: Karten-Sperre in der Gruppenarbeit ----------
+// Wer eine Karte gerade bearbeitet (hineintippt, sie zieht), hat sie: Die anderen sehen ihren Stand live, ändern
+// sie aber nicht — so überschreibt niemand, was ein anderer gerade schreibt. Wer was hält, kommt aus dem
+// Live-Kanal (lib/gastSync.ts); hier wird nur durchgesetzt, wieder an der einen Stelle, am set() des Speichers.
+const kartenSperren = new Map<string, Map<string, string>>();   // Board → Karte → Name dessen, der sie hält
+export function setzeKartenSperren(boardId: string, sperren: Map<string, string>): void {
+  if (sperren.size) kartenSperren.set(boardId, sperren); else kartenSperren.delete(boardId);
+}
+export const karteGesperrtVon = (boardId: string, nodeId: string): string | undefined => kartenSperren.get(boardId)?.get(nodeId);
+let sperrHinweisAm = 0;
+function sperrHinweis(name: string): void {
+  const jetzt = performance.now();
+  if (jetzt - letzteEingabe > 1500 || jetzt - sperrHinweisAm < 4000) return;
+  sperrHinweisAm = jetzt;
+  queueMicrotask(() => useBoard.getState().showToast(`✋ ${name} bearbeitet diese Karte gerade — gleich wieder frei.`, false, 4000));
+}
+/** Gesperrte Karten behalten Inhalt und Lage (auch gegen Löschen); alles andere geht durch */
+function sperrschutz(alt: BoardDoc, neu: BoardDoc, sperren: Map<string, string>): BoardDoc {
+  const nach = new Map(neu.nodes.map((n) => [n.id, n]));
+  let wer = '';
+  let anders = false;
+  const fehlend: AppNode[] = [];
+  const zurueck = new Map<string, AppNode>();
+  for (const n of alt.nodes) {
+    const name = sperren.get(n.id);
+    if (!name) continue;
+    const m = nach.get(n.id);
+    if (!m) { fehlend.push(n); wer = name; anders = true; continue; }
+    if (m !== n && inhaltAnders(n, m)) {
+      // Auswahl und Maße dürfen sich ändern — Inhalt und Lage nicht
+      const a = n as Record<string, unknown>; const b = m as Record<string, unknown>;
+      const kopie: Record<string, unknown> = { ...a };
+      for (const k of ANSICHT_FELDER) { if (b[k] === undefined) delete kopie[k]; else kopie[k] = b[k]; }
+      zurueck.set(n.id, kopie as AppNode); wer = name; anders = true;
+    }
+  }
+  if (!anders) return neu;
+  sperrHinweis(wer);
+  if (fehlend.length === 0) return { ...neu, nodes: neu.nodes.map((n) => zurueck.get(n.id) ?? n) };
+  // Eine gesperrte Karte sollte gelöscht werden: Sie bleibt an ihrem Platz in der Reihe, mit ihren Verbindungen
+  const bleibt = new Set(fehlend.map((n) => n.id));
+  const nodes: AppNode[] = [];
+  const drin = new Set<string>();
+  for (const n of alt.nodes) {
+    const m = bleibt.has(n.id) ? n : zurueck.get(n.id) ?? nach.get(n.id);
+    if (m) { nodes.push(m); drin.add(n.id); }
+  }
+  for (const n of neu.nodes) if (!drin.has(n.id)) nodes.push(n);
+  const kanten = new Set(neu.edges.map((e) => e.id));
+  const edges = [...neu.edges, ...alt.edges.filter((e) => !kanten.has(e.id) && (bleibt.has(e.source) || bleibt.has(e.target)) && drin.has(e.source) && drin.has(e.target))];
+  return { ...neu, nodes, edges: edges.length === neu.edges.length ? neu.edges : edges };
+}
+
+/** Die Board-Liste eines set(): nur lesend geteilte Boards behalten ihren Inhalt, gesperrte Karten ihren Stand */
 function leseschutz(alt: BoardDoc[], neu: BoardDoc[]): BoardDoc[] {
   const vorher = new Map(alt.map((b) => [b.id, b]));
   let geschuetzt = false; let verworfen = false;
   const aus = neu.map((b) => {
     const a = vorher.get(b.id);
-    if (!a || a === b || a.geteiltRolle !== 'lesen') return b;
+    if (!a || a === b) return b;
+    if (a.geteiltRolle !== 'lesen') {
+      const sperren = kartenSperren.get(b.id);
+      if (!sperren) return b;
+      const s = sperrschutz(a, b, sperren);
+      if (s !== b) geschuetzt = true;
+      return s;
+    }
     const r = nurAnsicht(a, b);
     geschuetzt = true;
     if (r.verworfen) verworfen = true;
@@ -654,6 +718,13 @@ function notesDiffer(a: AppNode[], b: AppNode[]): boolean {
     return prev !== undefined && prev !== n.data.blocks;
   });
 }
+/** M364: Kennungen der Notizen, deren Inhalt sich zwischen zwei Ständen geändert hat (Referenzvergleich) */
+function geaenderteNotizen(a: AppNode[], b: AppNode[]): string[] {
+  const blocksById = new Map(a.filter((n) => n.type === 'note').map((n) => [n.id, n.data.blocks]));
+  return b.filter((n) => n.type === 'note' && blocksById.has(n.id) && blocksById.get(n.id) !== n.data.blocks).map((n) => n.id);
+}
+/** M364: „Diese Notizen wurden von außen geändert" — `detail`: Kennungen. Der Editor der Karte übernimmt den Stand. */
+export const NOTIZ_EXTERN = 'pixinotes:notiz-extern';
 /** Radier-Geste: erster Treffer erzeugt den History-Eintrag, Rest der Geste nicht */
 let eraseSnapPending = false;
 
@@ -868,7 +939,7 @@ export const useBoard = create<BoardState>()(
       const set: typeof setRoh = ((teil: unknown, ersetzen?: boolean) => {
         if (leseschutzAus > 0) return (setRoh as (t: unknown, e?: boolean) => void)(teil, ersetzen);
         const vor = get();
-        if (!vor.boards.some((b) => b.geteiltRolle === 'lesen')) return (setRoh as (t: unknown, e?: boolean) => void)(teil, ersetzen);
+        if (kartenSperren.size === 0 && !vor.boards.some((b) => b.geteiltRolle === 'lesen')) return (setRoh as (t: unknown, e?: boolean) => void)(teil, ersetzen);
         let neu = (typeof teil === 'function' ? (teil as (s: BoardState) => Partial<BoardState>)(vor) : teil) as Partial<BoardState>;
         if (neu.boards && neu.boards !== vor.boards) neu = { ...neu, boards: leseschutz(vor.boards, neu.boards) };
         return (setRoh as (t: unknown, e?: boolean) => void)(neu, ersetzen);
@@ -1426,7 +1497,12 @@ export const useBoard = create<BoardState>()(
             const aktiv = boards.some((b) => b.id === s.activeId) ? s.activeId : boards[0].id;
             const alt = s.boards.find((b) => b.id === aktiv);
             const neu = boards.find((b) => b.id === aktiv);
-            const remount = betroffen.has(aktiv) && (!alt || !neu || notesDiffer(alt.nodes, neu.nodes));
+            /* M364: Geänderte Notizen frischen ihren Editor an Ort und Stelle auf (NoteCard hört auf das Ereignis) —
+               vorher wurde dafür das ganze Board neu aufgebaut: Wer gerade in einer ANDEREN Karte schrieb, verlor
+               Cursor und Rollstand, sobald irgendwo eine Notiz von außen geändert wurde. In der Gruppenarbeit
+               geschieht das im Sekundentakt. Neu aufgebaut wird nur noch, wenn das offene Board selbst wechselt. */
+            const remount = betroffen.has(aktiv) && (!alt || !neu);
+            const notizen = !remount && alt && neu && betroffen.has(aktiv) ? geaenderteNotizen(alt.nodes, neu.nodes) : [];
             set({
               boards,
               spaces,
@@ -1435,6 +1511,7 @@ export const useBoard = create<BoardState>()(
               future: s.future.filter(frei),
               importEpoch: remount ? s.importEpoch + 1 : s.importEpoch,
             });
+            if (notizen.length) window.dispatchEvent(new CustomEvent(NOTIZ_EXTERN, { detail: notizen }));
             return;
           }
           set({
@@ -1715,7 +1792,7 @@ export const useBoard = create<BoardState>()(
             anchor: d.anchor ? karte.get(d.anchor) : undefined,
           }));
           // M360: Die Kopie eines geteilten Boards gehört mir — ohne Besitzer-Kennung und ohne Leseschutz
-          const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, ...eigen } = quelle;
+          const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, gastLink: _l, ...eigen } = quelle;
           const kopie = {
             ...eigen, id: neueId(), name: `${quelle.name} (Kopie)`,
             nodes, edges, drawings, comments: [],
@@ -1754,7 +1831,7 @@ export const useBoard = create<BoardState>()(
             const quelle = st.boards.find((b) => b.id === bid);
             if (!quelle) continue;
             const karte = new Map(quelle.nodes.map((n) => [n.id, neueId()]));
-            const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, ...eigen } = quelle; // M360: Kopien gehören mir
+            const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, gastLink: _l, ...eigen } = quelle; // M360: Kopien gehören mir
             const kopie: BoardDoc = {
               ...eigen, id: neueId(), name: quelle.name,
               nodes: quelle.nodes.map((n) => ({ ...JSON.parse(JSON.stringify(n)), id: karte.get(n.id) as string, selected: false })),

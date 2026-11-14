@@ -41,6 +41,9 @@ import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
 import { initGrabsteine } from './lib/grabsteine';
 import { linkOeffnen, linkTokenAbholen } from './lib/linkTeilen';
 import { einladungAnnehmen, einladungOffen, einladungTokenAbholen } from './lib/einladung';
+import { initGastSync } from './lib/gastSync';
+import { GastNameDialog, LiveLeiste, NAME_FRAGEN } from './components/LiveLeiste';
+import { getAuthor } from './components/CommentLayer';
 import { loadKonto } from './lib/kontoSync';
 import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick gespeicherte Seitenstriche (M354-Fehler) einmal richten
 
@@ -63,7 +66,7 @@ export default function App() {
   const nurLesenBoard = nurLesenId ? { id: nurLesenId, von: nurLesenVon } : null;
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); }, []);
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); }, []);
 
   // Eigene Apps (M158): verwaiste HTML-Inhalte in IndexedDB entsorgen —
   // NUR beim Start (dann kann kein Undo eine gelöschte App-Karte zurückholen,
@@ -170,6 +173,12 @@ export default function App() {
           st.setSettingsOpen(true, 'konto');
         } else if (r.art === 'eigen') {
           st.showToast('Das ist der Einladungslink zu deinem eigenen Board — gib ihn an die anderen weiter.', false, 7000);
+        } else if (r.art === 'gast') {
+          // M364: ohne Konto dabei — einmal nach dem Namen fragen, damit die anderen sehen, wer schreibt
+          st.showToast(r.rolle === 'lesen'
+            ? '👥 Gemeinsames Board geöffnet — du liest live mit (nur lesen).'
+            : '👥 Du bist dabei — alle arbeiten live im selben Board. Eine Karte gehört dem, der sie gerade bearbeitet.', false, 9000);
+          if (!getAuthor().trim()) window.dispatchEvent(new CustomEvent(NAME_FRAGEN));
         } else {
           const von = r.von ? ` von ${r.von}` : '';
           st.showToast(r.rolle === 'lesen'
@@ -332,6 +341,9 @@ export default function App() {
             <button className="link-btn" onClick={() => useBoard.getState().setHelpOpen(true, 'datenschutz')}>Datenschutz</button>
           </div>
         )}
+        {/* M364: Gruppenarbeit — wer ist gerade im Board */}
+        {view === 'board' && !presenting && !focusCard && !tasksOpen && <LiveLeiste />}
+        <GastNameDialog />
         {/* M360: Nur lesend geteiltes Board — sagen, warum nichts geht, und den Ausweg anbieten */}
         {nurLesenBoard && view === 'board' && !presenting && !focusCard && (
           <div className="lese-band" role="status" data-taste="lese-band">

@@ -4,7 +4,7 @@ import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe } from '@blocknote/core/locales';
-import { useBoard, useNurLesen } from '../../store';
+import { NOTIZ_EXTERN, selectActiveBoard, useBoard, useNurLesen } from '../../store';
 import { STICKY_COLORS, type NoteNode } from '../../types';
 import { blocksToText } from '../../lib/serialize';
 import { indexZuAdresse } from '../../lib/formel';
@@ -234,6 +234,22 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extEpoch]);
 
+  // M364: Der Inhalt wurde von außen geändert (Abgleich, Mitschreiben eines anderen in der Gruppenarbeit) — der
+  // lebende Editor übernimmt ihn an Ort und Stelle. Währenddessen schreibt onChange nichts zurück.
+  const externRef = useRef(false);
+  useEffect(() => {
+    const auf = (e: Event) => {
+      if (!(e as CustomEvent<string[]>).detail?.includes(id)) return;
+      const blocks = selectActiveBoard(useBoard.getState()).nodes.find((n) => n.id === id)?.data.blocks as PartialBlock[] | undefined;
+      externRef.current = true;
+      try { editor.replaceBlocks(editor.document, (blocks?.length ? blocks : [{ type: 'paragraph' }]) as never); }
+      catch { useBoard.setState((s) => ({ importEpoch: s.importEpoch + 1 })); }   // Editor im Umbau: sicherer Weg, Board neu aufbauen
+      finally { setTimeout(() => { externRef.current = false; }, 60); }
+    };
+    window.addEventListener(NOTIZ_EXTERN, auf);
+    return () => window.removeEventListener(NOTIZ_EXTERN, auf);
+  }, [id, editor]);
+
   // Frische, leere Notiz: sofort den Cursor reinsetzen — lostippen ohne Extra-Klick
   useEffect(() => {
     if (!initialContent) {
@@ -429,7 +445,7 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
           sideMenu={false}
           formattingToolbar={false}
           slashMenu={false}   /* M283: eigenes Einfügen-Menü (NoteSlashMenu) */
-          onChange={() => { updateNodeData(id, { blocks: editor.document }); trackTable(); }}
+          onChange={() => { if (!externRef.current) updateNodeData(id, { blocks: editor.document }); trackTable(); }}
           onSelectionChange={trackTable}
         >
           {/* M201: Standard-Leiste + A₋/A₊/A₊₊/Aa für den markierten Text */}

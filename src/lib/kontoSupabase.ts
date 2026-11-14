@@ -196,7 +196,8 @@ export function sbRealtime(k: SupabaseKonfig, token: string, userId: string, onC
       ];
       senden('phx_join', { config: { broadcast: { self: false }, presence: { key: '' }, postgres_changes: aenderungen }, access_token: jwt });
       clearInterval(herz);
-      herz = setInterval(() => senden('heartbeat', {}, 'phoenix'), 30_000);
+      // M364: spätestens alle 25 s (Supabase trennt sonst) — vorher 30 s, der Kanal riss regelmäßig ab
+      herz = setInterval(() => senden('heartbeat', {}, 'phoenix'), 20_000);
     };
     ws.onmessage = (m) => {
       try {

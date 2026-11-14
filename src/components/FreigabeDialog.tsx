@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { useBoard } from '../store';
 import { freigabeAnlegen, freigabeEntfernen, freigabenDesBoards, freigabeRolleSetzen, freigabeVerlassen, loadKonto, type Freigabe, type FreigabeRolle } from '../lib/kontoSync';
 import { einladungDesBoards, einladungLoeschen, EinladungNichtEingerichtet, einladungSetzen, einladungUrl, type Einladung } from '../lib/einladung';
+import { gastVerlassen, kontoKanaele } from '../lib/gastSync';
 import { IX } from './Icons';
 
 /** M360: Rolle wählen — überall dieselben zwei Wörter */
@@ -31,10 +32,13 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
   const [rolle, setRolle] = useState<FreigabeRolle>('bearbeiten');
   const [link, setLink] = useState<Einladung | null | undefined | 'fehlt'>(undefined);
   const [linkRolle, setLinkRolle] = useState<FreigabeRolle>('bearbeiten');
+  // M364: Der Link lässt auch Leute ohne Konto mitarbeiten
+  const [ohneKonto, setOhneKonto] = useState(false);
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState('');
   const eigenesKonto = loadKonto();
   const gast = !!board?.geteiltVon;
+  const perLink = !!board?.gastLink;   // M364: ohne Konto per Link eingewählt
   const nurLesen = board?.geteiltRolle === 'lesen';
   const mailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail.trim());
 
@@ -44,7 +48,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
   useEffect(() => {
     if (!gast) {
       void laden();
-      einladungDesBoards(boardId).then((e) => { setLink(e); if (e) setLinkRolle(e.rolle === 'lesen' ? 'lesen' : 'bearbeiten'); })
+      einladungDesBoards(boardId).then((e) => { setLink(e); if (e) { setLinkRolle(e.rolle === 'lesen' ? 'lesen' : 'bearbeiten'); setOhneKonto(!!e.ohne_konto); } })
         .catch((e) => setLink(e instanceof EinladungNichtEingerichtet ? 'fehlt' : null));
     }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -62,6 +66,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
       await freigabeAnlegen(boardId, mail.trim(), rolle);
       setMail('');
       await laden();
+      void kontoKanaele();   // M364: Live-Kanal für dieses Board
       showToast(`✅ „${board.name}" ist für ${mail.trim()} ${rolle === 'lesen' ? 'zum Lesen ' : ''}freigegeben — sobald sich die Person mit dieser E-Mail anmeldet, sieht sie das Board.`, false, 8000);
     } catch (e) { setFehler((e as Error).message); } finally { setBusy(false); }
   };
@@ -84,15 +89,26 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
     if (busy) return;
     setBusy(true); setFehler('');
     try {
-      const e = await einladungSetzen(boardId, r);
+      const e = await einladungSetzen(boardId, r, neu ? ohneKonto : undefined);
       setLink(e); setLinkRolle(r);
       if (neu) await kopieren(einladungUrl(e.token));
       else showToast(`Wer dem Link ab jetzt folgt, ${r === 'lesen' ? 'darf nur lesen' : 'darf bearbeiten'}.`);
     } catch (e) { if (e instanceof EinladungNichtEingerichtet) setLink('fehlt'); else setFehler((e as Error).message); } finally { setBusy(false); }
   };
+  // M364: „Auch ohne Konto" an- oder abschalten — wirkt sofort, der Link bleibt derselbe
+  const ohneKontoSetzen = async (an: boolean) => {
+    if (!link || link === 'fehlt') { setOhneKonto(an); return; }
+    if (busy) return;
+    setBusy(true); setFehler('');
+    try {
+      const e = await einladungSetzen(boardId, linkRolle, an);
+      setLink(e); setOhneKonto(!!e.ohne_konto);
+      showToast(an ? 'Wer den Link öffnet, ist jetzt sofort dabei — auch ohne Konto.' : 'Der Link verlangt jetzt wieder ein PixiNotes-Konto. Gäste ohne Konto sind draußen.', false, 7000);
+    } catch (e) { setFehler((e as Error).message); } finally { setBusy(false); }
+  };
   const linkWeg = async () => {
     if (busy) return;
-    if (!window.confirm('Den Einladungslink widerrufen? Er funktioniert danach nicht mehr. Wer schon beigetreten ist, bleibt in der Liste und lässt sich dort entfernen.')) return;
+    if (!window.confirm('Den Einladungslink widerrufen? Er funktioniert danach nicht mehr. Wer mit Konto beigetreten ist, bleibt in der Liste und lässt sich dort entfernen; Gäste ohne Konto sind sofort draußen.')) return;
     setBusy(true); setFehler('');
     try { await einladungLoeschen(boardId); setLink(null); showToast('Einladungslink widerrufen.'); } catch (e) { setFehler((e as Error).message); } finally { setBusy(false); }
   };
@@ -101,7 +117,8 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
   };
   const verlassen = async () => {
     if (busy) return;
-    if (!window.confirm(`Die Freigabe von „${board.name}" verlassen? Das Board bleibt als eigene Kopie hier, Änderungen des Besitzers kommen nicht mehr an.`)) return;
+    if (!window.confirm(`${perLink ? 'Das gemeinsame Board' : 'Die Freigabe von'} „${board.name}" verlassen? Das Board bleibt als eigene Kopie hier, Änderungen der anderen kommen nicht mehr an.`)) return;
+    if (perLink) { gastVerlassen(boardId); showToast('Verlassen — das Board ist jetzt eine eigene Kopie.'); onClose(); return; }
     setBusy(true); setFehler('');
     try { await freigabeVerlassen(boardId); showToast('Freigabe verlassen — das Board ist jetzt eine eigene Kopie.'); onClose(); } catch (e) { setFehler((e as Error).message); } finally { setBusy(false); }
   };
@@ -117,20 +134,25 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
           <section className="modal-section">
             {gast ? (
               <>
-                {nurLesen ? (
+                {perLink ? (
+                  <p className="modal-hint" data-taste="freigabe-per-link">Du bist per <b>Einladungslink</b> in „{board.name}" — ohne Konto. {nurLesen
+                    ? <>Du liest live mit, kannst aber nichts ändern.</>
+                    : <>Alle arbeiten live im selben Board. Eine Karte gehört dem, der sie gerade bearbeitet — die anderen lesen mit und kommen dran, sobald sie frei ist.</>} Deinen Namen änderst du oben rechts am ersten Kürzel.</p>
+                ) : nurLesen ? (
                   <p className="modal-hint" data-taste="freigabe-nur-lesen">„{board.name}" gehört <b>{board.geteiltVonName ?? 'einem anderen Konto'}</b> und ist für dich <b>zum Lesen</b> freigegeben. Du siehst Änderungen live, kannst aber selbst nichts ändern. Für eigene Notizen: Board-Menü → <b>Duplizieren</b> — die Kopie gehört dir.</p>
                 ) : (
                   <p className="modal-hint">„{board.name}" gehört <b>{board.geteiltVonName ?? 'einem anderen Konto'}</b> und ist für dich freigegeben. Ihr arbeitet live auf demselben Stand; gleichzeitige Änderungen werden zusammengeführt.</p>
                 )}
                 <div className="modal-buttons">
-                  <button disabled={busy} onClick={verlassen} data-taste="freigabe-verlassen">{busy ? '…' : 'Freigabe verlassen'}</button>
+                  <button disabled={busy} onClick={verlassen} data-taste="freigabe-verlassen">{busy ? '…' : perLink ? 'Board verlassen' : 'Freigabe verlassen'}</button>
                 </div>
               </>
             ) : (
               <>
                 <p className="modal-hint">
-                  Gemeinsam an „{board.name}" arbeiten: Alle sehen Änderungen live. Wer mitmacht, braucht ein PixiNotes-Konto
-                  (⚙ → Daten → Konto) und findet das Board dann unter <b>Geteilt mit mir</b>. Du legst fest, wer bearbeiten und wer nur lesen darf.
+                  Gemeinsam an „{board.name}" arbeiten: Alle sehen Änderungen live, und eine Karte gehört dem, der sie gerade bearbeitet.
+                  Mit dem Einladungslink ist man <b>mit Konto</b> dabei (das Board liegt dann unter <b>Geteilt mit mir</b>) — oder, wenn du es erlaubst,
+                  <b> ganz ohne Konto</b>: Link öffnen, Namen sagen, mitmachen. Du legst fest, wer bearbeiten und wer nur lesen darf.
                 </p>
                 {link !== 'fehlt' && (
                   <div className="freigabe-block" data-taste="einladung">
@@ -149,12 +171,20 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                           <RollenWahl wert={linkRolle} disabled={busy} label="Rolle des Einladungslinks" taste="einladung-rolle" onChange={(r) => void linkAnlegen(r, false)} />
                           <button className="link-weg" disabled={busy} onClick={() => void linkWeg()} data-taste="einladung-weg">Link widerrufen</button>
                         </div>
+                        <label className="freigabe-schalter">
+                          <input type="checkbox" checked={ohneKonto} disabled={busy} onChange={(e) => void ohneKontoSetzen(e.target.checked)} data-taste="einladung-ohne-konto" />
+                          <span><b>Auch ohne Konto</b> — wer den Link öffnet, ist sofort dabei (Gruppenarbeit, Unterricht, Workshop)</span>
+                        </label>
                       </>
                     ) : (
                       <div className="freigabe-zeile">
                         <span>Wer dem Link folgt,</span>
                         <RollenWahl wert={linkRolle} disabled={busy} label="Rolle des Einladungslinks" taste="einladung-rolle" onChange={setLinkRolle} />
                         <button disabled={busy || !eigenesKonto} onClick={() => void linkAnlegen(linkRolle, true)} data-taste="einladung-anlegen">{busy ? '…' : 'Link erstellen und kopieren'}</button>
+                        <label className="freigabe-schalter">
+                          <input type="checkbox" checked={ohneKonto} disabled={busy} onChange={(e) => setOhneKonto(e.target.checked)} data-taste="einladung-ohne-konto" />
+                          <span><b>Auch ohne Konto</b> — wer den Link öffnet, ist sofort dabei (Gruppenarbeit, Unterricht, Workshop)</span>
+                        </label>
                       </div>
                     )}
                   </div>
@@ -185,7 +215,8 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                   </ul>
                 )}
                 <div className="modal-note">
-                  Anhänge (Dateien, Bilder als Datei) wandern bei geteilten Boards noch nicht mit — Notizen, Karten, Verbindungen und Zeichnungen schon.
+                  Gäste ohne Konto bekommen auch die Anhänge des Boards (PDF, Bilder) zum Ansehen; bei Gästen mit Konto wandern Anhänge noch nicht mit —
+                  Notizen, Karten, Verbindungen und Zeichnungen immer. Wer den Link ohne Konto hat, kann ihn weitergeben: Widerrufen beendet den Zugang für alle.
                   Bei der E-Mail-Einladung braucht die Person ein PixiNotes-Konto mit genau dieser E-Mail. Eine Kopie ohne Konto weitergeben: Board-Menü → <b>Per Link teilen</b>.
                 </div>
               </>
