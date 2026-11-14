@@ -16,7 +16,7 @@ import { fangAktiv, fangen, fangSetzen, type Kasten } from '../lib/fang';
 import { Fanglinien } from './Fanglinien';
 import { LiveSperren } from './LiveLeiste';
 import { useBoardTasten } from './boardTasten';
-import { mutedHistory, selectActiveBoard, selectNurLesen, useBoard } from '../store';
+import { leeresStartboard, mutedHistory, selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon } from '../lib/pdfSeiten';
 import { frameMembers } from '../lib/arrange';
 import { computePush } from '../lib/physics';
@@ -636,6 +636,8 @@ export function Board() {
   const boardBg = useBoard((s) => selectActiveBoard(s).bg);
   // M360: Nur lesend geteiltes Board — nichts ziehen, verbinden oder tippen (der Speicher verwirft Änderungen ohnehin)
   const nurLesen = useBoard(selectNurLesen);
+  /** M370: Steht nur das unberührte Startboard da? Dann bietet das leere Board die Beispiele an. */
+  const nurStart = useBoard((s) => !!leeresStartboard(s.boards));
   useEffect(() => {
     if (!nurLesen) return;
     const imBoard = (e: Event) => !!(e.target as HTMLElement | null)?.closest?.('.board-wrap');
@@ -1507,6 +1509,12 @@ export function Board() {
           <div>📝 Doppelklick (oder N) = neue Notiz</div>
           <div>📧 E-Mails (.eml/.msg) &amp; Dateien hierher ziehen</div>
           <div>🖼️ Strg+V fügt Screenshots ein</div>
+          {/* M370: Der Start ist leer — wer sehen will, was geht, holt sich die Beispiele mit einem Klick */}
+          {nurStart && (
+            <button className="empty-beispiele" onClick={() => useBoard.getState().addStarter()} data-taste="leer-beispiele">
+              ✨ Beispiele laden <small>fertige Boards zum Ausprobieren — alle Module im Einsatz</small>
+            </button>
+          )}
         </div>
       )}
       <ReactFlow
