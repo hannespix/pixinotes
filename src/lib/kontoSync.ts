@@ -646,7 +646,7 @@ const umgebungKern = (u: { spaces: Space[]; reihe: string[]; boards: Record<stri
 const kennLesen = async (): Promise<Kenn> => (await idbGet<Kenn>(KENN_KEY)) ?? leereKenn();
 
 /** FNV-1a über den JSON-Text plus Länge — schnell und für „gleich/anders" völlig ausreichend */
-function stempel(text: string): string {
+export function stempel(text: string): string {
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i += 1) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
   return `${h.toString(16)}:${text.length}`;
@@ -691,7 +691,19 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
   const sitzLesen = loadKonto();
   if (sitzLesen?.anbieter === 'supabase') {
     let liste: FremdFreigabe[] = fremdeFreigaben;
-    try { liste = await freigabenLaden(); } catch { /* ohne Netz: die zuletzt bekannten */ }
+    let listeFrisch = false;
+    try { liste = await freigabenLaden(); listeFrisch = true; } catch { /* ohne Netz: die zuletzt bekannten */ }
+    // M364: Der Besitzer hat eine Freigabe zum Bearbeiten beendet → das Board bleibt hier als eigene Kopie, mit
+    // Hinweis. (Bisher ergab sich das nur nebenbei — über einen veralteten Vorfahren in der Zusammenführung;
+    // ohne ihn wäre das Board still verschwunden. Nur lesend geteilte Boards verschwinden weiterhin, M360.)
+    if (listeFrisch) {
+      for (const b of useBoard.getState().boards) {
+        if (!b.geteiltVon || b.gastLink || b.geteiltRolle === 'lesen') continue;
+        if (liste.some((f) => f.board_id === b.id && f.besitzer === b.geteiltVon)) continue;
+        alsEigeneKopie(b.id);
+        useBoard.getState().showToast('Die Freigabe für dieses Board wurde beendet — es bleibt als eigene Kopie bei dir.', false, 8000);
+      }
+    }
     for (const f of liste) {
       if (boards.some((b) => b.id === f.board_id && !b.geteiltVon)) continue;
       try {
@@ -738,7 +750,13 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
   // ist ER der gemeinsame Vorfahre — nicht unser letzter eigener Stand, der
   // sonst eine fremde Lücke als „gelöscht" deuten ließe.
   const vorfahre = await basisFinden(u.basisEtag);
-  if (vorfahre && vorfahre.etag !== etag) await basisMerken('konto', { boards: vorfahre.boards, spaces: vorfahre.spaces });
+  // M364: Schreibt ein Gast in die Zeile des Besitzers, bleibt in der Umgebung der Vorfahre des LETZTEN EIGENEN
+  // Schreibens stehen — älter als das, was dieses Gerät schon kennt. Nähme man ihn, sähe die Zusammenführung die
+  // eigene, längst gesicherte Fassung einer Karte als „hier geändert" und verwürfe die des Gasts. Beim
+  // PixiNotes-Konto (Versionen zählen hoch, Schreiben hat eine Vorbedingung) gilt darum: nie hinter den
+  // bekannten Stand zurück. (Neue Server tragen den richtigen Vorfahren selbst ein, siehe Migration M364.)
+  const veraltet = sitzLesen?.anbieter === 'supabase' && !!alt.etag && !!u.basisEtag && Number(u.basisEtag) < Number(alt.etag);
+  if (vorfahre && vorfahre.etag !== etag && !veraltet) await basisMerken('konto', { boards: vorfahre.boards, spaces: vorfahre.spaces });
   await basenMerken(etag, { boards, spaces });
   return { payload, kenn };
 }
@@ -802,7 +820,7 @@ async function fremdZeile(besitzer: string, boardId: string): Promise<{ inhalt: 
   return z[0] ?? null;
 }
 /** Geteilte Boards, die in keinem Projekt stehen, landen unter „Geteilt mit mir" → ein Projekt je Besitzer */
-function mitGeteiltBereich(spaces: Space[], geteilt: BoardDoc[]): Space[] {
+export function mitGeteiltBereich(spaces: Space[], geteilt: BoardDoc[]): Space[] {
   const fehlt = geteilt.filter((b) => !spaces.some((sp) => sp.projects.some((p) => p.boardIds.includes(b.id))));
   if (fehlt.length === 0) return spaces;
   const aus = spaces.map((sp) => ({ ...sp, projects: sp.projects.map((p) => ({ ...p, boardIds: [...p.boardIds] })) }));
@@ -818,7 +836,7 @@ function mitGeteiltBereich(spaces: Space[], geteilt: BoardDoc[]): Space[] {
 }
 /** Ein Board ohne Freigabe weiterführen: als eigene Kopie (die Kennung des Besitzers fällt weg) */
 function alsEigeneKopie(boardId: string): void {
-  useBoard.setState((s) => ({ boards: s.boards.map((b) => (b.id === boardId ? (({ geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, ...rest }) => rest)(b) as BoardDoc : b)) }));
+  useBoard.setState((s) => ({ boards: s.boards.map((b) => (b.id === boardId ? (({ geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, gastLink: _l, ...rest }) => rest)(b) as BoardDoc : b)) }));
   fremdeFreigaben = fremdeFreigaben.filter((f) => f.board_id !== boardId);
 }
 /** Freigaben eines eigenen Boards (Besitzer-Sicht) */
@@ -912,7 +930,10 @@ function exklusiv<T>(fn: () => Promise<T>): Promise<T> {
 
 /** Aktuellen Stand ins Konto schreiben — nur Geändertes. Setzt Stempel, Basis, Kenntnis und Status. */
 export async function kontoWrite(): Promise<string> {
-  return exklusiv(() => kontoWriteRoh(true));
+  const r = await exklusiv(() => kontoWriteRoh(true));
+  // M364: Gäste, die per Link (ohne Konto) dabei sind, erfahren es über den Live-Kanal (lib/gastSync.ts)
+  window.dispatchEvent(new CustomEvent('pixinotes:konto-geschrieben'));
+  return r;
 }
 async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<string> {
   const lw = laufwerk();
@@ -943,7 +964,8 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
   // M330: Geteilte Boards gehören einem anderen Konto — sie gehen über freigabe_schreiben, nicht in die eigene Umgebung
   const eigene = payload.boards.filter((b) => !b.geteiltVon);
   // M360: nur lesend geteilte Boards reisen nie zurück — sie ändern sich hier nicht
-  const fremde = sitz?.anbieter === 'supabase' ? payload.boards.filter((b) => b.geteiltVon && b.geteiltRolle !== 'lesen') : [];
+  // M364: Boards, in die man sich nur per Link eingewählt hat (ohne Konto), gleicht lib/gastSync.ts ab
+  const fremde = sitz?.anbieter === 'supabase' ? payload.boards.filter((b) => b.geteiltVon && b.geteiltRolle !== 'lesen' && !b.gastLink) : [];
   const stempelNeu: Record<string, string> = {};
   const texte = new Map<string, string>();
   for (const b of eigene) {
@@ -953,7 +975,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
   }
   const fremdPlan: Array<{ b: BoardDoc; text: string; st: string }> = [];
   for (const b of fremde) {
-    const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, ...rein } = b;
+    const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, gastLink: _l, ...rein } = b;
     const text = JSON.stringify(rein);
     const st = stempel(text);
     if (kenn.fremd?.[b.id]?.stempel === st) continue;

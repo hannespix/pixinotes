@@ -245,10 +245,17 @@ export function standStempel(jetzt = new Date()): string {
   return jetzt.toISOString().replace(/Z$/, `${fein}Z`);
 }
 
+/**
+ * M364: Haken der Gruppenarbeit (lib/gastSync.ts). Karten, die gerade ein ANDERER bearbeitet, zeigen hier dessen
+ * Live-Stand — der gehört aber ihm: `vor` setzt für Schreiben und Zusammenführen den letzten gesicherten Stand
+ * dieser Karten ein, `nach` legt den Live-Stand danach wieder darüber (wo der Abgleich nichts Neueres brachte).
+ */
+export const liveHaken: { vor: (b: BoardDoc) => BoardDoc; nach: (b: BoardDoc) => BoardDoc } = { vor: (b) => b, nach: (b) => b };
+
 export function buildSyncPayload(): SyncPayload {
   const s = useBoard.getState();
   // M345: ohne Auswahl- und Zieh-Zustand — der gehört dem Gerät, nicht dem Dokument
-  const boards = s.boards.map((b) => ohneAuswahl(b));
+  const boards = s.boards.map((b) => ohneAuswahl(liveHaken.vor(b)));
   herkunft.set(boards, s.boards);
   return {
     app: 'pixinotes',
@@ -456,10 +463,10 @@ export async function fremdStandEinarbeiten(remote: SyncPayload, weg: SyncWeg, n
     return weg.uebernehmen(remote) ? 'uebernommen' : 'fehler';
   }
   const s = useBoard.getState();
-  const erg = dreiWegeMerge(basis, { boards: s.boards, spaces: s.spaces }, remote);
+  const erg = dreiWegeMerge(basis, { boards: s.boards.map((b) => liveHaken.vor(b)), spaces: s.spaces }, remote);
   if (erg.lokalNeu) {
     if (erg.geaendert.includes(s.activeId) && tippt()) return 'spaeter';
-    useBoard.getState().importSync(erg.boards, erg.spaces, s.activeId, { geaendert: erg.geaendert });
+    useBoard.getState().importSync(erg.boards.map((b) => liveHaken.nach(b)), erg.spaces, s.activeId, { geaendert: erg.geaendert });
     if (!flushPersist()) return 'fehler';
     // Beipack (M269) nachgelagert — Karten holen ihre Vorschau, sobald er da ist
     void uebernimmDateien(remote).then((n) => {

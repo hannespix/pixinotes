@@ -397,10 +397,13 @@ console.log('\n════ F: Anna entfernt die Freigabe → Bernd behält eine
   await warteBis(A.P, () => sb.freigaben.length === 0, 6000);
   pruefe('F2 Freigabe entfernt', sb.freigaben.length === 0);
   await schliessen(A.P);
-  // Bernd ändert etwas auf dem Board → keine Freigabe mehr → eigene Kopie
+  // M364: Bernds Gerät erfährt es (live oder beim nächsten Abgleich) → das Board bleibt als eigene Kopie, mit
+  // Hinweis — spätestens, wenn er etwas ändert und der Server das Schreiben ablehnt.
+  let hinweis = false;
+  const kopieFrueh = await warteBis(B.P, async () => { if (/bleibt als eigene Kopie/.test(await toast(B.P))) hinweis = true; const b = await boardVon(B.P, 'bx'); return !!b && !b.geteiltVon; }, 8000);
   await notiz(B.P, 'Nach dem Ende', 600, 300);
-  const kopie = await warteBis(B.P, async () => { const b = await boardVon(B.P, 'bx'); return !!b && !b.geteiltVon; }, 15000);
-  pruefe('F3 Bernds „Planung" verliert die Besitzer-Kennung (eigene Kopie), Hinweis erscheint', kopie && sb.aufrufe.keineFreigabe >= 1, `keineFreigabe ${sb.aufrufe.keineFreigabe}, toast ${await toast(B.P)}`);
+  const kopie = await warteBis(B.P, async () => { if (/bleibt als eigene Kopie/.test(await toast(B.P))) hinweis = true; const b = await boardVon(B.P, 'bx'); return !!b && !b.geteiltVon; }, 15000);
+  pruefe('F3 Bernds „Planung" verliert die Besitzer-Kennung (eigene Kopie), Hinweis erscheint', kopie && (hinweis || sb.aufrufe.keineFreigabe >= 1), `früh ${kopieFrueh}, keineFreigabe ${sb.aufrufe.keineFreigabe}, hinweis ${hinweis}`);
   const eigeneZeile = await warteBis(B.P, () => !!zeile(uidB, 'board-bx.json') && zeileText(uidB, 'board-bx.json').includes('Nach dem Ende'), 15000);
   pruefe('F4 die Kopie liegt jetzt in Bernds eigenem Konto; Annas Zeile bleibt ohne „Nach dem Ende"', eigeneZeile && !zeileText(uidA, 'board-bx.json').includes('Nach dem Ende'));
 }
@@ -410,7 +413,7 @@ console.log('\n════ G: Texte ════');
 {
   const js = readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.js')).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8')).join('\n');
   pruefe('G1 „Was ist neu" nennt M330', js.includes('Geteilte Boards und schnellerer Live-Abgleich (M330)'));
-  pruefe('G2 der Dialog nennt die Grenze bei Anhängen', js.includes('Anhänge (Dateien, Bilder als Datei) wandern bei geteilten Boards noch nicht mit'));
+  pruefe('G2 der Dialog nennt die Grenze bei Anhängen', js.includes('bei Gästen mit Konto wandern Anhänge noch nicht mit'));
 }
 
 await A.ctx.close(); await B.ctx.close();

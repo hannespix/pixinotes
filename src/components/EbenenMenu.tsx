@@ -207,9 +207,9 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
             <IMoveTo size={14} /> In Projekt verschieben …
           </button>
           <div className="ebenen-menu-titel">Weitergeben</div>
-          {kontoIstEigenes() && (
+          {(kontoIstEigenes() || board.gastLink) && (
             <button role="menuitem" onClick={() => { setFreigabe(true); zu(); }} data-taste="board-freigeben">
-              <IShare size={14} /> {board.geteiltVon ? 'Geteilt mit mir …' : 'Gemeinsam bearbeiten …'}
+              <IShare size={14} /> {board.gastLink ? 'Gemeinsames Board …' : board.geteiltVon ? 'Geteilt mit mir …' : 'Gemeinsam bearbeiten …'}
             </button>
           )}
           <button role="menuitem" onClick={() => { setLinkOffen(true); zu(); }} data-taste="board-link">

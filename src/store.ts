@@ -1,6 +1,7 @@
 // M217: MUSS vor dem persist-Init stehen — danach ist der Speicher belegt
 // und „erster Start" nicht mehr feststellbar
 import './lib/firstRun';
+import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import {
@@ -23,6 +24,8 @@ import { baueRueckverweis } from './lib/portale';
 
 /** Ein Freihand-Strich (Punkte in Flow-Koordinaten) */
 export interface Stroke {
+  /** M365: Wer den Strich gezogen hat (Gruppenarbeit) — Kennung wie bei Karten (`data.von`) */
+  von?: string;
   id: string;
   tool: 'pen' | 'marker';
   color: string;
@@ -66,6 +69,10 @@ export interface BoardDoc {
   /** M360: Der Besitzer hat das Board nur zum Lesen freigegeben — die Oberfläche ändert es nicht,
    *  nur der Abgleich bringt neue Stände (lib/kontoSync.ts) */
   geteiltRolle?: 'lesen';
+  /** M364: Per Einladungslink OHNE Konto eingewählt — das Token; den Abgleich macht lib/gastSync.ts */
+  gastLink?: string;
+  /** M364: Eigene Kopie aus einer beendeten Einwahl per Link — wählt man sich wieder ein, bleibt sie daneben stehen */
+  gastWar?: boolean;
   /** Kommentar-Threads (M148) — leben IM Board und wandern so automatisch
    *  im globalen Sync UND im Team-Projekt-Paket mit */
   comments?: CommentThread[];
@@ -110,6 +117,15 @@ interface HistoryEntry extends BoardSnap {
    *  gemeinsam zurück. M163 verschiebt Karten zwischen zwei Boards, M208 setzt
    *  Themen-Tags über eine ganze Themen-Insel hinweg. */
   others?: BoardSnap[];
+  /** M365: Stand NACH dem eigenen Schritt — gesetzt, sobald danach etwas von außen kam (Abgleich, Mitlesen).
+   *  Dann nimmt Rückgängig nur das zurück, was dieser Schritt selbst getan hat (`gezieltZurueck`), statt den
+   *  ganzen Stand zurückzudrehen und damit die Arbeit der anderen zu verwerfen. */
+  nach?: { nodes: AppNode[]; edges: Edge[]; drawings?: Stroke[] };
+  /** M365: Was andere angefasst haben, während dieser Schritt der jüngste war (er also noch „offen" ist: Ziehen,
+   *  Tippen laufen weiter). Diese Stellen gehören nicht zum Schritt und bleiben beim Rückgängig, wie sie sind. */
+  fremd?: string[];
+  /** … davon die Stellen, die der Schritt selbst schon geändert hatte — sie bleiben, mit Hinweis */
+  gemischt?: string[];
 }
 
 /** Momentaufnahme aller genannten Boards (für mehrbrettrige Undo-Schritte) */
@@ -537,6 +553,18 @@ export const selectActiveBoard = (s: BoardState): BoardDoc =>
 /** M360: Das offene Board ist nur zum Lesen geteilt */
 export const selectNurLesen = (s: BoardState): boolean => selectActiveBoard(s)?.geteiltRolle === 'lesen';
 export const useNurLesen = (): boolean => useBoard(selectNurLesen);
+/** M365: wie useNurLesen, aber für EINE Karte — auch fest, wenn Gäste hier nur Eigenes ändern dürfen */
+export function useKarteFest(von: string | undefined): boolean {
+  const nurLesen = useBoard(selectNurLesen);
+  const boardId = useBoard((s) => s.activeId);
+  const [, takt] = useState(0);
+  useEffect(() => {
+    const auf = () => takt((n) => n + 1);
+    window.addEventListener(GRUPPE_EREIGNIS, auf);
+    return () => window.removeEventListener(GRUPPE_EREIGNIS, auf);
+  }, []);
+  return nurLesen || karteFest(boardId, von);
+}
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -601,13 +629,305 @@ function nurAnsicht(alt: BoardDoc, neu: BoardDoc): { board: BoardDoc; verworfen:
   const edges = ansicht(alt.edges, neu.edges);
   return { board: nodes === alt.nodes && edges === alt.edges ? alt : { ...alt, nodes, edges }, verworfen };
 }
-/** Die Board-Liste eines set(): nur lesend geteilte Boards behalten ihren Inhalt */
+// ---------- M364: Karten-Sperre in der Gruppenarbeit ----------
+// Wer eine Karte gerade bearbeitet (hineintippt, sie zieht), hat sie: Die anderen sehen ihren Stand live, ändern
+// sie aber nicht — so überschreibt niemand, was ein anderer gerade schreibt. Wer was hält, kommt aus dem
+// Live-Kanal (lib/gastSync.ts); hier wird nur durchgesetzt, wieder an der einen Stelle, am set() des Speichers.
+const kartenSperren = new Map<string, Map<string, string>>();   // Board → Karte → Name dessen, der sie hält
+export function setzeKartenSperren(boardId: string, sperren: Map<string, string>): void {
+  if (sperren.size) kartenSperren.set(boardId, sperren); else kartenSperren.delete(boardId);
+}
+export const karteGesperrtVon = (boardId: string, nodeId: string): string | undefined => kartenSperren.get(boardId)?.get(nodeId);
+let sperrHinweisAm = 0;
+function sperrHinweis(name: string): void {
+  const jetzt = performance.now();
+  if (jetzt - letzteEingabe > 1500 || jetzt - sperrHinweisAm < 4000) return;
+  sperrHinweisAm = jetzt;
+  queueMicrotask(() => useBoard.getState().showToast(`✋ ${name} bearbeitet diese Karte gerade — gleich wieder frei.`, false, 4000));
+}
+/** Gesperrte Karten behalten Inhalt und Lage (auch gegen Löschen); alles andere geht durch */
+function sperrschutz(alt: BoardDoc, neu: BoardDoc, sperren: Map<string, string>): BoardDoc {
+  const nach = new Map(neu.nodes.map((n) => [n.id, n]));
+  let wer = '';
+  let anders = false;
+  const fehlend: AppNode[] = [];
+  const zurueck = new Map<string, AppNode>();
+  for (const n of alt.nodes) {
+    const name = sperren.get(n.id);
+    if (!name) continue;
+    const m = nach.get(n.id);
+    if (!m) { fehlend.push(n); wer = name; anders = true; continue; }
+    if (m !== n && inhaltAnders(n, m)) {
+      // Auswahl und Maße dürfen sich ändern — Inhalt und Lage nicht
+      const a = n as Record<string, unknown>; const b = m as Record<string, unknown>;
+      const kopie: Record<string, unknown> = { ...a };
+      for (const k of ANSICHT_FELDER) { if (b[k] === undefined) delete kopie[k]; else kopie[k] = b[k]; }
+      zurueck.set(n.id, kopie as AppNode); wer = name; anders = true;
+    }
+  }
+  if (!anders) return neu;
+  sperrHinweis(wer);
+  if (fehlend.length === 0) return { ...neu, nodes: neu.nodes.map((n) => zurueck.get(n.id) ?? n) };
+  // Eine gesperrte Karte sollte gelöscht werden: Sie bleibt an ihrem Platz in der Reihe, mit ihren Verbindungen
+  const bleibt = new Set(fehlend.map((n) => n.id));
+  const nodes: AppNode[] = [];
+  const drin = new Set<string>();
+  for (const n of alt.nodes) {
+    const m = bleibt.has(n.id) ? n : zurueck.get(n.id) ?? nach.get(n.id);
+    if (m) { nodes.push(m); drin.add(n.id); }
+  }
+  for (const n of neu.nodes) if (!drin.has(n.id)) nodes.push(n);
+  const kanten = new Set(neu.edges.map((e) => e.id));
+  const edges = [...neu.edges, ...alt.edges.filter((e) => !kanten.has(e.id) && (bleibt.has(e.source) || bleibt.has(e.target)) && drin.has(e.source) && drin.has(e.target))];
+  return { ...neu, nodes, edges: edges.length === neu.edges.length ? neu.edges : edges };
+}
+
+// ---------- M365: Wer hat was angelegt — und was dürfen Gäste? ----------
+// In einem geteilten Board trägt jede NEUE Karte und jeder neue Strich die Kennung dessen, der sie angelegt hat
+// (`data.von` bzw. `von`). Der Besitzer legt am Einladungslink fest, was Gäste dürfen:
+//   alles             – wie bisher
+//   eigenes-loeschen  – alles bearbeiten, aber nur Eigenes löschen (oder archivieren)
+//   eigenes           – nur Eigenes bearbeiten, verschieben und löschen; alles andere steht fest
+// Durchgesetzt wird es hier, am set() — für jede Bedienung auf einmal. Für Gäste ohne Konto prüft zusätzlich der
+// Server (gast_schreiben). Was vor der Gruppenarbeit da war, trägt keine Kennung und gehört damit dem Besitzer.
+export type GastRecht = 'alles' | 'eigenes-loeschen' | 'eigenes';
+export interface GruppenInfo { ich: string; recht: GastRecht; gast: boolean }
+const gruppen = new Map<string, GruppenInfo>();
+export const GRUPPE_EREIGNIS = 'pixinotes:gruppe';
+export function setzeGruppe(boardId: string, info: GruppenInfo | null): void {
+  const alt = gruppen.get(boardId);
+  if (info) gruppen.set(boardId, info); else gruppen.delete(boardId);
+  if (alt?.recht !== info?.recht || alt?.gast !== info?.gast || alt?.ich !== info?.ich) window.dispatchEvent(new CustomEvent(GRUPPE_EREIGNIS, { detail: boardId }));
+}
+/** Steht diese Karte für mich fest? (Gast, Recht „eigenes", Karte von jemand anderem) — dann nimmt ihr Editor nichts an */
+export const karteFest = (boardId: string, von: string | undefined): boolean => {
+  const g = gruppen.get(boardId);
+  return !!g && g.gast && g.recht === 'eigenes' && von !== g.ich;
+};
+export const gruppeVon = (boardId: string): GruppenInfo | undefined => gruppen.get(boardId);
+const vonKarte = (n: AppNode): string | undefined => (n.data as { von?: string } | undefined)?.von;
+/** Während Rückgängig/Wiederholen behält Zurückgeholtes seinen Ersteller */
+let stempelAus = 0;
+function ohneStempel(fn: () => void): void {
+  stempelAus += 1;
+  try { fn(); } finally { stempelAus -= 1; }
+}
+let rechtHinweisAm = 0;
+function rechtHinweis(text: string): void {
+  const jetzt = performance.now();
+  if (jetzt - letzteEingabe > 1500 || jetzt - rechtHinweisAm < 4000) return;
+  rechtHinweisAm = jetzt;
+  queueMicrotask(() => useBoard.getState().showToast(text, false, 5000));
+}
+/** Karten, die bleiben müssen, an ihrem Platz in der Reihe halten — mit ihren Verbindungen */
+function mitBleibenden(alt: BoardDoc, neu: BoardDoc, bleibt: Set<string>, zurueck: Map<string, AppNode>): BoardDoc {
+  if (bleibt.size === 0) return zurueck.size ? { ...neu, nodes: neu.nodes.map((n) => zurueck.get(n.id) ?? n) } : neu;
+  const nach = new Map(neu.nodes.map((n) => [n.id, n]));
+  const nodes: AppNode[] = [];
+  const drin = new Set<string>();
+  for (const n of alt.nodes) {
+    const m = bleibt.has(n.id) ? n : zurueck.get(n.id) ?? nach.get(n.id);
+    if (m) { nodes.push(m); drin.add(n.id); }
+  }
+  for (const n of neu.nodes) if (!drin.has(n.id)) nodes.push(n);
+  const kanten = new Set(neu.edges.map((e) => e.id));
+  const edges = [...neu.edges, ...alt.edges.filter((e) => !kanten.has(e.id) && (bleibt.has(e.source) || bleibt.has(e.target)) && drin.has(e.source) && drin.has(e.target))];
+  return { ...neu, nodes, edges: edges.length === neu.edges.length ? neu.edges : edges };
+}
+function gruppenschutz(alt: BoardDoc, neu0: BoardDoc, g: GruppenInfo): BoardDoc {
+  let neu = neu0;
+  // 1) Neues gehört dem, der es anlegt (auch eine Kopie einer fremden Karte)
+  if (neu.nodes !== alt.nodes) {
+    const vorher = new Set(alt.nodes.map((n) => n.id));
+    const mein = (n: AppNode): boolean => !vorher.has(n.id) && (stempelAus > 0 ? !vonKarte(n) : vonKarte(n) !== g.ich);
+    if (neu.nodes.some(mein)) neu = { ...neu, nodes: neu.nodes.map((n) => (mein(n) ? ({ ...n, data: { ...n.data, von: g.ich } } as AppNode) : n)) };
+  }
+  if (neu.drawings && neu.drawings !== alt.drawings) {
+    const vorher = new Set((alt.drawings ?? []).map((d) => d.id));
+    const mein = (d: Stroke): boolean => !vorher.has(d.id) && (stempelAus > 0 ? !d.von : d.von !== g.ich);
+    if (neu.drawings.some(mein)) neu = { ...neu, drawings: neu.drawings.map((d) => (mein(d) ? { ...d, von: g.ich } : d)) };
+  }
+  if (!g.gast || g.recht === 'alles') return neu;
+  // 2) Fremdes bleibt: nicht löschen, nicht archivieren — bei „eigenes" auch nicht ändern
+  let geloescht = false; let geaendert = false;
+  if (neu.nodes !== alt.nodes) {
+    const nach = new Map(neu.nodes.map((n) => [n.id, n]));
+    const bleibt = new Set<string>();
+    const zurueck = new Map<string, AppNode>();
+    for (const n of alt.nodes) {
+      if (vonKarte(n) === g.ich) continue;
+      const m = nach.get(n.id);
+      if (!m) { bleibt.add(n.id); geloescht = true; continue; }
+      if (m === n) continue;
+      const a = n as Record<string, unknown>; const b = m as Record<string, unknown>;
+      if (g.recht === 'eigenes') {
+        if (!inhaltAnders(n, m)) continue;
+        const kopie: Record<string, unknown> = { ...a };
+        for (const k of ANSICHT_FELDER) { if (b[k] === undefined) delete kopie[k]; else kopie[k] = b[k]; }
+        zurueck.set(n.id, kopie as AppNode); geaendert = true;
+      } else if (b.archived && !a.archived) {
+        const kopie: Record<string, unknown> = { ...b };
+        delete kopie.archived;
+        zurueck.set(n.id, kopie as AppNode); geloescht = true;
+      }
+    }
+    if (bleibt.size || zurueck.size) neu = mitBleibenden(alt, neu, bleibt, zurueck);
+  }
+  if (alt.drawings && neu.drawings !== alt.drawings) {
+    const da = new Set((neu.drawings ?? []).map((d) => d.id));
+    const fehlt = alt.drawings.filter((d) => !da.has(d.id) && d.von !== g.ich);
+    if (fehlt.length) { neu = { ...neu, drawings: [...(neu.drawings ?? []), ...fehlt] }; geloescht = true; }
+  }
+  if (geloescht) rechtHinweis('🔒 Löschen kannst du hier nur, was du selbst angelegt hast.');
+  else if (geaendert) rechtHinweis('🔒 Ändern kannst du hier nur deine eigenen Karten — neue anlegen geht immer.');
+  return neu;
+}
+
+// ---------- M365: Rückgängig in der Gruppe — nur der eigene Schritt ----------
+type Stand = { nodes: AppNode[]; edges: Edge[]; drawings?: Stroke[] };
+const FLUECHTIG = new Set(['selected', 'dragging', 'resizing', 'measured']);
+const ohneFluechtiges = (x: object): string => JSON.stringify(x, (k, v) => (FLUECHTIG.has(k) ? undefined : v));
+const gleichesObjekt = (a: object, b: object): boolean => a === b || ohneFluechtiges(a) === ohneFluechtiges(b);
+/**
+ * Einen eigenen Schritt gezielt umkehren. Der Schritt hat das Board von `zu` nach `von` gebracht; jetzt soll alles,
+ * was er anfasste, wieder wie in `zu` sein — aber nur dort, wo es noch so ist, wie der Schritt es hinterließ.
+ * Was andere inzwischen geändert haben, bleibt (und wird gezählt); was andere neu angelegt haben, sowieso.
+ */
+function gezieltZurueck(jetzt: Stand, von: Stand, zu: Stand, fremd?: Set<string>, gemischt?: Set<string>): { stand: Stand; getan: number; uebersprungen: number } {
+  let getan = 0; let uebersprungen = gemischt?.size ?? 0;
+  const liste = <T extends { id: string }>(cur: T[], vonL: T[], zuL: T[]): T[] => {
+    if (vonL === zuL) return cur;
+    const V = new Map(vonL.map((x) => [x.id, x]));
+    const Z = new Map(zuL.map((x) => [x.id, x]));
+    const C = new Map(cur.map((x) => [x.id, x]));
+    const ersetzt = new Map<string, T>();
+    const weg = new Set<string>();
+    const dazu: T[] = [];
+    for (const id of new Set([...V.keys(), ...Z.keys()])) {
+      if (fremd?.has(id)) continue;   // hat (auch) jemand anderes angefasst — gehört nicht zu diesem Schritt
+      const v = V.get(id); const z = Z.get(id); const c = C.get(id);
+      if (v && z) {
+        if (v === z || gleichesObjekt(v, z)) continue;
+        if (c && gleichesObjekt(c, v)) { ersetzt.set(id, z); getan += 1; } else uebersprungen += 1;
+      } else if (v && !z) {            // der Schritt hat es angelegt → wieder weg
+        if (!c) continue;
+        if (gleichesObjekt(c, v)) { weg.add(id); getan += 1; } else uebersprungen += 1;
+      } else if (z && !c) { dazu.push(z); getan += 1; }   // der Schritt hat es entfernt → wieder da
+    }
+    if (ersetzt.size === 0 && weg.size === 0 && dazu.length === 0) return cur;
+    // Reihenfolge: die des Ziel-Stands als Rückgrat (Eltern vor Kindern), danach, was andere neu angelegt haben
+    const bleibt = new Map<string, T>();
+    for (const x of cur) if (!weg.has(x.id)) bleibt.set(x.id, ersetzt.get(x.id) ?? x);
+    for (const x of dazu) bleibt.set(x.id, x);
+    const aus: T[] = [];
+    for (const x of zuL) { const m = bleibt.get(x.id); if (m) { aus.push(m); bleibt.delete(x.id); } }
+    for (const m of bleibt.values()) aus.push(m);
+    return aus;
+  };
+  const nodes = liste(jetzt.nodes, von.nodes, zu.nodes);
+  let edges = liste(jetzt.edges, von.edges, zu.edges);
+  const ids = new Set(nodes.map((n) => n.id));   // Verbindungen ohne Karte gibt es nicht
+  if (edges.some((e) => !ids.has(e.source) || !ids.has(e.target))) edges = edges.filter((e) => ids.has(e.source) && ids.has(e.target));
+  const drawings = jetzt.drawings || zu.drawings || von.drawings ? liste(jetzt.drawings ?? [], von.drawings ?? [], zu.drawings ?? []) : jetzt.drawings;
+  return { stand: { nodes, edges, drawings }, getan, uebersprungen };
+}
+/** Kennungen der Karten, Verbindungen und Striche, die sich zwischen zwei Ständen unterscheiden */
+function geaenderteIds(a: Stand, b: Stand): string[] {
+  const aus: string[] = [];
+  const liste = <T extends { id: string }>(x: T[], y: T[]): void => {
+    if (x === y) return;
+    const Y = new Map(y.map((o) => [o.id, o]));
+    for (const o of x) { const m = Y.get(o.id); if (!m || !gleichesObjekt(o, m)) aus.push(o.id); Y.delete(o.id); }
+    for (const id of Y.keys()) aus.push(id);
+  };
+  liste(a.nodes, b.nodes); liste(a.edges, b.edges); liste(a.drawings ?? [], b.drawings ?? []);
+  return aus;
+}
+/**
+ * Es kommt etwas von außen in dieses Board (`fremdIds`: was sich dadurch ändert). Der JÜNGSTE Schritt bleibt offen —
+ * Ziehen oder Tippen können noch laufen — und merkt sich nur, was die anderen angefasst haben. Ältere Schritte sind
+ * abgeschlossen: Sie merken sich den Stand, den sie hinterließen (das „Vorher" ihres Nachfolgers).
+ */
+function schritteAbgrenzen(liste: HistoryEntry[], boardId: string, jetzt: Stand, fremdIds: string[]): HistoryEntry[] {
+  if (!liste.some((e) => e.boardId === boardId)) return liste;
+  const aus = [...liste];
+  let danach: Stand | null = null;
+  for (let i = aus.length - 1; i >= 0; i -= 1) {
+    const e = aus[i];
+    if (e.boardId !== boardId) continue;
+    if (danach === null) {
+      // der jüngste Schritt dieses Boards
+      if (!e.nach && fremdIds.length) {
+        const vor = new Map<string, object>([...e.nodes, ...e.edges, ...(e.drawings ?? [])].map((o) => [o.id, o]));
+        const hier = new Map<string, object>([...jetzt.nodes, ...jetzt.edges, ...(jetzt.drawings ?? [])].map((o) => [o.id, o]));
+        const fremd = new Set(e.fremd ?? []); const gemischt = new Set(e.gemischt ?? []);
+        for (const id of fremdIds) {
+          const v = vor.get(id); const h = hier.get(id);
+          // Hatte der Schritt die Stelle selbst schon geändert (oder angelegt/entfernt), bevor der andere kam?
+          if (!fremd.has(id) && (!!v !== !!h || (v && h && !gleichesObjekt(v, h)))) gemischt.add(id);
+          fremd.add(id);
+        }
+        aus[i] = { ...e, fremd: [...fremd], ...(gemischt.size ? { gemischt: [...gemischt] } : {}) };
+      }
+    } else if (!e.nach) aus[i] = { ...e, nach: danach };
+    danach = { nodes: e.nodes, edges: e.edges, drawings: e.drawings };
+  }
+  return aus;
+}
+/** M365: Gleich kommt eine Karte von außen in dieses Board (Mitlesen beim Tippen) — die eigenen Schritte abgrenzen */
+export function verlaufAbgrenzen(boardId: string, fremdIds: string[]): void {
+  const s = useBoard.getState();
+  const b = s.boards.find((x) => x.id === boardId);
+  if (!b || (s.past.length === 0 && s.future.length === 0)) return;
+  const jetzt: Stand = { nodes: b.nodes, edges: b.edges, drawings: b.drawings };
+  const past = schritteAbgrenzen(s.past, boardId, jetzt, fremdIds);
+  const future = schritteAbgrenzen(s.future, boardId, jetzt, fremdIds);
+  if (past !== s.past || future !== s.future) useBoard.setState({ past, future });
+}
+/**
+ * Rückgängig (`zurueck`) oder Wiederholen (`vor`) eines Schritts, nach dem Fremdes dazukam: gezielt statt als
+ * ganzer Stand. Der Eintrag wandert mit vertauschten Rollen auf den anderen Stapel.
+ */
+function schrittGezielt(
+  set: (teil: Partial<BoardState>) => void, s: BoardState, entry: HistoryEntry, richtung: 'zurueck' | 'vor',
+): void {
+  const board = s.boards.find((b) => b.id === entry.boardId);
+  if (!board) return;
+  const jetzt: Stand = { nodes: board.nodes, edges: board.edges, drawings: board.drawings };
+  const zu: Stand = { nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings };
+  // Abgeschlossener Schritt: sein gemerkter Stand danach. Offener (jüngster) Schritt: der Stand von jetzt.
+  const von: Stand = entry.nach ?? jetzt;
+  const r = gezieltZurueck(jetzt, von, zu, new Set(entry.fremd ?? []), new Set(entry.gemischt ?? []));
+  const gegen: HistoryEntry = { boardId: entry.boardId, ...von, nach: zu, ...(entry.fremd ? { fremd: entry.fremd } : {}) };
+  const stapel = richtung === 'zurueck'
+    ? { past: s.past.slice(0, -1), future: r.getan ? [...s.future, gegen] : s.future }
+    : { future: s.future.slice(0, -1), past: r.getan ? [...s.past, gegen] : s.past };
+  const notizen = s.activeId === entry.boardId ? geaenderteNotizen(board.nodes, r.stand.nodes) : [];
+  set({
+    ...stapel,
+    ...(r.getan ? { boards: s.boards.map((b) => (b.id === entry.boardId ? { ...b, nodes: r.stand.nodes, edges: r.stand.edges, drawings: r.stand.drawings } : b)) } : {}),
+  });
+  if (notizen.length) window.dispatchEvent(new CustomEvent(NOTIZ_EXTERN, { detail: notizen }));
+  const was = richtung === 'zurueck' ? 'Zurückgenommen' : 'Wiederholt';
+  if (r.uebersprungen && r.getan) useBoard.getState().showToast(`↩ ${was} — ${r.uebersprungen === 1 ? 'eine Stelle blieb' : `${r.uebersprungen} Stellen blieben`}, wie sie ist: Jemand anderes hat sie inzwischen geändert.`, false, 6000);
+  else if (r.uebersprungen) useBoard.getState().showToast('↩ Nichts zurückgenommen — was dieser Schritt betraf, hat inzwischen jemand anderes geändert.', false, 6000);
+}
+
+/** Die Board-Liste eines set(): nur lesend geteilte Boards behalten ihren Inhalt, gesperrte Karten ihren Stand */
 function leseschutz(alt: BoardDoc[], neu: BoardDoc[]): BoardDoc[] {
   const vorher = new Map(alt.map((b) => [b.id, b]));
   let geschuetzt = false; let verworfen = false;
   const aus = neu.map((b) => {
     const a = vorher.get(b.id);
-    if (!a || a === b || a.geteiltRolle !== 'lesen') return b;
+    if (!a || a === b) return b;
+    if (a.geteiltRolle !== 'lesen') {
+      const sperren = kartenSperren.get(b.id);
+      const g = gruppen.get(b.id);
+      let s = sperren ? sperrschutz(a, b, sperren) : b;
+      if (g) s = gruppenschutz(a, s, g);   // M365: Ersteller vermerken, Rechte der Gäste
+      if (s !== b) geschuetzt = true;
+      return s;
+    }
     const r = nurAnsicht(a, b);
     geschuetzt = true;
     if (r.verworfen) verworfen = true;
@@ -654,6 +974,24 @@ function notesDiffer(a: AppNode[], b: AppNode[]): boolean {
     return prev !== undefined && prev !== n.data.blocks;
   });
 }
+/** M364: Kennungen der Notizen, deren Inhalt sich zwischen zwei Ständen geändert hat (Referenzvergleich) */
+function geaenderteNotizen(a: AppNode[], b: AppNode[]): string[] {
+  const blocksById = new Map(a.filter((n) => n.type === 'note').map((n) => [n.id, n.data.blocks]));
+  return b.filter((n) => n.type === 'note' && blocksById.has(n.id) && blocksById.get(n.id) !== n.data.blocks).map((n) => n.id);
+}
+/** M365: Notizen, die von außen ins Board kamen (Abgleich) — sie ziehen den Schreib-Cursor nicht an sich. Eine
+ *  frische, leere Notiz setzt den Cursor sonst sofort hinein; das gilt nur für selbst angelegte: Legt in der
+ *  Gruppenarbeit jemand eine Notiz an, spränge bei allen anderen der Cursor dorthin (und sie „hielten" die Karte). */
+const vonAussen = new Set<string>();
+export const kamVonAussen = (id: string): boolean => vonAussen.has(id);
+function fremdeNotizenMerken(alt: BoardDoc[], neu: BoardDoc[]): void {
+  const da = new Set<string>();
+  for (const b of alt) for (const n of b.nodes) da.add(n.id);
+  if (vonAussen.size > 4000) vonAussen.clear();
+  for (const b of neu) for (const n of b.nodes) if (n.type === 'note' && !da.has(n.id)) vonAussen.add(n.id);
+}
+/** M364: „Diese Notizen wurden von außen geändert" — `detail`: Kennungen. Der Editor der Karte übernimmt den Stand. */
+export const NOTIZ_EXTERN = 'pixinotes:notiz-extern';
 /** Radier-Geste: erster Treffer erzeugt den History-Eintrag, Rest der Geste nicht */
 let eraseSnapPending = false;
 
@@ -868,7 +1206,7 @@ export const useBoard = create<BoardState>()(
       const set: typeof setRoh = ((teil: unknown, ersetzen?: boolean) => {
         if (leseschutzAus > 0) return (setRoh as (t: unknown, e?: boolean) => void)(teil, ersetzen);
         const vor = get();
-        if (!vor.boards.some((b) => b.geteiltRolle === 'lesen')) return (setRoh as (t: unknown, e?: boolean) => void)(teil, ersetzen);
+        if (kartenSperren.size === 0 && gruppen.size === 0 && !vor.boards.some((b) => b.geteiltRolle === 'lesen')) return (setRoh as (t: unknown, e?: boolean) => void)(teil, ersetzen);
         let neu = (typeof teil === 'function' ? (teil as (s: BoardState) => Partial<BoardState>)(vor) : teil) as Partial<BoardState>;
         if (neu.boards && neu.boards !== vor.boards) neu = { ...neu, boards: leseschutz(vor.boards, neu.boards) };
         return (setRoh as (t: unknown, e?: boolean) => void)(neu, ersetzen);
@@ -1366,12 +1704,14 @@ export const useBoard = create<BoardState>()(
           });
         },
 
-        undo: () => {
+        undo: () => ohneStempel(() => {
           const s = get();
           const entry = s.past[s.past.length - 1];
           if (!entry) return;
           const board = s.boards.find((b) => b.id === entry.boardId);
           if (!board) { set({ past: s.past.slice(0, -1) }); return; }
+          // M365: Seit diesem Schritt kam Fremdes dazu → nur das Eigene zurücknehmen
+          if (entry.nach || entry.fremd) { schrittGezielt(set, s, entry, 'zurueck'); return; }
           // Remount, wenn Notiz-Inhalte betroffen sind — egal woher der Eintrag
           // stammt (Versions-Restore, KI-Edit, Struktur-Undo über Tipp-Grenzen)
           const remount = entry.remount || notesDiffer(board.nodes, entry.nodes);
@@ -1392,7 +1732,7 @@ export const useBoard = create<BoardState>()(
             }),
             ...(remount ? { importEpoch: s.importEpoch + 1 } : {}),
           });
-        },
+        }),
 
         // ---------- Trilium-Paket: Vorlagen ----------
         templates: [],
@@ -1413,6 +1753,7 @@ export const useBoard = create<BoardState>()(
           // Auto-Sync-Bremse: dieser Stand kam von außen — nicht gleich wieder
           // mit neuem Zeitstempel hochladen (falsche Konflikte auf anderen Geräten)
           markImported(boards, spaces);
+          fremdeNotizenMerken(get().boards, boards);
           if (sanft) {
             // M311: Hintergrund-Abgleich mit dem Sync-Ordner. Undo-Schritte zu
             // Boards, die drüben anders geworden sind, fallen weg — ein Undo
@@ -1422,19 +1763,36 @@ export const useBoard = create<BoardState>()(
             // nur beim Aufbau); alles andere zeichnet React Flow selbst nach.
             const s = get();
             const betroffen = new Set(sanft.geaendert);
-            const frei = (e: HistoryEntry) => !betroffen.has(e.boardId) && !(e.others ?? []).some((o) => betroffen.has(o.boardId));
+            // M365: Schritte auf betroffenen Boards fallen nicht mehr weg — sie merken sich ihren Stand danach und
+            // nehmen später nur noch das Eigene zurück. Nur Mehr-Board-Schritte (selten) verfallen wie bisher.
+            const frei = (e: HistoryEntry) => !(e.others ?? []).some((o) => betroffen.has(o.boardId) || betroffen.has(e.boardId));
+            let past = s.past.filter(frei); let future = s.future.filter(frei);
+            for (const id of betroffen) {
+              const b = s.boards.find((x) => x.id === id);
+              if (!b) { past = past.filter((e) => e.boardId !== id); future = future.filter((e) => e.boardId !== id); continue; }
+              const jetzt = { nodes: b.nodes, edges: b.edges, drawings: b.drawings };
+              const n = boards.find((x) => x.id === id);
+              const fremdIds = n ? geaenderteIds(jetzt, { nodes: n.nodes, edges: n.edges, drawings: n.drawings }) : [];
+              past = schritteAbgrenzen(past, id, jetzt, fremdIds); future = schritteAbgrenzen(future, id, jetzt, fremdIds);
+            }
             const aktiv = boards.some((b) => b.id === s.activeId) ? s.activeId : boards[0].id;
             const alt = s.boards.find((b) => b.id === aktiv);
             const neu = boards.find((b) => b.id === aktiv);
-            const remount = betroffen.has(aktiv) && (!alt || !neu || notesDiffer(alt.nodes, neu.nodes));
+            /* M364: Geänderte Notizen frischen ihren Editor an Ort und Stelle auf (NoteCard hört auf das Ereignis) —
+               vorher wurde dafür das ganze Board neu aufgebaut: Wer gerade in einer ANDEREN Karte schrieb, verlor
+               Cursor und Rollstand, sobald irgendwo eine Notiz von außen geändert wurde. In der Gruppenarbeit
+               geschieht das im Sekundentakt. Neu aufgebaut wird nur noch, wenn das offene Board selbst wechselt. */
+            const remount = betroffen.has(aktiv) && (!alt || !neu);
+            const notizen = !remount && alt && neu && betroffen.has(aktiv) ? geaenderteNotizen(alt.nodes, neu.nodes) : [];
             set({
               boards,
               spaces,
               activeId: aktiv,
-              past: s.past.filter(frei),
-              future: s.future.filter(frei),
+              past,
+              future,
               importEpoch: remount ? s.importEpoch + 1 : s.importEpoch,
             });
+            if (notizen.length) window.dispatchEvent(new CustomEvent(NOTIZ_EXTERN, { detail: notizen }));
             return;
           }
           set({
@@ -1492,12 +1850,13 @@ export const useBoard = create<BoardState>()(
           });
         },
 
-        redo: () => {
+        redo: () => ohneStempel(() => {
           const s = get();
           const entry = s.future[s.future.length - 1];
           if (!entry) return;
           const board = s.boards.find((b) => b.id === entry.boardId);
           if (!board) { set({ future: s.future.slice(0, -1) }); return; }
+          if (entry.nach || entry.fremd) { schrittGezielt(set, s, entry, 'vor'); return; }
           const remount = entry.remount || notesDiffer(board.nodes, entry.nodes);
           const restore = new Map((entry.others ?? []).map((o) => [o.boardId, o]));
           set({
@@ -1515,7 +1874,7 @@ export const useBoard = create<BoardState>()(
             }),
             ...(remount ? { importEpoch: s.importEpoch + 1 } : {}),
           });
-        },
+        }),
 
         setView: (view) => set({ view }),
 
@@ -1715,7 +2074,7 @@ export const useBoard = create<BoardState>()(
             anchor: d.anchor ? karte.get(d.anchor) : undefined,
           }));
           // M360: Die Kopie eines geteilten Boards gehört mir — ohne Besitzer-Kennung und ohne Leseschutz
-          const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, ...eigen } = quelle;
+          const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, gastLink: _l, ...eigen } = quelle;
           const kopie = {
             ...eigen, id: neueId(), name: `${quelle.name} (Kopie)`,
             nodes, edges, drawings, comments: [],
@@ -1754,7 +2113,7 @@ export const useBoard = create<BoardState>()(
             const quelle = st.boards.find((b) => b.id === bid);
             if (!quelle) continue;
             const karte = new Map(quelle.nodes.map((n) => [n.id, neueId()]));
-            const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, ...eigen } = quelle; // M360: Kopien gehören mir
+            const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, gastLink: _l, ...eigen } = quelle; // M360: Kopien gehören mir
             const kopie: BoardDoc = {
               ...eigen, id: neueId(), name: quelle.name,
               nodes: quelle.nodes.map((n) => ({ ...JSON.parse(JSON.stringify(n)), id: karte.get(n.id) as string, selected: false })),

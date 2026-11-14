@@ -9,7 +9,7 @@ import { blasenAn, SEITEN_EREIGNIS, seiteVon, seitenKommentare } from '../lib/pd
 /** Verfasser-Name: rein lokal (localStorage), wandert NIE ohne den Kommentar */
 const AUTHOR_KEY = 'pixinotes:author';
 export const getAuthor = (): string => localStorage.getItem(AUTHOR_KEY) ?? '';
-const setAuthor = (name: string) => { try { localStorage.setItem(AUTHOR_KEY, name.trim().slice(0, 40)); } catch { /* Sitzung reicht */ } };
+export const setAuthor = (name: string) => { try { localStorage.setItem(AUTHOR_KEY, name.trim().slice(0, 40)); } catch { /* Sitzung reicht */ } };
 
 const initials = (name: string) =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('') || '?';

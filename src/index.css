@@ -6729,3 +6729,54 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 .focus-nav .focus-act.nur-zeichen:hover { background: var(--surface-2) !important; }
 /* Die Seitenzahl in der Fußleiste wird getippt — dann bleibt die Leiste über der Tastatur stehen */
 [data-keyboard='on'] .focus-nav.dokument:has(.focus-seite input:focus) { display: flex; }
+
+/* ---------- M364: Gruppenarbeit — wer ist dabei, wer bearbeitet welche Karte ---------- */
+.live-leiste {
+  position: fixed; top: calc(58px + var(--safe-top) + var(--app-rand)); right: calc(14px + var(--app-rand));
+  display: flex; align-items: center; gap: 4px;
+  background: var(--surface-card); border: 1px solid var(--border); border-radius: 999px;
+  box-shadow: var(--pop-shadow); padding: 4px 10px 4px 4px; z-index: 55;
+  font-size: 12px; color: var(--muted); white-space: nowrap;
+}
+.live-chip {
+  width: 26px; height: 26px; flex: none; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--farbe, #6b7280); color: #fff; border: 2px solid var(--surface-card);
+  font: inherit; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; line-height: 1; padding: 0;
+  margin-left: -8px; cursor: default;
+}
+.live-chip:first-child { margin-left: 0; }
+.live-chip.ich { cursor: pointer; }
+.live-chip.ich:hover, .live-chip.ich:focus-visible { filter: brightness(1.12); outline: 2px solid var(--accent); outline-offset: 1px; }
+.live-chip.schreibt { box-shadow: 0 0 0 2px var(--farbe, #6b7280); }
+.live-chip.mehr { background: var(--surface); color: var(--ink); border-color: var(--border); }
+.live-zahl { margin-left: 6px; }
+.focus-mode .live-leiste { display: none; }
+@media (max-width: 520px) {
+  .live-leiste { top: calc(54px + var(--safe-top) + var(--app-rand)); right: calc(8px + var(--app-rand)); }
+  .live-zahl { display: none; }
+  .live-leiste { padding-right: 4px; }
+}
+/* Rahmen um eine Karte, die gerade ein anderer bearbeitet (Board-Koordinaten) */
+.live-sperre {
+  position: absolute; left: 0; top: 0; box-sizing: border-box; pointer-events: none; z-index: 3000;
+  border: 2px solid var(--farbe, #6b7280); border-radius: var(--r);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--farbe, #6b7280) 22%, transparent);
+}
+.live-sperre-name {
+  position: absolute; left: -2px; bottom: 100%; margin-bottom: 2px;
+  background: var(--farbe, #6b7280); color: #fff; font-size: 11px; font-weight: 700; line-height: 1;
+  padding: 3px 7px; border-radius: var(--r-xs); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+}
+.freigabe-schalter {
+  display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; font-size: 12.5px; line-height: 1.4; cursor: pointer; flex-basis: 100%;
+}
+.freigabe-schalter input { margin-top: 2px; flex: none; }
+.gast-name-dialog { max-width: 420px; }
+.gast-name-dialog .freigabe-zeile input { flex: 1; min-width: 0; }
+/* M365: Rechte der Gäste und Sicherung im Freigabe-Dialog */
+.freigabe-schalter.recht { align-items: center; cursor: default; }
+.freigabe-schalter.recht select { flex: 1; min-width: 0; }
+.freigabe-zeile.sicherung { margin-top: 8px; justify-content: space-between; }
+.live-recht { margin-left: 6px; padding: 2px 7px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border-soft); color: var(--ink); font-size: 11px; }
+@media (max-width: 520px) { .live-recht { display: none; } }

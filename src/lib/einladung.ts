@@ -10,10 +10,13 @@
 // Abgrenzung: „Per Link teilen" (M357, #l=) gibt eine KOPIE weiter, ohne Konto. Dieser Link führt aufs ORIGINAL.
 import { useBoard } from '../store';
 import { checkKontoRemote, kontoAnfrage, loadKonto, type FreigabeRolle } from './kontoSync';
+import { gastBeitreten, kontoKanaele, optionenGeaendert } from './gastSync';
+import type { GastRecht } from '../store';
 
 const OFFEN_KEY = 'pixinotes-einladung-offen';
 
-export interface Einladung { token: string; board_id: string; rolle: FreigabeRolle; created_at: string }
+/** `ohne_konto` (M364): Wer den Link öffnet, arbeitet sofort mit — ohne Anmeldung. Fehlt das Feld, kennt der Server es noch nicht. */
+export interface Einladung { token: string; board_id: string; rolle: FreigabeRolle; created_at: string; ohne_konto?: boolean; optionen?: { gastRecht?: string } }
 
 export const einladungUrl = (token: string): string => `${location.origin}${location.pathname}#e=${token}`;
 const rest = (): string => `${loadKonto()?.url ?? ''}/rest/v1`;
@@ -31,24 +34,27 @@ function neuesToken(): string {
 export async function einladungDesBoards(boardId: string): Promise<Einladung | null> {
   const s = loadKonto();
   if (s?.anbieter !== 'supabase') return null;
-  const res = await kontoAnfrage(`${rest()}/board_einladungen?select=token,board_id,rolle,created_at&board_id=eq.${encodeURIComponent(boardId)}&besitzer=eq.${encodeURIComponent(s.userId ?? '')}`, { cache: 'no-store' });
+  const res = await kontoAnfrage(`${rest()}/board_einladungen?select=*&board_id=eq.${encodeURIComponent(boardId)}&besitzer=eq.${encodeURIComponent(s.userId ?? '')}`, { cache: 'no-store' });
   if (res.status === 404) throw new EinladungNichtEingerichtet();
   if (!res.ok) throw new Error(`Einladungslink nicht lesbar (HTTP ${res.status}).`);
   const z = (await res.json()) as Einladung[];
   return z[0] ?? null;
 }
 
-/** Link anlegen oder seine Rolle ändern (das Token bleibt — schon verschickte Links gelten weiter) */
-export async function einladungSetzen(boardId: string, rolle: FreigabeRolle): Promise<Einladung> {
+/** Link anlegen oder Rolle bzw. „ohne Konto" ändern (das Token bleibt — schon verschickte Links gelten weiter) */
+export async function einladungSetzen(boardId: string, rolle: FreigabeRolle, ohneKonto?: boolean, gastRecht?: GastRecht): Promise<Einladung> {
   if (loadKonto()?.anbieter !== 'supabase') throw new Error('Einladungslinks gibt es mit dem PixiNotes-Konto (E-Mail-Anmeldung).');
   const alt = await einladungDesBoards(boardId);
   const res = await kontoAnfrage(`${rest()}/board_einladungen?on_conflict=besitzer,board_id`, {
     method: 'POST', headers: { ...KOPF, Prefer: 'resolution=merge-duplicates,return=representation' },
-    body: JSON.stringify({ token: alt?.token ?? neuesToken(), board_id: boardId, rolle }),
+    body: JSON.stringify({ token: alt?.token ?? neuesToken(), board_id: boardId, rolle, ...(ohneKonto === undefined ? {} : { ohne_konto: ohneKonto }), ...(gastRecht === undefined ? {} : { optionen: { gastRecht } }) }),
   });
   if (res.status === 404) throw new EinladungNichtEingerichtet();
+  if (res.status === 400 && (ohneKonto !== undefined || gastRecht !== undefined)) throw new Error('Diese Einstellung ist auf dem Server noch nicht eingerichtet.');
   if (!res.ok) throw new Error(`Einladungslink nicht gespeichert (HTTP ${res.status}).`);
   const z = (await res.json()) as Einladung[];
+  void kontoKanaele();   // M364: Live-Kanal dieses Boards öffnen
+  if (gastRecht !== undefined) optionenGeaendert(boardId);   // M365: Die Gäste fragen ihre Rechte neu ab
   return z[0];
 }
 
@@ -58,6 +64,7 @@ export async function einladungLoeschen(boardId: string): Promise<void> {
   if (s?.anbieter !== 'supabase') return;
   const res = await kontoAnfrage(`${rest()}/board_einladungen?board_id=eq.${encodeURIComponent(boardId)}&besitzer=eq.${encodeURIComponent(s.userId ?? '')}`, { method: 'DELETE' });
   if (!res.ok && res.status !== 404) throw new Error(`Einladungslink nicht gelöscht (HTTP ${res.status}).`);
+  void kontoKanaele();
 }
 
 // ---------- Empfänger ----------
@@ -77,6 +84,8 @@ export function einladungMerken(token: string | null): void {
 export type AnnahmeErgebnis =
   | { art: 'beigetreten'; boardId: string; rolle: FreigabeRolle; von?: string }
   | { art: 'eigen'; boardId: string }
+  /** M364: ohne Konto eingewählt (der Link erlaubt es) */
+  | { art: 'gast'; boardId: string; rolle: FreigabeRolle; schonDa: boolean }
   | { art: 'anmelden' };
 
 /**
@@ -84,13 +93,20 @@ export type AnnahmeErgebnis =
  * angenommen. Danach holt der Abgleich das Board und es wird geöffnet.
  */
 export async function einladungAnnehmen(token: string): Promise<AnnahmeErgebnis> {
-  if (loadKonto()?.anbieter !== 'supabase') { einladungMerken(token); return { art: 'anmelden' }; }
+  // M364: Ohne PixiNotes-Konto zuerst als Gast versuchen — erlaubt der Link das, ist man sofort dabei
+  const alsGast = async (): Promise<AnnahmeErgebnis> => {
+    const g = await gastBeitreten(token);
+    if (g) { einladungMerken(null); return { art: 'gast', boardId: g.boardId, rolle: g.rolle, schonDa: g.art === 'vorhanden' }; }
+    einladungMerken(token);
+    return { art: 'anmelden' };
+  };
+  if (loadKonto()?.anbieter !== 'supabase') return alsGast();
   let res: Response;
   try {
     res = await kontoAnfrage(`${rest()}/rpc/einladung_annehmen`, { method: 'POST', headers: KOPF, body: JSON.stringify({ p_token: token }) });
   } catch { throw new Error('Die Einladung ließ sich nicht annehmen — Internetverbindung prüfen.'); }
   if (res.status === 404) { einladungMerken(null); throw new EinladungNichtEingerichtet(); }
-  if (res.status === 401) { einladungMerken(token); return { art: 'anmelden' }; }
+  if (res.status === 401) return alsGast();
   if (!res.ok) throw new Error(`Die Einladung ließ sich nicht annehmen (HTTP ${res.status}).`);
   const info = (await res.json()) as { board_id: string; rolle: FreigabeRolle; eigen?: boolean; besitzer_email?: string } | null;
   einladungMerken(null);

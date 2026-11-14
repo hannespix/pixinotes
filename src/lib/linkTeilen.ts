@@ -96,7 +96,7 @@ export async function linkErstellen(boardId: string, fortschritt?: (text: string
     dateien.push({ id: n.id, name: d.name ?? 'Datei', mime: d.mime, groesse: blob.size, url });
   }
   fortschritt?.('Board …');
-  const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, ...eigen } = ohneAuswahl(board) as BoardDoc;
+  const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, gastLink: _l, ...eigen } = ohneAuswahl(board) as BoardDoc;
   const boardUrl = await hochladen(token, 'board.json', JSON.stringify({ app: 'pixinotes-board', version: 2, board: eigen }), 'application/json');
   const res = await kontoAnfrage(`${basis()}/rest/v1/board_links?on_conflict=token`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=representation' },
