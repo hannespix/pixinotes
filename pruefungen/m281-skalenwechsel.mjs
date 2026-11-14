@@ -41,6 +41,23 @@ const app = http.createServer((q, r) => {
 });
 await new Promise((x) => app.listen(PORT, x));
 
+/** M313: Die Zeit-Skala liegt im ⋯ des Zeitplans (früher ein Auswahlfeld in der Kopfzeile) */
+const ganttMenue = async (P, auf) => {
+  const offen = await P.evaluate(() => !!document.querySelector('.ebenen-menu button[data-skala]'));
+  if (offen !== auf) { await P.evaluate(() => { document.querySelector('.gantt-tools .ebenen-menu-knopf')?.click(); }); await P.waitForTimeout(250); }
+};
+const skalaWaehlen = async (P, wert) => {
+  await ganttMenue(P, true);
+  await P.evaluate((s) => { document.querySelector(`.ebenen-menu button[data-skala="${s}"]`)?.click(); }, wert);
+};
+/** Welche Skala gilt gerade? (Haken im Menü) */
+const skalaJetzt = async (P) => {
+  await ganttMenue(P, true);
+  const w = await P.evaluate(() => document.querySelector('.ebenen-menu button[data-skala][aria-checked="true"]')?.getAttribute('data-skala') ?? null);
+  await ganttMenue(P, false);
+  return w;
+};
+
 let ok = 0; let bad = 0;
 const pruefe = (n, gut, info = '') => {
   if (gut) { ok += 1; console.log(`  ✓ ${n}`); } else { bad += 1; console.log(`  ✗ ${n} ${info}`); }
@@ -91,8 +108,8 @@ async function seite(rows) {
   return { ctx, P };
 }
 
-const zustand = (P) => P.evaluate(() => ({
-  feld: document.querySelector('.gantt-scale').value,
+const zustand = async (P) => ({ feld: await skalaJetzt(P), ...(await zustandOhneFeld(P)) });
+const zustandOhneFeld = (P) => P.evaluate(() => ({
   dw: JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes[0].data.dayWidth,
   svgB: Number(document.querySelector('.gantt-svg').getAttribute('width')),
   fenster: document.querySelector('.gantt-scroll').clientWidth
@@ -106,7 +123,7 @@ for (const [name, rows, kuerzel] of [['kurzer Plan (4 Wochen)', KURZ, 'kurz'], [
   const { ctx, P } = await seite(rows);
   // Bewusst mehrfach hin und her — der Fehler zeigte sich auch beim Zurück
   for (const ziel of ['jahre', 'monate', 'wochen', 'tage', 'jahre', 'wochen', 'monate']) {
-    await P.locator('.gantt-scale').selectOption(ziel);
+    await skalaWaehlen(P, ziel);
     await P.waitForTimeout(700);
     const z = await zustand(P);
     pruefe(`„${ziel}" wird übernommen und bleibt stehen (${kuerzel})`,
@@ -118,12 +135,12 @@ for (const [name, rows, kuerzel] of [['kurzer Plan (4 Wochen)', KURZ, 'kurz'], [
       z.svgB >= z.fenster - 4, `${Math.round(z.svgB)} gegen Fenster ${Math.round(z.fenster)}`);
   }
   // Kopfzeile passt zur Wahl
-  await P.locator('.gantt-scale').selectOption('jahre');
+  await skalaWaehlen(P, 'jahre');
   await P.waitForTimeout(700);
   const j = await zustand(P);
   pruefe(`Jahres-Wahl zeigt Jahreszahlen in der Kopfzeile (${kuerzel})`,
     j.kopf.length > 0 && j.kopf.every((k) => /^\d{4}$/.test(k)), JSON.stringify(j.kopf.slice(0, 4)));
-  await P.locator('.gantt-scale').selectOption('tage');
+  await skalaWaehlen(P, 'tage');
   await P.waitForTimeout(700);
   const t = await zustand(P);
   pruefe(`Tages-Wahl zeigt Monatsnamen und Tageszahlen (${kuerzel})`,

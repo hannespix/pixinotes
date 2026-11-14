@@ -650,7 +650,7 @@ export function Settings() {
           <button className="modal-x" onClick={() => setOpen(false)} aria-label="Schließen">✕</button>
         </div>
 
-        {/* M300: Vier Reiter, nach Alltagsnähe geordnet — was jeder braucht zuerst,
+        {/* M300/M314: Drei Reiter, nach Alltagsnähe geordnet — was jeder braucht zuerst,
             angebundene Dienste zuletzt. */}
         <div className="modal-tabs">
           {TABS.map(([k, label]) => (

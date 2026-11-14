@@ -1,6 +1,7 @@
 // Karten-Fabriken: eine Quelle für Default-Größen, Farb-Rotation und
 // Node-Erzeugung (Audit M5/N5 — vorher vierfach dupliziert).
 import { useBoard } from '../store';
+import { leereBubbles } from './bubbles';
 import { MERMAID_TEMPLATES } from './mermaidTemplates';
 import {
   STICKY_COLORS,
@@ -63,8 +64,13 @@ export function makeEmail(position: Pos, data: EmailData): AppNode {
   return { id: uid(), type: 'email', width: CARD_WIDTHS.email, position, data };
 }
 
-export function makeImage(position: Pos, src: string, name?: string): AppNode {
-  return { id: uid(), type: 'image', width: CARD_WIDTHS.image, position, data: { src, name } };
+/**
+ * M374: Bilder liegen rahmenlos auf dem Board — die Karte IST das Bild. Sind die Maße bekannt, wird ein
+ * kleines Bild (Symbol, Logo) nicht auf die Standardbreite aufgeblasen.
+ */
+export function makeImage(position: Pos, src: string, name?: string, masse?: { w: number; h: number } | null): AppNode {
+  const breite = masse ? Math.max(24, Math.min(CARD_WIDTHS.image, Math.round(masse.w))) : CARD_WIDTHS.image;
+  return { id: uid(), type: 'image', width: breite, position, data: { src, name } };
 }
 
 export function makeFile(
@@ -84,6 +90,14 @@ export function makePortal(position: Pos): AppNode {
 
 /** Wochenplan (M153): Stundenraster Mo–Fr, 8–17 Uhr — Zeitbereich und
  *  Tage-Anzahl sind in der Karte umschaltbar */
+/** M373: Entscheidungs-Bubbles — startet leer; die Frage trägt man in der Karte ein */
+export function makeBubbles(position: Pos): AppNode {
+  return {
+    id: uid(), type: 'bubbles', width: 560, height: 440, position,
+    data: { title: 'Ideen', frage: '', ...leereBubbles() },
+  } as AppNode;
+}
+
 /** M186: Protokoll-Reihe — startet leer, die erste Sitzung legt der Nutzer an */
 export function makeMinutes(position: Pos): AppNode {
   return {

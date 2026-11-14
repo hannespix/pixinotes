@@ -26,6 +26,7 @@
 // referenzgleich, damit die Oberfläche nichts neu zeichnet, was sich nicht
 // geändert hat.
 import type { Edge } from '@xyflow/react';
+import { bubblesMischen, type BubblesData } from './bubbles';
 import type { BoardDoc, CommentThread, Project, Space, Stroke } from '../store';
 import type { AppNode } from '../types';
 
@@ -196,13 +197,37 @@ function mergeThread(basis: CommentThread | undefined, lokal: CommentThread, fre
   return { ...lokal, msgs, ...(resolved === undefined ? {} : { resolved }) };
 }
 
+/**
+ * M373: An einer Bubbles-Karte arbeiten viele zugleich — zwei Fassungen werden nie gegeneinander entschieden,
+ * sondern vereinigt (jede Idee, jede Stimme ein eigener Eintrag; lib/bubbles.ts). Das gilt auch, wenn nur eine
+ * Seite „geändert" hat: Der Vergleich mit der Basis sagt bei gleichzeitigen Schreibern nicht, was verloren ginge
+ * (A hat seine Idee schon gesichert, dann überschreibt B mit einer Fassung, die sie nie gesehen hat).
+ */
+function bubblesVereinen(nodes: AppNode[], lokal: AppNode[], fremd: AppNode[]): AppNode[] {
+  if (!nodes.some((n) => n.type === 'bubbles')) return nodes;
+  let geaendert = false;
+  const aus = nodes.map((n) => {
+    if (n.type !== 'bubbles') return n;
+    const l = lokal.find((x) => x.id === n.id); const f = fremd.find((x) => x.id === n.id);
+    if (!l || !f || l.type !== 'bubbles' || f.type !== 'bubbles') return n;
+    const m = bubblesMischen(l.data as Partial<BubblesData>, f.data as Partial<BubblesData>);
+    const d = n.data as Partial<BubblesData>;
+    if (JSON.stringify([d.ideen, d.stimmen, d.gruppen, d.abstimmung]) === JSON.stringify([m.ideen, m.stimmen, m.gruppen, m.abstimmung])) return n;
+    geaendert = true;
+    return { ...n, data: { ...n.data, ...m } } as AppNode;
+  });
+  return geaendert ? aus : nodes;
+}
+
 /** Zwei geänderte Fassungen EINES Boards: Felder dreiwegig, Inhalte je Kennung */
 function mergeBoard(basis: BoardDoc | undefined, lokal: BoardDoc, fremd: BoardDoc, z: Zaehler): BoardDoc {
   // M360: Nur lesend geteilt — es gilt allein der Stand des Besitzers
   if (fremd.geteiltVon && fremd.geteiltRolle === 'lesen') return fremd;
   const feld = <K extends keyof BoardDoc>(k: K): BoardDoc[K] =>
     (basis && str(lokal[k]) === str(basis[k]) ? fremd[k] : lokal[k]);
-  const nodes = mergeListe<AppNode>(basis?.nodes, lokal.nodes, fremd.nodes, z);
+  const nodes = bubblesVereinen(
+    mergeListe<AppNode>(basis?.nodes, lokal.nodes, fremd.nodes, z, (_b, l, f) => { if (!(l.type === 'bubbles' && f.type === 'bubbles')) z.konflikte += 1; return l; }),
+    lokal.nodes, fremd.nodes);
   const da = new Set(nodes.map((n) => n.id));
   const edges = mergeListe<Edge>(basis?.edges, lokal.edges, fremd.edges, z)
     .filter((e) => da.has(e.source) && da.has(e.target));
@@ -411,11 +436,16 @@ export function dreiWegeMerge(basis0: SyncStand | null, lokal0: SyncStand, fremd
   const ids = reihenfolge(basis?.boards.map((b) => b.id), lokal.boards.map((b) => b.id), fremd.boards.map((b) => b.id));
   for (const id of ids) {
     const l = mL.get(id);
-    const w = entscheide<BoardDoc>(mB?.get(id), l, mF.get(id), (b, lo, fr) => mergeBoard(b, lo, fr, z), z, (was) => {
+    const w0 = entscheide<BoardDoc>(mB?.get(id), l, mF.get(id), (b, lo, fr) => mergeBoard(b, lo, fr, z), z, (was) => {
       if (was === 'fremd') bericht.aktualisiert += 1;
       else if (was === 'neu') bericht.neu += 1;
       else bericht.entfernt += 1;
     }, !!z.kennt);   // M351: mit Grabsteinen jede Karte einzeln — die fremde Datei kann eigene Neue nie gesehen haben
+    // M373: Bubbles-Karten immer vereinigen — auch wenn das Board als Ganzes von einer Seite übernommen wurde
+    const f = mF.get(id);
+    const w = w0 !== undefined && l !== undefined && f !== undefined
+      ? (() => { const nodes = bubblesVereinen(w0.nodes, l.nodes, f.nodes); return nodes === w0.nodes ? w0 : { ...w0, nodes }; })()
+      : w0;
     if (w !== undefined) boards.push(w);
     // Abweichung vom lokalen Stand merken (für Undo-Verlauf und Neuaufbau der Ansicht)
     if ((w === undefined) !== (l === undefined) || (w !== undefined && l !== undefined && w !== l && str(w) !== str(l))) geaendert.push(id);

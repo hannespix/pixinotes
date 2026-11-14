@@ -154,7 +154,7 @@ function OverviewCanvas() {
         nodesConnectable={false}
         deleteKeyCode={null}
         nodeDragThreshold={6}
-        proOptions={{ hideAttribution: false }}
+        proOptions={{ hideAttribution: true }}
         onNodeClick={(_, node) => {
           if (node.type === 'ovBoard') openBoard((node.data as { board: BoardDoc }).board.id);
         }}
@@ -1761,6 +1761,6 @@ const TYP_NAME: Record<string, string> = {
   note: 'Notiz', kanban: 'Kanban', gantt: 'Zeitplan', calendar: 'Kalender',
   sheet: 'Rechen-Tabelle', file: 'Datei', image: 'Bild', frame: 'Rahmen',
   minutes: 'Protokoll', week: 'Wochenplan', time: 'Zeiterfassung',
-  diagram: 'Diagramm', portal: 'Portal', shape: 'Form', htmlapp: 'App',
+  diagram: 'Diagramm', portal: 'Portal', shape: 'Form', htmlapp: 'App', bubbles: 'Bubbles',
 };
 

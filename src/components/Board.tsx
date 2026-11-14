@@ -20,7 +20,7 @@ import { leeresStartboard, mutedHistory, selectActiveBoard, selectNurLesen, useB
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon } from '../lib/pdfSeiten';
 import { frameMembers } from '../lib/arrange';
 import { computePush } from '../lib/physics';
-import { imageFileToDataUrl } from '../lib/image';
+import { bildMasse, imageFileToDataUrl } from '../lib/image';
 import { canEmbed, makeImage, makeNote } from '../lib/nodes';
 import { textZuBloecken } from '../lib/notiz';
 import { importFilesToBoard } from '../lib/importFiles';
@@ -41,6 +41,7 @@ import { SheetCard } from './nodes/SheetCard';
 import { MinutesCard } from './nodes/MinutesCard';
 import { TimeCard } from './nodes/TimeCard';
 import { HtmlAppCard } from './nodes/HtmlAppCard';
+import { BubblesCard } from './nodes/BubblesCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { focusable } from './FocusSheet';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -102,6 +103,7 @@ const nodeTypes: NodeTypes = {
   minutes: guard(MinutesCard),
   time: guard(TimeCard),
   htmlapp: guard(HtmlAppCard),
+  bubbles: guard(BubblesCard),
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
@@ -1480,7 +1482,7 @@ export function Board() {
             ausgewichen += await importFilesToBoard([file], pos);
             continue;
           }
-          addNode(makeImage(pos, src, file.name && file.name !== 'image.png' ? file.name : 'Screenshot'));
+          addNode(makeImage(pos, src, file.name && file.name !== 'image.png' ? file.name : 'Screenshot', await bildMasse(src)));
           placed++;
         } catch (err) {
           console.error('Einfügen fehlgeschlagen:', err);
@@ -1568,7 +1570,8 @@ export function Board() {
           labelStyle: { fontSize: 11, fill: 'var(--muted)' },
           labelBgStyle: { fill: 'var(--bg)', fillOpacity: 0.9 },
         }}
-        proOptions={{ hideAttribution: false }}
+        // M373: der „React Flow"-Schriftzug unten rechts ist ausgeblendet (Nutzerwunsch); die Bibliothek ist in der Hilfe genannt
+        proOptions={{ hideAttribution: true }}
       >
         <ViewportPortal><Fanglinien /></ViewportPortal>
         {/* M364: Karten, die gerade ein anderer bearbeitet — Rahmen mit Namen */}

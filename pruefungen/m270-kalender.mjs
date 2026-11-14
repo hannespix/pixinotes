@@ -74,7 +74,7 @@ const kalMenue = async () => {
   const offen = await P.evaluate(() => !!document.querySelector('.cal-menu:not(.cal-dayedit)'));
   if (!offen) {
     await P.evaluate(() => {
-      document.querySelector('.cal-nav button[aria-label="Kalender-Optionen"]')?.click();
+      document.querySelector('.cal-nav button[aria-label="Mehr"]')?.click();   // M313: das ⋯ heißt „Mehr"
     });
     await P.waitForTimeout(500);
   }
@@ -90,7 +90,7 @@ const menueKnopf = (text) => P.evaluate((t) => {
 // ══ T1: Es gibt eine Jahresansicht ═══════════════════════════════════
 console.log('════ T1: Jahresansicht ════');
 {
-  const start = await P.evaluate(() => document.querySelector('.cal-nav button:nth-of-type(3)')?.textContent.trim());
+  const start = await P.evaluate(() => document.querySelector('.cal-nav button:nth-of-type(1)')?.textContent.trim());   // M313: der Umschalter steht vorn
   console.log('    Umschalter zeigt zunächst:', start);
   pruefe('T1a der Umschalter beginnt bei „Woche" (Monatsansicht)', start === 'Woche');
   // Monat → Woche → Jahr

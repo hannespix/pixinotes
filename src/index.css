@@ -439,6 +439,26 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .image-card { position: relative; background: var(--surface-card); border-radius: var(--r); padding: 8px; overflow: hidden; display: flex; flex-direction: column; }
 .image-card img { width: 100%; min-height: 0; flex: 1; object-fit: contain; border-radius: var(--r-sm); display: block; }
 .img-name { margin-top: 6px; }
+/* M374: Bilder liegen rahmenlos auf dem Board — die Karte IST das Bild. Kein Rand, keine Fläche, kein
+   Schatten; Durchsichtiges bleibt durchsichtig. Rahmen, Griffe, Lupe und Name kommen erst mit der Auswahl.
+   Der Schatten der Karte sitzt sonst am Knoten — bei Bildern trägt ihn nur die Fassung „mit Rahmen". */
+.react-flow__node-image, .react-flow__node-image:hover, .react-flow__node-image.dragging { box-shadow: none; border-radius: 0; }
+.react-flow__node-image.selected { border-radius: 2px; }
+.image-card.mit-rahmen { box-shadow: var(--card-shadow); }
+.image-card.rahmenlos:not(.kachel) { background: none; padding: 0; border-radius: 0; overflow: visible; }
+.image-card.rahmenlos:not(.kachel) img { border-radius: 0; }
+.image-card.kachel { box-shadow: var(--card-shadow); }
+/* Der Name steht UNTER dem Bild, außerhalb der Karte — er verändert ihre Maße nicht */
+.card-shell > .img-name.unterschrift {
+  position: absolute; top: 100%; left: 0; margin-top: 7px; min-width: min(160px, 60vw); max-width: max(100%, 220px);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Nicht markiert: kein Griff, keine Anschlusspunkte, keine Lupe — auch nicht beim Zeigen */
+.react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .pn-handle,
+.react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .card-grip { opacity: 0; pointer-events: none; }
+.react-flow__node:not(.selected) .image-card.rahmenlos:not(.kachel) .bild-lupe-auf { opacity: 0; pointer-events: none; }
+html[data-kontrast='hoch'] .image-card.rahmenlos:not(.kachel) { border: 0; }
+.focus-mode .pn-focused .image-card.rahmenlos:not(.kachel) { box-shadow: none !important; }
 
 /* ---------- Datei-Karte ---------- */
 /* M254: Bildvorschau auf der Datei-Karte — dieselbe Rolle wie die
@@ -6867,3 +6887,81 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
    niemand in der Notiz steht. So trug jede Karte, die ein anderer angelegt hatte, bei allen übrigen nur diesen
    blassen Satz, und unter fertigem Text blieb er als graue Zeile stehen. Jetzt nur noch mit Tastatur-Fokus. */
 .note-editor .bn-editor:not(:focus-within) .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before { content: none !important; }
+
+/* ───── M373: Entscheidungs-Bubbles ───── */
+.bubbles-card { background: var(--surface-card); border-radius: var(--r); padding: 10px 12px 10px; overflow: hidden; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
+.bub-kopf { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex: none; }
+.bub-titel { font-weight: 700; font-size: 14px; color: var(--ink); flex: 1; min-width: 0; border: none; background: transparent; outline: none; font-family: inherit; }
+.bub { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.bub-frage { display: flex; align-items: center; gap: 8px; flex: none; }
+.bub-frage-feld { flex: 1; min-width: 0; border: none; background: transparent; outline: none; font-family: inherit; font-size: 13px; color: var(--ink); padding: 2px 0; }
+.bub-frage-feld::placeholder { color: var(--muted); }
+.bub-zahl { flex: none; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.bub-buehne {
+  position: relative; flex: 1; min-height: 120px; overflow: hidden; border-radius: var(--r);
+  background: var(--surface); border: 1px solid var(--border-soft); touch-action: none; cursor: default;
+}
+.bub-blase {
+  position: absolute; left: 0; top: 0; width: 80px; height: 80px; border-radius: 50%; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 0.55em;
+  color: #fff; font-weight: 700; line-height: 1.15; cursor: grab; user-select: none; will-change: transform;
+  box-shadow: 0 2px 6px rgba(22, 25, 30, 0.22), inset 0 -6px 14px rgba(0, 0, 0, 0.12), inset 0 5px 10px rgba(255, 255, 255, 0.18);
+  outline: none;
+}
+.bub-blase:active { cursor: grabbing; }
+.bub-blase.gewaehlt, .bub-blase:focus-visible { box-shadow: 0 0 0 3px var(--surface-card), 0 0 0 6px var(--ink); z-index: 3; }
+.bub-blase.vorn { z-index: 2; }
+/* (kein Prozent-Innenabstand an der Blase: Prozente bezögen sich auf die Breite der Bühne, nicht der Blase) */
+.bub-text { display: block; width: 100%; max-height: 4.6em; overflow: hidden; overflow-wrap: break-word; hyphens: auto; pointer-events: none; }
+.bub-mal, .bub-punkte {
+  position: absolute; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 10px;
+  background: var(--surface-card); color: var(--ink); font-size: 11px; font-weight: 700; line-height: 20px; box-shadow: 0 1px 3px rgba(22, 25, 30, 0.3); pointer-events: none; white-space: nowrap;
+}
+/* auf dem Rand des Kreises (nicht in der Ecke seines Quadrats — dort deckt sie die Nachbarblase zu) */
+.bub-mal { right: 6%; top: 6%; }
+.bub-punkte { left: 6%; top: 6%; }
+.bub-meine {
+  position: absolute; bottom: 3%; left: 50%; transform: translateX(-50%); border: none; cursor: pointer; font-family: inherit;
+  background: rgba(22, 25, 30, 0.55); color: #fff; font-size: 9px; letter-spacing: 1px; line-height: 1; padding: 3px 7px; border-radius: 9px;
+}
+.bub-ring { position: absolute; left: 0; top: 0; border: 2px dashed; border-radius: 50%; box-sizing: border-box; pointer-events: none; opacity: 0; transition: opacity 0.2s; }
+.bub-ring-name { position: absolute; left: 0; top: 0; z-index: 4; opacity: 0; background: var(--surface); padding: 1px 8px; border-radius: 9px; font-size: 11.5px; font-weight: 700; line-height: 1.35; white-space: nowrap; max-width: 60%; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.bub-leer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 12%; text-align: center; color: var(--muted); font-size: 12.5px; line-height: 1.45; pointer-events: none; }
+.bub-leer b { color: var(--ink); font-size: 14px; }
+.bub-pille {
+  position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 5; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--pop-shadow); padding: 6px 8px; font-size: 12px;
+}
+.bub-pille-text { font-weight: 700; flex: 1 1 120px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bub-pille button, .bub-knopf, .bub-dazu, .bub-menue button {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink); font-family: inherit; font-size: 12px; cursor: pointer; border-radius: var(--r-xs); padding: 4px 9px; white-space: nowrap;
+}
+.bub-pille button.an, .bub-knopf.an { background: var(--accent); border-color: var(--accent); color: #fff; }
+.bub-pille button:hover, .bub-knopf:hover:not(:disabled), .bub-menue button:hover:not(:disabled) { border-color: var(--accent); }
+.bub-knopf:disabled, .bub-dazu:disabled, .bub-menue button:disabled { opacity: 0.45; cursor: default; }
+.bub-pille-feld { border: 1px solid var(--border-soft); border-radius: var(--r-xs); background: var(--surface); color: var(--ink); font-family: inherit; font-size: 12px; padding: 4px 7px; outline: none; flex: 1 1 140px; min-width: 0; }
+.bub-pille-feld.kurz { flex: 0 1 120px; }
+.bub-ergebnis { flex: none; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink); padding: 2px 2px 0; }
+.bub-ergebnis i { font-style: normal; color: var(--muted); font-weight: 700; }
+.bub-leiste { flex: none; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bub-eingabe { flex: 1 1 150px; min-width: 0; border: 1px solid var(--border-soft); border-radius: var(--r-xs); background: var(--surface); color: var(--ink); font-family: inherit; font-size: 13px; padding: 6px 9px; outline: none; }
+.bub-eingabe:focus { border-color: var(--accent); }
+.bub-dazu { font-weight: 700; padding: 5px 11px; }
+.bub-rest { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.bub-mehr { position: relative; }
+.bub-menue {
+  position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 20; min-width: 210px; display: flex; flex-direction: column; gap: 4px;
+  background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--pop-shadow); padding: 8px;
+}
+.bub-menue button { text-align: left; white-space: normal; }
+.bub-menue label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--ink); padding: 2px 2px 4px; }
+.bub-stufen { display: inline-flex; align-items: center; gap: 6px; }
+.bub-stufen button { padding: 2px 8px; }
+/* als Folie: die Bühne füllt die Folie, alles etwas größer */
+.presenter-slide.editable > .slide-bubbles { width: 100%; height: 100%; margin: 0; align-self: stretch; padding: 0; background: transparent; }
+.slide-bubbles-titel { margin: 0 0 4px; font-size: 1em; }
+.bub.gross .bub-frage-feld { font-size: 0.8em; }
+.bub.gross .bub-eingabe { font-size: 16px; padding: 9px 12px; }
+.bub.gross .bub-knopf, .bub.gross .bub-dazu { font-size: 14px; padding: 7px 13px; }
+.bub.gross .bub-ergebnis { font-size: 15px; }
+.bub.gross .bub-mal, .bub.gross .bub-punkte { font-size: 14px; height: 26px; line-height: 26px; min-width: 26px; border-radius: 13px; }

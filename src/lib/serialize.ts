@@ -1,6 +1,7 @@
 // Karten → Text / HTML: für „Per E-Mail teilen", Zwischenablage (Outlook-Paste)
 // und die Suche. Bewusst schlicht gehalten — sauberes Office-taugliches HTML.
 import { doneCol, kanbanCols, type AppNode, type SheetData } from '../types';
+import { bubblesAlsText } from './bubbles';
 import { formatBytes } from './parseEmail';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from './formel';
 
@@ -470,6 +471,8 @@ function baseNodeText(node: AppNode): string {
       return `Rahmen: ${node.data.name}`;
     case 'htmlapp':
       return `Eigene App: ${node.data.name} (${formatBytes(node.data.size)})`;
+    case 'bubbles':
+      return bubblesAlsText(node.data);
     case 'time': {
       const t = node.data;
       const labels: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause' };

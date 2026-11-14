@@ -8,7 +8,7 @@ import { textDateienAlsNotizen, textKarte } from '../lib/textNotiz';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { KACHEL_TYPEN, STICKY_COLORS, uid, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -684,6 +684,20 @@ export function SelectionToolbar() {
                     ))}
                   </div>
                 )}
+                {/* M374: Bilder liegen rahmenlos auf dem Board — hier kommt die Karte mit Rand zurück (und wieder weg) */}
+                {selected.every((n) => n.type === 'image') && (() => {
+                  const alleMit = selected.every((n) => (n.data as { rahmen?: boolean }).rahmen === true);
+                  return (
+                    <button
+                      data-taste="bild-rahmen"
+                      aria-pressed={alleMit}
+                      title={alleMit ? 'Nur das Bild zeigen — ohne Rand, Fläche und Schatten' : 'Als Karte mit Rand, Fläche und Schatten zeigen'}
+                      onClick={() => { setMenu(null); for (const n of selected) updateNodeData(n.id, { rahmen: alleMit ? undefined : true }); }}
+                    >
+                      <IImage size={14} /> {alleMit ? 'Ohne Rahmen (nur das Bild)' : 'Mit Rahmen (als Karte)'}
+                    </button>
+                  );
+                })()}
                 {/* M296: „Schrift & Größe" liegt hier — und NUR hier. M267 hatte
                     ihm einen eigenen Knopf in der Leiste gegeben; die Leiste soll
                     aber sechs Elemente haben, und ein Weg reicht. */}

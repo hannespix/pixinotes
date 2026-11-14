@@ -34,6 +34,23 @@ const app = http.createServer((q, r) => {
 });
 await new Promise((x) => app.listen(PORT, x));
 
+/** M313: Die Zeit-Skala liegt im ⋯ des Zeitplans (früher ein Auswahlfeld in der Kopfzeile) */
+const ganttMenue = async (P, auf) => {
+  const offen = await P.evaluate(() => !!document.querySelector('.ebenen-menu button[data-skala]'));
+  if (offen !== auf) { await P.evaluate(() => { document.querySelector('.gantt-tools .ebenen-menu-knopf')?.click(); }); await P.waitForTimeout(250); }
+};
+const skalaWaehlen = async (P, wert) => {
+  await ganttMenue(P, true);
+  await P.evaluate((s) => { document.querySelector(`.ebenen-menu button[data-skala="${s}"]`)?.click(); }, wert);
+};
+/** Welche Skala gilt gerade? (Haken im Menü) */
+const skalaJetzt = async (P) => {
+  await ganttMenue(P, true);
+  const w = await P.evaluate(() => document.querySelector('.ebenen-menu button[data-skala][aria-checked="true"]')?.getAttribute('data-skala') ?? null);
+  await ganttMenue(P, false);
+  return w;
+};
+
 let ok = 0; let bad = 0;
 const pruefe = (n, gut, info = '') => {
   if (gut) { ok += 1; console.log(`  ✓ ${n}`); } else { bad += 1; console.log(`  ✗ ${n} ${info}`); }
@@ -84,13 +101,13 @@ const mittenTag = () => P.evaluate(() => {
 console.log('════ T1: Zeit-Anker beim Skalenwechsel ════');
 {
   const vorher = await mittenTag();
-  await P.locator('.gantt-scale').selectOption('monate');
+  await skalaWaehlen(P, 'monate');
   await P.waitForTimeout(800);
   const nachher = await mittenTag();
   console.log(`    Mitte vorher Tag ${Math.round(vorher)}, nachher Tag ${Math.round(nachher)}`);
   pruefe('T1a Tage → Monate bleibt am selben Datum (±14 Tage)',
     Math.abs(vorher - nachher) < 14, `${Math.round(vorher)} → ${Math.round(nachher)}`);
-  await P.locator('.gantt-scale').selectOption('wochen');
+  await skalaWaehlen(P, 'wochen');
   await P.waitForTimeout(800);
   const zurueck = await mittenTag();
   pruefe('T1b Monate → Wochen ebenso', Math.abs(nachher - zurueck) < 14,
@@ -100,7 +117,7 @@ console.log('════ T1: Zeit-Anker beim Skalenwechsel ════');
 // ══ T2: Jahres-Skala füllt das Fenster ═══════════════════════════════
 console.log('\n════ T2: Jahres-Skala ════');
 {
-  await P.locator('.gantt-scale').selectOption('jahre');
+  await skalaWaehlen(P, 'jahre');
   await P.waitForTimeout(800);
   const j = await P.evaluate(() => {
     const svg = document.querySelector('.gantt-svg');
@@ -129,7 +146,7 @@ console.log('\n════ T2: Jahres-Skala ════');
 // ══ T2e/f: Monatsnamen überlappen nie ════════════════════════════════
 console.log('\n════ T2e: Monatsnamen in der Kopfzeile ════');
 {
-  await P.locator('.gantt-scale').selectOption('monate');
+  await skalaWaehlen(P, 'monate');
   await P.waitForTimeout(800);
   const m = await P.evaluate(() => {
     const t = [...document.querySelectorAll('.gantt-kopf .gantt-month')]
@@ -143,7 +160,7 @@ console.log('\n════ T2e: Monatsnamen in der Kopfzeile ════');
   pruefe('T2e die Monatsansicht beschriftet ihre Monate', m.anzahl >= 6, String(m.anzahl));
   pruefe('T2f kein Monatsname läuft in den nächsten hinein',
     m.kollisionen.length === 0, JSON.stringify(m.kollisionen));
-  await P.locator('.gantt-scale').selectOption('jahre');
+  await skalaWaehlen(P, 'jahre');
   await P.waitForTimeout(600);
 }
 
@@ -181,9 +198,10 @@ console.log('\n════ T4: Geisterzeilen füllen die Karte ════');
 // ══ T5: Heute-Fahne verdeckt keine Kopf-Beschriftung ═════════════════
 console.log('\n════ T5: Heute-Fahne ════');
 {
-  await P.locator('.gantt-scale').selectOption('tage');
+  await skalaWaehlen(P, 'tage');
   await P.waitForTimeout(800);
-  await P.locator('button[title="Zu heute springen"]').click();
+  await ganttMenue(P, true);
+  await P.evaluate(() => { [...document.querySelectorAll('.ebenen-menu button')].find((b) => b.textContent.includes('Zu heute springen'))?.click(); });
   await P.waitForTimeout(600);
   /* M281 hat die Regel VERBESSERT: M279 schob die Fahne unter die Kopfzeile,
      damit sie keine Tageszahl verdeckt — dort lag sie dann aber dauerhaft auf

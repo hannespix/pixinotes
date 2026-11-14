@@ -8,7 +8,7 @@
 // aktive Board zu einem verbundenen Team-Projekt gehört (attachments.ts).
 import { mutedHistory, useBoard, selectActiveBoard } from '../store';
 import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from './parseEmail';
-import { imageFileToDataUrl, readFileAsDataUrl } from './image';
+import { bildMasse, imageFileToDataUrl, readFileAsDataUrl } from './image';
 import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, makeNote, makeSheet } from './nodes';
 // M184: statisch importiert (kein dynamic import) — vite-plugin-singlefile
 // backt alles in EINE Datei; ein nachgeladener Zusatz-Brocken wäre dort nach
@@ -279,7 +279,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           showToast('⚠️ Speicher fast voll — Bild als Datei-Karte abgelegt, nicht eingebettet.');
           mirror(file, node.id, mirrorNote);
         } else {
-          const node = makeImage(pos, src, file.name);
+          const node = makeImage(pos, src, file.name, await bildMasse(src));
           addNode(node);
           mirror(file, node.id, mirrorNote);
         }

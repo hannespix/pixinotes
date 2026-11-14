@@ -89,13 +89,27 @@ const chips = () => P.evaluate(() => {
   return out;
 });
 
+/** Das ⋯ der Kalender-Karte öffnen oder schließen (M313: heißt „Mehr") */
+const menue = async (auf) => {
+  const offen = await P.evaluate(() => !!document.querySelector('.cal-menu:not(.cal-dayedit)'));
+  if (offen !== auf) {
+    await P.evaluate(() => document.querySelector('.cal-nav button[aria-label="Mehr"]')?.click());
+    await P.waitForTimeout(500);
+  }
+};
+
 // ══ T1: Verbunden-Bereich — nur die verbundene Notiz liefert ══════════
 console.log('════ T1: Termine der VERBUNDENEN Notiz ════');
 {
-  const bereich = await P.evaluate(() =>
-    [...document.querySelectorAll('.cal-nav button')].find((b) => b.textContent.includes('Verbunden'))?.textContent.trim());
-  console.log('    Bereichs-Schalter:', bereich);
-  pruefe('T1a der Kalender steht auf „Verbunden" (Pfeil vorhanden)', bereich === 'Verbunden (1)', bereich);
+  // M313: Die Quelle (alle Boards · dieses Board · verbundene Karten) liegt im ⋯ der Karte
+  await menue(true);
+  const bereich = await P.evaluate(() => {
+    const l = [...document.querySelectorAll('.cal-menu-check')].find((x) => x.querySelector('input[type="radio"]')?.checked);
+    return l?.textContent.trim();
+  });
+  console.log('    Quelle:', bereich);
+  pruefe('T1a der Kalender steht auf „Nur verbundene Karten" (Pfeil vorhanden)', bereich === 'Nur verbundene Karten (1)', bereich);
+  await menue(false);
 
   const c = await chips();
   console.log('    Chips im Mai 2027:', JSON.stringify(c));
@@ -110,10 +124,12 @@ console.log('════ T1: Termine der VERBUNDENEN Notiz ════');
 // ══ T2: Bereich „Alle Boards" — auch die unverbundene Notiz ══════════
 console.log('\n════ T2: Bereich „Alle Boards" ════');
 {
+  await menue(true);
   await P.evaluate(() => {
-    [...document.querySelectorAll('.cal-nav button')].find((b) => b.textContent.includes('Verbunden'))?.click();
+    [...document.querySelectorAll('.cal-menu-check')].find((x) => x.textContent.trim() === 'Alle Boards')?.querySelector('input')?.click();
   });
   await P.waitForTimeout(700);
+  await menue(false);
   const c = await chips();
   pruefe('T2a jetzt ist auch der Elternabend am 20. da', !!c['20']?.some((t) => t.includes('Elternabend')), JSON.stringify(c['20']));
   pruefe('T2b die verbundene Notiz liefert weiterhin', !!c['12']?.some((t) => t.includes('Deutsch')));
@@ -140,10 +156,7 @@ console.log('\n════ T3: Klick auf den Eintrag ════');
 // ══ T4: Abschaltbar ══════════════════════════════════════════════════
 console.log('\n════ T4: Der Schalter „Termine aus Notizen" ════');
 {
-  await P.evaluate(() => {
-    document.querySelector('.cal-nav button[aria-label="Kalender-Optionen"]')?.click();
-  });
-  await P.waitForTimeout(600);
+  await menue(true);
   const schalter = await P.evaluate(() => {
     const labels = [...document.querySelectorAll('.cal-menu-check')];
     const l = labels.find((x) => x.textContent.includes('Termine aus Notizen'));
