@@ -6827,6 +6827,54 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 }
 .live-zeig:hover, .live-zeig:focus-visible { border-color: var(--accent); }
 .live-zeig.an { background: var(--accent); border-color: var(--accent); }
+/* M377: Punkte auf Karten */
+.punkte-punkt { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+.punkte-marke {
+  position: absolute; left: 0; top: 0; z-index: 2900; margin: -11px 0 0 -30px;
+  display: inline-flex; align-items: center; gap: 4px; height: 22px; min-width: 22px; padding: 0 7px 0 6px;
+  border: 1.5px solid var(--surface-card); border-radius: 999px; background: #495057; color: #fff;
+  font: inherit; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .25); pointer-events: auto;
+}
+.punkte-marke.mein { background: var(--accent); }
+.punkte-marke:hover, .punkte-marke:focus-visible { filter: brightness(1.12); outline: none; }
+html[data-punkte-modus] .react-flow__node { cursor: pointer !important; }
+html[data-punkte-modus] .react-flow__node * { cursor: pointer !important; }
+html[data-punkte-modus] .react-flow__node:hover { outline: 2px dashed var(--accent); outline-offset: 3px; }
+html[data-alles-zeigen] .punkte-leiste { display: none !important; }
+.punkte-leiste {
+  position: fixed; left: 50%; bottom: calc(92px + var(--safe-bottom, 0px)); transform: translateX(-50%); z-index: 58;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 24px);
+  background: var(--surface-card); color: var(--ink); border: 1px solid var(--accent); border-radius: var(--r); box-shadow: var(--pop-shadow);
+  padding: 8px 10px 8px 14px; font-size: 12.5px;
+}
+.punkte-leiste-text { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); }
+.punkte-leiste-text b { color: var(--ink); }
+.punkte-leiste-zahl { color: var(--muted); font-variant-numeric: tabular-nums; }
+.punkte-leiste-zahl b { color: var(--ink); }
+.punkte-leiste button {
+  height: 28px; padding: 0 10px; border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.punkte-leiste button:hover:not(:disabled), .punkte-leiste button.an { border-color: var(--accent); color: var(--accent); }
+.punkte-leiste button:disabled { opacity: .45; cursor: default; }
+.punkte-leiste button.haupt { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+.punkte-leiste button.haupt:hover { filter: brightness(1.08); color: #fff; }
+.punkte-rang-wrap { position: relative; display: inline-flex; }
+.punkte-rang {
+  position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); width: min(340px, calc(100vw - 32px)); max-height: 46vh; overflow: auto;
+  background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--pop-shadow); padding: 4px;
+  display: flex; flex-direction: column;
+}
+.punkte-leiste .punkte-rang-zeile {
+  display: flex; align-items: center; gap: 8px; height: auto; min-height: 30px; padding: 4px 8px; border: none; background: none; text-align: left; white-space: normal;
+}
+.punkte-leiste .punkte-rang-zeile:hover { background: var(--surface-3); color: var(--ink); }
+.punkte-rang-platz { flex: none; width: 1.8em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.punkte-rang-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.punkte-rang-zahl { flex: none; display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-variant-numeric: tabular-nums; color: #495057; }
+.punkte-rang-zahl.mein { color: var(--accent); }
+.punkte-rang-mehr { padding: 4px 8px; font-size: 11.5px; color: var(--muted); }
 /* M376: Reaktionen und gemeinsamer Timer */
 .reakt-wrap, .timer-wrap { position: relative; display: inline-flex; }
 .live-zeig.timer-knopf { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }

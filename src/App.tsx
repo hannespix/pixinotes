@@ -46,6 +46,7 @@ import { initVorfuehren } from './lib/vorfuehren';
 import { initMauszeiger } from './lib/mauszeiger';
 import { initGruppenraum } from './lib/gruppenraum';
 import { GruppenraumSchicht } from './components/Gruppenraum';
+import { PunkteLeiste } from './components/Punkte';
 import { Vorfuehren } from './components/Vorfuehren';
 import { SprachHinweis } from './components/SprachHinweis';
 import { GastNameDialog, LiveLeiste, NAME_FRAGEN } from './components/LiveLeiste';
@@ -354,6 +355,8 @@ export default function App() {
         {view === 'board' && !tasksOpen && <Vorfuehren />}
         {/* M376: aufsteigende Reaktionen und die gemeinsame Uhr — über Board und Präsentation */}
         {view === 'board' && !tasksOpen && <GruppenraumSchicht />}
+        {/* M377: Punkte-Modus — Karten antippen statt auswählen */}
+        {view === 'board' && !tasksOpen && !presenting && <PunkteLeiste />}
         <GastNameDialog />
         {/* M368: anderssprachigen Nutzern sagen, dass der Browser die Oberfläche übersetzen kann */}
         {!presenting && <SprachHinweis />}

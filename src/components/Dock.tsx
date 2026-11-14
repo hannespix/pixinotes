@@ -4,6 +4,7 @@ import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
 import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, makeSheet, makeTime, makeWeek } from '../lib/nodes';
 import { importFilesToBoard, importHtmlAppFromUrl } from '../lib/importFiles';
+import { punkteModusSetzen } from '../lib/punkte';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
 import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
 import { selectActiveBoard } from '../store';
@@ -491,6 +492,15 @@ export function Dock() {
               <IArrange size={16} /> Anordnen &amp; Hintergrund …
             </button>
             <div className="dock-menu-label">Board</div>
+            {/* M377: Punkte kleben — Karten antippen, jede Person einen Punkt je Karte */}
+            <button
+              onClick={() => { setMoreMenu(false); punkteModusSetzen(true); }}
+              data-taste="punkte-modus"
+              title="Punkte vergeben: Karten antippen — alle im Board stimmen gleichzeitig ab, die Rangliste zeigt das Ergebnis"
+              aria-label="Punkte vergeben"
+            >
+              <ICircles size={16} /> Punkte vergeben
+            </button>
             <button
               onClick={() => { setMoreMenu(false); setPresenting(true); }}
               data-taste="praesentieren"
