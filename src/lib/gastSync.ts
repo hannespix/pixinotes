@@ -13,7 +13,7 @@
 // Maße der Karten (`measured`) misst jedes Gerät selbst — ein Telefon anders als ein Laptop. Sie reisen darum
 // nicht als Änderung: Verglichen und geschrieben wird mit den Maßen des letzten gemeinsamen Stands, sonst
 // schickten sich zwei verschiedene Geräte endlos „Änderungen" zu.
-import { flushPersist, isImportedState, NOTIZ_EXTERN, ohneLeseschutz, runDerived, setzeGruppe, setzeKartenSperren, useBoard, verlaufAbgrenzen, type BoardDoc, type GastRecht, type Space } from '../store';
+import { flushPersist, isImportedState, leeresStartboard, NOTIZ_EXTERN, ohneLeseschutz, ohneStartboard, runDerived, setzeGruppe, setzeKartenSperren, useBoard, verlaufAbgrenzen, type BoardDoc, type GastRecht, type Space } from '../store';
 import { getAuthor } from '../components/CommentLayer';
 import { loadFile, saveFile } from './fileStore';
 import { supabaseKonfig } from './kontoSupabase';
@@ -929,6 +929,9 @@ export async function gastBeitreten(token: string): Promise<GastErgebnis> {
     da = undefined;
   }
   const board = gezeichnet(roh, g, token);
+  // M370: Wer nichts Eigenes hat (nur das unberührte Startboard), sieht danach nur das geteilte Board
+  const start = leeresStartboard(boardsVor);
+  if (start) { ({ boards: boardsVor, spaces: spacesVor } = ohneStartboard({ boards: boardsVor, spaces: spacesVor }, start.id)); aktiv = board.id; }
   const boards = da ? boardsVor.map((b) => (b.id === board.id ? mitMassenVon(board, da!) : b)) : [...boardsVor, board];
   const spaces: Space[] = mitGeteiltBereich(spacesVor, boards.filter((b) => b.geteiltVon));
   // Erst der Eintrag, dann das Board, beides sofort fest — wird die Seite genau jetzt geschlossen, passt es zusammen

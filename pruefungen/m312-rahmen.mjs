@@ -11,7 +11,7 @@
  *      Bild-Export, Alles einpassen — kein zweites „Aufräumen", kein Archiv-Eintrag.
  *   D  Fläche: keine Zoom-Knöpfe, kein ✕ an Karten (Löschen über Leiste/Entf).
  *   E  Übersicht: keine offenen „+"/„✕"/„▶"-Knöpfe; ⋯ an Bereich, Projekt, Board.
- *   F  Begrüßung: zwei Knöpfe, „Beispiele ansehen" verdoppelt nichts.
+ *   F  Begrüßung: zwei Knöpfe; „Beispiele laden" holt die Beispiele einmal (M370: der Start ist leer).
  *   G  „Was ist neu" nennt M312.
  */
 // Läuft aus dem Repository: `node pruefungen/m312-rahmen.mjs`
@@ -229,12 +229,13 @@ console.log('\n════ F: Begrüßung beim ersten Start ════');
 {
   const { ctx, P } = await seite({ frisch: true });
   const knoepfe = await P.locator('.onb-acts button').allTextContents();
-  pruefe('F1 zwei Knöpfe: Loslegen, Beispiele ansehen', knoepfe.length === 2 && /Loslegen/.test(knoepfe[0]) && /Beispiele/.test(knoepfe[1]), JSON.stringify(knoepfe));
+  pruefe('F1 zwei Knöpfe: Loslegen, Beispiele laden', knoepfe.length === 2 && /Loslegen/.test(knoepfe[0]) && /Beispiele/.test(knoepfe[1]), JSON.stringify(knoepfe));
   const vorher = await P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board') ?? '{"state":{"boards":[]}}').state.boards.length);
   await P.locator('.onb-acts button', { hasText: 'Beispiele' }).click();
   await P.waitForTimeout(1200);
   const nachher = await P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards.length);
-  pruefe('F2 „Beispiele ansehen" verdoppelt die Beispiele nicht', nachher === vorher || vorher === 0, `vorher ${vorher}, nachher ${nachher}`);
+  // M370: Der Start ist ein leeres Board; die Beispiele ersetzen es — einmal, nicht doppelt
+  pruefe('F2 „Beispiele laden" holt die Beispiele einmal und ersetzt das leere Startboard', vorher <= 1 && nachher === 18, `vorher ${vorher}, nachher ${nachher}`);
   pruefe('F3 … und zeigt die Übersicht', (await P.locator('.ov-mode').count()) === 1);
   await ctx.close();
 }

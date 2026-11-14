@@ -6836,3 +6836,12 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
   flex: none; border: none; cursor: pointer; background: var(--accent); color: #fff;
   font-family: inherit; font-size: 12.5px; font-weight: 700; padding: 7px 14px; border-radius: 999px;
 }
+
+/* M370: leerer Start — die Beispiele sind ein Angebot auf dem leeren Board */
+.empty-board-hint .empty-beispiele {
+  pointer-events: auto; cursor: pointer; margin-top: 8px; font-family: inherit; font-size: 13.5px; font-weight: 700;
+  color: var(--accent-strong); background: var(--surface-card); border: 1px solid var(--accent); border-radius: var(--r-lg);
+  padding: 9px 18px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.empty-board-hint .empty-beispiele small { font-weight: 400; font-size: 11.5px; color: var(--muted); }
+.empty-board-hint .empty-beispiele:hover, .empty-board-hint .empty-beispiele:focus-visible { background: var(--accent-soft); }
