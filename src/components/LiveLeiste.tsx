@@ -11,7 +11,8 @@ import { ich, liveAuf, liveVerbunden, nameGeaendert, SPERREN_EREIGNIS, sperrenVo
 import type { Teilnehmer } from '../lib/liveKanal';
 import { getAuthor, setAuthor } from './CommentLayer';
 import { ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenStart, vorfuehrenStopp } from '../lib/vorfuehren';
-import { IX } from './Icons';
+import { ZEIGER_EREIGNIS, zeigerAn, zeigerSetzen } from '../lib/mauszeiger';
+import { IMousePointer, IX } from './Icons';
 
 export const NAME_FRAGEN = 'pixinotes:gast-name';
 
@@ -39,6 +40,7 @@ export function LiveLeiste() {
   useTakt(TEILNEHMER_EREIGNIS);
   useTakt(GRUPPE_EREIGNIS);
   useTakt(VORFUEHR_EREIGNIS);
+  useTakt(ZEIGER_EREIGNIS);
   // M366: Bei vielen Teilnehmern zeigt die Leiste wenige Kürzel und die Zahl; die ganze Liste klappt auf
   const [offen, setOffen] = useState(false);
   const nurLesen = useNurLesen();   // wer nur liest, führt nicht vor
@@ -80,6 +82,12 @@ export function LiveLeiste() {
         <button className={`live-zeig${ichFuehreVor(boardId) ? ' an' : ''}`} data-taste="vorfuehren" aria-pressed={ichFuehreVor(boardId)}
           title={ichFuehreVor(boardId) ? 'Vorführen beenden' : 'Vorführen: Alle folgen deiner Ansicht (Schwenken, Zoomen, Fokus)'}
           onClick={() => (ichFuehreVor(boardId) ? vorfuehrenStopp() : vorfuehrenStart(boardId))}>📣</button>
+      )}
+      {/* M375: Mauszeiger der anderen sehen und den eigenen zeigen — je Gerät abschaltbar */}
+      {andere.length > 0 && (
+        <button className={`live-zeig maus${zeigerAn() ? ' an' : ''}`} data-taste="live-maus" aria-pressed={zeigerAn()}
+          title={zeigerAn() ? 'Mauszeiger: Du siehst die Zeiger der anderen, sie sehen deinen — antippen blendet beides aus' : 'Mauszeiger sind ausgeblendet — antippen zeigt sie wieder'}
+          onClick={() => zeigerSetzen(!zeigerAn())}><IMousePointer size={14} /></button>
       )}
       {recht && (
         <span className="live-recht" data-taste="live-recht"

@@ -18,6 +18,7 @@ import { letzteSeite } from '../lib/pdfSeiten';
 import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, NoteNode, ShapeNode } from '../types';
 import { HtmlAppSlide } from './nodes/HtmlAppCard';
 import { BubblesBody } from './nodes/BubblesCard';
+import { FolienLaser } from './Mauszeiger';
 import { folgeIch, folgenSetzen, ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenStart, vorfuehrenStopp, vortragMelden, werFuehrtVor } from '../lib/vorfuehren';
 import { ich, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
 
@@ -229,6 +230,9 @@ export function Presenter() {
   }, []);
   /** Diese Präsentation hat sich geöffnet, weil ich dem Vorführenden folge — dann schließt sie sich auch mit ihm */
   const gefolgt = useRef(false);
+  /** M375: Laserpointer — ein roter Punkt statt des Mauszeigers; führt man vor, sehen ihn alle an derselben Stelle der Folie */
+  const [laser, setLaser] = useState(false);
+  useEffect(() => { if (!open) setLaser(false); }, [open]);
   const selbstRef = useRef<() => void>(() => {});
   /** Die Dokument-Folie meldet, ob auf der Seite noch etwas zu rollen ist — dann rollt der Schritt, statt zu blättern */
   const rollRef = useRef<((d: 1 | -1) => boolean) | null>(null);
@@ -271,6 +275,7 @@ export function Presenter() {
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') schrittRef.current(-1);
       else if (e.key === 'Home') { selbstRef.current(); setPos({ idx: 0, seite: 1 }); }          // M345
       else if (e.key === 'End') { selbstRef.current(); setPos({ idx: Math.max(0, slides.length - 1), seite: -1 }); }
+      else if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey && !e.altKey) setLaser((v) => !v);   // M375
       e.preventDefault();
       e.stopPropagation();
     };
@@ -362,6 +367,13 @@ export function Presenter() {
             📣 {ichZeige ? 'Team folgt' : 'Team mitnehmen'}
           </button>
         )}
+        {slides.length > 0 && (
+          <button className={`presenter-team presenter-laser ${laser ? 'an' : ''}`} data-taste="vortrag-laser" aria-pressed={laser}
+            title={laser ? 'Laserpointer ausschalten (L)' : 'Laserpointer: ein roter Punkt statt des Mauszeigers (L)'}
+            onClick={() => setLaser((v) => !v)}>
+            <span className="laser-knopf-punkt" aria-hidden="true" /> Laser
+          </button>
+        )}
         <button onClick={() => { selbst(); setOpen(false); }} aria-label="Präsentation beenden">✕</button>
       </div>
       {slides.length === 0 ? (
@@ -387,6 +399,8 @@ export function Presenter() {
           </div>
         )
       )}
+      {/* M375: Laser — eine Schicht genau über der Folie (misst sich selbst an ihr aus) */}
+      {slides.length > 0 && <FolienLaser boardId={board.id} folie={cur.id} an={laser} senden={ichZeige} />}
       <div className="presenter-foot">
         {/* aria-disabled statt disabled: Ein Knopf, der mit Tastatur-Fokus „disabled" wird, verschluckt danach alle Tasten (M361) */}
         <button onClick={() => weiter(-1)} aria-disabled={amAnfang} data-taste="vortrag-zurueck">‹ Zurück</button>

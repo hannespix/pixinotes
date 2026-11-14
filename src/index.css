@@ -6827,6 +6827,37 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 }
 .live-zeig:hover, .live-zeig:focus-visible { border-color: var(--accent); }
 .live-zeig.an { background: var(--accent); border-color: var(--accent); }
+/* M375: Live-Mauszeiger (Board-Koordinaten, im ViewportPortal) und Laserpointer */
+.live-zeig.maus { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+.live-zeig.maus.an { background: var(--surface); border-color: var(--accent); color: var(--accent); }
+.live-zeiger {
+  position: absolute; left: 0; top: 0; z-index: 3100; pointer-events: none; transform-origin: 0 0;
+  transition-property: transform; transition-timing-function: linear; will-change: transform;
+}
+.live-zeiger-pfeil { display: block; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .28)); }
+.live-zeiger-name {
+  position: absolute; left: 14px; top: 16px; background: var(--farbe, #6b7280); color: #fff;
+  font-size: 11px; font-weight: 700; line-height: 1; padding: 3px 7px; border-radius: var(--r-xs);
+  white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 3px rgba(0, 0, 0, .22);
+}
+.laser-punkt {
+  display: block; width: 14px; height: 14px; border-radius: 50%; background: #ff2d2d;
+  box-shadow: 0 0 0 3px rgba(255, 45, 45, .28), 0 0 14px 5px rgba(255, 45, 45, .55);
+}
+.live-zeiger.laser .laser-punkt { margin: -7px 0 0 -7px; }
+.live-zeiger.laser .live-zeiger-name { left: 12px; top: 10px; background: #d91e1e; }
+/* Laser auf der Folie: eine Schicht genau über der Folie */
+.folien-laser { position: absolute; z-index: 4; pointer-events: none; overflow: hidden; border-radius: var(--r-lg); }
+.folien-laser.an { pointer-events: auto; cursor: none; touch-action: none; }
+.folien-laser .laser-punkt {
+  position: absolute; margin: -7px 0 0 -7px; pointer-events: none;
+  transition-property: left, top; transition-timing-function: linear;
+}
+.folien-laser .laser-punkt.mein { transition: opacity .15s; }
+.folien-laser .laser-punkt .live-zeiger-name { left: 16px; top: 12px; background: #d91e1e; }
+.presenter-laser { display: inline-flex; align-items: center; gap: 6px; }
+.laser-knopf-punkt { width: 9px; height: 9px; border-radius: 50%; background: #ff4a4a; box-shadow: 0 0 6px 1px rgba(255, 74, 74, .7); }
+@media (prefers-reduced-motion: reduce) { .live-zeiger, .folien-laser .laser-punkt { transition-duration: 0ms !important; } }
 .zeig-band {
   position: fixed; top: calc(14px + var(--safe-top) + var(--app-rand)); left: 50%; transform: translateX(-50%);
   display: flex; align-items: center; gap: 10px;
@@ -6965,3 +6996,5 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 .bub.gross .bub-knopf, .bub.gross .bub-dazu { font-size: 14px; padding: 7px 13px; }
 .bub.gross .bub-ergebnis { font-size: 15px; }
 .bub.gross .bub-mal, .bub.gross .bub-punkte { font-size: 14px; height: 26px; line-height: 26px; min-width: 26px; border-radius: 13px; }
+
+html[data-alles-zeigen] .live-zeiger { display: none !important; }
