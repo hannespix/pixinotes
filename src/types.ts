@@ -36,6 +36,8 @@ export interface ImageData {
   name?: string;
   /** M263: eigener Titel der Karte — Dateinamen sagen selten, was drin ist */
   titel?: string;
+  /** M374: Bilder sind rahmenlos — true holt die Karte mit Rand, Fläche und Schatten zurück */
+  rahmen?: boolean;
   [key: string]: unknown;
 }
 

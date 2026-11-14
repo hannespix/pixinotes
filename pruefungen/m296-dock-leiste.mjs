@@ -1,7 +1,7 @@
 /**
  * M296 — Dock, Menüs und Auswahl-Leiste entrümpelt.
  *
- *   A  ＋-Menü: seit M316 eine Modul-Palette (20 Kacheln, fünf Gruppen).
+ *   A  ＋-Menü: seit M316 eine Modul-Palette (21 Kacheln seit M373, fünf Gruppen).
  *   B  ⋯-Menü: „Anordnen & Hintergrund" bündelt die Varianten (M312: kein zweites „Aufräumen"),
  *      der Physik-Schalter ist weg (⚙ → Bedienung).
  *   C  Auswahl-Leiste: fünf Elemente (M313); Schrift liegt im ⋯, Kopieren im Teilen-Dialog.
@@ -70,7 +70,7 @@ console.log('════ A: ＋-Menü (M316: eine Modul-Palette) ════')
   // Modulen als Kacheln in Gruppen — die Prüfung folgt der neuen Gestalt.
   const kacheln = await P.locator('.modul-palette .modul-kachel').count();
   const labels = await P.locator('.modul-palette .dock-menu-label').count();
-  pruefe('A1 eine Palette: 20 Kacheln in fünf Gruppen, kein „Weitere Module"', kacheln === 20 && labels === 5 && (await P.locator('.dock-menu-mehr').count()) === 0, `kacheln=${kacheln} labels=${labels}`);
+  pruefe('A1 eine Palette: 21 Kacheln (M373: Entscheidungs-Bubbles kamen dazu) in fünf Gruppen, kein „Weitere Module"', kacheln === 21 && labels === 5 && (await P.locator('.dock-menu-mehr').count()) === 0, `kacheln=${kacheln} labels=${labels}`);
   const texte = await P.locator('.modul-palette .modul-kachel').allTextContents();
   pruefe('A2 die Kernmodule sind da: Notiz, Kanban, Rechen-Tabelle, Datei oder Bild, Zeitplan', ['Notiz', 'Kanban', 'Rechen-Tabelle', 'Datei oder Bild', 'Zeitplan'].every((t) => texte.some((x) => x.includes(t))), JSON.stringify(texte));
   const hoehe = await P.evaluate(() => document.querySelector('.modul-palette').getBoundingClientRect().height);

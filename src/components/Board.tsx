@@ -20,7 +20,7 @@ import { leeresStartboard, mutedHistory, selectActiveBoard, selectNurLesen, useB
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon } from '../lib/pdfSeiten';
 import { frameMembers } from '../lib/arrange';
 import { computePush } from '../lib/physics';
-import { imageFileToDataUrl } from '../lib/image';
+import { bildMasse, imageFileToDataUrl } from '../lib/image';
 import { canEmbed, makeImage, makeNote } from '../lib/nodes';
 import { textZuBloecken } from '../lib/notiz';
 import { importFilesToBoard } from '../lib/importFiles';
@@ -1482,7 +1482,7 @@ export function Board() {
             ausgewichen += await importFilesToBoard([file], pos);
             continue;
           }
-          addNode(makeImage(pos, src, file.name && file.name !== 'image.png' ? file.name : 'Screenshot'));
+          addNode(makeImage(pos, src, file.name && file.name !== 'image.png' ? file.name : 'Screenshot', await bildMasse(src)));
           placed++;
         } catch (err) {
           console.error('Einfügen fehlgeschlagen:', err);

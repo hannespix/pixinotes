@@ -22,6 +22,10 @@ interface Props {
   rollt?: boolean;
   /** M339: Bedienelemente AUF der Karte, die nicht mitscrollen (Farbpunkt der Notiz) */
   aussen?: ReactNode;
+  /** M374: Beim Ziehen an den Griffen bleibt das Seitenverhältnis (rahmenlose Bilder) */
+  seitenverhaeltnis?: boolean;
+  /** M374: Die Karte zeigt Griff und Anschlusspunkte erst, wenn sie markiert ist (rahmenlose Bilder) */
+  ruhig?: boolean;
 }
 
 /** M339: So hoch wächst eine Notiz von selbst — darüber scrollt sie (von Hand lässt sie sich größer ziehen) */
@@ -31,7 +35,7 @@ const NOTIZ_MAX = 640;
  * Gemeinsame Hülle aller Karten: Lösch-Knopf, Verbindungs-Handles und
  * Resize-Griffe an Ecken/Kanten (sichtbar bei Selektion).
  */
-export function CardShell({ id, className, children, selected, minWidth = 170, minHeight = 70, style, schrumpft = false, rollt = false, aussen }: Props) {
+export function CardShell({ id, className, children, selected, minWidth = 170, minHeight = 70, style, schrumpft = false, rollt = false, aussen, seitenverhaeltnis = false, ruhig = false }: Props) {
   const removeNode = useBoard((s) => s.removeNode);
   const setNodeHeight = useBoard((s) => s.setNodeHeight);
   const setAutoFit = useBoard((s) => s.setAutoFit);
@@ -358,7 +362,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   // Wichtig: Lösch-Knopf & Handles liegen AUSSERHALB des card-body,
   // damit dessen overflow:hidden sie nicht abschneidet.
   return (
-    <div className="card-shell" data-ohne-hoehe={ohneHoehe ? '' : undefined} style={rollt ? ({ '--notiz-max': `${NOTIZ_MAX}px`, ...(typeof festeHoehe === 'number' ? { '--karte-h': `${festeHoehe}px` } : {}) } as CSSProperties) : undefined}>
+    <div className="card-shell" data-ruhig={ruhig && !alsKachel ? '' : undefined} data-ohne-hoehe={ohneHoehe ? '' : undefined} style={rollt ? ({ '--notiz-max': `${NOTIZ_MAX}px`, ...(typeof festeHoehe === 'number' ? { '--karte-h': `${festeHoehe}px` } : {}) } as CSSProperties) : undefined}>
       {/* Resize-Griffe: weiße Quadrate mit neutralem Rand (klassischer
           Auswahlrahmen) — bewusst ANDERS als die runden Akzent-Verbindungs-
           punkte, damit beides auf einen Blick unterscheidbar ist (M102).
@@ -367,6 +371,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
         isVisible={!!selected}
         minWidth={minWidth}
         minHeight={minHeight}
+        keepAspectRatio={seitenverhaeltnis}
         onResizeStart={onManualResizeStart}
         onResizeEnd={onManualResizeEnd}
       />

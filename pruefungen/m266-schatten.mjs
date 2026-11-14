@@ -90,8 +90,9 @@ console.log('════ T1: linke Spalte (Standard) ════');
   const { ctx, P } = await seite(true);
   const o = await P.evaluate(() => {
     const t = document.querySelector('.tabs').getBoundingClientRect();
-    const a = document.querySelector('.tab.active').getBoundingClientRect();
-    const b = document.querySelectorAll('.tab')[1].getBoundingClientRect();
+    // M297: In der Spalte steht der Baum — die Zeilen sind .side-board (früher Reiter .tab)
+    const a = document.querySelector('.tabs .side-board.active').getBoundingClientRect();
+    const b = document.querySelectorAll('.tabs .side-board')[1].getBoundingClientRect();
     return {
       rechts: Math.round(t.right), unten: Math.round(t.bottom),
       aktivY: Math.round(a.top + a.height / 2), andereY: Math.round(b.top + b.height / 2),
@@ -107,7 +108,9 @@ console.log('════ T1: linke Spalte (Standard) ════');
 
   const aktiv = await linie(P, o.rechts + 2, o.aktivY);
   const andere = await linie(P, o.rechts + 2, o.andereY);
-  const drunter = await linie(P, o.rechts + 2, o.unten + 40);
+  // M297: Die Spalte reicht heute bis zum unteren Rand — „unter der Leiste" gibt es dann nicht mehr
+  const bisUnten = o.unten + 40 >= 900;
+  const drunter = bisUnten ? [] : await linie(P, o.rechts + 2, o.unten + 40);
   console.log('    Grund ≈', grund);
   console.log('    aktive Zeile :', aktiv.join(' '));
   console.log('    andere Zeile :', andere.join(' '));
@@ -126,12 +129,13 @@ console.log('════ T1: linke Spalte (Standard) ════');
   pruefe('T1d beide Höhen sind gleich hell — kein Streifen an einer Zeile',
     Math.abs(dunkelste(aktiv) - dunkelste(andere)) <= 6,
     `${dunkelste(aktiv)} vs ${dunkelste(andere)}`);
-  pruefe('T1e unterhalb der Leiste ist der Grund unberührt',
+  if (bisUnten) pruefe('T1e die Spalte reicht bis zum unteren Rand (nichts darunter, das einen Streifen tragen könnte)', o.unten >= 880, String(o.unten));
+  else pruefe('T1e unterhalb der Leiste ist der Grund unberührt',
     grund - dunkelste(drunter) < 12, `${dunkelste(drunter)} gegen ${grund}`);
 
   // Und: der Verlauf ist in dieser Anordnung wirklich abgeschaltet
   const pseudo = await P.evaluate(() =>
-    getComputedStyle(document.querySelector('.tab.active'), '::after').content);
+    getComputedStyle(document.querySelector('.tabs .side-board.active'), '::after').content);
   pruefe('T1f der Sticky-Verlauf ist in der Spalte abgeschaltet', pseudo === 'none', pseudo);
   await ctx.close();
 }

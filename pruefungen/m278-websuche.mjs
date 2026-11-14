@@ -81,7 +81,7 @@ async function lexikaAttrappe(P, zaehler) {
 
 /** Den Recherche-Dialog öffnen (Dock → KI → Recherche) */
 async function oeffneDialog(P) {
-  await P.locator('button[title^="Mehr:"]').first().click();
+  await P.locator('.dock button[aria-label="Mehr"]').first().click();   // M198: der ⋯-Knopf des Docks heißt „Mehr"
   await P.waitForTimeout(500);
   await P.locator('button[aria-label="KI-Assistent"]').click();
   await P.waitForTimeout(500);

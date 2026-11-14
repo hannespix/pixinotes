@@ -439,6 +439,26 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .image-card { position: relative; background: var(--surface-card); border-radius: var(--r); padding: 8px; overflow: hidden; display: flex; flex-direction: column; }
 .image-card img { width: 100%; min-height: 0; flex: 1; object-fit: contain; border-radius: var(--r-sm); display: block; }
 .img-name { margin-top: 6px; }
+/* M374: Bilder liegen rahmenlos auf dem Board — die Karte IST das Bild. Kein Rand, keine Fläche, kein
+   Schatten; Durchsichtiges bleibt durchsichtig. Rahmen, Griffe, Lupe und Name kommen erst mit der Auswahl.
+   Der Schatten der Karte sitzt sonst am Knoten — bei Bildern trägt ihn nur die Fassung „mit Rahmen". */
+.react-flow__node-image, .react-flow__node-image:hover, .react-flow__node-image.dragging { box-shadow: none; border-radius: 0; }
+.react-flow__node-image.selected { border-radius: 2px; }
+.image-card.mit-rahmen { box-shadow: var(--card-shadow); }
+.image-card.rahmenlos:not(.kachel) { background: none; padding: 0; border-radius: 0; overflow: visible; }
+.image-card.rahmenlos:not(.kachel) img { border-radius: 0; }
+.image-card.kachel { box-shadow: var(--card-shadow); }
+/* Der Name steht UNTER dem Bild, außerhalb der Karte — er verändert ihre Maße nicht */
+.card-shell > .img-name.unterschrift {
+  position: absolute; top: 100%; left: 0; margin-top: 7px; min-width: min(160px, 60vw); max-width: max(100%, 220px);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Nicht markiert: kein Griff, keine Anschlusspunkte, keine Lupe — auch nicht beim Zeigen */
+.react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .pn-handle,
+.react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .card-grip { opacity: 0; pointer-events: none; }
+.react-flow__node:not(.selected) .image-card.rahmenlos:not(.kachel) .bild-lupe-auf { opacity: 0; pointer-events: none; }
+html[data-kontrast='hoch'] .image-card.rahmenlos:not(.kachel) { border: 0; }
+.focus-mode .pn-focused .image-card.rahmenlos:not(.kachel) { box-shadow: none !important; }
 
 /* ---------- Datei-Karte ---------- */
 /* M254: Bildvorschau auf der Datei-Karte — dieselbe Rolle wie die

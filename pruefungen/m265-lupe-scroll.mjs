@@ -77,6 +77,9 @@ console.log('════ T1: Scrollen im eingezoomten Zustand ════');
   const { ctx, P } = await seite([
     { id: 'i1', type: 'image', position: { x: 200, y: 200 }, width: 300, data: { src: BILD, name: 'plan.svg' } },
   ]);
+  // M374: Bilder liegen rahmenlos da — die Lupe erscheint, sobald das Bild markiert ist
+  await P.click('.image-card img');
+  await P.waitForTimeout(400);
   await P.click('.bild-lupe-auf');
   await P.waitForTimeout(600);
   // kräftig hineinzoomen

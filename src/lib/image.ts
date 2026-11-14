@@ -37,12 +37,37 @@ export async function imageFileToDataUrl(file: File, mime = file.type): Promise<
   const ctx = canvas.getContext('2d');
   if (!ctx) return umwandeln ? null : raw;
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  /* M374: Durchsichtiges bleibt durchsichtig. JPEG kennt keine Transparenz — ein freigestelltes Logo
+     bekäme einen schwarzen Kasten, und weil das JPEG fast immer kleiner ist als das PNG, geschah das
+     bei jeder größeren Grafik. Hat das Bild durchsichtige Stellen, wird es (verkleinert) in einem
+     Format mit Transparenz abgelegt: WebP, wo der Browser es schreiben kann, sonst PNG. */
+  if (hatTransparenz(ctx, canvas.width, canvas.height)) {
+    const webp = canvas.toDataURL('image/webp', 0.9);
+    const klar = webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/png');
+    if (umwandeln) return klar;
+    // das Original bleibt, wenn es nicht größer ist und nicht zu viele Bildpunkte hat
+    return maxSide <= HARD_DIMENSION && raw.length <= klar.length ? raw : klar;
+  }
   const jpeg = canvas.toDataURL('image/jpeg', 0.85);
   // Bei HEIC & Co. führt kein Weg am JPEG vorbei — sonst zeigt es nur Safari.
   if (umwandeln) return jpeg;
-  // Sonst JPEG nur nehmen, wenn es wirklich kleiner ist (z. B. nicht bei
-  // Grafiken mit Transparenz)
+  // Sonst JPEG nur nehmen, wenn es wirklich kleiner ist
   return jpeg.length < raw.length ? jpeg : raw;
+}
+
+/** Hat die Zeichenfläche Bildpunkte, die nicht voll deckend sind? */
+function hatTransparenz(ctx: CanvasRenderingContext2D, w: number, h: number): boolean {
+  try {
+    const d = ctx.getImageData(0, 0, w, h).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i] < 250) return true;
+  } catch { /* fremde Quelle — dann gilt: deckend */ }
+  return false;
+}
+
+/** M374: Breite und Höhe eines Bildes in Bildpunkten (oder null, wenn es sich nicht lesen lässt) */
+export async function bildMasse(src: string): Promise<{ w: number; h: number } | null> {
+  const img = await loadImage(src).catch(() => null);
+  return img && img.naturalWidth > 0 && img.naturalHeight > 0 ? { w: img.naturalWidth, h: img.naturalHeight } : null;
 }
 
 export function readFileAsDataUrl(file: File): Promise<string> {

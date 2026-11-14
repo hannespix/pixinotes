@@ -64,8 +64,13 @@ export function makeEmail(position: Pos, data: EmailData): AppNode {
   return { id: uid(), type: 'email', width: CARD_WIDTHS.email, position, data };
 }
 
-export function makeImage(position: Pos, src: string, name?: string): AppNode {
-  return { id: uid(), type: 'image', width: CARD_WIDTHS.image, position, data: { src, name } };
+/**
+ * M374: Bilder liegen rahmenlos auf dem Board — die Karte IST das Bild. Sind die Maße bekannt, wird ein
+ * kleines Bild (Symbol, Logo) nicht auf die Standardbreite aufgeblasen.
+ */
+export function makeImage(position: Pos, src: string, name?: string, masse?: { w: number; h: number } | null): AppNode {
+  const breite = masse ? Math.max(24, Math.min(CARD_WIDTHS.image, Math.round(masse.w))) : CARD_WIDTHS.image;
+  return { id: uid(), type: 'image', width: breite, position, data: { src, name } };
 }
 
 export function makeFile(

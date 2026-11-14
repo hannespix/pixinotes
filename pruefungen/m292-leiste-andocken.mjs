@@ -209,7 +209,11 @@ for (const [name, karte] of [
   await waehle(P);
   const l = await lage(P);
   console.log(`    ${name}:`, JSON.stringify(l));
-  pruefe(`T5 (${name}) die Leiste liegt nicht auf der Karte`, l && l.aufKarte <= 0, JSON.stringify(l));
+  /* M318: Füllt die Karte den ganzen Bildschirm, gibt es keinen freien Platz neben ihr — die Leiste dockt
+     dann unten an und steht an der Stelle des Docks (das dort ohnehin über dem Board liegt). Auf der Karte
+     liegen darf sie nur in diesem einen Fall. */
+  pruefe(`T5 (${name}) die Leiste liegt nicht auf der Karte (außer angedockt am unteren Rand)`,
+    l && (l.aufKarte <= 0 || (l.angedockt === 'dock' && l.leiste.bottom >= 844 - 70 && l.aufDock <= 0)), JSON.stringify(l));
   pruefe(`T5 (${name}) und nicht unter der Kopfleiste`, l && l.aufKopf <= 0, JSON.stringify(l));
   pruefe(`T5 (${name}) die Stelle ist eine der drei erlaubten`,
     ['oben', 'unten', 'dock'].includes(l?.angedockt ?? ''), JSON.stringify(l));

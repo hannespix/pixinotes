@@ -127,7 +127,9 @@ console.log('════ D: Telefon — Einstellungs-Reiter in einer Zeile ═�
   await P.locator('[data-taste="einstellungen"]').tap();
   await P.waitForSelector('.modal-tabs');
   const zeilen = await P.locator('.modal-tabs button').evaluateAll((bs) => new Set(bs.map((b) => b.offsetTop)).size);
-  pruefe('D1 alle vier Reiter stehen in einer Zeile', zeilen === 1 && (await P.locator('.modal-tabs button').count()) === 4, `Zeilen: ${zeilen}`);
+  // M314: Es sind drei Reiter (Darstellung · Daten · Dienste) — vorher vier
+  const reiter = await P.locator('.modal-tabs button').count();
+  pruefe('D1 alle drei Reiter stehen in einer Zeile', zeilen === 1 && reiter === 3, `Zeilen: ${zeilen}, Reiter: ${reiter}`);
   await P.screenshot({ path: `${SD}/m301-d-reiter.png` });
   await ctx.close();
 }
