@@ -4,6 +4,7 @@ import { nodeToText } from '../lib/serialize';
 import { IArchive, IChevronR, ISearch } from './Icons';
 import { InlineName } from './InlineName';
 import { BereichMenu, BoardMenu, ProjektMenu } from './EbenenMenu';
+import { kartenName } from '../lib/sprache';
 
 /**
  * M297: DER Baum der App — Bereich › Projekt › Board › Karte.
@@ -168,7 +169,7 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
                 translate="no"
                 title={n.archived ? 'Archivierte Karte öffnen' : 'Karte öffnen und bearbeiten'}
                 onClick={() => { oeffneKarte(b.id, n.id, herkunft); onNavigate?.(); }}
-              >{cardLabel(n)}</button>
+              >{kartenName(cardLabel(n))}</button>
             ))}
           </div>
         )}

@@ -35,6 +35,7 @@ const TYPE_ICON: Record<string, string> = {
 };
 
 import type { AppNode } from '../types';
+import { t } from '../lib/sprache';
 
 interface Hit {
   boardId: string;
@@ -237,7 +238,7 @@ export function SearchOverlay() {
     const q = query.trim().toLowerCase();
     if (!q || q === '#' || q.length < 2) return [];
     return buildCommands().filter((c) =>
-      `${c.label} ${c.hint} ${c.alias}`.toLowerCase().includes(q)).slice(0, 4);
+      `${c.label} ${c.hint} ${c.alias} ${t(c.label)} ${t(c.hint)} ${t(c.alias)}`.toLowerCase().includes(q)).slice(0, 4);   // M381: auch englisch
   }, [query]);
 
   // M312: Das Suchfeld im Baum öffnet diese Suche — also muss sie auch Boards

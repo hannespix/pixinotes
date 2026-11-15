@@ -3,7 +3,8 @@ import { useReactFlow, type NodeProps } from '@xyflow/react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
-import { de as blockNoteDe } from '@blocknote/core/locales';
+import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
+import { sprache } from '../../lib/sprache';
 import { useBoard, useNurLesen } from '../../store';
 import { STICKY_COLORS, uid, type MinutesData, type MinutesNode } from '../../types';
 import { allDecisions, buildEntry, currentEntry, entryLabel, nextDate, sortEntries } from '../../lib/minutes';
@@ -322,7 +323,7 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
   const editor = useCreateBlockNote({
     schema: noteSchema,
     initialContent: initialContent as never,
-    dictionary: blockNoteDe,
+    dictionary: sprache() === 'en' ? blockNoteEn : blockNoteDe,   // M381
     // M289: Damit Bilder überhaupt in den Text dürfen — Einfügen,
     // Ablegen und der Dateiwähler des Bild-Blocks laufen hier durch
     uploadFile: editorUpload(),   // M303: nie eine abgewiesene Zusage

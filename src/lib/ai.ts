@@ -3,6 +3,7 @@
 // es gibt keinen Zwischenserver, Inhalte gehen nur an den gewählten Endpunkt.
 import { useBoard, type AiSettings } from '../store';
 import { textZuBloecken } from './notiz';
+import { sprache } from './sprache';
 
 export function aiReady(ai: AiSettings): boolean {
   switch (ai.provider) {
@@ -94,7 +95,12 @@ export async function askAi(prompt: string, images: string[] = [], opt: KiOption
  * Klammern, und die App meldete fröhlich „2 Schritte". Jetzt sind 4096 Token
  * die Vorgabe, und wer fragt, erfährt vom Abschneiden.
  */
-export async function askAiVoll(prompt: string, images: string[] = [], opt: KiOptionen = {}): Promise<KiAntwort> {
+export async function askAiVoll(frage: string, images: string[] = [], opt: KiOptionen = {}): Promise<KiAntwort> {
+  // M381: Die Anweisungen an die KI sind deutsch geschrieben. Läuft die Oberfläche englisch, soll auch die
+  // Antwort englisch sein — Schlüssel, Formate und JSON-Strukturen, die eine Aktion auswertet, bleiben.
+  const prompt = sprache() === 'en'
+    ? `${frage.replace(/\bauf Deutsch\b/g, 'auf Englisch')}\n\n(Sprache: Schreibe alle Texte, die der Nutzer zu lesen bekommt, auf Englisch. Vorgegebene Schlüssel, Überschriften, Formate und JSON-Strukturen bleiben genau wie verlangt.)`
+    : frage;
   const ai = useBoard.getState().ai;
   if (!aiReady(ai)) throw new Error('KI nicht konfiguriert (⚙️ Einstellungen)');
   if (abgebrochen) throw new Error('abgebrochen');

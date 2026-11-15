@@ -16,6 +16,7 @@ import {
   ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
  IBubbles } from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
+import { t } from '../lib/sprache';
 
 /**
  * Das Werkzeug-Dock — drei Knöpfe: ＋ öffnet die Modul-Palette (M316: alle
@@ -356,7 +357,8 @@ export function Dock() {
   ];
   const GRUPPEN = ['Notieren & Rechnen', 'Planen', 'Ablauf', 'Einfügen', 'Ordnen'];
   const q = suche.trim().toLowerCase();
-  const passt = (m: Modul) => !q || `${m.name} ${m.hinweis ?? ''} ${m.suchwort ?? ''}`.toLowerCase().includes(q);
+  // M381: auf Englisch findet die Suche auch die englischen Namen und Suchwörter
+  const passt = (m: Modul) => !q || `${m.name} ${m.hinweis ?? ''} ${m.suchwort ?? ''} ${t(m.name)} ${t(m.hinweis ?? '')} ${t(m.suchwort ?? '')}`.toLowerCase().includes(q);
   const treffer = module.filter(passt);
   const vorlagenTreffer = templates.filter((t) => !q || t.name.toLowerCase().includes(q));
   const vorlageEinfuegen = (t: (typeof templates)[number]) => add(() => {

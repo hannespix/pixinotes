@@ -16,6 +16,7 @@ import {
   KONTO_DIRTY_KEY, notiereAenderung, SYNC_DIRTY_KEY, uebernimmDateien, WEBDAV_DIRTY_KEY, type SyncPayload, type SyncWeg,
 } from './syncFolder';
 import { nurAuswahlAnders } from './syncMerge';
+import { sprache } from './sprache';
 
 const LS_KEY = 'pixinotes-webdav';
 const STAMP_KEY = 'pixinotes:webdav-stamp';
@@ -100,6 +101,37 @@ const apple = (): boolean => /iPad|iPhone|iPod/.test(navigator.userAgent) || (/M
  * nichts verloren und stehen deshalb auch nicht drin.
  */
 export function corsRequestText(cfg: WebdavConfig | null): string {
+  // M381: Läuft die Oberfläche englisch, geht die Bitte an die IT englisch hinaus (eigene Fassung statt Zeile für Zeile)
+  if (sprache() === 'en') {
+    const h = cfg?.url ? cfg.url.replace(/^https?:\/\//, '').split('/')[0] : 'our Nextcloud';
+    return [
+      'Subject: CORS for WebDAV (browser access to ' + h + ')',
+      '',
+      'Hello,',
+      '',
+      `I use the web application PixiNotes and would like to store my notes via WebDAV in our Nextcloud (${h}).`,
+      'The browser aborts the connection because the server sends no CORS headers for /remote.php/dav.',
+      'The application runs entirely in the browser; no additional server is involved and no data is passed on to third parties.',
+      '',
+      `Origin that would need to be allowed: ${location.origin}`,
+      '',
+      'The following response headers are needed for /remote.php/dav:',
+      `  Access-Control-Allow-Origin: ${location.origin}`,
+      '  Access-Control-Allow-Methods: GET, PUT, OPTIONS',
+      '  Access-Control-Allow-Headers: Authorization, Content-Type',
+      '  Access-Control-Max-Age: 600',
+      'The OPTIONS request (preflight) must be answered with 200/204 without authentication —',
+      'otherwise it fails before the credentials are sent at all.',
+      '',
+      'In Nextcloud this can also be done without touching the server configuration, using the app',
+      '“WebAppPassword”: the origin above is entered there.',
+      '',
+      'PixiNotes only uses GET and PUT on a single JSON file in the given folder and signs in with an',
+      'app password (not the account password). No cookies are set.',
+      '',
+      'Thank you!',
+    ].join('\n');
+  }
   const host = cfg?.url ? cfg.url.replace(/^https?:\/\//, '').split('/')[0] : 'unsere Nextcloud';
   return [
     'Betreff: CORS-Freigabe für WebDAV (Browser-Zugriff auf ' + host + ')',

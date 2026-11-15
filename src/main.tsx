@@ -15,6 +15,8 @@ import { initEinstellungen } from './lib/einstellungen';
 import { initKopfmass } from './lib/kopfmass';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { initUebersetzung } from './lib/uebersetzung';
+import { initSprache, sprache } from './lib/sprache';
+import { startNamenAufEnglisch } from './store';
 
 // OAuth-Popup-Rücksprung (Kalender-Konten): Diese Seite dient dann nur als
 // Redirect-Ziel — Code ans Hauptfenster melden, App gar nicht erst rendern.
@@ -53,7 +55,9 @@ if (!handleOAuthRedirect()) {
   // M368: Die Übersetzung des Browsers darf die Oberfläche nicht zum Absturz bringen — vor dem ersten
   // Rendern, damit jeder Knoten, den React anlegt, schon unter dem Schutz steht
   initUebersetzung();
-  ReactDOM.createRoot(document.getElementById('root')!).render(
+  // M381: Ist Englisch gewählt, wird vor dem ersten Rendern das Wörterbuch geladen — sonst blitzte die
+  // Oberfläche kurz deutsch auf. Deutsch wartet auf nichts.
+  const starten = () => ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       {/* M213: letzte Rettungsleine — was hier ankommt, hätte sonst eine
           weiße Seite ergeben */}
@@ -62,6 +66,7 @@ if (!handleOAuthRedirect()) {
       </ErrorBoundary>
     </React.StrictMode>,
   );
+  void initSprache().then(() => { if (sprache() === 'en') startNamenAufEnglisch(); }).then(starten, starten);
 }
 
 // PWA: Service Worker nur im Prod-Build und über http(s) registrieren —

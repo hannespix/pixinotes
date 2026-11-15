@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { sprache, spracheSetzen } from '../lib/sprache';
 import { brainStatus, rebuildBrainIndex, syncBrainIndex } from '../lib/brain';
 import { claimWriter, flushPersist, useBoard } from '../store';
 import {
@@ -701,6 +702,15 @@ export function Settings() {
                   aria-label={`Akzentfarbe ${name}`}
                   onClick={() => setUiAccent(id)}
                 />
+              ))}
+            </div>
+          </div>
+          {/* M381: Die Oberfläche spricht Deutsch und Englisch — je Gerät; der Wechsel lädt die Seite neu */}
+          <div className="modal-row">
+            <span>Sprache</span>
+            <div className="seg" role="group" aria-label="Sprache" data-taste="sprache" translate="no">
+              {([['de', 'Deutsch'], ['en', 'English']] as const).map(([v, label]) => (
+                <button key={v} className={sprache() === v ? 'on' : ''} lang={v} data-sprache-wahl={v} onClick={() => spracheSetzen(v)}>{label}</button>
               ))}
             </div>
           </div>

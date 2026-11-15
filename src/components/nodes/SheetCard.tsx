@@ -177,7 +177,7 @@ export function SheetBody({ id, data, selected }: { id: string; data: SheetData;
 
       {data.quelle && (
         <div className="sheet-quelle">
-          aus <b translate="no">{data.quelle}</b> — Formeln übernommen, Änderungen bleiben hier
+          Quelle: <b translate="no">{data.quelle}</b> — Formeln übernommen, Änderungen bleiben hier
         </div>
       )}
 

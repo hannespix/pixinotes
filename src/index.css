@@ -7001,6 +7001,7 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
   z-index: 400; width: max-content; max-width: min(560px, calc(100vw - 24px));
 }
 .sprach-hinweis .sprach-text { flex: 1; min-width: 0; }
+.sprach-hinweis button + button { background: transparent; color: var(--accent-strong); border: 1px solid var(--accent); padding: 6px 12px; }
 .sprach-hinweis button {
   flex: none; border: none; cursor: pointer; background: var(--accent); color: #fff;
   font-family: inherit; font-size: 12.5px; font-weight: 700; padding: 7px 14px; border-radius: 999px;
@@ -7240,3 +7241,6 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
   .slide-week .week-wrap, .slide-time .time-wrap { padding: 10px 10px 12px; }
   .presenter-slide.editable > .slide-modul.slide-sheet, .presenter-slide.editable > .slide-modul.slide-minutes { padding: 10px 10px 8px; }
 }
+
+/* ---------- M381: englische Oberfläche ---------- */
+.help-en-hinweis { margin: 0 0 14px; padding: 9px 12px; border: 1px solid var(--accent); border-radius: var(--r); background: var(--accent-soft); font-size: 13px; line-height: 1.45; }
