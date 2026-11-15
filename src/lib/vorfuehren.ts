@@ -13,6 +13,11 @@
 //   · wohin in einem eigenen Tool gerollt wurde. Das geht nur bei eigenen Tools: Deren Inhalt liefert PixiNotes
 //     selbst aus und kann eine kleine Brücke hineinlegen (lib/htmlStore.ts). In eine fremde Webseite lässt der
 //     Browser niemanden hineinsehen — sie öffnet sich bei allen, aber jeder rollt sie selbst.
+//
+// M384: … und was der Vorführende in ein eigenes Tool eingibt: Feldwerte (Text, Häkchen, Auswahl), Klicks auf
+// Knöpfe, Enter und das Abschicken eines Formulars. Bei den Folgenden geschieht im selben Tool dasselbe. Was ein
+// Tool daraus macht, rechnet es selbst — Zufall, Zeitabläufe, Ziehen mit der Maus und Zeichenflächen lassen
+// sich so nicht nachstellen.
 import { ich, LIVE_NACHRICHT, liveSenden } from './gastSync';
 
 export interface Sicht { x: number; y: number; w: number; h: number }
@@ -28,7 +33,40 @@ export interface Zeiger {
   /** letzter Rollstand je Tool (die Seite selbst) — für alle, die später dazukommen */
   rollen: Record<string, Roll>;
 }
+/**
+ * M384: Eine Eingabe in einem Tool. `p` = Ort des Elements („#kennung" oder Weg von <body> aus), `a` = was geschah.
+ * Felder tragen ihren Wert absolut (`w`): Text `v`, Häkchen `c`, Mehrfachauswahl `m`, frei beschreibbarer Bereich `t`
+ * (nur Text, nie HTML). Klicks tragen die Stelle im Element als Anteil (x/y).
+ */
+export interface Eingabe {
+  p: string; a: 'input' | 'change' | 'click' | 'submit' | 'taste';
+  w?: { v?: string; c?: boolean; m?: number[]; t?: string };
+  x?: number; y?: number;
+}
+const EINGABE_ARTEN = ['input', 'change', 'click', 'submit', 'taste'];
+const WERT_MAX = 4000;
+/** Eingaben kommen aus dem Tool oder aus dem Kanal — beides fremde Angaben: nur Sauberes geht weiter */
+export function eingabeAus(roh: unknown): Eingabe | null {
+  const r = roh as Partial<Eingabe> | null;
+  if (!r || typeof r !== 'object' || typeof r.p !== 'string' || !r.p || r.p.length > 200 || !EINGABE_ARTEN.includes(r.a as string)) return null;
+  const aus: Eingabe = { p: r.p, a: r.a as Eingabe['a'] };
+  if (aus.a === 'input' || aus.a === 'change') {
+    const w = r.w;
+    if (!w || typeof w !== 'object') return null;
+    if (typeof w.v === 'string') { if (w.v.length > WERT_MAX) return null; aus.w = { v: w.v }; }
+    else if (typeof w.c === 'boolean') aus.w = { c: w.c };
+    else if (Array.isArray(w.m)) aus.w = { m: w.m.filter((n): n is number => Number.isInteger(n) && n >= 0 && n < 5000).slice(0, 200) };
+    else if (typeof w.t === 'string') { if (w.t.length > WERT_MAX) return null; aus.w = { t: w.t }; }
+    else return null;
+  } else if (aus.a === 'click') {
+    aus.x = typeof r.x === 'number' && r.x >= 0 && r.x <= 1 ? r.x : 0.5;
+    aus.y = typeof r.y === 'number' && r.y >= 0 && r.y <= 1 ? r.y : 0.5;
+  }
+  return aus;
+}
 export const VORFUEHR_EREIGNIS = 'pixinotes:vorfuehren';
+/** Eingaben des Vorführenden kamen an: detail = { boardId, karte, liste } */
+export const EINGABE_EREIGNIS = 'pixinotes:zeig-eingabe';
 /** Ein Rollstand kam an: detail = { boardId, karte, roll } */
 export const ROLL_EREIGNIS = 'pixinotes:zeig-roll';
 
@@ -41,6 +79,10 @@ let meineSicht: Sicht = { x: 0, y: 0, w: 0, h: 0 };
 let meinVortrag: Vortrag | null = null;
 const meineApps = new Set<string>();
 const meineRollen: Record<string, Roll> = {};
+/** M384: letzter Wert je Feld und Tool — für alle, die später dazukommen (höchstens 150 Felder je Tool) */
+const meineFelder = new Map<string, Map<string, Eingabe>>();
+const eingabeOffen = new Map<string, Eingabe[]>();                              // Tool → noch nicht Gesendetes, in Reihenfolge
+const eingabeWarte = new Map<string, ReturnType<typeof setTimeout>>();
 const melden = (boardId: string): void => { window.dispatchEvent(new CustomEvent(VORFUEHR_EREIGNIS, { detail: boardId })); };
 
 export const werFuehrtVor = (boardId: string): Zeiger | null => zeiger.get(boardId) ?? null;
@@ -102,6 +144,7 @@ export function appMelden(boardId: string, karte: string, an: boolean): void {
 }
 /** Das Tool wurde (neu) geladen oder geschlossen — sein Rollstand von vorhin gilt nicht mehr */
 export function rollVergessen(boardId: string, karte: string): void {
+  meineFelder.delete(karte); eingabeOffen.delete(karte);     // M384: … und seine Felder sind wieder leer
   if (!(karte in meineRollen)) return;
   delete meineRollen[karte];
   if (meinBoard === boardId) standSenden(boardId, true);
@@ -117,6 +160,48 @@ export function rollMelden(boardId: string, karte: string, roll: Roll): void {
   clearTimeout(rollWarte.get(k));
   const warte = 140 - (Date.now() - (rollZeit.get(k) ?? 0));
   if (warte <= 0) senden(); else rollWarte.set(k, setTimeout(senden, warte));
+}
+
+/** In Portionen senden — eine Nachricht bleibt klein, die Reihenfolge bleibt */
+function eingabenSenden(boardId: string, karte: string, liste: Eingabe[]): void {
+  let teil: Eingabe[] = []; let laenge = 0;
+  const los = () => { if (teil.length) liveSenden(boardId, 'zeigEin', { von: ich().id, karte, e: teil }); teil = []; laenge = 0; };
+  for (const e of liste) {
+    const l = JSON.stringify(e).length;
+    if (teil.length >= 40 || laenge + l > 12000) los();
+    teil.push(e); laenge += l;
+  }
+  los();
+}
+function eingabenHinaus(boardId: string, karte: string): void {
+  clearTimeout(eingabeWarte.get(karte)); eingabeWarte.delete(karte);
+  const liste = eingabeOffen.get(karte);
+  eingabeOffen.delete(karte);
+  if (liste?.length && meinBoard === boardId) eingabenSenden(boardId, karte, liste);
+}
+/**
+ * M384: Im Tool wurde etwas eingegeben. Getipptes sammelt sich kurz (ein Feld = sein letzter Wert); ein Klick,
+ * Enter oder Abschicken geht sofort hinaus — mit allem davor, damit der Text vor dem Knopfdruck ankommt.
+ */
+export function eingabeMelden(boardId: string, karte: string, e: Eingabe): void {
+  const feld = e.a === 'input' || e.a === 'change';
+  // Feldwerte merken — auch vor der Vorführung: Wer dann folgt, soll dasselbe sehen wie ich
+  if (feld) {
+    let felder = meineFelder.get(karte);
+    if (!felder) { felder = new Map(); meineFelder.set(karte, felder); }
+    if (felder.has(e.p) || felder.size < 150) felder.set(e.p, { ...e, a: 'change' });
+  }
+  if (meinBoard !== boardId) return;
+  let liste = eingabeOffen.get(karte);
+  if (!liste) { liste = []; eingabeOffen.set(karte, liste); }
+  const letzter = liste[liste.length - 1];
+  if (feld && letzter && letzter.p === e.p && letzter.a === 'input' ) liste[liste.length - 1] = e; else liste.push(e);
+  if (!feld || liste.length >= 40) { eingabenHinaus(boardId, karte); return; }
+  if (!eingabeWarte.has(karte)) eingabeWarte.set(karte, setTimeout(() => eingabenHinaus(boardId, karte), 110));
+}
+/** Mein Tool ist (neu) geladen und ich folge: den Vorführenden um die Feldwerte bitten, die er schon eingegeben hat */
+export function eingabenErbitten(boardId: string, karte: string): void {
+  if (folgeIch(boardId)) liveSenden(boardId, 'zeigEinBitte', { karte });
 }
 
 function rollenAus(roh: unknown): Record<string, Roll> {
@@ -143,6 +228,22 @@ export function initVorfuehren(): void {
       const sauber: Roll = { p: roll.p, x: roll.x, y: roll.y };
       if (sauber.p === '') z.rollen[r.karte] = sauber;
       if (folgeIch(d.boardId)) window.dispatchEvent(new CustomEvent(ROLL_EREIGNIS, { detail: { boardId: d.boardId, karte: r.karte, roll: sauber } }));
+      return;
+    }
+    if (d?.ereignis === 'zeigEin') {
+      const r = d.inhalt as { von?: unknown; karte?: unknown; e?: unknown } | undefined;
+      const z = zeiger.get(d.boardId);
+      if (!z || z.id !== r?.von || typeof r.karte !== 'string' || !Array.isArray(r.e) || !folgeIch(d.boardId)) return;
+      const liste = r.e.slice(0, 60).map(eingabeAus).filter((x): x is Eingabe => !!x);
+      if (liste.length) window.dispatchEvent(new CustomEvent(EINGABE_EREIGNIS, { detail: { boardId: d.boardId, karte: r.karte, liste } }));
+      return;
+    }
+    if (d?.ereignis === 'zeigEinBitte') {
+      const r = d.inhalt as { karte?: unknown } | undefined;
+      if (meinBoard !== d.boardId || typeof r?.karte !== 'string') return;
+      eingabenHinaus(d.boardId, r.karte);
+      const felder = meineFelder.get(r.karte);
+      if (felder?.size) eingabenSenden(d.boardId, r.karte, [...felder.values()]);
       return;
     }
     if (d?.ereignis !== 'zeig') return;
