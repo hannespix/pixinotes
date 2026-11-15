@@ -27,6 +27,15 @@ const RECHT = [
 
 const ALLE = [...SECTIONS, ...RECHT];
 
+/**
+ * M382: Die englische Fassung der Hilfe (HelpOverlayEn.tsx) — ein eigenes Paket. Wer die Hilfe lädt, lädt sie
+ * bei englischer Oberfläche gleich mit und meldet sie hier an (siehe App.tsx); dann steht sie an der Stelle der
+ * deutschen Texte. Fehlt sie (Laden gescheitert), bleibt die deutsche Hilfe mit ihrem Hinweis.
+ */
+type HilfeEnglisch = { NeuEn: () => JSX.Element; HilfeEn: () => JSX.Element };
+let EN: HilfeEnglisch | null = null;
+export const hilfeEnglischSetzen = (m: HilfeEnglisch | null): void => { EN = m; };
+
 /** Editierdistanz ≤ max? (bandbegrenztes Levenshtein mit Frühabbruch) */
 function editDistanceAtMost(a: string, b: string, max: number): boolean {
   if (Math.abs(a.length - b.length) > max) return false;
@@ -152,7 +161,9 @@ export function HelpOverlay() {
             <button className="link-btn help-zurueck" onClick={() => setSeite('hilfe')}>Zur Hilfe</button>
             <button className="modal-x" onClick={() => setOpen(false)} aria-label="Schließen">✕</button>
           </div>
-          <div className="help-body help-neu" data-sprache="aus" lang="de">
+          <div className="help-body help-neu">
+            {EN ? <EN.NeuEn /> : (
+            <div className="help-de" data-sprache="aus" lang="de">
             {sprache() === 'en' && <p className="help-en-hinweis" lang="en" translate="no" data-taste="hilfe-en-hinweis">This list is written in German. Your browser can translate it: choose “Translate” in the browser menu.</p>}
             {/* Kurzer Überblick über die jüngsten Ausbaustufen, neueste zuerst —
                 bewusst in Alltagssprache. Hier stehen die Begründungen; die
@@ -160,7 +171,8 @@ export function HelpOverlay() {
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht am Fuß der Hilfe.</p>
               <ul>
-                <li><b>🌐 English — die Oberfläche spricht jetzt auch Englisch (M381):</b> Unter <b>⚙ → Darstellung → Sprache</b> lässt sich PixiNotes auf <b>English</b> umstellen (je Gerät; die Seite lädt dabei einmal neu). Menüs, Knöpfe, Tooltips, Meldungen, Rückfragen, Datumsangaben und der Editor erscheinen dann englisch, die KI antwortet englisch. <b>Deine Inhalte bleiben, wie sie sind</b> — Notizen, Namen und Tickets werden nie übersetzt. Wer PixiNotes mit einem nicht-deutschen Browser zum ersten Mal öffnet, bekommt den Wechsel mit einem Klick angeboten. Diese Hilfe und „Was ist neu" sind vorerst deutsch (der Browser kann sie übersetzen); die Erkennung von Fristen im Text versteht weiter deutsche Angaben („bis Freitag") und Zahlenformate.</li>
+                <li><b>📖 Hilfe, Vorlagen und Standardnamen auf Englisch (M382):</b> Mit der englischen Oberfläche erscheinen jetzt auch diese <b>Hilfe</b> und <b>„Was ist neu"</b> auf Englisch — dieselben Abschnitte und Einträge wie in der deutschen Fassung. <b>Vorlagen</b> legen ihre Karten mit englischen Beschriftungen an (Meeting, Retrospective, SWOT …), und neue Karten, Boards, Projekte und Bereiche bekommen <b>englische Standardnamen</b> („Weekly plan", „New frame"). Die Suche in der Modul-Palette und mit Strg+K findet auch englische Begriffe („timeline", „template"). Impressum und Datenschutzerklärung sind zur Orientierung übersetzt; maßgeblich bleibt der deutsche Text.</li>
+                <li><b>🌐 English — die Oberfläche spricht jetzt auch Englisch (M381):</b> Unter <b>⚙ → Darstellung → Sprache</b> lässt sich PixiNotes auf <b>English</b> umstellen (je Gerät; die Seite lädt dabei einmal neu). Menüs, Knöpfe, Tooltips, Meldungen, Rückfragen, Datumsangaben und der Editor erscheinen dann englisch, die KI antwortet englisch. <b>Deine Inhalte bleiben, wie sie sind</b> — Notizen, Namen und Tickets werden nie übersetzt. Wer PixiNotes mit einem nicht-deutschen Browser zum ersten Mal öffnet, bekommt den Wechsel mit einem Klick angeboten. Die Erkennung von Fristen im Text versteht weiter deutsche Angaben („bis Freitag") und Zahlenformate.</li>
                 <li><b>▶ Wochenplan, Zeiterfassung, Protokoll und Rechen-Tabelle leben auf der Folie (M380):</b> In der Präsentation standen diese vier Karten bisher als Standbild. Jetzt sind sie dort <b>dasselbe Modul wie auf dem Board</b>, nur größer: im <b>Wochenplan</b> einen Block anklicken oder anlegen, die <b>Zeiterfassung</b> starten und stoppen, ins <b>Protokoll</b> schreiben und Beschlüsse festhalten, in der <b>Rechen-Tabelle</b> eine Zahl ändern — die Summen rechnen vor aller Augen neu. Tippen blättert dabei nicht weiter. Führt jemand vor („Folgt mir"), sehen alle die Änderung auf derselben Folie. Damit sind alle Module in der Präsentation lebendig.</li>
                 <li><b>🧩 Vorlagen für neue Boards (M379):</b> Statt bei null anzufangen: <b>＋ Neu → „Board aus Vorlage …"</b> legt ein Board an, auf dem die Karten für einen bekannten Anlass schon liegen — <b>Besprechung</b> (Ziel, Protokoll mit Tagesordnung, Aufgaben), <b>Rückblick</b> (gut gelaufen · hat gehakt · probieren wir aus, mit Abstimmung), <b>Projektplan</b>, <b>Brainstorming</b>, <b>Aufgaben-Board</b>, <b>Wochenplanung</b>, <b>Entscheidung</b>, <b>SWOT</b> und <b>Workshop</b>. Die Karten sind beschriftet, aber leer — nichts, was man erst wegräumen müsste. Auf einem <b>leeren Board</b> steht derselbe Weg als Knopf „Mit Vorlage beginnen"; dort füllt die Vorlage das Board, vor dem man steht (Strg+Z nimmt sie zurück).</li>
                 <li><b>🫧 Ideen-Bubbles für Workshops (M378):</b> Die Blasen bewegen sich natürlicher — große schieben kleine beiseite, eine losgelassene Blase <b>fliegt weiter</b>, und Gruppen stehen in <b>eigenen Feldern</b> nebeneinander (große Gruppen bekommen mehr Platz, freie Ideen ihr eigenes Feld). <b>Gruppieren mit der Hand:</b> eine Blase <b>auf eine Gruppe</b> ziehen (hinein), <b>auf eine andere Blase</b> („Gruppe aus beiden" oder „Verschmelzen"), <b>ins Freie</b> (heraus); „＋ Gruppe" legt eine leere an. Der Name einer Gruppe lässt sich ziehen (verschiebt sie) und antippen (umbenennen, auflösen). <b>Moderation:</b> Oben stehen die vier Schritte <b>Sammeln · Gruppieren · Abstimmen · Ergebnis</b> — alle sehen, wo die Runde steht; wer leitet, schaltet weiter. Unter ⋯: <b>verdeckt sammeln</b> (jeder sieht zuerst nur seine eigenen Ideen), <b>Namen ausblenden</b>, <b>Zwischenstand verbergen</b>, <b>Timer für alle</b> und <b>Ergebnis als Notiz</b>. ☰ zeigt alles als <b>Liste</b> nach Gruppen und Punkten.</li>
@@ -288,6 +300,8 @@ export function HelpOverlay() {
                 <li><b>📱 Ruhe am Handy, wenn die Tastatur kommt</b> — sobald du tippst, weicht alles, was gerade nicht hilft: Das Dock fährt weg, Zoom-Knöpfe und Fußzeile blenden aus, und die Eingabe-Blasen von Planer und Kalender docken als Blatt direkt über der Tastatur an, statt das Modul zu verdecken, in das du schreibst. Ist etwas ausgewählt, übernimmt die Auswahl-Leiste die Dock-Zeile — eine Leiste statt zweier gestapelter, und nie mehr zweireihig.</li>
               </ul>
             </section>
+            </div>
+            )}
             <div className="help-foot">
               <button className="link-btn" onClick={() => setSeite('hilfe')}>Zur Hilfe</button>
             </div>
@@ -332,7 +346,9 @@ export function HelpOverlay() {
               ))}
             </div>
           </nav>
-          <div className="help-body" ref={bodyRef} data-sprache="aus" lang="de">
+          <div className="help-body" ref={bodyRef}>
+            {EN ? <EN.HilfeEn /> : (
+            <div className="help-de" data-sprache="aus" lang="de">
             {sprache() === 'en' && <p className="help-en-hinweis" lang="en" translate="no" data-taste="hilfe-en-hinweis">The help texts are written in German. Your browser can translate them: choose “Translate” in the browser menu.</p>}
 
             <section id="help-start">
@@ -598,6 +614,8 @@ export function HelpOverlay() {
               </p>
               <p className="legal-hint">Dieses Muster ersetzt keine Rechtsberatung.</p>
             </section>
+            </div>
+            )}
 
             <div className="help-foot">
               PixiNotes — lokal, offen, deins. Feedback jederzeit willkommen. 📌

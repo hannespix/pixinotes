@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useBoard } from '../store';
 import { skizzeVon, VORLAGEN, type Vorlage, type VorlagenWunsch } from '../lib/vorlagen';
 import { IX } from './Icons';
+import { t } from '../lib/sprache';
 
 /** Kleine Skizze der Vorlage: ihre Karten als Flächen, so wie sie auf dem Board liegen */
 function Skizze({ vorlage }: { vorlage: Vorlage }) {
@@ -72,7 +73,7 @@ export function VorlagenDialog({ wunsch, onClose }: { wunsch: VorlagenWunsch; on
       onClose();
       return;
     }
-    st.boardAusVorlage(v.name, v.bauen(), fuellen ? { inBoard: ziel!.id } : { projectId: wunsch.projectId });
+    st.boardAusVorlage(t(v.name), v.bauen(), fuellen ? { inBoard: ziel!.id } : { projectId: wunsch.projectId });
     window.dispatchEvent(new CustomEvent('pixinotes:einpassen'));
     st.showToast(fuellen ? `Vorlage „${v.name}" eingesetzt — Strg+Z nimmt sie zurück.` : `Board „${v.name}" aus Vorlage angelegt.`);
     onClose();

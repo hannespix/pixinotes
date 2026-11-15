@@ -7244,3 +7244,4 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 
 /* ---------- M381: englische Oberfläche ---------- */
 .help-en-hinweis { margin: 0 0 14px; padding: 9px 12px; border: 1px solid var(--accent); border-radius: var(--r); background: var(--accent-soft); font-size: 13px; line-height: 1.45; }
+.help-de, .help-en { display: contents; }

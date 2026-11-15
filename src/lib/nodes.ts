@@ -3,6 +3,7 @@
 import { useBoard } from '../store';
 import { leereBubbles } from './bubbles';
 import { MERMAID_TEMPLATES } from './mermaidTemplates';
+import { t } from './sprache';
 import {
   STICKY_COLORS,
   uid,
@@ -80,7 +81,7 @@ export function makeFile(
   return { id: uid(), type: 'file', width: CARD_WIDTHS.file, position, data: file };
 }
 
-export function makeKanban(position: Pos, title = '📋 Neues Board'): AppNode {
+export function makeKanban(position: Pos, title = t('📋 Neues Board')): AppNode {
   return { id: uid(), type: 'kanban', width: CARD_WIDTHS.kanban, position, data: { title, items: [] } };
 }
 
@@ -94,7 +95,7 @@ export function makePortal(position: Pos): AppNode {
 export function makeBubbles(position: Pos): AppNode {
   return {
     id: uid(), type: 'bubbles', width: 560, height: 440, position,
-    data: { title: 'Ideen', frage: '', ...leereBubbles() },
+    data: { title: t('Ideen'), frage: '', ...leereBubbles() },
   } as AppNode;
 }
 
@@ -106,7 +107,7 @@ export function makeMinutes(position: Pos): AppNode {
     width: CARD_WIDTHS.minutes,
     height: 420,
     position,
-    data: { title: 'Besprechungsreihe', color: 'white', entries: [], agenda: [], rhythm: '', carryOpen: true },
+    data: { title: t('Besprechungsreihe'), color: 'white', entries: [], agenda: [], rhythm: '', carryOpen: true },
   } as AppNode;
 }
 
@@ -122,7 +123,7 @@ export function makeSheet(position: Pos, daten: Record<string, unknown> = {}): A
     width: 460,
     height: 300,
     position,
-    data: { title: 'Rechen-Tabelle', cells: {}, cols: 5, rows: 8, ...daten },
+    data: { title: t('Rechen-Tabelle'), cells: {}, cols: 5, rows: 8, ...daten },
   } as AppNode;
 }
 
@@ -133,7 +134,7 @@ export function makeWeek(position: Pos): AppNode {
     width: 620,
     height: 440,
     position,
-    data: { title: 'Wochenplan', days: 5, from: 8 * 60, to: 17 * 60, entries: [] },
+    data: { title: t('Wochenplan'), days: 5, from: 8 * 60, to: 17 * 60, entries: [] },
   };
 }
 
@@ -146,7 +147,7 @@ export function makeTime(position: Pos): AppNode {
     width: 460,
     height: 380,
     position,
-    data: { title: 'Zeiterfassung', segs: [] },
+    data: { title: t('Zeiterfassung'), segs: [] },
   };
 }
 
@@ -173,7 +174,7 @@ export function makeHtmlApp(position: Pos, file: { name: string; size: number })
 /* M287: „Neuer Rahmen“ statt „Neuer Bereich“ — „Bereich“ ist in dieser
    Anwendung die OBERSTE Hierarchie-Ebene (Bereich › Projekt › Board).
    Beide Dinge so zu nennen, führte prompt zur Verwechslung. */
-export function makeFrame(position: Pos, name = 'Neuer Rahmen'): AppNode {
+export function makeFrame(position: Pos, name = t('Neuer Rahmen')): AppNode {
   return {
     id: uid(),
     type: 'frame',
@@ -207,12 +208,12 @@ export function makeGantt(position: Pos): AppNode {
     height: 240,
     position,
     data: {
-      title: '📅 Zeitplan',
+      title: t('📅 Zeitplan'),
       dayWidth: 24,
       rows: [
-        { id: uid(), name: 'Phase 1', start: iso(now), end: iso(now + 6 * day), color: '#4f7cff', progress: 30 },
-        { id: uid(), name: 'Phase 2', start: iso(now + 7 * day), end: iso(now + 13 * day), color: '#3fa564' },
-        { id: uid(), name: 'Meilenstein', start: iso(now + 14 * day), end: iso(now + 14 * day), color: '#e07a3f' },
+        { id: uid(), name: t('Phase 1'), start: iso(now), end: iso(now + 6 * day), color: '#4f7cff', progress: 30 },
+        { id: uid(), name: t('Phase 2'), start: iso(now + 7 * day), end: iso(now + 13 * day), color: '#3fa564' },
+        { id: uid(), name: t('Meilenstein'), start: iso(now + 14 * day), end: iso(now + 14 * day), color: '#e07a3f' },
       ],
     },
   };
