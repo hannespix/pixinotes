@@ -3,6 +3,7 @@
 // Browser nie Richtung Server — der Link IST die Datei. Der Empfänger
 // öffnet ihn auf der Web-Version (oder jeder lokalen Kopie) und bekommt
 // das Board als neues Board importiert.
+import { kartenVonAussen } from './sicher';
 import type { BoardDoc } from '../store';
 import { uid, type AppNode, type KanbanData } from '../types';
 import { triggerDownload } from './download';
@@ -41,8 +42,19 @@ async function gunzip(bytes: Uint8Array): Promise<string> {
 /** Praktische Obergrenze für Links (Clipboard/Browser vertragen mehr, aber Messenger nicht) */
 export const SHARE_URL_LIMIT = 60_000;
 
+/**
+ * M388: Was ein Board zum GETEILTEN macht, reist nicht mit hinaus. Ein Board, das man selbst nur als Gast hat,
+ * trägt das Einladungs-Token und die E-Mail des Besitzers — wer eine Kopie weitergab, gab damit auch den
+ * Zugang zum Original weiter. (lib/linkTeilen.ts nimmt dieselben Felder heraus.)
+ */
+function zumWeitergeben(board: BoardDoc): BoardDoc {
+  const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, gastLink: _l, ...eigen } = board as BoardDoc & { gastWar?: unknown };
+  delete (eigen as { gastWar?: unknown }).gastWar;
+  return { ...eigen, nodes: eigen.nodes.map((n) => (n.selected ? { ...n, selected: false } : n)) } as BoardDoc;
+}
+
 export async function boardToShareUrl(board: BoardDoc): Promise<string> {
-  const payload: SharePayload = { app: 'pixinotes-board', version: 2, board };
+  const payload: SharePayload = { app: 'pixinotes-board', version: 2, board: zumWeitergeben(board) };
   const packed = b64url(await gzip(JSON.stringify(payload)));
   const base = `${window.location.origin}${window.location.pathname}`;
   return `${base}#b=${packed}`;
@@ -50,7 +62,7 @@ export async function boardToShareUrl(board: BoardDoc): Promise<string> {
 
 /** Fallback für große Boards (Bilder!): als .pixiboard.json herunterladen */
 export function downloadBoardFile(board: BoardDoc): void {
-  const payload: SharePayload = { app: 'pixinotes-board', version: 2, board };
+  const payload: SharePayload = { app: 'pixinotes-board', version: 2, board: zumWeitergeben(board) };
   const url = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: 'application/json' }));
   triggerDownload(url, `${board.name.replace(/[^\p{L}\d\-_ ]/gu, '').trim().slice(0, 40) || 'board'}.pixiboard.json`);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -59,7 +71,8 @@ export function downloadBoardFile(board: BoardDoc): void {
 /** Board aus geteiltem Payload klonen: frische IDs, damit nichts kollidiert */
 export function cloneSharedBoard(board: BoardDoc, idMap: Map<string, string> = new Map()): BoardDoc {
   // M357: Wer die Zuordnung alte → neue Karten-Id braucht (Anhänge liegen unter der Karten-Id), reicht die Karte herein
-  const nodes = (board.nodes ?? []).map((n) => {
+  // M388: Ein geteiltes Board stammt von anderen — ungültige Karten fallen weg, Adressen werden entschärft (lib/sicher.ts)
+  const nodes = kartenVonAussen(board.nodes).map((n) => {
     const nid = uid();
     idMap.set(n.id, nid);
     const clone = { ...n, id: nid, selected: false } as AppNode;

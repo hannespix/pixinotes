@@ -1,5 +1,6 @@
 // Karten-Fabriken: eine Quelle für Default-Größen, Farb-Rotation und
 // Node-Erzeugung (Audit M5/N5 — vorher vierfach dupliziert).
+import { tagLokal } from './tag';
 import { useBoard } from '../store';
 import { leereBubbles } from './bubbles';
 import { MERMAID_TEMPLATES } from './mermaidTemplates';
@@ -51,9 +52,26 @@ export function nextStickyColor(): StickyColor {
   return STICKY_COLORS[colorIdx++ % (STICKY_COLORS.length - 1)];
 }
 
+/**
+ * M388: Notizen, die der Mensch EBEN angelegt hat — nur sie bekommen von selbst den Cursor. Vorher zog jede leere
+ * Notiz bei jedem Öffnen ihres Boards den Cursor an sich: Am Telefon sprang die Tastatur auf, Kürzel landeten als
+ * Text in der Notiz, und im Team hielt die Karte dadurch eine Schreib-Sperre.
+ */
+const ebenAngelegt = new Map<string, number>();
+export function warEbenAngelegt(id: string): boolean {
+  const t = ebenAngelegt.get(id);
+  ebenAngelegt.delete(id);
+  return t !== undefined && Date.now() - t < 8000;
+}
+
 export function makeNote(position: Pos, opts?: { color?: StickyColor; blocks?: unknown[] }): AppNode {
+  const id = uid();
+  if (!opts?.blocks?.length) {
+    if (ebenAngelegt.size > 50) ebenAngelegt.clear();
+    ebenAngelegt.set(id, Date.now());
+  }
   return {
-    id: uid(),
+    id,
     type: 'note',
     width: CARD_WIDTHS.note,
     position,
@@ -199,7 +217,7 @@ export function makeShape(position: Pos, shape: ShapeKind = 'process'): AppNode 
 
 export function makeGantt(position: Pos): AppNode {
   const day = 864e5;
-  const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+  const iso = (t: number) => tagLokal(new Date(t));
   const now = Date.now();
   return {
     id: uid(),

@@ -10,12 +10,6 @@ export const FONT_STACKS: Record<CardFont, string> = {
   mono: "ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace",
 };
 
-export const FONT_LABELS: Record<CardFont, string> = {
-  serif: 'Serifen',
-  lesbar: 'Sehr gut lesbar',
-  hand: 'Handschrift',
-  mono: 'Monospace',
-};
 
 /** Inline-Textgrößen (M201) — relativ (em), damit sie mit der Karten-Größe
  *  (pn-size-*) sauber zusammenspielen statt sie zu überschreiben */

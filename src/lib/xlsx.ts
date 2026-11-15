@@ -44,6 +44,25 @@ function leseTexte(xml: string | null): string[] {
   return aus;
 }
 
+const spalteNr = (b: string): number => [...b].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0);
+const spalteName = (n: number): string => { let s = ''; let x = n; while (x > 0) { const r = (x - 1) % 26; s = String.fromCharCode(65 + r) + s; x = Math.floor((x - 1) / 26); } return s; };
+const adresseTeile = (adr: string): { zeile: number; spalte: number } => { const m = /^([A-Z]+)(\d+)$/.exec(adr); return m ? { zeile: Number(m[2]), spalte: spalteNr(m[1]) } : { zeile: 1, spalte: 1 }; };
+/** Außerhalb von "Text": Stück für Stück umformen */
+const ausserhalbText = (f: string, fn: (teil: string) => string): string => f.split(/("(?:[^"]|"")*")/).map((t, i) => (i % 2 ? t : fn(t))).join('');
+/** Bezüge einer Formel um Zeilen/Spalten versetzen — mit $ festgehaltene bleiben */
+function versetzeFormel(f: string, dz: number, ds: number): string {
+  return ausserhalbText(f, (teil) => teil.replace(/(^|[^A-Za-z0-9_.$])(\$?)([A-Z]{1,3})(\$?)(\d+)(?![A-Za-z0-9_(])/g, (_g, vor: string, fs: string, sp: string, fz: string, zl: string) => {
+    const s = fs ? spalteNr(sp) : spalteNr(sp) + ds; const z = fz ? Number(zl) : Number(zl) + dz;
+    return s < 1 || z < 1 ? `${vor}#BEZUG!` : `${vor}${fs}${spalteName(s)}${fz}${z}`;
+  }));
+}
+/**
+ * M388: Formel aus der Datei in die hiesige Schreibweise. In der Datei stehen Formeln immer amerikanisch: Komma
+ * trennt die Angaben einer Funktion. Hier trennt das Semikolon (das Komma ist Dezimalzeichen) — =ROUND(A1/3,2)
+ * rechnete darum still mit „3,2", =IF(A1>5,"a","b") meldete einen Fehler.
+ */
+const hiesigeFormel = (f: string): string => ausserhalbText(f, (teil) => teil.replace(/,/g, ';'));
+
 /**
  * Excel-Datum → lesbares Datum.
  *
@@ -52,6 +71,11 @@ function leseTexte(xml: string | null): string[] {
  * in der Karte eine nackte Zahl wie 45678 statt eines Datums.
  */
 const alsDatum = (tage: number): string => {
+  // M388: nur eine Uhrzeit (Bruchteil eines Tages) — vorher stand dort „1899-12-30"
+  if (tage > 0 && tage < 1) {
+    const min = Math.round(tage * 1440);
+    return `${String(Math.floor(min / 60) % 24).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+  }
   const ms = (tage - 25569) * 86400000;
   const d = new Date(Math.round(ms));
   return Number.isFinite(d.getTime()) ? d.toISOString().slice(0, 10) : String(tage);
@@ -62,10 +86,16 @@ function datumsFormate(stylesXml: string | null): Set<number> {
   const aus = new Set<number>();
   if (!stylesXml) return aus;
   const cellXfs = /<cellXfs\b[^>]*>([\s\S]*?)<\/cellXfs>/.exec(stylesXml)?.[1] ?? '';
+  // M388: eigene Formate (ab Nummer 164, z. B. „TT.MM.JJJJ") — am Formatcode erkannt; sonst blieb die nackte Tageszahl stehen
+  const eigene = new Set<number>();
+  for (const m of stylesXml.matchAll(/<numFmt\b[^>]*numFmtId="(\d+)"[^>]*formatCode="([^"]*)"/g)) {
+    const code = entschluessele(m[2]).replace(/"[^"]*"/g, '').replace(/\[[^\]]*\]/g, '').replace(/\\./g, '');
+    if (/[dy]/i.test(code) || /(^|[^a-z])(h{1,2}|m{1,2}|s{1,2})([^a-z]|$)/i.test(code) && /[hs]/i.test(code)) eigene.add(Number(m[1]));
+  }
   let i = 0;
   for (const m of cellXfs.matchAll(/<xf\b([^>]*)>/g)) {
     const nr = Number(/numFmtId="(\d+)"/.exec(m[1])?.[1] ?? '0');
-    if ((nr >= 14 && nr <= 22) || (nr >= 45 && nr <= 47)) aus.add(i);
+    if ((nr >= 14 && nr <= 22) || (nr >= 45 && nr <= 47) || eigene.has(nr)) aus.add(i);
     i += 1;
   }
   return aus;
@@ -99,6 +129,7 @@ export async function leseXlsx(daten: ArrayBuffer, index = 0): Promise<ExcelBlat
 
   const zellen: Record<string, string> = {};
   let spalten = 0; let zeilen = 0;
+  const geteilt = new Map<string, { formel: string; zeile: number; spalte: number }>();
 
   for (const m of xml.matchAll(/<c\b([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
     const attr = m[1];
@@ -108,14 +139,24 @@ export async function leseXlsx(daten: ArrayBuffer, index = 0): Promise<ExcelBlat
     const typ = /t="([^"]+)"/.exec(attr)?.[1] ?? 'n';
     const stil = Number(/s="(\d+)"/.exec(attr)?.[1] ?? '-1');
 
-    const formel = /<f\b[^>]*>([\s\S]*?)<\/f>/.exec(inhalt)?.[1];
+    let formel = /<f\b[^>]*>([\s\S]*?)<\/f>/.exec(inhalt)?.[1];
+    /* M388: „Geteilte" Formeln — jedes Herunterziehen in Excel. Nur die erste Zelle trägt den Text, die übrigen
+       verweisen darauf (<f t="shared" si="0"/>). Vorher kamen sie als ihr zuletzt gerechneter Wert an und
+       rechneten nie wieder. Jetzt bekommt jede ihre Formel, um ihre Lage versetzt. */
+    const fAttr = /<f\b([^>]*?)\/?>/.exec(inhalt)?.[1] ?? '';
+    const geteiltNr = /t="shared"/.test(fAttr) ? /si="(\d+)"/.exec(fAttr)?.[1] : undefined;
+    if (geteiltNr !== undefined) {
+      const hier = adresseTeile(adr);
+      if (formel) geteilt.set(geteiltNr, { formel: entschluessele(formel), ...hier });
+      else { const g = geteilt.get(geteiltNr); if (g) formel = versetzeFormel(g.formel, hier.zeile - g.zeile, hier.spalte - g.spalte); }
+    }
     const roh = /<v\b[^>]*>([\s\S]*?)<\/v>/.exec(inhalt)?.[1];
     // Text kann auch direkt in der Zelle stehen (t="inlineStr")
     const inlineText = /<is\b[^>]*>([\s\S]*?)<\/is>/.exec(inhalt)?.[1];
 
     let wert = '';
     if (formel) {
-      wert = `=${entschluessele(formel)}`;
+      wert = `=${hiesigeFormel(entschluessele(formel))}`;
     } else if (typ === 's' && roh !== undefined) {
       wert = texte[Number(roh)] ?? '';
     } else if (typ === 'inlineStr' && inlineText) {
@@ -126,11 +167,13 @@ export async function leseXlsx(daten: ArrayBuffer, index = 0): Promise<ExcelBlat
       wert = roh === '1' ? 'WAHR' : 'FALSCH';
     } else if (typ === 'e' && roh !== undefined) {
       wert = entschluessele(roh);
+    } else if (typ === 'str' && roh !== undefined) {
+      // M388: Text-Ergebnis einer Formel. Stand hinter dem allgemeinen Zweig und wurde nie erreicht —
+      // „Müller &amp; Söhne" kam darum mit dem rohen „&amp;" an.
+      wert = entschluessele(roh);
     } else if (roh !== undefined) {
       const zahl = Number(roh);
       wert = datums.has(stil) && Number.isFinite(zahl) && zahl > 0 ? alsDatum(zahl) : roh;
-    } else if (typ === 'str' && roh !== undefined) {
-      wert = entschluessele(roh);
     }
     if (wert === '') continue;
 

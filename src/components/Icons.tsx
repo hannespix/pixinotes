@@ -43,11 +43,7 @@ export const IGantt = make(<><path d="M4 6h9" /><path d="M9 12h11" /><path d="M6
 export const INote = make(<><path d="M15.5 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5Z" /><path d="M15 3v5h5" /></>);
 export const IKanban = make(<><path d="M6 5v11" /><path d="M12 5v6" /><path d="M18 5v14" /></>);
 export const IDiagram = make(<><rect width="6" height="5" x="9" y="3" rx="1" /><rect width="6" height="5" x="3" y="16" rx="1" /><rect width="6" height="5" x="15" y="16" rx="1" /><path d="M12 8v3" /><path d="M12 11H6v5" /><path d="M12 11h6v5" /></>);
-// M194: Seitenleiste rechts (ausfahrbarer Überblick)
-export const IPanelRight = make(<><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M15 3v18" /></>);
 export const IPanelLeft = make(<><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M9 3v18" /></>);
-// M193: Netz-Ansicht — Knoten mit Verbindungen (Graph, nicht Baum)
-export const IGraph = make(<><circle cx="12" cy="12" r="3" /><circle cx="5" cy="6" r="2" /><circle cx="19" cy="7" r="2" /><circle cx="6" cy="19" r="2" /><circle cx="18" cy="18" r="2" /><path d="m6.8 7.4 2.8 2.8" /><path d="m17.4 8.4-3 2.4" /><path d="m7.4 17.6 2.8-2.8" /><path d="m16.6 16.6-2.6-2.4" /></>);
 export const IFolder = make(<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />);
 export const IHome = make(<><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /><path d="M9 22V12h6v10" /></>);
 export const IChevronL = make(<path d="m15 18-6-6 6-6" />);
@@ -93,13 +89,9 @@ export const IPill = make(<rect width="18" height="10" x="3" y="7" rx="5" />);
 export const IQr = make(<><rect width="6" height="6" x="3" y="3" rx="1" /><rect width="6" height="6" x="15" y="3" rx="1" /><rect width="6" height="6" x="3" y="15" rx="1" /><path d="M15 15h2v2h-2zM19 15h2M15 19h2v2M19 19h2v2h-2" /></>);
 export const IMousePointer = make(<><path d="m4 3 7.1 17 2.4-7.5L21 10Z" /></>);
 export const IShare = make(<><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.6 13.5 6.8 4" /><path d="m15.4 6.5-6.8 4" /></>);
-/** M224: Sehen & Bedienen — Barrierefreiheits-Einstellungen */
-export const IEye = make(<><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>);
 export const ITag = make(<><path d="M12 2H4a2 2 0 0 0-2 2v8l10 10 10-10Z" /><circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none" /></>);
 export const IBookmark = make(<path d="M19 21 12 16 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z" />);
 export const IArrange = make(<><rect width="7" height="7" x="3" y="3" rx="1.5" /><rect width="7" height="7" x="14" y="3" rx="1.5" /><rect width="7" height="7" x="3" y="14" rx="1.5" /><path d="M17.5 14.5v6" /><path d="M14.5 17.5h6" /></>);
-export const IHelp = make(<><circle cx="12" cy="12" r="9" /><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 2.4-3 4" /><path d="M12 17.5h.01" /></>);
-export const IMagnet = make(<><path d="M5 3v7a7 7 0 0 0 14 0V3" /><path d="M5 3h4v7a3 3 0 0 0 6 0V3h4" /><path d="M5 8h4" /><path d="M15 8h4" /></>);
 
 /* ---------- M144: Anordnungs- & Export-Icons (statt Emojis in Menüs) ---------- */
 export const IFlowH = make(<><path d="M3 12h14" /><path d="m12 7 5 5-5 5" /></>);
@@ -132,16 +124,6 @@ export const IMaximize = make(<><path d="M15 3h6v6" /><path d="M9 21H3v-6" /><pa
 export const IMinimize = make(<><path d="M4 14h6v6" /><path d="M20 10h-6V4" /><path d="M14 10l7-7" /><path d="M3 21l7-7" /></>);
 export const IReload = make(<><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>);
 export const IStopSq = make(<rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor" stroke="none" />);
-// M243: Anfasser der Bearbeiten-Leiste — die sechs Punkte sind die
-// eingebürgerte Form für „hier anfassen und schieben" (Trello, Notion, Jira).
-export const IGrip = make(<>
-  <circle cx="9" cy="6" r="1.5" fill="currentColor" stroke="none" />
-  <circle cx="15" cy="6" r="1.5" fill="currentColor" stroke="none" />
-  <circle cx="9" cy="12" r="1.5" fill="currentColor" stroke="none" />
-  <circle cx="15" cy="12" r="1.5" fill="currentColor" stroke="none" />
-  <circle cx="9" cy="18" r="1.5" fill="currentColor" stroke="none" />
-  <circle cx="15" cy="18" r="1.5" fill="currentColor" stroke="none" />
-</>);
 
 /** M254: Bild/Foto — Rahmen mit Bergspitze und Sonne, das übliche Bildsymbol */
 export const IImage = make(<><rect width="18" height="18" x="3" y="3" rx="2" /><circle cx="9" cy="9" r="1.6" /><path d="m21 15-4.5-4.5L9 18" /></>);

@@ -3,6 +3,7 @@
 // Bisher ging auf dem Board fast alles nur mit der Maus: Man konnte keine Karte per Tastatur
 // auswählen, nicht zur nächsten springen, nicht in den Text hinein und wieder heraus.
 // Die Kürzel stehen (wie alle) in lib/tasten.ts; hier werden sie ausgeführt, weil sie die Kamera brauchen.
+import { overlayOffen } from '../lib/overlay';
 import { useEffect, type MutableRefObject } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { uid, type AppNode } from '../types';
@@ -24,7 +25,7 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
     const onKey = (e: KeyboardEvent) => {
       const st = useBoard.getState();
       if (st.view !== 'board' || st.presenting || st.searchOpen || st.settingsOpen || st.helpOpen || st.tasksOpen) return;
-      if (document.querySelector('.modal-backdrop')) return;
+      if (overlayOffen()) return;   // M388: auch Ticket-Fenster und Bild-Lupe (lib/overlay.ts)
       const t = e.target as HTMLElement | null;
       const closest = (sel: string) => (typeof t?.closest === 'function' ? t.closest(sel) : null);
       if (closest('.modal, [role="dialog"], [role="menu"], .dock-menu, .sel-more-menu, .nav-panel')) return;

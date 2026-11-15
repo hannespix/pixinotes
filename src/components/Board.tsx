@@ -1,3 +1,4 @@
+import { overlayOffen } from '../lib/overlay';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
@@ -730,7 +731,8 @@ export function Board() {
          warf die alte Zeile einen Fehler und riss den ganzen Handler mit. */
       const target = e.target as HTMLElement | null;
       if (typeof target?.closest === 'function'
-        && target.closest('input, textarea, [contenteditable="true"]')) return;
+        && target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (overlayOffen()) return;   // M388: Die Tasten gehören dem Fenster darüber, nicht der Fläche
       const st = useBoard.getState();
       if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -966,6 +968,10 @@ export function Board() {
       const target = e.target as HTMLElement | null;
       if (typeof target?.closest === 'function'
         && target.closest('input, textarea, [contenteditable="true"]')) return;
+      // M388: Auf einem Knopf, einer Auswahl oder einem Aufklapper löst die Leertaste DIESEN aus — und über einem
+      // Fenster schwenkt sie nichts. (Vorher schluckte das Board sie: Knöpfe ließen sich nur mit Enter bedienen.)
+      if (typeof target?.closest === 'function' && target.closest('button, a[href], select, summary, [role="button"], [role="menuitem"], [role="tab"], [role="checkbox"], [role="switch"]')) return;
+      if (overlayOffen()) return;
       e.preventDefault(); // Seite darf nicht scrollen
       setSpaceHeld(true);
     };
@@ -1606,7 +1612,6 @@ export function Board() {
           gap={gridSnap ? 20 : 26}
           size={1.6}
           lineWidth={0.6}
-          color={document.documentElement.dataset.theme === 'dark' ? '#2e3238' : '#d3d6dc'}
         />
         {/* M296: Die Minimap erst, wenn das Board groß genug ist, um sich darin
             zu verlaufen — bei fünf Karten ist sie nur ein grauer Kasten. */}

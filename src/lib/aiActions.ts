@@ -2,7 +2,13 @@
 // Aufgaben/Termine extrahieren, Prozesse ableiten, Briefings, Verbindungen.
 // Alle Aktionen sind NICHT destruktiv: sie legen neue Karten an bzw. ordnen
 // nur Positionen — und jede läuft über die Undo-History.
-import { askAi, askAiVoll, kiAbgebrochen, MD_HINT, mdToBlocks, prepImageForAi } from './ai';
+import { tagLokal } from './tag';
+import { askAi as askAiRoh, askAiVoll as askAiVollRoh, kiAbgebrochen, MD_HINT, mdToBlocks, prepImageForAi } from './ai';
+import { aufDemselbenBoard } from './zielBoard';
+
+// M388: Jede Antwort der KI kommt auf dem Board an, auf dem die Aktion begann (lib/zielBoard.ts)
+const askAi: typeof askAiRoh = (...a) => aufDemselbenBoard(() => askAiRoh(...a));
+const askAiVoll: typeof askAiVollRoh = (...a) => aufDemselbenBoard(() => askAiVollRoh(...a));
 import { nodeToText } from './serialize';
 import { makeFrame, makeGantt, makeKanban, makeMermaid, makeNote, makeShape, makeTime, makeWeek } from './nodes';
 import { mutedHistory, selectActiveBoard, useBoard } from '../store';
@@ -296,7 +302,7 @@ export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): 
   const items = await gather(nodes);
   if (items.length === 0) throw new Error('Keine Inhalte gefunden.');
   const imgs = await gatherImages(nodes);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = tagLokal();
   const { tasks } = await askJson<{ tasks: Array<{ text: string; due?: string }> }>(
     `Heute ist ${today}. Extrahiere aus den folgenden Karten alle konkreten Aufgaben/TODOs. Erkenne Termine/Fristen und setze sie als ISO-Datum (yyyy-mm-dd). Antworte NUR mit JSON: {"tasks":[{"text":"...","due":"yyyy-mm-dd"}]} — "due" nur, wenn wirklich ein Termin erkennbar ist.${imgHint(imgs)}\n\nKarten:\n${JSON.stringify(items)}`,
     imgs,

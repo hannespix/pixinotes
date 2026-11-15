@@ -19,7 +19,7 @@ import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
 import { InlineName } from './InlineName';
 import { BereichMenu, BoardMenu, ProjektMenu, insBild } from './EbenenMenu';
-import { IPlay, ITarget, IZoomIn, IZoomOut } from './Icons';
+import { ITarget, IZoomIn, IZoomOut } from './Icons';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
 interface ProjectZoneData { project: Project; spaceId: string; [key: string]: unknown }
@@ -192,7 +192,7 @@ function OverviewCanvas() {
           setTick((t) => t + 1);
         }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} color={document.documentElement.dataset.theme === 'dark' ? '#2e3238' : '#d3d6dc'} />
+        <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} />
       </ReactFlow>
       {/* M312: „+ Neuer Bereich" schwebte hier als eigener Knopf — Anlegen geht
           jetzt überall gleich über ＋ Neu am Fuß der Navigation. */}

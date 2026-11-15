@@ -119,18 +119,6 @@ export function taste(id: string): string {
     .replace(/Entf/g, '⌫');
 }
 
-/**
- * Titel für eine Sprechblase: „Karte archivieren (Alt+A)".
- *
- * Am Touchgerät bleibt das Kürzel weg — dort gibt es keine Tastatur, und der
- * Zusatz würde die ohnehin knappe Sprechblase nur zustellen.
- */
-export function mitTaste(titel: string, id: string): string {
-  const t = taste(id);
-  if (!t) return titel;
-  if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return titel;
-  return `${titel} (${t})`;
-}
 
 /**
  * Passt das Tastatur-Ereignis zu diesem Kürzel?
@@ -157,6 +145,8 @@ export function passt(e: KeyboardEvent, id: string): boolean {
   if (taste_ === '←') return e.key === 'ArrowLeft';
   // e.key liefert unter Alt je nach Layout Sonderzeichen (Alt+A → 'å' auf dem
   // Mac). e.code ist layoutunabhängig und damit die verlässliche Quelle.
-  if (/^[A-Za-z]$/.test(taste_)) return e.code === `Key${taste_.toUpperCase()}`;
+  // M388: Liefert die Taste einen Buchstaben, zählt DER (deutsche Tastatur: Z und Y sind gegenüber e.code vertauscht —
+  // Alt+Z lag auf der Taste „Y"). Nur wenn Alt daraus ein Sonderzeichen gemacht hat, entscheidet die Lage der Taste.
+  if (/^[A-Za-z]$/.test(taste_)) return /^[A-Za-z]$/.test(e.key) ? e.key.toLowerCase() === taste_.toLowerCase() : e.code === `Key${taste_.toUpperCase()}`;
   return e.key.toLowerCase() === taste_.toLowerCase();
 }

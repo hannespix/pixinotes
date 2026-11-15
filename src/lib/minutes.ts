@@ -30,6 +30,13 @@ export function entryLabel(e: MinutesEntry | undefined): string {
 }
 
 /** Datumsvorschlag für die nächste Sitzung — folgt dem Rhythmus der Reihe */
+function monateWeiter(d: Date, n: number): void {
+  const tag = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + n);
+  d.setDate(Math.min(tag, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+}
+
 export function nextDate(data: MinutesData, today = new Date()): string {
   const last = latestEntry(data);
   const base = last?.date ? new Date(`${last.date}T12:00:00`) : today;
@@ -38,8 +45,9 @@ export function nextDate(data: MinutesData, today = new Date()): string {
   switch (data.rhythm) {
     case 'woche': d.setDate(d.getDate() + 7); break;
     case 'zweiwochen': d.setDate(d.getDate() + 14); break;
-    case 'monat': d.setMonth(d.getMonth() + 1); break;
-    case 'quartal': d.setMonth(d.getMonth() + 3); break;
+    // M388: am Monatsende nicht überlaufen — 31.01. + 1 Monat ist der 28./29.02., nicht der 03.03.
+    case 'monat': monateWeiter(d, 1); break;
+    case 'quartal': monateWeiter(d, 3); break;
     default: return isoLocal(today);
   }
   // Läge der Vorschlag noch in der Vergangenheit, ist „heute" ehrlicher

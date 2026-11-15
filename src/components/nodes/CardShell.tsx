@@ -36,7 +36,6 @@ const NOTIZ_MAX = 640;
  * Resize-Griffe an Ecken/Kanten (sichtbar bei Selektion).
  */
 export function CardShell({ id, className, children, selected, minWidth = 170, minHeight = 70, style, schrumpft = false, rollt = false, aussen, seitenverhaeltnis = false, ruhig = false }: Props) {
-  const removeNode = useBoard((s) => s.removeNode);
   const setNodeHeight = useBoard((s) => s.setNodeHeight);
   const setAutoFit = useBoard((s) => s.setAutoFit);
   const showToast = useBoard((s) => s.showToast);

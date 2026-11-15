@@ -185,7 +185,3 @@ export async function dateiTextVonKarte(node: AppNode): Promise<string | null> {
   return aus;
 }
 
-/** Nach dem Nachreichen oder Ersetzen einer Datei den gemerkten Text vergessen */
-export function textVergessen(nodeId: string): void {
-  merker.delete(nodeId);
-}

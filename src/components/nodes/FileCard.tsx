@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
+import { wordEntschaerfen } from '../../lib/sicher';
 import { mutedHistory, selectActiveBoard, useBoard } from '../../store';
 import type { FileNode } from '../../types';
 import { formatBytes, MAX_EMBED_BYTES } from '../../lib/parseEmail';
@@ -176,7 +177,9 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
         size: f.size, lokal: true,
         ...(dataUrl && canEmbed(dataUrl.length) ? { dataUrl } : {}),
       }));
-      setBlobUrl((alt) => { if (alt) URL.revokeObjectURL(alt); return URL.createObjectURL(f); });
+      // M388: neu aus der Ablage lesen (der Lade-Effekt gibt seine Adresse selbst wieder frei). Vorher entstand hier
+      // eine zweite Objekt-Adresse, die niemand freigab — jede so geladene Datei blieb bis zum Neuladen im Speicher.
+      setNachzuegler((n) => n + 1);
       showToast(`„${file.name}" aus dem Team-Ordner geladen.`);
     } finally {
       setLoading(false);
@@ -669,7 +672,9 @@ function WordSeite({ id, quelle, zuklappen, onSeiten, onDownload }: {
         await renderAsync(blob, inhaltRef.current, stilRef.current ?? undefined, {
           inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false, useBase64URL: true,
           renderHeaders: true, renderFooters: true, renderFootnotes: true, renderComments: false, className: 'docx',
+          renderAltChunks: false,   // M388: eingebettetes HTML (altChunk) käme als Rahmen ohne Sandbox — mit Zugriff auf PixiNotes
         });
+        if (inhaltRef.current) wordEntschaerfen(inhaltRef.current);
         if (weg) return;
         const abschnitte = inhaltRef.current.querySelectorAll<HTMLElement>('section.docx');
         setSeiten(Math.max(1, abschnitte.length)); onSeiten?.(Math.max(1, abschnitte.length));

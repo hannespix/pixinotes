@@ -135,7 +135,9 @@ export default function App() {
       void cleanupOrphanHtml(ids);
       // M259: dasselbe für die Inhalte von Datei-Karten
       const dateiIds = new Set(
-        useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'file').map((n) => n.id)),
+        // M388: … und der Tool-Karten: Ein Quelltext, der per Ordner/WebDAV kam, liegt bis zum ersten Öffnen der Karte
+        // noch unter der Datei-Kennung — das Aufräumen löschte ihn sonst, bevor er je gezeigt wurde
+        useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'file' || n.type === 'htmlapp').map((n) => n.id)),
       );
       void cleanupOrphanFiles(dateiIds);
     }, 8000);
@@ -434,7 +436,7 @@ export default function App() {
         <div className={`toast ${toast ? 'show' : ''}`}>
           {toast?.message}
           {toast?.undo && (
-            <button className="toast-undo" onClick={restoreDeleted}>
+            <button className="toast-undo" onClick={toast.undo === 'schritt' ? () => useBoard.getState().undo() : restoreDeleted}>
               Rückgängig
             </button>
           )}

@@ -5,6 +5,7 @@
 //    Kanbans zu Kanbans …) und als kompakte Raster gelegt.
 // 3. Alle Blöcke werden mit sauberen Abständen zeilenweise gepackt
 //    (Shelf-Packing), sodass eine harmonische Gesamtfläche entsteht.
+import { tagLokal } from './tag';
 import type { Edge } from '@xyflow/react';
 import type { AppNode } from '../types';
 
@@ -470,7 +471,7 @@ export function arrangeQuadrantFull(nodes: AppNode[]): {
   moves: Array<[string, number, number]>;
   boxes: Array<{ x: number; y: number; w: number; h: number }>;
 } {
-  const soon = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+  const soon = tagLokal(new Date(Date.now() + 7 * 86_400_000));
   const important = (n: AppNode): boolean => {
     const d = n.data as { attrs?: Record<string, string>; items?: Array<{ prio?: number }> } | undefined;
     const a = (d?.attrs?.prio ?? d?.attrs?.wichtig ?? '').toLowerCase();
@@ -509,10 +510,6 @@ function arrangeQuadrant(nodes: AppNode[]): Array<[string, number, number]> {
   return arrangeQuadrantFull(nodes).moves;
 }
 
-/** Bahnen-Namen für den Toast der Schwimmbahnen-Anordnung */
-export function laneNames(nodes: AppNode[]): string[] {
-  return arrangeLanes(nodes).lanes;
-}
 
 /**
  * Vertikaler Fluss (M141): derselbe Schichten-Algorithmus, nur transponiert —

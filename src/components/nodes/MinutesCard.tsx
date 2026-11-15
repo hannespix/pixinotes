@@ -35,13 +35,13 @@ export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
       className={`minutes-card sticky-${(data as MinutesData).color ?? 'white'}`}
       style={(data as MinutesData).hex ? { background: (data as MinutesData).hex } : undefined}
     >
-      <MinutesBody id={id} data={data} selected={selected} />
+      <MinutesBody id={id} data={data} />
     </CardShell>
   );
 }
 
 /** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
-export function MinutesBody({ id, data, selected }: { id: string; data: MinutesData; selected?: boolean }) {
+export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   const m = data as MinutesData;
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);

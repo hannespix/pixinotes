@@ -73,15 +73,19 @@ export function jwtSub(token: string): string {
   } catch { return ''; }
 }
 
+/** M388: Der Server war nicht erreichbar (kein Netz, 5xx) — das ist keine Absage */
+export class NetzFehler extends Error {}
+
 async function authRuf(pfad: string, body: unknown, k = supabaseKonfig()): Promise<TokenAntwort> {
   if (!k.url || !k.key) throw new Error('PixiNotes-Konto: Der Betreiber hat noch kein Konto-Backend hinterlegt.');
   let res: Response;
   try {
     res = await fetch(`${k.url}/auth/v1/${pfad}`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: k.key }, body: JSON.stringify(body) });
   } catch {
-    throw new Error('PixiNotes-Konto: nicht erreichbar — Internetverbindung prüfen.');
+    throw new NetzFehler('PixiNotes-Konto: nicht erreichbar — Internetverbindung prüfen.');
   }
   const j = (await res.json().catch(() => ({}))) as TokenAntwort;
+  if (res.status >= 500) throw new NetzFehler('PixiNotes-Konto: vorübergehend nicht erreichbar.');
   if (!res.ok) throw new Error(fehlerText(j, res.status));
   return j;
 }
@@ -89,6 +93,7 @@ async function authRuf(pfad: string, body: unknown, k = supabaseKonfig()): Promi
 /** Link per E-Mail schicken (Magic Link). Der Link führt zurück in die App; `sbRueckkehrLesen` nimmt ihn an. */
 export async function sbLinkSenden(email: string): Promise<void> {
   const ziel = `${location.origin}${location.pathname}${location.search}`;
+  linkErwartet();
   await authRuf(`otp?redirect_to=${encodeURIComponent(ziel)}`, { email: email.trim(), create_user: true, options: { email_redirect_to: ziel } });
 }
 
@@ -101,6 +106,7 @@ export async function sbPasswortAnmelden(email: string, passwort: string): Promi
 /** Konto mit Passwort anlegen. Ist die Bestätigung per Mail an, kommt keine Sitzung — dann `null` (Hinweis anzeigen). */
 export async function sbRegistrieren(email: string, passwort: string): Promise<SbSitzung | null> {
   const ziel = `${location.origin}${location.pathname}${location.search}`;
+  linkErwartet();
   const j = await authRuf(`signup?redirect_to=${encodeURIComponent(ziel)}`, { email: email.trim(), password: passwort, options: { email_redirect_to: ziel } });
   if (!j.access_token) return null;
   return sitzungAus(j);
@@ -121,13 +127,31 @@ export async function sbNutzer(token: string, k = supabaseKonfig()): Promise<{ i
   } catch { return null; }
 }
 
-/** Abmelden beim Server (Refresh-Token ungültig machen) — Fehler sind egal */
+/** Abmelden beim Server (Refresh-Token ungültig machen) — Fehler sind egal.
+ *  M388: nur DIESE Sitzung (scope=local). Ohne die Angabe meldet der Server alle Geräte des Kontos ab. */
 export async function sbAbmelden(token: string, k = supabaseKonfig()): Promise<void> {
-  try { await fetch(`${k.url}/auth/v1/logout`, { method: 'POST', headers: { apikey: k.key, Authorization: `Bearer ${token}` } }); } catch { /* egal */ }
+  try { await fetch(`${k.url}/auth/v1/logout?scope=local`, { method: 'POST', headers: { apikey: k.key, Authorization: `Bearer ${token}` } }); } catch { /* egal */ }
 }
 
 /** Konto samt aller Daten löschen (RPC konto_loeschen aus der Migration, läuft als Besitzer) */
 export async function sbKontoLoeschen(token: string, k = supabaseKonfig()): Promise<void> {
+  /* M388: Erst die Dateien im Dateispeicher (Anhänge, Tool-Quelltexte). Die Löschfunktion entfernt nur den Nutzer
+     und seine Tabellenzeilen — die Dateien blieben beim Betreiber liegen, und wo der Speicher einen Nutzer mit
+     Dateien schützt, scheiterte das Löschen des Kontos daran ganz. */
+  const kopf = { apikey: k.key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const ordner = jwtSub(token);
+  if (ordner) {
+    try {
+      for (let runde = 0; runde < 50; runde += 1) {
+        const l = await fetch(`${k.url}/storage/v1/object/list/pixinotes`, { method: 'POST', headers: kopf, body: JSON.stringify({ prefix: `${ordner}/`, limit: 500 }) });
+        if (!l.ok) break;
+        const namen = ((await l.json()) as Array<{ name?: string }>).map((o) => o.name).filter((n): n is string => !!n);
+        if (namen.length === 0) break;
+        const d = await fetch(`${k.url}/storage/v1/object/pixinotes`, { method: 'DELETE', headers: kopf, body: JSON.stringify({ prefixes: namen.map((n) => `${ordner}/${n}`) }) });
+        if (!d.ok) break;
+      }
+    } catch { /* ohne Netz scheitert gleich auch das Löschen des Kontos — mit Meldung */ }
+  }
   let res: Response;
   try {
     res = await fetch(`${k.url}/rest/v1/rpc/konto_loeschen`, { method: 'POST', headers: { apikey: k.key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: '{}' });
@@ -141,6 +165,22 @@ export async function sbKontoLoeschen(token: string, k = supabaseKonfig()): Prom
  * (#access_token=…&refresh_token=…&type=magiclink|signup|recovery). Liest sie
  * aus, räumt die Adresse auf und liefert die Sitzung — sonst null.
  */
+/**
+ * M388: Hat DIESES Gerät einen Anmelde-Link angefordert? Die Rückkehr-Adresse trägt eine fertige Sitzung — wer
+ * jemandem einen Link mit seiner EIGENEN Sitzung schickt, meldete dessen Gerät damit in sein Konto ein, und die
+ * Boards des Opfers wanderten dorthin. Ein Link, den dieses Gerät nicht selbst angefordert hat (oder der eine
+ * bestehende Anmeldung ersetzen würde), wird darum erst nach Rückfrage angenommen (lib/kontoSync.ts).
+ */
+const LINK_KEY = 'pixinotes-sb-link';
+function linkErwartet(): void { try { localStorage.setItem(LINK_KEY, String(Date.now())); } catch { /* ohne Merkzeichen kommt die Rückfrage */ } }
+export function sbLinkWarErwartet(): boolean {
+  try {
+    const t = Number(localStorage.getItem(LINK_KEY) ?? 0);
+    localStorage.removeItem(LINK_KEY);
+    return t > 0 && Date.now() - t < 24 * 3600_000;
+  } catch { return false; }
+}
+
 export function sbRueckkehrLesen(): SbSitzung | null {
   const hash = location.hash.startsWith('#') ? location.hash.slice(1) : '';
   if (!/access_token=/.test(hash)) return null;
@@ -167,7 +207,7 @@ export interface RealtimeEreignis { tabelle: string; name: string; userId: strin
  * sich nach einem Abbruch mit wachsender Pause neu (bis 60 s). Kein Fehler
  * nach außen: ohne Realtime bleibt der Takt.
  */
-export function sbRealtime(k: SupabaseKonfig, token: string, userId: string, onChange: (ev: RealtimeEreignis) => void, besitzer: string[] = [], email = ''): RealtimeGriff {
+export function sbRealtime(k: SupabaseKonfig, token: string, userId: string, onChange: (ev: RealtimeEreignis) => void, besitzer: string[] = [], email = '', holeToken?: () => Promise<string>): RealtimeGriff {
   let ws: WebSocket | null = null;
   let aktiv = true, verbunden = false, ref = 0, pause = 1000;
   let herz: ReturnType<typeof setInterval> | undefined;
@@ -194,15 +234,24 @@ export function sbRealtime(k: SupabaseKonfig, token: string, userId: string, onC
         // Eine neue Einladung trägt noch keine gast_id — sie kommt über die E-Mail (RLS lässt sie durch)
         ...(email ? [{ event: '*', schema: 'public', table: 'board_freigaben', filter: `gast_email=eq.${email.toLowerCase()}` }] : []),
       ];
-      senden('phx_join', { config: { broadcast: { self: false }, presence: { key: '' }, postgres_changes: aenderungen }, access_token: jwt });
+      /* M388: mit einem GÜLTIGEN Token beitreten. Nach mehr als einer Stunde Pause war das gemerkte abgelaufen — der
+         Beitritt wurde abgewiesen, niemand versuchte es erneut, und die Antwort auf den Herzschlag ließ die Anzeige
+         trotzdem „live verbunden" melden. */
+      const beitreten = () => senden('phx_join', { config: { broadcast: { self: false }, presence: { key: '' }, postgres_changes: aenderungen }, access_token: jwt });
+      if (holeToken) void holeToken().then((t) => { jwt = t; }).catch(() => { /* dann mit dem gemerkten */ }).finally(beitreten);
+      else beitreten();
       clearInterval(herz);
       // M364: spätestens alle 25 s (Supabase trennt sonst) — vorher 30 s, der Kanal riss regelmäßig ab
       herz = setInterval(() => senden('heartbeat', {}, 'phoenix'), 20_000);
     };
     ws.onmessage = (m) => {
       try {
-        const j = JSON.parse(String(m.data)) as { event?: string; payload?: { status?: string; data?: { type?: string; table?: string; record?: { name?: string; user_id?: string; besitzer?: string }; old_record?: { name?: string; user_id?: string; besitzer?: string } } } };
-        if (j.event === 'phx_reply' && j.payload?.status === 'ok') verbunden = true;
+        const j = JSON.parse(String(m.data)) as { topic?: string; event?: string; payload?: { status?: string; data?: { type?: string; table?: string; record?: { name?: string; user_id?: string; besitzer?: string }; old_record?: { name?: string; user_id?: string; besitzer?: string } } } };
+        // nur die Antwort auf den eigenen Kanal zählt; eine Absage → neu verbinden (mit Pause, dann frischem Token)
+        if (j.event === 'phx_reply' && j.topic === topic) {
+          if (j.payload?.status === 'ok') verbunden = true;
+          else if (j.payload?.status === 'error') { verbunden = false; try { ws?.close(); } catch { /* egal */ } }
+        }
         if (j.event === 'postgres_changes') {
           const d = j.payload?.data;
           const r = d?.record ?? d?.old_record ?? {};

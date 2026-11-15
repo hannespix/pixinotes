@@ -318,7 +318,7 @@ export function myDayKeys(): Set<string> {
 export function toggleMyDay(key: string): Set<string> {
   const keys = myDayKeys();
   if (keys.has(key)) keys.delete(key); else keys.add(key);
-  localStorage.setItem(MYDAY_KEY, JSON.stringify({ d: isoLocal(new Date()), keys: [...keys].slice(0, 100) }));
+  try { localStorage.setItem(MYDAY_KEY, JSON.stringify({ d: isoLocal(new Date()), keys: [...keys].slice(0, 100) })); } catch { /* M388: Speicher voll — die Aufgabe selbst darf daran nicht hängen bleiben */ }
   return keys;
 }
 
@@ -339,7 +339,7 @@ export function doneLog(): DoneEntry[] {
 export function logDone(t: TaskRef): void {
   const list = doneLog();
   list.push({ d: isoLocal(new Date()), text: t.text.slice(0, 120), board: t.boardName });
-  localStorage.setItem(DONE_LOG_KEY, JSON.stringify(list.slice(-400)));
+  try { localStorage.setItem(DONE_LOG_KEY, JSON.stringify(list.slice(-400))); } catch { /* M388: Speicher voll — die Aufgabe selbst darf daran nicht hängen bleiben */ }
 }
 
 /** #Tags aus Aufgabentexten einsammeln (für den Tag-Filter der Zentrale) */
@@ -447,7 +447,7 @@ export function dueTasksToRemind(tasks: TaskRef[]): TaskRef[] {
   });
   if (hits.length) {
     for (const t of hits) done.add(`${t.key}|${t.due}`);
-    localStorage.setItem(REMINDED_KEY, JSON.stringify([...done].slice(-200)));
+    try { localStorage.setItem(REMINDED_KEY, JSON.stringify([...done].slice(-200))); } catch { /* M388: Speicher voll — die Aufgabe selbst darf daran nicht hängen bleiben */ }
   }
   return hits;
 }

@@ -20,9 +20,10 @@ export function BildLupe({ quelle, name, onClose, onDownload }: {
   const { zoom, rein, raus, einpassen, flaecheRef, griffe, maxZoom } = useLupe();
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    // M388: als Erste (Fangphase) und allein — sonst schloss Esc auch den Karten-Fokus oder die Präsentation darunter
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [onClose]);
 
   return createPortal(

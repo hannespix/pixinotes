@@ -6,7 +6,7 @@ import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from '../../lib/formel';
 import { alsCsv } from '../../lib/xlsx';
-import { IPlus, ISigma, IDownload, IX } from '../Icons';
+import { IPlus, ISigma, IDownload } from '../Icons';
 import { MenuHuelle } from '../EbenenMenu';
 
 /**
@@ -26,13 +26,13 @@ import { MenuHuelle } from '../EbenenMenu';
 export function SheetCard({ id, data, selected }: NodeProps<SheetNode>) {
   return (
     <CardShell id={id} selected={selected} minWidth={260} minHeight={160} className="sheet-card">
-      <SheetBody id={id} data={data} selected={selected} />
+      <SheetBody id={id} data={data} />
     </CardShell>
   );
 }
 
 /** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
-export function SheetBody({ id, data, selected }: { id: string; data: SheetData; selected?: boolean }) {
+export function SheetBody({ id, data }: { id: string; data: SheetData }) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
   const cells = useMemo(() => data.cells ?? {}, [data.cells]);

@@ -27,7 +27,6 @@ const stampKey = (id: string) => `pixinotes:psync-stamp:${id}`;
 const dirtyKey = (id: string) => `pixinotes:psync-dirty:${id}`;
 const idbKey = (id: string) => `proj:${id}`;
 
-export const projectSyncSupported = syncSupported;
 
 // ---------- Verbindungs-Verzeichnis (nur Ordner-NAMEN, keine Geheimnisse) ----------
 export function projectSyncMeta(): Record<string, { folder: string }> {

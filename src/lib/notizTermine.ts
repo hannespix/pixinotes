@@ -25,7 +25,7 @@
  * an dem er entstand.
  */
 import { de as chronoDe, type ParsedResult } from 'chrono-node';
-import { nurWortKeinTag } from './dates';
+import { kurzdaten, nurWortKeinTag } from './dates';
 
 export interface NotizTermin {
   /** ISO yyyy-mm-dd */
@@ -85,6 +85,14 @@ function scanne(blocks: AnyBlock[] | undefined, out: NotizTermin[]): void {
             ? `${String(r.start.get('hour')).padStart(2, '0')}:${String(r.start.get('minute') ?? 0).padStart(2, '0')}`
             : undefined;
           out.push({ iso: isoLocal(r.start.date()), zeit, text: text.slice(0, 90) });
+          if (out.length >= MAX_JE_NOTIZ) return;
+        }
+        // M388: deutsche Kurzdaten („am 3.12.", „12.11. um 10 Uhr") — die erkennt die Bibliothek nicht; die Frist-
+        // Marke der Notiz fand sie schon (lib/dates.ts), der Kalender nicht
+        for (const k of kurzdaten(text, new Date()).slice(0, 2)) {
+          const iso = isoLocal(k.date);
+          if (out.some((o) => o.iso === iso && o.text === text.slice(0, 90))) continue;
+          out.push({ iso, zeit: k.mitZeit ? `${String(k.date.getHours()).padStart(2, '0')}:${String(k.date.getMinutes()).padStart(2, '0')}` : undefined, text: text.slice(0, 90) });
           if (out.length >= MAX_JE_NOTIZ) return;
         }
       }
