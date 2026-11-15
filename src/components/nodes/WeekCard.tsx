@@ -47,6 +47,15 @@ function lanesFor(entries: WeekEntry[]): Map<string, { lane: number; lanes: numb
  * und Schichtplan ab.
  */
 export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
+  return (
+    <CardShell id={id} selected={selected} minWidth={380} minHeight={280} className="week-card">
+      <WeekBody id={id} data={data} selected={selected} />
+    </CardShell>
+  );
+}
+
+/** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
+export function WeekBody({ id, data, selected, folie }: { id: string; data: WeekData; selected?: boolean; /** auf einer Folie der Präsentation: der Block-Editor muss über ihr liegen */ folie?: boolean }) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const [pop, setPop] = useState<{ entryId: string; x: number; y: number } | null>(null);
 
@@ -144,7 +153,7 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
       : fmtTime(start);
 
   return (
-    <CardShell id={id} selected={selected} minWidth={380} minHeight={280} className="week-card">
+    <>
       {/* M160: KEIN Pauschal-nodrag — Kopfzeile ist ziehbar, nur Raster,
           Spalten-/Zeilen-Beschriftungen und Werkzeuge sind Bedienfläche */}
       <div className="week-wrap">
@@ -282,7 +291,7 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
       </div>
       {pop && popEntry && createPortal(
         <div
-          className="week-pop nodrag"
+          className={`week-pop nodrag${folie ? ' auf-folie' : ''}`}
           style={{ left: Math.min(pop.x, window.innerWidth - 260), top: Math.min(pop.y + 10, window.innerHeight - 260) }}
         >
           <input
@@ -368,6 +377,6 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
         </div>,
         document.body,
       )}
-    </CardShell>
+    </>
   );
 }

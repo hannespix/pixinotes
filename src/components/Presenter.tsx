@@ -15,16 +15,20 @@ import { GanttBody } from './nodes/GanttCard';
 import { CalendarBody } from './nodes/CalendarCard';
 import { DokumentFolie, dokumentArt } from './DokumentFolie';
 import { letzteSeite } from '../lib/pdfSeiten';
-import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, NoteNode, ShapeNode } from '../types';
+import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, MinutesNode, NoteNode, ShapeNode, SheetNode, TimeNode, WeekNode } from '../types';
 import { HtmlAppSlide } from './nodes/HtmlAppCard';
 import { BubblesBody } from './nodes/BubblesCard';
+import { WeekBody } from './nodes/WeekCard';
+import { TimeBody } from './nodes/TimeCard';
+import { MinutesBody } from './nodes/MinutesCard';
+import { SheetBody } from './nodes/SheetCard';
 import { FolienLaser } from './Mauszeiger';
 import { ReaktionsKnopf } from './Gruppenraum';
 import { folgeIch, folgenSetzen, ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenStart, vorfuehrenStopp, vortragMelden, werFuehrtVor } from '../lib/vorfuehren';
 import { ich, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
 
 /** Kartentypen, die auf der Folie LIVE editierbar sind */
-const EDITABLE = new Set(['note', 'shape', 'mermaid', 'kanban', 'gantt', 'calendar', 'bubbles']);
+const EDITABLE = new Set(['note', 'shape', 'mermaid', 'kanban', 'gantt', 'calendar', 'bubbles', 'week', 'time', 'minutes', 'sheet']);
 
 /** Bedient der Nutzer gerade ein Eingabe-/Bedienelement? Dann keine Folien-Navigation.
  *  SELECT/BUTTON gehören dazu: Pfeiltasten/Leertaste wählen dort Werte (Audit R6-F4) */
@@ -193,6 +197,34 @@ function SlideContent({ node }: { node: AppNode }) {
         <div className="slide-bubbles bubbles-card">
           <h3 className="slide-bubbles-titel" translate="no">{(node as BubblesNode).data.title || 'Ideen'}</h3>
           <BubblesBody id={node.id} data={(node as BubblesNode).data} gross />
+        </div>
+      );
+    // M380: Auch Wochenplan, Zeiterfassung, Protokoll und Rechen-Tabelle leben auf der Folie — vorher standen
+    // sie dort als Standbild (Tabelle aus dem Export). Derselbe Inhalt wie auf dem Board, nur größer.
+    case 'week':
+      return (
+        <div className="slide-modul slide-week week-card" data-taste="folie-week">
+          <WeekBody id={node.id} data={(node as WeekNode).data} folie />
+        </div>
+      );
+    case 'time':
+      return (
+        <div className="slide-modul slide-time time-card" data-taste="folie-time">
+          <TimeBody id={node.id} data={(node as TimeNode).data} />
+        </div>
+      );
+    case 'minutes': {
+      const m = (node as MinutesNode).data;
+      return (
+        <div className={`slide-modul slide-minutes minutes-card sticky-${m.color ?? 'white'}`} style={m.hex ? { background: m.hex } : undefined} data-taste="folie-minutes">
+          <MinutesBody id={node.id} data={m} />
+        </div>
+      );
+    }
+    case 'sheet':
+      return (
+        <div className="slide-modul slide-sheet sheet-card" data-taste="folie-sheet">
+          <SheetBody id={node.id} data={(node as SheetNode).data} />
         </div>
       );
     case 'htmlapp':

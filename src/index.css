@@ -7215,3 +7215,28 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 @media (max-width: 520px) {
   .vorlagen-gitter { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 12px 4px; }
 }
+
+/* ---------- M380: Wochenplan, Zeiterfassung, Protokoll, Rechen-Tabelle als lebende Folie ---------- */
+.presenter-slide.editable > .slide-modul {
+  width: min(1120px, 100%); height: min(74vh, 100%); align-self: center; text-align: left;
+  box-shadow: var(--pop-shadow); border-radius: var(--r-lg); position: relative;
+}
+.presenter-slide.editable > .slide-modul.slide-sheet { height: auto; max-height: 100%; width: min(1000px, 100%); padding: 16px 20px 14px; }
+.presenter-slide.editable > .slide-modul.slide-minutes { width: min(880px, 100%); padding: 16px 20px 14px; }
+.presenter-slide.editable > .slide-modul.slide-time { width: min(840px, 100%); height: min(64vh, 100%); }
+.slide-modul .drag-title { cursor: text; }
+.slide-week .week-title, .slide-time .time-title, .slide-minutes .minutes-title, .slide-sheet .drag-title { font-size: 19px; }
+.slide-week .week-wrap, .slide-time .time-wrap { padding: 18px 22px 20px; }
+.slide-week .week-dayname, .slide-week .week-hour { font-size: 12.5px; }
+/* der Block-Editor des Wochenplans hängt am Dokument — über der Präsentation (z 95) muss er darüber liegen */
+.week-pop.auf-folie { z-index: 120; }
+.slide-week .week-entry-time { font-size: 11px; }
+.slide-week .week-entry-text { font-size: 14px; }
+.slide-week .week-entry-who { font-size: 10.5px; }
+.slide-minutes .note-editor { font-size: 16px; }
+.slide-sheet table { font-size: 15px; }
+@media (max-width: 640px) {
+  .presenter-slide.editable > .slide-modul { height: min(78vh, 100%); }
+  .slide-week .week-wrap, .slide-time .time-wrap { padding: 10px 10px 12px; }
+  .presenter-slide.editable > .slide-modul.slide-sheet, .presenter-slide.editable > .slide-modul.slide-minutes { padding: 10px 10px 8px; }
+}
