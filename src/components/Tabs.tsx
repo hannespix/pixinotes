@@ -6,7 +6,7 @@ import { useOutsideClose } from '../lib/useOutsideClose';
 import { collectTasks } from '../lib/tasks';
 import { InlineName } from './InlineName';
 import { NavTree } from './Navigation';
-import { IChevronL, IChevronR, IHome, IPanelLeft, IPlus, ITasks, IX } from './Icons';
+import { IChevronL, IChevronR, IHome, IPanelLeft, IPlus, ITasks, IVorlage, IX } from './Icons';
 
 /**
  * Die Navigation der App.
@@ -363,6 +363,11 @@ export function Tabs() {
               addBoard(undefined, context?.project.id);
               showToast(`Neues Board in „${context?.project.name ?? 'Allgemein'}".`);
             }}><IPlus size={14} /> Board <small>in „{context?.project.name ?? 'Allgemein'}"</small></button>
+            {/* M379: dasselbe mit Karten für einen bekannten Anlass — Besprechung, Rückblick, Projektplan … */}
+            <button role="menuitem" data-taste="neu-vorlage" onClick={() => {
+              setNeuMenu(false);
+              window.dispatchEvent(new CustomEvent('pixinotes:vorlagen', { detail: { projectId: context?.project.id } }));
+            }}><IVorlage size={14} /> Board aus Vorlage …</button>
             <button role="menuitem" onClick={() => {
               setNeuMenu(false);
               if (context) addProject(context.space.id); else addSpace();

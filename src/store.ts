@@ -347,6 +347,11 @@ interface BoardState {
   renameProject: (id: string, name: string) => void;
   removeProject: (id: string) => void;
   addBoard: (name?: string, projectId?: string) => string;
+  /**
+   * M379: Board aus einer Vorlage. Ohne `inBoard` entsteht ein neues Board (im Projekt `projectId`); mit
+   * `inBoard` füllt die Vorlage dieses Board, solange es leer ist — rückgängig mit Strg+Z.
+   */
+  boardAusVorlage: (name: string, inhalt: { nodes: AppNode[]; edges: Edge[] }, wohin?: { projectId?: string; inBoard?: string }) => string;
   /** Fertiges Board (geteilt/importiert) einhängen und öffnen */
   importBoard: (doc: BoardDoc) => void;
   renameBoard: (id: string, name: string) => void;
@@ -2016,6 +2021,27 @@ export const useBoard = create<BoardState>()(
             })), boards),
             activeId: id,
           });
+          return id;
+        },
+
+        boardAusVorlage: (name, inhalt, wohin) => {
+          const ziel = wohin?.inBoard ? get().boards.find((x) => x.id === wohin.inBoard) : undefined;
+          const leer = !!ziel && !ziel.nodes.length && !ziel.edges.length && ziel.geteiltRolle !== 'lesen';
+          let id: string;
+          if (ziel && leer) {
+            id = ziel.id;
+            if (get().activeId !== id) set({ activeId: id });
+            get().pushHistory();
+            // Ein Board, das noch seinen Anfangsnamen trägt, heißt danach wie die Vorlage
+            const unbenannt = ziel.name === START_BOARD_NAME || /^✨ Board( \d+)?$/.test(ziel.name);
+            const neuerName = unbenannt ? nextName(name, get().boards.map((x) => x.name)) : ziel.name;
+            set({ boards: get().boards.map((x) => (x.id === id ? { ...x, name: neuerName, nodes: inhalt.nodes, edges: inhalt.edges } : x)) });
+          } else {
+            id = get().addBoard(nextName(name, get().boards.map((x) => x.name)), wohin?.projectId);
+            set({ boards: get().boards.map((x) => (x.id === id ? { ...x, nodes: inhalt.nodes, edges: inhalt.edges } : x)) });
+          }
+          // Voll-Remount: Notizen lesen ihren Inhalt nur beim Mount
+          set({ activeId: id, view: 'board', importEpoch: get().importEpoch + 1 });
           return id;
         },
 

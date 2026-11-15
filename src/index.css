@@ -7185,3 +7185,33 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 .bub.gross .bub-mal, .bub.gross .bub-punkte { font-size: 14px; height: 26px; line-height: 26px; min-width: 26px; border-radius: 13px; }
 
 html[data-alles-zeigen] .live-zeiger { display: none !important; }
+
+/* ---------- M379: Vorlagen beim Anlegen eines Boards ---------- */
+.modal.vorlagen-dialog { width: min(820px, 96vw); }
+.vorlagen-dialog .modal-head h2 small { font-size: 12.5px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+.vorlagen-gitter { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; padding: 16px 20px 6px; }
+.vorlage {
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: left; cursor: pointer;
+  font-family: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg); padding: 8px 8px 10px;
+}
+.vorlage:hover, .vorlage:focus-visible { border-color: var(--accent); background: var(--accent-soft); outline: none; }
+.vorlage:focus-visible { box-shadow: 0 0 0 2px var(--accent-soft); }
+.vorlage b { font-size: 13.5px; font-weight: 700; padding: 4px 4px 0; }
+.vorlage small { font-size: 11.5px; line-height: 1.4; color: var(--muted); padding: 0 4px; }
+.vorlage-skizze { display: block; width: 100%; aspect-ratio: 16 / 10; background: var(--surface-3); border-radius: var(--r); }
+.vorlage-skizze.leer { display: flex; align-items: center; justify-content: center; font-size: 26px; color: var(--muted); border: 1px dashed var(--border); background: none; }
+.vorlage-skizze .sk-karte { stroke: rgba(40, 48, 64, 0.22); stroke-width: 0.6; }
+.vorlage-skizze .sk-rahmen { stroke: rgba(40, 48, 64, 0.3); stroke-width: 0.6; stroke-dasharray: 2.5 2; }
+.vorlage-skizze .sk-spalte { fill: rgba(255, 255, 255, 0.75); }
+.vorlage-skizze .sk-balken { fill: rgba(63, 120, 90, 0.55); }
+.vorlage-skizze .sk-blase.b1 { fill: #4f7cff; opacity: 0.8; }
+.vorlage-skizze .sk-blase.b2 { fill: #e07a3f; opacity: 0.8; }
+.vorlage-skizze .sk-blase.b3 { fill: #3fa564; opacity: 0.8; }
+[data-theme='dark'] .vorlage-skizze svg, [data-theme='dark'] svg.vorlage-skizze { background: #262a31; }
+[data-theme='dark'] .vorlage-skizze .sk-karte, [data-theme='dark'] .vorlage-skizze .sk-rahmen { opacity: 0.82; }
+.vorlagen-fuss { font-size: 11.5px; color: var(--muted); margin: 6px 20px 16px; }
+.empty-board-hint .empty-beispiele + .empty-beispiele { margin-top: 0; }
+@media (max-width: 520px) {
+  .vorlagen-gitter { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 12px 4px; }
+}

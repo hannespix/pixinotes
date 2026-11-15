@@ -35,6 +35,18 @@ function kurzdaten(text: string, ref: Date): Array<{ text: string; date: Date; i
   return out;
 }
 
+/**
+ * M379: Ein nacktes „So", „Do", „Mi" ist im Deutschen meist ein Wort, kein Wochentag („So läuft es", „Do it",
+ * „So machen wir es"). Als Tag zählt die Zwei-Buchstaben-Form nur mit Punkt („So.") oder nach einem Wort, das
+ * einen Tag erwarten lässt („am Fr", „bis Mo").
+ */
+export function nurWortKeinTag(text: string, r: { text: string; index: number }): boolean {
+  if (!/^(mo|di|mi|do|fr|sa|so)$/i.test(r.text.trim())) return false;
+  const danach = text.charAt(r.index + r.text.length);
+  const davor = text.slice(0, r.index).trimEnd().split(/\s+/).pop()?.toLowerCase() ?? '';
+  return danach !== '.' && !['am', 'bis', 'ab', 'jeden', 'nächsten', 'kommenden', 'diesen', 'vor', 'seit'].includes(davor);
+}
+
 export function detectDates(text: string, ref: Date = new Date()): DetectedDate[] {
   if (!text) return [];
   let results: ParsedResult[] = [];
@@ -47,6 +59,7 @@ export function detectDates(text: string, ref: Date = new Date()): DetectedDate[
   for (const r of results) {
     // Reine Uhrzeiten überspringen
     if (!r.start.isCertain('day') && !r.start.isCertain('weekday')) continue;
+    if (nurWortKeinTag(text, r)) continue;
     funde.push({ text: r.text, date: r.start.date(), index: r.index });
   }
   funde.push(...kurzdaten(text, ref));

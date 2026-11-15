@@ -42,7 +42,8 @@ const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-s
 const TAG = 86_400_000;
 const now = new Date();
 const wt = (now.getDay() + 6) % 7; // Montag = 0
-const heute = new Date(now.getTime() - 3_600_000).toISOString();
+// „vor einer Stunde" — aber nie vor Mitternacht: In der ersten Stunde des Tages läge der Stempel sonst im Vortag
+const heute = new Date(Math.max(now.getTime() - 3_600_000, new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 30).getTime())).toISOString();
 const montag = new Date(now.getFullYear(), now.getMonth(), now.getDate() - wt, 8, 0).toISOString();
 const alt = new Date(now.getTime() - 20 * TAG).toISOString();
 const erwarteteGruppen = wt === 0 ? 2 : 3; // am Montag fällt „Diese Woche" mit „Heute" zusammen

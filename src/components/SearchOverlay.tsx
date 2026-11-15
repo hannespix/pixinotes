@@ -77,6 +77,9 @@ function buildCommands(): Command[] {
       run: add(() => makeNote(center()), 'Notiz') },
     { label: '＋ Kanban', hint: 'Neues Kanban-Board', alias: 'ticket spalten board',
       run: add(() => makeKanban(center()), 'Kanban') },
+    // M379: Vorlagen sind auch über Strg+K zu finden — unter dem Namen jeder Vorlage
+    { label: '🧩 Board aus Vorlage', hint: 'Besprechung, Rückblick, Projektplan, Brainstorming …', alias: 'vorlage template neues board besprechung meeting retro rückblick projektplan brainstorming workshop swot entscheidung',
+      run: () => window.dispatchEvent(new CustomEvent('pixinotes:vorlagen', { detail: {} })) },
     { label: '🏠 Zur Übersicht', hint: 'Alle Bereiche, Projekte und Boards', alias: 'home start mission',
       run: () => st().setView('overview') },
     { label: '🕸 Netz-Ansicht', hint: 'Boards als Graph', alias: 'graph netz verbindungen',
