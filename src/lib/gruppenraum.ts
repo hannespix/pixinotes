@@ -6,7 +6,7 @@
 //   · Timer: Einer stellt die Uhr, alle sehen sie ablaufen. Verschickt wird die RESTZEIT, nicht die Uhrzeit des
 //     Endes — die Uhren der Geräte gehen nicht gleich. Wer später dazukommt, bekommt sie mit der nächsten
 //     Meldung (der Starter wiederholt sie alle drei Sekunden).
-import { ich, LIVE_NACHRICHT, liveSenden, teilnehmerVon } from './gastSync';
+import { ich, ichIn, LIVE_NACHRICHT, liveSenden, teilnehmerVon } from './gastSync';
 
 // ---------- Reaktionen ----------
 export const REAKTIONEN = ['👍', '❤️', '👏', '😂', '🎉', '🤔', '✋', '✅'] as const;
@@ -20,7 +20,7 @@ export function reagieren(boardId: string, zeichen: string): boolean {
   while (zeiten.length && jetzt - zeiten[0] > 2000) zeiten.shift();
   if (zeiten.length >= 6) return false;
   zeiten.push(jetzt);
-  const t = ich();
+  const t = ichIn(boardId);
   window.dispatchEvent(new CustomEvent<Reaktion>(REAKTION_EREIGNIS, { detail: { boardId, zeichen, name: t.name, farbe: t.farbe, ich: true } }));
   liveSenden(boardId, 'reakt', { v: t.id, e: zeichen });
   return true;

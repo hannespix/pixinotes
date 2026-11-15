@@ -58,6 +58,36 @@ export function ich(): Teilnehmer {
 }
 
 /** M365: Kennung, unter der dieses Gerät Karten anlegt — Gäste per Link „g:…", Konten „k:…" (der Server prüft das Präfix) */
+/**
+ * M385: Zwei Anwesende nie in derselben Farbe. Jeder bringt seine Farbe mit (aus seiner Kennung gerechnet, acht
+ * stehen zur Wahl) — bei zwei Leuten trifft es in jedem achten Fall dieselbe, und dann sind zwei Mauszeiger,
+ * zwei Rahmen, zwei Kürzel nicht mehr auseinanderzuhalten. Hier wird verteilt: der Reihe der Kennungen nach
+ * behält jeder seine Farbe, solange sie frei ist, sonst bekommt er die nächste freie. Alle Geräte rechnen aus
+ * derselben Liste dasselbe; gemeldet wird weiter die mitgebrachte Farbe. Ab neun Leuten wiederholen sich Farben.
+ */
+export function farbenVerteilen(liste: Teilnehmer[]): Teilnehmer[] {
+  if (liste.length < 2) return liste;
+  const reihe = [...liste].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const belegt = new Set<string>();
+  const neu = new Map<string, string>();
+  for (const t of reihe) {
+    if (neu.has(t.id)) continue;      // derselbe Mensch in zwei Fenstern: eine Farbe
+    let f = t.farbe;
+    if (belegt.has(f) && belegt.size < FARBEN.length) {
+      let i = Math.max(0, FARBEN.indexOf(f));
+      while (belegt.has(FARBEN[i % FARBEN.length])) i += 1;
+      f = FARBEN[i % FARBEN.length];
+    }
+    belegt.add(f); neu.set(t.id, f);
+  }
+  return liste.map((t) => (neu.get(t.id) === t.farbe ? t : { ...t, farbe: neu.get(t.id) ?? t.farbe }));
+}
+/** Ich, so wie mich die anderen in diesem Board sehen (mit der verteilten Farbe) */
+export function ichIn(boardId: string): Teilnehmer {
+  const t = ich();
+  const f = anwesend.get(boardId)?.find((x) => x.id === t.id)?.farbe;
+  return f && f !== t.farbe ? { ...t, farbe: f } : t;
+}
 export const meineKennung = (alsGast: boolean): string => (alsGast ? `g:${ich().id}` : `k:${loadKonto()?.userId ?? ich().id}`);
 class GastFehler extends Error { constructor(public art: 'vorbedingung' | 'keine-freigabe' | 'netz' | 'fehlt' | 'abgelehnt' | 'nicht-erlaubt', text: string) { super(text); } }
 /** Server-Funktion mit dem öffentlichen Schlüssel aufrufen — kein Konto nötig */
@@ -193,7 +223,7 @@ function kanalOeffnen(boardId: string, kanalName: string, beiStand: () => void):
       }
       else window.dispatchEvent(new CustomEvent(LIVE_NACHRICHT, { detail: { boardId, ereignis, inhalt } }));
     },
-    teilnehmer: (liste) => { anwesend.set(boardId, liste); sperrenRechnen(boardId); if (liste.some((t) => t.id !== ich().id)) void sichern(boardId); teilnehmerMelden(boardId); },
+    teilnehmer: (liste) => { anwesend.set(boardId, farbenVerteilen(liste)); sperrenRechnen(boardId); if (liste.some((t) => t.id !== ich().id)) void sichern(boardId); teilnehmerMelden(boardId); },
   }));
   window.dispatchEvent(new CustomEvent(TEILNEHMER_EREIGNIS, { detail: boardId }));
 }
@@ -758,6 +788,20 @@ function gastBoardStarten(boardId: string, kanalName: string): void {
 interface EigenerLink { token: string; board_id: string; ohne_konto?: boolean; dateien?: GastDatei[]; optionen?: Optionen }
 let eigeneLinks: EigenerLink[] = [];
 const kontoKanal = new Map<string, string>();   // boardId → Besitzer (Kanäle, die über das Konto laufen)
+/** Der Einladungslink erschien, änderte sich oder fiel weg (M385: der QR-Knopf richtet sich danach) */
+export const EINLADUNG_EREIGNIS = 'pixinotes:einladung';
+/**
+ * M385: Der Einladungslink eines Boards, soweit dieses Gerät ihn kennt — als Besitzer der eigene Link, als Gast
+ * per Link der, über den man selbst hereinkam.
+ */
+export function einladungVon(boardId: string): { token: string; ohneKonto: boolean } | null {
+  const b = useBoard.getState().boards.find((x) => x.id === boardId);
+  if (!b) return null;
+  if (b.gastLink) return { token: b.gastLink, ohneKonto: true };
+  if (b.geteiltVon) return null;
+  const l = eigeneLinks.find((x) => x.board_id === boardId);
+  return l ? { token: l.token, ohneKonto: !!l.ohne_konto } : null;
+}
 let kontoLauf = 0;
 /**
  * Für jedes geteilte Board des angemeldeten Kontos den Live-Kanal öffnen: eigene Boards mit Einladungslink oder
@@ -781,7 +825,11 @@ export async function kontoKanaele(): Promise<void> {
       kontoAnfrage(`${basisUrl}/board_freigaben?select=board_id&besitzer=eq.${uid}`, { cache: 'no-store' }),
     ]);
     if (lauf !== kontoLauf) return;
-    if (rl.ok) eigeneLinks = (await rl.json()) as EigenerLink[];
+    if (rl.ok) {
+      const vorher = JSON.stringify(eigeneLinks.map((l) => [l.token, l.board_id, !!l.ohne_konto]));
+      eigeneLinks = (await rl.json()) as EigenerLink[];
+      if (vorher !== JSON.stringify(eigeneLinks.map((l) => [l.token, l.board_id, !!l.ohne_konto]))) window.dispatchEvent(new CustomEvent(EINLADUNG_EREIGNIS));
+    }
     const st = useBoard.getState();
     const eigen = (id: string): boolean => st.boards.some((b) => b.id === id && !b.geteiltVon);
     const ziel = new Map<string, string>();

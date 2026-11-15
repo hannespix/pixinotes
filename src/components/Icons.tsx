@@ -89,6 +89,8 @@ export const IWand = make(<><path d="M15 4V2" /><path d="M15 16v-2" /><path d="M
 export const ISquare = make(<rect width="16" height="12" x="4" y="6" rx="2" />);
 export const IDiamond = make(<path d="M12 3l9 9-9 9-9-9Z" />);
 export const IPill = make(<rect width="18" height="10" x="3" y="7" rx="5" />);
+/** M385: QR-Code — drei Suchmuster und ein paar Felder */
+export const IQr = make(<><rect width="6" height="6" x="3" y="3" rx="1" /><rect width="6" height="6" x="15" y="3" rx="1" /><rect width="6" height="6" x="3" y="15" rx="1" /><path d="M15 15h2v2h-2zM19 15h2M15 19h2v2M19 19h2v2h-2" /></>);
 export const IMousePointer = make(<><path d="m4 3 7.1 17 2.4-7.5L21 10Z" /></>);
 export const IShare = make(<><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><path d="m8.6 13.5 6.8 4" /><path d="m15.4 6.5-6.8 4" /></>);
 /** M224: Sehen & Bedienen — Barrierefreiheits-Einstellungen */

@@ -116,7 +116,7 @@ console.log('\n════ B: Hilfe auf Englisch ════');
   await P.screenshot({ path: `${SD}/m382-b-hilfe.png` });
   await P.locator('.help-neu-link').click(); await P.waitForTimeout(500);
   const neu = await P.locator('.help-body.help-neu li').evaluateAll((ls) => ls.slice(0, 3).map((l) => l.textContent.slice(0, 90)));
-  pruefe('B10 „What’s new" ist englisch, der neueste Eintrag zuerst', (() => { const nr = neu.map((t) => Number(/\(M(\d+)\)/.exec(t)?.[1] ?? 0)); return nr[0] >= 382 && nr[0] > nr[1] && nr[1] > nr[2] && neu.some((t) => /\(M382\)/.test(t) && /English/.test(t)); })() && (await P.locator('.help-body.help-neu li').count()) > 100, neu.join(' ¦ '));
+  pruefe('B10 „What’s new" ist englisch, der neueste Eintrag zuerst', (() => { const nr = neu.map((t) => Number(/\(M(\d+)\)/.exec(t)?.[1] ?? 0)); return nr[0] >= 382 && nr[0] > nr[1] && nr[1] > nr[2] && neu.every((t) => !/ (und|der|die|das|mit|für) /.test(t)); })() && (await P.locator('.help-body.help-neu li').count()) > 100, neu.join(' ¦ '));
   await P.screenshot({ path: `${SD}/m382-b-neu.png` });
   pruefe('B11 keine Skriptfehler', P.fehler.length === 0, JSON.stringify(P.fehler).slice(0, 300));
   await ctx.close();

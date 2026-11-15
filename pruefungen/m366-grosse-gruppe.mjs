@@ -583,7 +583,7 @@ pruefe('B2 Anna: „52 dabei"', await warteBis(A.P, async () => /52 dabei/.test(
   const chips = await G.P.locator('[data-taste="live-chip"]').count();
   const rest = await G.P.locator('[data-taste="live-rest"]').textContent().catch(() => '');
   const box = await G.P.locator('[data-taste="live-leiste"]').boundingBox();
-  pruefe('B3 die Leiste bleibt schmal: wenige Kürzel und „+N"', chips <= 4 && /^\+4[78]$/.test(rest) && box.width < 330 && box.x + box.width <= 1440, `${chips} ${rest} ${Math.round(box.width)}`);
+  pruefe('B3 die Leiste bleibt schmal: wenige Kürzel und „+N"', chips <= 4 && /^\+4[78]$/.test(rest) && box.width < 365 && box.x + box.width <= 1440   /* M385: ein Knopf mehr (QR-Code) */, `${chips} ${rest} ${Math.round(box.width)}`);
   await G.P.locator('[data-taste="live-auf"]').click(); await G.P.waitForTimeout(300);
   const zeilen = await G.P.locator('[data-taste="live-liste"] .live-liste-zeile').count();
   const lb = await G.P.locator('[data-taste="live-liste"]').boundingBox();
