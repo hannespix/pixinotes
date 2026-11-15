@@ -12,7 +12,8 @@
  *   E  Anna beendet die Präsentation → sie schließt sich bei Gerd, die Vorführung endet mit.
  *   F  Aus dem Karten-Fokus: „Ab dieser Karte präsentieren" → bei Gerd öffnet sich dieselbe Folie, dieselbe Seite.
  *   G  „Team folgt" abwählen → Anna präsentiert für sich, das bleibt gemerkt; „Team mitnehmen" stellt es zurück.
- *   H  Ein Gast, der selbst präsentiert, reißt niemanden mit (er hat den Knopf).
+ *   H  Ein Gast, der selbst präsentiert, reißt niemanden mit (er hat den Knopf). Nimmt er das Team mit und hört auf,
+ *      schließt sich die Präsentation bei allen — und die Besitzerin übernimmt dabei nicht von selbst.
  *   I  Auf dem Board (Anna führt vor): Karte im Fokus öffnet und schließt sich auch bei Gerd; die PDF-Karte klappt
  *      auf und blättert mit — im Fokus und auf dem Board; schließt Gerd den Fokus selbst, ist er gelöst.
  *   J  Wer mitten in der Präsentation dazukommt, landet auf derselben Folie, Seite und Vergrößerung.
@@ -839,7 +840,14 @@ console.log('\n════ H: Ein Gast präsentiert für sich ════');
 await G.P.keyboard.press('Alt+p'); await G.P.waitForTimeout(2500);
 pruefe('H1 Gerd startet die Präsentation → Anna bleibt auf ihrem Board', (await imVortrag(G.P)) === 1 && (await imVortrag(A.P)) === 0 && (await hatBand(A.P)) === 0);
 pruefe('H2 Gerd hat den Knopf „Team mitnehmen" (er entscheidet selbst)', /Team mitnehmen/.test(await G.P.locator('[data-taste="vortrag-team"]').textContent().catch(() => '')));
-await G.P.keyboard.press('Escape'); await G.P.waitForTimeout(600);
+await G.P.locator('[data-taste="vortrag-team"]').tap();
+await warteBis(A.P, async () => (await imVortrag(A.P)) === 1, 8000);
+pruefe('H3 Gerd drückt „Team mitnehmen" → seine Präsentation öffnet sich bei Anna, sie folgt', (await imVortrag(A.P)) === 1 && /du folgst/.test(await zband(A.P)), await zband(A.P));
+await G.P.keyboard.press('Escape');
+await warteBis(A.P, async () => (await imVortrag(A.P)) === 0, 8000);
+pruefe('H4 Gerd beendet sie → bei Anna schließt sie sich', (await imVortrag(A.P)) === 0 && (await imVortrag(G.P)) === 0);
+await A.P.waitForTimeout(2500);
+pruefe('H5 … und Anna übernimmt dabei nicht von selbst: niemand führt vor, nichts öffnet sich wieder', (await hatBand(A.P)) === 0 && (await hatBand(G.P)) === 0 && (await imVortrag(G.P)) === 0 && (await imVortrag(A.P)) === 0, `${await zband(A.P)} | ${await zband(G.P)}`);
 
 // ══ I ═══════════════════════════════════════════════════════════════
 console.log('\n════ I: Auf dem Board — Fokus und PDF-Seiten ════');

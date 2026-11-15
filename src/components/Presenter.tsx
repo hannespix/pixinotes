@@ -264,6 +264,9 @@ export function Presenter() {
   }, []);
   /** Diese Präsentation hat sich geöffnet, weil ich dem Vorführenden folge — dann schließt sie sich auch mit ihm */
   const gefolgt = useRef(false);
+  /** M387: … und bleibt für diese Sitzung der Präsentation „fremd": Hört der Vorführende auf, übernimmt hier niemand von selbst */
+  const fremdGeoeffnet = useRef(false);
+  useEffect(() => { if (!open) fremdGeoeffnet.current = false; }, [open]);
   /** M375: Laserpointer — ein roter Punkt statt des Mauszeigers; führt man vor, sehen ihn alle an derselben Stelle der Folie */
   const [laser, setLaser] = useState(false);
   useEffect(() => { if (!open) setLaser(false); }, [open]);
@@ -395,7 +398,7 @@ export function Presenter() {
     }
     if (dort) {
       gefolgt.current = true;      // auch nach „Wieder folgen" in einer schon offenen Präsentation
-      if (!open) { setOpen(true); return; }
+      if (!open) { fremdGeoeffnet.current = true; setOpen(true); return; }
       const [karte, seite] = dort.split('|');
       const i = slides.findIndex((n) => n.id === karte);
       if (i >= 0) setPos((p) => (p.idx === i && p.seite === Number(seite) ? p : { idx: i, seite: Number(seite) }));
@@ -410,7 +413,7 @@ export function Presenter() {
   const eigenes = !board.geteiltVon;
   const jemandZeigt = !!zeigt;
   useEffect(() => {
-    if (!open || !teamDa || !eigenes || jemandZeigt || folgeIch(board.id)) return;
+    if (!open || !teamDa || !eigenes || jemandZeigt || folgeIch(board.id) || fremdGeoeffnet.current) return;
     vorfuehrenMitVortrag(board.id);
   }, [open, teamDa, eigenes, jemandZeigt, board.id]);
   // … und endet die Präsentation, endet eine so begonnene Vorführung mit ihr
