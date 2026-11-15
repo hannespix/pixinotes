@@ -25,6 +25,22 @@ import { IChevronL, IChevronR, IPlus, ISettings, IX } from '../Icons';
  * sonst zeigte das Blättern hartnäckig die vorige Sitzung.
  */
 export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
+  return (
+    <CardShell
+      id={id}
+      selected={selected}
+      minWidth={320}
+      minHeight={300}
+      className={`minutes-card sticky-${(data as MinutesData).color ?? 'white'}`}
+      style={(data as MinutesData).hex ? { background: (data as MinutesData).hex } : undefined}
+    >
+      <MinutesBody id={id} data={data} selected={selected} />
+    </CardShell>
+  );
+}
+
+/** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
+export function MinutesBody({ id, data, selected }: { id: string; data: MinutesData; selected?: boolean }) {
   const m = data as MinutesData;
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
@@ -120,14 +136,7 @@ export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
   }, [entry]);
 
   return (
-    <CardShell
-      id={id}
-      selected={selected}
-      minWidth={320}
-      minHeight={300}
-      className={`minutes-card sticky-${m.color ?? 'white'}`}
-      style={m.hex ? { background: m.hex } : undefined}
-    >
+    <>
       <div className="minutes-head">
         <DragTitle
           value={m.title}
@@ -292,7 +301,7 @@ export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
           )}
         </>
       )}
-    </CardShell>
+    </>
   );
 }
 

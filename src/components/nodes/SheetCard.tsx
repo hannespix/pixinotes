@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
-import type { SheetNode } from '../../types';
+import type { SheetData, SheetNode } from '../../types';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from '../../lib/formel';
@@ -24,6 +24,15 @@ import { MenuHuelle } from '../EbenenMenu';
  * und ein Raster darf rechnen.
  */
 export function SheetCard({ id, data, selected }: NodeProps<SheetNode>) {
+  return (
+    <CardShell id={id} selected={selected} minWidth={260} minHeight={160} className="sheet-card">
+      <SheetBody id={id} data={data} selected={selected} />
+    </CardShell>
+  );
+}
+
+/** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
+export function SheetBody({ id, data, selected }: { id: string; data: SheetData; selected?: boolean }) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
   const cells = useMemo(() => data.cells ?? {}, [data.cells]);
@@ -138,7 +147,7 @@ export function SheetCard({ id, data, selected }: NodeProps<SheetNode>) {
   };
 
   return (
-    <CardShell id={id} selected={selected} minWidth={260} minHeight={160} className="sheet-card">
+    <>
       <div className="sheet-head">
         <DragTitle
           value={data.title ?? 'Rechen-Tabelle'}
@@ -247,6 +256,6 @@ export function SheetCard({ id, data, selected }: NodeProps<SheetNode>) {
           ? <><b>{edit}</b> — Formeln beginnen mit <code>=</code>, z. B. <code>=SUMME(A1:A5)</code>. Enter übernimmt.</>
           : <>Zelle antippen zum Bearbeiten · <code>=</code> beginnt eine Formel · Σ setzt Summen</>}
       </div>
-    </CardShell>
+    </>
   );
 }

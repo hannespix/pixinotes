@@ -72,6 +72,15 @@ const durOf = (s: TimeSeg): number => Math.max(0, (s.end ?? (s.date === todayIso
  *   Alle Summen ohne Pausen.
  */
 export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
+  return (
+    <CardShell id={id} selected={selected} minWidth={380} minHeight={300} className="time-card">
+      <TimeBody id={id} data={data} selected={selected} />
+    </CardShell>
+  );
+}
+
+/** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
+export function TimeBody({ id, data, selected }: { id: string; data: TimeData; selected?: boolean }) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
   const [day, setDay] = useState(todayIso());
@@ -182,7 +191,7 @@ export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
   })();
 
   return (
-    <CardShell id={id} selected={selected} minWidth={380} minHeight={300} className="time-card">
+    <>
       <div className="time-wrap">
         <div className="time-head">
           <DragTitle
@@ -375,6 +384,6 @@ export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
           {view === 'jahr' && <span className="time-total" title="Jahressumme ohne Pausen">Jahr: <b>{fmtDur(workIn(`${year}-01-01`, `${year}-12-31`))}</b></span>}
         </div>
       </div>
-    </CardShell>
+    </>
   );
 }
