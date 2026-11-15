@@ -6793,6 +6793,8 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 }
 .freigabe-schalter input { margin-top: 2px; flex: none; }
 .gast-name-dialog { max-width: 420px; }
+/* M387: Kommt ein Gast dazu, während vorgeführt wird, liegt die Frage nach dem Namen über der Präsentation (95) und dem Band (97) */
+.modal-backdrop.ueber-vortrag { z-index: 99; }
 .gast-name-dialog .freigabe-zeile input { flex: 1; min-width: 0; }
 /* M365: Rechte der Gäste und Sicherung im Freigabe-Dialog */
 .freigabe-schalter.recht { align-items: center; cursor: default; }
@@ -6984,6 +6986,8 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
   z-index: 61; max-width: min(520px, 92vw); white-space: nowrap;
 }
 .zeig-band.ich { border-color: var(--accent); }
+/* M387: Im Karten-Fokus (öffnet sich jetzt auch bei allen, die folgen) sitzt das Band unter der Kopfzeile — sonst verdeckt es am Telefon den Kartentitel */
+.app.focus-mode .zeig-band:not(.im-vortrag) { top: calc(var(--focus-top) + 8px); }
 .zeig-band span { overflow: hidden; text-overflow: ellipsis; }
 .zeig-band button {
   flex: none; border: none; cursor: pointer; background: var(--accent); color: #fff;

@@ -35,7 +35,9 @@ export const SEITEN_EREIGNIS = 'pixinotes:pdf-seite';
  * Kommentar-Modus selbst.
  */
 export const DOKUMENT_BEFEHL = 'pixinotes:dokument-befehl';
-export type DokumentBefehl = { id?: string; was: 'vor' | 'zurueck' | 'gehe' | 'pin'; zu?: number };
+export type DokumentBefehl = { id?: string; was: 'vor' | 'zurueck' | 'gehe' | 'pin' | 'zeige' | 'zuklappen'; zu?: number };
+// M387: 'zeige' = aufklappen und zu Seite `zu` gehen, 'zuklappen' = wieder schließen — so stellt ein Gerät nach,
+// was der Vorführende an einer Dokument-Karte zeigt. Beides gilt nur für den Moment (nicht am Gerät gemerkt).
 
 /** Die Karte meldet ihre sichtbare Seite — oder null beim Zuklappen/Abbauen */
 export function seiteMelden(nodeId: string, g: SeitenGeometrie | null): void {
@@ -49,6 +51,13 @@ export function seiteMelden(nodeId: string, g: SeitenGeometrie | null): void {
     geometrien.set(nodeId, g);
   }
   window.dispatchEvent(new CustomEvent(SEITEN_EREIGNIS, { detail: nodeId }));
+}
+
+/** M387: alle aufgeklappten Dokument-Karten und ihre offene Seite */
+export function offeneSeiten(): Record<string, number> {
+  const aus: Record<string, number> = {};
+  for (const [id, g] of geometrien) aus[id] = g.seite;
+  return aus;
 }
 
 export function seiteVon(nodeId: string): SeitenGeometrie | undefined {

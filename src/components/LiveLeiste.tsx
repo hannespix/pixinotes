@@ -161,7 +161,7 @@ export function GastNameDialog() {
     setOffen(false);
   };
   return (
-    <div className="modal-backdrop" onClick={() => setOffen(false)}>
+    <div className="modal-backdrop ueber-vortrag" onClick={() => setOffen(false)}>
       <div className="modal gast-name-dialog" role="dialog" aria-modal="true" aria-label="Dein Name" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>👋 Wie heißt du?</h2>

@@ -129,6 +129,19 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
       })));
     }
   }, [id]);
+  /* M387: Der Vorführende hat diese Karte aufgeklappt — dann ist sie es hier auch, solange er sie zeigt.
+     Nur für den Moment: Am Gerät gemerkt (auf/zu) wird, was man selbst wählt. */
+  const [gezeigt, setGezeigt] = useState(false);
+  useEffect(() => {
+    const onBefehl = (e: Event) => {
+      const d = (e as CustomEvent<DokumentBefehl>).detail;
+      if (d?.id !== id) return;
+      if (d.was === 'zeige') setGezeigt(true); else if (d.was === 'zuklappen') setGezeigt(false);
+    };
+    window.addEventListener(DOKUMENT_BEFEHL, onBefehl);
+    return () => window.removeEventListener(DOKUMENT_BEFEHL, onBefehl);
+  }, [id]);
+  const offen = auf || imFokus || gezeigt;
   const [bildOffen, setBildOffen] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -187,8 +200,8 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           }}
         />
       </div>
-      <button className="file-body nodrag" onClick={istDokument ? () => aufklappen(!(auf || imFokus)) : quelle ? download : loadFromTeam}
-        title={istDokument ? (auf || imFokus ? 'Zuklappen' : 'Aufklappen — Seite für Seite lesen und anmerken') : quelle ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
+      <button className="file-body nodrag" onClick={istDokument ? () => { setGezeigt(false); aufklappen(!offen); } : quelle ? download : loadFromTeam}
+        title={istDokument ? (offen ? 'Zuklappen' : 'Aufklappen — Seite für Seite lesen und anmerken') : quelle ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
         <span className="meta">
           {eigenerTitel && <><span translate="no">{file.name}</span> · </>}{formatBytes(file.size)}
           {istDokument && seitenZahl > 0 && <> · {seitenZahl} Seite{seitenZahl === 1 ? '' : 'n'}</>}
@@ -222,7 +235,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
       {bildOffen && quelle && (
         <BildLupe quelle={quelle} name={titel} onClose={() => setBildOffen(false)} onDownload={download} />
       )}
-      {istDokument && !(auf || imFokus) && (
+      {istDokument && !offen && (
         <>
           {isPdf && <PdfThumb dataUrl={quelle!} onOpen={() => aufklappen(true)} onSeiten={setSeitenZahl} />}
           <button className="pdf-aufklappen nodrag" onClick={() => aufklappen(true)} data-taste="pdf-aufklappen"
@@ -231,13 +244,13 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           </button>
         </>
       )}
-      {isPdf && (auf || imFokus) && (
+      {isPdf && offen && (
         <PdfSeite id={id} dataUrl={quelle!} onSeiten={setSeitenZahl} onDownload={download}
-          zuklappen={imFokus ? undefined : () => aufklappen(false)} />
+          zuklappen={imFokus ? undefined : () => { setGezeigt(false); aufklappen(false); }} />
       )}
-      {isWord && (auf || imFokus) && (
+      {isWord && offen && (
         <WordSeite id={id} quelle={quelle!} onSeiten={setSeitenZahl} onDownload={download}
-          zuklappen={imFokus ? undefined : () => aufklappen(false)} />
+          zuklappen={imFokus ? undefined : () => { setGezeigt(false); aufklappen(false); }} />
       )}
       {/* M259: Ton und Bewegtbild kann der Browser selbst — dann soll er auch */}
       {art === 'audio' && quelle && <audio className="file-media nodrag" src={quelle} controls preload="metadata" />}
@@ -398,7 +411,7 @@ function useBlaetterTasten(id: string, barRef: React.RefObject<HTMLDivElement | 
       if (d?.id !== id) return;
       if (d.was === 'vor' && seite < seiten) blaettern(seite + 1);
       else if (d.was === 'zurueck' && seite > 1) blaettern(seite - 1);
-      else if (d.was === 'gehe' && d.zu) blaettern(d.zu);
+      else if ((d.was === 'gehe' || d.was === 'zeige') && d.zu) blaettern(d.zu);
     };
     window.addEventListener('keydown', onKey, true);
     window.addEventListener(DOKUMENT_BEFEHL, onBefehl);
