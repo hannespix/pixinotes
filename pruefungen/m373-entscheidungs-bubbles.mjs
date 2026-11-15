@@ -737,7 +737,8 @@ await blase(S1.P, 'Kaffeemaschine', W).click(); await S1.P.waitForTimeout(250);
 pruefe('D4 einen Punkt zurücknehmen und woanders vergeben', (await blase(S1.P, 'Stehtische', W).getAttribute('data-punkte')) === '0' && (await blase(S1.P, 'Kaffeemaschine', W).getAttribute('data-punkte')) === '1');
 await S1.P.locator(`${W} [data-taste="bub-auswerten"]`).click(); await S1.P.waitForTimeout(400);
 const erg = await S1.P.locator(`${W} [data-taste="bub-ergebnis"]`).textContent();
-pruefe('D5 Auswerten: Rangfolge mit Medaillen, die meisten Punkte vorn', /🥇\s*Ruheraum\s*2/.test(erg) && /🥈\s*Kaffeemaschine\s*1/.test(erg), erg);
+// M378: Platz und Punkte stehen ausdrücklich da („1. Ruheraum 2 Punkte") — eine nackte Zahl wurde als Platz gelesen
+pruefe('D5 Auswerten: Rangfolge mit Plätzen, die meisten Punkte auf Platz 1', /1\.\s*Ruheraum\s*2 Punkte/.test(erg) && /2\.\s*Kaffeemaschine\s*1 Punkt/.test(erg), erg);
 pruefe('D6 nach dem Auswerten vergibt ein Tipp keinen Punkt mehr', await (async () => { await blase(S1.P, 'Mehr Fenster', W).click(); await S1.P.waitForTimeout(250); return (await blase(S1.P, 'Mehr Fenster', W).getAttribute('data-punkte')) === '0'; })());
 await S1.P.locator(`${W} .bub-buehne`).click({ position: { x: 6, y: 6 } });
 
@@ -811,8 +812,8 @@ pruefe('F8 beide stimmen gleichzeitig ab → alle sechs Punkte zählen, bei Anna
 pruefe('F9 … und bei Gerd', JSON.stringify(await punkte(G.P)) === JSON.stringify(soll), JSON.stringify(await punkte(G.P)));
 pruefe('F10 jeder sieht sein eigenes Kontingent', /0 von 3/.test(await A.P.locator(`${W} [data-taste="bub-rest"]`).textContent()) && /0 von 3/.test(await G.P.locator(`${W} [data-taste="bub-rest"]`).textContent()));
 await A.P.locator(`${W} [data-taste="bub-auswerten"]`).click();
-await warteBis(G.P, async () => /🥇\s*Gerd 1\s*4/.test(await G.P.locator(`${W} [data-taste="bub-ergebnis"]`).textContent().catch(() => '')), 10000);
-pruefe('F11 Auswertung bei beiden: „Gerd 1" mit vier Punkten vorn', /🥇\s*Gerd 1\s*4/.test(await G.P.locator(`${W} [data-taste="bub-ergebnis"]`).textContent().catch(() => '')) && /🥇\s*Gerd 1\s*4/.test(await A.P.locator(`${W} [data-taste="bub-ergebnis"]`).textContent().catch(() => '')));
+await warteBis(G.P, async () => /1\.\s*Gerd 1\s*4 Punkte/.test(await G.P.locator(`${W} [data-taste="bub-ergebnis"]`).textContent().catch(() => '')), 10000);
+pruefe('F11 Auswertung bei beiden: „Gerd 1" mit vier Punkten vorn', /1\.\s*Gerd 1\s*4 Punkte/.test(await G.P.locator(`${W} [data-taste="bub-ergebnis"]`).textContent().catch(() => '')) && /1\.\s*Gerd 1\s*4 Punkte/.test(await A.P.locator(`${W} [data-taste="bub-ergebnis"]`).textContent().catch(() => '')));
 
 // ══ G ═══════════════════════════════════════════════════════════════
 console.log('\n════ G: Gelöscht bleibt gelöscht ════');

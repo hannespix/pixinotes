@@ -5,18 +5,47 @@
 // DOM-Elementen — 60-mal je Sekunde durch React zu gehen, wäre für fünfzig Blasen zu teuer —, und sobald alles
 // ruht, hört die Rechnung auf (kein Dauerlauf im Hintergrund). Die Lage der Blasen gehört dem Gerät: Geteilt
 // werden Ideen, Stimmen und Gruppen, nicht Koordinaten.
+//
+// M378 — ausgebaut für Workshops und große Runden:
+//   · Physik: Blasen haben Masse (große weichen kleinen kaum), lassen sich werfen, prallen weich von den Wänden;
+//     Gruppen stehen in einem Raster nebeneinander statt auf einem Kreis, freie Ideen haben ihr eigenes Feld.
+//   · Gruppieren mit der Hand: eine Blase auf eine Gruppe ziehen (hinein), auf eine andere Blase (neue Gruppe
+//     aus beiden — oder verschmelzen), ins Freie (heraus). Gruppen lassen sich umbenennen, verschieben, auflösen.
+//   · Moderation: vier Schritte (Sammeln · Gruppieren · Abstimmen · Ergebnis), für alle sichtbar; verdeckt und
+//     anonym sammeln; Zwischenstand beim Abstimmen verbergen; Liste statt Blasen; Ergebnis als Notiz; Timer.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
-import { gruppeVon, GRUPPE_EREIGNIS, useBoard, useKarteFest } from '../../store';
+import { gruppeVon, GRUPPE_EREIGNIS, selectActiveBoard, useBoard, useKarteFest } from '../../store';
 import type { BubblesNode } from '../../types';
 import { uid } from '../../types';
-import { ich, meineKennung } from '../../lib/gastSync';
+import { ich, liveAuf, meineKennung } from '../../lib/gastSync';
+import { timerStart } from '../../lib/gruppenraum';
+import { makeNote } from '../../lib/nodes';
 import { aiReady, askAi } from '../../lib/ai';
-import { blasenRadius, blasenVon, BUBBLE_FARBEN, bubblesDaten, geordnet, meinePunkte, rangfolge, type Blase, type BubblesData } from '../../lib/bubbles';
+import {
+  beteiligte, blasenRadius, blasenVon, BUBBLE_FARBEN, bubblesAlsBloecke, bubblesDaten, bubblesSchritt, geordnet, meinePunkte, rangfolge,
+  type Blase, type BubbleRegeln, type BubbleSchritt, type BubblesData,
+} from '../../lib/bubbles';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 
 interface Koerper { x: number; y: number; vx: number; vy: number; r: number; ziel: number; g: string | null; len: number; wort: number }
+/**
+ * M378: Radius des Kreises, den eine Gruppe mit diesen Blasen braucht (samt Luft für den Ring). Eine Blase: sie
+ * selbst; zwei: nebeneinander; mehr: dichte Packung (Kreise füllen einen Kreis zu gut 60 %).
+ */
+function feldRadius(rs: number[]): number {
+  if (rs.length === 0) return 30;
+  if (rs.length === 1) return rs[0] + 12;
+  if (rs.length === 2) return rs[0] + rs[1] + 2 + 12;
+  return Math.sqrt(rs.reduce((s, r) => s + (r + 2) * (r + 2), 0) / 0.6) + 12;
+}
+const SCHRITTE: Array<[BubbleSchritt, string, string]> = [
+  ['sammeln', 'Sammeln', 'Alle tragen Ideen ein'],
+  ['gruppieren', 'Gruppieren', 'Die Sammlung ist geschlossen — Ideen ordnen und zusammenfassen'],
+  ['abstimmen', 'Abstimmen', 'Jede Person vergibt ihre Punkte'],
+  ['ergebnis', 'Ergebnis', 'Die Rangfolge steht fest'],
+];
 
 /** Zahl aus einer Kennung — gleiche Kennung, gleiche Zahl, auf jedem Gerät (für den Startplatz einer Blase) */
 const zahlAus = (s: string): number => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967295; };
@@ -48,13 +77,35 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   /** Leiten (Abstimmung steuern, fremde Ideen löschen, Gruppen bilden) dürfen alle außer Gästen mit eingeschränktem Recht */
   const leiten = !fest && (!gruppe || !gruppe.gast || gruppe.recht === 'alles');
 
-  const blasen = useMemo(() => blasenVon(d, wer), [d, wer]);
+  const regeln: BubbleRegeln = d.regeln ?? { t: 0 };
+  const schritt0 = bubblesSchritt(d);
+  /** Verdeckt gesammelt wird nur, solange die Sammlung offen ist — mit dem nächsten Schritt liegt alles offen */
+  const verdeckt = !!regeln.verdeckt && schritt0 === 'sammeln';
+  /** Zwischenstand verbergen: beim Abstimmen zählt für die Anzeige nur, was ich selbst vergeben habe */
+  const still = !!regeln.still && d.abstimmung.phase === 'offen';
+  const blasen = useMemo(() => {
+    const roh1 = blasenVon(d, wer, { jeAutor: verdeckt });
+    return still ? roh1.map((b) => ({ ...b, punkte: b.meine })) : roh1;
+  }, [d, wer, verdeckt, still]);
+  /** Eine Blase, deren Wortlaut ich (noch) nicht sehe */
+  const zu = useCallback((b: Blase) => verdeckt && !b.von.includes(wer), [verdeckt, wer]);
+  const personen = useMemo(() => beteiligte(d), [d]);
   const gruppen = useMemo(() => Object.entries(d.gruppen).filter(([, g]) => g && !g.weg).sort((a, b) => a[1].t - b[1].t || a[0].localeCompare(b[0])), [d.gruppen]);
   const phase = d.abstimmung.phase;
   const vergeben = useMemo(() => meinePunkte(d, wer), [d, wer]);
   const uebrig = Math.max(0, d.abstimmung.punkte - vergeben);
   const rang = useMemo(() => (phase === 'fertig' ? rangfolge(blasen).filter((b) => b.punkte > 0) : []), [blasen, phase]);
-  const platz = useMemo(() => new Map(rang.slice(0, 3).map((b, i) => [b.id, i])), [rang]);
+  /**
+   * Platz je Blase nach dem Auswerten: Die meisten Punkte sind Platz 1, gleiche Punktzahl teilt sich den Platz
+   * (zwei Zweite, dann folgt der Vierte). Eine nackte Zahl an der Blase wurde als Platz gelesen, meinte aber
+   * Punkte — darum steht jetzt beides ausdrücklich da: „1." für den Platz, „5 Punkte" für die Punkte.
+   */
+  const platz = useMemo(() => {
+    const m = new Map<string, number>();
+    rang.forEach((b, i) => m.set(b.id, i > 0 && rang[i - 1].punkte === b.punkte ? m.get(rang[i - 1].id)! : i + 1));
+    return m;
+  }, [rang]);
+  const punkteText = (n: number) => `${n} ${n === 1 ? 'Punkt' : 'Punkte'}`;
 
   const [eingabe, setEingabe] = useState('');
   const [wahl, setWahl] = useState<string | null>(null);
@@ -62,6 +113,10 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const [neuGruppe, setNeuGruppe] = useState('');
   const [bearbeite, setBearbeite] = useState<string | null>(null);
   const [kiLaeuft, setKiLaeuft] = useState(false);
+  /** M378: gewählte Gruppe (Pille zum Umbenennen/Auflösen), Listenansicht, Frage nach dem Fallenlassen auf eine Blase */
+  const [gWahl, setGWahl] = useState<string | null>(null);
+  const [liste, setListe] = useState(false);
+  const [fallen, setFallen] = useState<{ was: string; auf: string } | null>(null);
   const gewaehlt = wahl ? blasen.find((b) => b.id === wahl) ?? null : null;
   useEffect(() => { if (wahl && !blasen.some((b) => b.id === wahl)) setWahl(null); }, [wahl, blasen]);
 
@@ -70,7 +125,9 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const ideeDazu = () => {
     const text = eingabe.trim().slice(0, 140);
     if (!text || fest) return;
-    updateNodeData(id, { ideen: { ...d.ideen, [uid()]: { text, von: wer, name: ich().name, t: jetzt() } } });
+    if (regeln.zu && !leiten) { showToast('Die Sammlung ist geschlossen — gerade wird gruppiert oder abgestimmt.'); return; }
+    // anonym: der Name wird gar nicht erst vermerkt
+    updateNodeData(id, { ideen: { ...d.ideen, [uid()]: { text, von: wer, ...(regeln.anonym ? {} : { name: ich().name }), t: jetzt() } } });
     setEingabe('');
   };
   const ideenAendern = (ids: string[], p: (alt: BubblesData['ideen'][string]) => Partial<BubblesData['ideen'][string]>) => {
@@ -81,6 +138,15 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const darfAendern = (b: Blase) => !fest && (leiten || b.von.every((v) => v === wer));
   const loeschen = (b: Blase) => { if (darfAendern(b)) { ideenAendern(b.ids, () => ({ weg: true })); setWahl(null); } };
   const inGruppe = (b: Blase, g: string | null) => { if (!fest) ideenAendern(b.ids, () => ({ g })); };
+  /** Zwei Blasen in dieselbe (eben angelegte) Gruppe — `auf` steckt schon darin, `was` kommt dazu */
+  const inGruppeMit = (was: Blase, auf: Blase, gid: string) => {
+    if (fest) return;
+    const t = jetzt();
+    const ideen = { ...d.ideen };
+    for (const i of [...was.ids, ...auf.ids]) if (ideen[i]) ideen[i] = { ...ideen[i], g: gid, t };
+    // die Gruppe selbst steht seit gruppeAnlegen im Speicher, aber noch nicht in `d` — sie darf hier nicht überschrieben werden
+    updateNodeData(id, { ideen });
+  };
   const gruppeAnlegen = (name: string, fuer?: Blase): string | null => {
     const n = name.trim().slice(0, 40);
     if (!n || fest) return null;
@@ -91,7 +157,38 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     updateNodeData(id, patch);
     return gid;
   };
-  const gruppeWeg = (gid: string) => { if (leiten && d.gruppen[gid]) updateNodeData(id, { gruppen: { ...d.gruppen, [gid]: { ...d.gruppen[gid], weg: true, t: jetzt() } } }); };
+  const gruppeWeg = (gid: string) => { if (leiten && d.gruppen[gid]) { updateNodeData(id, { gruppen: { ...d.gruppen, [gid]: { ...d.gruppen[gid], weg: true, t: jetzt() } } }); setGWahl(null); } };
+  const gruppeUmbenennen = (gid: string, name: string) => {
+    const n = name.trim().slice(0, 40);
+    if (!n || fest || !d.gruppen[gid] || d.gruppen[gid].name === n) return;
+    updateNodeData(id, { gruppen: { ...d.gruppen, [gid]: { ...d.gruppen[gid], name: n, t: jetzt() } } });
+  };
+  /** Zwei Ideen zu einer machen: Die gezogene übernimmt den Wortlaut der anderen — gleiche Texte verschmelzen von selbst */
+  const verschmelzen = (was: Blase, auf: Blase) => {
+    if (fest || !darfAendern(was)) { showToast('Verschmelzen kannst du nur deine eigenen Ideen — oder wer die Runde leitet.'); return; }
+    ideenAendern(was.ids, () => ({ text: auf.text, g: auf.gruppe ?? null }));
+    setWahl(auf.id);
+  };
+  const regelnSetzen = (p: Partial<BubbleRegeln>) => { if (leiten) updateNodeData(id, { regeln: { ...regeln, ...p, t: Math.max(jetzt(), regeln.t + 1) } }); };
+  /** Zum Schritt wechseln (wer leitet): Sammeln öffnet die Eingabe, ab Gruppieren ist sie geschlossen */
+  const schrittSetzen = (ziel: BubbleSchritt) => {
+    if (!leiten || ziel === schritt0) return;
+    const t = jetzt();
+    const zuNeu = ziel !== 'sammeln';
+    const phaseNeu: BubblesData['abstimmung']['phase'] = ziel === 'abstimmen' ? 'offen' : ziel === 'ergebnis' ? 'fertig' : 'aus';
+    updateNodeData(id, {
+      ...(zuNeu !== !!regeln.zu ? { regeln: { ...regeln, ...(zuNeu ? { zu: true } : { zu: false }), t: Math.max(t, regeln.t + 1) } } : {}),
+      ...(phaseNeu !== d.abstimmung.phase ? { abstimmung: { ...d.abstimmung, phase: phaseNeu, t: Math.max(t, d.abstimmung.t + 1) } } : {}),
+    });
+  };
+  /** Das Ergebnis als Notiz neben die Karte legen */
+  const alsNotiz = () => {
+    const st = useBoard.getState();
+    const hier = selectActiveBoard(st)?.nodes.find((n) => n.id === id);
+    const pos = hier ? { x: hier.position.x + ((hier.measured?.width ?? hier.width ?? 560) as number) + 40, y: hier.position.y } : { x: 0, y: 0 };
+    st.addNode(makeNote(pos, { color: 'white', blocks: bubblesAlsBloecke(d) as never }));
+    showToast('📝 Ergebnis als Notiz neben die Karte gelegt.');
+  };
   const stimme = (b: Blase, dazu: 1 | -1) => {
     if (fest || phase !== 'offen') return;
     if (dazu === 1 && uebrig <= 0) { showToast(`Alle ${d.abstimmung.punkte} Punkte sind vergeben — tippe auf deine Punkte an einer Blase, um einen zurückzunehmen.`); return; }
@@ -161,36 +258,72 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const ringe = useRef(new Map<string, HTMLElement>());
   const namen = useRef(new Map<string, HTMLElement>());
   const mass = useRef({ w: 600, h: 360 });
-  const zug = useRef<{ id: string; dx: number; dy: number; bewegt: boolean } | null>(null);
+  const zug = useRef<{ id: string; dx: number; dy: number; bewegt: boolean; vx: number; vy: number; px: number; py: number; pt: number } | null>(null);
+  /** M378: Gruppen, die ich auf DIESEM Gerät von Hand verschoben habe (Board-unabhängig, nicht geteilt) */
+  const versatz = useRef(new Map<string, { x: number; y: number }>());
+  /** gibt es freie Blasen neben Gruppen? Dann bekommen sie ein eigenes Feld im Raster */
+  const freiRef = useRef(false);
+  /** worüber die gezogene Blase gerade schwebt (nur Anzeige: Ziel hervorheben) */
+  const zielEl = useRef<HTMLElement | null>(null);
   const lauf = useRef<number | null>(null);
   const ruhe = useRef(0);
   const gruppenRef = useRef<string[]>([]);
   gruppenRef.current = gruppen.map(([g]) => g);
   const ruhig = useMemo(() => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches, []);
 
+  /**
+   * Wo eine Blase hingehört. Ohne Gruppen: die Mitte. Mit Gruppen bekommt jede ein eigenes Feld der Bühne — so
+   * groß, wie ihre Blasen Platz brauchen — und, wenn es freie Ideen gibt, auch diese eines (felderLegen). Der
+   * Anker ist die Mitte des Felds. Eine von Hand verschobene Gruppe bleibt, wo man sie hingelegt hat.
+   */
+  const felder = useRef(new Map<string, { x: number; y: number }>());
   const anker = useCallback((g: string | null): { x: number; y: number } => {
     const { w, h } = mass.current;
+    if (g) { const v = versatz.current.get(g); if (v) return { x: Math.min(Math.max(v.x, 30), w - 30), y: Math.min(Math.max(v.y, 30), h - 30) }; }
+    return felder.current.get(g ?? '') ?? { x: w / 2, y: h / 2 };
+  }, []);
+  /**
+   * Die Bühne in Felder teilen: Die Felder werden nach Gewicht (Fläche der Blasen) in zwei etwa gleich schwere
+   * Hälften geteilt, das Rechteck entlang seiner längeren Seite im selben Verhältnis — und so weiter, bis jedes
+   * Feld allein steht. Große Gruppen bekommen viel Platz, kleine wenig, und alle Felder bleiben annähernd
+   * quadratisch. (Ein Raster gleich großer Felder ließe eine große Gruppe über ihre Nachbarn quellen.)
+   */
+  const felderLegen = useCallback(() => {
+    const { w, h } = mass.current;
+    felder.current.clear();
     const gs = gruppenRef.current;
-    const i = g ? gs.indexOf(g) : -1;
-    if (i < 0 || !gs.length) return { x: w / 2, y: h / 2 };
-    if (gs.length === 1) return { x: w / 2, y: h / 2 };
-    // Gruppen auf einer Ellipse — nutzt beide Achsen, damit breite Karten sich auch in der Breite füllen
-    // die erste Gruppe links (breite Bühne) bzw. oben (hohe) — zwei Gruppen stehen so nebeneinander, wo Platz ist
-    const winkel = (i / gs.length) * Math.PI * 2 + (w >= h ? Math.PI : -Math.PI / 2);
-    return { x: w / 2 + Math.cos(winkel) * w * 0.3, y: h / 2 + Math.sin(winkel) * h * 0.28 };
+    if (!gs.length) return;
+    const mitglieder = new Map<string, number[]>();
+    for (const g of gs) mitglieder.set(g, []);
+    const freie: number[] = [];
+    for (const k of koerper.current.values()) { if (k.g && mitglieder.has(k.g)) mitglieder.get(k.g)!.push(k.ziel); else freie.push(k.ziel); }
+    // Gewicht = die Fläche des Kreises, den die Gruppe braucht (nicht die ihrer Blasen)
+    const zonen: Array<{ k: string; m: number }> = gs.map((g) => ({ k: g, m: feldRadius(mitglieder.get(g)!) ** 2 }));
+    if (freiRef.current) zonen.push({ k: '', m: feldRadius(freie) ** 2 });
+    const teilen = (liste: Array<{ k: string; m: number }>, x: number, y: number, bw: number, bh: number): void => {
+      if (liste.length === 1) { felder.current.set(liste[0].k, { x: x + bw / 2, y: y + bh / 2 }); return; }
+      const summe = liste.reduce((s0, z) => s0 + z.m, 0);
+      // Reihenfolge der Gruppen bleibt (links/oben die ersten): an der Stelle teilen, die den Hälften am nächsten kommt
+      let bis = 1; let links = liste[0].m; let beste = Math.abs(summe / 2 - links);
+      for (let i = 1, lauf0 = links; i < liste.length - 1; i++) { lauf0 += liste[i].m; const ab = Math.abs(summe / 2 - lauf0); if (ab < beste) { beste = ab; bis = i + 1; links = lauf0; } }
+      const anteil = Math.min(0.8, Math.max(0.2, links / summe));
+      if (bw >= bh) { teilen(liste.slice(0, bis), x, y, bw * anteil, bh); teilen(liste.slice(bis), x + bw * anteil, y, bw * (1 - anteil), bh); }
+      else { teilen(liste.slice(0, bis), x, y, bw, bh * anteil); teilen(liste.slice(bis), x, y + bh * anteil, bw, bh * (1 - anteil)); }
+    };
+    teilen(zonen, 0, 0, w, h);
   }, []);
 
   /** Die Gruppe als Scheibe: Mitte ihrer Blasen und der Radius bis zur äußersten (mit etwas Luft) — oder null, wenn leer */
-  const scheibe = useCallback((gid: string): { x: number; y: number; r: number } | null => {
+  const scheibe = useCallback((gid: string, ohne?: string): { x: number; y: number; r: number } => {
     // Mitte nach Fläche gewichtet: Eine große Blase zieht die Mitte zu sich — so bleibt der Ring eng um die Gruppe
     let n = 0; let sx = 0; let sy = 0;
-    for (const k of koerper.current.values()) if (k.g === gid) { const m = k.r * k.r; n += m; sx += k.x * m; sy += k.y * m; }
-    if (!n) return null;
+    for (const [kid, k] of koerper.current) if (k.g === gid && kid !== ohne) { const m = k.r * k.r; n += m; sx += k.x * m; sy += k.y * m; }
+    if (!n) { const a = anker(gid); return { x: a.x, y: a.y, r: 30 }; }   // leere Gruppe: ein Platz zum Hineinziehen
     const x = sx / n; const y = sy / n;
     let r = 0;
-    for (const k of koerper.current.values()) if (k.g === gid) r = Math.max(r, Math.hypot(k.x - x, k.y - y) + k.r);
+    for (const [kid, k] of koerper.current) if (k.g === gid && kid !== ohne) r = Math.max(r, Math.hypot(k.x - x, k.y - y) + k.r);
     return { x, y, r: r + 12 };
-  }, []);
+  }, [anker]);
 
   const zeichnen = useCallback(() => {
     for (const [bid, k] of koerper.current) {
@@ -210,8 +343,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     const { w, h } = mass.current;
     for (const gid of gruppenRef.current) {
       const el = ringe.current.get(gid); const nm = namen.current.get(gid);
-      const s0 = scheibe(gid);
-      if (!s0) { if (el) el.style.opacity = '0'; if (nm) nm.style.opacity = '0'; continue; }
+      const s0 = scheibe(gid, zug.current?.bewegt ? zug.current.id : undefined);
       if (el) {
         el.style.opacity = '1';
         el.style.transform = `translate(${(s0.x - s0.r).toFixed(1)}px, ${(s0.y - s0.r).toFixed(1)}px)`;
@@ -232,21 +364,25 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     const { w, h } = mass.current;
     const ks = [...koerper.current.entries()];
     const gezogen = zug.current?.id;
-    // 1) Kräfte: jede Blase zu ihrem Anker; Gruppen als Ganzes auseinander, in sich zusammen; freie aus den Ringen
+    // 1) Kräfte: jede Blase zu ihrem Anker — große etwas stärker (sie sammeln sich in der Mitte, kleine legen sich
+    //    außen an); Gruppen als Ganzes auseinander, in sich zusammen; freie aus den Feldern der Gruppen
+    let rMax = 1;
+    for (const [, k] of ks) if (k.ziel > rMax) rMax = k.ziel;
     for (const [bid, k] of ks) {
       k.r += (k.ziel - k.r) * 0.18;
       if (bid === gezogen) { k.vx = 0; k.vy = 0; continue; }
       const a = anker(k.g);
-      k.vx += (a.x - k.x) * 0.006; k.vy += (a.y - k.y) * 0.006;
+      const zugkraft = 0.0045 + 0.004 * (k.ziel / rMax);
+      k.vx += (a.x - k.x) * zugkraft; k.vy += (a.y - k.y) * zugkraft;
     }
     const gs = gruppenRef.current;
     if (gs.length) {
-      const sch = gs.map((g) => ({ g, s: scheibe(g) })).filter((x): x is { g: string; s: { x: number; y: number; r: number } } => !!x.s);
+      const sch = gs.map((g) => ({ g, s: scheibe(g, zug.current?.bewegt ? zug.current.id : undefined) }));
       for (let i = 0; i < sch.length; i++) {
         for (let j = i + 1; j < sch.length; j++) {
           const a = sch[i].s; const b = sch[j].s;
           let dx = b.x - a.x; let dy = b.y - a.y; let dist = Math.hypot(dx, dy);
-          const tiefe = a.r + b.r + 6 - dist;
+          const tiefe = a.r + b.r + 8 - dist;
           if (tiefe <= 0) continue;
           if (dist < 0.01) { dx = 1; dy = 0; dist = 1; }
           const sx = (dx / dist) * tiefe * 0.11; const sy = (dy / dist) * tiefe * 0.11;
@@ -257,44 +393,65 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         }
       }
       for (const { g, s: c } of sch) {
-        for (const [bid, k] of ks) if (k.g === g && bid !== gezogen) { k.vx += (c.x - k.x) * 0.012; k.vy += (c.y - k.y) * 0.012; }
+        // … und als Ganzes in die Bühne: Ragt der Ring über einen Rand, rückt die ganze Gruppe herein
+        const rx = c.x - c.r < 3 ? 3 - (c.x - c.r) : c.x + c.r > w - 3 ? (w - 3) - (c.x + c.r) : 0;
+        const ry = c.y - c.r < 3 ? 3 - (c.y - c.r) : c.y + c.r > h - 3 ? (h - 3) - (c.y + c.r) : 0;
+        for (const [bid, k] of ks) if (k.g === g && bid !== gezogen) { k.vx += (c.x - k.x) * 0.012 + rx * 0.05; k.vy += (c.y - k.y) * 0.012 + ry * 0.05; }
       }
       for (const [bid, k] of ks) {
         if (k.g || bid === gezogen) continue;
+        // Freie Blasen gehören in ihr eigenes Feld: aus den Feldern der Gruppen hinaus — und dabei nicht nur von
+        // deren Mitte weg, sondern auch auf das eigene Feld zu (sonst bliebe eine zwischen zwei Gruppen stecken)
+        const a = anker(null); const ax = a.x - k.x; const ay = a.y - k.y; const an = Math.hypot(ax, ay) || 1;
         for (const { s: c } of sch) {
           const dx = k.x - c.x; const dy = k.y - c.y; const dist = Math.hypot(dx, dy) || 1;
           const tiefe = c.r + k.r + 4 - dist;
-          if (tiefe > 0) { k.vx += (dx / dist) * tiefe * 0.08; k.vy += (dy / dist) * tiefe * 0.08; }
+          if (tiefe > 0) { k.vx += (dx / dist) * tiefe * 0.05 + (ax / an) * Math.min(tiefe, 40) * 0.05; k.vy += (dy / dist) * tiefe * 0.05 + (ay / an) * Math.min(tiefe, 40) * 0.05; }
         }
       }
     }
     // 2) Bewegen (gedämpft)
     let energie = 0;
     for (const [bid, k] of ks) {
-      if (bid !== gezogen) { k.vx *= 0.84; k.vy *= 0.84; k.x += k.vx; k.y += k.vy; }
+      if (bid !== gezogen) {
+        k.vx *= 0.86; k.vy *= 0.86;
+        // nie schneller als gut ein Radius je Bild (sonst spränge eine geworfene Blase durch andere hindurch)
+        const v = Math.hypot(k.vx, k.vy); const vMax = Math.max(18, k.r * 1.2);
+        if (v > vMax) { k.vx *= vMax / v; k.vy *= vMax / v; }
+        k.x += k.vx; k.y += k.vy;
+      }
       energie += k.vx * k.vx + k.vy * k.vy + Math.abs(k.ziel - k.r) * 0.05;
     }
-    // 3) Überlappungen auflösen — als Letztes und zweimal, damit im Ruhezustand wirklich keine bleibt —, dann die Wände
+    // 3) Überlappungen auflösen — als Letztes und zweimal, damit im Ruhezustand wirklich keine bleibt —, dann die
+    //    Wände. Jede Blase weicht im umgekehrten Verhältnis ihrer Masse (Fläche): Eine große schiebt eine kleine
+    //    beiseite und rührt sich selbst kaum. Die gezogene Blase schwebt über den anderen — sie soll irgendwo
+    //    fallen gelassen werden können (auf eine Gruppe, auf eine andere Blase), statt alles vor sich herzuschieben.
     for (let runde = 0; runde < 2; runde++) {
       for (let i = 0; i < ks.length; i++) {
+        if (ks[i][0] === gezogen) continue;
         for (let j = i + 1; j < ks.length; j++) {
+          if (ks[j][0] === gezogen) continue;
           const a = ks[i][1]; const b = ks[j][1];
           let dx = b.x - a.x; let dy = b.y - a.y; let dist = Math.hypot(dx, dy);
           const soll = a.r + b.r + (a.g === b.g ? 4 : 12);
           if (dist >= soll) continue;
           if (dist < 0.01) { dx = zahlAus(ks[i][0]) - 0.5; dy = zahlAus(ks[j][0]) - 0.5; dist = Math.hypot(dx, dy) || 1; }
           const nx = dx / dist; const ny = dy / dist; const tiefe = soll - dist;
-          const ta = ks[j][0] === gezogen ? 1 : ks[i][0] === gezogen ? 0 : 0.5;
+          const ma = a.r * a.r; const mb = b.r * b.r;
+          const ta = mb / (ma + mb);          // Anteil, den a weicht
           a.x -= nx * tiefe * ta; a.y -= ny * tiefe * ta;
           b.x += nx * tiefe * (1 - ta); b.y += ny * tiefe * (1 - ta);
-          // was aufeinander zuläuft, wird gebremst (sonst federn die Blasen ewig)
+          // was aufeinander zuläuft, tauscht Schwung (nach Masse) und verliert dabei etwas — sonst federten die Blasen ewig
           const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
-          if (rel < 0) { a.vx += nx * rel * 0.5 * (ta ? 1 : 0); a.vy += ny * rel * 0.5 * (ta ? 1 : 0); b.vx -= nx * rel * 0.5 * (ta < 1 ? 1 : 0); b.vy -= ny * rel * 0.5 * (ta < 1 ? 1 : 0); }
+          if (rel < 0) { const st = rel * 0.9; a.vx += nx * st * ta; a.vy += ny * st * ta; b.vx -= nx * st * (1 - ta); b.vy -= ny * st * (1 - ta); }
         }
       }
-      for (const [, k] of ks) {
-        k.x = Math.min(Math.max(k.x, k.r + 4), Math.max(k.r + 4, w - k.r - 4));
-        k.y = Math.min(Math.max(k.y, k.r + 4), Math.max(k.r + 4, h - k.r - 4));
+      for (const [bid, k] of ks) {
+        if (bid === gezogen) continue;
+        const xMin = k.r + 4; const xMax = Math.max(xMin, w - k.r - 4); const yMin = k.r + 4; const yMax = Math.max(yMin, h - k.r - 4);
+        // weich von der Wand zurück
+        if (k.x < xMin) { k.x = xMin; if (k.vx < 0) k.vx *= -0.35; } else if (k.x > xMax) { k.x = xMax; if (k.vx > 0) k.vx *= -0.35; }
+        if (k.y < yMin) { k.y = yMin; if (k.vy < 0) k.vy *= -0.35; } else if (k.y > yMax) { k.y = yMax; if (k.vy > 0) k.vy *= -0.35; }
       }
     }
     return ks.length ? energie / ks.length : 0;
@@ -328,11 +485,28 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     const roh = bs.map((b) => blasenRadius(b, bs.length, 1));
     const flaeche = roh.reduce((s, r) => s + Math.PI * r * r, 0);
     const voll = flaeche / Math.max(1, w * h);
-    const ziel = gruppenRef.current.length > 1 ? 0.2 : 0.38;
+    freiRef.current = gruppenRef.current.length > 0 && bs.some((b) => !b.gruppe);
+    const anzahlFelder = gruppenRef.current.length + (freiRef.current ? 1 : 0);
+    const ziel = anzahlFelder > 1 ? 0.3 : 0.38;
     let f = voll > ziel ? Math.sqrt(ziel / voll) : gross ? Math.min(1.7, Math.sqrt(ziel / Math.max(voll, 0.01))) : 1;
     // keine Blase breiter als die halbe kurze Seite
     const groesste = Math.max(0, ...roh) * f;
     if (groesste > Math.min(w, h) * 0.3) f *= (Math.min(w, h) * 0.3) / groesste;
+    // Mit Gruppen zählt nicht die Fläche der Blasen, sondern die der FELDER: Jede Gruppe braucht den Kreis um ihre
+    // Blasen (zwei Blasen nebeneinander füllen ihn nur zur Hälfte). Alle Felder zusammen sollen gut die halbe
+    // Bühne belegen — dann stehen sie nebeneinander, ohne über den Rand oder ineinander zu ragen.
+    if (anzahlFelder > 1) {
+      const zonen = new Map<string, number[]>();
+      for (const g of gruppenRef.current) zonen.set(g, []);
+      bs.forEach((b, i) => { const k = b.gruppe && zonen.has(b.gruppe) ? b.gruppe : ''; if (!zonen.has(k)) zonen.set(k, []); zonen.get(k)!.push(roh[i]); });
+      const belegt = (ff: number): number => { let a = 0; for (const rs of zonen.values()) { const r = feldRadius(rs.map((x) => x * ff)); a += Math.PI * r * r; } return a; };
+      const platz = w * h * 0.5;
+      if (belegt(f) > platz) {
+        let lo = f * 0.25; let hi = f;
+        for (let i = 0; i < 14; i++) { const m = (lo + hi) / 2; if (belegt(m) > platz) hi = m; else lo = m; }
+        f = lo;
+      }
+    }
     const da = new Set(bs.map((b) => b.id));
     for (const k of [...koerper.current.keys()]) if (!da.has(k)) koerper.current.delete(k);
     bs.forEach((b, i) => {
@@ -345,8 +519,9 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       const winkel = zahlAus(b.id) * Math.PI * 2;
       koerper.current.set(b.id, { x: w / 2 + Math.cos(winkel) * w * 0.42, y: h / 2 + Math.sin(winkel) * h * 0.42, vx: 0, vy: 0, r: zielR * 0.4, ziel: zielR, g: b.gruppe, len, wort });
     });
+    felderLegen();
     wecken();
-  }, [gross, wecken]);
+  }, [gross, wecken, felderLegen]);
 
   // Größe der Bühne (Layout-Maß, unabhängig vom Zoom des Boards)
   useEffect(() => {
@@ -354,7 +529,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     if (!el) return;
     const messen = () => {
       const w = el.offsetWidth || 600; const h = el.offsetHeight || 360;
-      if (w !== mass.current.w || h !== mass.current.h) { mass.current = { w, h }; radienSetzen(); }
+      if (w !== mass.current.w || h !== mass.current.h) { mass.current = { w, h }; versatz.current.clear(); radienSetzen(); }
     };
     messen();
     if (typeof ResizeObserver === 'undefined') return;
@@ -372,46 +547,124 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     const s = r.width / (el.offsetWidth || 1) || 1;
     return { x: (e.clientX - r.left) / s, y: (e.clientY - r.top) / s };
   };
+  /** Was liegt an dieser Stelle der Bühne? Eine andere Blase, sonst eine Gruppe, sonst nichts (das Freie) */
+  const zielAn = (p: { x: number; y: number }, ausser: string): { blase?: string; gruppe?: string } => {
+    let beste: string | undefined; let ab = Infinity;
+    for (const [kid, k] of koerper.current) {
+      if (kid === ausser) continue;
+      const a = Math.hypot(p.x - k.x, p.y - k.y);
+      if (a < k.r && a < ab) { ab = a; beste = kid; }
+    }
+    if (beste) return { blase: beste };
+    let gBeste: string | undefined; ab = Infinity;
+    for (const gid of gruppenRef.current) {
+      const c = scheibe(gid, ausser);     // ohne die gezogene selbst — sonst zöge sie den Ring ihrer Gruppe einfach mit
+      const a = Math.hypot(p.x - c.x, p.y - c.y);
+      if (a < c.r + 8 && a < ab) { ab = a; gBeste = gid; }
+    }
+    return gBeste ? { gruppe: gBeste } : {};
+  };
+  const zielZeigen = (z: { blase?: string; gruppe?: string }) => {
+    const el = z.blase ? knoten.current.get(z.blase) : z.gruppe ? ringe.current.get(z.gruppe) : null;
+    if (el === zielEl.current) return;
+    zielEl.current?.classList.remove('ziel');
+    zielEl.current = el ?? null;
+    el?.classList.add('ziel');
+  };
   const ziehStart = (e: React.PointerEvent, b: Blase) => {
     if (e.button !== 0) return;
     const k = koerper.current.get(b.id); if (!k) return;
     const p = punkt(e);
-    zug.current = { id: b.id, dx: k.x - p.x, dy: k.y - p.y, bewegt: false };
+    zug.current = { id: b.id, dx: k.x - p.x, dy: k.y - p.y, bewegt: false, vx: 0, vy: 0, px: p.x, py: p.y, pt: performance.now() };
     const start = { x: e.clientX, y: e.clientY };
+    const el = knoten.current.get(b.id);
     const bewegen = (ev: PointerEvent) => {
       const z = zug.current; if (!z) return;
       if (!z.bewegt && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 5) return;
-      z.bewegt = true;
+      if (!z.bewegt) { z.bewegt = true; el?.classList.add('zieht'); }
       const q = punkt(ev); const kk = koerper.current.get(z.id);
       if (kk) { kk.x = q.x + z.dx; kk.y = q.y + z.dy; }
+      // Schwung mitschreiben (geglättet) — beim Loslassen fliegt die Blase weiter
+      const jetzt0 = performance.now(); const dt = Math.max(8, jetzt0 - z.pt);
+      z.vx = z.vx * 0.6 + ((q.x - z.px) / dt) * 16 * 0.4; z.vy = z.vy * 0.6 + ((q.y - z.py) / dt) * 16 * 0.4;
+      z.px = q.x; z.py = q.y; z.pt = jetzt0;
+      if (!fest) zielZeigen(zielAn(q, z.id));
       wecken();
     };
-    const ende = () => {
+    const ende = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', bewegen); window.removeEventListener('pointerup', ende); window.removeEventListener('pointercancel', ende);
       const z = zug.current; zug.current = null;
+      el?.classList.remove('zieht'); zielZeigen({});
       if (!z) return;
       if (!z.bewegt) { tippen(b); return; }
       const kk = koerper.current.get(z.id);
-      // über welcher Gruppe liegt sie jetzt? (die nächste Gruppenmitte, wenn sie nah genug ist)
-      if (kk && gruppenRef.current.length && !fest) {
-        let ziel: string | null = null; let best = Infinity;
-        for (const gid of gruppenRef.current) {
-          const m = [...koerper.current.entries()].filter(([kid, x]) => x.g === gid && kid !== z.id).map(([, x]) => x);
-          const c = m.length ? { x: m.reduce((s, x) => s + x.x, 0) / m.length, y: m.reduce((s, x) => s + x.y, 0) / m.length } : anker(gid);
-          const reich = m.length ? Math.max(...m.map((x) => Math.hypot(x.x - c.x, x.y - c.y) + x.r)) + 20 : 70;
-          const ab = Math.hypot(kk.x - c.x, kk.y - c.y);
-          if (ab < reich && ab < best) { best = ab; ziel = gid; }
-        }
-        if (ziel !== b.gruppe && (ziel || b.gruppe)) inGruppe(b, ziel);
+      // Wurf: nur, wenn der Zeiger bis zuletzt in Bewegung war
+      if (kk && performance.now() - z.pt < 90) { kk.vx = Math.max(-32, Math.min(32, z.vx * 1.3)); kk.vy = Math.max(-32, Math.min(32, z.vy * 1.3)); }
+      if (kk && !fest && ev.type !== 'pointercancel') {
+        const ziel = zielAn(punkt(ev), z.id);
+        if (ziel.blase) {
+          const andere = blasenRef.current.find((x) => x.id === ziel.blase);
+          if (andere?.gruppe) { if (andere.gruppe !== b.gruppe) inGruppe(b, andere.gruppe); }
+          else if (andere) setFallen({ was: b.id, auf: andere.id });    // zwei freie Ideen: nachfragen, was gemeint ist
+        } else if (ziel.gruppe) { if (ziel.gruppe !== b.gruppe) inGruppe(b, ziel.gruppe); }
+        else if (b.gruppe) inGruppe(b, null);                           // ins Freie gezogen: heraus aus der Gruppe
       }
       wecken();
     };
     window.addEventListener('pointermove', bewegen); window.addEventListener('pointerup', ende); window.addEventListener('pointercancel', ende);
   };
+  /** Eine Gruppe an ihrem Namen fassen und verschieben (nur auf diesem Gerät); ein Tipp öffnet ihre Möglichkeiten */
+  const gruppeZiehen = (e: React.PointerEvent, gid: string) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    const start = { x: e.clientX, y: e.clientY };
+    const c0 = scheibe(gid); const p0 = punkt(e);
+    let bewegt = false;
+    const bewegen = (ev: PointerEvent) => {
+      if (!bewegt && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 5) return;
+      bewegt = true;
+      const q = punkt(ev);
+      versatz.current.set(gid, { x: c0.x + (q.x - p0.x), y: c0.y + (q.y - p0.y) });
+      wecken();
+    };
+    const ende = () => {
+      window.removeEventListener('pointermove', bewegen); window.removeEventListener('pointerup', ende); window.removeEventListener('pointercancel', ende);
+      if (!bewegt) { setGWahl((g) => (g === gid ? null : gid)); setWahl(null); setMenue(false); setFallen(null); }
+    };
+    window.addEventListener('pointermove', bewegen); window.addEventListener('pointerup', ende); window.addEventListener('pointercancel', ende);
+  };
   const tippen = (b: Blase) => {
     if (phase === 'offen' && !fest) { stimme(b, 1); return; }
-    setWahl((w) => (w === b.id ? null : b.id)); setMenue(false); setBearbeite(null);
+    if (zu(b)) { showToast('Diese Idee ist noch verdeckt — sie wird sichtbar, sobald die Sammlung endet.'); return; }
+    setWahl((w) => (w === b.id ? null : b.id)); setMenue(false); setBearbeite(null); setGWahl(null); setFallen(null);
   };
+  // Verschwundenes vergessen
+  // (Eine eben angelegte Gruppe kommt erst mit dem nächsten Durchlauf in den Daten an — darum wird die Wahl hier
+  //  nicht „aufgeräumt": gGewaehlt ist einfach leer, solange es die Gruppe nicht gibt.)
+  useEffect(() => { if (fallen && !(blasen.some((b) => b.id === fallen.was) && blasen.some((b) => b.id === fallen.auf))) setFallen(null); }, [fallen, blasen]);
+  // Eine Idee wurde ein weiteres Mal genannt (oder hat Punkte bekommen): Die Blase gibt einen kurzen Puls ab
+  const gewicht = useRef(new Map<string, number>());
+  useEffect(() => {
+    for (const b of blasen) {
+      const neu = b.mal * 1000 + b.punkte; const alt = gewicht.current.get(b.id);
+      gewicht.current.set(b.id, neu);
+      if (alt !== undefined && neu > alt && !ruhig) {
+        knoten.current.get(b.id)?.animate?.([{ boxShadow: '0 0 0 0 rgba(255,255,255,.95)' }, { boxShadow: '0 0 0 16px rgba(255,255,255,0)' }], { duration: 620, easing: 'ease-out' });
+      }
+    }
+  }, [blasen, ruhig]);
+  const fallenWas = fallen ? blasen.find((b) => b.id === fallen.was) ?? null : null;
+  const fallenAuf = fallen ? blasen.find((b) => b.id === fallen.auf) ?? null : null;
+  const gGewaehlt = gWahl ? gruppen.find(([g]) => g === gWahl) ?? null : null;
+  /** Für die Liste: Gruppen der Reihe nach, darin die Ideen nach Punkten, zuletzt die freien */
+  const abschnitte = useMemo(() => {
+    if (!liste) return [];
+    const sortiert = rangfolge(blasen);
+    const aus = gruppen.map(([gid, g]) => ({ gid: gid as string | null, name: g.name, farbe: BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length], ideen: sortiert.filter((b) => b.gruppe === gid) }));
+    const frei = sortiert.filter((b) => !b.gruppe);
+    if (frei.length || !aus.length) aus.push({ gid: null, name: gruppen.length ? 'Ohne Gruppe' : '', farbe: '#7b8494', ideen: frei });
+    return aus;
+  }, [liste, blasen, gruppen]);
 
   const farbeVon = (b: Blase, i: number): string => {
     const g = b.gruppe ? d.gruppen[b.gruppe] : null;
@@ -419,7 +672,6 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     if (!g && gruppen.length) return '#7b8494';
     return BUBBLE_FARBEN[(g ? g.farbe : i) % BUBBLE_FARBEN.length];
   };
-  const medaille = ['🥇', '🥈', '🥉'];
 
   return (
     <div className={`bub ${gross ? 'gross' : ''}`} data-ohne-sperre="" data-taste="bubbles">
@@ -428,25 +680,48 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           className="bub-frage-feld nodrag" value={d.frage ?? ''} disabled={fest} placeholder="Worum geht es? Frage hier eintragen …" translate="no"
           onChange={(e) => updateNodeData(id, { frage: e.target.value.slice(0, 160) })} data-taste="bub-frage"
         />
-        <span className="bub-zahl" data-taste="bub-zahl">{blasen.length} {blasen.length === 1 ? 'Idee' : 'Ideen'}</span>
+        <span className="bub-zahl" data-taste="bub-zahl">{blasen.length} {blasen.length === 1 ? 'Idee' : 'Ideen'}{personen > 1 ? ` · ${personen} Personen` : ''}</span>
+        <button className={`bub-ansicht nodrag${liste ? ' an' : ''}`} onClick={() => { setListe((l) => !l); setWahl(null); setGWahl(null); setFallen(null); }} aria-pressed={liste}
+          title={liste ? 'Zurück zu den Blasen' : 'Als Liste zeigen — nach Gruppen und Punkten geordnet'} data-taste="bub-ansicht">{liste ? '🫧' : '☰'}</button>
       </div>
-      <div className="bub-buehne nodrag nopan" ref={buehne} onPointerDown={(e) => { if (e.target === e.currentTarget) { setWahl(null); setMenue(false); } }}>
+      {/* M378: Wo steht die Runde? Für alle sichtbar; wer leitet, schaltet weiter */}
+      <div className="bub-schritte nodrag" role="group" aria-label="Ablauf" data-taste="bub-schritte">
+        {SCHRITTE.map(([k, name, hinweis], i) => (
+          <button key={k} className={`bub-schritt${k === schritt0 ? ' jetzt' : ''}${SCHRITTE.findIndex(([x]) => x === schritt0) > i ? ' war' : ''}`} disabled={!leiten}
+            aria-current={k === schritt0 ? 'step' : undefined} title={leiten ? `${hinweis} — hierhin schalten` : hinweis} data-taste="bub-schritt" data-schritt={k}
+            onClick={() => schrittSetzen(k)}><i>{i + 1}</i>{name}</button>
+        ))}
+        {(regeln.verdeckt || regeln.anonym || regeln.still) && (
+          <span className="bub-regeln" data-taste="bub-regeln" title="So ist diese Runde eingestellt (⋯)">
+            {[regeln.verdeckt ? 'verdeckt' : '', regeln.anonym ? 'anonym' : '', regeln.still ? 'Stand verborgen' : ''].filter(Boolean).join(' · ')}
+          </span>
+        )}
+      </div>
+      <div className="bub-buehne nodrag nopan" ref={buehne} onPointerDown={(e) => { if (e.target === e.currentTarget) { setWahl(null); setMenue(false); setGWahl(null); setFallen(null); } }}>
         {gruppen.map(([gid, g]) => (
-          <div key={gid} className="bub-ring" ref={(el) => { if (el) ringe.current.set(gid, el); else ringe.current.delete(gid); }}
-            style={{ borderColor: BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length] }} data-taste="bub-ring" data-gruppe={gid} />
+          <div key={gid} className={`bub-ring${gWahl === gid ? ' gewaehlt' : ''}`} ref={(el) => { if (el) ringe.current.set(gid, el); else ringe.current.delete(gid); }}
+            style={{ borderColor: BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length], background: `color-mix(in srgb, ${BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length]} 9%, transparent)` }} data-taste="bub-ring" data-gruppe={gid} />
         ))}
         {blasen.map((b, i) => (
           <div
-            key={b.id} className={`bub-blase ${wahl === b.id ? 'gewaehlt' : ''} ${platz.has(b.id) ? 'vorn' : ''}`}
+            key={b.id} className={`bub-blase ${wahl === b.id ? 'gewaehlt' : ''} ${(platz.get(b.id) ?? 9) <= 3 ? 'vorn' : ''}${zu(b) ? ' verdeckt' : ''}`}
             ref={(el) => { if (el) knoten.current.set(b.id, el); else knoten.current.delete(b.id); }}
             style={{ background: farbeVon(b, i) }} role="button" tabIndex={0} data-taste="bub-blase" data-id={b.id} data-punkte={b.punkte} data-mal={b.mal}
-            title={b.namen.length ? `${b.text} — von ${b.namen.join(', ')}` : b.text}
+            title={zu(b) ? 'Idee von jemand anderem — noch verdeckt' : b.namen.length && !regeln.anonym ? `${b.text} — von ${b.namen.join(', ')}` : b.text}
+            data-verdeckt={zu(b) ? '' : undefined}
             onPointerDown={(e) => ziehStart(e, b)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tippen(b); } }}
           >
-            <span className="bub-text" translate="no">{b.text}</span>
+            <span className="bub-text" translate="no">{zu(b) ? '•••' : b.text}</span>
             {b.mal > 1 && <span className="bub-mal" title={`${b.mal}-mal genannt`}>×{b.mal}</span>}
-            {b.punkte > 0 && <span className="bub-punkte" data-taste="bub-punkte">{platz.has(b.id) ? `${medaille[platz.get(b.id)!]} ` : ''}{b.punkte}</span>}
+            {/* Beim Abstimmen: die Punkte, als Punkte kenntlich. Nach dem Auswerten: der Platz groß, die Punkte darunter. */}
+            {b.punkte > 0 && phase !== 'fertig' && <span className="bub-punkte" data-taste="bub-punkte" title={punkteText(b.punkte)}><i aria-hidden="true">●</i>{b.punkte}</span>}
+            {phase === 'fertig' && platz.has(b.id) && (
+              <>
+                <span className={`bub-platz p${Math.min(platz.get(b.id)!, 4)}`} data-taste="bub-platz" data-platz={platz.get(b.id)} title={`${platz.get(b.id)}. Platz — ${punkteText(b.punkte)}`}>{platz.get(b.id)}.</span>
+                <span className="bub-punkte unten" data-taste="bub-punkte">{punkteText(b.punkte)}</span>
+              </>
+            )}
             {phase === 'offen' && b.meine > 0 && (
               <button className="bub-meine" title="Einen meiner Punkte zurücknehmen" data-taste="bub-zurueck"
                 onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); stimme(b, -1); }}>
@@ -456,8 +731,9 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           </div>
         ))}
         {gruppen.map(([gid, g]) => (
-          <span key={gid} className="bub-ring-name" translate="no" ref={(el) => { if (el) namen.current.set(gid, el); else namen.current.delete(gid); }}
-            style={{ color: BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length] }}>{g.name}</span>
+          <span key={gid} className={`bub-ring-name${gWahl === gid ? ' gewaehlt' : ''}`} translate="no" ref={(el) => { if (el) namen.current.set(gid, el); else namen.current.delete(gid); }}
+            style={{ color: BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length] }} data-taste="bub-ring-name" data-gruppe={gid}
+            title="Ziehen verschiebt die Gruppe · Tippen: umbenennen, auflösen" onPointerDown={(e) => gruppeZiehen(e, gid)}>{g.name}</span>
         ))}
         {blasen.length === 0 && (
           <div className="bub-leer">
@@ -465,7 +741,54 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
             <span>Unten eintragen und Enter drücken. Gleiche Ideen verschmelzen und wachsen — in einem gemeinsamen Board können alle gleichzeitig beitragen.</span>
           </div>
         )}
-        {gewaehlt && phase !== 'offen' && (
+        {!fest && phase === 'aus' && blasen.length > 0 && !gewaehlt && !gGewaehlt && !fallen && (
+          <button className="bub-gruppe-neu" data-taste="bub-gruppe-neu" title="Leere Gruppe anlegen — Ideen hineinziehen"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => { const gid = gruppeAnlegen(`Gruppe ${gruppen.length + 1}`); if (gid) { setGWahl(gid); setWahl(null); } }}>＋ Gruppe</button>
+        )}
+        {fallenWas && fallenAuf && (
+          <div className="bub-pille" data-taste="bub-fallen" onPointerDown={(e) => e.stopPropagation()}>
+            <span className="bub-pille-text" translate="no">„{fallenWas.text}" auf „{fallenAuf.text}"</span>
+            <button className="an" data-taste="bub-fallen-gruppe" onClick={() => {
+              const gid = gruppeAnlegen(`Gruppe ${gruppen.length + 1}`, fallenAuf);
+              if (gid) { inGruppeMit(fallenWas, fallenAuf, gid); setGWahl(gid); }
+              setFallen(null);
+            }}>＋ Gruppe aus beiden</button>
+            <button data-taste="bub-fallen-eins" title="Beide meinen dasselbe: zu einer Idee machen (sie zählt dann doppelt)" onClick={() => { verschmelzen(fallenWas, fallenAuf); setFallen(null); }}>⛓ Verschmelzen</button>
+            <button onClick={() => setFallen(null)} aria-label="Abbrechen">✕</button>
+          </div>
+        )}
+        {gGewaehlt && !fallen && (
+          <div className="bub-pille" data-taste="bub-gruppen-pille" onPointerDown={(e) => e.stopPropagation()}>
+            <span className="bub-pille-punkt" style={{ background: BUBBLE_FARBEN[gGewaehlt[1].farbe % BUBBLE_FARBEN.length] }} />
+            <input key={gGewaehlt[0]} className="bub-pille-feld" defaultValue={gGewaehlt[1].name} disabled={fest} maxLength={40} translate="no" aria-label="Name der Gruppe" data-taste="bub-gruppe-name"
+              autoFocus onFocus={(e) => e.target.select()}
+              onBlur={(e) => gruppeUmbenennen(gGewaehlt[0], e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { gruppeUmbenennen(gGewaehlt[0], (e.target as HTMLInputElement).value); setGWahl(null); } if (e.key === 'Escape') setGWahl(null); }} />
+            <span className="bub-pille-zahl">{blasen.filter((b) => b.gruppe === gGewaehlt[0]).length} Ideen</span>
+            {leiten && <button onClick={() => gruppeWeg(gGewaehlt[0])} title="Gruppe auflösen — die Ideen bleiben, frei" data-taste="bub-gruppe-weg">Auflösen</button>}
+            <button onClick={() => setGWahl(null)} aria-label="Schließen">✕</button>
+          </div>
+        )}
+        {liste && (
+          <div className="bub-liste" data-taste="bub-liste" onPointerDown={(e) => e.stopPropagation()}>
+            {abschnitte.map((a) => (
+              <section key={a.gid ?? 'frei'}>
+                {a.name && <h5 style={{ color: a.farbe }} translate={a.gid ? 'no' : undefined}><span className="bub-pille-punkt" style={{ background: a.farbe }} />{a.name} <i>{a.ideen.length}</i></h5>}
+                {a.ideen.map((b) => (
+                  <button key={b.id} className={`bub-zeile${wahl === b.id ? ' gewaehlt' : ''}`} data-taste="bub-zeile" data-id={b.id} onClick={() => tippen(b)}>
+                    <span className="bub-zeile-text" translate="no">{zu(b) ? '••• (noch verdeckt)' : b.text}</span>
+                    {b.mal > 1 && <span className="bub-zeile-mal">×{b.mal}</span>}
+                    {!regeln.anonym && !zu(b) && b.namen.length > 0 && <span className="bub-zeile-von" translate="no">{b.namen.slice(0, 2).join(', ')}{b.namen.length > 2 ? ` +${b.namen.length - 2}` : ''}</span>}
+                    {b.punkte > 0 && <span className="bub-zeile-punkte">{phase === 'fertig' && platz.has(b.id) ? <b className={`bub-platz klein p${Math.min(platz.get(b.id)!, 4)}`}>{platz.get(b.id)}.</b> : null}{punkteText(b.punkte)}</span>}
+                  </button>
+                ))}
+                {a.ideen.length === 0 && <div className="bub-zeile-leer">keine Ideen</div>}
+              </section>
+            ))}
+          </div>
+        )}
+        {gewaehlt && phase !== 'offen' && !fallen && (
           <div className="bub-pille" data-taste="bub-pille" onPointerDown={(e) => e.stopPropagation()}>
             {bearbeite === gewaehlt.id ? (
               <input autoFocus className="bub-pille-feld" defaultValue={gewaehlt.text} translate="no"
@@ -494,17 +817,17 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       {phase === 'fertig' && rang.length > 0 && (
         <div className="bub-ergebnis" data-taste="bub-ergebnis">
           {rang.slice(0, 5).map((b, i) => (
-            <span key={b.id}><b>{i < 3 ? medaille[i] : `${i + 1}.`}</b> <span translate="no">{b.text}</span> <i>{b.punkte}</i></span>
+            <span key={b.id} data-platz={platz.get(b.id)}><b className={`bub-platz klein p${Math.min(platz.get(b.id) ?? 4, 4)}`}>{platz.get(b.id)}.</b> <span translate="no">{b.text}</span> <i>{punkteText(b.punkte)}</i></span>
           ))}
         </div>
       )}
       <div className="bub-leiste nodrag">
         <input
-          className="bub-eingabe" value={eingabe} disabled={fest} maxLength={140} translate="no" data-taste="bub-eingabe"
-          placeholder={fest ? 'Diese Karte gehört jemand anderem — du kannst sie nur ansehen.' : 'Idee eintragen und Enter …'}
+          className="bub-eingabe" value={eingabe} disabled={fest || (!!regeln.zu && !leiten)} maxLength={140} translate="no" data-taste="bub-eingabe"
+          placeholder={fest ? 'Diese Karte gehört jemand anderem — du kannst sie nur ansehen.' : regeln.zu && !leiten ? 'Die Sammlung ist geschlossen.' : verdeckt ? 'Idee eintragen und Enter … (die anderen sehen sie erst später)' : 'Idee eintragen und Enter …'}
           onChange={(e) => setEingabe(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); ideeDazu(); } }}
         />
-        <button className="bub-dazu" onClick={ideeDazu} disabled={fest || !eingabe.trim()} title="Idee hinzufügen" data-taste="bub-dazu">＋</button>
+        <button className="bub-dazu" onClick={ideeDazu} disabled={fest || !eingabe.trim() || (!!regeln.zu && !leiten)} title="Idee hinzufügen" data-taste="bub-dazu">＋</button>
         {phase === 'offen' && <span className="bub-rest" data-taste="bub-rest">{uebrig} von {d.abstimmung.punkte} Punkten übrig — auf Blasen tippen</span>}
         {leiten && phase === 'aus' && <button className="bub-knopf" onClick={() => phaseSetzen('offen')} disabled={blasen.length < 2} title={`Punkte-Abstimmung: jede Person vergibt ${d.abstimmung.punkte} Punkte`} data-taste="bub-abstimmen">🗳 Abstimmen</button>}
         {leiten && phase === 'offen' && <button className="bub-knopf an" onClick={() => phaseSetzen('fertig')} data-taste="bub-auswerten">✓ Auswerten</button>}
@@ -521,6 +844,15 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
                     <button onClick={() => punkteSetzen(d.abstimmung.punkte + 1)} aria-label="Mehr Punkte">＋</button>
                   </span>
                 </label>
+                <label className="bub-schalter"><input type="checkbox" checked={!!regeln.verdeckt} onChange={(e) => regelnSetzen({ verdeckt: e.target.checked })} data-taste="bub-regel-verdeckt" /> Verdeckt sammeln <small>jeder sieht zuerst nur Eigenes</small></label>
+                <label className="bub-schalter"><input type="checkbox" checked={!!regeln.anonym} onChange={(e) => regelnSetzen({ anonym: e.target.checked })} data-taste="bub-regel-anonym" /> Namen ausblenden <small>neue Ideen ohne Namen</small></label>
+                <label className="bub-schalter"><input type="checkbox" checked={!!regeln.still} onChange={(e) => regelnSetzen({ still: e.target.checked })} data-taste="bub-regel-still" /> Zwischenstand verbergen <small>Punkte erst beim Auswerten</small></label>
+                {liveAuf(boardId) && (
+                  <span className="bub-timer" data-taste="bub-timer">⏱ Timer für alle
+                    {[1, 3, 5].map((m) => <button key={m} onClick={() => { setMenue(false); timerStart(boardId, m); }} data-min={m}>{m} min</button>)}
+                  </span>
+                )}
+                <button onClick={() => { setMenue(false); alsNotiz(); }} disabled={!blasen.length} data-taste="bub-als-notiz">📝 Ergebnis als Notiz ablegen</button>
                 {aiReady(ai) && <button onClick={() => { setMenue(false); void kiGruppen(); }} disabled={kiLaeuft || blasen.length < 3} title="Die Texte der Ideen gehen dafür an den hinterlegten KI-Anbieter">✨ {kiLaeuft ? 'KI gruppiert …' : 'Mit KI gruppieren'}</button>}
                 {gruppen.map(([gid, g]) => <button key={gid} onClick={() => gruppeWeg(gid)}>Gruppe „<span translate="no">{g.name}</span>" auflösen</button>)}
                 <button onClick={() => { setMenue(false); stimmenWeg(); }} disabled={!Object.keys(d.stimmen).length} data-taste="bub-stimmen-weg">Alle Punkte zurücksetzen</button>

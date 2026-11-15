@@ -216,7 +216,7 @@ function bubblesVereinen(nodes: AppNode[], lokal: AppNode[], fremd: AppNode[]): 
     if (n.type === 'bubbles' && l.type === 'bubbles' && f.type === 'bubbles') {
       const m = bubblesMischen(l.data as Partial<BubblesData>, f.data as Partial<BubblesData>);
       const d = n.data as Partial<BubblesData>;
-      if (JSON.stringify([d.ideen, d.stimmen, d.gruppen, d.abstimmung]) !== JSON.stringify([m.ideen, m.stimmen, m.gruppen, m.abstimmung])) {
+      if (JSON.stringify([d.ideen, d.stimmen, d.gruppen, d.abstimmung, d.regeln ?? null]) !== JSON.stringify([m.ideen, m.stimmen, m.gruppen, m.abstimmung, m.regeln ?? null])) {
         geaendert = true;
         n = { ...n, data: { ...n.data, ...m } } as AppNode;
       }
