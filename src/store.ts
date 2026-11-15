@@ -21,6 +21,7 @@ import { istAmText } from './lib/notizText';
 import { offeneSeite, seiteVon, strichRelativ } from './lib/pdfSeiten';
 import { findFreeSpot, frameMembers } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
+import { t } from './lib/sprache';
 
 /** Ein Freihand-Strich (Punkte in Flow-Koordinaten) */
 export interface Stroke {
@@ -1930,7 +1931,7 @@ export const useBoard = create<BoardState>()(
           set({
             spaces: [
               ...get().spaces,
-              { id: uid(), name: name ?? nextName('Neuer Bereich', get().spaces.map((s) => s.name)), projects: [] },
+              { id: uid(), name: name ?? nextName(t('Neuer Bereich'), get().spaces.map((s) => s.name)), projects: [] },
             ],
           }),
 
@@ -1959,7 +1960,7 @@ export const useBoard = create<BoardState>()(
                     ...sp,
                     projects: [
                       ...sp.projects,
-                      { id: uid(), name: name ?? nextName('📁 Projekt', sp.projects.map((p) => p.name)), boardIds: [] },
+                      { id: uid(), name: name ?? nextName(t('📁 Projekt'), sp.projects.map((p) => p.name)), boardIds: [] },
                     ],
                   }
                 : sp,
@@ -2006,7 +2007,7 @@ export const useBoard = create<BoardState>()(
               newSpaces = spaces.length
                 ? spaces.map((sp, i) =>
                     i === 0
-                      ? { ...sp, projects: [{ id: pid, name: 'Allgemein', boardIds: [] }] }
+                      ? { ...sp, projects: [{ id: pid, name: t('Allgemein'), boardIds: [] }] }
                       : sp,
                   )
                 : defaultHierarchy([]);

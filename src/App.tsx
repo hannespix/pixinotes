@@ -51,6 +51,7 @@ import { SprachHinweis } from './components/SprachHinweis';
 import { GastNameDialog, LiveLeiste, NAME_FRAGEN } from './components/LiveLeiste';
 import { getAuthor } from './components/CommentLayer';
 import { loadKonto } from './lib/kontoSync';
+import { sprache } from './lib/sprache';
 import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick gespeicherte Seitenstriche (M354-Fehler) einmal richten
 
 /**
@@ -58,7 +59,15 @@ import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick 
  * jemand sie aufruft. So bleibt der eigene App-Teil unter seiner Grenze (m321), obwohl Funktionen dazukommen.
  * Einmal geladen, bleibt sie da (Suchbegriff und Stelle bleiben beim Schließen erhalten).
  */
-const HelpOverlayLazy = lazy(() => import('./components/HelpOverlay').then((m) => ({ default: m.HelpOverlay })));
+const HelpOverlayLazy = lazy(async () => {
+  // M382: bei englischer Oberfläche kommt die englische Fassung der Hilfe gleich mit
+  const [m, en] = await Promise.all([
+    import('./components/HelpOverlay'),
+    sprache() === 'en' ? import('./components/HelpOverlayEn').catch(() => null) : null,
+  ]);
+  if (en) m.hilfeEnglischSetzen(en);
+  return { default: m.HelpOverlay };
+});
 function Hilfe() {
   const offen = useBoard((s) => s.helpOpen);
   const [geladen, setGeladen] = useState(false);

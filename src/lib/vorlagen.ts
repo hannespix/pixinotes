@@ -9,35 +9,37 @@
 import type { Edge } from '@xyflow/react';
 import { leereBubbles } from './bubbles';
 import { uid, type AppNode, type StickyColor } from '../types';
+// M381/M382: Läuft die Oberfläche englisch, entstehen die Karten der Vorlagen mit englischen Beschriftungen
+import { t } from './sprache';
 
 type Pos = { x: number; y: number };
 type Block = Record<string, unknown>;
 
-const h = (text: string): Block => ({ type: 'heading', props: { level: 3 }, content: text });
-const p = (text = ''): Block => ({ type: 'paragraph', content: text });
-const li = (text = ''): Block => ({ type: 'bulletListItem', content: text });
-const nr = (text = ''): Block => ({ type: 'numberedListItem', content: text });
-const haken = (text = ''): Block => ({ type: 'checkListItem', props: { checked: false }, content: text });
+const h = (text: string): Block => ({ type: 'heading', props: { level: 3 }, content: t(text) });
+const p = (text = ''): Block => ({ type: 'paragraph', content: t(text) });
+const li = (text = ''): Block => ({ type: 'bulletListItem', content: t(text) });
+const nr = (text = ''): Block => ({ type: 'numberedListItem', content: t(text) });
+const haken = (text = ''): Block => ({ type: 'checkListItem', props: { checked: false }, content: t(text) });
 
 const notiz = (pos: Pos, color: StickyColor, blocks: Block[], width = 270): AppNode =>
   ({ id: uid(), type: 'note', width, position: pos, data: { color, blocks } } as AppNode);
 const rahmen = (pos: Pos, w: number, hoehe: number, name: string, color = ''): AppNode =>
-  ({ id: uid(), type: 'frame', width: w, height: hoehe, position: pos, dragHandle: '.frame-head', data: { name, ...(color ? { color } : {}) } } as AppNode);
+  ({ id: uid(), type: 'frame', width: w, height: hoehe, position: pos, dragHandle: '.frame-head', data: { name: t(name), ...(color ? { color } : {}) } } as AppNode);
 const kanban = (pos: Pos, title: string, cols?: string[], width = 430): AppNode =>
-  ({ id: uid(), type: 'kanban', width, position: pos, data: { title, items: [], ...(cols ? { cols } : {}) } } as AppNode);
+  ({ id: uid(), type: 'kanban', width, position: pos, data: { title: t(title), items: [], ...(cols ? { cols: cols.map((c) => t(c)) } : {}) } } as AppNode);
 const bubbles = (pos: Pos, title: string, frage: string, w = 560, hoehe = 440): AppNode =>
-  ({ id: uid(), type: 'bubbles', width: w, height: hoehe, position: pos, data: { title, frage, ...leereBubbles() } } as AppNode);
+  ({ id: uid(), type: 'bubbles', width: w, height: hoehe, position: pos, data: { title: t(title), frage: t(frage), ...leereBubbles() } } as AppNode);
 const protokoll = (pos: Pos, title: string, agenda: string[]): AppNode =>
-  ({ id: uid(), type: 'minutes', width: 380, height: 420, position: pos, data: { title, color: 'white', entries: [], agenda, rhythm: '', carryOpen: true } } as AppNode);
+  ({ id: uid(), type: 'minutes', width: 380, height: 420, position: pos, data: { title: t(title), color: 'white', entries: [], agenda: agenda.map((a) => t(a)), rhythm: '', carryOpen: true } } as AppNode);
 const woche = (pos: Pos, title: string): AppNode =>
-  ({ id: uid(), type: 'week', width: 620, height: 440, position: pos, data: { title, days: 5, from: 8 * 60, to: 17 * 60, entries: [] } } as AppNode);
+  ({ id: uid(), type: 'week', width: 620, height: 440, position: pos, data: { title: t(title), days: 5, from: 8 * 60, to: 17 * 60, entries: [] } } as AppNode);
 
 const TAG = 864e5;
 const iso = (tage: number): string => new Date(Date.now() + tage * TAG).toISOString().slice(0, 10);
 const zeitplan = (pos: Pos, title: string, zeilen: Array<[name: string, von: number, bis: number, farbe: string]>, w = 620, hoehe = 250): AppNode =>
   ({
     id: uid(), type: 'gantt', width: w, height: hoehe, position: pos,
-    data: { title, dayWidth: 24, rows: zeilen.map(([name, von, bis, color]) => ({ id: uid(), name, start: iso(von), end: iso(bis), color })) },
+    data: { title: t(title), dayWidth: 24, rows: zeilen.map(([name, von, bis, color]) => ({ id: uid(), name: t(name), start: iso(von), end: iso(bis), color })) },
   } as AppNode);
 
 // Rahmen-Tönungen (wie lib/frameOps.ts FRAME_COLORS)
