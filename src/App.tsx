@@ -66,6 +66,21 @@ function Hilfe() {
   return offen || geladen ? <Suspense fallback={null}><HelpOverlayLazy /></Suspense> : null;
 }
 
+/**
+ * M379: Der Vorlagen-Dialog wird erst geladen, wenn ihn jemand aufruft (＋ Neu → „Board aus Vorlage",
+ * oder der Knopf auf dem leeren Board) — die Vorlagen selbst reisen mit ihm, nicht mit dem Start.
+ */
+const VorlagenDialogLazy = lazy(() => import('./components/VorlagenDialog').then((m) => ({ default: m.VorlagenDialog })));
+function Vorlagen() {
+  const [wunsch, setWunsch] = useState<{ projectId?: string; inBoard?: string } | null>(null);
+  useEffect(() => {
+    const auf = (e: Event) => setWunsch((e as CustomEvent<{ projectId?: string; inBoard?: string }>).detail ?? {});
+    window.addEventListener('pixinotes:vorlagen', auf);
+    return () => window.removeEventListener('pixinotes:vorlagen', auf);
+  }, []);
+  return wunsch ? <Suspense fallback={null}><VorlagenDialogLazy wunsch={wunsch} onClose={() => setWunsch(null)} /></Suspense> : null;
+}
+
 export default function App() {
   const toast = useBoard((s) => s.toast);
   const view = useBoard((s) => s.view);
@@ -341,6 +356,7 @@ export default function App() {
         <Onboarding />
         <SearchOverlay />
       <Hilfe />
+      <Vorlagen />
       <BildExport />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
       <GeteiltDialog />

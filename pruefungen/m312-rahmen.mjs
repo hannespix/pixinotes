@@ -142,7 +142,8 @@ console.log('\n════ B: Spalte ════');
   await P.locator('.tabs-foot .tab-add').click();
   await P.waitForTimeout(300);
   const neu = (await P.locator('.neu-menu [role="menuitem"]').allTextContents()).map((t) => t.trim());
-  pruefe('B16 ＋ Neu bietet Board, Projekt, Bereich, Beispiele', /^Board/.test(neu[0]) && /^Projekt/.test(neu[1]) && /^Bereich/.test(neu[2]) && /Beispiel/.test(neu[3]), JSON.stringify(neu));
+  // M379: „Board aus Vorlage …" steht gleich unter „Board"
+  pruefe('B16 ＋ Neu bietet Board, Board aus Vorlage, Projekt, Bereich, Beispiele', /^Board/.test(neu[0]) && /^Board aus Vorlage/.test(neu[1]) && /^Projekt/.test(neu[2]) && /^Bereich/.test(neu[3]) && /Beispiel/.test(neu[4]) && neu.length === 5, JSON.stringify(neu));
   await P.locator('.neu-menu [role="menuitem"]', { hasText: 'Bereich' }).click();
   await P.waitForTimeout(500);
   const bereiche = await P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.spaces.length);

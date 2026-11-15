@@ -108,6 +108,8 @@ export const ILanes = make(<><rect x="3" y="4" width="18" height="16" rx="2" /><
 export const ITimelineIcon = make(<><path d="M3 12h18" /><path d="M7 9.5v5" /><path d="M12 9.5v5" /><path d="M17 9.5v5" /></>);
 export const IQuadrant = make(<><rect x="3.5" y="3.5" width="17" height="17" rx="2" /><path d="M12 3.5v17" /><path d="M3.5 12h17" /></>);
 export const ICircles = make(<><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3" /></>);
+/** M379: Vorlage — ein Board mit vorgezeichneten Feldern */
+export const IVorlage = make(<><rect x="3" y="3.5" width="18" height="17" rx="2" /><path d="M3 9h18" /><path d="M9.5 9v11.5" /></>);
 /** M373: Entscheidungs-Bubbles — drei Blasen verschiedener Größe */
 export const IBubbles = make(<><circle cx="8.5" cy="14.5" r="5.5" /><circle cx="17" cy="8" r="3.6" /><circle cx="18" cy="18" r="2.2" /></>);
 export const IStack = make(<><path d="m12 3 9 5-9 5-9-5Z" /><path d="m3 12.5 9 5 9-5" /><path d="m3 16.5 9 5 9-5" /></>);

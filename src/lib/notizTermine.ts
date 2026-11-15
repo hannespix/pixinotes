@@ -25,6 +25,7 @@
  * an dem er entstand.
  */
 import { de as chronoDe, type ParsedResult } from 'chrono-node';
+import { nurWortKeinTag } from './dates';
 
 export interface NotizTermin {
   /** ISO yyyy-mm-dd */
@@ -79,6 +80,7 @@ function scanne(blocks: AnyBlock[] | undefined, out: NotizTermin[]): void {
         for (const r of ergebnisse.slice(0, 2)) {
           // Nur ausdrückliche Tage/Wochentage — kein „heute", kein Vages
           if (!r.start.isCertain('day') && !r.start.isCertain('weekday')) continue;
+          if (nurWortKeinTag(text, r)) continue;   // M379: „So läuft es" ist kein Sonntag
           const zeit = r.start.isCertain('hour')
             ? `${String(r.start.get('hour')).padStart(2, '0')}:${String(r.start.get('minute') ?? 0).padStart(2, '0')}`
             : undefined;

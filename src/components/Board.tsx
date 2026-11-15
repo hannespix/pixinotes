@@ -210,6 +210,20 @@ export function Board() {
     void setViewport(mitte(getViewport()));
   }, [anzeige, getViewport, setViewport]);
 
+  // M379: Eine Vorlage hat das Board gefüllt → alles ins Bild holen. Der gemerkte Ausschnitt gilt nicht mehr
+  // (er stammt vom leeren Board oder von einer zurückgenommenen Vorlage); mehrfach, weil Notizen ihre Höhe erst
+  // nach dem Messen kennen.
+  useEffect(() => {
+    let timer: number[] = [];
+    const auf = () => {
+      gemerkteAnsicht.delete(useBoard.getState().activeId);
+      timer.forEach((t) => window.clearTimeout(t));
+      timer = [60, 260, 520].map((ms) => window.setTimeout(() => { void fitView({ padding: 0.12, maxZoom: 1, duration: 0 }); }, ms));
+    };
+    window.addEventListener('pixinotes:einpassen', auf);
+    return () => { window.removeEventListener('pixinotes:einpassen', auf); timer.forEach((t) => window.clearTimeout(t)); };
+  }, [fitView]);
+
   const letztesBoard = useRef(activeId);
   const wunschAnsicht = useRef(gemerkteAnsicht.get(activeId) ?? null);
   if (letztesBoard.current !== activeId) {
@@ -1513,6 +1527,11 @@ export function Board() {
           <div>📝 Doppelklick (oder N) = neue Notiz</div>
           <div>📧 E-Mails (.eml/.msg) &amp; Dateien hierher ziehen</div>
           <div>🖼️ Strg+V fügt Screenshots ein</div>
+          {/* M379: Statt bei null anzufangen — Karten für einen bekannten Anlass hinlegen lassen */}
+          <button className="empty-beispiele" data-taste="leer-vorlage"
+            onClick={() => window.dispatchEvent(new CustomEvent('pixinotes:vorlagen', { detail: { inBoard: activeId } }))}>
+            🧩 Mit Vorlage beginnen <small>Besprechung, Rückblick, Projektplan, Brainstorming …</small>
+          </button>
           {/* M370: Der Start ist leer — wer sehen will, was geht, holt sich die Beispiele mit einem Klick */}
           {nurStart && (
             <button className="empty-beispiele" onClick={() => useBoard.getState().addStarter()} data-taste="leer-beispiele">
