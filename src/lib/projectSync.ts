@@ -7,6 +7,7 @@
 // WICHTIG: Das Paket enthält NIEMALS KI-Schlüssel, WebDAV-Zugangsdaten oder
 // OAuth-Tokens — die leben in eigenen localStorage-Schlüsseln außerhalb des
 // Board-Stores und werden hier gar nicht erst angefasst.
+import { t } from './sprache';
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc } from '../store';
 import { ensurePermission, idbDel, idbGet, idbSet, syncSupported, type SyncDirHandle } from './syncFolder';
 import { nurAuswahlAnders, ohneAuswahl } from './syncMerge';
@@ -214,11 +215,11 @@ export function buildInviteText(projectName: string, folderName: string): string
     '',
     'PixiNotes findet darin das Projekt-Paket, richtet den automatischen Abgleich ein und zeigt dir das Projekt neben deinen eigenen.',
     'Wer mitarbeiten darf, regelt allein die Ordner-Freigabe — diese E-Mail enthält keine Passwörter oder Zugangsdaten.',
-  ].join('\n');
+  ].map((z) => t(z)).join('\n');   // M381: auf Englisch geht die Einladung englisch hinaus
 }
 
 export function buildInviteMailto(projectName: string, folderName: string): string {
-  const subject = `Einladung zum PixiNotes-Projekt „${projectName}"`;
+  const subject = t(`Einladung zum PixiNotes-Projekt „${projectName}"`);
   return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(buildInviteText(projectName, folderName))}`;
 }
 

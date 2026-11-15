@@ -3,7 +3,8 @@ import { useReactFlow, type NodeProps } from '@xyflow/react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
-import { de as blockNoteDe } from '@blocknote/core/locales';
+import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
+import { sprache } from '../../lib/sprache';
 import { kamVonAussen, NOTIZ_EXTERN, selectActiveBoard, useBoard, useKarteFest } from '../../store';
 import { STICKY_COLORS, type NoteNode } from '../../types';
 import { blocksToText } from '../../lib/serialize';
@@ -211,7 +212,7 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
   const editor = useCreateBlockNote({
     schema: noteSchema,
     initialContent: initialContent as never,
-    dictionary: blockNoteDe,
+    dictionary: sprache() === 'en' ? blockNoteEn : blockNoteDe,   // M381
     // M289: Damit Bilder überhaupt in den Text dürfen — Einfügen,
     // Ablegen und der Dateiwähler des Bild-Blocks laufen hier durch.
     // M303: Passt ein Bild nicht mehr in den Stand, wird es zur Karte daneben.

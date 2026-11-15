@@ -704,7 +704,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
                   </button>
                 </div>
                 <div className="cal-export-spanne">
-                  <label>von <input type="date" value={exVon} onChange={(e) => setExVon(e.target.value)} /></label>
+                  <label>Von <input type="date" value={exVon} onChange={(e) => setExVon(e.target.value)} /></label>
                   <label>bis <input type="date" value={exBis} onChange={(e) => setExBis(e.target.value)} /></label>
                   <button
                     disabled={busy || !exVon || !exBis || exBis < exVon}

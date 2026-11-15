@@ -1,0 +1,20 @@
+{
+ "Von": "From",
+ "sonnig": "sunny",
+ "bedeckt": "overcast",
+ "zentriert": "centered",
+ "🏢 Work": "🏢 Work",
+ "General": "General",
+ "PixiNotes findet darin das Projekt-Paket, richtet den automatischen Abgleich ein und zeigt dir das Projekt neben deinen eigenen.": "PixiNotes finds the project package in it, sets up automatic sync and shows you the project next to your own.",
+ "PixiNotes verwendet nur GET und PUT auf eine einzelne JSON-Datei im angegebenen": "PixiNotes only uses GET and PUT on a single JSON file in the given",
+ "{0} stufenlos": "{0} stepless",
+ "{0}-mal genannt": "mentioned {0} times",
+ "{0} archivieren": "Archive {0}",
+ "{0} anrufen": "Call {0}",
+ "{0} offen": "{0} open",
+ "{0} jetzt starten": "Start {0} now",
+ "PDF, Word, Tabelle … als Datei-Karte neben der Notiz": "PDF, Word, spreadsheet … as a file card next to the note",
+ "{0} angelegt.": "{0} created.",
+ "{0} (geteilt)": "{0} (shared)",
+ "help anleitung": "help guide manual"
+}

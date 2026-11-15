@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
-import { de as blockNoteDe } from '@blocknote/core/locales';
+import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
+import { sprache } from '../lib/sprache';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodeToHtml } from '../lib/serialize';
 import { buildMermaidSource, getMermaid, preloadHandFont } from '../lib/mermaid';
@@ -51,7 +52,7 @@ function NoteSlide({ node }: { node: NoteNode }) {
   const editor = useCreateBlockNote({
     schema: noteSchema,
     initialContent: initialContent as never,
-    dictionary: blockNoteDe,
+    dictionary: sprache() === 'en' ? blockNoteEn : blockNoteDe,   // M381
     // M289: Damit Bilder überhaupt in den Text dürfen — Einfügen,
     // Ablegen und der Dateiwähler des Bild-Blocks laufen hier durch
     uploadFile: editorUpload(),   // M303: nie eine abgewiesene Zusage

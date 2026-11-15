@@ -1211,6 +1211,9 @@ const defaultHierarchy = (boardIds: string[]): Space[] => [
  * (Begrüßung, leeres Board, ＋ Neu).
  */
 export const START_BOARD_NAME = '🏠 Mein Board';
+/** M381: … und so heißt es, wenn die Oberfläche englisch läuft (siehe startNamenAufEnglisch) */
+export const START_BOARD_NAME_EN = '🏠 My board';
+const istStartName = (n: string): boolean => n === START_BOARD_NAME || n === START_BOARD_NAME_EN;
 function leererStart(): { boards: BoardDoc[]; spaces: Space[]; activeId: string } {
   const boardId = uid();
   return {
@@ -1227,7 +1230,7 @@ function leererStart(): { boards: BoardDoc[]; spaces: Space[]; activeId: string 
 export function leeresStartboard(boards: BoardDoc[]): BoardDoc | null {
   if (boards.length !== 1) return null;
   const b = boards[0];
-  const leer = b.name === START_BOARD_NAME && !b.nodes.length && !b.edges.length && !(b.drawings?.length) && !(b.comments?.length)
+  const leer = istStartName(b.name) && !b.nodes.length && !b.edges.length && !(b.drawings?.length) && !(b.comments?.length)
     && !b.geteiltVon && !b.gastLink;
   return leer ? b : null;
 }
@@ -2033,7 +2036,7 @@ export const useBoard = create<BoardState>()(
             if (get().activeId !== id) set({ activeId: id });
             get().pushHistory();
             // Ein Board, das noch seinen Anfangsnamen trägt, heißt danach wie die Vorlage
-            const unbenannt = ziel.name === START_BOARD_NAME || /^✨ Board( \d+)?$/.test(ziel.name);
+            const unbenannt = istStartName(ziel.name) || /^✨ Board( \d+)?$/.test(ziel.name);
             const neuerName = unbenannt ? nextName(name, get().boards.map((x) => x.name)) : ziel.name;
             set({ boards: get().boards.map((x) => (x.id === id ? { ...x, name: neuerName, nodes: inhalt.nodes, edges: inhalt.edges } : x)) });
           } else {
@@ -2870,3 +2873,19 @@ export const useBoard = create<BoardState>()(
     },
   ),
 );
+
+/**
+ * M381: Der unberührte Start trägt seine Namen in der Sprache der Oberfläche. Nur solange nichts angefasst
+ * wurde — eigene Namen bleiben, wie sie sind (auch auf einem Gerät, das später die Sprache wechselt).
+ */
+export function startNamenAufEnglisch(): void {
+  const s = useBoard.getState();
+  const start = leeresStartboard(s.boards);
+  const bereich = s.spaces[0];
+  if (!start || start.name !== START_BOARD_NAME || s.spaces.length !== 1 || bereich.projects.length !== 1) return;
+  if (bereich.name !== '🏢 Arbeit' || bereich.projects[0].name !== 'Allgemein') return;
+  useBoard.setState({
+    boards: [{ ...start, name: START_BOARD_NAME_EN }],
+    spaces: [{ ...bereich, name: '🏢 Work', projects: [{ ...bereich.projects[0], name: 'General' }] }],
+  });
+}
