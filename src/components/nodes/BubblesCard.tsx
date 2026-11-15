@@ -13,7 +13,8 @@
 //     aus beiden — oder verschmelzen), ins Freie (heraus). Gruppen lassen sich umbenennen, verschieben, auflösen.
 //   · Moderation: vier Schritte (Sammeln · Gruppieren · Abstimmen · Ergebnis), für alle sichtbar; verdeckt und
 //     anonym sammeln; Zwischenstand beim Abstimmen verbergen; Liste statt Blasen; Ergebnis als Notiz; Timer.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import { gruppeVon, GRUPPE_EREIGNIS, selectActiveBoard, useBoard, useKarteFest } from '../../store';
 import type { BubblesNode } from '../../types';
@@ -679,6 +680,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         <input
           className="bub-frage-feld nodrag" value={d.frage ?? ''} disabled={fest} placeholder="Worum geht es? Frage hier eintragen …" translate="no"
           onChange={(e) => updateNodeData(id, { frage: e.target.value.slice(0, 160) })} data-taste="bub-frage"
+          enterKeyHint="done" onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
         />
         <span className="bub-zahl" data-taste="bub-zahl">{blasen.length} {blasen.length === 1 ? 'Idee' : 'Ideen'}{personen > 1 ? ` · ${personen} Personen` : ''}</span>
         <button className={`bub-ansicht nodrag${liste ? ' an' : ''}`} onClick={() => { setListe((l) => !l); setWahl(null); setGWahl(null); setFallen(null); }} aria-pressed={liste}
@@ -747,7 +749,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
             onClick={() => { const gid = gruppeAnlegen(`Gruppe ${gruppen.length + 1}`); if (gid) { setGWahl(gid); setWahl(null); } }}>＋ Gruppe</button>
         )}
         {fallenWas && fallenAuf && (
-          <div className="bub-pille" data-taste="bub-fallen" onPointerDown={(e) => e.stopPropagation()}>
+          <Pille taste="bub-fallen">
             <span className="bub-pille-text" translate="no">„{fallenWas.text}" auf „{fallenAuf.text}"</span>
             <button className="an" data-taste="bub-fallen-gruppe" onClick={() => {
               const gid = gruppeAnlegen(`Gruppe ${gruppen.length + 1}`, fallenAuf);
@@ -756,19 +758,19 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
             }}>＋ Gruppe aus beiden</button>
             <button data-taste="bub-fallen-eins" title="Beide meinen dasselbe: zu einer Idee machen (sie zählt dann doppelt)" onClick={() => { verschmelzen(fallenWas, fallenAuf); setFallen(null); }}>⛓ Verschmelzen</button>
             <button onClick={() => setFallen(null)} aria-label="Abbrechen">✕</button>
-          </div>
+          </Pille>
         )}
         {gGewaehlt && !fallen && (
-          <div className="bub-pille" data-taste="bub-gruppen-pille" onPointerDown={(e) => e.stopPropagation()}>
+          <Pille taste="bub-gruppen-pille">
             <span className="bub-pille-punkt" style={{ background: BUBBLE_FARBEN[gGewaehlt[1].farbe % BUBBLE_FARBEN.length] }} />
             <input key={gGewaehlt[0]} className="bub-pille-feld" defaultValue={gGewaehlt[1].name} disabled={fest} maxLength={40} translate="no" aria-label="Name der Gruppe" data-taste="bub-gruppe-name"
-              autoFocus onFocus={(e) => e.target.select()}
+              autoFocus onFocus={(e) => e.target.select()} enterKeyHint="done"
               onBlur={(e) => gruppeUmbenennen(gGewaehlt[0], e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { gruppeUmbenennen(gGewaehlt[0], (e.target as HTMLInputElement).value); setGWahl(null); } if (e.key === 'Escape') setGWahl(null); }} />
             <span className="bub-pille-zahl">{blasen.filter((b) => b.gruppe === gGewaehlt[0]).length} Ideen</span>
             {leiten && <button onClick={() => gruppeWeg(gGewaehlt[0])} title="Gruppe auflösen — die Ideen bleiben, frei" data-taste="bub-gruppe-weg">Auflösen</button>}
             <button onClick={() => setGWahl(null)} aria-label="Schließen">✕</button>
-          </div>
+          </Pille>
         )}
         {liste && (
           <div className="bub-liste" data-taste="bub-liste" onPointerDown={(e) => e.stopPropagation()}>
@@ -789,13 +791,13 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           </div>
         )}
         {gewaehlt && phase !== 'offen' && !fallen && (
-          <div className="bub-pille" data-taste="bub-pille" onPointerDown={(e) => e.stopPropagation()}>
+          <Pille taste="bub-pille">
             {bearbeite === gewaehlt.id ? (
-              <input autoFocus className="bub-pille-feld" defaultValue={gewaehlt.text} translate="no"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') { const t = (e.target as HTMLInputElement).value.trim().slice(0, 140); if (t) ideenAendern(gewaehlt.ids, () => ({ text: t })); setBearbeite(null); }
-                  if (e.key === 'Escape') setBearbeite(null);
-                }} />
+              <IdeeFeld text={gewaehlt.text} onFertig={(neu) => {
+                const t = (neu ?? '').trim().slice(0, 140);
+                if (neu !== null && t && t !== gewaehlt.text) ideenAendern(gewaehlt.ids, () => ({ text: t }));
+                setBearbeite(null);
+              }} />
             ) : (
               <>
                 <span className="bub-pille-text" translate="no">{gewaehlt.text}</span>
@@ -805,13 +807,16 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
                 ))}
                 {!fest && (
                   <input className="bub-pille-feld kurz" placeholder="＋ Neue Gruppe" value={neuGruppe} onChange={(e) => setNeuGruppe(e.target.value)} data-taste="bub-neue-gruppe"
+                    enterKeyHint="done" maxLength={40}
                     onKeyDown={(e) => { if (e.key === 'Enter' && neuGruppe.trim()) { gruppeAnlegen(neuGruppe, gewaehlt); setNeuGruppe(''); } }} />
                 )}
-                {darfAendern(gewaehlt) && <button onClick={() => setBearbeite(gewaehlt.id)} title="Text ändern">✎</button>}
+                {/* M386: ohne Enter-Taste (Telefon) legt dieser Knopf die Gruppe an */}
+                {!fest && neuGruppe.trim() && <button className="bub-pille-ok" onClick={() => { gruppeAnlegen(neuGruppe, gewaehlt); setNeuGruppe(''); }} title="Gruppe anlegen" aria-label="Gruppe anlegen" data-taste="bub-neue-gruppe-ok">✓</button>}
+                {darfAendern(gewaehlt) && <button onClick={() => setBearbeite(gewaehlt.id)} title="Text ändern" aria-label="Text ändern" data-taste="bub-idee-aendern">✎</button>}
                 {darfAendern(gewaehlt) && <button onClick={() => loeschen(gewaehlt)} title="Idee löschen" data-taste="bub-loeschen">🗑</button>}
               </>
             )}
-          </div>
+          </Pille>
         )}
       </div>
       {phase === 'fertig' && rang.length > 0 && (
@@ -825,6 +830,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         <input
           className="bub-eingabe" value={eingabe} disabled={fest || (!!regeln.zu && !leiten)} maxLength={140} translate="no" data-taste="bub-eingabe"
           placeholder={fest ? 'Diese Karte gehört jemand anderem — du kannst sie nur ansehen.' : regeln.zu && !leiten ? 'Die Sammlung ist geschlossen.' : verdeckt ? 'Idee eintragen und Enter … (die anderen sehen sie erst später)' : 'Idee eintragen und Enter …'}
+          enterKeyHint="send"
           onChange={(e) => setEingabe(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); ideeDazu(); } }}
         />
         <button className="bub-dazu" onClick={ideeDazu} disabled={fest || !eingabe.trim() || (!!regeln.zu && !leiten)} title="Idee hinzufügen" data-taste="bub-dazu">＋</button>
@@ -866,6 +872,57 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   );
 }
 
+
+/** Schmaler Bildschirm (Telefon)? */
+function useSchmal(): boolean {
+  const [schmal, setSchmal] = useState(() => typeof matchMedia === 'function' && matchMedia('(max-width: 720px)').matches);
+  useEffect(() => {
+    const m = matchMedia('(max-width: 720px)');
+    const auf = () => setSchmal(m.matches);
+    m.addEventListener('change', auf);
+    return () => m.removeEventListener('change', auf);
+  }, []);
+  return schmal;
+}
+/**
+ * Die Leiste zu einer gewählten Blase oder Gruppe. Am Rechner liegt sie unten in der Karte. Am Telefon (M386)
+ * reicht die Karte oft über den Bildschirm hinaus oder ist verkleinert — die Knöpfe lägen außerhalb oder wären
+ * winzig. Dort steht die Leiste darum fest am unteren Bildschirmrand, in voller Größe, über der Tastatur.
+ */
+function Pille({ taste, children }: { taste: string; children: ReactNode }) {
+  const schmal = useSchmal();
+  const el = (
+    <div className={`bub-pille${schmal ? ' am-schirm' : ''}`} data-taste={taste} onPointerDown={(e) => e.stopPropagation()}>{children}</div>
+  );
+  return schmal ? createPortal(el, document.body) : el;
+}
+
+/**
+ * M386: Den Text einer Idee ändern. Übernommen wird mit Enter, mit ✓ und beim Verlassen des Felds; ✕ und Esc
+ * verwerfen. Vorher zählte nur die Enter-Taste — am Telefon gibt es die oft nicht (die Tastatur bietet „Weiter",
+ * das nur ins nächste Feld springt), und ohne Knopf ließ sich die Änderung dort gar nicht abschließen.
+ */
+function IdeeFeld({ text, onFertig }: { text: string; onFertig: (neu: string | null) => void }) {
+  const feld = useRef<HTMLInputElement | null>(null);
+  const erledigt = useRef(false);
+  const fertig = (neu: string | null) => { if (erledigt.current) return; erledigt.current = true; onFertig(neu); };
+  // Die Knöpfe nehmen dem Feld den Fokus nicht weg — sonst gälte schon das als „Feld verlassen" und ✕ übernähme
+  const haltFokus = (e: { preventDefault: () => void }) => e.preventDefault();
+  return (
+    <>
+      <input ref={feld} autoFocus className="bub-pille-feld" defaultValue={text} maxLength={140} translate="no" enterKeyHint="done"
+        aria-label="Text der Idee" data-taste="bub-idee-feld"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); fertig(e.currentTarget.value); }
+          else if (e.key === 'Escape') { e.stopPropagation(); fertig(null); }
+        }}
+        onBlur={(e) => fertig(e.currentTarget.value)} />
+      <button className="bub-pille-ok" onPointerDown={haltFokus} onMouseDown={haltFokus} onClick={() => fertig(feld.current?.value ?? null)}
+        title="Übernehmen" aria-label="Text übernehmen" data-taste="bub-idee-ok">✓</button>
+      <button onPointerDown={haltFokus} onMouseDown={haltFokus} onClick={() => fertig(null)} title="Abbrechen" aria-label="Abbrechen" data-taste="bub-idee-abbruch">✕</button>
+    </>
+  );
+}
 export function BubblesCard({ id, data, selected }: NodeProps<BubblesNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   return (

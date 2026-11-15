@@ -1,3 +1,4 @@
+import { initTelefonTastatur } from './lib/telefonTastatur';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import '@xyflow/react/dist/style.css';
@@ -55,6 +56,8 @@ if (!handleOAuthRedirect()) {
   // M368: Die Übersetzung des Browsers darf die Oberfläche nicht zum Absturz bringen — vor dem ersten
   // Rendern, damit jeder Knoten, den React anlegt, schon unter dem Schutz steht
   initUebersetzung();
+  // M386: „Fertig" statt „Weiter" auf der Telefon-Tastatur — Felder, die mit Enter abschließen, bekommen ihr Enter
+  initTelefonTastatur();
   // M381: Ist Englisch gewählt, wird vor dem ersten Rendern das Wörterbuch geladen — sonst blitzte die
   // Oberfläche kurz deutsch auf. Deutsch wartet auf nichts.
   const starten = () => ReactDOM.createRoot(document.getElementById('root')!).render(
