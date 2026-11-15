@@ -155,6 +155,95 @@ export function storageShim(id: string, initial: Record<string, string>): string
     rollZiel[String(d.roll.p||'')]={x:x,y:y};rollAus=Date.now()+300;
     if(!rollLauf){rollLauf=true;requestAnimationFrame(rollSchritt);}
   });
+  /* M384: Eingaben spiegeln. Das Tool meldet, was der Mensch davor eingibt — Feldwerte, Klicks, Enter, das
+     Abschicken eines Formulars — und stellt nach, was PixiNotes ihm schickt (beim Vorführen: die Eingaben des
+     Vorführenden). Nur echte Eingaben werden gemeldet (isTrusted), Nachgestelltes nicht — so entsteht kein Echo.
+     Verweise, Datei- und Passwortfelder bleiben außen vor; in frei beschreibbare Bereiche kommt nur Text. */
+  var submitAus=0;
+  function ort(el){
+    if(!el||!el.tagName)return null;
+    if(el.id&&el.id.length<120&&document.getElementById(el.id)===el)return '#'+el.id;
+    var p=weg(el);return p===''?null:p;
+  }
+  function suche(p){p=String(p);return p.charAt(0)==='#'?document.getElementById(p.slice(1)):(p===''?null:finde(p));}
+  function schreibbar(el){return el&&el.closest?el.closest('[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"]'):null;}
+  function istFeld(el){
+    if(!el||!el.tagName)return false;
+    if(el.tagName==='TEXTAREA'||el.tagName==='SELECT')return true;
+    return el.tagName==='INPUT'&&!/^(file|password|button|submit|reset|image|hidden)$/i.test(el.type||'');
+  }
+  function wert(el){
+    if(el.tagName==='INPUT'&&/^(checkbox|radio)$/i.test(el.type||''))return {c:!!el.checked};
+    if(el.tagName==='SELECT'&&el.multiple){var a=[];for(var i=0;i<el.options.length;i++)if(el.options[i].selected)a.push(i);return {m:a};}
+    if(!istFeld(el))return {t:String(el.textContent||'')};
+    return {v:String(el.value==null?'':el.value)};
+  }
+  function einHinaus(e){try{parent.postMessage({__pixiHapp:APP_ID,ein:e},'*');}catch(_){}}
+  function feldMelden(e){
+    if(!e.isTrusted)return;
+    var el=istFeld(e.target)?e.target:schreibbar(e.target);if(!el)return;
+    var p=ort(el),w=wert(el);if(!p)return;
+    if((w.v&&w.v.length>4000)||(w.t&&w.t.length>4000))return;
+    einHinaus({p:p,a:e.type==='change'?'change':'input',w:w});
+  }
+  document.addEventListener('input',feldMelden,true);
+  document.addEventListener('change',feldMelden,true);
+  document.addEventListener('click',function(e){
+    if(!e.isTrusted)return;
+    var el=e.target;if(!el||!el.tagName||!el.closest)return;
+    /* Felder melden sich mit ihrem Wert; Verweise würden bei allen etwas öffnen oder herunterladen */
+    if(istFeld(el)||schreibbar(el)||el.closest('a[href],a[download],label,option,input[type=file],input[type=password]'))return;
+    var p=ort(el);if(!p)return;
+    var r=el.getBoundingClientRect();
+    einHinaus({p:p,a:'click',x:r.width>0?Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)):0.5,y:r.height>0?Math.min(1,Math.max(0,(e.clientY-r.top)/r.height)):0.5});
+    /* Ein Klick auf den Abschicken-Knopf schickt das Formular ab — bei den anderen tut das der nachgestellte
+       Klick. Das Abschicken selbst noch einmal zu melden, schickte dort zweimal ab. */
+    var k=el.closest('button,input[type=submit],input[type=image]');
+    if(k&&k.form&&(k.tagName==='INPUT'||!k.type||k.type==='submit'))submitAus=Date.now()+150;
+  },true);
+  document.addEventListener('keydown',function(e){
+    if(!e.isTrusted||e.key!=='Enter'||e.isComposing||e.shiftKey||e.ctrlKey||e.metaKey||e.altKey)return;
+    var el=e.target;if(!el||!el.tagName||el.tagName==='TEXTAREA'||schreibbar(el))return;
+    var p=ort(el);if(p)einHinaus({p:p,a:'taste'});
+  },true);
+  document.addEventListener('submit',function(e){
+    if(!e.isTrusted||Date.now()<submitAus)return;
+    var p=ort(e.target);if(p)einHinaus({p:p,a:'submit'});
+  },true);
+  function setzen(el,w){
+    if(!w)return false;
+    if(typeof w.c==='boolean'){if(el.tagName!=='INPUT')return false;el.checked=w.c;return true;}
+    if(w.m){if(el.tagName!=='SELECT')return false;for(var i=0;i<el.options.length;i++)el.options[i].selected=w.m.indexOf(i)>=0;return true;}
+    if(typeof w.t==='string'){if(istFeld(el)||!schreibbar(el))return false;if(el.textContent!==w.t)el.textContent=w.t;return true;}
+    if(typeof w.v!=='string'||!istFeld(el)||/^(checkbox|radio)$/i.test(el.type||''))return false;
+    /* über den Setzer des Elementtyps — Tools, die ihre Felder selbst verwalten (React u. a.), merken es sonst nicht */
+    var pr=el.tagName==='TEXTAREA'?window.HTMLTextAreaElement:el.tagName==='SELECT'?window.HTMLSelectElement:window.HTMLInputElement;
+    var d=pr&&Object.getOwnPropertyDescriptor(pr.prototype,'value');
+    try{if(d&&d.set)d.set.call(el,w.v);else el.value=w.v;}catch(_){el.value=w.v;}
+    return true;
+  }
+  window.addEventListener('message',function(e){
+    var d=e.data;if(e.source!==parent||!d||d.__pixiEin!==APP_ID||!d.ein||!d.ein.length)return;
+    for(var i=0;i<d.ein.length&&i<60;i++){
+      var x=d.ein[i],el=x&&suche(x.p);if(!el||!el.tagName)continue;
+      try{
+        if(x.a==='click'){
+          if(istFeld(el)||(el.closest&&el.closest('a[href],a[download],input[type=file]')))continue;
+          var r=el.getBoundingClientRect();
+          el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window,clientX:r.left+r.width*(+x.x>=0&&+x.x<=1?+x.x:0.5),clientY:r.top+r.height*(+x.y>=0&&+x.y<=1?+x.y:0.5)}));
+        }else if(x.a==='submit'){
+          if(el.tagName!=='FORM')continue;
+          if(el.requestSubmit)el.requestSubmit();else el.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+        }else if(x.a==='taste'){
+          var k={key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true,cancelable:true};
+          el.dispatchEvent(new KeyboardEvent('keydown',k));el.dispatchEvent(new KeyboardEvent('keypress',k));el.dispatchEvent(new KeyboardEvent('keyup',k));
+        }else if(setzen(el,x.w)){
+          el.dispatchEvent(new Event('input',{bubbles:true}));
+          if(x.a==='change')el.dispatchEvent(new Event('change',{bubbles:true}));
+        }
+      }catch(_){}
+    }
+  });
 })();</script>`;
 }
 

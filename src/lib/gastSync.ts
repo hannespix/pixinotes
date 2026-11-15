@@ -21,7 +21,7 @@ import { checkKontoRemote, kontoAnfrage, loadKonto, mitGeteiltBereich, stempel }
 import { liveKanal, type LiveKanal, type Teilnehmer } from './liveKanal';
 import { istPatch, patchAnwenden, patchAus, type Patch } from './gastPatch';
 import { anhangKarte, idbDel, idbGet, idbSet, liveHaken } from './syncFolder';
-import { anhangGroesse, loadHtml, saveHtml } from './htmlStore';
+import { anhangGroesse, anhangLokal, loadHtml, saveHtml } from './htmlStore';
 import { berichtAlsSatz, dreiWegeMerge, ohneAuswahl } from './syncMerge';
 import type { AppNode } from '../types';
 
@@ -806,7 +806,9 @@ export async function kontoKanaele(): Promise<void> {
       if (jetzt) letzterStand.set(id, jetzt);
       kanalOeffnen(id, name, () => kontoPruefenBald(id));
     }
+    freigabenDateien.am = 0;      // Freigaben können sich geändert haben: neu fragen
     void anhaengeFreigeben();
+    fremdAnhaengeBald(true, 400);
   } catch { /* ohne Netz: beim nächsten Mal */ }
 }
 // ---------- M366: Änderungen sofort zeigen und weitergeben — für Geräte mit Konto ----------
@@ -925,43 +927,125 @@ const kontoKanaeleBald = (): void => { clearTimeout(kontoKanalTimer); kontoKanal
 const geteiltKennung = (boards: BoardDoc[]): string => boards.filter((b) => b.geteiltVon && !b.gastLink).map((b) => `${b.id}:${b.geteiltVon}`).join('|');
 /**
  * Anhänge (Dateien, die nicht im Board selbst stecken) für Gäste erreichbar machen: signierte Adressen der
- * schon im Konto liegenden Dateien, gemerkt am Link. Läuft nach jedem eigenen Schreiben — neue Dateien kommen so nach.
+ * schon im Konto liegenden Dateien, gemerkt am Link — und seit M384 auch an der Freigabe für ein Konto.
+ * Läuft nach jedem eigenen Schreiben — neue Dateien kommen so nach.
  */
-async function anhaengeFreigeben(): Promise<void> {
+const anhangKenn = (liste: Array<{ id: string; groesse?: number }>): string => JSON.stringify(liste.map((d) => [d.id, d.groesse ?? 0]));
+/** Die Liste für ein Board — `null`: Sie stimmt schon (dieselben Dateien, dieselben Größen) */
+async function anhangListe(s: { url?: string; userId: string }, board: BoardDoc, alt: GastDatei[]): Promise<GastDatei[] | null> {
+  // M371: Datei-Karten und eigene HTML-Tools (deren Quelltext liegt wie ein Anhang im Konto)
+  const karten = board.nodes.filter((n) => !!anhangKarte(n) && !n.archived && !(n.data as { dataUrl?: string }).dataUrl);
+  const soll = anhangKenn(karten.map((n) => ({ id: n.id, groesse: anhangKarte(n)!.size })));
+  if (soll === anhangKenn(alt)) return null;
+  const dateien: GastDatei[] = [];
+  for (const n of karten) {
+    const vorher = alt.find((d) => d.id === n.id);
+    // dieselbe Adresse, aber ein ersetzter Quelltext hat eine andere Größe — die Gäste holen ihn daran neu
+    if (vorher) { dateien.push({ ...vorher, groesse: anhangKarte(n)!.size }); continue; }
+    try {
+      const pfad = `${encodeURIComponent(s.userId)}/${encodeURIComponent(`datei-${n.id}`)}`;
+      const sig = await kontoAnfrage(`${s.url ?? ''}/storage/v1/object/sign/pixinotes/${pfad}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 10 * 365 * 24 * 3600 }) });
+      if (!sig.ok) continue;   // liegt (noch) nicht im Konto — beim nächsten Schreiben wieder
+      const j = (await sig.json()) as { signedURL?: string; signedUrl?: string };
+      const relativ = j.signedURL ?? j.signedUrl ?? '';
+      if (!relativ) continue;
+      const d = anhangKarte(n)!;
+      dateien.push({ id: n.id, name: d.name, mime: d.mime, groesse: d.size, url: /^https?:/.test(relativ) ? relativ : `${s.url ?? ''}/storage/v1${relativ.startsWith('/') ? '' : '/'}${relativ}` });
+    } catch { /* diese Datei beim nächsten Mal */ }
+  }
+  return anhangKenn(dateien) === anhangKenn(alt) ? null : dateien;
+}
+/** M384: Der Server kennt die Spalte board_freigaben.dateien nicht (Migration fehlt) — bis zum nächsten Laden nicht mehr fragen */
+let ohneFreigabeDateien = false;
+/** Was an den eigenen Freigaben schon steht (je Board die Listen aller Gäste) — und von wann die Auskunft ist */
+let freigabenDateien: { am: number; jeBoard: Map<string, GastDatei[][]> } = { am: 0, jeBoard: new Map() };
+let anhangLauf: Promise<void> = Promise.resolve();
+function anhaengeFreigeben(): Promise<void> {
+  // nacheinander: Zwei Läufe zugleich würden dieselbe Datei doppelt signieren
+  anhangLauf = anhangLauf.then(anhaengeFreigebenRoh, anhaengeFreigebenRoh);
+  return anhangLauf;
+}
+async function anhaengeFreigebenRoh(): Promise<void> {
   const s = loadKonto();
-  if (s?.anbieter !== 'supabase' || !s.userId || eigeneLinks.length === 0) return;
+  if (s?.anbieter !== 'supabase' || !s.userId) return;
+  const sitz = { url: s.url, userId: s.userId };
+  const eigenes = (id: string): BoardDoc | undefined => useBoard.getState().boards.find((b) => b.id === id && !b.geteiltVon);
   for (const l of eigeneLinks) {
-    if (!l.ohne_konto) continue;   // Gäste mit Konto holen Anhänge nicht über den Link
-    const board = useBoard.getState().boards.find((b) => b.id === l.board_id && !b.geteiltVon);
+    if (!l.ohne_konto) continue;   // Gäste mit Konto holen Anhänge über ihre Freigabe (unten)
+    const board = eigenes(l.board_id);
     if (!board) continue;
-    // M371: Datei-Karten und eigene HTML-Tools (deren Quelltext liegt wie ein Anhang im Konto)
-    const karten = board.nodes.filter((n) => !!anhangKarte(n) && !n.archived && !(n.data as { dataUrl?: string }).dataUrl);
-    const kenn = (liste: Array<{ id: string; groesse?: number }>) => JSON.stringify(liste.map((d) => [d.id, d.groesse ?? 0]));
-    const soll = kenn(karten.map((n) => ({ id: n.id, groesse: anhangKarte(n)!.size })));
-    if (soll === kenn(l.dateien ?? [])) continue;
-    const dateien: GastDatei[] = [];
-    for (const n of karten) {
-      const alt = (l.dateien ?? []).find((d) => d.id === n.id);
-      // dieselbe Adresse, aber ein ersetzter Quelltext hat eine andere Größe — die Gäste holen ihn daran neu
-      if (alt) { dateien.push({ ...alt, groesse: anhangKarte(n)!.size }); continue; }
-      try {
-        const pfad = `${encodeURIComponent(s.userId)}/${encodeURIComponent(`datei-${n.id}`)}`;
-        const sig = await kontoAnfrage(`${s.url ?? ''}/storage/v1/object/sign/pixinotes/${pfad}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 10 * 365 * 24 * 3600 }) });
-        if (!sig.ok) continue;   // liegt (noch) nicht im Konto — beim nächsten Schreiben wieder
-        const j = (await sig.json()) as { signedURL?: string; signedUrl?: string };
-        const relativ = j.signedURL ?? j.signedUrl ?? '';
-        if (!relativ) continue;
-        const d = anhangKarte(n)!;
-        dateien.push({ id: n.id, name: d.name, mime: d.mime, groesse: d.size, url: /^https?:/.test(relativ) ? relativ : `${s.url ?? ''}/storage/v1${relativ.startsWith('/') ? '' : '/'}${relativ}` });
-      } catch { /* diese Datei beim nächsten Mal */ }
-    }
-    if (kenn(dateien) === kenn(l.dateien ?? [])) continue;
+    const dateien = await anhangListe(sitz, board, l.dateien ?? []);
+    if (!dateien) continue;
     try {
       const res = await kontoAnfrage(`${s.url ?? ''}/rest/v1/board_einladungen?token=eq.${encodeURIComponent(l.token)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ dateien }) });
       if (res.ok) l.dateien = dateien;
     } catch { /* beim nächsten Mal */ }
   }
+  // M384: Gäste mit Konto — dieselbe Liste an der Freigabe; der Gast liest sie mit seiner Freigabe
+  if (ohneFreigabeDateien) return;
+  try {
+    const uid = encodeURIComponent(s.userId);
+    // Die Freigaben selbst ändern sich selten: nicht bei jedem Schreiben neu fragen
+    if (Date.now() - freigabenDateien.am > 60_000) {
+      const r = await kontoAnfrage(`${s.url ?? ''}/rest/v1/board_freigaben?select=board_id,dateien&besitzer=eq.${uid}`, { cache: 'no-store' });
+      if (!r.ok) { if (r.status === 400 || r.status === 404) ohneFreigabeDateien = true; return; }
+      const zeilen = (await r.json()) as Array<{ board_id: string; dateien?: GastDatei[] | null }>;
+      const jeBoard = new Map<string, GastDatei[][]>();
+      for (const z of zeilen) jeBoard.set(z.board_id, [...(jeBoard.get(z.board_id) ?? []), Array.isArray(z.dateien) ? z.dateien : []]);
+      freigabenDateien = { am: Date.now(), jeBoard };
+    }
+    for (const [boardId, listen] of freigabenDateien.jeBoard) {
+      const board = eigenes(boardId);
+      if (!board) continue;
+      // mehrere Gäste, ein Board: Die längste Liste ist der Stand; eine neu dazugekommene Freigabe ist noch leer
+      const alt = listen.reduce((a, b) => (b.length > a.length ? b : a), [] as GastDatei[]);
+      const einheitlich = listen.every((l) => anhangKenn(l) === anhangKenn(alt));
+      const dateien = (await anhangListe(sitz, board, alt)) ?? (einheitlich ? null : alt);
+      if (!dateien) continue;
+      const res = await kontoAnfrage(`${s.url ?? ''}/rest/v1/board_freigaben?besitzer=eq.${uid}&board_id=eq.${encodeURIComponent(boardId)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify({ dateien }) });
+      if (res.ok) freigabenDateien.jeBoard.set(boardId, listen.map(() => dateien));
+      else if (res.status === 400 || res.status === 404) { ohneFreigabeDateien = true; return; }
+    }
+  } catch { /* beim nächsten Mal */ }
 }
+
+/**
+ * M384: Als Gast mit Konto die Anhänge der geteilten Boards holen. Bisher kamen bei ihm nur die Karten an — ein
+ * eigenes Tool blieb eine leere Hülle, eine PDF ein Platzhalter (der Dateispeicher gibt nur den eigenen Ordner
+ * heraus). Die Adressen stehen an der Freigabe; gefragt wird nur, wenn hier wirklich etwas fehlt.
+ */
+let fremdAnhangAm = 0;
+let fremdAnhangLauf = false;
+async function fremdAnhaengeHolen(erzwingen = false): Promise<void> {
+  const s = loadKonto();
+  if (s?.anbieter !== 'supabase' || !s.userId || ohneFreigabeDateien || fremdAnhangLauf) return;
+  const boards = useBoard.getState().boards.filter((b) => b.geteiltVon && !b.gastLink);
+  if (!boards.length) return;
+  fremdAnhangLauf = true;
+  try {
+    let fehlt = false;
+    for (const b of boards) {
+      for (const n of b.nodes) {
+        const a = anhangKarte(n);
+        if (!a || n.archived || (n.data as { dataUrl?: string }).dataUrl) continue;
+        // fehlt ganz — oder (Tool) der Quelltext hier ist nicht mehr der der Karte
+        if (!(await anhangLokal(n.id)) || (a.tool && !!a.size && (await anhangGroesse(n.id)) !== a.size)) { fehlt = true; break; }
+      }
+      if (fehlt) break;
+    }
+    if (!fehlt) return;
+    if (!erzwingen && Date.now() - fremdAnhangAm < 15_000) return;
+    fremdAnhangAm = Date.now();
+    const r = await kontoAnfrage(`${s.url ?? ''}/rest/v1/board_freigaben?select=board_id,besitzer,dateien&gast_id=eq.${encodeURIComponent(s.userId)}`, { cache: 'no-store' });
+    if (!r.ok) { if (r.status === 400 || r.status === 404) ohneFreigabeDateien = true; return; }
+    for (const z of (await r.json()) as Array<{ board_id: string; besitzer: string; dateien?: GastDatei[] | null }>) {
+      const b = boards.find((x) => x.id === z.board_id && x.geteiltVon === z.besitzer);
+      if (b && Array.isArray(z.dateien) && z.dateien.length) await dateienHolen(b, z.dateien);
+    }
+  } catch { /* ohne Netz: beim nächsten Mal */ } finally { fremdAnhangLauf = false; }
+}
+let fremdAnhangTimer: ReturnType<typeof setTimeout> | undefined;
+const fremdAnhaengeBald = (erzwingen = false, ms = 1500): void => { clearTimeout(fremdAnhangTimer); fremdAnhangTimer = setTimeout(() => void fremdAnhaengeHolen(erzwingen), ms); };
 
 // ---------- Einwählen ----------
 export type GastErgebnis = { art: 'beigetreten' | 'vorhanden'; boardId: string; rolle: Rolle } | null;
@@ -1127,4 +1211,20 @@ export function initGastSync(): void {
     eigenOffen.clear();       // was offen war, ist jetzt geschrieben und im Kanal
     void anhaengeFreigeben();
   });
+  // M384: Gast mit Konto — Anhänge der geteilten Boards nachziehen: wenn eine Karte dazukommt, wenn der Besitzer
+  // die Liste an der Freigabe ergänzt hat (Realtime), und alle halbe Minute, solange etwas fehlt
+  window.addEventListener('pixinotes:freigaben-geaendert', () => {
+    fremdAnhaengeBald(true, 600);
+    // als Besitzer: eine neue Freigabe (auch von einem anderen eigenen Gerät angelegt) bekommt die Liste
+    freigabenDateien.am = 0;
+    void anhaengeFreigeben();
+  });
+  let anhangKarten = '';
+  useBoard.subscribe((st) => {
+    const jetzt = st.boards.filter((b) => b.geteiltVon && !b.gastLink).map((b) => b.nodes.filter((n) => !!anhangKarte(n)).map((n) => `${n.id}:${anhangKarte(n)!.size}`).join(',')).join('|');
+    if (jetzt === anhangKarten) return;
+    anhangKarten = jetzt;
+    if (jetzt.replace(/\|/g, '')) fremdAnhaengeBald(true);
+  });
+  setInterval(() => { if (document.visibilityState === 'visible') void fremdAnhaengeHolen(); }, 30_000);
 }

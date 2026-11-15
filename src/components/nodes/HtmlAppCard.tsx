@@ -5,7 +5,7 @@ import { useBoard } from '../../store';
 import type { HtmlAppNode } from '../../types';
 import { composeSrcdoc, htmlUebernehmen, loadAppState, loadAppStateAt, loadHtml, saveAppState, saveHtml } from '../../lib/htmlStore';
 import { kontoDateiNachladen } from '../../lib/kontoSync';
-import { appMelden, folgeIch, ROLL_EREIGNIS, rollMelden, rollVergessen, VORFUEHR_EREIGNIS, werFuehrtVor, type Roll } from '../../lib/vorfuehren';
+import { appMelden, EINGABE_EREIGNIS, eingabeAus, eingabeMelden, eingabenErbitten, folgeIch, ROLL_EREIGNIS, rollMelden, rollVergessen, VORFUEHR_EREIGNIS, werFuehrtVor, type Eingabe, type Roll } from '../../lib/vorfuehren';
 import { loadAppStateFromTeam, loadAttachment, saveAppStateToTeam } from '../../lib/attachments';
 import { triggerDownload } from '../../lib/download';
 import { CardShell } from './CardShell';
@@ -62,9 +62,12 @@ function useMitrollen(boardId: string, id: string, frame: RefObject<HTMLIFrameEl
   useEffect(() => {
     if (!laeuft) return;
     const vomTool = (e: MessageEvent) => {
-      const d = e.data as { __pixiHapp?: string; roll?: Partial<Roll> } | null;
-      const r = d?.roll;
-      if (d?.__pixiHapp !== id || !r || e.source !== frame.current?.contentWindow) return;
+      const d = e.data as { __pixiHapp?: string; roll?: Partial<Roll>; ein?: unknown } | null;
+      if (d?.__pixiHapp !== id || e.source !== frame.current?.contentWindow) return;
+      // M384: eine Eingabe im Tool — führe ich vor, geht sie ans Team
+      if (d.ein) { const ein = eingabeAus(d.ein); if (ein) eingabeMelden(boardId, id, ein); return; }
+      const r = d.roll;
+      if (!r) return;
       if (typeof r.p !== 'string' || r.p.length > 200 || !(typeof r.x === 'number' && r.x >= 0 && r.x <= 1) || !(typeof r.y === 'number' && r.y >= 0 && r.y <= 1)) return;
       rollMelden(boardId, id, { p: r.p, x: r.x, y: r.y });
     };
@@ -73,9 +76,24 @@ function useMitrollen(boardId: string, id: string, frame: RefObject<HTMLIFrameEl
       if (d?.boardId !== boardId || d.karte !== id) return;
       frame.current?.contentWindow?.postMessage({ __pixiRoll: id, roll: d.roll }, '*');
     };
+    // M384: Eingaben des Vorführenden — mein Tool stellt sie nach
+    const eingabenVomTeam = (e: Event) => {
+      const d = (e as CustomEvent<{ boardId: string; karte: string; liste: Eingabe[] }>).detail;
+      if (d?.boardId !== boardId || d.karte !== id) return;
+      frame.current?.contentWindow?.postMessage({ __pixiEin: id, ein: d.liste }, '*');
+    };
+    // Beginnt jemand vorzuführen, während mein Tool schon läuft: seine Feldwerte holen
+    let folgte = folgeIch(boardId);
+    const vorfuehrWechsel = () => {
+      const f = folgeIch(boardId);
+      if (f && !folgte) eingabenErbitten(boardId, id);
+      folgte = f;
+    };
     window.addEventListener('message', vomTool);
     window.addEventListener(ROLL_EREIGNIS, vomTeam);
-    return () => { window.removeEventListener('message', vomTool); window.removeEventListener(ROLL_EREIGNIS, vomTeam); };
+    window.addEventListener(EINGABE_EREIGNIS, eingabenVomTeam);
+    window.addEventListener(VORFUEHR_EREIGNIS, vorfuehrWechsel);
+    return () => { window.removeEventListener('message', vomTool); window.removeEventListener(ROLL_EREIGNIS, vomTeam); window.removeEventListener(EINGABE_EREIGNIS, eingabenVomTeam); window.removeEventListener(VORFUEHR_EREIGNIS, vorfuehrWechsel); };
   }, [boardId, id, frame, laeuft]);
 }
 /** Wer dazukommt, während schon gerollt ist: Das frisch geladene Tool fährt an die Stelle des Vorführenden */
@@ -87,6 +105,8 @@ function rollNachLaden(boardId: string, id: string, frame: HTMLIFrameElement | n
     // erst jetzt nachsehen: Bis das Tool steht, kann der Vorführende schon weitergerollt haben
     const r = folgeIch(boardId) ? werFuehrtVor(boardId)?.rollen[id] : undefined;
     if (r) frame.contentWindow?.postMessage({ __pixiRoll: id, roll: r }, '*');
+    // M384: … und bekommt die Feldwerte, die der Vorführende schon eingegeben hat
+    eingabenErbitten(boardId, id);
   }, 350);
 }
 
