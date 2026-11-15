@@ -7,12 +7,13 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { useInternalNode } from '@xyflow/react';
 import { GRUPPE_EREIGNIS, gruppeVon, useBoard, useNurLesen } from '../store';
-import { ich, liveAuf, liveVerbunden, nameGeaendert, SPERREN_EREIGNIS, sperrenVon, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
+import { EINLADUNG_EREIGNIS, einladungVon, ichIn, liveAuf, liveVerbunden, nameGeaendert, SPERREN_EREIGNIS, sperrenVon, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
+import { qrZeigen } from '../lib/qr';
 import type { Teilnehmer } from '../lib/liveKanal';
 import { getAuthor, setAuthor } from './CommentLayer';
 import { ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenStart, vorfuehrenStopp } from '../lib/vorfuehren';
 import { ZEIGER_EREIGNIS, zeigerAn, zeigerSetzen } from '../lib/mauszeiger';
-import { IMousePointer, IX } from './Icons';
+import { IMousePointer, IQr, IX } from './Icons';
 import { ReaktionsKnopf, TimerKnopf } from './Gruppenraum';
 
 export const NAME_FRAGEN = 'pixinotes:gast-name';
@@ -42,6 +43,7 @@ export function LiveLeiste() {
   useTakt(GRUPPE_EREIGNIS);
   useTakt(VORFUEHR_EREIGNIS);
   useTakt(ZEIGER_EREIGNIS);
+  useTakt(EINLADUNG_EREIGNIS);
   // M366: Bei vielen Teilnehmern zeigt die Leiste wenige Kürzel und die Zahl; die ganze Liste klappt auf
   const [offen, setOffen] = useState(false);
   const nurLesen = useNurLesen();   // wer nur liest, führt nicht vor
@@ -54,7 +56,7 @@ export function LiveLeiste() {
     return () => { window.removeEventListener('pointerdown', zu, true); window.removeEventListener('keydown', esc); };
   }, [offen]);
   if (!liveAuf(boardId)) return null;
-  const selbst = ich();
+  const selbst = ichIn(boardId);
   // M365: Als Gast sehen, was der Besitzer hier erlaubt
   const g = gruppeVon(boardId);
   const recht = g?.gast && g.recht !== 'alles' ? g.recht : null;
@@ -78,6 +80,11 @@ export function LiveLeiste() {
         {rest > 0 && <span className="live-chip mehr" data-taste="live-rest">+{rest}</span>}
         <span className="live-zahl" data-taste="live-zahl">{!verbunden ? 'verbindet …' : andere.length === 0 ? 'nur du' : `${andere.length + 1} dabei`}</span>
       </button>
+      {/* M385: QR-Code zum Mitmachen — der Einladungslink groß zum Scannen */}
+      {einladungVon(boardId) && (
+        <button className="live-zeig qr" data-taste="live-qr" title="QR-Code zum Mitmachen einblenden — das Publikum scannt ihn und ist im Board"
+          aria-label="QR-Code zum Mitmachen einblenden" onClick={() => qrZeigen(boardId)}><IQr size={14} /></button>
+      )}
       {/* M367: Vorführen — alle folgen meiner Ansicht */}
       {andere.length > 0 && !nurLesen && (
         <button className={`live-zeig${ichFuehreVor(boardId) ? ' an' : ''}`} data-taste="vorfuehren" aria-pressed={ichFuehreVor(boardId)}

@@ -7245,3 +7245,52 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 /* ---------- M381: englische Oberfläche ---------- */
 .help-en-hinweis { margin: 0 0 14px; padding: 9px 12px; border: 1px solid var(--accent); border-radius: var(--r); background: var(--accent-soft); font-size: 13px; line-height: 1.45; }
 .help-de, .help-en { display: contents; }
+
+/* ── M385: QR-Code zum Mitmachen ─────────────────────────────────────── */
+.live-zeig.qr { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+.qr-blende.gross {
+  position: fixed; inset: 0; z-index: 140; display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, #0b1020 72%, transparent); padding: calc(16px + var(--safe-top, 0px)) 16px 16px;
+}
+.qr-karte {
+  background: var(--surface-card); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-lg, 14px);
+  box-shadow: var(--pop-shadow); padding: 20px 24px 18px; width: min(560px, 100%); max-height: 100%; overflow: auto;
+  display: flex; flex-direction: column; gap: 12px; text-align: center;
+}
+.qr-kopf { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.qr-kopf h2 { margin: 0; font-size: 26px; letter-spacing: -.01em; }
+.qr-text { margin: 0; font-size: 16px; line-height: 1.45; color: var(--text); text-wrap: balance; }
+.qr-konto { color: var(--muted); }
+/* Der Code selbst: immer Weiß mit schwarzen Feldern, so groß wie Bildschirm und Karte es hergeben */
+.qr-code { background: #fff; border-radius: var(--r, 8px); line-height: 0; align-self: center; width: min(100%, 58vh, 460px); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+.qr-code svg { width: 100%; height: 100%; display: block; border-radius: inherit; }
+.qr-warte { color: #555; font-size: 13px; line-height: 1.4; padding: 12px; }
+.qr-adresse { font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: var(--muted); word-break: break-all; user-select: all; line-height: 1.35; }
+.qr-fuss { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.qr-dabei { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+.qr-knoepfe { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.qr-knoepfe button {
+  display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; padding: 7px 12px; cursor: pointer;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--r, 8px);
+}
+.qr-knoepfe button:hover, .qr-knoepfe button:focus-visible { border-color: var(--accent); }
+/* Klein in der Ecke: bleibt über Board, Fokus und Präsentation stehen; ziehen verschiebt */
+.qr-blende.ecke {
+  position: fixed; right: calc(14px + var(--app-rand, 0px)); bottom: calc(190px + var(--app-rand, 0px)); z-index: 140;
+  width: 188px; padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 6px;
+  background: var(--surface-card); color: var(--text); border: 1px solid var(--border); border-radius: var(--r, 8px);
+  box-shadow: var(--pop-shadow); cursor: grab; touch-action: none; user-select: none;
+}
+.qr-blende.ecke:active { cursor: grabbing; }
+.qr-ecke-kopf { display: flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; }
+.qr-ecke-kopf span { flex: 1; text-align: left; }
+.qr-ecke-kopf button { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; background: none; color: var(--muted); border-radius: var(--r-xs, 4px); cursor: pointer; }
+.qr-ecke-kopf button:hover, .qr-ecke-kopf button:focus-visible { background: var(--surface); color: var(--text); }
+.qr-blende.ecke .qr-code { width: 100%; }
+.qr-ecke-fuss { font-size: 12px; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) {
+  .qr-karte { padding: 16px 14px 14px; }
+  .qr-kopf h2 { font-size: 22px; }
+  .qr-blende.ecke { width: 140px; bottom: calc(120px + var(--app-rand, 0px)); }
+}
+@media print { .qr-blende { display: none; } }

@@ -1,3 +1,4 @@
+import { QR_EREIGNIS, type QrWunsch } from './lib/qr';
 import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { Board } from './components/Board';
@@ -88,6 +89,18 @@ function Vorlagen() {
     return () => window.removeEventListener('pixinotes:vorlagen', auf);
   }, []);
   return wunsch ? <Suspense fallback={null}><VorlagenDialogLazy wunsch={wunsch} onClose={() => setWunsch(null)} /></Suspense> : null;
+}
+
+/** M385: Die QR-Einblendung (samt Rechenbibliothek) wird erst geladen, wenn jemand sie aufruft */
+const QrBlendeLazy = lazy(() => import('./components/QrBlende').then((m) => ({ default: m.QrBlende })));
+function Qr() {
+  const [wunsch, setWunsch] = useState<QrWunsch | null>(null);
+  useEffect(() => {
+    const auf = (e: Event) => setWunsch((e as CustomEvent<QrWunsch>).detail ?? null);
+    window.addEventListener(QR_EREIGNIS, auf);
+    return () => window.removeEventListener(QR_EREIGNIS, auf);
+  }, []);
+  return wunsch ? <Suspense fallback={null}><QrBlendeLazy wunsch={wunsch} onClose={() => setWunsch(null)} /></Suspense> : null;
 }
 
 export default function App() {
@@ -366,6 +379,7 @@ export default function App() {
         <SearchOverlay />
       <Hilfe />
       <Vorlagen />
+      <Qr />
       <BildExport />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
       <GeteiltDialog />

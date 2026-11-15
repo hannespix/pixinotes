@@ -5,6 +5,7 @@
 // mir" und beide arbeiten live auf demselben Stand. Für den Gast zeigt der
 // Dialog den Besitzer und bietet „Freigabe verlassen" (das Board bleibt dann als
 // eigene Kopie auf dem Gerät).
+import { QR_EREIGNIS } from '../lib/qr';
 import { useEffect, useState } from 'react';
 import { useBoard } from '../store';
 import { freigabeAnlegen, freigabeEntfernen, freigabenDesBoards, freigabeRolleSetzen, freigabeVerlassen, loadKonto, type Freigabe, type FreigabeRolle } from '../lib/kontoSync';
@@ -198,6 +199,9 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                           <input readOnly value={einladungUrl(link.token)} onFocus={(e) => e.currentTarget.select()} aria-label="Einladungslink" data-taste="einladung-adresse" />
                           <button onClick={() => void kopieren(einladungUrl(link.token))} data-taste="einladung-kopieren">Kopieren</button>
                           {typeof navigator.share === 'function' && <button onClick={() => void linkSenden(einladungUrl(link.token))}>Senden …</button>}
+                          {/* M385: groß zum Scannen — für alle im Raum */}
+                          <button data-taste="einladung-qr" title="Den Link als QR-Code einblenden — zum Scannen vom Beamer oder Bildschirm"
+                            onClick={() => { window.dispatchEvent(new CustomEvent(QR_EREIGNIS, { detail: { boardId, url: einladungUrl(link.token), ohneKonto } })); onClose(); }}>QR-Code</button>
                         </div>
                         <div className="freigabe-zeile">
                           <span>Wer dem Link folgt,</span>

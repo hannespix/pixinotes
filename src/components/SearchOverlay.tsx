@@ -1,3 +1,4 @@
+import { qrZeigen } from '../lib/qr';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import uFuzzy from '@leeoniya/ufuzzy';
 import { mutedHistory, useBoard } from '../store';
@@ -81,6 +82,9 @@ function buildCommands(): Command[] {
     // M379: Vorlagen sind auch über Strg+K zu finden — unter dem Namen jeder Vorlage
     { label: '🧩 Board aus Vorlage', hint: 'Besprechung, Rückblick, Projektplan, Brainstorming …', alias: 'vorlage template neues board besprechung meeting retro rückblick projektplan brainstorming workshop swot entscheidung',
       run: () => window.dispatchEvent(new CustomEvent('pixinotes:vorlagen', { detail: {} })) },
+    // M385: Einladungslink als QR-Code einblenden
+    { label: '🔳 QR-Code zum Mitmachen', hint: 'Einladungslink groß einblenden — das Publikum scannt ihn', alias: 'qr code scannen publikum audience mitmachen teilnehmen einladen abstimmung workshop join',
+      run: () => { if (!qrZeigen()) st().showToast('Dieses Board hat noch keinen Einladungslink — Board-Menü ⋯ → „Gemeinsam bearbeiten" legt ihn an.', false, 7000); } },
     { label: '🏠 Zur Übersicht', hint: 'Alle Bereiche, Projekte und Boards', alias: 'home start mission',
       run: () => st().setView('overview') },
     { label: '🕸 Netz-Ansicht', hint: 'Boards als Graph', alias: 'graph netz verbindungen',

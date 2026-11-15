@@ -18,7 +18,7 @@
 // Knöpfe, Enter und das Abschicken eines Formulars. Bei den Folgenden geschieht im selben Tool dasselbe. Was ein
 // Tool daraus macht, rechnet es selbst — Zufall, Zeitabläufe, Ziehen mit der Maus und Zeichenflächen lassen
 // sich so nicht nachstellen.
-import { ich, LIVE_NACHRICHT, liveSenden } from './gastSync';
+import { ich, ichIn, LIVE_NACHRICHT, liveSenden, teilnehmerVon } from './gastSync';
 
 export interface Sicht { x: number; y: number; w: number; h: number }
 /** Stelle im Vortrag: die Karte, die als Folie offen ist, und die Seite darin */
@@ -95,7 +95,7 @@ export function folgenSetzen(boardId: string, an: boolean): void {
 export function vorfuehrenStart(boardId: string): void {
   if (meinBoard && meinBoard !== boardId) vorfuehrenStopp();
   meinBoard = boardId; meinSeit = Date.now(); gesendet = '';
-  const t = ich();
+  const t = ichIn(boardId);
   zeiger.set(boardId, { id: t.id, name: t.name, farbe: t.farbe, seit: meinSeit, zuletzt: Date.now(), sicht: { x: 0, y: 0, w: 0, h: 0 }, vortrag: meinVortrag, apps: [...meineApps], rollen: { ...meineRollen } });
   melden(boardId);
 }
@@ -116,7 +116,7 @@ function standSenden(boardId: string, sofort = false): void {
   if (!sofort && text === gesendet && jetzt - gesendetAm < 2500) return;
   if (!(meineSicht.w > 0)) return;       // noch kein Ausschnitt gemessen
   gesendet = text; gesendetAm = jetzt;
-  const t = ich();
+  const t = ichIn(boardId);
   const z = zeiger.get(boardId);
   if (z) { z.sicht = meineSicht; z.zuletzt = jetzt; z.vortrag = meinVortrag; z.apps = [...meineApps]; z.rollen = { ...meineRollen }; }
   liveSenden(boardId, 'zeig', { von: t.id, name: t.name, farbe: t.farbe, seit: meinSeit, ...stand });
@@ -264,7 +264,9 @@ export function initVorfuehren(): void {
     }
     if (alt?.id !== m.von) geloest.delete(d.boardId);
     zeiger.set(d.boardId, {
-      id: m.von, name: typeof m.name === 'string' ? m.name.slice(0, 40) : 'Jemand', farbe: typeof m.farbe === 'string' ? m.farbe : '#6b7280',
+      id: m.von, name: typeof m.name === 'string' ? m.name.slice(0, 40) : 'Jemand',
+      // M385: die Farbe, in der alle den Vorführenden sehen (verteilt, lib/gastSync.ts) — sonst die gemeldete
+      farbe: teilnehmerVon(d.boardId).find((t) => t.id === m.von)?.farbe ?? (typeof m.farbe === 'string' ? m.farbe : '#6b7280'),
       seit: m.seit, zuletzt: Date.now(), sicht: { x: s.x!, y: s.y!, w: s.w!, h: s.h! },
       vortrag: typeof m.vortrag?.karte === 'string' && typeof m.vortrag.seite === 'number' ? { karte: m.vortrag.karte, seite: m.vortrag.seite } : null,
       apps: Array.isArray(m.apps) ? m.apps.filter((a): a is string => typeof a === 'string').slice(0, 40) : [],
