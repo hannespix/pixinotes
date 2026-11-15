@@ -64,3 +64,51 @@ export function istPatch(x: unknown): x is Patch {
   }
   return true;
 }
+
+type Mass = { id: string; measured?: unknown };
+/** Karten des einen Stands mit den Maßen des anderen (nach Kennung) — die misst jedes Gerät selbst, sie sind keine Änderung */
+function mitMassenVon(b: BoardDoc, quelle: BoardDoc): BoardDoc {
+  const q = new Map(quelle.nodes.map((n) => [n.id, n as Mass]));
+  let anders = false;
+  const nodes = b.nodes.map((n) => {
+    const m = q.get(n.id);
+    const eigen = (n as Mass).measured;
+    if (!m || eigen === m.measured || JSON.stringify(eigen) === JSON.stringify(m.measured)) return n;
+    anders = true;
+    const kopie = { ...n } as Mass;
+    if (m.measured === undefined) delete kopie.measured; else kopie.measured = m.measured;
+    return kopie as typeof n;
+  });
+  return anders ? { ...b, nodes } : b;
+}
+const kanonisch = (x: unknown): unknown => {
+  if (Array.isArray(x)) return x.map(kanonisch);
+  if (x && typeof x === 'object') return Object.fromEntries(Object.keys(x).sort().map((k) => [k, kanonisch((x as Record<string, unknown>)[k])]));
+  return x;
+};
+/** Die Angaben des Boards selbst (Name, Tönung, Archiv …) — ohne Karten, Verbindungen, Striche, Kommentare */
+const boardFelder = (b: BoardDoc): string => {
+  const rest: Record<string, unknown> = { ...(b as unknown as Record<string, unknown>) };
+  for (const a of ARTEN) delete rest[a];
+  return JSON.stringify(kanonisch(rest));
+};
+
+/**
+ * M383: Lässt sich der Schritt von `basis` (dem Stand auf dem Server) zu `lokal` als Patch ausdrücken?
+ *   · `null`: nein — die Angaben des Boards selbst oder die Reihenfolge (was liegt vor was) haben sich geändert;
+ *     dann reist das ganze Board.
+ *   · sonst der Patch (`p: null` = inhaltlich gleich, höchstens anders gemessen) und der Stand, den der Server
+ *     danach hält.
+ */
+export function patchFuer(basis: BoardDoc, lokal: BoardDoc): { p: Patch | null; stand: BoardDoc } | null {
+  if (boardFelder(basis) !== boardFelder(lokal)) return null;
+  const ziel = mitMassenVon(lokal, basis);
+  const p = patchAus(basis, ziel);
+  const stand = p ? patchAnwenden(basis, p) : basis;
+  for (const a of ARTEN) {
+    const A = liste(stand, a); const B = liste(ziel, a);
+    if (A.length !== B.length) return null;
+    for (let i = 0; i < A.length; i += 1) if (A[i].id !== B[i].id) return null;
+  }
+  return { p, stand };
+}

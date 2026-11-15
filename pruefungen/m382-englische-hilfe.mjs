@@ -81,7 +81,7 @@ const ersteMarke = (q) => q.split('\n').filter((z) => /<li>/.test(z)).map((z) =>
 pruefe('A1 „Was ist neu": gleich viele Einträge in beiden Fassungen', ersteMarke(neuDe).length === ersteMarke(neuEn).length && ersteMarke(neuDe).length > 100, `${ersteMarke(neuDe).length} / ${ersteMarke(neuEn).length}`);
 const abw = ersteMarke(neuDe).map((m, i) => [m, ersteMarke(neuEn)[i]]).filter(([a, b]) => a !== b);
 pruefe('A2 … mit denselben Marken „(M…)" in derselben Reihenfolge', abw.length === 0, JSON.stringify(abw.slice(0, 5)));
-pruefe('A3 der neueste Eintrag (M382) steht in beiden oben', ersteMarke(neuDe)[0] === 'M382' && ersteMarke(neuEn)[0] === 'M382', `${ersteMarke(neuDe)[0]} / ${ersteMarke(neuEn)[0]}`);
+pruefe('A3 der neueste Eintrag steht in beiden oben — derselbe (M382 oder neuer)', ersteMarke(neuDe)[0] === ersteMarke(neuEn)[0] && Number(String(ersteMarke(neuDe)[0]).slice(1)) >= 382, `${ersteMarke(neuDe)[0]} / ${ersteMarke(neuEn)[0]}`);
 const abschnitte = (q) => [...q.matchAll(/<section id="(help-[a-z]+)">/g)].map((m) => m[1]);
 pruefe('A4 dieselben Abschnitte mit denselben Ankern', JSON.stringify(abschnitte(de)) === JSON.stringify(abschnitte(en)) && abschnitte(en).length === 9, abschnitte(en).join(','));
 const punkte = (q) => abschnitte(q).map((id) => { const a = q.indexOf(`<section id="${id}">`); return (q.slice(a, q.indexOf('</section>', a)).match(/<li>/g) ?? []).length; });
@@ -116,7 +116,7 @@ console.log('\n════ B: Hilfe auf Englisch ════');
   await P.screenshot({ path: `${SD}/m382-b-hilfe.png` });
   await P.locator('.help-neu-link').click(); await P.waitForTimeout(500);
   const neu = await P.locator('.help-body.help-neu li').evaluateAll((ls) => ls.slice(0, 3).map((l) => l.textContent.slice(0, 90)));
-  pruefe('B10 „What’s new" ist englisch, der neueste Eintrag zuerst', /\(M382\)/.test(neu[0]) && /English/.test(neu[0]) && /\(M381\)/.test(neu[1]) && (await P.locator('.help-body.help-neu li').count()) > 100, neu.join(' ¦ '));
+  pruefe('B10 „What’s new" ist englisch, der neueste Eintrag zuerst', (() => { const nr = neu.map((t) => Number(/\(M(\d+)\)/.exec(t)?.[1] ?? 0)); return nr[0] >= 382 && nr[0] > nr[1] && nr[1] > nr[2] && neu.some((t) => /\(M382\)/.test(t) && /English/.test(t)); })() && (await P.locator('.help-body.help-neu li').count()) > 100, neu.join(' ¦ '));
   await P.screenshot({ path: `${SD}/m382-b-neu.png` });
   pruefe('B11 keine Skriptfehler', P.fehler.length === 0, JSON.stringify(P.fehler).slice(0, 300));
   await ctx.close();
