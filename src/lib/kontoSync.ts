@@ -22,6 +22,7 @@ import {
 import { googleTokenFuer, loadCalAccounts, msAnmeldung, msTokenErneuern, oauthAvailable } from './calAccounts';
 import { sbAbmelden, sbErneuern, sbKontoLoeschen, sbNutzer, sbRealtime, sbRueckkehrLesen, supabaseKonfig, type RealtimeEreignis, type RealtimeGriff, type SbSitzung } from './kontoSupabase';
 import { nurAuswahlAnders } from './syncMerge';
+import { patchFuer, type Patch } from './gastPatch';
 import { anhangGroesse, anhangLokal } from './htmlStore';
 
 /** M328: 'supabase' = das eigene PixiNotes-Konto (E-Mail), Ablage beim Betreiber */
@@ -98,7 +99,7 @@ export function kontoAbmelden(): void {
   void idbDel(KENN_KEY);
   void idbDel(BASEN_KEY);
   anmeldungNoetig = false;
-  angewandtEtag = null;
+  angewandt = null;
 }
 
 // ---------- Anmeldung ----------
@@ -587,7 +588,12 @@ function realtimeStarten(): void {
   realtime = sbRealtime({ url: s.url ?? '', key: s.clientId }, s.token, uid, (ev: RealtimeEreignis) => {
     if (getWriterRole() !== 'writer' || anmeldungNoetig || !loadKonto()) return;
     // M330: Eine Freigabe kam dazu oder fiel weg — Liste neu holen, Boards nachziehen (Realtime startet bei Bedarf neu)
-    if (ev.tabelle === 'board_freigaben') { planen(() => checkKontoRemote(true)); return; }
+    if (ev.tabelle === 'board_freigaben') {
+      planen(() => checkKontoRemote(true));
+      // M384: An der Freigabe stehen auch die Adressen der Anhänge — der Gast zieht nach (lib/gastSync.ts)
+      window.dispatchEvent(new CustomEvent('pixinotes:freigaben-geaendert'));
+      return;
+    }
     // M330: Zeile eines Besitzers, dessen Board mit mir geteilt ist — sofort lesen
     if (ev.userId && ev.userId !== uid) { if (ev.name.startsWith(BOARD_PREFIX)) planen(() => checkKontoRemote(true)); return; }
     // Eigene Zeilen: erst die Umgebung macht einen neuen Stand gültig — Board-Dateien allein sind noch im Fluss
@@ -623,7 +629,15 @@ interface Umgebung {
 }
 /** Die letzten Server-Stände, die dieses Gerät gesehen oder geschrieben hat,
  *  je eTag — der Ring, aus dem die Zusammenführung ihren Vorfahren holt. */
-interface BasisEintrag { etag: string; boards: BoardDoc[]; spaces: Space[] }
+interface BasisEintrag {
+  etag: string; boards: BoardDoc[]; spaces: Space[];
+  /** M383: Welcher Stand genau (eigene Umgebung UND die Versionen der geteilten Boards anderer) */
+  marke?: string;
+  /** M383: Steckt dieser Stand im lokalen? `false` = nur gelesen, noch nicht eingearbeitet (der Nutzer tippte,
+   *  Konflikt). Ein solcher Stand taugt weder als Vorfahre der Zusammenführung noch als Ausgangspunkt eines
+   *  Patches — beides hielte fremde Karten, die hier noch fehlen, für hier gelöscht. */
+  drin?: boolean;
+}
 const BASEN_KEY = 'konto:basen';
 /** Board ohne die Maße der Karten — die misst jedes Gerät selbst (Telefon anders als Laptop) */
 function ohneMasse(b: BoardDoc): BoardDoc {
@@ -631,10 +645,22 @@ function ohneMasse(b: BoardDoc): BoardDoc {
 }
 const SERVER_STEMPEL = /^v\d+$/;
 const fingerabdruck = (b: BoardDoc): string => stempel(JSON.stringify(ohneMasse(b)));
-async function basenMerken(etag: string, stand: { boards: BoardDoc[]; spaces: Space[] }): Promise<void> {
-  const alt = ((await idbGet<BasisEintrag[]>(BASEN_KEY)) ?? []).filter((b) => b.etag !== etag);
-  alt.push({ etag, boards: stand.boards, spaces: stand.spaces });
+async function basenMerken(etag: string, stand: { boards: BoardDoc[]; spaces: Space[] }, marke: string, drin: boolean): Promise<void> {
+  const alle = (await idbGet<BasisEintrag[]>(BASEN_KEY)) ?? [];
+  const vorher = alle.find((b) => b.etag === etag);
+  const alt = alle.filter((b) => b.etag !== etag);
+  // derselbe Stand noch einmal gelesen: Was schon eingearbeitet war, bleibt es
+  alt.push({ etag, boards: stand.boards, spaces: stand.spaces, marke, drin: drin || (vorher?.drin === true && vorher.marke === marke) });
   await idbSet(BASEN_KEY, alt.slice(-6));
+}
+/** M383: Der gelesene Stand steckt jetzt im lokalen */
+async function basisIstDrin(k: Kenn): Promise<void> {
+  if (!k.etag) return;
+  const alle = (await idbGet<BasisEintrag[]>(BASEN_KEY)) ?? [];
+  const e = alle.find((b) => b.etag === k.etag);
+  if (!e || e.drin === true || (e.marke !== undefined && e.marke !== kennMarke(k))) return;
+  e.drin = true;
+  await idbSet(BASEN_KEY, alle);
 }
 async function basisFinden(etag: string | null | undefined): Promise<BasisEintrag | null> {
   if (!etag) return null;
@@ -652,9 +678,19 @@ interface Kenn {
   alias?: Record<string, { st: string; hash: string }>;
 }
 const leereKenn = (): Kenn => ({ boards: {}, dateien: [], etag: null, savedAt: null });
+/** M383: Kennzeichen eines Server-Stands — Version der eigenen Umgebung und der geteilten Boards anderer Konten */
+const kennMarke = (k: Pick<Kenn, 'etag' | 'fremd'>): string =>
+  `${k.etag ?? ''}|${Object.entries(k.fremd ?? {}).map(([id, f]) => `${id}:${f.version}`).sort().join(',')}`;
 /** M328: Der Inhalt der Umgebung ohne Zeitstempel und aktives Board — gleicher Kern = nichts zu schreiben */
 const umgebungKern = (u: { spaces: Space[]; reihe: string[]; boards: Record<string, string>; dateien: Record<string, unknown> }): string =>
-  stempel(JSON.stringify({ spaces: u.spaces, reihe: u.reihe, boards: u.boards, dateien: Object.keys(u.dateien ?? {}).sort() }));
+  stempel(JSON.stringify(kanonisch({ spaces: u.spaces, reihe: u.reihe, boards: u.boards, dateien: Object.keys(u.dateien ?? {}).sort() })));
+/** M383: Schlüssel sortiert — der Server legt die Umgebung nach einer kartenweisen Änderung mit anderer
+ *  Schlüsselfolge ab (jsonb); derselbe Inhalt muss denselben Kern ergeben, sonst schriebe jedes Gerät sie neu */
+function kanonisch(x: unknown): unknown {
+  if (Array.isArray(x)) return x.map(kanonisch);
+  if (x && typeof x === 'object') return Object.fromEntries(Object.keys(x).sort().map((k) => [k, kanonisch((x as Record<string, unknown>)[k])]));
+  return x;
+}
 const kennLesen = async (): Promise<Kenn> => (await idbGet<Kenn>(KENN_KEY)) ?? leereKenn();
 
 /** FNV-1a über den JSON-Text plus Länge — schnell und für „gleich/anders" völlig ausreichend */
@@ -776,8 +812,9 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
   // PixiNotes-Konto (Versionen zählen hoch, Schreiben hat eine Vorbedingung) gilt darum: nie hinter den
   // bekannten Stand zurück. (Neue Server tragen den richtigen Vorfahren selbst ein, siehe Migration M364.)
   const veraltet = sitzLesen?.anbieter === 'supabase' && !!alt.etag && !!u.basisEtag && Number(u.basisEtag) < Number(alt.etag);
-  if (vorfahre && vorfahre.etag !== etag && !veraltet) await basisMerken('konto', { boards: vorfahre.boards, spaces: vorfahre.spaces });
-  await basenMerken(etag, { boards, spaces });
+  // M383: … und nur, wenn dieser Stand hier auch eingearbeitet wurde (nicht bloß gelesen, während der Nutzer tippte)
+  if (vorfahre && vorfahre.drin !== false && vorfahre.etag !== etag && !veraltet) await basisMerken('konto', { boards: vorfahre.boards, spaces: vorfahre.spaces });
+  await basenMerken(etag, { boards, spaces }, kennMarke(kenn), false);
   return { payload, kenn };
 }
 
@@ -941,6 +978,33 @@ async function fremdSchreiben(besitzer: string, boardId: string, text: string, s
   }
 }
 
+// ---------- M383: Änderungen kartenweise schreiben ----------
+// Bisher reiste nach jeder Änderung das ganze Board (bei tausend Karten jedes Mal alle tausend), und wer zugleich
+// mit einem anderen schrieb, scheiterte an der Vorbedingung und musste erst zusammenführen. board_aendern nimmt
+// nur, was sich geändert hat, und fügt es auf dem Server unter der Zeilensperre ein — wie gast_aendern (M366)
+// für Gäste per Link, hier für den Besitzer und für Gäste mit Konto. Kennt der Server die Funktion nicht
+// (Migration fehlt), bleibt es beim bisherigen Weg.
+/** Der Server kennt board_aendern nicht — bis zum nächsten Laden nicht mehr fragen */
+let ohneBoardAendern = false;
+/** Größere Patches reisen als ganzes Board (der Server nimmt bis 6 Mio. Zeichen) */
+const PATCH_MAX_ZEICHEN = 4_000_000;
+interface AendernAntwort { version: number; vor: number; umgebung: number | null; umgebung_vor: number | null }
+/** `null`: auf diesem Weg nicht möglich (Funktion fehlt, abgelehnt) → das ganze Board schreiben */
+async function boardAendern(besitzer: string, boardId: string, p: Patch, savedAt?: string): Promise<AendernAntwort | null> {
+  const res = await anfrage(`${restUrl()}/rpc/board_aendern`, { method: 'POST', headers: JSON_KOPF, body: JSON.stringify({ p_besitzer: besitzer, p_board_id: boardId, p_patch: p, p_saved_at: savedAt ?? null }) });
+  if (res.status === 404) { ohneBoardAendern = true; return null; }
+  if (res.status >= 400 && res.status < 500) return null;     // keine Freigabe, Board fehlt, ungültig: der bisherige Weg klärt es
+  if (!res.ok) throw new Error(`PixiNotes-Konto: Schreiben fehlgeschlagen (HTTP ${res.status}).`);
+  const j = (await res.json().catch(() => null)) as Partial<AendernAntwort> | null;
+  if (!j || typeof j.version !== 'number' || typeof j.vor !== 'number') { ohneBoardAendern = true; return null; }
+  return { version: j.version, vor: j.vor, umgebung: typeof j.umgebung === 'number' ? j.umgebung : null, umgebung_vor: typeof j.umgebung_vor === 'number' ? j.umgebung_vor : null };
+}
+/** Geteiltes Board ohne die Angaben, die nur dieses Gerät betreffen */
+function ohneFreigabeFelder(b: BoardDoc): BoardDoc {
+  const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, gastLink: _l, ...rein } = b;
+  return rein as BoardDoc;
+}
+
 let kette: Promise<unknown> = Promise.resolve();
 function exklusiv<T>(fn: () => Promise<T>): Promise<T> {
   const p = kette.then(fn, fn);
@@ -958,7 +1022,7 @@ export async function kontoWrite(): Promise<string> {
 async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<string> {
   const lw = laufwerk();
   const vorab = await kennLesen();
-  if (!nachMerge && vorab.etag && vorab.etag !== angewandtEtag) {
+  if (!nachMerge && vorab.etag && kennMarke(vorab) !== angewandt) {
     // Der zuletzt gelesene Stand steckt noch nicht im lokalen (der Nutzer tippte, Konflikt,
     // Neustart): erst einarbeiten — sonst überschriebe die Vorbedingung fremde Karten.
     const r = await kontoLesen();
@@ -970,11 +1034,11 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
       // zusammengeführt/geschrieben: die Zusammenführung hat selbst geschrieben; gleich/übernommen: jetzt der eigene Anteil
       if (erg === 'zusammengefuehrt' || erg === 'geschrieben') return kontoStamp() ?? new Date().toISOString();
     } else {
-      angewandtEtag = null;
+      angewandt = null;
     }
   }
   const s = useBoard.getState();
-  const kenn = await kennLesen();
+  let kenn = await kennLesen();
   const sitz = loadKonto();
   // M329: Beim PixiNotes-Konto reisen nur NEUE Anhänge (bis 50 MB) — bekannte liegen schon im Dateispeicher
   const bekanntVorab = new Set(kenn.dateien);
@@ -1005,7 +1069,71 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
     if (kenn.fremd?.[b.id]?.stempel === st) continue;
     fremdPlan.push({ b, text, st });
   }
+  // M383: was kartenweise hinausging — eigene Boards (Kennung → Stempel davor) und geteilte Boards anderer
+  const gepatcht = new Map<string, string>();
+  const fremdErledigt = new Set<string>();
+  const fremdNeu: NonNullable<Kenn['fremd']> = { ...(kenn.fremd ?? {}) };
+  const kernBekannt = kenn.kern;
   try {
+    // M383: Geänderte Boards, die der Server schon kennt, kartenweise — nur was sich geändert hat
+    if (sitz?.anbieter === 'supabase' && sitz.userId && !ohneBoardAendern && kenn.etag) {
+      const basis = await basisFinden(kenn.etag);
+      // nur von einem Stand aus, der im lokalen steckt (nach einer Zusammenführung: der eben gelesene)
+      if (basis && (nachMerge || basis.drin !== false)) {
+        // Der Stand des Servers nach jedem Schritt — nur was wirklich hinausging, gilt als bekannt
+        const basisBoards = [...basis.boards];
+        let basisNeu = false;
+        const basisSetzen = (id: string, fremd: boolean, b: BoardDoc): void => {
+          const i = basisBoards.findIndex((x) => x.id === id && !!x.geteiltVon === fremd);
+          if (i >= 0) { basisBoards[i] = b; basisNeu = true; }
+        };
+        try {
+          for (const b of eigene) {
+            if (ohneBoardAendern) break;
+            const alt = kenn.boards[b.id];
+            if (!alt || alt === stempelNeu[b.id]) continue;      // neu (das ganze Board) oder unverändert
+            const vor = basis.boards.find((x) => x.id === b.id && !x.geteiltVon);
+            const f = vor ? patchFuer(vor, b) : null;
+            if (!f) continue;                                     // Name, Reihenfolge … geändert: das ganze Board
+            if (!f.p) { stempelNeu[b.id] = alt; aliasBleibt[b.id] = { st: alt, hash: fingerabdruck(b) }; continue; }   // nur anders gemessen
+            if (JSON.stringify(f.p).length > PATCH_MAX_ZEICHEN) continue;
+            const r = await boardAendern(sitz.userId, b.id, f.p, payload.savedAt);
+            if (!r || r.umgebung === null) continue;
+            // Hat inzwischen ein anderer geschrieben, liegt die eigene Änderung jetzt auf dessen Stand — den erst holen
+            if (String(r.umgebung_vor) !== kenn.etag) throw new VorbedingungFehler();
+            const st = `v${r.version}`;
+            gepatcht.set(b.id, alt);
+            stempelNeu[b.id] = st; aliasBleibt[b.id] = { st, hash: fingerabdruck(b) };
+            gelesen.set(b.id, { st, board: f.stand });
+            basisSetzen(b.id, false, f.stand);
+            kenn = { ...kenn, boards: { ...kenn.boards, [b.id]: st }, etag: String(r.umgebung), savedAt: payload.savedAt, kern: undefined, alias: { ...(kenn.alias ?? {}), [b.id]: aliasBleibt[b.id] } };
+            await idbSet(KENN_KEY, kenn);
+            angewandt = kennMarke(kenn);
+          }
+          for (const f of fremdPlan) {
+            if (ohneBoardAendern) break;
+            const kf = kenn.fremd?.[f.b.id];
+            const vor = basis.boards.find((x) => x.id === f.b.id && !!x.geteiltVon);
+            const pf = vor && kf ? patchFuer(ohneFreigabeFelder(vor), ohneFreigabeFelder(f.b)) : null;
+            if (!pf || !vor || !kf) continue;
+            if (!pf.p) { fremdNeu[f.b.id] = { ...kf, stempel: f.st }; fremdErledigt.add(f.b.id); continue; }
+            if (JSON.stringify(pf.p).length > PATCH_MAX_ZEICHEN) continue;
+            const r = await boardAendern(f.b.geteiltVon!, f.b.id, pf.p);
+            if (!r) continue;                                     // etwa: Freigabe beendet oder nur noch lesend — das klärt der bisherige Weg
+            if (String(r.vor) !== kf.version) throw new VorbedingungFehler();
+            fremdNeu[f.b.id] = { besitzer: f.b.geteiltVon!, version: String(r.version), stempel: f.st };
+            fremdErledigt.add(f.b.id);
+            gelesen.set(f.b.id, { st: `v${r.version}`, board: pf.stand });
+            basisSetzen(f.b.id, true, { ...vor, ...pf.stand });
+            kenn = { ...kenn, fremd: { ...fremdNeu } };
+            await idbSet(KENN_KEY, kenn);
+            angewandt = kennMarke(kenn);
+          }
+        } finally {
+          if (basisNeu && kenn.etag) await basenMerken(kenn.etag, { boards: basisBoards, spaces: basis.spaces }, kennMarke(kenn), true);
+        }
+      }
+    }
     const plan: Schreibplan = { schreiben: [], loeschen: [] };
     // 1) Boards, die sich geändert haben
     for (const b of eigene) {
@@ -1050,16 +1178,26 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
     };
     const kern = umgebungKern(u);
     // M330: Erst die geteilten Boards in die Zeilen ihrer Besitzer (jedes mit Vorbedingung auf seine Version)
-    const fremdNeu: NonNullable<Kenn['fremd']> = { ...(kenn.fremd ?? {}) };
     for (const f of fremdPlan) {
+      if (fremdErledigt.has(f.b.id)) continue;
       const v = await fremdSchreiben(f.b.geteiltVon!, f.b.id, f.text, f.st, kenn.fremd?.[f.b.id]?.version ?? null);
       fremdNeu[f.b.id] = { besitzer: f.b.geteiltVon!, version: v, stempel: f.st };
-      await idbSet(KENN_KEY, { ...kenn, fremd: fremdNeu } satisfies Kenn);
+      kenn = { ...kenn, fremd: { ...fremdNeu } };
+      await idbSet(KENN_KEY, kenn);
+      angewandt = kennMarke(kenn);
     }
+    // M383: Ging Eigenes kartenweise hinaus, hat der Server die Stempel dieser Boards schon in die Umgebung
+    // gesetzt. Ist sonst nichts anders (Bereiche, Reihe, Dateien, übrige Boards), ist sie damit auf dem Stand.
+    if (gepatcht.size > 0) {
+      const davor = { ...stempelNeu };
+      for (const [id, st] of gepatcht) davor[id] = st;
+      if (kernBekannt && kernBekannt === umgebungKern({ ...u, boards: davor })) kenn = { ...kenn, kern };
+    }
+    if (gepatcht.size > 0 || fremdErledigt.size > 0) { kenn = { ...kenn, fremd: fremdNeu }; await idbSet(KENN_KEY, kenn); }
     // M328: Nichts Eigenes geändert (gleiche Boards, Bereiche, Reihe, Dateien)? Dann die Umgebung nicht schreiben —
     // jeder Schreibvorgang bumpt sonst die Version und lässt andere Geräte unnötig zusammenführen.
     if (kenn.etag && kenn.kern === kern && plan.schreiben.length === 0 && plan.loeschen.length === 0 && kenn.savedAt) {
-      angewandtEtag = kenn.etag;
+      angewandt = kennMarke(kenn);
       localStorage.setItem(STAMP_KEY, kenn.savedAt);
       await basisMerken('konto', payload);
       const jetzt = useBoard.getState();
@@ -1076,8 +1214,8 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
       etag = await lw.schreiben(UMGEBUNG, JSON.stringify(u), 'application/json', kenn.etag);
     }
     await idbSet(KENN_KEY, { boards: stempelNeu, dateien: Object.keys(dateienMeta), etag, savedAt: payload.savedAt, kern, fremd: fremdNeu, ...(Object.keys(aliasBleibt).length ? { alias: aliasBleibt } : {}) } satisfies Kenn);
-    angewandtEtag = etag;
-    await basenMerken(etag, { boards: payload.boards, spaces: payload.spaces });
+    angewandt = kennMarke({ etag, fremd: fremdNeu });
+    await basenMerken(etag, { boards: payload.boards, spaces: payload.spaces }, angewandt, true);
   } catch (e) {
     if (e instanceof VorbedingungFehler && nochmal) {
       // Ein anderes Gerät hat zwischendurch geschrieben: dessen Stand einarbeiten —
@@ -1107,7 +1245,7 @@ export function applyKonto(p: SyncPayload): boolean {
   claimWriter();
   useBoard.getState().importSync(p.boards, p.spaces, p.activeId);
   if (!flushPersist()) return false;
-  void kennLesen().then((k) => { angewandtEtag = k.etag; });
+  void kennLesen().then((k) => { angewandt = kennMarke(k); return basisIstDrin(k); }).catch(() => {});
   try {
     localStorage.setItem(STAMP_KEY, p.savedAt);
     localStorage.removeItem(KONTO_DIRTY_KEY);
@@ -1144,11 +1282,19 @@ class SpaeterFehler extends Error { constructor() { super('Der Nutzer tippt gera
  * fremden Stand mit dem alten lokalen: Karten anderer Geräte gingen verloren
  * (im Wettlauf mit 1 s Tipp-Pause reproduziert). Darum zählt fürs Schreiben
  * nur dieser Wert; weicht die Kenntnis ab, wird erst eingearbeitet.
+ *
+ * M383: Gemerkt wird die Marke des Stands (kennMarke) — die Version der eigenen Umgebung UND die der geteilten
+ * Boards anderer Konten. Vorher zählte nur die eigene Umgebung: Ein Gast, der gerade tippte, las das Board des
+ * Besitzers neu, arbeitete es nicht ein und schrieb danach mit bestandener Vorbedingung darüber.
  */
-let angewandtEtag: string | null = null;
+let angewandt: string | null = null;
 async function einarbeiten(p: SyncPayload, nebenkopie = false): Promise<EinarbeitenErgebnis> {
   const e = await fremdStandEinarbeiten(p, kontoWeg(), nebenkopie);
-  if (e === 'gleich' || e === 'uebernommen' || e === 'zusammengefuehrt' || e === 'geschrieben') angewandtEtag = (await kennLesen()).etag;
+  if (e === 'gleich' || e === 'uebernommen' || e === 'zusammengefuehrt' || e === 'geschrieben') {
+    const k = await kennLesen();
+    angewandt = kennMarke(k);
+    await basisIstDrin(k);
+  }
   return e;
 }
 
