@@ -18,11 +18,22 @@
 // Knöpfe, Enter und das Abschicken eines Formulars. Bei den Folgenden geschieht im selben Tool dasselbe. Was ein
 // Tool daraus macht, rechnet es selbst — Zufall, Zeitabläufe, Ziehen mit der Maus und Zeichenflächen lassen
 // sich so nicht nachstellen.
+//
+// M387: Die Präsentation nimmt das Publikum von selbst mit — wer sie auf seinem eigenen Board startet, während
+// andere dabei sind, führt damit vor (abwählbar, die Wahl bleibt gemerkt). Und zur Ansicht gehört jetzt auch:
+//   · der Ausschnitt in einer Folie: ganze Seite oder Seitenbreite, Zoom und Rollstand (PDF, Word, Bild, lange Folien);
+//   · die Karte, die der Vorführende auf dem Board im Fokus hat;
+//   · welche Dokument-Karten auf dem Board aufgeklappt sind und welche Seite darin offen liegt.
 import { ich, ichIn, LIVE_NACHRICHT, liveSenden, teilnehmerVon } from './gastSync';
 
 export interface Sicht { x: number; y: number; w: number; h: number }
 /** Stelle im Vortrag: die Karte, die als Folie offen ist, und die Seite darin */
-export interface Vortrag { karte: string; seite: number }
+export interface Vortrag { karte: string; seite: number; ansicht?: Ansicht }
+/**
+ * M387: Ausschnitt in einer Folie. `m` = ganze Seite oder Seitenbreite und `z` = Zoom (nur Dokumente),
+ * x/y = Rollstand als Anteil des Rollwegs (0…1) — so passt er auf jedem Schirm.
+ */
+export interface Ansicht { m?: 'seite' | 'breite'; z?: number; x: number; y: number }
 /** Rollstand in einem Tool: `p` = Weg zum rollenden Element ('' = die Seite selbst), x/y = Anteil des Rollwegs (0…1) */
 export interface Roll { p: string; x: number; y: number }
 export interface Zeiger {
@@ -32,6 +43,10 @@ export interface Zeiger {
   apps: string[];
   /** letzter Rollstand je Tool (die Seite selbst) — für alle, die später dazukommen */
   rollen: Record<string, Roll>;
+  /** M387: Karte, die der Vorführende auf dem Board im Fokus hat */
+  fokus: string | null;
+  /** M387: aufgeklappte Dokument-Karten auf dem Board → offene Seite */
+  dok: Record<string, number>;
 }
 /**
  * M384: Eine Eingabe in einem Tool. `p` = Ort des Elements („#kennung" oder Weg von <body> aus), `a` = was geschah.
@@ -76,9 +91,19 @@ let meinBoard: string | null = null;
 let meinSeit = 0;
 let gesendet = ''; let gesendetAm = 0;
 let meineSicht: Sicht = { x: 0, y: 0, w: 0, h: 0 };
+/** Das Board, auf dem meineSicht gemessen wurde — der Ausschnitt eines anderen Boards gilt hier nicht */
+let sichtBoard: string | null = null;
+/** M387: Ersatz, solange kein Ausschnitt gemessen ist (Präsentation aus der Übersicht gestartet) — ohne gültigen
+ *  Ausschnitt verwirft der Empfänger die Meldung, und niemand sähe die Präsentation */
+const ERSATZ_SICHT: Sicht = { x: 0, y: 0, w: 1200, h: 800 };
 let meinVortrag: Vortrag | null = null;
 const meineApps = new Set<string>();
 const meineRollen: Record<string, Roll> = {};
+let meineAnsicht: { karte: string; a: Ansicht } | null = null;
+let meinFokus: string | null = null;
+let meineDok: Record<string, number> = {};
+/** M387: Diese Vorführung hat die Präsentation von selbst begonnen — sie endet dann auch mit ihr */
+let mitVortrag = false;
 /** M384: letzter Wert je Feld und Tool — für alle, die später dazukommen (höchstens 150 Felder je Tool) */
 const meineFelder = new Map<string, Map<string, Eingabe>>();
 const eingabeOffen = new Map<string, Eingabe[]>();                              // Tool → noch nicht Gesendetes, in Reihenfolge
@@ -92,17 +117,44 @@ export function folgenSetzen(boardId: string, an: boolean): void {
   if (an) geloest.delete(boardId); else geloest.add(boardId);
   melden(boardId);
 }
-export function vorfuehrenStart(boardId: string): void {
+/** `ausVortrag`: in der Präsentation begonnen — dann endet die Vorführung auch mit ihr (M387) */
+export function vorfuehrenStart(boardId: string, ausVortrag = false): void {
   if (meinBoard && meinBoard !== boardId) vorfuehrenStopp();
   meinBoard = boardId; meinSeit = Date.now(); gesendet = '';
   const t = ichIn(boardId);
-  zeiger.set(boardId, { id: t.id, name: t.name, farbe: t.farbe, seit: meinSeit, zuletzt: Date.now(), sicht: { x: 0, y: 0, w: 0, h: 0 }, vortrag: meinVortrag, apps: [...meineApps], rollen: { ...meineRollen } });
+  mitVortrag = ausVortrag;
+  zeiger.set(boardId, { id: t.id, name: t.name, farbe: t.farbe, seit: meinSeit, zuletzt: Date.now(), sicht: { x: 0, y: 0, w: 0, h: 0 }, vortrag: vortragJetzt(), apps: [...meineApps], rollen: { ...meineRollen }, fokus: meinFokus, dok: { ...meineDok } });
   melden(boardId);
+}
+/** Meine Stelle im Vortrag samt Ausschnitt (der gilt nur für die Folie, auf der er gemessen wurde) */
+function vortragJetzt(): Vortrag | null {
+  if (!meinVortrag) return null;
+  return meineAnsicht && meineAnsicht.karte === meinVortrag.karte ? { ...meinVortrag, ansicht: meineAnsicht.a } : meinVortrag;
+}
+
+/* ---------- M387: Die Präsentation nimmt das Publikum von selbst mit ---------- */
+const ALLEIN_KEY = 'pixinotes-vortrag-allein';
+/** Hat der Mensch „Team folgt" in der Präsentation abgewählt? Dann präsentiert er bis auf Weiteres für sich. */
+export function vortragAllein(): boolean {
+  try { return localStorage.getItem(ALLEIN_KEY) === '1'; } catch { return false; }
+}
+export function vortragAlleinSetzen(an: boolean): void {
+  try { if (an) localStorage.setItem(ALLEIN_KEY, '1'); else localStorage.removeItem(ALLEIN_KEY); } catch { /* Sitzung reicht */ }
+}
+/** Die Präsentation beginnt und andere sind im Board: vorführen — außer es läuft schon oder ist abgewählt */
+export function vorfuehrenMitVortrag(boardId: string): boolean {
+  if (meinBoard === boardId || vortragAllein()) return false;
+  vorfuehrenStart(boardId, true);
+  return true;
+}
+/** Die Präsentation endet: Eine Vorführung, die in ihr begann, endet mit ihr (wer vorher schon auf dem Board vorführte, führt weiter vor) */
+export function vortragZuEnde(boardId: string): void {
+  if (meinBoard === boardId && mitVortrag) vorfuehrenStopp();
 }
 export function vorfuehrenStopp(): void {
   const b = meinBoard;
   if (!b) return;
-  meinBoard = null;
+  meinBoard = null; mitVortrag = false;
   liveSenden(b, 'zeig', { von: ich().id, seit: meinSeit, ende: true });
   if (zeiger.get(b)?.id === ich().id) zeiger.delete(b);
   melden(b);
@@ -110,22 +162,29 @@ export function vorfuehrenStopp(): void {
 /** Den ganzen Stand senden — bei Änderung sofort, sonst alle 2,5 s als Lebenszeichen */
 function standSenden(boardId: string, sofort = false): void {
   if (meinBoard !== boardId) return;
-  const stand = { sicht: meineSicht, ...(meinVortrag ? { vortrag: meinVortrag } : {}), ...(meineApps.size ? { apps: [...meineApps] } : {}), ...(Object.keys(meineRollen).length ? { rollen: meineRollen } : {}) };
+  const v = vortragJetzt();
+  /* M387: Vorher ging ohne gemessenen Ausschnitt gar nichts hinaus. Wer „Team mitnehmen" in der Präsentation
+     drückte, ohne vorher auf dem Board vorgeführt zu haben, nahm darum niemanden mit: In der Präsentation gibt
+     es kein Board, das sich messen ließe. Jetzt wird der Ausschnitt laufend gemerkt (auch ohne Vorführung). */
+  const sicht = sichtBoard === boardId && meineSicht.w > 0 ? meineSicht : ERSATZ_SICHT;
+  const stand = {
+    sicht, ...(v ? { vortrag: v } : {}), ...(meineApps.size ? { apps: [...meineApps] } : {}), ...(Object.keys(meineRollen).length ? { rollen: meineRollen } : {}),
+    ...(meinFokus ? { fokus: meinFokus } : {}), ...(Object.keys(meineDok).length ? { dok: meineDok } : {}),
+  };
   const text = JSON.stringify(stand);
   const jetzt = Date.now();
   if (!sofort && text === gesendet && jetzt - gesendetAm < 2500) return;
-  if (!(meineSicht.w > 0)) return;       // noch kein Ausschnitt gemessen
   gesendet = text; gesendetAm = jetzt;
   const t = ichIn(boardId);
   const z = zeiger.get(boardId);
-  if (z) { z.sicht = meineSicht; z.zuletzt = jetzt; z.vortrag = meinVortrag; z.apps = [...meineApps]; z.rollen = { ...meineRollen }; }
+  if (z) { z.sicht = sicht; z.zuletzt = jetzt; z.vortrag = v; z.apps = [...meineApps]; z.rollen = { ...meineRollen }; z.fokus = meinFokus; z.dok = { ...meineDok }; }
   liveSenden(boardId, 'zeig', { von: t.id, name: t.name, farbe: t.farbe, seit: meinSeit, ...stand });
 }
 /** Der Vorführende meldet seinen Ausschnitt (das Bauteil ruft das im Takt) */
 export function sichtMelden(boardId: string, sicht: Sicht): void {
-  if (meinBoard !== boardId) return;
   meineSicht = { x: Math.round(sicht.x), y: Math.round(sicht.y), w: Math.round(sicht.w), h: Math.round(sicht.h) };
-  standSenden(boardId);
+  sichtBoard = boardId;
+  if (meinBoard === boardId) standSenden(boardId);
 }
 /** Lebenszeichen ohne neuen Ausschnitt — in der Folien-Präsentation gibt es das Board nicht, die Vorführung läuft trotzdem weiter */
 export function lebenszeichen(boardId: string): void { standSenden(boardId); }
@@ -133,7 +192,34 @@ export function lebenszeichen(boardId: string): void { standSenden(boardId); }
 export function vortragMelden(boardId: string, v: Vortrag | null): void {
   if (JSON.stringify(v) === JSON.stringify(meinVortrag)) return;
   meinVortrag = v;
+  if (!v || meineAnsicht?.karte !== v.karte) meineAnsicht = null;     // andere Folie: Der Ausschnitt von vorhin gilt nicht mehr
   if (meinBoard === boardId) { standSenden(boardId, true); melden(boardId); }
+}
+const runden = (n: number, stellen: number): number => Math.round(n * 10 ** stellen) / 10 ** stellen;
+let ansichtZeit = 0;
+let ansichtWarte: ReturnType<typeof setTimeout> | undefined;
+/** M387: Ausschnitt in der offenen Folie (Ansicht, Zoom, Rollstand) — höchstens acht Meldungen je Sekunde, die letzte kommt immer an */
+export function ansichtMelden(boardId: string, karte: string, a: Ansicht): void {
+  const sauber: Ansicht = { ...(a.m ? { m: a.m } : {}), ...(typeof a.z === 'number' ? { z: runden(a.z, 2) } : {}), x: runden(Math.min(1, Math.max(0, a.x)), 3), y: runden(Math.min(1, Math.max(0, a.y)), 3) };
+  if (meineAnsicht?.karte === karte && JSON.stringify(meineAnsicht.a) === JSON.stringify(sauber)) return;
+  meineAnsicht = { karte, a: sauber };
+  if (meinBoard !== boardId) return;
+  const senden = () => { ansichtZeit = Date.now(); ansichtWarte = undefined; standSenden(boardId, true); };
+  clearTimeout(ansichtWarte);
+  const warte = 120 - (Date.now() - ansichtZeit);
+  if (warte <= 0) senden(); else ansichtWarte = setTimeout(senden, warte);
+}
+/** M387: Die Karte im Fokus (null = keine) — gemerkt wird sie immer, gesendet, solange ich vorführe */
+export function fokusMelden(boardId: string, karte: string | null): void {
+  if (karte === meinFokus) return;
+  meinFokus = karte;
+  if (meinBoard === boardId) standSenden(boardId, true);
+}
+/** M387: aufgeklappte Dokument-Karten und ihre offene Seite */
+export function dokMelden(boardId: string, dok: Record<string, number>): void {
+  if (JSON.stringify(dok) === JSON.stringify(meineDok)) return;
+  meineDok = dok;
+  if (meinBoard === boardId) standSenden(boardId, true);
 }
 /** Ein Tool läuft / läuft nicht mehr */
 export function appMelden(boardId: string, karte: string, an: boolean): void {
@@ -204,6 +290,24 @@ export function eingabenErbitten(boardId: string, karte: string): void {
   if (folgeIch(boardId)) liveSenden(boardId, 'zeigEinBitte', { karte });
 }
 
+function ansichtAus(roh: unknown): Ansicht | undefined {
+  const r = roh as Partial<Ansicht> | null;
+  const anteil = (v: unknown): v is number => typeof v === 'number' && v >= 0 && v <= 1;
+  if (!r || typeof r !== 'object' || !anteil(r.x) || !anteil(r.y)) return undefined;
+  return {
+    ...(r.m === 'seite' || r.m === 'breite' ? { m: r.m } : {}),
+    ...(typeof r.z === 'number' && r.z >= 1 && r.z <= 6 ? { z: r.z } : {}),
+    x: r.x, y: r.y,
+  };
+}
+function dokAus(roh: unknown): Record<string, number> {
+  const aus: Record<string, number> = {};
+  if (!roh || typeof roh !== 'object') return aus;
+  for (const [karte, n] of Object.entries(roh as Record<string, unknown>).slice(0, 40)) {
+    if (typeof n === 'number' && Number.isInteger(n) && n >= 1 && n < 100000 && karte.length <= 80) aus[karte] = n;
+  }
+  return aus;
+}
 function rollenAus(roh: unknown): Record<string, Roll> {
   const aus: Record<string, Roll> = {};
   if (!roh || typeof roh !== 'object') return aus;
@@ -247,7 +351,7 @@ export function initVorfuehren(): void {
       return;
     }
     if (d?.ereignis !== 'zeig') return;
-    const m = d.inhalt as { von?: unknown; name?: unknown; farbe?: unknown; seit?: unknown; ende?: unknown; sicht?: Partial<Sicht>; vortrag?: Partial<Vortrag>; apps?: unknown; rollen?: unknown } | undefined;
+    const m = d.inhalt as { von?: unknown; name?: unknown; farbe?: unknown; seit?: unknown; ende?: unknown; sicht?: Partial<Sicht>; vortrag?: Partial<Vortrag>; apps?: unknown; rollen?: unknown; fokus?: unknown; dok?: unknown } | undefined;
     if (typeof m?.von !== 'string' || typeof m.seit !== 'number') return;
     const alt = zeiger.get(d.boardId);
     if (m.ende) {
@@ -260,7 +364,7 @@ export function initVorfuehren(): void {
     if (alt && alt.id !== m.von && alt.seit > m.seit) return;
     if (meinBoard === d.boardId) {
       if (meinSeit > m.seit) return;        // ich habe später begonnen — der andere hört auf, sobald ihn meine Meldung erreicht
-      meinBoard = null;                      // jemand hat übernommen
+      meinBoard = null; mitVortrag = false;  // jemand hat übernommen
     }
     if (alt?.id !== m.von) geloest.delete(d.boardId);
     zeiger.set(d.boardId, {
@@ -268,9 +372,12 @@ export function initVorfuehren(): void {
       // M385: die Farbe, in der alle den Vorführenden sehen (verteilt, lib/gastSync.ts) — sonst die gemeldete
       farbe: teilnehmerVon(d.boardId).find((t) => t.id === m.von)?.farbe ?? (typeof m.farbe === 'string' ? m.farbe : '#6b7280'),
       seit: m.seit, zuletzt: Date.now(), sicht: { x: s.x!, y: s.y!, w: s.w!, h: s.h! },
-      vortrag: typeof m.vortrag?.karte === 'string' && typeof m.vortrag.seite === 'number' ? { karte: m.vortrag.karte, seite: m.vortrag.seite } : null,
+      vortrag: typeof m.vortrag?.karte === 'string' && typeof m.vortrag.seite === 'number'
+        ? { karte: m.vortrag.karte, seite: m.vortrag.seite, ...(ansichtAus(m.vortrag.ansicht) ? { ansicht: ansichtAus(m.vortrag.ansicht) } : {}) } : null,
       apps: Array.isArray(m.apps) ? m.apps.filter((a): a is string => typeof a === 'string').slice(0, 40) : [],
       rollen: rollenAus(m.rollen),
+      fokus: typeof m.fokus === 'string' && m.fokus.length <= 80 ? m.fokus : null,
+      dok: dokAus(m.dok),
     });
     melden(d.boardId);
   });

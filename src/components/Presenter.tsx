@@ -25,7 +25,7 @@ import { MinutesBody } from './nodes/MinutesCard';
 import { SheetBody } from './nodes/SheetCard';
 import { FolienLaser } from './Mauszeiger';
 import { ReaktionsKnopf } from './Gruppenraum';
-import { folgeIch, folgenSetzen, ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenStart, vorfuehrenStopp, vortragMelden, werFuehrtVor } from '../lib/vorfuehren';
+import { ansichtMelden, folgeIch, folgenSetzen, ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenMitVortrag, vorfuehrenStart, vorfuehrenStopp, vortragAlleinSetzen, vortragMelden, vortragZuEnde, werFuehrtVor } from '../lib/vorfuehren';
 import { ich, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
 
 /** Kartentypen, die auf der Folie LIVE editierbar sind */
@@ -288,12 +288,30 @@ export function Presenter() {
    *  „ab hier präsentieren" heißt genau das und nicht „von vorn". */
   const presentFrom = useBoard((s) => s.presentFrom);
   const setPresentFrom = useBoard((s) => s.setPresentFrom);
+  /* M387: Die Stelle wird nur beim ÖFFNEN gesetzt. Vorher hing das an der Zahl der Folien — legte jemand im
+     Board während des Vortrags eine Karte an (oder löschte eine), sprang die Präsentation auf Folie 1 zurück. */
+  const stelleGesetzt = useRef(false);
+  /** Die Karte, die offen ist — bleibt sie im Board, bleibt der Vortrag auf ihr, auch wenn davor Folien dazukommen */
+  const offeneKarte = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open) { stelleGesetzt.current = false; offeneKarte.current = null; return; }
+    if (!stelleGesetzt.current) {
+      stelleGesetzt.current = true;
+      const ab = presentFrom ? slides.findIndex((n) => n.id === presentFrom) : -1;
+      // Aus dem Fokus eines Dokuments heraus geht es auf der Seite weiter, die dort offen lag
+      setPos({ idx: ab >= 0 ? ab : 0, seite: ab >= 0 && dokumentArt(slides[ab]) ? letzteSeite(slides[ab].id) : 1 });
+      if (presentFrom) setPresentFrom(null);
+    } else if (offeneKarte.current) {
+      const i = slides.findIndex((n) => n.id === offeneKarte.current);
+      if (i >= 0) setPos((p) => (p.idx === i ? p : { ...p, idx: i }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, slides.length]);
+  // Vollbild und Tasten hängen nur am Öffnen — eine neue Karte im Board wirft niemanden aus dem Vollbild
+  const folienZahl = useRef(0);
+  folienZahl.current = slides.length;
   useEffect(() => {
     if (!open) return;
-    const ab = presentFrom ? slides.findIndex((n) => n.id === presentFrom) : -1;
-    // Aus dem Fokus eines Dokuments heraus geht es auf der Seite weiter, die dort offen lag
-    setPos({ idx: ab >= 0 ? ab : 0, seite: ab >= 0 && dokumentArt(slides[ab]) ? letzteSeite(slides[ab].id) : 1 });
-    if (presentFrom) setPresentFrom(null);
     document.documentElement.requestFullscreen?.().catch(() => {});
     const onKey = (e: KeyboardEvent) => {
       // Tippen in Editor/Eingabefeld: Tasten durchlassen, aber nicht ans Board
@@ -308,7 +326,7 @@ export function Presenter() {
       else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') schrittRef.current(1);
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') schrittRef.current(-1);
       else if (e.key === 'Home') { selbstRef.current(); setPos({ idx: 0, seite: 1 }); }          // M345
-      else if (e.key === 'End') { selbstRef.current(); setPos({ idx: Math.max(0, slides.length - 1), seite: -1 }); }
+      else if (e.key === 'End') { selbstRef.current(); setPos({ idx: Math.max(0, folienZahl.current - 1), seite: -1 }); }
       else if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey && !e.altKey) setLaser((v) => !v);   // M375
       e.preventDefault();
       e.stopPropagation();
@@ -319,7 +337,7 @@ export function Presenter() {
       if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, slides.length]);
+  }, [open]);
 
   /**
    * M363: Ein Schritt im Vortrag. In einem Dokument (PDF, Word) geht es erst Seite für Seite, dann zur
@@ -350,6 +368,8 @@ export function Presenter() {
   const art = current ? dokumentArt(current) : null;
   const seitenHier = current && art && art !== 'bild' ? seitenJe[current.id] ?? 1 : 1;
   const seiteHier = pos.seite < 0 ? seitenHier : Math.min(Math.max(1, pos.seite), seitenHier);
+  // Gemerkt wird die Karte, auf die man selbst gegangen ist — nicht die, die nach einer Änderung der Folienfolge an ihrem Platz steht
+  useEffect(() => { offeneKarte.current = open && current ? current.id : null; /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [pos, open]);
 
   // ───── M371: Vorführen im Team ─────
   const zeigt = werFuehrtVor(board.id);
@@ -367,7 +387,12 @@ export function Presenter() {
   // Ich folge: Die Präsentation des Vorführenden öffnet sich hier, blättert mit und schließt sich mit ihm
   const dort = folge && zeigt?.vortrag ? `${zeigt.vortrag.karte}|${zeigt.vortrag.seite}` : '';
   useEffect(() => {
-    if (!folge) { gefolgt.current = false; return; }
+    if (!folge) {
+      // M387: Der Vorführende hat aufgehört (nicht: ich habe mich gelöst) — die Präsentation, die sich für ihn geöffnet hat, schließt sich
+      if (gefolgt.current && open && !werFuehrtVor(board.id)) setOpen(false);
+      gefolgt.current = false;
+      return;
+    }
     if (dort) {
       gefolgt.current = true;      // auch nach „Wieder folgen" in einer schon offenen Präsentation
       if (!open) { setOpen(true); return; }
@@ -379,6 +404,35 @@ export function Presenter() {
   }, [folge, dort, open, slides]);
   /** Lässt sich hier etwas ans Team zeigen? (gemeinsames Board mit Live-Verbindung) */
   const teamDa = liveVerbunden(board.id) && teilnehmerVon(board.id).some((t) => t.id !== ich().id);
+  /* M387: Wer auf seinem eigenen Board präsentiert, während andere dabei sind, nimmt sie von selbst mit — ohne
+     vorher „Vorführen" zu drücken. Auch wenn das Publikum erst während des Vortrags dazukommt. Gäste entscheiden
+     das weiter per Knopf (sonst risse jeder Teilnehmer mit „Präsentieren" alle anderen aus ihrer Arbeit). */
+  const eigenes = !board.geteiltVon;
+  const jemandZeigt = !!zeigt;
+  useEffect(() => {
+    if (!open || !teamDa || !eigenes || jemandZeigt || folgeIch(board.id)) return;
+    vorfuehrenMitVortrag(board.id);
+  }, [open, teamDa, eigenes, jemandZeigt, board.id]);
+  // … und endet die Präsentation, endet eine so begonnene Vorführung mit ihr
+  const boardIdRef = useRef(board.id);
+  boardIdRef.current = board.id;
+  useEffect(() => {
+    if (!open) return;
+    return () => vortragZuEnde(boardIdRef.current);
+  }, [open]);
+  /** M387: Rollstand einer gewöhnlichen Folie (lange Notiz, großes Kanban) — der Vorführende meldet ihn, wer folgt, rollt mit */
+  const folieRef = useRef<HTMLDivElement>(null);
+  const dortAnsicht = folge && zeigt?.vortrag && current && zeigt.vortrag.karte === current.id ? zeigt.vortrag.ansicht : undefined;
+  const dortRoll = dortAnsicht ? `${dortAnsicht.x}|${dortAnsicht.y}` : '';
+  useEffect(() => {
+    const el = folieRef.current;
+    if (!el || !dortRoll || art) return;
+    const [x, y] = dortRoll.split('|').map(Number);
+    // Es rollt die Folie selbst oder ihr Inhalt (eine lange Notiz rollt in sich) — je nach Schirm das eine oder das andere
+    for (const r of [el, el.firstElementChild as HTMLElement | null]) {
+      if (r && (r.scrollHeight > r.clientHeight + 2 || r.scrollWidth > r.clientWidth + 2)) r.scrollTo({ left: x * Math.max(0, r.scrollWidth - r.clientWidth), top: y * Math.max(0, r.scrollHeight - r.clientHeight), behavior: 'smooth' });
+    }
+  }, [dortRoll, art, current?.id]);
 
   if (!open) return null;
   /** im Folien-Zweig unten gibt es die Folie sicher (slides.length > 0) */
@@ -397,7 +451,7 @@ export function Presenter() {
         {(teamDa || ichZeige) && !folge && board.geteiltRolle !== 'lesen' && (
           <button className={`presenter-team ${ichZeige ? 'an' : ''}`} data-taste="vortrag-team"
             title={ichZeige ? 'Vorführen beenden — die anderen blättern wieder selbst' : 'Alle im Board sehen diese Präsentation und blättern mit dir'}
-            onClick={() => (ichZeige ? vorfuehrenStopp() : vorfuehrenStart(board.id))}>
+            onClick={() => { vortragAlleinSetzen(ichZeige); if (ichZeige) vorfuehrenStopp(); else vorfuehrenStart(board.id, true); }}>
             📣 {ichZeige ? 'Team folgt' : 'Team mitnehmen'}
           </button>
         )}
@@ -419,10 +473,17 @@ export function Presenter() {
           <div className="presenter-slide dokument">
             <DokumentFolie key={cur.id} node={cur as FileNode} art={art} seite={pos.seite}
               onSeiten={(n) => setSeitenJe((m) => (m[cur.id] === n ? m : { ...m, [cur.id]: n }))}
-              schritt={(d) => { selbst(); schritt(d); }} geheZu={(s) => { selbst(); setPos({ idx: safeIdx, seite: s }); }} rollRef={rollRef} ansichtMerker={ansichtMerker} />
+              schritt={(d) => { selbst(); schritt(d); }} geheZu={(s) => { selbst(); setPos({ idx: safeIdx, seite: s }); }} rollRef={rollRef} ansichtMerker={ansichtMerker}
+              onAnsicht={folge ? undefined : (a) => ansichtMelden(board.id, cur.id, a)} ansicht={dortAnsicht} />
           </div>
         ) : (
-          <div className={`presenter-slide ${EDITABLE.has(cur.type) ? 'editable' : ''} ${cur.type === 'htmlapp' ? 'app' : ''}`}
+          <div className={`presenter-slide ${EDITABLE.has(cur.type) ? 'editable' : ''} ${cur.type === 'htmlapp' ? 'app' : ''}`} ref={folieRef}
+            onScrollCapture={(e) => {
+              if (folgeIch(board.id)) return;
+              const el = e.target as HTMLElement;
+              if (el !== e.currentTarget && el.parentElement !== e.currentTarget) return;
+              ansichtMelden(board.id, cur.id, { x: el.scrollLeft / Math.max(1, el.scrollWidth - el.clientWidth), y: el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight) });
+            }}
             onTouchStart={(e) => { wisch.current = EDITABLE.has(cur.type) || e.touches.length !== 1 ? null : { x: e.touches[0].clientX, y: e.touches[0].clientY, t: performance.now() }; }}
             onTouchEnd={(e) => {
               const w = wisch.current; wisch.current = null;

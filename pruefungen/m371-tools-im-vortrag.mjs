@@ -667,6 +667,9 @@ pruefe('A3 beim Gast ist das Tool startbereit — der Quelltext kam über den Li
 
 // ══ B ═══════════════════════════════════════════════════════════════
 console.log('\n════ B: Tool und Webseite als Folie ════');
+// M387: Auf dem eigenen Board nimmt die Präsentation das Publikum von selbst mit — hier hat Anna das abgewählt
+// („Team folgt" aus), damit die Abschnitte B–F das Zusammenspiel mit „Vorführen" und dem Knopf einzeln prüfen.
+await A.P.evaluate(() => localStorage.setItem('pixinotes-vortrag-allein', '1'));
 await vortragStart(A.P);
 pruefe('B1 die Präsentation hat drei Folien: Notiz, Tool, Webseite', /1 \/ 3/.test(await folie(A.P)), await folie(A.P));
 await A.P.locator('[data-taste="vortrag-weiter"]').click(); await A.P.waitForTimeout(900);
@@ -757,7 +760,8 @@ await A.P.keyboard.press('Escape'); await A.P.waitForTimeout(500);
 
 // ══ G ═══════════════════════════════════════════════════════════════
 console.log('\n════ G: Auf dem Board ════');
-await G.P.locator('[data-taste="zeig-folgen"]').click();
+// M387: Die Vorführung aus F begann in der Präsentation und endete mit ihr — Anna führt jetzt auf dem Board vor
+await A.P.locator('[data-taste="vorfuehren"]').click();
 await warteBis(G.P, async () => /du folgst/.test(await zband(G.P)), 6000);
 const karteA = A.P.locator('.react-flow__node[data-id="h1"]');
 const karteG = G.P.locator('.react-flow__node[data-id="h1"]');

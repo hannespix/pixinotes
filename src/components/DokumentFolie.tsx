@@ -17,6 +17,7 @@ import { kontoDateiNachladen } from '../lib/kontoSync';
 import { pdfSeiteMasse, renderPdfPage } from '../lib/pdf';
 import { MarkerGruppen, StrichPfad } from './StrichPfad';
 import type { FileNode } from '../types';
+import type { Ansicht } from '../lib/vorfuehren';
 
 export type DokumentArt = 'pdf' | 'word' | 'bild';
 
@@ -60,7 +61,7 @@ const BREITE_MAX = 1180;
 /** Passt die ganze Seite nur schmaler als das auf den Schirm, startet die Folie in „Seitenbreite" (lesbar statt winzig) */
 const LESBAR_AB = 640;
 
-export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rollRef, ansichtMerker }: {
+export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rollRef, ansichtMerker, onAnsicht, ansicht }: {
   node: FileNode; art: DokumentArt;
   /** Gewünschte Seite; -1 = die letzte (wer rückwärts in das Dokument blättert, landet am Ende) */
   seite: number;
@@ -73,6 +74,10 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
   rollRef: { current: ((d: 1 | -1) => boolean) | null };
   /** Gewählte Ansicht je Dokument — sie bleibt, wenn man die Folie verlässt und wiederkommt */
   ansichtMerker: { current: Record<string, 'seite' | 'breite'> };
+  /** M387: Der Vorführende meldet seinen Ausschnitt — Ansicht, Zoom und Rollstand (Anteil des Rollwegs) */
+  onAnsicht?: (a: Ansicht) => void;
+  /** M387: Wer folgt, bekommt den Ausschnitt des Vorführenden und stellt ihn nach */
+  ansicht?: Ansicht;
 }) {
   const { quelle, fehlt } = useQuelle(node.id, node.data.dataUrl);
   const drawings = useBoard((s) => selectActiveBoard(s).drawings);
@@ -219,6 +224,48 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
   }, [breite, hoehe]);
   // Neue Seite: oben anfangen
   useEffect(() => { const el = flaecheRef.current; if (el) { el.scrollTop = 0; el.scrollLeft = 0; } }, [nr]);
+
+  // ---- M387: Ausschnitt melden (wer vorführt) und nachstellen (wer folgt) ----
+  const onAnsichtRef = useRef(onAnsicht);
+  onAnsichtRef.current = onAnsicht;
+  const ansichtJetzt = useCallback(() => {
+    const el = flaecheRef.current;
+    if (!el || !onAnsichtRef.current) return;
+    onAnsichtRef.current({
+      m: modusRef.current, z: zRef.current,
+      x: el.scrollLeft / Math.max(1, el.scrollWidth - el.clientWidth), y: el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight),
+    });
+  }, []);
+  const zRef = useRef(z);
+  zRef.current = z;
+  const meldet = !!onAnsicht;
+  useEffect(() => {
+    const el = flaecheRef.current;
+    if (!el || !meldet) return;
+    el.addEventListener('scroll', ansichtJetzt, { passive: true });
+    return () => el.removeEventListener('scroll', ansichtJetzt);
+  }, [meldet, ansichtJetzt]);
+  // Ansicht, Zoom, Seite oder Blattgröße geändert: nach dem Aufbau melden (dann stimmt der Rollweg)
+  useEffect(() => {
+    if (!meldet || !mass || breite <= 0) return;
+    const t = setTimeout(ansichtJetzt, 60);
+    return () => clearTimeout(t);
+  }, [meldet, modus, z, nr, breite, hoehe, mass, ansichtJetzt]);
+  const folgeM = ansicht?.m; const folgeZ = ansicht?.z;
+  useEffect(() => {
+    if (!ansicht) return;
+    // Die Ansicht des Vorführenden gilt — auch wenn sie gerade schon stimmt (sonst wählte dieses Gerät danach nach eigener Lesbarkeit)
+    if (folgeM) { modusFest.current = true; setModusRoh(folgeM); }
+    if (typeof folgeZ === 'number' && Math.abs(folgeZ - zRef.current) > 0.004) { anker.current = null; setZ(folgeZ); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folgeM, folgeZ]);
+  const folgeX = ansicht?.x; const folgeY = ansicht?.y;
+  useLayoutEffect(() => {
+    const el = flaecheRef.current;
+    if (!el || folgeX === undefined || folgeY === undefined) return;
+    el.scrollLeft = folgeX * Math.max(0, el.scrollWidth - el.clientWidth);
+    el.scrollTop = folgeY * Math.max(0, el.scrollHeight - el.clientHeight);
+  }, [folgeX, folgeY, breite, hoehe, nr]);
 
   // ---- PDF rendern: in der gezeigten Breite, entprellt (beim Zoomen streckt solange das alte Bild) ----
   useEffect(() => {
