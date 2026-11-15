@@ -7091,6 +7091,28 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 .bub-knopf:disabled, .bub-dazu:disabled, .bub-menue button:disabled { opacity: 0.45; cursor: default; }
 .bub-pille-feld { border: 1px solid var(--border-soft); border-radius: var(--r-xs); background: var(--surface); color: var(--ink); font-family: inherit; font-size: 12px; padding: 4px 7px; outline: none; flex: 1 1 140px; min-width: 0; }
 .bub-pille-feld.kurz { flex: 0 1 120px; }
+/* M386: Bestätigen im Feld — am Telefon der einzige sichere Weg, eine Änderung abzuschließen */
+.bub-pille button.bub-pille-ok { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+@media (pointer: coarse) {
+  /* Finger statt Mauszeiger: größere Knöpfe; 16 px Schrift, damit das Telefon beim Antippen nicht hineinzoomt */
+  .bub-pille button { min-width: 38px; min-height: 36px; }
+  .bub-pille-feld, .bub-eingabe, .bub-frage-feld { font-size: 16px; }
+  .bub-pille-feld { padding: 6px 8px; }
+  /* Am Telefon ist die Karte verkleinert, damit sie auf den Bildschirm passt — Bearbeiten-Leiste und Eingabe
+     blieben dabei winzig. Sie halten ihre Größe auf dem Bildschirm (Kehrwert des Zooms, höchstens 2,4-fach)
+     und brechen dafür in mehr Zeilen um. */
+  .bub-pille, .bub-leiste { zoom: clamp(1, var(--pn-inv, 1), 2.4); }
+}
+/* Am Telefon: die Leiste zur gewählten Blase/Gruppe steht fest am unteren Bildschirmrand (nicht in der Karte,
+   die dort über den Rand reicht oder verkleinert ist), über dem Dock und über der Tastatur */
+.bub-pille.am-schirm {
+  position: fixed; left: calc(8px + var(--safe-left, 0px)); right: calc(8px + var(--safe-right, 0px)); bottom: calc(112px + var(--app-rand, 0px) + env(safe-area-inset-bottom, 0px));
+  z-index: 62; zoom: 1; font-size: 14px; padding: 8px 10px; gap: 8px; max-height: 46vh; overflow-y: auto;
+}
+[data-keyboard='on'] .bub-pille.am-schirm { bottom: calc(8px + var(--kb)); }
+.bub-pille.am-schirm button { min-width: 42px; min-height: 40px; font-size: 14px; }
+.bub-pille.am-schirm .bub-pille-feld { font-size: 16px; padding: 8px 10px; min-height: 40px; flex-basis: 160px; }
+.bub-pille.am-schirm .bub-pille-text { font-size: 15px; flex-basis: 100%; white-space: normal; }
 .bub-ergebnis { flex: none; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink); padding: 2px 2px 0; }
 .bub-ergebnis i { font-style: normal; color: var(--muted); font-weight: 700; }
 .bub-leiste { flex: none; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
