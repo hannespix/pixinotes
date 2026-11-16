@@ -28,7 +28,7 @@ Jeder Fund wurde am Code nachgeprüft, bevor er behoben wurde. Status: ✅ behob
 | S6 | mittel | `nodeToHtml`: `progress`, `kind`, `date` ohne Escaping → Skript beim PDF-/Druck-Export | ✅ |
 | S7 | mittel | Anhänge-Adressen 10 Jahre gültig — Widerruf eines Links beendet den Zugriff nicht | ✅ neue Adressen gelten 30 Tage und erneuern sich selbst · früher ausgestellte bleiben bis zu ihrem Ablauf gültig (lassen sich nur durch Löschen der Datei entwerten) |
 | S8 | mittel | „Board im Link" / `.pixiboard.json` enthalten Einladungs-Token und E-Mail des Besitzers | ✅ beides wird vor dem Weitergeben entfernt |
-| S9 | mittel | Gast-Rechte („nur Eigenes") serverseitig nur für Karten geprüft, nicht für Verbindungen/Striche/Kommentare; `board_aendern` prüft sie gar nicht | ✅ Form jedes vom Gast geschriebenen Stücks prüft jetzt der Server (Migration `inhalt_pruefen`) · „nur Eigenes" für Verbindungen/Striche/Kommentare: ⏳ M391 |
+| S9 | mittel | Gast-Rechte („nur Eigenes") serverseitig nur für Karten geprüft, nicht für Verbindungen/Striche/Kommentare; `board_aendern` prüft sie gar nicht | ✅ Form jedes vom Gast geschriebenen Stücks prüft der Server (Migration `inhalt_pruefen` — liegt bereit, Einspielen braucht die Bestätigung des Besitzers; bis dahin prüft die App allein) · „nur Eigenes" für Verbindungen/Striche/Kommentare: ⏳ M391 |
 | S10 | niedrig | Speicher-Meldungen der Tools ohne Absender-Prüfung | ✅ nur der eigene Rahmen und selbst geöffnete Tabs |
 | S11 | niedrig | Bild-/Dateiquellen aus fremden Boards können fremde Server ansprechen (IP sichtbar) | ➖ Bilder aus dem Netz sind eine gewollte Funktion (Bild per Adresse); wer ein fremdes Board übernimmt, wird vorher gefragt |
 
@@ -79,7 +79,7 @@ Jeder Fund wurde am Code nachgeprüft, bevor er behoben wurde. Status: ✅ behob
 | Nr | Fund | Status |
 |----|------|--------|
 | A1 | Abmelden räumt Merkzeichen und Abgleich-Basis weg — nach erneutem Anmelden ersetzt der Server-Stand still alles Lokale; „Anmeldung abgelaufen" entsteht schon bei kurzem Offline; Abmelden meldet alle Geräte ab | ✅ Merkzeichen bleibt; Netzfehler ist kein Abmelden; Abmelden gilt nur für dieses Gerät |
-| A2 | Vom Gast geschriebener Board-Inhalt wird nicht geprüft: fremde `id` im Inhalt überschreibt ein anderes Board des Besitzers; kaputter Inhalt gilt als „gelöscht"; ungültige Stücke lassen den Abgleich abstürzen | ✅ im Programm (`boardVonAussen`) und auf dem Server (Migration `inhalt_pruefen`) |
+| A2 | Vom Gast geschriebener Board-Inhalt wird nicht geprüft: fremde `id` im Inhalt überschreibt ein anderes Board des Besitzers; kaputter Inhalt gilt als „gelöscht"; ungültige Stücke lassen den Abgleich abstürzen | ✅ im Programm (`boardVonAussen`); auf dem Server mit der Migration `inhalt_pruefen` (liegt bereit) |
 | A3 | Schlägt das Lesen eines geteilten Boards fehl, gilt der lokale Stand (mit Ungesichertem) als Server-Stand — die Änderungen gehen nie hinaus | ✅ es gilt der zuletzt gelesene Stand |
 | A4 | Konflikt beim ersten Anmelden lässt sich nicht zugunsten des lokalen Stands auflösen („Jetzt hochladen" scheitert immer) | ✅ ohne Basis wird vereinigt statt abgelehnt |
 | A5 | Tabellen-Abfragen filtern nur nach Name — bei gleicher Board-Kennung (eigene und geteilte Zeile) wird die falsche gelesen | ✅ |

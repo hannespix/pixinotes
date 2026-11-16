@@ -203,8 +203,9 @@ export function FocusSheet() {
       // Esc räumt IMMER das Oberste ab. Steht ein Menü, ein Dialog oder das
       // Slash-Menü offen, gehört der Druck dem — sonst verschwände plötzlich
       // die ganze Karte, obwohl man nur ein Menü wegklicken wollte.
-      // M388: … auch Ticket-Fenster, Bild-Lupe und offene Menüs: Vorher schloss Esc den Fokus und ließ das Fenster stehen
-      if (document.querySelector('.sel-menu-fixed, .modal, .nav-panel, .bn-suggestion-menu, .ov-graph-ctx, [role="menu"], .dock-menu, .comment-panel') || overlayOffen()) return;
+      // M388: … auch Ticket-Fenster, Bild-Lupe und offene Menüs: Vorher schloss Esc den Fokus und ließ das Fenster stehen.
+      // (Ein offenes Gespräch NEBEN der Karte zählt nicht dazu — es ist kein Fenster über ihr und bleibt beim Verlassen stehen.)
+      if (document.querySelector('.sel-menu-fixed, .modal, .nav-panel, .bn-suggestion-menu, .ov-graph-ctx, [role="menu"], .dock-menu') || overlayOffen()) return;
       e.stopPropagation();
       close();
     };
