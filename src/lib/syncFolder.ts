@@ -331,6 +331,24 @@ export async function anhangInhalt(id: string, tool: boolean): Promise<Blob | nu
   return blob instanceof Blob ? blob : new Blob([blob]);
 }
 
+/**
+ * M390: Die Inhalte aus der Geräte-Ablage zu einer Reihe von Karten — für Sicherung und Board-Datei. Diese beiden
+ * heißen „komplett", enthielten aber weder große Dateien noch die Quelltexte eigener Tools: Nach „Alles leeren" und
+ * dem Zurückladen der Sicherung waren sie endgültig weg.
+ */
+export async function dateienVonKarten(nodes: Array<{ id: string; type?: string; data: unknown }>): Promise<Record<string, SyncDatei>> {
+  const dateien: Record<string, SyncDatei> = {};
+  for (const n of nodes) {
+    const k = anhangKarte(n);
+    if (!k) continue;
+    try {
+      const blob = await anhangInhalt(k.id, !!k.tool);
+      if (blob) dateien[k.id] = { name: k.name, mime: k.mime, b64: await alsBase64(blob) };
+    } catch { /* eine unlesbare Datei hält die Sicherung nicht auf */ }
+  }
+  return dateien;
+}
+
 export async function buildSyncPayloadMitDateien(budgetMb = DATEI_BUDGET_MB, nur?: (id: string) => boolean): Promise<SyncPayload> {
   const p = buildSyncPayload();
   if (budgetMb <= 0) return p;

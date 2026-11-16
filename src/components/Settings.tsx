@@ -13,6 +13,7 @@ import {
   permissionState, pickSyncFolder, readSync, syncSupported, writeSync,
   SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, type SyncDirHandle,
 } from '../lib/syncFolder';
+import { dateienVonKarten, uebernimmDateien } from '../lib/syncFolder';
 import {
   applyWebdav, clearWebdav, corsRequestText, loadWebdav, saveWebdav, webdavRead, webdavStamp,
   webdavTest, webdavWrite, type WebdavConfig,
@@ -554,11 +555,17 @@ export function Settings() {
   const psWahl = freieProjekte.some(({ p }) => p.id === psPick) ? psPick : (freieProjekte[0]?.p.id ?? '');
 
   // ---- Datei-Sync: funktioniert überall (Firefox, file://, USB-Stick, Mail-Anhang) ----
-  const exportStateFile = () => {
+  const exportStateFile = async () => {
     const st = useBoard.getState();
+    // M390: „Der komplette Stand" heißt jetzt auch komplett — mit den Karten-Vorlagen und mit allem, was in der
+    // Geräte-Ablage liegt (große Dateien, Quelltexte eigener Tools; auch die der Vorlagen).
+    setBusy('datei');
+    const dateien = await dateienVonKarten([...st.boards.flatMap((b) => b.nodes), ...st.templates.map((t) => t.node)]).catch(() => ({}));
     const payload = {
       app: 'pixinotes', version: 2, savedAt: new Date().toISOString(),
       boards: st.boards, spaces: st.spaces, activeId: st.activeId,
+      templates: st.templates,
+      ...(Object.keys(dateien).length ? { dateien } : {}),
     };
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: 'application/json' }));
     const a = document.createElement('a');
@@ -579,6 +586,9 @@ export function Settings() {
       if (!window.confirm(`Stand vom ${p.savedAt ? new Date(p.savedAt).toLocaleString('de-DE') : '?'} laden? Die aktuellen Boards werden ersetzt.`)) return;
       claimWriter(); // bewusster Import — auch aus einem Mitlese-Fenster wirksam
       useBoard.getState().importSync(p.boards, p.spaces ?? [], p.activeId ?? p.boards[0].id);
+      // M390: Vorlagen und Inhalte der Geräte-Ablage aus der Sicherung zurücklegen
+      if (Array.isArray(p.templates)) useBoard.setState({ templates: p.templates });
+      void uebernimmDateien(p).then((n) => { if (n > 0) window.dispatchEvent(new CustomEvent('pixinotes:dateien-da')); });
       if (!flushPersist()) { showToast(QUOTA_IMPORT_MSG); return; }
       // Der Datei-Stand liegt in keinem Sync-Ziel → kein Fast-Forward darüber
       try { localStorage.setItem(SYNC_DIRTY_KEY, '1'); localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); } catch { /* unkritisch */ }
@@ -600,11 +610,9 @@ export function Settings() {
 
   /** Alles leeren — bewusst zweistufig (Bestätigung + Tipp-Wort), kein Undo */
   const resetEverything = async () => {
-    if (!window.confirm(
-      'Wirklich ALLES leeren?\n\nAlle Bereiche, Projekte, Boards, Karten, Versionen und Vorlagen werden gelöscht. '
-      + 'Ein verbundener Sync-Ordner wird getrennt (seine Dateien bleiben unangetastet). KI-Einstellungen bleiben erhalten.\n\n'
-      + 'Tipp: Vorher unter „Daten" den Stand als Datei exportieren.',
-    )) return;
+    // M390: EIN Text (kein zusammengesetzter) — nur so findet ihn das Wörterbuch; die Rückfrage stand auf Englisch
+    // sonst deutsch da, mit einem einzelnen übersetzten Wort
+    if (!window.confirm(`Wirklich ALLES leeren?\n\nAlle Bereiche, Projekte, Boards, Karten, Versionen und Vorlagen werden gelöscht. Ein verbundener Sync-Ordner wird getrennt (seine Dateien bleiben unangetastet). KI-Einstellungen bleiben erhalten.\n\nTipp: Vorher unter „Daten" den Stand als Datei exportieren — er enthält auch Vorlagen, große Dateien und eigene Tools.`)) return;
     const word = window.prompt('Zur Bestätigung bitte LEEREN eingeben:');
     if ((word ?? '').trim().toUpperCase() !== 'LEEREN') {
       showToast('Abgebrochen — nichts wurde gelöscht.');

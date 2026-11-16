@@ -1,6 +1,7 @@
+import { lesefolge } from './boardTasten';
 import { overlayOffen } from '../lib/overlay';
 import { tagLokal } from '../lib/tag';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBoard, type Tool } from '../store';
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon, type DokumentBefehl } from '../lib/pdfSeiten';
 import { nodeToText } from '../lib/serialize';
@@ -129,7 +130,8 @@ export function FocusSheet() {
 
   const zurueckZurUebersicht = useBoard((s) => s.focusHerkunft === 'overview');
   const board = boards.find((b) => b.id === activeId);
-  const siblings = (board?.nodes ?? []).filter(focusable);
+  // M390: geblättert wird in Lesefolge — wie mit Alt+↓/↑ auf dem Board (vorher: Reihenfolge des Anlegens)
+  const siblings = useMemo(() => lesefolge((board?.nodes ?? []).filter(focusable)), [board?.nodes]);
   const index = siblings.findIndex((n) => n.id === focusCard);
   const node = index >= 0 ? siblings[index] : undefined;
 

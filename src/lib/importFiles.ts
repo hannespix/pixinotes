@@ -15,7 +15,8 @@ import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, ma
 // dem Deploy nicht auffindbar (dieselbe Falle wie beim Mermaid-Modul, M90).
 import { docxToBlocks } from './docx';
 import { blattNamen, leseXlsx } from './xlsx';
-import { cloneSharedBoard, parseBoardPayload } from './share';
+import { boardDateienUebernehmen, cloneSharedBoard, parseBoardDatei } from './share';
+import { uebernimmDateien } from './syncFolder';
 import { mergeEvents, parseIcs, type IcsEvent } from './ics';
 import { saveHtml } from './htmlStore';
 import { saveFile } from './fileStore';
@@ -138,9 +139,12 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
       if (ext === 'json') {
         // Geteiltes Board (.pixiboard.json) oder Voll-Export importieren
         const text = await file.text();
-        const shared = parseBoardPayload(text);
+        const datei = parseBoardDatei(text);
+        const shared = datei?.board;
         if (shared) {
-          useBoard.getState().importBoard(cloneSharedBoard(shared));
+          const idMap = new Map<string, string>();
+          useBoard.getState().importBoard(cloneSharedBoard(shared, idMap));
+          void boardDateienUebernehmen(datei?.dateien, idMap);   // M390: große Dateien und Tools aus der Datei
           showToast(`Geteiltes Board „${shared.name}" importiert`);
           placed++;
           continue;
@@ -149,6 +153,9 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         if (full?.app === 'pixinotes' && Array.isArray(full.boards) && full.boards.length > 0) {
           if (window.confirm(`Kompletten Stand vom ${full.savedAt ? new Date(full.savedAt).toLocaleString('de-DE') : '?'} laden? Die aktuellen Boards werden ersetzt.`)) {
             useBoard.getState().importSync(full.boards, full.spaces ?? [], full.activeId ?? full.boards[0].id);
+            // M390: auch Vorlagen und die Inhalte der Geräte-Ablage aus der Sicherung
+            if (Array.isArray(full.templates)) useBoard.setState({ templates: full.templates });
+            void uebernimmDateien(full).then((nn) => { if (nn > 0) window.dispatchEvent(new CustomEvent('pixinotes:dateien-da')); });
             showToast('Stand aus Datei geladen');
           }
           placed++;
@@ -223,7 +230,9 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         const note = makeNote(pos, { blocks });
         note.width = 340;
         addNode(note);
-        showToast(`📝 „${file.name}" als Notiz übernommen — formatiert, nicht als Rohtext.`);
+        showToast(/\.(md|markdown|mdown|mkd)$/i.test(file.name)
+          ? `📝 „${file.name}" als Notiz übernommen — formatiert, nicht als Rohtext.`
+          : `📝 „${file.name}" als Notiz übernommen.`);
         mirror(file, note.id, mirrorNote);
         placed++;
         continue;

@@ -156,6 +156,8 @@ function Gitter({ zellenRoh, stilRoh, spalten, zeilen, schreibe }: GitterProps) 
         if (w !== null && w !== undefined && w !== '') break;
       }
       if (!unten) continue;
+      // M390: Steht unten schon eine Summe, ist die Spalte summiert — der zweite Klick summierte sie sonst mit (126 → 252)
+      if (/^=\s*SUMME\(/i.test(String(zellen[indexZuAdresse(s, unten - 1)] ?? ''))) continue;
       let oben = unten;
       while (oben > 1 && typeof werte[indexZuAdresse(s, oben - 2)] === 'number') oben -= 1;
       if (unten - oben < 1) continue;              // eine einzelne Zahl summiert niemand

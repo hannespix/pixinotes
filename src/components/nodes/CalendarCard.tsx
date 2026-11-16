@@ -189,6 +189,9 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     if (show.tasks) {
       for (const t of collectTasks(sourceBoards)) {
         if (scope === 'linked' && !linkedIds.has(t.nodeId)) continue; // M169: nur verbundene Quellen
+        // M390: Vorgänge des Zeitplans zeigt der Kalender selbst (◆ Meilenstein, Balken) — als Aufgabe standen sie
+        // ein zweites Mal da, und die Schalter „Meilensteine"/„Zeitplan-Balken" blendeten diese Kopie nicht aus
+        if (t.kind === 'gantt') continue;
         if (t.due) push(byDay, t.due, { icon: '☐', text: t.text, boardId: t.boardId, nodeId: t.nodeId, urgent: t.urgency === 'overdue' });
       }
     }
@@ -204,7 +207,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
         for (const n of b.nodes) {
           if (n.type !== 'note' || n.archived) continue;
           if (scope === 'linked' && !linkedIds.has(n.id)) continue;
-          for (const t of notizTermine((n.data as { blocks?: unknown[] }).blocks)) {
+          for (const t of notizTermine((n.data as { blocks?: unknown[] }).blocks, (n.data as { fristAnker?: Record<string, [string, string]> }).fristAnker)) {
             push(byDay, t.iso, {
               icon: '✎',
               text: t.zeit ? `${t.zeit} ${t.text}` : t.text,
@@ -225,7 +228,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
           } else if (show.gantt) {
             const s = dayOf(r.start);
             const e = dayOf(r.end);
-            for (let d = s; d <= e && d - s < 120; d++) {
+            for (let d = s; d <= e && d - s < LAENGSTER_BALKEN; d++) {
               push(stripsByDay, new Date(d * DAY).toISOString().slice(0, 10), {
                 text: r.name, color: r.color ?? '#4f7cff', boardId: b.id, nodeId: n.id, startsHere: d === s,
               });
@@ -241,7 +244,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
         } else {
           const s = dayOf(ev.start);
           const e = dayOf(ev.end);
-          for (let d = s; d <= e && d - s < 120; d++) {
+          for (let d = s; d <= e && d - s < LAENGSTER_BALKEN; d++) {
             push(stripsByDay, new Date(d * DAY).toISOString().slice(0, 10), {
               text: ev.title, color: '#8a8375', startsHere: d === s, ext: true,
             });
@@ -265,7 +268,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
       if (ev.endDate && ev.endDate > ev.date) {
         const s = dayOf(ev.date);
         const e2 = dayOf(ev.endDate);
-        for (let d = s; d <= e2 && d - s < 120; d++) {
+        for (let d = s; d <= e2 && d - s < LAENGSTER_BALKEN; d++) {
           push(stripsByDay, new Date(d * DAY).toISOString().slice(0, 10), {
             text: ev.title, color: ev.color ?? '#4f7cff', startsHere: d === s, ownDate: ev.date,
           });
@@ -1027,6 +1030,9 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
 }
 
 /** Kalender als Karte auf dem Whiteboard. */
+/** M390: Balken und mehrtägige Termine bis zwei Jahre — bei 120 Tagen rissen lange Vorgänge mitten im Lauf ab */
+const LAENGSTER_BALKEN = 732;
+
 export function CalendarCard({ id, data, selected }: NodeProps<CalendarNode>) {
   return (
     <CardShell id={id} selected={selected} minWidth={340} minHeight={280} className="cal-card">

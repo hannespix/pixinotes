@@ -40,11 +40,14 @@ export function loadWebdav(): WebdavConfig | null {
 
 export function saveWebdav(cfg: WebdavConfig) {
   localStorage.setItem(LS_KEY, JSON.stringify(cfg));
+  // M390: anderer Server, andere Regeln — die Vorbedingung beim Schreiben wird neu ausprobiert
+  localStorage.removeItem('pixinotes-webdav-ohne-bedingung');
 }
 
 export function clearWebdav() {
   localStorage.removeItem(LS_KEY);
   localStorage.removeItem(STAMP_KEY);
+  localStorage.removeItem('pixinotes-webdav-ohne-bedingung');
   void basisVergessen('webdav');
 }
 
@@ -118,7 +121,8 @@ export function corsRequestText(cfg: WebdavConfig | null): string {
       'The following response headers are needed for /remote.php/dav:',
       `  Access-Control-Allow-Origin: ${location.origin}`,
       '  Access-Control-Allow-Methods: GET, PUT, OPTIONS',
-      '  Access-Control-Allow-Headers: Authorization, Content-Type',
+      '  Access-Control-Allow-Headers: Authorization, Content-Type, If-Match',
+    '  Access-Control-Expose-Headers: ETag',
       '  Access-Control-Max-Age: 600',
       'The OPTIONS request (preflight) must be answered with 200/204 without authentication —',
       'otherwise it fails before the credentials are sent at all.',
@@ -165,6 +169,24 @@ export function corsRequestText(cfg: WebdavConfig | null): string {
   ].join('\n');
 }
 
+/**
+ * M390: Schreiben mit Vorbedingung.
+ *
+ * Vor jedem automatischen Schreiben wird gelesen und ein fremder Stand eingearbeitet (M311). Zwischen diesem Lesen
+ * und dem Schreiben liegt aber das Packen der Sicherung — mit Anhängen dauert das Sekunden. Schrieb in dieser Zeit
+ * ein zweites Gerät, überschrieb das erste dessen Stand, ohne ihn je gesehen zu haben. Zeigt der Server ein ETag,
+ * geht es jetzt als Bedingung mit („nur ersetzen, wenn es noch der gelesene Stand ist"); lehnt er ab (412), wird
+ * neu gelesen und zusammengeführt. Server, die die Kopfzeile über CORS nicht zulassen, schreiben wie bisher —
+ * das merkt sich die App, statt jedes Mal neu anzuecken.
+ */
+let davEtag: string | null = null;
+const OHNE_BEDINGUNG_KEY = 'pixinotes-webdav-ohne-bedingung';
+export class WebdavKonflikt extends Error {}
+const bedingungErlaubt = (): boolean => { try { return localStorage.getItem(OHNE_BEDINGUNG_KEY) !== '1'; } catch { return false; } };
+const bedingungAus = (): void => { try { localStorage.setItem(OHNE_BEDINGUNG_KEY, '1'); } catch { /* voll */ } davEtag = null; };
+/** Schwache ETags (W/…) taugen nicht für If-Match — der Vergleich schlüge immer fehl. */
+const etagAus = (res: Response): string | null => { const e = res.headers.get('ETag'); return e && !e.startsWith('W/') ? e : null; };
+
 async function davFetch(cfg: WebdavConfig, init: RequestInit): Promise<Response> {
   try {
     return await fetch(fileUrl(cfg), {
@@ -179,6 +201,7 @@ async function davFetch(cfg: WebdavConfig, init: RequestInit): Promise<Response>
 /** Stand vom Server lesen; null = Datei existiert (noch) nicht. */
 export async function webdavRead(cfg: WebdavConfig): Promise<SyncPayload | null> {
   const res = await davFetch(cfg, { method: 'GET', cache: 'no-store' });
+  davEtag = res.ok ? etagAus(res) : null;
   if (res.status === 404) return null;
   if (res.status === 401 || res.status === 403) throw new Error('Anmeldung abgelehnt — Benutzername/App-Passwort prüfen.');
   if (!res.ok) throw new Error(`WebDAV: HTTP ${res.status}`);
@@ -188,18 +211,30 @@ export async function webdavRead(cfg: WebdavConfig): Promise<SyncPayload | null>
 }
 
 /** Aktuellen Stand hochladen (Allow-List-Payload — ohne Einstellungen/Schlüssel). */
-export async function webdavWrite(cfg: WebdavConfig): Promise<string> {
+export async function webdavWrite(cfg: WebdavConfig, bedingt = false): Promise<string> {
   const s = useBoard.getState();
   // M269: eine Quelle für alle drei Wege — samt Dateien im Beipack. Was NICHT
   // mitgeht, bleibt unverändert: KI-/Konto-Einstellungen und Zugangsdaten.
   const payload = await buildSyncPayloadMitDateien(s.syncDateienMb ?? DATEI_BUDGET_MB);
-  const res = await davFetch(cfg, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  const body = JSON.stringify(payload);
+  const ohne = () => davFetch(cfg, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body });
+  let res: Response;
+  if (bedingt && davEtag && bedingungErlaubt()) {
+    try {
+      res = await fetch(fileUrl(cfg), { method: 'PUT', headers: { Authorization: basicAuth(cfg.user, cfg.secret), 'Content-Type': 'application/json', 'If-Match': davEtag }, body });
+    } catch {
+      // Die Vorabfrage des Browsers scheiterte — meist lässt der Server „If-Match" über CORS nicht zu. Ohne
+      // Bedingung noch einmal; nur wenn DAS gelingt, lag es an der Kopfzeile (und nicht am Netz).
+      res = await ohne();
+      if (res.ok || res.status === 201 || res.status === 204) bedingungAus();
+    }
+    if (res.status === 412) throw new WebdavKonflikt('Der Stand auf dem Server hat sich seit dem Lesen geändert.');
+  } else {
+    res = await ohne();
+  }
   if (res.status === 401 || res.status === 403) throw new Error('Anmeldung abgelehnt — Benutzername/App-Passwort prüfen.');
   if (!res.ok && res.status !== 201 && res.status !== 204) throw new Error(`WebDAV: HTTP ${res.status}`);
+  davEtag = etagAus(res);
   localStorage.setItem(STAMP_KEY, payload.savedAt);
   await basisMerken('webdav', payload); // M311: gemeinsamer Stand für die Zusammenführung
   // Nur „sauber" markieren, wenn währenddessen nicht weiter editiert wurde
@@ -248,7 +283,15 @@ const webdavWeg = (cfg: WebdavConfig): SyncWeg => ({
   source: 'webdav',
   stampKey: STAMP_KEY,
   dirtyKey: WEBDAV_DIRTY_KEY,
-  schreiben: () => webdavWrite(cfg),
+  // M390: Auch das Ergebnis einer Zusammenführung geht nur mit Vorbedingung hinaus. War schon wieder jemand
+  // schneller, liest der nächste Durchlauf neu und führt erneut zusammen (lokal liegt der vereinte Stand bereits).
+  schreiben: async () => {
+    try { return await webdavWrite(cfg, true); } catch (e) {
+      if (!(e instanceof WebdavKonflikt)) throw e;
+      setTimeout(() => { void autoPush().catch(() => {}); }, 400);
+      return webdavStamp() ?? '';
+    }
+  },
   uebernehmen: applyWebdav,
 });
 
@@ -285,7 +328,7 @@ export async function checkWebdavRemote(): Promise<void> {
   }
 }
 
-async function autoPush(): Promise<void> {
+async function autoPush(versuch = 0): Promise<void> {
   if (getWriterRole() !== 'writer') return; // Mitlese-Fenster synct nie
   const cfg = loadWebdav();
   if (!cfg?.auto) return;
@@ -309,7 +352,21 @@ async function autoPush(): Promise<void> {
       conflictWarned = false;
       return;
     }
-    await webdavWrite(cfg); // meldet bei Erfolg selbst 'ok'
+    try {
+      await webdavWrite(cfg, true); // meldet bei Erfolg selbst 'ok'
+    } catch (e) {
+      if (!(e instanceof WebdavKonflikt)) throw e;
+      // M390: Jemand war schneller. Neu lesen — liegt wirklich ein anderer Stand da, führt der nächste Durchlauf
+      // zusammen. Liegt derselbe da, vergleicht der Server ETags anders als gedacht: dann ohne Bedingung.
+      const nochmal = await webdavRead(cfg);
+      if (nochmal && nochmal.savedAt !== webdavStamp()) {
+        if (versuch < 3) return await autoPush(versuch + 1);
+        emitSyncStatus('webdav', 'error');
+        return;
+      }
+      bedingungAus();
+      await webdavWrite(cfg);
+    }
     conflictWarned = false;
   } catch (e) {
     emitSyncStatus('webdav', 'error');

@@ -93,6 +93,8 @@ export interface KanbanItem {
   erledigtAm?: string;
   /** M293: Wann das Ticket ins Archiv kam — nur im `archiv`-Bestand gesetzt */
   archiviertAm?: string;
+  /** M390: Wann es aus dem Archiv zurückkam — von da an zählt die Frist der Auto-Archivierung neu */
+  zurueckAm?: string;
 }
 
 /** Offene Blocker eines Tickets: Titel der unerledigten Abhängigkeiten (M118) */

@@ -7,11 +7,14 @@ import { kartenVonAussen } from './sicher';
 import type { BoardDoc } from '../store';
 import { uid, type AppNode, type KanbanData } from '../types';
 import { triggerDownload } from './download';
+import { anhangKarte, dateienVonKarten, uebernimmDateien, type SyncDatei } from './syncFolder';
 
 interface SharePayload {
   app: 'pixinotes-board';
   version: 2;
   board: BoardDoc;
+  /** M390: Inhalte aus der Geräte-Ablage (große Dateien, Tool-Quelltexte) — nur in der Datei, nie im Link */
+  dateien?: Record<string, SyncDatei>;
 }
 
 const b64url = (bytes: Uint8Array): string => {
@@ -62,10 +65,35 @@ export async function boardToShareUrl(board: BoardDoc): Promise<string> {
 
 /** Fallback für große Boards (Bilder!): als .pixiboard.json herunterladen */
 export function downloadBoardFile(board: BoardDoc): void {
-  const payload: SharePayload = { app: 'pixinotes-board', version: 2, board: zumWeitergeben(board) };
-  const url = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: 'application/json' }));
-  triggerDownload(url, `${board.name.replace(/[^\p{L}\d\-_ ]/gu, '').trim().slice(0, 40) || 'board'}.pixiboard.json`);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // M390: mit dem, was in der Geräte-Ablage liegt (große Dateien, eigene Tools) — die Datei ist das ganze Board
+  void (async () => {
+    const dateien = await dateienVonKarten(board.nodes).catch(() => ({}));
+    const payload: SharePayload = { app: 'pixinotes-board', version: 2, board: zumWeitergeben(board), ...(Object.keys(dateien).length ? { dateien } : {}) };
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+    triggerDownload(url, `${board.name.replace(/[^\p{L}\d\-_ ]/gu, '').trim().slice(0, 40) || 'board'}.pixiboard.json`);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  })();
+}
+
+/** M390: Hat das Board Inhalte, die in keinen Link passen (sie liegen in der Geräte-Ablage, nicht im Board)? */
+export function hatAblageInhalt(board: BoardDoc): boolean {
+  return board.nodes.some((n) => !!anhangKarte(n) && !(n.data as { dataUrl?: string }).dataUrl);
+}
+
+/** M390: Board-Datei lesen — das Board und, wenn vorhanden, die mitgereisten Inhalte */
+export function parseBoardDatei(text: string): { board: BoardDoc; dateien?: Record<string, SyncDatei> } | null {
+  const board = parseBoardPayload(text);
+  if (!board) return null;
+  try { const d = (JSON.parse(text) as SharePayload).dateien; return { board, dateien: d && typeof d === 'object' ? d : undefined }; } catch { return { board }; }
+}
+
+/** M390: Mitgereiste Inhalte unter den NEUEN Karten-Kennungen ablegen (idMap: alte → neue Kennung) */
+export async function boardDateienUebernehmen(dateien: Record<string, SyncDatei> | undefined, idMap: Map<string, string>): Promise<void> {
+  if (!dateien) return;
+  const neu: Record<string, SyncDatei> = {};
+  for (const [alt, d] of Object.entries(dateien)) { const id = idMap.get(alt); if (id) neu[id] = d; }
+  const n = await uebernimmDateien({ dateien: neu } as never);
+  if (n > 0) window.dispatchEvent(new CustomEvent('pixinotes:dateien-da'));
 }
 
 /** Board aus geteiltem Payload klonen: frische IDs, damit nichts kollidiert */

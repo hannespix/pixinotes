@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoard, type BoardSortierung } from '../store';
-import { boardToShareUrl, downloadBoardFile, SHARE_URL_LIMIT } from '../lib/share';
+import { boardToShareUrl, downloadBoardFile, hatAblageInhalt, SHARE_URL_LIMIT } from '../lib/share';
 import { kontoIstEigenes } from '../lib/kontoSync';
 import { FreigabeDialog } from './FreigabeDialog';
 import { LinkDialog } from './LinkDialog';
@@ -163,7 +163,10 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
       }
       try {
         await navigator.clipboard.writeText(url);
-        showToast('Teilen-Link kopiert, er enthält das komplette Board.');
+        // M390: ehrlich bleiben — was in der Geräte-Ablage liegt, passt in keinen Link
+        showToast(hatAblageInhalt(board)
+          ? 'Teilen-Link kopiert. Große Dateien und eigene Tools passen nicht in den Link — dafür „Als Datei sichern".'
+          : 'Teilen-Link kopiert, er enthält das komplette Board.', false, hatAblageInhalt(board) ? 8000 : undefined);
       } catch {
         window.prompt('Link zum Kopieren (Strg+C):', url); // M340: Zwischenablage gesperrt — der Link ist trotzdem da
       }
@@ -351,7 +354,11 @@ export function ProjektMenu({ projectId, onRename, klasse = '' }: {
                einzeln wäre das bei zehn Boards zehnmal dieselbe Geste. */
             if (!window.confirm(`Alle ${offen.length} Boards in „${projekt.name}" archivieren? Sie bleiben erhalten und lassen sich einzeln zurückholen.`)) return;
             offen.forEach((id) => archiveBoard(id, true));
-            showToast(`„${projekt.name}": ${offen.length} Board(s) archiviert.`);
+            // M390: gezählt wird, was wirklich archiviert wurde — das letzte sichtbare Board der Umgebung bleibt offen
+            const geschafft = offen.filter((id) => useBoard.getState().boards.find((x) => x.id === id)?.archived).length;
+            showToast(geschafft === offen.length
+              ? `„${projekt.name}": ${geschafft} Board(s) archiviert.`
+              : `„${projekt.name}": ${geschafft} von ${offen.length} Boards archiviert — das letzte sichtbare Board bleibt offen.`);
             zu();
           }}
         ><IArchive size={14} /> Alle Boards archivieren ({offen.length})</button>

@@ -78,10 +78,22 @@ export function makeTicketDrag(rootOf: () => HTMLElement | null, opts: Options) 
     let dragging = false;
     let holdTimer = 0;
 
+    /**
+     * M390: Solange ein Ticket am Finger hängt, schwenkt das Board nicht mit.
+     *
+     * Außerhalb des Karten-Fokus beginnt mit dem Aufsetzen des Fingers auch die Schwenk-Geste des Boards (am Finger
+     * darf man überall schwenken, auch über Karten). Griff nach der Haltezeit das Ticket, lief sie weiter: Das Board
+     * wanderte unter dem Finger mit, die Zielspalte gleich dazu — das Ticket landete, wo es herkam. Die Schwenk-Geste
+     * hört auf touchmove; der Zug selbst arbeitet mit Zeiger-Ereignissen. Ab dem Greifen kommen die touchmove
+     * deshalb nicht mehr beim Board an.
+     */
+    const keinSchwenk = (ev: TouchEvent) => { ev.stopPropagation(); };
+
     const begin = () => {
       if (dragging) return;
       dragging = true;
       window.clearTimeout(holdTimer);
+      if (touch) window.addEventListener('touchmove', keinSchwenk, { capture: true, passive: true });
       try { node.setPointerCapture(e.pointerId); } catch { /* Zeiger schon weg */ }
       // Kurzes Rütteln als Rückmeldung, dass der Zug greift (nur wo vorhanden)
       navigator.vibrate?.(12);
@@ -124,6 +136,7 @@ export function makeTicketDrag(rootOf: () => HTMLElement | null, opts: Options) 
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('touchmove', keinSchwenk, { capture: true });
       try { node.releasePointerCapture(e.pointerId); } catch { /* schon frei */ }
     }
 

@@ -38,7 +38,7 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
 
   return (
     <div className={`shape-wrap shape-${data.shape}`}>
-      <NodeResizer isVisible={!!selected} minWidth={90} minHeight={54} color="#4f7cff"
+      <NodeResizer isVisible={!!selected} minWidth={90} minHeight={54} color="#4f7cff" onResizeStart={() => useBoard.getState().pushHistory()}
         handleStyle={{ width: 9, height: 9, borderRadius: 3 }} />
       {handles.map((pos) => (
         <Handle key={pos} type="source" position={pos} id={pos} className="pn-handle shape-handle" />

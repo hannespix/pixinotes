@@ -6,7 +6,7 @@ import { nodesToText } from '../lib/serialize';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
 import { textDateienAlsNotizen, textKarte } from '../lib/textNotiz';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
-import { KACHEL_TYPEN, STICKY_COLORS, uid, type AppNode } from '../types';
+import { KACHEL_TYPEN, STICKY_COLORS, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
 import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
@@ -27,7 +27,6 @@ import { KARTEN_EREIGNIS, kartenWunschNehmen } from '../lib/kontextmenue';
  */
 export function SelectionToolbar() {
   const board = useBoard(selectActiveBoard);
-  const addNode = useBoard((s) => s.addNode);
   const setArchived = useBoard((s) => s.setArchived);
   const setAutoFit = useBoard((s) => s.setAutoFit);
   const removeNodes = useBoard((s) => s.removeNodes);
@@ -237,6 +236,11 @@ export function SelectionToolbar() {
   // samt Inhalt) und beim Löschen mit; bei reiner Rahmen-Auswahl zeigt die
   // Leiste eine kompakte Variante statt wie früher gar nicht zu erscheinen.
   const selected = board.nodes.filter((n) => n.selected && n.type !== 'frame');
+  /** M390: Eine Änderung an mehreren Karten ist EIN Rückgängig-Schritt (vorher: je Karte einer). */
+  const fuerAlle = (fn: (n: AppNode) => void) => {
+    useBoard.getState().pushHistory();
+    mutedHistory(() => { for (const n of selected) fn(n); });
+  };
   const selFrames = board.nodes.filter((n) => n.selected && n.type === 'frame');
   const framesOnly = selected.length === 0;
   // Geankerte Markierungen (M127) der ausgewählten Karten — bei Bedarf lösbar
@@ -323,16 +327,8 @@ export function SelectionToolbar() {
   };
 
   const duplicate = () => {
-    for (const n of selected) {
-      addNode({
-        ...n,
-        id: uid(),
-        selected: false,
-        position: { x: n.position.x + 30, y: n.position.y + 30 },
-        data: JSON.parse(JSON.stringify(n.data)),
-      });
-    }
-    showToast(`${selected.length} Karte${selected.length > 1 ? 'n' : ''} dupliziert`);
+    const n = useBoard.getState().dupliziere(selected.map((x) => x.id));
+    if (n) showToast(`${n} Karte${n > 1 ? 'n' : ''} dupliziert`);
   };
 
   const remove = () => removeNodes([...selected, ...selFrames].map((n) => n.id));
@@ -670,7 +666,7 @@ export function SelectionToolbar() {
                         className={`sel-farbe note-farbe-${c} ${selected.every((n) => (n.data as { color?: string }).color === c && !(n.data as { hex?: string }).hex) ? 'on' : ''}`}
                         title={FARB_NAMEN[c]}
                         aria-label={`Farbe ${FARB_NAMEN[c]}`}
-                        onClick={() => { for (const n of selected) updateNodeData(n.id, { color: c, hex: undefined }); }}
+                        onClick={() => fuerAlle((n) => updateNodeData(n.id, { color: c, hex: undefined }))}
                       />
                     ))}
                   </div>
@@ -683,7 +679,7 @@ export function SelectionToolbar() {
                       data-taste="bild-rahmen"
                       aria-pressed={alleMit}
                       title={alleMit ? 'Nur das Bild zeigen — ohne Rand, Fläche und Schatten' : 'Als Karte mit Rand, Fläche und Schatten zeigen'}
-                      onClick={() => { setMenu(null); for (const n of selected) updateNodeData(n.id, { rahmen: alleMit ? undefined : true }); }}
+                      onClick={() => { setMenu(null); fuerAlle((n) => updateNodeData(n.id, { rahmen: alleMit ? undefined : true })); }}
                     >
                       <IImage size={14} /> {alleMit ? 'Ohne Rahmen (nur das Bild)' : 'Mit Rahmen (als Karte)'}
                     </button>

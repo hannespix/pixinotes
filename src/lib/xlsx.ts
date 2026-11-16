@@ -173,7 +173,10 @@ export async function leseXlsx(daten: ArrayBuffer, index = 0): Promise<ExcelBlat
       wert = entschluessele(roh);
     } else if (roh !== undefined) {
       const zahl = Number(roh);
-      wert = datums.has(stil) && Number.isFinite(zahl) && zahl > 0 ? alsDatum(zahl) : roh;
+      // M390: Zahlen kommen in hiesiger Schreibweise in die Zelle (Komma) — „1.234" aus der Datei ist 1,234 und
+      // darf nicht als Tausender gelesen werden
+      wert = datums.has(stil) && Number.isFinite(zahl) && zahl > 0 ? alsDatum(zahl)
+        : Number.isFinite(zahl) && /^-?\d+\.\d+$/.test(roh) ? roh.replace('.', ',') : roh;
     }
     if (wert === '') continue;
 

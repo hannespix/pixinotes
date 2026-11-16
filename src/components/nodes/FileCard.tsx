@@ -354,6 +354,8 @@ function PdfThumb({ dataUrl, onOpen, onSeiten }: { dataUrl: string; onOpen: () =
  * außerhalb des Dokuments (freie Fläche, Kopfzeile, andere Karte) oder Esc gibt die Pfeile wieder der Karte.
  */
 let aktivesDokument: string | null = null;
+/** M390: Gehören ← → gerade dem Blättern in diesem Dokument? (Dann schieben sie die Karte nicht.) */
+export const dokumentHatPfeile = (id: string): boolean => aktivesDokument === id;
 /** Bedienflächen über dem Board — ein Griff dorthin (Werkzeug wählen, Farbe wechseln) beendet das Blättern nicht */
 const BEDIENUNG = '.draw-palette, .dock, .dock-menu, .sel-toolbar, .sel-toolbar-dock, .modal-backdrop, .ebenen-menu, .topbar, .top-actions, .tabs, .react-flow__minimap, .toast, .focus-head, .focus-nav, .schrift-vorschlag, .lese-band';
 

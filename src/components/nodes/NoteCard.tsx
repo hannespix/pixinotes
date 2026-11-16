@@ -26,6 +26,7 @@ import { NotizRuhend } from './NotizRuhend';
 import { hakenUmlegen, notizEinfach, type RuheBlock } from '../../lib/notizRuhend';
 import { NotizStriche } from './NotizStriche';
 import { DueChips } from './DueChips';
+import { fristenDerNotiz, type FristAnker } from '../../lib/fristAnker';
 import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from '../NoteTypo';
 
 
@@ -47,8 +48,9 @@ function zelleZuText(zelle: unknown): string {
 }
 
 /** Fristen-Chips für Notizen (M323: der Text kommt EINMAL berechnet von der Karte) */
-function NoteDueChips({ text, title }: { text: string; title: string }) {
-  return <DueChips text={text} context={title} />;
+function NoteDueChips({ text, title, blocks, anker }: { text: string; title: string; blocks: unknown; anker: FristAnker | undefined }) {
+  const fristen = useCallback(() => fristenDerNotiz(blocks, anker), [blocks, anker]);
+  return <DueChips text={text} context={title} fristen={fristen} />;
 }
 
 /** ☎/✉/🔗-Chips: erkannte Telefonnummern, Mails & Links aus dem Notiz-Text
@@ -96,7 +98,10 @@ function NoteLinkChipsInnen({ links }: { links: string[] }) {
     if (target?.kind === 'board') openBoard(target.boardId);
     else if (target?.kind === 'card') { openBoard(target.boardId); focusNode(target.boardId, target.nodeId); }
     else {
-      addBoard(name);
+      // M390: Das neue Board entsteht im Projekt der Notiz — vorher immer im ersten Projekt der Umgebung
+      const st = useBoard.getState();
+      const projekt = st.spaces.flatMap((sp) => sp.projects).find((p) => p.boardIds.includes(st.activeId))?.id;
+      addBoard(name, projekt);
       showToast(`Board „${name}" angelegt und verlinkt`);
     }
   };
@@ -243,6 +248,7 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
   // M364: Der Inhalt wurde von außen geändert (Abgleich, Mitschreiben eines anderen in der Gruppenarbeit) — der
   // lebende Editor übernimmt ihn an Ort und Stelle. Währenddessen schreibt onChange nichts zurück.
   const externRef = useRef(false);
+  const textRueckAm = useRef(0);   // M390: Zeitpunkt des letzten Strg+Z/Y im Text
   useEffect(() => {
     const auf = (e: Event) => {
       if (!(e as CustomEvent<string[]>).detail?.includes(id)) return;
@@ -456,6 +462,10 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
       <div
         className="nodrag nowheel note-editor"
         ref={editorRef}
+        onKeyDownCapture={(e) => {
+          // M390: Strg+Z / Strg+Y im Text — die Änderung, die gleich kommt, ist ein Rückgängig des Editors
+          if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'z' || e.key === 'Z' || e.key === 'y' || e.key === 'Y')) textRueckAm.current = Date.now();
+        }}
       >
         <BlockNoteView
           editor={editor}
@@ -464,7 +474,13 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
           sideMenu={false}
           formattingToolbar={false}
           slashMenu={false}   /* M283: eigenes Einfügen-Menü (NoteSlashMenu) */
-          onChange={() => { if (!externRef.current) updateNodeData(id, { blocks: editor.document }); trackTable(); }}
+          onChange={() => {
+            if (!externRef.current) {
+              if (Date.now() - textRueckAm.current < 400) { textRueckAm.current = 0; useBoard.getState().textRueckgaengig(id, editor.document as unknown[]); }
+              else updateNodeData(id, { blocks: editor.document });
+            }
+            trackTable();
+          }}
           onSelectionChange={trackTable}
         >
           {/* M201: Standard-Leiste + A₋/A₊/A₊₊/Aa für den markierten Text */}
@@ -666,7 +682,7 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
           <span className="note-fortschritt-text">{stand.erledigt}/{stand.gesamt} erledigt</span>
         </div>
       )}
-      <NoteDueChips text={text} title={titel} />
+      <NoteDueChips text={text} title={titel} blocks={data.blocks} anker={(data as { fristAnker?: FristAnker }).fristAnker} />
       <NoteEntityChips text={chipText} />
       <NoteLinkChips text={text} />
       <NoteAboFeeds id={id} />

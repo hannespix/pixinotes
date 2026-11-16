@@ -56,15 +56,29 @@ export function nurWortKeinTag(text: string, r: { text: string; index: number })
 const fundSpeicher = new Map<string, Array<{ text: string; date: Date; index: number }>>();
 let fundStunde = '';
 
-export function detectDates(text: string, ref: Date = new Date()): DetectedDate[] {
+/** M390: Vermerke, die wie ein Datum aussehen, aber keine Frist sind — die Protokoll-Reihe hängt sie an vertagte Punkte. */
+const KEIN_TERMIN = /\(offen seit [^)]*\)/gi;
+
+/**
+ * Datumsangaben im Text.
+ *
+ * M390: `anker` ist der Tag, an dem der Text GESCHRIEBEN wurde. „bis Freitag" meint den Freitag danach — nicht den
+ * Freitag nach dem Tag, an dem man die Notiz gerade ansieht. Ohne Anker wanderte jede relative Frist mit: Am Freitag
+ * hieß es „heute", ab Freitagmittag „in 7 Tagen" — überfällig wurde sie nie. Die Dringlichkeit rechnet weiter
+ * gegen `now`.
+ */
+export function detectDates(text: string, now: Date = new Date(), anker?: Date): DetectedDate[] {
   if (!text) return [];
-  const stunde = `${ref.getFullYear()}-${ref.getMonth()}-${ref.getDate()}-${ref.getHours()}`;
+  const ref = anker ?? now;
+  const stunde = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
   if (stunde !== fundStunde || fundSpeicher.size > 20000) { fundSpeicher.clear(); fundStunde = stunde; }
-  let funde = fundSpeicher.get(text);
+  const schluessel = anker ? `${anker.getFullYear()}-${anker.getMonth()}-${anker.getDate()}|${text}` : text;
+  let funde = fundSpeicher.get(schluessel);
   if (!funde) {
+    const lesbar = text.replace(KEIN_TERMIN, (m) => ' '.repeat(m.length));
     let results: ParsedResult[] = [];
     try {
-      results = chronoDe.parse(text, ref, { forwardDate: true });
+      results = chronoDe.parse(lesbar, ref, { forwardDate: true });
     } catch {
       return [];
     }
@@ -72,12 +86,12 @@ export function detectDates(text: string, ref: Date = new Date()): DetectedDate[
     for (const r of results) {
       // Reine Uhrzeiten überspringen
       if (!r.start.isCertain('day') && !r.start.isCertain('weekday')) continue;
-      if (nurWortKeinTag(text, r)) continue;
+      if (nurWortKeinTag(lesbar, r)) continue;
       funde.push({ text: r.text, date: r.start.date(), index: r.index });
     }
-    funde.push(...kurzdaten(text, ref));
+    funde.push(...kurzdaten(lesbar, ref));
     funde.sort((a, b) => a.index - b.index);
-    fundSpeicher.set(text, funde);
+    fundSpeicher.set(schluessel, funde);
   }
   const seen = new Set<string>();
   const out: DetectedDate[] = [];
@@ -85,7 +99,7 @@ export function detectDates(text: string, ref: Date = new Date()): DetectedDate[
     const key = f.date.toDateString();
     if (seen.has(key)) continue;
     seen.add(key);
-    const diffH = (f.date.getTime() - ref.getTime()) / 36e5;
+    const diffH = (f.date.getTime() - now.getTime()) / 36e5;
     out.push({
       label: f.text.trim(),
       date: f.date,
@@ -93,6 +107,16 @@ export function detectDates(text: string, ref: Date = new Date()): DetectedDate[
     });
   }
   return out.slice(0, 3);
+}
+
+/** M390: Hängt das Ergebnis am Tag des Lesens? („Freitag", „morgen", „in 3 Tagen" — nicht „20.11.") */
+export function hatRelativesDatum(text: string): boolean {
+  if (!text || text.length < 3) return false;
+  const a = new Date(2026, 0, 5, 0, 0, 1);    // ein Montag
+  const b = new Date(2026, 0, 16, 0, 0, 1);   // elf Tage später, ein Freitag
+  const da = detectDates(text, a, a); const db = detectDates(text, b, b);
+  if (da.length !== db.length) return true;
+  return da.some((d, i) => d.date.toDateString() !== db[i].date.toDateString());
 }
 
 export function formatDue(d: DetectedDate, now: Date = new Date()): string {

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { passt } from '../lib/tasten';
 import { usePfeilTasten } from './pfeilTasten';
+import { overlayOffen } from '../lib/overlay';
 import { useKontextSperre } from './Kontextmenue';
 
 /**
@@ -64,20 +65,32 @@ export function Tastatur() {
           else { st.setOverviewMode('netz'); st.setView('overview'); }
         });
       }
-      if (passt(e, 'praesentation')) return tun(() => st.setPresenting(!st.presenting));
+      /**
+       * M390: Was am Board etwas ÄNDERT oder die Ansicht wechselt, gehört dem Fenster darüber.
+       *
+       * N, F und Strg+Z waren seit M388 gesperrt, sobald ein Fenster offen ist — die Alt-Kürzel hier nicht: Mit
+       * offenen Einstellungen archivierte Alt+A die gewählte Karte dahinter, Alt+→ wechselte das Board, Alt+P legte
+       * die Präsentation über die Einstellungen; in der Präsentation wechselte Alt+→ zusätzlich zum Blättern das
+       * Board. `fenster` = irgendein Fenster oder die Präsentation liegt darüber; `amBoard` = das Board ist zu sehen.
+       */
+      const fenster = overlayOffen();
+      const amBoard = st.view === 'board' && !st.tasksOpen && !fenster;
+      if (passt(e, 'praesentation')) { if (!st.presenting && fenster) return; return tun(() => st.setPresenting(!st.presenting)); }
 
       // Board wechseln — innerhalb des Projekts, in dem das aktive Board liegt
       const projektBoards = () => {
         for (const sp of st.spaces) {
           for (const p of sp.projects) {
             if (p.boardIds.includes(st.activeId)) {
-              return p.boardIds.filter((id) => st.boards.some((b) => b.id === id));
+              // M390: archivierte Boards nur, wenn das Archiv eingeblendet ist — sonst blätterte man ins Unsichtbare
+              return p.boardIds.filter((id) => st.boards.some((b) => b.id === id && (!b.archived || st.showArchived || id === st.activeId)));
             }
           }
         }
         return st.boards.map((b) => b.id);
       };
       if (passt(e, 'boardVor') || passt(e, 'boardZurueck')) {
+        if (fenster) return;
         return tun(() => {
           const ids = projektBoards();
           if (ids.length < 2) return;
@@ -88,6 +101,7 @@ export function Tastatur() {
         });
       }
       if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && /^Digit[1-9]$/.test(e.code)) {
+        if (fenster) return;
         return tun(() => {
           const ids = projektBoards();
           const ziel = ids[Number(e.code.slice(5)) - 1];
@@ -97,6 +111,7 @@ export function Tastatur() {
 
       // ── Karten & Board (nur sinnvoll, wenn ein Board offen ist) ────────
       if (passt(e, 'archivieren')) {
+        if (!amBoard) return;
         return tun(() => {
           const gewaehlt = selectActiveBoard(st).nodes.filter((n) => n.selected).map((n) => n.id);
           const ids = gewaehlt.length ? gewaehlt : st.focusCard ? [st.focusCard] : [];
@@ -108,8 +123,9 @@ export function Tastatur() {
           st.setArchived(ids, true);
         });
       }
-      if (passt(e, 'archivZeigen')) return tun(() => st.setShowArchived(!st.showArchived));
+      if (passt(e, 'archivZeigen')) { if (fenster) return; return tun(() => st.setShowArchived(!st.showArchived)); }
       if (passt(e, 'fokus')) {
+        if (!amBoard) return;
         return tun(() => {
           if (st.focusCard) { st.setFocusCard(null); return; }
           const erste = selectActiveBoard(st).nodes.find((n) => n.selected);
@@ -117,13 +133,13 @@ export function Tastatur() {
           else st.showToast('Zum Öffnen im Fokus erst eine Karte auswählen.');
         });
       }
-      if (passt(e, 'raster')) return tun(() => st.setGridSnap(!st.gridSnap));
-      if (passt(e, 'physik')) return tun(() => st.setPhysicsEnabled(!st.physicsEnabled));
-      if (passt(e, 'zeichnen')) return tun(() => st.setTool(st.tool === 'select' ? 'pen' : 'select'));
+      if (passt(e, 'raster')) { if (!amBoard) return; return tun(() => st.setGridSnap(!st.gridSnap)); }
+      if (passt(e, 'physik')) { if (!amBoard) return; return tun(() => st.setPhysicsEnabled(!st.physicsEnabled)); }
+      if (passt(e, 'zeichnen')) { if (!amBoard) return; return tun(() => st.setTool(st.tool === 'select' ? 'pen' : 'select')); }
 
       // ── Reine Buchstaben: im Text sind das einfach Buchstaben ──────────
       if (imText(e)) return;
-      if (passt(e, 'alleWaehlen') && st.view === 'board') {
+      if (passt(e, 'alleWaehlen') && amBoard) {
         return tun(() => {
           const sichtbar = selectActiveBoard(st).nodes
             .filter((n) => !n.archived || st.showArchived)
@@ -133,8 +149,19 @@ export function Tastatur() {
       }
     };
 
+    /**
+     * M390: Entf / Rücktaste löschen keine Karten hinter einem Fenster. Das Löschen übernimmt die Bibliothek des
+     * Boards mit einem eigenen Zuhörer am Dokument — er bekommt die Taste nicht mehr zu sehen, solange ein Fenster
+     * darüber liegt. In Textfeldern bleibt alles, wie es ist.
+     */
+    const entfSperre = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      if (imText(e) || !overlayOffen()) return;
+      e.stopPropagation();
+    };
+    window.addEventListener('keydown', entfSperre, true);
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('keydown', entfSperre, true); };
   }, []);
 
   return null;
