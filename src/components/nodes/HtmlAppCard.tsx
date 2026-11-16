@@ -11,6 +11,7 @@ import { triggerDownload } from '../../lib/download';
 import { fremdeWebAdresse } from '../../lib/sicher';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
+import { useRandLeiste } from '../../lib/randLeiste';
 import { IAppWindow, ICloud, ICopy, IDownload, IMaximize, IMinimize, IMore, IPlay, IReload, IStopSq } from '../Icons';
 
 /**
@@ -138,6 +139,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   const [srcdoc, setSrcdoc] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [full, setFull] = useState(false);
+  const rand = useRandLeiste(full);   // M393: im Vollbild zieht sich die Kopfleiste zurück
   const [liveOn, setLiveOn] = useState(false);
   const [liveKey, setLiveKey] = useState(0); // Neustart der Live-Einbettung
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -375,7 +377,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
           Kopfzeile, Poster); nur echte Bedienelemente sind nodrag, und die
           laufende App-Fläche (iframe) schluckt ihre Eingaben selbst */}
       <div className={`happ-wrap ${full ? 'happ-full' : ''}`} ref={wrapRef}>
-        <div className="happ-head">
+        <div className={`happ-head ${rand.da ? 'da' : ''}`} {...rand.griff}>
           <IAppWindow size={15} />
           <DragTitle
             className="happ-title"
@@ -395,7 +397,13 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
               <IPlay size={14} />
             </button>
           )}
-          <button
+{/* M393: Im Vollbild gibt es kein ⋯ (das Menü läge außerhalb des Vollbilds) — hier führt ein Knopf zurück */}
+          {full ? (
+            <button className="happ-btn nodrag" data-taste="happ-vollbild-zu" title="Vollbild verlassen (Esc)" aria-label="Vollbild verlassen" onClick={toggleFull}>
+              <IMinimize size={14} />
+            </button>
+          ) : (
+                    <button
             className="happ-btn nodrag"
             data-hmbtn={id}
             title="Weitere Funktionen (eigener Tab, Herunterladen, Speicherstand)"
@@ -410,6 +418,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
           >
             <IMore size={14} />
           </button>
+          )}
         </div>
         <div className="happ-body">
           {runningUi ? (

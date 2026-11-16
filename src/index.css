@@ -3980,7 +3980,18 @@ body:has(.dock-menu) .toast { bottom: auto; top: calc(16px + var(--safe-top, 0px
 /* Natives Vollbild: die Karte selbst wird fullscreen — Kopfleiste bleibt
    als Steuerleiste oben (Stop/Neustart/Verkleinern), die App füllt den Rest */
 .happ-full:fullscreen { background: var(--surface); border-radius: 0; }
-.happ-full:fullscreen .happ-head { cursor: default; }
+/* M393: Im Vollbild gehört der Schirm dem Tool. Die Kopfleiste zieht sich nach oben zurück und kommt, wenn der
+   Zeiger den oberen Rand berührt (die schmale Greifkante hängt an ihr, sonst schluckte das Tool die Bewegung).
+   Beim Eintritt bleibt sie einen Moment stehen — so sieht man, wo sie ist (lib/randLeiste.ts). */
+.happ-full:fullscreen { position: relative; }
+.happ-full:fullscreen .happ-head {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 4; cursor: default;
+  background: var(--surface);
+  transform: translateY(-100%); transition: transform 0.2s ease;
+}
+.happ-full:fullscreen .happ-head::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 6px; }
+.happ-full:fullscreen .happ-head.da,
+.happ-full:fullscreen .happ-head:has(:focus-visible) { transform: none; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16); }
 
 /* ---------- Team-Anlagen (M159) ---------- */
 .file-teamload {
@@ -6929,7 +6940,23 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 @media (max-width: 900px) {
   .zeig-band.im-vortrag { left: 50%; transform: translateX(-50%); bottom: calc(64px + var(--safe-bottom, 0px)); max-width: calc(92vw / var(--pn-anz, 1)); }
 }
-.presenter-slide.app { margin: 0 2vw 10px; }
+/* M393: Läuft ein Tool als Folie, füllt es den Schirm bis oben: Die Kopfzeile der Präsentation zieht sich zurück
+   und kommt am oberen Rand wieder (wie im Vollbild der Karte). Die Fußzeile bleibt — über ihr wird geblättert,
+   denn Tasten landen im Tool. */
+.presenter-slide.app { margin: 0 0 10px; border-radius: 0; }
+.presenter:has(> .presenter-slide.app) > .presenter-head {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 6; background: #1a1814;
+  transform: translateY(-100%); transition: transform 0.2s ease;
+}
+.presenter:has(> .presenter-slide.app) > .presenter-head::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 6px; }
+/* mit dem Finger braucht die Greifkante mehr Höhe */
+@media (pointer: coarse) {
+  .happ-full:fullscreen .happ-head::after,
+  .presenter:has(> .presenter-slide.app) > .presenter-head::after { height: 18px; }
+}
+.presenter:has(> .presenter-slide.app) > .presenter-head.da,
+.presenter:has(> .presenter-slide.app) > .presenter-head:has(:focus-visible),
+.presenter:has(> .presenter-slide.app) > .presenter-head:has(.reakt-wahl) { transform: none; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); }
 
 /* M372: Der Schreibhinweis des Editors („Text eingeben oder '/' für Befehle tippen") gehört dem, der gerade in
    der Notiz schreibt. Der Editor hängt ihn an die Stelle seiner Schreibmarke — die gibt es aber auch, wenn

@@ -18,6 +18,7 @@ import { DokumentFolie, dokumentArt } from './DokumentFolie';
 import { letzteSeite } from '../lib/pdfSeiten';
 import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, MinutesNode, NoteNode, ShapeNode, SheetNode, TimeNode, WeekNode } from '../types';
 import { HtmlAppSlide } from './nodes/HtmlAppCard';
+import { useRandLeiste } from '../lib/randLeiste';
 import { BubblesBody } from './nodes/BubblesCard';
 import { WeekBody } from './nodes/WeekCard';
 import { TimeBody } from './nodes/TimeCard';
@@ -372,6 +373,8 @@ export function Presenter() {
   // idx robust klemmen — board.nodes kann während der Präsentation schrumpfen
   const safeIdx = Math.max(0, Math.min(idx, slides.length - 1));
   const current = slides[safeIdx] as AppNode | undefined;
+  // M393: Auf einer Tool-Folie gehört der Schirm dem Tool — die Kopfzeile kommt am oberen Rand
+  const rand = useRandLeiste(open && current?.type === 'htmlapp', 2200);
   const art = current ? dokumentArt(current) : null;
   const seitenHier = current && art && art !== 'bild' ? seitenJe[current.id] ?? 1 : 1;
   const seiteHier = pos.seite < 0 ? seitenHier : Math.min(Math.max(1, pos.seite), seitenHier);
@@ -450,7 +453,7 @@ export function Presenter() {
 
   return (
     <div className={`presenter ${art ? 'mit-dokument' : ''}`} role="dialog" aria-modal="true" aria-label="Präsentation">
-      <div className="presenter-head">
+      <div className={`presenter-head ${rand.da ? 'da' : ''}`} {...rand.griff}>
         <span translate="no">{board.name}</span>
         <span className="presenter-hint-edit">{art ? 'Doppelklick oder + / − vergrößert · B = Seitenbreite' : current?.type === 'htmlapp' ? 'Läuft auf der Folie · blättern mit ‹ ›' : 'Folien sind direkt editierbar'}</span>
         <span className="presenter-count">{slides.length ? safeIdx + 1 : 0} / {slides.length}</span>
