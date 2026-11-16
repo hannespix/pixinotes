@@ -63,6 +63,11 @@ export async function pdfSeiteText(dataUrl: string, pageNo: number): Promise<Arr
   return out;
 }
 
+/** M392: Grenzen fürs Bitmap einer Seite */
+const MIN_PIXEL = 700;
+const MAX_BREITE = 4096;
+const MAX_PIXEL = 8_000_000;
+
 /** Läuft ein Render noch, kann der Aufrufer ihn hierüber abbrechen. */
 export interface RenderHandle {
   promise: Promise<number>;
@@ -92,6 +97,11 @@ export function renderPdfPage(
    * einfrieren. Dort wird `cssBreite` also nur zum Rechnen benutzt.
    */
   festeGroesse = true,
+  /**
+   * M392: Stufe des Board-Zooms (lib/boardZoom.ts). Mit ihr wird das Bild so fein gemalt, wie es auf dem Schirm
+   * erscheint — nicht nur so fein, wie die Karte breit ist. Ohne Angabe gilt die Anzeigegröße der Wurzel (M242).
+   */
+  stufe?: number,
 ): RenderHandle {
   let renderTask: { cancel: () => void } | null = null;
   let cancelled = false;
@@ -116,26 +126,52 @@ export function renderPdfPage(
      *    auch dieses. Genau das war im Screenshot zu sehen: Text mit weichen
      *    Rändern. Der Zoom gehört also in die Rechnung.
      *
-     * Die Deckelung bei 4 ist eine Sicherung: Ein Retina-Schirm bei 200 %
-     * Anzeigegröße käme sonst auf ein Bitmap mit der vierfachen Kantenlänge,
-     * also dem Sechzehnfachen an Speicher. Vier reicht fürs Auge.
+     * Die Obergrenze steht seit M392 weiter unten (MAX_BREITE, MAX_PIXEL).
      */
-    const dichte = Math.min(4, Math.max(1, (window.devicePixelRatio || 1) * wurzelZoom()));
+    const dpr = window.devicePixelRatio || 1;
+    // Auf dem Board steckt die Anzeigegröße schon im Zoom (M268) — dort zählt die Stufe, sonst der Wurzel-Zoom
+    const dichte = Math.max(1, dpr * (stufe ?? wurzelZoom()));
     const breite = Math.max(40, Math.round(cssBreite));
-    const scale = (breite / base.width) * dichte;
-    const viewport = page.getViewport({ scale });
-    canvas.width = Math.round(viewport.width);
-    canvas.height = Math.round(viewport.height);
+    const verhaeltnis = base.height / base.width;
+    /**
+     * M392: Wie viele Bildpunkte breit?
+     *  · gebraucht werden Kartenbreite × Dichte (Schirm × Zoom-Stufe);
+     *  · eine kleine Karte bekommt in Ruhe etwas Vorrat (bis zum Doppelten, höchstens MIN_PIXEL breit) — dann ist
+     *    auch das erste Stück Hineinzoomen sofort scharf, noch bevor neu gemalt ist. Mehr als das Doppelte wäre
+     *    kein Gewinn: Ein Bild, das der Browser stark verkleinern muss, flimmert an feinen Linien;
+     *  · gedeckelt bei MAX_BREITE und MAX_PIXEL: Eine A4-Seite hat dann rund 2400 × 3400 Punkte. Mehr sieht
+     *    niemand, und ein Bitmap kostet vier Byte je Punkt.
+     */
+    let pixel = breite * dichte;
+    if (!stufe || stufe <= 1) pixel = Math.max(pixel, Math.min(2 * pixel, MIN_PIXEL));
+    pixel = Math.min(pixel, MAX_BREITE, Math.sqrt(MAX_PIXEL / verhaeltnis));
+    const viewport = page.getViewport({ scale: pixel / base.width });
     if (festeGroesse) {
       canvas.style.width = `${breite}px`;
-      canvas.style.height = `${Math.round((base.height / base.width) * breite)}px`;
+      canvas.style.height = `${Math.round(verhaeltnis * breite)}px`;
     }
-    const ctx = canvas.getContext('2d');
-    if (ctx && !cancelled) {
-      const task = page.render({ canvasContext: ctx, viewport });
+    if (cancelled) return doc.numPages;
+    /**
+     * M392: Gemalt wird in einen Puffer, getauscht in einem Zug. Vorher wurde das sichtbare Canvas erst geleert
+     * und dann bemalt — bei jedem Neumalen (andere Breite, anderer Zoom) blitzte die Seite leer auf. Das alte Bild
+     * bleibt jetzt stehen, bis das neue fertig ist. Nebenbei können sich zwei Malvorgänge nicht mehr dasselbe
+     * Canvas streitig machen.
+     */
+    const puffer = document.createElement('canvas');
+    puffer.width = Math.max(1, Math.round(viewport.width));
+    puffer.height = Math.max(1, Math.round(viewport.height));
+    const pctx = puffer.getContext('2d');
+    if (pctx) {
+      const task = page.render({ canvasContext: pctx, viewport });
       renderTask = task;
       await task.promise;
+      if (!cancelled) {
+        canvas.width = puffer.width;
+        canvas.height = puffer.height;
+        canvas.getContext('2d')?.drawImage(puffer, 0, 0);
+      }
     }
+    puffer.width = 0; puffer.height = 0;   // Speicher gleich freigeben
     return doc.numPages;
   })();
 

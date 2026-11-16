@@ -250,7 +250,8 @@ console.log('\n════ T5: PDF-Seite aufklappen und im Fokus groß ansehen 
   });
   console.log('   ', JSON.stringify(vor), '→', JSON.stringify(nach));
   pruefe('T5b im Fokus wird die PDF-Seite größer', !!nach && nach.fokus && nach.breite > vor.breite * 1.3, `${vor?.breite} → ${nach?.breite}`);
-  pruefe('T5c und dabei neu gerendert (scharf)', !!nach && nach.bitmap > vor.bitmap * 1.3, `${vor?.bitmap} → ${nach?.bitmap}`);
+  // M392: Schon die kleine Seite hat Vorrat — entscheidend ist, dass das Bitmap die sichtbare Breite deckt
+  pruefe('T5c und dabei scharf: das Bitmap deckt die sichtbare Breite', !!nach && nach.bitmap >= nach.breite * 0.98 && nach.bitmap >= vor.bitmap, `${vor?.bitmap} → ${nach?.bitmap} bei ${nach?.breite} Punkten`);
   pruefe('T5d die Seite liegt ganz im Bild', !!nach && nach.links >= 0 && nach.rechts <= nach.fenster, JSON.stringify(nach));
   await P.keyboard.press('Escape');
   await ctx.close();

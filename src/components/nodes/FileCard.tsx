@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { wordEntschaerfen } from '../../lib/sicher';
-import { mutedHistory, selectActiveBoard, useBoard } from '../../store';
+import { mutedHistory, runDerived, selectActiveBoard, useBoard } from '../../store';
 import type { FileNode } from '../../types';
 import { formatBytes, MAX_EMBED_BYTES } from '../../lib/parseEmail';
 import { triggerDownload } from '../../lib/download';
 import { readFileAsDataUrl } from '../../lib/image';
 import { canEmbed } from '../../lib/nodes';
 import { loadAttachment } from '../../lib/attachments';
+import { BOARD_ZOOM, zoomStufe } from '../../lib/boardZoom';
 import { pdfSeiteMasse, pdfSeiteText, renderPdfPage } from '../../lib/pdf';
 import { seitenTextMelden } from '../../lib/markerZeile';
 import { blasenAn, blasenSetzen, DOKUMENT_BEFEHL, letzteSeite, pdfAufgeklappt, pdfAufklappen, seiteMelden, seiteMerken, seitenKommentare, type DokumentBefehl } from '../../lib/pdfSeiten';
@@ -144,6 +145,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
   }, [id]);
   const offen = auf || imFokus || gezeigt;
   const [bildOffen, setBildOffen] = useState(false);
+  const [bildKaputt, setBildKaputt] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const download = () => {
@@ -185,6 +187,57 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
       setLoading(false);
     }
   };
+
+  /**
+   * M392: Ein Foto, das als DATEI abgelegt ist, sieht aus wie jedes andere Bild — rahmenlos.
+   *
+   * Rahmenlos (M374) waren nur eingebettete Bilder. Trägt ein Board schon einige Bilder, passt das nächste nicht
+   * mehr in den Stand und geht in die Geräte-Ablage — als Datei-Karte mit Kopfzeile, Rand und kleiner Vorschau.
+   * Bei Fotos war das der Normalfall: „Bilder haben immer noch einen Rahmen". Wo das Bild liegt, ist Technik;
+   * auf dem Board ist es ein Bild. Mit Rahmen (als Karte) gibt es weiter über ⋯ → „Mit Rahmen".
+   */
+  if (istBild && !bildKaputt && file.rahmen !== true) {
+    const anlegen = (e: React.SyntheticEvent<HTMLImageElement>) => {
+      const el = e.currentTarget;
+      if (!(el.naturalWidth > 0 && el.naturalHeight > 0)) return;
+      const st = useBoard.getState();
+      if (st.focusCard === id) return;
+      const n = selectActiveBoard(st)?.nodes.find((k) => k.id === id);
+      if (!n || typeof n.height !== 'number' || typeof n.width !== 'number') return;
+      const ziel = Math.max(8, Math.round(n.width * el.naturalHeight / el.naturalWidth));
+      if (Math.abs(ziel - n.height) > 2) runDerived(() => st.setNodeHeight(id, ziel));
+    };
+    const unterschrift = (
+      <div className="meta img-name unterschrift">
+        🖼️
+        <DragTitle
+          className="img-titel"
+          value={titel}
+          placeholder="Bild benennen"
+          onChange={(v) => {
+            const neu = v.trim();
+            useBoard.getState().updateNodeData(id, { titel: neu && neu !== file.name ? neu : undefined });
+          }}
+        />
+      </div>
+    );
+    return (
+      <CardShell id={id} selected={selected} minWidth={24} minHeight={24} seitenverhaeltnis ruhig
+        aussen={eigenerTitel || selected ? unterschrift : undefined}
+        className="image-card rahmenlos datei-bild">
+        <img src={quelle!} alt={titel || 'Bild'} draggable={false} onLoad={anlegen} onError={() => setBildKaputt(true)} />
+        <button
+          className="bild-lupe-auf nodrag"
+          title="Groß ansehen und zoomen"
+          aria-label="Bild groß ansehen"
+          onClick={(e) => { e.stopPropagation(); setBildOffen(true); }}
+        >⤢</button>
+        {bildOffen && (
+          <BildLupe quelle={quelle!} name={titel || 'Bild'} onClose={() => setBildOffen(false)} onDownload={download} />
+        )}
+      </CardShell>
+    );
+  }
 
   return (
     <CardShell id={id} selected={selected} minWidth={170} minHeight={50} className="file-card">
@@ -279,6 +332,37 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
 }
 
 /**
+ * M392: In welcher Zoom-Stufe muss dieses Bild gemalt sein, damit es auf dem Schirm scharf ist?
+ *
+ * Folgt dem Board-Zoom (in Stufen, erst wenn er ruht) — aber nur, solange das Bild zu sehen ist. Eine Karte außerhalb
+ * des Bildes bleibt bei Stufe 1 und fällt nach kurzer Zeit dorthin zurück: Bei 400 % Zoom wären sonst ALLE PDF-Karten
+ * des Boards sechzehnmal so groß im Speicher, obwohl nur eine zu sehen ist.
+ */
+function useMalStufe(ref: React.RefObject<HTMLElement | null>): number {
+  const [stufe, setStufe] = useState(1);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let sichtbar = typeof IntersectionObserver === 'undefined';
+    let t: number | undefined;
+    const setzen = () => setStufe(sichtbar ? zoomStufe() : 1);
+    const io = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver((es) => {
+      sichtbar = es[es.length - 1]?.isIntersecting ?? false;
+      window.clearTimeout(t);
+      // Ins Bild: gleich. Aus dem Bild: erst nach einer Weile — sonst malt jedes Schwenken hin und her
+      t = window.setTimeout(setzen, sichtbar ? 40 : 2000);
+    }, { rootMargin: '160px' });
+    io?.observe(el);
+    const aufZoom = () => { if (sichtbar) setzen(); };
+    window.addEventListener(BOARD_ZOOM, aufZoom);
+    setzen();
+    return () => { io?.disconnect(); window.clearTimeout(t); window.removeEventListener(BOARD_ZOOM, aufZoom); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return stufe;
+}
+
+/**
  * Erste PDF-Seite als Mini-Vorschau auf der Karte.
  *
  * M242: Gerendert wird in der Breite, in der die Vorschau tatsächlich zu sehen
@@ -291,6 +375,7 @@ function PdfThumb({ dataUrl, onOpen, onSeiten }: { dataUrl: string; onOpen: () =
   const ref = useRef<HTMLCanvasElement>(null);
   const [failed, setFailed] = useState(false);
   const [breite, setBreite] = useState(220);
+  const stufe = useMalStufe(ref);
 
   // Breite der Vorschau verfolgen. Entprellt und mit Totzone: Beim Ziehen an
   // der Kartenecke feuert der Beobachter sonst pro Frame ein volles
@@ -315,12 +400,12 @@ function PdfThumb({ dataUrl, onOpen, onSeiten }: { dataUrl: string; onOpen: () =
     // letztes Argument false: Die Miniatur behält `width: 100 %` aus dem
     // Stylesheet und wächst mit der Karte; nur die Auflösung folgt hier nach.
     let aktiv = true;
-    const h = renderPdfPage(dataUrl, 1, ref.current, breite, false);
+    const h = renderPdfPage(dataUrl, 1, ref.current, breite, false, stufe);
     // Ein abgebrochener Render (neue Breite kam dazwischen) ist kein Fehler
     h.promise.then((n) => { if (aktiv) onSeiten?.(n); }).catch(() => { if (aktiv) setFailed(true); });
     return () => { aktiv = false; h.cancel(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataUrl, breite]);
+  }, [dataUrl, breite, stufe]);
 
   if (failed) return null;
   return (
@@ -542,6 +627,7 @@ function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
   const [seiten, setSeiten] = useState(1);
   const [masse, setMasse] = useState<{ breite: number; hoehe: number } | null>(null);
   const [breite, setBreite] = useState(300);
+  const stufe = useMalStufe(ref);
   const [pinModus, setPinModus] = useState(false);
   const [failed, setFailed] = useState(false);
   const anzahlHier = useKommentareAufSeite(id, seite);
@@ -586,11 +672,11 @@ function PdfSeite({ id, dataUrl, zuklappen, onSeiten, onDownload }: {
   useEffect(() => {
     if (!ref.current) return;
     let aktiv = true;
-    const h = renderPdfPage(dataUrl, seite, ref.current, breite, true);
+    const h = renderPdfPage(dataUrl, seite, ref.current, breite, true, stufe);
     // Ein abgebrochener Render (Blättern oder neue Breite kam dazwischen) ist kein Fehler
     h.promise.then(() => { if (aktiv) melden(); }).catch(() => { if (aktiv) setFailed(true); });
     return () => { aktiv = false; h.cancel(); };
-  }, [dataUrl, seite, breite, melden]);
+  }, [dataUrl, seite, breite, stufe, melden]);
   // Beim Zuklappen/Abbauen: keine offene Seite mehr — Anmerkungen verschwinden, der Zähler bleibt
   useEffect(() => () => seiteMelden(id, null), [id]);
   // Kopfzeile oder Titel ändern die Lage der Seite in der Karte — nachmelden

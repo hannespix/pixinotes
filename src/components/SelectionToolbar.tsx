@@ -15,6 +15,7 @@ import { wurzelZoom } from '../lib/anzeige';
 // von Hand gepflegte Kopie der Schriftliste.
 import { FONT_STACKS, GROESSEN_KARTE, SCHRIFTEN } from '../lib/typo';
 import { ALIGN_LABEL, computeAlign, type AlignOp } from '../lib/align';
+import { vorschauArt } from '../lib/fileStore';
 import { mutedHistory } from '../store';
 import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
 import type { ArrangeMode } from '../lib/arrange';
@@ -672,7 +673,7 @@ export function SelectionToolbar() {
                   </div>
                 )}
                 {/* M374: Bilder liegen rahmenlos auf dem Board — hier kommt die Karte mit Rand zurück (und wieder weg) */}
-                {selected.every((n) => n.type === 'image') && (() => {
+                {selected.every((n) => n.type === 'image' || (n.type === 'file' && vorschauArt(String((n.data as { name?: string }).name ?? ''), (n.data as { mime?: string }).mime) === 'bild')) && (() => {
                   const alleMit = selected.every((n) => (n.data as { rahmen?: boolean }).rahmen === true);
                   return (
                     <button

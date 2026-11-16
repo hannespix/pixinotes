@@ -113,7 +113,7 @@ console.log('════ A: Notiz bei fast vollem Stand ════');
   const karte = (b?.nodes ?? []).find((n) => n.id !== 'n1');
   pruefe('A5 stattdessen eine Datei-Karte rechts neben der Notiz', !!karte && karte.type === 'file' && karte.position.x >= 60 + 320, JSON.stringify(karte && { type: karte.type, pos: karte.position }));
   pruefe('A6 … in der Geräte-Ablage, ohne Base64 im Stand', !!karte && karte.data.lokal === true && !karte.data.dataUrl);
-  pruefe('A7 die Karte ist auf dem Board zu sehen', (await P.locator('.file-card').count()) >= 1);
+  pruefe('A7 die Karte ist auf dem Board zu sehen', (await P.locator('.file-card, .image-card.rahmenlos').count()) >= 1);
   pruefe('A8 ein Hinweis nennt den Grund', [...toasts].some((t) => /Speicher fast voll/.test(t)), [...toasts].join(' | '));
   await P.screenshot({ path: `${SD}/m303-a-notiz.png` });
   await ctx.close();

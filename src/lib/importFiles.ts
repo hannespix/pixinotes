@@ -100,6 +100,9 @@ export async function importHtmlAppFromUrl(rawUrl: string, pos: { x: number; y: 
   }
 }
 
+/** M392: „Speicher fast voll" wird je Sitzung einmal gesagt, nicht bei jedem Foto */
+let vollGemeldet = false;
+
 /** Dateien importieren; gibt die Zahl der angelegten/verarbeiteten Karten zurück */
 export async function importFilesToBoard(files: File[], basePos: { x: number; y: number }): Promise<number> {
   const { addNode, showToast } = useBoard.getState();
@@ -285,7 +288,8 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
             delete node.data.lokal;
           }
           addNode(node);
-          showToast('⚠️ Speicher fast voll — Bild als Datei-Karte abgelegt, nicht eingebettet.');
+          // M392: Das Bild erscheint wie jedes andere (rahmenlos) — der Hinweis nennt nur noch den Zustand, einmal je Sitzung
+          if (!vollGemeldet) { vollGemeldet = true; showToast('⚠️ Speicher fast voll — neue Bilder liegen ab jetzt in der Geräte-Ablage statt im Board.', false, 7000); }
           mirror(file, node.id, mirrorNote);
         } else {
           const node = makeImage(pos, src, file.name, await bildMasse(src));

@@ -60,6 +60,8 @@ export interface FileData {
    *  fileStore.ts). Reist bewusst nicht mit: Ein Teilen-Link trägt den
    *  Board-Stand, nicht die Festplatte. */
   lokal?: boolean;
+  /** M392: Ein Bild, das als Datei abgelegt ist, liegt rahmenlos auf dem Board — true holt die Karte mit Kopfzeile und Rand zurück */
+  rahmen?: boolean;
   [key: string]: unknown;
 }
 
