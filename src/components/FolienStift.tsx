@@ -20,15 +20,14 @@ import { finalizeStroke } from '../lib/strokeShapes';
 import { seitenKommentare } from '../lib/pdfSeiten';
 import { wurzelZoom } from '../lib/anzeige';
 import { MarkerGruppen, StrichPfad } from './StrichPfad';
+import type { FolienWerkzeug } from '../lib/folienWerkzeug';
 
-export type FolienWerkzeug = 'pen' | 'marker' | 'eraser';
 /** Die Inhaltsbreite einer Folie in Einheiten der Folien-Striche */
 const EINHEIT = 1000;
 /** Strichstärken in Schirmpunkten */
 const DICKE = { pen: 3.2, marker: 18 };
 const RADIUS = 11;
 const STIFT_KEY = 'pixinotes-stift';
-export const FOLIEN_FARBEN = { pen: ['#e0392b', '#16191e', '#4f7cff', '#3fa564', '#e8a13a'], marker: ['#fff200', '#aaff00', '#ff9100', '#ff2d95', '#00e5ff'] };
 
 interface Lage {
   /** Kasten der Folie in der Bühne (Layout-Punkte) */

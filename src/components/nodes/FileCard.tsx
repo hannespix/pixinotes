@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { wordEntschaerfen } from '../../lib/sicher';
-import { mutedHistory, runDerived, selectActiveBoard, useBoard } from '../../store';
+import { mutedHistory, runDerived, selectActiveBoard, useBoard, useKarteFest } from '../../store';
 import type { FileNode } from '../../types';
 import { formatBytes, MAX_EMBED_BYTES } from '../../lib/parseEmail';
 import { triggerDownload } from '../../lib/download';
@@ -17,7 +17,8 @@ import { kontoDateiNachladen } from '../../lib/kontoSync';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { BildLupe } from './BildLupe';
-import { IDownload, IX } from '../Icons';
+import { ICrop, IDownload, IX } from '../Icons';
+import { bildBearbeiten } from '../BildEditorHost';
 
 const ICONS: Record<string, string> = {
   pdf: '📕',
@@ -146,6 +147,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
   const offen = auf || imFokus || gezeigt;
   const [bildOffen, setBildOffen] = useState(false);
   const [bildKaputt, setBildKaputt] = useState(false);
+  const fest = useKarteFest((file as { von?: string }).von);   // M395: Bearbeiten nur, wo ich darf
   const [loading, setLoading] = useState(false);
 
   const download = () => {
@@ -226,6 +228,15 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
         aussen={eigenerTitel || selected ? unterschrift : undefined}
         className="image-card rahmenlos datei-bild">
         <img src={quelle!} alt={titel || 'Bild'} draggable={false} onLoad={anlegen} onError={() => setBildKaputt(true)} />
+        {!fest && !/svg/i.test(`${file.mime ?? ''} ${file.name}`) && (
+          <button
+            className="bild-bearbeiten-auf nodrag"
+            data-taste="bild-bearbeiten-auf"
+            title="Bild bearbeiten — zuschneiden, drehen, gerade richten"
+            aria-label="Bild bearbeiten"
+            onClick={(e) => { e.stopPropagation(); bildBearbeiten(id); }}
+          ><ICrop size={14} /></button>
+        )}
         <button
           className="bild-lupe-auf nodrag"
           title="Groß ansehen und zoomen"

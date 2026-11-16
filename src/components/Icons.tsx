@@ -130,3 +130,10 @@ export const IImage = make(<><rect width="18" height="18" x="3" y="3" rx="2" /><
 
 /** M256: Sigma — das Zeichen für die Auto-Summe */
 export const ISigma = make(<><path d="M18 4H6l6 8-6 8h12" /></>);
+// M395: Bildbearbeitung
+export const ICrop = make(<><path d="M6 2v14a2 2 0 0 0 2 2h14" /><path d="M18 22V8a2 2 0 0 0-2-2H2" /></>);
+export const IDrehLinks = make(<><path d="M3 12a9 9 0 1 0 2.64-6.36" /><path d="M3 3v6h6" /></>);
+export const IDrehRechts = make(<><path d="M21 12a9 9 0 1 1-2.64-6.36" /><path d="M21 3v6h-6" /></>);
+export const ISpiegeln = make(<><path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3" /><path d="M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3" /><path d="M12 2v2" /><path d="M12 8v2" /><path d="M12 14v2" /><path d="M12 20v2" /></>);
+export const ISonne = make(<><circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.9 4.9 1.4 1.4" /><path d="m17.7 17.7 1.4 1.4" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m4.9 19.1 1.4-1.4" /><path d="m17.7 6.3 1.4-1.4" /></>);
+export const IVerpixeln = make(<><rect x="3.5" y="3.5" width="17" height="17" rx="1.5" /><path d="M3.5 9.2h17" /><path d="M3.5 14.8h17" /><path d="M9.2 3.5v17" /><path d="M14.8 3.5v17" /></>);

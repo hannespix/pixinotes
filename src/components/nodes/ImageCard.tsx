@@ -1,11 +1,13 @@
 import { useState, type SyntheticEvent } from 'react';
 import type { NodeProps } from '@xyflow/react';
-import { runDerived, selectActiveBoard, useBoard } from '../../store';
+import { runDerived, selectActiveBoard, useBoard, useKarteFest } from '../../store';
 import { triggerDownload } from '../../lib/download';
 import type { ImageNode } from '../../types';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { BildLupe } from './BildLupe';
+import { bildBearbeiten } from '../BildEditorHost';
+import { ICrop } from '../Icons';
 
 /**
  * Screenshot / Bild als Karte (per Strg+V, Drag&Drop oder aus E-Mail-Anhang).
@@ -29,6 +31,7 @@ export function ImageCard({ id, data, selected }: NodeProps<ImageNode>) {
   const img = data;
   const titel = img.titel?.trim() || img.name || '';
   const [lupe, setLupe] = useState(false);
+  const fest = useKarteFest((img as { von?: string }).von);
   const rahmen = img.rahmen === true;
   /* Ältere Bild-Karten tragen eine von Hand gezogene Höhe, in der noch Rand und Namenszeile stecken —
      rahmenlos stünde das Bild dann mit leeren Streifen in seiner Auswahl. Einmal an das Bild anlegen. */
@@ -71,6 +74,16 @@ export function ImageCard({ id, data, selected }: NodeProps<ImageNode>) {
       className={`image-card ${rahmen ? 'mit-rahmen' : 'rahmenlos'}`}
     >
       <img src={img.src} alt={titel || 'Bild'} draggable={false} onLoad={anlegen} />
+      {/* M395: zuschneiden, drehen, … — erscheint wie die Lupe erst am markierten Bild */}
+      {!fest && (
+        <button
+          className="bild-bearbeiten-auf nodrag"
+          data-taste="bild-bearbeiten-auf"
+          title="Bild bearbeiten — zuschneiden, drehen, gerade richten"
+          aria-label="Bild bearbeiten"
+          onClick={(e) => { e.stopPropagation(); bildBearbeiten(id); }}
+        ><ICrop size={14} /></button>
+      )}
       <button
         className="bild-lupe-auf nodrag"
         title="Groß ansehen und zoomen"

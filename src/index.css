@@ -460,7 +460,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 /* Nicht markiert: kein Griff, keine Anschlusspunkte, keine Lupe — auch nicht beim Zeigen */
 .react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .pn-handle,
 .react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .card-grip { opacity: 0; pointer-events: none; }
-.react-flow__node:not(.selected) .image-card.rahmenlos:not(.kachel) .bild-lupe-auf { opacity: 0; pointer-events: none; }
+.react-flow__node:not(.selected) .image-card.rahmenlos:not(.kachel) :is(.bild-lupe-auf, .bild-bearbeiten-auf) { opacity: 0; pointer-events: none; }
 html[data-kontrast='hoch'] .image-card.rahmenlos:not(.kachel) { border: 0; }
 .focus-mode .pn-focused .image-card.rahmenlos:not(.kachel) { box-shadow: none !important; }
 
@@ -2154,17 +2154,17 @@ html[data-kopf-eng='an'] .hint { display: none; }
  * derselbe Fund wie beim Kommentar-Pin in M148, hier von der Prüfreihe
  * gemeldet, bevor es jemand am Gerät erlebt.
  */
-.bild-lupe-auf {
+:is(.bild-lupe-auf, .bild-bearbeiten-auf) {
   position: absolute; top: 6px; left: 6px; z-index: 3;
   border: none; border-radius: var(--r); cursor: pointer; font-size: 13px; line-height: 1;
   padding: 5px 7px; background: rgba(20, 18, 14, 0.5); color: #fff;
   opacity: 0; transition: opacity 0.15s;
 }
-.image-card:hover .bild-lupe-auf, .react-flow__node.selected .bild-lupe-auf { opacity: 1; }
-.bild-lupe-auf:hover { background: rgba(20, 18, 14, 0.75); }
+.image-card:hover :is(.bild-lupe-auf, .bild-bearbeiten-auf), .react-flow__node.selected :is(.bild-lupe-auf, .bild-bearbeiten-auf) { opacity: 1; }
+:is(.bild-lupe-auf, .bild-bearbeiten-auf):hover { background: rgba(20, 18, 14, 0.75); }
 @media (pointer: coarse) {
   /* Am Finger gibt es kein Hovern — dort steht der Knopf dauerhaft da */
-  .bild-lupe-auf { opacity: 0.85; min-height: 32px; min-width: 32px; }
+  :is(.bild-lupe-auf, .bild-bearbeiten-auf) { opacity: 0.85; min-height: 32px; min-width: 32px; }
 }
 
 /* ---------- Präsentationsmodus ---------- */
@@ -6957,6 +6957,78 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 .presenter:has(> .presenter-slide.app) > .presenter-head.da,
 .presenter:has(> .presenter-slide.app) > .presenter-head:has(:focus-visible),
 .presenter:has(> .presenter-slide.app) > .presenter-head:has(.reakt-wahl) { transform: none; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); }
+
+/* ---------- M395: Bild bearbeiten ---------- */
+/* der Knopf am Bild: neben der Lupe, sichtbar wie sie (markiert bzw. unter dem Zeiger) */
+.bild-bearbeiten-auf { left: 40px; display: inline-flex; align-items: center; justify-content: center; padding: 4px 7px; }
+@media (pointer: coarse) { .bild-bearbeiten-auf { left: 44px; } }
+.bild-editor {
+  position: fixed; inset: 0; z-index: 130; display: flex; flex-direction: column; background: #1a1814; color: #e9ebee;
+  padding: var(--safe-top, 0px) 0 var(--safe-bottom, 0px); touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.be-kopf { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+.be-kopf button, .be-leiste button, .be-auto {
+  border: none; background: rgba(255, 255, 255, .1); color: #e9ebee; font: inherit; font-size: 13px; padding: 7px 12px;
+  border-radius: var(--r); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none;
+}
+.be-kopf button:hover, .be-leiste button:hover, .be-auto:hover { background: rgba(255, 255, 255, .18); }
+.be-kopf button:focus-visible, .be-leiste button:focus-visible, .be-auto:focus-visible, .bild-editor input:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.be-kopf .be-fertig { background: var(--accent-fill); color: #fff; font-weight: 700; padding: 7px 18px; }
+.be-kopf .be-fertig:disabled { opacity: .55; cursor: default; }
+.be-kopf .be-zurueck { background: none; color: #b8b2a4; }
+.be-titel { flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: center; gap: 10px; font-size: 13px; color: #b8b2a4; }
+.be-titel b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e9ebee; font-weight: 600; }
+.be-masse { flex: none; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.be-buehne { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.be-hinweis { color: #b8b2a4; font-size: 14px; }
+.be-blatt { position: relative; flex: none; cursor: crosshair; touch-action: none; }
+.be-blatt canvas { display: block; width: 100%; height: 100%; background:
+  repeating-conic-gradient(#3a3731 0% 25%, #2b2924 0% 50%) 0 0 / 16px 16px; }
+.be-schicht { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.be-dunkel { fill: rgba(12, 11, 9, .62); }
+.be-pixel { fill: rgba(255, 255, 255, .08); stroke: #fff; stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.be-entwurf { fill: rgba(255, 255, 255, .16); stroke: #fff; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.be-rahmen { position: absolute; box-sizing: border-box; border: 1.5px solid #fff; cursor: move; box-shadow: 0 0 0 1px rgba(0, 0, 0, .35); }
+/* Drittel-Linien: nur während des Ziehens — sie helfen beim Setzen, stören beim Ansehen */
+.be-drittel { position: absolute; inset: 0; opacity: 0; transition: opacity .12s; pointer-events: none; background:
+  linear-gradient(to right, transparent calc(33.33% - .5px), rgba(255, 255, 255, .55) calc(33.33% - .5px) calc(33.33% + .5px), transparent calc(33.33% + .5px) calc(66.66% - .5px), rgba(255, 255, 255, .55) calc(66.66% - .5px) calc(66.66% + .5px), transparent calc(66.66% + .5px)),
+  linear-gradient(to bottom, transparent calc(33.33% - .5px), rgba(255, 255, 255, .55) calc(33.33% - .5px) calc(33.33% + .5px), transparent calc(33.33% + .5px) calc(66.66% - .5px), rgba(255, 255, 255, .55) calc(66.66% - .5px) calc(66.66% + .5px), transparent calc(66.66% + .5px)); }
+.bild-editor.zieht .be-drittel { opacity: 1; }
+/* Griffe: sichtbar klein, greifbar groß (die Fläche drumherum gehört dazu) */
+.be-griff { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; }
+.be-griff::after { content: ''; position: absolute; left: 9px; top: 9px; width: 12px; height: 12px; background: #fff; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .4); }
+.be-griff.nw { left: 0; top: 0; cursor: nwse-resize; } .be-griff.no { left: 100%; top: 0; cursor: nesw-resize; }
+.be-griff.sw { left: 0; top: 100%; cursor: nesw-resize; } .be-griff.so { left: 100%; top: 100%; cursor: nwse-resize; }
+.be-griff.n { left: 50%; top: 0; cursor: ns-resize; } .be-griff.s { left: 50%; top: 100%; cursor: ns-resize; }
+.be-griff.w { left: 0; top: 50%; cursor: ew-resize; } .be-griff.o { left: 100%; top: 50%; cursor: ew-resize; }
+.be-griff.n::after, .be-griff.s::after { width: 22px; height: 6px; left: 4px; top: 12px; }
+.be-griff.w::after, .be-griff.o::after { width: 6px; height: 22px; left: 12px; top: 4px; }
+@media (pointer: coarse) { .be-griff { width: 44px; height: 44px; margin: -22px 0 0 -22px; } .be-griff::after { left: 16px; top: 16px; } .be-griff.n::after, .be-griff.s::after { left: 11px; top: 19px; } .be-griff.w::after, .be-griff.o::after { left: 19px; top: 11px; } }
+/* Leiste: eine Zeile; auf schmalen Schirmen rollt sie seitlich */
+.be-leiste { flex: none; display: flex; align-items: center; justify-content: safe center; gap: 14px; padding: 10px 14px 12px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; }
+.be-leiste::-webkit-scrollbar { display: none; }
+.be-gruppe { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.be-leiste button { min-width: 36px; height: 34px; padding: 0 10px; }
+.be-leiste button.an { background: var(--accent-fill); color: #fff; }
+.be-formate button { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.be-gerade, .be-regler { gap: 8px; font-size: 12.5px; color: #b8b2a4; }
+.be-gerade input { width: 150px; }
+.be-gerade output, .be-regler output { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: #e9ebee; }
+.bild-editor input[type='range'] { accent-color: var(--accent-fill); touch-action: none; cursor: pointer; }
+.be-anpassen { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 22px; padding: 8px 14px 0; }
+.be-regler { display: inline-flex; align-items: center; }
+.be-regler input { width: 140px; }
+.be-regler span { min-width: 68px; }
+@media (max-width: 620px) {
+  .be-kopf { padding: 8px 10px; gap: 6px; }
+  .be-kopf button { padding: 7px 10px; }
+  .be-titel b { display: none; }
+  /* am Telefon zwei Zeilen statt seitlich rollen — sonst lägen Regler und Verpixeln außer Sicht */
+  .be-leiste { gap: 8px 10px; padding: 8px 10px 10px; flex-wrap: wrap; justify-content: center; overflow: visible; touch-action: none; }
+  .be-formate { flex-basis: 100%; justify-content: center; }
+  .be-gerade input { width: 110px; }
+  .be-regler input { width: 120px; }
+}
 
 /* ---------- M394: Stift und Kommentare in der Präsentation ---------- */
 /* Die Zeichenschicht liegt über der Folie (wie der Laser) — sie fängt Eingaben nur, solange ein Werkzeug gewählt ist */
