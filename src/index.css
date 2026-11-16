@@ -446,6 +446,9 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .react-flow__node-image, .react-flow__node-image:hover, .react-flow__node-image.dragging { box-shadow: none; border-radius: 0; }
 .react-flow__node-image.selected { border-radius: 2px; }
 .image-card.mit-rahmen { box-shadow: var(--card-shadow); }
+/* M392: Ein Foto, das als Datei in der Geräte-Ablage liegt, ist auf dem Board dasselbe Bild — auch ohne Schatten am Knoten */
+.react-flow__node-file:has(.image-card.rahmenlos), .react-flow__node-file:has(.image-card.rahmenlos):hover, .react-flow__node-file.dragging:has(.image-card.rahmenlos) { box-shadow: none; border-radius: 0; }
+.react-flow__node-file.selected:has(.image-card.rahmenlos) { border-radius: 2px; }
 .image-card.rahmenlos:not(.kachel) { background: none; padding: 0; border-radius: 0; overflow: visible; }
 .image-card.rahmenlos:not(.kachel) img { border-radius: 0; }
 .image-card.kachel { box-shadow: var(--card-shadow); }

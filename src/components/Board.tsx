@@ -31,6 +31,7 @@ import type { AppNode } from '../types';
 import { NoteCard } from './nodes/NoteCard';
 import { EmailCard } from './nodes/EmailCard';
 import { ImageCard } from './nodes/ImageCard';
+import { boardZoomMelden } from '../lib/boardZoom';
 import { FileCard } from './nodes/FileCard';
 import { KanbanCard } from './nodes/KanbanCard';
 import { PortalCard } from './nodes/PortalCard';
@@ -950,6 +951,7 @@ export function Board() {
   const zoomMelden = useCallback((zoom: number, sofort = false) => {
     window.clearTimeout(zoomZeit.current);
     const setzen = () => {
+      boardZoomMelden(zoom);   // M392: Wer Bilder malt (PDF-Seiten), malt sie jetzt in der passenden Feinheit
       const wrap = zoomWrapRef.current;
       if (!wrap) return;
       const rel = zoom / (anzRef.current || 1);
