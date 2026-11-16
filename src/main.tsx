@@ -18,6 +18,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { initUebersetzung } from './lib/uebersetzung';
 import { initSprache, sprache } from './lib/sprache';
 import { startNamenAufEnglisch } from './store';
+import { fensterFokusStarten } from './lib/fensterFokus';
 
 // OAuth-Popup-Rücksprung (Kalender-Konten): Diese Seite dient dann nur als
 // Redirect-Ziel — Code ans Hauptfenster melden, App gar nicht erst rendern.
@@ -36,6 +37,8 @@ window.addEventListener('vite:preloadError', () => {
 });
 
 if (!handleOAuthRedirect()) {
+  // M389: Fokus-Führung für alle Fenster (hinein beim Öffnen, Tab im Kreis, zurück beim Schließen)
+  fensterFokusStarten();
   // M211: Tastaturhöhe als CSS-Variable — VOR dem Rendern, damit die
   // schwebenden Leisten schon beim ersten Frame richtig sitzen
   initViewportInsets();

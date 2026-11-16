@@ -18,6 +18,7 @@ import { suggestBoardLinks, type LinkSuggestion } from '../lib/brain';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
 import { InlineName } from './InlineName';
+import { wurzelZoom } from '../lib/anzeige';
 import { BereichMenu, BoardMenu, ProjektMenu, insBild } from './EbenenMenu';
 import { ITarget, IZoomIn, IZoomOut } from './Icons';
 
@@ -111,6 +112,8 @@ const nodeTypes: NodeTypes = {
   ovBoard: BoardTile,
 };
 
+const inLayout = (v: number) => v / wurzelZoom();
+
 function OverviewCanvas() {
   const anzeige = useBoard((s) => s.anzeige ?? 1);
   const spaces = useBoard((s) => s.spaces);
@@ -126,15 +129,26 @@ function OverviewCanvas() {
   // tick erzwingt Neu-Layout nach einem Drag (Kacheln rasten in die Zonen zurück)
   const [tick, setTick] = useState(0);
 
-  const { nodes, edges, projectRects } = useMemo(
-    () => layoutHierarchy(spaces, boards),
+  // M389: Am Telefon stand die ganze Umgebung als Briefmarke im Bild (vier Projekte nebeneinander, eingepasst auf
+  // 390 Punkte — Kacheln 30 Punkte breit, nichts lesbar, nichts treffbar). Schmal stehen die Projekte eines Bereichs
+  // UNTEREINANDER, zwei Kacheln je Zeile, und die Ansicht passt sich der BREITE an; nach unten wird gewischt.
+  const [schmal, setSchmal] = useState(() => window.matchMedia('(max-width: 640px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)');
+    const on = () => setSchmal(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const maxSpalten = schmal ? 2 : 3;
+  const { nodes, edges, projectRects, breite } = useMemo(
+    () => layoutHierarchy(spaces, boards, schmal),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [spaces, boards, tick],
+    [spaces, boards, tick, schmal],
   );
 
   // Nur bei ECHTER Strukturänderung remounten (fitView); nach einem reinen
   // Drag reicht die neue nodes-Referenz zum Zurückschnappen — Zoom bleibt (N2)
-  const structureKey = `${spaces.length}|${spaces.reduce((a, s) => a + s.projects.length, 0)}|${boards.length}`;
+  const structureKey = `${spaces.length}|${spaces.reduce((a, s) => a + s.projects.length, 0)}|${boards.length}|${schmal ? 's' : 'b'}`;
 
   return (
     <div className="board-wrap ov-canvas">
@@ -143,7 +157,14 @@ function OverviewCanvas() {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
-        fitView
+        fitView={!schmal}
+        onInit={schmal ? (rf) => {
+          const flaeche = document.querySelector('.ov-canvas')?.getBoundingClientRect();
+          if (!flaeche || !breite) return;
+          const kopf = document.querySelector('.ov-mode')?.getBoundingClientRect().bottom ?? flaeche.top + 150;
+          const zoom = Math.min(0.95 * anzeige, (inLayout(flaeche.width) - 16) / breite);
+          void rf.setViewport({ x: 8, y: Math.max(8, inLayout(kopf - flaeche.top) + 10), zoom });
+        } : undefined}
         /* M268: Auch die Netz-Übersicht rechnet den Anzeige-Zoom aus der
            Leinwand heraus — ihre Grenzen laufen deshalb mit dem Faktor. */
         fitViewOptions={{ padding: 0.18, maxZoom: 0.95 * anzeige }}
@@ -176,7 +197,7 @@ function OverviewCanvas() {
             const projekt = spaces.flatMap((sp) => sp.projects).find((p) => p.id === hit.id);
             if (projekt) {
               const andere = projekt.boardIds.filter((id) => id !== data.board.id && boards.some((b) => b.id === id));
-              const cols = Math.max(1, Math.min(3, projekt.boardIds.filter((id) => boards.some((b) => b.id === id)).length));
+              const cols = Math.max(1, Math.min(maxSpalten, projekt.boardIds.filter((id) => boards.some((b) => b.id === id)).length));
               const col = Math.max(0, Math.min(cols - 1, Math.round((node.position.x - (hit.x + GAP)) / (BW + GAP))));
               const row = Math.max(0, Math.round((node.position.y - (hit.y + PROJ_HEAD)) / (BH + GAP)));
               const platz = Math.min(andere.length, row * cols + col);
@@ -1527,7 +1548,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
 
 /* ---------- Layout: Hierarchie → Canvas-Positionen ---------- */
 
-function layoutHierarchy(spaces: Space[], boards: BoardDoc[]) {
+function layoutHierarchy(spaces: Space[], boards: BoardDoc[], schmal = false) {
   const boardById = new Map(boards.map((b) => [b.id, b]));
   const nodes: Node[] = [];
   const edges: Edge[] = [];
@@ -1535,21 +1556,28 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[]) {
   const tilePos = new Map<string, { x: number; y: number }>();
 
   let y = 0;
+  let breite = 0;
   spaces.forEach((space, si) => {
     const accent = SPACE_ACCENTS[si % SPACE_ACCENTS.length];
 
     const sizes = space.projects.map((p) => {
       const n = p.boardIds.length;
-      const cols = Math.max(1, Math.min(3, n));
+      const cols = Math.max(1, Math.min(schmal ? 2 : 3, n));
       const rows = Math.max(1, Math.ceil(Math.max(n, 1) / cols));
       return {
         cols,
-        w: Math.max(cols * (BW + GAP) + GAP, 250),
+        // schmal: alle Projekte gleich breit (zwei Kacheln) — untereinander wirkt ein Flatterrand unruhig
+        w: schmal ? 2 * (BW + GAP) + GAP : Math.max(cols * (BW + GAP) + GAP, 250),
         h: PROJ_HEAD + rows * (BH + GAP) + GAP,
       };
     });
-    const spaceW = Math.max(sizes.reduce((a, s) => a + s.w, 0) + GAP * (space.projects.length + 1), 340);
-    const spaceH = SPACE_HEAD + (sizes.length ? Math.max(...sizes.map((s) => s.h)) : 90) + GAP;
+    const spaceW = schmal
+      ? 2 * (BW + GAP) + GAP + 2 * GAP
+      : Math.max(sizes.reduce((a, s) => a + s.w, 0) + GAP * (space.projects.length + 1), 340);
+    const spaceH = schmal
+      ? SPACE_HEAD + (sizes.length ? sizes.reduce((a, s) => a + s.h + GAP, 0) : 90 + GAP)
+      : SPACE_HEAD + (sizes.length ? Math.max(...sizes.map((s) => s.h)) : 90) + GAP;
+    breite = Math.max(breite, spaceW);
 
     nodes.push({
       id: `s-${space.id}`,
@@ -1564,10 +1592,11 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[]) {
     });
 
     let px = GAP;
+    let py = y + SPACE_HEAD;
     space.projects.forEach((project, pi) => {
       const { cols, w, h } = sizes[pi];
       const projX = px;
-      const projY = y + SPACE_HEAD;
+      const projY = py;
       projectRects.push({ id: project.id, x: projX, y: projY, w, h });
       nodes.push({
         id: `p-${project.id}`,
@@ -1596,9 +1625,9 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[]) {
           style: { width: BW, height: BH },
         });
       });
-      px += w + GAP;
+      if (schmal) py += h + GAP; else px += w + GAP;
     });
-    y += spaceH + SPACE_GAP;
+    y += spaceH + (schmal ? 28 : SPACE_GAP);
   });
 
   // Portal-Karten → sichtbare Verknüpfungslinien zwischen Board-Kacheln
@@ -1617,7 +1646,7 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[]) {
     }
   }
 
-  return { nodes, edges, projectRects };
+  return { nodes, edges, projectRects, breite };
 }
 
 /* ---------- Zonen & Kacheln ---------- */
@@ -1735,7 +1764,13 @@ function BoardMiniMap({ board, accent }: { board: BoardDoc; accent: string }) {
             rx={1.5}
             fill={accent}
             opacity={n.type === 'frame' ? 0.2 : 0.45}
-            onClick={(e) => { e.stopPropagation(); oeffneKarte(board.id, n.id, 'overview'); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              // M389: Mit dem Finger öffnet die Kachel das BOARD. Die Mini-Karten sind dort wenige Punkte groß und
+              // zeigen ohne Maus nicht, was sie sind — wer die Kachel antippte, landete blind im Fokus irgendeiner Karte.
+              if ((e.nativeEvent as PointerEvent).pointerType === 'touch') { useBoard.getState().openBoard(board.id); return; }
+              oeffneKarte(board.id, n.id, 'overview');
+            }}
           >
             <title>{kartenTitel(n)} — öffnen und bearbeiten</title>
           </rect>

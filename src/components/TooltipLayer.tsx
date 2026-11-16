@@ -20,6 +20,17 @@ interface Tip { text: string; x: number; y: number; below: boolean; taste?: stri
  */
 const kuerzelVon = (el: HTMLElement) => (el.dataset.taste ? taste(el.dataset.taste) : undefined);
 
+/**
+ * M389: Der title ist bei Knöpfen, die nur ein Zeichen zeigen, zugleich ihr NAME (für Vorlese-Programme und
+ * Sprachsteuerung). Wandert er nach data-tip, wäre der Knopf danach namenlos — also bleibt er als aria-label.
+ */
+function nameSichern(el: HTMLElement, title: string) {
+  if (el.hasAttribute('aria-label') || el.hasAttribute('aria-labelledby')) return;
+  if (!el.matches('button, a, [role="button"], input, select, summary')) return;
+  if ((el.textContent ?? '').trim()) return;
+  el.setAttribute('aria-label', title.split(' — ')[0].split(' (')[0].trim() || title);
+}
+
 export function TooltipLayer() {
   const [tip, setTip] = useState<Tip | null>(null);
 
@@ -51,6 +62,7 @@ export function TooltipLayer() {
       const title = el.getAttribute('title');
       if (title) {
         el.dataset.tip = title;
+        nameSichern(el, title);
         el.removeAttribute('title');
       }
       if (el === currentEl) return;
@@ -124,6 +136,7 @@ export function TooltipLayer() {
       const title = t.getAttribute('title');
       if (title) {
         t.dataset.tip = title;
+        nameSichern(t, title);
         t.removeAttribute('title');
       }
       if (!t.dataset.tip) return;

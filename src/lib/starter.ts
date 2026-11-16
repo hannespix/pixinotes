@@ -390,7 +390,7 @@ export function buildStarter(): Starter {
     },
   } as AppNode;
   const projMermaid: AppNode = {
-    id: uid(), type: 'mermaid', width: 400, height: 260, position: { x: 540, y: 400 },
+    id: uid(), type: 'mermaid', width: 400, height: 520, position: { x: 540, y: 400 },
     data: {
       code: 'flowchart TD\n  A[Posteingang Papier] --> B[Scannen & Signieren]\n  B --> C{lesbar & vollständig?}\n  C -->|ja| D[In E-Akte ablegen]\n  C -->|nein| E[Nachscannen]\n  E --> B\n  D --> F[Papier 8 Wochen Zwischenlager]',
     },
@@ -403,9 +403,10 @@ export function buildStarter(): Starter {
     li('▶ startet die Präsentation — Folienreihenfolge folgt den Verbindungen'),
     li('Der Kalender rechts zeigt NUR dieses Board (Zahnrad → Quelle)'),
   ]);
-  const projCal: AppNode = { id: uid(), type: 'calendar', width: 460, height: 340, position: { x: 980, y: 380 }, data: { scope: 'board' } } as AppNode;
+  const projCal: AppNode = { id: uid(), type: 'calendar', width: 460, height: 340, position: { x: 1030, y: 380 }, data: { scope: 'board' } } as AppNode;
   // M165: Rahmen als Struktur-Ebene zeigen — er fängt Kanban + Prozess ein
-  const projFrame = frame({ x: 30, y: 340 }, 960, 400, 'Umsetzung', '#dbe7f6');
+  // M389: hoch genug für das Kanban mit seinen fünf Tickets — vorher ragte es unten aus dem Rahmen heraus
+  const projFrame = frame({ x: 30, y: 340 }, 960, 660, 'Umsetzung', '#dbe7f6');
   const idProj = board('🚀 Beispielprojekt: E-Akte', [projFrame, projGantt, projKanban, projMermaid, projNote, projCal], [
     edge(projGantt, projKanban, 'liefert Aufgaben'),
     edge(projKanban, projMermaid, 'Prozess dazu'),
