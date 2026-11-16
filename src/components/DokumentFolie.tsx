@@ -392,7 +392,7 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
     <div className="folie-dok" data-art={art} data-seite={nr} data-seiten={seiten} data-zoom={z.toFixed(2)} data-modus={modus}>
       <div className="folie-dok-flaeche" ref={flaecheRef} tabIndex={-1}
         onDoubleClick={(e) => zoomen(z > 1.05 ? 1 : 2.5, e.clientX, e.clientY)}>
-        <div className="folie-dok-seite" style={{ width: breite || undefined, height: mass ? hoehe : undefined }}>
+        <div className="folie-dok-seite" data-mass={mass ? `${mass.b} ${mass.h}` : undefined} style={{ width: breite || undefined, height: mass ? hoehe : undefined }}>
           {art === 'pdf' && <canvas ref={canvasRef} />}
           {art === 'word' && (
             <div className="word-seite folie-word">

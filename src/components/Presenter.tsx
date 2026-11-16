@@ -4,7 +4,7 @@ import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
 import { sprache } from '../lib/sprache';
-import { selectActiveBoard, useBoard } from '../store';
+import { selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { nodeToHtml } from '../lib/serialize';
 import { buildMermaidSource, getMermaid, preloadHandFont } from '../lib/mermaid';
 import { presentationOrder } from '../lib/presentOrder';
@@ -19,6 +19,9 @@ import { letzteSeite } from '../lib/pdfSeiten';
 import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, MinutesNode, NoteNode, ShapeNode, SheetNode, TimeNode, WeekNode } from '../types';
 import { HtmlAppSlide } from './nodes/HtmlAppCard';
 import { useRandLeiste } from '../lib/randLeiste';
+import { FOLIEN_FARBEN, FolienStift, type FolienWerkzeug } from './FolienStift';
+import { FolienKommentare } from './FolienKommentare';
+import { ICheck, IComment, IEraser, IHighlighter, IPen, IUndo } from './Icons';
 import { BubblesBody } from './nodes/BubblesCard';
 import { WeekBody } from './nodes/WeekCard';
 import { TimeBody } from './nodes/TimeCard';
@@ -270,6 +273,18 @@ export function Presenter() {
   useEffect(() => { if (!open) fremdGeoeffnet.current = false; }, [open]);
   /** M375: Laserpointer — ein roter Punkt statt des Mauszeigers; führt man vor, sehen ihn alle an derselben Stelle der Folie */
   const [laser, setLaser] = useState(false);
+  // M394: Stift, Textmarker, Radierer und Kommentare auf der Folie
+  const nurLesen = useBoard(selectNurLesen);
+  const [werkzeug, setWerkzeug] = useState<FolienWerkzeug | null>(null);
+  const [farben, setFarben] = useState<{ pen: string; marker: string }>({ pen: FOLIEN_FARBEN.pen[0], marker: FOLIEN_FARBEN.marker[0] });
+  const [kommOffen, setKommOffen] = useState(false);
+  const [faden, setFaden] = useState<string | null>(null);
+  const werkzeugRef = useRef(werkzeug); werkzeugRef.current = werkzeug;
+  const kommRef = useRef(kommOffen); kommRef.current = kommOffen;
+  const nurLesenRef = useRef(nurLesen); nurLesenRef.current = nurLesen;
+  const waehle = (w: FolienWerkzeug) => { setLaser(false); setWerkzeug((alt) => (alt === w ? null : w)); };
+  const waehleRef = useRef(waehle); waehleRef.current = waehle;
+  useEffect(() => { if (!open) { setWerkzeug(null); setKommOffen(false); setFaden(null); } }, [open]);
   useEffect(() => { if (!open) setLaser(false); }, [open]);
   const selbstRef = useRef<() => void>(() => {});
   /** Die Dokument-Folie meldet, ob auf der Seite noch etwas zu rollen ist — dann rollt der Schritt, statt zu blättern */
@@ -330,12 +345,21 @@ export function Presenter() {
       // Und Tab bleibt dem Browser: Die Knöpfe der Präsentation waren mit der Tastatur sonst nicht zu erreichen.
       if (e.key === 'Tab') return;
       if (e.key === 'Escape' && document.querySelector('.ticket-modal-backdrop, .modal-backdrop, .pdf-backdrop')) return;
+      const frei = !e.ctrlKey && !e.metaKey && !e.altKey;
+      const taste = e.key.toLowerCase();
+      // M394: Esc legt erst den Stift weg, schließt dann die Kommentare — erst das dritte beendet die Präsentation
+      if (e.key === 'Escape' && werkzeugRef.current) setWerkzeug(null);
+      else if (e.key === 'Escape' && kommRef.current) setKommOffen(false);
+      else if (frei && !nurLesenRef.current && (taste === 'p' || taste === 'm' || taste === 'e')) waehleRef.current(taste === 'p' ? 'pen' : taste === 'm' ? 'marker' : 'eraser');
+      else if (frei && taste === 'k') setKommOffen((v) => !v);
+      else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && taste === 'z' && werkzeugRef.current) useBoard.getState().undo();
+      else
       if (e.key === 'Escape') { selbstRef.current(); setOpen(false); }
       else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') schrittRef.current(1);
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') schrittRef.current(-1);
       else if (e.key === 'Home') { selbstRef.current(); setPos({ idx: 0, seite: 1 }); }          // M345
       else if (e.key === 'End') { selbstRef.current(); setPos({ idx: Math.max(0, folienZahl.current - 1), seite: -1 }); }
-      else if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey && !e.altKey) setLaser((v) => !v);   // M375
+      else if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey && !e.altKey) { setWerkzeug(null); setLaser((v) => !v); }   // M375
       e.preventDefault();
       e.stopPropagation();
     };
@@ -448,11 +472,12 @@ export function Presenter() {
   /** im Folien-Zweig unten gibt es die Folie sicher (slides.length > 0) */
   const cur = current as AppNode;
 
+  const offeneKomm = current ? (board.comments ?? []).reduce((n, c) => n + (c.nodeId === current.id && !c.resolved ? 1 : 0), 0) : 0;
   const amAnfang = safeIdx <= 0 && seiteHier <= 1;
   const amEnde = safeIdx >= slides.length - 1 && seiteHier >= seitenHier;
 
   return (
-    <div className={`presenter ${art ? 'mit-dokument' : ''}`} role="dialog" aria-modal="true" aria-label="Präsentation">
+    <div className={`presenter ${art ? 'mit-dokument' : ''} ${kommOffen ? 'mit-kommentaren' : ''} ${werkzeug ? 'mit-stift' : ''}`} role="dialog" aria-modal="true" aria-label="Präsentation">
       <div className={`presenter-head ${rand.da ? 'da' : ''}`} {...rand.griff}>
         <span translate="no">{board.name}</span>
         <span className="presenter-hint-edit">{art ? 'Doppelklick oder + / − vergrößert · B = Seitenbreite' : current?.type === 'htmlapp' ? 'Läuft auf der Folie · blättern mit ‹ ›' : 'Folien sind direkt editierbar'}</span>
@@ -470,8 +495,22 @@ export function Presenter() {
         {slides.length > 0 && (
           <button className={`presenter-team presenter-laser ${laser ? 'an' : ''}`} data-taste="vortrag-laser" aria-pressed={laser}
             title={laser ? 'Laserpointer ausschalten (L)' : 'Laserpointer: ein roter Punkt statt des Mauszeigers (L)'}
-            onClick={() => setLaser((v) => !v)}>
+            onClick={() => { setWerkzeug(null); setLaser((v) => !v); }}>
             <span className="laser-knopf-punkt" aria-hidden="true" /> Laser
+          </button>
+        )}
+        {/* M394: auf die Folie zeichnen, Kommentare zur Folie — zwei kleine Knöpfe, alles Weitere erst bei Bedarf */}
+        {slides.length > 0 && !nurLesen && (
+          <button className={`presenter-team presenter-ikon ${werkzeug ? 'an' : ''}`} data-taste="vortrag-stift" aria-pressed={!!werkzeug}
+            title={werkzeug ? 'Stift weglegen (Esc)' : 'Auf die Folie zeichnen: Stift (P), Textmarker (M), Radierer (E)'} aria-label="Auf die Folie zeichnen"
+            onClick={() => waehle(werkzeug ?? 'pen')}>
+            <IPen size={15} />
+          </button>
+        )}
+        {slides.length > 0 && (
+          <button className={`presenter-team presenter-ikon ${kommOffen ? 'an' : ''}`} data-taste="vortrag-kommentare" aria-pressed={kommOffen}
+            title="Kommentare zur Folie (K)" aria-label="Kommentare zur Folie" onClick={() => setKommOffen((v) => !v)}>
+            <IComment size={15} />{offeneKomm > 0 && <span className="presenter-zahl" data-taste="vortrag-kommentar-zahl">{offeneKomm}</span>}
           </button>
         )}
         <button onClick={() => { selbst(); setOpen(false); }} aria-label="Präsentation beenden">✕</button>
@@ -508,6 +547,32 @@ export function Presenter() {
       )}
       {/* M375: Laser — eine Schicht genau über der Folie (misst sich selbst an ihr aus) */}
       {slides.length > 0 && <FolienLaser boardId={board.id} folie={cur.id} an={laser} senden={ichZeige} />}
+      {/* M394: Zeichenschicht über der Folie, Werkzeuge erst, wenn gezeichnet wird, Kommentare als Spalte */}
+      {slides.length > 0 && (
+        <FolienStift folie={cur.id} werkzeug={werkzeug} farbe={werkzeug === 'marker' ? farben.marker : farben.pen} darf={!nurLesen}
+          onPin={(id) => { setFaden(id); setKommOffen(true); }} />
+      )}
+      {werkzeug && !nurLesen && slides.length > 0 && (
+        <div className="folien-palette" data-taste="folien-palette" role="toolbar" aria-label="Zeichnen">
+          <button className={werkzeug === 'pen' ? 'an' : ''} data-taste="folien-pen" aria-pressed={werkzeug === 'pen'} title="Stift (P)" aria-label="Stift" onClick={() => setWerkzeug('pen')}><IPen size={16} /></button>
+          <button className={werkzeug === 'marker' ? 'an' : ''} data-taste="folien-marker" aria-pressed={werkzeug === 'marker'} title="Textmarker (M)" aria-label="Textmarker" onClick={() => setWerkzeug('marker')}><IHighlighter size={16} /></button>
+          <button className={werkzeug === 'eraser' ? 'an' : ''} data-taste="folien-radierer" aria-pressed={werkzeug === 'eraser'} title="Radierer (E)" aria-label="Radierer" onClick={() => setWerkzeug('eraser')}><IEraser size={16} /></button>
+          {werkzeug !== 'eraser' && (
+            <span className="folien-farben">
+              {FOLIEN_FARBEN[werkzeug].map((f, i) => (
+                <button key={f} className={`folien-farbe ${farben[werkzeug] === f ? 'an' : ''}`} style={{ background: f }} data-taste="folien-farbe" data-farbe={f}
+                  aria-label={`Farbe ${i + 1}`} aria-pressed={farben[werkzeug] === f} onClick={() => setFarben((alt) => ({ ...alt, [werkzeug]: f }))} />
+              ))}
+            </span>
+          )}
+          <button data-taste="folien-zurueck" title="Rückgängig (Strg+Z)" aria-label="Rückgängig" onClick={() => useBoard.getState().undo()}><IUndo size={16} /></button>
+          <button className="folien-fertig" data-taste="folien-fertig" title="Stift weglegen (Esc)" aria-label="Stift weglegen" onClick={() => setWerkzeug(null)}><ICheck size={16} /></button>
+        </div>
+      )}
+      {kommOffen && slides.length > 0 && (
+        <FolienKommentare karte={cur.id} seite={art && art !== 'bild' ? seiteHier : null} faden={faden} onFaden={setFaden}
+          geheZu={(nr) => { selbst(); setPos({ idx: safeIdx, seite: nr }); }} zu={() => setKommOffen(false)} />
+      )}
       <div className="presenter-foot">
         {/* aria-disabled statt disabled: Ein Knopf, der mit Tastatur-Fokus „disabled" wird, verschluckt danach alle Tasten (M361) */}
         <button onClick={() => weiter(-1)} aria-disabled={amAnfang} data-taste="vortrag-zurueck">‹ Zurück</button>
