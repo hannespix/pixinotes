@@ -6958,6 +6958,90 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 .presenter:has(> .presenter-slide.app) > .presenter-head:has(:focus-visible),
 .presenter:has(> .presenter-slide.app) > .presenter-head:has(.reakt-wahl) { transform: none; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); }
 
+/* ---------- M394: Stift und Kommentare in der Präsentation ---------- */
+/* Die Zeichenschicht liegt über der Folie (wie der Laser) — sie fängt Eingaben nur, solange ein Werkzeug gewählt ist */
+.folien-stift { position: absolute; z-index: 3; pointer-events: none; overflow: hidden; }
+.folien-stift > svg { display: block; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+.folien-stift.an { z-index: 5; pointer-events: auto; touch-action: none; cursor: crosshair; }
+.folien-stift.an.eraser { cursor: cell; }
+.folien-pin { pointer-events: all; cursor: pointer; outline: none; }
+.folien-pin circle { fill: #f5b301; stroke: #fff; stroke-width: 2; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .35)); }
+.folien-pin text { fill: #1a1814; font-weight: 800; font-family: inherit; pointer-events: none; }
+.folien-pin.erledigt circle { fill: #9aa3ad; }
+.folien-pin:hover circle, .folien-pin:focus-visible circle { stroke: #1a1814; }
+/* Kopfzeile: zwei kleine Knöpfe */
+.presenter-head .presenter-ikon { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; }
+.presenter-zahl { font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* schmale Kopfzeile: der Board-Name kürzt sich, die Zählung bricht nicht um */
+.presenter-head > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.presenter-head .presenter-count { white-space: nowrap; flex: none; }
+.presenter-head button { flex: none; }
+/* Werkzeuge: erst da, wenn gezeichnet wird — als schmale Säule am linken Rand (unten mittig stehen die Leisten
+   des Dokuments und das Blättern); auf flachen Schirmen liegt sie quer unter der Kopfzeile */
+.folien-palette {
+  position: absolute; z-index: 7; left: 10px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 5px; max-height: calc(100% - 130px);
+  background: #26231e; border: 1px solid rgba(255, 255, 255, .14); border-radius: var(--r-lg); box-shadow: 0 8px 26px rgba(0, 0, 0, .45);
+}
+.folien-palette > button {
+  border: none; background: none; color: #e9ebee; min-width: 34px; height: 34px; padding: 0 8px; border-radius: var(--r);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font: inherit; font-size: 13px;
+}
+.folien-palette > button:hover { background: rgba(255, 255, 255, .1); }
+.folien-palette > button.an { background: var(--accent-fill); color: #fff; }
+.folien-palette .folien-fertig { background: rgba(255, 255, 255, .1); }
+.folien-farben { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; padding: 7px 0; margin: 2px 0; border-top: 1px solid rgba(255, 255, 255, .14); border-bottom: 1px solid rgba(255, 255, 255, .14); }
+.folien-farbe { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .28); padding: 0; cursor: pointer; }
+.folien-farbe.an { border-color: #fff; box-shadow: 0 0 0 2px var(--accent-fill); }
+.folien-palette button:focus-visible, .folien-farbe:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+/* flache und schmale Schirme: quer unter der Kopfzeile — die Säule läge sonst auf dem Text */
+@media (max-height: 520px), (max-width: 620px) {
+  .folien-palette { left: 50%; top: 52px; transform: translateX(-50%); flex-direction: row; max-height: none; max-width: calc(100% - 16px); padding: 5px 6px; overflow-x: auto; }
+  .folien-palette > button, .folien-farbe { flex: none; }
+  .folien-farben { flex-direction: row; padding: 0 7px; margin: 0 2px; border: none; border-left: 1px solid rgba(255, 255, 255, .14); border-right: 1px solid rgba(255, 255, 255, .14); }
+}
+/* Kommentare: eine Spalte rechts — auf breiten Schirmen rückt die Folie zur Seite, nichts wird verdeckt */
+.folien-kommentare {
+  position: absolute; z-index: 8; right: 12px; top: 54px; bottom: calc(60px + var(--safe-bottom, 0px)); width: min(340px, calc(100% - 24px));
+  display: flex; flex-direction: column; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--border-soft); border-radius: var(--r-lg); box-shadow: 0 10px 34px rgba(0, 0, 0, .45); overflow: hidden;
+}
+@media (min-width: 1100px) {
+  .presenter.mit-kommentaren > .presenter-slide { margin-right: 364px; }
+}
+@media (max-width: 620px) {
+  .folien-kommentare { left: 8px; right: 8px; width: auto; top: auto; max-height: 62%; }
+}
+.fk-kopf { display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 13px; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+.fk-kopf button { margin-left: auto; border: none; background: none; color: var(--muted); cursor: pointer; padding: 5px; border-radius: var(--r-sm); display: inline-flex; }
+.fk-kopf button:hover { background: var(--surface-2); color: var(--ink); }
+.fk-seite { font-size: 11px; font-weight: 700; color: var(--muted); background: var(--surface-2); padding: 2px 7px; border-radius: 999px; }
+.fk-liste { flex: 1; min-height: 0; overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.fk-leer { margin: 14px 6px; font-size: 12.5px; color: var(--muted); text-align: center; }
+.fk-faden { display: flex; flex-direction: column; gap: 7px; padding: 9px 10px; border: 1px solid var(--border-soft); border-radius: var(--r); cursor: default; }
+.fk-faden.gewaehlt { border-color: var(--accent-strong); box-shadow: 0 0 0 1px var(--accent-strong); }
+.fk-faden.erledigt .fk-beitrag { opacity: .55; }
+.fk-beitrag { display: flex; flex-direction: column; gap: 1px; }
+.fk-meta { font-size: 10.5px; color: var(--muted); }
+.fk-text { font-size: 13px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+.fk-knoepfe { display: flex; gap: 6px; }
+.fk-knoepfe button, .fk-woanders button {
+  border: 1px solid var(--border-soft); background: none; color: var(--muted); font: inherit; font-size: 11.5px; padding: 3px 9px; border-radius: var(--r-sm); cursor: pointer;
+}
+.fk-knoepfe button:hover, .fk-woanders button:hover { background: var(--surface-2); color: var(--ink); }
+.fk-faden.antwort .fk-knoepfe button:first-child { border-color: var(--accent-strong); color: var(--accent-strong); }
+.fk-woanders { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 4px 2px; font-size: 11.5px; color: var(--muted); }
+.fk-schreiben { display: flex; flex-direction: column; gap: 6px; padding: 9px 10px; border-top: 1px solid var(--border-soft); }
+.fk-antwort-an { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.fk-antwort-an button { border: none; background: none; color: var(--muted); cursor: pointer; padding: 3px; display: inline-flex; border-radius: var(--r-sm); }
+.fk-name, .fk-eingabe {
+  border: 1px solid var(--border-soft); border-radius: var(--r); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 13px; padding: 7px 9px; resize: none; width: 100%; box-sizing: border-box;
+}
+.fk-name:focus, .fk-eingabe:focus { outline: none; border-color: var(--accent-strong); }
+.fk-senden { align-self: flex-end; border: none; background: var(--accent-fill); color: #fff; font: inherit; font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: var(--r); cursor: pointer; }
+.fk-senden:disabled { opacity: .45; cursor: default; }
+
 /* M372: Der Schreibhinweis des Editors („Text eingeben oder '/' für Befehle tippen") gehört dem, der gerade in
    der Notiz schreibt. Der Editor hängt ihn an die Stelle seiner Schreibmarke — die gibt es aber auch, wenn
    niemand in der Notiz steht. So trug jede Karte, die ein anderer angelegt hatte, bei allen übrigen nur diesen

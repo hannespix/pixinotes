@@ -25,6 +25,13 @@ import { t } from './lib/sprache';
 import { fristAnkerPflegen, type FristAnker } from './lib/fristAnker';
 import { linksUmbenennen, normalizeName } from './lib/links';
 
+/**
+ * M394: „Seite" eines Strichs, der in der Präsentation auf eine Folie gezeichnet wurde und keiner Dokument-Seite
+ * gehört (Notiz, Modul, Bild, Tool). Die Punkte sind Tausendstel der Inhaltsbreite der Folie. Eine Seite −1 ist
+ * auf dem Board nie offen — dort bleiben diese Striche unsichtbar und unberührt; sie reisen aber mit dem Board.
+ */
+export const FOLIEN_SEITE = -1;
+
 /** Ein Freihand-Strich (Punkte in Flow-Koordinaten) */
 export interface Stroke {
   /** M365: Wer den Strich gezogen hat (Gruppenarbeit) — Kennung wie bei Karten (`data.von`) */
@@ -41,7 +48,8 @@ export interface Stroke {
    *  Karten-Ecke und der Strich wandert bei jeder Kartenbewegung mit */
   anchor?: string;
   /** M335: auf dieser SEITE einer PDF-Karte — die Punkte sind dann Seitenpunkte
-   *  (PDF-Punkte, Ursprung Seitenecke); sichtbar nur, wenn die Seite offen ist */
+   *  (PDF-Punkte, Ursprung Seitenecke); sichtbar nur, wenn die Seite offen ist.
+   *  FOLIEN_SEITE (−1): auf der Folie der Karte gezeichnet (M394). */
   seite?: number;
   /** M354: `width` ist in Seitenpunkten (wächst mit der Seite). Fehlt bei Seitenstrichen von vor M354 (Board-Punkte). */
   seitenBreite?: boolean;
@@ -349,6 +357,10 @@ interface BoardState {
   eraseStrokesPartial: (x: number, y: number, radius: number) => void;
   /** M320: Striche nach Id entfernen (Handschrift wurde zu Text) — ein History-Eintrag */
   removeStrokes: (ids: string[]) => void;
+  /** M394: Einen fertig verankerten Strich anhängen (Folie, Dokument-Seite) — ohne die Anker-Suche des Boards */
+  addStrokeFertig: (stroke: Stroke) => void;
+  /** M394: Striche nach Id radieren — innerhalb einer Radier-Geste (beginEraseGesture) EIN History-Eintrag */
+  eraseStrokesById: (ids: string[]) => void;
   /** Geankerte Striche der Karten wieder freistellen (Punkte werden absolut) */
   detachStrokes: (nodeIds: string[]) => void;
   /** Radier-Geste beginnt: nächster tatsächlicher Lösch-Treffer macht EINEN History-Eintrag */
@@ -1780,6 +1792,20 @@ export const useBoard = create<BoardState>()(
           patchActive((b) => ({
             drawings: integrateStroke(stroke, b.drawings ?? [], sessionIds, b.nodes).drawings,
           }));
+        },
+
+        addStrokeFertig: (stroke) => {
+          if (!stroke.anchor || stroke.points.length === 0) return;
+          get().pushHistory();
+          patchActive((b) => ({ drawings: [...(b.drawings ?? []), stroke] }));
+        },
+
+        eraseStrokesById: (ids) => {
+          const idSet = new Set(ids);
+          const board = get().boards.find((b) => b.id === get().activeId);
+          if (!board || !(board.drawings ?? []).some((s) => idSet.has(s.id))) return;
+          if (eraseSnapPending) { get().pushHistory(); eraseSnapPending = false; }
+          patchActive((b) => ({ drawings: (b.drawings ?? []).filter((s) => !idSet.has(s.id)) }));
         },
 
         removeStrokes: (ids) => {
