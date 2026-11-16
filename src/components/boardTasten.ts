@@ -6,6 +6,7 @@
 import { overlayOffen } from '../lib/overlay';
 import { useEffect, type MutableRefObject } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
+import { dokumentHatPfeile } from './nodes/FileCard';
 import { type AppNode } from '../types';
 
 interface Kamera {
@@ -120,6 +121,8 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
       // Vorher tat das die Bibliothek selbst: ohne Rückgängig-Schritt (Strg+Z nahm den Schritt davor mit) und ohne
       // den Inhalt eines Rahmens mitzunehmen. Schrittweite wie gewohnt: 5 Punkte, mit Umschalt 20.
       if (/^Arrow/.test(e.key) && gewaehlt.length && !st.focusCard && t?.classList?.contains('react-flow__node')) {
+        // In einem Dokument (PDF, Word, Folien), das zuletzt angefasst wurde, blättern ← → — das regelt die Karte selbst
+        if (!e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && gewaehlt.length === 1 && dokumentHatPfeile(gewaehlt[0].id)) return;
         const w = e.shiftKey ? 20 : 5;
         const [dx, dy] = e.key === 'ArrowRight' ? [w, 0] : e.key === 'ArrowLeft' ? [-w, 0] : e.key === 'ArrowDown' ? [0, w] : [0, -w];
         e.stopPropagation();
