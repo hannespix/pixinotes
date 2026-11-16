@@ -69,9 +69,21 @@ export function deuteEingabe(roh: string): ZellWert {
  * Tausendertrenner. Sonst ist der Punkt der Dezimaltrenner.
  */
 function alsZahl(t: string): number | null {
-  let s = t.replace(/\s|€|%$/g, '');
+  // M390: Nicht alles aus Ziffern ist eine Zahl. „0721 9260" ist eine Telefonnummer, „01067" eine Postleitzahl,
+  // „12 345 6" eine Kennung — vorher fielen die Leerzeichen einfach weg und die führende Null gleich mit, die Zelle
+  // rechnete als 7219260 bzw. 1067 mit. Leerzeichen gelten nur noch als Tausendertrenner (Dreiergruppen), und eine
+  // führende Null vor weiteren Ziffern macht aus dem Eintrag Text.
+  let s = t.trim().replace(/€/g, '').replace(/%$/, '').trim();
   if (!s) return null;
+  if (/\s/.test(s)) {
+    if (!/^[+-]?\d{1,3}([ \u00a0\u202f]\d{3})+([.,]\d+)?$/.test(s)) return null;
+    s = s.replace(/\s/g, '');
+  }
+  if (/^[+-]?0\d/.test(s)) return null;
   if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  // M390: Die Tabelle ZEIGT 3000 als „3.000" — tippt man das ab, muss sie es auch so lesen (vorher: 3). Punkte in
+  // Dreiergruppen sind Tausenderpunkte; „1.5" und „3.14" bleiben Dezimalzahlen.
+  else if (/^[+-]?\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
   if (!/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(s)) return null;
   const n = Number(s);
   return Number.isFinite(n) ? (t.trim().endsWith('%') ? n / 100 : n) : null;

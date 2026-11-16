@@ -114,7 +114,6 @@ export default function App() {
   const navLinks = useBoard((s) => s.navLinks);
   // M308: Die Spalte ist ziehbar — ihre Breite kommt aus dem Stand, nicht aus dem Stylesheet
   const spalteBreite = useBoard((s) => s.spalteBreite);
-  const restoreDeleted = useBoard((s) => s.restoreDeleted);
   const showToast = useBoard((s) => s.showToast);
   // M360: Ist das offene Board nur zum Lesen geteilt? (Kennung und Besitzer für das Hinweisband)
   const nurLesenId = useBoard((s) => (selectNurLesen(s) ? s.activeId : ''));
@@ -122,7 +121,7 @@ export default function App() {
   const nurLesenBoard = nurLesenId ? { id: nurLesenId, von: nurLesenVon } : null;
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); }, []);
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); window.setTimeout(() => useBoard.getState().fristAnkerNachtragen(), 1200); }, []);
 
   // Eigene Apps (M158): verwaiste HTML-Inhalte in IndexedDB entsorgen —
   // NUR beim Start (dann kann kein Undo eine gelöschte App-Karte zurückholen,
@@ -130,14 +129,17 @@ export default function App() {
   useEffect(() => {
     const t = setTimeout(() => {
       const ids = new Set(
-        useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'htmlapp').map((n) => n.id)),
+        [...useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'htmlapp').map((n) => n.id)),
+          // M390: … und der Vorlagen — ihr Tool-Quelltext liegt unter der Kennung der Vorlage
+          ...useBoard.getState().templates.filter((t) => t.node.type === 'htmlapp').map((t) => t.node.id)],
       );
       void cleanupOrphanHtml(ids);
       // M259: dasselbe für die Inhalte von Datei-Karten
       const dateiIds = new Set(
         // M388: … und der Tool-Karten: Ein Quelltext, der per Ordner/WebDAV kam, liegt bis zum ersten Öffnen der Karte
         // noch unter der Datei-Kennung — das Aufräumen löschte ihn sonst, bevor er je gezeigt wurde
-        useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'file' || n.type === 'htmlapp').map((n) => n.id)),
+        [...useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'file' || n.type === 'htmlapp').map((n) => n.id)),
+          ...useBoard.getState().templates.filter((t) => t.node.type === 'file' || t.node.type === 'htmlapp').map((t) => t.node.id)],
       );
       void cleanupOrphanFiles(dateiIds);
     }, 8000);
@@ -436,7 +438,7 @@ export default function App() {
         <div className={`toast ${toast ? 'show' : ''}`}>
           {toast?.message}
           {toast?.undo && (
-            <button className="toast-undo" onClick={toast.undo === 'schritt' ? () => useBoard.getState().undo() : restoreDeleted}>
+            <button className="toast-undo" onClick={() => useBoard.getState().hinweisRueckgaengig()}>
               Rückgängig
             </button>
           )}

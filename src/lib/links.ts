@@ -176,3 +176,39 @@ export function boardGraph(boards: BoardDoc[]): { nodes: GraphNode[]; links: Gra
   }
   return { nodes, links };
 }
+
+/**
+ * M390: [[Alt]] in den Blöcken einer Notiz durch [[Neu]] ersetzen. Gibt die neuen Blöcke zurück — oder null, wenn
+ * nichts zu ändern war (dann bleibt die Karte unberührt).
+ */
+export function linksUmbenennen(blocks: unknown, alt: string, neu: string): unknown[] | null {
+  if (!Array.isArray(blocks)) return null;
+  const ziel = normalizeName(alt);
+  let geaendert = false;
+  const text = (t: string): string => t.replace(WIKILINK_RE, (ganz, name: string) => {
+    if (normalizeName(name) !== ziel) return ganz;
+    geaendert = true;
+    return `[[${neu}]]`;
+  });
+  const inhalt = (c: unknown): unknown => {
+    if (typeof c === 'string') return text(c);
+    if (Array.isArray(c)) return c.map(inhalt);
+    if (c && typeof c === 'object') {
+      const o = c as Record<string, unknown>;
+      const aus: Record<string, unknown> = { ...o };
+      if (typeof o.text === 'string') aus.text = text(o.text);
+      if (o.content !== undefined) aus.content = inhalt(o.content);
+      if (Array.isArray(o.rows)) aus.rows = (o.rows as unknown[]).map(inhalt);
+      if (Array.isArray(o.cells)) aus.cells = (o.cells as unknown[]).map(inhalt);
+      return aus;
+    }
+    return c;
+  };
+  const lauf = (bs: unknown[]): unknown[] => bs.map((b) => {
+    if (!b || typeof b !== 'object') return b;
+    const o = b as Record<string, unknown>;
+    return { ...o, ...(o.content !== undefined ? { content: inhalt(o.content) } : {}), ...(Array.isArray(o.children) ? { children: lauf(o.children as unknown[]) } : {}) };
+  });
+  const aus = lauf(blocks);
+  return geaendert ? aus : null;
+}

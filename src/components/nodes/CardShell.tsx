@@ -234,7 +234,8 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   // ändern. Inline-Funktionen (neue Identität pro Render) killten so beim
   // ERSTEN Resize-Schritt die laufende Geste — unter Touch fror die Größe
   // ein („Pixel für Pixel"), unter Maus überlebte sie nur dank Window-Listenern.
-  const onManualResizeStart = useCallback(() => { resizingRef.current = true; }, []);
+  // M390: Größe ziehen ist ein eigener Rückgängig-Schritt (vorher nahm Strg+Z den Schritt davor mit)
+  const onManualResizeStart = useCallback(() => { resizingRef.current = true; useBoard.getState().pushHistory(); }, []);
   const onManualResizeEnd = useCallback(() => {
     resizingRef.current = false;
     lastResizeEnd.current = Date.now(); // Schonfrist gegen jede Automatik

@@ -212,7 +212,7 @@ body {
 .hint {
   font-size: 12px; color: var(--muted);
   background: var(--surface-glass); padding: 5px 11px; border-radius: var(--r-pill);
-  max-width: 24vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: calc(24vw / var(--pn-anz, 1)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 /* ---------- Karten (gemeinsam) ---------- */
@@ -451,7 +451,7 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .image-card.kachel { box-shadow: var(--card-shadow); }
 /* Der Name steht UNTER dem Bild, außerhalb der Karte — er verändert ihre Maße nicht */
 .card-shell > .img-name.unterschrift {
-  position: absolute; top: 100%; left: 0; margin-top: 7px; min-width: min(160px, 60vw); max-width: max(100%, 220px);
+  position: absolute; top: 100%; left: 0; margin-top: 7px; min-width: min(160px, calc(60vw / var(--pn-anz, 1))); max-width: max(100%, 220px);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* Nicht markiert: kein Griff, keine Anschlusspunkte, keine Lupe — auch nicht beim Zeigen */
@@ -600,7 +600,7 @@ input.img-titel {
   display: flex; gap: 4px; z-index: 50; align-items: center;
   background: var(--surface-glass);
   padding: 5px; border-radius: var(--r-lg); box-shadow: var(--chrome-shadow);
-  max-width: var(--kopf-rest, 42vw);
+  max-width: var(--kopf-rest, calc(42vw / var(--pn-anz, 1)));
 }
 /* Nur die Board-Tabs scrollen; Home/Teilen/Verlauf/＋ bleiben immer sichtbar.
    Kein overflow auf .tabs selbst — sonst wird das Verlaufs-Dropdown geclippt. */
@@ -823,7 +823,7 @@ input.img-titel {
   border-radius: var(--r); opacity: 0; transition: all 0.25s ease;
   /* Über ALLEN Overlays (Modals 80, Presenter 95): Fehlermeldungen z. B. vom
      WebDAV-Verbinden müssen auch bei offenen Einstellungen lesbar sein */
-  z-index: 120; pointer-events: none; max-width: 80vw;
+  z-index: 120; pointer-events: none; max-width: calc(80vw / var(--pn-anz, 1));
 }
 /* M268: Die Blase selbst fängt KEINE Klicks mehr ab — nur noch ihr Knopf.
    Vorher lag über dem unteren Bilddrittel eine unsichtbare Sperre: Wer dort
@@ -908,7 +908,7 @@ input.img-titel {
   border: 1.5px solid var(--accent); border-radius: var(--r-lg);
   box-shadow: var(--pop-shadow);
   font-size: 12.5px; line-height: 1.45; padding: 9px 14px;
-  z-index: 70; max-width: min(640px, 92vw);
+  z-index: 70; max-width: min(640px, calc(92vw / var(--pn-anz, 1)));
 }
 .writer-banner button {
   flex: none; border: none; cursor: pointer;
@@ -925,14 +925,14 @@ input.img-titel {
   display: flex; justify-content: center; align-items: flex-start; padding-top: 14vh;
 }
 .search-box {
-  width: min(620px, 92vw); background: var(--surface); border-radius: var(--r-lg);
+  width: min(620px, calc(92vw / var(--pn-anz, 1))); background: var(--surface); border-radius: var(--r-lg);
   box-shadow: var(--pop-shadow); overflow: hidden;
 }
 .search-box input {
   width: 100%; border: none; outline: none; font-family: inherit;
   font-size: 16px; padding: 16px 18px; color: var(--ink);
 }
-.search-results { max-height: 46vh; overflow-y: auto; border-top: 1px solid var(--border-soft); }
+.search-results { max-height: calc(46vh / var(--pn-anz, 1)); overflow-y: auto; border-top: 1px solid var(--border-soft); }
 .search-hit {
   display: flex; gap: 10px; align-items: center; width: 100%;
   border: none; background: none; font-family: inherit; text-align: left;
@@ -1021,7 +1021,7 @@ input.img-titel {
   .tabs {
     left: var(--kopf-links, 394px);
     transform: none;
-    max-width: var(--kopf-rest, 42vw);
+    max-width: var(--kopf-rest, calc(42vw / var(--pn-anz, 1)));
   }
 }
 
@@ -1030,7 +1030,7 @@ input.img-titel {
   .tabs {
     top: calc(62px + var(--safe-top)); left: 12px; transform: none;
     /* M236: gemessen statt vw — siehe lib/kopfmass.ts */
-    max-width: var(--kopf-voll, calc(100vw - 24px));
+    max-width: var(--kopf-voll, calc(calc(100vw / var(--pn-anz, 1)) - 24px));
   }
   .topbar { left: calc(12px + var(--app-rand)); }
   /* Zwei Zeilen statt einer: Die Tab-Leiste endet erst bei ~104px (M189) */
@@ -1050,7 +1050,7 @@ input.img-titel {
 html[data-kopf-eng='an'] .tabs {
   top: calc(62px + var(--safe-top));
   left: 12px;
-  max-width: var(--kopf-voll, calc(100vw - 24px));
+  max-width: var(--kopf-voll, calc(calc(100vw / var(--pn-anz, 1)) - 24px));
 }
 html[data-kopf-eng='an'] { --head-space: calc(118px + var(--safe-top) + var(--app-rand)); }
 html[data-kopf-eng='an'] .hint { display: none; }
@@ -1366,7 +1366,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
   background: var(--surface); border-radius: var(--r-lg); padding: 7px 9px;
   border: 1px solid var(--border-soft);
   box-shadow: var(--pop-shadow);
-  max-width: min(600px, 92vw);
+  max-width: min(600px, calc(92vw / var(--pn-anz, 1)));
 }
 .mm-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .mm-row > button {
@@ -1479,7 +1479,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
   display: flex; flex-direction: column; gap: 3px; min-width: 150px;
   /* M218: Auch nach dem Umklappen kann die Liste länger sein als der Platz —
      dann wird gescrollt, statt Einträge unerreichbar zu machen. */
-  max-height: min(52vh, 320px); overflow-y: auto; overscroll-behavior: contain;
+  max-height: min(calc(52vh / var(--pn-anz, 1)), 320px); overflow-y: auto; overscroll-behavior: contain;
 }
 /* Kein Platz nach unten (Karte liegt tief)? Dann über dem Knopf aufklappen. */
 
@@ -1545,7 +1545,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
   display: flex; align-items: center; gap: 6px; z-index: 55;
   background: var(--surface); border-radius: var(--r-lg); padding: 7px 10px; box-shadow: var(--pop-shadow);
   /* Schmale Screens: umbrechen statt überlaufen */
-  flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 20px);
+  flex-wrap: wrap; justify-content: center; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 20px);
 }
 .draw-swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
 .draw-swatch.active { box-shadow: 0 0 0 2px var(--accent); }
@@ -1561,7 +1561,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
   box-shadow: var(--pop-shadow); padding: 6px; display: flex; flex-direction: column;
   gap: 2px; min-width: 190px;
   /* Auf kleinen Screens nie unter Topbar/Tabs schieben — lieber intern scrollen */
-  max-height: calc(100vh - 170px); overflow-y: auto;
+  max-height: calc(calc(100vh / var(--pn-anz, 1)) - 170px); overflow-y: auto;
 }
 .dock-menu button {
   width: 100%; text-align: left; border: none; background: none; font-family: inherit;
@@ -1831,7 +1831,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
   display: inline-flex; align-items: center; justify-content: center;
 }
 .comment-panel {
-  position: fixed; z-index: 70; width: min(320px, calc(100vw - 28px));
+  position: fixed; z-index: 70; width: min(320px, calc(calc(100vw / var(--pn-anz, 1)) - 28px));
   background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--r-lg);
   box-shadow: var(--pop-shadow);
   display: flex; flex-direction: column; overflow: hidden;
@@ -1867,7 +1867,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
 }
 .comment-panel-tools button:hover { background: var(--surface-2); color: var(--ink); }
 .comment-panel-tools button.danger:hover { background: rgba(192, 57, 43, 0.1); color: #c0392b; }
-.comment-msgs { max-height: 40vh; overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
+.comment-msgs { max-height: calc(40vh / var(--pn-anz, 1)); overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
 .comment-msg { display: flex; flex-direction: column; gap: 1px; }
 .comment-msg-meta { font-size: 10.5px; color: var(--muted); }
 .comment-msg-text { font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
@@ -1916,7 +1916,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
  * Kopfzeile, Reiter und Fußzeile stehen, statt mitzuscrollen.
  */
 .modal {
-  width: min(560px, 96vw); max-height: 84vh; overflow: hidden; background: var(--surface);
+  width: min(560px, calc(96vw / var(--pn-anz, 1))); max-height: calc(84vh / var(--pn-anz, 1)); overflow: hidden; background: var(--surface);
   border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
   display: flex; flex-direction: column;
 }
@@ -1978,7 +1978,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
 }
 .psync-neu button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
 .psync-neu button:disabled { opacity: .5; cursor: default; }
-.bild-export { width: min(460px, 94vw); }
+.bild-export { width: min(460px, calc(94vw / var(--pn-anz, 1))); }
 .on-konto .link-btn { font-size: inherit; }
 
 @media (pointer: coarse) {
@@ -2217,14 +2217,14 @@ html[data-kopf-eng='an'] .hint { display: none; }
    sonst ragen ➕-Menü & Buttons seitlich raus ---------- */
 @media (max-width: 520px) {
   .dock {
-    max-width: calc(100vw - 12px);
+    max-width: calc(calc(100vw / var(--pn-anz, 1)) - 12px);
     gap: 2px; padding: 6px;
   }
   /* Nur die Werkzeugleisten-Buttons verkleinern — NICHT die Einträge im ➕-Menü */
   .dock > button, .dock-add-wrap > button { width: 40px; height: 40px; font-size: 18px; }
 
   /* Menü am linken Dock-Rand ausrichten, aber nie über den Viewport hinaus */
-  .dock-menu { bottom: 52px; max-width: calc(100vw - 20px); }
+  .dock-menu { bottom: 52px; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 20px); }
 }
 
 /* ---------- Editierbare Präsentations-Folien ---------- */
@@ -2246,7 +2246,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
 }
 .slide-note .bn-editor { font-size: clamp(16px, 2vw, 22px); }
 /* Form: Original-Optik in groß, Text direkt tippbar */
-.slide-shape { width: min(640px, 90%); height: min(360px, 60vh); position: relative; align-self: center; flex: none; }
+.slide-shape { width: min(640px, 90%); height: min(360px, calc(60vh / var(--pn-anz, 1))); position: relative; align-self: center; flex: none; }
 .slide-shape .shape-body { font-size: 22px; }
 .slide-shape-input { font-size: 22px !important; text-align: center; }
 /* Kanban: volle Interaktion, etwas größer gesetzt */
@@ -2266,7 +2266,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .slide-mermaid .mermaid-code { flex: 0 0 34%; font-size: 14px; min-height: 0; }
 .slide-mermaid .mermaid-preview { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; justify-content: center; }
 .slide-mermaid .mermaid-svg { width: 100%; }
-.slide-mermaid .mermaid-svg svg { max-width: 100%; max-height: 62vh; height: auto; }
+.slide-mermaid .mermaid-svg svg { max-width: 100%; max-height: calc(62vh / var(--pn-anz, 1)); height: auto; }
 
 /* Hinweis in der Zeichen-Palette — auf schmalen Screens ausblenden */
 
@@ -2440,7 +2440,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
 /* Detail-Spalte (M115) */
 .th-detail {
   position: fixed; top: 96px; right: 14px; bottom: 14px; z-index: 45;
-  width: min(360px, calc(100vw - 28px));
+  width: min(360px, calc(calc(100vw / var(--pn-anz, 1)) - 28px));
   background: var(--surface-card); border: 1px solid var(--border-soft);
   border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
   padding: 14px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 11px;
@@ -2631,7 +2631,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .gantt-month { font-size: 10px; font-weight: 700; fill: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .gantt-day { font-size: 9px; fill: var(--muted); opacity: 0.75; }
 /* Präsentations-Folie: Zeitplan groß */
-.slide-gantt { width: min(1100px, 100%); height: min(60vh, 100%); align-self: center; padding: 20px 24px !important; box-shadow: var(--pop-shadow); }
+.slide-gantt { width: min(1100px, 100%); height: min(calc(60vh / var(--pn-anz, 1)), 100%); align-self: center; padding: 20px 24px !important; box-shadow: var(--pop-shadow); }
 .slide-gantt .kanban-title { font-size: 20px; }
 
 /* ---------- Kalender-Karte ---------- */
@@ -2668,7 +2668,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .cal-chip.urgent { border-left-color: #d84b3d; background: rgba(216,75,61,.1); }
 .cal-more { font-size: 8.5px; color: var(--muted); }
 /* Kalender-Folie */
-.slide-cal { width: min(980px, 100%); height: min(64vh, 100%); align-self: center; padding: 20px 24px !important; box-shadow: var(--pop-shadow); }
+.slide-cal { width: min(980px, 100%); height: min(calc(64vh / var(--pn-anz, 1)), 100%); align-self: center; padding: 20px 24px !important; box-shadow: var(--pop-shadow); }
 .slide-cal .cal-title { font-size: 19px; }
 .slide-cal .cal-chip { font-size: 12px; }
 .slide-cal .cal-daynum { font-size: 12px; }
@@ -3325,7 +3325,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
 /* ---------- Ticket-Modal (M118, Trello-Vorbild) ---------- */
 .ticket-modal-backdrop { z-index: 90; }
 .ticket-modal {
-  width: min(620px, 96vw); max-height: 86vh; overflow-y: auto;
+  width: min(620px, calc(96vw / var(--pn-anz, 1))); max-height: calc(86vh / var(--pn-anz, 1)); overflow-y: auto;
   background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
   padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;
   font-size: 13px; color: var(--ink);
@@ -3440,7 +3440,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .kanban-addcol.k-auto-on:hover { background: var(--accent-strong); }
 
 /* ---------- Hilfe-Seite ---------- */
-.help-modal { width: min(860px, 94vw); max-height: 86vh; display: flex; flex-direction: column; }
+.help-modal { width: min(860px, calc(94vw / var(--pn-anz, 1))); max-height: calc(86vh / var(--pn-anz, 1)); display: flex; flex-direction: column; }
 .help-layout { display: flex; min-height: 0; flex: 1; }
 .help-nav {
   flex: none; width: 210px; border-right: 1px solid var(--border-soft);
@@ -3611,21 +3611,21 @@ html[data-kopf-eng='an'] .hint { display: none; }
   /* Übersicht-Bedienelemente unter die (auf 62px gerutschte) Tab-Leiste —
      sonst überlappen sie sich genau dort (R5-1) */
   .ov-mode { top: calc(112px + var(--safe-top)); right: 12px; }
-  .ov-graph-toggles { top: calc(112px + var(--safe-top)); left: 12px; right: auto; max-width: calc(100vw - 160px); flex-wrap: wrap; gap: 8px 12px; }
+  .ov-graph-toggles { top: calc(112px + var(--safe-top)); left: 12px; right: auto; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 160px); flex-wrap: wrap; gap: 8px 12px; }
   .ov-graph { padding: calc(156px + var(--safe-top)) 12px calc(12px + var(--safe-bottom)); }
   .backlinks { right: 12px; bottom: 150px; }
-  .backlinks-panel { max-width: calc(100vw - 24px); }
+  .backlinks-panel { max-width: calc(calc(100vw / var(--pn-anz, 1)) - 24px); }
 }
 
 @media (max-width: 640px) {
   /* Selection-Toolbar: umbrechen statt über den Rand laufen (R5-4) */
-  .sel-toolbar { flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 16px); }
+  .sel-toolbar { flex-wrap: wrap; justify-content: center; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 16px); }
   .sel-toolbar .sel-label, .sel-count { display: none; }
   /* Popover (KI/Attribute) mittig überm Button verankern statt rechtsbündig —
      rechtsbündig schiebt es bei mittig sitzenden Buttons aus dem Bild (R5-5) */
   .sel-ai-menu {
     right: auto; left: 50%; transform: translateX(-50%);
-    width: max-content; max-width: min(320px, calc(100vw - 24px)); min-width: 0;
+    width: max-content; max-width: min(320px, calc(calc(100vw / var(--pn-anz, 1)) - 24px)); min-width: 0;
   }
   /* Aufgaben-Zeile: Fälligkeit & Board-Chip in die zweite Zeile (R5-6) */
   .task-row { flex-wrap: wrap; }
@@ -3633,7 +3633,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
   .task-due-input { margin-left: 27px; }
   .task-board { margin-left: auto; }
   /* Netz-Ansicht: Umschalter + Filter passen nicht nebeneinander → stapeln */
-  .ov-graph-toggles { top: calc(158px + var(--safe-top)); max-width: calc(100vw - 24px); }
+  .ov-graph-toggles { top: calc(158px + var(--safe-top)); max-width: calc(calc(100vw / var(--pn-anz, 1)) - 24px); }
   .ov-graph { padding-top: calc(205px + var(--safe-top)); }
   .ov-graph-zoom { right: 12px; bottom: 60px; }
   /* Brotkrume kompakt: nur der Projektname, Baum auf Viewport-Breite */
@@ -3704,7 +3704,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
    ohne dass das Board mitscrollt oder zoomt */
 .react-flow__node:has(.bn-suggestion-menu) { z-index: 1000 !important; }
 .note-card .bn-suggestion-menu {
-  z-index: 40; max-height: min(420px, 55vh); width: min(360px, 84vw);
+  z-index: 40; max-height: min(420px, calc(55vh / var(--pn-anz, 1))); width: min(360px, calc(84vw / var(--pn-anz, 1)));
   overscroll-behavior: contain; scrollbar-width: thin;
 }
 /* M144: BlockNote gibt den Einträgen eine FIXE Höhe — Titel + Beschreibung +
@@ -3819,8 +3819,8 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .k-kompakt .kanban-item > .k-labels, .k-kompakt .kanban-item > .kanban-chips { display: none; }
 .k-kompakt .kanban-item:hover > .kanban-chips { display: inline-flex; }
 /* Archiv- und Einsammel-Fenster (Portal) — die Karten-Regeln des alten Inline-Panels gelten nicht mehr */
-.k-panel-modal { width: min(560px, 96vw); gap: 8px; }
-.k-panel-modal.collect-panel { max-height: 84vh; }
+.k-panel-modal { width: min(560px, calc(96vw / var(--pn-anz, 1))); gap: 8px; }
+.k-panel-modal.collect-panel { max-height: calc(84vh / var(--pn-anz, 1)); }
 @media (pointer: coarse) { .k-done-archiv { opacity: 1; } }
 
 /* ---------- Kachel-Ansicht großer Module (M298) ---------- */
@@ -4085,7 +4085,7 @@ button.link-dead:disabled { opacity: 0.45; }
   display: flex; align-items: flex-start; justify-content: center; padding: 9vh 16px 16px;
 }
 .lookup-panel {
-  width: min(560px, 100%); max-height: 78vh; overflow-y: auto;
+  width: min(560px, 100%); max-height: calc(78vh / var(--pn-anz, 1)); overflow-y: auto;
   background: var(--surface); border-radius: var(--r-lg); padding: 14px;
   box-shadow: var(--pop-shadow);
   display: flex; flex-direction: column; gap: 8px;
@@ -4138,8 +4138,8 @@ button.link-dead:disabled { opacity: 0.45; }
    (left 50% + translateX) gilt nur für die alte In-Toolbar-Variante. */
 .sel-menu-fixed {
   position: fixed; bottom: auto; right: auto; z-index: 75;
-  max-height: min(420px, calc(100vh - 24px)); overflow-y: auto;
-  max-width: min(320px, calc(100vw - 16px));
+  max-height: min(420px, calc(calc(100vh / var(--pn-anz, 1)) - 24px)); overflow-y: auto;
+  max-width: min(320px, calc(calc(100vw / var(--pn-anz, 1)) - 16px));
 }
 
 /* ---------- Verbindungen als Daten-Abos (M169) ---------- */
@@ -4266,33 +4266,33 @@ button.link-dead:disabled { opacity: 0.45; }
 
 /* ---------- Menüs & Popover: immer im Sichtfenster ---------- */
 .frame-menu, .happ-menu {
-  max-width: calc(100vw - 16px);
-  max-height: min(72vh, calc(100vh - 24px));
+  max-width: calc(calc(100vw / var(--pn-anz, 1)) - 16px);
+  max-height: min(calc(72vh / var(--pn-anz, 1)), calc(calc(100vh / var(--pn-anz, 1)) - 24px));
   overflow-y: auto;
 }
-.cal-menu, .week-pop, .mm-pop { max-width: min(460px, 92vw); max-height: 62vh; overflow-y: auto; }
-.dock-menu { max-width: min(320px, calc(100vw - 16px)); }
+.cal-menu, .week-pop, .mm-pop { max-width: min(460px, calc(92vw / var(--pn-anz, 1))); max-height: calc(62vh / var(--pn-anz, 1)); overflow-y: auto; }
+.dock-menu { max-width: min(320px, calc(calc(100vw / var(--pn-anz, 1)) - 16px)); }
 
 /* ---------- Responsive-Ausbau: Phone ---------- */
 @media (max-width: 640px) {
   .topbar { top: calc(8px + var(--safe-top)); left: 8px; gap: 6px; }
   .logo { font-size: 15px; padding: 6px 11px; }
-  .tabs { top: calc(52px + var(--safe-top)); left: 8px; max-width: var(--kopf-voll, calc(100vw - 16px)); }
+  .tabs { top: calc(52px + var(--safe-top)); left: 8px; max-width: var(--kopf-voll, calc(calc(100vw / var(--pn-anz, 1)) - 16px)); }
   /* Kopf- und Tab-Leiste rücken zusammen — Freiraum entsprechend knapper (M189) */
   :root { --head-space: calc(106px + var(--safe-top)); }
   /* Modals als Vollbild-Blätter — kein Gefummel mit Rändern */
   .modal-backdrop { padding: 0; align-items: stretch; }
-  .modal { width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; border: none; }
+  .modal { width: calc(100vw / var(--pn-anz, 1)); height: calc(100dvh / var(--pn-anz, 1)); max-height: calc(100dvh / var(--pn-anz, 1)); border-radius: 0; border: none; }
   .modal-head { border-radius: 0; }
   .ticket-modal-backdrop { padding: 0; align-items: stretch; }
-  .ticket-modal { width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 0; border: none; }
-  .comment-panel { max-width: calc(100vw - 16px); }
+  .ticket-modal { width: calc(100vw / var(--pn-anz, 1)); height: calc(100dvh / var(--pn-anz, 1)); max-height: calc(100dvh / var(--pn-anz, 1)); border-radius: 0; border: none; }
+  .comment-panel { max-width: calc(calc(100vw / var(--pn-anz, 1)) - 16px); }
   .lookup-backdrop { padding: 10px 8px; }
-  .lookup-panel { max-height: calc(100dvh - 20px); }
+  .lookup-panel { max-height: calc(calc(100dvh / var(--pn-anz, 1)) - 20px); }
   /* M189: NICHT den Kopf-Freiraum wegkürzen — nur die Seitenränder.
      Vorher lief die Aufgaben-Zentrale unter Kopf- und Tab-Leiste. */
   .taskhub { padding-left: 10px; padding-right: 10px; }
-  .collect-panel { max-width: calc(100vw - 24px); }
+  .collect-panel { max-width: calc(calc(100vw / var(--pn-anz, 1)) - 24px); }
 }
 @media (max-width: 520px) {
   /* Dock-Menüs auf Phones FEST mittig über dem Dock verankern (fixed +
@@ -4313,7 +4313,7 @@ button.link-dead:disabled { opacity: 0.45; }
      wo diese Leiste steht. Solange sie im Bild ist, rückt die Karten-Leiste
      um deren Höhe nach oben, statt sich verdecken zu lassen. */
   bottom: calc(76px + env(safe-area-inset-bottom, 0px) + var(--lv-typo-dock, 0px));
-  z-index: 60; max-width: calc(100vw - 10px);
+  z-index: 60; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 10px);
   flex-wrap: wrap; justify-content: center;
   animation: pn-fade-in 0.16s ease-out;
   border-radius: var(--r-lg);
@@ -4448,7 +4448,7 @@ button.link-dead:disabled { opacity: 0.45; }
 .nav-panel {
   position: fixed; left: var(--app-rand); top: var(--head-space);
   bottom: var(--app-rand);
-  width: 380px; max-width: calc(100vw - 40px);
+  width: 380px; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 40px);
   display: flex; flex-direction: column;
   /* M249: gespiegelt — allein die obere RECHTE Ecke steht frei */
   border-radius: 0 var(--r-lg) 0 0;
@@ -4895,7 +4895,7 @@ body:has(.sel-toolbar-dock) .sel-toolbar-dock {
      Passt etwas nicht, wird waagerecht geschoben statt gestapelt. */
   .sel-toolbar-dock {
     flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
-    max-width: calc(100vw - 12px); justify-content: flex-start;
+    max-width: calc(calc(100vw / var(--pn-anz, 1)) - 12px); justify-content: flex-start;
   }
   .sel-toolbar-dock::-webkit-scrollbar { display: none; }
   .sel-toolbar-dock button { flex: none; padding: 9px 10px; }
@@ -4910,7 +4910,7 @@ body:has(.sel-toolbar-dock) .sel-toolbar-dock {
     left: 8px !important; right: 8px; top: auto !important;
     bottom: calc(10px + var(--kb));
     width: auto !important; max-width: none !important;
-    max-height: min(52vh, calc(100dvh - var(--kb) - 20px)); overflow-y: auto;
+    max-height: min(calc(52vh / var(--pn-anz, 1)), calc(calc(100dvh / var(--pn-anz, 1)) - var(--kb) - 20px)); overflow-y: auto;
     transition: bottom 0.18s ease;
   }
 }
@@ -4947,7 +4947,7 @@ body:has(.sel-toolbar-dock) .sel-toolbar-dock {
      gedeckelt auf Text 720 / Module 1200 Layout-Punkte — eine FESTE Breite, unabhängig vom
      Zoom, damit Kamera und Kartenmaß sich nicht gegenseitig aufschaukeln. Die Kamera-
      Stufe (Board.tsx) richtet sich dann nach dieser Breite. */
-  min-width: min(calc(100vw - var(--fokus-rand, 32px)), var(--fokus-max, 720px)) !important;
+  min-width: min(calc(calc(100vw / var(--pn-anz, 1)) - var(--fokus-rand, 32px)), var(--fokus-max, 720px)) !important;
 }
 .focus-mode .pn-focused .card-shell,
 .focus-mode .pn-focused .card-body { width: 100% !important; }
@@ -5131,7 +5131,7 @@ body:has(.app.focus-mode) .sel-toolbar-dock button { flex: none; }
   animation: pn-fade-in 0.2s ease-out;
 }
 .onb {
-  width: min(460px, 100%); max-height: calc(100dvh - 32px); overflow: auto;
+  width: min(460px, 100%); max-height: calc(calc(100dvh / var(--pn-anz, 1)) - 32px); overflow: auto;
   background: var(--surface); border-radius: var(--r-lg); padding: 24px 24px 18px;
   box-shadow: var(--pop-shadow);
 }
@@ -5839,7 +5839,7 @@ audio.file-media { height: 40px; }
   position: fixed; z-index: 3000; background: var(--surface); border-radius: var(--r-lg);
   border: 1px solid var(--border-soft); box-shadow: var(--pop-shadow); padding: 6px; display: flex;
   flex-direction: column; gap: 2px; min-width: 224px; max-width: 300px;
-  max-height: calc(100vh - 90px); overflow-y: auto;
+  max-height: calc(calc(100vh / var(--pn-anz, 1)) - 90px); overflow-y: auto;
 }
 .ebenen-menu button {
   width: 100%; text-align: left; border: none; background: none; font-family: inherit;
@@ -5901,7 +5901,7 @@ audio.file-media { height: 40px; }
 /* M290: „Von einer anderen App geteilt" — der Empfangs-Dialog.
    Er ist die erste Sekunde nach dem Teilen und muss deshalb ohne Nachdenken
    lesbar sein: was kam an, wohin soll es, in welcher Form. */
-.geteilt-modal { max-width: 460px; width: min(460px, calc(100vw - 24px)); }
+.geteilt-modal { max-width: 460px; width: min(460px, calc(calc(100vw / var(--pn-anz, 1)) - 24px)); }
 .geteilt-vorschau {
   display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start;
   background: var(--surface-3); border-radius: var(--r); padding: 10px; margin-bottom: 12px;
@@ -5951,7 +5951,7 @@ audio.file-media { height: 40px; }
 @media (max-width: 640px) {
   .modal-backdrop:has(.geteilt-modal) { padding: 12px; align-items: center; }
   .modal.geteilt-modal {
-    width: calc(100vw - 24px); height: auto; max-height: 92dvh;
+    width: calc(calc(100vw / var(--pn-anz, 1)) - 24px); height: auto; max-height: calc(92dvh / var(--pn-anz, 1));
     border-radius: var(--r-lg); overflow: auto;
   }
   .modal.geteilt-modal .modal-head { border-radius: var(--r-lg) var(--r-lg) 0 0; }
@@ -6055,7 +6055,7 @@ audio.file-media { height: 40px; }
    .dock-menu (M174), sonst verschöben beide zusammen doppelt. */
 .dock-menu.modul-palette {
   left: 50%; right: auto; translate: -50% 0; transform: none; bottom: calc(100% + 8px);
-  width: min(470px, calc(100vw - 16px)); max-width: none; padding: 8px; gap: 2px;
+  width: min(470px, calc(calc(100vw / var(--pn-anz, 1)) - 16px)); max-width: none; padding: 8px; gap: 2px;
 }
 .modul-suche {
   display: flex; align-items: center; gap: 6px; padding: 0 8px; margin-bottom: 2px;
@@ -6090,7 +6090,7 @@ audio.file-media { height: 40px; }
 .modul-leer { font-size: 12px; color: var(--muted); padding: 10px 6px; }
 @media (max-width: 640px) {
   .modul-raster { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .dock-menu.modul-palette { max-height: calc(100vh - 150px - var(--safe-top)); }
+  .dock-menu.modul-palette { max-height: calc(calc(100vh / var(--pn-anz, 1)) - 150px - var(--safe-top)); }
 }
 
 /* ===== M320: Handschrift → Text in der Zeichen-Palette ===== */
@@ -6148,7 +6148,7 @@ audio.file-media { height: 40px; }
 /* Vorschlag nach der Schreibpause: unter dem Geschriebenen, ein Tipp übernimmt */
 .schrift-vorschlag {
   position: fixed; z-index: 60; display: inline-flex; align-items: center; gap: 2px;
-  max-width: min(420px, 80vw); padding: 2px 2px 2px 4px;
+  max-width: min(420px, calc(80vw / var(--pn-anz, 1))); padding: 2px 2px 2px 4px;
   background: var(--surface-pop, var(--surface-card)); color: var(--ink);
   border: 1px solid var(--border-soft); border-radius: var(--r); box-shadow: var(--pop-shadow);
   font-size: 13px; line-height: 1.3; pointer-events: auto;
@@ -6436,7 +6436,7 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 .sel-ai-menu button.sel-menu-gefahr svg { color: #c0392b; }
 [data-theme='dark'] .sel-ai-menu button.sel-menu-gefahr, [data-theme='dark'] .sel-ai-menu button.sel-menu-gefahr svg { color: #ff9a8c; }
 /* Am Zeiger geöffnet (Rechtsklick) darf das Karten-Menü die ganze Höhe nutzen — sonst lag „Löschen" hinter einem Rollbalken */
-.sel-menu-fixed.am-zeiger { max-height: calc(100vh - 16px); }
+.sel-menu-fixed.am-zeiger { max-height: calc(calc(100vh / var(--pn-anz, 1)) - 16px); }
 
 /* M352: Die Seite nimmt beim Klick den Tastatur-Fokus (Pfeile/Leertaste blättern) — ohne Rahmen bei Maus und Stift */
 .pdf-seite:focus:not(:focus-visible) { outline: none; }
@@ -6499,7 +6499,7 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
   border: 1px solid var(--border); border-radius: 999px;
   box-shadow: var(--pop-shadow);
   font-size: 12.5px; line-height: 1.3; padding: 5px 6px 5px 14px;
-  z-index: 60; max-width: min(560px, 92vw); white-space: nowrap;
+  z-index: 60; max-width: min(560px, calc(92vw / var(--pn-anz, 1))); white-space: nowrap;
 }
 .lese-band span { overflow: hidden; text-overflow: ellipsis; }
 .lese-band button {
@@ -6676,8 +6676,8 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 .live-mehr .live-chip:first-child { margin-left: 0; }
 .live-mehr:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .live-liste {
-  position: absolute; top: calc(100% + 6px); right: 0; min-width: 220px; max-width: min(320px, 92vw);
-  max-height: min(60vh, 420px); overflow-y: auto; overscroll-behavior: contain;
+  position: absolute; top: calc(100% + 6px); right: 0; min-width: 220px; max-width: min(320px, calc(92vw / var(--pn-anz, 1)));
+  max-height: min(calc(60vh / var(--pn-anz, 1)), 420px); overflow-y: auto; overscroll-behavior: contain;
   background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r);
   box-shadow: var(--pop-shadow); padding: 6px; white-space: normal; color: var(--ink);
 }
@@ -6711,7 +6711,7 @@ html[data-punkte-modus] .react-flow__node:hover { outline: 2px dashed var(--acce
 html[data-alles-zeigen] .punkte-leiste { display: none !important; }
 .punkte-leiste {
   position: fixed; left: 50%; bottom: calc(92px + var(--safe-bottom, 0px)); transform: translateX(-50%); z-index: 58;
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 24px);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 24px);
   background: var(--surface-card); color: var(--ink); border: 1px solid var(--accent); border-radius: var(--r); box-shadow: var(--pop-shadow);
   padding: 8px 10px 8px 14px; font-size: 12.5px;
 }
@@ -6729,7 +6729,7 @@ html[data-alles-zeigen] .punkte-leiste { display: none !important; }
 .punkte-leiste button.haupt:hover { filter: brightness(1.08); color: #fff; }
 .punkte-rang-wrap { position: relative; display: inline-flex; }
 .punkte-rang {
-  position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); width: min(340px, calc(100vw - 32px)); max-height: 46vh; overflow: auto;
+  position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); width: min(340px, calc(calc(100vw / var(--pn-anz, 1)) - 32px)); max-height: calc(46vh / var(--pn-anz, 1)); overflow: auto;
   background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--pop-shadow); padding: 4px;
   display: flex; flex-direction: column;
 }
@@ -6848,7 +6848,7 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
   display: flex; align-items: center; gap: 10px;
   background: var(--surface-card); color: var(--ink); border: 1px solid var(--border); border-radius: 999px;
   box-shadow: var(--pop-shadow); font-size: 12.5px; line-height: 1.3; padding: 5px 6px 5px 14px;
-  z-index: 61; max-width: min(520px, 92vw); white-space: nowrap;
+  z-index: 61; max-width: min(520px, calc(92vw / var(--pn-anz, 1))); white-space: nowrap;
 }
 .zeig-band.ich { border-color: var(--accent); }
 /* M387: Im Karten-Fokus (öffnet sich jetzt auch bei allen, die folgen) sitzt das Band unter der Kopfzeile — sonst verdeckt es am Telefon den Kartentitel */
@@ -6867,7 +6867,7 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
   display: flex; align-items: center; gap: 10px;
   background: var(--surface-card); color: var(--ink); border: 1px solid var(--accent); border-radius: 14px;
   box-shadow: var(--pop-shadow); font-size: 13px; line-height: 1.4; padding: 9px 10px 9px 14px;
-  z-index: 400; width: max-content; max-width: min(560px, calc(100vw - 24px));
+  z-index: 400; width: max-content; max-width: min(560px, calc(calc(100vw / var(--pn-anz, 1)) - 24px));
 }
 .sprach-hinweis .sprach-text { flex: 1; min-width: 0; }
 .sprach-hinweis button + button { background: transparent; color: var(--accent-strong); border: 1px solid var(--accent); padding: 6px 12px; }
@@ -6895,9 +6895,9 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 .presenter-head .presenter-team.an { background: var(--accent-fill); color: #fff; }
 /* das Vorführ-Band über der Präsentation: unten links neben der Fußleiste — dort verdeckt es keine Folie;
    auf schmalen Schirmen ist daneben kein Platz, dann sitzt es mittig über der Fußleiste */
-.zeig-band.im-vortrag { z-index: 97; top: auto; left: 22px; transform: none; bottom: calc(14px + var(--safe-bottom, 0px)); max-width: min(360px, 30vw); }
+.zeig-band.im-vortrag { z-index: 97; top: auto; left: 22px; transform: none; bottom: calc(14px + var(--safe-bottom, 0px)); max-width: min(360px, calc(30vw / var(--pn-anz, 1))); }
 @media (max-width: 900px) {
-  .zeig-band.im-vortrag { left: 50%; transform: translateX(-50%); bottom: calc(64px + var(--safe-bottom, 0px)); max-width: 92vw; }
+  .zeig-band.im-vortrag { left: 50%; transform: translateX(-50%); bottom: calc(64px + var(--safe-bottom, 0px)); max-width: calc(92vw / var(--pn-anz, 1)); }
 }
 .presenter-slide.app { margin: 0 2vw 10px; }
 
@@ -6976,7 +6976,7 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
    die dort über den Rand reicht oder verkleinert ist), über dem Dock und über der Tastatur */
 .bub-pille.am-schirm {
   position: fixed; left: calc(8px + var(--safe-left, 0px)); right: calc(8px + var(--safe-right, 0px)); bottom: calc(112px + var(--app-rand, 0px) + env(safe-area-inset-bottom, 0px));
-  z-index: 62; zoom: 1; font-size: 14px; padding: 8px 10px; gap: 8px; max-height: 46vh; overflow-y: auto;
+  z-index: 62; zoom: 1; font-size: 14px; padding: 8px 10px; gap: 8px; max-height: calc(46vh / var(--pn-anz, 1)); overflow-y: auto;
 }
 [data-keyboard='on'] .bub-pille.am-schirm { bottom: calc(8px + var(--kb)); }
 .bub-pille.am-schirm button { min-width: 42px; min-height: 40px; font-size: 14px; }
@@ -7079,7 +7079,7 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 html[data-alles-zeigen] .live-zeiger { display: none !important; }
 
 /* ---------- M379: Vorlagen beim Anlegen eines Boards ---------- */
-.modal.vorlagen-dialog { width: min(820px, 96vw); }
+.modal.vorlagen-dialog { width: min(820px, calc(96vw / var(--pn-anz, 1))); }
 .vorlagen-dialog .modal-head h2 small { font-size: 12.5px; font-weight: 400; color: var(--muted); margin-left: 6px; }
 .vorlagen-gitter { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; padding: 16px 20px 6px; }
 .vorlage {
@@ -7110,12 +7110,12 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 
 /* ---------- M380: Wochenplan, Zeiterfassung, Protokoll, Rechen-Tabelle als lebende Folie ---------- */
 .presenter-slide.editable > .slide-modul {
-  width: min(1120px, 100%); height: min(74vh, 100%); align-self: center; text-align: left;
+  width: min(1120px, 100%); height: min(calc(74vh / var(--pn-anz, 1)), 100%); align-self: center; text-align: left;
   box-shadow: var(--pop-shadow); border-radius: var(--r-lg); position: relative;
 }
 .presenter-slide.editable > .slide-modul.slide-sheet { height: auto; max-height: 100%; width: min(1000px, 100%); padding: 16px 20px 14px; }
 .presenter-slide.editable > .slide-modul.slide-minutes { width: min(880px, 100%); padding: 16px 20px 14px; }
-.presenter-slide.editable > .slide-modul.slide-time { width: min(840px, 100%); height: min(64vh, 100%); }
+.presenter-slide.editable > .slide-modul.slide-time { width: min(840px, 100%); height: min(calc(64vh / var(--pn-anz, 1)), 100%); }
 .slide-modul .drag-title { cursor: text; }
 .slide-week .week-title, .slide-time .time-title, .slide-minutes .minutes-title, .slide-sheet .drag-title { font-size: 19px; }
 .slide-week .week-wrap, .slide-time .time-wrap { padding: 18px 22px 20px; }
@@ -7128,7 +7128,7 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 .slide-minutes .note-editor { font-size: 16px; }
 .slide-sheet table { font-size: 15px; }
 @media (max-width: 640px) {
-  .presenter-slide.editable > .slide-modul { height: min(78vh, 100%); }
+  .presenter-slide.editable > .slide-modul { height: min(calc(78vh / var(--pn-anz, 1)), 100%); }
   .slide-week .week-wrap, .slide-time .time-wrap { padding: 10px 10px 12px; }
   .presenter-slide.editable > .slide-modul.slide-sheet, .presenter-slide.editable > .slide-modul.slide-minutes { padding: 10px 10px 8px; }
 }
@@ -7153,7 +7153,7 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 .qr-text { margin: 0; font-size: 16px; line-height: 1.45; color: var(--text); text-wrap: balance; }
 .qr-konto { color: var(--muted); }
 /* Der Code selbst: immer Weiß mit schwarzen Feldern, so groß wie Bildschirm und Karte es hergeben */
-.qr-code { background: #fff; border-radius: var(--r, 8px); line-height: 0; align-self: center; width: min(100%, 58vh, 460px); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+.qr-code { background: #fff; border-radius: var(--r, 8px); line-height: 0; align-self: center; width: min(100%, calc(58vh / var(--pn-anz, 1)), 460px); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
 .qr-code svg { width: 100%; height: 100%; display: block; border-radius: inherit; }
 .qr-warte { color: #555; font-size: 13px; line-height: 1.4; padding: 12px; }
 .qr-adresse { font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: var(--muted); word-break: break-all; user-select: all; line-height: 1.35; }
@@ -7215,3 +7215,8 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 
 /* M389: Das Fenster selbst nimmt beim Öffnen den Fokus (lib/fensterFokus.ts) — ohne Rahmen, es ist kein Ziel. */
 [data-fenster]:focus { outline: none; }
+
+/* M390: Anzeigegröße und Bildschirm-Einheiten. `vh`/`vw` messen das FENSTER; die Anzeigegröße vergrößert aber alles
+   (zoom an der Wurzel). Ein Fenster mit „höchstens 84vh" war bei 150 % darum 126 % der Bildschirmhöhe hoch — die
+   untersten Knöpfe („Alles leeren", „Mit Microsoft verbinden") lagen unerreichbar unter dem Rand, das ＋-Menü begann
+   über dem oberen. Alle Höhen und Breiten in vh/vw sind deshalb durch den Faktor geteilt (--pn-anz, sonst 1). */

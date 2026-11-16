@@ -24,6 +24,7 @@
  * („Freitag") hängen am heutigen Tag — der Cache gilt darum nur für den Tag,
  * an dem er entstand.
  */
+import { ankerFuer, type FristAnker } from './fristAnker';
 import { de as chronoDe, type ParsedResult } from 'chrono-node';
 import { kurzdaten, nurWortKeinTag } from './dates';
 
@@ -39,7 +40,7 @@ export interface NotizTermin {
 /** Höchstens so viele Termine je Notiz — eine Terminliste ja, ein Kalender-Klon nein */
 const MAX_JE_NOTIZ = 12;
 
-interface Eintrag { tag: string; termine: NotizTermin[] }
+interface Eintrag { tag: string; termine: NotizTermin[]; anker?: FristAnker }
 const cache = new WeakMap<object, Eintrag>();
 
 const heute = (): string => {
@@ -65,15 +66,17 @@ function inlineText(content: unknown): string {
   return content.map((c) => (c as { text?: string })?.text ?? '').join('');
 }
 
-function scanne(blocks: AnyBlock[] | undefined, out: NotizTermin[]): void {
+function scanne(blocks: AnyBlock[] | undefined, out: NotizTermin[], anker?: FristAnker): void {
   for (const b of blocks ?? []) {
     if (out.length >= MAX_JE_NOTIZ) return;
     if (b.type && SCAN_TYPEN.has(b.type)) {
       const text = inlineText(b.content).trim();
       if (text && text.length >= 6) {
+        // M390: gelesen wird vom Tag aus, an dem der Text geschrieben wurde — „am Freitag" bleibt DIESER Freitag
+        const ref = ankerFuer(anker, (b as { id?: string }).id, text) ?? new Date();
         let ergebnisse: ParsedResult[];
         try {
-          ergebnisse = chronoDe.parse(text, new Date(), { forwardDate: true });
+          ergebnisse = chronoDe.parse(text, ref, { forwardDate: true });
         } catch {
           ergebnisse = [];
         }
@@ -89,7 +92,7 @@ function scanne(blocks: AnyBlock[] | undefined, out: NotizTermin[]): void {
         }
         // M388: deutsche Kurzdaten („am 3.12.", „12.11. um 10 Uhr") — die erkennt die Bibliothek nicht; die Frist-
         // Marke der Notiz fand sie schon (lib/dates.ts), der Kalender nicht
-        for (const k of kurzdaten(text, new Date()).slice(0, 2)) {
+        for (const k of kurzdaten(text, ref).slice(0, 2)) {
           const iso = isoLocal(k.date);
           if (out.some((o) => o.iso === iso && o.text === text.slice(0, 90))) continue;
           out.push({ iso, zeit: k.mitZeit ? `${String(k.date.getHours()).padStart(2, '0')}:${String(k.date.getMinutes()).padStart(2, '0')}` : undefined, text: text.slice(0, 90) });
@@ -99,20 +102,20 @@ function scanne(blocks: AnyBlock[] | undefined, out: NotizTermin[]): void {
     }
     // Checklisten-Punkte NICHT scannen (laufen als Aufgaben) — aber ihre
     // Kinder schon: eingerückte Absätze unter einem Punkt sind normaler Text
-    scanne(b.children, out);
+    scanne(b.children, out, anker);
   }
 }
 
 /** Alle erkannten Termine einer Notiz (blocks = data.blocks der Karte) */
-export function notizTermine(blocks: unknown): NotizTermin[] {
+export function notizTermine(blocks: unknown, anker?: FristAnker): NotizTermin[] {
   if (!Array.isArray(blocks) || blocks.length === 0) return [];
   const key = blocks as object;
   const tag = heute();
   const alt = cache.get(key);
-  if (alt && alt.tag === tag) return alt.termine;
+  if (alt && alt.tag === tag && alt.anker === anker) return alt.termine;
   const out: NotizTermin[] = [];
   // Checklisten-Text überspringt scanne() selbst (Typ nicht in SCAN_TYPEN)
-  scanne(blocks as AnyBlock[], out);
-  cache.set(key, { tag, termine: out });
+  scanne(blocks as AnyBlock[], out, anker);
+  cache.set(key, { tag, termine: out, anker });
   return out;
 }

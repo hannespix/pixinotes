@@ -1,6 +1,7 @@
 // M202: Teilen-Dialog für einzelne Karten — ein Ort für alle Ausgabewege:
 // Übernahme-Link (PixiNotes), WhatsApp, E-Mail, Drucken/PDF-Dialog, PDF-Datei,
 // formatiertes Kopieren. Große Ziele (min. 44px), Esc/Außenklick schließt.
+import { lesefolge } from './boardTasten';
 import { useMemo, useState } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodesToHtml, nodesToText, sicherKuerzen } from '../lib/serialize';
@@ -16,7 +17,8 @@ export function ShareCardsModal() {
   const board = useBoard(selectActiveBoard);
   const [busy, setBusy] = useState('');
   const nodes = useMemo(
-    () => (ids ? board.nodes.filter((n) => ids.includes(n.id)) : []),
+    // M390: in Lesefolge — vorher in der Reihenfolge des Anlegens („C → A → D → B" für nebeneinander liegende A B C D)
+    () => (ids ? lesefolge(board.nodes.filter((n) => ids.includes(n.id))) : []),
     [ids, board.nodes],
   );
   // M341: Die WhatsApp-Nachricht steht fest, sobald der Dialog offen ist — der Knopf ist ein echter Link

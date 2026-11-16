@@ -52,7 +52,7 @@ Jeder Fund wurde am Code nachgeprüft, bevor er behoben wurde. Status: ✅ behob
 | K14 | Rückverweise und Aufgaben: ganze Umgebung wird bei jeder Änderung neu durchsucht | ✅ gemerkt je Board-Stand (Texte, Titel-Index, Datums-Funde) |
 | K15 | Alt+Z (Zeichnen) liegt auf deutscher Tastatur auf Y | ✅ |
 | K16 | „Heute" aus UTC: zwischen 0 und 2 Uhr gilt gestern (`HEUTE()`, Vorlagen, Anordnen, Aufgaben, Zeiterfassung, Fokus) | ✅ (`lib/tag.ts`) |
-| K17 | `RUNDEN(1,005;2)` → 1; Zahlenerkennung zerlegt Telefonnummern/PLZ | ✅ RUNDEN · Zahlenerkennung: ⏳ M390 |
+| K17 | `RUNDEN(1,005;2)` → 1; Zahlenerkennung zerlegt Telefonnummern/PLZ | ✅ RUNDEN; Zahlenerkennung in M390 |
 | K18 | Aufgaben-Protokoll schreibt ohne Schutz in den Speicher — voller Speicher blockiert „erledigt" | ✅ |
 
 ### 1.4 Bauteile (React)
@@ -66,8 +66,8 @@ Jeder Fund wurde am Code nachgeprüft, bevor er behoben wurde. Status: ✅ behob
 | R5 | Leertaste auf Knöpfen wirkungslos, solange das Board offen ist | ✅ |
 | R6 | Anordnen/KI/Handschrift schreiben auf das gerade aktive Board, nicht auf das, wo sie begannen | ✅ (`lib/zielBoard.ts`) |
 | R7 | Fenster ohne Fokus-Führung; Tab in der Präsentation tot | ✅ Tab in der Präsentation; Fokus-Führung der Fenster in M389 (U11) |
-| R8 | Ticket ziehen und Board schwenken gleichzeitig (Touch außerhalb des Fokus) | ⏳ M390 |
-| R9 | Auswahl-Leiste und Zeichen-Ebene rechnen je Bild neu | ⏳ M390 |
+| R8 | Ticket ziehen und Board schwenken gleichzeitig (Touch außerhalb des Fokus) | ✅ in M390 |
+| R9 | Auswahl-Leiste und Zeichen-Ebene rechnen je Bild neu | ➖ gemessen in M390: 60 Bilder/s |
 | R10 | Kommentar-Entwurf wandert in den nächsten Faden | ✅ |
 | R11 | Suche: Antwort einer überholten Frage erscheint | ✅ |
 | R12 | wie K16 | ✅ |
@@ -85,7 +85,7 @@ Jeder Fund wurde am Code nachgeprüft, bevor er behoben wurde. Status: ✅ behob
 | A5 | Tabellen-Abfragen filtern nur nach Name — bei gleicher Board-Kennung (eigene und geteilte Zeile) wird die falsche gelesen | ✅ |
 | A6 | „Anmeldung nötig" wird nach erfolgreichem Erneuern nicht zurückgesetzt — Live-Abgleich bleibt für die Sitzung aus | ✅ |
 | A7 | Fehlgeschlagenes Schreiben eines Link-Gasts wird nicht wiederholt | ✅ wiederholt mit wachsendem Abstand und sobald das Netz zurück ist |
-| A8 | WebDAV: Schreiben ohne Vorbedingung — zwei Geräte überschreiben einander | ⏳ M390 |
+| A8 | WebDAV: Schreiben ohne Vorbedingung — zwei Geräte überschreiben einander | ✅ in M390 |
 | A9 | Konto löschen lässt die Dateien im Speicher zurück (und scheitert daran) | ✅ |
 | A10 | Mitgelesene Karte: gefälschte Felder (`archived`, Art, Größe) bleiben nach dem Loslassen stehen und gehen mit dem nächsten Speichern hinaus | ✅ übernommen werden nur Inhalt, Lage, Größe |
 | A11 | Abgelehnter Kanal-Beitritt wird nie wiederholt; „live verbunden" wird fälschlich angezeigt | ✅ Konto-Kanal · Live-Kanal der Boards: ⏳ M391 |
@@ -120,5 +120,48 @@ ein Bild-für-Bild-Vergleich (37 von 38 identisch, eines mit 5 Bildpunkten Schre
 | U16 | Kopfleiste am Laptop: freie Fläche links von Rückgängig (die Suche steht dort in der Spalte) | ➖ gewollt: Die Leiste ist so breit wie die Spalte darunter |
 
 ## 3 · Logik-Audit (M390)
+
+Vorgehen: Drei Durchgänge im laufenden Programm (Headless-Browser, als Nutzer geklickt und getippt) — Karten und
+Boards, Planungs-Module, Ein-/Ausgabe und Präsentation; mit gestellter Uhr und in drei Zeitzonen. Jeder Fund wurde
+zweimal nachgestellt, bevor er hier landete.
+
+| Nr | Schwere | Fund | Status |
+|----|---------|------|--------|
+| L1 | hoch | Relative Fristen („bis Freitag", „morgen") wandern mit dem Tag des Ansehens und werden nie überfällig; Notiz und eingesammeltes Ticket widersprechen sich | ✅ jede relative Angabe merkt sich den Tag, an dem sie geschrieben wurde (Anker je Absatz); Altbestand bekommt den Tag des ersten Starts |
+| L2 | mittel | Board löschen kennt archivierte Boards nicht: springt auf ein archiviertes; löscht das letzte sichtbare | ✅ archivierte Boards zählen nicht als Arbeitsfläche |
+| L3 | mittel | Board umbenennen bricht `[[Verknüpfungen]]`; der Klick legt ein leeres Board mit altem Namen an (immer im ersten Projekt) | ✅ Umbenennen schreibt die Verknüpfungen in allen Notizen mit; ein per Klick angelegtes Board landet im Projekt der Notiz |
+| L4 | mittel | Ohne eigenen Rückgängig-Schritt: Etikett/Art einer Verbindung, Größe ziehen, Pfeiltasten — Strg+Z nimmt den Schritt davor mit | ✅ Etikett, Art und Stil einer Verbindung, Größe ziehen und Pfeiltasten sind je ein eigener Schritt |
+| L5 | mittel | Strg+Z im Notiztext, danach Strg+Z auf dem Board holt den entfernten Text zurück | ✅ das Rückgängig im Text legt auf dem Board keinen eigenen Schritt mehr an |
+| L6 | mittel | Rahmen in Mehrfachauswahl oder per Pfeiltasten bewegt: Inhalt bleibt liegen | ✅ jeder bewegte Rahmen nimmt seinen Inhalt mit — auch in der Mehrfachauswahl und per Pfeiltasten |
+| L7 | mittel | Archiv ausgeblendet: archivierte Karte bleibt unsichtbar gewählt, Entf löscht sie | ✅ beim Ausblenden des Archivs fällt Unsichtbares aus der Auswahl |
+| L8 | mittel | Tasten wirken durch Fenster und andere Ansichten: Entf, Alt+A, Strg+A, Alt+→, Alt+Z, Alt+P | ✅ hinter einem offenen Fenster wirkt keine Board-Taste mehr |
+| L9 | mittel | Mehrere Karten duplizieren/färben: je Karte ein Rückgängig-Schritt; Kopien stapeln sich deckungsgleich; Verbindungen zwischen den Kopien fehlen | ✅ Duplizieren und Färben mehrerer Karten sind ein Schritt; Kopien liegen versetzt, Verbindungen zwischen ihnen kommen mit |
+| L10 | niedrig | „Rückgängig" im Hinweis: nimmt nach weiterer Arbeit den falschen Schritt; nach Wiederherstellen löscht Strg+Z erneut; Verlauf am falschen Board | ✅ der Knopf nimmt genau die gemeldete Handlung zurück und verfällt, sobald weitergearbeitet wurde |
+| L11 | niedrig | Abgehakte Punkte behalten ihre Frist-Marke („überfällig!") | ✅ |
+| L12 | niedrig | Archiv: Alt+→ blättert auf archivierte Boards; Hinweis nennt falschen Ort; „Alle archivieren (2)" archiviert eines; archivierte Karte bleibt beim Rahmen-Zug liegen; Projekt-Kopie: Portale zeigen aufs Original | ✅ alle fünf |
+| L13 | hoch | Zeitplan: „heute" in Weltzeit und gerundet — ab 13 Uhr gilt morgen (neue Vorgänge, Heute-Linie) | ✅ |
+| L14 | hoch | Kanban: „Erledigt"-Spalte löschen macht laufende Tickets zu erledigten | ✅ erst die Spalte davor leeren — die Meldung sagt, warum |
+| L15 | hoch | Aufgaben-Zentrale: Punkte der Protokoll-Reihe lassen sich nicht abhaken, zählen aber als „geschafft" | ✅ abhaken in der Zentrale hakt im Protokoll ab |
+| L16 | mittel | Protokoll: Vermerk „(offen seit 09.11.26)" wird als Frist gelesen — jeder vertagte Punkt ist sofort überfällig | ✅ der Vermerk ist kein Termin |
+| L17 | mittel | Zeiterfassung über Mitternacht verliert die Zeit nach 0 Uhr | ✅ der Abschnitt endet um Mitternacht, der Rest steht am neuen Tag |
+| L18 | mittel | Rechen-Tabelle liest anders, als sie zeigt: „3.000" eingetippt wird 3; „2026" erscheint als „2.026" | ✅ gelesen wird, wie gezeigt wird („3.000" ist 3000, „1.5" bleibt 1,5). ➖ Die Anzeige mit Tausenderpunkt bleibt, damit Zahlen und Summen gleich aussehen; eine Jahreszahl als Text schreibt man mit Hochkomma |
+| L19 | mittel | Sammel-Kanban: „Zurück" aus Erledigt prallt zurück; Änderungen an Titel und Frist werden vom Abgleich überschrieben | ✅ „Zurück" öffnet die Quelle wieder (Zeitplan auf 90 %, Ticket eine Spalte zurück); Titel und Frist schreiben in die Quelle durch, bei Notiz-Punkten sind sie dort zu ändern |
+| L20 | mittel | Strg+Z nach „Weiter" an einem eingesammelten Ticket hinterlässt einen Stand, den es nie gab (zwei Schritte für einen Handgriff) | ✅ ein Handgriff, ein Schritt |
+| L21 | mittel | Kalender: Zeitplan-Vorgänge doppelt; Schalter „Meilensteine"/„Balken" blenden sie nicht aus; Balken über 120 Tage reißen ab | ✅ Vorgänge erscheinen einmal und folgen ihren Schaltern; Balken bis zwei Jahre |
+| L22 | mittel | Zeiterfassung ab UTC+13: Tageswechsel klemmt, Woche verschoben | ✅ Kalender-Rechnen in Ortszeit |
+| L23 | mittel | Schnelleingabe der Zentrale legt die Aufgabe in ein archiviertes Kanban | ✅ |
+| L24 | niedrig | Kleineres: zurückgeholtes Ticket wird wieder auto-archiviert; Zeiterfassung erlaubt Beginn nach Ende; Tagesnotiz ab Folgetag „überfällig"; zweiter Klick auf Auto-Summe summiert die Summe mit; Wochenplan: Zeilenwechsel verschiebt Blöcke | ✅ alle fünf (das zurückgeholte Ticket behält sein Erledigt-Datum; die Archiv-Frist zählt ab dem Zurückholen) |
+| L25 | hoch | Gesamt-Sicherung, Board-Datei und „Board im Link" sind nicht vollständig: Vorlagen, Tool-Quelltexte und große Dateien fehlen ohne Hinweis — nach „Alles leeren" endgültig weg | ✅ Sicherung und Board-Datei tragen Vorlagen, Tool-Quelltexte und Dateien mit; der Link sagt ehrlich, was er nicht tragen kann |
+| L26 | mittel | Karte duplizieren / aus Vorlage einfügen: Datei- und Tool-Karten kommen leer an | ✅ |
+| L27 | mittel | Anzeigegröße ab 130 %: Fenster und ＋-Menü ragen aus dem Bild, unterste Bedienelemente unerreichbar | ✅ alle Maße an der Bildschirmhöhe rechnen die Anzeigegröße ein (geprüft bei 150 % auf 1280×720) |
+| L28 | mittel | `.txt` wird als Markdown gelesen (Text geht verloren); Markdown-Export maskiert nichts | ✅ `.txt` bleibt Text, Zeile für Zeile; der Markdown-Export maskiert Zeichen mit Bedeutung |
+| L29 | niedrig | Die 21. Karten-Vorlage verdrängt still die älteste | ✅ Obergrenze 40 — und eine Meldung statt stillem Verdrängen |
+| L30 | niedrig | Reihenfolge: Teilen/Kopieren und Blättern im Fokus folgen der Anlege- statt der Lesefolge | ✅ überall die Lesefolge (zeilenweise von links oben) |
+| L31 | niedrig | English: Rückfrage „Alles leeren" deutsch; Export-Gerüst deutsch | ✅ Rückfrage übersetzt. ➖ Das Gerüst exportierter Dokumente bleibt deutsch — es ist Teil des Dokuments, nicht der Oberfläche |
+
+Aus dem Code-Audit hierher verschoben: K17 Zahlenerkennung ✅ (Telefonnummern, Postleitzahlen und Kennungen bleiben
+Text) · R8 ✅ nachgestellt und behoben (Ticket am Finger: Board schwenkt nicht mehr mit) · R9 ➖ gemessen: 300 Striche,
+60 Karten, Auswahl — Schwenken bleibt bei 60 Bildern/s · A8 ✅ WebDAV schreibt mit Vorbedingung (`If-Match`), wo der
+Server sie zulässt.
 
 ## 4 · Team-Audit (M391)

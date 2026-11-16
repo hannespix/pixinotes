@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { detectDates, downloadIcs, formatDue } from '../../lib/dates';
+import { detectDates, downloadIcs, formatDue, type DetectedDate } from '../../lib/dates';
 import { useBoard } from '../../store';
 import { ICalendar } from '../Icons';
 
@@ -7,7 +7,7 @@ import { ICalendar } from '../Icons';
  * Fristen-Chips unter einer Karte: automatisch erkannte Datumsangaben
  * mit Countdown-Färbung. Klick → .ics-Kalendereintrag.
  */
-export function DueChips({ text, context }: { text: string; context: string }) {
+export function DueChips({ text, context, fristen }: { text: string; context: string; /** M390: Notizen lesen ihre Fristen Block für Block (mit Anker) */ fristen?: () => DetectedDate[] }) {
   const showToast = useBoard((s) => s.showToast);
   // Countdown bleibt aktuell, auch wenn die App lange offen ist (N5)
   const [nowTick, setNowTick] = useState(0);
@@ -16,7 +16,7 @@ export function DueChips({ text, context }: { text: string; context: string }) {
     return () => clearInterval(t);
   }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const dates = useMemo(() => detectDates(text), [text, nowTick]);
+  const dates = useMemo(() => (fristen ? fristen() : detectDates(text)), [text, nowTick, fristen]);
   if (dates.length === 0) return null;
 
   return (

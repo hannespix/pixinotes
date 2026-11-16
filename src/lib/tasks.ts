@@ -5,6 +5,16 @@
 import type { BoardDoc } from '../store';
 import { doneCol, type GanttData, type KanbanData } from '../types';
 import { detectDates } from './dates';
+import { ankerFuer, type FristAnker } from './fristAnker';
+
+/** M390: Anker eines Protokoll-Punkts — der Tag, seit dem er offen ist, sonst der Sitzungstag. */
+function sitzungsAnker(text: string, sitzung: string | undefined): Date | undefined {
+  const m = /\(offen seit (\d{1,2})\.(\d{1,2})\.(\d{2,4})\)/i.exec(text);
+  const d = m
+    ? new Date(m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]), Number(m[2]) - 1, Number(m[1]), 0, 0, 1)
+    : sitzung ? new Date(`${sitzung}T00:00:01`) : undefined;
+  return d && !Number.isNaN(d.getTime()) ? d : undefined;
+}
 import { triggerDownload } from './download';
 
 export type TaskUrgency = 'none' | 'ok' | 'soon' | 'overdue';
@@ -155,7 +165,9 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
                 const text = inlineText(b.content).trim();
                 if (text) {
                   const itemId = b.id ?? `pos:${path}`;
-                  const detected = detectDates(text, now)[0];
+                  // M390: „bis Freitag" im Protokoll vom 09.11. meint den Freitag danach — und ein vertagter Punkt
+                  // behält den Tag, seit dem er offen ist (der Vermerk selbst ist keine Frist)
+                  const detected = detectDates(text, now, sitzungsAnker(text, newest.date))[0];
                   const due = detected ? isoLocal(detected.date) : undefined;
                   out.push({
                     key: `m:${board.id}:${node.id}:${newest.id}:${itemId}`,
@@ -186,7 +198,7 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
                 const itemId = b.id ?? `pos:${path}`;
                 // Fristen-Erkennung (M113): „bis Freitag", „am 24.07." usw. im
                 // Text zählen als Fälligkeit — wie bei den Fristen-Chips (M3)
-                const detected = detectDates(text, now)[0];
+                const detected = detectDates(text, now, ankerFuer((node.data as { fristAnker?: FristAnker }).fristAnker, b.id, text))[0];
                 const due = detected ? isoLocal(detected.date) : undefined;
                 out.push({
                   key: `c:${board.id}:${node.id}:${itemId}`,
@@ -242,7 +254,7 @@ export function collectListTasks(
         const text = inlineText(b.content).trim();
         if (text) {
           const itemId = b.id ?? `pos:${path}`;
-          const detected = detectDates(text, now)[0];
+          const detected = detectDates(text, now, ankerFuer((node.data as { fristAnker?: FristAnker }).fristAnker, b.id, text))[0];
           const due = detected ? isoLocal(detected.date) : undefined;
           out.push({
             key: `c:${board.id}:${node.id}:${itemId}`,

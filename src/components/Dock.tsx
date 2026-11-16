@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
-import { mutedHistory, useBoard } from '../store';
+import { anhaengeMitnehmen, mutedHistory, useBoard } from '../store';
 import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, makeSheet, makeTime, makeWeek } from '../lib/nodes';
 import { importFilesToBoard, importHtmlAppFromUrl } from '../lib/importFiles';
 import { punkteModusSetzen } from '../lib/punkte';
@@ -373,7 +373,9 @@ export function Dock() {
   const vorlageEinfuegen = (t: (typeof templates)[number]) => add(() => {
     const clone = JSON.parse(JSON.stringify(t.node)) as AppNode;
     const size = { w: clone.width ?? 260, h: clone.height ?? 120 };
-    return { ...clone, id: uid(), position: centerPos(size.w, size.h), selected: false };
+    const neu = { ...clone, id: uid(), position: centerPos(size.w, size.h), selected: false } as AppNode;
+    anhaengeMitnehmen([t.node], new Map([[t.node.id, neu.id]]));   // M390: Datei/Tool der Vorlage mitnehmen
+    return neu;
   });
   const grobeZeiger = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 

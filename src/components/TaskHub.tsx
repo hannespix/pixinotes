@@ -254,6 +254,21 @@ export function TaskHub() {
         rows: g.rows.map((r) => (r.id === t.itemId ? { ...r, progress: 100 } : r)),
       });
       if (useBoard.getState().konfetti) confetti({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
+    } else if (node.type === 'minutes') {
+      // M390: Die Punkte der Protokoll-Reihe liegen in den SITZUNGEN (entries[].blocks), nicht in data.blocks. Der
+      // Haken schrieb vorher ins Leere — der Punkt blieb offen, „Heute geschafft" zählte trotzdem jedes Mal weiter.
+      const md = node.data as { entries?: Array<{ id: string; blocks?: unknown[] }> };
+      const sitzung = t.key.split(':')[3];
+      let getroffen = false;
+      const entries = (md.entries ?? []).map((e) => {
+        if (e.id !== sitzung) return e;
+        const neu = toggleCheckBlock(e.blocks, t.itemId);
+        if (JSON.stringify(neu) !== JSON.stringify(e.blocks)) getroffen = true;
+        return { ...e, blocks: neu };
+      });
+      if (!getroffen) { showToast('Dieser Punkt ließ sich nicht abhaken — bitte im Protokoll selbst.'); return; }
+      logDone(t);
+      updateNodeDataOnBoard(t.boardId, t.nodeId, { entries, extEpoch: ((node.data as { extEpoch?: number }).extEpoch ?? 0) + 1 });
     } else {
       logDone(t);
       updateNodeDataOnBoard(t.boardId, t.nodeId, {
@@ -377,7 +392,8 @@ export function TaskHub() {
     if (!parsed.text) { showToast('Bitte auch einen Aufgabentext angeben.'); return; }
     const st = useBoard.getState();
     const board = st.boards.find((b) => b.id === (quickBoard || st.activeId)) ?? st.boards[0];
-    let kanban = board.nodes.find((n) => n.type === 'kanban') as import('../types').AppNode | undefined;
+    // M390: nicht in ein archiviertes Kanban — dort wäre die Aufgabe angelegt und nirgends zu sehen
+    let kanban = board.nodes.find((n) => n.type === 'kanban' && !n.archived) as import('../types').AppNode | undefined;
     if (!kanban) {
       kanban = makeKanban({ x: 140, y: 140 }, 'Aufgaben');
       st.addNodeToBoard(board.id, kanban);

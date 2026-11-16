@@ -903,12 +903,21 @@ export function Board() {
 
   const zugSchritt = useRef<{ eintrag: unknown; x: number; y: number } | null>(null);
   const onNodeDragStart = useCallback((_: unknown, node: Node) => {
-    if (node.type === 'frame') {
+    // M390: JEDER Rahmen, der sich bewegt, nimmt seinen Inhalt mit — nicht nur der gegriffene. Vorher blieb der
+    // Inhalt liegen, sobald zwei Rahmen gewählt waren oder man an einer mitgewählten Karte zog.
+    {
       const all = selectActiveBoard(useBoard.getState()).nodes;
-      // Mitglieder inkl. verschachtelter (kleinerer) Rahmen — deren Karten
-      // liegen ohnehin im äußeren Rahmen und bewegen sich genau EINMAL (M150)
-      const ids = frameMembers(node as AppNode, all, true).map((n) => n.id);
-      frameDrag.current = { id: node.id, ids, x: node.position.x, y: node.position.y };
+      const gewaehlt = node.selected ? all.filter((n) => n.selected) : [];
+      const rahmen = [...(node.type === 'frame' ? [node as AppNode] : []), ...gewaehlt.filter((n) => n.type === 'frame' && n.id !== node.id)];
+      if (rahmen.length) {
+        const bewegt = new Set([node.id, ...gewaehlt.map((n) => n.id)]);
+        // Mitglieder inkl. verschachtelter (kleinerer) Rahmen — deren Karten liegen ohnehin im äußeren Rahmen und
+        // bewegen sich genau EINMAL (M150); archivierte wandern mit
+        const ids = [...new Set(rahmen.flatMap((f) => frameMembers(f, all, true, true).map((n) => n.id)))].filter((id) => !bewegt.has(id));
+        frameDrag.current = { id: node.id, ids, x: node.position.x, y: node.position.y };
+      } else frameDrag.current = null;
+    }
+    if (node.type === 'frame') {
       useBoard.getState().pushHistory();
       return;
     }
@@ -1310,7 +1319,7 @@ export function Board() {
   }, []);
 
   const onNodeDrag = useCallback((_: unknown, node: Node) => {
-    if (node.type === 'frame') {
+    {
       const fd = frameDrag.current;
       if (fd && fd.id === node.id) {
         const dx = node.position.x - fd.x;
@@ -1325,8 +1334,8 @@ export function Board() {
           mutedHistory(() => st.setNodePositions(moves)); // eine History-Stufe: der pushHistory vom Drag-Start
         }
       }
-      return; // Rahmen kennen weder Physik noch Neigung
     }
+    if (node.type === 'frame') return; // Rahmen kennen weder Physik noch Neigung
     const track = dragTrack.current;
     if (!track || track.id !== node.id) return;
     const now = performance.now();
@@ -1352,7 +1361,8 @@ export function Board() {
       // M344: eingerastet abgelegt heißt genau dort — kein Wurf hinterher
       const gefangen = fangAktiv();
       fangSetzen([]);
-      if (node.type === 'frame') { frameDrag.current = null; return; }
+      frameDrag.current = null;
+      if (node.type === 'frame') return;
       // M365: Nichts bewegt (nur gezuckt)? Dann ist es kein Schritt.
       const zug = zugSchritt.current;
       zugSchritt.current = null;

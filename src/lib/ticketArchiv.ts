@@ -58,7 +58,10 @@ export function holeZurueck(data: KanbanData, ids: Iterable<string>): ArchivStan
   const dc = doneCol(data);
   const zurueck = (data.archiv ?? [])
     .filter((it) => set.has(it.id))
-    .map(({ archiviertAm: _weg, ...it }) => ({ ...it, col: dc }));
+    // M390: Die Uhr der Auto-Archivierung beginnt neu (`zurueckAm`) — nur nach dem alten Erledigt-Stempel wanderte
+    // das zurückgeholte Ticket beim nächsten Lauf (spätestens nach fünf Minuten) gleich wieder ins Archiv. Der
+    // Erledigt-Stempel selbst bleibt, wie er war: Die Spalte ordnet danach („Heute · Diese Woche · Älter").
+    .map(({ archiviertAm: _weg, ...it }) => ({ ...it, col: dc, zurueckAm: new Date().toISOString() }));
   return { items: [...data.items, ...zurueck], archiv: (data.archiv ?? []).filter((it) => !set.has(it.id)) };
 }
 
@@ -88,8 +91,10 @@ export function autoArchivLauf(data: KanbanData, now: Date = new Date()): AutoAr
   const weg: KanbanItem[] = [];
   for (const it of data.items) {
     if (it.col < dc) { bleibt.push(it); continue; }
-    const seit = it.erledigtAm ? Date.parse(it.erledigtAm) : Number.NaN;
-    if (Number.isNaN(seit)) {
+    const erledigt = it.erledigtAm ? Date.parse(it.erledigtAm) : Number.NaN;
+    const geholt = it.zurueckAm ? Date.parse(it.zurueckAm) : Number.NaN;
+    const seit = Number.isNaN(geholt) ? erledigt : Math.max(erledigt, geholt);
+    if (Number.isNaN(erledigt)) {
       bleibt.push({ ...it, erledigtAm: jetzt });
       geaendert = true;
     } else if (grenze !== null && seit <= grenze) {

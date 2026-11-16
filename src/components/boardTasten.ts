@@ -6,7 +6,7 @@
 import { overlayOffen } from '../lib/overlay';
 import { useEffect, type MutableRefObject } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
-import { uid, type AppNode } from '../types';
+import { type AppNode } from '../types';
 
 interface Kamera {
   getViewport: () => { x: number; y: number; zoom: number };
@@ -18,7 +18,8 @@ interface Kamera {
 const mass = (n: AppNode) => ({ w: n.measured?.width ?? n.width ?? 260, h: n.measured?.height ?? n.height ?? 120 });
 const mitte = (n: AppNode) => { const m = mass(n); return { x: n.position.x + m.w / 2, y: n.position.y + m.h / 2 }; };
 /** Lesereihenfolge: Zeile für Zeile von oben, in der Zeile von links */
-const lesefolge = (ns: AppNode[]) => [...ns].sort((a, b) => (Math.round(mitte(a).y / 160) - Math.round(mitte(b).y / 160)) || (a.position.x - b.position.x));
+/** Karten in Lesefolge: zeilenweise von oben nach unten, in der Zeile von links nach rechts (M390: auch für Teilen und Fokus) */
+export const lesefolge = (ns: AppNode[]) => [...ns].sort((a, b) => (Math.round(mitte(a).y / 160) - Math.round(mitte(b).y / 160)) || (a.position.x - b.position.x));
 
 export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>): void {
   useEffect(() => {
@@ -109,11 +110,21 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
       }
       if (strg && !e.altKey && !e.shiftKey && e.code === 'KeyD' && gewaehlt.length) {
         return tun(() => {
-          for (const n of gewaehlt) st.addNode({ ...n, id: uid(), selected: false, position: { x: n.position.x + 30, y: n.position.y + 30 }, data: JSON.parse(JSON.stringify(n.data)) } as AppNode);
-          st.showToast(`${gewaehlt.length} Karte${gewaehlt.length > 1 ? 'n' : ''} dupliziert`);
+          const zahl = st.dupliziere(gewaehlt.filter((n) => n.type !== 'frame').map((n) => n.id));
+          if (zahl) st.showToast(`${zahl} Karte${zahl > 1 ? 'n' : ''} dupliziert`);
         });
       }
       if (strg || e.altKey) return;
+
+      // ── Pfeiltasten schieben die gewählten Karten (M390) ─────────────────────────────────
+      // Vorher tat das die Bibliothek selbst: ohne Rückgängig-Schritt (Strg+Z nahm den Schritt davor mit) und ohne
+      // den Inhalt eines Rahmens mitzunehmen. Schrittweite wie gewohnt: 5 Punkte, mit Umschalt 20.
+      if (/^Arrow/.test(e.key) && gewaehlt.length && !st.focusCard && t?.classList?.contains('react-flow__node')) {
+        const w = e.shiftKey ? 20 : 5;
+        const [dx, dy] = e.key === 'ArrowRight' ? [w, 0] : e.key === 'ArrowLeft' ? [-w, 0] : e.key === 'ArrowDown' ? [0, w] : [0, -w];
+        e.stopPropagation();
+        return tun(() => st.verschiebeUm(gewaehlt.map((n) => n.id), dx, dy));
+      }
 
       // ── Enter: in die gewählte Karte — Notiz: schreiben, sonst: im Fokus öffnen ─────────
       if (e.key === 'Enter' && aufFlaeche && gewaehlt.length === 1 && !st.focusCard) {

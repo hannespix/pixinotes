@@ -37,11 +37,13 @@ const fmtDay = (iso: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
 const fmtDayShort = (iso: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-const addDaysIso = (iso: string, n: number) => new Date(new Date(`${iso}T12:00:00`).getTime() + n * 864e5).toISOString().slice(0, 10);
+// M390: Kalender-Rechnen bleibt in der Ortszeit. Über toISOString() lag der lokale Mittag ab UTC+13 (Neuseeland im
+// Sommer) am Vortag — „Weiter" blieb auf demselben Tag stehen, die Woche begann am Samstag.
+const addDaysIso = (iso: string, n: number) => { const d = new Date(`${iso}T12:00:00`); d.setDate(d.getDate() + n); return tagLokal(d); };
 const addMonthsIso = (iso: string, n: number): string => {
   const d = new Date(`${iso.slice(0, 7)}-15T12:00:00`);
   d.setMonth(d.getMonth() + n);
-  return d.toISOString().slice(0, 10);
+  return tagLokal(d);
 };
 const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
 
@@ -59,7 +61,11 @@ const isoWeekNo = (iso: string): number => {
 };
 
 /** Dauer eines Abschnitts — läuft er noch, zählt er bis JETZT */
-const durOf = (s: TimeSeg): number => Math.max(0, (s.end ?? (s.date === todayIso() ? nowMin() : s.start)) - s.start);
+/** M390: Läuft ein Abschnitt seit GESTERN (über Mitternacht gearbeitet), zählt er bis Mitternacht plus die Zeit seither. */
+const laeuftSeitGestern = (s: TimeSeg): boolean => s.end === undefined && s.date === addDaysIso(todayIso(), -1);
+const durOf = (s: TimeSeg): number => (laeuftSeitGestern(s)
+  ? 1440 - s.start + nowMin()
+  : Math.max(0, (s.end ?? (s.date === todayIso() ? nowMin() : s.start)) - s.start));
 
 /**
  * Zeiterfassung (M157/M161): so unkompliziert wie möglich.
@@ -104,10 +110,16 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
 
   /** Laufenden Abschnitt beenden (falls über Mitternacht vergessen: bei 23:59) */
   const closeRunning = (list: TimeSeg[]): TimeSeg[] =>
-    list.map((s) => {
-      if (s.end !== undefined) return s;
-      const end = s.date === todayIso() ? Math.max(s.start, nowMin()) : 1439;
-      return { ...s, end };
+    list.flatMap((s) => {
+      if (s.end !== undefined) return [s];
+      if (s.date === todayIso()) return [{ ...s, end: Math.max(s.start, nowMin()) }];
+      // M390: Über Mitternacht gearbeitet — der Abschnitt endet um Mitternacht, und die Zeit seither steht als
+      // eigener Abschnitt am heutigen Tag. Vorher fiel alles nach 0 Uhr weg (22:00–01:00 ergab 1:59 statt 3:00).
+      // Älter als gestern heißt „vergessen": Dann bleibt es beim Ende des Tages.
+      if (laeuftSeitGestern(s)) {
+        return [{ ...s, end: 1440 }, ...(nowMin() > 0 ? [{ id: uid(), date: todayIso(), start: 0, end: nowMin(), kind: s.kind }] : [])];
+      }
+      return [{ ...s, end: 1439 }];
     });
 
   /** Art anklicken: laufende Art nochmal = Stop, sonst nahtlos umschalten */
@@ -255,7 +267,7 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
                 <input
                   type="time"
                   value={toHM(s.start)}
-                  onChange={(e) => { const m = fromHM(e.target.value); if (m !== null) patchSeg(s.id, { start: m }); }}
+                  onChange={(e) => { const m = fromHM(e.target.value); if (m !== null) patchSeg(s.id, { start: m, ...(s.end !== undefined && s.end < m ? { end: m } : {}) }); }}
                 />
                 <span className="time-sep">–</span>
                 {s.end === undefined ? (

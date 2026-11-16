@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import confetti from 'canvas-confetti';
-import { runDerived, useBoard } from '../../store';
+import { mutedHistory, runDerived, useBoard } from '../../store';
 import { makeTicketDrag, type DropTarget } from '../../lib/dragTickets';
 import {
   kanbanCols, mitSpalte, openSubs, ticketBlockers, uid, wipFull, wipLimitOf,
@@ -162,6 +162,40 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const setItems = (items: KanbanItem[]) => updateNodeData(id, { items });
   const patchItem = (itemId: string, patch: Partial<KanbanItem>) =>
     setItems(kanban.items.map((it) => (it.id === itemId ? { ...it, ...patch } : it)));
+
+  /**
+   * M390: Ein eingesammeltes Ticket gehört seiner QUELLE. Titel und Frist dort zu ändern, wo man sie sieht, war
+   * möglich — der Abgleich setzte beides nach einer Sekunde auf den Stand der Quelle zurück. Jetzt schreibt die
+   * Änderung in die Quelle (Original-Ticket, Vorgang im Zeitplan). Bei einem Checklisten-Punkt steckt beides im
+   * Text der Notiz: Dort sind die Felder gesperrt und sagen, wo man ändert.
+   */
+  const quelleVon = (it: KanbanItem) => {
+    const l = it.link;
+    if (!l?.nodeId || !l.itemId) return null;
+    return useBoard.getState().boards.find((b) => b.id === l.boardId)?.nodes.find((n) => n.id === l.nodeId) ?? null;
+  };
+  const ausNotiz = (it: KanbanItem): boolean => quelleVon(it)?.type === 'note';
+  const patchTicket = (it: KanbanItem, patch: { text?: string; due?: string | undefined }) => {
+    patchItem(it.id, patch);
+    const src = quelleVon(it);
+    const l = it.link;
+    if (!src || !l?.itemId) return;
+    mutedHistory(() => {
+      if (src.type === 'kanban') {
+        const k = src.data as KanbanData;
+        useBoard.getState().updateNodeDataOnBoard(l.boardId, src.id, { items: k.items.map((i) => (i.id === l.itemId ? { ...i, ...patch } : i)) });
+      } else if (src.type === 'gantt') {
+        const g = src.data as GanttData;
+        useBoard.getState().updateNodeDataOnBoard(l.boardId, src.id, {
+          rows: g.rows.map((r) => (r.id !== l.itemId ? r : {
+            ...r,
+            ...(patch.text !== undefined ? { name: patch.text } : {}),
+            ...('due' in patch && patch.due ? { end: patch.due, start: r.start > patch.due ? patch.due : r.start } : {}),
+          })),
+        });
+      }
+    });
+  };
 
   /** Sprung-Chip: verknüpftes Board (bzw. Karte) öffnen */
   const followLink = (link: NonNullable<KanbanItem['link']>) => {
@@ -379,8 +413,17 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     // Beim Spaltenwechsel zusätzlich an die gewünschte Stelle einsortieren —
     // mitSpalte pflegt dabei den Erledigt-Stempel (Uhr der Auto-Archivierung, M293)
     const moved = kanban.items.map((it) => (it.id === item.id ? mitSpalte(it, col, kanban) : it));
-    setItems(at === undefined ? moved : spliceIntoCol(moved, item.id, col, at));
-    writeBackToSource(item, col);
+    // M390: EIN Handgriff, EIN Rückgängig-Schritt. Das Ticket und seine Quelle (Haken in der Notiz, Vorgang im
+    // Zeitplan, Original-Ticket) ändern sich zusammen — vorher waren es zwei Schritte, und ein Strg+Z nahm nur die
+    // Quelle zurück: Der Abgleich legte das Ticket daraufhin in eine Spalte, in der es nie gewesen war.
+    const st0 = useBoard.getState();
+    const quellBoard = item.link?.itemId ? item.link.boardId : undefined;
+    if (quellBoard && quellBoard !== st0.activeId) st0.pushHistoryBoards([st0.activeId, quellBoard]);
+    else st0.pushHistory();
+    mutedHistory(() => {
+      setItems(at === undefined ? moved : spliceIntoCol(moved, item.id, col, at));
+      writeBackToSource(item, col);
+    });
   };
 
   /** Reihenfolge innerhalb EINER Spalte ändern (kein Spaltenwechsel, keine
@@ -436,6 +479,25 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         rows: g.rows.map((r) => (r.id === link.itemId ? { ...r, progress: 100 } : r)),
       });
       showToast('☑ Zeitplan-Vorgang auf 100 % gesetzt.');
+    } else if (srcNode.type === 'gantt' && item.col >= done && col < done) {
+      // M390: „Zurück" aus Erledigt öffnet auch den Vorgang wieder. Vorher blieb er bei 100 % — der Abgleich hielt
+      // das Ticket darum für erledigt und schob es nach einer Sekunde zurück.
+      const g = srcNode.data as GanttData;
+      const r0 = g.rows.find((r) => r.id === link.itemId);
+      if (!r0 || (r0.progress ?? 0) < 100) return;
+      st.updateNodeDataOnBoard(link.boardId, link.nodeId, {
+        rows: g.rows.map((r) => (r.id === link.itemId ? { ...r, progress: 90 } : r)),
+      });
+      showToast('↩ Zeitplan-Vorgang wieder offen (90 %).');
+    } else if (srcNode.type === 'kanban' && item.col >= done && col < done) {
+      const k = srcNode.data as KanbanData;
+      const srcIt = k.items.find((i) => i.id === link.itemId);
+      const srcDone = kanbanCols(k).length - 1;
+      if (!srcIt || srcIt.col < srcDone) return;
+      st.updateNodeDataOnBoard(link.boardId, link.nodeId, {
+        items: k.items.map((i) => (i.id === link.itemId ? mitSpalte(i, Math.max(0, srcDone - 1), k) : i)),
+      });
+      showToast('↩ Auch im Quell-Kanban wieder offen.');
     } else if (srcNode.type === 'kanban' && col === done) {
       // M179: Kanban-Quelle — das ORIGINAL-Ticket wandert mit in dessen
       // Erledigt-Spalte (vorher blieb es offen und der Abgleich lief nur
@@ -526,6 +588,12 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const removeCol = (idx: number) => {
     if (cols.length <= 2) {
       showToast('Mindestens zwei Spalten müssen bleiben.');
+      return;
+    }
+    // M390: Die letzte Spalte IST „erledigt". Fiele sie weg, rückte die Spalte davor nach — und alles, was dort
+    // gerade in Arbeit ist, gälte als erledigt (durchgestrichen, aus der Aufgaben-Zentrale verschwunden).
+    if (idx === cols.length - 1 && kanban.items.some((it) => it.col === idx - 1)) {
+      showToast(`Die letzte Spalte ist „erledigt" — erst „${cols[idx - 1]}" leeren, sonst gälten die Tickets dort als erledigt.`, false, 8000);
       return;
     }
     const next = cols.filter((_, i) => i !== idx);
@@ -797,9 +865,8 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           className="kanban-due-input nodrag"
           autoFocus
           value={it.due ?? ''}
-          onChange={(e) =>
-            setItems(kanban.items.map((x) => (x.id === it.id ? { ...x, due: e.target.value || undefined } : x)))
-          }
+          disabled={ausNotiz(it)}
+          onChange={(e) => patchTicket(it, { due: e.target.value || undefined })}
           onBlur={() => setEditingDue(null)}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === 'Escape') setEditingDue(null); }}
         />
@@ -1316,7 +1383,9 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                 <input
                   className="ticket-title"
                   value={it.text}
-                  onChange={(e) => patchItem(it.id, { text: e.target.value })}
+                  readOnly={ausNotiz(it)}
+                  title={ausNotiz(it) ? 'Der Text kommt aus der Notiz — dort ändern (↗ am Ticket springt hin)' : undefined}
+                  onChange={(e) => patchTicket(it, { text: e.target.value })}
                 />
                 <button className="taskhub-x" title="Schließen (Esc)" onClick={() => setDetailId(null)}><IX size={14} /></button>
               </div>
@@ -1329,7 +1398,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                 >
                   {cols.map((c, i) => <option key={i} value={i} translate="no">{c}</option>)}
                 </select>
-                <label>📅<input type="date" value={it.due ?? ''} onChange={(e) => patchItem(it.id, { due: e.target.value || undefined })} /></label>
+                <label title={ausNotiz(it) ? 'Die Frist steht im Text der Notiz („bis Freitag", „am 3.12.") — dort ändern' : undefined}>📅<input type="date" value={it.due ?? ''} disabled={ausNotiz(it)} onChange={(e) => patchTicket(it, { due: e.target.value || undefined })} /></label>
                 <label>👤<input type="text" placeholder="Person" value={it.who ?? ''} onChange={(e) => patchItem(it.id, { who: e.target.value || undefined })} /></label>
                 <span className="ticket-prio-row" role="group" aria-label="Priorität">
                   {([[1, '!!!'], [2, '!!'], [3, '!']] as const).map(([p, label]) => (

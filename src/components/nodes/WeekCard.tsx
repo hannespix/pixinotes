@@ -121,6 +121,9 @@ export function WeekBody({ id, data, selected, folie }: { id: string; data: Week
       slots: slots.filter((_, k) => k !== i),
       entries: (data.entries ?? []).flatMap((e) => {
         const end = e.start + e.dur;
+        // M390: Nur Blöcke, die IN den eigenen Zeilen liegen, rücken nach. Uhrzeit-Blöcke (10:00 = Minute 600) teilen
+        // sich dieselbe Zahl, liegen aber jenseits der Zeilen — sie standen nach dem Zurückschalten eine Stunde früher.
+        if (e.start >= slots.length * 60) return [e];
         if (e.start >= s + 60) return [{ ...e, start: e.start - 60 }];
         if (end <= s) return [e];
         const dur = e.dur - 60;

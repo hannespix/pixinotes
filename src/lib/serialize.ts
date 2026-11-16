@@ -332,6 +332,10 @@ function inlineMd(content: unknown): string {
     const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(o.text) ?? ['', '', o.text, ''];
     let t = m[2];
     if (!t) return o.text;
+    // M390: Zeichen, die in Markdown etwas BEDEUTEN, bleiben Text. „<Name>" las jedes Markdown-Programm als HTML-Marke
+    // (und ließ es weg), „_unter_" als kursiv — beim Wieder-Einlesen fehlte der Wortlaut. Eckige Klammern bleiben
+    // unberührt: [[Verknüpfungen]] sollen in Obsidian & Co. weiter funktionieren.
+    if (!st.code) t = t.replace(/\\/g, '\\\\').replace(/([*_`<])/g, '\\$1');
     if (st.code) t = `\`${t}\``;
     if (st.bold) t = `**${t}**`;
     if (st.italic) t = `*${t}*`;
@@ -388,7 +392,8 @@ export function blocksToMarkdown(blocks: unknown[] | undefined): string {
           lines.push(`${ein}![${p?.caption || p?.name || 'Bild'}](${ziel})`);
           break;
         }
-        default: lines.push(text ? `${ein}${text}` : '');
+        // M390: Ein Absatz, der wie eine Überschrift, ein Listenpunkt oder ein Zitat BEGINNT, bleibt ein Absatz
+        default: lines.push(text ? `${ein}${text.replace(/^(#{1,6}\s|[-+>]\s)/, '\\$1').replace(/^(\d+)([.)]\s)/, '$1\\$2')}` : '');
       }
       vorher = b.type;
       if (b.children?.length) walk(b.children, depth + 1);

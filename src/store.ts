@@ -22,6 +22,8 @@ import { offeneSeite, seiteVon, strichRelativ } from './lib/pdfSeiten';
 import { findFreeSpot, frameMembers } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
 import { t } from './lib/sprache';
+import { fristAnkerPflegen, type FristAnker } from './lib/fristAnker';
+import { linksUmbenennen, normalizeName } from './lib/links';
 
 /** Ein Freihand-Strich (Punkte in Flow-Koordinaten) */
 export interface Stroke {
@@ -131,8 +133,10 @@ interface HistoryEntry extends BoardSnap {
   gemischt?: string[];
 }
 
+const VORLAGEN_MAX = 40;
+
 /** M388: Inhalte im Gerätespeicher (große Dateien, Tool-Quelltexte) zu den Karten einer Kopie mitnehmen */
-function anhaengeMitnehmen(nodes: AppNode[], karte: Map<string, string>): void {
+export function anhaengeMitnehmen(nodes: AppNode[], karte: Map<string, string>): void {
   const paare = nodes.filter((n) => n.type === 'file' || n.type === 'htmlapp').map((n) => [n.id, karte.get(n.id) as string] as [string, string]);
   if (paare.length) void import('./lib/anhangKopie').then((m) => m.anhaengeKopieren(paare)).catch(() => {});
 }
@@ -330,6 +334,10 @@ interface BoardState {
   setMilchglas: (on: boolean) => void;
   /** Karten-Daten auf einem BELIEBIGEN Board ändern (Aufgaben-Zentrale arbeitet boardübergreifend) */
   updateNodeDataOnBoard: (boardId: string, nodeId: string, data: Record<string, unknown>) => void;
+  /** M390: Ergebnis von Strg+Z/Strg+Y IM Notiztext übernehmen — ohne neuen Rückgängig-Schritt */
+  textRueckgaengig: (id: string, blocks: unknown[]) => void;
+  /** M390: Notizen ohne Fristen-Anker bekommen ihn nachgetragen (einmal beim Start) */
+  fristAnkerNachtragen: () => void;
   setPresenting: (on: boolean) => void;
   setTool: (tool: Tool) => void;
   updateAi: (patch: Partial<AiSettings>) => void;
@@ -350,6 +358,10 @@ interface BoardState {
   past: HistoryEntry[];
   future: HistoryEntry[];
   pushHistory: () => void;
+  /** M390: gebündelter Rückgängig-Schritt für eine benannte Änderung (siehe Implementierung) */
+  schritt: (key: string) => void;
+  /** M390: Karten um (dx, dy) verschieben — Rahmen nehmen ihren Inhalt mit; ein gebündelter Schritt */
+  verschiebeUm: (ids: string[], dx: number, dy: number) => void;
   /** EIN Undo-Schritt, der mehrere Boards umfasst (z. B. Themen-Tags einer Insel) */
   pushHistoryBoards: (boardIds: string[]) => void;
   undo: () => void;
@@ -447,6 +459,8 @@ interface BoardState {
   }) => void;
   removeEdge: (id: string) => void;
   addNode: (node: AppNode) => void;
+  /** M390: Karten des aktiven Boards duplizieren — ein Rückgängig-Schritt, mit Verbindungen und Anhängen; Rückgabe: Anzahl */
+  dupliziere: (ids: string[]) => number;
   /** Karte in ein BELIEBIGES Board einfügen (Schnell-Eingabe der Aufgaben-Zentrale, M114) */
   addNodeToBoard: (boardId: string, node: AppNode) => void;
   /**
@@ -532,6 +546,8 @@ interface BoardState {
   clearPendingFocus: () => void;
 
   showToast: (message: string, undo?: boolean | 'schritt', durationMs?: number, abbruch?: boolean) => void;
+  /** M390: Der Knopf „Rückgängig" im Hinweis */
+  hinweisRueckgaengig: () => void;
 
   /** Globale KI-Sperre: verhindert parallele KI-Aktionen aus Dock UND Auswahl-Leiste */
   aiBusy: boolean;
@@ -985,6 +1001,8 @@ function leseschutz(alt: BoardDoc[], neu: BoardDoc[]): BoardDoc[] {
  *  History-Einträge — der Aufrufer sichert vorher genau einen Snapshot.
  *  So macht wirklich EIN Strg+Z den kompletten Plan rückgängig (Audit R6-K1). */
 let historyMuted = false;
+/** M390: der Rückgängig-Schritt, zu dem der Knopf im aktuellen Hinweis gehört (siehe hinweisRueckgaengig) */
+let hinweisEintrag: unknown = null;
 
 /** M184: Stand vor dem letzten Struktur-Import (OneNote) — bewusst außerhalb
  *  des persistierten States: Ein Rückgängig gilt nur für die laufende Sitzung
@@ -1281,6 +1299,14 @@ export function ohneStartboard<T extends { boards: BoardDoc[]; spaces: Space[] }
   };
 }
 
+/** M390: Ändern sich die Blöcke einer Notiz, wandern die Fristen-Anker mit (lib/fristAnker.ts). */
+const mitFristAnker = (n: AppNode, data: Record<string, unknown>): Record<string, unknown> => {
+  if (n.type !== 'note' || !('blocks' in data) || 'fristAnker' in data) return data;
+  const alt = (n.data as { fristAnker?: FristAnker }).fristAnker;
+  const neu = fristAnkerPflegen(data.blocks, alt);
+  return neu === alt ? data : { ...data, fristAnker: neu };
+};
+
 export const useBoard = create<BoardState>()(
   persist(
     (setRoh, get) => {
@@ -1403,7 +1429,17 @@ export const useBoard = create<BoardState>()(
         },
 
         showArchived: false,
-        setShowArchived: (on) => set({ showArchived: on }),
+        setShowArchived: (on) => {
+          // M390: Mit dem Archiv verschwindet auch die Auswahl archivierter Karten — sonst blieb „1 ausgewählt"
+          // stehen und Entf löschte eine Karte, die niemand sah
+          if (on) { set({ showArchived: true }); return; }
+          set({
+            showArchived: false,
+            boards: get().boards.map((b) => (b.nodes.some((n) => n.archived && n.selected)
+              ? { ...b, nodes: b.nodes.map((n) => (n.archived && n.selected ? ({ ...n, selected: false } as AppNode) : n)) }
+              : b)),
+          });
+        },
 
         setBoardBg: (id, bg) =>
           set({ boards: get().boards.map((b) => (b.id === id ? { ...b, bg } : b)) }),
@@ -1628,13 +1664,63 @@ export const useBoard = create<BoardState>()(
                     ...b,
                     nodes: b.nodes.map((n) =>
                       n.id === nodeId
-                        ? ({ ...n, data: { ...n.data, ...data, ...(bumpt ? { extEpoch: (((n.data as { extEpoch?: number }).extEpoch) ?? 0) + 1 } : {}) } } as AppNode)
+                        ? ({ ...n, data: { ...n.data, ...mitFristAnker(n, data), ...(bumpt ? { extEpoch: (((n.data as { extEpoch?: number }).extEpoch) ?? 0) + 1 } : {}) } } as AppNode)
                         : n,
                     ),
                   }
                 : b,
             ),
           });
+        },
+        textRueckgaengig: (id, blocks) => {
+          /**
+           * M390: Strg+Z IM Notiztext ist das Rückgängig des Editors — fein, Wort für Wort. Sein Ergebnis kam bisher
+           * als gewöhnliche Änderung im Verlauf des Boards an: als NEUER Schritt. Wer danach auf der Fläche Strg+Z
+           * drückte, nahm damit das Zurücknehmen zurück — der entfernte Text stand wieder da. Jetzt legt das
+           * Editor-Rückgängig keinen Schritt an; und ist es genau bei einem gesicherten Stand angekommen, gilt
+           * dieser Schritt als verbraucht.
+           */
+          const s0 = get();
+          const board = s0.boards.find((b) => b.id === s0.activeId);
+          if (!board) return;
+          const gleich = (n: AppNode | undefined) => !!n && JSON.stringify((n.data as { blocks?: unknown }).blocks ?? null) === JSON.stringify(blocks ?? null);
+          let past = s0.past;
+          const oben = past[past.length - 1];
+          if (oben && oben.boardId === board.id && !oben.others?.length && gleich(oben.nodes.find((n) => n.id === id))) {
+            // nur verbrauchen, wenn der Schritt sonst nichts anderes sichert als diesen Text
+            const sonstGleich = oben.nodes.length === board.nodes.length && oben.edges === board.edges
+              && oben.nodes.every((n) => n.id === id || board.nodes.find((x) => x.id === n.id) === n);
+            if (sonstGleich) past = past.slice(0, -1);
+          }
+          lastEditKey = '';
+          set({
+            past,
+            boards: s0.boards.map((b) => (b.id !== board.id ? b : {
+              ...b,
+              nodes: b.nodes.map((n) => (n.id === id ? ({ ...n, data: { ...n.data, ...mitFristAnker(n, { blocks }) } } as AppNode) : n)),
+            })),
+          });
+        },
+        fristAnkerNachtragen: () => {
+          // Bestehende Notizen (vor M390 geschrieben, importiert, aus Vorlagen): Ihr Anker ist der Tag, an dem die
+          // App sie zum ersten Mal sieht. Nur eigene Boards — in einem geteilten ändert jeder nur, was er anfasst.
+          let geaendert = false;
+          const boards = get().boards.map((b) => {
+            if (b.geteiltVon) return b;
+            let anders = false;
+            const nodes = b.nodes.map((n) => {
+              if (n.type !== 'note') return n;
+              const alt = (n.data as { fristAnker?: FristAnker }).fristAnker;
+              const neu = fristAnkerPflegen((n.data as { blocks?: unknown }).blocks, alt);
+              if (neu === alt) return n;
+              anders = true;
+              return { ...n, data: { ...n.data, fristAnker: neu } } as AppNode;
+            });
+            if (!anders) return b;
+            geaendert = true;
+            return { ...b, nodes };
+          });
+          if (geaendert) runDerived(() => set({ boards }));
         },
         setPresenting: (on) => set({ presenting: on }),
         setTool: (tool) => {
@@ -1843,8 +1929,17 @@ export const useBoard = create<BoardState>()(
         templates: [],
 
         saveTemplate: (node, name) => {
-          const clean = JSON.parse(JSON.stringify({ ...node, selected: false })) as AppNode;
-          set({ templates: [...get().templates, { id: uid(), name: name.trim().slice(0, 40) || 'Vorlage', node: clean }].slice(-20) });
+          // M390: Die 21. Vorlage verdrängte still die älteste. Jetzt gibt es Platz für 40 — und wenn er voll ist,
+          // sagt es der Hinweis, statt etwas wegzunehmen.
+          if (get().templates.length >= VORLAGEN_MAX) {
+            get().showToast(`Es gibt schon ${VORLAGEN_MAX} Vorlagen — erst eine löschen (➕-Menü, ✕ an der Vorlage).`, false, 7000);
+            return;
+          }
+          // M390: Die Vorlage bekommt eine eigene Kennung, und was im Gerätespeicher liegt (große Datei, Tool-
+          // Quelltext), wird dorthin kopiert — vorher kam eine Datei- oder Tool-Karte aus der Vorlage leer an.
+          const clean = JSON.parse(JSON.stringify({ ...node, id: uid(), selected: false })) as AppNode;
+          anhaengeMitnehmen([node], new Map([[node.id, clean.id]]));
+          set({ templates: [...get().templates, { id: uid(), name: name.trim().slice(0, 40) || 'Vorlage', node: clean }] });
           get().showToast(`Vorlage „${name}" gespeichert — im ➕-Menü unter „Vorlagen".`);
         },
 
@@ -2131,7 +2226,36 @@ export const useBoard = create<BoardState>()(
         },
 
         renameBoard: (id, name) => {
-          const boards = get().boards.map((b) => (b.id === id ? { ...b, name } : b));
+          // M390: [[Verknüpfungen]] gehen über den NAMEN. Nach dem Umbenennen zeigten sie ins Leere — der Klick legte
+          // ein leeres Board mit dem alten Namen an. Die Texte ziehen jetzt mit, solange der alte Name eindeutig war.
+          const alt = get().boards.find((b) => b.id === id)?.name ?? '';
+          const eindeutig = !!alt && normalizeName(alt) !== normalizeName(name)
+            && get().boards.filter((b) => normalizeName(b.name) === normalizeName(alt)).length === 1;
+          const boards = get().boards.map((b) => {
+            if (b.id === id) return { ...b, name };
+            if (!eindeutig || b.geteiltVon) return b;
+            let anders = false;
+            const nodes = b.nodes.map((n) => {
+              if (n.type !== 'note') return n;
+              const neu = linksUmbenennen((n.data as { blocks?: unknown }).blocks, alt, name);
+              if (!neu) return n;
+              anders = true;
+              return { ...n, data: { ...n.data, blocks: neu, extEpoch: (((n.data as { extEpoch?: number }).extEpoch) ?? 0) + 1 } } as AppNode;
+            });
+            return anders ? { ...b, nodes } : b;
+          }).map((b) => {
+            // … auch im umbenannten Board selbst (Notizen, die auf ihr eigenes Board zeigen)
+            if (b.id !== id || !eindeutig) return b;
+            let anders = false;
+            const nodes = b.nodes.map((n) => {
+              if (n.type !== 'note') return n;
+              const neu = linksUmbenennen((n.data as { blocks?: unknown }).blocks, alt, name);
+              if (!neu) return n;
+              anders = true;
+              return { ...n, data: { ...n.data, blocks: neu, extEpoch: (((n.data as { extEpoch?: number }).extEpoch) ?? 0) + 1 } } as AppNode;
+            });
+            return anders ? { ...b, nodes } : b;
+          });
           // M310: Ein alphabetisch sortiertes Projekt rückt das Board an seinen neuen Platz
           set({ boards, spaces: sortiereProjekte(get().spaces, boards) });
         },
@@ -2143,10 +2267,23 @@ export const useBoard = create<BoardState>()(
             return;
           }
           const rest = boards.filter((b) => b.id !== id);
+          // M390: Archivierte Boards zählen nicht als Arbeitsfläche. Vorher sprang die Ansicht nach dem Löschen auf
+          // ein archiviertes Board, und das letzte SICHTBARE ließ sich löschen (beim Archivieren war das verboten).
+          const weg = boards.find((b) => b.id === id);
+          if (weg && !weg.archived && !rest.some((b) => !b.archived)) {
+            get().showToast('Das letzte Board bleibt offen 🙂');
+            return;
+          }
+          let activeId = get().activeId;
+          if (activeId === id) {
+            const projekt = get().spaces.flatMap((sp) => sp.projects).find((p) => p.boardIds.includes(id));
+            activeId = projekt?.boardIds.find((x) => x !== id && rest.some((b) => b.id === x && !b.archived))
+              ?? rest.find((b) => !b.archived)?.id ?? rest[0].id;
+          }
           set({
             boards: rest,
             spaces: stripBoardFromHierarchy(get().spaces, id),
-            activeId: get().activeId === id ? rest[0].id : get().activeId,
+            activeId,
           });
         },
 
@@ -2243,6 +2380,7 @@ export const useBoard = create<BoardState>()(
           const neueId = () => Math.random().toString(36).slice(2, 10);
           const neueBoards: BoardDoc[] = [];
           const ids: string[] = [];
+          const boardKarte = new Map<string, string>();   // M390: Original-Board → Kopie (für die Portale)
           for (const bid of projekt.boardIds) {
             const quelle = st.boards.find((b) => b.id === bid);
             if (!quelle) continue;
@@ -2259,7 +2397,16 @@ export const useBoard = create<BoardState>()(
             };
             neueBoards.push(kopie);
             ids.push(kopie.id);
+            boardKarte.set(quelle.id, kopie.id);
             anhaengeMitnehmen(quelle.nodes, karte);
+          }
+          // M390: Portale ZWISCHEN den kopierten Boards zeigen auf die Kopien. Vorher führte das Portal in der Kopie
+          // von „Planung" ins ORIGINAL-„Ziel" — wer in der Kopie weiterarbeitete, landete unbemerkt im alten Projekt.
+          for (const b of neueBoards) {
+            b.nodes = b.nodes.map((n) => {
+              const z = (n.data as { boardId?: string }).boardId;
+              return n.type === 'portal' && z && boardKarte.has(z) ? ({ ...n, data: { ...n.data, boardId: boardKarte.get(z) } } as AppNode) : n;
+            });
           }
           set({
             boards: [...st.boards, ...neueBoards],
@@ -2297,7 +2444,7 @@ export const useBoard = create<BoardState>()(
           }
           set({ boards, activeId });
           get().showToast(an
-            ? `Board „${board.name}" archiviert — im Dock unter ⋯ „Archiv einblenden" wieder sichtbar.`
+            ? `Board „${board.name}" archiviert — unten in der Navigation „Archiv einblenden" zeigt es wieder.`
             : `Board „${board.name}" zurückgeholt.`);
         },
 
@@ -2434,21 +2581,53 @@ export const useBoard = create<BoardState>()(
           set({ commentOpen: null });
         },
 
-        updateEdgeLabel: (id, label) =>
+        /**
+         * M390: Ein eigener Rückgängig-Schritt für Änderungen, die bisher keinen hatten (Etikett, Art und Aussehen
+         * einer Verbindung, Größe ziehen, mit Pfeiltasten schieben). Ohne ihn nahm Strg+Z den Schritt DAVOR mit
+         * zurück. Gebündelt wie beim Tippen: Dieselbe Sache innerhalb kurzer Zeit ist EIN Schritt.
+         */
+        schritt: (key) => {
+          if (historyMuted || inDerived()) return;
+          const now = Date.now();
+          const k = `${get().activeId}:${key}`;
+          const neu = k !== lastEditKey || now - lastEditAt > EDIT_COALESCE_MS;
+          if (neu) get().pushHistory();
+          lastEditKey = k;
+          lastEditAt = now;
+        },
+
+        verschiebeUm: (ids, dx, dy) => {
+          const b = selectActiveBoard(get());
+          const wahl = new Set(ids);
+          const rahmen = b.nodes.filter((n) => wahl.has(n.id) && n.type === 'frame');
+          // Rahmen nehmen ihren Inhalt mit — auch per Tastatur
+          for (const f of rahmen) for (const m of frameMembers(f, b.nodes, true, true)) wahl.add(m.id);
+          get().schritt(`pfeil:${[...ids].sort().join(',')}`);
+          patchActive((bb) => ({
+            nodes: bb.nodes.map((n) => (wahl.has(n.id) ? ({ ...n, position: { x: n.position.x + dx, y: n.position.y + dy } } as AppNode) : n)),
+          }));
+        },
+
+        updateEdgeLabel: (id, label) => {
+          get().schritt(`kante:${id}:etikett`);
           patchActive((b) => ({
             edges: b.edges.map((e) =>
               e.id === id ? { ...e, data: { ...e.data, label } } : e,
             ),
-          })),
+          }));
+        },
 
-        updateEdgeKind: (id, kind) =>
+        updateEdgeKind: (id, kind) => {
+          get().schritt(`kante:${id}:art`);
           patchActive((b) => ({
             edges: b.edges.map((e) =>
               e.id === id ? { ...e, data: { ...e.data, kind } } : e,
             ),
-          })),
+          }));
+        },
 
-        updateEdgeStyle: (id, patch) =>
+        updateEdgeStyle: (id, patch) => {
+          get().schritt(`kante:${id}:stil`);
           patchActive((b) => ({
             edges: b.edges.map((e) => {
               if (e.id !== id) return e;
@@ -2464,7 +2643,8 @@ export const useBoard = create<BoardState>()(
               }
               return { ...e, data };
             }),
-          })),
+          }));
+        },
 
         removeEdge: (id) => {
           get().pushHistory();
@@ -2474,6 +2654,33 @@ export const useBoard = create<BoardState>()(
         addNode: (node) => {
           get().pushHistory();
           patchActive((b) => ({ nodes: [...b.nodes, node] }));
+        },
+
+        dupliziere: (ids) => {
+          // M390: EIN Schritt für alle gewählten Karten (vorher je Karte einer — Strg+Z ließ Kopien zurück), die
+          // Verbindungen ZWISCHEN den Kopierten kommen mit, große Dateien und Tool-Quelltexte ebenfalls, und die
+          // Kopien landen nie deckungsgleich auf einer früheren Kopie.
+          const b = selectActiveBoard(get());
+          const wahl = b.nodes.filter((n) => ids.includes(n.id));
+          if (!wahl.length) return 0;
+          let k = 1;
+          const belegt = (kk: number) => wahl.some((n) => b.nodes.some((x) => x.type === n.type && Math.abs(x.position.x - (n.position.x + 30 * kk)) < 2 && Math.abs(x.position.y - (n.position.y + 30 * kk)) < 2));
+          while (k < 40 && belegt(k)) k += 1;
+          const karte = new Map(wahl.map((n) => [n.id, uid()]));
+          const neu = wahl.map((n) => ({
+            ...n, id: karte.get(n.id) as string, selected: true,
+            position: { x: n.position.x + 30 * k, y: n.position.y + 30 * k },
+            data: JSON.parse(JSON.stringify(n.data)),
+          }) as AppNode);
+          const kanten = b.edges.filter((e) => karte.has(e.source) && karte.has(e.target))
+            .map((e) => ({ ...e, id: uid(), source: karte.get(e.source) as string, target: karte.get(e.target) as string, selected: false }));
+          get().pushHistory();
+          patchActive((bb) => ({
+            nodes: [...bb.nodes.map((n) => (n.selected ? ({ ...n, selected: false } as AppNode) : n)), ...neu],
+            edges: [...bb.edges, ...kanten],
+          }));
+          anhaengeMitnehmen(wahl, karte);
+          return neu.length;
         },
 
         addNodeToBoard: (boardId, node) => {
@@ -2693,7 +2900,8 @@ export const useBoard = create<BoardState>()(
           const fehlt = <T extends { id: string }>(da: T[] | undefined, neu: T[] | undefined): T[] => { const ids = new Set((da ?? []).map((x) => x.id)); return (neu ?? []).filter((x) => !ids.has(x.id)); };
           const nodes = fehlt(ziel.nodes, snap.nodes);
           if (nodes.length === 0) { set({ lastDeleted: null }); return; }
-          get().pushHistory();
+          // M390: gesichert wird das Board, auf dem wiederhergestellt wird — nicht das gerade offene
+          if (snap.boardId !== get().activeId) get().pushHistoryBoards([snap.boardId]); else get().pushHistory();
           set({
             boards: get().boards.map((b) =>
               b.id === snap.boardId
@@ -2795,7 +3003,7 @@ export const useBoard = create<BoardState>()(
           }
           patchActive((b) => ({
             nodes: b.nodes.map((n) =>
-              n.id === id ? ({ ...n, data: { ...n.data, ...data } } as AppNode) : n,
+              n.id === id ? ({ ...n, data: { ...n.data, ...mitFristAnker(n, data) } } as AppNode) : n,
             ),
           }));
         },
@@ -2824,8 +3032,23 @@ export const useBoard = create<BoardState>()(
 
         clearPendingFocus: () => set({ pendingFocus: null }),
 
+        hinweisRueckgaengig: () => {
+          /**
+           * M390: Der Knopf „Rückgängig" im Hinweis nimmt GENAU den Schritt zurück, zu dem der Hinweis gehört.
+           * Ist seither nichts dazwischengekommen, ist das ein gewöhnliches Strg+Z — danach gibt es keinen
+           * übriggebliebenen Schritt, der die wiederhergestellte Karte beim nächsten Strg+Z erneut löscht, und der
+           * Verlauf stimmt auch, wenn man inzwischen auf einem anderen Board steht. Kam etwas dazwischen, wird nur
+           * Gelöschtes zurückgelegt; für alles andere sagt der Hinweis, wie es weitergeht.
+           */
+          const s0 = get();
+          const art = s0.toast?.undo;
+          if (hinweisEintrag && s0.past[s0.past.length - 1] === hinweisEintrag) { hinweisEintrag = null; s0.undo(); return; }
+          if (art === 'schritt') { s0.showToast('Inzwischen ist anderes dazugekommen — Strg+Z nimmt Schritt für Schritt zurück.', false, 6000); return; }
+          s0.restoreDeleted();
+        },
         showToast: (message, undo, durationMs, abbruch) => {
           if (toastTimer) clearTimeout(toastTimer);
+          hinweisEintrag = undo && !abbruch ? (get().past[get().past.length - 1] ?? null) : null;
           set({ toast: { message, undo, abbruch } });
           toastTimer = setTimeout(() => set({ toast: null }), durationMs ?? (undo ? 6000 : 3000));
         },

@@ -40,8 +40,25 @@ function titelAus(name: string): string {
 export async function textZuBloecken(name: string, text: string): Promise<unknown[]> {
   const inhalt = text.replace(/^﻿/, '').replace(/\r\n?/g, '\n').trim().slice(0, NOTIZ_MAX_ZEICHEN);
   if (!inhalt) return [];
-  const beginntMitTitel = /^#{1,3}\s+\S/.test(inhalt);
   const titel = titelAus(name);
+  // M390: Eine .txt ist TEXT, kein Markdown. Durch den Markdown-Leser gingen Wörter verloren („Platzhalter <Name>"
+  // wurde „Platzhalter"), Zeilen verschmolzen zu einem Absatz, „__doppelt__" verlor seine Striche. Jetzt bleibt
+  // jede Zeile, wie sie ist; nur was am Zeilenanfang eindeutig eine Liste oder Aufgabe ist, wird auch eine.
+  if (!MARKDOWN.has(name.split('.').pop()?.toLowerCase() ?? '')) {
+    const bloecke: unknown[] = titel ? [{ type: 'heading', props: { level: 3 }, content: titel }] : [];
+    for (const roh of inhalt.split('\n')) {
+      const t = roh.trim();
+      if (!t) continue;
+      let m: RegExpExecArray | null;
+      if ((m = /^[-•]\s+\[( |x|X)\]\s+(.*)$/.exec(t))) bloecke.push({ type: 'checkListItem', props: { checked: m[1] !== ' ' }, content: m[2] });
+      else if ((m = /^[☐☑]\s+(.*)$/.exec(t))) bloecke.push({ type: 'checkListItem', props: { checked: t.startsWith('☑') }, content: m[1] });
+      else if ((m = /^[-•]\s+(.*)$/.exec(t))) bloecke.push({ type: 'bulletListItem', content: m[1] });
+      else if ((m = /^\d+[.)]\s+(.*)$/.exec(t))) bloecke.push({ type: 'numberedListItem', content: m[1] });
+      else bloecke.push({ type: 'paragraph', content: t });
+    }
+    return bloecke;
+  }
+  const beginntMitTitel = /^#{1,3}\s+\S/.test(inhalt);
   const md = beginntMitTitel || !titel ? inhalt : `### ${titel}\n\n${inhalt}`;
   return mdToBlocks('', md);
 }

@@ -41,6 +41,7 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
           zeigt der abgerundete Akzent-Rand des Rahmens selbst; Griffe als
           dezente runde Punkte im Karten-Stil */}
       <NodeResizer
+        onResizeStart={() => useBoard.getState().pushHistory()}
         isVisible={selected}
         minWidth={260}
         minHeight={180}

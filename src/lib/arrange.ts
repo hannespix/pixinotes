@@ -565,11 +565,13 @@ export function findFreeSpot(
 /** Mitglieder eines Rahmens (M150): alle Karten, deren MITTELPUNKT im Rahmen
  *  liegt — sie gelten als „eingefangen" und wandern mit dem Rahmen mit.
  *  includeFrames: auch KLEINERE Rahmen einsammeln (verschachtelte Bereiche). */
-export function frameMembers(frame: AppNode, nodes: AppNode[], includeFrames = false): AppNode[] {
+export function frameMembers(frame: AppNode, nodes: AppNode[], includeFrames = false, mitArchiv = false): AppNode[] {
   const fs = sizeOf(frame);
   const fArea = fs.w * fs.h;
   return nodes.filter((n) => {
-    if (n.id === frame.id || n.archived) return false;
+    // M390 `mitArchiv`: Beim BEWEGEN des Rahmens wandern auch archivierte Karten mit — sonst lagen sie nach dem
+    // Zurückholen außerhalb. Zählen und Anordnen sehen sie weiterhin nicht.
+    if (n.id === frame.id || (n.archived && !mitArchiv)) return false;
     if (n.type === 'frame') {
       if (!includeFrames) return false;
       const os = sizeOf(n);
