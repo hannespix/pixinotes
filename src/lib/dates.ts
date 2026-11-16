@@ -17,8 +17,8 @@ export interface DetectedDate {
  * „morgen 10 Uhr"; die häufigste Schreibweise in Notizen blieb so unerkannt.
  */
 const KURZDATUM_RE = /(?<![\d.])(\d{1,2})\.(\d{1,2})\.(?:(\d{4}|\d{2})(?!\d))?(?!\d)(?:\s*(?:um\s*)?(\d{1,2})(?::(\d{2}))?\s*Uhr)?/gi;
-function kurzdaten(text: string, ref: Date): Array<{ text: string; date: Date; index: number }> {
-  const out: Array<{ text: string; date: Date; index: number }> = [];
+export function kurzdaten(text: string, ref: Date): Array<{ text: string; date: Date; index: number; mitZeit: boolean }> {
+  const out: Array<{ text: string; date: Date; index: number; mitZeit: boolean }> = [];
   for (const m of text.matchAll(KURZDATUM_RE)) {
     const tag = Number(m[1]);
     const monat = Number(m[2]);
@@ -30,7 +30,7 @@ function kurzdaten(text: string, ref: Date): Array<{ text: string; date: Date; i
     if (d.getDate() !== tag) continue; // 31.02. gibt es nicht
     // Ohne Jahr: Liegt es mehr als zwei Monate zurück, ist das nächste Jahr gemeint
     if (!m[3] && d.getTime() < ref.getTime() - 60 * 864e5) d = new Date(jahr + 1, monat - 1, tag, std, min);
-    out.push({ text: m[0].trim(), date: d, index: m.index ?? 0 });
+    out.push({ text: m[0].trim(), date: d, index: m.index ?? 0, mitZeit: m[4] !== undefined });
   }
   return out;
 }
@@ -47,23 +47,38 @@ export function nurWortKeinTag(text: string, r: { text: string; index: number })
   return danach !== '.' && !['am', 'bis', 'ab', 'jeden', 'nächsten', 'kommenden', 'diesen', 'vor', 'seit'].includes(davor);
 }
 
+/**
+ * M388: Gemerkte Funde je Text und Stunde. Die Datums-Erkennung ist teuer (rund 25 Mikrosekunden je Text klingt
+ * wenig — aber die Aufgaben-Zählung läuft bei JEDER Änderung über alle offenen Punkte aller Boards, also bei jedem
+ * Zieh-Schritt und jedem Tastendruck). Der Text eines Punkts ändert sich selten; sein Ergebnis hängt nur am Text
+ * und am Zeitpunkt („morgen") — mit der Stunde als Schlüssel bleibt es richtig.
+ */
+const fundSpeicher = new Map<string, Array<{ text: string; date: Date; index: number }>>();
+let fundStunde = '';
+
 export function detectDates(text: string, ref: Date = new Date()): DetectedDate[] {
   if (!text) return [];
-  let results: ParsedResult[] = [];
-  try {
-    results = chronoDe.parse(text, ref, { forwardDate: true });
-  } catch {
-    return [];
+  const stunde = `${ref.getFullYear()}-${ref.getMonth()}-${ref.getDate()}-${ref.getHours()}`;
+  if (stunde !== fundStunde || fundSpeicher.size > 20000) { fundSpeicher.clear(); fundStunde = stunde; }
+  let funde = fundSpeicher.get(text);
+  if (!funde) {
+    let results: ParsedResult[] = [];
+    try {
+      results = chronoDe.parse(text, ref, { forwardDate: true });
+    } catch {
+      return [];
+    }
+    funde = [];
+    for (const r of results) {
+      // Reine Uhrzeiten überspringen
+      if (!r.start.isCertain('day') && !r.start.isCertain('weekday')) continue;
+      if (nurWortKeinTag(text, r)) continue;
+      funde.push({ text: r.text, date: r.start.date(), index: r.index });
+    }
+    funde.push(...kurzdaten(text, ref));
+    funde.sort((a, b) => a.index - b.index);
+    fundSpeicher.set(text, funde);
   }
-  const funde: Array<{ text: string; date: Date; index: number }> = [];
-  for (const r of results) {
-    // Reine Uhrzeiten überspringen
-    if (!r.start.isCertain('day') && !r.start.isCertain('weekday')) continue;
-    if (nurWortKeinTag(text, r)) continue;
-    funde.push({ text: r.text, date: r.start.date(), index: r.index });
-  }
-  funde.push(...kurzdaten(text, ref));
-  funde.sort((a, b) => a.index - b.index);
   const seen = new Set<string>();
   const out: DetectedDate[] = [];
   for (const f of funde) {

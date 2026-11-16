@@ -30,7 +30,6 @@ export const TEXT_ARTEN: Array<{ art: BlockArt; kurz: string; name: string }> = 
 ];
 export const LISTEN_ARTEN: BlockArt[] = ['bulletListItem', 'numberedListItem', 'checkListItem'];
 export const istListe = (art: string | null | undefined): art is BlockArt => !!art && LISTEN_ARTEN.includes(art as BlockArt);
-export const artName = (art: BlockArt): string => TEXT_ARTEN.find((a) => a.art === art)?.name ?? (art === 'quote' ? 'Zitat' : 'Text');
 
 /* ───────────── Text-Marker ───────────── */
 

@@ -2,13 +2,13 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { NodeToolbar, Position, useReactFlow, useStore } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
-import { nodesToHtml, nodesToText } from '../lib/serialize';
+import { nodesToText } from '../lib/serialize';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
 import { textDateienAlsNotizen, textKarte } from '../lib/textNotiz';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { KACHEL_TYPEN, STICKY_COLORS, uid, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICopy, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -311,23 +311,6 @@ export function SelectionToolbar() {
     } finally {
       setAiBusy(false);
       useBoard.getState().setAiBusy(false);
-    }
-  };
-
-  const copyHtml = async () => {
-    const html = nodesToHtml(selected);
-    const text = nodesToText(selected);
-    try {
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          'text/html': new Blob([html], { type: 'text/html' }),
-          'text/plain': new Blob([text], { type: 'text/plain' }),
-        }),
-      ]);
-      showToast('📋 Als formatiertes HTML kopiert — direkt in Outlook/Word einfügbar');
-    } catch {
-      await navigator.clipboard.writeText(text);
-      showToast('📋 Als Text kopiert');
     }
   };
 

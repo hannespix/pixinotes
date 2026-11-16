@@ -1,3 +1,4 @@
+import { tagLokal } from '../lib/tag';
 import { useEffect, useMemo, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { mutedHistory, useBoard } from '../store';
@@ -148,7 +149,7 @@ export function TaskHub() {
   const [aiBusy, setAiBusy] = useState(false);
   const ai = useBoard((s) => s.ai);
 
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = tagLokal();
   const allTasks = useMemo(() => collectTasks(boards), [boards]);
   const persons = useMemo(
     () => [...new Set(allTasks.map((t) => t.who).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b)),

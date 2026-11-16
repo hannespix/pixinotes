@@ -17,7 +17,8 @@ export interface KachelZeile { text: string; warn?: boolean }
 export interface KachelInfo { typ: string; titel: string; zeilen: KachelZeile[] }
 
 const datum = (iso: string): string => {
-  const d = new Date(iso);
+  // M388: ein reines Datum als hiesigen Tag lesen (als Weltzeit gelesen stand westlich von Greenwich der Vortag da)
+  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? `${iso}T12:00:00` : iso);
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
 };
 const heuteIso = (): string => {

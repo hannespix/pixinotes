@@ -106,14 +106,6 @@ export function hullPath(points: Pt[], pad = 46): string {
   return smoothPath(inflate(convexHull(points), pad));
 }
 
-/** Mittelpunkt einer Punktgruppe — Ankerpunkt für die Beschriftung */
-export function centroid(points: Pt[]): Pt {
-  if (points.length === 0) return { x: 0, y: 0 };
-  return {
-    x: points.reduce((a, p) => a + p.x, 0) / points.length,
-    y: points.reduce((a, p) => a + p.y, 0) / points.length,
-  };
-}
 
 /** Über dem obersten Punkt sitzt die Beschriftung: dort, wo die Hülle
  *  wirklich ist — nicht über der Schwerpunkt-Spalte, die bei einer länglichen

@@ -21,8 +21,6 @@ const LEER: Fang = { linien: [], abstaende: [] };
 let stand: Fang = LEER;
 const hoerer = new Set<() => void>();
 export const fangStand = (): Fang => stand;
-/** Kompatibel zu M344: nur die Linien */
-export const fangLinien = (): Fanglinie[] => stand.linien;
 export const fangAktiv = (): boolean => stand.linien.length > 0 || stand.abstaende.length > 0;
 export function fangAbo(cb: () => void): () => void { hoerer.add(cb); return () => { hoerer.delete(cb); }; }
 export function fangSetzen(neu: Fanglinie[] | Fang): void {

@@ -17,6 +17,7 @@ import { kontoDateiNachladen } from '../lib/kontoSync';
 import { pdfSeiteMasse, renderPdfPage } from '../lib/pdf';
 import { MarkerGruppen, StrichPfad } from './StrichPfad';
 import type { FileNode } from '../types';
+import { wordEntschaerfen } from '../lib/sicher';
 import type { Ansicht } from '../lib/vorfuehren';
 
 export type DokumentArt = 'pdf' | 'word' | 'bild';
@@ -142,7 +143,9 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
         await renderAsync(blob, wordRef.current, wordStilRef.current ?? undefined, {
           inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false, useBase64URL: true,
           renderHeaders: true, renderFooters: true, renderFootnotes: true, renderComments: false, className: 'docx',
+          renderAltChunks: false,   // M388: eingebettetes HTML (altChunk) käme als Rahmen ohne Sandbox — mit Zugriff auf PixiNotes
         });
+        if (wordRef.current) wordEntschaerfen(wordRef.current);
         if (weg) return;
         const n = Math.max(1, wordRef.current.querySelectorAll('section.docx').length);
         setSeiten(n); onSeiten(n); setWordFertig(true);

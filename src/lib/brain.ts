@@ -179,13 +179,6 @@ export function brainBoardIds(st = useBoard.getState()): Set<string> {
   return drin;
 }
 
-/** Bereichs-Name eines Boards — für die Anzeige im Puls und in Quellen */
-export function spaceOfBoard(boardId: string, st = useBoard.getState()): string | null {
-  for (const sp of st.spaces) {
-    if (sp.projects.some((p) => p.boardIds.includes(boardId))) return sp.name;
-  }
-  return null;
-}
 
 export async function syncBrainIndex(): Promise<void> {
   const st = useBoard.getState();

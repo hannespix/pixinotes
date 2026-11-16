@@ -25,7 +25,7 @@ import { sbLinkSenden, sbPasswortAnmelden, sbRegistrieren, supabaseKonfig, supab
 import { browserErkenntHandschrift } from '../lib/handschrift';
 import { aiReady } from '../lib/ai';
 import {
-  applyFilesSync, canShareFiles, filesSyncDirty, filesSyncOn, filesSyncStamp, isAppleTouch,
+  applyFilesSync, canShareFiles, filesSyncDirty, filesSyncStamp, isAppleTouch,
   isStandalone, readSyncFile, saveViaFiles,
 } from '../lib/filesSync';
 import {
@@ -205,19 +205,12 @@ export function Settings() {
   const [sbKey, setSbKey] = useState('');
   const anzeige = useBoard((s) => s.anzeige);
   const setAnzeige = useBoard((s) => s.setAnzeige);
-  const syncDateienMb = useBoard((s) => s.syncDateienMb ?? 25);
-  const setSyncDateienMb = useBoard((s) => s.setSyncDateienMb);
   const lesbareSchrift = useBoard((s) => s.lesbareSchrift);
   const setLesbareSchrift = useBoard((s) => s.setLesbareSchrift);
   const hoherKontrast = useBoard((s) => s.hoherKontrast);
   const setHoherKontrast = useBoard((s) => s.setHoherKontrast);
-  const milchglas = useBoard((s) => s.milchglas);
-  const setMilchglas = useBoard((s) => s.setMilchglas);
   const clickZoom = useBoard((s) => s.clickZoom);
-  const stiftZeichnet = useBoard((s) => s.stiftZeichnet);
-  const setStiftZeichnet = useBoard((s) => s.setStiftZeichnet);
   const setClickZoom = useBoard((s) => s.setClickZoom);
-  const cardFocus = useBoard((s) => s.cardFocus);
   // M294: Bewegung auf der Fläche als Optionen — Physik, Klick-Zoom, Konfetti
   const physicsEnabled = useBoard((s) => s.physicsEnabled);
   const setPhysicsEnabled = useBoard((s) => s.setPhysicsEnabled);
@@ -227,13 +220,6 @@ export function Settings() {
   const setFingerGesten = useBoard((s) => s.setFingerGesten);
   const brainOffSpaces = useBoard((s) => s.brainOffSpaces);
   const toggleBrainSpace = useBoard((s) => s.toggleBrainSpace);
-  const setCardFocus = useBoard((s) => s.setCardFocus);
-  const fokusEinKlick = useBoard((s) => s.fokusEinKlick);
-  const setFokusEinKlick = useBoard((s) => s.setFokusEinKlick);
-  const fokusVollbild = useBoard((s) => s.fokusVollbild);
-  const setFokusVollbild = useBoard((s) => s.setFokusVollbild);
-  const navLinks = useBoard((s) => s.navLinks);
-  const setNavLinks = useBoard((s) => s.setNavLinks);
   const wheelZoom = useBoard((s) => s.wheelZoom);
   const handschriftOnline = useBoard((s) => s.handschriftOnline);
   const setHandschriftOnline = useBoard((s) => s.setHandschriftOnline);

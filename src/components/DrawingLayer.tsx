@@ -1,3 +1,4 @@
+import { aufDemselbenBoard } from '../lib/zielBoard';
 import { useEffect, useRef, useState } from 'react';
 import { useReactFlow, useViewport } from '@xyflow/react';
 import { selectNurLesen, selectActiveBoard, useBoard, type Stroke } from '../store';
@@ -1149,8 +1150,8 @@ export function DrawingLayer() {
       const ziel = zielNotiz(eigene);
       let zeilen = fertig ?? [];
       if (zeilen.length === 0) {
-        const e = await schriftErkennen(eigene, handschriftKi && aiReady(ai));
-        zeilen = e.ki ? await e.ki : e.zeilen;
+        // M388: Das Ergebnis gehört auf das Board, auf dem geschrieben wurde (lib/zielBoard.ts)
+        zeilen = await aufDemselbenBoard(async () => { const e = await schriftErkennen(eigene, handschriftKi && aiReady(ai)); return e.ki ? await e.ki : e.zeilen; });
       }
       const text = zeilen.map((z) => z.text).join('\n');
       if (!text) { showToast('Keine Schrift erkannt — deutlicher schreiben oder größer.'); return; }

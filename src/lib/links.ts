@@ -1,6 +1,7 @@
 // Obsidian-Gene für PixiNotes: [[Wikilinks]], #Tags und der Board-Graph.
 // Wikilinks verweisen auf Board-Namen (normalisiert, Emojis egal) oder
 // auf Karten-Titel; der Graph verbindet Boards über Portale UND Wikilinks.
+import type { AppNode } from '../types';
 import type { BoardDoc } from '../store';
 import { nodeToText } from './serialize';
 
@@ -50,23 +51,49 @@ export type LinkTarget =
   | { kind: 'card'; boardId: string; nodeId: string }
   | null;
 
+/*
+ * M388: Gemerktes je Karte und je Board-Liste. Vorher las JEDE Auflösung eines [[Links]] den Text ALLER Karten
+ * aller Boards neu — und die Rückverweise taten das für jede Notiz, bei jeder Änderung (auch je Zieh-Schritt):
+ * bei 600 Notizen über eine halbe Sekunde je Durchlauf. Karten ändern sich nicht (jede Änderung ergibt ein neues
+ * Objekt) — ihr Text und ihre Titelzeile lassen sich darum am Objekt merken, und der Titel-Index an der Liste.
+ */
+const textSpeicher = new WeakMap<object, string>();
+const kartenText = (n: AppNode): string => {
+  let t = textSpeicher.get(n);
+  if (t === undefined) { t = nodeToText(n); textSpeicher.set(n, t); }
+  return t;
+};
+const titelSpeicher = new WeakMap<object, string>();
+const kartenTitel = (n: AppNode): string => {
+  let t = titelSpeicher.get(n);
+  if (t === undefined) { t = normalizeName(kartenText(n).split('\n')[0] ?? ''); titelSpeicher.set(n, t); }
+  return t;
+};
+const titelIndex = new WeakMap<BoardDoc[], Map<string, LinkTarget>>();
+function kartenNachTitel(boards: BoardDoc[]): Map<string, LinkTarget> {
+  let m = titelIndex.get(boards);
+  if (!m) {
+    m = new Map();
+    for (const b of boards) {
+      for (const n of b.nodes) {
+        const t = kartenTitel(n);
+        if (t && !m.has(t)) m.set(t, { kind: 'card', boardId: b.id, nodeId: n.id });   // die erste Karte mit dem Titel gilt (wie bisher)
+      }
+    }
+    titelIndex.set(boards, m);
+  }
+  return m;
+}
+
 /** [[Name]] auflösen: exakter Board-Name → Board; sonst Karte, deren Titelzeile passt */
 export function resolveLink(name: string, boards: BoardDoc[]): LinkTarget {
   const wanted = normalizeName(name);
   if (!wanted) return null;
   const board = boards.find((b) => normalizeName(b.name) === wanted);
   if (board) return { kind: 'board', boardId: board.id };
-  for (const b of boards) {
-    for (const n of b.nodes) {
-      // exakter Titel-Vergleich — includes() würde Selbstbezüge matchen
-      // (die Notiz enthält ihren eigenen [[Link]] im Text)
-      const first = normalizeName(nodeToText(n).split('\n')[0] ?? '');
-      if (first && first === wanted) {
-        return { kind: 'card', boardId: b.id, nodeId: n.id };
-      }
-    }
-  }
-  return null;
+  // exakter Titel-Vergleich — includes() würde Selbstbezüge matchen
+  // (die Notiz enthält ihren eigenen [[Link]] im Text)
+  return kartenNachTitel(boards).get(wanted) ?? null;
 }
 
 export interface Backlink {
@@ -87,7 +114,8 @@ export function collectBacklinks(boards: BoardDoc[], targetBoardId: string): Bac
       if (n.type === 'portal' && n.data.boardId === targetBoardId && b.id !== targetBoardId) {
         out.push({ boardId: b.id, boardName: b.name, nodeId: n.id, label: 'Portal', kind: 'portal' });
       } else if (n.type === 'note') {
-        const text = nodeToText(n);
+        const text = kartenText(n);
+        if (!text.includes('[[')) continue;
         for (const name of extractWikilinks(text)) {
           const t = resolveLink(name, boards);
           if (t && t.boardId === targetBoardId && !(b.id === targetBoardId && t.kind === 'board')) {

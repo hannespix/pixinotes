@@ -126,11 +126,6 @@ export function bubblesMischen(a0: Partial<BubblesData> | undefined, b0: Partial
     ...(regeln.t > 0 ? { regeln } : {}),
   };
 }
-/** Sind die vereinigbaren Inhalte zweier Fassungen gleich? */
-export const bubblesGleich = (a: Partial<BubblesData> | undefined, b: Partial<BubblesData> | undefined): boolean => {
-  const x = bubblesMischen(a, undefined); const y = bubblesMischen(b, undefined);
-  return JSON.stringify(x) === JSON.stringify(y);
-};
 
 /** Eine Blase, wie sie zu sehen ist: gleiche Texte sind zu einer verschmolzen */
 export interface Blase {

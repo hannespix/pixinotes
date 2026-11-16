@@ -1,3 +1,5 @@
+import { overlayOffen } from '../lib/overlay';
+import { tagLokal } from '../lib/tag';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBoard, type Tool } from '../store';
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon, type DokumentBefehl } from '../lib/pdfSeiten';
@@ -84,7 +86,7 @@ function runAction(node: AppNode, key: string) {
   const st = useBoard.getState();
   const d = node.data as Record<string, unknown>;
   const id = () => Math.random().toString(36).slice(2, 10);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = tagLokal();
   st.pushHistory();
   if (key === 'ticket') {
     const items = (d.items as Array<Record<string, unknown>>) ?? [];
@@ -92,7 +94,7 @@ function runAction(node: AppNode, key: string) {
     st.showToast('＋ Ticket angelegt — Text antippen zum Ändern.');
   } else if (key === 'gantt-row') {
     const rows = (d.rows as Array<Record<string, unknown>>) ?? [];
-    const end = new Date(Date.now() + 4 * 864e5).toISOString().slice(0, 10);
+    const end = tagLokal(new Date(Date.now() + 4 * 864e5));
     st.updateNodeData(node.id, {
       rows: [...rows, { id: id(), name: `Vorgang ${rows.length + 1}`, start: today, end }],
     });
@@ -201,7 +203,9 @@ export function FocusSheet() {
       // Esc räumt IMMER das Oberste ab. Steht ein Menü, ein Dialog oder das
       // Slash-Menü offen, gehört der Druck dem — sonst verschwände plötzlich
       // die ganze Karte, obwohl man nur ein Menü wegklicken wollte.
-      if (document.querySelector('.sel-menu-fixed, .modal, .nav-panel, .bn-suggestion-menu, .ov-graph-ctx')) return;
+      // M388: … auch Ticket-Fenster, Bild-Lupe und offene Menüs: Vorher schloss Esc den Fokus und ließ das Fenster stehen.
+      // (Ein offenes Gespräch NEBEN der Karte zählt nicht dazu — es ist kein Fenster über ihr und bleibt beim Verlassen stehen.)
+      if (document.querySelector('.sel-menu-fixed, .modal, .nav-panel, .bn-suggestion-menu, .ov-graph-ctx, [role="menu"], .dock-menu') || overlayOffen()) return;
       e.stopPropagation();
       close();
     };

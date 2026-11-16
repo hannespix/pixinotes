@@ -11,7 +11,7 @@ import {
   addSeqActor, addSeqMsg, addSeqNote, addState, addTimelineEvent,
   addTimelinePeriod, axisLabels, diagramKind, ganttFlags, ganttSections,
   ganttTasks, getTitle, hasAutonumber, mindLines, mindText, nudgeQuadrantPoint,
-  pieSlices, quadrantLabels, quadrantPoints, removeGanttTask, removeMind,
+  pieSlices, quadrantLabels, removeGanttTask, removeMind,
   removePie, removeQuadrantPoint, removeSeqActor, removeSeqMsg, removeState,
   removeStateTrans, removeTimelineToken, renameGanttSection, renameGanttTask,
   renameMind, renamePie, renameQuadrantPoint, renameSeqActor, renameState,
@@ -19,7 +19,6 @@ import {
   setStateTransLabel, setTitle, shiftGanttTask, shiftPie, stateTransitions,
   timelineTokens, toggleAutonumber, toggleGanttFlag,
 } from '../../lib/mermaidEdit';
-import { useOutsideClose } from '../../lib/useOutsideClose';
 import { linkedOfType, mermaidFromNote } from '../../lib/moduleFeeds';
 import { CardShell } from './CardShell';
 
@@ -96,7 +95,6 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
   // schwebt aber UNTER der Karte, also lief es bei tief liegenden Karten aus
   // dem Bild, und die letzten Vorlagen waren unerreichbar. Beim Öffnen prüfen
   // wir, wo mehr Platz ist.
-  const [tplUp, setTplUp] = useState(false);
   const [pendingTpl, setPendingTpl] = useState<string | null>(null);
   const [selNode, setSelNode] = useState<string | null>(null);
   // Ausgewählte VERBINDUNG (M99): per Klick auf den Pfeil im Bild

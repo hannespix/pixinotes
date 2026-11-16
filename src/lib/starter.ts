@@ -2,12 +2,13 @@
 // Vorbelegung aus Bereichen → Projekten → Boards, mit der man sofort arbeiten
 // kann — und die nebenbei jedes Modul im echten Einsatz erklärt.
 // Alle IDs werden pro Aufruf frisch vergeben (mehrfach hinzufügbar, kollisionsfrei).
+import { tagLokal } from './tag';
 import type { Edge } from '@xyflow/react';
 import type { BoardDoc, Space } from '../store';
 import { uid, type AppNode } from '../types';
 
 const DAY = 864e5;
-const iso = (offsetDays: number) => new Date(Date.now() + offsetDays * DAY).toISOString().slice(0, 10);
+const iso = (offsetDays: number) => tagLokal(new Date(Date.now() + offsetDays * DAY));
 
 type Pos = { x: number; y: number };
 type Block = Record<string, unknown>;

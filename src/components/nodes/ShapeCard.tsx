@@ -26,7 +26,6 @@ const SHAPE_LABEL: Record<ShapeKind, string> = {
  */
 export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
-  const removeNode = useBoard((s) => s.removeNode);
   const [editing, setEditing] = useState(false);
 
   const cycleShape = () => updateNodeData(id, { shape: NEXT_SHAPE[data.shape] });

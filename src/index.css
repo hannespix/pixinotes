@@ -7320,3 +7320,9 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
   .qr-blende.ecke { width: 140px; bottom: calc(120px + var(--app-rand, 0px)); }
 }
 @media print { .qr-blende { display: none; } }
+
+/* ---------- M388: Raster-Farbe aus dem Stylesheet ---------- */
+/* Vorher las das Board die Farbe beim Zeichnen aus dem Dokument — nach dem Wechsel Hell/Dunkel blieben die Punkte
+   in der alten Farbe, bis sich das Board aus anderem Grund neu zeichnete. */
+.react-flow { --xy-background-pattern-color: #d3d6dc; }
+:root[data-theme="dark"] .react-flow { --xy-background-pattern-color: #2e3238; }

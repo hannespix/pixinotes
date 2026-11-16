@@ -6,6 +6,7 @@
 // Vorlage wählt, hat eigene Inhalte im Kopf und soll nichts wegräumen müssen.
 //
 // Jede Vorlage baut ihre Karten bei jedem Aufruf frisch (neue Ids, Daten ab heute).
+import { tagLokal } from './tag';
 import type { Edge } from '@xyflow/react';
 import { leereBubbles } from './bubbles';
 import { uid, type AppNode, type StickyColor } from '../types';
@@ -35,7 +36,7 @@ const woche = (pos: Pos, title: string): AppNode =>
   ({ id: uid(), type: 'week', width: 620, height: 440, position: pos, data: { title: t(title), days: 5, from: 8 * 60, to: 17 * 60, entries: [] } } as AppNode);
 
 const TAG = 864e5;
-const iso = (tage: number): string => new Date(Date.now() + tage * TAG).toISOString().slice(0, 10);
+const iso = (tage: number): string => tagLokal(new Date(Date.now() + tage * TAG));
 const zeitplan = (pos: Pos, title: string, zeilen: Array<[name: string, von: number, bis: number, farbe: string]>, w = 620, hoehe = 250): AppNode =>
   ({
     id: uid(), type: 'gantt', width: w, height: hoehe, position: pos,
@@ -212,14 +213,10 @@ export const VORLAGEN: Vorlage[] = [
   },
 ];
 
-export const vorlageVon = (id: string): Vorlage | undefined => VORLAGEN.find((v) => v.id === id);
 
 /** Ereignis, das den Vorlagen-Dialog öffnet: neues Board im Projekt — oder das leere Board `inBoard` füllen */
 export const VORLAGEN_EREIGNIS = 'pixinotes:vorlagen';
 export interface VorlagenWunsch { projectId?: string; inBoard?: string }
-export const vorlagenOeffnen = (wunsch: VorlagenWunsch = {}): void => {
-  window.dispatchEvent(new CustomEvent<VorlagenWunsch>(VORLAGEN_EREIGNIS, { detail: wunsch }));
-};
 
 // ---------- Skizze für die Kachel ----------
 export interface SkizzenTeil { art: string; x: number; y: number; w: number; h: number; farbe: string }

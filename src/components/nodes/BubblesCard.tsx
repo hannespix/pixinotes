@@ -821,7 +821,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       </div>
       {phase === 'fertig' && rang.length > 0 && (
         <div className="bub-ergebnis" data-taste="bub-ergebnis">
-          {rang.slice(0, 5).map((b, i) => (
+          {rang.slice(0, 5).map((b) => (
             <span key={b.id} data-platz={platz.get(b.id)}><b className={`bub-platz klein p${Math.min(platz.get(b.id) ?? 4, 4)}`}>{platz.get(b.id)}.</b> <span translate="no">{b.text}</span> <i>{punkteText(b.punkte)}</i></span>
           ))}
         </div>

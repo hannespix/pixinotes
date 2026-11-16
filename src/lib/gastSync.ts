@@ -13,13 +13,14 @@
 // Maße der Karten (`measured`) misst jedes Gerät selbst — ein Telefon anders als ein Laptop. Sie reisen darum
 // nicht als Änderung: Verglichen und geschrieben wird mit den Maßen des letzten gemeinsamen Stands, sonst
 // schickten sich zwei verschiedene Geräte endlos „Änderungen" zu.
-import { flushPersist, inDerived, isImportedState, leeresStartboard, NOTIZ_EXTERN, ohneLeseschutz, ohneStartboard, runDerived, setzeGruppe, setzeKartenSperren, useBoard, verlaufAbgrenzen, type BoardDoc, type GastRecht, type Space } from '../store';
+import { flushPersist, inDerived, isImportedState, leeresStartboard, NOTIZ_EXTERN, ohneLeseschutz, ohneStartboard, runDerived, persistHaken, setzeGruppe, setzeKartenSperren, useBoard, verlaufAbgrenzen, type BoardDoc, type GastRecht, type Space } from '../store';
 import { getAuthor } from '../components/CommentLayer';
 import { loadFile, saveFile } from './fileStore';
 import { supabaseKonfig } from './kontoSupabase';
 import { checkKontoRemote, kontoAnfrage, loadKonto, mitGeteiltBereich, stempel } from './kontoSync';
 import { liveKanal, type LiveKanal, type Teilnehmer } from './liveKanal';
-import { istPatch, patchAnwenden, patchAus, type Patch } from './gastPatch';
+import { istPatch, patchAnwenden, patchAus, patchSaeubern, type Patch } from './gastPatch';
+import { boardVonAussen, karteEntschaerfen, karteGueltig } from './sicher';
 import { anhangKarte, idbDel, idbGet, idbSet, liveHaken } from './syncFolder';
 import { anhangGroesse, anhangLokal, loadHtml, saveHtml } from './htmlStore';
 import { berichtAlsSatz, dreiWegeMerge, ohneAuswahl } from './syncMerge';
@@ -40,7 +41,7 @@ interface Eintrag { token: string; rolle: Rolle; version: number; kanal?: string
 interface Optionen { gastRecht?: string }
 /** M365: Was Gäste dürfen (Option des Besitzers am Einladungslink) — unbekannte Werte gelten als „alles" */
 export const rechtAus = (o: Optionen | null | undefined): GastRecht => (o?.gastRecht === 'eigenes' || o?.gastRecht === 'eigenes-loeschen' ? o.gastRecht : 'alles');
-interface GastDatei { id: string; name: string; mime?: string; groesse?: number; url: string }
+interface GastDatei { id: string; name: string; mime?: string; groesse?: number; url: string; /** M388: bis wann die Adresse gilt (ms) */ bis?: number }
 interface Gelesen { board_id: string; rolle: Rolle; besitzer: string; inhalt: string; version: number; dateien?: GastDatei[]; kanal?: string; optionen?: Optionen }
 
 const lesen = (): Record<string, Eintrag> => { try { return JSON.parse(localStorage.getItem(KEY) ?? '{}') as Record<string, Eintrag>; } catch { return {}; } };
@@ -209,6 +210,7 @@ function exklusiv<T>(boardId: string, fn: () => Promise<T>): Promise<T> {
   return p;
 }
 
+const optionenAm = new Map<string, number>();
 function kanalOeffnen(boardId: string, kanalName: string, beiStand: () => void): void {
   if (kanaele.has(boardId)) return;
   const k = supabaseKonfig();
@@ -219,6 +221,10 @@ function kanalOeffnen(boardId: string, kanalName: string, beiStand: () => void):
       else if (ereignis === 'karte') karteVonAussen(boardId, inhalt);
       else if (ereignis === 'optionen') {
         // Nur ein Anstoß — die Rechte selbst kommen vom Server
+        // M388: höchstens alle zwei Sekunden — sonst ließe sich über den Kanal bei jedem Gast eine Serverabfrage je Meldung auslösen
+        const jetzt = Date.now();
+        if (jetzt - (optionenAm.get(boardId) ?? 0) < 2000) return;
+        optionenAm.set(boardId, jetzt);
         if (lesen()[boardId]) void blick(boardId); else if (kontoKanal.has(boardId)) { rechteNeu.add(boardId); kontoKanaeleBald(); }
       }
       else window.dispatchEvent(new CustomEvent(LIVE_NACHRICHT, { detail: { boardId, ereignis, inhalt } }));
@@ -372,16 +378,25 @@ function karteSenden(boardId: string): void {
 /** Live-Stand einer Karte, die ein anderer gerade bearbeitet — nur vom Halter der Karte angenommen */
 function karteVonAussen(boardId: string, inhalt: unknown): void {
   const d = inhalt as { von?: string; node?: AppNode } | undefined;
-  if (!d?.node?.id || !d.von) return;
+  if (!d?.node?.id || typeof d.von !== 'string') return;
   if (sperren.get(boardId)?.get(d.node.id)?.id !== d.von) return;
+  // M388: Der Kanal ist eine fremde Eingabe. Nur eine gültige Karte derselben Art kommt hier an (eine Karte ohne
+  // Lage brächte die Fläche zum Absturz), und Adressen darin werden entschärft (lib/sicher.ts).
+  if (!karteGueltig(d.node)) return;
+  d.node = karteEntschaerfen(d.node);
   const st = useBoard.getState();
   const board = st.boards.find((b) => b.id === boardId);
   const alt = board?.nodes.find((n) => n.id === d.node!.id);
-  if (!board || !alt) return;
+  if (!board || !alt || alt.type !== d.node.type) return;
   // Den Stand VOR dem Mitschreiben merken: Er ist der letzte gesicherte — der Live-Stand gehört dem Schreiber
   const o = originale.get(boardId) ?? new Map<string, AppNode>();
   if (!o.has(alt.id)) { o.set(alt.id, alt); originale.set(boardId, o); }
-  const neu = mitAnsichtVon(d.node, alt);
+  // M388: Mitgelesen werden Inhalt, Lage und Größe — mehr ändert Schreiben und Ziehen nicht. Alles andere bleibt,
+  // wie es hier gesichert ist: Ein untergeschobenes „archiviert" oder „versteckt" bliebe sonst nach dem Loslassen
+  // stehen (verglichen wird nur Inhalt und Lage) und ginge mit dem nächsten eigenen Speichern zum Server.
+  const mass = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0 && v < 20000;
+  const gelesenes = { ...alt, data: d.node.data, position: { x: d.node.position.x, y: d.node.position.y }, ...(mass(d.node.width) ? { width: d.node.width } : {}), ...(mass(d.node.height) ? { height: d.node.height } : {}) } as AppNode;
+  const neu = mitAnsichtVon(gelesenes, alt);
   einspielen(boardId, neu, alt);
   const l = liveStaende.get(boardId) ?? new Map<string, AppNode>();
   l.set(neu.id, neu); liveStaende.set(boardId, l);
@@ -442,6 +457,7 @@ liveHaken.vor = (b) => {
   const nodes = b.nodes.map((n) => { const live = l.get(n.id); const orig = o.get(n.id); if (live && orig && gleicherInhalt(n, live)) { anders = true; return orig; } return n; });
   return anders ? { ...b, nodes } : b;
 };
+persistHaken.board = (b) => liveHaken.vor(b);   // M388: gespeichert wird der gesicherte Stand, nie das Mitgelesene
 liveHaken.nach = (b) => {
   const o = originale.get(b.id); const l = liveStaende.get(b.id);
   if (!o?.size || !l) return b;
@@ -543,7 +559,8 @@ async function holen(boardId: string): Promise<void> {
   try { g = await rpc<Gelesen | null>('gast_lesen', { p_token: e.token }); } catch { return; }
   if (!g) { beendet(boardId); return; }
   let fremd: BoardDoc;
-  try { fremd = gezeichnet(JSON.parse(g.inhalt) as BoardDoc, g, e.token); } catch { return; }
+  // M388: Der Stand vom Server wird geprüft; seine Kennung ist die des Boards, das hier abgeglichen wird
+  try { const b = boardVonAussen(JSON.parse(g.inhalt), boardId); if (!b) return; fremd = gezeichnet(b, g, e.token); } catch { return; }
   const basis = await basisLesen(boardId);
   const st = useBoard.getState();
   const lokal = st.boards.find((b) => b.id === boardId);
@@ -640,7 +657,7 @@ function laufBald(boardId: string): void {
 /** Eine Änderung eines anderen aus dem Live-Kanal */
 function deltaEmpfangen(boardId: string, inhalt: unknown, sonst: () => void): void {
   const d = inhalt as { v?: unknown; vor?: unknown; p?: unknown } | undefined;
-  const p = istPatch(d?.p) ? d.p : undefined;
+  const p = istPatch(d?.p) ? patchSaeubern(d.p) : undefined;
   const e = lesen()[boardId];
   if (!e) { deltaFuerKonto(boardId, sonst); return; }
   const k = kette(boardId);
@@ -649,6 +666,18 @@ function deltaEmpfangen(boardId: string, inhalt: unknown, sonst: () => void): vo
   } else if (p) k.ohneVersion.push(p);
   else { abgleichBald(boardId); return; }
   laufBald(boardId);
+}
+
+/**
+ * M388: Ein Schreiben, das am Netz scheiterte (oder an einem vorübergehenden Fehler des Servers), wird wiederholt
+ * — erst nach 2 s, dann seltener, höchstens jede Minute. Vorher blieb die letzte Änderung eines Gasts einfach
+ * liegen, bis er noch etwas änderte: Die anderen sahen sie nie, und er erfuhr es nicht.
+ */
+const netzVersuche = new Map<string, number>();
+function nochmalBald(boardId: string): void {
+  const n = (netzVersuche.get(boardId) ?? 0) + 1;
+  netzVersuche.set(boardId, n);
+  setTimeout(() => { if (lesen()[boardId]) schreibenBald(boardId); }, Math.min(60_000, 2000 * 2 ** Math.min(n - 1, 5)));
 }
 
 /** Eigene Änderungen zum Server: nur, was sich geändert hat (M366) */
@@ -672,6 +701,7 @@ async function hinaus(boardId: string): Promise<void> {
     const v = Number(r.version); const vor = Number(r.vor);
     kanaele.get(boardId)?.senden('delta', JSON.stringify(p).length <= DELTA_MAX_ZEICHEN ? { v, vor, p } : { v, vor });
     k.wartend.set(v, { v, vor, p, eigen: true });
+    netzVersuche.delete(boardId);
     await kettenLauf(boardId);
   } catch (f) {
     const art = f instanceof GastFehler ? f.art : 'netz';
@@ -679,7 +709,7 @@ async function hinaus(boardId: string): Promise<void> {
     if (art === 'fehlt' || art === 'abgelehnt') { ohnePatch = true; await hinausGanz(boardId); return; }
     if (art === 'keine-freigabe') { await holen(boardId); return; }   // Rolle geändert oder Link beendet — der Blick klärt es
     if (art === 'nicht-erlaubt') { await serverGilt(boardId); return; }
-    // Netz: der nächste Blick oder die nächste Änderung versucht es wieder
+    nochmalBald(boardId);
   }
 }
 
@@ -698,13 +728,14 @@ async function hinausGanz(boardId: string, versuch = 0): Promise<void> {
     const m = lesen();
     if (m[boardId]) { m[boardId] = { ...m[boardId], version: Number(v) }; schreiben(m); }
     basisSetzen(boardId, ohneAuswahl(zuSchreiben));
+    netzVersuche.delete(boardId);
     kanaele.get(boardId)?.senden('stand', { v: Number(v) });
   } catch (f) {
     const art = f instanceof GastFehler ? f.art : 'netz';
     if (art === 'vorbedingung' && versuch < 3) { await holen(boardId); return; }
     if (art === 'keine-freigabe') { await holen(boardId); return; }   // Rolle geändert oder Link beendet — der Blick klärt es
     if (art === 'nicht-erlaubt') { await serverGilt(boardId); return; }
-    // Netz: der nächste Blick oder die nächste Änderung versucht es wieder
+    nochmalBald(boardId);
   }
 }
 
@@ -720,7 +751,7 @@ async function serverGilt(boardId: string): Promise<void> {
   try { g = await rpc<Gelesen | null>('gast_lesen', { p_token: e.token }); } catch { return; }
   if (!g) { beendet(boardId); return; }
   let fremd: BoardDoc;
-  try { fremd = gezeichnet(JSON.parse(g.inhalt) as BoardDoc, g, e.token); } catch { return; }
+  try { const b = boardVonAussen(JSON.parse(g.inhalt), boardId); if (!b) return; fremd = gezeichnet(b, g, e.token); } catch { return; }
   const st = useBoard.getState();
   const lokal = st.boards.find((b) => b.id === boardId);
   if (!lokal) return;
@@ -978,30 +1009,37 @@ const geteiltKennung = (boards: BoardDoc[]): string => boards.filter((b) => b.ge
  * schon im Konto liegenden Dateien, gemerkt am Link — und seit M384 auch an der Freigabe für ein Konto.
  * Läuft nach jedem eigenen Schreiben — neue Dateien kommen so nach.
  */
+const ANHANG_GILT_MS = 30 * 24 * 3600_000;
 const anhangKenn = (liste: Array<{ id: string; groesse?: number }>): string => JSON.stringify(liste.map((d) => [d.id, d.groesse ?? 0]));
 /** Die Liste für ein Board — `null`: Sie stimmt schon (dieselben Dateien, dieselben Größen) */
 async function anhangListe(s: { url?: string; userId: string }, board: BoardDoc, alt: GastDatei[]): Promise<GastDatei[] | null> {
   // M371: Datei-Karten und eigene HTML-Tools (deren Quelltext liegt wie ein Anhang im Konto)
   const karten = board.nodes.filter((n) => !!anhangKarte(n) && !n.archived && !(n.data as { dataUrl?: string }).dataUrl);
   const soll = anhangKenn(karten.map((n) => ({ id: n.id, groesse: anhangKarte(n)!.size })));
-  if (soll === anhangKenn(alt)) return null;
+  /* M388: Die Adressen gelten 30 Tage statt zehn Jahre und werden erneuert, sobald weniger als die Hälfte übrig
+     ist (oder sie noch aus der Zeit ohne Ablauf stammen). Eine signierte Adresse lässt sich nicht einzeln
+     zurückziehen — wer sie einmal hatte, kam auch nach „Link widerrufen" weiter an die Datei. */
+  const jetzt = Date.now();
+  const frisch = (d: GastDatei): boolean => typeof d.bis === 'number' && d.bis - jetzt > ANHANG_GILT_MS / 2;
+  const erneuern = alt.some((d) => !frisch(d));
+  if (soll === anhangKenn(alt) && !erneuern) return null;
   const dateien: GastDatei[] = [];
   for (const n of karten) {
     const vorher = alt.find((d) => d.id === n.id);
     // dieselbe Adresse, aber ein ersetzter Quelltext hat eine andere Größe — die Gäste holen ihn daran neu
-    if (vorher) { dateien.push({ ...vorher, groesse: anhangKarte(n)!.size }); continue; }
+    if (vorher && frisch(vorher)) { dateien.push({ ...vorher, groesse: anhangKarte(n)!.size }); continue; }
     try {
       const pfad = `${encodeURIComponent(s.userId)}/${encodeURIComponent(`datei-${n.id}`)}`;
-      const sig = await kontoAnfrage(`${s.url ?? ''}/storage/v1/object/sign/pixinotes/${pfad}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 10 * 365 * 24 * 3600 }) });
-      if (!sig.ok) continue;   // liegt (noch) nicht im Konto — beim nächsten Schreiben wieder
+      const sig = await kontoAnfrage(`${s.url ?? ''}/storage/v1/object/sign/pixinotes/${pfad}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: Math.round(ANHANG_GILT_MS / 1000) }) });
+      if (!sig.ok) { if (vorher) dateien.push({ ...vorher, groesse: anhangKarte(n)!.size }); continue; }   // liegt (noch) nicht im Konto — beim nächsten Schreiben wieder
       const j = (await sig.json()) as { signedURL?: string; signedUrl?: string };
       const relativ = j.signedURL ?? j.signedUrl ?? '';
       if (!relativ) continue;
       const d = anhangKarte(n)!;
-      dateien.push({ id: n.id, name: d.name, mime: d.mime, groesse: d.size, url: /^https?:/.test(relativ) ? relativ : `${s.url ?? ''}/storage/v1${relativ.startsWith('/') ? '' : '/'}${relativ}` });
-    } catch { /* diese Datei beim nächsten Mal */ }
+      dateien.push({ id: n.id, name: d.name, mime: d.mime, groesse: d.size, url: /^https?:/.test(relativ) ? relativ : `${s.url ?? ''}/storage/v1${relativ.startsWith('/') ? '' : '/'}${relativ}`, bis: jetzt + ANHANG_GILT_MS });
+    } catch { if (vorher) dateien.push({ ...vorher, groesse: anhangKarte(n)!.size }); /* diese Datei beim nächsten Mal */ }
   }
-  return anhangKenn(dateien) === anhangKenn(alt) ? null : dateien;
+  return anhangKenn(dateien) === anhangKenn(alt) && JSON.stringify(dateien.map((d) => d.url)) === JSON.stringify(alt.map((d) => d.url)) ? null : dateien;
 }
 /** M384: Der Server kennt die Spalte board_freigaben.dateien nicht (Migration fehlt) — bis zum nächsten Laden nicht mehr fragen */
 let ohneFreigabeDateien = false;
@@ -1110,7 +1148,8 @@ export async function gastBeitreten(token: string): Promise<GastErgebnis> {
   if (!g?.inhalt) return null;
   let roh: BoardDoc;
   try { roh = JSON.parse(g.inhalt) as BoardDoc; } catch { throw new Error('Das geteilte Board ist beschädigt.'); }
-  if (!roh?.id || !Array.isArray(roh.nodes)) throw new Error('Das geteilte Board ist beschädigt.');
+  if (!roh?.id || typeof roh.id !== 'string' || !Array.isArray(roh.nodes)) throw new Error('Das geteilte Board ist beschädigt.');
+  roh = boardVonAussen(roh, roh.id) ?? roh;   // M388: ungültige Karten fallen weg, Adressen werden entschärft
   const st = useBoard.getState();
   let da = st.boards.find((b) => b.id === roh.id);
   let boardsVor = st.boards; let spacesVor = st.spaces; let aktiv = st.activeId;
@@ -1253,6 +1292,8 @@ export function initGastSync(): void {
   window.addEventListener('pagehide', () => { for (const id of [...basisTimer.keys()]) basisSichern(id); });
   // Mit Konto: Kanäle der geteilten Boards; nach jedem eigenen Schreiben den anderen Bescheid geben
   void kontoKanaele();
+  // M388: Das Netz ist wieder da → liegengebliebenes Schreiben der Gast-Boards gleich nachholen
+  window.addEventListener('online', () => { for (const id of Object.keys(lesen())) { netzVersuche.delete(id); schreibenBald(id); } });
   window.addEventListener('pixinotes:konto-verbunden', () => void kontoKanaele());
   window.addEventListener('pixinotes:konto-geschrieben', () => {
     kontoAenderungenSenden();

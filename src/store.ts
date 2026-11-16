@@ -108,6 +108,8 @@ interface BoardSnap {
   nodes: AppNode[];
   edges: Edge[];
   drawings?: Stroke[];
+  /** M388: Gespräche zum Zeitpunkt des Schritts — damit sie mit ihrer Karte zurückkehren (kommentareNach) */
+  comments?: CommentThread[];
 }
 
 interface HistoryEntry extends BoardSnap {
@@ -129,12 +131,38 @@ interface HistoryEntry extends BoardSnap {
   gemischt?: string[];
 }
 
+/** M388: Inhalte im Gerätespeicher (große Dateien, Tool-Quelltexte) zu den Karten einer Kopie mitnehmen */
+function anhaengeMitnehmen(nodes: AppNode[], karte: Map<string, string>): void {
+  const paare = nodes.filter((n) => n.type === 'file' || n.type === 'htmlapp').map((n) => [n.id, karte.get(n.id) as string] as [string, string]);
+  if (paare.length) void import('./lib/anhangKopie').then((m) => m.anhaengeKopieren(paare)).catch(() => {});
+}
+
 /** Momentaufnahme aller genannten Boards (für mehrbrettrige Undo-Schritte) */
 const snapBoards = (boards: BoardDoc[], ids: string[]): BoardSnap[] =>
   ids.flatMap((id) => {
     const b = boards.find((x) => x.id === id);
-    return b ? [{ boardId: b.id, nodes: b.nodes, edges: b.edges, drawings: b.drawings }] : [];
+    return b ? [{ boardId: b.id, nodes: b.nodes, edges: b.edges, drawings: b.drawings, comments: b.comments }] : [];
   });
+
+/**
+ * M388: Gespräche bei Rückgängig/Wiederholen. Sie sind kein eigener Schritt (ein Kommentar sichert nichts in den
+ * Verlauf) — den alten Stand zurückzulegen, nähme darum Beiträge weg, die seither dazukamen. Stattdessen gehen sie
+ * mit ihrer Karte: Verschwindet die Karte durch den Schritt, verschwinden ihre Gespräche; kehrt sie zurück, kehren
+ * die Gespräche aus dem gemerkten Stand zurück. (Vorher waren sie nach „Löschen + Strg+Z" für immer weg und nach
+ * „Verschieben + Strg+Z" hingen sie verwaist am Ziel-Board.)
+ */
+function kommentareNach(jetzt: CommentThread[] | undefined, gemerkt: CommentThread[] | undefined, vorher: AppNode[], nachher: AppNode[]): CommentThread[] | undefined {
+  if (!jetzt?.length && !gemerkt?.length) return jetzt;
+  const bleibt = new Set(nachher.map((n) => n.id));
+  const war = new Set(vorher.map((n) => n.id));
+  const aus = (jetzt ?? []).filter((c) => !c.nodeId || bleibt.has(c.nodeId));
+  const da = new Set(aus.map((c) => c.id));
+  let dazu = false;
+  for (const c of gemerkt ?? []) {
+    if (c.nodeId && bleibt.has(c.nodeId) && !war.has(c.nodeId) && !da.has(c.id)) { aus.push(c); dazu = true; }
+  }
+  return !dazu && aus.length === (jetzt ?? []).length ? jetzt : aus;
+}
 
 const HISTORY_LIMIT = 50;
 
@@ -174,8 +202,9 @@ export interface Space {
 
 interface Toast {
   message: string;
-  /** true → Toast zeigt einen „Rückgängig"-Knopf */
-  undo?: boolean;
+  /** true → Toast zeigt einen „Rückgängig"-Knopf, der das zuletzt Gelöschte wiederherstellt;
+   *  M388 'schritt' → der Knopf nimmt den letzten Schritt zurück (wie Strg+Z) — für alles, was kein Löschen ist */
+  undo?: boolean | 'schritt';
   /** M332: true → Toast zeigt „Abbrechen" für die laufende KI-Stapelaktion */
   abbruch?: boolean;
 }
@@ -186,6 +215,8 @@ interface DeletedSnapshot {
   edges: Edge[];
   /** An gelöschte Karten geankerte Striche — kommen beim Wiederherstellen mit */
   drawings?: Stroke[];
+  /** M388: … und die Gespräche an diesen Karten */
+  comments?: CommentThread[];
 }
 
 interface BoardState {
@@ -500,7 +531,7 @@ interface BoardState {
   focusNode: (boardId: string, nodeId: string) => void;
   clearPendingFocus: () => void;
 
-  showToast: (message: string, undo?: boolean, durationMs?: number, abbruch?: boolean) => void;
+  showToast: (message: string, undo?: boolean | 'schritt', durationMs?: number, abbruch?: boolean) => void;
 
   /** Globale KI-Sperre: verhindert parallele KI-Aktionen aus Dock UND Auswahl-Leiste */
   aiBusy: boolean;
@@ -639,11 +670,18 @@ function nurAnsicht(alt: BoardDoc, neu: BoardDoc): { board: BoardDoc; verworfen:
 // Wer eine Karte gerade bearbeitet (hineintippt, sie zieht), hat sie: Die anderen sehen ihren Stand live, ändern
 // sie aber nicht — so überschreibt niemand, was ein anderer gerade schreibt. Wer was hält, kommt aus dem
 // Live-Kanal (lib/gastSync.ts); hier wird nur durchgesetzt, wieder an der einen Stelle, am set() des Speichers.
+/**
+ * M388: Was auf die Platte geht, ist der GESICHERTE Stand. Liest man mit, während jemand anderes schreibt, steht
+ * dessen Zwischenstand hier im Board (aus dem Live-Kanal, nur Anzeige). Wurde er mitgespeichert, hielt das Gerät
+ * ihn nach einem Neuladen für eine eigene Änderung und schrieb ihn zum Server — den halben Satz eines anderen,
+ * oder was immer jemand in den Kanal gelegt hatte. lib/gastSync.ts hängt hier ein, wie ein Board ohne
+ * Mitgelesenes aussieht.
+ */
+export const persistHaken: { board: (b: BoardDoc) => BoardDoc } = { board: (b) => b };
 const kartenSperren = new Map<string, Map<string, string>>();   // Board → Karte → Name dessen, der sie hält
 export function setzeKartenSperren(boardId: string, sperren: Map<string, string>): void {
   if (sperren.size) kartenSperren.set(boardId, sperren); else kartenSperren.delete(boardId);
 }
-export const karteGesperrtVon = (boardId: string, nodeId: string): string | undefined => kartenSperren.get(boardId)?.get(nodeId);
 let sperrHinweisAm = 0;
 function sperrHinweis(name: string): void {
   const jetzt = performance.now();
@@ -1439,12 +1477,29 @@ export const useBoard = create<BoardState>()(
           if (!importUndo) return false;
           const snap = importUndo;
           importUndo = null;
+          /* M388: Zurückgenommen wird der IMPORT — was er an Boards, Bereichen und Projekten gebracht hat. Vorher
+             wurde der ganze Stand von davor zurückgelegt: Alles, was man seit dem Import auf seinen übrigen Boards
+             gearbeitet hatte, war weg (der Knopf steht die ganze Sitzung lang da). */
+          const st = get();
+          const vorher = new Set(snap.boards.map((b) => b.id));
+          const boards = st.boards.filter((b) => vorher.has(b.id));
+          if (boards.length === 0) {
+            set({ boards: snap.boards, spaces: snap.spaces, activeId: snap.activeId, canUndoImport: false, importEpoch: st.importEpoch + 1 });
+            return true;
+          }
+          const bleibt = new Set(boards.map((b) => b.id));
+          const raeume = new Set(snap.spaces.map((sp) => sp.id));
+          const projekte = new Set(snap.spaces.flatMap((sp) => sp.projects.map((pr) => pr.id)));
+          const spaces = st.spaces.filter((sp) => raeume.has(sp.id)).map((sp) => ({
+            ...sp,
+            projects: sp.projects.filter((pr) => projekte.has(pr.id)).map((pr) => ({ ...pr, boardIds: pr.boardIds.filter((id) => bleibt.has(id)) })),
+          }));
           set({
-            boards: snap.boards,
-            spaces: snap.spaces,
-            activeId: snap.activeId,
+            boards,
+            spaces,
+            activeId: bleibt.has(st.activeId) ? st.activeId : bleibt.has(snap.activeId) ? snap.activeId : boards[0].id,
             canUndoImport: false,
-            importEpoch: get().importEpoch + 1,
+            importEpoch: st.importEpoch + 1,
           });
           return true;
         },
@@ -1452,11 +1507,13 @@ export const useBoard = create<BoardState>()(
         canUndoImport: false,
 
         resetAll: () => {
+          importUndo = null;   // M388: „Import zurücknehmen" darf nach „Alles leeren" nichts wiederbeleben
           // Bewusst KEIN Undo: das ist der „frischer Start"-Schalter.
           // KI-Einstellungen bleiben erhalten (nur Inhalte werden geleert).
           claimWriter(); // bewusste Aktion — auch aus einem Mitlese-Fenster wirksam
           set({
             ...leererStart(),
+            canUndoImport: false,
             view: 'board',
             past: [],
             future: [],
@@ -1727,7 +1784,7 @@ export const useBoard = create<BoardState>()(
           const b = s.boards.find((x) => x.id === s.activeId);
           if (!b) return;
           set({
-            past: [...s.past.slice(-(HISTORY_LIMIT - 1)), { boardId: b.id, nodes: b.nodes, edges: b.edges, drawings: b.drawings }],
+            past: [...s.past.slice(-(HISTORY_LIMIT - 1)), { boardId: b.id, nodes: b.nodes, edges: b.edges, drawings: b.drawings, comments: b.comments }],
             future: [],
           });
         },
@@ -1741,7 +1798,7 @@ export const useBoard = create<BoardState>()(
           const others = snapBoards(s.boards, [...new Set(boardIds)].filter((id) => id !== b.id));
           set({
             past: [...s.past.slice(-(HISTORY_LIMIT - 1)), {
-              boardId: b.id, nodes: b.nodes, edges: b.edges, drawings: b.drawings, others,
+              boardId: b.id, nodes: b.nodes, edges: b.edges, drawings: b.drawings, comments: b.comments, others,
             }],
             future: [],
           });
@@ -1760,18 +1817,23 @@ export const useBoard = create<BoardState>()(
           const remount = entry.remount || notesDiffer(board.nodes, entry.nodes);
           // Mehr-Board-Schritt: alle Mitbetroffenen gemeinsam zurückdrehen
           const restore = new Map((entry.others ?? []).map((o) => [o.boardId, o]));
+          // M388: Strg+Z beendet die Tipp-Bündelung (sonst sicherte die nächste Eingabe in dieselbe Karte keinen Schritt
+          // und „Wiederholen" legte danach den alten Text über den neuen) — und das „zuletzt Gelöschte" ist mit dem
+          // Zurücknehmen erledigt: Der Hinweis-Knopf legte es sonst ein zweites Mal aufs Board.
+          lastEditKey = '';
           set({
+            lastDeleted: null,
             past: s.past.slice(0, -1),
             future: [...s.future, {
-              boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount,
+              boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, comments: board.comments, remount,
               others: snapBoards(s.boards, [...restore.keys()]),
             }],
             activeId: entry.boardId,
             view: 'board',
             boards: s.boards.map((b) => {
-              if (b.id === entry.boardId) return { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings };
+              if (b.id === entry.boardId) return { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings, comments: kommentareNach(b.comments, entry.comments, b.nodes, entry.nodes) };
               const o = restore.get(b.id);
-              return o ? { ...b, nodes: o.nodes, edges: o.edges, drawings: o.drawings } : b;
+              return o ? { ...b, nodes: o.nodes, edges: o.edges, drawings: o.drawings, comments: kommentareNach(b.comments, o.comments, b.nodes, o.nodes) } : b;
             }),
             ...(remount ? { importEpoch: s.importEpoch + 1 } : {}),
           });
@@ -1902,18 +1964,20 @@ export const useBoard = create<BoardState>()(
           if (entry.nach || entry.fremd) { schrittGezielt(set, s, entry, 'vor'); return; }
           const remount = entry.remount || notesDiffer(board.nodes, entry.nodes);
           const restore = new Map((entry.others ?? []).map((o) => [o.boardId, o]));
+          lastEditKey = '';
           set({
+            lastDeleted: null,
             future: s.future.slice(0, -1),
             past: [...s.past, {
-              boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, remount,
+              boardId: board.id, nodes: board.nodes, edges: board.edges, drawings: board.drawings, comments: board.comments, remount,
               others: snapBoards(s.boards, [...restore.keys()]),
             }],
             activeId: entry.boardId,
             view: 'board',
             boards: s.boards.map((b) => {
-              if (b.id === entry.boardId) return { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings };
+              if (b.id === entry.boardId) return { ...b, nodes: entry.nodes, edges: entry.edges, drawings: entry.drawings, comments: kommentareNach(b.comments, entry.comments, b.nodes, entry.nodes) };
               const o = restore.get(b.id);
-              return o ? { ...b, nodes: o.nodes, edges: o.edges, drawings: o.drawings } : b;
+              return o ? { ...b, nodes: o.nodes, edges: o.edges, drawings: o.drawings, comments: kommentareNach(b.comments, o.comments, b.nodes, o.nodes) } : b;
             }),
             ...(remount ? { importEpoch: s.importEpoch + 1 } : {}),
           });
@@ -2056,7 +2120,8 @@ export const useBoard = create<BoardState>()(
           const id = get().addBoard(doc.name);
           // … und mit dem geteilten Inhalt füllen
           const boards = get().boards.map((b) =>
-            b.id === id ? { ...b, nodes: doc.nodes, edges: doc.edges, drawings: doc.drawings } : b,
+            // M388: Kommentare und Hintergrund kamen nie an, obwohl cloneSharedBoard sie vorbereitet
+            b.id === id ? { ...b, nodes: doc.nodes, edges: doc.edges, drawings: doc.drawings, ...(doc.comments?.length ? { comments: doc.comments } : {}), ...(doc.bg ? { bg: doc.bg } : {}) } : b,
           );
           set({
             ...(start ? ohneStartboard({ boards, spaces: get().spaces }, start.id) : { boards }),
@@ -2148,6 +2213,7 @@ export const useBoard = create<BoardState>()(
             nodes, edges, drawings, comments: [],
           };
           const boards = [...st.boards, kopie];
+          anhaengeMitnehmen(quelle.nodes, karte);
           // M360: Die Kopie eines fremden Boards gehört nicht unter „Geteilt mit mir" — sie kommt ins erste eigene Projekt und geht auf
           const eigenes = quelle.geteiltVon ? st.spaces.filter((sp) => sp.id !== 'geteilt').flatMap((sp) => sp.projects)[0] : undefined;
           set({
@@ -2193,6 +2259,7 @@ export const useBoard = create<BoardState>()(
             };
             neueBoards.push(kopie);
             ids.push(kopie.id);
+            anhaengeMitnehmen(quelle.nodes, karte);
           }
           set({
             boards: [...st.boards, ...neueBoards],
@@ -2410,7 +2477,15 @@ export const useBoard = create<BoardState>()(
         },
 
         addNodeToBoard: (boardId, node) => {
-          get().pushHistory();
+          // M388: gesichert wird das ZIEL-Board (wie bei updateNodeDataOnBoard) — vorher das gerade offene: Ein
+          // Schnelleintrag aus der Aufgaben-Zentrale auf ein anderes Board ließ sich nicht zurücknehmen.
+          const s0 = get();
+          const ziel = s0.boards.find((b) => b.id === boardId);
+          if (!ziel) return;
+          if (!historyMuted) {
+            lastEditKey = '';
+            set({ past: [...s0.past.slice(-(HISTORY_LIMIT - 1)), { boardId: ziel.id, nodes: ziel.nodes, edges: ziel.edges, drawings: ziel.drawings, comments: ziel.comments }], future: [] });
+          }
           set({
             boards: get().boards.map((b) =>
               b.id === boardId ? { ...b, nodes: [...b.nodes, node] } : b),
@@ -2497,6 +2572,7 @@ export const useBoard = create<BoardState>()(
           if (removedNodes.length === 0) return;
           // Geankerte Markierungen gehören zur Karte — sie gehen (undo-fähig) mit
           const removedDrawings = (board.drawings ?? []).filter((s) => s.anchor && idSet.has(s.anchor));
+          const removedComments = (board.comments ?? []).filter((c) => idSet.has(c.nodeId));
           get().pushHistory();
           patchActive((b) => ({
             nodes: b.nodes.filter((n) => !idSet.has(n.id)),
@@ -2505,7 +2581,7 @@ export const useBoard = create<BoardState>()(
             // Kommentar-Pins hängen an der Karte — mit ihr verschwinden sie (M148)
             comments: (b.comments ?? []).filter((c) => !idSet.has(c.nodeId)),
           }));
-          set({ lastDeleted: { boardId: board.id, nodes: removedNodes, edges: removedEdges, drawings: removedDrawings } });
+          set({ lastDeleted: { boardId: board.id, nodes: removedNodes, edges: removedEdges, drawings: removedDrawings, comments: removedComments } });
           get().showToast(
             removedNodes.length === 1 ? 'Karte gelöscht' : `${removedNodes.length} Karten gelöscht`,
             true,
@@ -2530,8 +2606,9 @@ export const useBoard = create<BoardState>()(
           // EIN Undo-Schritt für BEIDE Boards (HistoryEntry.others)
           lastEditKey = '';
           set({
+            lastDeleted: null,   // M388: der Hinweis-Knopf gehört jetzt diesem Schritt, nicht einem früheren Löschen
             past: [...s.past.slice(-(HISTORY_LIMIT - 1)), {
-              boardId: src.id, nodes: src.nodes, edges: src.edges, drawings: src.drawings,
+              boardId: src.id, nodes: src.nodes, edges: src.edges, drawings: src.drawings, comments: src.comments,
               others: snapBoards(s.boards, [tgt.id]),
             }],
             future: [],
@@ -2582,7 +2659,7 @@ export const useBoard = create<BoardState>()(
           });
           get().showToast(
             `${moving.length === 1 ? 'Karte' : `${moving.length} Karten`} nach „${tgt.name}" verschoben — Strg+Z holt alles zurück.`,
-            true,
+            'schritt',   // M388: „Rückgängig" nimmt das Verschieben zurück (vorher: stellte irgendein früher Gelöschtes wieder her)
           );
         },
 
@@ -2611,15 +2688,21 @@ export const useBoard = create<BoardState>()(
             get().showToast('Das Board dieser Karten existiert nicht mehr.');
             return;
           }
+          // M388: nur, was nicht (wieder) da ist — nach Strg+Z lag die Karte sonst doppelt, mit derselben Kennung
+          const ziel = get().boards.find((b) => b.id === snap.boardId)!;
+          const fehlt = <T extends { id: string }>(da: T[] | undefined, neu: T[] | undefined): T[] => { const ids = new Set((da ?? []).map((x) => x.id)); return (neu ?? []).filter((x) => !ids.has(x.id)); };
+          const nodes = fehlt(ziel.nodes, snap.nodes);
+          if (nodes.length === 0) { set({ lastDeleted: null }); return; }
           get().pushHistory();
           set({
             boards: get().boards.map((b) =>
               b.id === snap.boardId
                 ? {
                     ...b,
-                    nodes: [...b.nodes, ...snap.nodes.map((n) => ({ ...n, selected: false }) as AppNode)],
-                    edges: [...b.edges, ...snap.edges],
-                    drawings: snap.drawings?.length ? [...(b.drawings ?? []), ...snap.drawings] : b.drawings,
+                    nodes: [...b.nodes, ...nodes.map((n) => ({ ...n, selected: false }) as AppNode)],
+                    edges: [...b.edges, ...fehlt(b.edges, snap.edges)],
+                    drawings: snap.drawings?.length ? [...(b.drawings ?? []), ...fehlt(b.drawings, snap.drawings)] : b.drawings,
+                    comments: snap.comments?.length ? [...(b.comments ?? []), ...fehlt(b.comments, snap.comments)] : b.comments,
                   }
                 : b,
             ),
@@ -2753,7 +2836,7 @@ export const useBoard = create<BoardState>()(
       version: 5,
       storage: createJSONStorage(() => debouncedSafeStorage),
       partialize: (s) => ({
-        boards: s.boards,
+        boards: s.boards.map((b) => persistHaken.board(b)),
         spaces: s.spaces,
         activeId: s.activeId,
         view: s.view,

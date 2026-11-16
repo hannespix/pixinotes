@@ -13,6 +13,7 @@
 // - Dieselbe Drei-Wege-Zusammenführung wie Ordner und WebDAV (M311):
 //   SyncWeg + fremdStandEinarbeiten. Abgleich alle zehn Sekunden über einen
 //   Mini-Abruf (eTag / Version von umgebung.json); erst eine Änderung lädt.
+import { boardVonAussen } from './sicher';
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
 import {
   alsBase64, anhangKarte, base64AlsBlob, basisLesen, basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB,
@@ -20,7 +21,7 @@ import {
   uebernimmDateien, WEBDAV_DIRTY_KEY, type EinarbeitenErgebnis, type SyncDatei, type SyncPayload, type SyncWeg,
 } from './syncFolder';
 import { googleTokenFuer, loadCalAccounts, msAnmeldung, msTokenErneuern, oauthAvailable } from './calAccounts';
-import { sbAbmelden, sbErneuern, sbKontoLoeschen, sbNutzer, sbRealtime, sbRueckkehrLesen, supabaseKonfig, type RealtimeEreignis, type RealtimeGriff, type SbSitzung } from './kontoSupabase';
+import { NetzFehler, sbAbmelden, sbErneuern, sbKontoLoeschen, sbLinkWarErwartet, sbNutzer, sbRealtime, sbRueckkehrLesen, supabaseKonfig, type RealtimeEreignis, type RealtimeGriff, type SbSitzung } from './kontoSupabase';
 import { nurAuswahlAnders } from './syncMerge';
 import { patchFuer, type Patch } from './gastPatch';
 import { anhangGroesse, anhangLokal } from './htmlStore';
@@ -94,7 +95,8 @@ export function kontoAbmelden(): void {
   if (s?.anbieter === 'supabase' && s.token) void sbAbmelden(s.token, { url: s.url ?? '', key: s.clientId });
   localStorage.removeItem(LS_KEY);
   localStorage.removeItem(STAMP_KEY);
-  localStorage.removeItem(KONTO_DIRTY_KEY);
+  // M388: Das Merkzeichen „hier liegt Ungesichertes" bleibt. Wurde es beim Abmelden gelöscht, ersetzte der Stand
+  // aus dem Konto nach dem nächsten Anmelden still alles, was seit dem letzten Abgleich hier entstanden war.
   void basisVergessen('konto');
   void idbDel(KENN_KEY);
   void idbDel(BASEN_KEY);
@@ -104,8 +106,6 @@ export function kontoAbmelden(): void {
 
 // ---------- Anmeldung ----------
 let anmeldungNoetig = false;
-/** Braucht der Konto-Sync eine neue Anmeldung (Google-Token abgelaufen, still nicht erneuerbar)? */
-export const kontoBrauchtAnmeldung = (): boolean => anmeldungNoetig;
 
 async function kontoName(s: KontoSitzung): Promise<string | undefined> {
   try {
@@ -166,11 +166,13 @@ export async function kontoLoeschen(): Promise<void> {
   realtimeStoppen();
   localStorage.removeItem(LS_KEY);
   localStorage.removeItem(STAMP_KEY);
-  localStorage.removeItem(KONTO_DIRTY_KEY);
+  // M388: Nach dem Löschen ist dieses Gerät die einzige Kopie — sie darf ein späteres Anmelden nicht ersetzen
+  try { localStorage.setItem(KONTO_DIRTY_KEY, '1'); } catch { /* voll */ }
   void basisVergessen('konto');
   void idbDel(KENN_KEY);
   void idbDel(BASEN_KEY);
   anmeldungNoetig = false;
+  angewandt = null;
 }
 
 /** Gültiges Token — still erneuert, wenn nötig. Wirft mit Klartext, wenn eine neue Anmeldung nötig ist. */
@@ -180,17 +182,24 @@ async function tokenHolen(interaktiv = false): Promise<{ s: KontoSitzung; token:
   if (s.token && s.tokenExp && s.tokenExp > Date.now()) return { s, token: s.token };
   if (s.anbieter === 'supabase') {
     if (!s.refreshToken) throw neueAnmeldung();
-    const t = await sbErneuern(s.refreshToken, { url: s.url ?? '', key: s.clientId }).catch(() => { throw neueAnmeldung(); });
+    // M388: Nur eine echte Absage ist „Anmeldung abgelaufen". Ohne Netz bleibt die Sitzung, wie sie ist —
+    // sonst stand nach jedem Funkloch die Aufforderung da, sich neu anzumelden.
+    const t = await sbErneuern(s.refreshToken, { url: s.url ?? '', key: s.clientId }).catch((e) => { if (e instanceof NetzFehler) throw e; throw neueAnmeldung(); });
     const next = { ...s, token: t.token, tokenExp: t.exp, refreshToken: t.refreshToken, userId: t.userId || s.userId };
     saveKonto(next);
+    anmeldungNoetig = false;   // sonst blieben Live-Abgleich und Takt für den Rest der Sitzung aus
     realtime?.token(t.token);
     return { s: next, token: t.token };
   }
   if (s.anbieter === 'ms') {
     if (!s.refreshToken) throw neueAnmeldung();
-    const t = await msTokenErneuern(s.clientId, s.tenant ?? 'common', s.refreshToken, MS_SCOPE_DRIVE).catch(() => { throw neueAnmeldung(); });
+    const t = await msTokenErneuern(s.clientId, s.tenant ?? 'common', s.refreshToken, MS_SCOPE_DRIVE).catch((e) => {
+      if (e instanceof TypeError) throw new NetzFehler('Microsoft-Konto: nicht erreichbar — Internetverbindung prüfen.');
+      throw neueAnmeldung();
+    });
     const next = { ...s, token: t.token, tokenExp: t.exp, refreshToken: t.refreshToken ?? s.refreshToken };
     saveKonto(next);
+    anmeldungNoetig = false;
     return { s: next, token: t.token };
   }
   // Google: stille Erneuerung — klappt, solange der Nutzer bei Google
@@ -433,7 +442,11 @@ function msLaufwerk(): Laufwerk {
 function supabaseLaufwerk(): Laufwerk {
   interface Zeile { name: string; version: number; groesse?: number; mime?: string; inhalt?: string; updated_at?: string }
   const basis = (): string => `${loadKonto()?.url ?? ''}/rest/v1/konto_dateien`;
-  const eq = (name: string) => `name=eq.${encodeURIComponent(name)}`;
+  /* M388: immer nur die EIGENEN Zeilen. Die Leseregel gibt auch Zeilen heraus, die andere mit mir geteilt haben
+     — hat ein geteiltes Board dieselbe Kennung wie ein eigenes (das alte „main", eine behaltene Kopie), kamen
+     zwei Zeilen zurück und irgendeine wurde gelesen: Das eigene Board nahm den Inhalt des fremden an. */
+  const mein = (): string => { const u = loadKonto()?.userId; return u ? `&user_id=eq.${encodeURIComponent(u)}` : ''; };
+  const eq = (name: string) => `name=eq.${encodeURIComponent(name)}${mein()}`;
   const zeilen = async (res: Response): Promise<Zeile[]> => {
     if (!res.ok) throw new Error(`PixiNotes-Konto: HTTP ${res.status}`);
     return (await res.json()) as Zeile[];
@@ -457,7 +470,7 @@ function supabaseLaufwerk(): Laufwerk {
   };
   return {
     async liste() {
-      const z = await zeilen(await anfrage(`${basis()}?select=name,version,groesse,updated_at&order=name`, { cache: 'no-store' }));
+      const z = await zeilen(await anfrage(`${basis()}?select=name,version,groesse,updated_at&order=name${mein()}`, { cache: 'no-store' }));
       return z.map((r) => ({ name: r.name, id: r.name, etag: String(r.version), size: r.groesse ?? 0, modifiedTime: r.updated_at }));
     },
     async kopf(name) {
@@ -604,7 +617,7 @@ function realtimeStarten(): void {
       if (kopf === null || kopf === kenn.etag) return; // die eigene Änderung
       await checkKontoRemote(true);
     });
-  }, besitzer, s.name ?? '');
+  }, besitzer, s.name ?? '', () => (anmeldungNoetig ? Promise.reject(new Error('Anmeldung nötig')) : tokenHolen().then((r) => r.token)));
 }
 function realtimeStoppen(): void {
   clearTimeout(realtimeTimer);
@@ -732,10 +745,18 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
     }
     const t = await lw.lesenText(`${BOARD_PREFIX}${id}.json`);
     if (!t) continue; // gerade gelöscht — der nächste Takt holt den passenden Stand
-    try {
-      const b = JSON.parse(t) as BoardDoc; gelesen.set(id, { st, board: b }); boards.push(b);
+    // M388: In diese Datei schreiben auch Gäste. Ihr Inhalt wird geprüft, und die Kennung bestimmt der Dateiname —
+    // nie der Inhalt (lib/sicher.ts). Ist die Datei kein Board mehr, gilt sie NICHT als gelöscht: Der hiesige Stand
+    // bleibt und repariert sie mit dem nächsten Schreiben. (Vorher löschte ein kaputter Inhalt das Board überall.)
+    let b: BoardDoc | null = null;
+    try { b = boardVonAussen(JSON.parse(t), id); } catch { b = null; }
+    if (b) {
+      gelesen.set(id, { st, board: b }); boards.push(b);
       if (SERVER_STEMPEL.test(st)) alias[id] = { st, hash: fingerabdruck(b) };
-    } catch { /* kaputte Datei überlesen */ }
+    } else {
+      const hier = useBoard.getState().boards.find((x) => x.id === id && !x.geteiltVon);
+      if (hier) boards.push(hier);
+    }
   }
   if (boards.length === 0) return null;
   // M330: Boards, die andere Konten mit mir geteilt haben — aus deren Zeilen, mit Besitzer-Kennung
@@ -767,7 +788,12 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
         const c = gelesen.get(f.board_id);
         let b: BoardDoc | null = null;
         if (c && altF && c.st === `v${z.version}` && altF.version === String(z.version)) b = c.board;
-        else { try { b = JSON.parse(z.inhalt) as BoardDoc; gelesen.set(f.board_id, { st: `v${z.version}`, board: b }); } catch { continue; } }
+        else {
+          // M388: geprüft und mit der Kennung der Freigabe (nicht der aus dem Inhalt); kein Board → wie „nicht lesbar"
+          b = boardVonAussen(JSON.parse(z.inhalt), f.board_id);
+          if (!b) throw new Error('kein Board');
+          gelesen.set(f.board_id, { st: `v${z.version}`, board: b });
+        }
         b = { ...b, geteiltVon: f.besitzer, geteiltVonName: f.besitzer_email };
         // M360: nur lesend geteilt — die Oberfläche ändert das Board nicht (Leseschutz im Speicher)
         if (f.rolle === 'lesen') b.geteiltRolle = 'lesen'; else delete b.geteiltRolle;
@@ -777,7 +803,13 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
       } catch {
         // Ein fremdes Board darf den Abgleich nicht aufhalten. M360: Ließ sich seine Zeile gerade nicht lesen
         // (Netz), gilt der hiesige Stand weiter — sonst hielte die Zusammenführung das Board für entfernt.
-        const hier = useBoard.getState().boards.find((x) => x.id === f.board_id && x.geteiltVon === f.besitzer);
+        // M388: … und zwar der zuletzt GELESENE Stand des Servers, nicht das Board, wie es hier gerade aussieht.
+        // Sonst galt Ungesichertes als „schon auf dem Server" und ging nie hinaus (verschobene, gelöschte Karten,
+        // Striche); mit der nächsten Änderung des Besitzers verschwand es. Nur ohne gemerkten Stand der hiesige.
+        const lokal = useBoard.getState().boards.find((x) => x.id === f.board_id && x.geteiltVon === f.besitzer);
+        const zuletzt = gelesen.get(f.board_id)?.board
+          ?? (await basisLesen('konto'))?.boards.find((x) => x.id === f.board_id && x.geteiltVon === f.besitzer);
+        const hier = lokal && zuletzt ? { ...zuletzt, geteiltVon: f.besitzer, geteiltVonName: lokal.geteiltVonName, ...(lokal.geteiltRolle ? { geteiltRolle: lokal.geteiltRolle } : {}) } as BoardDoc : lokal;
         if (hier && !boards.some((x) => x.id === hier.id)) {
           boards.push(hier);
           if (alt.fremd?.[f.board_id]) fremd[f.board_id] = alt.fremd[f.board_id];
@@ -960,7 +992,9 @@ async function fremdSchreiben(besitzer: string, boardId: string, text: string, s
         const z = await fremdZeile(besitzer, boardId).catch(() => null);
         if (z) {
           try {
-            const frisch = { ...(JSON.parse(z.inhalt) as BoardDoc), geteiltVon: besitzer, geteiltVonName: liste.find((f) => f.board_id === boardId)?.besitzer_email, geteiltRolle: 'lesen' as const };
+            const gelesenesBoard = boardVonAussen(JSON.parse(z.inhalt), boardId);
+            if (!gelesenesBoard) throw new Error('kein Board');
+            const frisch = { ...gelesenesBoard, geteiltVon: besitzer, geteiltVonName: liste.find((f) => f.board_id === boardId)?.besitzer_email, geteiltRolle: 'lesen' as const };
             const st = useBoard.getState();
             st.importSync(st.boards.map((b) => (b.id === boardId ? frisch : b)), st.spaces, st.activeId, { geaendert: [boardId] });
             const kenn = await kennLesen();
@@ -1271,6 +1305,7 @@ const kontoWeg = (): SyncWeg => ({
   dirtyKey: KONTO_DIRTY_KEY,
   schreiben: () => kontoWriteRoh(true, true),
   uebernehmen: applyKonto,
+  vereinen: true,
 });
 class SpaeterFehler extends Error { constructor() { super('Der Nutzer tippt gerade — gleich noch einmal.'); } }
 
@@ -1422,13 +1457,23 @@ export function initKontoSync(): void {
   try {
     const rk = sbRueckkehrLesen();
     if (rk) {
-      void kontoAnmeldenSupabase(rk).then(async (s) => {
+      // M388: Ein Link, den dieses Gerät nicht angefordert hat oder der eine andere Anmeldung ersetzt: erst fragen
+      const erwartet = sbLinkWarErwartet();
+      const bisher = loadKonto();
+      void (async () => {
+        if (erwartet && (!bisher || bisher.userId === rk.userId)) return true;
+        const wer = (await sbNutzer(rk.token))?.email ?? '…';
+        return window.confirm(`Mit dem PixiNotes-Konto ${wer} anmelden?\n\nDieser Anmelde-Link wurde nicht auf diesem Gerät angefordert${bisher ? ' — und hier ist schon ein Konto angemeldet' : ''}. Nach dem Anmelden gleichen sich die Boards dieses Geräts mit diesem Konto ab. Bestätige nur, wenn es dein eigenes Konto ist.`);
+      })().then((ja) => {
+        if (!ja) { useBoard.getState().showToast('Nicht angemeldet — der Link wurde verworfen.', false, 6000); return undefined; }
+        return kontoAnmeldenSupabase(rk).then(async (s) => {
         const r = await kontoVerbinden();
         const wo = s.name ? `als „${s.name}"` : 'mit dem PixiNotes-Konto';
         useBoard.getState().showToast(r === 'konflikt'
           ? `✅ Angemeldet ${wo}. Im Konto liegt schon ein Stand und hier Eigenes — unter ⚙ → Daten → Synchronisation wählen.`
           : `✅ Angemeldet ${wo} — Änderungen gleichen sich ab jetzt automatisch ab.`, false, 7000);
         window.dispatchEvent(new CustomEvent('pixinotes:konto'));
+        });
       }).catch((e) => useBoard.getState().showToast(`⚠️ ${(e as Error).message}`, false, 8000));
     }
   } catch (e) {
@@ -1447,6 +1492,8 @@ export function initKontoSync(): void {
     // M330: Mit Live-Verbindung reicht eine Sekunde Tipp-Pause — die anderen Geräte warten
     timer = setTimeout(() => { void autoPush(); }, kontoLiveVerbunden() ? 1000 : 2500);
   });
+  // M388: Das Netz ist wieder da → Ungesichertes gleich hochladen (vorher erst mit der nächsten Änderung)
+  window.addEventListener('online', () => { if (loadKonto() && localStorage.getItem(KONTO_DIRTY_KEY)) void autoPush(); });
   if (loadKonto()) {
     realtimeStarten();
     void checkKontoRemote(true).then(() => {

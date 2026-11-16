@@ -1,3 +1,4 @@
+import { warEbenAngelegt } from '../../lib/nodes';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { useReactFlow, type NodeProps } from '@xyflow/react';
 import { useCreateBlockNote } from '@blocknote/react';
@@ -269,7 +270,8 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
   // M365: … aber nur in der selbst angelegten. Eine leere Notiz, die jemand anderes gerade angelegt hat und die
   // per Abgleich hier ankommt, nähme sonst jedem den Cursor weg.
   useEffect(() => {
-    if (!initialContent && !kamVonAussen(id)) {
+    // M388: … und nur in der EBEN angelegten — nicht in jeder leeren Notiz bei jedem Öffnen des Boards
+    if (!initialContent && !kamVonAussen(id) && warEbenAngelegt(id)) {
       const t = setTimeout(() => editor.focus(), 60);
       return () => clearTimeout(t);
     }
@@ -520,7 +522,6 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
 /** Haftnotiz: ruhend als schlichtes HTML, mit vollem Block-Editor, sobald jemand schreibt (M338). */
 export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
-  const showToast = useBoard((s) => s.showToast);
   const konfetti = useBoard((s) => s.konfetti);
 
   // M323: EIN Klartext je Notiz — Fristen, Chips und Wikilinks lasen ihn

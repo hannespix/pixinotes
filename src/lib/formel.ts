@@ -127,7 +127,9 @@ function zerteile(f: string): Zeichen[] | null {
     if (/[A-Za-z_ÄÖÜäöüß$]/.test(c)) {
       let s = '';
       while (i < f.length && /[A-Za-z0-9_ÄÖÜäöüß$.]/.test(f[i])) { s += f[i]; i += 1; }
-      aus.push(adresseZuIndex(s) ? { art: 'bezug', wert: s.toUpperCase() } : { art: 'name', wert: s.toUpperCase() });
+      // M388: $A$1 ist dieselbe Zelle wie A1 (das $ hält den Bezug nur beim Kopieren fest) — vorher las es leer
+      const ohne = s.replace(/\$/g, '');
+      aus.push(adresseZuIndex(ohne) ? { art: 'bezug', wert: ohne.toUpperCase() } : { art: 'name', wert: s.toUpperCase() });
       continue;
     }
     const zwei = f.slice(i, i + 2);
@@ -168,8 +170,22 @@ function bereich(von: string, bis: string, lies: ZellLeser): ZellWert[] {
 const flach = (args: (ZellWert | ZellWert[])[]): ZellWert[] =>
   args.flatMap((a) => (Array.isArray(a) ? a : [a]));
 
+/* M388: Leere Zellen zählen in einer Liste nicht mit (wie in jeder Tabellenkalkulation). Vorher wurden sie zu 0:
+   MITTELWERT über drei Zahlen und zwei leere Zellen teilte durch fünf, MIN ergab 0, PRODUKT ebenso. Beim
+   einzelnen Rechnen (A1 + B1) bleibt leer = 0. */
 const zahlen = (args: (ZellWert | ZellWert[])[]): number[] =>
-  flach(args).map(zuZahl).filter((n): n is number => n !== null);
+  flach(args).filter((v) => v !== null && v !== '').map(zuZahl).filter((n): n is number => n !== null);
+/** Kaufmännisch runden — ohne den Fehler der Gleitkommazahl (1,005 → 1,01) und bei negativen Zahlen vom Nullpunkt weg */
+function runde(w: number, stellen: number): number {
+  const st = Math.max(-12, Math.min(12, Math.trunc(stellen)));
+  const r = Number(`${Math.round(Number(`${Math.abs(w)}e${st}`))}e${-st}`);
+  return Number.isFinite(r) ? Math.sign(w) * r : Math.round(w * 10 ** st) / 10 ** st;
+}
+/** Heute nach der Uhr des Geräts — nicht nach Weltzeit (die zeigt bis 1 bzw. 2 Uhr nachts noch gestern) */
+function heuteLokal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 /**
  * Die Funktionen. Deutsche UND englische Namen, weil Vorlagen aus Excel
@@ -186,8 +202,7 @@ const FUNKTIONEN: Record<string, (a: (ZellWert | ZellWert[])[]) => ZellWert> = {
   RUNDEN: (a) => {
     const [w, st] = [zuZahl(flach([a[0]])[0]), zuZahl(flach([a[1] ?? 0])[0]) ?? 0];
     if (w === null) return FEHLER.wert;
-    const f = 10 ** st;
-    return Math.round(w * f) / f;
+    return runde(w, st);
   },
   ABS: (a) => { const n = zuZahl(flach([a[0]])[0]); return n === null ? FEHLER.wert : Math.abs(n); },
   WENN: (a) => {
@@ -196,7 +211,7 @@ const FUNKTIONEN: Record<string, (a: (ZellWert | ZellWert[])[]) => ZellWert> = {
     const zweig = wahr ? a[1] : a[2];
     return zweig === undefined ? wahr : (flach([zweig])[0] ?? null);
   },
-  HEUTE: () => new Date().toISOString().slice(0, 10),
+  HEUTE: () => heuteLokal(),
   LÄNGE: (a) => String(flach([a[0]])[0] ?? '').length,
   VERKETTEN: (a) => flach(a).map((v) => (v === null ? '' : String(v))).join(''),
 };
@@ -207,8 +222,6 @@ const ALIAS: Record<string, string> = {
   LEN: 'LÄNGE', CONCATENATE: 'VERKETTEN', LAENGE: 'LÄNGE',
 };
 
-/** Liste der Funktionsnamen — für Hilfe und Autovervollständigung */
-export const FUNKTIONSNAMEN = Object.keys(FUNKTIONEN);
 
 function wert(l: Lage): ZellWert | ZellWert[] {
   const t = schau(l);
@@ -252,6 +265,15 @@ function wert(l: Lage): ZellWert | ZellWert[] {
     l.i += 1;
     const fn = FUNKTIONEN[name];
     if (!fn) return FEHLER.name;
+    // M388: WENN wertet nur den gewählten Zweig — =WENN(B1=0;0;A1/B1) meldete sonst den Fehler des anderen
+    if (name === 'WENN') {
+      const p = flach([args[0]])[0];
+      if (istFehler(p)) return p;
+      const wahr = p === true || (typeof p === 'number' && p !== 0);
+      const zweig = wahr ? args[1] : args[2];
+      if (zweig === undefined) return wahr;
+      return flach([zweig]).find(istFehler) ?? (flach([zweig])[0] ?? null);
+    }
     const schlecht = flach(args).find(istFehler);
     return schlecht ?? fn(args);
   }

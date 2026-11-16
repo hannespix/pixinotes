@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { mutedHistory, useBoard } from '../store';
@@ -11,9 +11,9 @@ import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
 import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
-  IAppWindow, IArchive, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
+  IAppWindow, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
-  ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITasks, ITimelineIcon, ITimer, IWand, IWeek, IX,
+  ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITimelineIcon, ITimer, IWand, IWeek, IX,
  IBubbles } from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
 import { t } from '../lib/sprache';
@@ -125,7 +125,16 @@ export function Dock() {
     const STAGGER = 14; // ms pro Karte — wirkt organisch statt mechanisch
     const ease = (t: number) => 1 - Math.pow(1 - t, 3);
     const t0 = performance.now();
+    // M388: Die Bewegung gehört dem Board, auf dem sie begann. Wechselt man währenddessen das Board, kommen die Karten
+    // dort sofort an ihr Ziel — vorher blieb das Board halb aufgeräumt stehen, und die Schritte landeten im falschen.
+    const startBoard = useBoard.getState().activeId;
     const step = (now: number) => {
+      if (useBoard.getState().activeId !== startBoard) {
+        const ziel = new Map(targets.map(([id, x, y]) => [id, { x, y }]));
+        useBoard.setState((s) => ({ boards: s.boards.map((b) => (b.id === startBoard ? { ...b, nodes: b.nodes.map((n) => { const p = ziel.get(n.id); return p ? { ...n, position: p } : n; }) } : b)) }));
+        setArranging(false);
+        return;
+      }
       let done = true;
       const frame: Array<[string, number, number]> = [];
       targets.forEach(([id, tx, ty], i) => {

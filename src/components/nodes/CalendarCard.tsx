@@ -85,6 +85,9 @@ const dayOf = (iso: string) => Math.floor(Date.UTC(+iso.slice(0, 4), +iso.slice(
  * Zeitplan-Balken/Meilensteine und EXTERNE Termine (.ics-Import & URL-Abos:
  * Outlook, Google, Apple, Nextcloud). Export des Sichtbaren als .ics.
  */
+const KEINE_ICS: IcsEvent[] = [];
+const KEINE_EIGENEN: MyEvent[] = [];
+
 export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   const boards = useBoard((s) => s.boards);
   const activeId = useBoard((s) => s.activeId);
@@ -126,10 +129,11 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   const scopeChoice = (data.scope as 'all' | 'board' | 'linked') ?? (linkedIds.size ? 'linked' : 'all');
   const scope = scopeChoice === 'linked' && linkedIds.size === 0 ? 'all' : scopeChoice;
   const show = { ...SHOW_DEFAULT, ...(data.show as Partial<ShowFlags> | undefined) };
-  const icsEvents = (data.icsEvents as IcsEvent[] | undefined) ?? [];
+  // M388: feste leere Liste — ein frisches [] je Durchlauf ließ die Terminberechnung (useMemo) bei jedem Rendern neu laufen
+  const icsEvents = (data.icsEvents as IcsEvent[] | undefined) ?? KEINE_ICS;
   const icsUrls = (data.icsUrls as string[] | undefined) ?? [];
   // M176: eigene Termine — direkt im Kalender eintragbar (Klick auf den Tag)
-  const myEvents = (data.myEvents as MyEvent[] | undefined) ?? [];
+  const myEvents = (data.myEvents as MyEvent[] | undefined) ?? KEINE_EIGENEN;
   const [dayEdit, setDayEdit] = useState<string | null>(null);
   const [evTitle, setEvTitle] = useState('');
   const [evTime, setEvTime] = useState('');

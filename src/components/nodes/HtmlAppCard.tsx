@@ -8,6 +8,7 @@ import { kontoDateiNachladen } from '../../lib/kontoSync';
 import { appMelden, EINGABE_EREIGNIS, eingabeAus, eingabeMelden, eingabenErbitten, folgeIch, ROLL_EREIGNIS, rollMelden, rollVergessen, VORFUEHR_EREIGNIS, werFuehrtVor, type Eingabe, type Roll } from '../../lib/vorfuehren';
 import { loadAppStateFromTeam, loadAttachment, saveAppStateToTeam } from '../../lib/attachments';
 import { triggerDownload } from '../../lib/download';
+import { fremdeWebAdresse } from '../../lib/sicher';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { IAppWindow, ICloud, ICopy, IDownload, IMaximize, IMinimize, IMore, IPlay, IReload, IStopSq } from '../Icons';
@@ -26,6 +27,17 @@ const SANDBOX = 'allow-scripts allow-forms allow-modals allow-popups allow-point
  *  Für Inhalte UNSERER Herkunft wäre das gefährlich — deshalb lehnt der
  *  URL-Import gleichnamige Herkunft ab und die Karte startet sie nicht. */
 const SANDBOX_LIVE = `${SANDBOX} allow-same-origin`;
+/** M388: Ein Speicherstand ist eine flache Liste aus Texten — höchstens 5 MB */
+function speicherGueltig(store: unknown): store is Record<string, string> {
+  if (!store || typeof store !== 'object' || Array.isArray(store)) return false;
+  let summe = 0;
+  for (const [k, v] of Object.entries(store as Record<string, unknown>)) {
+    if (typeof v !== 'string') return false;
+    summe += k.length + v.length;
+    if (summe > 5_000_000) return false;
+  }
+  return true;
+}
 
 /**
  * M371: Den Quelltext eines eigenen Tools auf dieses Gerät holen. Er reist seit M371 mit dem Board — über das
@@ -129,10 +141,15 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   const [liveOn, setLiveOn] = useState(false);
   const [liveKey, setLiveKey] = useState(0); // Neustart der Live-Einbettung
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  /* M388: Die Adresse einer Live-Seite stammt aus dem Board — und das kann von anderen kommen. Eingebettet und
+     geöffnet wird nur eine fremde http(s)-Adresse (lib/sicher.ts): „javascript:…" liefe im Namen von PixiNotes. */
+  const liveAdresse = data.live ? fremdeWebAdresse(data.url) : null;
   const isLive = !!data.live && !!data.url;
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
+  /** Tabs, die diese Karte selbst geöffnet hat (In neuem Tab) — nur von dort nimmt sie Speicher-Meldungen an */
+  const eigeneTabs = useRef(new Set<Window>());
   const boardId = useBoard((st) => st.activeId);
   // App-Name ohne Stale-Closure (Team-Speicherstand wird verzögert geschrieben)
   const nameRef = useRef(data.name);
@@ -170,6 +187,10 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     const onMsg = (e: MessageEvent) => {
       const d = e.data as { __pixiHapp?: string; store?: Record<string, string> } | null;
       if (d?.__pixiHapp !== id || !d.store) return;
+      // M388: nur vom Rahmen dieser Karte oder von einem Tab, den sie selbst geöffnet hat — sonst könnte jede
+      // eingebettete Seite den Speicherstand eines anderen Tools überschreiben. Und nur, was ein Speicher ist.
+      if (e.source !== frameRef.current?.contentWindow && !eigeneTabs.current.has(e.source as Window)) return;
+      if (!speicherGueltig(d.store)) return;
       const store = d.store;
       void saveAppState(id, store).then(() => {
         // M170: verbundene Notizen zeigen den Speicherstand als Auszug —
@@ -207,13 +228,11 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
 
   const start = async () => {
     if (isLive) {
-      // Sicherheitsnetz: Live nur für FREMDE Herkunft (s. SANDBOX_LIVE)
-      try {
-        if (new URL(data.url!).origin === window.location.origin) {
-          showToast('Diese Adresse gehört zu PixiNotes selbst — bitte als Datei laden.');
-          return;
-        }
-      } catch { return; }
+      // Sicherheitsnetz: Live nur für eine FREMDE Webadresse (s. SANDBOX_LIVE und lib/sicher.ts)
+      if (!liveAdresse) {
+        showToast('Diese Adresse lässt sich nicht einbetten — nur fremde Webseiten (https://…).');
+        return;
+      }
       setLiveOn(true);
       return;
     }
@@ -270,9 +289,10 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   /** M164: Kopie-Karten mit gemerkter Quelle frisch von der URL laden */
   const reloadFromUrl = async () => {
     setMenuPos(null);
-    if (!data.url) return;
+    const quelle = fremdeWebAdresse(data.url);
+    if (!quelle) return;
     try {
-      const res = await fetch(data.url, { mode: 'cors' });
+      const res = await fetch(quelle, { mode: 'cors' });
       if (!res.ok) throw new Error(String(res.status));
       const text = await res.text();
       await saveHtml(id, text);
@@ -312,6 +332,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     const url = URL.createObjectURL(new Blob([wrapper], { type: 'text/html' }));
     const win = window.open(url, '_blank');
     if (!win) showToast('Pop-up blockiert — bitte für diese Seite erlauben.');
+    else eigeneTabs.current.add(win);
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
@@ -393,10 +414,10 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
         <div className="happ-body">
           {runningUi ? (
             <>
-              {liveOn ? (
+              {liveOn && liveAdresse ? (
                 /* M164 Live: fremde URL direkt — die Same-Origin-Policy des
                    Browsers hält sie von PixiNotes fern (s. SANDBOX_LIVE) */
-                <iframe key={liveKey} className="happ-frame" title={data.name} sandbox={SANDBOX_LIVE} src={data.url} />
+                <iframe key={liveKey} className="happ-frame" title={data.name} sandbox={SANDBOX_LIVE} src={liveAdresse} />
               ) : (
                 <iframe ref={frameRef} className="happ-frame" title={data.name} sandbox={SANDBOX} srcDoc={srcdoc ?? ''} onLoad={() => rollNachLaden(boardId, id, frameRef.current)} />
               )}
@@ -452,7 +473,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
           )}
           <button
             disabled={hasSrc !== true}
-            onClick={() => { if (isLive) { setMenuPos(null); window.open(data.url, '_blank'); } else void openInTab(); }}
+            onClick={() => { if (isLive) { setMenuPos(null); if (liveAdresse) window.open(liveAdresse, '_blank', 'noopener'); } else void openInTab(); }}
           >
             <IAppWindow size={14} /> Im eigenen Browser-Tab öffnen
           </button>
@@ -497,6 +518,7 @@ export function HtmlAppSlide({ node }: { node: HtmlAppNode }) {
   const { id, data } = node;
   const boardId = useBoard((st) => st.activeId);
   const isLive = !!data.live && !!data.url;
+  const liveAdresse = data.live ? fremdeWebAdresse(data.url) : null;   // M388: nur fremde http(s)-Adressen
   const [srcdoc, setSrcdoc] = useState<string | null>(null);
   const [fehlt, setFehlt] = useState(false);
   const frame = useRef<HTMLIFrameElement | null>(null);
@@ -517,7 +539,7 @@ export function HtmlAppSlide({ node }: { node: HtmlAppNode }) {
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       const d = e.data as { __pixiHapp?: string; store?: Record<string, string> } | null;
-      if (d?.__pixiHapp !== id || !d.store || e.source !== frame.current?.contentWindow) return;
+      if (d?.__pixiHapp !== id || !d.store || e.source !== frame.current?.contentWindow || !speicherGueltig(d.store)) return;
       void saveAppState(id, d.store).then(() => window.dispatchEvent(new CustomEvent('pixinotes:happ-state', { detail: id })));
     };
     window.addEventListener('message', onMsg);
@@ -526,15 +548,15 @@ export function HtmlAppSlide({ node }: { node: HtmlAppNode }) {
   useMitrollen(boardId, id, frame, srcdoc !== null);
   // Folie zu: der Rollstand dieser Folie gilt nicht weiter (auf dem Board beginnt das Tool wieder oben)
   useEffect(() => () => rollVergessen(boardId, id), [boardId, id]);
-  const fremd = (() => { try { return new URL(data.url ?? '').origin !== window.location.origin; } catch { return false; } })();
-  const adresse = (() => { try { return new URL(data.url ?? '').hostname; } catch { return ''; } })();
+  const fremd = !!liveAdresse;
+  const adresse = (() => { try { return new URL(liveAdresse ?? '').hostname; } catch { return ''; } })();
   const vorfuehrung = !!werFuehrtVor(boardId);
   return (
     <div className="slide-app" data-taste="folie-app">
       {isLive ? (
         fremd
-          ? <iframe ref={frame} className="slide-app-frame" title={data.name} sandbox={SANDBOX_LIVE} src={data.url} />
-          : <p className="slide-app-hinweis">Diese Adresse gehört zu PixiNotes selbst und wird nicht eingebettet.</p>
+          ? <iframe ref={frame} className="slide-app-frame" title={data.name} sandbox={SANDBOX_LIVE} src={liveAdresse ?? undefined} />
+          : <p className="slide-app-hinweis">Diese Adresse lässt sich nicht einbetten — nur fremde Webseiten (https://…).</p>
       ) : srcdoc !== null ? (
         <iframe ref={frame} className="slide-app-frame" title={data.name} sandbox={SANDBOX} srcDoc={srcdoc} onLoad={() => rollNachLaden(boardId, id, frame.current)} />
       ) : (

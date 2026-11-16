@@ -88,7 +88,8 @@ function CommentPanel() {
   const removeCommentMsg = useBoard((s) => s.removeCommentMsg);
   const [bearbeite, setBearbeite] = useState<string | null>(null);
   const [entwurf, setEntwurf] = useState('');
-  useEffect(() => { setBearbeite(null); }, [openId]);
+  // M388: … und der Antwort-Entwurf gehört zu SEINEM Faden — er wanderte sonst in den nächsten und wurde dort gesendet
+  useEffect(() => { setBearbeite(null); setText(''); }, [openId]);
 
   const isNew = openId?.startsWith('new:') ?? false;
   const thread = isNew ? null : (board.comments ?? []).find((c) => c.id === openId);

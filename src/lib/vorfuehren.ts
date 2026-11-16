@@ -353,6 +353,10 @@ export function initVorfuehren(): void {
     if (d?.ereignis !== 'zeig') return;
     const m = d.inhalt as { von?: unknown; name?: unknown; farbe?: unknown; seit?: unknown; ende?: unknown; sicht?: Partial<Sicht>; vortrag?: Partial<Vortrag>; apps?: unknown; rollen?: unknown; fokus?: unknown; dok?: unknown } | undefined;
     if (typeof m?.von !== 'string' || typeof m.seit !== 'number') return;
+    // M388: Vorführen kann nur, wer im Board anwesend ist — und nicht „seit übermorgen": Mit einer Zeit in der
+    // Zukunft ließe sich die Vorführung sonst dauerhaft an sich reißen (es führt vor, wer zuletzt begonnen hat).
+    if (m.von === ich().id || m.von.length > 80 || !Number.isFinite(m.seit) || m.seit > Date.now() + 60_000) return;
+    if (!m.ende && !teilnehmerVon(d.boardId).some((t) => t.id === m.von)) return;
     const alt = zeiger.get(d.boardId);
     if (m.ende) {
       if (alt?.id === m.von) { zeiger.delete(d.boardId); geloest.delete(d.boardId); melden(d.boardId); }

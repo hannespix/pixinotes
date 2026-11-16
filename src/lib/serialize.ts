@@ -87,6 +87,11 @@ function inlineText(content: unknown): string {
     const rows = (content as { rows: { cells: unknown[] }[] }).rows;
     return rows.map((r) => r.cells.map((cell) => inlineText(cell)).join(' | ')).join('\n');
   }
+  // M388: Tabellenzelle in der Form des Editors ({ type: 'tableCell', content: […] }). Sie wurde nicht erkannt —
+  // der Text aus Notiz-Tabellen fehlte darum in Suche, KI-Kontext, Verknüpfungen und im Text-Export.
+  if (typeof content === 'object' && content !== null && (content as { content?: unknown }).content !== undefined) {
+    return inlineText((content as { content: unknown }).content);
+  }
   return '';
 }
 
@@ -556,7 +561,7 @@ export function nodeToHtml(node: AppNode): string {
     case 'gantt': {
       const g = node.data;
       const items = g.rows
-        .map((r) => `<li>${r.start === r.end ? '◆' : '▬'} ${esc(r.name)}: ${esc(r.start)} → ${esc(r.end)}${r.progress ? ` (${r.progress}%)` : ''}</li>`)
+        .map((r) => `<li>${r.start === r.end ? '◆' : '▬'} ${esc(r.name)}: ${esc(r.start)} → ${esc(r.end)}${Number(r.progress) > 0 ? ` (${Math.round(Number(r.progress))}%)` : ''}</li>`)
         .join('');
       return `<h3>${esc(g.title)}</h3><ul>${items || '<li>—</li>'}</ul>`;
     }
@@ -588,9 +593,9 @@ export function nodeToHtml(node: AppNode): string {
       }
       const parts = [...byDate.entries()].map(([date, list]) => {
         const items = list.map((s) =>
-          `<li>${hm(s.start)}–${s.end !== undefined ? hm(s.end) : 'läuft'} ${labels[s.kind] ?? s.kind}${s.note ? ` <i>(${esc(s.note)})</i>` : ''}</li>`).join('');
+          `<li>${hm(s.start)}–${s.end !== undefined ? hm(s.end) : 'läuft'} ${labels[s.kind] ?? esc(String(s.kind ?? ''))}${s.note ? ` <i>(${esc(s.note)})</i>` : ''}</li>`).join('');
         const work = list.reduce((a, s) => a + (s.kind === 'pause' || s.end === undefined ? 0 : s.end - s.start), 0);
-        return `<h4>${date}</h4><ul>${items}</ul><p><b>Summe (ohne Pausen): ${hm(work)} h</b></p>`;
+        return `<h4>${esc(String(date))}</h4><ul>${items}</ul><p><b>Summe (ohne Pausen): ${hm(work)} h</b></p>`;
       });
       return `<h3>${esc(t.title)}</h3>${parts.join('') || '<p>—</p>'}`;
     }

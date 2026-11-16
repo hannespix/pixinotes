@@ -1,3 +1,4 @@
+import { tagLokal } from '../../lib/tag';
 import { useEffect, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
@@ -22,7 +23,7 @@ const kindColor = (k: TimeSeg['kind']) => KINDS.find(([key]) => key === k)?.[2] 
 type TimeView = 'tag' | 'woche' | 'monat' | 'jahr';
 const VIEWS: Array<[TimeView, string]> = [['tag', 'Tag'], ['woche', 'Woche'], ['monat', 'Monat'], ['jahr', 'Jahr']];
 
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => tagLokal();   // M388: nach der Uhr des Geräts, nicht nach Weltzeit
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
 const toHM = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 const fromHM = (v: string): number | null => {
@@ -74,13 +75,13 @@ const durOf = (s: TimeSeg): number => Math.max(0, (s.end ?? (s.date === todayIso
 export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
   return (
     <CardShell id={id} selected={selected} minWidth={380} minHeight={300} className="time-card">
-      <TimeBody id={id} data={data} selected={selected} />
+      <TimeBody id={id} data={data} />
     </CardShell>
   );
 }
 
 /** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
-export function TimeBody({ id, data, selected }: { id: string; data: TimeData; selected?: boolean }) {
+export function TimeBody({ id, data }: { id: string; data: TimeData }) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
   const [day, setDay] = useState(todayIso());

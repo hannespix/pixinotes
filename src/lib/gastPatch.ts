@@ -4,6 +4,7 @@
 // „Gesetzt" heißt: Das Objekt ersetzt sein Gegenstück mit derselben Kennung oder kommt neu dazu. Patches sind
 // absolut (kein „füge Text ein"), darum schadet es nicht, einen zweimal anzuwenden. Der Server (gast_aendern)
 // wendet sie genauso an wie patchAnwenden hier.
+import { karteEntschaerfen, karteGueltig } from './sicher';
 import type { BoardDoc } from '../store';
 
 export type Art = 'nodes' | 'edges' | 'drawings' | 'comments';
@@ -63,6 +64,29 @@ export function istPatch(x: unknown): x is Patch {
     if (t.del !== undefined && !(Array.isArray(t.del) && t.del.every((d) => typeof d === 'string'))) return false;
   }
   return true;
+}
+
+/**
+ * M388: Ein Patch aus dem Kanal oder vom Server, bevor er ins Board kommt: Karten müssen Karten sein (Lage, Art,
+ * Inhalt), Verbindungen zwei Enden haben, Striche Punkte, Gespräche Beiträge — sonst fällt das Stück weg.
+ * Adressen in Karten werden entschärft.
+ */
+export function patchSaeubern(p: Patch): Patch {
+  const aus: Patch = {};
+  const text = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
+  for (const a of ARTEN) {
+    const t = p[a];
+    if (!t) continue;
+    let set = t.set as unknown[] | undefined;
+    if (set) {
+      if (a === 'nodes') set = set.filter(karteGueltig).map((n) => karteEntschaerfen(n));
+      else if (a === 'edges') set = set.filter((e) => text((e as { source?: unknown }).source) && text((e as { target?: unknown }).target));
+      else if (a === 'drawings') set = set.filter((s) => Array.isArray((s as { points?: unknown }).points));
+      else if (a === 'comments') set = set.filter((c) => Array.isArray((c as { msgs?: unknown }).msgs));
+    }
+    (aus as Record<string, unknown>)[a] = { ...(set ? { set } : {}), ...(t.del ? { del: t.del } : {}) };
+  }
+  return aus;
 }
 
 type Mass = { id: string; measured?: unknown };

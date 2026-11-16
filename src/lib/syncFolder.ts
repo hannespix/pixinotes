@@ -464,6 +464,12 @@ export interface SyncWeg {
   schreiben: () => Promise<string>;
   /** Fremden Stand ohne Zusammenführung übernehmen (Umstieg ohne Basis) */
   uebernehmen: (p: SyncPayload) => boolean;
+  /**
+   * M388: Ohne gemeinsame Basis, aber mit Eigenem hier UND einem Stand dort: beides vereinen, statt den Menschen
+   * wählen zu lassen, welche Seite verloren geht. (Beim Konto ließ sich die Wahl „Jetzt hochladen" gar nicht
+   * ausführen — das Schreiben prüfte vorher wieder denselben Konflikt.)
+   */
+  vereinen?: boolean;
 }
 
 export type EinarbeitenErgebnis =
@@ -491,8 +497,10 @@ export async function fremdStandEinarbeiten(remote: SyncPayload, weg: SyncWeg, n
   const basis = await basisLesen(weg.source);
   grabsteineVereinigen(remote.geloescht); // M351: Löschungen reisen über mehrere Geräte weiter
   if (!basis) {
-    if (nebenkopie || localStorage.getItem(weg.dirtyKey)) return 'konflikt';
-    return weg.uebernehmen(remote) ? 'uebernommen' : 'fehler';
+    if (nebenkopie) return 'konflikt';
+    if (!localStorage.getItem(weg.dirtyKey)) return weg.uebernehmen(remote) ? 'uebernommen' : 'fehler';
+    if (!weg.vereinen) return 'konflikt';
+    // weiter unten: Zusammenführen ohne Basis = Vereinigung (nichts gilt als gelöscht; bei Gleichem bleibt das Hiesige)
   }
   const s = useBoard.getState();
   const erg = dreiWegeMerge(basis, { boards: s.boards.map((b) => liveHaken.vor(b)), spaces: s.spaces }, remote);

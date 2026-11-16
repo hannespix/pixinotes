@@ -217,21 +217,27 @@ export function SearchOverlay() {
   const canAsk = brainOn && aiReady(ai);
   const [answer, setAnswer] = useState<{ text: string; sources: BrainHit[] } | null>(null);
   const [asking, setAsking] = useState(false);
+  const frageLauf = useRef(0);
+  const queryRef = useRef(query);
+  queryRef.current = query;
   const ask = async () => {
     const q = query.trim();
     if (!q || asking) return;
     setAsking(true);
     setAnswer(null);
+    const lauf = ++frageLauf.current;
     try {
       const res = await askBrain(q);
+      // M388: Wurde inzwischen weitergetippt oder neu gefragt, gehört die Antwort zu einer alten Frage
+      if (lauf !== frageLauf.current || queryRef.current.trim() !== q) return;
       setAnswer({
         text: res.answer || 'Dazu steht nichts in deinen Karten.',
         sources: res.sources,
       });
     } catch (e) {
-      setAnswer({ text: `Antwort fehlgeschlagen: ${(e as Error).message}`, sources: [] });
+      if (lauf === frageLauf.current) setAnswer({ text: `Antwort fehlgeschlagen: ${(e as Error).message}`, sources: [] });
     } finally {
-      setAsking(false);
+      if (lauf === frageLauf.current) setAsking(false);
     }
   };
   // Frage-Ergebnis verwerfen, sobald weitergetippt wird

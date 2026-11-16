@@ -325,6 +325,10 @@ export function Presenter() {
         e.stopPropagation();
         return;
       }
+      // M388: Steht über der Folie ein Fenster (Ticket, Bild-Lupe), schließt Esc DAS — nicht auch noch die Präsentation.
+      // Und Tab bleibt dem Browser: Die Knöpfe der Präsentation waren mit der Tastatur sonst nicht zu erreichen.
+      if (e.key === 'Tab') return;
+      if (e.key === 'Escape' && document.querySelector('.ticket-modal-backdrop, .modal-backdrop, .pdf-backdrop')) return;
       if (e.key === 'Escape') { selbstRef.current(); setOpen(false); }
       else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') schrittRef.current(1);
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') schrittRef.current(-1);

@@ -38,7 +38,6 @@ export function punkteMischen(a: unknown, b: unknown): Punkte {
   }
   return aus;
 }
-export const punkteGleich = (a: unknown, b: unknown): boolean => JSON.stringify(punkteMischen(a, undefined)) === JSON.stringify(punkteMischen(b, undefined));
 
 // ---------- Punkte-Modus: Karten antippen statt auswählen ----------
 export const PUNKTE_MODUS = 'pixinotes:punkte-modus';

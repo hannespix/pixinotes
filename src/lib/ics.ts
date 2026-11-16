@@ -26,10 +26,17 @@ export interface IcsEvent {
   note?: string;
 }
 
-function icsDate(val: string): { iso: string; dateOnly: boolean } | null {
-  const m = val.trim().match(/^(\d{4})(\d{2})(\d{2})(T\d{6}Z?)?/);
+function icsDate(val: string): { iso: string; dateOnly: boolean; mitternacht?: boolean } | null {
+  const m = val.trim().match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?/);
   if (!m) return null;
-  return { iso: `${m[1]}-${m[2]}-${m[3]}`, dateOnly: !m[4] };
+  if (m[4] === undefined) return { iso: `${m[1]}-${m[2]}-${m[3]}`, dateOnly: true };
+  // M388: Zeitangaben in Weltzeit (…Z) gelten am hiesigen Tag — 23:30 Z im Sommer ist hier schon der nächste
+  if (m[7]) {
+    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return { iso, dateOnly: false, mitternacht: d.getHours() === 0 && d.getMinutes() === 0 };
+  }
+  return { iso: `${m[1]}-${m[2]}-${m[3]}`, dateOnly: false, mitternacht: m[4] === '00' && m[5] === '00' };
 }
 
 const shiftDay = (iso: string, n: number): string =>
@@ -40,14 +47,16 @@ const shiftDay = (iso: string, n: number): string =>
 export function parseIcs(text: string): IcsEvent[] {
   const lines = text.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '').replace(/\r/g, '').split('\n');
   const out: IcsEvent[] = [];
-  let cur: { title?: string; start?: string; end?: string; endDateOnly?: boolean } | null = null;
+  let cur: { title?: string; start?: string; end?: string; endDateOnly?: boolean; endMitternacht?: boolean } | null = null;
   for (const line of lines) {
     if (line.startsWith('BEGIN:VEVENT')) { cur = {}; continue; }
     if (line.startsWith('END:VEVENT')) {
       if (cur?.title && cur.start) {
         let end = cur.end;
         // Ganztages-DTEND ist per RFC exklusiv → letzter Tag = end - 1
-        if (end && cur.endDateOnly) end = shiftDay(end, -1);
+        // M388: … und ein Ende um Punkt 0 Uhr ebenso (Outlook schreibt Ganztägiges so; ein Abendtermin bis
+        // Mitternacht belegte sonst auch den nächsten Tag)
+        if (end && (cur.endDateOnly || cur.endMitternacht)) end = shiftDay(end, -1);
         if (end && end <= cur.start) end = undefined;
         out.push({ title: cur.title, start: cur.start, end });
       }
@@ -70,7 +79,7 @@ export function parseIcs(text: string): IcsEvent[] {
       if (d) cur.start = d.iso;
     } else if (key === 'DTEND' || key.startsWith('DTEND;')) {
       const d = icsDate(val);
-      if (d) { cur.end = d.iso; cur.endDateOnly = d.dateOnly; }
+      if (d) { cur.end = d.iso; cur.endDateOnly = d.dateOnly; cur.endMitternacht = !!d.mitternacht; }
     }
   }
   return out.slice(0, 500);
@@ -130,8 +139,13 @@ export function downloadIcsEvents(events: IcsEvent[], filename = 'pixinotes-kale
     const zeilen = ['BEGIN:VEVENT', `UID:pn-${i}-${fmt(e.start)}@pixinotes`];
     if (mitZeit) {
       zeilen.push(`DTSTART:${fmt(e.start)}T${zeit(e.startTime!)}`);
-      const endTag = e.end && e.end > e.start ? e.end : e.start;
-      const endZeit = e.endTime ?? `${String((Number(e.startTime!.slice(0, 2)) + 1) % 24).padStart(2, '0')}:${e.startTime!.slice(3, 5)}`;
+      let endTag = e.end && e.end > e.start ? e.end : e.start;
+      const std = Number(e.startTime!.slice(0, 2));
+      const endZeit = e.endTime ?? `${String((std + 1) % 24).padStart(2, '0')}:${e.startTime!.slice(3, 5)}`;
+      // M388: Beginn nach 23 Uhr ohne Endzeit — die Stunde danach liegt am nächsten Tag (sonst lag das Ende vor dem Beginn)
+      if (!e.endTime && std >= 23 && endTag === e.start) endTag = shiftDay(endTag, 1);
+      // … und eine Endzeit, die am selben Tag vor dem Beginn läge, meint den nächsten Tag
+      else if (e.endTime && endTag === e.start && e.endTime <= e.startTime!) endTag = shiftDay(endTag, 1);
       zeilen.push(`DTEND:${fmt(endTag)}T${zeit(endZeit)}`);
     } else {
       zeilen.push(`DTSTART;VALUE=DATE:${fmt(e.start)}`);

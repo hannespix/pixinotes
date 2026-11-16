@@ -26,7 +26,6 @@ export function flachen(inhalt: BlockInhalt): Array<{ text: string; styles: Reco
   return out;
 }
 
-export const inhaltText = (inhalt: BlockInhalt): string => flachen(inhalt).map((k) => k.text).join('');
 
 /** Zeichenbereiche [start, end) aus dem Inhalt entfernen; doppelte Leerzeichen an den Nahtstellen glätten */
 export function inhaltOhneBereiche(inhalt: BlockInhalt, bereiche: Array<[number, number]>): InlineKnoten[] {

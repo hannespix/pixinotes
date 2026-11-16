@@ -5,6 +5,16 @@ export function triggerDownload(href: string, filename: string): void {
    * schnell zehn Megabyte lang — Safari und mancher Chrome brechen solche Downloads still ab
    * (es passiert einfach nichts). Ein Blob hat diese Grenze nicht.
    */
+  /* M388: Die Adresse kann aus einem Board stammen, das andere gefüllt haben. Einen Anker mit einer
+     javascript:-Adresse führt der Browser beim Klick aus — im Namen von PixiNotes. Heruntergeladen wird darum
+     nur Eingebettetes (data:, blob:); eine Webadresse öffnet sich in einem neuen Tab, alles andere bleibt liegen. */
+  if (typeof href !== 'string' || !href) return;
+  if (!/^(data:|blob:)/i.test(href)) {
+    let u: URL;
+    try { u = new URL(href, window.location.href); } catch { return; }
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return;
+    if (u.origin !== window.location.origin) { window.open(u.href, '_blank', 'noopener'); return; }
+  }
   let ziel = href;
   let frei: string | null = null;
   if (href.startsWith('data:')) {
