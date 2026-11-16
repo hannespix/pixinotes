@@ -1029,7 +1029,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
           onClick={aboCode ? undefined : onPreviewClick}
           onDoubleClick={aboCode ? undefined : onPreviewDblClick}
         >
-          <div className={`mermaid-svg ${error ? 'stale' : ''}`} translate="no" dangerouslySetInnerHTML={{ __html: svg }} />
+          <div className={`mermaid-svg ${error ? 'stale' : ''}${style ? '' : ' mm-schlicht'}`} translate="no" dangerouslySetInnerHTML={{ __html: svg }} />
           {aboAvailable && (
             <button
               className={`mm-abo-chip nodrag ${aboCode ? 'on' : ''}`}

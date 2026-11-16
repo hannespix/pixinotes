@@ -199,6 +199,14 @@ export function SelectionToolbar() {
     // M350: am Zeiger geöffnet kann es unten aus dem Bild ragen — dann nach oben verankern
     const unten = inLayout(window.innerHeight) - 8;
     if (inLayout(b.bottom) > unten) { el.style.top = `${Math.max(8, unten - inLayout(b.height))}px`; el.style.bottom = 'auto'; }
+    // M389: Nach oben geöffnet kann es OBEN aus dem Bild ragen (Tablet im Karten-Fokus: Leiste mitten im Bild, Menü
+    // 420 hoch) — die ersten Einträge lagen dann unter der Kopfzeile. Es bleibt unter ihr und rollt, wenn es muss.
+    const kopf = document.querySelector('.focus-head')?.getBoundingClientRect().bottom ?? 0;
+    const oben = Math.max(8, inLayout(kopf) + 6);
+    if (inLayout(b.top) < oben) {
+      el.style.top = `${oben}px`; el.style.bottom = 'auto';
+      el.style.maxHeight = `${Math.max(160, unten - oben)}px`;
+    }
   }, [menu, menuPos, amZeiger]);
   const menuPortal = (extraClass: string, content: React.ReactNode) => createPortal(
     <div

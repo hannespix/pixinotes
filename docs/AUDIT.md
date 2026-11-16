@@ -65,7 +65,7 @@ Jeder Fund wurde am Code nachgeprüft, bevor er behoben wurde. Status: ✅ behob
 | R4 | Leere Notiz zieht bei jedem Öffnen des Boards den Cursor an sich (Tastatur am Telefon, Sperre im Team) | ✅ nur frisch angelegte Notizen |
 | R5 | Leertaste auf Knöpfen wirkungslos, solange das Board offen ist | ✅ |
 | R6 | Anordnen/KI/Handschrift schreiben auf das gerade aktive Board, nicht auf das, wo sie begannen | ✅ (`lib/zielBoard.ts`) |
-| R7 | Fenster ohne Fokus-Führung; Tab in der Präsentation tot | ✅ Tab in der Präsentation · Fokus-Führung der Fenster: ⏳ M389 |
+| R7 | Fenster ohne Fokus-Führung; Tab in der Präsentation tot | ✅ Tab in der Präsentation; Fokus-Führung der Fenster in M389 (U11) |
 | R8 | Ticket ziehen und Board schwenken gleichzeitig (Touch außerhalb des Fokus) | ⏳ M390 |
 | R9 | Auswahl-Leiste und Zeichen-Ebene rechnen je Bild neu | ⏳ M390 |
 | R10 | Kommentar-Entwurf wandert in den nächsten Faden | ✅ |
@@ -94,6 +94,30 @@ Jeder Fund wurde am Code nachgeprüft, bevor er behoben wurde. Status: ✅ behob
 | A14 | Aufräumen beim Start löscht Tool-Quelltexte, die per Ordner/WebDAV kamen und noch nie geöffnet wurden | ✅ |
 
 ## 2 · UI-Audit (M389)
+
+Vorgehen: Jede Ansicht auf drei Geräten (Laptop 1440, Tablet 820 mit Finger, Telefon 390) in Hell und Dunkel
+durchfahren, fotografiert und vermessen — Kontrast jedes Bedienelements, Größe jedes Tippziels, Überdeckungen,
+Abgeschnittenes, Elemente außerhalb des Bildes; dazu alle 18 Beispiel-Boards. Vor dem Aufräumen des Stylesheets
+ein Bild-für-Bild-Vergleich (37 von 38 identisch, eines mit 5 Bildpunkten Schreibmarke).
+
+| Nr | Fund | Status |
+|----|------|--------|
+| U1 | Weiße Schrift auf Akzentfarbe: 3,1–4,4:1 statt 4,5:1 — Start-Knopf, aktive Reiter und Filter, Zähler, alle „an"-Knöpfe (31 Regeln), in allen fünf Akzentfarben | ✅ eigene Stufe `--accent-fill` |
+| U2 | Akzent als Schrift: 3,5–3,7:1 (aktiver Reiter der Einstellungen, Verweise, Termine „heute"; im Dunkeln auf getönten Flächen) | ✅ `--accent-strong`, im Dunkeln je Akzent eine hellere Stufe |
+| U3 | „Impressum · Datenschutz" im Dunkeln mit 2,3:1 | ✅ |
+| U4 | Punkte der Präsentation 9 × 9 Punkte | ✅ zu sehen 9, zu treffen 24 × 32 (Finger 36 × 40) |
+| U5 | Tippziele am Finger unter 40 Punkten: „⋮" und Aufklapp-Pfeile der Navigation, Farbpunkte im Kartenmenü, „Übersicht"/„Neu" am Telefon, Knöpfe der Präsentations-Kopfzeile; mit Maus: Schließen-Kreuz 25 × 20, Pfeile 17 × 17 | ✅ |
+| U6 | Tablet, Karte im Fokus: Das Kartenmenü ragte oben aus dem Bild — die ersten Einträge lagen unter der Kopfzeile | ✅ bleibt darunter und rollt bei Bedarf |
+| U7 | Fokus-Leiste: „▶ Präsentieren" stand als zweizeiliger, ungestaltet wirkender Knopf da (Zeichen über dem Wort) | ✅ |
+| U8 | Telefon: Die Übersicht zeigte die ganze Umgebung als Briefmarke (Kacheln 30 Punkte breit) | ✅ Projekte untereinander, zwei Kacheln je Zeile, an die Breite angepasst |
+| U9 | Telefon: Tipp auf die Vorschau einer Kachel öffnete blind eine einzelne Karte im Fokus statt des Boards | ✅ mit dem Finger öffnet die Kachel das Board |
+| U10 | Knöpfe, die nur ein Zeichen zeigen, verloren nach dem ersten Überfahren ihren Namen (title wandert in die Sprechblase) | ✅ bleibt als `aria-label` |
+| U11 | Fenster ohne Fokus-Führung (aus dem Code-Audit, R7): Tab wanderte durch das Board dahinter, nach dem Schließen stand der Fokus irgendwo | ✅ `lib/fensterFokus.ts` — für alle Fenster |
+| U12 | Mindmap ohne Farbschema: jede zweite Ebene (Kästen und Äste) auf dem Board-Grund unsichtbar | ✅ |
+| U13 | Hohe Diagramme (Ablauf von oben nach unten) in der Karte abgeschnitten, der Anfang nicht einmal durch Rollen erreichbar | ✅ passt immer ganz hinein |
+| U14 | Beispielprojekt: Kanban ragte aus dem Rahmen „Umsetzung", Kalender überlappte ihn; Wochenplan-Einträge mitten im Wort abgeschnitten | ✅ |
+| U15 | 38 CSS-Klassen ohne Verwendung (75 Regeln, 9 KB) | ✅ entfernt |
+| U16 | Kopfleiste am Laptop: freie Fläche links von Rückgängig (die Suche steht dort in der Spalte) | ➖ gewollt: Die Leiste ist so breit wie die Spalte darunter |
 
 ## 3 · Logik-Audit (M390)
 
