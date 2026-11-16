@@ -357,6 +357,14 @@ interface BoardState {
   eraseStrokesPartial: (x: number, y: number, radius: number) => void;
   /** M320: Striche nach Id entfernen (Handschrift wurde zu Text) — ein History-Eintrag */
   removeStrokes: (ids: string[]) => void;
+  /**
+   * M395: Ein Bild wurde bearbeitet. `patch` sind die neuen Daten der Karte, `verhaeltnis` Höhe/Breite des neuen
+   * Bildes (die Karte behält ihre Breite). Mit `neueId` wird die Karte unter einer neuen Kennung fortgeführt —
+   * nötig bei Bildern aus der Geräte-Ablage: Deren Inhalt hängt an der Kennung, und nur eine neue reist beim
+   * Abgleich als neue Datei mit. Verbindungen, Striche, Kommentare und Ticket-Verweise ziehen mit um.
+   * Ein Rückgängig-Schritt.
+   */
+  bildErsetzen: (id: string, patch: Record<string, unknown>, verhaeltnis: number, neueId?: string) => void;
   /** M394: Einen fertig verankerten Strich anhängen (Folie, Dokument-Seite) — ohne die Anker-Suche des Boards */
   addStrokeFertig: (stroke: Stroke) => void;
   /** M394: Striche nach Id radieren — innerhalb einer Radier-Geste (beginEraseGesture) EIN History-Eintrag */
@@ -1792,6 +1800,53 @@ export const useBoard = create<BoardState>()(
           patchActive((b) => ({
             drawings: integrateStroke(stroke, b.drawings ?? [], sessionIds, b.nodes).drawings,
           }));
+        },
+
+        bildErsetzen: (id, patch, verhaeltnis, neueId) => {
+          const st = get();
+          const board = st.boards.find((b) => b.id === st.activeId);
+          const alt = board?.nodes.find((n) => n.id === id);
+          if (!board || !alt) return;
+          get().pushHistory();
+          const ziel = neueId ?? id;
+          const breite = typeof alt.width === 'number' ? alt.width : alt.measured?.width;
+          const rahmen = (alt.data as { rahmen?: boolean }).rahmen === true;
+          const neu = {
+            ...alt, id: ziel, data: { ...alt.data, ...patch },
+            // rahmenlos IST die Karte das Bild — ihre Höhe folgt dem neuen Seitenverhältnis
+            ...(!rahmen && breite && verhaeltnis > 0 ? { height: Math.max(8, Math.round(breite * verhaeltnis)) } : {}),
+          } as AppNode;
+          const um = (k: string) => (k === id ? ziel : k);
+          set({
+            boards: get().boards.map((b) => {
+              // Tickets anderer Boards können auf die Karte zeigen
+              const tickets = (n: AppNode): AppNode => {
+                if (ziel === id || n.type !== 'kanban') return n;
+                const items = (n.data as { items?: Array<{ link?: { boardId: string; nodeId?: string }; links?: Array<{ boardId: string; nodeId: string }> }> }).items;
+                if (!items?.some((i) => (i.link?.boardId === board.id && i.link.nodeId === id) || i.links?.some((l) => l.boardId === board.id && l.nodeId === id))) return n;
+                return { ...n, data: { ...n.data, items: items.map((i) => ({
+                  ...i,
+                  ...(i.link?.boardId === board.id && i.link.nodeId === id ? { link: { ...i.link, nodeId: ziel } } : {}),
+                  ...(i.links ? { links: i.links.map((l) => (l.boardId === board.id && l.nodeId === id ? { ...l, nodeId: ziel } : l)) } : {}),
+                })) } } as AppNode;
+              };
+              if (b.id !== board.id) {
+                if (ziel === id) return b;
+                const nodes = b.nodes.map(tickets);
+                return nodes.some((n, i) => n !== b.nodes[i]) ? { ...b, nodes } : b;
+              }
+              return {
+                ...b,
+                nodes: b.nodes.map((n) => (n.id === id ? neu : tickets(n.parentId === id ? ({ ...n, parentId: ziel } as AppNode) : n))),
+                ...(ziel === id ? {} : {
+                  edges: b.edges.map((e) => (e.source === id || e.target === id ? { ...e, source: um(e.source), target: um(e.target) } : e)),
+                  drawings: (b.drawings ?? []).map((d) => (d.anchor === id ? { ...d, anchor: ziel } : d)),
+                  comments: (b.comments ?? []).map((c) => (c.nodeId === id ? { ...c, nodeId: ziel } : c)),
+                }),
+              };
+            }),
+            ...(ziel !== id && get().focusCard === id ? { focusCard: ziel } : {}),
+          });
         },
 
         addStrokeFertig: (stroke) => {

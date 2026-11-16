@@ -8,7 +8,7 @@ import { textDateienAlsNotizen, textKarte } from '../lib/textNotiz';
 import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
 import { KACHEL_TYPEN, STICKY_COLORS, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICrop, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -16,6 +16,7 @@ import { wurzelZoom } from '../lib/anzeige';
 import { FONT_STACKS, GROESSEN_KARTE, SCHRIFTEN } from '../lib/typo';
 import { ALIGN_LABEL, computeAlign, type AlignOp } from '../lib/align';
 import { vorschauArt } from '../lib/fileStore';
+import { bildBearbeitbar, bildBearbeiten } from './BildEditorHost';
 import { mutedHistory } from '../store';
 import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
 import type { ArrangeMode } from '../lib/arrange';
@@ -671,6 +672,12 @@ export function SelectionToolbar() {
                       />
                     ))}
                   </div>
+                )}
+                {/* M395: ein einzelnes Bild bearbeiten (zuschneiden, drehen, …) */}
+                {selected.length === 1 && bildBearbeitbar(selected[0]) && (
+                  <button data-taste="bild-bearbeiten" onClick={() => { setMenu(null); bildBearbeiten(selected[0].id); }}>
+                    <ICrop size={14} /> Bild bearbeiten …
+                  </button>
                 )}
                 {/* M374: Bilder liegen rahmenlos auf dem Board — hier kommt die Karte mit Rand zurück (und wieder weg) */}
                 {selected.every((n) => n.type === 'image' || (n.type === 'file' && vorschauArt(String((n.data as { name?: string }).name ?? ''), (n.data as { mime?: string }).mime) === 'bild')) && (() => {

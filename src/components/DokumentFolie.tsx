@@ -12,25 +12,16 @@
 // (Breite des Blatts) wird hier gerechnet.
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { selectActiveBoard, useBoard, type Stroke } from '../store';
-import { loadFile, vorschauArt } from '../lib/fileStore';
+import { loadFile } from '../lib/fileStore';
 import { kontoDateiNachladen } from '../lib/kontoSync';
 import { pdfSeiteMasse, renderPdfPage } from '../lib/pdf';
 import { MarkerGruppen, StrichPfad } from './StrichPfad';
 import type { FileNode } from '../types';
 import { wordEntschaerfen } from '../lib/sicher';
 import type { Ansicht } from '../lib/vorfuehren';
+import type { DokumentArt } from '../lib/dokumentArt';
 
-export type DokumentArt = 'pdf' | 'word' | 'bild';
-
-/** Lässt sich diese Datei-Karte als Dokument-Folie zeigen? */
-export function dokumentArt(node: { type?: string; data?: unknown }): DokumentArt | null {
-  if (node.type !== 'file') return null;
-  const d = node.data as { name?: string; mime?: string };
-  const name = d.name ?? '';
-  if (name.toLowerCase().endsWith('.docx')) return 'word';
-  const art = vorschauArt(name, d.mime);
-  return art === 'pdf' ? 'pdf' : art === 'bild' ? 'bild' : null;
-}
+export { dokumentArt, type DokumentArt } from '../lib/dokumentArt';
 
 /** Inhalt der Datei: aus der Karte (kleine Dateien), der Geräte-Ablage oder dem Konto */
 function useQuelle(id: string, dataUrl: string | undefined): { quelle: string | null; fehlt: boolean } {

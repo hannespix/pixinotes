@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
@@ -14,13 +14,17 @@ import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from '.
 import { KanbanBody } from './nodes/KanbanCard';
 import { GanttBody } from './nodes/GanttCard';
 import { CalendarBody } from './nodes/CalendarCard';
-import { DokumentFolie, dokumentArt } from './DokumentFolie';
+import { dokumentArt } from '../lib/dokumentArt';
 import { letzteSeite } from '../lib/pdfSeiten';
 import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, MinutesNode, NoteNode, ShapeNode, SheetNode, TimeNode, WeekNode } from '../types';
 import { HtmlAppSlide } from './nodes/HtmlAppCard';
 import { useRandLeiste } from '../lib/randLeiste';
-import { FOLIEN_FARBEN, FolienStift, type FolienWerkzeug } from './FolienStift';
-import { FolienKommentare } from './FolienKommentare';
+import { FOLIEN_FARBEN, type FolienWerkzeug } from '../lib/folienWerkzeug';
+
+// M395: Was nur WÄHREND einer Präsentation gebraucht wird, kommt erst dann — der Kern der App bleibt schlank
+const DokumentFolie = lazy(() => import('./DokumentFolie').then((m) => ({ default: m.DokumentFolie })));
+const FolienStift = lazy(() => import('./FolienStift').then((m) => ({ default: m.FolienStift })));
+const FolienKommentare = lazy(() => import('./FolienKommentare').then((m) => ({ default: m.FolienKommentare })));
 import { ICheck, IComment, IEraser, IHighlighter, IPen, IUndo } from './Icons';
 import { BubblesBody } from './nodes/BubblesCard';
 import { WeekBody } from './nodes/WeekCard';
@@ -520,10 +524,12 @@ export function Presenter() {
       ) : (
         art ? (
           <div className="presenter-slide dokument">
-            <DokumentFolie key={cur.id} node={cur as FileNode} art={art} seite={pos.seite}
-              onSeiten={(n) => setSeitenJe((m) => (m[cur.id] === n ? m : { ...m, [cur.id]: n }))}
-              schritt={(d) => { selbst(); schritt(d); }} geheZu={(s) => { selbst(); setPos({ idx: safeIdx, seite: s }); }} rollRef={rollRef} ansichtMerker={ansichtMerker}
-              onAnsicht={folge ? undefined : (a) => ansichtMelden(board.id, cur.id, a)} ansicht={dortAnsicht} />
+            <Suspense fallback={null}>
+              <DokumentFolie key={cur.id} node={cur as FileNode} art={art} seite={pos.seite}
+                onSeiten={(n) => setSeitenJe((m) => (m[cur.id] === n ? m : { ...m, [cur.id]: n }))}
+                schritt={(d) => { selbst(); schritt(d); }} geheZu={(s) => { selbst(); setPos({ idx: safeIdx, seite: s }); }} rollRef={rollRef} ansichtMerker={ansichtMerker}
+                onAnsicht={folge ? undefined : (a) => ansichtMelden(board.id, cur.id, a)} ansicht={dortAnsicht} />
+            </Suspense>
           </div>
         ) : (
           <div className={`presenter-slide ${EDITABLE.has(cur.type) ? 'editable' : ''} ${cur.type === 'htmlapp' ? 'app' : ''}`} ref={folieRef}
@@ -549,8 +555,10 @@ export function Presenter() {
       {slides.length > 0 && <FolienLaser boardId={board.id} folie={cur.id} an={laser} senden={ichZeige} />}
       {/* M394: Zeichenschicht über der Folie, Werkzeuge erst, wenn gezeichnet wird, Kommentare als Spalte */}
       {slides.length > 0 && (
-        <FolienStift folie={cur.id} werkzeug={werkzeug} farbe={werkzeug === 'marker' ? farben.marker : farben.pen} darf={!nurLesen}
-          onPin={(id) => { setFaden(id); setKommOffen(true); }} />
+        <Suspense fallback={null}>
+          <FolienStift folie={cur.id} werkzeug={werkzeug} farbe={werkzeug === 'marker' ? farben.marker : farben.pen} darf={!nurLesen}
+            onPin={(id) => { setFaden(id); setKommOffen(true); }} />
+        </Suspense>
       )}
       {werkzeug && !nurLesen && slides.length > 0 && (
         <div className="folien-palette" data-taste="folien-palette" role="toolbar" aria-label="Zeichnen">
@@ -570,8 +578,10 @@ export function Presenter() {
         </div>
       )}
       {kommOffen && slides.length > 0 && (
-        <FolienKommentare karte={cur.id} seite={art && art !== 'bild' ? seiteHier : null} faden={faden} onFaden={setFaden}
-          geheZu={(nr) => { selbst(); setPos({ idx: safeIdx, seite: nr }); }} zu={() => setKommOffen(false)} />
+        <Suspense fallback={null}>
+          <FolienKommentare karte={cur.id} seite={art && art !== 'bild' ? seiteHier : null} faden={faden} onFaden={setFaden}
+            geheZu={(nr) => { selbst(); setPos({ idx: safeIdx, seite: nr }); }} zu={() => setKommOffen(false)} />
+        </Suspense>
       )}
       <div className="presenter-foot">
         {/* aria-disabled statt disabled: Ein Knopf, der mit Tastatur-Fokus „disabled" wird, verschluckt danach alle Tasten (M361) */}
