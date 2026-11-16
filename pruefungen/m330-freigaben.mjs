@@ -413,7 +413,7 @@ console.log('\n════ G: Texte ════');
 {
   const js = readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.js')).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8')).join('\n');
   pruefe('G1 „Was ist neu" nennt M330', js.includes('Geteilte Boards und schnellerer Live-Abgleich (M330)'));
-  pruefe('G2 der Dialog nennt die Grenze bei Anhängen', js.includes('bei Gästen mit Konto wandern Anhänge noch nicht mit'));
+  pruefe('G2 der Dialog nennt die Grenze bei Anhängen', js.includes('Anhänge (PDF, Bilder) sehen bisher nur Gäste per Link'));
 }
 
 await A.ctx.close(); await B.ctx.close();
