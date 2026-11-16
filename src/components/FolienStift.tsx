@@ -20,7 +20,7 @@ import { finalizeStroke } from '../lib/strokeShapes';
 import { seitenKommentare } from '../lib/pdfSeiten';
 import { wurzelZoom } from '../lib/anzeige';
 import { MarkerGruppen, StrichPfad } from './StrichPfad';
-import type { FolienWerkzeug } from '../lib/folienWerkzeug';
+import { FOLIE_ZOOM, type FolieZoom, type FolienWerkzeug } from '../lib/folienWerkzeug';
 
 /** Die Inhaltsbreite einer Folie in Einheiten der Folien-Striche */
 const EINHEIT = 1000;
@@ -91,7 +91,7 @@ function trifft(s: Stroke, x: number, y: number, r: number): boolean {
   return false;
 }
 
-export function FolienStift({ folie, werkzeug, farbe, darf, onPin }: {
+export function FolienStift({ folie, werkzeug, farbe, darf, onPin, onWisch }: {
   /** Karte der Folie */
   folie: string;
   werkzeug: FolienWerkzeug | null;
@@ -100,6 +100,8 @@ export function FolienStift({ folie, werkzeug, farbe, darf, onPin }: {
   darf: boolean;
   /** Tipp auf einen Kommentar-Pin der Seite */
   onPin: (threadId: string) => void;
+  /** M396: schneller Wisch zur Seite mit einem Finger (Stiftgeräte) — blättern: +1 weiter, −1 zurück */
+  onWisch?: (richtung: 1 | -1) => void;
 }) {
   const drawings = useBoard((s) => selectActiveBoard(s).drawings);
   const comments = useBoard((s) => selectActiveBoard(s).comments);
@@ -109,7 +111,14 @@ export function FolienStift({ folie, werkzeug, farbe, darf, onPin }: {
   const [lage, setLage] = useState<Lage | null>(null);
   const lageRef = useRef<Lage | null>(null);
   const [laufend, setLaufend] = useState<Stroke | null>(null);
-  const zug = useRef<{ id: number; art: 'strich' | 'radieren' | 'schieben'; tool: 'pen' | 'marker'; punkte: [number, number][]; druck: number[]; stift: boolean; x: number; y: number } | null>(null);
+  const zug = useRef<{
+    id: number; art: 'strich' | 'radieren' | 'schieben' | 'zwei'; tool: 'pen' | 'marker'; punkte: [number, number][]; druck: number[]; stift: boolean;
+    x: number; y: number; x0: number; y0: number; t0: number; sl0: number;
+  } | null>(null);
+  /** M396: aufliegende Finger, die Mitte/der Abstand zweier Finger, und Berührungen während eines Stift-Zugs (Handballen) */
+  const finger = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const zwei = useRef<{ mx: number; my: number; d: number } | null>(null);
+  const stumm = useRef<Set<number>>(new Set());
   const bild = useRef(0);
 
   // Die Folie lebt: Sie rollt, zoomt, blättert, baut sich um. Statt jedem Auslöser nachzulaufen, wird je Bild
@@ -125,7 +134,8 @@ export function FolienStift({ folie, werkzeug, farbe, darf, onPin }: {
     return () => cancelAnimationFrame(lauf);
   }, []);
   // andere Folie, andere Seite: ein angefangener Strich gehört nicht dorthin
-  useEffect(() => { zug.current = null; setLaufend(null); }, [folie, lage?.seite, werkzeug]);
+  useEffect(() => { zug.current = null; finger.current.clear(); zwei.current = null; stumm.current.clear(); delete document.body.dataset.stiftZug; setLaufend(null); }, [folie, lage?.seite, werkzeug]);
+  useEffect(() => () => { delete document.body.dataset.stiftZug; }, []);
 
   const folienStriche = useMemo(
     () => (drawings ?? []).filter((s) => s.anchor === folie && s.seite === FOLIEN_SEITE),
@@ -160,32 +170,86 @@ export function FolienStift({ folie, werkzeug, farbe, darf, onPin }: {
     setLaufend({ id: 'laufend', tool: z.tool, color: farbe, width: DICKE[z.tool] / l.k, points: z.punkte.slice(), druck: z.stift ? z.druck.slice() : undefined });
   };
 
+  /** Was rollt, wenn die Folie geschoben wird: das Blatt des Dokuments, sonst die Fläche, die in sich rollt, sonst die Folie */
+  const roller = (): HTMLElement | null => {
+    const m = messen();
+    return (m?.blatt.querySelector('.folie-dok-flaeche') as HTMLElement | null) ?? (m && m.flaeche.scrollHeight > m.flaeche.clientHeight + 2 ? m.flaeche : m?.blatt ?? null);
+  };
+  const mitteUndAbstand = () => {
+    const [a, b] = Array.from(finger.current.values());
+    return { mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2, d: Math.hypot(b.x - a.x, b.y - a.y) };
+  };
+  /** Ein Stift-Zug läuft: Die Tipp-Gesten (lib/tippGesten.ts) halten dann jede Berührung für die aufgelegte Hand */
+  const stiftMelden = (an: boolean) => { if (an) document.body.dataset.stiftZug = '1'; else delete document.body.dataset.stiftZug; };
+  const verwerfen = () => {
+    if (bild.current) { cancelAnimationFrame(bild.current); bild.current = 0; }
+    setLaufend(null);
+  };
+
   const runter = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!aktiv || zug.current || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if (!aktiv || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    const z0 = zug.current;
+    if (e.pointerType === 'touch') {
+      // M396: Der Stift schreibt gerade — das ist die aufgelegte Hand
+      if (z0?.stift) { stumm.current.add(e.pointerId); return; }
+      if (z0 && z0.art !== 'zwei' && !finger.current.has(z0.id)) return;          // die Maus zeichnet gerade
+      finger.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* Zeiger schon fort — dann ohne Fang */ }
+      e.preventDefault();
+      if (finger.current.size >= 2) {
+        // M396: zweiter Finger — ein eben begonnener Finger-Strich war keiner; ab jetzt schieben und kneifen zwei Finger
+        verwerfen();
+        zug.current = { id: -1, art: 'zwei', tool: 'pen', punkte: [], druck: [], stift: false, x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now(), sl0: 0 };
+        zwei.current = finger.current.size === 2 ? mitteUndAbstand() : null;
+        return;
+      }
+    } else if (z0) {
+      // Der Stift geht vor: Er übernimmt, auch wenn gerade ein Finger schiebt
+      if (e.pointerType !== 'pen' || z0.stift) return;
+      verwerfen(); finger.current.clear(); zwei.current = null; zug.current = null;
+    }
     let hatStift = false;
     try { if (e.pointerType === 'pen') localStorage.setItem(STIFT_KEY, '1'); hatStift = !!localStorage.getItem(STIFT_KEY); } catch { /* dann zeichnet auch der Finger */ }
     const [x, y] = ort(e, e.currentTarget);
     try { e.currentTarget.setPointerCapture?.(e.pointerId); } catch { /* Zeiger schon fort — dann ohne Fang */ }
     e.preventDefault();
+    const grund = { id: e.pointerId, tool: 'pen' as 'pen' | 'marker', punkte: [] as [number, number][], druck: [] as number[], stift: e.pointerType === 'pen', x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, t0: performance.now(), sl0: 0 };
     // Auf Geräten mit Stift schreibt der Stift — der Finger schiebt die Folie (wie auf dem Board)
-    if (e.pointerType === 'touch' && hatStift) { zug.current = { id: e.pointerId, art: 'schieben', tool: 'pen', punkte: [], druck: [], stift: false, x: e.clientX, y: e.clientY }; return; }
+    if (e.pointerType === 'touch' && hatStift) { zug.current = { ...grund, art: 'schieben', sl0: roller()?.scrollLeft ?? 0 }; return; }
+    if (e.pointerType === 'pen') stiftMelden(true);
     // Radierer — auch das Radier-Ende eines Stifts
     if (werkzeug === 'eraser' || (e.pointerType === 'pen' && (e.buttons & 32) !== 0)) {
       beginEraseGesture();
-      zug.current = { id: e.pointerId, art: 'radieren', tool: 'pen', punkte: [], druck: [], stift: false, x: e.clientX, y: e.clientY };
+      zug.current = { ...grund, art: 'radieren' };
       radieren(x, y);
       return;
     }
-    zug.current = { id: e.pointerId, art: 'strich', tool: werkzeug as 'pen' | 'marker', punkte: [[x, y]], druck: [e.pressure || 0.5], stift: e.pointerType === 'pen', x: e.clientX, y: e.clientY };
+    zug.current = { ...grund, art: 'strich', tool: werkzeug as 'pen' | 'marker', punkte: [[x, y]], druck: [e.pressure || 0.5] };
     zeichnen();
   };
   const bewegt = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch') {
+      if (stumm.current.has(e.pointerId)) return;
+      const f = finger.current.get(e.pointerId);
+      if (f) { f.x = e.clientX; f.y = e.clientY; }
+    }
     const z = zug.current;
-    if (!z || z.id !== e.pointerId) return;
+    if (!z) return;
+    if (z.art === 'zwei') {
+      // zwei Finger: die Folie folgt der Mitte; kneifen zoomt die Dokument-Seite um diese Mitte
+      const alt = zwei.current;
+      if (finger.current.size !== 2 || !alt) return;
+      const neu = mitteUndAbstand();
+      roller()?.scrollBy({ left: (alt.mx - neu.mx) / wurzelZoom(), top: (alt.my - neu.my) / wurzelZoom() });
+      if (alt.d > 24 && neu.d > 24 && Math.abs(neu.d / alt.d - 1) > 0.004) {
+        window.dispatchEvent(new CustomEvent<FolieZoom>(FOLIE_ZOOM, { detail: { faktor: neu.d / alt.d, x: neu.mx, y: neu.my } }));
+        zwei.current = neu;
+      } else zwei.current = { ...neu, d: alt.d };
+      return;
+    }
+    if (z.id !== e.pointerId) return;
     if (z.art === 'schieben') {
-      const m = messen();
-      const roller = (m?.blatt.querySelector('.folie-dok-flaeche') as HTMLElement | null) ?? (m && m.flaeche.scrollHeight > m.flaeche.clientHeight + 2 ? m.flaeche : m?.blatt);
-      roller?.scrollBy({ left: (z.x - e.clientX) / wurzelZoom(), top: (z.y - e.clientY) / wurzelZoom() });
+      roller()?.scrollBy({ left: (z.x - e.clientX) / wurzelZoom(), top: (z.y - e.clientY) / wurzelZoom() });
       z.x = e.clientX; z.y = e.clientY;
       return;
     }
@@ -201,11 +265,29 @@ export function FolienStift({ folie, werkzeug, farbe, darf, onPin }: {
     if (z.art === 'strich' && !bild.current) bild.current = requestAnimationFrame(() => { bild.current = 0; zeichnen(); });
   };
   const hoch = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'touch') {
+      if (stumm.current.delete(e.pointerId)) return;
+      finger.current.delete(e.pointerId);
+    }
     const z = zug.current;
-    if (!z || z.id !== e.pointerId) return;
+    if (!z) return;
+    if (z.art === 'zwei') {
+      // erst wenn alle Finger oben sind, ist die Geste vorbei — ein liegengebliebener Finger zeichnet nicht weiter
+      zwei.current = null;
+      if (finger.current.size === 0) zug.current = null;
+      return;
+    }
+    if (z.id !== e.pointerId) return;
     zug.current = null;
-    if (bild.current) { cancelAnimationFrame(bild.current); bild.current = 0; }
-    setLaufend(null);
+    if (z.stift) stiftMelden(false);
+    verwerfen();
+    if (z.art === 'schieben') {
+      // M396: ein schneller Wisch zur Seite blättert — wie ohne Stift (nicht, wenn das Blatt selbst seitlich gerollt ist)
+      const dx = e.clientX - z.x0; const dy = e.clientY - z.y0;
+      if (e.type !== 'pointercancel' && Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4 && performance.now() - z.t0 < 700
+        && Math.abs((roller()?.scrollLeft ?? 0) - z.sl0) < 2) onWisch?.(dx < 0 ? 1 : -1);
+      return;
+    }
     if (z.art !== 'strich' || e.type === 'pointercancel') return;
     const l = lageRef.current ?? lage;
     // ein Tipp ist ein Punkt
@@ -227,9 +309,7 @@ export function FolienStift({ folie, werkzeug, farbe, darf, onPin }: {
   /** Das Rad rollt weiter die Folie — die Schicht liegt nur darüber */
   const rad = (e: ReactWheelEvent<HTMLDivElement>) => {
     if (e.ctrlKey || e.metaKey) return;
-    const m = messen();
-    const roller = (m?.blatt.querySelector('.folie-dok-flaeche') as HTMLElement | null) ?? (m && m.flaeche.scrollHeight > m.flaeche.clientHeight + 2 ? m.flaeche : m?.blatt);
-    roller?.scrollBy({ left: e.deltaX, top: e.deltaY });
+    roller()?.scrollBy({ left: e.deltaX, top: e.deltaY });
   };
 
   const marker = folienStriche.filter((s) => s.tool === 'marker');

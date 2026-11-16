@@ -20,6 +20,7 @@ import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNo
 import { HtmlAppSlide } from './nodes/HtmlAppCard';
 import { useRandLeiste } from '../lib/randLeiste';
 import { FOLIEN_FARBEN, type FolienWerkzeug } from '../lib/folienWerkzeug';
+import { useTippGesten } from '../lib/tippGesten';
 
 // M395: Was nur WÄHREND einer Präsentation gebraucht wird, kommt erst dann — der Kern der App bleibt schlank
 const DokumentFolie = lazy(() => import('./DokumentFolie').then((m) => ({ default: m.DokumentFolie })));
@@ -289,6 +290,10 @@ export function Presenter() {
   const waehle = (w: FolienWerkzeug) => { setLaser(false); setWerkzeug((alt) => (alt === w ? null : w)); };
   const waehleRef = useRef(waehle); waehleRef.current = waehle;
   useEffect(() => { if (!open) { setWerkzeug(null); setKommOffen(false); setFaden(null); } }, [open]);
+  // M396: Zwei-Finger-Tipp = Rückgängig, Drei-Finger-Tipp = Wiederholen — auch in der Präsentation (nicht in Textfeldern und auf Leisten)
+  const fingerGesten = useBoard((st) => st.fingerGesten);
+  useTippGesten(open && fingerGesten, (ziel) => !!ziel?.closest('.presenter-slide, .folien-stift')
+    && !ziel.closest('input, textarea, select, button, a, [contenteditable="true"], .folie-dok-leiste, .folien-palette, .folien-kommentare'));
   useEffect(() => { if (!open) setLaser(false); }, [open]);
   const selbstRef = useRef<() => void>(() => {});
   /** Die Dokument-Folie meldet, ob auf der Seite noch etwas zu rollen ist — dann rollt der Schritt, statt zu blättern */
@@ -557,7 +562,7 @@ export function Presenter() {
       {slides.length > 0 && (
         <Suspense fallback={null}>
           <FolienStift folie={cur.id} werkzeug={werkzeug} farbe={werkzeug === 'marker' ? farben.marker : farben.pen} darf={!nurLesen}
-            onPin={(id) => { setFaden(id); setKommOffen(true); }} />
+            onPin={(id) => { setFaden(id); setKommOffen(true); }} onWisch={(d) => { selbst(); schritt(d); }} />
         </Suspense>
       )}
       {werkzeug && !nurLesen && slides.length > 0 && (
