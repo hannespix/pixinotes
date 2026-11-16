@@ -60,6 +60,12 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
     moveBoard(boardId, projektId, vor);
   };
   const byId = useMemo(() => new Map(boards.map((b) => [b.id, b])), [boards]);
+  // M391: Wer nur als Gast hier ist (per Link gekommen, nichts Eigenes), sieht keine leeren eigenen Bereiche —
+  // „Arbeit › Allgemein (0)" neben dem einen Board, um das es geht, ist nur Ballast. Mit dem ersten eigenen Board sind sie da.
+  const sichtbareBereiche = useMemo(() => {
+    const nurGast = boards.length > 0 && boards.every((b) => b.geteiltVon || b.gastLink);
+    return nurGast ? spaces.filter((sp) => sp.projects.some((p) => p.boardIds.length > 0)) : spaces;
+  }, [boards, spaces]);
   /**
    * M309: Archivierte Karten sind im Baum verborgen, bis man das Archiv
    * einblendet — wie auf dem Board (Dock) und in Kacheln und Netz (M232).
@@ -187,7 +193,7 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
       >
         <ISearch size={13} /><span>Suchen …</span><kbd>Strg K</kbd>
       </button>
-      {spaces.map((sp) => {
+      {sichtbareBereiche.map((sp) => {
         const projekte = sp.projects.map((p) => ({
           p,
           liste: p.boardIds

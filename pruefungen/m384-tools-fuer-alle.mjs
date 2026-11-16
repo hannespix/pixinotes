@@ -395,6 +395,9 @@ async function geraet(name, stand, anker = '') {
   await P.waitForTimeout(1500);
   return { ctx, P, name };
 }
+/** M391: Die Werkzeuge der Gruppe (Vorführen, Timer, QR-Code, Mauszeiger, Name) stehen in der Liste hinter der Leiste */
+const gruppeAuf = async (P) => { if (!(await P.locator('[data-taste="live-liste"]').count()) && (await P.locator('[data-taste="live-auf"]').count())) { await P.locator('[data-taste="live-auf"]').click(); await P.waitForTimeout(250); } };
+const gruppeZu = async (P) => { if (await P.locator('[data-taste="live-liste"]').count()) { await P.locator('[data-taste="live-auf"]').click(); await P.waitForTimeout(150); } };
 const zustand = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state);
 const texte = (P) => zustand(P).then((s) => JSON.stringify(s.boards));
 const boardVon = (P, id) => zustand(P).then((s) => s.boards.find((b) => b.id === id));
@@ -466,7 +469,7 @@ async function dialogOeffnen(P, name) {
   const z = P.locator('.tabs.spalte .side-board', { hasText: name }).first();
   await z.hover(); await P.waitForTimeout(200);
   await z.locator('.ebenen-menu-knopf').click(); await P.waitForTimeout(300);
-  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600);
+  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600); await P.waitForSelector('[data-taste="einladung-optionen"], [data-taste="freigabe-ohne-konto"], [data-taste="freigabe-verlassen"]', { timeout: 2500 }).catch(() => {}); await P.evaluate(() => document.querySelectorAll('.freigabe-dialog details').forEach((d) => { d.open = true; }));
 }
 
 const sperre = (P, karte) => P.locator(`[data-taste="live-sperre"][data-karte="${karte}"]`);
@@ -745,6 +748,7 @@ await warteBis(A.P, async () => { fa0 = await rahmen(A.P, 'happ-frame', 'titel')
 await warteBis(B.P, async () => { fb0 = await rahmen(B.P, 'happ-frame', 'titel'); return !!fb0; }, 8000);
 await tippen(A.P, fa0, '#lang', 'vorher notiert'); await A.P.waitForTimeout(1200);
 pruefe('C-1 ohne Vorführung: Annas Eingabe bleibt bei ihr', (await im(fb0, '#lang', 'value')) === '');
+await gruppeAuf(A.P);
 await A.P.locator('[data-taste="vorfuehren"]').click(); await A.P.waitForTimeout(600);
 await warteBis(B.P, async () => /du folgst/.test(await zband(B.P)), 8000);
 pruefe('C-0 Anna beginnt vorzuführen → Bernds schon laufendes Tool zeigt, was sie vorher eingetragen hat', await warteBis(B.P, async () => (await im(fb0, '#lang', 'value')) === 'vorher notiert', 8000), String(await im(fb0, '#lang', 'value')));

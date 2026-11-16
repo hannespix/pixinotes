@@ -312,8 +312,8 @@ const zeileA = A.P.locator('.tabs.spalte .side-board', { hasText: 'Planung' }).f
 await zeileA.hover(); await A.P.waitForTimeout(200);
 await zeileA.locator('.ebenen-menu-knopf').click(); await A.P.waitForTimeout(300);
 pruefe('A1 das Board-Menü bietet „Für ein Konto freigeben …" (nur mit PixiNotes-Konto)', (await A.P.locator('[data-taste="board-freigeben"]').count()) === 1);
-await A.P.locator('[data-taste="board-freigeben"]').click(); await A.P.waitForTimeout(500);
-pruefe('A2 der Freigabe-Dialog öffnet sich, noch niemand', (await A.P.locator('.freigabe-dialog').count()) === 1 && /Noch für niemanden/.test(await A.P.locator('.freigabe-dialog').textContent()));
+await A.P.locator('[data-taste="board-freigeben"]').click(); await A.P.waitForTimeout(500); await A.P.waitForSelector('[data-taste="einladung-optionen"], [data-taste="freigabe-ohne-konto"], [data-taste="freigabe-verlassen"]', { timeout: 2500 }).catch(() => {}); await A.P.evaluate(() => document.querySelectorAll('.freigabe-dialog details').forEach((d) => { d.open = true; }));
+pruefe('A2 der Freigabe-Dialog öffnet sich, noch niemand', (await A.P.locator('.freigabe-dialog').count()) === 1 && (await A.P.locator('[data-taste="freigabe-liste"]').count()) === 0 && /Einzelne Person per E-Mail einladen/.test(await A.P.locator('.freigabe-dialog').textContent()));
 await A.P.locator('[data-taste="freigabe-email"]').fill('Bernd@Example.de');
 await A.P.locator('[data-taste="freigabe-einladen"]').click();
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="freigabe-liste"] li').count()) === 1, 6000);
@@ -390,7 +390,7 @@ console.log('\n════ F: Anna entfernt die Freigabe → Bernd behält eine
   const zeileA2 = A.P.locator('.tabs.spalte .side-board', { hasText: 'Planung' }).first();
   await zeileA2.hover(); await A.P.waitForTimeout(200);
   await zeileA2.locator('.ebenen-menu-knopf').click(); await A.P.waitForTimeout(300);
-  await A.P.locator('[data-taste="board-freigeben"]').click(); await A.P.waitForTimeout(500);
+  await A.P.locator('[data-taste="board-freigeben"]').click(); await A.P.waitForTimeout(500); await A.P.waitForSelector('[data-taste="einladung-optionen"], [data-taste="freigabe-ohne-konto"], [data-taste="freigabe-verlassen"]', { timeout: 2500 }).catch(() => {}); await A.P.evaluate(() => document.querySelectorAll('.freigabe-dialog details').forEach((d) => { d.open = true; }));
   await warteBis(A.P, async () => (await A.P.locator('[data-taste="freigabe-liste"] li').count()) === 1, 6000);
   pruefe('F1 die Liste zeigt Bernd als „angenommen"', /angenommen/.test(await A.P.locator('[data-taste="freigabe-liste"]').textContent()));
   await A.P.locator('[data-taste="freigabe-liste"] .freigabe-weg').click();

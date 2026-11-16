@@ -44,8 +44,8 @@ export function ReaktionsKnopf({ boardId, klasse = 'live-zeig' }: { boardId: str
 }
 
 const ZEITEN = [1, 2, 3, 5, 10, 15];
-export function TimerKnopf({ boardId }: { boardId: string }) {
-  const [offen, setOffen] = useAufklappen('.timer-wrap');
+/** M391: Timer stellen — eine Zeile in der Liste der Gruppe (vorher ein eigener Knopf in der Leiste) */
+export function TimerZeile({ boardId, fertig }: { boardId: string; fertig: () => void }) {
   const [, takt] = useState(0);
   useEffect(() => {
     const auf = () => takt((n) => n + 1);
@@ -54,20 +54,16 @@ export function TimerKnopf({ boardId }: { boardId: string }) {
   }, []);
   const laeuft = !!timerVon(boardId);
   return (
-    <span className="timer-wrap">
-      <button className={`live-zeig timer-knopf${laeuft || offen ? ' an' : ''}`} data-taste="timer-auf" aria-expanded={offen} aria-haspopup="true"
-        title={laeuft ? 'Timer läuft — neu stellen oder anhalten' : 'Timer für alle: Einer stellt die Uhr, alle sehen sie ablaufen'}
-        onClick={() => setOffen((o) => !o)}><ITimer size={14} /></button>
-      {offen && (
-        <span className="timer-wahl" role="group" aria-label="Timer stellen" data-taste="timer-wahl">
-          <span className="timer-wahl-titel">Timer für alle</span>
-          {ZEITEN.map((m) => (
-            <button key={m} data-taste="timer-min" data-min={m} onClick={() => { timerStart(boardId, m); setOffen(false); }}>{m} min</button>
-          ))}
-          {laeuft && <button className="stopp" data-taste="timer-stopp" onClick={() => { timerStopp(boardId); setOffen(false); }}>Anhalten</button>}
-        </span>
-      )}
-    </span>
+    <div className="timer-zeile" role="group" aria-label="Timer für alle stellen" data-taste="timer-wahl">
+      <span className="timer-zeile-titel" title="Einer stellt die Uhr, alle sehen sie ablaufen"><ITimer size={15} /> Timer für alle</span>
+      <span className="timer-zeile-zeiten">
+        {ZEITEN.map((m) => (
+          <button key={m} data-taste="timer-min" data-min={m} title={`${m} Minuten`} aria-label={`${m} Minuten`} onClick={() => { timerStart(boardId, m); fertig(); }}>{m}</button>
+        ))}
+        <span className="timer-zeile-einheit">min</span>
+        {laeuft && <button className="stopp" data-taste="timer-stopp" onClick={() => { timerStopp(boardId); fertig(); }}>Anhalten</button>}
+      </span>
+    </div>
   );
 }
 

@@ -2,12 +2,11 @@ import { useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoard, type BoardSortierung } from '../store';
 import { boardToShareUrl, downloadBoardFile, hatAblageInhalt, SHARE_URL_LIMIT } from '../lib/share';
-import { kontoIstEigenes } from '../lib/kontoSync';
 import { FreigabeDialog } from './FreigabeDialog';
 import { LinkDialog } from './LinkDialog';
 import {
   IArchive, IArchiveRestore, ICopy, IDownload, IDuplicate, IMore, IMoveTo,
-  IPen, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck,
+  IPen, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck, IUsers, IX,
 } from './Icons';
 import { MENUE_HIER } from '../lib/kontextmenue';
 
@@ -132,6 +131,7 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
   klasse?: string;
 }) {
   const board = useBoard((s) => s.boards.find((b) => b.id === boardId));
+  const fremd = !!board && (!!board.geteiltVon || !!board.gastLink);   // M391: als Gast in diesem Board
   const spaces = useBoard((s) => s.spaces);
   const renameBoard = useBoard((s) => s.renameBoard);
   const duplicateBoard = useBoard((s) => s.duplicateBoard);
@@ -199,10 +199,11 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
         </>
       ) : (
         <>
-          <button role="menuitem" onClick={() => { zu(); if (onRename) onRename(); else {
+          {/* M391: Das Board eines anderen benennt, archiviert und löscht man nicht — man verlässt es (im Dialog „Gemeinsames Board") */}
+          {!fremd && <button role="menuitem" onClick={() => { zu(); if (onRename) onRename(); else {
             const n = window.prompt('Board umbenennen:', board.name);
             if (n?.trim()) renameBoard(boardId, n.trim());
-          } }}><IPen size={14} /> Umbenennen</button>
+          } }}><IPen size={14} /> Umbenennen</button>}
           <button role="menuitem" onClick={() => { duplicateBoard(boardId); zu(); }}>
             <IDuplicate size={14} /> Duplizieren
           </button>
@@ -210,13 +211,12 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
             <IMoveTo size={14} /> In Projekt verschieben …
           </button>
           <div className="ebenen-menu-titel">Weitergeben</div>
-          {(kontoIstEigenes() || board.gastLink) && (
-            <button role="menuitem" onClick={() => { setFreigabe(true); zu(); }} data-taste="board-freigeben">
-              <IShare size={14} /> {board.gastLink ? 'Gemeinsames Board …' : board.geteiltVon ? 'Geteilt mit mir …' : 'Gemeinsam bearbeiten …'}
-            </button>
-          )}
+          {/* M391: immer da — ohne Konto sagt der Dialog, was fehlt (vorher fehlte der Punkt und niemand fand die Funktion) */}
+          <button role="menuitem" onClick={() => { setFreigabe(true); zu(); }} data-taste="board-freigeben">
+            <IUsers size={14} /> {board.gastLink ? 'Gemeinsames Board …' : board.geteiltVon ? 'Geteilt mit mir …' : 'Gemeinsam bearbeiten …'}
+          </button>
           <button role="menuitem" onClick={() => { setLinkOffen(true); zu(); }} data-taste="board-link">
-            <IShare size={14} /> Per Link teilen …
+            <IShare size={14} /> Kopie per Link teilen …
           </button>
           <button role="menuitem" onClick={() => { downloadBoardFile(board); zu(); }}>
             <IDownload size={14} /> Als Datei sichern
@@ -224,11 +224,13 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
           <button role="menuitem" onClick={() => { setView('board'); openBoard(boardId); setPresenting(true); zu(); }}>
             <IPlay size={14} /> Präsentieren
           </button>
-          <div className="ebenen-menu-titel">Aufräumen</div>
-          <button role="menuitem" onClick={() => { archiveBoard(boardId, !board.archived); zu(); }}>
+          {!fremd && <div className="ebenen-menu-titel">Aufräumen</div>}
+          {!fremd && <button role="menuitem" onClick={() => { archiveBoard(boardId, !board.archived); zu(); }}>
             {board.archived ? <><IArchiveRestore size={14} /> Zurückholen</> : <><IArchive size={14} /> Archivieren</>}
-          </button>
-          <button
+          </button>}
+          {fremd && <div className="ebenen-menu-titel">Aufräumen</div>}
+          {fremd && <button role="menuitem" data-taste="board-verlassen" onClick={() => { setFreigabe(true); zu(); }}><IX size={14} /> Verlassen …</button>}
+          {!fremd && <button
             role="menuitem"
             className="ebenen-menu-gefahr"
             onClick={() => {
@@ -238,7 +240,7 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
               if (window.confirm(frage)) removeBoard(boardId);
               zu();
             }}
-          ><ITrash size={14} /> Löschen</button>
+          ><ITrash size={14} /> Löschen</button>}
         </>
       )
     )} />

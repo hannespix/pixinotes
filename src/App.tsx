@@ -50,6 +50,7 @@ import { PunkteLeiste } from './components/Punkte';
 import { Vorfuehren } from './components/Vorfuehren';
 import { SprachHinweis } from './components/SprachHinweis';
 import { GastNameDialog, LiveLeiste, NAME_FRAGEN } from './components/LiveLeiste';
+import { FreigabeHost } from './components/FreigabeDialog';
 import { getAuthor } from './components/CommentLayer';
 import { loadKonto } from './lib/kontoSync';
 import { sprache } from './lib/sprache';
@@ -413,6 +414,7 @@ export default function App() {
         {/* M377: Punkte-Modus — Karten antippen statt auswählen */}
         {view === 'board' && !tasksOpen && !presenting && <PunkteLeiste />}
         <GastNameDialog />
+        <FreigabeHost />
         {/* M368: anderssprachigen Nutzern sagen, dass der Browser die Oberfläche übersetzen kann */}
         {!presenting && <SprachHinweis />}
         {/* M360: Nur lesend geteiltes Board — sagen, warum nichts geht, und den Ausweg anbieten */}

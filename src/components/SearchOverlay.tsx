@@ -84,7 +84,10 @@ function buildCommands(): Command[] {
       run: () => window.dispatchEvent(new CustomEvent('pixinotes:vorlagen', { detail: {} })) },
     // M385: Einladungslink als QR-Code einblenden
     { label: '🔳 QR-Code zum Mitmachen', hint: 'Einladungslink groß einblenden — das Publikum scannt ihn', alias: 'qr code scannen publikum audience mitmachen teilnehmen einladen abstimmung workshop join',
-      run: () => { if (!qrZeigen()) st().showToast('Dieses Board hat noch keinen Einladungslink — Board-Menü ⋯ → „Gemeinsam bearbeiten" legt ihn an.', false, 7000); } },
+      // M391: Gibt es noch keinen Link, geht gleich der Dialog auf, der ihn anlegt (vorher: ein Hinweis, wo er zu finden wäre)
+      run: () => { if (!qrZeigen()) { window.dispatchEvent(new CustomEvent('pixinotes:freigabe-oeffnen', { detail: {} })); st().showToast('Dieses Board hat noch keinen Einladungslink — hier legst du ihn an.', false, 5000); } } },
+    { label: '👥 Gemeinsam bearbeiten', hint: 'Andere per Link einladen — live im selben Board', alias: 'einladen teilen team gruppe gruppenarbeit zusammenarbeit freigeben freigabe share invite collaborate live link gast gäste',
+      run: () => window.dispatchEvent(new CustomEvent('pixinotes:freigabe-oeffnen', { detail: {} })) },
     { label: '🏠 Zur Übersicht', hint: 'Alle Bereiche, Projekte und Boards', alias: 'home start mission',
       run: () => st().setView('overview') },
     { label: '🕸 Netz-Ansicht', hint: 'Boards als Graph', alias: 'graph netz verbindungen',

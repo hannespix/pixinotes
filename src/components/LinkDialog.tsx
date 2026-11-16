@@ -53,7 +53,7 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal freigabe-dialog link-dialog" role="dialog" aria-modal="true" aria-label="Board per Link teilen" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>🔗 Per Link teilen</h2>
+          <h2>🔗 Kopie per Link teilen</h2>
           <button className="modal-x" onClick={onClose} aria-label="Schließen"><IX size={16} /></button>
         </div>
         <div className="modal-body">

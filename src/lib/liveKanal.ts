@@ -57,12 +57,26 @@ export function liveKanal(
       ...(typeof m.karte === 'string' && m.karte ? { karte: m.karte, seit: typeof m.seit === 'number' ? m.seit : 0 } : {}),
     };
   };
+  /**
+   * Leitung abbauen und nach der Pause neu aufbauen. Wartet NICHT auf das Schließen-Ereignis: Antwortet der Server
+   * nicht mehr, bleibt eine Leitung lange im Zustand „schließt" — so lange wäre niemand verbunden.
+   */
+  const neu = () => {
+    verbunden = false;
+    clearInterval(herz);
+    const alt = ws; ws = null;
+    if (alt) { alt.onopen = null; alt.onmessage = null; alt.onclose = null; alt.onerror = null; try { alt.close(); } catch { /* egal */ } }
+    da.clear(); melden();
+    if (!aktiv) return;
+    clearTimeout(neuTimer);
+    neuTimer = setTimeout(verbinden, pause);
+    pause = Math.min(pause * 2, 60_000);
+  };
   const verbinden = () => {
     if (!aktiv || typeof WebSocket === 'undefined' || !k.url || !k.key) return;
     const url = `${k.url.replace(/^http/, 'ws')}/realtime/v1/websocket?apikey=${encodeURIComponent(k.key)}&vsn=1.0.0`;
     try { ws = new WebSocket(url); } catch { return; }
     ws.onopen = () => {
-      pause = 1000;
       roh('phx_join', {
         config: { broadcast: { ack: false, self: false }, presence: { enabled: true, key: selbst.id }, postgres_changes: [], private: false },
         ...(token ? { access_token: token } : {}),
@@ -74,7 +88,15 @@ export function liveKanal(
       try {
         const j = JSON.parse(String(m.data)) as { topic?: string; event?: string; payload?: Record<string, unknown> & { status?: string; event?: string; payload?: unknown } };
         if (j.topic !== topic) return;
-        if (j.event === 'phx_reply' && j.payload?.status === 'ok' && !verbunden) { verbunden = true; anmelden(); return; }
+        // M391: Die Antwort auf den Beitritt kann auch eine ABLEHNUNG sein (Grenze erreicht, Schlüssel abgelaufen) — und ein
+        // Kanal kann auf dem Server enden, während die Leitung steht. Beides blieb unbemerkt: „verbindet …" für immer,
+        // oder scheinbar verbunden, aber stumm. Jetzt wird die Leitung dann neu aufgebaut (mit wachsender Pause).
+        if (j.event === 'phx_reply' && !verbunden) {
+          if (j.payload?.status === 'ok') { verbunden = true; pause = 1000; anmelden(); }
+          else if (j.payload?.status === 'error') neu();
+          return;
+        }
+        if (j.event === 'phx_error' || j.event === 'phx_close') { neu(); return; }
         if (j.event === 'broadcast' && typeof j.payload?.event === 'string') { auf.nachricht(j.payload.event, j.payload.payload); return; }
         if (j.event === 'presence_state') {
           da.clear();
@@ -90,15 +112,8 @@ export function liveKanal(
         }
       } catch { /* egal */ }
     };
-    ws.onclose = () => {
-      verbunden = false;
-      clearInterval(herz);
-      da.clear(); melden();
-      if (!aktiv) return;
-      neuTimer = setTimeout(verbinden, pause);
-      pause = Math.min(pause * 2, 60_000);
-    };
-    ws.onerror = () => { try { ws?.close(); } catch { /* egal */ } };
+    ws.onclose = () => neu();
+    ws.onerror = () => neu();
   };
   verbinden();
   return {

@@ -8,11 +8,14 @@
 import { QR_EREIGNIS } from '../lib/qr';
 import { useEffect, useState } from 'react';
 import { useBoard } from '../store';
-import { freigabeAnlegen, freigabeEntfernen, freigabenDesBoards, freigabeRolleSetzen, freigabeVerlassen, loadKonto, type Freigabe, type FreigabeRolle } from '../lib/kontoSync';
+import { freigabeAnlegen, freigabeEntfernen, freigabenDesBoards, freigabeRolleSetzen, freigabeVerlassen, kontoIstEigenes, loadKonto, type Freigabe, type FreigabeRolle } from '../lib/kontoSync';
 import { einladungDesBoards, einladungLoeschen, EinladungNichtEingerichtet, einladungSetzen, einladungUrl, type Einladung } from '../lib/einladung';
 import { gastVerlassen, kontoKanaele, rechtAus, sicherungVon, sicherungZurueck } from '../lib/gastSync';
 import { gruppeVon, type GastRecht } from '../store';
 import { IX } from './Icons';
+
+/** M391: Den Einladungs-Dialog von überall öffnen */
+export const FREIGABE_OEFFNEN = 'pixinotes:freigabe-oeffnen';
 
 /** M360: Rolle wählen — überall dieselben zwei Wörter */
 function RollenWahl({ wert, onChange, disabled, taste, label }: { wert: FreigabeRolle; onChange: (r: FreigabeRolle) => void; disabled?: boolean; taste?: string; label: string }) {
@@ -35,13 +38,15 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
   const [link, setLink] = useState<Einladung | null | undefined | 'fehlt'>(undefined);
   const [linkRolle, setLinkRolle] = useState<FreigabeRolle>('bearbeiten');
   // M364: Der Link lässt auch Leute ohne Konto mitarbeiten
-  const [ohneKonto, setOhneKonto] = useState(false);
+  // M391: Vorgabe ist der unkomplizierte Weg — Link öffnen, Namen sagen, mitmachen. Ein Konto verlangt, wer es will.
+  const [ohneKonto, setOhneKonto] = useState(true);
   // M365: Was Gäste dürfen; Sicherung von vor der Gruppenarbeit (Zeitpunkt)
   const [recht, setRecht] = useState<GastRecht>('alles');
   const [sicherung, setSicherung] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState('');
-  const eigenesKonto = loadKonto();
+  const eigenesKonto = kontoIstEigenes() ? loadKonto() : null;
+  const andererWeg = !eigenesKonto && !!loadKonto();   // mit Google/Microsoft-Ablage angemeldet
   const gast = !!board?.geteiltVon;
   const perLink = !!board?.gastLink;   // M364: ohne Konto per Link eingewählt
   const nurLesen = board?.geteiltRolle === 'lesen';
@@ -51,7 +56,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
     try { setListe(await freigabenDesBoards(boardId)); setFehler(''); } catch (e) { setFehler((e as Error).message); setListe([]); }
   };
   useEffect(() => {
-    if (!gast) {
+    if (!gast && eigenesKonto) {
       void laden();
       void sicherungVon(boardId).then((z) => setSicherung(z));
       einladungDesBoards(boardId).then((e) => { setLink(e); if (e) { setLinkRolle(e.rolle === 'lesen' ? 'lesen' : 'bearbeiten'); setOhneKonto(!!e.ohne_konto); setRecht(rechtAus(e.optionen)); } })
@@ -181,90 +186,105 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                   <button disabled={busy} onClick={verlassen} data-taste="freigabe-verlassen">{busy ? '…' : perLink ? 'Board verlassen' : 'Freigabe verlassen'}</button>
                 </div>
               </>
+            ) : !eigenesKonto ? (
+              <>
+                {/* M391: Ohne Konto war der Menüpunkt unsichtbar — jetzt sagt der Dialog, was fehlt, und führt hin */}
+                <p className="modal-hint" data-taste="freigabe-ohne-konto">
+                  <b translate="no">{board.name}</b>: Andere öffnen einen Link und arbeiten live mit — ohne Konto. Nur du brauchst ein kostenloses PixiNotes-Konto, damit das Board einen gemeinsamen Ort hat.
+                  {andererWeg && <> Dein Abgleich über Google oder Microsoft bleibt davon unberührt, kann aber nicht live teilen.</>}
+                </p>
+                <div className="modal-buttons">
+                  <button className="primaer" data-taste="freigabe-anmelden" onClick={() => { onClose(); useBoard.getState().setSettingsOpen(true, 'konto'); }}>Anmelden oder Konto anlegen</button>
+                </div>
+              </>
             ) : (
               <>
-                <p className="modal-hint">
-                  Gemeinsam an „<span translate="no">{board.name}</span>" arbeiten: Alle sehen Änderungen live, und eine Karte gehört dem, der sie gerade bearbeitet.
-                  Mit dem Einladungslink ist man <b>mit Konto</b> dabei (das Board liegt dann unter <b>Geteilt mit mir</b>) — oder, wenn du es erlaubst,
-                  <b> ganz ohne Konto</b>: Link öffnen, Namen sagen, mitmachen. Du legst fest, wer bearbeiten und wer nur lesen darf.
-                </p>
                 {link !== 'fehlt' && (
-                  <div className="freigabe-block" data-taste="einladung">
-                    <div className="freigabe-titel">Einladungslink</div>
+                  <div data-taste="einladung">
                     {link === undefined ? (
                       <div className="modal-note">Lade …</div>
                     ) : link ? (
                       <>
                         <div className="link-zeile">
                           <input readOnly value={einladungUrl(link.token)} onFocus={(e) => e.currentTarget.select()} aria-label="Einladungslink" data-taste="einladung-adresse" />
-                          <button onClick={() => void kopieren(einladungUrl(link.token))} data-taste="einladung-kopieren">Kopieren</button>
-                          {typeof navigator.share === 'function' && <button onClick={() => void linkSenden(einladungUrl(link.token))}>Senden …</button>}
+                          <button className="primaer" onClick={() => void kopieren(einladungUrl(link.token))} data-taste="einladung-kopieren">Kopieren</button>
                           {/* M385: groß zum Scannen — für alle im Raum */}
                           <button data-taste="einladung-qr" title="Den Link als QR-Code einblenden — zum Scannen vom Beamer oder Bildschirm"
                             onClick={() => { window.dispatchEvent(new CustomEvent(QR_EREIGNIS, { detail: { boardId, url: einladungUrl(link.token), ohneKonto } })); onClose(); }}>QR-Code</button>
+                          {typeof navigator.share === 'function' && <button onClick={() => void linkSenden(einladungUrl(link.token))}>Senden …</button>}
                         </div>
+                        {/* Ein Satz sagt, was der Link gerade kann — die Schalter dazu stehen unter „Optionen" */}
+                        <p className="modal-hint freigabe-satz" data-taste="einladung-satz">
+                          Wer den Link öffnet, <b>{ohneKonto ? 'ist sofort dabei — ohne Konto' : 'meldet sich mit seinem PixiNotes-Konto an'}</b> {linkRolle === 'lesen' ? 'und liest mit.'
+                            : recht === 'eigenes' ? 'und arbeitet live mit (ändert nur eigene Karten).'
+                            : recht === 'eigenes-loeschen' ? 'und arbeitet live mit (löscht nur Eigenes).' : 'und arbeitet live mit.'}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="modal-hint freigabe-satz">
+                          <b translate="no">{board.name}</b>: Link öffnen, Namen sagen, mitmachen — alle sehen Änderungen live.
+                        </p>
+                        <div className="modal-buttons">
+                          <button className="primaer" disabled={busy} onClick={() => void linkAnlegen(linkRolle, true)} data-taste="einladung-anlegen">{busy ? '…' : 'Einladungslink erstellen'}</button>
+                        </div>
+                      </>
+                    )}
+                    {link !== undefined && (
+                      <details className="freigabe-mehr" data-taste="einladung-optionen">
+                        <summary>Optionen</summary>
                         <div className="freigabe-zeile">
                           <span>Wer dem Link folgt,</span>
-                          <RollenWahl wert={linkRolle} disabled={busy} label="Rolle des Einladungslinks" taste="einladung-rolle" onChange={(r) => void linkAnlegen(r, false)} />
-                          <button className="link-weg" disabled={busy} onClick={() => void linkWeg()} data-taste="einladung-weg">Link widerrufen</button>
+                          <RollenWahl wert={linkRolle} disabled={busy} label="Rolle des Einladungslinks" taste="einladung-rolle" onChange={link ? (r) => void linkAnlegen(r, false) : setLinkRolle} />
                         </div>
+                        {rechtWahl}
                         <label className="freigabe-schalter">
                           <input type="checkbox" checked={ohneKonto} disabled={busy} onChange={(e) => void ohneKontoSetzen(e.target.checked)} data-taste="einladung-ohne-konto" />
-                          <span><b>Auch ohne Konto</b> — wer den Link öffnet, ist sofort dabei (Gruppenarbeit, Unterricht, Workshop)</span>
+                          <span><b>Mitmachen ohne Konto</b> — ausgeschaltet braucht jeder Gast ein PixiNotes-Konto</span>
                         </label>
-                        {rechtWahl}
-                        {sicherung && (
+                        {link && sicherung && (
                           <div className="freigabe-zeile sicherung" data-taste="sicherung">
                             <span>🛟 Stand von vor der Gruppenarbeit ({new Date(sicherung).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })})</span>
                             <button disabled={busy} onClick={() => void zurueckZurSicherung()} data-taste="sicherung-zurueck">Wiederherstellen</button>
                           </div>
                         )}
-                      </>
-                    ) : (
-                      <div className="freigabe-zeile">
-                        <span>Wer dem Link folgt,</span>
-                        <RollenWahl wert={linkRolle} disabled={busy} label="Rolle des Einladungslinks" taste="einladung-rolle" onChange={setLinkRolle} />
-                        <button disabled={busy || !eigenesKonto} onClick={() => void linkAnlegen(linkRolle, true)} data-taste="einladung-anlegen">{busy ? '…' : 'Link erstellen und kopieren'}</button>
-                        <label className="freigabe-schalter">
-                          <input type="checkbox" checked={ohneKonto} disabled={busy} onChange={(e) => setOhneKonto(e.target.checked)} data-taste="einladung-ohne-konto" />
-                          <span><b>Auch ohne Konto</b> — wer den Link öffnet, ist sofort dabei (Gruppenarbeit, Unterricht, Workshop)</span>
-                        </label>
-                        {rechtWahl}
-                      </div>
+                        {link && (
+                          <div className="freigabe-zeile sicherung">
+                            <span>Zugang für alle beenden, die den Link haben</span>
+                            <button className="link-weg" disabled={busy} onClick={() => void linkWeg()} data-taste="einladung-weg">Link widerrufen</button>
+                          </div>
+                        )}
+                      </details>
                     )}
                   </div>
                 )}
-                <div className="freigabe-block">
-                  <div className="freigabe-titel">{link === 'fehlt' ? 'Person einladen' : 'Oder eine Person per E-Mail einladen'}</div>
+                <details className="freigabe-mehr" data-taste="freigabe-person" open={link === 'fehlt' || !!liste?.length || undefined}>
+                  <summary>{liste?.length ? `Einzelne Personen (${liste.length})` : 'Einzelne Person per E-Mail einladen'}</summary>
                   <div className="freigabe-zeile">
                     <input type="email" autoComplete="off" placeholder="kollegin@example.de" value={mail} onChange={(e) => setMail(e.target.value)} aria-label="E-Mail"
                       onKeyDown={(e) => { if (e.key === 'Enter') void einladen(); }} data-taste="freigabe-email" />
                     <RollenWahl wert={rolle} disabled={busy} label="Rolle der eingeladenen Person" taste="freigabe-rolle" onChange={setRolle} />
-                    <button disabled={!mailOk || busy || !eigenesKonto} onClick={einladen} data-taste="freigabe-einladen">{busy ? '…' : 'Freigeben'}</button>
+                    <button disabled={!mailOk || busy} onClick={einladen} data-taste="freigabe-einladen">{busy ? '…' : 'Freigeben'}</button>
                   </div>
-                </div>
-                {liste === null ? (
-                  <div className="modal-note">Lade Freigaben …</div>
-                ) : liste.length === 0 ? (
-                  <div className="modal-note">Noch für niemanden freigegeben.</div>
-                ) : (
-                  <ul className="freigabe-liste" data-taste="freigabe-liste">
-                    {liste.map((f) => (
-                      <li key={f.id}>
-                        <span className="freigabe-mail" translate="no">{f.gast_email}</span>
-                        <span className={`freigabe-stand ${f.gast_id ? 'an' : ''}`}>{f.gast_id ? 'angenommen' : 'wartet auf Anmeldung'}</span>
-                        <RollenWahl wert={f.rolle === 'lesen' ? 'lesen' : 'bearbeiten'} disabled={busy} label={`Rolle von ${f.gast_email}`} onChange={(r) => void rolleAendern(f, r)} />
-                        <button className="freigabe-weg" disabled={busy} onClick={() => void entfernen(f)} title="Freigabe entfernen" aria-label={`Freigabe für ${f.gast_email} entfernen`}><IX size={13} /></button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <div className="modal-note">
-                  Gäste ohne Konto bekommen auch die Anhänge des Boards (PDF, Bilder) zum Ansehen; bei Gästen mit Konto wandern Anhänge noch nicht mit —
-                  Notizen, Karten, Verbindungen und Zeichnungen immer. Wer den Link ohne Konto hat, kann ihn weitergeben: Widerrufen beendet den Zugang für alle.
-                  „Eigenes" ist, was jemand in der Gruppenarbeit selbst angelegt hat; was vorher da war, gehört dir. Strg+Z nimmt bei allen nur die eigenen Schritte zurück.
-                  Bei der E-Mail-Einladung braucht die Person ein PixiNotes-Konto mit genau dieser E-Mail. Eine Kopie ohne Konto weitergeben: Board-Menü → <b>Per Link teilen</b>.
-                </div>
+                  {liste === null ? (
+                    <div className="modal-note">Lade Freigaben …</div>
+                  ) : liste.length > 0 && (
+                    <ul className="freigabe-liste" data-taste="freigabe-liste">
+                      {liste.map((f) => (
+                        <li key={f.id}>
+                          <span className="freigabe-mail" translate="no">{f.gast_email}</span>
+                          <span className={`freigabe-stand ${f.gast_id ? 'an' : ''}`}>{f.gast_id ? 'angenommen' : 'wartet auf Anmeldung'}</span>
+                          <RollenWahl wert={f.rolle === 'lesen' ? 'lesen' : 'bearbeiten'} disabled={busy} label={`Rolle von ${f.gast_email}`} onChange={(r) => void rolleAendern(f, r)} />
+                          <button className="freigabe-weg" disabled={busy} onClick={() => void entfernen(f)} title="Freigabe entfernen" aria-label={`Freigabe für ${f.gast_email} entfernen`}><IX size={13} /></button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="modal-note">
+                    Die Person braucht ein PixiNotes-Konto mit genau dieser E-Mail; das Board liegt bei ihr dann unter <b>Geteilt mit mir</b>.
+                    Anhänge (PDF, Bilder) sehen bisher nur Gäste per Link.
+                  </div>
+                </details>
               </>
             )}
             {fehler && <div className="modal-error" role="alert">⚠️ {fehler}</div>}
@@ -273,4 +293,15 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
       </div>
     </div>
   );
+}
+
+/** M391: Ein Ort, an dem der Dialog von überall aufgeht (Leiste „Einladen …", Befehle) */
+export function FreigabeHost() {
+  const [boardId, setBoardId] = useState<string | null>(null);
+  useEffect(() => {
+    const auf = (e: Event) => setBoardId((e as CustomEvent<{ boardId?: string }>).detail?.boardId ?? useBoard.getState().activeId);
+    window.addEventListener(FREIGABE_OEFFNEN, auf);
+    return () => window.removeEventListener(FREIGABE_OEFFNEN, auf);
+  }, []);
+  return boardId ? <FreigabeDialog boardId={boardId} onClose={() => setBoardId(null)} /> : null;
 }

@@ -433,7 +433,7 @@ async function dialogOeffnen(P, name) {
   const z = P.locator('.tabs.spalte .side-board', { hasText: name }).first();
   await z.hover(); await P.waitForTimeout(200);
   await z.locator('.ebenen-menu-knopf').click(); await P.waitForTimeout(300);
-  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600);
+  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600); await P.waitForSelector('[data-taste="einladung-optionen"], [data-taste="freigabe-ohne-konto"], [data-taste="freigabe-verlassen"]', { timeout: 2500 }).catch(() => {}); await P.evaluate(() => document.querySelectorAll('.freigabe-dialog details').forEach((d) => { d.open = true; }));
 }
 
 const sperre = (P, karte) => P.locator(`[data-taste="live-sperre"][data-karte="${karte}"]`);
@@ -508,7 +508,6 @@ const uidA = nutzerId('anna@example.de');
 await warteBis(A.P, () => !!zeile(uidA, 'umgebung.json'), 8000);
 await dialogOeffnen(A.P, 'Planung');
 pruefe('A1 der Dialog bietet die Wahl „Gäste dürfen …" mit drei Stufen', (await A.P.locator('[data-taste="einladung-recht"] option').count()) === 3);
-await A.P.locator('[data-taste="einladung-ohne-konto"]').check();
 await A.P.locator('[data-taste="einladung-recht"]').selectOption('eigenes-loeschen');
 await A.P.locator('[data-taste="einladung-anlegen"]').click();
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="einladung-adresse"]').count()) === 1, 6000);
