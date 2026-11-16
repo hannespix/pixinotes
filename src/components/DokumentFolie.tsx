@@ -20,6 +20,7 @@ import type { FileNode } from '../types';
 import { wordEntschaerfen } from '../lib/sicher';
 import type { Ansicht } from '../lib/vorfuehren';
 import type { DokumentArt } from '../lib/dokumentArt';
+import { FOLIE_ZOOM, type FolieZoom } from '../lib/folienWerkzeug';
 
 export { dokumentArt, type DokumentArt } from '../lib/dokumentArt';
 
@@ -232,6 +233,12 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
   }, []);
   const zRef = useRef(z);
   zRef.current = z;
+  // M396: Die Zeichenschicht liegt über der Seite, solange ein Stift gewählt ist — kneifen zwei Finger dort, zoomt die Seite trotzdem
+  useEffect(() => {
+    const auf = (e: Event) => { const d = (e as CustomEvent<FolieZoom>).detail; if (d && d.faktor > 0) zoomen(zRef.current * d.faktor, d.x, d.y); };
+    window.addEventListener(FOLIE_ZOOM, auf);
+    return () => window.removeEventListener(FOLIE_ZOOM, auf);
+  }, [zoomen]);
   const meldet = !!onAnsicht;
   useEffect(() => {
     const el = flaecheRef.current;
