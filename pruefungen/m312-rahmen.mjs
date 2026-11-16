@@ -167,8 +167,8 @@ console.log('\n════ C: Dock ════');
   await P.locator('.dock [aria-label="Mehr"]').click();
   await P.waitForTimeout(300);
   const mehr = await beschriftung(P, '.dock-menu-more button');
-  // M377: „Punkte vergeben" kam dazu (Abstimmen auf dem Board)
-  pruefe('C2 ⋯: KI-Assistent, Anordnen, Punkte vergeben, Präsentieren, Als Bild exportieren, Alles einpassen', JSON.stringify(mehr) === JSON.stringify(['KI-Assistent', 'Anordnen', 'Punkte vergeben', 'Präsentieren', 'Als Bild exportieren', 'Alles einpassen']), JSON.stringify(mehr));
+  // M377: „Punkte vergeben" kam dazu (Abstimmen auf dem Board) · M391: „Gemeinsam bearbeiten" (der Weg zur Zusammenarbeit vom Board aus)
+  pruefe('C2 ⋯: KI-Assistent, Anordnen, Gemeinsam bearbeiten, Punkte vergeben, Präsentieren, Als Bild exportieren, Alles einpassen', JSON.stringify(mehr) === JSON.stringify(['KI-Assistent', 'Anordnen', 'Gemeinsam bearbeiten', 'Punkte vergeben', 'Präsentieren', 'Als Bild exportieren', 'Alles einpassen']), JSON.stringify(mehr));
   pruefe('C3 kein zweites „Aufräumen", kein Archiv-Eintrag im Dock', !mehr.some((m) => /aufräumen|Archiv/i.test(m)));
   await P.locator('.dock-menu-more [aria-label="Alles einpassen"]').click();
   await P.waitForTimeout(600);

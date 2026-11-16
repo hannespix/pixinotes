@@ -353,7 +353,7 @@ async function dialogOeffnen(P, name) {
   const z = P.locator('.tabs.spalte .side-board', { hasText: name }).first();
   await z.hover(); await P.waitForTimeout(200);
   await z.locator('.ebenen-menu-knopf').click(); await P.waitForTimeout(300);
-  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600);
+  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600); await P.waitForSelector('[data-taste="einladung-optionen"], [data-taste="freigabe-ohne-konto"], [data-taste="freigabe-verlassen"]', { timeout: 2500 }).catch(() => {}); await P.evaluate(() => document.querySelectorAll('.freigabe-dialog details').forEach((d) => { d.open = true; }));
 }
 
 // ══ A: Anna gibt nur zum Lesen frei ═════════════════════════════════
@@ -367,7 +367,7 @@ await warteBis(A.P, () => !!zeile(uidA, 'umgebung.json'), 8000);
   await z.hover(); await A.P.waitForTimeout(200);
   await z.locator('.ebenen-menu-knopf').click(); await A.P.waitForTimeout(300);
   pruefe('A1 das Board-Menü nennt den Weg „Gemeinsam bearbeiten …"', /Gemeinsam bearbeiten/.test(await A.P.locator('[data-taste="board-freigeben"]').textContent()));
-  await A.P.locator('[data-taste="board-freigeben"]').click(); await A.P.waitForTimeout(600);
+  await A.P.locator('[data-taste="board-freigeben"]').click(); await A.P.waitForTimeout(600); await A.P.waitForSelector('[data-taste="einladung-optionen"], [data-taste="freigabe-ohne-konto"], [data-taste="freigabe-verlassen"]', { timeout: 2500 }).catch(() => {}); await A.P.evaluate(() => document.querySelectorAll('.freigabe-dialog details').forEach((d) => { d.open = true; }));
 }
 pruefe('A2 der Dialog bietet Einladungslink und E-Mail mit Rollenwahl', (await A.P.locator('[data-taste="einladung"]').count()) === 1 && (await A.P.locator('[data-taste="freigabe-rolle"]').count()) === 1);
 await A.P.locator('[data-taste="freigabe-email"]').fill('bernd@example.de');
@@ -478,6 +478,7 @@ pruefe('F7 Bernds eigene Kopie bleibt', !!(await zustand(B.P)).boards.find((b) =
 // ══ G: Einladungslink ═══════════════════════════════════════════════
 console.log('\n════ G: Einladungslink ════');
 await dialogOeffnen(A.P, 'Ideen');
+await A.P.locator('[data-taste="einladung-ohne-konto"]').uncheck();   // M391: Vorgabe ist ohne Konto; dieser Link soll ein Konto verlangen
 await A.P.locator('[data-taste="einladung-anlegen"]').click();
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="einladung-adresse"]').count()) === 1, 6000);
 const einl = sb.einladungen[0];

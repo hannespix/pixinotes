@@ -338,6 +338,8 @@ async function dienste(ctx) {
           if (j.payload?.event === 'stand') sb.aufrufe.stand += 1;
           if (j.payload?.event === 'delta') sb.aufrufe.delta += 1;
           if (j.payload?.event === 'maus') sb.aufrufe.maus = (sb.aufrufe.maus ?? 0) + 1;
+          // M391: Für die Drosselung zählen nur gemeldete STELLEN — das „weg" eines anderen, der gerade stillhält, ist keine
+          if (j.payload?.event === 'maus' && !j.payload?.payload?.weg) sb.aufrufe.mausStelle = (sb.aufrufe.mausStelle ?? 0) + 1;
           liveAn(eintrag.live.topic, { topic: eintrag.live.topic, event: 'broadcast', payload: j.payload, ref: null }, eintrag.live);
         }
         return;
@@ -391,6 +393,9 @@ async function geraet(name, stand, anker = '') {
   await P.waitForTimeout(1500);
   return { ctx, P, name };
 }
+/** M391: Die Werkzeuge der Gruppe (Vorführen, Timer, QR-Code, Mauszeiger, Name) stehen in der Liste hinter der Leiste */
+const gruppeAuf = async (P) => { if (!(await P.locator('[data-taste="live-liste"]').count()) && (await P.locator('[data-taste="live-auf"]').count())) { await P.locator('[data-taste="live-auf"]').click(); await P.waitForTimeout(250); } };
+const gruppeZu = async (P) => { if (await P.locator('[data-taste="live-liste"]').count()) { await P.locator('[data-taste="live-auf"]').click(); await P.waitForTimeout(150); } };
 const zustand = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state);
 const texte = (P) => zustand(P).then((s) => JSON.stringify(s.boards));
 const boardVon = (P, id) => zustand(P).then((s) => s.boards.find((b) => b.id === id));
@@ -462,7 +467,7 @@ async function dialogOeffnen(P, name) {
   const z = P.locator('.tabs.spalte .side-board', { hasText: name }).first();
   await z.hover(); await P.waitForTimeout(200);
   await z.locator('.ebenen-menu-knopf').click(); await P.waitForTimeout(300);
-  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600);
+  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600); await P.waitForSelector('[data-taste="einladung-optionen"], [data-taste="freigabe-ohne-konto"], [data-taste="freigabe-verlassen"]', { timeout: 2500 }).catch(() => {}); await P.evaluate(() => document.querySelectorAll('.freigabe-dialog details').forEach((d) => { d.open = true; }));
 }
 
 const sperre = (P, karte) => P.locator(`[data-taste="live-sperre"][data-karte="${karte}"]`);
@@ -682,7 +687,6 @@ await anmelden(A.P, 'anna@example.de', 'geheim123', true);
 const uidA = nutzerId('anna@example.de');
 await warteBis(A.P, () => !!zeile(uidA, 'umgebung.json'), 8000);
 await dialogOeffnen(A.P, 'Planung');
-await A.P.locator('[data-taste="einladung-ohne-konto"]').check();
 await A.P.locator('[data-taste="einladung-anlegen"]').click();
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="einladung-adresse"]').count()) === 1, 6000);
 const token = /#e=(.+)$/.exec(await A.P.locator('[data-taste="einladung-adresse"]').inputValue().catch(() => ''))?.[1] ?? '';
@@ -703,7 +707,9 @@ await warteBis(G.P, async () => /2 dabei/.test(await zahl(G.P)), 8000);
 await warteBis(A.P, async () => /2 dabei/.test(await zahl(A.P)), 8000);
 const annaName = await G.P.evaluate(() => document.querySelector('[data-taste="live-chip"]')?.dataset.name ?? '');
 pruefe('A2 vor der ersten Bewegung ist kein Zeiger zu sehen', (await zeiger(A.P)).length === 0 && (await zeiger(G.P)).length === 0);
+await gruppeAuf(A.P);
 pruefe('A3 der Schalter für die Mauszeiger ist da und an', (await A.P.locator('[data-taste="live-maus"]').getAttribute('aria-pressed')) === 'true');
+await gruppeZu(A.P);
 
 await fahren(A.P, [820, 600], [900, 640]);
 await warteBis(G.P, async () => (await zeiger(G.P)).length === 1, 5000);
@@ -739,14 +745,18 @@ pruefe('A11 Anna sieht Gerds Zeiger — „Gerd", an seiner Stelle', za.length =
 pruefe('A12 die beiden haben verschiedene Farben', za[0] && zg[0] && za[0].farbe !== zg[0].farbe, `${za[0]?.farbe} / ${zg[0]?.farbe}`);
 
 // Abschalten: Anna blendet die Zeiger aus
+await gruppeAuf(A.P);
 await A.P.locator('[data-taste="live-maus"]').click();
+await gruppeZu(A.P);
 await warteBis(G.P, async () => (await zeiger(G.P)).length === 0, 4000);
 pruefe('A13 Anna schaltet ab: Ihr Zeiger verschwindet bei Gerd sofort', (await zeiger(G.P)).length === 0);
 const t14 = Date.now();
 await warteBis(A.P, async () => (await zeiger(A.P)).length === 0, 4000);
 console.log(`    Gerds Zeiger war bei Anna nach ${Date.now() - t14} ms weg`);
+await gruppeAuf(A.P);
 pruefe('A14 … und sie sieht Gerds Zeiger nicht mehr', (await zeiger(A.P)).length === 0 && (await A.P.locator('[data-taste="live-maus"]').getAttribute('aria-pressed')) === 'false',
   JSON.stringify({ z: await zeiger(A.P), an: await A.P.locator('[data-taste="live-maus"]').getAttribute('aria-pressed') }));
+await gruppeZu(A.P);
 const vorAus = sb.aufrufe.maus;
 await fahren(A.P, [820, 600], [700, 560]);
 await fahren(G.P, [1080, 700], [1000, 640]);
@@ -754,8 +764,12 @@ await A.P.waitForTimeout(700);
 pruefe('A15 abgeschaltet sendet Anna nichts und zeigt nichts — Gerd sendet weiter', (await zeiger(A.P)).length === 0 && (await zeiger(G.P)).length === 0 && sb.aufrufe.maus > vorAus, `${vorAus} → ${sb.aufrufe.maus}`);
 await A.P.reload({ waitUntil: 'domcontentloaded' });
 await warteBis(A.P, async () => /2 dabei/.test(await zahl(A.P)), 12000);
+await gruppeAuf(A.P);
 pruefe('A16 die Wahl bleibt nach dem Neuladen', (await A.P.locator('[data-taste="live-maus"]').getAttribute('aria-pressed')) === 'false');
+await gruppeZu(A.P);
+await gruppeAuf(A.P);
 await A.P.locator('[data-taste="live-maus"]').click();
+await gruppeZu(A.P);
 await fahren(A.P, [700, 560], [820, 600]);
 await warteBis(G.P, async () => (await zeiger(G.P)).length === 1, 5000);
 pruefe('A17 wieder eingeschaltet ist Annas Zeiger wieder da', (await zeiger(G.P)).length === 1);
@@ -781,11 +795,11 @@ const leute = Array.from({ length: 48 }, (_, i) => ({ id: `f${String(i + 1).padS
 for (const t of leute) fakeDa(topic, t.id, t);
 await warteBis(A.P, async () => /50 dabei/.test(await zahl(A.P)), 8000);
 await A.P.waitForTimeout(800);
-vor = sb.aufrufe.maus; t0 = Date.now();
+vor = sb.aufrufe.mausStelle ?? 0; t0 = Date.now();
 await fahren(A.P, [1000, 700], [700, 500], 100, 25);    // gut zweieinhalb Sekunden
 dauer = Date.now() - t0;
 await A.P.waitForTimeout(900);
-const inGruppe = sb.aufrufe.maus - vor;
+const inGruppe = (sb.aufrufe.mausStelle ?? 0) - vor;
 console.log(`    zu fünfzigst: ${inGruppe} Meldungen in ${dauer} ms`);
 pruefe('B4 zu fünfzigst: höchstens alle 0,7 Sekunden eine Meldung je Person', inGruppe >= 2 && inGruppe <= dauer / 700 + 2, `${inGruppe} in ${dauer} ms`);
 // alle fünfzig bewegen sich: Gerd zeigt höchstens vierzig Zeiger — und bleibt bedienbar
@@ -810,6 +824,7 @@ pruefe('B8 wer geht, nimmt seinen Zeiger mit', (await zeiger(G.P)).length <= 1, 
 // ══ C ═══════════════════════════════════════════════════════════════
 console.log('\n════ C: Vorführen — Laser auf dem Board ════');
 await warteBis(A.P, async () => /2 dabei/.test(await zahl(A.P)), 8000);
+await gruppeAuf(A.P);
 await A.P.locator('[data-taste="vorfuehren"]').click();
 await warteBis(G.P, async () => /führt vor/.test(await zband(G.P)), 6000);
 await G.P.waitForTimeout(900);          // Gerds Ansicht fährt mit

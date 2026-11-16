@@ -14,7 +14,8 @@ import {
   IAppWindow, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITimelineIcon, ITimer, IWand, IWeek, IX,
- IBubbles } from './Icons';
+ IBubbles , IUsers
+} from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
 import { t } from '../lib/sprache';
 
@@ -32,6 +33,7 @@ export function Dock() {
   const addNode = useBoard((s) => s.addNode);
   const showToast = useBoard((s) => s.showToast);
   const setSettingsOpen = useBoard((s) => s.setSettingsOpen);
+  const alsGast = useBoard((s) => { const b = s.boards.find((x) => x.id === s.activeId); return !!b && (!!b.geteiltVon || !!b.gastLink); });
   const setPresenting = useBoard((s) => s.setPresenting);
   const tool = useBoard((s) => s.tool);
   const setTool = useBoard((s) => s.setTool);
@@ -505,6 +507,15 @@ export function Dock() {
               <IArrange size={16} /> Anordnen &amp; Hintergrund …
             </button>
             <div className="dock-menu-label">Board</div>
+            {/* M391: Der Weg zur Zusammenarbeit steht auch am Board selbst — am Telefon gibt es die linke Spalte nicht */}
+            <button
+              onClick={() => { setMoreMenu(false); window.dispatchEvent(new CustomEvent('pixinotes:freigabe-oeffnen', { detail: {} })); }}
+              data-taste="dock-gemeinsam"
+              title="Andere per Link einladen — live im selben Board"
+              aria-label="Gemeinsam bearbeiten"
+            >
+              <IUsers size={16} /> {alsGast ? 'Gemeinsames Board …' : 'Gemeinsam bearbeiten …'}
+            </button>
             {/* M377: Punkte kleben — Karten antippen, jede Person einen Punkt je Karte */}
             <button
               onClick={() => { setMoreMenu(false); punkteModusSetzen(true); }}

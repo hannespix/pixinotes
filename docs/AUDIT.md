@@ -24,11 +24,11 @@ Jeder Fund wurde am Code nachgeprüft, bevor er behoben wurde. Status: ✅ behob
 | S2 | kritisch | Word-Vorschau (docx-preview) führt eingebettetes HTML (altChunk) ohne Sandbox aus; Verweise ungefiltert | ✅ altChunk aus; Skripte, Rahmen, Ereignis-Attribute und fremde Verweise werden aus der Vorschau entfernt |
 | S3 | hoch | Rückkehr vom Anmelde-Link nimmt jedes `#access_token=…` an — fremdes Konto ließe sich unterschieben, eigene Boards würden dorthin hochgeladen | ✅ Rückfrage, wenn der Link nicht auf diesem Gerät angefordert wurde oder ein anderes Konto ersetzen würde |
 | S4 | hoch | `triggerDownload` klickt jede Adresse aus dem Board an (auch `javascript:`) | ✅ nur `data:`/`blob:` werden gespeichert; fremde Webadressen öffnen einen neuen Tab; alles andere wird ignoriert |
-| S5 | hoch | Live-Kanal: Inhalte (`karte`, `delta`, `zeig`, Sperren) gelangen ungeprüft in den Stand; Nur-Lese-Gäste können senden; Karte ohne Lage bringt alle zum Absturz | ✅ alles aus dem Kanal wird geprüft (Form, Absender anwesend, Zeit); kaputte Stücke fallen weg · Kanäle mit Server-Prüfung der Teilnehmer: ⏳ M391 |
+| S5 | hoch | Live-Kanal: Inhalte (`karte`, `delta`, `zeig`, Sperren) gelangen ungeprüft in den Stand; Nur-Lese-Gäste können senden; Karte ohne Lage bringt alle zum Absturz | ✅ alles aus dem Kanal wird geprüft (Form, Absender anwesend, Zeit); kaputte Stücke fallen weg · Kanäle mit Server-Prüfung der Teilnehmer: ➖ setzen ein Konto je Teilnehmer voraus (§4) |
 | S6 | mittel | `nodeToHtml`: `progress`, `kind`, `date` ohne Escaping → Skript beim PDF-/Druck-Export | ✅ |
 | S7 | mittel | Anhänge-Adressen 10 Jahre gültig — Widerruf eines Links beendet den Zugriff nicht | ✅ neue Adressen gelten 30 Tage und erneuern sich selbst · früher ausgestellte bleiben bis zu ihrem Ablauf gültig (lassen sich nur durch Löschen der Datei entwerten) |
 | S8 | mittel | „Board im Link" / `.pixiboard.json` enthalten Einladungs-Token und E-Mail des Besitzers | ✅ beides wird vor dem Weitergeben entfernt |
-| S9 | mittel | Gast-Rechte („nur Eigenes") serverseitig nur für Karten geprüft, nicht für Verbindungen/Striche/Kommentare; `board_aendern` prüft sie gar nicht | ✅ Form jedes vom Gast geschriebenen Stücks prüft der Server (Migration `inhalt_pruefen` — liegt bereit, Einspielen braucht die Bestätigung des Besitzers; bis dahin prüft die App allein) · „nur Eigenes" für Verbindungen/Striche/Kommentare: ⏳ M391 |
+| S9 | mittel | Gast-Rechte („nur Eigenes") serverseitig nur für Karten geprüft, nicht für Verbindungen/Striche/Kommentare; `board_aendern` prüft sie gar nicht | ✅ Form jedes vom Gast geschriebenen Stücks prüft der Server (Migration `inhalt_pruefen` — liegt bereit, Einspielen braucht die Bestätigung des Besitzers; bis dahin prüft die App allein) · „nur Eigenes" gilt jetzt auch für Verbindungen und Striche — in der App und auf dem Server (Migration `team_haertung`, M391); Kommentare ➖ (§4) |
 | S10 | niedrig | Speicher-Meldungen der Tools ohne Absender-Prüfung | ✅ nur der eigene Rahmen und selbst geöffnete Tabs |
 | S11 | niedrig | Bild-/Dateiquellen aus fremden Boards können fremde Server ansprechen (IP sichtbar) | ➖ Bilder aus dem Netz sind eine gewollte Funktion (Bild per Adresse); wer ein fremdes Board übernimmt, wird vorher gefragt |
 
@@ -88,9 +88,9 @@ Jeder Fund wurde am Code nachgeprüft, bevor er behoben wurde. Status: ✅ behob
 | A8 | WebDAV: Schreiben ohne Vorbedingung — zwei Geräte überschreiben einander | ✅ in M390 |
 | A9 | Konto löschen lässt die Dateien im Speicher zurück (und scheitert daran) | ✅ |
 | A10 | Mitgelesene Karte: gefälschte Felder (`archived`, Art, Größe) bleiben nach dem Loslassen stehen und gehen mit dem nächsten Speichern hinaus | ✅ übernommen werden nur Inhalt, Lage, Größe |
-| A11 | Abgelehnter Kanal-Beitritt wird nie wiederholt; „live verbunden" wird fälschlich angezeigt | ✅ Konto-Kanal · Live-Kanal der Boards: ⏳ M391 |
-| A12 | wie S9; dazu: `p_stempel` unbegrenzt, `freigabe_schreiben` ohne Version legt Zeilen an | ⏳ M391 |
-| A13 | Entgegengesetzte Sperr-Reihenfolge in `konto_schreiben` und den Gast-Funktionen (Deadlock möglich) | ⏳ M391 |
+| A11 | Abgelehnter Kanal-Beitritt wird nie wiederholt; „live verbunden" wird fälschlich angezeigt | ✅ Konto-Kanal · Live-Kanal der Boards (M391): Ablehnung und Kanal-Ende bauen die Leitung neu auf |
+| A12 | wie S9; dazu: `p_stempel` unbegrenzt, `freigabe_schreiben` ohne Version legt Zeilen an | ✅ Migration `team_haertung` (M391): Stempel höchstens 200 Zeichen; `freigabe_schreiben` legt keine Zeile mehr an |
+| A13 | Entgegengesetzte Sperr-Reihenfolge in `konto_schreiben` und den Gast-Funktionen (Deadlock möglich) | ✅ Migration `team_haertung` (M391): `konto_schreiben` sperrt erst die Dateien, dann die Umgebung — wie alle Gast-Funktionen |
 | A14 | Aufräumen beim Start löscht Tool-Quelltexte, die per Ordner/WebDAV kamen und noch nie geöffnet wurden | ✅ |
 
 ## 2 · UI-Audit (M389)
@@ -165,3 +165,40 @@ Text) · R8 ✅ nachgestellt und behoben (Ticket am Finger: Board schwenkt nicht
 Server sie zulässt.
 
 ## 4 · Team-Audit (M391)
+
+Vorgehen: Die Zusammenarbeit von Anfang bis Ende durchgespielt — als Besitzerin ohne und mit Konto, als Gast am
+Laptop und am Telefon — und gezählt, was man sieht, bevor man etwas tun kann. Leitlinie: Ein Hauptweg je Fenster;
+in Ruhe zeigt die Oberfläche einen Zustand, keine Werkzeugsammlung.
+
+| | vorher | jetzt |
+|---|---|---|
+| Einladungs-Dialog: Wörter | 212 | 25 |
+| Einladungs-Dialog: sichtbare Bedienelemente (ohne Link / mit Link) | 8 / 11 | 4 / 6 |
+| Leiste der Gruppe: Knöpfe (allein / zu dritt) | 4 / 7 | 1 / 2 |
+| Schritte bis jemand ohne Konto mitarbeiten kann | Menü → Haken setzen → Link erstellen | Menü → Link erstellen |
+
+| Nr | Schwere | Fund | Status |
+|----|---------|------|--------|
+| T1 | hoch | Ohne Konto fehlte der Menüpunkt „Gemeinsam bearbeiten" ganz — die Funktion war nicht zu finden | ✅ der Punkt ist immer da; der Dialog sagt in zwei Sätzen, was fehlt, und führt mit einem Knopf zur Anmeldung |
+| T2 | hoch | Einladungs-Dialog: 212 Wörter, elf Bedienelemente, zwei gleichrangige Wege, eine Fußnote aus fünf Sätzen; in der Vorgabe brauchten Gäste ein Konto | ✅ ein Hauptknopf („Einladungslink erstellen"), Vorgabe „mitmachen ohne Konto"; Rolle, Rechte, Widerrufen und die E-Mail-Einladung sind eingeklappt; ein Satz sagt, was der Link gerade kann |
+| T3 | hoch | Leiste der Gruppe: bis zu sieben runde Symbol-Knöpfe (Name, Liste, QR, 📣, 😀, ⏱, Zeiger) — nur per Überfahren zu deuten | ✅ ein Knopf zeigt, wer da ist; dahinter stehen die Werkzeuge mit Namen. Sichtbar bleibt nur „Reagieren" (ein Tipp, braucht jeder). Was läuft, zeigt sich selbst: das Band „Du führst vor", die Uhr des Timers |
+| T4 | mittel | Telefon: Die Leiste lag über dem Board-Namen der Kopfzeile | ✅ sie ist schmal genug und überdeckt keinen Knopf; die Liste bleibt im Bild, ihre Zeilen sind 44 px hoch |
+| T5 | mittel | Gast per Link sah neben dem einen Board einen leeren eigenen Bereich („Arbeit › Allgemein 0") | ✅ wer nur Gast ist, sieht nur, worum es geht; mit dem ersten eigenen Board sind die Bereiche da |
+| T6 | mittel | Am fremden Board bot das Menü Umbenennen, Archivieren und Löschen — es wirkte nur auf dem eigenen Gerät oder kam beim nächsten Abgleich wieder | ✅ für Gäste: „Verlassen …" statt der drei |
+| T7 | mittel | „Gemeinsam bearbeiten …" und „Per Link teilen …" standen nebeneinander — beides Links, der Unterschied (live oder Kopie) stand nirgends | ✅ „Kopie per Link teilen …"; eigenes Symbol für das Gemeinsame |
+| T8 | mittel | „Nur Eigenes" schützte Karten, aber nicht die Verbindungen dazwischen (App und Server) und Striche nur in der App | ✅ eine Verbindung trägt, wer sie gezogen hat; fremde bleiben, solange ihre Karten bleiben — bei „eigenes" auch unverändert. Der Server prüft Verbindungen und Striche mit (Migration `team_haertung`) |
+| T9 | mittel | Lehnte der Server den Beitritt zum Live-Kanal ab oder endete der Kanal, blieb es bei „verbindet …" bzw. bei einer stummen Verbindung | ✅ die Leitung wird mit wachsender Pause neu aufgebaut — ohne auf ein Schließen zu warten, das bei stummer Gegenstelle nicht kommt |
+| T10 | niedrig | Befehl „QR-Code zum Mitmachen" ohne Link: nur ein Hinweis, wo der Link anzulegen wäre | ✅ der Dialog geht gleich auf; neuer Befehl „Gemeinsam bearbeiten" in Strg+K |
+| T11 | niedrig | Das Recht des Gasts stand als Kürzel in der Leiste („🔒 nur Eigenes ändern"), am Telefon gar nicht | ✅ als ganzer Satz in der Liste — auf jedem Gerät |
+| T12 | mittel | Vom Board aus führte kein Weg zur Zusammenarbeit — nur über „⋯" am Board-Namen in der linken Spalte, die es am Telefon nicht gibt | ✅ „Gemeinsam bearbeiten …" steht auch im „⋮" des Docks (Abschnitt Board) |
+
+Bewusst nicht geändert: ➖ **Kommentare** bleiben ein Gespräch — sie tragen einen Namen, keine Kennung; die App lässt
+jeden nur die eigenen Beiträge ändern, der Server kann einen Namen nicht prüfen. ➖ **Private Kanäle** (Server prüft
+jeden Teilnehmer) setzen ein Konto je Teilnehmer voraus — Gäste per Link haben keins. Der Kanalname ist ein Geheimnis,
+das nur der Server an Berechtigte ausgibt; alles aus dem Kanal wird in der App geprüft (S5), und der Stand selbst
+kommt immer vom Server. ➖ **Reaktionen, Timer, Punkte, QR-Einblendung** sind unverändert — sie waren im Durchgang
+ohne Befund.
+
+Server: Die Migrationen `inhalt_pruefen` (M388) und `team_haertung` (M391) liegen im Repository und sind gegen ein
+lokales Postgres geprüft (`m388b`, `m391b`). Einspielen braucht die Bestätigung des Besitzers der Datenbank; bis dahin
+gilt, was die App prüft. Die App läuft mit und ohne sie.

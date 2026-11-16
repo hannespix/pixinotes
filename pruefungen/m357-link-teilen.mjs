@@ -3,7 +3,7 @@
  * Supabase (PostgREST auf board_links, RPC link_lesen, Dateispeicher mit signierten Adressen) ist im
  * Node-Prozess nachgebaut.
  *
- *   A  Besitzerin (angemeldet): Board-Menü → „Per Link teilen …" → „Link erstellen": Board-Datei und der
+ *   A  Besitzerin (angemeldet): Board-Menü → „Kopie per Link teilen …" → „Link erstellen": Board-Datei und der
  *      PDF-Anhang liegen im Dateispeicher, die Zeile steht in board_links, der Dialog zeigt den kurzen Link.
  *   B  Empfänger OHNE Konto und ohne Daten öffnet den Link: keine Einführung, keine Rückfrage — das Board ist
  *      offen, mit Notiz, Strich und der PDF (Anhang unter der NEUEN Karten-Id in der Geräte-Ablage).
@@ -204,7 +204,7 @@ await anna.P.locator('.react-flow__pane').click({ position: { x: 900, y: 600 } }
 // Board-Menü über den Befehl im Baum/Tab — der Eintrag trägt data-taste
 await menue(anna.P);
 const eintrag = anna.P.locator('[data-taste="board-link"]');
-pruefe('A1 das Board-Menü bietet „Per Link teilen …"', (await eintrag.count()) === 1 && /Per Link teilen/.test(await eintrag.textContent()));
+pruefe('A1 das Board-Menü bietet „Kopie per Link teilen …" (M391: beim Namen genannt)', (await eintrag.count()) === 1 && /Kopie per Link teilen/.test(await eintrag.textContent()));
 await eintrag.click(); await anna.P.waitForTimeout(600);
 pruefe('A2 Dialog: noch kein Link, Knopf „Link erstellen und kopieren"', (await anna.P.locator('[data-taste="link-erstellen"]').count()) === 1);
 await anna.P.locator('[data-taste="link-erstellen"]').click();

@@ -390,6 +390,9 @@ async function geraet(name, stand, anker = '') {
   await P.waitForTimeout(1500);
   return { ctx, P, name };
 }
+/** M391: Die Werkzeuge der Gruppe (Vorführen, Timer, QR-Code, Mauszeiger, Name) stehen in der Liste hinter der Leiste */
+const gruppeAuf = async (P) => { if (!(await P.locator('[data-taste="live-liste"]').count()) && (await P.locator('[data-taste="live-auf"]').count())) { await P.locator('[data-taste="live-auf"]').click(); await P.waitForTimeout(250); } };
+const gruppeZu = async (P) => { if (await P.locator('[data-taste="live-liste"]').count()) { await P.locator('[data-taste="live-auf"]').click(); await P.waitForTimeout(150); } };
 const zustand = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state);
 const texte = (P) => zustand(P).then((s) => JSON.stringify(s.boards));
 const boardVon = (P, id) => zustand(P).then((s) => s.boards.find((b) => b.id === id));
@@ -461,7 +464,7 @@ async function dialogOeffnen(P, name) {
   const z = P.locator('.tabs.spalte .side-board', { hasText: name }).first();
   await z.hover(); await P.waitForTimeout(200);
   await z.locator('.ebenen-menu-knopf').click(); await P.waitForTimeout(300);
-  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600);
+  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600); await P.waitForSelector('[data-taste="einladung-optionen"], [data-taste="freigabe-ohne-konto"], [data-taste="freigabe-verlassen"]', { timeout: 2500 }).catch(() => {}); await P.evaluate(() => document.querySelectorAll('.freigabe-dialog details').forEach((d) => { d.open = true; }));
 }
 
 const sperre = (P, karte) => P.locator(`[data-taste="live-sperre"][data-karte="${karte}"]`);
@@ -661,14 +664,15 @@ await anmelden(A.P, 'anna@example.de', 'geheim123', true);
 const uidA = nutzerId('anna@example.de');
 await warteBis(A.P, () => !!zeile(uidA, 'umgebung.json'), 8000);
 await dialogOeffnen(A.P, 'Planung');
-await A.P.locator('[data-taste="einladung-ohne-konto"]').check();
 await A.P.locator('[data-taste="einladung-anlegen"]').click();
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="einladung-adresse"]').count()) === 1, 6000);
 const token = /#e=(.+)$/.exec(await A.P.locator('[data-taste="einladung-adresse"]').inputValue().catch(() => ''))?.[1] ?? '';
 await schliessen(A.P);
 await warteBis(A.P, () => sb.live.length >= 1, 8000);
 const topic = `realtime:pn-${kanalVon(uidA, 'bx')}`;
-pruefe('A1 allein im Board gibt es keinen Reaktions-Knopf (niemand sähe es) — den Timer schon', (await A.P.locator('[data-taste="reakt-auf"]').count()) === 0 && (await A.P.locator('[data-taste="timer-auf"]').count()) === 1);
+await gruppeAuf(A.P);
+pruefe('A1 allein im Board gibt es keinen Reaktions-Knopf (niemand sähe es) — den Timer schon', (await A.P.locator('[data-taste="reakt-auf"]').count()) === 0 && (await A.P.locator('[data-taste="timer-wahl"]').count()) === 1);
+await gruppeZu(A.P);
 
 const beitreten = async (kurz, name) => {
   const g = await geraet2(kurz, standB, `#e=${token}`);
@@ -717,6 +721,7 @@ pruefe('A11 (Gegenprobe) eine gültige kommt an', (await fluege(A.P)).length ===
 
 // ══ B ═══════════════════════════════════════════════════════════════
 console.log('\n════ B: Reaktionen in der Präsentation ════');
+await gruppeAuf(A.P);
 await A.P.locator('[data-taste="vorfuehren"]').click();
 await warteBis(G.P, async () => /führt vor/.test(await zband(G.P)), 6000);
 await vortragStart(A.P);
@@ -741,8 +746,11 @@ console.log('\n════ C: Timer ════');
 await A.P.keyboard.press('Escape');
 await warteBis(G.P, async () => (await imVortrag(G.P)) === 0, 6000);
 await A.P.locator('[data-taste="zeig-ende"]').click().catch(() => {});
-await A.P.locator('[data-taste="timer-auf"]').click();
+await gruppeAuf(A.P);
+await gruppeAuf(A.P);
 pruefe('C1 ⏱ bietet sechs Zeiten', (await A.P.locator('[data-taste="timer-min"]').count()) === 6 && (await A.P.locator('[data-taste="timer-stopp"]').count()) === 0);
+await gruppeZu(A.P);
+await gruppeAuf(A.P);
 await A.P.locator('[data-taste="timer-min"][data-min="5"]').click();
 await warteBis(G.P, async () => !!(await chip(G.P)), 4000);
 let ca = await chip(A.P); let cg = await chip(G.P);
@@ -775,12 +783,15 @@ await A.P.waitForTimeout(3500);          // Annas Wiederholung dürfte jetzt nic
 pruefe('C8 … und bleibt weg (der Starter wiederholt einen angehaltenen Lauf nicht)', !(await chip(A.P)) && !(await chip(G.P)) && !(await chip(H.P)));
 
 // Der spätere Start gilt; Ablauf
-await A.P.locator('[data-taste="timer-auf"]').click();
+await gruppeAuf(A.P);
+await gruppeAuf(A.P);
 await A.P.locator('[data-taste="timer-min"][data-min="10"]').click();
 await warteBis(G.P, async () => (await chip(G.P))?.sek > 500, 4000);
 pruefe('C9 neuer Lauf: zehn Minuten bei allen', (await chip(G.P))?.sek > 590 && (await chip(H.P))?.sek > 590);
-await A.P.locator('[data-taste="timer-auf"]').click();
+await gruppeAuf(A.P);
+await gruppeAuf(A.P);
 pruefe('C10 läuft die Uhr, bietet ⏱ auch „Anhalten"', (await A.P.locator('[data-taste="timer-stopp"]').count()) === 1);
+await gruppeZu(A.P);
 await A.P.keyboard.press('Escape');
 // Gerd stellt (nachgebaut) einen späteren, sehr kurzen Lauf — der gilt, der alte nicht mehr
 const idG = idVon('Gerd');

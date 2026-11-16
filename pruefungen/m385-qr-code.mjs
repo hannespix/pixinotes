@@ -398,6 +398,9 @@ async function geraet(name, stand, anker = '', opt = {}) {
   await P.waitForTimeout(1500);
   return { ctx, P, name };
 }
+/** M391: Die Werkzeuge der Gruppe (Vorführen, Timer, QR-Code, Mauszeiger, Name) stehen in der Liste hinter der Leiste */
+const gruppeAuf = async (P) => { if (!(await P.locator('[data-taste="live-liste"]').count()) && (await P.locator('[data-taste="live-auf"]').count())) { await P.locator('[data-taste="live-auf"]').click(); await P.waitForTimeout(250); } };
+const gruppeZu = async (P) => { if (await P.locator('[data-taste="live-liste"]').count()) { await P.locator('[data-taste="live-auf"]').click(); await P.waitForTimeout(150); } };
 const zustand = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state);
 const texte = (P) => zustand(P).then((s) => JSON.stringify(s.boards));
 const boardVon = (P, id) => zustand(P).then((s) => s.boards.find((b) => b.id === id));
@@ -469,7 +472,7 @@ async function dialogOeffnen(P, name) {
   const z = P.locator('.tabs.spalte .side-board', { hasText: name }).first();
   await z.hover(); await P.waitForTimeout(200);
   await z.locator('.ebenen-menu-knopf').click(); await P.waitForTimeout(300);
-  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600);
+  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600); await P.waitForSelector('[data-taste="einladung-optionen"], [data-taste="freigabe-ohne-konto"], [data-taste="freigabe-verlassen"]', { timeout: 2500 }).catch(() => {}); await P.evaluate(() => document.querySelectorAll('.freigabe-dialog details').forEach((d) => { d.open = true; }));
 }
 
 const sperre = (P, karte) => P.locator(`[data-taste="live-sperre"][data-karte="${karte}"]`);
@@ -566,7 +569,7 @@ const farbNr = (id) => { let h = 0; for (const c of id) h = (h * 31 + c.charCode
 const gleicheFarbe = (vorn, nr) => { for (let i = 0; i < 5000; i += 1) { const id = `${vorn}${String(i).padStart(6, '0')}`; if (farbNr(id) === nr) return id; } return `${vorn}000000`; };
 const ICH_A = 'anna000001'; const ICH_G = gleicheFarbe('gerd', farbNr(ICH_A)); const ICH_H = gleicheFarbe('hann', farbNr(ICH_A));
 /** Wer steht in der Leiste, in welcher Farbe? (ich selbst unter „ich") */
-const farbenIn = (P) => P.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-taste="live-ich"], [data-taste="live-chip"]')].map((c) => [c.dataset.name ?? 'ich', c.style.getPropertyValue('--farbe')])));
+const farbenIn = (P) => P.evaluate(() => Object.fromEntries([...document.querySelectorAll('[data-taste="live-ich-chip"], [data-taste="live-chip"]')].map((c) => [c.dataset.name ?? 'ich', c.style.getPropertyValue('--farbe')])));
 const blende = (P) => P.locator('[data-taste="qr-blende"]');
 const form = (P) => blende(P).getAttribute('data-form').catch(() => null);
 const kasten = (P) => blende(P).boundingBox();
@@ -586,14 +589,17 @@ const A = await geraet('A', standA, '', { ich: ICH_A });
 await anmelden(A.P, 'anna@example.de', 'geheim123', true);
 const uidA = nutzerId('anna@example.de');
 await warteBis(A.P, () => !!zeile(uidA, 'umgebung.json'), 8000);
+await gruppeAuf(A.P);
 pruefe('A1 ohne Einladungslink gibt es keinen QR-Knopf', (await A.P.locator('[data-taste="live-qr"]').count()) === 0);
+await gruppeZu(A.P);
 const gefunden = await befehl(A.P, 'qr');
 pruefe('A2 der Befehl „QR-Code zum Mitmachen" (Strg+K „qr") sagt, wo der Link entsteht', gefunden && /keinen Einladungslink/.test(await toast(A.P)) && (await blende(A.P).count()) === 0, await toast(A.P));
+pruefe('A2b … und öffnet gleich den Dialog, der ihn anlegt (M391)', (await A.P.locator('.freigabe-dialog [data-taste="einladung-anlegen"]').count()) === 1);
+await schliessen(A.P);
 
 // ══ B ═══════════════════════════════════════════════════════════════
 console.log('\n════ B: Link anlegen, Code einblenden, Code lesen ════');
 await dialogOeffnen(A.P, 'Planung');
-await A.P.locator('[data-taste="einladung-ohne-konto"]').check();
 await A.P.locator('[data-taste="einladung-anlegen"]').click();
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="einladung-adresse"]').count()) === 1, 6000);
 const adresse = await A.P.locator('[data-taste="einladung-adresse"]').inputValue();
@@ -657,7 +663,10 @@ await A.P.locator('[data-taste="qr-ecke"]').click(); await A.P.waitForTimeout(40
 console.log('\n════ E: schließen und wieder einblenden ════');
 await A.P.keyboard.press('Escape'); await A.P.waitForTimeout(400);
 pruefe('E1 Esc schließt die große Ansicht', (await blende(A.P).count()) === 0);
+await gruppeAuf(A.P);
 pruefe('E2 oben in der Leiste steht jetzt der QR-Knopf', (await A.P.locator('[data-taste="live-qr"]').count()) === 1);
+await gruppeZu(A.P);
+await gruppeAuf(A.P);
 await A.P.locator('[data-taste="live-qr"]').click();
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="qr-code"] svg').count()) === 1, 6000);
 pruefe('E3 … er blendet den Code wieder ein', (await form(A.P)) === 'gross' && (await qrLesen(A.P))?.text === adresse);
@@ -672,8 +681,12 @@ console.log('\n════ F: Gast, dunkles Farbschema, Englisch ════')
 const H = await geraet('H', standB, anker, { dunkel: true, sprache: 'en', ich: ICH_H });
 await warteBis(H.P, async () => !!(await boardVon(H.P, 'bx')), 12000);
 if (await H.P.locator('[data-taste="gast-name"]').count()) { await H.P.locator('[data-taste="gast-name"]').fill('Hanna'); await H.P.locator('[data-taste="gast-name-ok"]').click(); await H.P.waitForTimeout(500); }
+await gruppeAuf(H.P);
 await warteBis(H.P, async () => (await H.P.locator('[data-taste="live-qr"]').count()) === 1, 8000);
+await gruppeAuf(H.P);
 pruefe('F1 auch der Gast hat den QR-Knopf', (await H.P.locator('[data-taste="live-qr"]').count()) === 1);
+await gruppeZu(H.P);
+await gruppeAuf(H.P);
 await H.P.locator('[data-taste="live-qr"]').click();
 await warteBis(H.P, async () => (await H.P.locator('[data-taste="qr-code"] svg').count()) === 1, 6000);
 {
@@ -693,7 +706,9 @@ await warteBis(H.P, async () => (await H.P.locator('[data-taste="qr-code"] svg')
   pruefe('F4c … und auf jedem Gerät dieselbe Zuordnung (Anna sieht Hanna in der Farbe, die Hanna für sich sieht)', fa.Hanna === fh.ich && fa.ich === fh.anna && fa.Gerd === fh.Gerd, `${JSON.stringify(fa)} ${JSON.stringify(fh)}`);
 }
 // auf dem Telefon
+await gruppeAuf(G.P);
 if (await G.P.locator('[data-taste="live-qr"]').count()) {
+  await gruppeAuf(G.P);
   await G.P.locator('[data-taste="live-qr"]').click();
   await warteBis(G.P, async () => (await G.P.locator('[data-taste="qr-code"] svg').count()) === 1, 6000);
   const r = await G.P.locator('.qr-karte').boundingBox();
@@ -704,6 +719,7 @@ if (await G.P.locator('[data-taste="live-qr"]').count()) {
 
 // ══ G ═══════════════════════════════════════════════════════════════
 console.log('\n════ G: Link mit Konto; Link widerrufen ════');
+await gruppeAuf(A.P);
 await A.P.locator('[data-taste="live-qr"]').click();
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="qr-code"] svg').count()) === 1, 6000);
 await A.P.locator('[data-taste="qr-ecke"]').click(); await A.P.waitForTimeout(300);
@@ -723,7 +739,9 @@ await dialogOeffnen(A.P, 'Planung');
 await A.P.locator('[data-taste="einladung-weg"]').click(); await A.P.waitForTimeout(1500);
 await schliessen(A.P);
 pruefe('G3 Link widerrufen → die Einblendung verschwindet (kein toter Code bleibt stehen)', await warteBis(A.P, async () => (await blende(A.P).count()) === 0, 6000));
+await gruppeAuf(A.P);
 pruefe('G4 … und der Knopf in der Leiste auch', await warteBis(A.P, async () => (await A.P.locator('[data-taste="live-qr"]').count()) === 0, 6000));
+await gruppeZu(A.P);
 
 // ══ H ═══════════════════════════════════════════════════════════════
 console.log('\n════ H: kein fremder Dienst, Paket, Texte ════');

@@ -390,6 +390,9 @@ async function geraet(name, stand, anker = '') {
   await P.waitForTimeout(1500);
   return { ctx, P, name };
 }
+/** M391: Die Werkzeuge der Gruppe (Vorführen, Timer, QR-Code, Mauszeiger, Name) stehen in der Liste hinter der Leiste */
+const gruppeAuf = async (P) => { if (!(await P.locator('[data-taste="live-liste"]').count()) && (await P.locator('[data-taste="live-auf"]').count())) { await P.locator('[data-taste="live-auf"]').click(); await P.waitForTimeout(250); } };
+const gruppeZu = async (P) => { if (await P.locator('[data-taste="live-liste"]').count()) { await P.locator('[data-taste="live-auf"]').click(); await P.waitForTimeout(150); } };
 const zustand = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state);
 const texte = (P) => zustand(P).then((s) => JSON.stringify(s.boards));
 const boardVon = (P, id) => zustand(P).then((s) => s.boards.find((b) => b.id === id));
@@ -461,7 +464,7 @@ async function dialogOeffnen(P, name) {
   const z = P.locator('.tabs.spalte .side-board', { hasText: name }).first();
   await z.hover(); await P.waitForTimeout(200);
   await z.locator('.ebenen-menu-knopf').click(); await P.waitForTimeout(300);
-  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600);
+  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600); await P.waitForSelector('[data-taste="einladung-optionen"], [data-taste="freigabe-ohne-konto"], [data-taste="freigabe-verlassen"]', { timeout: 2500 }).catch(() => {}); await P.evaluate(() => document.querySelectorAll('.freigabe-dialog details').forEach((d) => { d.open = true; }));
 }
 
 const sperre = (P, karte) => P.locator(`[data-taste="live-sperre"][data-karte="${karte}"]`);
@@ -765,7 +768,6 @@ await anmelden(A.P, 'anna@example.de', 'geheim123', true);
 const uidA = nutzerId('anna@example.de');
 await warteBis(A.P, () => !!zeile(uidA, 'umgebung.json'), 8000);
 await dialogOeffnen(A.P, 'Planung');
-await A.P.locator('[data-taste="einladung-ohne-konto"]').check();
 await A.P.locator('[data-taste="einladung-anlegen"]').click();
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="einladung-adresse"]').count()) === 1, 6000);
 const token = /#e=(.+)$/.exec(await A.P.locator('[data-taste="einladung-adresse"]').inputValue().catch(() => ''))?.[1] ?? '';
@@ -775,6 +777,7 @@ await warteBis(G.P, async () => !!(await boardVon(G.P, 'bx')), 12000);
 await G.P.locator('[data-taste="gast-name"]').fill('Gerd');
 await G.P.locator('[data-taste="gast-name-ok"]').click(); await G.P.waitForTimeout(500);
 await warteBis(G.P, async () => /2 dabei/.test(await zahl(G.P)), 8000);
+await gruppeAuf(A.P);
 await A.P.locator('[data-taste="vorfuehren"]').click(); await A.P.waitForTimeout(600);
 await warteBis(G.P, async () => /du folgst/.test(await zband(G.P)), 6000);
 await vortragStart(A.P);

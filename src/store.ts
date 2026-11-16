@@ -766,6 +766,7 @@ export const karteFest = (boardId: string, von: string | undefined): boolean => 
 };
 export const gruppeVon = (boardId: string): GruppenInfo | undefined => gruppen.get(boardId);
 const vonKarte = (n: AppNode): string | undefined => (n.data as { von?: string } | undefined)?.von;
+const vonKante = (e: Edge): string | undefined => (e.data as { von?: string } | undefined)?.von;
 /** Während Rückgängig/Wiederholen behält Zurückgeholtes seinen Ersteller */
 let stempelAus = 0;
 function ohneStempel(fn: () => void): void {
@@ -807,9 +808,15 @@ function gruppenschutz(alt: BoardDoc, neu0: BoardDoc, g: GruppenInfo): BoardDoc 
     const mein = (d: Stroke): boolean => !vorher.has(d.id) && (stempelAus > 0 ? !d.von : d.von !== g.ich);
     if (neu.drawings.some(mein)) neu = { ...neu, drawings: neu.drawings.map((d) => (mein(d) ? { ...d, von: g.ich } : d)) };
   }
+  // M391: Auch eine Verbindung trägt, wer sie gezogen hat — sonst ließe sich „nur Eigenes" an Pfeilen nicht halten
+  if (neu.edges !== alt.edges) {
+    const vorher = new Set(alt.edges.map((e) => e.id));
+    const mein = (e: Edge): boolean => !vorher.has(e.id) && (stempelAus > 0 ? !vonKante(e) : vonKante(e) !== g.ich);
+    if (neu.edges.some(mein)) neu = { ...neu, edges: neu.edges.map((e) => (mein(e) ? { ...e, data: { ...(e.data ?? {}), von: g.ich } } : e)) };
+  }
   if (!g.gast || g.recht === 'alles') return neu;
   // 2) Fremdes bleibt: nicht löschen, nicht archivieren — bei „eigenes" auch nicht ändern
-  let geloescht = false; let geaendert = false;
+  let geloescht = false; let geaendert = false; let kanteFest = false;
   if (neu.nodes !== alt.nodes) {
     const nach = new Map(neu.nodes.map((n) => [n.id, n]));
     const bleibt = new Set<string>();
@@ -838,8 +845,28 @@ function gruppenschutz(alt: BoardDoc, neu0: BoardDoc, g: GruppenInfo): BoardDoc 
     const fehlt = alt.drawings.filter((d) => !da.has(d.id) && d.von !== g.ich);
     if (fehlt.length) { neu = { ...neu, drawings: [...(neu.drawings ?? []), ...fehlt] }; geloescht = true; }
   }
+  // M391: Fremde Verbindungen bleiben, solange ihre beiden Karten bleiben (mit einer gelöschten Karte gehen ihre
+  // Pfeile wie immer mit) — bei „eigenes" bleiben sie auch, wie sie sind. Vorher ließen sich die Pfeile des
+  // Besitzers löschen und umbeschriften, obwohl er „nur Eigenes" festgelegt hatte.
+  if (neu.edges !== alt.edges) {
+    const karten = new Set(neu.nodes.map((n) => n.id));
+    const nach = new Map(neu.edges.map((e) => [e.id, e]));
+    const zurueck: Edge[] = [];
+    const ersetzt = new Map<string, Edge>();
+    for (const e of alt.edges) {
+      if (vonKante(e) === g.ich || !karten.has(e.source) || !karten.has(e.target)) continue;
+      const m = nach.get(e.id);
+      if (!m) { zurueck.push(e); geloescht = true; continue; }
+      if (g.recht === 'eigenes' && m !== e && (m.source !== e.source || m.target !== e.target || JSON.stringify(m.data ?? null) !== JSON.stringify(e.data ?? null))) {
+        ersetzt.set(e.id, { ...m, source: e.source, target: e.target, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle, data: e.data });
+        kanteFest = true;
+      }
+    }
+    if (zurueck.length || ersetzt.size) neu = { ...neu, edges: [...neu.edges.map((e) => ersetzt.get(e.id) ?? e), ...zurueck] };
+  }
   if (geloescht) rechtHinweis('🔒 Löschen kannst du hier nur, was du selbst angelegt hast.');
   else if (geaendert) rechtHinweis('🔒 Ändern kannst du hier nur deine eigenen Karten — neue anlegen geht immer.');
+  else if (kanteFest) rechtHinweis('🔒 Diese Verbindung hat jemand anderes gezogen — ändern kannst du hier nur Eigenes.');
   return neu;
 }
 

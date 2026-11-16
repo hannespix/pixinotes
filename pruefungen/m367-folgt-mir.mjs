@@ -393,6 +393,9 @@ async function geraet(name, stand, anker = '') {
   await P.waitForTimeout(1500);
   return { ctx, P, name };
 }
+/** M391: Die Werkzeuge der Gruppe (Vorführen, Timer, QR-Code, Mauszeiger, Name) stehen in der Liste hinter der Leiste */
+const gruppeAuf = async (P) => { if (!(await P.locator('[data-taste="live-liste"]').count()) && (await P.locator('[data-taste="live-auf"]').count())) { await P.locator('[data-taste="live-auf"]').click(); await P.waitForTimeout(250); } };
+const gruppeZu = async (P) => { if (await P.locator('[data-taste="live-liste"]').count()) { await P.locator('[data-taste="live-auf"]').click(); await P.waitForTimeout(150); } };
 const zustand = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state);
 const texte = (P) => zustand(P).then((s) => JSON.stringify(s.boards));
 const boardVon = (P, id) => zustand(P).then((s) => s.boards.find((b) => b.id === id));
@@ -464,7 +467,7 @@ async function dialogOeffnen(P, name) {
   const z = P.locator('.tabs.spalte .side-board', { hasText: name }).first();
   await z.hover(); await P.waitForTimeout(200);
   await z.locator('.ebenen-menu-knopf').click(); await P.waitForTimeout(300);
-  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600);
+  await P.locator('[data-taste="board-freigeben"]').click(); await P.waitForTimeout(600); await P.waitForSelector('[data-taste="einladung-optionen"], [data-taste="freigabe-ohne-konto"], [data-taste="freigabe-verlassen"]', { timeout: 2500 }).catch(() => {}); await P.evaluate(() => document.querySelectorAll('.freigabe-dialog details').forEach((d) => { d.open = true; }));
 }
 
 const sperre = (P, karte) => P.locator(`[data-taste="live-sperre"][data-karte="${karte}"]`);
@@ -570,7 +573,6 @@ await anmelden(A.P, 'anna@example.de', 'geheim123', true);
 const uidA = nutzerId('anna@example.de');
 await warteBis(A.P, () => !!zeile(uidA, 'umgebung.json'), 8000);
 await dialogOeffnen(A.P, 'Planung');
-await A.P.locator('[data-taste="einladung-ohne-konto"]').check();
 await A.P.locator('[data-taste="einladung-anlegen"]').click();
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="einladung-adresse"]').count()) === 1, 6000);
 const token = /#e=(.+)$/.exec(await A.P.locator('[data-taste="einladung-adresse"]').inputValue().catch(() => ''))?.[1] ?? '';
@@ -583,7 +585,11 @@ await G.P.locator('[data-taste="gast-name"]').fill('Gerd');
 await G.P.locator('[data-taste="gast-name-ok"]').click(); await G.P.waitForTimeout(500);
 await warteBis(G.P, async () => /2 dabei/.test(await zahl(G.P)), 8000);
 pruefe('A1 beide sind im Board; solange niemand vorführt, gibt es kein Band', /2 dabei/.test(await zahl(G.P)) && (await hatBand(G.P)) === 0 && (await hatBand(A.P)) === 0);
+await gruppeAuf(A.P);
+await gruppeAuf(G.P);
 pruefe('A2 die Leiste bietet „Vorführen" an', (await A.P.locator('[data-taste="vorfuehren"]').count()) === 1 && (await G.P.locator('[data-taste="vorfuehren"]').count()) === 1);
+await gruppeZu(A.P);
+await gruppeZu(G.P);
 void topic;
 
 // ══ B ═══════════════════════════════════════════════════════════════
@@ -591,6 +597,7 @@ console.log('\n════ B: Anna führt vor ════');
 await schwenken(G.P, -260, -140);   // Gerd steht erst einmal woanders
 await G.P.mouse.move(1300, 760); await G.P.mouse.wheel(0, -400); await G.P.waitForTimeout(500);
 pruefe('B1 vorher zeigen die beiden Verschiedenes', !zeigt(await sichtVon(G.P), await sichtVon(A.P)));
+await gruppeAuf(A.P);
 await A.P.locator('[data-taste="vorfuehren"]').click(); await A.P.waitForTimeout(600);
 pruefe('B2 Anna: „Du führst vor"', /Du führst vor/.test(await zband(A.P)) && (await A.P.locator('[data-taste="zeig-ende"]').count()) === 1, await zband(A.P));
 await warteBis(G.P, async () => /führt vor/.test(await zband(G.P)), 6000);
@@ -647,6 +654,7 @@ console.log('\n════ E: Ein Telefon folgt ════');
 
 // ══ F ═══════════════════════════════════════════════════════════════
 console.log('\n════ F: Gerd übernimmt ════');
+await gruppeAuf(G.P);
 await G.P.locator('[data-taste="vorfuehren"]').click(); await G.P.waitForTimeout(700);
 await warteBis(A.P, async () => /Gerd/.test(await zband(A.P)), 6000);
 pruefe('F1 Gerd führt jetzt vor; Anna folgt ihm (und führt nicht mehr vor)', /Du führst vor/.test(await zband(G.P)) && /Gerd/.test(await zband(A.P)) && /du folgst/.test(await zband(A.P)) && (await A.P.locator('[data-taste="zeig-ende"]').count()) === 0, `${await zband(G.P)} | ${await zband(A.P)}`);
@@ -665,6 +673,7 @@ pruefe('G2 danach bewegt sich Annas Ansicht nicht mehr mit', Math.abs(mitte(awai
 
 // ══ H ═══════════════════════════════════════════════════════════════
 console.log('\n════ H: Der Vorführende verschwindet ════');
+await gruppeAuf(G.P);
 await G.P.locator('[data-taste="vorfuehren"]').click();
 await warteBis(A.P, async () => /Gerd/.test(await zband(A.P)), 6000);
 await G.ctx.close();
@@ -683,7 +692,10 @@ console.log('\n════ I: Nur lesen ════');
   await warteBis(L.P, async () => !!(await boardVon(L.P, 'bx')), 12000);
   if (await L.P.locator('[data-taste="gast-name"]').count()) { await L.P.locator('[data-taste="gast-name"]').fill('Lena'); await L.P.locator('[data-taste="gast-name-ok"]').click(); await L.P.waitForTimeout(400); }
   await warteBis(L.P, async () => /2 dabei/.test(await zahl(L.P)), 8000);
+  await gruppeAuf(L.P);
   pruefe('I1 wer nur liest, bekommt kein „Vorführen"', (await L.P.locator('[data-taste="live-leiste"]').count()) === 1 && (await L.P.locator('[data-taste="vorfuehren"]').count()) === 0);
+  await gruppeZu(L.P);
+  await gruppeAuf(A.P);
   await A.P.locator('[data-taste="vorfuehren"]').click();
   await warteBis(L.P, async () => /du folgst/.test(await zband(L.P)), 6000);
   await schwenken(A.P, -180, -100);
