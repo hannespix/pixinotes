@@ -87,7 +87,7 @@ console.log('\n════ A: Vollbild der Karte ════');
   pruefe('A2 die Karte ist im Vollbild', await bis(vollbild, 4000));
   await bis(async () => !!(await kasten('.happ-full .happ-head')), 2000);
   const gleich = await kasten('.happ-full .happ-head');
-  pruefe('A3 beim Eintritt steht die Leiste einen Moment — man sieht, wo sie ist', !!gleich && gleich.oben >= -1, gleich);
+  pruefe('A3 beim Eintritt steht die Leiste einen Moment – man sieht, wo sie ist', !!gleich && gleich.oben >= -1, gleich);
   await P.mouse.move(700, 500);
   pruefe('A4 dann zieht sie sich nach oben zurück', await bis(async () => ((await kasten('.happ-full .happ-head'))?.unten ?? 9) <= 0, 4000), await kasten('.happ-full .happ-head'));
   const fl = await kasten('.happ-full .happ-frame');
@@ -99,7 +99,7 @@ console.log('\n════ A: Vollbild der Karte ════');
   pruefe('A7 das Tool läuft weiter und zählt (kein Neustart beim Wechsel)', (await zahl()) === 3, String(await zahl()));
   await P.mouse.move(700, 2); await P.mouse.move(701, 3);
   pruefe('A8 am oberen Rand kommt die Leiste', await bis(async () => ((await kasten('.happ-full .happ-head'))?.oben ?? -9) >= -1, 3000), await kasten('.happ-full .happ-head'));
-  pruefe('A9 sie bietet „Vollbild verlassen" — kein ⋯, dessen Menü im Vollbild unsichtbar wäre',
+  pruefe('A9 sie bietet „Vollbild verlassen" – kein ⋯, dessen Menü im Vollbild unsichtbar wäre',
     (await P.locator('.happ-full [data-taste="happ-vollbild-zu"]').count()) === 1 && (await P.locator('.happ-full [data-hmbtn]').count()) === 0);
   await P.screenshot({ path: path.join(SD, 'm393-a-leiste.png') });
   const k = await kasten('.happ-full .happ-head');
@@ -167,7 +167,7 @@ console.log('\n════ C: Texte ════');
 {
   const de = readFileSync(path.join(__repo, 'src/components/HelpOverlay.tsx'), 'utf-8');
   const en = readFileSync(path.join(__repo, 'src/components/HelpOverlayEn.tsx'), 'utf-8');
-  pruefe('C1 die Hilfe nennt M393 — deutsch und englisch', de.includes('(M393)') && en.includes('(M393)'));
+  pruefe('C1 die Hilfe nennt M393 – deutsch und englisch', de.includes('(M393)') && en.includes('(M393)'));
   pruefe('C2 keine Fehler in der Konsole', fehler.length === 0, fehler.join(' | ').slice(0, 300));
 }
 

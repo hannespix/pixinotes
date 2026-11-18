@@ -232,7 +232,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     if (isLive) {
       // Sicherheitsnetz: Live nur für eine FREMDE Webadresse (s. SANDBOX_LIVE und lib/sicher.ts)
       if (!liveAdresse) {
-        showToast('Diese Adresse lässt sich nicht einbetten — nur fremde Webseiten (https://…).');
+        showToast('Diese Adresse lässt sich nicht einbetten – nur fremde Webseiten (https://…).');
         return;
       }
       setLiveOn(true);
@@ -302,7 +302,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
       showToast('Frisch von der Quelle geladen.');
       if (srcdoc !== null) { setSrcdoc(null); await start(); }
     } catch {
-      showToast('Die Quelle war nicht erreichbar (offline oder CORS) — der lokale Stand bleibt.');
+      showToast('Die Quelle war nicht erreichbar (offline oder CORS) – der lokale Stand bleibt.');
     }
   };
 
@@ -322,7 +322,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   const openInTab = async () => {
     setMenuPos(null);
     const [html, st] = await Promise.all([loadHtml(id), freshestState()]);
-    if (!html) { showToast('Kein Inhalt auf diesem Gerät — zuerst die HTML-Datei laden.'); return; }
+    if (!html) { showToast('Kein Inhalt auf diesem Gerät – zuerst die HTML-Datei laden.'); return; }
     // „</“ im JSON-Text maskieren, damit kein früher </script> die Hülle sprengt
     const innerJson = JSON.stringify(composeSrcdoc(id, html, st)).replace(/<\//g, '<\\/');
     const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -333,7 +333,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
       + `document.querySelector("iframe").srcdoc=${innerJson};</` + 'script></body></html>';
     const url = URL.createObjectURL(new Blob([wrapper], { type: 'text/html' }));
     const win = window.open(url, '_blank');
-    if (!win) showToast('Pop-up blockiert — bitte für diese Seite erlauben.');
+    if (!win) showToast('Pop-up blockiert – bitte für diese Seite erlauben.');
     else eigeneTabs.current.add(win);
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
@@ -355,7 +355,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     const savedAt = await saveAppStateToTeam(id, data.name, st);
     showToast(savedAt
       ? `Speicherstand im Team-Ordner gesichert (pixinotes-anlagen/…/Apps/).`
-      : 'Kein Team-Ordner verbunden — das Board gehört zu keinem Team-Projekt (⚙ → Daten → Synchronisation).');
+      : 'Kein Team-Ordner verbunden – das Board gehört zu keinem Team-Projekt (Einstellungen → Daten → Synchronisation).');
   };
 
   const pickFile = async (f: File | undefined) => {
@@ -367,7 +367,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     updateNodeData(id, { name: f.name, size: f.size });
     setHasSrc(true);
     setSrcdoc(null);
-    showToast(`„${f.name}" geladen — mit Start ausführen.`);
+    showToast(`„${f.name}" geladen – mit Start ausführen.`);
   };
 
   const runningUi = srcdoc !== null || liveOn;
@@ -449,8 +449,8 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
                     {hasSrc === null
                       ? 'Inhalt wird geladen …'
                       : isLive
-                        ? `Live-App von ${(() => { try { return new URL(data.url!).hostname; } catch { return '?'; } })()} — läuft direkt von der Quelle und braucht dafür Internet.`
-                        : 'Bereit — die App startet erst auf Klick und läuft dann als eigene, abgeschottete Instanz.'}
+                        ? `Live-App von ${(() => { try { return new URL(data.url!).hostname; } catch { return '?'; } })()} – läuft direkt von der Quelle und braucht dafür Internet.`
+                        : 'Bereit – die App startet erst auf Klick und läuft dann als eigene, abgeschottete Instanz.'}
                   </p>
                   <button className="happ-load happ-go nodrag" disabled={hasSrc !== true || starting} onClick={start}>
                     <IPlay size={14} /> Starten
@@ -565,14 +565,14 @@ export function HtmlAppSlide({ node }: { node: HtmlAppNode }) {
       {isLive ? (
         fremd
           ? <iframe ref={frame} className="slide-app-frame" title={data.name} sandbox={SANDBOX_LIVE} src={liveAdresse ?? undefined} />
-          : <p className="slide-app-hinweis">Diese Adresse lässt sich nicht einbetten — nur fremde Webseiten (https://…).</p>
+          : <p className="slide-app-hinweis">Diese Adresse lässt sich nicht einbetten – nur fremde Webseiten (https://…).</p>
       ) : srcdoc !== null ? (
         <iframe ref={frame} className="slide-app-frame" title={data.name} sandbox={SANDBOX} srcDoc={srcdoc} onLoad={() => rollNachLaden(boardId, id, frame.current)} />
       ) : (
         <p className="slide-app-hinweis">{fehlt ? 'Der Inhalt dieses Tools liegt auf diesem Gerät nicht vor.' : 'Tool startet …'}</p>
       )}
       {isLive && fremd && vorfuehrung && (
-        <div className="slide-app-fuss" data-taste="folie-app-fremd">Webseite von <span translate="no">{adresse}</span> — sie öffnet sich bei allen; rollen und klicken muss darin jeder selbst.</div>
+        <div className="slide-app-fuss" data-taste="folie-app-fremd">Webseite von <span translate="no">{adresse}</span> – sie öffnet sich bei allen; rollen und klicken muss darin jeder selbst.</div>
       )}
     </div>
   );

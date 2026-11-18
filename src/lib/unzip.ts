@@ -54,7 +54,7 @@ export class ZipArchive {
     for (let i = data.byteLength - 22; i >= data.byteLength - maxBack; i--) {
       if (view.getUint32(i, true) === SIG_EOCD) { eocd = i; break; }
     }
-    if (eocd < 0) throw new Error('Kein ZIP-Verzeichnis gefunden — Datei ist beschädigt oder kein ZIP/DOCX.');
+    if (eocd < 0) throw new Error('Kein ZIP-Verzeichnis gefunden – Datei ist beschädigt oder kein ZIP/DOCX.');
 
     let count = view.getUint16(eocd + 10, true);
     let cdOffset = view.getUint32(eocd + 16, true);
@@ -112,7 +112,7 @@ export class ZipArchive {
     if (e.method === 0) return raw.slice();
     if (e.method !== 8) throw new Error(`ZIP-Eintrag „${name}" nutzt ein nicht unterstütztes Packverfahren (${e.method}).`);
     if (typeof DecompressionStream === 'undefined') {
-      throw new Error('Dieser Browser kann ZIP-Inhalte nicht entpacken (DecompressionStream fehlt) — bitte einen aktuellen Browser verwenden.');
+      throw new Error('Dieser Browser kann ZIP-Inhalte nicht entpacken (DecompressionStream fehlt) – bitte einen aktuellen Browser verwenden.');
     }
     // slice() ist nötig: Der Blob darf keine Sicht auf den Gesamtpuffer halten
     const stream = new Blob([raw.slice()]).stream().pipeThrough(new DecompressionStream('deflate-raw'));

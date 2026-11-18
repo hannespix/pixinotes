@@ -7,11 +7,12 @@ import { useEffect, useState } from 'react';
 import { istUebersetzt } from '../lib/uebersetzung';
 import { spracheSetzen } from '../lib/sprache';
 
+import { IGlobe } from './Icons';
 const MERKER = 'pixinotes-sprachhinweis';
 
 /** Sprache → Hinweis. Fehlt eine Sprache, gilt Englisch. */
 const TEXTE: Record<string, string> = {
-  en: 'PixiNotes is written in German — an English interface is built in. For other languages: Your browser can translate it (choose “Translate” in the browser menu or the address bar). Your notes stay as they are.',
+  en: 'PixiNotes is written in German – an English interface is built in. For other languages: Your browser can translate it (choose “Translate” in the browser menu or the address bar). Your notes stay as they are.',
   fr: 'PixiNotes est en allemand. Votre navigateur peut le traduire : choisissez « Traduire » dans le menu ou la barre d’adresse. Vos notes restent inchangées.',
   es: 'PixiNotes está en alemán. Tu navegador puede traducirlo: elige «Traducir» en el menú o en la barra de direcciones. Tus notas no se modifican.',
   it: 'PixiNotes è in tedesco. Il browser può tradurlo: scegli «Traduci» nel menu o nella barra degli indirizzi. Le tue note restano invariate.',
@@ -55,7 +56,7 @@ export function SprachHinweis() {
   if (!sprache) return null;
   return (
     <div className="sprach-hinweis" role="status" translate="no" lang={sprache} dir={sprache === 'ar' ? 'rtl' : 'ltr'} data-taste="sprach-hinweis">
-      <span aria-hidden="true">🌐</span>
+      <IGlobe size={15} aria-hidden="true" />
       <span className="sprach-text">{TEXTE[sprache]}</span>
       {/* M381: Englisch ist eingebaut — ein Klick, ohne den Umweg über den Browser */}
       <button className="sprach-en" onClick={() => { merken(); spracheSetzen('en'); }} data-taste="sprach-englisch">English</button>

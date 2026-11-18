@@ -25,10 +25,10 @@ export function DueChips({ text, context, fristen }: { text: string; context: st
         <button
           key={i}
           className={`due-chip due-${d.urgency} nodrag`}
-          title={`„${d.label}" erkannt — Klick erstellt Kalendereintrag (.ics)`}
+          title={`„${d.label}" erkannt – Klick erstellt Kalendereintrag (.ics)`}
           onClick={() => {
             downloadIcs(context, d.date);
-            showToast('📅 Kalendereintrag erstellt — in Outlook öffnen und speichern');
+            showToast('Kalendereintrag erstellt – in Outlook öffnen und speichern');
           }}
         >
           <ICalendar size={11} /> {formatDue(d)}

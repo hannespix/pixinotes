@@ -37,7 +37,7 @@ export function BildExport() {
     try {
       const nodes = activeBoard.nodes.filter((n) => !n.archived && (!nurAuswahl || n.selected));
       await exportBoard({ format, name: activeBoard.name, nodes, scale, background: bg, header, nurDiese: nurAuswahl, edges: activeBoard.edges });
-      showToast(format === 'print' ? '🖨️ Druckdialog geöffnet — dort „Als PDF speichern".' : '⬇️ Bild erstellt.');
+      showToast(format === 'print' ? 'Druckdialog geöffnet – dort „Als PDF speichern".' : 'Bild erstellt.');
       setOpen(false);
     } catch (e) {
       showToast(`Abgebrochen: ${String((e as Error).message)}`, false, 8000);
@@ -49,7 +49,7 @@ export function BildExport() {
     <div className="modal-backdrop" onClick={() => setOpen(false)}>
       <div className="modal bild-export" role="dialog" aria-modal="true" aria-label="Als Bild exportieren" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>🖼 Als Bild exportieren</h2>
+          <h2>Als Bild exportieren</h2>
           <button className="modal-x" onClick={() => setOpen(false)} aria-label="Schließen">✕</button>
         </div>
         <div className="modal-body">

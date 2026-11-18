@@ -53,7 +53,7 @@ export function useRandZiehen(
     onPointerUp: beenden,
     onPointerCancel: beenden,
     onDoubleClick,
-    title: 'Breite ziehen — Doppelklick stellt die Ausgangsbreite her',
+    title: 'Breite ziehen – Doppelklick stellt die Ausgangsbreite her',
     'aria-label': 'Breite ändern',
     role: 'separator' as const,
     'aria-orientation': 'vertical' as const,

@@ -117,7 +117,7 @@ export async function writeProjectSync(projectId: string): Promise<string> {
   const handle = await projectHandle(projectId);
   if (!handle) throw new Error('Kein Sync-Ordner mit diesem Projekt verbunden.');
   const built = buildPayloadBody(projectId);
-  if (!built) throw new Error('Projekt ist leer oder existiert nicht mehr — nichts zu speichern.');
+  if (!built) throw new Error('Projekt ist leer oder existiert nicht mehr – nichts zu speichern.');
   const payload: ProjectPayload = {
     app: 'pixinotes-projekt',
     version: 1,
@@ -207,13 +207,13 @@ export function buildInviteText(projectName: string, folderName: string): string
     '',
     `ich lade dich ein, an unserem PixiNotes-Projekt „${projectName}" mitzuarbeiten. So trittst du bei:`,
     '',
-    `1) Nimm die Ordner-Freigabe an: [HIER den Freigabe-Link zum Ordner „${folderName}" einfügen — z. B. in Nextcloud über „Teilen"]`,
+    `1) Nimm die Ordner-Freigabe an: [HIER den Freigabe-Link zum Ordner „${folderName}" einfügen – z. B. in Nextcloud über „Teilen"]`,
     '2) Lass den freigegebenen Ordner von deinem Sync-Client (Nextcloud/OneDrive/Dropbox) auf deinen Rechner synchronisieren.',
     `3) Öffne PixiNotes: ${appUrl}`,
     '4) Dort: Einstellungen (Zahnrad) → Synchronisation → „Projekt beitreten…" → wähle den synchronisierten Ordner aus.',
     '',
     'PixiNotes findet darin das Projekt-Paket, richtet den automatischen Abgleich ein und zeigt dir das Projekt neben deinen eigenen.',
-    'Wer mitarbeiten darf, regelt allein die Ordner-Freigabe — diese E-Mail enthält keine Passwörter oder Zugangsdaten.',
+    'Wer mitarbeiten darf, regelt allein die Ordner-Freigabe – diese E-Mail enthält keine Passwörter oder Zugangsdaten.',
   ].map((z) => t(z)).join('\n');   // M381: auf Englisch geht die Einladung englisch hinaus
 }
 
@@ -243,7 +243,7 @@ async function autoSaveProject(projectId: string): Promise<void> {
   if (remote && remote.savedAt !== projectStamp(projectId)) {
     if (!conflictWarned.has(projectId)) {
       conflictWarned.add(projectId);
-      useBoard.getState().showToast(`⚠️ Im Team-Ordner liegt ein neuerer Stand von „${built.name}". Unter ⚙ → Daten → Synchronisation entscheiden.`);
+      useBoard.getState().showToast(`Im Team-Ordner liegt ein neuerer Stand von „${built.name}". Unter Einstellungen → Daten → Synchronisation entscheiden.`);
     }
     return;
   }
@@ -264,11 +264,11 @@ export async function checkProjectRemotes(): Promise<void> {
     const remote = await readProjectFile(handle, projectId);
     if (!remote || remote.savedAt === projectStamp(projectId)) continue;
     if (!localStorage.getItem(dirtyKey(projectId)) && applyProjectPayload(remote)) {
-      useBoard.getState().showToast(`☁️ Team-Projekt „${remote.project.name}" aktualisiert (${new Date(remote.savedAt).toLocaleString('de-DE')}).`);
+      useBoard.getState().showToast(`Team-Projekt „${remote.project.name}" aktualisiert (${new Date(remote.savedAt).toLocaleString('de-DE')}).`);
       conflictWarned.delete(projectId);
     } else if (!conflictWarned.has(projectId)) {
       conflictWarned.add(projectId);
-      useBoard.getState().showToast(`⚠️ Team-Projekt „${remote.project.name}": Die Stände weichen ab. Unter ⚙ → Daten → Synchronisation entscheiden.`);
+      useBoard.getState().showToast(`Team-Projekt „${remote.project.name}": Die Stände weichen ab. Unter Einstellungen → Daten → Synchronisation entscheiden.`);
     }
   }
 }

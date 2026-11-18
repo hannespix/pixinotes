@@ -65,7 +65,7 @@ async function seite({ telefon = false } = {}) {
 }
 const deckkraft = (P, sel) => P.locator(sel).first().evaluate((el) => getComputedStyle(el).opacity);
 
-console.log('════ A: Telefon — ein Weg ════');
+console.log('════ A: Telefon – ein Weg ════');
 {
   const { ctx, P } = await seite({ telefon: true });
   pruefe('A1 die Kopfleiste ist kompakt und trägt genau einen Weg-Knopf', (await P.locator('.tabs.kompakt').count()) === 1 && (await P.locator('.tabs .tab-pfad').count()) === 1 && (await P.locator('.tabs .tab-nav').count()) === 1);
@@ -91,7 +91,7 @@ console.log('════ A: Telefon — ein Weg ════');
   await ctx.close();
 }
 
-console.log('════ B: PC — Verbindungspunkte nur beim Zeigen ════');
+console.log('════ B: PC – Verbindungspunkte nur beim Zeigen ════');
 {
   const { ctx, P } = await seite();
   // Eine ganz sichtbare Karte wählen (nicht unter der Navigation)
@@ -109,7 +109,7 @@ console.log('════ B: PC — Verbindungspunkte nur beim Zeigen ═══�
   await ctx.close();
 }
 
-console.log('════ C: Touch — Auswahl zeigt die Punkte ════');
+console.log('════ C: Touch – Auswahl zeigt die Punkte ════');
 {
   const { ctx, P } = await seite({ telefon: true });
   pruefe('C0 der Browser meldet hover:none', await P.evaluate(() => matchMedia('(hover: none)').matches));
@@ -121,7 +121,7 @@ console.log('════ C: Touch — Auswahl zeigt die Punkte ════');
   await ctx.close();
 }
 
-console.log('════ D: Telefon — Einstellungs-Reiter in einer Zeile ════');
+console.log('════ D: Telefon – Einstellungs-Reiter in einer Zeile ════');
 {
   const { ctx, P } = await seite({ telefon: true });
   await P.locator('[data-taste="einstellungen"]').tap();

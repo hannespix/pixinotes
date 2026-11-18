@@ -55,6 +55,7 @@ import { BildEditorHost } from './components/BildEditorHost';
 import { getAuthor } from './components/CommentLayer';
 import { loadKonto } from './lib/kontoSync';
 import { sprache } from './lib/sprache';
+import { ILock } from './components/Icons';
 import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick gespeicherte Seitenstriche (M354-Fehler) einmal richten
 
 /**
@@ -157,7 +158,7 @@ export default function App() {
     if (!useBoard.getState().ruheHinweis) return;
     const t = setTimeout(() => {
       useBoard.getState().setRuheHinweis(false);
-      useBoard.getState().showToast('Physik und Klick-Zoom sind jetzt aus. Wieder einschalten: ⚙ → Darstellung.', false, 8000);
+      useBoard.getState().showToast('Physik und Klick-Zoom sind jetzt aus. Wieder einschalten: Einstellungen → Darstellung.', false, 8000);
     }, 1500);
     return () => clearTimeout(t);
   }, []);
@@ -166,11 +167,9 @@ export default function App() {
   const ui = useBoard((s) => s.ui);
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    // M178: Browser-/Statusleisten-Farbe (meta theme-color) folgt der
-    // Akzentfarbe — vorher stand sie fest auf Blau, egal welcher Akzent
-    const ACCENT_HEX: Record<string, string> = {
-      blau: '#4f7cff', gruen: '#2e9e63', violett: '#7c5cff', orange: '#e0762e', rosa: '#d44f6e',
-    };
+    // M397: Die Statusleiste des Geräts trägt die Farbe des App-Grunds, nicht
+    // mehr den Akzent – ein kräftig blauer Balken über einer ruhigen App
+    // wirkt wie ein Fremdkörper (vorher M178: Akzentfarbe)
     const apply = () => {
       const dark = ui.theme === 'dark' || (ui.theme === 'system' && mq.matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
@@ -181,7 +180,7 @@ export default function App() {
         meta.name = 'theme-color';
         document.head.appendChild(meta);
       }
-      meta.content = ACCENT_HEX[ui.accent] ?? ACCENT_HEX.blau;
+      meta.content = dark ? '#141618' : '#f3f4f6';
     };
     apply();
     mq.addEventListener('change', apply);
@@ -198,7 +197,7 @@ export default function App() {
       if (window.confirm(`Geteiltes Board „${shared.name ?? 'Board'}" (${shared.nodes?.length ?? 0} Karten) übernehmen?`)) {
         claimWriter(); // bewusster Import — auch aus einem Mitlese-Fenster wirksam
         st.importBoard(cloneSharedBoard(shared));
-        st.showToast('Geteiltes Board übernommen — liegt als eigenes Board in deiner Tab-Leiste.');
+        st.showToast('Geteiltes Board übernommen – liegt als eigenes Board in deiner Tab-Leiste.');
       }
     })();
   }, []);
@@ -213,9 +212,9 @@ export default function App() {
     claimWriter(); // bewusster Import — auch aus einem Mitlese-Fenster wirksam
     linkOeffnen(token, (name) => window.confirm(`Von „${name}" gibt es eine neuere Fassung.\n\nOK = neue Fassung laden (als weiteres Board, dein bisheriges bleibt)\nAbbrechen = dein bisheriges öffnen`))
       .then((wie) => useBoard.getState().showToast(wie === 'vorhanden'
-        ? 'Geteiltes Board geöffnet — du hattest es schon.'
-        : 'Geteiltes Board geöffnet — es ist jetzt dein eigenes; Änderungen bleiben bei dir.', false, 6000))
-      .catch((e: Error) => useBoard.getState().showToast(`⚠️ ${e.message}`, false, 9000));
+        ? 'Geteiltes Board geöffnet – du hattest es schon.'
+        : 'Geteiltes Board geöffnet – es ist jetzt dein eigenes; Änderungen bleiben bei dir.', false, 6000))
+      .catch((e: Error) => useBoard.getState().showToast(`${e.message}`, false, 9000));
   }, []);
 
   // M360: Einladungslink (#e=<token>) — als Gast beitreten und das gemeinsame Board öffnen. Ohne Anmeldung
@@ -231,23 +230,23 @@ export default function App() {
         const st = useBoard.getState();
         if (r.art === 'anmelden') {
           if (!vomLink) return;
-          st.showToast('👥 Einladung zu einem gemeinsamen Board: Melde dich mit E-Mail an — danach öffnet es sich von selbst.', false, 14000);
+          st.showToast('Einladung zu einem gemeinsamen Board: Melde dich mit E-Mail an – danach öffnet es sich von selbst.', false, 14000);
           st.setSettingsOpen(true, 'konto');
         } else if (r.art === 'eigen') {
-          st.showToast('Das ist der Einladungslink zu deinem eigenen Board — gib ihn an die anderen weiter.', false, 7000);
+          st.showToast('Das ist der Einladungslink zu deinem eigenen Board – gib ihn an die anderen weiter.', false, 7000);
         } else if (r.art === 'gast') {
           // M364: ohne Konto dabei — einmal nach dem Namen fragen, damit die anderen sehen, wer schreibt
           st.showToast(r.rolle === 'lesen'
-            ? '👥 Gemeinsames Board geöffnet — du liest live mit (nur lesen).'
-            : '👥 Du bist dabei — alle arbeiten live im selben Board. Eine Karte gehört dem, der sie gerade bearbeitet.', false, 9000);
+            ? 'Gemeinsames Board geöffnet – du liest live mit (nur lesen).'
+            : 'Du bist dabei – alle arbeiten live im selben Board. Eine Karte gehört dem, der sie gerade bearbeitet.', false, 9000);
           if (!getAuthor().trim()) window.dispatchEvent(new CustomEvent(NAME_FRAGEN));
         } else {
           const von = r.von ? ` von ${r.von}` : '';
           st.showToast(r.rolle === 'lesen'
-            ? `👥 Geteiltes Board${von} geöffnet — du liest live mit (nur lesen).`
-            : `👥 Geteiltes Board${von} geöffnet — ihr arbeitet jetzt gemeinsam daran.`, false, 8000);
+            ? `Geteiltes Board${von} geöffnet – du liest live mit (nur lesen).`
+            : `Geteiltes Board${von} geöffnet – ihr arbeitet jetzt gemeinsam daran.`, false, 8000);
         }
-      }).catch((e: Error) => useBoard.getState().showToast(`⚠️ ${e.message}`, false, 9000))
+      }).catch((e: Error) => useBoard.getState().showToast(`${e.message}`, false, 9000))
         .finally(() => { laeuft = false; });
     };
     const token = einladungTokenAbholen();
@@ -269,11 +268,11 @@ export default function App() {
       const hits = dueTasksToRemind(collectTasks(boards));
       if (hits.length === 0) return;
       if (hits.length === 1) {
-        showToast(`⏰ Fällig: „${hits[0].text}" (${hits[0].boardName}) — Details unter ✅`);
-        notifyBrowser('PixiNotes ⏰ Aufgabe fällig', `${hits[0].text} (${hits[0].boardName})`);
+        showToast(`Fällig: „${hits[0].text}" (${hits[0].boardName}) – Details in der Aufgaben-Zentrale`);
+        notifyBrowser('PixiNotes Aufgabe fällig', `${hits[0].text} (${hits[0].boardName})`);
       } else {
-        showToast(`⏰ ${hits.length} Aufgaben fällig — Details unter ✅`);
-        notifyBrowser('PixiNotes ⏰', `${hits.length} Aufgaben sind fällig`);
+        showToast(`${hits.length} Aufgaben fällig – Details in der Aufgaben-Zentrale`);
+        notifyBrowser('PixiNotes', `${hits.length} Aufgaben sind fällig`);
       }
     };
     const t0 = setTimeout(remind, 2500);
@@ -288,7 +287,7 @@ export default function App() {
     const lauf = () => {
       const n = autoArchivAlleBoards();
       if (n > 0) {
-        useBoard.getState().showToast(`🗃 ${n} erledigte${n === 1 ? 's Ticket' : ' Tickets'} automatisch archiviert.`);
+        useBoard.getState().showToast(`${n} erledigte${n === 1 ? 's Ticket' : ' Tickets'} automatisch archiviert.`);
       }
     };
     const t0 = setTimeout(lauf, 4000);
@@ -324,7 +323,7 @@ export default function App() {
       if (now - lastDefense < 10_000) return; // gedrosselt: kein Toast/Write-Ping-Pong
       lastDefense = now;
       if (singleWriterSupported()) reassertPersist();
-      showToast('⚠️ Ein zweites PixiNotes-Fenster schreibt mit, bitte das andere Fenster schließen.');
+      showToast('Ein zweites PixiNotes-Fenster schreibt mit, bitte das andere Fenster schließen.');
     };
     window.addEventListener('storage', onStorage);
     return () => { window.removeEventListener('storage', onStorage); clearTimeout(adoptTimer); };
@@ -333,7 +332,7 @@ export default function App() {
   // Quota-Warnung aus dem Storage-Layer (Audit K1)
   useEffect(() => {
     const warn = () =>
-      showToast('⚠️ Speicher voll, Änderungen werden nicht gesichert. Große Bilder löschen oder exportieren.');
+      showToast('Speicher voll, Änderungen werden nicht gesichert. Große Bilder löschen oder exportieren.');
     window.addEventListener('pixinotes:quota', warn);
     return () => window.removeEventListener('pixinotes:quota', warn);
   }, [showToast]);
@@ -422,7 +421,7 @@ export default function App() {
         {/* M360: Nur lesend geteiltes Board — sagen, warum nichts geht, und den Ausweg anbieten */}
         {nurLesenBoard && view === 'board' && !presenting && !focusCard && (
           <div className="lese-band" role="status" data-taste="lese-band">
-            <span>🔒 <b>Nur lesen</b> · {nurLesenBoard.von ? `geteilt von ${nurLesenBoard.von}` : 'geteiltes Board'}</span>
+            <span><ILock size={13} /> <b>Nur lesen</b> · {nurLesenBoard.von ? `geteilt von ${nurLesenBoard.von}` : 'geteiltes Board'}</span>
             <button onClick={() => useBoard.getState().duplicateBoard(nurLesenBoard.id)} data-taste="lese-kopie">Eigene Kopie anlegen</button>
           </div>
         )}
@@ -432,7 +431,7 @@ export default function App() {
               {/* M247: genauer sagen, WAS hier nicht gespeichert wird. „Liest nur mit"
                   klang wie „gar nichts geht" — dabei betrifft es nur die Inhalte;
                   Design und Anzeige werden auch hier dauerhaft gemerkt. */}
-              👀 PixiNotes ist in einem anderen Fenster/Tab geöffnet — <b>Änderungen an Karten
+              PixiNotes ist in einem anderen Fenster/Tab geöffnet – <b>Änderungen an Karten
               werden hier nicht gespeichert</b>, damit sich die Stände nicht gegenseitig
               überschreiben. Design- und Anzeige-Einstellungen bleiben erhalten.
             </span>
@@ -447,7 +446,7 @@ export default function App() {
             </button>
           )}
           {toast?.abbruch && (
-            <button className="toast-undo" data-taste="ki-abbrechen" onClick={() => { kiAbbrechen(); useBoard.getState().showToast('⏹ Abbruch angefordert — die laufende Portion wird noch beendet …', false, 8000); }}>
+            <button className="toast-undo" data-taste="ki-abbrechen" onClick={() => { kiAbbrechen(); useBoard.getState().showToast('⏹ Abbruch angefordert – die laufende Portion wird noch beendet …', false, 8000); }}>
               Abbrechen
             </button>
           )}

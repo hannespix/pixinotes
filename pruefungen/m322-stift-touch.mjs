@@ -108,7 +108,7 @@ const zaehler = (P) => P.evaluate(() => ({ ...window.__rf }));
 const welle = (x0, y0, n = 24) => Array.from({ length: n }, (_, i) => [x0 + i * 8, y0 + Math.sin(i / 3) * 30]);
 
 // ══ A: Zeichenmodus, Stift als Doppelmeldung ════════════════════════
-console.log('\n════ A: Zeichenmodus — Stift-Touches erreichen React Flow nicht ════');
+console.log('\n════ A: Zeichenmodus – Stift-Touches erreichen React Flow nicht ════');
 {
   const { ctx, P } = await seite();
   await werkzeug(P, 'Stift');

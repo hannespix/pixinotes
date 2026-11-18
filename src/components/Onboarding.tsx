@@ -44,10 +44,10 @@ export function Onboarding() {
         <h2>Willkommen bei Pixi<span>Notes</span></h2>
         <p className="onb-lead">
           Eine unendliche Fläche für Notizen, Aufgaben und Pläne. <b>Alles bleibt in
-          diesem Browser</b> — kein Konto, kein Server, keine Anmeldung.
+          diesem Browser</b> – kein Konto, kein Server, keine Anmeldung.
         </p>
         <ul className="onb-steps">
-          <li><b>Doppelklick</b> auf die Fläche legt eine Notiz an — <b>＋</b> unten alle anderen Module.</li>
+          <li><b>Doppelklick</b> auf die Fläche legt eine Notiz an – <b>＋</b> unten alle anderen Module.</li>
           <li><b>Zwei Finger</b> (oder Mausrad) schieben und zoomen die Fläche.</li>
           <li><b>Strg+K</b> durchsucht alles und führt Befehle aus.</li>
         </ul>

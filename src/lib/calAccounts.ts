@@ -129,10 +129,10 @@ export async function googleTokenFuer(clientId: string, scope: string, still: bo
       scope,
       ...(still ? { prompt: '' } : {}),
       callback: (resp) => {
-        if (resp.error || !resp.access_token) reject(new Error(still ? 'Google-Sitzung abgelaufen — bitte neu anmelden.' : `Google-Anmeldung abgebrochen (${resp.error ?? 'kein Token'})`));
+        if (resp.error || !resp.access_token) reject(new Error(still ? 'Google-Sitzung abgelaufen – bitte neu anmelden.' : `Google-Anmeldung abgebrochen (${resp.error ?? 'kein Token'})`));
         else resolve({ access_token: resp.access_token, expires_in: resp.expires_in ?? 3600 });
       },
-      error_callback: (err) => reject(new Error(still ? 'Google-Sitzung abgelaufen — bitte neu anmelden.' : `Google-Anmeldung abgebrochen (${err.type ?? err.message ?? 'Popup'})`)),
+      error_callback: (err) => reject(new Error(still ? 'Google-Sitzung abgelaufen – bitte neu anmelden.' : `Google-Anmeldung abgebrochen (${err.type ?? err.message ?? 'Popup'})`)),
     });
     client.requestAccessToken(still ? { prompt: '' } : undefined);
   });
@@ -178,7 +178,7 @@ async function refreshGoogle(acc: GoogleAccount): Promise<GoogleAccount> {
       scope: GOOGLE_SCOPE,
       prompt: '',
       callback: (resp) => {
-        if (resp.error || !resp.access_token) reject(new Error('Google-Sitzung abgelaufen — bitte in den Einstellungen neu verbinden.'));
+        if (resp.error || !resp.access_token) reject(new Error('Google-Sitzung abgelaufen – bitte in den Einstellungen neu verbinden.'));
         else resolve({ access_token: resp.access_token, expires_in: resp.expires_in ?? 3600 });
       },
     });
@@ -236,7 +236,7 @@ export function handleOAuthRedirect(): boolean {
   const state = params.get('state');
   if (!code || !state || !state.startsWith('pixinotes-ms-') || !window.opener) return false;
   (window.opener as Window).postMessage({ type: 'pixinotes-oauth', code, state }, window.location.origin);
-  document.body.textContent = 'Anmeldung erfolgreich — dieses Fenster kann geschlossen werden.';
+  document.body.textContent = 'Anmeldung erfolgreich – dieses Fenster kann geschlossen werden.';
   setTimeout(() => window.close(), 400);
   return true;
 }
@@ -287,7 +287,7 @@ export async function msAnmeldung(clientId: string, tenant = 'common', scope = M
   }).toString();
 
   const popup = window.open(auth.toString(), 'pixinotes-ms-login', 'width=520,height=680');
-  if (!popup) throw new Error('Popup blockiert — bitte Popups für diese Seite erlauben.');
+  if (!popup) throw new Error('Popup blockiert – bitte Popups für diese Seite erlauben.');
 
   const code = await new Promise<string>((resolve, reject) => {
     const timer = window.setInterval(() => {
@@ -348,7 +348,7 @@ async function msToken(clientId: string, tenant: string, body: Record<string, st
 }
 
 async function refreshMicrosoft(acc: MsAccount): Promise<MsAccount> {
-  if (!acc.refreshToken) throw new Error('Microsoft-Sitzung abgelaufen — bitte in den Einstellungen neu verbinden.');
+  if (!acc.refreshToken) throw new Error('Microsoft-Sitzung abgelaufen – bitte in den Einstellungen neu verbinden.');
   // WICHTIG: mit dem GESPEICHERTEN Umfang erneuern. Würde hier pauschal der
   // erweiterte Satz stehen, verweigerte Microsoft bei Konten ohne
   // OneNote-Zustimmung das Token — und der Kalender fiele mit aus.
@@ -364,13 +364,13 @@ async function refreshMicrosoft(acc: MsAccount): Promise<MsAccount> {
 export async function msAccessToken(needNotes = false): Promise<string> {
   const acc = loadCalAccounts().ms;
   if (!acc || (!acc.token && !acc.refreshToken)) {
-    throw new Error('Kein Microsoft-Konto verbunden — in den Einstellungen unter „Kalender" verbinden.');
+    throw new Error('Kein Microsoft-Konto verbunden – in den Einstellungen unter „Kalender" verbinden.');
   }
   if (needNotes && !msHasNotes(acc)) {
-    throw new Error('Die Verbindung hat noch keinen Zugriff auf OneNote — in den Einstellungen einmal „Mit OneNote verbinden" wählen.');
+    throw new Error('Die Verbindung hat noch keinen Zugriff auf OneNote – in den Einstellungen einmal „Mit OneNote verbinden" wählen.');
   }
   const fresh = acc.token && acc.tokenExp && acc.tokenExp > Date.now() ? acc : await refreshMicrosoft(acc);
-  if (!fresh.token) throw new Error('Microsoft-Sitzung abgelaufen — bitte neu verbinden.');
+  if (!fresh.token) throw new Error('Microsoft-Sitzung abgelaufen – bitte neu verbinden.');
   return fresh.token;
 }
 

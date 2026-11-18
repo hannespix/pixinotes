@@ -93,7 +93,7 @@ console.log('\n════ A: Paket-Schnitt ════');
   pruefe('A4 beim Start wird kein Mermaid geladen', !geladen.some((f) => /mermaid/.test(f)), geladen.join(', '));
   pruefe('A5 beim Start kein PDF-, XLSX-, MSG- oder E-Mail-Parser', !geladen.some((f) => /pdf|xlsx|postal|msgreader|native-/.test(f)), geladen.filter((f) => /pdf|xlsx|postal|msgreader|native-/.test(f)).join(', '));
   pruefe(`A6 Start-JS unter 3,8 MB (ist ${(summe / 1024 / 1024).toFixed(2)} MB in ${geladen.length} Dateien; vorher 6,3 MB)`, summe < 3_800_000 && summe > 1_000_000, String(summe));
-  console.log(`  ⏱ Dock sichtbar nach ${dock} ms, erste Karte nach ${karte} ms`);
+  console.log(`  Dock sichtbar nach ${dock} ms, erste Karte nach ${karte} ms`);
   pruefe('E1 Dock und erste Karte in unter 1,5 s sichtbar (lokal, kalt)', dock < 1500 && karte < 1500, JSON.stringify({ dock, karte }));
   await ctx.close();
 }

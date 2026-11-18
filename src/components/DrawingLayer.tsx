@@ -18,7 +18,7 @@ import { linienPfad, MARKER, MarkerGruppen, PEN, StrichPfad, strichKontur } from
 import { markerEinrasten } from '../lib/markerZeile';
 import { istAmText } from '../lib/notizText';
 import type { AppNode } from '../types';
-import { IType, IX } from './Icons';
+import { IType, IX, IPen } from './Icons';
 
 const EMPTY: Stroke[] = [];
 const PEN_COLORS = ['#16191e', '#e0392b', '#e8a13a', '#3fa564', '#4f7cff', '#a05fd4'];
@@ -301,7 +301,7 @@ export function DrawingLayer() {
       formen.forEach((pts, i) => commitStroke({ ...d, id: i === 0 ? d.id : uid(), points: pts, druck: undefined }));
       drawing.current = null;
       tipp.current = null;
-      showToast(formen.length > 1 ? '✨ Pfeil eingerastet' : '✨ Form eingerastet');
+      showToast(formen.length > 1 ? 'Pfeil eingerastet' : 'Form eingerastet');
       force((n) => n + 1);
     }
   };
@@ -851,7 +851,7 @@ export function DrawingLayer() {
         removeStrokes(opfer.map((s) => s.id));
         sessionIds.current = sessionIds.current.filter((id) => !opfer.some((s) => s.id === id));
         vorschlagVerwerfen();
-        showToast(opfer.length === 1 ? '✂️ Durchgestrichen — Strich gelöscht (↶ holt ihn zurück)' : `✂️ Durchgestrichen — ${opfer.length} Striche gelöscht (↶ holt sie zurück)`);
+        showToast(opfer.length === 1 ? 'Durchgestrichen – Strich gelöscht (↶ holt ihn zurück)' : `Durchgestrichen – ${opfer.length} Striche gelöscht (↶ holt sie zurück)`);
         return true;
       }
     }
@@ -912,7 +912,7 @@ export function DrawingLayer() {
       const treffer = woerter.filter((w) => ueberdeckung(schirmBox, wortBox(w)) >= 0.5);
       if (treffer.length > 0) {
         woerterLoeschen(noteId, treffer);
-        showToast(treffer.length === 1 ? `✂️ „${treffer[0].text}" gelöscht (↶ holt es zurück)` : `✂️ ${treffer.length} Wörter gelöscht (↶ holt sie zurück)`);
+        showToast(treffer.length === 1 ? `„${treffer[0].text}" gelöscht (↶ holt es zurück)` : `${treffer.length} Wörter gelöscht (↶ holt sie zurück)`);
         return true;
       }
     }
@@ -926,7 +926,7 @@ export function DrawingLayer() {
       });
       if (treffer.length > 0) {
         woerterLoeschen(noteId, treffer);
-        showToast(treffer.length === 1 ? `✂️ „${treffer[0].text}" durchgestrichen — gelöscht (↶)` : `✂️ ${treffer.length} Wörter durchgestrichen — gelöscht (↶)`);
+        showToast(treffer.length === 1 ? `„${treffer[0].text}" durchgestrichen – gelöscht (↶)` : `${treffer.length} Wörter durchgestrichen – gelöscht (↶)`);
         return true;
       }
     }
@@ -1154,14 +1154,14 @@ export function DrawingLayer() {
         zeilen = await aufDemselbenBoard(async () => { const e = await schriftErkennen(eigene, handschriftKi && aiReady(ai)); return e.ki ? await e.ki : e.zeilen; });
       }
       const text = zeilen.map((z) => z.text).join('\n');
-      if (!text) { showToast('Keine Schrift erkannt — deutlicher schreiben oder größer.'); return; }
+      if (!text) { showToast('Keine Schrift erkannt – deutlicher schreiben oder größer.'); return; }
       const kurz = text.length > 40 ? `${text.slice(0, 40)}…` : text;
       if (ziel) {
         inNotizEinfuegen(ziel, zeilen, box);
-        showToast(`✍️ In „${noteTitle((ziel.data as { blocks?: unknown[] }).blocks)}" eingefügt: „${kurz}"`);
+        showToast(`In „${noteTitle((ziel.data as { blocks?: unknown[] }).blocks)}" eingefügt: „${kurz}"`);
       } else {
         addNode(makeNote({ x: box.minX, y: box.minY }, { color: 'white', blocks: zeilenZuBloecken(zeilen) }));
-        showToast(`✍️ Neue Notiz: „${kurz}"`);
+        showToast(`Neue Notiz: „${kurz}"`);
       }
       removeStrokes(eigene.map((s) => s.id));
       sessionIds.current = sessionIds.current.filter((id) => !eigene.some((s) => s.id === id));
@@ -1317,11 +1317,11 @@ export function DrawingLayer() {
             <button
               className="vorschlag-text"
               translate="no"
-              title={vorschlag.status === 'ki' ? 'Erkannt — die KI prüft noch; Tipp übernimmt sofort' : 'Tipp: Text übernehmen (in die Notiz darunter oder als neue Notiz) — rechts die Textart wechseln'}
+              title={vorschlag.status === 'ki' ? 'Erkannt – die KI prüft noch; Tipp übernimmt sofort' : 'Tipp: Text übernehmen (in die Notiz darunter oder als neue Notiz) – rechts die Textart wechseln'}
               aria-label="Erkannten Text übernehmen"
               onClick={() => void handschriftUebernehmen(vorschlag.zeilen)}
             >
-              <b>{vorschlag.status === 'ki' ? '✍️…' : '✍️'}</b>{vorschlag.zeilen.map((z) => artVorsatz(z) + z.text).join('\n')}
+              <b><IPen size={13} />{vorschlag.status === 'ki' ? '…' : ''}</b>{vorschlag.zeilen.map((z) => artVorsatz(z) + z.text).join('\n')}
             </button>
           )}
           {vorschlag.status !== 'erkennt' && (
@@ -1382,7 +1382,7 @@ export function DrawingLayer() {
               ))}
               <input
                 type="range" className="draw-regler nodrag" aria-label={`${was} stufenlos`}
-                title={`${was}: ${jetzt} Pt. — stufenlos`}
+                title={`${was}: ${jetzt} Pt. – stufenlos`}
                 min={def.min} max={def.max} step={def.schritt} value={jetzt}
                 onChange={(e) => staerkeSetzen(w, Number(e.target.value))}
               />
@@ -1417,7 +1417,7 @@ export function DrawingLayer() {
           <span className="draw-hint" title={radiererArt === 'teil' ? 'Nimmt weg, was der Stift berührt' : 'Nimmt ganze Striche auf einmal weg'}>Radierer</span>
         ) : (
           <span className="draw-hint" title={`${durchgriff ? 'Stift schreibt, Finger bedient, Seitentaste greift · ' : ''}kurz halten = Form`}>
-            {tool === 'marker' ? 'Textmarker' : 'Stift'} ✨
+            {tool === 'marker' ? 'Textmarker' : 'Stift'}
           </span>
         )}
         {schriftDa && (

@@ -601,7 +601,7 @@ await gruppeAuf(A.P);
 await A.P.locator('[data-taste="vorfuehren"]').click(); await A.P.waitForTimeout(600);
 pruefe('B2 Anna: „Du führst vor"', /Du führst vor/.test(await zband(A.P)) && (await A.P.locator('[data-taste="zeig-ende"]').count()) === 1, await zband(A.P));
 await warteBis(G.P, async () => /führt vor/.test(await zband(G.P)), 6000);
-pruefe('B3 Gerd: „anna führt vor — du folgst"', /anna/i.test(await zband(G.P)) && /du folgst/.test(await zband(G.P)), await zband(G.P));
+pruefe('B3 Gerd: „anna führt vor – du folgst"', /anna/i.test(await zband(G.P)) && /du folgst/.test(await zband(G.P)), await zband(G.P));
 pruefe('B4 Gerds Ansicht ist auf Annas Ausschnitt gefahren', await folgt(G.P, A.P), `${JSON.stringify(await sichtVon(G.P))} / ${JSON.stringify(await sichtVon(A.P))}`);
 await G.P.screenshot({ path: path.join(SD, 'm367-folgt.png') });
 

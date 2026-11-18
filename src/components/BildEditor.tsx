@@ -259,7 +259,7 @@ export function BildEditor({ quelle, name, mime, onFertig, onAbbruch }: {
       <div className="be-kopf">
         <button className="be-abbruch" data-taste="be-abbrechen" onClick={onAbbruch}>Abbrechen</button>
         <span className="be-titel"><b translate="no">{name}</b>{bild && <span className="be-masse" data-taste="be-masse">{ergebnis.w} × {ergebnis.h}</span>}</span>
-        {geaendert && <button className="be-zurueck" data-taste="be-zuruecksetzen" onClick={() => { setS(OHNE); setFormat(null); }} title="Alle Änderungen verwerfen — das Bild wie zu Beginn">Zurücksetzen</button>}
+        {geaendert && <button className="be-zurueck" data-taste="be-zuruecksetzen" onClick={() => { setS(OHNE); setFormat(null); }} title="Alle Änderungen verwerfen – das Bild wie zu Beginn">Zurücksetzen</button>}
         <button className="be-fertig" data-taste="be-fertig" disabled={!bild || arbeitet} onClick={() => void fertig()}>{arbeitet ? 'Wird gespeichert …' : 'Fertig'}</button>
       </div>
       <div className="be-buehne" ref={buehne}>
@@ -299,16 +299,16 @@ export function BildEditor({ quelle, name, mime, onFertig, onAbbruch }: {
         <span className="be-gruppe be-formate" role="group" aria-label="Seitenverhältnis des Ausschnitts">
           {FORMATE.map((f) => (
             <button key={f.name} className={istGewaehlt(f.f) ? 'an' : ''} aria-pressed={istGewaehlt(f.f)} data-taste="be-format" data-format={f.name}
-              title={f.f === null ? 'Ausschnitt frei ziehen' : f.f === 'original' ? 'Seitenverhältnis des Bildes behalten' : 'Festes Seitenverhältnis — noch einmal tippen: hoch statt quer'}
+              title={f.f === null ? 'Ausschnitt frei ziehen' : f.f === 'original' ? 'Seitenverhältnis des Bildes behalten' : 'Festes Seitenverhältnis – noch einmal tippen: hoch statt quer'}
               onClick={() => { setModus('schnitt'); waehleFormat(f.f); }}>{beschriftung(f)}</button>
           ))}
         </span>
         <span className="be-gruppe" role="group" aria-label="Drehen und spiegeln">
           <button data-taste="be-links" title="Nach links drehen (Umschalt+R)" aria-label="Nach links drehen" onClick={() => wende('links')}><IDrehLinks size={17} /></button>
           <button data-taste="be-rechts" title="Nach rechts drehen (R)" aria-label="Nach rechts drehen" onClick={() => wende('rechts')}><IDrehRechts size={17} /></button>
-          <button data-taste="be-spiegeln" title="Spiegeln — links und rechts tauschen" aria-label="Spiegeln" onClick={() => wende('spiegeln')}><ISpiegeln size={17} /></button>
+          <button data-taste="be-spiegeln" title="Spiegeln – links und rechts tauschen" aria-label="Spiegeln" onClick={() => wende('spiegeln')}><ISpiegeln size={17} /></button>
         </span>
-        <label className="be-gruppe be-gerade" title="Gerade richten — schiefen Horizont oder schräg fotografiertes Blatt ausgleichen (Doppelklick: zurück auf 0)">
+        <label className="be-gruppe be-gerade" title="Gerade richten – schiefen Horizont oder schräg fotografiertes Blatt ausgleichen (Doppelklick: zurück auf 0)">
           <span>Gerade</span>
           <input type="range" min={-NEIGUNG_MAX} max={NEIGUNG_MAX} step={0.5} value={s.neigung} data-taste="be-neigung" aria-label="Gerade richten"
             onChange={(e) => setS((v) => ({ ...v, neigung: Number(e.target.value) }))} onDoubleClick={() => setS((v) => ({ ...v, neigung: 0 }))} />
@@ -318,7 +318,7 @@ export function BildEditor({ quelle, name, mime, onFertig, onAbbruch }: {
           <button className={anpassenAuf ? 'an' : ''} aria-pressed={anpassenAuf} data-taste="be-anpassen" title="Helligkeit, Kontrast, Sättigung" aria-label="Helligkeit, Kontrast, Sättigung"
             onClick={() => setAnpassenAuf((v) => !v)}><ISonne size={17} /></button>
           <button className={modus === 'pixel' ? 'an' : ''} aria-pressed={modus === 'pixel'} data-taste="be-verpixeln"
-            title="Verpixeln — Rechteck über Namen, Gesichter oder Nummern ziehen; ein Tipp darauf nimmt es wieder weg" aria-label="Verpixeln"
+            title="Verpixeln – Rechteck über Namen, Gesichter oder Nummern ziehen; ein Tipp darauf nimmt es wieder weg" aria-label="Verpixeln"
             onClick={() => setModus((m) => (m === 'pixel' ? 'schnitt' : 'pixel'))}><IVerpixeln size={17} /></button>
         </span>
       </div>

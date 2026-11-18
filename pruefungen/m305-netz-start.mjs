@@ -59,12 +59,12 @@ const state = {
     board('b13', 'Trading', 3),
   ],
   spaces: [
-    { id: 's1', name: '🏢 Arbeit', projects: [
+    { id: 's1', name: 'Arbeit', projects: [
       { id: 'p1', name: 'Prüfung', boardIds: ['b1', 'b2', 'b3', 'b4'] },
       { id: 'p2', name: 'Laufbahn', boardIds: ['b5', 'b6'] },
       { id: 'p3', name: 'Termine', boardIds: ['b7', 'b8'] },
     ] },
-    { id: 's2', name: '🏠 Privat', projects: [
+    { id: 's2', name: 'Privat', projects: [
       { id: 'p4', name: 'Reisen', boardIds: ['b9', 'b10'] },
       { id: 'p5', name: 'Haushalt', boardIds: ['b11', 'b12', 'b13'] },
     ] },
@@ -110,7 +110,7 @@ const stand = (P) => P.evaluate(() => {
 });
 const imBild = (s, id) => { const p = s.lagen[id]; return p && p.x > s.view.x && p.x < s.view.x + s.view.w && p.y > s.view.y && p.y < s.view.y + s.view.h; };
 
-console.log('════ A: Notebook — ein Bildpunkt je Einheit, keine Kartentitel ════');
+console.log('════ A: Notebook – ein Bildpunkt je Einheit, keine Kartentitel ════');
 {
   const { ctx, P } = await seite();
   const s = await stand(P);
@@ -123,7 +123,7 @@ console.log('════ A: Notebook — ein Bildpunkt je Einheit, keine Karten
   await ctx.close();
 }
 
-console.log('\n════ B: Großer Schirm — das ganze Netz, mittig ════');
+console.log('\n════ B: Großer Schirm – das ganze Netz, mittig ════');
 {
   const { ctx, P } = await seite({ viewport: { width: 2200, height: 1200 } });
   const s = await stand(P);
@@ -140,7 +140,7 @@ console.log('\n════ B: Großer Schirm — das ganze Netz, mittig ══�
   await ctx.close();
 }
 
-console.log('\n════ C: Telefon — die Umgebung des aktiven Boards ════');
+console.log('\n════ C: Telefon – die Umgebung des aktiven Boards ════');
 {
   const { ctx, P } = await seite({ viewport: { width: 390, height: 844 }, mobil: true });
   const s = await stand(P);

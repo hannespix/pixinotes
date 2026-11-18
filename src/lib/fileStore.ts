@@ -97,10 +97,10 @@ export function vorschauArt(name: string, mime?: string): Vorschau {
 export function warumKeineVorschau(name: string): string {
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
   if (['zip', '7z', 'rar', 'tar', 'gz', 'bz2', 'xz'].includes(ext)) {
-    return 'Ein Archiv zeigt erst etwas, wenn man es auspackt — das gehört ins Dateisystem, nicht ins Board.';
+    return 'Ein Archiv zeigt erst etwas, wenn man es auspackt – das gehört ins Dateisystem, nicht ins Board.';
   }
   if (['doc', 'ppt', 'pptx', 'odt', 'odp', 'ods'].includes(ext)) {
-    return 'Dieses Office-Format kann der Browser nicht darstellen. Aus dem Programm heraus als PDF speichern — das zeigt PixiNotes dann direkt an.';
+    return 'Dieses Office-Format kann der Browser nicht darstellen. Aus dem Programm heraus als PDF speichern – das zeigt PixiNotes dann direkt an.';
   }
   if (['exe', 'msi', 'dmg', 'deb', 'rpm', 'appimage', 'bin'].includes(ext)) {
     return 'Ein Programm wird nicht angezeigt und hier auch nicht ausgeführt.';

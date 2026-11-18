@@ -6,7 +6,7 @@ import { useMemo, useState } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { nodesToHtml, nodesToText, sicherKuerzen } from '../lib/serialize';
 import { cardsShareUrl, cardsToBoardDoc, cardsToPdf, printCards, whatsappNachricht } from '../lib/shareCards';
-import { ICopy, IDownload, IFolder, IMail, IX } from './Icons';
+import { ICopy, IDownload, IFolder, IMail, IX, IComment, IDrucker } from './Icons';
 
 const MAILTO_LIMIT = 1800;
 
@@ -38,7 +38,7 @@ export function ShareCardsModal() {
       } else {
         try {
           await navigator.clipboard.writeText(url);
-          showToast('🔗 Übernahme-Link kopiert, er enthält die Karten komplett.');
+          showToast('Übernahme-Link kopiert, er enthält die Karten komplett.');
         } catch {
           // M340: Zwischenablage gesperrt (Safari nach kurzer Wartezeit, eingebettete Ansicht) — der Link ist trotzdem da
           window.prompt('Link zum Kopieren (Strg+C):', url);
@@ -51,7 +51,7 @@ export function ShareCardsModal() {
 
   const mail = () => {
     let text = nodesToText(nodes);
-    if (text.length > MAILTO_LIMIT) text = `${sicherKuerzen(text, MAILTO_LIMIT)}\n… (gekürzt — vollständigen Inhalt per „Kopieren" einfügen)`;
+    if (text.length > MAILTO_LIMIT) text = `${sicherKuerzen(text, MAILTO_LIMIT)}\n… (gekürzt – vollständigen Inhalt per „Kopieren" einfügen)`;
     const subject = encodeURIComponent(`Notizen aus PixiNotes (${title})`);
     window.open(`mailto:?subject=${subject}&body=${encodeURIComponent(text)}`, '_self');
   };
@@ -70,8 +70,8 @@ export function ShareCardsModal() {
       return;
     }
     void navigator.clipboard?.writeText(wa.text).then(
-      () => showToast('💬 Lange Nachricht: WhatsApp bekommt den Anfang, der ganze Text liegt in der Zwischenablage.', false, 12000),
-      () => showToast('💬 Lange Nachricht: WhatsApp bekommt nur den Anfang. Für alles: „Kopieren" und in WhatsApp einfügen.', false, 12000),
+      () => showToast('Lange Nachricht: WhatsApp bekommt den Anfang, der ganze Text liegt in der Zwischenablage.', false, 12000),
+      () => showToast('Lange Nachricht: WhatsApp bekommt nur den Anfang. Für alles: „Kopieren" und in WhatsApp einfügen.', false, 12000),
     );
   };
 
@@ -81,10 +81,10 @@ export function ShareCardsModal() {
         'text/html': new Blob([nodesToHtml(nodes)], { type: 'text/html' }),
         'text/plain': new Blob([nodesToText(nodes)], { type: 'text/plain' }),
       })]);
-      showToast('📋 Formatiert kopiert — direkt in Outlook/Word einfügbar.');
+      showToast('Formatiert kopiert – direkt in Outlook/Word einfügbar.');
     } catch {
       await navigator.clipboard.writeText(nodesToText(nodes));
-      showToast('📋 Als Text kopiert.');
+      showToast('Als Text kopiert.');
     }
   };
 
@@ -92,7 +92,7 @@ export function ShareCardsModal() {
     setBusy('pdf');
     try {
       await cardsToPdf(nodes, `pixinotes-${board.name.replace(/[^\p{L}\d\-_ ]/gu, '').trim().slice(0, 30) || 'karten'}`);
-      showToast('📄 PDF-Datei erstellt (Downloads).');
+      showToast('PDF-Datei erstellt (Downloads).');
     } catch (e) {
       // M244: Der Grund gehört dazu. Vorher meldete der Export auch dann
       // Erfolg, wenn die Seite leer blieb — das kostet mehr Zeit als ein
@@ -106,7 +106,7 @@ export function ShareCardsModal() {
     <div className="modal-backdrop" onClick={close}>
       <div className="modal share-cards-modal" role="dialog" aria-modal="true" aria-label="Karten teilen" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>Teilen &amp; Export — {title}</h2>
+          <h2>Teilen &amp; Export – {title}</h2>
           <button className="modal-x" onClick={close} aria-label="Schließen"><IX size={14} /></button>
         </div>
         <div className="modal-body">
@@ -126,9 +126,9 @@ export function ShareCardsModal() {
             onClick={whatsapp}
             title="Inhalt als Nachricht über WhatsApp teilen (öffnet WhatsApp bzw. WhatsApp Web)"
           >
-            <span className="share-emoji" aria-hidden>💬</span>
+            <span className="share-emoji" aria-hidden><IComment size={18} /></span>
             <b>WhatsApp</b>
-            <span>{wa?.gekuerzt ? 'lange Nachricht — siehe Hinweis' : 'Inhalt als Nachricht'}</span>
+            <span>{wa?.gekuerzt ? 'lange Nachricht – siehe Hinweis' : 'Inhalt als Nachricht'}</span>
           </a>
           <button onClick={mail} title="Inhalt als E-Mail-Entwurf im Mail-Programm öffnen">
             <IMail size={18} />
@@ -136,10 +136,10 @@ export function ShareCardsModal() {
             <span>als Entwurf öffnen</span>
           </button>
           <button
-            onClick={() => { if (!printCards(nodes, `PixiNotes — ${board.name}`)) showToast('Pop-up blockiert — bitte Pop-ups für diese Seite erlauben.'); }}
-            title={'Druckansicht öffnen — dort bietet der Browser auch „Als PDF sichern" an'}
+            onClick={() => { if (!printCards(nodes, `PixiNotes – ${board.name}`)) showToast('Pop-up blockiert – bitte Pop-ups für diese Seite erlauben.'); }}
+            title={'Druckansicht öffnen – dort bietet der Browser auch „Als PDF sichern" an'}
           >
-            <span className="share-emoji" aria-hidden>🖨️</span>
+            <span className="share-emoji" aria-hidden><IDrucker size={18} /></span>
             <b>Drucken</b>
             <span>auch „als PDF sichern"</span>
           </button>
@@ -148,7 +148,7 @@ export function ShareCardsModal() {
             <b>PDF-Datei</b>
             <span>{busy === 'pdf' ? 'wird erstellt …' : 'direkt herunterladen'}</span>
           </button>
-          <button onClick={() => void copyHtml()} title="Formatiert in die Zwischenablage — direkt in Outlook/Word/Teams einfügbar">
+          <button onClick={() => void copyHtml()} title="Formatiert in die Zwischenablage – direkt in Outlook/Word/Teams einfügbar">
             <ICopy size={18} />
             <b>Kopieren</b>
             <span>formatiert (Outlook/Word)</span>

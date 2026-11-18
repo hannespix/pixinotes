@@ -111,7 +111,7 @@ const chipText = async (P) => {
 const texte = (bs) => bs.map((b) => [b.type, Array.isArray(b.content) ? b.content.map((c) => c.text).join('') : (b.content ?? '')]);
 
 // ══ A: Vorschlag, Schrift ins Leere ═════════════════════════════════
-console.log('\n════ A: Vorschlag nach Schreibpause — neue Notiz ════');
+console.log('\n════ A: Vorschlag nach Schreibpause – neue Notiz ════');
 {
   const { ctx, P } = await seite();
   await werkzeug(P, 'Stift');

@@ -31,6 +31,7 @@ import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from '.
 
 
 
+import { ITimer, IAppWindow } from '../Icons';
 /**
  * M283: Der reine Text einer Tabellenzelle — für die Umwandlung in die
  * Rechen-Tabelle. Eine Zelle kann ein Objekt mit `content`, ein Array von
@@ -165,14 +166,14 @@ function NoteAboFeeds({ id }: { id: string }) {
     <div className="abo-feeds nodrag">
       {times.length > 0 && (
         <span className="abo-time-chip" title="Aus der verbundenen Zeiterfassung: Arbeitszeit heute · diese Woche (ohne Pausen)">
-          ⏱ {fmtHM(day)} · W {fmtHM(week)}
+          <ITimer size={11} /> {fmtHM(day)} · W {fmtHM(week)}
         </span>
       )}
       {apps.map((a) => {
         const lines = appStateLines(states[a.id]);
         return (
-          <div key={a.id} className="abo-extract" title="Speicherstand der verbundenen App (lesbarer Auszug) — aktualisiert sich, sobald die App speichert">
-            <b translate="no">📟 {(a.data.name as string) || 'App'}</b>
+          <div key={a.id} className="abo-extract" title="Speicherstand der verbundenen App (lesbarer Auszug) – aktualisiert sich, sobald die App speichert">
+            <b translate="no"><IAppWindow size={12} /> {(a.data.name as string) || 'App'}</b>
             {lines.length === 0
               ? <span className="abo-extract-empty">noch nichts gespeichert</span>
               : lines.map((l, i) => <span key={i} translate="no">{l}</span>)}
@@ -340,7 +341,7 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
       updateNodeData(id, { blocks: editor.document });
       setTableSel(null);
       setTabZelle(null);
-      showToast('Tabelle entfernt — Strg+Z im Text holt sie zurück.');
+      showToast('Tabelle entfernt – Strg+Z im Text holt sie zurück.');
     } catch { /* Block schon weg */ }
   };
   /**
@@ -382,7 +383,7 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
       updateNodeData(id, { blocks: editor.document });
       setTableSel(null);
       setTabZelle(null);
-      showToast('Umgewandelt — jetzt rechnet die Tabelle: „=SUMME(A1:A3)" in eine Zelle schreiben.');
+      showToast('Umgewandelt – jetzt rechnet die Tabelle: „=SUMME(A1:A3)" in eine Zelle schreiben.');
     } catch {
       showToast('Diese Tabelle ließ sich nicht umwandeln.');
     }
@@ -430,8 +431,8 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
         ? { ...z, zeile: Math.min(z.zeile, neu.length - 1) }
         : { ...z, spalte: Math.min(z.spalte, (neu[0]?.cells.length ?? 1) - 1) }) : z));
       showToast(was === 'zeile'
-        ? 'Zeile entfernt — Strg+Z im Text holt sie zurück.'
-        : 'Spalte entfernt — Strg+Z im Text holt sie zurück.');
+        ? 'Zeile entfernt – Strg+Z im Text holt sie zurück.'
+        : 'Spalte entfernt – Strg+Z im Text holt sie zurück.');
     } catch { /* Tabelle inzwischen weg */ }
   };
 
@@ -499,14 +500,14 @@ function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['dat
             <>
               <button
                 className="due-chip table-del-chip"
-                title="Die Zeile mit dem Cursor löschen — ist es die letzte, verschwindet die Tabelle"
+                title="Die Zeile mit dem Cursor löschen – ist es die letzte, verschwindet die Tabelle"
                 onClick={() => entferne('zeile')}
               >
                 ⌫ Zeile
               </button>
               <button
                 className="due-chip table-del-chip"
-                title="Die Spalte mit dem Cursor löschen — ist es die letzte, verschwindet die Tabelle"
+                title="Die Spalte mit dem Cursor löschen – ist es die letzte, verschwindet die Tabelle"
                 onClick={() => entferne('spalte')}
               >
                 ⌫ Spalte

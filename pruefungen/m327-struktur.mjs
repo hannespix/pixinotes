@@ -144,7 +144,7 @@ const aufraeumen = async (P) => {
 };
 
 // ══ A: Form-Marker ins Leere ═════════════════════════════════════════
-console.log('\n════ A: Form-Marker — Kästchen, Strich, Unterstreichung, Größe ════');
+console.log('\n════ A: Form-Marker – Kästchen, Strich, Unterstreichung, Größe ════');
 {
   const { ctx, P } = await seite();
   await werkzeug(P, 'Stift');
@@ -226,7 +226,7 @@ console.log('\n════ B: Text-Marker aus dem Erkenner ════');
 }
 
 // ══ C: Kontext der Notiz ═════════════════════════════════════════════
-console.log('\n════ C: Unter einer Liste geht die Liste weiter — links der Einrückung wieder Text ════');
+console.log('\n════ C: Unter einer Liste geht die Liste weiter – links der Einrückung wieder Text ════');
 {
   const { ctx, P } = await seite();
   await werkzeug(P, 'Stift');

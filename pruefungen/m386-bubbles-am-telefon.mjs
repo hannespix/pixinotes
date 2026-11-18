@@ -78,7 +78,7 @@ async function bearbeiten(P, text, tipp) {
 const schreiben = async (P, text) => { await P.keyboard.press('Control+A'); await P.keyboard.type(text, { delay: 15 }); await P.waitForTimeout(150); };
 
 // ══ A ═══════════════════════════════════════════════════════════════
-console.log('\n════ A: Telefon — ✓ übernimmt ════');
+console.log('\n════ A: Telefon – ✓ übernimmt ════');
 const T = await geraet(true);
 await warteBis(T.P, async () => (await T.P.locator(`${W} [data-taste="bub-blase"]`).count()) === 4, 10000);
 pruefe('A0 auf dem Telefon steht die Karte mit vier Blasen', (await texte(T.P)) === 'Kaffeemaschine|Mehr Fenster|Ruheraum|Stehtische', await texte(T.P));
@@ -87,17 +87,17 @@ pruefe('A2 im Feld gibt es jetzt „✓" zum Übernehmen und „✕" zum Verwerf
 await schreiben(T.P, 'Ruheraum mit Sofa');
 await T.P.screenshot({ path: path.join(SD, 'm386-telefon-feld.png') });
 await T.P.locator('[data-taste="bub-idee-ok"]').tap(); await T.P.waitForTimeout(400);
-pruefe('A3 ein Tipp auf ✓ übernimmt den neuen Text — ohne Enter-Taste', (await feld(T.P).count()) === 0 && /Ruheraum mit Sofa/.test(await texte(T.P)) && !/\|Ruheraum\|/.test(`|${await texte(T.P)}|`), await texte(T.P));
+pruefe('A3 ein Tipp auf ✓ übernimmt den neuen Text – ohne Enter-Taste', (await feld(T.P).count()) === 0 && /Ruheraum mit Sofa/.test(await texte(T.P)) && !/\|Ruheraum\|/.test(`|${await texte(T.P)}|`), await texte(T.P));
 pruefe('A4 … er ist gespeichert', await warteBis(T.P, async () => /Ruheraum mit Sofa/.test(await gespeichert(T.P)), 4000), await gespeichert(T.P));
 
 // ══ B ═══════════════════════════════════════════════════════════════
-console.log('\n════ B: Telefon — Feld verlassen, verwerfen, leer ════');
+console.log('\n════ B: Telefon – Feld verlassen, verwerfen, leer ════');
 await bearbeiten(T.P, 'Stehtische', true); await schreiben(T.P, 'Stehtische am Fenster');
 await T.P.keyboard.press('Tab'); await T.P.waitForTimeout(400);
-pruefe('B1 „Weiter" auf der Tastatur (Tab) verlässt das Feld — die Änderung gilt', (await feld(T.P).count()) === 0 && /Stehtische am Fenster/.test(await texte(T.P)), await texte(T.P));
+pruefe('B1 „Weiter" auf der Tastatur (Tab) verlässt das Feld – die Änderung gilt', (await feld(T.P).count()) === 0 && /Stehtische am Fenster/.test(await texte(T.P)), await texte(T.P));
 await bearbeiten(T.P, 'Mehr Fenster', true); await schreiben(T.P, 'Größere Fenster');
 await T.P.locator(`${W} [data-taste="bub-zahl"]`).tap(); await T.P.waitForTimeout(400);   // irgendwo daneben: auf den Zähler der Karte
-pruefe('B2 ein Tipp daneben verlässt das Feld — die Änderung gilt', (await feld(T.P).count()) === 0 && /Größere Fenster/.test(await texte(T.P)), await texte(T.P));
+pruefe('B2 ein Tipp daneben verlässt das Feld – die Änderung gilt', (await feld(T.P).count()) === 0 && /Größere Fenster/.test(await texte(T.P)), await texte(T.P));
 await bearbeiten(T.P, 'Kaffeemaschine', true); await schreiben(T.P, 'Teekocher');
 await T.P.locator('[data-taste="bub-idee-abbruch"]').tap(); await T.P.waitForTimeout(400);
 pruefe('B3 ✕ verwirft: der alte Text bleibt', (await feld(T.P).count()) === 0 && /Kaffeemaschine/.test(await texte(T.P)) && !/Teekocher/.test(await texte(T.P)), await texte(T.P));
@@ -117,7 +117,7 @@ await bearbeiten(T.P, 'Kaffeemaschine', true);
       eingabe: document.querySelector(`${w} [data-taste="bub-eingabe"]`).getAttribute('enterkeyhint'), frage: document.querySelector(`${w} [data-taste="bub-frage"]`).getAttribute('enterkeyhint') };
   }, W);
   pruefe('C1 das Feld sagt der Telefon-Tastatur „Fertig" (statt „Weiter"), die Ideen-Eingabe „Senden"', m.hinweis === 'done' && m.eingabe === 'send' && m.frage === 'done', JSON.stringify(m));
-  pruefe('C2 die Leiste steht am Telefon fest am unteren Bildschirmrand, ganz im Bild — nicht in der Karte', !m.inKarte && m.leiste[0] >= 0 && m.leiste[1] <= m.schirm[0] && m.leiste[2] <= m.schirm[1] && m.leiste[2] > m.schirm[1] - 140, JSON.stringify(m));
+  pruefe('C2 die Leiste steht am Telefon fest am unteren Bildschirmrand, ganz im Bild – nicht in der Karte', !m.inKarte && m.leiste[0] >= 0 && m.leiste[1] <= m.schirm[0] && m.leiste[2] <= m.schirm[1] && m.leiste[2] > m.schirm[1] - 140, JSON.stringify(m));
   pruefe('C3 Knöpfe fingergroß (mind. 40 × 40), Schrift im Feld 16 px (kein Hineinzoomen), das Feld breit genug zum Lesen', m.okH >= 40 && m.okB >= 40 && m.schrift === '16px' && m.feldB >= 150, JSON.stringify(m));
 }
 await T.P.locator('[data-taste="bub-idee-abbruch"]').tap(); await T.P.waitForTimeout(300);
@@ -130,7 +130,7 @@ pruefe('D1 sobald ein Gruppenname dasteht, erscheint „✓" daneben', (await T.
 await T.P.locator('[data-taste="bub-neue-gruppe-ok"]').tap(); await T.P.waitForTimeout(500);
 {
   const g = await T.P.evaluate(() => { const d = JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes[0].data; const gid = Object.entries(d.gruppen).find(([, x]) => x.name === 'Küche' && !x.weg)?.[0]; return { gid: !!gid, drin: Object.values(d.ideen).filter((i) => i.g === gid && !i.weg).map((i) => i.text).join() }; });
-  pruefe('D2 ein Tipp darauf legt die Gruppe an — die gewählte Idee steckt darin', g.gid && g.drin === 'Kaffeemaschine', JSON.stringify(g));
+  pruefe('D2 ein Tipp darauf legt die Gruppe an – die gewählte Idee steckt darin', g.gid && g.drin === 'Kaffeemaschine', JSON.stringify(g));
 }
 await T.P.locator(`${W} [data-taste="bub-eingabe"]`).tap(); await T.P.keyboard.type('Pflanzen', { delay: 15 });
 await T.P.locator(`${W} [data-taste="bub-dazu"]`).tap(); await T.P.waitForTimeout(500);
@@ -162,7 +162,7 @@ console.log('\n════ F: andere Felder, Texte ════');
   pruefe('F1 auch andere einzeilige Felder (hier: Suche, Strg+K) bekommen beim Hineintippen den Hinweis „Fertig"', s.tag === 'INPUT' && (s.hinweis === 'done' || s.form), JSON.stringify(s));
   await R.P.keyboard.press('Escape');
   const hilfe = readdirSync(path.join(DIST, 'assets')).filter((f) => /^HelpOverlay/.test(f)).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8'));
-  pruefe('F2 „Was ist neu" nennt es — deutsch und englisch', hilfe.filter((t) => t.includes('(M386)')).length === 2, `${hilfe.length}`);
+  pruefe('F2 „Was ist neu" nennt es – deutsch und englisch', hilfe.filter((t) => t.includes('(M386)')).length === 2, `${hilfe.length}`);
   pruefe('F3 keine Fehler am Rechner', R.P.fehler.length === 0, R.P.fehler.join());
 }
 

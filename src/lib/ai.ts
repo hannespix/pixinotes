@@ -102,7 +102,7 @@ export async function askAiVoll(frage: string, images: string[] = [], opt: KiOpt
     ? `${frage.replace(/\bauf Deutsch\b/g, 'auf Englisch')}\n\n(Sprache: Schreibe alle Texte, die der Nutzer zu lesen bekommt, auf Englisch. Vorgegebene Schlüssel, Überschriften, Formate und JSON-Strukturen bleiben genau wie verlangt.)`
     : frage;
   const ai = useBoard.getState().ai;
-  if (!aiReady(ai)) throw new Error('KI nicht konfiguriert (⚙️ Einstellungen)');
+  if (!aiReady(ai)) throw new Error('KI nicht konfiguriert (Einstellungen)');
   if (abgebrochen) throw new Error('abgebrochen');
   try {
     return await askOnce(ai, prompt, images, opt);
@@ -111,7 +111,7 @@ export async function askAiVoll(frage: string, images: string[] = [], opt: KiOpt
     // Gratis-Dienst/Ollama: das Modell versteht evtl. keine Bilder — einmal
     // ohne Fotos nachfassen, statt die ganze Aktion scheitern zu lassen
     if (images.length > 0 && (ai.provider === 'free' || ai.provider === 'ollama')) {
-      return askOnce(ai, `${prompt}\n\n(Hinweis: Die Fotos konnten nicht übertragen werden — arbeite nur mit dem Kartentext.)`, [], opt);
+      return askOnce(ai, `${prompt}\n\n(Hinweis: Die Fotos konnten nicht übertragen werden – arbeite nur mit dem Kartentext.)`, [], opt);
     }
     throw e;
   }
@@ -184,10 +184,10 @@ async function askOnce(ai: AiSettings, prompt: string, images: string[], opt: Ki
         if (res.status >= 500) {
           // Community-Dienst wackelt gern kurz — einmal kurz warten und nochmal
           await new Promise((r) => setTimeout(r, 1500));
-          if (ctrl.signal.aborted) throw new Error('Zeitüberschreitung — der Gratis-Dienst antwortet gerade nicht.');
+          if (ctrl.signal.aborted) throw new Error('Zeitüberschreitung – der Gratis-Dienst antwortet gerade nicht.');
           res = await doFetch();
         }
-        if (!res.ok) throw new Error(`Gratis-KI: HTTP ${res.status} — der kostenlose Dienst ist gerade ausgelastet. Kurz warten und nochmal versuchen, oder in den Einstellungen OpenRouter/Ollama wählen.`);
+        if (!res.ok) throw new Error(`Gratis-KI: HTTP ${res.status} – der kostenlose Dienst ist gerade ausgelastet. Kurz warten und nochmal versuchen, oder in den Einstellungen OpenRouter/Ollama wählen.`);
         const data = await res.json();
         const msg = data.choices?.[0]?.message;
         // Reasoning-Modell: manchmal steht die Antwort nur im reasoning-Feld
@@ -232,7 +232,7 @@ async function askOnce(ai: AiSettings, prompt: string, images: string[], opt: Ki
             ...(images.length ? { images: images.map(b64Of) } : {}),
           }),
         });
-        if (!res.ok) throw new Error(`Ollama: HTTP ${res.status} — läuft ollama serve? OLLAMA_ORIGINS gesetzt?`);
+        if (!res.ok) throw new Error(`Ollama: HTTP ${res.status} – läuft ollama serve? OLLAMA_ORIGINS gesetzt?`);
         const data = await res.json();
         return { text: data.response ?? '', abgeschnitten: data.done_reason === 'length' };
       }
@@ -241,7 +241,7 @@ async function askOnce(ai: AiSettings, prompt: string, images: string[], opt: Ki
     }
   } catch (e) {
     if (abgebrochen) throw new Error('abgebrochen');
-    if ((e as Error).name === 'AbortError') throw new Error('Zeitüberschreitung — der KI-Dienst hat nicht rechtzeitig geantwortet.');
+    if ((e as Error).name === 'AbortError') throw new Error('Zeitüberschreitung – der KI-Dienst hat nicht rechtzeitig geantwortet.');
     throw e;
   } finally {
     clearTimeout(timer);
@@ -322,7 +322,7 @@ export async function askAnthropicWebSuche(prompt: string): Promise<WebSuchErgeb
  */
 export const MD_HINT = 'Formatiere die Antwort als Markdown: "## " für Zwischenüberschriften, '
   + '**fett** für Schlüsselbegriffe, "- " für Stichpunkte und für ALLES Abhakbare '
-  + 'Checklisten im Format "- [ ] …". Keine Codeblöcke, kompakt bleiben.';
+  + 'Checklisten im Format "- [ ] …". Keine Codeblöcke, keine Emojis, kompakt bleiben.';
 
 // Kopfloser BlockNote-Editor NUR zum Markdown-Parsen (wird nie gemountet)
 let mdParser: import('@blocknote/core').BlockNoteEditor | null = null;

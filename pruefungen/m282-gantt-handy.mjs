@@ -105,7 +105,7 @@ console.log('════ T1: Telefon (390) auf dem Board ════');
   const m = await messe(P);
   console.log('   ', JSON.stringify(m));
   pruefe('T1a die Werkzeugleiste bleibt IN der Karte', !m.ragtRaus, JSON.stringify(m));
-  pruefe('T1b sie beginnt vorn — „Vorgang hinzufügen" ist erreichbar', m.ersterSichtbar);
+  pruefe('T1b sie beginnt vorn – „Vorgang hinzufügen" ist erreichbar', m.ersterSichtbar);
   pruefe('T1c die Knöpfe sind fingergerecht (≥ 40 Punkte)', m.kleinsteHoehe >= 40, String(m.kleinsteHoehe));
   pruefe('T1d die Namensspalte frisst höchstens 38 % der Breite',
     m.spalteAnteil <= 0.385, `${Math.round(m.spalteAnteil * 100)} %`);

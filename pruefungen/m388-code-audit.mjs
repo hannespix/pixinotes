@@ -58,7 +58,7 @@ console.log('\n════ A: Rechnen und Prüfen ════');
   pruefe('A6 Kalender: ein Ende um Punkt 0 Uhr belegt den nächsten Tag nicht; Ganztägiges über zwei Tage bleibt zwei Tage', !ics[0].end && !ics[1].end && ics[2].end === '2026-11-21', ics);
   pruefe('A7 Monatsrhythmus läuft am Monatsende nicht über (31.01. → 28.02., 30.11. + Quartal → 28.02.)', m.nextDate({ entries: [{ id: 'a', date: '2026-01-31', blocks: [] }], rhythm: 'monat' }, new Date(2026, 0, 31, 12)) === '2026-02-28' && m.nextDate({ entries: [{ id: 'a', date: '2026-11-30', blocks: [] }], rhythm: 'quartal' }, new Date(2026, 10, 30, 12)) === '2027-02-28');
   const kd = m.detectDates('Treffen am 3.12. um 10 Uhr', new Date(2026, 10, 16, 9));
-  pruefe('A8 „am 3.12. um 10 Uhr" wird als Termin erkannt — auch beim zweiten Aufruf (gemerkt)', kd.length === 1 && kd[0].date.getMonth() === 11 && kd[0].date.getDate() === 3 && m.detectDates('Treffen am 3.12. um 10 Uhr', new Date(2026, 10, 16, 9))[0].date.getDate() === 3, kd);
+  pruefe('A8 „am 3.12. um 10 Uhr" wird als Termin erkannt – auch beim zweiten Aufruf (gemerkt)', kd.length === 1 && kd[0].date.getMonth() === 11 && kd[0].date.getDate() === 3 && m.detectDates('Treffen am 3.12. um 10 Uhr', new Date(2026, 10, 16, 9))[0].date.getDate() === 3, kd);
   const h1 = m.nodeToHtml({ id: 'g', type: 'gantt', position: { x: 0, y: 0 }, data: { title: 'T', rows: [{ id: 'r', name: 'n', start: '2026-01-01', end: '2026-01-02', progress: '<img src=x onerror=alert(1)>' }] } });
   const h2 = m.nodeToHtml({ id: 't', type: 'time', position: { x: 0, y: 0 }, data: { title: 'Z', segs: [{ id: 's', date: '<script>1</script>', start: 60, end: 120, kind: '<b>x</b>' }] } });
   pruefe('A9 Export: Fortschritt, Datum und Art einer fremden Karte kommen nie als HTML an', !/<img|<script|<b>x/.test(h1 + h2) && h2.includes('&lt;script&gt;'), (h1 + h2).slice(0, 200));
@@ -74,7 +74,7 @@ console.log('\n════ A: Rechnen und Prüfen ════');
   const p = m.patchSaeubern({ nodes: { set: [{ id: 'a' }, { id: 'b', type: 'note', position: { x: 1, y: 1 }, data: {} }], del: ['x'] }, edges: { set: [{ id: 'e' }] } });
   pruefe('A15 ein Patch aus dem Kanal: nur gültige Karten und Verbindungen bleiben', p.nodes.set.length === 1 && p.nodes.del.length === 1 && p.edges.set.length === 0, p);
   const taste = (key, code) => ({ key, code, altKey: true, ctrlKey: false, metaKey: false, shiftKey: false });
-  pruefe('A16 Alt+Z gilt der Taste, auf der Z steht (deutsche Tastatur) — nicht mehr der Taste Y', m.passt(taste('z', 'KeyY'), 'zeichnen') && !m.passt(taste('y', 'KeyZ'), 'zeichnen') && m.passt(taste('Ω', 'KeyZ'), 'zeichnen'));
+  pruefe('A16 Alt+Z gilt der Taste, auf der Z steht (deutsche Tastatur) – nicht mehr der Taste Y', m.passt(taste('z', 'KeyY'), 'zeichnen') && !m.passt(taste('y', 'KeyZ'), 'zeichnen') && m.passt(taste('Ω', 'KeyZ'), 'zeichnen'));
   const boards = [{ id: 'b1', name: 'Eins', nodes: [{ id: 'n1', type: 'note', position: { x: 0, y: 0 }, data: { blocks: [{ type: 'paragraph', content: [{ type: 'text', text: 'Zielkarte' }] }] } }, { id: 'n2', type: 'note', position: { x: 0, y: 0 }, data: { blocks: [{ type: 'paragraph', content: [{ type: 'text', text: 'siehe [[Zielkarte]] und [[Zwei]]' }] }] } }], edges: [] }, { id: 'b2', name: 'Zwei', nodes: [], edges: [] }];
   pruefe('A17 Verknüpfungen lösen sich über den gemerkten Titel-Index auf wie bisher', m.resolveLink('zielkarte', boards)?.nodeId === 'n1' && m.resolveLink('Zwei', boards)?.boardId === 'b2' && m.resolveLink('gibtsnicht', boards) === null && m.collectBacklinks(boards, 'b2').length === 1);
   delete globalThis.window; delete globalThis.localStorage;
@@ -147,7 +147,7 @@ await P.goto(`http://localhost:${PORT}/#b=${packed}`, { waitUntil: 'networkidle'
 await P.reload({ waitUntil: 'networkidle' });   // der Anker allein lädt die Seite nicht neu
 await warteBis(async () => (await zustand()).boards.some((b) => /Fremdes/.test(b.name)), 8000);
 const fremd = (await zustand()).boards.find((b) => /Fremdes/.test(b.name));
-pruefe('B3 das geteilte Board kommt an — ohne Absturz, ohne die Karte ohne Lage und ohne den Unsinn', !!fremd && fremd.nodes.length === 3 && fehler.length === 0 && dialoge >= 1, `${fremd?.nodes.length} ${fehler.join()}`);
+pruefe('B3 das geteilte Board kommt an – ohne Absturz, ohne die Karte ohne Lage und ohne den Unsinn', !!fremd && fremd.nodes.length === 3 && fehler.length === 0 && dialoge >= 1, `${fremd?.nodes.length} ${fehler.join()}`);
 pruefe('B4 … und ohne die javascript:-Adressen in Tool- und Datei-Karte', !!fremd && !JSON.stringify(fremd).includes('javascript:'), JSON.stringify(fremd ?? {}).slice(0, 300));
 pruefe('B5 … und ohne Einladungs-Token und Besitzer-Adresse des Absenders', !!fremd && !fremd.gastLink && !fremd.geteiltVonName && !JSON.stringify(fremd).includes('geheim-token'));
 await P.locator('.tabs.spalte .side-board', { hasText: 'Planung' }).first().click();
@@ -169,12 +169,12 @@ await warteBis(async () => (await board()).nodes.length === 5);
 pruefe('C3 Karte gelöscht: Sie und ihr Gespräch sind weg, der Hinweis bietet „Rückgängig"', (await board()).nodes.length === 5 && ((await board()).comments ?? []).length === 0 && (await P.locator('.toast.show .toast-undo').count()) === 1);
 await P.keyboard.press('Control+z');
 await warteBis(async () => (await board()).nodes.length === 6);
-pruefe('C4 Strg+Z holt die Karte zurück — mit ihrem Gespräch', (await board()).nodes.length === 6 && ((await board()).comments ?? []).length === 1 && (await board()).comments[0].nodeId === 'n2', JSON.stringify((await board()).comments));
+pruefe('C4 Strg+Z holt die Karte zurück – mit ihrem Gespräch', (await board()).nodes.length === 6 && ((await board()).comments ?? []).length === 1 && (await board()).comments[0].nodeId === 'n2', JSON.stringify((await board()).comments));
 if (await P.locator('.toast.show .toast-undo').count()) { await P.locator('.toast.show .toast-undo').click(); await P.waitForTimeout(900); }
 const ids = (await board()).nodes.map((n) => n.id);
 pruefe('C5 der Hinweis-Knopf danach legt nichts doppelt an (jede Kennung einmal)', ids.length === 6 && new Set(ids).size === 6, ids.join());
 await P.keyboard.press('Control+y'); await warteBis(async () => (await board()).nodes.length === 5);
-pruefe('C6 Wiederholen löscht wieder — das Gespräch geht mit', (await board()).nodes.length === 5 && ((await board()).comments ?? []).length === 0);
+pruefe('C6 Wiederholen löscht wieder – das Gespräch geht mit', (await board()).nodes.length === 5 && ((await board()).comments ?? []).length === 0);
 await P.keyboard.press('Control+z'); await warteBis(async () => (await board()).nodes.length === 6);
 // Tasten wirken nicht durch Fenster
 await frei();
@@ -196,7 +196,7 @@ pruefe('C10 keine Fehler der Seite', fehler.length === 0, fehler.join(' | '));
 // ══ D ═══════════════════════════════════════════════════════════════
 console.log('\n════ D: Texte ════');
 const quelle = (p) => readFileSync(path.join(__repo, p), 'utf8');
-pruefe('D1 Hilfe nennt M388 — deutsch und englisch', quelle('src/components/HelpOverlay.tsx').includes('(M388)') && quelle('src/components/HelpOverlayEn.tsx').includes('(M388)'));
+pruefe('D1 Hilfe nennt M388 – deutsch und englisch', quelle('src/components/HelpOverlay.tsx').includes('(M388)') && quelle('src/components/HelpOverlayEn.tsx').includes('(M388)'));
 pruefe('D2 docs/AUDIT.md führt die Funde; docs/UMBAU.md nennt M388', existsSync(path.join(__repo, 'docs', 'AUDIT.md')) && quelle('docs/AUDIT.md').includes('S1') && quelle('docs/UMBAU.md').includes('M388'));
 pruefe('D3 der Build prüft ungenutzte Deklarationen (tsconfig)', /"noUnusedLocals": true/.test(quelle('tsconfig.json')) && /"noUnusedParameters": true/.test(quelle('tsconfig.json')));
 

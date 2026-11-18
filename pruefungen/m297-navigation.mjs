@@ -45,11 +45,11 @@ const state = {
     { id: 'b5', name: 'Familienplan', edges: [], drawings: [], comments: [], nodes: [note('n7', 'Einkauf', 60, 60)] },
   ],
   spaces: [
-    { id: 's1', name: '🏢 Arbeitsplatz', projects: [
+    { id: 's1', name: 'Arbeitsplatz', projects: [
       { id: 'p1', name: 'Täglicher Einstieg', boardIds: ['b1', 'b2'] },
       { id: 'p2', name: 'Wissensbasis', boardIds: ['b3', 'b4'] },
     ] },
-    { id: 's2', name: '🏡 Privat', projects: [{ id: 'p3', name: 'Familie', boardIds: ['b5'] }] },
+    { id: 's2', name: 'Privat', projects: [{ id: 'p3', name: 'Familie', boardIds: ['b5'] }] },
   ],
   activeId: 'b1', view: 'board',
 };
@@ -84,7 +84,7 @@ console.log('════ A: Die Spalte als Rahmen ════');
     const karten = [...document.querySelectorAll('.react-flow__node')].map((n) => n.getBoundingClientRect().left);
     return { rechts: spalte.right, links: Math.min(...karten) };
   });
-  pruefe('A7 die Fläche beginnt rechts der Spalte — keine Karte darunter', lage.links >= lage.rechts, JSON.stringify(lage));
+  pruefe('A7 die Fläche beginnt rechts der Spalte – keine Karte darunter', lage.links >= lage.rechts, JSON.stringify(lage));
   await P.screenshot({ path: `${SD}/m297-a-spalte.png` });
 
   // Anderes Projekt aufklappen und ein Board öffnen
@@ -102,7 +102,7 @@ console.log('════ A: Die Spalte als Rahmen ════');
   await P.keyboard.type('Antrag');
   await P.waitForTimeout(500);
   const treffer = await P.locator('.search-box .search-hit .hit-title').allTextContents();
-  pruefe('A10 die Suche zeigt passende Karten — über alle Projekte', treffer.length === 2 && treffer.every((t) => /Antrag/.test(t)), JSON.stringify(treffer));
+  pruefe('A10 die Suche zeigt passende Karten – über alle Projekte', treffer.length === 2 && treffer.every((t) => /Antrag/.test(t)), JSON.stringify(treffer));
   await P.keyboard.press('Control+A');
   await P.keyboard.type('Kontakte');
   await P.waitForTimeout(500);
@@ -114,7 +114,7 @@ console.log('════ A: Die Spalte als Rahmen ════');
   await P.mouse.click(900, 700);
   await P.keyboard.press('Alt+U');
   await P.waitForTimeout(500);
-  pruefe('A12 Alt+U blendet die Spalte aus — Kopfleiste mit Brotkrume', (await P.locator('.tabs.spalte').count()) === 0 && (await P.locator('.tab-nav').count()) === 1);
+  pruefe('A12 Alt+U blendet die Spalte aus – Kopfleiste mit Brotkrume', (await P.locator('.tabs.spalte').count()) === 0 && (await P.locator('.tab-nav').count()) === 1);
   await P.keyboard.press('Alt+U');
   await P.waitForTimeout(500);
   pruefe('A13 Alt+U holt sie zurück', (await P.locator('.tabs.spalte .side-tree').count()) === 1);
@@ -130,14 +130,14 @@ console.log('════ B: Übersicht ════');
   const { ctx, P } = await seite({ view: 'overview' });
   pruefe('B1 auch in der Übersicht steht die Spalte mit dem Baum', (await P.locator('.tabs.spalte .side-tree').count()) === 1);
   const schalter = await P.evaluate(() => [...document.querySelectorAll('button')].filter((b) => b.textContent.trim() === 'Netz' && b.getBoundingClientRect().width > 0).length);
-  pruefe('B2 „Netz" gibt es genau einmal — in der Übersicht', schalter === 1, `netz=${schalter}`);
+  pruefe('B2 „Netz" gibt es genau einmal – in der Übersicht', schalter === 1, `netz=${schalter}`);
   await P.locator('.ov-mode button', { hasText: 'Netz' }).click();
   await P.waitForTimeout(1500);
   pruefe('B3 das Netz öffnet dort', (await P.locator('.ov-graph').count()) === 1);
   await ctx.close();
 }
 
-console.log('════ C: Schmal — Kopfleiste und Ausstülpung ════');
+console.log('════ C: Schmal – Kopfleiste und Ausstülpung ════');
 {
   const { ctx, P } = await seite({ viewport: { width: 720, height: 900 } });
   pruefe('C1 unter 861 Punkten: Kopfleiste mit Brotkrume statt Spalte', (await P.locator('.tabs.spalte').count()) === 0 && (await P.locator('.tab-nav').count()) === 1);

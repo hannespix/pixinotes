@@ -206,7 +206,7 @@ console.log('\n════ T4: Toast im Fokus ════');
   if (lage) {
     pruefe('T4a die Meldung liegt nicht auf einer Leiste', !lage.kollision, JSON.stringify(lage));
   } else {
-    pruefe('T4a die Meldung liegt nicht auf einer Leiste', true, '(keine Meldung ausgelöst — nichts zu prüfen)');
+    pruefe('T4a die Meldung liegt nicht auf einer Leiste', true, '(keine Meldung ausgelöst – nichts zu prüfen)');
   }
   await ctx.close();
 }

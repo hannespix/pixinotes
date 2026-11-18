@@ -53,7 +53,7 @@ export function BildEditorHost() {
       const name = d.titel?.trim() || d.name;
       if (d.dataUrl) { setOffen({ id, quelle: d.dataUrl, name, mime: d.mime ?? /^data:([^;,]+)/.exec(d.dataUrl)?.[1] ?? 'image/jpeg' }); return; }
       void loadFile(id).then((b) => {
-        if (!b) { showToast('Das Bild liegt nicht auf diesem Gerät — zum Bearbeiten erst laden.'); return; }
+        if (!b) { showToast('Das Bild liegt nicht auf diesem Gerät – zum Bearbeiten erst laden.'); return; }
         const url = URL.createObjectURL(b);
         setOffen({ id, quelle: url, name, mime: b.type || d.mime || 'image/jpeg', frei: () => URL.revokeObjectURL(url) });
       });
@@ -73,7 +73,7 @@ export function BildEditorHost() {
       const d = n.data as { src: string; name?: string };
       const src = await blobAlsDataUrl(e.blob);
       if (src.length > d.src.length && !canEmbed(src.length - d.src.length)) {
-        showToast('⚠️ Speicher fast voll — das bearbeitete Bild ist größer als vorher und passt nicht mehr ins Board.', false, 7000);
+        showToast('Speicher fast voll – das bearbeitete Bild ist größer als vorher und passt nicht mehr ins Board.', false, 7000);
         return;
       }
       st.bildErsetzen(offen.id, { src, ...(d.name ? { name: nameMitEndung(d.name, e.mime) } : {}) }, verhaeltnis);

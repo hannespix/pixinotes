@@ -51,7 +51,7 @@ const note = (id, text, x = 60, y = 60) => ({ id, type: 'note', width: 240, posi
 const board = (id, name, nodes) => ({ id, name, edges: [], drawings: [], comments: [], nodes });
 const standA = {
   boards: [board('bx', 'Planung', [note('x1', 'Planung Notiz')]), board('by', 'Ideen', [note('y1', 'Ideen Notiz')])],
-  spaces: [{ id: 's1', name: '🏢 Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['bx', 'by'] }] }],
+  spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['bx', 'by'] }] }],
   activeId: 'bx', view: 'board',
 };
 const standB = {

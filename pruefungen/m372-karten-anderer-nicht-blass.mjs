@@ -677,7 +677,7 @@ await A.P.mouse.dblclick(1150, 650); await A.P.waitForTimeout(600);
 pruefe('A1 bei Anna (sie schreibt) steht der Schreibhinweis', (await hinweise(A.P, 'neu')).some((h) => /Text eingeben/.test(h)), JSON.stringify(await hinweise(A.P, 'neu')));
 await warteBis(G.P, async () => (await neueKarten(G.P)).length === 1, 8000);
 pruefe('A2 die leere Karte ist bei Gerd angekommen', (await neueKarten(G.P)).length === 1);
-pruefe('A3 bei Gerd steht kein blasser Hinweis in ihr — sie ist leer', (await hinweise(G.P, 'neu')).length === 0 && (await neueKarten(G.P))[0] === '', JSON.stringify([await hinweise(G.P, 'neu'), await neueKarten(G.P)]));
+pruefe('A3 bei Gerd steht kein blasser Hinweis in ihr – sie ist leer', (await hinweise(G.P, 'neu')).length === 0 && (await neueKarten(G.P))[0] === '', JSON.stringify([await hinweise(G.P, 'neu'), await neueKarten(G.P)]));
 pruefe('A4 sie trägt Annas Rahmen', (await G.P.locator('[data-taste="live-sperre"]').count()) === 1);
 await G.P.screenshot({ path: path.join(SD, 'm372-gerd-leer.png'), clip: { x: 980, y: 570, width: 360, height: 180 } });
 

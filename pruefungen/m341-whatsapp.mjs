@@ -104,11 +104,16 @@ console.log('\n════ A/B: Auszeichnung und Link ════');
   pruefe('A2 fett, kursiv, durchgestrichen in WhatsApp-Zeichen', text.includes('Normal *fett* und _kursiv_ und ~weg~'));
   pruefe('A3 der Link steht mit seiner Adresse da', text.includes('Plan: https://example.com/plan'));
   pruefe('A4 Liste mit Unterpunkt, Nummern, Zitat', text.includes('- Punkt eins\n   ◦ Unterpunkt tief\n\n1. Erstens\n2. Zweitens') && text.includes('> Ein Zitat'));
-  pruefe('A5 offene und erledigte Punkte', text.includes('⬜ Offene Aufgabe') && text.includes('✅ ~Erledigte Aufgabe~'));
-  pruefe('A6 zweite Karte abgesetzt, ihr Titel fett', text.includes('\n\n———\n\n*Aufgaben*\n\n_') && text.includes('⬜ Angebot schreiben @Mia') && !/:\n\s+—/.test(text));
+  pruefe('A5 offene und erledigte Punkte', text.includes('☐ Offene Aufgabe') && text.includes('☑ ~Erledigte Aufgabe~'));
+  pruefe('A6 zweite Karte abgesetzt, ihr Titel fett', text.includes('\n\n———\n\n*Aufgaben*\n\n_') && text.includes('☐ Angebot schreiben @Mia') && !/:\n\s+—/.test(text));
   pruefe('B1 ein echter Link auf wa.me in neuem Tab', h.startsWith('https://wa.me/?text=') && await a.getAttribute('target') === '_blank' && /noopener/.test(await a.getAttribute('rel')));
   const [pop] = await Promise.all([P.waitForEvent('popup', { timeout: 15000 }), a.click()]);
-  pruefe('B2 der Klick öffnet WhatsApp mit genau dieser Nachricht', pop.url() === h, pop.url().slice(0, 60));
+  // Das neue Fenster meldet seine Adresse erst, wenn die Anfrage losgeht – darauf warten statt sofort zu lesen
+  const ziel = await Promise.race([
+    pop.waitForEvent('request', { timeout: 8000 }).then((r) => r.url(), () => ''),
+    pop.waitForURL(/wa\.me/, { timeout: 8000, waitUntil: 'commit' }).then(() => pop.url(), () => ''),
+  ]) || pop.url();
+  pruefe('B2 der Klick öffnet WhatsApp mit genau dieser Nachricht', ziel === h, ziel.slice(0, 60));
   await pop.close();
 
   console.log('\n════ C: lange Nachricht ════');

@@ -128,7 +128,7 @@ console.log('\n════ A: Auf eine Folie zeichnen ════');
 {
   await vortragAuf(P);
   await aufFolie(P, 'folie');
-  pruefe('A1 in der Kopfzeile: ein Stift- und ein Kommentar-Knopf — keine Werkzeugleiste, solange nicht gezeichnet wird',
+  pruefe('A1 in der Kopfzeile: ein Stift- und ein Kommentar-Knopf – keine Werkzeugleiste, solange nicht gezeichnet wird',
     (await P.locator('[data-taste="vortrag-stift"]').count()) === 1 && (await P.locator('[data-taste="vortrag-kommentare"]').count()) === 1 && (await P.locator('.folien-palette').count()) === 0);
   await P.locator('[data-taste="vortrag-stift"]').click(); await P.waitForTimeout(300);
   pruefe('A2 der Stift-Knopf holt die Werkzeuge, der Stift ist gewählt', (await P.locator('[data-taste="folien-pen"][aria-pressed="true"]').count()) === 1 && (await P.locator('.folien-stift.an.pen').count()) === 1);
@@ -152,11 +152,11 @@ console.log('\n════ A: Auf eine Folie zeichnen ════');
   // Radierer
   await P.keyboard.press('e'); await P.waitForTimeout(200);
   await ziehen(P, [[n.l + n.w * 0.4, n.t + 30], [n.l + n.w * 0.4, n.t + 110]]);
-  pruefe('A8 der Radierer nimmt den Strich, den er berührt — den anderen nicht', await bis(async () => { const d = (await brettVon(P)).drawings ?? []; return d.length === 1 && d[0].tool === 'marker'; }), ((await brettVon(P)).drawings ?? []).map((s) => s.tool));
+  pruefe('A8 der Radierer nimmt den Strich, den er berührt – den anderen nicht', await bis(async () => { const d = (await brettVon(P)).drawings ?? []; return d.length === 1 && d[0].tool === 'marker'; }), ((await brettVon(P)).drawings ?? []).map((s) => s.tool));
   await P.locator('[data-taste="folien-zurueck"]').click();
   pruefe('A9 Rückgängig holt ihn wieder', await bis(async () => ((await brettVon(P)).drawings ?? []).length === 2));
   await P.keyboard.press('Escape'); await P.waitForTimeout(300);
-  pruefe('A10 Esc legt den Stift weg — die Präsentation bleibt, die Werkzeuge sind fort, die Striche stehen',
+  pruefe('A10 Esc legt den Stift weg – die Präsentation bleibt, die Werkzeuge sind fort, die Striche stehen',
     (await P.locator('.presenter').count()) === 1 && (await P.locator('.folien-palette').count()) === 0 && (await P.locator('.folien-stift.an').count()) === 0 && (await P.locator('.folien-stift svg path').count()) === 2);
   pruefe('A11 ohne Stift gehört die Folie wieder dem Inhalt (die Schicht fängt nichts ab)', await P.evaluate(() => { const r = document.querySelector('.presenter-slide .slide-note').getBoundingClientRect(); return !!document.elementFromPoint(r.left + r.width / 2, r.top + 50)?.closest('.slide-note'); }));
   // andere Fenstergröße: der Strich bleibt an seiner Stelle der Folie
@@ -230,7 +230,7 @@ console.log('\n════ F: Stift schreibt, Finger rollt ════');
   for (let i = 1; i <= 8; i++) await zeiger('pointermove', 'pen', t.l + 200 + i * 20, 300 + (i % 2) * 14, 0.3 + i * 0.07);
   await zeiger('pointerup', 'pen', t.l + 360, 300);
   const stift = (await striche(P, (x) => x.anchor === 'p1' && x.seite === 2))[0];
-  pruefe('F1 der Stift schreibt — mit seinem Druck', !!stift && Array.isArray(stift.druck) && stift.druck.length === stift.points.length && stift.druck[stift.druck.length - 1] > stift.druck[0], stift && { punkte: stift.points.length, druck: stift.druck });
+  pruefe('F1 der Stift schreibt – mit seinem Druck', !!stift && Array.isArray(stift.druck) && stift.druck.length === stift.points.length && stift.druck[stift.druck.length - 1] > stift.druck[0], stift && { punkte: stift.points.length, druck: stift.druck });
   const roll = () => P.evaluate(() => document.querySelector('.folie-dok-flaeche').scrollTop);
   const vor = await roll();
   await zeiger('pointerdown', 'touch', t.l + 300, 500);
@@ -254,11 +254,11 @@ console.log('\n════ C: Kommentare ════');
   pruefe('C1 der Kommentar der Seite steht als Pin an seiner Stelle', !!pin && Math.abs((pin.l + pin.r) / 2 - soll[0]) < 4 && Math.abs((pin.t + pin.b) / 2 - soll[1]) < 4, { pin, soll });
   pruefe('C2 am Kommentar-Knopf steht die Zahl der offenen Gespräche der Karte (2)', (await P.locator('[data-taste="vortrag-kommentar-zahl"]').textContent()) === '2');
   await P.locator('[data-taste="folien-pin"]').first().click(); await P.waitForTimeout(400);
-  pruefe('C3 ein Tipp auf den Pin öffnet die Spalte mit diesem Gespräch — hervorgehoben, „Seite 2"',
+  pruefe('C3 ein Tipp auf den Pin öffnet die Spalte mit diesem Gespräch – hervorgehoben, „Seite 2"',
     (await P.locator('.folien-kommentare .fk-faden.gewaehlt', { hasText: 'Quelle für Seite zwei?' }).count()) === 1 && /Seite 2/.test(await P.locator('.fk-kopf').textContent()));
-  pruefe('C4 die Spalte zeigt nur die Gespräche dieser Seite — die anderen als Sprung', (await P.locator('.fk-faden').count()) === 1 && (await P.locator('[data-taste="folien-kommentar-seite"]').textContent()).trim() === 'Seite 3');
+  pruefe('C4 die Spalte zeigt nur die Gespräche dieser Seite – die anderen als Sprung', (await P.locator('.fk-faden').count()) === 1 && (await P.locator('[data-taste="folien-kommentar-seite"]').textContent()).trim() === 'Seite 3');
   const fol = await kasten(P, '.presenter-slide'); const sp = await kasten(P, '.folien-kommentare');
-  pruefe('C5 die Folie rückt zur Seite — die Spalte verdeckt nichts', fol.r <= sp.l + 1, { folie: fol.r, spalte: sp.l });
+  pruefe('C5 die Folie rückt zur Seite – die Spalte verdeckt nichts', fol.r <= sp.l + 1, { folie: fol.r, spalte: sp.l });
   await P.locator('[data-taste="folien-kommentar-text"]').fill('Bitte Seite zwei kürzen');
   await P.locator('[data-taste="folien-kommentar-senden"]').click(); await P.waitForTimeout(400);
   const neu = ((await brettVon(P)).comments ?? []).find((c) => c.msgs[0].text === 'Bitte Seite zwei kürzen');
@@ -271,7 +271,7 @@ console.log('\n════ C: Kommentare ════');
   const alt = ((await brettVon(P)).comments ?? []).find((c) => c.id === 'c-s2');
   pruefe('C8 Antworten hängt an das Gespräch an (Enter sendet)', alt.msgs.length === 2 && alt.msgs[1].text === 'Steht im Anhang' && ((await brettVon(P)).comments ?? []).length === 4, alt.msgs.map((m) => m.text));
   await P.locator('.fk-faden', { hasText: 'Quelle für Seite zwei?' }).locator('[data-taste="folien-erledigt"]').click(); await P.waitForTimeout(300);
-  pruefe('C9 „Erledigt" hakt es ab — die Zahl am Knopf sinkt', await bis(async () => ((await brettVon(P)).comments ?? []).find((c) => c.id === 'c-s2').resolved === true) && (await P.locator('[data-taste="vortrag-kommentar-zahl"]').textContent()) === '2', await P.locator('[data-taste="vortrag-kommentar-zahl"]').textContent());
+  pruefe('C9 „Erledigt" hakt es ab – die Zahl am Knopf sinkt', await bis(async () => ((await brettVon(P)).comments ?? []).find((c) => c.id === 'c-s2').resolved === true) && (await P.locator('[data-taste="vortrag-kommentar-zahl"]').textContent()) === '2', await P.locator('[data-taste="vortrag-kommentar-zahl"]').textContent());
   await P.locator('[data-taste="folien-kommentar-seite"]').click(); await P.waitForTimeout(900);
   pruefe('C10 der Sprung blättert zur Seite mit dem anderen Gespräch', (await dokSeite(P)) === 3 && (await P.locator('.fk-faden', { hasText: 'Anhang fehlt' }).count()) === 1, { seite: await dokSeite(P) });
   // Notiz-Folie: Gespräche der Karte
@@ -287,7 +287,7 @@ console.log('\n════ C: Kommentare ════');
   const e1 = { stift: await P.locator('.folien-palette').count(), spalte: await P.locator('.folien-kommentare').count(), vortrag: await P.locator('.presenter').count() };
   await P.keyboard.press('Escape'); await P.waitForTimeout(200);
   const e2 = { spalte: await P.locator('.folien-kommentare').count(), vortrag: await P.locator('.presenter').count() };
-  pruefe('C13 Esc legt erst den Stift weg, schließt dann die Spalte — die Präsentation bleibt', e1.stift === 0 && e1.spalte === 1 && e1.vortrag === 1 && e2.spalte === 0 && e2.vortrag === 1, { e1, e2 });
+  pruefe('C13 Esc legt erst den Stift weg, schließt dann die Spalte – die Präsentation bleibt', e1.stift === 0 && e1.spalte === 1 && e1.vortrag === 1 && e2.spalte === 0 && e2.vortrag === 1, { e1, e2 });
   await P.keyboard.press('k'); await P.waitForTimeout(200);
   pruefe('C14 K öffnet die Spalte wieder', (await P.locator('.folien-kommentare').count()) === 1);
   await P.keyboard.press('Escape'); await P.keyboard.press('Escape'); await P.waitForTimeout(600);
@@ -317,12 +317,12 @@ console.log('\n════ D: nur lesen ════');
   const L = await seite(st);
   await vortragAuf(L.P); await aufFolie(L.P, 'folie');
   const nurLesen = await L.P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].geteiltRolle);
-  if (nurLesen !== 'lesen') console.log('    (das Board blieb nicht „nur lesen" — Stand:', nurLesen, ')');
+  if (nurLesen !== 'lesen') console.log('    (das Board blieb nicht „nur lesen" – Stand:', nurLesen, ')');
   pruefe('D1 kein Stift-Knopf; die Striche der Folie sind zu sehen', nurLesen === 'lesen' && (await L.P.locator('[data-taste="vortrag-stift"]').count()) === 0 && (await L.P.locator('.folien-stift svg path').count()) === 1);
   await L.P.keyboard.press('p'); await L.P.waitForTimeout(200);
   pruefe('D2 auch die Taste holt keine Werkzeuge', (await L.P.locator('.folien-palette').count()) === 0);
   await L.P.locator('[data-taste="vortrag-kommentare"]').click(); await L.P.waitForTimeout(300);
-  pruefe('D3 Kommentare lassen sich lesen — schreiben, antworten, erledigen nicht', (await L.P.locator('.fk-faden', { hasText: 'Zahl bitte prüfen' }).count()) === 1
+  pruefe('D3 Kommentare lassen sich lesen – schreiben, antworten, erledigen nicht', (await L.P.locator('.fk-faden', { hasText: 'Zahl bitte prüfen' }).count()) === 1
     && (await L.P.locator('[data-taste="folien-kommentar-text"]').count()) === 0 && (await L.P.locator('[data-taste="folien-antworten"]').count()) === 0);
   await L.ctx.close();
 }
@@ -331,7 +331,7 @@ console.log('\n════ E: Texte ════');
 {
   const de = readFileSync(path.join(__repo, 'src/components/HelpOverlay.tsx'), 'utf-8');
   const en = readFileSync(path.join(__repo, 'src/components/HelpOverlayEn.tsx'), 'utf-8');
-  pruefe('E1 die Hilfe nennt M394 — deutsch und englisch', de.includes('(M394)') && en.includes('(M394)'));
+  pruefe('E1 die Hilfe nennt M394 – deutsch und englisch', de.includes('(M394)') && en.includes('(M394)'));
   pruefe('E2 keine Fehler in der Konsole', fehler.length === 0, fehler.join(' | ').slice(0, 300));
 }
 

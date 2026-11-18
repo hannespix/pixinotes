@@ -53,7 +53,7 @@ interface FocusAction { label: string; hint: string; key: string }
 const ACTIONS: Record<string, FocusAction[]> = {
   kanban: [{ label: '＋ Ticket', hint: 'Neues Ticket in der ersten Spalte anlegen', key: 'ticket' }],
   gantt: [{ label: '＋ Vorgang', hint: 'Neuen Vorgang ab heute anlegen', key: 'gantt-row' }],
-  week: [{ label: '＋ Block', hint: 'Neuen Block anlegen — Zeit und Text danach in der Karte', key: 'week-entry' }],
+  week: [{ label: '＋ Block', hint: 'Neuen Block anlegen – Zeit und Text danach in der Karte', key: 'week-entry' }],
   time: [{ label: '＋ Zeit', hint: 'Arbeitszeit für heute nacherfassen', key: 'time-seg' }],
   sheet: [{ label: '＋ Zeile', hint: 'Eine Zeile an die Rechen-Tabelle anhängen', key: 'sheet-row' }],
 };
@@ -92,14 +92,14 @@ function runAction(node: AppNode, key: string) {
   if (key === 'ticket') {
     const items = (d.items as Array<Record<string, unknown>>) ?? [];
     st.updateNodeData(node.id, { items: [...items, { id: id(), text: 'Neues Ticket', col: 0 }] });
-    st.showToast('＋ Ticket angelegt — Text antippen zum Ändern.');
+    st.showToast('＋ Ticket angelegt – Text antippen zum Ändern.');
   } else if (key === 'gantt-row') {
     const rows = (d.rows as Array<Record<string, unknown>>) ?? [];
     const end = tagLokal(new Date(Date.now() + 4 * 864e5));
     st.updateNodeData(node.id, {
       rows: [...rows, { id: id(), name: `Vorgang ${rows.length + 1}`, start: today, end }],
     });
-    st.showToast('＋ Vorgang angelegt — Name und Zeitraum in der Karte anpassen.');
+    st.showToast('＋ Vorgang angelegt – Name und Zeitraum in der Karte anpassen.');
   } else if (key === 'week-entry') {
     const entries = (d.entries as Array<Record<string, unknown>>) ?? [];
     // Beginn: Anfang des Rasters, Dauer eine Einheit — Feinheiten in der Karte
@@ -107,17 +107,17 @@ function runAction(node: AppNode, key: string) {
     st.updateNodeData(node.id, {
       entries: [...entries, { id: id(), day: 0, start: from, dur: 60, text: 'Neuer Block' }],
     });
-    st.showToast('＋ Block angelegt — antippen für Zeit, Tag und Text.');
+    st.showToast('＋ Block angelegt – antippen für Zeit, Tag und Text.');
   } else if (key === 'sheet-row') {
     const rows = typeof d.rows === 'number' ? d.rows : 8;
     st.updateNodeData(node.id, { rows: rows + 1 });
-    st.showToast('＋ Zeile angehängt — Zelle antippen zum Ausfüllen.');
+    st.showToast('＋ Zeile angehängt – Zelle antippen zum Ausfüllen.');
   } else if (key === 'time-seg') {
     const segs = (d.segs as Array<Record<string, unknown>>) ?? [];
     st.updateNodeData(node.id, {
       segs: [...segs, { id: id(), date: today, start: 8 * 60, end: 9 * 60, kind: 'arbeit' }],
     });
-    st.showToast('＋ Stunde für heute erfasst — Zeiten in der Karte anpassen.');
+    st.showToast('＋ Stunde für heute erfasst – Zeiten in der Karte anpassen.');
   }
 }
 
@@ -383,11 +383,11 @@ export function FocusSheet() {
                   onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
                 <span>/ {dok.seiten}</span>
               </label>
-              <button className={`focus-werkzeug ${tool === 'pen' ? 'on' : ''}`} onClick={() => werkzeug('pen')} aria-pressed={tool === 'pen'} title="Stift — auf die Seite schreiben" aria-label="Stift" data-taste="fokus-stift"><IPen size={18} /></button>
+              <button className={`focus-werkzeug ${tool === 'pen' ? 'on' : ''}`} onClick={() => werkzeug('pen')} aria-pressed={tool === 'pen'} title="Stift – auf die Seite schreiben" aria-label="Stift" data-taste="fokus-stift"><IPen size={18} /></button>
               <button className={`focus-werkzeug ${tool === 'marker' ? 'on' : ''}`} onClick={() => werkzeug('marker')} aria-pressed={tool === 'marker'} title="Textmarker" aria-label="Textmarker" data-taste="fokus-marker"><IHighlighter size={18} /></button>
               <button className={`focus-werkzeug ${tool === 'eraser' ? 'on' : ''}`} onClick={() => werkzeug('eraser')} aria-pressed={tool === 'eraser'} title="Radierer" aria-label="Radierer" data-taste="fokus-radierer"><IEraser size={18} /></button>
               <button className={`focus-werkzeug ${pinAn ? 'on' : ''}`} onClick={() => { setTool('select'); dokumentBefehl(node.id, 'pin'); }} aria-pressed={pinAn}
-                title="Kommentar an eine Stelle — danach auf die Stelle tippen" aria-label="Kommentar an eine Stelle" data-taste="fokus-kommentar"><IComment size={18} /></button>
+                title="Kommentar an eine Stelle – danach auf die Stelle tippen" aria-label="Kommentar an eine Stelle" data-taste="fokus-kommentar"><IComment size={18} /></button>
             </>
           )}
           {/* M228: Die Brücke zum Vortrag. Fokus und Präsentation sind bewusst
@@ -398,7 +398,7 @@ export function FocusSheet() {
           <button
             className={`focus-act ${dok ? 'nur-zeichen' : ''}`}
             aria-label="Ab dieser Karte präsentieren"
-            title="Ab dieser Karte präsentieren — Vollbild, Folienfolge aus den Verbindungen"
+            title="Ab dieser Karte präsentieren – Vollbild, Folienfolge aus den Verbindungen"
             onClick={() => {
               const st = useBoard.getState();
               st.setPresentFrom(node.id);

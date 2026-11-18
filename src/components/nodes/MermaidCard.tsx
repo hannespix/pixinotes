@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { NodeToolbar, Position, type NodeProps } from '@xyflow/react';
 import { runDerived, useBoard } from '../../store';
 import type { MermaidNode } from '../../types';
-import { IWand } from '../Icons';
+import { IWand, IUhr } from '../Icons';
 import { MenuHuelle } from '../EbenenMenu';
 import { aiReady } from '../../lib/ai';
 import { aiMermaid, buildMermaidSource, getMermaid, LEGACY_MERMAID_DEFAULT, MERMAID_STYLES, MERMAID_TEMPLATES as TEMPLATES, preloadHandFont } from '../../lib/mermaid';
@@ -724,7 +724,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
       setSelEdge(null);
       setSelOther(null);
       setConnectFrom(null);
-      showToast('✨ Diagramm aktualisiert.');
+      showToast('Diagramm aktualisiert.');
     } catch (e) {
       showToast(`KI-Diagramm fehlgeschlagen: ${String((e as Error).message).slice(0, 120)}`, false, 8000);
     } finally {
@@ -813,7 +813,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
                       className={ganttFlags(data.code, selOther.idx).includes(f) ? 'active' : ''}
                       title={f === 'done' ? 'Erledigt markieren' : f === 'active' ? 'Als laufend markieren' : 'Als kritisch markieren'}
                       onClick={() => up(toggleGanttFlag(data.code, selOther.idx, f))}
-                    >{f === 'done' ? '✓' : f === 'active' ? '▶' : '⚠'}</button>
+                    >{f === 'done' ? '✓' : f === 'active' ? '▶' : '!'}</button>
                   ))}
                   <span className="mm-sep" />
                   <button title="Neue Aufgabe direkt danach" onClick={() => updateNodeData(id, { code: addGanttTask(data.code, selOther.idx) })}>＋ Danach</button>
@@ -854,7 +854,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
               return (
                 <>
                   <span className="mm-sel-name" translate="no" title={tk?.isPeriod ? 'Ausgewählte Periode' : 'Ausgewähltes Ereignis'}>
-                    {tk?.isPeriod ? '🕘' : '•'} „{tk?.text ?? ''}"
+                    {tk?.isPeriod ? <IUhr size={11} /> : '•'} „{tk?.text ?? ''}"
                   </span>
                   <button onClick={() => startOtherRename(selOther)}>✎ Umbenennen</button>
                   <button title="Ereignis in dieser Periode anfügen" onClick={() => updateNodeData(id, { code: addTimelineEvent(data.code, selOther.idx) })}>＋ Ereignis</button>
@@ -969,7 +969,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
               <div className="ebenen-menu-titel">Vorlage</div>
               {Object.keys(TEMPLATES).map((t) => (
                 <button key={t} role="menuitem" className={pendingTpl === t ? 'mm-confirm' : ''} onClick={() => { const war = pendingTpl; applyTemplate(t); if (war === t || !data.code.trim()) zu(); }}>
-                  {pendingTpl === t ? `„${t}" ersetzt dein Diagramm — sicher?` : t}
+                  {pendingTpl === t ? `„${t}" ersetzt dein Diagramm – sicher?` : t}
                 </button>
               ))}
               <div className="ebenen-menu-titel">Farbschema</div>
@@ -981,7 +981,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
               </div>
               <div className="ebenen-menu-titel">Darstellung</div>
               <button role="menuitem" className={look === 'hand' ? 'aktiv' : ''} onClick={() => { updateNodeData(id, { look: look === 'hand' ? undefined : 'hand' }); zu(); }} title="Kritzel-Formen + Handschrift">
-                ✏️ Handgezeichneter Look {look === 'hand' ? 'aus' : 'an'}
+                Handgezeichneter Look {look === 'hand' ? 'aus' : 'an'}
               </button>
               {isFlow && <button role="menuitem" onClick={() => { toggleDirection(); zu(); }} title="oben/unten ⇄ links/rechts">⇄ Richtung wechseln</button>}
               {kind === 'seq' && (
@@ -1004,7 +1004,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             <input
               value={aiText}
               disabled={aiBusy}
-              placeholder={data.code.trim() ? '✨ Änderung beschreiben — z. B. „füge eine Prüfung ein"' : '✨ Diagramm beschreiben — z. B. „Urlaubsantrag-Prozess"'}
+              placeholder={data.code.trim() ? 'Änderung beschreiben – z. B. „füge eine Prüfung ein"' : 'Diagramm beschreiben – z. B. „Urlaubsantrag-Prozess"'}
               onChange={(e) => setAiText(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') void runAi(); }}
             />
@@ -1034,8 +1034,8 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             <button
               className={`mm-abo-chip nodrag ${aboCode ? 'on' : ''}`}
               title={aboCode
-                ? 'Abo aktiv: Das Diagramm folgt automatisch der Checkliste der verbundenen Notiz (Erledigtes grün). Klick pausiert das Abo und zeigt wieder den eigenen Code — der bleibt unangetastet.'
-                : 'Abo pausiert — Klick zeigt wieder die Checkliste der verbundenen Notiz als Diagramm.'}
+                ? 'Abo aktiv: Das Diagramm folgt automatisch der Checkliste der verbundenen Notiz (Erledigtes grün). Klick pausiert das Abo und zeigt wieder den eigenen Code – der bleibt unangetastet.'
+                : 'Abo pausiert – Klick zeigt wieder die Checkliste der verbundenen Notiz als Diagramm.'}
               onClick={(e) => { e.stopPropagation(); updateNodeData(id, { linkSync: aboCode ? false : true }); }}
             >
               ⇢ Abo {aboCode ? 'an' : 'aus'}
@@ -1062,7 +1062,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
           )}
           {error && (
             <div className="mermaid-error" title={error}>
-              ⚠️ {svg ? 'Code unvollständig — letztes gültiges Diagramm bleibt sichtbar' : error}
+              {svg ? 'Code unvollständig – letztes gültiges Diagramm bleibt sichtbar' : error}
             </div>
           )}
           {connectFrom && !error && (

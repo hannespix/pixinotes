@@ -540,7 +540,7 @@ console.log('\n════ C: Alles bearbeiten, nur Eigenes löschen ═══�
 await inKarte(G.P, 'Planung Notiz'); await G.P.keyboard.press('End'); await G.P.keyboard.type(' GERD-SCHREIBT', { delay: 30 });
 await heraus(G.P);
 await warteBis(G.P, () => /GERD-SCHREIBT/.test(bxServer()), 10000);
-pruefe('C1 Gerd bearbeitet Annas alte Karte — das ist erlaubt und landet auf dem Server', /GERD-SCHREIBT/.test(bxServer()));
+pruefe('C1 Gerd bearbeitet Annas alte Karte – das ist erlaubt und landet auf dem Server', /GERD-SCHREIBT/.test(bxServer()));
 await waehlen(G.P, 'Planung Notiz');
 await G.P.keyboard.press('Delete'); await G.P.waitForTimeout(600);
 pruefe('C2 löschen kann er sie nicht', (await boardVon(G.P, 'bx')).nodes.some((n) => n.id === 'x1'));
@@ -602,7 +602,7 @@ pruefe('E2 Anna legt „Anna drei" an', await notizPlatz(A.P, 'Anna drei'));
 await warteBis(G.P, async () => hat(G.P, 'Anna drei'), 16000);
 await leer(G.P);
 await G.P.keyboard.press('Control+z'); await G.P.waitForTimeout(700);
-pruefe('E3 Gerds Strg+Z nimmt „Gerd drei" zurück — „Anna drei" bleibt', !(await hat(G.P, 'Gerd drei')) && (await hat(G.P, 'Anna drei')) && (await hat(G.P, 'Gerd zwei')));
+pruefe('E3 Gerds Strg+Z nimmt „Gerd drei" zurück – „Anna drei" bleibt', !(await hat(G.P, 'Gerd drei')) && (await hat(G.P, 'Anna drei')) && (await hat(G.P, 'Gerd zwei')));
 await warteBis(G.P, () => !serverKarte('Gerd drei'), 10000);
 pruefe('E4 auf dem Server ebenso', !serverKarte('Gerd drei') && !!serverKarte('Anna drei'));
 await G.P.keyboard.press('Control+Shift+z'); await G.P.waitForTimeout(700);
@@ -634,7 +634,7 @@ pruefe('E9 Gerd legt „Gerd vier" an', await notizPlatz(G.P, 'Gerd vier'));
 await warteBis(A.P, async () => hat(A.P, 'Gerd vier'), 20000);
 await leer(A.P);
 await A.P.keyboard.press('Control+z'); await A.P.waitForTimeout(700);
-pruefe('E10 Annas Strg+Z holt „Anna neu" zurück — „Gerd vier" bleibt', (await hat(A.P, 'Anna neu')) && (await hat(A.P, 'Gerd vier')));
+pruefe('E10 Annas Strg+Z holt „Anna neu" zurück – „Gerd vier" bleibt', (await hat(A.P, 'Anna neu')) && (await hat(A.P, 'Gerd vier')));
 await warteBis(G.P, async () => (await hat(G.P, 'Anna neu')) && (await hat(G.P, 'Gerd vier')), 20000);
 pruefe('E11 bei Gerd und auf dem Server ebenso', (await hat(G.P, 'Anna neu')) && (await hat(G.P, 'Gerd vier')) && !!serverKarte('Anna neu') && !!serverKarte('Gerd vier'));
 
@@ -654,13 +654,13 @@ pruefe('E11 bei Gerd und auf dem Server ebenso', (await hat(G.P, 'Anna neu')) &&
   await warteBis(G.P, async () => hat(G.P, 'Anna sechs'), 20000);
   await leer(G.P);
   await G.P.keyboard.press('Control+z'); await G.P.waitForTimeout(800);
-  pruefe('E15 Gerds Strg+Z holt seine Karte an den alten Platz — „Anna sechs" bleibt, ohne Hinweis', (await lageVon(G.P)) === alt && (await hat(G.P, 'Anna sechs')) && !/jemand anderes/i.test(await toast(G.P)), `${alt} → ${await lageVon(G.P)} | ${await toast(G.P)}`);
+  pruefe('E15 Gerds Strg+Z holt seine Karte an den alten Platz – „Anna sechs" bleibt, ohne Hinweis', (await lageVon(G.P)) === alt && (await hat(G.P, 'Anna sechs')) && !/jemand anderes/i.test(await toast(G.P)), `${alt} → ${await lageVon(G.P)} | ${await toast(G.P)}`);
   await warteBis(A.P, async () => (await lageVon(A.P)) === alt, 20000);
   pruefe('E16 bei Anna steht die Karte ebenfalls wieder am alten Platz', (await lageVon(A.P)) === alt && (await hat(A.P, 'Anna sechs')));
 }
 
 // ══ F ═══════════════════════════════════════════════════════════════
-console.log('\n════ F: Sicherung — der Stand von vor der Gruppenarbeit ════');
+console.log('\n════ F: Sicherung – der Stand von vor der Gruppenarbeit ════');
 await ruhe(A.P);
 await dialogOeffnen(A.P, 'Planung');
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="sicherung"]').count()) === 1, 6000);

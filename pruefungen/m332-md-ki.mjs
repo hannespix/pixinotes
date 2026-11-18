@@ -209,7 +209,7 @@ console.log('════ C: 8 große Dateien → Portionen mit Fortschritt ═�
   const ks = await knoten(P);
   pruefe('C6 acht neue Notizen, je eine pro Datei', ks.filter((k) => k.type === 'note').length === 8, String(ks.filter((k) => k.type === 'note').length));
   const ende = toasts[toasts.length - 1];
-  pruefe('C7 Endmeldung nennt Schritte und Teile ohne ⚠️', /8 Schritte in \d+ Teilen/.test(ende) && !ende.includes('⚠️'), ende);
+  pruefe('C7 Endmeldung nennt Schritte und Teile ohne', /8 Schritte in \d+ Teilen/.test(ende) && !ende.includes('Nicht geschafft'), ende);
   const edges = await P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].edges);
   pruefe('C8 jede Notiz ist mit ihrer Datei verbunden (from)', edges.length === 8, String(edges.length));
   await P.keyboard.press('Control+z');
@@ -219,7 +219,7 @@ console.log('════ C: 8 große Dateien → Portionen mit Fortschritt ═�
 }
 
 // ══ D: ein Teil scheitert ═════════════════════════════════════════════
-console.log('════ D: ein Teil scheitert — Rest läuft, Meldung ehrlich ════');
+console.log('════ D: ein Teil scheitert – Rest läuft, Meldung ehrlich ════');
 {
   const { ctx, P, aufrufe } = await seite({ nodes: dateiKarten(8), plan: (nr) => (nr === 2 ? { status: 500 } : null) });
   await dockAnweisung(P, 'Wandle alle Dateien in Notizen um');
@@ -229,7 +229,7 @@ console.log('════ D: ein Teil scheitert — Rest läuft, Meldung ehrlich
   const kaputt = aufrufe[1]?.items.length ?? 0;
   pruefe('D1 die anderen Teile liefen durch', n === 8 - kaputt && n >= 4, `${n} Notizen, Teil 2 hatte ${kaputt}`);
   const ende = toasts[toasts.length - 1];
-  pruefe('D2 Meldung mit ⚠️ und „Nicht geschafft"', ende.includes('⚠️') && ende.includes('Nicht geschafft') && /HTTP 500/.test(ende), ende);
+  pruefe('D2 Meldung mit und „Nicht geschafft"', ende.includes('Nicht geschafft') && /HTTP 500/.test(ende), ende);
   pruefe('D3 Meldung nennt die betroffenen Karten', /Teil 2 \(kapitel-/.test(ende), ende);
   await ctx.close();
 }
@@ -249,7 +249,7 @@ console.log('════ E: abgeschnittene Antwort → Portion halbieren ══
   pruefe('E1 trotz Abschneiden am Ende alle 8 Notizen', ks.filter((k) => k.type === 'note').length === 8, String(ks.filter((k) => k.type === 'note').length));
   pruefe('E2 ein Aufruf mehr als Portionen (die halbierte)', aufrufe.length >= 4 && aufrufe.slice(1, 3).every((a) => a.items.length < aufrufe[0].items.length), JSON.stringify(aufrufe.map((a) => a.items.length)));
   pruefe('E3 kein „halb"-Teilergebnis übernommen', !ks.some((k) => JSON.stringify(k.data.blocks ?? []).includes('halb')));
-  pruefe('E4 Endmeldung ohne ⚠️', !toasts[toasts.length - 1].includes('⚠️'), toasts[toasts.length - 1]);
+  pruefe('E4 Endmeldung ohne', !toasts[toasts.length - 1].includes('Nicht geschafft'), toasts[toasts.length - 1]);
   await ctx.close();
 }
 

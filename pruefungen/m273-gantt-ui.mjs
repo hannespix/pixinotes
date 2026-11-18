@@ -133,7 +133,7 @@ console.log('\n════ T2: Balken-Beschriftung & Co. ════');
   pruefe('T2a jeder sichtbare Vorgang trägt seinen Namen am Balken',
     info.anzahl >= info.sichtbareBalken && info.anzahl >= 8,
     `${info.anzahl} Namen bei ${info.sichtbareBalken} sichtbaren Balken`);
-  pruefe('T2b Namen stehen im Balken, wenn sie hineinpassen — sonst daneben',
+  pruefe('T2b Namen stehen im Balken, wenn sie hineinpassen – sonst daneben',
     info.innen.length >= 10 && info.anzahl > info.innen.length, `${info.innen.length} innen von ${info.anzahl}`);
   pruefe('T2c die Heute-Fahne ist da', info.heutePille);
   pruefe('T2d der Fortschritt füllt die volle Balkenhöhe', info.overlayHoehe === 15, String(info.overlayHoehe));

@@ -55,12 +55,12 @@ async function graphFetch(url: string, accept: string, needNotes = true): Promis
         await wait(Math.min(retry, 30) * 1000);
         continue;
       }
-      if (res.status === 401) throw new Error('Microsoft hat die Anmeldung abgelehnt — bitte in den Einstellungen neu verbinden.');
-      if (res.status === 403) throw new Error('Keine Berechtigung für OneNote — in den Einstellungen „Mit OneNote verbinden" wählen.');
+      if (res.status === 401) throw new Error('Microsoft hat die Anmeldung abgelehnt – bitte in den Einstellungen neu verbinden.');
+      if (res.status === 403) throw new Error('Keine Berechtigung für OneNote – in den Einstellungen „Mit OneNote verbinden" wählen.');
       if (!res.ok) throw new Error(`OneNote: HTTP ${res.status}`);
       return res;
     }
-    throw new Error('OneNote antwortet gerade nicht (Anfragegrenze erreicht) — bitte in ein paar Minuten erneut versuchen.');
+    throw new Error('OneNote antwortet gerade nicht (Anfragegrenze erreicht) – bitte in ein paar Minuten erneut versuchen.');
   });
 }
 
@@ -282,11 +282,11 @@ export async function runOneNoteImport(
       }
     }
     if (projects.length > 0) {
-      spaces.push({ id: uid(), name: `📓 ${choice.notebook.name}`, projects });
+      spaces.push({ id: uid(), name: `${choice.notebook.name}`, projects });
     }
   }
 
-  if (boards.length === 0) throw new Error('Nichts zu importieren — die gewählten Abschnitte enthalten keine Seiten.');
+  if (boards.length === 0) throw new Error('Nichts zu importieren – die gewählten Abschnitte enthalten keine Seiten.');
 
   useBoard.getState().importStructure({ spaces, boards, activeId: boards[0].id });
   return { notebooks: spaces.length, boards: boards.length, pages: pageCount, skipped };

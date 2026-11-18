@@ -120,7 +120,7 @@ const { ctx, P } = await seite();
 
 console.log('════ A: zugeklappt ════');
 let z = await zustand(P);
-pruefe('A1 Miniatur, Seitenzahl im Meta, Aufklappen-Knopf — keine Seite offen', z.thumb && /3 Seiten/.test(z.meta) && z.aufKnopf?.includes('Aufklappen') && !z.seiteOffen, JSON.stringify({ meta: z.meta, knopf: z.aufKnopf, offen: z.seiteOffen }));
+pruefe('A1 Miniatur, Seitenzahl im Meta, Aufklappen-Knopf – keine Seite offen', z.thumb && /3 Seiten/.test(z.meta) && z.aufKnopf?.includes('Aufklappen') && !z.seiteOffen, JSON.stringify({ meta: z.meta, knopf: z.aufKnopf, offen: z.seiteOffen }));
 pruefe('A2 keine Pfade, keine Striche', z.pfade.length === 0 && z.striche.length === 0);
 
 console.log('\n════ B: aufklappen ════');
@@ -183,7 +183,7 @@ pruefe('F3 der Pin sitzt auf der Seite an der Stelle', pin && Math.abs((pin.l + 
 await P.keyboard.press('Escape');
 await P.locator('[data-taste="pdf-zurueck"]').click(); await P.waitForTimeout(700);
 z = await zustand(P);
-pruefe('F4 auf Seite 1 kein Seiten-Pin, Zähler 💬 1 bleibt', !z.pins.some((p) => p.seite) && /💬 1/.test(z.meta), JSON.stringify({ pins: z.pins, meta: z.meta }));
+pruefe('F4 auf Seite 1 kein Seiten-Pin, Zähler 1 bleibt', !z.pins.some((p) => p.seite) && /·\s+1$/.test(z.meta.trim()), JSON.stringify({ pins: z.pins, meta: z.meta }));
 await P.locator('[data-taste="pdf-vor"]').click(); await P.waitForTimeout(700);
 z = await zustand(P);
 pruefe('F5 auf Seite 2 ist der Pin wieder da', z.pins.some((p) => p.seite));

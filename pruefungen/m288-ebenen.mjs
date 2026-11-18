@@ -166,7 +166,7 @@ console.log('\n════ T3: Board archivieren ════');
   const st = await stand(P);
   pruefe('T3a das Board ist als archiviert vermerkt',
     st.boards.find((b) => b.id === 'b1')?.archived === true, JSON.stringify(st.boards.map((b) => [b.name, !!b.archived])));
-  pruefe('T3b es ist NICHT gelöscht — alle Karten sind noch da',
+  pruefe('T3b es ist NICHT gelöscht – alle Karten sind noch da',
     st.boards.find((b) => b.id === 'b1')?.nodes.length === 1);
   pruefe('T3c es verschwindet aus der Seitenleiste',
     await P.locator('.side-board', { hasText: 'Berichte' }).count() === 0);

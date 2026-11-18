@@ -208,7 +208,7 @@ const flaggen = await N.evaluate(() => {
 });
 const alleNein = (l) => l.length > 0 && l.every((x) => x === false);
 const alleJa = (l) => l.length > 0 && l.every((x) => x === true);
-pruefe('A3 Notiztext wird nicht übersetzt — auf der Karte und in der Seitenleiste', alleNein(flaggen.notiz) && flaggen.notiz.length >= 2, JSON.stringify(flaggen.notiz));
+pruefe('A3 Notiztext wird nicht übersetzt – auf der Karte und in der Seitenleiste', alleNein(flaggen.notiz) && flaggen.notiz.length >= 2, JSON.stringify(flaggen.notiz));
 pruefe('A4 Board-Namen werden nicht übersetzt', alleNein(flaggen.board) && alleNein(flaggen.board2), JSON.stringify([flaggen.board, flaggen.board2]));
 pruefe('A5 Projekt- und Bereichsnamen werden nicht übersetzt', alleNein(flaggen.projekt) && alleNein(flaggen.bereich), JSON.stringify([flaggen.projekt, flaggen.bereich]));
 pruefe('A6 die Oberfläche bleibt übersetzbar (Übersicht, Aufgaben, Impressum, Knöpfe)', alleJa(flaggen.uebersicht) && alleJa(flaggen.aufgaben) && alleJa(flaggen.recht) && flaggen.einst === true, JSON.stringify(flaggen));
@@ -244,11 +244,11 @@ for (const [kenn, bauart] of [['B', 'ersetzt'], ['C', 'verpackt']]) {
     // in einer übersetzten Seite weiterschreiben
     const k = P.locator('.react-flow__node[data-id="n2"] .note-editor');
     await k.click({ position: { x: 24, y: 12 } }); await P.waitForTimeout(500);
-    await P.keyboard.press('Control+End'); await P.keyboard.type(' — ergänzt', { delay: 25 });
+    await P.keyboard.press('Control+End'); await P.keyboard.type(' – ergänzt', { delay: 25 });
     await P.waitForTimeout(400);
     const f = await frei(P); await P.mouse.click(f.x - 320, f.y + 380); await P.waitForTimeout(1600);
     const n2 = await P.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('pixinotes-board')).state.boards.find((b) => b.id === 'b1').nodes.find((x) => x.id === 'n2').data.blocks));
-    pruefe('D4 Schreiben in der übersetzten Seite speichert genau das Getippte', n2.includes('Zweite Karte mit Text — ergänzt') && !n2.includes('⟦'), n2.slice(0, 200));
+    pruefe('D4 Schreiben in der übersetzten Seite speichert genau das Getippte', n2.includes('Zweite Karte mit Text – ergänzt') && !n2.includes('⟦'), n2.slice(0, 200));
     pruefe('D5 weiterhin kein Fehler', P.fehler.length === 0 && await kaputt(P) === 0, JSON.stringify(P.fehler).slice(0, 200));
   }
   await P.context().close();
@@ -267,7 +267,7 @@ console.log('════ E: Gegenversuch ohne Schutz ════');
   console.log(`    ohne Schutz: ${ab.length} Schritte mit falschem Text, ${P.fehler.length} Fehler der Seite, ${await kaputt(P)} abgestürzte Bereiche`);
   if (ab[0]) console.log(`    z. B. ${ab[0].slice(0, 220)}`);
   if (P.fehler[0]) console.log(`    z. B. ${P.fehler[0].slice(0, 160)}`);
-  pruefe('E1 ohne den Schutz geht dieselbe Folge schief — die Prüfung trifft die gefährlichen Stellen', zahl > 0, String(zahl));
+  pruefe('E1 ohne den Schutz geht dieselbe Folge schief – die Prüfung trifft die gefährlichen Stellen', zahl > 0, String(zahl));
   await P.context().close();
 }
 

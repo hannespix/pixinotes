@@ -138,7 +138,7 @@ console.log('\n════ B: Spalte ════');
   pruefe('B14 „Neues Projekt" legt eines an', projekte === 3, `Projekte: ${projekte}`);
   // ＋ Neu
   const fuss = await beschriftung(P, '.tabs.spalte .tabs-foot button');
-  pruefe('B15 Fuß der Spalte: ＋ Neu und ‹ — kein Teilen', JSON.stringify(fuss) === JSON.stringify(['Neu', 'Spalte ausblenden']), JSON.stringify(fuss));
+  pruefe('B15 Fuß der Spalte: ＋ Neu und ‹ – kein Teilen', JSON.stringify(fuss) === JSON.stringify(['Neu', 'Spalte ausblenden']), JSON.stringify(fuss));
   await P.locator('.tabs-foot .tab-add').click();
   await P.waitForTimeout(300);
   const neu = (await P.locator('.neu-menu [role="menuitem"]').allTextContents()).map((t) => t.trim());

@@ -12,7 +12,7 @@ export async function aufDemselbenBoard<T>(fn: () => Promise<T>): Promise<T> {
   const st = useBoard.getState();
   if (st.activeId !== start && st.boards.some((b) => b.id === start)) {
     st.openBoard(start);
-    st.showToast('↩ Zurück auf dem Board, auf dem die Aktion begonnen hat — dort liegt das Ergebnis.', false, 5000);
+    st.showToast('↩ Zurück auf dem Board, auf dem die Aktion begonnen hat – dort liegt das Ergebnis.', false, 5000);
   }
   return r;
 }

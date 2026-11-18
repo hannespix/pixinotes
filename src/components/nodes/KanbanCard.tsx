@@ -13,16 +13,12 @@ import { linkedNeighborIds } from '../../lib/links';
 import { fmtHM, linkedOfType, timeSums } from '../../lib/moduleFeeds';
 import { nodeToText } from '../../lib/serialize';
 import { AUTO_ARCHIV_STANDARD_TAGE, archiviere, autoArchivLauf, holeZurueck } from '../../lib/ticketArchiv';
-import { IArchive, IArchiveRestore, ICalendar, IChevronL, IChevronR, ICompact, IDownload, IFolder, IMore, IPlus, IRedo, ISearch, ISettings, IX } from '../Icons';
+import { IArchive, IArchiveRestore, ICalendar, IChevronL, IChevronR, ICompact, IDownload, IFolder, IMore, IPlus, IRedo, ISearch, ISettings, IX, ILock, ILink, ITimer, IPerson } from '../Icons';
 import { CardShell } from './CardShell';
 import { insBild } from '../EbenenMenu';
 import { DragTitle } from './DragTitle';
 
-/** Symbol je Karten-Typ für die Verknüpfungs-Liste im Ticket-Modal (M118) */
-const TYPE_ICON: Record<string, string> = {
-  note: '📝', kanban: '📋', mermaid: '📊', gantt: '📅', calendar: '🗓️',
-  shape: '⬛', image: '🖼️', pdf: '📄', email: '✉️', file: '📎', portal: '🚪',
-};
+import { KartenSymbol } from '../KartenSymbol';
 
 const TAG_RE = /#([\p{L}\d_-]{2,20})/gu;
 const TAG_MS = 86_400_000;
@@ -213,8 +209,8 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     return 'ok';
   };
   const DEAD_TITLE: Record<'no-board' | 'no-node', string> = {
-    'no-board': 'Nicht mehr verfügbar — das verknüpfte Board wurde gelöscht',
-    'no-node': 'Nicht mehr verfügbar — die verknüpfte Karte wurde gelöscht',
+    'no-board': 'Nicht mehr verfügbar – das verknüpfte Board wurde gelöscht',
+    'no-node': 'Nicht mehr verfügbar – die verknüpfte Karte wurde gelöscht',
   };
 
   /**
@@ -395,7 +391,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     if (col > item.col) {
       const blockers = ticketBlockers(item, kanban);
       if (blockers.length > 0) {
-        showToast(`🔒 Erst erledigen: ${blockers.join(' · ')}`);
+        showToast(`Erst erledigen: ${blockers.join(' · ')}`);
         return;
       }
       if (col === done && openSubs(item) > 0) {
@@ -404,7 +400,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       }
     }
     if (wipFull(kanban, col)) {
-      showToast(`🚦 WIP-Limit: „${cols[col]}" fasst höchstens ${wipLimitOf(kanban, col)} Ticket(s).`);
+      showToast(`WIP-Limit: „${cols[col]}" fasst höchstens ${wipLimitOf(kanban, col)} Ticket(s).`);
       return;
     }
     if (col === done && useBoard.getState().konfetti) {
@@ -562,7 +558,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     // gesagt, wenn die erste Spalte damit über ihrem Limit liegt
     const lim = wipLimitOf(kanban, 0);
     if (lim && kanban.items.filter((it) => colOf(it) === 0).length + 1 > lim) {
-      showToast(`🚦 Hinweis: „${cols[0]}" liegt jetzt über dem WIP-Limit (${lim}).`);
+      showToast(`Hinweis: „${cols[0]}" liegt jetzt über dem WIP-Limit (${lim}).`);
     }
   };
 
@@ -593,7 +589,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     // M390: Die letzte Spalte IST „erledigt". Fiele sie weg, rückte die Spalte davor nach — und alles, was dort
     // gerade in Arbeit ist, gälte als erledigt (durchgestrichen, aus der Aufgaben-Zentrale verschwunden).
     if (idx === cols.length - 1 && kanban.items.some((it) => it.col === idx - 1)) {
-      showToast(`Die letzte Spalte ist „erledigt" — erst „${cols[idx - 1]}" leeren, sonst gälten die Tickets dort als erledigt.`, false, 8000);
+      showToast(`Die letzte Spalte ist „erledigt" – erst „${cols[idx - 1]}" leeren, sonst gälten die Tickets dort als erledigt.`, false, 8000);
       return;
     }
     const next = cols.filter((_, i) => i !== idx);
@@ -655,7 +651,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const filtering = !!(query || quick !== 'alle' || tagFilter || boardFilter);
   const visibleItems = kanban.items.filter(matches);
   const grouped = kanban.groupBy === 'board';
-  const boardName = (bid?: string) => (bid ? boards.find((b) => b.id === bid)?.name ?? 'Board' : '— hier erstellt —');
+  const boardName = (bid?: string) => (bid ? boards.find((b) => b.id === bid)?.name ?? 'Board' : 'hier erstellt');
   const resetFilters = () => { setQuery(''); setQuick('alle'); setTagFilter(''); setBoardFilter(''); };
 
   // ---------- Einsammeln konfigurieren (Quell-Boards, board-weise räumen) ----------
@@ -729,7 +725,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     if (ids.length === 0) return;
     updateNodeData(id, archiviere(kanban, ids));
     if (detailId && ids.includes(detailId)) setDetailId(null);
-    showToast(ids.length === 1 ? '🗃 Ticket archiviert. Strg+Z holt es zurück.' : `🗃 ${ids.length} Tickets archiviert. Strg+Z holt sie zurück.`);
+    showToast(ids.length === 1 ? 'Ticket archiviert. Strg+Z holt es zurück.' : `${ids.length} Tickets archiviert. Strg+Z holt sie zurück.`);
   };
   /** Die ganze Erledigt-Spalte — bei aktivem Filter nur, was gerade zu sehen ist */
   const erledigteZumArchivieren = (filtering ? visibleItems : kanban.items).filter((it) => colOf(it) === done);
@@ -743,7 +739,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     if (ids.length === 0) return;
     updateNodeData(id, { archiv: archiv.filter((it) => !ids.includes(it.id)) });
     archivFokus();
-    showToast(`${ids.length === 1 ? 'Archiviertes Ticket' : `${ids.length} archivierte Tickets`} endgültig gelöscht — Strg+Z macht das rückgängig.`);
+    showToast(`${ids.length === 1 ? 'Archiviertes Ticket' : `${ids.length} archivierte Tickets`} endgültig gelöscht – Strg+Z macht das rückgängig.`);
   };
   /** Automatik umstellen — und sofort anwenden, damit die Wirkung zu sehen ist.
    *  Einstellung und Lauf gehen in EINEM Store-Schritt, Strg+Z nimmt also beides
@@ -754,9 +750,9 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     const erg = an ? autoArchivLauf(next) : null;
     updateNodeData(id, { autoArchiv: next.autoArchiv, autoArchivTage: tage, ...(erg?.patch ?? {}) });
     if (erg?.archiviert) {
-      showToast(`🗃 ${erg.archiviert} Ticket${erg.archiviert === 1 ? '' : 's'} älter als ${tage} Tag${tage === 1 ? '' : 'e'} archiviert.`);
+      showToast(`${erg.archiviert} Ticket${erg.archiviert === 1 ? '' : 's'} älter als ${tage} Tag${tage === 1 ? '' : 'e'} archiviert.`);
     } else if (an) {
-      showToast(`⏱ Automatik an: Erledigtes wandert nach ${tage} Tag${tage === 1 ? '' : 'en'} ins Archiv.`);
+      showToast(`Automatik an: Erledigtes wandert nach ${tage} Tag${tage === 1 ? '' : 'en'} ins Archiv.`);
     }
   };
 
@@ -826,7 +822,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           {(it.subs?.length ?? 0) > 0 && (
             <em
               className={`k-subs ${openSubs(it) === 0 ? 'done' : ''}`}
-              title={`Checkliste: ${it.subs!.filter((s) => s.done).length}/${it.subs!.length} erledigt — Ticket öffnen`}
+              title={`Checkliste: ${it.subs!.filter((s) => s.done).length}/${it.subs!.length} erledigt – Ticket öffnen`}
               onClick={() => setDetailId(it.id)}
             >☑ {it.subs!.filter((s) => s.done).length}/{it.subs!.length}</em>
           )}
@@ -835,13 +831,13 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
               className="k-blocked"
               title={`Blockiert durch: ${ticketBlockers(it, kanban).join(' · ')}`}
               onClick={() => setDetailId(it.id)}
-            >🔒</em>
+            ><ILock size={11} /></em>
           )}
           {(it.links?.length ?? 0) > 0 && (
-            <em className="k-links" title={`${it.links!.length} verknüpfte Karte(n) — Ticket öffnen`} onClick={() => setDetailId(it.id)}>🔗{it.links!.length}</em>
+            <em className="k-links" title={`${it.links!.length} verknüpfte Karte(n) – Ticket öffnen`} onClick={() => setDetailId(it.id)}><ILink size={11} />{it.links!.length}</em>
           )}
           {it.who && <em className="k-who" translate="no" title={it.who}>{it.who.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase()}</em>}
-          {it.note && <em className="k-note" title="Hat Beschreibung — Ticket öffnen" onClick={() => setDetailId(it.id)}>≡</em>}
+          {it.note && <em className="k-note" title="Hat Beschreibung – Ticket öffnen" onClick={() => setDetailId(it.id)}>≡</em>}
           {it.link && (() => {
             const state = linkState(it.link!);
             return state === 'ok' ? (
@@ -973,7 +969,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           <span
             className="abo-time-chip nodrag"
             title="Arbeitszeit heute · diese Woche aus der verbundenen Zeiterfassung"
-          >⏱ {fmtHM(timeChip.day)} · W {fmtHM(timeChip.week)}</span>
+          ><ITimer size={11} /> {fmtHM(timeChip.day)} · W {fmtHM(timeChip.week)}</span>
         )}
         <button
           className={`kanban-addcol nodrag ${filterOpen || filtering ? 'k-auto-on' : ''}`}
@@ -1050,7 +1046,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           <button className={`k-chip ${quick === 'faellig' ? 'on' : ''}`} title="Nur Tickets mit Frist" onClick={() => setQuick(quick === 'faellig' ? 'alle' : 'faellig')}>Frist</button>
           <button className={`k-chip ${quick === 'ueberfaellig' ? 'on' : ''}`} title="Nur überfällige Tickets" onClick={() => setQuick(quick === 'ueberfaellig' ? 'alle' : 'ueberfaellig')}>Überfällig</button>
           {allTags.map((tag) => (
-            <button key={tag} className={`k-chip k-tag ${tagFilter === tag ? 'on' : ''}`} translate="no" title={`Nur Tickets mit #${tag} — Tags einfach im Ticket-Text tippen`} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}>#{tag}</button>
+            <button key={tag} className={`k-chip k-tag ${tagFilter === tag ? 'on' : ''}`} translate="no" title={`Nur Tickets mit #${tag} – Tags einfach im Ticket-Text tippen`} onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}>#{tag}</button>
           ))}
           {(linkedBoards.length > 0 || boardFilter) && (
             /* M179: schon ab EINEM Quell-Board sichtbar (plus „hier erstellt")
@@ -1058,7 +1054,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                er unsichtbar fest und die Tickets verschwanden „grundlos" */
             <select className="k-filter-board" value={boardFilter} title="Nur Tickets aus einem Quell-Board (bzw. nur hier erstellte)" onChange={(e) => setBoardFilter(e.target.value)}>
               <option value="">alle Quell-Boards</option>
-              <option value="local">— hier erstellt —</option>
+              <option value="local">– hier erstellt –</option>
               {linkedBoards.map((b) => <option key={b.id} value={b.id} translate="no">{b.name}</option>)}
             </select>
           )}
@@ -1132,7 +1128,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   <button
                     className={`kanban-count nodrag ${lim && realCount >= lim ? 'wip-full' : ''}`}
                     title={colIdx < done
-                      ? `${realCount} Ticket(s)${lim ? ` · WIP-Limit ${lim}` : ''} — Klick setzt das WIP-Limit (max. Tickets in dieser Spalte)`
+                      ? `${realCount} Ticket(s)${lim ? ` · WIP-Limit ${lim}` : ''} – Klick setzt das WIP-Limit (max. Tickets in dieser Spalte)`
                       : 'Tickets in der Spalte'}
                     onClick={() => colIdx < done && setWipEdit(colIdx)}
                   >
@@ -1230,7 +1226,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   >
                     <IChevronR size={11} />
                   </button>
-                  <label title={checked ? 'Wird eingesammelt — Klick schließt dieses Board aus' : 'Ausgeschlossen — Klick sammelt wieder ein'}>
+                  <label title={checked ? 'Wird eingesammelt – Klick schließt dieses Board aus' : 'Ausgeschlossen – Klick sammelt wieder ein'}>
                     <input type="checkbox" checked={checked} onChange={() => toggleCollectBoard(b.id)} />
                     <span className="collect-name" translate="no">{b.name}</span>
                   </label>
@@ -1257,7 +1253,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                         <label
                           className="collect-sub"
                           key={s.nodeId}
-                          title={on ? 'Wird eingesammelt — Klick überspringt künftig genau diese Karte' : 'Abgewählt — Klick sammelt diese Karte wieder ein'}
+                          title={on ? 'Wird eingesammelt – Klick überspringt künftig genau diese Karte' : 'Abgewählt – Klick sammelt diese Karte wieder ein'}
                         >
                           <input type="checkbox" checked={on} disabled={!checked && !abo} onChange={() => toggleCollectNode(s.nodeId)} />
                           <span className="collect-name" translate="no">{s.label}</span>
@@ -1279,7 +1275,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           {(kanban.ignoreKeys?.length ?? 0) > 0 && (
             <button
               className="collect-reset"
-              title="Ignorier-Liste leeren — beim nächsten Einsammeln kommen sie zurück"
+              title="Ignorier-Liste leeren – beim nächsten Einsammeln kommen sie zurück"
               onClick={() => { updateNodeData(id, { ignoreKeys: undefined }); showToast('Entfernte Tickets werden wieder eingesammelt.'); }}
             >
               {kanban.ignoreKeys!.length} dauerhaft entfernte(s) Ticket(s) wieder zulassen
@@ -1320,7 +1316,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
               key={anzeigeTage}
               defaultValue={anzeigeTage}
               disabled={!kanban.autoArchiv}
-              title="Tage in der Erledigt-Spalte — Enter oder Feld verlassen übernimmt"
+              title="Tage in der Erledigt-Spalte – Enter oder Feld verlassen übernimmt"
               onBlur={(e) => {
                 const v = saubereTage(Number(e.target.value));
                 e.target.value = String(v);
@@ -1342,7 +1338,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
             <div className="collect-row k-archiv-row" key={it.id} data-archiv-id={it.id}>
               <span className="collect-name" translate="no" title={`${it.text}${it.who ? ` · ${it.who}` : ''}${it.note ? `\n${it.note}` : ''}`}>{it.text}</span>
               <em className="k-archiv-meta" title={`Erledigt am ${kurzDatum(it.erledigtAm)} · archiviert am ${kurzDatum(it.archiviertAm)}`}>
-                ✓ {kurzDatum(it.erledigtAm)} · 🗃 {kurzDatum(it.archiviertAm)}
+                ✓ {kurzDatum(it.erledigtAm)} · <IArchive size={11} /> {kurzDatum(it.archiviertAm)}
               </em>
               <button className="collect-clear k-archiv-back" title={`Zurückholen nach „${cols[done]}"`} onClick={() => holeZurueckTickets([it.id])}><IArchiveRestore size={12} /></button>
               <button className="collect-clear" title="Endgültig löschen" onClick={() => loescheArchivierte([it.id])}><IX size={10} /></button>
@@ -1384,7 +1380,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   className="ticket-title"
                   value={it.text}
                   readOnly={ausNotiz(it)}
-                  title={ausNotiz(it) ? 'Der Text kommt aus der Notiz — dort ändern (↗ am Ticket springt hin)' : undefined}
+                  title={ausNotiz(it) ? 'Der Text kommt aus der Notiz – dort ändern (↗ am Ticket springt hin)' : undefined}
                   onChange={(e) => patchTicket(it, { text: e.target.value })}
                 />
                 <button className="taskhub-x" title="Schließen (Esc)" onClick={() => setDetailId(null)}><IX size={14} /></button>
@@ -1398,8 +1394,8 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                 >
                   {cols.map((c, i) => <option key={i} value={i} translate="no">{c}</option>)}
                 </select>
-                <label title={ausNotiz(it) ? 'Die Frist steht im Text der Notiz („bis Freitag", „am 3.12.") — dort ändern' : undefined}>📅<input type="date" value={it.due ?? ''} disabled={ausNotiz(it)} onChange={(e) => patchTicket(it, { due: e.target.value || undefined })} /></label>
-                <label>👤<input type="text" placeholder="Person" value={it.who ?? ''} onChange={(e) => patchItem(it.id, { who: e.target.value || undefined })} /></label>
+                <label title={ausNotiz(it) ? 'Die Frist steht im Text der Notiz („bis Freitag", „am 3.12.") – dort ändern' : undefined}><ICalendar size={13} /><input type="date" value={it.due ?? ''} disabled={ausNotiz(it)} onChange={(e) => patchTicket(it, { due: e.target.value || undefined })} /></label>
+                <label><IPerson size={13} /><input type="text" placeholder="Person" value={it.who ?? ''} onChange={(e) => patchItem(it.id, { who: e.target.value || undefined })} /></label>
                 <span className="ticket-prio-row" role="group" aria-label="Priorität">
                   {([[1, '!!!'], [2, '!!'], [3, '!']] as const).map(([p, label]) => (
                     <button
@@ -1414,7 +1410,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   /* M293: Erledigt-Datum zeigen und von hier aus archivieren */
                   <span className="ticket-erledigt">
                     ✓ erledigt{it.erledigtAm ? ` am ${kurzDatum(it.erledigtAm)}` : ''}
-                    <button className="ticket-jump" title="Ins Archiv legen — verlässt die Spalte, bleibt in der Karte" onClick={() => archiviereTickets([it.id])}><IArchive size={11} /> Archivieren</button>
+                    <button className="ticket-jump" title="Ins Archiv legen – verlässt die Spalte, bleibt in der Karte" onClick={() => archiviereTickets([it.id])}><IArchive size={11} /> Archivieren</button>
                   </span>
                 )}
               </div>
@@ -1463,7 +1459,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
               {/* Abhängigkeiten: erst wenn alle erledigt sind, darf das Ticket weiter */}
               <div className="ticket-section">
                 <div className="ticket-section-head">
-                  🔒 Abhängig von
+                  Abhängig von
                   {blockers.length > 0 && <span className="ticket-blocked-label">blockiert</span>}
                 </div>
                 {(it.deps ?? []).map((d) => {
@@ -1486,7 +1482,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     onChange={(e) => {
                       const v = e.target.value;
                       if (!v || (it.deps ?? []).includes(v)) return;
-                      if (wouldCycle(it.id, v)) { showToast('🔁 Das würde einen Abhängigkeits-Kreis schließen.'); return; }
+                      if (wouldCycle(it.id, v)) { showToast('Das würde einen Abhängigkeits-Kreis schließen.'); return; }
                       patchItem(it.id, { deps: [...(it.deps ?? []), v] });
                     }}
                   >
@@ -1503,11 +1499,11 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
 
               {/* Verknüpfte Karten/Module aus allen Boards */}
               <div className="ticket-section">
-                <div className="ticket-section-head">🔗 Verknüpfte Karten</div>
+                <div className="ticket-section-head">Verknüpfte Karten</div>
                 {(it.links ?? []).map((l, i) => {
                   const b = boards.find((x) => x.id === l.boardId);
                   const n = b?.nodes.find((x) => x.id === l.nodeId);
-                  const label = n ? `${TYPE_ICON[n.type ?? ''] ?? '🗂️'} ${(nodeToText(n).split('\n')[0] || n.type || 'Karte').slice(0, 44)}` : '⚠ Ziel gelöscht';
+                  const label = n ? (nodeToText(n).split('\n')[0] || n.type || 'Karte').slice(0, 44) : 'Ziel gelöscht';
                   const dead = !b || !n; // M167: totes Ziel → ausgrauen, ✕ bleibt
                   return (
                     <div key={`${l.nodeId}-${i}`} className="ticket-linkrow">
@@ -1515,7 +1511,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                         className={`ticket-linkjump ${dead ? 'link-dead' : ''}`}
                         translate={dead ? undefined : 'no'}
                         disabled={dead}
-                        title={dead ? `${DEAD_TITLE[!b ? 'no-board' : 'no-node']} — ✕ entfernt die Verknüpfung` : `Öffnen (${b!.name})`}
+                        title={dead ? `${DEAD_TITLE[!b ? 'no-board' : 'no-node']} – ✕ entfernt die Verknüpfung` : `Öffnen (${b!.name})`}
                         onClick={() => followLink({ boardId: l.boardId, nodeId: l.nodeId })}
                       >
                         {label} <em>· {b?.name ?? 'gelöschtes Board'}</em>
@@ -1540,7 +1536,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     <optgroup key={b.id} label={b.name} translate="no">
                       {b.nodes.filter((n) => n.id !== id && !n.archived).slice(0, 60).map((n) => (
                         <option key={n.id} value={`${b.id}::${n.id}`}>
-                          {TYPE_ICON[n.type ?? ''] ?? '🗂️'} {(nodeToText(n).split('\n')[0] || n.type || 'Karte').slice(0, 60)}
+                          <KartenSymbol art={n.type} size={13} /> {(nodeToText(n).split('\n')[0] || n.type || 'Karte').slice(0, 60)}
                         </option>
                       ))}
                     </optgroup>
@@ -1562,7 +1558,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                       patchItem(it.id, { link: { boardId: v } });
                     }}
                   >
-                    <option value="">— kein Board —</option>
+                    <option value="">– kein Board –</option>
                     {boards.map((b) => <option key={b.id} value={b.id} translate="no">{b.name}</option>)}
                   </select>
                   {it.link && (linkState(it.link) === 'ok' ? (

@@ -26,7 +26,7 @@ import { useTippGesten } from '../lib/tippGesten';
 const DokumentFolie = lazy(() => import('./DokumentFolie').then((m) => ({ default: m.DokumentFolie })));
 const FolienStift = lazy(() => import('./FolienStift').then((m) => ({ default: m.FolienStift })));
 const FolienKommentare = lazy(() => import('./FolienKommentare').then((m) => ({ default: m.FolienKommentare })));
-import { ICheck, IComment, IEraser, IHighlighter, IPen, IUndo } from './Icons';
+import { ICheck, IComment, IEraser, IHighlighter, IPen, IUndo, IMegafon } from './Icons';
 import { BubblesBody } from './nodes/BubblesCard';
 import { WeekBody } from './nodes/WeekCard';
 import { TimeBody } from './nodes/TimeCard';
@@ -145,7 +145,7 @@ function MermaidSlide({ node }: { node: MermaidNode }) {
   return (
     <div className="slide-mermaid">
       <div className="mermaid-head">
-        <span>📊 Diagramm</span>
+        <span>Diagramm</span>
         <div className="mermaid-tools">
           <button className={edit ? 'active' : ''} title="Code bearbeiten" onClick={() => setEdit((e) => !e)}>‹/›</button>
         </div>
@@ -165,7 +165,7 @@ function MermaidSlide({ node }: { node: MermaidNode }) {
           <div className={`mermaid-svg ${error ? 'stale' : ''}`} translate="no" dangerouslySetInnerHTML={{ __html: svg }} />
           {error && (
             <div className="mermaid-error" title={error}>
-              ⚠️ {svg ? 'Code unvollständig — letztes gültiges Diagramm bleibt sichtbar' : error}
+              {svg ? 'Code unvollständig – letztes gültiges Diagramm bleibt sichtbar' : error}
             </div>
           )}
         </div>
@@ -494,9 +494,9 @@ export function Presenter() {
         {/* M371: Die Präsentation dem Team zeigen — dieselbe Folie, dieselbe Seite, bei allen */}
         {(teamDa || ichZeige) && !folge && board.geteiltRolle !== 'lesen' && (
           <button className={`presenter-team ${ichZeige ? 'an' : ''}`} data-taste="vortrag-team"
-            title={ichZeige ? 'Vorführen beenden — die anderen blättern wieder selbst' : 'Alle im Board sehen diese Präsentation und blättern mit dir'}
+            title={ichZeige ? 'Vorführen beenden – die anderen blättern wieder selbst' : 'Alle im Board sehen diese Präsentation und blättern mit dir'}
             onClick={() => { vortragAlleinSetzen(ichZeige); if (ichZeige) vorfuehrenStopp(); else vorfuehrenStart(board.id, true); }}>
-            📣 {ichZeige ? 'Team folgt' : 'Team mitnehmen'}
+            <IMegafon size={14} /> {ichZeige ? 'Team folgt' : 'Team mitnehmen'}
           </button>
         )}
         {/* M376: Das Publikum reagiert — der Vortragende sieht es aufsteigen */}

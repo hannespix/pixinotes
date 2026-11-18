@@ -160,7 +160,7 @@ console.log('════ A: rahmenlos ════');
   await P.mouse.click(png.x + png.w / 2, png.y + png.h / 2);
   await P.waitForTimeout(500);
   const m = await lage(P, 'png');
-  pruefe('B1 ein Klick markiert das Bild — mit Auswahlrahmen', m.gewaehlt && m.umriss === 'solid', `${m.gewaehlt} ${m.umriss}`);
+  pruefe('B1 ein Klick markiert das Bild – mit Auswahlrahmen', m.gewaehlt && m.umriss === 'solid', `${m.gewaehlt} ${m.umriss}`);
   pruefe('B2 jetzt sind die Größen-Griffe da', m.ziehgriffe >= 4, String(m.ziehgriffe));
   pruefe('B3 … die Lupe', m.lupe === '1', String(m.lupe));
   pruefe('B4 … und der Name, unter dem Bild', m.name?.text.includes('logo.png') && m.name.oben >= m.y + m.h, JSON.stringify(m.name));

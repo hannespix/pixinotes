@@ -17,7 +17,7 @@ import { initKopfmass } from './lib/kopfmass';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { initUebersetzung } from './lib/uebersetzung';
 import { initSprache, sprache } from './lib/sprache';
-import { startNamenAufEnglisch } from './store';
+import { alteNamenOhneEmoji, startNamenAufEnglisch } from './store';
 import { fensterFokusStarten } from './lib/fensterFokus';
 
 // OAuth-Popup-Rücksprung (Kalender-Konten): Diese Seite dient dann nur als
@@ -72,6 +72,7 @@ if (!handleOAuthRedirect()) {
       </ErrorBoundary>
     </React.StrictMode>,
   );
+  alteNamenOhneEmoji();
   void initSprache().then(() => { if (sprache() === 'en') startNamenAufEnglisch(); }).then(starten, starten);
 }
 

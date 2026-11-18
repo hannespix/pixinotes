@@ -30,7 +30,7 @@ const pruefe = (n, gut, info = '') => { if (gut) { ok += 1; console.log(`  ✓ $
 let da = sql('select 1;', '').rc === 0;
 if (!da && !PSQL) { spawnSync('service', ['postgresql', 'start'], { encoding: 'utf8' }); da = sql('select 1;', '').rc === 0; }
 if (!da) {
-  console.log('  ÜBERSPRUNGEN: kein lokales Postgres erreichbar (service postgresql start / PN_PSQL) — board_aendern wurde hier NICHT gegen eine echte Datenbank geprüft.');
+  console.log('  ÜBERSPRUNGEN: kein lokales Postgres erreichbar (service postgresql start / PN_PSQL) – board_aendern wurde hier NICHT gegen eine echte Datenbank geprüft.');
   console.log('\n0 bestanden, 0 durchgefallen (übersprungen)');
   process.exit(0);
 }
@@ -51,7 +51,7 @@ console.log('\n════ 1: Migrationen einspielen ════');
   pruefe('1c die neue Migration lässt sich ein zweites Mal einspielen (nichts doppelt, kein Fehler)', zwei.rc === 0 && !/ERROR/.test(zwei.aus), zwei.aus.slice(-300));
 }
 
-console.log('\n════ 2: board_aendern — Rechte, Rechnung, Antwort ════');
+console.log('\n════ 2: board_aendern – Rechte, Rechnung, Antwort ════');
 {
   const r = sql(readFileSync(path.join(__repo, 'pruefungen', 'sql', 'm383-board-aendern.sql'), 'utf8'));
   const zeilen = r.aus.split('\n').filter((z) => /^(OK|FEHLER) /.test(z));
@@ -68,7 +68,7 @@ console.log('\n════ 3: zwei schreiben gleichzeitig ════');
   const nach = sql(`\\pset tuples_only on\n\\pset format unaligned\nselect version || '|' || (select count(*) from json_array_elements(inhalt::json->'nodes') x where x->>'id' ~ '^(anna|bernd)\\d+$') || '|' || (select inhalt::jsonb->'boards'->>'bx' from public.konto_dateien where user_id = '${A}' and name = 'umgebung.json') from public.konto_dateien where user_id = '${A}' and name = 'board-bx.json';`).aus.trim();
   const [version, karten, stempel] = nach.split('|');
   pruefe('3a beide Verbindungen laufen ohne Fehler durch (keine Verklemmung)', r1.rc === 0 && r2.rc === 0 && !/ERROR/.test(r1.aus + r2.aus), (r1.aus + r2.aus).split('\n').filter((z) => /ERROR/.test(z)).slice(0, 3).join(' '));
-  pruefe('3b alle 120 Karten stehen im Board — keine ging im Wettlauf verloren', karten === '120', nach);
+  pruefe('3b alle 120 Karten stehen im Board – keine ging im Wettlauf verloren', karten === '120', nach);
   pruefe('3c die Versionen zählen lückenlos (120 Schritte), der Stempel der Umgebung ist der letzte', Number(version) === Number(vorher) + 120 && stempel === `v${version}`, `${vorher} → ${nach}`);
 }
 

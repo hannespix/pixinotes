@@ -308,17 +308,17 @@ export function SelectionToolbar() {
   const runAi = async (fn: (nodes: AppNode[], pos: { x: number; y: number }, fortschritt: (m: string) => void) => Promise<string>, restoreCmd?: string) => {
     setMenu(null);
     // GLOBALE Sperre teilt sich die Auswahl-Leiste mit dem Dock (Audit R6-K6)
-    if (useBoard.getState().aiBusy) { showToast('Eine KI-Aktion läuft bereits — kurz warten.'); return; }
+    if (useBoard.getState().aiBusy) { showToast('Eine KI-Aktion läuft bereits – kurz warten.'); return; }
     useBoard.getState().setAiBusy(true);
     kiAbbruchZuruecksetzen();
     setAiBusy(true);
-    showToast(`✨ KI analysiert ${selected.length} Karte(n) …`, false, 120000, true);
+    showToast(`KI analysiert ${selected.length} Karte(n) …`, false, 120000, true);
     try {
       const pos = screenToFlowPosition({ x: window.innerWidth / 2 + 160, y: window.innerHeight / 2 - 80 });
       // M332: Stapel-Aktionen melden ihren Fortschritt; der Toast bietet „Abbrechen"
-      const fortschritt = (m: string) => showToast(`✨ KI: ${m}`, false, 180000, true);
+      const fortschritt = (m: string) => showToast(`KI: ${m}`, false, 180000, true);
       const msg = await fn(selected, pos, fortschritt);
-      showToast(`✨ ${msg}`, false, msg.includes('⚠️') || msg.startsWith('Abgebrochen') ? 12000 : 5000);
+      showToast(`${msg}`, false, msg.includes('unberücksichtigt') || msg.includes('Nicht geschafft') || msg.startsWith('Abgebrochen') ? 12000 : 5000);
     } catch (e) {
       showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`, false, 8000);
       if (restoreCmd) setCmd(restoreCmd);
@@ -455,7 +455,7 @@ export function SelectionToolbar() {
                 />
                 <button onClick={addAttr} title="Hinzufügen">＋</button>
               </div>
-              <div className="sel-attr-hint">z. B. status = wartet · kunde = ACME — über Strg+K durchsuchbar</div>
+              <div className="sel-attr-hint">z. B. status = wartet · kunde = ACME – über Strg+K durchsuchbar</div>
             </>
           ))}
         </span>
@@ -479,8 +479,8 @@ export function SelectionToolbar() {
               />
               <div className="sel-attr-title">KI-Werkzeuge</div>
               {selected.some((n) => n.type === 'note') && (
-                <button disabled={aiBusy} onClick={() => runAi((n, _p, f) => aiPolish(n, f))} title="Verbesserte Fassung als neue Notiz daneben — das Original bleibt" data-taste="ki-verbessern">
-                  ✨ {selected.filter((n) => n.type === 'note').length > 1 ? `Texte verbessern (${selected.filter((n) => n.type === 'note').length})` : 'Text verbessern'}
+                <button disabled={aiBusy} onClick={() => runAi((n, _p, f) => aiPolish(n, f))} title="Verbesserte Fassung als neue Notiz daneben – das Original bleibt" data-taste="ki-verbessern">
+                  <IWand size={14} /> {selected.filter((n) => n.type === 'note').length > 1 ? `Texte verbessern (${selected.filter((n) => n.type === 'note').length})` : 'Text verbessern'}
                 </button>
               )}
               <button disabled={aiBusy} onClick={() => runAi(aiTasks)}>Aufgaben extrahieren</button>
@@ -511,7 +511,7 @@ export function SelectionToolbar() {
                       for (const [rid, w, h] of resizes) st.resizeNode(rid, w, h);
                     });
                     setMenu(null);
-                    showToast(`📏 ${ALIGN_LABEL[op].slice(2).trim()} — Strg+Z macht es rückgängig`);
+                    showToast(`${ALIGN_LABEL[op].slice(2).trim()} – Strg+Z macht es rückgängig`);
                   }}
                 >
                   {ALIGN_LABEL[op]}
@@ -604,7 +604,7 @@ export function SelectionToolbar() {
                 >
                   <IUndo size={13} /> Zurück auf Standard
                 </button>
-                <div className="sel-attr-hint">Gilt für die ganze Karte — einzelne Wörter formatierst du direkt im Text. „Sehr gut lesbar" ist die für Sehschwäche entworfene Atkinson Hyperlegible</div>
+                <div className="sel-attr-hint">Gilt für die ganze Karte – einzelne Wörter formatierst du direkt im Text. „Sehr gut lesbar" ist die für Sehschwäche entworfene Atkinson Hyperlegible</div>
               </>
             );
           })())}
@@ -646,7 +646,7 @@ export function SelectionToolbar() {
                     >
                       <IComment size={14} /> Kommentar
                     </button>
-                    <button onClick={() => setMenu('attr')} title="Eigenschaften (schlüssel = wert) — über Strg+K durchsuchbar" aria-label="Eigenschaften">
+                    <button onClick={() => setMenu('attr')} title="Eigenschaften (schlüssel = wert) – über Strg+K durchsuchbar" aria-label="Eigenschaften">
                       <ITag size={14} /> Eigenschaften …{Object.keys(attrs).length > 0 ? ` (${Object.keys(attrs).length})` : ''}
                     </button>
                   </>
@@ -686,7 +686,7 @@ export function SelectionToolbar() {
                     <button
                       data-taste="bild-rahmen"
                       aria-pressed={alleMit}
-                      title={alleMit ? 'Nur das Bild zeigen — ohne Rand, Fläche und Schatten' : 'Als Karte mit Rand, Fläche und Schatten zeigen'}
+                      title={alleMit ? 'Nur das Bild zeigen – ohne Rand, Fläche und Schatten' : 'Als Karte mit Rand, Fläche und Schatten zeigen'}
                       onClick={() => { setMenu(null); fuerAlle((n) => updateNodeData(n.id, { rahmen: alleMit ? undefined : true })); }}
                     >
                       <IImage size={14} /> {alleMit ? 'Ohne Rahmen (nur das Bild)' : 'Mit Rahmen (als Karte)'}
@@ -726,7 +726,7 @@ export function SelectionToolbar() {
                   className={allAuto ? 'on' : ''}
                   onClick={() => setAutoFit(selected.map((n) => n.id), !allAuto)}
                   title={allAuto
-                    ? 'Auto-Größe ist AN: Karte wächst mit dem Inhalt — manuelles Ziehen an den Griffen schaltet sie ab'
+                    ? 'Auto-Größe ist AN: Karte wächst mit dem Inhalt – manuelles Ziehen an den Griffen schaltet sie ab'
                     : 'Auto-Größe: Karte wächst automatisch mit dem Inhalt (jederzeit per Ziehen übersteuerbar)'}
                   aria-label="Auto-Größe"
                 >
@@ -752,7 +752,7 @@ export function SelectionToolbar() {
                 {anchoredCount > 0 && (
                   <button
                     onClick={() => { setMenu(null); detachStrokes(selected.map((n) => n.id)); }}
-                    title={`${anchoredCount} Markierung${anchoredCount > 1 ? 'en' : ''} kleben an dieser Karte und wandern mit — Klick löst sie und lässt sie frei auf dem Board liegen`}
+                    title={`${anchoredCount} Markierung${anchoredCount > 1 ? 'en' : ''} kleben an dieser Karte und wandern mit – Klick löst sie und lässt sie frei auf dem Board liegen`}
                   >
                     <IPen size={14} /> Markierungen lösen ({anchoredCount})
                   </button>
@@ -764,20 +764,20 @@ export function SelectionToolbar() {
                       setMenu(null);
                       const { fertig, fehler } = await textDateienAlsNotizen(selected);
                       showToast(fertig
-                        ? `📝 ${fertig} Textdatei${fertig > 1 ? 'en' : ''} als Notiz übernommen${fehler.length ? ` — nicht geschafft: ${fehler.join(' · ')}` : ''}`
+                        ? `${fertig} Textdatei${fertig > 1 ? 'en' : ''} als Notiz übernommen${fehler.length ? ` – nicht geschafft: ${fehler.join(' · ')}` : ''}`
                         : `Keine Textdatei ließ sich übernehmen: ${fehler.join(' · ')}`, false, fehler.length ? 9000 : 4000);
                     }}
                     data-taste="als-notiz"
-                    title="Als formatierte Notiz übernehmen — Überschriften und Listen bleiben; die Datei-Karte wird ersetzt"
+                    title="Als formatierte Notiz übernehmen – Überschriften und Listen bleiben; die Datei-Karte wird ersetzt"
                     aria-label="Als Notiz übernehmen"
                   >
-                    📝 Als Notiz übernehmen ({selected.filter(textKarte).length})
+                    Als Notiz übernehmen ({selected.filter(textKarte).length})
                   </button>
                 )}
                 {allArchived ? (
                   <button
                     onClick={() => { setMenu(null); setArchived(selected.map((n) => n.id), false); }}
-                    title="Aus dem Archiv zurückholen — die Karte gilt wieder als aktiv"
+                    title="Aus dem Archiv zurückholen – die Karte gilt wieder als aktiv"
                     aria-label="Zurückholen"
                   >
                     <IArchiveRestore size={14} /> Aus dem Archiv zurückholen
@@ -786,7 +786,7 @@ export function SelectionToolbar() {
                   <button
                     onClick={() => { setMenu(null); setArchived(selected.map((n) => n.id), true); }}
                     data-taste="archivieren"
-                    title="Archivieren — Karte gilt als erledigt, wird ausgeblendet und taucht nicht mehr in Aufgaben/Erinnerungen auf"
+                    title="Archivieren – Karte gilt als erledigt, wird ausgeblendet und taucht nicht mehr in Aufgaben/Erinnerungen auf"
                     aria-label="Archivieren"
                   >
                     <IArchive size={14} /> Archivieren (erledigt)
@@ -809,7 +809,7 @@ export function SelectionToolbar() {
           ><IMore size={15} /></button>
         </span>
       )}
-      <button onClick={remove} title={selFrames.length ? 'Löschen (Rahmen: nur der Rahmen — die Karten darin bleiben liegen)' : 'Löschen'} className="danger"><ITrash size={15} /></button>
+      <button onClick={remove} title={selFrames.length ? 'Löschen (Rahmen: nur der Rahmen – die Karten darin bleiben liegen)' : 'Löschen'} className="danger"><ITrash size={15} /></button>
     </>
   );
 

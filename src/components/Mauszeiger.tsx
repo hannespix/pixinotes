@@ -9,6 +9,7 @@ import { useBoard } from '../store';
 import { ichFuehreVor, VORFUEHR_EREIGNIS } from '../lib/vorfuehren';
 import { ZEIGER_EREIGNIS, zeigerMelden, zeigerVon, zeigerWeg, type FernZeiger } from '../lib/mauszeiger';
 
+import { IMegafon } from './Icons';
 /** Höchstens so viele Zeiger gleichzeitig — die, die sich zuletzt bewegt haben */
 const HOECHSTENS = 40;
 
@@ -63,7 +64,7 @@ export function LiveZeiger() {
         <div key={z.id} className={`live-zeiger${z.laser ? ' laser' : ''}`} data-taste="live-zeiger" data-name={z.name} data-laser={z.laser ? '' : undefined}
           style={{ '--farbe': z.farbe, transform: `translate(${z.x}px, ${z.y}px) scale(${k})`, transitionDuration: `${z.gleiten}ms` } as CSSProperties}>
           {z.laser ? <span className="laser-punkt" /> : <Pfeil />}
-          <span className="live-zeiger-name" translate="no">{z.laser ? `📣 ${z.name}` : z.name}</span>
+          <span className="live-zeiger-name" translate="no">{z.laser && <><IMegafon size={12} /> </>}{z.name}</span>
         </div>
       ))}
     </>
@@ -117,7 +118,7 @@ export function FolienLaser({ boardId, folie, an, senden }: { boardId: string; f
       {fern.map((z) => (
         <span key={z.id} className="laser-punkt fern" data-taste="laser-fern" data-name={z.name}
           style={{ left: `${z.x * 100}%`, top: `${z.y * 100}%`, transitionDuration: `${z.gleiten}ms` }}>
-          <span className="live-zeiger-name" translate="no">📣 {z.name}</span>
+          <span className="live-zeiger-name" translate="no"><IMegafon size={12} /> {z.name}</span>
         </span>
       ))}
     </div>

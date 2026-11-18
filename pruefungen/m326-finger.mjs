@@ -223,7 +223,7 @@ console.log('\n════ F: Zeichenmodus ════');
 }
 
 // ══ H: Zeichnen mit Finger/Maus: zwei Finger zoomen, Mausrad geht durch ══
-console.log('\n════ H: Ohne Stift-Gerät — zwei Finger zoomen, Mausrad zoomt ════');
+console.log('\n════ H: Ohne Stift-Gerät – zwei Finger zoomen, Mausrad zoomt ════');
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, hasTouch: true });
   await ctx.addInitScript((st) => { localStorage.setItem('pixinotes-onboarded', '1'); localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ schliff: 2, navLinks: false, stiftZeichnet: true, handschriftAuto: false, wheelZoom: true })); localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state: st })); }, stand);

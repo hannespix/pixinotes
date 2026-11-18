@@ -100,7 +100,7 @@ pruefe('B1 keine Farbpunkte', z.farben === 0, String(z.farben));
 pruefe('B2 kein Farbwähler', z.waehler === 0, String(z.waehler));
 pruefe('B3 Art (Teil / Strich) und Größe (drei Stufen, Regler) sind da', z.arten === 2 && z.groessen === 3 && z.regler === 1, JSON.stringify(z));
 pruefe('B4 kein Trennstrich, der nichts mehr abtrennt', !z.trennerVorHinweis);
-pruefe('B5 „Radierer" ohne ✨ und ohne den Formen-Tipp', z.hinweis === 'Radierer' && !z.tipp.includes('Form') && z.tipp.length > 5, JSON.stringify([z.hinweis, z.tipp]));
+pruefe('B5 „Radierer" ohne und ohne den Formen-Tipp', z.hinweis === 'Radierer' && !z.tipp.includes('Form') && z.tipp.length > 5, JSON.stringify([z.hinweis, z.tipp]));
 await P.locator('.draw-palette .draw-radierer-art').nth(1).click(); await P.waitForTimeout(200);
 const tipp2 = (await leiste(P)).tipp;
 pruefe('B6 der Tipp nennt die gewählte Radierer-Art', tipp2 !== z.tipp && tipp2.includes('Striche'), tipp2);
@@ -123,7 +123,7 @@ if (await dock.count()) {
   pruefe('D1 Radierer-Leiste ohne Farben, innerhalb der Breite', !!z && z.farben === 0 && z.waehler === 0 && z.links >= 0 && z.rechts <= z.breite, JSON.stringify(z));
   await werkzeug(T, 'Stift');
   const s = await leiste(T);
-  pruefe('D2 sie ist schmaler als die Stift-Leiste oder gleich — nie breiter', !!s && (z.rechts - z.links) <= (s.rechts - s.links), JSON.stringify([z, s]));
+  pruefe('D2 sie ist schmaler als die Stift-Leiste oder gleich – nie breiter', !!s && (z.rechts - z.links) <= (s.rechts - s.links), JSON.stringify([z, s]));
 } else {
   pruefe('D1 Zeichnen ist am Telefon erreichbar', false, 'Knopf fehlt');
 }

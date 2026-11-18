@@ -106,7 +106,7 @@ console.log('\n════ A: umschalten ════');
   pruefe('A3 Einstellungen → Darstellung: Sprache mit „Deutsch" und „English"', (await wahl.count()) === 2 && (await wahl.allTextContents()).join('|') === 'Deutsch|English' && (await P.locator('[data-taste="sprache"] button.on').textContent()) === 'Deutsch', (await wahl.allTextContents()).join('|'));
   await P.locator('[data-sprache-wahl="en"]').click();
   await P.waitForLoadState('networkidle'); await P.waitForTimeout(1500);
-  pruefe('A4 „English" lädt die Seite neu — lang="en", Wörterbuch geladen', (await lang(P)) === 'en' && abrufe.some((a) => /\/en-[^/]+\.js$/.test(a)), `${await lang(P)}`);
+  pruefe('A4 „English" lädt die Seite neu – lang="en", Wörterbuch geladen', (await lang(P)) === 'en' && abrufe.some((a) => /\/en-[^/]+\.js$/.test(a)), `${await lang(P)}`);
   const titel = await P.locator('[data-taste="einstellungen"]').getAttribute('title');
   const dock = await P.locator('.dock').evaluate((d) => [...d.querySelectorAll('button')].map((b) => b.getAttribute('aria-label') || b.getAttribute('title') || '').filter(Boolean));
   pruefe('A5 Kopfleiste und Dock sprechen Englisch (Beschriftungen und Tooltips)', titel === 'Settings' && dock.some((t) => /^More/.test(t)) && !dock.some((t) => /Mehr|Zeichnen|hinzufügen/.test(t)), JSON.stringify([titel, dock]));
@@ -216,7 +216,7 @@ pruefe('C1 eine Notiz mit dem Wort „Speichern" zeigt weiter „Speichern"', /S
 await springe('kanban');
 pruefe('C2 ein Ticket namens „Löschen" heißt weiter „Löschen"', (await knoten('kanban').locator('.kanban-item-text').allTextContents()).includes('Löschen'), (await knoten('kanban').locator('.kanban-item-text').allTextContents()).join('|'));
 const kartenNamen = await P.locator('.side-card').allTextContents();
-pruefe('C3b Karten ohne eigenen Titel heißen in der Navigation englisch (Calendar, Diagram, Project portal) — eigene Titel bleiben', kartenNamen.some((n) => /^Calendar \(month view/.test(n)) && kartenNamen.includes('Diagram') && kartenNamen.includes('Project portal') && kartenNamen.includes('Nutzer-Kanban') && !kartenNamen.some((n) => /Kalender|Diagramm/.test(n)), kartenNamen.join('|'));
+pruefe('C3b Karten ohne eigenen Titel heißen in der Navigation englisch (Calendar, Diagram, Project portal) – eigene Titel bleiben', kartenNamen.some((n) => /^Calendar \(month view/.test(n)) && kartenNamen.includes('Diagram') && kartenNamen.includes('Project portal') && kartenNamen.includes('Nutzer-Kanban') && !kartenNamen.some((n) => /Kalender|Diagramm/.test(n)), kartenNamen.join('|'));
 pruefe('C3 ein Board namens „Aufgaben" heißt in der Navigation weiter „Aufgaben"', (await P.locator('.side-board-name').allTextContents()).includes('Aufgaben'), (await P.locator('.side-board-name').allTextContents()).join('|'));
 const tk = /Nutzer-Kanban/.test(await knoten('kanban').textContent());
 await springe('week'); const tw = /Nutzer-Woche/.test(await knoten('week').textContent());
@@ -231,7 +231,7 @@ const toast = () => P.evaluate(() => document.querySelector('.toast')?.textConte
 await neuAuf();
 await P.locator('[data-taste="neu-vorlage"]').click(); await P.locator('[data-taste="vorlagen-dialog"]').waitFor({ timeout: 6000 });
 await P.locator('[data-taste="vorlage"][data-vorlage="swot"]').click(); await P.waitForTimeout(900);
-pruefe('D1 Meldung mit Namen: „Board “🧭 SWOT” created from template."', /Board “🧭 SWOT” created from template\./.test(await toast()), await toast());
+pruefe('D1 Meldung mit Namen: „Board “SWOT” created from template."', /Board “SWOT” created from template\./.test(await toast()), await toast());
 // alles auswählen (Board der Vorlage: acht Karten) und duplizieren → Mehrzahl
 await P.mouse.click(1400, 880); await P.keyboard.press('Control+a'); await P.waitForTimeout(400);
 const zahl = await P.locator('.sel-count').textContent().catch(() => '');
@@ -273,7 +273,7 @@ console.log('\n════ E: Sprachhinweis, Start, Telefon ════');
   await Q.waitForLoadState('networkidle'); await Q.waitForTimeout(1500);
   pruefe('E2 ein Klick auf „English" stellt um', (await lang(Q)) === 'en' && (await Q.locator('[data-taste="sprach-hinweis"]').count()) === 0);
   const namen = await Q.evaluate(() => { const s = JSON.parse(localStorage.getItem('pixinotes-board')).state; return [s.spaces[0].name, s.spaces[0].projects[0].name, s.boards[0].name]; });
-  pruefe('E3 der unberührte Start heißt dann englisch (Work · General · My board)', JSON.stringify(namen) === JSON.stringify(['🏢 Work', 'General', '🏠 My board']), JSON.stringify(namen));
+  pruefe('E3 der unberührte Start heißt dann englisch (Work · General · My board)', JSON.stringify(namen) === JSON.stringify(['Work', 'General', 'My board']), JSON.stringify(namen));
   pruefe('E4 das leere Board bietet Vorlagen und Beispiele englisch an', /Start with a template/.test(await Q.locator('[data-taste="leer-vorlage"]').textContent()) && /Load samples/.test(await Q.locator('[data-taste="leer-beispiele"]').textContent()));
   await Q.screenshot({ path: `${SD}/m381-e-start.png` });
   await ctx.close();
@@ -291,7 +291,7 @@ console.log('\n════ E: Sprachhinweis, Start, Telefon ════');
   await T.locator('.dock .dock-add-wrap').last().locator('button').first().tap(); await T.waitForTimeout(400);
   const menue = await T.locator('.dock-menu-more').evaluate((m) => { const r = m.getBoundingClientRect(); return { l: r.left, r: r.right, quer: m.scrollWidth - m.clientWidth }; });
   await T.screenshot({ path: `${SD}/m381-e-telefon.png` });
-  pruefe('E6 Telefon: englische Beschriftungen passen — nichts läuft quer über, das Menü liegt im Bild', q1 <= 1 && menue.l >= 0 && menue.r <= 390 && menue.quer <= 1 && T.fehler.length === 0, JSON.stringify([q1, menue]));
+  pruefe('E6 Telefon: englische Beschriftungen passen – nichts läuft quer über, das Menü liegt im Bild', q1 <= 1 && menue.l >= 0 && menue.r <= 390 && menue.quer <= 1 && T.fehler.length === 0, JSON.stringify([q1, menue]));
   await ctx.close();
 }
 

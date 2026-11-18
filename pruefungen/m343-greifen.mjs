@@ -102,7 +102,7 @@ console.log('\n════ A: herausgezoomt, Griffe in Bildschirm-Größe ═�
   const p1 = await lage(P, 'n1');
   pruefe('A4 am Griff gezogen bewegt sich die Karte um den Zeigerweg', (p1.x - p0.x) * z2 > 44 && (p1.x - p0.x) * z2 < 64 && (p1.y - p0.y) * z2 > 28 && (p1.y - p0.y) * z2 < 44, JSON.stringify({ p0, p1 }));
 
-  console.log('\n════ B: weiter Zoom — die ganze Karte ist der Griff ════');
+  console.log('\n════ B: weiter Zoom – die ganze Karte ist der Griff ════');
   await P.mouse.click(1380, 860); await P.waitForTimeout(200);
   const z3 = await zoomeAuf(P, 0.25);
   b = await karte(P, 'n2');

@@ -99,7 +99,7 @@ export function makeFile(
   return { id: uid(), type: 'file', width: CARD_WIDTHS.file, position, data: file };
 }
 
-export function makeKanban(position: Pos, title = t('📋 Neues Board')): AppNode {
+export function makeKanban(position: Pos, title = t('Neues Board')): AppNode {
   return { id: uid(), type: 'kanban', width: CARD_WIDTHS.kanban, position, data: { title, items: [] } };
 }
 
@@ -226,7 +226,7 @@ export function makeGantt(position: Pos): AppNode {
     height: 240,
     position,
     data: {
-      title: t('📅 Zeitplan'),
+      title: t('Zeitplan'),
       dayWidth: 24,
       rows: [
         { id: uid(), name: t('Phase 1'), start: iso(now), end: iso(now + 6 * day), color: '#4f7cff', progress: 30 },

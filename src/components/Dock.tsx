@@ -120,7 +120,7 @@ export function Dock() {
     }
     if (dupes.length) {
       mutedHistory(() => st.onEdgesChange(dupes.map((id) => ({ type: 'remove' as const, id }))));
-      showToast(`🧹 ${dupes.length} doppelte Verbindung(en) zusammengefasst.`);
+      showToast(`${dupes.length} doppelte Verbindung(en) zusammengefasst.`);
     }
     setArranging(true);
     const DUR = 700;
@@ -159,7 +159,7 @@ export function Dock() {
           timeline: 'Zeitstrahl nach Fristen', compact: 'kompakt gepackt', quadrant: 'Quadrant in vier Rahmen',
           grid: 'Raster nach Modultyp', circles: 'Kreis-Bündel', stack: 'Stapel je Modultyp',
         }[mode];
-        showToast(`🧹 Aufgeräumt: ${msg}.`);
+        showToast(`Aufgeräumt: ${msg}.`);
       }
     };
     requestAnimationFrame(step);
@@ -217,18 +217,18 @@ export function Dock() {
     setAiMenu(false);
     if (!aiReady(ai)) { showToast('Zuerst die KI in den Einstellungen konfigurieren (Ollama, Anthropic, OpenAI …).'); setSettingsOpen(true); return; }
     // GLOBALE Sperre: auch die Auswahl-Leiste darf währenddessen nichts starten
-    if (useBoard.getState().aiBusy) { showToast('Eine KI-Aktion läuft bereits — kurz warten.'); return; }
+    if (useBoard.getState().aiBusy) { showToast('Eine KI-Aktion läuft bereits – kurz warten.'); return; }
     useBoard.getState().setAiBusy(true);
     kiAbbruchZuruecksetzen();
     setAiBusy(label);
-    showToast('✨ KI analysiert das Board …', false, 120000, true);
+    showToast('KI analysiert das Board …', false, 120000, true);
     try {
       const st = useBoard.getState();
       const nodes = selectActiveBoard(st).nodes;
       // M332: Stapel-Aktionen melden ihren Fortschritt; der Toast bietet „Abbrechen"
-      const fortschritt = (m: string) => showToast(`✨ KI: ${m}`, false, 180000, true);
+      const fortschritt = (m: string) => showToast(`KI: ${m}`, false, 180000, true);
       const msg = await fn(nodes, screenToFlowPosition({ x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 120 }), fortschritt);
-      showToast(`✨ ${msg}`, false, msg.includes('⚠️') || msg.startsWith('Abgebrochen') ? 12000 : 5000);
+      showToast(`${msg}`, false, msg.includes('unberücksichtigt') || msg.includes('Nicht geschafft') || msg.startsWith('Abgebrochen') ? 12000 : 5000);
     } catch (e) {
       showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`, false, 8000);
       // Freitext-Eingabe bei Fehler zurückgeben — nicht neu tippen müssen
@@ -278,7 +278,7 @@ export function Dock() {
 
   // App von URL (M164): Kopie laden, wenn die Quelle es erlaubt — sonst live
   const addHtmlAppUrl = async () => {
-    const url = window.prompt('Adresse (URL) der HTML-App — z. B. ein Tool auf GitHub:');
+    const url = window.prompt('Adresse (URL) der HTML-App – z. B. ein Tool auf GitHub:');
     setAddMenu(false);
     if (!url?.trim()) return;
     await importHtmlAppFromUrl(url, centerPos(560, 440));
@@ -347,15 +347,15 @@ export function Dock() {
       }),
     },
     { id: 'protokoll', gruppe: 'Notieren & Rechnen', name: 'Protokoll-Reihe', hinweis: 'Alle Sitzungen einer Besprechung in einer Karte', suchwort: 'besprechung sitzung meeting minutes', icon: <IMinutes size={18} />, tun: () => add(() => makeMinutes(centerPos(380, 420))) },
-    { id: 'tabelle', gruppe: 'Notieren & Rechnen', name: 'Rechen-Tabelle', hinweis: 'Tabelle, die rechnet — Excel-Dateien lassen sich auch aufs Board ziehen', suchwort: 'excel csv summe zahlen', icon: <ISigma size={18} />, tun: () => add(() => makeSheet(centerPos(460, 300))) },
-    { id: 'bubbles', gruppe: 'Notieren & Rechnen', name: 'Entscheidungs-Bubbles', hinweis: 'Ideen sammeln, gruppieren und mit Punkten abstimmen — alle gleichzeitig', suchwort: 'ideen brainstorming abstimmung voting blasen workshop entscheidung punkte', icon: <IBubbles size={18} />, tun: () => add(() => makeBubbles(centerPos(560, 440))) },
+    { id: 'tabelle', gruppe: 'Notieren & Rechnen', name: 'Rechen-Tabelle', hinweis: 'Tabelle, die rechnet – Excel-Dateien lassen sich auch aufs Board ziehen', suchwort: 'excel csv summe zahlen', icon: <ISigma size={18} />, tun: () => add(() => makeSheet(centerPos(460, 300))) },
+    { id: 'bubbles', gruppe: 'Notieren & Rechnen', name: 'Entscheidungs-Bubbles', hinweis: 'Ideen sammeln, gruppieren und mit Punkten abstimmen – alle gleichzeitig', suchwort: 'ideen brainstorming abstimmung voting blasen workshop entscheidung punkte', icon: <IBubbles size={18} />, tun: () => add(() => makeBubbles(centerPos(560, 440))) },
     { id: 'kanban', gruppe: 'Planen', name: 'Kanban-Board', hinweis: 'Spalten und Karten: Offen, In Arbeit, Erledigt', suchwort: 'aufgaben todo spalten tickets', icon: <IKanban size={18} />, tun: () => add(() => makeKanban(centerPos(420, 200))) },
     { id: 'zeitplan', gruppe: 'Planen', name: 'Zeitplan', hinweis: 'Zeitplan (Gantt): Vorgänge als Balken auf der Zeitachse', suchwort: 'gantt projekt termine balken', icon: <IGantt size={18} />, tun: () => add(() => makeGantt(centerPos(560, 240))) },
     { id: 'kalender', gruppe: 'Planen', name: 'Kalender', hinweis: 'Kalender (Monat), auch mit Google- und Microsoft-Terminen', suchwort: 'monat termine', icon: <ICalendar size={18} />, tun: () => add(() => makeCalendar(centerPos(430, 340))) },
     { id: 'woche', gruppe: 'Planen', name: 'Wochenplan', hinweis: 'Stundenraster: Tage als Spalten, Uhrzeiten als Zeilen', suchwort: 'stunden woche stundenplan', icon: <IWeek size={18} />, tun: () => add(() => makeWeek(centerPos(620, 440))) },
     { id: 'zeit', gruppe: 'Planen', name: 'Zeiterfassung', hinweis: 'Arbeitszeit per Start/Stop erfassen', suchwort: 'stoppuhr timer arbeitszeit', icon: <ITimer size={18} />, tun: () => add(() => makeTime(centerPos(460, 380))) },
     { id: 'diagramm', gruppe: 'Ablauf', name: 'Diagramm', hinweis: 'Diagramm (Mermaid): Flussdiagramm, Mindmap, Sequenz …', suchwort: 'mermaid mindmap fluss sequenz chart', icon: <IDiagram size={18} />, tun: () => add(() => makeMermaid(centerPos(380, 240))) },
-    { id: 'schritt', gruppe: 'Ablauf', name: 'Schritt', hinweis: 'Prozess-Schritt (Rechteck) — verbinden per Ziehen am Rand', suchwort: 'prozess form rechteck kasten', icon: <ISquare size={18} />, tun: () => addShape('process') },
+    { id: 'schritt', gruppe: 'Ablauf', name: 'Schritt', hinweis: 'Prozess-Schritt (Rechteck) – verbinden per Ziehen am Rand', suchwort: 'prozess form rechteck kasten', icon: <ISquare size={18} />, tun: () => addShape('process') },
     { id: 'entscheidung', gruppe: 'Ablauf', name: 'Entscheidung', hinweis: 'Entscheidung (Raute): ja / nein', suchwort: 'raute ja nein verzweigung', icon: <IDiamond size={18} />, tun: () => addShape('decision') },
     { id: 'start', gruppe: 'Ablauf', name: 'Start/Ende', hinweis: 'Start oder Ende eines Ablaufs', suchwort: 'terminator anfang schluss', icon: <IPill size={18} />, tun: () => addShape('terminator') },
     { id: 'datei', gruppe: 'Einfügen', name: 'Datei oder Bild', hinweis: 'Bilder, PDFs, E-Mails, Excel, Word und mehr', suchwort: 'pdf upload anhang dokument foto', icon: <IPaperclip size={18} />, tun: () => anyFileRef.current?.click() },
@@ -363,7 +363,7 @@ export function Dock() {
     { id: 'zwischenablage', gruppe: 'Einfügen', name: 'Zwischen\u00adablage', hinweis: 'Bild aus der Zwischenablage einfügen (am PC: Strg+V)', suchwort: 'einfügen paste screenshot kopiert', icon: <ICopy size={18} />, tun: () => void ausZwischenablage() },
     { id: 'app', gruppe: 'Einfügen', name: 'Eigene App', hinweis: 'Eine HTML-Datei als lauffähige App-Karte', suchwort: 'html widget programm', icon: <IAppWindow size={18} />, tun: () => happFileRef.current?.click() },
     { id: 'appurl', gruppe: 'Einfügen', name: 'App von URL', hinweis: 'HTML-App von einer Internet-Adresse', suchwort: 'link einbetten web adresse', icon: <IAppWindow size={18} />, tun: () => void addHtmlAppUrl() },
-    { id: 'rahmen', gruppe: 'Ordnen', name: 'Rahmen', hinweis: 'Benannter Rahmen auf dem Board, nimmt seine Karten mit — nicht der Bereich in der Übersicht', suchwort: 'gruppe bereich zusammenfassen', icon: <IFrame size={18} />, tun: () => add(() => makeFrame(centerPos(640, 420))) },
+    { id: 'rahmen', gruppe: 'Ordnen', name: 'Rahmen', hinweis: 'Benannter Rahmen auf dem Board, nimmt seine Karten mit – nicht der Bereich in der Übersicht', suchwort: 'gruppe bereich zusammenfassen', icon: <IFrame size={18} />, tun: () => add(() => makeFrame(centerPos(640, 420))) },
     { id: 'portal', gruppe: 'Ordnen', name: 'Portal', hinweis: 'Portal zu einem anderen Board', suchwort: 'link verweis board sprung', icon: <IFolder size={18} />, tun: () => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board.'); } },
   ];
   const GRUPPEN = ['Notieren & Rechnen', 'Planen', 'Ablauf', 'Einfügen', 'Ordnen'];
@@ -511,7 +511,7 @@ export function Dock() {
             <button
               onClick={() => { setMoreMenu(false); window.dispatchEvent(new CustomEvent('pixinotes:freigabe-oeffnen', { detail: {} })); }}
               data-taste="dock-gemeinsam"
-              title="Andere per Link einladen — live im selben Board"
+              title="Andere per Link einladen – live im selben Board"
               aria-label="Gemeinsam bearbeiten"
             >
               <IUsers size={16} /> {alsGast ? 'Gemeinsames Board …' : 'Gemeinsam bearbeiten …'}
@@ -520,7 +520,7 @@ export function Dock() {
             <button
               onClick={() => { setMoreMenu(false); punkteModusSetzen(true); }}
               data-taste="punkte-modus"
-              title="Punkte vergeben: Karten antippen — alle im Board stimmen gleichzeitig ab, die Rangliste zeigt das Ergebnis"
+              title="Punkte vergeben: Karten antippen – alle im Board stimmen gleichzeitig ab, die Rangliste zeigt das Ergebnis"
               aria-label="Punkte vergeben"
             >
               <ICircles size={16} /> Punkte vergeben
@@ -580,9 +580,9 @@ export function Dock() {
             <button
               disabled={!!aiBusy}
               onClick={() => { setAiMenu(false); useBoard.getState().setRechercheOpen(true); }}
-              title="Recherche mit echten Quellen: Wikipedia, Wikivoyage, Wetter (Open-Meteo) — mit Rückfragen-Dialog"
+              title="Recherche mit echten Quellen: Wikipedia, Wikivoyage, Wetter (Open-Meteo) – mit Rückfragen-Dialog"
             >
-              🔎 Recherche mit Quellen …
+              Recherche mit Quellen …
             </button>
             <button disabled={!!aiBusy} onClick={() => runAi('cluster', (n) => aiCluster(n))}>Themen clustern &amp; anordnen</button>
             <button disabled={!!aiBusy} onClick={() => runAi('tasks', aiTasks)}>Aufgaben &amp; Termine extrahieren</button>
@@ -591,8 +591,8 @@ export function Dock() {
             <button disabled={!!aiBusy} onClick={() => runAi('edges', (n) => aiEdges(n))}>Verbindungen vorschlagen</button>
             <div className="dock-menu-foot">
               {aiReady(ai)
-                ? 'Nicht destruktiv: legt neue Karten an bzw. ordnet nur an — Strg+Z macht alles rückgängig.'
-                : 'KI zuerst in den Einstellungen wählen — „Gratis" geht ohne Schlüssel, Ollama = alles lokal.'}
+                ? 'Nicht destruktiv: legt neue Karten an bzw. ordnet nur an – Strg+Z macht alles rückgängig.'
+                : 'KI zuerst in den Einstellungen wählen – „Gratis" geht ohne Schlüssel, Ollama = alles lokal.'}
             </div>
           </div>
         )}
@@ -602,20 +602,20 @@ export function Dock() {
             <button onClick={() => arrange('flow')} title="Verbundene Karten als Prozess von links nach rechts, der Rest als Typ-Gruppen"><IFlowH size={15} /> Fluss horizontal</button>
             <button onClick={() => arrange('flowV')} title="Verbundene Karten als Prozess von oben nach unten, der Rest als Typ-Gruppen"><IFlowV size={15} /> Fluss vertikal</button>
             <button onClick={() => arrange('grid')} title="Alles in ein sauberes Raster, sortiert nach Modultyp"><IGridLayout size={15} /> Raster</button>
-            <button onClick={() => arrange('compact')} title="Minimale Fläche — dicht gepackt, ideal vor dem Bild-Export"><ICompact size={15} /> Kompakt packen</button>
+            <button onClick={() => arrange('compact')} title="Minimale Fläche – dicht gepackt, ideal vor dem Bild-Export"><ICompact size={15} /> Kompakt packen</button>
             <button onClick={() => arrange('lanes')} title="Eine Bahn pro Person (Eigenschaft wer/who oder Personen aus Tickets/Zeitplänen)"><ILanes size={15} /> Schwimmbahnen (Personen)</button>
             <button onClick={() => arrange('timeline')} title="Karten mit Fristen chronologisch von links nach rechts, Undatiertes darunter"><ITimelineIcon size={15} /> Zeitstrahl (Fristen)</button>
             <button onClick={() => arrange('quadrant')} title="Eisenhower: links oben wichtig+dringend · rechts oben wichtig · links unten dringend · rechts unten Rest"><IQuadrant size={15} /> Quadrant (wichtig/dringend)</button>
             <button onClick={() => arrange('circles')} title="Zusammenhängendes und Typ-Gruppen jeweils als Kreis-Bündel"><ICircles size={15} /> Kreis-Bündel</button>
-            <button onClick={() => arrange('stack')} title="Karten pro Modultyp überlappend stapeln — Überschriften bleiben sichtbar; Physik wird dafür ausgeschaltet"><IStack size={15} /> Stapeln (überlappend)</button>
+            <button onClick={() => arrange('stack')} title="Karten pro Modultyp überlappend stapeln – Überschriften bleiben sichtbar; Physik wird dafür ausgeschaltet"><IStack size={15} /> Stapeln (überlappend)</button>
             <div className="dock-menu-label">Raster</div>
             <button
               className={gridSnap ? 'active' : ''}
               onClick={() => {
                 setGridSnap(!gridSnap);
                 showToast(gridSnap
-                  ? '⊞ Gitter aus — Karten bewegen sich wieder frei.'
-                  : '⊞ Gitter an — Karten rasten beim Verschieben am Raster ein.');
+                  ? '⊞ Gitter aus – Karten bewegen sich wieder frei.'
+                  : '⊞ Gitter an – Karten rasten beim Verschieben am Raster ein.');
               }}
               title="Linien-Gitter anzeigen und Karten beim Verschieben am Raster einrasten lassen"
             >

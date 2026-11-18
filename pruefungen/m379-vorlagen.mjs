@@ -646,7 +646,7 @@ const standEins = {
   activeId: 'b1', view: 'board',
 };
 const standLeer = {
-  boards: [board('b1', '✨ Board', []), board('b2', 'Jahresplanung', [])],
+  boards: [board('b1', 'Board', []), board('b2', 'Jahresplanung', [])],
   spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['b1', 'b2'] }] }],
   activeId: 'b1', view: 'board',
 };
@@ -718,7 +718,7 @@ pruefe('A11 es trägt Notizen, Protokoll und Kanban', ['note', 'minutes', 'kanba
 pruefe('A12 das alte Board ist unberührt', st.boards.find((b) => b.id === 'b1').nodes.length === 1);
 await S1.P.waitForTimeout(600);
 let ks = await vKarten(S1.P);
-pruefe('A13 alle Karten sind zu sehen — das Board ist eingepasst', ks.length === 4 && imBild(ks), JSON.stringify(ks.map((k) => [k.art, Math.round(k.l), Math.round(k.t), Math.round(k.r), Math.round(k.b)])));
+pruefe('A13 alle Karten sind zu sehen – das Board ist eingepasst', ks.length === 4 && imBild(ks), JSON.stringify(ks.map((k) => [k.art, Math.round(k.l), Math.round(k.t), Math.round(k.r), Math.round(k.b)])));
 pruefe('A14 eine Meldung sagt, was geschah', /Besprechung/.test(await toast(S1.P)) && /Vorlage/.test(await toast(S1.P)), await toast(S1.P));
 await S1.P.screenshot({ path: `${SD}/m379-a-besprechung.png` });
 await dialogAuf(S1.P); await vWaehlen(S1.P, 'besprechung');
@@ -792,7 +792,7 @@ pruefe('C2 der Dialog spricht vom Board, vor dem man steht', /Vorlage für diese
 await vWaehlen(S2.P, 'rueckblick');
 await warteBis(S2.P, async () => (await boardVon(S2.P, 'b1')).nodes.length === 11, 4000);
 st = await stand379(S2.P);
-pruefe('C3 die Vorlage füllt dieses Board — es entsteht kein neues', st.boards.length === 2 && st.activeId === 'b1' && st.boards[0].nodes.length === 11, JSON.stringify(st.boards.map((b) => [b.id, b.name, b.nodes.length])));
+pruefe('C3 die Vorlage füllt dieses Board – es entsteht kein neues', st.boards.length === 2 && st.activeId === 'b1' && st.boards[0].nodes.length === 11, JSON.stringify(st.boards.map((b) => [b.id, b.name, b.nodes.length])));
 pruefe('C4 das unbenannte Board heißt jetzt wie die Vorlage', /Rückblick/.test(st.boards[0].name), st.boards[0].name);
 await S2.P.waitForTimeout(700);
 ks = await vKarten(S2.P);
@@ -803,7 +803,7 @@ await S2.P.screenshot({ path: `${SD}/m379-c-rueckblick.png` });
 await S2.P.mouse.click(1400, 870); await S2.P.waitForTimeout(200);
 await S2.P.keyboard.press('Control+z');
 await warteBis(S2.P, async () => (await boardVon(S2.P, 'b1')).nodes.length === 0, 4000);
-pruefe('C8 Strg+Z nimmt die Vorlage zurück — das Board ist wieder leer', (await boardVon(S2.P, 'b1')).nodes.length === 0 && (await S2.P.locator('.react-flow__node').count()) === 0, String((await boardVon(S2.P, 'b1')).nodes.length));
+pruefe('C8 Strg+Z nimmt die Vorlage zurück – das Board ist wieder leer', (await boardVon(S2.P, 'b1')).nodes.length === 0 && (await S2.P.locator('.react-flow__node').count()) === 0, String((await boardVon(S2.P, 'b1')).nodes.length));
 pruefe('C9 … und bietet die Vorlagen wieder an', (await S2.P.locator('[data-taste="leer-vorlage"]').count()) === 1);
 // benanntes Board behält seinen Namen
 await S2.P.locator('.side-board-name, .tab', { hasText: 'Jahresplanung' }).first().click();
@@ -837,7 +837,7 @@ const anleitung = await S2.P.locator('.react-flow__node-note').first().textConte
 pruefe('D3 die Notiz daneben erklärt den Ablauf in vier Schritten', /So läuft es/.test(anleitung) && /Punkte vergeben/.test(anleitung), anleitung.slice(0, 160));
 const nid = (await boardVon(S2.P, 'b1')).nodes.find((n) => n.type === 'note').id;
 await inKarte(S2.P, 'So läuft es');
-await S2.P.keyboard.press('Control+End'); await S2.P.keyboard.type(' — klappt'); await S2.P.waitForTimeout(300);
+await S2.P.keyboard.press('Control+End'); await S2.P.keyboard.type(' – klappt'); await S2.P.waitForTimeout(300);
 await heraus(S2.P);
 await warteBis(S2.P, async () => /klappt/.test(JSON.stringify((await boardVon(S2.P, 'b1')).nodes.find((n) => n.id === nid).data.blocks)), 5000);
 pruefe('D4 die Notiz der Vorlage lässt sich beschreiben', /klappt/.test(JSON.stringify((await boardVon(S2.P, 'b1')).nodes.find((n) => n.id === nid).data.blocks)));
@@ -864,12 +864,12 @@ await A.P.locator('[data-taste="leer-vorlage"]').click();
 await A.P.locator(DLG).waitFor({ timeout: 6000 }); await vWaehlen(A.P, 'entscheidung');
 await warteBis(A.P, async () => (await boardVon(A.P, 'bx')).nodes.length === 7, 4000);
 const angekommen = await warteBis(G.P, async () => ((await boardVon(G.P, 'bx'))?.nodes.length ?? 0) === 7, 15000);
-pruefe('E1 Anna setzt im geteilten Board eine Vorlage ein — beim Gast erscheinen alle sieben Karten', angekommen && (await G.P.locator('.react-flow__node').count()) === 7, String((await boardVon(G.P, 'bx'))?.nodes.length));
+pruefe('E1 Anna setzt im geteilten Board eine Vorlage ein – beim Gast erscheinen alle sieben Karten', angekommen && (await G.P.locator('.react-flow__node').count()) === 7, String((await boardVon(G.P, 'bx'))?.nodes.length));
 pruefe('E2 der Name des geteilten Boards bleibt', (await boardVon(A.P, 'bx')).name === 'Planung', (await boardVon(A.P, 'bx')).name);
 const GB = '.react-flow__node-bubbles';
 await G.P.locator(`${GB} [data-taste="bub-eingabe"]`).fill('Weg A'); await G.P.keyboard.press('Enter');
 const zurueck = await warteBis(A.P, async () => (await A.P.locator(`${GB} [data-taste="bub-blase"]`).count()) === 1, 12000);
-pruefe('E3 der Gast trägt in die Bubbles der Vorlage ein — Anna sieht es', zurueck);
+pruefe('E3 der Gast trägt in die Bubbles der Vorlage ein – Anna sieht es', zurueck);
 pruefe('E4 kein „doppelt bearbeitet", keine Skriptfehler', !/doppelt bearbeitet/.test(await toast(A.P)) && !/doppelt bearbeitet/.test(await toast(G.P)) && A.P.fehler.length === 0 && G.P.fehler.length === 0, JSON.stringify([A.P.fehler, G.P.fehler]).slice(0, 300));
 await A.ctx.close(); await G.ctx.close();
 
@@ -901,7 +901,7 @@ const quelle = readFileSync(path.join(__repo, 'src/components/HelpOverlay.tsx'),
 pruefe('F3 „Was ist neu" nennt die Vorlagen (M379), neueste zuerst', /\(M379\)/.test(quelle) && /Board aus Vorlage/.test(quelle) && quelle.indexOf('(M379)') < quelle.indexOf('(M378)'));
 const haupt = readFileSync(path.join(DIST, 'index.html'), 'utf-8');
 const hauptJs = /assets\/(index-[^"]+\.js)/.exec(haupt)?.[1];
-pruefe('F4 die Vorlagen reisen nicht mit dem Start — eigenes Paket, erst beim Öffnen geladen', !!hauptJs && !/Gut gelaufen/.test(readFileSync(path.join(DIST, 'assets', hauptJs), 'utf-8')), String(hauptJs));
+pruefe('F4 die Vorlagen reisen nicht mit dem Start – eigenes Paket, erst beim Öffnen geladen', !!hauptJs && !/Gut gelaufen/.test(readFileSync(path.join(DIST, 'assets', hauptJs), 'utf-8')), String(hauptJs));
 
 console.log(`\n  m379-vorlagen: ${ok} bestanden, ${bad} fehlgeschlagen`);
 await browser.close(); app.close();

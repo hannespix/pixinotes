@@ -154,7 +154,7 @@ console.log('\n════ F: Automatik statt Option ════');
 console.log('\n════ G: Was ist neu ════');
 {
   const js = readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.js')).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8')).join('\n');
-  pruefe('G1 „Was ist neu" nennt M314', js.includes('Etappe 3 — die Einstellungen (M314)'));
+  pruefe('G1 „Was ist neu" nennt M314', js.includes('Etappe 3 – die Einstellungen (M314)'));
 }
 
 console.log(`\n  ${ok} bestanden, ${bad} durchgefallen`);

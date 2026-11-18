@@ -226,7 +226,7 @@ export async function aiMermaid(instruction: string, currentCode: string): Promi
       ? `Ändere das folgende Mermaid-Diagramm gemäß der Anweisung.\nAktueller Code:\n\`\`\`mermaid\n${currentCode}\n\`\`\``
       : 'Erstelle ein Mermaid-Diagramm gemäß der Beschreibung. Wähle selbst den passendsten Typ (flowchart TD, sequenceDiagram, gantt, mindmap, pie, stateDiagram-v2, timeline, quadrantChart).',
     `Anweisung: ${instruction}`,
-    'Antworte AUSSCHLIESSLICH mit dem vollständigen, gültigen Mermaid-Code — ohne Erklärungen, ohne ```-Zaun. Beschriftungen auf Deutsch, kompakt und fachlich sauber.',
+    'Antworte AUSSCHLIESSLICH mit dem vollständigen, gültigen Mermaid-Code – ohne Erklärungen, ohne ```-Zaun. Beschriftungen auf Deutsch, kompakt und fachlich sauber.',
   ].join('\n\n');
   const m = await getMermaid();
   let code = stripFences(await askAi(prompt));
@@ -235,7 +235,7 @@ export async function aiMermaid(instruction: string, currentCode: string): Promi
   } catch (e) {
     const err = String((e as Error)?.message ?? e).split('\n').slice(0, 3).join(' ');
     code = stripFences(await askAi(
-      `Dieser Mermaid-Code ist fehlerhaft.\nCode:\n\`\`\`mermaid\n${code}\n\`\`\`\nFehlermeldung: ${err}\nGib den korrigierten, vollständigen Mermaid-Code zurück — NUR den Code, ohne Erklärungen.`,
+      `Dieser Mermaid-Code ist fehlerhaft.\nCode:\n\`\`\`mermaid\n${code}\n\`\`\`\nFehlermeldung: ${err}\nGib den korrigierten, vollständigen Mermaid-Code zurück – NUR den Code, ohne Erklärungen.`,
     ));
     await m.parse(code); // wirft bei erneutem Fehler → Karte zeigt die Meldung
   }

@@ -1,13 +1,13 @@
 {
-  "name": "PixiNotes — Whiteboard, Notizen & Projekte",
+  "name": "PixiNotes – Whiteboard, Notizen & Projekte",
   "short_name": "PixiNotes",
-  "description": "Lokales Whiteboard mit Notizen, Kanban, Zeitplänen, Kalender und KI — alle Daten bleiben in deinem Browser.",
+  "description": "Lokales Whiteboard mit Notizen, Kanban, Zeitplänen, Kalender und KI – alle Daten bleiben in deinem Browser.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#f3f4f6",
-  "theme_color": "#4f7cff",
+  "theme_color": "#f3f4f6",
   "lang": "de",
   "share_target": {
     "action": "./teilen-ziel",

@@ -665,7 +665,7 @@ await G.P.locator('[data-taste="gast-name"]').fill('Gerd');
 await G.P.locator('[data-taste="gast-name-ok"]').click(); await G.P.waitForTimeout(500);
 await warteBis(G.P, async () => /2 dabei/.test(await zahl(G.P)), 8000);
 await warteBis(G.P, async () => (await G.P.locator('.react-flow__node[data-id="h1"] .happ-go:not([disabled])').count()) === 1, 10000);
-pruefe('A3 beim Gast ist das Tool startbereit — der Quelltext kam über den Link (ohne Anmeldung)', (await G.P.locator('.react-flow__node[data-id="h1"] .happ-go:not([disabled])').count()) === 1 && speicherAbrufe.includes(`${uidA}/datei-h1`), speicherAbrufe.join());
+pruefe('A3 beim Gast ist das Tool startbereit – der Quelltext kam über den Link (ohne Anmeldung)', (await G.P.locator('.react-flow__node[data-id="h1"] .happ-go:not([disabled])').count()) === 1 && speicherAbrufe.includes(`${uidA}/datei-h1`), speicherAbrufe.join());
 
 // ══ B ═══════════════════════════════════════════════════════════════
 console.log('\n════ B: Tool und Webseite als Folie ════');
@@ -684,7 +684,7 @@ await A.P.locator('[data-taste="vortrag-weiter"]').click(); await A.P.waitForTim
 const fw = await rahmen(A.P, 'slide-app-frame', 'fremd');
 pruefe('B5 die Webseite ist als Folie geöffnet', !!fw && /3 \/ 3/.test(await folie(A.P)), await folie(A.P));
 pruefe('B6 solange niemand vorführt, steht kein Hinweis zur fremden Seite da', (await A.P.locator('[data-taste="folie-app-fremd"]').count()) === 0);
-pruefe('B7 Gerd bleibt auf seinem Board — ohne Vorführen folgt niemand', (await imVortrag(G.P)) === 0);
+pruefe('B7 Gerd bleibt auf seinem Board – ohne Vorführen folgt niemand', (await imVortrag(G.P)) === 0);
 await A.P.keyboard.press('Escape'); await A.P.waitForTimeout(500);
 pruefe('B8 Esc beendet die Präsentation', (await imVortrag(A.P)) === 0);
 

@@ -179,7 +179,7 @@ pruefe('D1 im Fokus öffnet die Karte auf Seite 3', imFokus && s.attr === '3', J
 await P.keyboard.press('PageDown'); await P.waitForTimeout(700);
 await P.keyboard.press('Escape'); await P.waitForTimeout(1200);
 s = await seite('f1');
-pruefe('D2 im Fokus weitergeblättert (Seite 4) — gilt nach Esc auf dem Board', s.attr === '4' && (await gemerkt()).f1 === 4, JSON.stringify({ s, g: await gemerkt() }));
+pruefe('D2 im Fokus weitergeblättert (Seite 4) – gilt nach Esc auf dem Board', s.attr === '4' && (await gemerkt()).f1 === 4, JSON.stringify({ s, g: await gemerkt() }));
 
 console.log('\n════ E: gemerkte Seite gibt es nicht ════');
 await P.evaluate(() => { const m = JSON.parse(localStorage.getItem('pixinotes-pdf-seite') ?? '{}'); m.f2 = 9; localStorage.setItem('pixinotes-pdf-seite', JSON.stringify(m)); });

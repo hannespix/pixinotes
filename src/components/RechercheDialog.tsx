@@ -69,8 +69,8 @@ export function RechercheDialog() {
     try {
       const erg = await fuehreRechercheAus(auftrag.trim(), p, a, setSchritt);
       showToast(erg.quellen
-        ? `🔎 Recherche fertig — Notiz mit ${erg.quellen} Quelle(n) liegt auf dem Board. Strg+Z entfernt sie.`
-        : '🔎 Recherche fertig — keine Quelle erreichbar, die Notiz sagt ehrlich, was offen blieb.', false, 8000);
+        ? `Recherche fertig – Notiz mit ${erg.quellen} Quelle(n) liegt auf dem Board. Strg+Z entfernt sie.`
+        : 'Recherche fertig – keine Quelle erreichbar, die Notiz sagt ehrlich, was offen blieb.', false, 8000);
       schliessen();
     } catch (e) {
       setFehler((e as Error).message);
@@ -84,12 +84,12 @@ export function RechercheDialog() {
     <div className="modal-backdrop nodrag" onClick={(e) => { if (e.target === e.currentTarget && phase !== 'laeuft') schliessen(); }}>
       <div className="modal recherche-modal" role="dialog" aria-label="Recherche mit Quellen">
         <div className="modal-head">
-          <h2>🔎 Recherche mit echten Quellen</h2>
+          <h2>Recherche mit echten Quellen</h2>
           <button className="modal-x" title="Schließen" onClick={schliessen}><IX size={16} /></button>
         </div>
         <div className="modal-body">
           {!aiReady(ai) && (
-            <div className="modal-note">Zuerst in ⚙ → Dienste einen Anbieter wählen — „Gratis" geht ohne Schlüssel.</div>
+            <div className="modal-note">Zuerst in Einstellungen → Dienste einen Anbieter wählen – „Gratis" geht ohne Schlüssel.</div>
           )}
           {phase === 'eingabe' && (
             <>
@@ -98,13 +98,13 @@ export function RechercheDialog() {
                   /* M278: Mit eigenem Anthropic-Schlüssel sucht das Modell
                      selbst im Netz — der Hinweis sagt ehrlich, welcher Weg gilt */
                   <>Die KI plant die Suche, stellt bei Bedarf <b>Rückfragen</b> und recherchiert dann
-                    <b> selbst im Netz</b> (Websuche deines Anthropic-Zugangs) — mit Quellenliste aus
+                    <b> selbst im Netz</b> (Websuche deines Anthropic-Zugangs) – mit Quellenliste aus
                     den gelesenen Seiten. Was sich nicht belegen lässt, steht ehrlich als Lücke da.
                     Ausgewählte Karten zählen als Kontext.</>
                 ) : (
                   <>Die KI plant die Suche, stellt bei Bedarf <b>Rückfragen</b>, holt dann echtes Material
                     aus <b>Wikipedia</b>, <b>Wikivoyage</b> und der <b>Open-Meteo-Wettervorhersage</b> und
-                    antwortet nur daraus — mit Quellenliste. Was die Quellen nicht hergeben (z. B.
+                    antwortet nur daraus – mit Quellenliste. Was die Quellen nicht hergeben (z. B.
                     Öffnungszeiten), steht ehrlich als Lücke da. Ausgewählte Karten zählen als Kontext.</>
                 )}
               </p>
@@ -117,7 +117,7 @@ export function RechercheDialog() {
                 onChange={(e) => setAuftrag(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void starten(); } }}
               />
-              {fehler && <div className="cal-menu-err">⚠️ {fehler}</div>}
+              {fehler && <div className="cal-menu-err">{fehler}</div>}
               <div className="modal-buttons">
                 <button disabled={!auftrag.trim() || !aiReady(ai)} onClick={() => void starten()}>Recherche starten</button>
               </div>
@@ -127,7 +127,7 @@ export function RechercheDialog() {
           {phase === 'fragen' && plan && (
             <>
               <p className="modal-hint">
-                <b>Rückfragen der KI</b> — Antworten schärfen das Ergebnis, alles ist freiwillig.
+                <b>Rückfragen der KI</b> – Antworten schärfen das Ergebnis, alles ist freiwillig.
               </p>
               {plan.fragen.map((f, i) => (
                 <label key={i} className="recherche-frage">
@@ -141,7 +141,7 @@ export function RechercheDialog() {
                   />
                 </label>
               ))}
-              {fehler && <div className="cal-menu-err">⚠️ {fehler}</div>}
+              {fehler && <div className="cal-menu-err">{fehler}</div>}
               <div className="modal-buttons">
                 <button onClick={() => void ausfuehren(plan, antworten)}>Mit diesen Antworten recherchieren</button>
                 <button onClick={() => void ausfuehren(plan, [])}>Ohne Antworten loslegen</button>

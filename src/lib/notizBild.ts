@@ -37,11 +37,11 @@ export async function notizBildHochladen(file: File, stillBeiBudget = false): Pr
   }
   const src = await imageFileToDataUrl(file);
   if (src === null) {
-    showToast('⚠️ Dieses Bildformat kann der Browser nicht lesen — als Datei-Karte aufs Board ziehen.');
+    showToast('Dieses Bildformat kann der Browser nicht lesen – als Datei-Karte aufs Board ziehen.');
     throw new Error('Format nicht lesbar');
   }
   if (!canEmbed(src.length)) {
-    if (!stillBeiBudget) showToast('⚠️ Speicher fast voll — Bild nicht eingebettet. Exportiere in den Datenordner (⚙️).');
+    if (!stillBeiBudget) showToast('Speicher fast voll – Bild nicht eingebettet. Exportiere in den Datenordner (Einstellungen).');
     throw new Error('Speicherbudget');
   }
   return src;

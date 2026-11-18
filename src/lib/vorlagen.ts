@@ -59,7 +59,7 @@ export interface Vorlage {
 export const VORLAGEN: Vorlage[] = [
   {
     id: 'besprechung',
-    name: '🗓️ Besprechung',
+    name: 'Besprechung',
     text: 'Tagesordnung, Protokoll und die Aufgaben, die daraus entstehen.',
     bauen: () => ({
       nodes: [
@@ -73,8 +73,8 @@ export const VORLAGEN: Vorlage[] = [
   },
   {
     id: 'rueckblick',
-    name: '🔁 Rückblick',
-    text: 'Retro im Team: Was lief gut, was hakte, was probieren wir aus — mit Abstimmung.',
+    name: 'Rückblick',
+    text: 'Retro im Team: Was lief gut, was hakte, was probieren wir aus – mit Abstimmung.',
     bauen: () => {
       const spalte = (x: number, name: string, ton: string, farbe: StickyColor): AppNode[] => [
         rahmen({ x, y: 0 }, 340, 420, name, ton),
@@ -83,9 +83,9 @@ export const VORLAGEN: Vorlage[] = [
       ];
       return {
         nodes: [
-          ...spalte(0, '😀 Gut gelaufen', GRUEN, 'mint'),
-          ...spalte(370, '😕 Hat gehakt', ROSE, 'pink'),
-          ...spalte(740, '💡 Probieren wir aus', BLAU, 'sky'),
+          ...spalte(0, 'Gut gelaufen', GRUEN, 'mint'),
+          ...spalte(370, 'Hat gehakt', ROSE, 'pink'),
+          ...spalte(740, 'Probieren wir aus', BLAU, 'sky'),
           bubbles({ x: 0, y: 460 }, 'Maßnahmen', 'Was nehmen wir uns bis zum nächsten Mal vor?', 620, 440),
           kanban({ x: 650, y: 460 }, 'Das setzen wir um'),
         ],
@@ -95,12 +95,12 @@ export const VORLAGEN: Vorlage[] = [
   },
   {
     id: 'projektplan',
-    name: '🚀 Projektplan',
+    name: 'Projektplan',
     text: 'Ziel und Umfang, Zeitplan mit Meilenstein, Aufgaben, Beteiligte und Risiken.',
     bauen: () => ({
       nodes: [
         notiz({ x: 0, y: 0 }, 'yellow', [h('Ziel'), p(), h('Gehört dazu'), li(), h('Gehört nicht dazu'), li()], 290),
-        zeitplan({ x: 330, y: 0 }, '📅 Zeitplan', [
+        zeitplan({ x: 330, y: 0 }, 'Zeitplan', [
           ['Vorbereitung', 0, 4, '#4f7cff'],
           ['Umsetzung', 5, 15, '#3fa564'],
           ['Abschluss', 16, 20, '#8a63d2'],
@@ -115,7 +115,7 @@ export const VORLAGEN: Vorlage[] = [
   },
   {
     id: 'brainstorming',
-    name: '🫧 Brainstorming',
+    name: 'Brainstorming',
     text: 'Ideen als Blasen sammeln, gruppieren und mit Punkten abstimmen.',
     bauen: () => ({
       nodes: [
@@ -123,18 +123,18 @@ export const VORLAGEN: Vorlage[] = [
         notiz({ x: 760, y: 0 }, 'yellow', [
           h('So läuft es'),
           nr('Frage oben in der Karte eintragen'),
-          nr('Alle sammeln Ideen — eine je Blase'),
+          nr('Alle sammeln Ideen – eine je Blase'),
           nr('Ähnliches aufeinander ziehen: Gruppen'),
           nr('Punkte vergeben, Ergebnis ansehen'),
         ], 300),
-        rahmen({ x: 760, y: 250 }, 340, 270, '🅿️ Parkplatz', SAND),
+        rahmen({ x: 760, y: 250 }, 340, 270, 'Parkplatz', SAND),
       ],
       edges: [],
     }),
   },
   {
     id: 'aufgaben',
-    name: '✅ Aufgaben-Board',
+    name: 'Aufgaben-Board',
     text: 'Ein großes Kanban mit vier Spalten und einer Notiz für das Wichtigste.',
     bauen: () => ({
       nodes: [
@@ -146,7 +146,7 @@ export const VORLAGEN: Vorlage[] = [
   },
   {
     id: 'woche',
-    name: '📆 Wochenplanung',
+    name: 'Wochenplanung',
     text: 'Wochenplan, die drei wichtigsten Dinge und offene Punkte.',
     bauen: () => ({
       nodes: [
@@ -159,14 +159,14 @@ export const VORLAGEN: Vorlage[] = [
   },
   {
     id: 'entscheidung',
-    name: '⚖️ Entscheidung',
+    name: 'Entscheidung',
     text: 'Frage, Gründe dafür und dagegen, Optionen zur Abstimmung, Ergebnis.',
     bauen: () => ({
       nodes: [
         notiz({ x: 0, y: 0 }, 'yellow', [h('Worüber entscheiden wir?'), p(), h('Bis wann?'), p()], 290),
-        rahmen({ x: 330, y: 0 }, 340, 360, '👍 Dafür', GRUEN),
+        rahmen({ x: 330, y: 0 }, 340, 360, 'Dafür', GRUEN),
         notiz({ x: 360, y: 64 }, 'mint', [p()], 280),
-        rahmen({ x: 700, y: 0 }, 340, 360, '👎 Dagegen', ROSE),
+        rahmen({ x: 700, y: 0 }, 340, 360, 'Dagegen', ROSE),
         notiz({ x: 730, y: 64 }, 'pink', [p()], 280),
         bubbles({ x: 0, y: 400 }, 'Optionen', 'Welchen Weg gehen wir?', 620, 440),
         notiz({ x: 660, y: 400 }, 'sky', [h('So machen wir es'), p(), h('Begründung'), p()], 320),
@@ -176,7 +176,7 @@ export const VORLAGEN: Vorlage[] = [
   },
   {
     id: 'swot',
-    name: '🧭 SWOT',
+    name: 'SWOT',
     text: 'Stärken, Schwächen, Chancen und Risiken in vier Feldern.',
     bauen: () => {
       const feld = (x: number, y: number, name: string, ton: string, farbe: StickyColor): AppNode[] => [
@@ -185,10 +185,10 @@ export const VORLAGEN: Vorlage[] = [
       ];
       return {
         nodes: [
-          ...feld(0, 0, '💪 Stärken', GRUEN, 'mint'),
-          ...feld(430, 0, '🩹 Schwächen', ROSE, 'pink'),
-          ...feld(0, 330, '🌱 Chancen', BLAU, 'sky'),
-          ...feld(430, 330, '⚠️ Risiken', SAND, 'yellow'),
+          ...feld(0, 0, 'Stärken', GRUEN, 'mint'),
+          ...feld(430, 0, 'Schwächen', ROSE, 'pink'),
+          ...feld(0, 330, 'Chancen', BLAU, 'sky'),
+          ...feld(430, 330, 'Risiken', SAND, 'yellow'),
         ],
         edges: [],
       };
@@ -196,8 +196,8 @@ export const VORLAGEN: Vorlage[] = [
   },
   {
     id: 'workshop',
-    name: '🎪 Workshop',
-    text: 'Für große Runden: Ankommen, Arbeiten, Ergebnis — mit Erwartungen, Ideen und Verabredungen.',
+    name: 'Workshop',
+    text: 'Für große Runden: Ankommen, Arbeiten, Ergebnis – mit Erwartungen, Ideen und Verabredungen.',
     bauen: () => ({
       nodes: [
         notiz({ x: 0, y: 0 }, 'yellow', [h('Ablauf'), nr('Ankommen'), nr('Arbeiten'), nr('Ergebnis sichern'), h('Spielregeln'), li()], 280),

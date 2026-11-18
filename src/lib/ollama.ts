@@ -103,8 +103,8 @@ export function erlaubnisHilfe(): { herkunft: string; befehle: string[]; hinweis
     ? '*' : window.location.origin;
   const wert = `OLLAMA_ORIGINS=${herkunft}`;
   const hinweis = herkunft === '*'
-    ? 'Die Seite wurde als lokale Datei geöffnet — sie hat dann keine benennbare Herkunft, deshalb hier „*".'
-    : 'So darf genau diese Seite an Ollama — keine andere.';
+    ? 'Die Seite wurde als lokale Datei geöffnet – sie hat dann keine benennbare Herkunft, deshalb hier „*".'
+    : 'So darf genau diese Seite an Ollama – keine andere.';
   switch (system()) {
     case 'linux':
       return { herkunft, hinweis, befehle: [
@@ -213,21 +213,21 @@ export interface Vorschlag {
  * ollama.com/library funktioniert genauso: Namen eintippen, fertig.
  */
 export const VORSCHLAEGE: Vorschlag[] = [
-  { name: 'gemma3:12b', platz: '~8 GB', zweck: 'Googles Mittelklasse, sehr gutes Deutsch — versteht auch Bilder' },
+  { name: 'gemma3:12b', platz: '~8 GB', zweck: 'Googles Mittelklasse, sehr gutes Deutsch – versteht auch Bilder' },
   { name: 'gemma3:4b', platz: '~3 GB', zweck: 'dieselbe Familie für schwächere Rechner und Notebooks' },
-  { name: 'gemma3:27b', platz: '~17 GB', zweck: 'die große Fassung — braucht eine kräftige Grafikkarte' },
+  { name: 'gemma3:27b', platz: '~17 GB', zweck: 'die große Fassung – braucht eine kräftige Grafikkarte' },
   { name: 'qwen3:14b', platz: '~9 GB', zweck: 'stark bei Struktur und Aufzählungen, denkt vor dem Antworten' },
   { name: 'qwen3:8b', platz: '~5 GB', zweck: 'flott und genügsam, guter Allrounder' },
   { name: 'llama3.1:8b', platz: '~5 GB', zweck: 'der bewährte Klassiker von Meta' },
-  { name: 'llama3.2:3b', platz: '~2 GB', zweck: 'sehr klein — läuft zur Not auch ohne Grafikkarte' },
+  { name: 'llama3.2:3b', platz: '~2 GB', zweck: 'sehr klein – läuft zur Not auch ohne Grafikkarte' },
   { name: 'mistral-small', platz: '~14 GB', zweck: 'europäisches Modell, kräftig im Deutschen' },
   { name: 'phi4', platz: '~9 GB', zweck: 'Microsofts kompaktes Modell, stark im Schlussfolgern' },
-  { name: 'deepseek-r1:14b', platz: '~9 GB', zweck: 'Denkmodell — langsamer, dafür sorgfältiger' },
+  { name: 'deepseek-r1:14b', platz: '~9 GB', zweck: 'Denkmodell – langsamer, dafür sorgfältiger' },
 ];
 
 /** Einbettungs-Modelle fürs Gehirn (M204) */
 export const EINBETTUNGS_VORSCHLAEGE: Vorschlag[] = [
-  { name: 'nomic-embed-text', platz: '~280 MB', zweck: 'bewährt, klein, mehrsprachig — die Voreinstellung' },
+  { name: 'nomic-embed-text', platz: '~280 MB', zweck: 'bewährt, klein, mehrsprachig – die Voreinstellung' },
   { name: 'mxbai-embed-large', platz: '~670 MB', zweck: 'genauer, dafür größer und langsamer' },
   { name: 'bge-m3', platz: '~1,2 GB', zweck: 'ausdrücklich mehrsprachig, gut für deutsche Texte' },
   { name: 'all-minilm', platz: '~45 MB', zweck: 'winzig und schnell, dafür grober' },

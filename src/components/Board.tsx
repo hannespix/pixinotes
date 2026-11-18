@@ -709,7 +709,7 @@ export function Board() {
     // fliegt die Suche ins Leere
     if (node.archived && !useBoard.getState().showArchived) {
       useBoard.getState().setShowArchived(true);
-      useBoard.getState().showToast('🗃 Der Treffer liegt im Archiv — archivierte Karten sind jetzt eingeblendet.');
+      useBoard.getState().showToast('Der Treffer liegt im Archiv – archivierte Karten sind jetzt eingeblendet.');
     }
     const t = setTimeout(() => {
       const w = node.measured?.width ?? 280;
@@ -1404,7 +1404,7 @@ export function Board() {
        */
       const p = screenToFlowPosition({ x: clientX, y: clientY });
       addNote({ x: p.x - 130, y: p.y - 30 });
-      showToast('Notiz erstellt — lostippen! „/" öffnet das Block-Menü ✍️');
+      showToast('Notiz erstellt – lostippen! „/" öffnet das Block-Menü');
     },
     [addNote, screenToFlowPosition, showToast],
   );
@@ -1451,7 +1451,7 @@ export function Board() {
         const text = e.dataTransfer.getData('text/plain');
         if (text) {
           addNode(makeNote(basePos, { blocks: [{ type: 'paragraph', content: text }] }));
-          showToast('Text als Notiz abgelegt 📝');
+          showToast('Text als Notiz abgelegt');
         }
         return;
       }
@@ -1495,7 +1495,7 @@ export function Board() {
         e.preventDefault();
         const pos = screenToFlowPosition({ x: window.innerWidth / 2 - 135, y: window.innerHeight / 2 - 60 });
         addNode(makeNote(pos, { blocks: textZuBloecken(text) }));
-        showToast('📝 Notiz aus der Zwischenablage');
+        showToast('Notiz aus der Zwischenablage');
         return;
       }
       e.preventDefault();
@@ -1520,10 +1520,10 @@ export function Board() {
           placed++;
         } catch (err) {
           console.error('Einfügen fehlgeschlagen:', err);
-          showToast('⚠️ Bild aus der Zwischenablage konnte nicht gelesen werden');
+          showToast('Bild aus der Zwischenablage konnte nicht gelesen werden');
         }
       }
-      if (placed > 0) showToast(placed === 1 ? '🖼️ Screenshot eingefügt' : `🖼️ ${placed} Bilder eingefügt`);
+      if (placed > 0) showToast(placed === 1 ? 'Screenshot eingefügt' : `${placed} Bilder eingefügt`);
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
@@ -1542,20 +1542,32 @@ export function Board() {
       <EdgeMarkerDefs />
       {nodes.length === 0 && !nurLesen && (
         <div className="empty-board-hint">
-          <div>📝 Doppelklick (oder N) = neue Notiz</div>
-          <div>📧 E-Mails (.eml/.msg) &amp; Dateien hierher ziehen</div>
-          <div>🖼️ Strg+V fügt Screenshots ein</div>
-          {/* M379: Statt bei null anzufangen — Karten für einen bekannten Anlass hinlegen lassen */}
-          <button className="empty-beispiele" data-taste="leer-vorlage"
-            onClick={() => window.dispatchEvent(new CustomEvent('pixinotes:vorlagen', { detail: { inBoard: activeId } }))}>
-            🧩 Mit Vorlage beginnen <small>Besprechung, Rückblick, Projektplan, Brainstorming …</small>
-          </button>
-          {/* M370: Der Start ist leer — wer sehen will, was geht, holt sich die Beispiele mit einem Klick */}
-          {nurStart && (
-            <button className="empty-beispiele" onClick={() => useBoard.getState().addStarter()} data-taste="leer-beispiele">
-              ✨ Beispiele laden <small>fertige Boards zum Ausprobieren — alle Module im Einsatz</small>
-            </button>
-          )}
+          {/* M397: ein ruhiger Block statt gestrichelter Kästchen – und am Finger
+              stehen keine Maus- und Tastatur-Wege */}
+          <div className="leer-block">
+            <p className="leer-titel">Dieses Board ist leer</p>
+            <dl className="leer-wege leer-maus">
+              <dt>Doppelklick</dt><dd>Neue Notiz (auch Taste N)</dd>
+              <dt>Strg+V</dt><dd>Bild oder Text einfügen</dd>
+              <dt>Hineinziehen</dt><dd>Dateien, Bilder, E-Mails</dd>
+            </dl>
+            <p className="leer-wege leer-finger">Doppeltipp legt eine Notiz an. Alles andere liegt unten im Plus.</p>
+            <div className="leer-knoepfe">
+              {/* M379: Statt bei null anzufangen — Karten für einen bekannten Anlass hinlegen lassen */}
+              <button className="empty-beispiele" data-taste="leer-vorlage"
+                title="Besprechung, Rückblick, Projektplan, Brainstorming …"
+                onClick={() => window.dispatchEvent(new CustomEvent('pixinotes:vorlagen', { detail: { inBoard: activeId } }))}>
+                Mit Vorlage beginnen
+              </button>
+              {/* M370: Der Start ist leer — wer sehen will, was geht, holt sich die Beispiele mit einem Klick */}
+              {nurStart && (
+                <button className="empty-beispiele still" onClick={() => useBoard.getState().addStarter()} data-taste="leer-beispiele"
+                  title="Fertige Boards zum Ausprobieren – alle Module im Einsatz">
+                  Beispiele laden
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
       <ReactFlow

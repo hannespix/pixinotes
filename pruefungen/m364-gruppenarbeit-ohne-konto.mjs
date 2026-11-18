@@ -485,11 +485,11 @@ await warteBis(A.P, async () => /nur du/.test(await zahl(A.P)), 6000);
 pruefe('A5 oben rechts: „nur du"', /nur du/.test(await zahl(A.P)), await zahl(A.P));
 
 // ══ B ═══════════════════════════════════════════════════════════════
-console.log('\n════ B: Gerd öffnet den Link — ohne Konto ════');
+console.log('\n════ B: Gerd öffnet den Link – ohne Konto ════');
 const G = await geraet('G', standB, `#e=${token}`);
 await warteBis(G.P, async () => !!(await boardVon(G.P, 'bx')), 12000);
 const bxG = await boardVon(G.P, 'bx');
-pruefe('B1 „Planung" ist da — als Board per Link (Token gemerkt), ohne Konto', bxG?.gastLink === token && bxG?.geteiltVon === uidA && !bxG?.geteiltRolle && (await G.P.evaluate(() => !localStorage.getItem('pixinotes-konto'))), JSON.stringify({ l: bxG?.gastLink, v: bxG?.geteiltVon }));
+pruefe('B1 „Planung" ist da – als Board per Link (Token gemerkt), ohne Konto', bxG?.gastLink === token && bxG?.geteiltVon === uidA && !bxG?.geteiltRolle && (await G.P.evaluate(() => !localStorage.getItem('pixinotes-konto'))), JSON.stringify({ l: bxG?.gastLink, v: bxG?.geteiltVon }));
 pruefe('B2 keine Anmeldung verlangt (Einstellungen bleiben zu), das Board ist offen', (await G.P.locator('.modal-tabs').count()) === 0 && (await zustand(G.P)).activeId === 'bx' && /Planung Notiz/.test(await texteVon(G.P)));
 pruefe('B3 es fragt nach dem Namen', (await G.P.locator('[data-taste="gast-name"]').count()) === 1);
 await G.P.screenshot({ path: path.join(SD, 'm364-name.png') });
@@ -503,7 +503,7 @@ pruefe('B6 das Board steht bei Gerd unter „Geteilt mit mir"', (await zustand(G
 await G.P.screenshot({ path: path.join(SD, 'm364-gast.png') });
 
 // ══ C ═══════════════════════════════════════════════════════════════
-console.log('\n════ C: Beide schreiben — es kommt jeweils drüben an ════');
+console.log('\n════ C: Beide schreiben – es kommt jeweils drüben an ════');
 await G.P.evaluate(() => { document.querySelector('.react-flow').__marke = 'bleibt'; });
 pruefe('C1 Gerd legt eine Karte an', await notizPlatz(G.P, 'Von Gerd'));
 await warteBis(G.P, () => /Von Gerd/.test(bxServer()), 10000);
@@ -520,13 +520,13 @@ await G.P.waitForTimeout(1200);
 pruefe('C8 beide Stände tragen die drei Karten, nichts doppelt', (await boardVon(G.P, 'bx')).nodes.length === 3 && (await boardVon(A.P, 'bx')).nodes.length === 3, `${(await boardVon(G.P, 'bx')).nodes.length}/${(await boardVon(A.P, 'bx')).nodes.length}`);
 
 // ══ D ═══════════════════════════════════════════════════════════════
-console.log('\n════ D: Karten-Sperre — wer zuerst anfasst, hat die Karte ════');
+console.log('\n════ D: Karten-Sperre – wer zuerst anfasst, hat die Karte ════');
 await A.P.waitForTimeout(2600); await G.P.waitForTimeout(500);
 const gastSchreibenVor = sb.aufrufe.gastSchreiben;
 const serverVorD = bxServer();
 await inKarte(A.P, 'Planung Notiz');
 await warteBis(G.P, async () => (await sperre(G.P, 'x1').count()) === 1, 6000);
-pruefe('D1 Gerd sieht den Rahmen um Annas Karte — mit ihrem Namen', (await sperre(G.P, 'x1').count()) === 1 && /anna/i.test(await sperre(G.P, 'x1').textContent().catch(() => '')), await sperre(G.P, 'x1').textContent().catch(() => '-'));
+pruefe('D1 Gerd sieht den Rahmen um Annas Karte – mit ihrem Namen', (await sperre(G.P, 'x1').count()) === 1 && /anna/i.test(await sperre(G.P, 'x1').textContent().catch(() => '')), await sperre(G.P, 'x1').textContent().catch(() => '-'));
 pruefe('D2 Anna selbst sieht um ihre Karte keinen Sperr-Rahmen', (await sperre(A.P, 'x1').count()) === 0);
 // Anna tippt langsam — Gerd liest mit, bevor irgendetwas gespeichert ist
 await A.P.keyboard.press('End');
@@ -590,7 +590,7 @@ await warteBis(A.P, async () => /GGG-PARALLEL/.test(JSON.stringify(await boardVo
 pruefe('D18 beides liegt auf dem Server und in beiden Ständen', /AAA-PARALLEL/.test(bxServer()) && /GGG-PARALLEL/.test(bxServer()) && /GGG-PARALLEL/.test(JSON.stringify(await boardVon(A.P, 'bx'))) && /AAA-PARALLEL/.test(JSON.stringify(await boardVon(G.P, 'bx'))));
 
 // ══ E ═══════════════════════════════════════════════════════════════
-console.log('\n════ E: Der Kanal ist nur Anzeige — nichts Gefälschtes wird gespeichert ════');
+console.log('\n════ E: Der Kanal ist nur Anzeige – nichts Gefälschtes wird gespeichert ════');
 await A.P.waitForTimeout(2600);
 {
   const x1 = JSON.parse(bxServer()).nodes.find((n) => n.id === 'x1');
@@ -604,7 +604,7 @@ await A.P.waitForTimeout(2600);
   await G.P.waitForTimeout(400);
   fakeSenden(topic, 'karte', { von: 'boese', node: falsch });
   await warteBis(G.P, async () => /GEFAELSCHT/.test(await texteVon(G.P)), 4000);
-  pruefe('E2 ein (gefälschter) Halter wird angezeigt — Rahmen und Text', (await sperre(G.P, 'x1').count()) === 1 && /Mallory/.test(await sperre(G.P, 'x1').textContent().catch(() => '')) && /GEFAELSCHT/.test(await texteVon(G.P)));
+  pruefe('E2 ein (gefälschter) Halter wird angezeigt – Rahmen und Text', (await sperre(G.P, 'x1').count()) === 1 && /Mallory/.test(await sperre(G.P, 'x1').textContent().catch(() => '')) && /GEFAELSCHT/.test(await texteVon(G.P)));
   // Gerd und Anna ändern etwas anderes → ihr Schreiben trägt das Gefälschte nicht
   pruefe('E3 Gerd legt währenddessen eine Karte an', await notizPlatz(G.P, 'Gerd zwei'));
   await warteBis(G.P, () => /Gerd zwei/.test(bxServer()), 12000);
@@ -622,7 +622,7 @@ await A.P.waitForTimeout(2600);
 }
 
 // ══ F ═══════════════════════════════════════════════════════════════
-console.log('\n════ F: Rolle des Links — nur lesen und zurück ════');
+console.log('\n════ F: Rolle des Links – nur lesen und zurück ════');
 await dialogOeffnen(A.P, 'Planung');
 await A.P.locator('[data-taste="einladung-rolle"]').selectOption('lesen');
 await warteBis(A.P, () => sb.einladungen[0]?.rolle === 'lesen', 6000);
@@ -648,7 +648,7 @@ await warteBis(G.P, async () => (await band(G.P)) === 0, 12000);
 pruefe('F6 zurück auf „bearbeiten": Das Band verschwindet', (await band(G.P)) === 0 && !(await boardVon(G.P, 'bx')).geteiltRolle);
 
 // ══ G ═══════════════════════════════════════════════════════════════
-console.log('\n════ G: Neu laden — Gerd bleibt dabei ════');
+console.log('\n════ G: Neu laden – Gerd bleibt dabei ════');
 await G.P.reload({ waitUntil: 'networkidle' }); await G.P.waitForTimeout(1500);
 await warteBis(G.P, async () => /2 dabei/.test(await zahl(G.P)), 10000);
 pruefe('G1 nach dem Neuladen wieder „2 dabei", mit Namen „Gerd"', /2 dabei/.test(await zahl(G.P)) && (await chipNamen(A.P)).includes('Gerd'), await zahl(G.P));
@@ -662,7 +662,7 @@ await G.P.screenshot({ path: path.join(SD, 'm364-gast-dialog.png') });
 await schliessen(G.P);
 
 // ══ H ═══════════════════════════════════════════════════════════════
-console.log('\n════ H: „Auch ohne Konto" aus — und wieder an ════');
+console.log('\n════ H: „Auch ohne Konto" aus – und wieder an ════');
 await dialogOeffnen(A.P, 'Planung');
 await A.P.locator('[data-taste="einladung-ohne-konto"]').click();   // der Haken folgt der Antwort des Servers
 await warteBis(A.P, () => sb.einladungen[0]?.ohne_konto === false, 6000);
@@ -685,7 +685,7 @@ await warteBis(G.P, async () => (await boardVon(G.P, 'bx'))?.gastLink === token,
 {
   const st = await zustand(G.P);
   const kopie = st.boards.find((b) => /Planung \(Kopie\)/.test(b.name));
-  pruefe('H5 Link erneut geöffnet: wieder dabei — die Kopie von eben steht daneben', st.boards.find((b) => b.id === 'bx')?.gastLink === token && !!kopie && /Nur bei Gerd/.test(JSON.stringify(kopie)) && !/Nur bei Gerd/.test(JSON.stringify(st.boards.find((b) => b.id === 'bx'))), st.boards.map((b) => b.name).join(','));
+  pruefe('H5 Link erneut geöffnet: wieder dabei – die Kopie von eben steht daneben', st.boards.find((b) => b.id === 'bx')?.gastLink === token && !!kopie && /Nur bei Gerd/.test(JSON.stringify(kopie)) && !/Nur bei Gerd/.test(JSON.stringify(st.boards.find((b) => b.id === 'bx'))), st.boards.map((b) => b.name).join(','));
   pruefe('H6 kein zweites Mal nach dem Namen gefragt', (await G.P.locator('[data-taste="gast-name"]').count()) === 0);
 }
 
@@ -726,7 +726,7 @@ sb.ohneGast = false;
 await J.ctx.close();
 
 // ══ K ═══════════════════════════════════════════════════════════════
-console.log('\n════ K: Live-Kanal tot — der Abgleich läuft trotzdem ════');
+console.log('\n════ K: Live-Kanal tot – der Abgleich läuft trotzdem ════');
 sb.ohneLive = true;
 const K = await geraet('K', standB, `#e=${token}`);
 await warteBis(K.P, async () => !!(await boardVon(K.P, 'bx')), 12000);

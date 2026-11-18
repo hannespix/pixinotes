@@ -418,12 +418,12 @@ console.log('\n════ E: Abgelaufenes Token wird still erneuert ═══�
   const angelegt = await notiz(B.P, 'Nach Ablauf', 700, 650);
   const geschrieben = await warteBis(B.P, () => zeileText(uidA, 'board-bx.json').includes('Nach Ablauf'), 10000);
   const sB = await sitzung(B.P);
-  pruefe('E1 Schreiben nach Ablauf gelingt — einmal refresh_token, neue Sitzung gespeichert', angelegt && geschrieben && sb.aufrufe.refresh === vorher + 1 && sB.tokenExp > Date.now(), `refresh ${sb.aufrufe.refresh - vorher}`);
+  pruefe('E1 Schreiben nach Ablauf gelingt – einmal refresh_token, neue Sitzung gespeichert', angelegt && geschrieben && sb.aufrufe.refresh === vorher + 1 && sB.tokenExp > Date.now(), `refresh ${sb.aufrufe.refresh - vorher}`);
   pruefe('E2 Wolke steht auf ok', await warteBis(B.P, async () => (await B.P.locator('.sync-status [data-state="ok"], .sync-status.ok, [data-sync-state="ok"]').count()) > 0 || true, 1000));
 }
 
 // ══ F: Bedingtes Schreiben ══════════════════════════════════════════
-console.log('\n════ F: Zwei Geräte zugleich — Vorbedingung, Zusammenführung, nichts verloren ════');
+console.log('\n════ F: Zwei Geräte zugleich – Vorbedingung, Zusammenführung, nichts verloren ════');
 {
   const [nA, nB] = await Promise.all([notiz(A.P, 'A gleichzeitig', 1250, 250), notiz(B.P, 'B gleichzeitig', 1250, 420)]);
   pruefe('F0 beide Geräte legen zugleich eine Karte an', nA && nB, `A ${nA}, B ${nB}`);
@@ -439,7 +439,7 @@ console.log('\n════ F: Zwei Geräte zugleich — Vorbedingung, Zusammenf
   const nF = await notiz(A.P, 'A danach', 1250, 600);
   const beide = await warteBis(A.P, async () => { const t = await texte(A.P); return t.includes('Fremd still') && t.includes('A danach'); }, 20000);
   const tabelle = await warteBis(A.P, () => zeileText(uidA, 'board-bx.json').includes('A danach') && zeileText(uidA, 'board-by.json').includes('Fremd still'), 10000);
-  pruefe('F4 fremder Stand genau beim Schreiben: Vorbedingung schlägt an, A führt zusammen — beide Karten lokal und in der Tabelle', nF && beide && tabelle && (sb.aufrufe.vorbedingung ?? 0) > vorher && !sb.stoerung, `vorbedingung ${(sb.aufrufe.vorbedingung ?? 0) - vorher}, lokal ${beide}, tabelle ${tabelle}`);
+  pruefe('F4 fremder Stand genau beim Schreiben: Vorbedingung schlägt an, A führt zusammen – beide Karten lokal und in der Tabelle', nF && beide && tabelle && (sb.aufrufe.vorbedingung ?? 0) > vorher && !sb.stoerung, `vorbedingung ${(sb.aufrufe.vorbedingung ?? 0) - vorher}, lokal ${beide}, tabelle ${tabelle}`);
 }
 
 // ══ H: Große Anhänge (M329) ═════════════════════════════════════════
@@ -506,7 +506,7 @@ console.log('\n════ G: Konto löschen, Abmelden, Texte ════');
   pruefe('G5 Hinterlegen speichert URL (ohne Schrägstrich am Ende) und Schlüssel; E-Mail-Felder erscheinen', JSON.stringify(await E.P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-supabase')))) === JSON.stringify({ url: SB_URL, key: SB_KEY }) && (await E.P.locator('[data-taste="konto-link"]').count()) === 1);
   await E.ctx.close();
   const js = readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.js')).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8')).join('\n');
-  pruefe('G6 „Was ist neu" nennt M328', js.includes('Eigenes PixiNotes-Konto — mit E-Mail auf jedem Gerät (M328)'));
+  pruefe('G6 „Was ist neu" nennt M328', js.includes('Eigenes PixiNotes-Konto – mit E-Mail auf jedem Gerät (M328)'));
   pruefe('G7 die Hilfe erklärt den Datenschutz des PixiNotes-Kontos', js.includes('PixiNotes-Konto (E-Mail):') && js.includes('Row Level Security'));
   pruefe('G8 „Was ist neu" nennt M329 (Anhänge bis 50 MB)', js.includes('Große Anhänge im PixiNotes-Konto (M329)'));
 }

@@ -1239,7 +1239,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           ['Wikilinks', 'wikis', showWikis],
           ['Gliederung', 'regionen', showRegions],
           ['Physik', 'physik', physicsOn],
-          ...(brainOn ? [['🧠 Vorschläge', 'vorschlaege', showSuggest] as const] : []),
+          ...(brainOn ? [['Vorschläge', 'vorschlaege', showSuggest] as const] : []),
         ] as const).map(([label, key, on]) => (
           <label key={key} className="ov-graph-toggle">
             <input type="checkbox" checked={on} onChange={(e) => setLayer(key, e.target.checked)} /> {label}
@@ -1295,8 +1295,8 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
             >
               <title>
                 {rg.schlaeft
-                  ? `„${rg.name}" ist nicht Teil des Gehirns — klicken zum Einschalten`
-                  : `${rg.kind === 'space' ? 'Bereich' : 'Projekt'} „${rg.name}"${brainOn ? ' — klicken, um ihn aus dem Gehirn zu nehmen' : ''}`}
+                  ? `„${rg.name}" ist nicht Teil des Gehirns – klicken zum Einschalten`
+                  : `${rg.kind === 'space' ? 'Bereich' : 'Projekt'} „${rg.name}"${brainOn ? ' – klicken, um ihn aus dem Gehirn zu nehmen' : ''}`}
               </title>
               <path
                 ref={(el) => { if (el) regionEls.current.set(rg.key, el); else regionEls.current.delete(rg.key); }}
@@ -1361,7 +1361,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
                     setSugMenu({ x: e.clientX, y: e.clientY, a: l.a, b: l.b, score: l.score ?? 0 });
                   }}
                 >
-                  <title>{`Vorschlag: „${boardName(l.a)}" ↔ „${boardName(l.b)}" (${Math.round((l.score ?? 0) * 100)} % inhaltliche Nähe) — anklicken`}</title>
+                  <title>{`Vorschlag: „${boardName(l.a)}" ↔ „${boardName(l.b)}" (${Math.round((l.score ?? 0) * 100)} % inhaltliche Nähe) – anklicken`}</title>
                 </line>
               </g>
             );
@@ -1479,14 +1479,14 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
       </div>
       {linkFrom && (
         <div className="ov-graph-linkhint nodrag">
-          🔗 Verknüpfen: Ziel-Board anklicken — Portal entsteht auf „{boardName(linkFrom)}"
+          Verknüpfen: Ziel-Board anklicken – Portal entsteht auf „{boardName(linkFrom)}"
           <button onClick={() => setLinkFrom(null)}>Abbrechen (Esc)</button>
         </div>
       )}
       {sugMenu && (
         <div className="ov-graph-ctx nodrag" ref={insBild} style={{ left: sugMenu.x, top: sugMenu.y }}>
           <div className="ov-graph-ctx-title">
-            🧠 Vorschlag · {Math.round(sugMenu.score * 100)} % Nähe
+            Vorschlag · {Math.round(sugMenu.score * 100)} % Nähe
           </div>
           <div className="ov-graph-ctx-sub" translate="no">
             „{boardName(sugMenu.a)}" ↔ „{boardName(sugMenu.b)}"
@@ -1494,7 +1494,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           <button onClick={() => acceptSuggestion(sugMenu.a, sugMenu.b)}>Verknüpfen (Portal anlegen)</button>
           <button onClick={() => { openBoard(sugMenu.a); setSugMenu(null); }}>„<span translate="no">{boardName(sugMenu.a)}</span>" öffnen</button>
           <button onClick={() => { openBoard(sugMenu.b); setSugMenu(null); }}>„<span translate="no">{boardName(sugMenu.b)}</span>" öffnen</button>
-          <button onClick={() => { rejectLink(sugMenu.a, sugMenu.b); setSugMenu(null); }}>Passt nicht — nicht mehr vorschlagen</button>
+          <button onClick={() => { rejectLink(sugMenu.a, sugMenu.b); setSugMenu(null); }}>Passt nicht – nicht mehr vorschlagen</button>
         </div>
       )}
       {ctxMenu && (
@@ -1639,8 +1639,7 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[], schmal = false) {
           id: `pe-${b.id}-${targetId}-${n.id}`,
           source: `b-${b.id}`,
           target: `b-${targetId}`,
-          label: '🗂️',
-          style: { stroke: 'rgba(124,92,255,.55)', strokeWidth: 2, strokeDasharray: '7 5' },
+          style: { stroke: 'var(--accent)', strokeOpacity: 0.55, strokeWidth: 2, strokeDasharray: '7 5' },
         });
       }
     }
@@ -1772,7 +1771,7 @@ function BoardMiniMap({ board, accent }: { board: BoardDoc; accent: string }) {
               oeffneKarte(board.id, n.id, 'overview');
             }}
           >
-            <title>{kartenTitel(n)} — öffnen und bearbeiten</title>
+            <title>{kartenTitel(n)} – öffnen und bearbeiten</title>
           </rect>
         );
       })}

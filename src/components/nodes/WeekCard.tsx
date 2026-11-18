@@ -212,7 +212,7 @@ export function WeekBody({ id, data, selected, folie }: { id: string; data: Week
                 <input
                   className="week-col-input"
                   value={c}
-                  title="Spalte umbenennen — schaltet auf freie Spalten um"
+                  title="Spalte umbenennen – schaltet auf freie Spalten um"
                   onChange={(e) => renameCol(i, e.target.value)}
                 />
               ) : c}

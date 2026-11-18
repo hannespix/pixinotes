@@ -22,6 +22,7 @@ import type { Ansicht } from '../lib/vorfuehren';
 import type { DokumentArt } from '../lib/dokumentArt';
 import { FOLIE_ZOOM, type FolieZoom } from '../lib/folienWerkzeug';
 
+import { IPaperclip } from './Icons';
 export { dokumentArt, type DokumentArt } from '../lib/dokumentArt';
 
 /** Inhalt der Datei: aus der Karte (kleine Dateien), der Geräte-Ablage oder dem Konto */
@@ -379,7 +380,7 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
   if (fehlt || fehler) {
     return (
       <div className="folie-dok leer">
-        <p>📎 <b translate="no">{node.data.titel?.trim() || node.data.name}</b></p>
+        <p><IPaperclip size={16} /> <b translate="no">{node.data.titel?.trim() || node.data.name}</b></p>
         <p className="folie-dok-hinweis">{fehlt ? 'Der Inhalt dieser Datei liegt nicht auf diesem Gerät.' : 'Diese Datei lässt sich hier nicht darstellen.'}</p>
       </div>
     );
@@ -431,7 +432,7 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
         )}
         <button onClick={() => zoomen(z / 1.25)} aria-disabled={z <= Z_MIN + 0.001} aria-label="Verkleinern" title="Verkleinern (−)" data-taste="folie-kleiner">−</button>
         <button className="folie-dok-modus" onClick={() => { setZ(1); if (z <= 1.001) waehleModus('wechseln'); }}
-          title="Zwischen ganzer Seite und Seitenbreite wechseln (B) — bei Vergrößerung: zurück auf 100 %" data-taste="folie-modus">
+          title="Zwischen ganzer Seite und Seitenbreite wechseln (B) – bei Vergrößerung: zurück auf 100 %" data-taste="folie-modus">
           {z > 1.001 ? `${Math.round(z * 100)} %` : modus === 'seite' ? 'Ganze Seite' : 'Seitenbreite'}
         </button>
         <button onClick={() => zoomen(z * 1.25)} aria-disabled={z >= Z_MAX - 0.001} aria-label="Vergrößern" title="Vergrößern (+)" data-taste="folie-groesser">+</button>

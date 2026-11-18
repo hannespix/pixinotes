@@ -42,10 +42,10 @@ const mitArchiv = {
     { id: 'b1', name: 'Schreibtisch', edges: [], drawings: [], comments: [], nodes: [note('n1', 'Antrag prüfen', 60, 60), note('n2', 'Alte Telefonnotiz', 360, 60, true), note('n3', 'Erledigte Idee', 60, 320, true)] },
     { id: 'b2', name: 'Altes Projekt', archived: true, edges: [], drawings: [], comments: [], nodes: [note('n4', 'Abschlussbericht', 60, 60)] },
   ],
-  spaces: [{ id: 's1', name: '🏢 Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['b1', 'b2'] }] }],
+  spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['b1', 'b2'] }] }],
   activeId: 'b1', view: 'overview',
 };
-const ohneArchiv = { ...mitArchiv, boards: [{ ...mitArchiv.boards[0], nodes: [note('n1', 'Antrag prüfen', 60, 60)] }], spaces: [{ id: 's1', name: '🏢 Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['b1'] }] }] };
+const ohneArchiv = { ...mitArchiv, boards: [{ ...mitArchiv.boards[0], nodes: [note('n1', 'Antrag prüfen', 60, 60)] }], spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['b1'] }] }] };
 
 async function seite(st) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });

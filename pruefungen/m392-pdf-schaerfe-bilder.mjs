@@ -144,7 +144,7 @@ const brettAuf = async (P, name) => {
 const bis = async (P, fn, ms = 6000) => { const e = Date.now() + ms; let v; while (Date.now() < e) { v = await fn(); if (v) return v; await P.waitForTimeout(150); } return fn(); };
 
 // ══ A ═══════════════════════════════════════════════════════════════
-console.log('\n════ A: PDF — so fein gemalt, wie es zu sehen ist ════');
+console.log('\n════ A: PDF – so fein gemalt, wie es zu sehen ist ════');
 {
   const { ctx, P } = await seite(1);
   // Das Board passt beim Öffnen alles ein (die ferne Karte macht es winzig) — erst auf etwa 100 % heran
@@ -225,7 +225,7 @@ console.log('\n════ C: Fotos ohne Rahmen ════');
   }, id);
   const foto = await bis(P, async () => { const l = await lage('foto'); return l.bildFuellt ? l : null; }) ?? await lage('foto');
   const eingebettet = await lage('bild');
-  pruefe('C1 ein Foto, das als Datei abgelegt ist: keine Kopfzeile, keine Größenangabe — nur das Bild', /image-card/.test(foto.klasse) && /rahmenlos/.test(foto.klasse) && !foto.kopf && !foto.meta, foto);
+  pruefe('C1 ein Foto, das als Datei abgelegt ist: keine Kopfzeile, keine Größenangabe – nur das Bild', /image-card/.test(foto.klasse) && /rahmenlos/.test(foto.klasse) && !foto.kopf && !foto.meta, foto);
   pruefe('C2 … ohne Schatten, Fläche und Rand; das Bild füllt die Karte', foto.schatten === 'none' && /rgba\(0, 0, 0, 0\)|transparent/.test(foto.grund) && foto.rand === '0px' && foto.bildFuellt, foto);
   pruefe('C3 … genau wie ein eingebettetes Bild daneben', foto.schatten === eingebettet.schatten && foto.grund === eingebettet.grund && foto.rand === eingebettet.rand && /rahmenlos/.test(eingebettet.klasse), [foto, eingebettet]);
   await P.screenshot({ path: path.join(SD, 'm392-fotos.png') });
@@ -280,7 +280,7 @@ console.log('\n════ C: Fotos ohne Rahmen ════');
   const sicht1 = await P.evaluate(() => [...document.querySelectorAll('.react-flow__node-file')].map((k) => ({ rahmenlos: !!k.querySelector('.image-card.rahmenlos'), kopf: !!k.querySelector('.file-kopf'), schatten: getComputedStyle(k).boxShadow })));
   pruefe('C8 fast voller Stand: Das eingefügte Foto liegt in der Geräte-Ablage (Datei, ohne Base64 im Stand)', k1.length === 1 && k1[0].type === 'file' && k1[0].data.lokal === true && !k1[0].data.dataUrl, k1.map((n) => [n.type, n.data.lokal]));
   pruefe('C9 … und erscheint trotzdem rahmenlos als Bild', sicht1.length === 1 && sicht1[0].rahmenlos && !sicht1[0].kopf && sicht1[0].schatten === 'none', sicht1);
-  pruefe('C10 der Hinweis nennt den Zustand — ohne „Datei-Karte"', t1.some((t) => /Speicher fast voll/.test(t)) && !t1.some((t) => /Datei-Karte/.test(t)), t1);
+  pruefe('C10 der Hinweis nennt den Zustand – ohne „Datei-Karte"', t1.some((t) => /Speicher fast voll/.test(t)) && !t1.some((t) => /Datei-Karte/.test(t)), t1);
   await P.waitForTimeout(4500);
   await einfuegen();
   const t2 = await toasts(3500);
@@ -292,7 +292,7 @@ console.log('\n════ C: Fotos ohne Rahmen ════');
 console.log('\n════ D: Texte ════');
 {
   const lies = (p) => readFileSync(path.join(__repo, p), 'utf8');
-  pruefe('D1 die Hilfe nennt M392 — deutsch und englisch', lies('src/components/HelpOverlay.tsx').includes('(M392)') && lies('src/components/HelpOverlayEn.tsx').includes('(M392)'));
+  pruefe('D1 die Hilfe nennt M392 – deutsch und englisch', lies('src/components/HelpOverlay.tsx').includes('(M392)') && lies('src/components/HelpOverlayEn.tsx').includes('(M392)'));
   pruefe('D2 keine Fehler in der Konsole', fehler.length === 0, fehler.slice(0, 3));
 }
 

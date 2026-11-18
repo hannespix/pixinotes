@@ -57,5 +57,5 @@ export function arrangeFrameInside(id: string, mode: ArrangeMode): void {
     if (t < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
-  st.showToast('Rahmen-Inhalt angeordnet — Strg+Z stellt die alte Ordnung wieder her.');
+  st.showToast('Rahmen-Inhalt angeordnet – Strg+Z stellt die alte Ordnung wieder her.');
 }

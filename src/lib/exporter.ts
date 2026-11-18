@@ -45,7 +45,7 @@ export async function exportBoard(o: BoardExportOptions): Promise<void> {
    * er blockiert. Der Druck-Export meldete dann „Popup blockiert", obwohl niemand etwas falsch machte.
    */
   const druck = o.format === 'print' ? window.open('', '_blank') : null;
-  if (o.format === 'print' && !druck) throw new Error('Popup blockiert — bitte Popups für diese Seite erlauben.');
+  if (o.format === 'print' && !druck) throw new Error('Popup blockiert – bitte Popups für diese Seite erlauben.');
   if (druck) druck.document.write('<title>PixiNotes</title><p style="font:14px system-ui;color:#666;padding:24px">Bild wird erstellt …</p>');
 
   // Zuschnitt: Bounding-Box der Karten + Rand (+ Platz für die Kopfzeile)

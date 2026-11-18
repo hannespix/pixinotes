@@ -704,7 +704,7 @@ await A.P.locator('[data-taste="freigabe-einladen"]').click();
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="freigabe-liste"] li').count()) === 1, 6000);
 await schliessen(A.P);
 await A.P.waitForTimeout(3000);
-pruefe('A1 die Freigabe steht — wie bisher, ohne Anhänge', sb.freigaben.length === 1 && !sb.freigaben[0].dateien, JSON.stringify(sb.freigaben));
+pruefe('A1 die Freigabe steht – wie bisher, ohne Anhänge', sb.freigaben.length === 1 && !sb.freigaben[0].dateien, JSON.stringify(sb.freigaben));
 {
   const vor = sb.spalteFehlt ?? 0;
   await notizPlatz(A.P, 'Noch eine Karte'); await A.P.waitForTimeout(5000);
@@ -725,7 +725,7 @@ await warteBis(B.P, async () => !!(await boardVon(B.P, 'bx')), 15000);
 await boardWechseln(B.P, 'Planung', 'anna@example.de');
 const startbereit = (P, id) => P.locator(`.react-flow__node[data-id="${id}"] .happ-go:not([disabled])`).count();
 await warteBis(B.P, async () => (await startbereit(B.P, 'h1')) === 1, 20000);
-pruefe('B3 bei Bernd ist das Tool startbereit — der Quelltext kam mit', (await startbereit(B.P, 'h1')) === 1 && (await inAblage(B.P, 'happ:h1')));
+pruefe('B3 bei Bernd ist das Tool startbereit – der Quelltext kam mit', (await startbereit(B.P, 'h1')) === 1 && (await inAblage(B.P, 'happ:h1')));
 pruefe('B4 … über die signierte Adresse (der Dateispeicher gibt Angemeldeten nur den eigenen Ordner)', speicherAbrufe.includes(`${uidA}/datei-h1`), `${speicherAbrufe.join()} fremdOrdner=${sb.fremdOrdner ?? 0}`);
 await warteBis(B.P, () => inAblage(B.P, `file:${dateiId}`), 15000);
 pruefe('B5 auch die Datei ist bei Bernd angekommen', (await inAblage(B.P, `file:${dateiId}`)) && speicherAbrufe.includes(`${uidA}/datei-${dateiId}`), speicherAbrufe.join());
@@ -734,10 +734,10 @@ await A.P.locator('.dock input[type="file"][accept*="html"]').setInputFiles({ na
 let zweitesId = '';
 await warteBis(A.P, async () => { zweitesId = (await boardVon(A.P, 'bx')).nodes.find((n) => n.type === 'htmlapp' && n.id !== 'h1')?.id ?? ''; return !!zweitesId && sb.objekte.has(`${uidA}/datei-${zweitesId}`); }, 20000);
 await warteBis(B.P, async () => !!zweitesId && (await inAblage(B.P, `happ:${zweitesId}`)), 40000);
-pruefe('B6 ein später angelegtes Tool kommt bei Bernd an — Karte und Quelltext, ohne Neuladen', !!zweitesId && (await inAblage(B.P, `happ:${zweitesId}`)) && (await startbereit(B.P, zweitesId)) === 1, `${zweitesId} ${dateienAn()}`);
+pruefe('B6 ein später angelegtes Tool kommt bei Bernd an – Karte und Quelltext, ohne Neuladen', !!zweitesId && (await inAblage(B.P, `happ:${zweitesId}`)) && (await startbereit(B.P, zweitesId)) === 1, `${zweitesId} ${dateienAn()}`);
 
 // ══ C ═══════════════════════════════════════════════════════════════
-console.log('\n════ C: Anna führt vor — Eingaben im Tool kommen bei Bernd an ════');
+console.log('\n════ C: Anna führt vor – Eingaben im Tool kommen bei Bernd an ════');
 // Beide haben das Tool schon offen, Anna hat schon etwas eingetragen — dann erst beginnt sie vorzuführen
 const karteA0 = A.P.locator('.react-flow__node[data-id="h1"]');
 const karteB0 = B.P.locator('.react-flow__node[data-id="h1"]');
@@ -846,7 +846,7 @@ if (!fa) { await karteA.locator('.happ-startbtn, .happ-go').first().click(); awa
 console.log('\n════ E: Texte ════');
 {
   const hilfe = readdirSync(path.join(DIST, 'assets')).filter((f) => /^HelpOverlay/.test(f)).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8'));
-  pruefe('E1 „Was ist neu" nennt es — deutsch und englisch', hilfe.filter((t) => t.includes('(M384)')).length === 2, `${hilfe.length}`);
+  pruefe('E1 „Was ist neu" nennt es – deutsch und englisch', hilfe.filter((t) => t.includes('(M384)')).length === 2, `${hilfe.length}`);
   const mig = readFileSync(path.join(__repo, 'supabase', 'migrations', '20261115100000_board_aendern.sql'), 'utf8');
   pruefe('E2 die Spalte für die Anhänge steht in der Migration', /alter table public\.board_freigaben\s+add column if not exists dateien jsonb/.test(mig));
 }

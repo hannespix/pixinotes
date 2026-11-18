@@ -137,7 +137,7 @@ console.log('════ B: Board bei fast vollem Stand ════');
   await ctx.close();
 }
 
-console.log('════ C: Stand mit Platz — der normale Weg bleibt ════');
+console.log('════ C: Stand mit Platz – der normale Weg bleibt ════');
 {
   const { ctx, P, fehler } = await seite(false);
   await P.locator('.note-editor .bn-block-content').first().click();

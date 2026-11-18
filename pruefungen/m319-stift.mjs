@@ -201,7 +201,7 @@ console.log('\n════ D: Zwei Finger ════');
   await P.evaluate(() => document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 32, pointerType: 'touch' })));
   await warte(P);
   const d = await striche(P);
-  pruefe('D1 der zweite Finger bricht den Strich ab — nichts gespeichert', d.length === 0, String(d.length));
+  pruefe('D1 der zweite Finger bricht den Strich ab – nichts gespeichert', d.length === 0, String(d.length));
   await ctx.close();
 }
 

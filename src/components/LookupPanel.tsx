@@ -95,11 +95,11 @@ export function LookupPanel() {
           <button className="lookup-x" title="Schließen (Esc)" onClick={() => setLookup(null)}><IX size={13} /></button>
         </div>
 
-        <div className="lookup-section">Wikipedia ({lang.toUpperCase()}) — feine Treffer</div>
+        <div className="lookup-section">Wikipedia ({lang.toUpperCase()}) – feine Treffer</div>
         <div className="lookup-hits">
           {state === 'lädt' && <div className="lookup-note">Sucht …</div>}
-          {state === 'fehler' && <div className="lookup-note">Wikipedia nicht erreichbar (offline?) — die groben Quellen unten funktionieren als Links trotzdem.</div>}
-          {state === 'ok' && hits.length === 0 && <div className="lookup-note">Keine Artikel gefunden — Begriff anpassen oder unten grob suchen.</div>}
+          {state === 'fehler' && <div className="lookup-note">Wikipedia nicht erreichbar (offline?) – die groben Quellen unten funktionieren als Links trotzdem.</div>}
+          {state === 'ok' && hits.length === 0 && <div className="lookup-note">Keine Artikel gefunden – Begriff anpassen oder unten grob suchen.</div>}
           {hits.map((h) => (
             <a key={h.url} className="lookup-hit" translate="no" href={h.url} target="_blank" rel="noopener noreferrer" title={h.url}>
               <b>{h.title}</b>
@@ -108,7 +108,7 @@ export function LookupPanel() {
           ))}
         </div>
 
-        <div className="lookup-section">Weitere Quellen — bewusst grob (öffnet deren Suchseite)</div>
+        <div className="lookup-section">Weitere Quellen – bewusst grob (öffnet deren Suchseite)</div>
         <div className="lookup-coarse">
           {COARSE_SOURCES.map((s) => (
             <a
@@ -117,13 +117,13 @@ export function LookupPanel() {
               href={enc ? s.url(enc) : undefined}
               target="_blank"
               rel="noopener noreferrer"
-              title={`${s.hint} — öffnet die Suchseite mit deinem Begriff (keine geratenen Tief-Links, die in 404 enden)`}
+              title={`${s.hint} – öffnet die Suchseite mit deinem Begriff (keine geratenen Tief-Links, die in 404 enden)`}
             >
               <IExternal size={12} /> {s.name}
             </a>
           ))}
         </div>
-        <div className="lookup-foot">Wikipedia liefert stabile Artikel-Links · andere Quellen absichtlich nur als Suche — Tief-Links wären zu oft 404 · Esc schließt</div>
+        <div className="lookup-foot">Wikipedia liefert stabile Artikel-Links · andere Quellen absichtlich nur als Suche – Tief-Links wären zu oft 404 · Esc schließt</div>
       </div>
     </div>,
     document.body,

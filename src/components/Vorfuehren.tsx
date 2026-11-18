@@ -6,6 +6,7 @@ import { dokMelden, fokusMelden, folgeIch, folgenSetzen, ichFuehreVor, lebenszei
 import { DOKUMENT_BEFEHL, offeneSeiten, SEITEN_EREIGNIS, seiteMerken, seiteVon, type DokumentBefehl } from '../lib/pdfSeiten';
 import { focusable } from './FocusSheet';
 
+import { IMegafon } from './Icons';
 export function Vorfuehren() {
   const boardId = useBoard((s) => s.activeId);
   /** M371: Läuft die Folien-Präsentation, sitzt das Band über ihr (unten, damit es die Kopfzeile nicht verdeckt) */
@@ -149,17 +150,17 @@ export function Vorfuehren() {
     <div className={`zeig-band${ichZeige ? ' ich' : ''}${imVortrag ? ' im-vortrag' : ''}`} role="status" data-taste="zeig-band">
       {ichZeige ? (
         <>
-          <span>📣 <b>Du führst vor</b> — {imVortrag ? 'alle sehen deine Folien' : 'alle folgen deiner Ansicht'}</span>
+          <span><IMegafon size={14} /> <b>Du führst vor</b> – {imVortrag ? 'alle sehen deine Folien' : 'alle folgen deiner Ansicht'}</span>
           <button onClick={() => vorfuehrenStopp()} data-taste="zeig-ende">Beenden</button>
         </>
       ) : folge ? (
         <>
-          <span>📣 <b translate="no">{z.name}</b> führt vor — du folgst</span>
+          <span><IMegafon size={14} /> <b translate="no">{z.name}</b> führt vor – du folgst</span>
           <button className="leise" onClick={() => folgenSetzen(boardId, false)} data-taste="zeig-loesen">Lösen</button>
         </>
       ) : (
         <>
-          <span>📣 <b translate="no">{z.name}</b> führt vor</span>
+          <span><IMegafon size={14} /> <b translate="no">{z.name}</b> führt vor</span>
           <button onClick={() => folgenSetzen(boardId, true)} data-taste="zeig-folgen">Wieder folgen</button>
         </>
       )}

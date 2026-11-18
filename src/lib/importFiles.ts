@@ -79,7 +79,7 @@ export async function importHtmlAppFromUrl(rawUrl: string, pos: { x: number; y: 
     (node.data as { url?: string }).url = u.href;
     await saveHtml(node.id, text);
     addNode(node);
-    showToast(`„${name}" von der Adresse kopiert — mit ▶ starten (läuft auch offline).`);
+    showToast(`„${name}" von der Adresse kopiert – mit ▶ starten (läuft auch offline).`);
     mirror(new File([text], name, { type: 'text/html' }), node.id, { done: false });
     return 'kopie';
   } catch {
@@ -164,7 +164,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           placed++;
           continue;
         }
-        showToast('JSON erkannt, aber keine PixiNotes-Datei — als Datei-Karte abgelegt.');
+        showToast('JSON erkannt, aber keine PixiNotes-Datei – als Datei-Karte abgelegt.');
       }
       if (ext === 'docx' && WORD_ALS_NOTIZ) {
         // M184: Word-Dokument → Notiz-Karte. Das ist zugleich der kontofreie
@@ -182,7 +182,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           if (!canEmbed(img.src.length)) break;
           addNode(makeImage({ x: pos.x + 380, y: pos.y + (imgOffset - 1) * 220 }, img.src, img.alt ?? file.name));
         }
-        showToast(`📄 „${res.title || file.name}" als Notiz übernommen${res.images.length ? ` (+ ${Math.min(res.images.length, 8)} Bild(er))` : ''}.`);
+        showToast(`„${res.title || file.name}" als Notiz übernommen${res.images.length ? ` (+ ${Math.min(res.images.length, 8)} Bild(er))` : ''}.`);
         mirror(file, note.id, mirrorNote);
         placed++;
         continue;
@@ -218,8 +218,8 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         }
         if (!gesetzt) { showToast(`„${file.name}" enthält keine gefüllten Zellen.`); continue; }
         showToast(gesetzt > 1
-          ? `📊 ${gesetzt} Blätter aus „${file.name}" übernommen — Formeln inklusive.`
-          : `📊 „${file.name}" als Rechen-Tabelle übernommen — Formeln inklusive.`);
+          ? `${gesetzt} Blätter aus „${file.name}" übernommen – Formeln inklusive.`
+          : `„${file.name}" als Rechen-Tabelle übernommen – Formeln inklusive.`);
         mirror(file, erste, mirrorNote);
         placed++;
         continue;
@@ -234,8 +234,8 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         note.width = 340;
         addNode(note);
         showToast(/\.(md|markdown|mdown|mkd)$/i.test(file.name)
-          ? `📝 „${file.name}" als Notiz übernommen — formatiert, nicht als Rohtext.`
-          : `📝 „${file.name}" als Notiz übernommen.`);
+          ? `„${file.name}" als Notiz übernommen – formatiert, nicht als Rohtext.`
+          : `„${file.name}" als Notiz übernommen.`);
         mirror(file, note.id, mirrorNote);
         placed++;
         continue;
@@ -246,7 +246,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         const node = makeHtmlApp(pos, { name: file.name, size: file.size });
         await saveHtml(node.id, await file.text());
         addNode(node);
-        showToast(`„${file.name}" als App-Karte abgelegt — mit ▶ starten.`);
+        showToast(`„${file.name}" als App-Karte abgelegt – mit ▶ starten.`);
         mirror(file, node.id, mirrorNote);
         placed++;
         continue;
@@ -254,12 +254,12 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
       if (ext === 'eml' || file.type === 'message/rfc822') {
         const email = await parseEml(await file.arrayBuffer());
         addNode(makeEmail(pos, email));
-        showToast(`📧 „${email.subject}" importiert — ${email.attachments.length} Anhänge als Chips`);
+        showToast(`„${email.subject}" importiert – ${email.attachments.length} Anhänge als Chips`);
         mirror(file, null, mirrorNote);
       } else if (ext === 'msg') {
         const email = await parseMsg(await file.arrayBuffer());
         addNode(makeEmail(pos, email));
-        showToast(`📧 Outlook-Mail „${email.subject}" importiert`);
+        showToast(`Outlook-Mail „${email.subject}" importiert`);
         mirror(file, null, mirrorNote);
       } else if (istBild) {
         const src = await imageFileToDataUrl(file, mime);
@@ -269,7 +269,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           const node = makeFile(pos, { name: file.name, size: file.size, mime,
             dataUrl: file.size <= MAX_EMBED_BYTES ? await readFileAsDataUrl(file) : undefined });
           addNode(node);
-          showToast(`„${file.name}": Dieses Bildformat kann der Browser nicht anzeigen — als Datei abgelegt.`);
+          showToast(`„${file.name}": Dieses Bildformat kann der Browser nicht anzeigen – als Datei abgelegt.`);
           mirror(file, node.id, mirrorNote);
           placed++;
           continue;
@@ -289,7 +289,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           }
           addNode(node);
           // M392: Das Bild erscheint wie jedes andere (rahmenlos) — der Hinweis nennt nur noch den Zustand, einmal je Sitzung
-          if (!vollGemeldet) { vollGemeldet = true; showToast('⚠️ Speicher fast voll — neue Bilder liegen ab jetzt in der Geräte-Ablage statt im Board.', false, 7000); }
+          if (!vollGemeldet) { vollGemeldet = true; showToast('Speicher fast voll – neue Bilder liegen ab jetzt in der Geräte-Ablage statt im Board.', false, 7000); }
           mirror(file, node.id, mirrorNote);
         } else {
           const node = makeImage(pos, src, file.name, await bildMasse(src));
@@ -319,7 +319,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           // Karte anzulegen, die eine Vorschau verspricht, die nie kommt.
           console.error('Datei-Ablage fehlgeschlagen:', e);
           delete node.data.lokal;
-          showToast(`„${file.name}" konnte nicht abgelegt werden — der Gerätespeicher ist voll.`);
+          showToast(`„${file.name}" konnte nicht abgelegt werden – der Gerätespeicher ist voll.`);
         }
         addNode(node);
         mirror(file, node.id, mirrorNote);
@@ -327,7 +327,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
       placed++;
     } catch (err) {
       console.error('Import fehlgeschlagen:', err);
-      showToast(`⚠️ „${file.name}" konnte nicht gelesen werden`);
+      showToast(`„${file.name}" konnte nicht gelesen werden`);
     }
   }
   return placed;

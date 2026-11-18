@@ -116,7 +116,7 @@ console.log('════ C: Bewusste Wahl mit Marke bleibt ════');
   await ctx.close();
 }
 
-console.log('════ D: Der Schalter unter ⚙ → Darstellung (M314: Lebendige Fläche) ════');
+console.log('════ D: Der Schalter unter Einstellungen → Darstellung (M314: Lebendige Fläche) ════');
 {
   const { ctx, P } = await seite();
   await P.locator('[data-taste="einstellungen"]').click();

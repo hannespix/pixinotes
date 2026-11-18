@@ -392,7 +392,7 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
           type="source"
           position={pos}
           className="pn-handle"
-          title="Verbindung ziehen — auf einer anderen Karte loslassen"
+          title="Verbindung ziehen – auf einer anderen Karte loslassen"
         />
       ))}
       {/* Ganzkarten-Ziel: während einer Verbindung reicht es, IRGENDWO auf der

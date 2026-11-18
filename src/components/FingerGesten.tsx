@@ -142,8 +142,8 @@ export function FingerGesten() {
         if (n === 2) { toast(rueckgaengig() ? '↶ Rückgängig (Zwei-Finger-Tipp)' : 'Nichts rückgängig zu machen'); return; }
         if (n === 3) { toast(wiederholen() ? '↷ Wiederholen (Drei-Finger-Tipp)' : 'Nichts zu wiederholen'); return; }
         if (n === 4) {
-          if (document.fullscreenElement) { void document.exitFullscreen().then(() => toast('⛶ Vollbild aus')).catch(() => toast('Vollbild ließ sich nicht beenden')); }
-          else { void document.documentElement.requestFullscreen?.().then(() => toast('⛶ Vollbild (Vier-Finger-Tipp beendet es)')).catch(() => toast('Vollbild ist hier nicht möglich')); }
+          if (document.fullscreenElement) { void document.exitFullscreen().then(() => toast('Vollbild aus')).catch(() => toast('Vollbild ließ sich nicht beenden')); }
+          else { void document.documentElement.requestFullscreen?.().then(() => toast('Vollbild (Vier-Finger-Tipp beendet es)')).catch(() => toast('Vollbild ist hier nicht möglich')); }
           return;
         }
         return;

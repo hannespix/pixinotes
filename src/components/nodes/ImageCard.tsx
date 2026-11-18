@@ -7,7 +7,7 @@ import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { BildLupe } from './BildLupe';
 import { bildBearbeiten } from '../BildEditorHost';
-import { ICrop } from '../Icons';
+import { ICrop, IImage } from '../Icons';
 
 /**
  * Screenshot / Bild als Karte (per Strg+V, Drag&Drop oder aus E-Mail-Anhang).
@@ -48,7 +48,7 @@ export function ImageCard({ id, data, selected }: NodeProps<ImageNode>) {
   };
   const name = (
     <div className={`meta img-name${rahmen ? '' : ' unterschrift'}`}>
-      🖼️
+      <IImage size={13} />
       <DragTitle
         className="img-titel"
         value={titel}
@@ -79,7 +79,7 @@ export function ImageCard({ id, data, selected }: NodeProps<ImageNode>) {
         <button
           className="bild-bearbeiten-auf nodrag"
           data-taste="bild-bearbeiten-auf"
-          title="Bild bearbeiten — zuschneiden, drehen, gerade richten"
+          title="Bild bearbeiten – zuschneiden, drehen, gerade richten"
           aria-label="Bild bearbeiten"
           onClick={(e) => { e.stopPropagation(); bildBearbeiten(id); }}
         ><ICrop size={14} /></button>

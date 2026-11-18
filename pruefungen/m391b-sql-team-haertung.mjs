@@ -26,7 +26,7 @@ const pruefe = (n, gut, info = '') => { if (gut) { ok += 1; console.log(`  ✓ $
 let da = sql('select 1;', '').rc === 0;
 if (!da && !PSQL) { spawnSync('service', ['postgresql', 'start'], { encoding: 'utf8' }); da = sql('select 1;', '').rc === 0; }
 if (!da) {
-  console.log('  ÜBERSPRUNGEN: kein lokales Postgres erreichbar (service postgresql start / PN_PSQL) — der Auslöser wurde hier NICHT gegen eine echte Datenbank geprüft.');
+  console.log('  ÜBERSPRUNGEN: kein lokales Postgres erreichbar (service postgresql start / PN_PSQL) – der Auslöser wurde hier NICHT gegen eine echte Datenbank geprüft.');
   console.log('\n0 bestanden, 0 durchgefallen (übersprungen)');
   process.exit(0);
 }

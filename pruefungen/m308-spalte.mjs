@@ -41,7 +41,7 @@ const state = {
     { id: 'b1', name: 'Schreibtisch', edges: [], drawings: [], comments: [], nodes: [note('n1', 'Antrag prüfen', 60, 60), note('n2', 'Telefonnotiz', 360, 60)] },
     { id: 'b2', name: 'Wissen', edges: [], drawings: [], comments: [], nodes: [note('n3', 'Leitfaden', 60, 60)] },
   ],
-  spaces: [{ id: 's1', name: '🏢 Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['b1', 'b2'] }] }],
+  spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['b1', 'b2'] }] }],
   activeId: 'b1', view: 'board',
 };
 async function seite({ viewport = { width: 1440, height: 900 }, mobil = false } = {}) {
@@ -66,7 +66,7 @@ const masse = (P) => P.evaluate(() => {
   };
 });
 
-console.log('════ A: Griff — Breite ziehen ════');
+console.log('════ A: Griff – Breite ziehen ════');
 {
   const { ctx, P } = await seite();
   const griff = P.locator('.tabs.spalte .spalte-griff');

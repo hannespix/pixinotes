@@ -278,7 +278,7 @@ export function Tabs() {
         <button
           className={`tab-nav ${navOpen ? 'active' : ''}`}
           data-taste="navigator"
-          title={`${context?.space.name ?? '—'} › ${context?.project.name ?? '—'} — Navigation öffnen`}
+          title={`${context?.space.name ?? '—'} › ${context?.project.name ?? '—'} – Navigation öffnen`}
           onClick={() => setNavOpen((o) => !o)}
         >
           <span className="tab-nav-space" translate="no">{context?.space.name ?? '—'}</span>
@@ -326,7 +326,7 @@ export function Tabs() {
         <button
           className={`tab-nav tab-pfad ${navOpen ? 'active' : ''}`}
           data-taste="navigator"
-          title={`${context?.space.name ?? '—'} › ${context?.project.name ?? '—'} › ${aktivesBoard?.name ?? '—'} — Navigation öffnen`}
+          title={`${context?.space.name ?? '—'} › ${context?.project.name ?? '—'} › ${aktivesBoard?.name ?? '—'} – Navigation öffnen`}
           aria-haspopup="dialog"
           aria-expanded={navOpen}
           onClick={() => setNavOpen((o) => !o)}
@@ -377,7 +377,7 @@ export function Tabs() {
             </button>
             <div className="ebenen-menu-titel">Zum Ausprobieren</div>
             <button role="menuitem" onClick={() => { setNeuMenu(false); addStarter(); }}>
-              ✨ Beispiel-Umgebung hinzufügen
+              Beispiel-Umgebung hinzufügen
             </button>
           </div>
         )}

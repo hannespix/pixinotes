@@ -105,7 +105,7 @@ pruefe('A0 PDF aufgeklappt auf Seite 1', z.seite === '1', JSON.stringify(z));
 await klickSeite();
 await knopf('pdf-vor', 4); z = await lage();
 const pos0 = z.pos;
-pruefe('A1 per Knopf auf Seite 5 — „›" ist am Ende ohne Wirkung', z.seite === '5' && (await karte.locator('[data-taste="pdf-vor"]').getAttribute('aria-disabled')) === 'true', z.seite);
+pruefe('A1 per Knopf auf Seite 5 – „›" ist am Ende ohne Wirkung', z.seite === '5' && (await karte.locator('[data-taste="pdf-vor"]').getAttribute('aria-disabled')) === 'true', z.seite);
 await taste('ArrowLeft'); z = await lage();
 pruefe('A2 ← blättert danach weiter (Seite 4)', z.seite === '4', z.seite);
 await taste('ArrowRight'); z = await lage();

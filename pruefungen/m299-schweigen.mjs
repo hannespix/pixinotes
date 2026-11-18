@@ -140,7 +140,7 @@ console.log('════ C: „Was ist neu" aus dem Logo-Menü ════');
   await P.waitForTimeout(200);
   await P.locator('[data-taste="hilfe"]').click();
   await P.waitForSelector('.help-modal');
-  pruefe('C4 ❓ danach öffnet wieder die Hilfe, nicht die Neu-Seite', (await P.locator('.help-neu-modal').count()) === 0 && (await navTexte(P)).length === 6);
+  pruefe('C4 danach öffnet wieder die Hilfe, nicht die Neu-Seite', (await P.locator('.help-neu-modal').count()) === 0 && (await navTexte(P)).length === 6);
   await ctx.close();
 }
 
@@ -158,7 +158,7 @@ console.log('════ D: Impressum aus dem Logo-Menü ════');
   await ctx.close();
 }
 
-console.log('════ E: Einstellungen — kein Erklärtext über zwei Sätze ════');
+console.log('════ E: Einstellungen – kein Erklärtext über zwei Sätze ════');
 {
   const { ctx, P } = await seite();
   await P.locator('[data-taste="einstellungen"]').click();

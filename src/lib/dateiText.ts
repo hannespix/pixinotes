@@ -166,7 +166,7 @@ export async function dateiTextVonKarte(node: AppNode): Promise<string | null> {
           : art === 'xlsx' ? await xlsxText(blob)
             : (await blob.text()).slice(0, MAX_ZEICHEN);
     } else if (!text) {
-      const aus = 'Der Inhalt dieser Datei liegt nicht auf diesem Gerät — nichts daraus ist bekannt.';
+      const aus = 'Der Inhalt dieser Datei liegt nicht auf diesem Gerät – nichts daraus ist bekannt.';
       merker.set(node.id, aus);
       return aus;
     }
@@ -179,7 +179,7 @@ export async function dateiTextVonKarte(node: AppNode): Promise<string | null> {
   const aus = text.trim()
     ? text
     : (art === 'pdf'
-      ? 'Diese PDF enthält keine Textebene (vermutlich ein Scan) — der Inhalt ist ohne Texterkennung nicht lesbar.'
+      ? 'Diese PDF enthält keine Textebene (vermutlich ein Scan) – der Inhalt ist ohne Texterkennung nicht lesbar.'
       : 'Diese Datei enthält keinen lesbaren Text.');
   merker.set(node.id, aus);
   return aus;

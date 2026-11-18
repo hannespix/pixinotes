@@ -732,7 +732,7 @@ pruefe('B2 die Frage nach dem Namen liegt über der Präsentation, die sich bei 
 await G.P.locator('[data-taste="gast-name"]').fill('Gerd');
 await G.P.locator('[data-taste="gast-name-ok"]').click(); await G.P.waitForTimeout(500);
 await warteBis(A.P, async () => /Du führst vor/.test(await zband(A.P)), 8000);
-pruefe('B3 ohne „Vorführen" zu drücken führt Anna vor — das Band sagt es', /Du führst vor/.test(await zband(A.P)) && /alle sehen deine Folien/.test(await zband(A.P)), await zband(A.P));
+pruefe('B3 ohne „Vorführen" zu drücken führt Anna vor – das Band sagt es', /Du führst vor/.test(await zband(A.P)) && /alle sehen deine Folien/.test(await zband(A.P)), await zband(A.P));
 pruefe('B4 bei Gerd ist die Präsentation offen, erste Folie, er folgt', (await imVortrag(G.P)) === 1 && /1 \/ 4/.test(await folie(G.P)) && /du folgst/.test(await zband(G.P)), `${await folie(G.P)} | ${await zband(G.P)}`);
 await A.P.locator('[data-taste="vortrag-weiter"]').click();
 await warteBis(G.P, async () => (await dok(G.P))?.seite === 1 && /2 \/ 4/.test(await folie(G.P)), 8000);
@@ -786,7 +786,7 @@ console.log('\n════ D: Eine Karte kommt während des Vortrags dazu ═�
 fakeAendern({ nodes: { set: [{ id: 'neu1', type: 'note', width: 200, position: { x: 10, y: 0 }, data: { color: 'yellow', blocks: [{ type: 'paragraph', content: 'Neu davor' }] } }], del: [] } });
 await warteBis(A.P, async () => /\/ 5/.test(await folie(A.P)), 8000);
 await warteBis(G.P, async () => /\/ 5/.test(await folie(G.P)), 8000);
-pruefe('D1 es sind jetzt fünf Folien — Anna bleibt auf der langen Notiz (vorher: Sprung auf Folie 1)', /4 \/ 5/.test(await folie(A.P)) && (await A.P.locator('.presenter .slide-note').textContent()).includes('Absatz 1 der langen'), await folie(A.P));
+pruefe('D1 es sind jetzt fünf Folien – Anna bleibt auf der langen Notiz (vorher: Sprung auf Folie 1)', /4 \/ 5/.test(await folie(A.P)) && (await A.P.locator('.presenter .slide-note').textContent()).includes('Absatz 1 der langen'), await folie(A.P));
 pruefe('D2 Gerd ebenso', /4 \/ 5/.test(await folie(G.P)) && (await G.P.locator('.presenter .slide-note').textContent()).includes('Absatz 1 der langen'), await folie(G.P));
 
 // ══ E ═══════════════════════════════════════════════════════════════
@@ -795,13 +795,13 @@ await A.P.keyboard.press('Escape');
 await warteBis(G.P, async () => (await imVortrag(G.P)) === 0, 8000);
 pruefe('E1 Anna beendet die Präsentation → bei Gerd schließt sie sich', (await imVortrag(A.P)) === 0 && (await imVortrag(G.P)) === 0);
 await warteBis(G.P, async () => (await hatBand(G.P)) === 0, 6000);
-pruefe('E2 die Vorführung, die mit der Präsentation begann, endet mit ihr — kein Band mehr', (await hatBand(A.P)) === 0 && (await hatBand(G.P)) === 0, `${await zband(A.P)} | ${await zband(G.P)}`);
+pruefe('E2 die Vorführung, die mit der Präsentation begann, endet mit ihr – kein Band mehr', (await hatBand(A.P)) === 0 && (await hatBand(G.P)) === 0, `${await zband(A.P)} | ${await zband(G.P)}`);
 
 // ══ F ═══════════════════════════════════════════════════════════════
 console.log('\n════ F: Aus dem Karten-Fokus präsentieren ════');
 await fokusAuf(A.P, 'skript.pdf');
 let ka = await karteLage(A.P, 'f1');
-pruefe('F1 Anna hat die PDF im Fokus — Gerd nicht (niemand führt vor)', ka.fokus && ka.auf && !(await fokusAn(G.P)), JSON.stringify(ka));
+pruefe('F1 Anna hat die PDF im Fokus – Gerd nicht (niemand führt vor)', ka.fokus && ka.auf && !(await fokusAn(G.P)), JSON.stringify(ka));
 await A.P.locator('[data-taste="fokus-seite-nr"]').click(); await A.P.keyboard.type('3'); await A.P.keyboard.press('Enter'); await A.P.waitForTimeout(700);
 pruefe('F2 sie blättert im Fokus auf Seite 3', (await karteLage(A.P, 'f1')).seite === 3, JSON.stringify(await karteLage(A.P, 'f1')));
 await A.P.locator('.focus-nav button[aria-label="Ab dieser Karte präsentieren"]').click();
@@ -852,7 +852,7 @@ await A.P.waitForTimeout(2500);
 pruefe('H5 … und Anna übernimmt dabei nicht von selbst: niemand führt vor, nichts öffnet sich wieder', (await hatBand(A.P)) === 0 && (await hatBand(G.P)) === 0 && (await imVortrag(G.P)) === 0 && (await imVortrag(A.P)) === 0, `${await zband(A.P)} | ${await zband(G.P)}`);
 
 // ══ I ═══════════════════════════════════════════════════════════════
-console.log('\n════ I: Auf dem Board — Fokus und PDF-Seiten ════');
+console.log('\n════ I: Auf dem Board – Fokus und PDF-Seiten ════');
 await frei(A.P);
 await gruppeAuf(A.P);
 await A.P.locator('[data-taste="vorfuehren"]').click(); await A.P.waitForTimeout(600);
@@ -931,7 +931,7 @@ pruefe('J3 Anna beendet die Präsentation → sie schließt sich bei beiden; Ann
 console.log('\n════ K: Fehlerfrei; Texte ════');
 pruefe('K1 keine Fehler der Seite auf allen drei Geräten', A.P.fehler.length === 0 && G.P.fehler.length === 0 && H.P.fehler.length === 0, JSON.stringify([A.P.fehler, G.P.fehler, H.P.fehler]).slice(0, 400));
 const quelle = (p) => readFileSync(path.join(__repo, p), 'utf8');
-pruefe('K2 Hilfe nennt M387 — deutsch und englisch', quelle('src/components/HelpOverlay.tsx').includes('(M387)') && quelle('src/components/HelpOverlayEn.tsx').includes('(M387)'));
+pruefe('K2 Hilfe nennt M387 – deutsch und englisch', quelle('src/components/HelpOverlay.tsx').includes('(M387)') && quelle('src/components/HelpOverlayEn.tsx').includes('(M387)'));
 pruefe('K3 docs/UMBAU.md führt M387', quelle('docs/UMBAU.md').includes('M387'));
 
 await browser.close(); app.close();

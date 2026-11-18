@@ -13,7 +13,7 @@ import type { Teilnehmer } from '../lib/liveKanal';
 import { getAuthor, setAuthor } from './CommentLayer';
 import { ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenStart, vorfuehrenStopp } from '../lib/vorfuehren';
 import { ZEIGER_EREIGNIS, zeigerAn, zeigerSetzen } from '../lib/mauszeiger';
-import { ICheck, IMousePointer, IPen, IQr, IUsers, IX } from './Icons';
+import { ICheck, IMousePointer, IPen, IQr, IUsers, IX, ILock, IMegafon } from './Icons';
 import { ReaktionsKnopf, TimerZeile } from './Gruppenraum';
 import { FREIGABE_OEFFNEN } from './FreigabeDialog';
 
@@ -79,12 +79,12 @@ export function LiveLeiste() {
   const tun = (f: () => void) => () => { setOffen(false); f(); };
   return (
     <div className={`live-leiste${offen ? ' offen' : ''}`} role="group" aria-label="Gerade in diesem Board" data-taste="live-leiste">
-      <button className="live-mehr" aria-expanded={offen} aria-haspopup="true" aria-label="Wer ist dabei — Teilnehmer und Werkzeuge der Gruppe" data-taste="live-auf"
-        title="Wer ist dabei — Teilnehmer und Werkzeuge der Gruppe" onClick={() => setOffen((o) => !o)}>
+      <button className="live-mehr" aria-expanded={offen} aria-haspopup="true" aria-label="Wer ist dabei – Teilnehmer und Werkzeuge der Gruppe" data-taste="live-auf"
+        title="Wer ist dabei – Teilnehmer und Werkzeuge der Gruppe" onClick={() => setOffen((o) => !o)}>
         <span className="live-chip ich" translate="no" style={farbe(selbst.farbe)} data-taste="live-ich-chip">{kuerzel(selbst.name)}</span>
         {sichtbar.map((t) => (
           <span key={t.id} className={`live-chip${t.karte ? ' schreibt' : ''}`} translate="no" style={farbe(t.farbe)} data-taste="live-chip" data-name={t.name}
-            title={t.karte ? `${t.name} — bearbeitet gerade eine Karte` : t.name}>{kuerzel(t.name)}</span>
+            title={t.karte ? `${t.name} – bearbeitet gerade eine Karte` : t.name}>{kuerzel(t.name)}</span>
         ))}
         {rest > 0 && <span className="live-chip mehr" data-taste="live-rest">+{rest}</span>}
         <span className="live-zahl" data-taste="live-zahl">{!verbunden ? 'verbindet …' : andere.length === 0 ? 'nur du' : `${andere.length + 1} dabei`}</span>
@@ -109,7 +109,7 @@ export function LiveLeiste() {
           </div>
           {recht && (
             <div className="live-liste-hinweis" data-taste="live-recht">
-              🔒 {recht === 'eigenes' ? 'Du kannst hier nur deine eigenen Karten ändern und löschen — neue anlegen geht immer.' : 'Du kannst hier alles bearbeiten, aber nur löschen, was du selbst angelegt hast.'}
+              <ILock size={13} /> {recht === 'eigenes' ? 'Du kannst hier nur deine eigenen Karten ändern und löschen – neue anlegen geht immer.' : 'Du kannst hier alles bearbeiten, aber nur löschen, was du selbst angelegt hast.'}
             </div>
           )}
           <div className="live-liste-aktionen">
@@ -126,7 +126,7 @@ export function LiveLeiste() {
             {andere.length > 0 && !nurLesen && (
               <button data-taste="vorfuehren" aria-pressed={fuehrtVor} title="Alle folgen deiner Ansicht: Schwenken, Zoomen, Fokus"
                 onClick={tun(() => (fuehrtVor ? vorfuehrenStopp() : vorfuehrenStart(boardId)))}>
-                <span className="live-zeichen" aria-hidden="true">📣</span> {fuehrtVor ? 'Vorführen beenden' : 'Vorführen — alle folgen dir'}
+                <span className="live-zeichen" aria-hidden="true"><IMegafon size={15} /></span> {fuehrtVor ? 'Vorführen beenden' : 'Vorführen – alle folgen dir'}
               </button>
             )}
             {/* M375: Mauszeiger der anderen sehen und den eigenen zeigen — je Gerät abschaltbar */}
@@ -188,12 +188,12 @@ export function GastNameDialog() {
     <div className="modal-backdrop ueber-vortrag" onClick={() => setOffen(false)}>
       <div className="modal gast-name-dialog" role="dialog" aria-modal="true" aria-label="Dein Name" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>👋 Wie heißt du?</h2>
+          <h2>Wie heißt du?</h2>
           <button className="modal-x" onClick={() => setOffen(false)} aria-label="Schließen"><IX size={16} /></button>
         </div>
         <div className="modal-body">
           <section className="modal-section">
-            <p className="modal-hint">Die anderen im Board sehen deinen Namen — an der Karte, die du gerade bearbeitest, und an deinen Kommentaren.</p>
+            <p className="modal-hint">Die anderen im Board sehen deinen Namen – an der Karte, die du gerade bearbeitest, und an deinen Kommentaren.</p>
             <div className="freigabe-zeile">
               <input autoFocus value={name} maxLength={40} placeholder="Dein Name" aria-label="Dein Name" data-taste="gast-name"
                 onChange={(e) => setName(e.target.value)}

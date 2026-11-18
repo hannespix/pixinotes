@@ -176,7 +176,7 @@ console.log('\n════ T2: Export aller Termine ════');
     const ics = readFileSync(pfad, 'utf8');
     const anzahl = (ics.match(/BEGIN:VEVENT/g) ?? []).length;
     console.log(`    ${datei.suggestedFilename()} · ${ics.length} Zeichen · ${anzahl} VEVENTs`);
-    pruefe('T2d ALLE sechs Termine sind drin — auch die aus 2026 und 2028',
+    pruefe('T2d ALLE sechs Termine sind drin – auch die aus 2026 und 2028',
       anzahl === 6, `${anzahl} statt 6`);
     for (const t of TERMINE) {
       pruefe(`T2e „${t.title.slice(0, 28)}" ist enthalten`,

@@ -32,7 +32,7 @@ import { createReactBlockSpec } from '@blocknote/react';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from '../lib/formel';
 import { resolveLink } from '../lib/links';
 import { useBoard } from '../store';
-import { IPlus, ISigma, IX } from './Icons';
+import { IPlus, ISigma, IX, ILink } from './Icons';
 
 /** Zellformat: fett, Ausrichtung, Hintergrund — je Zelladresse gemerkt */
 export interface ZellStil {
@@ -176,7 +176,7 @@ function Gitter({ zellenRoh, stilRoh, spalten, zeilen, schreibe }: GitterProps) 
     const t = resolveLink(ziel, boards);
     if (t?.kind === 'board') openBoard(t.boardId);
     else if (t?.kind === 'card') { openBoard(t.boardId); focusNode(t.boardId, t.nodeId); }
-    else showToast(`„${ziel}" gibt es (noch) nicht — Name prüfen oder Board anlegen.`);
+    else showToast(`„${ziel}" gibt es (noch) nicht – Name prüfen oder Board anlegen.`);
   };
 
   const aktivStil = aktiv ? stil[aktiv] ?? {} : {};
@@ -235,7 +235,7 @@ function Gitter({ zellenRoh, stilRoh, spalten, zeilen, schreibe }: GitterProps) 
                             title={link.extern ? link.ziel : `Zu „${link.ziel}" springen`}
                             onClick={() => folgeLink(link.ziel, link.extern)}
                           >
-                            {link.extern ? '🔗' : '⧉'} {link.text}
+                            {link.extern ? <ILink size={11} /> : '⧉'} {link.text}
                           </button>
                           <button
                             type="button"

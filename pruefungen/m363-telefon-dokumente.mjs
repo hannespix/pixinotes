@@ -190,7 +190,7 @@ const fit = z.zoom;
 pruefe('A1 ein Tipp öffnet die PDF im Fokus', z.fokus, z);
 pruefe('A2 die Karte passt in die Schirmbreite (nichts abgeschnitten)', z.links >= 0 && z.rechts <= z.b && z.seiteB >= z.b * 0.88, z);
 const leiste = await P.evaluate(() => [...document.querySelectorAll('.focus-nav.dokument button')].map((b) => { const r = b.getBoundingClientRect(); return [b.getAttribute('data-taste') ?? b.getAttribute('aria-label'), Math.round(r.width), Math.round(r.height), r.right <= innerWidth + 1 && r.left >= -1]; }));
-pruefe('A3 Fußleiste: Seiten-Pfeile, Stift, Textmarker, Radierer, Kommentar — alle ≥ 44 Punkte und im Bild',
+pruefe('A3 Fußleiste: Seiten-Pfeile, Stift, Textmarker, Radierer, Kommentar – alle ≥ 44 Punkte und im Bild',
   ['fokus-seite-zurueck', 'fokus-stift', 'fokus-marker', 'fokus-radierer', 'fokus-kommentar', 'fokus-seite-vor'].every((t) => leiste.some((l) => l[0] === t && l[1] >= 44 && l[2] >= 44 && l[3])), leiste);
 pruefe('A4 Kopfzeile und Leiste nennen die Seite', /Seite 1 von 4/.test(await P.locator('.focus-title').textContent()) && (await P.locator('[data-taste="fokus-seite-nr"]').inputValue()) === '1');
 await P.screenshot({ path: path.join(SD, 'm363-fokus.png') });
@@ -215,7 +215,7 @@ await kneifen(195, 320, 45, 140); z = await lage();
 const gezoomt = z.zoom;
 pruefe('C1 zwei Finger vergrößern die Seite', z.zoom > fit * 1.8 && z.rechts - z.links > z.b * 1.8, z);
 await zug(320, 350, 60, 350); const geschoben = await lage();
-pruefe('C2 ein Finger schiebt das vergrößerte Blatt seitwärts — und blättert dabei nicht', geschoben.links < z.links - 150 && geschoben.seite === 2, { vor: z.links, nach: geschoben.links, seite: geschoben.seite });
+pruefe('C2 ein Finger schiebt das vergrößerte Blatt seitwärts – und blättert dabei nicht', geschoben.links < z.links - 150 && geschoben.seite === 2, { vor: z.links, nach: geschoben.links, seite: geschoben.seite });
 for (let i = 0; i < 4; i++) await zug(330, 350, 40, 350);
 z = await lage();
 pruefe('C3 … bis an die rechte Kante, nicht darüber hinaus', z.rechts >= z.b - 12 && z.rechts <= z.b + 2, z);
@@ -243,7 +243,7 @@ pruefe('D2 ein Fingerstrich markiert auf der Seite (Seite 3 dieser PDF)', b.draw
 z = await lage();
 pruefe('D3 dabei hat sich nichts verschoben und nicht geblättert', z.seite === 3 && Math.abs(z.zoom - fit) < 0.02, z);
 await kneifen(195, 320, 45, 130); z = await lage(); b = await board(P);
-pruefe('D4 zwei Finger zoomen auch mit Textmarker — ohne Strich', z.zoom > fit * 1.5 && b.drawings.length === n0 + 1, { zoom: z.zoom, striche: b.drawings.length });
+pruefe('D4 zwei Finger zoomen auch mit Textmarker – ohne Strich', z.zoom > fit * 1.5 && b.drawings.length === n0 + 1, { zoom: z.zoom, striche: b.drawings.length });
 await kneifen(195, 320, 140, 20);
 await P.locator('[data-taste="fokus-radierer"]').tap(); await P.waitForTimeout(400);
 const laenge = (bb) => bb.drawings.filter((s) => s.anchor === 'f1' && s.seite === 3 && s.tool === 'marker').reduce((sum, s) => sum + (Math.max(...s.points.map((p) => p[0])) - Math.min(...s.points.map((p) => p[0]))), 0);
@@ -320,7 +320,7 @@ while (druecke < 8 && (await dfolie()).seite === 1) { await taste('Space', 900);
 g = await dfolie();
 pruefe('F4 am Seitenende blättert sie; die neue Seite beginnt oben', g.seite === 2 && g.rollTop === 0 && druecke <= 4, { ...g, druecke });
 await taste('0', 700); g = await dfolie();
-pruefe('F5 „0": ganze Seite — passt in die Höhe', g.modus === 'seite' && g.blattH <= g.platzH + 1 && g.zoom === 1, g);
+pruefe('F5 „0": ganze Seite – passt in die Höhe', g.modus === 'seite' && g.blattH <= g.platzH + 1 && g.zoom === 1, g);
 await taste('ArrowRight'); await taste('ArrowRight'); g = await dfolie();
 pruefe('F6 → blättert Seite für Seite (Seite 4)', g.seite === 4, g.seite);
 await taste('ArrowRight', 900); g = await dfolie();

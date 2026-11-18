@@ -3,7 +3,7 @@
  "sonnig": "sunny",
  "bedeckt": "overcast",
  "zentriert": "centered",
- "🏢 Work": "🏢 Work",
+ "Work": "Work",
  "General": "General",
  "PixiNotes findet darin das Projekt-Paket, richtet den automatischen Abgleich ein und zeigt dir das Projekt neben deinen eigenen.": "PixiNotes finds the project package in it, sets up automatic sync and shows you the project next to your own.",
  "PixiNotes verwendet nur GET und PUT auf eine einzelne JSON-Datei im angegebenen": "PixiNotes only uses GET and PUT on a single JSON file in the given",
@@ -18,5 +18,6 @@
  "{0} (geteilt)": "{0} (shared)",
  "help anleitung": "help guide manual",
  "Helligkeit": "Brightness",
- "Sättigung": "Saturation"
+ "Sättigung": "Saturation",
+ "Recherche": "Research"
 }

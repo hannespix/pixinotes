@@ -120,7 +120,7 @@ await zug(P, welle(500, 420), { id: 41 }); await warte(P, 800);
 const vorD = (await striche(P)).length;
 await tipp(P, 520, 396, 42); await warte(P, 700);
 s = await striche(P);
-pruefe('D1 Wort und Punkt darüber — beide als Striche', vorD === 1 && s.length === 2 && s[1].points.length === 2, JSON.stringify(s.map((x) => x.points.length)));
+pruefe('D1 Wort und Punkt darüber – beide als Striche', vorD === 1 && s.length === 2 && s[1].points.length === 2, JSON.stringify(s.map((x) => x.points.length)));
 
 console.log('\n════ E: Tipp auf Bedienbares bleibt Klick ════');
 await warte(P, 4200);   // frisches Schreiben ist vorbei

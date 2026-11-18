@@ -576,7 +576,7 @@ const fakeAendern = (p, { senden = true, mitInhalt = true } = {}) => {
 const gleichServer = async (P) => (await idsLokal(P)) === idsVon(bxServer());
 
 // ══ A ═══════════════════════════════════════════════════════════════
-console.log('\n════ A: Anna allein — Änderungen reisen kartenweise ════');
+console.log('\n════ A: Anna allein – Änderungen reisen kartenweise ════');
 const A = await geraet('A1', standA);
 await anmelden(A.P, 'anna@example.de', 'geheim123', true);
 const uidA = nutzerId('anna@example.de');
@@ -597,7 +597,7 @@ pruefe('A2 Anna legt eine Karte an', await notizPlatz(A.P, 'Karte eins'));
 await warteBis(A.P, () => /Karte eins/.test(bxServer()), 10000);
 {
   const d = seit(m);
-  pruefe('A3 sie geht kartenweise hinaus (board_aendern) — das Board reist nicht als Ganzes', /Karte eins/.test(bxServer()) && d.patches.length >= 1 && d.ganz.length === 0, kurz(d));
+  pruefe('A3 sie geht kartenweise hinaus (board_aendern) – das Board reist nicht als Ganzes', /Karte eins/.test(bxServer()) && d.patches.length >= 1 && d.ganz.length === 0, kurz(d));
   const id = idVon('Karte eins');
   pruefe('A4 der Patch nennt genau diese eine Karte, sonst nichts', !!id && kartenIn(d).join() === id && d.patches.every((x) => Object.keys(x.p).join() === 'nodes' && !(x.p.nodes.del ?? []).length), kurz(d));
   const groesste = Math.max(...d.patches.map((x) => x.bytes));
@@ -605,7 +605,7 @@ await warteBis(A.P, () => /Karte eins/.test(bxServer()), 10000);
   const u = um();
   pruefe('A6 die Umgebung trägt den Stempel des Servers („v<Version>")', u.boards.bx === `v${zeile(uidA, 'board-bx.json').version}`, `${u.boards.bx} / v${zeile(uidA, 'board-bx.json').version}`);
   const stamp = await A.P.evaluate(() => localStorage.getItem('pixinotes:konto-stamp'));
-  pruefe('A7 … und den Zeitpunkt des Geräts — der eigene Schreibvorgang gilt ihm nicht als fremd', u.savedAt === stamp, `${u.savedAt} / ${stamp}`);
+  pruefe('A7 … und den Zeitpunkt des Geräts – der eigene Schreibvorgang gilt ihm nicht als fremd', u.savedAt === stamp, `${u.savedAt} / ${stamp}`);
   pruefe('A8 die anderen Karten des Boards sind unverändert da (9 + 1)', JSON.parse(bxServer()).nodes.length === 10 && JSON.parse(bxServer()).nodes.filter((n) => n.data.ballast?.length > 20000).length === 8);
 }
 m = marke();
@@ -729,7 +729,7 @@ m = marke();
   const beiAnna = await warteBis(A.P, () => hat(A.P, 'Gruß von Bernd'), 14000);
   await A.P.waitForTimeout(4000);
   const d2 = seit(m);
-  pruefe('C4 Anna sieht sie — und schreibt dafür nichts zurück', beiAnna && d2.patches.every((x) => x.geraet === 'B') && d2.ganz.length === 0, kurz(d2));
+  pruefe('C4 Anna sieht sie – und schreibt dafür nichts zurück', beiAnna && d2.patches.every((x) => x.geraet === 'B') && d2.ganz.length === 0, kurz(d2));
 }
 m = marke();
 {
@@ -802,7 +802,7 @@ m = marke();
   const ok1 = await notizPlatz(A.P, 'Anna noch einmal');
   const da = await warteBis(G.P, () => hat(G.P, 'Anna noch einmal'), 12000);
   const d = seit(m);
-  pruefe('D3 Anna schreibt danach weiter kartenweise — nur ihre neue Karte', ok1 && da && d.ganz.length === 0 && kartenIn(d).join() === idVon('Anna noch einmal'), kurz(d));
+  pruefe('D3 Anna schreibt danach weiter kartenweise – nur ihre neue Karte', ok1 && da && d.ganz.length === 0 && kartenIn(d).join() === idVon('Anna noch einmal'), kurz(d));
   const ids = (t) => JSON.parse(t).nodes.map((n) => n.id).sort().join();
   await G.P.waitForTimeout(2500);
   pruefe('D4 Anna, Gerd und das Konto halten dieselben Karten', ids(bxServer()) === (await boardVon(A.P, 'bx')).nodes.map((n) => n.id).sort().join() && ids(bxServer()) === (await boardVon(G.P, 'bx')).nodes.map((n) => n.id).sort().join());
@@ -842,7 +842,7 @@ console.log('\n════ F: Migration, Hilfe ════');
   const sql = existsSync(mig) ? readFileSync(mig, 'utf8') : '';
   pruefe('F1 die Migration liegt im Repository (board_aendern nur für Angemeldete, mit Freigabe-Prüfung)', /create or replace function public\.board_aendern/.test(sql) && /grant execute on function public\.board_aendern\(uuid, text, json, text\) to authenticated/.test(sql) && /f\.rolle = 'bearbeiten'/.test(sql) && !/board_aendern[^;]*to anon/.test(sql));
   const hilfe = readdirSync(path.join(DIST, 'assets')).filter((f) => /^HelpOverlay/.test(f)).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8'));
-  pruefe('F2 „Was ist neu" nennt es — deutsch und englisch', hilfe.filter((t) => t.includes('(M383)')).length === 2, `${hilfe.length}`);
+  pruefe('F2 „Was ist neu" nennt es – deutsch und englisch', hilfe.filter((t) => t.includes('(M383)')).length === 2, `${hilfe.length}`);
 }
 
 console.log(`\n${ok} bestanden, ${bad} durchgefallen`);

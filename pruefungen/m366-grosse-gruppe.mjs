@@ -565,7 +565,7 @@ await G.P.locator('[data-taste="gast-name"]').fill('Gerd');
 await G.P.locator('[data-taste="gast-name-ok"]').click(); await G.P.waitForTimeout(500);
 await warteBis(G.P, async () => /2 dabei/.test(await zahl(G.P)), 8000);
 pruefe('A1 Gerd ist dabei', /2 dabei/.test(await zahl(G.P)));
-pruefe('A2 Gerd legt eine Karte an — sie geht kartenweise hinaus (gast_aendern), nicht als ganzes Board', (await notizPlatz(G.P, 'Gerd eins')) && (await warteBis(G.P, () => /Gerd eins/.test(bxServer()), 8000)) && sb.aufrufe.gastAendern >= 1 && sb.aufrufe.gastSchreiben === 0, JSON.stringify(sb.aufrufe));
+pruefe('A2 Gerd legt eine Karte an – sie geht kartenweise hinaus (gast_aendern), nicht als ganzes Board', (await notizPlatz(G.P, 'Gerd eins')) && (await warteBis(G.P, () => /Gerd eins/.test(bxServer()), 8000)) && sb.aufrufe.gastAendern >= 1 && sb.aufrufe.gastSchreiben === 0, JSON.stringify(sb.aufrufe));
 await warteBis(A.P, async () => /Gerd eins/.test(JSON.stringify(await boardVon(A.P, 'bx'))), 12000);
 pruefe('A3 Anna sieht sie', /Gerd eins/.test(JSON.stringify(await boardVon(A.P, 'bx'))));
 await G.P.waitForTimeout(1500);
@@ -594,7 +594,7 @@ pruefe('B2 Anna: „52 dabei"', await warteBis(A.P, async () => /52 dabei/.test(
 }
 
 // ══ C + D ═══════════════════════════════════════════════════════════
-console.log('\n════ C/D: Sturm — 240 Änderungen in 12 Sekunden, Gerd schreibt mit ════');
+console.log('\n════ C/D: Sturm – 240 Änderungen in 12 Sekunden, Gerd schreibt mit ════');
 await G.P.evaluate(() => { window.__luecken = []; let t = performance.now(); const f = () => { const n = performance.now(); window.__luecken.push(n - t); t = n; window.__raf = requestAnimationFrame(f); }; window.__raf = requestAnimationFrame(f); });
 const vorher = { ...sb.aufrufe };
 let sturmN = 0;
@@ -617,7 +617,7 @@ for (let i = 1; i <= 5; i += 1) { gerdOk = (await notizPlatz(G.P, `Gerd im Sturm
 await sturm;
 await warteBis(G.P, () => [1, 2, 3, 4, 5].every((i) => new RegExp(`Gerd im Sturm ${i}`).test(bxServer())), 12000);
 void gerdOk;   // (die Zählung im Helfer stimmt im Sturm nicht — es kommen ja laufend Karten dazu)
-pruefe('D1 Gerds fünf Karten liegen auf dem Server — ohne Wiederholungen (keine Vorbedingung, kein ganzes Board)', [1, 2, 3, 4, 5].every((i) => new RegExp(`Gerd im Sturm ${i}`).test(bxServer())) && sb.aufrufe.vorbedingung === vorher.vorbedingung && sb.aufrufe.gastSchreiben === 0, `server: ${[1, 2, 3, 4, 5].map((i) => new RegExp(`Gerd im Sturm ${i}`).test(bxServer())).join(',')} | lokal: ${(await Promise.all([1, 2, 3, 4, 5].map(async (i) => new RegExp(`Gerd im Sturm ${i}`).test(JSON.stringify(await boardVon(G.P, 'bx')))))).join(',')} | ${JSON.stringify(sb.aufrufe)}`);
+pruefe('D1 Gerds fünf Karten liegen auf dem Server – ohne Wiederholungen (keine Vorbedingung, kein ganzes Board)', [1, 2, 3, 4, 5].every((i) => new RegExp(`Gerd im Sturm ${i}`).test(bxServer())) && sb.aufrufe.vorbedingung === vorher.vorbedingung && sb.aufrufe.gastSchreiben === 0, `server: ${[1, 2, 3, 4, 5].map((i) => new RegExp(`Gerd im Sturm ${i}`).test(bxServer())).join(',')} | lokal: ${(await Promise.all([1, 2, 3, 4, 5].map(async (i) => new RegExp(`Gerd im Sturm ${i}`).test(JSON.stringify(await boardVon(G.P, 'bx')))))).join(',')} | ${JSON.stringify(sb.aufrufe)}`);
 await warteBis(G.P, () => gleichServer(G.P), 15000);
 {
   const srv = JSON.parse(bxServer());
@@ -659,7 +659,7 @@ console.log('\n════ F: 20 halten gleichzeitig eine Karte ════');
   await warteBis(G.P, async () => (await G.P.locator('[data-taste="live-sperre"]').count()) === 20, 6000);
   pruefe('F1 Gerd sieht 20 Rahmen mit Namen', (await G.P.locator('[data-taste="live-sperre"]').count()) === 20 && /Teilnehmerin/.test(await G.P.locator('[data-taste="live-sperre"]').first().textContent()));
   await G.P.locator('[data-taste="live-auf"]').click(); await G.P.waitForTimeout(300);
-  pruefe('F2 die Liste nennt, wer gerade schreibt — sie stehen vorn', /20 schreiben gerade/.test(await G.P.locator('.live-liste-kopf').textContent()) && /schreibt/.test(await G.P.locator('[data-taste="live-liste"] .live-liste-zeile').nth(1).textContent()));
+  pruefe('F2 die Liste nennt, wer gerade schreibt – sie stehen vorn', /20 schreiben gerade/.test(await G.P.locator('.live-liste-kopf').textContent()) && /schreibt/.test(await G.P.locator('[data-taste="live-liste"] .live-liste-zeile').nth(1).textContent()));
   await G.P.keyboard.press('Escape');
   pruefe('F3 Gerd kann daneben weiterarbeiten', await notizPlatz(G.P, 'Gerd neben den Rahmen'));
   for (let i = 0; i < 20; i += 1) { const alt = leute[i]; const neu = { ...alt, karte: null, seit: null }; fakeWeg(topic, alt.id, alt); fakeDa(topic, alt.id, neu); leute[i] = neu; }
@@ -675,7 +675,7 @@ console.log('\n════ G: Zu groß für den Kanal ════');
   const lesenVor = sb.aufrufe.gastLesen;
   fakeAendern({ nodes: { set: [karteF('gross', 'Sehr große Karte', 210, 'g:f03')] } }, { mitInhalt: false });
   await warteBis(G.P, async () => /Sehr große Karte/.test(JSON.stringify(await boardVon(G.P, 'bx'))), 12000);
-  pruefe('G1 die Änderung kommt ohne Inhalt durch den Kanal — ein Abgleich holt sie', /Sehr große Karte/.test(JSON.stringify(await boardVon(G.P, 'bx'))) && sb.aufrufe.gastLesen - lesenVor === 1, `${sb.aufrufe.gastLesen - lesenVor}×`);
+  pruefe('G1 die Änderung kommt ohne Inhalt durch den Kanal – ein Abgleich holt sie', /Sehr große Karte/.test(JSON.stringify(await boardVon(G.P, 'bx'))) && sb.aufrufe.gastLesen - lesenVor === 1, `${sb.aufrufe.gastLesen - lesenVor}×`);
 }
 
 // ══ H ═══════════════════════════════════════════════════════════════
@@ -695,7 +695,7 @@ console.log('\n════ H: Anna (mit Konto) ändert etwas ════');
   fakeAendern({ nodes: { set: [karteF('nachAnna', 'Nach Anna', 220, 'g:f04')] } });
   await warteBis(G.P, async () => /Nach Anna/.test(JSON.stringify(await boardVon(G.P, 'bx'))), 6000);
   await G.P.waitForTimeout(2500);
-  pruefe('H4 die nächste Änderung eines Gasts schließt an — weiter ohne Neuladen', /Nach Anna/.test(JSON.stringify(await boardVon(G.P, 'bx'))) && sb.aufrufe.gastLesen - lesenVor === 0 && (await gleichServer(G.P)), `${sb.aufrufe.gastLesen - lesenVor}×`);
+  pruefe('H4 die nächste Änderung eines Gasts schließt an – weiter ohne Neuladen', /Nach Anna/.test(JSON.stringify(await boardVon(G.P, 'bx'))) && sb.aufrufe.gastLesen - lesenVor === 0 && (await gleichServer(G.P)), `${sb.aufrufe.gastLesen - lesenVor}×`);
   void t0;
 }
 
@@ -709,7 +709,7 @@ console.log('\n════ I: Server ohne gast_aendern ════');
   const ganzVor = sb.aufrufe.gastSchreiben;
   pruefe('I1 Karla legt eine Karte an', await notizPlatz(K.P, 'Von Karla'));
   await warteBis(K.P, () => /Von Karla/.test(bxServer()), 12000);
-  pruefe('I2 sie kommt an — über den bisherigen Weg (ganzes Board mit Vorbedingung)', /Von Karla/.test(bxServer()) && sb.aufrufe.gastSchreiben > ganzVor);
+  pruefe('I2 sie kommt an – über den bisherigen Weg (ganzes Board mit Vorbedingung)', /Von Karla/.test(bxServer()) && sb.aufrufe.gastSchreiben > ganzVor);
   sb.ohneAendern = false;
   await K.ctx.close();
 }

@@ -70,7 +70,7 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
             {data.name}
           </span>
         )}
-        {memberCount > 0 && <span className="frame-count" title={`${memberCount} Karte(n) in diesem Rahmen — sie wandern mit dem Rahmen mit`}>{memberCount}</span>}
+        {memberCount > 0 && <span className="frame-count" title={`${memberCount} Karte(n) in diesem Rahmen – sie wandern mit dem Rahmen mit`}>{memberCount}</span>}
       </div>
       <div className="frame-body" style={tint ? { background: `${tint}55` } : undefined} />
     </div>
