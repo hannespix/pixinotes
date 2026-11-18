@@ -7474,3 +7474,11 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 :root { font-variant-emoji: text; }
 .bn-editor, .note-editor, [translate='no'], input, textarea, [contenteditable='true'] { font-variant-emoji: normal; }
 .reakt-wahl, .reakt-flug { font-variant-emoji: emoji; }
+
+/* ---------- M399: Anordnen – Symbol-Zeilen im Menü der Auswahl ---------- */
+.sel-ai-menu.anordnen-menu { min-width: 0; width: max-content; }
+.anordnen-reihe { display: flex; align-items: center; gap: 2px; padding: 0 3px 2px; }
+.anordnen-reihe > i { width: 1px; height: 18px; background: var(--border-soft); margin: 0 5px; flex: none; }
+.sel-ai-menu .anordnen-knopf { width: 32px; height: 30px; padding: 0; display: grid; place-items: center; flex: none; color: var(--ink); }
+.sel-ai-menu .anordnen-knopf:disabled { opacity: .35; cursor: default; background: none; }
+@media (pointer: coarse) { .sel-ai-menu .anordnen-knopf { width: 40px; height: 38px; } }

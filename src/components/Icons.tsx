@@ -152,3 +152,23 @@ export const ILink = make(<><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1
 export const ILaecheln = make(<><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><path d="M9 9h.01" /><path d="M15 9h.01" /></>);
 export const INetz = make(<><circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="8" r="2.5" /><circle cx="10" cy="18" r="2.5" /><path d="M8.4 6.4 15.6 7.6" /><path d="M6.8 8.4 9.2 15.6" /><path d="M16.5 10 11.5 16" /></>);
 export const IBuch = make(<><path d="M4 5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-2z" /><path d="M8 3v18" /></>);
+
+// M399: Anordnen – Kanten, Verteilen, Größe, Raster (eigene, einfache Zeichnungen im selben Strich)
+export const IKanteLinks = make(<><path d="M3 3v18" /><rect x="7" y="5" width="13" height="5" rx="1" /><rect x="7" y="14" width="8" height="5" rx="1" /></>);
+export const IKanteMitteX = make(<><path d="M12 2v3" /><path d="M12 10v4" /><path d="M12 19v3" /><rect x="4" y="5" width="16" height="5" rx="1" /><rect x="7" y="14" width="10" height="5" rx="1" /></>);
+export const IKanteRechts = make(<><path d="M21 3v18" /><rect x="4" y="5" width="13" height="5" rx="1" /><rect x="9" y="14" width="8" height="5" rx="1" /></>);
+export const IKanteOben = make(<><path d="M3 3h18" /><rect x="5" y="7" width="5" height="13" rx="1" /><rect x="14" y="7" width="5" height="8" rx="1" /></>);
+export const IKanteMitteY = make(<><path d="M2 12h3" /><path d="M10 12h4" /><path d="M19 12h3" /><rect x="5" y="4" width="5" height="16" rx="1" /><rect x="14" y="7" width="5" height="10" rx="1" /></>);
+export const IKanteUnten = make(<><path d="M3 21h18" /><rect x="5" y="4" width="5" height="13" rx="1" /><rect x="14" y="9" width="5" height="8" rx="1" /></>);
+export const IVerteilenX = make(<><path d="M3 3v18" /><path d="M21 3v18" /><rect x="9" y="6" width="6" height="12" rx="1" /></>);
+export const IVerteilenY = make(<><path d="M3 3h18" /><path d="M3 21h18" /><rect x="6" y="9" width="12" height="6" rx="1" /></>);
+export const IAlsZeile = make(<><rect x="2" y="7" width="5" height="10" rx="1" /><rect x="9.5" y="7" width="5" height="10" rx="1" /><rect x="17" y="7" width="5" height="10" rx="1" /></>);
+export const IAlsSpalte = make(<><rect x="7" y="2" width="10" height="5" rx="1" /><rect x="7" y="9.5" width="10" height="5" rx="1" /><rect x="7" y="17" width="10" height="5" rx="1" /></>);
+export const IGleichBreit = make(<><path d="M4 6h16" /><path d="m7 3-3 3 3 3" /><path d="m17 3 3 3-3 3" /><rect x="4" y="13" width="16" height="7" rx="1" /></>);
+export const IGleichHoch = make(<><path d="M6 4v16" /><path d="m3 7 3-3 3 3" /><path d="m3 17 3 3 3-3" /><rect x="13" y="4" width="7" height="16" rx="1" /></>);
+export const IGleichGross = make(<><rect x="3" y="6" width="8" height="12" rx="1" /><rect x="13" y="6" width="8" height="12" rx="1" /></>);
+export const IGroesser = make(<><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M12 8v8" /><path d="M8 12h8" /></>);
+export const IKleiner = make(<><rect x="5" y="5" width="14" height="14" rx="2" /><path d="M9 12h6" /></>);
+export const IRaster = make(<><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>);
+export const IPacken = make(<><rect x="3" y="3" width="7" height="10" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="17" width="7" height="4" rx="1" /></>);
+export const IOrdnen = make(<><rect x="3" y="4" width="6" height="6" rx="1" /><rect x="12" y="4" width="9" height="6" rx="1" /><rect x="3" y="14" width="10" height="6" rx="1" /><rect x="16" y="14" width="5" height="6" rx="1" /></>);

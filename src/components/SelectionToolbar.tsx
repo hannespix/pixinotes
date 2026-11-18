@@ -14,7 +14,12 @@ import { wurzelZoom } from '../lib/anzeige';
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
 // von Hand gepflegte Kopie der Schriftliste.
 import { FONT_STACKS, GROESSEN_KARTE, SCHRIFTEN } from '../lib/typo';
-import { ALIGN_LABEL, computeAlign, type AlignOp } from '../lib/align';
+import { ALIGN_LABEL, ALIGN_MIN, computeAlign, type AlignOp } from '../lib/align';
+import { sizeOf } from '../lib/arrange';
+import {
+  IKanteLinks, IKanteMitteX, IKanteRechts, IKanteOben, IKanteMitteY, IKanteUnten, IVerteilenX, IVerteilenY, IAlsZeile, IAlsSpalte,
+  IGleichBreit, IGleichHoch, IGleichGross, IGroesser, IKleiner, IRaster, IPacken, IOrdnen,
+} from './Icons';
 import { vorschauArt } from '../lib/fileStore';
 import { bildBearbeitbar, bildBearbeiten } from './BildEditorHost';
 import { mutedHistory } from '../store';
@@ -244,6 +249,37 @@ export function SelectionToolbar() {
     mutedHistory(() => { for (const n of selected) fn(n); });
   };
   const selFrames = board.nodes.filter((n) => n.selected && n.type === 'frame');
+  /** M399: Ein Anordnungs-Befehl auf die Auswahl – ein Rückgängig-Schritt, gleich wie viele Karten sich bewegen */
+  const anordnen = (op: AlignOp, offenLassen = false) => {
+    const { moves, resizes } = computeAlign(selected, op);
+    if (moves.length === 0 && resizes.length === 0) {
+      if (!offenLassen) { setMenu(null); showToast('Die Karten stehen schon so.'); }
+      return;
+    }
+    const st = useBoard.getState();
+    st.pushHistory();
+    mutedHistory(() => {
+      // Eine von Hand gesetzte Höhe soll bleiben: wie beim Ziehen am Griff endet die Auto-Größe
+      const hoehe = resizes.filter(([rid, , h]) => Math.abs(h - sizeOf(selected.find((n) => n.id === rid)!).h) > 0.01).map(([rid]) => rid);
+      if (hoehe.length) st.setAutoFit(hoehe, false);
+      for (const [rid, w, h] of resizes) st.resizeNode(rid, w, h);
+      if (moves.length) st.setNodePositions(moves);
+    });
+    if (offenLassen) return;
+    setMenu(null);
+    showToast(`${ALIGN_LABEL[op]} – Strg+Z macht es rückgängig`);
+  };
+  const anordnenKnopf = (op: AlignOp, Bild: (p: { size?: number }) => JSX.Element, offenLassen = false) => (
+    <button
+      key={op}
+      className="anordnen-knopf"
+      data-anordnen={op}
+      title={ALIGN_LABEL[op]}
+      aria-label={ALIGN_LABEL[op]}
+      disabled={selected.length < (ALIGN_MIN[op] ?? 2)}
+      onClick={() => anordnen(op, offenLassen)}
+    ><Bild size={17} /></button>
+  );
   const framesOnly = selected.length === 0;
   // Geankerte Markierungen (M127) der ausgewählten Karten — bei Bedarf lösbar
   const anchoredCount = (board.drawings ?? []).filter(
@@ -495,28 +531,32 @@ export function SelectionToolbar() {
       )}
       {selected.length >= 2 && (
         <span className="sel-ai-wrap">
-          {menu === 'align' && menuPortal('', (
+          {menu === 'align' && menuPortal('anordnen-menu', (
             <>
-              {(['left', 'centerX', 'top', 'centerY', 'distH', 'distV', 'width'] as AlignOp[]).map((op) => (
-                <button
-                  key={op}
-                  disabled={(op === 'distH' || op === 'distV') && selected.length < 3}
-                  onClick={() => {
-                    const { moves, resizes } = computeAlign(selected, op);
-                    if (moves.length === 0 && resizes.length === 0) return;
-                    const st = useBoard.getState();
-                    st.pushHistory();
-                    mutedHistory(() => {
-                      if (moves.length) st.setNodePositions(moves);
-                      for (const [rid, w, h] of resizes) st.resizeNode(rid, w, h);
-                    });
-                    setMenu(null);
-                    showToast(`${ALIGN_LABEL[op].slice(2).trim()} – Strg+Z macht es rückgängig`);
-                  }}
-                >
-                  {ALIGN_LABEL[op]}
-                </button>
-              ))}
+              {/* M399: vier Gruppen statt einer Liste – Kanten, Verteilen, Größe als Symbol-Zeilen, die großen
+                  Umordnungen (Raster, Packen, Aufräumen) mit Namen */}
+              <div className="sel-attr-title">Ausrichten</div>
+              <div className="anordnen-reihe">
+                {anordnenKnopf('left', IKanteLinks)}{anordnenKnopf('centerX', IKanteMitteX)}{anordnenKnopf('right', IKanteRechts)}
+                <i aria-hidden="true" />
+                {anordnenKnopf('top', IKanteOben)}{anordnenKnopf('centerY', IKanteMitteY)}{anordnenKnopf('bottom', IKanteUnten)}
+              </div>
+              <div className="sel-attr-title">Verteilen</div>
+              <div className="anordnen-reihe">
+                {anordnenKnopf('distH', IVerteilenX)}{anordnenKnopf('distV', IVerteilenY)}
+                <i aria-hidden="true" />
+                {anordnenKnopf('row', IAlsZeile)}{anordnenKnopf('column', IAlsSpalte)}
+              </div>
+              <div className="sel-attr-title">Größe</div>
+              <div className="anordnen-reihe">
+                {anordnenKnopf('width', IGleichBreit)}{anordnenKnopf('height', IGleichHoch)}{anordnenKnopf('size', IGleichGross)}
+                <i aria-hidden="true" />
+                {anordnenKnopf('smaller', IKleiner, true)}{anordnenKnopf('bigger', IGroesser, true)}
+              </div>
+              <div className="sel-attr-title">Anordnen</div>
+              <button data-anordnen="grid" onClick={() => anordnen('grid')} title="Spalten und Zeilen bündig, Reihenfolge wie gelesen"><IRaster size={14} /> Raster</button>
+              <button data-anordnen="pack" onClick={() => anordnen('pack')} title="Dicht aneinander, ohne Lücken und Überlappen"><IPacken size={14} /> Kompakt packen</button>
+              <button data-anordnen="tidy" onClick={() => anordnen('tidy')} title="Anordnung bleibt, Abstände werden gleich, nichts überlappt"><IOrdnen size={14} /> Aufräumen</button>
             </>
           ))}
         </span>
@@ -705,8 +745,8 @@ export function SelectionToolbar() {
                   </button>
                 )}
                 {selected.length >= 2 && (
-                  <button onClick={() => setMenu('align')} title="Ausrichten & Verteilen (wie in PowerPoint)" aria-label="Ausrichten">
-                    <IArrange size={14} /> Ausrichten &amp; Verteilen …
+                  <button onClick={() => setMenu('align')} title="Ausrichten, verteilen, gleiche Größe, Raster" aria-label="Anordnen" data-taste="anordnen-auf">
+                    <IArrange size={14} /> Anordnen …
                   </button>
                 )}
                 {selected.every((n) => KACHEL_TYPEN.has(n.type ?? '')) && (() => {
@@ -803,6 +843,7 @@ export function SelectionToolbar() {
           <button
             className={menu === 'more' || menu === 'attr' || menu === 'ai' || menu === 'align' || menu === 'font' || aiBusy ? 'ai-on' : ''}
             data-smbtn
+            data-taste="auswahl-mehr"
             onClick={toggleMenu('more')}
             title="Mehr"
             aria-label="Mehr"
