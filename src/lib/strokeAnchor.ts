@@ -2,6 +2,7 @@ import type { AppNode } from '../types';
 import type { Stroke } from '../store';
 import { aufSeite, offeneSeite, strichRelativ } from './pdfSeiten';
 import { blockBei, kastenInnen, strichKasten, textLage } from './notizText';
+import { drehe, winkelVon } from './drehung';
 
 /**
  * M127: Freihand-Striche an Karten ankern. Ein Strich, der beim Absetzen
@@ -159,13 +160,25 @@ export function integrateStroke(
    * Inhaltspunkte (Scrollstand eingerechnet) und der Absatz unter ihrer Mitte als Bezug —
    * für alle Striche der Gruppe derselbe, damit ein Pfeil nicht auseinanderläuft.
    */
+  /**
+   * M400: Liegt die Karte schräg, steht alles, was sie SELBST zeichnet (Text einer Notiz, Dokument-Seite), in ihren
+   * eigenen Achsen. Brett-Punkte werden dafür um die Kartenmitte zurückgedreht. Striche auf der Brett-Ebene bleiben,
+   * wie sie gezeichnet wurden – sie drehen sich erst mit, wenn die Karte weitergedreht wird (store.setWinkel).
+   */
+  const grad = winkelVon(target);
+  const zielKasten = target ? nodeRect(target) : null;
+  const inKarte = (abs: [number, number][]): [number, number][] => {
+    if (!grad || !zielKasten) return abs;
+    const mitte = { x: zielKasten.x + zielKasten.w / 2, y: zielKasten.y + zielKasten.h / 2 };
+    return abs.map(([x, y]) => { const q = drehe({ x, y }, mitte, -grad); return [q.x, q.y] as [number, number]; });
+  };
   let text: { scroll: number; block?: string; blockY?: number } | null = null;
   let notizDa = false; // Notiz mit vermessbarem Scrollbereich — nur dann ist „nicht am Text" eine Aussage
   if (target && target.type === 'note') {
     const lage = textLage(target.id);
     if (lage) {
       notizDa = true;
-      const rel = gruppe.map((g) => strichKasten(g.abs.map(([x, y]) => [x - target.position.x, y - target.position.y] as [number, number]), g.s.width / 2));
+      const rel = gruppe.map((g) => strichKasten(inKarte(g.abs).map(([x, y]) => [x - target.position.x, y - target.position.y] as [number, number]), g.s.width / 2));
       if (rel.every((k) => kastenInnen(k, lage.w, lage.h))) {
         const mitte = (Math.min(...rel.map((k) => k.minY)) + Math.max(...rel.map((k) => k.maxY))) / 2 + lage.scroll;
         const b = blockBei(target.id, mitte);
@@ -188,7 +201,8 @@ export function integrateStroke(
   const place = (roh: Stroke, abs: [number, number][]): Stroke => {
     const s = brett(roh);
     if (!target) return { ...s, ...frei, anchor: undefined, seite: undefined, points: abs };
-    const rel = abs.map(([x, y]) => [x - target.position.x, y - target.position.y + (text ? text.scroll : 0)] as [number, number]);
+    const eigen = !!text || !!offeneSeite(target.id);   // die Karte zeichnet selbst → ihre Achsen
+    const rel = (eigen ? inKarte(abs) : abs).map(([x, y]) => [x - target.position.x, y - target.position.y + (text ? text.scroll : 0)] as [number, number]);
     if (text) return { ...s, anchor: target.id, seite: undefined, amText: true, block: text.block, blockY: text.blockY, points: rel };
     return anSeite({ ...s, ...frei, anchor: target.id, seite: undefined, amText: notizDa ? false : undefined, points: rel });
   };

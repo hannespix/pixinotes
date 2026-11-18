@@ -16,9 +16,10 @@ import { wurzelZoom } from '../lib/anzeige';
 import { FONT_STACKS, GROESSEN_KARTE, SCHRIFTEN } from '../lib/typo';
 import { ALIGN_LABEL, ALIGN_MIN, computeAlign, type AlignOp } from '../lib/align';
 import { sizeOf } from '../lib/arrange';
+import { istDrehbar, winkelVon } from '../lib/drehung';
 import {
   IKanteLinks, IKanteMitteX, IKanteRechts, IKanteOben, IKanteMitteY, IKanteUnten, IVerteilenX, IVerteilenY, IAlsZeile, IAlsSpalte,
-  IGleichBreit, IGleichHoch, IGleichGross, IGroesser, IKleiner, IRaster, IPacken, IOrdnen,
+  IGleichBreit, IGleichHoch, IGleichGross, IGroesser, IKleiner, IRaster, IPacken, IOrdnen, ISchraeg,
 } from './Icons';
 import { vorschauArt } from '../lib/fileStore';
 import { bildBearbeitbar, bildBearbeiten } from './BildEditorHost';
@@ -268,6 +269,19 @@ export function SelectionToolbar() {
     if (offenLassen) return;
     setMenu(null);
     showToast(`${ALIGN_LABEL[op]} – Strg+Z macht es rückgängig`);
+  };
+  /** M400: markierte Karten locker schräg legen (jede anders, zwischen 2° und 7°) oder gerade richten */
+  const drehen = (art: 'schraeg' | 'gerade') => {
+    const karten = selected.filter((n) => istDrehbar(n));
+    const neu: Array<[string, number]> = art === 'gerade'
+      ? karten.filter((n) => winkelVon(n)).map((n) => [n.id, 0])
+      : karten.map((n, i) => [n.id, (i % 2 ? 1 : -1) * (2 + Math.round(Math.random() * 50) / 10)]);
+    setMenu(null);
+    if (neu.length === 0) return;
+    const st = useBoard.getState();
+    st.pushHistory();
+    mutedHistory(() => st.setWinkel(neu));
+    showToast(art === 'gerade' ? 'Gerade gerichtet – Strg+Z macht es rückgängig' : 'Schräg gelegt – Strg+Z macht es rückgängig');
   };
   const anordnenKnopf = (op: AlignOp, Bild: (p: { size?: number }) => JSX.Element, offenLassen = false) => (
     <button
@@ -557,6 +571,13 @@ export function SelectionToolbar() {
               <button data-anordnen="grid" onClick={() => anordnen('grid')} title="Spalten und Zeilen bündig, Reihenfolge wie gelesen"><IRaster size={14} /> Raster</button>
               <button data-anordnen="pack" onClick={() => anordnen('pack')} title="Dicht aneinander, ohne Lücken und Überlappen"><IPacken size={14} /> Kompakt packen</button>
               <button data-anordnen="tidy" onClick={() => anordnen('tidy')} title="Anordnung bleibt, Abstände werden gleich, nichts überlappt"><IOrdnen size={14} /> Aufräumen</button>
+              {/* M400: Zettel locker hinlegen – und wieder gerade */}
+              {selected.some((n) => istDrehbar(n)) && (
+                <>
+                  <button data-anordnen="schraeg" onClick={() => drehen('schraeg')} title="Jede Karte leicht anders geneigt, wie hingelegte Zettel"><ISchraeg size={14} /> Schräg legen</button>
+                  <button data-anordnen="gerade" disabled={!selected.some((n) => winkelVon(n))} onClick={() => drehen('gerade')} title="Alle markierten Karten wieder gerade stellen"><IRaster size={14} /> Gerade richten</button>
+                </>
+              )}
             </>
           ))}
         </span>
@@ -772,6 +793,11 @@ export function SelectionToolbar() {
                 >
                   <IFit size={14} /> Auto-Größe {allAuto ? 'AUS' : 'AN'}
                 </button>
+                {selected.some((n) => winkelVon(n)) && (
+                  <button onClick={() => drehen('gerade')} title="Schräg liegende Karten wieder gerade stellen" data-taste="gerade-richten">
+                    <IRaster size={14} /> Gerade richten
+                  </button>
+                )}
                 <div className="sel-attr-title">Weitergeben</div>
                 <button
                   onClick={() => {

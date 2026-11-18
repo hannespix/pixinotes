@@ -7482,3 +7482,37 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 .sel-ai-menu .anordnen-knopf { width: 32px; height: 30px; padding: 0; display: grid; place-items: center; flex: none; color: var(--ink); }
 .sel-ai-menu .anordnen-knopf:disabled { opacity: .35; cursor: default; background: none; }
 @media (pointer: coarse) { .sel-ai-menu .anordnen-knopf { width: 40px; height: 38px; } }
+
+/* ---------- M400: Karten schräg legen ---------- */
+/* Die Hülle dreht sich um ihre Mitte; der Knoten darum bleibt gerade (React Flow rechnet mit geraden Kästen).
+   Schatten und Auswahlrahmen wandern deshalb vom Knoten auf die Hülle – sonst bliebe ein gerader Kasten stehen. */
+.card-shell[data-winkel] { transform: rotate(var(--winkel)); box-shadow: var(--card-shadow); border-radius: var(--r); transition: box-shadow 0.18s ease; }
+.react-flow__node.dragging > .card-shell[data-winkel] { transform: rotate(var(--winkel)); }
+.react-flow__node:has(> .card-shell[data-winkel]),
+.react-flow__node:has(> .card-shell[data-winkel]):hover,
+.react-flow__node.dragging:has(> .card-shell[data-winkel]) { box-shadow: none; }
+.react-flow__node:hover > .card-shell[data-winkel], .react-flow__node.dragging > .card-shell[data-winkel] { box-shadow: var(--card-shadow-lift); }
+.react-flow__node.selected:has(> .card-shell[data-winkel]) { outline: none; }
+.react-flow__node.selected > .card-shell[data-winkel] { outline: 2px solid var(--accent); outline-offset: 2px; }
+.react-flow__node-image > .card-shell[data-winkel], .card-shell[data-winkel]:has(.image-card.rahmenlos) { box-shadow: none !important; border-radius: 0; }
+html[data-alles-zeigen] .react-flow__node.selected > .card-shell[data-winkel] { outline: none !important; }
+/* Dreh-Knopf: außen an der unteren rechten Ecke – dort liegt sonst nichts */
+.dreh-knopf {
+  position: absolute; right: -30px; bottom: -30px; z-index: 7; width: 22px; height: 22px; padding: 0;
+  display: grid; place-items: center; border-radius: 50%; cursor: grab; touch-action: none;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink); box-shadow: var(--chrome-shadow);
+}
+.dreh-knopf:hover { background: var(--surface-2); }
+.dreh-knopf:active { cursor: grabbing; }
+@media (pointer: coarse) { .dreh-knopf { width: 32px; height: 32px; right: -40px; bottom: -40px; } }
+.dreh-anzeige {
+  position: absolute; left: 50%; top: -34px; transform: translateX(-50%) rotate(calc(-1 * var(--winkel, 0deg))); z-index: 8; pointer-events: none;
+  background: var(--ink); color: var(--surface); font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: var(--r-sm); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* Eck-Griffe der schrägen Karte: dieselben weißen Quadrate wie am geraden Auswahlrahmen */
+.karte-eck-griff { position: absolute; width: 9px; height: 9px; z-index: 6; background: var(--surface); border: 1px solid var(--border); border-radius: 1px; touch-action: none; }
+.karte-eck-griff.oben { top: -7px; } .karte-eck-griff.unten { bottom: -7px; }
+.karte-eck-griff.links { left: -7px; } .karte-eck-griff.rechts { right: -7px; }
+.karte-eck-griff.oben.links, .karte-eck-griff.unten.rechts { cursor: nwse-resize; }
+.karte-eck-griff.oben.rechts, .karte-eck-griff.unten.links { cursor: nesw-resize; }
+@media (pointer: coarse) { .karte-eck-griff { width: 16px; height: 16px; } .karte-eck-griff.oben { top: -11px; } .karte-eck-griff.unten { bottom: -11px; } .karte-eck-griff.links { left: -11px; } .karte-eck-griff.rechts { right: -11px; } }

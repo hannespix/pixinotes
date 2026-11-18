@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useInternalNode, useReactFlow, useStore, ViewportPortal } from '@xyflow/react';
 import { selectActiveBoard, useBoard, type CommentThread } from '../store';
+import { drehe, winkelVon } from '../lib/drehung';
 import { IPen, ITrash, IX } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 import { blasenAn, SEITEN_EREIGNIS, seiteVon, seitenKommentare } from '../lib/pdfSeiten';
@@ -31,11 +32,16 @@ function CommentPin({ thread, nr }: { thread: CommentThread; nr?: number }) {
   const erste = thread.msgs[0];
   // M335: Pin an einer STELLE auf einer PDF-Seite — nur sichtbar, wenn die Seite offen liegt
   let lage = { x: node.internals.positionAbsolute.x + w + 3, y: node.internals.positionAbsolute.y - 13 };
+  // M400: An der schrägen Karte sitzt der Pin an der gedrehten Ecke
+  const grad = winkelVon(node as unknown as { winkel?: number });
+  const mitte = { x: node.internals.positionAbsolute.x + w / 2, y: node.internals.positionAbsolute.y + (node.measured.height ?? 160) / 2 };
+  if (grad) { const ecke = drehe({ x: lage.x + 13, y: lage.y + 13 }, mitte, grad); lage = { x: ecke.x - 13, y: ecke.y - 13 }; }
   const aufSeite = thread.seite != null && thread.px != null && thread.py != null;
   if (aufSeite) {
     const g = seiteVon(thread.nodeId);
     if (!g || g.seite !== thread.seite) return null;
     lage = { x: node.internals.positionAbsolute.x + g.dx + thread.px! * g.k - 13, y: node.internals.positionAbsolute.y + g.dy + thread.py! * g.k - 13 };
+    if (grad) { const ort = drehe({ x: lage.x + 13, y: lage.y + 13 }, mitte, grad); lage = { x: ort.x - 13, y: ort.y - 13 }; }
   }
   const oeffnen = (e: React.MouseEvent) => { e.stopPropagation(); setCommentOpen(thread.id); };
   return (
