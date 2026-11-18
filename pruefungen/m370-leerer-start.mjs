@@ -39,7 +39,7 @@ const pruefe = (n, gut, info = '') => {
   if (gut) { ok += 1; console.log(`  ✓ ${n}`); } else { bad += 1; console.log(`  ✗ ${n} ${info}`); }
 };
 
-const START = '🏠 Mein Board';
+const START = 'Mein Board';
 const geteilt = { id: 'gx', name: 'Projektplan', edges: [], drawings: [], nodes: [
   { id: 'g1', type: 'note', width: 220, position: { x: 0, y: 0 }, data: { color: 'yellow', blocks: [{ type: 'paragraph', content: 'Geteilte Notiz eins' }] } },
   { id: 'g2', type: 'note', width: 220, position: { x: 280, y: 0 }, data: { color: 'sky', blocks: [{ type: 'paragraph', content: 'Geteilte Notiz zwei' }] } },
@@ -48,7 +48,7 @@ const nutzlast = JSON.stringify({ app: 'pixinotes-board', version: 2, board: get
 const hashB = `#b=${gzipSync(Buffer.from(nutzlast)).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
 const eigenes = (boards) => ({
   boards,
-  spaces: [{ id: 's1', name: '🏢 Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: boards.map((b) => b.id) }] }],
+  spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: boards.map((b) => b.id) }] }],
   activeId: boards[0].id, view: 'board',
 });
 const notiz = { id: 'e1', type: 'note', width: 200, position: { x: 0, y: 0 }, data: { color: 'green', blocks: [{ type: 'paragraph', content: 'Meins' }] } };
@@ -111,7 +111,7 @@ console.log('════ A: Erster Start ════');
 {
   const P = await geraet();
   let z = await lage(P);
-  pruefe('A1 genau ein Board, leer — keine Beispiel-Umgebung', z.boards.length === 1 && z.boards[0] === `${START}:0` && z.bereiche.length === 1, JSON.stringify(z));
+  pruefe('A1 genau ein Board, leer – keine Beispiel-Umgebung', z.boards.length === 1 && z.boards[0] === `${START}:0` && z.bereiche.length === 1, JSON.stringify(z));
   pruefe('A2 die Begrüßung erscheint und bietet „Beispiele laden" an', z.begruessung && await P.locator('[data-taste="onb-beispiele"]').innerText() === 'Beispiele laden');
   await P.locator('.onb-primary').click(); await P.waitForTimeout(400);
   z = await lage(P);

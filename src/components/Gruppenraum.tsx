@@ -10,7 +10,7 @@ import {
   type Reaktion,
 } from '../lib/gruppenraum';
 import { ich } from '../lib/gastSync';
-import { ITimer, IX } from './Icons';
+import { ITimer, IX, ILaecheln } from './Icons';
 
 /** Aufklappen mit Schließen bei Klick daneben und Esc */
 function useAufklappen(wurzel: string): [boolean, (an: boolean | ((o: boolean) => boolean)) => void] {
@@ -31,7 +31,7 @@ export function ReaktionsKnopf({ boardId, klasse = 'live-zeig' }: { boardId: str
   return (
     <span className="reakt-wrap">
       <button className={`${klasse} reakt-knopf${offen ? ' an' : ''}`} data-taste="reakt-auf" aria-expanded={offen} aria-haspopup="true"
-        title="Reagieren — das Symbol steigt bei allen kurz auf" onClick={() => setOffen((o) => !o)}>😀</button>
+        title="Reagieren – das Symbol steigt bei allen kurz auf" onClick={() => setOffen((o) => !o)}><ILaecheln size={16} /></button>
       {offen && (
         <span className="reakt-wahl" role="group" aria-label="Reaktion wählen" data-taste="reakt-wahl">
           {REAKTIONEN.map((z) => (

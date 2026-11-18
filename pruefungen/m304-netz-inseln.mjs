@@ -63,12 +63,12 @@ const state = {
     board('b13', 'Trading', 3),
   ],
   spaces: [
-    { id: 's1', name: '🏢 Arbeit', projects: [
+    { id: 's1', name: 'Arbeit', projects: [
       { id: 'p1', name: 'Prüfung', boardIds: ['b1', 'b2', 'b3', 'b4'] },
       { id: 'p2', name: 'Laufbahn', boardIds: ['b5', 'b6'] },
       { id: 'p3', name: 'Termine', boardIds: ['b7', 'b8'] },
     ] },
-    { id: 's2', name: '🏠 Privat', projects: [
+    { id: 's2', name: 'Privat', projects: [
       { id: 'p4', name: 'Reisen', boardIds: ['b9', 'b10'] },
       { id: 'p5', name: 'Haushalt', boardIds: ['b11', 'b12', 'b13'] },
     ] },
@@ -141,7 +141,7 @@ const huellenGetrennt = (P, a, b) => P.evaluate(([ka, kb]) => {
 }, [a, b]);
 const getrennt = async (P, a, b) => { const r = await huellenGetrennt(P, a, b); return { gut: !r.fehlt && r.aInB === 0 && r.bInA === 0, info: JSON.stringify(r) }; };
 
-console.log('════ A: Physik aus — die Landkarte liegt still ════');
+console.log('════ A: Physik aus – die Landkarte liegt still ════');
 {
   const { ctx, P } = await seite();
   const n = await P.locator('.ov-graph-node[data-board]').count();
@@ -214,7 +214,7 @@ console.log('════ A: Physik aus — die Landkarte liegt still ═══�
   await ctx.close();
 }
 
-console.log('\n════ B: Physik — ruhiger Start, Heimkehr nach dem Ziehen ════');
+console.log('\n════ B: Physik – ruhiger Start, Heimkehr nach dem Ziehen ════');
 {
   const { ctx, P } = await seite();
   const l0 = await lagen(P);
@@ -255,7 +255,7 @@ console.log('\n════ B: Physik — ruhiger Start, Heimkehr nach dem Ziehe
   await ctx.close();
 }
 
-console.log('\n════ C: Karten-Ebene — die Hüllen umschließen die Punkte ════');
+console.log('\n════ C: Karten-Ebene – die Hüllen umschließen die Punkte ════');
 {
   const { ctx, P } = await seite();
   await P.locator('.ov-graph-toggle', { hasText: 'Karten' }).locator('input').click();

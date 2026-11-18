@@ -159,7 +159,7 @@ await P.waitForTimeout(2000);
     return { text: text.includes('WEBSUCHE-MARKER'), quelleA: text.includes('example.org/a'),
       quelleB: text.includes('example.org/b'),
       doppelt: (text.match(/example\.org\/a/g) ?? []).length,
-      titel: text.includes('🔎'), zu: !document.querySelector('.recherche-modal') };
+      titel: text.includes('Recherche: '), zu: !document.querySelector('.recherche-modal') };
   });
   console.log('   ', JSON.stringify(notiz));
   pruefe('T1h die Notiz entsteht mit dem Text aus der Websuche', notiz?.text === true);

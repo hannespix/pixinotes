@@ -129,13 +129,13 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
     next.push({ id: uid(), date: todayIso(), start: nowMin(), kind });
     patch(next);
     setDay(todayIso());
-    if (!running) showToast(`⏱ ${kindLabel(kind)} läuft — Stop oder andere Art beendet den Eintrag.`);
+    if (!running) showToast(`${kindLabel(kind)} läuft – Stop oder andere Art beendet den Eintrag.`);
   };
 
   const stop = () => {
     if (!running) return;
     patch(closeRunning(segs));
-    showToast(`⏱ ${kindLabel(running.kind)} beendet (${fmtDur(durOf(running))}).`);
+    showToast(`${kindLabel(running.kind)} beendet (${fmtDur(durOf(running))}).`);
   };
 
   /** Nacherfassen: neue Zeile nach dem letzten Eintrag des angezeigten Tages */
@@ -226,7 +226,7 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
               key={k}
               className={`time-kind ${running?.kind === k ? 'on' : ''}`}
               style={running?.kind === k ? { background: color, borderColor: color } : { color }}
-              title={running?.kind === k ? `${label} läuft — Klick beendet` : running ? `Nahtlos zu ${label} wechseln` : `${label} jetzt starten`}
+              title={running?.kind === k ? `${label} läuft – Klick beendet` : running ? `Nahtlos zu ${label} wechseln` : `${label} jetzt starten`}
               onClick={() => record(k)}
             >
               {label}
@@ -258,7 +258,7 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
         {view === 'tag' && (
           /* Tages-Liste: alle Zeilen direkt editierbar = Nacherfassen & Korrigieren */
           <div className="time-rows nodrag">
-            {rows.length === 0 && <div className="time-empty">Noch nichts erfasst — oben starten oder „＋ Eintrag" für die Nacherfassung.</div>}
+            {rows.length === 0 && <div className="time-empty">Noch nichts erfasst – oben starten oder „＋ Eintrag" für die Nacherfassung.</div>}
             {rows.map((s) => (
               <div className="time-row" key={s.id} style={{ borderLeftColor: kindColor(s.kind) }}>
                 <select value={s.kind} onChange={(e) => patchSeg(s.id, { kind: e.target.value as TimeSeg['kind'] })}>
@@ -330,7 +330,7 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
                 <button
                   key={d}
                   className={`time-mday ${d === todayIso() ? 'is-today' : ''}`}
-                  title={`${fmtDay(d)}${total ? ` — ${fmtDur(total)} (ohne Pausen)` : ''} · Klick öffnet den Tag`}
+                  title={`${fmtDay(d)}${total ? ` – ${fmtDur(total)} (ohne Pausen)` : ''} · Klick öffnet den Tag`}
                   onClick={() => { setDay(d); setView('tag'); }}
                 >
                   <span>{i + 1}</span>
@@ -352,7 +352,7 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
                 <button
                   key={m}
                   className={`time-ymonth ${todayIso().slice(0, 7) === m ? 'is-today' : ''}`}
-                  title={`${name} ${year}${total ? ` — ${fmtDur(total)} (ohne Pausen)` : ''} · Klick öffnet den Monat`}
+                  title={`${name} ${year}${total ? ` – ${fmtDur(total)} (ohne Pausen)` : ''} · Klick öffnet den Monat`}
                   onClick={() => { setDay(`${m}-15`); setView('monat'); }}
                 >
                   <span>{name.slice(0, 3)}</span>

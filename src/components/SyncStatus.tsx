@@ -39,24 +39,24 @@ export function SyncStatus() {
     noperm: source === 'konto' ? {
       // M317: Google-Token abgelaufen und still nicht erneuerbar — ein Klick holt es nach
       cls: 'sync-status sync-warn sync-noperm',
-      tip: `${label}: Anmeldung abgelaufen — klicken, um sie zu erneuern`,
+      tip: `${label}: Anmeldung abgelaufen – klicken, um sie zu erneuern`,
       icon: <ICloudOff size={16} />,
       onClick: () => { void kontoNeuAnmelden().then((ok) => { if (!ok) openSync(); }); },
     } : {
       cls: 'sync-status sync-warn sync-noperm',
-      tip: 'Auto-Sync pausiert: Der Browser hat die Ordner-Freigabe nach dem Neustart zurückgesetzt — klicken, um sie neu zu erteilen',
+      tip: 'Auto-Sync pausiert: Der Browser hat die Ordner-Freigabe nach dem Neustart zurückgesetzt – klicken, um sie neu zu erteilen',
       icon: <ICloudOff size={16} />,
       onClick: () => { void regrantSyncAccess().then((ok) => { if (!ok) openSync(); }); },
     },
     error: {
       cls: 'sync-status sync-warn',
-      tip: `${label}: Speichern fehlgeschlagen — klicken für Details`,
+      tip: `${label}: Speichern fehlgeschlagen – klicken für Details`,
       icon: <ICloudAlert size={16} />,
       onClick: openSync,
     },
     conflict: {
       cls: 'sync-status sync-warn',
-      tip: `${label}: dort liegt ein anderer Stand — klicken zum Laden oder Überschreiben`,
+      tip: `${label}: dort liegt ein anderer Stand – klicken zum Laden oder Überschreiben`,
       icon: <ICloudAlert size={16} />,
       onClick: openSync,
     },
@@ -64,11 +64,11 @@ export function SyncStatus() {
     // Wolke zum Sicherungs-Knopf: ein Tipp öffnet direkt das Teilen-Blatt.
     manual: {
       cls: 'sync-status sync-warn',
-      tip: 'Ungesicherte Änderungen — tippen, um den Stand in die Dateien-App (Nextcloud-Ordner) zu sichern',
+      tip: 'Ungesicherte Änderungen – tippen, um den Stand in die Dateien-App (Nextcloud-Ordner) zu sichern',
       icon: <ICloudUp size={16} />,
       onClick: () => {
         void saveViaFiles()
-          .then(() => useBoard.getState().showToast('☁️ Stand ausgegeben — im Nextcloud-Ordner die vorhandene pixinotes-daten.json ersetzen.', false, 9000))
+          .then(() => useBoard.getState().showToast('Stand ausgegeben – im Nextcloud-Ordner die vorhandene pixinotes-daten.json ersetzen.', false, 9000))
           .catch((e: Error) => { if (e.message !== 'abgebrochen') openSync(); });
       },
     },

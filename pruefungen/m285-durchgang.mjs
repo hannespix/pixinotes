@@ -60,7 +60,7 @@ async function seite(ansicht) {
       data: { name: 'Bereich Planung', color: '#dbe7f6' } };
     localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state: {
       boards: [
-        { id: 'b0', name: '🏠 Schreibtisch', edges: [], drawings: [], comments: [],
+        { id: 'b0', name: 'Schreibtisch', edges: [], drawings: [], comments: [],
           nodes: [rahmen, mk('n1', 'Antrag prüfen', 60, 70), mk('n2', 'Rückmeldung Amt', 320, 70), mk('n3', 'Dritte Notiz', 60, 330)] },
         { id: 'b1', name: 'Projekt B', edges: [], drawings: [], comments: [], nodes: [mk('m1', 'Konzept B', 40, 40)] },
       ],

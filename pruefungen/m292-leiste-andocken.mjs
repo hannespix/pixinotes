@@ -87,7 +87,7 @@ async function waehle(P) {
       board: !!document.querySelector('.react-flow'),
       fehler: document.querySelector('.err-box')?.textContent?.slice(0, 80) ?? null,
     }));
-    if (!lageDiag.board) console.log('    ⚠ Board nicht gerendert:', JSON.stringify(lageDiag));
+    if (!lageDiag.board) console.log('    Board nicht gerendert:', JSON.stringify(lageDiag));
     // Rückfallweg: Auswahl direkt setzen (nicht die Bedienung, aber derselbe Zustand)
     await P.evaluate(() => {
       const k = document.querySelector('.react-flow__node[data-id="n1"]');
@@ -138,7 +138,7 @@ console.log('════ T1: Platz oben ════');
   pruefe('T1c und liegt NICHT auf der Karte (das war der Befund)', l.aufKarte <= 0, String(l.aufKarte));
   pruefe('T1d dicht an der Kante (höchstens 30 Punkte Abstand)',
     l.karte.top - l.leiste.bottom <= 30, String(l.karte.top - l.leiste.bottom));
-  pruefe('T1e kein Zieh-Griff mehr — die Stelle ist keine Geschmacksfrage', !l.griffDa);
+  pruefe('T1e kein Zieh-Griff mehr – die Stelle ist keine Geschmacksfrage', !l.griffDa);
   await P.screenshot({ path: `${SD}/m292-oben.png` });
   await ctx.close();
 }

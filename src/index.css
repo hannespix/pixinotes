@@ -208,7 +208,8 @@ body {
 }
 .logo:hover { background: var(--surface-2); }
 .logo.active { box-shadow: 0 0 0 2px var(--accent) inset, var(--chrome-shadow); }
-.logo span { color: var(--accent); }
+/* M397: Wortmarke in einer Farbe – der zweite Teil ist nur leichter gesetzt */
+.logo span { font-weight: 500; }
 .hint {
   font-size: 12px; color: var(--muted);
   background: var(--surface-glass); padding: 5px 11px; border-radius: var(--r-pill);
@@ -491,7 +492,8 @@ input.file-titel {
   font-family: inherit; font-size: 12.5px; color: var(--ink);
   padding: 2px 12px 6px; cursor: pointer; text-align: left;
 }
-.file-icon { font-size: 22px; }
+/* M397: gezeichnetes Symbol in fester Kachel – die Kopfzeile ist so hoch wie zuvor */
+.file-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; color: var(--muted); }
 /* Der Titel der Bild-Karte steht in derselben Zeile wie das Symbol */
 .img-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .img-titel { flex: 1; min-width: 0; }
@@ -688,18 +690,19 @@ input.img-titel {
 
 /* ---------- Portal-Karte ---------- */
 .portal-card {
-  background: linear-gradient(135deg, var(--surface-card) 0%, #f4efff 100%);
+  /* M397: ruhige Fläche mit festem Rand – kein violetter Verlauf, keine Strichelung */
+  background: var(--surface-card);
   border-radius: var(--r-lg); padding: 16px; text-align: center;
-  border: 1.5px dashed rgba(124, 92, 255, 0.35);
+  border: 1px solid var(--border);
 }
 .portal-icon { font-size: 26px; margin-bottom: 4px; }
 .portal-name { font-weight: 700; font-size: 13.5px; margin-bottom: 2px; }
 .portal-open {
-  margin-top: 10px; border: none; background: #5b3fd4; color: #fff;
+  margin-top: 10px; border: none; background: var(--accent-fill); color: #fff;
   font-family: inherit; font-size: 12px; padding: 5px 14px; border-radius: var(--r);
   cursor: pointer;
 }
-.portal-open:hover { background: #4a30b8; }
+.portal-open:hover { filter: brightness(.9); }
 .portal-select {
   margin-top: 8px; font-family: inherit; font-size: 12px;
   border: 1px solid var(--border-soft); border-radius: var(--r-sm); padding: 4px 6px;
@@ -1131,10 +1134,19 @@ html[data-kopf-eng='an'] .hint { display: none; }
   align-items: center; justify-content: center; gap: 10px;
   pointer-events: none; z-index: 5; color: var(--muted);
 }
-.empty-board-hint div {
-  background: rgba(255, 255, 255, 0.65); border: 1.5px dashed var(--border-soft);
-  border-radius: var(--r-lg); padding: 9px 18px; font-size: 13.5px;
+/* M397: ein ruhiger Textblock, linksbündig gesetzt – keine gestrichelten Kästchen */
+.leer-block { display: flex; flex-direction: column; gap: 14px; max-width: min(340px, calc(100vw - 48px)); }
+.leer-titel { margin: 0; font-size: 15px; font-weight: 650; color: var(--ink); letter-spacing: -0.005em; }
+.leer-wege { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+dl.leer-wege { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; }
+dl.leer-wege dt { color: var(--ink); font-weight: 550; }
+dl.leer-wege dd { margin: 0; }
+.leer-finger { display: none; }
+@media (hover: none) and (pointer: coarse) {
+  .leer-maus { display: none !important; }
+  .leer-finger { display: block; }
 }
+.leer-knoepfe { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 2px; }
 
 /* Auto-Größe-Schalter in der Auswahl-Leiste (M103) */
 .sel-toolbar button.on { background: var(--accent-soft); color: var(--accent-strong); }
@@ -2204,8 +2216,9 @@ html[data-kopf-eng='an'] .hint { display: none; }
 .presenter-dots button.on::before { background: #e9ebee; }
 
 /* ---------- KI-Aktionen ---------- */
-.ai-btn { background: rgba(124, 92, 255, 0.12) !important; color: #5b3fd4 !important; font-weight: 600; }
-.ai-btn:hover:not(:disabled) { background: rgba(124, 92, 255, 0.22) !important; }
+/* M397: KI-Knöpfe tragen die Akzentfarbe der App – kein eigenes Violett */
+.ai-btn { background: var(--accent-soft) !important; color: var(--accent-strong) !important; font-weight: 600; }
+.ai-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 24%, transparent) !important; }
 .ai-btn:disabled { opacity: 0.6; cursor: default; }
 
 /* ---------- Touch: Untermenüs über dem höheren Dock (50px-Buttons) ansetzen.
@@ -2927,7 +2940,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
   font-size: 12.5px; padding: 7px 10px; border-radius: var(--r-sm); cursor: pointer; color: var(--ink);
 }
 .sel-ai-menu button:hover { background: var(--surface-2); }
-.sel-toolbar button.ai-on { color: #5b3fd4; background: rgba(124,92,255,.14); }
+.sel-toolbar button.ai-on { color: var(--accent-strong); background: var(--accent-soft); }
 
 /* Teilen-Button in der Tab-Leiste */
 
@@ -3322,8 +3335,8 @@ html[data-kopf-eng='an'] .hint { display: none; }
 }
 .k-who { background: var(--accent-soft); color: var(--accent-strong); }
 .k-note { background: var(--surface-dim); color: var(--muted); }
-.k-link { background: rgba(124,92,255,.14); color: #5b3fd4; font-size: 10px; }
-.k-link:hover { background: rgba(124,92,255,.28); }
+.k-link { background: var(--accent-soft); color: var(--accent-strong); font-size: 10px; }
+.k-link:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 
 /* ---------- Ticket-Modal (M118, Trello-Vorbild) ---------- */
 .ticket-modal-backdrop { z-index: 90; }
@@ -3433,10 +3446,10 @@ html[data-kopf-eng='an'] .hint { display: none; }
   font-size: 11.5px; padding: 4px 7px; color: var(--ink); min-width: 0; flex: 1; background: var(--surface);
 }
 .ticket-jump {
-  border: none; background: rgba(124,92,255,.14); color: #5b3fd4; border-radius: var(--r-sm);
+  border: none; background: var(--accent-soft); color: var(--accent-strong); border-radius: var(--r-sm);
   font-family: inherit; font-size: 11px; font-weight: 600; padding: 5px 9px; cursor: pointer; flex: none;
 }
-.ticket-jump:hover { background: rgba(124,92,255,.28); }
+.ticket-jump:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 .ticket-detail-foot { font-size: 10px; color: var(--muted); text-align: center; }
 .slide-kanban { position: relative; }
 .kanban-addcol.k-auto-on { color: #fff; background: var(--accent-fill); opacity: 1; }
@@ -3598,11 +3611,11 @@ html[data-kopf-eng='an'] .hint { display: none; }
 }
 .ai-cmd-input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
 .ai-cmd-go {
-  border: none; background: #5b3fd4; color: #fff !important; border-radius: var(--r);
+  border: none; background: var(--accent-fill); color: #fff !important; border-radius: var(--r);
   font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 8px 10px;
   cursor: pointer; text-align: center !important;
 }
-.ai-cmd-go:hover { background: #4a30b8 !important; }
+.ai-cmd-go:hover { filter: brightness(.9); }
 .ai-cmd-go:disabled { opacity: .45; cursor: default; }
 .sel-ai-menu .ai-cmd-small { margin-bottom: 2px; font-size: 12px; }
 
@@ -3657,7 +3670,7 @@ html[data-kopf-eng='an'] .hint { display: none; }
 [data-theme='dark'] .react-flow__minimap { background: var(--surface); }
 [data-theme='dark'] .react-flow__minimap-mask { fill: rgba(20, 19, 16, 0.65); }
 [data-theme='dark'] .react-flow__minimap-node { fill: #4a463d; }
-[data-theme='dark'] .portal-card { background: linear-gradient(135deg, var(--surface-2) 0%, #453c63 100%); color: var(--ink); }
+[data-theme='dark'] .portal-card { background: var(--surface-2); color: var(--ink); }
 [data-theme='dark'] .react-flow__controls button { background: var(--surface); fill: var(--ink); color: var(--ink); border-bottom-color: var(--border-soft); }
 [data-theme='dark'] .react-flow__controls button:hover { background: var(--surface-2); }
 /* M191: halbtransparent, damit der Glas-Blur des Toasts auch dunkel wirkt */
@@ -3690,11 +3703,6 @@ html[data-kopf-eng='an'] .hint { display: none; }
    dürfen dort NICHT dem dunklen color-scheme folgen */
 [data-theme='dark'] .react-flow__node-note { color-scheme: light; }
 [data-theme='dark'] .react-flow__node-note .due-chip { background: rgba(0, 0, 0, 0.08); color: #5a616d; }
-/* Violette KI-Akzente: #5b3fd4 säuft auf dunklen Flächen ab → aufhellen */
-[data-theme='dark'] .ai-btn { color: #beadff !important; background: rgba(124, 92, 255, 0.22) !important; }
-[data-theme='dark'] .sel-toolbar button.ai-on,
-[data-theme='dark'] .k-link,
-[data-theme='dark'] .ticket-jump { color: #beadff; }
 [data-theme='dark'] .ticket-erledigt { color: #7fd6a4; } /* M293: Erledigt-Grün lesbar auf dunklem Grund */
 /* Tooltip hebt sich sonst kaum vom dunklen Grund ab */
 [data-theme='dark'] .tipbox { border: 1px solid var(--border-soft); }
@@ -4340,7 +4348,6 @@ button.link-dead:disabled { opacity: 0.45; }
 
 /* ---------- M175: Dark-Mode-Lesbarkeit (helle Flächen + helle Schrift) ---------- */
 [data-theme='dark'] .sel-toolbar button.danger:hover { background: rgba(216, 75, 61, 0.32); }
-[data-theme='dark'] .empty-board-hint div { background: rgba(0, 0, 0, 0.35); }
 
 /* ---------- M176: eigene Kalender-Termine + Tabellen-Chip ---------- */
 .cal-chip.own { border-left-color: var(--accent); font-weight: 600; }
@@ -6202,7 +6209,7 @@ audio.file-media { height: 40px; }
 .schrift-vorschlag .vorschlag-art.on { color: var(--accent-strong); box-shadow: inset 0 0 0 1.5px var(--accent); }
 
 /* ===== M330: Geteilte Boards ===== */
-.side-board-geteilt { font-size: 12px; margin-left: auto; margin-right: 4px; opacity: .8; }
+.side-board-geteilt { font-size: 12px; margin-left: auto; margin-right: 4px; opacity: .8; display: inline-flex; align-items: center; }
 .freigabe-dialog .freigabe-liste { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
 .freigabe-dialog .freigabe-liste li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--border-soft); border-radius: var(--r-sm); }
 .freigabe-dialog .freigabe-mail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -6919,12 +6926,14 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 
 /* M370: leerer Start — die Beispiele sind ein Angebot auf dem leeren Board */
 .empty-board-hint .empty-beispiele {
-  pointer-events: auto; cursor: pointer; margin-top: 8px; font-family: inherit; font-size: 13.5px; font-weight: 700;
-  color: var(--accent-strong); background: var(--surface-card); border: 1px solid var(--accent); border-radius: var(--r-lg);
-  padding: 9px 18px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  pointer-events: auto; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600;
+  color: var(--ink); background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 7px 13px;
 }
-.empty-board-hint .empty-beispiele small { font-weight: 400; font-size: 11.5px; color: var(--muted); }
-.empty-board-hint .empty-beispiele:hover, .empty-board-hint .empty-beispiele:focus-visible { background: var(--accent-soft); }
+.empty-board-hint .empty-beispiele:hover, .empty-board-hint .empty-beispiele:focus-visible { background: var(--surface-2); }
+/* M397: das zweite Angebot ist nur Text – ein Knopf reicht als Hauptweg */
+.empty-board-hint .empty-beispiele.still { background: none; border-color: transparent; color: var(--muted); padding: 7px 4px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border); }
+.empty-board-hint .empty-beispiele.still:hover, .empty-board-hint .empty-beispiele.still:focus-visible { background: none; color: var(--ink); }
 
 /* M371: Tools und Webseiten als Folie — sie füllen die Folie, ohne Rand, und laufen wirklich */
 .presenter-slide.app { padding: 0; overflow: hidden; display: flex; }
@@ -7316,7 +7325,6 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 [data-theme='dark'] .vorlage-skizze svg, [data-theme='dark'] svg.vorlage-skizze { background: #262a31; }
 [data-theme='dark'] .vorlage-skizze .sk-karte, [data-theme='dark'] .vorlage-skizze .sk-rahmen { opacity: 0.82; }
 .vorlagen-fuss { font-size: 11.5px; color: var(--muted); margin: 6px 20px 16px; }
-.empty-board-hint .empty-beispiele + .empty-beispiele { margin-top: 0; }
 @media (max-width: 520px) {
   .vorlagen-gitter { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 12px 4px; }
 }
@@ -7432,3 +7440,8 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
    (zoom an der Wurzel). Ein Fenster mit „höchstens 84vh" war bei 150 % darum 126 % der Bildschirmhöhe hoch — die
    untersten Knöpfe („Alles leeren", „Mit Microsoft verbinden") lagen unerreichbar unter dem Rand, das ＋-Menü begann
    über dem oberen. Alle Höhen und Breiten in vh/vw sind deshalb durch den Faktor geteilt (--pn-anz, sonst 1). */
+
+/* M397: Gezeichnete Symbole im laufenden Text sitzen auf der Zeilenmitte statt auf der Grundlinie.
+   :where() wiegt nichts – jede eigene Regel einer Leiste oder eines Knopfs geht vor. */
+:where(span, b, em, i, p, li, label, dt, dd, h2, small, div, button, a) > svg[aria-hidden='true'][stroke='currentColor'] { vertical-align: -0.14em; }
+.hit-icon, .portal-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }

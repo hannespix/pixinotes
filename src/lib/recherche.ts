@@ -18,6 +18,7 @@ import { nodesToText } from './serialize';
 import { makeNote } from './nodes';
 import { findFreeSpot } from './arrange';
 import { mutedHistory, selectActiveBoard, useBoard } from '../store';
+import { t } from './sprache';
 import { sammleQuellen, type Quelle } from './webQuellen';
 import type { AppNode } from '../types';
 
@@ -37,10 +38,10 @@ export async function planeRecherche(auftrag: string, kontext: string): Promise<
 Auftrag: "${auftrag}"
 ${kontext ? `Kontext von den ausgewählten Karten:\n${kontext.slice(0, 2000)}\n` : ''}
 Antworte NUR mit JSON:
-{"suchbegriffe": ["2-4 Lexikon-taugliche Suchbegriffe (Orte, Dinge, Themen — KEINE ganzen Sätze)"],
+{"suchbegriffe": ["2-4 Lexikon-taugliche Suchbegriffe (Orte, Dinge, Themen – KEINE ganzen Sätze)"],
  "reise": true/false (geht es um Ausflüge, Reisen, Orte?),
  "wetterOrt": "Ortsname" oder null (nur wenn Wetter für die Antwort wichtig ist),
- "fragen": ["höchstens 3 kurze Rückfragen, deren Antwort die Recherche WIRKLICH besser machen würde — [] wenn der Auftrag klar ist"]}`,
+ "fragen": ["höchstens 3 kurze Rückfragen, deren Antwort die Recherche WIRKLICH besser machen würde – [] wenn der Auftrag klar ist"]}`,
   );
   return {
     fragen: (p.fragen ?? []).filter((f) => typeof f === 'string' && f.trim()).slice(0, 3),
@@ -89,7 +90,7 @@ export async function fuehreRechercheAus(
     try {
       return await rechercheMitWebsuche(auftrag, plan, dialogText, kontext, melde);
     } catch {
-      melde('Websuche nicht verfügbar — nutze die Nachschlagewerke…');
+      melde('Websuche nicht verfügbar – nutze die Nachschlagewerke…');
     }
   }
 
@@ -101,12 +102,12 @@ export async function fuehreRechercheAus(
   });
 
   melde(quellen.length
-    ? `${quellen.length} Quelle(n) gefunden — schreibe die Antwort…`
-    : 'Keine Quellen erreichbar — schreibe eine ehrliche Antwort…');
+    ? `${quellen.length} Quelle(n) gefunden – schreibe die Antwort…`
+    : 'Keine Quellen erreichbar – schreibe eine ehrliche Antwort…');
 
   const dialog = dialogText;
   const material = quellen
-    .map((q, i) => `[${i + 1}] ${ART_LABEL[q.art]} — ${q.titel}\n${q.text}`)
+    .map((q, i) => `[${i + 1}] ${ART_LABEL[q.art]} – ${q.titel}\n${q.text}`)
     .join('\n\n---\n\n');
   const heute = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
 
@@ -120,14 +121,14 @@ export async function fuehreRechercheAus(
 Auftrag: "${auftrag}"
 ${dialog ? `\nPräzisierungen aus dem Rückfragen-Dialog:\n${dialog}\n` : ''}${kontext ? `\nKartenkontext:\n${kontext}\n` : ''}
 Quellenmaterial:
-${material || '(keine Quelle erreichbar — sage das ehrlich und gib an, was der Nutzer selbst prüfen sollte)'}`,
+${material || '(keine Quelle erreichbar – sage das ehrlich und gib an, was der Nutzer selbst prüfen sollte)'}`,
   );
 
   // Quellenliste ans Ende — klickbare Links, damit jede Angabe prüfbar ist
   const fussnoten = quellen.length
     ? `\n\n## Quellen\n${quellen.map((q, i) => `- [${i + 1}] ${ART_LABEL[q.art]}: [${q.titel}](${q.url})`).join('\n')}`
     : '';
-  const titel = `🔎 ${auftrag.slice(0, 60)}`;
+  const titel = `${t('Recherche')}: ${auftrag.slice(0, 60)}`;
   melde('Lege die Notiz an…');
   await legeRechercheNotizAn(titel, `${md.trim()}${fussnoten}`);
   return { quellen: quellen.length, titel };
@@ -154,12 +155,12 @@ ${plan.suchbegriffe.length ? `Nützliche Suchrichtungen: ${plan.suchbegriffe.joi
   );
 
   melde(quellen.length
-    ? `${quellen.length} Netz-Quelle(n) gelesen — lege die Notiz an…`
-    : 'Antwort da — lege die Notiz an…');
+    ? `${quellen.length} Netz-Quelle(n) gelesen – lege die Notiz an…`
+    : 'Antwort da – lege die Notiz an…');
   const fussnoten = quellen.length
     ? `\n\n## Quellen\n${quellen.map((q) => `- Web: [${q.titel}](${q.url})`).join('\n')}`
     : '';
-  const titel = `🔎 ${auftrag.slice(0, 60)}`;
+  const titel = `${t('Recherche')}: ${auftrag.slice(0, 60)}`;
   await legeRechercheNotizAn(titel, `${text.trim()}${fussnoten}`);
   return { quellen: quellen.length, titel };
 }

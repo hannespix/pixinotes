@@ -117,7 +117,7 @@ console.log('════ A: ruhend nach dem Laden ════');
   pruefe('B2 gleich viele Blöcke, gleiche Kartenhöhe', vor.bloecke.length === nach.bloecke.length && vor.bloecke.length === 18 && vor.hoehe === nach.hoehe, JSON.stringify({ vor: [vor.bloecke.length, vor.hoehe, vor.bloecke.map((b) => b.typ[0] + ':' + b.text)], nach: [nach.bloecke.length, nach.hoehe, nach.bloecke.map((b) => b.typ[0] + ':' + b.text)] }));
   const abweichung = [];
   vor.bloecke.forEach((b, i) => { const n = nach.bloecke[i]; if (!n) return; for (const k of ['x', 'y', 'w', 'h', 'ix', 'iw', 'ih']) if (Math.abs(b[k] - n[k]) > 0.6) abweichung.push(`${i} ${b.typ} „${b.text}" ${k}: ${b[k]} → ${n[k]}`); if (b.schrift !== n.schrift) abweichung.push(`${i} ${b.typ} Schrift ${b.schrift} → ${n.schrift}`); if (b.index !== n.index) abweichung.push(`${i} Nummer ${b.index} → ${n.index}`); });
-  pruefe('B3 jeder Block liegt, wo er ruhend lag — Lage, Größe, Schrift, Nummer', abweichung.length === 0, '\n      ' + abweichung.slice(0, 12).join('\n      '));
+  pruefe('B3 jeder Block liegt, wo er ruhend lag – Lage, Größe, Schrift, Nummer', abweichung.length === 0, '\n      ' + abweichung.slice(0, 12).join('\n      '));
   pruefe('B4 Nummern laufen wie im Editor (1, 2, neu ab 5)', JSON.stringify(vor.bloecke.filter((b) => b.typ === 'numberedListItem').map((b) => b.index)) === '["1","2","5"]', JSON.stringify(vor.bloecke.filter((b) => b.typ === 'numberedListItem').map((b) => b.index)));
   await ctx.close();
 }
@@ -151,7 +151,7 @@ console.log('\n════ D: Haken ruhend umlegen ════');
   await P.locator('.react-flow__node[data-id="n2"] input[type="checkbox"]').nth(1).click();
   await P.waitForTimeout(700);
   let n2 = await knoten(P, 'n2');
-  pruefe('D1 „Brot" ist abgehakt — in den Daten und in der Ansicht', n2.data.blocks[2].props?.checked === true && await P.evaluate(() => document.querySelectorAll('.react-flow__node[data-id="n2"] [data-checked="true"]').length === 2));
+  pruefe('D1 „Brot" ist abgehakt – in den Daten und in der Ansicht', n2.data.blocks[2].props?.checked === true && await P.evaluate(() => document.querySelectorAll('.react-flow__node[data-id="n2"] [data-checked="true"]').length === 2));
   pruefe('D2 dabei entsteht kein Editor', !(await editoren(P)).includes('n2'));
   pruefe('D3 der Fortschritt zeigt 2/3', await P.evaluate(() => document.querySelector('.react-flow__node[data-id="n2"] .note-fortschritt-text')?.textContent.includes('2/3')));
   await P.locator('.react-flow__pane').click({ position: { x: 20, y: 700 } });
@@ -169,7 +169,7 @@ console.log('\n════ E: Verweilen und Fokus wecken ════');
   await P.mouse.move(box.x + 30, box.y + 12); await P.waitForTimeout(80);
   pruefe('E1 nach 80 ms Verweilen ruht die Notiz noch', !(await editoren(P)).includes('n2'));
   await P.waitForTimeout(600);
-  pruefe('E2 nach dem Verweilen ist der Editor vorgewärmt — ohne Fokus', (await editoren(P)).includes('n2') && await P.evaluate(() => !document.activeElement?.closest('.note-editor')));
+  pruefe('E2 nach dem Verweilen ist der Editor vorgewärmt – ohne Fokus', (await editoren(P)).includes('n2') && await P.evaluate(() => !document.activeElement?.closest('.note-editor')));
   // Fokus (ein Klick, wie am Tablet eingestellt) weckt n1
   const k1 = await P.locator('.react-flow__node[data-id="n1"]').boundingBox();
   await P.mouse.click(k1.x + k1.width / 2, k1.y + k1.height - 6);
@@ -219,7 +219,7 @@ console.log('\n════ H: Fern-Ruhe ════');
   await P.locator('.react-flow__pane').click({ position: { x: 10, y: 800 } });
   await P.keyboard.press('f'); await P.waitForTimeout(1200);
   const da = await zustand();
-  pruefe('H4 kommt die Karte ins Bild, ist ihr Inhalt wieder da — gleiche Höhe, keine der sichtbaren Karten ruht', !da.fern && da.cv === 'visible' && da.imBild && da.hoehe === weg.hoehe && da.nah.length >= 6 && da.nah.every((f) => f === false), JSON.stringify(da));
+  pruefe('H4 kommt die Karte ins Bild, ist ihr Inhalt wieder da – gleiche Höhe, keine der sichtbaren Karten ruht', !da.fern && da.cv === 'visible' && da.imBild && da.hoehe === weg.hoehe && da.nah.length >= 6 && da.nah.every((f) => f === false), JSON.stringify(da));
   await ctx.close();
 }
 

@@ -122,7 +122,7 @@ console.log('════ A: Automatik räumt beim Start ════');
   console.log('   ', JSON.stringify({ spalten: l.inSpalten, badge: l.badge, toast: l.toast.slice(0, 70) }));
   pruefe('A1 das 10 Tage alte Ticket ist aus der Spalte verschwunden', !l.inSpalten.includes('t1'), JSON.stringify(l.inSpalten));
   pruefe('A2 das 2 Tage alte bleibt (Frist 7 Tage)', l.inSpalten.includes('t2'));
-  pruefe('A3 das Ticket OHNE Stempel bleibt — es wird gestempelt, nicht weggeräumt', l.inSpalten.includes('t3'));
+  pruefe('A3 das Ticket OHNE Stempel bleibt – es wird gestempelt, nicht weggeräumt', l.inSpalten.includes('t3'));
   pruefe('A4 das offene Ticket bleibt unberührt', l.inSpalten.includes('t4'));
   pruefe('A5 die Kopfzeile zählt 1 archiviertes Ticket', l.badge === '1', `badge=${l.badge}`);
   pruefe('A6 der Lauf meldet sich (Toast)', /automatisch archiviert/.test(l.toast), l.toast);
@@ -151,7 +151,7 @@ console.log('════ A: Automatik räumt beim Start ════');
   // Archiv-Panel: Zeilen, neueste zuerst, zurückholen
   await oeffneArchiv(P);
   l = await lage(P);
-  pruefe('A13 das Archiv listet beide — das zuletzt archivierte oben', JSON.stringify(l.zeilen) === JSON.stringify(['t2', 't1']), JSON.stringify(l.zeilen));
+  pruefe('A13 das Archiv listet beide – das zuletzt archivierte oben', JSON.stringify(l.zeilen) === JSON.stringify(['t2', 't1']), JSON.stringify(l.zeilen));
   await P.locator('.k-archiv-row[data-archiv-id="t2"] .k-archiv-back').click();
   await P.waitForTimeout(700);
   l = await lage(P);
@@ -162,7 +162,7 @@ console.log('════ A: Automatik räumt beim Start ════');
   await P.screenshot({ path: `${SD}/m293-a-panel.png` });
   await P.keyboard.press('Escape');
   await P.waitForTimeout(300);
-  pruefe('A17 Esc schließt das Archiv — auch nachdem der geklickte Knopf mit seiner Zeile verschwand',
+  pruefe('A17 Esc schließt das Archiv – auch nachdem der geklickte Knopf mit seiner Zeile verschwand',
     (await P.locator('.k-archiv-panel').count()) === 0);
   // Rückfallweg, damit die folgenden Messungen nicht am offenen Panel scheitern
   if (await P.locator('.k-archiv-panel').count()) { await P.locator('.k-archiv-panel .ticket-detail-head button').click(); await P.waitForTimeout(300); }
@@ -172,7 +172,7 @@ console.log('════ A: Automatik räumt beim Start ════');
   await P.locator('.kanban-item[data-kid="t2"] .k-archiv-btn').click();
   await P.waitForTimeout(600);
   l = await lage(P);
-  pruefe('A18 🗃 am Ticket archiviert es', !l.inSpalten.includes('t2') && l.badge === '2', JSON.stringify({ s: l.inSpalten, b: l.badge }));
+  pruefe('A18 am Ticket archiviert es', !l.inSpalten.includes('t2') && l.badge === '2', JSON.stringify({ s: l.inSpalten, b: l.badge }));
 
   // Die ganze Erledigt-Spalte
   const spalten = P.locator('.kanban-col');
@@ -245,7 +245,7 @@ console.log('\n════ B: Einstellung der Automatik ════');
   await P.locator('.k-archiv-auto input[type="number"]').press('Enter');
   await P.waitForTimeout(600);
   l = await lage(P);
-  pruefe('B14 0 Tage gibt es nicht — das Feld fällt auf die Voreinstellung', l.gespeichert?.autoArchivTage === 7
+  pruefe('B14 0 Tage gibt es nicht – das Feld fällt auf die Voreinstellung', l.gespeichert?.autoArchivTage === 7
     && (await P.locator('.k-archiv-auto input[type="number"]').inputValue()) === '7', JSON.stringify(l.gespeichert));
 
   // Ausschalten: Archiv bleibt, Feld gesperrt, Wert gemerkt

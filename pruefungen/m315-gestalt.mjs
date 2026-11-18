@@ -85,7 +85,7 @@ console.log('\n════ A: Tokens und Flächen ════');
   const blur = await P.evaluate(() => {
     let n = 0; const seen = [];
     for (const sh of document.styleSheets) { let rules; try { rules = sh.cssRules; } catch { continue; }
-      const geh = (rs) => { for (const r of rs) { if (r.cssRules) geh(r.cssRules); if (r.style && (r.style.backdropFilter || r.style.webkitBackdropFilter) && !/^\.m_/.test(r.selectorText || '')) { n += 1; if (seen.length < 5) seen.push(r.selectorText); } } };
+      const geh = (rs) => { for (const r of rs) { if (r.cssRules) geh(r.cssRules); if (r.style && !/^(|unset|none|initial|revert)$/.test(r.style.backdropFilter || r.style.webkitBackdropFilter || '') && !/^\.m_/.test(r.selectorText || '')) { n += 1; if (seen.length < 5) seen.push(r.selectorText); } } };
       geh(rules); }
     return { n, seen };
   });
@@ -201,7 +201,7 @@ console.log('\n════ F: Telefon ════');
 console.log('\n════ G: Was ist neu ════');
 {
   const js = readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.js')).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8')).join('\n');
-  pruefe('G1 „Was ist neu" nennt M315', js.includes('Etappe 4 — das Gesicht (M315)'));
+  pruefe('G1 „Was ist neu" nennt M315', js.includes('Etappe 4 – das Gesicht (M315)'));
 }
 
 await browser.close(); app.close();

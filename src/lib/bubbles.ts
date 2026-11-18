@@ -205,7 +205,7 @@ export function rangfolge(blasen: Blase[]): Blase[] {
 export function bubblesAlsText(d0: Partial<BubblesData> | undefined): string {
   const d = bubblesDaten(d0);
   const blasen = rangfolge(blasenVon(d, ''));
-  const zeile = (b: Blase) => `• ${b.text}${b.mal > 1 ? ` (${b.mal}×)` : ''}${b.punkte ? ` — ${b.punkte} ${b.punkte === 1 ? 'Punkt' : 'Punkte'}` : ''}`;
+  const zeile = (b: Blase) => `• ${b.text}${b.mal > 1 ? ` (${b.mal}×)` : ''}${b.punkte ? ` – ${b.punkte} ${b.punkte === 1 ? 'Punkt' : 'Punkte'}` : ''}`;
   const kopf = [d.title || 'Ideen', d.frage ?? ''].filter(Boolean).join('\n');
   const gruppen = Object.entries(d.gruppen).filter(([, g]) => g && !g.weg).sort((a, b) => a[1].t - b[1].t);
   if (!gruppen.length) return `${kopf}\n${blasen.map(zeile).join('\n')}`.trim();
@@ -222,7 +222,7 @@ export function bubblesAlsText(d0: Partial<BubblesData> | undefined): string {
 export function bubblesAlsBloecke(d0: Partial<BubblesData> | undefined): Array<{ type: string; props?: Record<string, unknown>; content: string }> {
   const d = bubblesDaten(d0);
   const blasen = rangfolge(blasenVon(d, ''));
-  const zeile = (b: Blase) => `${b.text}${b.mal > 1 ? ` (${b.mal}×)` : ''}${b.punkte ? ` — ${b.punkte} ${b.punkte === 1 ? 'Punkt' : 'Punkte'}` : ''}`;
+  const zeile = (b: Blase) => `${b.text}${b.mal > 1 ? ` (${b.mal}×)` : ''}${b.punkte ? ` – ${b.punkte} ${b.punkte === 1 ? 'Punkt' : 'Punkte'}` : ''}`;
   const aus: Array<{ type: string; props?: Record<string, unknown>; content: string }> = [{ type: 'heading', props: { level: 2 }, content: d.title || 'Ideen' }];
   if (d.frage) aus.push({ type: 'paragraph', content: d.frage });
   const n = beteiligte(d);
@@ -233,7 +233,7 @@ export function bubblesAlsBloecke(d0: Partial<BubblesData> | undefined): Array<{
     const drin = blasen.filter((b) => b.gruppe === id);
     if (!drin.length) continue;
     const summe = drin.reduce((s, b) => s + b.punkte, 0);
-    aus.push({ type: 'heading', props: { level: 3 }, content: `${g.name}${summe ? ` — ${summe} ${summe === 1 ? 'Punkt' : 'Punkte'}` : ''}` });
+    aus.push({ type: 'heading', props: { level: 3 }, content: `${g.name}${summe ? ` – ${summe} ${summe === 1 ? 'Punkt' : 'Punkte'}` : ''}` });
     for (const b of drin) aus.push({ type: 'bulletListItem', content: zeile(b) });
   }
   const frei = blasen.filter((b) => !b.gruppe);

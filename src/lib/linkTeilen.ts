@@ -110,7 +110,7 @@ export async function linkErstellen(boardId: string, fortschritt?: (text: string
   const z = (await res.json()) as LinkZeile[];
   // Anhänge von Karten, die es nicht mehr gibt, aus der Fassung nehmen
   for (const a of alt?.dateien ?? []) if (!dateien.some((d) => d.id === a.id)) await entfernen(token, a.id);
-  if (fehlend.length) useBoard.getState().showToast(`Nicht im Link: ${fehlend.join(', ')} — die Datei liegt auf diesem Gerät nicht vor.`, false, 8000);
+  if (fehlend.length) useBoard.getState().showToast(`Nicht im Link: ${fehlend.join(', ')} – die Datei liegt auf diesem Gerät nicht vor.`, false, 8000);
   return z[0] ?? { token, board_id: boardId, name: board.name, board_url: boardUrl, dateien, updated_at: new Date().toISOString() };
 }
 
@@ -146,15 +146,15 @@ function empfangenLesen(): Record<string, Empfangen> {
  */
 export async function linkOeffnen(token: string, neuerLaden: (name: string) => boolean = () => true): Promise<'geoeffnet' | 'vorhanden'> {
   const k = supabaseKonfig();
-  if (!k.url || !k.key) throw new Error('Diese Fassung der App kennt den PixiNotes-Server nicht — den Link bitte auf der Web-Version öffnen.');
+  if (!k.url || !k.key) throw new Error('Diese Fassung der App kennt den PixiNotes-Server nicht – den Link bitte auf der Web-Version öffnen.');
   let res: Response;
   try {
     res = await fetch(`${k.url}/rest/v1/rpc/link_lesen`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: k.key, Authorization: `Bearer ${k.key}` }, body: JSON.stringify({ p_token: token }) });
-  } catch { throw new Error('Der Link ließ sich nicht laden — Internetverbindung prüfen.'); }
+  } catch { throw new Error('Der Link ließ sich nicht laden – Internetverbindung prüfen.'); }
   if (res.status === 404) throw new Error('Link-Freigaben sind beim Betreiber noch nicht eingerichtet.');
   if (!res.ok) throw new Error(`Der Link ließ sich nicht laden (HTTP ${res.status}).`);
   const info = (await res.json()) as { name: string; board_url: string; dateien: LinkDatei[]; stand: string } | null;
-  if (!info?.board_url) throw new Error('Diesen Link gibt es nicht mehr — er wurde gelöscht oder ist unvollständig.');
+  if (!info?.board_url) throw new Error('Diesen Link gibt es nicht mehr – er wurde gelöscht oder ist unvollständig.');
 
   const st = useBoard.getState();
   const bekannt = empfangenLesen()[token];
@@ -164,7 +164,7 @@ export async function linkOeffnen(token: string, neuerLaden: (name: string) => b
       return 'vorhanden';
     }
   }
-  const roh = await fetch(info.board_url).then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status))))).catch(() => { throw new Error('Die geteilte Fassung ließ sich nicht laden — der Link wurde vermutlich gelöscht.'); });
+  const roh = await fetch(info.board_url).then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status))))).catch(() => { throw new Error('Die geteilte Fassung ließ sich nicht laden – der Link wurde vermutlich gelöscht.'); });
   const board = parseBoardPayload(roh);
   if (!board) throw new Error('Die geteilte Fassung ist beschädigt.');
   const ids = new Map<string, string>();

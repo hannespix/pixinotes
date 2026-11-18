@@ -40,7 +40,7 @@ const board = (id, name) => ({ id, name, edges: [], drawings: [], comments: [], 
 // Anlege-Reihenfolge (Board-Stand): Mango, Zebra, Apfel — gespeicherte Reihenfolge im Projekt: Zebra, Apfel, Mango
 const state = {
   boards: [board('b2', 'Mango'), board('b3', 'Zebra'), board('b1', 'Apfel')],
-  spaces: [{ id: 's1', name: '🏢 Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['b3', 'b1', 'b2'] }] }],
+  spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['b3', 'b1', 'b2'] }] }],
   activeId: 'b1', view: 'overview',
 };
 async function seite() {

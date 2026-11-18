@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useBoard } from '../store';
 import { collectBacklinks } from '../lib/links';
 import { relatedToBoard, type BrainHit } from '../lib/brain';
-import { IFolder, INote, IX } from './Icons';
+import { IFolder, INote, IX, INetz } from './Icons';
 
 /**
  * Backlinks-Leiste (Obsidian: „Was verlinkt hierher?"): zeigt Portale und
@@ -49,7 +49,7 @@ export function BacklinksPanel() {
       {open && (
         <div className="backlinks-panel">
           <div className="backlinks-head">
-            {backlinks.length > 0 ? 'Verlinkt hierher' : '🧠 Verwandt (Bedeutung)'}
+            {backlinks.length > 0 ? 'Verlinkt hierher' : 'Verwandt (Bedeutung)'}
             <button onClick={() => setOpen(false)} aria-label="Backlinks schließen"><IX size={11} /></button>
           </div>
           {backlinks.map((b, i) => (
@@ -60,16 +60,16 @@ export function BacklinksPanel() {
             </button>
           ))}
           {related.length > 0 && backlinks.length > 0 && (
-            <div className="backlinks-head backlinks-sub">🧠 Verwandt (Bedeutung)</div>
+            <div className="backlinks-head backlinks-sub">Verwandt (Bedeutung)</div>
           )}
           {related.map((r) => (
             <button
               key={`${r.boardId}:${r.nodeId}`}
               className="backlinks-row"
               onClick={() => jump(r.boardId, r.nodeId)}
-              title={`Inhaltlich verwandt (${Math.round(r.score * 100)} % Ähnlichkeit) — noch nicht verlinkt`}
+              title={`Inhaltlich verwandt (${Math.round(r.score * 100)} % Ähnlichkeit) – noch nicht verlinkt`}
             >
-              <span className="backlinks-icon">🧠</span>
+              <span className="backlinks-icon"><INetz size={14} /></span>
               <span className="backlinks-label" translate={r.title ? 'no' : undefined}>{r.title || '(ohne Titel)'}</span>
               <span className="backlinks-board" translate="no">{r.boardName}</span>
             </button>
@@ -80,10 +80,10 @@ export function BacklinksPanel() {
         className={`backlinks-pill ${open ? 'on' : ''}`}
         onClick={() => setOpen((o) => !o)}
         title={related.length > 0
-          ? 'Was verlinkt hierher — und was ist inhaltlich verwandt? (🧠 semantischer Index)'
+          ? 'Was verlinkt hierher – und was ist inhaltlich verwandt? (semantischer Index)'
           : 'Was verlinkt hierher? (Portale & Wikilinks)'}
       >
-        ↩ {backlinks.length}{related.length > 0 ? ` · 🧠 ${related.length}` : ''}
+        ↩ {backlinks.length}{related.length > 0 ? <> · <INetz size={11} /> {related.length}</> : null}
       </button>
     </div>
   );

@@ -17,19 +17,10 @@ import { kontoDateiNachladen } from '../../lib/kontoSync';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { BildLupe } from './BildLupe';
-import { ICrop, IDownload, IX } from '../Icons';
+import { ICrop, IDownload, IX, IImage, IComment } from '../Icons';
 import { bildBearbeiten } from '../BildEditorHost';
 
-const ICONS: Record<string, string> = {
-  pdf: '📕',
-  xlsx: '📊',
-  xls: '📊',
-  csv: '📊',
-  docx: '📄',
-  doc: '📄',
-  pptx: '📽️',
-  zip: '🗜️',
-};
+import { DateiSymbol } from '../KartenSymbol';
 
 /**
  * Datei als Karte. PDFs zeigen die erste Seite als Mini-Vorschau direkt auf
@@ -40,7 +31,6 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
   const showToast = useBoard((s) => s.showToast);
   const file = data;
   const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-  const icon = ICONS[ext] ?? '📎';
   /** M263: „DB_Reservierung_762631109316.pdf" sagt niemandem etwas. */
   const eigenerTitel = !!file.titel?.trim();
   const titel = eigenerTitel ? file.titel!.trim() : file.name;
@@ -211,7 +201,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
     };
     const unterschrift = (
       <div className="meta img-name unterschrift">
-        🖼️
+        <IImage size={13} />
         <DragTitle
           className="img-titel"
           value={titel}
@@ -232,7 +222,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           <button
             className="bild-bearbeiten-auf nodrag"
             data-taste="bild-bearbeiten-auf"
-            title="Bild bearbeiten — zuschneiden, drehen, gerade richten"
+            title="Bild bearbeiten – zuschneiden, drehen, gerade richten"
             aria-label="Bild bearbeiten"
             onClick={(e) => { e.stopPropagation(); bildBearbeiten(id); }}
           ><ICrop size={14} /></button>
@@ -256,7 +246,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
           Rahmen und Formen). Der Dateiname bleibt daneben stehen, sobald er
           abweicht — er ist die Wahrheit über die Datei, nicht der Titel. */}
       <div className="file-kopf">
-        <span className="file-icon">{icon}</span>
+        <span className="file-icon"><DateiSymbol name={file.name} size={20} /></span>
         <DragTitle
           className="file-titel"
           value={titel}
@@ -268,12 +258,12 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
         />
       </div>
       <button className="file-body nodrag" onClick={istDokument ? () => { setGezeigt(false); aufklappen(!offen); } : quelle ? download : loadFromTeam}
-        title={istDokument ? (offen ? 'Zuklappen' : 'Aufklappen — Seite für Seite lesen und anmerken') : quelle ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
+        title={istDokument ? (offen ? 'Zuklappen' : 'Aufklappen – Seite für Seite lesen und anmerken') : quelle ? 'Herunterladen' : file.ref ? 'Aus dem Team-Ordner laden' : undefined}>
         <span className="meta">
           {eigenerTitel && <><span translate="no">{file.name}</span> · </>}{formatBytes(file.size)}
           {istDokument && seitenZahl > 0 && <> · {seitenZahl} Seite{seitenZahl === 1 ? '' : 'n'}</>}
           {istDokument && seitenStriche > 0 && <> · ✎ {seitenStriche}</>}
-          {istDokument && seitenKommentare > 0 && <> · 💬 {seitenKommentare}</>}
+          {istDokument && seitenKommentare > 0 && <> · <IComment size={11} /> {seitenKommentare}</>}
         </span>
       </button>
       {/* Nachladen braucht nur, wem der Inhalt fehlt — sonst liegt er schon hier */}
@@ -333,9 +323,9 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
               Bleibt eine Karte trotzdem leer, liegt es fast immer an der
               Größe — das gehört hier hin, nicht ins Handbuch. */}
           {kontoLaedt ? 'Wird gerade aus dem PixiNotes-Konto geladen … ' : ''}Der Inhalt liegt nicht auf diesem Gerät. Dateien werden bis zur eingestellten
-          Obergrenze mitsynchronisiert (⚙ → Daten → Synchronisation); diese hier ist mit
+          Obergrenze mitsynchronisiert (Einstellungen → Daten → Synchronisation); diese hier ist mit
           {' '}{formatBytes(file.size)} entweder größer oder wurde vor dieser Neuerung eingefügt.
-          Auf dem Gerät mit der Datei einmal speichern — oder sie hier erneut einfügen.
+          Auf dem Gerät mit der Datei einmal speichern – oder sie hier erneut einfügen.
         </div>
       )}
     </CardShell>
@@ -420,7 +410,7 @@ function PdfThumb({ dataUrl, onOpen, onSeiten }: { dataUrl: string; onOpen: () =
 
   if (failed) return null;
   return (
-    <button className="pdf-thumb nodrag" onClick={onOpen} title="Aufklappen — Seite für Seite lesen und anmerken">
+    <button className="pdf-thumb nodrag" onClick={onOpen} title="Aufklappen – Seite für Seite lesen und anmerken">
       <canvas ref={ref} />
     </button>
   );
@@ -549,8 +539,8 @@ function SeitenLeiste({ id, seite, seiten, blaettern, pinModus, setPinModus, anz
       <button onClick={() => { if (seite < seiten) blaettern(seite + 1); }} aria-disabled={seite >= seiten} aria-label="Nächste Seite" title="Nächste Seite" data-taste="pdf-vor">›</button>
       <span className="pdf-seite-luft" />
       <button className={pinModus ? 'on' : ''} onClick={() => setPinModus((p) => !p)} data-taste="pdf-kommentar"
-        title={pinModus ? 'Abbrechen' : 'Kommentar an eine Stelle der Seite setzen — danach auf die Stelle tippen'} aria-pressed={pinModus} aria-label="Kommentar an Stelle">
-        💬{anzahlHier > 0 && <span className="pdf-kommentar-zahl" data-taste="pdf-seite-kommentare">{anzahlHier}</span>}
+        title={pinModus ? 'Abbrechen' : 'Kommentar an eine Stelle der Seite setzen – danach auf die Stelle tippen'} aria-pressed={pinModus} aria-label="Kommentar an Stelle">
+        <IComment size={14} />{anzahlHier > 0 && <span className="pdf-kommentar-zahl" data-taste="pdf-seite-kommentare">{anzahlHier}</span>}
       </button>
       <button onClick={onDownload} title="Herunterladen" aria-label="Herunterladen"><IDownload size={13} /></button>
       {zuklappen && <button onClick={zuklappen} title="Zuklappen" aria-label="Zuklappen" data-taste="pdf-zuklappen"><IX size={13} /></button>}
@@ -845,7 +835,7 @@ function WordSeite({ id, quelle, zuklappen, onSeiten, onDownload }: {
     useBoard.getState().setCommentOpen(`new:${id}`, { seite, px: Math.round(px * 10) / 10, py: Math.round(py * 10) / 10 });
   };
 
-  if (status === 'fehler') return <div className="file-nopreview">Dieses Word-Dokument lässt sich nicht darstellen — „Als Notiz übernehmen" (Auswahl → ⋯) holt den Text.</div>;
+  if (status === 'fehler') return <div className="file-nopreview">Dieses Word-Dokument lässt sich nicht darstellen – „Als Notiz übernehmen" (Auswahl → ⋯) holt den Text.</div>;
   return (
     <div className="pdf-seite-wrap nodrag" ref={wrapRef} data-taste="pdf-seite-wrap" data-art="word">
       <SeitenLeiste id={id} seite={seite} seiten={seiten} blaettern={blaettern} pinModus={pinModus} setPinModus={setPinModus}

@@ -3,7 +3,7 @@ import { useBoard } from '../../store';
 import { boardMetaLabel } from '../../lib/boardStats';
 import { zeigtAuf } from '../../lib/portale';
 import type { PortalNode } from '../../types';
-import { IPlay } from '../Icons';
+import { IPlay, IFolder } from '../Icons';
 import { CardShell } from './CardShell';
 
 /**
@@ -30,7 +30,7 @@ export function PortalCard({ id, data, selected }: NodeProps<PortalNode>) {
 
   return (
     <CardShell id={id} selected={selected} minWidth={160} minHeight={130} className="portal-card">
-      <div className="portal-icon">🗂️</div>
+      <div className="portal-icon"><IFolder size={22} /></div>
       {target ? (
         <>
           <div className="portal-name" translate="no">{target.name}</div>
@@ -39,7 +39,7 @@ export function PortalCard({ id, data, selected }: NodeProps<PortalNode>) {
             gegenseitig ? (
               <div className="portal-rueck" title={data.rueck
                 ? `Rückverweis: „${target.name}" hat diese Karte beim Verlinken hier angelegt.`
-                : `„${target.name}" verweist ebenfalls hierher — die Verbindung gilt in beide Richtungen.`}>
+                : `„${target.name}" verweist ebenfalls hierher – die Verbindung gilt in beide Richtungen.`}>
                 ⇄ {data.rueck ? 'Rückverweis' : 'beidseitig'}
               </div>
             ) : (

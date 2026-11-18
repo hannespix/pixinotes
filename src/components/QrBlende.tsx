@@ -88,7 +88,7 @@ export function QrBlende({ wunsch, onClose }: { wunsch: QrWunsch; onClose: () =>
   };
   const kopieren = async () => {
     try { await navigator.clipboard.writeText(wunsch.url); showToast('Link kopiert.'); }
-    catch { showToast('Kopieren ging nicht — den Link bitte im Board-Menü ⋯ → „Gemeinsam bearbeiten" markieren.', false, 7000); }
+    catch { showToast('Kopieren ging nicht – den Link bitte im Board-Menü ⋯ → „Gemeinsam bearbeiten" markieren.', false, 7000); }
   };
 
   const code = (
@@ -127,7 +127,7 @@ export function QrBlende({ wunsch, onClose }: { wunsch: QrWunsch; onClose: () =>
           <button className="modal-x" onClick={onClose} aria-label="Schließen" data-taste="qr-zu"><IX size={18} /></button>
         </div>
         <p className="qr-text">
-          Code mit der Handy-Kamera scannen —<br />
+          Code mit der Handy-Kamera scannen –<br />
           {wunsch.ohneKonto ? 'du bist sofort im Board' : 'du kommst ins Board'} {en ? '“' : '„'}<b translate="no">{name}</b>{en ? '”' : '"'}.
           {!wunsch.ohneKonto && <> <span className="qr-konto" data-taste="qr-konto">Dafür ist ein PixiNotes-Konto nötig.</span></>}
         </p>
@@ -137,7 +137,7 @@ export function QrBlende({ wunsch, onClose }: { wunsch: QrWunsch; onClose: () =>
           <span className="qr-dabei" data-taste="qr-dabei" aria-live="polite">{dabei > 1 ? `${dabei} dabei` : 'Noch niemand sonst dabei'}</span>
           <span className="qr-knoepfe">
             <button onClick={() => void kopieren()} data-taste="qr-kopieren">Link kopieren</button>
-            <button onClick={() => { setLage(null); setEcke(true); }} data-taste="qr-ecke" title="Klein in die Ecke legen und weiterarbeiten — der Code bleibt sichtbar"><IMinimize size={14} /> In die Ecke</button>
+            <button onClick={() => { setLage(null); setEcke(true); }} data-taste="qr-ecke" title="Klein in die Ecke legen und weiterarbeiten – der Code bleibt sichtbar"><IMinimize size={14} /> In die Ecke</button>
           </span>
         </div>
       </div>

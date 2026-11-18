@@ -168,7 +168,7 @@ console.log('\n════ B: Kein Weg offen → Hinweis, nichts geht außer Ha
   await knopf.click();
   await warte(P, 1000);
   const t = await toast(P);
-  pruefe('B3 Klartext-Hinweis nennt den Schalter ⚙ → Dienste → Handschrift', /erkennt Handschrift nicht selbst/.test(t) && /Dienste/.test(t) && /Handschrift/.test(t), t);
+  pruefe('B3 Klartext-Hinweis nennt den Schalter Einstellungen → Dienste → Handschrift', /erkennt Handschrift nicht selbst/.test(t) && /Dienste/.test(t) && /Handschrift/.test(t), t);
   pruefe('B4 kein Aufruf nach außen ohne Opt-in', online === 0, String(online));
   pruefe('B5 die Striche bleiben erhalten', (await striche(P)).length === 3);
   pruefe('B6 keine Notiz entstanden', (await knoten(P)).length === 1);

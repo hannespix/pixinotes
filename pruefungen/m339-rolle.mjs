@@ -105,7 +105,7 @@ console.log('\n════ A: Überlauf mit Scrollbalken ════');
   pruefe('A3 eine kurze Notiz hat keinen Scrollbereich und keinen Balken', !kurz.rollt && await P.evaluate(() => getComputedStyle(document.querySelector('.react-flow__node[data-id="n2"] .note-spur')).display === 'none'));
   const auto = await rolle(P, 'n3');
   const n3 = (await board(P)).nodes.find((n) => n.id === 'n3');
-  pruefe('A4 eine Notiz ohne feste Höhe wächst mit dem Inhalt bis 640 — darüber scrollt sie', n3.height === undefined && auto.h === 640 && auto.rollt && auto.max > 100, JSON.stringify({ h: n3.height, koerper: auto.h, rollt: auto.rollt, max: auto.max }));
+  pruefe('A4 eine Notiz ohne feste Höhe wächst mit dem Inhalt bis 640 – darüber scrollt sie', n3.height === undefined && auto.h === 640 && auto.rollt && auto.max > 100, JSON.stringify({ h: n3.height, koerper: auto.h, rollt: auto.rollt, max: auto.max }));
   // Rad über der Notiz (Rad schwenkt in der Vorgabe: Modul-Scroll gewinnt)
   await P.mouse.move(r.karte.x + 100, r.karte.y + 120);
   await P.mouse.wheel(0, 180); await P.waitForTimeout(350);
@@ -120,7 +120,7 @@ console.log('\n════ A: Überlauf mit Scrollbalken ════');
   await P.mouse.move(r.daumen.x, r.daumen.cy + 60, { steps: 6 }); await P.mouse.up(); await P.waitForTimeout(400);
   const r2 = await rolle(P, 'n1');
   const pos1 = (await board(P)).nodes.find((n) => n.id === 'n1').position;
-  pruefe('A8 Ziehen am Daumen scrollt — die Karte bleibt stehen, das Board auch', r2.top > r.top + 150 && pos0.x === pos1.x && pos0.y === pos1.y && vp0 === await P.evaluate(() => document.querySelector('.react-flow__viewport').style.transform), JSON.stringify({ vor: r.top, nach: r2.top, pos0, pos1 }));
+  pruefe('A8 Ziehen am Daumen scrollt – die Karte bleibt stehen, das Board auch', r2.top > r.top + 150 && pos0.x === pos1.x && pos0.y === pos1.y && vp0 === await P.evaluate(() => document.querySelector('.react-flow__viewport').style.transform), JSON.stringify({ vor: r.top, nach: r2.top, pos0, pos1 }));
   await scrollen(P, 'n1', 99999);
   const ende = await rolle(P, 'n1');
   pruefe('A9 am Ende: Schatten nur oben, Daumen unten', ende.oben && !ende.unten && Math.abs(ende.daumen.y + ende.daumen.h - (ende.karte.h - 4 * ende.k)) < 3, JSON.stringify(ende));

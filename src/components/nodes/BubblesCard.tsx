@@ -30,6 +30,7 @@ import {
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 
+import { IBubbles, ITrash, IWand } from '../Icons';
 interface Koerper { x: number; y: number; vx: number; vy: number; r: number; ziel: number; g: string | null; len: number; wort: number }
 /**
  * M378: Radius des Kreises, den eine Gruppe mit diesen Blasen braucht (samt Luft für den Ring). Eine Blase: sie
@@ -43,7 +44,7 @@ function feldRadius(rs: number[]): number {
 }
 const SCHRITTE: Array<[BubbleSchritt, string, string]> = [
   ['sammeln', 'Sammeln', 'Alle tragen Ideen ein'],
-  ['gruppieren', 'Gruppieren', 'Die Sammlung ist geschlossen — Ideen ordnen und zusammenfassen'],
+  ['gruppieren', 'Gruppieren', 'Die Sammlung ist geschlossen – Ideen ordnen und zusammenfassen'],
   ['abstimmen', 'Abstimmen', 'Jede Person vergibt ihre Punkte'],
   ['ergebnis', 'Ergebnis', 'Die Rangfolge steht fest'],
 ];
@@ -126,7 +127,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const ideeDazu = () => {
     const text = eingabe.trim().slice(0, 140);
     if (!text || fest) return;
-    if (regeln.zu && !leiten) { showToast('Die Sammlung ist geschlossen — gerade wird gruppiert oder abgestimmt.'); return; }
+    if (regeln.zu && !leiten) { showToast('Die Sammlung ist geschlossen – gerade wird gruppiert oder abgestimmt.'); return; }
     // anonym: der Name wird gar nicht erst vermerkt
     updateNodeData(id, { ideen: { ...d.ideen, [uid()]: { text, von: wer, ...(regeln.anonym ? {} : { name: ich().name }), t: jetzt() } } });
     setEingabe('');
@@ -166,7 +167,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   };
   /** Zwei Ideen zu einer machen: Die gezogene übernimmt den Wortlaut der anderen — gleiche Texte verschmelzen von selbst */
   const verschmelzen = (was: Blase, auf: Blase) => {
-    if (fest || !darfAendern(was)) { showToast('Verschmelzen kannst du nur deine eigenen Ideen — oder wer die Runde leitet.'); return; }
+    if (fest || !darfAendern(was)) { showToast('Verschmelzen kannst du nur deine eigenen Ideen – oder wer die Runde leitet.'); return; }
     ideenAendern(was.ids, () => ({ text: auf.text, g: auf.gruppe ?? null }));
     setWahl(auf.id);
   };
@@ -188,11 +189,11 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     const hier = selectActiveBoard(st)?.nodes.find((n) => n.id === id);
     const pos = hier ? { x: hier.position.x + ((hier.measured?.width ?? hier.width ?? 560) as number) + 40, y: hier.position.y } : { x: 0, y: 0 };
     st.addNode(makeNote(pos, { color: 'white', blocks: bubblesAlsBloecke(d) as never }));
-    showToast('📝 Ergebnis als Notiz neben die Karte gelegt.');
+    showToast('Ergebnis als Notiz neben die Karte gelegt.');
   };
   const stimme = (b: Blase, dazu: 1 | -1) => {
     if (fest || phase !== 'offen') return;
-    if (dazu === 1 && uebrig <= 0) { showToast(`Alle ${d.abstimmung.punkte} Punkte sind vergeben — tippe auf deine Punkte an einer Blase, um einen zurückzunehmen.`); return; }
+    if (dazu === 1 && uebrig <= 0) { showToast(`Alle ${d.abstimmung.punkte} Punkte sind vergeben – tippe auf deine Punkte an einer Blase, um einen zurückzunehmen.`); return; }
     // Meine Punkte liegen an der Idee, auf die ich getippt habe; beim Zurücknehmen von irgendeiner in dieser Blase
     const stimmen = { ...d.stimmen };
     if (dazu === 1) {
@@ -248,7 +249,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       if (!n) throw new Error('leer');
       updateNodeData(id, { gruppen: neueGruppen, ideen });
     } catch {
-      showToast('Die KI hat keine brauchbaren Gruppen geliefert — bitte noch einmal versuchen oder von Hand gruppieren.');
+      showToast('Die KI hat keine brauchbaren Gruppen geliefert – bitte noch einmal versuchen oder von Hand gruppieren.');
     } finally { setKiLaeuft(false); }
   };
 
@@ -636,7 +637,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   };
   const tippen = (b: Blase) => {
     if (phase === 'offen' && !fest) { stimme(b, 1); return; }
-    if (zu(b)) { showToast('Diese Idee ist noch verdeckt — sie wird sichtbar, sobald die Sammlung endet.'); return; }
+    if (zu(b)) { showToast('Diese Idee ist noch verdeckt – sie wird sichtbar, sobald die Sammlung endet.'); return; }
     setWahl((w) => (w === b.id ? null : b.id)); setMenue(false); setBearbeite(null); setGWahl(null); setFallen(null);
   };
   // Verschwundenes vergessen
@@ -684,13 +685,13 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         />
         <span className="bub-zahl" data-taste="bub-zahl">{blasen.length} {blasen.length === 1 ? 'Idee' : 'Ideen'}{personen > 1 ? ` · ${personen} Personen` : ''}</span>
         <button className={`bub-ansicht nodrag${liste ? ' an' : ''}`} onClick={() => { setListe((l) => !l); setWahl(null); setGWahl(null); setFallen(null); }} aria-pressed={liste}
-          title={liste ? 'Zurück zu den Blasen' : 'Als Liste zeigen — nach Gruppen und Punkten geordnet'} data-taste="bub-ansicht">{liste ? '🫧' : '☰'}</button>
+          title={liste ? 'Zurück zu den Blasen' : 'Als Liste zeigen – nach Gruppen und Punkten geordnet'} data-taste="bub-ansicht">{liste ? <IBubbles size={15} /> : '☰'}</button>
       </div>
       {/* M378: Wo steht die Runde? Für alle sichtbar; wer leitet, schaltet weiter */}
       <div className="bub-schritte nodrag" role="group" aria-label="Ablauf" data-taste="bub-schritte">
         {SCHRITTE.map(([k, name, hinweis], i) => (
           <button key={k} className={`bub-schritt${k === schritt0 ? ' jetzt' : ''}${SCHRITTE.findIndex(([x]) => x === schritt0) > i ? ' war' : ''}`} disabled={!leiten}
-            aria-current={k === schritt0 ? 'step' : undefined} title={leiten ? `${hinweis} — hierhin schalten` : hinweis} data-taste="bub-schritt" data-schritt={k}
+            aria-current={k === schritt0 ? 'step' : undefined} title={leiten ? `${hinweis} – hierhin schalten` : hinweis} data-taste="bub-schritt" data-schritt={k}
             onClick={() => schrittSetzen(k)}><i>{i + 1}</i>{name}</button>
         ))}
         {(regeln.verdeckt || regeln.anonym || regeln.still) && (
@@ -709,7 +710,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
             key={b.id} className={`bub-blase ${wahl === b.id ? 'gewaehlt' : ''} ${(platz.get(b.id) ?? 9) <= 3 ? 'vorn' : ''}${zu(b) ? ' verdeckt' : ''}`}
             ref={(el) => { if (el) knoten.current.set(b.id, el); else knoten.current.delete(b.id); }}
             style={{ background: farbeVon(b, i) }} role="button" tabIndex={0} data-taste="bub-blase" data-id={b.id} data-punkte={b.punkte} data-mal={b.mal}
-            title={zu(b) ? 'Idee von jemand anderem — noch verdeckt' : b.namen.length && !regeln.anonym ? `${b.text} — von ${b.namen.join(', ')}` : b.text}
+            title={zu(b) ? 'Idee von jemand anderem – noch verdeckt' : b.namen.length && !regeln.anonym ? `${b.text} – von ${b.namen.join(', ')}` : b.text}
             data-verdeckt={zu(b) ? '' : undefined}
             onPointerDown={(e) => ziehStart(e, b)}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tippen(b); } }}
@@ -720,7 +721,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
             {b.punkte > 0 && phase !== 'fertig' && <span className="bub-punkte" data-taste="bub-punkte" title={punkteText(b.punkte)}><i aria-hidden="true">●</i>{b.punkte}</span>}
             {phase === 'fertig' && platz.has(b.id) && (
               <>
-                <span className={`bub-platz p${Math.min(platz.get(b.id)!, 4)}`} data-taste="bub-platz" data-platz={platz.get(b.id)} title={`${platz.get(b.id)}. Platz — ${punkteText(b.punkte)}`}>{platz.get(b.id)}.</span>
+                <span className={`bub-platz p${Math.min(platz.get(b.id)!, 4)}`} data-taste="bub-platz" data-platz={platz.get(b.id)} title={`${platz.get(b.id)}. Platz – ${punkteText(b.punkte)}`}>{platz.get(b.id)}.</span>
                 <span className="bub-punkte unten" data-taste="bub-punkte">{punkteText(b.punkte)}</span>
               </>
             )}
@@ -740,11 +741,11 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         {blasen.length === 0 && (
           <div className="bub-leer">
             <b>Noch keine Ideen</b>
-            <span>Unten eintragen und Enter drücken. Gleiche Ideen verschmelzen und wachsen — in einem gemeinsamen Board können alle gleichzeitig beitragen.</span>
+            <span>Unten eintragen und Enter drücken. Gleiche Ideen verschmelzen und wachsen – in einem gemeinsamen Board können alle gleichzeitig beitragen.</span>
           </div>
         )}
         {!fest && phase === 'aus' && blasen.length > 0 && !gewaehlt && !gGewaehlt && !fallen && (
-          <button className="bub-gruppe-neu" data-taste="bub-gruppe-neu" title="Leere Gruppe anlegen — Ideen hineinziehen"
+          <button className="bub-gruppe-neu" data-taste="bub-gruppe-neu" title="Leere Gruppe anlegen – Ideen hineinziehen"
             onPointerDown={(e) => e.stopPropagation()}
             onClick={() => { const gid = gruppeAnlegen(`Gruppe ${gruppen.length + 1}`); if (gid) { setGWahl(gid); setWahl(null); } }}>＋ Gruppe</button>
         )}
@@ -768,7 +769,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
               onBlur={(e) => gruppeUmbenennen(gGewaehlt[0], e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { gruppeUmbenennen(gGewaehlt[0], (e.target as HTMLInputElement).value); setGWahl(null); } if (e.key === 'Escape') setGWahl(null); }} />
             <span className="bub-pille-zahl">{blasen.filter((b) => b.gruppe === gGewaehlt[0]).length} Ideen</span>
-            {leiten && <button onClick={() => gruppeWeg(gGewaehlt[0])} title="Gruppe auflösen — die Ideen bleiben, frei" data-taste="bub-gruppe-weg">Auflösen</button>}
+            {leiten && <button onClick={() => gruppeWeg(gGewaehlt[0])} title="Gruppe auflösen – die Ideen bleiben, frei" data-taste="bub-gruppe-weg">Auflösen</button>}
             <button onClick={() => setGWahl(null)} aria-label="Schließen">✕</button>
           </Pille>
         )}
@@ -813,7 +814,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
                 {/* M386: ohne Enter-Taste (Telefon) legt dieser Knopf die Gruppe an */}
                 {!fest && neuGruppe.trim() && <button className="bub-pille-ok" onClick={() => { gruppeAnlegen(neuGruppe, gewaehlt); setNeuGruppe(''); }} title="Gruppe anlegen" aria-label="Gruppe anlegen" data-taste="bub-neue-gruppe-ok">✓</button>}
                 {darfAendern(gewaehlt) && <button onClick={() => setBearbeite(gewaehlt.id)} title="Text ändern" aria-label="Text ändern" data-taste="bub-idee-aendern">✎</button>}
-                {darfAendern(gewaehlt) && <button onClick={() => loeschen(gewaehlt)} title="Idee löschen" data-taste="bub-loeschen">🗑</button>}
+                {darfAendern(gewaehlt) && <button onClick={() => loeschen(gewaehlt)} title="Idee löschen" data-taste="bub-loeschen"><ITrash size={14} /></button>}
               </>
             )}
           </Pille>
@@ -829,13 +830,13 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       <div className="bub-leiste nodrag">
         <input
           className="bub-eingabe" value={eingabe} disabled={fest || (!!regeln.zu && !leiten)} maxLength={140} translate="no" data-taste="bub-eingabe"
-          placeholder={fest ? 'Diese Karte gehört jemand anderem — du kannst sie nur ansehen.' : regeln.zu && !leiten ? 'Die Sammlung ist geschlossen.' : verdeckt ? 'Idee eintragen und Enter … (die anderen sehen sie erst später)' : 'Idee eintragen und Enter …'}
+          placeholder={fest ? 'Diese Karte gehört jemand anderem – du kannst sie nur ansehen.' : regeln.zu && !leiten ? 'Die Sammlung ist geschlossen.' : verdeckt ? 'Idee eintragen und Enter … (die anderen sehen sie erst später)' : 'Idee eintragen und Enter …'}
           enterKeyHint="send"
           onChange={(e) => setEingabe(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); ideeDazu(); } }}
         />
         <button className="bub-dazu" onClick={ideeDazu} disabled={fest || !eingabe.trim() || (!!regeln.zu && !leiten)} title="Idee hinzufügen" data-taste="bub-dazu">＋</button>
-        {phase === 'offen' && <span className="bub-rest" data-taste="bub-rest">{uebrig} von {d.abstimmung.punkte} Punkten übrig — auf Blasen tippen</span>}
-        {leiten && phase === 'aus' && <button className="bub-knopf" onClick={() => phaseSetzen('offen')} disabled={blasen.length < 2} title={`Punkte-Abstimmung: jede Person vergibt ${d.abstimmung.punkte} Punkte`} data-taste="bub-abstimmen">🗳 Abstimmen</button>}
+        {phase === 'offen' && <span className="bub-rest" data-taste="bub-rest">{uebrig} von {d.abstimmung.punkte} Punkten übrig – auf Blasen tippen</span>}
+        {leiten && phase === 'aus' && <button className="bub-knopf" onClick={() => phaseSetzen('offen')} disabled={blasen.length < 2} title={`Punkte-Abstimmung: jede Person vergibt ${d.abstimmung.punkte} Punkte`} data-taste="bub-abstimmen">Abstimmen</button>}
         {leiten && phase === 'offen' && <button className="bub-knopf an" onClick={() => phaseSetzen('fertig')} data-taste="bub-auswerten">✓ Auswerten</button>}
         {leiten && phase === 'fertig' && <button className="bub-knopf" onClick={() => phaseSetzen('offen')} title="Abstimmung wieder öffnen" data-taste="bub-weiter">↺ Weiter abstimmen</button>}
         {leiten && (
@@ -854,12 +855,12 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
                 <label className="bub-schalter"><input type="checkbox" checked={!!regeln.anonym} onChange={(e) => regelnSetzen({ anonym: e.target.checked })} data-taste="bub-regel-anonym" /> Namen ausblenden <small>neue Ideen ohne Namen</small></label>
                 <label className="bub-schalter"><input type="checkbox" checked={!!regeln.still} onChange={(e) => regelnSetzen({ still: e.target.checked })} data-taste="bub-regel-still" /> Zwischenstand verbergen <small>Punkte erst beim Auswerten</small></label>
                 {liveAuf(boardId) && (
-                  <span className="bub-timer" data-taste="bub-timer">⏱ Timer für alle
+                  <span className="bub-timer" data-taste="bub-timer">Timer für alle
                     {[1, 3, 5].map((m) => <button key={m} onClick={() => { setMenue(false); timerStart(boardId, m); }} data-min={m}>{m} min</button>)}
                   </span>
                 )}
-                <button onClick={() => { setMenue(false); alsNotiz(); }} disabled={!blasen.length} data-taste="bub-als-notiz">📝 Ergebnis als Notiz ablegen</button>
-                {aiReady(ai) && <button onClick={() => { setMenue(false); void kiGruppen(); }} disabled={kiLaeuft || blasen.length < 3} title="Die Texte der Ideen gehen dafür an den hinterlegten KI-Anbieter">✨ {kiLaeuft ? 'KI gruppiert …' : 'Mit KI gruppieren'}</button>}
+                <button onClick={() => { setMenue(false); alsNotiz(); }} disabled={!blasen.length} data-taste="bub-als-notiz">Ergebnis als Notiz ablegen</button>
+                {aiReady(ai) && <button onClick={() => { setMenue(false); void kiGruppen(); }} disabled={kiLaeuft || blasen.length < 3} title="Die Texte der Ideen gehen dafür an den hinterlegten KI-Anbieter"><IWand size={14} /> {kiLaeuft ? 'KI gruppiert …' : 'Mit KI gruppieren'}</button>}
                 {gruppen.map(([gid, g]) => <button key={gid} onClick={() => gruppeWeg(gid)}>Gruppe „<span translate="no">{g.name}</span>" auflösen</button>)}
                 <button onClick={() => { setMenue(false); stimmenWeg(); }} disabled={!Object.keys(d.stimmen).length} data-taste="bub-stimmen-weg">Alle Punkte zurücksetzen</button>
                 <button onClick={() => { setMenue(false); if (window.confirm('Alle Ideen dieser Karte löschen?')) allesWeg(); }} disabled={!blasen.length}>Alle Ideen löschen</button>
@@ -928,7 +929,7 @@ export function BubblesCard({ id, data, selected }: NodeProps<BubblesNode>) {
   return (
     <CardShell id={id} selected={selected} minWidth={360} minHeight={320} className="bubbles-card">
       <div className="bub-kopf">
-        <span aria-hidden="true">🫧</span>
+        <IBubbles size={16} aria-hidden="true" />
         <DragTitle className="bub-titel" value={data.title ?? ''} onChange={(v) => updateNodeData(id, { title: v })} placeholder="Ideen" />
       </div>
       <BubblesBody id={id} data={data} />

@@ -57,12 +57,12 @@ const state = {
     board('b13', 'Trading', 3),
   ],
   spaces: [
-    { id: 's1', name: '🏢 Arbeit', projects: [
+    { id: 's1', name: 'Arbeit', projects: [
       { id: 'p1', name: 'Prüfung', boardIds: ['b1', 'b2', 'b3', 'b4'] },
       { id: 'p2', name: 'Laufbahn', boardIds: ['b5', 'b6'] },
       { id: 'p3', name: 'Termine', boardIds: ['b7', 'b8'] },
     ] },
-    { id: 's2', name: '🏠 Privat', projects: [
+    { id: 's2', name: 'Privat', projects: [
       { id: 'p4', name: 'Reisen', boardIds: ['b9', 'b10'] },
       { id: 'p5', name: 'Haushalt', boardIds: ['b11', 'b12', 'b13'] },
     ] },

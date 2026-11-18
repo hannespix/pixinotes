@@ -660,7 +660,7 @@ if (typeof window !== 'undefined') {
   for (const ev of ['pointerdown', 'pointerup', 'keydown', 'drop', 'paste'] as const) window.addEventListener(ev, merken, true);
 }
 let leseHinweisAm = 0;
-export const LESE_HINWEIS = '🔒 Dieses Board ist nur zum Lesen freigegeben. Für eigene Änderungen: oben „Eigene Kopie anlegen".';
+export const LESE_HINWEIS = 'Dieses Board ist nur zum Lesen freigegeben. Für eigene Änderungen: oben „Eigene Kopie anlegen".';
 function leseHinweis(): void {
   const jetzt = performance.now();
   if (jetzt - letzteEingabe > 1500 || jetzt - leseHinweisAm < 4000) return;
@@ -723,7 +723,7 @@ function sperrHinweis(name: string): void {
   const jetzt = performance.now();
   if (jetzt - letzteEingabe > 1500 || jetzt - sperrHinweisAm < 4000) return;
   sperrHinweisAm = jetzt;
-  queueMicrotask(() => useBoard.getState().showToast(`✋ ${name} bearbeitet diese Karte gerade — gleich wieder frei.`, false, 4000));
+  queueMicrotask(() => useBoard.getState().showToast(`${name} bearbeitet diese Karte gerade – gleich wieder frei.`, false, 4000));
 }
 /** Gesperrte Karten behalten Inhalt und Lage (auch gegen Löschen); alles andere geht durch */
 function sperrschutz(alt: BoardDoc, neu: BoardDoc, sperren: Map<string, string>): BoardDoc {
@@ -884,9 +884,9 @@ function gruppenschutz(alt: BoardDoc, neu0: BoardDoc, g: GruppenInfo): BoardDoc 
     }
     if (zurueck.length || ersetzt.size) neu = { ...neu, edges: [...neu.edges.map((e) => ersetzt.get(e.id) ?? e), ...zurueck] };
   }
-  if (geloescht) rechtHinweis('🔒 Löschen kannst du hier nur, was du selbst angelegt hast.');
-  else if (geaendert) rechtHinweis('🔒 Ändern kannst du hier nur deine eigenen Karten — neue anlegen geht immer.');
-  else if (kanteFest) rechtHinweis('🔒 Diese Verbindung hat jemand anderes gezogen — ändern kannst du hier nur Eigenes.');
+  if (geloescht) rechtHinweis('Löschen kannst du hier nur, was du selbst angelegt hast.');
+  else if (geaendert) rechtHinweis('Ändern kannst du hier nur deine eigenen Karten – neue anlegen geht immer.');
+  else if (kanteFest) rechtHinweis('Diese Verbindung hat jemand anderes gezogen – ändern kannst du hier nur Eigenes.');
   return neu;
 }
 
@@ -1016,8 +1016,8 @@ function schrittGezielt(
   });
   if (notizen.length) window.dispatchEvent(new CustomEvent(NOTIZ_EXTERN, { detail: notizen }));
   const was = richtung === 'zurueck' ? 'Zurückgenommen' : 'Wiederholt';
-  if (r.uebersprungen && r.getan) useBoard.getState().showToast(`↩ ${was} — ${r.uebersprungen === 1 ? 'eine Stelle blieb' : `${r.uebersprungen} Stellen blieben`}, wie sie ist: Jemand anderes hat sie inzwischen geändert.`, false, 6000);
-  else if (r.uebersprungen) useBoard.getState().showToast('↩ Nichts zurückgenommen — was dieser Schritt betraf, hat inzwischen jemand anderes geändert.', false, 6000);
+  if (r.uebersprungen && r.getan) useBoard.getState().showToast(`↩ ${was} – ${r.uebersprungen === 1 ? 'eine Stelle blieb' : `${r.uebersprungen} Stellen blieben`}, wie sie ist: Jemand anderes hat sie inzwischen geändert.`, false, 6000);
+  else if (r.uebersprungen) useBoard.getState().showToast('↩ Nichts zurückgenommen – was dieser Schritt betraf, hat inzwischen jemand anderes geändert.', false, 6000);
 }
 
 /** Die Board-Liste eines set(): nur lesend geteilte Boards behalten ihren Inhalt, gesperrte Karten ihren Stand */
@@ -1206,7 +1206,7 @@ function queueSuccession(): void {
     .request(LOCK_NAME, { signal: ctl.signal }, () => {
       adoptPersistedState(); // der alte Schreiber kann Neueres hinterlassen haben
       setWriterRole('writer');
-      useBoard.getState().showToast('✍️ Das andere Fenster ist zu — dieses Fenster speichert jetzt wieder selbst.');
+      useBoard.getState().showToast('Das andere Fenster ist zu – dieses Fenster speichert jetzt wieder selbst.');
       return holdForever();
     })
     .catch(() => {
@@ -1220,7 +1220,7 @@ function queueSuccession(): void {
 function demoted(): void {
   setWriterRole('follower');
   adoptPersistedState();
-  useBoard.getState().showToast('👀 Ein anderes Fenster hat die Bearbeitung übernommen — dieses Fenster liest nur noch mit.');
+  useBoard.getState().showToast('Ein anderes Fenster hat die Bearbeitung übernommen – dieses Fenster liest nur noch mit.');
   queueSuccession();
 }
 
@@ -1303,7 +1303,7 @@ function nextName(base: string, existing: string[]): string {
 const defaultHierarchy = (boardIds: string[]): Space[] => [
   {
     id: 'space-work',
-    name: '🏢 Arbeit',
+    name: 'Arbeit',
     projects: [{ id: 'proj-general', name: 'Allgemein', boardIds }],
   },
 ];
@@ -1314,15 +1314,17 @@ const defaultHierarchy = (boardIds: string[]): Space[] => [
  * neben dem einen Board, um das es ging, stand eine fremde Welt. Beispiele gibt es weiter, aber auf Wunsch
  * (Begrüßung, leeres Board, ＋ Neu).
  */
-export const START_BOARD_NAME = '🏠 Mein Board';
+export const START_BOARD_NAME = 'Mein Board';
 /** M381: … und so heißt es, wenn die Oberfläche englisch läuft (siehe startNamenAufEnglisch) */
-export const START_BOARD_NAME_EN = '🏠 My board';
-const istStartName = (n: string): boolean => n === START_BOARD_NAME || n === START_BOARD_NAME_EN;
+export const START_BOARD_NAME_EN = 'My board';
+/** Bis M396 trugen die vorgegebenen Namen ein Emoji vorweg – ein unberührtes Board von damals zählt weiter als unberührt */
+const ohneVorsatz = (n: string): string => n.replace(/^[^\p{L}\p{N}]+\s+/u, '');
+const istStartName = (n: string): boolean => { const k = ohneVorsatz(n); return k === START_BOARD_NAME || k === START_BOARD_NAME_EN; };
 function leererStart(): { boards: BoardDoc[]; spaces: Space[]; activeId: string } {
   const boardId = uid();
   return {
     boards: [{ id: boardId, name: START_BOARD_NAME, nodes: [], edges: [], drawings: [] }],
-    spaces: [{ id: uid(), name: '🏢 Arbeit', projects: [{ id: uid(), name: 'Allgemein', boardIds: [boardId] }] }],
+    spaces: [{ id: uid(), name: 'Arbeit', projects: [{ id: uid(), name: 'Allgemein', boardIds: [boardId] }] }],
     activeId: boardId,
   };
 }
@@ -1470,7 +1472,7 @@ export const useBoard = create<BoardState>()(
           }));
           get().showToast(
             archived
-              ? `🗃 ${ids.length} Karte${ids.length > 1 ? 'n' : ''} archiviert. Strg+Z holt sie zurück.`
+              ? `${ids.length} Karte${ids.length > 1 ? 'n' : ''} archiviert. Strg+Z holt sie zurück.`
               : `${ids.length} Karte${ids.length > 1 ? 'n' : ''} aus dem Archiv zurückgeholt.`,
           );
         },
@@ -1533,7 +1535,7 @@ export const useBoard = create<BoardState>()(
             // Voll-Remount: neue Boards mit BlockNote-Inhalten sauber mounten
             importEpoch: get().importEpoch + 1,
           });
-          get().showToast(`🧭 Beispiele geladen: ${fresh.spaces.length} Bereiche, ${fresh.boards.length} Boards zum Ausprobieren.`);
+          get().showToast(`Beispiele geladen: ${fresh.spaces.length} Bereiche, ${fresh.boards.length} Boards zum Ausprobieren.`);
         },
 
         // M184: Struktur-Import (OneNote). Bewusst EIN set() statt vieler
@@ -1605,7 +1607,7 @@ export const useBoard = create<BoardState>()(
             templates: [],
             importEpoch: get().importEpoch + 1,
           });
-          get().showToast('🧹 Alles geleert — frischer Start. Beispiele gibt es jederzeit unter ＋ Neu.');
+          get().showToast('Alles geleert – frischer Start. Beispiele gibt es jederzeit unter ＋ Neu.');
         },
 
         settingsSection: null,
@@ -1963,8 +1965,8 @@ export const useBoard = create<BoardState>()(
             }),
           }));
           get().showToast(affected.length === 1
-            ? '✍ Markierung von der Karte gelöst — sie bleibt frei auf dem Board.'
-            : `✍ ${affected.length} Markierungen von der Karte gelöst — sie bleiben frei auf dem Board.`);
+            ? 'Markierung von der Karte gelöst – sie bleibt frei auf dem Board.'
+            : `${affected.length} Markierungen von der Karte gelöst – sie bleiben frei auf dem Board.`);
         },
 
         // ---------- Undo/Redo (Board-Struktur) ----------
@@ -2040,7 +2042,7 @@ export const useBoard = create<BoardState>()(
           // M390: Die 21. Vorlage verdrängte still die älteste. Jetzt gibt es Platz für 40 — und wenn er voll ist,
           // sagt es der Hinweis, statt etwas wegzunehmen.
           if (get().templates.length >= VORLAGEN_MAX) {
-            get().showToast(`Es gibt schon ${VORLAGEN_MAX} Vorlagen — erst eine löschen (➕-Menü, ✕ an der Vorlage).`, false, 7000);
+            get().showToast(`Es gibt schon ${VORLAGEN_MAX} Vorlagen – erst eine löschen (＋-Menü, ✕ an der Vorlage).`, false, 7000);
             return;
           }
           // M390: Die Vorlage bekommt eine eigene Kennung, und was im Gerätespeicher liegt (große Datei, Tool-
@@ -2048,7 +2050,7 @@ export const useBoard = create<BoardState>()(
           const clean = JSON.parse(JSON.stringify({ ...node, id: uid(), selected: false })) as AppNode;
           anhaengeMitnehmen([node], new Map([[node.id, clean.id]]));
           set({ templates: [...get().templates, { id: uid(), name: name.trim().slice(0, 40) || 'Vorlage', node: clean }] });
-          get().showToast(`Vorlage „${name}" gespeichert — im ➕-Menü unter „Vorlagen".`);
+          get().showToast(`Vorlage „${name}" gespeichert – im ＋-Menü unter „Vorlagen".`);
         },
 
         removeTemplate: (id) =>
@@ -2209,11 +2211,11 @@ export const useBoard = create<BoardState>()(
           const space = get().spaces.find((sp) => sp.id === id);
           if (!space) return;
           if (space.projects.some((p) => p.boardIds.length > 0)) {
-            get().showToast('Bereich enthält noch Boards — erst verschieben oder löschen.');
+            get().showToast('Bereich enthält noch Boards – erst verschieben oder löschen.');
             return;
           }
           if (get().spaces.length <= 1) {
-            get().showToast('Der letzte Bereich bleibt bestehen 🙂');
+            get().showToast('Der letzte Bereich bleibt bestehen');
             return;
           }
           set({ spaces: get().spaces.filter((sp) => sp.id !== id) });
@@ -2227,7 +2229,7 @@ export const useBoard = create<BoardState>()(
                     ...sp,
                     projects: [
                       ...sp.projects,
-                      { id: uid(), name: name ?? nextName(t('📁 Projekt'), sp.projects.map((p) => p.name)), boardIds: [] },
+                      { id: uid(), name: name ?? nextName(t('Projekt'), sp.projects.map((p) => p.name)), boardIds: [] },
                     ],
                   }
                 : sp,
@@ -2246,7 +2248,7 @@ export const useBoard = create<BoardState>()(
           const project = get().spaces.flatMap((sp) => sp.projects).find((p) => p.id === id);
           if (!project) return;
           if (project.boardIds.length > 0) {
-            get().showToast('Projekt enthält noch Boards — erst verschieben oder löschen.');
+            get().showToast('Projekt enthält noch Boards – erst verschieben oder löschen.');
             return;
           }
           set({
@@ -2281,7 +2283,7 @@ export const useBoard = create<BoardState>()(
               target = newSpaces[0].projects[0]?.id ?? pid;
             }
           }
-          const boards = [...get().boards, { id, name: name ?? nextName('✨ Board', get().boards.map((b) => b.name)), nodes: [], edges: [] }];
+          const boards = [...get().boards, { id, name: name ?? nextName('Board', get().boards.map((b) => b.name)), nodes: [], edges: [] }];
           set({
             boards,
             spaces: sortiereProjekte(newSpaces.map((sp) => ({
@@ -2304,7 +2306,7 @@ export const useBoard = create<BoardState>()(
             if (get().activeId !== id) set({ activeId: id });
             get().pushHistory();
             // Ein Board, das noch seinen Anfangsnamen trägt, heißt danach wie die Vorlage
-            const unbenannt = istStartName(ziel.name) || /^✨ Board( \d+)?$/.test(ziel.name);
+            const unbenannt = istStartName(ziel.name) || /^Board( \d+)?$/.test(ohneVorsatz(ziel.name));
             const neuerName = unbenannt ? nextName(name, get().boards.map((x) => x.name)) : ziel.name;
             set({ boards: get().boards.map((x) => (x.id === id ? { ...x, name: neuerName, nodes: inhalt.nodes, edges: inhalt.edges } : x)) });
           } else {
@@ -2371,7 +2373,7 @@ export const useBoard = create<BoardState>()(
         removeBoard: (id) => {
           const boards = get().boards;
           if (boards.length <= 1) {
-            get().showToast('Das letzte Board bleibt offen 🙂');
+            get().showToast('Das letzte Board bleibt offen');
             return;
           }
           const rest = boards.filter((b) => b.id !== id);
@@ -2379,7 +2381,7 @@ export const useBoard = create<BoardState>()(
           // ein archiviertes Board, und das letzte SICHTBARE ließ sich löschen (beim Archivieren war das verboten).
           const weg = boards.find((b) => b.id === id);
           if (weg && !weg.archived && !rest.some((b) => !b.archived)) {
-            get().showToast('Das letzte Board bleibt offen 🙂');
+            get().showToast('Das letzte Board bleibt offen');
             return;
           }
           let activeId = get().activeId;
@@ -2474,10 +2476,10 @@ export const useBoard = create<BoardState>()(
           });
           if (eigenes) {
             get().openBoard(kopie.id);
-            get().showToast(`Kopie von „${quelle.name}" angelegt — sie gehört dir und liegt in „${eigenes.name}".`, false, 6000);
+            get().showToast(`Kopie von „${quelle.name}" angelegt – sie gehört dir und liegt in „${eigenes.name}".`, false, 6000);
             return;
           }
-          get().showToast(`Board „${quelle.name}" kopiert — die Kopie liegt daneben.`);
+          get().showToast(`Board „${quelle.name}" kopiert – die Kopie liegt daneben.`);
         },
 
         duplicateProject: (projectId) => {
@@ -2546,13 +2548,13 @@ export const useBoard = create<BoardState>()(
             else {
               // Das LETZTE sichtbare Board bleibt sichtbar — sonst stünde die
               // Anwendung ohne Arbeitsfläche da (dieselbe Regel wie beim Löschen)
-              get().showToast('Das letzte Board bleibt offen 🙂');
+              get().showToast('Das letzte Board bleibt offen');
               return;
             }
           }
           set({ boards, activeId });
           get().showToast(an
-            ? `Board „${board.name}" archiviert — unten in der Navigation „Archiv einblenden" zeigt es wieder.`
+            ? `Board „${board.name}" archiviert – unten in der Navigation „Archiv einblenden" zeigt es wieder.`
             : `Board „${board.name}" zurückgeholt.`);
         },
 
@@ -2594,19 +2596,19 @@ export const useBoard = create<BoardState>()(
             (t1 === consumer && (typeof sources === 'string' ? t2 === sources : sources.has(t2 ?? '')))
             || (t2 === consumer && (typeof sources === 'string' ? t1 === sources : sources.has(t1 ?? '')));
           if ((t1 === 'kanban' && t2 === 'gantt') || (t1 === 'gantt' && t2 === 'kanban')) {
-            get().showToast('🔗 Verbunden: Fristen werden Meilensteine, Vorgänge werden Tickets.');
+            get().showToast('Verbunden: Fristen werden Meilensteine, Vorgänge werden Tickets.');
           } else if (pair('kanban')) {
-            get().showToast('🔗 Verbunden: Offene Punkte der Karte landen als Tickets im Kanban.');
+            get().showToast('Verbunden: Offene Punkte der Karte landen als Tickets im Kanban.');
           } else if (pair('calendar')) {
-            get().showToast('🔗 Verbunden: Der Kalender zeigt Termine und Fristen der Karte.');
+            get().showToast('Verbunden: Der Kalender zeigt Termine und Fristen der Karte.');
           } else if (pair('time', 'week')) {
-            get().showToast('🔗 Verbunden: Der Wochenplan liefert die Sollzeit für die Zeiterfassung.');
+            get().showToast('Verbunden: Der Wochenplan liefert die Sollzeit für die Zeiterfassung.');
           } else if (pair('time', 'note') || pair('time', 'kanban')) {
-            get().showToast('🔗 Verbunden: Die Karte zeigt die Arbeitszeit aus der Zeiterfassung.');
+            get().showToast('Verbunden: Die Karte zeigt die Arbeitszeit aus der Zeiterfassung.');
           } else if (pair('mermaid', 'note')) {
-            get().showToast('🔗 Verbunden: Das Diagramm folgt der Checkliste der Notiz.');
+            get().showToast('Verbunden: Das Diagramm folgt der Checkliste der Notiz.');
           } else if (pair('note', 'htmlapp')) {
-            get().showToast('🔗 Verbunden: Die Notiz zeigt den Speicherstand der App.');
+            get().showToast('Verbunden: Die Notiz zeigt den Speicherstand der App.');
           }
         },
 
@@ -2833,8 +2835,8 @@ export const useBoard = create<BoardState>()(
             }),
           });
           get().showToast(rueck
-            ? `🔗 Portal zu „${ziel.name}" — und dort liegt jetzt ein Rückverweis auf „${quelle.name}". Strg+Z macht beides rückgängig.`
-            : `🔗 Portal zu „${ziel.name}" — von dort führt bereits ein Portal zurück.`);
+            ? `Portal zu „${ziel.name}" – und dort liegt jetzt ein Rückverweis auf „${quelle.name}". Strg+Z macht beides rückgängig.`
+            : `Portal zu „${ziel.name}" – von dort führt bereits ein Portal zurück.`);
         },
 
         portalAnlegen: (quellBoardId, zielBoardId, position) => {
@@ -2858,8 +2860,8 @@ export const useBoard = create<BoardState>()(
             }),
           });
           get().showToast(rueck
-            ? `🔗 Portal „${quelle.name}" ⇄ „${ziel.name}" — auf beiden Boards liegt jetzt eine Karte. Strg+Z macht beides rückgängig.`
-            : `🔗 Portal „${quelle.name}" → „${ziel.name}" — zurück führte schon eines. Strg+Z macht es rückgängig.`);
+            ? `Portal „${quelle.name}" ⇄ „${ziel.name}" – auf beiden Boards liegt jetzt eine Karte. Strg+Z macht beides rückgängig.`
+            : `Portal „${quelle.name}" → „${ziel.name}" – zurück führte schon eines. Strg+Z macht es rückgängig.`);
         },
 
         rueckverweisNachtragen: (quellBoardId, zielBoardId) => {
@@ -2873,7 +2875,7 @@ export const useBoard = create<BoardState>()(
           set({
             boards: get().boards.map((b) => (b.id === ziel.id ? { ...b, nodes: [...b.nodes, rueck] } : b)),
           });
-          get().showToast(`🔗 „${ziel.name}" verweist jetzt auf „${quelle.name}" zurück. Strg+Z macht es rückgängig.`);
+          get().showToast(`„${ziel.name}" verweist jetzt auf „${quelle.name}" zurück. Strg+Z macht es rückgängig.`);
         },
 
         removeNode: (id) => get().removeNodes([id]),
@@ -2973,7 +2975,7 @@ export const useBoard = create<BoardState>()(
             }),
           });
           get().showToast(
-            `${moving.length === 1 ? 'Karte' : `${moving.length} Karten`} nach „${tgt.name}" verschoben — Strg+Z holt alles zurück.`,
+            `${moving.length === 1 ? 'Karte' : `${moving.length} Karten`} nach „${tgt.name}" verschoben – Strg+Z holt alles zurück.`,
             'schritt',   // M388: „Rückgängig" nimmt das Verschieben zurück (vorher: stellte irgendein früher Gelöschtes wieder her)
           );
         },
@@ -3151,7 +3153,7 @@ export const useBoard = create<BoardState>()(
           const s0 = get();
           const art = s0.toast?.undo;
           if (hinweisEintrag && s0.past[s0.past.length - 1] === hinweisEintrag) { hinweisEintrag = null; s0.undo(); return; }
-          if (art === 'schritt') { s0.showToast('Inzwischen ist anderes dazugekommen — Strg+Z nimmt Schritt für Schritt zurück.', false, 6000); return; }
+          if (art === 'schritt') { s0.showToast('Inzwischen ist anderes dazugekommen – Strg+Z nimmt Schritt für Schritt zurück.', false, 6000); return; }
           s0.restoreDeleted();
         },
         showToast: (message, undo, durationMs, abbruch) => {
@@ -3256,7 +3258,7 @@ export const useBoard = create<BoardState>()(
         // v0: {nodes, edges} — Einzelboard
         if (version === 0 && p && 'nodes' in p) {
           const boards = [
-            { id: 'main', name: '🏠 Mein Schreibtisch', nodes: p.nodes as Node[], edges: p.edges as Edge[] },
+            { id: 'main', name: 'Mein Schreibtisch', nodes: p.nodes as Node[], edges: p.edges as Edge[] },
           ];
           return anchorLegacyStrokes({ boards, spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' });
         }
@@ -3264,7 +3266,7 @@ export const useBoard = create<BoardState>()(
         if (version === 1 && p && 'boards' in p) {
           const boards = (p.boards as BoardDoc[]) ?? [];
           if (boards.length === 0) {
-            return { boards: [{ id: 'main', name: '🏠 Mein Schreibtisch', nodes: [], edges: [] }], spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' };
+            return { boards: [{ id: 'main', name: 'Mein Schreibtisch', nodes: [], edges: [] }], spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' };
           }
           return anchorLegacyStrokes({
             boards,
@@ -3277,7 +3279,7 @@ export const useBoard = create<BoardState>()(
         if (p && 'boards' in p) {
           const boards = (p.boards as BoardDoc[]) ?? [];
           if (boards.length === 0) {
-            return { boards: [{ id: 'main', name: '🏠 Mein Schreibtisch', nodes: [], edges: [] }], spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' };
+            return { boards: [{ id: 'main', name: 'Mein Schreibtisch', nodes: [], edges: [] }], spaces: defaultHierarchy(['main']), activeId: 'main', view: 'board' };
           }
           if (!boards.some((b) => b.id === (p.activeId as string))) {
             return mergeTimeKinds(stripHappHandle(anchorLegacyStrokes({ ...p, activeId: boards[0].id })));
@@ -3290,6 +3292,34 @@ export const useBoard = create<BoardState>()(
 );
 
 /**
+ * M397: PixiNotes vergibt keine Emojis mehr. Namen, die die App früher selbst vergeben hat („🏠 Mein Board",
+ * „🏢 Arbeit", die Beispiel-Boards, „✨ Board 2" …), verlieren ihren Vorsatz – einmal je Gerät. Eigene Namen
+ * bleiben unangetastet: Es zählt nur, was nach dem Vorsatz genau einem alten Standardnamen entspricht.
+ */
+const ALTE_STANDARDNAMEN = new Set(
+  'Arbeit|Work|Mein Board|My board|Mein Schreibtisch|My desk|Board|Projekt|Project|Arbeitsplatz|Wissen & Nachschlagen|Zusammenarbeit & Projekte|Privat|Schreibtisch|Aufgaben-Zentrale|Zeiterfassung & Abwesenheit|Dienstreise|Dienstwagen|Wissen|Software & Tipps|Datenschutz & IT-Sicherheit|Ansprechpartner|Jour fixe|Mitarbeitergespräche|Beispielprojekt: E-Akte|Onboarding neue Kolleg:innen|Prozesse & Mindmap|Eigene Apps & Dateien|Familienplan|Routinen & Ziele|Verträge & Fristen|Besprechung|Meeting|Rückblick|Retrospective|Projektplan|Project plan|Brainstorming|Aufgaben-Board|Task board|Wochenplanung|Weekly planning|Entscheidung|Decision|SWOT|Workshop'.split('|'),
+);
+export function alteNamenOhneEmoji(): void {
+  try {
+    if (localStorage.getItem('pixinotes-ohne-emoji')) return;
+    localStorage.setItem('pixinotes-ohne-emoji', '1');
+  } catch { return; }
+  const neu = (n: string): string => {
+    const kern = ohneVorsatz(n);
+    return kern !== n && ALTE_STANDARDNAMEN.has(kern.replace(/ \d+$/, '')) ? kern : n;
+  };
+  const s = useBoard.getState();
+  const boards = s.boards.map((b) => (neu(b.name) === b.name ? b : { ...b, name: neu(b.name) }));
+  const spaces = s.spaces.map((sp) => {
+    const projects = sp.projects.map((p) => (neu(p.name) === p.name ? p : { ...p, name: neu(p.name) }));
+    const gleich = projects.every((p, i) => p === sp.projects[i]) && neu(sp.name) === sp.name;
+    return gleich ? sp : { ...sp, name: neu(sp.name), projects };
+  });
+  if (boards.every((b, i) => b === s.boards[i]) && spaces.every((sp, i) => sp === s.spaces[i])) return;
+  mutedHistory(() => useBoard.setState({ boards, spaces }));
+}
+
+/**
  * M381: Der unberührte Start trägt seine Namen in der Sprache der Oberfläche. Nur solange nichts angefasst
  * wurde — eigene Namen bleiben, wie sie sind (auch auf einem Gerät, das später die Sprache wechselt).
  */
@@ -3298,9 +3328,9 @@ export function startNamenAufEnglisch(): void {
   const start = leeresStartboard(s.boards);
   const bereich = s.spaces[0];
   if (!start || start.name !== START_BOARD_NAME || s.spaces.length !== 1 || bereich.projects.length !== 1) return;
-  if (bereich.name !== '🏢 Arbeit' || bereich.projects[0].name !== 'Allgemein') return;
+  if (bereich.name !== 'Arbeit' || bereich.projects[0].name !== 'Allgemein') return;
   useBoard.setState({
     boards: [{ ...start, name: START_BOARD_NAME_EN }],
-    spaces: [{ ...bereich, name: '🏢 Work', projects: [{ ...bereich.projects[0], name: 'General' }] }],
+    spaces: [{ ...bereich, name: 'Work', projects: [{ ...bereich.projects[0], name: 'General' }] }],
   });
 }

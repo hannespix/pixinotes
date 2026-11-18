@@ -177,7 +177,7 @@ await markiere(D);
   });
   console.log('   ', JSON.stringify(m));
   pruefe('T4a die Leiste erscheint', !!m);
-  pruefe('T4b am Desktop KEIN Dock — sie schwebt an der Auswahl', !!m && !m.dock && m.nahDerKarte, JSON.stringify(m));
+  pruefe('T4b am Desktop KEIN Dock – sie schwebt an der Auswahl', !!m && !m.dock && m.nahDerKarte, JSON.stringify(m));
 }
 await ctx2.close();
 

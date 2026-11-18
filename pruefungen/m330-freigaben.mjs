@@ -331,13 +331,13 @@ const uidB = nutzerId('bernd@example.de');
 const da = await warteBis(B.P, async () => !!(await boardVon(B.P, 'bx')), 15000);
 const bxB = await boardVon(B.P, 'bx');
 pruefe('B1 die Einladung ist angenommen (gast_id = Bernd)', sb.freigaben[0].gast_id === uidB);
-pruefe('B2 „Planung" liegt bei Bernd — mit Annas Karte und Besitzer-Kennung', da && bxB?.name === 'Planung' && JSON.stringify(bxB.nodes).includes('Planung Notiz') && bxB.geteiltVon === uidA && bxB.geteiltVonName === 'anna@example.de', JSON.stringify(bxB && { name: bxB.name, geteiltVon: bxB.geteiltVon, geteiltVonName: bxB.geteiltVonName }));
+pruefe('B2 „Planung" liegt bei Bernd – mit Annas Karte und Besitzer-Kennung', da && bxB?.name === 'Planung' && JSON.stringify(bxB.nodes).includes('Planung Notiz') && bxB.geteiltVon === uidA && bxB.geteiltVonName === 'anna@example.de', JSON.stringify(bxB && { name: bxB.name, geteiltVon: bxB.geteiltVon, geteiltVonName: bxB.geteiltVonName }));
 const spB = await zustand(B.P).then((s) => s.spaces);
 const geteilt = spB.find((sp) => sp.id === 'geteilt');
 pruefe('B3 … unter „Geteilt mit mir › anna@example.de"; Bernds eigenes Board bleibt', geteilt?.name === 'Geteilt mit mir' && geteilt.projects[0]?.name === 'anna@example.de' && geteilt.projects[0].boardIds.includes('bx') && !!(await boardVon(B.P, 'bz')), JSON.stringify(spB));
 pruefe('B4 Bernds Umgebung listet „Planung" NICHT als eigenes Board', !JSON.parse(zeileText(uidB, 'umgebung.json')).boards.bx && !zeile(uidB, 'board-bx.json'));
 await aufklappen(B.P, 'anna@example.de');
-pruefe('B5 Abzeichen 👥 in der Spalte (Projekt „anna@example.de" aufgeklappt)', (await B.P.locator('.side-board', { hasText: 'Planung' }).locator('.side-board-geteilt').count()) === 1);
+pruefe('B5 Abzeichen in der Spalte (Projekt „anna@example.de" aufgeklappt)', (await B.P.locator('.side-board', { hasText: 'Planung' }).locator('.side-board-geteilt').count()) === 1);
 pruefe('B6 Bernds Realtime lauscht auch auf Annas Zeilen', sb.sockets.some((s) => s.uid === uidB && s.filter.some((f) => f.filter === `user_id=eq.${uidA}`)), JSON.stringify(sb.sockets.map((s) => [s.uid, s.filter.map((f) => f.filter)])));
 
 // ══ C: Bernd schreibt, Anna sieht ═══════════════════════════════════

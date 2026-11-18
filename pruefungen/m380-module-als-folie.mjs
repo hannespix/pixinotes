@@ -782,7 +782,7 @@ await A.P.locator('[data-taste="vorfuehren"]').click(); await A.P.waitForTimeout
 await warteBis(G.P, async () => /du folgst/.test(await zband(G.P)), 6000);
 await vortragStart(A.P);
 await warteBis(G.P, async () => (await imVortrag(G.P)) === 1, 8000);
-pruefe('D1 Anna führt vor und präsentiert — die Präsentation öffnet sich bei Gerd', (await imVortrag(G.P)) === 1, await folie(G.P));
+pruefe('D1 Anna führt vor und präsentiert – die Präsentation öffnet sich bei Gerd', (await imVortrag(G.P)) === 1, await folie(G.P));
 await zuFolie(A.P, 'folie-week');
 await warteBis(G.P, async () => (await folieJetzt(G.P))?.art === 'folie-week', 8000);
 pruefe('D2 Gerd sieht den Wochenplan als lebende Folie', (await folieJetzt(G.P))?.art === 'folie-week' && (await G.P.locator('.presenter-slide .week-entry', { hasText: 'Jour fixe' }).count()) === 1, JSON.stringify(await folieJetzt(G.P)));
@@ -791,13 +791,13 @@ await A.P.mouse.click(tagA.x + tagA.width / 2, tagA.y + tagA.height * 0.6); awai
 await A.P.locator('.week-pop .week-pop-text').first().fill('Review'); await A.P.waitForTimeout(300);
 await A.P.mouse.click(700, 30); await A.P.waitForTimeout(300);
 const beiGerd = await warteBis(G.P, async () => (await G.P.locator('.presenter-slide .week-entry', { hasText: 'Review' }).count()) === 1, 15000);
-pruefe('D3 Anna legt auf der Folie einen Block an — er erscheint auf Gerds Folie', beiGerd, JSON.stringify((await kDaten(G.P, 'bx', 'w1'))?.entries));
+pruefe('D3 Anna legt auf der Folie einen Block an – er erscheint auf Gerds Folie', beiGerd, JSON.stringify((await kDaten(G.P, 'bx', 'w1'))?.entries));
 await zuFolie(A.P, 'folie-sheet');
 await warteBis(G.P, async () => (await folieJetzt(G.P))?.art === 'folie-sheet', 8000);
 await A.P.locator('.presenter-slide tbody tr').nth(1).locator('td').nth(1).click(); await A.P.waitForTimeout(300);
 await A.P.locator('.presenter-slide tbody input').first().fill('1500'); await A.P.keyboard.press('Enter'); await A.P.waitForTimeout(300);
 const summeG = await warteBis(G.P, async () => /1\.680/.test(await G.P.locator('.presenter-slide tbody tr').nth(3).locator('td').nth(1).textContent()), 15000);
-pruefe('D4 Anna ändert eine Zahl in der Tabelle — bei Gerd rechnet die Summe neu (1.680)', summeG, await G.P.locator('.presenter-slide tbody tr').nth(3).locator('td').nth(1).textContent());
+pruefe('D4 Anna ändert eine Zahl in der Tabelle – bei Gerd rechnet die Summe neu (1.680)', summeG, await G.P.locator('.presenter-slide tbody tr').nth(3).locator('td').nth(1).textContent());
 pruefe('D5 kein „doppelt bearbeitet", keine Skriptfehler', !/doppelt bearbeitet/.test(await toast(A.P)) && !/doppelt bearbeitet/.test(await toast(G.P)) && A.P.fehler.length === 0 && G.P.fehler.length === 0, JSON.stringify([A.P.fehler, G.P.fehler]).slice(0, 300));
 await G.P.screenshot({ path: `${SD}/m380-d-gast.png` });
 await A.ctx.close(); await G.ctx.close();

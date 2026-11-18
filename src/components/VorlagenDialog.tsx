@@ -75,7 +75,7 @@ export function VorlagenDialog({ wunsch, onClose }: { wunsch: VorlagenWunsch; on
     }
     st.boardAusVorlage(t(v.name), v.bauen(), fuellen ? { inBoard: ziel!.id } : { projectId: wunsch.projectId });
     window.dispatchEvent(new CustomEvent('pixinotes:einpassen'));
-    st.showToast(fuellen ? `Vorlage „${v.name}" eingesetzt — Strg+Z nimmt sie zurück.` : `Board „${v.name}" aus Vorlage angelegt.`);
+    st.showToast(fuellen ? `Vorlage „${v.name}" eingesetzt – Strg+Z nimmt sie zurück.` : `Board „${v.name}" aus Vorlage angelegt.`);
     onClose();
   };
 
@@ -101,7 +101,7 @@ export function VorlagenDialog({ wunsch, onClose }: { wunsch: VorlagenWunsch; on
               </button>
             ))}
           </div>
-          <p className="vorlagen-fuss">Die Karten sind beschriftet, aber leer — nichts, was man erst wegräumen müsste.</p>
+          <p className="vorlagen-fuss">Die Karten sind beschriftet, aber leer – nichts, was man erst wegräumen müsste.</p>
         </div>
       </div>
     </div>

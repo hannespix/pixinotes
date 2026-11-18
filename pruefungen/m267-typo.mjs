@@ -214,11 +214,11 @@ const kartenMenue = await P.evaluate(() => {
   };
 });
 console.log('   ', JSON.stringify(kartenMenue));
-pruefe('T4b ein Klick genügt — das Menü ist offen', !!kartenMenue);
+pruefe('T4b ein Klick genügt – das Menü ist offen', !!kartenMenue);
 pruefe('T4c die Größen heißen wie beim markierten Text',
   JSON.stringify(kartenMenue?.groessen) === JSON.stringify(['Klein', 'Standard', 'Groß', 'Riesig']),
   JSON.stringify(kartenMenue?.groessen));
-pruefe('T4d Größe steht vor Schriftart — wie im Aa-Menü',
+pruefe('T4d Größe steht vor Schriftart – wie im Aa-Menü',
   JSON.stringify(kartenMenue?.titel) === JSON.stringify(['Textgröße', 'Schriftart']),
   JSON.stringify(kartenMenue?.titel));
 pruefe('T4e es gibt „Zurück auf Standard"',
@@ -265,7 +265,7 @@ const mehr = await P.evaluate(() => {
 });
 console.log('    ⋯-Menü:', JSON.stringify(mehr));
 pruefe('T5a das ⋯-Menü öffnet', !!mehr);
-pruefe('T5b „Schrift & Größe" steht genau dort — einmal, nicht zusätzlich in der Leiste',
+pruefe('T5b „Schrift & Größe" steht genau dort – einmal, nicht zusätzlich in der Leiste',
   mehr?.some((e) => e.includes('Schrift')), JSON.stringify(mehr));
 
 await P.screenshot({ path: `${SD}/m267-karte.png` });
@@ -303,7 +303,7 @@ const mass = await P.evaluate(() => {
 console.log('   ', JSON.stringify(mass));
 pruefe('T6a die Leiste hängt nicht mehr im beschnittenen Kartenkasten',
   mass?.lage === 'fixed', JSON.stringify(mass?.lage));
-pruefe('T6b sie ragt über den Kartenrand hinaus — und darf das jetzt',
+pruefe('T6b sie ragt über den Kartenrand hinaus – und darf das jetzt',
   (mass?.ueberDenRand ?? 0) > 100, `${mass?.ueberDenRand} Punkte`);
 pruefe('T6c JEDER Knopf ist anklickbar (nichts liegt hinter dem Rand)',
   mass?.nichtTreffbar.length === 0, JSON.stringify(mass?.nichtTreffbar));
@@ -385,7 +385,7 @@ console.log('\n════ T8: Telefon ════');
   pruefe('T8b sie stapeln sich nicht', m.ueber === false, JSON.stringify(m));
   pruefe('T8c die Formatier-Leiste dockt über die volle Schirmbreite an (M226)',
     m.breit >= m.schirm - 1, JSON.stringify(m));
-  pruefe('T8d sie ist quer scrollbar — alle Knöpfe erreichbar',
+  pruefe('T8d sie ist quer scrollbar – alle Knöpfe erreichbar',
     m.scroll >= m.breit, JSON.stringify(m));
   // Der Aa-Knopf muss auch am Telefon zu erreichen sein
   const erreichbar = await T.evaluate(async () => {

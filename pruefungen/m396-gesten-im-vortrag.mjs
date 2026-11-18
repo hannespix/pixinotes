@@ -180,7 +180,7 @@ console.log('\n════ A: Gerät mit Stift ════');
   await P.waitForTimeout(300);
   const s1 = (await striche(P, (x) => x.anchor === 'p1'))[0];
   const xs = s1 ? s1.points.map((p) => p[0]) : [];
-  pruefe('A1 der Stift schreibt — die aufgelegte Hand rollt nichts und unterbricht den Strich nicht', !!s1 && (await anzahl(P)) === 1 && Math.max(...xs) - Math.min(...xs) > 60 && (await rollstand(P)).oben === vor.oben, { n: await anzahl(P), xs: [Math.min(...xs), Math.max(...xs)], roll: await rollstand(P) });
+  pruefe('A1 der Stift schreibt – die aufgelegte Hand rollt nichts und unterbricht den Strich nicht', !!s1 && (await anzahl(P)) === 1 && Math.max(...xs) - Math.min(...xs) > 60 && (await rollstand(P)).oben === vor.oben, { n: await anzahl(P), xs: [Math.min(...xs), Math.max(...xs)], roll: await rollstand(P) });
   // zwei Finger schieben
   const a = [t.l + 400, 600]; const b = [t.l + 600, 600];
   await zeiger(P, 'pointerdown', 'touch', 21, a[0], a[1]); await zeiger(P, 'pointerdown', 'touch', 22, b[0], b[1]);
@@ -188,7 +188,7 @@ console.log('\n════ A: Gerät mit Stift ════');
   await zeiger(P, 'pointerup', 'touch', 22, b[0], b[1] - 180); await zeiger(P, 'pointerup', 'touch', 21, a[0], a[1] - 180);
   await P.waitForTimeout(250);
   const nach = await rollstand(P);
-  pruefe('A2 zwei Finger schieben die Folie (rund 180 Punkte) — gezeichnet wird dabei nichts', Math.abs(nach.oben - vor.oben - 180) < 20 && (await anzahl(P)) === 1, { vor, nach, n: await anzahl(P) });
+  pruefe('A2 zwei Finger schieben die Folie (rund 180 Punkte) – gezeichnet wird dabei nichts', Math.abs(nach.oben - vor.oben - 180) < 20 && (await anzahl(P)) === 1, { vor, nach, n: await anzahl(P) });
   // zwei Finger kneifen: zoomen um die Mitte
   const z0 = await zoomstand(P);
   const m = [t.l + 500, 450];
@@ -203,7 +203,7 @@ console.log('\n════ A: Gerät mit Stift ════');
   // Tipp-Gesten
   await tippe(P, [[t.l + 400, 500], [t.l + 520, 500]]);
   const t5 = await toast(P);
-  pruefe('A5 Zwei-Finger-Tipp macht den Strich rückgängig — mit Meldung', await bis(async () => (await anzahl(P)) === 0) && /Rückgängig \(Zwei-Finger-Tipp\)/.test(t5), { n: await anzahl(P), t: await toast(P) });
+  pruefe('A5 Zwei-Finger-Tipp macht den Strich rückgängig – mit Meldung', await bis(async () => (await anzahl(P)) === 0) && /Rückgängig \(Zwei-Finger-Tipp\)/.test(t5), { n: await anzahl(P), t: await toast(P) });
   await tippe(P, [[t.l + 400, 500], [t.l + 520, 500], [t.l + 640, 500]]);
   const t6 = await toast(P);
   pruefe('A6 Drei-Finger-Tipp holt ihn wieder', await bis(async () => (await anzahl(P)) === 1) && /Wiederholen \(Drei-Finger-Tipp\)/.test(t6), { n: await anzahl(P), t: await toast(P) });
@@ -245,7 +245,7 @@ console.log('\n════ A: Gerät mit Stift ════');
   await stiftStrich(P, linie(notiz.l + 60, notiz.t + 30, notiz.l + 240, notiz.t + 30));
   await bis(async () => (await anzahl(P)) === n2 + 1);
   await tippe(P, [[notiz.l + 80, notiz.t + 40], [notiz.l + 200, notiz.t + 40]]);
-  pruefe('C3 mit gewähltem Stift liegt die Zeichenschicht darüber — dann gilt sie auch dort', await bis(async () => (await anzahl(P)) === n2), { n2, n: await anzahl(P) });
+  pruefe('C3 mit gewähltem Stift liegt die Zeichenschicht darüber – dann gilt sie auch dort', await bis(async () => (await anzahl(P)) === n2), { n2, n: await anzahl(P) });
   await ctx.close();
 }
 
@@ -274,7 +274,7 @@ console.log('\n════ B: Gerät ohne Stift ════');
   const nach = await rollstand(P);
   pruefe('B2 kommt ein zweiter Finger dazu, war es kein Strich: zwei Finger schieben, nichts wird gezeichnet', Math.abs(nach.oben - vor.oben - 180) < 24 && (await anzahl(P)) === 1, { vor, nach, n: await anzahl(P) });
   await tippe(P, [[t.l + 400, 500], [t.l + 520, 500]]);
-  pruefe('B3 Zwei-Finger-Tipp: rückgängig — und kein Punkt bleibt zurück', await bis(async () => (await anzahl(P)) === 0) && (await P.waitForTimeout(800), (await anzahl(P)) === 0), { n: await anzahl(P) });
+  pruefe('B3 Zwei-Finger-Tipp: rückgängig – und kein Punkt bleibt zurück', await bis(async () => (await anzahl(P)) === 0) && (await P.waitForTimeout(800), (await anzahl(P)) === 0), { n: await anzahl(P) });
   await ctx.close();
 }
 
@@ -299,7 +299,7 @@ console.log('\n════ E: Texte ════');
 {
   const de = readFileSync(path.join(__repo, 'src/components/HelpOverlay.tsx'), 'utf-8');
   const en = readFileSync(path.join(__repo, 'src/components/HelpOverlayEn.tsx'), 'utf-8');
-  pruefe('E1 die Hilfe nennt M396 — deutsch und englisch', de.includes('(M396)') && en.includes('(M396)'));
+  pruefe('E1 die Hilfe nennt M396 – deutsch und englisch', de.includes('(M396)') && en.includes('(M396)'));
   pruefe('E2 keine Fehler in der Konsole', fehler.length === 0, fehler.join(' | ').slice(0, 300));
 }
 

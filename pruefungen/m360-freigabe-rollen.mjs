@@ -380,7 +380,7 @@ await A.P.screenshot({ path: path.join(SD, 'm360-dialog.png') });
 await schliessen(A.P);
 
 // ══ B: Bernd liest mit ══════════════════════════════════════════════
-console.log('\n════ B: Bernd sieht das Board — und kann nichts ändern ════');
+console.log('\n════ B: Bernd sieht das Board – und kann nichts ändern ════');
 const B = await geraet('B', standB);
 await anmelden(B.P, 'bernd@example.de', 'geheim456', true);
 const uidB = nutzerId('bernd@example.de');
@@ -390,7 +390,7 @@ pruefe('B1 „Planung" ist da, mit Besitzer und Rolle „lesen"', bxB?.geteiltVo
 await boardWechseln(B.P, 'Planung', 'anna@example.de');
 await B.P.waitForTimeout(600);
 pruefe('B2 Hinweisband „Nur lesen · geteilt von anna@…" mit „Eigene Kopie anlegen"', (await band(B.P)) === 1 && /Nur lesen/.test(await B.P.locator('[data-taste="lese-band"]').textContent()) && /anna@example\.de/.test(await B.P.locator('[data-taste="lese-band"]').textContent()) && (await B.P.locator('[data-taste="lese-kopie"]').count()) === 1);
-pruefe('B3 die Spalte zeigt ein Schloss statt der zwei Köpfe', /🔒/.test(await B.P.locator('.tabs.spalte .side-board', { hasText: 'Planung' }).first().textContent()));
+pruefe('B3 die Spalte zeigt ein Schloss statt der zwei Köpfe', (await B.P.locator('.tabs.spalte .side-board', { hasText: 'Planung' }).first().locator('.side-board-geteilt[data-rolle="lesen"] svg').count()) === 1);
 await B.P.screenshot({ path: path.join(SD, 'm360-nur-lesen.png') });
 const schreibVor = sb.aufrufe.freigabeSchreiben;
 // Doppelklick auf die freie Fläche: keine neue Notiz, dafür ein Hinweis
@@ -416,7 +416,7 @@ await B.P.mouse.click(kb2.x + 12, kb2.y + 6); await B.P.waitForTimeout(300);
 await B.P.waitForTimeout(5200); // der Hinweis von eben ist verklungen
 await B.P.mouse.click(1250, 800); await B.P.waitForTimeout(300);
 await B.P.mouse.click(kb2.x + 12, kb2.y + 6); await B.P.waitForTimeout(400);
-pruefe('B9 Auswählen geht weiterhin — ohne Hinweis (ein Klick ist keine Bearbeitung)', (await B.P.locator('.react-flow__node.selected').count()) === 1 && !/nur zum Lesen/.test(await toast(B.P)), await toast(B.P));
+pruefe('B9 Auswählen geht weiterhin – ohne Hinweis (ein Klick ist keine Bearbeitung)', (await B.P.locator('.react-flow__node.selected').count()) === 1 && !/nur zum Lesen/.test(await toast(B.P)), await toast(B.P));
 await B.P.keyboard.press('Delete'); await B.P.waitForTimeout(500);
 pruefe('B10 Entf löscht die Karte nicht', (await knoten(B.P)) === 1 && (await boardVon(B.P, 'bx')).nodes.length === 1);
 await B.P.keyboard.press('Escape'); await B.P.waitForTimeout(200);
@@ -428,7 +428,7 @@ pruefe('B12 nichts reist zum Server (kein freigabe_schreiben)', sb.aufrufe.freig
 pruefe('B13 Verbindungs-Punkte sind unsichtbar', await B.P.evaluate(() => [...document.querySelectorAll('.react-flow__handle')].every((h) => getComputedStyle(h).visibility === 'hidden')));
 
 // ══ C: Annas Änderung kommt live ════════════════════════════════════
-console.log('\n════ C: Anna schreibt — Bernd liest live mit ════');
+console.log('\n════ C: Anna schreibt – Bernd liest live mit ════');
 await A.P.waitForTimeout(300);
 pruefe('C0 Anna legt eine Notiz an', await notizFrei(A.P, 'Von Anna live'));
 pruefe('C1 Bernd sieht sie binnen Sekunden', await warteBis(B.P, async () => /Von Anna live/.test(await texteVon(B.P)), 12000), await texteVon(B.P));
@@ -453,7 +453,7 @@ const keineVor = sb.aufrufe.keineFreigabe;
 await notizFrei(B.P, 'Zu spät');
 pruefe('E1 der Server lehnt Bernds Änderung ab', await warteBis(B.P, () => sb.aufrufe.keineFreigabe > keineVor, 10000));
 pruefe('E2 das Board bleibt geteilt und ist jetzt nur lesbar (keine stille Abspaltung)', await warteBis(B.P, async () => { const b = await boardVon(B.P, 'bx'); return b?.geteiltVon === uidA && b?.geteiltRolle === 'lesen'; }, 8000), JSON.stringify(await boardVon(B.P, 'bx').then((b) => ({ von: b?.geteiltVon, rolle: b?.geteiltRolle }))));
-pruefe('E3 Bernds abgelehnte Karte ist wieder weg — sein Stand gleicht Annas', await warteBis(B.P, async () => !/Zu spät/.test(JSON.stringify(await boardVon(B.P, 'bx'))) && !/Zu spät/.test(await texteVon(B.P)), 8000));
+pruefe('E3 Bernds abgelehnte Karte ist wieder weg – sein Stand gleicht Annas', await warteBis(B.P, async () => !/Zu spät/.test(JSON.stringify(await boardVon(B.P, 'bx'))) && !/Zu spät/.test(await texteVon(B.P)), 8000));
 pruefe('E4 Annas Zeile hat die Karte nie gesehen', !/Zu spät/.test(zeileText(uidA, 'board-bx.json')));
 pruefe('E5 das Band ist zurück', (await band(B.P)) === 1);
 
@@ -502,7 +502,7 @@ await schliessen(C.P);
 pruefe('G5 „Ideen" ist bei Clara da und offen', await warteBis(C.P, async () => { const s = await zustand(C.P); return s.activeId === 'by' && s.boards.some((b) => b.id === 'by' && b.geteiltVon === uidA); }, 16000), await zustand(C.P).then((s) => `${s.activeId} ${s.boards.map((b) => b.id)}`));
 pruefe('G6 die gemerkte Einladung ist erledigt', (await C.P.evaluate(() => localStorage.getItem('pixinotes-einladung-offen'))) === null);
 await C.P.waitForTimeout(800);
-pruefe('G7 Clara schreibt mit — Anna sieht es', (await notizFrei(C.P, 'Von Clara')) && await warteBis(A.P, () => /Von Clara/.test(zeileText(uidA, 'board-by.json')), 14000));
+pruefe('G7 Clara schreibt mit – Anna sieht es', (await notizFrei(C.P, 'Von Clara')) && await warteBis(A.P, () => /Von Clara/.test(zeileText(uidA, 'board-by.json')), 14000));
 // Rolle des Links ändern: Token bleibt
 await dialogOeffnen(A.P, 'Ideen');
 pruefe('G8 Anna sieht Clara in der Liste (angenommen)', /clara@example\.de/.test(await A.P.locator('[data-taste="freigabe-liste"]').textContent()) && /angenommen/.test(await A.P.locator('[data-taste="freigabe-liste"]').textContent()));
@@ -513,7 +513,7 @@ pruefe('G10 Claras bestehende Freigabe behält „bearbeiten"', sb.freigaben.fin
 await schliessen(A.P);
 // Bernd ist angemeldet und folgt dem Link (Anker in der offenen App)
 await B.P.evaluate((t) => { location.hash = `#e=${t}`; }, einl.token);
-pruefe('G11 Bernd (angemeldet) tritt bei — als Leser', await warteBis(B.P, () => sb.freigaben.some((f) => f.board_id === 'by' && f.gast_id === uidB && f.rolle === 'lesen'), 10000));
+pruefe('G11 Bernd (angemeldet) tritt bei – als Leser', await warteBis(B.P, () => sb.freigaben.some((f) => f.board_id === 'by' && f.gast_id === uidB && f.rolle === 'lesen'), 10000));
 pruefe('G12 „Ideen" geht bei Bernd auf, mit Band', await warteBis(B.P, async () => (await zustand(B.P)).activeId === 'by' && (await band(B.P)) === 1, 16000), await zustand(B.P).then((s) => s.activeId));
 pruefe('G13 Meldung nennt die Besitzerin und „nur lesen"', await warteBis(B.P, async () => /anna@example\.de/.test(await toast(B.P)) && /nur lesen/.test(await toast(B.P)), 4000), await toast(B.P));
 // Anna öffnet ihren eigenen Link

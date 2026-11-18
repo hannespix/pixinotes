@@ -179,7 +179,7 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
 
       {data.quelle && (
         <div className="sheet-quelle">
-          Quelle: <b translate="no">{data.quelle}</b> — Formeln übernommen, Änderungen bleiben hier
+          Quelle: <b translate="no">{data.quelle}</b> – Formeln übernommen, Änderungen bleiben hier
         </div>
       )}
 
@@ -255,7 +255,7 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
 
       <div className="sheet-fuss">
         {edit
-          ? <><b>{edit}</b> — Formeln beginnen mit <code>=</code>, z. B. <code>=SUMME(A1:A5)</code>. Enter übernimmt.</>
+          ? <><b>{edit}</b> – Formeln beginnen mit <code>=</code>, z. B. <code>=SUMME(A1:A5)</code>. Enter übernimmt.</>
           : <>Zelle antippen zum Bearbeiten · <code>=</code> beginnt eine Formel · Σ setzt Summen</>}
       </div>
     </>

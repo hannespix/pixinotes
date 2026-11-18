@@ -175,7 +175,7 @@ const notiz = await P.evaluate(() => {
   const text = JSON.stringify(n.data.blocks);
   return {
     dialogZu: !document.querySelector('.recherche-modal'),
-    titelDrin: text.includes('🔎'),
+    titelDrin: text.includes('Recherche: '),
     inhalt: text.includes('Kaiserstuhl'),
     quellenListe: text.includes('Quellen') && text.includes('wikipedia.org'),
     luecke: text.includes('Öffnungszeiten'),

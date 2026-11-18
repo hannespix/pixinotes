@@ -32,7 +32,7 @@ const pruefe = (n, gut, info = '') => {
   if (gut) { ok += 1; console.log(`  ✓ ${n}`); } else { bad += 1; console.log(`  ✗ ${n} ${typeof info === 'string' ? info : JSON.stringify(info)}`); }
 };
 const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox'] });
-const abs = (id, n) => Array.from({ length: n }, (_, i) => ({ id: `${id}${i}`, type: 'paragraph', content: `Zeile ${i + 1} — ein etwas längerer Satz, damit die Notiz wirklich überläuft.` }));
+const abs = (id, n) => Array.from({ length: n }, (_, i) => ({ id: `${id}${i}`, type: 'paragraph', content: `Zeile ${i + 1} – ein etwas längerer Satz, damit die Notiz wirklich überläuft.` }));
 const nz = (id, x, y, h, n, farbe = 'yellow') => ({ id, type: 'note', width: 300, ...(h ? { height: h, autoFit: false } : {}), position: { x, y }, data: { color: farbe, blocks: abs(id, n) } });
 const stand = (nah = false) => ({
   boards: [{ id: 'b1', name: 'Lang', comments: [], edges: [], drawings: [], nodes: [
@@ -91,7 +91,7 @@ console.log('\n════ A: Scrollbalken auf dem Board ════');
   pruefe('A2 eine Notiz ohne Überlauf hat keinen', !k2.rollt && k2.daumen.anzeige === 'none', k2);
   await ziehen(P, k1.daumen.x, k1.daumen.y, 60);
   let nach = await karte(P, 'n1');
-  pruefe('A3 der Balken lässt sich ziehen — der Text rollt, die Karte bleibt', nach.st > 100 && nach.tf === k1.tf, [nach.st, nach.tf, k1.tf]);
+  pruefe('A3 der Balken lässt sich ziehen – der Text rollt, die Karte bleibt', nach.st > 100 && nach.tf === k1.tf, [nach.st, nach.tf, k1.tf]);
 
   // mittlerer Zoom
   await leer(P);
@@ -145,7 +145,7 @@ console.log('\n════ B: Zoom-Modus (Fokus) ════');
   const kam2 = await kamera(P);
   await ziehen(P, b1.x, b1.y, 120);
   const b2 = await balken();
-  pruefe('B5c der Balken lässt sich ziehen — die Kamera rollt mit', (await kamera(P)) !== kam2 && b2.top > b1.top + 60, [b1.top, b2.top]);
+  pruefe('B5c der Balken lässt sich ziehen – die Kamera rollt mit', (await kamera(P)) !== kam2 && b2.top > b1.top + 60, [b1.top, b2.top]);
   const fokusNoch = await P.evaluate(() => !!document.querySelector('.app.focus-mode'));
   pruefe('B5d der Zug am Balken schließt den Fokus nicht', fokusNoch);
   await P.keyboard.press('Escape'); await P.waitForTimeout(1200);

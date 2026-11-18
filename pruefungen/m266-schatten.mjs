@@ -126,7 +126,7 @@ console.log('════ T1: linke Spalte (Standard) ════');
     grund - dunkelste(andere) < 22, `${dunkelste(andere)} gegen Grund ${grund}`);
   pruefe('T1c neben der AKTIVEN Zeile ebenso (dort saß der Streifen)',
     grund - dunkelste(aktiv) < 22, `${dunkelste(aktiv)} gegen Grund ${grund}`);
-  pruefe('T1d beide Höhen sind gleich hell — kein Streifen an einer Zeile',
+  pruefe('T1d beide Höhen sind gleich hell – kein Streifen an einer Zeile',
     Math.abs(dunkelste(aktiv) - dunkelste(andere)) <= 6,
     `${dunkelste(aktiv)} vs ${dunkelste(andere)}`);
   if (bisUnten) pruefe('T1e die Spalte reicht bis zum unteren Rand (nichts darunter, das einen Streifen tragen könnte)', o.unten >= 880, String(o.unten));

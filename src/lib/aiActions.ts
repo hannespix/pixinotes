@@ -65,7 +65,7 @@ let letzteAuslassung = 0;
 /** Hinweis für die Ergebnis-Meldung, wenn Karten weggelassen wurden */
 function auslassungsHinweis(): string {
   return letzteAuslassung > 0
-    ? ` — ⚠️ ${letzteAuslassung} Karte(n) passten nicht mehr in den Kontext und blieben unberücksichtigt (weniger Karten auswählen oder die Freitext-Anweisung nutzen, die in Portionen arbeitet)`
+    ? ` – ${letzteAuslassung} Karte(n) passten nicht mehr in den Kontext und blieben unberücksichtigt (weniger Karten auswählen oder die Freitext-Anweisung nutzen, die in Portionen arbeitet)`
     : '';
 }
 
@@ -241,13 +241,13 @@ export async function askJsonVoll<T>(prompt: string, images: string[] = []): Pro
   } catch { /* einmal strenger nachfragen */ }
   if (kiAbgebrochen()) throw new Error('abgebrochen');
   const second = await askAiVoll(
-    `${prompt}\n\nWICHTIG: Antworte AUSSCHLIESSLICH mit dem vollständigen, gültigen JSON-Objekt — keine Einleitung, kein Markdown, keine Kommentare, nichts danach.`,
+    `${prompt}\n\nWICHTIG: Antworte AUSSCHLIESSLICH mit dem vollständigen, gültigen JSON-Objekt – keine Einleitung, kein Markdown, keine Kommentare, nichts danach.`,
     images,
   );
   try {
     return { wert: parseJson<T>(second.text), abgeschnitten: second.abgeschnitten };
   } catch {
-    throw new Error('Die KI hat zweimal kein sauberes JSON geliefert — einfach nochmal versuchen (bei Gratis-Modellen passiert das öfter) oder in den Einstellungen ein stärkeres Modell wählen.');
+    throw new Error('Die KI hat zweimal kein sauberes JSON geliefert – einfach nochmal versuchen (bei Gratis-Modellen passiert das öfter) oder in den Einstellungen ein stärkeres Modell wählen.');
   }
 }
 
@@ -304,7 +304,7 @@ export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): 
   const imgs = await gatherImages(nodes);
   const today = tagLokal();
   const { tasks } = await askJson<{ tasks: Array<{ text: string; due?: string }> }>(
-    `Heute ist ${today}. Extrahiere aus den folgenden Karten alle konkreten Aufgaben/TODOs. Erkenne Termine/Fristen und setze sie als ISO-Datum (yyyy-mm-dd). Antworte NUR mit JSON: {"tasks":[{"text":"...","due":"yyyy-mm-dd"}]} — "due" nur, wenn wirklich ein Termin erkennbar ist.${imgHint(imgs)}\n\nKarten:\n${JSON.stringify(items)}`,
+    `Heute ist ${today}. Extrahiere aus den folgenden Karten alle konkreten Aufgaben/TODOs. Erkenne Termine/Fristen und setze sie als ISO-Datum (yyyy-mm-dd). Antworte NUR mit JSON: {"tasks":[{"text":"...","due":"yyyy-mm-dd"}]} – "due" nur, wenn wirklich ein Termin erkennbar ist.${imgHint(imgs)}\n\nKarten:\n${JSON.stringify(items)}`,
     imgs,
   );
   const clean = (tasks ?? []).filter((t) => t.text?.trim()).slice(0, 30);
@@ -316,7 +316,7 @@ export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): 
     st.addNode({
       id: kanbanId, type: 'kanban', width: 430, position: freeSpot(pos, 430, 300),
       data: {
-        title: '✨ Extrahierte Aufgaben',
+        title: 'Extrahierte Aufgaben',
         items: clean.map((t) => ({
           id: uid(), text: t.text.trim().slice(0, 140), col: 0,
           due: /^\d{4}-\d{2}-\d{2}$/.test(t.due ?? '') ? t.due : undefined,
@@ -326,7 +326,7 @@ export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): 
     linkSources(nodes, kanbanId);
   });
   const withDue = clean.filter((t) => t.due).length;
-  return `${clean.length} Aufgabe(n) extrahiert${withDue ? `, davon ${withDue} mit Termin` : ''} — als Kanban aufs Board gelegt${auslassungsHinweis()}`;
+  return `${clean.length} Aufgabe(n) extrahiert${withDue ? `, davon ${withDue} mit Termin` : ''} – als Kanban aufs Board gelegt${auslassungsHinweis()}`;
 }
 
 /** Prozess/Workflow aus dem Inhalt ableiten → Mermaid-Flowchart */
@@ -362,7 +362,7 @@ export async function aiBriefing(nodes: AppNode[], pos: { x: number; y: number }
     imgs,
   );
   const st = useBoard.getState();
-  const briefNote = makeNote(freeSpot(pos, 280, 340), { color: 'sky', blocks: await mdToBlocks('✨ Board-Briefing', res.trim()) });
+  const briefNote = makeNote(freeSpot(pos, 280, 340), { color: 'sky', blocks: await mdToBlocks('Board-Briefing', res.trim()) });
   st.pushHistory();
   mutedHistory(() => {
     st.addNode(briefNote);
@@ -393,7 +393,7 @@ export async function aiWeekPlan(
     + JSON.stringify(items),
   );
   const st = useBoard.getState();
-  st.addNode(makeNote(freeSpot(pos, 280, 380), { color: 'sky', blocks: await mdToBlocks('🗓️ Wochenplan', res.trim()) }));
+  st.addNode(makeNote(freeSpot(pos, 280, 380), { color: 'sky', blocks: await mdToBlocks('Wochenplan', res.trim()) }));
   return 'Wochenplan als Notiz aufs Board gelegt';
 }
 
@@ -442,7 +442,7 @@ export async function aiPolish(nodes: AppNode[], fortschritt?: Fortschritt): Pro
       const answer = await askAi(
         `Verbessere den folgenden Notiztext: korrigiere Rechtschreibung und Grammatik, straffe Formulierungen, behalte Bedeutung, Sprache (Deutsch) und Aufzählungsstruktur bei. Du darfst Markdown nutzen (## Überschriften, **fett**, "- " Punkte, "- [ ] " Checklisten). Antworte NUR mit dem verbesserten Text.\n\n${text.slice(0, 6000)}`,
       );
-      const blocks = await mdToBlocks('✨ Vorschlag', answer);
+      const blocks = await mdToBlocks('Vorschlag', answer);
       const suggestion = makeNote(
         freeSpot({ x: note.position.x + ((note.width as number | undefined) ?? 280) + 40, y: note.position.y }, 280, 320),
         { color: 'mint', blocks },
@@ -460,10 +460,10 @@ export async function aiPolish(nodes: AppNode[], fortschritt?: Fortschritt): Pro
   }
   if (fertig === 0 && fehler.length) throw new Error(fehler[0]);
   const basis = notizen.length === 1
-    ? 'Verbesserter Text liegt als Vorschlag daneben — das Original bleibt unangetastet'
-    : `${fertig} von ${notizen.length} Texten verbessert — die Vorschläge liegen jeweils daneben, die Originale bleiben`;
-  if (kiAbgebrochen() && fertig < notizen.length) return `Abgebrochen — ${basis}`;
-  return fehler.length ? `⚠️ ${basis}. Nicht geschafft: ${fehler.join(' · ')}` : basis;
+    ? 'Verbesserter Text liegt als Vorschlag daneben – das Original bleibt unangetastet'
+    : `${fertig} von ${notizen.length} Texten verbessert – die Vorschläge liegen jeweils daneben, die Originale bleiben`;
+  if (kiAbgebrochen() && fertig < notizen.length) return `Abgebrochen – ${basis}`;
+  return fehler.length ? `${basis}. Nicht geschafft: ${fehler.join(' · ')}` : basis;
 }
 
 /* ---------- Freitext-Kommando: die KI darf (fast) alles ---------- */
@@ -533,7 +533,7 @@ function portionsName(items: Ctx[]): string {
 
 function planPrompt(wish: string, items: Ctx[], imgs: string[], teil?: { i: number; n: number }): string {
   const teilHinweis = teil
-    ? `\n\nDies ist Teil ${teil.i} von ${teil.n} einer größeren Aufgabe: Die Karten sind in Portionen aufgeteilt. Setze den Wunsch VOLLSTÄNDIG für JEDE hier gelistete Karte um (z. B. je Karte eine eigene Notiz, wenn der Wunsch das verlangt). Die übrigen Karten kommen in weiteren Teilen und sind hier nicht zu sehen — fasse nichts über diese Portion hinaus zusammen.`
+    ? `\n\nDies ist Teil ${teil.i} von ${teil.n} einer größeren Aufgabe: Die Karten sind in Portionen aufgeteilt. Setze den Wunsch VOLLSTÄNDIG für JEDE hier gelistete Karte um (z. B. je Karte eine eigene Notiz, wenn der Wunsch das verlangt). Die übrigen Karten kommen in weiteren Teilen und sind hier nicht zu sehen – fasse nichts über diese Portion hinaus zusammen.`
     : '';
   return `Du bist der Assistent eines Whiteboard-Tools (Karten auf einer Leinwand). Setze den Wunsch des Nutzers als Operationsplan um.
 
@@ -550,15 +550,15 @@ Erlaubte Operationen (max. ${OPS_MAX}):
 {"op":"mermaid","code":"flowchart TD\\n  A[Start] --> B[Ende]","from":"<optional>"}
 {"op":"shape","shape":"process|decision|terminator","text":"...","from":"<optional>"}
 {"op":"week","title":"...","days":5|7,"entries":[{"day":0,"start":540,"dur":90,"text":"...","who":"optional"}],"from":"<optional>"} (Stunden-/Wochen-/Dienstplan: day 0=Montag … 6=Sonntag, start/dur in MINUTEN seit Mitternacht)
-{"op":"time","title":"...","from":"<optional>"} (Arbeitszeiterfassungs-Karte mit Start/Stop — Einträge macht der Nutzer selbst)
-{"op":"frame","name":"...","around":["<id>","<id>"]} (benannter Rahmen-Bereich UM die genannten vorhandenen Karten — gruppiert sie)
+{"op":"time","title":"...","from":"<optional>"} (Arbeitszeiterfassungs-Karte mit Start/Stop – Einträge macht der Nutzer selbst)
+{"op":"frame","name":"...","around":["<id>","<id>"]} (benannter Rahmen-Bereich UM die genannten vorhandenen Karten – gruppiert sie)
 {"op":"edit_note","id":"<existierende Notiz-id>","text":"KOMPLETTER neuer Inhalt als Markdown; erste Zeile = '## Überschrift'"}
 {"op":"edit_title","id":"<id>","title":"..."} (für Kanban/Zeitplan-Titel oder Form-Text)
 {"op":"add_tickets","id":"<Kanban-id>","items":[{"text":"...","due":"yyyy-mm-dd"}]}
 {"op":"edge","source":"<id>","target":"<id>","label":"kurzes Label"}
 {"op":"delete","ids":["<id>"]} (NUR wenn der Nutzer ausdrücklich löschen will)
 Modulwahl: Prozesse/Abläufe → mermaid · Aufgabenlisten → kanban · Phasen/Zeiträume/Termine → gantt · Stundenplan/Wochenplan/Dienstplan → week · Arbeitszeit erfassen → time · Karten thematisch gruppieren → frame · Wissen/Text → note (Markdown voll ausnutzen, erledigbare Punkte als '- [ ] ' Checklisten).
-Regeln: verwende nur existierende ids aus der Liste; bei "verbessern/umschreiben" nutze edit_note mit dem vollständigen neuen Text; erfinde keine Fakten. Leitest du ein neues Modul aus dem Inhalt einer bestehenden Karte ab (oder bezieht es sich klar auf sie), setze deren id als "from" — das Board verbindet beide dann automatisch mit einem Pfeil.${imgHint(imgs)}`;
+Regeln: verwende nur existierende ids aus der Liste; setze keine Emojis in Titel, Namen und Texte; bei "verbessern/umschreiben" nutze edit_note mit dem vollständigen neuen Text; erfinde keine Fakten. Leitest du ein neues Modul aus dem Inhalt einer bestehenden Karte ab (oder bezieht es sich klar auf sie), setze deren id als "from" – das Board verbindet beide dann automatisch mit einem Pfeil.${imgHint(imgs)}`;
 }
 
 interface PlanErgebnis { done: number; editedNote: boolean }
@@ -601,7 +601,7 @@ function planAusfuehren(
             }));
           if (rows.length === 0) break;
           const node = makeGantt(place(240));
-          (node.data as { title: string; rows: unknown[] }).title = (o.title ?? '📅 Zeitplan').slice(0, 60);
+          (node.data as { title: string; rows: unknown[] }).title = (o.title ?? 'Zeitplan').slice(0, 60);
           (node.data as { rows: unknown[] }).rows = rows;
           st.addNode(node);
           linkFrom(o, node.id);
@@ -827,7 +827,7 @@ export async function aiCommand(instruction: string, nodes: AppNode[], pos: { x:
       if (erg.done > 0) geschafft += 1;
       else fehler.push(`Teil ${teilNr} (${portionsName(items)}): kein Schritt war ausführbar (unbekannte ids?)`);
       if (wert.summary?.trim()) zusammenfassungen.push(wert.summary.trim());
-      if (abgeschnitten) fehler.push(`Teil ${teilNr} (${portionsName(items)}): die Antwort des Modells war abgeschnitten — das Ergebnis ist vermutlich unvollständig`);
+      if (abgeschnitten) fehler.push(`Teil ${teilNr} (${portionsName(items)}): die Antwort des Modells war abgeschnitten – das Ergebnis ist vermutlich unvollständig`);
     } catch (e) {
       if ((e as Error).message === 'abgebrochen') { abgebrochen = true; break; }
       fehler.push(`Teil ${teilNr} (${portionsName(items)}): ${(e as Error).message}`);
@@ -835,10 +835,10 @@ export async function aiCommand(instruction: string, nodes: AppNode[], pos: { x:
   }
 
   if (done === 0) {
-    if (abgebrochen) return 'Abgebrochen — es wurde noch nichts geändert.';
+    if (abgebrochen) return 'Abgebrochen – es wurde noch nichts geändert.';
     throw new Error(fehler.length
       ? (teilNr > 1 ? `Nichts umgesetzt. ${fehler.join(' · ')}` : fehler[0].replace(/^Teil 1 \([^)]*\): /, ''))
-      : 'Die KI hat keine ausführbaren Schritte geliefert — Anweisung bitte konkreter formulieren.');
+      : 'Die KI hat keine ausführbaren Schritte geliefert – Anweisung bitte konkreter formulieren.');
   }
   if (editedNote) {
     // BlockNote liest Inhalte nur beim Mount — geänderte Notizen brauchen
@@ -850,10 +850,10 @@ export async function aiCommand(instruction: string, nodes: AppNode[], pos: { x:
     }));
   }
   const schritte = `${done} Schritt${done > 1 ? 'e' : ''}`;
-  if (abgebrochen) return `Abgebrochen nach Teil ${teilNr - 1} — ${schritte} bleiben (Strg+Z macht sie rückgängig)`;
+  if (abgebrochen) return `Abgebrochen nach Teil ${teilNr - 1} – ${schritte} bleiben (Strg+Z macht sie rückgängig)`;
   if (fehler.length) {
-    return `⚠️ ${geschafft} von ${teilNr} Teilen umgesetzt (${schritte}). Nicht geschafft: ${fehler.join(' · ')}. Tipp: die betroffenen Karten auswählen und die Anweisung dort erneut ausführen.`;
+    return `${geschafft} von ${teilNr} Teilen umgesetzt (${schritte}). Nicht geschafft: ${fehler.join(' · ')}. Tipp: die betroffenen Karten auswählen und die Anweisung dort erneut ausführen.`;
   }
-  if (teilNr > 1) return `${zusammenfassungen[0] || 'Anweisung umgesetzt'} — ${schritte} in ${teilNr} Teilen (Strg+Z macht alles rückgängig)`;
-  return `${zusammenfassungen[0] || 'Anweisung umgesetzt'} (${schritte} — Strg+Z macht alles rückgängig)`;
+  if (teilNr > 1) return `${zusammenfassungen[0] || 'Anweisung umgesetzt'} – ${schritte} in ${teilNr} Teilen (Strg+Z macht alles rückgängig)`;
+  return `${zusammenfassungen[0] || 'Anweisung umgesetzt'} (${schritte} – Strg+Z macht alles rückgängig)`;
 }

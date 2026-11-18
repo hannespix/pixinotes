@@ -100,7 +100,7 @@ console.log('\n════ A: Navigationsbaum ════');
   const zu = await P.evaluate(() => ({ karten: document.querySelectorAll('.nav-tree .side-card').length, f: document.activeElement.textContent.trim() }));
   await taste(P, 'ArrowRight');
   const auf = await P.evaluate(() => document.querySelectorAll('.nav-tree .side-card').length);
-  pruefe('A4 ← klappt das Board zu, → wieder auf — der Fokus bleibt', zu.karten === 0 && zu.f === 'Alpha' && auf === 4, [zu, auf]);
+  pruefe('A4 ← klappt das Board zu, → wieder auf – der Fokus bleibt', zu.karten === 0 && zu.f === 'Alpha' && auf === 4, [zu, auf]);
   await taste(P, 'ArrowLeft'); await taste(P, 'ArrowDown');
   f = await fokus(P);
   await taste(P, 'Enter'); await P.waitForTimeout(500);
@@ -208,7 +208,7 @@ console.log('\n════ E/F: Übersicht und Netz ════');
   const namen = new Set([f.t.slice(0, 5)]);
   for (const t of ['ArrowRight', 'ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowLeft']) { await taste(P, t); namen.add((await fokus(P)).t.slice(0, 5)); }
   const lagenNach = await P.evaluate(() => [...document.querySelectorAll('.react-flow__node-ovBoard')].map((n) => n.style.transform));
-  pruefe('E2 Pfeile springen von Kachel zu Kachel — keine Kachel wird dabei verschoben', namen.size >= 3 && JSON.stringify(lagenVor) === JSON.stringify(lagenNach), [...namen]);
+  pruefe('E2 Pfeile springen von Kachel zu Kachel – keine Kachel wird dabei verschoben', namen.size >= 3 && JSON.stringify(lagenVor) === JSON.stringify(lagenNach), [...namen]);
   const rahmen = await P.evaluate(() => { const s = getComputedStyle(document.activeElement.querySelector('.ov-board')); return { o: s.outlineStyle, w: s.outlineWidth }; });
   pruefe('E3 die gewählte Kachel trägt einen sichtbaren Fokus-Rahmen', rahmen.o === 'solid' && parseFloat(rahmen.w) >= 2, rahmen);
   f = await fokus(P);

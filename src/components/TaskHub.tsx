@@ -11,7 +11,7 @@ import {
 import { aiReady, mdToBlocks } from '../lib/ai';
 import { applyTopicTag, brainDigest, buildTopicOverview, type DigestLine, type TopicCluster } from '../lib/brain';
 import { aiWeekPlan } from '../lib/aiActions';
-import { IBell, ICalendar, IChevronR, IFilter, IGantt, IKanban, INote, ISearch, IUsers, IWand, IX } from './Icons';
+import { IBell, ICalendar, IChevronR, IFilter, IGantt, IKanban, INote, ISearch, IUsers, IWand, IX, ISonne } from './Icons';
 
 const PRIO_LABEL: Record<1 | 2 | 3, string> = { 1: '!!!', 2: '!!', 3: '!' };
 
@@ -142,7 +142,7 @@ export function TaskHub() {
     mutedHistory(() => st.addNode(note));
     setOpen(false);
     st.focusNode(st.activeId, note.id);
-    showToast(`📝 Übersichts-Notiz „${label}" angelegt — Strg+Z macht es rückgängig.`);
+    showToast(`Übersichts-Notiz „${label}" angelegt – Strg+Z macht es rückgängig.`);
   };
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null); // Accordion-Werkzeuge (M116)
@@ -237,7 +237,7 @@ export function TaskHub() {
       // Abhängigkeiten & Ticket-Checkliste (M118): erst erledigen, dann abhaken
       if (item) {
         const blk = ticketBlockers(item, k);
-        if (blk.length > 0) { showToast(`🔒 Erst erledigen: ${blk.join(' · ')}`); return; }
+        if (blk.length > 0) { showToast(`Erst erledigen: ${blk.join(' · ')}`); return; }
         if (openSubs(item) > 0) { showToast(`☑ Noch ${openSubs(item)} Checklisten-Punkt(e) im Ticket offen.`); return; }
       }
       logDone(t); // „Heute geschafft"-Protokoll (M114)
@@ -266,7 +266,7 @@ export function TaskHub() {
         if (JSON.stringify(neu) !== JSON.stringify(e.blocks)) getroffen = true;
         return { ...e, blocks: neu };
       });
-      if (!getroffen) { showToast('Dieser Punkt ließ sich nicht abhaken — bitte im Protokoll selbst.'); return; }
+      if (!getroffen) { showToast('Dieser Punkt ließ sich nicht abhaken – bitte im Protokoll selbst.'); return; }
       logDone(t);
       updateNodeDataOnBoard(t.boardId, t.nodeId, { entries, extEpoch: ((node.data as { extEpoch?: number }).extEpoch ?? 0) + 1 });
     } else {
@@ -323,7 +323,7 @@ export function TaskHub() {
     // Vorwärts gilt die Abhängigkeits-Sperre auch hier (M118)
     if (item && col > item.col) {
       const blk = ticketBlockers(item, k);
-      if (blk.length > 0) { showToast(`🔒 Erst erledigen: ${blk.join(' · ')}`); return; }
+      if (blk.length > 0) { showToast(`Erst erledigen: ${blk.join(' · ')}`); return; }
     }
     if (col >= doneCol(k)) { complete(t); return; } // letzte Spalte = erledigt (inkl. Checklisten-Gate)
     updateNodeDataOnBoard(t.boardId, t.nodeId, {
@@ -363,9 +363,9 @@ export function TaskHub() {
   const planWeek = async () => {
     if (aiBusy) return;
     setAiBusy(true);
-    showToast('✨ KI plant die Woche …');
+    showToast('KI plant die Woche …');
     try {
-      showToast(`✨ ${await aiWeekPlan(allTasks, { x: 140, y: 120 })}`);
+      showToast(`${await aiWeekPlan(allTasks, { x: 140, y: 120 })}`);
     } catch (e) {
       showToast(`Wochenplan fehlgeschlagen: ${(e as Error).message}`);
     } finally {
@@ -424,8 +424,8 @@ export function TaskHub() {
     try {
       const perm = await Notification.requestPermission();
       showToast(perm === 'granted'
-        ? 'Browser-Benachrichtigungen aktiv — Erinnerungen kommen auch als System-Meldung.'
-        : 'Benachrichtigungen nicht erlaubt — Erinnerungen erscheinen weiter in der App.');
+        ? 'Browser-Benachrichtigungen aktiv – Erinnerungen kommen auch als System-Meldung.'
+        : 'Benachrichtigungen nicht erlaubt – Erinnerungen erscheinen weiter in der App.');
       tick((n) => n + 1);
     } catch {
       showToast('Dieser Browser unterstützt keine Benachrichtigungen.');
@@ -435,7 +435,7 @@ export function TaskHub() {
   const exportIcs = () => {
     const n = downloadTasksIcs(tasks);
     showToast(n > 0
-      ? `${n} Aufgabe(n) mit Frist als Kalender-Datei exportiert — in Outlook öffnen.`
+      ? `${n} Aufgabe(n) mit Frist als Kalender-Datei exportiert – in Outlook öffnen.`
       : 'Keine Aufgaben mit Fälligkeitsdatum in dieser Ansicht.');
   };
 
@@ -472,9 +472,9 @@ export function TaskHub() {
             className="brain-pulse-head"
             onClick={() => setPulseOpen((o) => { merkePuls(!o); return !o; })}
             aria-expanded={pulseOpen}
-            title="Was das Gehirn gerade in deinem Wissensnetz sieht — Themen, Knotenpunkte, fehlende Verknüpfungen"
+            title="Was das Gehirn gerade in deinem Wissensnetz sieht – Themen, Knotenpunkte, fehlende Verknüpfungen"
           >
-            🧠 Gehirn-Puls <span className="brain-pulse-count">{digest.length}</span>
+            Gehirn-Puls <span className="brain-pulse-count">{digest.length}</span>
             <span className="brain-pulse-caret">{pulseOpen ? '▾' : '▸'}</span>
           </button>
           {pulseOpen && (
@@ -498,25 +498,25 @@ export function TaskHub() {
                         onClick={() => {
                           const n = applyTopicTag(d.cluster!, d.label!);
                           showToast(n > 0
-                            ? `🏷 „thema = ${d.label}" auf ${n} Karte(n) gesetzt — über Strg+K findbar, Strg+Z macht es rückgängig.`
+                            ? `„thema = ${d.label}" auf ${n} Karte(n) gesetzt – über Strg+K findbar, Strg+Z macht es rückgängig.`
                             : `Alle Karten tragen „thema = ${d.label}" bereits.`);
                         }}
-                        title={'Allen Karten dieser Themen-Insel die Eigenschaft „thema" geben — danach über Strg+K und Schwimmbahnen nutzbar'}
+                        title={'Allen Karten dieser Themen-Insel die Eigenschaft „thema" geben – danach über Strg+K und Schwimmbahnen nutzbar'}
                       >
-                        🏷 Als Thema markieren
+                        Als Thema markieren
                       </button>
                       <button
                         onClick={() => void makeOverview(d.cluster!, d.label!)}
                         title="Eine Übersichts-Notiz anlegen, die alle Karten dieses Themas bündelt (mit Board-Links und Checkliste)"
                       >
-                        📝 Übersichts-Notiz anlegen
+                        Übersichts-Notiz anlegen
                       </button>
                     </div>
                   )}
                 </div>
               ))}
               <div className="brain-pulse-foot">
-                Rein rechnerisch aus dem semantischen Index — keine KI-Anfrage, keine Kosten.
+                Rein rechnerisch aus dem semantischen Index – keine KI-Anfrage, keine Kosten.
                 Vorschläge lassen sich im Netz annehmen oder ablehnen.
               </div>
             </div>
@@ -526,7 +526,7 @@ export function TaskHub() {
 
       {/* Filter (T1) — inkl. „Mein Tag"-Fokusliste (M115) */}
       <div className="taskhub-filters">
-        {([['all', 'Alle'], ['myday', `☀ Mein Tag${myDay.size > 0 ? ` (${myDay.size})` : ''}`], ['today', 'Heute'], ['overdue', 'Überfällig']] as const).map(([f, label]) => (
+        {([['all', 'Alle'], ['myday', `Mein Tag${myDay.size > 0 ? ` (${myDay.size})` : ''}`], ['today', 'Heute'], ['overdue', 'Überfällig']] as const).map(([f, label]) => (
           <button key={f} className={`th-chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>{label}</button>
         ))}
         {/* M227: Der Trichter existiert nur auf schmalen Schirmen (CSS, kein JS-
@@ -547,7 +547,7 @@ export function TaskHub() {
         {/* M231: Reihenfolge ist Absicht — erst das aktive Board (Voreinstellung),
             dann alle, dann die einzelnen. Der häufigste Fall steht oben. */}
         <select className="th-board th-adv" value={boardFilter} onChange={(e) => setBoardFilter(e.target.value)} title="Nach Board filtern">
-          <option value={AKTIV}>Aktives Board — {aktivName}</option>
+          <option value={AKTIV}>Aktives Board – {aktivName}</option>
           <option value="all">Auf allen Boards</option>
           {boards.map((b) => <option key={b.id} value={b.id} translate="no">{b.name}</option>)}
         </select>
@@ -561,7 +561,7 @@ export function TaskHub() {
           <button
             className={`th-chip th-adv ${groupByPerson ? 'on' : ''}`}
             onClick={() => setGroupByPerson((g) => !g)}
-            title="Nach Person gruppieren — wer macht was?"
+            title="Nach Person gruppieren – wer macht was?"
           ><IUsers size={13} /></button>
         )}
       </div>
@@ -591,7 +591,7 @@ export function TaskHub() {
       <div className="taskhub-quickrow">
         <input
           className="taskhub-quick"
-          placeholder={'Neue Aufgabe … — versteht „bis Freitag", @Person, #tag und !/!!/!!! als Priorität'}
+          placeholder={'Neue Aufgabe … – versteht „bis Freitag", @Person, #tag und !/!!/!!! als Priorität'}
           value={quick}
           onChange={(e) => setQuick(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && quickAdd()}
@@ -610,7 +610,7 @@ export function TaskHub() {
       {tasks.length === 0 ? (
         <div className="taskhub-empty">
           {filter === 'all' && boardFilter === 'all'
-            ? 'Nichts offen! Neue Aufgaben entstehen aus Kanban-Tickets und Checklisten in Notizen — oder oben per Schnell-Eingabe.'
+            ? 'Nichts offen! Neue Aufgaben entstehen aus Kanban-Tickets und Checklisten in Notizen – oder oben per Schnell-Eingabe.'
             : filter === 'all' && boardFilter === AKTIV && allTasks.length > 0
               // M231: Der häufigste Leerfall seit der neuen Voreinstellung —
               // hier ist nichts, anderswo schon. Das gehört dazugesagt.
@@ -655,7 +655,7 @@ export function TaskHub() {
                             {t.prio && <b className={`task-prio-mark prio-${t.prio}`}>{PRIO_LABEL[t.prio]} </b>}
                             {t.text}
                           </span>
-                          {myDay.has(t.key) && <span className="task-myday-mark" title={'In „Mein Tag" vorgenommen'}>☀</span>}
+                          {myDay.has(t.key) && <span className="task-myday-mark" title={'In „Mein Tag" vorgenommen'}><ISonne size={12} /></span>}
                           {t.who && !groupByPerson && <span className="task-who" translate="no" title="Zuständig">{t.who}</span>}
                           {t.due && <span className={`task-due urgency-${t.urgency}`}>{formatDueShort(t.due)}</span>}
                           <span className="task-board" translate="no">{t.boardName}</span>
@@ -697,7 +697,7 @@ export function TaskHub() {
                             {t.kind === 'kanban' && (
                               <button
                                 className={`task-prio prio-${t.prio ?? 0}`}
-                                title={t.prio ? `Priorität ${t.prio === 1 ? 'hoch' : t.prio === 2 ? 'mittel' : 'niedrig'} — Klick schaltet weiter` : 'Priorität setzen (Klick: hoch → mittel → niedrig → keine)'}
+                                title={t.prio ? `Priorität ${t.prio === 1 ? 'hoch' : t.prio === 2 ? 'mittel' : 'niedrig'} – Klick schaltet weiter` : 'Priorität setzen (Klick: hoch → mittel → niedrig → keine)'}
                                 onClick={() => cyclePrio(t)}
                               >{t.prio ? PRIO_LABEL[t.prio] : '!'}</button>
                             )}
@@ -751,7 +751,7 @@ export function TaskHub() {
             </button>
             {doneOpen && (
               today.length === 0
-                ? <div className="th-done-empty">Heute noch nichts abgehakt — die Woche zeigt die letzten 7 Tage.</div>
+                ? <div className="th-done-empty">Heute noch nichts abgehakt – die Woche zeigt die letzten 7 Tage.</div>
                 : (
                   <ul>
                     {today.slice(-30).reverse().map((e, i) => (
@@ -840,7 +840,7 @@ export function TaskHub() {
               </>
             ) : (
               <p className="th-detail-hint">
-                Checklisten-Punkte werden direkt in ihrer Notiz bearbeitet — unten zur Karte springen.
+                Checklisten-Punkte werden direkt in ihrer Notiz bearbeitet – unten zur Karte springen.
                 Erkannte Frist: {t.due ? formatDueShort(t.due) : 'keine'}.
               </p>
             )}

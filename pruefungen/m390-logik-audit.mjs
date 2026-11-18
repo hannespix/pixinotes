@@ -64,8 +64,8 @@ console.log('\n════ A: Rechnen und Lesen ════');
   const mo = new Date(2026, 10, 16, 10); const fr = new Date(2026, 10, 20, 10);
   const frei = m.detectDates('Bericht bis morgen', fr);
   const fest = m.detectDates('Bericht bis morgen', fr, new Date(2026, 10, 16, 0, 0, 1));
-  pruefe('A3 „bis morgen" mit Anker (Montag geschrieben) ist am Freitag der Dienstag — und überfällig', frei[0]?.date.getDate() === 21 && fest[0]?.date.getDate() === 17 && fest[0]?.urgency === 'overdue', [frei[0], fest[0]]);
-  pruefe('A4 relativ sind „morgen", „Freitag", „nächste Woche" — ein festes Datum nicht', m.hatRelativesDatum('bis morgen') && m.hatRelativesDatum('am Freitag fertig') && m.hatRelativesDatum('nächste Woche') && !m.hatRelativesDatum('am 20.11.2026') && !m.hatRelativesDatum('kein Termin'));
+  pruefe('A3 „bis morgen" mit Anker (Montag geschrieben) ist am Freitag der Dienstag – und überfällig', frei[0]?.date.getDate() === 21 && fest[0]?.date.getDate() === 17 && fest[0]?.urgency === 'overdue', [frei[0], fest[0]]);
+  pruefe('A4 relativ sind „morgen", „Freitag", „nächste Woche" – ein festes Datum nicht', m.hatRelativesDatum('bis morgen') && m.hatRelativesDatum('am Freitag fertig') && m.hatRelativesDatum('nächste Woche') && !m.hatRelativesDatum('am 20.11.2026') && !m.hatRelativesDatum('kein Termin'));
   const bl = [para('p1', 'Bericht bis morgen'), para('p2', 'fest am 20.11.2026'), para('p3', 'ohne alles')];
   const a1 = m.fristAnkerPflegen(bl, undefined, '2026-11-16');
   const a2 = m.fristAnkerPflegen(bl, a1, '2026-11-20');
@@ -77,7 +77,7 @@ console.log('\n════ A: Rechnen und Lesen ════');
   pruefe('A8 … am Schreibtag selbst ist dieselbe Frist „morgen" (nicht überfällig)', m.fristenDerNotiz([bl[0]], a1, mo)[0]?.urgency === 'soon');
 
   const um = m.linksUmbenennen([para('p', 'Siehe [[ziele]] und [[Andere]]'), { id: 'x', type: 'bulletListItem', content: t('nichts'), children: [para('k', 'tief: [[Ziele]]')] }], 'Ziele', 'Jahresziele');
-  pruefe('A9 Umbenennen schreibt [[Links]] um — ohne Rücksicht auf Groß/Klein, auch in Unterpunkten, andere bleiben', um?.[0].content[0].text === 'Siehe [[Jahresziele]] und [[Andere]]' && um?.[1].children[0].content[0].text === 'tief: [[Jahresziele]]' && m.linksUmbenennen([para('p', 'kein Link')], 'Ziele', 'X') === null, um);
+  pruefe('A9 Umbenennen schreibt [[Links]] um – ohne Rücksicht auf Groß/Klein, auch in Unterpunkten, andere bleiben', um?.[0].content[0].text === 'Siehe [[Jahresziele]] und [[Andere]]' && um?.[1].children[0].content[0].text === 'tief: [[Jahresziele]]' && m.linksUmbenennen([para('p', 'kein Link')], 'Ziele', 'X') === null, um);
 
   const md = m.blocksToMarkdown([para('p', '2 * 3 = 6 und a_b_c <b>fett</b>'), para('q', '# keine Überschrift'), para('r', '1. kein Listenpunkt'), para('s', '- kein Punkt')]);
   pruefe('A10 Markdown-Export: Zeichen mit Bedeutung sind entschärft (Stern, Unterstrich, <, Zeilenanfänge)', md.includes('2 \\* 3 = 6') && md.includes('a\\_b\\_c') && md.includes('\\<b>') && /^\\# keine/m.test(md) && /^1\\\. kein/m.test(md) && /^\\- kein/m.test(md), md);
@@ -90,7 +90,7 @@ console.log('\n════ A: Rechnen und Lesen ════');
   const zur = m.holeZurueck({ autoArchiv: true, items: [], archiv: [{ id: 'tk', text: 'alt', col: 2, erledigtAm: alt, archiviertAm: alt }] }, ['tk']);
   const lauf = m.autoArchivLauf({ autoArchiv: true, items: zur.items, archiv: zur.archiv });
   const spaeter = m.autoArchivLauf({ autoArchiv: true, items: zur.items, archiv: zur.archiv }, new Date(Date.now() + 8 * 864e5));
-  pruefe('A12 ein zurückgeholtes Ticket behält sein Erledigt-Datum, wandert aber nicht sofort wieder ins Archiv — erst nach neuer Frist', zur.items[0].erledigtAm === alt && lauf === null && spaeter?.archiviert === 1, [zur.items[0], lauf, spaeter?.archiviert]);
+  pruefe('A12 ein zurückgeholtes Ticket behält sein Erledigt-Datum, wandert aber nicht sofort wieder ins Archiv – erst nach neuer Frist', zur.items[0].erledigtAm === alt && lauf === null && spaeter?.archiviert === 1, [zur.items[0], lauf, spaeter?.archiviert]);
 
   const rahmen = { id: 'f', type: 'frame', width: 400, height: 300, position: { x: 0, y: 0 }, data: {} };
   const drin = { id: 'n', type: 'note', width: 100, height: 60, position: { x: 50, y: 50 }, data: {} };
@@ -159,7 +159,7 @@ console.log('\n════ B: Fristen an der Notiz ════');
   await h.P.clock.setFixedTime(new Date('2026-11-23T10:00:00+01:00'));
   await h.P.reload({ waitUntil: 'networkidle' }); await h.P.waitForTimeout(1500);
   const cNeu = await chip(neu?.id);
-  pruefe('B5 eine Woche später steht dort weiter der 20.11. — überfällig, nicht der nächste Freitag', cNeu.length === 1 && /20\.11\./.test(cNeu[0]) && /due-overdue/.test(cNeu[0]), cNeu);
+  pruefe('B5 eine Woche später steht dort weiter der 20.11. – überfällig, nicht der nächste Freitag', cNeu.length === 1 && /20\.11\./.test(cNeu[0]) && /due-overdue/.test(cNeu[0]), cNeu);
   await h.ctx.close();
 }
 
@@ -178,7 +178,7 @@ console.log('\n════ C: Boards ════');
   const feld = h.P.locator('.side-board-name input, input.side-board-name').first();
   await feld.fill('Jahresziele'); await feld.press('Enter'); await h.P.waitForTimeout(900);
   const txt = JSON.stringify((await h.board('b1')).nodes[0].data.blocks);
-  pruefe('C1 Board umbenannt: Der [[Link]] in der Notiz heißt mit — er zeigt weiter auf das Board', txt.includes('[[Jahresziele]]') && !txt.includes('[[Ziele]]'), txt);
+  pruefe('C1 Board umbenannt: Der [[Link]] in der Notiz heißt mit – er zeigt weiter auf das Board', txt.includes('[[Jahresziele]]') && !txt.includes('[[Ziele]]'), txt);
   // Löschen von „Jahresziele" (b1 bleibt als einziges sichtbares) — erlaubt; danach b1 löschen — verboten
   await zeile('Jahresziele').locator('.ebenen-menu-knopf').click({ force: true }); await h.P.waitForTimeout(300);
   await h.P.locator('.ebenen-menu button', { hasText: 'Löschen' }).first().click(); await h.P.waitForTimeout(900);
@@ -188,7 +188,7 @@ console.log('\n════ C: Boards ════');
   const loeschen = h.P.locator('.ebenen-menu button', { hasText: 'Löschen' }).first();
   if (await loeschen.count()) { await loeschen.click(); await h.P.waitForTimeout(900); }
   s = await h.zustand();
-  pruefe('C3 das letzte SICHTBARE Board bleibt — auch wenn im Archiv noch eines liegt', s.boards.some((b) => b.id === 'b1') && s.activeId === 'b1', [s.boards.map((b) => b.id), await h.toast()]);
+  pruefe('C3 das letzte SICHTBARE Board bleibt – auch wenn im Archiv noch eines liegt', s.boards.some((b) => b.id === 'b1') && s.activeId === 'b1', [s.boards.map((b) => b.id), await h.toast()]);
   await h.ctx.close();
 }
 
@@ -216,7 +216,7 @@ console.log('\n════ D: Tasten und Schritte ════');
   const d1 = await lage();
   await h.P.keyboard.press('Control+z'); await h.P.waitForTimeout(900);
   const d2 = await lage();
-  pruefe('D3 Duplizieren zweier verbundener Karten nimmt den Pfeil mit — und ist EIN Schritt', d1.n === 4 && d1.e === 2 && d2.n === 2 && d2.e === 1, [d1, d2]);
+  pruefe('D3 Duplizieren zweier verbundener Karten nimmt den Pfeil mit – und ist EIN Schritt', d1.n === 4 && d1.e === 2 && d2.n === 2 && d2.e === 1, [d1, d2]);
   // Löschen → „Rückgängig" in der Meldung holt Karte UND Pfeil
   await h.frei(); await h.knoten('a2').click({ position: { x: 8, y: 8 } }); await h.P.waitForTimeout(200);
   await h.P.keyboard.press('Delete'); await h.P.waitForTimeout(600);
@@ -230,7 +230,7 @@ console.log('\n════ D: Tasten und Schritte ════');
   const farben = async () => (await h.board()).nodes.map((n) => n.data.color).join();
   const f1 = await farben();
   await h.frei(); await h.P.keyboard.press('Control+z'); await h.P.waitForTimeout(900);
-  pruefe('D5 zwei Karten auf einmal gefärbt — EIN Rückgängig stellt beide zurück', f1 !== 'yellow,yellow' && new Set(f1.split(',')).size === 1 && (await farben()) === 'yellow,yellow', [f1, await farben()]);
+  pruefe('D5 zwei Karten auf einmal gefärbt – EIN Rückgängig stellt beide zurück', f1 !== 'yellow,yellow' && new Set(f1.split(',')).size === 1 && (await farben()) === 'yellow,yellow', [f1, await farben()]);
   await h.ctx.close();
 }
 
@@ -265,7 +265,7 @@ console.log('\n════ E: Planung ════');
   const h = await profil(st, { zeit: '2026-11-16T22:00:00Z', tz: 'Pacific/Auckland' });
   await h.knoten('g1').locator('.gantt-addzeile').click({ force: true }); await h.P.waitForTimeout(700);
   const rows = (await h.board()).nodes.find((n) => n.id === 'g1').data.rows;
-  pruefe('E5 Zeitplan: „heute" ist der Tag am Gerät (Auckland, 17.11.) — nicht der in Greenwich', rows.length === 2 && rows[1].start === '2026-11-17', rows.map((r) => r.start));
+  pruefe('E5 Zeitplan: „heute" ist der Tag am Gerät (Auckland, 17.11.) – nicht der in Greenwich', rows.length === 2 && rows[1].start === '2026-11-17', rows.map((r) => r.start));
   await h.ctx.close();
 }
 
@@ -308,7 +308,7 @@ console.log('\n════ G: Finger und Anzeige ════');
   for (let i = 1; i <= 12; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: von[0] + (ziel[0] - von[0]) * i / 12, y: von[1] + (ziel[1] - von[1]) * i / 12, id: 1 }] }); await h.P.waitForTimeout(30); }
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await h.P.waitForTimeout(900);
   const col = (await h.board()).nodes[0].data.items[0].col;
-  pruefe('G1 Finger: Ein Ticket halten und ziehen legt es in die nächste Spalte — das Board schwenkt nicht mit', col === 1 && (await sicht()) === v0, [col, v0, await sicht()]);
+  pruefe('G1 Finger: Ein Ticket halten und ziehen legt es in die nächste Spalte – das Board schwenkt nicht mit', col === 1 && (await sicht()) === v0, [col, v0, await sicht()]);
   await h.ctx.close();
 }
 {
@@ -326,7 +326,7 @@ console.log('\n════ G: Finger und Anzeige ════');
 }
 
 // ══ H ═══════════════════════════════════════════════════════════════
-console.log('\n════ H: WebDAV — zwei Geräte gleichzeitig ════');
+console.log('\n════ H: WebDAV – zwei Geräte gleichzeitig ════');
 {
   const dav = { body: null, n: 0, etag: null, mitIfMatch: true, log: [], nachLesen: null };
   const srv = http.createServer((q, r) => {
@@ -362,7 +362,7 @@ console.log('\n════ H: WebDAV — zwei Geräte gleichzeitig ════
     dav.nachLesen = fremd('Vom zweiten Gerät');
     await neueNotiz(h.P, 'Dritte Notiz');
     await warte(() => /Dritte Notiz/.test(dav.body) && /Vom zweiten Gerät/.test(dav.body), 25000);
-    pruefe('H2 schreibt ein zweites Gerät zwischen Lesen und Schreiben, wird der überholte Stand abgelehnt (412) — einmal', dav.log.filter((l) => l === 'PUT 412').length === 1, dav.log.join(' | '));
+    pruefe('H2 schreibt ein zweites Gerät zwischen Lesen und Schreiben, wird der überholte Stand abgelehnt (412) – einmal', dav.log.filter((l) => l === 'PUT 412').length === 1, dav.log.join(' | '));
     pruefe('H3 danach liegt auf dem Server BEIDES: die Karte des zweiten Geräts und die eigene neue', /Dritte Notiz/.test(dav.body) && /Vom zweiten Gerät/.test(dav.body) && /Zweite Notiz/.test(dav.body));
     pruefe('H4 … und die fremde Karte ist auch im eigenen Board angekommen', await warte(async () => /Vom zweiten Gerät/.test(await h.P.evaluate(() => localStorage.getItem('pixinotes-board')))));
     pruefe('H5 das erfolgreiche Schreiben trug die Bedingung (If-Match)', dav.log.some((l) => l === 'PUT 204 bedingt'), dav.log.join(' | '));
@@ -385,7 +385,7 @@ console.log('\n════ H: WebDAV — zwei Geräte gleichzeitig ════
 console.log('\n════ Texte ════');
 {
   const lies = (p) => readFileSync(path.join(__repo, p), 'utf8');
-  pruefe('T1 die Hilfe nennt M390 — deutsch und englisch', lies('src/components/HelpOverlay.tsx').includes('(M390)') && lies('src/components/HelpOverlayEn.tsx').includes('(M390)'));
+  pruefe('T1 die Hilfe nennt M390 – deutsch und englisch', lies('src/components/HelpOverlay.tsx').includes('(M390)') && lies('src/components/HelpOverlayEn.tsx').includes('(M390)'));
   pruefe('T2 die Audit-Liste führt die Logik-Funde mit Stand', /## 3 · Logik-Audit/.test(lies('docs/AUDIT.md')) && !/\| L\d+ \|[^\n]*⏳/.test(lies('docs/AUDIT.md')));
   pruefe('T3 keine Fehler in der Konsole', fehler.length === 0, fehler.slice(0, 3));
 }

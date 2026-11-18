@@ -67,7 +67,7 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
     const carried = (fresh.blocks ?? []).filter((b) => (b as { type?: string })?.type === 'checkListItem').length;
     patch({ entries: [...(m.entries ?? []), fresh], current: fresh.id });
     showToast(carried > 0
-      ? `Neue Sitzung angelegt — ${carried} offene(r) Punkt(e) aus der letzten Sitzung übernommen.`
+      ? `Neue Sitzung angelegt – ${carried} offene(r) Punkt(e) aus der letzten Sitzung übernommen.`
       : 'Neue Sitzung angelegt.');
   };
 
@@ -121,7 +121,7 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
     } else {
       patchEntry(entry.id, { blocks: [...((entry.blocks as unknown[]) ?? []), ...fresh] });
     }
-    showToast(`TOP „${name.trim()}" angelegt — gilt nur für diese Sitzung.`);
+    showToast(`TOP „${name.trim()}" angelegt – gilt nur für diese Sitzung.`);
   };
 
   /** TOPs der laufenden Sitzung: aus den Überschriften abgeleitet (eine Wahrheit) */
@@ -267,7 +267,7 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
 
           {entry && (
             <div className="minutes-decisions nodrag">
-              <b title="Beschlüsse sind Festlegungen, keine Aufgaben — sie bleiben dauerhaft nachschlagbar">
+              <b title="Beschlüsse sind Festlegungen, keine Aufgaben – sie bleiben dauerhaft nachschlagbar">
                 Beschlüsse dieser Sitzung
               </b>
               {(entry.decisions ?? []).map((d) => (

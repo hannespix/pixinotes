@@ -134,7 +134,7 @@ console.log('\n════ C: Tastatur ════');
   const text = await P.evaluate(() => document.querySelector('.react-flow__node[data-id="n1"] .bn-inline-content').textContent);
   await P.keyboard.press('Escape'); await P.waitForTimeout(400);
   const raus = await P.evaluate(() => !document.activeElement?.closest('[contenteditable="true"]'));
-  pruefe('C5 Enter setzt den Cursor ans Ende der Notiz — man schreibt sofort weiter', imText && text === 'Erste dazu', JSON.stringify({ imText, text }));
+  pruefe('C5 Enter setzt den Cursor ans Ende der Notiz – man schreibt sofort weiter', imText && text === 'Erste dazu', JSON.stringify({ imText, text }));
   pruefe('C6 Esc verlässt den Text, die Karte bleibt gewählt', raus && (await gewaehlt(P)).join() === 'n1', JSON.stringify(await gewaehlt(P)));
   // Strg+D
   const n0 = (await knoten(P)).length;

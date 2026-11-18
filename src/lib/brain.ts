@@ -88,7 +88,7 @@ async function embed(texts: string[], kind: 'doc' | 'query'): Promise<number[][]
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ model: modell, input: texts }),
     });
-    if (!res.ok) throw new Error(`Ollama-Embeddings: HTTP ${res.status} — Modell holen mit: ollama pull ${modell}`);
+    if (!res.ok) throw new Error(`Ollama-Embeddings: HTTP ${res.status} – Modell holen mit: ollama pull ${modell}`);
     const data = await res.json();
     return (data.embeddings as number[][]).map(normalize);
   }
@@ -389,9 +389,9 @@ export function buildTopicOverview(cluster: TopicCluster, label: string): { titl
     byBoard.set(c.boardName, [...(byBoard.get(c.boardName) ?? []), c.title || '(ohne Titel)']);
   }
   const lines: string[] = [
-    `## 🧠 Übersicht: ${label}`,
+    `## Übersicht: ${label}`,
     '',
-    `${cluster.cards.length} Karten aus ${byBoard.size} Board${byBoard.size > 1 ? 's' : ''} — automatisch nach Bedeutung gebündelt.`,
+    `${cluster.cards.length} Karten aus ${byBoard.size} Board${byBoard.size > 1 ? 's' : ''} – automatisch nach Bedeutung gebündelt.`,
     '',
   ];
   for (const [board, titles] of byBoard) {
@@ -399,7 +399,7 @@ export function buildTopicOverview(cluster: TopicCluster, label: string): { titl
     for (const t of titles) lines.push(`- [ ] ${t.slice(0, 90)}`);
     lines.push('');
   }
-  lines.push('_Erzeugt vom Gehirn-Puls — Karten ergänzen, umformulieren und verlinken wie in jeder anderen Notiz._');
+  lines.push('_Erzeugt vom Gehirn-Puls – Karten ergänzen, umformulieren und verlinken wie in jeder anderen Notiz._');
   return { title: `Übersicht: ${label}`, markdown: lines.join('\n') };
 }
 
@@ -420,7 +420,7 @@ export async function brainDigest(rejected: Set<string>): Promise<DigestLine[]> 
     const label = topicLabel(t);
     out.push({
       kind: 'thema',
-      text: `${label} — ${t.cards.length} Karten aus ${t.boards.length} Board${t.boards.length > 1 ? 's' : ''} (${t.boards.slice(0, 3).join(', ')})`,
+      text: `${label} – ${t.cards.length} Karten aus ${t.boards.length} Board${t.boards.length > 1 ? 's' : ''} (${t.boards.slice(0, 3).join(', ')})`,
       boardId: t.cards[0]?.boardId,
       cluster: t,
       label,
@@ -445,7 +445,7 @@ export async function brainDigest(rejected: Set<string>): Promise<DigestLine[]> 
   for (const s of sug) {
     out.push({
       kind: 'vorschlag',
-      text: `„${nameOf(s.a)}" und „${nameOf(s.b)}" passen zusammen (${Math.round(s.score * 100)} %) — noch nicht verknüpft`,
+      text: `„${nameOf(s.a)}" und „${nameOf(s.b)}" passen zusammen (${Math.round(s.score * 100)} %) – noch nicht verknüpft`,
       boardId: s.a,
     });
   }

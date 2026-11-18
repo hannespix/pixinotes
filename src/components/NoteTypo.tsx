@@ -138,7 +138,7 @@ function TypoButtons() {
         className="bn-button"
         label="A−"
         mainTooltip={kleiner === undefined
-          ? `Textgröße: ${jetzt} — kleiner geht nicht`
+          ? `Textgröße: ${jetzt} – kleiner geht nicht`
           : `Eine Stufe kleiner: ${jetzt} → ${stufenName(GROESSEN_TEXT, kleiner)}`}
         isDisabled={kleiner === undefined}
         onClick={() => kleiner !== undefined && setzeGroesse(kleiner)}
@@ -149,7 +149,7 @@ function TypoButtons() {
         className="bn-button"
         label="A+"
         mainTooltip={groesser === undefined
-          ? `Textgröße: ${jetzt} — größer geht nicht`
+          ? `Textgröße: ${jetzt} – größer geht nicht`
           : `Eine Stufe größer: ${jetzt} → ${stufenName(GROESSEN_TEXT, groesser)}`}
         isDisabled={groesser === undefined}
         onClick={() => groesser !== undefined && setzeGroesse(groesser)}
@@ -161,7 +161,7 @@ function TypoButtons() {
           <Components.FormattingToolbar.Button
             className="bn-button pn-typo-knopf"
             label="Aa"
-            mainTooltip={`Schrift & Größe des markierten Texts — jetzt: ${jetzt}${schrift ? `, ${stufenName(SCHRIFTEN, schrift)}` : ''}`}
+            mainTooltip={`Schrift & Größe des markierten Texts – jetzt: ${jetzt}${schrift ? `, ${stufenName(SCHRIFTEN, schrift)}` : ''}`}
             isSelected={!!groesse || !!schrift}
           >
             Aa
@@ -323,7 +323,7 @@ export function NoteSlashMenu({ dateienAufsBoard }: {
           onItemClick: () => { waehleDateien(dateienAufsBoard); },
         }] : []), {
           title: 'Tabelle',
-          subtext: 'Rechnet mit „=" — Summen, Prozente, Bedingungen',
+          subtext: 'Rechnet mit „=" – Summen, Prozente, Bedingungen',
           aliases: ['tabelle', 'table', 'rechnen', 'summe', 'excel', 'kalkulation'],
           group: 'Basisblöcke',
           icon: <ISigma size={16} />,

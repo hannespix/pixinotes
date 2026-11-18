@@ -73,21 +73,21 @@ async function friendly(e: unknown, cfg: WebdavConfig): Promise<Error> {
     // aufrufen — der Browser bricht ab, bevor CORS überhaupt zur Sprache kommt.
     if (location.protocol === 'https:' && /^http:\/\//i.test(cfg.url.trim())) {
       return new Error(
-        'Die Server-Adresse beginnt mit http:// — eine über https ausgelieferte Seite darf das nicht aufrufen '
+        'Die Server-Adresse beginnt mit http:// – eine über https ausgelieferte Seite darf das nicht aufrufen '
         + '(„Mixed Content"). Bitte https:// verwenden.',
       );
     }
     try {
       await fetch(fileUrl(cfg), { method: 'GET', mode: 'no-cors', cache: 'no-store' });
       return new Error(
-        `Der Server ist erreichbar, blockiert aber Browser-Zugriffe (fehlende CORS-Freigabe). Das liegt am Server, nicht am Gerät — ${apple() ? 'auf dem iPad ist es genauso wie auf jedem anderen Browser' : 'jeder Browser verhält sich hier gleich'}. `
+        `Der Server ist erreichbar, blockiert aber Browser-Zugriffe (fehlende CORS-Freigabe). Das liegt am Server, nicht am Gerät – ${apple() ? 'auf dem iPad ist es genauso wie auf jedem anderen Browser' : 'jeder Browser verhält sich hier gleich'}. `
         + 'Nötig ist eine einmalige Freigabe durch die IT (bei Nextcloud z. B. die App „WebAppPassword" mit dieser PixiNotes-Adresse als erlaubte Herkunft). '
-        + 'In ⚙ → Daten → Synchronisation steht ein fertiger Text für die IT zum Kopieren. '
+        + 'In Einstellungen → Daten → Synchronisation steht ein fertiger Text für die IT zum Kopieren. '
         + `Ohne Freigabe funktioniert ${apple() ? 'auf dem iPad die Synchronisation über die Dateien-App' : 'der Sync-Ordner oder der Datei-Export'}.`,
       );
     } catch {
       return new Error(
-        'Server nicht erreichbar — Adresse prüfen (Tippfehler? VPN/Firewall? HTTPS?). '
+        'Server nicht erreichbar – Adresse prüfen (Tippfehler? VPN/Firewall? HTTPS?). '
         + 'Die Ordner-URL sieht bei Nextcloud so aus: https://cloud.example.de/remote.php/dav/files/BENUTZERNAME/PixiNotes',
       );
     }
@@ -203,7 +203,7 @@ export async function webdavRead(cfg: WebdavConfig): Promise<SyncPayload | null>
   const res = await davFetch(cfg, { method: 'GET', cache: 'no-store' });
   davEtag = res.ok ? etagAus(res) : null;
   if (res.status === 404) return null;
-  if (res.status === 401 || res.status === 403) throw new Error('Anmeldung abgelehnt — Benutzername/App-Passwort prüfen.');
+  if (res.status === 401 || res.status === 403) throw new Error('Anmeldung abgelehnt – Benutzername/App-Passwort prüfen.');
   if (!res.ok) throw new Error(`WebDAV: HTTP ${res.status}`);
   const p = (await res.json()) as SyncPayload;
   if (p?.app !== 'pixinotes' || !Array.isArray(p.boards) || p.boards.length === 0 || !Array.isArray(p.spaces)) return null;
@@ -232,7 +232,7 @@ export async function webdavWrite(cfg: WebdavConfig, bedingt = false): Promise<s
   } else {
     res = await ohne();
   }
-  if (res.status === 401 || res.status === 403) throw new Error('Anmeldung abgelehnt — Benutzername/App-Passwort prüfen.');
+  if (res.status === 401 || res.status === 403) throw new Error('Anmeldung abgelehnt – Benutzername/App-Passwort prüfen.');
   if (!res.ok && res.status !== 201 && res.status !== 204) throw new Error(`WebDAV: HTTP ${res.status}`);
   davEtag = etagAus(res);
   localStorage.setItem(STAMP_KEY, payload.savedAt);
@@ -313,13 +313,13 @@ export async function checkWebdavRemote(): Promise<void> {
   }
   const r = await fremdStandEinarbeiten(remote, webdavWeg(cfg));
   if (r === 'uebernommen') {
-    useBoard.getState().showToast(`☁️ Neuerer Stand vom WebDAV-Server übernommen (${new Date(remote.savedAt).toLocaleString('de-DE')}).`);
+    useBoard.getState().showToast(`Neuerer Stand vom WebDAV-Server übernommen (${new Date(remote.savedAt).toLocaleString('de-DE')}).`);
     staleHintShown = false;
   } else if (r === 'konflikt') {
     emitSyncStatus('webdav', 'conflict');
     if (!staleHintShown) {
       staleHintShown = true;
-      useBoard.getState().showToast('☁️ Server und lokaler Stand weichen ab, nichts wurde überschrieben. Unter ⚙ → Daten → Synchronisation wählen.');
+      useBoard.getState().showToast('Server und lokaler Stand weichen ab, nichts überschrieben. Wählen: Einstellungen → Daten.');
     }
   } else if (r === 'fehler') {
     emitSyncStatus('webdav', 'error');
@@ -343,7 +343,7 @@ async function autoPush(versuch = 0): Promise<void> {
         emitSyncStatus('webdav', 'conflict');
         if (!conflictWarned) {
           conflictWarned = true;
-          useBoard.getState().showToast('⚠️ Auf dem WebDAV-Server liegt ein anderer Stand. Unter ⚙ → Daten → Synchronisation laden oder überschreiben.');
+          useBoard.getState().showToast('Der WebDAV-Server hat einen anderen Stand. Laden oder überschreiben: Einstellungen → Daten.');
         }
         return;
       }

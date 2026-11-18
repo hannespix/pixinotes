@@ -53,7 +53,7 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal freigabe-dialog link-dialog" role="dialog" aria-modal="true" aria-label="Board per Link teilen" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>🔗 Kopie per Link teilen</h2>
+          <h2>Kopie per Link teilen</h2>
           <button className="modal-x" onClick={onClose} aria-label="Schließen"><IX size={16} /></button>
         </div>
         <div className="modal-body">
@@ -63,19 +63,19 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
                 {fehlt ? (
                   <p className="modal-hint" data-taste="link-fehlt">
                     Kurze Links (samt Anhängen) sind auf dem PixiNotes-Server noch nicht eingerichtet. Bis dahin geht es so:
-                    Das Board steckt im Link selbst — ohne Anhänge, und nur, solange es klein genug ist.
+                    Das Board steckt im Link selbst – ohne Anhänge, und nur, solange es klein genug ist.
                   </p>
                 ) : (
                   <>
                     <p className="modal-hint">
-                      Ein <b>kurzer Link</b>, den jeder direkt öffnen kann — samt PDFs und anderen Anhängen — braucht das PixiNotes-Konto
-                      (⚙ → Daten → Konto, Anmeldung mit E-Mail). Nur du brauchst es; wer den Link bekommt, nicht.
+                      Ein <b>kurzer Link</b>, den jeder direkt öffnen kann – samt PDFs und anderen Anhängen – braucht das PixiNotes-Konto
+                      (Einstellungen → Daten → Konto, Anmeldung mit E-Mail). Nur du brauchst es; wer den Link bekommt, nicht.
                     </p>
                     <div className="modal-buttons">
                       <button onClick={() => { onClose(); useBoard.getState().setSettingsOpen(true); }} data-taste="link-konto">Konto einrichten …</button>
                     </div>
                     <div className="modal-note">
-                      Ohne Konto geht es so: Das Board steckt dann im Link selbst — ohne Anhänge, und nur, solange es klein genug ist.
+                      Ohne Konto geht es so: Das Board steckt dann im Link selbst – ohne Anhänge, und nur, solange es klein genug ist.
                     </div>
                   </>
                 )}
@@ -88,7 +88,7 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
               <div className="modal-note">Lade …</div>
             ) : zeile ? (
               <>
-                <p className="modal-hint">Wer diesen Link öffnet, bekommt „<span translate="no">{board.name}</span>" direkt als eigenes Board — ohne Konto, samt Anhängen.</p>
+                <p className="modal-hint">Wer diesen Link öffnet, bekommt „<span translate="no">{board.name}</span>" direkt als eigenes Board – ohne Konto, samt Anhängen.</p>
                 <div className="link-zeile">
                   <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label="Link" data-taste="link-adresse" />
                   <button onClick={() => void kopieren()} data-taste="link-kopieren">Kopieren</button>
@@ -106,7 +106,7 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
             ) : (
               <>
                 <p className="modal-hint">
-                  Einen Link zu „<span translate="no">{board.name}</span>" anlegen: Wer ihn öffnet, bekommt das Board direkt als eigenes Board — ohne Konto, samt PDFs und anderen Anhängen.
+                  Einen Link zu „<span translate="no">{board.name}</span>" anlegen: Wer ihn öffnet, bekommt das Board direkt als eigenes Board – ohne Konto, samt PDFs und anderen Anhängen.
                 </p>
                 <div className="modal-buttons">
                   <button disabled={!!busy} onClick={erstellen} data-taste="link-erstellen">{busy || 'Link erstellen und kopieren'}</button>
@@ -115,11 +115,11 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
             )}
             {mitKonto && (
               <div className="modal-note">
-                Jeder, der den Link kennt, kann diese Fassung lesen — sie liegt dafür auf dem PixiNotes-Server, bis du den Link löschst.
+                Jeder, der den Link kennt, kann diese Fassung lesen – sie liegt dafür auf dem PixiNotes-Server, bis du den Link löschst.
                 Empfänger arbeiten an ihrer eigenen Kopie. Zum gemeinsamen Arbeiten in Echtzeit (oder live mitlesen lassen): Board-Menü → <b>Gemeinsam bearbeiten</b>.
               </div>
             )}
-            {fehler && <div className="modal-error" role="alert">⚠️ {fehler}</div>}
+            {fehler && <div className="modal-error" role="alert">{fehler}</div>}
           </section>
         </div>
       </div>

@@ -110,7 +110,7 @@ export function storageShim(id: string, initial: Record<string, string>): string
   }
   try{Object.defineProperty(window,'localStorage',{value:makeStore(mem,true),configurable:true});}catch(e){}
   try{Object.defineProperty(window,'sessionStorage',{value:makeStore({},false),configurable:true});}catch(e){}
-  /* M371: Mitrollen. Das Tool meldet, wohin gerollt wurde (als Anteil des Rollwegs — ein Telefon ist anders
+  /* M371: Mitrollen. Das Tool meldet, wohin gerollt wurde (als Anteil des Rollwegs – ein Telefon ist anders
      hoch als ein Beamer), und rollt dorthin, wohin PixiNotes es schickt. Mehr kann die Brücke nicht: kein
      Zugriff auf Inhalte, nur Rollstände; welches Element rollt, steht als Weg von <body> aus dabei. */
   var rollAus=0,rollT=null,rollOffen={},rollZiel={},rollLauf=false;
@@ -155,9 +155,9 @@ export function storageShim(id: string, initial: Record<string, string>): string
     rollZiel[String(d.roll.p||'')]={x:x,y:y};rollAus=Date.now()+300;
     if(!rollLauf){rollLauf=true;requestAnimationFrame(rollSchritt);}
   });
-  /* M384: Eingaben spiegeln. Das Tool meldet, was der Mensch davor eingibt — Feldwerte, Klicks, Enter, das
-     Abschicken eines Formulars — und stellt nach, was PixiNotes ihm schickt (beim Vorführen: die Eingaben des
-     Vorführenden). Nur echte Eingaben werden gemeldet (isTrusted), Nachgestelltes nicht — so entsteht kein Echo.
+  /* M384: Eingaben spiegeln. Das Tool meldet, was der Mensch davor eingibt – Feldwerte, Klicks, Enter, das
+     Abschicken eines Formulars – und stellt nach, was PixiNotes ihm schickt (beim Vorführen: die Eingaben des
+     Vorführenden). Nur echte Eingaben werden gemeldet (isTrusted), Nachgestelltes nicht – so entsteht kein Echo.
      Verweise, Datei- und Passwortfelder bleiben außen vor; in frei beschreibbare Bereiche kommt nur Text. */
   var submitAus=0;
   function ort(el){
@@ -196,7 +196,7 @@ export function storageShim(id: string, initial: Record<string, string>): string
     var p=ort(el);if(!p)return;
     var r=el.getBoundingClientRect();
     einHinaus({p:p,a:'click',x:r.width>0?Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)):0.5,y:r.height>0?Math.min(1,Math.max(0,(e.clientY-r.top)/r.height)):0.5});
-    /* Ein Klick auf den Abschicken-Knopf schickt das Formular ab — bei den anderen tut das der nachgestellte
+    /* Ein Klick auf den Abschicken-Knopf schickt das Formular ab – bei den anderen tut das der nachgestellte
        Klick. Das Abschicken selbst noch einmal zu melden, schickte dort zweimal ab. */
     var k=el.closest('button,input[type=submit],input[type=image]');
     if(k&&k.form&&(k.tagName==='INPUT'||!k.type||k.type==='submit'))submitAus=Date.now()+150;
@@ -216,7 +216,7 @@ export function storageShim(id: string, initial: Record<string, string>): string
     if(w.m){if(el.tagName!=='SELECT')return false;for(var i=0;i<el.options.length;i++)el.options[i].selected=w.m.indexOf(i)>=0;return true;}
     if(typeof w.t==='string'){if(istFeld(el)||!schreibbar(el))return false;if(el.textContent!==w.t)el.textContent=w.t;return true;}
     if(typeof w.v!=='string'||!istFeld(el)||/^(checkbox|radio)$/i.test(el.type||''))return false;
-    /* über den Setzer des Elementtyps — Tools, die ihre Felder selbst verwalten (React u. a.), merken es sonst nicht */
+    /* über den Setzer des Elementtyps – Tools, die ihre Felder selbst verwalten (React u. a.), merken es sonst nicht */
     var pr=el.tagName==='TEXTAREA'?window.HTMLTextAreaElement:el.tagName==='SELECT'?window.HTMLSelectElement:window.HTMLInputElement;
     var d=pr&&Object.getOwnPropertyDescriptor(pr.prototype,'value');
     try{if(d&&d.set)d.set.call(el,w.v);else el.value=w.v;}catch(_){el.value=w.v;}

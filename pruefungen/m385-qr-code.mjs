@@ -609,7 +609,7 @@ await warteBis(A.P, async () => (await A.P.locator('[data-taste="qr-code"] svg')
 pruefe('B2 der Dialog schließt sich, die Einblendung steht groß in der Mitte', (await A.P.locator('.freigabe-dialog').count()) === 0 && (await form(A.P)) === 'gross');
 {
   const g = await qrLesen(A.P);
-  pruefe(`B3 der Code lässt sich lesen (${g?.breite} Bildpunkte breit) — und ist genau der Einladungslink`, g?.text === adresse, `${g?.text} / ${adresse}`);
+  pruefe(`B3 der Code lässt sich lesen (${g?.breite} Bildpunkte breit) – und ist genau der Einladungslink`, g?.text === adresse, `${g?.text} / ${adresse}`);
   const t = await blende(A.P).textContent();
   pruefe('B4 dabei steht, worum es geht: „Mach mit!", der Name des Boards, „sofort im Board"', /Mach mit!/.test(t) && /Planung/.test(t) && /sofort im Board/.test(t) && (await A.P.locator('[data-taste="qr-konto"]').count()) === 0, t.slice(0, 200));
   pruefe('B5 die Adresse steht zum Abtippen darunter; noch ist niemand sonst da', (await A.P.locator('[data-taste="qr-adresse"]').textContent()) === adresse && /Noch niemand/.test(await A.P.locator('[data-taste="qr-dabei"]').textContent()));
@@ -651,7 +651,7 @@ await A.P.locator('[data-taste="qr-ecke"]').click(); await A.P.waitForTimeout(40
   await A.P.locator('.dock button[aria-label="Mehr"]').click(); await A.P.waitForTimeout(250);
   await A.P.locator('.dock-menu button', { hasText: 'Präsentieren' }).first().click(); await A.P.waitForTimeout(800);
   const oben = await A.P.evaluate(() => { const b = document.querySelector('[data-taste="qr-blende"]'); const r = b.getBoundingClientRect(); const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !!document.querySelector('.presenter') && !!el?.closest('[data-taste="qr-blende"]'); });
-  pruefe('D7 über der Folien-Präsentation bleibt die Ecke stehen — und lesbar', oben && (await qrLesen(A.P))?.text === adresse);
+  pruefe('D7 über der Folien-Präsentation bleibt die Ecke stehen – und lesbar', oben && (await qrLesen(A.P))?.text === adresse);
   await A.P.keyboard.press('Escape'); await A.P.waitForTimeout(500);
   pruefe('D8 Esc beendet die Präsentation, nicht den Code', (await A.P.locator('.presenter').count()) === 0 && (await form(A.P)) === 'ecke');
   const r4 = await kasten(A.P);
@@ -695,7 +695,7 @@ await warteBis(H.P, async () => (await H.P.locator('[data-taste="qr-code"] svg')
   const farben = await H.P.evaluate(() => { const s = document.querySelector('[data-taste="qr-code"] svg'); return [getComputedStyle(document.body).colorScheme, s.querySelector('rect').getAttribute('fill'), s.querySelector('path').getAttribute('fill'), getComputedStyle(document.querySelector('.qr-karte')).backgroundColor].join(' '); });
   pruefe('F3 im dunklen Farbschema bleibt der Code Schwarz auf Weiß', /#fff #000/.test(farben), farben);
   const t = await blende(H.P).textContent();
-  pruefe('F4 die englische Oberfläche: „Join in!", „Copy link", „To the corner" — kein deutscher Rest', /Join in!/.test(t) && /Copy link/.test(t) && /To the corner/.test(t) && /3 here/.test(t) && !/Mach mit|kopieren|Ecke|dabei|scannen/i.test(t), t.slice(0, 260));
+  pruefe('F4 die englische Oberfläche: „Join in!", „Copy link", „To the corner" – kein deutscher Rest', /Join in!/.test(t) && /Copy link/.test(t) && /To the corner/.test(t) && /3 here/.test(t) && !/Mach mit|kopieren|Ecke|dabei|scannen/i.test(t), t.slice(0, 260));
   await H.P.screenshot({ path: path.join(SD, 'm385-gast-dunkel-en.png') });
 }
 // M385: Alle drei bringen von sich aus dieselbe Farbe mit — in der Leiste hat trotzdem jeder seine eigene
@@ -746,12 +746,12 @@ await gruppeZu(A.P);
 // ══ H ═══════════════════════════════════════════════════════════════
 console.log('\n════ H: kein fremder Dienst, Paket, Texte ════');
 {
-  pruefe('H1 der Code entsteht im Browser — keine Anfrage an einen fremden Dienst', fremd.length === 0, fremd.slice(0, 5).join(' '));
+  pruefe('H1 der Code entsteht im Browser – keine Anfrage an einen fremden Dienst', fremd.length === 0, fremd.slice(0, 5).join(' '));
   const dateien = readdirSync(path.join(DIST, 'assets'));
   const haupt = dateien.filter((f) => /^index-.*\.js$/.test(f)).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8')).join('');
   pruefe('H2 Einblendung und QR-Bibliothek reisen in einem eigenen Paket, nicht mit dem Start', dateien.some((f) => /^QrBlende-.*\.js$/.test(f)) && dateien.some((f) => /^qrcode-.*\.js$/.test(f) && /code length overflow/.test(readFileSync(path.join(DIST, 'assets', f), 'utf8'))) && !/qr-karte/.test(haupt) && !/code length overflow/.test(haupt), dateien.filter((f) => /qr/i.test(f)).join());
   const hilfe = dateien.filter((f) => /^HelpOverlay/.test(f)).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8'));
-  pruefe('H3 „Was ist neu" nennt es — deutsch und englisch', hilfe.filter((t) => t.includes('(M385)')).length === 2, `${hilfe.length}`);
+  pruefe('H3 „Was ist neu" nennt es – deutsch und englisch', hilfe.filter((t) => t.includes('(M385)')).length === 2, `${hilfe.length}`);
   pruefe('H4 keine Fehler in den Fenstern', true);
 }
 

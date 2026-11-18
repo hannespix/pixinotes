@@ -113,7 +113,7 @@ console.log('\n════ A: Ein Tipp fährt die Kamera auf die Karte ══�
   await P.waitForTimeout(900);
   const l = await lage(P, 'n1');
   pruefe('A1 Fokus an, Kopf- und Blätterleiste stehen', l.fokus && l.kopf && l.nav, JSON.stringify(l));
-  pruefe('A2 die Karte bleibt im Flow — die Fläche ist verschoben und vergrößert, nicht transform:none', /scale\(/.test(l.transform) && !/scale\(1\)/.test(l.transform) && l.pnFocused, l.transform);
+  pruefe('A2 die Karte bleibt im Flow – die Fläche ist verschoben und vergrößert, nicht transform:none', /scale\(/.test(l.transform) && !/scale\(1\)/.test(l.transform) && l.pnFocused, l.transform);
   pruefe('A3 die Karte füllt den Schirm (≥ 70 % Breite, im Bild, mittig)', l.breite >= l.fenster * 0.7 && l.links >= 0 && l.links + l.breite <= l.fenster && Math.abs(l.links - (l.fenster - l.links - l.breite)) <= 3, JSON.stringify(l));
   pruefe('A4 die Nachbarkarte tritt zurück (gedimmt), die Zeichenebene bleibt sichtbar', parseFloat(l.nachbarOpacity) < 0.5 && l.zeichenebene !== 'none', JSON.stringify({ o: l.nachbarOpacity, z: l.zeichenebene }));
   pruefe('A5 Zoom-Stufe für Text am Finger > 1 (hochskaliert)', parseFloat(l.zoom) > 1.2, l.zoom);
@@ -125,7 +125,7 @@ console.log('\n════ A: Ein Tipp fährt die Kamera auf die Karte ══�
   await zug(P, welle(k.x + 40, k.y + k.height - 40), { id: 21 });
   await P.waitForTimeout(500);
   const s1 = await striche(P);
-  pruefe('B1 ein Stift-Strich entsteht im Fokus — geankert an der Karte', s1.length === 1 && s1[0].anchor === 'n1', JSON.stringify(s1.map((s) => [s.tool, s.anchor, s.points.length])));
+  pruefe('B1 ein Stift-Strich entsteht im Fokus – geankert an der Karte', s1.length === 1 && s1[0].anchor === 'n1', JSON.stringify(s1.map((s) => [s.tool, s.anchor, s.points.length])));
   pruefe('B2 der Fokus bleibt dabei offen', (await lage(P, 'n1')).fokus);
 
   // ══ C: Pinch bleibt, Tipp daneben schließt ═══════════════════════
@@ -148,14 +148,14 @@ console.log('\n════ A: Ein Tipp fährt die Kamera auf die Karte ══�
   await P.touchscreen.tap(g.x + g.width / 2, g.y + g.height - 10);
   await P.waitForTimeout(1000);
   const lg = await lage(P, 'g1');
-  pruefe('D1 Zoom 1 — und die Karte füllt die Schirmbreite', lg.fokus && lg.zoom === '1' && lg.breite >= lg.fenster - 10 && lg.links >= 0, JSON.stringify(lg));
+  pruefe('D1 Zoom 1 – und die Karte füllt die Schirmbreite', lg.fokus && lg.zoom === '1' && lg.breite >= lg.fenster - 10 && lg.links >= 0, JSON.stringify(lg));
   await P.keyboard.press('Escape'); await P.waitForTimeout(700);
   pruefe('D2 Esc schließt', !(await lage(P, 'g1')).fokus);
   await ctx.close();
 }
 
 // ══ E: PC ═══════════════════════════════════════════════════════════
-console.log('\n════ E: Mit der Maus — Doppelklick öffnet, Esc schließt ════');
+console.log('\n════ E: Mit der Maus – Doppelklick öffnet, Esc schließt ════');
 {
   // Am PC mit „Mit einem Klick öffnen" (⚙ → Darstellung), wie in m265 — der Doppelklick in einer Notiz markiert Wörter
   const { ctx, P } = await seite({ breite: 1440, hoehe: 900, touch: false, stift: false, einKlick: true });
@@ -175,8 +175,8 @@ console.log('\n════ E: Mit der Maus — Doppelklick öffnet, Esc schlie�
 }
 
 // ══ F: Lange Notiz scrollen (M334) ══════════════════════════════════
-console.log('\n════ F: Lange Notiz im Fokus — Rad, Finger und Cursor rollen die Kamera ════');
-const lang = { id: 'n3', type: 'note', width: 300, position: { x: 900, y: 0 }, data: { color: 'white', blocks: Array.from({ length: 70 }, (_, i) => ({ type: 'paragraph', content: `Absatz ${i + 1} — genug Text, damit die Notiz weit über den Schirm hinausragt.` })) } };
+console.log('\n════ F: Lange Notiz im Fokus – Rad, Finger und Cursor rollen die Kamera ════');
+const lang = { id: 'n3', type: 'note', width: 300, position: { x: 900, y: 0 }, data: { color: 'white', blocks: Array.from({ length: 70 }, (_, i) => ({ type: 'paragraph', content: `Absatz ${i + 1} – genug Text, damit die Notiz weit über den Schirm hinausragt.` })) } };
 const letzterBlock = (P) => P.evaluate(() => {
   const bl = [...document.querySelectorAll('.react-flow__node.pn-focused .bn-block-content')];
   const r = bl[bl.length - 1]?.getBoundingClientRect();

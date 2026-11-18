@@ -78,7 +78,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
       setMail('');
       await laden();
       void kontoKanaele();   // M364: Live-Kanal für dieses Board
-      showToast(`✅ „${board.name}" ist für ${mail.trim()} ${rolle === 'lesen' ? 'zum Lesen ' : ''}freigegeben — sobald sich die Person mit dieser E-Mail anmeldet, sieht sie das Board.`, false, 8000);
+      showToast(`„${board.name}" ist für ${mail.trim()} ${rolle === 'lesen' ? 'zum Lesen ' : ''}freigegeben – sobald sich die Person mit dieser E-Mail anmeldet, sieht sie das Board.`, false, 8000);
     } catch (e) { setFehler((e as Error).message); } finally { setBusy(false); }
   };
   const entfernen = async (f: Freigabe) => {
@@ -114,7 +114,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
     try {
       const e = await einladungSetzen(boardId, linkRolle, an);
       setLink(e); setOhneKonto(!!e.ohne_konto);
-      showToast(an ? 'Wer den Link öffnet, ist jetzt sofort dabei — auch ohne Konto.' : 'Der Link verlangt jetzt wieder ein PixiNotes-Konto. Gäste ohne Konto sind draußen.', false, 7000);
+      showToast(an ? 'Wer den Link öffnet, ist jetzt sofort dabei – auch ohne Konto.' : 'Der Link verlangt jetzt wieder ein PixiNotes-Konto. Gäste ohne Konto sind draußen.', false, 7000);
     } catch (e) { setFehler((e as Error).message); } finally { setBusy(false); }
   };
   // M365: Rechte der Gäste umstellen — wirkt sofort bei allen, die über den Link dabei sind
@@ -129,8 +129,8 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
     } catch (e) { setFehler((e as Error).message); } finally { setBusy(false); }
   };
   const zurueckZurSicherung = async () => {
-    if (!window.confirm('Den Stand von vor der Gruppenarbeit wiederherstellen? Alles, was seitdem dazukam oder geändert wurde, fällt weg — für alle. Mit Strg+Z holst du es zurück.')) return;
-    if (await sicherungZurueck(boardId)) { showToast('🛟 Stand von vor der Gruppenarbeit wiederhergestellt — Strg+Z nimmt das zurück.', false, 8000); onClose(); }
+    if (!window.confirm('Den Stand von vor der Gruppenarbeit wiederherstellen? Alles, was seitdem dazukam oder geändert wurde, fällt weg – für alle. Mit Strg+Z holst du es zurück.')) return;
+    if (await sicherungZurueck(boardId)) { showToast('Stand von vor der Gruppenarbeit wiederhergestellt – Strg+Z nimmt das zurück.', false, 8000); onClose(); }
     else setFehler('Die Sicherung ließ sich nicht laden.');
   };
   const rechtWahl = (
@@ -156,16 +156,16 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
   const verlassen = async () => {
     if (busy) return;
     if (!window.confirm(`${perLink ? 'Das gemeinsame Board' : 'Die Freigabe von'} „${board.name}" verlassen? Das Board bleibt als eigene Kopie hier, Änderungen der anderen kommen nicht mehr an.`)) return;
-    if (perLink) { gastVerlassen(boardId); showToast('Verlassen — das Board ist jetzt eine eigene Kopie.'); onClose(); return; }
+    if (perLink) { gastVerlassen(boardId); showToast('Verlassen – das Board ist jetzt eine eigene Kopie.'); onClose(); return; }
     setBusy(true); setFehler('');
-    try { await freigabeVerlassen(boardId); showToast('Freigabe verlassen — das Board ist jetzt eine eigene Kopie.'); onClose(); } catch (e) { setFehler((e as Error).message); } finally { setBusy(false); }
+    try { await freigabeVerlassen(boardId); showToast('Freigabe verlassen – das Board ist jetzt eine eigene Kopie.'); onClose(); } catch (e) { setFehler((e as Error).message); } finally { setBusy(false); }
   };
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal freigabe-dialog" role="dialog" aria-modal="true" aria-label="Board freigeben" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>👥 {gast ? 'Geteiltes Board' : 'Gemeinsam bearbeiten'}</h2>
+          <h2>{gast ? 'Geteiltes Board' : 'Gemeinsam bearbeiten'}</h2>
           <button className="modal-x" onClick={onClose} aria-label="Schließen"><IX size={16} /></button>
         </div>
         <div className="modal-body">
@@ -173,12 +173,12 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
             {gast ? (
               <>
                 {perLink ? (
-                  <p className="modal-hint" data-taste="freigabe-per-link">Du bist per <b>Einladungslink</b> in „<span translate="no">{board.name}</span>" — ohne Konto. {nurLesen
+                  <p className="modal-hint" data-taste="freigabe-per-link">Du bist per <b>Einladungslink</b> in „<span translate="no">{board.name}</span>" – ohne Konto. {nurLesen
                     ? <>Du liest live mit, kannst aber nichts ändern.</>
-                    : <>Alle arbeiten live im selben Board. Eine Karte gehört dem, der sie gerade bearbeitet — die anderen lesen mit und kommen dran, sobald sie frei ist.</>} {gruppeVon(boardId)?.recht === 'eigenes' ? 'Der Besitzer hat festgelegt: Ändern und löschen kannst du nur deine eigenen Karten — neue anlegen geht immer. '
+                    : <>Alle arbeiten live im selben Board. Eine Karte gehört dem, der sie gerade bearbeitet – die anderen lesen mit und kommen dran, sobald sie frei ist.</>} {gruppeVon(boardId)?.recht === 'eigenes' ? 'Der Besitzer hat festgelegt: Ändern und löschen kannst du nur deine eigenen Karten – neue anlegen geht immer. '
                     : gruppeVon(boardId)?.recht === 'eigenes-loeschen' ? 'Der Besitzer hat festgelegt: Löschen kannst du nur, was du selbst angelegt hast. ' : ''}Strg+Z nimmt nur deine eigenen Schritte zurück. Deinen Namen änderst du oben rechts am ersten Kürzel.</p>
                 ) : nurLesen ? (
-                  <p className="modal-hint" data-taste="freigabe-nur-lesen">„<span translate="no">{board.name}</span>" gehört <b translate={board.geteiltVonName ? 'no' : undefined}>{board.geteiltVonName ?? 'einem anderen Konto'}</b> und ist für dich <b>zum Lesen</b> freigegeben. Du siehst Änderungen live, kannst aber selbst nichts ändern. Für eigene Notizen: Board-Menü → <b>Duplizieren</b> — die Kopie gehört dir.</p>
+                  <p className="modal-hint" data-taste="freigabe-nur-lesen">„<span translate="no">{board.name}</span>" gehört <b translate={board.geteiltVonName ? 'no' : undefined}>{board.geteiltVonName ?? 'einem anderen Konto'}</b> und ist für dich <b>zum Lesen</b> freigegeben. Du siehst Änderungen live, kannst aber selbst nichts ändern. Für eigene Notizen: Board-Menü → <b>Duplizieren</b> – die Kopie gehört dir.</p>
                 ) : (
                   <p className="modal-hint">„<span translate="no">{board.name}</span>" gehört <b translate={board.geteiltVonName ? 'no' : undefined}>{board.geteiltVonName ?? 'einem anderen Konto'}</b> und ist für dich freigegeben. Ihr arbeitet live auf demselben Stand; gleichzeitige Änderungen werden zusammengeführt.</p>
                 )}
@@ -190,7 +190,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
               <>
                 {/* M391: Ohne Konto war der Menüpunkt unsichtbar — jetzt sagt der Dialog, was fehlt, und führt hin */}
                 <p className="modal-hint" data-taste="freigabe-ohne-konto">
-                  <b translate="no">{board.name}</b>: Andere öffnen einen Link und arbeiten live mit — ohne Konto. Nur du brauchst ein kostenloses PixiNotes-Konto, damit das Board einen gemeinsamen Ort hat.
+                  <b translate="no">{board.name}</b>: Andere öffnen einen Link und arbeiten live mit – ohne Konto. Nur du brauchst ein kostenloses PixiNotes-Konto, damit das Board einen gemeinsamen Ort hat.
                   {andererWeg && <> Dein Abgleich über Google oder Microsoft bleibt davon unberührt, kann aber nicht live teilen.</>}
                 </p>
                 <div className="modal-buttons">
@@ -209,13 +209,13 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                           <input readOnly value={einladungUrl(link.token)} onFocus={(e) => e.currentTarget.select()} aria-label="Einladungslink" data-taste="einladung-adresse" />
                           <button className="primaer" onClick={() => void kopieren(einladungUrl(link.token))} data-taste="einladung-kopieren">Kopieren</button>
                           {/* M385: groß zum Scannen — für alle im Raum */}
-                          <button data-taste="einladung-qr" title="Den Link als QR-Code einblenden — zum Scannen vom Beamer oder Bildschirm"
+                          <button data-taste="einladung-qr" title="Den Link als QR-Code einblenden – zum Scannen vom Beamer oder Bildschirm"
                             onClick={() => { window.dispatchEvent(new CustomEvent(QR_EREIGNIS, { detail: { boardId, url: einladungUrl(link.token), ohneKonto } })); onClose(); }}>QR-Code</button>
                           {typeof navigator.share === 'function' && <button onClick={() => void linkSenden(einladungUrl(link.token))}>Senden …</button>}
                         </div>
                         {/* Ein Satz sagt, was der Link gerade kann — die Schalter dazu stehen unter „Optionen" */}
                         <p className="modal-hint freigabe-satz" data-taste="einladung-satz">
-                          Wer den Link öffnet, <b>{ohneKonto ? 'ist sofort dabei — ohne Konto' : 'meldet sich mit seinem PixiNotes-Konto an'}</b> {linkRolle === 'lesen' ? 'und liest mit.'
+                          Wer den Link öffnet, <b>{ohneKonto ? 'ist sofort dabei – ohne Konto' : 'meldet sich mit seinem PixiNotes-Konto an'}</b> {linkRolle === 'lesen' ? 'und liest mit.'
                             : recht === 'eigenes' ? 'und arbeitet live mit (ändert nur eigene Karten).'
                             : recht === 'eigenes-loeschen' ? 'und arbeitet live mit (löscht nur Eigenes).' : 'und arbeitet live mit.'}
                         </p>
@@ -223,7 +223,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                     ) : (
                       <>
                         <p className="modal-hint freigabe-satz">
-                          <b translate="no">{board.name}</b>: Link öffnen, Namen sagen, mitmachen — alle sehen Änderungen live.
+                          <b translate="no">{board.name}</b>: Link öffnen, Namen sagen, mitmachen – alle sehen Änderungen live.
                         </p>
                         <div className="modal-buttons">
                           <button className="primaer" disabled={busy} onClick={() => void linkAnlegen(linkRolle, true)} data-taste="einladung-anlegen">{busy ? '…' : 'Einladungslink erstellen'}</button>
@@ -240,11 +240,11 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                         {rechtWahl}
                         <label className="freigabe-schalter">
                           <input type="checkbox" checked={ohneKonto} disabled={busy} onChange={(e) => void ohneKontoSetzen(e.target.checked)} data-taste="einladung-ohne-konto" />
-                          <span><b>Mitmachen ohne Konto</b> — ausgeschaltet braucht jeder Gast ein PixiNotes-Konto</span>
+                          <span><b>Mitmachen ohne Konto</b> – ausgeschaltet braucht jeder Gast ein PixiNotes-Konto</span>
                         </label>
                         {link && sicherung && (
                           <div className="freigabe-zeile sicherung" data-taste="sicherung">
-                            <span>🛟 Stand von vor der Gruppenarbeit ({new Date(sicherung).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })})</span>
+                            <span>Stand von vor der Gruppenarbeit ({new Date(sicherung).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })})</span>
                             <button disabled={busy} onClick={() => void zurueckZurSicherung()} data-taste="sicherung-zurueck">Wiederherstellen</button>
                           </div>
                         )}
@@ -287,7 +287,7 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                 </details>
               </>
             )}
-            {fehler && <div className="modal-error" role="alert">⚠️ {fehler}</div>}
+            {fehler && <div className="modal-error" role="alert">{fehler}</div>}
           </section>
         </div>
       </div>

@@ -36,7 +36,7 @@ export interface Kuerzel {
 
 export const KUERZEL: Kuerzel[] = [
   // ── Überall erreichbar ──────────────────────────────────────────────────
-  { id: 'suche', taste: 'Strg+K', was: 'Suche über alles — und Befehle', gruppe: 'Überall' },
+  { id: 'suche', taste: 'Strg+K', was: 'Suche über alles – und Befehle', gruppe: 'Überall' },
   { id: 'hilfe', taste: 'Alt+H', was: 'Hilfe öffnen und schließen', gruppe: 'Überall' },
   { id: 'einstellungen', taste: 'Alt+E', was: 'Einstellungen öffnen und schließen', gruppe: 'Überall' },
   { id: 'aufgaben', taste: 'Alt+T', was: 'Aufgaben-Zentrale öffnen und schließen', gruppe: 'Überall' },
@@ -48,7 +48,7 @@ export const KUERZEL: Kuerzel[] = [
 
   // ── Ansichten ───────────────────────────────────────────────────────────
   { id: 'ueberblick', taste: 'Alt+U', was: 'Navigation links ein- und ausblenden', gruppe: 'Ansichten' },
-  { id: 'netz', taste: 'Alt+G', was: 'Netz-Ansicht — und zurück zum Board', gruppe: 'Ansichten' },
+  { id: 'netz', taste: 'Alt+G', was: 'Netz-Ansicht – und zurück zum Board', gruppe: 'Ansichten' },
   { id: 'navigator', taste: 'Alt+W', was: 'Navigation: im Baum suchen (am Telefon: Baum öffnen)', gruppe: 'Ansichten' },
   { id: 'praesentation', taste: 'Alt+P', was: 'Präsentation starten', gruppe: 'Ansichten' },
   { id: 'baumPfeile', taste: '↑ ↓ → ←', was: 'im Navigationsbaum: weitergehen, aufklappen, zuklappen bzw. zum Übergeordneten', gruppe: 'Ansichten', fremd: true },
@@ -66,7 +66,7 @@ export const KUERZEL: Kuerzel[] = [
   { id: 'alleWaehlen', taste: 'Strg+A', was: 'alle Karten des Boards auswählen', gruppe: 'Karten' },
   // M344 — ausgeführt in components/boardTasten.ts (brauchen die Kamera) bzw. FocusSheet
   { id: 'karteWeiter', taste: 'Tab', was: 'nächste Karte auswählen (Umschalt+Tab: vorige)', gruppe: 'Karten', fremd: true },
-  { id: 'karteAlt', taste: 'Alt+↓ / Alt+↑', was: 'nächste / vorige Karte — auch beim Schreiben und im Fokus', gruppe: 'Karten', fremd: true },
+  { id: 'karteAlt', taste: 'Alt+↓ / Alt+↑', was: 'nächste / vorige Karte – auch beim Schreiben und im Fokus', gruppe: 'Karten', fremd: true },
   { id: 'karteRichtung', taste: 'Strg+Pfeiltaste', was: 'zur Karte in dieser Richtung springen', gruppe: 'Karten', fremd: true },
   { id: 'karteRand', taste: 'Pos1 / Ende', was: 'erste / letzte Karte des Boards auswählen', gruppe: 'Karten', fremd: true },
   { id: 'auswahlDazu', taste: 'Strg+Umschalt+Pfeiltaste', was: 'Auswahl um die Karte in dieser Richtung erweitern', gruppe: 'Karten', fremd: true },
@@ -75,8 +75,8 @@ export const KUERZEL: Kuerzel[] = [
   { id: 'karteSchieben', taste: 'Pfeiltasten', was: 'gewählte Karte verschieben (Umschalt: größere Schritte)', gruppe: 'Karten', fremd: true },
   { id: 'duplizieren', taste: 'Strg+D', was: 'Auswahl duplizieren', gruppe: 'Karten', fremd: true },
   { id: 'freiAblegen', taste: 'Strg beim Ziehen', was: 'ohne Fanglinien und Abstände frei ablegen', gruppe: 'Karten', fremd: true },
-  { id: 'pdf-vor', taste: 'Bild↓', mac: 'fn+↓', was: 'PDF/Word: nächste Seite der gewählten Karte — im Fokus oder nach Klick auf die Seite auch → und Leertaste', gruppe: 'Karten', fremd: true },
-  { id: 'pdf-zurueck', taste: 'Bild↑', mac: 'fn+↑', was: 'PDF/Word: vorige Seite — im Fokus oder nach Klick auf die Seite auch ← und Umschalt+Leertaste', gruppe: 'Karten', fremd: true },
+  { id: 'pdf-vor', taste: 'Bild↓', mac: 'fn+↓', was: 'PDF/Word: nächste Seite der gewählten Karte – im Fokus oder nach Klick auf die Seite auch → und Leertaste', gruppe: 'Karten', fremd: true },
+  { id: 'pdf-zurueck', taste: 'Bild↑', mac: 'fn+↑', was: 'PDF/Word: vorige Seite – im Fokus oder nach Klick auf die Seite auch ← und Umschalt+Leertaste', gruppe: 'Karten', fremd: true },
   { id: 'pdfRand', taste: 'Pos1 / Ende', mac: 'fn+← / fn+→', was: 'PDF/Word im Fokus: erste bzw. letzte Seite', gruppe: 'Karten', fremd: true },
   { id: 'loeschen', taste: 'Entf', was: 'Auswahl oder Verbindung löschen', gruppe: 'Karten', fremd: true },
   { id: 'einfuegen', taste: 'Strg+V', was: 'Screenshot, Bild oder Text einfügen', gruppe: 'Karten', fremd: true },
@@ -84,7 +84,7 @@ export const KUERZEL: Kuerzel[] = [
   // ── Board ───────────────────────────────────────────────────────────────
   { id: 'rueckgaengig', taste: 'Strg+Z', was: 'rückgängig', gruppe: 'Board' },
   { id: 'wiederholen', taste: 'Strg+Y', was: 'wiederholen', gruppe: 'Board' },
-  { id: 'einpassen', taste: 'F', was: 'Auswahl einpassen — ohne Auswahl das ganze Board', gruppe: 'Board' },
+  { id: 'einpassen', taste: 'F', was: 'Auswahl einpassen – ohne Auswahl das ganze Board', gruppe: 'Board' },
   { id: 'zoomTasten', taste: '+ / − / 0', was: 'hinein- und herauszoomen, 0 = 100 %', gruppe: 'Board', fremd: true },
   { id: 'raster', taste: 'Alt+R', was: 'Raster-Fang ein- und ausschalten', gruppe: 'Board' },
   { id: 'physik', taste: 'Alt+O', was: 'Physik (Karten weichen aus) ein- und ausschalten', gruppe: 'Board' },

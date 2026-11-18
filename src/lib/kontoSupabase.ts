@@ -50,12 +50,12 @@ interface TokenAntwort { access_token?: string; refresh_token?: string; expires_
 const fehlerText = (j: TokenAntwort, status: number): string => {
   const roh = j.error_description ?? j.msg ?? j.message ?? j.error ?? '';
   if (/invalid login credentials|invalid_grant/i.test(roh)) return 'E-Mail oder Passwort stimmen nicht.';
-  if (/email not confirmed/i.test(roh)) return 'Die E-Mail-Adresse ist noch nicht bestätigt — bitte den Link aus der Mail öffnen.';
-  if (/rate limit|too many/i.test(roh) || status === 429) return 'Zu viele Versuche — bitte kurz warten.';
-  if (/user already registered|already been registered/i.test(roh)) return 'Für diese E-Mail gibt es schon ein Konto — bitte anmelden.';
+  if (/email not confirmed/i.test(roh)) return 'Die E-Mail-Adresse ist noch nicht bestätigt – bitte den Link aus der Mail öffnen.';
+  if (/rate limit|too many/i.test(roh) || status === 429) return 'Zu viele Versuche – bitte kurz warten.';
+  if (/user already registered|already been registered/i.test(roh)) return 'Für diese E-Mail gibt es schon ein Konto – bitte anmelden.';
   if (/signups not allowed/i.test(roh)) return 'Neue Konten sind beim Betreiber gerade nicht freigeschaltet.';
-  if (/password should be|weak password/i.test(roh)) return 'Das Passwort ist zu kurz — mindestens 6 Zeichen.';
-  if (/refresh_token|invalid refresh/i.test(roh)) return 'Anmeldung abgelaufen — bitte neu anmelden.';
+  if (/password should be|weak password/i.test(roh)) return 'Das Passwort ist zu kurz – mindestens 6 Zeichen.';
+  if (/refresh_token|invalid refresh/i.test(roh)) return 'Anmeldung abgelaufen – bitte neu anmelden.';
   return roh ? `PixiNotes-Konto: ${roh}` : `PixiNotes-Konto: HTTP ${status}`;
 };
 
@@ -82,7 +82,7 @@ async function authRuf(pfad: string, body: unknown, k = supabaseKonfig()): Promi
   try {
     res = await fetch(`${k.url}/auth/v1/${pfad}`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: k.key }, body: JSON.stringify(body) });
   } catch {
-    throw new NetzFehler('PixiNotes-Konto: nicht erreichbar — Internetverbindung prüfen.');
+    throw new NetzFehler('PixiNotes-Konto: nicht erreichbar – Internetverbindung prüfen.');
   }
   const j = (await res.json().catch(() => ({}))) as TokenAntwort;
   if (res.status >= 500) throw new NetzFehler('PixiNotes-Konto: vorübergehend nicht erreichbar.');
@@ -155,8 +155,8 @@ export async function sbKontoLoeschen(token: string, k = supabaseKonfig()): Prom
   let res: Response;
   try {
     res = await fetch(`${k.url}/rest/v1/rpc/konto_loeschen`, { method: 'POST', headers: { apikey: k.key, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: '{}' });
-  } catch { throw new Error('PixiNotes-Konto: nicht erreichbar — Internetverbindung prüfen.'); }
-  if (res.status === 404) throw new Error('PixiNotes-Konto: Das Löschen ist beim Betreiber noch nicht freigeschaltet (Funktion konto_loeschen fehlt). Bis dahin: Abmelden — oder dem Betreiber schreiben.');
+  } catch { throw new Error('PixiNotes-Konto: nicht erreichbar – Internetverbindung prüfen.'); }
+  if (res.status === 404) throw new Error('PixiNotes-Konto: Das Löschen ist beim Betreiber noch nicht freigeschaltet (Funktion konto_loeschen fehlt). Bis dahin: Abmelden – oder dem Betreiber schreiben.');
   if (!res.ok) throw new Error(`PixiNotes-Konto: Löschen fehlgeschlagen (HTTP ${res.status}).`);
 }
 

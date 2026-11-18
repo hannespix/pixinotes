@@ -5,7 +5,7 @@ import { importFilesToBoard } from '../lib/importFiles';
 import { makeNote } from '../lib/nodes';
 import { notizBildHochladen } from '../lib/notizBild';
 import { nodeToText } from '../lib/serialize';
-import { IX } from './Icons';
+import { IX, IFileText } from './Icons';
 
 /**
  * M290: „Teilen mit … PixiNotes" (Android).
@@ -109,7 +109,7 @@ export function GeteiltDialog() {
       gesetzt++;
     }
     showToast(gesetzt > 0
-      ? `Geteiltes übernommen — ${gesetzt} Karte(n) auf „${boards.find((b) => b.id === zielBoard)?.name}".`
+      ? `Geteiltes übernommen – ${gesetzt} Karte(n) auf „${boards.find((b) => b.id === zielBoard)?.name}".`
       : 'Es war nichts Übernehmbares dabei.');
   };
 
@@ -158,7 +158,7 @@ export function GeteiltDialog() {
               <div key={d.name + d.size} className="geteilt-stueck">
                 {(d.type || '').startsWith('image/')
                   ? <img src={URL.createObjectURL(d)} alt="" />
-                  : <span className="geteilt-symbol" aria-hidden>📄</span>}
+                  : <span className="geteilt-symbol" aria-hidden><IFileText size={18} /></span>}
                 <span className="geteilt-name" translate="no">{d.name}</span>
               </div>
             ))}
@@ -213,7 +213,7 @@ export function GeteiltDialog() {
           )}
           {form === 'notiz' && !nurBilder && dateien.length > 0 && (
             <div className="geteilt-hinweis">
-              In die Notiz wandern nur Bilder — alles andere wird eine Datei-Karte auf demselben Board.
+              In die Notiz wandern nur Bilder – alles andere wird eine Datei-Karte auf demselben Board.
             </div>
           )}
         </div>

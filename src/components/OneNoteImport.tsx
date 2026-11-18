@@ -3,6 +3,7 @@ import { loadCalAccounts, msHasNotes, oauthAvailable } from '../lib/calAccounts'
 import { fetchNotebooks, runOneNoteImport, type OnNotebook } from '../lib/onenote';
 import { useBoard } from '../store';
 
+import { IBuch } from './Icons';
 /**
  * M184: OneNote-Import — Notizbuch wird Bereich, Abschnitt wird Board,
  * jede Seite eine Notiz-Karte. Bewusst als eigene Komponente: Der Ablauf hat
@@ -42,7 +43,7 @@ export function OneNoteImport({ onClose, onDienste }: { onClose: () => void; onD
     const list = await fetchNotebooks();
     setBooks(list);
     const total = list.reduce((n, b) => n + b.sections.length, 0);
-    if (total === 0) setError('Es wurden keine Abschnitte gefunden — hat dieses Konto OneNote-Notizbücher?');
+    if (total === 0) setError('Es wurden keine Abschnitte gefunden – hat dieses Konto OneNote-Notizbücher?');
   });
 
   const toggle = (id: string) => setPicked((s) => {
@@ -65,9 +66,9 @@ export function OneNoteImport({ onClose, onDienste }: { onClose: () => void; onD
     if (choices.length === 0) { setError('Bitte mindestens einen Abschnitt auswählen.'); return; }
     const res = await runOneNoteImport(choices, { withImages, maxPages }, (msg, done, total) => setProgress({ msg, done, total }));
     showToast(
-      `📓 OneNote übernommen: ${res.boards} Board(s) mit ${res.pages} Seite(n)`
-      + (res.skipped.length ? ` — ${res.skipped.length} übersprungen` : '')
-      + '. Rückgängig über ⚙ → Daten.',
+      `OneNote übernommen: ${res.boards} Board(s) mit ${res.pages} Seite(n)`
+      + (res.skipped.length ? ` – ${res.skipped.length} übersprungen` : '')
+      + '. Rückgängig über Einstellungen → Daten.',
       false, 9000,
     );
     onClose();
@@ -97,7 +98,7 @@ export function OneNoteImport({ onClose, onDienste }: { onClose: () => void; onD
         </div>
       ) : (
         <>
-          <div className="modal-note">✅ OneNote-Zugriff steht{acc?.connectedAs ? ` (${acc.connectedAs})` : ''}.</div>
+          <div className="modal-note">OneNote-Zugriff steht{acc?.connectedAs ? ` (${acc.connectedAs})` : ''}.</div>
           <div className="modal-buttons">
             <button disabled={!!busy} onClick={load}>
               {busy === 'load' ? 'Lade Notizbücher…' : books ? 'Notizbücher neu laden' : 'Notizbücher laden'}
@@ -112,7 +113,7 @@ export function OneNoteImport({ onClose, onDienste }: { onClose: () => void; onD
             {books.map((b) => (
               <div key={b.id} className="on-book">
                 <button className="on-book-name" onClick={() => toggleBook(b)}>
-                  📓 <span translate="no">{b.name}</span> <span className="on-count">{b.sections.length} Abschnitt(e)</span>
+                  <IBuch size={14} /> <span translate="no">{b.name}</span> <span className="on-count">{b.sections.length} Abschnitt(e)</span>
                 </button>
                 {b.sections.map((s) => (
                   <label key={s.id} className="on-sec">
@@ -158,7 +159,7 @@ export function OneNoteImport({ onClose, onDienste }: { onClose: () => void; onD
         <div className="modal-buttons">
           <button
             onClick={() => {
-              if (useBoard.getState().undoImport()) showToast('Import zurückgenommen — der Stand von davor ist wiederhergestellt.');
+              if (useBoard.getState().undoImport()) showToast('Import zurückgenommen – der Stand von davor ist wiederhergestellt.');
             }}
           >
             Letzten Import zurücknehmen

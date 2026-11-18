@@ -140,7 +140,7 @@ console.log('\n════ A: Einstieg ════');
   const s = await griff(P, 'so');
   await ziehe(P, s, [s[0] - 200, s[1] - 100]);
   await P.keyboard.press('Escape'); await P.waitForTimeout(400);
-  pruefe('A5 Esc schließt den Editor — das Bild bleibt, wie es war, und die Karte ist noch da', (await P.locator('.bild-editor').count()) === 0 && (await karte(P, 'bild'))?.data.src === bildUrl);
+  pruefe('A5 Esc schließt den Editor – das Bild bleibt, wie es war, und die Karte ist noch da', (await P.locator('.bild-editor').count()) === 0 && (await karte(P, 'bild'))?.data.src === bildUrl);
 }
 
 console.log('\n════ B: Zuschneiden ════');
@@ -187,7 +187,7 @@ console.log('\n════ B: Zuschneiden ════');
   const q6 = await kasten(P, '.be-rahmen');
   pruefe('B11 „Zurücksetzen" stellt alles auf Anfang', Math.abs(q6.w - b2.w) < 2 && Math.abs(q6.h - b2.h) < 2 && (await P.locator('[data-taste="be-zuruecksetzen"]').count()) === 0);
   await P.locator('[data-taste="be-fertig"]').click(); await P.waitForTimeout(500);
-  pruefe('B12 „Fertig" ohne Änderung schließt nur — nichts wird neu gespeichert', (await P.locator('.bild-editor').count()) === 0 && (await karte(P, 'bild'))?.data.src === bildUrl);
+  pruefe('B12 „Fertig" ohne Änderung schließt nur – nichts wird neu gespeichert', (await P.locator('.bild-editor').count()) === 0 && (await karte(P, 'bild'))?.data.src === bildUrl);
 }
 
 console.log('\n════ C: Drehen und Spiegeln ════');
@@ -213,7 +213,7 @@ console.log('\n════ C: Drehen und Spiegeln ════');
   await P.locator('[data-taste="be-spiegeln"]').click(); await P.waitForTimeout(300);
   await fertig(P);
   k = await karte(P, 'bild'); m = await lesen(P, k.data.src, ECKEN); lo = herkunft(m.farben[0]); const lu = herkunft(m.farben[2]);
-  pruefe('C5 Spiegeln tauscht links und rechts — oben bleibt oben', m.w === 400 && nah(lo[0], 1) && nah(lo[1], 0) && nah(lu[1], 1), { lo, lu });
+  pruefe('C5 Spiegeln tauscht links und rechts – oben bleibt oben', m.w === 400 && nah(lo[0], 1) && nah(lo[1], 0) && nah(lu[1], 1), { lo, lu });
   await rueckgaengig(P);
   // gedreht UND gespiegelt: „spiegeln" heißt, was man sieht
   await oeffne(P, 'bild');
@@ -318,7 +318,7 @@ console.log('\n════ H: Bild aus der Geräte-Ablage ════');
   await fertig(P);
   const brett = await brettVon(P);
   const neu = brett.nodes.find((n) => n.type === 'file');
-  pruefe('H2 die Karte lebt unter einer neuen Kennung weiter — gleiche Stelle, gleiche Breite, neues Format', !!neu && neu.id !== 'foto' && !brett.nodes.some((n) => n.id === 'foto') && neu.position.x === 560 && neu.width === 300 && Math.abs(neu.height - 600) <= 2, neu && { id: neu.id, pos: neu.position, w: neu.width, h: neu.height });
+  pruefe('H2 die Karte lebt unter einer neuen Kennung weiter – gleiche Stelle, gleiche Breite, neues Format', !!neu && neu.id !== 'foto' && !brett.nodes.some((n) => n.id === 'foto') && neu.position.x === 560 && neu.width === 300 && Math.abs(neu.height - 600) <= 2, neu && { id: neu.id, pos: neu.position, w: neu.width, h: neu.height });
   pruefe('H3 Verbindung und Kommentar sind mit umgezogen', brett.edges[0].source === neu?.id && brett.edges[0].target === 'n1' && brett.comments[0].nodeId === neu?.id, { kante: brett.edges[0], kommentar: brett.comments[0].nodeId });
   const inAblage = await P.evaluate((id) => new Promise((fertig2) => { const q = indexedDB.open('pixinotes-sync'); q.onsuccess = () => { const g = q.result.transaction('kv').objectStore('kv').get(`file:${id}`); g.onsuccess = () => fertig2(g.result instanceof Blob ? { size: g.result.size, type: g.result.type } : null); g.onerror = () => fertig2(null); }; }), neu.id);
   pruefe('H4 das neue Bild liegt in der Ablage; die Karte nennt Größe und Typ', !!inAblage && inAblage.size === neu.data.size && inAblage.type === 'image/png' && neu.data.mime === 'image/png' && neu.data.lokal === true, { inAblage, data: { size: neu.data.size, mime: neu.data.mime } });
@@ -362,7 +362,7 @@ console.log('\n════ J: Texte ════');
 {
   const de = readFileSync(path.join(__repo, 'src/components/HelpOverlay.tsx'), 'utf-8');
   const en = readFileSync(path.join(__repo, 'src/components/HelpOverlayEn.tsx'), 'utf-8');
-  pruefe('J1 die Hilfe nennt M395 — deutsch und englisch', de.includes('(M395)') && en.includes('(M395)'));
+  pruefe('J1 die Hilfe nennt M395 – deutsch und englisch', de.includes('(M395)') && en.includes('(M395)'));
   pruefe('J2 keine Fehler in der Konsole', fehler.length === 0, fehler.join(' | ').slice(0, 300));
 }
 

@@ -582,7 +582,7 @@ const A = await geraet('A', standA, '', { ich: ICH_A });
   const z = A.P.locator('.tabs.spalte .side-board', { hasText: 'Planung' }).first();
   await z.hover(); await z.locator('.ebenen-menu-knopf').click(); await A.P.waitForTimeout(300);
   const menue = await A.P.evaluate(() => [...document.querySelectorAll('.ebenen-menu button')].map((b) => b.textContent.trim()));
-  pruefe('A1 das Board-Menü bietet „Gemeinsam bearbeiten …" — auch ohne Konto (vorher fehlte der Punkt)', menue.some((t) => /Gemeinsam bearbeiten/.test(t)), JSON.stringify(menue));
+  pruefe('A1 das Board-Menü bietet „Gemeinsam bearbeiten …" – auch ohne Konto (vorher fehlte der Punkt)', menue.some((t) => /Gemeinsam bearbeiten/.test(t)), JSON.stringify(menue));
   pruefe('A2 … und nennt die Kopie beim Namen: „Kopie per Link teilen …"', menue.some((t) => /^Kopie per Link teilen/.test(t)), JSON.stringify(menue));
   await A.P.locator('[data-taste="board-freigeben"]').click(); await A.P.waitForTimeout(500);
   const sicht = await zuSehen(A.P, '.freigabe-dialog');
@@ -613,10 +613,10 @@ await A.P.waitForSelector('[data-taste="einladung-anlegen"]', { timeout: 6000 })
   pruefe('B2 der Dialog kommt mit unter 40 Wörtern aus (vorher 212)', w < 40, String(w));
   await A.P.locator('[data-taste="einladung-anlegen"]').click();
   await warteBis(A.P, async () => (await A.P.locator('[data-taste="einladung-adresse"]').count()) === 1, 6000);
-  pruefe('B3 ein Klick legt den Link an — Vorgabe: mitmachen ohne Konto, bearbeiten', sb.einladungen[0]?.ohne_konto === true && sb.einladungen[0]?.rolle === 'bearbeiten' && /Einladungslink kopiert/.test(await toast(A.P)), JSON.stringify(sb.einladungen[0]));
+  pruefe('B3 ein Klick legt den Link an – Vorgabe: mitmachen ohne Konto, bearbeiten', sb.einladungen[0]?.ohne_konto === true && sb.einladungen[0]?.rolle === 'bearbeiten' && /Einladungslink kopiert/.test(await toast(A.P)), JSON.stringify(sb.einladungen[0]));
   pruefe('B4 ein Satz sagt, was der Link kann', /sofort dabei/.test(await satz(A.P)) && /arbeitet live mit/.test(await satz(A.P)), await satz(A.P));
   const mit = await zuSehen(A.P, '.freigabe-dialog');
-  pruefe('B5 mit Link: Adresse, Kopieren, QR-Code — und weiter nur die zwei eingeklappten Zeilen', mit.length <= 7 && ['Einladungslink', 'Kopieren', 'Optionen'].every((t) => mit.includes(t)) && !mit.some((t) => /widerrufen|Was Gäste dürfen|E-Mail$/.test(t)), JSON.stringify(mit));
+  pruefe('B5 mit Link: Adresse, Kopieren, QR-Code – und weiter nur die zwei eingeklappten Zeilen', mit.length <= 7 && ['Einladungslink', 'Kopieren', 'Optionen'].every((t) => mit.includes(t)) && !mit.some((t) => /widerrufen|Was Gäste dürfen|E-Mail$/.test(t)), JSON.stringify(mit));
   await A.P.locator('[data-taste="einladung-optionen"] > summary').click(); await A.P.waitForTimeout(250);
   await A.P.locator('[data-taste="einladung-ohne-konto"]').click();   // der Haken folgt der Antwort des Servers
   await warteBis(A.P, () => sb.einladungen[0]?.ohne_konto === false, 5000); await A.P.waitForTimeout(300);
@@ -653,11 +653,11 @@ await T.P.locator('[data-taste="gast-name"]').fill('Hanna Handy'); await T.P.loc
 await warteBis(A.P, async () => /3 dabei/.test(await zahl(A.P)), 12000);
 {
   const zuDritt = await zuSehen(A.P, '.live-leiste');
-  pruefe('C4 zu dritt: ZWEI Knöpfe — wer da ist, und Reagieren (vorher sieben)', zuDritt.length === 2 && /3 dabei/.test(await zahl(A.P)), JSON.stringify(zuDritt));
+  pruefe('C4 zu dritt: ZWEI Knöpfe – wer da ist, und Reagieren (vorher sieben)', zuDritt.length === 2 && /3 dabei/.test(await zahl(A.P)), JSON.stringify(zuDritt));
   await listeAuf(A.P);
   const namen = await A.P.evaluate(() => [...document.querySelectorAll('[data-taste="live-liste"] .live-name')].map((e) => e.textContent));
   const e2 = await eintraege(A.P);
-  pruefe('C5 die Liste nennt alle drei und alle Werkzeuge beim Namen', JSON.stringify(namen.slice().sort()) === JSON.stringify(['Gerd Gast', 'Hanna Handy', 'anna']) && e2.length === 5 && e2[0] === 'Einladen …' && e2[1] === 'QR-Code zum Mitmachen zeigen' && /Vorführen — alle folgen dir$/.test(e2[2]) && e2[3] === 'Mauszeiger zeigen' && e2[4] === 'Timer für alle', JSON.stringify([namen, e2]));
+  pruefe('C5 die Liste nennt alle drei und alle Werkzeuge beim Namen', JSON.stringify(namen.slice().sort()) === JSON.stringify(['Gerd Gast', 'Hanna Handy', 'anna']) && e2.length === 5 && e2[0] === 'Einladen …' && e2[1] === 'QR-Code zum Mitmachen zeigen' && /Vorführen – alle folgen dir$/.test(e2[2]) && e2[3] === 'Mauszeiger zeigen' && e2[4] === 'Timer für alle', JSON.stringify([namen, e2]));
   await A.P.locator('[data-taste="vorfuehren"]').click(); await A.P.waitForTimeout(1500);
   const beimVorfuehren = await zuSehen(A.P, '.live-leiste');
   pruefe('C6 Vorführen aus der Liste: Gerd folgt; die Leiste bleibt bei zwei Knöpfen (das Band zeigt es)', /führt vor/.test(await G.P.locator('body').innerText()) && beimVorfuehren.length === 2 && (await A.P.locator('[data-taste="zeig-ende"]').count()) === 1, JSON.stringify(beimVorfuehren));
@@ -671,7 +671,7 @@ await warteBis(A.P, async () => /3 dabei/.test(await zahl(A.P)), 12000);
   pruefe('C9 Gast: dieselbe Liste ohne „Einladen …"; sein Recht steht als ganzer Satz darin', !eg.includes('Einladen …') && eg.includes('QR-Code zum Mitmachen zeigen') && /nur deine eigenen Karten/.test(await G.P.locator('[data-taste="live-recht"]').innerText().catch(() => '')), JSON.stringify(eg));
   await G.P.locator('[data-taste="live-ich"]').click(); await G.P.waitForTimeout(400);
   await G.P.locator('[data-taste="gast-name"]').fill('Gerd G.'); await G.P.locator('[data-taste="gast-name-ok"]').click();
-  pruefe('C10 Namen ändern am eigenen Eintrag — bei der Besitzerin kommt er an', await warteBis(A.P, async () => (await chipNamen(A.P)).includes('Gerd G.'), 8000), JSON.stringify(await chipNamen(A.P)));
+  pruefe('C10 Namen ändern am eigenen Eintrag – bei der Besitzerin kommt er an', await warteBis(A.P, async () => (await chipNamen(A.P)).includes('Gerd G.'), 8000), JSON.stringify(await chipNamen(A.P)));
   await A.P.locator('[data-taste="reakt-auf"]').click(); await A.P.waitForTimeout(300);
   await A.P.locator('[data-taste="reakt"]').first().click();
   pruefe('C11 Reagieren bleibt ein Tipp aus der Leiste', await warteBis(G.P, async () => (await G.P.locator('[data-taste="reakt-flug"]').count()) > 0, 5000));
@@ -701,11 +701,11 @@ console.log('\n════ D: Telefon ════');
 console.log('\n════ E: als Gast ════');
 {
   const bereiche = await G.P.evaluate(() => [...document.querySelectorAll('.tabs.spalte .side-space-name')].map((e) => e.textContent.trim()));
-  pruefe('E1 die Spalte des Gasts zeigt keinen leeren eigenen Bereich — nur, worum es geht', bereiche.length === 1 && /Geteilt mit mir/.test(bereiche[0]), JSON.stringify(bereiche));
+  pruefe('E1 die Spalte des Gasts zeigt keinen leeren eigenen Bereich – nur, worum es geht', bereiche.length === 1 && /Geteilt mit mir/.test(bereiche[0]), JSON.stringify(bereiche));
   const z = G.P.locator('.tabs.spalte .side-board', { hasText: 'Planung' }).first();
   await z.hover(); await z.locator('.ebenen-menu-knopf').click(); await G.P.waitForTimeout(300);
   const menue = await G.P.evaluate(() => [...document.querySelectorAll('.ebenen-menu button')].map((b) => b.textContent.trim()));
-  pruefe('E2 am fremden Board: kein Umbenennen, Archivieren, Löschen — dafür „Verlassen …"', !menue.some((t) => /Umbenennen|Archivieren|Löschen/.test(t)) && menue.includes('Verlassen …') && menue.some((t) => /Gemeinsames Board/.test(t)), JSON.stringify(menue));
+  pruefe('E2 am fremden Board: kein Umbenennen, Archivieren, Löschen – dafür „Verlassen …"', !menue.some((t) => /Umbenennen|Archivieren|Löschen/.test(t)) && menue.includes('Verlassen …') && menue.some((t) => /Gemeinsames Board/.test(t)), JSON.stringify(menue));
   await G.P.locator('[data-taste="board-verlassen"]').click(); await G.P.waitForTimeout(500);
   pruefe('E3 „Verlassen …" führt zum Dialog mit „Board verlassen"', (await G.P.locator('[data-taste="freigabe-verlassen"]').count()) === 1);
   await schliessen(G.P);
@@ -718,7 +718,7 @@ console.log('\n════ F: „nur Eigenes" gilt auch für Verbindungen ═�
   const vorher = (await kanten(G.P)).map((e) => e.id);
   const geklickt = await kanteLoeschen(G.P, 'e1');
   await G.P.waitForTimeout(1500);
-  pruefe('F1 Gerd wählt die Verbindung der Besitzerin und drückt Entf — sie bleibt, bei ihm und auf dem Server', geklickt && vorher.includes('e1') && (await kanten(G.P)).some((e) => e.id === 'e1') && kantenServer().some((e) => e.id === 'e1'), JSON.stringify([vorher, (await kanten(G.P)).map((e) => e.id)]));
+  pruefe('F1 Gerd wählt die Verbindung der Besitzerin und drückt Entf – sie bleibt, bei ihm und auf dem Server', geklickt && vorher.includes('e1') && (await kanten(G.P)).some((e) => e.id === 'e1') && kantenServer().some((e) => e.id === 'e1'), JSON.stringify([vorher, (await kanten(G.P)).map((e) => e.id)]));
   // Gerd legt zwei eigene Notizen an und verbindet sie
   await notizPlatz(G.P, 'Gerd eins'); await notizPlatz(G.P, 'Gerd zwei');
   await G.P.mouse.click(760, 800); await G.P.waitForTimeout(300);
@@ -733,7 +733,7 @@ console.log('\n════ F: „nur Eigenes" gilt auch für Verbindungen ═�
     await warteBis(G.P, () => kantenServer().some((e) => e.id === neu.id), 8000);
     await G.P.mouse.click(760, 800); await G.P.waitForTimeout(200);
     await kanteLoeschen(G.P, neu.id);
-    pruefe('F3 … und lässt sich von ihm löschen — bei ihm und auf dem Server', !(await kanten(G.P)).some((e) => e.id === neu.id) && await warteBis(G.P, () => !kantenServer().some((e) => e.id === neu.id), 8000), JSON.stringify((await kanten(G.P)).map((e) => e.id)));
+    pruefe('F3 … und lässt sich von ihm löschen – bei ihm und auf dem Server', !(await kanten(G.P)).some((e) => e.id === neu.id) && await warteBis(G.P, () => !kantenServer().some((e) => e.id === neu.id), 8000), JSON.stringify((await kanten(G.P)).map((e) => e.id)));
   } else pruefe('F3 … und lässt sich von ihm löschen', false, 'keine eigene Verbindung entstanden');
   pruefe('F4 die Verbindung der Besitzerin steht unverändert da', kantenServer().find((e) => e.id === 'e1')?.data?.label === 'führt zu', JSON.stringify(kantenServer()));
 }
@@ -746,7 +746,7 @@ console.log('\n════ G: abgelehnter Beitritt ════');
   await H.P.waitForSelector('[data-taste="gast-name"]', { timeout: 8000 });
   await H.P.locator('[data-taste="gast-name"]').fill('Hugo'); await H.P.locator('[data-taste="gast-name-ok"]').click();
   const dabei = await warteBis(H.P, async () => /dabei/.test(await zahl(H.P)), 15000);
-  pruefe('G1 der Server lehnt den Beitritt zweimal ab — die App versucht es weiter und ist dann dabei', dabei && sb.abgelehnt === 2, JSON.stringify({ zahl: await zahl(H.P), abgelehnt: sb.abgelehnt }));
+  pruefe('G1 der Server lehnt den Beitritt zweimal ab – die App versucht es weiter und ist dann dabei', dabei && sb.abgelehnt === 2, JSON.stringify({ zahl: await zahl(H.P), abgelehnt: sb.abgelehnt }));
   await H.ctx.close();
 }
 
@@ -761,7 +761,7 @@ console.log('\n════ H: Befehl und Texte ════');
   pruefe('H1 Strg+K „gemeinsam" → „Gemeinsam bearbeiten" öffnet den Dialog', da && (await A.P.locator('.freigabe-dialog').count()) === 1);
   await schliessen(A.P);
   const lies = (p) => readFileSync(path.join(__repo, p), 'utf8');
-  pruefe('H2 die Hilfe nennt M391 — deutsch und englisch', lies('src/components/HelpOverlay.tsx').includes('(M391)') && lies('src/components/HelpOverlayEn.tsx').includes('(M391)'));
+  pruefe('H2 die Hilfe nennt M391 – deutsch und englisch', lies('src/components/HelpOverlay.tsx').includes('(M391)') && lies('src/components/HelpOverlayEn.tsx').includes('(M391)'));
   const audit = lies('docs/AUDIT.md');
   pruefe('H3 die Audit-Liste führt die Team-Funde; kein Fund ist mehr offen', /\| T1 \|/.test(audit) && !/\|[^\n|]*⏳[^\n]*\|\s*$/m.test(audit.split('\n').filter((z) => /^\| [A-Z]+\d+ \|/.test(z)).join('\n')), audit.split('\n').filter((z) => /^\| [A-Z]+\d+ \|/.test(z) && /⏳/.test(z)).map((z) => z.slice(0, 12)).join(' '));
   pruefe('H4 kein fremder Dienst wurde angesprochen', fremd.length === 0, fremd.slice(0, 3).join(' '));

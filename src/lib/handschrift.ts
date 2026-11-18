@@ -84,12 +84,12 @@ export interface Erkannt { text: string; alternativen: string[] }
 /** Wie handschriftErkennen, aber mit den weiteren Lesarten des Erkenners (für die KI-Korrektur) */
 export async function handschriftKandidaten(strichePunkte: Punkt[][], sprache = 'de'): Promise<Erkannt> {
   const { striche, w, h } = normieren(strichePunkte.filter((s) => s.length > 1));
-  if (striche.length === 0) throw new Error('Nichts geschrieben — erst mit dem Stift schreiben, dann „Text".');
+  if (striche.length === 0) throw new Error('Nichts geschrieben – erst mit dem Stift schreiben, dann „Text".');
   const weg = handschriftWeg();
   let kandidaten: string[];
   if (weg === 'browser') kandidaten = await imBrowser(striche, sprache);
   else if (weg === 'online') kandidaten = await online(striche, w, h, sprache);
-  else throw new Error('Dein Browser erkennt Handschrift nicht selbst. Unter ⚙ → Dienste → Handschrift lässt sich die Online-Erkennung einschalten.');
+  else throw new Error('Dein Browser erkennt Handschrift nicht selbst. Unter Einstellungen → Dienste → Handschrift lässt sich die Online-Erkennung einschalten.');
   return { text: kandidaten[0] ?? '', alternativen: kandidaten.slice(1, 5) };
 }
 
@@ -127,7 +127,7 @@ export async function kiKorrektur(roh: string, alternativen: string[], kontext: 
   if (!roh.trim() || !aiReady(useBoard.getState().ai)) return roh;
   const prompt = [
     'Du korrigierst die Ausgabe einer Handschrift-Erkennung (Deutsch, gelegentlich Englisch).',
-    'Gib NUR den korrigierten Text zurück — ohne Anführungszeichen, ohne Erklärung, ohne Einleitung.',
+    'Gib NUR den korrigierten Text zurück – ohne Anführungszeichen, ohne Erklärung, ohne Einleitung.',
     'Regeln: Nur offensichtliche Lesefehler beheben (ähnliche Buchstaben wie rn/m, l/1, O/0; fehlende Umlaute und ß; Groß-/Kleinschreibung am Satzanfang; Zahlen, Uhrzeiten und Datumsformate wie 12.11. oder 14:30).',
     'Nichts hinzufügen, nichts weglassen, nichts umformulieren, Zeilenumbrüche genau beibehalten. Ist der Text schon richtig, gib ihn unverändert zurück.',
     'Zeichen am Zeilenanfang wie „- ", „• ", „1. ", „[ ] ", „[x] " oder „# " sind Aufzählungs- und Strukturmarker: genau so stehen lassen.',
@@ -161,9 +161,9 @@ export async function kiKorrektur(roh: string, alternativen: string[], kontext: 
  */
 export async function handschriftErkennen(strichePunkte: Punkt[][], sprache = 'de'): Promise<string> {
   const { striche, w, h } = normieren(strichePunkte.filter((s) => s.length > 1));
-  if (striche.length === 0) throw new Error('Nichts geschrieben — erst mit dem Stift schreiben, dann „Text".');
+  if (striche.length === 0) throw new Error('Nichts geschrieben – erst mit dem Stift schreiben, dann „Text".');
   const weg = handschriftWeg();
   if (weg === 'browser') return (await imBrowser(striche, sprache))[0] ?? '';
   if (weg === 'online') return (await online(striche, w, h, sprache))[0] ?? '';
-  throw new Error('Dein Browser erkennt Handschrift nicht selbst. Unter ⚙ → Dienste → Handschrift lässt sich die Online-Erkennung einschalten.');
+  throw new Error('Dein Browser erkennt Handschrift nicht selbst. Unter Einstellungen → Dienste → Handschrift lässt sich die Online-Erkennung einschalten.');
 }

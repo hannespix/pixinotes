@@ -8,7 +8,7 @@ import { nodeToText } from '../../lib/serialize';
 import { downloadIcsEvents, fetchIcsUrl, mergeEvents, parseIcs, type IcsEvent } from '../../lib/ics';
 import { notizTermine } from '../../lib/notizTermine';
 import { anyAccountConnected, fetchAccountEvents, invalidateAccountEvents, type CalAccountEvent } from '../../lib/calAccounts';
-import { IChevronL, IChevronR, IMore } from '../Icons';
+import { IChevronL, IChevronR, IMore, IOrt, ILink, ITrash } from '../Icons';
 import { CardShell } from './CardShell';
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
@@ -145,11 +145,11 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   /** M177: Zeile für den Detail-Tooltip eines eigenen Termins */
   const ownTip = (ev: MyEvent): string => {
     const parts = [ev.title];
-    if (ev.time) parts.push(`🕐 ${ev.time}${ev.end ? `–${ev.end}` : ''}`);
+    if (ev.time) parts.push(`${ev.time}${ev.end ? `–${ev.end}` : ''}`);
     if (ev.endDate) parts.push(`bis ${new Date(`${ev.endDate}T12:00:00`).toLocaleDateString('de-DE')}`);
-    if (ev.place) parts.push(`📍 ${ev.place}`);
+    if (ev.place) parts.push(`${ev.place}`);
     if (ev.note) parts.push(ev.note.slice(0, 140));
-    return `${parts.join(' · ')} — Klick öffnet den Termin`;
+    return `${parts.join(' · ')} – Klick öffnet den Termin`;
   };
   const sourceBoards = scope === 'board' ? boards.filter((b) => b.id === activeId) : boards;
 
@@ -401,7 +401,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   };
   const evIcs = (ev: MyEvent) => {
     downloadIcsEvents([{ title: ev.time ? `${ev.time} ${ev.title}` : ev.title, start: ev.date, end: ev.endDate }]);
-    showToast('.ics erstellt — in Outlook/Apple Kalender öffnen und bestätigen.');
+    showToast('.ics erstellt – in Outlook/Apple Kalender öffnen und bestätigen.');
   };
 
   // ---------- ICS: Import, Abo, Export ----------
@@ -409,7 +409,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     const events = parseIcs(await file.text());
     if (events.length === 0) { showToast('Keine Termine in der Datei gefunden.'); return; }
     updateNodeData(id, { icsEvents: mergeEvents(icsEvents, events) });
-    showToast(`${events.length} Termin(e) importiert — als „Externe Termine" eingeblendet`);
+    showToast(`${events.length} Termin(e) importiert – als „Externe Termine" eingeblendet`);
   };
 
   const subscribeUrl = () => {
@@ -420,7 +420,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   };
 
   const refreshSubscriptions = async (urls = icsUrls) => {
-    if (urls.length === 0) { showToast('Keine ICS-Abos vorhanden — erst eine URL abonnieren.'); return; }
+    if (urls.length === 0) { showToast('Keine ICS-Abos vorhanden – erst eine URL abonnieren.'); return; }
     setBusy(true);
     let ok = 0, fail = 0, added = 0;
     let merged = icsEvents;
@@ -441,7 +441,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     setBusy(false);
     showToast(fail === 0
       ? `Abos aktualisiert: ${added} neue Termin(e) aus ${ok} Kalender(n)`
-      : `${ok} Abo(s) aktualisiert, ${fail} fehlgeschlagen — viele Server erlauben Browser-Zugriff (CORS) nicht; dann die .ics-Datei importieren.`);
+      : `${ok} Abo(s) aktualisiert, ${fail} fehlgeschlagen – viele Server erlauben Browser-Zugriff (CORS) nicht; dann die .ics-Datei importieren.`);
   };
 
   /**
@@ -558,7 +558,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     }
     for (const [title, span] of spans) events.push({ title, start: span.start, end: span.end });
     const n = downloadIcsEvents(events, 'pixinotes-kalender-sichtbar.ics');
-    showToast(n ? `${n} sichtbare Einträge als .ics exportiert — in Outlook importierbar.` : 'Nichts zu exportieren.');
+    showToast(n ? `${n} sichtbare Einträge als .ics exportiert – in Outlook importierbar.` : 'Nichts zu exportieren.');
   };
 
   /** Export über einen Zeitraum (oder ohne Grenzen: alles) */
@@ -575,7 +575,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
       const spanne = von && bis
         ? `${new Date(`${von}T12:00:00`).toLocaleDateString('de-DE')} – ${new Date(`${bis}T12:00:00`).toLocaleDateString('de-DE')}`
         : 'alle Zeiträume';
-      showToast(`📅 ${n} Termine exportiert (${spanne})${konto ? `, davon ${konto} aus verbundenen Konten` : ''} — in Outlook über „Datei → Öffnen & Exportieren → Importieren" einlesen.`, false, 9000);
+      showToast(`${n} Termine exportiert (${spanne})${konto ? `, davon ${konto} aus verbundenen Konten` : ''} – in Outlook über „Datei → Öffnen & Exportieren → Importieren" einlesen.`, false, 9000);
     } finally {
       setBusy(false);
     }
@@ -679,7 +679,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
             ))}
           </div>
           <div className="cal-menu-col">
-            <div className="cal-menu-label">Termine (ICS — Outlook/Google/Apple)</div>
+            <div className="cal-menu-label">Termine (ICS – Outlook/Google/Apple)</div>
             <button disabled={busy} onClick={() => fileRef.current?.click()}>.ics-Datei importieren…</button>
             <button disabled={busy} onClick={subscribeUrl}>ICS-URL abonnieren…</button>
             <button disabled={busy} onClick={() => void refreshSubscriptions()}>
@@ -721,7 +721,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
                   </button>
                 </div>
                 <div className="cal-export-hinweis">
-                  Nimmt <b>alle</b> Termine des Zeitraums mit, nicht nur die angezeigten — mit
+                  Nimmt <b>alle</b> Termine des Zeitraums mit, nicht nur die angezeigten – mit
                   Uhrzeit, Ort und Notiz. Termine verbundener Konten werden für den Zeitraum
                   eigens nachgeladen (bei „Alle Termine" nicht, dort fehlt die Zeitgrenze).
                 </div>
@@ -744,11 +744,11 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
                 >
                   Konto-Termine aktualisieren ({accEvents.length})
                 </button>
-                {accError && <div className="cal-menu-err">⚠️ {accError}</div>}
+                {accError && <div className="cal-menu-err">{accError}</div>}
               </>
             ) : (
               <button
-                title="Google oder Microsoft 365 verbinden (⚙ → Dienste)"
+                title="Google oder Microsoft 365 verbinden (Einstellungen → Dienste)"
                 onClick={() => useBoard.getState().setSettingsOpen(true, 'dienste')}
               >
                 Konto verbinden… (Einstellungen)
@@ -793,8 +793,8 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
                         key={iso}
                         className={`cal-jahr-tag ${anzahl ? `voll v${Math.min(anzahl, 3)}` : ''} ${iso === todayIso ? 'heute' : ''}`}
                         title={anzahl
-                          ? `${new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE')} — ${anzahl} Eintrag/Einträge:\n${namen.join('\n')}`
-                          : `${new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE')} — Klick öffnet den Monat`}
+                          ? `${new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE')} – ${anzahl} Eintrag/Einträge:\n${namen.join('\n')}`
+                          : `${new Date(`${iso}T12:00:00`).toLocaleDateString('de-DE')} – Klick öffnet den Monat`}
                         onClick={() => updateNodeData(id, { view: 'month', month: `${year}-${String(m + 1).padStart(2, '0')}` })}
                       >
                         {i - versatz + 1}
@@ -823,7 +823,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
                 className={`cal-strip ${s.ext ? 'ext' : ''}`}
                 translate="no"
                 style={{ background: s.color }}
-                title={s.ownDate ? `${s.text} (eigener Termin — Klick öffnet ihn)` : `${s.text}${s.ext ? ' (extern)' : ' — zur Karte springen'}`}
+                title={s.ownDate ? `${s.text} (eigener Termin – Klick öffnet ihn)` : `${s.text}${s.ext ? ' (extern)' : ' – zur Karte springen'}`}
                 onClick={(ev) => {
                   ev.stopPropagation();
                   if (s.ownDate) { setDayEdit(s.ownDate); setEvEdit(null); }
@@ -839,7 +839,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
                 className={`cal-chip ${e.urgent ? 'urgent' : ''} ${e.ext ? 'ext' : ''} ${e.own ? 'own' : ''}`}
                 translate="no"
                 style={e.color ? { borderLeftColor: e.color } : undefined}
-                title={e.own ? (e.tip ?? e.text) : `${e.text}${e.ext ? ' (externer Termin)' : ' — zur Karte springen'}`}
+                title={e.own ? (e.tip ?? e.text) : `${e.text}${e.ext ? ' (externer Termin)' : ' – zur Karte springen'}`}
                 onClick={(ev) => {
                   ev.stopPropagation();
                   if (e.own) { setDayEdit(c.iso); setEvEdit(null); setEvTitle(''); setEvTime(''); }
@@ -886,15 +886,15 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
                 className="cal-dayedit-title"
                 translate="no"
                 style={ev.color ? { color: ev.color } : undefined}
-                title={`${ownTip(ev)} — Klick: bearbeiten`}
+                title={`${ownTip(ev)} – Klick: bearbeiten`}
                 onClick={() => { setEvEdit({ ...ev }); setEvIsNew(false); setLinkQuery(''); }}
               >
                 ★ {ev.time ? `${ev.time} · ` : ''}{ev.title}
-                {ev.place ? <span className="cal-dayedit-sub"> 📍{ev.place}</span> : null}
-                {ev.link ? <span className="cal-dayedit-sub"> 🔗</span> : null}
+                {ev.place ? <span className="cal-dayedit-sub"> <IOrt size={11} /> {ev.place}</span> : null}
+                {ev.link ? <span className="cal-dayedit-sub"> <ILink size={11} /></span> : null}
               </button>
-              <button title="An Google Kalender übergeben — öffnet Google mit vorausgefülltem Termin, dort mit einem Klick speichern" onClick={() => toGoogle(ev)}>→G</button>
-              <button title="Als .ics-Datei — in Outlook/Apple Kalender öffnen" onClick={() => evIcs(ev)}>.ics</button>
+              <button title="An Google Kalender übergeben – öffnet Google mit vorausgefülltem Termin, dort mit einem Klick speichern" onClick={() => toGoogle(ev)}>→G</button>
+              <button title="Als .ics-Datei – in Outlook/Apple Kalender öffnen" onClick={() => evIcs(ev)}>.ics</button>
               <button title="Termin löschen" onClick={() => removeMyEvent(ev.id)}>✕</button>
             </div>
           ))}
@@ -907,16 +907,16 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
               }}
             >＋ Termin mit Details</button>
             <button
-              title="Eine vorhandene Karte als Termin eintragen: Karte suchen — Titel und Verknüpfung werden übernommen"
+              title="Eine vorhandene Karte als Termin eintragen: Karte suchen – Titel und Verknüpfung werden übernommen"
               onClick={() => {
                 setEvEdit({ id: Math.random().toString(36).slice(2, 10), date: dayEdit, title: '' });
                 setEvIsNew(true);
                 setLinkQuery('');
               }}
-            >📎 Karte als Termin…</button>
+            >Karte als Termin…</button>
           </div>
           <div className="cal-dayedit-foot">
-            Klick auf einen Termin = bearbeiten · „→G"/.ics übergibt an deinen echten Kalender · Rückrichtung: Konto/ICS-Abo (⚙)
+            Klick auf einen Termin = bearbeiten · „→G"/.ics übergibt an deinen echten Kalender · Rückrichtung: Konto/ICS-Abo (Einstellungen)
           </div>
         </div>
       )}
@@ -945,7 +945,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
             <label>Bis
               <input type="time" value={evEdit.end ?? ''} onChange={(e) => setEvEdit({ ...evEdit, end: e.target.value || undefined })} />
             </label>
-            <label title="Enddatum für mehrtägige Termine — erscheint als farbiger Streifen">Bis-Datum
+            <label title="Enddatum für mehrtägige Termine – erscheint als farbiger Streifen">Bis-Datum
               <input type="date" value={evEdit.endDate ?? ''} onChange={(e) => setEvEdit({ ...evEdit, endDate: e.target.value || undefined })} />
             </label>
           </div>
@@ -974,21 +974,21 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
           </div>
           {evEdit.link ? (
             <div className="cal-evform-link">
-              🔗
+              <ILink size={12} />
               <button
                 className="cal-dayedit-title"
                 translate={linkLabel(evEdit.link) ? 'no' : undefined}
                 title={linkLabel(evEdit.link) ? 'Zur verknüpften Karte springen' : 'Ziel wurde gelöscht'}
                 onClick={() => linkLabel(evEdit.link!) && jumpLink(evEdit.link!)}
               >
-                {linkLabel(evEdit.link) ?? '⚠ Ziel gelöscht'}
+                {linkLabel(evEdit.link) ?? 'Ziel gelöscht'}
               </button>
               <button title="Verknüpfung entfernen" onClick={() => setEvEdit({ ...evEdit, link: undefined })}>✕</button>
             </div>
           ) : (
             <div className="cal-evform-pick">
               <input
-                placeholder="🔗 Karte/Board verknüpfen — suchen …"
+                placeholder="Karte/Board verknüpfen – suchen …"
                 value={linkQuery}
                 onChange={(e) => setLinkQuery(e.target.value)}
               />
@@ -1011,7 +1011,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
             </div>
           )}
           <div className="cal-evform-actions">
-            <button className="cal-evform-save" disabled={!evEdit.title.trim()} onClick={saveEvent}>💾 Speichern</button>
+            <button className="cal-evform-save" disabled={!evEdit.title.trim()} onClick={saveEvent}>Speichern</button>
             {!evIsNew && (
               <>
                 <button title="An Google Kalender übergeben" onClick={() => toGoogle(evEdit)}>→G</button>
@@ -1019,7 +1019,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
                 <button
                   title="Termin löschen"
                   onClick={() => { removeMyEvent(evEdit.id); setEvEdit(null); }}
-                >🗑</button>
+                ><ITrash size={14} /></button>
               </>
             )}
           </div>

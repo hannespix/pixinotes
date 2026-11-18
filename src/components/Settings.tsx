@@ -64,7 +64,7 @@ const NEEDS_URL = new Set(['ollama', 'custom']);
 // vorher log der Erfolgs-Toast bei vollem Speicher (Stand nur im RAM, nach
 // Neustart wieder weg). Jetzt wird ehrlich gewarnt und KEIN Stempel gesetzt.
 const QUOTA_IMPORT_MSG =
-  '⚠️ Geladen, aber NICHT dauerhaft gespeichert — der Browser-Speicher ist voll! '
+  'Geladen, aber NICHT dauerhaft gespeichert – der Browser-Speicher ist voll! '
   + 'Bitte Platz schaffen (z. B. große Bilder löschen) und erneut laden, sonst ist der Stand nach dem Schließen weg.';
 
 type Reiter = 'design' | 'daten' | 'dienste';
@@ -301,13 +301,13 @@ export function Settings() {
   const doConnectGoogle = () => doExport(async () => {
     const name = await connectGoogle(gClientId.trim());
     refreshCalAcc();
-    showToast(`✅ Google verbunden: ${name}`);
+    showToast(`Google verbunden: ${name}`);
   }, 'google');
 
   const doConnectMs = () => doExport(async () => {
     const name = await connectMicrosoft(msClientId.trim(), msTenant.trim() || 'common', msMitNotes);
     refreshCalAcc();
-    showToast(`✅ Microsoft 365 verbunden: ${name}`);
+    showToast(`Microsoft 365 verbunden: ${name}`);
   }, 'ms');
 
   /** M300: OneNote nachträglich freischalten — dieselbe App-ID, ein weiteres Bestätigen */
@@ -316,7 +316,7 @@ export function Settings() {
     if (!acc) return;
     const name = await connectMicrosoft(acc.clientId, acc.tenant ?? 'common', true);
     refreshCalAcc();
-    showToast(`✅ OneNote freigeschaltet: ${name}`);
+    showToast(`OneNote freigeschaltet: ${name}`);
   }, 'ms');
 
   const toggleGoogleCalendar = (calId: string, enabled: boolean) => {
@@ -338,16 +338,16 @@ export function Settings() {
     saveWebdav(cfg);
     setDavCfg(cfg);
     if (state === 'vorhanden') {
-      showToast('✅ Verbunden — auf dem Server liegt bereits ein Stand. „Vom Server laden" holt ihn.');
+      showToast('Verbunden – auf dem Server liegt bereits ein Stand. „Vom Server laden" holt ihn.');
     } else {
       await webdavWrite(cfg);
-      showToast('✅ Verbunden — aktueller Stand wurde hochgeladen. Änderungen syncen ab jetzt automatisch.');
+      showToast('Verbunden – aktueller Stand wurde hochgeladen. Änderungen syncen ab jetzt automatisch.');
     }
   });
 
   const davPush = () => doDav('davpush', async () => {
     const stamp = await webdavWrite(davCfg!);
-    showToast(`⬆️ Hochgeladen (${new Date(stamp).toLocaleTimeString('de-DE')}).`);
+    showToast(`Hochgeladen (${new Date(stamp).toLocaleTimeString('de-DE')}).`);
   });
 
   const davPull = () => doDav('davpull', async () => {
@@ -355,14 +355,14 @@ export function Settings() {
     if (!p) { showToast('Auf dem Server liegt (noch) keine PixiNotes-Datei.'); return; }
     if (!window.confirm(`Stand vom ${new Date(p.savedAt).toLocaleString('de-DE')} laden? Der lokale Stand wird ersetzt (Strg+Z geht danach nicht zurück).`)) return;
     if (!applyWebdav(p)) { showToast(QUOTA_IMPORT_MSG); return; }
-    showToast('⬇️ Stand vom WebDAV-Server geladen.');
+    showToast('Stand vom WebDAV-Server geladen.');
   });
 
   const davDisconnect = () => {
     clearWebdav();
     setDavCfg(null);
     setDavSecret('');
-    showToast('WebDAV getrennt — Zugangsdaten gelöscht, Daten bleiben lokal erhalten.');
+    showToast('WebDAV getrennt – Zugangsdaten gelöscht, Daten bleiben lokal erhalten.');
   };
 
   // ---- M317: Konto-Sync ----
@@ -372,11 +372,11 @@ export function Settings() {
   }, label);
 
   const kontoMeldung = (r: VerbindenErgebnis, wo: string) => {
-    if (r === 'hochgeladen') showToast(`✅ Angemeldet — der aktuelle Stand liegt jetzt in ${wo}. Änderungen gleichen sich ab jetzt automatisch ab.`);
-    else if (r === 'uebernommen') showToast(`✅ Angemeldet — der Stand aus ${wo} wurde übernommen.`);
-    else if (r === 'zusammengefuehrt') showToast(`✅ Angemeldet — Stand mit ${wo} zusammengeführt.`);
+    if (r === 'hochgeladen') showToast(`Angemeldet – der aktuelle Stand liegt jetzt in ${wo}. Änderungen gleichen sich ab jetzt automatisch ab.`);
+    else if (r === 'uebernommen') showToast(`Angemeldet – der Stand aus ${wo} wurde übernommen.`);
+    else if (r === 'zusammengefuehrt') showToast(`Angemeldet – Stand mit ${wo} zusammengeführt.`);
     else if (r === 'konflikt') showToast(`In ${wo} liegt schon ein Stand und hier Eigenes. Unten „Vom Konto laden" oder „Jetzt hochladen" wählen.`, false, 9000);
-    else showToast(`✅ Angemeldet bei ${wo} — alles auf dem gleichen Stand.`);
+    else showToast(`Angemeldet bei ${wo} – alles auf dem gleichen Stand.`);
   };
   const kontoConnect = (anbieter: Anbieter) => doKonto('konto', async () => {
     const sitz = await kontoAnmelden(anbieter, anbieter === 'google' ? kontoGid : kontoMsid, kontoTenant.trim() || 'common');
@@ -394,28 +394,28 @@ export function Settings() {
   const kontoMailLink = () => doKonto('konto', async () => {
     await sbLinkSenden(kontoMail);
     setKontoLinkWeg(true);
-    showToast(`✉️ Link an ${kontoMail.trim()} geschickt — ein Tipp darauf meldet dieses Gerät an.`, false, 8000);
+    showToast(`Link an ${kontoMail.trim()} geschickt – ein Tipp darauf meldet dieses Gerät an.`, false, 8000);
   });
   const kontoMailPasswort = () => doKonto('konto', async () => kontoSbFertig(await sbPasswortAnmelden(kontoMail, kontoPass)));
   const kontoMailRegistrieren = () => doKonto('konto', async () => {
     const s = await sbRegistrieren(kontoMail, kontoPass);
-    if (!s) { setKontoLinkWeg(true); showToast('✉️ Konto angelegt — bitte den Bestätigungs-Link aus der Mail öffnen, dann ist dieses Gerät angemeldet.', false, 9000); return; }
+    if (!s) { setKontoLinkWeg(true); showToast('Konto angelegt – bitte den Bestätigungs-Link aus der Mail öffnen, dann ist dieses Gerät angemeldet.', false, 9000); return; }
     await kontoSbFertig(s);
   });
   const sbKonfigSichern = () => {
     supabaseKonfigSpeichern({ url: sbUrl, key: sbKey });
-    showToast(supabaseKonfiguriert() ? '✅ Konto-Backend hinterlegt — Nutzer können sich jetzt mit E-Mail anmelden.' : 'Konto-Backend entfernt.');
+    showToast(supabaseKonfiguriert() ? 'Konto-Backend hinterlegt – Nutzer können sich jetzt mit E-Mail anmelden.' : 'Konto-Backend entfernt.');
   };
   const kontoEigenesLoeschen = () => doKonto('kontoweg', async () => {
     if (!window.confirm('Das PixiNotes-Konto und alle dort gespeicherten Boards endgültig löschen? Die Daten auf diesem Gerät bleiben erhalten.')) return;
     await kontoLoeschen();
     setKontoSitz(null);
-    showToast('Konto gelöscht — die Daten bleiben nur noch auf diesem Gerät.');
+    showToast('Konto gelöscht – die Daten bleiben nur noch auf diesem Gerät.');
   });
 
   const kontoPush = () => doKonto('kontopush', async () => {
     const st = await kontoWrite();
-    showToast(`⬆️ Hochgeladen (${new Date(st).toLocaleTimeString('de-DE')}).`);
+    showToast(`Hochgeladen (${new Date(st).toLocaleTimeString('de-DE')}).`);
   });
 
   const kontoPull = () => doKonto('kontopull', async () => {
@@ -423,20 +423,20 @@ export function Settings() {
     if (!r) { showToast(`In ${kontoLabel()} liegt (noch) kein PixiNotes-Stand.`); return; }
     if (!window.confirm(`Stand vom ${new Date(r.payload.savedAt).toLocaleString('de-DE')} laden? Der lokale Stand wird ersetzt (Strg+Z geht danach nicht zurück).`)) return;
     if (!applyKonto(r.payload)) { showToast(QUOTA_IMPORT_MSG); return; }
-    showToast(`⬇️ Stand aus ${kontoLabel()} geladen.`);
+    showToast(`Stand aus ${kontoLabel()} geladen.`);
   });
 
   const kontoLogout = () => {
     kontoAbmelden();
     setKontoSitz(null);
-    showToast('Abgemeldet — die Daten bleiben lokal und im Konto erhalten.');
+    showToast('Abgemeldet – die Daten bleiben lokal und im Konto erhalten.');
   };
 
   const copyCorsText = async () => {
     const text = corsRequestText(davCfg ?? (davUrl.trim() ? { url: davUrl.trim(), user: '', secret: '', auto: false } : null));
     try {
       await navigator.clipboard.writeText(text);
-      showToast('📋 Text für die IT kopiert — er enthält keine Zugangsdaten.');
+      showToast('Text für die IT kopiert – er enthält keine Zugangsdaten.');
     } catch {
       // Zwischenablage verweigert (Safari ohne Nutzergeste o. Ä.) → als Mail öffnen
       const [subject, ...rest] = text.split('\n');
@@ -450,10 +450,10 @@ export function Settings() {
       const way = await saveViaFiles();
       setFilesTick((n) => n + 1);
       showToast(way === 'geteilt'
-        ? '☁️ Teilen-Blatt geöffnet — „In Dateien sichern" → den Nextcloud-Ordner wählen und die vorhandene pixinotes-daten.json ersetzen.'
-        : '💾 pixinotes-daten.json gespeichert — in den Nextcloud-Ordner legen (vorhandene Datei ersetzen).', false, 9000);
+        ? 'Teilen-Blatt geöffnet – „In Dateien sichern" → den Nextcloud-Ordner wählen und die vorhandene pixinotes-daten.json ersetzen.'
+        : 'pixinotes-daten.json gespeichert – in den Nextcloud-Ordner legen (vorhandene Datei ersetzen).', false, 9000);
     } catch (e) {
-      if ((e as Error).message === 'abgebrochen') { showToast('Nicht gesichert — Vorgang abgebrochen.'); return; }
+      if ((e as Error).message === 'abgebrochen') { showToast('Nicht gesichert – Vorgang abgebrochen.'); return; }
       throw e;
     }
   }, 'filessave');
@@ -464,7 +464,7 @@ export function Settings() {
     if (!window.confirm(`Stand vom ${new Date(p.savedAt).toLocaleString('de-DE')} laden? Die aktuellen Boards werden ersetzt (Strg+Z geht danach nicht zurück).`)) return;
     if (!applyFilesSync(p)) { showToast(QUOTA_IMPORT_MSG); return; }
     setFilesTick((n) => n + 1);
-    showToast('⬇️ Stand aus der Dateien-App geladen.');
+    showToast('Stand aus der Dateien-App geladen.');
   };
 
   const connectSync = async () => {
@@ -475,10 +475,10 @@ export function Settings() {
       `Im Ordner liegt bereits ein PixiNotes-Stand (${new Date(remote.savedAt).toLocaleString('de-DE')}).\n\nOK = diesen Stand LADEN (ersetzt die lokalen Boards)\nAbbrechen = lokalen Stand in den Ordner schreiben`,
     )) {
       if (!applySync(remote)) { showToast(QUOTA_IMPORT_MSG); return; }
-      showToast('☁️ Stand aus dem Sync-Ordner geladen');
+      showToast('Stand aus dem Sync-Ordner geladen');
     } else {
       await writeSync(handle);
-      showToast(`☁️ Verbunden — Änderungen werden automatisch nach „${handle.name}" gespeichert`);
+      showToast(`Verbunden – Änderungen werden automatisch nach „${handle.name}" gespeichert`);
     }
   };
 
@@ -487,13 +487,13 @@ export function Settings() {
     const remote = await readSync(syncHandle);
     if (!remote) { showToast('Keine (gültige) pixinotes-daten.json im Ordner gefunden.'); return; }
     if (!applySync(remote)) { showToast(QUOTA_IMPORT_MSG); return; }
-    showToast('☁️ Stand aus dem Sync-Ordner geladen');
+    showToast('Stand aus dem Sync-Ordner geladen');
   };
 
   const saveToSync = async () => {
     if (!syncHandle || !(await ensurePermission(syncHandle, true))) return;
     await writeSync(syncHandle);
-    showToast('☁️ In den Sync-Ordner gespeichert');
+    showToast('In den Sync-Ordner gespeichert');
   };
 
   // ---- Team-Sync (M145): einzelne Projekte in eigene Sync-Ordner ----
@@ -503,13 +503,13 @@ export function Settings() {
     if (res.state === 'vorhanden') {
       showToast(`Im Ordner liegt schon ein Stand von „${projectName}". Unten laden oder überschreiben.`);
     } else {
-      showToast(`☁️ „${projectName}" wird jetzt nach „${res.folder}" gespiegelt.`);
+      showToast(`„${projectName}" wird jetzt nach „${res.folder}" gespiegelt.`);
     }
   }, `psc-${projectId}`);
 
   const psSave = (projectId: string) => doExport(async () => {
     const stamp = await writeProjectSync(projectId);
-    showToast(`☁️ Projekt in den Team-Ordner gespeichert (${new Date(stamp).toLocaleTimeString('de-DE')}).`);
+    showToast(`Projekt in den Team-Ordner gespeichert (${new Date(stamp).toLocaleTimeString('de-DE')}).`);
   }, `pss-${projectId}`);
 
   const psLoad = (projectId: string, projectName: string) => doExport(async () => {
@@ -520,13 +520,13 @@ export function Settings() {
     if (!window.confirm(`Team-Stand von „${projectName}" vom ${new Date(p.savedAt).toLocaleString('de-DE')} laden? Ersetzt die Boards dieses Projekts (andere Projekte bleiben unberührt).`)) return;
     setOpen(true, 'daten'); // Import remountet die App — Reiter beibehalten
     if (!applyProjectPayload(p)) { showToast(QUOTA_IMPORT_MSG); return; }
-    showToast(`☁️ Team-Projekt „${p.project.name}" geladen.`);
+    showToast(`Team-Projekt „${p.project.name}" geladen.`);
   }, `psl-${projectId}`);
 
   const psOff = (projectId: string) => doExport(async () => {
     await disconnectProjectSync(projectId);
     setPsMeta(projectSyncMeta());
-    showToast('Team-Ordner getrennt — das Projekt bleibt lokal erhalten.');
+    showToast('Team-Ordner getrennt – das Projekt bleibt lokal erhalten.');
   }, `pso-${projectId}`);
 
   const psJoin = () => doExport(async () => {
@@ -536,7 +536,7 @@ export function Settings() {
     setOpen(true, 'daten');
     setPsMeta(projectSyncMeta());
     if (!res.persisted) { showToast(QUOTA_IMPORT_MSG); return; }
-    showToast(`✅ Beigetreten: ${res.names.map((n) => `„${n}"`).join(', ')} aus Ordner „${res.folder}" — Abgleich läuft ab jetzt automatisch.`);
+    showToast(`Beigetreten: ${res.names.map((n) => `„${n}"`).join(', ')} aus Ordner „${res.folder}" – Abgleich läuft ab jetzt automatisch.`);
   }, 'psjoin');
 
   /** M300: Ein Knopf statt zwei — der Text landet in der Zwischenablage UND als
@@ -545,7 +545,7 @@ export function Settings() {
     const folder = psMeta[projectId]?.folder ?? 'Team-Ordner';
     navigator.clipboard?.writeText(buildInviteText(projectName, folder)).catch(() => {});
     window.location.href = buildInviteMailto(projectName, folder);
-    showToast('Einladung kopiert und als E-Mail geöffnet — nur noch den Freigabe-Link einfügen.');
+    showToast('Einladung kopiert und als E-Mail geöffnet – nur noch den Freigabe-Link einfügen.');
   };
 
   // Team-Sync: verbundene Projekte in der Liste, freie im Wähler
@@ -573,7 +573,7 @@ export function Settings() {
     a.download = `pixinotes-daten-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast('💾 Kompletter Stand als Datei exportiert');
+    showToast('Kompletter Stand als Datei exportiert');
   };
 
   const importStateFile = async (file: File) => {
@@ -592,7 +592,7 @@ export function Settings() {
       if (!flushPersist()) { showToast(QUOTA_IMPORT_MSG); return; }
       // Der Datei-Stand liegt in keinem Sync-Ziel → kein Fast-Forward darüber
       try { localStorage.setItem(SYNC_DIRTY_KEY, '1'); localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); } catch { /* unkritisch */ }
-      showToast('📂 Stand aus Datei geladen');
+      showToast('Stand aus Datei geladen');
       setOpen(false);
     } catch {
       showToast('Datei konnte nicht gelesen werden.');
@@ -612,10 +612,10 @@ export function Settings() {
   const resetEverything = async () => {
     // M390: EIN Text (kein zusammengesetzter) — nur so findet ihn das Wörterbuch; die Rückfrage stand auf Englisch
     // sonst deutsch da, mit einem einzelnen übersetzten Wort
-    if (!window.confirm(`Wirklich ALLES leeren?\n\nAlle Bereiche, Projekte, Boards, Karten, Versionen und Vorlagen werden gelöscht. Ein verbundener Sync-Ordner wird getrennt (seine Dateien bleiben unangetastet). KI-Einstellungen bleiben erhalten.\n\nTipp: Vorher unter „Daten" den Stand als Datei exportieren — er enthält auch Vorlagen, große Dateien und eigene Tools.`)) return;
+    if (!window.confirm(`Wirklich ALLES leeren?\n\nAlle Bereiche, Projekte, Boards, Karten, Versionen und Vorlagen werden gelöscht. Ein verbundener Sync-Ordner wird getrennt (seine Dateien bleiben unangetastet). KI-Einstellungen bleiben erhalten.\n\nTipp: Vorher unter „Daten" den Stand als Datei exportieren – er enthält auch Vorlagen, große Dateien und eigene Tools.`)) return;
     const word = window.prompt('Zur Bestätigung bitte LEEREN eingeben:');
     if ((word ?? '').trim().toUpperCase() !== 'LEEREN') {
-      showToast('Abgebrochen — nichts wurde gelöscht.');
+      showToast('Abgebrochen – nichts wurde gelöscht.');
       return;
     }
     // Sync trennen, BEVOR geleert wird — sonst würde der Auto-Sync den
@@ -641,7 +641,7 @@ export function Settings() {
     <div className="modal-backdrop" onClick={() => setOpen(false)}>
       <div className="modal" role="dialog" aria-modal="true" aria-label="Einstellungen" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <h2>⚙️ Einstellungen</h2>
+          <h2>Einstellungen</h2>
           <button className="modal-x" onClick={() => setOpen(false)} aria-label="Schließen">✕</button>
         </div>
 
@@ -806,11 +806,11 @@ export function Settings() {
             <>
               <p className="modal-hint">
                 {supabaseKonfiguriert()
-                  ? 'Mit E-Mail anmelden — ein PixiNotes-Konto, das auf jedem Gerät geht, auch ohne Google Drive oder OneDrive. Oder mit Google bzw. Microsoft: dann liegt der Stand im App-Ordner deines eigenen Drive/OneDrive.'
-                  : 'Mit Google oder Microsoft anmelden — PixiNotes legt seinen Stand im App-Ordner deines eigenen Google Drive bzw. OneDrive ab und gleicht ihn auf allen Geräten ab. Kein Server, nichts einzurichten.'}
+                  ? 'Mit E-Mail anmelden – ein PixiNotes-Konto, das auf jedem Gerät geht, auch ohne Google Drive oder OneDrive. Oder mit Google bzw. Microsoft: dann liegt der Stand im App-Ordner deines eigenen Drive/OneDrive.'
+                  : 'Mit Google oder Microsoft anmelden – PixiNotes legt seinen Stand im App-Ordner deines eigenen Google Drive bzw. OneDrive ab und gleicht ihn auf allen Geräten ab. Kein Server, nichts einzurichten.'}
               </p>
               {!oauthAvailable() && (
-                <div className="modal-note">⚠️ Die Einzeldatei (file://) kann keine Anmeldung per Google, Microsoft oder E-Mail-Link — dafür die gehostete App nutzen. Hier bleiben E-Mail mit Passwort, Ordner, WebDAV und Datei.</div>
+                <div className="modal-note">Die Einzeldatei (file://) kann keine Anmeldung per Google, Microsoft oder E-Mail-Link – dafür die gehostete App nutzen. Hier bleiben E-Mail mit Passwort, Ordner, WebDAV und Datei.</div>
               )}
               {!kontoSitz ? (
                 <>
@@ -826,7 +826,7 @@ export function Settings() {
                           {busy === 'konto' ? '…' : 'Anmelde-Link per E-Mail'}
                         </button>
                       </div>
-                      {kontoLinkWeg && <div className="modal-note">✉️ Link verschickt — ein Tipp darauf meldet dieses Gerät an. Kein Passwort nötig.</div>}
+                      {kontoLinkWeg && <div className="modal-note">Link verschickt – ein Tipp darauf meldet dieses Gerät an. Kein Passwort nötig.</div>}
                       <details className="modal-details">
                         <summary>Mit Passwort anmelden oder Konto erstellen</summary>
                         <label className="modal-row">
@@ -854,7 +854,7 @@ export function Settings() {
                       <summary>Einmalig vom Betreiber: Konto-Backend und Client-IDs hinterlegen</summary>
                       <p className="modal-hint">
                         Nutzer tippen hier nichts. Der Betreiber hinterlegt einmal das Konto-Backend (Supabase-Projekt) und je Anbieter eine App-ID im Build
-                        (Repository-Variablen <code>VITE_SUPABASE_URL</code>, <code>VITE_SUPABASE_ANON_KEY</code>, <code>VITE_GOOGLE_CLIENT_ID</code>, <code>VITE_MS_CLIENT_ID</code>) — oder hier. Dieselben IDs gelten für die Kalender-Konten unter Dienste.
+                        (Repository-Variablen <code>VITE_SUPABASE_URL</code>, <code>VITE_SUPABASE_ANON_KEY</code>, <code>VITE_GOOGLE_CLIENT_ID</code>, <code>VITE_MS_CLIENT_ID</code>) – oder hier. Dieselben IDs gelten für die Kalender-Konten unter Dienste.
                       </p>
                       {!supabaseKonfiguriert() && (
                         <>
@@ -880,7 +880,7 @@ export function Settings() {
                       </label>
                       <div className="modal-note">
                         Google Cloud Console → APIs &amp; Dienste → Anmeldedaten → OAuth-Client „Webanwendung", autorisierte JavaScript-Quelle <code>{location.origin}</code>.
-                        Berechtigung <code>drive.appdata</code> gilt als nicht sensibel — keine Prüfung durch Google nötig.
+                        Berechtigung <code>drive.appdata</code> gilt als nicht sensibel – keine Prüfung durch Google nötig.
                       </div>
                       <label className="modal-row">
                         <span>Microsoft App-ID</span>
@@ -907,14 +907,14 @@ export function Settings() {
                     )}
                   </div>
                   <div className="modal-note" data-taste="konto-stand">
-                    ✅ Angemeldet bei {kontoLabel(kontoSitz)}{kontoSitz.name ? <> als „<span translate="no">{kontoSitz.name}</span>"</> : ''} — Änderungen werden automatisch abgeglichen
+                    Angemeldet bei {kontoLabel(kontoSitz)}{kontoSitz.name ? <> als „<span translate="no">{kontoSitz.name}</span>"</> : ''} – Änderungen werden automatisch abgeglichen
                     {kontoStamp() ? ` (letzter Abgleich: ${new Date(kontoStamp()!).toLocaleString('de-DE')})` : ''}
-                    {kontoIstEigenes(kontoSitz) ? (kontoLiveVerbunden() ? ', live verbunden' : ', Abgleich alle zehn Sekunden') : ''}. Anhänge bis {kontoDateiMaxMb(kontoSitz)} MB wandern mit{kontoIstEigenes(kontoSitz) ? ' — große laden beim Öffnen der Karte nach' : ''}.
+                    {kontoIstEigenes(kontoSitz) ? (kontoLiveVerbunden() ? ', live verbunden' : ', Abgleich alle zehn Sekunden') : ''}. Anhänge bis {kontoDateiMaxMb(kontoSitz)} MB wandern mit{kontoIstEigenes(kontoSitz) ? ' – große laden beim Öffnen der Karte nach' : ''}.
                   </div>
                 </>
               )}
               {kontoError && (
-                <div className="modal-error" role="alert">⚠️ {kontoError}</div>
+                <div className="modal-error" role="alert">{kontoError}</div>
               )}
             </>
           )}
@@ -936,16 +936,16 @@ export function Settings() {
                         onClick={() => doExport(async () => {
                           if (await ensurePermission(syncHandle, true)) {
                             setSyncPerm('granted');
-                            showToast('Zugriff erlaubt — Auto-Sync läuft wieder.');
+                            showToast('Zugriff erlaubt – Auto-Sync läuft wieder.');
                             // Direkt prüfen: liegt im Ordner ein neuerer Stand,
                             // wird er jetzt gefahrlos übernommen (Fast-Forward)
                             await checkSyncRemote();
                           } else {
-                            showToast('Zugriff nicht erteilt — Sync bleibt pausiert.');
+                            showToast('Zugriff nicht erteilt – Sync bleibt pausiert.');
                           }
                         }, 'syncperm')}
                       >
-                        {busy === 'syncperm' ? '…' : '🔓 Zugriff erlauben'}
+                        {busy === 'syncperm' ? '…' : 'Zugriff erlauben'}
                       </button>
                     )}
                     <button disabled={!!busy} onClick={() => doExport(saveToSync, 'syncsave')}>
@@ -957,7 +957,7 @@ export function Settings() {
                     <button disabled={!!busy} onClick={() => doExport(async () => {
                       await disconnectSync();
                       setSyncHandle(null);
-                      showToast('Sync-Ordner getrennt — Daten bleiben lokal erhalten.');
+                      showToast('Sync-Ordner getrennt – Daten bleiben lokal erhalten.');
                     }, 'syncoff')}>
                       {busy === 'syncoff' ? '…' : 'Trennen'}
                     </button>
@@ -967,8 +967,8 @@ export function Settings() {
               {syncHandle && (
                 <div className="modal-note">
                   {syncPerm === 'prompt'
-                    ? <>⚠️ Verbunden mit „<span translate="no">{syncHandle.name}</span>", aber der Browser hat den Zugriff nach dem Neustart zurückgesetzt — bitte oben „Zugriff erlauben" klicken, sonst pausiert der Auto-Sync.</>
-                    : <>✅ Verbunden mit Ordner „<span translate="no">{syncHandle.name}</span>" — Änderungen werden automatisch gespeichert
+                    ? <>Verbunden mit „<span translate="no">{syncHandle.name}</span>", aber der Browser hat den Zugriff nach dem Neustart zurückgesetzt – bitte oben „Zugriff erlauben" klicken, sonst pausiert der Auto-Sync.</>
+                    : <>Verbunden mit Ordner „<span translate="no">{syncHandle.name}</span>" – Änderungen werden automatisch gespeichert
                       {knownStamp() ? ` (letzter Sync: ${new Date(knownStamp()!).toLocaleString('de-DE')})` : ''}.
                       Schreibt ein anderes Gerät zwischenzeitlich, werden beide Stände zusammengeführt.</>}
                 </div>
@@ -980,10 +980,10 @@ export function Settings() {
             <>
               <p className="modal-hint">Direkt auf den Server (Nextcloud, ownCloud …), ohne Desktop-Client, auch am Tablet und Handy. Bei Nextcloud ein App-Passwort anlegen.</p>
               <details className="modal-details">
-                <summary>⚠️ Wird blockiert? Das liegt am Server (CORS) — so wird es freigegeben</summary>
+                <summary>Wird blockiert? Das liegt am Server (CORS) – so wird es freigegeben</summary>
                 <p className="modal-hint">
                   Nextcloud erlaubt Browser-Zugriffe auf <code>/remote.php/dav</code> standardmäßig nicht, in jedem Browser und auf jedem Gerät.
-                  Die Freigabe muss vom Server kommen — am schnellsten mit der Nextcloud-App <b>„WebAppPassword"</b>, in der eure IT
+                  Die Freigabe muss vom Server kommen – am schnellsten mit der Nextcloud-App <b>„WebAppPassword"</b>, in der eure IT
                   diese Herkunft einträgt: <code>{location.origin}</code>
                 </p>
                 <div className="modal-buttons">
@@ -1005,7 +1005,7 @@ export function Settings() {
                   </label>
                   {davUrl.trim() !== '' && !davUrl.includes('remote.php') && (
                     <div className="modal-note">
-                      💡 Das sieht nicht nach einer WebDAV-Ordner-URL aus. Bei Nextcloud lautet sie meist:{' '}
+                      Das sieht nicht nach einer WebDAV-Ordner-URL aus. Bei Nextcloud lautet sie meist:{' '}
                       <code>https://DEINE-CLOUD/remote.php/dav/files/BENUTZERNAME/PixiNotes</code>{' '}
                       (zu finden in Nextcloud unten links unter „Dateieinstellungen" → WebDAV).
                     </div>
@@ -1032,14 +1032,14 @@ export function Settings() {
                     <button disabled={!!busy} onClick={davDisconnect}>Trennen</button>
                   </div>
                   <div className="modal-note">
-                    ✅ Verbunden mit <span translate="no">{davCfg.url.replace(/^https?:\/\//, '').split('/')[0]}</span> — Änderungen werden automatisch hochgeladen
+                    Verbunden mit <span translate="no">{davCfg.url.replace(/^https?:\/\//, '').split('/')[0]}</span> – Änderungen werden automatisch hochgeladen
                     {webdavStamp() ? ` (letzter Sync: ${new Date(webdavStamp()!).toLocaleString('de-DE')})` : ''}.
                     Schreibt ein anderes Gerät zwischenzeitlich, warnt PixiNotes statt zu überschreiben.
                   </div>
                 </>
               )}
               {davError && (
-                <div className="modal-error" role="alert">⚠️ {davError}</div>
+                <div className="modal-error" role="alert">{davError}</div>
               )}
             </>
           )}
@@ -1051,7 +1051,7 @@ export function Settings() {
               {isAppleTouch() && (
                 <div className="modal-note">
                   <b>Einmalig einrichten:</b> die <b>Nextcloud-App</b> aus dem App Store installieren und
-                  anmelden — danach erscheint deine Nextcloud in der <b>Dateien-App</b> als Speicherort.
+                  anmelden – danach erscheint deine Nextcloud in der <b>Dateien-App</b> als Speicherort.
                   Beim Sichern wählst du dort deinen PixiNotes-Ordner und ersetzt die vorhandene Datei.
                 </div>
               )}
@@ -1074,16 +1074,16 @@ export function Settings() {
               </div>
               <div className="modal-note">
                 {filesSyncDirty()
-                  ? <>⚠️ <b>Es gibt Änderungen, die noch nirgends gesichert sind.</b>{filesSyncStamp() ? ` Zuletzt gesichert: ${new Date(filesSyncStamp()!).toLocaleString('de-DE')}.` : ''} Die Wolke oben in der Kopfleiste erinnert dich daran — ein Tipp darauf sichert sofort.</>
+                  ? <><b>Es gibt Änderungen, die noch nirgends gesichert sind.</b>{filesSyncStamp() ? ` Zuletzt gesichert: ${new Date(filesSyncStamp()!).toLocaleString('de-DE')}.` : ''} Die Wolke oben in der Kopfleiste erinnert dich daran – ein Tipp darauf sichert sofort.</>
                   : filesSyncStamp()
-                    ? <>✅ Gesichert am {new Date(filesSyncStamp()!).toLocaleString('de-DE')} — seitdem keine Änderungen.</>
-                    : <>Noch nichts gesichert. Nach jeder längeren Arbeitseinheit einmal sichern — der Browser-Speicher allein ist kein Backup.</>}
+                    ? <>Gesichert am {new Date(filesSyncStamp()!).toLocaleString('de-DE')} – seitdem keine Änderungen.</>
+                    : <>Noch nichts gesichert. Nach jeder längeren Arbeitseinheit einmal sichern – der Browser-Speicher allein ist kein Backup.</>}
               </div>
               {isAppleTouch() && !isStandalone() && (
                 <div className="modal-note">
-                  💡 <b>Wichtig auf dem iPad:</b> Safari löscht die Daten von Webseiten, die man 7 Tage
+                  <b>Wichtig auf dem iPad:</b> Safari löscht die Daten von Webseiten, die man 7 Tage
                   nicht benutzt. Leg PixiNotes über <b>Teilen → „Zum Home-Bildschirm"</b> auf den
-                  Startbildschirm — dann gilt diese Löschregel nicht mehr.
+                  Startbildschirm – dann gilt diese Löschregel nicht mehr.
                 </div>
               )}
             </div>
@@ -1091,7 +1091,7 @@ export function Settings() {
         </section>
 
         <section className="modal-section">
-          <h3>Team-Sync — Projekte teilen</h3>
+          <h3>Team-Sync – Projekte teilen</h3>
           <p className="modal-hint">Ein Projekt wird in einen eigenen, fürs Team freigegebenen Ordner gespiegelt. Wer mitarbeitet, regelt allein die Ordner-Freigabe.</p>
           {syncSupported() ? (
             <>
@@ -1119,7 +1119,7 @@ export function Settings() {
                   {verbundene.map(({ sp, p }) => (
                     <div className="psync-row" key={p.id}>
                       <span className="psync-name" translate="no" title={`${sp.name} › ${p.name}`}>{sp.name} › <b>{p.name}</b></span>
-                      <span className="psync-status" translate="no">☁ „{psMeta[p.id].folder}"{projectStamp(p.id) ? ` · ${new Date(projectStamp(p.id)!).toLocaleString('de-DE')}` : ''}</span>
+                      <span className="psync-status" translate="no">„{psMeta[p.id].folder}"{projectStamp(p.id) ? ` · ${new Date(projectStamp(p.id)!).toLocaleString('de-DE')}` : ''}</span>
                       <span className="psync-actions">
                         <button disabled={!!busy} onClick={() => psSave(p.id)}>{busy === `pss-${p.id}` ? '…' : 'Jetzt speichern'}</button>
                         <button disabled={!!busy} onClick={() => psLoad(p.id, p.name)}>{busy === `psl-${p.id}` ? '…' : 'Vom Ordner laden'}</button>
@@ -1150,7 +1150,7 @@ export function Settings() {
           <div className="modal-buttons">
             <button disabled={!!busy} onClick={() => doExport(async () => {
               const r = await exportToFolder(spaces, boards);
-              showToast(r === 'ok' ? '📁 In Ordner gespeichert' : '⬇️ Markdown-Datei heruntergeladen');
+              showToast(r === 'ok' ? 'In Ordner gespeichert' : 'Markdown-Datei heruntergeladen');
             }, 'folder')}>
               {busy === 'folder' ? '…' : hasFolderApi ? 'Ordner wählen & speichern' : 'Als Markdown exportieren'}
             </button>
@@ -1187,7 +1187,7 @@ export function Settings() {
               // Wechsel auf „Eigener Server" an eine fremde URL (Audit R6-K2)
               updateAi({ provider, model: MODELS[provider]?.[0] ?? '', baseUrl: DEFAULT_BASE[provider] ?? '', apiKey: '' });
             }}>
-              <option value="none">— aus —</option>
+              <option value="none">– aus –</option>
               <option value="free">Gratis (Pollinations.ai)</option>
               <option value="openrouter">OpenRouter (kostenloser Account)</option>
               <option value="anthropic">Anthropic (Claude)</option>
@@ -1230,7 +1230,7 @@ export function Settings() {
                   {lokal.length > 0 && (
                     <div className="modell-liste">
                       <div className="modell-kopf">
-                        {lokal.filter((m) => !istEinbettungsModell(m.name)).length} Modelle auf {ai.baseUrl.replace(/^https?:\/\//, '')} — anklicken zum Übernehmen
+                        {lokal.filter((m) => !istEinbettungsModell(m.name)).length} Modelle auf {ai.baseUrl.replace(/^https?:\/\//, '')} – anklicken zum Übernehmen
                       </div>
                       {lokal.filter((m) => !istEinbettungsModell(m.name)).map((m) => (
                         <button
@@ -1245,7 +1245,7 @@ export function Settings() {
                       {lokal.some((m) => istEinbettungsModell(m.name)) && (
                         <div className="modell-fuss">
                           Nicht gezeigt: {lokal.filter((m) => istEinbettungsModell(m.name)).map((m) => m.name).join(', ')}
-                          {' '}— Einbettungs-Modelle fürs Gehirn, sie können nicht antworten.
+                          {' '}– Einbettungs-Modelle fürs Gehirn, sie können nicht antworten.
                         </div>
                       )}
                     </div>
@@ -1254,10 +1254,10 @@ export function Settings() {
                       passende Anleitung, nicht alle auf einmal. */}
                   {lokalLage === 'verboten' && (
                     <div className="modal-note warn ollama-hilfe">
-                      <b>Der Server läuft — aber der Browser darf nicht zugreifen.</b>
+                      <b>Der Server läuft – aber der Browser darf nicht zugreifen.</b>
                       <p>
                         Ollama weist die Anfrage von dieser Seite ab, weil sie nicht in seiner Liste erlaubter
-                        Herkünfte steht — eine Schutzvorkehrung, kein Fehler deiner Einrichtung.
+                        Herkünfte steht – eine Schutzvorkehrung, kein Fehler deiner Einrichtung.
                       </p>
                       <p>{erlaubnisHilfe().hinweis}</p>
                       <pre>{erlaubnisHilfe().befehle.join('\n')}</pre>
@@ -1270,18 +1270,18 @@ export function Settings() {
                       <p>
                         Dort lauscht kein Dienst: prüfen mit <code>ollama serve</code> oder{' '}
                         <code>systemctl status ollama</code>, die Voreinstellung ist <code>http://127.0.0.1:11434</code>.
-                        Von einem anderen Gerät ist „localhost" immer das Gerät selbst — dort die Netzwerkadresse
+                        Von einem anderen Gerät ist „localhost" immer das Gerät selbst – dort die Netzwerkadresse
                         des Rechners eintragen und Ollama mit <code>OLLAMA_HOST=0.0.0.0</code> starten.
                       </p>
                     </div>
                   )}
                   {lokalLage === 'leer' && (
                     <div className="modal-note warn">
-                      Der Server antwortet, hat aber kein Modell installiert — unten stehen
+                      Der Server antwortet, hat aber kein Modell installiert – unten stehen
                       Vorschläge mit dem passenden Befehl.
                     </div>
                   )}
-                  {lokalFehler && <div className="modal-note warn">⚠️ {lokalFehler}</div>}
+                  {lokalFehler && <div className="modal-note warn">{lokalFehler}</div>}
                   {ai.provider === 'ollama' && (
                     <details className="modell-tipps">
                       <summary>Noch kein Modell? Bewährte Vorschläge zum Nachladen</summary>
@@ -1323,7 +1323,7 @@ export function Settings() {
                       ? 'Ollama muss laufen (ollama serve); für den Browser-Zugriff ggf. OLLAMA_ORIGINS setzen.'
                       : (NEEDS_KEY.has(ai.provider) && !ai.apiKey)
                         ? 'Ohne Schlüssel bleiben die KI-Aktionen ausgeblendet.'
-                        : '✅ Konfiguriert — KI-Aktionen erscheinen auf den Karten.'}
+                        : 'Konfiguriert – KI-Aktionen erscheinen auf den Karten.'}
               </div>
             </>
           )}
@@ -1331,7 +1331,7 @@ export function Settings() {
 
         {/* ---- M204: Gehirn — semantischer Index ---- */}
         <section className="modal-section">
-          <h3>🧠 Gehirn</h3>
+          <h3>Gehirn</h3>
           <p className="modal-hint">Die Suche findet nach Bedeutung („Kita" findet „Betreuungszeiten") und zeigt verwandte Karten. Der Index bleibt in diesem Browser.</p>
           <label className="modal-row modal-row-check">
             <span>Gehirn einschalten</span>
@@ -1348,8 +1348,8 @@ export function Settings() {
             <>
               <p className="modal-hint">
                 {brainInfo.busy
-                  ? `⏳ Indexiere … (${brainInfo.indexed} Karten fertig)`
-                  : brainInfo.error ? `⚠️ ${brainInfo.error}` : `✅ ${brainInfo.indexed} Karten im Index`}
+                  ? `Indexiere … (${brainInfo.indexed} Karten fertig)`
+                  : brainInfo.error ? `${brainInfo.error}` : `${brainInfo.indexed} Karten im Index`}
               </p>
               {/* M314: Bereiche, Anbieter und Modell braucht man einmal — eingeklappt */}
               <details className="modal-details">
@@ -1400,23 +1400,23 @@ export function Settings() {
                     {lokal.filter((m) => istEinbettungsModell(m.name)).map((m) => <option key={m.name} value={m.name} />)}
                   </datalist>
                   <div className="modal-hint">
-                    Installiert: {lokal.filter((m) => istEinbettungsModell(m.name)).map((m) => m.name).join(', ') || '— noch keines gefunden'}
+                    Installiert: {lokal.filter((m) => istEinbettungsModell(m.name)).map((m) => m.name).join(', ') || 'noch keines gefunden'}
                     {' · '}Nachladen mit <code>ollama pull …</code>: {EINBETTUNGS_VORSCHLAEGE.map((v) => `${v.name} (${v.platz})`).join(' · ')}.
                   </div>
                 </>
               )}
               <div className="modal-hint">
                 {brainInfo.busy
-                  ? `⏳ Indexiere … (${brainInfo.indexed} Karten fertig)`
+                  ? `Indexiere … (${brainInfo.indexed} Karten fertig)`
                   : brainInfo.error
-                    ? `⚠️ ${brainInfo.error}`
-                    : `✅ ${brainInfo.indexed} Karten im Index · Anbieter: ${brainInfo.provider === 'ollama' ? 'Ollama (lokal)' : brainInfo.provider === 'browser' ? 'im Browser' : 'Cloud'}`}
+                    ? `${brainInfo.error}`
+                    : `${brainInfo.indexed} Karten im Index · Anbieter: ${brainInfo.provider === 'ollama' ? 'Ollama (lokal)' : brainInfo.provider === 'browser' ? 'im Browser' : 'Cloud'}`}
               </div>
               <div className="modal-actions">
                 <button className="btn" onClick={() => void rebuildBrainIndex()}>Index neu aufbauen</button>
               </div>
               <p className="modal-hint">
-                Nach einem Wechsel von Anbieter oder Modell „Index neu aufbauen" — Vektoren verschiedener Modelle sind nicht vergleichbar.
+                Nach einem Wechsel von Anbieter oder Modell „Index neu aufbauen" – Vektoren verschiedener Modelle sind nicht vergleichbar.
               </p>
               </details>
             </>
@@ -1428,20 +1428,20 @@ export function Settings() {
           <h3>Handschrift</h3>
           <p className="modal-hint">
             {browserErkenntHandschrift()
-              ? '„Text" in der Zeichen-Palette wandelt Geschriebenes in eine Notiz — dein Browser erkennt die Schrift selbst, nichts verlässt das Gerät.'
-              : '„Text" in der Zeichen-Palette wandelt Geschriebenes in eine Notiz — das kann dein Browser nicht selbst (Chrome auf ChromeOS, Windows und Mac kann es). Am iPad schreibt der Pencil mit Scribble direkt in die Textfelder.'}
+              ? '„Text" in der Zeichen-Palette wandelt Geschriebenes in eine Notiz – dein Browser erkennt die Schrift selbst, nichts verlässt das Gerät.'
+              : '„Text" in der Zeichen-Palette wandelt Geschriebenes in eine Notiz – das kann dein Browser nicht selbst (Chrome auf ChromeOS, Windows und Mac kann es). Am iPad schreibt der Pencil mit Scribble direkt in die Textfelder.'}
           </p>
           <label className="modal-row modal-row-check">
             <span>Online-Erkennung (Google)</span>
             <input type="checkbox" checked={handschriftOnline} onChange={(e) => setHandschriftOnline(e.target.checked)} data-taste="handschrift-online" />
           </label>
-          <p className="modal-hint">Ersatz, wenn der Browser es nicht kann: Die Striche gehen dann an Googles Handschrift-Dienst — ohne Konto, aber außer Haus. Standard: aus.</p>
+          <p className="modal-hint">Ersatz, wenn der Browser es nicht kann: Die Striche gehen dann an Googles Handschrift-Dienst – ohne Konto, aber außer Haus. Standard: aus.</p>
           {/* M324: Vorschlag nach der Schreibpause und KI-Korrektur */}
           <label className="modal-row modal-row-check">
             <span>Vorschlag nach dem Schreiben</span>
             <input type="checkbox" checked={handschriftAuto} onChange={(e) => setHandschriftAuto(e.target.checked)} data-taste="handschrift-auto" />
           </label>
-          <p className="modal-hint">Kurz nach dem Absetzen erscheint der erkannte Text unter dem Geschriebenen — ein Tipp übernimmt ihn in die Notiz darunter oder in eine neue.</p>
+          <p className="modal-hint">Kurz nach dem Absetzen erscheint der erkannte Text unter dem Geschriebenen – ein Tipp übernimmt ihn in die Notiz darunter oder in eine neue.</p>
           {aiReady(ai) && (
             <>
               <label className="modal-row modal-row-check">
@@ -1459,14 +1459,14 @@ export function Settings() {
           <p className="modal-hint">Google und Microsoft 365 liefern Termine in die Kalender-Karten, Microsoft auf Wunsch auch OneNote-Notizbücher. Die Anmeldung läuft direkt zwischen Browser und Anbieter, die Client-ID legt eure IT an.</p>
           {!oauthAvailable() && (
             <div className="modal-note">
-              ⚠️ Die Einzeldatei (file://) kann kein OAuth, dafür die gehostete App nutzen. Ohne Anmeldung: ICS-Abo in der Kalender-Karte.
+              Die Einzeldatei (file://) kann kein OAuth, dafür die gehostete App nutzen. Ohne Anmeldung: ICS-Abo in der Kalender-Karte.
             </div>
           )}
 
           <h4>Google</h4>
           {calAcc.google?.token ? (
             <>
-              <div className="modal-note">✅ Verbunden{calAcc.google.connectedAs ? <> als „<span translate="no">{calAcc.google.connectedAs}</span>"</> : ''} — Kalender wählen:</div>
+              <div className="modal-note">Verbunden{calAcc.google.connectedAs ? <> als „<span translate="no">{calAcc.google.connectedAs}</span>"</> : ''} – Kalender wählen:</div>
               {(calAcc.google.calendars ?? []).map((c) => (
                 <label key={c.id} className="cal-menu-check" style={{ display: 'flex', gap: 6 }}>
                   <input type="checkbox" checked={c.enabled} onChange={(e) => toggleGoogleCalendar(c.id, e.target.checked)} />
@@ -1498,7 +1498,7 @@ export function Settings() {
           {(calAcc.ms?.token || calAcc.ms?.refreshToken) ? (
             <>
               <div className="modal-note">
-                ✅ Verbunden{calAcc.ms.connectedAs ? <> als „<span translate="no">{calAcc.ms.connectedAs}</span>"</> : ''} · Kalender ✓ · OneNote {msHasNotes(calAcc.ms) ? '✓' : '—'}
+                Verbunden{calAcc.ms.connectedAs ? <> als „<span translate="no">{calAcc.ms.connectedAs}</span>"</> : ''} · Kalender ✓ · OneNote {msHasNotes(calAcc.ms) ? '✓' : '—'}
               </div>
               <div className="modal-buttons">
                 {!msHasNotes(calAcc.ms) && (

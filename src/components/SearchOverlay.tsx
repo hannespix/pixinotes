@@ -21,23 +21,11 @@ const uf = new uFuzzy({
   intraIns: 1,
 });
 
-const TYPE_ICON: Record<string, string> = {
-  note: '📝',
-  email: '📧',
-  kanban: '📋',
-  sheet: '📊',
-  gantt: '📅',
-  calendar: '🗓️',
-  image: '🖼️',
-  file: '📎',
-  portal: '🗂️',
-  shape: '🔷',
-  mermaid: '📊',
-};
-
 import type { AppNode } from '../types';
 import { t } from '../lib/sprache';
 
+import { INetz } from './Icons';
+import { KartenSymbol } from './KartenSymbol';
 interface Hit {
   boardId: string;
   boardName: string;
@@ -80,25 +68,25 @@ function buildCommands(): Command[] {
     { label: '＋ Kanban', hint: 'Neues Kanban-Board', alias: 'ticket spalten board',
       run: add(() => makeKanban(center()), 'Kanban') },
     // M379: Vorlagen sind auch über Strg+K zu finden — unter dem Namen jeder Vorlage
-    { label: '🧩 Board aus Vorlage', hint: 'Besprechung, Rückblick, Projektplan, Brainstorming …', alias: 'vorlage template neues board besprechung meeting retro rückblick projektplan brainstorming workshop swot entscheidung',
+    { label: 'Board aus Vorlage', hint: 'Besprechung, Rückblick, Projektplan, Brainstorming …', alias: 'vorlage template neues board besprechung meeting retro rückblick projektplan brainstorming workshop swot entscheidung',
       run: () => window.dispatchEvent(new CustomEvent('pixinotes:vorlagen', { detail: {} })) },
     // M385: Einladungslink als QR-Code einblenden
-    { label: '🔳 QR-Code zum Mitmachen', hint: 'Einladungslink groß einblenden — das Publikum scannt ihn', alias: 'qr code scannen publikum audience mitmachen teilnehmen einladen abstimmung workshop join',
+    { label: 'QR-Code zum Mitmachen', hint: 'Einladungslink groß einblenden – das Publikum scannt ihn', alias: 'qr code scannen publikum audience mitmachen teilnehmen einladen abstimmung workshop join',
       // M391: Gibt es noch keinen Link, geht gleich der Dialog auf, der ihn anlegt (vorher: ein Hinweis, wo er zu finden wäre)
-      run: () => { if (!qrZeigen()) { window.dispatchEvent(new CustomEvent('pixinotes:freigabe-oeffnen', { detail: {} })); st().showToast('Dieses Board hat noch keinen Einladungslink — hier legst du ihn an.', false, 5000); } } },
-    { label: '👥 Gemeinsam bearbeiten', hint: 'Andere per Link einladen — live im selben Board', alias: 'einladen teilen team gruppe gruppenarbeit zusammenarbeit freigeben freigabe share invite collaborate live link gast gäste',
+      run: () => { if (!qrZeigen()) { window.dispatchEvent(new CustomEvent('pixinotes:freigabe-oeffnen', { detail: {} })); st().showToast('Dieses Board hat noch keinen Einladungslink – hier legst du ihn an.', false, 5000); } } },
+    { label: 'Gemeinsam bearbeiten', hint: 'Andere per Link einladen – live im selben Board', alias: 'einladen teilen team gruppe gruppenarbeit zusammenarbeit freigeben freigabe share invite collaborate live link gast gäste',
       run: () => window.dispatchEvent(new CustomEvent('pixinotes:freigabe-oeffnen', { detail: {} })) },
-    { label: '🏠 Zur Übersicht', hint: 'Alle Bereiche, Projekte und Boards', alias: 'home start mission',
+    { label: 'Zur Übersicht', hint: 'Alle Bereiche, Projekte und Boards', alias: 'home start mission',
       run: () => st().setView('overview') },
-    { label: '🕸 Netz-Ansicht', hint: 'Boards als Graph', alias: 'graph netz verbindungen',
+    { label: 'Netz-Ansicht', hint: 'Boards als Graph', alias: 'graph netz verbindungen',
       run: () => { st().setOverviewMode('netz'); st().setView('overview'); } },
-    { label: '✅ Aufgaben-Zentrale', hint: 'Alle offenen Aufgaben aller Boards', alias: 'tasks todo fristen',
+    { label: 'Aufgaben-Zentrale', hint: 'Alle offenen Aufgaben aller Boards', alias: 'tasks todo fristen',
       run: () => st().setTasksOpen(true) },
     { label: '▶ Präsentieren', hint: 'Karten als Folien zeigen', alias: 'presenter folien vortrag',
       run: () => st().setPresenting(true) },
-    { label: '⚙️ Einstellungen', hint: 'KI, Sync, Design, Daten', alias: 'settings optionen ki sync',
+    { label: 'Einstellungen', hint: 'KI, Sync, Design, Daten', alias: 'settings optionen ki sync',
       run: () => st().setSettingsOpen(true) },
-    { label: '❓ Hilfe', hint: 'Anleitung zu allen Funktionen', alias: 'help anleitung',
+    { label: 'Hilfe', hint: 'Anleitung zu allen Funktionen', alias: 'help anleitung',
       run: () => st().setHelpOpen(true, 'start') },
   ];
 }
@@ -285,7 +273,7 @@ export function SearchOverlay() {
         />
         {canAsk && query.trim().length >= 3 && query.trim() !== '#' && (
           <button className="search-ask" onClick={() => void ask()} disabled={asking}>
-            {asking ? '🧠 denkt nach …' : '🧠 Frag dein Gehirn (Strg+Enter)'}
+            {asking ? 'denkt nach …' : 'Frag dein Gehirn (Strg+Enter)'}
           </button>
         )}
         {answer && (
@@ -306,7 +294,7 @@ export function SearchOverlay() {
                 ))}
               </div>
             )}
-            <div className="search-answer-foot">Antwort nur aus deinen Karten — Quellen anklicken springt hin.</div>
+            <div className="search-answer-foot">Antwort nur aus deinen Karten – Quellen anklicken springt hin.</div>
           </div>
         )}
         {query.trim() === '#' && (
@@ -317,7 +305,7 @@ export function SearchOverlay() {
               </button>
             ))}
             {collectAllTags(useBoard.getState().boards).length === 0 && (
-              <div className="search-empty">Noch keine #Tags — einfach #stichwort in eine Notiz schreiben.</div>
+              <div className="search-empty">Noch keine #Tags – einfach #stichwort in eine Notiz schreiben.</div>
             )}
           </div>
         )}
@@ -343,7 +331,7 @@ export function SearchOverlay() {
             )}
             {boardHits.length > 0 && (
               <div className="search-cmds">
-                <div className="search-sem-head">🗂 Boards</div>
+                <div className="search-sem-head">Boards</div>
                 {boardHits.map((b) => (
                   <button
                     key={b.id}
@@ -367,7 +355,7 @@ export function SearchOverlay() {
                 onMouseEnter={() => setCursor(i)}
                 onClick={() => jump(h)}
               >
-                <span className="hit-icon">{TYPE_ICON[h.node.type ?? ''] ?? '🗒️'}</span>
+                <span className="hit-icon"><KartenSymbol art={h.node.type} size={15} /></span>
                 <span className="hit-main">
                   <span className="hit-title" translate={h.title ? 'no' : undefined}>{h.title || '(ohne Titel)'}</span>
                   <span className="hit-snippet" translate="no">{h.snippet}</span>
@@ -379,14 +367,14 @@ export function SearchOverlay() {
         )}
         {semOnly.length > 0 && query.trim() && query.trim() !== '#' && (
           <div className="search-results search-sem">
-            <div className="search-sem-head">🧠 Nach Bedeutung</div>
+            <div className="search-sem-head">Nach Bedeutung</div>
             {semOnly.map((h) => (
               <button
                 key={`sem-${h.boardId}-${h.nodeId}`}
                 className="search-hit"
                 onClick={() => { setOpen(false); focusNode(h.boardId, h.nodeId); }}
               >
-                <span className="hit-icon">🧠</span>
+                <span className="hit-icon"><INetz size={15} /></span>
                 <span className="hit-main">
                   <span className="hit-title" translate={h.title ? 'no' : undefined}>{h.title || '(ohne Titel)'}</span>
                   <span className="hit-snippet">inhaltlich verwandt · {Math.round(h.score * 100)} %</span>
@@ -396,7 +384,7 @@ export function SearchOverlay() {
             ))}
           </div>
         )}
-        <div className="search-footer">↑↓ navigieren · Enter springt zur Karte · # zeigt alle Tags · Esc schließt · sucht in allen Boards, tippfehlertolerant{brainOn ? ' · 🧠 findet auch nach Bedeutung' : ''}</div>
+        <div className="search-footer">↑↓ navigieren · Enter springt zur Karte · # zeigt alle Tags · Esc schließt · sucht in allen Boards, tippfehlertolerant{brainOn ? ' · findet auch nach Bedeutung' : ''}</div>
       </div>
     </div>
   );

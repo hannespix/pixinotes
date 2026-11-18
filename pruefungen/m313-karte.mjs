@@ -111,7 +111,7 @@ console.log('\n════ C: Zeitplan-Kopf ════');
 {
   await waehle(P, 'g1');
   const kopf = await texte(P, '.react-flow__node[data-id="g1"] .gantt-tools > button, .react-flow__node[data-id="g1"] .gantt-tools .ebenen-menu-knopf');
-  pruefe('C1 der Kopf hat ＋ Vorgang und ⋯ — nicht neun Knöpfe', kopf.length === 2 && /Vorgang/.test(kopf[0]) && /^Mehr/.test(kopf[1]), JSON.stringify(kopf));
+  pruefe('C1 der Kopf hat ＋ Vorgang und ⋯ – nicht neun Knöpfe', kopf.length === 2 && /Vorgang/.test(kopf[0]) && /^Mehr/.test(kopf[1]), JSON.stringify(kopf));
   pruefe('C2 kein Skalen-Auswahlfeld mehr im Kopf', (await P.locator('.gantt-scale').count()) === 0);
   // echter Klick (Maus): die ausgewählte Karte reicht ihn an das ⋯ durch
   await P.locator('.react-flow__node[data-id="g1"] .gantt-tools .ebenen-menu-knopf').click();
@@ -145,7 +145,7 @@ console.log('\n════ E: Diagramm ════');
   await waehle(P, 'd1');
   // Die Diagramm-Leiste ist eine NodeToolbar (Portal außerhalb des Knotens) — nur die ausgewählte Karte hat eine
   const kopf = await texte(P, '.mm-row > button, .mm-row .ebenen-menu-knopf');
-  pruefe('E1 der Kopf zeigt ＋ Schritt und ⋯ — keine Farbpunkte, kein Vorlage-Knopf', kopf.length === 2 && /Schritt/.test(kopf[0]) && /^Mehr/.test(kopf[1]), JSON.stringify(kopf));
+  pruefe('E1 der Kopf zeigt ＋ Schritt und ⋯ – keine Farbpunkte, kein Vorlage-Knopf', kopf.length === 2 && /Schritt/.test(kopf[0]) && /^Mehr/.test(kopf[1]), JSON.stringify(kopf));
   await P.evaluate(() => document.querySelector('.mm-row .ebenen-menu-knopf')?.click());
   await P.waitForTimeout(300);
   const titel = await P.locator('.ebenen-menu .ebenen-menu-titel').allTextContents();
@@ -163,7 +163,7 @@ console.log('\n════ F: Kalender ════');
 {
   await waehle(P, 'c1');
   const kopf = await texte(P, '.react-flow__node[data-id="c1"] .cal-nav button');
-  pruefe('F1 Kopf: Ansicht, ‹, heute, ›, ⋯ — kein Quellen-Knopf', kopf.length === 5 && !kopf.some((k) => /Alle Boards|Dieses Board/.test(k)) && /^Mehr/.test(kopf[4]), JSON.stringify(kopf));
+  pruefe('F1 Kopf: Ansicht, ‹, heute, ›, ⋯ – kein Quellen-Knopf', kopf.length === 5 && !kopf.some((k) => /Alle Boards|Dieses Board/.test(k)) && /^Mehr/.test(kopf[4]), JSON.stringify(kopf));
   await P.evaluate(() => document.querySelector('.react-flow__node[data-id="c1"] .cal-nav [aria-label="Mehr"]')?.click());
   await P.waitForTimeout(300);
   const quelle = await P.locator('.cal-menu input[type="radio"]').count();
@@ -180,7 +180,7 @@ await ctx.close();
 console.log('\n════ G: Was ist neu ════');
 {
   const js = readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.js')).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8')).join('\n');
-  pruefe('G1 „Was ist neu" nennt M313', js.includes('Etappe 2 — die Karte (M313)'));
+  pruefe('G1 „Was ist neu" nennt M313', js.includes('Etappe 2 – die Karte (M313)'));
 }
 
 console.log(`\n  ${ok} bestanden, ${bad} durchgefallen`);

@@ -22,8 +22,8 @@ export function TopActions() {
 
   return (
     <div className="top-actions">
-      <button onClick={undo} disabled={!canUndo} data-taste="rueckgaengig" title={view === 'board' ? 'Rückgängig' : 'Rückgängig — nur in der Board-Ansicht'} aria-label="Rückgängig"><IUndo size={16} /></button>
-      <button onClick={redo} disabled={!canRedo} data-taste="wiederholen" title={view === 'board' ? 'Wiederholen' : 'Wiederholen — nur in der Board-Ansicht'} aria-label="Wiederholen"><IRedo size={16} /></button>
+      <button onClick={undo} disabled={!canUndo} data-taste="rueckgaengig" title={view === 'board' ? 'Rückgängig' : 'Rückgängig – nur in der Board-Ansicht'} aria-label="Rückgängig"><IUndo size={16} /></button>
+      <button onClick={redo} disabled={!canRedo} data-taste="wiederholen" title={view === 'board' ? 'Wiederholen' : 'Wiederholen – nur in der Board-Ansicht'} aria-label="Wiederholen"><IRedo size={16} /></button>
       <span className="top-actions-sep" />
       <button className="ta-suche" onClick={() => setSearchOpen(true)} data-taste="suche" title="Suche" aria-label="Suche"><ISearch size={16} /></button>
       <button onClick={() => setSettingsOpen(true)} data-taste="einstellungen" title="Einstellungen" aria-label="Einstellungen"><ISettings size={16} /></button>

@@ -141,7 +141,7 @@ console.log('\n════ A: Tipp = Klick ════');
   pruefe('A3 ein Stift-Tipp auf den Kartenrand wählt die Karte', await P.locator('.react-flow__node.selected[data-id="n2"]').count() === 1, JSON.stringify(n2));
   const [fx, fy] = await freierPunkt(P);
   await tipp(P, fx, fy); await warte(P, 400);
-  pruefe('A4 ein Stift-Tipp auf die Fläche wählt ab — und malt keinen Punkt', (await P.locator('.react-flow__node.selected').count()) === 0 && (await striche(P)).length === 0, JSON.stringify({ sel: await P.locator('.react-flow__node.selected').count(), n: (await striche(P)).length }));
+  pruefe('A4 ein Stift-Tipp auf die Fläche wählt ab – und malt keinen Punkt', (await P.locator('.react-flow__node.selected').count()) === 0 && (await striche(P)).length === 0, JSON.stringify({ sel: await P.locator('.react-flow__node.selected').count(), n: (await striche(P)).length }));
   await ctx.close();
 }
 
@@ -194,7 +194,7 @@ console.log('\n════ D: Text mit dem Stift bearbeiten ════');
   const brot = await wortRect(P, 'n1', 'Brot');
   await zug(P, kritzelUeber(brot), { id: 41, takt: 4 }); await warte(P, 900);
   let n1 = (await knoten(P)).find((k) => k.id === 'n1');
-  pruefe('D1 Kritzel über „Brot" löscht das Wort — der Satz bleibt sauber', blockText(n1, 'b-satz') === 'Milch Butter Eier' && (await striche(P)).length === 0, blockText(n1, 'b-satz'));
+  pruefe('D1 Kritzel über „Brot" löscht das Wort – der Satz bleibt sauber', blockText(n1, 'b-satz') === 'Milch Butter Eier' && (await striche(P)).length === 0, blockText(n1, 'b-satz'));
   pruefe('D2 Hinweis nennt das Wort', /„Brot" gelöscht/.test(await toast(P)), await toast(P));
   const butter = await wortRect(P, 'n1', 'Butter');
   await zug(P, Array.from({ length: 14 }, (_, i) => [butter.x - 3 + i * ((butter.w + 6) / 13), butter.y + butter.h * 0.5 + (i % 2)]), { id: 42 }); await warte(P, 900);
@@ -216,7 +216,7 @@ console.log('\n════ D: Text mit dem Stift bearbeiten ════');
   await zug(P, Array.from({ length: 14 }, (_, i) => [idee.x - 3 + i * ((idee.w + 6) / 13), idee.y + idee.h * 0.5 + (i % 2)]), { id: 45 }); await warte(P, 900);
   n2 = (await knoten(P)).find((k) => k.id === 'n2');
   const t2 = n2.data.blocks.map((b) => (Array.isArray(b.content) ? b.content.map((c) => c.text).join('') : (b.content ?? ''))).join('|');
-  pruefe('D7 Durchstreichen wirkt auch dort — und die Blöcke tragen danach feste Ids', t2 === 'Kurze' && n2.data.blocks.every((b) => typeof b.id === 'string' && !b.id.startsWith('_r')), JSON.stringify({ t2, ids: n2.data.blocks.map((b) => b.id ?? null) }));
+  pruefe('D7 Durchstreichen wirkt auch dort – und die Blöcke tragen danach feste Ids', t2 === 'Kurze' && n2.data.blocks.every((b) => typeof b.id === 'string' && !b.id.startsWith('_r')), JSON.stringify({ t2, ids: n2.data.blocks.map((b) => b.id ?? null) }));
   await P.screenshot({ path: path.join(SD, 'm325-textgesten.png') });
   await ctx.close();
 }

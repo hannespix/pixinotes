@@ -682,7 +682,7 @@ pruefe('A7 Ziehen an einer Karte im Modus: kein Punkt, und die Karte bleibt lieg
 await tipp(S1.P, 'x1');
 m = await marken(S1.P);
 const p1 = await (async () => { await S1.P.waitForTimeout(700); return punkteIn(S1.P, 'b1', 'x1'); })();
-pruefe('A8 noch ein Tipp nimmt den Punkt zurück — die Marke ist weg', !m.x1, JSON.stringify(m));
+pruefe('A8 noch ein Tipp nimmt den Punkt zurück – die Marke ist weg', !m.x1, JSON.stringify(m));
 pruefe('A9 … und er bleibt als „zurückgenommen" vermerkt (kommt beim Abgleich nicht wieder)', p1 && Object.values(p1).length === 1 && Object.values(p1)[0].n === 0, JSON.stringify(p1));
 await tipp(S1.P, 'x2'); await tipp(S1.P, 'x3');
 await S1.P.keyboard.press('Escape'); await S1.P.waitForTimeout(250);
@@ -764,11 +764,11 @@ const drin = await inKarte(G.P, 'Mehr Fenster');
 if (!drin) console.log('    (Gerd kam nicht in die Notiz)');
 await G.P.keyboard.press('End'); await G.P.keyboard.type(' und Licht', { delay: 25 });
 await warteBis(A.P, async () => (await A.P.locator('[data-taste="live-sperre"][data-karte="x2"]').count()) === 1, 6000);
-pruefe('C1 Gerd schreibt in „Mehr Fenster" — bei Anna trägt die Karte seinen Rahmen', (await A.P.locator('[data-taste="live-sperre"][data-karte="x2"]').count()) === 1);
+pruefe('C1 Gerd schreibt in „Mehr Fenster" – bei Anna trägt die Karte seinen Rahmen', (await A.P.locator('[data-taste="live-sperre"][data-karte="x2"]').count()) === 1);
 const vorher = await zahlen(A.P);
 await tipp(A.P, 'x2');       // Anna hat dort schon einen Punkt — der Tipp nähme ihn zurück
 await A.P.waitForTimeout(400);
-pruefe('C2 Anna tippt die Karte an: Der Punkt ändert sich nicht — mit einem Hinweis, wer gerade schreibt', (await zahlen(A.P)) === vorher && /Gerd bearbeitet diese Karte gerade/.test(await toast(A.P)), `${await zahlen(A.P)} · ${await toast(A.P)}`);
+pruefe('C2 Anna tippt die Karte an: Der Punkt ändert sich nicht – mit einem Hinweis, wer gerade schreibt', (await zahlen(A.P)) === vorher && /Gerd bearbeitet diese Karte gerade/.test(await toast(A.P)), `${await zahlen(A.P)} · ${await toast(A.P)}`);
 // Hanna gibt gleichzeitig einer ANDEREN Karte einen Punkt, während Gerd weiterschreibt
 await Promise.all([G.P.keyboard.type(' bitte', { delay: 25 }), tipp(H.P, 'x2').catch(() => {}), tipp(H.P, 'x1')]);
 // Gerd verlässt die Karte

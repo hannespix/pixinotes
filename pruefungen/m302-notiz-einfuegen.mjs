@@ -76,7 +76,7 @@ console.log('════ A: Kein Chip, drei Menü-Einträge ════');
   const { ctx, P } = await seite();
   await P.locator('.note-editor .bn-block-content').first().click();
   await P.waitForTimeout(500);
-  pruefe('A1 kein 🖼-Chip mehr unter der Notiz, auch mit Cursor im Text', (await P.locator('.due-chip', { hasText: 'Bild' }).count()) === 0 && (await P.locator('.bild-chip').count()) === 0);
+  pruefe('A1 kein Bild-Chip mehr unter der Notiz, auch mit Cursor im Text', (await P.locator('.due-chip', { hasText: 'Bild' }).count()) === 0 && (await P.locator('.bild-chip').count()) === 0);
   await P.keyboard.press('End');
   await P.keyboard.press('Enter');
   await P.keyboard.type('/');
@@ -130,7 +130,7 @@ console.log('════ D: Quelltext ════');
 {
   const karte = readFileSync(join(__repo, 'src/components/nodes/NoteCard.tsx'), 'utf8');
   const css = readFileSync(join(__repo, 'src/index.css'), 'utf8');
-  pruefe('D1 kein Bild-Chip mehr in der Notiz-Karte', !/bild-chip|🖼 Bild/.test(karte));
+  pruefe('D1 kein Bild-Chip mehr in der Notiz-Karte', !/bild-chip/.test(karte));
   pruefe('D2 keine Chip-Regel mehr im Stylesheet', !/bild-chip/.test(css));
 }
 

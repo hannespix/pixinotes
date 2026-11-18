@@ -9,7 +9,7 @@ import { triggerDownload } from '../../lib/download';
 import { aiReady, askAi, textToBlocks } from '../../lib/ai';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
-import { IMail, IWand } from '../Icons';
+import { IMail, IWand, IPaperclip } from '../Icons';
 
 const PREVIEW_CHARS = 420;
 
@@ -58,11 +58,11 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
     if (att.dataUrl && isImageMime(att.mime)) {
       // Bild-Anhang wird eine eigene Bild-Karte neben der E-Mail
       addDerived(makeImage({ x: positionAbsoluteX + 340, y: positionAbsoluteY + 40 }, att.dataUrl, att.name), 'Anhang');
-      showToast(`🖼️ „${att.name}" als eigene Karte herausgelöst`);
+      showToast(`„${att.name}" als eigene Karte herausgelöst`);
     } else if (att.dataUrl) {
       triggerDownload(att.dataUrl, att.name);
     } else {
-      showToast('Anhang zu groß zum Einbetten — nur Metadaten gespeichert.');
+      showToast('Anhang zu groß zum Einbetten – nur Metadaten gespeichert.');
     }
   };
 
@@ -74,11 +74,11 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
       );
       addDerived(makeNote(
         { x: positionAbsoluteX + 340, y: positionAbsoluteY },
-        { color: 'yellow', blocks: textToBlocks('✨ Zusammenfassung', answer) },
+        { color: 'yellow', blocks: textToBlocks('Zusammenfassung', answer) },
       ), 'Zusammenfassung');
-      showToast('✨ Zusammenfassung als Notiz daneben gelegt');
+      showToast('Zusammenfassung als Notiz daneben gelegt');
     } catch (e) {
-      showToast(`⚠️ KI-Fehler: ${(e as Error).message}`);
+      showToast(`KI-Fehler: ${(e as Error).message}`);
     } finally {
       setAiBusy(false);
     }
@@ -131,7 +131,7 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
               }
               onClick={() => openAttachment(att)}
             >
-              📎 {att.name}
+              <IPaperclip size={12} /> {att.name}
               {att.size ? <span className="chip-size">{formatBytes(att.size)}</span> : null}
             </button>
           ))}

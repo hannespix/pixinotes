@@ -42,7 +42,7 @@ export class ErrorBoundary extends Component<Props, State> {
       <div className={`err-box${this.props.full ? ' err-full' : ''}`} role="alert">
         <b>{what} lässt sich gerade nicht anzeigen.</b>
         <p>
-          Deine Daten sind davon <b>nicht</b> betroffen — sie liegen unverändert in
+          Deine Daten sind davon <b>nicht</b> betroffen – sie liegen unverändert in
           diesem Browser. Kaputt ist nur die Darstellung.
         </p>
         <div className="err-acts">

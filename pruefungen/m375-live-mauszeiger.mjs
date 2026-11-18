@@ -658,7 +658,7 @@ const zeiger = (P) => P.evaluate(() => [...document.querySelectorAll('[data-tast
   return {
     name: el.dataset.name, laser: el.hasAttribute('data-laser'), farbe: el.style.getPropertyValue('--farbe'),
     x: Number(t[1]), y: Number(t[2]), k: Number(t[3]), sx: spitze.left, sy: spitze.top,
-    pfeilBreite: pfeil ? pfeil.width : null, punkt: !!el.querySelector('.laser-punkt'), schild: el.querySelector('.live-zeiger-name')?.textContent ?? '',
+    pfeilBreite: pfeil ? pfeil.width : null, punkt: !!el.querySelector('.laser-punkt'), schild: el.querySelector('.live-zeiger-name')?.textContent ?? '', megafon: !!el.querySelector('.live-zeiger-name svg'),
     gleiten: el.style.transitionDuration,
   };
 }));
@@ -717,7 +717,7 @@ await G.P.waitForTimeout(900);
 let zg = await zeiger(G.P);
 const zielA = await flow(A.P, 900, 640);
 console.log('    Anna zeigt auf', JSON.stringify(zielA), '· Gerd sieht', JSON.stringify(zg));
-pruefe('A4 Gerd sieht einen Zeiger — mit Annas Namen', zg.length === 1 && zg[0].name === annaName && zg[0].schild === annaName && !!annaName, JSON.stringify(zg));
+pruefe('A4 Gerd sieht einen Zeiger – mit Annas Namen', zg.length === 1 && zg[0].name === annaName && zg[0].schild === annaName && !!annaName, JSON.stringify(zg));
 pruefe('A5 … an derselben Stelle des Boards', zg[0] && nahe(zg[0].x, zielA.x, 2) && nahe(zg[0].y, zielA.y, 2), `${zg[0]?.x},${zg[0]?.y} gegen ${zielA.x},${zielA.y}`);
 const aufG = await schirm(G.P, zielA.x, zielA.y);
 pruefe('A6 … also auch auf Gerds Bildschirm dort, wo diese Stelle bei ihm liegt', zg[0] && nahe(zg[0].sx, aufG.x, 3) && nahe(zg[0].sy, aufG.y, 3), `${zg[0]?.sx},${zg[0]?.sy} gegen ${aufG.x},${aufG.y}`);
@@ -741,7 +741,7 @@ await warteBis(A.P, async () => (await zeiger(A.P)).length === 1, 5000);
 await A.P.waitForTimeout(700);
 const za = await zeiger(A.P);
 const zielG = await flow(G.P, 1080, 700);
-pruefe('A11 Anna sieht Gerds Zeiger — „Gerd", an seiner Stelle', za.length === 1 && za[0].name === 'Gerd' && nahe(za[0].x, zielG.x, 2) && nahe(za[0].y, zielG.y, 2), JSON.stringify({ za, zielG }));
+pruefe('A11 Anna sieht Gerds Zeiger – „Gerd", an seiner Stelle', za.length === 1 && za[0].name === 'Gerd' && nahe(za[0].x, zielG.x, 2) && nahe(za[0].y, zielG.y, 2), JSON.stringify({ za, zielG }));
 pruefe('A12 die beiden haben verschiedene Farben', za[0] && zg[0] && za[0].farbe !== zg[0].farbe, `${za[0]?.farbe} / ${zg[0]?.farbe}`);
 
 // Abschalten: Anna blendet die Zeiger aus
@@ -761,7 +761,7 @@ const vorAus = sb.aufrufe.maus;
 await fahren(A.P, [820, 600], [700, 560]);
 await fahren(G.P, [1080, 700], [1000, 640]);
 await A.P.waitForTimeout(700);
-pruefe('A15 abgeschaltet sendet Anna nichts und zeigt nichts — Gerd sendet weiter', (await zeiger(A.P)).length === 0 && (await zeiger(G.P)).length === 0 && sb.aufrufe.maus > vorAus, `${vorAus} → ${sb.aufrufe.maus}`);
+pruefe('A15 abgeschaltet sendet Anna nichts und zeigt nichts – Gerd sendet weiter', (await zeiger(A.P)).length === 0 && (await zeiger(G.P)).length === 0 && sb.aufrufe.maus > vorAus, `${vorAus} → ${sb.aufrufe.maus}`);
 await A.P.reload({ waitUntil: 'domcontentloaded' });
 await warteBis(A.P, async () => /2 dabei/.test(await zahl(A.P)), 12000);
 await gruppeAuf(A.P);
@@ -822,7 +822,7 @@ await warteBis(G.P, async () => (await zeiger(G.P)).length <= 1, 5000);
 pruefe('B8 wer geht, nimmt seinen Zeiger mit', (await zeiger(G.P)).length <= 1, String((await zeiger(G.P)).length));
 
 // ══ C ═══════════════════════════════════════════════════════════════
-console.log('\n════ C: Vorführen — Laser auf dem Board ════');
+console.log('\n════ C: Vorführen – Laser auf dem Board ════');
 await warteBis(A.P, async () => /2 dabei/.test(await zahl(A.P)), 8000);
 await gruppeAuf(A.P);
 await A.P.locator('[data-taste="vorfuehren"]').click();
@@ -836,7 +836,7 @@ const zielL = await flow(A.P, 880, 600);
 const aufGL = await schirm(G.P, zielL.x, zielL.y);
 console.log('    Laser bei Gerd:', JSON.stringify(laser));
 pruefe('C1 Annas Zeiger ist bei Gerd jetzt ein Laserpunkt (kein Pfeil)', !!laser && laser.punkt && laser.pfeilBreite === null, JSON.stringify(laser));
-pruefe('C2 … mit „📣" und ihrem Namen', !!laser && laser.schild.includes('📣') && laser.schild.includes(annaName), laser?.schild);
+pruefe('C2 … mit Megafon und ihrem Namen', !!laser && laser.megafon && laser.schild.includes(annaName), laser?.schild);
 pruefe('C3 … an der Stelle, auf die Anna zeigt', !!laser && nahe(laser.x, zielL.x, 2) && nahe(laser.y, zielL.y, 2) && nahe(laser.sx, aufGL.x, 4) && nahe(laser.sy, aufGL.y, 4), JSON.stringify({ laser, zielL, aufGL }));
 await G.P.screenshot({ path: `${SD}/m375-c-laser-board.png` });
 
@@ -869,7 +869,7 @@ await warteBis(G.P, async () => !!(await blatt(G.P)).fern, 5000);
 await G.P.waitForTimeout(700);
 let bg = await blatt(G.P);
 console.log('    Folie Anna', JSON.stringify({ w: ba.w, h: ba.h }), '· Gerd', JSON.stringify({ w: bg.w, h: bg.h, fern: bg.fern }));
-pruefe('D7 Gerd sieht Annas Laser — an derselben Stelle der Folie (30 % / 40 %)', bg.fern && nahe(bg.fern.x, bg.x + bg.w * 0.3, 3) && nahe(bg.fern.y, bg.y + bg.h * 0.4, 3), JSON.stringify(bg));
+pruefe('D7 Gerd sieht Annas Laser – an derselben Stelle der Folie (30 % / 40 %)', bg.fern && nahe(bg.fern.x, bg.x + bg.w * 0.3, 3) && nahe(bg.fern.y, bg.y + bg.h * 0.4, 3), JSON.stringify(bg));
 pruefe('D8 … mit ihrem Namen', bg.fern && bg.fern.name.includes(annaName), bg.fern?.name);
 pruefe('D9 Gerd selbst hat keinen eigenen Laser an (seine Folie bleibt bedienbar)', (await G.P.locator('.folien-laser.an').count()) === 0 && (await G.P.evaluate(() => getComputedStyle(document.querySelector('[data-taste="folien-laser"]')).pointerEvents)) === 'none');
 await G.P.screenshot({ path: `${SD}/m375-d-laser-folie.png` });
@@ -879,7 +879,7 @@ const vorFolie = await folie(A.P);
 await A.P.keyboard.press('ArrowRight');
 await warteBis(G.P, async () => (await folie(G.P)) !== vorFolie, 6000);
 await G.P.waitForTimeout(500);
-pruefe('D10 mit eingeschaltetem Laser lässt sich weiterblättern — Gerd blättert mit', (await folie(A.P)) !== vorFolie && (await folie(G.P)) === (await folie(A.P)), `${await folie(A.P)} / ${await folie(G.P)}`);
+pruefe('D10 mit eingeschaltetem Laser lässt sich weiterblättern – Gerd blättert mit', (await folie(A.P)) !== vorFolie && (await folie(G.P)) === (await folie(A.P)), `${await folie(A.P)} / ${await folie(G.P)}`);
 pruefe('D11 auf der neuen Folie steht kein alter Laserpunkt', !(await blatt(G.P)).fern);
 ba = await blatt(A.P);
 await fahren(A.P, [ba.x + ba.w * 0.5, ba.y + ba.h * 0.5], [ba.x + ba.w * 0.7, ba.y + ba.h * 0.6]);

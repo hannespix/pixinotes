@@ -334,7 +334,7 @@ await C.P.locator('.modal button', { hasText: 'Abmelden' }).click(); await C.P.w
 pruefe('H1 Abmelden löscht die Sitzung, die Daten bleiben', !(await sitzung(C.P)) && (await boardNamen(C.P)).includes('Microsoft-Board') && graph.items.has('umgebung.json'));
 pruefe('H2 danach stehen die Anmelde-Knöpfe wieder da', (await C.P.locator('[data-taste="konto-google"]').count()) === 1);
 const js = readdirSync(path.join(DIST, 'assets')).filter((f) => f.endsWith('.js')).map((f) => readFileSync(path.join(DIST, 'assets', f), 'utf8')).join('\n');
-pruefe('H3 „Was ist neu" nennt M317', js.includes('Konto-Sync — anmelden, fertig (M317)'));
+pruefe('H3 „Was ist neu" nennt M317', js.includes('Konto-Sync – anmelden, fertig (M317)'));
 pruefe('H4 die Hilfe erklärt den Konto-Weg', js.includes('Konto (Google Drive / OneDrive):'));
 
 await A.ctx.close(); await B.ctx.close(); await C.ctx.close();

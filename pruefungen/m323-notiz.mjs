@@ -201,7 +201,7 @@ console.log('\n════ G: Aufgaben-Rückweg ════');
   pruefe('G1 die Aufgabe „Brot" steht in der Zentrale', (await zeile.count()) === 1);
   await zeile.locator('input[type=checkbox]').first().click(); await warte(P, 800);
   const n1 = (await knoten(P)).find((k) => k.id === 'n1');
-  pruefe('G2 der Haken steht im Stand — und extEpoch ist hochgezählt, damit ein offener Editor ihn übernimmt', n1.data.blocks.find((b) => b.content?.[0]?.text === 'Brot' || b.content === 'Brot')?.props?.checked === true && typeof n1.data.extEpoch === 'number' && n1.data.extEpoch >= 1, JSON.stringify({ epoch: n1.data.extEpoch }));
+  pruefe('G2 der Haken steht im Stand – und extEpoch ist hochgezählt, damit ein offener Editor ihn übernimmt', n1.data.blocks.find((b) => b.content?.[0]?.text === 'Brot' || b.content === 'Brot')?.props?.checked === true && typeof n1.data.extEpoch === 'number' && n1.data.extEpoch >= 1, JSON.stringify({ epoch: n1.data.extEpoch }));
   // Die Zentrale blendet das Board aus; nach dem Schließen zeigt der Editor den Haken
   await P.keyboard.press('Escape'); await warte(P, 900);
   const imEditor = await P.evaluate(() => { const items = [...document.querySelectorAll('.react-flow__node[data-id="n1"] [data-content-type="checkListItem"]')]; return items.map((i) => ({ t: i.textContent.trim(), c: i.querySelector('input[type=checkbox]')?.checked })); });

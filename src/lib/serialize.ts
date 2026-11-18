@@ -144,7 +144,7 @@ export function blocksToText(blocks: unknown[] | undefined): string {
              wonach Menschen später suchen; die Base64-Daten selbst haben in
              Suche, E-Mail und KI-Anfrage nichts verloren. */
           const p = b.props as { caption?: string; name?: string } | undefined;
-          lines.push(`${indent}🖼 ${p?.caption || p?.name || 'Bild'}`);
+          lines.push(`${indent}[Bild: ${p?.caption || p?.name || 'ohne Namen'}]`);
           break;
         }
         default:
@@ -435,12 +435,12 @@ function baseNodeText(node: AppNode): string {
       // Ticket-Details (Person/Frist/Beschreibung) mit ausgeben — sonst sind
       // sie weder durchsuchbar noch im E-Mail-/Clipboard-Export (Audit R6-F2)
       const line = (it: (typeof k.items)[number], i: number) =>
-        `  ${i === done ? '☑' : '☐'} ${it.text}${it.due ? ` (bis ${it.due})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` — ${it.note}` : ''}`;
+        `  ${i === done ? '☑' : '☐'} ${it.text}${it.due ? ` (bis ${it.due})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` – ${it.note}` : ''}`;
       // M293: Archivierte Tickets hängen als eigener Abschnitt an — so bleiben
       // sie durchsuchbar (Strg+K) und fehlen in keinem Export
       const arch = k.archiv ?? [];
       const archText = arch.length
-        ? `\n\nArchiv (${arch.length}):\n${arch.map((it) => `  🗃 ${it.text}${it.who ? ` @${it.who}` : ''}`).join('\n')}`
+        ? `\n\nArchiv (${arch.length}):\n${arch.map((it) => `  ${it.text}${it.who ? ` @${it.who}` : ''}`).join('\n')}`
         : '';
       return `${k.title || 'Kanban'}\n${cols.map(
         (col, i) => `\n${col}:\n${k.items.filter((it) => Math.min(it.col, done) === i).map((it) => line(it, i)).join('\n') || '  —'}`,
@@ -540,7 +540,7 @@ export function nodeToHtml(node: AppNode): string {
       const atts = e.attachments.length
         ? `<p><b>Anhänge:</b> ${e.attachments.map((a) => esc(a.name)).join(', ')}</p>`
         : '';
-      return `<h3>📧 ${esc(e.subject)}</h3><p><b>Von:</b> ${esc(e.fromName)}${e.fromAddress ? ` &lt;${esc(e.fromAddress)}&gt;` : ''}</p><p style="white-space:pre-wrap">${esc(e.text)}</p>${atts}`;
+      return `<h3>${esc(e.subject)}</h3><p><b>Von:</b> ${esc(e.fromName)}${e.fromAddress ? ` &lt;${esc(e.fromAddress)}&gt;` : ''}</p><p style="white-space:pre-wrap">${esc(e.text)}</p>${atts}`;
     }
     case 'kanban': {
       const k = node.data;
@@ -553,7 +553,7 @@ export function nodeToHtml(node: AppNode): string {
       }).join('');
       const arch = k.archiv ?? []; // M293
       const archHtml = arch.length
-        ? `<h4>Archiv (${arch.length})</h4><ul>${arch.map((it) => `<li>🗃 ${esc(it.text)}</li>`).join('')}</ul>`
+        ? `<h4>Archiv (${arch.length})</h4><ul>${arch.map((it) => `<li>${esc(it.text)}</li>`).join('')}</ul>`
         : '';
       return `<h3>${esc(k.title)}</h3>${cols}${archHtml}`;
     }
@@ -580,13 +580,13 @@ export function nodeToHtml(node: AppNode): string {
     case 'file': {
       const f = node.data;
       const t = f.titel?.trim();
-      return `<p>📎 <b>${esc(t && t !== f.name ? t : f.name)}</b>${t && t !== f.name ? ` — ${esc(f.name)}` : ''} <span style="color:#777">(${formatBytes(f.size)})</span></p>`;
+      return `<p><b>${esc(t && t !== f.name ? t : f.name)}</b>${t && t !== f.name ? ` – ${esc(f.name)}` : ''} <span style="color:#777">(${formatBytes(f.size)})</span></p>`;
     }
     case 'frame':
       // Abschnitts-Folie im Presenter: der Rahmen-Name als Zwischentitel
       return `<h2 style="text-align:center;margin-top:1.4em">${esc(node.data.name)}</h2>`;
     case 'htmlapp':
-      return `<p>Eigene App: <b>${esc(node.data.name)}</b> (${formatBytes(node.data.size)}) — läuft nur live auf dem Board.</p>`;
+      return `<p>Eigene App: <b>${esc(node.data.name)}</b> (${formatBytes(node.data.size)}) – läuft nur live auf dem Board.</p>`;
     case 'time': {
       const t = node.data;
       const labels: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause' };
@@ -680,7 +680,7 @@ export function nodeToMarkdown(node: AppNode): string {
       const done = doneCol(k);
       const cols = kanbanCols(k).map((col, i) => {
         const items = k.items.filter((it) => Math.min(it.col, done) === i);
-        return `**${col}**\n\n${items.map((it) => `- [${i === done ? 'x' : ' '}] ${it.text}${it.due ? ` (bis ${it.due})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` — ${it.note}` : ''}`).join('\n') || '- —'}`;
+        return `**${col}**\n\n${items.map((it) => `- [${i === done ? 'x' : ' '}] ${it.text}${it.due ? ` (bis ${it.due})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` – ${it.note}` : ''}`).join('\n') || '- —'}`;
       });
       return `### ${k.title || 'Kanban'}\n\n${cols.join('\n\n')}${anhang}`;
     }
@@ -700,7 +700,7 @@ export function nodeToMarkdown(node: AppNode): string {
     case 'frame':
       return `## ${node.data.name}`;
     case 'email':
-      return `### 📧 ${node.data.subject}\n\n*Von: ${node.data.fromName}${node.data.fromAddress ? ` <${node.data.fromAddress}>` : ''}*\n\n${node.data.text}${anhang}`;
+      return `### ${node.data.subject}\n\n*Von: ${node.data.fromName}${node.data.fromAddress ? ` <${node.data.fromAddress}>` : ''}*\n\n${node.data.text}${anhang}`;
     default:
       return nodeToText(node);
   }
@@ -793,7 +793,7 @@ function waTabelle(roh: string[][], kopfzeile: boolean, reich?: string[][]): str
   // ohne Kopfzeile: erste Zelle fett, der Rest dahinter
   return z.map((r, k) => {
     const rest = R[k].slice(1).filter((c) => c !== '').join(' · ');
-    return `${waFett(r[0]) || '—'}${rest ? ` — ${rest}` : ''}`;
+    return `${waFett(r[0]) || '—'}${rest ? ` – ${rest}` : ''}`;
   });
 }
 
@@ -827,7 +827,7 @@ export function blocksToWhatsapp(blocks: unknown[] | undefined, mitTitel = true)
       if (lines.length && depth === 0 && !gleicheListe && hatInhalt) lines.push('');
       switch (b.type) {
         case 'heading': lines.push(`${ein}${waFett(text)}`); break;
-        case 'checkListItem': lines.push(`${ein}${b.props?.checked ? '✅' : '⬜'} ${b.props?.checked && text ? `~${text.replace(/~/g, '')}~` : text}`); break;
+        case 'checkListItem': lines.push(`${ein}${b.props?.checked ? '☑' : '☐'} ${b.props?.checked && text ? `~${text.replace(/~/g, '')}~` : text}`); break;
         case 'bulletListItem': lines.push(depth === 0 ? `- ${text}` : `${ein}◦ ${text}`); break;
         case 'numberedListItem': lines.push(`${ein}${nummer}. ${text}`); break;
         case 'quote': lines.push(`${ein}> ${text}`); break;
@@ -842,7 +842,7 @@ export function blocksToWhatsapp(blocks: unknown[] | undefined, mitTitel = true)
           break;
         }
         case 'rechentabelle': lines.push(...waTabelle(rechenBlockZeilen(b.props), true)); break;
-        case 'image': { const p = b.props as { caption?: string; name?: string } | undefined; lines.push(`${ein}🖼 ${p?.caption || p?.name || 'Bild'}`); break; }
+        case 'image': { const p = b.props as { caption?: string; name?: string } | undefined; lines.push(`${ein}[Bild: ${p?.caption || p?.name || 'ohne Namen'}]`); break; }
         default: if (text) lines.push(b === titelZeile ? waFett(text) : `${ein}${text}`);
       }
       vorher = b.type;
@@ -868,7 +868,7 @@ export function nodeToWhatsapp(node: AppNode): string {
       const spalten = kanbanCols(k).map((col, i) => {
         const items = k.items.filter((it) => Math.min(it.col, done) === i);
         if (!items.length) return '';
-        return `_${col}_\n${items.map((it) => `${i === done ? '✅' : '⬜'} ${it.text}${it.due ? ` (bis ${waDatum(it.due)})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` — ${it.note}` : ''}`).join('\n')}`;
+        return `_${col}_\n${items.map((it) => `${i === done ? '☑' : '☐'} ${it.text}${it.due ? ` (bis ${waDatum(it.due)})` : ''}${it.who ? ` @${it.who}` : ''}${it.note ? ` – ${it.note}` : ''}`).join('\n')}`;
       }).filter(Boolean);
       return `${waFett(k.title || 'Kanban')}\n\n${spalten.join('\n\n') || '—'}${anhang}`;
     }
@@ -925,7 +925,7 @@ export function nodeToWhatsapp(node: AppNode): string {
     }
     case 'email': {
       const e = node.data;
-      return `${waFett(`📧 ${e.subject}`)}\nVon: ${e.fromName}${e.fromAddress ? ` <${e.fromAddress}>` : ''}\n\n${e.text.trim()}${e.attachments.length ? `\n\n📎 ${e.attachments.map((a) => a.name).join(', ')}` : ''}${anhang}`;
+      return `${waFett(`${e.subject}`)}\nVon: ${e.fromName}${e.fromAddress ? ` <${e.fromAddress}>` : ''}\n\n${e.text.trim()}${e.attachments.length ? `\n\nAnhänge: ${e.attachments.map((a) => a.name).join(', ')}` : ''}${anhang}`;
     }
     case 'mermaid':
       // Der Quelltext in Festbreitenschrift — ein Bild kann der Link nicht mitnehmen
@@ -933,17 +933,17 @@ export function nodeToWhatsapp(node: AppNode): string {
     case 'file': {
       const f = node.data;
       const t = f.titel?.trim();
-      return `📎 ${t && t !== f.name ? `${t} (${f.name}, ${formatBytes(f.size)})` : `${f.name} (${formatBytes(f.size)})`}${anhang}`;
+      return `${t && t !== f.name ? `${t} (${f.name}, ${formatBytes(f.size)})` : `${f.name} (${formatBytes(f.size)})`}${anhang}`;
     }
     case 'image': {
       const i = node.data;
       const t = i.titel?.trim();
-      return `🖼 ${t || i.name || 'Bild'}${anhang}`;
+      return `Bild: ${t || i.name || 'ohne Namen'}${anhang}`;
     }
     case 'calendar':
-      return `📅 Kalender${node.data.month ? ` ${node.data.month}` : ''}`;
+      return `Kalender${node.data.month ? ` ${node.data.month}` : ''}`;
     default: {
-      const text = nodeToText(node).replace(/☑/g, '✅').replace(/☐/g, '⬜');
+      const text = nodeToText(node);
       return text;
     }
   }

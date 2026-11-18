@@ -40,7 +40,7 @@ const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-s
 const t = (text, styles = {}) => ({ type: 'text', text, styles });
 const reich = [
   { id: 'a1', type: 'heading', props: { level: 2 }, content: [t('Besprechung Relaunch')] },
-  { id: 'a2', type: 'paragraph', content: [t('Normal '), t('fett', { bold: true }), t(' und '), t('kursiv', { italic: true }), t(' und '), t('rot', { textColor: 'red' }), t(' — siehe '), { type: 'link', href: 'https://example.com/plan', content: [t('Plan')] }] },
+  { id: 'a2', type: 'paragraph', content: [t('Normal '), t('fett', { bold: true }), t(' und '), t('kursiv', { italic: true }), t(' und '), t('rot', { textColor: 'red' }), t(' – siehe '), { type: 'link', href: 'https://example.com/plan', content: [t('Plan')] }] },
   { id: 'a3', type: 'bulletListItem', content: [t('Punkt eins')], children: [{ id: 'a3a', type: 'bulletListItem', content: [t('Unterpunkt tief')], children: [{ id: 'a3b', type: 'checkListItem', props: { checked: true }, content: [t('ganz unten erledigt')] }] }] },
   { id: 'a4', type: 'numberedListItem', content: [t('Erstens')] },
   { id: 'a5', type: 'numberedListItem', content: [t('Zweitens')] },
@@ -114,7 +114,7 @@ console.log('\n════ A: Formatiert kopieren ════');
   await P.locator('.share-cards-modal button', { hasText: 'Kopieren' }).click(); await P.waitForTimeout(600);
   const z = await zwischenablage(P);
   const h = z['text/html'] ?? ''; const x = z['text/plain'] ?? '';
-  pruefe('A1 Unterpunkte sind dabei — auch der tief verschachtelte Haken', h.includes('Unterpunkt tief') && h.includes('☑ ganz unten erledigt'), h.slice(0, 300));
+  pruefe('A1 Unterpunkte sind dabei – auch der tief verschachtelte Haken', h.includes('Unterpunkt tief') && h.includes('☑ ganz unten erledigt'), h.slice(0, 300));
   pruefe('A2 Fett, Kursiv und Farbe bleiben', /<b>fett<\/b>/.test(h) && /<i>kursiv<\/i>/.test(h) && /color:#e03e3e[^>]*>rot/.test(h));
   pruefe('A3 der Link bleibt ein Link', /<a href="https:\/\/example\.com\/plan"[^>]*>Plan<\/a>/.test(h));
   pruefe('A4 Zitat, nummerierte Liste und Tabelle (mit Fett in der Zelle)', /<blockquote[^>]*>Ein Zitat/.test(h) && /<ol[^>]*>\s*<li>Erstens/.test(h) && /<td[^>]*><b>Zelle 2<\/b><\/td>/.test(h));
@@ -239,12 +239,12 @@ console.log('\n════ F: Markdown ════');
   const dls = [];
   P.on('download', (x) => dls.push(x));
   await knopf.click(); await P.waitForTimeout(1500);
-  pruefe('F1 EINE Datei (vorher je Board ein Download — der Browser ließ nur den ersten durch)', dls.length === 1 && dls[0].suggestedFilename() === 'pixinotes-export.md', String(dls.map((x) => x.suggestedFilename())));
+  pruefe('F1 EINE Datei (vorher je Board ein Download – der Browser ließ nur den ersten durch)', dls.length === 1 && dls[0].suggestedFilename() === 'pixinotes-export.md', String(dls.map((x) => x.suggestedFilename())));
   const ziel = path.join(SD, 'm340-export.md'); if (dls[0]) await dls[0].saveAs(ziel);
   const md = dls[0] ? readFileSync(ziel, 'utf8') : '';
   pruefe('F2 echtes Markdown: Überschriften, Fett, Link', md.includes('# Export <Test>') && md.includes('## Besprechung Relaunch') && md.includes('**fett**') && md.includes('[Plan](https://example.com/plan)'), md.slice(0, 300));
   pruefe('F3 Listen mit Einrückung, Kästchen, Nummern, Zitat', /- Punkt eins\n {2}- Unterpunkt tief\n {4}- \[x\] ganz unten erledigt\n\n1\. Erstens\n2\. Zweitens/.test(md) && md.includes('> Ein Zitat') && md.includes('- [ ] Offene Aufgabe'), md.slice(0, 600));
-  pruefe('F4 Tabelle und Kanban', /\| Kopf A \| Kopf B \|\n\| --- \| --- \|\n\| Zelle 1 \| \*\*Zelle 2\*\* \|/.test(md) && /### Aufgaben[\s\S]*- \[ \] Angebot schreiben \(bis 2026-12-01\) @Mia — mit Anlage/.test(md), md.slice(md.indexOf('### Aufgaben'), md.indexOf('### Aufgaben') + 200));
+  pruefe('F4 Tabelle und Kanban', /\| Kopf A \| Kopf B \|\n\| --- \| --- \|\n\| Zelle 1 \| \*\*Zelle 2\*\* \|/.test(md) && /### Aufgaben[\s\S]*- \[ \] Angebot schreiben \(bis 2026-12-01\) @Mia – mit Anlage/.test(md), md.slice(md.indexOf('### Aufgaben'), md.indexOf('### Aufgaben') + 200));
   await ctx.close();
 }
 

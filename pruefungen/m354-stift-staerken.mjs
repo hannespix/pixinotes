@@ -126,7 +126,7 @@ await warte(P, 500);
 const z = await P.evaluate(() => Number((document.querySelector('.react-flow__viewport').style.transform.match(/scale\(([\d.]+)\)/) ?? [])[1] ?? 1));
 await zug(P, welle(600, 500), { id: 23 }); await warte(P, 400);
 const wC = (await letzter(P))?.width;
-pruefe('C1 vergrößert (Zoom > 1,3) zeichnet „fein" auf dem Board dünner — am Schirm gleich dick', z > 1.3 && Math.abs(wC * z - 1.2) < 0.05, `zoom ${z} breite ${wC}`);
+pruefe('C1 vergrößert (Zoom > 1,3) zeichnet „fein" auf dem Board dünner – am Schirm gleich dick', z > 1.3 && Math.abs(wC * z - 1.2) < 0.05, `zoom ${z} breite ${wC}`);
 await ctx.close();
 
 console.log('\n════ D: Textmarker ════');

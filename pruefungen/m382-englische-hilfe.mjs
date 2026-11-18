@@ -81,7 +81,7 @@ const ersteMarke = (q) => q.split('\n').filter((z) => /<li>/.test(z)).map((z) =>
 pruefe('A1 „Was ist neu": gleich viele Einträge in beiden Fassungen', ersteMarke(neuDe).length === ersteMarke(neuEn).length && ersteMarke(neuDe).length > 100, `${ersteMarke(neuDe).length} / ${ersteMarke(neuEn).length}`);
 const abw = ersteMarke(neuDe).map((m, i) => [m, ersteMarke(neuEn)[i]]).filter(([a, b]) => a !== b);
 pruefe('A2 … mit denselben Marken „(M…)" in derselben Reihenfolge', abw.length === 0, JSON.stringify(abw.slice(0, 5)));
-pruefe('A3 der neueste Eintrag steht in beiden oben — derselbe (M382 oder neuer)', ersteMarke(neuDe)[0] === ersteMarke(neuEn)[0] && Number(String(ersteMarke(neuDe)[0]).slice(1)) >= 382, `${ersteMarke(neuDe)[0]} / ${ersteMarke(neuEn)[0]}`);
+pruefe('A3 der neueste Eintrag steht in beiden oben – derselbe (M382 oder neuer)', ersteMarke(neuDe)[0] === ersteMarke(neuEn)[0] && Number(String(ersteMarke(neuDe)[0]).slice(1)) >= 382, `${ersteMarke(neuDe)[0]} / ${ersteMarke(neuEn)[0]}`);
 const abschnitte = (q) => [...q.matchAll(/<section id="(help-[a-z]+)">/g)].map((m) => m[1]);
 pruefe('A4 dieselben Abschnitte mit denselben Ankern', JSON.stringify(abschnitte(de)) === JSON.stringify(abschnitte(en)) && abschnitte(en).length === 9, abschnitte(en).join(','));
 const punkte = (q) => abschnitte(q).map((id) => { const a = q.indexOf(`<section id="${id}">`); return (q.slice(a, q.indexOf('</section>', a)).match(/<li>/g) ?? []).length; });
@@ -148,10 +148,10 @@ const vorlage = async (P, id) => { await P.locator('[data-taste="leer-vorlage"]'
   await P.locator('[data-taste="vorlage"][data-vorlage="rueckblick"]').click(); await P.waitForTimeout(1000);
   const b = (await gespeichert(P)).boards[0];
   const rahmen = b.nodes.filter((n) => n.type === 'frame').map((n) => n.data.name);
-  pruefe('D2 „Retrospective": Die Rahmen heißen englisch — als Inhalt gespeichert', JSON.stringify(rahmen) === JSON.stringify(['😀 Went well', '😕 Didn’t go well', '💡 Let’s try']), JSON.stringify(rahmen));
+  pruefe('D2 „Retrospective": Die Rahmen heißen englisch – als Inhalt gespeichert', JSON.stringify(rahmen) === JSON.stringify(['Went well', 'Didn’t go well', 'Let’s try']), JSON.stringify(rahmen));
   const bub = b.nodes.find((n) => n.type === 'bubbles'); const kan = b.nodes.find((n) => n.type === 'kanban');
   pruefe('D3 … Frage der Bubbles und Titel des Kanban ebenfalls', bub.data.title === 'Actions' && /What do we commit to/.test(bub.data.frage) && kan.data.title === 'We’ll do this', JSON.stringify([bub.data.title, bub.data.frage, kan.data.title]));
-  pruefe('D4 das Board heißt, weil es noch seinen eigenen Namen trug, weiter „Nutzer-Board"; die Meldung ist englisch', b.name === 'Nutzer-Board' && /Template “🔁 Retrospective” inserted|Retrospective/.test(await toast(P)) && !/eingesetzt/.test(await toast(P)), `${b.name} | ${await toast(P)}`);
+  pruefe('D4 das Board heißt, weil es noch seinen eigenen Namen trug, weiter „Nutzer-Board"; die Meldung ist englisch', b.name === 'Nutzer-Board' && /Template “Retrospective” inserted|Retrospective/.test(await toast(P)) && !/eingesetzt/.test(await toast(P)), `${b.name} | ${await toast(P)}`);
   await P.screenshot({ path: `${SD}/m382-d-vorlage.png` });
   // neues Board aus Vorlage: Name englisch
   await P.locator('.tabs-foot .tab-add').click(); await P.waitForTimeout(300);
@@ -167,7 +167,7 @@ const vorlage = async (P, id) => { await P.locator('[data-taste="leer-vorlage"]'
   const { ctx, P } = await seite();
   await vorlage(P, 'rueckblick');
   const b = (await gespeichert(P)).boards[0];
-  pruefe('D7 deutsche Oberfläche: dieselbe Vorlage legt deutsche Karten an', JSON.stringify(b.nodes.filter((n) => n.type === 'frame').map((n) => n.data.name)) === JSON.stringify(['😀 Gut gelaufen', '😕 Hat gehakt', '💡 Probieren wir aus']) && b.nodes.find((n) => n.type === 'kanban').data.title === 'Das setzen wir um');
+  pruefe('D7 deutsche Oberfläche: dieselbe Vorlage legt deutsche Karten an', JSON.stringify(b.nodes.filter((n) => n.type === 'frame').map((n) => n.data.name)) === JSON.stringify(['Gut gelaufen', 'Hat gehakt', 'Probieren wir aus']) && b.nodes.find((n) => n.type === 'kanban').data.title === 'Das setzen wir um');
   await ctx.close();
 }
 
@@ -198,7 +198,7 @@ const palette = async (P) => { if (!(await P.locator('.modul-palette').count()))
   await P.locator('.tabs-foot .tab-add').click(); await P.waitForTimeout(300);
   await P.locator('.neu-menu [role="menuitem"]').nth(2).click(); await P.waitForTimeout(500);
   const st = await gespeichert(P);
-  pruefe('E4 ein neues Projekt heißt „📁 Project"', st.spaces[0].projects.some((p) => /^📁 Project/.test(p.name)), JSON.stringify(st.spaces[0].projects.map((p) => p.name)));
+  pruefe('E4 ein neues Projekt heißt „Project"', st.spaces[0].projects.some((p) => /^Project/.test(p.name)), JSON.stringify(st.spaces[0].projects.map((p) => p.name)));
   pruefe('E5 keine Skriptfehler', P.fehler.length === 0, JSON.stringify(P.fehler).slice(0, 300));
   await ctx.close();
 }
@@ -217,7 +217,7 @@ pruefe('F1 „Was ist neu" nennt die englische Hilfe (M382) in beiden Fassungen,
 const teile = readdirSync(path.join(DIST, 'assets'));
 const haupt = /assets\/(index-[^"]+\.js)/.exec(readFileSync(path.join(DIST, 'index.html'), 'utf-8'))?.[1];
 const hilfeDe = teile.find((t) => /^HelpOverlay-.*\.js$/.test(t));
-pruefe('F2 die englische Hilfe ist ein eigenes Paket — weder im Start noch im deutschen Hilfe-Paket', teile.some((t) => /^HelpOverlayEn-.*\.js$/.test(t)) && !!haupt && !!hilfeDe && !/Getting started/.test(readFileSync(path.join(DIST, 'assets', haupt), 'utf-8')) && !/Getting started/.test(readFileSync(path.join(DIST, 'assets', hilfeDe), 'utf-8')), `${haupt} ${hilfeDe}`);
+pruefe('F2 die englische Hilfe ist ein eigenes Paket – weder im Start noch im deutschen Hilfe-Paket', teile.some((t) => /^HelpOverlayEn-.*\.js$/.test(t)) && !!haupt && !!hilfeDe && !/Getting started/.test(readFileSync(path.join(DIST, 'assets', haupt), 'utf-8')) && !/Getting started/.test(readFileSync(path.join(DIST, 'assets', hilfeDe), 'utf-8')), `${haupt} ${hilfeDe}`);
 
 console.log(`\n  m382-englische-hilfe: ${ok} bestanden, ${bad} fehlgeschlagen`);
 await browser.close(); app.close();

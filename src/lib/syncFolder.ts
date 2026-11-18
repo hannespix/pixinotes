@@ -535,7 +535,7 @@ export async function fremdStandEinarbeiten(remote: SyncPayload, weg: SyncWeg, n
     if (erg.lokalNeu) {
       try { localStorage.setItem(weg.dirtyKey, '1'); } catch { /* voll */ }
       await weg.schreiben();
-      useBoard.getState().showToast(`☁️ Konfliktkopie eingearbeitet: ${berichtAlsSatz(erg.bericht)}.`);
+      useBoard.getState().showToast(`Konfliktkopie eingearbeitet: ${berichtAlsSatz(erg.bericht)}.`);
     }
     return erg.lokalNeu ? 'zusammengefuehrt' : 'gleich';
   }
@@ -549,7 +549,7 @@ export async function fremdStandEinarbeiten(remote: SyncPayload, weg: SyncWeg, n
     await basisMerken(weg.source, remote);
     emitSyncStatus(weg.source, 'ok', remote.savedAt);
   }
-  if (erg.lokalNeu) useBoard.getState().showToast(`☁️ Abgeglichen: ${berichtAlsSatz(erg.bericht)}.`);
+  if (erg.lokalNeu) useBoard.getState().showToast(`Abgeglichen: ${berichtAlsSatz(erg.bericht)}.`);
   return erg.lokalNeu ? 'zusammengefuehrt' : erg.fremdNeu ? 'geschrieben' : 'gleich';
 }
 
@@ -663,13 +663,13 @@ export async function checkSyncRemote(erzwingen = false): Promise<EinarbeitenErg
     } else {
       r = await fremdStandEinarbeiten(remote, ordnerWeg(handle));
       if (r === 'uebernommen') {
-        useBoard.getState().showToast(`☁️ Neuerer Stand aus dem Sync-Ordner übernommen (${new Date(remote.savedAt).toLocaleString('de-DE')}).`);
+        useBoard.getState().showToast(`Neuerer Stand aus dem Sync-Ordner übernommen (${new Date(remote.savedAt).toLocaleString('de-DE')}).`);
         staleHintShown = false;
       } else if (r === 'konflikt') {
         emitSyncStatus('ordner', 'conflict');
         if (!staleHintShown) {
           staleHintShown = true;
-          useBoard.getState().showToast('Sync-Ordner und lokaler Stand weichen ab, nichts überschrieben. Unter ⚙ → Daten → Synchronisation wählen.');
+          useBoard.getState().showToast('Sync-Ordner und lokaler Stand weichen ab, nichts überschrieben. Wählen: Einstellungen → Daten.');
         }
       } else if (r === 'fehler') {
         emitSyncStatus('ordner', 'error');
@@ -688,7 +688,7 @@ export async function checkSyncRemote(erzwingen = false): Promise<EinarbeitenErg
 export async function regrantSyncAccess(): Promise<boolean> {
   const handle = await getSyncHandle();
   if (!handle || !(await ensurePermission(handle, true))) return false;
-  useBoard.getState().showToast('Zugriff erlaubt — Auto-Sync läuft wieder.');
+  useBoard.getState().showToast('Zugriff erlaubt – Auto-Sync läuft wieder.');
   await checkSyncRemote().catch(() => {});
   if (localStorage.getItem(SYNC_DIRTY_KEY)) await autoSave().catch(() => {});
   return true;
@@ -721,7 +721,7 @@ async function autoSave(): Promise<void> {
           emitSyncStatus('ordner', 'conflict');
           if (!conflictWarned) {
             conflictWarned = true;
-            useBoard.getState().showToast('⚠️ Der Sync-Ordner hat einen anderen Stand. Unter ⚙ → Daten → Synchronisation laden oder überschreiben.');
+            useBoard.getState().showToast('Der Sync-Ordner hat einen anderen Stand. Laden oder überschreiben: Einstellungen → Daten.');
           }
           return;
         }

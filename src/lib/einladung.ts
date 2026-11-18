@@ -105,13 +105,13 @@ export async function einladungAnnehmen(token: string): Promise<AnnahmeErgebnis>
   let res: Response;
   try {
     res = await kontoAnfrage(`${rest()}/rpc/einladung_annehmen`, { method: 'POST', headers: KOPF, body: JSON.stringify({ p_token: token }) });
-  } catch { throw new Error('Die Einladung ließ sich nicht annehmen — Internetverbindung prüfen.'); }
+  } catch { throw new Error('Die Einladung ließ sich nicht annehmen – Internetverbindung prüfen.'); }
   if (res.status === 404) { einladungMerken(null); throw new EinladungNichtEingerichtet(); }
   if (res.status === 401) return alsGast();
   if (!res.ok) throw new Error(`Die Einladung ließ sich nicht annehmen (HTTP ${res.status}).`);
   const info = (await res.json()) as { board_id: string; rolle: FreigabeRolle; eigen?: boolean; besitzer_email?: string } | null;
   einladungMerken(null);
-  if (!info?.board_id) throw new Error('Diese Einladung gibt es nicht mehr — der Link wurde widerrufen.');
+  if (!info?.board_id) throw new Error('Diese Einladung gibt es nicht mehr – der Link wurde widerrufen.');
   const st = useBoard.getState();
   if (info.eigen) {
     if (st.boards.some((b) => b.id === info.board_id)) { st.setView('board'); st.openBoard(info.board_id); }

@@ -194,7 +194,7 @@ async function tokenHolen(interaktiv = false): Promise<{ s: KontoSitzung; token:
   if (s.anbieter === 'ms') {
     if (!s.refreshToken) throw neueAnmeldung();
     const t = await msTokenErneuern(s.clientId, s.tenant ?? 'common', s.refreshToken, MS_SCOPE_DRIVE).catch((e) => {
-      if (e instanceof TypeError) throw new NetzFehler('Microsoft-Konto: nicht erreichbar — Internetverbindung prüfen.');
+      if (e instanceof TypeError) throw new NetzFehler('Microsoft-Konto: nicht erreichbar – Internetverbindung prüfen.');
       throw neueAnmeldung();
     });
     const next = { ...s, token: t.token, tokenExp: t.exp, refreshToken: t.refreshToken ?? s.refreshToken };
@@ -220,7 +220,7 @@ function neueAnmeldung(): Error {
   anmeldungNoetig = true;
   emitSyncStatus('konto', 'noperm');
   beiNaechsterGeste();
-  return new Error(`${kontoLabel()}: Anmeldung abgelaufen — oben auf die Wolke klicken, um sie zu erneuern.`);
+  return new Error(`${kontoLabel()}: Anmeldung abgelaufen – oben auf die Wolke klicken, um sie zu erneuern.`);
 }
 let gesteWartet = false;
 function beiNaechsterGeste(): void {
@@ -260,7 +260,7 @@ async function anfrage(url: string, init: RequestInit = {}, nochmal = true): Pro
   try {
     res = await fetch(url, { ...init, headers: { ...(init.headers ?? {}), ...extra, Authorization: `Bearer ${token}` } });
   } catch {
-    throw new Error(`${kontoLabel()}: nicht erreichbar — Internetverbindung prüfen.`);
+    throw new Error(`${kontoLabel()}: nicht erreichbar – Internetverbindung prüfen.`);
   }
   if (res.status === 401 && nochmal) {
     // Token serverseitig ungültig (Kennwort geändert o. Ä.): einmal erneuern
@@ -272,7 +272,7 @@ async function anfrage(url: string, init: RequestInit = {}, nochmal = true): Pro
   if (res.status === 403) {
     const t = await res.text().catch(() => '');
     if (/insufficient|scope|permission|accessNotConfigured/i.test(t)) {
-      throw new Error(`${kontoLabel()}: Die Berechtigung für den App-Ordner fehlt — bitte abmelden und neu anmelden.`);
+      throw new Error(`${kontoLabel()}: Die Berechtigung für den App-Ordner fehlt – bitte abmelden und neu anmelden.`);
     }
     throw new Error(`${kontoLabel()}: Zugriff verweigert (HTTP 403).`);
   }
@@ -463,7 +463,7 @@ function supabaseLaufwerk(): Laufwerk {
     if (!res.ok) {
       const t = await res.text().catch(() => '');
       if (/exceeded|maximum size|too large|Payload/i.test(t) || res.status === 413) throw new Error('PixiNotes-Konto: Die Datei ist größer als der Dateispeicher erlaubt (50 MB).');
-      if (res.status === 404 || res.status === 400 && /[Bb]ucket not found/.test(t)) throw new Error('PixiNotes-Konto: Der Dateispeicher (Bucket „pixinotes") fehlt noch — Migration M329 beim Betreiber einspielen.');
+      if (res.status === 404 || res.status === 400 && /[Bb]ucket not found/.test(t)) throw new Error('PixiNotes-Konto: Der Dateispeicher (Bucket „pixinotes") fehlt noch – Migration M329 beim Betreiber einspielen.');
       throw new Error(`PixiNotes-Konto: Datei-Upload fehlgeschlagen (HTTP ${res.status}).`);
     }
     return res.headers.get('etag') ?? '';
@@ -549,7 +549,7 @@ function supabaseLaufwerk(): Laufwerk {
       if (!res.ok) {
         const t = await res.text().catch(() => '');
         if (/vorbedingung/i.test(t)) throw new VorbedingungFehler();
-        if (res.status === 404) throw new Error('PixiNotes-Konto: Die Datenbank ist noch nicht eingerichtet (Funktion konto_schreiben fehlt) — Migration beim Betreiber einspielen.');
+        if (res.status === 404) throw new Error('PixiNotes-Konto: Die Datenbank ist noch nicht eingerichtet (Funktion konto_schreiben fehlt) – Migration beim Betreiber einspielen.');
         throw new Error(`PixiNotes-Konto: Schreiben fehlgeschlagen (HTTP ${res.status}).`);
       }
       const v = (await res.json()) as number | string;
@@ -776,7 +776,7 @@ export async function kontoLesen(): Promise<{ payload: SyncPayload; kenn: Kenn }
         if (!b.geteiltVon || b.gastLink || b.geteiltRolle === 'lesen') continue;
         if (liste.some((f) => f.board_id === b.id && f.besitzer === b.geteiltVon)) continue;
         alsEigeneKopie(b.id);
-        useBoard.getState().showToast('Die Freigabe für dieses Board wurde beendet — es bleibt als eigene Kopie bei dir.', false, 8000);
+        useBoard.getState().showToast('Die Freigabe für dieses Board wurde beendet – es bleibt als eigene Kopie bei dir.', false, 8000);
       }
     }
     for (const f of liste) {
@@ -1001,11 +1001,11 @@ async function fremdSchreiben(besitzer: string, boardId: string, text: string, s
             await idbSet(KENN_KEY, { ...kenn, fremd: { ...(kenn.fremd ?? {}), [boardId]: { besitzer, version: String(z.version), stempel: stempel(z.inhalt) } } } satisfies Kenn);
           } catch { /* der nächste Abgleich holt den Stand */ }
         }
-        useBoard.getState().showToast('🔒 Der Besitzer hat dieses Board auf „Nur lesen" gestellt — deine letzte Änderung wurde nicht übernommen.', false, 8000);
+        useBoard.getState().showToast('Der Besitzer hat dieses Board auf „Nur lesen" gestellt – deine letzte Änderung wurde nicht übernommen.', false, 8000);
         throw new SpaeterFehler();
       }
       alsEigeneKopie(boardId);
-      useBoard.getState().showToast('Die Freigabe für dieses Board wurde beendet — es bleibt als eigene Kopie bei dir.', false, 8000);
+      useBoard.getState().showToast('Die Freigabe für dieses Board wurde beendet – es bleibt als eigene Kopie bei dir.', false, 8000);
       throw new SpaeterFehler();
     }
     throw e;
@@ -1063,7 +1063,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
     if (r) {
       const erg = await einarbeiten(r.payload);
       if (erg === 'spaeter') throw new SpaeterFehler();
-      if (erg === 'konflikt') { emitSyncStatus('konto', 'conflict'); throw new Error(`${kontoLabel()} und lokaler Stand weichen ab, nichts überschrieben. Unter ⚙ → Daten → Synchronisation wählen.`); }
+      if (erg === 'konflikt') { emitSyncStatus('konto', 'conflict'); throw new Error(`${kontoLabel()} und lokaler Stand weichen ab, nichts überschrieben. Unter Einstellungen → Daten → Synchronisation wählen.`); }
       if (erg === 'fehler') throw new Error('Der Stand aus dem Konto konnte nicht gespeichert werden (Browser-Speicher voll?).');
       // zusammengeführt/geschrieben: die Zusammenführung hat selbst geschrieben; gleich/übernommen: jetzt der eigene Anteil
       if (erg === 'zusammengefuehrt' || erg === 'geschrieben') return kontoStamp() ?? new Date().toISOString();
@@ -1258,7 +1258,7 @@ async function kontoWriteRoh(nochmal: boolean, nachMerge = false): Promise<strin
       if (r && r.payload.savedAt !== kontoStamp()) {
         const erg = await einarbeiten(r.payload);
         if (erg === 'spaeter') throw new SpaeterFehler();
-        if (erg === 'konflikt') { emitSyncStatus('konto', 'conflict'); throw new Error(`${kontoLabel()} und lokaler Stand weichen ab, nichts überschrieben. Unter ⚙ → Daten → Synchronisation wählen.`); }
+        if (erg === 'konflikt') { emitSyncStatus('konto', 'conflict'); throw new Error(`${kontoLabel()} und lokaler Stand weichen ab, nichts überschrieben. Unter Einstellungen → Daten → Synchronisation wählen.`); }
         if (erg === 'fehler') throw new Error('Der Stand aus dem Konto konnte nicht gespeichert werden (Browser-Speicher voll?).');
         return kontoStamp() ?? payload.savedAt;
       }
@@ -1307,7 +1307,7 @@ const kontoWeg = (): SyncWeg => ({
   uebernehmen: applyKonto,
   vereinen: true,
 });
-class SpaeterFehler extends Error { constructor() { super('Der Nutzer tippt gerade — gleich noch einmal.'); } }
+class SpaeterFehler extends Error { constructor() { super('Der Nutzer tippt gerade – gleich noch einmal.'); } }
 
 /**
  * M330: Welcher Server-Stand (eTag) ist wirklich im lokalen Stand eingearbeitet?
@@ -1386,13 +1386,13 @@ export async function checkKontoRemote(erzwingen = false): Promise<EinarbeitenEr
     if (r.payload.savedAt === kontoStamp() && !rollenAnders(r.payload.boards)) { staleHintShown = false; emitSyncStatus('konto', 'ok', r.payload.savedAt); return 'gleich'; }
     const e = await einarbeiten(r.payload);
     if (e === 'uebernommen') {
-      useBoard.getState().showToast(`☁️ Neuerer Stand aus ${kontoLabel()} übernommen (${new Date(r.payload.savedAt).toLocaleString('de-DE')}).`);
+      useBoard.getState().showToast(`Neuerer Stand aus ${kontoLabel()} übernommen (${new Date(r.payload.savedAt).toLocaleString('de-DE')}).`);
       staleHintShown = false;
     } else if (e === 'konflikt') {
       emitSyncStatus('konto', 'conflict');
       if (!staleHintShown) {
         staleHintShown = true;
-        useBoard.getState().showToast(`☁️ ${kontoLabel()} und lokaler Stand weichen ab, nichts überschrieben. Unter ⚙ → Daten → Synchronisation wählen.`);
+        useBoard.getState().showToast(`${kontoLabel()} und lokaler Stand weichen ab, nichts überschrieben. Unter Einstellungen → Daten → Synchronisation wählen.`);
       }
     } else if (e === 'fehler') {
       emitSyncStatus('konto', 'error');
@@ -1431,7 +1431,7 @@ async function autoPush(): Promise<void> {
     if (!anmeldungNoetig) emitSyncStatus('konto', 'error');
     if (!conflictWarned && !anmeldungNoetig) {
       conflictWarned = true;
-      useBoard.getState().showToast(`⚠️ ${(e as Error).message}`);
+      useBoard.getState().showToast(`${(e as Error).message}`);
     }
   }
 }
@@ -1463,21 +1463,21 @@ export function initKontoSync(): void {
       void (async () => {
         if (erwartet && (!bisher || bisher.userId === rk.userId)) return true;
         const wer = (await sbNutzer(rk.token))?.email ?? '…';
-        return window.confirm(`Mit dem PixiNotes-Konto ${wer} anmelden?\n\nDieser Anmelde-Link wurde nicht auf diesem Gerät angefordert${bisher ? ' — und hier ist schon ein Konto angemeldet' : ''}. Nach dem Anmelden gleichen sich die Boards dieses Geräts mit diesem Konto ab. Bestätige nur, wenn es dein eigenes Konto ist.`);
+        return window.confirm(`Mit dem PixiNotes-Konto ${wer} anmelden?\n\nDieser Anmelde-Link wurde nicht auf diesem Gerät angefordert${bisher ? ' – und hier ist schon ein Konto angemeldet' : ''}. Nach dem Anmelden gleichen sich die Boards dieses Geräts mit diesem Konto ab. Bestätige nur, wenn es dein eigenes Konto ist.`);
       })().then((ja) => {
-        if (!ja) { useBoard.getState().showToast('Nicht angemeldet — der Link wurde verworfen.', false, 6000); return undefined; }
+        if (!ja) { useBoard.getState().showToast('Nicht angemeldet – der Link wurde verworfen.', false, 6000); return undefined; }
         return kontoAnmeldenSupabase(rk).then(async (s) => {
         const r = await kontoVerbinden();
         const wo = s.name ? `als „${s.name}"` : 'mit dem PixiNotes-Konto';
         useBoard.getState().showToast(r === 'konflikt'
-          ? `✅ Angemeldet ${wo}. Im Konto liegt schon ein Stand und hier Eigenes — unter ⚙ → Daten → Synchronisation wählen.`
-          : `✅ Angemeldet ${wo} — Änderungen gleichen sich ab jetzt automatisch ab.`, false, 7000);
+          ? `Angemeldet ${wo}. Im Konto liegt schon ein Stand und hier Eigenes – unter Einstellungen → Daten → Synchronisation wählen.`
+          : `Angemeldet ${wo} – Änderungen gleichen sich ab jetzt automatisch ab.`, false, 7000);
         window.dispatchEvent(new CustomEvent('pixinotes:konto'));
         });
-      }).catch((e) => useBoard.getState().showToast(`⚠️ ${(e as Error).message}`, false, 8000));
+      }).catch((e) => useBoard.getState().showToast(`${(e as Error).message}`, false, 8000));
     }
   } catch (e) {
-    useBoard.getState().showToast(`⚠️ ${(e as Error).message}`, false, 8000);
+    useBoard.getState().showToast(`${(e as Error).message}`, false, 8000);
   }
   useBoard.subscribe((s, prev) => {
     if (s.spaces === prev.spaces && nurAuswahlAnders(prev.boards, s.boards)) return;   // M345: Auswählen ist keine Änderung

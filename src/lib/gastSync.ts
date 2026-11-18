@@ -520,7 +520,7 @@ function beendet(boardId: string): void {
   basisWeg(boardId);
   ohneLeseschutz(() => useBoard.setState((s) => ({ boards: s.boards.map((b) => (b.id === boardId ? alsKopie(b) : b)) })));
   flushPersist();
-  useBoard.getState().showToast('Der Link zu diesem Board wurde beendet — es bleibt als eigene Kopie bei dir.', false, 8000);
+  useBoard.getState().showToast('Der Link zu diesem Board wurde beendet – es bleibt als eigene Kopie bei dir.', false, 8000);
 }
 
 /**
@@ -542,7 +542,7 @@ function mischen(boardId: string, basis: BoardDoc | undefined, fremd: BoardDoc):
   if (kern(fuerHier) !== kern(lokal) || fuerHier.geteiltRolle !== lokal.geteiltRolle) {
     ohneLeseschutz(() => st.importSync(st.boards.map((b) => (b.id === boardId ? fuerHier : b)), st.spaces, st.activeId, { geaendert: [boardId] }));
     flushBald();   // der neue Stand soll einen Absturz oder ein schnelles Schließen überstehen
-    if (erg.bericht.konflikte) st.showToast(`👥 Abgeglichen: ${berichtAlsSatz(erg.bericht)}.`, false, 6000);
+    if (erg.bericht.konflikte) st.showToast(`Abgeglichen: ${berichtAlsSatz(erg.bericht)}.`, false, 6000);
   }
   return mitMassenVon(neu, fremd);
 }
@@ -761,7 +761,7 @@ async function serverGilt(boardId: string): Promise<void> {
   const m = lesen();
   if (m[boardId]) { m[boardId] = { ...m[boardId], version: g.version, rolle: g.rolle, recht: rechtAus(g.optionen) }; schreiben(m); }
   setzeGruppe(boardId, { ich: meineKennung(true), recht: rechtAus(g.optionen), gast: true });
-  st.showToast('🔒 Der Besitzer hat festgelegt, was Gäste ändern dürfen — deine letzte Änderung wurde nicht übernommen.', false, 8000);
+  st.showToast('Der Besitzer hat festgelegt, was Gäste ändern dürfen – deine letzte Änderung wurde nicht übernommen.', false, 8000);
 }
 const abgleichen = (boardId: string): Promise<void> => exklusiv(boardId, () => holen(boardId));
 /**
@@ -1143,7 +1143,7 @@ export async function gastBeitreten(token: string): Promise<GastErgebnis> {
   let g: Gelesen | null;
   try { g = await rpc<Gelesen | null>('gast_lesen', { p_token: token }); } catch (f) {
     if (f instanceof GastFehler && (f.art === 'fehlt' || f.art === 'abgelehnt')) return null;
-    throw new Error('Die Einladung ließ sich nicht laden — Internetverbindung prüfen.');
+    throw new Error('Die Einladung ließ sich nicht laden – Internetverbindung prüfen.');
   }
   if (!g?.inhalt) return null;
   let roh: BoardDoc;

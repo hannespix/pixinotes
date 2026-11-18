@@ -165,7 +165,7 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
         await navigator.clipboard.writeText(url);
         // M390: ehrlich bleiben — was in der Geräte-Ablage liegt, passt in keinen Link
         showToast(hatAblageInhalt(board)
-          ? 'Teilen-Link kopiert. Große Dateien und eigene Tools passen nicht in den Link — dafür „Als Datei sichern".'
+          ? 'Teilen-Link kopiert. Große Dateien und eigene Tools passen nicht in den Link – dafür „Als Datei sichern".'
           : 'Teilen-Link kopiert, er enthält das komplette Board.', false, hatAblageInhalt(board) ? 8000 : undefined);
       } catch {
         window.prompt('Link zum Kopieren (Strg+C):', url); // M340: Zwischenablage gesperrt — der Link ist trotzdem da
@@ -360,7 +360,7 @@ export function ProjektMenu({ projectId, onRename, klasse = '' }: {
             const geschafft = offen.filter((id) => useBoard.getState().boards.find((x) => x.id === id)?.archived).length;
             showToast(geschafft === offen.length
               ? `„${projekt.name}": ${geschafft} Board(s) archiviert.`
-              : `„${projekt.name}": ${geschafft} von ${offen.length} Boards archiviert — das letzte sichtbare Board bleibt offen.`);
+              : `„${projekt.name}": ${geschafft} von ${offen.length} Boards archiviert – das letzte sichtbare Board bleibt offen.`);
             zu();
           }}
         ><IArchive size={14} /> Alle Boards archivieren ({offen.length})</button>

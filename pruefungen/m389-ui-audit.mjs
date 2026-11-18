@@ -95,7 +95,7 @@ console.log('\n════ A: Farben ════');
     const l = document.querySelector('.legal-corner .link-btn'); const lc = getComputedStyle(l);
     return { aus, thema: document.documentElement.dataset.theme, recht: window.__kontrast(lc.color, getComputedStyle(document.documentElement).getPropertyValue('--bg').trim()), deckung: getComputedStyle(document.querySelector('.legal-corner')).opacity };
   });
-  pruefe('A5 dunkel: Akzent als Schrift auch auf getönten Flächen ≥ 4,5:1 — in allen fünf Farben', dunkel.thema === 'dark' && Object.values(dunkel.aus).every((v) => v.schrift >= 4.5 && v.fuell >= 4.5), JSON.stringify(dunkel.aus));
+  pruefe('A5 dunkel: Akzent als Schrift auch auf getönten Flächen ≥ 4,5:1 – in allen fünf Farben', dunkel.thema === 'dark' && Object.values(dunkel.aus).every((v) => v.schrift >= 4.5 && v.fuell >= 4.5), JSON.stringify(dunkel.aus));
   pruefe('A6 dunkel: „Impressum · Datenschutz" steht mit voller Deckung und ≥ 4,5:1 da', dunkel.recht >= 4.5 && dunkel.deckung === '1', JSON.stringify([dunkel.recht, dunkel.deckung]));
   await d.ctx.close();
 }
@@ -110,7 +110,7 @@ console.log('\n════ B: Fenster, Namen, Leisten ════');
   pruefe('B1 Fenster geöffnet: Der Fokus liegt im Fenster (nicht mehr auf dem Knopf dahinter)', await P.evaluate(() => !!document.activeElement?.closest('.modal-backdrop')), await P.evaluate(() => document.activeElement?.className ?? ''));
   let drin = true; const stationen = new Set();
   for (let i = 0; i < 45; i++) { await P.keyboard.press('Tab'); const s = await P.evaluate(() => [!!document.activeElement?.closest('.modal-backdrop'), (document.activeElement?.textContent ?? '').slice(0, 20) + '|' + (document.activeElement?.getAttribute('aria-label') ?? '')]); if (!s[0]) drin = false; stationen.add(s[1]); }
-  pruefe('B2 Tab läuft im Fenster im Kreis — 45 Schritte, nie dahinter, mehr als fünf Stationen', drin && stationen.size > 5, stationen.size);
+  pruefe('B2 Tab läuft im Fenster im Kreis – 45 Schritte, nie dahinter, mehr als fünf Stationen', drin && stationen.size > 5, stationen.size);
   for (let i = 0; i < 3; i++) await P.keyboard.press('Shift+Tab');
   pruefe('B3 … rückwärts ebenso', await P.evaluate(() => !!document.activeElement?.closest('.modal-backdrop')));
   await P.keyboard.press('Escape'); await P.waitForTimeout(350);
@@ -183,7 +183,7 @@ console.log('\n════ D: Telefon ════');
   pruefe('D3 … Board-Namen sind lesbar (≥ 9 Punkte auf dem Schirm)', ov.schrift >= 9, ov.schrift.toFixed(1));
   const ziel = await P.evaluate(() => { const e = [...document.querySelectorAll('.react-flow__node-ovBoard')].find((x) => /Aufgaben-Zentrale/.test(x.textContent)); const m = e.querySelector('.ov-mini-karte').getBoundingClientRect(); return [m.left + m.width / 2, m.top + m.height / 2]; });
   await P.touchscreen.tap(ziel[0], ziel[1]); await P.waitForTimeout(1200);
-  pruefe('D4 ein Tipp auf die Kachel — auch mitten auf die Vorschau — öffnet das BOARD, nicht blind eine Karte im Fokus', await P.evaluate(() => { const s = JSON.parse(localStorage.getItem('pixinotes-board')).state; return s.view === 'board' && /Aufgaben-Zentrale/.test(s.boards.find((b) => b.id === s.activeId).name) && !document.querySelector('.focus-head'); }));
+  pruefe('D4 ein Tipp auf die Kachel – auch mitten auf die Vorschau – öffnet das BOARD, nicht blind eine Karte im Fokus', await P.evaluate(() => { const s = JSON.parse(localStorage.getItem('pixinotes-board')).state; return s.view === 'board' && /Aufgaben-Zentrale/.test(s.boards.find((b) => b.id === s.activeId).name) && !document.querySelector('.focus-head'); }));
   const reiter = await P.evaluate(() => [...document.querySelectorAll('.tab-home, .tab-add')].filter((e) => e.getClientRects().length).map((e) => { const r = e.getBoundingClientRect(); return Math.min(r.width, r.height); }));
   pruefe('D5 „Übersicht" und „Neu" in der Kopfzeile: mindestens 40 Punkte', reiter.length >= 2 && Math.min(...reiter) >= 40, reiter.join());
   pruefe('D6 nichts ragt seitlich aus dem Bild', await P.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
@@ -213,7 +213,7 @@ console.log('\n════ E: Diagramme und Beispiele ════');
     const kanban = document.querySelector('.react-flow__node-kanban').getBoundingClientRect();
     return { passt: svg.top >= f.top - 1 && svg.bottom <= f.bottom + 1 && svg.left >= f.left - 1 && svg.right <= f.right + 1, rollt: fl.scrollHeight > fl.clientHeight + 2, imRahmen: kanban.top >= rahmen.top && kanban.bottom <= rahmen.bottom && kanban.left >= rahmen.left && kanban.right <= rahmen.right, k: [kanban.top, kanban.bottom], r: [rahmen.top, rahmen.bottom] };
   });
-  pruefe('E2 ein hohes Ablaufdiagramm passt ganz in seine Karte — nichts abgeschnitten, nichts zu rollen', pr.passt && !pr.rollt, JSON.stringify(pr));
+  pruefe('E2 ein hohes Ablaufdiagramm passt ganz in seine Karte – nichts abgeschnitten, nichts zu rollen', pr.passt && !pr.rollt, JSON.stringify(pr));
   pruefe('E3 Beispielprojekt: Das Kanban liegt (mit den übernommenen Aufgaben) im Rahmen „Umsetzung"', pr.imRahmen, JSON.stringify(pr));
   await ctx.close();
 }
@@ -225,7 +225,7 @@ const css = quelle('src/index.css');
 const tot = ['about-menu', 'tab-picker-liste', 'card-x', 'dock-tasks', 'side-board-pen', 'mm-pop-wrap', 'legal-link', 'sel-badge'];
 pruefe('F1 tote Klassen stehen nicht mehr im Stylesheet', tot.every((k) => !new RegExp(`\\.${k}(?![\\w-])`).test(css)), tot.filter((k) => new RegExp(`\\.${k}(?![\\w-])`).test(css)).join());
 pruefe('F2 die Sammel-Regeln, in denen sie standen, gelten weiter (Griffe bei weitem Zoom unsichtbar)', /\[data-weit\] \.react-flow__node :is\(\.card-grip, \.color-dot, \.note-farben, \.fit-hint\)/.test(css) && /html\[data-alles-zeigen\] :is\(\.react-flow__resize-control, \.pn-handle, \.card-grip/.test(css));
-pruefe('F3 Hilfe nennt M389 — deutsch und englisch', quelle('src/components/HelpOverlay.tsx').includes('(M389)') && quelle('src/components/HelpOverlayEn.tsx').includes('(M389)'));
+pruefe('F3 Hilfe nennt M389 – deutsch und englisch', quelle('src/components/HelpOverlay.tsx').includes('(M389)') && quelle('src/components/HelpOverlayEn.tsx').includes('(M389)'));
 pruefe('F4 docs/AUDIT.md führt die UI-Funde; docs/UMBAU.md nennt M389', /## 2 · UI-Audit \(M389\)\s+\S/.test(quelle('docs/AUDIT.md')) && quelle('docs/AUDIT.md').includes('U1') && quelle('docs/UMBAU.md').includes('M389'));
 pruefe('F5 keine Fehler der Seite', fehler.length === 0, fehler.join(' | '));
 

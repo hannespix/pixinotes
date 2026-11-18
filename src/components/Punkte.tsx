@@ -19,11 +19,11 @@ export function punktUmschalten(boardId: string, nodeId: string): boolean {
   const board = st.boards.find((b) => b.id === boardId);
   const n = board?.nodes.find((k) => k.id === nodeId);
   if (!board || !n) return false;
-  if (board.geteiltRolle === 'lesen') { st.showToast('Dieses Board ist nur zum Lesen geteilt — Punkte vergeben geht hier nicht.'); return false; }
-  if (karteFest(boardId, (n.data as { von?: string }).von)) { st.showToast('Hier darfst du nur eigene Karten ändern — Punkte auf fremde Karten gehen nicht.'); return false; }
+  if (board.geteiltRolle === 'lesen') { st.showToast('Dieses Board ist nur zum Lesen geteilt – Punkte vergeben geht hier nicht.'); return false; }
+  if (karteFest(boardId, (n.data as { von?: string }).von)) { st.showToast('Hier darfst du nur eigene Karten ändern – Punkte auf fremde Karten gehen nicht.'); return false; }
   // Eine Karte, die gerade ein anderer schreibt, gehört für den Moment ihm — was hier an ihr geändert würde, ginge unter
   const haelt = sperrenVon(boardId).get(nodeId);
-  if (haelt) { st.showToast(`✎ ${haelt.name} bearbeitet diese Karte gerade — gib deinen Punkt gleich noch einmal.`); return false; }
+  if (haelt) { st.showToast(`✎ ${haelt.name} bearbeitet diese Karte gerade – gib deinen Punkt gleich noch einmal.`); return false; }
   const ich = punkteIch(boardId);
   st.updateNodeData(nodeId, { punkte: punktSetzen(n.data, ich, !hatPunktVon(n.data, ich)) });
   return true;
@@ -38,7 +38,7 @@ function Marke({ id, zahl, mein, boardId }: { id: string; zahl: number; mein: bo
   return (
     <button className={`punkte-marke nodrag nopan${mein ? ' mein' : ''}`} data-taste="punkte-marke" data-karte={id} data-zahl={zahl} aria-pressed={mein}
       style={{ transform: `translate(${p.x + w}px, ${p.y}px)` }}
-      title={`${zahl} ${zahl === 1 ? 'Punkt' : 'Punkte'}${mein ? ' — einer davon von dir (antippen nimmt ihn zurück)' : ' — antippen gibt deinen dazu'}`}
+      title={`${zahl} ${zahl === 1 ? 'Punkt' : 'Punkte'}${mein ? ' – einer davon von dir (antippen nimmt ihn zurück)' : ' – antippen gibt deinen dazu'}`}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => { e.stopPropagation(); punktUmschalten(boardId, id); }}>
       <span className="punkte-punkt" aria-hidden="true" />{zahl}
@@ -152,7 +152,7 @@ export function PunkteLeiste() {
   };
   return (
     <div className="punkte-leiste" role="toolbar" aria-label="Punkte vergeben" data-taste="punkte-leiste">
-      <span className="punkte-leiste-text"><span className="punkte-punkt" aria-hidden="true" /> <b>Punkte vergeben</b> — Karte antippen</span>
+      <span className="punkte-leiste-text"><span className="punkte-punkt" aria-hidden="true" /> <b>Punkte vergeben</b> – Karte antippen</span>
       <span className="punkte-leiste-zahl" data-taste="punkte-stand">deine: <b>{meine}</b> · gesamt: <b>{gesamt}</b></span>
       <span className="punkte-rang-wrap">
         <button className={rang ? 'an' : ''} aria-expanded={rang} disabled={liste.length === 0} onClick={() => setRang((o) => !o)} data-taste="punkte-rang-auf">Rangliste</button>
