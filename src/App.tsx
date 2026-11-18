@@ -7,7 +7,6 @@ import { Tabs } from './components/Tabs';
 import { TopActions } from './components/TopActions';
 import { Overview } from './components/Overview';
 import { SearchOverlay } from './components/SearchOverlay';
-import { Settings } from './components/Settings';
 import { RechercheDialog } from './components/RechercheDialog';
 import { Presenter } from './components/Presenter';
 import {
@@ -52,6 +51,7 @@ import { SprachHinweis } from './components/SprachHinweis';
 import { GastNameDialog, LiveLeiste, NAME_FRAGEN } from './components/LiveLeiste';
 import { FreigabeHost } from './components/FreigabeDialog';
 import { BildEditorHost } from './components/BildEditorHost';
+import { EbeneLoeschenHost } from './components/EbeneLoeschenDialog';
 import { getAuthor } from './components/CommentLayer';
 import { loadKonto } from './lib/kontoSync';
 import { sprache } from './lib/sprache';
@@ -77,6 +77,18 @@ function Hilfe() {
   const [geladen, setGeladen] = useState(false);
   useEffect(() => { if (offen) setGeladen(true); }, [offen]);
   return offen || geladen ? <Suspense fallback={null}><HelpOverlayLazy /></Suspense> : null;
+}
+
+/**
+ * M398: Die Einstellungen kommen erst mit dem ersten Öffnen – das große Blatt gehört nicht in den Start.
+ * Danach bleibt es eingehängt: Reiter und Eingaben überleben das Schließen wie zuvor.
+ */
+const SettingsLazy = lazy(() => import('./components/Settings').then((m) => ({ default: m.Settings })));
+function Einstellungen() {
+  const offen = useBoard((s) => s.settingsOpen);
+  const [geladen, setGeladen] = useState(false);
+  useEffect(() => { if (offen) setGeladen(true); }, [offen]);
+  return offen || geladen ? <Suspense fallback={null}><SettingsLazy /></Suspense> : null;
 }
 
 /**
@@ -391,7 +403,7 @@ export default function App() {
       <LookupPanel />
       <TooltipLayer />
       <Tastatur />
-        <Settings />
+        <Einstellungen />
         <RechercheDialog />
         <Presenter />
         {/* §5 DDG: Impressum muss leicht erkennbar und unmittelbar erreichbar
@@ -416,6 +428,7 @@ export default function App() {
         <GastNameDialog />
         <FreigabeHost />
         <BildEditorHost />
+        <EbeneLoeschenHost />
         {/* M368: anderssprachigen Nutzern sagen, dass der Browser die Oberfläche übersetzen kann */}
         {!presenting && <SprachHinweis />}
         {/* M360: Nur lesend geteiltes Board — sagen, warum nichts geht, und den Ausweg anbieten */}
@@ -446,7 +459,7 @@ export default function App() {
             </button>
           )}
           {toast?.abbruch && (
-            <button className="toast-undo" data-taste="ki-abbrechen" onClick={() => { kiAbbrechen(); useBoard.getState().showToast('⏹ Abbruch angefordert – die laufende Portion wird noch beendet …', false, 8000); }}>
+            <button className="toast-undo" data-taste="ki-abbrechen" onClick={() => { kiAbbrechen(); useBoard.getState().showToast('Abbruch angefordert – die laufende Portion wird noch beendet …', false, 8000); }}>
               Abbrechen
             </button>
           )}

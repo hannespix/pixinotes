@@ -205,6 +205,12 @@ export interface Project {
 /** M310: manuell = gezogene Reihenfolge; alphabetisch nach Name; erstellt = Reihenfolge des Anlegens */
 export type BoardSortierung = 'manuell' | 'alphabetisch' | 'erstellt';
 
+/**
+ * M398: Was beim Löschen eines Projekts oder Bereichs mit den Boards darin geschieht.
+ * `behalten`: Die Boards ziehen in das Projekt `ziel` (beim Bereich: seine Projekte in den Bereich `ziel`).
+ */
+export type EbeneLoeschen = { boards: 'loeschen' } | { boards: 'behalten'; ziel: string };
+
 /** Ebene 1: Ein Bereich bündelt Projekte (z. B. „Arbeit", „Privat", „Team"). */
 export interface Space {
   id: string;
@@ -216,7 +222,7 @@ interface Toast {
   message: string;
   /** true → Toast zeigt einen „Rückgängig"-Knopf, der das zuletzt Gelöschte wiederherstellt;
    *  M388 'schritt' → der Knopf nimmt den letzten Schritt zurück (wie Strg+Z) — für alles, was kein Löschen ist */
-  undo?: boolean | 'schritt';
+  undo?: boolean | 'schritt' | 'ebene';
   /** M332: true → Toast zeigt „Abbrechen" für die laufende KI-Stapelaktion */
   abbruch?: boolean;
 }
@@ -406,10 +412,13 @@ interface BoardState {
   // Hierarchie (Bereiche / Projekte / Boards)
   addSpace: (name?: string) => void;
   renameSpace: (id: string, name: string) => void;
-  removeSpace: (id: string) => void;
+  /** M398: mit `mit` auch, wenn noch Boards darin liegen – sie werden gelöscht oder ziehen um */
+  removeSpace: (id: string, mit?: EbeneLoeschen) => void;
   addProject: (spaceId: string, name?: string) => void;
   renameProject: (id: string, name: string) => void;
-  removeProject: (id: string) => void;
+  removeProject: (id: string, mit?: EbeneLoeschen) => void;
+  /** M398: das zuletzt gelöschte Projekt oder den Bereich samt Boards zurückholen */
+  ebeneZurueck: () => boolean;
   addBoard: (name?: string, projectId?: string) => string;
   /**
    * M379: Board aus einer Vorlage. Ohne `inBoard` entsteht ein neues Board (im Projekt `projectId`); mit
@@ -565,7 +574,7 @@ interface BoardState {
   focusNode: (boardId: string, nodeId: string) => void;
   clearPendingFocus: () => void;
 
-  showToast: (message: string, undo?: boolean | 'schritt', durationMs?: number, abbruch?: boolean) => void;
+  showToast: (message: string, undo?: boolean | 'schritt' | 'ebene', durationMs?: number, abbruch?: boolean) => void;
   /** M390: Der Knopf „Rückgängig" im Hinweis */
   hinweisRueckgaengig: () => void;
 
@@ -1055,6 +1064,17 @@ let hinweisEintrag: unknown = null;
  *  des persistierten States: Ein Rückgängig gilt nur für die laufende Sitzung
  *  und soll nicht als riesiger Zweitstand mitgespeichert werden. */
 let importUndo: { boards: BoardDoc[]; spaces: Space[]; activeId: string } | null = null;
+/** M398: Stand vor dem letzten Löschen eines Projekts oder Bereichs – wie der Import nur für die laufende Sitzung */
+let ebenenUndo: {
+  art: 'projekt' | 'bereich';
+  bereich: Space; bereichIndex: number;
+  projekt?: Project; projektIndex?: number;
+  /** die gelöschten Boards mit ihrer Stelle in der Liste (Reihenfolge des Anlegens) */
+  boards: Array<{ board: BoardDoc; index: number }>;
+  activeId: string;
+  /** dabei von selbst angelegt, weil sonst nichts Sichtbares geblieben wäre */
+  neuesBoard?: string; neuesProjekt?: string;
+} | null = null;
 export function mutedHistory<T>(fn: () => T): T {
   historyMuted = true;
   try {
@@ -1410,6 +1430,86 @@ export const useBoard = create<BoardState>()(
       };
 
       /** Board-ID aus allen Projekten entfernen (Hilfsfunktion für move/delete) */
+      /**
+       * M398: Ein Projekt oder einen Bereich löschen – auch mit Inhalt. Vorher ging das nur leer: Wer aufräumen
+       * wollte, musste jedes Board einzeln öffnen und löschen. Jetzt entscheidet `mit`, was mit den Boards
+       * geschieht (löschen oder umziehen); der Stand davor bleibt für „Rückgängig" in der Meldung liegen.
+       * Boards, die einem anderen Konto gehören, werden nie gelöscht – sie ziehen in ein verbleibendes Projekt.
+       */
+      const ebeneLoeschen = (art: 'projekt' | 'bereich', id: string, mit?: EbeneLoeschen): void => {
+        const s0 = get();
+        const bereich = art === 'bereich' ? s0.spaces.find((sp) => sp.id === id) : s0.spaces.find((sp) => sp.projects.some((p) => p.id === id));
+        const projekt = art === 'projekt' ? bereich?.projects.find((p) => p.id === id) : undefined;
+        if (!bereich || (art === 'projekt' && !projekt)) return;
+        if (art === 'bereich' && s0.spaces.length <= 1) { s0.showToast('Der letzte Bereich bleibt bestehen'); return; }
+        const name = art === 'bereich' ? bereich.name : projekt!.name;
+        const ids = art === 'bereich' ? bereich.projects.flatMap((p) => p.boardIds) : projekt!.boardIds;
+        if (ids.length > 0 && !mit) {
+          s0.showToast(art === 'bereich' ? 'Bereich enthält noch Boards – erst verschieben oder löschen.' : 'Projekt enthält noch Boards – erst verschieben oder löschen.');
+          return;
+        }
+        const bereichIndex = s0.spaces.indexOf(bereich);
+        const projektIndex = projekt ? bereich.projects.indexOf(projekt) : undefined;
+        let spaces = art === 'bereich'
+          ? s0.spaces.filter((sp) => sp.id !== id)
+          : s0.spaces.map((sp) => (sp === bereich ? { ...sp, projects: sp.projects.filter((p) => p.id !== id) } : sp));
+        let boards = s0.boards;
+        let activeId = s0.activeId;
+        let neuesBoard: string | undefined; let neuesProjekt: string | undefined;
+        let weg: Array<{ board: BoardDoc; index: number }> = [];
+        let meldung = art === 'bereich' ? t(`Bereich „${name}" gelöscht.`) : t(`Projekt „${name}" gelöscht.`);
+        /** ein Projekt, das Boards aufnehmen kann – notfalls wird „Allgemein" angelegt */
+        const auffang = (): string => {
+          const da = spaces.flatMap((sp) => sp.projects)[0];
+          if (da) return da.id;
+          neuesProjekt = uid();
+          spaces = spaces.map((sp, i) => (i === 0 ? { ...sp, projects: [...sp.projects, { id: neuesProjekt!, name: t('Allgemein'), boardIds: [] }] } : sp));
+          return neuesProjekt;
+        };
+        const hinein = (projektId: string, neue: string[]) => {
+          spaces = spaces.map((sp) => ({ ...sp, projects: sp.projects.map((p) => (p.id === projektId ? { ...p, boardIds: [...p.boardIds, ...neue] } : p)) }));
+        };
+        if (ids.length > 0 && mit?.boards === 'behalten') {
+          if (art === 'bereich') {
+            const ziel = spaces.find((sp) => sp.id === mit.ziel);
+            if (!ziel) return;
+            spaces = spaces.map((sp) => (sp.id === mit.ziel ? { ...sp, projects: [...sp.projects, ...bereich.projects] } : sp));
+            meldung = t(`Bereich „${name}" gelöscht – die Projekte liegen jetzt in „${ziel.name}".`);
+          } else {
+            const ziel = spaces.flatMap((sp) => sp.projects).find((p) => p.id === mit.ziel);
+            if (!ziel) return;
+            hinein(ziel.id, ids);
+            spaces = sortiereProjekte(spaces, boards);
+            meldung = t(`Projekt „${name}" gelöscht – die Boards liegen jetzt in „${ziel.name}".`);
+          }
+        } else if (ids.length > 0) {
+          const betroffen = new Set(ids);
+          const fremd = (b: BoardDoc) => !!(b.geteiltVon || b.gastLink);
+          const bleiben = boards.filter((b) => betroffen.has(b.id) && fremd(b));
+          weg = boards.map((board, index) => ({ board, index })).filter(({ board }) => betroffen.has(board.id) && !fremd(board));
+          boards = boards.filter((b) => !betroffen.has(b.id) || fremd(b));
+          if (bleiben.length) hinein(auffang(), bleiben.map((b) => b.id));
+          // Ohne sichtbares Board gäbe es keine Arbeitsfläche mehr – dann liegt ein leeres bereit
+          if (!boards.some((b) => !b.archived)) {
+            neuesBoard = uid();
+            boards = [...boards, { id: neuesBoard, name: t(START_BOARD_NAME), nodes: [], edges: [], drawings: [] }];
+            hinein(auffang(), [neuesBoard]);
+          }
+          if (!boards.some((b) => b.id === activeId && !b.archived)) activeId = (boards.find((b) => !b.archived) ?? boards[0]).id;
+          const n = weg.length;
+          if (bleiben.length) {
+            meldung = art === 'bereich'
+              ? t(`Bereich „${name}" mit ${n} Board(s) gelöscht – geteilte Boards anderer bleiben.`)
+              : t(`Projekt „${name}" mit ${n} Board(s) gelöscht – geteilte Boards anderer bleiben.`);
+          } else {
+            meldung = art === 'bereich' ? t(`Bereich „${name}" mit ${n} Board(s) gelöscht.`) : t(`Projekt „${name}" mit ${n} Board(s) gelöscht.`);
+          }
+        }
+        ebenenUndo = { art, bereich, bereichIndex, projekt, projektIndex, boards: weg, activeId: s0.activeId, neuesBoard, neuesProjekt };
+        mutedHistory(() => set({ boards, spaces, activeId }));
+        get().showToast(meldung, 'ebene', 12000);
+      };
+
       const stripBoardFromHierarchy = (spaces: Space[], boardId: string): Space[] =>
         spaces.map((sp) => ({
           ...sp,
@@ -2207,19 +2307,7 @@ export const useBoard = create<BoardState>()(
         renameSpace: (id, name) =>
           set({ spaces: get().spaces.map((sp) => (sp.id === id ? { ...sp, name } : sp)) }),
 
-        removeSpace: (id) => {
-          const space = get().spaces.find((sp) => sp.id === id);
-          if (!space) return;
-          if (space.projects.some((p) => p.boardIds.length > 0)) {
-            get().showToast('Bereich enthält noch Boards – erst verschieben oder löschen.');
-            return;
-          }
-          if (get().spaces.length <= 1) {
-            get().showToast('Der letzte Bereich bleibt bestehen');
-            return;
-          }
-          set({ spaces: get().spaces.filter((sp) => sp.id !== id) });
-        },
+        removeSpace: (id, mit) => ebeneLoeschen('bereich', id, mit),
 
         addProject: (spaceId, name) =>
           set({
@@ -2244,19 +2332,52 @@ export const useBoard = create<BoardState>()(
             })),
           }),
 
-        removeProject: (id) => {
-          const project = get().spaces.flatMap((sp) => sp.projects).find((p) => p.id === id);
-          if (!project) return;
-          if (project.boardIds.length > 0) {
-            get().showToast('Projekt enthält noch Boards – erst verschieben oder löschen.');
-            return;
+        removeProject: (id, mit) => ebeneLoeschen('projekt', id, mit),
+
+        ebeneZurueck: () => {
+          const u = ebenenUndo;
+          if (!u) return false;
+          ebenenUndo = null;
+          const s0 = get();
+          let boards = s0.boards;
+          // Das von selbst angelegte Startboard geht wieder, solange nichts darauf liegt
+          const start = u.neuesBoard ? boards.find((b) => b.id === u.neuesBoard) : undefined;
+          const startWeg = !!start && !start.nodes.length && !start.edges.length && !(start.drawings?.length);
+          if (startWeg) boards = boards.filter((b) => b !== start);
+          const da = new Set(boards.map((b) => b.id));
+          boards = [...boards];
+          for (const { board, index } of [...u.boards].sort((x, y) => x.index - y.index)) {
+            if (!da.has(board.id)) boards.splice(Math.min(index, boards.length), 0, board);
           }
-          set({
-            spaces: get().spaces.map((sp) => ({
-              ...sp,
-              projects: sp.projects.filter((p) => p.id !== id),
-            })),
-          });
+          // Was zur gelöschten Ebene gehörte, kommt aus den übrigen Projekten heraus – dann steht die Ebene wieder an ihrer Stelle
+          const projekte = u.art === 'bereich' ? u.bereich.projects : [u.projekt!];
+          const zurueck = new Set(projekte.flatMap((p) => p.boardIds));
+          const projektIds = new Set(u.art === 'bereich' ? projekte.map((p) => p.id) : []);
+          let spaces = s0.spaces.map((sp) => ({
+            ...sp,
+            projects: sp.projects
+              .filter((p) => !projektIds.has(p.id))
+              .map((p) => ({ ...p, boardIds: p.boardIds.filter((b) => !zurueck.has(b) && !(startWeg && b === u.neuesBoard)) }))
+              .filter((p) => !(p.id === u.neuesProjekt && p.boardIds.length === 0)),
+          }));
+          if (u.art === 'bereich') {
+            spaces.splice(Math.min(u.bereichIndex, spaces.length), 0, u.bereich);
+          } else if (spaces.some((sp) => sp.id === u.bereich.id)) {
+            spaces = spaces.map((sp) => {
+              if (sp.id !== u.bereich.id) return sp;
+              const projects = [...sp.projects];
+              projects.splice(Math.min(u.projektIndex ?? projects.length, projects.length), 0, u.projekt!);
+              return { ...sp, projects };
+            });
+          } else {
+            spaces.splice(Math.min(u.bereichIndex, spaces.length), 0, { ...u.bereich, projects: [u.projekt!] });
+          }
+          const activeId = boards.some((b) => b.id === u.activeId) ? u.activeId
+            : boards.some((b) => b.id === s0.activeId) ? s0.activeId : (boards.find((b) => !b.archived) ?? boards[0]).id;
+          mutedHistory(() => set({ boards, spaces, activeId }));
+          const name = u.art === 'bereich' ? u.bereich.name : u.projekt!.name;
+          get().showToast(`„${name}" ist wieder da.`);
+          return true;
         },
 
         addBoard: (name, projectId) => {
@@ -3152,13 +3273,14 @@ export const useBoard = create<BoardState>()(
            */
           const s0 = get();
           const art = s0.toast?.undo;
+          if (art === 'ebene') { s0.ebeneZurueck(); return; }
           if (hinweisEintrag && s0.past[s0.past.length - 1] === hinweisEintrag) { hinweisEintrag = null; s0.undo(); return; }
           if (art === 'schritt') { s0.showToast('Inzwischen ist anderes dazugekommen – Strg+Z nimmt Schritt für Schritt zurück.', false, 6000); return; }
           s0.restoreDeleted();
         },
         showToast: (message, undo, durationMs, abbruch) => {
           if (toastTimer) clearTimeout(toastTimer);
-          hinweisEintrag = undo && !abbruch ? (get().past[get().past.length - 1] ?? null) : null;
+          hinweisEintrag = undo && undo !== 'ebene' && !abbruch ? (get().past[get().past.length - 1] ?? null) : null;
           set({ toast: { message, undo, abbruch } });
           toastTimer = setTimeout(() => set({ toast: null }), durationMs ?? (undo ? 6000 : 3000));
         },

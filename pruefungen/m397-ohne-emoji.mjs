@@ -31,7 +31,7 @@ const pruefe = (n, gut, info = '') => {
 };
 const lies = (p) => readFileSync(path.join(__repo, p), 'utf-8');
 /** Bunte Bildzeichen: der Emoji-Block, das Emoji-Auswahlzeichen und Zeichen, die Geräte von sich aus bunt malen */
-const BUNT = /[\u{1F000}-\u{1FAFF}️]|[✅✨⚡⏱⏰➕➖⬜⬛✋⚠⌨⭐⏳⌛⛔❌❓❗⚙]/u;
+const BUNT = /[\u{1F000}-\u{1FAFF}️]|[✅✨⚡⏱⏰➕➖⬜⬛✋⚠⌨⭐⏳⌛⛔❌❓❗⚙⏹⏺⏭⏮⏫⏬⏲⛓]/u;
 
 // ---------- A: Regel im Quelltext ----------
 console.log('A  Regel im Quelltext');
