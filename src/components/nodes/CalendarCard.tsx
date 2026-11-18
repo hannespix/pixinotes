@@ -240,7 +240,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     if (show.ics) {
       for (const ev of icsEvents) {
         if (!ev.end) {
-          push(byDay, ev.start, { icon: '▪', text: ev.title, ext: true });
+          push(byDay, ev.start, { icon: '■', text: ev.title, ext: true });
         } else {
           const s = dayOf(ev.start);
           const e = dayOf(ev.end);

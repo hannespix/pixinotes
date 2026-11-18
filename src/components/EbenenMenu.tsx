@@ -9,6 +9,7 @@ import {
   IPen, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck, IUsers, IX,
 } from './Icons';
 import { MENUE_HIER } from '../lib/kontextmenue';
+import { ebeneLoeschenFragen } from './EbeneLoeschenDialog';
 
 /**
  * M288: Ein Menü für die Ebenen ÜBER der Karte.
@@ -261,9 +262,9 @@ export function BereichMenu({ spaceId, onRename, klasse = '' }: {
   const space = useBoard((s) => s.spaces.find((sp) => sp.id === spaceId));
   const renameSpace = useBoard((s) => s.renameSpace);
   const addProject = useBoard((s) => s.addProject);
-  const removeSpace = useBoard((s) => s.removeSpace);
+  const einziger = useBoard((s) => s.spaces.length <= 1);
   if (!space) return null;
-  const leer = space.projects.length === 0;
+  const boardZahl = space.projects.reduce((n, p) => n + p.boardIds.length, 0);
   return (
     <MenuHuelle titel={`Bereich „${space.name}": umbenennen, Projekt anlegen, löschen`} klasse={klasse} kinder={(zu) => (
       <>
@@ -275,13 +276,15 @@ export function BereichMenu({ spaceId, onRename, klasse = '' }: {
           <IPlus size={14} /> Neues Projekt
         </button>
         <div className="ebenen-menu-titel">Aufräumen</div>
+        {/* M398: auch mit Inhalt – der Dialog fragt, was mit den Boards geschieht; nur der letzte Bereich bleibt */}
         <button
           role="menuitem"
           className="ebenen-menu-gefahr"
-          disabled={!leer}
-          title={leer ? undefined : 'Erst die Projekte verschieben oder löschen'}
-          onClick={() => { removeSpace(spaceId); zu(); }}
-        ><ITrash size={14} /> Löschen{leer ? '' : ' (nur wenn leer)'}</button>
+          disabled={einziger}
+          title={einziger ? 'Der letzte Bereich bleibt bestehen' : undefined}
+          data-taste="bereich-loeschen"
+          onClick={() => { zu(); ebeneLoeschenFragen('bereich', spaceId); }}
+        ><ITrash size={14} /> Löschen{boardZahl > 0 ? ' …' : ''}</button>
       </>
     )} />
   );
@@ -297,7 +300,6 @@ export function ProjektMenu({ projectId, onRename, klasse = '' }: {
   const boards = useBoard((s) => s.boards);
   const renameProject = useBoard((s) => s.renameProject);
   const duplicateProject = useBoard((s) => s.duplicateProject);
-  const removeProject = useBoard((s) => s.removeProject);
   const addBoard = useBoard((s) => s.addBoard);
   const archiveBoard = useBoard((s) => s.archiveBoard);
   const showToast = useBoard((s) => s.showToast);
@@ -367,14 +369,9 @@ export function ProjektMenu({ projectId, onRename, klasse = '' }: {
         <button
           role="menuitem"
           className="ebenen-menu-gefahr"
-          onClick={() => {
-            /* Der Store löscht bewusst nur LEERE Projekte und sagt das selbst —
-               hier wird deshalb nichts vorweggenommen. */
-            if (projekt.boardIds.length === 0 && !window.confirm(`Projekt „${projekt.name}" löschen?`)) { zu(); return; }
-            removeProject(projectId);
-            zu();
-          }}
-        ><ITrash size={14} /> Löschen</button>
+          data-taste="projekt-loeschen"
+          onClick={() => { zu(); ebeneLoeschenFragen('projekt', projectId); }}
+        ><ITrash size={14} /> Löschen{projekt.boardIds.length > 0 ? ' …' : ''}</button>
       </>
       )
     )} />

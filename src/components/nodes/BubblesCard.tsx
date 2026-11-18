@@ -757,7 +757,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
               if (gid) { inGruppeMit(fallenWas, fallenAuf, gid); setGWahl(gid); }
               setFallen(null);
             }}>＋ Gruppe aus beiden</button>
-            <button data-taste="bub-fallen-eins" title="Beide meinen dasselbe: zu einer Idee machen (sie zählt dann doppelt)" onClick={() => { verschmelzen(fallenWas, fallenAuf); setFallen(null); }}>⛓ Verschmelzen</button>
+            <button data-taste="bub-fallen-eins" title="Beide meinen dasselbe: zu einer Idee machen (sie zählt dann doppelt)" onClick={() => { verschmelzen(fallenWas, fallenAuf); setFallen(null); }}>Verschmelzen</button>
             <button onClick={() => setFallen(null)} aria-label="Abbrechen">✕</button>
           </Pille>
         )}

@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 const repo = fileURLToPath(new URL('..', import.meta.url));
 
 /** Bunte Bildzeichen: der Emoji-Block, alles mit Emoji-Auswahlzeichen, und Zeichen, die Geräte von sich aus bunt malen */
-const BUNT = '✅✨⚡⏱⏰➕➖⬜⬛⬇⬆✋☀☁⚙⚠⌨✂✏✒✍✉❤⚖⭐⏳⌛⛔❌❓❗⛶☝✌⏸⏯⏩⏪☕⚓⛅';
+const BUNT = '✅✨⚡⏱⏰➕➖⬜⬛⬇⬆✋☀☁⚙⚠⌨✂✏✒✍✉❤⚖⭐⏳⌛⛔❌❓❗⛶☝✌⏸⏯⏩⏪☕⚓⛅⏹⏺⏭⏮⏫⏬⏲⛓';
 const EIN = `(?:[\\u{1F000}-\\u{1FAFF}]|[\\u2600-\\u27BF\\u2B00-\\u2BFF\\u2300-\\u23FF]\\uFE0F|[${BUNT}]\\uFE0F?)(?:\\uFE0F|[\\u{1F3FB}-\\u{1F3FF}]|\\u200D(?:[\\u{1F000}-\\u{1FAFF}]|[\\u2600-\\u27BF])\\uFE0F?)*`;
 export const EMOJI = new RegExp(EIN, 'u');
 const EMOJI_G = new RegExp(EIN, 'gu');
