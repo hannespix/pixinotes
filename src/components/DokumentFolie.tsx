@@ -55,7 +55,7 @@ const BREITE_MAX = 1180;
 /** Passt die ganze Seite nur schmaler als das auf den Schirm, startet die Folie in „Seitenbreite" (lesbar statt winzig) */
 const LESBAR_AB = 640;
 
-export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rollRef, ansichtMerker, onAnsicht, ansicht }: {
+export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rollRef, ansichtMerker, vorgabe, onAnsicht, ansicht }: {
   node: FileNode; art: DokumentArt;
   /** Gewünschte Seite; -1 = die letzte (wer rückwärts in das Dokument blättert, landet am Ende) */
   seite: number;
@@ -68,6 +68,8 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
   rollRef: { current: ((d: 1 | -1) => boolean) | null };
   /** Gewählte Ansicht je Dokument — sie bleibt, wenn man die Folie verlässt und wiederkommt */
   ansichtMerker: { current: Record<string, 'seite' | 'breite'> };
+  /** M403: Darstellung der ganzen Präsentation („Einpassen" = ganze Seite, „Volle Breite" = Seitenbreite) – gilt, solange dieses Dokument nicht selbst umgestellt wurde */
+  vorgabe?: 'seite' | 'breite';
   /** M387: Der Vorführende meldet seinen Ausschnitt — Ansicht, Zoom und Rollstand (Anteil des Rollwegs) */
   onAnsicht?: (a: Ansicht) => void;
   /** M387: Wer folgt, bekommt den Ausschnitt des Vorführenden und stellt ihn nach */
@@ -83,9 +85,9 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
   /** Seitenmaß in Seitenpunkten (PDF-Punkte bzw. CSS-pt der Word-Seite; beim Bild Bildpunkte) */
   const [mass, setMass] = useState<{ b: number; h: number } | null>(null);
   const [platz, setPlatz] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
-  const [modus, setModusRoh] = useState<'seite' | 'breite'>(() => ansichtMerker.current[node.id] ?? 'seite');
+  const [modus, setModusRoh] = useState<'seite' | 'breite'>(() => ansichtMerker.current[node.id] ?? vorgabe ?? 'seite');
   /** Hat der Mensch den Modus selbst gewählt? Dann bleibt er (sonst entscheidet die Lesbarkeit, einmal je Dokument) */
-  const modusFest = useRef(!!ansichtMerker.current[node.id]);
+  const modusFest = useRef(!!ansichtMerker.current[node.id] || !!vorgabe);
   const modusRef = useRef(modus);
   modusRef.current = modus;
   /** Ansicht bewusst wählen (Knopf, B, 0): gilt ab jetzt für dieses Dokument */
@@ -179,6 +181,20 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
     modusFest.current = true;
     if (ganz < LESBAR_AB && ganz < platz.w * 0.7) setModusRoh('breite');
   }, [mass, platz, verhaeltnis]);
+  // M403: Die Darstellung der Präsentation wurde gewechselt, während dieses Dokument offen ist – sie gilt sofort
+  const vorgabeDavor = useRef(vorgabe);
+  useEffect(() => {
+    if (vorgabeDavor.current === vorgabe) return;
+    vorgabeDavor.current = vorgabe;
+    anker.current = null;
+    setZ(1);
+    if (vorgabe) { modusFest.current = true; setModusRoh(vorgabe); return; }
+    // „Standard": wieder nach Lesbarkeit
+    const ganz = Math.min(platz.w, platz.h / verhaeltnis);
+    modusFest.current = !!mass && platz.w > 0;
+    setModusRoh(mass && platz.w > 0 && ganz < LESBAR_AB && ganz < platz.w * 0.7 ? 'breite' : 'seite');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vorgabe]);
   // Leertaste/→ rollen erst die Seite zu Ende, dann blättern sie
   useEffect(() => {
     rollRef.current = (d) => {

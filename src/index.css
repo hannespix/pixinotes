@@ -7527,11 +7527,48 @@ html[data-alles-zeigen] .react-flow__node.selected > .card-shell[data-winkel] { 
 .presenter-slide.gezoomt.fz-kurz > :first-child { margin-bottom: var(--fz-unten, 0px) !important; }
 .presenter-slide.gezoomt.fz-ohne-x { overflow-x: hidden; }
 .presenter-slide.gezoomt.fz-ohne-y { overflow-y: hidden; }
-.presenter-zoom {
-  flex: none; border: 1px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .1); color: inherit; cursor: pointer;
-  font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; padding: 3px 9px; border-radius: var(--r-sm); min-height: 26px;
+/* ---------- M403: Darstellung der Folien, Verschieben mit der Maus ---------- */
+/* Folien ohne eigene Bedienung (Bild, Mail, Text): Was die Folie nicht füllt, steht in ihrer Mitte – wie bei den
+   editierbaren Folien über Auto-Ränder, damit hoher Inhalt oben erreichbar bleibt */
+.presenter-slide:not(.editable):not(.app):not(.dokument) { display: flex; align-items: flex-start; justify-content: flex-start; }
+.presenter-slide:not(.editable):not(.app):not(.dokument) > * { margin: auto; min-width: 0; max-width: 100%; }
+/* „Einpassen" und „Volle Breite": Der Platz des Rollbalkens bleibt frei (sonst änderte sein Erscheinen die Stufe) */
+/* Ein Bild ist nie breiter als die Folie (die Angabe am Bild selbst, 600 Punkte, gewann am Telefon und schob es seitlich hinaus) */
+.presenter-slide:not(.editable):not(.app):not(.dokument) > div > img { max-width: min(100%, 600px) !important; display: block; }
+.presenter-slide.fz-modus { scrollbar-gutter: stable both-edges; }
+/* „Volle Breite": Was in sich rollt, füllt die Höhe der Folie und rollt weiter in sich */
+.presenter-slide.fz-fest > .slide-note { max-height: min(100%, var(--fz-hoch, 100%)); }
+/* Verschieben: die Hand zeigt, wo ein Zug den Ausschnitt bewegt */
+.presenter-slide.zieh-bereit, .presenter-slide.zieh-bereit *, .folie-dok-flaeche.zieh-bereit, .folie-dok-flaeche.zieh-bereit * { cursor: grab; }
+html.folie-hand .presenter-slide, html.folie-hand .presenter-slide *, html.folie-hand .folien-stift, html.folie-hand .folien-stift * { cursor: grab !important; }
+html.folie-zieht, html.folie-zieht * { cursor: grabbing !important; user-select: none !important; -webkit-user-select: none !important; }
+/* Das Symbol der Darstellung in der Kopfzeile; selbst gezoomt zeigt es die Stufe */
+.presenter-ansicht { position: relative; flex: none; display: inline-flex; }
+.presenter-head .presenter-zoom { font-size: 12px; font-variant-numeric: tabular-nums; justify-content: center; }
+.presenter-ansicht-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; min-width: 184px; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border-soft); border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
 }
-.presenter-zoom:hover { background: rgba(255, 255, 255, .2); }
+.presenter-head .presenter-ansicht-menu button {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; text-align: left; border: none; background: none; color: var(--ink);
+  font: inherit; font-size: 13px; padding: 8px 10px; border-radius: var(--r); cursor: pointer; white-space: nowrap;
+}
+.presenter-head .presenter-ansicht-menu button:hover { background: var(--surface-2); }
+.presenter-ansicht-haken { width: 14px; height: 14px; flex: none; display: inline-grid; place-items: center; color: var(--accent-strong); }
+.presenter-ansicht-stufe { display: flex; align-items: center; gap: 4px; padding: 0 0 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border-soft); }
+.presenter-ansicht-stufe > span { flex: 1; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.presenter-head .presenter-ansicht-stufe button { width: 36px; flex: none; justify-content: center; font-size: 17px; line-height: 1; padding: 6px 0; }
+/* Schmaler Schirm: Das Symbol steht weit links – die Auswahl hängt dann an der Kopfzeile, nicht am Symbol */
+@media (max-width: 640px) {
+  .presenter-head { position: relative; }
+  .presenter-ansicht { position: static; }
+  .presenter-ansicht-menu { left: 10px; right: auto; top: calc(100% + 2px); }
+}
+@media (pointer: coarse) {
+  .presenter-head .presenter-ansicht-menu button { min-height: 44px; }
+  .presenter-head .presenter-ansicht-stufe button { width: 44px; }
+}
 /* Das Menü der ausgewählten Verbindung (Spitze, Farbe, Stärke) und ihr Namens-Chip liegen über den Karten –
    sie stehen in der Fläche und gerieten sonst unter jede Karte, die später angefasst wurde (höherer z-index) */
 .edge-opts, .edge-label.selected { z-index: 2147483000; }

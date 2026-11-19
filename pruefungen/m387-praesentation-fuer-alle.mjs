@@ -781,6 +781,23 @@ await warteBis(G.P, async () => nah((await folieRoll(G.P))?.y ?? 0, 0.7), 6000);
 const ra = await folieRoll(A.P); const rg = await folieRoll(G.P);
 pruefe('C6 Anna rollt die lange Notiz → Gerds Folie rollt an dieselbe Stelle', ra.weg > 100 && nah(ra.y, 0.7, 0.02) && rg.weg > 100 && nah(rg.y, 0.7), JSON.stringify([ra, rg]));
 
+// M403: Darstellung und Zoom einer gewöhnlichen Folie gehören zum Ausschnitt
+const zoomVon = (P) => P.evaluate(() => { const f = document.querySelector('.presenter .presenter-slide'); const k = f?.firstElementChild; if (!f || !k) return null;
+  return { z: Math.round(new DOMMatrixReadOnly(getComputedStyle(k).transform).a * 1000) / 1000, modus: f.classList.contains('fz-modus'), fest: f.classList.contains('fz-fest'), b: Math.round(k.getBoundingClientRect().width), platz: f.clientWidth, eigen: localStorage.getItem('pixinotes-folien-ansicht') }; });
+await A.P.locator('.presenter-count').click(); await A.P.waitForTimeout(150);
+await A.P.keyboard.press('+'); await A.P.waitForTimeout(120); await A.P.keyboard.press('+');
+await warteBis(G.P, async () => nah((await zoomVon(G.P))?.z ?? 0, 1.563, 0.02), 6000);
+pruefe('C7 Anna vergrößert die Notiz zweimal (+) → Gerds Notiz steht auf derselben Vergrößerung', nah((await zoomVon(A.P)).z, 1.563, 0.02) && nah((await zoomVon(G.P)).z, 1.563, 0.02), JSON.stringify([await zoomVon(A.P), await zoomVon(G.P)]));
+await A.P.keyboard.press('0');
+await warteBis(G.P, async () => (await zoomVon(G.P))?.z === 1, 6000);
+await A.P.keyboard.press('b');
+await warteBis(G.P, async () => (await zoomVon(G.P))?.fest === true, 6000);
+const za = await zoomVon(A.P); const zg = await zoomVon(G.P);
+pruefe('C8 Anna wählt „Volle Breite" (B) → auch Gerd sieht die Notiz in voller Breite, seine eigene Wahl bleibt unberührt', za.fest && zg.fest && za.b > za.platz - 60 && zg.b > zg.platz - 60 && zg.eigen === null && za.eigen === 'breite', JSON.stringify([za, zg]));
+await A.P.keyboard.press('b');
+await warteBis(G.P, async () => (await zoomVon(G.P))?.fest === false, 6000);
+pruefe('C9 zurück auf „Standard" → bei beiden wieder 100 %', (await zoomVon(A.P)).z === 1 && (await zoomVon(G.P)).z === 1 && (await zoomVon(A.P)).eigen === null, JSON.stringify([await zoomVon(A.P), await zoomVon(G.P)]));
+
 // ══ D ═══════════════════════════════════════════════════════════════
 console.log('\n════ D: Eine Karte kommt während des Vortrags dazu ════');
 fakeAendern({ nodes: { set: [{ id: 'neu1', type: 'note', width: 200, position: { x: 10, y: 0 }, data: { color: 'yellow', blocks: [{ type: 'paragraph', content: 'Neu davor' }] } }], del: [] } });

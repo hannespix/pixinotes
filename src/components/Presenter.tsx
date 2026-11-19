@@ -21,13 +21,14 @@ import { HtmlAppSlide } from './nodes/HtmlAppCard';
 import { useRandLeiste } from '../lib/randLeiste';
 import { FOLIEN_FARBEN, type FolienWerkzeug } from '../lib/folienWerkzeug';
 import { useTippGesten } from '../lib/tippGesten';
-import { useFolienZoom } from '../lib/folienZoom';
+import { ansichtGemerkt, ansichtMerken, FOLIEN_ANSICHTEN, useFolienZoom, type FolienAnsicht } from '../lib/folienZoom';
+import { useZiehRollen } from '../lib/ziehRollen';
 
 // M395: Was nur WÄHREND einer Präsentation gebraucht wird, kommt erst dann — der Kern der App bleibt schlank
 const DokumentFolie = lazy(() => import('./DokumentFolie').then((m) => ({ default: m.DokumentFolie })));
 const FolienStift = lazy(() => import('./FolienStift').then((m) => ({ default: m.FolienStift })));
 const FolienKommentare = lazy(() => import('./FolienKommentare').then((m) => ({ default: m.FolienKommentare })));
-import { ICheck, IComment, IEraser, IHighlighter, IPen, IUndo, IMegafon } from './Icons';
+import { ICheck, IComment, IEraser, IFit, IHighlighter, IPen, IUndo, IMegafon } from './Icons';
 import { BubblesBody } from './nodes/BubblesCard';
 import { WeekBody } from './nodes/WeekCard';
 import { TimeBody } from './nodes/TimeCard';
@@ -300,6 +301,27 @@ export function Presenter() {
   /** Die Dokument-Folie meldet, ob auf der Seite noch etwas zu rollen ist — dann rollt der Schritt, statt zu blättern */
   const rollRef = useRef<((d: 1 | -1) => boolean) | null>(null);
   const ansichtMerker = useRef<Record<string, 'seite' | 'breite'>>({});
+  // M403: Darstellung der Folien – gilt für die ganze Präsentation und bleibt gemerkt
+  const [ansicht, setAnsicht] = useState<FolienAnsicht>(ansichtGemerkt);
+  const ansichtRef = useRef(ansicht); ansichtRef.current = ansicht;
+  /** Wohin „B" von „Volle Breite" zurückführt */
+  const vorBreite = useRef<FolienAnsicht>(ansicht === 'breite' ? 'standard' : ansicht);
+  const waehleAnsicht = useCallback((a: FolienAnsicht) => {
+    if (a !== 'breite') vorBreite.current = a;
+    ansichtMerker.current = {};      // die Wahl gilt für alle Folien – auch für Dokumente, die schon einzeln umgestellt waren
+    ansichtMerken(a);
+    setAnsicht(a);
+  }, []);
+  const [ansichtMenu, setAnsichtMenu] = useState(false);
+  const ansichtMenuRef = useRef(ansichtMenu); ansichtMenuRef.current = ansichtMenu;
+  const ansichtHuelle = useRef<HTMLSpanElement>(null);
+  useEffect(() => { if (!open) setAnsichtMenu(false); }, [open]);
+  useEffect(() => {
+    if (!ansichtMenu) return;
+    const zu = (e: PointerEvent) => { if (!ansichtHuelle.current?.contains(e.target as Node)) setAnsichtMenu(false); };
+    window.addEventListener('pointerdown', zu, true);
+    return () => window.removeEventListener('pointerdown', zu, true);
+  }, [ansichtMenu]);
 
   const slides = useMemo(() => {
     if (!open) return [];
@@ -358,7 +380,8 @@ export function Presenter() {
       const frei = !e.ctrlKey && !e.metaKey && !e.altKey;
       const taste = e.key.toLowerCase();
       // M394: Esc legt erst den Stift weg, schließt dann die Kommentare — erst das dritte beendet die Präsentation
-      if (e.key === 'Escape' && werkzeugRef.current) setWerkzeug(null);
+      if (e.key === 'Escape' && ansichtMenuRef.current) setAnsichtMenu(false);
+      else if (e.key === 'Escape' && werkzeugRef.current) setWerkzeug(null);
       else if (e.key === 'Escape' && kommRef.current) setKommOffen(false);
       else if (frei && !nurLesenRef.current && (taste === 'p' || taste === 'm' || taste === 'e')) waehleRef.current(taste === 'p' ? 'pen' : taste === 'm' ? 'marker' : 'eraser');
       else if (frei && taste === 'k') setKommOffen((v) => !v);
@@ -468,6 +491,39 @@ export function Presenter() {
   const folieRef = useRef<HTMLDivElement>(null);
   const dortAnsicht = folge && zeigt?.vortrag && current && zeigt.vortrag.karte === current.id ? zeigt.vortrag.ansicht : undefined;
   const dortRoll = dortAnsicht ? `${dortAnsicht.x}|${dortAnsicht.y}` : '';
+  // M402: in den Inhalt gewöhnlicher Folien hinein- und herauszoomen (Dokumente zoomen selbst, Web-Tools laufen in ihrem Rahmen)
+  // M403: … von der gewählten Darstellung aus; wer folgt, sieht Darstellung und Zoom des Vorführenden
+  const zoombar = open && !art && !!current && current.type !== 'htmlapp';
+  /** Folie ohne eigene Bedienung (Bild, Mail, Text): Doppelklick zoomt, ein einfacher Zug verschiebt */
+  const statisch = !!current && !art && !EDITABLE.has(current.type) && current.type !== 'htmlapp';
+  const fz = useFolienZoom(folieRef, {
+    aktiv: zoombar, karte: current?.id, ansicht, doppel: statisch,
+    fremd: dortAnsicht?.a ? { a: dortAnsicht.a, d: dortAnsicht.d ?? 1 } : null,
+    wechsel: () => waehleAnsicht(ansichtRef.current === 'breite' ? vorBreite.current : 'breite'),
+  });
+  const zoomFaktor = fz.heim > 0 ? Math.round((fz.zoom / fz.heim) * 1000) / 1000 : 1;
+  const rollGemeldet = useRef<{ karte: string; x: number; y: number } | null>(null);
+  const standRef = useRef({ a: ansicht, d: zoomFaktor });
+  standRef.current = { a: ansicht, d: zoomFaktor };
+  // Darstellung oder Zoom geändert: den Ausschnitt melden (der Rollstand allein meldet sich beim Rollen)
+  useEffect(() => {
+    const el = folieRef.current;
+    if (!zoombar || !el || !current || folgeIch(board.id)) return;
+    // der Rollstand ist der zuletzt gemeldete dieser Folie (es rollt die Folie oder ihr Inhalt) – auf einer neuen Folie der Anfang
+    const t = setTimeout(() => {
+      const r = rollGemeldet.current?.karte === current.id ? rollGemeldet.current : { x: 0, y: 0 };
+      ansichtMelden(board.id, current.id, { x: r.x, y: r.y, ...standRef.current });
+    }, 80);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoombar, current?.id, ansicht, zoomFaktor, folge, board.id]);
+  // M403: den Ausschnitt mit der Maus verschieben – Leertaste + Ziehen, mittlere Taste, freie Fläche
+  useZiehRollen({
+    aktiv: open && !!current && current.type !== 'htmlapp',
+    finde: () => (art ? document.querySelector<HTMLElement>('.presenter .folie-dok-flaeche') : folieRef.current),
+    frei: (ziel, el) => !!art || statisch || ziel === el || ziel === el.firstElementChild || !!ziel.closest('.mermaid-preview'),
+    tippen: () => schrittRef.current(1),
+  });
   useEffect(() => {
     const el = folieRef.current;
     if (!el || !dortRoll || art) return;
@@ -476,10 +532,7 @@ export function Presenter() {
     for (const r of [el, el.firstElementChild as HTMLElement | null]) {
       if (r && (r.scrollHeight > r.clientHeight + 2 || r.scrollWidth > r.clientWidth + 2)) r.scrollTo({ left: x * Math.max(0, r.scrollWidth - r.clientWidth), top: y * Math.max(0, r.scrollHeight - r.clientHeight), behavior: 'smooth' });
     }
-  }, [dortRoll, art, current?.id]);
-
-  // M402: in den Inhalt gewöhnlicher Folien hinein- und herauszoomen (Dokumente zoomen selbst, Web-Tools laufen in ihrem Rahmen)
-  const fz = useFolienZoom(folieRef, open && !art && !!current && current.type !== 'htmlapp', current?.id);
+  }, [dortRoll, art, current?.id, fz.zoom]);
 
   if (!open) return null;
   /** im Folien-Zweig unten gibt es die Folie sicher (slides.length > 0) */
@@ -488,16 +541,39 @@ export function Presenter() {
   const offeneKomm = current ? (board.comments ?? []).reduce((n, c) => n + (c.nodeId === current.id && !c.resolved ? 1 : 0), 0) : 0;
   const amAnfang = safeIdx <= 0 && seiteHier <= 1;
   const amEnde = safeIdx >= slides.length - 1 && seiteHier >= seitenHier;
+  /** Hat man selbst gezoomt? Dann zeigt das Symbol die Stufe */
+  const eigenerZoom = zoombar && Math.abs(fz.zoom - fz.heim) > 0.001;
 
   return (
     <div className={`presenter ${art ? 'mit-dokument' : ''} ${kommOffen ? 'mit-kommentaren' : ''} ${werkzeug ? 'mit-stift' : ''}`} role="dialog" aria-modal="true" aria-label="Präsentation">
       <div className={`presenter-head ${rand.da ? 'da' : ''}`} {...rand.griff}>
         <span translate="no">{board.name}</span>
         <span className="presenter-hint-edit">{art ? 'Doppelklick oder + / − vergrößert · B = Seitenbreite' : current?.type === 'htmlapp' ? 'Läuft auf der Folie · blättern mit ‹ ›' : 'Folien sind direkt editierbar · Strg+Rad zoomt'}</span>
-        {fz.zoom !== 1 && !art && (
-          <button className="presenter-zoom" data-taste="folie-zoom" title="Zurück auf 100 % (Taste 0)" aria-label="Zoom zurücksetzen" onClick={() => fz.setzen(1)}>
-            <span translate="no">{Math.round(fz.zoom * 100)} %</span>
-          </button>
+        {/* M403: Darstellung der Folien – ein kleines Symbol; wer selbst gezoomt hat, sieht dort die Stufe */}
+        {slides.length > 0 && current?.type !== 'htmlapp' && (
+          <span className="presenter-ansicht" ref={ansichtHuelle}>
+            <button className={`presenter-team presenter-ikon presenter-zoom ${ansichtMenu ? 'an' : ''}`} data-taste="folie-zoom" aria-haspopup="menu" aria-expanded={ansichtMenu}
+              title="Darstellung der Folien" aria-label="Darstellung der Folien" onClick={() => setAnsichtMenu((v) => !v)}>
+              {eigenerZoom ? <span translate="no">{Math.round(fz.zoom * 100)} %</span> : <IFit size={15} />}
+            </button>
+            {ansichtMenu && (
+              <div className="presenter-ansicht-menu" role="menu" data-taste="folie-ansicht-menu">
+                {!art && (
+                  <div className="presenter-ansicht-stufe">
+                    <button data-taste="ansicht-kleiner" aria-label="Verkleinern" title="Verkleinern (−)" onClick={() => fz.mal(1 / 1.25)}>−</button>
+                    <span translate="no" data-taste="ansicht-stufe">{Math.round(fz.zoom * 100)} %</span>
+                    <button data-taste="ansicht-groesser" aria-label="Vergrößern" title="Vergrößern (+)" onClick={() => fz.mal(1.25)}>+</button>
+                  </div>
+                )}
+                {FOLIEN_ANSICHTEN.map((a) => (
+                  <button key={a.id} role="menuitemradio" aria-checked={ansicht === a.id} className={ansicht === a.id ? 'an' : ''} data-taste="folie-ansicht" data-ansicht={a.id} title={a.hinweis}
+                    onClick={() => { if (ansicht === a.id) fz.zurueck(); else waehleAnsicht(a.id); setAnsichtMenu(false); }}>
+                    <span className="presenter-ansicht-haken" aria-hidden="true">{ansicht === a.id && <ICheck size={14} />}</span>{a.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </span>
         )}
         <span className="presenter-count">{slides.length ? safeIdx + 1 : 0} / {slides.length}</span>
         {/* M371: Die Präsentation dem Team zeigen — dieselbe Folie, dieselbe Seite, bei allen */}
@@ -542,6 +618,7 @@ export function Presenter() {
               <DokumentFolie key={cur.id} node={cur as FileNode} art={art} seite={pos.seite}
                 onSeiten={(n) => setSeitenJe((m) => (m[cur.id] === n ? m : { ...m, [cur.id]: n }))}
                 schritt={(d) => { selbst(); schritt(d); }} geheZu={(s) => { selbst(); setPos({ idx: safeIdx, seite: s }); }} rollRef={rollRef} ansichtMerker={ansichtMerker}
+                vorgabe={ansicht === 'einpassen' ? 'seite' : ansicht === 'breite' ? 'breite' : undefined}
                 onAnsicht={folge ? undefined : (a) => ansichtMelden(board.id, cur.id, a)} ansicht={dortAnsicht} />
             </Suspense>
           </div>
@@ -551,7 +628,9 @@ export function Presenter() {
               if (folgeIch(board.id)) return;
               const el = e.target as HTMLElement;
               if (el !== e.currentTarget && el.parentElement !== e.currentTarget) return;
-              ansichtMelden(board.id, cur.id, { x: el.scrollLeft / Math.max(1, el.scrollWidth - el.clientWidth), y: el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight) });
+              const roll = { karte: cur.id, x: el.scrollLeft / Math.max(1, el.scrollWidth - el.clientWidth), y: el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight) };
+              rollGemeldet.current = roll;
+              ansichtMelden(board.id, cur.id, { x: roll.x, y: roll.y, ...standRef.current });
             }}
             onTouchStart={(e) => { wisch.current = EDITABLE.has(cur.type) || e.touches.length !== 1 ? null : { x: e.touches[0].clientX, y: e.touches[0].clientY, t: performance.now() }; }}
             onTouchEnd={(e) => {
@@ -559,8 +638,9 @@ export function Presenter() {
               const t = e.changedTouches[0];
               if (!w || !t) return;
               const dx = t.clientX - w.x; const dy = t.clientY - w.y;
-              // M402: Hineingezoomt schiebt der Finger den Inhalt – geblättert wird erst wieder bei 100 %
-              if (fz.zoom > 1.01) return;
+              // M402/M403: Ragt der Inhalt seitlich über die Folie, schiebt der Finger ihn – geblättert wird erst, wenn es nichts zu schieben gibt
+              const fl = folieRef.current;
+              if (fl && fl.scrollWidth > fl.clientWidth + 2) return;
               if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4 && performance.now() - w.t < 700) { selbst(); schritt(dx < 0 ? 1 : -1); }
             }}>
             <SlideContent key={cur.id} node={cur} />

@@ -122,9 +122,11 @@ const lage = () => P.evaluate(() => {
   pruefe('B3 beim Weiterzoomen bleibt die Stelle unter dem Zeiger stehen', !!b2 && b2.zoom > b.zoom && nah(b2.l + b2.w * rel.x, zeiger.x, 6) && nah(b2.t + b2.h * rel.y, zeiger.y, 6), { soll: zeiger, ist: b2 && { x: b2.l + b2.w * rel.x, y: b2.t + b2.h * rel.y } });
   pruefe('B4 oben steht die Stufe', new RegExp(`^${Math.round(b2.zoom * 100)} %$`).test(b2.chip), b2?.chip);
   pruefe('B5 die Folie selbst bleibt an ihrem Platz und so groß wie zuvor', !!b2 && nah(b2.f.l, a.f.l, 1) && nah(b2.f.w, a.f.w, 1) && nah(b2.f.h, a.f.h, 1), b2?.f);
-  await P.locator('[data-taste="folie-zoom"]').click(); await P.waitForTimeout(250);
+  // M403: Die Anzeige öffnet die Schnellauswahl – die gewählte Darstellung führt zurück
+  await P.locator('[data-taste="folie-zoom"]').click(); await P.waitForTimeout(200);
+  await P.locator('[data-taste="folie-ansicht"][aria-checked="true"]').click(); await P.waitForTimeout(350);
   const c = await lage();
-  pruefe('B6 ein Klick auf die Anzeige stellt 100 % wieder her', c?.zoom === 1 && c.chip === '' && nah(c.l, a.l, 1) && nah(c.t, a.t, 1) && nah(c.w, a.w, 1), c);
+  pruefe('B6 die Anzeige öffnet die Auswahl, die gewählte Darstellung stellt 100 % wieder her', c?.zoom === 1 && c.chip === '' && nah(c.l, a.l, 1) && nah(c.t, a.t, 1) && nah(c.w, a.w, 1), c);
   // Tasten (der Fokus liegt nicht im Text)
   await P.locator('.presenter-count').click(); await P.waitForTimeout(100);
   await P.keyboard.press('+'); await P.keyboard.press('+'); await P.waitForTimeout(250);
@@ -200,7 +202,8 @@ console.log('D  Zwei Finger kneifen, der Stift bleibt am Inhalt');
   const rel = async () => P.evaluate(() => { const k = document.querySelector('.presenter-slide').firstElementChild.getBoundingClientRect(); const p = [...document.querySelectorAll('.folien-stift svg path')].at(-1)?.getBoundingClientRect(); return p ? [(p.left - k.left) / k.width, (p.right - k.left) / k.width] : null; });
   const beiZwei = await rel();
   await P.keyboard.press('Escape'); await P.waitForTimeout(200);     // Stift weglegen
-  await P.locator('[data-taste="folie-zoom"]').click(); await P.waitForTimeout(500);
+  await P.locator('[data-taste="folie-zoom"]').click(); await P.waitForTimeout(200);
+  await P.locator('[data-taste="folie-ansicht"][aria-checked="true"]').click(); await P.waitForTimeout(500);
   const beiEins = await rel();
   pruefe('D4 zurück bei 100 % sitzt der Strich an derselben Stelle des Inhalts', !!beiZwei && !!beiEins && nah(beiZwei[0], beiEins[0], 0.02) && nah(beiZwei[1], beiEins[1], 0.02) && (await lage())?.zoom === 1, { beiZwei, beiEins });
   await P.keyboard.press('Escape'); await P.waitForTimeout(300);
@@ -215,7 +218,7 @@ console.log('E  Texte');
   await E.P.evaluate(() => 0);
   const lies = (p) => readFileSync(path.join(__repo, p), 'utf-8');
   const en = JSON.parse(lies('src/sprache/en.json'));
-  pruefe('E1 Hinweis und Anzeige sind übersetzt', en['Folien sind direkt editierbar · Strg+Rad zoomt'] === 'Slides can be edited directly · Ctrl+wheel zooms' && typeof en['Zurück auf 100 % (Taste 0)'] === 'string' && typeof en['Zoom zurücksetzen'] === 'string');
+  pruefe('E1 Hinweis und Anzeige sind übersetzt', en['Folien sind direkt editierbar · Strg+Rad zoomt'] === 'Slides can be edited directly · Ctrl+wheel zooms' && en['Darstellung der Folien'] === 'Slide view');
   await E.ctx.close();
   pruefe('E2 die Hilfe nennt M402 – deutsch und englisch', lies('src/components/HelpOverlay.tsx').includes('(M402)') && lies('src/components/HelpOverlayEn.tsx').includes('(M402)'));
   pruefe('E3 keine Fehler in der Konsole', fehler.length === 0, fehler.join(' | ').slice(0, 300));
