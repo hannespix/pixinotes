@@ -265,6 +265,11 @@ export function Presenter() {
   const seitenRef = useRef(seitenJe);
   seitenRef.current = seitenJe;
   const schrittRef = useRef<(d: 1 | -1) => void>(() => {});
+  /** M405: von Karte zu Karte – gleich, ob die Karte Seiten hat */
+  const karteRef = useRef<(d: 1 | -1) => void>(() => {});
+  /** Die Seite, auf der ein Dokument in dieser Präsentation zuletzt offen lag – dorthin kommt man zurück */
+  const seitenMerker = useRef<Record<string, number>>({});
+  useEffect(() => { if (!open) seitenMerker.current = {}; }, [open]);
   // M371: Vorführen im Team — die Präsentation gehört zur Ansicht, die der Vorführende mitnimmt
   const [, vorfuehrTakt] = useState(0);
   useEffect(() => {
@@ -386,6 +391,8 @@ export function Presenter() {
       else if (frei && !nurLesenRef.current && (taste === 'p' || taste === 'm' || taste === 'e')) waehleRef.current(taste === 'p' ? 'pen' : taste === 'm' ? 'marker' : 'eraser');
       else if (frei && taste === 'k') setKommOffen((v) => !v);
       else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && taste === 'z' && werkzeugRef.current) useBoard.getState().undo();
+      // M405: Strg + Pfeil geht immer zur nächsten Karte – auch mitten in einem Dokument
+      else if ((e.ctrlKey || e.metaKey) && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) karteRef.current(e.key === 'ArrowRight' ? 1 : -1);
       else
       if (e.key === 'Escape') { selbstRef.current(); setOpen(false); }
       else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') schrittRef.current(1);
@@ -420,9 +427,22 @@ export function Presenter() {
     if (i + d < 0 || i + d >= slides.length) return p;
     return { idx: i + d, seite: d === 1 ? 1 : -1 };
   }), [slides]);
-  /** Schritt per Taste oder Fußleiste: erst die Seite zu Ende rollen, dann blättern */
+  /** Schritt per Taste: erst die Seite zu Ende rollen, dann blättern */
   const weiter = (d: 1 | -1) => { selbst(); if (!rollRef.current?.(d)) schritt(d); };
   schrittRef.current = weiter;
+  /**
+   * M405: Zu einer Karte gehen – die Knöpfe der Fußleiste, die Punkte, Strg + Pfeil. Immer dieselbe Bewegung, gleich
+   * welcher Kartentyp: Ein Dokument mit vielen Seiten hält niemanden auf (seine Seiten blättert die Leiste am Dokument
+   * oder → / Leertaste). Zurück in einem Dokument liegt die Seite offen, auf der man es verlassen hat.
+   */
+  const zuKarte = (ziel: number) => {
+    if (ziel < 0 || ziel >= slides.length) return;
+    selbst();
+    const n = slides[ziel];
+    const art = dokumentArt(n);
+    setPos({ idx: ziel, seite: art && art !== 'bild' ? seitenMerker.current[n.id] ?? 1 : 1 });
+  };
+  karteRef.current = (d) => zuKarte(Math.max(0, Math.min(idx, slides.length - 1)) + d);
   // Wischen blättert auf Folien ohne eigene Bedienung (Bild, Mail, Text) — editierbare Folien und
   // Dokumente regeln das selbst (dort gehört der waagerechte Zug dem Inhalt)
   const wisch = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -437,6 +457,7 @@ export function Presenter() {
   const seiteHier = pos.seite < 0 ? seitenHier : Math.min(Math.max(1, pos.seite), seitenHier);
   // Gemerkt wird die Karte, auf die man selbst gegangen ist — nicht die, die nach einer Änderung der Folienfolge an ihrem Platz steht
   useEffect(() => { offeneKarte.current = open && current ? current.id : null; /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [pos, open]);
+  useEffect(() => { if (open && current && art && art !== 'bild') seitenMerker.current[current.id] = seiteHier; /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open, current?.id, art, seiteHier]);
 
   // ───── M371: Vorführen im Team ─────
   const zeigt = werFuehrtVor(board.id);
@@ -539,8 +560,8 @@ export function Presenter() {
   const cur = current as AppNode;
 
   const offeneKomm = current ? (board.comments ?? []).reduce((n, c) => n + (c.nodeId === current.id && !c.resolved ? 1 : 0), 0) : 0;
-  const amAnfang = safeIdx <= 0 && seiteHier <= 1;
-  const amEnde = safeIdx >= slides.length - 1 && seiteHier >= seitenHier;
+  const amAnfang = safeIdx <= 0;
+  const amEnde = safeIdx >= slides.length - 1;
   /** Hat man selbst gezoomt? Dann zeigt das Symbol die Stufe */
   const eigenerZoom = zoombar && Math.abs(fz.zoom - fz.heim) > 0.001;
 
@@ -681,13 +702,14 @@ export function Presenter() {
       )}
       <div className="presenter-foot">
         {/* aria-disabled statt disabled: Ein Knopf, der mit Tastatur-Fokus „disabled" wird, verschluckt danach alle Tasten (M361) */}
-        <button onClick={() => weiter(-1)} aria-disabled={amAnfang} data-taste="vortrag-zurueck">‹ Zurück</button>
+        {/* M405: immer von Karte zu Karte, bei jedem Kartentyp an derselben Stelle – die Seiten eines Dokuments blättert seine eigene Leiste */}
+        <button onClick={() => zuKarte(safeIdx - 1)} aria-disabled={amAnfang} data-taste="vortrag-zurueck" title="Vorherige Karte (Strg+←)">‹ Zurück</button>
         <span className="presenter-dots">
           {slides.slice(0, 24).map((s, i) => (
-            <button key={s.id} className={i === safeIdx ? 'on' : ''} onClick={() => { selbst(); setPos({ idx: i, seite: 1 }); }} aria-label={`Folie ${i + 1}`} />
+            <button key={s.id} className={i === safeIdx ? 'on' : ''} onClick={() => zuKarte(i)} aria-label={`Folie ${i + 1}`} />
           ))}
         </span>
-        <button onClick={() => weiter(1)} aria-disabled={amEnde} data-taste="vortrag-weiter">Weiter ›</button>
+        <button onClick={() => zuKarte(safeIdx + 1)} aria-disabled={amEnde} data-taste="vortrag-weiter" title="Nächste Karte (Strg+→)">Weiter ›</button>
       </div>
     </div>
   );

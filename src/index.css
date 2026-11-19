@@ -6614,10 +6614,11 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 @media (max-width: 860px) {
   .presenter-slide.dokument { margin: 0 0 6px; }
   .folie-dok-leiste { margin-top: 6px; }
-  /* Am Telefon zählt jede Zeile: Die Leiste des Dokuments blättert schon (auch über das Dokument hinaus) —
-     die Fußleiste der Präsentation weicht, die Seite bekommt ihren Platz */
-  .presenter.mit-dokument .presenter-foot { display: none; }
-  .presenter.mit-dokument .presenter-slide.dokument { margin-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+  /* M405: Die Fußleiste bleibt auch am Telefon auf Dokument-Folien stehen – „Weiter" und „Zurück" sind bei jedem
+     Kartentyp an derselben Stelle (vorher wich sie hier der Leiste des Dokuments, und aus einer langen PDF kam man
+     nur Seite für Seite heraus). Dafür rückt sie auf Dokument-Folien enger an die Leiste darüber. */
+  .presenter.mit-dokument .presenter-slide.dokument { margin-bottom: 4px; }
+  .presenter.mit-dokument .folie-dok-leiste { margin-top: 4px; }
   .folie-dok-nr > span:first-child { display: none; }
   .folie-dok-leiste .folie-dok-modus { min-width: 0; }
 }
