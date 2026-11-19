@@ -29,7 +29,8 @@ const sperren = (name) => {
   const text = readFileSync(path.join(repo, 'pruefungen', name), 'utf-8');
   const s = new Set();
   for (const m of text.matchAll(/\bPORT\w*\s*=\s*(\d{4,5})\b|listen\(\s*(\d{4,5})\b|localhost:(\d{4,5})\b|127\.0\.0\.1:(\d{4,5})\b/g)) s.add(`port:${m[1] ?? m[2] ?? m[3] ?? m[4]}`);
-  if (/psql|pntest|postgres/i.test(text)) s.add('datenbank');
+  // nur, wer wirklich die lokale Datenbank startet – „postgres_changes" in den Gruppen-Prüfungen ist ein Ereignisname
+  if (/\bpsql\b|pntest/.test(text)) s.add('datenbank');
   return [...s];
 };
 const offen = dateien.map((name) => ({ name, sperren: sperren(name) }));

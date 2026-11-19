@@ -106,6 +106,9 @@ const G = await auf({ nodes: [notiz('a', 100, 140, 220, 150, 'Schräg', -8), not
 const P = G.P;
 {
   const a = await bild(P, 'a'); const b = await bild(P, 'b');
+  // Beim Laden passt die Ansicht alle Karten ins Bild – das Vermessen der Karten darf das nicht stören
+  const imBild = await P.evaluate(() => [...document.querySelectorAll('.react-flow__node')].map((k) => { const r = k.getBoundingClientRect(); return { id: k.getAttribute('data-id'), drin: r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight }; }));
+  pruefe('A0 nach dem Laden liegen alle Karten im Bild (die Ansicht ist eingepasst)', imBild.length === 4 && imBild.every((k) => k.drin), imBild);
   pruefe('A1 die Karte mit Winkel liegt schräg (−8°)', a?.grad === -8 && a.attribut === '-8', a);
   pruefe('A2 der Schatten sitzt an der schrägen Hülle, nicht am geraden Knoten', a?.knotenSchatten === 'none' && a.huelleSchatten !== 'none', a);
   pruefe('A3 eine gerade Karte bleibt, wie sie war (kein Attribut, keine Drehung, Schatten am Knoten)', b?.grad === 0 && b.attribut === null && b.knotenSchatten !== 'none' && b.huelleSchatten === 'none', b);

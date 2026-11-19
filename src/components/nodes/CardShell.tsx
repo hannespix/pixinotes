@@ -71,8 +71,16 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
   const [drehAnzeige, setDrehAnzeige] = useState<number | null>(null);
   const updateNodeInternals = useUpdateNodeInternals();
   const { screenToFlowPosition } = useReactFlow();
-  // Die Anschlusspunkte sitzen nach dem Drehen woanders – React Flow misst sie neu
-  useEffect(() => { updateNodeInternals(id); }, [winkel, id, updateNodeInternals]);
+  // Die Anschlusspunkte sitzen nach dem Drehen woanders – React Flow misst sie neu. Nicht beim ersten Zeichnen:
+  // Da misst React Flow ohnehin (die Karte steht schon schräg), und ein zweites Vermessen jeder Karte brachte
+  // das anfängliche Einpassen der Ansicht durcheinander (Karten lagen außerhalb des Bildes).
+  const winkelGemessen = useRef<number | null>(null);
+  useEffect(() => {
+    if (winkelGemessen.current === null) { winkelGemessen.current = winkel; return; }
+    if (winkelGemessen.current === winkel) return;
+    winkelGemessen.current = winkel;
+    updateNodeInternals(id);
+  }, [winkel, id, updateNodeInternals]);
   const imFokusRef = useRef(imFokus);
   imFokusRef.current = imFokus;
   const schrumpftRef = useRef(schrumpft);
