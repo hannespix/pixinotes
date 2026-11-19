@@ -101,14 +101,14 @@ console.log('A  Das Menü');
       text: el.textContent, r: el.getBoundingClientRect().toJSON() };
   });
   pruefe('A1 vier Gruppen: Ausrichten, Verteilen, Größe, Anordnen', m?.titel.join('|') === 'Ausrichten|Verteilen|Größe|Anordnen', m?.titel);
-  pruefe('A2 achtzehn Befehle', m?.knoepfe.join(',') === 'left,centerX,right,top,centerY,bottom,distH,distV,row,column,width,height,size,smaller,bigger,grid,pack,tidy', m?.knoepfe);
+  pruefe('A2 achtzehn Befehle zum Anordnen – dazu seit M400 „Schräg legen" und „Gerade richten"', m?.knoepfe.join(',') === 'left,centerX,right,top,centerY,bottom,distH,distV,row,column,width,height,size,smaller,bigger,grid,pack,tidy,schraeg,gerade', m?.knoepfe);
   pruefe('A3 jeder Befehl hat ein gezeichnetes Symbol und einen Namen (Tooltip = Name für Vorleser)', m?.ohneBild === 0 && m.ohneNamen === 0, m);
   pruefe('A4 kein Emoji und keine Pfeil-Zeichen im Menü', !/[\u{1F000}-\u{1FAFF}️⇤⤒⇹⇳⭤↔↕]/u.test(m?.text ?? 'x'), m?.text);
   pruefe('A5 das Menü liegt ganz im Bild', !!m && m.r.left >= 0 && m.r.right <= 1440 && m.r.top >= 0 && m.r.bottom <= 900, m?.r);
   await P.keyboard.press('Escape');
   await alleWaehlen(P, ['n0', 'n1']); await menue(P);
   const aus = await P.evaluate(() => [...document.querySelectorAll('.anordnen-menu [data-anordnen]')].filter((b) => b.disabled).map((b) => b.getAttribute('data-anordnen')));
-  pruefe('A6 mit zwei Karten ist nur das Verteilen aus (braucht drei)', aus.join(',') === 'distH,distV', aus);
+  pruefe('A6 mit zwei Karten ist nur das Verteilen aus (braucht drei) – und „Gerade richten", solange nichts schräg liegt', aus.join(',') === 'distH,distV,gerade', aus);
   await P.keyboard.press('Escape');
 }
 
