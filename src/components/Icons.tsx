@@ -172,3 +172,7 @@ export const IKleiner = make(<><rect x="5" y="5" width="14" height="14" rx="2" /
 export const IRaster = make(<><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>);
 export const IPacken = make(<><rect x="3" y="3" width="7" height="10" rx="1" /><rect x="14" y="3" width="7" height="5" rx="1" /><rect x="14" y="12" width="7" height="9" rx="1" /><rect x="3" y="17" width="7" height="4" rx="1" /></>);
 export const IOrdnen = make(<><rect x="3" y="4" width="6" height="6" rx="1" /><rect x="12" y="4" width="9" height="6" rx="1" /><rect x="3" y="14" width="10" height="6" rx="1" /><rect x="16" y="14" width="5" height="6" rx="1" /></>);
+
+// M400: Drehen (Bogen mit Pfeilspitze)
+export const IDrehen = make(<><path d="M20 11a8 8 0 1 0-2.6 5.9" /><path d="M20 4v7h-7" /></>);
+export const ISchraeg = make(<><rect x="5" y="6" width="13" height="12" rx="1.5" transform="rotate(-10 11.5 12)" /></>);

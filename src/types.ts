@@ -403,7 +403,8 @@ export type AppNode =
   // liegen als KACHEL mit Kennzahlen auf dem Board und öffnen sich im Fokus —
   // das Board hört auf, mit jedem Modul zu wachsen. kachelMass merkt sich die
   // Größe vor dem Zusammenklappen fürs Ausklappen.
-  & { archived?: boolean; autoFit?: boolean; font?: CardFont; fontSize?: CardSize; kachel?: boolean; kachelMass?: { w: number; h: number } };
+  // winkel (M400): Die Karte liegt schräg – Grad im Uhrzeigersinn um ihre Mitte; fehlt ⇒ gerade (lib/drehung.ts).
+  & { archived?: boolean; autoFit?: boolean; font?: CardFont; fontSize?: CardSize; kachel?: boolean; kachelMass?: { w: number; h: number }; winkel?: number };
 
 /** M298: Modultypen, die sich zur Kachel zusammenklappen lassen */
 export const KACHEL_TYPEN: ReadonlySet<string> = new Set(['kanban', 'gantt', 'week', 'minutes']);

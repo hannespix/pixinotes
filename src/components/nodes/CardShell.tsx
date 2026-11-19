@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import { Handle, NodeResizer, Position } from '@xyflow/react';
-import { runDerived, selectActiveBoard, useBoard } from '../../store';
+import { Handle, NodeResizer, Position, useReactFlow, useUpdateNodeInternals } from '@xyflow/react';
+import { mutedHistory, runDerived, selectActiveBoard, useBoard } from '../../store';
+import { groesseGedreht, istDrehbar, winkelNorm, winkelRaste, winkelVon } from '../../lib/drehung';
+import { sizeOf } from '../../lib/arrange';
+import { IDrehen } from '../Icons';
 import { fernBeobachten } from '../../lib/fernRuhe';
 import { rolleMelden } from '../../lib/notizText';
 import { kachelInfo } from '../../lib/kachel';
@@ -58,6 +61,26 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     return n?.kachel ? n : null;
   });
   const imFokus = useBoard((s) => s.focusCard === id);
+  // M400: Die Karte liegt schräg – im Fokus steht sie gerade (dort wird gelesen und geschrieben)
+  const winkelRoh = useBoard((s) => winkelVon(selectActiveBoard(s)?.nodes.find((x) => x.id === id)));
+  const drehbar = useBoard((s) => istDrehbar(selectActiveBoard(s)?.nodes.find((x) => x.id === id)));
+  const nurLesen = useBoard((s) => selectActiveBoard(s)?.geteiltRolle === 'lesen');
+  const winkel = imFokus ? 0 : winkelRoh;
+  const winkelRef = useRef(winkel);
+  winkelRef.current = winkel;
+  const [drehAnzeige, setDrehAnzeige] = useState<number | null>(null);
+  const updateNodeInternals = useUpdateNodeInternals();
+  const { screenToFlowPosition } = useReactFlow();
+  // Die Anschlusspunkte sitzen nach dem Drehen woanders – React Flow misst sie neu. Nicht beim ersten Zeichnen:
+  // Da misst React Flow ohnehin (die Karte steht schon schräg), und ein zweites Vermessen jeder Karte brachte
+  // das anfängliche Einpassen der Ansicht durcheinander (Karten lagen außerhalb des Bildes).
+  const winkelGemessen = useRef<number | null>(null);
+  useEffect(() => {
+    if (winkelGemessen.current === null) { winkelGemessen.current = winkel; return; }
+    if (winkelGemessen.current === winkel) return;
+    winkelGemessen.current = winkel;
+    updateNodeInternals(id);
+  }, [winkel, id, updateNodeInternals]);
   const imFokusRef = useRef(imFokus);
   imFokusRef.current = imFokus;
   const schrumpftRef = useRef(schrumpft);
@@ -304,11 +327,19 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
        */
       if (autoFitRef.current && schrumpftRef.current && bearbeitetRef.current && !imFokusRef.current && !body.contains(document.activeElement)) {
         const shell = body.parentElement as HTMLElement | null;
-        const rb = body.getBoundingClientRect();
-        const massstab = body.clientHeight > 0 ? rb.height / body.clientHeight : 1;
-        let unten = rb.top;
-        for (const k of Array.from(body.children)) unten = Math.max(unten, k.getBoundingClientRect().bottom);
-        const inhalt = (unten - rb.top) / (massstab || 1) + 10;
+        let inhalt: number;
+        if (winkelRef.current) {
+          // M400: Eine schräge Karte hat schräge Rechtecke – gemessen wird dann im Layout (das kennt keine Drehung)
+          let unten = 0;
+          for (const k of Array.from(body.children) as HTMLElement[]) unten = Math.max(unten, k.offsetTop - (k.offsetParent === body ? 0 : body.offsetTop) + k.offsetHeight);
+          inhalt = unten + 10;
+        } else {
+          const rb = body.getBoundingClientRect();
+          const massstab = body.clientHeight > 0 ? rb.height / body.clientHeight : 1;
+          let unten = rb.top;
+          for (const k of Array.from(body.children)) unten = Math.max(unten, k.getBoundingClientRect().bottom);
+          inhalt = (unten - rb.top) / (massstab || 1) + 10;
+        }
         const rahmen = (shell?.offsetHeight ?? body.clientHeight) - body.clientHeight;
         const ziel = Math.max(minHeight, Math.ceil(inhalt + rahmen));
         const jetzt = shell?.offsetHeight ?? 0;
@@ -359,22 +390,117 @@ export function CardShell({ id, className, children, selected, minWidth = 170, m
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFit, id]);
 
+  /**
+   * M400: Drehen am Knopf. Der Winkel folgt dem Zeiger um die Kartenmitte und rastet alle 15° ein (Alt = frei).
+   * Sind mehrere drehbare Karten markiert, drehen sie sich gemeinsam um denselben Betrag – jede um ihre Mitte.
+   */
+  const drehStart = useCallback((e: React.PointerEvent) => {
+    if (e.button > 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const shell = bodyRef.current?.parentElement;
+    if (!shell) return;
+    const r = shell.getBoundingClientRect();
+    const mitte = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    const grad = (x: number, y: number) => (Math.atan2(y - mitte.y, x - mitte.x) * 180) / Math.PI;
+    const w0 = grad(e.clientX, e.clientY);
+    const nodes = selectActiveBoard(useBoard.getState())?.nodes ?? [];
+    const ich = nodes.find((n) => n.id === id);
+    const gruppe = nodes.filter((n) => (n.id === id || (ich?.selected && n.selected)) && istDrehbar(n)).map((n) => [n.id, winkelVon(n)] as [string, number]);
+    const eigen = winkelVon(ich);
+    let begonnen = false;
+    const zieh = (ev: PointerEvent) => {
+      const ziel = winkelRaste(eigen + (grad(ev.clientX, ev.clientY) - w0), ev.altKey);
+      const st = useBoard.getState();
+      if (!begonnen) { if (ziel === eigen) return; begonnen = true; st.pushHistory(); }
+      mutedHistory(() => st.setWinkel(gruppe.map(([gid, alt]) => [gid, gid === id ? ziel : winkelNorm(alt + (ziel - eigen))])));
+      setDrehAnzeige(ziel);
+    };
+    const los = () => {
+      window.removeEventListener('pointermove', zieh, true);
+      window.removeEventListener('pointerup', los, true);
+      window.removeEventListener('pointercancel', los, true);
+      setDrehAnzeige(null);
+    };
+    window.addEventListener('pointermove', zieh, true);
+    window.addEventListener('pointerup', los, true);
+    window.addEventListener('pointercancel', los, true);
+  }, [id]);
+  const geradeRichten = useCallback((e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    const st = useBoard.getState();
+    if (!winkelVon(selectActiveBoard(st)?.nodes.find((n) => n.id === id))) return;
+    st.pushHistory();
+    mutedHistory(() => st.setWinkel([[id, 0]]));
+  }, [id]);
+  /** M400: Größe ziehen an der schrägen Karte – in den Achsen der Karte, die gegenüberliegende Ecke bleibt stehen */
+  const eckeStart = useCallback((ecke: { x: -1 | 1; y: -1 | 1 }) => (e: React.PointerEvent) => {
+    if (e.button > 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const n = selectActiveBoard(useBoard.getState())?.nodes.find((x) => x.id === id);
+    if (!n) return;
+    const g = sizeOf(n);
+    const start = { x: n.position.x, y: n.position.y, w: g.w, h: g.h };
+    const p0 = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    const grad = winkelRef.current;
+    let begonnen = false;
+    const zieh = (ev: PointerEvent) => {
+      const p = screenToFlowPosition({ x: ev.clientX, y: ev.clientY });
+      const neu = groesseGedreht(start, grad, ecke, { x: p.x - p0.x, y: p.y - p0.y }, { minW: minWidth, minH: minHeight, verhaeltnis: seitenverhaeltnis });
+      if (!begonnen) { begonnen = true; onManualResizeStart(); }
+      const st = useBoard.getState();
+      mutedHistory(() => { st.resizeNode(id, Math.round(neu.w), Math.round(neu.h)); st.setNodePositions([[id, neu.x, neu.y]]); });
+    };
+    const los = () => {
+      window.removeEventListener('pointermove', zieh, true);
+      window.removeEventListener('pointerup', los, true);
+      window.removeEventListener('pointercancel', los, true);
+      if (begonnen) onManualResizeEnd();
+    };
+    window.addEventListener('pointermove', zieh, true);
+    window.addEventListener('pointerup', los, true);
+    window.addEventListener('pointercancel', los, true);
+  }, [id, minWidth, minHeight, seitenverhaeltnis, screenToFlowPosition, onManualResizeStart, onManualResizeEnd]);
+  const drehKnopf = !!selected && drehbar && !alsKachel && !imFokus && !nurLesen;
+
   // Wichtig: Lösch-Knopf & Handles liegen AUSSERHALB des card-body,
   // damit dessen overflow:hidden sie nicht abschneidet.
   return (
-    <div className="card-shell" data-ruhig={ruhig && !alsKachel ? '' : undefined} data-ohne-hoehe={ohneHoehe ? '' : undefined} style={rollt ? ({ '--notiz-max': `${NOTIZ_MAX}px`, ...(typeof festeHoehe === 'number' ? { '--karte-h': `${festeHoehe}px` } : {}) } as CSSProperties) : undefined}>
+    <div className="card-shell" data-ruhig={ruhig && !alsKachel ? '' : undefined} data-ohne-hoehe={ohneHoehe ? '' : undefined} data-winkel={winkel ? winkel : undefined}
+      style={rollt || winkel ? ({ ...(rollt ? { '--notiz-max': `${NOTIZ_MAX}px`, ...(typeof festeHoehe === 'number' ? { '--karte-h': `${festeHoehe}px` } : {}) } : {}), ...(winkel ? { '--winkel': `${winkel}deg` } : {}) } as CSSProperties) : undefined}>
       {/* Resize-Griffe: weiße Quadrate mit neutralem Rand (klassischer
           Auswahlrahmen) — bewusst ANDERS als die runden Akzent-Verbindungs-
           punkte, damit beides auf einen Blick unterscheidbar ist (M102).
           Farben kommen aus dem CSS (theme-fähig), nicht aus der color-Prop. */}
       <NodeResizer
-        isVisible={!!selected}
+        isVisible={!!selected && !winkel}
         minWidth={minWidth}
         minHeight={minHeight}
         keepAspectRatio={seitenverhaeltnis}
         onResizeStart={onManualResizeStart}
         onResizeEnd={onManualResizeEnd}
       />
+      {/* M400: An der schrägen Karte rechnen eigene Eck-Griffe in den Achsen der Karte – die der Bibliothek
+          kennen nur gerade Kästen. Dieselbe Klasse, damit die Auto-Größe das Ziehen wie gewohnt erkennt. */}
+      {!!selected && !!winkel && !nurLesen && ([[-1, -1], [1, -1], [-1, 1], [1, 1]] as Array<[-1 | 1, -1 | 1]>).map(([x, y]) => (
+        <div
+          key={`${x}${y}`}
+          className={`react-flow__resize-control karte-eck-griff nodrag nopan ${y < 0 ? 'oben' : 'unten'} ${x < 0 ? 'links' : 'rechts'}`}
+          data-taste="karte-eck-griff"
+          data-ecke={`${x},${y}`}
+          onPointerDown={eckeStart({ x, y })}
+        />
+      ))}
+      {drehKnopf && (
+        <button
+          className="dreh-knopf nodrag nopan"
+          data-taste="karte-drehen"
+          title="Drehen – Doppelklick stellt gerade"
+          aria-label="Drehen"
+          onPointerDown={drehStart}
+          onDoubleClick={geradeRichten}
+        ><IDrehen size={13} /></button>
+      )}
+      {drehAnzeige != null && <span className="dreh-anzeige" translate="no" aria-hidden="true">{drehAnzeige}°</span>}
       {/* Sichtbarer Griff: hier packt man die Karte IMMER — auch wenn sie
           innen komplett aus Editor/Eingabefeldern besteht */}
       <div className="card-grip" title="Ziehen zum Verschieben" aria-hidden="true">

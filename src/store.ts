@@ -17,9 +17,10 @@ import {
 import { buildStarter } from './lib/starter';
 import { KACHEL_TYPEN, uid, type AppNode, type CardFont, type CardSize, type TimeSeg } from './types';
 import { anchorStroke, integrateStroke } from './lib/strokeAnchor';
+import { drehe, istDrehbar, winkelNorm, winkelVon } from './lib/drehung';
 import { istAmText } from './lib/notizText';
 import { offeneSeite, seiteVon, strichRelativ } from './lib/pdfSeiten';
-import { findFreeSpot, frameMembers } from './lib/arrange';
+import { findFreeSpot, frameMembers, sizeOf } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
 import { t } from './lib/sprache';
 import { fristAnkerPflegen, type FristAnker } from './lib/fristAnker';
@@ -562,6 +563,8 @@ interface BoardState {
   setNodeHeight: (id: string, height: number) => void;
   /** Auto-Größe je Karte an/aus (M103; seit M111 Standard AN — false = manuell gebrochen) */
   setAutoFit: (ids: string[], on: boolean) => void;
+  /** M400: Karten schräg legen (Grad im Uhrzeigersinn, 0 = gerade) – Striche auf der Karte drehen sich mit */
+  setWinkel: (entries: Array<[string, number]>) => void;
   /** M339: Vor dem Verkleinern einer Notiz festschreiben, welche älteren Striche zum Text gehören */
   textStricheFestschreiben: (nodeId: string) => void;
   /** M298: Große Module als Kachel zusammenklappen (on) oder wieder ausklappen */
@@ -3185,6 +3188,36 @@ export const useBoard = create<BoardState>()(
               ids.includes(n.id) ? ({ ...n, autoFit: on ? undefined : false } as AppNode) : n,
             ),
           })),
+
+        setWinkel: (entries) => {
+          if (entries.length === 0) return;
+          const ziel = new Map(entries);
+          patchActive((b) => {
+            const gedreht = new Map<string, { d: number; mx: number; my: number; n: AppNode }>();
+            const nodes = b.nodes.map((n) => {
+              if (!ziel.has(n.id) || !istDrehbar(n)) return n;
+              const neu = winkelNorm(ziel.get(n.id)!);
+              const alt = winkelVon(n);
+              if (neu === alt) return n;
+              const g = sizeOf(n);
+              gedreht.set(n.id, { d: neu - alt, mx: g.w / 2, my: g.h / 2, n });
+              return { ...n, winkel: neu || undefined } as AppNode;
+            });
+            if (gedreht.size === 0) return {};
+            // Striche, die auf der Brett-Ebene an der Karte hängen, drehen sich um deren Mitte mit. Was die Karte
+            // selbst zeichnet (auf dem Text einer Notiz, auf einer Dokument-Seite), dreht sich schon mit ihr.
+            const drawings = (b.drawings ?? []).map((st) => {
+              const g = st.anchor ? gedreht.get(st.anchor) : undefined;
+              if (!g || st.seite != null) return st;
+              if (g.n.type === 'note' && !g.n.kachel && istAmText(st, true, g.mx * 2, g.n.height ?? undefined)) return st;
+              return { ...st, points: st.points.map(([x, y]) => {
+                const q = drehe({ x, y }, { x: g.mx, y: g.my }, g.d);
+                return [Math.round(q.x * 100) / 100, Math.round(q.y * 100) / 100] as [number, number];
+              }) };
+            });
+            return { nodes, drawings };
+          });
+        },
 
         setKachel: (ids, on) => {
           if (ids.length === 0) return;
