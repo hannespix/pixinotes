@@ -6287,8 +6287,10 @@ html[data-alles-zeigen] .react-flow__node.selectable.selected:focus-visible { ou
     outline-offset: calc(2px * var(--pn-inv, 1));
   }
 }
-/* Verbindungslinien bleiben sichtbar (2 Flächenpunkte wären bei 15 % ein Drittel Bildpunkt) */
-[data-weit] .react-flow__edge-path { stroke-width: calc(2px * var(--pn-inv, 1)) !important; }
+/* Verbindungslinien bleiben sichtbar (2 Flächenpunkte wären bei 15 % ein Drittel Bildpunkt) – aber maßvoll:
+   M401: `--pn-kante` (Board.tsx) hält die Linie bei knapp einem Bildpunkt, damit die Pfeilspitze (8 × Linienstärke)
+   nicht größer wird als die Karten, auf die sie zeigt. */
+[data-weit] .react-flow__edge-path { stroke-width: calc(var(--pn-kante, 2) * 1px) !important; }
 html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important; }
 
 /* M344: Fanglinien beim Ziehen — magenta wie in Figma, Strichstärke in Bildschirm-Größe */
