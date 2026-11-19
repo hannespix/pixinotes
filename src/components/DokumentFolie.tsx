@@ -433,7 +433,8 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
       <div className="folie-dok-leiste" role="toolbar" aria-label="Dokument">
         {art !== 'bild' && (
           <>
-            <button onClick={() => schritt(-1)} aria-label="Vorherige Seite" title="Vorherige Seite (←)" data-taste="folie-zurueck">‹</button>
+            {/* M405: Diese Leiste blättert nur IM Dokument – an der ersten und letzten Seite endet sie (zur nächsten Karte führt die Fußleiste) */}
+            <button onClick={() => { if (nr > 1) schritt(-1); }} aria-disabled={nr <= 1} aria-label="Vorherige Seite" title="Vorherige Seite (←)" data-taste="folie-zurueck">‹</button>
             <label className="folie-dok-nr">
               <span>Seite</span>
               <input inputMode="numeric" aria-label="Seite" value={eingabe || String(nr)} data-taste="folie-seite-nr"
@@ -443,7 +444,7 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
                 onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
               <span>/ {seiten}</span>
             </label>
-            <button onClick={() => schritt(1)} aria-label="Nächste Seite" title="Nächste Seite (→)" data-taste="folie-vor">›</button>
+            <button onClick={() => { if (nr < seiten) schritt(1); }} aria-disabled={nr >= seiten} aria-label="Nächste Seite" title="Nächste Seite (→)" data-taste="folie-vor">›</button>
             <span className="folie-dok-trenner" aria-hidden="true" />
           </>
         )}

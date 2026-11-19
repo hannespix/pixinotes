@@ -199,8 +199,8 @@ console.log('\n════ B: Auf eine Dokument-Seite zeichnen ════');
   await P.keyboard.press('Escape'); await P.waitForTimeout(200);
   await P.locator('[data-taste="folie-modus"]').click(); await P.waitForTimeout(500);
   // Seite 2
-  // „Weiter" rollt erst die Seite zu Ende, dann blättert es
-  for (let i = 0; i < 8 && (await dokSeite(P)) !== 2; i++) { await P.locator('[data-taste="vortrag-weiter"]').click(); await P.waitForTimeout(500); }
+  // M405: Die Seiten blättert die Leiste am Dokument („Weiter" unten geht zur nächsten Karte)
+  for (let i = 0; i < 8 && (await dokSeite(P)) !== 2; i++) { await P.locator('[data-taste="folie-vor"]').click(); await P.waitForTimeout(500); }
   await P.waitForTimeout(700);
   pruefe('B6 auf Seite 2 stehen die Striche von Seite 1 nicht', (await dokSeite(P)) === 2 && (await P.locator('.folie-dok-striche path').count()) === 0, { seite: await dokSeite(P) });
   await P.keyboard.press('m'); await P.waitForTimeout(250);

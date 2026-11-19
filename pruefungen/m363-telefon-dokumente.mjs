@@ -277,10 +277,11 @@ const folie = () => P.evaluate(() => {
 });
 let f = await folie();
 pruefe('E1 „▶" im Fokus startet die Präsentation bei diesem Dokument, auf der offenen Seite', f.da && f.seite === 1 && f.seiten === 4 && /2 \/ 3/.test(f.zaehler), f);
-pruefe('E2 die Seite füllt die Breite und zeigt Inhalt (kein Dateiname)', f.blattB >= f.b * 0.9 && f.tinte > 20, f);
+// M405: Die Fußleiste steht jetzt auch hier (eine Zeile weniger Höhe für die ganze Seite) – das Blatt bleibt fast schirmbreit
+pruefe('E2 die Seite füllt die Breite und zeigt Inhalt (kein Dateiname)', f.blattB >= f.b * 0.87 && f.tinte > 20, f);
 pruefe('E3 Anmerkungen vom Board liegen auf der Seite', f.striche >= 1, f.striche);
-pruefe('E4 am Telefon weicht die Fußleiste der Präsentation der Seite; die Dokument-Knöpfe sind ≥ 44 Punkte',
-  !f.fuss && await P.evaluate(() => [...document.querySelectorAll('.folie-dok-leiste button')].every((b) => b.getBoundingClientRect().height >= 44 && b.getBoundingClientRect().width >= 44)));
+pruefe('E4 am Telefon steht die Fußleiste auch auf der Dokument-Folie (M405: „Weiter" immer an derselben Stelle); die Dokument-Knöpfe sind ≥ 44 Punkte',
+  f.fuss && await P.evaluate(() => [...document.querySelectorAll('.folie-dok-leiste button')].every((b) => b.getBoundingClientRect().height >= 44 && b.getBoundingClientRect().width >= 44)));
 await P.screenshot({ path: path.join(SD, 'm363-vortrag-telefon.png') });
 await zug(300, 300, 70, 300); f = await folie();
 pruefe('E5 Wisch nach links → Seite 2 (mit dem Stiftstrich von dort)', f.seite === 2 && f.striche >= 1, f);
@@ -293,8 +294,11 @@ pruefe('E8 vergrößert rollt der Wisch das Blatt, statt zu blättern', f.seite 
 await doppeltipp(195, 300); f = await folie();
 pruefe('E9 Doppeltipp: zurück auf die ganze Seite', Math.abs(f.zoom - 1) < 0.01 && f.blattB <= f.b, f);
 await P.locator('[data-taste="folie-vor"]').tap(); await P.waitForTimeout(700);
-await P.locator('[data-taste="folie-vor"]').tap(); await P.waitForTimeout(900);
-pruefe('E10 „›" nach der letzten Seite führt zur nächsten Folie', (await P.locator('.folie-dok').count()) === 0 && /3 \/ 3/.test(await P.locator('.presenter-count').textContent()), await P.locator('.presenter-count').textContent());
+// M405: Die Leiste am Dokument endet an der letzten Seite – zur nächsten Folie führt „Weiter" in der Fußleiste
+const amEnde = await P.evaluate(() => ({ aus: document.querySelector('[data-taste="folie-vor"]')?.getAttribute('aria-disabled'), seite: document.querySelector('.folie-dok')?.dataset.seite, seiten: document.querySelector('.folie-dok')?.dataset.seiten }));
+pruefe('E10a „›" endet an der letzten Seite des Dokuments', amEnde.aus === 'true' && amEnde.seite === amEnde.seiten, amEnde);
+await P.locator('[data-taste="vortrag-weiter"]').tap(); await P.waitForTimeout(900);
+pruefe('E10 „Weiter" in der Fußleiste führt zur nächsten Folie', (await P.locator('.folie-dok').count()) === 0 && /3 \/ 3/.test(await P.locator('.presenter-count').textContent()), await P.locator('.presenter-count').textContent());
 await T.ctx.close();
 
 // ══════════════════════════ Desktop ══════════════════════════
@@ -339,10 +343,12 @@ await taste('0', 500);
 for (let i = 0; i < 12; i++) { if ((await Q.locator('[data-taste="vortrag-weiter"]').getAttribute('aria-disabled')) === 'true') break; await Q.locator('[data-taste="vortrag-weiter"]').click(); await Q.waitForTimeout(450); }
 await Q.waitForTimeout(1500);
 g = await dfolie();
-pruefe('F12 „Weiter" führt durch alle Seiten bis zur letzten Folie: das Word-Dokument, als Seite', g.da && g.art === 'word' && /4 \/ 4/.test(g.zaehler) && g.seite === g.seiten && g.seiten === 2, g);
+// M405: „Weiter" geht von Karte zu Karte – das Word-Dokument liegt auf seiner ersten Seite offen
+pruefe('F12 „Weiter" führt bis zur letzten Folie: das Word-Dokument, als Seite', g.da && g.art === 'word' && /4 \/ 4/.test(g.zaehler) && g.seite === 1 && g.seiten === 2, g);
+for (let i = 0; i < 6 && (await dfolie()).seite === 1; i++) await taste('ArrowRight', 800);
+g = await dfolie();
+pruefe('F14 nach dem (grau gewordenen) „Weiter" blättert → weiter (Word Seite 2)', g.art === 'word' && g.seite === 2, g);
 pruefe('F13 die Word-Seite zeigt ihren Text', /WORTMARKER-ZWEI/.test(await Q.evaluate(() => [...document.querySelectorAll('.folie-dok section.docx')].filter((s) => s.style.display !== 'none').map((s) => s.textContent).join(' '))));
-await taste('ArrowLeft', 800); g = await dfolie();
-pruefe('F14 nach dem (grau gewordenen) „Weiter" blättert ← weiter (Word Seite 1)', g.art === 'word' && g.seite === 1, g);
 await taste('Escape', 800);
 pruefe('F15 Esc beendet die Präsentation', (await Q.locator('.presenter').count()) === 0);
 
