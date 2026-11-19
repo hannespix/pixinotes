@@ -32,8 +32,9 @@ export interface Vortrag { karte: string; seite: number; ansicht?: Ansicht }
 /**
  * M387: Ausschnitt in einer Folie. `m` = ganze Seite oder Seitenbreite und `z` = Zoom (nur Dokumente),
  * x/y = Rollstand als Anteil des Rollwegs (0…1) — so passt er auf jedem Schirm.
+ * M403: `a` = Darstellung gewöhnlicher Folien und `d` = Zoom als Vielfaches ihrer Ausgangsstufe (1 = wie gewählt).
  */
-export interface Ansicht { m?: 'seite' | 'breite'; z?: number; x: number; y: number }
+export interface Ansicht { m?: 'seite' | 'breite'; z?: number; x: number; y: number; a?: 'standard' | 'einpassen' | 'breite'; d?: number }
 /** Rollstand in einem Tool: `p` = Weg zum rollenden Element ('' = die Seite selbst), x/y = Anteil des Rollwegs (0…1) */
 export interface Roll { p: string; x: number; y: number }
 export interface Zeiger {
@@ -200,7 +201,8 @@ let ansichtZeit = 0;
 let ansichtWarte: ReturnType<typeof setTimeout> | undefined;
 /** M387: Ausschnitt in der offenen Folie (Ansicht, Zoom, Rollstand) — höchstens acht Meldungen je Sekunde, die letzte kommt immer an */
 export function ansichtMelden(boardId: string, karte: string, a: Ansicht): void {
-  const sauber: Ansicht = { ...(a.m ? { m: a.m } : {}), ...(typeof a.z === 'number' ? { z: runden(a.z, 2) } : {}), x: runden(Math.min(1, Math.max(0, a.x)), 3), y: runden(Math.min(1, Math.max(0, a.y)), 3) };
+  const sauber: Ansicht = { ...(a.m ? { m: a.m } : {}), ...(typeof a.z === 'number' ? { z: runden(a.z, 2) } : {}), x: runden(Math.min(1, Math.max(0, a.x)), 3), y: runden(Math.min(1, Math.max(0, a.y)), 3),
+    ...(a.a ? { a: a.a, d: runden(typeof a.d === 'number' ? a.d : 1, 3) } : {}) };
   if (meineAnsicht?.karte === karte && JSON.stringify(meineAnsicht.a) === JSON.stringify(sauber)) return;
   meineAnsicht = { karte, a: sauber };
   if (meinBoard !== boardId) return;
@@ -298,6 +300,7 @@ function ansichtAus(roh: unknown): Ansicht | undefined {
     ...(r.m === 'seite' || r.m === 'breite' ? { m: r.m } : {}),
     ...(typeof r.z === 'number' && r.z >= 1 && r.z <= 6 ? { z: r.z } : {}),
     x: r.x, y: r.y,
+    ...(r.a === 'standard' || r.a === 'einpassen' || r.a === 'breite' ? { a: r.a, d: typeof r.d === 'number' && r.d >= 0.05 && r.d <= 20 ? r.d : 1 } : {}),
   };
 }
 function dokAus(roh: unknown): Record<string, number> {
