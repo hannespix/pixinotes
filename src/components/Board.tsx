@@ -960,6 +960,14 @@ export function Board() {
         wrap.style.setProperty('--pn-inv', inv);
         window.dispatchEvent(new Event('pixinotes:zoom-ruht'));   // M346: Scrollbalken passen ihre Größe an
       }
+      /**
+       * M401: Linienstärke im weiten Zoom. Vorher blieb die Linie dort 2 Bildpunkte stark – und weil die Pfeilspitze
+       * an der Linienstärke hängt, stand sie mit 16 Bildpunkten vor Karten, die nur noch 20 breit waren. Jetzt
+       * schrumpft die Linie mit (knapp ein Bildpunkt an der Grenze, nie unter 0,75), die Spitze entsprechend auf
+       * 6 bis 7 Bildpunkte. Der Wert steht in Flächenpunkten, ohne Deckel wie bei `--pn-inv`.
+       */
+      const kante = String(Math.round((Math.max(0.75, 0.9 * Math.sqrt(Math.min(rel, 0.5) / 0.45)) / Math.max(rel, 0.01)) * 100) / 100);
+      if (wrap.style.getPropertyValue('--pn-kante') !== kante) wrap.style.setProperty('--pn-kante', kante);
       // mit Spielraum, damit die Grenze beim Zoomen nicht flattert
       const jetzt = weitRef.current ? rel < 0.5 : rel < 0.45;
       if (jetzt !== weitRef.current) { weitRef.current = jetzt; setWeit(jetzt); }
