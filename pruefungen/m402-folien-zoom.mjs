@@ -112,7 +112,9 @@ const lage = () => P.evaluate(() => {
   const b = await lage();
   pruefe('B2 Strg + Rad vergrößert den Inhalt', !!b && b.zoom > 1.6 && b.zoom < 3.2 && nah(b.w, a.w * b.zoom, 3), b);
   // Ist der Inhalt größer als die Folie, bleibt beim Weiterzoomen die Stelle unter dem Zeiger stehen
-  const zeiger = { x: b.f.l + b.f.w * 0.35, y: b.f.t + b.f.h * 0.45 };
+  // M404: Eine Raste ist jetzt immer 14 % – der Inhalt ragt hier nur seitlich über die Folie. Seitlich bleibt die Stelle unter
+  // dem Zeiger stehen; in der Höhe passt er noch und steht mittig, darum liegt der Zeiger dort auf seiner Mitte.
+  const zeiger = { x: b.f.l + b.f.w * 0.35, y: b.t + b.h * 0.5 };
   const rel = { x: (zeiger.x - b.l) / b.w, y: (zeiger.y - b.t) / b.h };
   await P.mouse.move(zeiger.x, zeiger.y);
   await P.keyboard.down('Control');
