@@ -23,6 +23,7 @@ import type { DokumentArt } from '../lib/dokumentArt';
 import { FOLIE_ZOOM, type FolieZoom } from '../lib/folienWerkzeug';
 
 import { IPaperclip } from './Icons';
+import { radSchritt } from '../lib/radZoom';
 export { dokumentArt, type DokumentArt } from '../lib/dokumentArt';
 
 /** Inhalt der Datei: aus der Karte (kleine Dateien), der Geräte-Ablage oder dem Konto */
@@ -357,7 +358,7 @@ export function DokumentFolie({ node, art, seite, onSeiten, schritt, geheZu, rol
     const rad = (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
-      zoomen(z * Math.exp(-e.deltaY * 0.0022), e.clientX, e.clientY);
+      zoomen(z * 2 ** radSchritt(e).hoch, e.clientX, e.clientY);   // M404: jede Raste derselbe Schritt
     };
     el.addEventListener('touchstart', start, { passive: false });
     el.addEventListener('touchmove', zug, { passive: false });

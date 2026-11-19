@@ -6,6 +6,7 @@
 // die Bedienung dafür einmal für alle Vorschauen — Tasten, Rad, Doppelklick
 // und Zwei-Finger-Kneifen.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { radSchritt } from './radZoom';
 
 export interface LupenGriffe {
   onPointerDown: (e: React.PointerEvent) => void;
@@ -98,7 +99,7 @@ export function useLupe(maxZoom = 6) {
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
-      zoomAnPunkt(Math.exp(-e.deltaY * 0.0015), e.clientX, e.clientY);
+      zoomAnPunkt(2 ** radSchritt(e).hoch, e.clientX, e.clientY);   // M404: jede Raste derselbe Schritt
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);

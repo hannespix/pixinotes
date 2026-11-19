@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { FOLIE_ZOOM, type FolieZoom } from './folienWerkzeug';
 import { wurzelZoom } from './anzeige';
+import { radSchritt } from './radZoom';
 
 export const FOLIEN_ZOOM_MIN = 0.4;
 export const FOLIEN_ZOOM_MAX = 5;
@@ -244,7 +245,7 @@ export function useFolienZoom(ref: RefObject<HTMLElement | null>, wahl: FolienZo
     const rad = (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
-      setzen(zRef.current * Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0022)), { x: e.clientX, y: e.clientY }, false);
+      setzen(zRef.current * 2 ** radSchritt(e).hoch, { x: e.clientX, y: e.clientY }, false);   // M404: jede Raste derselbe Schritt
     };
     // Zwei Finger: kneifen zoomt um die Mitte, gemeinsames Schieben rollt
     let alt: { d: number; x: number; y: number } | null = null;
