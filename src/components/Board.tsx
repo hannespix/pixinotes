@@ -32,6 +32,7 @@ import { NoteCard } from './nodes/NoteCard';
 import { EmailCard } from './nodes/EmailCard';
 import { ImageCard } from './nodes/ImageCard';
 import { boardZoomMelden } from '../lib/boardZoom';
+import { bedienMass, BOARD_ZOOM_MAX, BOARD_ZOOM_MIN, radAnteil, radSchritt } from '../lib/radZoom';
 import { FileCard } from './nodes/FileCard';
 import { KanbanCard } from './nodes/KanbanCard';
 import { PortalCard } from './nodes/PortalCard';
@@ -359,7 +360,7 @@ export function Board() {
   useEffect(() => {
     const wrap = zoomWrapRef.current;
     if (!wrap) return;
-    const clampZoom = (z: number) => Math.max(0.15 * anzRef.current, Math.min(2.5 * anzRef.current, z));
+    const clampZoom = (z: number) => Math.max(BOARD_ZOOM_MIN * anzRef.current, Math.min(BOARD_ZOOM_MAX * anzRef.current, z));
     const zoomAt = (clientX: number, clientY: number, newZoom: number, fx?: number, fy?: number) => {
       const rect = wrap.getBoundingClientRect();
       const px = clientX - rect.left;
@@ -393,11 +394,64 @@ export function Board() {
       }
       return false;
     };
+    /**
+     * M404: Zoomen mit dem Rad. Jede Raste ist derselbe Schritt (lib/radZoom.ts) und wird weich angefahren: Das Ziel
+     * sammelt die Rasten, jedes Bild legt einen festen Anteil des Rests zurück. Feine Ereignisse (Kneifen am
+     * Trackpad, stufenlose Räder) folgen dem Finger sofort. Die Stelle unter dem Zeiger bleibt stehen.
+     */
+    const rad = { ziel: 0, x: 0, y: 0, bild: 0, zeit: 0, laeuft: false };
+    const radGrenze = (z: number) => { const f = fokusRef.current; return f ? Math.max(f.fit, clampZoom(z)) : clampZoom(z); };   // M363: im Fokus nie kleiner als eingepasst
+    const radSetzen = (z: number) => {
+      const neu = radGrenze(z);
+      // erst die Bedienung der Dokument-Karten auf die neue Stufe bringen – rutscht der Inhalt unter dem Zeiger dabei, zieht der Zoom-Anker mit
+      const rutsch = uiMeldenRef.current(neu, rad.x, rad.y);
+      if (rutsch) {
+        const rect = wrap.getBoundingClientRect();
+        const { x, y, zoom } = getViewport();
+        zoomAt(rad.x, rad.y, neu, (rad.x - rect.left - x) / zoom, (rad.y - rect.top - y) / zoom + rutsch);
+      } else zoomAt(rad.x, rad.y, neu);
+      const f = fokusRef.current;
+      if (f) { fokusFrei.current = neu > f.fit * 1.02; requestAnimationFrame(() => { fokusSchieben(0, 0); fokusBalken(); }); }   // danach an die Kartenkanten klemmen
+    };
+    const radBild = (jetzt: number) => {
+      const ist = Math.log2(getViewport().zoom);
+      const rest = rad.ziel - ist;
+      const anteil = radAnteil(jetzt - rad.zeit);
+      rad.zeit = jetzt;
+      if (Math.abs(rest) < 0.004) { radSetzen(2 ** rad.ziel); rad.laeuft = false; return; }
+      radSetzen(2 ** (ist + rest * anteil));
+      rad.bild = requestAnimationFrame(radBild);
+    };
+    const radZoomen = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const { hoch, raste } = radSchritt(e);
+      if (!hoch) return;
+      rad.x = e.clientX; rad.y = e.clientY;
+      const ist = Math.log2(getViewport().zoom);
+      if (!raste) {
+        // fein: sofort, ohne Nachlauf
+        cancelAnimationFrame(rad.bild); rad.laeuft = false;
+        radSetzen(2 ** (ist + hoch));
+        return;
+      }
+      // Raste: aufs Ziel sammeln (in den Grenzen) und anfahren; die erste Raste bewegt sich schon in diesem Bild
+      rad.ziel = Math.log2(radGrenze(2 ** ((rad.laeuft ? rad.ziel : ist) + hoch)));
+      if (rad.laeuft) return;
+      rad.laeuft = true;
+      rad.zeit = performance.now() - 16;
+      radBild(performance.now());
+    };
     const onWheel = (e: WheelEvent) => {
       const target = e.target as Element | null;
       if (inOverlay(target)) return; // Menü offen → Menü scrollt, Board bleibt ruhig
       const inNode = target?.closest?.('.react-flow__node');
-      if (!inNode) return; // auf der Fläche macht React Flow das selbst
+      if (!inNode) {
+        // M404: Auch auf der freien Fläche zoomt das Rad hier – derselbe Schritt, dasselbe weiche Anfahren wie über
+        // einer Karte. Schwenken per Rad (ohne Strg, wenn das Rad nicht zoomt) bleibt bei React Flow.
+        if ((e.ctrlKey || e.metaKey || wheelZoomRef.current) && target?.closest?.('.react-flow__renderer')) radZoomen(e);
+        return;
+      }
       // M334: Im Fokus rollt das Rad über der Karte die Kamera — außer ein
       // Inhalt (Code-Feld, Tabelle) kann selbst noch in diese Richtung scrollen
       if (fokusRef.current && !e.ctrlKey && !e.metaKey && inNode.classList.contains('pn-focused') && target) {
@@ -432,14 +486,8 @@ export function Board() {
           return;
         }
       }
-      if (!e.ctrlKey && !wheelZoomRef.current) return; // Modul-Scroll bleibt
-      e.preventDefault();
-      e.stopPropagation();
-      const factor = Math.pow(2, -e.deltaY * (e.ctrlKey ? 0.01 : 0.0022));
-      // M363: Im Fokus nie kleiner als eingepasst; danach an die Kartenkanten klemmen
-      const f = fokusRef.current;
-      zoomAt(e.clientX, e.clientY, f ? Math.max(f.fit, clampZoom(getViewport().zoom * factor)) : clampZoom(getViewport().zoom * factor));
-      if (f) { fokusFrei.current = getViewport().zoom > f.fit * 1.02; requestAnimationFrame(() => { fokusSchieben(0, 0); fokusBalken(); }); }
+      if (!e.ctrlKey && !e.metaKey && !wheelZoomRef.current) return; // Modul-Scroll bleibt
+      radZoomen(e);
     };
     // M143: Klicks im Slash-Menü (z. B. auf dessen Scrollleiste) dürfen weder
     // dem Editor den Fokus klauen noch BlockNotes „außerhalb geklickt"-
@@ -527,6 +575,7 @@ export function Board() {
         const f = fokusRef.current;
         const roh = clampZoom(p.zoom * (touchDist(e.touches) / p.dist));
         const newZoom = f ? Math.max(f.fit, roh) : roh;
+        p.fy += uiMeldenRef.current(newZoom, mid.x, mid.y);   // M404: rutscht der Inhalt unter den Fingern, zieht der Anker mit
         zoomAt(mid.x, mid.y, newZoom, p.fx, p.fy);
         if (f) fokusFrei.current = newZoom > f.fit * 1.02;
         return;
@@ -640,6 +689,7 @@ export function Board() {
     wrap.addEventListener('touchcancel', onTouchEnd, true);
     return () => {
       wrap.removeEventListener('wheel', onWheel, { capture: true } as EventListenerOptions);
+      cancelAnimationFrame(rad.bild);
       window.removeEventListener('pointerdown', onMenuPointerDown, true);
       window.removeEventListener('mousedown', onMenuPointerDown, true);
       window.removeEventListener('touchstart', onMenuPointerDown, true);
@@ -947,6 +997,33 @@ export function Board() {
    */
   const [weit, setWeit] = useState(false);
   const weitRef = useRef(false);
+  /**
+   * M404: Die Bedienung aufgeklappter Dokument-Karten (Titel, Blätterleiste, Kommentarliste) wächst nur bis 130 % mit –
+   * wer zum Lesen weiter hineinzoomt, bekommt mehr Seite statt größerer Knöpfe. `--pn-ui` trägt das Maß (CSS `zoom`
+   * an diesen Teilen); anders als `--pn-inv` wird es sofort gesetzt, in kleinen Stufen, damit beim Zoomen nichts springt.
+   * Weil die Karte dabei flacher wird, rutscht die Seite nach oben: Liegt die Stelle (x, y) auf einer Seite, kommt
+   * zurück, um wie viele Flächenpunkte – der Zoom-Anker zieht dann mit, und die Zeile unter dem Zeiger bleibt stehen.
+   */
+  const uiStand = useRef(1);
+  const uiMelden = useCallback((zoom: number, x?: number, y?: number): number => {
+    const wrap = zoomWrapRef.current;
+    if (!wrap) return 0;
+    // Im Fokus nicht: Dort misst sich die Ansicht an der Karte aus (würde sie flacher, passte sie sich neu ein), und die
+    // Leisten des Fokus liegen ohnehin fest auf dem Schirm
+    const ui = fokusRef.current ? 1 : bedienMass(zoom / (anzRef.current || 1));
+    if (ui === uiStand.current) return 0;
+    uiStand.current = ui;
+    const seite = x !== undefined && y !== undefined ? (document.elementFromPoint(x, y)?.closest('.pdf-seite') as HTMLElement | null) : null;
+    const vor = seite?.getBoundingClientRect().top;
+    if (ui === 1) wrap.style.removeProperty('--pn-ui'); else wrap.style.setProperty('--pn-ui', String(ui));
+    if (!seite || vor === undefined) return 0;
+    const nach = seite.getBoundingClientRect().top;
+    const fl = wrap.querySelector('.react-flow__viewport');
+    const jetzt = fl ? new DOMMatrixReadOnly(getComputedStyle(fl).transform).a : 0;
+    return jetzt > 0 ? (nach - vor) / jetzt : 0;
+  }, []);
+  const uiMeldenRef = useRef(uiMelden);
+  uiMeldenRef.current = uiMelden;
   const zoomZeit = useRef<number | undefined>(undefined);
   const zoomMelden = useCallback((zoom: number, sofort = false) => {
     window.clearTimeout(zoomZeit.current);
@@ -955,7 +1032,8 @@ export function Board() {
       const wrap = zoomWrapRef.current;
       if (!wrap) return;
       const rel = zoom / (anzRef.current || 1);
-      const inv = String(Math.round(Math.max(0.6, Math.min(7, 1 / rel)) * 20) / 20);
+      // M404: über 250 % hinaus (bis 600 %) bleiben Griffe und Rahmen so groß wie bei 250 %
+      const inv = String(Math.round((rel > 2.5 ? 1.5 / rel : Math.max(0.6, Math.min(7, 1 / rel))) * 20) / 20);
       if (wrap.style.getPropertyValue('--pn-inv') !== inv) {
         wrap.style.setProperty('--pn-inv', inv);
         window.dispatchEvent(new Event('pixinotes:zoom-ruht'));   // M346: Scrollbalken passen ihre Größe an
@@ -975,9 +1053,9 @@ export function Board() {
     if (sofort) setzen(); else zoomZeit.current = window.setTimeout(setzen, 90);
   }, []);
   useEffect(() => {
-    const id = requestAnimationFrame(() => zoomMelden(getViewport().zoom, true));
+    const id = requestAnimationFrame(() => { uiMelden(getViewport().zoom); zoomMelden(getViewport().zoom, true); });
     return () => { cancelAnimationFrame(id); window.clearTimeout(zoomZeit.current); };
-  }, [activeId, anzeige, getViewport, zoomMelden]);
+  }, [activeId, anzeige, getViewport, zoomMelden, uiMelden]);
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.code !== 'Space' || e.repeat) return;
@@ -1613,15 +1691,15 @@ export function Board() {
         // Zoom-Knöpfe und Flüge, nicht nur das Schwenken mit der Maus.
         // (M315: Die Papiertextur ist weg — und mit ihr die Kachel-Variablen,
         // die hier bei jedem Schwenk ins DOM geschrieben wurden.)
-        onViewportChange={(vp) => { gemerkteAnsicht.set(activeId, vp); zoomMelden(vp.zoom); if (fokusRef.current) fokusBalken(vp.y); }}
+        onViewportChange={(vp) => { gemerkteAnsicht.set(activeId, vp); uiMelden(vp.zoom); zoomMelden(vp.zoom); if (fokusRef.current) fokusBalken(vp.y); }}
         // M343: im weiten Zoom gibt es keine „nicht ziehen"-Zonen — die ganze Karte ist der Griff, das Rad gehört dem Board
         noDragClassName={weit && !focusCard ? 'nodrag-aus' : 'nodrag'}
         noWheelClassName={weit && !focusCard ? 'nowheel-aus' : 'nowheel'}
         zoomOnDoubleClick={false}
         deleteKeyCode={['Delete', 'Backspace']}
         multiSelectionKeyCode={['Meta', 'Shift']}
-        minZoom={0.15 * anzeige}
-        maxZoom={2.5 * anzeige}
+        minZoom={BOARD_ZOOM_MIN * anzeige}
+        maxZoom={BOARD_ZOOM_MAX * anzeige}
         fitView
         fitViewOptions={{ padding: 0.25, maxZoom: anzeige }}
         defaultEdgeOptions={{

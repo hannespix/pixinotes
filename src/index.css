@@ -7572,3 +7572,9 @@ html.folie-zieht, html.folie-zieht * { cursor: grabbing !important; user-select:
 /* Das Menü der ausgewählten Verbindung (Spitze, Farbe, Stärke) und ihr Namens-Chip liegen über den Karten –
    sie stehen in der Fläche und gerieten sonst unter jede Karte, die später angefasst wurde (höherer z-index) */
 .edge-opts, .edge-label.selected { z-index: 2147483000; }
+
+/* ---------- M404: Bedienung aufgeklappter Dokument-Karten im Zoom ---------- */
+/* Titel, Dateizeile, Blätterleiste und Kommentarliste wachsen nur bis 130 % mit (`--pn-ui`, von Board.tsx gesetzt):
+   Wer zum Lesen hineinzoomt, bekommt mehr Seite – nicht größere Knöpfe. Nur aufgeklappt; die zugeklappte Karte
+   und andere Dateien bestehen aus genau diesen Teilen und zoomen wie bisher. */
+.file-card:has(.pdf-seite-wrap) :is(.file-kopf, .file-body, .pdf-seite-bar, .pdf-kommentare) { zoom: var(--pn-ui, 1); }

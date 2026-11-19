@@ -65,7 +65,9 @@ const zoomeAuf = async (P, ziel) => {
   for (let i = 0; i < 80; i += 1) {
     const z = await zoom(P);
     if (Math.abs(z - ziel) / ziel < 0.06) break;
-    await P.keyboard.down('Control'); await P.mouse.wheel(0, z > ziel ? 30 : -30); await P.keyboard.up('Control');
+    // M404: Ein Ereignis zoomt höchstens eine Raste (14 %) – nahe am Ziel in feinen Schritten, damit es wie zuvor knapp getroffen wird
+    const weg = Math.abs(z - ziel) / ziel > 0.2 ? 30 : 5;
+    await P.keyboard.down('Control'); await P.mouse.wheel(0, z > ziel ? weg : -weg); await P.keyboard.up('Control');
     await P.waitForTimeout(25);
   }
   await P.waitForTimeout(450);
