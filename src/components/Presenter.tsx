@@ -21,6 +21,7 @@ import { HtmlAppSlide } from './nodes/HtmlAppCard';
 import { useRandLeiste } from '../lib/randLeiste';
 import { FOLIEN_FARBEN, type FolienWerkzeug } from '../lib/folienWerkzeug';
 import { useTippGesten } from '../lib/tippGesten';
+import { useFolienZoom } from '../lib/folienZoom';
 
 // M395: Was nur WÄHREND einer Präsentation gebraucht wird, kommt erst dann — der Kern der App bleibt schlank
 const DokumentFolie = lazy(() => import('./DokumentFolie').then((m) => ({ default: m.DokumentFolie })));
@@ -477,6 +478,9 @@ export function Presenter() {
     }
   }, [dortRoll, art, current?.id]);
 
+  // M402: in den Inhalt gewöhnlicher Folien hinein- und herauszoomen (Dokumente zoomen selbst, Web-Tools laufen in ihrem Rahmen)
+  const fz = useFolienZoom(folieRef, open && !art && !!current && current.type !== 'htmlapp', current?.id);
+
   if (!open) return null;
   /** im Folien-Zweig unten gibt es die Folie sicher (slides.length > 0) */
   const cur = current as AppNode;
@@ -489,7 +493,12 @@ export function Presenter() {
     <div className={`presenter ${art ? 'mit-dokument' : ''} ${kommOffen ? 'mit-kommentaren' : ''} ${werkzeug ? 'mit-stift' : ''}`} role="dialog" aria-modal="true" aria-label="Präsentation">
       <div className={`presenter-head ${rand.da ? 'da' : ''}`} {...rand.griff}>
         <span translate="no">{board.name}</span>
-        <span className="presenter-hint-edit">{art ? 'Doppelklick oder + / − vergrößert · B = Seitenbreite' : current?.type === 'htmlapp' ? 'Läuft auf der Folie · blättern mit ‹ ›' : 'Folien sind direkt editierbar'}</span>
+        <span className="presenter-hint-edit">{art ? 'Doppelklick oder + / − vergrößert · B = Seitenbreite' : current?.type === 'htmlapp' ? 'Läuft auf der Folie · blättern mit ‹ ›' : 'Folien sind direkt editierbar · Strg+Rad zoomt'}</span>
+        {fz.zoom !== 1 && !art && (
+          <button className="presenter-zoom" data-taste="folie-zoom" title="Zurück auf 100 % (Taste 0)" aria-label="Zoom zurücksetzen" onClick={() => fz.setzen(1)}>
+            <span translate="no">{Math.round(fz.zoom * 100)} %</span>
+          </button>
+        )}
         <span className="presenter-count">{slides.length ? safeIdx + 1 : 0} / {slides.length}</span>
         {/* M371: Die Präsentation dem Team zeigen — dieselbe Folie, dieselbe Seite, bei allen */}
         {(teamDa || ichZeige) && !folge && board.geteiltRolle !== 'lesen' && (
@@ -550,6 +559,8 @@ export function Presenter() {
               const t = e.changedTouches[0];
               if (!w || !t) return;
               const dx = t.clientX - w.x; const dy = t.clientY - w.y;
+              // M402: Hineingezoomt schiebt der Finger den Inhalt – geblättert wird erst wieder bei 100 %
+              if (fz.zoom > 1.01) return;
               if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4 && performance.now() - w.t < 700) { selbst(); schritt(dx < 0 ? 1 : -1); }
             }}>
             <SlideContent key={cur.id} node={cur} />

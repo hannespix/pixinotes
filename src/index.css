@@ -7518,3 +7518,20 @@ html[data-alles-zeigen] .react-flow__node.selected > .card-shell[data-winkel] { 
 .karte-eck-griff.oben.links, .karte-eck-griff.unten.rechts { cursor: nwse-resize; }
 .karte-eck-griff.oben.rechts, .karte-eck-griff.unten.links { cursor: nesw-resize; }
 @media (pointer: coarse) { .karte-eck-griff { width: 16px; height: 16px; } .karte-eck-griff.oben { top: -11px; } .karte-eck-griff.unten { bottom: -11px; } .karte-eck-griff.links { left: -11px; } .karte-eck-griff.rechts { right: -11px; } }
+
+/* ---------- M402: Zoom in der Präsentation, Pfeil-Menü über den Karten ---------- */
+/* Der Inhalt der Folie wird als Ganzes vergrößert oder verkleinert; die Folie rollt, was übersteht */
+.presenter-slide.gezoomt > :first-child { transform: translate(var(--fz-x, 0px), var(--fz-y, 0px)) scale(var(--fz, 1)); transform-origin: 0 0; }
+.presenter-slide.fz-heim > :first-child { transition: transform .16s ease-out; }
+@media (prefers-reduced-motion: reduce) { .presenter-slide.fz-heim > :first-child { transition: none; } }
+.presenter-slide.gezoomt.fz-kurz > :first-child { margin-bottom: var(--fz-unten, 0px) !important; }
+.presenter-slide.gezoomt.fz-ohne-x { overflow-x: hidden; }
+.presenter-slide.gezoomt.fz-ohne-y { overflow-y: hidden; }
+.presenter-zoom {
+  flex: none; border: 1px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .1); color: inherit; cursor: pointer;
+  font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; padding: 3px 9px; border-radius: var(--r-sm); min-height: 26px;
+}
+.presenter-zoom:hover { background: rgba(255, 255, 255, .2); }
+/* Das Menü der ausgewählten Verbindung (Spitze, Farbe, Stärke) und ihr Namens-Chip liegen über den Karten –
+   sie stehen in der Fläche und gerieten sonst unter jede Karte, die später angefasst wurde (höherer z-index) */
+.edge-opts, .edge-label.selected { z-index: 2147483000; }
