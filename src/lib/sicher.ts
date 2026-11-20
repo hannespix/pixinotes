@@ -84,7 +84,7 @@ export function karteEntschaerfen<T extends AppNode>(n: T): T {
     const { url: _u, live: _l, ...rest } = d;
     return { ...n, data: rest } as T;
   }
-  if (n.type === 'file' && d.dataUrl !== undefined && !(typeof d.dataUrl === 'string' && /^(data:|blob:)/i.test(d.dataUrl))) {
+  if ((n.type === 'file' || n.type === 'sheet') && d.dataUrl !== undefined && !(typeof d.dataUrl === 'string' && /^(data:|blob:)/i.test(d.dataUrl))) {
     const { dataUrl: _d, ...rest } = d;
     return { ...n, data: rest } as T;
   }

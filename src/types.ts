@@ -281,6 +281,16 @@ export interface SheetData {
   colW?: Record<string, number>;
   /** Herkunft, wenn die Tabelle aus einer Excel-Datei kam */
   quelle?: string;
+  /**
+   * M406: Die eingefügte Excel-Datei selbst – die Tabelle rechnet weiter, das Original bleibt herunterladbar.
+   * `datei` ist ihr Name; der Inhalt liegt wie bei einer Datei-Karte in der Geräte-Ablage unter der Kennung der
+   * Karte (`lokal`) und, wenn er klein genug ist, zusätzlich als `dataUrl` im Board (dann reist er überall mit).
+   */
+  datei?: string;
+  mime?: string;
+  size?: number;
+  dataUrl?: string;
+  lokal?: boolean;
   [key: string]: unknown;
 }
 export type SheetNode = Node<SheetData, 'sheet'>;

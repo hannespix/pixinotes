@@ -54,7 +54,10 @@ const neu = async (opt, thema = 'light') => {
 const insBoard = async (P, name, beruehrung = false) => {
   const knopf = P.locator('[data-taste="onb-beispiele"]');
   if (await knopf.count()) { if (beruehrung) await knopf.tap(); else await knopf.click(); await P.waitForTimeout(1300); }
-  await P.evaluate((n) => { const j = JSON.parse(localStorage.getItem('pixinotes-board')); const b = j.state.boards.find((x) => x.name.includes(n)); j.state.view = 'board'; j.state.activeId = b.id; localStorage.setItem('pixinotes-board', JSON.stringify(j)); }, name);
+  await P.evaluate((n) => { const j = JSON.parse(localStorage.getItem('pixinotes-board')); const b = j.state.boards.find((x) => x.name.includes(n)); j.state.view = 'board'; j.state.activeId = b.id; localStorage.setItem('pixinotes-board', JSON.stringify(j));
+    // Die laufende App schreibt beim Verlassen der Seite ihren eigenen Stand zurück, wenn gerade etwas offen ist (etwa ein
+    // Tageswechsel in den Beispieldaten) – und überschriebe diese Wahl. Bis zum Neuladen schreibt darum niemand mehr.
+    Storage.prototype.setItem = () => {}; }, name);
   await P.reload({ waitUntil: 'networkidle' }); await P.waitForTimeout(1500);
 };
 

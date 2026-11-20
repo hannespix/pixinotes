@@ -318,6 +318,11 @@ export function anhangKarte(n: { id: string; type?: string; data: unknown }): { 
     const name = d.name ?? 'Tool';
     return { id: n.id, name: /\.html?$/i.test(name) ? name : `${name}.html`, mime: 'text/html', size: d.size ?? 0, tool: true };
   }
+  // M406: Rechen-Tabellen aus einer Excel-Datei tragen ihr Original mit – es reist wie der Inhalt einer Datei-Karte
+  if (n.type === 'sheet') {
+    const d = n.data as { datei?: string; mime?: string; size?: number };
+    if (d.datei) return { id: n.id, name: d.datei, mime: d.mime, size: d.size ?? 0 };
+  }
   return null;
 }
 /** Der Inhalt zu einer solchen Karte aus der Geräte-Ablage — oder null, wenn er hier nicht liegt */

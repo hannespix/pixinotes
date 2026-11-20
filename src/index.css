@@ -5491,8 +5491,18 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
 .sheet-tools button:hover { border-color: var(--accent); color: var(--accent-strong); }
 .sheet-quelle {
   font-size: 11px; color: var(--muted); margin-bottom: 5px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: flex; align-items: center; gap: 8px; min-width: 0;
 }
+.sheet-quelle-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* M406: das Original der Tabelle – ein kleiner Knopf am Ende der Quellenzeile */
+.sheet-original {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; min-height: 22px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap;
+}
+.sheet-original:hover { background: var(--surface-2); }
+.sheet-original[aria-busy='true'] { opacity: .6; cursor: progress; }
+@media (pointer: coarse) { .sheet-original { min-height: 40px; padding: 6px 12px; font-size: 13px; } }
 .sheet-scroll { flex: 1; min-height: 0; overflow: auto; border-radius: var(--r-sm); }
 .sheet-grid { border-collapse: collapse; width: 100%; table-layout: fixed; }
 .sheet-grid th, .sheet-grid td {

@@ -153,8 +153,9 @@ export default function App() {
       const dateiIds = new Set(
         // M388: … und der Tool-Karten: Ein Quelltext, der per Ordner/WebDAV kam, liegt bis zum ersten Öffnen der Karte
         // noch unter der Datei-Kennung — das Aufräumen löschte ihn sonst, bevor er je gezeigt wurde
-        [...useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'file' || n.type === 'htmlapp').map((n) => n.id)),
-          ...useBoard.getState().templates.filter((t) => t.node.type === 'file' || t.node.type === 'htmlapp').map((t) => t.node.id)],
+        // M406: … und der Rechen-Tabellen aus einer Excel-Datei – ihr Original liegt unter der Kennung der Karte
+        [...useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'file' || n.type === 'htmlapp' || n.type === 'sheet').map((n) => n.id)),
+          ...useBoard.getState().templates.filter((t) => t.node.type === 'file' || t.node.type === 'htmlapp' || t.node.type === 'sheet').map((t) => t.node.id)],
       );
       void cleanupOrphanFiles(dateiIds);
     }, 8000);
