@@ -2,13 +2,16 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
-import type { SheetData, SheetNode } from '../../types';
+import type { SheetData, SheetNode, ZellStil } from '../../types';
+import { formatiereZahl } from '../../lib/zahlFormat';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from '../../lib/formel';
-import { alsCsv } from '../../lib/xlsx';
 import { IPlus, ISigma, IDownload, IFilter, ICheck, IArrowUp, IArrowDown, IPen } from '../Icons';
-import { ersteZeile, gezeigteZeilen, hyperlinkZiel, sichererLink, spaltenWerte } from '../../lib/tabellenAnsicht';
+import { alsCsv, ersteZeile, gezeigteZeilen, hyperlinkZiel, sichererLink, spaltenName, spaltenWerte } from '../../lib/tabellenAnsicht';
+
+/** M409: Breite einer Spalte, für die nichts festgelegt ist – darunter wird sie nicht gequetscht */
+const SPALTE_STD = 84;
 import { MenuHuelle } from '../EbenenMenu';
 import { loadFile } from '../../lib/fileStore';
 import { triggerDownload } from '../../lib/download';
@@ -57,7 +60,38 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
    */
   const kopf = Math.min(Math.max(1, data.kopf ?? ersteZeile(cells, rows)), rows);
   const filterAn = !!data.filterAn;
-  const text = useCallback((adr: string) => zeigeWert(werte[adr] ?? null), [werte]);
+  /** M409: Aussehen einer Zelle (aus Excel übernommen) und ihr Anzeigetext nach ihrem Zahlenformat */
+  const stilVon = useCallback((adr: string): ZellStil | undefined => {
+    const nr = data.stile?.[adr];
+    return nr === undefined ? undefined : data.stilListe?.[nr];
+  }, [data.stile, data.stilListe]);
+  const anzeigeVon = useCallback((adr: string): { text: string; farbe?: string } => {
+    const v = werte[adr] ?? null;
+    const z = typeof v === 'number' ? stilVon(adr)?.z : undefined;
+    return (z ? formatiereZahl(v as number, z) : null) ?? { text: zeigeWert(v) };
+  }, [werte, stilVon]);
+  const text = useCallback((adr: string) => anzeigeVon(adr).text, [anzeigeVon]);
+  /** M409: verbundene Zellen – die Ankerzelle spannt, die übrigen des Bereichs entfallen */
+  const verbund = useMemo(() => {
+    const anker = new Map<string, { cs: number; rs: number }>(); const bedeckt = new Map<string, { anker: string; gleicheZeile: boolean }>();
+    for (const ref of data.verbunden ?? []) {
+      const m = /^([A-Z]+)(\d+):([A-Z]+)(\d+)$/.exec(ref);
+      if (!m) continue;
+      const nr = (b: string) => [...b].reduce((n, c) => n * 26 + (c.charCodeAt(0) - 64), 0) - 1;
+      const s0 = nr(m[1]), s1 = Math.min(nr(m[3]), cols - 1), z0 = Number(m[2]), z1 = Math.min(Number(m[4]), rows);
+      if (s1 < s0 || z1 < z0 || (s1 === s0 && z1 === z0)) continue;
+      const a = indexZuAdresse(s0, z0 - 1);
+      anker.set(a, { cs: s1 - s0 + 1, rs: z1 - z0 + 1 });
+      for (let z = z0; z <= z1; z += 1) for (let sp = s0; sp <= s1; sp += 1) if (z !== z0 || sp !== s0) bedeckt.set(indexZuAdresse(sp, z - 1), { anker: a, gleicheZeile: z === z0 });
+    }
+    return { anker, bedeckt };
+  }, [data.verbunden, cols, rows]);
+  // Höhe der Buchstabenzeile: darunter bleibt die Kopfzeile der Datentabelle beim Rollen stehen
+  const rollRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = rollRef.current; const kopfzeile = el?.querySelector('thead') as HTMLElement | null;
+    if (el && kopfzeile) el.style.setProperty('--sheet-kopf-h', `${kopfzeile.offsetHeight}px`);
+  });
   const ansicht = useMemo(
     () => (filterAn ? gezeigteZeilen({ kopf, bis: data.bis, filter: data.filter, sort: data.sort }, cells, cols, rows, (a) => werte[a], text) : null),
     [filterAn, kopf, data.bis, data.filter, data.sort, cells, cols, rows, werte, text],
@@ -267,8 +301,10 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
         </div>
       )}
 
-      <div className="sheet-scroll nodrag">
-        <table className={`sheet-grid${filterAn ? ' datentabelle' : ''}`}>
+      <div className="sheet-scroll nodrag" ref={rollRef}>
+        {/* M409: Spalten behalten eine lesbare Breite – passt nicht alles in die Karte, rollt die Tabelle seitwärts
+            (statt jede Spalte auf wenige Zeichen zu quetschen) */}
+        <table className={`sheet-grid${filterAn ? ' datentabelle' : ''}`} style={{ minWidth: 34 + Array.from({ length: cols }, (_, s) => data.colW?.[spaltenName(s)] ?? SPALTE_STD).reduce((x, y) => x + y, 0) }}>
           <colgroup>
             <col style={{ width: 34 }} />
             {Array.from({ length: cols }, (_, s) => (
@@ -301,17 +337,38 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
                 <th className={`sheet-kopf sheet-zeilenkopf${gefiltert && ansicht && zeile >= ansicht.bereich.von && zeile <= ansicht.bereich.bis ? ' gefiltert' : ''}`}>{z + 1}</th>
                 {Array.from({ length: cols }, (_, s) => {
                   const adr = indexZuAdresse(s, z);
+                  // M409: Teil einer verbundenen Zelle – entfällt (über mehrere Zeilen nur, solange nicht gefiltert oder sortiert ist)
+                  const decke = verbund.bedeckt.get(adr);
+                  if (decke && (decke.gleicheZeile || !gefiltert)) return null;
+                  const spanne = verbund.anker.get(adr);
                   const roh = cells[adr] ?? '';
                   const wert = werte[adr];
-                  const anzeige = zeigeWert(wert ?? null);
+                  const gezeigt = anzeigeVon(adr);
+                  const anzeige = gezeigt.text;
                   const fehler = anzeige.startsWith('#');
                   const zahl = typeof wert === 'number';
+                  const stil = stilVon(adr);
+                  const linie = (l: string | undefined, x: number, y: number) => (l ? `inset ${x * (parseInt(l, 10) || 1)}px ${y * (parseInt(l, 10) || 1)}px 0 ${l.split(' ').slice(2).join(' ') || 'currentColor'}` : '');
+                  const zellStil: React.CSSProperties | undefined = stil ? {
+                    ...(stil.bg ? { background: stil.bg, color: stil.fa ?? '#1b1e24' } : stil.fa ? { color: stil.fa } : {}),
+                    ...(stil.a ? { textAlign: stil.a === 'm' ? 'center' : stil.a === 'r' ? 'right' : 'left' } : {}),
+                    ...(stil.v ? { verticalAlign: stil.v === 'o' ? 'top' : 'middle' } : stil.um ? { verticalAlign: 'top' } : {}),
+                    ...(stil.rr ? { borderRight: stil.rr } : {}), ...(stil.ru ? { borderBottom: stil.ru } : {}),
+                    ...(stil.ro || stil.rl ? { boxShadow: [linie(stil.ro, 0, 1), linie(stil.rl, 1, 0)].filter(Boolean).join(', ') } : {}),
+                  } : undefined;
+                  const textStil: React.CSSProperties | undefined = stil || gezeigt.farbe ? {
+                    ...(stil?.f ? { fontWeight: 700 } : {}), ...(stil?.k ? { fontStyle: 'italic' } : {}),
+                    ...(stil?.u || stil?.d ? { textDecoration: [stil.u ? 'underline' : '', stil.d ? 'line-through' : ''].filter(Boolean).join(' ') } : {}),
+                    ...(stil?.g ? { fontSize: `${Math.max(0.75, Math.min(2.2, stil.g / 11))}em` } : {}),
+                    ...(gezeigt.farbe ? { color: gezeigt.farbe } : {}),
+                  } : undefined;
                   const spalte = adr.replace(/\d+/g, '');
                   const link = edit === adr || fehler || anzeige === '' ? null : linkVon(adr, roh, anzeige);
                   const spalteAktiv = istKopf && (!!data.filter?.[spalte] || data.sort?.spalte === spalte);
                   return (
-                    <td key={s} className={`sheet-zelle${zahl ? ' zahl' : ''}${fehler ? ' fehler' : ''}${link ? ' mit-link' : ''}${istKopf ? ' mit-filter' : ''}`}
-                      onClick={() => edit !== adr && oeffne(adr)}>
+                    <td key={s} className={`sheet-zelle${zahl ? ' zahl' : ''}${fehler ? ' fehler' : ''}${link ? ' mit-link' : ''}${istKopf ? ' mit-filter' : ''}${stil?.um ? ' umbruch' : ''}${stil?.bg ? ' gefuellt' : ''}`}
+                      style={zellStil} colSpan={spanne && spanne.cs > 1 ? spanne.cs : undefined} rowSpan={spanne && spanne.rs > 1 && !gefiltert ? spanne.rs : undefined}
+                      data-zelle={adr} onClick={() => edit !== adr && oeffne(adr)}>
                       {edit === adr ? (
                         <input
                           ref={eingabe}
@@ -330,7 +387,7 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
                         />
                       ) : link ? (
                         <>
-                          <span translate="no">
+                          <span translate="no" style={textStil}>
                             <a className="sheet-link" href={link} target="_blank" rel="noopener noreferrer" data-taste="sheet-link" title={link}
                               onClick={(e) => e.stopPropagation()}>{anzeige}</a>
                           </span>
@@ -339,7 +396,7 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
                             onClick={(e) => { e.stopPropagation(); oeffne(adr); }}><IPen size={11} /></button>
                         </>
                       ) : (
-                        <span translate="no" title={roh.startsWith('=') ? roh : undefined}>{anzeige}</span>
+                        <span translate="no" style={textStil} title={roh.startsWith('=') ? roh : undefined}>{anzeige}</span>
                       )}
                       {istKopf && edit !== adr && (
                         <button className={`sheet-filter-knopf${spalteAktiv ? ' an' : ''}`} data-taste="sheet-filter" data-spalte={spalte} aria-haspopup="dialog" aria-expanded={filterAuf?.spalte === spalte}

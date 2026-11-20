@@ -4968,10 +4968,12 @@ body:has(.sel-toolbar-dock) .sel-toolbar-dock {
      gedeckelt auf Text 720 / Module 1200 Layout-Punkte — eine FESTE Breite, unabhängig vom
      Zoom, damit Kamera und Kartenmaß sich nicht gegenseitig aufschaukeln. Die Kamera-
      Stufe (Board.tsx) richtet sich dann nach dieser Breite. */
-  min-width: min(calc(calc(100vw / var(--pn-anz, 1)) - var(--fokus-rand, 32px)), var(--fokus-max, 720px)) !important;
+  min-width: min(calc(var(--fokus-platz, calc(100vw / var(--pn-anz, 1))) - var(--fokus-rand, 32px)), var(--fokus-max, 720px)) !important;
 }
 .focus-mode .pn-focused .card-shell,
 .focus-mode .pn-focused .card-body { width: 100% !important; }
+/* M409: Die Rechen-Tabelle wird im Fokus so hoch wie ihr Inhalt, höchstens wie der freie Platz (Board.tsx misst) */
+.focus-mode .react-flow__node-sheet.pn-focused { min-height: var(--fokus-hoch, 0px) !important; max-height: var(--fokus-hoch, none) !important; }
 /* Board-Werkzeuge an der Karte treten im Fokus zurück: Verschiebe-Griff, Löschen, Verbindungspunkte */
 .focus-mode .pn-focused .card-grip,
 .focus-mode .pn-focused .react-flow__handle { display: none !important; }
@@ -5503,20 +5505,26 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
 .sheet-original:hover { background: var(--surface-2); }
 .sheet-original[aria-busy='true'] { opacity: .6; cursor: progress; }
 @media (pointer: coarse) { .sheet-original { min-height: 40px; padding: 6px 12px; font-size: 13px; } }
-.sheet-scroll { flex: 1; min-height: 0; overflow: auto; border-radius: var(--r-sm); }
-.sheet-grid { border-collapse: collapse; width: 100%; table-layout: fixed; }
+.sheet-scroll { flex: 1; min-height: 0; overflow: auto; border-radius: var(--r-sm); overscroll-behavior: contain; }
+/* M409: Getrennte Ränder statt zusammengelegter – bei zusammengelegten verlieren stehenbleibende Zellen ihre Linien,
+   und der Inhalt schien beim Rollen durch die Fugen. Jede Zelle zeichnet rechts und unten; oben und links schließen
+   die erste Zeile und die erste Spalte ab. */
+.sheet-grid { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; }
 .sheet-grid th, .sheet-grid td {
-  border: 1px solid var(--border-soft); padding: 0; height: 26px;
+  border: 0; border-right: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); padding: 0; height: 26px;
   font-size: 12.5px; color: var(--ink); overflow: hidden;
 }
-/* Spalten- und Zeilenköpfe bleiben beim Scrollen stehen */
+.sheet-grid thead th { border-top: 1px solid var(--border-soft); }
+.sheet-grid tr > :first-child { border-left: 1px solid var(--border-soft); }
+/* Spalten- und Zeilenköpfe bleiben beim Scrollen stehen – deckend: `--surface-dim` ist durchscheinend, darunter liegt
+   darum die Fläche der Karte (sonst las man die Zeilen, die darunter durchrollen) */
 .sheet-kopf {
-  background: var(--surface-dim); color: var(--muted); font-size: 11px;
-  font-weight: 700; text-align: center; position: sticky; top: 0; z-index: 2;
+  background: linear-gradient(var(--surface-dim), var(--surface-dim)), var(--surface-card); color: var(--muted); font-size: 11px;
+  font-weight: 700; text-align: center; position: sticky; top: 0; z-index: 4;
 }
-.sheet-zeilenkopf { left: 0; top: auto; width: 34px; min-width: 34px; }
+.sheet-zeilenkopf { left: 0; top: auto; width: 34px; min-width: 34px; z-index: 2; }
 .sheet-eck {
-  background: var(--surface-dim); position: sticky; left: 0; top: 0; z-index: 3;
+  background: linear-gradient(var(--surface-dim), var(--surface-dim)), var(--surface-card); position: sticky; left: 0; top: 0; z-index: 5;
   width: 34px; min-width: 34px;
 }
 /* M407: Der Innenabstand galt nie – die allgemeine Regel für th/td (padding: 0) war genauer; Text und Zahlen klebten am Rand */
@@ -5525,7 +5533,9 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 /* Zahlen rechtsbündig — so sieht man Größenordnungen auf einen Blick */
-.sheet-zelle.zahl { text-align: right; font-variant-numeric: tabular-nums; }
+.sheet-grid td.sheet-zelle.zahl { text-align: right; font-variant-numeric: tabular-nums; }
+/* M409: Zeilenumbruch aus Excel – die Zeile wächst mit */
+.sheet-zelle.umbruch > span { white-space: normal; overflow-wrap: anywhere; line-height: 1.3; padding: 3px 0; }
 .sheet-zelle.fehler { color: #c0392b; font-weight: 600; }
 [data-theme='dark'] .sheet-zelle.fehler { color: #ff8b7a; }
 .sheet-zelle:hover { background: var(--accent-soft); }
@@ -7603,17 +7613,22 @@ html.folie-zieht, html.folie-zieht * { cursor: grabbing !important; user-select:
 .sheet-zelle.mit-link:hover .sheet-link-stift, .sheet-link-stift:focus-visible { display: grid; }
 /* Kopfzeile der Datentabelle: kräftig, bleibt beim Rollen unter den Spaltenbuchstaben stehen */
 .sheet-grid.datentabelle .sheet-kopfzeile > td {
-  font-weight: 700; background: var(--surface-dim); position: sticky; top: 27px; z-index: 1; padding-right: 26px;
+  font-weight: 700; background: linear-gradient(var(--surface-dim), var(--surface-dim)), var(--surface-card);
+  position: sticky; top: var(--sheet-kopf-h, 28px); z-index: 3; padding-right: 22px;
 }
+/* M409: … samt ihrer Zeilennummer (sie steht oben UND links fest) */
+.sheet-grid.datentabelle .sheet-kopfzeile > th { top: var(--sheet-kopf-h, 28px); z-index: 4; }
 .sheet-grid.datentabelle .sheet-datenzeile:nth-child(even) > td { background: color-mix(in srgb, var(--surface-dim) 45%, transparent); }
 .sheet-grid.datentabelle .sheet-datenzeile > td:hover { background: var(--accent-soft); }
 .sheet-filter-knopf {
-  position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; padding: 0;
-  display: grid; place-items: center; border: 1px solid var(--border-soft); border-radius: var(--r-xs);
-  background: var(--surface); color: var(--muted); cursor: pointer;
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; padding: 0;
+  display: grid; place-items: center; border: 0; border-radius: var(--r-xs);
+  background: transparent; color: inherit; opacity: .55; cursor: pointer;
 }
-.sheet-filter-knopf:hover { border-color: var(--accent); color: var(--accent-strong); }
-.sheet-filter-knopf.an { background: var(--accent-fill); border-color: var(--accent); color: #fff; }
+/* M409: leise – ohne Kasten, in der Farbe der Kopfzeile (auch auf einer farbigen aus Excel); kräftig erst unter
+   dem Zeiger oder wenn die Spalte gefiltert bzw. sortiert ist */
+.sheet-filter-knopf:hover, .sheet-filter-knopf:focus-visible, .sheet-filter-knopf[aria-expanded='true'] { opacity: 1; background: color-mix(in srgb, currentColor 16%, transparent); }
+.sheet-filter-knopf.an { opacity: 1; background: var(--accent-fill); color: #fff; }
 /* gefiltert oder sortiert: die echten Zeilennummern in der Akzentfarbe – wie in Excel */
 .sheet-zeilenkopf.gefiltert { color: var(--accent-strong); }
 .sheet-fuss { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -7653,7 +7668,7 @@ html.folie-zieht, html.folie-zieht * { cursor: grabbing !important; user-select:
   .sheet-link-stift { display: grid; width: 28px; height: 28px; }
   .sheet-zelle.mit-link { padding-right: 32px; }
   .sheet-filter-knopf { width: 28px; height: 28px; }
-  .sheet-grid.datentabelle .sheet-kopfzeile > td { top: 33px; padding-right: 34px; }
+  .sheet-grid.datentabelle .sheet-kopfzeile > td { padding-right: 34px; }
   .sheet-filter-weg { min-height: 36px; font-size: 13px; padding: 4px 12px; }
   .sheet-link-feld input { height: 36px; font-size: 16px; }
   .sheet-filter-liste label { padding: 9px 8px; font-size: 15px; }

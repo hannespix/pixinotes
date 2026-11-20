@@ -465,6 +465,16 @@ export function Board() {
           return;
         }
       }
+      /* M409: Eine ausgewählte Rechen-Tabelle (auch im Fokus oder beim Bearbeiten einer Zelle) rollt mit dem Rad ihren
+         Inhalt – senkrecht, mit Umschalt oder dem Trackpad auch seitwärts. Vorher bekam das Board jedes Rad-Ereignis:
+         Es schwenkte, und im Fokus verschob sich die ganze Karte. Unausgewählt gehört das Rad weiter dem Board (wer
+         darüber fährt, bleibt nicht an jeder Tabelle hängen); am Ende des Inhalts ebenfalls. */
+      if (!e.ctrlKey && !e.metaKey && target && inNode.classList.contains('react-flow__node-sheet')
+        && (inNode.classList.contains('selected') || inNode.classList.contains('pn-focused') || inNode.contains(document.activeElement))) {
+        const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+        const quer = e.shiftKey && !e.deltaX;
+        if (canScrollTowards(target, inNode, quer ? -dy : -e.deltaX, quer ? 0 : -dy)) { e.stopPropagation(); return; }
+      }
       // M339: Eine ausgewählte (oder gerade beschriebene) lange Notiz scrollt mit dem Rad ihren Text —
       // auch wenn das Rad sonst zoomt. Unausgewählt zoomt es weiter: Wer über das Board zoomt,
       // soll nicht an jeder langen Notiz hängen bleiben.
@@ -1127,7 +1137,7 @@ export function Board() {
       let versuche = 0;
       let raf = 0;
       let beobachter: ResizeObserver | null = null;
-      let zuletzt = { w: 0, h: 0 };
+      let zuletzt = { w: 0, h: 0, p: 0 };
       let timer: ReturnType<typeof setTimeout> | undefined;
       let platzUnten = -1;
       const fahren = (dauer = 320, nachfahren = false) => {
@@ -1135,16 +1145,20 @@ export function Board() {
         const pane = document.querySelector('.react-flow') as HTMLElement | null;
         const n = useBoard.getState().boards.find((b) => b.id === useBoard.getState().activeId)?.nodes.find((k) => k.id === focusCard);
         if (!el || !pane || !n || el.offsetWidth < 2) { if (versuche++ < 10) raf = requestAnimationFrame(() => fahren(dauer)); return; }
+        /* M409: Die Karte wird im Fokus so breit wie die FLÄCHE – nicht wie das Fenster. Steht links die Navigation,
+           ist die Fläche schmaler; ein Modul (bis 1200 breit) ragte dann rechts aus dem Bild und war dort abgeschnitten. */
+        document.documentElement.style.setProperty('--fokus-platz', `${pane.clientWidth}px`);
         // Wächst die Karte nach dem Einpassen (Bild oder PDF lädt, Text wird länger), zieht die Kamera nach
         if (!beobachter && typeof ResizeObserver !== 'undefined') {
           beobachter = new ResizeObserver(() => {
-            if (Math.abs(el.offsetWidth - zuletzt.w) < 4 && Math.abs(el.offsetHeight - zuletzt.h) < 4) return;
+            if (Math.abs(el.offsetWidth - zuletzt.w) < 4 && Math.abs(el.offsetHeight - zuletzt.h) < 4 && Math.abs(pane.clientWidth - zuletzt.p) < 4) return;
             clearTimeout(timer);
             timer = setTimeout(() => fahren(220, true), 120);
           });
           beobachter.observe(el);
+          beobachter.observe(pane);
         }
-        zuletzt = { w: el.offsetWidth, h: el.offsetHeight };
+        zuletzt = { w: el.offsetWidth, h: el.offsetHeight, p: pane.clientWidth };
         const css = getComputedStyle(document.documentElement);
         const oben = parseFloat(css.getPropertyValue('--focus-top')) || 52;
         const unten = fokusUnten(css);
@@ -1158,6 +1172,15 @@ export function Board() {
         const intern = getInternalNode(focusCard);
         const fx = intern?.internals.positionAbsolute.x ?? n.position.x;
         const fy = intern?.internals.positionAbsolute.y ?? n.position.y;
+        /* M409: Eine Rechen-Tabelle nutzt im Fokus auch die HÖHE. Sie behielt ihr Kartenmaß (zehn Zeilen sichtbar,
+           darüber und darunter leere Fläche); jetzt wird sie so hoch, wie ihr Inhalt braucht – höchstens so hoch wie
+           der Platz zwischen Kopfzeile und Leisten. Was dann noch übersteht, rollt in der Tabelle. */
+        const rollt = n.type === 'sheet' ? el.querySelector('.sheet-scroll') as HTMLElement | null : null;
+        if (rollt) {
+          const frei = hoehe - 2 * (window.matchMedia('(pointer: coarse)').matches ? 4 : 16);
+          const inhalt = el.offsetHeight - rollt.clientHeight + rollt.scrollHeight;
+          document.documentElement.style.setProperty('--fokus-hoch', `${Math.round(Math.min(frei, Math.max(inhalt, n.height ?? 0)))}px`);
+        } else document.documentElement.style.removeProperty('--fokus-hoch');
         const w = el.offsetWidth, h = el.offsetHeight;
         /* M346: Die Karte ist im Fokus breiter (und als Notiz länger) als auf dem Board — sie legte sich über
            ihre Nachbarn, die abgedunkelt durchschienen: ein Überlappen, das es auf dem Board nicht gibt.
@@ -1290,6 +1313,8 @@ export function Board() {
     document.querySelectorAll('.react-flow__node[data-fokus-weg]').forEach((k) => k.removeAttribute('data-fokus-weg'));
     document.documentElement.style.removeProperty('--fokus-zoom');
     document.documentElement.style.removeProperty('--fokus-max');
+    document.documentElement.style.removeProperty('--fokus-platz');
+    document.documentElement.style.removeProperty('--fokus-hoch');
     document.documentElement.style.removeProperty('--fokus-rand');
     if (fokusRueckkehr.current) {
       const prev = fokusRueckkehr.current;

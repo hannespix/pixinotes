@@ -271,6 +271,18 @@ export type WeekNode = Node<WeekData, 'week'>;
  * werden. Der Rohtext ist das, was man eintippt — inklusive „=SUMME(A1:A5)";
  * gerechnet wird beim Anzeigen (lib/formel.ts).
  */
+/**
+ * M409: Aussehen einer Tabellenzelle – knapp gehalten, weil es je Karte viele davon gibt.
+ * f fett · k kursiv · u unterstrichen · d durchgestrichen · g Schriftgröße (pt) · fa Schriftfarbe · bg Hintergrund ·
+ * a Ausrichtung (l links, m mittig, r rechts) · v senkrecht (o oben, m mittig) · um Zeilenumbruch ·
+ * ro/rr/ru/rl Linie oben/rechts/unten/links (CSS, z. B. „2px solid #1f4e79") · z Zahlenformat (Excel-Code)
+ */
+export interface ZellStil {
+  f?: 1; k?: 1; u?: 1; d?: 1; g?: number; fa?: string; bg?: string;
+  a?: 'l' | 'm' | 'r'; v?: 'o' | 'm'; um?: 1;
+  ro?: string; rr?: string; ru?: string; rl?: string;
+  z?: string;
+}
 export interface SheetData {
   title?: string;
   /** „A1" → Rohtext, z. B. „12,5" oder „=SUMME(A1:A5)" */
@@ -301,6 +313,11 @@ export interface SheetData {
   filterAn?: boolean;
   filter?: Record<string, string[]>;
   sort?: { spalte: string; ab?: boolean };
+  /** M409: Aussehen – `stilListe` hält jeden vorkommenden Stil einmal, `stile` nennt je Zelle seine Nummer darin */
+  stilListe?: ZellStil[];
+  stile?: Record<string, number>;
+  /** M409: verbundene Zellen als Bereiche („A8:C8") */
+  verbunden?: string[];
   [key: string]: unknown;
 }
 export type SheetNode = Node<SheetData, 'sheet'>;
