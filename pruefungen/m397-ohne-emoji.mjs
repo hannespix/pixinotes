@@ -56,7 +56,7 @@ console.log('A  Regel im Quelltext');
   pruefe('A5 kein eigenes Violett für KI und Portal – sie tragen die Akzentfarbe', !/#5b3fd4|#4a30b8|124, ?92, ?255|#f4efff|#453c63|#beadff/.test(css));
   const portal = css.slice(css.indexOf('.portal-card {'), css.indexOf('.portal-icon'));
   pruefe('A6 die Portal-Karte hat keinen Verlauf und keine Strichelung', !/gradient|dashed/.test(portal), portal.slice(0, 200));
-  const ki = `${lies('src/lib/ai.ts')}\n${lies('src/lib/aiActions.ts')}`;
+  const ki = `${lies('src/lib/ai.ts')}\n${lies('src/lib/aiActions.ts')}\n${lies('src/lib/kiAnweisung.ts')}`;
   pruefe('A7 die KI wird gebeten, keine Emojis zu setzen', /keine Emojis, kompakt bleiben/.test(ki) && /setze keine Emojis in Titel, Namen und Texte/.test(ki));
 }
 
