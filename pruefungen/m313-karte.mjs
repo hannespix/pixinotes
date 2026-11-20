@@ -132,7 +132,8 @@ console.log('\n════ D: Rechen-Tabelle ════');
   await P.evaluate(() => document.querySelector('.react-flow__node[data-id="s1"] .sheet-tools .ebenen-menu-knopf')?.click());
   await P.waitForTimeout(300);
   const m = await P.locator('.ebenen-menu button').allTextContents().then((t) => t.map((x) => x.trim()));
-  pruefe('D2 ⋯: Spalte anhängen, Auto-Summe, Als CSV speichern', JSON.stringify(m) === JSON.stringify(['Spalte anhängen', 'Auto-Summe', 'Als CSV speichern']), JSON.stringify(m));
+  // M407: dazu „Filtern und sortieren"
+  pruefe('D2 ⋯: Spalte anhängen, Auto-Summe, Filtern und sortieren, Als CSV speichern', JSON.stringify(m) === JSON.stringify(['Spalte anhängen', 'Auto-Summe', 'Filtern und sortieren', 'Als CSV speichern']), JSON.stringify(m));
   await P.locator('.ebenen-menu button', { hasText: 'Spalte anhängen' }).click();
   await P.waitForTimeout(400);
   const cols = await P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes.find((n) => n.id === 's1').data.cols);

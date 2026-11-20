@@ -291,6 +291,16 @@ export interface SheetData {
   size?: number;
   dataUrl?: string;
   lokal?: boolean;
+  /** M407: Zelle → Adresse eines Links (Web, Mail, Telefon) */
+  links?: Record<string, string>;
+  /** M407: Datentabelle – Kopfzeile (1 = erste Zeile) und, wenn sie feststeht, die letzte Datenzeile */
+  kopf?: number;
+  bis?: number;
+  /** M407: Filterknöpfe in der Kopfzeile; die Auswahl je Spalte (zugelassene Anzeigewerte) und die Sortierung –
+   *  beides eine Ansicht, die Zellen bleiben an ihrem Platz */
+  filterAn?: boolean;
+  filter?: Record<string, string[]>;
+  sort?: { spalte: string; ab?: boolean };
   [key: string]: unknown;
 }
 export type SheetNode = Node<SheetData, 'sheet'>;

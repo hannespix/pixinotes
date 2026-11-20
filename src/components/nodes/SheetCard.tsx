@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { SheetData, SheetNode } from '../../types';
@@ -6,7 +7,8 @@ import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from '../../lib/formel';
 import { alsCsv } from '../../lib/xlsx';
-import { IPlus, ISigma, IDownload } from '../Icons';
+import { IPlus, ISigma, IDownload, IFilter, ICheck, IArrowUp, IArrowDown, IPen } from '../Icons';
+import { ersteZeile, gezeigteZeilen, hyperlinkZiel, sichererLink, spaltenWerte } from '../../lib/tabellenAnsicht';
 import { MenuHuelle } from '../EbenenMenu';
 import { loadFile } from '../../lib/fileStore';
 import { triggerDownload } from '../../lib/download';
@@ -48,27 +50,59 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
   /** Ein Durchgang für die ganze Tabelle — Zellen dürfen aufeinander zeigen */
   const werte = useMemo(() => rechneBlatt(cells), [cells]);
 
-  const setzeZelle = (adr: string, roh: string) => {
-    const neu = { ...cells };
-    if (roh.trim() === '') delete neu[adr]; else neu[adr] = roh;
-    updateNodeData(id, { cells: neu });
+  /**
+   * M407: Datentabelle. Mit eingeschaltetem Filter trägt die Kopfzeile je Spalte einen Knopf zum Sortieren und
+   * Auswählen; beides ist eine Ansicht (lib/tabellenAnsicht.ts) – die Zellen bleiben an ihrem Platz, Formeln rechnen
+   * unverändert, die Zeilennummern am Rand bleiben die echten.
+   */
+  const kopf = Math.min(Math.max(1, data.kopf ?? ersteZeile(cells, rows)), rows);
+  const filterAn = !!data.filterAn;
+  const text = useCallback((adr: string) => zeigeWert(werte[adr] ?? null), [werte]);
+  const ansicht = useMemo(
+    () => (filterAn ? gezeigteZeilen({ kopf, bis: data.bis, filter: data.filter, sort: data.sort }, cells, cols, rows, (a) => werte[a], text) : null),
+    [filterAn, kopf, data.bis, data.filter, data.sort, cells, cols, rows, werte, text],
+  );
+  const reihen = useMemo(() => ansicht?.zeilen ?? Array.from({ length: rows }, (_, i) => i + 1), [ansicht, rows]);
+  const gefiltert = !!ansicht && (Object.keys(data.filter ?? {}).length > 0 || !!data.sort);
+  const [filterAuf, setFilterAuf] = useState<{ spalte: string; x: number; y: number } | null>(null);
+  useEffect(() => { if (!filterAn) setFilterAuf(null); }, [filterAn]);
+
+  /** M407: Link einer Zelle – in Excel angehängt, als =HYPERLINK(…) geschrieben oder einfach eine Adresse im Text */
+  const [linkEntwurf, setLinkEntwurf] = useState('');
+  const linkVon = (adr: string, roh: string, anzeige: string): string | null => {
+    const fest = data.links?.[adr];
+    if (fest) return sichererLink(fest);
+    if (roh.startsWith('=')) { const h = hyperlinkZiel(roh); return h ? sichererLink(h.adresse ?? String(werte[h.zelle ?? ''] ?? '')) : null; }
+    return sichererLink(anzeige);
   };
 
   const oeffne = (adr: string) => {
     setEdit(adr);
     setEntwurf(cells[adr] ?? '');
+    setLinkEntwurf(data.links?.[adr] ?? '');
     requestAnimationFrame(() => eingabe.current?.select());
   };
 
   const uebernimm = (weiter?: 'runter' | 'rechts') => {
     if (!edit) return;
-    setzeZelle(edit, entwurf);
+    const neu = { ...cells };
+    if (entwurf.trim() === '') delete neu[edit]; else neu[edit] = entwurf;
+    // der Link der Zelle: leer = keiner; angenommen wird nur, was sich gefahrlos öffnen lässt
+    const ziel = linkEntwurf.trim();
+    const links = { ...(data.links ?? {}) };
+    if (!ziel) delete links[edit];
+    else if (sichererLink(ziel)) links[edit] = ziel;
+    else showToast('Als Link gehen nur Web-, Mail- und Telefon-Adressen – der Link wurde nicht übernommen.');
+    const linksGeaendert = JSON.stringify(links) !== JSON.stringify(data.links ?? {});
+    updateNodeData(id, { cells: neu, ...(linksGeaendert ? { links: Object.keys(links).length ? links : undefined } : {}) });
     const sp = edit.replace(/\d+/g, '');
     const z = Number(edit.replace(/\D+/g, ''));
     let spIdx = 0;
     for (const c of sp) spIdx = spIdx * 26 + (c.charCodeAt(0) - 64);
     spIdx -= 1;
-    if (weiter === 'runter' && z < rows) oeffne(indexZuAdresse(spIdx, z));
+    // „runter" folgt der gezeigten Reihenfolge – gefiltert und sortiert ist die nächste Zeile nicht z + 1
+    const naechste = reihen[reihen.indexOf(z) + 1];
+    if (weiter === 'runter' && naechste) oeffne(indexZuAdresse(spIdx, naechste - 1));
     else if (weiter === 'rechts' && spIdx + 1 < cols) oeffne(indexZuAdresse(spIdx + 1, z - 1));
     else setEdit(null);
   };
@@ -191,6 +225,21 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
               <button role="menuitem" onClick={() => { autoSumme(); zu(); }} title="Schreibt unter jede Zahlenspalte =SUMME(…)" aria-label="Auto-Summe">
                 <ISigma size={14} /> Auto-Summe
               </button>
+              {/* M407: Datentabelle – Filterknöpfe in der Kopfzeile */}
+              <button role="menuitemcheckbox" aria-checked={filterAn} data-taste="sheet-filter-an" title="Kopfzeile mit Knöpfen zum Sortieren und Auswählen"
+                onClick={() => { updateNodeData(id, filterAn ? { filterAn: false, filter: undefined, sort: undefined } : { filterAn: true, kopf }); zu(); }}>
+                {filterAn ? <ICheck size={14} /> : <IFilter size={14} />} Filtern und sortieren
+              </button>
+              {filterAn && (
+                <>
+                  <button role="menuitem" data-taste="sheet-kopf-runter" aria-disabled={kopf >= rows - 1} onClick={() => { if (kopf < rows - 1) updateNodeData(id, { kopf: kopf + 1, bis: undefined, filter: undefined, sort: undefined }); }}>
+                    <IArrowDown size={14} /> Kopfzeile eine Zeile tiefer
+                  </button>
+                  <button role="menuitem" data-taste="sheet-kopf-hoch" aria-disabled={kopf <= 1} onClick={() => { if (kopf > 1) updateNodeData(id, { kopf: kopf - 1, bis: undefined, filter: undefined, sort: undefined }); }}>
+                    <IArrowUp size={14} /> Kopfzeile eine Zeile höher
+                  </button>
+                </>
+              )}
               <div className="ebenen-menu-titel">Weitergeben</div>
               <button role="menuitem" onClick={() => { csv(); zu(); }} title="Öffnet sich in Excel, LibreOffice und Numbers" aria-label="Als CSV speichern">
                 <IDownload size={14} /> Als CSV speichern
@@ -219,7 +268,7 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
       )}
 
       <div className="sheet-scroll nodrag">
-        <table className="sheet-grid">
+        <table className={`sheet-grid${filterAn ? ' datentabelle' : ''}`}>
           <colgroup>
             <col style={{ width: 34 }} />
             {Array.from({ length: cols }, (_, s) => (
@@ -247,9 +296,9 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: rows }, (_, z) => (
-              <tr key={z}>
-                <th className="sheet-kopf sheet-zeilenkopf">{z + 1}</th>
+            {reihen.map((zeile) => { const z = zeile - 1; const istKopf = filterAn && zeile === kopf; return (
+              <tr key={z} className={istKopf ? 'sheet-kopfzeile' : filterAn && ansicht && zeile >= ansicht.bereich.von && zeile <= ansicht.bereich.bis ? 'sheet-datenzeile' : undefined} data-zeile={zeile}>
+                <th className={`sheet-kopf sheet-zeilenkopf${gefiltert && ansicht && zeile >= ansicht.bereich.von && zeile <= ansicht.bereich.bis ? ' gefiltert' : ''}`}>{z + 1}</th>
                 {Array.from({ length: cols }, (_, s) => {
                   const adr = indexZuAdresse(s, z);
                   const roh = cells[adr] ?? '';
@@ -257,8 +306,11 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
                   const anzeige = zeigeWert(wert ?? null);
                   const fehler = anzeige.startsWith('#');
                   const zahl = typeof wert === 'number';
+                  const spalte = adr.replace(/\d+/g, '');
+                  const link = edit === adr || fehler || anzeige === '' ? null : linkVon(adr, roh, anzeige);
+                  const spalteAktiv = istKopf && (!!data.filter?.[spalte] || data.sort?.spalte === spalte);
                   return (
-                    <td key={s} className={`sheet-zelle${zahl ? ' zahl' : ''}${fehler ? ' fehler' : ''}`}
+                    <td key={s} className={`sheet-zelle${zahl ? ' zahl' : ''}${fehler ? ' fehler' : ''}${link ? ' mit-link' : ''}${istKopf ? ' mit-filter' : ''}`}
                       onClick={() => edit !== adr && oeffne(adr)}>
                       {edit === adr ? (
                         <input
@@ -266,7 +318,7 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
                           className="sheet-eingabe"
                           value={entwurf}
                           onChange={(e) => setEntwurf(e.target.value)}
-                          onBlur={() => uebernimm()}
+                          onBlur={(e) => { if (!(e.relatedTarget as HTMLElement | null)?.closest?.('.sheet-link-feld')) uebernimm(); }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') { e.preventDefault(); uebernimm('runter'); }
                             else if (e.key === 'Tab') { e.preventDefault(); uebernimm('rechts'); }
@@ -276,23 +328,138 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
                           onKeyUp={(e) => e.stopPropagation()}
                           autoFocus
                         />
+                      ) : link ? (
+                        <>
+                          <span translate="no">
+                            <a className="sheet-link" href={link} target="_blank" rel="noopener noreferrer" data-taste="sheet-link" title={link}
+                              onClick={(e) => e.stopPropagation()}>{anzeige}</a>
+                          </span>
+                          {/* der Text ist der Link – bearbeitet wird über den Stift (oder einen Klick daneben) */}
+                          <button className="sheet-link-stift" data-taste="sheet-link-stift" title="Zelle und Link bearbeiten" aria-label="Zelle und Link bearbeiten"
+                            onClick={(e) => { e.stopPropagation(); oeffne(adr); }}><IPen size={11} /></button>
+                        </>
                       ) : (
                         <span translate="no" title={roh.startsWith('=') ? roh : undefined}>{anzeige}</span>
+                      )}
+                      {istKopf && edit !== adr && (
+                        <button className={`sheet-filter-knopf${spalteAktiv ? ' an' : ''}`} data-taste="sheet-filter" data-spalte={spalte} aria-haspopup="dialog" aria-expanded={filterAuf?.spalte === spalte}
+                          title="Sortieren und auswählen" aria-label={`Spalte ${spalte} sortieren und auswählen`}
+                          onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); setFilterAuf(filterAuf?.spalte === spalte ? null : { spalte, x: r.left, y: r.bottom + 4 }); }}>
+                          {data.sort?.spalte === spalte ? (data.sort.ab ? <IArrowDown size={11} /> : <IArrowUp size={11} />) : <IFilter size={11} />}
+                        </button>
                       )}
                     </td>
                   );
                 })}
               </tr>
-            ))}
+            ); })}
           </tbody>
         </table>
       </div>
 
       <div className="sheet-fuss">
-        {edit
-          ? <><b>{edit}</b> – Formeln beginnen mit <code>=</code>, z. B. <code>=SUMME(A1:A5)</code>. Enter übernimmt.</>
-          : <>Zelle antippen zum Bearbeiten · <code>=</code> beginnt eine Formel · Σ setzt Summen</>}
+        {edit ? (
+          <>
+            <span className="sheet-fuss-text"><b>{edit}</b> – Formeln beginnen mit <code>=</code>, z. B. <code>=SUMME(A1:A5)</code>. Enter übernimmt.</span>
+            {/* M407: der Link dieser Zelle */}
+            <label className="sheet-link-feld nodrag">
+              <span>Link</span>
+              <input value={linkEntwurf} placeholder="https://… (optional)" data-taste="sheet-link-feld" aria-label="Link dieser Zelle" spellCheck={false} inputMode="url"
+                onChange={(e) => setLinkEntwurf(e.target.value)}
+                onBlur={(e) => { if (!(e.relatedTarget as HTMLElement | null)?.classList?.contains('sheet-eingabe')) uebernimm(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); uebernimm(); } else if (e.key === 'Escape') { e.preventDefault(); setEdit(null); } e.stopPropagation(); }}
+                onKeyUp={(e) => e.stopPropagation()} />
+            </label>
+          </>
+        ) : gefiltert && ansicht ? (
+          <>
+            <span className="sheet-fuss-text" data-taste="sheet-filter-stand">{`${ansicht.gezeigt} von ${ansicht.daten} Zeilen`}</span>
+            <button className="sheet-filter-weg nodrag" data-taste="sheet-filter-weg" onClick={() => updateNodeData(id, { filter: undefined, sort: undefined })}>Filter aufheben</button>
+          </>
+        ) : <>Zelle antippen zum Bearbeiten · <code>=</code> beginnt eine Formel · Σ setzt Summen</>}
       </div>
+      {filterAuf && ansicht && createPortal(
+        <SpaltenFilter
+          spalte={filterAuf.spalte} x={filterAuf.x} y={filterAuf.y}
+          werte={spaltenWerte(filterAuf.spalte, ansicht.bereich, (a) => werte[a], text)}
+          gewaehlt={data.filter?.[filterAuf.spalte] ?? null}
+          sort={data.sort?.spalte === filterAuf.spalte ? (data.sort.ab ? 'ab' : 'auf') : null}
+          onSort={(r) => updateNodeData(id, { sort: r ? { spalte: filterAuf.spalte, ab: r === 'ab' } : undefined })}
+          onFilter={(liste) => { const f = { ...(data.filter ?? {}) }; if (liste) f[filterAuf.spalte] = liste; else delete f[filterAuf.spalte]; updateNodeData(id, { filter: Object.keys(f).length ? f : undefined }); }}
+          zu={() => setFilterAuf(null)} />,
+        document.body,
+      )}
     </>
+  );
+}
+
+/**
+ * M407: Das Fenster am Filterknopf einer Spalte – sortieren (auf, ab, aufheben) und Werte auswählen.
+ * Jede Änderung wirkt sofort; es schließt beim Klick daneben oder mit Esc.
+ */
+function SpaltenFilter({ spalte, x, y, werte, gewaehlt, sort, onSort, onFilter, zu }: {
+  spalte: string; x: number; y: number;
+  werte: Array<{ text: string; zahl: number }>;
+  /** null = alle */
+  gewaehlt: string[] | null;
+  sort: 'auf' | 'ab' | null;
+  onSort: (r: 'auf' | 'ab' | null) => void;
+  onFilter: (liste: string[] | null) => void;
+  zu: () => void;
+}) {
+  const box = useRef<HTMLDivElement>(null);
+  const [suche, setSuche] = useState('');
+  const zuRef = useRef(zu); zuRef.current = zu;
+  useEffect(() => {
+    const raus = (e: PointerEvent) => {
+      const z = e.target as Element | null;
+      if (z && (box.current?.contains(z) || z.closest?.('.sheet-filter-knopf'))) return;
+      zuRef.current();
+    };
+    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); zuRef.current(); } };
+    window.addEventListener('pointerdown', raus, true);
+    window.addEventListener('keydown', taste, true);
+    return () => { window.removeEventListener('pointerdown', raus, true); window.removeEventListener('keydown', taste, true); };
+  }, []);
+  // ganz ins Bild rücken
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    if (r.right > window.innerWidth - 8) el.style.left = `${Math.max(8, window.innerWidth - 8 - r.width)}px`;
+    if (r.bottom > window.innerHeight - 8) el.style.top = `${Math.max(8, window.innerHeight - 8 - r.height)}px`;
+  }, [x, y]);
+  const menge = new Set(gewaehlt ?? werte.map((w) => w.text));
+  const sichtbar = werte.filter((w) => !suche.trim() || w.text.toLowerCase().includes(suche.trim().toLowerCase()));
+  const setze = (neu: Set<string>) => onFilter(werte.every((w) => neu.has(w.text)) ? null : werte.filter((w) => neu.has(w.text)).map((w) => w.text));
+  return (
+    <div ref={box} className="ebenen-menu sheet-filter-menu" role="dialog" aria-label={`Spalte ${spalte} sortieren und auswählen`} data-taste="sheet-filter-menu" style={{ left: x, top: y }}
+      onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} onKeyUp={(e) => e.stopPropagation()}>
+      <button role="menuitemradio" aria-checked={sort === 'auf'} data-taste="sheet-sort-auf" onClick={() => onSort(sort === 'auf' ? null : 'auf')}>
+        <IArrowUp size={14} /> Aufsteigend sortieren{sort === 'auf' && <span className="sheet-filter-haken"><ICheck size={13} /></span>}
+      </button>
+      <button role="menuitemradio" aria-checked={sort === 'ab'} data-taste="sheet-sort-ab" onClick={() => onSort(sort === 'ab' ? null : 'ab')}>
+        <IArrowDown size={14} /> Absteigend sortieren{sort === 'ab' && <span className="sheet-filter-haken"><ICheck size={13} /></span>}
+      </button>
+      <div className="ebenen-menu-titel">Auswählen</div>
+      {werte.length > 8 && (
+        <input className="sheet-filter-suche" value={suche} placeholder="Suchen …" aria-label="Werte suchen" data-taste="sheet-filter-suche" onChange={(e) => setSuche(e.target.value)} />
+      )}
+      <div className="sheet-filter-zeile">
+        <button data-taste="sheet-filter-alle" onClick={() => { const n = new Set(menge); for (const w of sichtbar) n.add(w.text); setze(n); }}>Alle</button>
+        <button data-taste="sheet-filter-keine" onClick={() => { const n = new Set(menge); for (const w of sichtbar) n.delete(w.text); setze(n); }}>Keine</button>
+      </div>
+      <div className="sheet-filter-liste" role="group" aria-label="Werte">
+        {sichtbar.slice(0, 300).map((w) => (
+          <label key={w.text} data-taste="sheet-filter-wert" data-wert={w.text}>
+            <input type="checkbox" checked={menge.has(w.text)} onChange={() => { const n = new Set(menge); if (n.has(w.text)) n.delete(w.text); else n.add(w.text); setze(n); }} />
+            <span className="sheet-filter-text" translate={w.text === '' ? undefined : 'no'}>{w.text === '' ? '(Leer)' : w.text}</span>
+            <span className="sheet-filter-zahl">{w.zahl}</span>
+          </label>
+        ))}
+        {sichtbar.length > 300 && <div className="sheet-filter-mehr">{`${sichtbar.length - 300} weitere – mit der Suche eingrenzen`}</div>}
+        {sichtbar.length === 0 && <div className="sheet-filter-mehr">Nichts gefunden</div>}
+      </div>
+    </div>
   );
 }

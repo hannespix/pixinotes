@@ -23,6 +23,11 @@ export interface ExcelBlatt {
   zellen: Record<string, string>;
   spalten: number;
   zeilen: number;
+  /** M407: Zelle → Adresse eines Links, der in Excel an der Zelle hing */
+  links?: Record<string, string>;
+  /** M407: Kopfzeile und letzte Datenzeile, wenn das Blatt einen Filter oder eine „Tabelle" trägt */
+  kopf?: number;
+  bis?: number;
 }
 
 /** XML-Entitäten zurückübersetzen (der Rest des Textes bleibt, wie er ist) */
@@ -188,7 +193,47 @@ export async function leseXlsx(daten: ArrayBuffer, index = 0): Promise<ExcelBlat
     zeilen = Math.max(zeilen, Number(adr.replace(/\D+/g, '')));
   }
 
-  return { name, zellen, spalten: Math.max(spalten, 4), zeilen: Math.max(zeilen, 6) };
+  /**
+   * M407: Was Excel neben den Zellen ablegt – Links und der Bereich eines Filters bzw. einer „Tabelle".
+   * Die Ziele der Links und die Tabellen stehen nicht im Blatt selbst, sondern in dessen Beziehungen
+   * (xl/worksheets/_rels/sheetN.xml.rels).
+   */
+  const rels = (await zip.text(blattPfade[nr].replace(/worksheets\/(sheet\d+\.xml)$/, 'worksheets/_rels/$1.rels')).catch(() => null)) ?? '';
+  const beziehung = new Map<string, { ziel: string; art: string }>();
+  for (const m of rels.matchAll(/<Relationship\b([^>]*)\/?>/g)) {
+    const id = /\bId="([^"]*)"/.exec(m[1])?.[1];
+    const ziel = /\bTarget="([^"]*)"/.exec(m[1])?.[1];
+    if (id && ziel) beziehung.set(id, { ziel: entschluessele(ziel), art: /\bType="[^"]*\/([a-zA-Z]+)"/.exec(m[1])?.[1] ?? '' });
+  }
+  const links: Record<string, string> = {};
+  for (const m of xml.matchAll(/<hyperlink\b([^>]*)\/?>/g)) {
+    const ref = /\bref="([A-Z]+\d+)(?::([A-Z]+\d+))?"/.exec(m[1]);
+    const ziel = beziehung.get(/\br:id="([^"]*)"/.exec(m[1])?.[1] ?? '')?.ziel;
+    if (!ref || !ziel || !/^(https?:|mailto:|tel:)/i.test(ziel)) continue;   // Sprünge im Blatt (location=…) haben hier kein Ziel
+    const a = adresseTeile(ref[1]); const b = ref[2] ? adresseTeile(ref[2]) : a;
+    for (let z = a.zeile; z <= Math.min(b.zeile, a.zeile + 500); z += 1) for (let s = a.spalte; s <= Math.min(b.spalte, a.spalte + 30); s += 1) links[`${spalteName(s)}${z}`] = ziel;
+  }
+  // Filterbereich: am Blatt selbst (Daten → Filtern) oder an einer „Tabelle" (Als Tabelle formatieren)
+  let kopf: number | undefined; let bis: number | undefined;
+  const bereich = (ref: string | undefined, ohneKopf = false, summen = 0) => {
+    const r = /^([A-Z]+\d+):([A-Z]+\d+)$/.exec(ref ?? '');
+    if (!r || ohneKopf || kopf !== undefined) return;
+    kopf = adresseTeile(r[1]).zeile; bis = adresseTeile(r[2]).zeile - summen;
+  };
+  bereich(/<autoFilter\b[^>]*\bref="([^"]*)"/.exec(xml)?.[1]);
+  for (const b of beziehung.values()) {
+    if (b.art !== 'table' || kopf !== undefined) continue;
+    const pfad = b.ziel.replace(/^\.\.\//, 'xl/').replace(/^\/(?=xl\/)/, '');
+    const t = (await zip.text(pfad).catch(() => null)) ?? '';
+    const kopfzeile = /<table\b([^>]*)>/.exec(t)?.[1] ?? '';
+    bereich(/\bref="([^"]*)"/.exec(kopfzeile)?.[1], /\bheaderRowCount="0"/.test(kopfzeile), Number(/\btotalsRowCount="(\d+)"/.exec(kopfzeile)?.[1] ?? '0'));
+  }
+
+  return {
+    name, zellen, spalten: Math.max(spalten, 4), zeilen: Math.max(zeilen, 6),
+    ...(Object.keys(links).length ? { links } : {}),
+    ...(kopf !== undefined && bis !== undefined && bis > kopf ? { kopf, bis } : {}),
+  };
 }
 
 /** Namen aller Blätter — für den ehrlichen Hinweis „Blatt 1 von 3 übernommen" */

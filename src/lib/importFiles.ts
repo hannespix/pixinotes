@@ -218,6 +218,9 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
             rows: blatt.zeilen,
             quelle: namen.length > 1 ? `${file.name} · ${blatt.name}` : file.name,
             datei: file.name, mime, size: file.size, lokal: true, ...(original ? { dataUrl: original } : {}),
+            // M407: Links der Zellen; und trägt das Blatt einen Filter oder eine „Tabelle", kommt sie als Datentabelle an
+            ...(blatt.links ? { links: blatt.links } : {}),
+            ...(blatt.kopf ? { kopf: blatt.kopf, bis: blatt.bis, filterAn: true } : {}),
           });
           try {
             await saveFile(node.id, file);
