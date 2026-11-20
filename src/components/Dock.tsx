@@ -6,7 +6,10 @@ import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeMermai
 import { importFilesToBoard, importHtmlAppFromUrl } from '../lib/importFiles';
 import { punkteModusSetzen } from '../lib/punkte';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
-import { aiBriefing, aiCluster, aiCommand, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
+import { aiBriefing, aiCluster, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
+/** M410: Die Freitext-Anweisung wird erst geladen, wenn sie gebraucht wird (lib/kiAnweisung.ts) */
+const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => import('../lib/kiAnweisung').then((m) => m.aiCommand(...a));
+import { kiBlaettern } from '../lib/kiVerlauf';
 import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
 import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
@@ -232,7 +235,7 @@ export function Dock() {
       // M332: Stapel-Aktionen melden ihren Fortschritt; der Toast bietet „Abbrechen"
       const fortschritt = (m: string) => showToast(`KI: ${m}`, false, 180000, true);
       const msg = await fn(nodes, screenToFlowPosition({ x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 120 }), fortschritt);
-      showToast(`${msg}`, false, msg.includes('unberücksichtigt') || msg.includes('Nicht geschafft') || msg.startsWith('Abgebrochen') ? 12000 : 5000);
+      showToast(`${msg}`, false, msg.includes('unberücksichtigt') || msg.includes('Nicht geschafft') || msg.startsWith('Abgebrochen') ? 12000 : Math.max(5000, msg.length * 75));
     } catch (e) {
       showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`, false, 8000);
       // Freitext-Eingabe bei Fehler zurückgeben — nicht neu tippen müssen
@@ -571,10 +574,17 @@ export function Dock() {
             <textarea
               className="ai-cmd-input"
               rows={2}
-              placeholder={'z. B. „Erstelle einen Wochenplan als Kanban" oder „Fasse alle Notizen zu einer zusammen"'}
+              placeholder={'z. B. „Erstelle eine Kostentabelle aus den Notizen", „Verschiebe erledigte Tickets" oder „Was ist diese Woche fällig?"'}
               value={cmd}
               onChange={(e) => setCmd(e.target.value)}
+              data-taste="ki-board-eingabe"
               onKeyDown={(e) => {
+                // M410: Pfeil hoch/runter blättert durch die früheren Anweisungen auf diesem Board
+                if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !e.shiftKey) {
+                  const frueher = kiBlaettern(useBoard.getState().activeId, cmd, e.key === 'ArrowUp');
+                  if (frueher !== null) { e.preventDefault(); setCmd(frueher); }
+                  return;
+                }
                 if (e.key === 'Enter' && !e.shiftKey && cmd.trim() && !aiBusy) {
                   e.preventDefault();
                   const wish = cmd;

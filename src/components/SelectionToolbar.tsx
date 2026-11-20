@@ -5,7 +5,10 @@ import { selectActiveBoard, useBoard } from '../store';
 import { nodesToText } from '../lib/serialize';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
 import { textDateienAlsNotizen, textKarte } from '../lib/textNotiz';
-import { aiBriefing, aiCommand, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
+import { aiBriefing, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
+/** M410: Die Freitext-Anweisung wird erst geladen, wenn sie gebraucht wird (lib/kiAnweisung.ts) */
+const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => import('../lib/kiAnweisung').then((m) => m.aiCommand(...a));
+import { kiBeispiel, kiBlaettern } from '../lib/kiVerlauf';
 import { KACHEL_TYPEN, STICKY_COLORS, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
 import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICrop, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
@@ -368,7 +371,7 @@ export function SelectionToolbar() {
       // M332: Stapel-Aktionen melden ihren Fortschritt; der Toast bietet „Abbrechen"
       const fortschritt = (m: string) => showToast(`KI: ${m}`, false, 180000, true);
       const msg = await fn(selected, pos, fortschritt);
-      showToast(`${msg}`, false, msg.includes('unberücksichtigt') || msg.includes('Nicht geschafft') || msg.startsWith('Abgebrochen') ? 12000 : 5000);
+      showToast(`${msg}`, false, msg.includes('unberücksichtigt') || msg.includes('Nicht geschafft') || msg.startsWith('Abgebrochen') ? 12000 : Math.max(5000, msg.length * 75));
     } catch (e) {
       showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`, false, 8000);
       if (restoreCmd) setCmd(restoreCmd);
@@ -516,10 +519,17 @@ export function SelectionToolbar() {
             <>
               <input
                 className="ai-cmd-input ai-cmd-small"
-                placeholder="Anweisung für die Auswahl …"
+                placeholder={selected.length === 1 ? kiBeispiel(selected[0].type) : 'Anweisung für die Auswahl …'}
+                data-taste="ki-auswahl-eingabe"
                 value={cmd}
                 onChange={(e) => setCmd(e.target.value)}
                 onKeyDown={(e) => {
+                  // M410: Pfeil hoch/runter blättert durch die früheren Anweisungen auf diesem Board
+                  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    const frueher = kiBlaettern(useBoard.getState().activeId, cmd, e.key === 'ArrowUp');
+                    if (frueher !== null) { e.preventDefault(); setCmd(frueher); }
+                    return;
+                  }
                   if (e.key === 'Enter' && cmd.trim() && !aiBusy) {
                     const wish = cmd;
                     setCmd('');

@@ -5,7 +5,7 @@ import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
 import { sprache } from '../../lib/sprache';
-import { useBoard, useNurLesen } from '../../store';
+import { mutedHistory, useBoard, useNurLesen } from '../../store';
 import { STICKY_COLORS, uid, type MinutesData, type MinutesNode } from '../../types';
 import { allDecisions, buildEntry, currentEntry, entryLabel, nextDate, sortEntries } from '../../lib/minutes';
 import { repairBlocks } from '../../lib/htmlBlocks';
@@ -341,10 +341,17 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
       const board = st.boards.find((b) => b.nodes.some((n) => n.id === nodeId));
       const node = board?.nodes.find((n) => n.id === nodeId);
       const cur = (node?.data as MinutesData | undefined)?.entries ?? [];
-      if (!cur.some((e) => e.id === entryId)) return;   // Sitzung wurde gelöscht
-      st.updateNodeData(nodeId, {
-        entries: cur.map((e) => (e.id === entryId ? { ...e, blocks: latest.current.document } : e)),
-      });
+      const alt = cur.find((e) => e.id === entryId);
+      if (!alt) return;   // Sitzung wurde gelöscht
+      /* M410: Das ist ein Nachsichern, keine Eingabe – also kein eigener Schritt für Rückgängig, und nichts
+         schreiben, wenn sich nichts geändert hat. Vorher legte jeder Abbau des Editors einen Schritt an, auch der
+         Neuaufbau des Boards nach einer KI-Aktion: „Strg+Z macht alles rückgängig" nahm dann erst diesen leeren
+         Schritt zurück, und die eigentliche Änderung blieb stehen. */
+      const neu = latest.current.document;
+      if (JSON.stringify(alt.blocks ?? []) === JSON.stringify(neu)) return;
+      mutedHistory(() => st.updateNodeData(nodeId, {
+        entries: cur.map((e) => (e.id === entryId ? { ...e, blocks: neu } : e)),
+      }));
     } catch { /* Karte gerade im Abbau */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
