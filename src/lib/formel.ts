@@ -203,6 +203,9 @@ function heuteLokal(): string {
  * Die Funktionen. Deutsche UND englische Namen, weil Vorlagen aus Excel
  * beides mitbringen — je nach Sprachfassung, in der sie gebaut wurden.
  */
+/** M411: Für welche Zelle gerade gerechnet wird – dorthin schreibt =HYPERLINK(…) sein Ziel (rechneBlattMitLinks) */
+let linkZelle: { adr: string; ziele: Record<string, string> } | null = null;
+
 const FUNKTIONEN: Record<string, (a: (ZellWert | ZellWert[])[]) => ZellWert> = {
   SUMME: (a) => zahlen(a).reduce((s, n) => s + n, 0),
   MITTELWERT: (a) => { const n = zahlen(a); return n.length ? n.reduce((s, x) => s + x, 0) / n.length : FEHLER.division; },
@@ -227,7 +230,12 @@ const FUNKTIONEN: Record<string, (a: (ZellWert | ZellWert[])[]) => ZellWert> = {
   LÄNGE: (a) => String(flach([a[0]])[0] ?? '').length,
   VERKETTEN: (a) => flach(a).map((v) => (v === null ? '' : String(v))).join(''),
   // M407: =HYPERLINK("https://…";"Angebot") zeigt den Text (oder die Adresse); die Tabelle macht daraus einen Link
-  HYPERLINK: (a) => { const ziel = flach([a[0]])[0]; const text = a[1] === undefined ? null : flach([a[1]])[0]; return text ?? ziel ?? ''; },
+  HYPERLINK: (a) => {
+    const ziel = flach([a[0]])[0]; const text = a[1] === undefined ? null : flach([a[1]])[0];
+    // M411: die AUSGERECHNETE Adresse merken – sie kann zusammengesetzt sein ("https://…?id="&A2)
+    if (linkZelle && ziel !== null && ziel !== '' && typeof ziel !== 'boolean') linkZelle.ziele[linkZelle.adr] = String(ziel);
+    return text ?? ziel ?? '';
+  },
 };
 // Englische Zweitnamen — dieselbe Funktion, anderer Aufruf
 const ALIAS: Record<string, string> = {
@@ -419,6 +427,19 @@ export function rechne(formel: string, lies: ZellLeser): ZellWert {
  * Endlosschleife.
  */
 export function rechneBlatt(zellen: Record<string, string>): Record<string, ZellWert> {
+  return rechneBlattMitLinks(zellen).werte;
+}
+
+/**
+ * M411: Wie rechneBlatt – dazu je Zelle die Adresse, die ihr =HYPERLINK(…) ergibt.
+ *
+ * Vorher wurde das Ziel aus dem Text der Formel gelesen und nur gefunden, wenn es wörtlich dastand oder eine
+ * einzelne Zelle war. Die übliche Schreibweise =HYPERLINK("https://…/ticket/"&A2; A2) blieb darum bloßer Text:
+ * In der Tabelle stand die Nummer, anklicken ließ sie sich nicht. Jetzt gilt, was die Formel ausrechnet. Eine
+ * Zelle, die nur auf eine Link-Zelle zeigt (=D2), erbt den Link nicht – wie in Excel.
+ */
+export function rechneBlattMitLinks(zellen: Record<string, string>): { werte: Record<string, ZellWert>; links: Record<string, string> } {
+  const links: Record<string, string> = {};
   const fertig: Record<string, ZellWert> = {};
   const laufend = new Set<string>();
 
@@ -432,14 +453,19 @@ export function rechneBlatt(zellen: Record<string, string>): Record<string, Zell
     // „12,5" nicht, dass dort eine ZAHL steht (rechtsbündig, Auto-Summe).
     if (!roh.startsWith('=')) { fertig[A] = deuteEingabe(roh); return fertig[A]; }
     laufend.add(A);
-    const v = rechne(roh.slice(1), hole);
+    const aussen = linkZelle;
+    linkZelle = { adr: A, ziele: links };
+    let v: ZellWert;
+    try { v = rechne(roh.slice(1), hole); } finally { linkZelle = aussen; }
     laufend.delete(A);
     fertig[A] = v;
+    // ein Ziel zählt nur, wenn die Zelle auch etwas zeigt (kein Fehler, nicht leer)
+    if (links[A] !== undefined && (v === null || v === '' || (typeof v === 'string' && v.startsWith('#')))) delete links[A];
     return v;
   };
 
   for (const adr of Object.keys(zellen)) hole(adr);
-  return fertig;
+  return { werte: fertig, links };
 }
 
 /** Anzeigetext einer Zelle — Zahlen deutsch formatiert, Fehler unverändert */
