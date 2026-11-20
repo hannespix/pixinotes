@@ -128,3 +128,19 @@ export function hyperlinkZiel(roh: string): { adresse?: string; zelle?: string }
   if (!m) return null;
   return m[1] !== undefined ? { adresse: m[1] } : { zelle: `${m[2].toUpperCase()}${m[3]}` };
 }
+
+/** Tabelle als CSV — öffnet sich in Excel, LibreOffice und Numbers. (M409: hier statt beim Excel-Leser, damit
+ *  der erst geladen wird, wenn eine Excel-Datei kommt.) */
+export function alsCsv(zellen: Record<string, string>, werte: Record<string, string>, spalten: number, zeilen: number): string {
+  const raus: string[] = [];
+  for (let z = 1; z <= zeilen; z += 1) {
+    const zeile: string[] = [];
+    for (let s = 0; s < spalten; s += 1) {
+      // Ausgegeben wird der ERRECHNETE Wert — eine CSV kennt keine Formeln
+      const v = werte[`${spaltenName(s)}${z}`] ?? zellen[`${spaltenName(s)}${z}`] ?? '';
+      zeile.push(/[";\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    }
+    raus.push(zeile.join(';'));
+  }
+  return `\uFEFF${raus.join('\r\n')}`;   // BOM, damit Excel die Umlaute erkennt
+}

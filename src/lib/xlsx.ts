@@ -16,6 +16,10 @@
  * versteht beide Schreibweisen (lib/formel.ts).
  */
 import { ZipArchive } from './unzip';
+import type { ZellStil } from '../types';
+import { leseStile } from './xlsxStil';
+import { formatiereDatum } from './zahlFormat';
+import { FEHLER, rechneBlatt } from './formel';
 
 export interface ExcelBlatt {
   name: string;
@@ -28,6 +32,11 @@ export interface ExcelBlatt {
   /** M407: Kopfzeile und letzte Datenzeile, wenn das Blatt einen Filter oder eine „Tabelle" trägt */
   kopf?: number;
   bis?: number;
+  /** M409: Aussehen der Zellen (jeder Stil einmal, je Zelle seine Nummer), Spaltenbreiten in Punkten, verbundene Bereiche */
+  stilListe?: ZellStil[];
+  stile?: Record<string, number>;
+  colW?: Record<string, number>;
+  verbunden?: string[];
 }
 
 /** XML-Entitäten zurückübersetzen (der Rest des Textes bleibt, wie er ist) */
@@ -41,9 +50,12 @@ const entschluessele = (s: string): string => s
 function leseTexte(xml: string | null): string[] {
   if (!xml) return [];
   const aus: string[] = [];
-  for (const m of xml.matchAll(/<si\b[^>]*>([\s\S]*?)<\/si>/g)) {
+  // M409: Ein leerer Eintrag steht als <si/> da – ohne diese Unterscheidung verschluckte er den nächsten, und alle
+  // Texte dahinter rutschten um eine Stelle (in der Zelle stand dann der Text einer anderen)
+  for (const m of xml.matchAll(/<si\b[^>]*?(?:\/>|>([\s\S]*?)<\/si>)/g)) {
     let text = '';
-    for (const t of m[1].matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)) text += entschluessele(t[1]);
+    // Lautschrift-Zusätze (<rPh>) gehören nicht zum Text
+    for (const t of (m[1] ?? '').replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').matchAll(/<t\b[^>]*>([\s\S]*?)<\/t>/g)) text += entschluessele(t[1]);
     aus.push(text);
   }
   return aus;
@@ -129,8 +141,13 @@ export async function leseXlsx(daten: ArrayBuffer, index = 0): Promise<ExcelBlat
   const name = namen[nr] ?? (blattPfade.length > 1 ? `Tabelle ${nr + 1}` : 'Tabelle');
 
   const texte = leseTexte(await zip.text('xl/sharedStrings.xml').catch(() => null));
-  const datums = datumsFormate(await zip.text('xl/styles.xml').catch(() => null));
+  const stylesXml = await zip.text('xl/styles.xml').catch(() => null);
+  const datums = datumsFormate(stylesXml);
+  // M409: Aussehen je Stil-Nummer der Mappe; für Datumswerte der Formatcode
+  const mappe = leseStile(stylesXml, await zip.text('xl/theme/theme1.xml').catch(() => null));
   const xml = (await zip.text(blattPfade[nr])) ?? '';
+  const stilVon: Record<string, number> = {};          // Zelle → Stil-Nummer der Mappe
+  const gemerkt: Record<string, string> = {};          // Formelzelle → zuletzt gerechneter Wert aus der Datei
 
   const zellen: Record<string, string> = {};
   let spalten = 0; let zeilen = 0;
@@ -159,9 +176,11 @@ export async function leseXlsx(daten: ArrayBuffer, index = 0): Promise<ExcelBlat
     // Text kann auch direkt in der Zelle stehen (t="inlineStr")
     const inlineText = /<is\b[^>]*>([\s\S]*?)<\/is>/.exec(inhalt)?.[1];
 
+    if (stil >= 0 && mappe.stile[stil] && Object.keys(mappe.stile[stil]).length) stilVon[adr] = stil;
     let wert = '';
     if (formel) {
       wert = `=${hiesigeFormel(entschluessele(formel))}`;
+      if (roh !== undefined) gemerkt[adr] = typ === 'str' || typ === 'e' ? entschluessele(roh) : typ === 'b' ? (roh === '1' ? 'WAHR' : 'FALSCH') : /^-?\d+\.\d+$/.test(roh) ? roh.replace('.', ',') : roh;
     } else if (typ === 's' && roh !== undefined) {
       wert = texte[Number(roh)] ?? '';
     } else if (typ === 'inlineStr' && inlineText) {
@@ -180,7 +199,8 @@ export async function leseXlsx(daten: ArrayBuffer, index = 0): Promise<ExcelBlat
       const zahl = Number(roh);
       // M390: Zahlen kommen in hiesiger Schreibweise in die Zelle (Komma) — „1.234" aus der Datei ist 1,234 und
       // darf nicht als Tausender gelesen werden
-      wert = datums.has(stil) && Number.isFinite(zahl) && zahl > 0 ? alsDatum(zahl)
+      // M409: Datum und Uhrzeit so, wie das Format der Zelle sie schreibt (vorher immer JJJJ-MM-TT)
+      wert = datums.has(stil) && Number.isFinite(zahl) && zahl > 0 ? (mappe.datum[stil] ? formatiereDatum(zahl, mappe.datum[stil] as string) : alsDatum(zahl))
         : Number.isFinite(zahl) && /^-?\d+\.\d+$/.test(roh) ? roh.replace('.', ',') : roh;
     }
     if (wert === '') continue;
@@ -229,10 +249,64 @@ export async function leseXlsx(daten: ArrayBuffer, index = 0): Promise<ExcelBlat
     bereich(/\bref="([^"]*)"/.exec(kopfzeile)?.[1], /\bheaderRowCount="0"/.test(kopfzeile), Number(/\btotalsRowCount="(\d+)"/.exec(kopfzeile)?.[1] ?? '0'));
   }
 
+  /**
+   * M409: Formeln, die hier (noch) nicht rechnen – eine unbekannte Funktion, ein Bezug auf ein anderes Blatt –,
+   * zeigten „#NAME?" statt ihres Ergebnisses. Sie bekommen den Wert, den Excel zuletzt gerechnet hat: Die Zelle
+   * stimmt, auch wenn sie dann nicht mehr mitrechnet.
+   */
+  if (Object.keys(gemerkt).length) {
+    const probe = rechneBlatt(zellen);
+    for (const [adr, wert] of Object.entries(gemerkt)) {
+      const v = probe[adr];
+      if (typeof v === 'string' && (v === FEHLER.name || v === FEHLER.bezug || v === FEHLER.wert) && !wert.startsWith('#')) zellen[adr] = wert;
+    }
+  }
+
+  // M409: Aussehen. Linien gehören in der Anzeige zur Zelle links bzw. darüber (jede Zelle zeichnet nur rechts und
+  // unten) – „oben" und „links" wandern darum zum Nachbarn; nur am Rand der Tabelle bleiben sie an der Zelle.
+  const zeilenMax = Math.max(zeilen, 6); const spaltenMax = Math.max(spalten, 4);
+  const jeZelle: Record<string, ZellStil> = {};
+  /** Treffen zwei Linien an derselben Kante zusammen, gilt die kräftigere (die doppelte Linie über einer Summe) */
+  const staerker = (neu: string, alt: string | undefined) => !alt || (parseInt(neu, 10) || 1) > (parseInt(alt, 10) || 1);
+  const anzahl = Object.keys(stilVon).length;
+  if (anzahl > 0 && anzahl <= 20000) {
+    for (const [adr, nrStil] of Object.entries(stilVon)) {
+      const a = adresseTeile(adr);
+      if (a.zeile > zeilenMax || a.spalte > Math.max(spaltenMax, 26)) continue;       // Formatierung weit unter oder neben den Daten bläht die Karte nicht auf
+      jeZelle[adr] = { ...mappe.stile[nrStil] };
+    }
+    for (const [adr, st] of Object.entries(jeZelle)) {
+      const a = adresseTeile(adr);
+      if (st.ro && a.zeile > 1) { const oben = `${spalteName(a.spalte)}${a.zeile - 1}`; jeZelle[oben] = { ...(jeZelle[oben] ?? {}) }; if (staerker(st.ro, jeZelle[oben].ru)) jeZelle[oben].ru = st.ro; delete st.ro; }
+      if (st.rl && a.spalte > 1) { const links2 = `${spalteName(a.spalte - 1)}${a.zeile}`; jeZelle[links2] = { ...(jeZelle[links2] ?? {}) }; if (staerker(st.rl, jeZelle[links2].rr)) jeZelle[links2].rr = st.rl; delete st.rl; }
+    }
+  }
+  const stilListe: ZellStil[] = []; const stile: Record<string, number> = {}; const bekannt = new Map<string, number>();
+  for (const [adr, st] of Object.entries(jeZelle)) {
+    if (!Object.keys(st).length) continue;
+    const schluessel = JSON.stringify(st, Object.keys(st).sort());
+    let nrListe = bekannt.get(schluessel);
+    if (nrListe === undefined) { nrListe = stilListe.length; stilListe.push(st); bekannt.set(schluessel, nrListe); }
+    stile[adr] = nrListe;
+  }
+  // Spaltenbreiten: Excel zählt in Zeichenbreiten – ein Zeichen sind rund 7 Punkte, dazu 5 Punkte Rand
+  const colW: Record<string, number> = {};
+  for (const m of (/<cols\b[^>]*>([\s\S]*?)<\/cols>/.exec(xml)?.[1] ?? '').matchAll(/<col\b([^>]*)\/?>/g)) {
+    const von = Number(/\bmin="(\d+)"/.exec(m[1])?.[1] ?? '0'); const bisSp = Number(/\bmax="(\d+)"/.exec(m[1])?.[1] ?? '0');
+    const breite = Number(/\bwidth="([\d.]+)"/.exec(m[1])?.[1] ?? '0');
+    if (!von || !breite || /\bhidden="1"/.test(m[1])) continue;
+    for (let sp = von; sp <= Math.min(bisSp, spaltenMax, 26); sp += 1) colW[spalteName(sp)] = Math.max(40, Math.min(600, Math.round(breite * 7 + 5)));
+  }
+  const verbunden = [...xml.matchAll(/<mergeCell\b[^>]*\bref="([A-Z]+\d+:[A-Z]+\d+)"/g)].map((m) => m[1])
+    .filter((ref) => { const e = adresseTeile(ref.split(':')[1]); return e.zeile <= zeilenMax && e.spalte <= Math.max(spaltenMax, 26); }).slice(0, 400);
+
   return {
     name, zellen, spalten: Math.max(spalten, 4), zeilen: Math.max(zeilen, 6),
     ...(Object.keys(links).length ? { links } : {}),
     ...(kopf !== undefined && bis !== undefined && bis > kopf ? { kopf, bis } : {}),
+    ...(stilListe.length ? { stilListe, stile } : {}),
+    ...(Object.keys(colW).length ? { colW } : {}),
+    ...(verbunden.length ? { verbunden } : {}),
   };
 }
 
@@ -245,24 +319,4 @@ export async function blattNamen(daten: ArrayBuffer): Promise<string[]> {
   } catch {
     return [];
   }
-}
-
-/** Tabelle als CSV — öffnet sich in Excel, LibreOffice und Numbers */
-export function alsCsv(zellen: Record<string, string>, werte: Record<string, string>,
-  spalten: number, zeilen: number): string {
-  const raus: string[] = [];
-  for (let z = 1; z <= zeilen; z += 1) {
-    const zeile: string[] = [];
-    for (let s = 0; s < spalten; s += 1) {
-      let name = '';
-      for (let n = s + 1; n > 0; n = Math.floor((n - 1) / 26)) {
-        name = String.fromCharCode(65 + ((n - 1) % 26)) + name;
-      }
-      // Ausgegeben wird der ERRECHNETE Wert — eine CSV kennt keine Formeln
-      const v = werte[`${name}${z}`] ?? zellen[`${name}${z}`] ?? '';
-      zeile.push(/[";\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-    }
-    raus.push(zeile.join(';'));
-  }
-  return `﻿${raus.join('\r\n')}`;   // BOM, damit Excel die Umlaute erkennt
 }

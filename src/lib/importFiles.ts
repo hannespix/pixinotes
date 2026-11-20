@@ -14,7 +14,6 @@ import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, ma
 // backt alles in EINE Datei; ein nachgeladener Zusatz-Brocken wäre dort nach
 // dem Deploy nicht auffindbar (dieselbe Falle wie beim Mermaid-Modul, M90).
 import { docxToBlocks } from './docx';
-import { blattNamen, leseXlsx } from './xlsx';
 import { boardDateienUebernehmen, cloneSharedBoard, parseBoardDatei } from './share';
 import { uebernimmDateien } from './syncFolder';
 import { mergeEvents, parseIcs, type IcsEvent } from './ics';
@@ -195,6 +194,8 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
          * sieht die Summe sofort mitwandern — es ist keine tote Momentaufnahme.
          */
         const puffer = await file.arrayBuffer();
+        // M409: Der Excel-Leser (samt Stilen und Zahlenformaten) wird erst geladen, wenn eine Excel-Datei kommt
+        const { blattNamen, leseXlsx } = await import('./xlsx');
         const namen = await blattNamen(puffer);
         /**
          * M406: Das Original bleibt bei der Tabelle – wer die Datei wieder braucht (weitergeben, in Excel öffnen),
@@ -221,6 +222,10 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
             // M407: Links der Zellen; und trägt das Blatt einen Filter oder eine „Tabelle", kommt sie als Datentabelle an
             ...(blatt.links ? { links: blatt.links } : {}),
             ...(blatt.kopf ? { kopf: blatt.kopf, bis: blatt.bis, filterAn: true } : {}),
+            // M409: Aussehen der Zellen, Spaltenbreiten, verbundene Zellen
+            ...(blatt.stilListe ? { stilListe: blatt.stilListe, stile: blatt.stile } : {}),
+            ...(blatt.colW ? { colW: blatt.colW } : {}),
+            ...(blatt.verbunden ? { verbunden: blatt.verbunden } : {}),
           });
           try {
             await saveFile(node.id, file);
@@ -230,7 +235,8 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
             delete node.data.lokal;
             if (!original) { delete node.data.datei; delete node.data.mime; delete node.data.size; }
           }
-          node.width = Math.min(920, 90 + spalten * 96);
+          // Breite der Karte: die Spalten in ihrer Breite aus der Datei (sonst 96 Punkte je Spalte)
+          node.width = Math.min(920, Math.max(300, 62 + Array.from({ length: spalten }, (_, sp) => blatt.colW?.[String.fromCharCode(65 + sp)] ?? 96).reduce((a, b) => a + b, 0)));
           node.height = Math.min(620, 120 + blatt.zeilen * 30);
           addNode(node);
           erste = erste ?? node.id;
