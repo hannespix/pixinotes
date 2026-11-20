@@ -14,7 +14,7 @@ import {
   IAppWindow, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITimelineIcon, ITimer, IWand, IWeek, IX,
- IBubbles , IUsers
+ IBubbles , IUsers, IArchive
 } from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
 import { t } from '../lib/sprache';
@@ -187,6 +187,10 @@ export function Dock() {
   // M198: ⋯-Menü bündelt die selteneren Aktionen (KI, Anordnen, Physik, Archiv) —
   // sichtbar bleiben nur noch fünf Primärknöpfe: ＋ · ✎ · Aufgaben · ⋯ · ▶
   const [moreMenu, setMoreMenu] = useState(false);
+  // M408: Das Archiv ist auch hier zu erreichen – am Fuß der Navigation fand man es nicht (am Telefon gibt es sie gar nicht)
+  const showArchived = useBoard((s) => s.showArchived);
+  const setShowArchived = useBoard((s) => s.setShowArchived);
+  const archivZahl = useBoard((s) => s.boards.reduce((n, b) => n + (b.archived ? 1 : 0) + b.nodes.reduce((k, x) => k + (x.archived ? 1 : 0), 0), 0));
   // Hintergrund-Klick/-Tipp schließt alle Dock-Flyouts (User-Wunsch)
   const dockRef = useRef<HTMLDivElement | null>(null);
   const dockMenuOpen = addMenu || drawMenu || aiMenu || arrangeMenu || moreMenu;
@@ -549,6 +553,16 @@ export function Dock() {
             >
               <ICompact size={16} /> Alles einpassen
             </button>
+            {(archivZahl > 0 || showArchived) && (
+              <button
+                onClick={() => { setMoreMenu(false); setShowArchived(!showArchived); }}
+                data-taste="dock-archiv"
+                title={showArchived ? 'Archivierte Karten und Boards ausblenden' : 'Archivierte Karten und Boards einblenden'}
+                aria-label={showArchived ? 'Archiv ausblenden' : 'Archiv einblenden'}
+              >
+                <IArchive size={16} /> {showArchived ? 'Archiv ausblenden' : `Archiv einblenden (${archivZahl})`}
+              </button>
+            )}
           </div>
         )}
         {aiMenu && (

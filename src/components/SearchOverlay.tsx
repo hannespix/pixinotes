@@ -84,6 +84,9 @@ function buildCommands(): Command[] {
       run: () => st().setTasksOpen(true) },
     { label: '▶ Präsentieren', hint: 'Karten als Folien zeigen', alias: 'presenter folien vortrag',
       run: () => st().setPresenting(true) },
+    // M408: das Archiv per Suche ein- und ausblenden
+    { label: st().showArchived ? 'Archiv ausblenden' : 'Archiv einblenden', hint: 'Archivierte Karten und Boards zeigen oder verbergen', alias: 'archiv archiviert archive wiederfinden verschwunden weg restore',
+      run: () => st().setShowArchived(!st().showArchived) },
     { label: 'Einstellungen', hint: 'KI, Sync, Design, Daten', alias: 'settings optionen ki sync',
       run: () => st().setSettingsOpen(true) },
     { label: 'Hilfe', hint: 'Anleitung zu allen Funktionen', alias: 'help anleitung',
