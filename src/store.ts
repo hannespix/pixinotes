@@ -1573,10 +1573,13 @@ export const useBoard = create<BoardState>()(
               idSet.has(n.id) ? { ...n, archived: archived || undefined, selected: false } : n,
             ),
           }));
+          // M408: Der Hinweis sagt, wo das Archiv ist (vorher nur „Strg+Z holt sie zurück" – danach suchte man es vergeblich)
           get().showToast(
+            // (Einzahl und Mehrzahl als ganze Sätze – ein angehängtes „n" lässt sich nicht übersetzen)
             archived
-              ? `${ids.length} Karte${ids.length > 1 ? 'n' : ''} archiviert. Strg+Z holt sie zurück.`
-              : `${ids.length} Karte${ids.length > 1 ? 'n' : ''} aus dem Archiv zurückgeholt.`,
+              ? (ids.length === 1 ? 'Karte archiviert. Wiederfinden: Mehr → „Archiv einblenden".' : `${ids.length} Karten archiviert. Wiederfinden: Mehr → „Archiv einblenden".`)
+              : (ids.length === 1 ? 'Karte aus dem Archiv zurückgeholt.' : `${ids.length} Karten aus dem Archiv zurückgeholt.`),
+            archived ? true : undefined,
           );
         },
 
@@ -2678,7 +2681,7 @@ export const useBoard = create<BoardState>()(
           }
           set({ boards, activeId });
           get().showToast(an
-            ? `Board „${board.name}" archiviert – unten in der Navigation „Archiv einblenden" zeigt es wieder.`
+            ? `Board „${board.name}" archiviert. Wiederfinden: Mehr → „Archiv einblenden".`
             : `Board „${board.name}" zurückgeholt.`);
         },
 
