@@ -226,6 +226,8 @@ const FUNKTIONEN: Record<string, (a: (ZellWert | ZellWert[])[]) => ZellWert> = {
   HEUTE: () => heuteLokal(),
   LÄNGE: (a) => String(flach([a[0]])[0] ?? '').length,
   VERKETTEN: (a) => flach(a).map((v) => (v === null ? '' : String(v))).join(''),
+  // M407: =HYPERLINK("https://…";"Angebot") zeigt den Text (oder die Adresse); die Tabelle macht daraus einen Link
+  HYPERLINK: (a) => { const ziel = flach([a[0]])[0]; const text = a[1] === undefined ? null : flach([a[1]])[0]; return text ?? ziel ?? ''; },
 };
 // Englische Zweitnamen — dieselbe Funktion, anderer Aufruf
 const ALIAS: Record<string, string> = {

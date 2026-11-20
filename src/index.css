@@ -5519,7 +5519,8 @@ html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-stro
   background: var(--surface-dim); position: sticky; left: 0; top: 0; z-index: 3;
   width: 34px; min-width: 34px;
 }
-.sheet-zelle { cursor: text; padding: 0 5px; text-align: left; }
+/* M407: Der Innenabstand galt nie – die allgemeine Regel für th/td (padding: 0) war genauer; Text und Zahlen klebten am Rand */
+.sheet-grid td.sheet-zelle { cursor: text; padding: 0 5px; text-align: left; }
 .sheet-zelle > span {
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
@@ -7589,3 +7590,72 @@ html.folie-zieht, html.folie-zieht * { cursor: grabbing !important; user-select:
    Wer zum Lesen hineinzoomt, bekommt mehr Seite – nicht größere Knöpfe. Nur aufgeklappt; die zugeklappte Karte
    und andere Dateien bestehen aus genau diesen Teilen und zoomen wie bisher. */
 .file-card:has(.pdf-seite-wrap) :is(.file-kopf, .file-body, .pdf-seite-bar, .pdf-kommentare) { zoom: var(--pn-ui, 1); }
+
+/* ---------- M407: Rechen-Tabelle als Datentabelle – Links, Kopfzeile, Filtern und Sortieren ---------- */
+/* Link in einer Zelle: der Text öffnet ihn, der Stift (oder ein Klick daneben) bearbeitet */
+.sheet-link { color: var(--accent-strong); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.sheet-zelle.mit-link, .sheet-zelle.mit-filter { position: relative; }
+.sheet-link-stift {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; padding: 0;
+  display: none; place-items: center; border: 1px solid var(--border-soft); border-radius: var(--r-xs);
+  background: var(--surface); color: var(--muted); cursor: pointer;
+}
+.sheet-zelle.mit-link:hover .sheet-link-stift, .sheet-link-stift:focus-visible { display: grid; }
+/* Kopfzeile der Datentabelle: kräftig, bleibt beim Rollen unter den Spaltenbuchstaben stehen */
+.sheet-grid.datentabelle .sheet-kopfzeile > td {
+  font-weight: 700; background: var(--surface-dim); position: sticky; top: 27px; z-index: 1; padding-right: 26px;
+}
+.sheet-grid.datentabelle .sheet-datenzeile:nth-child(even) > td { background: color-mix(in srgb, var(--surface-dim) 45%, transparent); }
+.sheet-grid.datentabelle .sheet-datenzeile > td:hover { background: var(--accent-soft); }
+.sheet-filter-knopf {
+  position: absolute; right: 3px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; padding: 0;
+  display: grid; place-items: center; border: 1px solid var(--border-soft); border-radius: var(--r-xs);
+  background: var(--surface); color: var(--muted); cursor: pointer;
+}
+.sheet-filter-knopf:hover { border-color: var(--accent); color: var(--accent-strong); }
+.sheet-filter-knopf.an { background: var(--accent-fill); border-color: var(--accent); color: #fff; }
+/* gefiltert oder sortiert: die echten Zeilennummern in der Akzentfarbe – wie in Excel */
+.sheet-zeilenkopf.gefiltert { color: var(--accent-strong); }
+.sheet-fuss { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sheet-fuss-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-filter-weg, .sheet-link-feld input {
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 11px;
+}
+.sheet-filter-weg { flex: none; padding: 2px 8px; min-height: 22px; cursor: pointer; white-space: nowrap; }
+.sheet-filter-weg:hover { border-color: var(--accent); color: var(--accent-strong); }
+.sheet-link-feld { flex: 1 1 150px; min-width: 110px; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
+.sheet-link-feld input { flex: 1; min-width: 0; height: 22px; padding: 0 6px; }
+.sheet-link-feld input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+/* das Fenster am Filterknopf */
+.sheet-filter-menu { min-width: 216px; max-width: 280px; }
+.sheet-filter-haken { margin-left: auto; display: inline-grid; color: var(--accent-strong); }
+.sheet-filter-suche {
+  width: 100%; box-sizing: border-box; height: 28px; padding: 0 8px; margin: 2px 0 4px; font: inherit; font-size: 13px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface); color: var(--ink);
+}
+.sheet-filter-zeile { display: flex; gap: 4px; padding: 0 2px 4px; }
+.ebenen-menu.sheet-filter-menu .sheet-filter-zeile button {
+  width: auto; flex: 1; text-align: center; justify-content: center; padding: 4px 8px; font-size: 12px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+}
+.sheet-filter-liste { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.sheet-filter-liste label {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: var(--r-sm); cursor: pointer;
+  font-size: 13px; color: var(--ink); min-width: 0;
+}
+.sheet-filter-liste label:hover { background: var(--surface-2); }
+.sheet-filter-liste input { flex: none; accent-color: var(--accent); }
+.sheet-filter-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-filter-zahl { flex: none; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sheet-filter-mehr { padding: 6px 8px; font-size: 12px; color: var(--muted); }
+@media (pointer: coarse) {
+  .sheet-link-stift { display: grid; width: 28px; height: 28px; }
+  .sheet-zelle.mit-link { padding-right: 32px; }
+  .sheet-filter-knopf { width: 28px; height: 28px; }
+  .sheet-grid.datentabelle .sheet-kopfzeile > td { top: 33px; padding-right: 34px; }
+  .sheet-filter-weg { min-height: 36px; font-size: 13px; padding: 4px 12px; }
+  .sheet-link-feld input { height: 36px; font-size: 16px; }
+  .sheet-filter-liste label { padding: 9px 8px; font-size: 15px; }
+  .sheet-filter-suche { height: 40px; font-size: 16px; }
+}
