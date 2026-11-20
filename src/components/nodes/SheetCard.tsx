@@ -8,6 +8,8 @@ import { indexZuAdresse, rechneBlatt, zeigeWert } from '../../lib/formel';
 import { alsCsv } from '../../lib/xlsx';
 import { IPlus, ISigma, IDownload } from '../Icons';
 import { MenuHuelle } from '../EbenenMenu';
+import { loadFile } from '../../lib/fileStore';
+import { triggerDownload } from '../../lib/download';
 
 /**
  * M256: Rechen-Tabelle — „Autosummen direkt in den Notizen".
@@ -148,6 +150,27 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
     setTimeout(() => URL.revokeObjectURL(url), 20_000);
   };
 
+  /**
+   * M406: Die eingefügte Excel-Datei wieder herunterladen – unverändert, wie sie hereinkam (die Tabelle hier ist
+   * eine Arbeitskopie: „Als CSV speichern" gibt ihren jetzigen Stand). Der Inhalt steht im Board, liegt in der
+   * Geräte-Ablage oder – bei großen Dateien auf einem anderen Gerät – im Konto.
+   */
+  const [holt, setHolt] = useState(false);
+  const original = async () => {
+    if (!data.datei || holt) return;
+    setHolt(true);
+    try {
+      let blob: Blob | undefined;
+      if (data.dataUrl) blob = await (await fetch(data.dataUrl)).blob();
+      if (!blob) blob = await loadFile(id).catch(() => undefined);
+      if (!blob) blob = (await import('../../lib/kontoSync').then((m) => m.kontoDateiNachladen(id)).catch(() => null)) ?? undefined;
+      if (!blob) { useBoard.getState().showToast('Die Excel-Datei liegt nicht auf diesem Gerät – sie wurde auf einem anderen eingefügt.'); return; }
+      const url = URL.createObjectURL(data.mime && blob.type !== data.mime ? new Blob([blob], { type: data.mime }) : blob);
+      triggerDownload(url, data.datei);
+      setTimeout(() => URL.revokeObjectURL(url), 20_000);
+    } finally { setHolt(false); }
+  };
+
   return (
     <>
       <div className="sheet-head">
@@ -172,6 +195,11 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
               <button role="menuitem" onClick={() => { csv(); zu(); }} title="Öffnet sich in Excel, LibreOffice und Numbers" aria-label="Als CSV speichern">
                 <IDownload size={14} /> Als CSV speichern
               </button>
+              {data.datei && (
+                <button role="menuitem" data-taste="sheet-original-menu" onClick={() => { void original(); zu(); }} title="Die eingefügte Datei, unverändert" aria-label="Excel-Datei herunterladen">
+                  <IDownload size={14} /> Excel-Datei herunterladen
+                </button>
+              )}
             </>
           )} />
         </div>
@@ -179,7 +207,14 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
 
       {data.quelle && (
         <div className="sheet-quelle">
-          Quelle: <b translate="no">{data.quelle}</b> – Formeln übernommen, Änderungen bleiben hier
+          <span className="sheet-quelle-text">Quelle: <b translate="no">{data.quelle}</b> – Formeln übernommen, Änderungen bleiben hier</span>
+          {/* M406: das Original bleibt bei der Tabelle */}
+          {data.datei && (
+            <button className="sheet-original nodrag" data-taste="sheet-original" onClick={() => void original()} aria-busy={holt}
+              title="Die eingefügte Excel-Datei herunterladen – unverändert" aria-label="Excel-Datei herunterladen">
+              <IDownload size={13} /> Original
+            </button>
+          )}
         </div>
       )}
 

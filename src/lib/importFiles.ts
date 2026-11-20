@@ -196,6 +196,14 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
          */
         const puffer = await file.arrayBuffer();
         const namen = await blattNamen(puffer);
+        /**
+         * M406: Das Original bleibt bei der Tabelle – wer die Datei wieder braucht (weitergeben, in Excel öffnen),
+         * lädt sie von der Karte herunter. Jede Karte trägt es selbst (so bleibt es beim Verschieben, Kopieren und
+         * Löschen einzelner Blätter erhalten): immer in der Geräte-Ablage, und im Board, solange es klein genug ist.
+         */
+        const blaetter = Math.max(1, Math.min(namen.length || 1, 8));
+        let original: string | undefined = file.size * blaetter <= MAX_EMBED_BYTES ? await readFileAsDataUrl(file) : undefined;
+        if (original && !canEmbed(original.length * blaetter)) original = undefined;
         // Jedes Blatt wird eine eigene Karte — nebeneinander abgelegt
         let erste: string | null = null;
         let gesetzt = 0;
@@ -209,7 +217,16 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
             cols: spalten,
             rows: blatt.zeilen,
             quelle: namen.length > 1 ? `${file.name} · ${blatt.name}` : file.name,
+            datei: file.name, mime, size: file.size, lokal: true, ...(original ? { dataUrl: original } : {}),
           });
+          try {
+            await saveFile(node.id, file);
+          } catch (e) {
+            // Gerätespeicher voll: Die Tabelle kommt trotzdem – das Original nur, wenn es im Board Platz hat
+            console.error('Datei-Ablage fehlgeschlagen:', e);
+            delete node.data.lokal;
+            if (!original) { delete node.data.datei; delete node.data.mime; delete node.data.size; }
+          }
           node.width = Math.min(920, 90 + spalten * 96);
           node.height = Math.min(620, 120 + blatt.zeilen * 30);
           addNode(node);
