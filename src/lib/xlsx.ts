@@ -19,7 +19,7 @@ import { ZipArchive } from './unzip';
 import type { ZellStil } from '../types';
 import { leseStile } from './xlsxStil';
 import { formatiereDatum } from './zahlFormat';
-import { FEHLER, rechneBlatt } from './formel';
+import { FEHLER, rechne, rechneBlatt } from './formel';
 
 export interface ExcelBlatt {
   name: string;
@@ -79,6 +79,22 @@ function versetzeFormel(f: string, dz: number, ds: number): string {
  * rechnete darum still mit „3,2", =IF(A1>5,"a","b") meldete einen Fehler.
  */
 const hiesigeFormel = (f: string): string => ausserhalbText(f, (teil) => teil.replace(/,/g, ';'));
+
+/** M411: Die erste Angabe von =HYPERLINK(…) – bis zum ersten „;" auf oberster Ebene (Text und Klammern beachtet) */
+function ersteAngabe(formel: string): string | null {
+  const m = /^=\s*HYPERLINK\s*\(/i.exec(formel);
+  if (!m) return null;
+  let tiefe = 0; let inText = false;
+  for (let i = m[0].length; i < formel.length; i += 1) {
+    const c = formel[i];
+    if (c === '"') inText = !inText;
+    else if (inText) continue;
+    else if (c === '(') tiefe += 1;
+    else if (c === ')') { if (tiefe === 0) return formel.slice(m[0].length, i); tiefe -= 1; }
+    else if (c === ';' && tiefe === 0) return formel.slice(m[0].length, i);
+  }
+  return null;
+}
 
 /**
  * Excel-Datum → lesbares Datum.
@@ -258,7 +274,16 @@ export async function leseXlsx(daten: ArrayBuffer, index = 0): Promise<ExcelBlat
     const probe = rechneBlatt(zellen);
     for (const [adr, wert] of Object.entries(gemerkt)) {
       const v = probe[adr];
-      if (typeof v === 'string' && (v === FEHLER.name || v === FEHLER.bezug || v === FEHLER.wert) && !wert.startsWith('#')) zellen[adr] = wert;
+      if (typeof v === 'string' && (v === FEHLER.name || v === FEHLER.bezug || v === FEHLER.wert) && !wert.startsWith('#')) {
+        /* M411: War es ein =HYPERLINK(…), bleibt der Link: Die Adresse (die erste Angabe) lässt sich oft rechnen, auch
+           wenn der angezeigte Text es nicht tut (eine Funktion, die es hier nicht gibt). Sie hängt dann fest an der Zelle. */
+        const erste = ersteAngabe(zellen[adr]);
+        if (erste && !links[adr]) {
+          const ziel = rechne(erste, (a) => probe[a.toUpperCase()] ?? null);
+          if (typeof ziel === 'string' && /^(https?:|mailto:|tel:)/i.test(ziel)) links[adr] = ziel;
+        }
+        zellen[adr] = wert;
+      }
     }
   }
 

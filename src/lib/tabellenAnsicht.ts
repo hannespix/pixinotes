@@ -122,13 +122,6 @@ export function sichererLink(roh: unknown): string | null {
   return null;
 }
 
-/** Ziel einer =HYPERLINK("…";"…")-Formel, wenn die Adresse wörtlich darin steht; sonst der Name der Zelle, in der sie steht */
-export function hyperlinkZiel(roh: string): { adresse?: string; zelle?: string } | null {
-  const m = /^=\s*HYPERLINK\(\s*(?:"([^"]*)"|\$?([A-Z]+)\$?(\d+))\s*[;)]/i.exec(roh);
-  if (!m) return null;
-  return m[1] !== undefined ? { adresse: m[1] } : { zelle: `${m[2].toUpperCase()}${m[3]}` };
-}
-
 /** Tabelle als CSV — öffnet sich in Excel, LibreOffice und Numbers. (M409: hier statt beim Excel-Leser, damit
  *  der erst geladen wird, wenn eine Excel-Datei kommt.) */
 export function alsCsv(zellen: Record<string, string>, werte: Record<string, string>, spalten: number, zeilen: number): string {

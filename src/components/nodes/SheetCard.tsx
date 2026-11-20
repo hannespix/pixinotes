@@ -6,9 +6,9 @@ import type { SheetData, SheetNode, ZellStil } from '../../types';
 import { formatiereZahl } from '../../lib/zahlFormat';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
-import { indexZuAdresse, rechneBlatt, zeigeWert } from '../../lib/formel';
+import { indexZuAdresse, rechneBlattMitLinks, zeigeWert } from '../../lib/formel';
 import { IPlus, ISigma, IDownload, IFilter, ICheck, IArrowUp, IArrowDown, IPen } from '../Icons';
-import { alsCsv, ersteZeile, gezeigteZeilen, hyperlinkZiel, sichererLink, spaltenName, spaltenWerte } from '../../lib/tabellenAnsicht';
+import { alsCsv, ersteZeile, gezeigteZeilen, sichererLink, spaltenName, spaltenWerte } from '../../lib/tabellenAnsicht';
 
 /** M409: Breite einer Spalte, für die nichts festgelegt ist – darunter wird sie nicht gequetscht */
 const SPALTE_STD = 84;
@@ -51,7 +51,7 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
   const eingabe = useRef<HTMLInputElement | null>(null);
 
   /** Ein Durchgang für die ganze Tabelle — Zellen dürfen aufeinander zeigen */
-  const werte = useMemo(() => rechneBlatt(cells), [cells]);
+  const { werte, links: formelLinks } = useMemo(() => rechneBlattMitLinks(cells), [cells]);
 
   /**
    * M407: Datentabelle. Mit eingeschaltetem Filter trägt die Kopfzeile je Spalte einen Knopf zum Sortieren und
@@ -68,8 +68,13 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
   const anzeigeVon = useCallback((adr: string): { text: string; farbe?: string } => {
     const v = werte[adr] ?? null;
     const z = typeof v === 'number' ? stilVon(adr)?.z : undefined;
-    return (z ? formatiereZahl(v as number, z) : null) ?? { text: zeigeWert(v) };
-  }, [werte, stilVon]);
+    const nachFormat = z ? formatiereZahl(v as number, z) : null;
+    if (nachFormat) return nachFormat;
+    /* M411: Eine Zahl, die ein Link ist, ist eine Kennung (Ticket 4711, Rechnung 100234) – sie steht da wie in
+       Excel, ohne Tausenderpunkt. Vorher stand dort „4.711". */
+    if (typeof v === 'number' && Number.isFinite(v) && (data.links?.[adr] || formelLinks[adr])) return { text: String(Math.round(v * 1e10) / 1e10).replace('.', ',') };
+    return { text: zeigeWert(v) };
+  }, [werte, stilVon, data.links, formelLinks]);
   const text = useCallback((adr: string) => anzeigeVon(adr).text, [anzeigeVon]);
   /** M409: verbundene Zellen – die Ankerzelle spannt, die übrigen des Bereichs entfallen */
   const verbund = useMemo(() => {
@@ -103,10 +108,11 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
 
   /** M407: Link einer Zelle – in Excel angehängt, als =HYPERLINK(…) geschrieben oder einfach eine Adresse im Text */
   const [linkEntwurf, setLinkEntwurf] = useState('');
-  const linkVon = (adr: string, roh: string, anzeige: string): string | null => {
+  const linkVon = (adr: string, anzeige: string): string | null => {
     const fest = data.links?.[adr];
     if (fest) return sichererLink(fest);
-    if (roh.startsWith('=')) { const h = hyperlinkZiel(roh); return h ? sichererLink(h.adresse ?? String(werte[h.zelle ?? ''] ?? '')) : null; }
+    // M411: bei =HYPERLINK(…) die Adresse, die die Formel AUSRECHNET (lib/formel.ts) – auch eine zusammengesetzte
+    if (formelLinks[adr]) return sichererLink(formelLinks[adr]);
     return sichererLink(anzeige);
   };
 
@@ -363,10 +369,10 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
                     ...(gezeigt.farbe ? { color: gezeigt.farbe } : {}),
                   } : undefined;
                   const spalte = adr.replace(/\d+/g, '');
-                  const link = edit === adr || fehler || anzeige === '' ? null : linkVon(adr, roh, anzeige);
+                  const link = edit === adr || fehler || anzeige === '' ? null : linkVon(adr, anzeige);
                   const spalteAktiv = istKopf && (!!data.filter?.[spalte] || data.sort?.spalte === spalte);
                   return (
-                    <td key={s} className={`sheet-zelle${zahl ? ' zahl' : ''}${fehler ? ' fehler' : ''}${link ? ' mit-link' : ''}${istKopf ? ' mit-filter' : ''}${stil?.um ? ' umbruch' : ''}${stil?.bg ? ' gefuellt' : ''}`}
+                    <td key={s} className={`sheet-zelle${zahl ? ' zahl' : ''}${fehler ? ' fehler' : ''}${link ? ` mit-link${(stil?.a ? stil.a === 'r' : zahl) ? ' stift-links' : ''}` : ''}${istKopf ? ' mit-filter' : ''}${stil?.um ? ' umbruch' : ''}${stil?.bg ? ' gefuellt' : ''}`}
                       style={zellStil} colSpan={spanne && spanne.cs > 1 ? spanne.cs : undefined} rowSpan={spanne && spanne.rs > 1 && !gefiltert ? spanne.rs : undefined}
                       data-zelle={adr} onClick={() => edit !== adr && oeffne(adr)}>
                       {edit === adr ? (

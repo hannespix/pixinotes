@@ -7611,6 +7611,9 @@ html.folie-zieht, html.folie-zieht * { cursor: grabbing !important; user-select:
   background: var(--surface); color: var(--muted); cursor: pointer;
 }
 .sheet-zelle.mit-link:hover .sheet-link-stift, .sheet-link-stift:focus-visible { display: grid; }
+/* M411: Steht der Link rechtsbündig (eine Nummer), säße der Stift genau auf ihm – am Finger öffnete ein Tipp auf
+   die Nummer dann die Bearbeitung statt des Links. Der Stift wechselt dort auf die linke Seite. */
+.sheet-zelle.mit-link.stift-links .sheet-link-stift { right: auto; left: 2px; }
 /* Kopfzeile der Datentabelle: kräftig, bleibt beim Rollen unter den Spaltenbuchstaben stehen */
 .sheet-grid.datentabelle .sheet-kopfzeile > td {
   font-weight: 700; background: linear-gradient(var(--surface-dim), var(--surface-dim)), var(--surface-card);
@@ -7667,6 +7670,7 @@ html.folie-zieht, html.folie-zieht * { cursor: grabbing !important; user-select:
 @media (pointer: coarse) {
   .sheet-link-stift { display: grid; width: 28px; height: 28px; }
   .sheet-zelle.mit-link { padding-right: 32px; }
+  .sheet-zelle.mit-link.stift-links { padding-right: 5px; padding-left: 32px; }
   .sheet-filter-knopf { width: 28px; height: 28px; }
   .sheet-grid.datentabelle .sheet-kopfzeile > td { padding-right: 34px; }
   .sheet-filter-weg { min-height: 36px; font-size: 13px; padding: 4px 12px; }
