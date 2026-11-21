@@ -13,6 +13,14 @@
 //     aus beiden — oder verschmelzen), ins Freie (heraus). Gruppen lassen sich umbenennen, verschieben, auflösen.
 //   · Moderation: vier Schritte (Sammeln · Gruppieren · Abstimmen · Ergebnis), für alle sichtbar; verdeckt und
 //     anonym sammeln; Zwischenstand beim Abstimmen verbergen; Liste statt Blasen; Ergebnis als Notiz; Timer.
+//
+// M415 — Tropfen: Eine Gruppe ist ein Tropfen, der sich um ihre Ideen legt, freie Ideen sind eigene Tropfen. Unter
+// den Blasen liegt dafür eine Schicht einfacher Scheiben, die ein SVG-Filter zu flüssigen Formen schmilzt (weich
+// zeichnen, dann hart abschneiden), mit Farbverlauf, wo Farben sich treffen, dünner Kontur und etwas Plastik.
+// Zieht man eine Idee aus ihrer Gruppe, zieht sie einen Hals und reißt ab; nähert man sie einer anderen Gruppe,
+// fließt sie hinein. Ideen in einer Gruppe bleiben einzeln lesbar (Pastell, Kontur, Schein). Angeregt vom Look des
+// Verantwortungsplaners (github.com/matthiassuetterlin) — dessen Code ist ohne Lizenz und hier nicht übernommen.
+// „Klar" (⋯) zeigt die Blasen wie bisher.
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
@@ -31,6 +39,17 @@ import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 
 import { IBubbles, ITrash, IWand } from '../Icons';
+/** M415: Lage und Größe eines Elements setzen — nur, was sich geändert hat (unveränderte Schreibvorgänge kosten im Tropfen-Look den ganzen Filter) */
+function setzen(el: HTMLElement, x: number, y: number, b: number, h: number): void {
+  const tf = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`; const bw = `${b.toFixed(1)}px`; const hh = `${h.toFixed(1)}px`;
+  if (el.style.transform !== tf) el.style.transform = tf;
+  if (el.style.width !== bw) el.style.width = bw;
+  if (el.style.height !== hh) el.style.height = hh;
+}
+/** M415: So weit legt sich der Tropfen einer Gruppe um ihre Ideen (wie der Ring: Radius bis zur äußersten + 12) */
+const TROPFEN_RAND = 12;
+/** M415: Pastell aus einer Kartenfarbe — auf hellem und dunklem Grund (die Bühne gibt --bub-grund vor) */
+const pastell = (farbe: string, anteil: number): string => `color-mix(in srgb, ${farbe} ${anteil}%, var(--bub-grund))`;
 interface Koerper { x: number; y: number; vx: number; vy: number; r: number; ziel: number; g: string | null; len: number; wort: number }
 /**
  * M378: Radius des Kreises, den eine Gruppe mit diesen Blasen braucht (samt Luft für den Ring). Eine Blase: sie
@@ -112,6 +131,8 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const [eingabe, setEingabe] = useState('');
   const [wahl, setWahl] = useState<string | null>(null);
   const [menue, setMenue] = useState(false);
+  /** M415: Tropfen (Standard) oder klar wie bisher — gehört zur Karte, alle sehen dasselbe */
+  const tropfen = (roh as { stil?: string }).stil !== 'klar';
   const [neuGruppe, setNeuGruppe] = useState('');
   const [bearbeite, setBearbeite] = useState<string | null>(null);
   const [kiLaeuft, setKiLaeuft] = useState(false);
@@ -119,6 +140,10 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const [gWahl, setGWahl] = useState<string | null>(null);
   const [liste, setListe] = useState(false);
   const [fallen, setFallen] = useState<{ was: string; auf: string } | null>(null);
+  /** M415: Doppelklick auf die Fläche — hier eine Idee eintragen (in der Gruppe, deren Tropfen dort liegt) */
+  const [hier, setHier] = useState<{ x: number; y: number; g: string | null } | null>(null);
+  /** M415: neue Ideen, die an einer bestimmten Stelle entstehen sollen (statt vom Rand hereinzufliegen) */
+  const startHier = useRef(new Map<string, { x: number; y: number }>());
   const gewaehlt = wahl ? blasen.find((b) => b.id === wahl) ?? null : null;
   useEffect(() => { if (wahl && !blasen.some((b) => b.id === wahl)) setWahl(null); }, [wahl, blasen]);
 
@@ -131,6 +156,22 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     // anonym: der Name wird gar nicht erst vermerkt
     updateNodeData(id, { ideen: { ...d.ideen, [uid()]: { text, von: wer, ...(regeln.anonym ? {} : { name: ich().name }), t: jetzt() } } });
     setEingabe('');
+  };
+  /** M415: Idee an der Stelle des Doppelklicks — dort entsteht sie, in der Gruppe, in deren Tropfen geklickt wurde */
+  const ideeHier = (text0: string) => {
+    const text = text0.trim().slice(0, 140);
+    const h = hier;
+    setHier(null);
+    if (!text || !h || fest) return;
+    if (regeln.zu && !leiten) { showToast('Die Sammlung ist geschlossen – gerade wird gruppiert oder abgestimmt.'); return; }
+    const neu = uid();
+    startHier.current.set(neu, { x: h.x, y: h.y });
+    updateNodeData(id, { ideen: { ...d.ideen, [neu]: { text, von: wer, ...(regeln.anonym ? {} : { name: ich().name }), t: jetzt(), ...(h.g && d.gruppen[h.g] && !d.gruppen[h.g].weg ? { g: h.g } : {}) } } });
+  };
+  /** M415: Farbe einer Gruppe ändern */
+  const gruppeFarbe = (gid: string, farbe: number) => {
+    if (fest || !d.gruppen[gid] || d.gruppen[gid].farbe === farbe) return;
+    updateNodeData(id, { gruppen: { ...d.gruppen, [gid]: { ...d.gruppen[gid], farbe, t: jetzt() } } });
   };
   const ideenAendern = (ids: string[], p: (alt: BubblesData['ideen'][string]) => Partial<BubblesData['ideen'][string]>) => {
     const ideen = { ...d.ideen };
@@ -257,6 +298,14 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const buehne = useRef<HTMLDivElement | null>(null);
   const koerper = useRef(new Map<string, Koerper>());
   const knoten = useRef(new Map<string, HTMLElement>());
+  /** M415: die Scheiben der Tropfen-Schicht — je Idee eine, dazu eine je leere Gruppe */
+  const formen = useRef(new Map<string, HTMLElement>());
+  /** je Gruppe eine Kern-Scheibe: füllt die Lücken zwischen ihren Ideen (leer: der Platz zum Hineinziehen) */
+  const kernFormen = useRef(new Map<string, HTMLElement>());
+  /** je Gruppe eine Kuppe oben am Tropfen, in der ihr Name steht (er läge sonst über den Ideen) */
+  const kopfFormen = useRef(new Map<string, HTMLElement>());
+  const tropfenRef = useRef(tropfen);
+  tropfenRef.current = tropfen;
   const ringe = useRef(new Map<string, HTMLElement>());
   const namen = useRef(new Map<string, HTMLElement>());
   const mass = useRef({ w: 600, h: 360 });
@@ -327,10 +376,19 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     return { x, y, r: r + 12 };
   }, [anker]);
 
-  const zeichnen = useCallback(() => {
+  /** M415: zuletzt gezeichnete Lage je Blase — was sich nicht sichtbar bewegt, wird nicht neu geschrieben */
+  const gezeichnet = useRef(new Map<string, { x: number; y: number; r: number }>());
+  /** zeichnet und sagt, wie weit sich die Blasen sichtbar bewegt haben (größter Weg in Punkten) */
+  const zeichnen = useCallback((): number => {
+    let weit = 0;
     for (const [bid, k] of koerper.current) {
       const el = knoten.current.get(bid);
       if (!el) continue;
+      const alt = gezeichnet.current.get(bid);
+      const weg = alt ? Math.max(Math.abs(alt.x - k.x), Math.abs(alt.y - k.y), Math.abs(alt.r - k.r)) : Infinity;
+      weit = Math.max(weit, weg);
+      if (weg < 0.2 && el.style.transform) continue;
+      gezeichnet.current.set(bid, { x: k.x, y: k.y, r: k.r });
       el.style.transform = `translate(${(k.x - k.r).toFixed(1)}px, ${(k.y - k.r).toFixed(1)}px)`;
       const dm = `${(k.r * 2).toFixed(1)}px`;
       if (el.style.width !== dm) {
@@ -338,6 +396,25 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         // Schrift so groß, dass der Text in die Blase passt: das längste Wort in die Breite, alles zusammen in die Höhe
         const fs = Math.min(gross ? 26 : 16, k.r * Math.sqrt(1.4 / Math.max(4, k.len)), (k.r * 1.56) / (Math.max(4, k.wort) * 0.6));
         el.style.fontSize = `${Math.max(7.5, fs).toFixed(1)}px`;
+      }
+    }
+    // M415: Tropfen — eine Scheibe je Idee; in einer Gruppe um den Rand der Gruppe größer (die Scheiben einer Gruppe
+    // fließen so zu einem Tropfen zusammen), die gezogene ohne Rand: Sie löst sich sichtbar und fließt woanders hinein.
+    if (tropfenRef.current) {
+      const gezogen = zug.current?.bewegt ? zug.current.id : null;
+      for (const [bid, k] of koerper.current) {
+        const f = formen.current.get(bid);
+        if (!f) continue;
+        const R = k.r + (k.g && bid !== gezogen && gruppenRef.current.includes(k.g) ? TROPFEN_RAND : 0);
+        setzen(f, k.x - R, k.y - R, R * 2, R * 2);
+      }
+      for (const [gid, f] of kernFormen.current) {
+        let n = 0;
+        for (const [bid, k] of koerper.current) if (k.g === gid && bid !== gezogen) n += 1;
+        const s0 = scheibe(gid, gezogen ?? undefined);
+        // leer: der ganze Platz; ab drei Ideen ein Kern in der Mitte (zwischen drei Kreisen bliebe sonst ein Loch)
+        const r = n === 0 ? s0.r : n >= 3 ? 0.42 * (s0.r - TROPFEN_RAND) : 0;
+        setzen(f, s0.x - r, s0.y - r, r * 2, r * 2);
       }
     }
     // Ringe um die Gruppen: Mitte der Mitglieder, Radius bis zur äußersten Blase. Der Name sitzt am oberen Rand
@@ -348,18 +425,33 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       const s0 = scheibe(gid, zug.current?.bewegt ? zug.current.id : undefined);
       if (el) {
         el.style.opacity = '1';
-        el.style.transform = `translate(${(s0.x - s0.r).toFixed(1)}px, ${(s0.y - s0.r).toFixed(1)}px)`;
-        el.style.width = `${(s0.r * 2).toFixed(1)}px`; el.style.height = `${(s0.r * 2).toFixed(1)}px`;
+        setzen(el, s0.x - s0.r, s0.y - s0.r, s0.r * 2, s0.r * 2);
       }
       if (nm) {
         nm.style.opacity = '1';
         const halb = nm.offsetWidth / 2;
         // oben am Ring; ragt der Ring oben hinaus, unten — und wenn auch das nicht passt, oben an der Kante der Bühne
-        const oben = s0.y - s0.r - 9; const unten = s0.y + s0.r - 9;
+        // M415: Im Tropfen-Look am oberen Rand des Tropfens (der Kreis um die Gruppe ist dort größer als die Form)
+        let obenRand = s0.y - s0.r;
+        let mitteX = s0.x;
+        if (tropfenRef.current) {
+          // über der obersten Idee: Dort ist die Form oben rund, und die Kuppe wächst sauber aus ihr heraus
+          let o = Infinity;
+          for (const [bid, k] of koerper.current) if (k.g === gid && bid !== (zug.current?.bewegt ? zug.current.id : null) && k.y - k.r - TROPFEN_RAND < o) { o = k.y - k.r - TROPFEN_RAND; mitteX = k.x; }
+          if (o < Infinity) obenRand = o;
+        }
+        // im Tropfen wächst oben eine Kuppe aus der Form, in der der Name steht; sonst sitzt er auf dem Ring
+        const lh = nm.offsetHeight || 18;
+        const oben = tropfenRef.current ? obenRand - lh + 10 : obenRand - 9; const unten = s0.y + s0.r - 9;
         const y = oben >= 3 ? oben : unten <= h - 22 ? unten : 3;
-        nm.style.transform = `translate(${Math.min(Math.max(s0.x - halb, 4), Math.max(4, w - nm.offsetWidth - 4)).toFixed(1)}px, ${y.toFixed(1)}px)`;
+        const x = Math.min(Math.max(mitteX - halb, 4), Math.max(4, w - nm.offsetWidth - 4));
+        const tf = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+        if (nm.style.transform !== tf) nm.style.transform = tf;
+        const kf = kopfFormen.current.get(gid);
+        if (kf) setzen(kf, x - 9, y - 5, nm.offsetWidth + 18, lh + 10);
       }
     }
+    return weit;
   }, [gross, scheibe]);
 
   const schritt = useCallback((): number => {
@@ -384,7 +476,8 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         for (let j = i + 1; j < sch.length; j++) {
           const a = sch[i].s; const b = sch[j].s;
           let dx = b.x - a.x; let dy = b.y - a.y; let dist = Math.hypot(dx, dy);
-          const tiefe = a.r + b.r + 8 - dist;
+          // M415: Tropfen brauchen Luft, sonst flössen benachbarte Gruppen ineinander
+          const tiefe = a.r + b.r + (tropfenRef.current ? 30 : 8) - dist;
           if (tiefe <= 0) continue;
           if (dist < 0.01) { dx = 1; dy = 0; dist = 1; }
           const sx = (dx / dist) * tiefe * 0.11; const sy = (dy / dist) * tiefe * 0.11;
@@ -407,7 +500,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         const a = anker(null); const ax = a.x - k.x; const ay = a.y - k.y; const an = Math.hypot(ax, ay) || 1;
         for (const { s: c } of sch) {
           const dx = k.x - c.x; const dy = k.y - c.y; const dist = Math.hypot(dx, dy) || 1;
-          const tiefe = c.r + k.r + 4 - dist;
+          const tiefe = c.r + k.r + (tropfenRef.current ? 22 : 4) - dist;
           if (tiefe > 0) { k.vx += (dx / dist) * tiefe * 0.05 + (ax / an) * Math.min(tiefe, 40) * 0.05; k.vy += (dy / dist) * tiefe * 0.05 + (ay / an) * Math.min(tiefe, 40) * 0.05; }
         }
       }
@@ -435,7 +528,8 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           if (ks[j][0] === gezogen) continue;
           const a = ks[i][1]; const b = ks[j][1];
           let dx = b.x - a.x; let dy = b.y - a.y; let dist = Math.hypot(dx, dy);
-          const soll = a.r + b.r + (a.g === b.g ? 4 : 12);
+          // gleiche Gruppe: dicht an dicht; freie Tropfen mit Luft (sonst verschmölzen sie); sonst etwas Abstand
+          const soll = a.r + b.r + (a.g === b.g ? (a.g || !tropfenRef.current ? 4 : 18) : tropfenRef.current ? 22 : 12);
           if (dist >= soll) continue;
           if (dist < 0.01) { dx = zahlAus(ks[i][0]) - 0.5; dy = zahlAus(ks[j][0]) - 0.5; dist = Math.hypot(dx, dy) || 1; }
           const nx = dx / dist; const ny = dy / dist; const tiefe = soll - dist;
@@ -459,20 +553,39 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     return ks.length ? energie / ks.length : 0;
   }, [anker, scheibe]);
 
+  /** M415: Lage aller Blasen vor 20 Bildern — für die Ruhe über ein Fenster (siehe bild) */
+  const fenster = useRef<{ n: number; lage: Map<string, [number, number]> }>({ n: 0, lage: new Map() });
   const wecken = useCallback(() => {
     ruhe.current = 0;
+    fenster.current = { n: 0, lage: new Map() };
     if (ruhig) { for (let i = 0; i < 400; i++) if (schritt() < 0.002 && i > 30) break; zeichnen(); return; }
     if (lauf.current != null) return;
     const bild = () => {
+      const vor = [...koerper.current.values()].map((k) => [k.x, k.y, k.r]);
       const e = schritt();
+      // M415: Ruhe auch dann, wenn sich je Bild kaum noch etwas bewegt — vorher krochen die Blasen um Hundertstel
+      // Punkte weiter (zwei Kräfte im Gleichgewicht), und die Rechnung lief endlos; im Tropfen-Look zeichnete der
+      // Filter so jedes Bild neu
+      let schub = 0; let i = 0;
+      for (const k of koerper.current.values()) { const v = vor[i++]; if (v) schub = Math.max(schub, Math.abs(k.x - v[0]), Math.abs(k.y - v[1]), Math.abs(k.r - v[2])); }
       zeichnen();
-      ruhe.current = e < 0.004 && !zug.current ? ruhe.current + 1 : 0;
+      ruhe.current = (e < 0.004 || schub < 0.1) && !zug.current ? ruhe.current + 1 : 0;
+      // M415: … oder über 20 Bilder hinweg hat sich keine Blase um mehr als einen Punkt bewegt. Eine Blase, die gegen
+      // ihre Nachbarin drückt, pendelt sonst im Takt weniger Bilder auf der Stelle (Energie bleibt hoch, Weg null).
+      const fe = fenster.current;
+      if (++fe.n % 20 === 0) {
+        let netto = 0;
+        for (const [kid, k] of koerper.current) { const alt = fe.lage.get(kid); netto = Math.max(netto, alt ? Math.hypot(k.x - alt[0], k.y - alt[1]) : Infinity); fe.lage.set(kid, [k.x, k.y]); }
+        if (fe.n >= 60 && netto < 1 && !zug.current) ruhe.current = 46;
+      }
       if (ruhe.current > 45) { lauf.current = null; return; }   // alles ruht: Schluss mit Rechnen
       lauf.current = requestAnimationFrame(bild);
     };
     lauf.current = requestAnimationFrame(bild);
   }, [ruhig, schritt, zeichnen]);
   useEffect(() => () => { if (lauf.current != null) cancelAnimationFrame(lauf.current); }, []);
+  // M415: Darstellung gewechselt (oder Liste zu): neue Abstände, und die Scheiben der Tropfen brauchen ihre Lage
+  useEffect(() => { wecken(); }, [tropfen, liste, wecken]);
 
   /**
    * Radien an den Platz anpassen: Die Blasen sollen die Bühne gut füllen, aber nie überfüllen — zusammen höchstens
@@ -519,7 +632,12 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       if (k) { k.ziel = zielR; k.g = b.gruppe; k.len = len; k.wort = wort; return; }
       // Neue fliegen vom Rand herein — von einer Stelle, die aus ihrer Kennung folgt (auf jedem Gerät dieselbe)
       const winkel = zahlAus(b.id) * Math.PI * 2;
-      koerper.current.set(b.id, { x: w / 2 + Math.cos(winkel) * w * 0.42, y: h / 2 + Math.sin(winkel) * h * 0.42, vx: 0, vy: 0, r: zielR * 0.4, ziel: zielR, g: b.gruppe, len, wort });
+      // M415: per Doppelklick angelegt — sie entsteht genau dort
+      const st = b.ids.map((x) => startHier.current.get(x)).find(Boolean);
+      for (const x of b.ids) startHier.current.delete(x);
+      koerper.current.set(b.id, st
+        ? { x: st.x, y: st.y, vx: 0, vy: 0, r: zielR * 0.3, ziel: zielR, g: b.gruppe, len, wort }
+        : { x: w / 2 + Math.cos(winkel) * w * 0.42, y: h / 2 + Math.sin(winkel) * h * 0.42, vx: 0, vy: 0, r: zielR * 0.4, ziel: zielR, g: b.gruppe, len, wort });
     });
     felderLegen();
     wecken();
@@ -541,7 +659,10 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   }, [radienSetzen]);
 
   // Blasen ↔ Körper abgleichen: Verschwundene fallen weg, Radius und Gruppe folgen
-  useEffect(() => { radienSetzen(); }, [blasen, radienSetzen, gruppen.length]);
+  // M415: nur, wenn sich an den Blasen wirklich etwas geändert hat — die Liste ist nach jedem Neuzeichnen ein neues
+  // Objekt, und jedes Mal die Physik zu wecken, ließ die Blasen nie zur Ruhe kommen
+  const blasenStand = useMemo(() => JSON.stringify(blasen.map((b) => [b.id, b.gruppe, b.text.length, b.mal, b.punkte])), [blasen]);
+  useEffect(() => { radienSetzen(); }, [blasenStand, radienSetzen, gruppen.length]);
 
   // Ziehen: die Blase folgt dem Zeiger; losgelassen über einer anderen Gruppe wechselt sie dorthin
   const punkt = (e: { clientX: number; clientY: number }) => {
@@ -676,7 +797,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   };
 
   return (
-    <div className={`bub ${gross ? 'gross' : ''}`} data-ohne-sperre="" data-taste="bubbles">
+    <div className={`bub ${gross ? 'gross' : ''}${tropfen ? ' tropfen' : ''}`} data-ohne-sperre="" data-taste="bubbles">
       <div className="bub-frage">
         <input
           className="bub-frage-feld nodrag" value={d.frage ?? ''} disabled={fest} placeholder="Worum geht es? Frage hier eintragen …" translate="no"
@@ -700,7 +821,58 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           </span>
         )}
       </div>
-      <div className="bub-buehne nodrag nopan" ref={buehne} onPointerDown={(e) => { if (e.target === e.currentTarget) { setWahl(null); setMenue(false); setGWahl(null); setFallen(null); } }}>
+      <div className="bub-buehne nodrag nopan" ref={buehne} onPointerDown={(e) => { if (e.target === e.currentTarget) { setWahl(null); setMenue(false); setGWahl(null); setFallen(null); } }}
+        onDoubleClick={(e) => {
+          // M415: Doppelklick auf die Fläche (oder einen Tropfen) — hier eine Idee eintragen
+          if (e.target !== e.currentTarget || fest || liste || (regeln.zu && !leiten)) return;
+          const p = punkt(e);
+          const z = zielAn(p, '');
+          if (z.blase) return;
+          setWahl(null); setGWahl(null); setFallen(null);
+          setHier({ x: p.x, y: p.y, g: z.gruppe ?? null });
+        }}>
+        {tropfen && !liste && (
+          <>
+            <svg className="bub-filter" aria-hidden="true" focusable="false">
+              <defs>
+                {/* Eigene Fassung des bekannten „Gooey"-Kniffs: Form = Weichzeichnung der Deckkraft, hart abgeschnitten;
+                    Farbe = stärker weichgezeichnet und deckend gemacht (dort entsteht der Verlauf), in die Form geschnitten;
+                    dazu ein Hauch Schatten unten rechts und eine dünne Kontur um die Form */}
+                <filter id={`bub-tropfen-${id}`} x="-4%" y="-4%" width="108%" height="108%" colorInterpolationFilters="sRGB">
+                  <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="weich" />
+                  <feColorMatrix in="weich" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 26 -12" result="form" />
+                  <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="farbeWeich" />
+                  <feColorMatrix in="farbeWeich" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 60 0" result="farbe" />
+                  <feComposite in="farbe" in2="form" operator="in" result="fuellung" />
+                  <feGaussianBlur in="form" stdDeviation="6" result="formWeich" />
+                  <feOffset in="formWeich" dx="-4" dy="-5" result="versetzt" />
+                  <feComposite in="form" in2="versetzt" operator="out" result="unten" />
+                  <feFlood floodColor="#0b1220" floodOpacity="0.09" result="dunkel" />
+                  <feComposite in="dunkel" in2="unten" operator="in" result="schatten" />
+                  <feMorphology in="form" operator="dilate" radius="1.3" result="dick" />
+                  <feComposite in="dick" in2="form" operator="out" result="rand" />
+                  <feFlood style={{ floodColor: 'var(--bub-kontur)' }} result="randFarbe" />
+                  <feComposite in="randFarbe" in2="rand" operator="in" result="kontur" />
+                  <feMerge><feMergeNode in="fuellung" /><feMergeNode in="schatten" /><feMergeNode in="kontur" /></feMerge>
+                </filter>
+              </defs>
+            </svg>
+            <div className="bub-formen" aria-hidden="true" style={{ filter: `url(#bub-tropfen-${id})` }} data-taste="bub-formen">
+              {gruppen.map(([gid, g]) => (
+                <i key={`kern-${gid}`} className="bub-form" style={{ background: pastell(BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length], 24) }}
+                  ref={(el) => { if (el) kernFormen.current.set(gid, el); else kernFormen.current.delete(gid); }} />
+              ))}
+              {gruppen.map(([gid, g]) => (
+                <i key={`kopf-${gid}`} className="bub-form kuppe" style={{ background: pastell(BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length], 24) }}
+                  ref={(el) => { if (el) kopfFormen.current.set(gid, el); else kopfFormen.current.delete(gid); }} />
+              ))}
+              {blasen.map((b, i) => (
+                <i key={b.id} className="bub-form" style={{ background: pastell(farbeVon(b, i), b.gruppe ? 24 : 32) }}
+                  ref={(el) => { if (el) formen.current.set(b.id, el); else formen.current.delete(b.id); }} />
+              ))}
+            </div>
+          </>
+        )}
         {gruppen.map(([gid, g]) => (
           <div key={gid} className={`bub-ring${gWahl === gid ? ' gewaehlt' : ''}`} ref={(el) => { if (el) ringe.current.set(gid, el); else ringe.current.delete(gid); }}
             style={{ borderColor: BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length], background: `color-mix(in srgb, ${BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length]} 9%, transparent)` }} data-taste="bub-ring" data-gruppe={gid} />
@@ -709,7 +881,13 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           <div
             key={b.id} className={`bub-blase ${wahl === b.id ? 'gewaehlt' : ''} ${(platz.get(b.id) ?? 9) <= 3 ? 'vorn' : ''}${zu(b) ? ' verdeckt' : ''}`}
             ref={(el) => { if (el) knoten.current.set(b.id, el); else knoten.current.delete(b.id); }}
-            style={{ background: farbeVon(b, i) }} role="button" tabIndex={0} data-taste="bub-blase" data-id={b.id} data-punkte={b.punkte} data-mal={b.mal}
+            // M415: Im Tropfen-Look trägt eine Idee in einer Gruppe ihre Fläche selbst (Pastell, Kontur); eine freie ist
+            // der Tropfen darunter — die Blase darüber nur Schrift und Bedienung
+            style={tropfen
+              ? { background: b.gruppe ? pastell(farbeVon(b, i), 46) : 'transparent', ['--bub-farbe' as string]: farbeVon(b, i) }
+              : { background: farbeVon(b, i) }}
+            data-frei={tropfen && !b.gruppe ? '' : undefined}
+            role="button" tabIndex={0} data-taste="bub-blase" data-id={b.id} data-punkte={b.punkte} data-mal={b.mal}
             title={zu(b) ? 'Idee von jemand anderem – noch verdeckt' : b.namen.length && !regeln.anonym ? `${b.text} – von ${b.namen.join(', ')}` : b.text}
             data-verdeckt={zu(b) ? '' : undefined}
             onPointerDown={(e) => ziehStart(e, b)}
@@ -735,13 +913,23 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         ))}
         {gruppen.map(([gid, g]) => (
           <span key={gid} className={`bub-ring-name${gWahl === gid ? ' gewaehlt' : ''}`} translate="no" ref={(el) => { if (el) namen.current.set(gid, el); else namen.current.delete(gid); }}
-            style={{ color: BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length] }} data-taste="bub-ring-name" data-gruppe={gid}
+            style={{ color: BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length], ['--g' as string]: BUBBLE_FARBEN[g.farbe % BUBBLE_FARBEN.length], ...(tropfen ? { fontSize: `${Math.min(19, 12.5 + blasen.filter((b) => b.gruppe === gid).length * 0.9).toFixed(1)}px` } : {}) }} data-taste="bub-ring-name" data-gruppe={gid}
             title="Ziehen verschiebt die Gruppe · Tippen: umbenennen, auflösen" onPointerDown={(e) => gruppeZiehen(e, gid)}>{g.name}</span>
         ))}
+        {hier && (
+          <input className="bub-hier" autoFocus maxLength={140} translate="no" data-taste="bub-hier" enterKeyHint="done"
+            placeholder={hier.g && d.gruppen[hier.g] ? `Idee für „${d.gruppen[hier.g].name}“ …` : 'Neue Idee …'}
+            style={{ left: Math.max(8, Math.min(hier.x - 90, mass.current.w - 188)), top: Math.max(8, Math.min(hier.y - 16, mass.current.h - 40)) }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => { if (e.key === 'Enter') ideeHier((e.target as HTMLInputElement).value); if (e.key === 'Escape') setHier(null); }}
+            onBlur={(e) => ideeHier(e.target.value)} />
+        )}
         {blasen.length === 0 && (
           <div className="bub-leer">
             <b>Noch keine Ideen</b>
-            <span>Unten eintragen und Enter drücken. Gleiche Ideen verschmelzen und wachsen – in einem gemeinsamen Board können alle gleichzeitig beitragen.</span>
+            <span>{tropfen
+              ? 'Unten eintragen und Enter drücken – oder doppelt auf die Fläche klicken. Gleiche Ideen verschmelzen und wachsen – in einem gemeinsamen Board können alle gleichzeitig beitragen.'
+              : 'Unten eintragen und Enter drücken. Gleiche Ideen verschmelzen und wachsen – in einem gemeinsamen Board können alle gleichzeitig beitragen.'}</span>
           </div>
         )}
         {!fest && phase === 'aus' && blasen.length > 0 && !gewaehlt && !gGewaehlt && !fallen && (
@@ -769,6 +957,15 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
               onBlur={(e) => gruppeUmbenennen(gGewaehlt[0], e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { gruppeUmbenennen(gGewaehlt[0], (e.target as HTMLInputElement).value); setGWahl(null); } if (e.key === 'Escape') setGWahl(null); }} />
             <span className="bub-pille-zahl">{blasen.filter((b) => b.gruppe === gGewaehlt[0]).length} Ideen</span>
+            {/* M415: Farbe der Gruppe */}
+            {!fest && (
+              <span className="bub-farben" role="group" aria-label="Farbe der Gruppe" data-taste="bub-gruppe-farben">
+                {BUBBLE_FARBEN.map((f, i) => (
+                  <button key={f} className={`bub-farbe${gGewaehlt[1].farbe % BUBBLE_FARBEN.length === i ? ' an' : ''}`} style={{ ['--f' as string]: f }}
+                    aria-label={`Farbe ${i + 1}`} aria-pressed={gGewaehlt[1].farbe % BUBBLE_FARBEN.length === i} onClick={() => gruppeFarbe(gGewaehlt[0], i)} data-farbe={i} />
+                ))}
+              </span>
+            )}
             {leiten && <button onClick={() => gruppeWeg(gGewaehlt[0])} title="Gruppe auflösen – die Ideen bleiben, frei" data-taste="bub-gruppe-weg">Auflösen</button>}
             <button onClick={() => setGWahl(null)} aria-label="Schließen">✕</button>
           </Pille>
@@ -859,6 +1056,11 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
                     {[1, 3, 5].map((m) => <button key={m} onClick={() => { setMenue(false); timerStart(boardId, m); }} data-min={m}>{m} min</button>)}
                   </span>
                 )}
+                {/* M415: Darstellung der Karte (für alle) */}
+                <span className="bub-timer" data-taste="bub-stil">Darstellung
+                  <button className={tropfen ? 'an' : ''} aria-pressed={tropfen} onClick={() => updateRoh(id, { stil: 'tropfen' })} data-stil="tropfen" title="Gruppen als Tropfen, die ineinanderfließen">Tropfen</button>
+                  <button className={tropfen ? '' : 'an'} aria-pressed={!tropfen} onClick={() => updateRoh(id, { stil: 'klar' })} data-stil="klar" title="Kräftige Blasen in Ringen (wie bisher)">Klar</button>
+                </span>
                 <button onClick={() => { setMenue(false); alsNotiz(); }} disabled={!blasen.length} data-taste="bub-als-notiz">Ergebnis als Notiz ablegen</button>
                 {aiReady(ai) && <button onClick={() => { setMenue(false); void kiGruppen(); }} disabled={kiLaeuft || blasen.length < 3} title="Die Texte der Ideen gehen dafür an den hinterlegten KI-Anbieter"><IWand size={14} /> {kiLaeuft ? 'KI gruppiert …' : 'Mit KI gruppieren'}</button>}
                 {gruppen.map(([gid, g]) => <button key={gid} onClick={() => gruppeWeg(gid)}>Gruppe „<span translate="no">{g.name}</span>" auflösen</button>)}

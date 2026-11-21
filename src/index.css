@@ -7326,6 +7326,79 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 .bub-schalter small { flex-basis: 100%; margin: -2px 0 0 22px; font-size: 10.5px; color: var(--muted); }
 .bub-timer { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink); padding: 2px; flex-wrap: wrap; }
 .bub-timer button { padding: 3px 8px; }
+.bub-timer button.an { border-color: var(--accent); color: var(--accent-strong, var(--accent)); font-weight: 600; }
+/* ---------- M415: Tropfen — Gruppen fließen als Tropfen um ihre Ideen, freie Ideen sind eigene Tropfen ---------- */
+.bub { --bub-grund: #ffffff; --bub-kontur: rgba(34, 38, 48, .72); }
+[data-theme='dark'] .bub { --bub-grund: #1b202a; --bub-kontur: rgba(226, 231, 240, .55); }
+.bub-filter { position: absolute; width: 0; height: 0; overflow: hidden; }
+.bub-formen { position: absolute; inset: 0; pointer-events: none; }
+.bub-form { position: absolute; left: 0; top: 0; width: 0; height: 0; border-radius: 50%; will-change: transform; }
+.bub-form.kuppe { border-radius: 999px; }
+.bub.tropfen .bub-blase {
+  color: var(--ink); font-weight: 650;
+  border: 1.5px solid var(--bub-kontur);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--bub-farbe, #7b8494) 30%, transparent), inset 0 -5px 10px rgba(11, 18, 32, .05);
+}
+/* freie Ideen: Die Fläche ist der Tropfen darunter (samt Kontur) */
+.bub.tropfen .bub-blase[data-frei], .bub.tropfen .bub-blase.zieht { background: transparent !important; border-color: transparent; box-shadow: none; }
+.bub.tropfen .bub-blase.gewaehlt, .bub.tropfen .bub-blase:focus-visible { box-shadow: 0 0 0 3px var(--surface-card), 0 0 0 5px var(--accent); border-color: transparent; }
+.bub.tropfen .bub-blase.ziel { box-shadow: 0 0 0 3px var(--surface-card), 0 0 0 5px var(--accent); }
+.bub.tropfen .bub-blase.verdeckt { color: rgba(255, 255, 255, .92); }
+/* der Ring ist im Tropfen nur noch Ziel und Auswahl — die Form zeichnet der Tropfen */
+.bub.tropfen .bub-ring { border-color: transparent !important; background: transparent !important; }
+.bub.tropfen .bub-ring.ziel, .bub.tropfen .bub-ring.gewaehlt { border: 2px dashed var(--accent) !important; box-shadow: none; }
+/* Der Name steht im Tropfen oben, wie eine Überschrift: ohne Pille, im dunklen Ton der Gruppe */
+.bub.tropfen .bub-ring-name {
+  background: transparent; box-shadow: none; border: none; padding: 0 4px; max-width: 70%;
+  color: color-mix(in srgb, var(--g, currentColor) 62%, var(--ink)) !important; letter-spacing: -0.01em;
+}
+.bub.tropfen .bub-ring-name:hover, .bub.tropfen .bub-ring-name.gewaehlt { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+/* ---------- M415: Das Modul randlos — die Tropfen liegen auf dem Board, die Bedienung tritt zurück ---------- */
+.react-flow__node-bubbles:has(.bub.tropfen) { box-shadow: none; background: transparent; }
+.react-flow__node-bubbles:has(.bub.tropfen):hover, .react-flow__node-bubbles:has(.bub.tropfen).dragging { box-shadow: 0 0 0 1px var(--border-soft); }
+.bubbles-card:has(.bub.tropfen) { background: transparent; }
+.bubbles-card:has(.bub.tropfen) .bub-kopf > svg { color: var(--muted); }
+.bubbles-card:has(.bub.tropfen) .bub-titel { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
+.bub.tropfen .bub-frage-feld { font-size: 14px; }
+.bub.tropfen .bub-ansicht { border-color: transparent; background: transparent; color: var(--muted); }
+.bub.tropfen .bub-ansicht:hover, .bub.tropfen .bub-ansicht.an { background: var(--surface-2); color: var(--ink); }
+/* Ablauf als schlichte Textreiter: der jetzige unterstrichen */
+.bub.tropfen .bub-schritte { gap: 12px; }
+.bub.tropfen .bub-schritt { border: none; background: transparent; border-radius: 0; height: 24px; padding: 0 1px; color: var(--muted); box-shadow: none; }
+.bub.tropfen .bub-schritt i { background: transparent; width: auto; height: auto; font-size: 10.5px; color: inherit; opacity: .7; }
+.bub.tropfen .bub-schritt:hover:not(:disabled) { color: var(--ink); }
+.bub.tropfen .bub-schritt.war { color: var(--ink); }
+.bub.tropfen .bub-schritt.war i { background: transparent; color: inherit; }
+.bub.tropfen .bub-schritt.jetzt { background: transparent; color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.bub.tropfen .bub-schritt.jetzt i { background: transparent; color: var(--accent-strong, var(--accent)); opacity: 1; }
+/* die Bühne ohne Kasten */
+.bub.tropfen .bub-buehne { background: transparent; border-color: transparent; }
+.bub.tropfen .bub-gruppe-neu { border-color: transparent; background: transparent; color: var(--muted); }
+.bub.tropfen .bub-gruppe-neu:hover { color: var(--ink); border-color: transparent; }
+/* unten eine schwebende Leiste: Feld und Knöpfe ohne eigene Rahmen */
+.bub.tropfen .bub-leiste {
+  align-self: center; width: min(100%, 760px); box-sizing: border-box; padding: 4px 4px 4px 14px; gap: 4px;
+  background: var(--surface-card); border: 1px solid var(--border-soft); border-radius: 20px; box-shadow: 0 6px 18px rgba(22, 25, 30, .07);
+}
+.bub.tropfen .bub-eingabe { border: none; background: transparent; padding: 6px 2px; }
+.bub.tropfen .bub-leiste .bub-dazu, .bub.tropfen .bub-leiste .bub-knopf:not(.an) { border-color: transparent; background: transparent; border-radius: 14px; }
+.bub.tropfen .bub-leiste .bub-dazu:hover:not(:disabled), .bub.tropfen .bub-leiste .bub-knopf:not(.an):hover:not(:disabled) { background: var(--surface-2); }
+.bub.tropfen .bub-leiste .bub-knopf.an { border-radius: 14px; }
+.bub.tropfen .bub-pille { border-radius: 16px; }
+/* M415: Idee an der Stelle des Doppelklicks */
+.bub-hier {
+  position: absolute; z-index: 7; width: 180px; height: 32px; box-sizing: border-box; padding: 0 12px;
+  border: 1.5px solid var(--bub-kontur, var(--border)); border-radius: 16px; background: var(--surface-card); color: var(--ink);
+  font: inherit; font-size: 13px; outline: none; box-shadow: 0 8px 22px rgba(22, 25, 30, .16);
+}
+/* M415: Farbe einer Gruppe */
+.bub-farben { display: inline-flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.bub-pille button.bub-farbe {
+  width: 18px; height: 18px; min-width: 0; padding: 0; border-radius: 50%; background: var(--f); border: 2px solid var(--surface-card);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--f) 55%, transparent);
+}
+.bub-pille button.bub-farbe.an { box-shadow: 0 0 0 2px var(--ink); }
+.bub-pille.am-schirm button.bub-farbe { width: 30px; height: 30px; min-height: 0; }
 .bub.gross .bub-schritt { font-size: 13px; height: 26px; border-radius: 13px; }
 .bub.gross .bub-zeile { font-size: 16px; min-height: 36px; }
 /* als Folie: die Bühne füllt die Folie, alles etwas größer */
