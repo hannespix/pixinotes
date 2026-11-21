@@ -77,7 +77,7 @@ console.log('\n════ A: Tokens und Flächen ════');
   const { ctx, P } = await seite();
   const font = await stil(P, 'body', 'fontFamily');
   // M416: Statt der Systemschrift setzt das Tool Manrope (mitgeliefert); ui-rounded weiterhin nicht
-  pruefe('A1 Manrope (M416), Systemschrift als Rückfall, nicht ui-rounded', /^"?Manrope Variable"?, Manrope, system-ui/.test(font) && !/rounded/i.test(font), font);
+  pruefe('A1 Manrope (M416), Systemschrift als Rückfall, nicht ui-rounded', /^"?PN Manrope"?, "?Manrope Variable"?, Manrope, system-ui/.test(font) && !/rounded/i.test(font), font);
   const bgImg = await stil(P, '.react-flow', 'backgroundImage');
   const bg = await stil(P, '.react-flow', 'backgroundColor');
   pruefe('A2 Fläche ohne Verlauf, einfarbig --bg', bgImg === 'none' && bg === 'rgb(243, 244, 246)', `${bgImg} / ${bg}`);

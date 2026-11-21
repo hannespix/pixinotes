@@ -57,10 +57,10 @@ const { ctx, P, fremd } = await auf();
 const a = await P.evaluate(async () => {
   await document.fonts.ready;
   const geladen = [...new Set([...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family.replace(/"/g, '')))];
-  return { geladen, check: document.fonts.check('16px "Manrope Variable"') && document.fonts.check('16px "Playfair Display Variable"') };
+  return { geladen, check: document.fonts.check('16px "PN Manrope"') && document.fonts.check('16px "Playfair Display Variable"') };
 });
-pruefe('A1 Manrope und Playfair Display sind geladen', a.geladen.includes('Manrope Variable') && a.geladen.includes('Playfair Display Variable') && a.check, a);
-pruefe('A2 die Oberfläche setzt Manrope', /^"?Manrope Variable/.test(await familie(P, 'body')) && /Manrope/.test(await familie(P, '.dock button')), await familie(P, 'body'));
+pruefe('A1 Manrope und Playfair Display sind geladen', a.geladen.includes('PN Manrope') && a.geladen.includes('Playfair Display Variable') && a.check, a);
+pruefe('A2 die Oberfläche setzt Manrope', /^"?PN Manrope/.test(await familie(P, 'body')) && /Manrope/.test(await familie(P, '.dock button')), await familie(P, 'body'));
 pruefe('A3 auch der Text in Notizen', /Manrope/.test(await familie(P, ".react-flow__node-note .bn-block-content[data-content-type='paragraph'] .bn-inline-content")), await familie(P, ".react-flow__node-note .bn-block-content[data-content-type='paragraph'] .bn-inline-content"));
 pruefe('A4 die Wortmarke in der Serife', /^"?Playfair Display Variable/.test(await familie(P, '.logo')), await familie(P, '.logo'));
 pruefe('A5 Kartentitel in der Serife', /Playfair/.test(await familie(P, '.react-flow__node-kanban .drag-title')), await familie(P, '.react-flow__node-kanban .drag-title'));
