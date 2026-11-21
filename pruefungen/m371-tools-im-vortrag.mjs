@@ -701,8 +701,10 @@ pruefe('C3 beide sehen das Band über der Präsentation', /Du führst vor/.test(
 await A.P.locator('[data-taste="vortrag-weiter"]').click();
 await warteBis(G.P, async () => /2 \/ 3/.test(await folie(G.P)), 6000);
 let fg = null;
-await warteBis(G.P, async () => { fg = await rahmen(G.P, 'slide-app-frame', 'titel'); return !!fg; }, 6000);
-pruefe('C4 Anna blättert zum Tool → Gerd ist auf derselben Folie, das Tool läuft auch bei ihm', /2 \/ 3/.test(await folie(G.P)) && !!fg, await folie(G.P));
+// M414: Bei Gerd steht das Abbild von Annas Tool (es läuft nicht noch einmal bei ihm, sondern zeigt Annas Stand)
+const istAbbild = async (f) => !!f && (await (await f.frameElement()).evaluate((e) => e.classList.contains('spiegel')).catch(() => false));
+await warteBis(G.P, async () => { fg = await rahmen(G.P, 'slide-app-frame', 'titel'); return istAbbild(fg); }, 8000);
+pruefe('C4 Anna blättert zum Tool → Gerd ist auf derselben Folie und sieht das Tool (Annas Abbild, M414)', /2 \/ 3/.test(await folie(G.P)) && await istAbbild(fg), await folie(G.P));
 await G.P.screenshot({ path: path.join(SD, 'm371-gast-folie.png') });
 
 // ══ D ═══════════════════════════════════════════════════════════════
@@ -722,7 +724,7 @@ const aZurueck = await anteil(fa);
 await warteBis(G.P, async () => Math.abs((await anteil(fg)) - aZurueck) < 0.02, 6000);
 pruefe('D4 zurückrollen ebenso', aZurueck < 0.15 && Math.abs((await anteil(fg)) - aZurueck) < 0.02, `${aZurueck.toFixed(3)} / ${(await anteil(fg)).toFixed(3)}`);
 await fg.evaluate(() => window.scrollTo(0, 2500)); await G.P.waitForTimeout(900);
-pruefe('D5 Gerds eigenes Rollen verstellt bei Anna nichts (es führt nur einer)', Math.abs((await anteil(fa)) - aZurueck) < 0.02, (await anteil(fa)).toFixed(3));
+pruefe('D5 Rollen in Gerds Abbild verstellt bei Anna nichts (es führt nur einer)', Math.abs((await anteil(fa)) - aZurueck) < 0.02, (await anteil(fa)).toFixed(3));
 await A.P.locator('[data-taste="vortrag-weiter"]').click();
 await warteBis(G.P, async () => /3 \/ 3/.test(await folie(G.P)), 6000);
 let fgw = null;
@@ -773,8 +775,8 @@ pruefe('G0 vorher läuft das Tool bei keinem', (await karteA.locator('iframe').c
 await karteA.locator('.happ-startbtn').click();
 await warteBis(G.P, async () => (await karteG.locator('iframe.happ-frame').count()) === 1, 8000);
 let kg = null;
-await warteBis(G.P, async () => { kg = await rahmen(G.P, 'happ-frame', 'titel'); return !!kg; }, 6000);
-pruefe('G1 Anna startet das Tool auf der Karte → es läuft auch bei Gerd', !!kg);
+await warteBis(G.P, async () => { kg = await rahmen(G.P, 'happ-frame', 'titel'); return istAbbild(kg); }, 8000);
+pruefe('G1 Anna startet das Tool auf der Karte → Gerd sieht es (Annas Abbild, M414)', await istAbbild(kg));
 const ka = await rahmen(A.P, 'happ-frame', 'titel');
 await ka.evaluate(() => window.scrollTo(0, 2200)); await A.P.waitForTimeout(200);
 const aKarte = await anteil(ka);

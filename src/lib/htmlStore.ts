@@ -222,6 +222,57 @@ export function storageShim(id: string, initial: Record<string, string>): string
     try{if(d&&d.set)d.set.call(el,w.v);else el.value=w.v;}catch(_){el.value=w.v;}
     return true;
   }
+  /* M414: Spiegeln. Führt jemand vor, schaltet PixiNotes das hier ein: Das Tool meldet dann bei jeder Änderung,
+     wie es GERADE aussieht – ein Abbild ohne Skripte, mit den Werten der Felder und den Zeichenflächen als Bild.
+     Die Zuschauer zeigen dieses Abbild (ohne das Tool selbst laufen zu lassen) und sehen so genau dasselbe,
+     auch wo das Tool mit eigenem Speicherstand, Zufall oder Zeit rechnet. Große Stücke (Bilder, lange Stile)
+     gehen als Teil mit Prüfsumme hinaus, damit sie nur einmal über die Leitung müssen. */
+  var sp=0,spT=null,spMo=null,spAlt='',spLw=[],spLwAm=0,spH={};
+  function spHash(v){var c=spH[v];if(c)return c;var h=2166136261,g=5381;for(var i=0;i<v.length;i++){var k=v.charCodeAt(i);h=Math.imul(h^k,16777619);g=(Math.imul(g,33)^k)|0;}c=(h>>>0).toString(36)+(g>>>0).toString(36)+v.length.toString(36);if(Object.keys(spH).length>60)spH={};spH[v]=c;return c;}
+  function spPlan(){if(sp&&!spT)spT=setTimeout(function(){spT=null;spBild();},250);}
+  function spBild(){
+    if(!sp)return;
+    var teile={},frisch=Date.now()-spLwAm>=900,lw=0,weg=[];if(frisch)spLwAm=Date.now();
+    function teil(v,a){if(v.length<4096)return null;var h=spHash(v);teile[h]=v;return 'pn-teil-'+(a?'a':'t')+':'+h;}
+    var o=document.documentElement,k=o.cloneNode(true),wa=document.createTreeWalker(o,1),wb=document.createTreeWalker(k,1),a=o,b=k;
+    do{
+      var t=a.tagName,i,r;
+      if(t==='SCRIPT'){b.textContent='';b.removeAttribute('src');b.setAttribute('type','pn/aus');continue;}
+      if(/^(IFRAME|FRAME|OBJECT|EMBED)$/.test(t)){weg.push([b,'div']);continue;}
+      if(t==='INPUT'){if(/^(checkbox|radio)$/i.test(a.type)){if(a.checked)b.setAttribute('checked','');else b.removeAttribute('checked');}else if(/^(password|file)$/i.test(a.type))b.removeAttribute('value');else b.setAttribute('value',a.value);}
+      else if(t==='TEXTAREA')b.textContent=a.value;
+      else if(t==='OPTION'){if(a.selected)b.setAttribute('selected','');else b.removeAttribute('selected');}
+      else if(t==='CANVAS'){var u='';try{u=(frisch||!spLw[lw])?a.toDataURL(a.width*a.height>500000?'image/jpeg':'image/png',.85):spLw[lw];}catch(_){}spLw[lw++]=u;weg.push([b,'img',u]);}
+      for(i=b.attributes.length-1;i>=0;i--){var at=b.attributes[i];if(/^on/i.test(at.name)){b.removeAttribute(at.name);continue;}r=teil(at.value,1);if(r)b.setAttribute(at.name,r);}
+      if(t==='STYLE'){r=teil(b.textContent,0);if(r)b.textContent=r;}
+    }while((a=wa.nextNode())&&(b=wb.nextNode()));
+    for(var j=0;j<weg.length;j++){var x=weg[j],e2=document.createElement(x[1]);for(var q=0;q<x[0].attributes.length;q++){var at2=x[0].attributes[q];if(!/^(on|src)/i.test(at2.name))e2.setAttribute(at2.name,at2.value);}if(x[1]==='img'){e2.setAttribute('data-pn-leinwand','');if(x[2])e2.setAttribute('src',teil(x[2],1)||x[2]);}x[0].parentNode.replaceChild(e2,x[0]);}
+    var kopf=k.querySelector('head'),leib=k.querySelector('body'),ha=[];
+    for(var m=0;m<k.attributes.length;m++)ha.push([k.attributes[m].name,k.attributes[m].value]);
+    var bild={k:kopf?kopf.innerHTML:'',b:leib?leib.outerHTML:'<body></body>',a:ha,w:innerWidth},txt=JSON.stringify(bild);
+    if(txt===spAlt)return;spAlt=txt;
+    try{parent.postMessage(txt.length>4e6?{__pixiHapp:APP_ID,bild:null}:{__pixiHapp:APP_ID,bild:bild,teile:teile},'*');}catch(_){}
+  }
+  function spAn(an){
+    sp=an?1:0;
+    if(!an){if(spMo){spMo.disconnect();spMo=null;}return;}
+    spAlt='';
+    if(!spMo){spMo=new MutationObserver(spPlan);spMo.observe(document.documentElement,{subtree:true,childList:true,attributes:true,characterData:true});}
+    spPlan();
+  }
+  document.addEventListener('input',spPlan,true);document.addEventListener('change',spPlan,true);
+  setInterval(function(){if(sp&&document.querySelector('canvas'))spPlan();},1000);
+  window.addEventListener('message',function(e){var d=e.data;if(e.source===parent&&d&&d.__pixiSpiegel===APP_ID)spAn(!!d.an);});
+  /* M414: Wo im Tool zeigt der Laser? PixiNotes fragt mit der Stelle im Rahmen; die Antwort nennt das Element darunter
+     (Weg ab <body>) und die Stelle darin – bei den Zuschauern hängt der Punkt dann am selben Inhalt. */
+  window.addEventListener('message',function(e){
+    var d=e.data;if(e.source!==parent||!d||d.__pixiWo!==APP_ID)return;
+    var x=+d.x,y=+d.y,el=document.elementFromPoint(x,y),r;
+    while(el&&el!==document.body&&el!==document.documentElement){r=el.getBoundingClientRect();if(getComputedStyle(el).display.indexOf('inline')!==0&&r.width>=12&&r.height>=12)break;el=el.parentElement;}
+    var p=(!el||el===document.body||el===document.documentElement)?'':weg(el);if(p===null)p='';
+    r=p===''?{left:0,top:0,width:innerWidth,height:innerHeight}:el.getBoundingClientRect();
+    try{parent.postMessage({__pixiHapp:APP_ID,wo:{n:d.n,p:p,x:r.width?Math.min(1,Math.max(0,(x-r.left)/r.width)):.5,y:r.height?Math.min(1,Math.max(0,(y-r.top)/r.height)):.5}},'*');}catch(_){}
+  });
   window.addEventListener('message',function(e){
     var d=e.data;if(e.source!==parent||!d||d.__pixiEin!==APP_ID||!d.ein||!d.ein.length)return;
     for(var i=0;i<d.ein.length&&i<60;i++){

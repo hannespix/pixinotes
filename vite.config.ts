@@ -42,6 +42,8 @@ export default defineConfig(({ mode }) => ({
                 if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
                 if (/node_modules\/(@blocknote|@tiptap|prosemirror-[a-z-]+|y-prosemirror|yjs|lib0|@mantine|@floating-ui|emoji-mart|@emoji-mart|linkifyjs|micromark[a-z-]*|mdast-[a-z-]+|hast-[a-z-]+|hastscript|unified|remark-[a-z-]+|rehype-[a-z-]+|parse5|vfile[a-z-]*|unist-[a-z-]+|property-information|@ungap)\//.test(id)) return 'editor';
                 if (/node_modules\/(@xyflow|d3-[a-z-]+|classcat|zustand)\//.test(id)) return 'fluss';
+                // M414: Rufnummern-Erkennung samt Länderdaten (rund 110 KB) — Fremdcode, der sich so gut wie nie ändert
+                if (/node_modules\/libphonenumber-js\//.test(id)) return 'rufnummer';
                 return undefined;
               },
             },

@@ -24,6 +24,10 @@
 //   · der Ausschnitt in einer Folie: ganze Seite oder Seitenbreite, Zoom und Rollstand (PDF, Word, Bild, lange Folien);
 //   · die Karte, die der Vorführende auf dem Board im Fokus hat;
 //   · welche Dokument-Karten auf dem Board aufgeklappt sind und welche Seite darin offen liegt.
+//
+// M414: Eigene Tools werden gespiegelt (lib/spiegel.ts): Die Zuschauer sehen ein Abbild dessen, was beim
+// Vorführenden im Tool steht — vorher rechnete jedes Gerät das Tool selbst, mit seinem eigenen Speicherstand,
+// eigenem Zufall und eigener Zeit; nachgestellt wurden nur Eingaben. Das Spiegeln lädt erst nach, wenn es gebraucht wird.
 import { ich, ichIn, LIVE_NACHRICHT, liveSenden, teilnehmerVon } from './gastSync';
 
 export interface Sicht { x: number; y: number; w: number; h: number }
@@ -111,16 +115,44 @@ const eingabeOffen = new Map<string, Eingabe[]>();                              
 const eingabeWarte = new Map<string, ReturnType<typeof setTimeout>>();
 const melden = (boardId: string): void => { window.dispatchEvent(new CustomEvent(VORFUEHR_EREIGNIS, { detail: boardId })); };
 
+/* ---------- M414: Spiegel eigener Tools ---------- */
+/** Ein neues Abbild eines Tools ist da: detail = { boardId, karte } */
+export const SPIEGEL_EREIGNIS = 'pixinotes:spiegel';
+const spiegelKarten = new Set<string>();       // `${boardId}|${karte}` — davon liegt hier ein Abbild vor
+const spiegelModul = () => import('./spiegel');
+/** Liegt ein Abbild dieses Tools vor (ich folge, der Vorführende hat es offen)? */
+export const spiegelDa = (boardId: string, karte: string): boolean => spiegelKarten.has(`${boardId}|${karte}`);
+/** (vom Spiegel-Modul) */
+export function spiegelMerken(boardId: string, karte: string): void {
+  spiegelKarten.add(`${boardId}|${karte}`);
+  window.dispatchEvent(new CustomEvent(SPIEGEL_EREIGNIS, { detail: { boardId, karte } }));
+}
+function spiegelVergessen(boardId: string): void {
+  let weg = false;
+  for (const k of [...spiegelKarten]) if (k.startsWith(`${boardId}|`)) { spiegelKarten.delete(k); weg = true; }
+  if (weg) { void spiegelModul().then((m) => m.vergessen(boardId)); window.dispatchEvent(new CustomEvent(SPIEGEL_EREIGNIS, { detail: { boardId, karte: '' } })); }
+}
+/** Mein Tool meldet sein Abbild — führe ich vor, geht es (gepackt, gedrosselt) an die anderen */
+export function spiegelBild(boardId: string, karte: string, bild: unknown, teile: unknown): void {
+  if (meinBoard !== boardId) return;
+  void spiegelModul().then((m) => m.senden(boardId, karte, bild, teile));
+}
+/** Ich folge und habe von diesem Tool noch kein Abbild: den Vorführenden darum bitten */
+export function spiegelErbitten(boardId: string, karte: string): void {
+  if (folgeIch(boardId) && !spiegelDa(boardId, karte)) liveSenden(boardId, 'zeigBildBitte', { karte });
+}
+
 export const werFuehrtVor = (boardId: string): Zeiger | null => zeiger.get(boardId) ?? null;
 export const ichFuehreVor = (boardId: string): boolean => meinBoard === boardId;
 export const folgeIch = (boardId: string): boolean => !!zeiger.get(boardId) && meinBoard !== boardId && !geloest.has(boardId);
 export function folgenSetzen(boardId: string, an: boolean): void {
-  if (an) geloest.delete(boardId); else geloest.add(boardId);
+  if (an) geloest.delete(boardId); else { geloest.add(boardId); spiegelVergessen(boardId); }
   melden(boardId);
 }
 /** `ausVortrag`: in der Präsentation begonnen — dann endet die Vorführung auch mit ihr (M387) */
 export function vorfuehrenStart(boardId: string, ausVortrag = false): void {
   if (meinBoard && meinBoard !== boardId) vorfuehrenStopp();
+  spiegelVergessen(boardId);      // M414: Abbilder eines anderen Vorführenden gelten nicht mehr
   meinBoard = boardId; meinSeit = Date.now(); gesendet = '';
   const t = ichIn(boardId);
   mitVortrag = ausVortrag;
@@ -157,6 +189,7 @@ export function vorfuehrenStopp(): void {
   if (!b) return;
   meinBoard = null; mitVortrag = false;
   liveSenden(b, 'zeig', { von: ich().id, seit: meinSeit, ende: true });
+  void spiegelModul().then((m) => m.vergessen(b));
   if (zeiger.get(b)?.id === ich().id) zeiger.delete(b);
   melden(b);
 }
@@ -326,6 +359,18 @@ export function initVorfuehren(): void {
   gestartet = true;
   window.addEventListener(LIVE_NACHRICHT, (e) => {
     const d = (e as CustomEvent<{ boardId: string; ereignis: string; inhalt: unknown }>).detail;
+    // M414: Abbilder eigener Tools — nur vom Vorführenden an die, die folgen; die Bitte darum nur an ihn
+    if (d?.ereignis === 'zeigBild' || d?.ereignis === 'zeigTeil') {
+      const r = d.inhalt as { von?: unknown } | undefined;
+      const z = zeiger.get(d.boardId);
+      if (z && z.id === r?.von && folgeIch(d.boardId)) void spiegelModul().then((m) => m.empfangen(d.boardId, d.ereignis, d.inhalt));
+      return;
+    }
+    if (d?.ereignis === 'zeigBildBitte') {
+      const r = d.inhalt as { karte?: unknown } | undefined;
+      if (meinBoard === d.boardId && typeof r?.karte === 'string' && r.karte.length <= 80) void spiegelModul().then((m) => m.erbeten(d.boardId, r.karte as string));
+      return;
+    }
     if (d?.ereignis === 'zeigRoll') {
       const r = d.inhalt as { von?: unknown; karte?: unknown; roll?: Partial<Roll> } | undefined;
       const z = zeiger.get(d.boardId);
@@ -362,7 +407,7 @@ export function initVorfuehren(): void {
     if (!m.ende && !teilnehmerVon(d.boardId).some((t) => t.id === m.von)) return;
     const alt = zeiger.get(d.boardId);
     if (m.ende) {
-      if (alt?.id === m.von) { zeiger.delete(d.boardId); geloest.delete(d.boardId); melden(d.boardId); }
+      if (alt?.id === m.von) { zeiger.delete(d.boardId); geloest.delete(d.boardId); spiegelVergessen(d.boardId); melden(d.boardId); }
       return;
     }
     const s = m.sicht;
@@ -372,8 +417,9 @@ export function initVorfuehren(): void {
     if (meinBoard === d.boardId) {
       if (meinSeit > m.seit) return;        // ich habe später begonnen — der andere hört auf, sobald ihn meine Meldung erreicht
       meinBoard = null; mitVortrag = false;  // jemand hat übernommen
+      void spiegelModul().then((sm) => sm.vergessen(d.boardId));
     }
-    if (alt?.id !== m.von) geloest.delete(d.boardId);
+    if (alt?.id !== m.von) { geloest.delete(d.boardId); spiegelVergessen(d.boardId); }
     zeiger.set(d.boardId, {
       id: m.von, name: typeof m.name === 'string' ? m.name.slice(0, 40) : 'Jemand',
       // M385: die Farbe, in der alle den Vorführenden sehen (verteilt, lib/gastSync.ts) — sonst die gemeldete
@@ -391,7 +437,7 @@ export function initVorfuehren(): void {
   // Meldet sich der Vorführende nicht mehr (Verbindung weg, Fenster zu), endet die Vorführung von selbst
   setInterval(() => {
     for (const [boardId, z] of zeiger) {
-      if (z.id !== ich().id && Date.now() - z.zuletzt > 9000) { zeiger.delete(boardId); geloest.delete(boardId); melden(boardId); }
+      if (z.id !== ich().id && Date.now() - z.zuletzt > 9000) { zeiger.delete(boardId); geloest.delete(boardId); spiegelVergessen(boardId); melden(boardId); }
     }
   }, 3000);
 }

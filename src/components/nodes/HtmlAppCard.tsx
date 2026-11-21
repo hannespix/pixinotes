@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { HtmlAppNode } from '../../types';
 import { composeSrcdoc, htmlUebernehmen, loadAppState, loadAppStateAt, loadHtml, saveAppState, saveHtml } from '../../lib/htmlStore';
 import { kontoDateiNachladen } from '../../lib/kontoSync';
-import { appMelden, EINGABE_EREIGNIS, eingabeAus, eingabeMelden, eingabenErbitten, folgeIch, ROLL_EREIGNIS, rollMelden, rollVergessen, VORFUEHR_EREIGNIS, werFuehrtVor, type Eingabe, type Roll } from '../../lib/vorfuehren';
+import { appMelden, EINGABE_EREIGNIS, eingabeAus, eingabeMelden, eingabenErbitten, folgeIch, ichFuehreVor, ROLL_EREIGNIS, rollMelden, rollVergessen, SPIEGEL_EREIGNIS, spiegelBild, spiegelDa, spiegelErbitten, VORFUEHR_EREIGNIS, werFuehrtVor, type Eingabe, type Roll } from '../../lib/vorfuehren';
 import { loadAppStateFromTeam, loadAttachment, saveAppStateToTeam } from '../../lib/attachments';
 import { triggerDownload } from '../../lib/download';
 import { fremdeWebAdresse } from '../../lib/sicher';
@@ -57,14 +57,49 @@ async function quelleHolen(id: string, teamRef?: string): Promise<boolean> {
   return false;
 }
 
-/** Alle Bauteile, die am Vorführen hängen, zeichnen neu, wenn sich dort etwas tut */
+/** Alle Bauteile, die am Vorführen hängen, zeichnen neu, wenn sich dort etwas tut (M414: auch wenn ein Abbild kommt) */
 function useVorfuehrTakt(): void {
   const [, takt] = useState(0);
   useEffect(() => {
     const auf = () => takt((n) => n + 1);
     window.addEventListener(VORFUEHR_EREIGNIS, auf);
-    return () => window.removeEventListener(VORFUEHR_EREIGNIS, auf);
+    window.addEventListener(SPIEGEL_EREIGNIS, auf);
+    return () => { window.removeEventListener(VORFUEHR_EREIGNIS, auf); window.removeEventListener(SPIEGEL_EREIGNIS, auf); };
   }, []);
+}
+
+/** M414: Das Abbild eines Tools beim Zuschauer (lädt erst, wenn jemand vorführt) */
+const SpiegelRahmen = lazy(() => import('../SpiegelRahmen'));
+/**
+ * M414: Ich führe vor und mein Tool läuft: Es meldet laufend sein Abbild, das an die Zuschauer geht (lib/spiegel.ts).
+ * Eingeschaltet wird die Brücke im Tool erst hier — und nach jedem Neuladen des Tools wieder.
+ */
+function useSpiegelSenden(boardId: string, id: string, frame: RefObject<HTMLIFrameElement | null>, aktiv: boolean): void {
+  useEffect(() => {
+    const f = frame.current;
+    const an = (wert: boolean) => { try { frame.current?.contentWindow?.postMessage({ __pixiSpiegel: id, an: wert }, '*'); } catch { /* weg */ } };
+    if (!aktiv || !f) return;
+    const vomTool = (e: MessageEvent) => {
+      const d = e.data as { __pixiHapp?: string; bild?: unknown; teile?: unknown } | null;
+      if (d?.__pixiHapp !== id || !d.bild || e.source !== frame.current?.contentWindow) return;
+      spiegelBild(boardId, id, d.bild, d.teile);
+    };
+    const geladen = () => an(true);
+    an(true);
+    f.addEventListener('load', geladen);
+    window.addEventListener('message', vomTool);
+    return () => { f.removeEventListener('load', geladen); window.removeEventListener('message', vomTool); an(false); };
+  }, [boardId, id, frame, aktiv]);
+}
+/** M414: Ich folge, das Tool ist beim Vorführenden offen, aber hier liegt noch kein Abbild: darum bitten (ein paar Mal) */
+function useSpiegelErbitten(boardId: string, id: string, noetig: boolean): void {
+  useEffect(() => {
+    if (!noetig) return;
+    let mal = 0;
+    spiegelErbitten(boardId, id);
+    const t = setInterval(() => { if (++mal > 5 || spiegelDa(boardId, id)) clearInterval(t); else spiegelErbitten(boardId, id); }, 3000);
+    return () => clearInterval(t);
+  }, [boardId, id, noetig]);
 }
 
 /**
@@ -278,8 +313,16 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dortAn, dortAus, laeuft, hasSrc, starting]);
-  const stopSelbst = () => { if (dortAn) selbstAus.current = true; vonFolgen.current = false; stop(); };
+  const [, neuZeichnen] = useState(0);
+  const stopSelbst = () => { if (dortAn) selbstAus.current = true; vonFolgen.current = false; stop(); neuZeichnen((n) => n + 1); };
   useMitrollen(boardId, id, frameRef, srcdoc !== null);
+  // M414: Spiegeln — führe ich vor (und präsentiere gerade nicht, dann zeigt die Folie das Tool), geht mein Abbild
+  // hinaus; folge ich und das Tool läuft beim Vorführenden, steht hier sein Abbild statt meines eigenen Tools.
+  const praesentiert = useBoard((st) => st.presenting);
+  useSpiegelSenden(boardId, id, frameRef, srcdoc !== null && !isLive && !praesentiert && ichFuehreVor(boardId));
+  // (selbst angehalten: kein Abbild, bis der Vorführende das Tool neu startet)
+  const spiegel = dortAn && !selbstAus.current && !isLive && spiegelDa(boardId, id);
+  useSpiegelErbitten(boardId, id, dortAn && !selbstAus.current && !isLive && !praesentiert && !spiegel);
 
   /** Neustart lädt auch den zuletzt GESPEICHERTEN App-Zustand frisch */
   const restart = async () => {
@@ -370,7 +413,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     showToast(`„${f.name}" geladen – mit Start ausführen.`);
   };
 
-  const runningUi = srcdoc !== null || liveOn;
+  const runningUi = srcdoc !== null || liveOn || spiegel;
   return (
     <CardShell id={id} selected={selected} minWidth={340} minHeight={260} className="happ-card">
       {/* M160: kein dragHandle mehr — die ganze Karte zieht normal (Griff,
@@ -423,7 +466,9 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
         <div className="happ-body">
           {runningUi ? (
             <>
-              {liveOn && liveAdresse ? (
+              {spiegel ? (
+                <Suspense fallback={null}><SpiegelRahmen boardId={boardId} karte={id} className="happ-frame" title={`${data.name} – Ansicht von ${zeigt?.name ?? ''}`} /></Suspense>
+              ) : liveOn && liveAdresse ? (
                 /* M164 Live: fremde URL direkt — die Same-Origin-Policy des
                    Browsers hält sie von PixiNotes fern (s. SANDBOX_LIVE) */
                 <iframe key={liveKey} className="happ-frame" title={data.name} sandbox={SANDBOX_LIVE} src={liveAdresse} />
@@ -555,6 +600,10 @@ export function HtmlAppSlide({ node }: { node: HtmlAppNode }) {
     return () => window.removeEventListener('message', onMsg);
   }, [id]);
   useMitrollen(boardId, id, frame, srcdoc !== null);
+  // M414: Spiegeln (wie bei der Karte): Ich führe vor → mein Abbild geht hinaus; ich folge → hier steht seins
+  useSpiegelSenden(boardId, id, frame, srcdoc !== null && !isLive && ichFuehreVor(boardId));
+  const spiegel = !isLive && folgeIch(boardId) && spiegelDa(boardId, id);
+  useSpiegelErbitten(boardId, id, !isLive && folgeIch(boardId) && !spiegel);
   // Folie zu: der Rollstand dieser Folie gilt nicht weiter (auf dem Board beginnt das Tool wieder oben)
   useEffect(() => () => rollVergessen(boardId, id), [boardId, id]);
   const fremd = !!liveAdresse;
@@ -562,7 +611,9 @@ export function HtmlAppSlide({ node }: { node: HtmlAppNode }) {
   const vorfuehrung = !!werFuehrtVor(boardId);
   return (
     <div className="slide-app" data-taste="folie-app">
-      {isLive ? (
+      {spiegel ? (
+        <Suspense fallback={null}><SpiegelRahmen boardId={boardId} karte={id} className="slide-app-frame" title={`${data.name} – Ansicht von ${werFuehrtVor(boardId)?.name ?? ''}`} /></Suspense>
+      ) : isLive ? (
         fremd
           ? <iframe ref={frame} className="slide-app-frame" title={data.name} sandbox={SANDBOX_LIVE} src={liveAdresse ?? undefined} />
           : <p className="slide-app-hinweis">Diese Adresse lässt sich nicht einbetten – nur fremde Webseiten (https://…).</p>

@@ -1077,6 +1077,7 @@
 "Vollbild verlassen (Esc)":"Exit fullscreen (Esc)",
 "Vollbild verlassen":"Exit fullscreen",
 "Weitere Funktionen (eigener Tab, Herunterladen, Speicherstand)":"More functions (own tab, download, saved state)",
+"{0} – Ansicht von {1}":"{0} – view of {1}",
 "Zum Bedienen der App zuerst die Karte anklicken":"Click the card first to use the app",
 "Der Inhalt dieser App liegt auf diesem Gerät (noch) nicht vor. Mit dem PixiNotes-Konto und in geteilten Boards reist er mit; sonst die HTML-Datei hier laden.":"This app’s content isn’t on this device (yet). With a PixiNotes account and in shared boards it travels along; otherwise load the HTML file here.",
 "HTML-Datei wählen":"Choose HTML file",
