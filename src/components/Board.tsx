@@ -1,3 +1,4 @@
+import { fokusAnsicht, fokusAnsichtMarkieren, fokusStufeLoesen, fokusZoomFuer, FOKUS_ANSICHT_EREIGNIS, FOKUS_ZOOM_EREIGNIS } from '../lib/fokusAnsicht';
 import { overlayOffen } from '../lib/overlay';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -417,7 +418,7 @@ export function Board() {
         zoomAt(rad.x, rad.y, neu, (rad.x - rect.left - x) / zoom, (rad.y - rect.top - y) / zoom + rutsch);
       } else zoomAt(rad.x, rad.y, neu);
       const f = fokusRef.current;
-      if (f) { fokusFrei.current = neu > f.fit * 1.02; fokusWunsch.current = fokusFrei.current ? neu : null; requestAnimationFrame(() => { fokusSchieben(0, 0); fokusBalken(); }); }   // danach an die Kartenkanten klemmen
+      if (f) { fokusFrei.current = neu > f.fit * 1.02; fokusWunsch.current = fokusFrei.current ? neu : null; requestAnimationFrame(() => { fokusSchieben(0, 0); fokusBalken(); }); window.dispatchEvent(new CustomEvent(FOKUS_ZOOM_EREIGNIS, { detail: { zoom: neu } })); }   // danach an die Kartenkanten klemmen
     };
     const radBild = (jetzt: number) => {
       const ist = Math.log2(getViewport().zoom);
@@ -1241,13 +1242,15 @@ export function Board() {
         const kd = dokument ? Math.max(1, Math.min(breite - 2 * rand, 720) / w) : 1;
         const passtD = Math.min((breite - 2 * rand) / (w * kd), (hoehe - 2 * rand) / (h * kd));
         const inBreiteD = (breite - 2 * rand) / (w * kd);
-        const eingepasst = dokument
+        const automatisch = dokument
           ? kd * (passtD < 1 && passtD >= 0.75 ? passtD : inBreiteD < 1 ? Math.max(0.3, inBreiteD) : grob ? Math.min(2.2, inBreiteD) : 1)
                 : bild ? Math.max(0.2, Math.min(grob ? 4 : 3, passt))
                   // Text: am Finger so breit wie der Schirm; mit der Maus auf eine gute Lesebreite (um 640 Punkte)
                   : text ? Math.max(0.3, Math.min(hoechstens, inBreite, grob ? hoechstens : Math.max(1.25, 640 / w)))
                     : schmal ? Math.min(1, Math.max(0.3, inBreite))
                       : Math.max(0.3, Math.min(hoechstens, Math.max(passt, Math.min(inBreite, 1))));
+        // M424: die gewählte Darstellung (Automatisch = die Regel oben, Einpassen, Seitenbreite, Originalgröße) samt Stufe
+        const eingepasst = fokusZoomFuer(fokusAnsicht(), automatisch, passt, inBreite);
         const zoom = eingepasst;
         fokusRef.current = { id: focusCard, oben, hoehe, rand, breite, fit: eingepasst };
         // Frei gezoomt: nicht zurück auf „eingepasst" springen (Seite blättert, Leiste dockt an) — nur klemmen
@@ -1274,9 +1277,15 @@ export function Board() {
         const y = oben + Math.max(rand, frei / 2) - fy * ziel;
         flyingUntil.current = performance.now() + dauer + 180;
         void setViewport({ x, y, zoom: ziel }, { duration: dauer });
+        window.dispatchEvent(new CustomEvent(FOKUS_ZOOM_EREIGNIS, { detail: { zoom: ziel } }));
       };
       fokusFrei.current = false;
       fokusEinpassen.current = () => fahren(220);
+      // M424: jede Karte beginnt in der gewählten Darstellung (ohne eigene Stufe); ändert man sie, fährt die Kamera neu
+      fokusStufeLoesen();
+      fokusAnsichtMarkieren();
+      const ansichtNeu = () => { fokusFrei.current = false; fokusWunsch.current = null; fahren(220); };
+      window.addEventListener(FOKUS_ANSICHT_EREIGNIS, ansichtNeu);
       fahren();
       // M363: Eine neue Seite beginnt oben — auch wenn die vorige bis ans Ende gerollt war
       let seiteZuletzt = seiteVon(focusCard)?.seite;
@@ -1335,7 +1344,7 @@ export function Board() {
         }, 60);
       };
       document.addEventListener('selectionchange', cursorFolgen);
-      return () => { if (raf) cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(cursorTimer); clearInterval(platzWacht); beobachter?.disconnect(); document.removeEventListener('selectionchange', cursorFolgen); window.removeEventListener(SEITEN_EREIGNIS, neueSeite); window.removeEventListener('resize', gedreht); clearTimeout(drehTimer); };
+      return () => { if (raf) cancelAnimationFrame(raf); clearTimeout(timer); clearTimeout(cursorTimer); clearInterval(platzWacht); beobachter?.disconnect(); document.removeEventListener('selectionchange', cursorFolgen); window.removeEventListener(SEITEN_EREIGNIS, neueSeite); window.removeEventListener(FOKUS_ANSICHT_EREIGNIS, ansichtNeu); window.removeEventListener('resize', gedreht); clearTimeout(drehTimer); };
     }
     fokusRef.current = null;
     fokusFrei.current = false;
