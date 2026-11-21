@@ -10,6 +10,8 @@
  *   C  Anna führt vor und gibt im Tool etwas ein: Text, Zahlen und Knopf, Häkchen, Auswahl, Formular (Knopf und
  *      Enter), Enter-Taste, langer Text, frei beschreibbarer Bereich, Klick auf eine Fläche — bei Bernd geschieht
  *      dasselbe. Nicht gespiegelt: Passwortfeld, Verweis. Bernds eigene Eingaben gehen nicht zu Anna.
+ *      M414: Wer folgt, sieht dabei Annas Abbild (lib/spiegel.ts) statt seines eigenen Tools — dieselben Werte;
+ *      selbst eingeben kann Bernd, nachdem er sich gelöst hat (dann geht nichts zu Anna).
  *   D  Bernd lädt neu → sein Tool startet und zeigt die Feldwerte, die Anna schon eingegeben hat.
  *      Ohne Vorführung wird nichts gespiegelt.
  *   E  Texte.
@@ -641,6 +643,18 @@ async function rahmen(P, klasse, id) {
   }
   return null;
 }
+/** M414: Annas Abbild bei dem, der folgt (frisch gesucht — Klasse „spiegel", ohne Skripte) */
+async function abbild(P, klasse = 'happ-frame') {
+  for (const f of P.frames()) {
+    if (f === P.mainFrame()) continue;
+    try {
+      const el = await f.frameElement();
+      if (!(await el.evaluate((e, k) => e.classList.contains(k) && e.classList.contains('spiegel'), klasse))) continue;
+      if (await f.evaluate(() => !!document.getElementById('titel'))) return f;
+    } catch { /* Rahmen ist gerade weg */ }
+  }
+  return null;
+}
 const anteil = (f, sel = null) => f.evaluate((s) => { const e = s ? document.querySelector(s) : document.scrollingElement; return e.scrollTop / Math.max(1, e.scrollHeight - e.clientHeight); }, sel);
 const folie = (P) => P.locator('.presenter .presenter-count').textContent().catch(() => '');
 const imVortrag = (P) => P.locator('.presenter').count();
@@ -751,14 +765,14 @@ pruefe('C-1 ohne Vorführung: Annas Eingabe bleibt bei ihr', (await im(fb0, '#la
 await gruppeAuf(A.P);
 await A.P.locator('[data-taste="vorfuehren"]').click(); await A.P.waitForTimeout(600);
 await warteBis(B.P, async () => /du folgst/.test(await zband(B.P)), 8000);
-pruefe('C-0 Anna beginnt vorzuführen → Bernds schon laufendes Tool zeigt, was sie vorher eingetragen hat', await warteBis(B.P, async () => (await im(fb0, '#lang', 'value')) === 'vorher notiert', 8000), String(await im(fb0, '#lang', 'value')));
+pruefe('C-0 Anna beginnt vorzuführen → bei Bernd steht Annas Tool (ihr Abbild) mit dem, was sie vorher eingetragen hat', await warteBis(B.P, async () => { const f = await abbild(B.P); return !!f && (await im(f, '#lang', 'value')) === 'vorher notiert'; }, 8000), String(await abbild(B.P).then((f) => f && im(f, '#lang', 'value'))));
 await fa0.locator('#lang').click(); await A.P.keyboard.press('Control+A'); await A.P.keyboard.press('Delete'); await A.P.waitForTimeout(400);
 const karteA = A.P.locator('.react-flow__node[data-id="h1"]');
 const karteB = B.P.locator('.react-flow__node[data-id="h1"]');
 let fa = null; let fb = null;
 await warteBis(A.P, async () => { fa = await rahmen(A.P, 'happ-frame', 'titel'); return !!fa; }, 8000);
-await warteBis(B.P, async () => { fb = await rahmen(B.P, 'happ-frame', 'titel'); return !!fb; }, 10000);
-pruefe('C0 das Tool läuft bei beiden', !!fa && !!fb && /du folgst/.test(await zband(B.P)), await zband(B.P));
+await warteBis(B.P, async () => { fb = await abbild(B.P); return !!fb; }, 10000);
+pruefe('C0 das Tool läuft bei Anna, Bernd sieht es', !!fa && !!fb && /du folgst/.test(await zband(B.P)), await zband(B.P));
 await B.P.waitForTimeout(800);
 await tippen(A.P, fa, '#name', 'Hallo Team');
 pruefe('C1 Text in ein Feld → steht bei Bernd', await warteBis(B.P, async () => (await im(fb, '#name', 'value')) === 'Hallo Team', 6000), String(await im(fb, '#name', 'value')));
@@ -790,15 +804,21 @@ await tippen(A.P, fa, '#geheim', 'streng geheim');
 await fa.locator('#verweis').click(); await A.P.waitForTimeout(1200);
 for (const p of A.ctx.pages()) if (p !== A.P) await p.close().catch(() => {});
 const fensterB = B.ctx.pages().length;
-pruefe('C9 nicht gespiegelt: das Passwortfeld und der Klick auf einen Verweis', (await im(fa, '#geheim', 'value')) === 'streng geheim' && (await im(fb, '#geheim', 'value')) === '' && (await im(fa, '#klicks')) === '1' && (await im(fb, '#klicks')) === '0' && fensterB === 1, `${await im(fb, '#geheim', 'value')} ${await im(fa, '#klicks')}/${await im(fb, '#klicks')}`);
+pruefe('C9 nicht gespiegelt: das Passwortfeld; der Verweis öffnet bei Bernd nichts', (await im(fa, '#geheim', 'value')) === 'streng geheim' && (await im(fb, '#geheim', 'value')) === '' && (await im(fa, '#klicks')) === '1' && fensterB === 1, `${await im(fb, '#geheim', 'value')} ${await im(fa, '#klicks')}/${await im(fb, '#klicks')}`);
 {
+  // M414: Das Abbild lässt sich nicht bedienen — wer selbst eingeben will, löst sich und hat sein eigenes Tool
+  pruefe('C10a Bernds Abbild ist nicht bedienbar', (await B.P.evaluate(() => getComputedStyle(document.querySelector('.react-flow__node[data-id="h1"] iframe.spiegel')).pointerEvents)) === 'none');
   const vorA = await im(fa, '#name', 'value');
+  await B.P.locator('[data-taste="zeig-loesen"]').click(); await B.P.waitForTimeout(400);
+  let eigen = null;
+  await warteBis(B.P, async () => { eigen = await rahmen(B.P, 'happ-frame', 'titel'); return !!eigen && !(await abbild(B.P)); }, 10000);
   // der erste Klick wählt bei Bernd die Karte aus, der zweite geht ins Tool
-  await fb.locator('#name').click(); await B.P.waitForTimeout(300); await fb.locator('#name').click(); await B.P.keyboard.press('End');
+  await eigen.locator('#name').click(); await B.P.waitForTimeout(300); await eigen.locator('#name').click(); await B.P.keyboard.press('End');
   await B.P.keyboard.type(' und Bernd', { delay: 25 }); await B.P.waitForTimeout(1200);
-  pruefe('C10 was Bernd (der folgt) selbst eingibt, geht nicht zu Anna', (await im(fa, '#name', 'value')) === vorA && /Bernd/.test(await im(fb, '#name', 'value')), `${await im(fa, '#name', 'value')} / ${await im(fb, '#name', 'value')}`);
+  pruefe('C10 Bernd löst sich und tippt in sein eigenes Tool → bei Anna kommt nichts an', (await im(fa, '#name', 'value')) === vorA && /Bernd/.test(await im(eigen, '#name', 'value')), `${await im(fa, '#name', 'value')} / ${await im(eigen, '#name', 'value')}`);
+  await B.P.locator('[data-taste="zeig-folgen"]').click(); await B.P.waitForTimeout(400);
   await tippen(A.P, fa, '#name', '!');
-  pruefe('C11 Annas nächster Wert gilt wieder für beide', await warteBis(B.P, async () => (await im(fb, '#name', 'value')) === (await im(fa, '#name', 'value')), 6000), `${await im(fa, '#name', 'value')} / ${await im(fb, '#name', 'value')}`);
+  pruefe('C11 er folgt wieder → er sieht Annas Wert', await warteBis(B.P, async () => { fb = await abbild(B.P); return !!fb && (await im(fb, '#name', 'value')) === (await im(fa, '#name', 'value')); }, 8000), `${await im(fa, '#name', 'value')} / ${fb ? await im(fb, '#name', 'value') : '-'}`);
 }
 pruefe('C12 keine Fehler in beiden Fenstern', A.P.fehler.length === 0 && B.P.fehler.length === 0, `${A.P.fehler.join()} ${B.P.fehler.join()}`);
 
@@ -807,8 +827,8 @@ console.log('\n════ D: Später dazukommen; ohne Vorführung ════
 const nameA = await im(fa, '#name', 'value');
 await B.P.reload({ waitUntil: 'networkidle' }); await B.P.waitForTimeout(2500);
 fb = null;
-await warteBis(B.P, async () => { fb = await rahmen(B.P, 'happ-frame', 'titel'); return !!fb; }, 20000);
-pruefe('D1 Bernd lädt neu → das Tool startet bei ihm wieder von selbst (er folgt)', !!fb && /du folgst/.test(await zband(B.P)), await zband(B.P));
+await warteBis(B.P, async () => { fb = await abbild(B.P); return !!fb; }, 20000);
+pruefe('D1 Bernd lädt neu → Annas Tool steht bei ihm wieder von selbst (er folgt)', !!fb && /du folgst/.test(await zband(B.P)), await zband(B.P));
 pruefe('D2 … und zeigt die Feldwerte, die Anna schon eingegeben hat (Text, Häkchen, Auswahl, langer Text)', !!fb && (await warteBis(B.P, async () => (await im(fb, '#name', 'value')) === nameA && (await im(fb, '#haken', 'checked')) === true && (await im(fb, '#wahl', 'value')) === 'blau' && (await im(fb, '#lang', 'value')) === 'Erste Zeile\nzweite', 8000)), fb ? `${await im(fb, '#name', 'value')} ${await im(fb, '#haken', 'checked')} ${await im(fb, '#wahl', 'value')}` : '');
 pruefe('D3 … das Passwort bleibt auch dann bei Anna', !!fb && (await im(fb, '#geheim', 'value')) === '');
 // in der Folien-Präsentation: dasselbe Tool als Folie
@@ -825,7 +845,7 @@ await vortragStart(A.P);
 await warteBis(B.P, async () => (await imVortrag(B.P)) === 1, 8000);
 let sa = null; let sbf = null;
 for (let i = 0; i < 6 && !sa; i += 1) { sa = await rahmen(A.P, 'slide-app-frame', 'titel'); if (!sa) { await A.P.locator('[data-taste="vortrag-weiter"]').click(); await A.P.waitForTimeout(900); } }
-await warteBis(B.P, async () => { sbf = await rahmen(B.P, 'slide-app-frame', 'titel'); return !!sbf; }, 10000);
+await warteBis(B.P, async () => { sbf = await abbild(B.P, 'slide-app-frame'); return !!sbf; }, 10000);
 if (sa && sbf) { await B.P.waitForTimeout(800); await tippen(A.P, sa, '#schnell', 'auf der Folie'); }
 pruefe('D3b auch in der Folien-Präsentation: Annas Eingabe im Tool steht bei Bernd auf derselben Folie', !!sa && !!sbf && (await warteBis(B.P, async () => (await im(sbf, '#schnell', 'value')) === 'auf der Folie', 6000)), sbf ? String(await im(sbf, '#schnell', 'value')) : `${!!sa} ${!!sbf} ${await folie(A.P)} ${await folie(B.P)}`);
 await A.P.keyboard.press('Escape'); await A.P.waitForTimeout(400);

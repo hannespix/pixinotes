@@ -6922,6 +6922,8 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
   transition-property: left, top; transition-timing-function: linear;
 }
 .folien-laser .laser-punkt.mein { transition: opacity .15s; }
+/* M414: Die Stelle liegt hier gerade außerhalb des Bildes – der Punkt steht blass am Rand, in ihrer Richtung */
+.folien-laser .laser-punkt.fern.rand { opacity: .45; }
 .folien-laser .laser-punkt .live-zeiger-name { left: 16px; top: 12px; background: #d91e1e; }
 .presenter-laser { display: inline-flex; align-items: center; gap: 6px; }
 .laser-knopf-punkt { width: 9px; height: 9px; border-radius: 50%; background: #ff4a4a; box-shadow: 0 0 6px 1px rgba(255, 74, 74, .7); }
@@ -6974,6 +6976,8 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 .presenter-slide.app { padding: 0; overflow: hidden; display: flex; }
 .slide-app { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #fff; }
 .slide-app-frame { flex: 1; min-height: 0; width: 100%; border: 0; display: block; background: #fff; }
+/* M414: Das Abbild des Vorführenden zeigt nur – bedienen lässt es sich nicht (wer selbst will, löst sich im Band) */
+.slide-app-frame.spiegel, .happ-frame.spiegel { pointer-events: none; }
 .slide-app-hinweis { margin: auto; padding: 24px; color: var(--muted); font-size: 16px; text-align: center; }
 .slide-app-fuss { flex: none; padding: 6px 14px; font-size: 12px; line-height: 1.35; color: #5b6472; background: #f1f3f6; border-top: 1px solid #dfe3ea; }
 .presenter-head .presenter-team { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
