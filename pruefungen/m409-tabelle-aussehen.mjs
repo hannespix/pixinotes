@@ -208,12 +208,14 @@ const lang = () => {
 };
 /** Was liegt an einem Punkt der Tabelle obenauf – und ist es deckend? */
 const obenauf = (P) => P.evaluate(() => {
-  const r = document.querySelector('.sheet-scroll').getBoundingClientRect();
+  const rEl = document.querySelector('.sheet-scroll'); const r = rEl.getBoundingClientRect();
+  // M413: Im Fokus ist die Karte gezoomt – Maße aus dem Layout mit dem Maßstab auf den Schirm umrechnen
+  const m = r.width / rEl.offsetWidth;
   const deckt = (el) => { const c = getComputedStyle(el); const m = /rgba?\(([^)]+)\)/.exec(c.backgroundColor); const t = m ? m[1].split(',').map((x) => parseFloat(x)) : [0, 0, 0, 0]; return (t.length < 4 || t[3] >= 0.999); };
   const an = (x, y) => { const el = document.elementFromPoint(x, y)?.closest('th, td'); if (!el) return null; const tr = el.closest('tr'); return { art: el.tagName + (tr.parentElement.tagName === 'THEAD' ? ':buchstabe' : tr.classList.contains('sheet-kopfzeile') ? ':kopf' : ':daten'), text: el.textContent.trim().slice(0, 12), deckt: deckt(el) }; };
-  const kopfH = document.querySelector('.sheet-grid thead').offsetHeight; const zeileH = document.querySelector('.sheet-kopfzeile').offsetHeight;
-  return { buchstabe: an(r.left + 200, r.top + kopfH / 2), kopf: an(r.left + 200, r.top + kopfH + zeileH / 2), ecke: an(r.left + 10, r.top + kopfH / 2), kopfNr: an(r.left + 10, r.top + kopfH + zeileH / 2), nr: an(r.left + 10, r.top + kopfH + zeileH + 40), daten: an(r.left + 200, r.top + kopfH + zeileH + 40),
-    kopfUnten: Math.round(document.querySelector('.sheet-kopfzeile td').getBoundingClientRect().bottom - r.top), soll: kopfH + zeileH };
+  const kopfH = document.querySelector('.sheet-grid thead').offsetHeight * m; const zeileH = document.querySelector('.sheet-kopfzeile').offsetHeight * m;
+  return { buchstabe: an(r.left + 200 * m, r.top + kopfH / 2), kopf: an(r.left + 200 * m, r.top + kopfH + zeileH / 2), ecke: an(r.left + 10 * m, r.top + kopfH / 2), kopfNr: an(r.left + 10 * m, r.top + kopfH + zeileH / 2), nr: an(r.left + 10 * m, r.top + kopfH + zeileH + 40 * m), daten: an(r.left + 200 * m, r.top + kopfH + zeileH + 40 * m),
+    kopfUnten: Math.round(document.querySelector('.sheet-kopfzeile td').getBoundingClientRect().bottom - r.top), soll: Math.round(kopfH + zeileH) };
 });
 
 // ---------- C + D: Kopfzeilen beim Rollen; Rad ----------
@@ -263,7 +265,9 @@ console.log('E  Fokus neben der Navigation');
   await P.keyboard.press('Enter'); await P.waitForTimeout(1300);
   const f = await lage(P);
   pruefe('E1 Fokus offen; die Tabelle liegt ganz in der Fläche – rechts nichts abgeschnitten', f.fokus && f.flaeche[0] > 200 && f.karte[0] >= f.flaeche[0] && f.karte[2] <= f.flaeche[2], f);
-  pruefe('E2 sie nutzt die Höhe: mehr als doppelt so viele Zeilen sichtbar wie in der Karte', f.ch >= 600 && f.karte[3] <= f.flaeche[3], f);
+  // M413: Die Karte behält im Fokus ihre Form (vorher wuchs sie in die Höhe und sah anders aus als am Board) – sie kommt näher
+  const form = (q) => (q[2] - q[0]) / (q[3] - q[1]);
+  pruefe('E2 sie behält ihre Form und kommt näher: gleiches Seitenverhältnis, deutlich größer, ganz im Bild', Math.abs(form(f.karte) - k.width / k.height) < 0.02 && f.karte[2] - f.karte[0] > k.width * 1.3 && f.karte[3] <= f.flaeche[3], { ...f, vorher: [Math.round(k.width), Math.round(k.height)] });
   await P.evaluate(() => { document.querySelector('.sheet-scroll').scrollTop = 0; });
   const kf = await P.locator('.react-flow__node').first().boundingBox();
   await P.mouse.move(kf.x + 300, kf.y + 300);

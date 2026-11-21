@@ -114,7 +114,9 @@ console.log('\n════ A: Ein Tipp fährt die Kamera auf die Karte ══�
   const l = await lage(P, 'n1');
   pruefe('A1 Fokus an, Kopf- und Blätterleiste stehen', l.fokus && l.kopf && l.nav, JSON.stringify(l));
   pruefe('A2 die Karte bleibt im Flow – die Fläche ist verschoben und vergrößert, nicht transform:none', /scale\(/.test(l.transform) && !/scale\(1\)/.test(l.transform) && l.pnFocused, l.transform);
-  pruefe('A3 die Karte füllt den Schirm (≥ 70 % Breite, im Bild, mittig)', l.breite >= l.fenster * 0.7 && l.links >= 0 && l.links + l.breite <= l.fenster && Math.abs(l.links - (l.fenster - l.links - l.breite)) <= 3, JSON.stringify(l));
+  // M413: Die Karte wird nicht mehr umgeformt (auf 720 Punkte verbreitert) – sie steht in ihrer Form groß im Bild
+  pruefe('A3 die Karte steht groß und mittig im Bild (≥ 55 % Breite) – in ihrer Form', l.breite >= l.fenster * 0.55 && l.links >= 0 && l.links + l.breite <= l.fenster && Math.abs(l.links - (l.fenster - l.links - l.breite)) <= 3
+    && Math.abs(l.breite / l.hoehe - vorher.breite / vorher.hoehe) < 0.03, JSON.stringify({ l, vorher: [vorher.breite, vorher.hoehe] }));
   pruefe('A4 die Nachbarkarte tritt zurück (gedimmt), die Zeichenebene bleibt sichtbar', parseFloat(l.nachbarOpacity) < 0.5 && l.zeichenebene !== 'none', JSON.stringify({ o: l.nachbarOpacity, z: l.zeichenebene }));
   pruefe('A5 Zoom-Stufe für Text am Finger > 1 (hochskaliert)', parseFloat(l.zoom) > 1.2, l.zoom);
   await P.screenshot({ path: path.join(SD, 'm333-fokus.png') });
@@ -131,7 +133,8 @@ console.log('\n════ A: Ein Tipp fährt die Kamera auf die Karte ══�
   // ══ C: Pinch bleibt, Tipp daneben schließt ═══════════════════════
   console.log('\n════ C: Zwei Finger schließen nicht, ein Tipp daneben schon ════');
   const mitte = { x: l.fenster / 2, y: 400 };
-  await geste(P, [{ id: 1, von: { x: mitte.x - 40, y: mitte.y }, bis: { x: mitte.x - 90, y: mitte.y } }, { id: 2, von: { x: mitte.x + 40, y: mitte.y }, bis: { x: mitte.x + 90, y: mitte.y } }], { schritte: 8, takt: 40 });
+  // (kleiner Zug: Die Karte ist seit M413 schon 2,4-fach – weiter gespreizt füllte sie den Schirm, und „daneben" gäbe es nicht)
+  await geste(P, [{ id: 1, von: { x: mitte.x - 40, y: mitte.y }, bis: { x: mitte.x - 52, y: mitte.y } }, { id: 2, von: { x: mitte.x + 40, y: mitte.y }, bis: { x: mitte.x + 52, y: mitte.y } }], { schritte: 8, takt: 40 });
   await P.waitForTimeout(500);
   pruefe('C1 nach einem Pinch ist der Fokus noch offen', (await lage(P, 'n1')).fokus);
   // Tipp auf freie Fläche rechts unten (neben der Karte)
@@ -143,12 +146,14 @@ console.log('\n════ A: Ein Tipp fährt die Kamera auf die Karte ══�
   pruefe('C3 … und die Kamera steht wieder wie vorher', Math.abs(nachher.links - vorher.links) <= 3 && Math.abs(nachher.breite - vorher.breite) <= 3, `vorher ${vorher.links}/${vorher.breite}, nachher ${nachher.links}/${nachher.breite}`);
 
   // ══ D: Modul im Fokus ═════════════════════════════════════════════
-  console.log('\n════ D: Ein Modul (Zeitplan) bekommt Breite statt Pixel ════');
+  console.log('\n════ D: Ein Modul (Zeitplan) behält seine Form und steht groß im Bild (M413) ════');
+  const gv = await lage(P, 'g1');
   const g = await P.locator('.react-flow__node[data-id="g1"]').boundingBox();
   await P.touchscreen.tap(g.x + g.width / 2, g.y + g.height - 10);
   await P.waitForTimeout(1000);
   const lg = await lage(P, 'g1');
-  pruefe('D1 Zoom 1 – und die Karte füllt die Schirmbreite', lg.fokus && lg.zoom === '1' && lg.breite >= lg.fenster - 10 && lg.links >= 0, JSON.stringify(lg));
+  pruefe('D1 vergrößert, ganz im Bild – und im selben Seitenverhältnis wie auf dem Board (vorher: auf Schirmbreite gezogen)', lg.fokus && parseFloat(lg.zoom) > 1.2 && lg.links >= 0 && lg.links + lg.breite <= lg.fenster
+    && Math.abs(lg.breite / lg.hoehe - gv.breite / gv.hoehe) < 0.03, JSON.stringify({ lg, vorher: [gv.breite, gv.hoehe] }));
   await P.keyboard.press('Escape'); await P.waitForTimeout(700);
   pruefe('D2 Esc schließt', !(await lage(P, 'g1')).fokus);
   await ctx.close();
@@ -164,8 +169,8 @@ console.log('\n════ E: Mit der Maus – Doppelklick öffnet, Esc schlie�
   await P.mouse.click(box.x + box.width / 2, box.y + box.height - 8);
   await P.waitForTimeout(900);
   const l = await lage(P, 'n1');
-  pruefe('E1 ein Klick öffnet den Fokus als Zoom, maßvoll (Zoom ≤ 1,25)', l.fokus && parseFloat(l.zoom) <= 1.25 && parseFloat(l.zoom) >= 1, JSON.stringify(l));
-  pruefe('E2 die Karte wird dabei breiter (bis 720 Punkte), bleibt im Bild', l.breite > vorher.breite && l.links >= 0 && l.links + l.breite <= l.fenster, JSON.stringify({ vorher: vorher.breite, jetzt: l.breite }));
+  pruefe('E1 ein Klick öffnet den Fokus als Zoom, maßvoll (Zoom ≤ 1,6)', l.fokus && parseFloat(l.zoom) <= 1.6 && parseFloat(l.zoom) >= 1.25, JSON.stringify(l));
+  pruefe('E2 die Karte steht dabei größer im Bild – in ihrer Form (M413: nicht mehr auf 720 Punkte verbreitert)', l.breite > vorher.breite && l.links >= 0 && l.links + l.breite <= l.fenster && Math.abs(l.breite / l.hoehe - vorher.breite / vorher.hoehe) < 0.03, JSON.stringify({ vorher: [vorher.breite, vorher.hoehe], jetzt: [l.breite, l.hoehe] }));
   await P.keyboard.press('Escape'); await P.waitForTimeout(700);
   const n = await lage(P, 'n1');
   pruefe('E3 Esc schließt, Kamera und Kartenbreite wie vorher', !n.fokus && Math.abs(n.breite - vorher.breite) <= 3 && Math.abs(n.links - vorher.links) <= 3, JSON.stringify({ vorher, n }));

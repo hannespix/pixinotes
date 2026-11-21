@@ -4964,16 +4964,18 @@ body:has(.sel-toolbar-dock) .sel-toolbar-dock {
 .focus-mode .react-flow__attribution { display: none !important; }
 .focus-mode .react-flow__node.pn-focused {
   z-index: 3 !important;
-  /* Breite statt Pixel: Die Karte wird im Fokus so breit wie der Schirm (abzüglich Rand),
-     gedeckelt auf Text 720 / Module 1200 Layout-Punkte — eine FESTE Breite, unabhängig vom
-     Zoom, damit Kamera und Kartenmaß sich nicht gegenseitig aufschaukeln. Die Kamera-
-     Stufe (Board.tsx) richtet sich dann nach dieser Breite. */
-  min-width: min(calc(var(--fokus-platz, calc(100vw / var(--pn-anz, 1))) - var(--fokus-rand, 32px)), var(--fokus-max, 720px)) !important;
+}
+/* M413: Die Karte behält im Fokus ihre Form – die Kamera fährt heran (Board.tsx). Nur am Telefon füllt ein Modul
+   weiter die Schirmbreite: zusammengeschoben auf die Breite eines Telefons ließe es sich nicht bedienen. */
+@media (max-width: 640px) {
+  .focus-mode .react-flow__node.pn-focused:is(.react-flow__node-kanban, .react-flow__node-gantt, .react-flow__node-week, .react-flow__node-sheet,
+    .react-flow__node-time, .react-flow__node-minutes, .react-flow__node-calendar, .react-flow__node-bubbles, .react-flow__node-mermaid, .react-flow__node-htmlapp) {
+    min-width: calc(var(--fokus-platz, calc(100vw / var(--pn-anz, 1))) - var(--fokus-rand, 8px)) !important;
+  }
 }
 .focus-mode .pn-focused .card-shell,
 .focus-mode .pn-focused .card-body { width: 100% !important; }
-/* M409: Die Rechen-Tabelle wird im Fokus so hoch wie ihr Inhalt, höchstens wie der freie Platz (Board.tsx misst) */
-.focus-mode .react-flow__node-sheet.pn-focused { min-height: var(--fokus-hoch, 0px) !important; max-height: var(--fokus-hoch, none) !important; }
+
 /* Board-Werkzeuge an der Karte treten im Fokus zurück: Verschiebe-Griff, Löschen, Verbindungspunkte */
 .focus-mode .pn-focused .card-grip,
 .focus-mode .pn-focused .react-flow__handle { display: none !important; }
@@ -6655,7 +6657,16 @@ html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important
 .focus-nav.dokument { gap: 2px; }
 .focus-nav.dokument .focus-acts { gap: 2px; align-items: center; overflow-x: auto; scrollbar-width: none; justify-content: safe center; }
 .focus-nav.dokument .focus-acts::-webkit-scrollbar { display: none; }
-.focus-nav.dokument > button { width: 48px; flex: none; }
+/* M413: Seiten blättern – eine Gruppe um die Seitenzahl. Außen an der Leiste steht bei jeder Karte „Karte" */
+.focus-seiten { flex: none; display: inline-flex; align-items: center; border: 1px solid var(--border-soft); border-radius: var(--r); background: var(--surface); margin-right: 4px; }
+.focus-seiten .focus-seite { padding: 0 2px; }
+.focus-nav .focus-seite-knopf { width: 40px; height: 40px; flex: none; color: var(--ink); }
+.focus-seiten .focus-seite input { height: 30px; border-color: transparent; background: var(--surface-2); }
+/* Am Telefon reicht der Platz unten nicht für beide Paare. Bei einem Dokument stehen dort die SEITEN außen (wie
+   bisher – hineingezoomt schiebt der Finger das Blatt, ohne Knöpfe käme man nicht zur nächsten Seite); die
+   Karten-Knöpfe stehen dann im Kopf (FocusSheet). */
+.focus-nav.dokument > .focus-seite-knopf { width: 48px; height: 44px; flex: none; }
+.focus-kopf-karten { flex: none; display: inline-flex; align-items: center; }
 .focus-nav button[aria-disabled='true'] { opacity: .3; cursor: default; }
 .focus-seite { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); padding: 0 6px; white-space: nowrap; }
 .focus-seite input {

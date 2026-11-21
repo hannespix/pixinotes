@@ -4,6 +4,7 @@
 // auswählen, nicht zur nächsten springen, nicht in den Text hinein und wieder heraus.
 // Die Kürzel stehen (wie alle) in lib/tasten.ts; hier werden sie ausgeführt, weil sie die Kamera brauchen.
 import { overlayOffen } from '../lib/overlay';
+import { leseFolge } from '../lib/kartenFolge';
 import { useEffect, type MutableRefObject } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
 import { dokumentHatPfeile } from './nodes/FileCard';
@@ -18,9 +19,8 @@ interface Kamera {
 }
 const mass = (n: AppNode) => ({ w: n.measured?.width ?? n.width ?? 260, h: n.measured?.height ?? n.height ?? 120 });
 const mitte = (n: AppNode) => { const m = mass(n); return { x: n.position.x + m.w / 2, y: n.position.y + m.h / 2 }; };
-/** Lesereihenfolge: Zeile für Zeile von oben, in der Zeile von links */
-/** Karten in Lesefolge: zeilenweise von oben nach unten, in der Zeile von links nach rechts (M390: auch für Teilen und Fokus) */
-export const lesefolge = (ns: AppNode[]) => [...ns].sort((a, b) => (Math.round(mitte(a).y / 160) - Math.round(mitte(b).y / 160)) || (a.position.x - b.position.x));
+/** Karten in Lesefolge: zeilenweise von oben, in der Zeile von links (M390; seit M413 eine Regel für alle: lib/kartenFolge.ts) */
+export const lesefolge = (ns: AppNode[]) => leseFolge(ns);
 
 export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>): void {
   useEffect(() => {

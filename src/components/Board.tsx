@@ -278,6 +278,12 @@ export function Board() {
    * von selbst neu ein — wer in eine PDF-Seite hineingezoomt hat, bleibt dort, auch beim Blättern.
    */
   const fokusFrei = useRef(false);
+  /**
+   * M413: Wer im Fokus näher herangeht, will das bei der nächsten Karte nicht wiederholen. Gemerkt wird die
+   * Zoomstufe selbst (nicht „so viel mehr als eingepasst") – der Text ist dann auf jeder Karte gleich groß.
+   * `null`: eingepasst. Gilt, solange der Fokus offen ist; beim Schließen vergessen.
+   */
+  const fokusWunsch = useRef<number | null>(null);
   const fokusEinpassen = useRef<() => void>(() => {});
   const letzterTipp = useRef<{ x: number; y: number; t: number } | null>(null);
   const fokusGrenzen = useCallback((): { min: number; max: number; passt: boolean } | null => {
@@ -411,7 +417,7 @@ export function Board() {
         zoomAt(rad.x, rad.y, neu, (rad.x - rect.left - x) / zoom, (rad.y - rect.top - y) / zoom + rutsch);
       } else zoomAt(rad.x, rad.y, neu);
       const f = fokusRef.current;
-      if (f) { fokusFrei.current = neu > f.fit * 1.02; requestAnimationFrame(() => { fokusSchieben(0, 0); fokusBalken(); }); }   // danach an die Kartenkanten klemmen
+      if (f) { fokusFrei.current = neu > f.fit * 1.02; fokusWunsch.current = fokusFrei.current ? neu : null; requestAnimationFrame(() => { fokusSchieben(0, 0); fokusBalken(); }); }   // danach an die Kartenkanten klemmen
     };
     const radBild = (jetzt: number) => {
       const ist = Math.log2(getViewport().zoom);
@@ -587,7 +593,7 @@ export function Board() {
         const newZoom = f ? Math.max(f.fit, roh) : roh;
         p.fy += uiMeldenRef.current(newZoom, mid.x, mid.y);   // M404: rutscht der Inhalt unter den Fingern, zieht der Anker mit
         zoomAt(mid.x, mid.y, newZoom, p.fx, p.fy);
-        if (f) fokusFrei.current = newZoom > f.fit * 1.02;
+        if (f) { fokusFrei.current = newZoom > f.fit * 1.02; fokusWunsch.current = fokusFrei.current ? newZoom : null; }
         return;
       }
       const pan = panRef.current;
@@ -662,9 +668,10 @@ export function Board() {
               e.preventDefault();
               const f = fokusRef.current;
               if (f) {
-                if (fokusFrei.current) { fokusFrei.current = false; fokusEinpassen.current(); }
+                if (fokusFrei.current) { fokusFrei.current = false; fokusWunsch.current = null; fokusEinpassen.current(); }
                 else {
                   fokusFrei.current = true;
+                  fokusWunsch.current = clampZoom(f.fit * 2.4);
                   zoomAt(t.clientX, t.clientY, clampZoom(f.fit * 2.4));
                   requestAnimationFrame(() => { fokusSchieben(0, 0); fokusBalken(); });
                 }
@@ -1172,15 +1179,6 @@ export function Board() {
         const intern = getInternalNode(focusCard);
         const fx = intern?.internals.positionAbsolute.x ?? n.position.x;
         const fy = intern?.internals.positionAbsolute.y ?? n.position.y;
-        /* M409: Eine Rechen-Tabelle nutzt im Fokus auch die HÖHE. Sie behielt ihr Kartenmaß (zehn Zeilen sichtbar,
-           darüber und darunter leere Fläche); jetzt wird sie so hoch, wie ihr Inhalt braucht – höchstens so hoch wie
-           der Platz zwischen Kopfzeile und Leisten. Was dann noch übersteht, rollt in der Tabelle. */
-        const rollt = n.type === 'sheet' ? el.querySelector('.sheet-scroll') as HTMLElement | null : null;
-        if (rollt) {
-          const frei = hoehe - 2 * (window.matchMedia('(pointer: coarse)').matches ? 4 : 16);
-          const inhalt = el.offsetHeight - rollt.clientHeight + rollt.scrollHeight;
-          document.documentElement.style.setProperty('--fokus-hoch', `${Math.round(Math.min(frei, Math.max(inhalt, n.height ?? 0)))}px`);
-        } else document.documentElement.style.removeProperty('--fokus-hoch');
         const w = el.offsetWidth, h = el.offsetHeight;
         /* M346: Die Karte ist im Fokus breiter (und als Notiz länger) als auf dem Board — sie legte sich über
            ihre Nachbarn, die abgedunkelt durchschienen: ein Überlappen, das es auf dem Board nicht gibt.
@@ -1216,12 +1214,32 @@ export function Board() {
            Breite und rollt senkrecht; am Finger wird eine schmale Karte dafür auch vergrößert. Hineinzoomen
            geht mit zwei Fingern, Doppeltipp oder Strg+Rad. */
         const inBreite = (breite - 2 * rand) / w;
-        const zoom = dokument && passt < 1 && passt >= 0.75
-          ? passt
-          : dokument && inBreite < 1 ? Math.max(0.3, inBreite)
-            : dokument && grob ? Math.min(2.2, inBreite)
-              : text ? Math.min(grob ? 2.2 : 1.25, Math.max(1, passt)) : 1;
-        fokusRef.current = { id: focusCard, oben, hoehe, rand, breite, fit: zoom };
+        /* M413: Der Fokus zeigt die Karte, WIE SIE IST – nur größer. Bisher wurde sie dafür umgeformt: Notizen
+           auf 720 Punkte verbreitert (der Text brach neu um), Module auf bis zu 1200 (aus einem Hochformat wurde
+           ein Querformat). Jetzt behält jede Karte ihre Maße, und die Kamera fährt heran:
+             · Text (Notiz, Mail …): bis zu einer guten Lesebreite, höchstens 1,6-fach (am Finger 2,4-fach) – eine lange Notiz rollt senkrecht.
+             · Bilder: ganz ins Bild.
+             · Module: ganz ins Bild, aber nie unter ihre Größe auf dem Board, solange sie in die Breite passen.
+           Ausnahme Telefon: Dort füllt ein Modul weiter die Schirmbreite (Stylesheet) – zusammengeschoben auf
+           390 Punkte wäre ein Kanban nicht zu bedienen. Dokumente behalten ihre eigene Regel (M353/M363). */
+        const schmal = breite <= 640;
+        const hoechstens = grob ? 2.4 : 1.6;
+        const bild = n.type === 'image' || (n.type === 'file' && !dokument && !!el.querySelector('img, video'));
+        /* Dokumente: dieselbe Größe auf dem Schirm wie bisher – eine gut lesbare Seitenbreite (um 720 Punkte), die
+           ganze Seite nur, wenn sie dafür wenig schrumpfen muss (M353/M363). Früher wurde dazu die KARTE auf 720
+           verbreitert; jetzt wird um denselben Faktor `kd` gezoomt, und die Karte bleibt, wie sie ist. */
+        const kd = dokument ? Math.max(1, Math.min(breite - 2 * rand, 720) / w) : 1;
+        const passtD = Math.min((breite - 2 * rand) / (w * kd), (hoehe - 2 * rand) / (h * kd));
+        const inBreiteD = (breite - 2 * rand) / (w * kd);
+        const eingepasst = dokument
+          ? kd * (passtD < 1 && passtD >= 0.75 ? passtD : inBreiteD < 1 ? Math.max(0.3, inBreiteD) : grob ? Math.min(2.2, inBreiteD) : 1)
+                : bild ? Math.max(0.2, Math.min(grob ? 4 : 3, passt))
+                  // Text: am Finger so breit wie der Schirm; mit der Maus auf eine gute Lesebreite (um 640 Punkte)
+                  : text ? Math.max(0.3, Math.min(hoechstens, inBreite, grob ? hoechstens : Math.max(1.25, 640 / w)))
+                    : schmal ? Math.min(1, Math.max(0.3, inBreite))
+                      : Math.max(0.3, Math.min(hoechstens, Math.max(passt, Math.min(inBreite, 1))));
+        const zoom = eingepasst;
+        fokusRef.current = { id: focusCard, oben, hoehe, rand, breite, fit: eingepasst };
         // Frei gezoomt: nicht zurück auf „eingepasst" springen (Seite blättert, Leiste dockt an) — nur klemmen
         if (nachfahren && fokusFrei.current) {
           requestAnimationFrame(() => { fokusSchieben(0, 0); fokusBalken(); });
@@ -1235,15 +1253,17 @@ export function Board() {
           fokusScroll(0);
           return;
         }
-        document.documentElement.style.setProperty('--fokus-zoom', String(zoom));
+        document.documentElement.style.setProperty('--fokus-zoom', String(eingepasst));
         document.documentElement.style.setProperty('--fokus-rand', `${2 * rand}px`);
-        document.documentElement.style.setProperty('--fokus-max', text ? '720px' : '1200px');
+        // M413: der gemerkte Zoom der vorigen Karte – nie kleiner als eingepasst
+        const ziel = fokusWunsch.current && fokusWunsch.current > eingepasst * 1.02 ? Math.min(BOARD_ZOOM_MAX, fokusWunsch.current) : eingepasst;
+        fokusFrei.current = ziel > eingepasst * 1.02;
         // Waagerecht mittig, sobald die Karte in die Breite passt — sonst bündig links (schwenken)
-        const x = (w * zoom <= breite - 2 * rand ? (breite - w * zoom) / 2 : rand) - fx * zoom;
-        const frei = hoehe - h * zoom;
-        const y = oben + Math.max(rand, frei / 2) - fy * zoom;
+        const x = (w * ziel <= breite - 2 * rand ? (breite - w * ziel) / 2 : rand) - fx * ziel;
+        const frei = hoehe - h * ziel;
+        const y = oben + Math.max(rand, frei / 2) - fy * ziel;
         flyingUntil.current = performance.now() + dauer + 180;
-        void setViewport({ x, y, zoom }, { duration: dauer });
+        void setViewport({ x, y, zoom: ziel }, { duration: dauer });
       };
       fokusFrei.current = false;
       fokusEinpassen.current = () => fahren(220);
@@ -1309,12 +1329,11 @@ export function Board() {
     }
     fokusRef.current = null;
     fokusFrei.current = false;
+    fokusWunsch.current = null;
     fokusBalken();
     document.querySelectorAll('.react-flow__node[data-fokus-weg]').forEach((k) => k.removeAttribute('data-fokus-weg'));
     document.documentElement.style.removeProperty('--fokus-zoom');
-    document.documentElement.style.removeProperty('--fokus-max');
     document.documentElement.style.removeProperty('--fokus-platz');
-    document.documentElement.style.removeProperty('--fokus-hoch');
     document.documentElement.style.removeProperty('--fokus-rand');
     if (fokusRueckkehr.current) {
       const prev = fokusRueckkehr.current;

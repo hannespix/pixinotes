@@ -131,7 +131,9 @@ console.log('\n════ B: Zoom-Modus (Fokus) ════');
   await P.keyboard.press('Alt+f'); await P.waitForTimeout(1600);
   const f = {}; for (const id of ['n1', 'n2', 'n3', 'n5', 'n6', 'n7']) f[id] = await karte(P, id);
   pruefe('B1 die Notiz mit fester Höhe zeigt im Fokus ihren ganzen Text (kein innerer Überlauf)', f.n1.lh > 600 && f.n1.sh - f.n1.ch <= 4 && !f.n1.rollt, f.n1);
-  pruefe('B2 Nachbarn, die unter der vergrößerten Karte lägen, sind ausgeblendet', ['n2', 'n3', 'n5'].every((id) => f[id].weg && f[id].deckkraft === 0), [f.n2, f.n3, f.n5].map((x) => [x.weg, x.deckkraft]));
+  // M413: Die Karte wird im Fokus nicht mehr verbreitert – sie wächst nur nach unten (ganzer Text). Ausgeblendet wird,
+  // was DARUNTER läge (n3); die Nachbarn daneben (n2, n5) bleiben als abgedunkelte Umgebung stehen.
+  pruefe('B2 der Nachbar, der unter der länger gewordenen Karte läge, ist ausgeblendet; die daneben nicht', f.n3.weg && f.n3.deckkraft === 0 && ['n2', 'n5'].every((id) => !f[id].weg && f[id].deckkraft > 0.1 && f[id].deckkraft < 0.4), [f.n2, f.n3, f.n5].map((x) => [x.weg, x.deckkraft]));
   pruefe('B3 entfernte Karten bleiben als abgedunkelte Umgebung', ['n6', 'n7'].every((id) => !f[id].weg && f[id].deckkraft > 0.1 && f[id].deckkraft < 0.4), [f.n6.deckkraft, f.n7.deckkraft, f.n6.weg, f.n7.weg]);
   const schnitt = (a, b) => a[0] < b[0] + b[2] && a[0] + a[2] > b[0] && a[1] < b[1] + b[3] && a[1] + a[3] > b[1];
   const sichtbarDrauf = ['n2', 'n3', 'n5', 'n6', 'n7'].filter((id) => f[id].deckkraft > 0 && schnitt(f[id].r, f.n1.r));
