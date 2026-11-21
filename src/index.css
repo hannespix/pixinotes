@@ -7889,3 +7889,39 @@ html[data-kopf-eng='an'] .tabs { top: calc(14px + var(--kopf-h) + var(--kopf-luf
 @media (prefers-reduced-motion: reduce) {
   .logo, .tabs:not(.spalte) .tab { transition: none; }
 }
+
+/* ---------- M416: Schrift — eine elegante, zeitlose Serife für Überschriften, eine klare Sans für alles andere ----------
+   Wie im Verantwortungsplaner von Matthias Sütterlin: Playfair Display und Manrope (beide SIL Open Font License,
+   eingebunden in main.tsx). Die Serife bleibt den großen Stellen vorbehalten (Wortmarke, Titel, Überschriften) —
+   in kleinen Größen und in der Bedienung trägt die Sans. „Sehr gut lesbar" setzt weiter überall Atkinson. */
+:root {
+  --font-ui: 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Playfair Display Variable', 'Playfair Display', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+}
+body { font-family: var(--font-ui); }
+/* Knöpfe und Felder erben die Schrift (der Browser gäbe ihnen sonst seine eigene) — ohne Gewicht, jede gezielte Regel gewinnt */
+:where(button, input, select, textarea) { font-family: inherit; }
+/* BlockNote setzt seine Schrift in einer Stilvorlage, die später lädt — doppelte Klasse, damit unsere gilt */
+.bn-container.bn-container { --bn-font-family: var(--font-ui); }
+/* … und setzt am Editor selbst „Inter" fest (nicht über die Variable) */
+.bn-container .bn-editor.bn-default-styles { font-family: var(--bn-font-family); }
+/* die Wortmarke */
+.logo { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -0.01em; }
+.logo span { font-weight: 400; }
+/* Titel und Überschriften */
+.modal-head h2, .help-body h3, .ovc-space-name, .focus-title b, .react-flow__node .drag-title, .bub-leer b,
+.bn-block-content[data-content-type='heading'][data-level='1'], .bn-block-content[data-content-type='heading'][data-level='2'] {
+  font-family: var(--font-display); letter-spacing: 0;
+}
+.react-flow__node .drag-title { font-weight: 600; }
+.ovc-space-name { font-weight: 700; }
+.modal-head h2 { font-weight: 600; }   /* Größe wie bisher (M347: höchstens 16 Punkte) */
+/* „Sehr gut lesbar": auch Titel und Überschriften in Atkinson (die Serife ist dort keine Hilfe) */
+html[data-lesbar='an'] :is(.logo, .modal-head h2, .help-body h3, .ovc-space-name, .focus-title b, .react-flow__node .drag-title, .bub-leer b,
+  .bn-block-content[data-content-type='heading']) { font-family: 'Atkinson Hyperlegible', system-ui, -apple-system, sans-serif; }
+html[data-lesbar='an'] .bn-container.bn-container { --bn-font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; }
+/* Gliederung in den Einstellungen: kleine, gesperrte Versalien statt fetter Zwischentitel (wie „ANSICHT · FARBEN") */
+.modal-section h3:not(.modal-danger h3) { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0 0 10px; }
+/* Titel auf Folien */
+.presenter-slide h3, .slide-bubbles-titel { font-family: var(--font-display); letter-spacing: 0; }
+html[data-lesbar='an'] :is(.presenter-slide h3, .slide-bubbles-titel) { font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; }
