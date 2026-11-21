@@ -14,6 +14,10 @@
  *   C  Bedienung wie zuvor: Board treffen, ziehen (die Insel zieht mit), öffnen; Chips schalten die Ebenen.
  *   D  Dunkler Modus: leisere Inseln.
  *   E  Hilfe und Umbau-Liste.
+ *
+ * M423: „Netzansicht bitte tropfiger und mit mehr farbigen Verläufen wie bei den Ideabubbles … organischer."
+ * Die Inseln sind jetzt zwei Canvas-Flächen (lib/netzTropfen.ts: weichzeichnen, hart schneiden, Farben laufen
+ * ineinander); jedes Projekt hat einen eigenen Ton, jedes Board einen eigenen Verlauf. A1–A4, C2, D1 und F prüfen das.
  */
 // Läuft aus dem Repository: `node pruefungen/m419-netz-tropfen.mjs`
 import { fileURLToPath } from 'node:url';
@@ -113,7 +117,19 @@ const a = await P.evaluate(() => {
   const tropfen = g.querySelector('circle.ov-tropfen');
   const grad = document.getElementById((tropfen.getAttribute('fill').match(/#([^)]+)/) ?? [])[1]);
   const stops = grad ? [...grad.querySelectorAll('stop')].map((s) => getComputedStyle(s).stopColor) : [];
-  const inseln = [...document.querySelectorAll('.ov-insel')].map((i) => ({ k: i.className.baseVal, kreise: i.querySelectorAll('circle').length, bruecken: i.querySelectorAll('line').length, op: +getComputedStyle(i).opacity }));
+  /** Eine Fläche auswerten: Deckkraft (CSS), wie viel ist bemalt, wie viele verschiedene Töne (in 12 Stufen) */
+  const flaeche = (sel) => {
+    const c = document.querySelector(sel); if (!c) return null;
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let bemalt = 0; let kante = 0; const toene = new Set();
+    for (let i = 0; i < d.length; i += 16) {
+      const al = d[i + 3]; if (al > 200) bemalt++; else if (al > 10) kante++;
+      if (al > 200) { const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx - mn > 0.08) { let h = mx === r ? (g - b) / (mx - mn) : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4; h = ((h * 60) + 360) % 360; toene.add(Math.floor(h / 30)); } }
+    }
+    const n = d.length / 16;
+    return { op: +getComputedStyle(c).opacity, bemalt: bemalt / n, kante: kante / n, toene: toene.size, gemalt: +(c.dataset.gemalt ?? 0), breite: parseFloat(c.style.width) };
+  };
+  const inseln = { raum: flaeche('.ov-flaeche-raum'), projekt: flaeche('.ov-flaeche-projekt') };
   const wiki = document.querySelector('.ov-kante-wiki');
   const huelle = document.querySelector('.ov-region path');
   const spaceText = document.querySelector('.ov-region-space text');
@@ -125,11 +141,12 @@ const a = await P.evaluate(() => {
     huelle: huelle && +getComputedStyle(huelle).fillOpacity, raumSchrift: spaceText && getComputedStyle(spaceText).fontFamily,
   };
 });
-pruefe('A1 ein Board ist ein flacher Tropfen in der Farbe seines Bereichs (Privat = zweite Farbe): sanfter Verlauf, kein Schatten, kein Glanz', a.fill === 'url(#netz-tropfen-1)' && a.stops.length === 3 && new Set(a.stops).size === 3 && a.flach && a.letzterKreis, a);
-pruefe('A2 die Karten-Punkte sind kleine Tropfen', a.punkte.length > 0 && a.punkte.every((f) => /^url\(#netz-tropfen-\d\)$/.test(f ?? '')), a.punkte);
-const raum = a.inseln.filter((i) => / ov-insel-space/.test(i.k)); const proj = a.inseln.filter((i) => / ov-insel-project/.test(i.k));
-pruefe('A3 Bereiche und Projekte sind Inseln: je Board ein Kreis, Brücken verbinden alle (Spannbaum)', raum.length === 2 && proj.length === 5 && a.inseln.every((i) => i.kreise >= 1 && i.bruecken === i.kreise - 1) && raum.some((i) => i.kreise === 8), a.inseln);
-pruefe('A4 randlos und leise: die Hülle selbst ist unsichtbar, die Inseln sind zarte Flächen', a.huelle === 0 && a.inseln.every((i) => i.op > 0 && i.op < 0.12), { h: a.huelle, op: a.inseln.map((i) => i.op) });
+pruefe('A1 ein Board ist ein flacher Tropfen mit eigenem Verlauf (zwei Töne), kein Schatten, kein Glanz', a.fill === 'url(#nt-b9)' && a.stops.length === 2 && new Set(a.stops).size === 2 && a.flach && a.letzterKreis, a);
+pruefe('A2 die Karten-Punkte tragen den Verlauf ihres Boards', a.punkte.length > 0 && a.punkte.every((f) => /^url\(#nt-b\d+\)$/.test(f ?? '')), a.punkte);
+const { raum, projekt } = a.inseln;
+pruefe('A3 (M423) Bereiche und Projekte sind organische Tropfen-Flächen: bemalt, mit weicher Kante, gemalt', !!raum && !!projekt && raum.bemalt > 0.1 && projekt.bemalt > 0.05 && projekt.kante > 0.005 && raum.gemalt > 0 && projekt.gemalt > 0, a.inseln);
+pruefe('A4 (M423) farbig: in den Projekt-Tropfen laufen mehrere Töne ineinander (mindestens 4 von 12 Farbtonstufen)', !!projekt && projekt.toene >= 4, a.inseln);
+pruefe('A4b randlos und leise: die Hülle selbst ist unsichtbar, die Flächen durchscheinend', a.huelle === 0 && raum.op > 0 && raum.op < projekt.op && projekt.op < 0.6, { h: a.huelle, raum: raum.op, projekt: projekt.op });
 pruefe('A5 Wikilinks als Perlenschnur (runde Punkte)', /^0[ ,]/.test(a.wiki ?? '') && a.wikiCap === 'round', a);
 pruefe('A6 Bereichsnamen in der Serife', /Newsreader/.test(a.raumSchrift ?? ''), a.raumSchrift);
 const chips = await P.evaluate(() => [...document.querySelectorAll('.ov-graph-toggle')].map((l) => ({ t: l.textContent.trim(), an: l.querySelector('input').checked, bg: getComputedStyle(l).backgroundColor, rund: parseFloat(getComputedStyle(l).borderRadius) > 20, kaestchen: +getComputedStyle(l.querySelector('input')).opacity })));
@@ -160,16 +177,23 @@ const c = await P.evaluate(() => {
   return { x, y, treffer: document.elementFromPoint(x, y)?.closest('.ov-graph-node')?.getAttribute('data-board') };
 });
 pruefe('C1 ein Board wird an seinem Tropfen getroffen', c.treffer === 'b2', c);
+// M423: Takt beim Ziehen — die Fläche wird dabei neu gemalt (halbe Auflösung, jedes dritte Bild)
+const zugTakt = P.evaluate(async () => { const t = []; let last = performance.now(); let an = true; const f = (n) => { t.push(n - last); last = n; if (an) requestAnimationFrame(f); }; requestAnimationFrame(f); await new Promise((x) => setTimeout(x, 900)); an = false; t.sort((x, y) => x - y); return { n: t.length, median: t[Math.floor(t.length / 2)] }; });
 await P.mouse.move(c.x, c.y); await P.mouse.down();
 for (let i = 1; i <= 12; i++) { await P.mouse.move(c.x + i * 8, c.y + i * 4); await P.waitForTimeout(16); }
+for (let i = 1; i <= 24; i++) { await P.mouse.move(c.x + 96 + Math.sin(i / 4) * 40, c.y + 48 + i); await P.waitForTimeout(16); }
+const zt = await zugTakt;
+pruefe('C1b (M423) Ziehen hält den Takt, obwohl die Tropfen-Fläche mitfließt (Median ≤ 20 ms)', zt.median <= 20 && zt.n >= 40, zt);
+const vorher = await P.evaluate(() => +(document.querySelector('.ov-flaeche-projekt').dataset.gemalt ?? 0));
+await P.mouse.up(); await P.waitForTimeout(1500);
 const mitten = await P.evaluate(() => {
+  // Liegt unter dem gezogenen Board jetzt Fläche? (Lage des Boards → Bildpunkt der Projekt-Fläche)
   const m = /translate\(([-\d.e]+)[ ,]+([-\d.e]+)\)/.exec(document.querySelector('.ov-graph-node[data-board="b2"]').getAttribute('transform'));
-  const k = document.querySelector('.ov-insel-project circle[cx]'); const alle = [...document.querySelectorAll('.ov-insel circle')];
-  const mein = alle.filter((e) => Math.abs(+e.getAttribute('cx') - +m[1]) < 0.01 && Math.abs(+e.getAttribute('cy') - +m[2]) < 0.01);
-  return { x: +m[1], y: +m[2], mein: mein.length, k: !!k };
+  const c = document.querySelector('.ov-flaeche-projekt'); const t = /translate\(([-\d.e]+)px, ([-\d.e]+)px\)/.exec(c.style.transform);
+  const sx = c.width / parseFloat(c.style.width); const px = Math.floor((+m[1] - +t[1]) * sx); const py = Math.floor((+m[2] - +t[2]) * sx);
+  return { gemalt: +(c.dataset.gemalt ?? 0), deck: c.getContext('2d').getImageData(px, py, 1, 1).data[3] };
 });
-await P.mouse.up(); await P.waitForTimeout(300);
-pruefe('C2 ziehen bewegt das Board – seine Insel-Kreise (Bereich und Projekt) ziehen mit', mitten.mein === 2, mitten);
+pruefe('C2 (M423) ziehen bewegt das Board – die Tropfen-Fläche fließt mit (neu gemalt, unter dem Board deckend)', mitten.gemalt > vorher && mitten.deck > 200, { vorher, ...mitten });
 await P.locator('.ov-graph-toggle', { hasText: 'Karten' }).click(); await P.waitForTimeout(500);
 pruefe('C3 ein Chip schaltet die Ebene (Karten aus → keine Karten-Punkte)', (await P.locator('.ov-graph-dot').count()) === 0 && !(await P.locator('.ov-graph-toggle', { hasText: 'Karten' }).locator('input').isChecked()));
 await P.locator('.ov-graph-toggle', { hasText: 'Karten' }).click(); await P.waitForTimeout(400);
@@ -187,8 +211,8 @@ await ctx.close();
 console.log('D  Dunkel');
 {
   const { ctx: c2, P: Q } = await seite(true);
-  const d = await Q.evaluate(() => ({ insel: +getComputedStyle(document.querySelector('.ov-insel-space')).opacity }));
-  pruefe('D1 dunkler Modus: Inseln leiser', d.insel < 0.06, d);
+  const d = await Q.evaluate(() => ({ raum: +getComputedStyle(document.querySelector('.ov-flaeche-raum')).opacity, projekt: +getComputedStyle(document.querySelector('.ov-flaeche-projekt')).opacity }));
+  pruefe('D1 dunkler Modus: Flächen leiser als hell', d.raum < 0.2 && d.projekt < 0.46, d);
   await Q.screenshot({ path: path.join(SD, 'm419-netz-dunkel.png') });
   await c2.close();
 }
