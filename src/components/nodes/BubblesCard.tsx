@@ -837,23 +837,19 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
               <defs>
                 {/* Eigene Fassung des bekannten „Gooey"-Kniffs: Form = Weichzeichnung der Deckkraft, hart abgeschnitten;
                     Farbe = stärker weichgezeichnet und deckend gemacht (dort entsteht der Verlauf), in die Form geschnitten;
-                    dazu ein Hauch Schatten unten rechts und eine dünne Kontur um die Form */}
+                    dazu eine dünne Kontur um die Form. Flach, ohne Schatten (M419: „Der 3D-Effekt passt nicht zum
+                    sleeken Flat-Design") — das spart zugleich vier Filterschritte je Bild. */}
                 <filter id={`bub-tropfen-${id}`} x="-4%" y="-4%" width="108%" height="108%" colorInterpolationFilters="sRGB">
                   <feGaussianBlur in="SourceAlpha" stdDeviation="7" result="weich" />
                   <feColorMatrix in="weich" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 26 -12" result="form" />
                   <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="farbeWeich" />
                   <feColorMatrix in="farbeWeich" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 60 0" result="farbe" />
                   <feComposite in="farbe" in2="form" operator="in" result="fuellung" />
-                  <feGaussianBlur in="form" stdDeviation="6" result="formWeich" />
-                  <feOffset in="formWeich" dx="-4" dy="-5" result="versetzt" />
-                  <feComposite in="form" in2="versetzt" operator="out" result="unten" />
-                  <feFlood floodColor="#0b1220" floodOpacity="0.09" result="dunkel" />
-                  <feComposite in="dunkel" in2="unten" operator="in" result="schatten" />
                   <feMorphology in="form" operator="dilate" radius="1.3" result="dick" />
                   <feComposite in="dick" in2="form" operator="out" result="rand" />
                   <feFlood style={{ floodColor: 'var(--bub-kontur)' }} result="randFarbe" />
                   <feComposite in="randFarbe" in2="rand" operator="in" result="kontur" />
-                  <feMerge><feMergeNode in="fuellung" /><feMergeNode in="schatten" /><feMergeNode in="kontur" /></feMerge>
+                  <feMerge><feMergeNode in="fuellung" /><feMergeNode in="kontur" /></feMerge>
                 </filter>
               </defs>
             </svg>

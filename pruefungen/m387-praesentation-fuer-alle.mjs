@@ -752,6 +752,10 @@ await A.P.locator('[data-taste="folie-zurueck"]').click();
 await warteBis(G.P, async () => (await dok(G.P))?.seite === 2, 8000);
 pruefe('B7 zurück per Knopf der Dokument-Leiste → Gerd ist auf Seite 2', (await dok(G.P))?.seite === 2);
 await G.P.screenshot({ path: path.join(SD, 'm387-telefon-pdf.png') });
+pruefe('B7b (M418) am Telefon liegt „Präsentation beenden" ganz im Bild und ist antippbar', await G.P.evaluate(() => {
+  const k = document.querySelector('[aria-label="Präsentation beenden"]'); if (!k) return false; const r = k.getBoundingClientRect();
+  return r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight && document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)?.closest('[aria-label="Präsentation beenden"]') === k;
+}));
 
 // ══ C ═══════════════════════════════════════════════════════════════
 console.log('\n════ C: Der Ausschnitt in der Folie ════');

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
@@ -555,6 +555,31 @@ export function Presenter() {
     }
   }, [dortRoll, art, current?.id, fz.zoom]);
 
+  // M418: Auf dem Handy reicht die Kopfzeile nicht für alle Knöpfe — „Beenden" darf trotzdem nie
+  // aus dem Bild rutschen. Die Zeile misst sich selbst und verdichtet stufenweise:
+  // 1 = Knöpfe nur als Symbol, 2 = zwei Zeilen (oben Name und Beenden, darunter die Werkzeuge).
+  const kopfRef = useRef<HTMLDivElement | null>(null);
+  const kopfPassen = useRef(() => {});
+  kopfPassen.current = () => {
+    const h = kopfRef.current;
+    if (!h) return;
+    // voll: Sie läuft über — oder der Board-Name ist zum Strich geschrumpft
+    const name = h.firstElementChild as HTMLElement | null;
+    const voll = () => h.scrollWidth > h.clientWidth || (!!name && name.clientWidth < Math.min(72, name.scrollWidth));
+    h.dataset.eng = '0';
+    if (voll()) { h.dataset.eng = '1'; if (voll()) h.dataset.eng = '2'; }
+  };
+  useEffect(() => {
+    const h = kopfRef.current;
+    if (!h || typeof ResizeObserver === 'undefined') return;
+    let breite = h.clientWidth;
+    const ro = new ResizeObserver(() => { if (h.clientWidth !== breite) { breite = h.clientWidth; kopfPassen.current(); } });
+    ro.observe(h);
+    return () => ro.disconnect();
+  }, [open]);
+  useLayoutEffect(() => { kopfPassen.current(); },
+    [open, board.name, slides.length, current?.type, teamDa, ichZeige, folge, laser, werkzeug, kommOffen, fz.zoom, board.comments, art]);
+
   if (!open) return null;
   /** im Folien-Zweig unten gibt es die Folie sicher (slides.length > 0) */
   const cur = current as AppNode;
@@ -567,7 +592,7 @@ export function Presenter() {
 
   return (
     <div className={`presenter ${art ? 'mit-dokument' : ''} ${kommOffen ? 'mit-kommentaren' : ''} ${werkzeug ? 'mit-stift' : ''}`} role="dialog" aria-modal="true" aria-label="Präsentation">
-      <div className={`presenter-head ${rand.da ? 'da' : ''}`} {...rand.griff}>
+      <div className={`presenter-head ${rand.da ? 'da' : ''}`} ref={kopfRef} data-eng="0" {...rand.griff}>
         <span translate="no">{board.name}</span>
         <span className="presenter-hint-edit">{art ? 'Doppelklick oder + / − vergrößert · B = Seitenbreite' : current?.type === 'htmlapp' ? 'Läuft auf der Folie · blättern mit ‹ ›' : 'Folien sind direkt editierbar · Strg+Rad zoomt'}</span>
         {/* M403: Darstellung der Folien – ein kleines Symbol; wer selbst gezoomt hat, sieht dort die Stufe */}
@@ -599,19 +624,19 @@ export function Presenter() {
         <span className="presenter-count">{slides.length ? safeIdx + 1 : 0} / {slides.length}</span>
         {/* M371: Die Präsentation dem Team zeigen — dieselbe Folie, dieselbe Seite, bei allen */}
         {(teamDa || ichZeige) && !folge && board.geteiltRolle !== 'lesen' && (
-          <button className={`presenter-team ${ichZeige ? 'an' : ''}`} data-taste="vortrag-team"
+          <button className={`presenter-team ${ichZeige ? 'an' : ''}`} data-taste="vortrag-team" aria-label={ichZeige ? 'Team folgt' : 'Team mitnehmen'}
             title={ichZeige ? 'Vorführen beenden – die anderen blättern wieder selbst' : 'Alle im Board sehen diese Präsentation und blättern mit dir'}
             onClick={() => { vortragAlleinSetzen(ichZeige); if (ichZeige) vorfuehrenStopp(); else vorfuehrenStart(board.id, true); }}>
-            <IMegafon size={14} /> {ichZeige ? 'Team folgt' : 'Team mitnehmen'}
+            <IMegafon size={14} /> <span className="presenter-wort">{ichZeige ? 'Team folgt' : 'Team mitnehmen'}</span>
           </button>
         )}
         {/* M376: Das Publikum reagiert — der Vortragende sieht es aufsteigen */}
         {teamDa && <ReaktionsKnopf boardId={board.id} klasse="presenter-team" />}
         {slides.length > 0 && (
-          <button className={`presenter-team presenter-laser ${laser ? 'an' : ''}`} data-taste="vortrag-laser" aria-pressed={laser}
+          <button className={`presenter-team presenter-laser ${laser ? 'an' : ''}`} data-taste="vortrag-laser" aria-pressed={laser} aria-label="Laser"
             title={laser ? 'Laserpointer ausschalten (L)' : 'Laserpointer: ein roter Punkt statt des Mauszeigers (L)'}
             onClick={() => { setWerkzeug(null); setLaser((v) => !v); }}>
-            <span className="laser-knopf-punkt" aria-hidden="true" /> Laser
+            <span className="laser-knopf-punkt" aria-hidden="true" /> <span className="presenter-wort">Laser</span>
           </button>
         )}
         {/* M394: auf die Folie zeichnen, Kommentare zur Folie — zwei kleine Knöpfe, alles Weitere erst bei Bedarf */}
@@ -628,7 +653,7 @@ export function Presenter() {
             <IComment size={15} />{offeneKomm > 0 && <span className="presenter-zahl" data-taste="vortrag-kommentar-zahl">{offeneKomm}</span>}
           </button>
         )}
-        <button onClick={() => { selbst(); setOpen(false); }} aria-label="Präsentation beenden">✕</button>
+        <button className="presenter-zu" data-taste="vortrag-zu" onClick={() => { selbst(); setOpen(false); }} aria-label="Präsentation beenden" title="Präsentation beenden (Esc)">✕</button>
       </div>
       {slides.length === 0 ? (
         <div className="presenter-slide"><p>Keine präsentierbaren Karten auf diesem Board.</p></div>

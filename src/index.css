@@ -3049,8 +3049,9 @@ dl.leer-wege dd { margin: 0; }
 }
 .ov-graph-zoom button:hover { background: var(--surface-2); color: var(--ink); }
 .ov-graph-node { cursor: pointer; }
-.ov-graph-node circle { fill: var(--surface); stroke: var(--accent); stroke-width: 2; transition: fill .15s; }
-.ov-graph-node:hover circle { fill: var(--accent-soft); }
+/* M419: Board-Kugeln sind Tropfen (Farbe aus dem Verlauf, siehe NetzDefs) — hier nur Kontur und Hover */
+.ov-graph-node .ov-tropfen { stroke: var(--netz-kontur); transition: filter .15s; }
+.ov-graph-node:hover .ov-tropfen { filter: saturate(1.35) brightness(1.03); }
 .ov-graph-node text { font-size: 12px; fill: var(--ink); font-family: inherit; pointer-events: none; }
 .ov-graph-node .ov-graph-count { font-size: 10px; fill: var(--muted); }
 .ov-graph-legend { text-align: center; font-size: 11.5px; color: var(--muted); padding-top: 6px; }
@@ -3124,20 +3125,19 @@ dl.leer-wege dd { margin: 0; }
   color: var(--ink); cursor: pointer; white-space: nowrap;
 }
 .ov-graph-dot { cursor: pointer; }
-.ov-graph-dot circle { fill: var(--surface); stroke: #a09a8a; stroke-width: 1.5; }
-.ov-graph-dot:hover circle { stroke: var(--accent); fill: var(--accent-soft); }
+.ov-graph-dot circle { stroke: var(--netz-kontur); }
+.ov-graph-dot:hover circle { stroke: var(--accent); }
 .ov-graph-dot-label { fill: var(--muted); font-family: inherit; pointer-events: none; }
 .ov-graph-dot:hover .ov-graph-dot-label { fill: var(--accent); }
 
 /* ---------- M193: Netz tiefer integriert — Standort, Suche, Projekt-Filter ---------- */
 /* „Du bist hier": Ring um das aktuell geöffnete Board */
 .ov-graph-here { fill: none; stroke: var(--accent); opacity: 0.5; }
-.ov-graph-node.here circle:not(.ov-graph-here) { fill: var(--accent-soft); }
 .ov-graph-node.here text { font-weight: 700; }
 /* Suche hebt HERVOR statt zu filtern — Nicht-Treffer treten zurück,
    bleiben aber sichtbar, damit der Zusammenhang erhalten bleibt */
 .ov-graph-node.dim, .ov-graph-dot.dim { opacity: 0.22; }
-.ov-graph-node.hit circle:not(.ov-graph-here) { fill: var(--accent); }
+.ov-graph-node.hit .ov-tropfen { stroke: var(--accent); filter: saturate(1.8); }
 .ov-graph-node.hit text { fill: var(--ink); font-weight: 700; }
 .ov-graph-dot.hit circle { fill: var(--accent); stroke: var(--accent-strong); }
 .ov-graph-find { display: flex; align-items: center; gap: 7px; }
@@ -5236,7 +5236,6 @@ body:has(.app.focus-mode) .sel-toolbar-dock button { flex: none; }
    <line>-Kinder im SVG. Weit draußen treten sie hinter die Bänder zurück. */
 /* M223: Der Ausschnitt lebt als eigene Ebene — Verschieben und Zoomen sind
    damit reines Zeichnen statt einer Neuvermessung des SVG. */
-.ov-graph-vp { transform-box: view-box; transform-origin: 0 0; will-change: transform; }
 .ov-graph-svg.geo-space .ov-graph-vp > line,
 .ov-graph-svg.geo-space .ov-graph-suggest { opacity: 0.12; transition: opacity 0.28s ease; }
 .ov-graph-svg .ov-graph-vp > line { transition: opacity 0.28s ease; }
@@ -7891,27 +7890,42 @@ html[data-kopf-eng='an'] .tabs { top: calc(14px + var(--kopf-h) + var(--kopf-luf
 }
 
 /* ---------- M416: Schrift — eine elegante, zeitlose Serife für Überschriften, eine klare Sans für alles andere ----------
-   Wie im Verantwortungsplaner von Matthias Sütterlin: Playfair Display und Manrope (beide SIL Open Font License,
-   eingebunden in main.tsx). Die Serife bleibt den großen Stellen vorbehalten (Wortmarke, Titel, Überschriften) —
-   in kleinen Größen und in der Bedienung trägt die Sans. „Sehr gut lesbar" setzt weiter überall Atkinson. */
-/* Manrope bringt höhere Zeilenmaße mit als die Systemschrift (normale Zeilenhöhe ≈ 1,37 statt ≈ 1,17) — Menüs und
-   Leisten würden spürbar höher, bei großer Anzeigegröße passte das ⋯-Menü nicht mehr an seinen Knopf. Für die
-   lateinischen Zeichen gibt es darum eine eigene Fassung mit den Maßen der Systemschrift; die Buchstaben bleiben. */
+   Die Idee stammt aus dem Verantwortungsplaner von Matthias Sütterlin (dort Playfair Display und Manrope).
+   M420: In PixiNotes wirkte genau diese Paarung unruhig — Playfair Display ist für große Überschriften gezeichnet
+   (unter etwa 20 px flimmern ihre Haarlinien), stand hier aber auch in kleinen Kartentiteln; Manrope hat sehr
+   schmale Wortabstände. Jetzt: Newsreader (optische Größen: klein kräftig und offen, groß fein) und Geist.
+   Die Serife bleibt den großen Stellen vorbehalten (Wortmarke, Dialog- und Folientitel, große Überschriften,
+   Bereiche) — Kartentitel und alle Bedienung trägt die Sans. „Sehr gut lesbar" setzt weiter überall Atkinson. */
+/* Geist bringt höhere Zeilenmaße mit als die Systemschrift — Menüs und Leisten würden spürbar höher, bei großer
+   Anzeigegröße passte das ⋯-Menü nicht mehr an seinen Knopf (m268). Für die lateinischen Zeichen gibt es darum
+   eine eigene Fassung mit den Maßen der Systemschrift; die Buchstaben bleiben. Mit echter Kursiven. */
 @font-face {
-  font-family: 'PN Manrope'; font-style: normal; font-display: swap; font-weight: 200 800;
-  src: url('../node_modules/@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2') format('woff2-variations');
+  font-family: 'PN Geist'; font-style: normal; font-display: swap; font-weight: 100 900;
+  src: url('../node_modules/@fontsource-variable/geist/files/geist-latin-wght-normal.woff2') format('woff2-variations');
   unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
   ascent-override: 92%; descent-override: 25%; line-gap-override: 0%;
 }
 @font-face {
-  font-family: 'PN Manrope'; font-style: normal; font-display: swap; font-weight: 200 800;
-  src: url('../node_modules/@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2') format('woff2-variations');
+  font-family: 'PN Geist'; font-style: normal; font-display: swap; font-weight: 100 900;
+  src: url('../node_modules/@fontsource-variable/geist/files/geist-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+  ascent-override: 92%; descent-override: 25%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'PN Geist'; font-style: italic; font-display: swap; font-weight: 100 900;
+  src: url('../node_modules/@fontsource-variable/geist/files/geist-latin-wght-italic.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+  ascent-override: 92%; descent-override: 25%; line-gap-override: 0%;
+}
+@font-face {
+  font-family: 'PN Geist'; font-style: italic; font-display: swap; font-weight: 100 900;
+  src: url('../node_modules/@fontsource-variable/geist/files/geist-latin-ext-wght-italic.woff2') format('woff2-variations');
   unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
   ascent-override: 92%; descent-override: 25%; line-gap-override: 0%;
 }
 :root {
-  --font-ui: 'PN Manrope', 'Manrope Variable', 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-display: 'Playfair Display Variable', 'Playfair Display', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-ui: 'PN Geist', 'Geist Variable', 'Geist', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Newsreader Variable', 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
 }
 body { font-family: var(--font-ui); }
 /* Knöpfe und Felder erben die Schrift (der Browser gäbe ihnen sonst seine eigene) — ohne Gewicht, jede gezielte Regel gewinnt */
@@ -7921,22 +7935,129 @@ body { font-family: var(--font-ui); }
 /* … und setzt am Editor selbst „Inter" fest (nicht über die Variable) */
 .bn-container .bn-editor.bn-default-styles { font-family: var(--bn-font-family); }
 /* die Wortmarke */
-.logo { font-family: var(--font-display); font-weight: 700; font-size: 19px; letter-spacing: -0.01em; }
+.logo { font-family: var(--font-display); font-weight: 600; font-size: 21px; letter-spacing: -0.012em; font-optical-sizing: auto; }
 .logo span { font-weight: 400; }
 /* Titel und Überschriften */
-.modal-head h2, .help-body h3, .ovc-space-name, .focus-title b, .react-flow__node .drag-title, .bub-leer b,
+/* M420: Kartentitel (.drag-title) stehen wieder in der Sans — viele kleine Serifentitel machten das Board unruhig */
+.modal-head h2, .help-body h3, .ovc-space-name, .focus-title b, .bub-leer b,
 .bn-block-content[data-content-type='heading'][data-level='1'], .bn-block-content[data-content-type='heading'][data-level='2'] {
-  font-family: var(--font-display); letter-spacing: 0;
+  font-family: var(--font-display); letter-spacing: -0.005em; font-optical-sizing: auto;
 }
-.react-flow__node .drag-title { font-weight: 600; }
-.ovc-space-name { font-weight: 700; }
+/* etwas leichter als fett: die Serife trägt die Rangordnung über Form und Größe (BlockNote setzt 700 mit langer Regel — darum :is mit Gewicht) */
+:is(.bn-container, .notiz-ruhend, .presenter-slide, .react-flow__node) .bn-block-outer .bn-block > .bn-block-content[data-content-type='heading']:is([data-level='1'], [data-level='2']) { font-weight: 560; }
+.ovc-space-name { font-weight: 600; }
 .modal-head h2 { font-weight: 600; }   /* Größe wie bisher (M347: höchstens 16 Punkte) */
 /* „Sehr gut lesbar": auch Titel und Überschriften in Atkinson (die Serife ist dort keine Hilfe) */
-html[data-lesbar='an'] :is(.logo, .modal-head h2, .help-body h3, .ovc-space-name, .focus-title b, .react-flow__node .drag-title, .bub-leer b,
+html[data-lesbar='an'] :is(.logo, .modal-head h2, .help-body h3, .ovc-space-name, .focus-title b, .bub-leer b,
   .bn-block-content[data-content-type='heading']) { font-family: 'Atkinson Hyperlegible', system-ui, -apple-system, sans-serif; }
 html[data-lesbar='an'] .bn-container.bn-container { --bn-font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; }
 /* Gliederung in den Einstellungen: kleine, gesperrte Versalien statt fetter Zwischentitel (wie „ANSICHT · FARBEN") */
 .modal-section h3:not(.modal-danger h3) { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; color: var(--muted); margin: 0 0 10px; }
 /* Titel auf Folien */
-.presenter-slide h3, .slide-bubbles-titel { font-family: var(--font-display); letter-spacing: 0; }
+.presenter-slide h3, .slide-bubbles-titel { font-family: var(--font-display); letter-spacing: -0.01em; font-weight: 500; font-optical-sizing: auto; }
 html[data-lesbar='an'] :is(.presenter-slide h3, .slide-bubbles-titel) { font-family: 'Atkinson Hyperlegible', system-ui, sans-serif; }
+
+/* ---------- M418: Präsentation auf dem Handy — „Beenden" bleibt immer erreichbar ---------- */
+/* Die Präsentation liegt über allem, auch über Statusleiste, Kerbe und Home-Leiste (viewport-fit=cover):
+   Ihr Inhalt beginnt erst innerhalb der sicheren Ränder, dorthin reicht jeder Finger. */
+.presenter {
+  padding: var(--safe-top) env(safe-area-inset-right, 0px) var(--safe-bottom) env(safe-area-inset-left, 0px);
+}
+/* Die zurückgezogene Kopfzeile über einem Tool: Sie reicht bis an den Schirmrand und füllt den sicheren Rand,
+   versteckt bleibt nur ihr Inhalt — die Greifkante liegt damit unter der Statusleiste, nicht in ihr. */
+.presenter:has(> .presenter-slide.app) > .presenter-head {
+  padding-top: calc(14px + var(--safe-top));
+  padding-left: calc(22px + env(safe-area-inset-left, 0px));
+  padding-right: calc(22px + env(safe-area-inset-right, 0px));
+  transform: translateY(calc(-100% + var(--safe-top)));
+}
+@media (max-width: 860px) {
+  .presenter:has(> .presenter-slide.app) > .presenter-head {
+    padding-top: calc(8px + var(--safe-top));
+    padding-left: calc(12px + env(safe-area-inset-left, 0px));
+    padding-right: calc(12px + env(safe-area-inset-right, 0px));
+  }
+}
+/* Passt die Kopfzeile nicht (Presenter.tsx misst): erst nur Symbole, dann zwei Zeilen —
+   oben Name und Beenden, darunter die Werkzeuge. */
+.presenter-head:is([data-eng='1'], [data-eng='2']) { gap: 6px; }
+.presenter-head:is([data-eng='1'], [data-eng='2']) .presenter-wort { display: none; }
+.presenter-head:is([data-eng='1'], [data-eng='2']) .presenter-team:not(.presenter-ikon) {
+  display: inline-flex; align-items: center; justify-content: center; padding: 6px 9px;
+}
+.presenter-head[data-eng='2'] { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
+.presenter-head[data-eng='2'] > span:first-child { order: -2; flex: 1 1 calc(100% - 60px); }
+.presenter-head[data-eng='2'] > .presenter-zu { order: -1; }
+.presenter-head > .presenter-zu { flex: none; }
+
+/* ---------- M419: Das Netz im Tropfen-Look — randlos, pastell, flüssig ---------- */
+:root {
+  --netz-kontur: rgba(28, 36, 64, 0.1);
+  --netz-insel: 1;
+}
+:root[data-theme='dark'] { --netz-kontur: rgba(255, 255, 255, 0.09); --netz-insel: 0.62; }
+
+/* Die Ebene, die verschoben und skaliert wird: ein HTML-Element (Overview.tsx, paintVb). Nur während der
+   Bewegung trägt sie will-change — dann schiebt der Compositor ein fertiges Bild; in Ruhe wird scharf gezeichnet. */
+.ov-graph-svg { position: relative; overflow: hidden; }
+.ov-graph-ebene { position: absolute; left: 0; top: 0; width: 1px; height: 1px; transform-origin: 0 0; }
+.ov-graph-ebene.bewegt { will-change: transform; }
+.ov-graph-leinwand { display: block; overflow: visible; }
+
+/* Tropfen: flaches Pastell aus der Bereichsfarbe, gemischt mit der Fläche — ein sanfter diagonaler Verlauf,
+   kein Schatten, kein Glanz (flat wie die Ideabubbles) */
+.ov-tropfen-hell { stop-color: color-mix(in srgb, currentColor 18%, var(--surface)); }
+.ov-tropfen-mitte { stop-color: color-mix(in srgb, currentColor 26%, var(--surface)); }
+.ov-tropfen-rand { stop-color: color-mix(in srgb, currentColor 36%, var(--surface)); }
+html[data-kontrast='hoch'] .ov-graph-node .ov-tropfen { stroke: var(--ink); }
+.ov-graph-here { opacity: 0.45; }
+
+/* Beschriftung: Boards in der klaren Sans, Bereiche in der Serife */
+.ov-graph-node text { font-weight: 600; letter-spacing: 0.005em; }
+.ov-graph-node .ov-graph-count { font-weight: 600; fill: color-mix(in srgb, var(--ink) 55%, transparent); }
+.ov-region text { font-family: var(--font-display); font-weight: 600; letter-spacing: 0.01em; fill: color-mix(in srgb, currentColor 70%, var(--ink)); fill-opacity: 0.85; }
+
+/* Inseln ohne Rand: leise Flächen, Projekte als etwas dichtere Kerne. Die (unsichtbare) Kontur bleibt anfassbar. */
+/* Die Hüllen selbst sind nur noch die Griffkante (Klick schaltet den Bereich im Gehirn) — sichtbar sind die Inseln */
+.ov-region path { fill-opacity: 0; stroke-opacity: 0; stroke-width: 10; }
+.ov-region-project path, .ov-region:hover path,
+.ov-graph-svg.geo-space .ov-region-space path, .ov-region.schlaeft path { fill-opacity: 0; stroke-opacity: 0; stroke-dasharray: none; }
+.ov-insel { pointer-events: none; transition: opacity 0.28s ease; }
+.ov-insel circle { fill: currentColor; }
+.ov-insel line { stroke: currentColor; stroke-linecap: round; }
+.ov-insel-space { opacity: calc(0.075 * var(--netz-insel)); }
+.ov-insel-project { opacity: calc(0.085 * var(--netz-insel)); }
+.ov-insel.schlaeft { color: var(--muted) !important; opacity: calc(0.06 * var(--netz-insel)); }
+.ov-graph-svg.geo-space .ov-insel-project { opacity: 0; }
+.ov-graph-svg.geo-space .ov-insel-space { opacity: calc(0.14 * var(--netz-insel)); }
+
+/* Verbindungen: Portal als ruhige Linie, Wikilink als Perlenschnur */
+.ov-kante-portal { stroke: color-mix(in srgb, var(--accent) 42%, transparent); stroke-linecap: round; }
+.ov-kante-wiki { stroke: color-mix(in srgb, var(--muted) 60%, transparent); stroke-linecap: round; }
+.ov-sat-linie { stroke: color-mix(in srgb, var(--muted) 32%, transparent); stroke-linecap: round; }
+
+/* Ebenen-Schalter als leise Chips statt Kästchen — die Kästchen bleiben (unsichtbar) für Tastatur und Vorleser */
+.ov-graph-toggles { gap: 2px; padding: 5px; align-items: center; }
+.ov-graph-toggle { position: relative; padding: 5px 11px; border-radius: 999px; color: var(--muted); transition: background-color .15s, color .15s; }
+.ov-graph-toggle:hover { color: var(--ink); background: var(--surface-2); }
+.ov-graph-toggle:has(input:checked) { color: var(--accent-strong); background: var(--accent-soft); }
+.ov-graph-toggle input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.ov-graph-toggle:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ov-graph-find { margin-left: 4px; }
+.ov-graph-find input { border-radius: 999px; }
+.ov-graph-legend { opacity: 0.75; }
+
+/* ---------- M417: Flache Karten mit leisen Rändern ----------
+   „Flat, clean, randlos, wenig sichtbare Ränder" — und: „Der 3D-Effekt passt nicht zum sleeken Flat-Design".
+   Die Kante wird leiser, der Schatten ist nur noch ein Hauch; auch angehoben schwebt eine Karte nicht,
+   sie wird nur etwas deutlicher umrissen. Hoher Kontrast behält kräftige Kanten. */
+:root {
+  --card-shadow: 0 0 0 1px rgba(22, 25, 30, 0.06), 0 1px 1px rgba(22, 25, 30, 0.035);
+  --card-shadow-lift: 0 0 0 1px rgba(22, 25, 30, 0.11), 0 2px 6px -2px rgba(22, 25, 30, 0.08);
+}
+[data-theme='dark'] {
+  --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.065), 0 1px 1px rgba(0, 0, 0, 0.3);
+  --card-shadow-lift: 0 0 0 1px rgba(255, 255, 255, 0.11), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
+}
+html[data-kontrast='hoch'] { --card-shadow: 0 0 0 1px rgba(22, 25, 30, 0.28), 0 1px 2px rgba(22, 25, 30, 0.1); --card-shadow-lift: 0 0 0 1px rgba(22, 25, 30, 0.4), 0 2px 6px rgba(22, 25, 30, 0.12); }
+html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 1px 2px rgba(0, 0, 0, 0.5); --card-shadow-lift: 0 0 0 1px rgba(255, 255, 255, 0.4), 0 2px 6px rgba(0, 0, 0, 0.5); }

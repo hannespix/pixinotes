@@ -4,7 +4,12 @@
  * Gemeldet: „Was mir an Matthias' Tool gefällt, ist auch die Schriftkombination einer sehr schönen, eleganten, zeitlosen
  * Serifenschrift mit einer klaren Sans-Schrift … kannst du das auch als Grundidee für unser komplettes Tool übernehmen?"
  *
- *   A  Manrope für Bedienung und Text (auch in Notizen), Playfair Display für Wortmarke, Titel und große Überschriften.
+ * M420: „Die Serifenschrift ist schon gut, könnte aber noch zeitloser, moderner, schicker, wertiger sein. Momentan
+ * empfinde ich die Kombination etwas unrund/unruhig." → Newsreader (optische Größen) statt Playfair Display, Geist
+ * statt Manrope; die Serife steht nur noch an großen Stellen, Kartentitel tragen die Sans.
+ *
+ *   A  Geist für Bedienung und Text (auch in Notizen und Kartentiteln), Newsreader für Wortmarke, Dialog- und
+ *      Folientitel und große Überschriften.
  *   B  Beide liegen beim Tool – keine Anfrage an einen Schriften-Dienst; die Lizenzen liegen bei.
  *   C  Einstellungen: Abschnitte als kleine, gesperrte Versalien; der Dialogtitel in der Serife.
  *   D  „Besser lesbar" setzt weiter überall Atkinson Hyperlegible – auch Titel und Überschriften.
@@ -57,19 +62,21 @@ const { ctx, P, fremd } = await auf();
 const a = await P.evaluate(async () => {
   await document.fonts.ready;
   const geladen = [...new Set([...document.fonts].filter((f) => f.status === 'loaded').map((f) => f.family.replace(/"/g, '')))];
-  return { geladen, check: document.fonts.check('16px "PN Manrope"') && document.fonts.check('16px "Playfair Display Variable"') };
+  return { geladen, check: document.fonts.check('16px "PN Geist"') && document.fonts.check('16px "Newsreader Variable"') };
 });
-pruefe('A1 Manrope und Playfair Display sind geladen', a.geladen.includes('PN Manrope') && a.geladen.includes('Playfair Display Variable') && a.check, a);
-pruefe('A2 die Oberfläche setzt Manrope', /^"?PN Manrope/.test(await familie(P, 'body')) && /Manrope/.test(await familie(P, '.dock button')), await familie(P, 'body'));
-pruefe('A3 auch der Text in Notizen', /Manrope/.test(await familie(P, ".react-flow__node-note .bn-block-content[data-content-type='paragraph'] .bn-inline-content")), await familie(P, ".react-flow__node-note .bn-block-content[data-content-type='paragraph'] .bn-inline-content"));
-pruefe('A4 die Wortmarke in der Serife', /^"?Playfair Display Variable/.test(await familie(P, '.logo')), await familie(P, '.logo'));
-pruefe('A5 Kartentitel in der Serife', /Playfair/.test(await familie(P, '.react-flow__node-kanban .drag-title')), await familie(P, '.react-flow__node-kanban .drag-title'));
-pruefe('A6 die große Überschrift einer Notiz in der Serife, der Fließtext nicht', /Playfair/.test(await familie(P, ".bn-block-content[data-content-type='heading'][data-level='1']")) && !/Playfair/.test(await familie(P, ".bn-block-content[data-content-type='paragraph']")));
+pruefe('A1 Geist und Newsreader sind geladen – Manrope und Playfair Display nicht mehr', a.geladen.includes('PN Geist') && a.geladen.includes('Newsreader Variable') && a.check && !a.geladen.some((f) => /Manrope|Playfair/.test(f)), a);
+pruefe('A2 die Oberfläche setzt Geist', /^"?PN Geist/.test(await familie(P, 'body')) && /Geist/.test(await familie(P, '.dock button')), await familie(P, 'body'));
+pruefe('A3 auch der Text in Notizen', /Geist/.test(await familie(P, ".react-flow__node-note .bn-block-content[data-content-type='paragraph'] .bn-inline-content")), await familie(P, ".react-flow__node-note .bn-block-content[data-content-type='paragraph'] .bn-inline-content"));
+pruefe('A4 die Wortmarke in der Serife', /^"?Newsreader Variable/.test(await familie(P, '.logo')), await familie(P, '.logo'));
+pruefe('A5 (M420) Kartentitel in der Sans – viele kleine Serifentitel machten das Board unruhig', /^"?PN Geist/.test(await familie(P, '.react-flow__node-kanban .drag-title')), await familie(P, '.react-flow__node-kanban .drag-title'));
+pruefe('A6 die große Überschrift einer Notiz in der Serife, der Fließtext nicht', /Newsreader/.test(await familie(P, ".bn-block-content[data-content-type='heading'][data-level='1']")) && !/Newsreader/.test(await familie(P, ".bn-block-content[data-content-type='paragraph']")));
+const opt = await P.evaluate(() => { const l = document.querySelector('.logo'); const r = document.createRange(); r.selectNodeContents(document.querySelector(".react-flow__node-note .bn-block-content[data-content-type='paragraph'] .bn-inline-content")); const t = r.getBoundingClientRect(); const n = document.querySelector(".react-flow__node-note .bn-block-content[data-content-type='paragraph'] .bn-inline-content").textContent.length; return { opsz: getComputedStyle(l).fontOpticalSizing, zeichen: t.width / n, kursiv: [...document.fonts].some((f) => /PN Geist/.test(f.family) && f.style === 'italic') }; });
+pruefe('A7 (M420) optische Größen an, echte Kursive vorhanden', opt.opsz === 'auto' && opt.kursiv, opt);
 
 console.log('B  Beim Tool');
 pruefe('B1 keine Anfrage an einen Schriften-Dienst (oder sonst nach außen)', fremd.length === 0, fremd.slice(0, 3).join(' | '));
 const lizenz = await P.evaluate(async () => (await fetch('lizenzen/schriften.txt')).text());
-pruefe('B2 die Lizenzen liegen bei (SIL Open Font License, alle drei Schriften)', /Manrope Project Authors/.test(lizenz) && /Playfair Display Project Authors/.test(lizenz) && /Braille Institute/.test(lizenz) && /SIL Open Font License/.test(lizenz));
+pruefe('B2 die Lizenzen liegen bei (SIL Open Font License: Geist, Newsreader, Atkinson)', /Geist Project Authors/.test(lizenz) && /Newsreader Project Authors/.test(lizenz) && /Braille Institute/.test(lizenz) && /SIL Open Font License/.test(lizenz) && !/Manrope|Playfair/.test(lizenz));
 
 console.log('C  Einstellungen');
 await P.keyboard.press('Control+,'); await P.waitForTimeout(800);
@@ -78,7 +85,7 @@ const c = await P.evaluate(() => {
   const h2 = document.querySelector('.modal-head h2'); const h3 = document.querySelector('.modal-section h3');
   return { titel: h2 && getComputedStyle(h2).fontFamily, abschnitt: h3 && { t: getComputedStyle(h3).textTransform, ls: parseFloat(getComputedStyle(h3).letterSpacing), fs: parseFloat(getComputedStyle(h3).fontSize) } };
 });
-pruefe('C1 der Dialogtitel in der Serife', /Playfair/.test(c.titel ?? ''), c);
+pruefe('C1 der Dialogtitel in der Serife', /Newsreader/.test(c.titel ?? ''), c);
 pruefe('C2 Abschnitte als kleine, gesperrte Versalien', c.abschnitt?.t === 'uppercase' && c.abschnitt.ls > 0.5 && c.abschnitt.fs <= 12, c);
 await ctx.close();
 
@@ -90,6 +97,10 @@ console.log('D  Besser lesbar');
   await c2.close();
 }
 
+{
+  const quelle = (p) => readFileSync(path.join(__repo, p), 'utf8');
+  pruefe('E1 Hilfe nennt M420 – deutsch und englisch; docs/UMBAU.md führt M420', quelle('src/components/HelpOverlay.tsx').includes('(M420)') && quelle('src/components/HelpOverlayEn.tsx').includes('(M420)') && quelle('docs/UMBAU.md').includes('M420'));
+}
 pruefe('keine Seitenfehler', fehler.length === 0, fehler.slice(0, 3).join(' | '));
 await browser.close(); app.close();
 console.log(`\nM416: ${ok} bestanden, ${bad} fehlgeschlagen`);

@@ -7,11 +7,11 @@ import '@blocknote/mantine/style.css';
 // eingebettet wie Kalam, damit die Ein-Datei-App offline bleibt
 import '@fontsource/atkinson-hyperlegible/400.css';
 import '@fontsource/atkinson-hyperlegible/700.css';
-// M416: Zwei Schriften für das ganze Tool — Manrope (klar, für Bedienung und Text) und Playfair Display (eine
-// elegante, zeitlose Serife für Überschriften). Beide frei (SIL Open Font License) und hier eingebunden: Es geht
-// nichts an einen Schriften-Dienst, und das Tool sieht offline und als Einzeldatei genauso aus.
-import '@fontsource-variable/manrope/wght.css';
-import '@fontsource-variable/playfair-display/wght.css';
+// M416/M420: Zwei Schriften für das ganze Tool — Geist (klar und ruhig, für Bedienung und Text) und Newsreader (eine
+// zeitlose Serife mit optischen Größen für die großen Stellen). Beide frei (SIL Open Font License) und hier
+// eingebunden: Es geht nichts an einen Schriften-Dienst, und das Tool sieht offline und als Einzeldatei genauso aus.
+// Geist selbst wird in index.css eingebunden (eigene Fassung mit angepassten Zeilenmaßen).
+import '@fontsource-variable/newsreader/opsz.css';
 import './index.css';
 import App from './App';
 import { handleOAuthRedirect } from './lib/calAccounts';
