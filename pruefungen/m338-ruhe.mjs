@@ -131,7 +131,7 @@ console.log('\n════ C: Klick weckt, Cursor an der Klickstelle ═══�
     const p = document.querySelector('.react-flow__node[data-id="n3"] .bn-inline-content');
     const tn = p.firstChild; const r = document.createRange();
     const i = tn.textContent.indexOf('Welt'); r.setStart(tn, i); r.setEnd(tn, i + 1);
-    const b = r.getBoundingClientRect(); return { x: b.left - 1, y: b.top + b.height / 2 };
+    const b = r.getBoundingClientRect(); return { x: b.left + 1, y: b.top + b.height / 2 }; // M416: linker Rand des „W“ – das Leerzeichen der Schrift ist schmal
   });
   await P.mouse.click(punkt.x, punkt.y);
   await P.waitForTimeout(500);
