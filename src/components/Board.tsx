@@ -1138,6 +1138,16 @@ export function Board() {
   const fokusUnten = (css: CSSStyleDeclaration) =>
     ['--focus-nav-h', '--focus-tools-h', '--focus-format-h'].reduce((s, v) => s + (parseFloat(css.getPropertyValue(v)) || 0), 0);
   const fokusRueckkehr = useRef<{ x: number; y: number; zoom: number } | null>(null);
+  // M413: Startet aus dem Fokus die Präsentation, wird das Board ausgehängt, bevor es zur Ansicht von vorher
+  // zurückgefahren ist – es kam dann in der Fokus-Ansicht zurück (hineingezoomt, mitten auf der Karte). Beim
+  // Aushängen wird deshalb die Ansicht von vor dem Fokus gemerkt, auch wenn die Rückfahrt gerade noch läuft.
+  const fokusRueckfahrt = useRef<{ x: number; y: number; zoom: number } | null>(null);
+  const aktivesBoard = useRef(activeId);
+  aktivesBoard.current = activeId;
+  useEffect(() => () => {
+    const zurueck = fokusRueckkehr.current ?? fokusRueckfahrt.current;
+    if (zurueck) gemerkteAnsicht.set(aktivesBoard.current, zurueck);
+  }, []);
   useEffect(() => {
     if (focusCard) {
       if (!fokusRueckkehr.current) fokusRueckkehr.current = getViewport();
@@ -1338,6 +1348,8 @@ export function Board() {
     if (fokusRueckkehr.current) {
       const prev = fokusRueckkehr.current;
       fokusRueckkehr.current = null;
+      fokusRueckfahrt.current = prev;
+      window.setTimeout(() => { if (fokusRueckfahrt.current === prev) fokusRueckfahrt.current = null; }, 400);
       flyingUntil.current = performance.now() + 500;
       void setViewport(prev, { duration: 300 });
     }

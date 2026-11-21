@@ -202,6 +202,17 @@ for (let i = 0; i < 6; i++) {
 }
 pruefe('E1 sechs Folien in der Reihenfolge des Fokus', reihe.join(' ') === 'Start Ziel PDF Zweite Plan Lose', reihe.join(' '));
 await P.keyboard.press('Escape'); await P.waitForTimeout(800);
+// Aus dem Fokus in die Präsentation und zurück: Das Board steht wieder da, wo es vor dem Fokus stand
+const ansicht = () => P.evaluate(() => { const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\)/.exec(document.querySelector('.react-flow__viewport')?.style.transform ?? ''); return m ? m.slice(1).map(Number) : null; });
+const vorher = await ansicht();
+await fokusAuf(P, 'f1'); await warteAufPdf(P);
+const imFokus = await ansicht();
+await P.locator('.focus-nav button[aria-label="Ab dieser Karte präsentieren"]').click();
+await P.waitForSelector('.presenter', { timeout: 5000 }); await P.waitForTimeout(900);
+pruefe('E2 „Ab dieser Karte präsentieren" beginnt auf dieser Karte (3 / 6)', (await folie()).zaehler === '3 / 6' && (await folie()).dok, await folie());
+await P.keyboard.press('Escape'); await P.waitForTimeout(900);
+const nachher = await ansicht();
+pruefe('E3 nach der Präsentation steht das Board wie vor dem Fokus (vorher: hineingezoomt auf der Karte)', !!vorher && !!nachher && Math.abs(nachher[2] - vorher[2]) < 0.01 && Math.abs(nachher[0] - vorher[0]) < 2 && Math.abs(nachher[1] - vorher[1]) < 2 && Math.abs(imFokus[2] - vorher[2]) > 0.1, { vorher, imFokus, nachher });
 await ctx.close();
 
 // ---------- F: Telefon ----------
