@@ -1,3 +1,4 @@
+import { tropfenMalen, hexRgb, tonDrehen, type TropfenKreis, type TropfenBruecke } from '../lib/netzTropfen';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
@@ -251,6 +252,25 @@ function regionGeo(ids: string[], pad: number, at: (id: string) => Pt | undefine
   return { d: hullPath(pts, pad), label: topAnchor(pts, pad) };
 }
 
+/** M423: Kennung des Farbverlaufs eines Boards (nur Zeichen, die in einer url(#…) sicher sind) */
+const verlaufId = (boardId: string) => `nt-${boardId.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+/**
+ * M423: Der Verlauf eines Board-Tropfens — vom eigenen Ton zu einem verwandten zweiten (um 40° gedreht), beide als
+ * Pastell mit der Fläche gemischt: flach, aber farbig wie die Ideabubbles.
+ */
+function BoardVerlauf({ id, farbe }: { id: string; farbe: [number, number, number] }) {
+  const zwei = tonDrehen(farbe, 40);
+  const rgb = (c: [number, number, number]) => `rgb(${c[0] | 0} ${c[1] | 0} ${c[2] | 0})`;
+  return (
+    <defs>
+      <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" style={{ stopColor: `color-mix(in srgb, ${rgb(farbe)} 30%, var(--surface))` }} />
+        <stop offset="1" style={{ stopColor: `color-mix(in srgb, ${rgb(zwei)} 52%, var(--surface))` }} />
+      </linearGradient>
+    </defs>
+  );
+}
+
 /**
  * M419: Minimaler Spannbaum (Prim) über die Startlage einer Insel — die kürzesten Brücken, die alle Boards
  * verbinden. Auf der Startlage gerechnet, damit sich die Gestalt beim Ausschwingen nicht umbaut.
@@ -476,17 +496,11 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const linkEls = useRef(new Map<number, SVGLineElement>());
   // M223: Auch Gelände und Bänder werden pro Frame imperativ nachgezogen
   const regionEls = useRef(new Map<string, SVGPathElement>());
-  /** M419: Die Kreise der Tropfen-Inseln je Board (ein Board steht in Bereichs- und Projekt-Insel) */
-  const inselEls = useRef(new Map<string, Set<SVGCircleElement>>());
-  /** M419: Brücken zwischen den Kreisen einer Insel (runde, dicke Linien) — sie ersetzen den Goo-Filter */
-  const brueckeEls = useRef(new Map<string, { a: string; b: string; el: SVGLineElement }>());
-  const inselRef = (id: string) => (el: SVGCircleElement | null) => {
-    if (!el) return;
-    let set = inselEls.current.get(id);
-    if (!set) { set = new Set(); inselEls.current.set(id, set); }
-    for (const c of set) if (!c.isConnected) set.delete(c);
-    set.add(el);
-  };
+  /** M423: die Tropfen-Flächen (Bereiche und Projekte) — Canvas auf der Netz-Ebene, gemalt von lib/netzTropfen */
+  const raumFlaeche = useRef<HTMLCanvasElement | null>(null);
+  const projektFlaeche = useRef<HTMLCanvasElement | null>(null);
+  /** Neu malen mit den Lagen, die `at` liefert — die Frame-Schleife und der Render rufen es auf */
+  const tropfenNeu = useRef<(at: (id: string) => Pt | undefined, wie?: { bewegt?: boolean; ohneRaum?: boolean }) => void>(() => {});
   const regionTextEls = useRef(new Map<string, SVGTextElement>());
   const bundleEls = useRef(new Map<string, SVGLineElement>());
   const bundleTextEls = useRef(new Map<string, SVGTextElement>());
@@ -555,16 +569,9 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           const p = m.get(id);
           if (p) el.setAttribute('transform', `translate(${p.x} ${p.y})`);
         }
-        for (const [id, set] of inselEls.current) {
-          const p = m.get(id);
-          if (p) for (const c of set) { c.setAttribute('cx', String(p.x)); c.setAttribute('cy', String(p.y)); }
-        }
-        for (const { a: ia, b: ib, el } of brueckeEls.current.values()) {
-          const A = m.get(ia), B = m.get(ib);
-          if (!A || !B) continue;
-          el.setAttribute('x1', String(A.x)); el.setAttribute('y1', String(A.y));
-          el.setAttribute('x2', String(B.x)); el.setAttribute('y2', String(B.y));
-        }
+        // M423: die Tropfen-Flächen ziehen mit — jedes dritte Bild in halber Auflösung (weiche Formen), der helle
+        // Kontinent der Bereiche nur jedes sechste; in Ruhe einmal scharf (unten)
+        if (frame % 3 === 0) tropfenNeu.current((id) => m.get(id), { bewegt: true, ohneRaum: frame % 6 !== 0 });
         for (const [i, el] of linkEls.current) {
           const l = links[i];
           if (!l) continue;
@@ -612,6 +619,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         raf = requestAnimationFrame(step);
       } else {
         // Ruhe: Schleife anhalten statt weiterzulaufen (M223)
+        tropfenNeu.current((id) => m.get(id));   // M423: die letzte Lage genau
         svgRef.current?.closest('.sidepanel')?.classList.remove('graph-motion');
       }
     };
@@ -728,8 +736,70 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   // davon, wann React zuletzt gerendert hat (M223)
   regionsRef.current = regions;
   bundlesRef.current = bundles;
-  /** M419: Brücken je Insel — nur bei Strukturänderungen neu (Startlage, Gliederung) */
-  const bruecken = useMemo(() => new Map(regions.map((rg) => [rg.key, spannbaum(rg.ids, seedPos)])), [regions, seedPos]);
+  /**
+   * M423: Gliederung der Tropfen-Flächen — je Bereich ein heller Kontinent, je Projekt ein dichterer Tropfen. Farben:
+   * Jedes Projekt bekommt einen eigenen Ton innerhalb der Bereichsfarbe, jedes Board eine leichte Abweichung davon;
+   * wo Boards zusammenfließen, laufen die Töne ineinander (wie bei den Ideabubbles). Brücken (Spannbaum über die
+   * Startlage) geben Boards, die weiter auseinander liegen, einen organischen Hals.
+   */
+  const tropfenPlan = useMemo(() => {
+    const raeume: { ids: string[]; farbe: [number, number, number]; bruecken: [string, string][] }[] = [];
+    const projekte: { ids: string[]; bruecken: [string, string][] }[] = [];
+    const boardFarbe = new Map<string, [number, number, number]>();
+    if (!showRegions) return { raeume, projekte, boardFarbe };
+    const DREH = [0, 34, -30, 62, -58, 90];
+    spaces.forEach((sp, si) => {
+      const schlaeft = brainOn && brainOffSpaces.includes(sp.id);
+      const grund = schlaeft ? ([150, 152, 160] as [number, number, number]) : hexRgb(SPACE_ACCENTS[si % SPACE_ACCENTS.length]);
+      const alle: string[] = [];
+      sp.projects.forEach((proj, pi) => {
+        const ids = proj.boardIds.filter((id) => seedPos.has(id));
+        if (!ids.length) return;
+        alle.push(...ids);
+        const pf = schlaeft ? grund : tonDrehen(grund, DREH[pi % DREH.length]);
+        for (const id of ids) {
+          // je Board eine leichte, feste Abweichung (aus der Kennung) — Verläufe statt einer Fläche in einem Ton
+          let hsh = 0; for (let i = 0; i < id.length; i++) hsh = (hsh * 31 + id.charCodeAt(i)) | 0;
+          boardFarbe.set(id, schlaeft ? grund : tonDrehen(pf, ((hsh % 53) + 53) % 53 - 26, (((hsh >> 5) % 11) - 5) / 100));
+        }
+        projekte.push({ ids, bruecken: spannbaum(ids, seedPos) });
+      });
+      if (alle.length) raeume.push({ ids: alle, farbe: grund, bruecken: spannbaum(alle, seedPos) });
+    });
+    return { raeume, projekte, boardFarbe };
+  }, [spaces, seedPos, showRegions, brainOn, brainOffSpaces]);
+  tropfenNeu.current = (at, wie = {}) => {
+    const plan = tropfenPlan;
+    const maxSeite = wie.bewegt ? 300 : 640;
+    const lege = (cv: HTMLCanvasElement | null, kreise: TropfenKreis[], br: TropfenBruecke[], weich: number, kontur: number) => {
+      if (!cv) return;
+      const b = tropfenMalen(cv, kreise, br, { weich, kontur, maxSeite });
+      if (!b) { cv.style.display = 'none'; return; }
+      cv.style.display = '';
+      cv.style.transform = `translate(${b.x}px, ${b.y}px)`;
+      cv.style.width = `${b.w}px`; cv.style.height = `${b.h}px`;
+      cv.dataset.gemalt = String(Number(cv.dataset.gemalt ?? 0) + 1);
+    };
+    const kr: TropfenKreis[] = []; const br: TropfenBruecke[] = [];
+    if (!wie.ohneRaum) for (const r of plan.raeume) {
+      for (const id of r.ids) { const p = at(id); if (p) kr.push({ x: p.x, y: p.y, r: fuss(id) + HUELLE_BEREICH * 0.55, farbe: r.farbe }); }
+      for (const [a, b] of r.bruecken) { const A = at(a), B = at(b); if (A && B) br.push({ x1: A.x, y1: A.y, x2: B.x, y2: B.y, breite: 2 * (Math.min(fuss(a), fuss(b)) + HUELLE_BEREICH * 0.55) * 0.55, farbe: r.farbe }); }
+    }
+    if (!wie.ohneRaum) lege(raumFlaeche.current, kr, br, 22, 0);
+    const kp: TropfenKreis[] = []; const bp: TropfenBruecke[] = [];
+    for (const pr of plan.projekte) {
+      for (const id of pr.ids) { const p = at(id); const f = plan.boardFarbe.get(id); if (p && f) kp.push({ x: p.x, y: p.y, r: fuss(id) + HUELLE_PROJEKT * 0.2, farbe: f }); }
+      for (const [a, b] of pr.bruecken) {
+        const A = at(a), B = at(b); const fa = plan.boardFarbe.get(a), fb = plan.boardFarbe.get(b);
+        if (A && B && fa && fb) bp.push({ x1: A.x, y1: A.y, x2: B.x, y2: B.y, breite: 2 * Math.min(fuss(a), fuss(b)) * 0.5, farbe: [(fa[0] + fb[0]) / 2, (fa[1] + fb[1]) / 2, (fa[2] + fb[2]) / 2] });
+      }
+    }
+    lege(projektFlaeche.current, kp, bp, 13, -0.22);
+  };
+  // Erstes Bild und jede Änderung der Gliederung (Boards, Projekte, Ebenen) — nicht beim reinen Zoomen
+  useEffect(() => {
+    tropfenNeu.current((id) => (physicsOn ? simPos.current.get(id) ?? seedPos.get(id) : seedPos.get(id)));
+  }, [tropfenPlan, physicsOn, seedPos, fuss]);
 
   // ---------- M195: Knoten ziehen (stupst die Nachbarn physikalisch an) ----------
   const dragNode = useRef<string | null>(null);
@@ -1373,34 +1443,12 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         {/* M223: EINE Gruppe trägt Verschiebung und Zoom — Pan/Zoom sind damit
             reines Zeichnen statt einer Neuvermessung des ganzen SVG */}
         <div className="ov-graph-ebene" ref={vpRef}>
+        {/* M423: die Tropfen-Flächen — organisch verschmolzen, Farben laufen ineinander (lib/netzTropfen) */}
+        <canvas className="ov-flaeche ov-flaeche-raum" ref={raumFlaeche} aria-hidden="true" />
+        <canvas className="ov-flaeche ov-flaeche-projekt" ref={projektFlaeche} aria-hidden="true" />
         <svg className="ov-graph-leinwand" width="1" height="1" aria-hidden="false">
         <NetzDefs />
         <g className="ov-graph-vp">
-        {/* M419: Tropfen-Inseln — je Bereich und Projekt verschmelzen Kreise um die Boards zu einer weichen,
-            randlosen Fläche: Die Gruppe trägt die Deckkraft, so verdichten sich Überlappungen nicht. Bewusst ohne
-            Weichzeichner-Filter (gemessen: bis 0,5 s je Bild beim Zoomen). Die Hüllen darüber bleiben unsichtbar zum Anfassen. */}
-        {regions.map((rg) => {
-          const extra = rg.pad * (rg.kind === 'space' ? 0.75 : 0.45);
-          return (
-            <g key={`i-${rg.key}`} className={`ov-insel ov-insel-${rg.kind} ${rg.schlaeft ? 'schlaeft' : ''}`} style={{ color: rg.accent }}>
-              {(bruecken.get(rg.key) ?? []).map(([ia, ib]) => {
-                const A = pos.get(ia), B = pos.get(ib);
-                if (!A || !B) return null;
-                const k = `${rg.key}:${ia}:${ib}`;
-                // Der Hals ist schmaler als die Kreise — so entsteht die Taille, die einen Tropfen ausmacht
-                const breite = 2 * (Math.min(fuss(ia), fuss(ib)) + extra) * (rg.kind === 'space' ? 0.5 : 0.62);
-                return (
-                  <line key={k} x1={A.x} y1={A.y} x2={B.x} y2={B.y} strokeWidth={breite}
-                    ref={(el) => { if (el) brueckeEls.current.set(k, { a: ia, b: ib, el }); else brueckeEls.current.delete(k); }} />
-                );
-              })}
-              {rg.ids.map((id) => {
-                const p = pos.get(id);
-                return p ? <circle key={id} ref={inselRef(id)} cx={p.x} cy={p.y} r={fuss(id) + extra} /> : null;
-              })}
-            </g>
-          );
-        })}
         {/* M221: Gelände zuerst — alles Weitere liegt darauf */}
         {regions.map((rg) => {
           const geo = regionGeo(rg.ids, rg.pad, (id) => pos.get(id), fuss);
@@ -1516,7 +1564,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
                   onClick={() => { openBoard(sb.boardId); focusNode(sb.boardId, d.nodeId); }}
                 >
                   <title>{d.title}</title>
-                  <circle cx={d.x} cy={d.y} r={ui(5)} strokeWidth={ui(1)} fill={`url(#netz-tropfen-${farbIndex.get(sb.boardId) ?? 0})`} />
+                  <circle cx={d.x} cy={d.y} r={ui(5)} strokeWidth={ui(1)} fill={tropfenPlan.boardFarbe.has(sb.boardId) ? `url(#${verlaufId(sb.boardId)})` : `url(#netz-tropfen-${farbIndex.get(sb.boardId) ?? 0})`} />
                   {lod === 2 && (
                     <text
                       className="ov-graph-dot-label"
@@ -1568,7 +1616,8 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
               {n.id === activeId && <circle className="ov-graph-here" r={rad + ui(6)} strokeWidth={ui(2)} />}
               {/* M419: ein flacher Tropfen — sanfter Pastell-Verlauf aus der Farbe des Bereichs, feine Kontur.
                   Bewusst ohne Schatten und Glanz (flat), und ohne Filter: kostet beim Zeichnen fast nichts. */}
-              <circle className="ov-tropfen" r={rad} strokeWidth={ui(1)} fill={`url(#netz-tropfen-${farbIndex.get(n.id) ?? 0})`} />
+              {tropfenPlan.boardFarbe.has(n.id) && <BoardVerlauf id={verlaufId(n.id)} farbe={tropfenPlan.boardFarbe.get(n.id)!} />}
+              <circle className="ov-tropfen" r={rad} strokeWidth={ui(1)} fill={tropfenPlan.boardFarbe.has(n.id) ? `url(#${verlaufId(n.id)})` : `url(#netz-tropfen-${farbIndex.get(n.id) ?? 0})`} />
               <text
                 x={0} y={rad + ui(17)} textAnchor="middle"
                 // Deckel in SVG-Einheiten: weit rausgezoomt schrumpfen Namen,

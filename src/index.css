@@ -8121,3 +8121,14 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .happ-size, .happ-head .happ-btn
   ) { opacity: 0; pointer-events: none; }
 }
+
+/* ---------- M423: Das Netz tropfiger, organischer, farbiger ----------
+   Die Inseln sind zwei Canvas-Flächen auf der Netz-Ebene (lib/netzTropfen.ts): weichgezeichnet und hart geschnitten
+   wie die Ideabubbles, die Töne laufen ineinander. Bereiche als heller Kontinent, Projekte als dichtere Tropfen. */
+.ov-flaeche { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; transition: opacity 0.28s ease; }
+.ov-flaeche-raum { opacity: calc(0.2 * var(--netz-insel)); }
+.ov-flaeche-projekt { opacity: calc(0.46 * var(--netz-insel)); }
+.ov-graph-svg.geo-space .ov-flaeche-projekt { opacity: 0; }
+.ov-graph-svg.geo-space .ov-flaeche-raum { opacity: calc(0.32 * var(--netz-insel)); }
+:root[data-theme='dark'] { --netz-insel: 0.7; }
+html[data-kontrast='hoch'] .ov-flaeche-projekt { opacity: 0.3; }
