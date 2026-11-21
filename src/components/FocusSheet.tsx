@@ -6,7 +6,8 @@ import { useBoard, type Tool } from '../store';
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon, type DokumentBefehl } from '../lib/pdfSeiten';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
-import { IChevronL, IChevronR, IComment, IEraser, IHighlighter, IPen, IPlay, IX } from './Icons';
+import { ICheck, IChevronL, IChevronR, IComment, IEraser, IFit, IHighlighter, IPen, IPlay, IX } from './Icons';
+import { FOKUS_ANSICHTEN, FOKUS_ZOOM_EREIGNIS, FOKUS_ANSICHT_EREIGNIS, fokusAnsicht, fokusAnsichtSetzen, fokusStufe, fokusStufeMal, type FokusAnsicht } from '../lib/fokusAnsicht';
 
 /**
  * M212: „Karte im Fokus" — am Handy füllt ein angetipptes Modul den Schirm.
@@ -312,6 +313,36 @@ export function FocusSheet() {
     mq.addEventListener('change', f);
     return () => mq.removeEventListener('change', f);
   }, []);
+  // M424: Darstellung im Fokus — gewählte Ansicht, aktuelle Stufe der Kamera, Menü offen?
+  const [ansicht, setAnsicht] = useState<FokusAnsicht>(() => fokusAnsicht());
+  const [zoom, setZoom] = useState(1);
+  const [stufe, setStufe] = useState(1);
+  const [ansichtMenu, setAnsichtMenu] = useState(false);
+  const ansichtHuelle = useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    // Die Meldung nennt das Ziel der Kamerafahrt; fährt die Kamera danach nach (Karte wächst, Rand klemmt), zählt
+    // der tatsächliche Stand — er wird nach der Fahrt abgelesen
+    let nach: ReturnType<typeof setTimeout> | undefined;
+    const ist = () => { const m = /scale\(([\d.]+)\)/.exec((document.querySelector('.react-flow__viewport') as HTMLElement | null)?.style.transform ?? ''); if (m) setZoom(Number(m[1])); };
+    const z = (e: Event) => {
+      const d = (e as CustomEvent<{ zoom: number }>).detail;
+      if (d && Number.isFinite(d.zoom)) setZoom(d.zoom);
+      clearTimeout(nach); nach = setTimeout(ist, 700);
+    };
+    const a = () => { setAnsicht(fokusAnsicht()); setStufe(fokusStufe()); };
+    window.addEventListener(FOKUS_ZOOM_EREIGNIS, z);
+    window.addEventListener(FOKUS_ANSICHT_EREIGNIS, a);
+    return () => { clearTimeout(nach); window.removeEventListener(FOKUS_ZOOM_EREIGNIS, z); window.removeEventListener(FOKUS_ANSICHT_EREIGNIS, a); };
+  }, []);
+  useEffect(() => { setStufe(1); setAnsichtMenu(false); }, [focusCard]);
+  useEffect(() => {
+    if (!ansichtMenu) return;
+    const weg = (e: PointerEvent) => { if (!ansichtHuelle.current?.contains(e.target as Node)) setAnsichtMenu(false); };
+    const taste = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setAnsichtMenu(false); } };
+    window.addEventListener('pointerdown', weg, true);
+    window.addEventListener('keydown', taste, true);
+    return () => { window.removeEventListener('pointerdown', weg, true); window.removeEventListener('keydown', taste, true); };
+  }, [ansichtMenu]);
   useEffect(() => {
     if (!focusCard) { setPinAn(false); return; }
     const t = setInterval(() => setPinAn(!!document.querySelector(`.react-flow__node[data-id="${focusCard}"] .pdf-seite.pin-modus`)), 250);
@@ -396,6 +427,29 @@ export function FocusSheet() {
           <b translate="no">{cardTitle(node)}</b>
           <span>{typeName}{siblings.length > 1 ? ` · ${index + 1} von ${siblings.length}` : ''}{dok ? ` · Seite ${dok.seite} von ${dok.seiten}` : ''}</span>
         </div>
+        {/* M424: Darstellung wie in der Präsentation — ein kleines Symbol; wer die Stufe verstellt hat, sieht dort die Prozent */}
+        <span className="focus-ansicht" ref={ansichtHuelle}>
+          <button className={`focus-ansicht-knopf ${ansichtMenu ? 'an' : ''}`} data-taste="fokus-ansicht" aria-haspopup="menu" aria-expanded={ansichtMenu}
+            title={`Darstellung: ${FOKUS_ANSICHTEN.find((x) => x.id === ansicht)?.name ?? ''} · ${Math.round(zoom * 100)} %`} aria-label="Darstellung der Karte"
+            onClick={() => setAnsichtMenu((v) => !v)}>
+            {stufe !== 1 || ansicht !== 'auto' ? <span translate="no">{Math.round(zoom * 100)} %</span> : <IFit size={16} />}
+          </button>
+          {ansichtMenu && (
+            <div className="focus-ansicht-menu" role="menu" data-taste="fokus-ansicht-menu">
+              <div className="focus-ansicht-stufe">
+                <button data-taste="fokus-kleiner" aria-label="Verkleinern" title="Verkleinern" onClick={() => fokusStufeMal(1 / 1.25)}>−</button>
+                <span translate="no" data-taste="fokus-stufe">{Math.round(zoom * 100)} %</span>
+                <button data-taste="fokus-groesser" aria-label="Vergrößern" title="Vergrößern" onClick={() => fokusStufeMal(1.25)}>+</button>
+              </div>
+              {FOKUS_ANSICHTEN.map((a) => (
+                <button key={a.id} role="menuitemradio" aria-checked={ansicht === a.id} className={ansicht === a.id ? 'an' : ''} data-taste="fokus-ansicht-wahl" data-ansicht={a.id} title={a.hinweis}
+                  onClick={() => { fokusAnsichtSetzen(a.id); setAnsichtMenu(false); }}>
+                  <span className="focus-ansicht-haken" aria-hidden="true">{ansicht === a.id && <ICheck size={14} />}</span>{a.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </span>
         {/* M413: Am Telefon ist unten kein Platz für Seiten UND Karten. Bei einem Dokument blättern die Knöpfe unten
             dort weiter die Seiten (hineingezoomt schiebt der Finger das Blatt – ohne sie käme man nicht weiter);
             zur nächsten Karte führen diese beiden hier oben. Ab Tablet-Breite steht alles unten. */}
