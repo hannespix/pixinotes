@@ -356,15 +356,6 @@ export function Dock() {
     { id: 'protokoll', gruppe: 'Notieren & Rechnen', name: 'Protokoll-Reihe', hinweis: 'Alle Sitzungen einer Besprechung in einer Karte', suchwort: 'besprechung sitzung meeting minutes', icon: <IMinutes size={18} />, tun: () => add(() => makeMinutes(centerPos(380, 420))) },
     { id: 'tabelle', gruppe: 'Notieren & Rechnen', name: 'Rechen-Tabelle', hinweis: 'Tabelle, die rechnet – Excel-Dateien lassen sich auch aufs Board ziehen', suchwort: 'excel csv summe zahlen', icon: <ISigma size={18} />, tun: () => add(() => makeSheet(centerPos(460, 300))) },
     { id: 'bubbles', gruppe: 'Notieren & Rechnen', name: 'Entscheidungs-Bubbles', hinweis: 'Ideen sammeln, gruppieren und mit Punkten abstimmen – alle gleichzeitig', suchwort: 'ideen brainstorming abstimmung voting blasen workshop entscheidung punkte', icon: <IBubbles size={18} />, tun: () => add(() => makeBubbles(centerPos(560, 440))) },
-    // M425: Vibe Studio als Karte — Folien gestalten und vorführen, ohne das Board zu verlassen
-    {
-      id: 'praesentation', gruppe: 'Notieren & Rechnen', name: 'Präsentation', hinweis: 'Folien mit Vibe Studio gestalten und vorführen – direkt auf dem Board',
-      suchwort: 'folien vortrag slides vibe studio powerpoint keynote deck', icon: <IFolien size={18} />,
-      tun: () => {
-        setAddMenu(false);
-        void praesentationAnlegen(centerPos(800, 520)).then((id) => { if (id) focusNode(useBoard.getState().activeId, id); });
-      },
-    },
     { id: 'kanban', gruppe: 'Planen', name: 'Kanban-Board', hinweis: 'Spalten und Karten: Offen, In Arbeit, Erledigt', suchwort: 'aufgaben todo spalten tickets', icon: <IKanban size={18} />, tun: () => add(() => makeKanban(centerPos(420, 200))) },
     { id: 'zeitplan', gruppe: 'Planen', name: 'Zeitplan', hinweis: 'Zeitplan (Gantt): Vorgänge als Balken auf der Zeitachse', suchwort: 'gantt projekt termine balken', icon: <IGantt size={18} />, tun: () => add(() => makeGantt(centerPos(560, 240))) },
     { id: 'kalender', gruppe: 'Planen', name: 'Kalender', hinweis: 'Kalender (Monat), auch mit Google- und Microsoft-Terminen', suchwort: 'monat termine', icon: <ICalendar size={18} />, tun: () => add(() => makeCalendar(centerPos(430, 340))) },
@@ -374,6 +365,16 @@ export function Dock() {
     { id: 'schritt', gruppe: 'Ablauf', name: 'Schritt', hinweis: 'Prozess-Schritt (Rechteck) – verbinden per Ziehen am Rand', suchwort: 'prozess form rechteck kasten', icon: <ISquare size={18} />, tun: () => addShape('process') },
     { id: 'entscheidung', gruppe: 'Ablauf', name: 'Entscheidung', hinweis: 'Entscheidung (Raute): ja / nein', suchwort: 'raute ja nein verzweigung', icon: <IDiamond size={18} />, tun: () => addShape('decision') },
     { id: 'start', gruppe: 'Ablauf', name: 'Start/Ende', hinweis: 'Start oder Ende eines Ablaufs', suchwort: 'terminator anfang schluss', icon: <IPill size={18} />, tun: () => addShape('terminator') },
+    // M425: Vibe Studio als Karte — Folien gestalten und vorführen, ohne das Board zu verlassen (in „Ablauf“: Folge von Folien;
+    // die Gruppen stehen in Zeilen zu fünf Kacheln, „Notieren & Rechnen“ ist voll)
+    {
+      id: 'praesentation', gruppe: 'Ablauf', name: 'Präsentation', hinweis: 'Folien mit Vibe Studio gestalten und vorführen – direkt auf dem Board',
+      suchwort: 'folien vortrag slides vibe studio powerpoint keynote deck', icon: <IFolien size={18} />,
+      tun: () => {
+        setAddMenu(false);
+        void praesentationAnlegen(centerPos(800, 520)).then((id) => { if (id) focusNode(useBoard.getState().activeId, id); });
+      },
+    },
     { id: 'datei', gruppe: 'Einfügen', name: 'Datei oder Bild', hinweis: 'Bilder, PDFs, E-Mails, Excel, Word und mehr', suchwort: 'pdf upload anhang dokument foto', icon: <IPaperclip size={18} />, tun: () => anyFileRef.current?.click() },
     { id: 'foto', gruppe: 'Einfügen', name: 'Foto', hinweis: 'Foto aufnehmen oder aus der Mediathek wählen (iPhone/iPad)', suchwort: 'kamera mediathek bild aufnehmen', icon: <IImage size={18} />, tun: () => fotoRef.current?.click() },
     { id: 'zwischenablage', gruppe: 'Einfügen', name: 'Zwischen\u00adablage', hinweis: 'Bild aus der Zwischenablage einfügen (am PC: Strg+V)', suchwort: 'einfügen paste screenshot kopiert', icon: <ICopy size={18} />, tun: () => void ausZwischenablage() },

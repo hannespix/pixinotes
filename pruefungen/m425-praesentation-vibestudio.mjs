@@ -4,7 +4,7 @@
  * Gewünscht: „Können wir das Präsentationstool Vibe Studio irgendwie als Modul in PixiNotes integrieren? Dass man
  * quasi Vibe-Studio-Präsentationen direkt auf dem PixiNotes-Whiteboard erstellen kann?"
  *
- *   A  Modul-Palette: Kachel „Präsentation" (Notieren & Rechnen), die Suche findet sie über „folien" und „vibe".
+ *   A  Modul-Palette: Kachel „Präsentation" (Gruppe Ablauf), die Suche findet sie über „folien" und „vibe".
  *   B  Ein Klick legt eine App-Karte an (16 : 9 mit Platz für den Editor), die gleich läuft — kein ▶ nötig.
  *   C  In der Karte läuft Vibe Studio: leere Titelfolie „Neue Präsentation", „Bearbeiten" öffnet den Editor.
  *   D  Ein bearbeiteter Text bleibt an der Karte gespeichert — nach dem Neuladen und erneuten Start ist er noch da.
@@ -83,6 +83,8 @@ let neuId = null;
   const kachel = P.locator('.modul-kachel[data-modul="praesentation"]');
   const gruppe = await kachel.evaluate((el) => el.closest('.modul-gruppe, [data-gruppe]')?.querySelector('.dock-menu-label, .modul-gruppe-name')?.textContent?.trim() ?? el.closest('section, div')?.previousElementSibling?.textContent?.trim() ?? '').catch(() => '');
   pruefe('A1 Kachel „Präsentation" in der Palette', (await kachel.count()) === 1 && (await kachel.textContent()).includes('Präsentation'), gruppe);
+  const reihe = await P.evaluate(() => ['praesentation', 'diagramm'].map((id) => Math.round(document.querySelector(`.modul-kachel[data-modul="${id}"]`).getBoundingClientRect().top)));
+  pruefe('A1b steht in der Reihe von „Ablauf" (keine Kachel allein in einer Zeile)', reihe[0] === reihe[1], reihe);
   pruefe('A2 Hinweis nennt Vibe Studio', /Vibe Studio/.test((await kachel.getAttribute('title')) ?? ''));
   for (const w of ['folien', 'vibe']) {
     await P.fill('.modul-suche input', w); await P.waitForTimeout(200);
