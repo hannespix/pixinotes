@@ -1,4 +1,4 @@
-import { lesefolge } from './boardTasten';
+import { folgeNachbar, kartenFolge } from '../lib/kartenFolge';
 import { overlayOffen } from '../lib/overlay';
 import { tagLokal } from '../lib/tag';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -130,8 +130,10 @@ export function FocusSheet() {
 
   const zurueckZurUebersicht = useBoard((s) => s.focusHerkunft === 'overview');
   const board = boards.find((b) => b.id === activeId);
-  // M390: geblättert wird in Lesefolge — wie mit Alt+↓/↑ auf dem Board (vorher: Reihenfolge des Anlegens)
-  const siblings = useMemo(() => lesefolge((board?.nodes ?? []).filter(focusable)), [board?.nodes]);
+  /* M413: Geblättert wird in derselben Reihenfolge wie im Vortrag (lib/kartenFolge.ts): Verbundenes am Stück und
+     den Pfeilen nach, Rahmen als Abschnitte, sonst Lesefolge. Gerechnet über alle Karten – Formen eines Ablaufs
+     geben die Richtung mit vor, auch wenn der Fokus sie überspringt. (M390: reine Lesefolge.) */
+  const siblings = useMemo(() => kartenFolge((board?.nodes ?? []).filter((n) => !n.archived), board?.edges ?? []).filter(focusable), [board?.nodes, board?.edges]);
   const index = siblings.findIndex((n) => n.id === focusCard);
   const node = index >= 0 ? siblings[index] : undefined;
 
@@ -156,10 +158,14 @@ export function FocusSheet() {
   useEffect(() => {
     if (!focusCard) return;
     const onKey = (e: KeyboardEvent) => {
-      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      if (e.shiftKey) return;
+      // M413: Strg+→ / Strg+← wie im Vortrag (M405) – außer beim Schreiben, dort springt das wortweise
+      const strg = (e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')
+        && !(e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]'));
+      const alt = e.altKey && !e.ctrlKey && !e.metaKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp');
+      if (!strg && !alt) return;
       e.preventDefault(); e.stopPropagation();
-      step(e.key === 'ArrowDown' ? 1 : -1);
+      step(e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : -1);
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
@@ -298,6 +304,14 @@ export function FocusSheet() {
   // Der Kommentar-Modus lebt in der Karte — hier nur gespiegelt, damit der Knopf zeigt, dass er an ist
   const [pinAn, setPinAn] = useState(false);
   const [seitenEingabe, setSeitenEingabe] = useState('');
+  // M413: Am Telefon ist die Fußleiste zu schmal für Seiten- UND Karten-Knöpfe (siehe unten)
+  const [eng, setEng] = useState(() => window.matchMedia('(max-width: 560px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 560px)');
+    const f = () => setEng(mq.matches);
+    mq.addEventListener('change', f);
+    return () => mq.removeEventListener('change', f);
+  }, []);
   useEffect(() => {
     if (!focusCard) { setPinAn(false); return; }
     const t = setInterval(() => setPinAn(!!document.querySelector(`.react-flow__node[data-id="${focusCard}"] .pdf-seite.pin-modus`)), 250);
@@ -325,6 +339,32 @@ export function FocusSheet() {
   };
 
   const typeName = TYPE_LABEL[node.type ?? ''] ?? 'Karte';
+  const vorige = folgeNachbar(siblings, board?.edges ?? [], node.id, false);
+  const naechste = folgeNachbar(siblings, board?.edges ?? [], node.id, true);
+
+  // M413: Die Seiten-Bausteine. Ab Tablet-Breite stehen sie als Gruppe in der Mitte; am Telefon stehen die beiden
+  // Knöpfe außen in der Leiste (dort ist für zwei Paare kein Platz) und die Karten-Knöpfe im Kopf.
+  const seiteZurueck = dok && (
+    <button className="focus-seite-knopf" onClick={() => dokumentBefehl(node.id, 'zurueck')} aria-disabled={dok.seite <= 1} title="Vorherige Seite (oder über die Seite wischen)" aria-label="Vorherige Seite" data-taste="fokus-seite-zurueck">
+      <IChevronL size={eng ? 18 : 15} />
+    </button>
+  );
+  const seiteVor = dok && (
+    <button className="focus-seite-knopf" onClick={() => dokumentBefehl(node.id, 'vor')} aria-disabled={dok.seite >= dok.seiten} title="Nächste Seite (oder über die Seite wischen)" aria-label="Nächste Seite" data-taste="fokus-seite-vor">
+      <IChevronR size={eng ? 18 : 15} />
+    </button>
+  );
+  // Seitenzahl zum Antippen: direkt zu einer Seite springen (das Feld auf der Karte ist am Telefon winzig)
+  const seitenFeld = dok && (
+    <label className="focus-seite" data-taste="fokus-seite">
+      <input inputMode="numeric" aria-label={`Seite (${dok.seite} von ${dok.seiten})`} value={seitenEingabe || String(dok.seite)} data-taste="fokus-seite-nr"
+        onFocus={(e) => { setSeitenEingabe(String(dok.seite)); e.currentTarget.select(); }}
+        onChange={(e) => setSeitenEingabe(e.target.value.replace(/[^0-9]/g, ''))}
+        onBlur={() => { const zu = parseInt(seitenEingabe, 10); setSeitenEingabe(''); if (zu) dokumentBefehl(node.id, 'gehe', Math.min(dok.seiten, Math.max(1, zu))); }}
+        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+      <span>/ {dok.seiten}</span>
+    </label>
+  );
 
   return (
     <>
@@ -354,17 +394,25 @@ export function FocusSheet() {
             ohnehin bei allen Karten-Werkzeugen. */}
         <div className="focus-title">
           <b translate="no">{cardTitle(node)}</b>
-          <span>{typeName}{dok ? ` · Seite ${dok.seite} von ${dok.seiten}` : siblings.length > 1 ? ` · ${index + 1} von ${siblings.length}` : ''}</span>
+          <span>{typeName}{siblings.length > 1 ? ` · ${index + 1} von ${siblings.length}` : ''}{dok ? ` · Seite ${dok.seite} von ${dok.seiten}` : ''}</span>
         </div>
+        {/* M413: Am Telefon ist unten kein Platz für Seiten UND Karten. Bei einem Dokument blättern die Knöpfe unten
+            dort weiter die Seiten (hineingezoomt schiebt der Finger das Blatt – ohne sie käme man nicht weiter);
+            zur nächsten Karte führen diese beiden hier oben. Ab Tablet-Breite steht alles unten. */}
+        {eng && dok && siblings.length > 1 && vorige && naechste && (
+          <span className="focus-kopf-karten" role="group" aria-label="Karten">
+            <button onClick={() => step(-1)} title={`Vorige Karte: ${cardTitle(vorige.karte)} (Alt+↑)`} aria-label="Vorige Karte" data-taste="fokus-kopf-karte-zurueck"><IChevronL size={18} /></button>
+            <button onClick={() => step(1)} title={`Nächste Karte: ${cardTitle(naechste.karte)} (Alt+↓)`} aria-label="Nächste Karte" data-taste="fokus-kopf-karte-vor"><IChevronR size={18} /></button>
+          </span>
+        )}
       </div>
       <div className={`focus-nav ${dok ? 'dokument' : ''}`} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        {dok ? (
-          <button onClick={() => dokumentBefehl(node.id, 'zurueck')} aria-disabled={dok.seite <= 1} title="Vorherige Seite (oder über die Seite wischen)" aria-label="Vorherige Seite" data-taste="fokus-seite-zurueck">
+        {/* M413: Außen steht IMMER die Karte – bei jedem Kartentyp an derselben Stelle. Die Seiten eines Dokuments
+            blättert die Gruppe um die Seitenzahl (und ein Wisch über die Seite). Vorher blätterten diese Knöpfe bei
+            einem Dokument dessen Seiten, und zur nächsten Karte führte dort kein Knopf. */}
+        {eng && dok ? seiteZurueck : siblings.length > 1 && vorige ? (
+          <button className="focus-karte" onClick={() => step(-1)} title={`Vorige Karte: ${cardTitle(vorige.karte)} (Alt+↑)`} aria-label="Vorige Karte" data-taste="fokus-karte-zurueck">
             <IChevronL size={18} />
-          </button>
-        ) : siblings.length > 1 ? (
-          <button onClick={() => step(-1)} title="Vorige Karte (oder nach rechts wischen)" aria-label="Vorige Karte">
-            <IChevronL size={16} />
           </button>
         ) : <span className="focus-nav-gap" />}
         {/* M214: Was in der Mitte steht, hängt am Modultyp — beim Planer ein
@@ -375,14 +423,7 @@ export function FocusSheet() {
           {dok && (
             <>
               {/* Seitenzahl zum Antippen: direkt zu einer Seite springen (das Feld auf der Karte ist am Telefon winzig) */}
-              <label className="focus-seite" data-taste="fokus-seite">
-                <input inputMode="numeric" aria-label={`Seite (${dok.seite} von ${dok.seiten})`} value={seitenEingabe || String(dok.seite)} data-taste="fokus-seite-nr"
-                  onFocus={(e) => { setSeitenEingabe(String(dok.seite)); e.currentTarget.select(); }}
-                  onChange={(e) => setSeitenEingabe(e.target.value.replace(/[^0-9]/g, ''))}
-                  onBlur={() => { const zu = parseInt(seitenEingabe, 10); setSeitenEingabe(''); if (zu) dokumentBefehl(node.id, 'gehe', Math.min(dok.seiten, Math.max(1, zu))); }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
-                <span>/ {dok.seiten}</span>
-              </label>
+              {eng ? seitenFeld : <span className="focus-seiten" role="group" aria-label="Seiten">{seiteZurueck}{seitenFeld}{seiteVor}</span>}
               <button className={`focus-werkzeug ${tool === 'pen' ? 'on' : ''}`} onClick={() => werkzeug('pen')} aria-pressed={tool === 'pen'} title="Stift – auf die Seite schreiben" aria-label="Stift" data-taste="fokus-stift"><IPen size={18} /></button>
               <button className={`focus-werkzeug ${tool === 'marker' ? 'on' : ''}`} onClick={() => werkzeug('marker')} aria-pressed={tool === 'marker'} title="Textmarker" aria-label="Textmarker" data-taste="fokus-marker"><IHighlighter size={18} /></button>
               <button className={`focus-werkzeug ${tool === 'eraser' ? 'on' : ''}`} onClick={() => werkzeug('eraser')} aria-pressed={tool === 'eraser'} title="Radierer" aria-label="Radierer" data-taste="fokus-radierer"><IEraser size={18} /></button>
@@ -419,13 +460,9 @@ export function FocusSheet() {
             </button>
           ))}
         </div>
-        {dok ? (
-          <button onClick={() => dokumentBefehl(node.id, 'vor')} aria-disabled={dok.seite >= dok.seiten} title="Nächste Seite (oder über die Seite wischen)" aria-label="Nächste Seite" data-taste="fokus-seite-vor">
+        {eng && dok ? seiteVor : siblings.length > 1 && naechste ? (
+          <button className="focus-karte" onClick={() => step(1)} title={`Nächste Karte: ${cardTitle(naechste.karte)} (Alt+↓)`} aria-label="Nächste Karte" data-taste="fokus-karte-vor">
             <IChevronR size={18} />
-          </button>
-        ) : siblings.length > 1 ? (
-          <button onClick={() => step(1)} title="Nächste Karte (oder nach links wischen)" aria-label="Nächste Karte">
-            <IChevronR size={16} />
           </button>
         ) : <span className="focus-nav-gap" />}
       </div>

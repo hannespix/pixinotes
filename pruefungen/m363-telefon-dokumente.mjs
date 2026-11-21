@@ -359,7 +359,8 @@ console.log('\n════ G: Fokus am Desktop ════');
   await Q.locator('.react-flow__node[data-id="f1"]').evaluate((el) => el.focus());
   await taste('Enter', 1500);
   const d = await Q.evaluate(() => { const m = /scale\(([\d.]+)\)/.exec(document.querySelector('.react-flow__viewport')?.style.transform ?? ''); const r = document.querySelector('.react-flow__node[data-id="f1"]').getBoundingClientRect(); return { zoom: m ? Number(m[1]) : 0, links: r.left, rechts: r.right, b: innerWidth, leiste: !!document.querySelector('.focus-nav.dokument [data-taste="fokus-marker"]') }; });
-  pruefe('G1 hohe Seite am breiten Schirm: weiter in Lesegröße (Zoom 1), ganz im Bild', Math.abs(d.zoom - 1) < 0.01 && d.links >= 0 && d.rechts <= d.b, d);
+  // M413: Die Karte behält im Fokus ihre Form – die Lesegröße (720 Punkte breit) kommt jetzt aus dem Zoom
+  pruefe('G1 hohe Seite am breiten Schirm: weiter in Lesegröße (720 Punkte breit), ganz im Bild', Math.abs(d.rechts - d.links - 720) < 2 && d.links >= 0 && d.rechts <= d.b, d);
   pruefe('G2 die Dokument-Leiste gibt es auch hier', d.leiste);
   await taste('Escape', 800);
 }

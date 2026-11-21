@@ -7,7 +7,7 @@ import { sprache } from '../lib/sprache';
 import { selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { nodeToHtml } from '../lib/serialize';
 import { buildMermaidSource, getMermaid, preloadHandFont } from '../lib/mermaid';
-import { presentationOrder } from '../lib/presentOrder';
+import { kartenFolge } from '../lib/kartenFolge';
 import { useAndroidBackspaceFix } from '../lib/blocknoteAndroidFix';
 import { editorUpload } from '../lib/notizBild';
 import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from './NoteTypo';
@@ -330,9 +330,9 @@ export function Presenter() {
 
   const slides = useMemo(() => {
     if (!open) return [];
-    // Reihenfolge folgt der Gliederung: verbundene Karten als Cluster,
-    // innerhalb den Pfeilen nach (Prozess-Logik); Unverbundenes in Lesereihenfolge
-    return presentationOrder(board.nodes.filter((n) => !n.archived), board.edges)
+    // M413: dieselbe Reihenfolge wie beim Blättern im Fokus (lib/kartenFolge.ts) – Verbundenes am Stück und den
+    // Pfeilen nach, Rahmen als Abschnitte, sonst Lesefolge
+    return kartenFolge(board.nodes.filter((n) => !n.archived), board.edges)
       // Editierbare Typen immer zeigen (auch leere Notizen — die füllt man live);
       // statische nur, wenn sie Inhalt haben. Archivierte Karten sind erledigt
       // und gehören nicht in den Vortrag (M87)

@@ -182,7 +182,9 @@ console.log('\n════ A: PDF – so fein gemalt, wie es zu sehen ist ═�
   const zMax = await zoom(P);
   const rMax = await schaerfe(P, 'riesig');
   pruefe(`A6 eine 2400 Punkte breite Karte bei ${zMax.toFixed(1)}× Zoom: Das Bild bleibt unter 8 Millionen Bildpunkten und 4096 Punkten Breite`, !!rMax && zMax >= 2.4 && rMax.bitmap * rMax.hoch <= 8_050_000 && rMax.bitmap <= 4096 && rMax.bitmap >= 2300, { zMax, ...rMax });
-  // aufgeklappte Seite im Fokus
+  // aufgeklappte Seite im Fokus. (M413: Der Fokus zieht die Karte nicht mehr breiter, er zoomt – die Seite ist auf dem
+  // Schirm größer als vorher und muss dafür fein genug sein. Größer als der Vorrat einer ruhenden kleinen Karte muss
+  // das Bild dazu nicht werden.)
   await brettAuf(P, 'Lesen');
   const vor = await schaerfe(P, 'offen');
   const m = await P.evaluate(() => { const r = document.querySelector('.react-flow__node[data-id="offen"] .file-kopf').getBoundingClientRect(); return [r.right - 14, r.top + 8]; });
@@ -191,7 +193,7 @@ console.log('\n════ A: PDF – so fein gemalt, wie es zu sehen ist ═�
   const imFokus = await P.evaluate(() => !!document.querySelector('.focus-head'));
   const zf = await zoom(P);
   const rfok = await bis(P, async () => { const s = await schaerfe(P, 'offen'); return s && s.je >= 0.98 ? s : null; });
-  pruefe(`A7 im Fokus (Board-Zoom ${zf.toFixed(2)}): Die aufgeklappte Seite ist so fein wie der Schirm`, imFokus && !!rfok && rfok.bitmap >= rfok.schirm * 0.98 && (zf <= 1.05 || rfok.bitmap > (vor?.bitmap ?? 0)), { imFokus, zf, vor, ...(rfok ?? await schaerfe(P, 'offen')) });
+  pruefe(`A7 im Fokus (Board-Zoom ${zf.toFixed(2)}): Die aufgeklappte Seite ist so fein wie der Schirm`, imFokus && !!rfok && rfok.bitmap >= rfok.schirm * 0.98 && (zf <= 1.05 || rfok.schirm > (vor?.schirm ?? 0)), { imFokus, zf, vor, ...(rfok ?? await schaerfe(P, 'offen')) });
   await P.screenshot({ path: path.join(SD, 'm392-fokus.png') });
   await ctx.close();
 }
