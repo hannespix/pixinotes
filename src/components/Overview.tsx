@@ -251,6 +251,51 @@ function regionGeo(ids: string[], pad: number, at: (id: string) => Pt | undefine
   return { d: hullPath(pts, pad), label: topAnchor(pts, pad) };
 }
 
+/**
+ * M419: Minimaler Spannbaum (Prim) über die Startlage einer Insel — die kürzesten Brücken, die alle Boards
+ * verbinden. Auf der Startlage gerechnet, damit sich die Gestalt beim Ausschwingen nicht umbaut.
+ */
+function spannbaum(ids: string[], lage: Map<string, Pt>): [string, string][] {
+  const da = ids.filter((id) => lage.has(id));
+  if (da.length < 2) return [];
+  const drin = new Set([da[0]]);
+  const out: [string, string][] = [];
+  while (drin.size < da.length) {
+    let best: [string, string] | null = null; let bd = Infinity;
+    for (const a of drin) {
+      const A = lage.get(a)!;
+      for (const b of da) {
+        if (drin.has(b)) continue;
+        const B = lage.get(b)!;
+        const d = (A.x - B.x) ** 2 + (A.y - B.y) ** 2;
+        if (d < bd) { bd = d; best = [a, b]; }
+      }
+    }
+    if (!best) break;
+    drin.add(best[1]); out.push(best);
+  }
+  return out;
+}
+
+/**
+ * M419: Farbverläufe der Tropfen — je Bereichsfarbe ein flacher, diagonaler Pastell-Verlauf (wie die Ideabubbles).
+ * Die Pastelltöne mischen sich aus der Bereichsfarbe und der Fläche (var(--surface)), passen sich also
+ * hellem und dunklem Modus an.
+ */
+function NetzDefs() {
+  return (
+    <defs>
+      {SPACE_ACCENTS.map((c, i) => (
+        <linearGradient key={c} id={`netz-tropfen-${i}`} x1="0" y1="0" x2="1" y2="1" style={{ color: c }}>
+          <stop offset="0" className="ov-tropfen-hell" />
+          <stop offset="0.62" className="ov-tropfen-mitte" />
+          <stop offset="1" className="ov-tropfen-rand" />
+        </linearGradient>
+      ))}
+    </defs>
+  );
+}
+
 /** Detailgrad aus dem Maßstab (M43) — an einer Stelle, damit Render und
  *  Zoom-Logik nicht auseinanderlaufen */
 const lodOf = (scale: number): 0 | 1 | 2 => (scale < 0.42 ? 0 : scale <= 1.35 ? 1 : 2);
@@ -368,6 +413,12 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
    * übereinander, mit oder ohne Karten-Ebene.
    */
   const gliederung = useMemo(() => gliederungAus(spaces, scoped.map((b) => b.id)), [spaces, scoped]);
+  /** M419: Welcher Bereich färbt den Tropfen eines Boards (Index in SPACE_ACCENTS) */
+  const farbIndex = useMemo(() => {
+    const m = new Map<string, number>();
+    spaces.forEach((sp, si) => { for (const p of sp.projects) for (const id of p.boardIds) m.set(id, si % SPACE_ACCENTS.length); });
+    return m;
+  }, [spaces]);
   const { nodes, links: realLinks, pos: seedPos, fuss } = useMemo(() => {
     const g = boardGraph(scoped);
     const fussVon = new Map(g.nodes.map((n) => [n.id, kugelRadius(n.cards) + (showCards ? 44 : 30)]));
@@ -425,6 +476,17 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const linkEls = useRef(new Map<number, SVGLineElement>());
   // M223: Auch Gelände und Bänder werden pro Frame imperativ nachgezogen
   const regionEls = useRef(new Map<string, SVGPathElement>());
+  /** M419: Die Kreise der Tropfen-Inseln je Board (ein Board steht in Bereichs- und Projekt-Insel) */
+  const inselEls = useRef(new Map<string, Set<SVGCircleElement>>());
+  /** M419: Brücken zwischen den Kreisen einer Insel (runde, dicke Linien) — sie ersetzen den Goo-Filter */
+  const brueckeEls = useRef(new Map<string, { a: string; b: string; el: SVGLineElement }>());
+  const inselRef = (id: string) => (el: SVGCircleElement | null) => {
+    if (!el) return;
+    let set = inselEls.current.get(id);
+    if (!set) { set = new Set(); inselEls.current.set(id, set); }
+    for (const c of set) if (!c.isConnected) set.delete(c);
+    set.add(el);
+  };
   const regionTextEls = useRef(new Map<string, SVGTextElement>());
   const bundleEls = useRef(new Map<string, SVGLineElement>());
   const bundleTextEls = useRef(new Map<string, SVGTextElement>());
@@ -492,6 +554,16 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         for (const [id, el] of satEls.current) {
           const p = m.get(id);
           if (p) el.setAttribute('transform', `translate(${p.x} ${p.y})`);
+        }
+        for (const [id, set] of inselEls.current) {
+          const p = m.get(id);
+          if (p) for (const c of set) { c.setAttribute('cx', String(p.x)); c.setAttribute('cy', String(p.y)); }
+        }
+        for (const { a: ia, b: ib, el } of brueckeEls.current.values()) {
+          const A = m.get(ia), B = m.get(ib);
+          if (!A || !B) continue;
+          el.setAttribute('x1', String(A.x)); el.setAttribute('y1', String(A.y));
+          el.setAttribute('x2', String(B.x)); el.setAttribute('y2', String(B.y));
         }
         for (const [i, el] of linkEls.current) {
           const l = links[i];
@@ -656,6 +728,8 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   // davon, wann React zuletzt gerendert hat (M223)
   regionsRef.current = regions;
   bundlesRef.current = bundles;
+  /** M419: Brücken je Insel — nur bei Strukturänderungen neu (Startlage, Gliederung) */
+  const bruecken = useMemo(() => new Map(regions.map((rg) => [rg.key, spannbaum(rg.ids, seedPos)])), [regions, seedPos]);
 
   // ---------- M195: Knoten ziehen (stupst die Nachbarn physikalisch an) ----------
   const dragNode = useRef<string | null>(null);
@@ -868,7 +942,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const marking = needle !== '' && hits.boards.size > 0;
 
   // ---------- Pan & Zoom wie auf dem Whiteboard (viewBox-Steuerung) ----------
-  const svgRef = useRef<SVGSVGElement | null>(null);
+  const svgRef = useRef<HTMLDivElement | null>(null);
   /**
    * M223: Die viewBox ist KEIN React-Zustand mehr im engeren Sinn.
    *
@@ -897,7 +971,10 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
    * bleiben gültig. (React Flow auf den Boards macht es genauso — deshalb
    * fühlt sich das Board flüssiger an als das Netz.)
    */
-  const vpRef = useRef<SVGGElement | null>(null);
+  const vpRef = useRef<HTMLDivElement | null>(null);
+  /** M419: Merker, ob sich der Ausschnitt gerade bewegt (dann trägt die Ebene will-change) */
+  const ruheUhr = useRef(0);
+  const letzterVb = useRef('');
   /** Fingerabdruck der Zoomstufe: nur wenn er sich ändert, muss React ran */
   const stufe = (w: number) =>
     `${sizeStep(w)}|${lodOf((rectWRef.current || GRAPH_W) / w)}|${geoOf(netzBreiteRef.current / w)}`;
@@ -916,7 +993,18 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     // CSS-transform statt transform-Attribut: Blink kann die Gruppe damit auf
     // eine eigene Ebene heben (will-change) und schiebt sie beim Zoomen, statt
     // das SVG neu zu vermessen.
-    g.style.transform = `translate(${ox - v.x * k}px, ${oy - v.y * k}px) scale(${k})`;
+    const t = `translate(${ox - v.x * k}px, ${oy - v.y * k}px) scale(${k})`;
+    if (t === letzterVb.current) return;
+    // M419: Während Verschieben und Zoomen trägt die Ebene will-change — der Compositor bewegt dann
+    // ein fertiges Bild, statt das Netz bei jedem Schritt neu zu zeichnen. In Ruhe fällt es wieder weg,
+    // dann zeichnet der Browser einmal gestochen scharf in der neuen Größe.
+    if (letzterVb.current) {
+      g.classList.add('bewegt');
+      window.clearTimeout(ruheUhr.current);
+      ruheUhr.current = window.setTimeout(() => g.classList.remove('bewegt'), 220);
+    }
+    letzterVb.current = t;
+    g.style.transform = t;
     // Für Tests und Fehlersuche einsehbar — data-Attribute lösen kein Layout aus
     svgRef.current?.setAttribute('data-view', `${v.x} ${v.y} ${v.w} ${v.h}`);
   };
@@ -947,6 +1035,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     if (stufe(next.w) !== committedStufe.current) planeCommit();
   };
   useEffect(() => () => {
+    window.clearTimeout(ruheUhr.current);
     if (commitRaf.current) cancelAnimationFrame(commitRaf.current);
     if (commitTimer.current) clearTimeout(commitTimer.current);
   }, []);
@@ -1073,7 +1162,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     rectVeraltet();   // neue Geste → einmal frisch vermessen (M223)
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 1) {
@@ -1085,7 +1174,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     // umleiten und Knoten-Klicks schlucken — erst beim echten Pannen (s. unten)
   };
 
-  const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     langdruckPruefen(e);   // M234: bewegt = ziehen/schieben, kein Menü
     // M197: Hängt ein Knoten am Finger, gehört die Bewegung ihm — die Events
     // kommen dank Capture an der SVG-Wurzel zuverlässig hier an (iOS-Safari
@@ -1126,7 +1215,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     }
   };
 
-  const onPointerEnd = (e: React.PointerEvent<SVGSVGElement>) => {
+  const onPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
     langdruckEnde();   // M234: losgelassen, bevor die Zeit um war
     releaseDraggedNode();
     pointers.current.delete(e.pointerId);
@@ -1267,7 +1356,9 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           )}
         </span>
       </div>
-      <svg
+      {/* M419: Das Netz liegt auf einer HTML-Ebene, die verschoben und skaliert wird (wie die Boards mit
+          React Flow) — so kann der Compositor sie bewegen, ohne neu zu zeichnen. */}
+      <div
         ref={svgRef}
         data-view={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`}
         className={`ov-graph-svg geo-${geoLevel}`}
@@ -1281,7 +1372,35 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
       >
         {/* M223: EINE Gruppe trägt Verschiebung und Zoom — Pan/Zoom sind damit
             reines Zeichnen statt einer Neuvermessung des ganzen SVG */}
-        <g className="ov-graph-vp" ref={vpRef}>
+        <div className="ov-graph-ebene" ref={vpRef}>
+        <svg className="ov-graph-leinwand" width="1" height="1" aria-hidden="false">
+        <NetzDefs />
+        <g className="ov-graph-vp">
+        {/* M419: Tropfen-Inseln — je Bereich und Projekt verschmelzen Kreise um die Boards zu einer weichen,
+            randlosen Fläche: Die Gruppe trägt die Deckkraft, so verdichten sich Überlappungen nicht. Bewusst ohne
+            Weichzeichner-Filter (gemessen: bis 0,5 s je Bild beim Zoomen). Die Hüllen darüber bleiben unsichtbar zum Anfassen. */}
+        {regions.map((rg) => {
+          const extra = rg.pad * (rg.kind === 'space' ? 0.75 : 0.45);
+          return (
+            <g key={`i-${rg.key}`} className={`ov-insel ov-insel-${rg.kind} ${rg.schlaeft ? 'schlaeft' : ''}`} style={{ color: rg.accent }}>
+              {(bruecken.get(rg.key) ?? []).map(([ia, ib]) => {
+                const A = pos.get(ia), B = pos.get(ib);
+                if (!A || !B) return null;
+                const k = `${rg.key}:${ia}:${ib}`;
+                // Der Hals ist schmaler als die Kreise — so entsteht die Taille, die einen Tropfen ausmacht
+                const breite = 2 * (Math.min(fuss(ia), fuss(ib)) + extra) * (rg.kind === 'space' ? 0.5 : 0.62);
+                return (
+                  <line key={k} x1={A.x} y1={A.y} x2={B.x} y2={B.y} strokeWidth={breite}
+                    ref={(el) => { if (el) brueckeEls.current.set(k, { a: ia, b: ib, el }); else brueckeEls.current.delete(k); }} />
+                );
+              })}
+              {rg.ids.map((id) => {
+                const p = pos.get(id);
+                return p ? <circle key={id} ref={inselRef(id)} cx={p.x} cy={p.y} r={fuss(id) + extra} /> : null;
+              })}
+            </g>
+          );
+        })}
         {/* M221: Gelände zuerst — alles Weitere liegt darauf */}
         {regions.map((rg) => {
           const geo = regionGeo(rg.ids, rg.pad, (id) => pos.get(id), fuss);
@@ -1371,9 +1490,10 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
               key={i}
               ref={(el) => { if (el) linkEls.current.set(i, el); else linkEls.current.delete(i); }}
               x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-              stroke={l.kind === 'portal' ? 'rgba(79,124,255,.5)' : 'rgba(120,110,90,.45)'}
-              strokeWidth={l.kind === 'portal' ? ui(2) : ui(1.5)}
-              strokeDasharray={l.kind === 'wikilink' ? `${ui(5)} ${ui(4)}` : undefined}
+              className={l.kind === 'portal' ? 'ov-kante-portal' : 'ov-kante-wiki'}
+              strokeWidth={l.kind === 'portal' ? ui(2) : ui(2.2)}
+              // M419: Wikilinks als Perlenschnur (runde Punkte) statt Strichel
+              strokeDasharray={l.kind === 'wikilink' ? `0 ${ui(6)}` : undefined}
             />
           );
         })}
@@ -1387,7 +1507,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
               transform={`translate(${center.x} ${center.y})`}
             >
               {sb.lines.map((l, i) => (
-                <line key={`c${i}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="rgba(120,110,90,.3)" strokeWidth={ui(1)} />
+                <line key={`c${i}`} className="ov-sat-linie" x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} strokeWidth={ui(1)} />
               ))}
               {sb.dots.map((d) => (
                 <g
@@ -1396,7 +1516,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
                   onClick={() => { openBoard(sb.boardId); focusNode(sb.boardId, d.nodeId); }}
                 >
                   <title>{d.title}</title>
-                  <circle cx={d.x} cy={d.y} r={ui(5)} strokeWidth={ui(1.5)} />
+                  <circle cx={d.x} cy={d.y} r={ui(5)} strokeWidth={ui(1)} fill={`url(#netz-tropfen-${farbIndex.get(sb.boardId) ?? 0})`} />
                   {lod === 2 && (
                     <text
                       className="ov-graph-dot-label"
@@ -1445,8 +1565,10 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
             >
               {/* M193: „Du bist hier" — ohne diesen Ring verliert man im
                   Gesamtnetz sofort den Bezug zum eigenen Standort */}
-              {n.id === activeId && <circle className="ov-graph-here" r={rad + ui(7)} strokeWidth={ui(2.5)} />}
-              <circle r={rad} strokeWidth={ui(2)} />
+              {n.id === activeId && <circle className="ov-graph-here" r={rad + ui(6)} strokeWidth={ui(2)} />}
+              {/* M419: ein flacher Tropfen — sanfter Pastell-Verlauf aus der Farbe des Bereichs, feine Kontur.
+                  Bewusst ohne Schatten und Glanz (flat), und ohne Filter: kostet beim Zeichnen fast nichts. */}
+              <circle className="ov-tropfen" r={rad} strokeWidth={ui(1)} fill={`url(#netz-tropfen-${farbIndex.get(n.id) ?? 0})`} />
               <text
                 x={0} y={rad + ui(17)} textAnchor="middle"
                 // Deckel in SVG-Einheiten: weit rausgezoomt schrumpfen Namen,
@@ -1465,7 +1587,9 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           );
         })}
         </g>
-      </svg>
+        </svg>
+        </div>
+      </div>
       <div className="ov-graph-zoom nodrag">
         <button onClick={() => zoomButton(1 / 1.35)} title="Vergrößern" aria-label="Vergrößern"><IZoomIn size={16} /></button>
         <button onClick={() => zoomButton(1.35)} title="Verkleinern" aria-label="Verkleinern"><IZoomOut size={16} /></button>

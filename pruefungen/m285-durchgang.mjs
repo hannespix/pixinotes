@@ -138,7 +138,8 @@ console.log('\n════ T2: Netzansicht ════');
   pruefe('T2a das Netz ist offen', await P.evaluate(() => !!document.querySelector('.ov-graph')));
   // Rechtsklick auf einen Board-Knoten öffnet das Menü
   const treffer = await P.evaluate(() => {
-    const k = document.querySelector('.ov-graph circle, .ov-graph .ov-graph-node, .ov-graph g[data-board]');
+    // M419: Der erste Kreis im Netz ist jetzt ein Insel-Kreis (Dekoration) — gemeint ist der Board-Knoten
+    const k = document.querySelector('.ov-graph .ov-graph-node circle.ov-tropfen, .ov-graph .ov-graph-node, .ov-graph g[data-board]');
     if (!k) return false;
     const r = k.getBoundingClientRect();
     k.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 }));
