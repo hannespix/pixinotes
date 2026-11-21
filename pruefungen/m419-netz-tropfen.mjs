@@ -131,7 +131,7 @@ const raum = a.inseln.filter((i) => / ov-insel-space/.test(i.k)); const proj = a
 pruefe('A3 Bereiche und Projekte sind Inseln: je Board ein Kreis, Brücken verbinden alle (Spannbaum)', raum.length === 2 && proj.length === 5 && a.inseln.every((i) => i.kreise >= 1 && i.bruecken === i.kreise - 1) && raum.some((i) => i.kreise === 8), a.inseln);
 pruefe('A4 randlos und leise: die Hülle selbst ist unsichtbar, die Inseln sind zarte Flächen', a.huelle === 0 && a.inseln.every((i) => i.op > 0 && i.op < 0.12), { h: a.huelle, op: a.inseln.map((i) => i.op) });
 pruefe('A5 Wikilinks als Perlenschnur (runde Punkte)', /^0[ ,]/.test(a.wiki ?? '') && a.wikiCap === 'round', a);
-pruefe('A6 Bereichsnamen in der Serife', /Playfair/.test(a.raumSchrift ?? ''), a.raumSchrift);
+pruefe('A6 Bereichsnamen in der Serife', /Newsreader/.test(a.raumSchrift ?? ''), a.raumSchrift);
 const chips = await P.evaluate(() => [...document.querySelectorAll('.ov-graph-toggle')].map((l) => ({ t: l.textContent.trim(), an: l.querySelector('input').checked, bg: getComputedStyle(l).backgroundColor, rund: parseFloat(getComputedStyle(l).borderRadius) > 20, kaestchen: +getComputedStyle(l.querySelector('input')).opacity })));
 const an = chips.find((c) => c.an); const aus = chips.find((c) => !c.an);
 pruefe('A7 Ebenen-Schalter als runde Chips – an: getönt, aus: ohne Fläche; das Kästchen bleibt unsichtbar bedienbar', an && aus && an.rund && an.bg !== aus.bg && /rgba\(0, 0, 0, 0\)|transparent/.test(aus.bg) && chips.every((c) => c.kaestchen === 0), chips);
