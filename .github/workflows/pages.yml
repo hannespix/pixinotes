@@ -17,12 +17,12 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+# Zwei Jobs, wie von GitHub für Pages vorgesehen: „bauen" lädt das Paket hoch, „deploy" veröffentlicht es danach.
+# In einem einzigen Job fragte die Veröffentlichung das Paket 0,3 Sekunden nach dem Hochladen ab — GitHub kannte
+# es dann mitunter noch nicht („Found 0 artifact(s)"), und der Lauf scheiterte trotz erfolgreichem Bau.
 jobs:
-  deploy:
+  bauen:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -74,6 +74,13 @@ jobs:
         with:
           path: dist
 
+  deploy:
+    needs: bauen
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deployment
         id: deployment
         uses: actions/deploy-pages@v4
