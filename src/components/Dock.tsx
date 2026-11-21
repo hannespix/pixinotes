@@ -3,7 +3,7 @@ import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { anhaengeMitnehmen, mutedHistory, useBoard } from '../store';
 import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, makeSheet, makeTime, makeWeek } from '../lib/nodes';
-import { importFilesToBoard, importHtmlAppFromUrl } from '../lib/importFiles';
+import { importFilesToBoard, importHtmlAppFromUrl, praesentationAnlegen } from '../lib/importFiles';
 import { punkteModusSetzen } from '../lib/punkte';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
 import { aiBriefing, aiCluster, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
@@ -17,7 +17,7 @@ import {
   IAppWindow, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITimelineIcon, ITimer, IWand, IWeek, IX,
- IBubbles , IUsers, IArchive
+ IBubbles , IUsers, IArchive, IFolien
 } from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
 import { t } from '../lib/sprache';
@@ -356,6 +356,15 @@ export function Dock() {
     { id: 'protokoll', gruppe: 'Notieren & Rechnen', name: 'Protokoll-Reihe', hinweis: 'Alle Sitzungen einer Besprechung in einer Karte', suchwort: 'besprechung sitzung meeting minutes', icon: <IMinutes size={18} />, tun: () => add(() => makeMinutes(centerPos(380, 420))) },
     { id: 'tabelle', gruppe: 'Notieren & Rechnen', name: 'Rechen-Tabelle', hinweis: 'Tabelle, die rechnet – Excel-Dateien lassen sich auch aufs Board ziehen', suchwort: 'excel csv summe zahlen', icon: <ISigma size={18} />, tun: () => add(() => makeSheet(centerPos(460, 300))) },
     { id: 'bubbles', gruppe: 'Notieren & Rechnen', name: 'Entscheidungs-Bubbles', hinweis: 'Ideen sammeln, gruppieren und mit Punkten abstimmen – alle gleichzeitig', suchwort: 'ideen brainstorming abstimmung voting blasen workshop entscheidung punkte', icon: <IBubbles size={18} />, tun: () => add(() => makeBubbles(centerPos(560, 440))) },
+    // M425: Vibe Studio als Karte — Folien gestalten und vorführen, ohne das Board zu verlassen
+    {
+      id: 'praesentation', gruppe: 'Notieren & Rechnen', name: 'Präsentation', hinweis: 'Folien mit Vibe Studio gestalten und vorführen – direkt auf dem Board',
+      suchwort: 'folien vortrag slides vibe studio powerpoint keynote deck', icon: <IFolien size={18} />,
+      tun: () => {
+        setAddMenu(false);
+        void praesentationAnlegen(centerPos(800, 520)).then((id) => { if (id) focusNode(useBoard.getState().activeId, id); });
+      },
+    },
     { id: 'kanban', gruppe: 'Planen', name: 'Kanban-Board', hinweis: 'Spalten und Karten: Offen, In Arbeit, Erledigt', suchwort: 'aufgaben todo spalten tickets', icon: <IKanban size={18} />, tun: () => add(() => makeKanban(centerPos(420, 200))) },
     { id: 'zeitplan', gruppe: 'Planen', name: 'Zeitplan', hinweis: 'Zeitplan (Gantt): Vorgänge als Balken auf der Zeitachse', suchwort: 'gantt projekt termine balken', icon: <IGantt size={18} />, tun: () => add(() => makeGantt(centerPos(560, 240))) },
     { id: 'kalender', gruppe: 'Planen', name: 'Kalender', hinweis: 'Kalender (Monat), auch mit Google- und Microsoft-Terminen', suchwort: 'monat termine', icon: <ICalendar size={18} />, tun: () => add(() => makeCalendar(centerPos(430, 340))) },
