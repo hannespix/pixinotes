@@ -48,9 +48,31 @@ function setzen(el: HTMLElement, x: number, y: number, b: number, h: number): vo
 }
 /** M415: So weit legt sich der Tropfen einer Gruppe um ihre Ideen (wie der Ring: Radius bis zur äußersten + 12) */
 const TROPFEN_RAND = 12;
+/** M422: Platz über einem Tropfen für die Kuppe mit dem Gruppennamen (Zeilenhöhe + Polster) */
+const TROPFEN_KUPPE = 26;
 /** M415: Pastell aus einer Kartenfarbe — auf hellem und dunklem Grund (die Bühne gibt --bub-grund vor) */
 const pastell = (farbe: string, anteil: number): string => `color-mix(in srgb, ${farbe} ${anteil}%, var(--bub-grund))`;
-interface Koerper { x: number; y: number; vx: number; vy: number; r: number; ziel: number; g: string | null; len: number; wort: number }
+interface Koerper { x: number; y: number; vx: number; vy: number; r: number; ziel: number; g: string | null; len: number; wort: number; wortText?: string }
+
+/**
+ * M422: Breite des längsten Worts je Punkt Schriftgröße — gemessen, nicht geschätzt. Mit „Zeichen × 0,64" passten fette
+ * kurze Wörter („Blubb", „Kuchen") knapp nicht hinein und brachen mitten im Wort. Wörter ab 10 Zeichen dürfen
+ * getrennt werden (index.css); für sie zählt ein Stück von 10 Zeichen.
+ */
+const WORT_MASS = new Map<string, number>();
+let wortCtx: CanvasRenderingContext2D | null | undefined;
+function wortBreite(wort: string, schrift: string): number {
+  const stueck = wort.length >= 10 ? wort.slice(0, 10) : wort;
+  const key = `${schrift}|${stueck}`;
+  const da = WORT_MASS.get(key);
+  if (da !== undefined) return da;
+  if (wortCtx === undefined) { try { wortCtx = document.createElement('canvas').getContext('2d'); } catch { wortCtx = null; } }
+  let b = stueck.length * 0.64;
+  if (wortCtx) { wortCtx.font = `650 100px ${schrift}`; b = wortCtx.measureText(stueck).width / 100; }
+  WORT_MASS.set(key, b);
+  return b;
+}
+if (typeof document !== 'undefined' && document.fonts?.addEventListener) document.fonts.addEventListener('loadingdone', () => WORT_MASS.clear());
 /**
  * M378: Radius des Kreises, den eine Gruppe mit diesen Blasen braucht (samt Luft für den Ring). Eine Blase: sie
  * selbst; zwei: nebeneinander; mehr: dichte Packung (Kreise füllen einen Kreis zu gut 60 %).
@@ -387,14 +409,21 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       const alt = gezeichnet.current.get(bid);
       const weg = alt ? Math.max(Math.abs(alt.x - k.x), Math.abs(alt.y - k.y), Math.abs(alt.r - k.r)) : Infinity;
       weit = Math.max(weit, weg);
-      if (weg < 0.2 && el.style.transform) continue;
+      const dm = `${(k.r * 2).toFixed(1)}px`;
+      // Größe und Schrift neu, wenn sich der Durchmesser oder das längste Wort geändert hat
+      const massKey = `${dm}|${k.wortText ?? ''}`;
+      if (weg < 0.2 && el.style.transform && el.dataset.mass === massKey) continue;
       gezeichnet.current.set(bid, { x: k.x, y: k.y, r: k.r });
       el.style.transform = `translate(${(k.x - k.r).toFixed(1)}px, ${(k.y - k.r).toFixed(1)}px)`;
-      const dm = `${(k.r * 2).toFixed(1)}px`;
-      if (el.style.width !== dm) {
+      if (el.dataset.mass !== massKey) {
+        el.dataset.mass = massKey;
         el.style.width = dm; el.style.height = dm;
         // Schrift so groß, dass der Text in die Blase passt: das längste Wort in die Breite, alles zusammen in die Höhe
-        const fs = Math.min(gross ? 26 : 16, k.r * Math.sqrt(1.4 / Math.max(4, k.len)), (k.r * 1.56) / (Math.max(4, k.wort) * 0.6));
+        // M422: Das längste Wort wird gemessen (wortBreite) — ein kurzes wie „Kuchen" wird kleiner gesetzt statt
+        // getrennt („Ku-chen"); getrennt werden nur lange Wörter (siehe hyphenate-limit-chars in index.css)
+        // Breite: Die Zeile steht nicht ganz am Durchmesser (Kreis), dazu das Polster der Blase (2 × 0,55 em)
+        const wb = k.wortText ? wortBreite(k.wortText, getComputedStyle(el).fontFamily) : Math.max(4, k.wort) * 0.64;
+        const fs = Math.min(gross ? 26 : 16, k.r * Math.sqrt(1.4 / Math.max(4, k.len)), (k.r * 1.8) / (wb + 1.1));
         el.style.fontSize = `${Math.max(7.5, fs).toFixed(1)}px`;
       }
     }
@@ -443,8 +472,10 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         // im Tropfen wächst oben eine Kuppe aus der Form, in der der Name steht; sonst sitzt er auf dem Ring
         const lh = nm.offsetHeight || 18;
         const oben = tropfenRef.current ? obenRand - lh + 10 : obenRand - 9; const unten = s0.y + s0.r - 9;
-        const y = oben >= 3 ? oben : unten <= h - 22 ? unten : 3;
-        const x = Math.min(Math.max(mitteX - halb, 4), Math.max(4, w - nm.offsetWidth - 4));
+        // M422: Die Kuppe ist 9 Punkte breiter und 5 höher als der Name — so weit muss er vom Rand der Bühne bleiben
+        const rk = tropfenRef.current ? 13 : 4; const ok = tropfenRef.current ? 8 : 3;
+        const y = oben >= ok ? oben : unten <= h - 22 ? unten : ok;
+        const x = Math.min(Math.max(mitteX - halb, rk), Math.max(rk, w - nm.offsetWidth - rk));
         const tf = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
         if (nm.style.transform !== tf) nm.style.transform = tf;
         const kf = kopfFormen.current.get(gid);
@@ -489,8 +520,10 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       }
       for (const { g, s: c } of sch) {
         // … und als Ganzes in die Bühne: Ragt der Ring über einen Rand, rückt die ganze Gruppe herein
+        // M422: im Tropfen-Look oben mit Platz für die Kuppe des Namens
+        const oben = tropfenRef.current ? 3 + TROPFEN_KUPPE : 3;
         const rx = c.x - c.r < 3 ? 3 - (c.x - c.r) : c.x + c.r > w - 3 ? (w - 3) - (c.x + c.r) : 0;
-        const ry = c.y - c.r < 3 ? 3 - (c.y - c.r) : c.y + c.r > h - 3 ? (h - 3) - (c.y + c.r) : 0;
+        const ry = c.y - c.r < oben ? oben - (c.y - c.r) : c.y + c.r > h - 3 ? (h - 3) - (c.y + c.r) : 0;
         for (const [bid, k] of ks) if (k.g === g && bid !== gezogen) { k.vx += (c.x - k.x) * 0.012 + rx * 0.05; k.vy += (c.y - k.y) * 0.012 + ry * 0.05; }
       }
       for (const [bid, k] of ks) {
@@ -544,7 +577,13 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       }
       for (const [bid, k] of ks) {
         if (bid === gezogen) continue;
-        const xMin = k.r + 4; const xMax = Math.max(xMin, w - k.r - 4); const yMin = k.r + 4; const yMax = Math.max(yMin, h - k.r - 4);
+        // M422: Im Tropfen-Look ragt die Form einer Gruppe um TROPFEN_RAND über ihre Ideen hinaus, und oben wächst die
+        // Kuppe mit dem Namen heraus. Beides gehört in die Bühne — sonst schnitt deren Kante den Tropfen glatt ab
+        // (und der Name wich nach unten aus, mitten in die Nachbargruppe).
+        const rand = tropfenRef.current && k.g ? TROPFEN_RAND + 2 : 0;
+        const kuppe = tropfenRef.current && k.g ? TROPFEN_KUPPE : 0;
+        const xMin = k.r + 4 + rand; const xMax = Math.max(xMin, w - k.r - 4 - rand);
+        const yMin = k.r + 4 + rand + kuppe; const yMax = Math.max(yMin, h - k.r - 4 - rand);
         // weich von der Wand zurück
         if (k.x < xMin) { k.x = xMin; if (k.vx < 0) k.vx *= -0.35; } else if (k.x > xMax) { k.x = xMax; if (k.vx > 0) k.vx *= -0.35; }
         if (k.y < yMin) { k.y = yMin; if (k.vy < 0) k.vy *= -0.35; } else if (k.y > yMax) { k.y = yMax; if (k.vy > 0) k.vy *= -0.35; }
@@ -615,29 +654,36 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       for (const g of gruppenRef.current) zonen.set(g, []);
       bs.forEach((b, i) => { const k = b.gruppe && zonen.has(b.gruppe) ? b.gruppe : ''; if (!zonen.has(k)) zonen.set(k, []); zonen.get(k)!.push(roh[i]); });
       const belegt = (ff: number): number => { let a = 0; for (const rs of zonen.values()) { const r = feldRadius(rs.map((x) => x * ff)); a += Math.PI * r * r; } return a; };
-      const platz = w * h * 0.5;
+      // M422: im Tropfen-Look ohne den Streifen, den Rand und Namenskuppe an den Kanten brauchen
+      const platz = (tropfenRef.current ? Math.max(1, w - 2 * (TROPFEN_RAND + 6)) * Math.max(1, h - 2 * (TROPFEN_RAND + 6) - TROPFEN_KUPPE) : w * h) * 0.5;
       if (belegt(f) > platz) {
         let lo = f * 0.25; let hi = f;
         for (let i = 0; i < 14; i++) { const m = (lo + hi) / 2; if (belegt(m) > platz) hi = m; else lo = m; }
         f = lo;
       }
     }
+    const schrift = getComputedStyle(document.body).fontFamily;
     const da = new Set(bs.map((b) => b.id));
     for (const k of [...koerper.current.keys()]) if (!da.has(k)) koerper.current.delete(k);
     bs.forEach((b, i) => {
-      const len = b.text.length; const wort = Math.max(...b.text.split(/[\s-]+/).map((x) => x.length));
+      // M422: Für die Schriftgröße zählt ein Wort höchstens 11 Zeichen — längere werden getrennt (hyphens), statt die
+      // ganze Blase auf 7,5 Punkte schrumpfen zu lassen („Vaterlandsliebeleidampfhochhausmuseum")
+      const woerter = b.text.split(/[\s-]+/);
+      const wortText = woerter.reduce((a, x) => (x.length > a.length ? x : a), '');
+      const len = b.text.length; const wort = Math.min(11, wortText.length);
       // nie so klein, dass das längste Wort nicht mehr lesbar hineinpasst
-      const zielR = Math.max(14, roh[i] * f, Math.min(wort, 16) * 2.9);
+      // M422: nie so klein, dass das längste Wort bei der kleinsten Schrift (7,5) nicht hineinpasst — gemessen
+      const zielR = Math.max(14, roh[i] * f, (7.5 * (wortBreite(wortText, schrift) + 1.1)) / 1.8);
       const k = koerper.current.get(b.id);
-      if (k) { k.ziel = zielR; k.g = b.gruppe; k.len = len; k.wort = wort; return; }
+      if (k) { k.ziel = zielR; k.g = b.gruppe; k.len = len; k.wort = wort; k.wortText = wortText; return; }
       // Neue fliegen vom Rand herein — von einer Stelle, die aus ihrer Kennung folgt (auf jedem Gerät dieselbe)
       const winkel = zahlAus(b.id) * Math.PI * 2;
       // M415: per Doppelklick angelegt — sie entsteht genau dort
       const st = b.ids.map((x) => startHier.current.get(x)).find(Boolean);
       for (const x of b.ids) startHier.current.delete(x);
       koerper.current.set(b.id, st
-        ? { x: st.x, y: st.y, vx: 0, vy: 0, r: zielR * 0.3, ziel: zielR, g: b.gruppe, len, wort }
-        : { x: w / 2 + Math.cos(winkel) * w * 0.42, y: h / 2 + Math.sin(winkel) * h * 0.42, vx: 0, vy: 0, r: zielR * 0.4, ziel: zielR, g: b.gruppe, len, wort });
+        ? { x: st.x, y: st.y, vx: 0, vy: 0, r: zielR * 0.3, ziel: zielR, g: b.gruppe, len, wort, wortText }
+        : { x: w / 2 + Math.cos(winkel) * w * 0.42, y: h / 2 + Math.sin(winkel) * h * 0.42, vx: 0, vy: 0, r: zielR * 0.4, ziel: zielR, g: b.gruppe, len, wort, wortText });
     });
     felderLegen();
     wecken();
@@ -883,6 +929,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
               ? { background: b.gruppe ? pastell(farbeVon(b, i), 46) : 'transparent', ['--bub-farbe' as string]: farbeVon(b, i) }
               : { background: farbeVon(b, i) }}
             data-frei={tropfen && !b.gruppe ? '' : undefined}
+            data-gruppe={b.gruppe ?? undefined}
             role="button" tabIndex={0} data-taste="bub-blase" data-id={b.id} data-punkte={b.punkte} data-mal={b.mal}
             title={zu(b) ? 'Idee von jemand anderem – noch verdeckt' : b.namen.length && !regeln.anonym ? `${b.text} – von ${b.namen.join(', ')}` : b.text}
             data-verdeckt={zu(b) ? '' : undefined}
