@@ -779,7 +779,9 @@ pruefe('C7 alles kommt zur Ruhe (kein Dauerlauf)', await ruhen(S1.P));
 // (nichts im Weg) und VOM Anker weg: Weiter als der Punkt des Loslassens kommt sie nur mit eigenem Schwung.
 {
   const standWurf = {
-    boards: [board('b1', 'Wurf', [{ ...bub('k1', 'Wurf'), data: { title: 'Wurf', frage: '', ideen: { i1: { text: 'Solo', von: 'k:x', t: 1 } }, stimmen: {}, gruppen: {}, abstimmung: { phase: 'aus', punkte: 3, t: 0 } } }])],
+    // M415: im Look „Klar" — hier geht es um die Physik; den Tropfen-Filter rechnet der Prüf-Browser ohne Grafikkarte
+    // so langsam (gut 70 ms je Bild), dass der Wurf in der Messzeit nur wenige Schritte käme
+    boards: [board('b1', 'Wurf', [{ ...bub('k1', 'Wurf'), data: { title: 'Wurf', frage: '', stil: 'klar', ideen: { i1: { text: 'Solo', von: 'k:x', t: 1 } }, stimmen: {}, gruppen: {}, abstimmung: { phase: 'aus', punkte: 3, t: 0 } } }])],
     spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['b1'] }] }],
     activeId: 'b1', view: 'board',
   };
