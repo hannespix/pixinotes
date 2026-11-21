@@ -8,6 +8,7 @@ import { kontoDateiNachladen } from '../../lib/kontoSync';
 import { appMelden, EINGABE_EREIGNIS, eingabeAus, eingabeMelden, eingabenErbitten, folgeIch, ichFuehreVor, ROLL_EREIGNIS, rollMelden, rollVergessen, SPIEGEL_EREIGNIS, spiegelBild, spiegelDa, spiegelErbitten, VORFUEHR_EREIGNIS, werFuehrtVor, type Eingabe, type Roll } from '../../lib/vorfuehren';
 import { loadAppStateFromTeam, loadAttachment, saveAppStateToTeam } from '../../lib/attachments';
 import { triggerDownload } from '../../lib/download';
+import { sofortStarten, VIBE_STUDIO } from '../../lib/vibeStudio';
 import { fremdeWebAdresse } from '../../lib/sicher';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
@@ -182,6 +183,9 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
      geöffnet wird nur eine fremde http(s)-Adresse (lib/sicher.ts): „javascript:…" liefe im Namen von PixiNotes. */
   const liveAdresse = data.live ? fremdeWebAdresse(data.url) : null;
   const isLive = !!data.live && !!data.url;
+  /* M425: Vibe Studio führt die Folien im Vollbild vor (F oder Knopf in der Folie) — das darf nur dieses Werkzeug,
+     sonst bleibt es beim Vollbild der ganzen Karte (Knopf in der Kopfleiste) */
+  const vollbildErlaubt = data.vorlage === VIBE_STUDIO ? 'fullscreen' : undefined;
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
@@ -313,6 +317,11 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dortAn, dortAus, laeuft, hasSrc, starting]);
+  // M425: frisch angelegte Präsentation (Vibe Studio) läuft gleich — wer sie anlegt, will sie bearbeiten
+  useEffect(() => {
+    if (hasSrc === true && !laeuft && !starting && sofortStarten(id)) void start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSrc, id]);
   const [, neuZeichnen] = useState(0);
   const stopSelbst = () => { if (dortAn) selbstAus.current = true; vonFolgen.current = false; stop(); neuZeichnen((n) => n + 1); };
   useMitrollen(boardId, id, frameRef, srcdoc !== null);
@@ -371,7 +380,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
     const wrapper = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>${esc(data.name)} – PixiNotes App</title>`
       + '<style>html,body{margin:0;height:100%;background:#fff}iframe{border:0;width:100%;height:100%;display:block}</style></head><body>'
-      + `<iframe sandbox="${SANDBOX}"></iframe>`
+      + `<iframe sandbox="${SANDBOX}"${vollbildErlaubt ? ` allow="${vollbildErlaubt}"` : ''}></iframe>`
       + '<script>window.addEventListener("message",function(e){if(e.data&&e.data.__pixiHapp&&window.opener){try{window.opener.postMessage(e.data,"*")}catch(_){}}});'
       + `document.querySelector("iframe").srcdoc=${innerJson};</` + 'script></body></html>';
     const url = URL.createObjectURL(new Blob([wrapper], { type: 'text/html' }));
@@ -473,7 +482,7 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
                    Browsers hält sie von PixiNotes fern (s. SANDBOX_LIVE) */
                 <iframe key={liveKey} className="happ-frame" title={data.name} sandbox={SANDBOX_LIVE} src={liveAdresse} />
               ) : (
-                <iframe ref={frameRef} className="happ-frame" title={data.name} sandbox={SANDBOX} srcDoc={srcdoc ?? ''} onLoad={() => rollNachLaden(boardId, id, frameRef.current)} />
+                <iframe ref={frameRef} className="happ-frame" title={data.name} sandbox={SANDBOX} allow={vollbildErlaubt} srcDoc={srcdoc ?? ''} onLoad={() => rollNachLaden(boardId, id, frameRef.current)} />
               )}
               {/* Nicht ausgewählt: Klicks gehören dem Board (auswählen/ziehen).
                   Erst die AUSGEWÄHLTE Karte reicht Eingaben an die App durch —

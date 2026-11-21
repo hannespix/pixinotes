@@ -3,7 +3,7 @@ import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { anhaengeMitnehmen, mutedHistory, useBoard } from '../store';
 import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, makeSheet, makeTime, makeWeek } from '../lib/nodes';
-import { importFilesToBoard, importHtmlAppFromUrl } from '../lib/importFiles';
+import { importFilesToBoard, importHtmlAppFromUrl, praesentationAnlegen } from '../lib/importFiles';
 import { punkteModusSetzen } from '../lib/punkte';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
 import { aiBriefing, aiCluster, aiEdges, aiProcess, aiTasks } from '../lib/aiActions';
@@ -17,7 +17,7 @@ import {
   IAppWindow, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITimelineIcon, ITimer, IWand, IWeek, IX,
- IBubbles , IUsers, IArchive
+ IBubbles , IUsers, IArchive, IFolien
 } from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
 import { t } from '../lib/sprache';
@@ -365,6 +365,16 @@ export function Dock() {
     { id: 'schritt', gruppe: 'Ablauf', name: 'Schritt', hinweis: 'Prozess-Schritt (Rechteck) – verbinden per Ziehen am Rand', suchwort: 'prozess form rechteck kasten', icon: <ISquare size={18} />, tun: () => addShape('process') },
     { id: 'entscheidung', gruppe: 'Ablauf', name: 'Entscheidung', hinweis: 'Entscheidung (Raute): ja / nein', suchwort: 'raute ja nein verzweigung', icon: <IDiamond size={18} />, tun: () => addShape('decision') },
     { id: 'start', gruppe: 'Ablauf', name: 'Start/Ende', hinweis: 'Start oder Ende eines Ablaufs', suchwort: 'terminator anfang schluss', icon: <IPill size={18} />, tun: () => addShape('terminator') },
+    // M425: Vibe Studio als Karte — Folien gestalten und vorführen, ohne das Board zu verlassen (in „Ablauf“: Folge von Folien;
+    // die Gruppen stehen in Zeilen zu fünf Kacheln, „Notieren & Rechnen“ ist voll)
+    {
+      id: 'praesentation', gruppe: 'Ablauf', name: 'Präsentation', hinweis: 'Folien mit Vibe Studio gestalten und vorführen – direkt auf dem Board',
+      suchwort: 'folien vortrag slides vibe studio powerpoint keynote deck', icon: <IFolien size={18} />,
+      tun: () => {
+        setAddMenu(false);
+        void praesentationAnlegen(centerPos(800, 520)).then((id) => { if (id) focusNode(useBoard.getState().activeId, id); });
+      },
+    },
     { id: 'datei', gruppe: 'Einfügen', name: 'Datei oder Bild', hinweis: 'Bilder, PDFs, E-Mails, Excel, Word und mehr', suchwort: 'pdf upload anhang dokument foto', icon: <IPaperclip size={18} />, tun: () => anyFileRef.current?.click() },
     { id: 'foto', gruppe: 'Einfügen', name: 'Foto', hinweis: 'Foto aufnehmen oder aus der Mediathek wählen (iPhone/iPad)', suchwort: 'kamera mediathek bild aufnehmen', icon: <IImage size={18} />, tun: () => fotoRef.current?.click() },
     { id: 'zwischenablage', gruppe: 'Einfügen', name: 'Zwischen\u00adablage', hinweis: 'Bild aus der Zwischenablage einfügen (am PC: Strg+V)', suchwort: 'einfügen paste screenshot kopiert', icon: <ICopy size={18} />, tun: () => void ausZwischenablage() },

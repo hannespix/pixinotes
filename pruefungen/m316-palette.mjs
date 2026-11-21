@@ -1,7 +1,7 @@
 /**
  * M316 — Die Modul-Palette: ＋ zeigt alle Module auf einen Blick.
  *
- *   A  Eine Palette statt Liste + „Weitere Module": fünf Gruppen, 21 Kacheln (M373: Entscheidungs-Bubbles kamen dazu)
+ *   A  Eine Palette statt Liste + „Weitere Module": fünf Gruppen, 22 Kacheln (M373: Entscheidungs-Bubbles, M425: Präsentation kamen dazu)
  *      (Symbol + Name), eindeutige Namen, mittig über dem Dock, im Bild.
  *   B  Suche: „summe" lässt nur die Rechen-Tabelle übrig; Enter legt sie an;
  *      Esc leert zuerst die Suche, ein zweites Esc schließt.
@@ -74,7 +74,7 @@ console.log('\n════ A: Eine Palette ════');
   pruefe('A2 Gruppen: Notieren & Rechnen · Planen · Ablauf · Einfügen · Ordnen · Vorlagen', gruppen.join(' · ') === 'Notieren & Rechnen · Planen · Ablauf · Einfügen · Ordnen · Vorlagen', gruppen.join(' · '));
   const n = await kacheln(P).count();
   const namen = await kacheln(P).locator('> span:first-of-type').allTextContents();
-  pruefe('A3 21 Modul-Kacheln mit eindeutigen Namen', n === 21 && new Set(namen).size === 21, `${n}: ${namen.join(', ')}`);
+  pruefe('A3 22 Modul-Kacheln mit eindeutigen Namen', n === 22 && new Set(namen).size === 22, `${n}: ${namen.join(', ')}`);
   const symbole = await P.evaluate(() => [...document.querySelectorAll('.modul-palette .modul-kachel')].every((b) => b.querySelector('svg') && b.textContent.trim().length > 0));
   pruefe('A4 jede Kachel hat Symbol und Namen', symbole);
   const lage = await P.evaluate(() => {
@@ -110,7 +110,7 @@ console.log('\n════ B: Suche ════');
   await P.keyboard.type('xyzq'); await P.waitForTimeout(200);
   pruefe('B5 ohne Treffer ein ehrlicher Satz', (await P.locator('.modul-leer').count()) === 1 && (await kacheln(P).count()) === 0);
   await P.keyboard.press('Escape'); await P.waitForTimeout(200);
-  pruefe('B6 Esc leert zuerst die Suche, Palette bleibt offen', (await P.locator('.modul-palette').count()) === 1 && (await P.inputValue('.modul-suche input')) === '' && (await kacheln(P).count()) === 21);
+  pruefe('B6 Esc leert zuerst die Suche, Palette bleibt offen', (await P.locator('.modul-palette').count()) === 1 && (await P.inputValue('.modul-suche input')) === '' && (await kacheln(P).count()) === 22);
   await P.keyboard.press('Escape'); await P.waitForTimeout(200);
   pruefe('B7 zweites Esc schließt', (await P.locator('.modul-palette').count()) === 0);
   await ctx.close();
