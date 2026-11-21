@@ -161,7 +161,7 @@ const FOLGE = [
   ['Zeichnen aus', async (P) => { await P.keyboard.press('Escape'); }],
   ['anderes Board', async (P) => { await P.click('.side-board-name:has-text("Einkauf")'); }],
   ['zurück', async (P) => { await P.click('.side-board-name:has-text("Sitzung Montag")'); }],
-  ['Übersicht', async (P) => { await P.click('.tab-home'); }],
+  ['Übersicht', async (P) => { await P.click('[data-taste="uebersicht"]'); }],
   ['Aufgaben', async (P) => { await P.click('[data-taste="aufgaben"]'); }],
   ['zurück ins Board', async (P) => { await P.click('.side-board-name:has-text("Sitzung Montag")'); }],
   ['Board-Menü auf', async (P) => { await P.locator('.side-board-name:has-text("Einkauf")').hover(); await P.click('button[aria-label^="Board „Einkauf"]'); }],

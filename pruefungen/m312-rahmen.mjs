@@ -2,8 +2,8 @@
  * M312 — Weniger ist mehr, Etappe 1: der Rahmen.
  *
  *   A  Kopfleiste: Logo + Rückgängig · Wiederholen · Einstellungen; der Suche-Knopf
- *      ist bei offener Spalte verborgen; das Logo öffnet die Hilfe (mit Fassung
- *      und „Was ist neu" im Fuß); kein Logo-Menü, kein Hilfe-Knopf.
+ *      ist bei offener Spalte verborgen; das Logo führt zur Übersicht (M412), die Hilfe
+ *      (mit Fassung und „Was ist neu" im Fuß) hat einen Knopf; kein Logo-Menü.
  *   B  Spalte: Suchfeld öffnet die Suche (Karten + Boards), „Aufgaben" mit Zahl
  *      öffnet die Aufgaben-Zentrale, kein Stift in Board-Zeilen, Bereiche haben
  *      ein ⋯ (umbenennen, Projekt anlegen), ＋ Neu legt Board / Projekt / Bereich an.
@@ -71,11 +71,12 @@ console.log('\n════ A: Kopfleiste ════');
 {
   const { ctx, P } = await seite();
   const oben = await beschriftung(P, '.topbar button');
-  pruefe('A1 Kopfleiste: Logo (Hilfe) + Rückgängig · Wiederholen · Einstellungen', JSON.stringify(oben) === JSON.stringify(['Hilfe', 'Rückgängig', 'Wiederholen', 'Einstellungen']), JSON.stringify(oben));
-  pruefe('A2 kein eigener Hilfe-Knopf, kein Logo-Menü', (await P.locator('.top-actions [aria-label="Hilfe"]').count()) === 0 && (await P.locator('.about-menu').count()) === 0);
-  await P.locator('button.logo').click();
+  // M412: Das Logo führt zur Übersicht; die Hilfe sitzt bei offener Spalte an deren Fuß (sonst in der Aktionsleiste)
+  pruefe('A1 Kopfleiste: Logo (Übersicht) + Rückgängig · Wiederholen · Einstellungen', JSON.stringify(oben) === JSON.stringify(['PixiNotes – zur Übersicht', 'Rückgängig', 'Wiederholen', 'Einstellungen']), JSON.stringify(oben));
+  pruefe('A2 die Hilfe hat EINEN Ort (am Fuß der Spalte), kein Logo-Menü', (await P.locator('[data-taste="hilfe"]').count()) === 1 && (await P.locator('.tabs.spalte .tabs-foot [data-taste="hilfe"]').count()) === 1 && (await P.locator('.about-menu').count()) === 0);
+  await P.locator('[data-taste="hilfe"]').click();
   await P.waitForTimeout(500);
-  pruefe('A3 das Logo öffnet die Hilfe', (await P.locator('.help-modal').count()) === 1);
+  pruefe('A3 der Hilfe-Knopf öffnet die Hilfe', (await P.locator('.help-modal').count()) === 1);
   const fuss = await P.locator('.help-fassung').textContent().catch(() => '');
   pruefe('A4 im Fuß der Hilfe stehen Fassung und Stand', /PixiNotes \d/.test(fuss) && /Stand/.test(fuss), fuss);
   pruefe('A5 … und der Link „Was ist neu"', (await P.locator('.help-neu-link').count()) === 1);
@@ -138,7 +139,7 @@ console.log('\n════ B: Spalte ════');
   pruefe('B14 „Neues Projekt" legt eines an', projekte === 3, `Projekte: ${projekte}`);
   // ＋ Neu
   const fuss = await beschriftung(P, '.tabs.spalte .tabs-foot button');
-  pruefe('B15 Fuß der Spalte: ＋ Neu und ‹ – kein Teilen', JSON.stringify(fuss) === JSON.stringify(['Neu', 'Spalte ausblenden']), JSON.stringify(fuss));
+  pruefe('B15 Fuß der Spalte: ＋ Neu, Hilfe (seit M412) und ‹ – kein Teilen', JSON.stringify(fuss) === JSON.stringify(['Neu', 'Hilfe', 'Spalte ausblenden']), JSON.stringify(fuss));
   await P.locator('.tabs-foot .tab-add').click();
   await P.waitForTimeout(300);
   const neu = (await P.locator('.neu-menu [role="menuitem"]').allTextContents()).map((t) => t.trim());

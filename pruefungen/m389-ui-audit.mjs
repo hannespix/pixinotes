@@ -187,8 +187,8 @@ console.log('\n════ D: Telefon ════');
   const ziel = await P.evaluate(() => { const e = [...document.querySelectorAll('.react-flow__node-ovBoard')].find((x) => /Aufgaben-Zentrale/.test(x.textContent)); const m = e.querySelector('.ov-mini-karte').getBoundingClientRect(); return [m.left + m.width / 2, m.top + m.height / 2]; });
   await P.touchscreen.tap(ziel[0], ziel[1]); await P.waitForTimeout(1200);
   pruefe('D4 ein Tipp auf die Kachel – auch mitten auf die Vorschau – öffnet das BOARD, nicht blind eine Karte im Fokus', await P.evaluate(() => { const s = JSON.parse(localStorage.getItem('pixinotes-board')).state; return s.view === 'board' && /Aufgaben-Zentrale/.test(s.boards.find((b) => b.id === s.activeId).name) && !document.querySelector('.focus-head'); }));
-  const reiter = await P.evaluate(() => [...document.querySelectorAll('.tab-home, .tab-add')].filter((e) => e.getClientRects().length).map((e) => { const r = e.getBoundingClientRect(); return Math.min(r.width, r.height); }));
-  pruefe('D5 „Übersicht" und „Neu" in der Kopfzeile: mindestens 40 Punkte', reiter.length >= 2 && Math.min(...reiter) >= 40, reiter.join());
+  const reiter = await P.evaluate(() => [...document.querySelectorAll('.logo, .tab-add')].filter((e) => e.getClientRects().length).map((e) => { const r = e.getBoundingClientRect(); return Math.min(r.width, r.height); }));
+  pruefe('D5 „Übersicht" (seit M412 das Logo) und „Neu" in der Kopfzeile: mindestens 40 Punkte', reiter.length >= 2 && Math.min(...reiter) >= 40, reiter.join());
   pruefe('D6 nichts ragt seitlich aus dem Bild', await P.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
   await ctx.close();
 }

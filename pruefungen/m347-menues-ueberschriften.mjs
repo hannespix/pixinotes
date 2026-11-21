@@ -148,7 +148,7 @@ for (const g of ['telefon', 'tablet']) {
   const menue = await rect(P, '.dock-menu'); const dock = await rect(P, '.dock');
   pruefe(`D1 ${g}: das Dock-Menü sitzt nah über dem Dock (≤ 16 Punkte)`, !!menue && !!dock && dock.top - menue.bottom >= 2 && dock.top - menue.bottom <= 16, [menue?.bottom, dock?.top]);
   await P.keyboard.press('Escape'); await P.waitForTimeout(300);
-  await P.evaluate(() => document.querySelector('.tab-home')?.click()); await P.waitForTimeout(1200);
+  await P.evaluate(() => document.querySelector('[data-taste="uebersicht"]')?.click()); await P.waitForTimeout(1200);
   await P.evaluate(() => { [...document.querySelectorAll('.ov-mode button')].find((x) => x.textContent.trim() === 'Hierarchie')?.click(); }); await P.waitForTimeout(1000);
   // Projekt-Menü der Kachel ganz rechts
   const knopf = await P.evaluate(() => { const ks = [...document.querySelectorAll('.ov-canvas .ov-head-actions .ebenen-menu-knopf')].filter((e) => e.getBoundingClientRect().width > 2); ks.sort((a, b) => b.getBoundingClientRect().right - a.getBoundingClientRect().right); const r = ks[0]?.getBoundingClientRect(); return r ? [r.left + r.width / 2, r.top + r.height / 2] : null; });

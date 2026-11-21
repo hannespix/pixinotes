@@ -6,7 +6,7 @@ import { useOutsideClose } from '../lib/useOutsideClose';
 import { collectTasks } from '../lib/tasks';
 import { InlineName } from './InlineName';
 import { NavTree } from './Navigation';
-import { IChevronL, IChevronR, IHome, IPanelLeft, IPlus, ITasks, IVorlage, IX } from './Icons';
+import { IChevronL, IChevronR, IHelp, IHome, IPanelLeft, IPlus, ITasks, IVorlage, IX } from './Icons';
 
 /**
  * Die Navigation der App.
@@ -85,6 +85,15 @@ export function Tabs() {
     return () => mq.removeEventListener('change', on);
   }, []);
   const spalte = navLinks && breit;
+  /* M412: Ragen Reiter links oder rechts über die Reihe hinaus? Statt eines Rollbalkens zeigt ein weicher Rand,
+     dass es dort weitergeht (Stylesheet: .gerollt, .mehr-rechts). */
+  const [rollt, setRollt] = useState({ links: false, rechts: false });
+  const rollMessen = () => {
+    const el = reiheRef.current;
+    if (!el) return;
+    const neu = { links: el.scrollLeft > 2, rechts: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 };
+    setRollt((alt) => (alt.links === neu.links && alt.rechts === neu.rechts ? alt : neu));
+  };
   /**
    * M236: Beim Board-Wechsel den aktiven Tab ins Bild holen.
    *
@@ -97,6 +106,17 @@ export function Tabs() {
     const el = reiheRef.current?.querySelector('.tab.active') as HTMLElement | null;
     el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
   }, [activeId, view]);
+  // M412: Ränder der Reihe nachführen – beim Aufbau, wenn sich ihre Breite oder die Zahl der Boards ändert
+  useEffect(() => {
+    const el = reiheRef.current;
+    rollMessen();
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(rollMessen);
+    ro.observe(el);
+    const spaeter = window.setTimeout(rollMessen, 400);   // nach dem weichen Hinrollen zum aktiven Reiter
+    return () => { ro.disconnect(); window.clearTimeout(spaeter); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
 
   /**
    * M261: Reihe oder Wähler? Das entscheidet der PLATZ, nicht die Fenstergröße.
@@ -263,6 +283,9 @@ export function Tabs() {
   return (
     <div className={`tabs ${kompakt ? 'kompakt' : ''} ${krumeKurz ? 'krume-kurz' : ''} ${spalte ? 'spalte' : ''}`} ref={leisteRef}>
       {spalte && <div className="spalte-griff" {...spalteGriff}><span /></div>}
+      {/* M412: In der Reihe führt das Logo zur Übersicht – das Haus daneben war derselbe Weg ein zweites Mal.
+          In der Spalte bleibt „Übersicht" die erste Zeile der Liste. */}
+      {spalte && (
       <button
         className={`tab-home ${view === 'overview' ? 'active' : ''}`}
         title="Übersicht"
@@ -272,6 +295,7 @@ export function Tabs() {
         <IHome size={15} />
         <span className="tab-home-label">Übersicht</span>
       </button>
+      )}
       {spalte && aufgabenKnopf('tab-tasks')}
       {!spalte && !kompakt && (
         /* Brotkrume „Bereich › Projekt" öffnet den Baum als Ausstülpung von links */
@@ -338,13 +362,29 @@ export function Tabs() {
         </button>
       ) : (
       /* Nur die Board-Tabs des AKTIVEN Projekts — scrollen bei Bedarf */
-      <div className="tabs-scroll" ref={reiheRef}>
+      <div className={`tabs-scroll ${rollt.links ? 'gerollt' : ''} ${rollt.rechts ? 'mehr-rechts' : ''}`} ref={reiheRef} role="tablist" aria-label="Boards des Projekts"
+        onScroll={rollMessen}
+        onWheel={(e) => {
+          // M412: Das Mausrad rollt die Reiter seitwärts (ein Rollbalken ist nicht mehr zu sehen)
+          const el = e.currentTarget;
+          if (el.scrollWidth <= el.clientWidth + 1 || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+          el.scrollLeft += e.deltaY;
+        }}>
         {projectBoards.map((b) => (
           <div
             key={b.id}
             className={`tab ${b.id === activeId && view === 'board' ? 'active' : ''}`}
             onClick={() => openBoard(b.id)}
             title="Klick = wechseln · Doppelklick auf den Namen = umbenennen"
+            role="tab"
+            aria-selected={b.id === activeId && view === 'board'}
+            tabIndex={b.id === activeId || (view !== 'board' && b.id === projectBoards[0]?.id) ? 0 : -1}
+            onKeyDown={(e) => {
+              // M412: mit der Tastatur – Eingabe/Leertaste öffnet; ← → zum Nachbarn übernimmt die eine Regel
+              // für alle Leisten (pfeilTasten.ts)
+              if (e.target !== e.currentTarget) return;
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); openBoard(b.id); }
+            }}
           >
             <InlineName value={b.name} className="tab-name" onRename={(name) => renameBoard(b.id, name)} />
             <span className="tab-count">{b.nodes.filter((n) => showArchived || !n.archived).length}</span>
@@ -392,6 +432,12 @@ export function Tabs() {
           <IPlus size={14} />
         </button>
       </div>
+      {spalte && (
+        /* M412: Die Hilfe sitzt in der Spalte am Fuß (in der Reihe: in der Aktionsleiste) */
+        <button className="tab-hilfe" data-taste="hilfe" title="Hilfe · Was ist neu · Impressum" aria-label="Hilfe" onClick={() => useBoard.getState().setHelpOpen(true)}>
+          <IHelp size={15} />
+        </button>
+      )}
       {spalte && (
         <button
           className="tab-spalte-zu"

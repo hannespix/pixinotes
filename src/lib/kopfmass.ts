@@ -21,7 +21,7 @@
  */
 
 /** Luft zwischen Aktionsleiste und Tab-Leiste — dieselbe wie das gap der Topbar */
-const LUFT = 14;
+const LUFT = 8;   // M412: dieselbe Luft wie zwischen Logo und Aktionen (--kopf-luft)
 
 export function initKopfmass(): () => void {
   const root = document.documentElement;
