@@ -8029,3 +8029,18 @@ html[data-kontrast='hoch'] .ov-graph-node .ov-tropfen { stroke: var(--ink); }
 .ov-graph-find { margin-left: 4px; }
 .ov-graph-find input { border-radius: 999px; }
 .ov-graph-legend { opacity: 0.75; }
+
+/* ---------- M417: Flache Karten mit leisen Rändern ----------
+   „Flat, clean, randlos, wenig sichtbare Ränder" — und: „Der 3D-Effekt passt nicht zum sleeken Flat-Design".
+   Die Kante wird leiser, der Schatten ist nur noch ein Hauch; auch angehoben schwebt eine Karte nicht,
+   sie wird nur etwas deutlicher umrissen. Hoher Kontrast behält kräftige Kanten. */
+:root {
+  --card-shadow: 0 0 0 1px rgba(22, 25, 30, 0.06), 0 1px 1px rgba(22, 25, 30, 0.035);
+  --card-shadow-lift: 0 0 0 1px rgba(22, 25, 30, 0.11), 0 2px 6px -2px rgba(22, 25, 30, 0.08);
+}
+[data-theme='dark'] {
+  --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.065), 0 1px 1px rgba(0, 0, 0, 0.3);
+  --card-shadow-lift: 0 0 0 1px rgba(255, 255, 255, 0.11), 0 2px 6px -2px rgba(0, 0, 0, 0.4);
+}
+html[data-kontrast='hoch'] { --card-shadow: 0 0 0 1px rgba(22, 25, 30, 0.28), 0 1px 2px rgba(22, 25, 30, 0.1); --card-shadow-lift: 0 0 0 1px rgba(22, 25, 30, 0.4), 0 2px 6px rgba(22, 25, 30, 0.12); }
+html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.3), 0 1px 2px rgba(0, 0, 0, 0.5); --card-shadow-lift: 0 0 0 1px rgba(255, 255, 255, 0.4), 0 2px 6px rgba(0, 0, 0, 0.5); }
