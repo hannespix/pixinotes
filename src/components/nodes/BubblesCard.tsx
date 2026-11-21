@@ -797,7 +797,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   };
 
   return (
-    <div className={`bub ${gross ? 'gross' : ''}${tropfen ? ' tropfen' : ''}`} data-ohne-sperre="" data-taste="bubbles">
+    <div className={`bub ${gross ? 'gross' : ''}${tropfen ? ' tropfen' : ''}`} data-ohne-sperre="" data-taste="bubbles" data-phase={phase}>
       <div className="bub-frage">
         <input
           className="bub-frage-feld nodrag" value={d.frage ?? ''} disabled={fest} placeholder="Worum geht es? Frage hier eintragen …" translate="no"
