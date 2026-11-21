@@ -1,25 +1,28 @@
 import { useBoard } from '../store';
 
 /**
- * M312: Das Logo öffnet die Hilfe.
+ * M412: Das Logo führt zur Übersicht.
  *
- * Bis M311 hing hier ein Menü mit A−/A+, „Sehen & Bedienen", „Was ist neu",
- * Hilfe, Impressum und Datenschutz — jeder Eintrag ein zweiter Weg zu etwas,
- * das schon einen Ort hatte (Anzeigegröße: ⚙ → Darstellung; Impressum und
- * Datenschutz: die Ecke unten rechts und die Hilfe; „Was ist neu": der Fuß der
- * Hilfe). Jetzt ist das Logo der eine Zugang zur Hilfe, und die Fassung steht
- * dort im Fuß.
+ * Seit M312 öffnete es die Hilfe. Gewünscht war das Naheliegende: Ein Klick auf den Namen der App bringt nach
+ * Hause – zur Übersicht aller Bereiche, Projekte und Boards. Das braucht man täglich, die Hilfe selten. Sie hat
+ * jetzt ihren eigenen Knopf (das Fragezeichen in der Aktionsleiste bzw. am Fuß der Spalte), und das Haus-Symbol in
+ * der Reiter-Leiste entfällt: zwei Wege zum selben Ziel nebeneinander waren einer zu viel.
  */
 export function AboutMenu() {
-  const setHelpOpen = useBoard((s) => s.setHelpOpen);
+  const view = useBoard((s) => s.view);
+  const setView = useBoard((s) => s.setView);
+  const setOverviewMode = useBoard((s) => s.setOverviewMode);
+  const setTasksOpen = useBoard((s) => s.setTasksOpen);
+  const aktiv = view === 'overview';
   return (
     <div className="logo-wrap">
       <button
-        className="logo"
-        onClick={() => setHelpOpen(true)}
-        data-taste="hilfe"
-        title="Hilfe · Was ist neu · Impressum"
-        aria-label="Hilfe"
+        className={`logo ${aktiv ? 'active' : ''}`}
+        onClick={() => { setOverviewMode('hierarchie'); setTasksOpen(false); setView('overview'); }}
+        data-taste="uebersicht"
+        title="Übersicht – alle Bereiche, Projekte und Boards"
+        aria-label="PixiNotes – zur Übersicht"
+        aria-current={aktiv ? 'page' : undefined}
       >
         Pixi<span>Notes</span>
       </button>

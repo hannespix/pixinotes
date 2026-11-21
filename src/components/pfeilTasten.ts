@@ -22,7 +22,8 @@ const MENUE = '.ebenen-menu, .dock-menu, .sel-menu-fixed, .sel-ai-menu, .sel-att
 const LEISTE = '.dock, .sel-toolbar, .top-actions, .tabs:not(.spalte), .ov-mode, .taskhub-filters, .taskhub-actions, '
   + '.focus-head, .draw-palette, .ov-graph-zoom, .help-nav';
 const GRUPPE = `${MENUE}, ${LEISTE}`;
-const KNOPF = 'button:not(:disabled), a[href], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], '
+// M412: auch die Board-Reiter der Kopfleiste ([role="tab"]) – ← → wandern von Reiter zu Reiter
+const KNOPF = 'button:not(:disabled), a[href], [role="menuitem"], [role="menuitemcheckbox"], [role="menuitemradio"], [role="tab"], '
   + 'input:not(:disabled):not([type="hidden"]), select:not(:disabled)';
 const BAUM_ZIEL = '.side-tree-find, .side-proj-name, .side-board-name, .side-card, .side-archiv';
 const AUFGABE_ZIEL = '.th-group-head, .task-main';

@@ -156,7 +156,14 @@ console.log('\n════ T2: Kopfleisten-Anordnung behält ihren Schatten ═
   console.log('   ', JSON.stringify(r));
   pruefe('T2a oben ist es eine Reihe', r.reihe === 'row');
   pruefe('T2b der aktive Reiter klebt weiterhin', r.klebt === 'sticky');
-  pruefe('T2c und behält seinen Verlauf (M261)', r.verlauf !== 'none', r.verlauf);
+  // M412: Der Verlauf steht nicht mehr dauernd da – er erscheint, sobald Reiter hinter dem aktiven vorbeiziehen
+  const gerollt = await P.evaluate(async () => {
+    const e = document.querySelector('.tabs-scroll'); const a = e.querySelector('.tab.active');
+    e.style.maxWidth = '150px'; e.scrollLeft = 60; e.dispatchEvent(new Event('scroll'));
+    await new Promise((x) => setTimeout(x, 300));
+    return { links: e.scrollLeft, verlauf: getComputedStyle(a, '::after').content, klasse: e.className };
+  });
+  pruefe('T2c in Ruhe kein Verlauf, beim Rollen schon (M261, seit M412 nur dann)', r.verlauf === 'none' && (gerollt.links === 0 || gerollt.verlauf !== 'none'), JSON.stringify({ ruhe: r.verlauf, gerollt }));
   await ctx.close();
 }
 

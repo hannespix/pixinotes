@@ -161,7 +161,7 @@ console.log('\n════ C: Kachel in der Übersicht ziehen ════');
 console.log('\n════ D: „Was ist neu" ════');
 {
   const { ctx, P } = await seite();
-  await P.locator('button.logo').click();
+  await P.locator('[data-taste="hilfe"]').click();
   await P.locator('.help-neu-link').click();
   await P.waitForSelector('.help-neu-modal');
   const eintraege = await P.locator('#help-neu li').allTextContents();

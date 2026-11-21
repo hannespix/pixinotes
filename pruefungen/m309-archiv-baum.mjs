@@ -110,7 +110,7 @@ console.log('\n════ C: Ohne Archiviertes ════');
 console.log('\n════ D: „Was ist neu" ════');
 {
   const { ctx, P } = await seite(ohneArchiv);
-  await P.locator('button.logo').click();
+  await P.locator('[data-taste="hilfe"]').click();
   await P.locator('.help-neu-link').click();
   await P.waitForSelector('.help-neu-modal');
   const eintraege = await P.locator('#help-neu li').allTextContents();

@@ -124,7 +124,7 @@ console.log('════ B: Die Hilfe ════');
 console.log('════ C: „Was ist neu" aus dem Logo-Menü ════');
 {
   const { ctx, P } = await seite();
-  await P.locator('button.logo').click();
+  await P.locator('[data-taste="hilfe"]').click();
   await P.locator('.help-neu-link').click();
   await P.waitForSelector('.help-neu-modal');
   pruefe('C1 eigene Seite: Titel „Was ist neu", kein Hilfe-Menü, kein Suchfeld',
@@ -147,7 +147,7 @@ console.log('════ C: „Was ist neu" aus dem Logo-Menü ════');
 console.log('════ D: Impressum aus dem Logo-Menü ════');
 {
   const { ctx, P } = await seite();
-  await P.locator('button.logo').click();
+  await P.locator('[data-taste="hilfe"]').click();
   await P.locator('.help-nav button', { hasText: 'Impressum' }).click();
   await P.waitForSelector('.help-modal');
   await P.waitForTimeout(1200); // der Sprung scrollt weich (scroll-behavior: smooth)

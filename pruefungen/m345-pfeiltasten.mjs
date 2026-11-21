@@ -193,7 +193,7 @@ console.log('\n════ E/F: Übersicht und Netz ════');
   pruefe('F4 Enter öffnet das Board', ziel !== 'b1' && st.activeId === ziel && st.view === 'board', [ziel, st.activeId, st.view]);
 
   // Kacheln
-  await P.click('.tab-home'); await P.waitForTimeout(700);
+  await P.click('[data-taste="uebersicht"]'); await P.waitForTimeout(700);
   await P.evaluate(() => { [...document.querySelectorAll('.ov-mode button')].find((b) => b.textContent.trim() === 'Hierarchie')?.click(); });
   await P.waitForTimeout(1200);
   await P.evaluate(() => document.activeElement?.blur?.());

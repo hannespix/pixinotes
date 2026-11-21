@@ -45,6 +45,8 @@ export const IKanban = make(<><path d="M6 5v11" /><path d="M12 5v6" /><path d="M
 export const IDiagram = make(<><rect width="6" height="5" x="9" y="3" rx="1" /><rect width="6" height="5" x="3" y="16" rx="1" /><rect width="6" height="5" x="15" y="16" rx="1" /><path d="M12 8v3" /><path d="M12 11H6v5" /><path d="M12 11h6v5" /></>);
 export const IPanelLeft = make(<><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M9 3v18" /></>);
 export const IFolder = make(<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />);
+/** M412: Hilfe – Kreis mit Fragezeichen */
+export const IHelp = make(<><circle cx="12" cy="12" r="9.5" /><path d="M9.2 9.2a2.9 2.9 0 0 1 5.6 1c0 1.9-2.8 2.5-2.8 4" /><path d="M12 17.3h.01" /></>);
 export const IHome = make(<><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" /><path d="M9 22V12h6v10" /></>);
 export const IChevronL = make(<path d="m15 18-6-6 6-6" />);
 export const IChevronR = make(<path d="m9 18 6-6-6-6" />);
