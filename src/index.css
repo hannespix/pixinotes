@@ -7192,6 +7192,8 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 .bub-blase.vorn { z-index: 2; }
 /* (kein Prozent-Innenabstand an der Blase: Prozente bezögen sich auf die Breite der Bühne, nicht der Blase) */
 .bub-text { display: block; width: 100%; max-height: 4.6em; overflow: hidden; overflow-wrap: break-word; hyphens: auto; pointer-events: none; }
+/* M422: nur lange Wörter trennen (mindestens 10 Zeichen, je Teil mindestens 4) — „Kuchen" bleibt ganz, statt „Ku-chen" */
+.bub-text { hyphenate-limit-chars: 10 4 4; -webkit-hyphenate-limit-before: 4; -webkit-hyphenate-limit-after: 4; }
 .bub-mal, .bub-punkte {
   position: absolute; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 10px;
   background: var(--surface-card); color: var(--ink); font-size: 11px; font-weight: 700; line-height: 20px; box-shadow: 0 1px 3px rgba(22, 25, 30, 0.3); pointer-events: none; white-space: nowrap;
