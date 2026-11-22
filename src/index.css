@@ -7988,6 +7988,9 @@ html[data-lesbar='an'] :is(.presenter-slide h3, .slide-bubbles-titel) { font-fam
 .presenter-head:is([data-eng='1'], [data-eng='2']) .presenter-team:not(.presenter-ikon) {
   display: inline-flex; align-items: center; justify-content: center; padding: 6px 9px;
 }
+/* M426: ein Knopf mehr („Nur Inhalt") — wird es eng, wandert er ins Menü „Darstellung" (dort steht er ohnehin),
+   damit Name und Knöpfe auf dem Telefon in einer Zeile bleiben */
+.presenter-head:is([data-eng='1'], [data-eng='2']):has(> .presenter-ansicht) > [data-taste='vortrag-rein'] { display: none; }
 .presenter-head[data-eng='2'] { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; }
 .presenter-head[data-eng='2'] > span:first-child { order: -2; flex: 1 1 calc(100% - 60px); }
 .presenter-head[data-eng='2'] > .presenter-zu { order: -1; }
@@ -8155,3 +8158,69 @@ html[data-kontrast='hoch'] .ov-flaeche-projekt { opacity: 0.3; }
   .focus-head .focus-ansicht-menu button { min-height: 44px; }
   .focus-head .focus-ansicht-stufe button { width: 44px; }
 }
+
+/* ---------- M426: Nur Inhalt (Vollbild ohne Bedienung) ----------
+   „Im Präsentations- und im Fokus-Modus ein Vollbild, welches alle UI-Elemente ausblendet … 100 % Content ohne Rahmen,
+   Menüs etc." Am Wurzelelement steht data-rein (vortrag | fokus, lib/reinAnsicht.tsx). Taste F schaltet, Esc kehrt
+   zurück; der einzige sichtbare Rückweg ist eine Kante oben, die erst beim Überfahren oder Antippen einen Knopf zeigt. */
+html[data-rein-ruhe], html[data-rein-ruhe] * { cursor: none !important; }
+.rein-rand {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 400; height: calc(26px + var(--safe-top, 0px));
+  display: flex; justify-content: center; align-items: flex-start; pointer-events: auto;
+}
+.rein-zurueck {
+  margin-top: calc(10px + var(--safe-top, 0px)); display: inline-flex; align-items: center; gap: 8px;
+  border: none; border-radius: 999px; padding: 7px 10px 7px 15px; cursor: pointer;
+  font: 600 13px/1.2 var(--font-ui); color: #fff; background: rgba(24, 24, 27, 0.82);
+  opacity: 0; transform: translateY(-140%); pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.rein-rand.da .rein-zurueck { opacity: 1; transform: none; pointer-events: auto; }
+.rein-zurueck kbd { font: 600 11px/1 var(--font-ui); padding: 3px 6px; border-radius: 5px; background: rgba(255, 255, 255, 0.18); color: #fff; }
+.rein-zurueck:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .rein-zurueck { transition: opacity 0.15s ease; transform: none; } }
+
+/* Präsentation: die Folie randlos über den ganzen Schirm — ohne Kopf, Fuß, Rahmen, Schatten */
+.presenter.rein > .presenter-head,
+.presenter.rein > .presenter-foot,
+.presenter.rein .folien-palette,
+.presenter.rein .folie-dok-leiste,
+html[data-rein] .zeig-band { display: none !important; }
+.presenter.rein > .presenter-slide { margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+.presenter.rein > .presenter-slide.editable > * { box-shadow: none; }
+.presenter.rein > .presenter-slide.dokument { margin: 0 !important; }
+
+/* Karten-Fokus: nur die Karte — keine Leisten, keine anderen Karten, keine Pfeile, kein Punktraster, kein Rahmen */
+:root[data-rein='fokus'] {
+  --focus-top: 0px !important; --focus-nav-h: 0px !important; --focus-tools-h: 0px !important;
+  --focus-format-h: 0px !important; --focus-bottom: 0px !important;
+}
+html[data-rein='fokus'] :is(.focus-head, .focus-nav, .sel-toolbar, .sel-toolbar-dock, .sel-menu-fixed, .fokus-spur, .react-flow__background,
+  .react-flow__edges, .react-flow__edgelabel-renderer, .react-flow__nodesselection, .react-flow__selection, .react-flow__resize-control,
+  .pn-handle, .card-grip, .color-dot, .note-farben, .fit-hint, .note-spur, .bn-formatting-toolbar, .bn-side-menu) { display: none !important; }
+html[data-rein='fokus'] .focus-mode .react-flow__node:not(.pn-focused) { opacity: 0 !important; visibility: hidden; }
+html[data-rein='fokus'] .react-flow__node.pn-focused { outline: none !important; box-shadow: none !important; }
+html[data-rein='fokus'] .focus-mode .pn-focused .card-body { box-shadow: none !important; border-color: transparent !important; }
+/* Die Bedienung der Module (M421) bleibt weg — auch markiert, mit dem Zeiger darauf oder mit dem Fokus darin.
+   Dieselbe Liste wie im M421-Block (dort steht sie dreimal) — neue Bedien-Klassen auch hier eintragen. */
+html[data-rein] :is(.react-flow__node, .presenter-slide) :is(
+    .kanban-add,
+    .gantt-tools, .gantt-addzeile,
+    .cal-nav,
+    .bub:not([data-phase='offen']) :is(.bub-ansicht, .bub-schritte, .bub-gruppe-neu, .bub-leiste, .bub-zahl, .bub-frage-feld:placeholder-shown),
+    .time-rec, .time-nav, .time-empty,
+    .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
+    .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
+    .happ-size, .happ-head,
+    /* dazu, was M421 als „immer da" stehen lässt, für den Vortrag aber Bedienung ist */
+    .kanban-addcol, .kanban-col-x, .kanban-item-actions, .card-actions
+) { opacity: 0 !important; pointer-events: none !important; animation: none !important; }
+/* Ein Tool (eigene App, Präsentation aus Vibe Studio) füllt die Karte ohne Kopfzeile */
+html[data-rein] .react-flow__node .happ-head { display: none !important; }
+
+/* Knöpfe zum Einschalten */
+.focus-head .focus-rein-knopf { flex: none; color: var(--muted); }
+.focus-head .focus-rein-knopf:hover { color: var(--ink); }
+/* „Nur Inhalt" auch als Eintrag im Menü „Darstellung" (Präsentation und Fokus) */
+.presenter-head .presenter-ansicht-menu .rein-wahl, .focus-head .focus-ansicht-menu .rein-wahl { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 8px; }
+.rein-wahl kbd { margin-left: auto; font: 600 11px/1 var(--font-ui); padding: 3px 6px; border-radius: 5px; background: var(--surface-2); color: var(--muted); }

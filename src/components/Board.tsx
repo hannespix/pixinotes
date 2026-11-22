@@ -1178,7 +1178,9 @@ export function Board() {
         }
         zuletzt = { w: el.offsetWidth, h: el.offsetHeight, p: pane.clientWidth };
         const css = getComputedStyle(document.documentElement);
-        const oben = parseFloat(css.getPropertyValue('--focus-top')) || 52;
+        // M426: 0 ist ein gültiger Wert („Nur Inhalt") — „|| 52" machte daraus wieder 52
+        const obenWert = parseFloat(css.getPropertyValue('--focus-top'));
+        const oben = Number.isFinite(obenWert) ? obenWert : 52;
         const unten = fokusUnten(css);
         const tastatur = parseFloat(css.getPropertyValue('--kb')) || 0;
         platzUnten = unten + tastatur;
@@ -1205,7 +1207,9 @@ export function Board() {
         }
         // Am Finger fast randlos (jeder Punkt zählt für Spalten und Zellen), mit Maus etwas Luft
         const grob = window.matchMedia('(pointer: coarse)').matches;
-        const rand = grob ? 4 : 16;
+        // M426: „Nur Inhalt" (reinAnsicht.tsx) — keine Leisten, kein Rand: die Karte bekommt den ganzen Schirm
+        const rein = document.documentElement.dataset.rein === 'fokus';
+        const rand = rein ? 0 : grob ? 4 : 16;
         const passt = Math.min((breite - 2 * rand) / w, (hoehe - 2 * rand) / h);
         // Die Karte ist im Fokus schon verbreitert (CSS min-width: Schirmbreite, Text bis 720,
         // Module bis 1200). TEXT (Notiz, Bild, Datei, Mail) wird zusätzlich hochskaliert, bis es
@@ -1250,7 +1254,10 @@ export function Board() {
                     : schmal ? Math.min(1, Math.max(0.3, inBreite))
                       : Math.max(0.3, Math.min(hoechstens, Math.max(passt, Math.min(inBreite, 1))));
         // M424: die gewählte Darstellung (Automatisch = die Regel oben, Einpassen, Seitenbreite, Originalgröße) samt Stufe
-        const eingepasst = fokusZoomFuer(fokusAnsicht(), automatisch, passt, inBreite);
+        // M426: In „Nur Inhalt" heißt Automatisch: so groß wie möglich (ganze Karte, ganze Seite) – nur Text bleibt
+        // bei seiner Lesebreite, eine kurze Notiz würde sonst riesig
+        const automatischRein = !rein ? automatisch : dokument ? kd * passtD : text ? automatisch : passt;
+        const eingepasst = fokusZoomFuer(fokusAnsicht(), automatischRein, passt, inBreite);
         const zoom = eingepasst;
         fokusRef.current = { id: focusCard, oben, hoehe, rand, breite, fit: eingepasst };
         // Frei gezoomt: nicht zurück auf „eingepasst" springen (Seite blättert, Leiste dockt an) — nur klemmen
