@@ -27,7 +27,7 @@ export type RuheInline =
 
 const TYPEN = new Set(['paragraph', 'heading', 'bulletListItem', 'numberedListItem', 'checkListItem', 'quote']);
 const PROPS = new Set(['textColor', 'backgroundColor', 'textAlignment', 'level', 'checked', 'start']);
-const STILE = new Set(['bold', 'italic', 'underline', 'strike', 'code', 'textColor', 'backgroundColor']);
+const STILE = new Set(['bold', 'italic', 'underline', 'strike', 'code', 'textColor', 'backgroundColor', 'textSize', 'textFont']);
 
 function textEinfach(t: unknown): boolean {
   const o = t as { type?: string; text?: unknown; styles?: Record<string, unknown> };

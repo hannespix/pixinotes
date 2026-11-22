@@ -8286,3 +8286,9 @@ html[data-kontrast='hoch'] .pn-schatten-ebene { display: none; }
 .react-flow__node-shape .shape-body .bn-block-content:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"], [data-content-type="checkListItem"]) { justify-content: center; }
 .react-flow__node-shape .shape-body .bn-block-content:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"], [data-content-type="checkListItem"]) > .bn-inline-content { flex: 0 1 auto; width: auto; text-align: left; }
 .slide-shape .slide-shape-text .bn-editor { font-size: 22px; }
+
+/* ===== M436: Formen — keine leere Zeile unter einer Überschrift =====
+   BlockNote hängt hinter einen letzten Block, der kein Absatz ist (Überschrift, Liste …), immer einen leeren Absatz
+   an. In der Notiz ist das Platz zum Weiterschreiben, in der Form schob er den Text aus der Mitte. Er bleibt
+   unsichtbar, solange der Cursor nicht in ihm steht. */
+.shape-body .bn-editor > .bn-block-group > .bn-block-outer:last-child:not(:first-child):has(> .bn-block > .bn-block-content[data-content-type="paragraph"]:not([data-is-empty-and-focused]) > .bn-inline-content > .ProseMirror-trailingBreak:only-child) { display: none; }

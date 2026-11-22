@@ -5,7 +5,7 @@ import type { NoteNode, ShapeKind, ShapeNode } from '../../types';
 import { IPalette } from '../Icons';
 import { NotizEditor } from './NoteCard';
 import { NotizRuhend } from './NotizRuhend';
-import { hakenUmlegen, type RuheBlock } from '../../lib/notizRuhend';
+import { hakenUmlegen, notizEinfach, type RuheBlock } from '../../lib/notizRuhend';
 import { warEbenAngelegt, alsEbenAngelegt } from '../../lib/nodes';
 
 const SHAPE_COLORS = ['#eef2ff', '#e6f7ec', '#fff4e0', '#ffe9ef', '#eef7ff', '#f3eeff', '#ffffff'];
@@ -62,6 +62,8 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
     [data.blocks, data.text],
   );
   const leer = !data.text?.trim() && !blocks.length;
+  // Was das schlichte HTML nicht pixelgleich zeigen kann (Tabelle, Bild …), zeigt der Editor auch in Ruhe
+  const einfach = useMemo(() => leer || notizEinfach(blocks), [leer, blocks]);
 
   // ---- Bearbeiten: ruhend ↔ Editor ----
   const [aktiv, setAktiv] = useState(() => {
@@ -102,15 +104,19 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
   const grund = data.grund as { w: number; h: number } | undefined;
   const grundRef = useRef(grund);
   grundRef.current = grund;
+  // Während man am Rahmen zieht, hält sich das Mitwachsen heraus — die Hand gewinnt
+  const ziehtRef = useRef(false);
   const anpassen = useCallback(() => {
     const body = bodyRef.current; const inhalt = inhaltRef.current;
-    if (!body || !inhalt) return;
+    if (!body || !inhalt || ziehtRef.current) return;
     const st = useBoard.getState();
     const n = st.boards.find((b) => b.id === st.activeId)?.nodes.find((k) => k.id === id);
     if (!n) return;
     const w = (typeof n.width === 'number' ? n.width : body.offsetWidth) || body.offsetWidth;
     const h = (typeof n.height === 'number' ? n.height : body.offsetHeight) || body.offsetHeight;
     const g = grundRef.current ?? { w, h };
+    // Von Hand gesetzte Breite bleibt: dann wächst auch die Raute nur noch in die Höhe
+    const breiteFest = !!(g as { manuell?: boolean }).manuell;
     const cs = getComputedStyle(body);
     const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
     const raute = data.shape === 'decision';
@@ -119,8 +125,8 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
     let zielH = Math.min(MAX_H, Math.max(g.h, braucht));
     let zielW = w;
     // Die Raute bleibt eine Raute: Wird sie zu hoch für ihre Breite, wächst sie auch in die Breite
-    if (raute && zielH > w * 0.85 && w < MAX_W) zielW = Math.min(MAX_W, Math.max(g.w, Math.round(w * 1.12)));
-    if (raute && zielH <= g.h) zielW = Math.max(g.w, Math.min(w, Math.round(zielH / 0.85)));
+    if (raute && !breiteFest && zielH > w * 0.85 && w < MAX_W) zielW = Math.min(MAX_W, Math.max(g.w, Math.round(w * 1.12)));
+    if (raute && !breiteFest && zielH <= g.h) zielW = Math.max(g.w, Math.min(w, Math.round(zielH / 0.85)));
     if (raute && zielW < g.w) zielW = g.w;
     zielH = Math.round(zielH);
     if (Math.abs(zielH - h) < 2 && Math.abs(zielW - w) < 2) return;
@@ -143,9 +149,14 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
 
   return (
     <div className={`shape-wrap shape-${data.shape}`} ref={wrapRef}>
-      <NodeResizer isVisible={!!selected} minWidth={90} minHeight={54} color="#4f7cff" onResizeStart={() => useBoard.getState().pushHistory()}
-        // Von Hand gezogen: das ist ihre eigene Größe — der Text wächst von hier aus weiter
-        onResizeEnd={(_, p) => runDerived(() => useBoard.getState().updateNodeData(id, { grund: { w: Math.round(p.width), h: Math.round(p.height) } }))}
+      <NodeResizer isVisible={!!selected} minWidth={90} minHeight={54} color="#4f7cff"
+        onResizeStart={() => { ziehtRef.current = true; useBoard.getState().pushHistory(); }}
+        // Von Hand gezogen: das ist ihre eigene Größe — der Text wächst von hier aus weiter (nur noch nach unten)
+        onResizeEnd={(_, p) => {
+          ziehtRef.current = false;
+          runDerived(() => useBoard.getState().updateNodeData(id, { grund: { w: Math.round(p.width), h: Math.round(p.height), manuell: true } }));
+          requestAnimationFrame(anpassen);
+        }}
         handleStyle={{ width: 9, height: 9, borderRadius: 3 }} />
       {handles.map((pos) => (
         <Handle key={pos} type="source" position={pos} id={pos} className="pn-handle shape-handle" />
@@ -176,8 +187,8 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
         onBlurCapture={(e) => { if (aktiv && !imEditor(e.relatedTarget as Element | null)) ruhen(); }}
         onKeyDownCapture={(e) => { if (aktiv && e.key === 'Escape') { (document.activeElement as HTMLElement | null)?.blur(); setAktiv(false); } }}
       >
-        <div className={`shape-inhalt ${aktiv ? 'nodrag nowheel' : ''}`} ref={inhaltRef}>
-          {aktiv ? (
+        <div className={`shape-inhalt ${aktiv || !einfach ? 'nodrag nowheel' : ''}`} ref={inhaltRef}>
+          {aktiv || !einfach ? (
             <NotizEditor id={id} data={{ ...data, blocks } as unknown as NoteNode['data']} startPunkt={startPunkt} />
           ) : leer ? (
             <span className="shape-ph">Doppelklick…</span>
