@@ -56,6 +56,8 @@ export function TooltipLayer() {
     };
 
     const over = (e: MouseEvent) => {
+      // M440: Mit gedrückter Taste wird gezogen, nicht gezeigt — sonst schwebte eine Sprechblase über der Kachel
+      if (e.buttons !== 0) { if (currentEl) hide(); return; }
       const el = (e.target as HTMLElement | null)?.closest?.('[title], [data-tip]') as HTMLElement | null;
       if (!el) return;
       // nativen Browser-Tooltip abschalten: title einmalig nach data-tip verschieben
