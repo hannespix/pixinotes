@@ -3,7 +3,7 @@
 // Alle Aktionen sind NICHT destruktiv: sie legen neue Karten an bzw. ordnen
 // nur Positionen — und jede läuft über die Undo-History.
 import { tagLokal } from './tag';
-import { askAi as askAiRoh, askAiVoll as askAiVollRoh, kiAbgebrochen, MD_HINT, mdToBlocks, prepImageForAi } from './ai';
+import { askAi as askAiRoh, askAiVoll as askAiVollRoh, kiAbgebrochen, MD_HINT, mdToBlocks, prepImageForAi, type KiOptionen } from './ai';
 import { aufDemselbenBoard } from './zielBoard';
 
 // M388: Jede Antwort der KI kommt auf dem Board an, auf dem die Aktion begann (lib/zielBoard.ts)
@@ -244,8 +244,8 @@ export async function askJson<T>(prompt: string, images: string[] = []): Promise
 /** M332: wie askJson, meldet aber, ob das Modell an seiner Ausgabegrenze
  *  abbrach — dann ist der Plan unvollständig, und der Aufrufer darf das
  *  nicht als Erfolg verkaufen. */
-export async function askJsonVoll<T>(prompt: string, images: string[] = []): Promise<{ wert: T; abgeschnitten: boolean }> {
-  const first = await askAiVoll(prompt, images);
+export async function askJsonVoll<T>(prompt: string, images: string[] = [], opt: KiOptionen = {}): Promise<{ wert: T; abgeschnitten: boolean }> {
+  const first = await askAiVoll(prompt, images, opt);
   try {
     return { wert: parseJson<T>(first.text), abgeschnitten: first.abgeschnitten };
   } catch { /* einmal strenger nachfragen */ }
@@ -253,12 +253,43 @@ export async function askJsonVoll<T>(prompt: string, images: string[] = []): Pro
   const second = await askAiVoll(
     `${prompt}\n\nWICHTIG: Antworte AUSSCHLIESSLICH mit dem vollständigen, gültigen JSON-Objekt – keine Einleitung, kein Markdown, keine Kommentare, nichts danach.`,
     images,
+    opt,
   );
   try {
     return { wert: parseJson<T>(second.text), abgeschnitten: second.abgeschnitten };
   } catch {
     throw new Error('Die KI hat zweimal kein sauberes JSON geliefert – einfach nochmal versuchen (bei Gratis-Modellen passiert das öfter) oder in den Einstellungen ein stärkeres Modell wählen.');
   }
+}
+
+/**
+ * M427: Präsentation per KI. Die KI liefert eine Gliederung (JSON), lib/kiPraesentation.ts prüft sie und baut daraus
+ * Folien in der Vorlage von Vibe Studio; das Ergebnis ist eine Präsentations-Karte wie aus der Modul-Palette.
+ * Quelle: die übergebenen Karten (Auswahl oder ganzes Board) und der Wunsch (Thema, Publikum, Länge, Ton).
+ */
+export async function aiPraesentation(nodes: AppNode[], pos: { x: number; y: number }, fortschritt?: (m: string) => void, wunsch = ''): Promise<string> {
+  const kp = await import('./kiPraesentation');
+  const { vibeStudioVorlage } = await import('./vibeStudio');
+  const quellen = nodes.filter((n) => !n.archived && n.type !== 'htmlapp' && n.type !== 'portal');
+  const items = await gather(quellen);
+  if (items.length === 0 && !wunsch.trim()) throw new Error('Keine Inhalte gefunden – Karten aufs Board legen oder im Feld beschreiben, worum es gehen soll.');
+  fortschritt?.('Vorlage laden …');
+  const vorlage = await vibeStudioVorlage().catch(() => { throw new Error('Die Vorlage für Präsentationen ist gerade nicht erreichbar – bitte mit Internet erneut versuchen.'); });
+  fortschritt?.('Gliederung und Folien schreiben …');
+  const imgs = await gatherImages(quellen);
+  const inhalt = items.map((c) => `[${c.type}] ${c.text}`).join('\n\n');
+  const heute = new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+  const { wert, abgeschnitten } = await askJsonVoll<unknown>(`${kp.gliederungPrompt(wunsch, inhalt, heute)}${imgHint(imgs)}`, imgs, { maxTokens: 8000 });
+  const g = kp.gliederungPruefen(wert);
+  const html = kp.deckBauen(vorlage, g);
+  const { praesentationAnlegen } = await import('./importFiles');
+  // Die Karte legt ihren eigenen Rückgängig-Schritt an; die Pfeile zu den Quellen gehören zu ihm
+  const id = await praesentationAnlegen(freeSpot(pos, 800, 520), { html, name: g.titel });
+  if (!id) throw new Error('Die Präsentation ließ sich nicht anlegen.');
+  mutedHistory(() => linkSources(quellen, id));
+  const st = useBoard.getState();
+  st.focusNode(st.activeId, id);
+  return `Präsentation „${g.titel}" mit ${g.folien.length} Folien angelegt – „Bearbeiten" in der Folie öffnet Vibe Studio.${abgeschnitten ? ' Die Antwort der KI war am Ende abgeschnitten; es fehlen eventuell die letzten Folien.' : ''}${auslassungsHinweis()}`;
 }
 
 const SECTION_COLORS = ['#eef2ff', '#e6f7ec', '#fff4e0', '#ffe9ef', '#f3eeff', '#eef7ff'];

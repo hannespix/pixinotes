@@ -47,16 +47,19 @@ function mirror(file: File, nodeId: string | null, note: { done: boolean }): voi
  * M425: Neue Präsentation (Vibe Studio) als App-Karte — startet sofort, der Editor ist mit „Bearbeiten" (E) bereit.
  * Die Karte ist eine ganz normale eigene App: Team-Ordner-Kopie, Speicherstand, „Im eigenen Tab", Herunterladen.
  */
-export async function praesentationAnlegen(pos: { x: number; y: number }): Promise<string | null> {
+export async function praesentationAnlegen(pos: { x: number; y: number }, fertig?: { html: string; name: string }): Promise<string | null> {
   const { addNode, showToast } = useBoard.getState();
   let html: string;
-  try {
-    html = await vibeStudioVorlage();
-  } catch {
-    showToast('Die Vorlage für Präsentationen ist gerade nicht erreichbar – bitte mit Internet erneut versuchen.');
-    return null;
+  if (fertig) html = fertig.html;   // M427: von der KI gebaut (aiActions.ts → kiPraesentation.ts)
+  else {
+    try {
+      html = await vibeStudioVorlage();
+    } catch {
+      showToast('Die Vorlage für Präsentationen ist gerade nicht erreichbar – bitte mit Internet erneut versuchen.');
+      return null;
+    }
   }
-  const node = makeHtmlApp(pos, { name: 'Präsentation', size: html.length });
+  const node = makeHtmlApp(pos, { name: fertig?.name || 'Präsentation', size: html.length });
   // 16 : 9 und Platz für die Werkzeugleiste des Editors
   node.width = 800;
   node.height = 520;
@@ -64,8 +67,8 @@ export async function praesentationAnlegen(pos: { x: number; y: number }): Promi
   await saveHtml(node.id, html);
   sofortStartenVormerken(node.id);
   addNode(node);
-  showToast('Präsentation angelegt – „Bearbeiten" in der Folie (oder E) öffnet den Editor, gespeichert wird in der Karte.');
-  mirror(new File([html], 'Präsentation.html', { type: 'text/html' }), node.id, { done: false });
+  if (!fertig) showToast('Präsentation angelegt – „Bearbeiten" in der Folie (oder E) öffnet den Editor, gespeichert wird in der Karte.');
+  mirror(new File([html], `${(fertig?.name || 'Präsentation').replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'Präsentation'}.html`, { type: 'text/html' }), node.id, { done: false });
   return node.id;
 }
 

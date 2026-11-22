@@ -296,6 +296,16 @@ const platzFuer = (anbieter: string): number => (anbieter === 'free' || anbieter
 /** Der Wunsch verlangt etwas für JEDE Karte („alle Dateien", „jede Notiz") – dann wird in Portionen gearbeitet */
 const FUER_JEDE = /(^|[^a-zäöüß])(jede[rsnm]?|jeweils|alle[nrs]?|sämtliche[nrs]?|each|every|all)(?![a-zäöüß])/i;
 
+/** M427: Der Wunsch verlangt eine Präsentation (anlegen – nicht eine Notiz ZUR Präsentation oder eine Frage danach) */
+export function willPraesentation(wunsch: string): boolean {
+  const s = wunsch.toLowerCase();
+  const m = /(präsentation|praesentation|foliensatz|folien|slides?|slide ?deck|presentation)(?![a-zäöüß])/.exec(s);
+  if (!m) return false;
+  const davor = s.slice(Math.max(0, m.index - 14), m.index);
+  if (/(zur|zum|der|des|die|dem|den|in|im|auf|the)\s+$/.test(davor)) return false;
+  return /(^|[^a-zäöüß])(erstell|mach|bau|generier|entwirf|entwerf|schreib|leg\S* .{0,40}an\b|bereite?\S* .{0,40}vor\b|vorbereit|create|make|build|generate|draft|prepare)/.test(s);
+}
+
 /**
  * Freitext-Anweisung ausführen: „Erstelle …", „Verbessere …", „Verbinde …", „Wie viel …?".
  * Die KI liefert einen Operationsplan (JSON), der validiert und über die
@@ -307,6 +317,17 @@ const FUER_JEDE = /(^|[^a-zäöüß])(jede[rsnm]?|jeweils|alle[nrs]?|sämtliche[
 export async function aiCommand(instruction: string, nodes: AppNode[], pos: { x: number; y: number }, fortschritt?: Fortschritt): Promise<string> {
   const wish = instruction.trim();
   if (!wish) throw new Error('Bitte zuerst eine Anweisung eingeben.');
+  /* M427: „Mach eine Präsentation …" / „Erstelle Folien zu …" – ein eigener Weg (Gliederung → Vibe-Studio-Folien),
+     nicht der Operationsplan: Folien sind kein Modul, das man Schritt für Schritt füllt. */
+  if (willPraesentation(wish)) {
+    const { aiPraesentation } = await import('./aiActions');
+    const st0 = useBoard.getState();
+    const alle = selectActiveBoard(st0)?.nodes ?? nodes;
+    const ergebnis = await aiPraesentation(nodes.length ? nodes : alle, pos, fortschritt, wish);
+    const b0 = selectActiveBoard(useBoard.getState());
+    if (b0) kiMerken(b0.id, { t: Date.now(), wunsch: wish, ergebnis, karten: [] });
+    return ergebnis;
+  }
   const km = await import('./kiModule');
   const st = useBoard.getState();
   const board = selectActiveBoard(st);

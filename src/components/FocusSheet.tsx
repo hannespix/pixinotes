@@ -6,7 +6,8 @@ import { useBoard, type Tool } from '../store';
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon, type DokumentBefehl } from '../lib/pdfSeiten';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
-import { ICheck, IChevronL, IChevronR, IComment, IEraser, IFit, IHighlighter, IPen, IPlay, IX } from './Icons';
+import { ICheck, IChevronL, IChevronR, IComment, IEraser, IFit, IHighlighter, IMaximize, IPen, IPlay, IX } from './Icons';
+import { istRein, ReinRand, useReinAnsicht } from '../lib/reinAnsicht';
 import { FOKUS_ANSICHTEN, FOKUS_ZOOM_EREIGNIS, FOKUS_ANSICHT_EREIGNIS, fokusAnsicht, fokusAnsichtSetzen, fokusStufe, fokusStufeMal, type FokusAnsicht } from '../lib/fokusAnsicht';
 
 /**
@@ -178,6 +179,8 @@ export function FocusSheet() {
   // Cleanup beim Blättern seinen eigenen Eintrag ab, das löst popstate aus —
   // und der Fokus schlösse sich beim Weiterblättern von selbst.
   const isOpen = !!focusCard;
+  // M426: Nur Inhalt – Vollbild ohne Kopf- und Fußleiste, ohne Rahmen und Bedienung (F, Esc)
+  const reinAnsicht = useReinAnsicht('fokus', isOpen);
   useEffect(() => {
     if (!isOpen) return;
     history.pushState({ pnFocus: true }, '');
@@ -207,6 +210,7 @@ export function FocusSheet() {
     if (!focusCard) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      if (istRein()) return;   // M426: Esc führt erst aus „Nur Inhalt" zurück (reinAnsicht.tsx)
       const t = e.target as HTMLElement | null;
       if (t?.closest('input, textarea, [contenteditable="true"]')) return;
       // Esc räumt IMMER das Oberste ab. Steht ein Menü, ein Dialog oder das
@@ -249,6 +253,7 @@ export function FocusSheet() {
       if (!s0) return;
       if (performance.now() - s0.t > 450 || Math.hypot(e.clientX - s0.x, e.clientY - s0.y) > 8) return;
       if (document.body.dataset.stiftZug === '1') return;
+      if (istRein()) return;   // M426: in „Nur Inhalt" ist neben der Karte nichts zum Wegklicken
       close();
     };
     window.addEventListener('pointerdown', onDown, true);
@@ -399,6 +404,7 @@ export function FocusSheet() {
 
   return (
     <>
+      <ReinRand an={reinAnsicht.rein} onAus={reinAnsicht.aus} />
       <div
         className="focus-head"
         onTouchStart={onTouchStart}
@@ -447,9 +453,16 @@ export function FocusSheet() {
                   <span className="focus-ansicht-haken" aria-hidden="true">{ansicht === a.id && <ICheck size={14} />}</span>{a.name}
                 </button>
               ))}
+              <button className="rein-wahl" data-taste="fokus-rein-wahl" onClick={() => { setAnsichtMenu(false); reinAnsicht.umschalten(); }}>
+                <span className="focus-ansicht-haken" aria-hidden="true"><IMaximize size={14} /></span>Nur Inhalt<kbd>F</kbd>
+              </button>
             </div>
           )}
         </span>
+        <button className="focus-rein-knopf" data-taste="fokus-rein" onClick={reinAnsicht.umschalten}
+          title="Nur Inhalt – Vollbild ohne Bedienung (F)" aria-label="Nur Inhalt (Vollbild ohne Bedienung)">
+          <IMaximize size={16} />
+        </button>
         {/* M413: Am Telefon ist unten kein Platz für Seiten UND Karten. Bei einem Dokument blättern die Knöpfe unten
             dort weiter die Seiten (hineingezoomt schiebt der Finger das Blatt – ohne sie käme man nicht weiter);
             zur nächsten Karte führen diese beiden hier oben. Ab Tablet-Breite steht alles unten. */}

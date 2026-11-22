@@ -19,6 +19,7 @@ import { letzteSeite } from '../lib/pdfSeiten';
 import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, MinutesNode, NoteNode, ShapeNode, SheetNode, TimeNode, WeekNode } from '../types';
 import { HtmlAppSlide } from './nodes/HtmlAppCard';
 import { useRandLeiste } from '../lib/randLeiste';
+import { ReinRand, useReinAnsicht } from '../lib/reinAnsicht';
 import { FOLIEN_FARBEN, type FolienWerkzeug } from '../lib/folienWerkzeug';
 import { useTippGesten } from '../lib/tippGesten';
 import { ansichtGemerkt, ansichtMerken, FOLIEN_ANSICHTEN, useFolienZoom, type FolienAnsicht } from '../lib/folienZoom';
@@ -28,7 +29,7 @@ import { useZiehRollen } from '../lib/ziehRollen';
 const DokumentFolie = lazy(() => import('./DokumentFolie').then((m) => ({ default: m.DokumentFolie })));
 const FolienStift = lazy(() => import('./FolienStift').then((m) => ({ default: m.FolienStift })));
 const FolienKommentare = lazy(() => import('./FolienKommentare').then((m) => ({ default: m.FolienKommentare })));
-import { ICheck, IComment, IEraser, IFit, IHighlighter, IPen, IUndo, IMegafon } from './Icons';
+import { ICheck, IComment, IEraser, IFit, IHighlighter, IMaximize, IPen, IUndo, IMegafon } from './Icons';
 import { BubblesBody } from './nodes/BubblesCard';
 import { WeekBody } from './nodes/WeekCard';
 import { TimeBody } from './nodes/TimeCard';
@@ -451,7 +452,10 @@ export function Presenter() {
   const safeIdx = Math.max(0, Math.min(idx, slides.length - 1));
   const current = slides[safeIdx] as AppNode | undefined;
   // M393: Auf einer Tool-Folie gehört der Schirm dem Tool — die Kopfzeile kommt am oberen Rand
-  const rand = useRandLeiste(open && current?.type === 'htmlapp', 2200);
+  // M426: Nur Inhalt – Folie randlos über den ganzen Schirm, ohne Kopf- und Fußzeile (F, Esc)
+  const reinAnsicht = useReinAnsicht('vortrag', open);
+  const rand = useRandLeiste(open && current?.type === 'htmlapp' && !reinAnsicht.rein, 2200);
+  useEffect(() => { if (reinAnsicht.rein) { setKommOffen(false); setAnsichtMenu(false); } }, [reinAnsicht.rein]);
   const art = current ? dokumentArt(current) : null;
   const seitenHier = current && art && art !== 'bild' ? seitenJe[current.id] ?? 1 : 1;
   const seiteHier = pos.seite < 0 ? seitenHier : Math.min(Math.max(1, pos.seite), seitenHier);
@@ -591,7 +595,7 @@ export function Presenter() {
   const eigenerZoom = zoombar && Math.abs(fz.zoom - fz.heim) > 0.001;
 
   return (
-    <div className={`presenter ${art ? 'mit-dokument' : ''} ${kommOffen ? 'mit-kommentaren' : ''} ${werkzeug ? 'mit-stift' : ''}`} role="dialog" aria-modal="true" aria-label="Präsentation">
+    <div className={`presenter ${reinAnsicht.rein ? 'rein' : ''} ${art ? 'mit-dokument' : ''} ${kommOffen ? 'mit-kommentaren' : ''} ${werkzeug ? 'mit-stift' : ''}`} role="dialog" aria-modal="true" aria-label="Präsentation">
       <div className={`presenter-head ${rand.da ? 'da' : ''}`} ref={kopfRef} data-eng="0" {...rand.griff}>
         <span translate="no">{board.name}</span>
         <span className="presenter-hint-edit">{art ? 'Doppelklick oder + / − vergrößert · B = Seitenbreite' : current?.type === 'htmlapp' ? 'Läuft auf der Folie · blättern mit ‹ ›' : 'Folien sind direkt editierbar · Strg+Rad zoomt'}</span>
@@ -617,6 +621,9 @@ export function Presenter() {
                     <span className="presenter-ansicht-haken" aria-hidden="true">{ansicht === a.id && <ICheck size={14} />}</span>{a.name}
                   </button>
                 ))}
+                <button className="rein-wahl" data-taste="folie-rein" onClick={() => { setAnsichtMenu(false); reinAnsicht.umschalten(); }}>
+                  <span className="presenter-ansicht-haken" aria-hidden="true"><IMaximize size={14} /></span>Nur Inhalt<kbd>F</kbd>
+                </button>
               </div>
             )}
           </span>
@@ -653,6 +660,10 @@ export function Presenter() {
             <IComment size={15} />{offeneKomm > 0 && <span className="presenter-zahl" data-taste="vortrag-kommentar-zahl">{offeneKomm}</span>}
           </button>
         )}
+        <button className="presenter-team presenter-ikon" data-taste="vortrag-rein" onClick={reinAnsicht.umschalten}
+          title="Nur Inhalt – Vollbild ohne Bedienung (F)" aria-label="Nur Inhalt (Vollbild ohne Bedienung)">
+          <IMaximize size={15} />
+        </button>
         <button className="presenter-zu" data-taste="vortrag-zu" onClick={() => { selbst(); setOpen(false); }} aria-label="Präsentation beenden" title="Präsentation beenden (Esc)">✕</button>
       </div>
       {slides.length === 0 ? (
@@ -693,6 +704,7 @@ export function Presenter() {
           </div>
         )
       )}
+      <ReinRand an={reinAnsicht.rein} onAus={reinAnsicht.aus} />
       {/* M375: Laser — eine Schicht genau über der Folie (misst sich selbst an ihr aus) */}
       {slides.length > 0 && <FolienLaser boardId={board.id} folie={cur.id} an={laser} senden={ichZeige} />}
       {/* M394: Zeichenschicht über der Folie, Werkzeuge erst, wenn gezeichnet wird, Kommentare als Spalte */}
