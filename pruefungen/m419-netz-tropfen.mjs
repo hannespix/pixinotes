@@ -18,6 +18,11 @@
  * M423: „Netzansicht bitte tropfiger und mit mehr farbigen Verläufen wie bei den Ideabubbles … organischer."
  * Die Inseln sind jetzt zwei Canvas-Flächen (lib/netzTropfen.ts: weichzeichnen, hart schneiden, Farben laufen
  * ineinander); jedes Projekt hat einen eigenen Ton, jedes Board einen eigenen Verlauf. A1–A4, C2, D1 und F prüfen das.
+ *
+ * M439: „Netzansicht muss noch besser werden. Blur zu krass, Schrift verblasst hinter dem Fog … Blur-Ebene nur für
+ * Farbfelder nutzen, gerne harte Kanten ohne Rand für die Blasen und Verbindungen, aber mit schönen Farbverläufen."
+ * G prüft: Blasen und Punkte ohne Rand, Verbindungen im Farbverlauf von Board zu Board, Farbflächen klar begrenzt und
+ * fein gerechnet, Schrift kräftig.
  */
 // Läuft aus dem Repository: `node pruefungen/m419-netz-tropfen.mjs`
 import { fileURLToPath } from 'node:url';
@@ -153,6 +158,26 @@ const chips = await P.evaluate(() => [...document.querySelectorAll('.ov-graph-to
 const an = chips.find((c) => c.an); const aus = chips.find((c) => !c.an);
 pruefe('A7 Ebenen-Schalter als runde Chips – an: getönt, aus: ohne Fläche; das Kästchen bleibt unsichtbar bedienbar', an && aus && an.rund && an.bg !== aus.bg && /rgba\(0, 0, 0, 0\)|transparent/.test(aus.bg) && chips.every((c) => c.kaestchen === 0), chips);
 await P.screenshot({ path: path.join(SD, 'm419-netz.png') });
+
+console.log('G  Sauber (M439)');
+const g = await P.evaluate(() => {
+  const tropfen = [...document.querySelectorAll('circle.ov-tropfen, .ov-graph-dot circle')];
+  const ohneRand = tropfen.every((c) => { const cs = getComputedStyle(c); return cs.stroke === 'none' || parseFloat(cs.strokeWidth) === 0; });
+  const kanten = [...document.querySelectorAll('.ov-kante-portal, .ov-kante-wiki')];
+  const verlaeufe = kanten.map((k) => { const id = (/url\(["']?#([^"')]+)/.exec(k.style.stroke ?? '') ?? [])[1]; const v = id && document.getElementById(id); return v ? [...v.querySelectorAll('stop')].map((st) => getComputedStyle(st).stopColor) : null; });
+  const c = document.querySelector('.ov-flaeche-projekt');
+  const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+  let voll = 0; let saum = 0;
+  for (let i = 3; i < d.length; i += 4) { if (d[i] > 245) voll++; else if (d[i] > 10) saum++; }
+  const t = document.querySelector('.ov-graph-node text'); const ts = getComputedStyle(t);
+  const ink = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+  return { ohneRand, n: tropfen.length, kanten: kanten.length, verlaeufe: verlaeufe.slice(0, 4), alleVerlauf: verlaeufe.every((v) => v && v.length === 2), bunt: verlaeufe.some((v) => v && v[0] !== v[1]),
+    aufloesung: c.width, saumAnteil: saum / Math.max(1, voll + saum), schrift: { fill: ts.fill, op: +ts.fillOpacity, gewicht: +ts.fontWeight }, ink };
+});
+pruefe('G1 Blasen und Karten-Punkte: harte Kante ohne Rand', g.n > 5 && g.ohneRand, g);
+pruefe('G2 Verbindungen im Farbverlauf von Board zu Board (ohne Rand, nicht grau)', g.kanten > 0 && g.alleVerlauf && g.bunt, g.verlaeufe);
+pruefe('G3 Farbflächen klar begrenzt (schmaler Saum statt Nebel) und fein gerechnet', g.saumAnteil < 0.12 && g.aufloesung >= 600, { saum: g.saumAnteil, aufloesung: g.aufloesung });
+pruefe('G4 die Schrift steht kräftig über allem (volle Deckkraft, halbfett)', g.schrift.op === 1 && g.schrift.gewicht >= 600, g.schrift);
 
 console.log('B  Leistung');
 const b = await P.evaluate(() => ({ filter: document.querySelectorAll('.ov-graph-svg [filter], .ov-graph-svg filter').length, ebene: document.querySelector('.ov-graph-ebene')?.tagName, trafo: document.querySelector('.ov-graph-ebene')?.style.transform, vpTrafo: document.querySelector('.ov-graph-vp')?.style.transform ?? '' }));
