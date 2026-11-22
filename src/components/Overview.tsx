@@ -252,6 +252,8 @@ function regionGeo(ids: string[], pad: number, at: (id: string) => Pt | undefine
   return { d: hullPath(pts, pad), label: topAnchor(pts, pad) };
 }
 
+/** M439: RGB-Tripel als CSS-Farbe */
+const rgbText = (c: [number, number, number]) => `rgb(${c[0] | 0} ${c[1] | 0} ${c[2] | 0})`;
 /** M423: Kennung des Farbverlaufs eines Boards (nur Zeichen, die in einer url(#…) sicher sind) */
 const verlaufId = (boardId: string) => `nt-${boardId.replace(/[^A-Za-z0-9_-]/g, '_')}`;
 /**
@@ -264,8 +266,9 @@ function BoardVerlauf({ id, farbe }: { id: string; farbe: [number, number, numbe
   return (
     <defs>
       <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" style={{ stopColor: `color-mix(in srgb, ${rgb(farbe)} 30%, var(--surface))` }} />
-        <stop offset="1" style={{ stopColor: `color-mix(in srgb, ${rgb(zwei)} 52%, var(--surface))` }} />
+        {/* M439: kräftiger — die Blase steht jetzt mit harter Kante ohne Rand auf der leisen Farbfläche */}
+        <stop offset="0" style={{ stopColor: `color-mix(in srgb, ${rgb(farbe)} 58%, var(--surface))` }} />
+        <stop offset="1" style={{ stopColor: `color-mix(in srgb, ${rgb(zwei)} 86%, var(--surface))` }} />
       </linearGradient>
     </defs>
   );
@@ -494,6 +497,8 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
   const nodeEls = useRef(new Map<string, SVGGElement>());
   const satEls = useRef(new Map<string, SVGGElement>());
   const linkEls = useRef(new Map<number, SVGLineElement>());
+  /** M439: die Farbverläufe der Verbindungen (vom Ton des einen Boards zum Ton des anderen) ziehen mit */
+  const linkVerlaufEls = useRef(new Map<number, SVGLinearGradientElement>());
   // M223: Auch Gelände und Bänder werden pro Frame imperativ nachgezogen
   const regionEls = useRef(new Map<string, SVGPathElement>());
   /** M423: die Tropfen-Flächen (Bereiche und Projekte) — Canvas auf der Netz-Ebene, gemalt von lib/netzTropfen */
@@ -579,6 +584,8 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           if (!A || !B) continue;
           el.setAttribute('x1', String(A.x)); el.setAttribute('y1', String(A.y));
           el.setAttribute('x2', String(B.x)); el.setAttribute('y2', String(B.y));
+          const v = linkVerlaufEls.current.get(i);
+          if (v) { v.setAttribute('x1', String(A.x)); v.setAttribute('y1', String(A.y)); v.setAttribute('x2', String(B.x)); v.setAttribute('y2', String(B.y)); }
         }
         // M223: Gelände und Bänder ziehen mit. Die Hüllen kosten mehr als ein
         // transform (konvexe Hülle + Kurve + Zeichenkette), darum nur jeden
@@ -768,12 +775,17 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
     });
     return { raeume, projekte, boardFarbe };
   }, [spaces, seedPos, showRegions, brainOn, brainOffSpaces]);
+  /** M439: der Ton eines Boards (aus dem Tropfen-Plan, sonst die Farbe seines Bereichs) */
+  const boardRgb = (id: string): [number, number, number] => tropfenPlan.boardFarbe.get(id) ?? hexRgb(SPACE_ACCENTS[(farbIndex.get(id) ?? 0) % SPACE_ACCENTS.length]);
   tropfenNeu.current = (at, wie = {}) => {
     const plan = tropfenPlan;
-    const maxSeite = wie.bewegt ? 300 : 640;
+    // M439: in Ruhe feiner gerechnet — die Kante der Farbfläche soll klar sein, nicht neblig
+    const maxSeite = wie.bewegt ? 720 : 1400;
     const lege = (cv: HTMLCanvasElement | null, kreise: TropfenKreis[], br: TropfenBruecke[], weich: number, kontur: number) => {
       if (!cv) return;
-      const b = tropfenMalen(cv, kreise, br, { weich, kontur, maxSeite });
+      // M439: Der Weichzeichner formt nur die Farbfläche (runde Hälse) — geschnitten wird steil, die Kante ist
+      // anderthalb Punkte breit statt eines Nebelsaums
+      const b = tropfenMalen(cv, kreise, br, { weich, kontur, maxSeite, steil: wie.bewegt ? 12 : 16 });
       if (!b) { cv.style.display = 'none'; return; }
       cv.style.display = '';
       cv.style.transform = `translate(${b.x}px, ${b.y}px)`;
@@ -794,7 +806,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         if (A && B && fa && fb) bp.push({ x1: A.x, y1: A.y, x2: B.x, y2: B.y, breite: 2 * Math.min(fuss(a), fuss(b)) * 0.5, farbe: [(fa[0] + fb[0]) / 2, (fa[1] + fb[1]) / 2, (fa[2] + fb[2]) / 2] });
       }
     }
-    lege(projektFlaeche.current, kp, bp, 13, -0.22);
+    lege(projektFlaeche.current, kp, bp, 13, 0);
   };
   // Erstes Bild und jede Änderung der Gliederung (Boards, Projekte, Ebenen) — nicht beim reinen Zoomen
   useEffect(() => {
@@ -1504,6 +1516,23 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
             </g>
           );
         })}
+        {/* M439: die Farbverläufe der Verbindungen — einer je Link, die Bild-Schleife zieht ihre Enden mit */}
+        <defs>
+          {links.map((l, i) => {
+            if (l.kind === 'vorschlag' || (l.kind === 'portal' && !showPortals) || (l.kind === 'wikilink' && !showWikis)) return null;
+            const a = pos.get(l.a), b = pos.get(l.b);
+            if (!a || !b) return null;
+            return (
+              <linearGradient
+                key={i} id={`nk-${i}`} gradientUnits="userSpaceOnUse" x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                ref={(el) => { if (el) linkVerlaufEls.current.set(i, el); else linkVerlaufEls.current.delete(i); }}
+              >
+                <stop offset="0" style={{ stopColor: rgbText(boardRgb(l.a)) }} />
+                <stop offset="1" style={{ stopColor: rgbText(boardRgb(l.b)) }} />
+              </linearGradient>
+            );
+          })}
+        </defs>
         {links.map((l, i) => {
           if (l.kind === 'portal' && !showPortals) return null;
           if (l.kind === 'wikilink' && !showWikis) return null;
@@ -1533,15 +1562,18 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
               </g>
             );
           }
+          // M439: harte Linie ohne Rand, im Farbverlauf vom Ton des einen Boards zum Ton des anderen (Verlauf oben in
+          // den gemeinsamen <defs> der Verbindungen)
           return (
             <line
               key={i}
               ref={(el) => { if (el) linkEls.current.set(i, el); else linkEls.current.delete(i); }}
               x1={a.x} y1={a.y} x2={b.x} y2={b.y}
               className={l.kind === 'portal' ? 'ov-kante-portal' : 'ov-kante-wiki'}
-              strokeWidth={l.kind === 'portal' ? ui(2) : ui(2.2)}
+              style={{ stroke: `url(#nk-${i})` }}
+              strokeWidth={l.kind === 'portal' ? ui(2.4) : ui(3)}
               // M419: Wikilinks als Perlenschnur (runde Punkte) statt Strichel
-              strokeDasharray={l.kind === 'wikilink' ? `0 ${ui(6)}` : undefined}
+              strokeDasharray={l.kind === 'wikilink' ? `0 ${ui(7)}` : undefined}
             />
           );
         })}
@@ -1555,7 +1587,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
               transform={`translate(${center.x} ${center.y})`}
             >
               {sb.lines.map((l, i) => (
-                <line key={`c${i}`} className="ov-sat-linie" x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} strokeWidth={ui(1)} />
+                <line key={`c${i}`} className="ov-sat-linie" x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} strokeWidth={ui(1.2)} style={{ stroke: rgbText(boardRgb(sb.boardId)) }} />
               ))}
               {sb.dots.map((d) => (
                 <g
@@ -1564,7 +1596,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
                   onClick={() => { openBoard(sb.boardId); focusNode(sb.boardId, d.nodeId); }}
                 >
                   <title>{d.title}</title>
-                  <circle cx={d.x} cy={d.y} r={ui(5)} strokeWidth={ui(1)} fill={tropfenPlan.boardFarbe.has(sb.boardId) ? `url(#${verlaufId(sb.boardId)})` : `url(#netz-tropfen-${farbIndex.get(sb.boardId) ?? 0})`} />
+                  <circle cx={d.x} cy={d.y} r={ui(5)} strokeWidth={0} fill={tropfenPlan.boardFarbe.has(sb.boardId) ? `url(#${verlaufId(sb.boardId)})` : `url(#netz-tropfen-${farbIndex.get(sb.boardId) ?? 0})`} />
                   {lod === 2 && (
                     <text
                       className="ov-graph-dot-label"
@@ -1617,7 +1649,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
               {/* M419: ein flacher Tropfen — sanfter Pastell-Verlauf aus der Farbe des Bereichs, feine Kontur.
                   Bewusst ohne Schatten und Glanz (flat), und ohne Filter: kostet beim Zeichnen fast nichts. */}
               {tropfenPlan.boardFarbe.has(n.id) && <BoardVerlauf id={verlaufId(n.id)} farbe={tropfenPlan.boardFarbe.get(n.id)!} />}
-              <circle className="ov-tropfen" r={rad} strokeWidth={ui(1)} fill={tropfenPlan.boardFarbe.has(n.id) ? `url(#${verlaufId(n.id)})` : `url(#netz-tropfen-${farbIndex.get(n.id) ?? 0})`} />
+              <circle className="ov-tropfen" r={rad} strokeWidth={0} fill={tropfenPlan.boardFarbe.has(n.id) ? `url(#${verlaufId(n.id)})` : `url(#netz-tropfen-${farbIndex.get(n.id) ?? 0})`} />
               <text
                 x={0} y={rad + ui(17)} textAnchor="middle"
                 // Deckel in SVG-Einheiten: weit rausgezoomt schrumpfen Namen,

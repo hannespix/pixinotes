@@ -8321,3 +8321,26 @@ html[data-kontrast='hoch'] .pn-schatten-ebene { display: none; }
 .side-proj-boards .side-board.active .side-board-name { font-weight: 600; }
 .side-proj-boards .side-board-arrow { opacity: 0.55; }
 .side-proj-boards .side-board:hover .side-board-arrow, .side-proj-boards .side-board-arrow.open { opacity: 1; }
+
+/* ===== M439: Netz sauberer — weich ist nur die Farbfläche, alles darauf hat harte Kanten =====
+   „Blur zu krass, Schrift verblasst hinter dem Fog … Blur-Ebene nur für Farbfelder nutzen, gerne harte Kanten ohne
+   Rand für die Blasen und Verbindungen, aber mit schönen Farbverläufen." Die Farbflächen (Bereiche, Projekte) sind
+   leiser und klar begrenzt; Boards, Karten-Punkte und Verbindungen stehen mit harter Kante ohne Rand in kräftigeren
+   Verläufen darauf; die Schrift liegt klar darüber. */
+.ov-flaeche-raum { opacity: calc(0.12 * var(--netz-insel)); }
+.ov-flaeche-projekt { opacity: calc(0.26 * var(--netz-insel)); }
+.ov-graph-svg.geo-space .ov-flaeche-raum { opacity: calc(0.2 * var(--netz-insel)); }
+.ov-graph-node .ov-tropfen, .ov-graph-dot circle { stroke: none; }
+.ov-graph-node:hover .ov-tropfen { filter: saturate(1.2) brightness(1.04); }
+.ov-graph-dot:hover circle { stroke: none; filter: brightness(1.08) saturate(1.2); }
+.ov-graph-node:focus-visible > circle.ov-tropfen { stroke: var(--accent); stroke-width: 2px; }
+html[data-kontrast='hoch'] .ov-graph-node .ov-tropfen { stroke: var(--ink); stroke-width: 1px; }
+.ov-kante-portal { stroke-linecap: round; opacity: 0.8; }
+.ov-kante-wiki { stroke-linecap: round; opacity: 0.85; }
+.ov-sat-linie { opacity: 0.38; }
+/* Schrift: klar und dunkel, mit einem schmalen Hof in der Grundfarbe — sie steht über Fläche und Linien */
+.ov-graph-node text { fill: var(--ink); }
+.ov-graph-node .ov-graph-count { fill: color-mix(in srgb, var(--ink) 78%, transparent); }
+.ov-graph-dot-label { fill: color-mix(in srgb, var(--ink) 78%, transparent); }
+.ov-region text { fill-opacity: 1; }
+:root[data-theme='dark'] .ov-graph-node .ov-graph-count { fill: color-mix(in srgb, #fff 86%, transparent); }
