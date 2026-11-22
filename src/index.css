@@ -8299,3 +8299,25 @@ html[data-kontrast='hoch'] .pn-schatten-ebene { display: none; }
 /* Der Schatten der Form (filter) macht sie zu einem eigenen Stapel — der Editor käme darin nicht über die
    Anfasser hinaus. Solange geschrieben wird, ruht der Schatten. */
 .react-flow__node-shape .shape-body:has(.shape-inhalt-wach) { filter: none; }
+
+/* ===== M437: Fokus mit angehefteter Seitenleiste — kein toter Streifen links =====
+   Im Fokus tritt die Leiste zurück (.focus-mode .tabs), ihr Band (::before) und der Abstand der Fläche blieben aber
+   stehen: links ein leerer Streifen, auch in „Nur Inhalt". Jetzt bekommt die Fläche die ganze Breite. */
+@media (min-width: 861px) {
+  .app.nav-links.focus-mode::before { display: none; }
+  .app.nav-links.focus-mode .board-wrap { margin-left: 0; }
+}
+
+/* ===== M438: Seitenleiste — Projekte und Boards ruhig unterscheidbar =====
+   „In der Sidebar sehen Boards und Projekte vom Format her gleich aus … irgendwie sollte das abgesetzt sein, ohne
+   unruhig zu wirken." Das Projekt ist ein Ordner: leises Ordner-Symbol, halbfette Schrift. Seine Boards hängen
+   eingerückt an einer feinen Linie, in normaler Schrift — das gewählte Board trägt die Fläche und halbfett. */
+.nav-tree .side-proj-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12.5px; letter-spacing: 0; }
+.side-proj-name .side-proj-ordner { flex: none; color: var(--muted); opacity: 0.85; }
+.side-proj.auf .side-proj-ordner { color: var(--accent-strong); opacity: 0.7; }
+.side-proj-name .side-proj-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-proj-boards { margin: 1px 0 4px 11px; padding-left: 5px; border-left: 1px solid var(--border); }
+.side-proj-boards .side-board-name { font-weight: 400; }
+.side-proj-boards .side-board.active .side-board-name { font-weight: 600; }
+.side-proj-boards .side-board-arrow { opacity: 0.55; }
+.side-proj-boards .side-board:hover .side-board-arrow, .side-proj-boards .side-board-arrow.open { opacity: 1; }
