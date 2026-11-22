@@ -244,7 +244,8 @@ interface BoardState {
   activeId: string;
   view: 'overview' | 'board';
   toast: Toast | null;
-  pendingFocus: { boardId: string; nodeId: string } | null;
+  /** M431: `markieren: false` — nur hinfahren, die Auswahl bleibt, wie sie ist */
+  pendingFocus: { boardId: string; nodeId: string; markieren?: boolean } | null;
   lastDeleted: DeletedSnapshot | null;
   tool: Tool;
   settingsOpen: boolean;
@@ -574,7 +575,7 @@ interface BoardState {
   setNodePosition: (id: string, x: number, y: number) => void;
   /** Mehrere Positionen in EINEM Store-Update — für den Physik-Loop (60 fps) */
   setNodePositions: (entries: Array<[string, number, number]>) => void;
-  focusNode: (boardId: string, nodeId: string) => void;
+  focusNode: (boardId: string, nodeId: string, opt?: { markieren?: boolean }) => void;
   clearPendingFocus: () => void;
 
   showToast: (message: string, undo?: boolean | 'schritt' | 'ebene', durationMs?: number, abbruch?: boolean) => void;
@@ -3293,8 +3294,8 @@ export const useBoard = create<BoardState>()(
             };
           }),
 
-        focusNode: (boardId, nodeId) => {
-          set({ pendingFocus: { boardId, nodeId }, activeId: boardId, view: 'board' });
+        focusNode: (boardId, nodeId, opt) => {
+          set({ pendingFocus: { boardId, nodeId, markieren: opt?.markieren }, activeId: boardId, view: 'board' });
         },
 
         clearPendingFocus: () => set({ pendingFocus: null }),

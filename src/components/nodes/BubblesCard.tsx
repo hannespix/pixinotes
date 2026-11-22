@@ -401,7 +401,15 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   /** M415: zuletzt gezeichnete Lage je Blase — was sich nicht sichtbar bewegt, wird nicht neu geschrieben */
   const gezeichnet = useRef(new Map<string, { x: number; y: number; r: number }>());
   /** zeichnet und sagt, wie weit sich die Blasen sichtbar bewegt haben (größter Weg in Punkten) */
-  const zeichnen = useCallback((): number => {
+  /* M429: Lage der Gruppen-Namen, wie sie gerade gezeichnet ist — der Name gleitet zu seinem Ziel, statt zu springen.
+     `namenRest`: wie weit der am weitesten entfernte Name noch von seinem Ziel weg ist (solange rechnet die Bühne weiter).
+     `namenSeite`: oben oder unten am Ring (ohne Tropfen) — mit Spielraum, damit der Name an der Grenze nicht pendelt.
+     `gruppeImZug`: die Gruppe, die gerade am Namen gezogen wird — ihr Name folgt der Hand ohne Verzug. */
+  const namenLage = useRef(new Map<string, { x: number; y: number }>());
+  const namenRest = useRef(0);
+  const namenSeite = useRef(new Map<string, 'o' | 'u' | 'k'>());
+  const gruppeImZug = useRef<string | null>(null);
+  const zeichnen = useCallback((sofort = false): number => {
     let weit = 0;
     for (const [bid, k] of koerper.current) {
       const el = knoten.current.get(bid);
@@ -449,6 +457,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     // Ringe um die Gruppen: Mitte der Mitglieder, Radius bis zur äußersten Blase. Der Name sitzt am oberen Rand
     // des Rings — aber immer in der Bühne, auch wenn der Ring oben hinausragt.
     const { w, h } = mass.current;
+    namenRest.current = 0;
     for (const gid of gruppenRef.current) {
       const el = ringe.current.get(gid); const nm = namen.current.get(gid);
       const s0 = scheibe(gid, zug.current?.bewegt ? zug.current.id : undefined);
@@ -464,18 +473,46 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         let obenRand = s0.y - s0.r;
         let mitteX = s0.x;
         if (tropfenRef.current) {
-          // über der obersten Idee: Dort ist die Form oben rund, und die Kuppe wächst sauber aus ihr heraus
+          /* über der obersten Idee: Dort ist die Form oben rund, und die Kuppe wächst sauber aus ihr heraus.
+             M429: nicht genau über DER obersten — liegen zwei fast gleich hoch, wechselte „die oberste" von Bild zu
+             Bild, und der Name sprang zwischen beiden hin und her. Jetzt die Mitte der oberen Ideen, gewichtet danach,
+             wie weit oben sie liegen: Sie wandert stetig, wenn eine Idee aufsteigt oder absinkt. */
+          const gezogenId = zug.current?.bewegt ? zug.current.id : null;
           let o = Infinity;
-          for (const [bid, k] of koerper.current) if (k.g === gid && bid !== (zug.current?.bewegt ? zug.current.id : null) && k.y - k.r - TROPFEN_RAND < o) { o = k.y - k.r - TROPFEN_RAND; mitteX = k.x; }
-          if (o < Infinity) obenRand = o;
+          for (const [bid, k] of koerper.current) if (k.g === gid && bid !== gezogenId) o = Math.min(o, k.y - k.r - TROPFEN_RAND);
+          if (o < Infinity) {
+            let sw = 0; let sx = 0;
+            for (const [bid, k] of koerper.current) {
+              if (k.g !== gid || bid === gezogenId) continue;
+              const g = Math.exp(-(k.y - k.r - TROPFEN_RAND - o) / 12);
+              sw += g; sx += g * k.x;
+            }
+            obenRand = o; mitteX = sx / sw;
+          }
         }
         // im Tropfen wächst oben eine Kuppe aus der Form, in der der Name steht; sonst sitzt er auf dem Ring
         const lh = nm.offsetHeight || 18;
         const oben = tropfenRef.current ? obenRand - lh + 10 : obenRand - 9; const unten = s0.y + s0.r - 9;
         // M422: Die Kuppe ist 9 Punkte breiter und 5 höher als der Name — so weit muss er vom Rand der Bühne bleiben
         const rk = tropfenRef.current ? 13 : 4; const ok = tropfenRef.current ? 8 : 3;
-        const y = oben >= ok ? oben : unten <= h - 22 ? unten : ok;
-        const x = Math.min(Math.max(mitteX - halb, rk), Math.max(rk, w - nm.offsetWidth - rk));
+        let zy: number;
+        if (tropfenRef.current) zy = Math.max(oben, ok);   // die Physik hält Platz für die Kuppe frei (M422)
+        else {
+          // M429: oben oder unten am Ring — mit Spielraum, sonst pendelt der Name an der Grenze zwischen beiden
+          const vorher = namenSeite.current.get(gid) ?? 'o';
+          const seite = (vorher === 'o' ? oben >= ok - 4 : oben >= ok + 8) ? 'o' : unten <= h - 22 ? 'u' : 'k';
+          namenSeite.current.set(gid, seite);
+          zy = seite === 'o' ? Math.max(oben, ok) : seite === 'u' ? unten : ok;
+        }
+        const zx = Math.min(Math.max(mitteX - halb, rk), Math.max(rk, w - nm.offsetWidth - rk));
+        // M429: gleiten statt springen — je Bild ein gutes Fünftel des Wegs (nach ~⅓ s da); beim Ziehen der Gruppe direkt
+        const alt = namenLage.current.get(gid);
+        const f = sofort || !alt || gruppeImZug.current === gid ? 1 : 0.22;
+        let x = alt ? alt.x + (zx - alt.x) * f : zx; let y = alt ? alt.y + (zy - alt.y) * f : zy;
+        if (Math.abs(zx - x) < 0.15) x = zx;
+        if (Math.abs(zy - y) < 0.15) y = zy;
+        namenLage.current.set(gid, { x, y });
+        namenRest.current = Math.max(namenRest.current, Math.abs(zx - x), Math.abs(zy - y));
         const tf = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
         if (nm.style.transform !== tf) nm.style.transform = tf;
         const kf = kopfFormen.current.get(gid);
@@ -485,8 +522,21 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     return weit;
   }, [gross, scheibe]);
 
+  /* M429: Zeitpunkt des letzten Anstoßes (neue Idee, Ziehen, andere Größe). Danach klingt die Bewegung ab: Anziehung
+     zum eigenen Feld, Abstoßung der Gruppen und das Auflösen von Überlappungen gleichen sich auf großer Bühne nie
+     ganz aus — die Gruppen drehten sich endlos langsam umeinander („ein stetiges Wabern"). */
+  const alter = useRef(0);
   const schritt = useCallback((): number => {
     const { w, h } = mass.current;
+    const t0 = performance.now() - alter.current;
+    /* erst lebendig (1,5 s), dann klingen die Kräfte ab und sind nach 5 s aus — nach der Uhr, nicht nach Bildern: Ein
+       langsames Gerät zeichnet weniger Bilder je Sekunde und käme sonst viel später zur Ruhe. Nur die
+       Geschwindigkeit zu dämpfen genügte nicht: Die Kräfte schoben Blase gegen Blase, das Auflösen der Überlappung
+       schob zurück — und dabei rutschten sie seitlich aneinander vorbei, die Gruppen kreisten weiter. */
+    const kuehl = t0 < 1500 ? 1 : Math.max(0, 1 - (t0 - 1500) / 3500);
+    const daempfung = 0.86 * (0.55 + 0.45 * kuehl);
+    const v0 = new Map<string, [number, number]>();
+    for (const [bid, k] of koerper.current) v0.set(bid, [k.vx, k.vy]);
     const ks = [...koerper.current.entries()];
     const gezogen = zug.current?.id;
     // 1) Kräfte: jede Blase zu ihrem Anker — große etwas stärker (sie sammeln sich in der Mitte, kleine legen sich
@@ -511,7 +561,8 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           const tiefe = a.r + b.r + (tropfenRef.current ? 30 : 8) - dist;
           if (tiefe <= 0) continue;
           if (dist < 0.01) { dx = 1; dy = 0; dist = 1; }
-          const sx = (dx / dist) * tiefe * 0.11; const sy = (dy / dist) * tiefe * 0.11;
+          // M429: sanfter als zuvor (0,11) — die Gruppen schoben sich gegenseitig an, statt nur Abstand zu halten
+          const sx = (dx / dist) * tiefe * 0.08; const sy = (dy / dist) * tiefe * 0.08;
           for (const [bid, k] of ks) {
             if (bid === gezogen) continue;
             if (k.g === sch[i].g) { k.vx -= sx; k.vy -= sy; } else if (k.g === sch[j].g) { k.vx += sx; k.vy += sy; }
@@ -538,11 +589,14 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         }
       }
     }
-    // 2) Bewegen (gedämpft)
+    // 2) Bewegen (gedämpft) — M429: die Kräfte dieses Bilds nur zum Anteil, den das Abklingen noch zulässt
     let energie = 0;
     for (const [bid, k] of ks) {
       if (bid !== gezogen) {
-        k.vx *= 0.86; k.vy *= 0.86;
+        const vorKraft = v0.get(bid);
+        if (vorKraft && kuehl < 1) { k.vx = vorKraft[0] + (k.vx - vorKraft[0]) * kuehl; k.vy = vorKraft[1] + (k.vy - vorKraft[1]) * kuehl; }
+        k.vx *= daempfung; k.vy *= daempfung;
+        if (kuehl === 0) { k.vx = 0; k.vy = 0; }
         // nie schneller als gut ein Radius je Bild (sonst spränge eine geworfene Blase durch andere hindurch)
         const v = Math.hypot(k.vx, k.vy); const vMax = Math.max(18, k.r * 1.2);
         if (v > vMax) { k.vx *= vMax / v; k.vy *= vMax / v; }
@@ -596,8 +650,9 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const fenster = useRef<{ n: number; lage: Map<string, [number, number]> }>({ n: 0, lage: new Map() });
   const wecken = useCallback(() => {
     ruhe.current = 0;
+    alter.current = performance.now();
     fenster.current = { n: 0, lage: new Map() };
-    if (ruhig) { for (let i = 0; i < 400; i++) if (schritt() < 0.002 && i > 30) break; zeichnen(); return; }
+    if (ruhig) { for (let i = 0; i < 400; i++) if (schritt() < 0.002 && i > 30) break; zeichnen(true); return; }
     if (lauf.current != null) return;
     const bild = () => {
       const vor = [...koerper.current.values()].map((k) => [k.x, k.y, k.r]);
@@ -608,15 +663,19 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       let schub = 0; let i = 0;
       for (const k of koerper.current.values()) { const v = vor[i++]; if (v) schub = Math.max(schub, Math.abs(k.x - v[0]), Math.abs(k.y - v[1]), Math.abs(k.r - v[2])); }
       zeichnen();
-      ruhe.current = (e < 0.004 || schub < 0.1) && !zug.current ? ruhe.current + 1 : 0;
+      // M429: … und kein Name gleitet noch zu seinem Platz
+      ruhe.current = (e < 0.004 || schub < 0.1) && !zug.current && namenRest.current < 0.3 ? ruhe.current + 1 : 0;
       // M415: … oder über 20 Bilder hinweg hat sich keine Blase um mehr als einen Punkt bewegt. Eine Blase, die gegen
       // ihre Nachbarin drückt, pendelt sonst im Takt weniger Bilder auf der Stelle (Energie bleibt hoch, Weg null).
       const fe = fenster.current;
       if (++fe.n % 20 === 0) {
         let netto = 0;
         for (const [kid, k] of koerper.current) { const alt = fe.lage.get(kid); netto = Math.max(netto, alt ? Math.hypot(k.x - alt[0], k.y - alt[1]) : Infinity); fe.lage.set(kid, [k.x, k.y]); }
-        if (fe.n >= 60 && netto < 1 && !zug.current) ruhe.current = 46;
+        if (fe.n >= 60 && netto < 1 && !zug.current && namenRest.current < 0.3) ruhe.current = 46;
       }
+      // M429: Sind die Kräfte ausgeklungen (fünf Sekunden nach dem letzten Anstoß), steht alles — sofern gerade nichts
+      // gezogen wird und kein Name mehr zu seinem Platz gleitet
+      if (performance.now() - alter.current > 5000 && !zug.current && namenRest.current < 0.3) ruhe.current = 46;
       if (ruhe.current > 45) { lauf.current = null; return; }   // alles ruht: Schluss mit Rechnen
       lauf.current = requestAnimationFrame(bild);
     };
@@ -794,9 +853,11 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
       bewegt = true;
       const q = punkt(ev);
       versatz.current.set(gid, { x: c0.x + (q.x - p0.x), y: c0.y + (q.y - p0.y) });
+      gruppeImZug.current = gid;
       wecken();
     };
     const ende = () => {
+      gruppeImZug.current = null;
       window.removeEventListener('pointermove', bewegen); window.removeEventListener('pointerup', ende); window.removeEventListener('pointercancel', ende);
       if (!bewegt) { setGWahl((g) => (g === gid ? null : gid)); setWahl(null); setMenue(false); setFallen(null); }
     };

@@ -8224,3 +8224,23 @@ html[data-rein] .react-flow__node .happ-head { display: none !important; }
 /* „Nur Inhalt" auch als Eintrag im Menü „Darstellung" (Präsentation und Fokus) */
 .presenter-head .presenter-ansicht-menu .rein-wahl, .focus-head .focus-ansicht-menu .rein-wahl { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 8px; }
 .rein-wahl kbd { margin-left: auto; font: 600 11px/1 var(--font-ui); padding: 3px 6px; border-radius: 5px; background: var(--surface-2); color: var(--muted); }
+
+/* ---------- M430: Kanban bei wenig Breite ----------
+   „Unsauber, wenn die Modulbreite nicht ausreicht … Überlappungen im UI." Die Leiste eines Tickets (‹ Frist ✕ ›) war
+   breiter als ein schmales Ticket und ragte über die Nachbarspalte; im Spaltenkopf drückten Zähler und Knöpfe den
+   Namen auf wenige Buchstaben („TO", „DC") oder ganz weg. Jetzt bricht die Leiste innerhalb des Tickets um, und der
+   Name behält seinen Platz: Was im Kopf nicht daneben passt, rückt in eine zweite Zeile. */
+.kanban-item > .kanban-item-actions { max-width: calc(100% - 12px); flex-wrap: wrap; justify-content: flex-end; }
+@media (pointer: coarse) { .kanban-item > .kanban-item-actions { max-width: 100%; } }
+.kanban-col-head { flex-wrap: wrap; justify-content: flex-end; row-gap: 3px; }
+.kanban-col-head > .kanban-col-name { flex: 1 1 5em; min-width: min(100%, 5em); width: auto; }
+/* Ist das Ticket schmal, stehen die Knöpfe als ordentliches Raster (zwei je Zeile, gleich breit) unter dem Text,
+   statt einzeln untereinander oder über den Rand hinaus */
+.kanban-item { container-type: inline-size; }
+@container (max-width: 170px) {
+  .kanban-item-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; }
+  .kanban-item-actions button { min-width: 0; width: 100%; }
+}
+@container (max-width: 170px) {
+  .kanban-item > .kanban-item-actions { left: 6px; right: 6px; max-width: none; justify-self: stretch; }
+}

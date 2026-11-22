@@ -201,7 +201,9 @@ for (let i = 0; i < 6; i++) {
   if (i < 5) { await P.locator('[data-taste="vortrag-weiter"]').click({ force: true }); await P.waitForTimeout(800); }
 }
 pruefe('E1 sechs Folien in der Reihenfolge des Fokus', reihe.join(' ') === 'Start Ziel PDF Zweite Plan Lose', reihe.join(' '));
-await P.keyboard.press('Escape'); await P.waitForTimeout(800);
+await P.keyboard.press('Escape'); await P.waitForTimeout(1200);
+// M431: Das Board steht danach auf der zuletzt gezeigten Karte — für den nächsten Schritt wieder alles ins Bild
+await P.mouse.click(1420, 880); await P.waitForTimeout(200); await P.keyboard.press('f'); await P.waitForTimeout(900);
 // Aus dem Fokus in die Präsentation und zurück: Das Board steht wieder da, wo es vor dem Fokus stand
 const ansicht = () => P.evaluate(() => { const m = /translate\(([-\d.]+)px, ([-\d.]+)px\) scale\(([\d.]+)\)/.exec(document.querySelector('.react-flow__viewport')?.style.transform ?? ''); return m ? m.slice(1).map(Number) : null; });
 const vorher = await ansicht();
@@ -210,9 +212,11 @@ const imFokus = await ansicht();
 await P.locator('.focus-nav button[aria-label="Ab dieser Karte präsentieren"]').click();
 await P.waitForSelector('.presenter', { timeout: 5000 }); await P.waitForTimeout(900);
 pruefe('E2 „Ab dieser Karte präsentieren" beginnt auf dieser Karte (3 / 6)', (await folie()).zaehler === '3 / 6' && (await folie()).dok, await folie());
-await P.keyboard.press('Escape'); await P.waitForTimeout(900);
-const nachher = await ansicht();
-pruefe('E3 nach der Präsentation steht das Board wie vor dem Fokus (vorher: hineingezoomt auf der Karte)', !!vorher && !!nachher && Math.abs(nachher[2] - vorher[2]) < 0.01 && Math.abs(nachher[0] - vorher[0]) < 2 && Math.abs(nachher[1] - vorher[1]) < 2 && Math.abs(imFokus[2] - vorher[2]) > 0.1, { vorher, imFokus, nachher });
+await P.locator('[data-taste="vortrag-weiter"]').click({ force: true }); await P.waitForTimeout(800);
+await P.keyboard.press('Escape'); await P.waitForTimeout(1400);
+// M431 (statt „das Board steht wie vor dem Fokus"): zurück auf dem Board, mittig bei der zuletzt gezeigten Karte
+const nachVortrag = await P.evaluate(() => { const r = document.querySelector('.react-flow__node[data-id="n2"]').getBoundingClientRect(); const p = document.querySelector('.react-flow').getBoundingClientRect(); return { fokus: !!document.querySelector('.focus-head'), dx: Math.round(r.left + r.width / 2 - p.left - p.width / 2), dy: Math.round(r.top + r.height / 2 - p.top - p.height / 2) }; });
+pruefe('E3 nach der Präsentation auf dem Board, bei der zuletzt gezeigten Karte (4 / 6 = „Zweite")', !nachVortrag.fokus && Math.abs(nachVortrag.dx) < 40 && Math.abs(nachVortrag.dy) < 40 && !!vorher && !!imFokus, nachVortrag);
 await ctx.close();
 
 // ---------- F: Telefon ----------

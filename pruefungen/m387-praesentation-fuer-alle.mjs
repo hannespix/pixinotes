@@ -700,7 +700,19 @@ const karteLage = (P, id) => P.evaluate((i) => {
   return { fokus: !!document.querySelector('.app.focus-mode') && !!k?.classList.contains('pn-focused'), auf: !!s, seite: Number(s?.getAttribute('data-seite') ?? 0) };
 }, id);
 const fokusAn = (P) => P.evaluate(() => !!document.querySelector('.app.focus-mode'));
-const frei = async (P) => { await heraus(P); await P.mouse.click(1380, 640); await P.waitForTimeout(300); };
+// Ein Klick ins Leere — wirklich ins Leere: Seit M431 steht das Board nach einer Präsentation auf deren letzter Karte,
+// eine feste Stelle (früher 1380, 640) kann dann mitten auf einer Karte liegen
+const frei = async (P) => {
+  await heraus(P);
+  const pkt = await P.evaluate(() => {
+    for (const [x, y] of [[1380, 640], [1380, 120], [80, 640], [80, 140], [720, 760], [1380, 760]]) {
+      const el = document.elementFromPoint(x, y);
+      if (el?.classList.contains('react-flow__pane')) return [x, y];
+    }
+    return [1380, 640];
+  });
+  await P.mouse.click(pkt[0], pkt[1]); await P.waitForTimeout(300);
+};
 const fokusAuf = async (P, text) => { await frei(P); await waehlen(P, text); await P.keyboard.press('Alt+f'); await P.waitForTimeout(700); };
 const nah = (a, b, tol = 0.06) => Math.abs(a - b) <= tol;
 
