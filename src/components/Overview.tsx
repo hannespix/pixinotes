@@ -1,6 +1,7 @@
 import { tropfenMalen, hexRgb, tonDrehen, type TropfenKreis, type TropfenBruecke } from '../lib/netzTropfen';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
+  applyNodeChanges,
   Background,
   BackgroundVariant,
   ReactFlow,
@@ -141,21 +142,88 @@ function OverviewCanvas() {
     return () => mq.removeEventListener('change', on);
   }, []);
   const maxSpalten = schmal ? 2 : 3;
-  const { nodes, edges, projectRects, breite } = useMemo(
-    () => layoutHierarchy(spaces, boards, schmal),
+  /**
+   * M440: Ziehen mit Gefühl. Während eine Kachel gezogen wird, steht eine VORSCHAU der neuen Ordnung: Das Board
+   * ist (nur für die Anzeige) schon an der Stelle unter der Maus eingereiht — die anderen Kacheln weichen dorthin
+   * aus, das Ziel-Projekt wächst mit. Weil die Kacheln per CSS-Übergang gleiten, sieht man das als weiches
+   * Verdrängen. Die gezogene Kachel haftet an der Maus (gehoben, neigt sich mit dem Tempo); beim Loslassen wird
+   * genau die Vorschau übernommen, und die Kachel gleitet federnd in ihren Platz.
+   */
+  const [vorschau, setVorschau] = useState<{ boardId: string; projectId: string; index: number } | null>(null);
+  const vorschauRef = useRef(vorschau);
+  vorschauRef.current = vorschau;
+  const anzeigeSpaces = useMemo(() => {
+    if (!vorschau) return spaces;
+    const sichtbar = new Set(boards.map((b) => b.id));
+    return spaces.map((sp) => ({
+      ...sp,
+      projects: sp.projects.map((p) => {
+        const ohne = p.boardIds.filter((id) => id !== vorschau.boardId);
+        if (p.id !== vorschau.projectId) return ohne.length === p.boardIds.length ? p : { ...p, boardIds: ohne };
+        const vis = ohne.filter((id) => sichtbar.has(id)); const rest = ohne.filter((id) => !sichtbar.has(id));
+        vis.splice(Math.max(0, Math.min(vis.length, vorschau.index)), 0, vorschau.boardId);
+        return { ...p, boardIds: [...vis, ...rest] };
+      }),
+    }));
+  }, [spaces, boards, vorschau]);
+  const mindestens = useMemo(() => (vorschau ? new Map(spaces.flatMap((sp) => sp.projects.map((p) => [p.id, p.boardIds.length] as const))) : undefined), [vorschau, spaces]);
+  const { nodes: layoutNodes, edges, projectRects, breite } = useMemo(
+    () => layoutHierarchy(anzeigeSpaces, boards, schmal, mindestens),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [spaces, boards, tick, schmal],
+    [anzeigeSpaces, boards, tick, schmal, mindestens],
   );
+  // Gesteuerte Knoten: Die gezogene Kachel behält ihre Lage unter der Maus, alle anderen folgen dem (Vorschau-)Layout
+  const ziehe = useRef<{ id: string; x: number; y: number; t: number; vx: number } | null>(null);
+  const [rfNodes, setRfNodes] = useState<Node[]>(layoutNodes);
+  useEffect(() => {
+    const z = ziehe.current;
+    setRfNodes(layoutNodes.map((n) => {
+      if (z && n.id === z.id) return { ...n, position: { x: z.x, y: z.y }, dragging: true };
+      if (vorschau && n.id === `p-${vorschau.projectId}`) return { ...n, className: 'ovc-ziel' };
+      return n;
+    }));
+  }, [layoutNodes, vorschau]);
+  // Erst nach dem ersten Einpassen gleiten die Kacheln — sonst flögen sie beim Öffnen von links oben herein
+  const [weich, setWeich] = useState(false);
+  useEffect(() => { setWeich(false); const t = window.setTimeout(() => setWeich(true), 450); return () => window.clearTimeout(t); }, [schmal, spaces.length, boards.length]);
+  // Neigung der gezogenen Kachel: folgt dem Tempo wie eine Feder und schwingt aus, wenn die Hand stillsteht
+  const neigung = useRef({ winkel: 0, ziel: 0, raf: 0, el: null as HTMLElement | null });
+  const neigen = () => {
+    const n = neigung.current;
+    n.ziel *= 0.86;
+    n.winkel += (n.ziel - n.winkel) * 0.22;
+    if (n.el) n.el.style.setProperty('--ovc-neigung', `${n.winkel.toFixed(2)}deg`);
+    if (ziehe.current || Math.abs(n.winkel) > 0.05) n.raf = requestAnimationFrame(neigen);
+    else { n.raf = 0; if (n.el) n.el.style.removeProperty('--ovc-neigung'); }
+  };
+  useEffect(() => () => cancelAnimationFrame(neigung.current.raf), []);
+  /** Wohin käme die Kachel, ließe man sie hier los? (Projekt unter ihrer Mitte, Platz im Raster) */
+  const platzFuer = (node: Node): { projectId: string; index: number } | null => {
+    const cx = node.position.x + BW / 2;
+    const cy = node.position.y + BH / 2;
+    const hit = projectRects.find((r) => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h);
+    if (!hit) return null;
+    const projekt = anzeigeSpaces.flatMap((sp) => sp.projects).find((p) => p.id === hit.id);
+    if (!projekt) return null;
+    const boardId = (node.data as { board: BoardDoc }).board.id;
+    const sichtbar = projekt.boardIds.filter((id) => boards.some((b) => b.id === id));
+    const andere = sichtbar.filter((id) => id !== boardId);
+    const cols = Math.max(1, Math.min(maxSpalten, andere.length + 1));
+    const col = Math.max(0, Math.min(cols - 1, Math.round((node.position.x - (hit.x + GAP)) / (BW + GAP))));
+    const row = Math.max(0, Math.round((node.position.y - (hit.y + PROJ_HEAD)) / (BH + GAP)));
+    return { projectId: hit.id, index: Math.min(andere.length, row * cols + col) };
+  };
 
   // Nur bei ECHTER Strukturänderung remounten (fitView); nach einem reinen
   // Drag reicht die neue nodes-Referenz zum Zurückschnappen — Zoom bleibt (N2)
   const structureKey = `${spaces.length}|${spaces.reduce((a, s) => a + s.projects.length, 0)}|${boards.length}|${schmal ? 's' : 'b'}`;
 
   return (
-    <div className="board-wrap ov-canvas">
+    <div className={`board-wrap ov-canvas${weich ? ' ov-weich' : ''}${vorschau ? ' ov-zieht' : ''}`}>
       <ReactFlow
         key={structureKey /* nach Drag/Strukturänderung sauber neu einrasten + fitView */}
-        nodes={nodes}
+        nodes={rfNodes}
+        onNodesChange={(ch) => setRfNodes((nds) => applyNodeChanges(ch, nds))}
         edges={edges}
         nodeTypes={nodeTypes}
         fitView={!schmal}
@@ -180,34 +248,48 @@ function OverviewCanvas() {
         onNodeClick={(_, node) => {
           if (node.type === 'ovBoard') openBoard((node.data as { board: BoardDoc }).board.id);
         }}
+        onNodeDragStart={(e, node) => {
+          if (node.type !== 'ovBoard') return;
+          ziehe.current = { id: node.id, x: node.position.x, y: node.position.y, t: e.timeStamp, vx: 0 };
+          const n = neigung.current;
+          n.el = document.querySelector(`.ov-canvas .react-flow__node[data-id="${node.id}"]`);
+          if (!n.raf) n.raf = requestAnimationFrame(neigen);
+        }}
+        onNodeDrag={(e, node) => {
+          const z = ziehe.current;
+          if (node.type !== 'ovBoard' || !z) return;
+          const dt = Math.max(8, e.timeStamp - z.t);
+          const vx = (node.position.x - z.x) / dt;            // Punkte je Millisekunde
+          z.vx = z.vx * 0.6 + vx * 0.4;
+          z.x = node.position.x; z.y = node.position.y; z.t = e.timeStamp;
+          // Neigung wie ein angehobenes Blatt: in Zugrichtung, gedeckelt
+          neigung.current.ziel = Math.max(-7, Math.min(7, z.vx * 9));
+          const p = platzFuer(node);
+          const boardId = (node.data as { board: BoardDoc }).board.id;
+          const alt = vorschauRef.current;
+          if (!p) { if (alt) setVorschau(null); return; }
+          if (!alt || alt.projectId !== p.projectId || alt.index !== p.index) setVorschau({ boardId, ...p });
+        }}
         onNodeDragStop={(_, node) => {
+          ziehe.current = null;
           if (node.type !== 'ovBoard') return;
           const data = node.data as { board: BoardDoc; projectId: string };
-          const cx = node.position.x + BW / 2;
-          const cy = node.position.y + BH / 2;
-          const hit = projectRects.find(
-            (r) => cx >= r.x && cx <= r.x + r.w && cy >= r.y && cy <= r.y + r.h,
-          );
-          if (hit && hit.id !== data.projectId) {
-            moveBoard(data.board.id, hit.id);
-          } else if (hit) {
-            /* M310: Innerhalb des Projekts abgelegt — die Kachel rückt an den
-               Platz, über dem sie losgelassen wurde. Der Platz ergibt sich aus
-               dem Raster der Kacheln (Spalten × Zeilen); ein automatisch
-               sortiertes Projekt wird dadurch manuell. */
-            const projekt = spaces.flatMap((sp) => sp.projects).find((p) => p.id === hit.id);
-            if (projekt) {
-              const andere = projekt.boardIds.filter((id) => id !== data.board.id && boards.some((b) => b.id === id));
-              const cols = Math.max(1, Math.min(maxSpalten, projekt.boardIds.filter((id) => boards.some((b) => b.id === id)).length));
-              const col = Math.max(0, Math.min(cols - 1, Math.round((node.position.x - (hit.x + GAP)) / (BW + GAP))));
-              const row = Math.max(0, Math.round((node.position.y - (hit.y + PROJ_HEAD)) / (BH + GAP)));
-              const platz = Math.min(andere.length, row * cols + col);
-              const vor = andere[platz];
-              const neu = [...andere];
-              neu.splice(platz, 0, data.board.id);
-              if (neu.some((id, i) => id !== projekt.boardIds[i])) {
-                if (projekt.sortierung && projekt.sortierung !== 'manuell') setProjektSortierung(hit.id, 'manuell');
-                moveBoard(data.board.id, hit.id, vor);
+          const v = vorschauRef.current ?? (() => { const p = platzFuer(node); return p ? { boardId: data.board.id, ...p } : null; })();
+          setVorschau(null);
+          if (v) {
+            // Genau die Vorschau übernehmen: Platz im Ziel-Projekt (vor welchem Board?)
+            const ziel = anzeigeSpaces.flatMap((sp) => sp.projects).find((p) => p.id === v.projectId);
+            const vorher = spaces.flatMap((sp) => sp.projects).find((p) => p.id === v.projectId);
+            if (ziel && vorher) {
+              const sichtbar = ziel.boardIds.filter((id) => boards.some((b) => b.id === id));
+              const liste = sichtbar.includes(data.board.id) ? sichtbar : (() => { const l = sichtbar.filter((id) => id !== data.board.id); l.splice(Math.min(l.length, v.index), 0, data.board.id); return l; })();
+              const vor = liste[liste.indexOf(data.board.id) + 1];
+              const alteListe = vorher.boardIds.filter((id) => boards.some((b) => b.id === id));
+              const geaendert = v.projectId !== data.projectId || liste.some((id, k) => id !== alteListe[k]);
+              if (geaendert) {
+                /* M310: Innerhalb des Projekts umsortiert — ein automatisch sortiertes Projekt wird manuell */
+                if (v.projectId === data.projectId && vorher.sortierung && vorher.sortierung !== 'manuell') setProjektSortierung(v.projectId, 'manuell');
+                moveBoard(data.board.id, v.projectId, vor);
               }
             }
           }
@@ -1753,7 +1835,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
 
 /* ---------- Layout: Hierarchie → Canvas-Positionen ---------- */
 
-function layoutHierarchy(spaces: Space[], boards: BoardDoc[], schmal = false) {
+function layoutHierarchy(spaces: Space[], boards: BoardDoc[], schmal = false, mindestens?: Map<string, number>) {
   const boardById = new Map(boards.map((b) => [b.id, b]));
   const nodes: Node[] = [];
   const edges: Edge[] = [];
@@ -1766,7 +1848,8 @@ function layoutHierarchy(spaces: Space[], boards: BoardDoc[], schmal = false) {
     const accent = SPACE_ACCENTS[si % SPACE_ACCENTS.length];
 
     const sizes = space.projects.map((p) => {
-      const n = p.boardIds.length;
+      // M440: Während eines Zugs schrumpft kein Projekt — sonst rutschte das Ziel unter der Maus weg
+      const n = Math.max(p.boardIds.length, mindestens?.get(p.id) ?? 0);
       const cols = Math.max(1, Math.min(schmal ? 2 : 3, n));
       const rows = Math.max(1, Math.ceil(Math.max(n, 1) / cols));
       return {
