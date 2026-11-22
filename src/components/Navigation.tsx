@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
-import { IArchive, IChevronR, ISearch, ILock, IUsers } from './Icons';
+import { IArchive, IChevronR, IFolder, ISearch, ILock, IUsers } from './Icons';
 import { InlineName } from './InlineName';
 import { BereichMenu, BoardMenu, ProjektMenu } from './EbenenMenu';
 import { kartenName } from '../lib/sprache';
@@ -224,12 +224,21 @@ export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
                       translate="no"
                       title={liste.length > 0 ? `${p.name} öffnen` : 'Projekt ist leer'}
                       onClick={() => { if (liste.length > 0) geheZu(liste[0].id); else toggle(setOffeneProjekte, p.id); }}
-                    >{p.name}</button>
+                    >
+                      {/* M438: Ein Projekt ist ein Ordner — leise markiert, damit es sich von seinen Boards abhebt */}
+                      <IFolder size={13} className="side-proj-ordner" aria-hidden="true" />
+                      <span className="side-proj-text">{p.name}</span>
+                    </button>
                     {!auf && <span className="side-board-count">{liste.length}</span>}
                     <ProjektMenu projectId={p.id} />
                   </div>
-                  {auf && liste.length === 0 && <div className="side-empty">leer</div>}
-                  {auf && liste.map((b) => boardZeile(b, p.id, liste))}
+                  {auf && (
+                    // M438: Die Boards hängen eingerückt an einer feinen Linie unter ihrem Projekt
+                    <div className="side-proj-boards">
+                      {liste.length === 0 && <div className="side-empty">leer</div>}
+                      {liste.map((b) => boardZeile(b, p.id, liste))}
+                    </div>
+                  )}
                 </div>
               );
             })}
