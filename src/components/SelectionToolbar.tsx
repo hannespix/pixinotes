@@ -5,7 +5,7 @@ import { selectActiveBoard, useBoard } from '../store';
 import { nodesToText } from '../lib/serialize';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
 import { textDateienAlsNotizen, textKarte } from '../lib/textNotiz';
-import { aiBriefing, aiEdges, aiPolish, aiProcess, aiTasks } from '../lib/aiActions';
+import { aiBriefing, aiEdges, aiPolish, aiPraesentation, aiProcess, aiTasks } from '../lib/aiActions';
 /** M410: Die Freitext-Anweisung wird erst geladen, wenn sie gebraucht wird (lib/kiAnweisung.ts) */
 const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => import('../lib/kiAnweisung').then((m) => m.aiCommand(...a));
 import { kiBeispiel, kiBlaettern } from '../lib/kiVerlauf';
@@ -546,6 +546,9 @@ export function SelectionToolbar() {
               <button disabled={aiBusy} onClick={() => runAi(aiTasks)}>Aufgaben extrahieren</button>
               <button disabled={aiBusy} onClick={() => runAi(aiProcess)}>Als Workflow-Diagramm</button>
               <button disabled={aiBusy} onClick={() => runAi(aiBriefing)}>Zusammenfassen</button>
+              {/* M427: aus den markierten Karten eine Präsentation (Vibe Studio); steht im Feld etwas, ist es der Wunsch */}
+              <button disabled={aiBusy} data-taste="ki-praesentation-auswahl" title="Folien aus den markierten Karten – was im Feld darüber steht, gilt als Wunsch (Publikum, Länge, Ton)"
+                onClick={() => { const wunsch = cmd; setCmd(''); runAi((n, p, f) => aiPraesentation(n, p, f, wunsch)); }}>Als Präsentation</button>
               {selected.length >= 2 && (
                 <button disabled={aiBusy} onClick={() => runAi((n) => aiEdges(n))}>Verbindungen vorschlagen</button>
               )}
