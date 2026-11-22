@@ -39,6 +39,8 @@ import { FolienLaser } from './Mauszeiger';
 import { ReaktionsKnopf } from './Gruppenraum';
 import { ansichtMelden, folgeIch, folgenSetzen, ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenMitVortrag, vorfuehrenStart, vorfuehrenStopp, vortragAlleinSetzen, vortragMelden, vortragZuEnde, werFuehrtVor } from '../lib/vorfuehren';
 import { ich, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
+import { NotizRuhend } from './nodes/NotizRuhend';
+import type { RuheBlock } from '../lib/notizRuhend';
 
 /** Kartentypen, die auf der Folie LIVE editierbar sind */
 const EDITABLE = new Set(['note', 'shape', 'mermaid', 'kanban', 'gantt', 'calendar', 'bubbles', 'week', 'time', 'minutes', 'sheet']);
@@ -104,12 +106,19 @@ function ShapeSlide({ node }: { node: ShapeNode }) {
         className="shape-body"
         style={{ background: node.data.color, '--shape-fill': node.data.color } as CSSProperties}
       >
-        <textarea
-          className="shape-input slide-shape-input"
-          value={node.data.text}
-          placeholder="Text…"
-          onChange={(e) => updateNodeData(node.id, { text: e.target.value })}
-        />
+        {/* M435: Formatierter Text (wie in Notizen) erscheint auf der Folie formatiert; schlichter Text bleibt direkt editierbar */}
+        {Array.isArray(node.data.blocks) && node.data.blocks.length ? (
+          <div className="note-editor shape-ruhend slide-shape-text" translate="no">
+            <NotizRuhend blocks={node.data.blocks as RuheBlock[]} onHaken={() => undefined} />
+          </div>
+        ) : (
+          <textarea
+            className="shape-input slide-shape-input"
+            value={node.data.text}
+            placeholder="Text…"
+            onChange={(e) => updateNodeData(node.id, { text: e.target.value })}
+          />
+        )}
       </div>
     </div>
   );

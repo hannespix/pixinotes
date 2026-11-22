@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { anhaengeMitnehmen, mutedHistory, useBoard } from '../store';
-import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, makeSheet, makeTime, makeWeek } from '../lib/nodes';
+import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, alsEbenAngelegt, makeSheet, makeTime, makeWeek } from '../lib/nodes';
 import { importFilesToBoard, importHtmlAppFromUrl, praesentationAnlegen } from '../lib/importFiles';
 import { punkteModusSetzen } from '../lib/punkte';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
@@ -262,7 +262,7 @@ export function Dock() {
     focusNode(useBoard.getState().activeId, node.id);
     setAddMenu(false);
   };
-  const addShape = (shape: ShapeKind) => add(() => makeShape(centerPos(150, 70), shape));
+  const addShape = (shape: ShapeKind) => add(() => { const n = makeShape(centerPos(150, 70), shape); alsEbenAngelegt(n.id); return n; });
 
   // Datei einfügen (M159): der Dialog-Weg für ALLE integrierbaren Typen —
   // am Smartphone gibt es kein Drag & Drop, dieser Weg ist dort der einzige
