@@ -755,6 +755,8 @@ pruefe('C3 die geänderte Zelle und die Summe stehen in der Karte', /1\.400/.tes
 const huellen = await S1.P.evaluate(() => ['week', 'time', 'minutes', 'sheet'].map((t) => { const n = document.querySelector(`.react-flow__node-${t}`); const h = n?.querySelector('.card-shell'); return { t, huelle: !!h, klasse: h?.querySelector('.card-body')?.className ?? '', griff: !!n?.querySelector('.card-grip') }; }));
 pruefe('C4 alle vier Karten tragen weiter ihre Kartenhülle (Griff, Klasse)', huellen.every((h) => h.huelle && h.griff && new RegExp(`${h.t === 'minutes' ? 'minutes' : h.t}-card`).test(h.klasse)), JSON.stringify(huellen));
 pruefe('C5 ohne Auswahl zeigt der Wochenplan keine Werkzeuge', (await S1.P.locator('.react-flow__node-week .week-tools').count()) === 0);
+// M431: Nach dem Beenden steht das Board auf der zuletzt gezeigten Karte — wieder alles ins Bild
+await S1.P.keyboard.press('Escape'); await S1.P.keyboard.press('f'); await S1.P.waitForTimeout(700);
 await S1.P.locator('.react-flow__node-week .week-title').click(); await S1.P.waitForTimeout(400);
 pruefe('C6 … mit Auswahl schon (Spalten, Zeilen, Zeitraum)', (await S1.P.locator('.react-flow__node-week .week-tools select').count()) >= 2, String(await S1.P.locator('.react-flow__node-week .week-tools select').count()));
 pruefe('C7 auf der Folie stand der Wochenplan ohne diese Werkzeuge (ruhiges Bild)', true);

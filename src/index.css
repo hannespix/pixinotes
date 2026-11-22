@@ -8237,12 +8237,22 @@ html[data-rein] .react-flow__node .happ-head { display: none !important; }
 /* Ist das Ticket schmal, stehen die Knöpfe als ordentliches Raster (zwei je Zeile, gleich breit) unter dem Text,
    statt einzeln untereinander oder über den Rand hinaus */
 .kanban-item { container-type: inline-size; }
-@container (max-width: 170px) {
-  .kanban-item-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; }
-  .kanban-item-actions button { min-width: 0; width: 100%; }
+/* Finger: Die Leiste steht im Ticket (in den Fluss) — schmal als Raster */
+@media (pointer: coarse) {
+  @container (max-width: 170px) {
+    .kanban-item-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; }
+    .kanban-item-actions button { min-width: 0; width: 100%; }
+    .kanban-item > .kanban-item-actions { justify-self: stretch; }
+  }
 }
-@container (max-width: 170px) {
-  .kanban-item > .kanban-item-actions { left: 6px; right: 6px; max-width: none; justify-self: stretch; }
+/* Maus: Die Leiste ist eine kleine Pille rechts unten, die nur beim Zeigen erscheint — schmal werden ihre Knöpfe
+   kompakter (sie darf nie über den Text wachsen, sonst fängt sie dort die Klicks ab), und unsichtbar nimmt sie keine */
+@media (pointer: fine) {
+  .kanban-item:not(:hover):not(:focus-within) > .kanban-item-actions { pointer-events: none; }
+  @container (max-width: 170px) {
+    .kanban-item > .kanban-item-actions { gap: 0; padding: 1px; flex-wrap: nowrap; }
+    .kanban-item-actions button { padding: 1px 3px; }
+  }
 }
 
 /* ---------- M432: Pfeile mit Tiefe — weicher, perspektivischer Schatten unter jeder Verbindung ----------

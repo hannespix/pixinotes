@@ -353,6 +353,8 @@ await taste('Escape', 800);
 pruefe('F15 Esc beendet die Präsentation', (await Q.locator('.presenter').count()) === 0);
 
 console.log('\n════ G: Fokus am Desktop ════');
+// M431: Nach dem Beenden steht das Board auf der zuletzt gezeigten Karte — wieder alles ins Bild
+await taste('Escape', 200); await taste('f', 800);
 {
   const box = await Q.locator('.react-flow__node[data-id="f1"]').boundingBox();
   await Q.mouse.click(box.x + box.width - 60, box.y + 12); await Q.waitForTimeout(250);

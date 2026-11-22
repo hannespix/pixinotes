@@ -765,6 +765,8 @@ await A.P.keyboard.press('Escape'); await A.P.waitForTimeout(500);
 
 // ══ G ═══════════════════════════════════════════════════════════════
 console.log('\n════ G: Auf dem Board ════');
+// M431: Nach dem Beenden steht das Board auf der zuletzt gezeigten Karte — für die Schritte hier wieder alles ins Bild
+for (const P of [A.P, G.P]) { await heraus(P); await P.keyboard.press('f'); await P.waitForTimeout(700); }
 // M387: Die Vorführung aus F begann in der Präsentation und endete mit ihr — Anna führt jetzt auf dem Board vor
 await gruppeAuf(A.P);
 await A.P.locator('[data-taste="vorfuehren"]').click();
