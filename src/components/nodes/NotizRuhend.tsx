@@ -7,6 +7,8 @@
 // Blöcke über `.bn-block[data-id]` — auch das bleibt gültig.
 import { Fragment, memo, type ReactNode } from 'react';
 import { pfadId, type RuheBlock, type RuheInline } from '../../lib/notizRuhend';
+import { FONT_STACKS, INLINE_SIZE_EM } from '../../lib/typo';
+import type { CardFont } from '../../types';
 
 function auszeichnen(text: string, stile: Record<string, unknown> | undefined, key: number): ReactNode {
   let k: ReactNode = text;
@@ -16,6 +18,9 @@ function auszeichnen(text: string, stile: Record<string, unknown> | undefined, k
   if (s.underline) k = <u>{k}</u>;
   if (s.italic) k = <em>{k}</em>;
   if (s.bold) k = <strong>{k}</strong>;
+  // M436: Schriftart und -größe aus dem Schrift-Menü — wie im Editor als Span mit Inline-Stil
+  if (typeof s.textSize === 'string' && INLINE_SIZE_EM[s.textSize]) k = <span style={{ fontSize: INLINE_SIZE_EM[s.textSize] }}>{k}</span>;
+  if (typeof s.textFont === 'string' && FONT_STACKS[s.textFont as CardFont]) k = <span style={{ fontFamily: FONT_STACKS[s.textFont as CardFont] }}>{k}</span>;
   if (typeof s.textColor === 'string' && s.textColor !== 'default') k = <span data-text-color={s.textColor}>{k}</span>;
   if (typeof s.backgroundColor === 'string' && s.backgroundColor !== 'default') k = <span data-background-color={s.backgroundColor}>{k}</span>;
   return <Fragment key={key}>{k}</Fragment>;
