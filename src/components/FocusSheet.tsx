@@ -305,6 +305,76 @@ export function FocusSheet() {
   }, [focusCard, node, setFocusCard]);
 
   const dok = useOffeneSeite(focusCard);
+
+  /**
+   * M441: Im Vollbild („Nur Inhalt" oder Browser-Vollbild) wischt man am Telefon zur nächsten Karte — Kopf und Fuß, an
+   * denen das Wischen sonst hängt, sind dort ausgeblendet. Nach links: nächste Karte, nach rechts: vorige; in einem
+   * Dokument blättert der Wisch erst die Seiten, am Ende geht es zur Nachbarkarte. Vorrang haben: was seitlich rollen
+   * kann (Tabelle, Kanban), eine Textauswahl, Eingabefelder, Zwei-Finger-Gesten und eine hineingezoomte Karte (dort
+   * schiebt der Finger das Blatt).
+   */
+  const wischRef = useRef({ step, dok, id: focusCard });
+  wischRef.current = { step, dok, id: focusCard };
+  const vollbild = reinAnsicht.rein;
+  useEffect(() => {
+    if (!focusCard) return;
+    let start: { x: number; y: number; t: number; roll: HTMLElement | null; links: number; seite: boolean } | null = null;
+    const rollbarSeitlich = (el: Element | null): HTMLElement | null => {
+      for (let e = el as HTMLElement | null; e && e !== document.body; e = e.parentElement) {
+        if (e.scrollWidth > e.clientWidth + 2) {
+          const ox = getComputedStyle(e).overflowX;
+          if (ox === 'auto' || ox === 'scroll') return e;
+        }
+      }
+      return null;
+    };
+    const anDerReihe = () => vollbild || !!document.fullscreenElement;
+    const beginn = (e: TouchEvent) => {
+      if (!anDerReihe() || e.touches.length !== 1) { start = null; return; }
+      const t = e.touches[0];
+      const ziel = e.target as Element | null;
+      if (ziel?.closest?.('input, textarea, select, .rein-rand, .bn-toolbar, .mantine-Popover-dropdown')) { start = null; return; }
+      const roll = rollbarSeitlich(ziel);
+      // Hineingezoomt (die Karte ist breiter als der Schirm) schiebt der Finger das Blatt — kein Blättern
+      const karte = document.querySelector('.react-flow__node.pn-focused')?.getBoundingClientRect();
+      if (karte && karte.width > window.innerWidth + 4) { start = null; return; }
+      start = { x: t.clientX, y: t.clientY, t: performance.now(), roll, links: roll?.scrollLeft ?? 0, seite: !!ziel?.closest?.('.pdf-seite') };
+    };
+    const zug = (e: TouchEvent) => { if (start && e.touches.length > 1) start = null; };
+    const ende = (e: TouchEvent) => {
+      const s0 = start; start = null;
+      if (!s0 || !anDerReihe()) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - s0.x; const dy = t.clientY - s0.y;
+      if (performance.now() - s0.t > 650 || Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+      if (s0.roll) {
+        if (Math.abs(s0.roll.scrollLeft - s0.links) > 2) return;   // der Finger hat seitlich gerollt
+        // Kann der Inhalt in Wischrichtung noch weiter, gehört der Wisch ihm — erst am Anschlag wird geblättert
+        const max = s0.roll.scrollWidth - s0.roll.clientWidth;
+        if (dx < 0 ? s0.roll.scrollLeft < max - 2 : s0.roll.scrollLeft > 2) return;
+      }
+      const sel = window.getSelection();
+      if (sel && !sel.isCollapsed && sel.toString().trim()) return;
+      const { step: schritt, dok: d, id } = wischRef.current;
+      const vor = dx < 0;
+      const nochSeiten = !!d && (vor ? d.seite < d.seiten : d.seite > 1);
+      if (nochSeiten) {
+        // Auf der Seite selbst blättert schon das Board (Board.tsx, M363) — daneben übernimmt dieser Wisch das Blättern
+        if (!s0.seite && id) dokumentBefehl(id, vor ? 'vor' : 'zurueck');
+        return;
+      }
+      schritt(vor ? 1 : -1);
+    };
+    // In der Capture-Phase: Die Board-Gesten (Rollen, Schwenken im Fokus) halten die Ereignisse sonst an
+    window.addEventListener('touchstart', beginn, { passive: true, capture: true });
+    window.addEventListener('touchmove', zug, { passive: true, capture: true });
+    window.addEventListener('touchend', ende, { capture: true });
+    return () => {
+      window.removeEventListener('touchstart', beginn, true);
+      window.removeEventListener('touchmove', zug, true);
+      window.removeEventListener('touchend', ende, true);
+    };
+  }, [focusCard, vollbild]);
   const tool = useBoard((s) => s.tool);
   const setTool = useBoard((s) => s.setTool);
   // Der Kommentar-Modus lebt in der Karte — hier nur gespiegelt, damit der Knopf zeigt, dass er an ist
