@@ -8292,3 +8292,10 @@ html[data-kontrast='hoch'] .pn-schatten-ebene { display: none; }
    an. In der Notiz ist das Platz zum Weiterschreiben, in der Form schob er den Text aus der Mitte. Er bleibt
    unsichtbar, solange der Cursor nicht in ihm steht. */
 .shape-body .bn-editor > .bn-block-group > .bn-block-outer:last-child:not(:first-child):has(> .bn-block > .bn-block-content[data-content-type="paragraph"]:not([data-is-empty-and-focused]) > .bn-inline-content > .ProseMirror-trailingBreak:only-child) { display: none; }
+/* M436: Solange der Editor in der Form wach ist, liegen seine Leiste und ihre Menüs über Anfassern,
+   Verbindungspunkten und der Form-Leiste — die gehören derselben Karte an und malten sich sonst darüber */
+.shape-inhalt.shape-inhalt-wach { z-index: 40; }
+.react-flow__node-shape:has(.shape-inhalt-wach) { z-index: 1001 !important; }
+/* Der Schatten der Form (filter) macht sie zu einem eigenen Stapel — der Editor käme darin nicht über die
+   Anfasser hinaus. Solange geschrieben wird, ruht der Schatten. */
+.react-flow__node-shape .shape-body:has(.shape-inhalt-wach) { filter: none; }

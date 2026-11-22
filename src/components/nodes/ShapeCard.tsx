@@ -187,7 +187,7 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
         onBlurCapture={(e) => { if (aktiv && !imEditor(e.relatedTarget as Element | null)) ruhen(); }}
         onKeyDownCapture={(e) => { if (aktiv && e.key === 'Escape') { (document.activeElement as HTMLElement | null)?.blur(); setAktiv(false); } }}
       >
-        <div className={`shape-inhalt ${aktiv || !einfach ? 'nodrag nowheel' : ''}`} ref={inhaltRef}>
+        <div className={`shape-inhalt ${aktiv || !einfach ? 'nodrag nowheel shape-inhalt-wach' : ''}`} ref={inhaltRef}>
           {aktiv || !einfach ? (
             <NotizEditor id={id} data={{ ...data, blocks } as unknown as NoteNode['data']} startPunkt={startPunkt} />
           ) : leer ? (

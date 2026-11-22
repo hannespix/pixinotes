@@ -9,6 +9,8 @@
  *   B  Eine Überschrift steht mittig — keine leere Zeile darunter, weder ruhend noch im Editor.
  *   C  Von Hand ziehen: Die Form folgt der Hand, behält danach die gezogene Größe; zu klein für den Text wächst sie
  *      nur in die Höhe (die von Hand gesetzte Breite bleibt, auch bei der Raute).
+ *   E  „Textbearbeitungs-Menü: falsche Z-Reihenfolge!" — Formatleiste und ihre Menüs liegen über Anfassern,
+ *      Verbindungspunkten und der Form-Leiste.
  */
 // Läuft aus dem Repository: `node pruefungen/m436-formen-feinschliff.mjs`
 import { fileURLToPath } from 'node:url';
@@ -114,6 +116,23 @@ await P.keyboard.type(' Sind alle Nachweise und Unterschriften vollständig?'); 
 const voll = await karte('r');
 pruefe('C3 von Hand gesetzte Breite bleibt; der Text holt sich nur Höhe', Math.abs(voll.w - schmal.w) <= 1 && voll.h > schmal.h, { schmal, voll });
 await P.mouse.click(1150, 700); await warte(300);
+
+console.log('E  Menüs obenauf');
+[mx, my] = await mitte('h');
+await P.mouse.click(mx, my); await warte(300);
+await P.mouse.dblclick(mx, my); await warte(600);
+await P.keyboard.press('Control+a'); await warte(600);
+await P.locator('.bn-formatting-toolbar button').first().click(); await warte(500);
+const verdeckt = await P.evaluate(() => {
+  const m = document.querySelector('.mantine-Menu-dropdown'); if (!m) return ['kein Menü'];
+  const r = m.getBoundingClientRect(); const fremd = new Set();
+  for (let y = r.top + 6; y < r.bottom - 6; y += 10) for (let x = r.left + 6; x < r.right - 6; x += 10) {
+    const e = document.elementFromPoint(x, y); if (e && !m.contains(e)) fremd.add(String(e.className).slice(0, 40));
+  }
+  return [...fremd];
+});
+pruefe('E1 das Absatz-Menü der Formatleiste liegt über Anfassern, Verbindungspunkten und Form-Leiste', verdeckt.length === 0, verdeckt);
+await P.keyboard.press('Escape'); await P.mouse.click(1150, 700); await warte(300);
 
 pruefe('keine Seitenfehler', fehler.length === 0, fehler.slice(0, 3).join(' | '));
 {
