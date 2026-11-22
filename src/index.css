@@ -8244,3 +8244,13 @@ html[data-rein] .react-flow__node .happ-head { display: none !important; }
 @container (max-width: 170px) {
   .kanban-item > .kanban-item-actions { left: 6px; right: 6px; max-width: none; justify-self: stretch; }
 }
+
+/* ---------- M432: Pfeile mit Tiefe — weicher, perspektivischer Schatten unter jeder Verbindung ----------
+   „3D-Schatten bei Pfeilen etc. fehlen mir noch." Die Karten bleiben flach (M417); die Verbindungen heben sich ab:
+   Unter jeder Linie liegt ein weicher Schatten, der an den Enden die Karten berührt und zur Mitte hin tiefer liegt
+   (LabeledEdge.tsx), und die Linie gewinnt vom Start zum Ziel an Kraft. Hoher Kontrast: ohne Schatten. */
+:root { --kante-schatten: rgba(15, 22, 38, .075); }
+[data-theme='dark'] { --kante-schatten: rgba(0, 0, 0, .22); }
+.pn-kante-schatten { fill: none; stroke: var(--kante-schatten); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.pn-kante-schatten.weit { opacity: 0.6; }
+html[data-kontrast='hoch'] .pn-kante-schatten { display: none; }
