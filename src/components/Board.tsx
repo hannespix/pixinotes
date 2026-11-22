@@ -783,7 +783,7 @@ export function Board() {
       const w = node.measured?.width ?? 280;
       const h = node.measured?.height ?? 120;
       setCenter(node.position.x + w / 2, node.position.y + h / 2, { zoom: 1, duration: 650 });
-      onNodesChange(
+      if (pendingFocus.markieren !== false) onNodesChange(
         nodes.map((n) => ({ id: n.id, type: 'select' as const, selected: n.id === node.id })),
       );
       clearPendingFocus();

@@ -306,6 +306,14 @@ export function willPraesentation(wunsch: string): boolean {
   return /(^|[^a-zäöüß])(erstell|mach|bau|generier|entwirf|entwerf|schreib|leg\S* .{0,40}an\b|bereite?\S* .{0,40}vor\b|vorbereit|create|make|build|generate|draft|prepare)/.test(s);
 }
 
+/** M428: Der Wunsch will eine vorhandene Präsentation ändern (nicht eine neue anlegen) */
+export function willUeberarbeiten(wunsch: string): boolean {
+  const s = wunsch.toLowerCase();
+  if (!/(präsentation|praesentation|foliensatz|folien|slides?|presentation|vortrag)(?![a-zäöüß])/.test(s)) return false;
+  if (/\b(neue[nrs]?|new)\s+(präsentation|praesentation|foliensatz|folien|slides?|presentation)/.test(s)) return false;
+  return /(^|[^a-zäöüß])(überarbeit|verbesser|kürz|kuerz|änder|aender|ergänz|ergaenz|erweiter|aktualisier|übersetz|uebersetz|straff|vereinfach|füge?\S* .{0,60}hinzu|nimm .{0,60}raus|entfern|lösch|tausch|mach\S* .{0,60}(kürzer|länger|knapper|klarer|einfacher|sachlicher|lockerer|englisch|deutsch)|formulier|revise|improve|shorten|update|translate|rewrite|edit)/.test(s);
+}
+
 /**
  * Freitext-Anweisung ausführen: „Erstelle …", „Verbessere …", „Verbinde …", „Wie viel …?".
  * Die KI liefert einen Operationsplan (JSON), der validiert und über die
@@ -319,6 +327,21 @@ export async function aiCommand(instruction: string, nodes: AppNode[], pos: { x:
   if (!wish) throw new Error('Bitte zuerst eine Anweisung eingeben.');
   /* M427: „Mach eine Präsentation …" / „Erstelle Folien zu …" – ein eigener Weg (Gliederung → Vibe-Studio-Folien),
      nicht der Operationsplan: Folien sind kein Modul, das man Schritt für Schritt füllt. */
+  /* M428: „Mach die Präsentation kürzer", „Ergänze die Folien um …" — eine vorhandene Präsentation überarbeiten:
+     die markierte, sonst die einzige auf dem Board */
+  if (willUeberarbeiten(wish)) {
+    const st0 = useBoard.getState();
+    const istDeck = (n: AppNode) => n.type === 'htmlapp' && (n.data as { vorlage?: string }).vorlage === 'vibestudio';
+    const alle = selectActiveBoard(st0)?.nodes ?? nodes;
+    const kandidaten = nodes.filter(istDeck).length === 1 ? nodes.filter(istDeck) : alle.filter(istDeck);
+    if (kandidaten.length === 1) {
+      const { aiPraesentationUeberarbeiten } = await import('./aiActions');
+      const ergebnis = await aiPraesentationUeberarbeiten(kandidaten[0].id, wish, fortschritt);
+      const b0 = selectActiveBoard(useBoard.getState());
+      if (b0) kiMerken(b0.id, { t: Date.now(), wunsch: wish, ergebnis, karten: [kandidaten[0].id] });
+      return ergebnis;
+    }
+  }
   if (willPraesentation(wish)) {
     const { aiPraesentation } = await import('./aiActions');
     const st0 = useBoard.getState();

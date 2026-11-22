@@ -3,17 +3,17 @@ import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import type { HtmlAppNode } from '../../types';
-import { composeSrcdoc, htmlUebernehmen, loadAppState, loadAppStateAt, loadHtml, saveAppState, saveHtml } from '../../lib/htmlStore';
+import { composeSrcdoc, fassungTauschen, htmlUebernehmen, loadAppState, loadAppStateAt, loadHtml, saveAppState, saveHtml, vorigeFassung } from '../../lib/htmlStore';
 import { kontoDateiNachladen } from '../../lib/kontoSync';
 import { appMelden, EINGABE_EREIGNIS, eingabeAus, eingabeMelden, eingabenErbitten, folgeIch, ichFuehreVor, ROLL_EREIGNIS, rollMelden, rollVergessen, SPIEGEL_EREIGNIS, spiegelBild, spiegelDa, spiegelErbitten, VORFUEHR_EREIGNIS, werFuehrtVor, type Eingabe, type Roll } from '../../lib/vorfuehren';
 import { loadAppStateFromTeam, loadAttachment, saveAppStateToTeam } from '../../lib/attachments';
 import { triggerDownload } from '../../lib/download';
-import { sofortStarten, VIBE_STUDIO } from '../../lib/vibeStudio';
+import { HAPP_NEU, HAPP_STARTEN, mitBruecke, sofortStarten, VIBE_STUDIO } from '../../lib/vibeStudio';
 import { fremdeWebAdresse } from '../../lib/sicher';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { useRandLeiste } from '../../lib/randLeiste';
-import { IAppWindow, ICloud, ICopy, IDownload, IMaximize, IMinimize, IMore, IPlay, IReload, IStopSq } from '../Icons';
+import { IAppWindow, ICloud, ICopy, IDownload, IMaximize, IMinimize, IMore, IPlay, IReload, IStopSq, IUndo, IWand } from '../Icons';
 
 /**
  * Sandbox OHNE allow-same-origin — die Sicherheits-Grundentscheidung:
@@ -179,6 +179,38 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
   const [liveOn, setLiveOn] = useState(false);
   const [liveKey, setLiveKey] = useState(0); // Neustart der Live-Einbettung
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  /* M428: Präsentation (Vibe Studio): mit KI überarbeiten, vorige Fassung zurückholen */
+  const istPraesentation = data.vorlage === VIBE_STUDIO;
+  const [fassungDa, setFassungDa] = useState(false);
+  useEffect(() => { if (menuPos && istPraesentation) void vorigeFassung(id).then((f) => setFassungDa(!!f?.html)); }, [menuPos, istPraesentation, id]);
+  const kiUeberarbeiten = async () => {
+    setMenuPos(null);
+    const st = useBoard.getState();
+    const ki = await import('../../lib/ai');
+    if (!ki.aiReady(st.ai)) { showToast('Zuerst die KI in den Einstellungen konfigurieren (Ollama, Anthropic, OpenAI …).'); st.setSettingsOpen(true); return; }
+    if (st.aiBusy) { showToast('Eine KI-Aktion läuft bereits – kurz warten.'); return; }
+    const wunsch = window.prompt('Was soll die KI an der Präsentation ändern? (z. B. „kürzer, für die Geschäftsführung", „eine Folie zu den Kosten ergänzen", „auf Englisch")', '');
+    if (wunsch === null) return;
+    st.setAiBusy(true);
+    ki.kiAbbruchZuruecksetzen();
+    showToast('KI überarbeitet die Präsentation …', false, 120000, true);
+    try {
+      const { aiPraesentationUeberarbeiten } = await import('../../lib/aiActions');
+      const msg = await aiPraesentationUeberarbeiten(id, wunsch, (m) => showToast(`KI: ${m}`, false, 180000, true));
+      showToast(msg, false, 9000);
+    } catch (e) {
+      showToast(`KI-Aktion fehlgeschlagen: ${(e as Error).message}`, false, 8000);
+    } finally {
+      useBoard.getState().setAiBusy(false);
+    }
+  };
+  const fassungZurueck = async () => {
+    setMenuPos(null);
+    const alt = await fassungTauschen(id);
+    if (!alt) { showToast('Es gibt keine vorige Fassung.'); return; }
+    window.dispatchEvent(new CustomEvent(HAPP_NEU, { detail: id }));
+    showToast('Vorige Fassung wiederhergestellt – derselbe Menüpunkt holt die neuere zurück.');
+  };
   /* M388: Die Adresse einer Live-Seite stammt aus dem Board — und das kann von anderen kommen. Eingebettet und
      geöffnet wird nur eine fremde http(s)-Adresse (lib/sicher.ts): „javascript:…" liefe im Namen von PixiNotes. */
   const liveAdresse = data.live ? fremdeWebAdresse(data.url) : null;
@@ -281,7 +313,8 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     try {
       const [html, st] = await Promise.all([loadHtml(id), freshestState()]);
       if (!html) { setHasSrc(false); return; }
-      setSrcdoc(composeSrcdoc(id, html, st));
+      // M428: Präsentationen aus Vibe Studio bekommen die Lese-Brücke (KI-Überarbeiten liest damit die Folien)
+      setSrcdoc(composeSrcdoc(id, mitBruecke(id, html), st));
     } finally {
       setStarting(false);
     }
@@ -317,6 +350,15 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dortAn, dortAus, laeuft, hasSrc, starting]);
+  // M428: Die KI möchte die Folien lesen (Karte starten) oder hat die Präsentation ersetzt (neu laden)
+  useEffect(() => {
+    const starten = (e: Event) => { if ((e as CustomEvent<string>).detail === id && !laeuft && !starting) void start(); };
+    const neu = (e: Event) => { if ((e as CustomEvent<string>).detail !== id) return; setHasSrc(true); if (laeuft) void restart(); else void start(); };
+    window.addEventListener(HAPP_STARTEN, starten);
+    window.addEventListener(HAPP_NEU, neu);
+    return () => { window.removeEventListener(HAPP_STARTEN, starten); window.removeEventListener(HAPP_NEU, neu); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, laeuft, starting]);
   // M425: frisch angelegte Präsentation (Vibe Studio) läuft gleich — wer sie anlegt, will sie bearbeiten
   useEffect(() => {
     if (hasSrc === true && !laeuft && !starting && sofortStarten(id)) void start();
@@ -526,6 +568,18 @@ export function HtmlAppCard({ id, data, selected }: NodeProps<HtmlAppNode>) {
       {/* Funktions-Menü als Portal (die Karte hat overflow:hidden, M151-Muster) */}
       {menuPos && createPortal(
         <div className="happ-menu nodrag" style={{ left: menuPos.x, top: menuPos.y }}>
+          {istPraesentation && !isLive && (
+            <>
+              <button disabled={hasSrc !== true} onClick={() => void kiUeberarbeiten()} data-taste="happ-ki-ueberarbeiten">
+                <IWand size={14} /> Mit KI überarbeiten …
+              </button>
+              {fassungDa && (
+                <button onClick={() => void fassungZurueck()} data-taste="happ-fassung-zurueck">
+                  <IUndo size={14} /> Vorige Fassung wiederherstellen
+                </button>
+              )}
+            </>
+          )}
           {runningUi && (
             <>
               <button onClick={() => { setMenuPos(null); toggleFull(); }}>

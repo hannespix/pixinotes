@@ -197,10 +197,14 @@ export function LabeledEdge({
         if (cand !== undefined) { off = cand; break; }
       }
     }
+    // M432: Der Schatten berührt an den Enden die Karten und wandert zur Mitte hin nach unten — als höbe sich der
+    // Pfeil in der Mitte vom Board ab (perspektivisch). Nur die inneren Punkte der Kurve rücken dafür hinab.
+    const hub = Math.min(26, 5 + dist * 0.05);
     if (off === 0) {
       // Normalfall: EINE Kurve — maximal harmonisch
       return {
         path: `M ${sx},${sy} L ${ax},${ay} C ${c1bx},${c1by} ${c2bx},${c2by} ${bx},${by} L ${tx},${ty}`,
+        schatten: `M ${sx},${sy} L ${ax},${ay} C ${c1bx},${c1by + hub} ${c2bx},${c2by + hub} ${bx},${by} L ${tx},${ty}`,
         lx: baseMidX,
         ly: baseMidY,
       };
@@ -211,11 +215,17 @@ export function LabeledEdge({
         + ` C ${g.c1x},${g.c1y} ${g.c2x},${g.c2y} ${g.midX},${g.midY}`
         + ` C ${g.c3x},${g.c3y} ${g.c4x},${g.c4y} ${bx},${by}`
         + ` L ${tx},${ty}`,
+      schatten: `M ${sx},${sy} L ${ax},${ay}`
+        + ` C ${g.c1x},${g.c1y + hub * 0.7} ${g.c2x},${g.c2y + hub} ${g.midX},${g.midY + hub}`
+        + ` C ${g.c3x},${g.c3y + hub} ${g.c4x},${g.c4y + hub * 0.7} ${bx},${by}`
+        + ` L ${tx},${ty}`,
       lx: g.midX,
       ly: g.midY,
     };
   })();
 
+  // M432: gerade und Winkel-Verbindungen: der Schatten liegt etwas tiefer, gleichmäßig
+  const schattenPfad = geo ? geo.schatten : null;
   const [edgePath, labelX, labelY] = geo
     ? [geo.path, geo.lx, geo.ly]
     : kind === 'step'
@@ -251,13 +261,30 @@ export function LabeledEdge({
           </marker>
         </defs>
       )}
+      {/* M432: Tiefe — ein weicher Schatten unter der Linie, und die Linie gewinnt zum Ziel hin an Kraft. Ohne
+          SVG-Filter und ohne Maske: Beides je Verbindung machte das Verschieben eines Boards mit vielen Pfeilen zäh
+          (gemessen bis 300 ms je Bild). Der Schatten sind zwei breite, blasse Linien (außen weich, innen dichter),
+          der Verlauf ein Farbverlauf als Strich. */}
+      <path className="pn-kante-schatten weit" d={schattenPfad ?? edgePath} transform={schattenPfad ? undefined : 'translate(0 4)'}
+        style={{ strokeWidth: width + 7 }} aria-hidden="true" />
+      <path className="pn-kante-schatten" d={schattenPfad ?? edgePath} transform={schattenPfad ? undefined : 'translate(0 4)'}
+        style={{ strokeWidth: width + 2.5 }} aria-hidden="true" />
+      {!selected && (
+        <defs>
+          <linearGradient id={`pn-verlauf-${id}`} gradientUnits="userSpaceOnUse" x1={sx} y1={sy} x2={tx} y2={ty}>
+            <stop offset="0" style={{ stopColor: stroke, stopOpacity: 0.5 }} />
+            <stop offset="0.6" style={{ stopColor: stroke, stopOpacity: 1 }} />
+          </linearGradient>
+        </defs>
+      )}
       <BaseEdge
         id={id}
         path={edgePath}
         markerEnd={head ? `url(#${markerId})` : undefined}
         markerStart={headStart ? `url(#${markerId})` : undefined}
         style={{
-          stroke,
+          // gewählt: in voller Kraft; sonst vom Start blasser zum Ziel kräftig (gerade Linien ohne Ausdehnung: einfarbig)
+          stroke: selected || (Math.abs(tx - sx) < 1 && Math.abs(ty - sy) < 1) ? stroke : `url(#pn-verlauf-${id})`,
           strokeWidth: selected ? width + 0.5 : width,
           strokeDasharray: kind === 'dashed' ? '7 5' : undefined,
         }}

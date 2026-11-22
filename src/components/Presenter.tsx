@@ -395,7 +395,7 @@ export function Presenter() {
       // M405: Strg + Pfeil geht immer zur nächsten Karte – auch mitten in einem Dokument
       else if ((e.ctrlKey || e.metaKey) && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) karteRef.current(e.key === 'ArrowRight' ? 1 : -1);
       else
-      if (e.key === 'Escape') { selbstRef.current(); setOpen(false); }
+      if (e.key === 'Escape') { selbstRef.current(); selbstBeendet.current = true; setOpen(false); }
       else if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') schrittRef.current(1);
       else if (e.key === 'ArrowLeft' || e.key === 'PageUp') schrittRef.current(-1);
       else if (e.key === 'Home') { selbstRef.current(); setPos({ idx: 0, seite: 1 }); }          // M345
@@ -461,6 +461,25 @@ export function Presenter() {
   const seiteHier = pos.seite < 0 ? seitenHier : Math.min(Math.max(1, pos.seite), seitenHier);
   // Gemerkt wird die Karte, auf die man selbst gegangen ist — nicht die, die nach einer Änderung der Folienfolge an ihrem Platz steht
   useEffect(() => { offeneKarte.current = open && current ? current.id : null; /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [pos, open]);
+  /* M431: „Wenn man den Präsentationsmodus verlässt, soll zur letzten in der Präsentation aktiven Karte oder Modul
+     gesprungen werden." Die zuletzt gezeigte Karte merken — beim Schließen fährt das Board dorthin (mittig, Zoom 1).
+     Auch wenn der Vortrag im Karten-Fokus begann: zurück aufs Board, bei der Karte — nicht erneut in den Fokus (der
+     schlug beim Vorführen Dokumente auf den anderen Geräten wieder auf). */
+  const zuletztGezeigt = useRef<{ board: string; karte: string } | null>(null);
+  /** Selbst beendet (Esc, ✕) — schließt sich die Präsentation, weil der Vorführende sie beendet, bleibt alles, wie es ist */
+  const selbstBeendet = useRef(false);
+  useEffect(() => { if (open && current) zuletztGezeigt.current = { board: board.id, karte: current.id }; }, [open, current, board.id]);
+  useEffect(() => {
+    if (open) return;
+    const z = zuletztGezeigt.current;
+    const selbstZu = selbstBeendet.current;
+    zuletztGezeigt.current = null; selbstBeendet.current = false;
+    if (!z || !selbstZu) return;
+    const st = useBoard.getState();
+    if (st.activeId !== z.board) return;   // inzwischen auf einem anderen Board: dort nicht hinfahren
+    // nur hinfahren: Markieren wirkte bei Dokumenten wie „aufschlagen" und bei mehreren Geräten bis zu den anderen
+    st.focusNode(z.board, z.karte, { markieren: false });
+  }, [open]);
   useEffect(() => { if (open && current && art && art !== 'bild') seitenMerker.current[current.id] = seiteHier; /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [open, current?.id, art, seiteHier]);
 
   // ───── M371: Vorführen im Team ─────
@@ -664,7 +683,7 @@ export function Presenter() {
           title="Nur Inhalt – Vollbild ohne Bedienung (F)" aria-label="Nur Inhalt (Vollbild ohne Bedienung)">
           <IMaximize size={15} />
         </button>
-        <button className="presenter-zu" data-taste="vortrag-zu" onClick={() => { selbst(); setOpen(false); }} aria-label="Präsentation beenden" title="Präsentation beenden (Esc)">✕</button>
+        <button className="presenter-zu" data-taste="vortrag-zu" onClick={() => { selbst(); selbstBeendet.current = true; setOpen(false); }} aria-label="Präsentation beenden" title="Präsentation beenden (Esc)">✕</button>
       </div>
       {slides.length === 0 ? (
         <div className="presenter-slide"><p>Keine präsentierbaren Karten auf diesem Board.</p></div>
