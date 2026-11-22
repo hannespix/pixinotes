@@ -54,20 +54,21 @@ const auf = async (kontrast = false) => {
 /** Linie und Schatten einer Verbindung: Anfang, Mitte, Ende (Board-Koordinaten) */
 const messen = (P, id) => P.evaluate((i) => {
   const g = document.querySelector(`.react-flow__edge[data-id="${i}"]`);
-  const linie = g?.querySelector('.react-flow__edge-path'); const schatten = g?.querySelector('.pn-kante-schatten');
+  const linie = g?.querySelector('.react-flow__edge-path'); const schatten = document.querySelector(`.pn-schatten-ebene .pn-kante-schatten[data-kante="${i}"]`);
   if (!linie || !schatten) return null;
   const punkte = (p) => { const L = p.getTotalLength(); const a = p.getPointAtLength(0); const m = p.getPointAtLength(L / 2); const e = p.getPointAtLength(L); return { a: [a.x, a.y], m: [m.x, m.y], e: [e.x, e.y] }; };
   const verlauf = /url\(["']?#([^"')]+)/.exec(linie.style.stroke ?? '')?.[1];
   const stops = verlauf ? [...document.getElementById(verlauf)?.querySelectorAll('stop') ?? []].map((s) => Number(getComputedStyle(s).stopOpacity)) : [];
   const farbe = verlauf ? getComputedStyle(document.getElementById(verlauf).querySelector('stop')).stopColor : linie.style.stroke;
-  const zahl = g.querySelectorAll('.pn-kante-schatten').length;
-  return { linie: punkte(linie), schatten: punkte(schatten), sichtbar: getComputedStyle(schatten).display !== 'none', farbe, maske: !!verlauf, stops, zahl, filter: schatten.getAttribute('filter') };
+  const ebene = schatten.closest('svg.pn-schatten-ebene');
+  const zahl = document.querySelectorAll(`.pn-kante-schatten[data-kante="${i}"]`).length;
+  return { linie: punkte(linie), schatten: punkte(schatten), sichtbar: getComputedStyle(ebene).display !== 'none', farbe, maske: !!verlauf, stops, zahl, filter: schatten.getAttribute('filter'), weich: getComputedStyle(ebene).filter, ebenen: document.querySelectorAll('svg.pn-schatten-ebene').length, unten: ebene.parentElement.firstElementChild === ebene || ebene.parentElement.querySelector(':scope > svg') === ebene };
 }, id);
 
 console.log('A  Schatten');
 const { ctx, P } = await auf();
 const e1 = await messen(P, 'e1'); const e2 = await messen(P, 'e2');
-pruefe('A1 jede Verbindung hat einen weichen Schatten (zwei Lagen, ohne teuren Filter)', !!e1 && !!e2 && e1.zahl === 2 && e2.zahl === 2 && !e1.filter, { e1, e2 });
+pruefe('A1 jede Verbindung hat einen weichen Schatten – eine Linie je Pfeil in EINER gemeinsamen Ebene unter allen Pfeilen, ein einziger Weichzeichner darüber (M434)', !!e1 && !!e2 && e1.zahl === 1 && e2.zahl === 1 && !e1.filter && e1.ebenen === 1 && e1.unten && /blur\(/.test(e1.weich), { e1, e2 });
 const nah = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < 1.5;
 pruefe('A2 an den Enden berührt der Schatten die Karten (gleiche Endpunkte wie die Linie)', nah(e1.linie.a, e1.schatten.a) && nah(e1.linie.e, e1.schatten.e) && nah(e2.linie.a, e2.schatten.a) && nah(e2.linie.e, e2.schatten.e), { e1, e2 });
 pruefe('A3 zur Mitte hin liegt er tiefer – der Pfeil hebt sich ab (lange Verbindung stärker)', e1.schatten.m[1] - e1.linie.m[1] > 4 && e2.schatten.m[1] - e2.linie.m[1] > e1.schatten.m[1] - e1.linie.m[1], { e1: e1.schatten.m[1] - e1.linie.m[1], e2: e2.schatten.m[1] - e2.linie.m[1] });
@@ -83,6 +84,16 @@ await P.mouse.click(mitte[0], mitte[1]);
 await P.waitForTimeout(400);
 const gewaehlt = await P.evaluate(() => { const l = document.querySelector('.react-flow__edge[data-id="e2"] .react-flow__edge-path'); return { gewaehlt: document.querySelector('.react-flow__edge[data-id="e2"]').classList.contains('selected'), strich: l.style.stroke }; });
 pruefe('C1 eine gewählte Verbindung steht in voller Kraft (ohne Verlauf)', gewaehlt.gewaehlt && !/url\(/.test(gewaehlt.strich), gewaehlt);
+// M434: ⚙ → Darstellung → „Pfeilschatten" schaltet ihn ab (und gespeichert)
+await P.keyboard.press('Escape');
+await P.locator('[data-taste="einstellungen"]').click(); await P.waitForTimeout(300);
+const schalter = P.locator('[data-taste="pfeil-schatten"]');
+const vorher = await schalter.isChecked();
+await schalter.uncheck(); await P.waitForTimeout(1500);
+const aus = await P.evaluate(() => ({ zahl: document.querySelectorAll('.pn-kante-schatten').length, gespeichert: JSON.parse(localStorage.getItem('pixinotes-board')).state.pfeilSchatten }));
+pruefe('C3 Einstellungen → Darstellung: „Pfeilschatten" aus → keine Schatten, gemerkt', vorher && aus.zahl === 0 && aus.gespeichert === false, { vorher, aus });
+await schalter.check(); await P.waitForTimeout(300);
+pruefe('C4 wieder an → Schatten zurück', (await P.locator('.pn-kante-schatten').count()) === 2);
 await ctx.close();
 {
   const { ctx: c2, P: Q } = await auf(true);

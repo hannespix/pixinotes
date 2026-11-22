@@ -217,6 +217,8 @@ export function Settings() {
   const setPhysicsEnabled = useBoard((s) => s.setPhysicsEnabled);
   const konfetti = useBoard((s) => s.konfetti);
   const setKonfetti = useBoard((s) => s.setKonfetti);
+  const pfeilSchatten = useBoard((s) => s.pfeilSchatten);
+  const setPfeilSchatten = useBoard((s) => s.setPfeilSchatten);
   const fingerGesten = useBoard((s) => s.fingerGesten);
   const setFingerGesten = useBoard((s) => s.setFingerGesten);
   const brainOffSpaces = useBoard((s) => s.brainOffSpaces);
@@ -678,6 +680,11 @@ export function Settings() {
             </div>
           </div>
           <p className="modal-hint">„System" folgt deinem Gerät. Haftnotizen bleiben auch im Dunkeln helles Papier.</p>
+          {/* M434: Der weiche Pfeilschatten lässt sich abschalten */}
+          <label className="modal-row modal-row-check">
+            <span>Pfeilschatten</span>
+            <input type="checkbox" checked={pfeilSchatten} onChange={(e) => setPfeilSchatten(e.target.checked)} data-taste="pfeil-schatten" />
+          </label>
           <div className="modal-row">
             <span>Akzentfarbe</span>
             <div className="accent-swatches">

@@ -8259,8 +8259,12 @@ html[data-rein] .react-flow__node .happ-head { display: none !important; }
    „3D-Schatten bei Pfeilen etc. fehlen mir noch." Die Karten bleiben flach (M417); die Verbindungen heben sich ab:
    Unter jeder Linie liegt ein weicher Schatten, der an den Enden die Karten berührt und zur Mitte hin tiefer liegt
    (LabeledEdge.tsx), und die Linie gewinnt vom Start zum Ziel an Kraft. Hoher Kontrast: ohne Schatten. */
-:root { --kante-schatten: rgba(15, 22, 38, .075); }
-[data-theme='dark'] { --kante-schatten: rgba(0, 0, 0, .22); }
+/* M433: „Pfeil-Schatten bitte weicher" — fünf sehr blasse Lagen (LabeledEdge, SCHATTEN_LAGEN) statt zwei: In der Mitte
+   decken sich alle (zusammen etwa so dicht wie vorher), nach außen läuft der Schatten in feinen Stufen aus */
+:root { --kante-schatten: rgba(15, 22, 38, .16); }
+[data-theme='dark'] { --kante-schatten: rgba(0, 0, 0, .42); }
+/* M434: eine gemeinsame Ebene für alle Pfeilschatten, ein einziger Weichzeichner darüber */
+.react-flow .react-flow__edges svg.pn-schatten-ebene { overflow: visible; position: absolute; left: 0; top: 0; width: 1px; height: 1px; pointer-events: none; filter: blur(5px); }
 .pn-kante-schatten { fill: none; stroke: var(--kante-schatten); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-.pn-kante-schatten.weit { opacity: 0.6; }
-html[data-kontrast='hoch'] .pn-kante-schatten { display: none; }
+.pn-kante-anker { display: none; }
+html[data-kontrast='hoch'] .pn-schatten-ebene { display: none; }

@@ -614,6 +614,9 @@ interface BoardState {
   /** M294: Konfetti beim Erledigen — bewusst eine Option, keine Voreinstellung */
   konfetti: boolean;
   setKonfetti: (on: boolean) => void;
+  /** M434: Weicher Schatten unter Pfeilen — an; ⚙ → Darstellung schaltet ihn ab */
+  pfeilSchatten: boolean;
+  setPfeilSchatten: (on: boolean) => void;
   /** M294: Einmaliger Hinweis nach der Umstellung auf die ruhigen
    *  Voreinstellungen (gesetzt von lib/einstellungen.ts, nicht persistiert) */
   ruheHinweis: boolean;
@@ -1558,6 +1561,8 @@ export const useBoard = create<BoardState>()(
         setPhysicsEnabled: (on) => set({ physicsEnabled: on }),
         konfetti: false,
         setKonfetti: (on) => set({ konfetti: on }),
+        pfeilSchatten: true,
+        setPfeilSchatten: (on) => set({ pfeilSchatten: on }),
         ruheHinweis: false,
         setRuheHinweis: (on) => set({ ruheHinweis: on }),
         stiftZeichnet: true,
@@ -3340,6 +3345,7 @@ export const useBoard = create<BoardState>()(
         ui: s.ui,
         physicsEnabled: s.physicsEnabled,
         konfetti: s.konfetti,
+        pfeilSchatten: s.pfeilSchatten,
         stiftZeichnet: s.stiftZeichnet,
         clickZoom: s.clickZoom,
         cardFocus: s.cardFocus,
