@@ -292,6 +292,54 @@ export async function aiPraesentation(nodes: AppNode[], pos: { x: number; y: num
   return `Präsentation „${g.titel}" mit ${g.folien.length} Folien angelegt – „Bearbeiten" in der Folie öffnet Vibe Studio.${abgeschnitten ? ' Die Antwort der KI war am Ende abgeschnitten; es fehlen eventuell die letzten Folien.' : ''}${auslassungsHinweis()}`;
 }
 
+/**
+ * M428: Eine bestehende Präsentation (Vibe Studio) per KI überarbeiten. Die Folien werden aus der laufenden
+ * Präsentation gelesen — mit allem, was im Editor geändert wurde —, die KI liefert die überarbeitete Gliederung, und
+ * die Karte bekommt die neuen Folien. Gestaltung (Logo, Design, Schriften) bleibt; die vorige Fassung lässt sich über
+ * das Menü der Karte zurückholen. Quellen: die Karten mit einem Pfeil zur Präsentation.
+ */
+export async function aiPraesentationUeberarbeiten(id: string, wunsch: string, fortschritt?: (m: string) => void): Promise<string> {
+  const kp = await import('./kiPraesentation');
+  const vs = await import('./vibeStudio');
+  const hs = await import('./htmlStore');
+  const st0 = useBoard.getState();
+  const board = selectActiveBoard(st0);
+  const karte = board?.nodes.find((n) => n.id === id);
+  if (!karte || karte.type !== 'htmlapp') throw new Error('Diese Karte ist keine Präsentation.');
+  fortschritt?.('Folien lesen …');
+  const stand = await vs.vibeLesen(id);
+  if (!stand.folien.length) throw new Error('In der Präsentation stehen keine Folien.');
+  const bisher = kp.standAlsGliederung(stand.titel, stand.folien);
+  // Quellen: Karten mit einem Pfeil zur oder von der Präsentation
+  const quellIds = new Set((board?.edges ?? []).flatMap((e) => (e.target === id ? [e.source] : e.source === id ? [e.target] : [])));
+  const quellen = (board?.nodes ?? []).filter((n) => quellIds.has(n.id) && !n.archived && n.type !== 'htmlapp');
+  const items = quellen.length ? await gather(quellen) : [];
+  const inhalt = items.map((c) => `[${c.type}] ${c.text}`).join('\n\n');
+  fortschritt?.('Überarbeiten …');
+  const vorlage = await vs.vibeStudioVorlage().catch(() => { throw new Error('Die Vorlage für Präsentationen ist gerade nicht erreichbar – bitte mit Internet erneut versuchen.'); });
+  const heute = new Date().toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' });
+  const { wert, abgeschnitten } = await askJsonVoll<unknown>(kp.ueberarbeitenPrompt(wunsch, bisher, inhalt, heute), [], { maxTokens: 12000 });
+  const g = kp.gliederungPruefen(wert);
+  // Eine abgeschnittene Antwort ersetzt nie eine ganze Präsentation (es fehlten Folien am Ende)
+  if (abgeschnitten) throw new Error('Die Antwort der KI war abgeschnitten – die Präsentation bleibt unverändert. Bitte erneut versuchen oder in Teilen überarbeiten lassen.');
+  // Gestaltung aus dem Editor übernehmen (Logo, Design, Schriften); Texte und Folien kommen neu
+  const altStand = (await hs.loadAppState(id)) ?? {};
+  const schluessel = Object.keys(altStand).find((k) => k.startsWith('vibecoding-editor-')) ?? 'vibecoding-editor-v8:srcdoc';
+  let gestaltung: Record<string, unknown> = {};
+  try { const alt = JSON.parse(altStand[schluessel] ?? '{}') as Record<string, unknown>; gestaltung = { logo: alt.logo ?? null, design: alt.design ?? null, typography: alt.typography ?? null, fontFiles: alt.fontFiles ?? [], assets: alt.logo ? alt.assets ?? [] : [] }; } catch { /* ohne Gestaltung */ }
+  const html = kp.deckBauen(vorlage, g);
+  const neuerStand: Record<string, string> = { ...Object.fromEntries(Object.entries(altStand).filter(([k]) => !k.startsWith('vibecoding-editor-'))),
+    [schluessel]: JSON.stringify({ schema: 1, updatedAt: Date.now(), texts: {}, added: [], slideLogos: {}, studio: null, ...gestaltung }) };
+  await hs.fassungSichern(id);
+  await hs.saveHtml(id, html);
+  await hs.saveAppState(id, neuerStand);
+  const st = useBoard.getState();
+  const name = String(karte.data.name ?? '');
+  mutedHistory(() => st.updateNodeData(id, { size: html.length, ...(name === bisher.titel || name === 'Präsentation' ? { name: g.titel } : {}) }));
+  window.dispatchEvent(new CustomEvent(vs.HAPP_NEU, { detail: id }));
+  return `Präsentation überarbeitet: ${bisher.folien.length + 1} → ${g.folien.length} Folien. Die vorige Fassung holt das Menü der Karte (⋮) zurück.`;
+}
+
 const SECTION_COLORS = ['#eef2ff', '#e6f7ec', '#fff4e0', '#ffe9ef', '#f3eeff', '#eef7ff'];
 
 /** Themen-Cluster: Karten gruppieren, in Spalten anordnen, Sektions-Header setzen */

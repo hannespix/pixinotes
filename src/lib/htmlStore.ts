@@ -56,6 +56,7 @@ export async function deleteHtmlApp(id: string): Promise<void> {
   await idbDel(SRC(id));
   await idbDel(STATE(id));
   await idbDel(STATE_AT(id));
+  await idbDel(`happ-vorher:${id}`);
 }
 
 /**
@@ -69,7 +70,7 @@ export async function cleanupOrphanHtml(validIds: Set<string>): Promise<void> {
     const keys = await idbKeys();
     for (const key of keys) {
       if (typeof key !== 'string') continue;
-      const m = /^happ(?:-state(?:-at)?)?:(.+)$/.exec(key);
+      const m = /^happ(?:-state(?:-at)?|-vorher)?:(.+)$/.exec(key);   // M428: auch die vorige Fassung
       if (m && !validIds.has(m[1])) await idbDel(key);
     }
   } catch {
@@ -307,4 +308,26 @@ export function composeSrcdoc(id: string, html: string, initial: Record<string, 
   const root = /<html[^>]*>/i.exec(html);
   if (root) return html.slice(0, root.index + root[0].length) + shim + html.slice(root.index + root[0].length);
   return shim + html;
+}
+
+/* ───── M428: vorige Fassung einer überarbeiteten Präsentation ─────
+   Die KI ersetzt Quelltext und Speicherstand der Karte; die Fassung davor bleibt hier, eine Stufe tief, und lässt sich
+   über das Menü der Karte zurückholen (das tauscht beide — so geht es auch wieder vor). */
+const VORHER = (id: string) => `happ-vorher:${id}`;
+export interface Fassung { html: string; state: Record<string, string>; at: string }
+export async function fassungSichern(id: string): Promise<boolean> {
+  const [html, state] = await Promise.all([loadHtml(id), loadAppState(id)]);
+  if (!html) return false;
+  await idbSet(VORHER(id), { html, state: state ?? {}, at: new Date().toISOString() } satisfies Fassung);
+  return true;
+}
+export const vorigeFassung = (id: string) => idbGet<Fassung>(VORHER(id));
+/** Vorige und jetzige Fassung tauschen */
+export async function fassungTauschen(id: string): Promise<Fassung | null> {
+  const alt = await vorigeFassung(id);
+  if (!alt?.html) return null;
+  await fassungSichern(id);
+  await saveHtml(id, alt.html);
+  await saveAppState(id, alt.state ?? {});
+  return alt;
 }

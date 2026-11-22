@@ -159,13 +159,8 @@ export function deckBauen(vorlage: string, g: Gliederung): string {
   return html.replace(/<title>[^<]*<\/title>/, () => `<title>${esc(g.titel)}</title>`);
 }
 
-/** Der Auftrag an das Modell */
-export function gliederungPrompt(wunsch: string, inhalt: string, heute: string): string {
-  return `Du erstellst eine Präsentation für das Präsentations-Werkzeug „Vibe Studio".
-Wunsch des Nutzers: ${wunsch.trim() || 'Eine klare Präsentation über den Inhalt der Karten.'}
-Heute ist ${heute}.
-
-Antworte NUR mit JSON in genau dieser Form:
+/** Form und Regeln der Antwort — für Erstellen und Überarbeiten dieselben */
+const FORMAT_REGELN = `Antworte NUR mit JSON in genau dieser Form:
 {"titel":"…","untertitel":"…","autor":"","anlass":"","folien":[
  {"art":"kapitel","titel":"Kurzer Kapiteltitel.","text":"optionaler Satz","notiz":"Sprechernotiz"},
  {"art":"text","marke":"01 / thema","titel":"Aussage als Satz.","text":"2–3 Sätze","notiz":"…"},
@@ -185,7 +180,61 @@ Regeln:
 - "marke": kleine Zeile über dem Titel, klein geschrieben, z. B. "02 / umsatz" (Kapitelnummer / Stichwort); darf fehlen.
 - "notiz": was die vortragende Person dazu sagt (2–4 Sätze, mit den Details aus den Karten).
 - Wechsle die Folienarten ab, wo es passt – nicht nur "text". Keine Emojis, kein Markdown.
-- Sprache: wie der Wunsch bzw. die Karten.
+- Sprache: wie der Wunsch bzw. die Karten.`;
+
+/** Der Auftrag an das Modell */
+export function gliederungPrompt(wunsch: string, inhalt: string, heute: string): string {
+  return `Du erstellst eine Präsentation für das Präsentations-Werkzeug „Vibe Studio".
+Wunsch des Nutzers: ${wunsch.trim() || 'Eine klare Präsentation über den Inhalt der Karten.'}
+Heute ist ${heute}.
+
+${FORMAT_REGELN}
 
 ${inhalt ? `Inhalt der Karten:\n${inhalt}` : 'Es gibt keine Karten – erstelle die Präsentation aus dem Wunsch und allgemeinem Wissen, ohne erfundene Zahlen.'}`;
+}
+
+/**
+ * M428: Der Auftrag zum Überarbeiten — die bestehende Präsentation als Gliederung (aus der laufenden Präsentation
+ * gelesen, mit allen Änderungen im Editor) und der Wunsch. Was der Wunsch nicht betrifft, soll bleiben.
+ */
+export function ueberarbeitenPrompt(wunsch: string, bisher: Gliederung, inhalt: string, heute: string): string {
+  return `Du überarbeitest eine bestehende Präsentation im Präsentations-Werkzeug „Vibe Studio".
+Wunsch des Nutzers: ${wunsch.trim() || 'Klarer und knapper formulieren, Struktur und Aussagen beibehalten.'}
+Heute ist ${heute}.
+
+Die Präsentation jetzt (JSON, Folie für Folie; die Titelfolie steckt in "titel"/"untertitel"):
+${JSON.stringify(bisher)}
+
+Ändere nur, was der Wunsch verlangt. Alles andere bleibt möglichst wörtlich: Reihenfolge, Titel, Texte, Sprechernotizen,
+Folienarten. Verlangt der Wunsch neue Folien, füge sie an passender Stelle ein; soll etwas weg, lass es weg.
+Die Regel „6 bis 12 Folien" gilt hier nicht: Behalte die Zahl der Folien, außer der Wunsch verlangt anderes.
+Antworte mit der VOLLSTÄNDIGEN überarbeiteten Präsentation im selben Format.
+
+${FORMAT_REGELN}
+
+${inhalt ? `Inhalt der Karten, aus denen die Präsentation entstand (für neue Fakten nur diese verwenden):\n${inhalt}` : ''}`;
+}
+
+/** M428: Die gelesenen Folien (Brücke in der laufenden Präsentation) als Gliederung */
+export function standAlsGliederung(titelFenster: string, folien: { klassen: string; marke: string; titel: string; untertitel: string; absaetze: string[]; punkte: { titel: string; text: string }[]; zahl: string; zusatz: string[]; notiz: string }[]): Gliederung {
+  const g: Gliederung = { titel: '', untertitel: '', folien: [] };
+  const k = (f: { klassen: string }, c: string) => (` ${f.klassen} `).includes(` ${c} `);
+  const letzteGross = folien.map((f, i) => (k(f, 'quote-slide') && k(f, 'big') ? i : -1)).filter((i) => i >= 0).pop() ?? -1;
+  folien.forEach((f, i) => {
+    const text = [...f.absaetze, ...f.zusatz].join(' ').trim() || undefined;
+    const notiz = f.notiz || undefined; const marke = f.marke || undefined;
+    if (i === 0 && k(f, 'chapter')) {
+      g.titel = f.titel; g.untertitel = f.untertitel;
+      return;
+    }
+    if (k(f, 'chapter')) { g.folien.push({ art: 'kapitel', titel: f.titel, text: f.untertitel || text, notiz, marke }); return; }
+    if (k(f, 'quote-slide') && k(f, 'big')) { g.folien.push({ art: i === letzteGross && i >= folien.length - 2 ? 'schluss' : 'kapitel', titel: f.titel, text, notiz, marke }); return; }
+    if (k(f, 'quote-slide')) { g.folien.push({ art: 'zitat', titel: f.titel.replace(/^[„"»]|[“"«]$/g, ''), text, notiz, marke }); return; }
+    if (k(f, 'count-slide') && f.zahl) { g.folien.push({ art: 'zahl', zahl: f.zahl, titel: f.titel.replace(f.zahl, '').trim(), text, notiz, marke }); return; }
+    if (k(f, 'flow-slide') && f.punkte.length) { g.folien.push({ art: 'ablauf', titel: f.titel, punkte: f.punkte, notiz, marke }); return; }
+    if (f.punkte.length >= 2) { g.folien.push({ art: 'punkte', titel: f.titel, punkte: f.punkte, text, notiz, marke }); return; }
+    g.folien.push({ art: 'text', titel: f.titel || f.zahl || 'Folie', text, notiz, marke });
+  });
+  if (!g.titel) g.titel = titelFenster.replace(/ · .*$/, '') || 'Präsentation';
+  return g;
 }
