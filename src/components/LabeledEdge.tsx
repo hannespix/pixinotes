@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   BaseEdge,
   EdgeLabelRenderer,
@@ -9,7 +10,27 @@ import {
 } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
 import { getFloatingEdgeParams } from '../lib/floatingEdge';
+
 import type { AppNode } from '../types';
+
+/**
+ * M434: EIN gemeinsamer Weichzeichner für alle Pfeilschatten (User-Idee). Jede Verbindung legt ihren Schatten als
+ * eine schlichte Linie in eine gemeinsame Ebene ganz unten in React Flows Kanten-Schicht; die Ebene trägt einen
+ * einzigen CSS-Weichzeichner. Statt eines Filters je Pfeil (M432: bis 300 ms je Bild) oder fünf Lagen je Pfeil
+ * (M433) rechnet der Browser einmal über alles — und der Schatten läuft wirklich weich aus.
+ */
+function schattenEbene(von: Element | null): SVGSVGElement | null {
+  const schicht = von?.closest('.react-flow__edges');
+  if (!schicht) return null;
+  let e = schicht.querySelector<SVGSVGElement>(':scope > svg.pn-schatten-ebene');
+  if (!e) {
+    e = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    e.setAttribute('class', 'pn-schatten-ebene');
+    e.setAttribute('aria-hidden', 'true');
+    schicht.insertBefore(e, schicht.firstChild);
+  }
+  return e;
+}
 
 /** Karten-Rechteck (leicht aufgebläht) für die Hindernis-Prüfung */
 interface ORect { x1: number; y1: number; x2: number; y2: number }
@@ -71,6 +92,18 @@ export function LabeledEdge({
   const updateEdgeKind = useBoard((s) => s.updateEdgeKind);
   const updateEdgeStyle = useBoard((s) => s.updateEdgeStyle);
   const removeEdge = useBoard((s) => s.removeEdge);
+  const mitSchatten = useBoard((s) => s.pfeilSchatten !== false);
+  const anker = useRef<SVGGElement>(null);
+  const [ebene, setEbene] = useState<SVGSVGElement | null>(null);
+  const [blass, setBlass] = useState(false);
+  useLayoutEffect(() => {
+    if (!mitSchatten) return;
+    const e = schattenEbene(anker.current);
+    if (e !== ebene) setEbene(e);
+    // archivierte Verbindungen stehen blass — ihr Schatten (in der gemeinsamen Ebene) mit
+    const b = !!anker.current?.closest('.react-flow__edge')?.classList.contains('archived-edge');
+    if (b !== blass) setBlass(b);
+  });
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
   const [editing, setEditing] = useState(false);
@@ -263,12 +296,16 @@ export function LabeledEdge({
       )}
       {/* M432: Tiefe — ein weicher Schatten unter der Linie, und die Linie gewinnt zum Ziel hin an Kraft. Ohne
           SVG-Filter und ohne Maske: Beides je Verbindung machte das Verschieben eines Boards mit vielen Pfeilen zäh
-          (gemessen bis 300 ms je Bild). Der Schatten sind zwei breite, blasse Linien (außen weich, innen dichter),
-          der Verlauf ein Farbverlauf als Strich. */}
-      <path className="pn-kante-schatten weit" d={schattenPfad ?? edgePath} transform={schattenPfad ? undefined : 'translate(0 4)'}
-        style={{ strokeWidth: width + 7 }} aria-hidden="true" />
-      <path className="pn-kante-schatten" d={schattenPfad ?? edgePath} transform={schattenPfad ? undefined : 'translate(0 4)'}
-        style={{ strokeWidth: width + 2.5 }} aria-hidden="true" />
+          (gemessen bis 300 ms je Bild). Der Schatten: übereinander gelegte, nach außen breitere, sehr blasse Linien —
+          wo sich viele decken (in der Mitte), ist er dichter, nach außen läuft er in feinen Stufen aus (M433: „weicher").
+          Der Verlauf der Linie ist ein Farbverlauf als Strich. */}
+      {/* Anker: findet die gemeinsame Schatten-Ebene dieser Leinwand */}
+      <g ref={anker} className="pn-kante-anker" aria-hidden="true" />
+      {mitSchatten && ebene && createPortal(
+        <path className="pn-kante-schatten" data-kante={id} d={schattenPfad ?? edgePath} transform={schattenPfad ? undefined : 'translate(0 4)'}
+          style={{ strokeWidth: width + 5, opacity: blass ? 0.35 : undefined }} />,
+        ebene,
+      )}
       {!selected && (
         <defs>
           <linearGradient id={`pn-verlauf-${id}`} gradientUnits="userSpaceOnUse" x1={sx} y1={sy} x2={tx} y2={ty}>
