@@ -1516,6 +1516,23 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
             </g>
           );
         })}
+        {/* M439: die Farbverläufe der Verbindungen — einer je Link, die Bild-Schleife zieht ihre Enden mit */}
+        <defs>
+          {links.map((l, i) => {
+            if (l.kind === 'vorschlag' || (l.kind === 'portal' && !showPortals) || (l.kind === 'wikilink' && !showWikis)) return null;
+            const a = pos.get(l.a), b = pos.get(l.b);
+            if (!a || !b) return null;
+            return (
+              <linearGradient
+                key={i} id={`nk-${i}`} gradientUnits="userSpaceOnUse" x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+                ref={(el) => { if (el) linkVerlaufEls.current.set(i, el); else linkVerlaufEls.current.delete(i); }}
+              >
+                <stop offset="0" style={{ stopColor: rgbText(boardRgb(l.a)) }} />
+                <stop offset="1" style={{ stopColor: rgbText(boardRgb(l.b)) }} />
+              </linearGradient>
+            );
+          })}
+        </defs>
         {links.map((l, i) => {
           if (l.kind === 'portal' && !showPortals) return null;
           if (l.kind === 'wikilink' && !showWikis) return null;
@@ -1545,29 +1562,19 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
               </g>
             );
           }
-          // M439: harte Linie ohne Rand, im Farbverlauf vom Ton des einen Boards zum Ton des anderen
-          const vid = `nk-${i}`;
+          // M439: harte Linie ohne Rand, im Farbverlauf vom Ton des einen Boards zum Ton des anderen (Verlauf oben in
+          // den gemeinsamen <defs> der Verbindungen)
           return (
-            <g key={i}>
-              <defs>
-                <linearGradient
-                  id={vid} gradientUnits="userSpaceOnUse" x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                  ref={(el) => { if (el) linkVerlaufEls.current.set(i, el); else linkVerlaufEls.current.delete(i); }}
-                >
-                  <stop offset="0" style={{ stopColor: rgbText(boardRgb(l.a)) }} />
-                  <stop offset="1" style={{ stopColor: rgbText(boardRgb(l.b)) }} />
-                </linearGradient>
-              </defs>
-              <line
-                ref={(el) => { if (el) linkEls.current.set(i, el); else linkEls.current.delete(i); }}
-                x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                className={l.kind === 'portal' ? 'ov-kante-portal' : 'ov-kante-wiki'}
-                style={{ stroke: `url(#${vid})` }}
-                strokeWidth={l.kind === 'portal' ? ui(2.4) : ui(3)}
-                // M419: Wikilinks als Perlenschnur (runde Punkte) statt Strichel
-                strokeDasharray={l.kind === 'wikilink' ? `0 ${ui(7)}` : undefined}
-              />
-            </g>
+            <line
+              key={i}
+              ref={(el) => { if (el) linkEls.current.set(i, el); else linkEls.current.delete(i); }}
+              x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+              className={l.kind === 'portal' ? 'ov-kante-portal' : 'ov-kante-wiki'}
+              style={{ stroke: `url(#nk-${i})` }}
+              strokeWidth={l.kind === 'portal' ? ui(2.4) : ui(3)}
+              // M419: Wikilinks als Perlenschnur (runde Punkte) statt Strichel
+              strokeDasharray={l.kind === 'wikilink' ? `0 ${ui(7)}` : undefined}
+            />
           );
         })}
         {lod >= 1 && satellites.map((sb) => {
