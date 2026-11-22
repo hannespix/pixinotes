@@ -64,6 +64,12 @@ export function warEbenAngelegt(id: string): boolean {
   return t !== undefined && Date.now() - t < 8000;
 }
 
+/** M435: Auch eine eben aus der Palette gelegte Form bekommt den Cursor — man tippt gleich los */
+export function alsEbenAngelegt(id: string): void {
+  if (ebenAngelegt.size > 50) ebenAngelegt.clear();
+  ebenAngelegt.set(id, Date.now());
+}
+
 export function makeNote(position: Pos, opts?: { color?: StickyColor; blocks?: unknown[] }): AppNode {
   const id = uid();
   if (!opts?.blocks?.length) {

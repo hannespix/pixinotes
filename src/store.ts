@@ -24,6 +24,7 @@ import { findFreeSpot, frameMembers, sizeOf } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
 import { t } from './lib/sprache';
 import { fristAnkerPflegen, type FristAnker } from './lib/fristAnker';
+import { blocksToText } from './lib/serialize';
 import { linksUmbenennen, normalizeName } from './lib/links';
 
 /**
@@ -1377,6 +1378,14 @@ export function ohneStartboard<T extends { boards: BoardDoc[]; spaces: Space[] }
 
 /** M390: Ändern sich die Blöcke einer Notiz, wandern die Fristen-Anker mit (lib/fristAnker.ts). */
 const mitFristAnker = (n: AppNode, data: Record<string, unknown>): Record<string, unknown> => {
+  // M435: Formen (Schritt, Entscheidung, Start/Ende) tragen formatierten Text wie Notizen — `text` bleibt die
+  // Klartext-Fassung für KI, Suche, Export und Vortrag. Neue Blöcke schreiben den Klartext nach; wer nur den
+  // Klartext setzt (KI, Vortrag, Import), dem gehört der Inhalt: die alten Blöcke fallen weg.
+  if (n.type === 'shape') {
+    if ('blocks' in data) return { ...data, text: blocksToText(data.blocks as unknown[] | undefined).trim() };
+    if ('text' in data) return { ...data, blocks: undefined };
+    return data;
+  }
   if (n.type !== 'note' || !('blocks' in data) || 'fristAnker' in data) return data;
   const alt = (n.data as { fristAnker?: FristAnker }).fristAnker;
   const neu = fristAnkerPflegen(data.blocks, alt);

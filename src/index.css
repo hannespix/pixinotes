@@ -8268,3 +8268,21 @@ html[data-rein] .react-flow__node .happ-head { display: none !important; }
 .pn-kante-schatten { fill: none; stroke: var(--kante-schatten); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .pn-kante-anker { display: none; }
 html[data-kontrast='hoch'] .pn-schatten-ebene { display: none; }
+
+/* ===== M435: Formen (Schritt, Entscheidung, Start/Ende) mit Notiz-Text — mittig, transparent, wachsen mit ===== */
+.shape-inhalt { width: 100%; position: relative; z-index: 1; min-width: 0; }
+.shape-body .note-editor { cursor: text; }
+.shape-body .note-editor .bn-editor { padding-inline: 0 !important; font-size: 12.5px; }
+.react-flow__node-shape .shape-body .bn-block-content[data-content-type="paragraph"],
+.react-flow__node-shape .shape-body .bn-block-content[data-content-type="heading"] { justify-content: center; }
+.react-flow__node-shape .shape-body .bn-block-content[data-content-type="paragraph"] > .bn-inline-content,
+.react-flow__node-shape .shape-body .bn-block-content[data-content-type="heading"] > .bn-inline-content { text-align: center; }
+/* Die Titelzeile der Notiz (erster Absatz fett) gilt in Formen nicht — hier steht ein kurzer Schritt, kein Titel */
+.shape-body .note-editor .bn-editor > .bn-block-group:has(> .bn-block-outer:nth-child(2)) > .bn-block-outer:first-child > .bn-block > .bn-block-content[data-content-type="paragraph"] > p { font-weight: inherit; font-size: 1em; letter-spacing: normal; }
+.shape-decision .shape-body { padding: 6px 25%; }
+.shape-terminator .shape-body { padding: 8px 16px; }
+.shape-body .shape-ph { position: relative; z-index: 1; display: block; }
+/* Listen in Formen: Punkt und Text stehen zusammen in der Mitte */
+.react-flow__node-shape .shape-body .bn-block-content:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"], [data-content-type="checkListItem"]) { justify-content: center; }
+.react-flow__node-shape .shape-body .bn-block-content:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"], [data-content-type="checkListItem"]) > .bn-inline-content { flex: 0 1 auto; width: auto; text-align: left; }
+.slide-shape .slide-shape-text .bn-editor { font-size: 22px; }
