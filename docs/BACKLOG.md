@@ -22,3 +22,11 @@ immer Vorrang vor dieser Liste.
 - Eingebaute Übersetzung der Oberfläche statt Browser-Übersetzer (UMBAU Zeile 54)
 - E-Mail-Destillat: Thread → Kernaussage, offene Fragen, Aufgaben (KONZEPT §5)
 - Nächtlicher CI-Lauf aller Prüfreihen (braucht Chromium im Runner)
+- BlockNote 0.31 → aktuelle Fassung – schließt die 22 „moderaten" Meldungen in tiptap/uuid (AUDIT C6), neue Editor-Funktionen – package.json, NoteCard.tsx, NotizRuhend.tsx, notizRuhend.ts
+- Gemeinsames Tippen in einer Notiz (Yjs über Realtime-Broadcast, BlockNote kann Yjs) – heute sperrt das Team ganze Karten (UMBAU §5a „Später möglich") – NoteCard.tsx, lib/gastSync.ts, lib/kontoSupabase.ts
+- Server-Migrationen `inhalt_pruefen` und `team_haertung` einspielen (braucht Freigabe des Besitzers) – serverseitige Prüfung der Gast-Schreibvorgänge, Stempel-Grenze, Sperr-Reihenfolge (AUDIT S9/A12/A13) – supabase/migrations/
+- Fortsetzbare Uploads über 50 MB (TUS) und OneDrive-Upload-Sitzungen über 4 MB – große Anhänge im Konto-Sync (UMBAU §5a) – lib/kontoSync.ts, lib/kontoSupabase.ts
+- `index.css` in Teil-Dateien je Modul aufteilen (Import-Reihenfolge erhalten) – weniger Merge-Konflikte paralleler Agenten am größten Hotspot (~8 400 Zeilen) – src/index.css, main.tsx
+- `store.ts` in Scheiben schneiden (Boards, Verlauf, Sync, Team) ohne API-Bruch – Hotspot entschärfen, schnellere Orientierung (3 500 Zeilen) – src/store.ts
+- Texte in SVG (Gantt-Balken, Netz-Beschriftungen) übersetzbar bzw. englisch – Lücke der Browser-Übersetzung und der englischen Oberfläche (UMBAU M368 „Grenzen") – GanttCard.tsx, Overview.tsx, lib/sprache.ts
+- Text in Bildern finden (OCR lokal, z. B. Tesseract-WASM, nachgeladen) – Screenshots durchsuchbar und für KI lesbar (KONZEPT §9, nicht umgesetzt) – ImageCard.tsx, Suche, lib/kiModule.ts

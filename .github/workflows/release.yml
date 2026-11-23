@@ -1,4 +1,4 @@
-# Nach jedem Merge: portable Single-File neu bauen und committen.
+# Nach jedem Merge: portable Single-File (und den MCP-Server) neu bauen und committen.
 # Vorher änderte jeder PR die 3-MB-Datei release/pixinotes.html – parallele
 # PRs kollidierten dort immer. Jetzt macht das nur noch dieser Lauf.
 # Ein Push mit GITHUB_TOKEN löst keine weiteren Workflows aus (keine Schleife).
@@ -35,6 +35,9 @@ jobs:
           VITE_MS_TENANT: ${{ vars.VITE_MS_TENANT }}
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://dckzqvbrffmemdzamtqr.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRja3pxdmJyZmZtZW1kemFtdHFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5ODc2NDIsImV4cCI6MjEwOTU2MzY0Mn0.KWHKi9w2CSrszq3xtQlMOCnyFlwO26QTXwnLWwUKBHs' }}
+      # M443: der MCP-Server (release/pixinotes-mcp.mjs) teilt die Modul-Logik mit der App — mit nachbauen
+      - name: MCP-Server bauen
+        run: npm run build:mcp
       - name: Committen, falls geändert
         run: |
           git config user.name "github-actions[bot]"
