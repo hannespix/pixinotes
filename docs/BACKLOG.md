@@ -8,7 +8,6 @@ immer Vorrang vor dieser Liste.
 | Nr. | Thema |
 |---|---|
 | M477 | Gemeinsam in einer Notiz tippen (Yjs) |
-| M480 | `store.ts` in Scheiben (nach M477) |
 
 ## Offene Punkte aus gemergten Meilensteinen
 - M449: Versionen nur je Gerät (reisen nicht mit Sync/Export)
