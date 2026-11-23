@@ -243,3 +243,6 @@ export function boardVonAussen(roh: unknown, id: string): BoardDoc | null {
     ...(b.comments !== undefined ? { comments: liste<NonNullable<BoardDoc['comments']>[number]>(b.comments, (c) => Array.isArray(c.msgs)) } : {}),
   };
 }
+
+// M477: Nachrichten des gemeinsamen Tippens (Live-Kanal) prüft lib/sicherNotizY.ts — eigene Datei, damit die Prüfung
+// mit dem Abgleich nachlädt statt im Start-Paket zu stehen (dort ist sie nur Teil dieser Schicht).

@@ -3531,4 +3531,6 @@
 "Bewegung beim Ziehen aus":"Motion while dragging off",
 "Bewegung beim Ziehen an":"Motion while dragging on",
 "Bewegung beim Ziehen (heben, ausweichen, federn) ein- und ausschalten":"Turn motion while dragging (lift, make room, spring) on and off",
-"Karten pro Modultyp überlappend stapeln – Überschriften bleiben sichtbar":"Stack cards per module type, overlapping – titles stay visible"}
+"Karten pro Modultyp überlappend stapeln – Überschriften bleiben sichtbar":"Stack cards per module type, overlapping – titles stay visible",
+"Rechtschreibung prüfen":"Check spelling",
+"Der Browser unterstreicht Tippfehler beim Bearbeiten von Notizen, Tickets, Zellen und Namen; Rechtsklick zeigt Vorschläge. Formeln, Code, Such- und Adressfelder bleiben ohne.":"Your browser underlines typos while you edit notes, tickets, cells and names; right-click shows suggestions. Formulas, code, search and address fields stay unchecked."}

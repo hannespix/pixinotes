@@ -1018,6 +1018,7 @@ export function MermaidCard({ id, data, selected, width: nodeW, height: nodeH }:
             className="mermaid-code nodrag nowheel"
             value={data.code}
             spellCheck={false}
+            data-rechtschreibung="aus"
             onChange={(e) => updateNodeData(id, { code: e.target.value })}
           />
         )}

@@ -215,6 +215,7 @@ function Gitter({ zellenRoh, stilRoh, spalten, zeilen, schreibe }: GitterProps) 
                         <input
                           ref={eingabe}
                           className="rt-eingabe"
+                          data-rechtschreibung="formel"
                           value={entwurf}
                           onChange={(e) => setEntwurf(e.target.value)}
                           onBlur={() => uebernimm()}

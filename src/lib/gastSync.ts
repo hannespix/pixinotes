@@ -28,6 +28,8 @@ export {
   nameGeaendert, SPERREN_EREIGNIS, sperrenVon, TEILNEHMER_EREIGNIS, teilnehmerVon,
 };
 import { liveKanal, type Teilnehmer } from './liveKanal';
+// M477: Gemeinsam tippen in Notizen — horcht auf den Kanal (Weckruf, Stand-Fragen); lädt mit dem Abgleich, nie im Start
+import './notizGemeinsam';
 import { istPatch, patchAnwenden, patchAus, patchSaeubern, type Patch } from './gastPatch';
 import { boardVonAussen, karteEntschaerfen, karteGueltig } from './sicher';
 import { anhangKarte, idbDel, idbGet, idbSet, liveHaken } from './syncFolder';
