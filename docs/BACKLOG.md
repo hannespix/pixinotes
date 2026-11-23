@@ -20,9 +20,9 @@ immer Vorrang vor dieser Liste.
 - M449: Versionen nur je Gerät (reisen nicht mit Sync/Export)
 - M463: „lange in Arbeit“ misst die Kanban-Karte, nicht das einzelne Ticket (Tickets tragen keine eigene Zeit)
 - M458: Erweiterung nicht im Chrome-/Edge-/Firefox-Store (nur „Entpackt laden“); kein Weg in die portable pixinotes.html; keine feste Schnellablage-Zone (KONZEPT „Inbox-Ecke“)
+- M466: Outlook nur lesen und auf Abruf (kein Abo/Delta-Abgleich, keine Ordner außer Posteingang, kein Antworten über Graph); Konto-Termine stehen wie bisher nur in der Kalender-Karte, nicht in der Aufgaben-Zentrale; braucht `VITE_MS_CLIENT_ID` im Build
 
 ## Ideen (noch nicht vergeben)
-- Microsoft-Graph-Anbindung (Outlook-Mails/Termine live) — Roadmap Phase 4
 - Eingebaute Übersetzung der Oberfläche statt Browser-Übersetzer (UMBAU Zeile 54)
 - Nächtlicher CI-Lauf aller Prüfreihen (braucht Chromium im Runner)
 - BlockNote 0.31 → aktuelle Fassung – schließt die 22 „moderaten" Meldungen in tiptap/uuid (AUDIT C6), neue Editor-Funktionen – package.json, NoteCard.tsx, NotizRuhend.tsx, notizRuhend.ts

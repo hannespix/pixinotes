@@ -44,5 +44,6 @@
  "{0}/storage/v1/object/{1}{2}/{3}/{4}",
  "{0}/storage/v1{1}{2}",
  "{0}{1}.json",
- "“WebAppPassword”: the origin above is entered there."
+ "“WebAppPassword”: the origin above is entered there.",
+ "Calendars.Read"
 ]
