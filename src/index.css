@@ -472,6 +472,17 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   position: absolute; top: 100%; left: 0; margin-top: 7px; min-width: min(160px, calc(60vw / var(--pn-anz, 1))); max-width: max(100%, 220px);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* M465: Mit Angaben aus dem Text im Bild stehen Name und Chips gemeinsam unter dem Bild — ebenfalls außerhalb der Karte */
+.card-shell > .bild-unten {
+  position: absolute; top: 100%; left: 0; margin-top: 7px; display: flex; flex-direction: column; gap: 5px;
+  width: max(100%, min(340px, calc(70vw / var(--pn-anz, 1)))); z-index: 2;
+}
+.bild-unten > .img-name.unterschrift { margin-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bildtext-chips { margin-top: 0; padding: 0; }
+.bildtext-frist { display: inline-flex; gap: 3px; }
+.due-chip.bildtext-aufgabe { display: inline-flex; align-items: center; gap: 4px; background: transparent; border-color: var(--border); color: var(--muted); }
+.due-chip.bildtext-aufgabe:hover { color: var(--ink); border-color: var(--accent); }
+.bildtext-chips .due-chip:not(.bildtext-aufgabe) { display: inline-flex; align-items: center; gap: 4px; }
 /* Nicht markiert: kein Griff, keine Anschlusspunkte, keine Lupe — auch nicht beim Zeigen */
 .react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .pn-handle,
 .react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .card-grip { opacity: 0; pointer-events: none; }
@@ -8235,7 +8246,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools
+    .kontakt-tools,
+    .bildtext-chips
 ) { transition: opacity 0.14s ease; }
 @media (hover: hover) {
   .react-flow__node:not(.selected):not(:focus-within):not(:hover) :is(
@@ -8247,7 +8259,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools
+    .kontakt-tools,
+    .bildtext-chips
   ) { opacity: 0; }
   /* Zeiger ruht auf der Karte: erst nach einem Moment einblenden. Als Animation (hält während des Verzugs bei 0),
      damit ein Klick — die Karte ist dann markiert, die Regel greift nicht mehr — sofort alles zeigt. */
@@ -8260,7 +8273,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools
+    .kontakt-tools,
+    .bildtext-chips
   ) { animation: pn-bedienung-ein 0.16s ease 0.35s backwards; }
 }
 /* Finger: kein Zeiger, der ruhen könnte — erst antippen (markieren), dann bedienen. Unsichtbares fängt keinen Tipp. */
@@ -8274,7 +8288,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools
+    .kontakt-tools,
+    .bildtext-chips
   ) { opacity: 0; pointer-events: none; }
 }
 

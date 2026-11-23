@@ -136,6 +136,8 @@ function schreiben(boardId: string, n: AppNode, fp: string, text: string): void 
   runDerived(() => mutedHistory(() => useBoard.getState().updateNodeDataOnBoard(boardId, n.id, {
     ocrText: text, ocrAm: Date.now(), ocrFuer: fp,
   })));
+  // M465: Das Gehirn bettet den neuen Text bald ein (brain.ts hört darauf)
+  try { window.dispatchEvent(new CustomEvent('pixinotes:bildtext-fertig', { detail: { boardId, nodeId: n.id } })); } catch { /* ohne Fenster */ }
 }
 
 /** Ein Bild erkennen und den Text an der Karte ablegen. Liefert den Text (oder null bei Fehler). */

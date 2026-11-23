@@ -3318,4 +3318,10 @@
 "Screenshots und Bilder werden durchsuchbar: PixiNotes liest den Text darin (Deutsch und Englisch), wenn der Rechner ruhig ist – ganz auf diesem Gerät. Die Suche (Strg+K) findet ihn, die KI liest ihn mit, und über ⋯ lässt er sich kopieren.":"Screenshots and pictures become searchable: PixiNotes reads the text in them (German and English) while the computer is idle – entirely on this device. Search (Ctrl+K) finds it, the AI reads it too, and ⋯ lets you copy it.",
 "datei-{0}-{1}":"datei-{0}-{1}",
 "Kein Canvas":"No canvas",
-"Kein PNG":"No PNG"}
+"Kein PNG":"No PNG",
+"„{0}\" im Bild erkannt – Klick erstellt Kalendereintrag (.ics)":"“{0}” recognised in the image – click creates a calendar entry (.ics)",
+"Diese Frist als Aufgabe anlegen – erscheint dann in der Aufgaben-Zentrale":"Create this deadline as a task – it then appears in the task center",
+"als Aufgabe":"as task",
+"Das Bild gibt es nicht mehr – keine Aufgabe angelegt.":"The image no longer exists – no task created.",
+"Diese Frist ist schon als Aufgabe in „{0}\" angelegt.":"This deadline is already a task in “{0}”.",
+"Aufgabe „{0}\" mit Frist in „{1}\" angelegt – zu sehen in der Aufgaben-Zentrale":"Task “{0}” with deadline created in “{1}” – visible in the task center"}
