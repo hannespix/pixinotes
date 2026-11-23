@@ -74,3 +74,4 @@ Gemessen mit `dist/`, Board mit einer Notiz „Hallo Welt", Chromium kalt (wie M
 - `calAccounts` (~15 KB) bleibt im Start: `main.tsx` fängt damit die Rückkehr aus der Kalender-Anmeldung ab.
 - Die Notiz-Chips erscheinen bei Texten mit Termin/Rufnummer einen Augenblick nach dem Board (lokal wenige ms,
   über das Netz ein Abruf von ~55 bzw. ~140 KB).
+- Nebenbei: m444 erwartete noch „1 Aufgabe(n) überfällig" — seit M461 heißt es „1 Aufgabe überfällig" (Reihe angepasst).
