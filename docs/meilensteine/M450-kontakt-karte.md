@@ -37,6 +37,8 @@ die KI lesbar, und über vCard austauschbar mit Outlook, Apple, Google und Andro
 - CSS: eigener Abschnitt „M450: Kontakt-Karte“ nach der Portal-Karte in `index.css`.
 
 ## Grenzen / offen
-- Keine KI-Operation zum Anlegen/Ändern von Kontakten (nur Lesen) und kein MCP-Werkzeug dafür.
-- Kein Export mehrerer Karten in eine .vcf und kein Abgleich mit Outlook/Graph-Kontakten (KONZEPT Stufe 3).
+- ~~Keine KI-Operation zum Anlegen/Ändern von Kontakten (nur Lesen) und kein MCP-Werkzeug dafür.~~ Erledigt → M454
+  (`kontakt`/`edit_kontakt` in App-KI und MCP).
+- ~~Kein Export mehrerer Karten in eine .vcf~~ Erledigt → M454 (Auswahl-Menü und Board-Menü). Offen bleibt der
+  Abgleich mit Outlook/Graph-Kontakten (KONZEPT Stufe 3).
 - „Kontakt-Karte aus E-Mail-Signatur / erkanntem Namen“ (KONZEPT §3.7, §3.8 Hover-Aktion) noch nicht.

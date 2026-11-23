@@ -3137,4 +3137,8 @@
 "Vor KI-Umbau":"Before AI rework",
 "Vor Wiederherstellen":"Before restoring",
 "Dieses Board ist nur zum Lesen freigegeben – als Kopie öffnen geht.":"This board is shared read-only – opening it as a copy works.",
-"{0} (Stand)":"{0} (version)"}
+"{0} (Stand)":"{0} (version)",
+"Kontakt als vCard":"Contact as vCard",
+"{0} Kontakte als vCard":"{0} contacts as vCard",
+"Kontakte als vCard ({0})":"Contacts as vCard ({0})",
+"Die gewählten Kontakte in einer vCard-Datei (.vcf) – für Outlook, Telefon, Adressbuch":"The selected contacts in one vCard file (.vcf) – for Outlook, phone, address book"}

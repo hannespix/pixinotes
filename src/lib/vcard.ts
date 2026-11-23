@@ -9,7 +9,7 @@
 // Foto nur, wenn es ein eingebettetes Bild ist (lib/sicher.ts kontaktBild). Fremde Bildadressen (PHOTO;VALUE=uri:
 // https://…) fallen weg: Sie würden beim Anzeigen einen fremden Server anfragen.
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
-import type { KontaktData } from '../types';
+import type { KontaktData, KontaktTelefon } from '../types';
 import { kontaktBild } from './sicher';
 
 /** Höchstens so viele Kontakte aus einer Datei — ein ganzes Adressbuch soll das Board nicht fluten */
@@ -267,13 +267,35 @@ export function vcardSchreiben(k: KontaktData): string {
   return `${z.map(falte).join('\r\n')}\r\n`;
 }
 
+/** Daten in fester Gestalt — eine Karte aus einem fremden Board kann Felder anderer Art tragen.
+ *  M454: aus KontaktCard.tsx hierher, damit auch KI-Operationen und der Sammel-Export sie nutzen (ohne JSX). */
+export function kontaktDaten(d: Partial<KontaktData> | undefined): KontaktData {
+  const text = (v: unknown) => (typeof v === 'string' ? v : '');
+  const telefone = (Array.isArray(d?.telefone) ? d!.telefone : [])
+    .filter((t): t is KontaktTelefon => !!t && typeof t === 'object' && typeof (t as KontaktTelefon).nummer === 'string')
+    .map((t) => ({ nummer: t.nummer, ...(typeof t.art === 'string' && t.art ? { art: t.art } : {}) }));
+  const emails = (Array.isArray(d?.emails) ? d!.emails : []).filter((m): m is string => typeof m === 'string');
+  return {
+    ...d,
+    name: text(d?.name), funktion: text(d?.funktion), firma: text(d?.firma), adresse: text(d?.adresse),
+    web: text(d?.web), notiz: text(d?.notiz), telefone, emails, foto: kontaktBild(d?.foto) ?? undefined,
+  };
+}
+
+/** M454: Mehrere Kontakte in EINER Datei — vCards hintereinander, so wie Outlook, Apple und Google ein Adressbuch
+ *  exportieren und wieder einlesen */
+export function vcardSammeln(liste: KontaktData[]): string {
+  return liste.map((k) => vcardSchreiben(kontaktDaten(k))).join('');
+}
+
 /**
  * Dateiname für den Export: der Name in ASCII (ä → ae, ß → ss, Akzente weg), ohne Zeichen, die Dateisysteme nicht
  * mögen. Umlaute im Dateinamen gehen nicht überall durch — Chromium ohne UTF-8-Umgebung machte daraus „download“,
  * ältere Mail-Programme verstümmeln sie im Anhang. Der Inhalt der Datei bleibt UTF-8.
  */
-export function vcardDateiname(k: KontaktData): string {
-  const ascii = (k.name || k.firma || 'Kontakt')
+export function vcardDateiname(k: KontaktData | string): string {
+  // M454: auch ein freier Name (Sammel-Export: „Board – 3 Kontakte“)
+  const ascii = (typeof k === 'string' ? k : (k.name || k.firma || 'Kontakt'))
     .replace(/Ä/g, 'Ae').replace(/Ö/g, 'Oe').replace(/Ü/g, 'Ue').replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
     .normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7e]/g, '');
   const basis = ascii.replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
