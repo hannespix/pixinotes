@@ -10,81 +10,17 @@
 //   Azure-App-Registrierung als "SPA") — PixiNotes liefert bewusst keine
 //   eingebaute ID aus, damit die Behörde die Kontrolle behält.
 
-const LS_KEY = 'pixinotes-cal-accounts';
-
-export interface CalAccountEvent {
-  date: string;        // yyyy-mm-dd (Starttag)
-  title: string;
-  time?: string;       // hh:mm, wenn kein Ganztagstermin
-  provider: 'google' | 'ms';
-  /**
-   * M471: Kennung beim Anbieter, Ende, Ort und Web-Link. Fehlen bei Einträgen aus der Zeit vor M471 (Zwischenspeicher
-   * Fassung 1) — alles Lesende muss ohne sie auskommen.
-   */
-  id?: string;
-  /** hh:mm Ende (Ortszeit), nur bei Zeitterminen */
-  end?: string;
-  /** yyyy-mm-dd letzter Tag (inklusiv), nur wenn er nach dem Starttag liegt */
-  endDate?: string;
-  /** ganztägig (ohne Uhrzeit) */
-  allDay?: boolean;
-  place?: string;
-  /** Adresse des Termins bei Google/Outlook — erst beim Anzeigen über lib/sicher.ts (fremdeWebAdresse) geprüft */
-  link?: string;
-}
-
-export interface GoogleAccount {
-  clientId: string;
-  token?: string;
-  tokenExp?: number;      // epoch ms
-  connectedAs?: string;   // Kalender-Name des Primärkalenders (Anzeige)
-  calendars?: Array<{ id: string; name: string; enabled: boolean }>;
-}
-
-export interface MsAccount {
-  clientId: string;
-  tenant?: string;        // Azure-Tenant, default 'common' bzw. 'organizations'
-  token?: string;
-  tokenExp?: number;
-  refreshToken?: string;
-  connectedAs?: string;
-  /** M184: Tatsächlich erteilte Berechtigungen. Fehlt der Eintrag, stammt die
-   *  Verbindung aus der Zeit vor dem OneNote-Import und kann nur Kalender. */
-  scopes?: string;
-}
-
-export interface CalAccounts {
-  google?: GoogleAccount;
-  ms?: MsAccount;
-}
-
-export function loadCalAccounts(): CalAccounts {
-  try {
-    return JSON.parse(localStorage.getItem(LS_KEY) ?? '{}') as CalAccounts;
-  } catch {
-    return {};
-  }
-}
-
-export function saveCalAccounts(acc: CalAccounts) {
-  localStorage.setItem(LS_KEY, JSON.stringify(acc));
-  // Kalender-Karten lauschen darauf (gleiche Seite → kein natives storage-Event)
-  window.dispatchEvent(new CustomEvent('pixinotes-cal-accounts'));
-}
-
-export function patchCalAccounts(patch: Partial<CalAccounts>) {
-  saveCalAccounts({ ...loadCalAccounts(), ...patch });
-}
-
-/** OAuth braucht eine echte Web-Origin — unter file:// gibt es keine. */
-export const oauthAvailable = () => /^https?:$/.test(window.location.protocol);
-
-const googleConnected = (a?: GoogleAccount) => !!a?.token;
-const msConnected = (a?: MsAccount) => !!(a?.token || a?.refreshToken);
-export const anyAccountConnected = () => {
-  const acc = loadCalAccounts();
-  return googleConnected(acc.google) || msConnected(acc.ms);
-};
+import {
+  gemerkteTermine, googleConnected, loadCalAccounts, msConnected, oauthAvailable, patchCalAccounts, saveCalAccounts,
+  TERMINE_EREIGNIS, TERMINE_FASSUNG, TERMINE_KEY,
+  type CalAccountEvent, type GemerkteTermine, type GoogleAccount, type MsAccount,
+} from './calKonten';
+// M483: der leichte Teil liegt in lib/calKonten.ts (im Start) — hier weitergereicht, damit alle Aufrufer bleiben dürfen
+export {
+  anyAccountConnected, gemerkteTermine, handleOAuthRedirect, loadCalAccounts, oauthAvailable, patchCalAccounts, saveCalAccounts,
+  TERMINE_EREIGNIS, TERMINE_FASSUNG,
+  type CalAccountEvent, type CalAccounts, type GemerkteTermine, type GoogleAccount, type MsAccount,
+} from './calKonten';
 
 // ---------------------------------------------------------------- Google ----
 // Google Identity Services (GIS) — das offizielle Browser-SDK wird erst beim
@@ -268,21 +204,6 @@ async function pkcePair(): Promise<{ verifier: string; challenge: string }> {
 
 const redirectUri = () => window.location.origin + window.location.pathname;
 
-/**
- * MUSS früh beim App-Start laufen: Sind wir das OAuth-Popup (?code=&state=),
- * Code ans Hauptfenster melden und Fenster schließen. Gibt true zurück, wenn
- * diese Seite nur als Redirect-Ziel diente (App dann nicht weiter rendern).
- */
-export function handleOAuthRedirect(): boolean {
-  const params = new URLSearchParams(window.location.search);
-  const code = params.get('code');
-  const state = params.get('state');
-  if (!code || !state || !state.startsWith('pixinotes-ms-') || !window.opener) return false;
-  (window.opener as Window).postMessage({ type: 'pixinotes-oauth', code, state }, window.location.origin);
-  document.body.textContent = 'Anmeldung erfolgreich – dieses Fenster kann geschlossen werden.';
-  setTimeout(() => window.close(), 400);
-  return true;
-}
 
 /**
  * Interaktiv mit Microsoft 365 verbinden (Popup, PKCE ohne Client-Secret).
@@ -628,31 +549,8 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false, op
 // (m446). Deshalb merkt sich jeder erfolgreiche Abruf (Kalender-Karte,
 // Zentrale) die Termine der nächsten Wochen in einem eigenen Schlüssel —
 // wie die Tokens nie im Board, Sync, Link oder Export.
-const TERMINE_KEY = 'pixinotes-cal-termine';
-export const TERMINE_EREIGNIS = 'pixinotes-cal-termine';
 const TERMINE_VOR = 1;    // Tage zurück, die aufgehoben werden
 const TERMINE_NACH = 62;  // Tage voraus — genug für Heute/Morgen, ohne den Speicher zu füllen
-/** M471: aktuelle Fassung des Zwischenspeichers (siehe GemerkteTermine.v) */
-export const TERMINE_FASSUNG = 2;
-
-export interface GemerkteTermine {
-  /** M471: Fassung des Zwischenspeichers — 1 (M469: nur Tag, Uhrzeit, Titel, Konto) oder 2 (mit Kennung, Ende, Ort, Link) */
-  v: number;
-  /** Zeitpunkt des letzten erfolgreichen Abrufs, der heute abdeckte (epoch ms) */
-  stand: number;
-  /** abgedeckte Tage (yyyy-mm-dd) → Termine dieses Tages */
-  tage: Record<string, CalAccountEvent[]>;
-}
-
-export function gemerkteTermine(): GemerkteTermine {
-  try {
-    const roh = JSON.parse(localStorage.getItem(TERMINE_KEY) ?? 'null') as GemerkteTermine | null;
-    if (roh && typeof roh === 'object' && roh.tage && typeof roh.tage === 'object') {
-      return { v: Number(roh.v) || 1, stand: Number(roh.stand) || 0, tage: roh.tage };
-    }
-  } catch { /* defekt → leer */ }
-  return { v: TERMINE_FASSUNG, stand: 0, tage: {} };
-}
 
 function termineSchreiben(g: GemerkteTermine) {
   try {

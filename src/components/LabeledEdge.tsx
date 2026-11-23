@@ -9,7 +9,8 @@ import {
   type EdgeProps,
 } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
-import { getFloatingEdgeParams } from '../lib/floatingEdge';
+import { getFloatingEdgeParams, mitAnzeige } from '../lib/floatingEdge';
+import { useAnzeige } from '../lib/zugAnzeige';
 
 import type { AppNode } from '../types';
 
@@ -106,6 +107,8 @@ export function LabeledEdge({
   });
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
+  // M485: während eines Zugs der sichtbaren (gehobenen, geneigten, ausweichenden) Karte folgen
+  const sAnz = useAnzeige(source); const tAnz = useAnzeige(target);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
@@ -125,7 +128,7 @@ export function LabeledEdge({
   let sx = sourceX, sy = sourceY, tx = targetX, ty = targetY;
   let sPos = sourcePosition, tPos = targetPosition;
   if (sourceNode && targetNode && sourceNode.measured.width && targetNode.measured.width) {
-    const p = getFloatingEdgeParams(sourceNode, targetNode);
+    const p = getFloatingEdgeParams(mitAnzeige(sourceNode, sAnz), mitAnzeige(targetNode, tAnz));
     if (Number.isFinite(p.sx) && Number.isFinite(p.tx)) {
       ({ sx, sy, tx, ty } = p);
       sPos = p.sourcePos;

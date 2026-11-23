@@ -61,5 +61,5 @@ Kannst du diese super Animation auch auf alle Module etc im Board anwenden?!" Vo
 ## Grenzen / offen
 - Kein Wurf mehr: Er vertrug sich nicht mit „federt an den Platz, endet exakt dort" und mit den Fanglinien.
 - Ausweichen ist einstufig (keine Kettenreaktion): Ein Nachbar kann auf einen dritten gleiten — bewusst, weil sonst
-  jedes Bild viele Karten neu rechnen und schreiben müsste.
-- Kanten zeigen während des Zugs auf die ungehobene Lage (bei 1–6 % Heben kaum sichtbar).
+  jedes Bild viele Karten neu rechnen und schreiben müsste. → M485: Kette bis drei Stufen, nur als Anzeige.
+- Kanten zeigen während des Zugs auf die ungehobene Lage (bei 1–6 % Heben kaum sichtbar). → M485: sie folgen der sichtbaren Lage.

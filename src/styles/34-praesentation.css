@@ -117,9 +117,11 @@
      der Karte) rücken den Ursprung an die richtige Stelle.
    · M344-Lehre: Eine gehobene, geneigte Karte zeigt ihre Kanten nicht dort, wo sie landen. Greift eine
      Fanglinie (`data-gerastet`), liegt die Karte deshalb flach und gerade — Linie und Kante stimmen überein.
-   · Beim Loslassen (`data-gehoben="landet"`) senkt sie sich federnd, die Neigung schwingt aus. */
+   · Beim Loslassen (`data-gehoben="landet"`) senkt sie sich federnd, die Neigung schwingt aus.
+   · M485: Kettenreaktion — wer von einer ausweichenden Nachbarin angestoßen wird (`--zieh-stufe` 1, 2), setzt
+     sich je Stufe 45 ms später in Bewegung; die Welle läuft so sichtbar von der Karte weg. */
 .board-wrap[data-zieh] .react-flow__node {
-  transition: box-shadow 0.18s ease, translate var(--zieh-feder-dauer) var(--zieh-feder), scale var(--zieh-landen-dauer) var(--zieh-landen);
+  transition: box-shadow 0.18s ease, translate var(--zieh-feder-dauer) var(--zieh-feder) calc(var(--zieh-stufe, 0) * 45ms), scale var(--zieh-landen-dauer) var(--zieh-landen);
 }
 .board-wrap[data-zieh] .react-flow__node[data-gehoben] {
   rotate: var(--zieh-neigung, 0deg);

@@ -22,7 +22,7 @@ import type { AppNode } from '../types';
 import { findFreeSpot } from './arrange';
 import { frisch } from './kartenZeit';
 import { alsDateien, type Geteiltes } from './geteilt';
-import { importFilesToBoard } from './importFiles';
+import { importFilesToBoard } from './importSpaet';
 import { makeNote } from './nodes';
 import { webAdresseVonAussen } from './sicher';
 import { zahlWort } from './sprache';
