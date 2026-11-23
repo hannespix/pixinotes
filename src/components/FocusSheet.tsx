@@ -40,7 +40,7 @@ const TYPE_LABEL: Record<string, string> = {
   week: 'Planer', minutes: 'Protokoll', time: 'Zeiterfassung', mermaid: 'Diagramm',
   image: 'Bild', file: 'Datei', email: 'E-Mail', htmlapp: 'App', shape: 'Form',
   portal: 'Portal', frame: 'Rahmen', sheet: 'Rechen-Tabelle', bubbles: 'Bubbles',
-  kontakt: 'Kontakt',
+  kontakt: 'Kontakt', pixi: 'Pixi',
   fluessig: 'Flüssige Schrift',
 };
 

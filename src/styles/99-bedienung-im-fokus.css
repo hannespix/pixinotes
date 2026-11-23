@@ -17,7 +17,7 @@
     .minutes-setup-btn, .minutes-new, .pr-werkzeuge, .pr-person-neu:placeholder-shown, .pr-person-weg, .pr-runde:not(:has(.pr-person)), .minutes-decision-add:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)), .pr-aeltere, .pr-vorschlag, .pr-top-stand, .pr-beschluss-top.leer,
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools,
+    .kontakt-tools, .pixi-tools,
     .fl-werkzeuge,
     .bildtext-chips
 ) { transition: opacity 0.14s ease; }
@@ -31,7 +31,7 @@
     .minutes-setup-btn, .minutes-new, .pr-werkzeuge, .pr-person-neu:placeholder-shown, .pr-person-weg, .pr-runde:not(:has(.pr-person)), .minutes-decision-add:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)), .pr-aeltere, .pr-vorschlag, .pr-top-stand, .pr-beschluss-top.leer,
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools,
+    .kontakt-tools, .pixi-tools,
     .fl-werkzeuge,
     .bildtext-chips
   ) { opacity: 0; }
@@ -46,7 +46,7 @@
     .minutes-setup-btn, .minutes-new, .pr-werkzeuge, .pr-person-neu:placeholder-shown, .pr-person-weg, .pr-runde:not(:has(.pr-person)), .minutes-decision-add:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)), .pr-aeltere, .pr-vorschlag, .pr-top-stand, .pr-beschluss-top.leer,
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools,
+    .kontakt-tools, .pixi-tools,
     .fl-werkzeuge,
     .bildtext-chips
   ) { animation: pn-bedienung-ein 0.16s ease 0.35s backwards; }
@@ -62,7 +62,7 @@
     .minutes-setup-btn, .minutes-new, .pr-werkzeuge, .pr-person-neu:placeholder-shown, .pr-person-weg, .pr-runde:not(:has(.pr-person)), .minutes-decision-add:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)), .pr-aeltere, .pr-vorschlag, .pr-top-stand, .pr-beschluss-top.leer,
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools,
+    .kontakt-tools, .pixi-tools,
     .fl-werkzeuge,
     .bildtext-chips
   ) { opacity: 0; pointer-events: none; }

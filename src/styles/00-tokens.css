@@ -137,6 +137,19 @@
    * hellem und dunklem Grund. 24 px (über 32 px ignoriert Chrome/Edge unter Windows den Zeiger
    * am Fensterrand), Hotspot in der Mitte, immer mit System-Fallback dahinter.
    */
+  /* M501: Pixi, das Maskottchen — Farben aus pix-el (Display-Grün, dunkle Kontur, gelbe Antennenspitze).
+     Arme und Effekte (Zzz, Noten) liegen NEBEN dem Körper auf dem Board-Grund: im Dunkeln hell. */
+  --pixi-koerper: #e3efa8;
+  --pixi-tinte: #0f380f;
+  --pixi-tinte-auf-hell: #0f380f;
+  --pixi-tinte-auf-dunkel: #f3f6e4;
+  --pixi-wangen: #7a9a1c;
+  --pixi-spitze: #e8b800;
+  --pixi-funke: #b88a00;
+  --pixi-herz: #d93a62;
+  --pixi-arm: #0f380f;
+  --pixi-effekt: #306230;
+  --pixi-schatten: rgba(15, 56, 15, 0.16);
   --zeiger-fadenkreuz: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 2v7M12 15v7M2 12h7M15 12h7' stroke='%23fff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M12 2v7M12 15v7M2 12h7M15 12h7' stroke='%23111' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='12' r='1.7' fill='%23111' stroke='%23fff' stroke-width='1.2'/%3E%3C/svg%3E") 12 12, crosshair;
 }
 
@@ -178,6 +191,19 @@
   /* M389: Akzent ALS SCHRIFT auf dunklem Grund braucht eine hellere Stufe (der Akzent selbst: 4,4:1 auf
      Flächen, 3,7:1 auf getönten Flächen — zu wenig für 12-px-Schrift). */
   --accent-strong: #8eabff;
+  /* M501: Pixi bleibt hell mit dunkler Kontur; was neben ihm auf dem dunklen Grund steht, wird hell */
+  --pixi-koerper: #d4ef78;
+  /* Kontur heller als im Hellen: ≥ 3:1 zum dunklen Grund (3,5:1) UND zum hellen Körper (4,1:1) — sonst verschwänden
+     Umriss, Füße und Antenne im Dunkeln */
+  --pixi-tinte: #3d7a2e;
+  --pixi-tinte-auf-hell: #3d7a2e;
+  --pixi-wangen: #6d8f17;
+  --pixi-spitze: #ffd84a;
+  --pixi-funke: #ffd84a;
+  --pixi-herz: #ff7a95;
+  --pixi-arm: #d4ef78;
+  --pixi-effekt: #d4ef78;
+  --pixi-schatten: rgba(0, 0, 0, 0.45);
 }
 [data-theme='dark'][data-accent='gruen'] { --accent-strong: #5fcf93; }
 [data-theme='dark'][data-accent='violett'] { --accent-strong: #ab98ff; }

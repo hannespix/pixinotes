@@ -154,6 +154,10 @@ export const ITabelle = make(<><rect x="3" y="4" width="18" height="16" rx="2" /
 export const IFolien = make(<><rect x="3" y="4" width="18" height="12" rx="1.5" /><path d="M12 16v4" /><path d="M8 20h8" /></>);
 export const IOrt = make(<><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></>);
 export const IUhr = make(<><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>);
+/** M501: Pixi, das Maskottchen — Körper mit Antenne, zwei Augen, Füßchen (Umriss wie die übrigen Symbole) */
+export const IPixi = make(<><path d="M12 5V2.5h1.5" /><rect x="4" y="5" width="16" height="13" rx="3.5" /><path d="M9 10v1.6" /><path d="M15 10v1.6" /><path d="M10 14.5h4" /><path d="M8 18v3" /><path d="M16 18v3" /></>);
+/** M501: Mond (Pixi darf einschlafen) */
+export const IMond = make(<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" />);
 export const IPerson = make(<><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>);
 /** M450: Telefonhörer (Kontakt-Karte) */
 export const ITelefon = make(<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z" />);
