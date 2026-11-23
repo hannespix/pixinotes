@@ -49,6 +49,13 @@ function setzen(el: HTMLElement, x: number, y: number, b: number, h: number): vo
 }
 /** M415: So weit legt sich der Tropfen einer Gruppe um ihre Ideen (wie der Ring: Radius bis zur äußersten + 12) */
 const TROPFEN_RAND = 12;
+/** M496: Takt der Physik (ms je Schritt, wie bisher ein Bild bei 60 Hz) und wie viel Zeit ein Bild höchstens nachholt */
+const SCHRITT_MS = 1000 / 60;
+const SCHRITT_MAX_MS = 100;
+/** M496: Gleiten der Gruppennamen — Zeitkonstante (ms; bei 60 Hz ein gutes Fünftel des Wegs je Bild) und Höchsttempo
+ *  (Punkte je ms; 0,3 = 5 Punkte je Bild bei 60 Hz, 300 je Sekunde) */
+const NAME_TAU = 67;
+const NAME_TEMPO = 0.3;
 /** M422: Platz über einem Tropfen für die Kuppe mit dem Gruppennamen (Zeilenhöhe + Polster) */
 const TROPFEN_KUPPE = 26;
 /** M415: Pastell aus einer Kartenfarbe — auf hellem und dunklem Grund (die Bühne gibt --bub-grund vor) */
@@ -410,7 +417,8 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   const namenRest = useRef(0);
   const namenSeite = useRef(new Map<string, 'o' | 'u' | 'k'>());
   const gruppeImZug = useRef<string | null>(null);
-  const zeichnen = useCallback((sofort = false): number => {
+  /** zeichnet; `dt` = Zeit seit dem letzten gezeichneten Bild in ms (M496: das Gleiten der Namen rechnet nach der Uhr) */
+  const zeichnen = useCallback((sofort = false, dt = SCHRITT_MS): number => {
     let weit = 0;
     for (const [bid, k] of koerper.current) {
       const el = knoten.current.get(bid);
@@ -506,10 +514,21 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           zy = seite === 'o' ? Math.max(oben, ok) : seite === 'u' ? unten : ok;
         }
         const zx = Math.min(Math.max(mitteX - halb, rk), Math.max(rk, w - nm.offsetWidth - rk));
-        // M429: gleiten statt springen — je Bild ein gutes Fünftel des Wegs (nach ~⅓ s da); beim Ziehen der Gruppe direkt
+        // M429: gleiten statt springen (nach ~⅓ s da); beim Ziehen der Gruppe direkt
+        /* M496: nach der Uhr statt je Bild — vorher ein gutes Fünftel des Wegs JE BILD, ohne Obergrenze. Beim
+           Einschwingen fliegen die Ideen vom Rand herein, das Ziel des Namens lief bis 1 500 Punkte je Sekunde
+           voraus, und der Name folgte mit 25 Punkten je Bild (gemessen, schon ohne Last). Jetzt exponentiell mit
+           Zeitkonstante NAME_TAU (bei 60 Hz wie bisher ein gutes Fünftel je Bild) und höchstens NAME_TEMPO Punkte je
+           Millisekunde: Der Name gleitet hinterher, statt zu fliegen — auf jedem Gerät gleich schnell. */
         const alt = namenLage.current.get(gid);
-        const f = sofort || !alt || gruppeImZug.current === gid ? 1 : 0.22;
-        let x = alt ? alt.x + (zx - alt.x) * f : zx; let y = alt ? alt.y + (zy - alt.y) * f : zy;
+        let x = zx; let y = zy;
+        if (!sofort && alt && gruppeImZug.current !== gid) {
+          const f = 1 - Math.exp(-dt / NAME_TAU);
+          let sx = (zx - alt.x) * f; let sy = (zy - alt.y) * f;
+          const weg = Math.hypot(sx, sy); const max = NAME_TEMPO * dt;
+          if (weg > max) { sx *= max / weg; sy *= max / weg; }
+          x = alt.x + sx; y = alt.y + sy;
+        }
         if (Math.abs(zx - x) < 0.15) x = zx;
         if (Math.abs(zy - y) < 0.15) y = zy;
         namenLage.current.set(gid, { x, y });
@@ -655,25 +674,40 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
     fenster.current = { n: 0, lage: new Map() };
     if (ruhig) { for (let i = 0; i < 400; i++) if (schritt() < 0.002 && i > 30) break; zeichnen(true); return; }
     if (lauf.current != null) return;
-    const bild = () => {
-      const vor = [...koerper.current.values()].map((k) => [k.x, k.y, k.r]);
-      const e = schritt();
-      // M415: Ruhe auch dann, wenn sich je Bild kaum noch etwas bewegt — vorher krochen die Blasen um Hundertstel
-      // Punkte weiter (zwei Kräfte im Gleichgewicht), und die Rechnung lief endlos; im Tropfen-Look zeichnete der
-      // Filter so jedes Bild neu
-      let schub = 0; let i = 0;
-      for (const k of koerper.current.values()) { const v = vor[i++]; if (v) schub = Math.max(schub, Math.abs(k.x - v[0]), Math.abs(k.y - v[1]), Math.abs(k.r - v[2])); }
-      zeichnen();
-      // M429: … und kein Name gleitet noch zu seinem Platz
-      ruhe.current = (e < 0.004 || schub < 0.1) && !zug.current && namenRest.current < 0.3 ? ruhe.current + 1 : 0;
-      // M415: … oder über 20 Bilder hinweg hat sich keine Blase um mehr als einen Punkt bewegt. Eine Blase, die gegen
-      // ihre Nachbarin drückt, pendelt sonst im Takt weniger Bilder auf der Stelle (Energie bleibt hoch, Weg null).
+    /* M496: Die Physik rechnet in festen Schritten von SCHRITT_MS (je Schritt dieselben Kräfte, Dämpfung und
+       Höchsttempo wie zuvor je Bild bei 60 Hz). Vorher genau ein Schritt je Bild: Auf einem langsamen Gerät mit
+       30 Bildern je Sekunde liefen die Blasen halb so schnell, während das Abklingen nach der Uhr lief — sie kamen
+       an anderer Stelle zur Ruhe als auf einem schnellen. Jetzt so viele Schritte, wie Zeit vergangen ist; mehr als
+       SCHRITT_MAX_MS am Stück holt sie nicht nach (dann lieber Zeitlupe als ein Satz über die halbe Bühne).
+       Gerundet, nicht abgeschnitten: Bei 60 Hz schwankt der Abstand der Bilder um 16,7 ms — mit `while (vorrat ≥
+       Schritt)` fielen dann mal zwei Schritte, mal keiner in ein Bild (gemessen: doppelter Satz einer Blase). Der
+       Rest bleibt so zwischen −½ und +½ Schritt, und bei 60 Hz rechnet jedes Bild genau einen. */
+    let letzt: number | null = null; let vorrat = 0;
+    const bild = (jetzt: number) => {
+      const dt = letzt == null ? SCHRITT_MS : Math.min(SCHRITT_MAX_MS, Math.max(0, jetzt - letzt));
+      letzt = jetzt; vorrat += dt;
       const fe = fenster.current;
-      if (++fe.n % 20 === 0) {
-        let netto = 0;
-        for (const [kid, k] of koerper.current) { const alt = fe.lage.get(kid); netto = Math.max(netto, alt ? Math.hypot(k.x - alt[0], k.y - alt[1]) : Infinity); fe.lage.set(kid, [k.x, k.y]); }
-        if (fe.n >= 60 && netto < 1 && !zug.current && namenRest.current < 0.3) ruhe.current = 46;
+      const schritte = Math.round(vorrat / SCHRITT_MS);
+      vorrat -= schritte * SCHRITT_MS;
+      for (let n = 0; n < schritte; n++) {
+        const vor = [...koerper.current.values()].map((k) => [k.x, k.y, k.r]);
+        const e = schritt();
+        // M415: Ruhe auch dann, wenn sich je Schritt kaum noch etwas bewegt — vorher krochen die Blasen um
+        // Hundertstel Punkte weiter (zwei Kräfte im Gleichgewicht), und die Rechnung lief endlos; im Tropfen-Look
+        // zeichnete der Filter so jedes Bild neu
+        let schub = 0; let i = 0;
+        for (const k of koerper.current.values()) { const v = vor[i++]; if (v) schub = Math.max(schub, Math.abs(k.x - v[0]), Math.abs(k.y - v[1]), Math.abs(k.r - v[2])); }
+        // M429: … und kein Name gleitet noch zu seinem Platz
+        ruhe.current = (e < 0.004 || schub < 0.1) && !zug.current && namenRest.current < 0.3 ? ruhe.current + 1 : 0;
+        // M415: … oder über 20 Schritte hinweg hat sich keine Blase um mehr als einen Punkt bewegt. Eine Blase, die
+        // gegen ihre Nachbarin drückt, pendelt sonst im Takt weniger Schritte auf der Stelle (Energie hoch, Weg null).
+        if (++fe.n % 20 === 0) {
+          let netto = 0;
+          for (const [kid, k] of koerper.current) { const alt = fe.lage.get(kid); netto = Math.max(netto, alt ? Math.hypot(k.x - alt[0], k.y - alt[1]) : Infinity); fe.lage.set(kid, [k.x, k.y]); }
+          if (fe.n >= 60 && netto < 1 && !zug.current && namenRest.current < 0.3) ruhe.current = 46;
+        }
       }
+      zeichnen(false, dt);
       // M429: Sind die Kräfte ausgeklungen (fünf Sekunden nach dem letzten Anstoß), steht alles — sofern gerade nichts
       // gezogen wird und kein Name mehr zu seinem Platz gleitet
       if (performance.now() - alter.current > 5000 && !zug.current && namenRest.current < 0.3) ruhe.current = 46;

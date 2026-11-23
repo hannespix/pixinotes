@@ -15,7 +15,6 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
 import http from 'node:http';
-import os from 'node:os';
 import { chromium, devices } from 'playwright-core';
 const __repo = fileURLToPath(new URL('..', import.meta.url));
 const SD = path.join(__repo, 'pruefungen', 'ablage');
@@ -61,27 +60,29 @@ async function auf(w, h, geraet = devices['Pixel 7'], dunkel = true) {
 }
 
 
+/* M496: Die Spur misst nach der Zeit der Bilder. Vorher las ein eigener rAF-Rückruf die Lage mit performance.now()
+   — er lief VOR dem Rückruf der App, sah also die Lage des vorigen Bilds und teilte deren Weg durch das Intervall des
+   nächsten Bilds. Unter Last (ein langes Bild, dann ein kurzes) wurde so aus einem langsamen Gleiten ein „Sprung".
+   Jetzt schreibt ein MutationObserver jede neue Lage mit document.timeline.currentTime mit (= Zeitstempel des Bilds,
+   den auch die App bekommt; er läuft direkt nach ihrem Rückruf im selben Bild), und der Weg zählt über genau das
+   Intervall seit dem vorigen Bild. Die Grenze gilt damit auch unter Last unverändert: 6 Punkte je 16,7 ms. */
 const spurNamen = async (P, ms) => P.evaluate((dauer) => new Promise((ok) => {
-  const spur = {}; const t0 = performance.now();
-  const lauf = () => {
-    for (const n of document.querySelectorAll('.bub-ring-name')) {
-      const m = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(n.style.transform); if (!m) continue;
-      (spur[n.dataset.gruppe] ??= []).push([+m[1], +m[2], performance.now()]);
-    }
-    if (performance.now() - t0 < dauer) requestAnimationFrame(lauf); else ok(spur);
-  };
+  const namen = {}; const bilder = []; const t0 = performance.now();
+  const tr = /translate\(([-\d.]+)px, ([-\d.]+)px\)/;
+  const mo = new MutationObserver((ms) => {
+    const T = document.timeline.currentTime;
+    for (const m of ms) { const n = m.target; if (!n.classList?.contains('bub-ring-name')) continue; const x = tr.exec(n.style.transform); if (x) (namen[n.dataset.gruppe] ??= []).push([+x[1], +x[2], T]); }
+  });
+  mo.observe(document, { subtree: true, attributes: true, attributeFilter: ['style'] });
+  const lauf = (ts) => { bilder.push(ts); if (performance.now() - t0 < dauer) requestAnimationFrame(lauf); else { mo.disconnect(); ok({ namen, bilder }); } };
   requestAnimationFrame(lauf);
 }), ms);
-// Sprung je Bild bei 60 Hz: Fällt unter Last ein Bild aus, zählt die Strecke über die tatsächlich vergangene Zeit
-// (ein echter Sprung bleibt ein Sprung – er passiert in einem einzigen Bild, egal wie lang es war)
-// M448: Auch umgelegt auf die verstrichene Zeit sprang ein Name unter schwerer Fremdlast (Last über der Kernzahl,
-// parallele Prüfungen und Agenten) gelegentlich 11–12 Punkte – das Einschwingen beginnt dann mitten im noch nicht
-// fertigen Aufbau. Auf einem ruhigen Rechner gilt die Grenze 6 weiter; unter Last 12 (ein echter Sprung des Namens
-// über den Ring ist viel größer), und die Ausgabe sagt es.
-const unterLast = os.loadavg()[0] > os.cpus().length;
-const sprungGrenze = unterLast ? 12 : 6;
-if (unterLast) console.log(`  (Rechner unter Last ${os.loadavg()[0].toFixed(1)} bei ${os.cpus().length} Kernen – Sprung-Grenze ${sprungGrenze} Punkte)`);
-const groessterSprung = (spur) => Math.max(0, ...Object.values(spur).map((p) => { let m = 0; for (let i = 1; i < p.length; i++) { const bilder = Math.max(1, (p[i][2] - p[i - 1][2]) / 16.7); m = Math.max(m, Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]) / bilder); } return m; }));
+const sprungGrenze = 6;
+/** größter Weg eines Namens je 16,7 ms: Weg einer Änderung geteilt durch die Bilder seit dem vorigen Bild */
+const groessterSprung = ({ namen, bilder }) => {
+  const vorBild = (T) => { let lo = 0; let hi = bilder.length - 1; let r = null; while (lo <= hi) { const m = (lo + hi) >> 1; if (bilder[m] < T - 0.01) { r = bilder[m]; lo = m + 1; } else hi = m - 1; } return r; };
+  return Math.max(0, ...Object.values(namen).map((p) => { let m = 0; for (let i = 1; i < p.length; i++) { const vb = vorBild(p[i][2]); const bilderZahl = Math.max(1, (vb == null ? 16.7 : p[i][2] - vb) / 16.7); m = Math.max(m, Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]) / bilderZahl); } return m; }));
+};
 /** M484: Warten, bis sich 1 s lang nichts mehr bewegt (höchstens ms) — das Einschwingen dauert unter Last länger */
 const stillBis = async (P, ms = 20000) => { const ende = Date.now() + ms; while (Date.now() < ende) { if ((await bewegung(P, 1000)) === 0) return; } };
 const bewegung = (P, ms, sel = '.bub-blase') => P.evaluate(([dauer, s]) => new Promise((ok) => {
