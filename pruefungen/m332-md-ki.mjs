@@ -94,6 +94,16 @@ async function seite({ nodes = [], plan = null } = {}) {
 }
 
 const knoten = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes);
+/** M484: Der Speicher schreibt verzögert – unter Last stand nach der Endmeldung noch der alte Stand (0 Notizen). Warten,
+ *  bis der gespeicherte Stand 1 s lang gleich bleibt (höchstens 15 s). */
+const gespeichert = async (P, stillMs = 1000, maxMs = 15000) => {
+  let vor = await P.evaluate(() => localStorage.getItem('pixinotes-board')); let seit = Date.now(); const ende = Date.now() + maxMs;
+  while (Date.now() < ende) {
+    await P.waitForTimeout(150);
+    const jetzt = await P.evaluate(() => localStorage.getItem('pixinotes-board'));
+    if (jetzt !== vor) { vor = jetzt; seit = Date.now(); } else if (Date.now() - seit >= stillMs) return;
+  }
+};
 const toastText = (P) => P.evaluate(() => document.querySelector('.toast')?.textContent ?? '');
 
 /** Freitext-Anweisung übers Dock (ganzes Board) absenden */
@@ -131,11 +141,13 @@ async function auswaehlen(P, ids) {
   await P.waitForTimeout(1500);
 }
 async function auswahlMenue(P, menue, knopfText) {
+  // M484: Leiste und Menüs werden seit M483 nachgeladen – auf sie warten statt fester 400 ms (unter Last zu knapp)
+  await P.waitForSelector('.sel-toolbar button[aria-label="Mehr"]', { timeout: 15000 }).catch(() => {});
   await P.evaluate(() => [...document.querySelectorAll('.sel-toolbar button')].find((b) => b.getAttribute('aria-label') === 'Mehr')?.click());
-  await P.waitForTimeout(400);
+  await P.waitForSelector('.sel-more-menu', { timeout: 15000 }).catch(() => {});
   if (menue === 'ai') {
     await P.evaluate(() => [...(document.querySelector('.sel-more-menu')?.querySelectorAll('button') ?? [])].find((b) => b.textContent.includes('KI-Aktionen'))?.click());
-    await P.waitForTimeout(400);
+    await P.waitForSelector('.sel-ai-menu', { timeout: 15000 }).catch(() => {});
     return P.evaluate((t) => { const b = [...(document.querySelector('.sel-ai-menu')?.querySelectorAll('button') ?? [])].find((x) => x.textContent.includes(t)); b?.click(); return !!b; }, knopfText);
   }
   return P.evaluate((t) => { const b = [...(document.querySelector('.sel-more-menu')?.querySelectorAll('button') ?? [])].find((x) => x.textContent.includes(t)); b?.click(); return !!b; }, knopfText);
@@ -200,6 +212,7 @@ console.log('════ C: 8 große Dateien → Portionen mit Fortschritt ═�
   });
   await dockAnweisung(P, 'Wandle alle Dateien in schön formatierte Notizkarten um');
   const toasts = await wartenBisFertig(P);
+  await gespeichert(P);
   const alleToasts = await P.evaluate(() => window.__toasts);
   pruefe('C1 mehrere Aufrufe statt einem (Portionen)', aufrufe.length >= 3, `${aufrufe.length} Aufrufe`);
   pruefe('C2 jeder Aufruf sieht nur seinen Teil der Karten', aufrufe.every((a) => a.items.length <= 4 && a.items.length >= 1) && new Set(aufrufe.flatMap((a) => a.items)).size === 8, JSON.stringify(aufrufe.map((a) => a.items)));
@@ -224,6 +237,7 @@ console.log('════ D: ein Teil scheitert – Rest läuft, Meldung ehrlich
   const { ctx, P, aufrufe } = await seite({ nodes: dateiKarten(8), plan: (nr) => (nr === 2 ? { status: 500 } : null) });
   await dockAnweisung(P, 'Wandle alle Dateien in Notizen um');
   const toasts = await wartenBisFertig(P);
+  await gespeichert(P);
   const ks = await knoten(P);
   const n = ks.filter((k) => k.type === 'note').length;
   const kaputt = aufrufe[1]?.items.length ?? 0;
@@ -245,6 +259,7 @@ console.log('════ E: abgeschnittene Antwort → Portion halbieren ══
   } });
   await dockAnweisung(P, 'Wandle alle Dateien in Notizen um');
   const toasts = await wartenBisFertig(P);
+  await gespeichert(P);
   const ks = await knoten(P);
   pruefe('E1 trotz Abschneiden am Ende alle 8 Notizen', ks.filter((k) => k.type === 'note').length === 8, String(ks.filter((k) => k.type === 'note').length));
   pruefe('E2 ein Aufruf mehr als Portionen (die halbierte)', aufrufe.length >= 4 && aufrufe.slice(1, 3).every((a) => a.items.length < aufrufe[0].items.length), JSON.stringify(aufrufe.map((a) => a.items.length)));

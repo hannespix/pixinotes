@@ -441,7 +441,10 @@ async function boardWechseln(P, name, projekt) {
 async function notiz(P, text, x = 900, y = 500) {
   const vorher = await P.locator('.react-flow__node').count();
   await P.mouse.dblclick(x, y);
+  // M484: zusätzlich auf den Cursor in der neuen Notiz warten – unter Last kam er nach den 700 ms, der Rückfall-Klick
+  // traf dann die Hülle einer anderen Karte und hing 30 s (m366 TimeoutError)
   await P.waitForTimeout(700);
+  await P.waitForFunction(() => document.activeElement?.getAttribute('contenteditable') === 'true', null, { timeout: 8000 }).catch(() => {});
   const aktiv = await P.evaluate(() => document.activeElement?.getAttribute('contenteditable') === 'true');
   if (!aktiv) { await P.locator('.react-flow__node').last().locator('[contenteditable="true"]').first().click(); await P.waitForTimeout(300); }
   await P.keyboard.type(text, { delay: 20 });
@@ -648,7 +651,8 @@ async function rahmen(P, klasse, id) {
 const anteil = (f, sel = null) => f.evaluate((s) => { const e = s ? document.querySelector(s) : document.scrollingElement; return e.scrollTop / Math.max(1, e.scrollHeight - e.clientHeight); }, sel);
 const folie = (P) => P.locator('.presenter .presenter-count').textContent().catch(() => '');
 const imVortrag = (P) => P.locator('.presenter').count();
-const vortragStart = async (P) => { await P.locator('.dock button[aria-label="Mehr"]').click(); await P.waitForTimeout(250); await P.locator('.dock-menu button', { hasText: 'Präsentieren' }).first().click(); await P.waitForTimeout(700); };
+// M484: auf die offene Präsentation warten statt fester 700 ms – der Vortrag wird nachgeladen, unter Last dauert das länger
+const vortragStart = async (P) => { await P.locator('.dock button[aria-label="Mehr"]').click(); await P.waitForTimeout(250); await P.locator('.dock-menu button', { hasText: 'Präsentieren' }).first().click(); await P.waitForSelector('.presenter', { timeout: 15000 }).catch(() => {}); await P.waitForTimeout(400); };
 
 // ---------- M387: Board mit Notiz, PDF (4 Seiten), langer Notiz, Notiz ----------
 function pdfText(n) {
@@ -872,7 +876,8 @@ await warteBis(G.P, async () => (await hatBand(G.P)) === 0, 6000);
 
 // ══ H ═══════════════════════════════════════════════════════════════
 console.log('\n════ H: Ein Gast präsentiert für sich ════');
-await G.P.keyboard.press('Alt+p'); await G.P.waitForTimeout(2500);
+await G.P.keyboard.press('Alt+p');
+await warteBis(G.P, async () => (await imVortrag(G.P)) === 1, 15000); await G.P.waitForTimeout(2500);   // M484: erst offen, dann 2,5 s „bei Anna bleibt es zu"
 pruefe('H1 Gerd startet die Präsentation → Anna bleibt auf ihrem Board', (await imVortrag(G.P)) === 1 && (await imVortrag(A.P)) === 0 && (await hatBand(A.P)) === 0);
 pruefe('H2 Gerd hat den Knopf „Team mitnehmen" (er entscheidet selbst)', /Team mitnehmen/.test(await G.P.locator('[data-taste="vortrag-team"]').textContent().catch(() => '')));
 await G.P.locator('[data-taste="vortrag-team"]').tap();

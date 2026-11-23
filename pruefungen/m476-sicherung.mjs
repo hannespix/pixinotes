@@ -352,9 +352,13 @@ console.log('\nG  Automatisch in einen Ordner');
   pruefe('G0 Einstellungen bieten „Automatisch sichern" (aus)', (await h.P.locator('[data-taste="auto-sicherung"]').count()) === 1 && !(await h.P.locator('[data-taste="auto-sicherung"]').isChecked()));
   await h.P.locator('[data-taste="auto-sicherung"]').click();
   const HEUTE = 'PixiNotes-Alles-2026-11-23.pixinotes';
-  const l = await h.bis(async () => { const x = await liste(); return x.includes(HEUTE) ? x : null; }, 10000);
-  pruefe('G1 Einschalten: Ordner gewählt, die erste Sicherung liegt sofort darin', !!l, await liste());
-  const auto = (l ?? []).filter((n) => /^PixiNotes-Alles-/.test(n));
+  const l1 = await h.bis(async () => { const x = await liste(); return x.includes(HEUTE) ? x : null; }, 10000);
+  pruefe('G1 Einschalten: Ordner gewählt, die erste Sicherung liegt sofort darin', !!l1, await liste());
+  // M484: Die Datei steht im Ordner, sobald sie angelegt ist; Inhalt und das Aufräumen der alten folgen danach. Unter
+  // Last lasen G2/G4 zu früh (8 Dateien bzw. leere Datei) — auf den fertigen Zustand warten, höchstens 10 s.
+  const groesse = (n) => h.P.evaluate(async (n) => { try { return (await (await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Sicherungen')).getFileHandle(n)).getFile()).size; } catch { return 0; } }, n);
+  const l = (await h.bis(async () => { const x = await liste(); return x.filter((n) => /^PixiNotes-Alles-/.test(n)).length <= 7 && (await groesse(HEUTE)) > 0 ? x : null; }, 10000)) ?? (await liste());
+  const auto = l.filter((n) => /^PixiNotes-Alles-/.test(n));
   pruefe('G2 die letzten 7 bleiben, ältere sind weg', auto.length === 7 && !auto.includes('PixiNotes-Alles-2026-10-01.pixinotes') && !auto.includes('PixiNotes-Alles-2026-10-02.pixinotes'), auto);
   pruefe('G3 fremde Dateien im Ordner bleiben unberührt', (l ?? []).includes('andere.txt'));
   const inhalt = await h.P.evaluate(async (n) => {
@@ -373,7 +377,7 @@ console.log('\nG  Automatisch in einen Ordner');
   pruefe('G7 Fenster verdeckt am selben Tag: keine zweite Sicherung', (await liste()).filter((n) => /^PixiNotes-Alles-/.test(n)).length === 7 && !(await liste()).includes('PixiNotes-Alles-2026-11-24.pixinotes'), await liste());
   await h.P.clock.fastForward('25:00:00');
   await verdeckt();
-  const l2 = await h.bis(async () => { const x = await liste(); return x.includes('PixiNotes-Alles-2026-11-24.pixinotes') ? x : null; }, 10000);
+  const l2 = await h.bis(async () => { const x = await liste(); return x.includes('PixiNotes-Alles-2026-11-24.pixinotes') && x.filter((n) => /^PixiNotes-Alles-/.test(n)).length <= 7 ? x : null; }, 10000);   // M484: erst nach dem Aufräumen
   pruefe('G8 einen Tag später beim Verdecken/Schließen: die nächste Sicherung, wieder höchstens 7', !!l2 && l2.filter((n) => /^PixiNotes-Alles-/.test(n)).length === 7 && l2.includes(HEUTE), await liste());
   await h.ctx.close();
 }

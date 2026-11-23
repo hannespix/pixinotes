@@ -347,7 +347,8 @@ console.log('\n════ Finger (Tablet) ════');
   pruefe('F Dock-Menü „Mehr": Einträge am Finger ≥ 40 Punkte hoch', mehr.length === 0, [...new Set(mehr)].join(' · '));
   await P.keyboard.press('Escape'); await P.waitForTimeout(300);
   const g = await P.evaluate(() => { const r = document.querySelector('.react-flow__node-note').getBoundingClientRect(); return [r.left + r.width / 2, r.top + 8]; });
-  await P.touchscreen.tap(g[0], g[1]); await P.waitForTimeout(600);
+  // M484: Die Auswahl-Leiste wird seit M483 nachgeladen – auf sie warten statt fester 600 ms (unter Last zu knapp)
+  await P.touchscreen.tap(g[0], g[1]); await P.waitForSelector('.sel-toolbar', { timeout: 15000 }).catch(() => {}); await P.waitForTimeout(300);
   const sel = await P.evaluate(() => { const s = document.querySelector('.sel-toolbar'); return s ? window.__a11y.ziele(s, 40) : ['keine Leiste']; });
   pruefe('F Auswahl-Leiste: Tippziele am Finger ≥ 40 Punkte', sel.length === 0, [...new Set(sel)].join(' · '));
   await ctx.close();

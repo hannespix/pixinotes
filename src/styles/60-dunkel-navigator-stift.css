@@ -20,6 +20,65 @@
 [data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-editor th p {
   color: var(--ink) !important;
 }
+/* M492: Eine Notiz ohne bekannte Farbe (alter Stand, Import) hat kein Papier — ihr Text stand im Dunkeln als
+   BlockNote-Grau #3f3f3f auf der Fläche (1,7:1). Ohne Papier folgt die Schrift dem Theme wie bei Weiß. */
+[data-theme='dark'] .react-flow__node-note:has(.note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background'])),
+[data-theme='dark'] .react-flow__node-note:has(.note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background'])) .bn-editor { color: var(--ink); }
+
+/* ================= M492: BlockNote-Menüs folgen dem Erscheinungsbild =================
+   Die Editoren laufen mit `theme="light"`, weil ihr INHALT auf Papier steht (Haftnotizen bleiben im Dunkeln
+   hell, M338; Protokoll und weiße Notiz setzen ihre Schrift selbst, M284/M489) — BlockNotes dunkles Thema hätte
+   Schrift und Hervorhebungen auf dem Papier hell gemacht. Mit dem hellen Thema kamen aber auch alle MENÜS hell:
+   Einfügen-Menü („/"), Formatierungs-Leiste, Link-Werkzeug, Farbwahl, Seitenmenü, Tabellen-Griffe, Vorschläge.
+   Menüs gehören zur Oberfläche, nicht zum Papier — sie schweben über der Karte wie Auswahl-Leiste und
+   Kontextmenü und folgen deshalb dem Theme, auch über einer gelben Haftnotiz. Darum nur die Menü-Variablen
+   (BlockNote: `--bn-colors-menu/tooltip/hovered/selected/disabled/shadow/border`, Mantine: Schrift, Fläche,
+   Rand) auf die Tokens — Editor-Schrift, -Fläche und Hervorhebungen (`editor-*`, `highlights-*`) bleiben hell. */
+[data-theme='dark'] .bn-root {
+  --bn-colors-menu-text: var(--ink);
+  --bn-colors-menu-background: var(--surface);
+  --bn-colors-tooltip-text: var(--ink);
+  --bn-colors-tooltip-background: var(--surface-2);
+  --bn-colors-hovered-text: var(--ink);
+  --bn-colors-hovered-background: var(--surface-2);
+  /* gewählt = umgekehrt wie im Hellen (dort dunkle Fläche, helle Schrift) */
+  --bn-colors-selected-text: var(--surface);
+  --bn-colors-selected-background: var(--ink);
+  --bn-colors-disabled-text: var(--muted);
+  --bn-colors-disabled-background: var(--surface-2);
+  --bn-colors-border: var(--border-soft);
+  /* Schatten: der helle Standard (#cfcfcf) leuchtete im Dunkeln als Lichthof um jedes Menü */
+  --bn-colors-shadow: rgba(0, 0, 0, 0.55);
+}
+[data-theme='dark'] .bn-mantine[data-mantine-color-scheme] {
+  --mantine-color-text: var(--ink);
+  --mantine-color-dimmed: var(--muted);
+  --mantine-color-body: var(--surface);
+  --mantine-color-placeholder: var(--muted);
+  --mantine-color-default: var(--surface);
+  --mantine-color-default-hover: var(--surface-2);
+  --mantine-color-default-color: var(--ink);
+  --mantine-color-default-border: var(--border);
+  --mantine-shadow-md: var(--pop-shadow);
+}
+/* Native Teile in den Menüs (Eingabefeld im Link-Werkzeug, Bildlaufleisten) dunkel zeichnen — nur dort, die
+   Abhak-Kästchen im Text stehen auf dem Papier und bleiben, wie sie sind. */
+[data-theme='dark'] .bn-mantine :is(.bn-toolbar, .bn-suggestion-menu, .bn-grid-suggestion-menu, .bn-menu-dropdown,
+  .mantine-Menu-dropdown, .mantine-Popover-dropdown, .bn-panel, .bn-side-menu .mantine-Menu-dropdown) { color-scheme: dark; }
+/* Farbwahl: Die Muster „A" zeigen die Schrift-/Hintergrundfarbe, wie sie im TEXT erscheint — und der steht auf
+   hellem Papier. Auf der dunklen Menüfläche wäre Braun 1,9:1 gewesen und hätte anders gewirkt als im Text;
+   darum liegt jedes Muster auf der Editor-Fläche (die bleibt hell, s. o.). */
+[data-theme='dark'] .bn-root .bn-color-icon[data-background-color='default'] { background-color: var(--bn-colors-editor-background); }
+[data-theme='dark'] .bn-root .bn-color-icon[data-text-color='default'] { color: var(--bn-colors-editor-text); }
+/* Rand des Einfügen-Menüs: BlockNote nimmt Mantines Hellgrau (gray-2) fest */
+[data-theme='dark'] .bn-mantine .bn-suggestion-menu { border-color: var(--border-soft); }
+/* Seitenmenü und Tabellen-Griffe sitzen AUF dem Papier (nicht schwebend daneben): ihr Hover nimmt die Fläche des
+   Papiers, sonst stünde ein dunkler Fleck auf der gelben Protokoll-Seite. Das Protokoll kennt sein Papier (M489). */
+[data-theme='dark'] .minutes-card :is(.bn-side-menu, .bn-table-handle) {
+  --bn-colors-hovered-background: var(--pr-flaeche);
+  --bn-colors-hovered-text: var(--pr-ink);
+  --bn-colors-menu-background: transparent;
+}
 
 /* ================= M285: Karten aus jeder Ansicht bearbeiten =================
    Die Mini-Vorschau war ein Bild; jetzt ist jedes Rechteck ein Ziel. Der
