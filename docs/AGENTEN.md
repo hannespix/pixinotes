@@ -33,6 +33,9 @@ Jeder Arbeits-Agent liefert selbstständig bis zum Merge.
 7. **Erst mergen, wenn „PR prüfen“ für den Head-Commit grün ist**
    (`mcp__github__actions_list`, `resource_id: pruefen.yml`, ~1 min). In
    Runde 1 mergten zwei Agenten, bevor der Lauf überhaupt startete.
+8. **Vor jedem PR** `node werkzeug/alle-pruefungen.mjs --geaendert` laufen lassen – das
+   nimmt die betroffenen Reihen und immer die Wächter-Reihen (Kacheln, Tooltips,
+   Hilfe, „Was ist neu", Englisch, ohne Emoji) mit, die neue Meilensteine sonst brechen.
 
 ## Brief für einen Arbeits-Agenten (Vorlage)
 ```

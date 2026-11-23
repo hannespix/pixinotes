@@ -6,6 +6,7 @@
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard, type BoardDoc, type Space } from '../store';
 import { berichtAlsSatz, dreiWegeMerge, nurAuswahlAnders, ohneAuswahl, type SyncStand } from './syncMerge';
 import { grabsteineFuer, grabsteineVereinigen } from './grabsteine';
+import { zeitenVonAussen } from './sicher';
 
 /** Dateiname im Sync-Ordner — auch der Dateien-App-Weg (M190) schreibt GENAU
  *  diese Datei, damit ein iPad und ein Desktop denselben Nextcloud-Ordner
@@ -516,7 +517,9 @@ const tippt = (): boolean => Date.now() - letzteAenderung < 2500;
  * beides gehört der Hauptdatei; was aus der Kopie übernommen wurde, wird
  * danach ganz normal als eigener Anteil in die Hauptdatei geschrieben.
  */
-export async function fremdStandEinarbeiten(remote: SyncPayload, weg: SyncWeg, nebenkopie = false): Promise<EinarbeitenErgebnis> {
+export async function fremdStandEinarbeiten(remote0: SyncPayload, weg: SyncWeg, nebenkopie = false): Promise<EinarbeitenErgebnis> {
+  // M470: Zeitpunkte von außen säubern (Karten, Ticket-Spaltenzeit) – gestempelt wird dabei nichts
+  const remote: SyncPayload = Array.isArray(remote0?.boards) ? { ...remote0, boards: zeitenVonAussen(remote0.boards) } : remote0;
   const basis = await basisLesen(weg.source);
   grabsteineVereinigen(remote.geloescht); // M351: Löschungen reisen über mehrere Geräte weiter
   if (!basis) {

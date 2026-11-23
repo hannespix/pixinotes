@@ -13,7 +13,7 @@
 //
 // Alte Boards haben keine Zahlen – dann heißt es „unbekannt", bis die Karte das nächste Mal geändert wird. Ein
 // erfundenes Datum (etwa der Tag der Umstellung) würde das Briefing auf Monate hinaus belügen.
-import type { AppNode } from '../types';
+import { kanbanCols, type AppNode, type KanbanData, type KanbanItem } from '../types';
 import { sprache } from './sprache';
 
 /** Felder in `data`, die nur Ansicht oder Aussehen sind – ihre Änderung stempelt nicht */
@@ -49,7 +49,46 @@ export function inhaltGeaendert(alt: Record<string, unknown>, patch: Record<stri
 /** Die Karte nach einem data-Patch: gestempelt, wenn der Inhalt sich änderte (sonst dieselbe Karte) */
 export function nachPatch<T extends AppNode>(neu: T, alt: AppNode, patch: Record<string, unknown>, jetzt = Date.now()): T {
   if (!inhaltGeaendert(alt.data as Record<string, unknown>, patch)) return neu;
-  return { ...neu, geaendert: jetzt } as T;
+  let aus = { ...neu, geaendert: jetzt } as T;
+  // M470: Tickets merken sich, seit wann sie in ihrer Spalte stehen
+  if (alt.type === 'kanban' && Array.isArray(patch.items)) {
+    const items = spaltenStempeln(alt.data as KanbanData, neu.data as KanbanData, jetzt);
+    if (items) aus = { ...aus, data: { ...aus.data, items } } as T;
+  }
+  return aus;
+}
+
+/**
+ * M470: `spalteSeit` der Tickets nach einer Änderung von Hand. Neu in `items` (angelegt, aus dem Archiv, aus einem
+ * anderen Kanban) → jetzt; die Spalte gewechselt → jetzt; sonst bleibt der alte Stempel (auch wenn ein Editor das
+ * Ticket ohne ihn neu baut). „Gewechselt" heißt: der Index ist anders UND (die Spalten sind dieselben ODER der
+ * Spaltenname ist ein anderer) — eine eingefügte Spalte verschiebt Indizes, ohne dass ein Ticket umzieht.
+ * Rückgabe null, wenn nichts zu stempeln war.
+ */
+export function spaltenStempeln(alt: KanbanData, neu: KanbanData, jetzt = Date.now()): KanbanItem[] | null {
+  if (!Array.isArray(neu.items)) return null;
+  const vorher = new Map((Array.isArray(alt.items) ? alt.items : []).map((it) => [it.id, it]));
+  const altCols = kanbanCols(alt);
+  const neuCols = kanbanCols(neu);
+  const gleicheSpalten = JSON.stringify(altCols) === JSON.stringify(neuCols);
+  let anders = false;
+  const items = neu.items.map((it) => {
+    const a = vorher.get(it.id);
+    let seit: number | undefined;
+    if (!a) seit = jetzt;
+    else if (a.col !== it.col && (gleicheSpalten || altCols[a.col] !== neuCols[it.col])) seit = jetzt;
+    else seit = a.spalteSeit;
+    if (seit === it.spalteSeit) return it;
+    anders = true;
+    if (seit === undefined) { const { spalteSeit: _w, ...rest } = it; return rest as KanbanItem; }
+    return { ...it, spalteSeit: seit };
+  });
+  return anders ? items : null;
+}
+
+/** M470: Seit wann steht das Ticket in seiner Spalte? Ohne eigenen Stempel die Änderungszeit der Kanban-Karte */
+export function spalteSeitVon(it: KanbanItem, kanban: AppNode): number | undefined {
+  return typeof it.spalteSeit === 'number' ? it.spalteSeit : zeitVon(kanban);
 }
 
 /** Eine neu angelegte Karte (auch eine Kopie): angelegt = geändert = jetzt */
@@ -67,7 +106,8 @@ const gueltig = (v: unknown, jetzt: number): v is number =>
   typeof v === 'number' && Number.isFinite(v) && v >= FRUEHESTENS && v <= jetzt + ZUKUNFT_TOLERANZ;
 
 /** Zeitpunkte einer Karte von außen: Zahl, glaubhaft, nicht (nennenswert) in der Zukunft – sonst weg */
-export function zeitSaeubern<T extends AppNode>(n: T, jetzt = Date.now()): T {
+export function zeitSaeubern<T extends AppNode>(n0: T, jetzt = Date.now()): T {
+  const n = ticketZeitSaeubern(n0, jetzt);
   const z = n as T & MitZeit;
   const a = z.angelegt; const g = z.geaendert;
   const aOk = a === undefined || gueltig(a, jetzt);
@@ -77,6 +117,29 @@ export function zeitSaeubern<T extends AppNode>(n: T, jetzt = Date.now()): T {
   if (!aOk) delete kopie.angelegt;
   if (!gOk) delete kopie.geaendert;
   return kopie;
+}
+
+/** M470: `spalteSeit` an Tickets von außen (Sync, Datei, Live-Kanal): dieselbe Regel wie für die Karte */
+function ticketZeitSaeubern<T extends AppNode>(n: T, jetzt: number): T {
+  if (n.type !== 'kanban') return n;
+  const d = n.data as KanbanData;
+  const reinigen = (liste: unknown): { liste: unknown; anders: boolean } => {
+    if (!Array.isArray(liste)) return { liste, anders: false };
+    let anders = false;
+    const aus = liste.map((it: unknown) => {
+      if (!it || typeof it !== 'object' || !('spalteSeit' in it)) return it;
+      const v = (it as KanbanItem).spalteSeit;
+      if (v === undefined || gueltig(v, jetzt)) return it;
+      anders = true;
+      const { spalteSeit: _w, ...rest } = it as KanbanItem;
+      return rest;
+    });
+    return { liste: aus, anders };
+  };
+  const i = reinigen(d.items);
+  const a = reinigen(d.archiv);
+  if (!i.anders && !a.anders) return n;
+  return { ...n, data: { ...d, items: i.liste, ...(d.archiv !== undefined ? { archiv: a.liste } : {}) } } as T;
 }
 
 /** Von zwei inhaltsgleichen Fassungen die spätere (für den Abgleich: deterministisch auf beiden Geräten) */

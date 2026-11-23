@@ -48,8 +48,9 @@ Risiko-Liste ohne KI, die mehr als ein Wortmuster ist (M444).
 - Zähl-Texte über `zahlWort` (M461).
 
 ## Grenzen / offen
-- „In Arbeit" misst die Karte, nicht das einzelne Ticket: wer in derselben Kanban-Karte irgendein Ticket bewegt,
-  setzt die Uhr für alle zurück.
+- → M470: Jedes Ticket trägt `spalteSeit` (gesetzt beim Spaltenwechsel); das Briefing misst je Ticket, die Karte
+  nur noch für ältere Tickets ohne Stempel. (Vorher: „In Arbeit" maß die Karte – wer irgendein Ticket bewegte, setzte
+  die Uhr für alle zurück.)
 - Gleichnamige verschiedene Personen werden zusammengelegt (ergänzt, nichts überschrieben); Unterscheidung nur über
   die Adresse. Ein Vorname allein reicht nie.
 - Automatische Wege (`runDerived`: Kanban-Rücksync, Auto-Einsammeln, Ticket-Archiv, Umbenennen von Verknüpfungen)

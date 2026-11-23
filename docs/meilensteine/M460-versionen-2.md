@@ -52,5 +52,6 @@ Sicherung — die „Vor Abgleich"-Sicherung ist auf eine je 10 Minuten gedrosse
 - Live-Mitlesen (Zwischenstände anderer beim Tippen, `gastSync.einspielen`) zählt nicht als Schub — es ist nur
   Anzeige; gesicherte Änderungen kommen über `importSync` und werden gezählt.
 - Neue Karten zählen nicht zum Schub (sie nehmen nichts weg). Ein Schub, der nur Pfeile oder Striche ändert, auch nicht.
-- Kein Zurückholen von Pfeilen oder Strichen allein; keine Mehrfachauswahl („alle gelöschten zurück").
+- → M470: Pfeile und Striche stehen jetzt in der Liste und lassen sich einzeln zurückholen; Mehrfachauswahl mit
+  „Auswahl zurückholen" (ein Strg+Z). (Vorher: kein Zurückholen von Pfeilen oder Strichen allein; keine Mehrfachauswahl.)
 - Versionen bleiben je Gerät (reisen nicht mit Sync/Export) — wie M449.

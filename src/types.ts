@@ -107,6 +107,10 @@ export interface KanbanItem {
   archiviertAm?: string;
   /** M390: Wann es aus dem Archiv zurückkam — von da an zählt die Frist der Auto-Archivierung neu */
   zurueckAm?: string;
+  /** M470: Seit wann das Ticket in seiner jetzigen Spalte steht (ms wie Date.now()) — gestempelt beim Anlegen und
+   *  bei jedem Spaltenwechsel von Hand (lib/kartenZeit.ts → nachPatch), nicht beim Bearbeiten; fehlt bei älteren
+   *  Ständen (dann zählt die Änderungszeit der Kanban-Karte, M463) */
+  spalteSeit?: number;
 }
 
 /** Offene Blocker eines Tickets: Titel der unerledigten Abhängigkeiten (M118) */
