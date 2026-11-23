@@ -11,6 +11,8 @@
 // Übersicht und Board benutzen dieselbe Feder und dasselbe Tempo; das Board außerdem `Ausweichen`
 // (die Übersicht weicht über ihr Raster aus, siehe Overview.tsx `vorschau`).
 
+import { anzeigeMelden, anzeigeSetzen, type Anzeige } from './zugAnzeige';
+
 /** Rechtecke in Flächen-Punkten */
 export interface Kasten { x: number; y: number; w: number; h: number }
 
@@ -100,30 +102,72 @@ export function wegVektor(schieber: Kasten, andere: Kasten, abstand = 12): [numb
 
 export interface Ausweicher { id: string; el: HTMLElement | null; kasten: Kasten }
 
+/** M485: So viele Stufen tief nimmt eine ausweichende Karte ihre Nachbarn mit (1 = nur die Karten unter der gezogenen) */
+export const AUSWEICH_STUFEN = 3;
+/** M485: Mit jeder Stufe hält die Kette weniger Abstand (12 → 8 → 5 Punkte) — sie läuft weich aus */
+export const STUFEN_DAEMPFUNG = 0.66;
+
+const verschoben = (k: Kasten, v: [number, number]): Kasten => ({ x: k.x + v[0], y: k.y + v[1], w: k.w, h: k.h });
+
 /**
  * Ausweichen während eines Zugs (M481): Wer unter dem gezogenen Kasten liegt, gleitet beiseite — nur als
  * Anzeige (`translate` am Knoten, der Übergang kommt aus dem CSS), ohne den Stand anzufassen. Erst beim
  * Ablegen wird übernommen, was dann noch ausweicht (`ende`). So schreibt ein Zug nichts Zusätzliches in den
  * Verlauf oder an das Live-Team, und wer nur darüber hinwegzieht, findet alles, wie es war.
+ *
+ * M485: Kettenreaktion — trifft eine ausweichende Karte ihrerseits eine Nachbarin, gleitet die mit (bis
+ * `stufen` tief, mit kleiner werdendem Abstand und je Stufe etwas später: `--zieh-stufe` verzögert den Übergang).
+ * Nie angestoßen wird, was schon vor dem Zug an der Schiebenden lag (Stapel bleiben Stapel), und nie in die
+ * gezogene Karte hinein.
  */
-export function ausweichen(kandidaten: Ausweicher[], abstand = 12) {
+export function ausweichen(kandidaten: Ausweicher[], abstand = 12, stufen = 1) {
   const versatz = new Map<string, [number, number]>();
-  const setzen = (k: Ausweicher, v: [number, number] | null) => {
+  /** M485: wer in diesem Zug je verschoben wurde (gleitet womöglich noch zurück) — die Kanten schauen dorthin */
+  const beruehrt = new Set<string>();
+  const setzen = (k: Ausweicher, v: [number, number] | undefined, stufe = 1) => {
     const alt = versatz.get(k.id);
     if (!v) {
       if (!alt) return;
       versatz.delete(k.id);
-      if (k.el) k.el.style.removeProperty('translate');
+      if (k.el) { k.el.style.removeProperty('translate'); k.el.style.removeProperty('--zieh-stufe'); }
       return;
     }
+    beruehrt.add(k.id);
     if (alt && Math.abs(alt[0] - v[0]) < 0.5 && Math.abs(alt[1] - v[1]) < 0.5) return;
     versatz.set(k.id, v);
-    if (k.el) k.el.style.setProperty('translate', `${v[0].toFixed(1)}px ${v[1].toFixed(1)}px`);
+    if (k.el) {
+      if (stufe > 1) k.el.style.setProperty('--zieh-stufe', String(stufe - 1)); else k.el.style.removeProperty('--zieh-stufe');
+      k.el.style.setProperty('translate', `${v[0].toFixed(1)}px ${v[1].toFixed(1)}px`);
+    }
   };
   return {
     /** Der gezogene Kasten steht jetzt hier */
     setze(kasten: Kasten): void {
-      for (const k of kandidaten) setzen(k, wegVektor(kasten, k.kasten, abstand));
+      const neu = new Map<string, [[number, number], number]>();
+      let front: Array<[Ausweicher, Kasten]> = [];
+      for (const k of kandidaten) {
+        const v = wegVektor(kasten, k.kasten, abstand);
+        if (v) { neu.set(k.id, [v, 1]); front.push([k, verschoben(k.kasten, v)]); }
+      }
+      // M485: weitere Stufen — nur, wer noch nicht ausweicht, und nur von einer Nachbarin, mit der er vorher nichts zu tun hatte
+      for (let st = 2; st <= stufen && front.length; st += 1) {
+        const ab = abstand * STUFEN_DAEMPFUNG ** (st - 1);
+        const naechste: Array<[Ausweicher, Kasten]> = [];
+        for (const k of kandidaten) {
+          if (neu.has(k.id)) continue;
+          for (const [f, r] of front) {
+            if (wegVektor(f.kasten, k.kasten, 0)) continue;
+            const v = wegVektor(r, k.kasten, ab);
+            if (!v) continue;
+            const ziel = verschoben(k.kasten, v);
+            if (wegVektor(kasten, ziel, 0)) continue;
+            neu.set(k.id, [v, st]); naechste.push([k, ziel]);
+            break;
+          }
+        }
+        front = naechste;
+      }
+      for (const k of kandidaten) { const n = neu.get(k.id); setzen(k, n?.[0], n?.[1]); }
     },
     /** Was ausweicht, als [id, x, y] in Flächen-Punkten (neue Lage) */
     ende(): Array<[string, number, number]> {
@@ -135,8 +179,9 @@ export function ausweichen(kandidaten: Ausweicher[], abstand = 12) {
       return raus;
     },
     /** Alle zurück an ihren Platz (gleitend) */
-    zurueck(): void { for (const k of kandidaten) setzen(k, null); },
+    zurueck(): void { for (const k of kandidaten) setzen(k, undefined); },
     get anzahl() { return versatz.size; },
+    beruehrt,
   };
 }
 
@@ -144,7 +189,7 @@ export function ausweichen(kandidaten: Ausweicher[], abstand = 12) {
  * Übernommene Ausweich-Lage ohne Ruck: Der Knoten trägt noch `translate`; sobald React Flow ihn an die neue
  * Lage gesetzt hat (Inline-`transform`), fällt `translate` weg — im selben Bild und ohne Übergang.
  */
-export function versatzAufloesen(el: HTMLElement, x: number, y: number): void {
+export function versatzAufloesen(el: HTMLElement, x: number, y: number, id?: string): void {
   let n = 0;
   const pruefen = () => {
     const tr = el.style.transform;
@@ -154,6 +199,9 @@ export function versatzAufloesen(el: HTMLElement, x: number, y: number): void {
       const tr0 = el.style.transition;
       el.style.transition = 'none';
       el.style.removeProperty('translate');
+      el.style.removeProperty('--zieh-stufe');
+      // M485: die Kanten im selben Bild zurück auf den Stand — der trägt jetzt die neue Lage
+      if (id) { anzeigeSetzen(id); anzeigeMelden(); }
       void el.offsetWidth; // Stil jetzt anwenden, bevor der Übergang zurückkommt
       el.style.transition = tr0;
       return;
@@ -161,6 +209,49 @@ export function versatzAufloesen(el: HTMLElement, x: number, y: number): void {
     requestAnimationFrame(pruefen);
   };
   pruefen();
+}
+
+/**
+ * M485: Die Kanten folgen der sichtbaren Karte. Gehoben, geneigt und ausgewichen wird über CSS am Knoten (mit
+ * Übergängen); was davon gerade zu sehen ist, liest dieser Beobachter je Bild aus dem berechneten Stil (`translate`,
+ * `scale`, `rotate` — mitten im Übergang der aktuelle Zwischenwert) und gibt es über lib/zugAnzeige.ts an die
+ * Kanten. Nur für Karten mit Verbindung und nur, solange sich etwas bewegt — ohne Kanten kostet er nichts.
+ * Geschrieben wird dabei nichts (kein Stand, kein Verlauf, kein Live-Team).
+ */
+export function kantenBeobachter(elVon: (id: string) => HTMLElement | null, beobachtet: () => Iterable<string>, verbunden: ReadonlySet<string>) {
+  const zuletzt = new Map<string, Anzeige>();
+  const els = new Map<string, HTMLElement | null>();
+  let raf = 0; let bis = Infinity;
+  const lesen = () => {
+    raf = 0;
+    let bewegt = false; let geaendert = false;
+    for (const id of beobachtet()) {
+      if (!verbunden.has(id)) continue;
+      let e = els.get(id);
+      if (e === undefined) { e = elVon(id); els.set(id, e); }
+      if (!e?.isConnected) continue;
+      const cs = getComputedStyle(e);
+      const t = cs.translate === 'none' ? [] : cs.translate.split(' ').map(parseFloat);
+      const a: Anzeige = [t[0] || 0, t[1] || 0, cs.scale === 'none' ? 1 : parseFloat(cs.scale) || 1, cs.rotate === 'none' ? 0 : parseFloat(cs.rotate) || 0];
+      const alt = zuletzt.get(id);
+      if (Math.abs(a[0]) < 0.05 && Math.abs(a[1]) < 0.05 && Math.abs(a[2] - 1) < 1e-4 && Math.abs(a[3]) < 0.01) {
+        if (alt) { zuletzt.delete(id); anzeigeSetzen(id); geaendert = true; }
+        continue;
+      }
+      bewegt = true;
+      if (alt && a.every((v, i) => Math.abs(v - alt[i]) < 0.01)) continue;
+      zuletzt.set(id, a); anzeigeSetzen(id, a); geaendert = true;
+    }
+    if (bewegt || performance.now() < bis) raf = requestAnimationFrame(lesen);
+    else if (zuletzt.size) { for (const id of zuletzt.keys()) anzeigeSetzen(id); zuletzt.clear(); geaendert = true; }   // nichts hängen lassen
+    if (geaendert) anzeigeMelden();
+  };
+  const an = () => { if (!raf) raf = requestAnimationFrame(lesen); };
+  an();
+  return {
+    /** Zug vorbei: noch so lange schauen, bis Landen und Zurückgleiten vorbei sind */
+    nachlauf(ms: number) { bis = performance.now() + ms; an(); },
+  };
 }
 
 /* ───────────────────────── Ein Zug auf dem Board ───────────────────────── */
@@ -194,7 +285,7 @@ const masse = (n: ZugKnoten) => ({ w: n.measured?.width ?? n.width ?? 260, h: n.
  * Auswahl, Rahmen dabei. Ausweichen nur, was beim Greifen NICHT schon unter der Karte lag (Stapel bleiben Stapel),
  * keine Rahmen, nichts Archiviertes und kein Rahmen-Inhalt (dort ist die Ordnung gewollt).
  */
-export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugKnoten[], zoom: number): Zug | null {
+export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugKnoten[], zoom: number, verbunden?: ReadonlySet<string>): Zug | null {
   const bewegt = gegriffen.selected ? alle.filter((n) => n.selected) : alle.filter((n) => n.id === gegriffen.id);
   if (bewegt.length === 0 || bewegt.length > ZIEH_HEBEN_MAX || bewegt.some((n) => n.type === 'frame')) return null;
   const el = (id: string) => wurzel.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
@@ -223,7 +314,11 @@ export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugK
     if (wegVektor(kasten, k, 0) || imRahmen(k)) continue;
     kandidaten.push({ id: n.id, el: el(n.id), kasten: k });
   }
-  const aus = kandidaten.length ? ausweichen(kandidaten, AUSWEICH_ABSTAND) : null;
+  // M485: Kettenreaktion über mehrere Stufen — nicht bei „weniger Bewegung"
+  const aus = kandidaten.length ? ausweichen(kandidaten, AUSWEICH_ABSTAND, bewegungArm() ? 1 : AUSWEICH_STUFEN) : null;
+  const beob = verbunden?.size
+    ? kantenBeobachter(el, function* () { for (const n of bewegt) yield n.id; if (aus) yield* aus.beruehrt; }, verbunden)
+    : null;
   const neigung = neigungsFeder(wurzel, '--zieh-neigung', neigungsGrenze(kasten.w, kasten.h));
   const tempo = tempoMesser(x0 * zoom, performance.now());
   let gerastetVorher = false;
@@ -243,6 +338,7 @@ export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugK
     ende(abbrechen = false) {
       wurzel.removeAttribute('data-gerastet');
       neigung.loslassen();
+      beob?.nachlauf(LANDEN_MS + 400);
       for (const g of gehoben) {
         g.el.dataset.gehoben = 'landet';
         window.setTimeout(() => { if (g.el.dataset.gehoben === 'landet') delete g.el.dataset.gehoben; }, LANDEN_MS);
@@ -254,7 +350,7 @@ export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugK
     aufloesen(lagen) {
       for (const [id, x, y] of lagen) {
         const e = kandidaten.find((k) => k.id === id)?.el;
-        if (e) versatzAufloesen(e, x, y);
+        if (e) versatzAufloesen(e, x, y, id);
       }
     },
   };
