@@ -20,6 +20,8 @@ import { sprache } from './sprache';
 const ANSICHT = new Set([
   'extEpoch', 'month', 'view', 'current', 'dayWidth', 'filter', 'filterAn', 'sort', 'kompakt', 'groupBy', 'colW',
   'rahmen', 'color', 'hex', 'look', 'show', 'fitOnLoad', 'icsEvents', 'lokal', 'ref',
+  // M463: Merker an der Mail, dass ein Destillat daneben liegt (M451) – die Mail selbst bleibt unverändert
+  'destillat',
 ]);
 
 const TAG = 86_400_000;

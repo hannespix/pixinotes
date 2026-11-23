@@ -39,6 +39,6 @@ erstellen" im KI-Assistenten schrieb einen freien Überblick ohne Fristen-Reihen
 ## Grenzen / offen
 - „Unbeantwortete E-Mail-Karten" und „verwaiste Karten (seit 3 Wochen unangefasst)" aus dem Konzept fehlen –
   Karten tragen kein Änderungsdatum; das wäre ein eigener Meilenstein.
-- Die Risiko-Erkennung ohne KI ist ein Wortmuster (deutsch + risk/blocked/delay); „Problem" kann auch
-  harmlose Zeilen treffen.
+- → M463: ohne KI nennt die Risiko-Liste jetzt auch überfällige Fristen mit Namen, Tickets lange „in Arbeit“ und blockierende Pfeile. (Vorher: Die Risiko-Erkennung ohne KI ist ein Wortmuster (deutsch + risk/blocked/delay); „Problem" kann auch
+  harmlose Zeilen treffen – das Wortmuster bleibt als Ergänzung.)
 - Briefing nur fürs aktive Board, nicht boardübergreifend (dafür gibt es „Woche planen" in der Aufgaben-Zentrale).
