@@ -100,7 +100,7 @@ console.log('\n════ A: Start ohne Node-Ersatz ════');
   const start = jsGeladen();
   const summe = start.reduce((a, f) => a + statSync(path.join(DIST, 'assets', f)).size, 0);
   console.log(`  Start-JS ${(summe / 1024 / 1024).toFixed(2)} MB (${summe} B) in ${start.length} Dateien: ${start.join(', ')}`);
-  pruefe(`A1 Start-JS unter ${(START_JS_GRENZE / 1024 / 1024).toFixed(2)} MB (ist ${(summe / 1024 / 1024).toFixed(2)} MB; vorher 2,09 MB)`, summe < START_JS_GRENZE && summe > 1_000_000, String(summe));
+  pruefe(`A1 Start-JS unter ${(START_JS_GRENZE / 1024 / 1024).toFixed(2)} MB (ist ${(summe / 1024 / 1024).toFixed(2)} MB; vorher 2,10 MB)`, summe < START_JS_GRENZE && summe > 1_000_000, String(summe));
   pruefe('A2 kein Buffer-Ersatz in den Start-Dateien', !start.some(hatBuffer), start.filter(hatBuffer));
   pruefe('A3 kein process-Ersatz in den Start-Dateien', !start.some(hatProcess), start.filter(hatProcess));
   const glob = await P.evaluate(() => ({ buffer: typeof globalThis.Buffer, process: typeof globalThis.process, global: typeof globalThis.global }));

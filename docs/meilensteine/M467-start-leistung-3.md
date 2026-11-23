@@ -22,7 +22,7 @@ Gemessen mit `dist/`, Board mit einer Notiz, Chromium kalt (wie M446/M459), Stan
 
 | | vorher | nachher |
 |---|---|---|
-| Start-JS (über die Leitung) | 2 198 693 B (2,10 MiB), 4 Dateien | 2 168 523 B (2,07 MiB), 4 Dateien — −30 170 B |
+| Start-JS (über die Leitung) | 2 198 693 B (2,10 MiB), 4 Dateien | 2 168 523 B (2,07 MiB), 4 Dateien — −30 170 B; nach Einmischen von M466: 2 170 290 B |
 | Paket `editor` | 989 876 B (gzip 299,8 KB) | 959 887 B (gzip 290,6 KB) |
 | Buffer-/process-Ersatz im Start | ja (im Editor-Paket) | nein — nur im MSG-Paket |
 | globales `Buffer`/`process` im Browser | nein | nein |
