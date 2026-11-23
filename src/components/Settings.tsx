@@ -227,9 +227,12 @@ export function Settings() {
   const setLesbareSchrift = useBoard((s) => s.setLesbareSchrift);
   const hoherKontrast = useBoard((s) => s.hoherKontrast);
   const setHoherKontrast = useBoard((s) => s.setHoherKontrast);
-  const clickZoom = useBoard((s) => s.clickZoom);
-  const setClickZoom = useBoard((s) => s.setClickZoom);
-  // M294: Bewegung auf der Fläche als Optionen — Physik, Klick-Zoom, Konfetti
+  // M490: Einrasten (Aus · Fanglinien · Raster) — Raster ist gridSnap, „Aus" schaltet auch die Fanglinien ab
+  const gridSnap = useBoard((s) => s.gridSnap);
+  const setGridSnap = useBoard((s) => s.setGridSnap);
+  const fangLinien = useBoard((s) => s.fangLinien);
+  const setFangLinien = useBoard((s) => s.setFangLinien);
+  const einrasten = gridSnap ? 'raster' : fangLinien ? 'fang' : 'aus';
   const ziehBewegung = useBoard((s) => s.ziehBewegung);
   const setZiehBewegung = useBoard((s) => s.setZiehBewegung);
   const konfetti = useBoard((s) => s.konfetti);
@@ -696,8 +699,9 @@ export function Settings() {
             Automatisch statt Option (Milchglas gibt es seit M315 gar nicht
             mehr): Navigation links (Fuß ‹), Karte im Fokus samt Öffnen-/
             Zeigen-Art (Handy: Tipp, PC: Doppelklick, Blatt), Stift zeichnet
-            sofort (an). Zusammengelegt: Lesbarkeit (Schrift + Kontrast) und
-            Lebendige Fläche (Physik + Klick-Zoom + Konfetti). */}
+            sofort (an). Zusammengelegt: Lesbarkeit (Schrift + Kontrast).
+            M490: „Lebendige Fläche" ist aufgelöst — Klick-Zoom entfällt, Konfetti
+            ist ein eigener Schalter, dazu „Einrasten" (Aus · Fanglinien · Raster). */}
         {tab === 'design' && (
         <>
         <section className="modal-section">
@@ -783,15 +787,26 @@ export function Settings() {
             <input type="checkbox" checked={ziehBewegung} onChange={(e) => setZiehBewegung(e.target.checked)} data-taste="zieh-bewegung" />
           </label>
           <p className="modal-hint">Gegriffene Karten heben und neigen sich, Nachbarn weichen aus, beim Loslassen federn sie an ihren Platz. Aus: Karten folgen der Maus ohne Bewegung.</p>
+          {/* M490: Fanglinien abschaltbar, Raster-Fang (Alt+R, Kontextmenü, Dock) als dritter Zustand */}
+          <div className="modal-row">
+            <span>Einrasten</span>
+            <div className="seg" role="group" aria-label="Einrasten" data-taste="einrasten">
+              {([['aus', 'Aus'], ['fang', 'Fanglinien'], ['raster', 'Raster']] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  className={einrasten === v ? 'on' : ''}
+                  aria-pressed={einrasten === v}
+                  data-einrasten={v}
+                  onClick={() => { if (v === 'raster') setGridSnap(true); else { setGridSnap(false); setFangLinien(v === 'fang'); } }}
+                >{label}</button>
+              ))}
+            </div>
+          </div>
+          <p className="modal-hint">Fanglinien richten gezogene Karten an Kanten und Mitten anderer Karten aus, Raster am Gitter. Strg beim Ziehen legt frei ab, Alt+R schaltet das Raster.</p>
           <label className="modal-row modal-row-check">
-            <span>Lebendige Fläche</span>
-            <input
-              type="checkbox"
-              checked={clickZoom || konfetti}
-              onChange={(e) => { setClickZoom(e.target.checked); setKonfetti(e.target.checked); }}
-            />
+            <span>Konfetti beim Erledigen</span>
+            <input type="checkbox" checked={konfetti} onChange={(e) => setKonfetti(e.target.checked)} data-taste="konfetti" />
           </label>
-          <p className="modal-hint">Die Ansicht fliegt zu angeklickten Karten, Konfetti beim Erledigen. Aus bleibt die Fläche ruhig.</p>
           {/* M326: Finger-Gesten nach Procreate */}
           <label className="modal-row modal-row-check">
             <span>Finger-Gesten (wie Procreate)</span>

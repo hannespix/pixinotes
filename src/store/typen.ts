@@ -388,6 +388,10 @@ export interface BoardState {
   /** Gitter anzeigen + Karten am Raster einrasten (persistiert, M88) */
   gridSnap: boolean;
   setGridSnap: (on: boolean) => void;
+  /** M490: Fanglinien beim Ziehen (an Kanten/Mitten anderer Karten einrasten). Einrasten „Aus" = weder
+   *  Fanglinien noch Raster; „Raster" = gridSnap (hat Vorrang, fangLinien bleibt für den Rückweg mit Alt+R stehen) */
+  fangLinien: boolean;
+  setFangLinien: (on: boolean) => void;
   removeBoard: (id: string) => void;
   /** Board in ein (anderes) Projekt verschieben, optional vor ein bestimmtes Board */
   moveBoard: (boardId: string, targetProjectId: string, beforeBoardId?: string) => void;
@@ -495,9 +499,6 @@ export interface BoardState {
   /** Höherer Kontrast: kräftigere Schrift und Ränder, kein Milchglas, keine Textur */
   hoherKontrast: boolean;
   setHoherKontrast: (on: boolean) => void;
-  /** Klick-Zoom: beim Anklicken sanft zur Karte fliegen (wenn klein/außerhalb) */
-  clickZoom: boolean;
-  setClickZoom: (on: boolean) => void;
   /** Mausrad zoomt statt zu scrollen (Miro-Stil) */
   wheelZoom: boolean;
   /** M320: Handschrift online erkennen lassen (Google Input Tools) — Opt-in, Striche verlassen das Gerät */

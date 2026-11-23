@@ -89,7 +89,6 @@ export const KUERZEL: Kuerzel[] = [
   { id: 'raster', taste: 'Alt+R', was: 'Raster-Fang ein- und ausschalten', gruppe: 'Board' },
   { id: 'physik', taste: 'Alt+O', was: 'Bewegung beim Ziehen (heben, ausweichen, federn) ein- und ausschalten', gruppe: 'Board' },
   { id: 'schwenken', taste: 'Leertaste halten', was: 'Ansicht verschieben, auch über Karten', gruppe: 'Board', fremd: true },
-  { id: 'zurueckfliegen', taste: 'Esc', was: 'nach einem Klick-Zoom zurück zur alten Position', gruppe: 'Board', fremd: true },
 
   // ── Text & Zeichnen ─────────────────────────────────────────────────────
   { id: 'zeichnen', taste: 'Alt+Z', was: 'Zeichnen (Stift) ein- und ausschalten', gruppe: 'Text & Zeichnen' },

@@ -52,7 +52,8 @@ import { ErrorBoundary } from './ErrorBoundary';
  * großes Blatt über dem Board (siehe Stylesheet) — dort ist der Zusammenhang
  * zum Board wertvoll, am Telefon wäre er verschenkter Platz.
  *
- * Der Klick-Zoom bleibt als Rückfalloption für alle, die den Fokus abschalten.
+ * M490: Den Klick-Zoom (Ansicht fliegt zur angeklickten Karte) gibt es nicht mehr — seit M314 ist der
+ * Fokus immer an und hat ihn verdrängt; hinfliegen tun Doppelklick (Fokus), Suche und Übersicht.
  */
 const isPhoneFocus = () => window.matchMedia('(pointer: coarse)').matches;
 
@@ -953,7 +954,7 @@ export function Board() {
    * M344: Fanglinien. Beim Ziehen rastet die Karte (bzw. der Kasten um alle gezogenen Karten) an
    * Kanten und Mitten der übrigen Karten ein — 6 Bildpunkte Fangweite, in jeder Zoomstufe gleich.
    * Strg/⌘ gedrückt: frei ablegen. Mit Raster-Fang hat das Raster Vorrang; Rahmen ziehen ihre
-   * Karten über eigene Deltas mit und bleiben außen vor.
+   * Karten über eigene Deltas mit und bleiben außen vor. M490: Einrasten „Aus" (fangLinien false) = frei.
    */
   const strgRef = useRef(false);
   const ziehtRef = useRef(false);
@@ -978,7 +979,7 @@ export function Board() {
       const ids = new Set(zieh.map((c) => c.id));
       const mass = (n: AppNode) => ({ w: n.measured?.width ?? n.width ?? 260, h: n.measured?.height ?? n.height ?? 120 });
       const bewegt = alle.filter((n) => ids.has(n.id));
-      if (st.gridSnap || strgRef.current || bewegt.some((n) => n.type === 'frame') || bewegt.length === 0) fangSetzen([]);
+      if (st.gridSnap || !st.fangLinien || strgRef.current || bewegt.some((n) => n.type === 'frame') || bewegt.length === 0) fangSetzen([]);
       else {
         let x1 = Infinity; let y1 = Infinity; let x2 = -Infinity; let y2 = -Infinity;
         for (const c of zieh) {
@@ -1030,9 +1031,6 @@ export function Board() {
     zugSchritt.current = { eintrag: past[past.length - 1], x: node.position.x, y: node.position.y };
   }, [ziehBeginnen]);
 
-  // Klick-Zoom (optional, ⚙ → Design → Bedienung): fliegt NUR, wenn die Karte
-  // klein oder angeschnitten ist — wer schon nah dran arbeitet, wird nicht
-  // herumgeworfen. Drags lösen kein Click-Event aus (React Flow unterdrückt das).
   // Leertaste halten + ziehen = Pannen, auch ÜBER Karten (Photoshop-Gewohnheit).
   // React Flow startet den Flächen-Pan nur auf der Fläche selbst — deshalb werden
   // Karten während gehaltener Leertaste durchklick-transparent (CSS .space-pan).
@@ -1133,9 +1131,6 @@ export function Board() {
     };
   }, []);
 
-  // Esc fliegt nach einem Klick-Zoom zur vorherigen Position zurück — aber nur,
-  // solange man die Ansicht nicht selbst weiterbewegt hat
-  const returnViewport = useRef<{ x: number; y: number; zoom: number } | null>(null);
   const flyingUntil = useRef(0);
 
   /**
@@ -1426,24 +1421,7 @@ export function Board() {
     // Karte wählen) — nicht der Finger-Tipp, der am Tablet das Blatt öffnet.
     const stift = (e.nativeEvent as PointerEvent).pointerType === 'pen';
     if (!e.shiftKey && !stift && (isPhoneFocus() || st0.fokusEinKlick) && oeffneFokus(node)) return;
-    // Klick-Zoom nur noch, wenn der Fokus AUS ist — sonst zoomte die Ansicht
-    // zusätzlich zum Fokus, und man landete nach dem Schließen woanders
-    if (st0.cardFocus || !useBoard.getState().clickZoom || e.shiftKey) return;
-    // Rahmen NIE per Klick einpassen (User-Report M162): Klicks treffen dort
-    // immer die Titel-Leiste/Werkzeuge — bei großen Rahmen zoomte die Ansicht
-    // so weit heraus, dass genau diese Werkzeuge unlesbar wurden
-    if (node.type === 'frame') return;
-    const { x, y, zoom } = getViewport();
-    const w = (node.measured?.width ?? 260) * zoom;
-    const h = (node.measured?.height ?? 160) * zoom;
-    const sx = node.position.x * zoom + x;
-    const sy = node.position.y * zoom + y;
-    const fullyVisible = sx >= 8 && sy >= 64 && sx + w <= window.innerWidth - 8 && sy + h <= window.innerHeight - 76;
-    if (fullyVisible && zoom >= 0.65 * anzRef.current) return; // gut lesbar im Blick → nicht springen
-    returnViewport.current = { x, y, zoom };
-    flyingUntil.current = performance.now() + 700;
-    void fitView({ nodes: [{ id: node.id }], padding: 0.35, duration: 450, maxZoom: 1.05 * anzRef.current });
-  }, [fitView, getViewport, oeffneFokus]);
+  }, [oeffneFokus]);
 
   /**
    * M227: Nach dem Fokus die Karte GANZ ins Bild holen.
@@ -1476,26 +1454,6 @@ export function Board() {
     window.addEventListener('pixinotes:fokus-zurueck', zurueck);
     return () => window.removeEventListener('pixinotes:fokus-zurueck', zurueck);
   }, [fitView, getViewport]);
-
-  useEffect(() => {
-    const onEsc = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || !returnViewport.current) return;
-      const st = useBoard.getState();
-      // Overlays haben Vorrang (deren Esc schließt sie) — und nur im Auswahl-Werkzeug
-      if (st.searchOpen || st.settingsOpen || st.helpOpen || st.tasksOpen || st.presenting || st.tool !== 'select') return;
-      // Der Klick-Zoom fokussiert meist den Karten-Editor — Esc darf trotzdem
-      // zurückfliegen (der Anker existiert nur direkt nach dem Flug und ist
-      // einmalig). Nur ein offenes Slash-Menü hat Vorrang.
-      if (document.querySelector('.bn-suggestion-menu')) return;
-      (document.activeElement as HTMLElement | null)?.blur?.();
-      const prev = returnViewport.current;
-      returnViewport.current = null;
-      flyingUntil.current = performance.now() + 700;
-      void setViewport(prev, { duration: 400 });
-    };
-    window.addEventListener('keydown', onEsc);
-    return () => window.removeEventListener('keydown', onEsc);
-  }, [setViewport]);
 
   // Angefasst = dauerhaft nach vorn: Capture-Listener statt onNodeClick, damit
   // auch Klicks in Editor/nodrag-Bereiche zählen (die erreichen onNodeClick nicht)
@@ -1791,8 +1749,7 @@ export function Board() {
         snapGrid={[20, 20]}
         zoomOnScroll={wheelZoom}
         panActivationKeyCode="Space"
-        onMoveEnd={() => { if (performance.now() > flyingUntil.current) returnViewport.current = null; }}
-        // M249: Ausschnitt je Board festhalten — jede Änderung zählt, auch
+                // M249: Ausschnitt je Board festhalten — jede Änderung zählt, auch
         // Zoom-Knöpfe und Flüge, nicht nur das Schwenken mit der Maus.
         // (M315: Die Papiertextur ist weg — und mit ihr die Kachel-Variablen,
         // die hier bei jedem Schwenk ins DOM geschrieben wurden.)

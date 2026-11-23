@@ -216,7 +216,6 @@ export const speicherAuswahl = (s: BoardState) => ({
   konfetti: s.konfetti,
   pfeilSchatten: s.pfeilSchatten,
   stiftZeichnet: s.stiftZeichnet,
-  clickZoom: s.clickZoom,
   cardFocus: s.cardFocus,
   fokusEinKlick: s.fokusEinKlick,
   fokusVollbild: s.fokusVollbild,
@@ -235,6 +234,7 @@ export const speicherAuswahl = (s: BoardState) => ({
   handschriftKi: s.handschriftKi,
   showArchived: s.showArchived,
   gridSnap: s.gridSnap,
+  fangLinien: s.fangLinien,
   overviewMode: s.overviewMode,
   graphLayers: s.graphLayers,
 });
