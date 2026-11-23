@@ -67,6 +67,8 @@ import { FingerGesten } from './FingerGesten';
 import { CommentLayer } from './CommentLayer';
 import { SelectionToolbar } from './SelectionToolbar';
 import { BoardKontextmenue } from './Kontextmenue';
+import { fristenLaden } from '../lib/dates';
+import { rufnummernLaden } from '../lib/rufnummer';
 
 /** M213: Jede Karte bekommt ihre eigene Fehlergrenze. Stolpert eine — etwa
  *  über kaputte Daten aus einem Import —, bleibt der Schaden auf sie
@@ -89,19 +91,21 @@ const guard = <P extends object>(C: React.ComponentType<P>): React.ComponentType
  * kein Spinner, kein Text, damit nichts flackert. `kartenVorladen()` holt alle Teile kurz nach dem Start im
  * Leerlauf nach, damit das Anlegen später ohne Wartezeit geht und der Service Worker sie auch offline hat.
  */
+/** M459: Karten, die Fristen bzw. Rufnummern lesen, kommen erst mit der (nachgeladenen) Erkennung — kein Nachrücken */
+const mitFristen = <T,>(teil: Promise<T>): Promise<T> => Promise.all([teil, fristenLaden().catch(() => {})]).then(([t]) => t);
 const KARTEN_LADER = {
-  kanban: () => import('./nodes/KanbanCard').then((m) => m.KanbanCard),
+  kanban: () => mitFristen(import('./nodes/KanbanCard').then((m) => m.KanbanCard)),
   shape: () => import('./nodes/ShapeCard').then((m) => m.ShapeCard),
   mermaid: () => import('./nodes/MermaidCard').then((m) => m.MermaidCard),
-  gantt: () => import('./nodes/GanttCard').then((m) => m.GanttCard),
-  calendar: () => import('./nodes/CalendarCard').then((m) => m.CalendarCard),
+  gantt: () => mitFristen(import('./nodes/GanttCard').then((m) => m.GanttCard)),
+  calendar: () => mitFristen(import('./nodes/CalendarCard').then((m) => m.CalendarCard)),
   week: () => import('./nodes/WeekCard').then((m) => m.WeekCard),
   sheet: () => import('./nodes/SheetCard').then((m) => m.SheetCard),
   minutes: () => import('./nodes/MinutesCard').then((m) => m.MinutesCard),
   time: () => import('./nodes/TimeCard').then((m) => m.TimeCard),
   htmlapp: () => import('./nodes/HtmlAppCard').then((m) => m.HtmlAppCard),
   bubbles: () => import('./nodes/BubblesCard').then((m) => m.BubblesCard),
-  kontakt: () => import('./nodes/KontaktCard').then((m) => m.KontaktCard),
+  kontakt: () => Promise.all([import('./nodes/KontaktCard'), rufnummernLaden().catch(() => {})]).then(([m]) => m.KontaktCard),
 } satisfies Record<string, () => Promise<React.ComponentType<any>>>;
 
 const spaet = (laden: () => Promise<React.ComponentType<any>>): React.ComponentType<any> => {

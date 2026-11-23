@@ -9,7 +9,7 @@ import {
   REAKTION_EREIGNIS, REAKTIONEN, reagieren, TIMER_EREIGNIS, timerRest, timerStart, timerStopp, timerText, timerVergessen, timerVon,
   type Reaktion,
 } from '../lib/gruppenraum';
-import { ich } from '../lib/gastSync';
+import { ich } from '../lib/liveStand';
 import { ITimer, IX, ILaecheln } from './Icons';
 
 /** Aufklappen mit Schließen bei Klick daneben und Esc */

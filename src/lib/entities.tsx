@@ -4,7 +4,7 @@
 // wa.me/4917…) oder Datumsangaben in Dateinamen dürfen den Treffer nicht
 // zerschneiden (Audit N4 + Praxis-Bug: „08.07.2026" ist keine Rufnummer).
 import type { ReactNode } from 'react';
-import { findPhoneNumbersInText } from 'libphonenumber-js';
+import { rufnummernFuer } from './rufnummer';
 
 const URL_RE = /https?:\/\/[^\s<>"')]+/g;
 /** file://-Links (Netzlaufwerke) — im Büroalltag allgegenwärtig */
@@ -84,7 +84,8 @@ export function extractEntities(text: string): EntityHit[] {
   }
 
   try {
-    for (const p of findPhoneNumbersInText(text, 'DE')) {
+    // M459: Die Erkennung lädt bei Bedarf — bis dahin ohne Telefon-Treffer (die Anzeige zeichnet danach neu)
+    for (const p of rufnummernFuer(text)?.findPhoneNumbersInText(text, 'DE') ?? []) {
       if (inZone(p.startsAt, p.endsAt)) continue;
       const display = text.slice(p.startsAt, p.endsAt);
       const context = text.slice(Math.max(0, p.startsAt - 3), Math.min(text.length, p.endsAt + 3));
@@ -168,7 +169,8 @@ export function enrichText(text: string): ReactNode[] {
 
   // 5. Telefonnummern (außerhalb von URLs/Pfaden/Mails, keine Datumsangaben)
   try {
-    for (const p of findPhoneNumbersInText(text, 'DE')) {
+    // M459: Die Erkennung lädt bei Bedarf — bis dahin ohne Telefon-Link (die Anzeige zeichnet danach neu)
+    for (const p of rufnummernFuer(text)?.findPhoneNumbersInText(text, 'DE') ?? []) {
       if (overlaps(p.startsAt, p.endsAt)) continue;
       const display = text.slice(p.startsAt, p.endsAt);
       // Datum statt Rufnummer? Auch den unmittelbaren Kontext prüfen, falls

@@ -11,7 +11,11 @@
 import { useBoard, type BoardDoc } from '../store';
 import { loadFile, saveFile } from './fileStore';
 import { anhangInhalt, anhangKarte } from './syncFolder';
-import { kontoAnfrage, kontoDateiNachladen, loadKonto } from './kontoSync';
+import { loadKonto } from './kontoSitzung';
+import { kontoDateiHolen } from './syncStart';
+// M459: Der Konto-Abgleich lädt bei Bedarf (lib/syncStart.ts) — Anfragen holen ihn sich hier selbst
+const kontoAnfrage = async (url: string, init: RequestInit = {}): Promise<Response> => (await import('./kontoSync')).kontoAnfrage(url, init);
+const kontoDateiNachladen = (id: string): Promise<Blob | null> => kontoDateiHolen(id);
 import { supabaseKonfig } from './kontoSupabase';
 import { ohneAuswahl } from './syncMerge';
 import { cloneSharedBoard, parseBoardPayload } from './share';

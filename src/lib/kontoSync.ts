@@ -26,24 +26,11 @@ import { nurAuswahlAnders } from './syncMerge';
 import { patchFuer, type Patch } from './gastPatch';
 import { anhangGroesse, anhangLokal } from './htmlStore';
 
-/** M328: 'supabase' = das eigene PixiNotes-Konto (E-Mail), Ablage beim Betreiber */
-export type Anbieter = 'google' | 'ms' | 'supabase';
+// M459: Sitzung und Anzeige liegen in lib/kontoSitzung.ts (ohne den Abgleich, für den Start) — hier weitergereicht
+import { KONTO_LS_KEY, kontoIstEigenes, kontoLabel, loadKonto, type Anbieter, type KontoSitzung } from './kontoSitzung';
+export { kontoIstEigenes, kontoLabel, loadKonto, type Anbieter, type KontoSitzung };
 
-export interface KontoSitzung {
-  anbieter: Anbieter;
-  /** OAuth-Client-ID — beim PixiNotes-Konto der öffentliche Anon-Key */
-  clientId: string;
-  tenant?: string;
-  token?: string;
-  tokenExp?: number;      // epoch ms
-  refreshToken?: string;  // Microsoft und PixiNotes-Konto (Google-SPAs bekommen keinen)
-  name?: string;          // Anzeige: E-Mail oder Name des Kontos
-  /** PixiNotes-Konto: Adresse des Projekts und die eigene Nutzer-Id (für Realtime-Filter) */
-  url?: string;
-  userId?: string;
-}
-
-const LS_KEY = 'pixinotes-konto-sync';
+const LS_KEY = KONTO_LS_KEY;
 const STAMP_KEY = 'pixinotes:konto-stamp';
 const KENN_KEY = 'konto:kenn';
 const UMGEBUNG = 'umgebung.json';
@@ -74,19 +61,8 @@ export function bekannteClientId(a: Anbieter): string {
 }
 export const bekannterTenant = (): string => (env.VITE_MS_TENANT ?? loadCalAccounts().ms?.tenant ?? 'common') || 'common';
 
-export function loadKonto(): KontoSitzung | null {
-  try {
-    const s = JSON.parse(localStorage.getItem(LS_KEY) ?? 'null') as KontoSitzung | null;
-    return s?.anbieter && s.clientId && (s.token || s.refreshToken) ? s : null;
-  } catch {
-    return null;
-  }
-}
 function saveKonto(s: KontoSitzung): void { localStorage.setItem(LS_KEY, JSON.stringify(s)); }
 export const kontoStamp = (): string | null => localStorage.getItem(STAMP_KEY);
-export const kontoLabel = (s: KontoSitzung | null = loadKonto()): string => (s?.anbieter === 'supabase' ? 'PixiNotes-Konto' : s?.anbieter === 'ms' ? 'OneDrive' : 'Google Drive');
-/** M328: Ist das angemeldete Konto das eigene PixiNotes-Konto? */
-export const kontoIstEigenes = (s: KontoSitzung | null = loadKonto()): boolean => s?.anbieter === 'supabase';
 
 /** Abmelden: Zugangsdaten, Stempel, Basis und Server-Kenntnis weg — die Daten bleiben lokal UND im Konto. */
 export function kontoAbmelden(): void {
@@ -125,6 +101,7 @@ async function kontoName(s: KontoSitzung): Promise<string | undefined> {
 
 /** Interaktiv anmelden (Popup). Speichert die Sitzung; Verbinden/Abgleich macht `kontoVerbinden`. */
 export async function kontoAnmelden(anbieter: Anbieter, clientId: string, tenant = 'common', hint?: string): Promise<KontoSitzung> {
+  initKontoSync();   // M459: siehe kontoAnmeldenSupabase
   if (!oauthAvailable()) throw new Error('Anmelden geht nur über die gehostete App (http/https), nicht aus der Einzeldatei.');
   if (!clientId.trim()) throw new Error(anbieter === 'google' ? 'Keine Google-Client-ID hinterlegt.' : 'Keine Microsoft-App-ID hinterlegt.');
   let s: KontoSitzung;
@@ -147,6 +124,7 @@ export async function kontoAnmelden(anbieter: Anbieter, clientId: string, tenant
  * Speichert die Sitzung und startet Realtime; Verbinden/Abgleich macht `kontoVerbinden`.
  */
 export async function kontoAnmeldenSupabase(sitz: SbSitzung): Promise<KontoSitzung> {
+  initKontoSync();   // M459: der Abgleich läuft ohne Konto nicht von selbst an (lib/syncStart.ts) — vor der Anmeldung starten wie früher beim Start
   const k = supabaseKonfig();
   if (!k.url || !k.key) throw new Error('PixiNotes-Konto: Der Betreiber hat noch kein Konto-Backend hinterlegt.');
   const s: KontoSitzung = { anbieter: 'supabase', clientId: k.key, url: k.url, token: sitz.token, tokenExp: sitz.exp, refreshToken: sitz.refreshToken, userId: sitz.userId, name: sitz.email };

@@ -13,7 +13,7 @@ import { pdfSeiteMasse, pdfSeiteText, renderPdfPage } from '../../lib/pdf';
 import { seitenTextMelden } from '../../lib/markerZeile';
 import { blasenAn, blasenSetzen, DOKUMENT_BEFEHL, letzteSeite, pdfAufgeklappt, pdfAufklappen, seiteMelden, seiteMerken, seitenKommentare, type DokumentBefehl } from '../../lib/pdfSeiten';
 import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/fileStore';
-import { kontoDateiNachladen } from '../../lib/kontoSync';
+
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { BildLupe } from './BildLupe';
@@ -21,6 +21,7 @@ import { ICrop, IDownload, IX, IImage, IComment } from '../Icons';
 import { bildBearbeiten } from '../BildEditorHost';
 
 import { DateiSymbol } from '../KartenSymbol';
+import { kontoDateiHolen } from '../../lib/syncStart';
 
 /**
  * Datei als Karte. PDFs zeigen die erste Seite als Mini-Vorschau direkt auf
@@ -67,7 +68,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
       // M329: Nicht hier, aber im PixiNotes-Konto? Dann jetzt holen (große Anhänge reisen erst beim Öffnen)
       if (!b) {
         setKontoLaedt(true);
-        try { b = (await kontoDateiNachladen(id)) ?? undefined; } catch { b = undefined; }
+        try { b = (await kontoDateiHolen(id)) ?? undefined; } catch { b = undefined; }
         setKontoLaedt(false);
       }
       if (!b || weg) return;

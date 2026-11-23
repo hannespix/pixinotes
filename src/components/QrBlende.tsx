@@ -5,7 +5,7 @@
 // trägt den Einladungslink des Boards; wer ihn scannt, landet im Board (mit „auch ohne Konto": sofort).
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useBoard } from '../store';
-import { EINLADUNG_EREIGNIS, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
+import { EINLADUNG_EREIGNIS, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/liveStand';
 import { qrBild, qrWunschFuer, qrZeigen, type QrBild, type QrWunsch } from '../lib/qr';
 import { sprache } from '../lib/sprache';
 import { IMaximize, IMinimize, IX } from './Icons';

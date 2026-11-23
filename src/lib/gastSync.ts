@@ -14,11 +14,20 @@
 // nicht als Änderung: Verglichen und geschrieben wird mit den Maßen des letzten gemeinsamen Stands, sonst
 // schickten sich zwei verschiedene Geräte endlos „Änderungen" zu.
 import { flushPersist, inDerived, isImportedState, leeresStartboard, NOTIZ_EXTERN, ohneLeseschutz, ohneStartboard, runDerived, persistHaken, setzeGruppe, setzeKartenSperren, useBoard, verlaufAbgrenzen, type BoardDoc, type GastRecht, type Space } from '../store';
-import { getAuthor } from '../components/CommentLayer';
 import { loadFile, saveFile } from './fileStore';
 import { supabaseKonfig } from './kontoSupabase';
 import { checkKontoRemote, kontoAnfrage, loadKonto, mitGeteiltBereich, stempel } from './kontoSync';
-import { liveKanal, type LiveKanal, type Teilnehmer } from './liveKanal';
+// M459: Kanäle, Anwesende, Sperren und „wer bin ich" liegen in lib/liveStand.ts (fürs Starten ohne den Abgleich) —
+// hier gefüllt und weitergereicht
+import {
+  anwesend, eigeneLinks, eigeneLinksSetzen, EINLADUNG_EREIGNIS, einladungVon, farbenVerteilen, GAST_NAME, ich, ichIn, kanaele, LIVE_NACHRICHT,
+  liveAuf, liveSenden, liveVerbunden, meineKennung, nameGeaendert, sperren, SPERREN_EREIGNIS, sperrenVon, TEILNEHMER_EREIGNIS, teilnehmerVon,
+} from './liveStand';
+export {
+  EINLADUNG_EREIGNIS, einladungVon, farbenVerteilen, GAST_NAME, ich, ichIn, LIVE_NACHRICHT, liveAuf, liveSenden, liveVerbunden, meineKennung,
+  nameGeaendert, SPERREN_EREIGNIS, sperrenVon, TEILNEHMER_EREIGNIS, teilnehmerVon,
+};
+import { liveKanal, type Teilnehmer } from './liveKanal';
 import { istPatch, patchAnwenden, patchAus, patchSaeubern, type Patch } from './gastPatch';
 import { boardVonAussen, karteEntschaerfen, karteGueltig } from './sicher';
 import { anhangKarte, idbDel, idbGet, idbSet, liveHaken } from './syncFolder';
@@ -27,14 +36,11 @@ import { berichtAlsSatz, dreiWegeMerge, ohneAuswahl } from './syncMerge';
 import type { AppNode } from '../types';
 
 const KEY = 'pixinotes-gast';
-const ICH_KEY = 'pixinotes-gast-ich';
 const BLICK_MS = 3500;
 /** M366: Mit stehendem Live-Kanal kommen Änderungen von selbst — der Blick ist dann nur noch die Kontrolle */
 const BLICK_MIT_KANAL_MS = 20_000;
 /** Größer wird eine Änderung nicht über den Kanal geschickt (dann holen die anderen den Stand) */
 const DELTA_MAX_ZEICHEN = 60_000;
-export const GAST_NAME = 'Per Link';
-export const TEILNEHMER_EREIGNIS = 'pixinotes:teilnehmer';
 
 type Rolle = 'bearbeiten' | 'lesen';
 interface Eintrag { token: string; rolle: Rolle; version: number; kanal?: string; recht?: GastRecht }
@@ -48,48 +54,6 @@ const lesen = (): Record<string, Eintrag> => { try { return JSON.parse(localStor
 const schreiben = (m: Record<string, Eintrag>): void => { try { localStorage.setItem(KEY, JSON.stringify(m)); } catch { /* voll */ } };
 const basisKey = (boardId: string): string => `gast:basis:${boardId}`;
 
-/** Wer bin ich im Kanal? Kennung je Gerät, Farbe aus der Kennung, Name aus den Kommentaren */
-const FARBEN = ['#2563eb', '#db2777', '#059669', '#d97706', '#7c3aed', '#0891b2', '#dc2626', '#4d7c0f'];
-export function ich(): Teilnehmer {
-  let id = '';
-  try { id = localStorage.getItem(ICH_KEY) ?? ''; if (!id) { id = Math.random().toString(36).slice(2, 12); localStorage.setItem(ICH_KEY, id); } } catch { id = Math.random().toString(36).slice(2, 12); }
-  let h = 0;
-  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return { id, name: getAuthor().trim() || loadKonto()?.name?.split('@')[0] || 'Gast', farbe: FARBEN[h % FARBEN.length] };
-}
-
-/** M365: Kennung, unter der dieses Gerät Karten anlegt — Gäste per Link „g:…", Konten „k:…" (der Server prüft das Präfix) */
-/**
- * M385: Zwei Anwesende nie in derselben Farbe. Jeder bringt seine Farbe mit (aus seiner Kennung gerechnet, acht
- * stehen zur Wahl) — bei zwei Leuten trifft es in jedem achten Fall dieselbe, und dann sind zwei Mauszeiger,
- * zwei Rahmen, zwei Kürzel nicht mehr auseinanderzuhalten. Hier wird verteilt: der Reihe der Kennungen nach
- * behält jeder seine Farbe, solange sie frei ist, sonst bekommt er die nächste freie. Alle Geräte rechnen aus
- * derselben Liste dasselbe; gemeldet wird weiter die mitgebrachte Farbe. Ab neun Leuten wiederholen sich Farben.
- */
-export function farbenVerteilen(liste: Teilnehmer[]): Teilnehmer[] {
-  if (liste.length < 2) return liste;
-  const reihe = [...liste].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  const belegt = new Set<string>();
-  const neu = new Map<string, string>();
-  for (const t of reihe) {
-    if (neu.has(t.id)) continue;      // derselbe Mensch in zwei Fenstern: eine Farbe
-    let f = t.farbe;
-    if (belegt.has(f) && belegt.size < FARBEN.length) {
-      let i = Math.max(0, FARBEN.indexOf(f));
-      while (belegt.has(FARBEN[i % FARBEN.length])) i += 1;
-      f = FARBEN[i % FARBEN.length];
-    }
-    belegt.add(f); neu.set(t.id, f);
-  }
-  return liste.map((t) => (neu.get(t.id) === t.farbe ? t : { ...t, farbe: neu.get(t.id) ?? t.farbe }));
-}
-/** Ich, so wie mich die anderen in diesem Board sehen (mit der verteilten Farbe) */
-export function ichIn(boardId: string): Teilnehmer {
-  const t = ich();
-  const f = anwesend.get(boardId)?.find((x) => x.id === t.id)?.farbe;
-  return f && f !== t.farbe ? { ...t, farbe: f } : t;
-}
-export const meineKennung = (alsGast: boolean): string => (alsGast ? `g:${ich().id}` : `k:${loadKonto()?.userId ?? ich().id}`);
 class GastFehler extends Error { constructor(public art: 'vorbedingung' | 'keine-freigabe' | 'netz' | 'fehlt' | 'abgelehnt' | 'nicht-erlaubt', text: string) { super(text); } }
 /** Server-Funktion mit dem öffentlichen Schlüssel aufrufen — kein Konto nötig */
 async function rpc<T>(name: string, body: unknown): Promise<T> {
@@ -188,21 +152,11 @@ const groesse = (boardId: string): number => Math.max(1, anwesend.get(boardId)?.
 const streuung = (boardId: string, jeKopfMs: number): number => Math.random() * (300 + groesse(boardId) * jeKopfMs);
 
 // ---------- Laufender Abgleich ----------
-const kanaele = new Map<string, LiveKanal>();                 // boardId → Kanal
-const anwesend = new Map<string, Teilnehmer[]>();             // boardId → wer ist dabei
 const laeuft = new Map<string, Promise<unknown>>();           // boardId → Kette (nie zwei Abgleiche zugleich)
 const schreibTimer = new Map<string, ReturnType<typeof setTimeout>>();
 let letzteAenderung = 0;
 let gestartet = false;
 
-export const teilnehmerVon = (boardId: string): Teilnehmer[] => anwesend.get(boardId) ?? [];
-/** Auf diesem Board läuft ein Live-Kanal (geteiltes Board: Besitzer, Gast mit Konto oder Gast per Link) */
-export const liveAuf = (boardId: string): boolean => kanaele.has(boardId);
-/** Steht die Live-Verbindung gerade? (sonst gleicht der regelmäßige Blick ab — nur ohne „wer ist dabei") */
-export const liveVerbunden = (boardId: string): boolean => !!kanaele.get(boardId)?.verbunden;
-/** Nachricht an alle anderen auf diesem Board (für „Folgt mir") */
-export const liveSenden = (boardId: string, ereignis: string, inhalt?: unknown): void => kanaele.get(boardId)?.senden(ereignis, inhalt);
-export const LIVE_NACHRICHT = 'pixinotes:live-nachricht';
 
 function exklusiv<T>(boardId: string, fn: () => Promise<T>): Promise<T> {
   const p = (laeuft.get(boardId) ?? Promise.resolve()).then(fn, fn);
@@ -290,10 +244,6 @@ export async function sicherungZurueck(boardId: string): Promise<boolean> {
 // zu, gewinnt der frühere Zeitpunkt (bei Gleichstand die kleinere Kennung) — auf allen Geräten gleich.
 const meine = new Map<string, { karte: string; seit: number }>();   // boardId → Karte, die ich halte
 const meineKarte = (boardId: string): { karte?: string; seit?: number } => meine.get(boardId) ?? {};
-/** Wer hält welche Karte (ohne mich)? → an den Speicher (Schutz) und an die Anzeige */
-export const SPERREN_EREIGNIS = 'pixinotes:karten-sperren';
-const sperren = new Map<string, Map<string, Teilnehmer>>();          // boardId → Karte → Halter
-export const sperrenVon = (boardId: string): Map<string, Teilnehmer> => sperren.get(boardId) ?? new Map();
 function sperrenRechnen(boardId: string): void {
   const selbst = ich().id;
   const halter = new Map<string, Teilnehmer>();
@@ -474,11 +424,6 @@ liveHaken.nach = (b) => {
   });
   return anders ? { ...b, nodes } : b;
 };
-/** Der eigene Name hat sich geändert (Namensfeld beim Einwählen, Kommentar-Name) — allen Kanälen sagen */
-export function nameGeaendert(): void {
-  const t = ich();
-  for (const k of kanaele.values()) k.ich(t);
-}
 
 /** Anhänge des Besitzers nachladen, die hier noch fehlen (die Karten zeigen sie, sobald sie liegen) */
 async function dateienHolen(board: BoardDoc, dateien: GastDatei[] | undefined): Promise<void> {
@@ -817,22 +762,7 @@ function gastBoardStarten(boardId: string, kanalName: string): void {
 
 // ---------- Mit Konto: Kanäle der geteilten Boards (Besitzer und Gäste mit Konto) ----------
 interface EigenerLink { token: string; board_id: string; ohne_konto?: boolean; dateien?: GastDatei[]; optionen?: Optionen }
-let eigeneLinks: EigenerLink[] = [];
 const kontoKanal = new Map<string, string>();   // boardId → Besitzer (Kanäle, die über das Konto laufen)
-/** Der Einladungslink erschien, änderte sich oder fiel weg (M385: der QR-Knopf richtet sich danach) */
-export const EINLADUNG_EREIGNIS = 'pixinotes:einladung';
-/**
- * M385: Der Einladungslink eines Boards, soweit dieses Gerät ihn kennt — als Besitzer der eigene Link, als Gast
- * per Link der, über den man selbst hereinkam.
- */
-export function einladungVon(boardId: string): { token: string; ohneKonto: boolean } | null {
-  const b = useBoard.getState().boards.find((x) => x.id === boardId);
-  if (!b) return null;
-  if (b.gastLink) return { token: b.gastLink, ohneKonto: true };
-  if (b.geteiltVon) return null;
-  const l = eigeneLinks.find((x) => x.board_id === boardId);
-  return l ? { token: l.token, ohneKonto: !!l.ohne_konto } : null;
-}
 let kontoLauf = 0;
 /**
  * Für jedes geteilte Board des angemeldeten Kontos den Live-Kanal öffnen: eigene Boards mit Einladungslink oder
@@ -843,7 +773,7 @@ export async function kontoKanaele(): Promise<void> {
   const s = loadKonto();
   if (s?.anbieter !== 'supabase' || !s.userId) {
     for (const id of kontoKanal.keys()) kanalSchliessen(id);
-    kontoKanal.clear(); eigeneLinks = [];
+    kontoKanal.clear(); eigeneLinksSetzen([]);
     return;
   }
   kontoLauf += 1;
@@ -857,14 +787,14 @@ export async function kontoKanaele(): Promise<void> {
     ]);
     if (lauf !== kontoLauf) return;
     if (rl.ok) {
-      const vorher = JSON.stringify(eigeneLinks.map((l) => [l.token, l.board_id, !!l.ohne_konto]));
-      eigeneLinks = (await rl.json()) as EigenerLink[];
-      if (vorher !== JSON.stringify(eigeneLinks.map((l) => [l.token, l.board_id, !!l.ohne_konto]))) window.dispatchEvent(new CustomEvent(EINLADUNG_EREIGNIS));
+      const vorher = JSON.stringify(eigeneLinks().map((l) => [l.token, l.board_id, !!l.ohne_konto]));
+      eigeneLinksSetzen((await rl.json()) as EigenerLink[]);
+      if (vorher !== JSON.stringify(eigeneLinks().map((l) => [l.token, l.board_id, !!l.ohne_konto]))) window.dispatchEvent(new CustomEvent(EINLADUNG_EREIGNIS));
     }
     const st = useBoard.getState();
     const eigen = (id: string): boolean => st.boards.some((b) => b.id === id && !b.geteiltVon);
     const ziel = new Map<string, string>();
-    for (const l of eigeneLinks) if (eigen(l.board_id)) ziel.set(l.board_id, s.userId);
+    for (const l of eigeneLinks() as EigenerLink[]) if (eigen(l.board_id)) ziel.set(l.board_id, s.userId);
     if (rf.ok) for (const f of (await rf.json()) as Array<{ board_id: string }>) if (eigen(f.board_id)) ziel.set(f.board_id, s.userId);
     for (const b of st.boards) if (b.geteiltVon && !b.gastLink) ziel.set(b.id, b.geteiltVon);
     for (const id of [...kontoKanal.keys()]) if (ziel.get(id) !== kontoKanal.get(id)) { kanalSchliessen(id); kontoKanal.delete(id); letzterStand.delete(id); setzeGruppe(id, null); }
@@ -1056,7 +986,7 @@ async function anhaengeFreigebenRoh(): Promise<void> {
   if (s?.anbieter !== 'supabase' || !s.userId) return;
   const sitz = { url: s.url, userId: s.userId };
   const eigenes = (id: string): BoardDoc | undefined => useBoard.getState().boards.find((b) => b.id === id && !b.geteiltVon);
-  for (const l of eigeneLinks) {
+  for (const l of eigeneLinks() as EigenerLink[]) {
     if (!l.ohne_konto) continue;   // Gäste mit Konto holen Anhänge über ihre Freigabe (unten)
     const board = eigenes(l.board_id);
     if (!board) continue;

@@ -27,7 +27,7 @@ import type { NodeProps } from '@xyflow/react';
 import { gruppeVon, GRUPPE_EREIGNIS, selectActiveBoard, useBoard, useKarteFest } from '../../store';
 import type { BubblesNode } from '../../types';
 import { uid } from '../../types';
-import { ich, liveAuf, meineKennung } from '../../lib/gastSync';
+import { ich, liveAuf, meineKennung } from '../../lib/liveStand';
 import { timerStart } from '../../lib/gruppenraum';
 import { makeNote } from '../../lib/nodes';
 import { aiReady, askAi } from '../../lib/ai';

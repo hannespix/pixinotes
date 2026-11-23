@@ -23,7 +23,8 @@ import { offeneSeite, seiteVon, strichRelativ } from './lib/pdfSeiten';
 import { findFreeSpot, frameMembers, sizeOf } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
 import { t } from './lib/sprache';
-import { fristAnkerPflegen, type FristAnker } from './lib/fristAnker';
+import { blockeMitDatum, fristAnkerNachLaden, fristAnkerPflegen, type FristAnker } from './lib/fristAnker';
+import { fristenBereit, fristenLaden } from './lib/dates';
 import { blocksToText } from './lib/serialize';
 import { linksUmbenennen, normalizeName } from './lib/links';
 
@@ -1402,6 +1403,8 @@ const mitFristAnker = (n: AppNode, data: Record<string, unknown>): Record<string
   const neu = fristAnkerPflegen(data.blocks, alt);
   return neu === alt ? data : { ...data, fristAnker: neu };
 };
+// M459: Wurde ein Text geschrieben, bevor die Fristen-Erkennung geladen war, trägt der Speicher den Anker danach nach
+fristAnkerNachLaden(() => useBoard.getState().fristAnkerNachtragen());
 
 export const useBoard = create<BoardState>()(
   persist(
@@ -1885,6 +1888,11 @@ export const useBoard = create<BoardState>()(
         fristAnkerNachtragen: () => {
           // Bestehende Notizen (vor M390 geschrieben, importiert, aus Vorlagen): Ihr Anker ist der Tag, an dem die
           // App sie zum ersten Mal sieht. Nur eigene Boards — in einem geteilten ändert jeder nur, was er anfasst.
+          // M459: Die Erkennung lädt bei Bedarf — steht irgendwo ein möglicher Termin, erst laden, dann nachtragen.
+          if (!fristenBereit()) {
+            const brauchts = get().boards.some((b) => !b.geteiltVon && b.nodes.some((n) => n.type === 'note' && blockeMitDatum((n.data as { blocks?: unknown }).blocks)));
+            if (brauchts) { void fristenLaden().then(() => get().fristAnkerNachtragen(), () => {}); return; }
+          }
           let geaendert = false;
           const boards = get().boards.map((b) => {
             if (b.geteiltVon) return b;
