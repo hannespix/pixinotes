@@ -67,7 +67,7 @@ import { CommentLayer } from './CommentLayer';
 import { BoardKontextmenue } from './Kontextmenue';
 import { fristenLaden } from '../lib/dates';
 import { rufnummernLaden } from '../lib/rufnummer';
-import { EINGANG_ZIEHEN, eingangHolen } from '../lib/eingang';
+import { EINGANG_ZIEHEN, eingangHolen, eingangZielWeg } from '../lib/eingang';
 
 /** M213: Jede Karte bekommt ihre eigene Fehlergrenze. Stolpert eine — etwa
  *  über kaputte Daten aus einem Import —, bleibt der Schaden auf sie
@@ -1591,10 +1591,23 @@ export function Board() {
       const basePos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
       // M478: aus der Eingangs-Liste gezogen — genau dort einsortieren, wo losgelassen wurde
       if (e.dataTransfer.types.includes(EINGANG_ZIEHEN)) {
+        eingangZielWeg();
+        let gruppen: string[] = [];
         try {
-          const gruppen = JSON.parse(e.dataTransfer.getData(EINGANG_ZIEHEN)) as unknown;
-          if (Array.isArray(gruppen)) eingangHolen(gruppen.filter((g): g is string => typeof g === 'string'), undefined, basePos);
+          const roh = JSON.parse(e.dataTransfer.getData(EINGANG_ZIEHEN)) as unknown;
+          if (Array.isArray(roh)) gruppen = roh.filter((g): g is string => typeof g === 'string');
         } catch { /* kein gültiger Eintrag */ }
+        if (!gruppen.length) return;
+        // M488: auf eine Notiz gezogen → in die Notiz (offen: an die Ablagestelle); nachgeladen, nur hier gebraucht
+        const karte = (e.target as HTMLElement | null)?.closest?.('.react-flow__node-note') as HTMLElement | null;
+        const notizId = karte?.dataset.id;
+        if (karte && notizId) {
+          const y = e.clientY;
+          const { ablageIndex, eingangInNotiz } = await import('../lib/eingangNotiz');
+          const blocks = selectActiveBoard(useBoard.getState()).nodes.find((n) => n.id === notizId)?.data.blocks;
+          if (eingangInNotiz(gruppen, notizId, ablageIndex(karte, Array.isArray(blocks) ? blocks : [], y))) return;
+        }
+        eingangHolen(gruppen, undefined, basePos);
         return;
       }
       const files = Array.from(e.dataTransfer.files);
@@ -1688,7 +1701,15 @@ export function Board() {
       data-zieh={ziehBewegung ? '' : undefined}
       className={`board-wrap ${spaceHeld ? 'space-pan' : ''} ${boardBg ? `board-bg-${boardBg}` : ''} ${nurLesen ? 'nur-lesen' : ''}`}
       onDrop={handleDrop}
-      onDragOver={(e) => e.preventDefault()}
+      onDragOver={(e) => {
+        e.preventDefault();
+        // M488: Die Notiz unter einem gezogenen Eingangs-Eintrag leise markieren — dort landet er IN der Notiz
+        if (!e.dataTransfer.types.includes(EINGANG_ZIEHEN)) return;
+        const karte = (e.target as HTMLElement | null)?.closest?.('.react-flow__node-note');
+        if (karte?.hasAttribute('data-eingang-ziel')) return;
+        eingangZielWeg();
+        karte?.setAttribute('data-eingang-ziel', '');
+      }}
       onDoubleClick={handleDoubleClick}
       onTouchEnd={handleTouchEnd}
     >
