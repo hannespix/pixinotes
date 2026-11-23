@@ -208,10 +208,18 @@ Screenshots und Zwischendateien landen in `pruefungen/ablage/`
 | m443 | MCP-Schnittstelle: KI-Modelle legen von außen Boards an, lesen und füllen sie – mit allen Modulen |
 | m444 | KI: Board-Briefing „Was ist auf diesem Board gerade wichtig?" |
 | m445 | Karten nach Themen ordnen (Auto-Clustering) |
+| m446 | Start-Leistung: schneller erster Bildaufbau |
 | m447 | Barrierefreiheit (WCAG 2.1 AA): Kern-Oberfläche per Tastatur und Vorlese-Programm bedienbar |
 | m449 | Board-Versionen: frühere Stände ansehen und wiederherstellen |
 | m450 | Kontakt-Karte: Visitenkarte mit Rufnummern, E-Mail, Anschrift; vCard rein und raus |
 | m451 | E-Mail-Destillat: Kernaussage, offene Fragen, Aufgaben, Termine aus einem langen Mail-Verlauf |
+| m452 | Text in Bildern finden (Texterkennung, lokal im Browser) |
+| m453 | Karten wissen, wann sie zuletzt geändert wurden |
+| m454 | Kontakte für KI und MCP, Sammel-Export |
+| m455 | Texte in Grafiken mehrsprachig |
+| m456 | Navigation am Telefon barrierefrei (Befund B11 aus M447) |
+| m457 | Kontakt aus der Mail-Signatur |
+| m458 | Browser-Erweiterung „An PixiNotes senden" (Ordner `erweiterung/`) |
 
 Die Reihen sind bewusst GEGEN DAS VERHALTEN geschrieben, nicht gegen die
 Struktur: Wo möglich messen sie Bildpunkte, echte Downloads, abgefangene
