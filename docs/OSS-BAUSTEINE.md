@@ -49,7 +49,7 @@ Bonus: BlockNote + Yjs + Hocuspocus sind ein **dokumentiert zusammenspielendes T
 | `.msg`-Outlook-Dateien parsen | **[@kenjiuno/msgreader](https://www.npmjs.com/package/@kenjiuno/msgreader)** — Betreff, Absender, Body, Anhänge; aktiv gepflegt (100+ Releases) | 🟢 Apache-2.0 |
 | PDF-Vorschau | [pdf.js](https://mozilla.github.io/pdf.js/) (Mozilla) | 🟢 Apache-2.0 |
 | Excel → Tabellen-Karte | [SheetJS CE](https://sheetjs.com/) | 🟢 Apache-2.0 |
-| OCR für Screenshots | [tesseract.js](https://github.com/naptha/tesseract.js) (WASM, lokal im Browser) | 🟢 Apache-2.0 |
+| OCR für Screenshots | [tesseract.js](https://github.com/naptha/tesseract.js) (WASM, lokal im Browser) — **im Einsatz seit M452** (tesseract.js 7 + tesseract.js-core, Sprachdaten `@tesseract.js-data/deu` und `/eng` 4.0.0_best_int, MIT); Worker, Kern und Sprachdaten liegen in `dist/ocr/` neben der App | 🟢 Apache-2.0 |
 | `.ics`-Termine | [ical.js](https://github.com/kewisch/ical.js) | 🟢 MPL-2.0 |
 
 → **Der komplette Outlook-Drag&Drop-Pfad ist mit fertigen Bausteinen abgedeckt** — wir schreiben nur den Glue-Code (Drop-Handler → Parser-Worker → Karte).
