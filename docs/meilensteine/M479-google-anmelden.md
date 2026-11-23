@@ -37,7 +37,7 @@ Nutzerwunsch: „google anmeldung fehlt noch! (per email adresse)". Die Google-V
 - `lib/kontoSync.ts` `initKontoSync`: Rückkehr per Fragment **oder** Code. Ein Code gilt immer als selbst
   angefordert, weil nur der hier gemerkte Verifier ihn tauscht. Die M388-Rückfrage bleibt für fremde Links und für
   den Wechsel auf ein anderes Konto.
-- `lib/syncStart.ts` `syncNoetig`: `?code=`/`?error=` mit PKCE-Merkzeichen lädt den Abgleich sofort (M459).
+- `lib/syncStart.ts` `syncNoetig`: ein Ausdruck über `location.href` (`[#?&](access_token|error|code)=`) lädt den Abgleich sofort (M459); kürzer als vorher, die Start-JS-Grenze (m459) lag nach M478 nur noch 35 Byte entfernt.
 - `components/Settings.tsx`: Zustand `sbWege` (stilles `sbAnbieterAn` beim Öffnen des Konto-Wegs) und `sbAus`,
   Handler `kontoOAuth`. Tasten `konto-sb-google`, `konto-sb-ms`, `konto-google-aus`, `konto-google-betreiber`.
 
