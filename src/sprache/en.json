@@ -682,6 +682,8 @@
 "Geteiltes in die Notiz „{0}\" übernommen.":"Shared content added to the note “{0}”.",
 "Geteiltes übernehmen":"Add shared content",
 "Von einer anderen App geteilt":"Shared from another app",
+"Aus dem Browser gesendet":"Sent from the browser",
+"Aus dem Browser übernommen – {0} Karte(n) auf „{1}\".":"Added from the browser – {0} card(s) on “{1}”.",
 "Verwerfen":"Discard",
 "Es ist nichts angekommen.":"Nothing arrived.",
 "Wohin?":"Where to?",

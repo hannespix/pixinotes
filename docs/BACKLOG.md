@@ -20,10 +20,10 @@ immer Vorrang vor dieser Liste.
 - M445: Auto-Aufräumen (nächtlich) und Pin „nicht mit ordnen“ fehlen
 - M449: Versionen nur je Gerät (reisen nicht mit Sync/Export); Live-Team-Änderungen lösen keine eigene Sicherung aus; einzelne Stände nicht löschbar; kein Vergleich Karte für Karte
 - M444: Risiko-Erkennung ohne KI nur Wortmuster
+- M458: Erweiterung nicht im Chrome-/Edge-/Firefox-Store (nur „Entpackt laden“); kein Weg in die portable pixinotes.html; keine feste Schnellablage-Zone (KONZEPT „Inbox-Ecke“)
 
 ## Ideen (noch nicht vergeben)
 - Microsoft-Graph-Anbindung (Outlook-Mails/Termine live) — Roadmap Phase 4
-- Browser-Erweiterung „An PixiNotes senden" (Capture)
 - Eingebaute Übersetzung der Oberfläche statt Browser-Übersetzer (UMBAU Zeile 54)
 - Nächtlicher CI-Lauf aller Prüfreihen (braucht Chromium im Runner)
 - BlockNote 0.31 → aktuelle Fassung – schließt die 22 „moderaten" Meldungen in tiptap/uuid (AUDIT C6), neue Editor-Funktionen – package.json, NoteCard.tsx, NotizRuhend.tsx, notizRuhend.ts
