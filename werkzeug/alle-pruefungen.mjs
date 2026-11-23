@@ -14,8 +14,9 @@
 // Fällt eine Datei durch, wird sie am Ende EINMAL allein wiederholt – unter Last kann eine Wartezeit knapp werden;
 // was auch allein durchfällt, ist ein echter Fehler. Rückgabewert 1, wenn danach noch etwas rot ist.
 import { spawn, spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync, appendFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, appendFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
@@ -92,6 +93,29 @@ const sperren = (name) => {
 };
 const offen = dateien.map((name) => ({ name, sperren: sperren(name) }));
 const belegt = new Set();
+// Sperren über alle Worktrees: Mehrere Agenten starten dieselben alten Reihen (feste Ports 4431–4776) zugleich.
+// Ein Verzeichnis je Sperre unter os.tmpdir() (mkdir ist atomar), darin die PID des Halters. Stirbt der Halter,
+// gilt die Sperre als frei. So warten Läufe aus verschiedenen Worktrees aufeinander, statt an EADDRINUSE zu scheitern.
+const SPERR_DIR = path.join(tmpdir(), 'pixinotes-pruef-sperren');
+mkdirSync(SPERR_DIR, { recursive: true });
+const sperrPfad = (s) => path.join(SPERR_DIR, s.replace(/[^a-z0-9]/gi, '_'));
+const lebt = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+const nehmen = (s) => {
+  const p = sperrPfad(s);
+  try { mkdirSync(p); writeFileSync(path.join(p, 'pid'), String(process.pid)); return true; } catch { /* belegt */ }
+  let pid = 0;
+  try { pid = Number(readFileSync(path.join(p, 'pid'), 'utf-8')); } catch { /* gerade im Anlegen */ return false; }
+  if (pid && !lebt(pid)) { rmSync(p, { recursive: true, force: true }); return nehmen(s); }
+  return false;
+};
+const freigeben = (s) => { try { if (Number(readFileSync(path.join(sperrPfad(s), 'pid'), 'utf-8')) === process.pid) rmSync(sperrPfad(s), { recursive: true, force: true }); } catch { /* schon frei */ } };
+const allesNehmen = (liste) => {
+  const genommen = [];
+  for (const s of liste) { if (nehmen(s)) genommen.push(s); else { genommen.forEach(freigeben); return false; } }
+  return true;
+};
+process.on('exit', () => { for (const s of belegt) freigeben(s); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(130));
 const ergebnis = new Map();
 if (bericht) writeFileSync(bericht, '');
 const start = Date.now();
@@ -127,11 +151,12 @@ const zeile = (name, r, zusatz = '') => {
 
 await new Promise((alleFertig) => {
   let laufend = 0;
+  let wartet = false; // eine Nachfrage gleichzeitig, wenn fremde Worktrees Ports halten
   const weiter = () => {
     if (offen.length === 0 && laufend === 0) { alleFertig(); return; }
     while (laufend < bahnen) {
-      const i = offen.findIndex((d) => d.sperren.every((s) => !belegt.has(s)));
-      if (i < 0) break;
+      const i = offen.findIndex((d) => d.sperren.every((s) => !belegt.has(s)) && allesNehmen(d.sperren));
+      if (i < 0) { if (offen.length && !wartet) { wartet = true; setTimeout(() => { wartet = false; weiter(); }, 3000); } break; }
       const d = offen.splice(i, 1)[0];
       for (const s of d.sperren) belegt.add(s);
       laufend += 1;
@@ -140,7 +165,7 @@ await new Promise((alleFertig) => {
         // M448: auch der erste Fehlschlag kommt mit Grund in den Bericht – sonst ist ein Wackler, der beim
         // Wiederholen grün wird, hinterher nicht mehr zu finden
         zeile(d.name, r, r.rc === 0 ? '' : ' | erster Lauf rot, wird allein wiederholt');
-        for (const s of d.sperren) belegt.delete(s);
+        for (const s of d.sperren) { belegt.delete(s); freigeben(s); }
         laufend -= 1;
         weiter();
       });
@@ -153,7 +178,11 @@ await new Promise((alleFertig) => {
 const rot = [...ergebnis].filter(([, r]) => r.rc !== 0).map(([name]) => name).sort();
 const bleibtRot = [];
 for (const name of rot) {
+  const sp = sperren(name);
+  while (!allesNehmen(sp)) await new Promise((x) => setTimeout(x, 3000));
+  sp.forEach((s) => belegt.add(s));
   const r = await lauf(name);
+  sp.forEach((s) => { belegt.delete(s); freigeben(s); });
   zeile(name, r, r.rc === 0 ? ' | allein wiederholt: grün' : ' | auch allein rot');
   if (r.rc !== 0) { bleibtRot.push(name); if (!bericht) console.log(r.aus.split('\n').filter((z) => /✗|Error/.test(z)).slice(0, 12).join('\n')); }
 }

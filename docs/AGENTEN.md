@@ -15,6 +15,11 @@ Jeder Arbeits-Agent liefert selbstständig bis zum Merge.
 1. **Eine Nummer, ein Branch, ein PR, eine Datei in `docs/meilensteine/`.**
 2. **Ports:** Die Prüfreihe von Meilenstein N lauscht auf **5000 + N**
    (M444 → 5444; zwei Server → 5444 und 6444). Alte Reihen nutzen 4431–4776.
+   **Alte Reihen immer über `node werkzeug/alle-pruefungen.mjs …` starten**, nie
+   direkt mit `node pruefungen/…`: der Läufer sperrt Ports über alle Worktrees
+   (`$TMPDIR/pixinotes-pruef-sperren/`, PID des Halters, tote Halter werden
+   übernommen) – parallele Agenten warten aufeinander statt an EADDRINUSE zu
+   scheitern.
 3. **CSS:** neue Regeln nicht ans Ende von `index.css` hängen, sondern an den
    thematisch passenden Abschnitt (oder in den Block des Moduls) — das Ende
    ist der Konflikt-Hotspot. Ausnahme: die drei Listen „Bedienung nur im
