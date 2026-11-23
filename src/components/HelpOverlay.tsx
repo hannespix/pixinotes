@@ -517,7 +517,7 @@ export function HelpOverlay() {
                 <li><b>Zeitplan (Gantt):</b> Balken ziehen, ◆ Meilenstein, Pfeile = Abhängigkeiten mit Konflikt-Warnung; Skala von Tagen bis Jahren.</li>
                 <li><b>Wochenplan:</b> Raster aus Spalten (Wochentage oder frei: Personen, Räume) × Zeilen (Uhrzeiten oder eigene Einheiten). Klick auf einen Slot legt einen Block an.</li>
                 <li><b>Zeiterfassung:</b> Arbeit / Pause mit einem Klick, jede Zeile direkt editierbar; Ansichten Tag, Woche, Monat, Jahr.</li>
-                <li><b>Protokoll-Reihe:</b> eine Karte für eine ganze Besprechungsserie. Oben „Sitzung“ oder „Übersicht“; <b>＋</b> legt die nächste Sitzung an und nimmt Runde und offene Aufgaben mit. In der Sitzung markieren TOP, Aufgabe und § Beschluss die Zeile am Cursor; Person als „Anna: …“ oder @Anna, Frist wie „bis Freitag“. Die Übersicht zeigt offene Aufgaben nach Person, alle Beschlüsse und Teilnahme und sucht in allen Sitzungen; ⋯ kopiert oder verschickt eine Sitzung. Rhythmus, feste Tagesordnung und Farbe unter dem Zahnrad.</li>
+                <li><b>Protokoll-Reihe:</b> eine Karte für eine ganze Besprechungsserie. <b>＋</b> legt die nächste Sitzung an und nimmt Runde und offene Aufgaben mit. TOP, Aufgabe und § Beschluss markieren die Zeile am Cursor (Person als „Anna: …“ oder @Anna, Frist wie „bis Freitag“). Die Übersicht zeigt offene Aufgaben nach Person, alle Beschlüsse und sucht in allen Sitzungen; ⋯ kopiert oder verschickt eine Sitzung.</li>
                 <li><b>Kachel:</b> ⋯ → „Als Kachel zeigen" klappt diese Module auf Typ, Titel und Kennzahlen zusammen. „Öffnen" zeigt das Modul im Fokus, „Ausklappen" bringt es in alter Größe zurück.</li>
               </ul>
               <h4>Weitere Module</h4>

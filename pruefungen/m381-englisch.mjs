@@ -245,7 +245,9 @@ await springe('minutes');
 // Rückfrage des Browsers (confirm): Protokoll-Sitzung löschen
 P.dialoge.length = 0;
 await waehle('minutes');
-await knoten('minutes').locator('.minutes-nav button').last().click({ force: true }).catch(() => {}); await P.waitForTimeout(500);
+// M489: Sitzung löschen steht im ⋯-Menü der Sitzung
+await knoten('minutes').locator('.pr-mehr').click({ force: true }).catch(() => {}); await P.waitForTimeout(200);
+await knoten('minutes').locator('.pr-menue .pr-gefahr').click({ force: true }).catch(() => {}); await P.waitForTimeout(500);
 pruefe('D4 Rückfragen des Browsers sind englisch', P.dialoge.length >= 1 && /Delete|delete/.test(P.dialoge[0]) && !/löschen/.test(P.dialoge[0]), JSON.stringify(P.dialoge).slice(0, 200));
 await P.keyboard.press('Control+z'); await P.waitForTimeout(400); await P.mouse.click(1400, 880);
 await springe('calendar');
