@@ -43,6 +43,10 @@ export interface Eintrag {
 
 /** Datentransfer-Typ beim Ziehen aus der Liste aufs Board (Board.tsx) */
 export const EINGANG_ZIEHEN = 'application/x-pixinotes-eingang';
+/** M488: Markierung der Notiz unter einem gezogenen Eintrag entfernen (Ablegen, Ziehen beendet) */
+export function eingangZielWeg(): void {
+  document.querySelectorAll('[data-eingang-ziel]').forEach((el) => el.removeAttribute('data-eingang-ziel'));
+}
 /** Ereignis „Eingang öffnen" (detail: { gruppe? } = diesen Eintrag zeigen) */
 export const EINGANG_OEFFNEN = 'pixinotes:eingang';
 
@@ -179,7 +183,7 @@ const breite = (n: AppNode) => n.width ?? n.measured?.width ?? 300;
 const hoehe = (n: AppNode) => n.height ?? n.measured?.height ?? 200;
 
 /** Die Marke weg: Eingesammeltes ist eine ganz normale Karte */
-const ohneMarke = (n: AppNode): AppNode => {
+export const ohneMarke = (n: AppNode): AppNode => {
   if (!marke(n)) return n;
   const { eingang: _e, ...data } = n.data as Record<string, unknown>;
   return { ...n, data } as AppNode;

@@ -1,8 +1,7 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BaseEdge,
-  EdgeLabelRenderer,
   getSmoothStepPath,
   getStraightPath,
   useInternalNode,
@@ -10,37 +9,85 @@ import {
 } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
 import { getFloatingEdgeParams, mitAnzeige } from '../lib/floatingEdge';
-import { useAnzeige } from '../lib/zugAnzeige';
+import { anzeigeStand, anzeigeVon, hoeren, useAnzeige, type Anzeige } from '../lib/zugAnzeige';
 
 import type { AppNode } from '../types';
 
+/**
+ * M486: Ziel der Beschriftungen — dasselbe wie React Flows `EdgeLabelRenderer`, aber gemerkt: Der suchte es bei
+ * JEDER Änderung im React-Flow-Stand (also bei jedem Zug-Ereignis) für jede Kante neu per querySelector im ganzen Board.
+ */
+const labelZiele = new WeakMap<Element, Element | null>();
+function labelZiel(von: Element | null): Element | null {
+  const rf = von?.closest('.react-flow');
+  if (!rf) return null;
+  let z = labelZiele.get(rf);
+  if (!z?.isConnected) { z = rf.querySelector('.react-flow__edgelabel-renderer'); labelZiele.set(rf, z); }
+  return z;
+}
 /**
  * M434: EIN gemeinsamer Weichzeichner für alle Pfeilschatten (User-Idee). Jede Verbindung legt ihren Schatten als
  * eine schlichte Linie in eine gemeinsame Ebene ganz unten in React Flows Kanten-Schicht; die Ebene trägt einen
  * einzigen CSS-Weichzeichner. Statt eines Filters je Pfeil (M432: bis 300 ms je Bild) oder fünf Lagen je Pfeil
  * (M433) rechnet der Browser einmal über alles — und der Schatten läuft wirklich weich aus.
  */
+const ebenen = new WeakMap<Element, SVGSVGElement>();
 function schattenEbene(von: Element | null): SVGSVGElement | null {
   const schicht = von?.closest('.react-flow__edges');
   if (!schicht) return null;
-  let e = schicht.querySelector<SVGSVGElement>(':scope > svg.pn-schatten-ebene');
+  // M486: gemerkt je Kanten-Schicht — die Suche lief bei jedem Render jeder Kante
+  let e = ebenen.get(schicht);
+  if (e?.parentNode === schicht) return e;
+  e = schicht.querySelector<SVGSVGElement>(':scope > svg.pn-schatten-ebene') ?? undefined;
   if (!e) {
     e = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     e.setAttribute('class', 'pn-schatten-ebene');
     e.setAttribute('aria-hidden', 'true');
     schicht.insertBefore(e, schicht.firstChild);
   }
+  ebenen.set(schicht, e);
   return e;
 }
 
 /** Karten-Rechteck (leicht aufgebläht) für die Hindernis-Prüfung */
 interface ORect { x1: number; y1: number; x2: number; y2: number }
 const PAD = 10;
-const rectOf = (n: AppNode): ORect => {
+// M486: mit der angezeigten Lage (ausweichend, gehoben) — die Kante weicht dem aus, was man sieht
+const rectOf = (n: AppNode, a?: Anzeige): ORect => {
   const w = n.measured?.width ?? (typeof n.width === 'number' ? n.width : 260);
   const h = n.measured?.height ?? (typeof n.height === 'number' ? n.height : 170);
-  return { x1: n.position.x - PAD, y1: n.position.y - PAD, x2: n.position.x + w + PAD, y2: n.position.y + h + PAD };
+  const s = a?.[2] ?? 1;
+  const x = n.position.x + (a?.[0] ?? 0) - (w * (s - 1)) / 2; const y = n.position.y + (a?.[1] ?? 0) - (h * (s - 1)) / 2;
+  return { x1: x - PAD, y1: y - PAD, x2: x + w * s + PAD, y2: y + h * s + PAD };
 };
+/**
+ * M486: Kästen aller Karten, denen Kanten ausweichen — EINMAL je Stand bzw. Anzeige-Stand für alle Kanten gerechnet
+ * (vorher rechnete jede Kante je Zug-Ereignis alle Karten). Gleiche Karte, gleiche Lage → dasselbe Objekt, damit eine
+ * Kante „nichts hat sich geändert" am Objekt erkennt.
+ */
+type HRect = ORect & { id: string };
+let hStand: { nodes: AppNode[] | null; anz: number; liste: HRect[]; je: Map<AppNode, HRect> } = { nodes: null, anz: -1, liste: [], je: new Map() };
+function hindernisse(): HRect[] {
+  const nodes = selectActiveBoard(useBoard.getState()).nodes;
+  const anz = anzeigeStand();
+  if (hStand.nodes === nodes && hStand.anz === anz) return hStand.liste;
+  const je = new Map<AppNode, HRect>(); const liste: HRect[] = [];
+  for (const n of nodes) {
+    // Rahmen sind Hintergrund-Flächen — Kanten dürfen ruhig darüberlaufen (M150)
+    if (n.archived || n.type === 'frame') continue;
+    const a = anzeigeVon(n.id);
+    const r = (!a && hStand.je.get(n)) || { id: n.id, ...rectOf(n, a) };
+    if (!a) je.set(n, r);
+    liste.push(r);
+  }
+  hStand = { nodes, anz, liste, je };
+  return liste;
+}
+/** M486: Hindernisse hängen am Stand UND an der Zug-Anzeige */
+const abo = (f: () => void) => { const a = useBoard.subscribe(f); const b = hoeren(f); return () => { a(); b(); }; };
+/** Weiteste Auslenkung der Kurve über die Endpunkte hinaus: Stummel 22 + Griff 110 bis zur Basis-Mitte, Ausweichen 240,
+ *  Griff 110 um die verschobene Mitte (die Kurve bleibt in der Hülle ihrer Stützpunkte) — plus Luft */
+const KORRIDOR = 500;
 
 /** Verbindungs-Stile für Prozessdiagramme. 'line' ist ein Altbestand
  *  (Kurve ohne Spitze) — die Spitze ist seit M146 ein EIGENER Schalter. */
@@ -97,7 +144,10 @@ export function LabeledEdge({
   const anker = useRef<SVGGElement>(null);
   const [ebene, setEbene] = useState<SVGSVGElement | null>(null);
   const [blass, setBlass] = useState(false);
+  const [labels, setLabels] = useState<Element | null>(null);
   useLayoutEffect(() => {
+    const l = labelZiel(anker.current);
+    if (l !== labels) setLabels(l);
     if (!mitSchatten) return;
     const e = schattenEbene(anker.current);
     if (e !== ebene) setEbene(e);
@@ -139,14 +189,25 @@ export function LabeledEdge({
   // M132: Kanten-Routing gegen den „Kabelsalat" — (a) laufen mehrere Kanten
   // zwischen denselben Karten, fächern sie mit Versatz auf; (b) schneidet der
   // Direktweg FREMDE Karten, weicht die Kante mit einem Bogen darum aus.
-  const allNodes = useBoard((s) => selectActiveBoard(s).nodes);
-  const allEdges = useBoard((s) => selectActiveBoard(s).edges);
+  // M486: Nicht mehr ALLE Karten und Kanten abonnieren — das zeichnete bei jedem Zug-Ereignis jede Verbindung neu
+  // (100 Verbindungen: über 100 ms je Mausbewegung). Abonniert werden der Versatz und das ERGEBNIS des Ausweichens
+  // (je eine Zahl): Die Hindernis-Prüfung läuft im Abo gegen die Karten im Korridor, den die Kurve überhaupt erreichen
+  // kann — bleibt der Ausweich-Versatz gleich, rendert die Kante nicht.
+  // Parallel-Auffächerung: stabile Reihenfolge über sortierte Kanten-IDs
+  const pShift = useBoard((s) => {
+    const sib = selectActiveBoard(s).edges
+      .filter((e) => (e.source === source && e.target === target) || (e.source === target && e.target === source))
+      .map((e) => e.id)
+      .sort();
+    return sib.length > 1 ? (sib.indexOf(id) - (sib.length - 1) / 2) * 26 : 0;
+  });
   // M136/M137 — EINE Geometrie für alle Kurven-Kanten (Profi-Tool-Stil wie
   // Miro/Lucidchart): kurzer GERADER Stummel senkrecht aus dem Konnektor,
   // weiche kubische Kurve, GERADER Einlauf in den Ziel-Konnektor. Hindernis-
   // Ausweichen und Parallel-Auffächern (M132) verschieben dabei nur noch die
   // Kurvenmitte seitlich — Aus- und Einlauf bleiben IMMER senkrecht.
-  const geo = (() => {
+  // M486: Basis der Kurve nur neu, wenn sich die Endpunkte ändern
+  const basis = useMemo(() => {
     if (kind === 'step') return null; // Winkel-Route bleibt bewusst rechtwinklig
     const dist = Math.hypot(tx - sx, ty - sy);
     if (dist < 4) return null;
@@ -158,17 +219,6 @@ export function LabeledEdge({
     const ax = sx + nsx * stub, ay = sy + nsy * stub;
     const bx = tx + ntx * stub, by = ty + nty * stub;
 
-    // Parallel-Auffächerung: stabile Reihenfolge über sortierte Kanten-IDs
-    const siblings = allEdges
-      .filter((e) => (e.source === source && e.target === target) || (e.source === target && e.target === source))
-      .map((e) => e.id)
-      .sort();
-    const pShift = siblings.length > 1 ? (siblings.indexOf(id) - (siblings.length - 1) / 2) * 26 : 0;
-
-    const obstacles = allNodes
-      // Rahmen sind Hintergrund-Flächen — Kanten dürfen ruhig darüberlaufen (M150)
-      .filter((n) => n.id !== source && n.id !== target && !n.archived && n.type !== 'frame')
-      .map(rectOf);
     const mnx = -(ty - sy) / dist, mny = (tx - sx) / dist; // Normale zum Direktweg
     // M138/M139: Basis ist EINE einzige Kubik mit Tangenten senkrecht zur
     // Kartenseite — knickfrei UND wellenfrei (eine Kubik kann höchstens ein
@@ -207,7 +257,7 @@ export function LabeledEdge({
         y: u * u * u * y0 + 3 * u * u * t * y1 + 3 * u * t * t * y2 + t * t * t * y3,
       };
     };
-    const blockedAt = (o: number): boolean => {
+    const blockedAt = (o: number, obstacles: ORect[]): boolean => {
       for (let i = 1; i < 18; i++) {
         const t = (i % 9) / 9 || 0.05;
         let p;
@@ -223,16 +273,37 @@ export function LabeledEdge({
       }
       return false;
     };
+    return { dist, ax, ay, bx, by, c1bx, c1by, c2bx, c2by, baseMidX, baseMidY, mny, geometry, blockedAt };
+  }, [kind, sx, sy, tx, ty, sPos, tPos]);
+  const vorher = useRef<{ b: object; p: number; h: ORect[]; off: number } | null>(null);
+  const off = useSyncExternalStore(abo, () => {
+    const b = basis;
+    if (!b) return 0;
+    const m = KORRIDOR + Math.abs(pShift);
+    const x1 = Math.min(sx, tx) - m, x2 = Math.max(sx, tx) + m, y1 = Math.min(sy, ty) - m, y2 = Math.max(sy, ty) + m;
+    const h: ORect[] = [];
+    for (const r of hindernisse()) if (r.id !== source && r.id !== target && r.x2 > x1 && r.x1 < x2 && r.y2 > y1 && r.y1 < y2) h.push(r);
+    // gleiche Hindernisse, gleiche Basis → gleiches Ergebnis (spart das Abtasten bei jedem Bild des Zugs)
+    const v = vorher.current;
+    if (v && v.b === b && v.p === pShift && v.h.length === h.length && v.h.every((r, i) => r === h[i])) return v.off;
     let off = pShift;
-    if (blockedAt(off)) {
+    if (b.blockedAt(off, h)) {
       // M140: bevorzugt NACH OBEN ausweichen — lange Rückläufer laufen dann
       // als flacher Bogen ÜBER dem Prozessband statt mitten durchs Bild
-      const upFirst = mny > 0 ? -1 : 1;
+      const upFirst = b.mny > 0 ? -1 : 1;
       for (const m of [70, 120, 180, 240]) {
-        const cand = [pShift + upFirst * m, pShift - upFirst * m].find((o) => !blockedAt(o));
+        const cand = [pShift + upFirst * m, pShift - upFirst * m].find((o) => !b.blockedAt(o, h));
         if (cand !== undefined) { off = cand; break; }
       }
     }
+    vorher.current = { b, p: pShift, h, off };
+    return off;
+  });
+  // M486: Pfad nur neu, wenn sich Basis oder Ausweich-Versatz ändern (nicht bei Auswahl, Schatten, Label)
+  const geo = useMemo(() => {
+    const b = basis;
+    if (!b) return null;
+    const { dist, ax, ay, bx, by, c1bx, c1by, c2bx, c2by, baseMidX, baseMidY, geometry } = b;
     // M432: Der Schatten berührt an den Enden die Karten und wandert zur Mitte hin nach unten — als höbe sich der
     // Pfeil in der Mitte vom Board ab (perspektivisch). Nur die inneren Punkte der Kurve rücken dafür hinab.
     const hub = Math.min(26, 5 + dist * 0.05);
@@ -258,7 +329,7 @@ export function LabeledEdge({
       lx: g.midX,
       ly: g.midY,
     };
-  })();
+  }, [basis, off, sx, sy, tx, ty]);
 
   // M432: gerade und Winkel-Verbindungen: der Schatten liegt etwas tiefer, gleichmäßig
   const schattenPfad = geo ? geo.schatten : null;
@@ -330,7 +401,7 @@ export function LabeledEdge({
         }}
       />
       {/* Marker-Defs einmalig (React Flow eigene Marker sind fummelig bei Farbe) */}
-      <EdgeLabelRenderer>
+      {labels && createPortal(<>
         <div
           className={`edge-label nodrag nopan ${label ? '' : 'empty'} ${selected ? 'selected' : ''}`}
           data-edge-id={id}
@@ -436,7 +507,7 @@ export function LabeledEdge({
             </div>
           </div>
         )}
-      </EdgeLabelRenderer>
+      </>, labels)}
     </>
   );
 }
