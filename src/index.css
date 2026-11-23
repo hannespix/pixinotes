@@ -7265,6 +7265,8 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
    niemand in der Notiz steht. So trug jede Karte, die ein anderer angelegt hatte, bei allen übrigen nur diesen
    blassen Satz, und unter fertigem Text blieb er als graue Zeile stehen. Jetzt nur noch mit Tastatur-Fokus. */
 .note-editor .bn-editor:not(:focus-within) .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before { content: none !important; }
+/* M462: Seit BlockNote 0.57 steht der Hinweis als ::after am Block statt als ::before am Text */
+.note-editor .bn-editor:not(:focus-within) .bn-block-content:has(.ProseMirror-trailingBreak:only-child)::after { content: none !important; }
 
 /* ───── M373: Entscheidungs-Bubbles ───── */
 .bubbles-card { background: var(--surface-card); border-radius: var(--r); padding: 10px 12px 10px; overflow: hidden; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }

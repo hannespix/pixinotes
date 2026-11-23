@@ -36,6 +36,22 @@ Audit-Befund C6 (`docs/AUDIT.md`): 22 „moderate" npm-Meldungen in tiptap/uuid 
   Dateien à 75–190 KB) als eigene Module in `@blocknote/core/dist` ab und lädt sie per `import()`. Die
   Editor-Regel zog sie in den Start (Editor-Paket 4,2 MB). Module, die nur dynamisch erreicht werden
   (`getModuleInfo`: keine statischen, aber dynamische Importeure), bleiben jetzt eigene Nachlade-Teile.
+- **Strg+A** markiert wie bisher die ganze Notiz: `selectAllBehavior: 'document'` in `NoteCard`,
+  `MinutesCard`, `Presenter` (0.57 markiert sonst erst den Block).
+- **Schluss-Absatz:** 0.31 hängte nach der ersten Änderung einen leeren Absatz an (und speicherte ihn).
+  0.57 zeigt stattdessen eine Klickfläche `.bn-trailing-block` (30px, nie gespeichert). `index.css`: eine
+  leere Zeile hoch (`1.5em`) und nur mit Fokus im Editor — sonst wüchse jede Karte schon beim Wecken
+  (Fokus-Zoom M333) und die ruhende Notiz bräuchte eine Nachbildung. In Formen ganz ausgeblendet
+  (wie der leere Absatz in M436). `NotizRuhend` hängt keinen Schluss-Absatz mehr an (`hatNummern`/`SCHLUSS`
+  entfallen).
+- **Gleiches Bild wie vorher, ruhend wie wach (M338):**
+  - Listen: 0.57 setzt die Marke in eine 24px-Spalte und den Haken in eine 24px-Zeile mit eigenen Rändern;
+    ein Block in `index.css` stellt die kompakte Form aus 0.31 her (gemessen: gleiche Lagen wie 0.31).
+  - Haken-Block: 0.57 legt Haken und Text ohne Hülle direkt in den Block — `NotizRuhend` ebenso.
+  - Farben: Die Variablen `--bn-colors-*` hängen jetzt an `.bn-root` (vorher `.bn-container`); die ruhende
+    Notiz trägt die Klasse mit (sonst Schwarz statt Editor-Grau und keine Blockfarben).
+  - Überschrift Stufe 1 hat kein `data-level` mehr (Vorgabewert wird weggelassen). CSS-Regeln für H1
+    lauten `:is([data-level='1'], :not([data-level]))`; `NotizRuhend` lässt das Attribut bei Stufe 1 ebenso weg.
 - Eigene Stile (`textSize`, `textFont`) rendert BlockNote 0.57 als Mark-View (Hülle
   `.react-renderer.mark-textSize` + Span mit Stil). Gespeichertes JSON und die ruhende Darstellung sind
   unverändert; die Optik ist gleich.
@@ -49,6 +65,10 @@ Audit-Befund C6 (`docs/AUDIT.md`): 22 „moderate" npm-Meldungen in tiptap/uuid 
   verschachtelte Liste, Nummern, Ausrichtung + Blockfarben, Zitat, Codeblock, Rechentabelle, alte
   Tabelle, Bild als Daten-URL mit Bildunterschrift. Neu erzeugen: alten Stand bauen, Notizen mit diesen
   Teil-Blöcken anlegen, einmal tippen (der Editor schreibt dann das volle JSON), `localStorage` lesen.
+
+- Angepasste alte Reihen: `m283` (T4: Zelle mit echtem Klick statt per Skript gesetzter DOM-Auswahl ohne
+  Fokus — die übernimmt ProseMirror nicht mehr), `m338` (B2: 17 statt 18 Blöcke, kein angehängter
+  Schluss-Absatz), `m416` (A6: H1-Selektor ohne `data-level`), `m446` (Grenze).
 
 ## Prüfreihe m462
 A Altbestand ruhend · B geweckt (h1–h3, Haken, Stile, Ausrichtung, Rechentabelle, alte Tabelle, Bild) ·
