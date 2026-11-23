@@ -57,10 +57,21 @@
 }
 .ticket-progress { height: 7px; border-radius: var(--r-pill); background: var(--surface-dim); overflow: hidden; }
 .ticket-progress i { display: block; height: 100%; background: #2e9e63; border-radius: var(--r-pill); transition: width 0.2s; }
-.ticket-sub { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.ticket-sub { display: flex; align-items: center; gap: 6px; font-size: 12.5px; border-radius: var(--r-sm); }
 .ticket-sub input[type='checkbox'] { width: 15px; height: 15px; flex: none; cursor: pointer; }
 .ticket-sub span { flex: 1; min-width: 0; }
 .ticket-sub span.done, .ticket-dep span.done { text-decoration: line-through; color: var(--muted); }
+/* M498: Punkte direkt im Text umbenennen; der Griff sortiert um (ziehen), leise, bis man darüber ist */
+.ticket-sub-text {
+  flex: 1; min-width: 0; font: inherit; color: var(--ink); background: none;
+  border: 1px solid transparent; border-radius: var(--r-sm); padding: 2px 5px; outline: none;
+}
+.ticket-sub-text:hover { border-color: var(--feld-rand); }
+.ticket-sub-text:focus { border-color: var(--accent); background: var(--surface-card); }
+.ticket-sub-text.done { text-decoration: line-through; color: var(--muted); }
+.ticket-sub-griff { display: inline-flex; flex: none; color: var(--muted); cursor: grab; opacity: 0.45; padding: 2px 0; }
+.ticket-sub:hover .ticket-sub-griff, .ticket-sub:focus-within .ticket-sub-griff { opacity: 1; }
+.ticket-sub.zieht { background: var(--surface-dim); }
 .ticket-sub button, .ticket-dep button, .ticket-linkrow > button:last-child {
   border: none; background: none; color: var(--muted); cursor: pointer; padding: 2px; flex: none;
 }

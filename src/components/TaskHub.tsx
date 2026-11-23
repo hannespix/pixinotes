@@ -2,6 +2,7 @@ import { tagLokal } from '../lib/tag';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { konfettiWerfen } from '../lib/konfetti';
 import { mutedHistory, useBoard } from '../store';
+import { ticketsSetzen } from '../lib/kanbanLive';
 import { liveVerbunden } from '../lib/liveStand';
 import { doneCol, kanbanCols, mitSpalte, openSubs, ticketBlockers, uid, type GanttData, type KanbanData } from '../types';
 import { makeKanban, makeNote } from '../lib/nodes';
@@ -248,6 +249,12 @@ export function TaskHub() {
 
   if (!open) return null;
 
+  /**
+   * M498: Ein Ticket ändern — ist sein Kanban im Live-Board gerade gemeinsam offen, über dessen Y-Dokument (sonst
+   * „heilte" der Schreiber die Änderung weg bzw. sie ginge im kartenweisen Abgleich verloren), sonst über den Speicher
+   */
+  const ticketsAendern = (t: TaskRef, k: KanbanData, neu: KanbanData['items']) =>
+    ticketsSetzen(t.boardId, t.nodeId, k.items, neu, () => updateNodeDataOnBoard(t.boardId, t.nodeId, { items: neu }));
   const complete = (t: TaskRef) => {
     const board = boards.find((b) => b.id === t.boardId);
     const node = board?.nodes.find((n) => n.id === t.nodeId);
@@ -263,9 +270,7 @@ export function TaskHub() {
       }
       logDone(t); // „Heute geschafft"-Protokoll (M114)
       // mitSpalte stempelt das Erledigt-Datum — Uhr der Auto-Archivierung (M293)
-      updateNodeDataOnBoard(t.boardId, t.nodeId, {
-        items: k.items.map((it) => (it.id === t.itemId ? mitSpalte(it, doneCol(k), k) : it)),
-      });
+      ticketsAendern(t, k, k.items.map((it) => (it.id === t.itemId ? mitSpalte(it, doneCol(k), k) : it)));
       if (useBoard.getState().konfetti) konfettiWerfen({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
     } else if (t.kind === 'gantt') {
       logDone(t);
@@ -300,9 +305,16 @@ export function TaskHub() {
         .catch(ueberSpeicher);
     } else {
       logDone(t);
-      updateNodeDataOnBoard(t.boardId, t.nodeId, {
+      const ueberSpeicher = () => updateNodeDataOnBoard(t.boardId, t.nodeId, {
         blocks: toggleCheckBlock(node.data.blocks as unknown[] | undefined, t.itemId),
       });
+      // M498: Im Live-Board über das Y-Dokument der Notiz (wie M493 beim Protokoll) — schreibt dort gerade jemand
+      // gemeinsam, „heilte" sein Gerät einen Haken über den Speicher wieder weg
+      if (t.boardId !== useBoard.getState().activeId || !liveVerbunden(t.boardId)) { ueberSpeicher(); return; }
+      void Promise.all([import('../lib/notizGemeinsamKern'), import('./NoteTypo'), import('../lib/htmlBlocks')])
+        .then(([k, nt, hb]) => k.notizHaken(t.boardId, t.nodeId, hb.repairBlocks((node.data.blocks ?? []) as never), nt.noteSchema, t.itemId, true))
+        .then((gut) => { if (!gut) ueberSpeicher(); })
+        .catch(ueberSpeicher);
     }
   };
 
@@ -321,9 +333,7 @@ export function TaskHub() {
       return;
     }
     const k = node.data as KanbanData;
-    updateNodeDataOnBoard(t.boardId, t.nodeId, {
-      items: k.items.map((it) => (it.id === t.itemId ? { ...it, due: due || undefined } : it)),
-    });
+    ticketsAendern(t, k, k.items.map((it) => (it.id === t.itemId ? { ...it, due: due || undefined } : it)));
   };
 
   /** Schlummern (M113): Frist ehrlich verschieben — +1 Tag / +1 Woche */
@@ -338,9 +348,7 @@ export function TaskHub() {
     if (!node || t.kind !== 'kanban') return;
     const k = node.data as KanbanData;
     const next = t.prio === undefined ? 1 : t.prio >= 3 ? undefined : ((t.prio + 1) as 1 | 2 | 3);
-    updateNodeDataOnBoard(t.boardId, t.nodeId, {
-      items: k.items.map((it) => (it.id === t.itemId ? { ...it, prio: next } : it)),
-    });
+    ticketsAendern(t, k, k.items.map((it) => (it.id === t.itemId ? { ...it, prio: next } : it)));
   };
 
   /** Kanban-Spalte direkt aus der Liste umstellen (M114) */
@@ -355,9 +363,7 @@ export function TaskHub() {
       if (blk.length > 0) { showToast(`Erst erledigen: ${blk.join(' · ')}`); return; }
     }
     if (col >= doneCol(k)) { complete(t); return; } // letzte Spalte = erledigt (inkl. Checklisten-Gate)
-    updateNodeDataOnBoard(t.boardId, t.nodeId, {
-      items: k.items.map((it) => (it.id === t.itemId ? mitSpalte(it, col, k) : it)),
-    });
+    ticketsAendern(t, k, k.items.map((it) => (it.id === t.itemId ? mitSpalte(it, col, k) : it)));
   };
 
   /** Kanban-Ticket hinter einer Aufgabe direkt ändern (Detail-Spalte, M115) */
@@ -365,9 +371,7 @@ export function TaskHub() {
     const node = boards.find((b) => b.id === t.boardId)?.nodes.find((n) => n.id === t.nodeId);
     if (!node || t.kind !== 'kanban') return;
     const k = node.data as KanbanData;
-    updateNodeDataOnBoard(t.boardId, t.nodeId, {
-      items: k.items.map((it) => (it.id === t.itemId ? { ...it, ...patch } : it)),
-    });
+    ticketsAendern(t, k, k.items.map((it) => (it.id === t.itemId ? { ...it, ...patch } : it)));
   };
   const itemOf = (t: TaskRef) => {
     const node = boards.find((b) => b.id === t.boardId)?.nodes.find((n) => n.id === t.nodeId);
