@@ -1,4 +1,6 @@
 [
+ "eigen|{0}",
+ "ics|uid:{0}|{1}",
  "&user_id=eq.{0}",
  "'Atkinson Hyperlegible', system-ui, sans-serif",
  "--- config: {0} --- {1}",

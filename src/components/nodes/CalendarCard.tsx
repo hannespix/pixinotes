@@ -11,6 +11,9 @@ import { anyAccountConnected, fetchAccountEvents, invalidateAccountEvents, type 
 import { IChevronL, IChevronR, IMore, IOrt, ILink, ITrash } from '../Icons';
 import { CardShell } from './CardShell';
 import { zahlWort } from '../../lib/sprache';
+import { ausKonto, kontoKennung, terminSchluessel, terminZeit, type ZentralTermin } from '../../lib/termineZentrale';
+import { setTerminMarke, terminMarke, TERMIN_MARKE_EREIGNIS, type TerminMarke } from '../../lib/terminMarke';
+import { fremdeWebAdresse } from '../../lib/sicher';
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 /**
@@ -34,6 +37,10 @@ interface CalEntry {
   own?: boolean;
   /** M177: ausführlicher Tooltip (Zeitraum, Ort, Notiz) */
   tip?: string;
+  /** M471: Schlüssel wie in der Aufgaben-Zentrale (Markierung) */
+  key?: string;
+  /** M471: externer Termin (Konto, ICS) — Klick öffnet seine Angaben */
+  termin?: ZentralTermin;
 }
 
 /** M176/M177: Eigener Termin — direkt in der Kalender-Karte eingetragen */
@@ -69,6 +76,9 @@ interface CalStrip {
   ext?: boolean;
   /** M177: eigener mehrtägiger Termin — Klick öffnet den Tages-Editor am Beginn */
   ownDate?: string;
+  /** M471: Schlüssel und externer Termin (siehe CalEntry) */
+  key?: string;
+  termin?: ZentralTermin;
 }
 
 interface ShowFlags { tasks: boolean; gantt: boolean; miles: boolean; ics: boolean; konto: boolean; notiz: boolean }
@@ -149,6 +159,39 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   const [evEdit, setEvEdit] = useState<MyEvent | null>(null);
   const [evIsNew, setEvIsNew] = useState(false);
   const [linkQuery, setLinkQuery] = useState('');
+  /**
+   * M471: Ein einzelner Termin aus der Aufgaben-Zentrale (lib/terminMarke.ts) oder per Klick auf einen externen
+   * Eintrag: `markiert` hebt ihn im Raster hervor, `detail` zeigt Zeit, Ort, Quelle und den Link zu Google/Outlook.
+   * Eigene Termine öffnen stattdessen ihren Editor.
+   */
+  const [markiert, setMarkiert] = useState<string | null>(null);
+  const [detail, setDetail] = useState<ZentralTermin | null>(null);
+  const eigeneRef = useRef(myEvents);
+  eigeneRef.current = myEvents;
+  useEffect(() => {
+    const anwenden = (m: TerminMarke | null) => {
+      if (!m || m.kartenId !== id) return;
+      setMarkiert(m.termin.key);
+      const eigen = m.termin.quelle === 'eigen' ? eigeneRef.current.find((e) => e.id === m.termin.eigenId) : undefined;
+      if (eigen) {
+        setDetail(null);
+        setDayEdit(eigen.date);
+        setEvEdit({ ...eigen });
+        setEvIsNew(false);
+        setLinkQuery('');
+      } else {
+        setDayEdit(null);
+        setEvEdit(null);
+        setDetail(m.termin);
+      }
+      // Die Marke gilt einmal: eine später wieder gezeichnete Karte öffnet den Termin nicht erneut
+      window.setTimeout(() => { if (terminMarke() === m) setTerminMarke(null); }, 3000);
+    };
+    anwenden(terminMarke());
+    const auf = () => anwenden(terminMarke());
+    window.addEventListener(TERMIN_MARKE_EREIGNIS, auf);
+    return () => window.removeEventListener(TERMIN_MARKE_EREIGNIS, auf);
+  }, [id]);
 
   /** M177: Zeile für den Detail-Tooltip eines eigenen Termins */
   const ownTip = (ev: MyEvent): string => {
@@ -247,14 +290,20 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     }
     if (show.ics) {
       for (const ev of icsEvents) {
+        // M471: derselbe Schlüssel wie in der Aufgaben-Zentrale — dort angeklickt, hier markiert
+        const key = terminSchluessel('ics', { id: ev.uid, beginn: ev.start, time: ev.startTime, title: ev.title });
+        const termin: ZentralTermin = {
+          key, quelle: 'ics', date: ev.start, beginn: ev.start, title: ev.title, time: ev.startTime,
+          end: ev.endTime, endDate: ev.end, place: ev.place,
+        };
         if (!ev.end) {
-          push(byDay, ev.start, { icon: '■', text: ev.title, ext: true });
+          push(byDay, ev.start, { icon: '■', text: ev.title, ext: true, key, termin });
         } else {
           const s = dayOf(ev.start);
           const e = dayOf(ev.end);
           for (let d = s; d <= e && d - s < LAENGSTER_BALKEN; d++) {
             push(stripsByDay, new Date(d * DAY).toISOString().slice(0, 10), {
-              text: ev.title, color: '#8a8375', startsHere: d === s, ext: true,
+              text: ev.title, color: '#8a8375', startsHere: d === s, ext: true, key, termin,
             });
           }
         }
@@ -262,11 +311,15 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     }
     if (show.konto) {
       for (const ev of accEvents) {
+        const termin = ausKonto(ev);
         push(byDay, ev.date, {
           icon: '●',
           text: ev.time ? `${ev.time} ${ev.title}` : ev.title,
           color: PROVIDER_COLOR[ev.provider],
           ext: true,
+          key: termin.key,
+          termin,
+          tip: [ev.title, terminZeit(termin), ev.place, kontoKennung(ev.provider)].filter(Boolean).join(' · '),
         });
       }
     }
@@ -279,6 +332,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
         for (let d = s; d <= e2 && d - s < LAENGSTER_BALKEN; d++) {
           push(stripsByDay, new Date(d * DAY).toISOString().slice(0, 10), {
             text: ev.title, color: ev.color ?? '#4f7cff', startsHere: d === s, ownDate: ev.date,
+            key: terminSchluessel('eigen', { id: ev.id, beginn: ev.date, time: ev.time, title: ev.title }),
           });
         }
       } else {
@@ -288,6 +342,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
           own: true,
           color: ev.color,
           tip: ownTip(ev),
+          key: terminSchluessel('eigen', { id: ev.id, beginn: ev.date, time: ev.time, title: ev.title }),
         });
       }
     }
@@ -629,6 +684,12 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   }
 
   const maxEntries = view === 'week' ? 8 : 3;
+  /** M471: Die ersten Einträge eines Tages — ein markierter Termin rückt dabei immer in die Sichtbaren */
+  const sichtbar = (liste: CalEntry[]): CalEntry[] => {
+    const i = markiert ? liste.findIndex((e) => e.key === markiert) : -1;
+    if (i < maxEntries) return liste.slice(0, maxEntries);
+    return [...liste.slice(0, maxEntries - 1), liste[i]];
+  };
 
   return (
     <div className="cal-body">
@@ -822,35 +883,38 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
             key={c.iso}
             className={`cal-cell ${c.inMonth ? '' : 'out'} ${c.iso === todayIso ? 'today' : ''}`}
             title="Klick: eigenen Termin an diesem Tag eintragen"
-            onClick={() => { setDayEdit(c.iso); setEvEdit(null); setEvTitle(''); setEvTime(''); }}
+            onClick={() => { setDayEdit(c.iso); setEvEdit(null); setEvTitle(''); setEvTime(''); setDetail(null); }}
           >
             <span className="cal-daynum">{c.day}</span>
             {(stripsByDay.get(c.iso) ?? []).slice(0, 3).map((s, i) => (
               <button
                 key={`s${i}`}
-                className={`cal-strip ${s.ext ? 'ext' : ''}`}
+                className={`cal-strip ${s.ext ? 'ext' : ''} ${s.key && s.key === markiert ? 'markiert' : ''}`}
                 translate="no"
                 style={{ background: s.color }}
                 title={s.ownDate ? `${s.text} (eigener Termin – Klick öffnet ihn)` : `${s.text}${s.ext ? ' (extern)' : ' – zur Karte springen'}`}
                 onClick={(ev) => {
                   ev.stopPropagation();
                   if (s.ownDate) { setDayEdit(s.ownDate); setEvEdit(null); }
+                  else if (s.termin) { setDayEdit(null); setDetail(s.termin); setMarkiert(s.termin.key); }
                   else jump(s);
                 }}
               >
                 {s.startsHere || cells[0].iso === c.iso ? s.text : ' '}
               </button>
             ))}
-            {(byDay.get(c.iso) ?? []).slice(0, maxEntries).map((e, i) => (
+            {sichtbar(byDay.get(c.iso) ?? []).map((e, i) => (
               <button
                 key={i}
-                className={`cal-chip ${e.urgent ? 'urgent' : ''} ${e.ext ? 'ext' : ''} ${e.own ? 'own' : ''}`}
+                className={`cal-chip ${e.urgent ? 'urgent' : ''} ${e.ext ? 'ext' : ''} ${e.own ? 'own' : ''} ${e.key && e.key === markiert ? 'markiert' : ''}`}
                 translate="no"
                 style={e.color ? { borderLeftColor: e.color } : undefined}
-                title={e.own ? (e.tip ?? e.text) : `${e.text}${e.ext ? ' (externer Termin)' : ' – zur Karte springen'}`}
+                title={e.own ? (e.tip ?? e.text) : e.termin ? `${e.tip ?? e.text} – Klick zeigt den Termin` : `${e.text}${e.ext ? ' (externer Termin)' : ' – zur Karte springen'}`}
+                aria-current={e.key && e.key === markiert ? 'true' : undefined}
                 onClick={(ev) => {
                   ev.stopPropagation();
                   if (e.own) { setDayEdit(c.iso); setEvEdit(null); setEvTitle(''); setEvTime(''); }
+                  else if (e.termin) { setDayEdit(null); setDetail(e.termin); setMarkiert(e.termin.key); }
                   else jump(e);
                 }}
               >
@@ -928,6 +992,30 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
           </div>
         </div>
       )}
+      {detail && !dayEdit && (() => {
+        /* M471: ein einzelner externer Termin (Konto oder ICS) — Zeit, Ort, Quelle und der Weg zum Original */
+        const link = fremdeWebAdresse(detail.link);
+        const zu = () => { setDetail(null); setMarkiert(null); setTerminMarke(null); };
+        return (
+          <div className="cal-menu cal-dayedit cal-termin nodrag" role="dialog" aria-label="Termin">
+            <div className="cal-dayedit-head">
+              <b translate="no">{detail.title}</b>
+              <button title="Schließen" aria-label="Schließen" onClick={zu}>✕</button>
+            </div>
+            <div className="cal-termin-zeile">
+              {new Date(`${detail.date}T12:00:00`).toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}
+              {' · '}{terminZeit(detail)}
+            </div>
+            {detail.place && <div className="cal-termin-zeile" translate="no"><IOrt size={11} /> {detail.place}</div>}
+            <div className="cal-termin-zeile cal-termin-quelle">{kontoKennung(detail.quelle)}</div>
+            {link && (
+              <a className="cal-termin-link" href={link} target="_blank" rel="noopener noreferrer">
+                {detail.quelle === 'google' ? 'In Google Kalender öffnen' : 'In Outlook öffnen'}
+              </a>
+            )}
+          </div>
+        );
+      })()}
       {dayEdit && evEdit && (
         /* M177: Detail-Editor — alle Termin-Felder + Karten-/Board-Verknüpfung */
         <div className="cal-menu cal-dayedit cal-evform nodrag">

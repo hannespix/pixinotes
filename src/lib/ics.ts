@@ -19,14 +19,19 @@ export interface IcsEvent {
    *
    * Beim IMPORT bleiben die Felder leer — dort werden Termine weiterhin
    * tagesgenau geführt, weil die Kalenderkarte tageweise rastert.
+   * M471: … bis auf Uhrzeit, Ort und UID: Die Aufgaben-Zentrale zeigt ICS-Abos
+   * unter „Termine heute und morgen" mit Uhrzeit (Ortszeit) und erinnert davor.
+   * Das Raster der Kalender-Karte bleibt tagesgenau.
    */
   startTime?: string;   // HH:MM
   endTime?: string;     // HH:MM
   place?: string;
   note?: string;
+  /** M471: Kennung aus dem Kalender (UID) — nur beim Import gesetzt */
+  uid?: string;
 }
 
-function icsDate(val: string): { iso: string; dateOnly: boolean; mitternacht?: boolean } | null {
+function icsDate(val: string): { iso: string; dateOnly: boolean; mitternacht?: boolean; zeit?: string } | null {
   const m = val.trim().match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?/);
   if (!m) return null;
   if (m[4] === undefined) return { iso: `${m[1]}-${m[2]}-${m[3]}`, dateOnly: true };
@@ -34,10 +39,17 @@ function icsDate(val: string): { iso: string; dateOnly: boolean; mitternacht?: b
   if (m[7]) {
     const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    return { iso, dateOnly: false, mitternacht: d.getHours() === 0 && d.getMinutes() === 0 };
+    const zeit = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return { iso, dateOnly: false, mitternacht: d.getHours() === 0 && d.getMinutes() === 0, zeit };
   }
-  return { iso: `${m[1]}-${m[2]}-${m[3]}`, dateOnly: false, mitternacht: m[4] === '00' && m[5] === '00' };
+  // Ohne Z (auch mit TZID): Wandzeit, wie sie dasteht
+  return { iso: `${m[1]}-${m[2]}-${m[3]}`, dateOnly: false, mitternacht: m[4] === '00' && m[5] === '00', zeit: `${m[4]}:${m[5]}` };
 }
+
+/** M471: Text eines Feldes nach RFC 5545 entschlüsseln (\\, \, \; \n) */
+const icsText = (val: string, hoechstens: number): string => val
+  .replace(/\\([\\,;nN])/g, (_, c: string) => (c === 'n' || c === 'N' ? ' ' : c))
+  .trim().slice(0, hoechstens);
 
 const shiftDay = (iso: string, n: number): string =>
   new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) + n * 864e5)
@@ -47,7 +59,10 @@ const shiftDay = (iso: string, n: number): string =>
 export function parseIcs(text: string): IcsEvent[] {
   const lines = text.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '').replace(/\r/g, '').split('\n');
   const out: IcsEvent[] = [];
-  let cur: { title?: string; start?: string; end?: string; endDateOnly?: boolean; endMitternacht?: boolean } | null = null;
+  let cur: {
+    title?: string; start?: string; end?: string; endDateOnly?: boolean; endMitternacht?: boolean;
+    startZeit?: string; startMitternacht?: boolean; endZeit?: string; place?: string; uid?: string;
+  } | null = null;
   for (const line of lines) {
     if (line.startsWith('BEGIN:VEVENT')) { cur = {}; continue; }
     if (line.startsWith('END:VEVENT')) {
@@ -58,7 +73,15 @@ export function parseIcs(text: string): IcsEvent[] {
         // Mitternacht belegte sonst auch den nächsten Tag)
         if (end && (cur.endDateOnly || cur.endMitternacht)) end = shiftDay(end, -1);
         if (end && end <= cur.start) end = undefined;
-        out.push({ title: cur.title, start: cur.start, end });
+        const ev: IcsEvent = { title: cur.title, start: cur.start, end };
+        // M471: Uhrzeit nur bei echten Zeitterminen — 0 Uhr bis 0 Uhr (Outlooks Ganztägiges) bleibt ohne
+        if (cur.startZeit && !(cur.startMitternacht && (cur.endMitternacht || !cur.endZeit))) {
+          ev.startTime = cur.startZeit;
+          if (cur.endZeit && !cur.endDateOnly) ev.endTime = cur.endZeit;
+        }
+        if (cur.place) ev.place = cur.place;
+        if (cur.uid) ev.uid = cur.uid;
+        out.push(ev);
       }
       cur = null;
       continue;
@@ -76,20 +99,36 @@ export function parseIcs(text: string): IcsEvent[] {
         .trim().slice(0, 120);
     } else if (key === 'DTSTART' || key.startsWith('DTSTART;')) {
       const d = icsDate(val);
-      if (d) cur.start = d.iso;
+      if (d) { cur.start = d.iso; cur.startZeit = d.zeit; cur.startMitternacht = !!d.mitternacht; }
     } else if (key === 'DTEND' || key.startsWith('DTEND;')) {
       const d = icsDate(val);
-      if (d) { cur.end = d.iso; cur.endDateOnly = d.dateOnly; cur.endMitternacht = !!d.mitternacht; }
+      if (d) { cur.end = d.iso; cur.endDateOnly = d.dateOnly; cur.endMitternacht = !!d.mitternacht; cur.endZeit = d.zeit; }
+    } else if (key === 'LOCATION' || key.startsWith('LOCATION;')) {
+      const ort = icsText(val, 200);
+      if (ort) cur.place = ort;
+    } else if (key === 'UID') {
+      if (val.trim()) cur.uid = val.trim().slice(0, 300);
     }
   }
   return out.slice(0, 500);
 }
 
-/** Termin-Duplikate (gleicher Titel + Starttag) zusammenführen */
+/**
+ * Termin-Duplikate (gleicher Titel + Starttag) zusammenführen.
+ * M471: Ein schon vorhandener Eintrag ohne Uhrzeit (Import vor M471) übernimmt Uhrzeit, Ort und UID des neuen —
+ * so bekommen bestehende Abos beim nächsten „Abos aktualisieren" ihre Uhrzeiten.
+ */
 export function mergeEvents(existing: IcsEvent[], incoming: IcsEvent[]): IcsEvent[] {
-  const seen = new Set(existing.map((e) => `${e.title}|${e.start}`));
+  const neu = new Map(incoming.map((e) => [`${e.title}|${e.start}`, e]));
+  const seen = new Set<string>();
+  const alt = existing.map((e) => {
+    const k = `${e.title}|${e.start}`;
+    seen.add(k);
+    const n = neu.get(k);
+    return n && !e.startTime && !e.place && !e.uid && (n.startTime || n.place || n.uid) ? { ...e, ...n } : e;
+  });
   const fresh = incoming.filter((e) => !seen.has(`${e.title}|${e.start}`));
-  return [...existing, ...fresh].slice(-800);
+  return [...alt, ...fresh].slice(-800);
 }
 
 /**

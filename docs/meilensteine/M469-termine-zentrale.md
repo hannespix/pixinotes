@@ -39,10 +39,13 @@ Board mit Kalender-Karte aufzurufen.
 - CSS: Block „M469" nach `.th-done-empty` in `index.css`. Texte englisch in `src/sprache/en.json`, Hilfe DE/EN (Neu).
 
 ## Grenzen / offen
-- Beim App-Start gibt es bewusst keinen Abruf (m446): Erinnerungen kennen nur Termine, die Kalender-Karte oder Zentrale
-  zuletzt geholt haben. Wer die App den ganzen Tag offen hat, ohne Kalender oder Zentrale anzusehen, bekommt neue
-  Termine erst nach dem nächsten Abruf.
-- Abruf-Termine tragen keine Kennung des Kalenders: Der Klick führt zur Kalender-Karte am Tag, nicht zu einem
-  einzelnen Termin. Endzeit und Ort liefert der vorhandene Abruf nicht (nur Start und Titel).
-- Erinnerung im 5-Minuten-Takt: sie kommt 10–15 Minuten vor Beginn, nicht minutengenau.
-- Eigene Termine der Kalender-Karte und ICS-Abos stehen nicht im Abschnitt (nur Konten).
+- Erledigt in **M471** (`docs/meilensteine/M471-termine-vollstaendig.md`): Kennung, Ende, Ort und Web-Link im Abruf;
+  der Klick öffnet den einzelnen Termin in der Kalender-Karte; eigene Termine und ICS-Abos stehen im Abschnitt;
+  mit eingeschalteter Erinnerung holt die App Heute/Morgen gedrosselt im Hintergrund nach.
+- Ursprünglich offen (→ M471):
+  - Beim App-Start gibt es bewusst keinen Abruf (m446): Erinnerungen kennen nur Termine, die Kalender-Karte oder
+    Zentrale zuletzt geholt haben.
+  - Abruf-Termine tragen keine Kennung des Kalenders: Der Klick führt zur Kalender-Karte am Tag, nicht zu einem
+    einzelnen Termin. Endzeit und Ort liefert der vorhandene Abruf nicht (nur Start und Titel).
+  - Eigene Termine der Kalender-Karte und ICS-Abos stehen nicht im Abschnitt (nur Konten).
+- Weiter offen: Erinnerung im 5-Minuten-Takt — sie kommt 10–15 Minuten vor Beginn, nicht minutengenau.
