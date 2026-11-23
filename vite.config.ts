@@ -57,6 +57,23 @@ function processNurMsg(): Plugin {
   };
 }
 
+/**
+ * M462: „frimousse" (Emoji-Auswahl von BlockNote 0.57) für alle Module auf den Nachlader
+ * src/lib/frimousseNachladen.tsx lenken — nur der Nachlader selbst bekommt das echte Paket (per import()).
+ * So bleibt die Bibliothek aus dem Start-Paket, wie früher emoji-mart bei BlockNote 0.31.
+ */
+function frimousseNachladen(): Plugin {
+  const nachlader = resolve('src/lib/frimousseNachladen.tsx');
+  return {
+    name: 'pixinotes-frimousse-nachladen',
+    enforce: 'pre',
+    resolveId(quelle, importeur) {
+      if (quelle !== 'frimousse' || !importeur || resolve(importeur.split('?')[0]) === nachlader) return null;
+      return nachlader;
+    },
+  };
+}
+
 // Modus "single": baut EINE portable pixinotes.html (läuft per Doppelklick,
 // auch von file:// ohne Server/Installation/Adminrechte).
 export default defineConfig(({ mode }) => ({
@@ -85,6 +102,7 @@ export default defineConfig(({ mode }) => ({
       overrides: { buffer: 'vite-plugin-node-polyfills/shims/buffer' },
     }),
     processNurMsg(),
+    frimousseNachladen(),
     ...(mode === 'single' ? [viteSingleFile({ removeViteModuleLoader: true })] : [ocrDateienKopieren()]),
   ],
   build:

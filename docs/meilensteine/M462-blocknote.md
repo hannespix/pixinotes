@@ -57,25 +57,36 @@ Audit-Befund C6 (`docs/AUDIT.md`): 22 „moderate" npm-Meldungen in tiptap/uuid 
   unverändert; die Optik ist gleich.
 - `editor.prosemirrorView` (Android-Fix M110) und `tryParseMarkdownToBlocks` (KI, M117/M332) bestehen
   weiter; `_headless` wird ignoriert (ein ungemounteter Editor ist von selbst kopflos).
-- Start-JS (`pruefungen/m446-start-leistung.mjs`): Editor-Paket 990 KB → 1.039 KB (+21 KB gzip, Tiptap 3 +
-  Mantine 8 + frimousse statisch in `@blocknote/react`). Start gesamt 2,52 MB; Grenze A1 von 2,5 auf
-  **2,6 MB** angehoben (begründet im Kopf der Reihe). Grenze A4 (Editor < 1,1 MB, keine Emoji-Daten) hält.
+- **Emoji-Auswahl nachgeladen:** `@blocknote/react` 0.57 importiert die Emoji-Auswahl `frimousse` (~27 KB) statisch.
+  Das Plugin `frimousseNachladen()` in `vite.config.ts` lenkt „frimousse" für alle Module auf
+  `src/lib/frimousseNachladen.tsx`; der Nachlader lädt das echte Paket beim ersten Öffnen (`EmojiPicker.Root` mit
+  eigener Suspense-Grenze; die übrigen Teile und `useSkinTone` laufen nur innerhalb von Root). Wie früher
+  emoji-mart in 0.31. Die Emoji-Daten kommen offline aus `@blocknote/core/emoji-data` (eigene Nachlade-Teile).
+- **Start-JS** (gemessen mit `dist/`, Stand nach Einmischen von M467): Editor-Paket 959 887 B → 1 010 260 B;
+  Start gesamt 2 170 290 B → **2 220 718 B (+50 KB)**. Ohne den Nachlader wären es 2 246 608 B gewesen. Gewachsen
+  sind Tiptap 3 / BlockNote-Kern (+59 KB Quelltext), `@floating-ui/react` (+38 KB), `@blocknote/react` (+17 KB),
+  Mantine (+8 KB); weggefallen sind yjs, y-prosemirror, lib0 und linkifyjs (0.57 bindet sie nur noch für
+  Zusammenarbeit an). Grenze `START_JS_GRENZE` in **m446, m459 und m467** von 2 190 000 auf **2 240 000 B**
+  angehoben (Kommentar in allen drei Reihen); A4 (Editor < 1,1 MB, keine Emoji-Daten) hält. Weiter kürzen ginge nur,
+  wenn der Editor selbst nachgeladen würde (M446 hat das bewusst verworfen: sichtbares Nachrücken der Notizen) —
+  bzw. die mitgebündelte Kommentar-/Versions-Oberfläche von BlockNote (`bn-thread` …) aus `BlockNoteView` fiele.
 - Fixture `pruefungen/daten/m462-notizen-blocknote031.json`: zwei Notizen, die der **alte** Build
   (0.31.3) gespeichert hat — Überschriften 1–3, Inline-Stile inkl. textSize/textFont, Link, Haken,
   verschachtelte Liste, Nummern, Ausrichtung + Blockfarben, Zitat, Codeblock, Rechentabelle, alte
   Tabelle, Bild als Daten-URL mit Bildunterschrift. Neu erzeugen: alten Stand bauen, Notizen mit diesen
   Teil-Blöcken anlegen, einmal tippen (der Editor schreibt dann das volle JSON), `localStorage` lesen.
 
-- Angepasste alte Reihen: `m283` (T4: Zelle mit echtem Klick statt per Skript gesetzter DOM-Auswahl ohne
+- Angepasste alte Reihen: `m372` (Schreibhinweis steht seit 0.57 als `::after` am Block — Messung liest beide;
+  die M372-Regel in `index.css` blendet auch das `::after` ohne Fokus aus), `m283` (T4: Zelle mit echtem Klick statt per Skript gesetzter DOM-Auswahl ohne
   Fokus — die übernimmt ProseMirror nicht mehr), `m338` (B2: 17 statt 18 Blöcke, kein angehängter
-  Schluss-Absatz), `m416` (A6: H1-Selektor ohne `data-level`), `m446` (Grenze).
+  Schluss-Absatz), `m416` (A6: H1-Selektor ohne `data-level`), `m446`, `m459`, `m467` (Grenze).
 
 ## Prüfreihe m462
 A Altbestand ruhend · B geweckt (h1–h3, Haken, Stile, Ausrichtung, Rechentabelle, alte Tabelle, Bild) ·
 C Bearbeiten/Speichern/Neuladen ohne Blockverlust, einfache Alt-Notiz ruht auch nach dem Speichern mit
 dem neuen Editor · D Einfügen-Menü deutsch, eine Tabelle, Bild ja/Video nein, keine 0.57-Neuheiten ·
 E Überschrift, Checkliste, Rechentabelle über das Menü · F Formatier-Leiste A+ → `textSize` · G keine
-Seitenfehler.
+Seitenfehler · H Emoji-Bibliothek nicht im Start, „/Emoji" öffnet die Auswahl und fügt ein.
 
 ## Grenzen / offen
 - Die Block-Typ-Auswahl der Formatier-Leiste zeigt die aufklappbare Liste aus 0.57 weiterhin an (nur das

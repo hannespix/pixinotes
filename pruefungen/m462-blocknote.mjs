@@ -19,6 +19,7 @@
  *   E  Über das Menü eingefügt: Überschrift, Checkliste, Rechentabelle
  *   F  Formatier-Leiste: markierter Text → A+ setzt die Größe (Stil textSize)
  *   G  keine Seitenfehler
+ *   H  Emoji-Auswahl (frimousse) nicht im Start, „/Emoji" lädt sie nach und fügt ein
  */
 // Läuft aus dem Repository: `node pruefungen/m462-blocknote.mjs` (braucht dist/).
 import { fileURLToPath } from 'node:url';
@@ -243,6 +244,33 @@ console.log('\n════ F: Formatier-Leiste ════');
   const s = await stand(P, 'nA');
   const absatz = s.find((x) => JSON.stringify(x.content ?? '').includes('Mittig'));
   pruefe('F3 A+ schreibt die Größe als Stil textSize', JSON.stringify(absatz?.content ?? '').includes('textSize'), JSON.stringify(absatz?.content));
+  await ctx.close();
+}
+
+// ══ H ═════════════════════════════════════════════════════════════════
+console.log('\n════ H: Emoji-Auswahl wird nachgeladen ════');
+{
+  const { ctx, P } = await seite();
+  const imStart = await P.evaluate(async () => {
+    const dateien = [...document.querySelectorAll('script[src], link[rel="modulepreload"]')].map((e) => e.src || e.href);
+    let mit = false;
+    for (const d of dateien) { const t = await (await fetch(d)).text(); if (t.includes('frimousse-root')) mit = true; }
+    return mit;
+  });
+  pruefe('H1 die Emoji-Bibliothek steht nicht in den Start-Dateien', !imStart);
+  const ziel = karte(P, 'nB').getByText('Nach dem Bild', { exact: true });
+  await ziel.click(); await P.waitForTimeout(500);
+  await ziel.click(); await P.keyboard.press('End');
+  await P.keyboard.press('Enter'); await P.keyboard.type('/Emoji'); await P.waitForTimeout(700);
+  await P.keyboard.press('Enter'); await P.waitForTimeout(1500);
+  const knoepfe = P.locator('[role="row"] [frimousse-emoji]');
+  const anzahl = await knoepfe.count();
+  pruefe('H2 „/Emoji" öffnet die Auswahl mit Emojis (offline, aus dem eigenen Paket)', anzahl > 20, String(anzahl));
+  if (anzahl) { await knoepfe.first().click(); await P.waitForTimeout(800); }
+  await P.mouse.click(1300, 950); await P.waitForTimeout(1500);
+  const s = await stand(P, 'nB');
+  const t = JSON.stringify(s);
+  pruefe('H3 das gewählte Emoji steht im Text', /\p{Extended_Pictographic}/u.test(t), t.slice(-200));
   await ctx.close();
 }
 
