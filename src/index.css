@@ -58,6 +58,15 @@
    */
   --app-rand: 0px;
   --head-space: calc(110px + var(--safe-top) + var(--app-rand));
+  /*
+   * M464: Eigene Mauszeiger — nur hier (und für Inline-Styles über lib/zeiger.ts).
+   * Unter Windows ist das System-Fadenkreuz („Präzisionsauswahl") ein dünnes, invertierendes
+   * 1-px-Kreuz: auf mittelgrauen Flächen, Screenshots und bei 150 % Anzeige kaum zu sehen.
+   * Darum ein eigenes Fadenkreuz mit Doppelkontur (dunkel innen, weiß außen) — sichtbar auf
+   * hellem und dunklem Grund. 24 px (über 32 px ignoriert Chrome/Edge unter Windows den Zeiger
+   * am Fensterrand), Hotspot in der Mitte, immer mit System-Fallback dahinter.
+   */
+  --zeiger-fadenkreuz: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 2v7M12 15v7M2 12h7M15 12h7' stroke='%23fff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M12 2v7M12 15v7M2 12h7M15 12h7' stroke='%23111' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='12' r='1.7' fill='%23111' stroke='%23fff' stroke-width='1.2'/%3E%3C/svg%3E") 12 12, crosshair;
 }
 
 /* ---------- Akzentfarben-Themes ---------- */
@@ -2125,7 +2134,7 @@ dl.leer-wege dd { margin: 0; }
   background: #fff; line-height: 0;
 }
 .pdf-seite canvas { width: 100%; height: auto; display: block; }
-.pdf-seite.pin-modus { cursor: crosshair; outline: 2px solid var(--accent); outline-offset: -2px; }
+.pdf-seite.pin-modus { cursor: var(--zeiger-fadenkreuz); outline: 2px solid var(--accent); outline-offset: -2px; }
 /* M337: Word-Seite — docx-preview baut die Seiten auf, sichtbar ist eine, skaliert auf Kartenbreite */
 .word-seite { line-height: normal; color: #000; }
 .word-inhalt { position: relative; }
@@ -2963,7 +2972,7 @@ dl.leer-wege dd { margin: 0; }
   width: 22px !important; height: 22px !important;
   background: transparent !important; border: none !important;
   opacity: 0; transition: opacity 0.15s;
-  cursor: crosshair !important;
+  cursor: var(--zeiger-fadenkreuz) !important;
   /* Über dem Karteninhalt: die innere Kreis-Hälfte (Optik UND Trefferfläche)
      wurde sonst vom später gerenderten card-body verdeckt (M102) */
   z-index: 5 !important;
@@ -2987,6 +2996,8 @@ dl.leer-wege dd { margin: 0; }
 /* Während des Verbindens: Ganzkarten-Ziel aktiv, alle Anschlüsse sichtbar,
    Karte unter dem Zeiger leuchtet als Ziel auf */
 .react-flow:has(.react-flow__connectionline) .pn-handle-body { pointer-events: all !important; }
+/* M464: React Flow setzt an Anschlüssen das System-Fadenkreuz — unter Windows kaum sichtbar */
+.react-flow__handle.connectionindicator { cursor: var(--zeiger-fadenkreuz); }
 .react-flow:has(.react-flow__connectionline) .pn-handle { opacity: 1; }
 .react-flow:has(.react-flow__connectionline) .pn-handle-body:hover {
   box-shadow: inset 0 0 0 2.5px var(--accent);
@@ -7001,7 +7012,10 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 .live-zeiger.laser .live-zeiger-name { left: 12px; top: 10px; background: #d91e1e; }
 /* Laser auf der Folie: eine Schicht genau über der Folie */
 .folien-laser { position: absolute; z-index: 4; pointer-events: none; overflow: hidden; border-radius: var(--r-lg); }
-.folien-laser.an { pointer-events: auto; cursor: none; touch-action: none; }
+/* M464: Den Systemzeiger nur verstecken, solange der eigene Laserpunkt wirklich zu sehen ist (data-sichtbar) —
+   vorher war der Zeiger nach L ohne Bewegung einfach weg, ohne Punkt als Ersatz. Ohne :has() bleibt er sichtbar. */
+.folien-laser.an { pointer-events: auto; touch-action: none; }
+.folien-laser.an:has(> .laser-punkt.mein[data-sichtbar]) { cursor: none; }
 .folien-laser .laser-punkt {
   position: absolute; margin: -7px 0 0 -7px; pointer-events: none;
   transition-property: left, top; transition-timing-function: linear;
@@ -7114,7 +7128,7 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 .be-masse { flex: none; font-size: 11.5px; font-variant-numeric: tabular-nums; }
 .be-buehne { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .be-hinweis { color: #b8b2a4; font-size: 14px; }
-.be-blatt { position: relative; flex: none; cursor: crosshair; touch-action: none; }
+.be-blatt { position: relative; flex: none; cursor: var(--zeiger-fadenkreuz); touch-action: none; }
 .be-blatt canvas { display: block; width: 100%; height: 100%; background:
   repeating-conic-gradient(#3a3731 0% 25%, #2b2924 0% 50%) 0 0 / 16px 16px; }
 .be-schicht { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
@@ -7167,7 +7181,7 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 /* Die Zeichenschicht liegt über der Folie (wie der Laser) — sie fängt Eingaben nur, solange ein Werkzeug gewählt ist */
 .folien-stift { position: absolute; z-index: 3; pointer-events: none; overflow: hidden; }
 .folien-stift > svg { display: block; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
-.folien-stift.an { z-index: 5; pointer-events: auto; touch-action: none; cursor: crosshair; }
+.folien-stift.an { z-index: 5; pointer-events: auto; touch-action: none; cursor: var(--zeiger-fadenkreuz); }
 .folien-stift.an.eraser { cursor: cell; }
 .folien-pin { pointer-events: all; cursor: pointer; outline: none; }
 .folien-pin circle { fill: #f5b301; stroke: #fff; stroke-width: 2; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .35)); }
