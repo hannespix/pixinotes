@@ -19,7 +19,7 @@ import {
   webdavTest, webdavWrite, type WebdavConfig,
 } from '../lib/webdav';
 import {
-  applyKonto, bekannteClientId, bekannterTenant, kontoAbmelden, kontoAnmelden, kontoAnmeldenSupabase, kontoDateiMaxMb, kontoIstEigenes, kontoLabel, kontoLesen, kontoLiveVerbunden, kontoLoeschen, kontoStamp,
+  applyKonto, bekannteClientId, bekannterTenant, vorgabeClientId, kontoAbmelden, kontoAnmelden, kontoAnmeldenSupabase, kontoDateiMaxMb, kontoIstEigenes, kontoLabel, kontoLesen, kontoLiveVerbunden, kontoLoeschen, kontoStamp,
   kontoVerbinden, kontoWrite, loadKonto, type Anbieter, type KontoSitzung, type VerbindenErgebnis,
 } from '../lib/kontoSync';
 import { sbLinkSenden, sbPasswortAnmelden, sbRegistrieren, supabaseKonfig, supabaseKonfigSpeichern, supabaseKonfiguriert, type SbSitzung } from '../lib/kontoSupabase';
@@ -77,6 +77,13 @@ const TABS: ReadonlyArray<readonly [Reiter, string]> = [
 /** Alte Reiter-Namen aus Verweisen (Toasts, Menüs, Karten) landen im passenden neuen Reiter */
 const ALT_REITER: Record<string, Reiter> = { ki: 'dienste', kalender: 'dienste', export: 'daten', sync: 'daten', konto: 'daten' };
 type SyncWeg = 'konto' | 'ordner' | 'webdav' | 'datei';
+
+/** M443: Der MCP-Server liegt neben der App; in der portablen Datei (file://) zeigt der Link auf die Website */
+const MCP_DATEI = /^https?:/.test(typeof location !== 'undefined' ? location.protocol : '') ? 'pixinotes-mcp.mjs' : 'https://hannespix.github.io/pixinotes/pixinotes-mcp.mjs';
+/** Der Eintrag fürs KI-Programm — als Code nicht übersetzt, darum stehen die Platzhalter gleich in der Sprache der Oberfläche */
+const mcpKonfig = () => JSON.stringify({ mcpServers: { pixinotes: { command: 'node', args: sprache() === 'en'
+  ? ['/path/to/pixinotes-mcp.mjs', '--ordner', '/path/to/sync-folder']
+  : ['/Pfad/zu/pixinotes-mcp.mjs', '--ordner', '/Pfad/zum/Sync-Ordner'] } } }, null, 2);
 
 /**
  * Einstellungen: Design, Daten, Synchronisation, Dienste (KI, Gehirn, Konten).
@@ -181,6 +188,8 @@ export function Settings() {
   // Board-Store) — flüchtig in den Komponenten-State gespiegelt
   const [calAcc, setCalAcc] = useState<CalAccounts>({});
   const [gClientId, setGClientId] = useState('');
+  /** M442: Nur die E-Mail-Adresse — Google wählt damit das Konto vor */
+  const [gMail, setGMail] = useState('');
   const [msClientId, setMsClientId] = useState('');
   const [msTenant, setMsTenant] = useState('');
   // WebDAV-Zugang (separater localStorage-Schlüssel — nie in Exporten)
@@ -268,8 +277,9 @@ export function Settings() {
     if (!open) return;
     const acc = loadCalAccounts();
     setCalAcc(acc);
-    setGClientId(acc.google?.clientId ?? '');
-    setMsClientId(acc.ms?.clientId ?? '');
+    // M442: Die Client-IDs kommen vom Betreiber (Build) — Nutzer tippen sie nicht
+    setGClientId(acc.google?.clientId || bekannteClientId('google'));
+    setMsClientId(acc.ms?.clientId || bekannteClientId('ms'));
     setMsTenant(acc.ms?.tenant ?? '');
     const dav = loadWebdav();
     setDavCfg(dav);
@@ -301,7 +311,7 @@ export function Settings() {
   const refreshCalAcc = () => setCalAcc(loadCalAccounts());
 
   const doConnectGoogle = () => doExport(async () => {
-    const name = await connectGoogle(gClientId.trim());
+    const name = await connectGoogle(gClientId.trim(), /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(gMail.trim()) ? gMail.trim() : undefined);
     refreshCalAcc();
     showToast(`Google verbunden: ${name}`);
   }, 'google');
@@ -381,7 +391,8 @@ export function Settings() {
     else showToast(`Angemeldet bei ${wo} – alles auf dem gleichen Stand.`);
   };
   const kontoConnect = (anbieter: Anbieter) => doKonto('konto', async () => {
-    const sitz = await kontoAnmelden(anbieter, anbieter === 'google' ? kontoGid : kontoMsid, kontoTenant.trim() || 'common');
+    const hinweis = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(kontoMail.trim()) ? kontoMail.trim() : undefined;   // M442: E-Mail wählt das Konto vor
+    const sitz = await kontoAnmelden(anbieter, anbieter === 'google' ? kontoGid : kontoMsid, kontoTenant.trim() || 'common', hinweis);
     setKontoSitz(sitz);
     kontoMeldung(await kontoVerbinden(), kontoLabel(sitz));
   });
@@ -1334,6 +1345,23 @@ export function Settings() {
               </div>
             </>
           )}
+          {/* M443: Von außen — KI-Programme legen über den MCP-Server Boards an und füllen sie */}
+          <details className="modal-details mcp-einrichtung" data-taste="mcp">
+            <summary>KI-Programme von außen (MCP)</summary>
+            <p className="modal-hint">
+              Claude, Cursor und andere KI-Programme auf deinem Rechner legen damit Boards an, lesen und füllen sie – mit
+              allen Modulen. Sie schreiben in deinen Sync-Ordner; PixiNotes übernimmt die Änderungen von allein.
+            </p>
+            <ol className="mcp-schritte">
+              <li><a href={MCP_DATEI} download="pixinotes-mcp.mjs">pixinotes-mcp.mjs laden</a> und ablegen (braucht Node.js 18 oder neuer).</li>
+              <li>Im KI-Programm als MCP-Server eintragen, die Pfade durch deine ersetzen:</li>
+            </ol>
+            <pre className="mcp-code"><code>{mcpKonfig()}</code></pre>
+            <div className="modal-buttons">
+              <button data-taste="mcp-kopieren" onClick={() => { void navigator.clipboard?.writeText(mcpKonfig()).then(() => showToast('Eintrag kopiert.'), () => showToast('Kopieren nicht möglich – bitte markieren.')); }}>Eintrag kopieren</button>
+            </div>
+            <p className="modal-note">Ohne Sync-Ordner geht es auch über dein PixiNotes-Konto: statt --ordner das Argument --konto und PIXINOTES_EMAIL/PIXINOTES_PASSWORT als Umgebung.</p>
+          </details>
         </section>
 
         {/* ---- M204: Gehirn — semantischer Index ---- */}
@@ -1463,7 +1491,7 @@ export function Settings() {
         {/* ---- Konten: Google & Microsoft 365 — Kalender, bei Microsoft auch OneNote ---- */}
         <section className="modal-section">
           <h3>Konten</h3>
-          <p className="modal-hint">Google und Microsoft 365 liefern Termine in die Kalender-Karten, Microsoft auf Wunsch auch OneNote-Notizbücher. Die Anmeldung läuft direkt zwischen Browser und Anbieter, die Client-ID legt eure IT an.</p>
+          <p className="modal-hint">Google und Microsoft 365 liefern Termine in die Kalender-Karten, Microsoft auf Wunsch auch OneNote-Notizbücher. Die Anmeldung läuft direkt zwischen Browser und Anbieter – du bestätigst nur dein Konto.</p>
           {!oauthAvailable() && (
             <div className="modal-note">
               Die Einzeldatei (file://) kann kein OAuth, dafür die gehostete App nutzen. Ohne Anmeldung: ICS-Abo in der Kalender-Karte.
@@ -1486,18 +1514,40 @@ export function Settings() {
             </>
           ) : (
             <>
-              <label className="modal-row">
-                <span>Client-ID</span>
-                <input
-                  type="text" placeholder="xxxxx.apps.googleusercontent.com"
-                  value={gClientId} onChange={(e) => setGClientId(e.target.value)}
-                />
-              </label>
-              <div className="modal-buttons">
-                <button disabled={!gClientId.trim() || !oauthAvailable() || busy === 'google'} onClick={doConnectGoogle}>
-                  {busy === 'google' ? '…' : 'Mit Google verbinden'}
-                </button>
-              </div>
+              {/* M442: Für Nutzer nur die E-Mail-Adresse und ein Knopf — Google wählt das Konto damit vor und fragt
+                  einmal nach der Erlaubnis. Die technische Client-ID richtet der Betreiber einmal ein. */}
+              {gClientId.trim() ? (
+                <>
+                  <label className="modal-row">
+                    <span>Google-Konto</span>
+                    <input type="email" autoComplete="email" placeholder="name@gmail.com (optional)" value={gMail} onChange={(e) => setGMail(e.target.value)} data-taste="google-mail" />
+                  </label>
+                  <div className="modal-buttons">
+                    <button disabled={!oauthAvailable() || busy === 'google'} onClick={doConnectGoogle} data-taste="google-verbinden">
+                      {busy === 'google' ? '…' : 'Mit Google verbinden'}
+                    </button>
+                  </div>
+                  <div className="modal-note">Google öffnet ein kleines Fenster: Konto bestätigen, Kalender freigeben – fertig.</div>
+                </>
+              ) : (
+                <div className="modal-note" data-taste="google-nicht-eingerichtet">Die Google-Anmeldung ist auf dieser Installation noch nicht eingerichtet. Termine kommen bis dahin per ICS-Abo in die Kalender-Karte.</div>
+              )}
+              {!vorgabeClientId('google').trim() && (
+                <details className="modal-details" data-taste="google-betreiber">
+                  <summary>Für Betreiber: Google-Anmeldung einrichten</summary>
+                  <label className="modal-row">
+                    <span>Client-ID</span>
+                    <input
+                      type="text" placeholder="xxxxx.apps.googleusercontent.com"
+                      value={gClientId} onChange={(e) => setGClientId(e.target.value)}
+                    />
+                  </label>
+                  <div className="modal-note">
+                    Einmalig: Google Cloud Console → APIs &amp; Dienste → Anmeldedaten → OAuth-Client „Webanwendung“, autorisierte JavaScript-Quelle <code>{location.origin}</code>.
+                    Am besten als Repository-Variable <code>VITE_GOOGLE_CLIENT_ID</code> hinterlegen – dann sieht kein Nutzer dieses Feld.
+                  </div>
+                </details>
+              )}
             </>
           )}
 

@@ -18,7 +18,7 @@ Die komplette App steckt in **einer HTML-Datei** (~3 MB): läuft in jedem modern
 
 > 💡 Die Daten liegen im Browser-Speicher (localStorage), gebunden an Browser + Ablageort der Datei. Gleicher Browser + gleicher Ort = alles bleibt erhalten. Zum Mitnehmen: Karten über die Auswahl-Toolbar teilen/exportieren. Der geplante **Arbeitsordner-Modus** (Kapitel 8b im Konzept) speichert künftig direkt als Markdown-Dateien.
 
-Neu bauen nach Code-Änderungen: `npm run build:single` → erzeugt `release/pixinotes.html`.
+Neu gebaut wird die Datei nach jedem Merge auf den Hauptzweig automatisch (Workflow `.github/workflows/release.yml`) — in Pull Requests bitte nicht mit committen. Lokal zum Ausprobieren: `npm run build:single` → `release/pixinotes.html`.
 
 ## 🛠️ Entwicklung (mit npm)
 
@@ -61,6 +61,9 @@ npm run dev        # → http://localhost:5173
 - 🚀 **Wurf-Physik** (Option, standardmäßig aus): Karten mit Schwung loslassen — sie gleiten mit Momentum weiter
 - 👆 **Touch & responsiv**: große Hit-Targets und permanente Controls auf Touch-Geräten, Doppel-Tap = Notiz, angepasstes Layout für schmale Screens
 - 💾 **Local-first**: Alles wird automatisch im Browser gespeichert (localStorage), kein Account nötig
+- 👥 **Konto und Team**: optionales PixiNotes-Konto (E-Mail, Supabase) oder Ablage im App-Ordner von Google Drive/OneDrive; Boards mit Rollen freigeben, Gruppenarbeit per Einladungslink auch ohne Konto, Live-Mauszeiger, Laser, Reaktionen, Punkte und „Folgt mir"
+- 🖊️ **Stift wie auf Papier**: Druck-Konturen, Stift schreibt / Finger bedient, Handschrift wird Text, Anmerkungen direkt auf PDF- und Word-Seiten
+- 🧠 **KI kennt jedes Modul**: liest und bedient alle Kartentypen, „Frag dein Gehirn" über die eigene Wissensbasis, Recherche mit Quellen, Präsentationen per KI (Vibe Studio)
 
 | Weitere Ressourcen | Wo |
 |---|---|
@@ -77,6 +80,17 @@ npm run dev        # → http://localhost:5173
 
 ## 🗺️ Status
 
-**Version 1.0** — voll funktionsfähige App, lokal nutzbar ohne Installation. Drei Audit-Runden (Design/Usability, Logik, Code inkl. Security) sind eingeflossen; siehe [`docs/AUDIT.md`](docs/AUDIT.md).
+**Stand November 2026 — über 440 Meilensteine (M1–M441, ab M442 in [`docs/meilensteine/`](docs/meilensteine/)).** Version 1.0 entstand am ersten Tag (14.07.2026); seitdem kamen unter anderem dazu:
 
-**Noch offen (Roadmap):** Echtzeit-Kollaboration (Yjs/CRDT), IndexedDB-Auslagerung großer Binärdaten, weitere KI-Aktionen (Auto-Clustering, Board-Briefing), Live-Anbindung an Microsoft 365 (MS Graph). Details in [`docs/KONZEPT.md`](docs/KONZEPT.md).
+- **Sync auf jedem Weg**: Ordner (Nextcloud/OneDrive-Client) und WebDAV mit Drei-Wege-Zusammenführung, App-Ordner von Google Drive/OneDrive, eigenes **PixiNotes-Konto** (Supabase, Frankfurt) mit Dateispeicher bis 50 MB
+- **Team und Live**: Freigaben mit Rollen, Gäste per Link ohne Konto, Änderungen kartenweise über den Live-Kanal, Mauszeiger, Laser, Reaktionen, Timer, QR-Code zum Mitmachen
+- **Präsentation und Vortrag**: „Folgt mir", lebende Folien aus Modulen und Tools, Stift in der Präsentation, Reihenfolge entlang der Pfeile, **Vibe Studio** und Präsentationen per KI
+- **Stift und Handschrift**: Druck-Konturen, Procreate-Gesten, Handschrift → Text, Anmerkungen auf PDF- und Word-Seiten
+- **KI-Module**: Aktionen, Freitext-Kommando, Vision, Gehirn (Embeddings/RAG), Recherche, KI kennt jedes Modul
+- **Umbau „Weniger ist mehr"** (ab M312): drei feste Orte, ein Weg pro Aufgabe, flache ruhige Gestalt, Bedienung erst im Fokus; englische Oberfläche; vier Audit-Runden im November ([`docs/AUDIT.md`](docs/AUDIT.md))
+
+Wie es dazu kam und welche Entscheidungen tragen: [`docs/HISTORIE.md`](docs/HISTORIE.md). Offene und laufende Aufgaben: [`docs/BACKLOG.md`](docs/BACKLOG.md).
+
+## 🤝 Mitwirken (auch für Agenten und LLMs)
+
+Bitte zuerst [`CLAUDE.md`](CLAUDE.md) lesen (Produkt, Stack, Befehle, Regeln), dann [`docs/AGENTEN.md`](docs/AGENTEN.md) (parallele Arbeit, Ports, Merge), [`docs/HISTORIE.md`](docs/HISTORIE.md) (Phasen, Lehren, wiederkehrende Fehlerklassen) und [`docs/BACKLOG.md`](docs/BACKLOG.md). Jede sichtbare Änderung bekommt eine Meilenstein-Nummer, eine Prüfreihe in `pruefungen/` und eine Datei in `docs/meilensteine/`.
