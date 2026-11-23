@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoard } from '../store';
 import { useRandZiehen } from '../lib/randZiehen';
@@ -227,6 +227,26 @@ export function Tabs() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [navOpen]);
+  /**
+   * M456: Solange die Ausstülpung offen ist, ist alles dahinter `inert` — Tab, Vorlese-Programm und Finger erreichen
+   * die Kopfleiste und das Board nicht mehr (die Fokus-Führung selbst übernimmt lib/fensterFokus.ts, dort steht
+   * .nav-backdrop in der Fenster-Liste). Gesetzt wird ein Bild später: Die Fenster-Führung merkt sich vorher noch,
+   * wo der Fokus stand (der Auslöser liegt im Hintergrund). Aufgehoben wird SOFORT beim Schließen (Layout-Effekt,
+   * noch im selben Commit) — sonst gäbe die Fenster-Führung den Fokus an einen Knopf zurück, der noch inert ist.
+   */
+  useLayoutEffect(() => {
+    if (!navOpen) return;
+    const gesetzt: HTMLElement[] = [];
+    const id = requestAnimationFrame(() => {
+      for (const el of document.body.children) {
+        if (!(el instanceof HTMLElement) || el.classList.contains('nav-backdrop') || el.inert) continue;
+        if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') continue;
+        el.inert = true;
+        gesetzt.push(el);
+      }
+    });
+    return () => { cancelAnimationFrame(id); for (const el of gesetzt) el.inert = false; };
+  }, [navOpen]);
   // In der Spalte gibt es keine Ausstülpung — wer das Fenster verbreitert, hat sie nicht mehr offen
   useEffect(() => { if (spalte) setNavOpen(false); }, [spalte]);
 
@@ -303,6 +323,9 @@ export function Tabs() {
           className={`tab-nav ${navOpen ? 'active' : ''}`}
           data-taste="navigator"
           title={`${context?.space.name ?? '—'} › ${context?.project.name ?? '—'} – Navigation öffnen`}
+          aria-haspopup="dialog"
+          aria-expanded={navOpen}
+          aria-controls="nav-panel"
           onClick={() => setNavOpen((o) => !o)}
         >
           <span className="tab-nav-space" translate="no">{context?.space.name ?? '—'}</span>
@@ -313,7 +336,7 @@ export function Tabs() {
       {navOpen && createPortal(
         <div className="nav-backdrop" onClick={() => setNavOpen(false)}>
           {/* M245: Ausstülpung am linken Rand — angedockt, in der Breite ziehbar, deckend. */}
-          <div className="nav-panel slideout nodrag" style={{ width: navBreite }} role="dialog" aria-label="Navigation" onClick={(e) => e.stopPropagation()}>
+          <div className="nav-panel slideout nodrag" id="nav-panel" style={{ width: navBreite }} role="dialog" aria-modal="true" aria-label="Navigation" onClick={(e) => e.stopPropagation()}>
             <div className="nav-grip" {...navGriff}><span /></div>
             <div className="nav-head">
               <b>Navigation</b>
@@ -353,6 +376,7 @@ export function Tabs() {
           title={`${context?.space.name ?? '—'} › ${context?.project.name ?? '—'} › ${aktivesBoard?.name ?? '—'} – Navigation öffnen`}
           aria-haspopup="dialog"
           aria-expanded={navOpen}
+          aria-controls="nav-panel"
           onClick={() => setNavOpen((o) => !o)}
         >
           <span className="tab-nav-proj tab-pfad-proj" translate="no">{context?.project.name ?? '—'}</span>
