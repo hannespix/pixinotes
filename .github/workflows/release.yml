@@ -1,0 +1,49 @@
+# Nach jedem Merge: portable Single-File neu bauen und committen.
+# Vorher änderte jeder PR die 3-MB-Datei release/pixinotes.html – parallele
+# PRs kollidierten dort immer. Jetzt macht das nur noch dieser Lauf.
+# Ein Push mit GITHUB_TOKEN löst keine weiteren Workflows aus (keine Schleife).
+name: Single-File nachbauen
+
+on:
+  push:
+    branches: [claude/notes-whiteboard-design-bnwvxj]
+    paths-ignore: ['release/pixinotes.html', 'docs/**', '**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Single-File bauen
+        run: npm run build:single
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_MS_CLIENT_ID: ${{ vars.VITE_MS_CLIENT_ID }}
+          VITE_MS_TENANT: ${{ vars.VITE_MS_TENANT }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL || 'https://dckzqvbrffmemdzamtqr.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRja3pxdmJyZmZtZW1kemFtdHFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5ODc2NDIsImV4cCI6MjEwOTU2MzY0Mn0.KWHKi9w2CSrszq3xtQlMOCnyFlwO26QTXwnLWwUKBHs' }}
+      - name: Committen, falls geändert
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add release/
+          if git diff --cached --quiet; then echo "unverändert"; exit 0; fi
+          git commit -m "Single-File nachgebaut (${GITHUB_SHA::7})"
+          for i in 1 2 3; do
+            git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep 5
+          done
+          exit 1

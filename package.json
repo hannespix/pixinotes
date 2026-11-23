@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "check": "tsc -b",
     "build": "tsc -b && vite build",
     "build:single": "vite build --mode single && node -e \"require('fs').renameSync('release/index.html','release/pixinotes.html')\"",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "pruefen": "node werkzeug/alle-pruefungen.mjs"
   },
   "dependencies": {
     "@blocknote/core": "^0.31.0",
