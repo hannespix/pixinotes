@@ -34,6 +34,8 @@ export const IEraser = make(<><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-
 export const IUndo = make(<><path d="M3 7v6h6" /><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" /></>);
 export const IRedo = make(<><path d="M21 7v6h-6" /><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" /></>);
 export const ITasks = make(<><rect width="18" height="18" x="3" y="3" rx="3" /><path d="m8.5 12 2.5 2.5L16 9" /></>);
+/** M478: Eingang (Ablage für alles, was von außen kommt) */
+export const IEingang = make(<><path d="M22 12h-6l-2 3h-4l-2-3H2" /><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></>);
 export const IPlay = make(<polygon points="6 4 20 12 6 20 6 4" fill="currentColor" stroke="none" />);
 export const ISearch = make(<><circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" /></>);
 export const IFilter = make(<path d="M3 4.5h18l-7 8.2V20l-4-2.2v-7.1z" />);

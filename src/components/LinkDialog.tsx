@@ -81,7 +81,7 @@ export function LinkDialog({ boardId, onClose, ohneKonto, alsDatei }: { boardId:
                 )}
                 <div className="modal-buttons">
                   <button onClick={() => { ohneKonto(); onClose(); }} data-taste="link-ohne-konto">Board im Link kopieren</button>
-                  <button onClick={() => { alsDatei(); onClose(); }}>Als Datei sichern</button>
+                  <button onClick={() => { alsDatei(); onClose(); }}>Sicherung herunterladen</button>
                 </div>
               </>
             ) : zeile === undefined ? (

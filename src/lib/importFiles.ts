@@ -15,7 +15,7 @@ import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, ma
 // dem Deploy nicht auffindbar (dieselbe Falle wie beim Mermaid-Modul, M90).
 import { docxToBlocks } from './docx';
 import { boardDateienUebernehmen, cloneSharedBoard, parseBoardDatei } from './share';
-import { uebernimmDateien } from './syncFolder';
+import { sicherungEinspielenOeffnen } from './sicherungTakt';
 import type { IcsEvent } from './ics';
 import { vcardLesen, vcardText, VCARD_MAX } from './vcard';
 import { saveHtml } from './htmlStore';
@@ -135,8 +135,16 @@ export async function importHtmlAppFromUrl(rawUrl: string, pos: { x: number; y: 
 let vollGemeldet = false;
 
 /** Dateien importieren; gibt die Zahl der angelegten/verarbeiteten Karten zurück */
-export async function importFilesToBoard(files: File[], basePos: { x: number; y: number }): Promise<number> {
-  const { addNode, showToast } = useBoard.getState();
+export async function importFilesToBoard(
+  files: File[], basePos: { x: number; y: number },
+  /** M478: `ablegen` nimmt die fertigen Karten entgegen, statt sie aufs aktive Board zu legen (Eingang). Dann gibt
+   *  es keine Sonderwege, die das aktive Board ändern (Termine in dessen Kalender, Board-Dateien) und keinen
+   *  Team-Spiegel — die Datei wird eine Karte wie jede andere und erst beim Einsortieren Teil eines Boards. */
+  opts?: { ablegen?: (node: AppNode) => void },
+): Promise<number> {
+  const { addNode: aufsBoard, showToast } = useBoard.getState();
+  const addNode = opts?.ablegen ?? aufsBoard;
+  const spiegeln: typeof mirror = opts?.ablegen ? () => {} : mirror;
   const mirrorNote = { done: false };
   let offset = 0;
   let placed = 0;
@@ -157,7 +165,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
     const istBild = mime.startsWith('image/');
 
     try {
-      if (ext === 'ics') {
+      if (ext === 'ics' && !opts?.ablegen) {
         // Outlook/Google/Apple-Kalender: Termine in die Kalender-Karte mergen
         // M473: Der ICS-Leser (mit Zeitzonen und Serien) lädt erst hier nach — er gehört nicht in den Start (m446)
         const { mergeEvents, parseIcs } = await import('./ics');
@@ -183,7 +191,13 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         placed++;
         continue;
       }
-      if (ext === 'json') {
+      if (ext === 'pixinotes' && !opts?.ablegen) {
+        // M476: Eine Sicherung (ein Board oder alles) — erst die Vorschau, dann einspielen
+        sicherungEinspielenOeffnen(file);
+        placed++;
+        continue;
+      }
+      if (ext === 'json' && !opts?.ablegen) {
         // Geteiltes Board (.pixiboard.json) oder Voll-Export importieren
         const text = await file.text();
         const datei = parseBoardDatei(text);
@@ -198,13 +212,9 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         }
         const full = JSON.parse(text);
         if (full?.app === 'pixinotes' && Array.isArray(full.boards) && full.boards.length > 0) {
-          if (window.confirm(`Kompletten Stand vom ${full.savedAt ? new Date(full.savedAt).toLocaleString('de-DE') : '?'} laden? Die aktuellen Boards werden ersetzt.`)) {
-            useBoard.getState().importSync(full.boards, full.spaces ?? [], full.activeId ?? full.boards[0].id);
-            // M390: auch Vorlagen und die Inhalte der Geräte-Ablage aus der Sicherung
-            if (Array.isArray(full.templates)) useBoard.setState({ templates: full.templates });
-            void uebernimmDateien(full).then((nn) => { if (nn > 0) window.dispatchEvent(new CustomEvent('pixinotes:dateien-da')); });
-            showToast('Stand aus Datei geladen');
-          }
+          // M476: Ein kompletter Stand ersetzt nicht mehr ungefragt alles — die Vorschau zeigt, was drin ist,
+          // und bietet „als Kopie" (Standard) oder „vorhandene ersetzen" (mit Versionen und Rückgängig)
+          sicherungEinspielenOeffnen(file);
           placed++;
           continue;
         }
@@ -227,7 +237,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           addNode(makeImage({ x: pos.x + 380, y: pos.y + (imgOffset - 1) * 220 }, img.src, img.alt ?? file.name));
         }
         showToast(`„${res.title || file.name}" als Notiz übernommen${res.images.length ? ` (+ ${zahlWort(Math.min(res.images.length, 8), 'Bild', 'Bilder')})` : ''}.`);
-        mirror(file, note.id, mirrorNote);
+        spiegeln(file, note.id, mirrorNote);
         placed++;
         continue;
       }
@@ -291,7 +301,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         showToast(gesetzt > 1
           ? `${gesetzt} Blätter aus „${file.name}" übernommen – Formeln inklusive.`
           : `„${file.name}" als Rechen-Tabelle übernommen – Formeln inklusive.`);
-        mirror(file, erste, mirrorNote);
+        spiegeln(file, erste, mirrorNote);
         placed++;
         continue;
       }
@@ -307,7 +317,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         showToast(/\.(md|markdown|mdown|mkd)$/i.test(file.name)
           ? `„${file.name}" als Notiz übernommen – formatiert, nicht als Rohtext.`
           : `„${file.name}" als Notiz übernommen.`);
-        mirror(file, note.id, mirrorNote);
+        spiegeln(file, note.id, mirrorNote);
         placed++;
         continue;
       }
@@ -318,7 +328,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         await saveHtml(node.id, await file.text());
         addNode(node);
         showToast(`„${file.name}" als App-Karte abgelegt – mit ▶ starten.`);
-        mirror(file, node.id, mirrorNote);
+        spiegeln(file, node.id, mirrorNote);
         placed++;
         continue;
       }
@@ -326,12 +336,12 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         const email = await parseEml(await file.arrayBuffer());
         addNode(makeEmail(pos, email));
         showToast(`„${email.subject}" importiert – ${zahlWort(email.attachments.length, 'Anhang', 'Anhänge')} als Chips`);
-        mirror(file, null, mirrorNote);
+        spiegeln(file, null, mirrorNote);
       } else if (ext === 'msg') {
         const email = await parseMsg(await file.arrayBuffer());
         addNode(makeEmail(pos, email));
         showToast(`Outlook-Mail „${email.subject}" importiert`);
-        mirror(file, null, mirrorNote);
+        spiegeln(file, null, mirrorNote);
       } else if (istBild) {
         const src = await imageFileToDataUrl(file, mime);
         if (src === null) {
@@ -341,7 +351,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
             dataUrl: file.size <= MAX_EMBED_BYTES ? await readFileAsDataUrl(file) : undefined });
           addNode(node);
           showToast(`„${file.name}": Dieses Bildformat kann der Browser nicht anzeigen – als Datei abgelegt.`);
-          mirror(file, node.id, mirrorNote);
+          spiegeln(file, node.id, mirrorNote);
           placed++;
           continue;
         }
@@ -361,11 +371,11 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           addNode(node);
           // M392: Das Bild erscheint wie jedes andere (rahmenlos) — der Hinweis nennt nur noch den Zustand, einmal je Sitzung
           if (!vollGemeldet) { vollGemeldet = true; showToast('Speicher fast voll – neue Bilder liegen ab jetzt in der Geräte-Ablage statt im Board.', false, 7000); }
-          mirror(file, node.id, mirrorNote);
+          spiegeln(file, node.id, mirrorNote);
         } else {
           const node = makeImage(pos, src, file.name, await bildMasse(src));
           addNode(node);
-          mirror(file, node.id, mirrorNote);
+          spiegeln(file, node.id, mirrorNote);
         }
       } else {
         /**
@@ -393,7 +403,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           showToast(`„${file.name}" konnte nicht abgelegt werden – der Gerätespeicher ist voll.`);
         }
         addNode(node);
-        mirror(file, node.id, mirrorNote);
+        spiegeln(file, node.id, mirrorNote);
       }
       placed++;
     } catch (err) {

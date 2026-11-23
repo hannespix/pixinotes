@@ -60,3 +60,4 @@ dafür einen Server bräuchte (local-first).
 - Die portable Datei (`file://`) erreicht die Erweiterung nicht (Dateizugriff müsste man je Erweiterung erlauben).
 - Firefox-Angaben sind enthalten, aber nicht geprüft.
 - Nur das oberste Dokument liefert den Auszug; Auswahl in Rahmen kommt über das Kontextmenü (`selectionText`).
+- ~~Keine feste Schnellablage (KONZEPT „Inbox-Ecke“)~~ → **erledigt in M478** (`docs/meilensteine/M478-eingang.md`): Gesendetes wartet im Eingang statt im Empfangs-Dialog; „ohne Rückfrage“ bleibt direkt aufs offene Board.

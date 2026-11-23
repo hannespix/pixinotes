@@ -94,6 +94,8 @@ const ctx = await chromium.launchPersistentContext(profil, {
 await ctx.addInitScript(([port]) => {
   if (location.port !== String(port) || sessionStorage.getItem('m458-gesaet')) return;
   sessionStorage.setItem('m458-gesaet', '1');
+  // M478: Diese Reihe prüft den Empfangs-Dialog — mit dem Eingang (Vorgabe an) käme alles ohne Dialog dorthin (m478)
+  localStorage.setItem('pixinotes-eingang-sammeln', '0');
   if (localStorage.getItem('pixinotes-board')) return;
   localStorage.setItem('pixinotes-onboarded', '1');
   localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state: {

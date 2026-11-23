@@ -16,6 +16,12 @@ Runner anders war, unter nachgestellten Runner-Bedingungen geprüft.
 | m382 | E1: neue Karten tragen englische Standardnamen – im Ergebnis fehlte die Kanban-Karte ganz | **Nur im Runner**: kein App-Fehler (lokal heißt sie „New board"). Der Store schreibt gebündelt 400 ms nach der letzten Änderung; die Reihe las localStorage nach festen Pausen von 700 ms, auf dem langsameren Runner war die zuletzt angelegte Karte noch nicht geschrieben. Nachgestellt mit 6-facher CPU-Drosselung (CDP `Emulation.setCPUThrottlingRate`): lokal genau derselbe Befund. | Reihe robust gemacht: wartet (bis 8 s), bis die Kanban-Karte gespeichert ist, statt sofort zu lesen; Grenzen und Erwartung unverändert. Mit Drosselung grün (Wartezeit 169 ms). |
 | m398 | A8/C6/E6/F3: Lösch-Meldungen samt „Rückgängig" | Bewusst geänderte Oberfläche (M461: „3 Boards" statt „3 Board(s)"); M448 (#150) hat die Erwartungen schon angepasst. | Nichts zu tun; lokal 48/48 grün. |
 
+## Zweiter Lauf (Run 45165068307, nach dem Merge von #160)
+Die fünf Reihen oben waren grün. Neu rot war **m374** D4 („danach ist das Bild eine Karte mit Rand"): Klasse und
+Innenabstand stimmten, aber `data.rahmen` stand nach 500 ms noch nicht in localStorage – dieselbe Ursache wie
+m382 (gebündeltes Schreiben, langsamer Runner), lokal grün. D4 fragt jetzt wie D6 derselben Reihe bis 4 s nach.
+`m414` war ein Wackler (beim zweiten Mal grün) und bleibt unverändert.
+
 ## Grenzen / offen
 - Runner-Unterschiede, die hier auffielen: geringere Rechenleistung (Zeitfenster um Debounces). Schriften
   spielten bei diesen fünf Reihen keine Rolle.

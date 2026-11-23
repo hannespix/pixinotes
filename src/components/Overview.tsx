@@ -25,6 +25,7 @@ import { BereichMenu, BoardMenu, ProjektMenu, insBild } from './EbenenMenu';
 import { ITarget, IZoomIn, IZoomOut } from './Icons';
 import { kartenName, zahlWort } from '../lib/sprache';
 import { SVG_INHALT } from '../lib/uebersetzung';
+import { ohneEingang } from '../lib/eingangId';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
 interface ProjectZoneData { project: Project; spaceId: string; [key: string]: unknown }
@@ -48,9 +49,11 @@ interface ProjectRect { id: string; x: number; y: number; w: number; h: number }
  * Kräfte-Layout und Titel-Arbeit bei jedem Render neu — genau das Ruckeln,
  * das M223 beseitigt hat.
  */
-function ohneArchiv<T extends { archived?: boolean; nodes: Array<{ archived?: boolean }> }>(
+function ohneArchiv<T extends { id: string; system?: string; archived?: boolean; nodes: Array<{ archived?: boolean }> }>(
   boards: T[], zeigen: boolean,
 ): T[] {
+  // M478: Der Eingang ist ein System-Board — keine Kachel, keine Netz-Kugel
+  boards = ohneEingang(boards as Array<T & { id: string; system?: string }>);
   if (zeigen) return boards;
   // M288: Ein archiviertes BOARD verschwindet ganz — Kachel wie Netz-Kugel.
   // Gefiltert wird an derselben Quelle wie die archivierten Karten, damit

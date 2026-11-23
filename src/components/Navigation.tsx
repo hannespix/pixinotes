@@ -5,6 +5,7 @@ import { IArchive, IChevronR, IFolder, ISearch, ILock, IUsers } from './Icons';
 import { InlineName } from './InlineName';
 import { BereichMenu, BoardMenu, ProjektMenu } from './EbenenMenu';
 import { kartenName } from '../lib/sprache';
+import { useNutzerBoards } from '../lib/eingang';
 
 /**
  * M297: DER Baum der App — Bereich › Projekt › Board › Karte.
@@ -27,7 +28,7 @@ import { kartenName } from '../lib/sprache';
  */
 export function NavTree({ onNavigate }: { onNavigate?: () => void }) {
   const spaces = useBoard((s) => s.spaces);
-  const boards = useBoard((s) => s.boards);
+  const boards = useNutzerBoards();   // M478: Der Eingang steht nicht im Baum (auch nicht unter „Ohne Projekt")
   const activeId = useBoard((s) => s.activeId);
   const openBoard = useBoard((s) => s.openBoard);
   const setView = useBoard((s) => s.setView);

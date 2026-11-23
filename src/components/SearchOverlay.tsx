@@ -25,9 +25,11 @@ const uf = new uFuzzy({
 
 import type { AppNode } from '../types';
 import { t, zahlWort } from '../lib/sprache';
+import { sicherungEinspielenOeffnen } from '../lib/sicherungTakt';
 
 import { INetz } from './Icons';
 import { KartenSymbol } from './KartenSymbol';
+import { EINGANG_ID, eingangOeffnen, marke, ohneEingang } from '../lib/eingang';
 interface Hit {
   boardId: string;
   boardName: string;
@@ -96,12 +98,22 @@ function buildCommands(): Command[] {
     // M408: das Archiv per Suche ein- und ausblenden
     { label: st().showArchived ? 'Archiv ausblenden' : 'Archiv einblenden', hint: 'Archivierte Karten und Boards zeigen oder verbergen', alias: 'archiv archiviert archive wiederfinden verschwunden weg restore',
       run: () => st().setShowArchived(!st().showArchived) },
+    // M478: was von außen kam und noch einsortiert werden will
+    { label: 'Eingang', hint: 'Aus Browser, Teilen und Outlook – einsortieren', alias: 'eingang inbox ablage schnellablage später geteilt erweiterung browser sortieren einsortieren',
+      run: () => eingangOeffnen() },
     // M466: Mails aus Microsoft 365 aufs Board holen (Fenster wird erst jetzt geladen)
     { label: 'Outlook', hint: 'Mails aus Microsoft 365 als E-Mail-Karte aufs Board holen', alias: 'outlook mail mails e-mail email postfach posteingang inbox microsoft 365 exchange graph',
       run: () => window.dispatchEvent(new CustomEvent('pixinotes:outlook')) },
     // M449: frühere Stände des offenen Boards
     { label: 'Versionen', hint: 'Frühere Stände dieses Boards ansehen und wiederherstellen', alias: 'version versionen verlauf history zeitreise früher gestern stand wiederherstellen zurückholen backup sicherung snapshot',
       run: () => window.dispatchEvent(new CustomEvent('pixinotes:versionen', { detail: { boardId: st().activeId } })) },
+    // M476: Sicherung — alles in eine Datei, dieses Board, oder eine Sicherung einspielen (Code lädt erst jetzt)
+    { label: 'Alles sichern', hint: 'Alle Boards mit Anhängen als eine Datei (ohne KI-Schlüssel)', alias: 'sicherung sichern backup alles export datei herunterladen speichern umzug',
+      run: () => { void import('../lib/sicherung').then((m) => m.allesSichern()); } },
+    { label: 'Sicherung dieses Boards', hint: 'Das offene Board mit Anhängen als Datei herunterladen', alias: 'sicherung sichern backup board datei herunterladen export',
+      run: () => { void import('../lib/sicherung').then((m) => m.boardSichern(st().activeId)); } },
+    { label: 'Sicherung einspielen', hint: 'Eine .pixinotes-Datei als Kopie hinzufügen oder Vorhandenes ersetzen', alias: 'sicherung einspielen backup laden wiederherstellen import datei restore',
+      run: () => sicherungEinspielenOeffnen() },
     { label: 'Einstellungen', hint: 'KI, Sync, Design, Daten', alias: 'settings optionen ki sync',
       run: () => st().setSettingsOpen(true) },
     { label: 'Hilfe', hint: 'Anleitung zu allen Funktionen', alias: 'help anleitung',
@@ -229,6 +241,8 @@ export function SearchOverlay() {
 
   const jump = (hit: Hit) => {
     setOpen(false);
+    // M478: Eine Karte im Eingang liegt auf keinem Board — die Eingangs-Liste öffnet sich bei ihrem Eintrag
+    if (hit.boardId === EINGANG_ID) { eingangOeffnen(marke(hit.node)?.gruppe ?? hit.node.id); return; }
     focusNode(hit.boardId, hit.node.id);
   };
 
@@ -294,7 +308,7 @@ export function SearchOverlay() {
   const boardHits = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q || q === '#') return [];
-    return boards.filter((b) => b.name.toLowerCase().includes(q)).slice(0, 5);
+    return ohneEingang(boards).filter((b) => b.name.toLowerCase().includes(q)).slice(0, 5);
   }, [query, boards]);
 
   if (!open) return null;
