@@ -87,7 +87,7 @@ export const KUERZEL: Kuerzel[] = [
   { id: 'einpassen', taste: 'F', was: 'Auswahl einpassen – ohne Auswahl das ganze Board', gruppe: 'Board' },
   { id: 'zoomTasten', taste: '+ / − / 0', was: 'hinein- und herauszoomen, 0 = 100 %', gruppe: 'Board', fremd: true },
   { id: 'raster', taste: 'Alt+R', was: 'Raster-Fang ein- und ausschalten', gruppe: 'Board' },
-  { id: 'physik', taste: 'Alt+O', was: 'Physik (Karten weichen aus) ein- und ausschalten', gruppe: 'Board' },
+  { id: 'physik', taste: 'Alt+O', was: 'Bewegung beim Ziehen (heben, ausweichen, federn) ein- und ausschalten', gruppe: 'Board' },
   { id: 'schwenken', taste: 'Leertaste halten', was: 'Ansicht verschieben, auch über Karten', gruppe: 'Board', fremd: true },
   { id: 'zurueckfliegen', taste: 'Esc', was: 'nach einem Klick-Zoom zurück zur alten Position', gruppe: 'Board', fremd: true },
 

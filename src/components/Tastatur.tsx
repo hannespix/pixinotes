@@ -134,7 +134,7 @@ export function Tastatur() {
         });
       }
       if (passt(e, 'raster')) { if (!amBoard) return; return tun(() => st.setGridSnap(!st.gridSnap)); }
-      if (passt(e, 'physik')) { if (!amBoard) return; return tun(() => st.setPhysicsEnabled(!st.physicsEnabled)); }
+      if (passt(e, 'physik')) { if (!amBoard) return; return tun(() => { st.setZiehBewegung(!st.ziehBewegung); st.showToast(st.ziehBewegung ? 'Bewegung beim Ziehen aus' : 'Bewegung beim Ziehen an'); }); }
       if (passt(e, 'zeichnen')) { if (!amBoard) return; return tun(() => st.setTool(st.tool === 'select' ? 'pen' : 'select')); }
 
       // ── Reine Buchstaben: im Text sind das einfach Buchstaben ──────────
