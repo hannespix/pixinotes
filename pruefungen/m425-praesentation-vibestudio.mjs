@@ -64,7 +64,9 @@ const paletteAuf = async (P) => {
 };
 const knoten = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes);
 const vibeRahmen = (P) => P.frames().find((f) => f !== P.mainFrame() && f.url().startsWith('about:srcdoc'));
-const warteRahmen = async (P, ms = 8000) => {
+// M448: 20 s statt 8 s – unter Last (parallele Prüfungen, nachgeladene Module seit M446) brauchte der Editor
+// im Rahmen gelegentlich länger; gewartet wird weiter nur, bis „#edit" da ist
+const warteRahmen = async (P, ms = 20000) => {
   for (let t = 0; t < ms; t += 250) {
     const f = vibeRahmen(P);
     if (f && await f.locator('#edit').count().catch(() => 0)) return f;

@@ -17,7 +17,7 @@
 // Sicherheit: Der Vorführende kann jeder sein, der im Board ist. Was ankommt, wird darum wie fremder Inhalt
 // behandelt: Skripte, Rahmen, Weiterleitungen, Ereignis-Merkmale und „javascript:"-Adressen fliegen heraus, und
 // der Rahmen beim Zuschauer erlaubt keinerlei Ausführung (sandbox ohne allow-scripts).
-import { ich, liveSenden, teilnehmerVon } from './gastSync';
+import { ich, liveSenden, teilnehmerVon } from './liveStand';
 import { folgeIch, spiegelMerken, werFuehrtVor } from './vorfuehren';
 
 export interface Bild { k: string; b: string; a: [string, string][]; w: number }

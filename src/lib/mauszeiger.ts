@@ -17,7 +17,7 @@
 // Stillhalten stehen: Solange er an ist, meldet er sich gut jede Sekunde neu (vorher verschwand er bei den
 // anderen nach zwei Sekunden Stillstand, beim Vorführenden blieb er stehen). Und auf einer Folie hängt er am
 // Inhalt unter dem Zeiger (`anker`): Auf einem Telefon liegt eine PDF-Seite anders in der Folie als am Beamer.
-import { ich, LIVE_NACHRICHT, liveSenden, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from './gastSync';
+import { ich, LIVE_NACHRICHT, liveSenden, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from './liveStand';
 
 export interface FernZeiger {
   id: string; name: string; farbe: string;

@@ -9,8 +9,16 @@
 //
 // Abgrenzung: „Per Link teilen" (M357, #l=) gibt eine KOPIE weiter, ohne Konto. Dieser Link führt aufs ORIGINAL.
 import { useBoard } from '../store';
-import { checkKontoRemote, kontoAnfrage, loadKonto, type FreigabeRolle } from './kontoSync';
-import { gastBeitreten, kontoKanaele, optionenGeaendert } from './gastSync';
+import type { FreigabeRolle } from './kontoSync';
+import { loadKonto } from './kontoSitzung';
+import { syncLaden } from './syncStart';
+// M459: Konto- und Gast-Abgleich laden bei Bedarf — wer sie hier braucht, startet sie (lib/syncStart.ts). Ein
+// Einladungslink (#e=…) funktioniert so weiter direkt: Annehmen lädt und startet den Abgleich vor dem Beitritt.
+const kontoAnfrage = async (url: string, init: RequestInit = {}): Promise<Response> => (await syncLaden()).konto.kontoAnfrage(url, init);
+const checkKontoRemote = async (erzwingen?: boolean) => (await syncLaden()).konto.checkKontoRemote(erzwingen);
+const gastBeitreten = async (token: string) => (await syncLaden()).gast.gastBeitreten(token);
+const kontoKanaele = async (): Promise<void> => (await syncLaden()).gast.kontoKanaele();
+const optionenGeaendert = (boardId: string): void => { void syncLaden().then((m) => m.gast.optionenGeaendert(boardId)); };
 import type { GastRecht } from '../store';
 
 const OFFEN_KEY = 'pixinotes-einladung-offen';

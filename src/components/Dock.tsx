@@ -677,7 +677,8 @@ export function Dock() {
               onClick={() => { setAiMenu(false); void import('../lib/themenOrdnen').then((m) => m.themenOrdnenStarten()); }}>Nach Themen ordnen …</button>
             <button disabled={!!aiBusy} onClick={() => runAi('tasks', aiTasks)}>Aufgaben &amp; Termine extrahieren</button>
             <button disabled={!!aiBusy} onClick={() => runAi('process', aiProcess)}>Workflow als Diagramm ableiten</button>
-            <button disabled={!!aiBusy} data-taste="ki-briefing" onClick={briefing} title="Lage des Boards als neue Notiz: Fristen (überfällig zuerst), Entscheidungen, wichtigste Inhalte, Risiken – geht auch ohne KI">Board-Briefing (Lage)</button>
+            {/* M448: Sprechblase höchstens 110 Zeichen (Leitplanke „Die App redet weniger", Prüfreihe m299) */}
+            <button disabled={!!aiBusy} data-taste="ki-briefing" onClick={briefing} title="Lage des Boards als neue Notiz: Fristen, Entscheidungen, wichtigste Inhalte, Risiken – auch ohne KI">Board-Briefing (Lage)</button>
             {/* M427: Präsentation (Vibe Studio) aus dem Board; was im Feld oben steht, ist der Wunsch */}
             <button disabled={!!aiBusy} data-taste="ki-praesentation" title="Folien aus dem Board – was im Feld oben steht, gilt als Wunsch (Thema, Publikum, Länge, Ton)"
               onClick={() => { const wunsch = cmd; setCmd(''); runAi('praes', (n, p, f) => aiPraesentation(n, p, f, wunsch), wunsch || undefined); }}>Präsentation erstellen</button>

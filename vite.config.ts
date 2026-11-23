@@ -72,6 +72,10 @@ export default defineConfig(({ mode }) => ({
               // statt dass eine 6-MB-Datei komplett neu kommt. Schwergewichte
               // (Mermaid-Rohtext, PDF, XLSX, MSG) bleiben eigene Nachlade-Teile.
               manualChunks(id) {
+                // M459: die Weichen der nachgeladenen Erkennungen gehören in deren Paket — sonst legt Rollup die reine
+                // Weiterleitung ins Start-Paket und zieht damit das ganze Paket wieder in den Start
+                if (/src\/lib\/rufnummerKern\.ts$/.test(id)) return 'rufnummer';
+                if (/src\/lib\/chronoKern\.ts$/.test(id)) return 'fristen';
                 if (!id.includes('node_modules/')) return undefined;
                 if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
                 // M446: NUR der Teil, den der Editor beim Start braucht. BlockNote lädt
@@ -83,6 +87,8 @@ export default defineConfig(({ mode }) => ({
                 if (/node_modules\/(@xyflow|d3-[a-z-]+|classcat|zustand)\//.test(id)) return 'fluss';
                 // M414: Rufnummern-Erkennung samt Länderdaten (rund 110 KB) — Fremdcode, der sich so gut wie nie ändert
                 if (/node_modules\/libphonenumber-js\//.test(id)) return 'rufnummer';
+                // M459: Fristen-Erkennung (chrono-node) — lädt bei Bedarf (lib/dates.ts)
+                if (/node_modules\/chrono-node\//.test(id)) return 'fristen';
                 return undefined;
               },
             },

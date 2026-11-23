@@ -7,7 +7,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { useInternalNode } from '@xyflow/react';
 import { GRUPPE_EREIGNIS, gruppeVon, useBoard, useNurLesen } from '../store';
-import { EINLADUNG_EREIGNIS, einladungVon, ichIn, liveAuf, liveVerbunden, nameGeaendert, SPERREN_EREIGNIS, sperrenVon, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
+import { EINLADUNG_EREIGNIS, einladungVon, ichIn, liveAuf, liveVerbunden, nameGeaendert, SPERREN_EREIGNIS, sperrenVon, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/liveStand';
 import { qrZeigen } from '../lib/qr';
 import type { Teilnehmer } from '../lib/liveKanal';
 import { getAuthor, setAuthor } from './CommentLayer';
@@ -15,7 +15,7 @@ import { ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenStart, vorfuehrenStopp } fro
 import { ZEIGER_EREIGNIS, zeigerAn, zeigerSetzen } from '../lib/mauszeiger';
 import { ICheck, IMousePointer, IPen, IQr, IUsers, IX, ILock, IMegafon } from './Icons';
 import { ReaktionsKnopf, TimerZeile } from './Gruppenraum';
-import { FREIGABE_OEFFNEN } from './FreigabeDialog';
+import { FREIGABE_OEFFNEN } from './FreigabeHost';
 
 export const NAME_FRAGEN = 'pixinotes:gast-name';
 

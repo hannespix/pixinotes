@@ -257,9 +257,19 @@ console.log('════ E: abgeschnittene Antwort → Portion halbieren ══
 console.log('════ F: Abbrechen über den Toast ════');
 {
   const { ctx, P, aufrufe } = await seite({ nodes: dateiKarten(8), plan: async () => { await new Promise((r) => setTimeout(r, 1200)); return null; } });
+  // M448: Wackler F3 – die Endmeldung „Abgebrochen nach Teil …" kam manchmal erst, nachdem das Abfragen im
+  // 150-ms-Takt schon aufgehört hatte (Dock nicht mehr beschäftigt), oder ein anderer Toast verdrängte sie
+  // zwischen zwei Blicken. Deshalb jeden Toast im Seitenkontext mitschreiben und ausdrücklich auf sie warten.
+  await P.evaluate(() => {
+    window.__toasts = [];
+    new MutationObserver(() => { const t = document.querySelector('.toast')?.textContent ?? ''; if (t && window.__toasts[window.__toasts.length - 1] !== t) window.__toasts.push(t); })
+      .observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
   await dockAnweisung(P, 'Wandle alle Dateien in Notizen um');
   let gedrueckt = false;
-  const toasts = await wartenBisFertig(P, 60000, { beiText: { text: 'Teil 2 von', tue: async () => { const k = P.locator('[data-taste="ki-abbrechen"]'); gedrueckt = (await k.count()) === 1; await k.click(); } } });
+  await wartenBisFertig(P, 60000, { beiText: { text: 'Teil 2 von', tue: async () => { const k = P.locator('[data-taste="ki-abbrechen"]'); gedrueckt = (await k.count()) === 1; await k.click(); } } });
+  await P.waitForFunction(() => window.__toasts.some((t) => /Abgebrochen nach Teil \d/.test(t)), null, { timeout: 15000 }).catch(() => {});
+  const toasts = await P.evaluate(() => window.__toasts);
   await P.waitForTimeout(1500);
   const ks = await knoten(P);
   const n = ks.filter((k) => k.type === 'note').length;

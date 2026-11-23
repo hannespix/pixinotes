@@ -39,7 +39,7 @@ console.log('\n════ A: Rechnen und Prüfen ════');
   const einstieg = path.join(SD, 'm388-einstieg.ts');
   writeFileSync(einstieg, [
     `export { rechneBlatt } from ${lib('formel')};`, `export { parseIcs } from ${lib('ics')};`, `export { nextDate } from ${lib('minutes')};`,
-    `export { detectDates } from ${lib('dates')};`, `export { nodeToHtml, nodeToText } from ${lib('serialize')};`, `export * as sicher from ${lib('sicher')};`,
+    `export { detectDates, fristenLaden } from ${lib('dates')};`, `export { nodeToHtml, nodeToText } from ${lib('serialize')};`, `export * as sicher from ${lib('sicher')};`,
     `export { patchSaeubern } from ${lib('gastPatch')};`, `export { tagLokal } from ${lib('tag')};`, `export { resolveLink, collectBacklinks } from ${lib('links')};`, `export { passt } from ${lib('tasten')};`,
   ].join('\n'));
   const aus = path.join(SD, 'm388-bündel.mjs');
@@ -47,6 +47,7 @@ console.log('\n════ A: Rechnen und Prüfen ════');
   globalThis.window = { location: { href: 'https://app.example/pixinotes/', origin: 'https://app.example', pathname: '/pixinotes/' }, addEventListener() {}, dispatchEvent() {} };
   globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
   const m = await import(pathToFileURL(aus).href);
+  await m.fristenLaden();   // M459: die Fristen-Erkennung lädt bei Bedarf (in der App beim ersten Text mit Datum)
   const f = m.rechneBlatt({ A1: '10', A2: '20', A3: '30', B1: '0', C1: '=MITTELWERT(A1:A5)', C2: '=ANZAHL(A1:A5)', C3: '=MIN(A1:A5)', C4: '=PRODUKT(A1:A5)', C5: '=WENN(B1=0;0;A1/B1)', C6: '=$A$1+1', C7: '=RUNDEN(1,005;2)', C8: '=RUNDEN(-2,5;0)', C9: '=A4+1', C10: '=WENN(A1/B1>1;1;2)', C11: '=HEUTE()' });
   pruefe('A1 leere Zellen zählen in MITTELWERT, ANZAHL, MIN, PRODUKT nicht mit', f.C1 === 20 && f.C2 === 3 && f.C3 === 10 && f.C4 === 6000, f);
   pruefe('A2 WENN wertet nur den gewählten Zweig (=WENN(B1=0;0;A1/B1) → 0); ein Fehler in der Bedingung bleibt ein Fehler', f.C5 === 0 && f.C10 === '#DIV/0!', [f.C5, f.C10]);
