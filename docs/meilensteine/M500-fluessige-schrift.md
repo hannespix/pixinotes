@@ -1,5 +1,5 @@
 # M500 — Flüssige Schrift: ein kurzer Text als Flüssigkeit (Liquid Type als Karte)
-PR: #… · Prüfreihe: `pruefungen/m500-fluessige-schrift.mjs` (Port 5500) · Datum: 2026-11-23
+PR: #191 · Prüfreihe: `pruefungen/m500-fluessige-schrift.mjs` (Port 5500) · Datum: 2026-11-23
 
 ## Warum
 Wunsch des Nutzers: „Schau dir die liquid type engine im entsprechenden repository an … Ich hätte gerne eine einfache
