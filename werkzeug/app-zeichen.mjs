@@ -13,6 +13,12 @@ const mal = async (name, px, rund, rand) => {
   await p.setContent(`<style>html,body{margin:0;background:transparent}svg{display:block;width:${px}px;height:${px}px}</style>${zeichen(rund, rand)}`);
   await p.screenshot({ path: `${ZIEL}/${name}`, omitBackground: true }); await p.close();
 };
+// M458: `node werkzeug/app-zeichen.mjs erweiterung/icons erweiterung` – die Größen der Browser-Erweiterung
+if (process.argv[3] === 'erweiterung') {
+  for (const px of [16, 32, 48, 128]) await mal(`icon-${px}.png`, px, 22, 0);
+  await b.close();
+  process.exit(0);
+}
 await mal('icon-180.png', 180, 0, 0);
 await mal('icon-192.png', 192, 22, 0);
 await mal('icon-512.png', 512, 22, 0);

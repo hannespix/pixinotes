@@ -64,6 +64,34 @@ export function kontaktBild(roh: unknown): string | null {
   return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
 }
 
+/**
+ * M458: Text, der von außen hereinkommt (Browser-Erweiterung, Teilen-Adresse). Nur Zeichenketten; Steuerzeichen
+ * außer Zeilenumbruch und Tabulator fallen weg, Länge gedeckelt. Spitze Klammern bleiben stehen — der Text landet
+ * ausschließlich als TEXT in Notiz und Dialog (nie als HTML), ein „<script>" darin ist dort nur Buchstaben.
+ */
+export function textVonAussen(roh: unknown, hoechstens = 20_000): string {
+  if (typeof roh !== 'string') return '';
+  return roh.normalize('NFC').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u202A-\u202E\u2066-\u2069]/g, '').trim().slice(0, hoechstens);
+}
+
+/** M458: Webadresse von außen (Quelle einer gesendeten Seite) — nur http(s), höchstens 2 000 Zeichen */
+export function webAdresseVonAussen(roh: unknown): string | null {
+  if (typeof roh !== 'string' || !roh.trim() || roh.length > 2000) return null;
+  try {
+    const u = new URL(roh.trim());
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
+  } catch { return null; }
+}
+
+/**
+ * M458: Eingebettetes Rasterbild von außen (Bild oder Bildschirmfoto aus der Browser-Erweiterung): nur
+ * data:image/png|jpeg|gif|webp als base64 — kein SVG (darin können Skripte stehen), keine Webadresse.
+ */
+export function rasterBildVonAussen(roh: unknown, hoechstens = 25_000_000): string | null {
+  if (typeof roh !== 'string' || roh.length > hoechstens) return null;
+  return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
+}
+
 const endlich = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /**
