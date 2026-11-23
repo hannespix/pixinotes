@@ -234,5 +234,5 @@ console.log('════ E: Seitenfehler ════');
 pruefe('E: keine Seitenfehler', fehler.length === 0, fehler.slice(0, 3).join(' | '));
 
 await browser.close(); app.close();
-console.log(`\n${ok} ✓  ${bad} ✗`);
+console.log(`\nM492: ${ok} bestanden, ${bad} fehlgeschlagen`);
 process.exit(bad ? 1 : 0);
