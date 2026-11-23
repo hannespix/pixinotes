@@ -1202,6 +1202,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           tabIndex={-1}
           ref={collectRef}
           role="dialog"
+          aria-modal="true"
           aria-label="Einsammeln konfigurieren"
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.key === 'Escape' && setCollectOpen(false)}
@@ -1296,6 +1297,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
           tabIndex={-1}
           ref={archivRef}
           role="dialog"
+          aria-modal="true"
           aria-label="Archiv"
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.key === 'Escape' && setArchivOpen(false)}
@@ -1373,6 +1375,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.key === 'Escape' && setDetailId(null)}
               role="dialog"
+              aria-modal="true"
               aria-label="Ticket bearbeiten"
             >
               <div className="ticket-modal-head">
