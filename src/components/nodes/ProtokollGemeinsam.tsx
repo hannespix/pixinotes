@@ -9,8 +9,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { selectActiveBoard, useBoard, useNurLesen } from '../../store';
 import { liveVerbunden, TEILNEHMER_EREIGNIS } from '../../lib/liveStand';
-import { gemeinsamGewuenscht, gemeinsamKern, NOTIZ_Y_WACH } from '../../lib/notizGemeinsam';
-import type { NotizSitzung } from '../../lib/notizGemeinsamKern';
+import { gemeinsamKern, NOTIZ_Y_WACH } from '../../lib/notizGemeinsam';
+import type { ProtokollSitzung } from '../../lib/notizGemeinsamKern';
+import { protokollLiveSetzen } from '../../lib/protokollLive';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import type { MinutesData } from '../../types';
 import { EntryEditor, ProtokollRuhend, type EntryEditorProps } from './MinutesCard';
@@ -20,7 +21,7 @@ type Modus =
   | { art: 'allein' }
   | { art: 'pause'; danach: 'allein' | 'laedt' }
   | { art: 'laedt' }
-  | { art: 'gemeinsam'; s: NotizSitzung };
+  | { art: 'gemeinsam'; s: ProtokollSitzung };
 
 /** Kanal steht? Rechnet neu, sobald er auf- oder zugeht oder sich die Runde ändert */
 function useLive(boardId: string): boolean {
@@ -76,10 +77,13 @@ export default function ProtokollGemeinsam(p: EntryEditorProps) {
     if (modus.art !== 'laedt') return;
     let weg = false;
     const node = selectActiveBoard(useBoard.getState()).nodes.find((x) => x.id === nodeId);
-    const blocks = ((node?.data as MinutesData | undefined)?.entries ?? []).find((e) => e.id === entryId)?.blocks ?? [];
+    const eintrag = ((node?.data as MinutesData | undefined)?.entries ?? []).find((e) => e.id === entryId);
+    const blocks = eintrag?.blocks ?? [];
     gemeinsamKern()
-      // Auf den Stand der anderen wird nur gewartet, wo schon jemand arbeitet (lib/notizGemeinsam.ts)
-      .then((k) => k.protokollOeffnen(boardId, nodeId, entryId, repairBlocks(blocks as unknown[]), noteSchema, !nurLesenRef.current, gemeinsamGewuenscht(boardId, n)))
+      // M493: Immer kurz auf den Stand der anderen warten (nur wenn andere im Kanal sind). Das Protokoll öffnet sich
+      // bei allen von selbst — wer nicht wartete, begann aus seinem gespeicherten Stand, während ein anderer schon
+      // einen hatte; zwei Anfänge übereinander verloren unter Last den Text (m487 B5/B8). Die ruhende Ansicht steht so lange.
+      .then((k) => k.protokollOeffnen(boardId, nodeId, entryId, repairBlocks(blocks as unknown[]), noteSchema, !nurLesenRef.current, true, eintrag?.decisions ?? []))
       .then((s) => { if (weg) { s.schliessen(); return; } setModus({ art: 'gemeinsam', s }); })
       .catch(() => { kernKaputt.current = true; if (!weg) setModus({ art: 'allein' }); });   // Yjs lädt nicht: allein (mit Sperre)
     return () => { weg = true; };
@@ -88,7 +92,11 @@ export default function ProtokollGemeinsam(p: EntryEditorProps) {
   useEffect(() => {
     if (modus.art !== 'gemeinsam') return;
     const s = modus.s;
-    return () => { try { s.abschied(); } catch { /* egal */ } s.schliessen(); };
+    // M493: Die Karte zeigt und ändert die Beschlüsse dieser Sitzung jetzt über das Y-Dokument (lib/protokollLive.ts)
+    // (nur, wenn das Dokument sie trägt — eines von einem Gerät mit älterer Fassung hat sie nicht, dann gilt der Speicher)
+    const mit = s.mitBeschluessen();
+    if (mit) protokollLiveSetzen(n, s);
+    return () => { if (mit) protokollLiveSetzen(n, null); try { s.abschied(); } catch { /* egal */ } s.schliessen(); };
   }, [modus]);
   // Ein anderer schreibt in diesem Protokoll, während es hier noch allein läuft (Kanal kam eben erst): mitsehen,
   // sobald der Cursor frei ist — der Effekt oben erledigt das; der Weckruf beschleunigt nur
