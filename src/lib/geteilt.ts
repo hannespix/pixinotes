@@ -23,6 +23,8 @@ export interface Geteiltes {
   adresse: string;
   dateien: GeteilteDatei[];
   wann: string;
+  /** M458: von der Browser-Erweiterung statt aus dem Teilen-Menü von Android */
+  herkunft?: 'erweiterung';
 }
 
 function db(): Promise<IDBDatabase> {

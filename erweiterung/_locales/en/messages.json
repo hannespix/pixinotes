@@ -1,0 +1,23 @@
+{
+  "name": { "message": "Send to PixiNotes" },
+  "beschreibung": { "message": "Send selected text, the page, an image or a screenshot to PixiNotes as a card – no server, straight into the open tab." },
+  "knopf": { "message": "Send this page to PixiNotes (right-click: visible area as image)" },
+  "menueAuswahl": { "message": "Send selection to PixiNotes" },
+  "menueSeite": { "message": "Send page to PixiNotes" },
+  "menueLink": { "message": "Send link to PixiNotes" },
+  "menueBild": { "message": "Send image to PixiNotes" },
+  "menueBildschirm": { "message": "Send visible area as image to PixiNotes" },
+  "bildNichtLadbar": { "message": "The image could not be loaded – here is its address." },
+  "fehlerKeineBerechtigung": { "message": "Permission for this PixiNotes address is missing. Images only arrive with permission – please save the options again." },
+  "fehlerNichtAngekommen": { "message": "PixiNotes did not accept the item. Is the address in the options correct?" },
+  "optTitel": { "message": "Send to PixiNotes – options" },
+  "optAdresse": { "message": "PixiNotes address" },
+  "optAdresseHinweis": { "message": "Default: the web app on GitHub Pages. Your own address (e.g. self-hosted) needs your consent once." },
+  "optDirekt": { "message": "Put it on the open board without asking" },
+  "optDirektHinweis": { "message": "Otherwise PixiNotes asks every time which board it should go to." },
+  "optSpeichern": { "message": "Save" },
+  "optGespeichert": { "message": "Saved." },
+  "optUngueltig": { "message": "Please enter an address starting with http:// or https://." },
+  "optAbgelehnt": { "message": "Saved, but without permission: text and links arrive, images do not." },
+  "optDatenschutz": { "message": "The extension sends nothing to the internet: items only go to the PixiNotes tab in this browser. No tracking." }
+}

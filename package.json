@@ -8,6 +8,7 @@
     "check": "tsc -b",
     "build": "tsc -b && vite build",
     "build:mcp": "node werkzeug/mcp-bauen.mjs",
+    "build:erweiterung": "node werkzeug/erweiterung-packen.mjs",
     "build:single": "vite build --mode single && node -e \"require('fs').renameSync('release/index.html','release/pixinotes.html')\"",
     "preview": "vite preview",
     "pruefen": "node werkzeug/alle-pruefungen.mjs"
