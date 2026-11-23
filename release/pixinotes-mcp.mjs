@@ -38061,6 +38061,21 @@ function blocksToText(blocks) {
   walk(blocks, 0);
   return lines.join("\n");
 }
+function kontaktZeilen(d0) {
+  const d = d0 ?? {};
+  const s = (v) => typeof v === "string" ? v.trim() : "";
+  const tel = (Array.isArray(d.telefone) ? d.telefone : []).filter((t2) => t2 && s(t2.nummer)).map((t2) => `Tel.${s(t2.art) ? ` (${s(t2.art)})` : ""}: ${s(t2.nummer)}`);
+  const mail = (Array.isArray(d.emails) ? d.emails : []).map(s).filter(Boolean).map((m) => `E-Mail: ${m}`);
+  return [
+    s(d.name) || s(d.firma) || "Kontakt",
+    [s(d.funktion), s(d.firma)].filter(Boolean).join(" \xB7 "),
+    ...tel,
+    ...mail,
+    s(d.adresse) ? `Anschrift: ${s(d.adresse).replace(/\s*\n\s*/g, ", ")}` : "",
+    s(d.web) ? `Web: ${s(d.web)}` : "",
+    s(d.notiz)
+  ].filter(Boolean);
+}
 function nodeToText(node2) {
   const base = baseNodeText(node2);
   const attrs = node2.data?.attrs;
@@ -38131,6 +38146,8 @@ ${g.rows.map((r) => `  ${r.start === r.end ? "\u25C6" : "\u25AC"} ${r.name}: ${r
       return `Eigene App: ${node2.data.name} (${formatBytes(node2.data.size)})`;
     case "bubbles":
       return bubblesAlsText(node2.data);
+    case "kontakt":
+      return kontaktZeilen(node2.data).join("\n");
     case "time": {
       const t2 = node2.data;
       const labels = { arbeit: "Arbeit", pause: "Pause" };
@@ -38329,6 +38346,10 @@ ${bubblesAlsText(n.data)}`;
       return `Kalender${n.data.month ? ` (${n.data.month})` : ""} \u2013 zeigt Fristen und Zeitplan-Eintr\xE4ge aller Boards; hat keinen eigenen Inhalt`;
     case "shape":
       return `Form (${n.data.shape}): ${n.data.text || ""}`;
+    // M450: Kontakt-Karte — die Felder als Zeilen (Name, Funktion · Firma, Tel., E-Mail, Anschrift …)
+    case "kontakt":
+      return `Kontakt
+${nodeToText(n)}`;
     default:
       return nodeToText(n);
   }
@@ -39044,7 +39065,8 @@ var TYP_WORTE = [
   [/mail/i, "email"],
   [/datei|pdf|dokument|word/i, "file"],
   [/idee|bubble|brainstorm/i, "bubbles"],
-  [/bild|foto|screenshot/i, "image"]
+  [/bild|foto|screenshot/i, "image"],
+  [/kontakt|telefon|anruf|ansprechpartner|adresse|visitenkarte/i, "kontakt"]
 ];
 function kiRang(wunsch, karten, zuletzt, naehe) {
   const worte = [...new Set(wunsch.toLowerCase().split(/[^a-zäöüß0-9]+/i).filter((w) => w.length >= 4))];

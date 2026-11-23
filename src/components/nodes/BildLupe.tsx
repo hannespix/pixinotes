@@ -28,7 +28,7 @@ export function BildLupe({ quelle, name, onClose, onDownload }: {
 
   return createPortal(
     <div className="pdf-backdrop nodrag" onClick={onClose}>
-      <div className="pdf-viewer" onClick={(e) => e.stopPropagation()}>
+      <div className="pdf-viewer" role="dialog" aria-modal="true" aria-label={name} onClick={(e) => e.stopPropagation()}>
         <div className="pdf-bar">
           <b translate="no">{name}</b>
           <span className="pdf-nav">

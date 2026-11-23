@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { anhaengeMitnehmen, mutedHistory, useBoard } from '../store';
-import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, alsEbenAngelegt, makeSheet, makeTime, makeWeek } from '../lib/nodes';
+import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeKontakt, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, alsEbenAngelegt, makeSheet, makeTime, makeWeek } from '../lib/nodes';
 import { importFilesToBoard, importHtmlAppFromUrl, praesentationAnlegen } from '../lib/importFiles';
 import { punkteModusSetzen } from '../lib/punkte';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
@@ -18,7 +18,7 @@ import {
   IAppWindow, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITimelineIcon, ITimer, IWand, IWeek, IX,
- IBubbles , IUsers, IArchive, IFolien, IUhr
+ IBubbles , IUsers, IArchive, IFolien, IUhr, IPerson
 } from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
 import { t } from '../lib/sprache';
@@ -418,6 +418,8 @@ export function Dock() {
     { id: 'app', gruppe: 'Einfügen', name: 'Eigene App', hinweis: 'Eine HTML-Datei als lauffähige App-Karte', suchwort: 'html widget programm', icon: <IAppWindow size={18} />, tun: () => happFileRef.current?.click() },
     { id: 'appurl', gruppe: 'Einfügen', name: 'App von URL', hinweis: 'HTML-App von einer Internet-Adresse', suchwort: 'link einbetten web adresse', icon: <IAppWindow size={18} />, tun: () => void addHtmlAppUrl() },
     { id: 'rahmen', gruppe: 'Ordnen', name: 'Rahmen', hinweis: 'Benannter Rahmen auf dem Board, nimmt seine Karten mit – nicht der Bereich in der Übersicht', suchwort: 'gruppe bereich zusammenfassen', icon: <IFrame size={18} />, tun: () => add(() => makeFrame(centerPos(640, 420))) },
+    // M450: Kontakt-Karte — in „Ordnen“, dort ist noch Platz in der Zeile (die anderen Gruppen sind mit fünf voll)
+    { id: 'kontakt', gruppe: 'Ordnen', name: 'Kontakt', hinweis: 'Visitenkarte mit Rufnummer, E-Mail und Anschrift – auch aus einer .vcf-Datei', suchwort: 'person adresse telefon visitenkarte vcard vcf adressbuch ansprechpartner', icon: <IPerson size={18} />, tun: () => add(() => { const n = makeKontakt(centerPos(300, 180)); alsEbenAngelegt(n.id); return n; }) },
     { id: 'portal', gruppe: 'Ordnen', name: 'Portal', hinweis: 'Portal zu einem anderen Board', suchwort: 'link verweis board sprung', icon: <IFolder size={18} />, tun: () => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board.'); } },
   ];
   const GRUPPEN = ['Notieren & Rechnen', 'Planen', 'Ablauf', 'Einfügen', 'Ordnen'];
@@ -512,6 +514,8 @@ export function Dock() {
           onClick={() => { const o = addMenu; closeDockMenus(); setAddMenu(!o); }}
           title="Objekt hinzufügen"
           aria-label="Objekt hinzufügen"
+          aria-haspopup="dialog"
+          aria-expanded={addMenu}
         >
           <IPlus />
         </button>
@@ -533,6 +537,8 @@ export function Dock() {
           data-taste="zeichnen"
           title="Zeichnen (Stift, Textmarker, Radierer)"
           aria-label="Zeichnen"
+          aria-haspopup="true"
+          aria-expanded={drawMenu}
         >
           {tool === 'marker' ? <IHighlighter /> : tool === 'eraser' ? <IEraser /> : <IPen />}
         </button>
@@ -729,6 +735,8 @@ export function Dock() {
           onClick={() => { const o = moreMenu || aiMenu || arrangeMenu; closeDockMenus(); setMoreMenu(!o); }}
           title="Mehr"
           aria-label="Mehr"
+          aria-haspopup="true"
+          aria-expanded={moreMenu || aiMenu || arrangeMenu}
         >
           <IMore />
         </button>

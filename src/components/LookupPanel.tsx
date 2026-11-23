@@ -71,7 +71,7 @@ export function LookupPanel() {
 
   return createPortal(
     <div className="lookup-backdrop nodrag" onClick={() => setLookup(null)}>
-      <div className="lookup-panel" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && setLookup(null)}>
+      <div className="lookup-panel" role="dialog" aria-modal="true" aria-label="Nachschlagen" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.key === 'Escape' && setLookup(null)}>
         <div className="lookup-head">
           <ISearch size={15} />
           <input

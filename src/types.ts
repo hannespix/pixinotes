@@ -427,8 +427,27 @@ export type FrameNode = Node<FrameData, 'frame'>;
 /** M373: Entscheidungs-Bubbles — Ideen als Blasen, Gruppen, Punkte-Abstimmung (Daten: lib/bubbles.ts) */
 export type BubblesNode = Node<import('./lib/bubbles').BubblesData, 'bubbles'>;
 
+/** M450: Eine Rufnummer der Kontakt-Karte — Art frei (Mobil, Dienstlich, Privat, Fax …) */
+export interface KontaktTelefon { art?: string; nummer: string }
+/** M450: Kontakt-Karte — eine Person mit Rufnummern, E-Mail, Anschrift; rein/raus als vCard (lib/vcard.ts) */
+export interface KontaktData {
+  name: string;
+  funktion?: string;
+  firma?: string;
+  telefone: KontaktTelefon[];
+  emails: string[];
+  /** Anschrift, mehrzeilig */
+  adresse?: string;
+  web?: string;
+  notiz?: string;
+  /** Foto als eingebettetes Bild (nur data:image/…, lib/sicher.ts) */
+  foto?: string;
+  [key: string]: unknown;
+}
+export type KontaktNode = Node<KontaktData, 'kontakt'>;
+
 export type AppNode =
-  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode | MinutesNode | SheetNode | BubblesNode)
+  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode | MinutesNode | SheetNode | BubblesNode | KontaktNode)
   // Archiv (M87): Karten jedes Typs lassen sich als Ganzes „erledigt" ablegen —
   // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface.
   // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der

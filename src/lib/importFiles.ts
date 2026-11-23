@@ -9,7 +9,7 @@
 import { mutedHistory, useBoard, selectActiveBoard } from '../store';
 import { guessMime, MAX_EMBED_BYTES, parseEml, parseMsg } from './parseEmail';
 import { bildMasse, imageFileToDataUrl, readFileAsDataUrl } from './image';
-import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, makeNote, makeSheet } from './nodes';
+import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, makeKontakt, makeNote, makeSheet } from './nodes';
 // M184: statisch importiert (kein dynamic import) — vite-plugin-singlefile
 // backt alles in EINE Datei; ein nachgeladener Zusatz-Brocken wäre dort nach
 // dem Deploy nicht auffindbar (dieselbe Falle wie beim Mermaid-Modul, M90).
@@ -17,6 +17,7 @@ import { docxToBlocks } from './docx';
 import { boardDateienUebernehmen, cloneSharedBoard, parseBoardDatei } from './share';
 import { uebernimmDateien } from './syncFolder';
 import { mergeEvents, parseIcs, type IcsEvent } from './ics';
+import { vcardLesen, vcardText, VCARD_MAX } from './vcard';
 import { saveHtml } from './htmlStore';
 import { saveFile } from './fileStore';
 import { mirrorAttachment } from './attachments';
@@ -165,6 +166,17 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         const cur = (cal.data.icsEvents as IcsEvent[] | undefined) ?? [];
         st.updateNodeData(cal.id, { icsEvents: mergeEvents(cur, events) });
         showToast(`${events.length} Termin(e) in die Kalender-Karte importiert`);
+        placed++;
+        continue;
+      }
+      if (ext === 'vcf' || ext === 'vcard' || /^text\/(x-)?vcard/i.test(file.type)) {
+        // M450: Visitenkarten (Outlook, Apple, Android, Google) → eine Kontakt-Karte je Kontakt, nebeneinander.
+        const kontakte = vcardLesen(vcardText(await file.arrayBuffer()));
+        if (kontakte.length === 0) { showToast(`In „${file.name}" steht kein Kontakt.`); continue; }
+        kontakte.forEach((k, i) => addNode(makeKontakt({ x: pos.x + (i % 4) * 320, y: pos.y + Math.floor(i / 4) * 230 }, k)));
+        showToast(kontakte.length === 1
+          ? `Kontakt „${kontakte[0].name}" übernommen.`
+          : `${kontakte.length} Kontakte übernommen${kontakte.length >= VCARD_MAX ? ` (höchstens ${VCARD_MAX} je Datei)` : ''}.`);
         placed++;
         continue;
       }

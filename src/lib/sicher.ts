@@ -56,6 +56,15 @@ export function wordEntschaerfen(wurzel: HTMLElement): void {
   });
 }
 
+/**
+ * M450: Foto einer Kontakt-Karte — nur ein eingebettetes Rasterbild (data:image/png|jpeg|gif|webp). Keine Webadresse
+ * (die fragte beim Anzeigen einen fremden Server an), kein SVG (darin können Skripte stehen), nichts über 1,5 MB.
+ */
+export function kontaktBild(roh: unknown): string | null {
+  if (typeof roh !== 'string' || roh.length > 1_500_000) return null;
+  return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
+}
+
 const endlich = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /**
@@ -89,6 +98,10 @@ export function karteEntschaerfen<T extends AppNode>(n0: T): T {
   }
   if ((n.type === 'file' || n.type === 'sheet') && d.dataUrl !== undefined && !(typeof d.dataUrl === 'string' && /^(data:|blob:)/i.test(d.dataUrl))) {
     const { dataUrl: _d, ...rest } = d;
+    return { ...n, data: rest } as T;
+  }
+  if (n.type === 'kontakt' && d.foto !== undefined && !kontaktBild(d.foto)) {
+    const { foto: _f, ...rest } = d;
     return { ...n, data: rest } as T;
   }
   if (n.type === 'image' && d.src !== undefined && !ladbareQuelle(d.src)) {

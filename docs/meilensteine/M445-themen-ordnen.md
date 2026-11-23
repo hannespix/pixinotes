@@ -42,5 +42,5 @@ es nur im Dock – ohne Chat-KI ging es gar nicht.
 ## Grenzen / offen
 - Kein automatisches nächtliches Aufräumen und kein Pin „vom Aufräumen ausschließen" (KONZEPT nennt beides).
 - Karten aus bestehenden Rahmen werden bei Auswahl herausgenommen; verschachtelte Rahmen werden nicht gebildet.
-- Liegt das Board in einem vom Gehirn ausgeschlossenen Bereich, hat der Rückfall keine Vektoren („zu wenig Inhalt").
+- Liegt das Board in einem vom Gehirn ausgeschlossenen Bereich, hat der Rückfall keine Vektoren („zu wenig Inhalt") – behoben in M451: die Meldung nennt den Ausschluss.
 - Keine Morph-Animation – die Karten springen an ihren Platz (ruhiger, und die Messung bleibt eindeutig).
