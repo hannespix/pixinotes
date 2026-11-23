@@ -442,7 +442,10 @@ async function boardWechseln(P, name, projekt) {
 async function notiz(P, text, x = 900, y = 500) {
   const vorher = await P.locator('.react-flow__node').count();
   await P.mouse.dblclick(x, y);
+  // M484: zusätzlich auf den Cursor in der neuen Notiz warten – unter Last kam er nach den 700 ms, der Rückfall-Klick
+  // traf dann die Hülle einer anderen Karte und hing 30 s (m366 TimeoutError)
   await P.waitForTimeout(700);
+  await P.waitForFunction(() => document.activeElement?.getAttribute('contenteditable') === 'true', null, { timeout: 8000 }).catch(() => {});
   const aktiv = await P.evaluate(() => document.activeElement?.getAttribute('contenteditable') === 'true');
   if (!aktiv) { await P.locator('.react-flow__node').last().locator('[contenteditable="true"]').first().click(); await P.waitForTimeout(300); }
   await P.keyboard.type(text, { delay: 20 });
@@ -649,7 +652,8 @@ async function rahmen(P, klasse, id) {
 const anteil = (f, sel = null) => f.evaluate((s) => { const e = s ? document.querySelector(s) : document.scrollingElement; return e.scrollTop / Math.max(1, e.scrollHeight - e.clientHeight); }, sel);
 const folie = (P) => P.locator('.presenter .presenter-count').textContent().catch(() => '');
 const imVortrag = (P) => P.locator('.presenter').count();
-const vortragStart = async (P) => { await P.locator('.dock button[aria-label="Mehr"]').click(); await P.waitForTimeout(250); await P.locator('.dock-menu button', { hasText: 'Präsentieren' }).first().click(); await P.waitForTimeout(700); };
+// M484: auf die offene Präsentation warten statt fester 700 ms – der Vortrag wird nachgeladen, unter Last dauert das länger
+const vortragStart = async (P) => { await P.locator('.dock button[aria-label="Mehr"]').click(); await P.waitForTimeout(250); await P.locator('.dock-menu button', { hasText: 'Präsentieren' }).first().click(); await P.waitForSelector('.presenter', { timeout: 15000 }).catch(() => {}); await P.waitForTimeout(400); };
 // ---------- M414 ----------
 function pdfText(n) {
   const obj = [];
@@ -878,12 +882,26 @@ fakeSenden(topic, 'zeigBild', { von: sb.zeigVon, karte: 'h1', s: 1e9, i: 0, n: 1
 let fb = null;
 await warteBis(H.P, async () => !!(fb = await toolRahmen(H.P, 'boese', true)), 6000);
 await H.P.waitForTimeout(800);
-const befund = fb ? await fb.evaluate(() => ({
-  skripte: document.querySelectorAll('script,iframe,meta,base').length,
-  on: [...document.querySelectorAll('*')].filter((e) => [...e.attributes].some((a) => /^on/i.test(a.name))).length,
-  js: [...document.querySelectorAll('[href],[action],[formaction]')].filter((e) => /javascript:/i.test(e.getAttribute('href') ?? e.getAttribute('action') ?? e.getAttribute('formaction') ?? '')).length,
-  stil: getComputedStyle(document.getElementById('boese')).color,
-})) : null;
+// M484: Unter Last kam zwischen Finden und Lesen ein echtes Abbild von Anna an und ersetzte das fremde (gewollt: eine
+// viel kleinere Folgenummer gilt als Neubeginn) — #boese war weg, getComputedStyle auf null. Dann das fremde Abbild
+// noch einmal senden, den Rahmen neu suchen und erneut lesen.
+const befundLesen = (f) => f.evaluate(() => {
+  const el = document.getElementById('boese');
+  if (!el) return null;
+  return {
+    skripte: document.querySelectorAll('script,iframe,meta,base').length,
+    on: [...document.querySelectorAll('*')].filter((e) => [...e.attributes].some((a) => /^on/i.test(a.name))).length,
+    js: [...document.querySelectorAll('[href],[action],[formaction]')].filter((e) => /javascript:/i.test(e.getAttribute('href') ?? e.getAttribute('action') ?? e.getAttribute('formaction') ?? '')).length,
+    stil: getComputedStyle(el).color,
+  };
+}).catch(() => null);
+let befund = fb ? await befundLesen(fb) : null;
+for (let i = 1; i <= 20 && !befund; i += 1) {
+  if (i % 5 === 0) fakeSenden(topic, 'zeigBild', { von: sb.zeigVon, karte: 'h1', s: 1e9 + i, i: 0, n: 1, z: 0, d: JSON.stringify(boese) });
+  await H.P.waitForTimeout(300);
+  fb = (await toolRahmen(H.P, 'boese', true)) ?? fb;
+  befund = fb ? await befundLesen(fb) : null;
+}
 pruefe('F1 das fremde Abbild wird gezeigt – aber ohne Skripte, Rahmen, Weiterleitung, Ereignis-Merkmale und javascript:-Adressen', !!befund && befund.skripte === 0 && befund.on === 0 && befund.js === 0 && befund.stil === 'rgb(255, 0, 0)', JSON.stringify(befund));
 pruefe('F2 nichts davon lief: Der Titel von Hannas Seite ist unverändert', (await H.P.title()) === titelVor && !/^B\d/.test(await H.P.title()), await H.P.title());
 await ta.click('#zufall');

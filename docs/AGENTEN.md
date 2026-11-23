@@ -40,6 +40,32 @@ Jeder Arbeits-Agent liefert selbstständig bis zum Merge.
    nimmt die betroffenen Reihen und immer die Wächter-Reihen (Kacheln, Tooltips,
    Hilfe, „Was ist neu", Englisch, ohne Emoji) mit, die neue Meilensteine sonst brechen.
 
+## Prüfreihen, die unter Last nicht flattern (M484)
+Mehrere Agenten lassen Reihen gleichzeitig laufen; dann bekommt jeder Browser nur einen Bruchteil der CPU. Was
+allein grün und unter Last rot ist, ist fast immer eine dieser Ursachen:
+- **Nie `waitForTimeout(n)` und danach prüfen, ob etwas eingetreten ist.** Auf den Zustand warten
+  (`waitForSelector`, `warteBis(P, fn, ms)`, `waitForFunction`); feste Pausen nur dort, wo bewiesen werden soll,
+  dass etwas **nicht** passiert — und dann erst nach dem positiven Zustand (erst „Präsentation offen", dann 2,5 s
+  „bei Anna bleibt sie zu").
+- **Marken für „seitdem wurde nichts geschrieben" erst setzen, wenn der vorige Schritt beim Server angekommen ist**
+  (z. B. `serverRuhig()` in m383: so lange warten, bis der nachgebaute Server einige Sekunden nichts mehr bekommt).
+  Sonst zählt ein verspäteter Schreibvorgang des vorigen Schritts für den nächsten.
+- **Zeitgrenzen großzügig, wo nur gewartet wird** (Nachladen, Rahmen, Kanal: 15–30 s); eng nur dort, wo die Zeit
+  selbst geprüft wird.
+- **Testaufbau nicht gegen die App rennen lassen:** Wer `localStorage` von außen umschreibt und neu lädt, prüft
+  danach, ob der Eingriff den Neustart überlebt hat (m428 `pfeilUndNeuLaden`) — die App kann ihren Stand dazwischen
+  noch einmal schreiben.
+- **Rahmen (iframes) nicht an `frame.url()` erkennen:** unter Last meldet Playwright für `srcdoc`-Rahmen zeitweise
+  `""`. Am Inhalt erkennen (`#edit`, eine bekannte Kennung) und alle Rahmen durchgehen, nicht nur den ersten.
+- **Nachweis:** `node werkzeug/alle-pruefungen.mjs m383 m428 --wiederhole 10 --bahnen 6` lässt die Auswahl zehnmal
+  nebeneinander laufen (ohne Einzelwiederholung) und meldet je Reihe „x von 10 grün"; `--ablage <ordner>` hebt die volle
+  Ausgabe jedes roten Laufs auf. Zusätzliche CPU-Last für den Nachweis: ein paar `node -e "for(;;);"`-Prozesse daneben.
+- **Gespeicherten Stand erst lesen, wenn er steht:** Der Speicher schreibt `pixinotes-board` verzögert. Wer nach einer
+  Aktion `localStorage` liest, wartet auf die erwartete Änderung oder darauf, dass der Stand eine Weile gleich bleibt.
+- **Tippen, das ein Rückgängig-Schritt sein soll, in einem Zug** (`keyboard.insertText`): einzeln getippte Tasten
+  fasst der Editor nur binnen kurzer Zeit zusammen, unter Last zerfällt die Eingabe in mehrere Schritte.
+- **Kurze Hinweise (Toasts) mitschreiben statt hinterher abfragen** (MutationObserver vor der Aktion, wie m332/m477).
+
 ## Brief für einen Arbeits-Agenten (Vorlage)
 ```
 Repo /home/user/pixinotes (Worktree). Lies CLAUDE.md und docs/AGENTEN.md.

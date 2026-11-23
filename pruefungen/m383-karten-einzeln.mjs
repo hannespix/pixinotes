@@ -465,7 +465,10 @@ async function boardWechseln(P, name, projekt) {
 async function notiz(P, text, x = 900, y = 500) {
   const vorher = await P.locator('.react-flow__node').count();
   await P.mouse.dblclick(x, y);
+  // M484: zusätzlich auf den Cursor in der neuen Notiz warten – unter Last kam er nach den 700 ms, der Rückfall-Klick
+  // traf dann die Hülle einer anderen Karte und hing 30 s (m366 TimeoutError)
   await P.waitForTimeout(700);
+  await P.waitForFunction(() => document.activeElement?.getAttribute('contenteditable') === 'true', null, { timeout: 8000 }).catch(() => {});
   const aktiv = await P.evaluate(() => document.activeElement?.getAttribute('contenteditable') === 'true');
   if (!aktiv) { await P.locator('.react-flow__node').last().locator('[contenteditable="true"]').first().click(); await P.waitForTimeout(300); }
   await P.keyboard.type(text, { delay: 20 });
@@ -588,6 +591,19 @@ const marke = () => ({ p: sb.patches.length, g: sb.ganz.length, h: sb.geholt.len
 const seit = (m) => ({ patches: sb.patches.slice(m.p), ganz: sb.ganz.slice(m.g), geholt: sb.geholt.slice(m.h), stapel: sb.aufrufe.stapel - m.st, vorbedingung: sb.aufrufe.vorbedingung - m.vb, freigabeSchreiben: sb.aufrufe.freigabeSchreiben - m.fs });
 const kurz = (d) => JSON.stringify({ patches: d.patches.map((x) => [x.geraet, x.board, x.bytes, Object.fromEntries(Object.entries(x.p).map(([k, v]) => [k, [(v.set ?? []).map((o) => o.id), v.del ?? []]]))]), ganz: d.ganz.map((x) => [x.geraet, x.name]), stapel: d.stapel, vb: d.vorbedingung, fs: d.freigabeSchreiben });
 /** Kennungen aller Karten, die in den Patches seit der Marke vorkommen */
+// M484: Vor einer Marke, nach der „nichts zurückgeschrieben" gezählt wird, muss das Schreiben des vorigen Schritts
+// angekommen sein. Unter Last kam der Text-Patch einer eben angelegten Karte erst nach der Marke und zählte für den
+// nächsten Schritt (D2 rot). Statt fester Pausen: warten, bis der Server stillMs lang nichts Neues bekommen hat.
+const serverRuhig = async (P, stillMs = 3000, maxMs = 25000) => {
+  const zaehl = () => sb.patches.length + sb.ganz.length + sb.aufrufe.stapel + sb.aufrufe.freigabeSchreiben + (sb.aufrufe.gastAendern ?? 0);
+  let n = zaehl(); let still = Date.now(); const ende = Date.now() + maxMs;
+  while (Date.now() < ende) {
+    await P.waitForTimeout(250);
+    const k = zaehl();
+    if (k !== n) { n = k; still = Date.now(); } else if (Date.now() - still >= stillMs) return true;
+  }
+  return false;
+};
 const kartenIn = (d) => [...new Set(d.patches.flatMap((x) => [...(x.p.nodes?.set ?? []).map((o) => o.id), ...(x.p.nodes?.del ?? [])]))];
 const idVon = (text) => { try { return JSON.parse(bxServer()).nodes.find((n) => JSON.stringify(n.data.blocks).includes(text))?.id; } catch { return undefined; } };
 pruefe('A1 neu im Konto reisen die Boards einmal als Ganzes (über 200 kB)', sb.patches.length === 0 && sb.ganz.some((g) => g.name === 'board-bx.json') && zeilenGroesse() > 200000, `${zeilenGroesse()} ${kurz(seit({ p: 0, g: 0, h: 0, st: 0, vb: 0, fs: 0 }))}`);
@@ -671,6 +687,7 @@ await warteBis(A2.P, async () => !!(await boardVon(A2.P, 'bx')), 12000);
 await boardWechseln(A2.P, 'Planung 2', 'Allgemein');
 pruefe('B1 das zweite Gerät hat den Stand (mit „Karte zwei", ohne „Karte eins")', (await hat(A2.P, 'Karte zwei')) && !(await hat(A2.P, 'Karte eins')));
 await A2.P.waitForTimeout(3000);
+await serverRuhig(A.P);
 m = marke();
 {
   await leer(A.P);
@@ -689,6 +706,7 @@ m = marke();
   pruefe('B4 Gerät zwei legt eine Karte an → kartenweise hinaus, Gerät eins zeigt sie', ok2 && da && d.patches.some((x) => x.geraet === 'A2') && d.ganz.length === 0, kurz(d));
 }
 await A.P.waitForTimeout(3500);
+await serverRuhig(A.P);
 m = marke();
 {
   await leer(A.P); await leer(A2.P);
@@ -718,6 +736,7 @@ const uidB = nutzerId('bernd@example.de');
 await warteBis(B.P, async () => !!(await boardVon(B.P, 'bx')), 15000);
 await boardWechseln(B.P, 'Planung 2', 'anna@example.de');
 await B.P.waitForTimeout(3000);
+await serverRuhig(B.P);
 m = marke();
 {
   const ok1 = await notizPlatz(B.P, 'Gruß von Bernd');
@@ -731,6 +750,7 @@ m = marke();
   const d2 = seit(m);
   pruefe('C4 Anna sieht sie – und schreibt dafür nichts zurück', beiAnna && d2.patches.every((x) => x.geraet === 'B') && d2.ganz.length === 0, kurz(d2));
 }
+await serverRuhig(A.P);
 m = marke();
 {
   await leer(A.P);
@@ -785,6 +805,9 @@ m = marke();
   const t0 = Date.now();
   const ok1 = await notizPlatz(A.P, 'Anna für Gerd');
   const da = await warteBis(G.P, () => hat(G.P, 'Anna für Gerd'), 12000);
+  // M484: Gerd sieht die Karte über den Live-Kanal oft vor Annas Text-Patch beim Server – erst den abwarten
+  await warteBis(A.P, () => /Anna für Gerd/.test(bxServer()), 12000);
+  await serverRuhig(A.P);
   const d = seit(m);
   pruefe(`D1 Anna legt eine Karte an (kartenweise) → Gerd hat sie nach ${Date.now() - t0} ms`, ok1 && da && d.patches.some((x) => x.geraet === 'A1') && d.ganz.length === 0, kurz(d));
 }
@@ -792,9 +815,10 @@ m = marke();
 {
   const ok1 = await notizPlatz(G.P, 'Gerd für Anna');
   const da = await warteBis(A.P, () => hat(A.P, 'Gerd für Anna'), 14000);
+  const serverHatte = /Gerd für Anna/.test(bxServer());   // M484: stand Gerds Text schon im Konto, als Anna ihn sah?
   await A.P.waitForTimeout(4000);
   const d = seit(m);
-  pruefe('D2 Gerd legt eine Karte an → Anna hat sie und schreibt nichts zurück', ok1 && da && d.patches.length === 0 && d.ganz.length === 0, kurz(d));
+  pruefe('D2 Gerd legt eine Karte an → Anna hat sie und schreibt nichts zurück', ok1 && da && d.patches.length === 0 && d.ganz.length === 0, `${kurz(d)} Gerds Karte: ${idVon('Gerd für Anna')} · Text schon im Konto, als Anna ihn sah: ${serverHatte}`);
 }
 m = marke();
 {

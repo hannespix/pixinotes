@@ -89,7 +89,11 @@ export function Vorfuehren() {
     for (const [karte, seite] of Object.entries(dok)) {
       const hier = seiteVon(karte);
       if (hier?.seite === seite) continue;
-      if (!hier) aufGefolgt.current.add(karte);
+      // M484: jede Karte merken, der „zeige" galt – nicht nur die, die hier noch zu war. Unter Last kam der Fokus des
+      // Vorführenden vor seiner Seitenangabe an: Die Karte war (im Fokus) schon offen, bekam beim Blättern „zeige",
+      // stand aber nicht in der Liste – nach dem Schließen des Fokus kam nie „zuklappen", sie blieb offen (m387 I8/I11).
+      // „zuklappen" nimmt nur das Zeigen zurück; wer die Karte selbst aufgeklappt hat, behält sie offen.
+      aufGefolgt.current.add(karte);
       seiteMerken(karte, seite);       // klappt die Karte erst auf, beginnt sie gleich auf dieser Seite
       befehl({ id: karte, was: 'zeige', zu: seite });
     }

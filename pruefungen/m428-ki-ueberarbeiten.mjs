@@ -74,10 +74,14 @@ const idbSetzen = (P, key, wert) => P.evaluate(async ([k, w]) => {
   const db = await new Promise((ok, nein) => { const r = indexedDB.open('pixinotes-sync'); r.onsuccess = () => ok(r.result); r.onerror = () => nein(r.error); });
   await new Promise((ok) => { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(w, k); tx.oncomplete = ok; });
 }, [key, wert]);
-const rahmen = async (P, ms = 12000) => {
+const rahmen = async (P, ms = 30000) => {   // M484: unter Last braucht der Rahmen länger als 12 s
   for (let t = 0; t < ms; t += 250) {
-    const f = P.frames().find((x) => x !== P.mainFrame() && x.url().startsWith('about:srcdoc'));
-    if (f && await f.locator('#edit').count().catch(() => 0)) return f;
+    // M484: alle Rahmen prüfen und nicht nach der Adresse filtern – unter Last meldet Playwright für den Rahmen der
+    // Präsentation zeitweise "" statt "about:srcdoc" (gemessen), der Editor (#edit) steht trotzdem darin
+    for (const f of P.frames()) {
+      if (f === P.mainFrame()) continue;
+      if (await f.locator('#edit').count().catch(() => 0)) return f;
+    }
     await P.waitForTimeout(250);
   }
   return null;
@@ -91,9 +95,12 @@ const fertig = async (P) => {
 /** Präsentation anlegen (Palette), Titel im Editor ändern, Pfeil von der Notiz */
 const anlegen = async (P) => {
   await P.locator('.dock .dock-add-wrap').nth(0).locator('button').first().click(); await P.waitForTimeout(400);
-  await P.locator('.modul-kachel[data-modul="praesentation"]').click(); await P.waitForTimeout(1500);
+  await P.locator('.modul-kachel[data-modul="praesentation"]').click();
+  // M484: auf die neue Karte im Speicher warten statt fester 1,5 s
+  await P.waitForFunction(() => JSON.parse(localStorage.getItem('pixinotes-board') ?? '{}').state?.boards?.[0]?.nodes?.some((n) => n.type === 'htmlapp'), null, { timeout: 20000 });
   const id = (await board(P)).nodes.find((n) => n.type === 'htmlapp').id;
   const f = await rahmen(P);
+  if (!f) throw new Error(`Präsentation ohne Editor-Rahmen nach 30 s – Rahmen: ${JSON.stringify(await Promise.all(P.frames().map(async (x) => [x.url().slice(0, 40), await x.locator('#edit').count().catch(() => -1)])))}`);
   const k = await P.locator(`.react-flow__node[data-id="${id}"]`).boundingBox();
   await P.mouse.click(k.x + 60, k.y + 12); await P.waitForTimeout(300);
   await f.locator('#edit').click({ force: true }); await P.waitForTimeout(800);
@@ -101,13 +108,23 @@ const anlegen = async (P) => {
   await f.evaluate(() => { const el = document.querySelector('.chapter-title h1'); const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
   await P.keyboard.type('Quartalsbericht Q3');
   await f.locator('.reveal').first().click({ position: { x: 20, y: 20 }, force: true }).catch(() => {});
-  await P.waitForTimeout(2500);
-  await P.evaluate(([q, d]) => {
-    const b = JSON.parse(localStorage.getItem('pixinotes-board'));
-    b.state.boards[0].edges.push({ id: 'e-q', source: q, target: d, type: 'labeled', data: {} });
-    localStorage.setItem('pixinotes-board', JSON.stringify(b));
-  }, ['q1', id]);
+  // M484: warten, bis der geänderte Titel im Stand der Karte liegt (statt fester 2,5 s)
+  for (let t = 0; t < 20000 && !JSON.stringify(await idb(P, `happ-state:${id}`) ?? '').includes('Quartalsbericht Q3'); t += 250) await P.waitForTimeout(250);
+  await P.waitForTimeout(1000);   // der Speicher der App schreibt mit kurzer Verzögerung – danach erst den Pfeil eintragen
   return id;
+};
+/** Pfeil von der Notiz zur Präsentation in den gespeicherten Stand legen und neu laden. M484: Schreibt die App ihren
+ *  Stand zwischen Eintragen und Neuladen noch einmal, ist der Pfeil weg – dann erneut eintragen. */
+const pfeilUndNeuLaden = async (P, id) => {
+  for (let versuch = 0; versuch < 4; versuch += 1) {
+    await P.evaluate(([q, d]) => {
+      const b = JSON.parse(localStorage.getItem('pixinotes-board'));
+      if (!b.state.boards[0].edges.some((e) => e.id === 'e-q')) b.state.boards[0].edges.push({ id: 'e-q', source: q, target: d, type: 'labeled', data: {} });
+      localStorage.setItem('pixinotes-board', JSON.stringify(b));
+    }, ['q1', id]);
+    await P.reload({ waitUntil: 'networkidle' }); await P.waitForTimeout(1500);
+    if ((await board(P)).edges.some((e) => e.id === 'e-q')) return;
+  }
 };
 const menue = async (P, id) => {
   await P.locator(`[data-hmbtn="${id}"]`).click({ force: true }); await P.waitForTimeout(400);
@@ -117,7 +134,7 @@ console.log('\n════ A–C: Karten-Menü ════');
 {
   const { ctx, P, aufrufe } = await auf({ wert: NEU });
   const id = await anlegen(P);
-  await P.reload({ waitUntil: 'networkidle' }); await P.waitForTimeout(1500);   // Pfeil aus dem gespeicherten Stand
+  await pfeilUndNeuLaden(P, id);   // Pfeil aus dem gespeicherten Stand
   // Gestaltung, die bleiben soll
   const stand = await idb(P, `happ-state:${id}`);
   const schl = Object.keys(stand ?? {}).find((k) => k.startsWith('vibecoding-editor-'));
@@ -164,9 +181,10 @@ console.log('\n════ D: Freitext, Auswahl ════');
   await fertig(P);
   pruefe('D1 „Mach die Präsentation kürzer" überarbeitet die vorhandene (keine zweite)', (aufrufe[0] ?? '').startsWith('Du überarbeitest') && (await board(P)).nodes.filter((n) => n.type === 'htmlapp').length === 1 && (await idb(P, `happ:${id}`)).includes('Kurzbericht Q3'));
   const k = await P.locator(`.react-flow__node[data-id="${id}"]`).boundingBox();
-  await P.mouse.click(k.x + 60, k.y + 12); await P.waitForTimeout(400);
-  await P.evaluate(() => [...(document.querySelector('.sel-toolbar')?.querySelectorAll('button') ?? [])].find((x) => x.getAttribute('aria-label') === 'Mehr')?.click()); await P.waitForTimeout(500);
-  await P.evaluate(() => [...(document.querySelector('.sel-more-menu')?.querySelectorAll('button') ?? [])].find((b) => b.textContent.includes('KI-Aktionen'))?.click()); await P.waitForTimeout(400);
+  // M484: Auswahl-Leiste und Menüs laden seit M483 nach – auf sie warten statt fester Pausen
+  await P.mouse.click(k.x + 60, k.y + 12); await P.waitForSelector('.sel-toolbar button[aria-label="Mehr"]', { timeout: 15000 }).catch(() => {});
+  await P.evaluate(() => [...(document.querySelector('.sel-toolbar')?.querySelectorAll('button') ?? [])].find((x) => x.getAttribute('aria-label') === 'Mehr')?.click()); await P.waitForSelector('.sel-more-menu', { timeout: 15000 }).catch(() => {});
+  await P.evaluate(() => [...(document.querySelector('.sel-more-menu')?.querySelectorAll('button') ?? [])].find((b) => b.textContent.includes('KI-Aktionen'))?.click()); await P.waitForSelector('[data-taste="ki-praesentation-ueberarbeiten"]', { timeout: 15000 }).catch(() => {});
   pruefe('D2 Auswahl-KI einer Präsentation: „Präsentation überarbeiten"', (await P.locator('[data-taste="ki-praesentation-ueberarbeiten"]').count()) === 1);
   await ctx.close();
 }
