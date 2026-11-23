@@ -55,6 +55,9 @@ m332, m447, m429, m354, m366. Jeder Agent verlor damit Wiederholungen und Gewiss
 - **m429 B1:** wartet erst, bis 1 s lang nichts mehr läuft (höchstens 20 s), und prüft dann 3 s Stillstand. (Ein
   Versuch für A1 — Messbeginn erst mit allen Namen, unter Last zwei Messintervalle — machte es nicht besser und ist
   zurückgenommen, siehe „Grenzen".)
+- **m476 G2/G4/G8:** Die Sicherungsdatei steht im Ordner, sobald sie angelegt ist; Inhalt und das Aufräumen der
+  alten Sicherungen folgen danach. Die Reihe wartet jetzt auf den fertigen Zustand (höchstens 7 Dateien, heutige nicht
+  leer) statt nur darauf, dass die Datei auftaucht.
 - **m366 (und 23 weitere Reihen mit demselben Helfer `notiz()`):** „Port belegt" war kein Fehler der Reihe (andere
   Agenten starteten sie ohne den Läufer). Der TimeoutError (bei Last über 20 auf 4 Kernen, mit `--ablage` gefunden):
   `notiz()` legt per Doppelklick eine Notiz an, wartete 700 ms auf den Cursor darin und klickte sonst in den Editor der
