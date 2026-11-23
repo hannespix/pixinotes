@@ -1,0 +1,22 @@
+/* ============================================================
+   M477: Gemeinsam in einer Notiz tippen
+   ============================================================ */
+/* Die Hülle, die zwischen „allein" und „gemeinsam" wählt, ist für das Layout unsichtbar — die Notiz misst und
+   scrollt wie vorher (CardShell → .note-editor). */
+.note-wahl { display: contents; }
+
+/* Cursor der anderen: schmaler Strich in ihrer Farbe, darüber beim Tippen ihr Name (BlockNote blendet ihn nach
+   zwei Sekunden Ruhe wieder aus). Etwas kleiner als BlockNotes Vorgabe, damit er in einer Notiz-Zeile bleibt. */
+.note-editor .bn-collaboration-cursor__base .bn-collaboration-cursor__caret { width: 2px; }
+.note-editor .bn-collaboration-cursor__base[data-active] .bn-collaboration-cursor__label {
+  top: -15px;
+  font-size: 11px;
+  line-height: 1.2;
+  padding: 1px 4px;
+  z-index: 3;
+}
+/* Markierung der anderen: die Farbe kommt aus der Person (Inline-Stil von y-prosemirror) */
+.note-editor .ProseMirror-yjs-selection { border-radius: 2px; }
+@media print {
+  .note-editor .bn-collaboration-cursor__base { display: none; }
+}

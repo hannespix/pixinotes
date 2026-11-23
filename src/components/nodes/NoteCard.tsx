@@ -6,7 +6,9 @@ import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
 import { sprache } from '../../lib/sprache';
-import { kamVonAussen, NOTIZ_EXTERN, selectActiveBoard, useBoard, useKarteFest } from '../../store';
+import { kamVonAussen, mutedHistory, NOTIZ_EXTERN, selectActiveBoard, useBoard, useKarteFest } from '../../store';
+import { gemeinsamGewuenscht, gemeinsamKern, NOTIZ_Y_WACH, useGemeinsamMoeglich } from '../../lib/notizGemeinsam';
+import type { NotizSitzung } from '../../lib/notizGemeinsamKern';
 import { STICKY_COLORS, type NoteNode } from '../../types';
 import { blocksToText } from '../../lib/serialize';
 import { indexZuAdresse } from '../../lib/formel';
@@ -191,7 +193,17 @@ function NoteAboFeeds({ id }: { id: string }) {
  * Der lebende Editor einer Notiz (BlockNote, MPL-2.0) — entsteht erst bei Bedarf (M338).
  * `startPunkt`: Bildschirmstelle des Klicks, der ihn geweckt hat; dort landet der Cursor.
  */
-export function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNode['data']; startPunkt: MutableRefObject<{ x: number; y: number } | null> }) {
+export function NotizEditor({ id, data, startPunkt, sitzung, abschied, fokus, ohneSperre }: {
+  id: string; data: NoteNode['data']; startPunkt: MutableRefObject<{ x: number; y: number } | null>;
+  /** M477: gemeinsam tippen — die Yjs-Sitzung dieser Notiz (sonst allein wie bisher) */
+  sitzung?: NotizSitzung;
+  /** M477: hier hinterlegt der Editor, was beim Verlassen der Sitzung noch zu sichern ist */
+  abschied?: MutableRefObject<(() => void) | null>;
+  /** M477: nach dem Aufbau den Cursor hineinsetzen (Betreten per Tastatur) */
+  fokus?: boolean;
+  /** M477: im Live-Board nimmt der Editor keine Karten-Sperre (er wechselt beim Betreten ohnehin in „gemeinsam") */
+  ohneSperre?: boolean;
+}) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
 
@@ -219,18 +231,50 @@ export function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNo
   // M360: nur lesend geteiltes Board — der Editor zeigt, nimmt aber nichts an; M365: ebenso eine fremde Karte,
   // wenn Gäste hier nur Eigenes ändern dürfen
   const nurLesen = useKarteFest((data as { von?: string }).von);
-  const editor = useCreateBlockNote({
+  const basis = {
     schema: noteSchema,
     // M462: Strg+A markiert wie bisher die ganze Notiz (BlockNote 0.57: erst den Block)
-    selectAllBehavior: 'document',
+    selectAllBehavior: 'document' as const,
     initialContent: initialContent as never,
     dictionary: sprache() === 'en' ? blockNoteEn : blockNoteDe,   // M381
     // M289: Damit Bilder überhaupt in den Text dürfen — Einfügen,
     // Ablegen und der Dateiwähler des Bild-Blocks laufen hier durch.
     // M303: Passt ein Bild nicht mehr in den Stand, wird es zur Karte daneben.
     uploadFile: editorUpload((f) => dateienNebenDieNotiz([f])),
-  });
+  };
+  // M477: gemeinsam — derselbe Editor, dazu die Yjs-Kollaboration (Inhalt aus dem Y-Dokument statt initialContent)
+  const editor = useCreateBlockNote(sitzung ? sitzung.optionen(basis) : basis);
   useAndroidBackspaceFix(editor);
+
+  /**
+   * M477: Das Block-JSON sichern. Allein wie immer; gemeinsam nur, wer gerade Schreiber ist (lib/notizGemeinsamKern.ts)
+   * — und ohne eigenen Rückgängig-Schritt im Board: Den Text nimmt Strg+Z im Editor zurück (nur das Eigene, Yjs), ein
+   * Board-Rückgängig, das die Zeilen der anderen mitnähme, gäbe es sonst obendrein.
+   */
+  /** M477: der letzte Stand des Editors — beim Verlassen der Sitzung ist der Editor womöglich schon abgebaut */
+  const letzterStand = useRef<unknown[] | null>(null);
+  const blocksSichern = useCallback((stand?: unknown[]) => {
+    if (!sitzung) { updateNodeData(id, { blocks: editor.document }); return; }
+    if (!sitzung.istSchreiber()) return;
+    const jetzt = stand ?? editor.document;
+    const alt = selectActiveBoard(useBoard.getState()).nodes.find((n) => n.id === id)?.data.blocks;
+    if (alt && JSON.stringify(alt) === JSON.stringify(jetzt)) return;
+    mutedHistory(() => updateNodeData(id, { blocks: jetzt }));
+  }, [sitzung, editor, id, updateNodeData]);
+  useEffect(() => {
+    if (!sitzung) return;
+    sitzung.darfSchreiben(!nurLesen);
+    // Der bisherige Schreiber ging: einmal den ganzen Stand sichern
+    const ab = sitzung.beiSchreiber(() => blocksSichern());
+    // Nicht wieder leeren: Die Hülle ruft das beim Verlassen auf — womöglich erst nach dem Abbau dieses Editors
+    if (abschied) abschied.current = () => { if (letzterStand.current) blocksSichern(letzterStand.current); };
+    return ab;
+  }, [sitzung, nurLesen, blocksSichern, abschied]);
+  useEffect(() => {
+    if (!fokus) return;
+    const t = setTimeout(() => { try { editor.focus(); } catch { /* weg */ } }, 30);
+    return () => clearTimeout(t);
+  }, [fokus, editor]);
 
   // M170: Externer Schreiber (Kanban-Rück-Sync) hat die Blöcke geändert —
   // der lebende Editor liest Inhalt sonst nur beim Mount. extEpoch zählt bei
@@ -240,6 +284,8 @@ export function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNo
   useEffect(() => {
     if (extEpoch === lastEpoch.current) return;
     lastEpoch.current = extEpoch;
+    // M477: gemeinsam übernimmt nur der Schreiber — er gibt den Stand über Yjs an alle weiter (sonst käme er n-mal)
+    if (sitzung && !sitzung.istSchreiber()) return;
     const blocks = data.blocks as PartialBlock[] | undefined;
     if (blocks?.length) {
       // `as never`: Die Blöcke kommen als gespeicherte Daten herein, ihr Typ ist
@@ -256,6 +302,9 @@ export function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNo
   const externRef = useRef(false);
   const textRueckAm = useRef(0);   // M390: Zeitpunkt des letzten Strg+Z/Y im Text
   useEffect(() => {
+    // M477: gemeinsam ist das Y-Dokument die Quelle — der gespeicherte Stand, der hier ankommt, ist der eigene (vom
+    // Schreiber zurück) und meist schon überholt. Ihn einzuspielen, schöbe ihn über Yjs allen wieder unter.
+    if (sitzung) return;
     const auf = (e: Event) => {
       if (!(e as CustomEvent<string[]>).detail?.includes(id)) return;
       const blocks = selectActiveBoard(useBoard.getState()).nodes.find((n) => n.id === id)?.data.blocks as PartialBlock[] | undefined;
@@ -276,7 +325,7 @@ export function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNo
     };
     window.addEventListener(NOTIZ_EXTERN, auf);
     return () => window.removeEventListener(NOTIZ_EXTERN, auf);
-  }, [id, editor]);
+  }, [id, editor, sitzung]);
 
   // Frische, leere Notiz: sofort den Cursor reinsetzen — lostippen ohne Extra-Klick
   // M365: … aber nur in der selbst angelegten. Eine leere Notiz, die jemand anderes gerade angelegt hat und die
@@ -343,7 +392,7 @@ export function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNo
     if (!tableSel) return;
     try {
       editor.removeBlocks([tableSel]);
-      updateNodeData(id, { blocks: editor.document });
+      blocksSichern();
       setTableSel(null);
       setTabZelle(null);
       showToast('Tabelle entfernt – Strg+Z im Text holt sie zurück.');
@@ -385,7 +434,7 @@ export function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNo
           zeilen: Math.min(200, rows.length),
         },
       } as never]);
-      updateNodeData(id, { blocks: editor.document });
+      blocksSichern();
       setTableSel(null);
       setTabZelle(null);
       showToast('Umgewandelt – jetzt rechnet die Tabelle: „=SUMME(A1:A3)" in eine Zelle schreiben.');
@@ -422,7 +471,7 @@ export function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNo
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
-      updateNodeData(id, { blocks: editor.document });
+      blocksSichern();
       // M230: Nach dem Umbau steht der Cursor nicht mehr IN der Tabelle —
       // BlockNote meldet dann einen anderen Block, die Chips verschwanden
       // schlagartig. Für den Nutzer sah das aus, als ginge nur ein einziger
@@ -466,11 +515,14 @@ export function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNo
   return (
     <>
       <div
-        className="nodrag nowheel note-editor"
+        className={`nodrag nowheel note-editor${sitzung ? ' note-gemeinsam' : ''}`}
         ref={editorRef}
+        // M477: gemeinsam (und im Live-Board überhaupt) nimmt das Schreiben keine Karten-Sperre (lib/gastSync.ts)
+        {...(sitzung || ohneSperre ? { 'data-ohne-sperre': '' } : {})}
         onKeyDownCapture={(e) => {
           // M390: Strg+Z / Strg+Y im Text — die Änderung, die gleich kommt, ist ein Rückgängig des Editors
-          if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'z' || e.key === 'Z' || e.key === 'y' || e.key === 'Y')) textRueckAm.current = Date.now();
+          // M477: gemeinsam nicht — dort nimmt Yjs nur das Eigene zurück, das Board bekommt den Stand wie jede Änderung
+          if (!sitzung && (e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'z' || e.key === 'Z' || e.key === 'y' || e.key === 'Y')) textRueckAm.current = Date.now();
         }}
       >
         <BlockNoteView
@@ -481,7 +533,8 @@ export function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNo
           formattingToolbar={false}
           slashMenu={false}   /* M283: eigenes Einfügen-Menü (NoteSlashMenu) */
           onChange={() => {
-            if (!externRef.current) {
+            if (sitzung) { letzterStand.current = editor.document; blocksSichern(letzterStand.current); }   // M477: auch Änderungen der anderen — gesichert nur vom Schreiber
+            else if (!externRef.current) {
               if (Date.now() - textRueckAm.current < 400) { textRueckAm.current = 0; useBoard.getState().textRueckgaengig(id, editor.document as unknown[]); }
               else updateNodeData(id, { blocks: editor.document });
             }
@@ -538,6 +591,105 @@ export function NotizEditor({ id, data, startPunkt }: { id: string; data: NoteNo
         </div>
       )}
     </>
+  );
+}
+
+type EditorModus =
+  | { art: 'allein' }
+  | { art: 'pause'; danach: 'allein' | 'laedt'; fokus: boolean }
+  | { art: 'laedt'; fokus: boolean }
+  | { art: 'gemeinsam'; s: NotizSitzung; fokus: boolean };
+/**
+ * M477: Allein oder gemeinsam? Ohne Live-Kanal immer allein (wie bisher). Im Live-Board wechselt der Editor in
+ * „gemeinsam", sobald man die Notiz betritt oder ein anderer in ihr arbeitet (lib/notizGemeinsam.ts) — erst dann
+ * entsteht eine Yjs-Sitzung. Gewechselt wird nie unter dem Cursor: zwischen zwei Editoren steht kurz die ruhende
+ * Ansicht (gleicher Umbruch, der Klick setzt danach den Cursor an dieselbe Stelle), so sichert der alte sauber,
+ * bevor der neue liest.
+ */
+function NotizEditorWahl({ id, data, startPunkt }: { id: string; data: NoteNode['data']; startPunkt: MutableRefObject<{ x: number; y: number } | null> }) {
+  const boardId = useBoard((s) => s.activeId);
+  const live = useGemeinsamMoeglich(boardId);
+  const nurLesen = useKarteFest((data as { von?: string }).von);
+  const nurLesenRef = useRef(nurLesen); nurLesenRef.current = nurLesen;
+  const kernKaputt = useRef(false);
+  const [modus, setModus] = useState<EditorModus>(() => (live && (startPunkt.current || gemeinsamGewuenscht(boardId, id)) ? { art: 'laedt', fokus: false } : { art: 'allein' }));
+  const huelle = useRef<HTMLDivElement>(null);
+  const abschied = useRef<(() => void) | null>(null);
+  const gemeinsam = modus.art === 'laedt' || modus.art === 'gemeinsam';
+  const fokussiert = (): boolean => !!huelle.current?.contains(document.activeElement);
+
+  /** Betreten (Klick oder Tastatur) im Live-Board: gemeinsam weiter */
+  const wechselt = useRef(false);
+  const betreten = (p: { x: number; y: number } | null) => {
+    if (!live || kernKaputt.current || modus.art !== 'allein' || wechselt.current) return;
+    wechselt.current = true;
+    if (p) startPunkt.current = p;
+    setModus({ art: 'pause', danach: 'laedt', fokus: !p });
+  };
+  useEffect(() => { if (modus.art !== 'pause') wechselt.current = false; }, [modus.art]);
+  // Jemand anderes arbeitet in dieser Notiz: mitsehen (nicht, wenn ich gerade selbst im Editor bin)
+  useEffect(() => {
+    if (!live || modus.art !== 'allein') return;
+    const auf = (e: Event) => {
+      const d = (e as CustomEvent<{ boardId?: string; nodeId?: string }>).detail;
+      if (d?.boardId !== boardId || d.nodeId !== id || fokussiert() || kernKaputt.current) return;
+      setModus({ art: 'pause', danach: 'laedt', fokus: false });
+    };
+    window.addEventListener(NOTIZ_Y_WACH, auf);
+    return () => window.removeEventListener(NOTIZ_Y_WACH, auf);
+  }, [live, modus.art, boardId, id]);
+  // Kanal weg: zurück zu allein — sobald der Cursor die Notiz verlassen hat
+  useEffect(() => {
+    if (live || !gemeinsam) return;
+    const pruefen = () => { if (!fokussiert()) setModus({ art: 'pause', danach: 'allein', fokus: false }); };
+    pruefen();
+    const spaeter = () => setTimeout(pruefen, 0);
+    document.addEventListener('focusout', spaeter, true);
+    return () => document.removeEventListener('focusout', spaeter, true);
+  }, [live, gemeinsam]);
+  useEffect(() => {
+    if (modus.art !== 'pause') return;
+    const danach = modus.danach; const fokus = modus.fokus;
+    const t = setTimeout(() => setModus(danach === 'laedt' ? { art: 'laedt', fokus } : { art: 'allein' }), 0);
+    return () => clearTimeout(t);
+  }, [modus]);
+  useEffect(() => {
+    if (modus.art !== 'laedt') return;
+    let weg = false;
+    const fokus = modus.fokus;
+    const blocks = (selectActiveBoard(useBoard.getState()).nodes.find((n) => n.id === id)?.data.blocks ?? []) as unknown[];
+    gemeinsamKern()
+      .then((k) => k.sitzungOeffnen(boardId, id, repairBlocks(blocks), noteSchema as never, !nurLesenRef.current))
+      .then((s) => { if (weg) { s.schliessen(); return; } setModus({ art: 'gemeinsam', s, fokus }); })
+      .catch(() => { kernKaputt.current = true; if (!weg) setModus({ art: 'allein' }); });
+    return () => { weg = true; };
+  }, [modus, boardId, id]);
+  // Sitzung verlassen: zuerst sichern (wer Schreiber ist), dann zu
+  useEffect(() => {
+    if (modus.art !== 'gemeinsam') return;
+    const s = modus.s;
+    return () => {
+      try { abschied.current?.(); } catch { /* egal */ }
+      abschied.current = null;
+      s.schliessen();
+    };
+  }, [modus]);
+
+  return (
+    <div
+      ref={huelle}
+      className="note-wahl"
+      onPointerDownCapture={(e) => { if (e.button === 0) betreten({ x: e.clientX, y: e.clientY }); }}
+      onFocusCapture={() => betreten(null)}
+    >
+      {modus.art === 'allein' && <NotizEditor id={id} data={data} startPunkt={startPunkt} ohneSperre={live && !kernKaputt.current} />}
+      {modus.art === 'gemeinsam' && <NotizEditor key={modus.s.doc.clientID} id={id} data={data} startPunkt={startPunkt} sitzung={modus.s} abschied={abschied} fokus={modus.fokus} />}
+      {(modus.art === 'pause' || modus.art === 'laedt') && (
+        <div className="nodrag nowheel note-editor" translate="no">
+          <NotizRuhend blocks={data.blocks as RuheBlock[]} onHaken={() => { /* gleich wieder ein Editor */ }} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -601,8 +753,11 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
       if (typeof d.x === 'number' && typeof d.y === 'number') startPunkt.current = { x: d.x, y: d.y };
       setAktiv(true);
     };
+    // M477: Jemand anderes tippt in dieser Notiz — der Editor wacht auf und zeigt es live (gemeinsam)
+    const wach = (e: Event) => { if ((e as CustomEvent<{ nodeId?: string }>).detail?.nodeId === id) setAktiv(true); };
     window.addEventListener('pixinotes:notiz-aktiv', auf);
-    return () => window.removeEventListener('pixinotes:notiz-aktiv', auf);
+    window.addEventListener(NOTIZ_Y_WACH, wach);
+    return () => { window.removeEventListener('pixinotes:notiz-aktiv', auf); window.removeEventListener(NOTIZ_Y_WACH, wach); };
   }, [aktiv, id]);
   const verweilen = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(verweilen.current), []);
@@ -652,7 +807,7 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
       </>}
     >
       {aktiv ? (
-        <NotizEditor id={id} data={data} startPunkt={startPunkt} />
+        <NotizEditorWahl id={id} data={data} startPunkt={startPunkt} />
       ) : (
         <div
           className="nodrag nowheel note-editor"
