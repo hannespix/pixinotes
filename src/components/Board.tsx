@@ -26,7 +26,7 @@ import { frameMembers } from '../lib/arrange';
 import { bildMasse, imageFileToDataUrl } from '../lib/image';
 import { canEmbed, makeImage, makeNote } from '../lib/nodes';
 import { textZuBloecken } from '../lib/notiz';
-import { importFilesToBoard } from '../lib/importFiles';
+import { importFilesToBoard } from '../lib/importSpaet';
 import type { AppNode } from '../types';
 import { NoteCard } from './nodes/NoteCard';
 import { EmailCard } from './nodes/EmailCard';
@@ -64,7 +64,6 @@ const istMaus = () => window.matchMedia('(pointer: fine)').matches;
 import { DrawingLayer } from './DrawingLayer';
 import { FingerGesten } from './FingerGesten';
 import { CommentLayer } from './CommentLayer';
-import { SelectionToolbar } from './SelectionToolbar';
 import { BoardKontextmenue } from './Kontextmenue';
 import { fristenLaden } from '../lib/dates';
 import { rufnummernLaden } from '../lib/rufnummer';
@@ -143,6 +142,31 @@ const nodeTypes: NodeTypes = {
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
+
+/**
+ * M483: Die Auswahl-Leiste (samt KI-Aktionen, Ausrichten, Rahmen-Werkzeugen) gehört nicht in den Start — auf einem
+ * frisch geöffneten Board ist nichts ausgewählt. Sie lädt mit der ersten Auswahl; vorher holt App.tsx sie im Leerlauf
+ * still nach (`imLeerlaufVorladen`), dann steht sie bei der ersten Auswahl ohne Verzug. Einmal da, bleibt sie
+ * eingehängt (auch über einen Board-Wechsel hinweg), wie vorher. Den Rechtsklick-Wunsch („Mehr"-Menü am Zeiger)
+ * holt sie sich beim Einhängen selbst ab (kartenWunschNehmen, M350). Schon die erste Berührung/Taste stößt das Laden an.
+ */
+export const auswahlLeisteLaden = () => import('./SelectionToolbar');
+const AuswahlLeisteSpaet = lazy(() => auswahlLeisteLaden().then((m) => ({ default: m.SelectionToolbar })));
+let auswahlLeisteEingehaengt = false;
+function AuswahlLeiste() {
+  const gewaehlt = useBoard((s) => selectActiveBoard(s).nodes.some((n) => n.selected));
+  const [an, setAn] = useState(auswahlLeisteEingehaengt);
+  useEffect(() => { if (gewaehlt && !an) { auswahlLeisteEingehaengt = true; setAn(true); } }, [gewaehlt, an]);
+  // Die erste Berührung oder Taste kündigt eine Auswahl an — dann schon holen, nicht erst mit ihr (spart den Abruf)
+  useEffect(() => {
+    if (an) return;
+    const vorab = () => { void auswahlLeisteLaden().catch(() => null); };
+    window.addEventListener('pointerdown', vorab, { capture: true, once: true });
+    window.addEventListener('keydown', vorab, { capture: true, once: true });
+    return () => { window.removeEventListener('pointerdown', vorab, true); window.removeEventListener('keydown', vorab, true); };
+  }, [an]);
+  return an || gewaehlt ? <Suspense fallback={null}><AuswahlLeisteSpaet /></Suspense> : null;
+}
 
 
 /**
@@ -1773,7 +1797,7 @@ export function Board() {
             onClick={(_, pos) => { void setCenter(pos.x, pos.y, { duration: 350, zoom: getViewport().zoom }); }}
           />
         )}
-        <SelectionToolbar />
+        <AuswahlLeiste />
         <BoardKontextmenue />
         <DrawingLayer />
         <FingerGesten />

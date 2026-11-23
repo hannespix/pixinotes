@@ -10,7 +10,6 @@ import { karteFest, selectActiveBoard, selectNurLesen, useBoard } from '../store
 import { loadFile, saveFile, vorschauArt } from '../lib/fileStore';
 import { canEmbed } from '../lib/nodes';
 import { MAX_EMBED_BYTES } from '../lib/parseEmail';
-import { blobAlsDataUrl, nameMitEndung } from '../lib/bildBearbeiten';
 import { uid, type AppNode } from '../types';
 import type { BildErgebnis } from './BildEditor';
 
@@ -65,6 +64,8 @@ export function BildEditorHost() {
   if (!offen) return null;
 
   const fertig = async (e: BildErgebnis) => {
+    // M483: die Bild-Hilfen kommen mit dem Editor (er hat sie längst geladen), nicht mit dem Start
+    const { blobAlsDataUrl, nameMitEndung } = await import('../lib/bildBearbeiten');
     const st = useBoard.getState();
     const n = selectActiveBoard(st)?.nodes.find((k) => k.id === offen.id);
     if (!n || !bildBearbeitbar(n)) { zu(); return; }

@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useBoard } from '../store';
-import { alsDateien, geteiltMarkeAbholen, leseGeteiltes, loescheGeteiltes, type Geteiltes } from '../lib/geteilt';
-import { erweiterungEingang } from '../lib/erweiterung';
-import { eingangSammeln, geteiltesInEingang, textBloecke } from '../lib/eingang';
-import { importFilesToBoard } from '../lib/importFiles';
+import { alsDateien, loescheGeteiltes, type Geteiltes } from '../lib/geteilt';
+import { textBloecke } from '../lib/eingang';
+import { importFilesToBoard } from '../lib/importSpaet';
 import { makeNote } from '../lib/nodes';
 import { notizBildHochladen } from '../lib/notizBild';
 import { nodeToText } from '../lib/serialize';
@@ -43,7 +42,7 @@ function platzAuf(boardId: string): { x: number; y: number } {
  * Das Geteilte als Karten auf ein Board legen — gemeinsam für den Dialog und, M458, für die Erweiterung mit
  * „ohne Rückfrage". Gibt die Zahl der Karten zurück.
  */
-async function aufsBoardLegen(g: Geteiltes, boardId: string): Promise<number> {
+export async function aufsBoardLegen(g: Geteiltes, boardId: string): Promise<number> {
   const pos = platzAuf(boardId);
   const dateien = alsDateien(g);
   let gesetzt = 0;
@@ -55,8 +54,9 @@ async function aufsBoardLegen(g: Geteiltes, boardId: string): Promise<number> {
   return gesetzt;
 }
 
-export function GeteiltDialog() {
-  const [gabe, setGabe] = useState<Geteiltes | null>(null);
+/** M483: Der Dialog selbst — er lädt erst, wenn etwas angekommen ist (GeteiltHost.tsx wacht beim Start und hört
+ *  auf die Browser-Erweiterung). Ein neuer Wunsch hängt ihn neu ein (Schlüssel im Host). */
+export function GeteiltDialog({ gabe, ziel, onClose }: { gabe: Geteiltes; ziel?: string; onClose: () => void }) {
   const boards = useBoard((s) => s.boards);
   const spaces = useBoard((s) => s.spaces);
   const activeId = useBoard((s) => s.activeId);
@@ -64,41 +64,10 @@ export function GeteiltDialog() {
   const setView = useBoard((s) => s.setView);
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
-  const [zielBoard, setZielBoard] = useState(activeId);
+  const [zielBoard, setZielBoard] = useState(ziel ?? activeId);
   const [form, setForm] = useState<'karten' | 'notiz'>('karten');
   const [zielNotiz, setZielNotiz] = useState<string>('');
   const [laeuft, setLaeuft] = useState(false);
-
-  /* Beim Start nachsehen, ob etwas im Eingang liegt. Der Umweg über die
-     Adressmarke („?geteilt=1") ist Absicht: Ohne sie würde ein alter,
-     liegengebliebener Eingang bei jedem Start wieder aufpoppen. */
-  useEffect(() => {
-    const marke = geteiltMarkeAbholen();
-    void leseGeteiltes().then((g) => {
-      if (!g) return;
-      // Ohne Marke nur übernehmen, was frisch ist (max. 5 Minuten alt)
-      const frisch = Date.now() - new Date(g.wann).getTime() < 5 * 60_000;
-      if (!marke && !frisch) { void loescheGeteiltes(); return; }
-      // M478: Mit „Eingehendes im Eingang sammeln" wartet es dort, statt mitten in der Arbeit nach dem Ziel zu fragen
-      if (eingangSammeln()) void geteiltesInEingang(g, 'teilen').finally(() => void loescheGeteiltes());
-      else setGabe(g);
-    });
-  }, []);
-
-  /* M458: Browser-Erweiterung „An PixiNotes senden" — derselbe Dialog. Mit der Einstellung „ohne Rückfrage"
-     landet das Gesendete gleich auf dem geöffneten Board, mit einer kurzen Meldung. */
-  useEffect(() => erweiterungEingang(({ gabe: g, direkt }) => {
-    const st = useBoard.getState();
-    /* M478: „Ohne Rückfrage auf das geöffnete Board" ist ein gezieltes Ziel und bleibt direkt; alles andere wartet im
-       Eingang (Einstellung, Vorgabe an) statt den Empfangs-Dialog mitten in die Arbeit zu stellen. */
-    if (!direkt && eingangSammeln()) { void geteiltesInEingang(g, 'erweiterung'); return; }
-    if (!direkt || !st.boards.some((b) => b.id === st.activeId)) { setZielBoard(st.activeId); setGabe(g); return; }
-    const ziel = st.activeId;
-    st.setView('board');
-    void aufsBoardLegen(g, ziel).then((n) => useBoard.getState().showToast(n > 0
-      ? `Aus dem Browser übernommen – ${zahlWort(n, 'Karte', 'Karten')} auf „${useBoard.getState().boards.find((b) => b.id === ziel)?.name}".`
-      : 'Es war nichts Übernehmbares dabei.'));
-  }), []);
 
   const notizen = useMemo(
     () => (boards.find((b) => b.id === zielBoard)?.nodes ?? []).filter((n) => n.type === 'note'),
@@ -106,13 +75,11 @@ export function GeteiltDialog() {
   );
   useEffect(() => { setZielNotiz(notizen[0]?.id ?? ''); }, [notizen]);
 
-  if (!gabe) return null;
-
   const dateien = alsDateien(gabe);
   const nurBilder = dateien.length > 0 && dateien.every((d) => (d.type || '').startsWith('image/'));
   const textTeil = [gabe.titel, gabe.text, gabe.adresse].filter(Boolean).join('\n');
 
-  const schliessen = () => { setGabe(null); void loescheGeteiltes(); };
+  const schliessen = () => { onClose(); void loescheGeteiltes(); };
 
   const platz = platzAuf;
 

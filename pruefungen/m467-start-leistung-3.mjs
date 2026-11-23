@@ -24,7 +24,8 @@ const SINGLE = process.env.PN_SINGLE ?? path.join(__repo, 'release', 'pixinotes.
 const PORT = 5467;
 /** Grenze knapp über dem gemessenen Stand (2 168 523 B = 2,07 MiB; vorher 2 198 693 B, siehe docs/meilensteine/M467-start-leistung-3.md) */
 // M462: BlockNote 0.57 (Tiptap 3, Mantine 8) — Start 2 220 718 B (+50 KB, Emoji-Auswahl schon nachgeladen; siehe docs/meilensteine/M462-blocknote.md)
-const START_JS_GRENZE = 2_240_000;
+// M483: Start 2 095 863 B (vorher 2 238 181 B) — Grenze GESENKT auf neuer Stand + gut 20 KB, damit das Polster nicht gleich wieder verbraucht ist (docs/meilensteine/M483-start-leicht.md)
+const START_JS_GRENZE = 2_120_000;
 
 let ok = 0; let bad = 0;
 const pruefe = (n, gut, info = '') => {

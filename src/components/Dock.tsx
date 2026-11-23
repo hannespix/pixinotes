@@ -3,10 +3,16 @@ import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { anhaengeMitnehmen, mutedHistory, useBoard } from '../store';
 import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeKontakt, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, alsEbenAngelegt, makeSheet, makeTime, makeWeek } from '../lib/nodes';
-import { importFilesToBoard, importHtmlAppFromUrl, praesentationAnlegen } from '../lib/importFiles';
+import { importFilesToBoard, importHtmlAppFromUrl, praesentationAnlegen } from '../lib/importSpaet';
 import { punkteModusSetzen } from '../lib/punkte';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
-import { aiEdges, aiPraesentation, aiProcess, aiTasks } from '../lib/aiActions';
+// M483: Die KI-Aktionen (lib/aiActions.ts) kommen erst mit dem Klick — die Weichen haben dieselben Signaturen
+type KiAktionen = typeof import('../lib/aiActions');
+const kiAktionen = () => import('../lib/aiActions');
+const aiEdges: KiAktionen['aiEdges'] = (...a) => kiAktionen().then((m) => m.aiEdges(...a));
+const aiPraesentation: KiAktionen['aiPraesentation'] = (...a) => kiAktionen().then((m) => m.aiPraesentation(...a));
+const aiProcess: KiAktionen['aiProcess'] = (...a) => kiAktionen().then((m) => m.aiProcess(...a));
+const aiTasks: KiAktionen['aiTasks'] = (...a) => kiAktionen().then((m) => m.aiTasks(...a));
 /** M410: Die Freitext-Anweisung wird erst geladen, wenn sie gebraucht wird (lib/kiAnweisung.ts) */
 const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => import('../lib/kiAnweisung').then((m) => m.aiCommand(...a));
 import { kiBlaettern } from '../lib/kiVerlauf';
