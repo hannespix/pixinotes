@@ -6,7 +6,7 @@ import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeMermai
 import { importFilesToBoard, importHtmlAppFromUrl, praesentationAnlegen } from '../lib/importFiles';
 import { punkteModusSetzen } from '../lib/punkte';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
-import { aiBriefing, aiCluster, aiEdges, aiPraesentation, aiProcess, aiTasks } from '../lib/aiActions';
+import { aiBriefing, aiEdges, aiPraesentation, aiProcess, aiTasks } from '../lib/aiActions';
 /** M410: Die Freitext-Anweisung wird erst geladen, wenn sie gebraucht wird (lib/kiAnweisung.ts) */
 const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => import('../lib/kiAnweisung').then((m) => m.aiCommand(...a));
 import { kiBlaettern } from '../lib/kiVerlauf';
@@ -630,7 +630,9 @@ export function Dock() {
             >
               Recherche mit Quellen …
             </button>
-            <button disabled={!!aiBusy} onClick={() => runAi('cluster', (n) => aiCluster(n))}>Themen clustern &amp; anordnen</button>
+            {/* M445: mit Vorschau und Rahmen; geht auch ohne Chat-KI über das Gehirn (lib/themenOrdnen.ts) */}
+            <button disabled={!!aiBusy} data-taste="ki-themen-board" title="Lose Karten in benannte Rahmen ordnen – erst nach deiner Bestätigung"
+              onClick={() => { setAiMenu(false); void import('../lib/themenOrdnen').then((m) => m.themenOrdnenStarten()); }}>Nach Themen ordnen …</button>
             <button disabled={!!aiBusy} onClick={() => runAi('tasks', aiTasks)}>Aufgaben &amp; Termine extrahieren</button>
             <button disabled={!!aiBusy} onClick={() => runAi('process', aiProcess)}>Workflow als Diagramm ableiten</button>
             <button disabled={!!aiBusy} onClick={() => runAi('brief', aiBriefing)}>Analytisches Briefing erstellen</button>

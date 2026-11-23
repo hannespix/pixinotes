@@ -64,6 +64,10 @@ jobs:
       - name: Single-File zum Download in die Site legen
         run: cp release/pixinotes.html dist/pixinotes.html
 
+      # M443: MCP-Server für KI-Programme von außen — eine Datei, zum Download neben der App
+      - name: MCP-Server bauen und in die Site legen
+        run: npm run build:mcp && cp release/pixinotes-mcp.mjs dist/pixinotes-mcp.mjs
+
       - name: Pages konfigurieren
         uses: actions/configure-pages@v5
         with:

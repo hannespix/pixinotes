@@ -1973,6 +1973,17 @@ dl.leer-wege dd { margin: 0; }
 .modal-buttons button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
 .modal-buttons button:disabled { opacity: .5; cursor: default; }
 .modal-foot { padding: 12px 20px; font-size: 11px; color: var(--muted); text-align: center; }
+/* M445: Nach Themen ordnen – Vorschlag prüfen (components/ThemenDialog.tsx) */
+.themen-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.themen-liste li { border: 1px solid var(--border-soft); border-radius: var(--r); padding: 8px 10px; }
+.themen-liste li.aus { opacity: .55; }
+.themen-kopf { display: flex; align-items: center; gap: 8px; }
+.themen-name { flex: 1; min-width: 0; border: 1px solid transparent; border-radius: var(--r); padding: 4px 6px; background: transparent; color: var(--ink); font: inherit; font-weight: 600; font-size: 13.5px; }
+.themen-name:hover, .themen-name:focus { border-color: var(--border-soft); background: var(--surface-3); outline: none; }
+.themen-zahl { font-size: 12px; color: var(--muted); min-width: 1.5em; text-align: right; }
+.themen-karten { font-size: 12px; color: var(--muted); line-height: 1.45; margin: 4px 0 0 26px; }
+.themen-dialog .modal-buttons button.primaer { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; font-weight: 600; }
+.themen-dialog .modal-buttons button.primaer:hover:not(:disabled) { background: var(--accent-fill); border-color: var(--accent-fill); filter: brightness(1.07); }
 /* M300: Seg-Schalter (Erscheinungsbild, Anzeigegröße, Sync-Weg, Obergrenze …) —
    vorher trugen die Knöpfe die Klasse, aber keine Regel: Der aktive Zustand
    war unsichtbar. */
@@ -8405,3 +8416,11 @@ html[data-kontrast='hoch'] .ov-graph-node .ov-tropfen { stroke: var(--ink); stro
   .ov-canvas.ov-weich .react-flow__node:not(.dragging) { transition: transform 0.12s ease, width 0.12s ease, height 0.12s ease; }
   .ov-canvas .react-flow__node-ovBoard .ovc-tile { transform: none !important; }
 }
+/* M443: Einrichtung des MCP-Servers — knapp, Code zum Kopieren */
+.mcp-schritte { margin: 0 0 8px; padding-left: 18px; font-size: 12.5px; color: var(--ink); line-height: 1.55; }
+.mcp-schritte a { color: var(--accent); }
+.mcp-code {
+  margin: 0 0 8px; padding: 8px 10px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--border-soft);
+  font-size: 11.5px; line-height: 1.45; overflow-x: auto; white-space: pre;
+}
+.mcp-code code { word-break: normal; font: inherit; background: none; padding: 0; }

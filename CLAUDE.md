@@ -23,6 +23,7 @@ Oberfläche, Bedienung erst im Fokus, keine neuen Knöpfe ohne Grund.
 | Meilensteine ab M442 (eine Datei je Meilenstein) | `docs/meilensteine/` |
 | Entwicklungsgeschichte (Phasen, Wendepunkte, Lehren) | `docs/HISTORIE.md` |
 | Arbeitsweise mehrerer Agenten parallel | `docs/AGENTEN.md` |
+| MCP-Server für KI-Programme von außen (`mcp/`, `npm run build:mcp`) | `docs/MCP.md` |
 | Audits (Design, Logik, Code/Security) mit Befund-Listen | `docs/AUDIT.md` |
 | E2E-Prüfreihen (eine je Meilenstein) | `pruefungen/` + `pruefungen/README.md` |
 | Werkzeuge (Prüfungen parallel, Sprache, App-Zeichen) | `werkzeug/` |
@@ -80,7 +81,8 @@ Chromium: `/opt/pw-browsers/chromium` (sonst `PW_CHROMIUM=…`).
   **sofort selbst mergen**, wenn PR-Prüfung (`.github/workflows/pruefen.yml`)
   und lokale Reihen grün sind. Keine Rückfrage, kein Warten auf Review.
 - **`release/pixinotes.html` nie im PR ändern.** Die Datei baut und committet
-  der Workflow `release.yml` nach jedem Merge selbst (vorher war sie die
+  der Workflow `release.yml` nach jedem Merge selbst (ebenso den MCP-Server
+  `release/pixinotes-mcp.mjs`, M443) (vorher war sie die
   häufigste Konfliktquelle zwischen parallelen PRs).
 - **Keine Zeilen mehr an die Etappen-Tabelle in `docs/UMBAU.md` anhängen** —
   stattdessen `docs/meilensteine/MNNN-*.md` (Vorlage dort im README).
