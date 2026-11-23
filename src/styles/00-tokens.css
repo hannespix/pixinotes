@@ -46,7 +46,7 @@
      (Braun 1,9:1, Grau 2,8:1 auf der dunklen Karte). Hier je Farbe eine Nachtstufe: Schrift hell und gedeckt
      (Leuchtdichte ≈ 0,4–0,55), Hintergrund dunkel getönt (≈ 0,035–0,045) — so hält JEDE Kombination ≥ 4,5:1:
      Farbschrift auf Karte/Fläche/Grund und auf jedem Hintergrund, Standardschrift auf jedem Hintergrund.
-     Helles Papier und der helle Modus behalten BlockNotes Farben unverändert. */
+     Helles Papier im Dunkeln behält BlockNotes Farben; der helle Modus hat seit M499 eigene Hellstufen (unten). */
   --nacht-hl-grau: #b5b4b0;    --nacht-hl-grau-grund: #3a3c40;
   --nacht-hl-braun: #d0a891;   --nacht-hl-braun-grund: #43362f;
   --nacht-hl-rot: #f5948b;     --nacht-hl-rot-grund: #4f2b2b;
@@ -56,6 +56,22 @@
   --nacht-hl-blau: #73b8e2;    --nacht-hl-blau-grund: #1f3a4a;
   --nacht-hl-lila: #b9a0ea;    --nacht-hl-lila-grund: #382d4d;
   --nacht-hl-rosa: #ee93c6;    --nacht-hl-rosa-grund: #482a3d;
+  /* M499: dieselben neun Farben auf HELLEM Papier (im hellen Modus: weiße Notiz, Haftnotizen, Protokoll).
+     BlockNotes Originale waren als Schrift auf Weiß teils zu schwach (Gelb 2,1:1, Grau 2,8:1, Orange 3,3:1,
+     Rot 4,3:1). Schrift jetzt Leuchtdichte ≤ 0,121 bei gleichem Farbton (Gelb wird Ocker/Senf, Orange Rost), der
+     Hintergrund etwas satter, aber Leuchtdichte ≥ 0,73 — so hält JEDE Kombination ≥ 4,5:1 (min 4,60:1):
+     Farbschrift auf Weiß und auf den Haftnotiz-Farben (Rosa ist die dunkelste), Farbschrift auf jedem
+     Hintergrund, Standardschrift (#3f3f3f) auf jedem Hintergrund ≥ 7:1 (min 7,89:1). Dieselben Werte stehen für
+     Export und Druck in lib/editorFarben.ts. Im Dunkeln (auch auf hellen Haftnotizen) unverändert (M494). */
+  --tag-hl-grau: #5e5d59;      --tag-hl-grau-grund: #e3e4e6;
+  --tag-hl-braun: #6e4530;     --tag-hl-braun-grund: #ecdcd2;
+  --tag-hl-rot: #b42318;       --tag-hl-rot-grund: #fcd9d6;
+  --tag-hl-orange: #9a4a00;    --tag-hl-orange-grund: #fde1c6;
+  --tag-hl-gelb: #7c5d00;      --tag-hl-gelb-grund: #fbe98e;
+  --tag-hl-gruen: #1e6e4e;     --tag-hl-gruen-grund: #d3ecdf;
+  --tag-hl-blau: #0b62a8;      --tag-hl-blau-grund: #d6e7f7;
+  --tag-hl-lila: #6c36b5;      --tag-hl-lila-grund: #e7dcf6;
+  --tag-hl-rosa: #ad1771;      --tag-hl-rosa-grund: #f8d9ea;
   /* M494: Schrift auf einer FREI gewählten Farbe (Gantt-Balken, Kalender-Streifen, Wochenplan-Blöcke).
      lib/lesbareSchrift.ts wählt nach der Helligkeit der gezeichneten Fläche; Schwarz nur, wo Weiß und Tinte
      beide knapp unter 4,5:1 bleiben (mittlere Helligkeit). In beiden Themes gleich — die Fläche ist es auch. */

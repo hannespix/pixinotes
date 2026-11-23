@@ -13,7 +13,7 @@ import { linkedNeighborIds } from '../../lib/links';
 import { fmtHM, linkedOfType, timeSums } from '../../lib/moduleFeeds';
 import { nodeToText } from '../../lib/serialize';
 import { AUTO_ARCHIV_STANDARD_TAGE, archiviere, autoArchivLauf, holeZurueck } from '../../lib/ticketArchiv';
-import { IArchive, IArchiveRestore, ICalendar, IChevronL, IChevronR, ICompact, IDownload, IFolder, IMore, IPlus, IRedo, ISearch, ISettings, IX, ILock, ILink, ITimer, IPerson } from '../Icons';
+import { IArchive, IArchiveRestore, ICalendar, IChevronL, IChevronR, ICompact, IDownload, IFolder, IMore, IPlus, IRedo, ISearch, ISettings, IX, ILock, ILink, ITimer, IPerson, IGriff } from '../Icons';
 import { CardShell } from './CardShell';
 import { insBild } from '../EbenenMenu';
 import { DragTitle } from './DragTitle';
@@ -23,9 +23,12 @@ import { t, zahlWort } from '../../lib/sprache';
 import { tageSeit, zeitLang } from '../../lib/kartenZeit';
 import { useNutzerBoards } from '../../lib/eingang';
 import { liveVerbunden } from '../../lib/liveStand';
+import { ticketsSetzen, useKanbanLive } from '../../lib/kanbanLive';
 
 /** M487: Titel und Beschreibung eines Tickets gemeinsam tippen — nachgeladen, nur im Live-Board (./KanbanGemeinsam.tsx) */
 const KanbanFeld = lazy(() => import('./KanbanGemeinsam'));
+/** M498: hält im Live-Board die gemeinsame Sitzung der Karte (Felder, Checkliste, Reihenfolge) — ebenfalls nachgeladen */
+const KanbanHalter = lazy(() => import('./KanbanGemeinsam').then((m) => ({ default: m.KanbanHalter })));
 
 const TAG_RE = /#([\p{L}\d_-]{2,20})/gu;
 const TAG_MS = 86_400_000;
@@ -72,7 +75,16 @@ const saubereTage = (v: number): number => Math.max(1, Math.min(365, Math.round(
  * variabel (➕/✕); die letzte Spalte ist immer „Erledigt" (🎉 + Durchstreichen).
  */
 export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
-  const kanban = data;
+  // M498: Steht im Live-Board die gemeinsame Sitzung der Karte, zeigt das Kanban den gemeinsamen Stand (Felder,
+  // Checklisten, Reihenfolge aus dem Y-Dokument) — sofort bei allen, nicht erst, wenn der Schreiber gesichert hat
+  const boardIdHier = useBoard((s) => s.activeId);
+  const { live: kanbanGemeinsam, version: gemeinsamStand } = useKanbanLive(boardIdHier, id);
+  const kanban = useMemo<KanbanData>(() => {
+    if (!kanbanGemeinsam) return data;
+    const items = kanbanGemeinsam.anwenden(data.items);
+    return items === data.items ? data : { ...data, items };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, kanbanGemeinsam, gemeinsamStand]);
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
   const boards = useNutzerBoards();   // M478: ohne den Eingang
@@ -85,7 +97,6 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   // M487: Im Live-Board tippen mehrere zugleich im Ticket-Fenster (Yjs). Einmal live, bleibt es dabei; lädt der
   // Yjs-Teil nicht, gelten wieder die gewohnten Felder (`feldAllein`). Gefragt wird beim Zeichnen — also spätestens,
   // wenn das Ticket-Fenster aufgeht (kein Takt je Kanban-Karte für jede Änderung der Runde).
-  const boardIdHier = useBoard((s) => s.activeId);
   const jeLive = useRef(false);
   if (liveVerbunden(boardIdHier)) jeLive.current = true;
   const [feldAllein, setFeldAllein] = useState(false);
@@ -180,9 +191,22 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const cols = kanbanCols(kanban);
   const done = cols.length - 1;
 
-  const setItems = (items: KanbanItem[]) => updateNodeData(id, { items });
+  // M498: Änderungen an bestehenden Tickets im Live-Board über das Y-Dokument (lib/kanbanLive.ts), sonst wie bisher
+  const setItems = (items: KanbanItem[]) => ticketsSetzen(boardIdHier, id, kanban.items, items, () => updateNodeData(id, { items }));
   const patchItem = (itemId: string, patch: Partial<KanbanItem>) =>
     setItems(kanban.items.map((it) => (it.id === itemId ? { ...it, ...patch } : it)));
+  // M498: Checklisten-Punkt an eine andere Stelle (Griff ziehen, Alt+↑/↓)
+  const [ziehPunkt, setZiehPunkt] = useState<string | null>(null);
+  const punktVerschieben = (it: KanbanItem, sid: string, ziel: number) => {
+    const subs = it.subs ?? [];
+    const von = subs.findIndex((x) => x.id === sid);
+    const nach = Math.max(0, Math.min(subs.length - 1, ziel));
+    if (von < 0 || von === nach) return;
+    const neu = [...subs];
+    const [p] = neu.splice(von, 1);
+    neu.splice(nach, 0, p);
+    patchItem(it.id, { subs: neu });
+  };
 
   /**
    * M390: Ein eingesammeltes Ticket gehört seiner QUELLE. Titel und Frist dort zu ändern, wo man sie sieht, war
@@ -203,8 +227,10 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
     if (!src || !l?.itemId) return;
     mutedHistory(() => {
       if (src.type === 'kanban') {
+        // M498: Die Quelle kann selbst gerade gemeinsam offen sein — dann über ihr Y-Dokument, nie daran vorbei
         const k = src.data as KanbanData;
-        useBoard.getState().updateNodeDataOnBoard(l.boardId, src.id, { items: k.items.map((i) => (i.id === l.itemId ? { ...i, ...patch } : i)) });
+        const neu = k.items.map((i) => (i.id === l.itemId ? { ...i, ...patch } : i));
+        ticketsSetzen(l.boardId, src.id, k.items, neu, () => useBoard.getState().updateNodeDataOnBoard(l.boardId, src.id, { items: neu }));
       } else if (src.type === 'gantt') {
         const g = src.data as GanttData;
         useBoard.getState().updateNodeDataOnBoard(l.boardId, src.id, {
@@ -487,11 +513,21 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       const note = isDone || col === 0 ? null : (cols[col] ?? '').trim() || null;
       const blocks = annotateCheckBlock(srcNode.data.blocks as unknown[] | undefined, link.itemId, { checked: isDone, note });
       if (!blocks) return;
-      st.updateNodeDataOnBoard(link.boardId, link.nodeId, {
+      const ueberSpeicher = () => useBoard.getState().updateNodeDataOnBoard(link.boardId, link.nodeId!, {
         blocks,
         // extEpoch: geöffnete Notiz-Editoren übernehmen den externen Stand (NoteCard)
         extEpoch: ((srcNode.data.extEpoch as number | undefined) ?? 0) + 1,
       });
+      // M498: Im Live-Board über das Y-Dokument der Notiz — tippt dort gerade jemand, heilte sein Gerät den Haken über
+      // den Speicher wieder weg (und das Ersetzen im Editor drehte seine letzten Zeichen zurück). Der Spalten-Vermerk
+      // „(→ Spalte)" bleibt dann aus: Er änderte den Text, den gerade andere schreiben.
+      if (link.boardId === st.activeId && liveVerbunden(link.boardId) && (isDone || col === 0)) {
+        const nodeId = link.nodeId; const itemId = link.itemId;
+        void Promise.all([import('../../lib/notizGemeinsamKern'), import('../NoteTypo'), import('../../lib/htmlBlocks')])
+          .then(([k, nt, hb]) => k.notizHaken(link.boardId, nodeId, hb.repairBlocks((srcNode.data.blocks ?? []) as never), nt.noteSchema, itemId, isDone))
+          .then((gut) => { if (!gut) ueberSpeicher(); })
+          .catch(ueberSpeicher);
+      } else ueberSpeicher();
       if (isDone) showToast('☑ Auch in der Quell-Notiz abgehakt.');
     } else if (srcNode.type === 'gantt' && col === done) {
       const g = srcNode.data as GanttData;
@@ -515,9 +551,8 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       const srcIt = k.items.find((i) => i.id === link.itemId);
       const srcDone = kanbanCols(k).length - 1;
       if (!srcIt || srcIt.col < srcDone) return;
-      st.updateNodeDataOnBoard(link.boardId, link.nodeId, {
-        items: k.items.map((i) => (i.id === link.itemId ? mitSpalte(i, Math.max(0, srcDone - 1), k) : i)),
-      });
+      const neu = k.items.map((i) => (i.id === link.itemId ? mitSpalte(i, Math.max(0, srcDone - 1), k) : i));
+      ticketsSetzen(link.boardId, link.nodeId, k.items, neu, () => st.updateNodeDataOnBoard(link.boardId, link.nodeId!, { items: neu }));
       showToast('↩ Auch im Quell-Kanban wieder offen.');
     } else if (srcNode.type === 'kanban' && col === done) {
       // M179: Kanban-Quelle — das ORIGINAL-Ticket wandert mit in dessen
@@ -527,9 +562,9 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       const srcIt = k.items.find((i) => i.id === link.itemId);
       const srcDone = kanbanCols(k).length - 1;
       if (!srcIt || srcIt.col === srcDone) return;
-      st.updateNodeDataOnBoard(link.boardId, link.nodeId, {
-        items: k.items.map((i) => (i.id === link.itemId ? mitSpalte(i, srcDone, k) : i)),
-      });
+      // M498: auch hier über das Y-Dokument der Quelle, wenn sie gerade gemeinsam offen ist
+      const neu = k.items.map((i) => (i.id === link.itemId ? mitSpalte(i, srcDone, k) : i));
+      ticketsSetzen(link.boardId, link.nodeId, k.items, neu, () => st.updateNodeDataOnBoard(link.boardId, link.nodeId!, { items: neu }));
       showToast('☑ Auch im Quell-Kanban erledigt.');
     }
   };
@@ -884,6 +919,8 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
         <input
           type="date"
           className="kanban-due-input nodrag"
+          // M498: Die Frist läuft im Live-Board über das gemeinsame Dokument — dafür keine Sperre der ganzen Karte
+          data-ohne-sperre={kanbanGemeinsam ? '' : undefined}
           autoFocus
           value={it.due ?? ''}
           disabled={ausNotiz(it)}
@@ -988,6 +1025,11 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
 
   return (
     <div className={`kanban-body${kanban.kompakt ? ' k-kompakt' : ''}`}>
+      {gemeinsameFelder && (
+        <Suspense fallback={null}>
+          <KanbanHalter boardId={boardIdHier} nodeId={id} darf={!feldFest} offen={detailId !== null} />
+        </Suspense>
+      )}
       <div className="kanban-head">
         <DragTitle className="kanban-title" value={kanban.title} onChange={setTitle} placeholder="Kanban" />
         {timeChip && (
@@ -1479,16 +1521,57 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                 {subs.length > 0 && (
                   <div className="ticket-progress"><i style={{ width: `${Math.round((subsDone / subs.length) * 100)}%` }} /></div>
                 )}
-                {subs.map((s) => (
-                  <label key={s.id} className="ticket-sub">
+                {subs.map((s, i) => (
+                  /* M498: Punkte lassen sich umbenennen (direkt im Text) und umsortieren (Griff ziehen oder Alt+↑/↓) —
+                     im Live-Board gemeinsam, jeder Punkt für sich (lib/notizGemeinsamKern.ts) */
+                  <div
+                    key={s.id}
+                    className={`ticket-sub${ziehPunkt === s.id ? ' zieht' : ''}`}
+                    data-taste="ticket-sub"
+                    data-punkt={s.id}
+                    onDragOver={(e) => { if (ziehPunkt) { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; } }}
+                    onDrop={(e) => {
+                      if (!ziehPunkt) return;
+                      // Der gezogene Punkt gehört hierher — nicht als Text aufs Board (das legte sonst eine Notiz an)
+                      e.preventDefault(); e.stopPropagation();
+                      if (ziehPunkt !== s.id) punktVerschieben(it, ziehPunkt, i);
+                      setZiehPunkt(null);
+                    }}
+                  >
+                    <i
+                      className="ticket-sub-griff"
+                      draggable
+                      title="Ziehen sortiert um (oder Alt+↑ / Alt+↓ im Text)"
+                      onDragStart={(e) => { e.stopPropagation(); setZiehPunkt(s.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('application/x-pixinotes-ticket', s.id); }}
+                      onDragEnd={() => setZiehPunkt(null)}
+                    ><IGriff size={12} /></i>
                     <input
                       type="checkbox"
                       checked={!!s.done}
+                      aria-label={`Erledigt: ${s.text}`}
                       onChange={() => patchItem(it.id, { subs: subs.map((x) => (x.id === s.id ? { ...x, done: !x.done } : x)) })}
                     />
-                    <span className={s.done ? 'done' : ''} translate="no">{s.text}</span>
+                    <input
+                      className={`ticket-sub-text${s.done ? ' done' : ''}`}
+                      value={s.text}
+                      aria-label="Checklisten-Punkt"
+                      translate="no"
+                      maxLength={140}
+                      onChange={(e) => patchItem(it.id, { subs: subs.map((x) => (x.id === s.id ? { ...x, text: e.target.value } : x)) })}
+                      onKeyDown={(e) => {
+                        if (!e.altKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+                        e.preventDefault(); e.stopPropagation();
+                        punktVerschieben(it, s.id, i + (e.key === 'ArrowUp' ? -1 : 1));
+                        // Beim Umhängen kann das Feld den Fokus verlieren — er bleibt am Punkt
+                        const sel = e.currentTarget.selectionStart;
+                        requestAnimationFrame(() => {
+                          const f = detailRef.current?.querySelector<HTMLInputElement>(`[data-punkt="${CSS.escape(s.id)}"] .ticket-sub-text`);
+                          if (f && document.activeElement !== f) { f.focus(); if (sel !== null) f.setSelectionRange(sel, sel); }
+                        });
+                      }}
+                    />
                     <button title="Punkt entfernen" onClick={() => patchItem(it.id, { subs: subs.filter((x) => x.id !== s.id) })}><IX size={10} /></button>
-                  </label>
+                  </div>
                 ))}
                 <input
                   className="ticket-sub-add"

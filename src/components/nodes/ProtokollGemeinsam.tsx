@@ -83,7 +83,7 @@ export default function ProtokollGemeinsam(p: EntryEditorProps) {
       // M493: Immer kurz auf den Stand der anderen warten (nur wenn andere im Kanal sind). Das Protokoll öffnet sich
       // bei allen von selbst — wer nicht wartete, begann aus seinem gespeicherten Stand, während ein anderer schon
       // einen hatte; zwei Anfänge übereinander verloren unter Last den Text (m487 B5/B8). Die ruhende Ansicht steht so lange.
-      .then((k) => k.protokollOeffnen(boardId, nodeId, entryId, repairBlocks(blocks as unknown[]), noteSchema, !nurLesenRef.current, true, eintrag?.decisions ?? []))
+      .then((k) => k.protokollOeffnen(boardId, nodeId, entryId, repairBlocks(blocks as unknown[]), noteSchema, !nurLesenRef.current, true, eintrag?.decisions ?? [], eintrag?.infoTops ?? []))
       .then((s) => { if (weg) { s.schliessen(); return; } setModus({ art: 'gemeinsam', s }); })
       .catch(() => { kernKaputt.current = true; if (!weg) setModus({ art: 'allein' }); });   // Yjs lädt nicht: allein (mit Sperre)
     return () => { weg = true; };

@@ -39776,6 +39776,9 @@ init_define_import_meta_env();
 // src/lib/serialize.ts
 init_define_import_meta_env();
 
+// src/lib/editorFarben.ts
+init_define_import_meta_env();
+
 // src/lib/parseEmail.ts
 init_define_import_meta_env();
 function formatBytes(size) {
