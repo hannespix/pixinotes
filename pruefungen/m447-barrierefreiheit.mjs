@@ -52,6 +52,8 @@ const werkzeug = () => {
   const deckung = (el) => { let a = 1; for (let e = el; e; e = e.parentElement) a *= parseFloat(getComputedStyle(e).opacity); return a; };
   const sichtbar = (el) => {
     if (!el.getClientRects().length) return false;
+    // Inhalt eines zugeklappten <details> hat in Chrome Maße, ist aber nicht zu sehen (content-visibility: hidden)
+    if (el.checkVisibility && !el.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true })) return false;
     const cs = getComputedStyle(el); if (cs.visibility === 'hidden') return false;
     if (deckung(el) < 0.05) return false;
     const r = el.getBoundingClientRect();
@@ -230,6 +232,8 @@ for (const thema of ['light', 'dark']) {
   const reiter = await P.locator('.modal-tabs button').count();
   for (let i = 1; i < reiter; i++) {
     await P.locator('.modal-tabs button').nth(i).click(); await P.waitForTimeout(300);
+    // auch was hinter „Mehr …"-Aufklappern steht
+    await P.evaluate(() => document.querySelectorAll('.modal-backdrop details:not([open])').forEach((d) => { d.open = true; })); await P.waitForTimeout(200);
     const r = await P.locator('.modal-tabs button').nth(i).innerText();
     await oberflaeche(P, `Einstellungen › ${r.trim()}`, '.modal-backdrop', T);
   }

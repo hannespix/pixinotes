@@ -229,3 +229,4 @@ Dunkeln, Einstellungen, Hilfe, Suche, Karten-Fokus, Übersicht, reduzierte Beweg
 | B10 | Suchfelder ohne sichtbares Etikett, benannt über Platzhalter bzw. `aria-label` | ➖ Chrome und Vorlese-Programme lesen beides als Namen; ein Etikett je Suchfeld widerspräche dem ruhigen Leitbild — die Prüfung lässt den Platzhalter gelten |
 | B11 | Navigation als Ausklapp-Spalte am Telefon (`.nav-panel`): `role="dialog"` ohne `aria-modal` und ohne Fokus-Falle | ⏳ eigene Aufgabe — die Spalte ist dort Teil der Kopfleiste, eine Falle müsste die Kopfleiste ausnehmen |
 | B12 | Vor dem Board liegen am Laptop rund 50 Tab-Stationen der Navigation | ➖ F6 springt von Bereich zu Bereich (M345), Strg+K sucht |
+| B13 | Einstellungen › Dienste › „KI-Programme von außen (MCP)": Verweis „pixinotes-mcp.mjs laden" in `--accent` mit 3,5:1 | ✅ `--accent-strong` |

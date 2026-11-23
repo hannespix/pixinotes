@@ -4,7 +4,7 @@ PR: siehe Merge-Titel „… (M447)" · Prüfreihe: `pruefungen/m447-barrierefre
 ## Warum
 WCAG 2.1 AA-Durchsicht der Kern-Oberfläche (Kopfleiste, Seitenleiste, Dock, Auswahl-Leiste, Kontextmenüs,
 Einstellungen, Hilfe, Suche, Aufgaben-Zentrale, Übersicht, Karten-Fokus, Fenster) — automatisch in Hell und Dunkel.
-Befund-Liste mit Status: `docs/AUDIT.md` §5 (B1–B12).
+Befund-Liste mit Status: `docs/AUDIT.md` §5 (B1–B13).
 
 ## Was
 - **Tab auf dem Board** springt weiter von Karte zu Karte, verlässt nach der letzten Karte aber die Fläche
@@ -14,7 +14,7 @@ Befund-Liste mit Status: `docs/AUDIT.md` §5 (B1–B12).
 - **Menü einer Karte** (⋯ und Rechtsklick) ist ein Menü (`role="menu"`, Einträge `menuitem`) — wie das Menü der Fläche.
 - **Fenster**: Recherche, Kanban (Einsammeln, Archiv, Ticket) mit `aria-modal`; Nachschlagen und Bild-Lupe mit
   `role="dialog"`; die Bild-Lupe hat jetzt Fokus-Führung (Fokus hinein, Tab im Kreis, Fokus zurück).
-- **„Impressum · Datenschutz"** im Hellen mit voller Deckung (vorher 3,7:1).
+- **„Impressum · Datenschutz"** im Hellen mit voller Deckung (vorher 3,7:1); Verweis im MCP-Abschnitt der Einstellungen in `--accent-strong` (vorher 3,5:1).
 
 ## Wie (Architektur)
 - `src/components/boardTasten.ts`: im Block „Nächste / vorige Karte" — ist die gewählte Karte die letzte (erste) der
