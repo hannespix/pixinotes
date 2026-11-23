@@ -26,6 +26,8 @@ Kollaboration über Yjs.
   gemeinsam nicht eingespielt, `extEpoch` nur vom Schreiber, Strg+Z ohne Board-Rückgängig.
 - `components/nodes/NotizGemeinsam.tsx` (nachgeladen, ≈ 3 KB): Modi `allein` → `pause` → `laedt` → `gemeinsam`, Hülle
   `.note-wahl` (`display: contents`, `data-ohne-sperre`, Klasse `note-gemeinsam`), Fokus nach dem Wechsel.
+  Eine eben hier angelegte Notiz beginnt gleich gemeinsam (kein Wechsel unter dem ersten Tippen); ruht die Maus auf
+  einer Notiz, wird der Yjs-Teil schon geholt.
 - `lib/notizGemeinsam.ts` (lädt mit dem Abgleich, `lib/gastSync.ts` bindet es ein — Kanäle gibt es nur mit ihm):
   horcht auf `LIVE_NACHRICHT`, Weckruf `NOTIZ_Y_WACH` (+ `pixinotes:notiz-aktiv` für ruhende Notizen),
   `gemeinsamGewuenscht`, Nachlader `gemeinsamKern()`.

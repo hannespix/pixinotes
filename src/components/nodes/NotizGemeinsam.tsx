@@ -6,7 +6,8 @@
 // steht kurz die ruhende Ansicht (gleicher Umbruch, der Klick setzt danach den Cursor an dieselbe Stelle), so sichert
 // der alte sauber, bevor der neue liest.
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
-import { selectActiveBoard, useBoard, useKarteFest } from '../../store';
+import { kamVonAussen, selectActiveBoard, useBoard, useKarteFest } from '../../store';
+import { warEbenAngelegt } from '../../lib/nodes';
 import type { NoteNode } from '../../types';
 import { liveVerbunden, TEILNEHMER_EREIGNIS } from '../../lib/liveStand';
 import { gemeinsamGewuenscht, gemeinsamKern, NOTIZ_Y_WACH } from '../../lib/notizGemeinsam';
@@ -42,7 +43,13 @@ export default function NotizGemeinsam({ id, data, startPunkt }: { id: string; d
   const nurLesenRef = useRef(nurLesen); nurLesenRef.current = nurLesen;
   /** Der Yjs-Teil lädt nicht: allein weiter, mit Karten-Sperre wie vor M477 */
   const kernKaputt = useRef(false);
-  const [modus, setModus] = useState<Modus>(() => (live && (startPunkt.current || gemeinsamGewuenscht(boardId, id)) ? { art: 'laedt', fokus: false } : { art: 'allein' }));
+  // Gleich gemeinsam beginnen: nach einem Klick in die ruhende Notiz, wenn ein anderer schon darin arbeitet — oder bei
+  // einer eben hier angelegten Notiz (sonst stünde erst ein Editor allein da und wechselte unter dem ersten Tippen)
+  const [modus, setModus] = useState<Modus>(() => {
+    if (!live) return { art: 'allein' };
+    if (warEbenAngelegt(id) && !kamVonAussen(id)) return { art: 'laedt', fokus: true };
+    return startPunkt.current || gemeinsamGewuenscht(boardId, id) ? { art: 'laedt', fokus: false } : { art: 'allein' };
+  });
   const huelle = useRef<HTMLDivElement>(null);
   const gemeinsam = modus.art === 'laedt' || modus.art === 'gemeinsam';
   const fokussiert = (): boolean => !!huelle.current?.contains(document.activeElement);
@@ -120,6 +127,8 @@ export default function NotizGemeinsam({ id, data, startPunkt }: { id: string; d
       {...(kernKaputt.current ? {} : { 'data-ohne-sperre': '' })}
       onPointerDownCapture={(e) => { if (e.button === 0) betreten({ x: e.clientX, y: e.clientY }); }}
       onFocusCapture={() => betreten(null)}
+      // Die Maus ruht auf der Notiz: den Yjs-Teil schon holen — beim Klick ist er dann da (keine verschluckten Tasten)
+      onPointerEnter={() => { if (live && !kernKaputt.current) gemeinsamKern().catch(() => { /* später */ }); }}
     >
       {modus.art === 'allein' && <NotizEditor id={id} data={data} startPunkt={startPunkt} />}
       {modus.art === 'gemeinsam' && <NotizEditor key={modus.s.doc.clientID} id={id} data={data} startPunkt={startPunkt} sitzung={modus.s} />}
