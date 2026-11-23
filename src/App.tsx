@@ -51,7 +51,7 @@ import { BildEditorHost } from './components/BildEditorHost';
 import { EbeneLoeschenHost } from './components/EbeneLoeschenDialog';
 import { getAuthor } from './components/CommentLayer';
 import { loadKonto } from './lib/kontoSync';
-import { sprache } from './lib/sprache';
+import { sprache, zahlWort } from './lib/sprache';
 import { ILock } from './components/Icons';
 import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick gespeicherte Seitenstriche (M354-Fehler) einmal richten
 
@@ -295,7 +295,7 @@ export default function App() {
       if (!shared) return;
       clearShareHash();
       const st = useBoard.getState();
-      if (window.confirm(`Geteiltes Board „${shared.name ?? 'Board'}" (${shared.nodes?.length ?? 0} Karten) übernehmen?`)) {
+      if (window.confirm(`Geteiltes Board „${shared.name ?? 'Board'}" (${zahlWort(shared.nodes?.length ?? 0, 'Karte', 'Karten')}) übernehmen?`)) {
         claimWriter(); // bewusster Import — auch aus einem Mitlese-Fenster wirksam
         st.importBoard(cloneSharedBoard(shared));
         st.showToast('Geteiltes Board übernommen – liegt als eigenes Board in deiner Tab-Leiste.');
@@ -372,7 +372,7 @@ export default function App() {
         showToast(`Fällig: „${hits[0].text}" (${hits[0].boardName}) – Details in der Aufgaben-Zentrale`);
         notifyBrowser('PixiNotes Aufgabe fällig', `${hits[0].text} (${hits[0].boardName})`);
       } else {
-        showToast(`${hits.length} Aufgaben fällig – Details in der Aufgaben-Zentrale`);
+        showToast(`${zahlWort(hits.length, 'Aufgabe', 'Aufgaben')} fällig – Details in der Aufgaben-Zentrale`);
         notifyBrowser('PixiNotes', `${hits.length} Aufgaben sind fällig`);
       }
     };

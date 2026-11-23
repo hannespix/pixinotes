@@ -23,7 +23,7 @@ import { InlineName } from './InlineName';
 import { wurzelZoom } from '../lib/anzeige';
 import { BereichMenu, BoardMenu, ProjektMenu, insBild } from './EbenenMenu';
 import { ITarget, IZoomIn, IZoomOut } from './Icons';
-import { kartenName } from '../lib/sprache';
+import { kartenName, zahlWort } from '../lib/sprache';
 import { SVG_INHALT } from '../lib/uebersetzung';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
@@ -469,7 +469,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
         .filter(Boolean)
         .slice(0, 4);
       const more = b.nodes.length - titles.length;
-      m.set(b.id, `${b.name} · ${b.nodes.length} Karten\n${titles.map((t) => `• ${t}`).join('\n')}${more > 0 ? `\n… und ${more} weitere` : ''}`);
+      m.set(b.id, `${b.name} · ${zahlWort(b.nodes.length, 'Karte', 'Karten')}\n${titles.map((t) => `• ${t}`).join('\n')}${more > 0 ? `\n… und ${more} weitere` : ''}`);
     }
     return m;
   }, [boards]);
@@ -1517,7 +1517,7 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
           {needle && (
             <b className={`ov-graph-hits ${marking ? '' : 'none'}`}>
               {marking
-                ? `${hits.boards.size} Board${hits.boards.size === 1 ? '' : 's'}${showCards ? ` · ${hits.cards.size} Karten` : ''}`
+                ? `${hits.boards.size} Board${hits.boards.size === 1 ? '' : 's'}${showCards ? ` · ${zahlWort(hits.cards.size, 'Karte', 'Karten')}` : ''}`
                 : 'keine Treffer'}
             </b>
           )}

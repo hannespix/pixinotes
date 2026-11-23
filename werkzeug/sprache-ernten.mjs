@@ -10,6 +10,7 @@
 //   · Texte in Ausdrücken innerhalb von JSX ({bedingung ? 'A' : 'B'})
 //   · Texte an bekannten Ausgängen (showToast, confirm, prompt, alert, Error …) und in Beschriftungs-Feldern
 //     von Objekten (label, hint, title, name, text …)
+//   · Zähl-Wörter aus zahlWort(n, 'Karte', 'Karten') als „{n} Karte" und „{n} Karten" (M461)
 // Vorlagen mit Einsetzungen (`Board „${name}" angelegt.`) werden zu Mustern mit {0}, {1} …
 import ts from 'typescript';
 import { readFileSync, readdirSync, statSync, writeFileSync, existsSync } from 'node:fs';
@@ -111,6 +112,8 @@ export function ernten() {
         const e = n.expression;
         const name = ts.isIdentifier(e) ? e.text : ts.isPropertyAccessExpression(e) ? e.name.text : '';
         if (AUSGAENGE.has(name)) (n.arguments ?? []).forEach((a) => tief(a, sf, `aufruf:${name}`));
+        // M461: zahlWort(n, 'Karte', 'Karten') → Schlüssel „{n} Karte" und „{n} Karten" (lib/sprache.ts)
+        if (name === 'zahlWort') (n.arguments ?? []).slice(1, 3).forEach((a) => { if (ts.isStringLiteral(a)) merke(`{n} ${a.text}`, false, sf, a, 'zahlwort'); });
       } else if (ts.isPropertyAssignment(n) && (ts.isIdentifier(n.name) || ts.isStringLiteral(n.name)) && TEXT_FELDER.has(n.name.text)) tief(n.initializer, sf, `feld:${n.name.text}`);
       // Andere Felder (hinweis: '…', process: 'Schritt (Rechteck)', 'aria-label': '…'): nur, was eindeutig deutscher Text ist
       else if (ts.isPropertyAssignment(n) && (ts.isIdentifier(n.name) || ts.isStringLiteral(n.name)) && !KEIN_TEXT_FELD.has(n.name.text) && (ts.isStringLiteral(n.initializer) || ts.isNoSubstitutionTemplateLiteral(n.initializer) || ts.isTemplateExpression(n.initializer))) {

@@ -9,6 +9,7 @@ import { selectActiveBoard, useBoard } from '../store';
 import { nodeToText } from '../lib/serialize';
 import type { ThemenGruppe, ThemenVorschlag } from '../lib/themenOrdnen';
 import { IX } from './Icons';
+import { zahlWort } from '../lib/sprache';
 
 function kartenTitel(id: string): string {
   const n = selectActiveBoard(useBoard.getState()).nodes.find((k) => k.id === id);
@@ -61,7 +62,7 @@ function Dialog({ vorschlag, fertig }: { vorschlag: ThemenVorschlag; fertig: (g:
           <section className="modal-section">
             <div className="modal-buttons">
               <button ref={ordnenRef} className="primaer" data-taste="themen-ordnen" disabled={!gewaehlt.length} onClick={ordnen}>
-                {`${anzahl} Karten ordnen`}
+                {`${zahlWort(anzahl, 'Karte', 'Karten')} ordnen`}
               </button>
               <button data-taste="themen-abbrechen" onClick={() => fertig(null)}>Abbrechen</button>
             </div>

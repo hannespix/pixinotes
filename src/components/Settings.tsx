@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { sprache, spracheSetzen } from '../lib/sprache';
+import { sprache, spracheSetzen, zahlWort } from '../lib/sprache';
 import { brainStatus, rebuildBrainIndex, syncBrainIndex } from '../lib/brain';
 import { claimWriter, flushPersist, useBoard } from '../store';
 import {
@@ -1385,8 +1385,8 @@ export function Settings() {
             <>
               <p className="modal-hint">
                 {brainInfo.busy
-                  ? `Indexiere … (${brainInfo.indexed} Karten fertig)`
-                  : brainInfo.error ? `${brainInfo.error}` : `${brainInfo.indexed} Karten im Index`}
+                  ? `Indexiere … (${zahlWort(brainInfo.indexed, 'Karte', 'Karten')} fertig)`
+                  : brainInfo.error ? `${brainInfo.error}` : `${zahlWort(brainInfo.indexed, 'Karte', 'Karten')} im Index`}
               </p>
               {/* M314: Bereiche, Anbieter und Modell braucht man einmal — eingeklappt */}
               <details className="modal-details">
@@ -1403,7 +1403,7 @@ export function Settings() {
                     <label key={sp.id} className={`brain-scope-row ${an ? '' : 'off'}`}>
                       <input type="checkbox" checked={an} onChange={() => toggleBrainSpace(sp.id)} />
                       <span className="brain-scope-name" translate="no">{sp.name}</span>
-                      <span className="brain-scope-count">{karten} Karten</span>
+                      <span className="brain-scope-count">{zahlWort(karten, 'Karte', 'Karten')}</span>
                     </label>
                   );
                 })}
@@ -1444,10 +1444,10 @@ export function Settings() {
               )}
               <div className="modal-hint">
                 {brainInfo.busy
-                  ? `Indexiere … (${brainInfo.indexed} Karten fertig)`
+                  ? `Indexiere … (${zahlWort(brainInfo.indexed, 'Karte', 'Karten')} fertig)`
                   : brainInfo.error
                     ? `${brainInfo.error}`
-                    : `${brainInfo.indexed} Karten im Index · Anbieter: ${brainInfo.provider === 'ollama' ? 'Ollama (lokal)' : brainInfo.provider === 'browser' ? 'im Browser' : 'Cloud'}`}
+                    : `${zahlWort(brainInfo.indexed, 'Karte', 'Karten')} im Index · Anbieter: ${brainInfo.provider === 'ollama' ? 'Ollama (lokal)' : brainInfo.provider === 'browser' ? 'im Browser' : 'Cloud'}`}
               </div>
               <div className="modal-actions">
                 <button className="btn" onClick={() => void rebuildBrainIndex()}>Index neu aufbauen</button>
