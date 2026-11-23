@@ -8,6 +8,11 @@
 //                                                       Dateien passen (M448, für schnelle Agenten-Läufe)
 //   node werkzeug/alle-pruefungen.mjs --geaendert --basis origin/anderer-zweig   → gegen einen anderen Stand
 //   node werkzeug/alle-pruefungen.mjs --geaendert --nur-zeigen                   → nur auflisten, nichts starten
+//   node werkzeug/alle-pruefungen.mjs --ohne-datenbank → Reihen an der lokalen Datenbank (psql/pntest) auslassen
+//                                                       (M468, der nächtliche CI-Lauf hat kein Postgres)
+//   node werkzeug/alle-pruefungen.mjs --json datei    → Ergebnis je Reihe als JSON (nach jeder Reihe neu
+//                                                       geschrieben, auch ein abgebrochener Lauf hinterlässt Daten)
+//   node werkzeug/alle-pruefungen.mjs --nur-zeigen    → Auswahl auflisten (Trockenlauf), nichts starten
 //
 // Jede Prüfung startet ihren eigenen kleinen Server und Browser. Was sich dabei in die Quere käme, läuft nie
 // gleichzeitig: Dateien mit demselben Port, und die Prüfungen an der lokalen Datenbank (eine gemeinsame Datenbank).
@@ -24,6 +29,8 @@ const args = process.argv.slice(2);
 const wert = (name, sonst) => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : sonst; };
 const bahnen = Math.max(1, Number(wert('--bahnen', 4)) || 4);
 const bericht = wert('--bericht', '');
+const jsonDatei = wert('--json', '');
+const ohneDatenbank = args.includes('--ohne-datenbank');
 const basis = wert('--basis', '');
 const nurGeaendert = args.includes('--geaendert');
 const nurZeigen = args.includes('--nur-zeigen');
@@ -81,7 +88,6 @@ if (nurGeaendert) {
   if (grund.size === 0) console.log('  keine passende Reihe – für Änderungen an store.ts, index.css, App.tsx die volle Reihe laufen lassen');
   dateien = dateien.filter((n) => grund.has(n));
 }
-if (nurZeigen) process.exit(0);
 /** Was eine Datei für sich allein braucht: ihre Ports, und die gemeinsame Datenbank */
 const sperren = (name) => {
   const text = readFileSync(path.join(repo, 'pruefungen', name), 'utf-8');
@@ -91,6 +97,18 @@ const sperren = (name) => {
   if (/\bpsql\b|pntest/.test(text)) s.add('datenbank');
   return [...s];
 };
+// M468: --ohne-datenbank – dieselbe Erkennung wie für die Sperre („braucht Datenbank", M448). Ausgelassen, nicht
+// gelöscht: Ausgabe und JSON nennen die Reihen, damit niemand sie für geprüft hält.
+const ausgelassen = ohneDatenbank ? dateien.filter((n) => sperren(n).includes('datenbank')) : [];
+if (ausgelassen.length) {
+  console.log(`--ohne-datenbank: ${ausgelassen.length} Reihe(n) ausgelassen (brauchen die lokale Datenbank): ${ausgelassen.map((n) => n.replace(/\.mjs$/, '')).join(', ')}`);
+  dateien = dateien.filter((n) => !ausgelassen.includes(n));
+}
+if (nurZeigen) {
+  // bei --geaendert steht die Auswahl samt Grund schon oben
+  if (!nurGeaendert) { console.log(`${dateien.length} Reihe(n):`); for (const n of dateien) console.log(`  ${n.replace(/\.mjs$/, '')}  [${sperren(n).join(', ') || 'ohne Sperre'}]`); }
+  process.exit(0);
+}
 const offen = dateien.map((name) => ({ name, sperren: sperren(name) }));
 const belegt = new Set();
 // Sperren über alle Worktrees: Mehrere Agenten starten dieselben alten Reihen (feste Ports 4431–4776) zugleich.
@@ -119,6 +137,21 @@ for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(130)
 const ergebnis = new Map();
 if (bericht) writeFileSync(bericht, '');
 const start = Date.now();
+// M468: maschinenlesbares Ergebnis für den Nachtlauf (Zusammenfassung, Issue „Nachtlauf rot"). Nach jeder Reihe neu
+// geschrieben – bricht der Lauf ab (Zeitlimit), bleibt der Stand bis dahin lesbar („fertig": false).
+const jsonStand = { start: new Date(start).toISOString(), bahnen, fertig: false, gesamt: dateien.length, ausgelassen: ausgelassen.map((n) => n.replace(/\.mjs$/, '')), reihen: {} };
+const jsonSchreiben = () => { if (jsonDatei) writeFileSync(jsonDatei, `${JSON.stringify({ ...jsonStand, minuten: Number(((Date.now() - start) / 60000).toFixed(1)), reihen: Object.values(jsonStand.reihen) }, null, 1)}\n`); };
+const merkeJson = (name, r, zweiter) => {
+  const reihe = name.replace(/\.mjs$/, '');
+  const summe = (r.aus.match(/^.*\d+ bestanden.*$/gm) ?? []).pop()?.trim() ?? '';
+  const fehler = r.rc === 0 ? [] : r.aus.split('\n').filter((z) => /✗|Error|error/.test(z)).slice(0, 8).map((z) => z.slice(0, 300));
+  const alt = jsonStand.reihen[reihe];
+  jsonStand.reihen[reihe] = zweiter
+    ? { ...alt, rot: r.rc !== 0, rc: r.rc, sek: alt.sek + r.sek, summe: summe || alt.summe, wiederholt: true, fehler: r.rc === 0 ? alt.fehler : fehler }
+    : { reihe, rot: r.rc !== 0, rc: r.rc, sek: r.sek, summe, wiederholt: false, fehler };
+  jsonSchreiben();
+};
+jsonSchreiben();
 
 const einmal = (name) => new Promise((fertig) => {
   const t0 = Date.now();
@@ -162,6 +195,7 @@ await new Promise((alleFertig) => {
       laufend += 1;
       lauf(d.name).then((r) => {
         ergebnis.set(d.name, r);
+        merkeJson(d.name, r, false);
         // M448: auch der erste Fehlschlag kommt mit Grund in den Bericht – sonst ist ein Wackler, der beim
         // Wiederholen grün wird, hinterher nicht mehr zu finden
         zeile(d.name, r, r.rc === 0 ? '' : ' | erster Lauf rot, wird allein wiederholt');
@@ -184,10 +218,14 @@ for (const name of rot) {
   const r = await lauf(name);
   sp.forEach((s) => { belegt.delete(s); freigeben(s); });
   zeile(name, r, r.rc === 0 ? ' | allein wiederholt: grün' : ' | auch allein rot');
+  merkeJson(name, r, true);
   if (r.rc !== 0) { bleibtRot.push(name); if (!bericht) console.log(r.aus.split('\n').filter((z) => /✗|Error/.test(z)).slice(0, 12).join('\n')); }
 }
 const minuten = ((Date.now() - start) / 60000).toFixed(1);
 console.log(`\n${dateien.length - bleibtRot.length} von ${dateien.length} Dateien grün · ${rot.length - bleibtRot.length} erst beim zweiten Mal · ${minuten} min bei ${bahnen} Bahnen`);
 if (bleibtRot.length) console.log(`rot: ${bleibtRot.join(', ')}`);
+if (ausgelassen.length) console.log(`ausgelassen (Datenbank): ${ausgelassen.map((n) => n.replace(/\.mjs$/, '')).join(', ')}`);
+jsonStand.fertig = true;
+jsonSchreiben();
 if (bericht) appendFileSync(bericht, 'FERTIG\n');
 process.exit(bleibtRot.length ? 1 : 0);

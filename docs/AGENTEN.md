@@ -45,11 +45,24 @@ PR auf claude/notes-whiteboard-design-bnwvxj, selbst gemergt (squash).
 Rückmeldung: 5 Zeilen — PR-Link, was geändert, was offen.
 ```
 
+## Nachtlauf
+Jede Nacht (02:17 UTC) fährt `.github/workflows/nachtlauf.yml` die **volle**
+Prüfreihe gegen den Hauptzweig (M468) – auf dem Runner ohne die drei
+Datenbank-Reihen (`--ohne-datenbank`). Ist etwas rot, steht es in **einem**
+offenen Issue „Nachtlauf rot" (Label `nachtlauf`) mit der Liste der roten
+Reihen und dem Link zum Lauf; der nächste grüne Lauf schließt es. **Der
+Orchestrator schaut morgens zuerst dorthin** und vergibt je rote Reihe (oder
+je gemeinsame Ursache) eine Aufgabe, bevor neue Meilensteine starten. Bericht
+und `nachtlauf-ergebnis.json` liegen als Artefakt am Lauf; die Zusammenfassung
+des Laufs zeigt grün/rot je Reihe mit Dauer. Von Hand starten: Workflow
+„Nachtlauf" → *Run workflow* (`auswahl` = nur einige Reihen, ein solcher Lauf
+fasst das Issue nicht an).
+
 ## Token sparen
 - Agenten lesen gezielt (`grep -n`, `sed -n a,bp`), nie ganze 8 000-Zeilen-
   Dateien.
 - `docs/UMBAU.md` nur per `grep` nach dem betroffenen Dateinamen befragen.
 - Prüfreihen nur für den eigenen Bereich laufen lassen
   (`node werkzeug/alle-pruefungen.mjs m29 m44`), die volle Reihe läuft
-  nachts bzw. auf Wunsch.
+  nachts (Abschnitt „Nachtlauf") bzw. auf Wunsch.
 - Rückmeldungen kurz halten; Details gehören in die Meilenstein-Datei.
