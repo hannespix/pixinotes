@@ -2712,6 +2712,7 @@
 "„{0}\": {1} archiviert.":"“{0}”: {1} archived.",
 "„{0}\": {1} von {2} archiviert – das letzte sichtbare Board bleibt offen.":"“{0}”: {1} of {2} archived – the last visible board stays open.",
 "Geteiltes übernommen – {0} auf „{1}\".":"Shared content added – {0} on “{1}”.",
+"Aus dem Browser übernommen – {0} auf „{1}\".":"Added from the browser – {0} on “{1}”.",
 "{0} in die Notiz, {1} als Karte aufs Board.":"{0} into the note, {1} onto the board as cards.",
 "Punkte-Abstimmung: jede Person vergibt {0}":"Dot voting: each person gives {0}",
 "{0} importiert – als „Externe Termine\" eingeblendet":"{0} imported – shown as “External events”",

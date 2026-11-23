@@ -113,7 +113,7 @@ export function GeteiltDialog() {
     const ziel = st.activeId;
     st.setView('board');
     void aufsBoardLegen(g, ziel).then((n) => useBoard.getState().showToast(n > 0
-      ? `Aus dem Browser übernommen – ${n} Karte(n) auf „${useBoard.getState().boards.find((b) => b.id === ziel)?.name}".`
+      ? `Aus dem Browser übernommen – ${zahlWort(n, 'Karte', 'Karten')} auf „${useBoard.getState().boards.find((b) => b.id === ziel)?.name}".`
       : 'Es war nichts Übernehmbares dabei.'));
   }), []);
 
