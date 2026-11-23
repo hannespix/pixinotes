@@ -101,6 +101,7 @@ const KARTEN_LADER = {
   time: () => import('./nodes/TimeCard').then((m) => m.TimeCard),
   htmlapp: () => import('./nodes/HtmlAppCard').then((m) => m.HtmlAppCard),
   bubbles: () => import('./nodes/BubblesCard').then((m) => m.BubblesCard),
+  kontakt: () => import('./nodes/KontaktCard').then((m) => m.KontaktCard),
 } satisfies Record<string, () => Promise<React.ComponentType<any>>>;
 
 const spaet = (laden: () => Promise<React.ComponentType<any>>): React.ComponentType<any> => {
@@ -134,6 +135,7 @@ const nodeTypes: NodeTypes = {
   time: guard(spaet(KARTEN_LADER.time)),
   htmlapp: guard(spaet(KARTEN_LADER.htmlapp)),
   bubbles: guard(spaet(KARTEN_LADER.bubbles)),
+  kontakt: guard(spaet(KARTEN_LADER.kontakt)),
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };

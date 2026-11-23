@@ -87,6 +87,8 @@ declare global {
             client_id: string;
             scope: string;
             prompt?: string;
+            /** M442: E-Mail-Adresse — Google wählt dieses Konto vor (kein Konto-Wählen, kein Tippen) */
+            login_hint?: string;
             callback: (resp: { access_token?: string; expires_in?: number; error?: string }) => void;
             error_callback?: (err: { type?: string; message?: string }) => void;
           }) => { requestAccessToken: (over?: { prompt?: string }) => void };
@@ -120,7 +122,7 @@ const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly';
  * Kann GIS das Popup nicht öffnen (außerhalb einer Geste geblockt), meldet
  * `error_callback` — sonst hinge das Versprechen für immer.
  */
-export async function googleTokenFuer(clientId: string, scope: string, still: boolean): Promise<{ token: string; exp: number }> {
+export async function googleTokenFuer(clientId: string, scope: string, still: boolean, hint?: string): Promise<{ token: string; exp: number }> {
   if (!oauthAvailable()) throw new Error('Anmelden geht nur über die gehostete App (http/https), nicht aus der Einzeldatei.');
   await loadGis();
   const t = await new Promise<{ access_token: string; expires_in: number }>((resolve, reject) => {
@@ -128,6 +130,7 @@ export async function googleTokenFuer(clientId: string, scope: string, still: bo
       client_id: clientId,
       scope,
       ...(still ? { prompt: '' } : {}),
+      ...(hint ? { login_hint: hint } : {}),
       callback: (resp) => {
         if (resp.error || !resp.access_token) reject(new Error(still ? 'Google-Sitzung abgelaufen – bitte neu anmelden.' : `Google-Anmeldung abgebrochen (${resp.error ?? 'kein Token'})`));
         else resolve({ access_token: resp.access_token, expires_in: resp.expires_in ?? 3600 });
@@ -140,13 +143,14 @@ export async function googleTokenFuer(clientId: string, scope: string, still: bo
 }
 
 /** Interaktiv mit Google verbinden (Popup). Speichert Token + Kalenderliste. */
-export async function connectGoogle(clientId: string): Promise<string> {
+export async function connectGoogle(clientId: string, hint?: string): Promise<string> {
   if (!oauthAvailable()) throw new Error('Anmelden geht nur über die gehostete App (http/https), nicht aus der Einzeldatei.');
   await loadGis();
   const token = await new Promise<{ access_token: string; expires_in: number }>((resolve, reject) => {
     const client = window.google!.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: GOOGLE_SCOPE,
+      ...(hint ? { login_hint: hint } : {}),
       callback: (resp) => {
         if (resp.error || !resp.access_token) reject(new Error(`Google-Anmeldung abgebrochen (${resp.error ?? 'kein Token'})`));
         else resolve({ access_token: resp.access_token, expires_in: resp.expires_in ?? 3600 });

@@ -2,14 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { anhaengeMitnehmen, mutedHistory, useBoard } from '../store';
-import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, alsEbenAngelegt, makeSheet, makeTime, makeWeek } from '../lib/nodes';
+import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeKontakt, makeMermaid, makeMinutes, makeNote, makePortal, makeShape, alsEbenAngelegt, makeSheet, makeTime, makeWeek } from '../lib/nodes';
 import { importFilesToBoard, importHtmlAppFromUrl, praesentationAnlegen } from '../lib/importFiles';
 import { punkteModusSetzen } from '../lib/punkte';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
-import { aiBriefing, aiCluster, aiEdges, aiPraesentation, aiProcess, aiTasks } from '../lib/aiActions';
+import { aiEdges, aiPraesentation, aiProcess, aiTasks } from '../lib/aiActions';
 /** M410: Die Freitext-Anweisung wird erst geladen, wenn sie gebraucht wird (lib/kiAnweisung.ts) */
 const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => import('../lib/kiAnweisung').then((m) => m.aiCommand(...a));
 import { kiBlaettern } from '../lib/kiVerlauf';
+import { versionenOeffnen, versionSichern } from '../lib/boardVersionen';
 import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
 import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
@@ -17,7 +18,7 @@ import {
   IAppWindow, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITimelineIcon, ITimer, IWand, IWeek, IX,
- IBubbles , IUsers, IArchive, IFolien
+ IBubbles , IUsers, IArchive, IFolien, IUhr, IPerson
 } from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
 import { t } from '../lib/sprache';
@@ -232,6 +233,8 @@ export function Dock() {
     try {
       const st = useBoard.getState();
       const nodes = selectActiveBoard(st).nodes;
+      // M449: Vor dem KI-Umbau den Stand sichern — falls das Ergebnis nicht gefällt und Strg+Z nicht mehr reicht
+      void versionSichern(selectActiveBoard(st), 'ki');
       // M332: Stapel-Aktionen melden ihren Fortschritt; der Toast bietet „Abbrechen"
       const fortschritt = (m: string) => showToast(`KI: ${m}`, false, 180000, true);
       const msg = await fn(nodes, screenToFlowPosition({ x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 120 }), fortschritt);
@@ -245,6 +248,40 @@ export function Dock() {
       useBoard.getState().setAiBusy(false);
     }
   };
+
+  /**
+   * M444: Board-Briefing – die Lage des Boards als neue Notiz rechts neben dem sichtbaren Ausschnitt.
+   * Anders als die übrigen KI-Aktionen geht es auch OHNE KI: dann entsteht das Briefing lokal aus den Aufgaben
+   * und Fristen (lib/tasks.ts), Beschlüssen und Risiko-Zeilen – statt nur auf die Einstellungen zu verweisen.
+   */
+  const briefing = async () => {
+    setAiMenu(false);
+    if (useBoard.getState().aiBusy) { showToast('Eine KI-Aktion läuft bereits – kurz warten.'); return; }
+    const mitKi = aiReady(ai);
+    useBoard.getState().setAiBusy(true);
+    kiAbbruchZuruecksetzen();
+    setAiBusy('briefing');
+    if (mitKi) showToast('KI analysiert das Board …', false, 120000, true);
+    try {
+      const { boardBriefing } = await import('../lib/boardBriefing');
+      const rechtsOben = screenToFlowPosition({ x: window.innerWidth, y: 90 });
+      const msg = await boardBriefing(rechtsOben, mitKi, (m) => showToast(`KI: ${m}`, false, 180000, true));
+      showToast(mitKi ? msg : `${msg} Mit eingerichteter KI (Einstellungen) wird es ausführlicher.`, false, msg.includes('unberücksichtigt') ? 12000 : 7000);
+    } catch (e) {
+      showToast(`Briefing fehlgeschlagen: ${(e as Error).message}`, false, 8000);
+    } finally {
+      setAiBusy('');
+      useBoard.getState().setAiBusy(false);
+    }
+  };
+  const briefingRef = useRef(briefing);
+  briefingRef.current = briefing;
+  // M444: Strg+K → „Board-Briefing" schickt dieses Ereignis (die Suche kennt den sichtbaren Ausschnitt nicht)
+  useEffect(() => {
+    const los = () => { void briefingRef.current(); };
+    window.addEventListener('pixinotes:board-briefing', los);
+    return () => window.removeEventListener('pixinotes:board-briefing', los);
+  }, []);
 
   // Wunschposition Bildmitte — aber nie ÜBER bestehende Karten (M130):
   // findFreeSpot weicht auf die nächste freie Stelle aus
@@ -381,6 +418,8 @@ export function Dock() {
     { id: 'app', gruppe: 'Einfügen', name: 'Eigene App', hinweis: 'Eine HTML-Datei als lauffähige App-Karte', suchwort: 'html widget programm', icon: <IAppWindow size={18} />, tun: () => happFileRef.current?.click() },
     { id: 'appurl', gruppe: 'Einfügen', name: 'App von URL', hinweis: 'HTML-App von einer Internet-Adresse', suchwort: 'link einbetten web adresse', icon: <IAppWindow size={18} />, tun: () => void addHtmlAppUrl() },
     { id: 'rahmen', gruppe: 'Ordnen', name: 'Rahmen', hinweis: 'Benannter Rahmen auf dem Board, nimmt seine Karten mit – nicht der Bereich in der Übersicht', suchwort: 'gruppe bereich zusammenfassen', icon: <IFrame size={18} />, tun: () => add(() => makeFrame(centerPos(640, 420))) },
+    // M450: Kontakt-Karte — in „Ordnen“, dort ist noch Platz in der Zeile (die anderen Gruppen sind mit fünf voll)
+    { id: 'kontakt', gruppe: 'Ordnen', name: 'Kontakt', hinweis: 'Visitenkarte mit Rufnummer, E-Mail und Anschrift – auch aus einer .vcf-Datei', suchwort: 'person adresse telefon visitenkarte vcard vcf adressbuch ansprechpartner', icon: <IPerson size={18} />, tun: () => add(() => { const n = makeKontakt(centerPos(300, 180)); alsEbenAngelegt(n.id); return n; }) },
     { id: 'portal', gruppe: 'Ordnen', name: 'Portal', hinweis: 'Portal zu einem anderen Board', suchwort: 'link verweis board sprung', icon: <IFolder size={18} />, tun: () => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board.'); } },
   ];
   const GRUPPEN = ['Notieren & Rechnen', 'Planen', 'Ablauf', 'Einfügen', 'Ordnen'];
@@ -566,6 +605,15 @@ export function Dock() {
             >
               <ICompact size={16} /> Alles einpassen
             </button>
+            {/* M449: frühere Stände des Boards ansehen und zurückholen */}
+            <button
+              onClick={() => { setMoreMenu(false); versionenOeffnen(useBoard.getState().activeId); }}
+              data-taste="dock-versionen"
+              title="Frühere Stände dieses Boards ansehen und wiederherstellen"
+              aria-label="Versionen"
+            >
+              <IUhr size={16} /> Versionen …
+            </button>
             {(archivZahl > 0 || showArchived) && (
               <button
                 onClick={() => { setMoreMenu(false); setShowArchived(!showArchived); }}
@@ -618,10 +666,12 @@ export function Dock() {
             >
               Recherche mit Quellen …
             </button>
-            <button disabled={!!aiBusy} onClick={() => runAi('cluster', (n) => aiCluster(n))}>Themen clustern &amp; anordnen</button>
+            {/* M445: mit Vorschau und Rahmen; geht auch ohne Chat-KI über das Gehirn (lib/themenOrdnen.ts) */}
+            <button disabled={!!aiBusy} data-taste="ki-themen-board" title="Lose Karten in benannte Rahmen ordnen – erst nach deiner Bestätigung"
+              onClick={() => { setAiMenu(false); void import('../lib/themenOrdnen').then((m) => m.themenOrdnenStarten()); }}>Nach Themen ordnen …</button>
             <button disabled={!!aiBusy} onClick={() => runAi('tasks', aiTasks)}>Aufgaben &amp; Termine extrahieren</button>
             <button disabled={!!aiBusy} onClick={() => runAi('process', aiProcess)}>Workflow als Diagramm ableiten</button>
-            <button disabled={!!aiBusy} onClick={() => runAi('brief', aiBriefing)}>Analytisches Briefing erstellen</button>
+            <button disabled={!!aiBusy} data-taste="ki-briefing" onClick={briefing} title="Lage des Boards als neue Notiz: Fristen (überfällig zuerst), Entscheidungen, wichtigste Inhalte, Risiken – geht auch ohne KI">Board-Briefing (Lage)</button>
             {/* M427: Präsentation (Vibe Studio) aus dem Board; was im Feld oben steht, ist der Wunsch */}
             <button disabled={!!aiBusy} data-taste="ki-praesentation" title="Folien aus dem Board – was im Feld oben steht, gilt als Wunsch (Thema, Publikum, Länge, Ton)"
               onClick={() => { const wunsch = cmd; setCmd(''); runAi('praes', (n, p, f) => aiPraesentation(n, p, f, wunsch), wunsch || undefined); }}>Präsentation erstellen</button>

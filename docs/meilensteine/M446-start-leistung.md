@@ -24,7 +24,7 @@ Kein sichtbarer Verhaltenswechsel. Gemessen mit `dist/`, Board mit einer Notiz, 
   BlockNote lädt `emoji-mart` + `@emoji-mart/data` (480 KB Quelltext) und die Markdown-/HTML-Kette
   (`unified`, `remark-*`, `rehype-*`, `parse5`, `mdast/hast/micromark` …) selbst per `import()` — stand das
   in der Regex, zog manualChunks es in den Start. Das war allein rund 0,9 MB.
-- **`Board.tsx` `KARTEN_LADER` + `spaet()`:** Kanban, Form, Diagramm, Zeitplan, Kalender, Woche, Tabelle,
+- **`Board.tsx` `KARTEN_LADER` + `spaet()`:** Kanban, Form, Diagramm, Zeitplan, Kalender, Woche, Tabelle, Kontakt,
   Protokoll, Zeit, Eigene App und Bubbles sind `React.lazy` hinter `guard()`. Platzhalter `.karte-laedt`
   (leer, in Kartengröße, `index.css` Abschnitt „Karten (gemeinsam)"). Notiz, E-Mail, Bild, Datei, Rahmen,
   Portal bleiben fest im Start. `kartenVorladen()` holt alle Kartentypen.

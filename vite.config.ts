@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => ({
   ],
   build:
     mode === 'single'
-      ? { outDir: 'release', chunkSizeWarningLimit: 10000 }
+      ? { outDir: 'release', chunkSizeWarningLimit: 10000, emptyOutDir: false } // M443: der MCP-Server liegt daneben
       : {
           chunkSizeWarningLimit: 1500,
           rollupOptions: {

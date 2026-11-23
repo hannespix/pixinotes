@@ -438,6 +438,9 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   padding: 4px 9px; cursor: pointer; font-family: inherit; color: var(--ink);
 }
 .card-actions button:hover { background: var(--border); }
+/* M451: Aufgaben aus dem E-Mail-Destillat übernehmen — eine zweite, umbrechende Zeile unter den Aktionen */
+.email-aufgaben { flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.email-aufgaben-label { font-size: 12px; color: var(--muted); }
 
 /* ---------- Bild-Karte ---------- */
 .image-card { position: relative; background: var(--surface-card); border-radius: var(--r); padding: 8px; overflow: hidden; display: flex; flex-direction: column; }
@@ -725,6 +728,61 @@ input.img-titel {
 .portal-rueck-add:hover { border-color: var(--accent); color: var(--ink); }
 @media (pointer: coarse) {
   .portal-rueck-add { font-size: 12.5px; min-height: 32px; padding: 5px 11px; }
+}
+
+/* ---------- M450: Kontakt-Karte ----------
+   Eine Visitenkarte: flach, ruhig, Foto oder Initialen links, darunter Rufnummern, E-Mail, Anschrift als Links.
+   Bearbeiten und vCard-Export stehen nur im Fokus (Listen „Bedienung nur im Fokus“). */
+.kontakt-card { background: var(--surface-card); border-radius: var(--r-lg); border: 1px solid var(--border); padding: 12px 14px; }
+.kontakt-kopf { display: flex; align-items: center; gap: 10px; }
+.kontakt-foto {
+  flex: none; width: 44px; height: 44px; border-radius: 50%; overflow: hidden;
+  display: grid; place-items: center; background: var(--surface-2); color: var(--muted);
+  font-weight: 700; font-size: 15px; letter-spacing: 0.02em;
+}
+.kontakt-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kontakt-titel { flex: 1; min-width: 0; }
+.kontakt-name { font-weight: 700; font-size: 14.5px; line-height: 1.25; color: var(--ink); overflow-wrap: anywhere; }
+.kontakt-unter { font-size: 12px; color: var(--muted); margin-top: 1px; overflow-wrap: anywhere; }
+.kontakt-tools { display: flex; gap: 2px; align-self: flex-start; }
+.kontakt-knopf {
+  display: inline-grid; place-items: center; width: 28px; height: 28px; border: none; border-radius: var(--r-sm);
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.kontakt-knopf:hover { background: var(--surface-2); color: var(--ink); }
+.kontakt-inhalt { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+.kontakt-zeile { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.kontakt-zeile > svg { flex: none; margin-top: 2px; color: var(--muted); }
+.kontakt-link { color: var(--accent-strong); text-decoration: none; overflow-wrap: anywhere; }
+.kontakt-link:hover { text-decoration: underline; }
+.kontakt-art-text { color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+.kontakt-adresse { white-space: pre-line; overflow-wrap: anywhere; }
+.kontakt-karte { font-size: 11.5px; margin-left: 4px; }
+.kontakt-notiz { margin: 4px 0 0; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; border-top: 1px solid var(--border-soft); padding-top: 6px; }
+.kontakt-leer { margin: 0; color: var(--muted); font-size: 12px; }
+.kontakt-form { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.kontakt-feld {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; color: var(--ink);
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); padding: 5px 7px; background: var(--surface);
+  resize: vertical;
+}
+.kontakt-feld:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.kontakt-gruppe { display: flex; flex-direction: column; gap: 4px; }
+.kontakt-zeile-feld { display: flex; gap: 4px; align-items: center; }
+.kontakt-zeile-feld .kontakt-art { flex: 0 0 92px; }
+.kontakt-weg {
+  flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; border: none; border-radius: var(--r-sm);
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.kontakt-weg:hover { background: var(--surface-2); color: var(--ink); }
+.kontakt-dazu {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 12px;
+  border: none; background: transparent; color: var(--accent-strong); padding: 3px 2px; cursor: pointer;
+}
+.kontakt-foto-zeile { display: flex; gap: 10px; }
+@media (pointer: coarse) {
+  .kontakt-knopf, .kontakt-weg { width: 40px; height: 40px; }
+  .kontakt-dazu { min-height: 36px; }
 }
 
 /* ---------- Übersicht (Mission Control) ---------- */
@@ -1975,6 +2033,17 @@ dl.leer-wege dd { margin: 0; }
 .modal-buttons button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
 .modal-buttons button:disabled { opacity: .5; cursor: default; }
 .modal-foot { padding: 12px 20px; font-size: 11px; color: var(--muted); text-align: center; }
+/* M445: Nach Themen ordnen – Vorschlag prüfen (components/ThemenDialog.tsx) */
+.themen-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.themen-liste li { border: 1px solid var(--border-soft); border-radius: var(--r); padding: 8px 10px; }
+.themen-liste li.aus { opacity: .55; }
+.themen-kopf { display: flex; align-items: center; gap: 8px; }
+.themen-name { flex: 1; min-width: 0; border: 1px solid transparent; border-radius: var(--r); padding: 4px 6px; background: transparent; color: var(--ink); font: inherit; font-weight: 600; font-size: 13.5px; }
+.themen-name:hover, .themen-name:focus { border-color: var(--border-soft); background: var(--surface-3); outline: none; }
+.themen-zahl { font-size: 12px; color: var(--muted); min-width: 1.5em; text-align: right; }
+.themen-karten { font-size: 12px; color: var(--muted); line-height: 1.45; margin: 4px 0 0 26px; }
+.themen-dialog .modal-buttons button.primaer { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; font-weight: 600; }
+.themen-dialog .modal-buttons button.primaer:hover:not(:disabled) { background: var(--accent-fill); border-color: var(--accent-fill); filter: brightness(1.07); }
 /* M300: Seg-Schalter (Erscheinungsbild, Anzeigegröße, Sync-Weg, Obergrenze …) —
    vorher trugen die Knöpfe die Klasse, aber keine Regel: Der aktive Zustand
    war unsichtbar. */
@@ -7441,6 +7510,38 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 [data-theme='dark'] .vorlage-skizze svg, [data-theme='dark'] svg.vorlage-skizze { background: #262a31; }
 [data-theme='dark'] .vorlage-skizze .sk-karte, [data-theme='dark'] .vorlage-skizze .sk-rahmen { opacity: 0.82; }
 .vorlagen-fuss { font-size: 11.5px; color: var(--muted); margin: 6px 20px 16px; }
+/* M449: Versionen eines Boards — Liste links, Vorschau rechts */
+.modal.versionen-dialog { width: min(760px, calc(96vw / var(--pn-anz, 1))); }
+.versionen-dialog .modal-head h2 small { font-size: 12.5px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+.versionen-text { font-size: 12.5px; line-height: 1.5; color: var(--muted); margin: 14px 20px 10px; }
+.versionen-leer { font-size: 13px; color: var(--muted); margin: 18px 20px; }
+.versionen-teile { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(0, 1.4fr); gap: 14px; padding: 0 20px; }
+.versionen-liste { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow-y: auto; border: 1px solid var(--border-soft); border-radius: var(--r); }
+.versionen-liste li + li { border-top: 1px solid var(--border-soft); }
+.versionen-liste button {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; cursor: pointer;
+  font-family: inherit; color: var(--ink); background: none; border: 0; padding: 8px 12px;
+}
+.versionen-liste button:hover, .versionen-liste button:focus-visible { background: var(--surface-3); outline: none; }
+.versionen-liste button.aktiv { background: var(--accent-soft); }
+.versionen-liste b { font-size: 13px; font-weight: 600; }
+.versionen-liste small { font-size: 11.5px; color: var(--muted); }
+.versionen-vorschau { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.versionen-zahlen { font-size: 12.5px; color: var(--muted); margin: 0; }
+.versionen-frage p { font-size: 12.5px; line-height: 1.5; margin: 0 0 8px; }
+.versionen-knoepfe { display: flex; flex-wrap: wrap; gap: 8px; }
+.versionen-knoepfe button, .versionen-fuss button {
+  font-family: inherit; font-size: 13px; cursor: pointer; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r); padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px;
+}
+.versionen-knoepfe button.versionen-haupt { background: var(--accent); border-color: var(--accent); color: #fff; }
+.versionen-knoepfe button:disabled, .versionen-fuss button:disabled { opacity: 0.5; cursor: default; }
+.versionen-fuss { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 14px 20px 16px; }
+.versionen-fuss small { font-size: 11.5px; color: var(--muted); }
+@media (max-width: 560px) {
+  .versionen-teile { grid-template-columns: 1fr; padding: 0 12px; }
+  .versionen-liste { max-height: 180px; }
+}
 @media (max-width: 520px) {
   .vorlagen-gitter { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 12px 4px; }
 }
@@ -8088,7 +8189,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .time-rec, .time-nav, .time-empty,
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
-    .happ-size, .happ-head .happ-btn
+    .happ-size, .happ-head .happ-btn,
+    .kontakt-tools
 ) { transition: opacity 0.14s ease; }
 @media (hover: hover) {
   .react-flow__node:not(.selected):not(:focus-within):not(:hover) :is(
@@ -8099,7 +8201,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .time-rec, .time-nav, .time-empty,
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
-    .happ-size, .happ-head .happ-btn
+    .happ-size, .happ-head .happ-btn,
+    .kontakt-tools
   ) { opacity: 0; }
   /* Zeiger ruht auf der Karte: erst nach einem Moment einblenden. Als Animation (hält während des Verzugs bei 0),
      damit ein Klick — die Karte ist dann markiert, die Regel greift nicht mehr — sofort alles zeigt. */
@@ -8111,7 +8214,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .time-rec, .time-nav, .time-empty,
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
-    .happ-size, .happ-head .happ-btn
+    .happ-size, .happ-head .happ-btn,
+    .kontakt-tools
   ) { animation: pn-bedienung-ein 0.16s ease 0.35s backwards; }
 }
 /* Finger: kein Zeiger, der ruhen könnte — erst antippen (markieren), dann bedienen. Unsichtbares fängt keinen Tipp. */
@@ -8124,7 +8228,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .time-rec, .time-nav, .time-empty,
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
-    .happ-size, .happ-head .happ-btn
+    .happ-size, .happ-head .happ-btn,
+    .kontakt-tools
   ) { opacity: 0; pointer-events: none; }
 }
 
@@ -8375,3 +8480,11 @@ html[data-kontrast='hoch'] .ov-graph-node .ov-tropfen { stroke: var(--ink); stro
   .ov-canvas.ov-weich .react-flow__node:not(.dragging) { transition: transform 0.12s ease, width 0.12s ease, height 0.12s ease; }
   .ov-canvas .react-flow__node-ovBoard .ovc-tile { transform: none !important; }
 }
+/* M443: Einrichtung des MCP-Servers — knapp, Code zum Kopieren */
+.mcp-schritte { margin: 0 0 8px; padding-left: 18px; font-size: 12.5px; color: var(--ink); line-height: 1.55; }
+.mcp-schritte a { color: var(--accent); }
+.mcp-code {
+  margin: 0 0 8px; padding: 8px 10px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--border-soft);
+  font-size: 11.5px; line-height: 1.45; overflow-x: auto; white-space: pre;
+}
+.mcp-code code { word-break: normal; font: inherit; background: none; padding: 0; }

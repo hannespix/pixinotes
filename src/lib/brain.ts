@@ -267,6 +267,22 @@ export async function brainSearch(query: string, k = 6): Promise<BrainHit[]> {
     .slice(0, k);
 }
 
+/** M445: Einbettungen einzelner Karten eines Boards – Rückfall für „Nach Themen ordnen" ohne Chat-KI.
+ *  Gleicht vorher ab (neue Karten bekommen ihren Vektor); leer, wenn das Gehirn aus ist. */
+export async function kartenVektoren(boardId: string, ids: string[]): Promise<Map<string, { title: string; vec: number[] }>> {
+  const out = new Map<string, { title: string; vec: number[] }>();
+  if (!useBoard.getState().brain.on) return out;
+  while (running) await new Promise((r) => setTimeout(r, 150));
+  await syncBrainIndex();
+  if (lastError) throw new Error(lastError);
+  await loadIndex();
+  for (const id of ids) {
+    const e = mem?.get(KEY(boardId, id));
+    if (e) out.set(id, { title: e.title, vec: e.vec });
+  }
+  return out;
+}
+
 /* ---------- M207: Gehirn-Puls — Themen, Knotenpunkte, Digest ----------
    Drei Auswertungen ÜBER den Index, alle rein rechnerisch (keine KI-Kosten):
    Themen-Inseln (Clustering), Knotenpunkte (wer hängt mit vielem zusammen)
