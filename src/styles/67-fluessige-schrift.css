@@ -1,0 +1,56 @@
+/* ---------- M500: Flüssige Schrift (Liquid Type) ----------
+   Die Flüssigkeit füllt die Karte; die Farbe kommt aus den Tokens (color → der Motor liest sie): Schrift oder Akzent.
+   Die Schriftart folgt der Karte (pn-font-*); ohne eigene Wahl Georgia wie im Original. Bedienung liegt unten über
+   der Fläche und erscheint nur im Fokus (M421-Listen in 99-bedienung-im-fokus.css) – nichts verschiebt sich. */
+.fluessig-card {
+  background: var(--surface-card); border-radius: var(--r-lg); border: 1px solid var(--border);
+  height: 100%; position: relative; overflow: hidden;
+}
+.fluessig-card.fl-farbe-schrift .fl-buehne { color: var(--ink); }
+.fluessig-card.fl-farbe-akzent .fl-buehne { color: var(--accent-strong); }
+.fl-buehne {
+  position: absolute; inset: 0; font-family: Georgia, 'Iowan Old Style', Cambria, 'Times New Roman', serif;
+}
+.fl-flaeche { display: block; width: 100%; height: 100%; touch-action: none; }
+.fl-flaeche.nodrag { cursor: grab; }
+.fl-flaeche.nodrag:active { cursor: grabbing; }
+.fl-ersatz {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; padding: 10px; text-align: center; container-type: size;
+}
+.fl-ersatz-text { font-size: clamp(18px, 26cqmin, 120px); font-weight: 500; line-height: 1.05; overflow-wrap: anywhere; }
+.fl-hinweis, .fl-leer { margin: 0; font-family: system-ui, sans-serif; font-size: 12px; color: var(--muted); }
+.fl-leer { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.fl-werkzeuge {
+  /* unter der Karte statt auf der Flüssigkeit — die Schrift bleibt frei, auch beim Spielen mit ihr */
+  position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%); z-index: 6;
+  display: flex; flex-wrap: nowrap; gap: 6px; align-items: center; white-space: nowrap;
+  padding: 5px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--card-shadow); font-family: system-ui, sans-serif; font-size: 12px;
+}
+/* Sie liegt außerhalb der Karte: unsichtbar darf sie keine Klicks auf das Board oder Karten darunter fangen —
+   darum ganz weg, solange die Karte weder markiert noch im Fokus ist (auch nicht beim bloßen Überfahren) */
+.react-flow__node:not(.selected):not(:focus-within):not(.pn-focused) .fl-werkzeuge { visibility: hidden; }
+/* Im Karten-Fokus füllt die Karte den Schirm — dort unten in der Karte */
+.react-flow__node.pn-focused .fl-werkzeuge { top: auto; bottom: 12px; }
+.fl-text {
+  flex: none; width: 150px; height: 28px; padding: 0 8px; font: inherit; font-size: 13px; color: var(--ink);
+  background: var(--surface-card); border: 1px solid var(--feld-rand); border-radius: var(--r-sm);
+}
+.fl-text:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.fl-wahl { display: inline-flex; border: 1px solid var(--feld-rand); border-radius: var(--r-sm); overflow: hidden; }
+.fl-wahl button, .fl-schalter {
+  height: 28px; padding: 0 9px; font: inherit; color: var(--muted); background: transparent; border: 0; cursor: pointer;
+}
+.fl-wahl button + button { border-left: 1px solid var(--feld-rand); }
+.fl-schalter { border: 1px solid var(--feld-rand); border-radius: var(--r-sm); }
+.fl-wahl button:hover, .fl-schalter:hover { background: var(--surface-2); color: var(--ink); }
+.fl-wahl button.aktiv, .fl-schalter.aktiv { background: var(--accent-soft); color: var(--ink); }
+.fl-wahl button:focus-visible, .fl-schalter:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (pointer: coarse) {
+  .fl-text, .fl-wahl button, .fl-schalter { height: 40px; }
+}
+/* Auf der Folie: groß, ohne Kartenrand */
+.presenter-slide.editable > .slide-modul.slide-fluessig {
+  width: min(1120px, 100%); height: min(calc(60vh / var(--pn-anz, 1)), 100%); box-shadow: none; border: 0; background: transparent;
+}

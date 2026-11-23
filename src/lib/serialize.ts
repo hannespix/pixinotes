@@ -2,6 +2,7 @@
 // und die Suche. Bewusst schlicht gehalten — sauberes Office-taugliches HTML.
 import { doneCol, kanbanCols, type AppNode, type KontaktData, type SheetData } from '../types';
 import { bubblesAlsText } from './bubbles';
+import { fluessigText } from './fluessigDaten';
 import { EDITOR_GRUND, EDITOR_SCHRIFT } from './editorFarben';
 import { formatBytes } from './parseEmail';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from './formel';
@@ -504,6 +505,9 @@ function baseNodeText(node: AppNode): string {
     case 'kontakt':
       // M450: alle Felder — so findet die Suche (Strg+K) einen Kontakt auch über Firma, Ort oder Rufnummer
       return kontaktZeilen(node.data).join('\n');
+    case 'fluessig':
+      // M500: nur der Text — die Flüssigkeit selbst ist Darstellung
+      return fluessigText(node.data.text);
     case 'time': {
       const t = node.data;
       const labels: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause' };
@@ -606,6 +610,8 @@ export function nodeToHtml(node: AppNode): string {
     case 'frame':
       // Abschnitts-Folie im Presenter: der Rahmen-Name als Zwischentitel
       return `<h2 style="text-align:center;margin-top:1.4em">${esc(node.data.name)}</h2>`;
+    case 'fluessig':
+      return `<p style="font:500 2.4em Georgia,serif;text-align:center;margin:.4em 0">${esc(fluessigText(node.data.text))}</p>`;
     case 'kontakt': {
       const [kopf, ...rest] = kontaktZeilen(node.data);
       return `<h3>${esc(kopf)}</h3>${rest.map((z) => `<p style="margin:2px 0;white-space:pre-wrap">${esc(z)}</p>`).join('')}`;
@@ -722,6 +728,8 @@ export function nodeToMarkdown(node: AppNode): string {
     }
     case 'mermaid':
       return `\`\`\`mermaid\n${node.data.code}\n\`\`\`${anhang}`;
+    case 'fluessig':
+      return `## ${fluessigText(node.data.text)}${anhang}`;
     case 'kontakt': {
       const [kopf, ...rest] = kontaktZeilen(node.data);
       return `### ${kopf}\n\n${rest.map((z) => `- ${z.replace(/\n/g, ' ')}`).join('\n')}${anhang}`;

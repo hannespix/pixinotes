@@ -110,6 +110,8 @@ export const ICircles = make(<><circle cx="12" cy="12" r="8.5" /><circle cx="12"
 export const IVorlage = make(<><rect x="3" y="3.5" width="18" height="17" rx="2" /><path d="M3 9h18" /><path d="M9.5 9v11.5" /></>);
 /** M373: Entscheidungs-Bubbles — drei Blasen verschiedener Größe */
 export const IBubbles = make(<><circle cx="8.5" cy="14.5" r="5.5" /><circle cx="17" cy="8" r="3.6" /><circle cx="18" cy="18" r="2.2" /></>);
+/** M500: Flüssige Schrift — ein Buchstabe, von dem ein Tropfen fällt */
+export const IFluessig = make(<><path d="M5 18c0-6 2.5-12 7-12s7 6 7 12" /><path d="M8 14h8" /><path d="M12 18.5c-1.2 1.4-1.8 2.3-1.8 3a1.8 1.8 0 0 0 3.6 0c0-.7-.6-1.6-1.8-3Z" /></>);
 export const IStack = make(<><path d="m12 3 9 5-9 5-9-5Z" /><path d="m3 12.5 9 5 9-5" /><path d="m3 16.5 9 5 9-5" /></>);
 export const IGridSnap = make(<><rect x="3.5" y="3.5" width="17" height="17" rx="1.5" /><path d="M9.2 3.5v17" /><path d="M14.8 3.5v17" /><path d="M3.5 9.2h17" /><path d="M3.5 14.8h17" /></>);
 export const IComment = make(<><path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.3 8.9 8.9 0 0 1-3.2-.6L3 21l1.8-5.2a8 8 0 0 1-.8-3.3A8.4 8.4 0 0 1 12.5 4.2a8.4 8.4 0 0 1 8.5 7.3Z" /></>);
