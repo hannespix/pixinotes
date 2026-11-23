@@ -69,7 +69,8 @@ schaltet ab; abgeschaltet keine Erkennung, kein ⋯-Eintrag · G keine Seitenfeh
 ## Grenzen / offen
 - Handschrift im Foto, schräge Fotos und sehr kleine Schrift erkennt Tesseract schlecht; gedruckter Text in
   Screenshots gut. Keine Vorverarbeitung (Entzerren, Kontrast) über das Weiß-Hinterlegen hinaus.
-- Das Gehirn (Bedeutungssuche, M204) bettet den Bildtext noch nicht ein; die Fuzzy-Suche findet ihn.
-- Telefonnummern/Links im Bildtext klickbar machen (KONZEPT §3) — nicht umgesetzt.
+- ~~Das Gehirn (Bedeutungssuche, M204) bettet den Bildtext noch nicht ein~~ → erledigt in M465.
+- ~~Telefonnummern/Links im Bildtext klickbar machen (KONZEPT §3)~~ → erledigt in M465 (Chips am markierten Bild,
+  Frist nur auf Klick als Aufgabe).
 - Nur Deutsch + Englisch; weitere Sprachen wären je ~1–3 MB in `dist/ocr/`.
 - Portable Datei ohne Netz: keine Erkennung (bewusst, siehe oben).
