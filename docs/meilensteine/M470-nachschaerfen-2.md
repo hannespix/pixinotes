@@ -52,8 +52,8 @@ Offene Punkte aus M460 („kein Zurückholen von Pfeilen oder Strichen allein; k
   Ticket-Fenster. Hilfe DE/EN, `en.json`.
 
 ## Grenzen / offen
-- Im Drei-Wege-Abgleich zählt ein anderer `spalteSeit` desselben Tickets als Unterschied (kein „spätere gilt" wie bei
-  `geaendert`, M453) – nur, wenn zwei Geräte dasselbe Ticket bewegen.
+- ~~Im Drei-Wege-Abgleich zählt ein anderer `spalteSeit` desselben Tickets als Unterschied (kein „spätere gilt" wie bei
+  `geaendert`, M453) – nur, wenn zwei Geräte dasselbe Ticket bewegen.~~ → erledigt in M472 (`lib/abgleichZeiten.ts`).
 - Gespräche (Kommentare) und neue Pfeile/Striche stehen nicht in „Seitdem"; „neu" bleibt nur bei Karten.
 - Tickets aus der Zeit vor M470 zeigen keine Spaltenzeit, bis sie das nächste Mal die Spalte wechseln (das Briefing
   nimmt für sie weiter die Kartenzeit).
