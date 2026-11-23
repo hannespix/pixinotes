@@ -81,12 +81,7 @@ const spurNamen = async (P, ms) => P.evaluate((dauer) => new Promise((ok) => {
 const unterLast = os.loadavg()[0] > os.cpus().length;
 const sprungGrenze = unterLast ? 12 : 6;
 if (unterLast) console.log(`  (Rechner unter Last ${os.loadavg()[0].toFixed(1)} bei ${os.cpus().length} Kernen – Sprung-Grenze ${sprungGrenze} Punkte)`);
-// M484: Unter Last laufen Messung und Bewegung zwar im selben Bildtakt, aber nicht immer in derselben Reihenfolge —
-// dann fallen zwei Gleit-Schritte der App in ein Messintervall und keiner ins nächste (gemessen 12,8 bei Grenze 12).
-// Unter Last zählt deshalb die Strecke über zwei Messintervalle (je Bild gemittelt); ein echter Sprung (der Name wechselt
-// zwischen Ideen, Dutzende Punkte) bleibt darüber. Auf einem ruhigen Rechner gilt wie bisher das einzelne Intervall.
-const SCHRITT = unterLast ? 2 : 1;
-const groessterSprung = (spur) => Math.max(0, ...Object.values(spur).map((p) => { let m = 0; for (let i = SCHRITT; i < p.length; i++) { const bilder = Math.max(SCHRITT, (p[i][2] - p[i - SCHRITT][2]) / 16.7); m = Math.max(m, Math.hypot(p[i][0] - p[i - SCHRITT][0], p[i][1] - p[i - SCHRITT][1]) / bilder); } return m; }));
+const groessterSprung = (spur) => Math.max(0, ...Object.values(spur).map((p) => { let m = 0; for (let i = 1; i < p.length; i++) { const bilder = Math.max(1, (p[i][2] - p[i - 1][2]) / 16.7); m = Math.max(m, Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]) / bilder); } return m; }));
 /** M484: Warten, bis sich 1 s lang nichts mehr bewegt (höchstens ms) — das Einschwingen dauert unter Last länger */
 const stillBis = async (P, ms = 20000) => { const ende = Date.now() + ms; while (Date.now() < ende) { if ((await bewegung(P, 1000)) === 0) return; } };
 const bewegung = (P, ms, sel = '.bub-blase') => P.evaluate(([dauer, s]) => new Promise((ok) => {
@@ -100,9 +95,6 @@ console.log('\n════ A/C: Board ════');
 {
   globalThis.WARTE = 200;
   const { ctx, P } = await auf(640, 440, { viewport: { width: 1440, height: 900 } });
-  // M484: erst messen, wenn alle vier Gruppen-Namen stehen – unter Last kam der Aufbau (erste Lage der Namen) sonst
-  // in die Messung und zählte als Sprung (17 Punkte bei Last über der Kernzahl)
-  await P.waitForFunction(() => [...document.querySelectorAll('.bub-ring-name')].filter((n) => /translate\(/.test(n.style.transform)).length >= 4, null, { timeout: 15000 }).catch(() => {});
   const frueh = await spurNamen(P, 5000);
   pruefe(`A1 beim Einschwingen: kein Name springt (≤ ${sprungGrenze} Punkte je Bild)`, groessterSprung(frueh) <= sprungGrenze, groessterSprung(frueh).toFixed(1));
   await P.waitForTimeout(2500);

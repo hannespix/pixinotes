@@ -52,12 +52,9 @@ m332, m447, m429, m354, m366. Jeder Agent verlor damit Wiederholungen und Gewiss
 - **m354 A2:** Der Strich lag nach 400 ms noch nicht im gespeicherten Stand (der Wert der Meldung, eine Abfrage später,
   stimmte). `zeichnen()` wartet, bis sich der Stand ändert; die Prüfung, dass ein Radierer nichts trifft (E2), behält
   ihre feste Wartezeit.
-- **m429 A1/B1:** Die Messung „kein Name springt" begann 200 ms nach dem Laden; unter Last lag die erste Lage der Namen
-  (Aufbau) noch darin. Sie beginnt jetzt, wenn alle vier Gruppen-Namen stehen. Unter Last (Last über der Kernzahl)
-  zählt die Strecke über zwei Messintervalle: Messung und Bewegung laufen im selben Bildtakt, aber nicht immer in
-  derselben Reihenfolge — dann fallen zwei Gleit-Schritte in ein Intervall (gemessen 12,8 bei Grenze 12). Ein echter
-  Sprung (Name wechselt zwischen Ideen, Dutzende Punkte) bleibt darüber; ruhig gilt wie bisher das einzelne Intervall.
-  B1 wartet erst, bis 1 s lang nichts mehr läuft (höchstens 20 s), und prüft dann 3 s Stillstand.
+- **m429 B1:** wartet erst, bis 1 s lang nichts mehr läuft (höchstens 20 s), und prüft dann 3 s Stillstand. (Ein
+  Versuch für A1 — Messbeginn erst mit allen Namen, unter Last zwei Messintervalle — machte es nicht besser und ist
+  zurückgenommen, siehe „Grenzen".)
 - **m366 (und 23 weitere Reihen mit demselben Helfer `notiz()`):** „Port belegt" war kein Fehler der Reihe (andere
   Agenten starteten sie ohne den Läufer). Der TimeoutError (bei Last über 20 auf 4 Kernen, mit `--ablage` gefunden):
   `notiz()` legt per Doppelklick eine Notiz an, wartete 700 ms auf den Cursor darin und klickte sonst in den Editor der
@@ -85,8 +82,13 @@ m383 1 von 3 und 0 von 3, m428 1 von 3, m477 1 von 4 und 2 von 4 (Hauptzweig ohn
 je 3 von 3, später m387 1 von 2, m354 1 von 2, m429 1 von 2. Nach der Änderung: siehe PR (10 Durchgänge).
 
 ## Grenzen / offen
-- m429 A1 misst ein Gleiten Bild für Bild; bei Last über dem Vierfachen der Kernzahl (gemessen 18,5 auf 4 Kernen) kam
-  es noch einmal auf 13,7 (Grenze 12). Weiter lockern hieße, einen echten Sprung zu übersehen — offen gelassen.
+- **m429 A1 flattert weiter** (in 10 Durchgängen 1–3 rot, Werte 8,8 bis 21 bei Grenze 6/12): Die Reihe misst ein
+  Gleiten Bild für Bild, das unter CPU-Mangel nicht mehr gleichmäßig ist; ob dahinter auch ein Verhalten der App steckt
+  (Kräfte je Bild statt je Zeit beim Einschwingen), ist offen. Eigene Aufgabe: Messung von der Bildfolge lösen oder die
+  Physik zeitbasiert prüfen — nicht einfach die Grenze heben.
+- **m487 B5/B8 flattert** (gleichzeitiges Tippen im Protokoll, M487): Unter Last landen Gerds Zeichen mitten in Annas
+  Text bzw. ein Leerzeichen fehlt, auf beiden Seiten gleich. Gehört zu M487 (Cursor-Lage im gemeinsamen Protokoll), hier
+  nicht angefasst.
 - m477 lief einmal in das Zeitlimit des Läufers (600 s, hängend bei `keyboard.type` nach Abschnitt B, Last ~20 auf
   4 Kernen); nicht wieder aufgetreten, Ursache offen.
 - Der Schreiber-Anspruch ist wie `schreibt` eine Selbstauskunft im Kanal: Ein manipuliertes Programm ohne Schreibrecht
