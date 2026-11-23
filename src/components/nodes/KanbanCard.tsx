@@ -19,6 +19,7 @@ import { insBild } from '../EbenenMenu';
 import { DragTitle } from './DragTitle';
 
 import { KartenSymbol } from '../KartenSymbol';
+import { zahlWort } from '../../lib/sprache';
 
 const TAG_RE = /#([\p{L}\d_-]{2,20})/gu;
 const TAG_MS = 86_400_000;
@@ -347,7 +348,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       updated ? `${updated} aktualisiert` : '',
     ].filter(Boolean).join(', ');
     if (announce) {
-      showToast(`${fresh.length} Aufgabe(n) eingesammelt${parts ? ` (${parts})` : ''}.`);
+      showToast(`${zahlWort(fresh.length, 'Aufgabe', 'Aufgaben')} eingesammelt${parts ? ` (${parts})` : ''}.`);
     } else {
       showToast(`⟳ Auto-Abgleich: ${fresh.length} neu${parts ? `, ${parts}` : ''}`);
     }
@@ -400,7 +401,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       }
     }
     if (wipFull(kanban, col)) {
-      showToast(`WIP-Limit: „${cols[col]}" fasst höchstens ${wipLimitOf(kanban, col)} Ticket(s).`);
+      showToast(`WIP-Limit: „${cols[col]}" fasst höchstens ${zahlWort(wipLimitOf(kanban, col) ?? 0, 'Ticket', 'Tickets')}.`);
       return;
     }
     if (col === done && useBoard.getState().konfetti) {
@@ -705,7 +706,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       items: kanban.items.filter((it) => it.link?.boardId !== bid),
       ignoreKeys: [...new Set([...(kanban.ignoreKeys ?? []), ...keys])],
     });
-    showToast(`${gone.length} Ticket(s) aus „${boardName(bid)}" entfernt und vom Einsammeln ausgenommen.`);
+    showToast(`${zahlWort(gone.length, 'Ticket', 'Tickets')} aus „${boardName(bid)}" entfernt und vom Einsammeln ausgenommen.`);
   };
 
   // ---------- Archiv (M293): Erledigtes aus den Spalten nehmen, ohne es zu löschen ----------
@@ -1128,7 +1129,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                   <button
                     className={`kanban-count nodrag ${lim && realCount >= lim ? 'wip-full' : ''}`}
                     title={colIdx < done
-                      ? `${realCount} Ticket(s)${lim ? ` · WIP-Limit ${lim}` : ''} – Klick setzt das WIP-Limit (max. Tickets in dieser Spalte)`
+                      ? `${zahlWort(realCount, 'Ticket', 'Tickets')}${lim ? ` · WIP-Limit ${lim}` : ''} – Klick setzt das WIP-Limit (max. Tickets in dieser Spalte)`
                       : 'Tickets in der Spalte'}
                     onClick={() => colIdx < done && setWipEdit(colIdx)}
                   >
@@ -1279,7 +1280,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
               title="Ignorier-Liste leeren – beim nächsten Einsammeln kommen sie zurück"
               onClick={() => { updateNodeData(id, { ignoreKeys: undefined }); showToast('Entfernte Tickets werden wieder eingesammelt.'); }}
             >
-              {kanban.ignoreKeys!.length} dauerhaft entfernte(s) Ticket(s) wieder zulassen
+              {`${zahlWort(kanban.ignoreKeys!.length, 'dauerhaft entferntes Ticket', 'dauerhaft entfernte Tickets')} wieder zulassen`}
             </button>
           )}
           <div className="ticket-detail-foot">Gilt für Einsammeln und Auto-Abgleich · Esc schließt</div>

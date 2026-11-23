@@ -1,11 +1,30 @@
 // M449: Versionen eines Boards — frühere Stände ansehen und zurückholen (lib/boardVersionen.ts).
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBoard } from '../store';
-import { GRUND_TEXT, versionenVon, versionLaden, versionSichern, type VersionInfo, type VersionStand } from '../lib/boardVersionen';
+import { GRUND_TEXT, kartenVergleich, versionenVon, versionLaden, versionLoeschen, versionSichern, type VersionInfo, type VersionStand } from '../lib/boardVersionen';
+import { nodeToText } from '../lib/serialize';
+import { vorWann, zeitLang, zeitVon } from '../lib/kartenZeit';
+import { KartenSymbol } from './KartenSymbol';
 import { skizzeVon } from '../lib/vorlagen';
 import { sprache } from '../lib/sprache';
 import type { AppNode } from '../types';
 import { IUhr, IX } from './Icons';
+
+/** Menschliche Namen der Kartenarten — für Karten ohne eigene Beschriftung */
+const ART_NAME: Record<string, string> = {
+  note: 'Notiz', email: 'E-Mail', kanban: 'Kanban', gantt: 'Zeitplan', calendar: 'Kalender', sheet: 'Rechen-Tabelle', file: 'Datei',
+  image: 'Bild', frame: 'Rahmen', minutes: 'Protokoll', week: 'Wochenplan', time: 'Zeiterfassung', mermaid: 'Diagramm', portal: 'Portal',
+  shape: 'Form', htmlapp: 'App', bubbles: 'Bubbles', kontakt: 'Kontakt', pdf: 'PDF',
+};
+/** M460: Titel oder erste Zeile einer Karte (für den Vergleich Karte für Karte) */
+function kartenName(n: AppNode): string {
+  const d = (n.data ?? {}) as Record<string, unknown>;
+  const direkt = ['title', 'name', 'subject', 'text', 'label'].map((k) => (typeof d[k] === 'string' ? (d[k] as string) : '')).find((v) => v.trim());
+  if (direkt) return direkt.trim().slice(0, 70);
+  let text = '';
+  try { text = nodeToText(n).split('\n').find((z) => z.trim()) ?? ''; } catch { /* unbekannte Karte */ }
+  return (text.trim() || ART_NAME[n.type ?? ''] || 'Karte').slice(0, 70);
+}
 
 const zeitFormat = () => new Intl.DateTimeFormat(sprache() === 'en' ? 'en-GB' : 'de-DE', {
   weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -46,7 +65,7 @@ export function VersionenDialog({ boardId, onClose }: { boardId: string; onClose
   const [liste, setListe] = useState<VersionInfo[] | null>(null);
   const [wahl, setWahl] = useState<string | null>(null);
   const [stand, setStand] = useState<VersionStand | null>(null);
-  const [frage, setFrage] = useState(false);
+  const [frage, setFrage] = useState<false | 'ersetzen' | 'loeschen'>(false);
   const [busy, setBusy] = useState(false);
   const zu = useRef<HTMLButtonElement>(null);
   const lesen = board?.geteiltRolle === 'lesen';
@@ -85,6 +104,28 @@ export function VersionenDialog({ boardId, onClose }: { boardId: string; onClose
       weg: board.nodes.filter((n) => !dann.has(n.id)).length,
     };
   }, [stand, board]);
+  /** M460: Karte für Karte — was ist seitdem neu, gelöscht, geändert */
+  const vergleich = useMemo(() => (stand && board ? kartenVergleich(stand, board.nodes) : null), [stand, board]);
+
+  const zurueckholen = (ids: string[], name: string) => {
+    if (!stand || !board) return;
+    const st = useBoard.getState();
+    const n = st.kartenZurueckholen(boardId, ids, stand);
+    if (n === 1) st.showToast(`„${name}" zurückgeholt – Strg+Z nimmt es zurück.`, false, 6000);
+    else if (n > 1) st.showToast(`${n} Karten zurückgeholt – Strg+Z nimmt es zurück.`, false, 6000);
+  };
+
+  const loeschen = async () => {
+    if (!info) return;
+    setBusy(true);
+    const weg = await versionLoeschen(boardId, info.id);
+    setBusy(false);
+    setFrage(false);
+    if (weg) useBoard.getState().showToast(`Version vom ${kurzFormat().format(info.at)} gelöscht.`);
+    const l = await versionenVon(boardId);
+    setListe(l);
+    setWahl(l[0]?.id ?? null);
+  };
 
   const sichernJetzt = async () => {
     if (!board) return;
@@ -131,7 +172,7 @@ export function VersionenDialog({ boardId, onClose }: { boardId: string; onClose
         </div>
         <div className="modal-body">
           <p className="versionen-text">
-            PixiNotes sichert dieses Board selbst: beim Verlassen, alle 10 Minuten, wenn sich etwas geändert hat, und vor Abgleich, Import und KI-Umbau. Ältere Stände werden ausgedünnt (einer je Stunde, später einer je Tag).
+            PixiNotes sichert dieses Board selbst: beim Verlassen, alle 10 Minuten, wenn sich etwas geändert hat, und vor Abgleich, Import, KI-Umbau und großen Änderungen anderer. Ältere Stände werden ausgedünnt (einer je Stunde, später einer je Tag).
           </p>
           {liste && !liste.length ? (
             <p className="versionen-leer" data-taste="versionen-leer">Noch keine Versionen. Die erste entsteht, sobald du das Board änderst.</p>
@@ -158,7 +199,50 @@ export function VersionenDialog({ boardId, onClose }: { boardId: string; onClose
                         <> · gegenüber jetzt: {unterschied.zurueck ? `${unterschied.zurueck} kämen zurück` : ''}{unterschied.zurueck && unterschied.weg ? ', ' : ''}{unterschied.weg ? `${unterschied.weg} fielen weg` : ''}</>
                       ) : null}
                     </p>
-                    {frage ? (
+                    {vergleich && (vergleich.neu.length + vergleich.geloescht.length + vergleich.geaendert.length) > 0 && (
+                      <div className="versionen-vergleich" data-taste="versionen-vergleich">
+                        <h3>Seitdem</h3>
+                        <ul>
+                          {vergleich.geloescht.map((n) => (
+                            <li key={`g-${n.id}`} data-taste="vergleich-karte" data-art="geloescht" data-id={n.id}>
+                              <KartenSymbol art={n.type} size={14} aria-hidden="true" />
+                              <span className="vv-titel" translate="no">{kartenName(n)}</span>
+                              <small>gelöscht</small>
+                              {!lesen && <button disabled={busy} onClick={() => zurueckholen([n.id], kartenName(n))} data-taste="karte-zurueckholen"
+                                title="Diese Karte aus dem Stand zurück aufs Board legen">Zurückholen</button>}
+                            </li>
+                          ))}
+                          {vergleich.geaendert.map(({ dann, jetzt }) => {
+                            const z = zeitVon(jetzt);
+                            return (
+                              <li key={`a-${dann.id}`} data-taste="vergleich-karte" data-art="geaendert" data-id={dann.id}>
+                                <KartenSymbol art={jetzt.type} size={14} aria-hidden="true" />
+                                <span className="vv-titel" translate="no">{kartenName(jetzt)}</span>
+                                <small title={z ? zeitLang(z) : undefined}>{z ? `geändert ${vorWann(z)}` : 'geändert'}</small>
+                                {!lesen && <button disabled={busy} onClick={() => zurueckholen([dann.id], kartenName(dann))} data-taste="karte-zurueckholen"
+                                  title="Den Inhalt von damals zurückholen – Lage und Größe bleiben">Zurückholen</button>}
+                              </li>
+                            );
+                          })}
+                          {vergleich.neu.map((n) => (
+                            <li key={`n-${n.id}`} data-taste="vergleich-karte" data-art="neu" data-id={n.id}>
+                              <KartenSymbol art={n.type} size={14} aria-hidden="true" />
+                              <span className="vv-titel" translate="no">{kartenName(n)}</span>
+                              <small>neu</small>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {frage === 'loeschen' ? (
+                      <div className="versionen-frage" role="alert">
+                        <p>Diese Version wird gelöscht. Das Board und die anderen Versionen bleiben, wie sie sind.</p>
+                        <div className="versionen-knoepfe">
+                          <button className="versionen-haupt" disabled={busy} onClick={() => void loeschen()} data-taste="version-loeschen-ja">Ja, löschen</button>
+                          <button disabled={busy} onClick={() => setFrage(false)}>Abbrechen</button>
+                        </div>
+                      </div>
+                    ) : frage ? (
                       <div className="versionen-frage" role="alert">
                         <p>Das Board bekommt diesen Stand. Der jetzige wird vorher als Version gesichert, und Strg+Z nimmt es zurück.</p>
                         <div className="versionen-knoepfe">
@@ -168,9 +252,11 @@ export function VersionenDialog({ boardId, onClose }: { boardId: string; onClose
                       </div>
                     ) : (
                       <div className="versionen-knoepfe">
-                        <button className="versionen-haupt" disabled={busy || lesen} onClick={() => setFrage(true)} data-taste="version-wiederherstellen"
+                        <button className="versionen-haupt" disabled={busy || lesen} onClick={() => setFrage('ersetzen')} data-taste="version-wiederherstellen"
                           title={lesen ? 'Nur zum Lesen freigegeben – als Kopie öffnen geht' : 'Dieses Board auf den Stand zurücksetzen'}>Wiederherstellen …</button>
                         <button disabled={busy} onClick={alsKopie} data-taste="version-kopie" title="Den Stand als neues Board daneben öffnen">Als Kopie öffnen</button>
+                        <button className="versionen-leise" disabled={busy} onClick={() => setFrage('loeschen')} data-taste="version-loeschen"
+                          title="Diese Version aus der Liste löschen">Löschen …</button>
                       </div>
                     )}
                   </>

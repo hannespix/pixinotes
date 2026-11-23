@@ -4,6 +4,7 @@ import { fetchNotebooks, runOneNoteImport, type OnNotebook } from '../lib/onenot
 import { useBoard } from '../store';
 
 import { IBuch } from './Icons';
+import { zahlWort } from '../lib/sprache';
 /**
  * M184: OneNote-Import — Notizbuch wird Bereich, Abschnitt wird Board,
  * jede Seite eine Notiz-Karte. Bewusst als eigene Komponente: Der Ablauf hat
@@ -66,7 +67,7 @@ export function OneNoteImport({ onClose, onDienste }: { onClose: () => void; onD
     if (choices.length === 0) { setError('Bitte mindestens einen Abschnitt auswählen.'); return; }
     const res = await runOneNoteImport(choices, { withImages, maxPages }, (msg, done, total) => setProgress({ msg, done, total }));
     showToast(
-      `OneNote übernommen: ${res.boards} Board(s) mit ${res.pages} Seite(n)`
+      `OneNote übernommen: ${zahlWort(res.boards, 'Board', 'Boards')} mit ${zahlWort(res.pages, 'Seite', 'Seiten')}`
       + (res.skipped.length ? ` – ${res.skipped.length} übersprungen` : '')
       + '. Rückgängig über Einstellungen → Daten.',
       false, 9000,
@@ -113,7 +114,7 @@ export function OneNoteImport({ onClose, onDienste }: { onClose: () => void; onD
             {books.map((b) => (
               <div key={b.id} className="on-book">
                 <button className="on-book-name" onClick={() => toggleBook(b)}>
-                  <IBuch size={14} /> <span translate="no">{b.name}</span> <span className="on-count">{b.sections.length} Abschnitt(e)</span>
+                  <IBuch size={14} /> <span translate="no">{b.name}</span> <span className="on-count">{zahlWort(b.sections.length, 'Abschnitt', 'Abschnitte')}</span>
                 </button>
                 {b.sections.map((s) => (
                   <label key={s.id} className="on-sec">
@@ -140,7 +141,7 @@ export function OneNoteImport({ onClose, onDienste }: { onClose: () => void; onD
 
           <div className="modal-buttons">
             <button disabled={pickedCount === 0 || !!busy} onClick={doImport}>
-              {busy === 'import' ? 'Hole Inhalte…' : `${pickedCount} Abschnitt(e) übernehmen`}
+              {busy === 'import' ? 'Hole Inhalte…' : `${zahlWort(pickedCount, 'Abschnitt', 'Abschnitte')} übernehmen`}
             </button>
           </div>
         </>

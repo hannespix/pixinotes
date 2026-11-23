@@ -8,7 +8,7 @@
 // Was von außen kommt, ist Text — eine Adresse wird daraus erst in der Karte (tel:, mailto:, Kartenlink), und das
 // Foto nur, wenn es ein eingebettetes Bild ist (lib/sicher.ts kontaktBild). Fremde Bildadressen (PHOTO;VALUE=uri:
 // https://…) fallen weg: Sie würden beim Anzeigen einen fremden Server anfragen.
-import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import { rufnummern } from './rufnummer';
 import type { KontaktData, KontaktTelefon } from '../types';
 import { kontaktBild } from './sicher';
 
@@ -305,7 +305,8 @@ export function vcardDateiname(k: KontaktData | string): string {
 /** Rufnummer → tel:-Adresse: international (E.164), wenn libphonenumber sie erkennt (Inland = Deutschland), sonst Ziffern und + */
 export function telAdresse(nummer: string): string | null {
   try {
-    const p = parsePhoneNumberFromString(nummer, 'DE');
+    // M459: die Kontakt-Karte lädt erst mit der Erkennung (Board.tsx) — ohne sie bleibt die Ziffernfassung unten
+    const p = rufnummern()?.parsePhoneNumberFromString(nummer, 'DE');
     if (p?.isPossible()) return `tel:${p.number}`;
   } catch { /* unten weiter */ }
   const n = nummer.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '');

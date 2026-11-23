@@ -6,7 +6,8 @@
 //     aus lib/tasks.ts (collectTasks), damit Daten und Reihenfolge stimmen und nichts erfunden wird.
 //   · Entscheidungen – Beschlüsse aus Protokoll-Karten, Zeilen „Beschluss: …" aus Notizen.
 //   · Wichtigste Inhalte – die gehaltvollsten Karten.
-//   · Risiken und Blocker – Zeilen mit „Risiko", „blockiert", „Verzug" … und überfällige Fristen.
+//   · Risiken und Blocker – überfällige Fristen (M463: mit Namen und Dauer), Tickets lange „in Arbeit" (M463, über
+//     die Änderungszeit der Kanban-Karte), Pfeile mit blockierender Beziehung (M463) und Zeilen mit „Risiko" …
 //   · M453: Lange unberührt – Karten, deren Inhalt seit über 30 Tagen niemand geändert hat, und E-Mail-Karten ohne
 //     Folgeaktivität (keine Notiz daran, kein Ticket dazu, keine Antwort im Gespräch). Nur Karten mit bekanntem
 //     Zeitpunkt; der Abschnitt erscheint nur, wenn es solche Karten gibt.
@@ -15,12 +16,13 @@
 // Bewusst keine Checklisten „- [ ]" in der Notiz: Sie würden als neue Aufgaben in der Aufgaben-Zentrale auftauchen
 // und die Fristen doppelt mahnen.
 import { useBoard, selectActiveBoard, mutedHistory, type BoardDoc } from '../store';
-import type { AppNode, MinutesData } from '../types';
+import { doneCol, kanbanCols, type AppNode, type KanbanData, type MinutesData } from '../types';
 import { collectTasks, formatDueShort, type TaskRef } from './tasks';
+import { fristenLaden } from './dates';
 import { nodeToText } from './serialize';
 import { findFreeSpot } from './arrange';
 import { tagLokal } from './tag';
-import { t } from './sprache';
+import { t, zahlWort } from './sprache';
 import { tageSeit, zeitVon } from './kartenZeit';
 
 export interface BoardLage {
@@ -31,6 +33,9 @@ export interface BoardLage {
   entscheidungen: Array<{ text: string; datum?: string; karte: string }>;
   inhalte: Array<{ id: string; titel: string }>;
   risiken: Array<{ text: string; karte: string }>;
+  /** M463: Risiken aus der STRUKTUR des Boards (ohne KI, vor den Wortmustern): überfällige Fristen mit Namen, Tickets
+   *  lange „in Arbeit", Pfeile mit blockierender Beziehung */
+  befunde: Array<{ text: string; karte: string }>;
   /** M453: Inhalt seit UNBERUEHRT_TAGE nicht geändert (älteste zuerst) */
   unberuehrt: Array<{ titel: string; tage: number }>;
   /** M453: E-Mail-Karten ohne Folgeaktivität seit MAIL_TAGE (älteste zuerst) */
@@ -64,6 +69,52 @@ function hatFolge(board: BoardDoc, mail: AppNode, seit: number): boolean {
     if (c.nodeId === mail.id && c.msgs.some((m) => Date.parse(m.at) > seit)) return true;
   }
   return false;
+}
+
+/** M463: ab wann ein Ticket als „lange in Arbeit" gilt – gemessen an der letzten Änderung seiner Kanban-Karte (M453) */
+export const IN_ARBEIT_TAGE = 14;
+const BEFUND_MAX = 3;
+/** M463: Beziehungsnamen an Pfeilen, die eine Blockade oder Abhängigkeit ausdrücken */
+const BLOCKIERT = /\b(blockier\w*|blockt|blocker\w*|block(s|ed|ing)?|hängt\s+(an|von)|wartet\s+auf|abhängig\w*|bremst|verhinder\w*|depends?\s+on|waits?\s+(for|on))\b/i;
+
+/** M463: Risiken aus der Struktur des Boards – ohne KI, aber mehr als ein Wortmuster */
+function befundeSammeln(board: BoardDoc, karten: AppNode[], ueberfaellig: TaskRef[], name: Map<string, string>, jetzt: number): BoardLage['befunde'] {
+  const out: BoardLage['befunde'] = [];
+  // 1. Überfällige Fristen mit Namen und Dauer, die ältesten zuerst
+  const alt = [...ueberfaellig].filter((a) => a.due).sort((a, b) => (a.due ?? '').localeCompare(b.due ?? ''));
+  for (const a of alt.slice(0, BEFUND_MAX)) {
+    const tage = Math.max(1, tageSeit(Date.parse(`${a.due}T23:59:59`), jetzt) + 1);
+    out.push({ text: t('Frist seit {0} überschritten: {1}').replace('{0}', zahlWort(tage, 'Tag', 'Tagen')).replace('{1}', a.text.trim().slice(0, 120)), karte: name.get(a.nodeId) ?? '' });
+  }
+  // 2. Tickets, die lange „in Arbeit" stehen: mittlere Spalten einer Kanban-Karte, die seit IN_ARBEIT_TAGE niemand
+  //    geändert hat (Tickets tragen keine eigene Zeit – die Karte stempelt bei jedem Verschieben, M453)
+  let inArbeit = 0;
+  for (const n of karten) {
+    if (n.type !== 'kanban' || inArbeit >= BEFUND_MAX) continue;
+    const d = n.data as KanbanData;
+    const z = zeitVon(n);
+    if (d.autoCollect || z === undefined) continue;
+    const tage = tageSeit(z, jetzt);
+    if (tage < IN_ARBEIT_TAGE) continue;
+    const cols = kanbanCols(d);
+    for (const it of d.items ?? []) {
+      if (inArbeit >= BEFUND_MAX) break;
+      if (it.col <= 0 || it.col >= doneCol(d) || !it.text?.trim()) continue;
+      out.push({ text: t('Seit {0} Tagen in „{1}“: {2}').replace('{0}', String(tage)).replace('{1}', cols[it.col] ?? '').replace('{2}', it.text.trim().slice(0, 120)), karte: d.title || name.get(n.id) || '' });
+      inArbeit += 1;
+    }
+  }
+  // 3. Pfeile, deren Beziehungsname eine Blockade nennt („blockiert", „wartet auf", „hängt an" …)
+  const aktiv = new Set(karten.map((n) => n.id));
+  let pfeile = 0;
+  for (const e of board.edges ?? []) {
+    if (pfeile >= BEFUND_MAX) break;
+    const label = String((e.data as { label?: unknown } | undefined)?.label ?? '').trim();
+    if (!label || !BLOCKIERT.test(label) || !aktiv.has(e.source) || !aktiv.has(e.target)) continue;
+    out.push({ text: `„${name.get(e.source) || t('Karte')}“ ${label} „${name.get(e.target) || t('Karte')}“`, karte: '' });
+    pfeile += 1;
+  }
+  return out;
 }
 
 const OHNE_INHALT = new Set(['shape', 'frame', 'portal', 'calendar', 'time']);
@@ -144,6 +195,7 @@ export function lageSammeln(board: BoardDoc, now: Date = new Date()): BoardLage 
     entscheidungen: entscheidungen.slice(0, 8),
     inhalte,
     risiken: risiken.slice(0, 6),
+    befunde: befundeSammeln(board, karten, aufgaben.filter((a) => a.urgency === 'overdue'), name, jetzt),
     unberuehrt: unberuehrt.slice(0, LISTE_MAX),
     mailsOhneFolge: mailsOhneFolge.slice(0, LISTE_MAX),
   };
@@ -186,7 +238,8 @@ export function lageMarkdown(l: BoardLage, now: Date = new Date()): string {
   teile.push([`## ${t('Entscheidungen')}`, ...(ent.length ? ent : [`- ${t('Keine Beschlüsse gefunden.')}`])].join('\n'));
   teile.push([`## ${t('Wichtigste Inhalte')}`, ...(l.inhalte.length ? l.inhalte.map((i) => `- ${i.titel}`) : [`- ${t('Das Board ist noch leer.')}`])].join('\n'));
   const ris = [
-    ...(l.ueberfaellig.length ? [`- **${t('{0} Aufgabe(n) überfällig').replace('{0}', String(l.ueberfaellig.length))}**`] : []),
+    ...(l.ueberfaellig.length ? [`- **${t('{0} überfällig').replace('{0}', zahlWort(l.ueberfaellig.length, 'Aufgabe', 'Aufgaben'))}**`] : []),
+    ...l.befunde.map((b) => `- ${b.text}${b.karte ? ` (${b.karte})` : ''}`),
     ...l.risiken.map((r) => `- ${r.text}${r.karte && r.karte !== r.text ? ` (${r.karte})` : ''}`),
   ];
   teile.push([`## ${t('Risiken und Blocker')}`, ...(ris.length ? ris : [`- ${t('Nichts erkannt.')}`])].join('\n'));
@@ -216,6 +269,7 @@ export const BRIEFING_BREITE = 380;
  * entsteht das Briefing lokal; abgebrochen wird ohne Karte.
  */
 export async function boardBriefing(rechtsOben: { x: number; y: number }, mitKi: boolean, fortschritt?: (m: string) => void): Promise<string> {
+  await fristenLaden().catch(() => {});   // M459: die Fristen-Erkennung lädt bei Bedarf
   const st0 = useBoard.getState();
   const board = selectActiveBoard(st0);
   const boardId = st0.activeId;
@@ -234,13 +288,14 @@ export async function boardBriefing(rechtsOben: { x: number; y: number }, mitKi:
         bald: lage.bald.map((a) => ({ aufgabe: a.text, frist: a.due, wer: a.who })),
         beschluesse: lage.entscheidungen.map((e) => ({ text: e.text, datum: e.datum, karte: e.karte })),
         risikozeilen: lage.risiken.map((r) => r.text),
+        befunde: lage.befunde.map((b) => b.text),
       };
       const antwort = await aufDemselbenBoard(() => askAi(
         `Heute ist ${tagLokal()}. Erstelle ein knappes Board-Briefing für das Board „${board.name}" auf Deutsch. `
         + 'Die Aufgaben mit Fristen stehen bereits als eigener Abschnitt im Briefing – wiederhole sie NICHT einzeln. '
         + 'Schreibe genau diese Abschnitte als "## "-Überschriften: Lage (ein bis zwei Sätze: worum es geht, wo es steht), '
         + 'Entscheidungen (nur, was in Protokollen/Beschlüssen wirklich steht – nichts erfinden), Wichtigste Inhalte (höchstens fünf Stichpunkte), '
-        + 'Risiken und Blocker (überfällige Fristen, Abhängigkeiten, offene Fragen). '
+        + 'Risiken und Blocker (überfällige Fristen, Abhängigkeiten, offene Fragen – die lokal erkannten Befunde gehören dazu). '
         + 'Nur Stichpunkte mit "- " und **fett** für Schlüsselbegriffe; KEINE Checklisten "- [ ]", keine Emojis, keine Codeblöcke, höchstens 16 Zeilen.\n\n'
         + `Lokal erkannte Fakten:\n${JSON.stringify(fakten)}\n\nKarten:\n${JSON.stringify(items)}`,
       ));
@@ -268,5 +323,5 @@ export async function boardBriefing(rechtsOben: { x: number; y: number }, mitKi:
   mutedHistory(() => st.addNode(notiz));
   st.focusNode(boardId, notiz.id);
   const zahl = lage.ueberfaellig.length;
-  return `${t('Board-Briefing angelegt')} (${wie})${zahl ? ` – ${t('{0} Aufgabe(n) überfällig').replace('{0}', String(zahl))}` : ''}${ausgelassen}.`;
+  return `${t('Board-Briefing angelegt')} (${wie})${zahl ? ` – ${t('{0} überfällig').replace('{0}', zahlWort(zahl, 'Aufgabe', 'Aufgaben'))}` : ''}${ausgelassen}.`;
 }

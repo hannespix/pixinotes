@@ -8,6 +8,7 @@
     "check": "tsc -b",
     "build": "tsc -b && vite build",
     "build:mcp": "node werkzeug/mcp-bauen.mjs",
+    "build:erweiterung": "node werkzeug/erweiterung-packen.mjs",
     "build:single": "vite build --mode single && node -e \"require('fs').renameSync('release/index.html','release/pixinotes.html')\"",
     "preview": "vite preview",
     "pruefen": "node werkzeug/alle-pruefungen.mjs"
@@ -23,6 +24,8 @@
     "@leeoniya/ufuzzy": "^1.0.19",
     "@mantine/core": "^8.3.18",
     "@mantine/hooks": "^8.3.18",
+    "@tesseract.js-data/deu": "^1.0.0",
+    "@tesseract.js-data/eng": "^1.0.0",
     "@xyflow/react": "^12.6.0",
     "canvas-confetti": "^1.9.3",
     "chrono-node": "^2.10.0",
@@ -36,6 +39,7 @@
     "qrcode-generator": "^2.0.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "tesseract.js": "^7.0.0",
     "zustand": "^5.0.3"
   },
   "devDependencies": {

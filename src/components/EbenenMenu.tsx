@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoard, type BoardSortierung } from '../store';
 import { boardToShareUrl, downloadBoardFile, hatAblageInhalt, SHARE_URL_LIMIT } from '../lib/share';
-import { FreigabeDialog } from './FreigabeDialog';
-import { LinkDialog } from './LinkDialog';
+import { FreigabeDialogSpaet } from './FreigabeHost';
+// M459: „Per Link teilen" (mit Konto-Anfragen) kommt erst beim Öffnen
+const LinkDialog = lazy(() => import('./LinkDialog').then((m) => ({ default: m.LinkDialog })));
 import {
   IArchive, IArchiveRestore, ICopy, IDownload, IDuplicate, IMore, IMoveTo,
   IPen, IPerson, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck, IUsers, IX, IUhr,
@@ -12,6 +13,7 @@ import { MENUE_HIER } from '../lib/kontextmenue';
 import { versionenOeffnen } from '../lib/boardVersionen';
 import { ebeneLoeschenFragen } from './EbeneLoeschenDialog';
 import { kontakteHerunterladen } from '../lib/kontaktExport';
+import { zahlWort } from '../lib/sprache';
 
 /**
  * M288: Ein Menü für die Ebenen ÜBER der Karte.
@@ -181,8 +183,8 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
 
   return (
     <>
-    {freigabe && createPortal(<FreigabeDialog boardId={boardId} onClose={() => setFreigabe(false)} />, document.body)}
-    {linkOffen && createPortal(<LinkDialog boardId={boardId} onClose={() => setLinkOffen(false)} ohneKonto={() => void teilen()} alsDatei={() => downloadBoardFile(board)} />, document.body)}
+    {freigabe && createPortal(<FreigabeDialogSpaet boardId={boardId} onClose={() => setFreigabe(false)} />, document.body)}
+    {linkOffen && createPortal(<Suspense fallback={null}><LinkDialog boardId={boardId} onClose={() => setLinkOffen(false)} ohneKonto={() => void teilen()} alsDatei={() => downloadBoardFile(board)} /></Suspense>, document.body)}
     <MenuHuelle titel={`Board „${board.name}": umbenennen, duplizieren, verschieben, archivieren, teilen, löschen`} klasse={klasse} kinder={(zu) => (
       verschieben ? (
         <>
@@ -248,7 +250,7 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
             className="ebenen-menu-gefahr"
             onClick={() => {
               const frage = board.nodes.length > 0
-                ? `Board „${board.name}" mit ${board.nodes.length} Karten wirklich LÖSCHEN? Archivieren legt es stattdessen nur zur Seite.`
+                ? `Board „${board.name}" mit ${zahlWort(board.nodes.length, 'Karte', 'Karten')} wirklich LÖSCHEN? Archivieren legt es stattdessen nur zur Seite.`
                 : `Board „${board.name}" wirklich löschen?`;
               if (window.confirm(frage)) removeBoard(boardId);
               zu();
@@ -373,8 +375,8 @@ export function ProjektMenu({ projectId, onRename, klasse = '' }: {
             // M390: gezählt wird, was wirklich archiviert wurde — das letzte sichtbare Board der Umgebung bleibt offen
             const geschafft = offen.filter((id) => useBoard.getState().boards.find((x) => x.id === id)?.archived).length;
             showToast(geschafft === offen.length
-              ? `„${projekt.name}": ${geschafft} Board(s) archiviert.`
-              : `„${projekt.name}": ${geschafft} von ${offen.length} Boards archiviert – das letzte sichtbare Board bleibt offen.`);
+              ? `„${projekt.name}": ${zahlWort(geschafft, 'Board', 'Boards')} archiviert.`
+              : `„${projekt.name}": ${geschafft} von ${zahlWort(offen.length, 'Board', 'Boards')} archiviert – das letzte sichtbare Board bleibt offen.`);
             zu();
           }}
         ><IArchive size={14} /> Alle Boards archivieren ({offen.length})</button>

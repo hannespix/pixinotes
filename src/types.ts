@@ -38,6 +38,12 @@ export interface ImageData {
   titel?: string;
   /** M374: Bilder sind rahmenlos — true holt die Karte mit Rand, Fläche und Schatten zurück */
   rahmen?: boolean;
+  /** M452: Text, den die Erkennung im Bild gefunden hat (leer = nichts gefunden) — macht Screenshots durchsuchbar */
+  ocrText?: string;
+  /** M452: wann erkannt (ms) */
+  ocrAm?: number;
+  /** M452: Fingerabdruck des Bildes, zu dem ocrText gehört — ändert sich das Bild (zuschneiden), wird neu erkannt */
+  ocrFuer?: string;
   [key: string]: unknown;
 }
 
@@ -62,6 +68,10 @@ export interface FileData {
   lokal?: boolean;
   /** M392: Ein Bild, das als Datei abgelegt ist, liegt rahmenlos auf dem Board — true holt die Karte mit Kopfzeile und Rand zurück */
   rahmen?: boolean;
+  /** M452: erkannter Text eines Bildes, das als Datei abgelegt ist (wie ImageData) */
+  ocrText?: string;
+  ocrAm?: number;
+  ocrFuer?: string;
   [key: string]: unknown;
 }
 
@@ -462,7 +472,8 @@ export type AppNode =
   // winkel (M400): Die Karte liegt schräg – Grad im Uhrzeigersinn um ihre Mitte; fehlt ⇒ gerade (lib/drehung.ts).
   // angelegt/geaendert (M453): Zeitpunkt der Anlage bzw. der letzten INHALTLICHEN Änderung (ms, lib/kartenZeit.ts) —
   // fehlt bei Karten aus der Zeit davor („unbekannt").
-  & { angelegt?: number; geaendert?: number; archived?: boolean; autoFit?: boolean; font?: CardFont; fontSize?: CardSize; kachel?: boolean; kachelMass?: { w: number; h: number }; winkel?: number };
+  // ohneOrdnen (M463): „Nicht mit ordnen" – „Nach Themen ordnen" (lib/themenOrdnen.ts) lässt die Karte liegen.
+  & { angelegt?: number; geaendert?: number; ohneOrdnen?: boolean; archived?: boolean; autoFit?: boolean; font?: CardFont; fontSize?: CardSize; kachel?: boolean; kachelMass?: { w: number; h: number }; winkel?: number };
 
 /** M298: Modultypen, die sich zur Kachel zusammenklappen lassen */
 export const KACHEL_TYPEN: ReadonlySet<string> = new Set(['kanban', 'gantt', 'week', 'minutes']);

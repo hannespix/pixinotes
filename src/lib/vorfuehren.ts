@@ -28,7 +28,7 @@
 // M414: Eigene Tools werden gespiegelt (lib/spiegel.ts): Die Zuschauer sehen ein Abbild dessen, was beim
 // Vorführenden im Tool steht — vorher rechnete jedes Gerät das Tool selbst, mit seinem eigenen Speicherstand,
 // eigenem Zufall und eigener Zeit; nachgestellt wurden nur Eingaben. Das Spiegeln lädt erst nach, wenn es gebraucht wird.
-import { ich, ichIn, LIVE_NACHRICHT, liveSenden, teilnehmerVon } from './gastSync';
+import { ich, ichIn, LIVE_NACHRICHT, liveSenden, teilnehmerVon } from './liveStand';
 
 export interface Sicht { x: number; y: number; w: number; h: number }
 /** Stelle im Vortrag: die Karte, die als Folie offen ist, und die Seite darin */

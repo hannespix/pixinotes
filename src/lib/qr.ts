@@ -3,7 +3,7 @@
 // Der Code entsteht hier im Browser (kleine Bibliothek, erst beim Aufruf geladen). Der Link geht dafür an
 // keinen fremden Dienst: Er IST der Zugang zum Board.
 import { useBoard } from '../store';
-import { einladungVon } from './gastSync';
+import { einladungVon } from './liveStand';
 import { einladungUrl } from './einladung';
 
 export const QR_EREIGNIS = 'pixinotes:qr';

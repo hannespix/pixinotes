@@ -15,6 +15,7 @@ const SPALTE_STD = 84;
 import { MenuHuelle } from '../EbenenMenu';
 import { loadFile } from '../../lib/fileStore';
 import { triggerDownload } from '../../lib/download';
+import { zahlWort } from '../../lib/sprache';
 
 /**
  * M256: Rechen-Tabelle — „Autosummen direkt in den Notizen".
@@ -436,7 +437,7 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
           </>
         ) : gefiltert && ansicht ? (
           <>
-            <span className="sheet-fuss-text" data-taste="sheet-filter-stand">{`${ansicht.gezeigt} von ${ansicht.daten} Zeilen`}</span>
+            <span className="sheet-fuss-text" data-taste="sheet-filter-stand">{`${ansicht.gezeigt} von ${zahlWort(ansicht.daten, 'Zeile', 'Zeilen')}`}</span>
             <button className="sheet-filter-weg nodrag" data-taste="sheet-filter-weg" onClick={() => updateNodeData(id, { filter: undefined, sort: undefined })}>Filter aufheben</button>
           </>
         ) : <>Zelle antippen zum Bearbeiten · <code>=</code> beginnt eine Formel · Σ setzt Summen</>}

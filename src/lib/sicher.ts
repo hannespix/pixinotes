@@ -66,6 +66,51 @@ export function kontaktBild(roh: unknown): string | null {
 }
 
 /**
+ * M458: Text, der von außen hereinkommt (Browser-Erweiterung, Teilen-Adresse). Nur Zeichenketten; Steuerzeichen
+ * außer Zeilenumbruch und Tabulator fallen weg, Länge gedeckelt. Spitze Klammern bleiben stehen — der Text landet
+ * ausschließlich als TEXT in Notiz und Dialog (nie als HTML), ein „<script>" darin ist dort nur Buchstaben.
+ */
+export function textVonAussen(roh: unknown, hoechstens = 20_000): string {
+  if (typeof roh !== 'string') return '';
+  return roh.normalize('NFC').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u202A-\u202E\u2066-\u2069]/g, '').trim().slice(0, hoechstens);
+}
+
+/**
+ * M466: Mail-Inhalt aus Microsoft Graph (meist HTML) als reiner Text für die E-Mail-Karte. Das HTML wird nur in ein
+ * TRÄGES Dokument geparst (DOMParser: keine Skripte, keine Ereignisse, kein Nachladen von Bildern oder Styles), dann
+ * fallen script/style/head/Formulare weg, Blöcke werden Zeilenumbrüche, und am Ende gilt dieselbe Säuberung wie für
+ * jeden Text von außen. Auf dem Board steht danach nie HTML — ein „<script>" in der Mail bleibt Buchstabe oder fällt weg.
+ */
+export function mailTextVonAussen(roh: unknown, art: 'html' | 'text' = 'html', hoechstens = 200_000): string {
+  if (typeof roh !== 'string') return '';
+  if (art === 'text') return textVonAussen(roh, hoechstens);
+  const doc = new DOMParser().parseFromString(roh.slice(0, 2_000_000), 'text/html');
+  doc.querySelectorAll('script, style, head, noscript, template, iframe, object, embed, svg, form').forEach((el) => el.remove());
+  doc.querySelectorAll('br').forEach((el) => el.replaceWith('\n'));
+  doc.querySelectorAll('p, div, li, tr, h1, h2, h3, h4, h5, h6, blockquote, table').forEach((el) => el.append('\n'));
+  const text = (doc.body?.textContent ?? '').replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+  return textVonAussen(text, hoechstens);
+}
+
+/** M458: Webadresse von außen (Quelle einer gesendeten Seite) — nur http(s), höchstens 2 000 Zeichen */
+export function webAdresseVonAussen(roh: unknown): string | null {
+  if (typeof roh !== 'string' || !roh.trim() || roh.length > 2000) return null;
+  try {
+    const u = new URL(roh.trim());
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
+  } catch { return null; }
+}
+
+/**
+ * M458: Eingebettetes Rasterbild von außen (Bild oder Bildschirmfoto aus der Browser-Erweiterung): nur
+ * data:image/png|jpeg|gif|webp als base64 — kein SVG (darin können Skripte stehen), keine Webadresse.
+ */
+export function rasterBildVonAussen(roh: unknown, hoechstens = 25_000_000): string | null {
+  if (typeof roh !== 'string' || roh.length > hoechstens) return null;
+  return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
+}
+
+/**
  * M457: Kontakt-Felder, die aus einer fremden E-Mail (Signatur) oder aus einer KI-Antwort stammen. Nur Text, gekürzt,
  * ohne Steuerzeichen; E-Mail nur in Adressform, Webseite nur http(s) (auch ohne „https://“ geschrieben), Rufnummern
  * höchstens zwölf, kein Foto. Felder, die nicht als brauchbarer Text kommen, fehlen im Ergebnis.

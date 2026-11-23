@@ -4,6 +4,7 @@ import { useBoard } from '../store';
 import { useRandZiehen } from '../lib/randZiehen';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { collectTasks } from '../lib/tasks';
+import { useFristenStand } from '../lib/dates';
 import { InlineName } from './InlineName';
 import { NavTree } from './Navigation';
 import { IChevronL, IChevronR, IHelp, IHome, IPanelLeft, IPlus, ITasks, IVorlage, IX } from './Icons';
@@ -54,10 +55,13 @@ export function Tabs() {
   const neuRef = useRef<HTMLDivElement | null>(null);
   useOutsideClose(neuMenu, neuRef, () => setNeuMenu(false));
   // Offene Aufgaben über alle Boards — die Zahl am Eintrag „Aufgaben"
+  // M459: die Fristen-Erkennung lädt bei Bedarf — danach neu zählen (überfällig hängt an ihr)
+  const fristenStand = useFristenStand();
   const taskStats = useMemo(() => {
     const ts = collectTasks(boards);
     return { open: ts.length, overdue: ts.filter((t) => t.urgency === 'overdue').length };
-  }, [boards]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boards, fristenStand]);
   // M245: Die Ausstülpung ist in der Breite ziehbar, die Breite wird gemerkt
   const navBreite = useBoard((s) => s.navBreite);
   const setNavBreite = useBoard((s) => s.setNavBreite);

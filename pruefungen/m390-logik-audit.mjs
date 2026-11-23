@@ -43,7 +43,7 @@ console.log('\n════ A: Rechnen und Lesen ════');
   const lib = (n) => JSON.stringify(path.join(__repo, 'src', 'lib', n));
   const einstieg = path.join(SD, 'm390-einstieg.ts');
   writeFileSync(einstieg, [
-    `export { rechneBlatt } from ${lib('formel')};`, `export { detectDates, hatRelativesDatum } from ${lib('dates')};`,
+    `export { rechneBlatt } from ${lib('formel')};`, `export { detectDates, hatRelativesDatum, fristenLaden } from ${lib('dates')};`,
     `export { fristAnkerPflegen, fristenDerNotiz } from ${lib('fristAnker')};`, `export { linksUmbenennen } from ${lib('links')};`,
     `export { blocksToMarkdown } from ${lib('serialize')};`, `export { textZuBloecken } from ${lib('textNotiz')};`,
     `export { holeZurueck, autoArchivLauf } from ${lib('ticketArchiv')};`, `export { frameMembers } from ${lib('arrange')};`,
@@ -56,6 +56,7 @@ console.log('\n════ A: Rechnen und Lesen ════');
   globalThis.document = { addEventListener() {}, removeEventListener() {}, querySelector: () => null, querySelectorAll: () => [], documentElement: { style: {}, dataset: {}, classList: { add() {}, remove() {}, toggle() {} }, setAttribute() {} }, createElement: () => ({ style: {}, setAttribute() {}, appendChild() {} }), body: { appendChild() {}, classList: { add() {}, remove() {}, toggle() {} } }, hidden: false, visibilityState: 'visible' };
   globalThis.navigator ??= { userAgent: 'node', language: 'de-DE' };
   const m = await import(pathToFileURL(aus).href);
+  await m.fristenLaden();   // M459: die Fristen-Erkennung lädt bei Bedarf (in der App beim ersten Text mit Datum)
 
   const f = m.rechneBlatt({ A1: '0721 9260', A2: '01067', A3: '1 250', A4: '3.000', A5: '1.5', A6: '12 345 6', B1: '=A3+A4', B2: '=A5*2', B3: '=SUMME(A1:A2)', B4: '=ANZAHL(A1:A6)' });
   pruefe('A1 „1 250" und „3.000" sind Zahlen (Tausender), „1.5" bleibt eine Dezimalzahl', f.B1 === 4250 && f.B2 === 3, [f.B1, f.B2]);

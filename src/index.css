@@ -58,6 +58,15 @@
    */
   --app-rand: 0px;
   --head-space: calc(110px + var(--safe-top) + var(--app-rand));
+  /*
+   * M464: Eigene Mauszeiger — nur hier (und für Inline-Styles über lib/zeiger.ts).
+   * Unter Windows ist das System-Fadenkreuz („Präzisionsauswahl") ein dünnes, invertierendes
+   * 1-px-Kreuz: auf mittelgrauen Flächen, Screenshots und bei 150 % Anzeige kaum zu sehen.
+   * Darum ein eigenes Fadenkreuz mit Doppelkontur (dunkel innen, weiß außen) — sichtbar auf
+   * hellem und dunklem Grund. 24 px (über 32 px ignoriert Chrome/Edge unter Windows den Zeiger
+   * am Fensterrand), Hotspot in der Mitte, immer mit System-Fallback dahinter.
+   */
+  --zeiger-fadenkreuz: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 2v7M12 15v7M2 12h7M15 12h7' stroke='%23fff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M12 2v7M12 15v7M2 12h7M15 12h7' stroke='%23111' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='12' r='1.7' fill='%23111' stroke='%23fff' stroke-width='1.2'/%3E%3C/svg%3E") 12 12, crosshair;
 }
 
 /* ---------- Akzentfarben-Themes ---------- */
@@ -478,6 +487,17 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   position: absolute; top: 100%; left: 0; margin-top: 7px; min-width: min(160px, calc(60vw / var(--pn-anz, 1))); max-width: max(100%, 220px);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* M465: Mit Angaben aus dem Text im Bild stehen Name und Chips gemeinsam unter dem Bild — ebenfalls außerhalb der Karte */
+.card-shell > .bild-unten {
+  position: absolute; top: 100%; left: 0; margin-top: 7px; display: flex; flex-direction: column; gap: 5px;
+  width: max(100%, min(340px, calc(70vw / var(--pn-anz, 1)))); z-index: 2;
+}
+.bild-unten > .img-name.unterschrift { margin-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bildtext-chips { margin-top: 0; padding: 0; }
+.bildtext-frist { display: inline-flex; gap: 3px; }
+.due-chip.bildtext-aufgabe { display: inline-flex; align-items: center; gap: 4px; background: transparent; border-color: var(--border); color: var(--muted); }
+.due-chip.bildtext-aufgabe:hover { color: var(--ink); border-color: var(--accent); }
+.bildtext-chips .due-chip:not(.bildtext-aufgabe) { display: inline-flex; align-items: center; gap: 4px; }
 /* Nicht markiert: kein Griff, keine Anschlusspunkte, keine Lupe — auch nicht beim Zeigen */
 .react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .pn-handle,
 .react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .card-grip { opacity: 0; pointer-events: none; }
@@ -1024,6 +1044,8 @@ input.img-titel {
 .hit-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .hit-title { font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hit-snippet { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* M452: Der Treffer kam aus dem Text im Bild — leise Marke vor dem Ausschnitt */
+.hit-im-bild { color: var(--accent-strong); font-weight: 600; margin-right: 6px; }
 .hit-board {
   font-size: 10.5px; color: var(--muted); background: var(--surface-dim);
   border-radius: var(--r-pill); padding: 2px 9px; flex: none; max-width: 130px;
@@ -2138,7 +2160,7 @@ dl.leer-wege dd { margin: 0; }
   background: #fff; line-height: 0;
 }
 .pdf-seite canvas { width: 100%; height: auto; display: block; }
-.pdf-seite.pin-modus { cursor: crosshair; outline: 2px solid var(--accent); outline-offset: -2px; }
+.pdf-seite.pin-modus { cursor: var(--zeiger-fadenkreuz); outline: 2px solid var(--accent); outline-offset: -2px; }
 /* M337: Word-Seite — docx-preview baut die Seiten auf, sichtbar ist eine, skaliert auf Kartenbreite */
 .word-seite { line-height: normal; color: #000; }
 .word-inhalt { position: relative; }
@@ -2976,7 +2998,7 @@ dl.leer-wege dd { margin: 0; }
   width: 22px !important; height: 22px !important;
   background: transparent !important; border: none !important;
   opacity: 0; transition: opacity 0.15s;
-  cursor: crosshair !important;
+  cursor: var(--zeiger-fadenkreuz) !important;
   /* Über dem Karteninhalt: die innere Kreis-Hälfte (Optik UND Trefferfläche)
      wurde sonst vom später gerenderten card-body verdeckt (M102) */
   z-index: 5 !important;
@@ -3000,6 +3022,8 @@ dl.leer-wege dd { margin: 0; }
 /* Während des Verbindens: Ganzkarten-Ziel aktiv, alle Anschlüsse sichtbar,
    Karte unter dem Zeiger leuchtet als Ziel auf */
 .react-flow:has(.react-flow__connectionline) .pn-handle-body { pointer-events: all !important; }
+/* M464: React Flow setzt an Anschlüssen das System-Fadenkreuz — unter Windows kaum sichtbar */
+.react-flow__handle.connectionindicator { cursor: var(--zeiger-fadenkreuz); }
 .react-flow:has(.react-flow__connectionline) .pn-handle { opacity: 1; }
 .react-flow:has(.react-flow__connectionline) .pn-handle-body:hover {
   box-shadow: inset 0 0 0 2.5px var(--accent);
@@ -3066,6 +3090,8 @@ dl.leer-wege dd { margin: 0; }
   border-radius: var(--r-sm); cursor: pointer; font-size: 13px; padding: 0; text-align: center;
 }
 .sel-attr-hint { font-size: 10px; color: var(--muted); padding: 2px 6px 3px; line-height: 1.4; }
+/* M463: Änderungszeit im ⋯ der Karte – eine leise Zeile unter allen Einträgen, kein Knopf */
+.sel-menu-zeit { font-size: 10.5px; color: var(--muted); padding: 5px 8px 2px; margin-top: 3px; border-top: 1px solid var(--border-soft); }
 
 .sel-toolbar .sel-ai-wrap > button { position: relative; }
 /* M127: Zähler-Badge (z. B. Anzahl geankerter Markierungen) an Toolbar-Buttons */
@@ -4626,6 +4652,24 @@ button.link-dead:disabled { opacity: 0.45; }
 .on-sec span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .on-empty { font-size: 11px; color: var(--muted); padding: 2px 14px; }
 .on-progress { display: flex; align-items: center; gap: 9px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+
+/* M466: Outlook-Fenster — ruhige Liste wie ein Posteingang, ein Knopf je Mail */
+.outlook-modal { max-width: 620px; }
+.outlook-suche { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; color: var(--muted); }
+.outlook-suche input { flex: 1; min-width: 0; }
+.outlook-kopf { font-size: 12px; color: var(--muted); margin: 6px 0 4px; min-height: 16px; }
+.outlook-liste { list-style: none; margin: 0; padding: 0; max-height: min(52vh, 460px); overflow-y: auto; border-top: 1px solid var(--border-soft); }
+.outlook-mail { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--border-soft); }
+.outlook-text { flex: 1; min-width: 0; }
+.outlook-zeile1 { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.outlook-zeile1 b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.outlook-mail.ungelesen .outlook-zeile1 b, .outlook-mail.ungelesen .outlook-betreff { font-weight: 650; }
+.outlook-datum { color: var(--muted); font-size: 12px; flex: none; }
+.outlook-betreff, .outlook-vorschau { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.outlook-vorschau { color: var(--muted); font-size: 12px; }
+.outlook-mail > button { flex: none; }
+.outlook-leer { padding: 14px 2px; color: var(--muted); font-size: 13px; }
+.outlook-konto { flex: 1; font-size: 12px; color: var(--muted); align-self: center; }
 .on-bar { flex: 1; height: 6px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; }
 .on-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.3s ease; }
 
@@ -7014,7 +7058,10 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 .live-zeiger.laser .live-zeiger-name { left: 12px; top: 10px; background: #d91e1e; }
 /* Laser auf der Folie: eine Schicht genau über der Folie */
 .folien-laser { position: absolute; z-index: 4; pointer-events: none; overflow: hidden; border-radius: var(--r-lg); }
-.folien-laser.an { pointer-events: auto; cursor: none; touch-action: none; }
+/* M464: Den Systemzeiger nur verstecken, solange der eigene Laserpunkt wirklich zu sehen ist (data-sichtbar) —
+   vorher war der Zeiger nach L ohne Bewegung einfach weg, ohne Punkt als Ersatz. Ohne :has() bleibt er sichtbar. */
+.folien-laser.an { pointer-events: auto; touch-action: none; }
+.folien-laser.an:has(> .laser-punkt.mein[data-sichtbar]) { cursor: none; }
 .folien-laser .laser-punkt {
   position: absolute; margin: -7px 0 0 -7px; pointer-events: none;
   transition-property: left, top; transition-timing-function: linear;
@@ -7127,7 +7174,7 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 .be-masse { flex: none; font-size: 11.5px; font-variant-numeric: tabular-nums; }
 .be-buehne { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .be-hinweis { color: #b8b2a4; font-size: 14px; }
-.be-blatt { position: relative; flex: none; cursor: crosshair; touch-action: none; }
+.be-blatt { position: relative; flex: none; cursor: var(--zeiger-fadenkreuz); touch-action: none; }
 .be-blatt canvas { display: block; width: 100%; height: 100%; background:
   repeating-conic-gradient(#3a3731 0% 25%, #2b2924 0% 50%) 0 0 / 16px 16px; }
 .be-schicht { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
@@ -7180,7 +7227,7 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
 /* Die Zeichenschicht liegt über der Folie (wie der Laser) — sie fängt Eingaben nur, solange ein Werkzeug gewählt ist */
 .folien-stift { position: absolute; z-index: 3; pointer-events: none; overflow: hidden; }
 .folien-stift > svg { display: block; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
-.folien-stift.an { z-index: 5; pointer-events: auto; touch-action: none; cursor: crosshair; }
+.folien-stift.an { z-index: 5; pointer-events: auto; touch-action: none; cursor: var(--zeiger-fadenkreuz); }
 .folien-stift.an.eraser { cursor: cell; }
 .folien-pin { pointer-events: all; cursor: pointer; outline: none; }
 .folien-pin circle { fill: #f5b301; stroke: #fff; stroke-width: 2; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .35)); }
@@ -7567,6 +7614,23 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 .versionen-knoepfe button:disabled, .versionen-fuss button:disabled { opacity: 0.5; cursor: default; }
 .versionen-fuss { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 14px 20px 16px; }
 .versionen-fuss small { font-size: 11.5px; color: var(--muted); }
+/* M460: Löschen ist leise (ohne Rahmen) — es soll neben Wiederherstellen nicht gleich gewichtig wirken */
+.versionen-knoepfe button.versionen-leise { border-color: transparent; background: none; color: var(--muted); margin-left: auto; }
+.versionen-knoepfe button.versionen-leise:hover { color: var(--ink); background: var(--surface-3); }
+/* M460: Karte für Karte — eine ruhige Liste unter der Vorschau, Zurückholen als kleiner Textknopf */
+.versionen-vergleich h3 { font-size: 11.5px; font-weight: 600; color: var(--muted); margin: 2px 0 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.versionen-vergleich ul { list-style: none; margin: 0; padding: 0; max-height: 168px; overflow-y: auto; border: 1px solid var(--border-soft); border-radius: var(--r); }
+.versionen-vergleich li { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12.5px; min-height: 30px; }
+.versionen-vergleich li + li { border-top: 1px solid var(--border-soft); }
+.versionen-vergleich li > svg { flex: none; color: var(--muted); }
+.versionen-vergleich .vv-titel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.versionen-vergleich small { flex: none; font-size: 11.5px; color: var(--muted); }
+.versionen-vergleich button {
+  flex: none; font-family: inherit; font-size: 12px; cursor: pointer; color: var(--accent-strong); background: none; border: 0;
+  border-radius: var(--r); padding: 3px 6px;
+}
+.versionen-vergleich button:hover, .versionen-vergleich button:focus-visible { background: var(--surface-3); }
+.versionen-vergleich button:disabled { opacity: 0.5; cursor: default; }
 @media (max-width: 560px) {
   .versionen-teile { grid-template-columns: 1fr; padding: 0 12px; }
   .versionen-liste { max-height: 180px; }
@@ -8220,7 +8284,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools
+    .kontakt-tools,
+    .bildtext-chips
 ) { transition: opacity 0.14s ease; }
 @media (hover: hover) {
   .react-flow__node:not(.selected):not(:focus-within):not(:hover) :is(
@@ -8232,7 +8297,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools
+    .kontakt-tools,
+    .bildtext-chips
   ) { opacity: 0; }
   /* Zeiger ruht auf der Karte: erst nach einem Moment einblenden. Als Animation (hält während des Verzugs bei 0),
      damit ein Klick — die Karte ist dann markiert, die Regel greift nicht mehr — sofort alles zeigt. */
@@ -8245,7 +8311,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools
+    .kontakt-tools,
+    .bildtext-chips
   ) { animation: pn-bedienung-ein 0.16s ease 0.35s backwards; }
 }
 /* Finger: kein Zeiger, der ruhen könnte — erst antippen (markieren), dann bedienen. Unsichtbares fängt keinen Tipp. */
@@ -8259,7 +8326,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools
+    .kontakt-tools,
+    .bildtext-chips
   ) { opacity: 0; pointer-events: none; }
 }
 

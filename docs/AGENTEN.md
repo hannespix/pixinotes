@@ -15,6 +15,11 @@ Jeder Arbeits-Agent liefert selbstständig bis zum Merge.
 1. **Eine Nummer, ein Branch, ein PR, eine Datei in `docs/meilensteine/`.**
 2. **Ports:** Die Prüfreihe von Meilenstein N lauscht auf **5000 + N**
    (M444 → 5444; zwei Server → 5444 und 6444). Alte Reihen nutzen 4431–4776.
+   **Alte Reihen immer über `node werkzeug/alle-pruefungen.mjs …` starten**, nie
+   direkt mit `node pruefungen/…`: der Läufer sperrt Ports über alle Worktrees
+   (`$TMPDIR/pixinotes-pruef-sperren/`, PID des Halters, tote Halter werden
+   übernommen) – parallele Agenten warten aufeinander statt an EADDRINUSE zu
+   scheitern.
 3. **CSS:** neue Regeln nicht ans Ende von `index.css` hängen, sondern an den
    thematisch passenden Abschnitt (oder in den Block des Moduls) — das Ende
    ist der Konflikt-Hotspot. Ausnahme: die drei Listen „Bedienung nur im
@@ -40,11 +45,24 @@ PR auf claude/notes-whiteboard-design-bnwvxj, selbst gemergt (squash).
 Rückmeldung: 5 Zeilen — PR-Link, was geändert, was offen.
 ```
 
+## Nachtlauf
+Jede Nacht (02:17 UTC) fährt `.github/workflows/nachtlauf.yml` die **volle**
+Prüfreihe gegen den Hauptzweig (M468) – auf dem Runner ohne die drei
+Datenbank-Reihen (`--ohne-datenbank`). Ist etwas rot, steht es in **einem**
+offenen Issue „Nachtlauf rot" (Label `nachtlauf`) mit der Liste der roten
+Reihen und dem Link zum Lauf; der nächste grüne Lauf schließt es. **Der
+Orchestrator schaut morgens zuerst dorthin** und vergibt je rote Reihe (oder
+je gemeinsame Ursache) eine Aufgabe, bevor neue Meilensteine starten. Bericht
+und `nachtlauf-ergebnis.json` liegen als Artefakt am Lauf; die Zusammenfassung
+des Laufs zeigt grün/rot je Reihe mit Dauer. Von Hand starten: Workflow
+„Nachtlauf" → *Run workflow* (`auswahl` = nur einige Reihen, ein solcher Lauf
+fasst das Issue nicht an).
+
 ## Token sparen
 - Agenten lesen gezielt (`grep -n`, `sed -n a,bp`), nie ganze 8 000-Zeilen-
   Dateien.
 - `docs/UMBAU.md` nur per `grep` nach dem betroffenen Dateinamen befragen.
 - Prüfreihen nur für den eigenen Bereich laufen lassen
   (`node werkzeug/alle-pruefungen.mjs m29 m44`), die volle Reihe läuft
-  nachts bzw. auf Wunsch.
+  nachts (Abschnitt „Nachtlauf") bzw. auf Wunsch.
 - Rückmeldungen kurz halten; Details gehören in die Meilenstein-Datei.

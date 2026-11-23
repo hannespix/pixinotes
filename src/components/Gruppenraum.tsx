@@ -9,8 +9,9 @@ import {
   REAKTION_EREIGNIS, REAKTIONEN, reagieren, TIMER_EREIGNIS, timerRest, timerStart, timerStopp, timerText, timerVergessen, timerVon,
   type Reaktion,
 } from '../lib/gruppenraum';
-import { ich } from '../lib/gastSync';
+import { ich } from '../lib/liveStand';
 import { ITimer, IX, ILaecheln } from './Icons';
+import { zahlWort } from '../lib/sprache';
 
 /** Aufklappen mit Schließen bei Klick daneben und Esc */
 function useAufklappen(wurzel: string): [boolean, (an: boolean | ((o: boolean) => boolean)) => void] {
@@ -58,7 +59,7 @@ export function TimerZeile({ boardId, fertig }: { boardId: string; fertig: () =>
       <span className="timer-zeile-titel" title="Einer stellt die Uhr, alle sehen sie ablaufen"><ITimer size={15} /> Timer für alle</span>
       <span className="timer-zeile-zeiten">
         {ZEITEN.map((m) => (
-          <button key={m} data-taste="timer-min" data-min={m} title={`${m} Minuten`} aria-label={`${m} Minuten`} onClick={() => { timerStart(boardId, m); fertig(); }}>{m}</button>
+          <button key={m} data-taste="timer-min" data-min={m} title={zahlWort(m, 'Minute', 'Minuten')} aria-label={zahlWort(m, 'Minute', 'Minuten')} onClick={() => { timerStart(boardId, m); fertig(); }}>{m}</button>
         ))}
         <span className="timer-zeile-einheit">min</span>
         {laeuft && <button className="stopp" data-taste="timer-stopp" onClick={() => { timerStopp(boardId); fertig(); }}>Anhalten</button>}

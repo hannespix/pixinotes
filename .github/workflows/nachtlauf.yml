@@ -1,0 +1,88 @@
+# M468: Jede Nacht alle Prüfreihen (pruefungen/m*.mjs) gegen den Hauptzweig.
+# Die PR-Prüfung (pruefen.yml) baut nur; die E2E-Reihen laufen dort, wo ein Agent arbeitet, und meist nur die
+# betroffenen (--geaendert). Was parallele Meilensteine nebenbei kaputt machen, fällt so erst Tage später auf.
+# Dieser Lauf fährt die volle Reihe, legt Bericht und JSON als Artefakt ab, schreibt grün/rot je Reihe in die
+# Zusammenfassung und hält EIN Issue „Nachtlauf rot" (Label nachtlauf) aktuell – beim nächsten grünen Lauf
+# schließt er es. Der Orchestrator schaut morgens dorthin (docs/AGENTEN.md, „Nachtlauf").
+# Reihen an der lokalen Datenbank (m383b, m388b, m391b: psql/pntest) laufen hier nicht (--ohne-datenbank).
+name: Nachtlauf
+
+on:
+  schedule:
+    - cron: '17 2 * * *' # 02:17 UTC, außerhalb der vollen Stunde (dort stauen sich geplante Läufe)
+  workflow_dispatch:
+    inputs:
+      bahnen:
+        description: 'Reihen gleichzeitig (leer = Kerne − 1)'
+        required: false
+        default: ''
+      auswahl:
+        description: 'Nur Reihen, deren Name so beginnt (z. B. "m44 m45"; leer = alle)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: nachtlauf
+  cancel-in-progress: false
+
+jobs:
+  alle-reihen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Chromium installieren
+        # die Reihen erwarten /opt/pw-browsers/chromium (Claude-Umgebung) – hier den Pfad von playwright-core setzen
+        run: |
+          npx playwright-core install --with-deps --no-shell chromium
+          echo "PW_CHROMIUM=$(node werkzeug/chromium-pfad.mjs)" >> "$GITHUB_ENV"
+      - name: Bauen
+        id: bauen
+        # dist/ für alle Reihen; Single-File (m321, m446) und MCP-Server (m443, m454, m463) aus demselben Stand
+        run: |
+          npm run build
+          npm run build:single
+          npm run build:mcp
+      - name: Prüfreihen
+        id: pruefen
+        timeout-minutes: 150
+        env:
+          BAHNEN: ${{ inputs.bahnen }}
+          AUSWAHL: ${{ inputs.auswahl }}
+        run: |
+          # ubuntu-latest hat 4 Kerne: eine Bahn weniger, damit Takt- und Warte-Messungen nicht unter Eigenlast wackeln
+          if [ -z "$BAHNEN" ]; then BAHNEN=$(( $(nproc) > 2 ? $(nproc) - 1 : 1 )); fi
+          echo "Bahnen: $BAHNEN · Last vorher: $(cut -d' ' -f1-3 /proc/loadavg)"
+          node werkzeug/alle-pruefungen.mjs $AUSWAHL --ohne-datenbank --bahnen "$BAHNEN" \
+            --bericht nachtlauf-bericht.txt --json nachtlauf-ergebnis.json
+      - name: Bericht ablegen
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nachtlauf-bericht
+          path: |
+            nachtlauf-bericht.txt
+            nachtlauf-ergebnis.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Zusammenfassung und Issue
+        if: always()
+        uses: actions/github-script@v7
+        env:
+          BAU: ${{ steps.bauen.outcome }}
+          LAUF: ${{ steps.pruefen.outcome }}
+          AUSWAHL: ${{ inputs.auswahl }}
+        with:
+          script: |
+            const melden = require('./werkzeug/nachtlauf-melden.cjs');
+            const laufUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await melden({ github, context, core, datei: 'nachtlauf-ergebnis.json', bau: process.env.BAU, lauf: process.env.LAUF, laufUrl, teilauswahl: process.env.AUSWAHL ?? '' });

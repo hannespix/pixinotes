@@ -25,7 +25,8 @@
  * an dem er entstand.
  */
 import { ankerFuer, type FristAnker } from './fristAnker';
-import { de as chronoDe, type ParsedResult } from 'chrono-node';
+import type { ParsedResult } from 'chrono-node';
+import { chronoDe } from './chronoKern';
 import { kurzdaten, nurWortKeinTag } from './dates';
 
 export interface NotizTermin {

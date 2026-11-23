@@ -20,6 +20,7 @@ import { FRAME_COLORS } from './frameOps';
 import { aiReady, kiAbbruchZuruecksetzen, kiAbgebrochen } from './ai';
 import { askJson, auslassungsHinweis, gather } from './aiActions';
 import { nodeToText } from './serialize';
+import { zahlWort } from './sprache';
 
 export interface ThemenGruppe { titel: string; ids: string[] }
 export interface ThemenVorschlag {
@@ -38,10 +39,16 @@ const TITEL_MAX = 40;
 /** Was geordnet wird: die Auswahl (ohne Rahmen) – oder ohne Auswahl alle losen Karten des Boards
  *  (nicht archiviert, keine Rahmen, in keinem Rahmen). Bereits gerahmte Inhalte bleiben, wo sie sind. */
 export function themenKandidaten(alle: AppNode[], auswahl?: AppNode[]): AppNode[] {
-  if (auswahl && auswahl.length) return auswahl.filter((n) => n.type !== 'frame' && !n.archived);
+  // M463: Karten mit „Nicht mit ordnen" (Eigenschaft im ⋯ der Karte) bleiben immer liegen – auch in einer Auswahl
+  if (auswahl && auswahl.length) return auswahl.filter((n) => n.type !== 'frame' && !n.archived && !n.ohneOrdnen);
   const rahmen = alle.filter((n) => n.type === 'frame' && !n.archived);
   const gerahmt = new Set(rahmen.flatMap((f) => frameMembers(f, alle).map((m) => m.id)));
-  return alle.filter((n) => n.type !== 'frame' && !n.archived && !gerahmt.has(n.id));
+  return alle.filter((n) => n.type !== 'frame' && !n.archived && !n.ohneOrdnen && !gerahmt.has(n.id));
+}
+
+/** M463: Wie viele Karten der Auswahl bzw. des Boards ordnen nicht mit (für die Meldung) */
+export function ausgenommenZahl(alle: AppNode[], auswahl?: AppNode[]): number {
+  return (auswahl && auswahl.length ? auswahl : alle).filter((n) => n.type !== 'frame' && !n.archived && n.ohneOrdnen).length;
 }
 
 /** Die Antwort der KI in saubere Gruppen bringen: bekannte Kennungen, jede Karte einmal, Vergessenes in den Rest */
@@ -251,6 +258,8 @@ export async function themenOrdnenStarten(auswahl?: AppNode[]): Promise<void> {
   const st = useBoard.getState();
   if (st.aiBusy) { st.showToast('Eine KI-Aktion läuft bereits – kurz warten.'); return; }
   const karten = themenKandidaten(selectActiveBoard(st).nodes, auswahl);
+  const ausgenommen = ausgenommenZahl(selectActiveBoard(st).nodes, auswahl);
+  const ausgenommenHinweis = ausgenommen ? ` – nicht mit geordnet: ${zahlWort(ausgenommen, 'Karte', 'Karten')}` : '';
   if (karten.length < 3) {
     st.showToast(auswahl?.length ? 'Zum Ordnen nach Themen mindestens 3 Karten markieren.' : 'Zu wenig lose Karten zum Ordnen nach Themen.');
     return;
@@ -262,7 +271,7 @@ export async function themenOrdnenStarten(auswahl?: AppNode[]): Promise<void> {
   }
   st.setAiBusy(true);
   kiAbbruchZuruecksetzen();
-  st.showToast(`Suche Themen in ${karten.length} Karten …`, false, 120000, aiReady(st.ai));
+  st.showToast(`Suche Themen in ${zahlWort(karten.length, 'Karte', 'Karten')} …`, false, 120000, aiReady(st.ai));
   let vorschlag: ThemenVorschlag;
   try {
     vorschlag = await themenVorschlagen(karten);
@@ -273,7 +282,7 @@ export async function themenOrdnenStarten(auswahl?: AppNode[]): Promise<void> {
   } finally {
     useBoard.getState().setAiBusy(false);
   }
-  useBoard.getState().showToast(`${vorschlag.gruppen.length} Themen gefunden – bitte prüfen.`, false, 2500);
+  useBoard.getState().showToast(`${zahlWort(vorschlag.gruppen.length, 'Thema', 'Themen')} gefunden – bitte prüfen.`, false, 2500);
   const { themenDialog } = await import('../components/ThemenDialog');
   const bestaetigt = await themenDialog(vorschlag);
   const st2 = useBoard.getState();
@@ -284,5 +293,5 @@ export async function themenOrdnenStarten(auswahl?: AppNode[]): Promise<void> {
   }
   const rahmen = themenAnwenden(bestaetigt);
   const n = bestaetigt.reduce((a, g) => a + g.ids.length, 0);
-  st2.showToast(`${n} Karten in ${rahmen.length} Rahmen geordnet: ${bestaetigt.map((g) => g.titel).join(' · ')}${vorschlag.hinweis}`, 'schritt', 9000);
+  st2.showToast(`${zahlWort(n, 'Karte', 'Karten')} in ${zahlWort(rahmen.length, 'Rahmen', 'Rahmen')} geordnet: ${bestaetigt.map((g) => g.titel).join(' · ')}${vorschlag.hinweis}${ausgenommenHinweis}`, 'schritt', 9000);
 }
