@@ -18,7 +18,7 @@
 .eingang-ziel select { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--r-sm); padding: 5px 6px; }
 .eingang-liste { list-style: none; margin: 0; padding: 0 6px; overflow-y: auto; flex: 1; border-top: 1px solid var(--border-soft); }
 .eingang-eintrag {
-  display: flex; align-items: center; gap: 9px; padding: 8px 6px; border-bottom: 1px solid var(--border-soft);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 9px; padding: 8px 6px; border-bottom: 1px solid var(--border-soft);
   border-radius: var(--r-sm); cursor: grab; outline: none;
 }
 .eingang-eintrag:last-child { border-bottom: none; }
@@ -44,6 +44,33 @@
 .eingang-tun button:hover, .eingang-fuss button:hover { background: var(--accent-soft); color: var(--accent-strong); }
 .eingang-tun .eingang-weg { background: none; color: var(--muted); padding: 6px; }
 .eingang-tun .eingang-weg:hover { background: var(--surface-2); color: #c0392b; }
+/* M488: ⋯ je Eintrag (nur wenn etwas in eine Notiz passt) — leise, erst beim Zeigen; am Finger immer da */
+.eingang-tun .eingang-mehr { background: none; color: var(--muted); padding: 6px; }
+@media (hover: hover) {
+  .eingang-eintrag:not(:hover):not(:focus-within) .eingang-mehr:not([aria-expanded='true']) { opacity: 0; }
+}
+/* Das Menü steht als eigene Zeile unter dem Eintrag — nichts wird vom Rand der Liste abgeschnitten */
+.eingang-menue { flex-basis: 100%; display: flex; justify-content: flex-end; }
+.eingang-menue button {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink); font: inherit; font-size: 12px;
+  font-weight: 600; padding: 5px 10px; border-radius: var(--r-pill); cursor: pointer;
+}
+.eingang-menue button:hover, .eingang-menue button:focus-visible { background: var(--accent-soft); color: var(--accent-strong); }
+/* M488: Notiz-Wahl („In Notiz einfügen …") an der Stelle der Liste */
+.eingang-ziel input {
+  flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm); padding: 5px 8px;
+}
+.eingang-notizen li { list-style: none; }
+.eingang-notiz {
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 6px; border: none; border-bottom: 1px solid var(--border-soft);
+  background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; border-radius: var(--r-sm);
+}
+.eingang-notiz > svg { flex: none; color: var(--muted); }
+.eingang-notiz:hover, .eingang-notiz:focus-visible { background: var(--surface-2); outline: none; }
+.eingang-leer { color: var(--muted); padding: 14px 8px; font-size: 12.5px; }
+/* M488: Die Notiz, auf die ein Eingangs-Eintrag gerade gezogen wird — dort landet er IN der Notiz */
+.react-flow__node-note[data-eingang-ziel] { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: var(--r-lg); }
 .eingang-fuss { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-top: 1px solid var(--border-soft); min-height: 44px; }
 .eingang-alle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); flex: 1; cursor: pointer; }
 .eingang-tipp { color: var(--muted); font-size: 11.5px; }
