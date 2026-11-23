@@ -1,17 +1,24 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useReactFlow, type NodeProps } from '@xyflow/react';
-import { useCreateBlockNote } from '@blocknote/react';
+import { SuggestionMenuController, useBlockNoteEditor, useCreateBlockNote, useExtension, type DefaultReactSuggestionItem, type SuggestionMenuProps } from '@blocknote/react';
+import { SuggestionMenu } from '@blocknote/core/extensions';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
-import { sprache, zahlWort } from '../../lib/sprache';
+import { sprache, t, zahlWort } from '../../lib/sprache';
 import { mutedHistory, useBoard, useNurLesen } from '../../store';
 import { STICKY_COLORS, uid, type MinutesData, type MinutesEntry, type MinutesNode } from '../../types';
 import {
-  allDecisions, anwesenheit, aufgabenStand, buildEntry, carryOverBlocks, currentEntry, entryLabel, fristText, kurzDatum, langDatum,
-  nextDate, offeneAufgaben, papierArt, sitzungAlsText, sortEntries, sucheInReihe, tagesordnung, teilnehmende,
+  allDecisions, anwesenheit, aufgabenStand, currentEntry, entryLabel, fristText, kurzDatum, langDatum,
+  nextDate, offeneAufgaben, papierArt, sitzungAlsText, sortEntries, suchNorm, sucheInReihe, tagesordnung, teilnehmende,
   teilnehmendeText, type OffeneAufgabe,
 } from '../../lib/minutes';
+import {
+  dateiName, erwaehnung, mailAdresse, nachMonat, neueSitzung, sitzungAlsHtml, sitzungAlsMarkdown, uebergabeVorschlag,
+  unbekanntePersonen, type UebergabePunkt,
+} from '../../lib/protokollSchliff';
+import { triggerDownload } from '../../lib/download';
+import { overlayOffen } from '../../lib/overlay';
 import { toggleCheckBlock } from '../../lib/tasks';
 import { fristenLaden, useFristenStand } from '../../lib/dates';
 import { repairBlocks } from '../../lib/htmlBlocks';
@@ -21,7 +28,7 @@ import { importFilesToBoard } from '../../lib/importSpaet';
 import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from '../NoteTypo';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
-import { ICheck, ICopy, IMail, IMore, IPlus, ISearch, ISettings, ITrash, IUsers, IX } from '../Icons';
+import { ICheck, ICopy, IDownload, IDrucker, IMail, IMore, IPlus, ISearch, ISettings, ITrash, IUsers, IX } from '../Icons';
 import type { NotizSitzung } from '../../lib/notizGemeinsamKern';
 import { liveVerbunden, TEILNEHMER_EREIGNIS } from '../../lib/liveStand';
 import { PROTOKOLL_LIVE, protokollLive, type ProtokollLive } from '../../lib/protokollLive';
@@ -79,6 +86,8 @@ const inhaltText = (c: unknown): string => (typeof c === 'string'
   : Array.isArray(c) ? c.map((s) => (s as { text?: string })?.text ?? '').join('') : '');
 
 type Ansicht = 'sitzung' | 'uebersicht';
+/** M495: höchstens so viele Sitzungen stehen in der Leiste, der Rest unter „Ältere …“ */
+const LEISTE_MAX = 8;
 
 /**
  * M493: Ist diese Sitzung gerade gemeinsam geöffnet (Live-Board, ProtokollGemeinsam)? Dann laufen die Beschlüsse über
@@ -108,6 +117,9 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   const [suche, setSuche] = useState('');
   const [beschlussText, setBeschlussText] = useState('');
   const [personText, setPersonText] = useState('');
+  // M495: Übergabe an die nächste Sitzung (null = zu), abgelehnte Personen-Vorschläge („Sitzung:name")
+  const [uebergabe, setUebergabe] = useState<{ punkte: UebergabePunkt[]; gewaehlt: Set<string>; datum: string } | null>(null);
+  const [abgelehnt, setAbgelehnt] = useState<Set<string>>(() => new Set());
   // M187: Zugriff auf den LEBENDEN Editor der angezeigten Sitzung. Werkzeuge ändern über ihn statt über den
   // Speicher — sonst überholt der Editor beim nächsten Neuaufbau die Änderung mit seinem alten Stand.
   const editorRef = useRef<LebenderEditor | null>(null);
@@ -142,17 +154,34 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   };
   const zeige = (entryId: string) => { patch({ current: entryId }); setAnsicht('sitzung'); setMenueOffen(false); };
 
-  /** Neue Sitzung: Runde und offene Aufgaben der letzten übernehmen, Tagesordnung vorstrukturieren */
+  /**
+   * Neue Sitzung: Runde, offene Aufgaben und (M495) TOPs ohne Beschluss der letzten übernehmen, Tagesordnung
+   * vorstrukturieren. Gibt es etwas zu übernehmen, zeigt „+" erst die Übergabe — alles angehakt, abwählbar.
+   */
   const addEntry = () => {
-    const date = nextDate(m);
-    const fresh = buildEntry(m, date);
-    const aufgaben = m.carryOpen === false ? 0 : carryOverBlocks(sortEntries(m.entries ?? [])[0]).length;
+    setMenueOffen(false);
+    const vorschlag = uebergabeVorschlag(m);
+    if (vorschlag.length === 0) { anlegen(new Set(), nextDate(m)); return; }
+    setUebergabe({ punkte: vorschlag, gewaehlt: new Set(vorschlag.map((p) => p.key)), datum: nextDate(m) });
+  };
+  const anlegen = (gewaehlt: Set<string>, datum: string) => {
+    const date = datum || nextDate(m);
+    const fresh = neueSitzung(m, date, gewaehlt);
+    const vorschlag = uebergabeVorschlag(m).filter((p) => gewaehlt.has(p.key));
+    const aufgaben = vorschlag.filter((p) => p.art === 'aufgabe').length;
+    const tops = vorschlag.filter((p) => p.art === 'top').length;
     const personen = teilnehmende(fresh.attendees).length;
     patch({ entries: [...(m.entries ?? []), fresh], current: fresh.id });
+    setUebergabe(null);
     setAnsicht('sitzung');
-    const dazu = [personen ? zahlWort(personen, 'Person', 'Personen') : '', aufgaben ? zahlWort(aufgaben, 'offene Aufgabe', 'offene Aufgaben') : ''].filter(Boolean);
-    showToast(dazu.length
-      ? `Sitzung am ${langDatum(date)} angelegt – übernommen: ${dazu.join(' und ')}.`
+    const dazu = [
+      personen ? zahlWort(personen, 'Person', 'Personen') : '',
+      aufgaben ? zahlWort(aufgaben, 'offene Aufgabe', 'offene Aufgaben') : '',
+      tops ? zahlWort(tops, 'offener TOP', 'offene TOPs') : '',
+    ].filter(Boolean);
+    const liste = dazu.length ? new Intl.ListFormat(sprache() === 'en' ? 'en-GB' : 'de-DE', { type: 'conjunction' }).format(dazu) : '';
+    showToast(liste
+      ? `Sitzung am ${langDatum(date)} angelegt – übernommen: ${liste}.`
       : `Sitzung am ${langDatum(date)} angelegt.`);
   };
 
@@ -241,13 +270,17 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
 
   // ---------- Runde ----------
   const runde = teilnehmende(entry?.attendees);
-  const personDazu = () => {
-    if (!entry) return;
-    const neu = teilnehmende(personText);
-    if (neu.length === 0) return;
-    patchEntry(entry.id, { attendees: teilnehmendeText(teilnehmende([...runde, ...neu].join(','))) });
+  const personDazu = (namen = teilnehmende(personText)) => {
+    if (!entry || namen.length === 0) return;
+    patchEntry(entry.id, { attendees: teilnehmendeText(teilnehmende([...runde, ...namen].join(','))) });
     setPersonText('');
   };
+  // M495: „Mia: …" in einer Aufgabe, Mia aber nicht in der Runde — vorschlagen statt still übergehen
+  const personVorschlaege = useMemo(
+    () => unbekanntePersonen(entry).filter((n) => !abgelehnt.has(`${entry?.id}:${n.toLowerCase()}`)),
+    [entry, abgelehnt],
+  );
+  const ablehnen = (n: string) => setAbgelehnt((alt) => new Set(alt).add(`${entry?.id}:${n.toLowerCase()}`));
   const personWeg = (name: string) => {
     if (!entry) return;
     patchEntry(entry.id, { attendees: teilnehmendeText(runde.filter((n) => n !== name)) });
@@ -296,26 +329,100 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
     try { await navigator.clipboard.writeText(sitzungAlsText(m, entry)); showToast('Sitzung als Text kopiert.'); }
     catch { showToast('Kopieren ging nicht – der Browser hat den Zugriff verweigert.'); }
   };
-  const perMail = () => {
+  /**
+   * M495: mailto kürzt lange Protokolle (Outlook/Windows schneiden ab etwa 2 000 Zeichen ab, manche Programme öffnen
+   * gar nichts). Passt die Sitzung nicht, liegt der volle Text in der Zwischenablage, und das Mailprogramm öffnet mit
+   * Betreff und dem Hinweis, ihn einzufügen.
+   */
+  const perMail = async () => {
     if (!entry) return;
     setMenueOffen(false);
-    const betreff = `${m.title?.trim() || 'Protokoll'} – ${langDatum(entry.date)}`;
-    window.open(`mailto:?subject=${encodeURIComponent(betreff)}&body=${encodeURIComponent(sitzungAlsText(m, entry))}`, '_self');
+    const text = sitzungAlsText(m, entry);
+    const kopiert = mailAdresse(m, entry, text, '').lang
+      ? await navigator.clipboard.writeText(text).then(() => true, () => false)
+      : false;
+    const hinweis = kopiert
+      ? t('Der Text des Protokolls liegt in der Zwischenablage – bitte hier einfügen (Strg+V, am Mac Cmd+V).')
+      : t('Das Protokoll ist zu lang für eine E-Mail-Verknüpfung. In PixiNotes über ⋯ „Als Text kopieren“ holen und hier einfügen.');
+    const { adresse, lang } = mailAdresse(m, entry, text, hinweis);
+    window.open(adresse, '_self');
+    if (lang) showToast(kopiert
+      ? 'Das Protokoll ist lang – der Text liegt in der Zwischenablage. Im Mailprogramm einfügen.'
+      : 'Das Protokoll ist zu lang für eine E-Mail-Verknüpfung – bitte „Als Text kopieren“ nutzen.');
+  };
+  const speichern = (art: 'md' | 'html') => {
+    if (!entry) return;
+    setMenueOffen(false);
+    const inhalt = art === 'md' ? sitzungAlsMarkdown(m, entry) : sitzungAlsHtml(m, entry);
+    const url = URL.createObjectURL(new Blob([inhalt], { type: art === 'md' ? 'text/markdown;charset=utf-8' : 'text/html;charset=utf-8' }));
+    triggerDownload(url, dateiName(m, entry, art));
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  };
+  /** Druckansicht: ruhiges, sauberes Blatt in einem eigenen Fenster — dort bietet jeder Browser auch „Als PDF sichern" */
+  const drucken = () => {
+    if (!entry) return;
+    setMenueOffen(false);
+    const win = window.open('', '_blank', 'width=820,height=900');
+    if (!win) { speichern('html'); showToast('Das Druckfenster wurde blockiert – die Druckansicht liegt als Datei bei den Downloads.'); return; }
+    win.document.write(sitzungAlsHtml(m, entry));
+    win.document.close();
+    win.focus();
+    setTimeout(() => { try { win.print(); } catch { /* Fenster schon zu */ } }, 250);
   };
 
   /** M187: Farbe wie bei der Notiz-Karte */
   const farbe = (c: (typeof STICKY_COLORS)[number]) => patch({ color: c, hex: undefined });
 
   const tops = useMemo(() => tagesordnung(entry), [entry]);
-  // Die gezeigte Sitzung in der Leiste sichtbar halten — nur die Leiste rollt (nie die Arbeitsfläche)
+  /* M495: Viele Sitzungen. Die Leiste zeigt so viele der neuesten, wie in die Breite passen (die gezeigte immer),
+     der Rest steht in „Ältere …", nach Monat gruppiert. Vorher wuchs die Leiste nur waagrecht — bei 50 Sitzungen
+     ein langer Rollbalken. Gemessen wird am DOM: zu breit → eine weniger; breiter geworden → neu messen. */
+  const [platz, setPlatz] = useState(LEISTE_MAX);
+  const sichtbar = useMemo(() => {
+    const v = sorted.slice(0, platz);
+    if (!entry || v.some((x) => x.id === entry.id)) return v;
+    return [...v.slice(0, Math.max(0, platz - 1)), entry];
+  }, [sorted, platz, entry]);
+  const aeltere = useMemo(() => {
+    const ids = new Set(sichtbar.map((x) => x.id));
+    return nachMonat(sorted.filter((x) => !ids.has(x.id)));
+  }, [sorted, sichtbar]);
+  useLayoutEffect(() => {
+    const l = leisteRef.current;
+    if (l && platz > 1 && l.scrollWidth > l.clientWidth + 1) setPlatz((p) => Math.max(1, p - 1));
+  });
   useEffect(() => {
-    const leiste = leisteRef.current;
-    const aktiv = leiste?.querySelector<HTMLElement>('.pr-tag[aria-selected="true"]');
-    if (!leiste || !aktiv) return;
-    const l = aktiv.offsetLeft - leiste.offsetLeft;
-    if (l < leiste.scrollLeft) leiste.scrollLeft = l - 8;
-    else if (l + aktiv.offsetWidth > leiste.scrollLeft + leiste.clientWidth) leiste.scrollLeft = l + aktiv.offsetWidth - leiste.clientWidth + 8;
-  }, [entry?.id, ansicht]);
+    const l = leisteRef.current;
+    if (!l || typeof ResizeObserver === 'undefined') return undefined;
+    let breite = l.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (Math.abs(l.clientWidth - breite) < 2) return;
+      if (l.clientWidth > breite) setPlatz(LEISTE_MAX);
+      breite = l.clientWidth;
+    });
+    ro.observe(l);
+    return () => ro.disconnect();
+  }, [ansicht, sorted.length > 0]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // ←/→ zwischen den Sitzungen (neueste links) — nur, wenn kein Fenster über dem Board liegt. Pos1/Ende bleiben dem
+  // Board (erste/letzte Karte, M345: boardTasten.ts hört sie auf der ganzen Fläche)
+  const tasteFolgt = useRef(false);
+  const leisteTaste = (ev: { key: string; preventDefault: () => void; stopPropagation: () => void }) => {
+    if (overlayOffen() || !entry) return;
+    const i = sorted.findIndex((x) => x.id === entry.id);
+    const ziel = ev.key === 'ArrowRight' ? i + 1 : ev.key === 'ArrowLeft' ? i - 1 : -2;
+    if (ziel === -2) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (ziel < 0 || ziel >= sorted.length || ziel === i) return;
+    tasteFolgt.current = true;
+    patch({ current: sorted[ziel].id });
+  };
+  useEffect(() => {
+    if (!tasteFolgt.current) return;
+    tasteFolgt.current = false;
+    leisteRef.current?.querySelector<HTMLElement>('.pr-tag[aria-selected="true"]')?.focus();
+  }, [entry?.id]);
+
   const stand = aufgabenStand(entry);
 
   return (
@@ -338,7 +445,7 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
           </div>
         )}
         {!nurLesen && sorted.length > 0 && (
-          <button className="minutes-new nodrag" title="Nächste Sitzung anlegen – übernimmt Runde und offene Aufgaben" aria-label="Nächste Sitzung anlegen" onClick={addEntry} data-taste="pr-neu">
+          <button className="minutes-new nodrag" title="Nächste Sitzung anlegen – übernimmt Runde, offene Aufgaben und TOPs ohne Beschluss (abwählbar)" aria-label="Nächste Sitzung anlegen" onClick={addEntry} data-taste="pr-neu">
             <IPlus size={14} />
           </button>
         )}
@@ -404,29 +511,92 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
         </div>
       )}
 
+      {uebergabe && (
+        <div
+          className="pr-uebergabe nodrag"
+          role="group"
+          aria-label="Nächste Sitzung anlegen"
+          onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setUebergabe(null); } }}
+        >
+          <div className="pr-uebergabe-kopf">
+            <b>Nächste Sitzung</b>
+            <input
+              type="date"
+              className="pr-datum"
+              value={uebergabe.datum}
+              aria-label="Datum der nächsten Sitzung"
+              onChange={(e) => setUebergabe({ ...uebergabe, datum: e.target.value })}
+            />
+          </div>
+          <p className="pr-leer">Aus der letzten Sitzung übernehmen:</p>
+          <div className="pr-uebergabe-liste">
+            {uebergabe.punkte.map((p) => (
+              <label key={p.key} className="pr-uebergabe-punkt">
+                <input
+                  type="checkbox"
+                  checked={uebergabe.gewaehlt.has(p.key)}
+                  onChange={(e) => {
+                    const g = new Set(uebergabe.gewaehlt);
+                    if (e.target.checked) g.add(p.key); else g.delete(p.key);
+                    setUebergabe({ ...uebergabe, gewaehlt: g });
+                  }}
+                />
+                <span className="pr-art">{p.art === 'top' ? 'TOP ohne Beschluss' : 'Aufgabe'}</span>
+                <span className="pr-uebergabe-text" translate="no">{p.text}</span>
+              </label>
+            ))}
+          </div>
+          <div className="pr-uebergabe-fuss">
+            <button className="pr-knopf" onClick={() => setUebergabe(null)}>Abbrechen</button>
+            <button className="pr-knopf pr-haupt" data-taste="pr-anlegen" onClick={() => anlegen(uebergabe.gewaehlt, uebergabe.datum)}>Sitzung anlegen</button>
+          </div>
+        </div>
+      )}
+
       {sorted.length === 0 ? (
         <div className="minutes-empty">
           Noch keine Sitzung.
-          {!nurLesen && <button className="nodrag" onClick={addEntry}>Erste Sitzung anlegen</button>}
+          {!nurLesen && <button className="nodrag" onClick={() => anlegen(new Set(), nextDate(m))}>Erste Sitzung anlegen</button>}
         </div>
       ) : ansicht === 'sitzung' ? (
         <>
-          <div className="pr-leiste nodrag" role="tablist" aria-label="Sitzungen" ref={leisteRef}>
-            {sorted.map((e) => {
-              const aktiv = e.id === entry?.id;
-              return (
-                <button
-                  key={e.id}
-                  role="tab"
-                  aria-selected={aktiv}
-                  className="pr-tag"
-                  title={e.title?.trim() ? `${e.title.trim()} · ${langDatum(e.date)}` : langDatum(e.date)}
-                  onClick={() => patch({ current: e.id })}
-                >
-                  {kurzDatum(e.date)}
-                </button>
-              );
-            })}
+          <div className="pr-leiste-zeile nodrag">
+            <div className="pr-leiste" role="tablist" aria-label="Sitzungen" ref={leisteRef} onKeyDown={leisteTaste}>
+              {sichtbar.map((e) => {
+                const aktiv = e.id === entry?.id;
+                return (
+                  <button
+                    key={e.id}
+                    role="tab"
+                    aria-selected={aktiv}
+                    tabIndex={aktiv ? 0 : -1}
+                    className="pr-tag"
+                    title={e.title?.trim() ? `${e.title.trim()} · ${langDatum(e.date)}` : langDatum(e.date)}
+                    onClick={() => patch({ current: e.id })}
+                  >
+                    {kurzDatum(e.date)}
+                  </button>
+                );
+              })}
+            </div>
+            {aeltere.length > 0 && (
+              <select
+                className="pr-aeltere"
+                value=""
+                aria-label="Ältere Sitzungen"
+                title="Ältere Sitzungen, nach Monat"
+                onChange={(ev) => { if (ev.target.value) patch({ current: ev.target.value }); }}
+              >
+                <option value="">{`Ältere (${aeltere.reduce((n, g) => n + g.sitzungen.length, 0)})`}</option>
+                {aeltere.map((g) => (
+                  <optgroup key={g.label} label={g.label}>
+                    {g.sitzungen.map((e) => (
+                      <option key={e.id} value={e.id}>{e.title?.trim() ? `${langDatum(e.date)} · ${e.title.trim()}` : langDatum(e.date)}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            )}
           </div>
 
           {entry && (
@@ -454,13 +624,16 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
                 </button>
                 <button onMouseDown={(e) => e.preventDefault()} onClick={alsBeschluss} title="Zeile am Cursor als Beschluss festhalten" aria-label="Als Beschluss festhalten" data-taste="pr-beschluss">§<span className="pr-wort">Beschluss</span></button>
                 <div className="pr-menue-wrap">
-                  <button className="pr-mehr" aria-label="Weitere Aktionen der Sitzung" title="Kopieren, versenden, löschen" aria-expanded={menueOffen} onClick={() => setMenueOffen((o) => !o)}>
+                  <button className="pr-mehr" aria-label="Weitere Aktionen der Sitzung" title="Kopieren, versenden, drucken, speichern, löschen" aria-expanded={menueOffen} onClick={() => setMenueOffen((o) => !o)}>
                     <IMore size={14} />
                   </button>
                   {menueOffen && (
                     <div className="pr-menue" role="menu">
                       <button role="menuitem" onClick={() => void alsText()}><ICopy size={13} /> Als Text kopieren</button>
-                      <button role="menuitem" onClick={perMail}><IMail size={13} /> Per E-Mail versenden</button>
+                      <button role="menuitem" onClick={() => void perMail()}><IMail size={13} /> Per E-Mail versenden</button>
+                      <button role="menuitem" onClick={drucken} data-taste="pr-drucken"><IDrucker size={13} /> Drucken / als PDF</button>
+                      <button role="menuitem" onClick={() => speichern('md')}><IDownload size={13} /> Als Markdown speichern (.md)</button>
+                      <button role="menuitem" onClick={() => speichern('html')}><IDownload size={13} /> Als Webseite speichern (.html)</button>
                       {!nurLesen && <button role="menuitem" className="pr-gefahr" onClick={() => removeEntry(entry.id)}><ITrash size={13} /> Sitzung löschen</button>}
                     </div>
                   )}
@@ -486,11 +659,19 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
                   value={personText}
                   onChange={(e) => setPersonText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); personDazu(); } }}
-                  onBlur={personDazu}
+                  onBlur={() => personDazu()}
                 />
               )}
             </div>
           )}
+
+          {entry && !nurLesen && personVorschlaege.map((n) => (
+            <div key={n} className="pr-vorschlag nodrag" role="group" aria-label="Vorschlag für die Runde">
+              <span className="pr-vorschlag-text">{`${n} zur Runde hinzufügen?`}</span>
+              <button className="pr-vorschlag-ja" onClick={() => personDazu([n])} data-taste="pr-person-ja">Hinzufügen</button>
+              <button className="pr-vorschlag-nein" title="Nicht zur Runde" aria-label="Nicht zur Runde" onClick={() => ablehnen(n)}><IX size={10} /></button>
+            </div>
+          ))}
 
           {tops.length > 0 && (
             <div className="minutes-tops nodrag" aria-label="Tagesordnung">
@@ -676,6 +857,12 @@ export function EntryEditor({ nodeId, entryId, blocks, editorRef, sitzung }: Ent
     return safe.length > 0 ? safe : undefined;
   });
   const nurLesen = useNurLesen(); // M360
+  // M495: die Runde dieser Sitzung — für die @-Liste beim Tippen
+  const rundeText = useBoard((s) => {
+    const n = s.boards.find((b) => b.id === s.activeId)?.nodes.find((x) => x.id === nodeId);
+    return (n?.data as MinutesData | undefined)?.entries?.find((e) => e.id === entryId)?.attendees ?? '';
+  });
+  const runde = useMemo(() => teilnehmende(rundeText), [rundeText]);
   const basis = {
     schema: noteSchema,
     // M462: Strg+A markiert wie bisher die ganze Notiz (BlockNote 0.57: erst den Block)
@@ -769,7 +956,60 @@ export function EntryEditor({ nodeId, entryId, blocks, editorRef, sitzung }: Ent
         <NoteToolbar />
         {/* M283: „/" bietet die rechnende Tabelle an */}
         <NoteSlashMenu />
+        {/* M495: „@" schlägt die Runde der Sitzung vor */}
+        {!nurLesen && runde.length > 0 && <PersonenMenue runde={runde} />}
       </BlockNoteView>
+    </div>
+  );
+}
+
+/**
+ * M495: „@" im Protokolltext schlägt die Runde vor (Pfeile, Enter, Klick). Eingefügt wird „@Vorname " (bei zwei
+ * gleichen Vornamen der volle Name) — so erkennt die Übersicht die Person (lib/minutes.ts personVon). Öffnet nur am
+ * Wortanfang: in „anna@amt.de" stört keine Liste. Passt niemand, schließt die Liste sofort — sonst schluckte sie Enter.
+ */
+function PersonenMenue({ runde }: { runde: string[] }) {
+  const editor = useBlockNoteEditor();
+  const amWortanfang = useCallback((tr: { selection: { from: number }; doc: { textBetween: (a: number, b: number, c?: string, d?: string) => string } }) => {
+    const von = tr.selection.from;
+    const davor = tr.doc.textBetween(Math.max(0, von - 1), von, ' ', ' ');
+    return davor === '' || /\s/.test(davor);
+  }, []);
+  return (
+    <SuggestionMenuController
+      triggerCharacter="@"
+      shouldOpen={amWortanfang as never}
+      getItems={async (frage: string): Promise<DefaultReactSuggestionItem[]> => {
+        const f = suchNorm(frage.trim());
+        return runde
+          .filter((r) => !f || suchNorm(r).split(/\s+/).some((w) => w.startsWith(f)) || suchNorm(r).startsWith(f))
+          .slice(0, 8)
+          .map((r) => ({ title: r, onItemClick: () => editor.insertInlineContent(`@${erwaehnung(r, runde)} `) }));
+      }}
+      suggestionMenuComponent={PersonenListe}
+    />
+  );
+}
+function PersonenListe({ items, selectedIndex, onItemClick, loadingState }: SuggestionMenuProps<DefaultReactSuggestionItem>) {
+  const menue = useExtension(SuggestionMenu);
+  const leer = loadingState === 'loaded' && items.length === 0;
+  useEffect(() => { if (leer) menue.closeMenu(); }, [leer, menue]);
+  if (items.length === 0) return null;
+  return (
+    <div className="pr-at-liste" role="listbox" aria-label="Person erwähnen">
+      {items.map((it, i) => (
+        <div
+          key={it.title}
+          role="option"
+          aria-selected={i === selectedIndex}
+          className="pr-at-name"
+          translate="no"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onItemClick?.(it)}
+        >
+          {it.title}
+        </div>
+      ))}
     </div>
   );
 }

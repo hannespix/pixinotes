@@ -167,6 +167,8 @@ console.log('════ B–E: Arbeiten mit der Reihe, Altbestand, Neuladen �
   // B — neue Sitzung (die neueste ist s3 mit drei Namen und zwei offenen Aufgaben)
   await waehle(P, 'm1');
   await P.locator(`${M} [data-taste="pr-neu"]`).click();
+  // M495: gibt es etwas zu übernehmen, zeigt „+" erst die Übergabe (alles angehakt) — anlegen wie vorgeschlagen
+  await P.locator(`${M} [data-taste="pr-anlegen"]`).click();
   await P.waitForTimeout(500);
   let n = await knoten(P, 'm1');
   const neu = n.data.entries.find((e) => !['s2', 's3'].includes(e.id));
