@@ -3137,4 +3137,6 @@
 "Vor KI-Umbau":"Before AI rework",
 "Vor Wiederherstellen":"Before restoring",
 "Dieses Board ist nur zum Lesen freigegeben – als Kopie öffnen geht.":"This board is shared read-only – opening it as a copy works.",
-"{0} (Stand)":"{0} (version)"}
+"{0} (Stand)":"{0} (version)",
+"· schläft":"· asleep",
+"Abo aus Kanban: „{0}\" fällig am {1}":"Subscription from Kanban: “{0}” due on {1}"}

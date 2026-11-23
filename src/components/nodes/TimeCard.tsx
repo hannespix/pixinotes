@@ -7,6 +7,7 @@ import { fmtDiff, linkedOfType, sollForDate } from '../../lib/moduleFeeds';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { IChevronL, IChevronR, IPlus, IX } from '../Icons';
+import { kwText, t as uebersetze } from '../../lib/sprache';
 
 /** Erfassungs-Arten: [Schlüssel, Label, Farbe]. Seit M171 bewusst nur noch
  *  Arbeit & Pause — Besonderheiten (Fahrzeit, Ortstermin …) gehören in die
@@ -170,8 +171,8 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
   };
   const navLabel =
     view === 'tag' ? fmtDay(day)
-      : view === 'woche' ? `KW ${isoWeekNo(day)} · ${fmtDayShort(monday)} – ${fmtDayShort(sunday)}`
-        : view === 'monat' ? `${MONTHS[Number(day.slice(5, 7)) - 1]} ${year}`
+      : view === 'woche' ? `${kwText(isoWeekNo(day))} · ${fmtDayShort(monday)} – ${fmtDayShort(sunday)}`
+        : view === 'monat' ? `${uebersetze(MONTHS[Number(day.slice(5, 7)) - 1])} ${year}`   // M455: Monat + Jahr als Ganzes kennt das Wörterbuch nicht
           : year;
   const notToday =
     view === 'tag' ? day !== todayIso()
