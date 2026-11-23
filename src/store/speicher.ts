@@ -212,7 +212,7 @@ export const speicherAuswahl = (s: BoardState) => ({
   rejectedLinks: s.rejectedLinks,
   templates: s.templates,
   ui: s.ui,
-  physicsEnabled: s.physicsEnabled,
+  ziehBewegung: s.ziehBewegung,
   konfetti: s.konfetti,
   pfeilSchatten: s.pfeilSchatten,
   stiftZeichnet: s.stiftZeichnet,

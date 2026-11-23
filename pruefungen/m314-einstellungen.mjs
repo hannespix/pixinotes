@@ -86,7 +86,8 @@ console.log('\n════ A: Reiter ════');
   // M434: „Pfeilschatten" kam auf ausdrücklichen Wunsch dazu (abschaltbar unter Darstellung)
   // M478: „Eingehendes im Eingang sammeln" (vernünftige Menschen wollen es verschieden: sammeln oder sofort fragen)
   // M482: „Rechtschreibung prüfen" (Nutzerwunsch; wer die Wellenlinien nicht will, schaltet sie hier ab)
-  pruefe('B2 genau elf Zeilen', JSON.stringify(z) === JSON.stringify(['Erscheinungsbild', 'Pfeilschatten', 'Akzentfarbe', 'Sprache', 'Anzeigegröße', 'Besser lesbar', 'Mausrad zoomt', 'Lebendige Fläche', 'Finger-Gesten (wie Procreate)', 'Eingehendes im Eingang sammeln', 'Rechtschreibung prüfen']), JSON.stringify(z));
+  // M481: „Bewegung beim Ziehen" ersetzt die Physik (Verdrängen, Werfen) – Standard an
+  pruefe('B2 genau zwölf Zeilen', JSON.stringify(z) === JSON.stringify(['Erscheinungsbild', 'Pfeilschatten', 'Akzentfarbe', 'Sprache', 'Anzeigegröße', 'Besser lesbar', 'Mausrad zoomt', 'Bewegung beim Ziehen', 'Lebendige Fläche', 'Finger-Gesten (wie Procreate)', 'Eingehendes im Eingang sammeln', 'Rechtschreibung prüfen']), JSON.stringify(z));
   pruefe('B3 keine Zeilen mehr für Milchglas, Navigation, Fokus, Stift, Physik, Klick-Zoom, Konfetti', !z.some((t) => /Milchglas|Navigation|Fokus|Stift|Physik|Klick|Konfetti|Kontrast|lesbare Schrift/.test(t)));
   const check = (text) => P.locator('.modal-row-check', { hasText: text }).locator('input[type="checkbox"]');
   await check('Besser lesbar').check();
@@ -98,7 +99,7 @@ console.log('\n════ A: Reiter ════');
   await check('Lebendige Fläche').check();
   await P.waitForTimeout(600);
   v = await vorlieben(P);
-  pruefe('B6 „Lebendige Fläche" setzt Physik, Klick-Zoom und Konfetti', v.physicsEnabled === true && v.clickZoom === true && v.konfetti === true, JSON.stringify({ p: v.physicsEnabled, k: v.clickZoom, c: v.konfetti }));
+  pruefe('B6 „Lebendige Fläche" setzt Klick-Zoom und Konfetti (M481: Physik ist „Bewegung beim Ziehen")', v.physicsEnabled === undefined && v.clickZoom === true && v.konfetti === true, JSON.stringify({ p: v.physicsEnabled, k: v.clickZoom, c: v.konfetti }));
   await check('Lebendige Fläche').uncheck();
   await P.waitForTimeout(400);
   pruefe('B7 kein Erklärtext hat mehr als zwei Sätze', (await P.evaluate(() => [...document.querySelectorAll('.modal-body .modal-hint')].map((e) => e.textContent.trim()).filter((t) => (t.match(/[.!?](\s|$)/g) ?? []).length > 2).length)) === 0);

@@ -26,6 +26,7 @@ import { ITarget, IZoomIn, IZoomOut } from './Icons';
 import { kartenName, zahlWort } from '../lib/sprache';
 import { SVG_INHALT } from '../lib/uebersetzung';
 import { ohneEingang } from '../lib/eingangId';
+import { neigungsFeder, tempoMesser, type Neigung } from '../lib/ziehGefuehl';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
 interface ProjectZoneData { project: Project; spaceId: string; [key: string]: unknown }
@@ -178,7 +179,7 @@ function OverviewCanvas() {
     [anzeigeSpaces, boards, tick, schmal, mindestens],
   );
   // Gesteuerte Knoten: Die gezogene Kachel behält ihre Lage unter der Maus, alle anderen folgen dem (Vorschau-)Layout
-  const ziehe = useRef<{ id: string; x: number; y: number; t: number; vx: number } | null>(null);
+  const ziehe = useRef<{ id: string; x: number; y: number } | null>(null);
   const [rfNodes, setRfNodes] = useState<Node[]>(layoutNodes);
   useEffect(() => {
     const z = ziehe.current;
@@ -191,17 +192,11 @@ function OverviewCanvas() {
   // Erst nach dem ersten Einpassen gleiten die Kacheln — sonst flögen sie beim Öffnen von links oben herein
   const [weich, setWeich] = useState(false);
   useEffect(() => { setWeich(false); const t = window.setTimeout(() => setWeich(true), 450); return () => window.clearTimeout(t); }, [schmal, spaces.length, boards.length]);
-  // Neigung der gezogenen Kachel: folgt dem Tempo wie eine Feder und schwingt aus, wenn die Hand stillsteht
-  const neigung = useRef({ winkel: 0, ziel: 0, raf: 0, el: null as HTMLElement | null });
-  const neigen = () => {
-    const n = neigung.current;
-    n.ziel *= 0.86;
-    n.winkel += (n.ziel - n.winkel) * 0.22;
-    if (n.el) n.el.style.setProperty('--ovc-neigung', `${n.winkel.toFixed(2)}deg`);
-    if (ziehe.current || Math.abs(n.winkel) > 0.05) n.raf = requestAnimationFrame(neigen);
-    else { n.raf = 0; if (n.el) n.el.style.removeProperty('--ovc-neigung'); }
-  };
-  useEffect(() => () => cancelAnimationFrame(neigung.current.raf), []);
+  // Neigung der gezogenen Kachel: folgt dem Tempo wie eine Feder und schwingt aus, wenn die Hand stillsteht.
+  // M481: Feder und Tempo kommen aus lib/ziehGefuehl.ts — dieselben wie beim Ziehen auf dem Board.
+  const neigung = useRef<Neigung | null>(null);
+  const tempo = useRef<ReturnType<typeof tempoMesser> | null>(null);
+  useEffect(() => () => neigung.current?.stop(), []);
   /** Wohin käme die Kachel, ließe man sie hier los? (Projekt unter ihrer Mitte, Platz im Raster) */
   const platzFuer = (node: Node): { projectId: string; index: number } | null => {
     const cx = node.position.x + BW / 2;
@@ -255,20 +250,17 @@ function OverviewCanvas() {
         }}
         onNodeDragStart={(e, node) => {
           if (node.type !== 'ovBoard') return;
-          ziehe.current = { id: node.id, x: node.position.x, y: node.position.y, t: e.timeStamp, vx: 0 };
-          const n = neigung.current;
-          n.el = document.querySelector(`.ov-canvas .react-flow__node[data-id="${node.id}"]`);
-          if (!n.raf) n.raf = requestAnimationFrame(neigen);
+          ziehe.current = { id: node.id, x: node.position.x, y: node.position.y };
+          neigung.current?.stop();
+          neigung.current = neigungsFeder(document.querySelector(`.ov-canvas .react-flow__node[data-id="${node.id}"]`), '--zieh-neigung');
+          tempo.current = tempoMesser(node.position.x, e.timeStamp);
         }}
         onNodeDrag={(e, node) => {
           const z = ziehe.current;
           if (node.type !== 'ovBoard' || !z) return;
-          const dt = Math.max(8, e.timeStamp - z.t);
-          const vx = (node.position.x - z.x) / dt;            // Punkte je Millisekunde
-          z.vx = z.vx * 0.6 + vx * 0.4;
-          z.x = node.position.x; z.y = node.position.y; z.t = e.timeStamp;
-          // Neigung wie ein angehobenes Blatt: in Zugrichtung, gedeckelt
-          neigung.current.ziel = Math.max(-7, Math.min(7, z.vx * 9));
+          z.x = node.position.x; z.y = node.position.y;
+          // Neigung wie ein angehobenes Blatt: in Zugrichtung, gedeckelt (lib/ziehGefuehl.ts)
+          if (tempo.current) neigung.current?.tempo(tempo.current.messen(node.position.x, e.timeStamp));
           const p = platzFuer(node);
           const boardId = (node.data as { board: BoardDoc }).board.id;
           const alt = vorschauRef.current;
@@ -277,6 +269,7 @@ function OverviewCanvas() {
         }}
         onNodeDragStop={(_, node) => {
           ziehe.current = null;
+          neigung.current?.loslassen();
           if (node.type !== 'ovBoard') return;
           const data = node.data as { board: BoardDoc; projectId: string };
           const v = vorschauRef.current ?? (() => { const p = platzFuer(node); return p ? { boardId: data.board.id, ...p } : null; })();

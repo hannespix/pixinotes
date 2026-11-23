@@ -105,14 +105,36 @@
 
 /* Hinweis in der Zeichen-Palette — auf schmalen Screens ausblenden */
 
-/* ---------- Physik-Effekte: natürliches Drag-Gefühl ---------- */
-/* Beim Ablegen federt die Karte mit leichtem Overshoot zurück */
+/* ---------- Ziehen: natürliches Gefühl ---------- */
 .react-flow__node > * { transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
-/* M344: Beim Ziehen bleibt die Karte, wie sie ist — vorher wurde sie um 3,5 % vergrößert und in
-   Bewegungsrichtung geneigt. Das sah lebendig aus, aber ihre Kanten standen dann nicht mehr dort,
-   wo sie nach dem Ablegen liegen: Ausrichten an einer Oberkante war Glückssache. Der angehobene
-   Schatten (oben) zeigt weiterhin, dass sie in der Hand ist. */
 .react-flow__node.dragging > * { transform: none; transition: none; }
+/* M481: Ziehen mit Gefühl wie die Board-Kacheln der Übersicht (M440). Gilt nur mit „Bewegung beim Ziehen"
+   (`data-zieh` an der Fläche, lib/ziehGefuehl.ts und Board.tsx `ziehBeginnen`).
+   · Nachbarn weichen über `translate` aus und gleiten zurück (Feder-Kurve, leicht überschwingend).
+   · Die gegriffene Karte (`data-gehoben="an"`) hebt sich (`scale`, je nach Größe 1–6 %) und neigt sich mit dem
+     Tempo (`rotate`, Variable an der Fläche). Die Drehpunkte stehen auf ihrer Mitte: React Flow setzt die Lage
+     als Inline-`transform`, die Einzel-Eigenschaften `scale`/`rotate` wirken davor — `--zieh-x/-y` (die Lage
+     der Karte) rücken den Ursprung an die richtige Stelle.
+   · M344-Lehre: Eine gehobene, geneigte Karte zeigt ihre Kanten nicht dort, wo sie landen. Greift eine
+     Fanglinie (`data-gerastet`), liegt die Karte deshalb flach und gerade — Linie und Kante stimmen überein.
+   · Beim Loslassen (`data-gehoben="landet"`) senkt sie sich federnd, die Neigung schwingt aus. */
+.board-wrap[data-zieh] .react-flow__node {
+  transition: box-shadow 0.18s ease, translate var(--zieh-feder-dauer) var(--zieh-feder), scale var(--zieh-landen-dauer) var(--zieh-landen);
+}
+.board-wrap[data-zieh] .react-flow__node[data-gehoben] {
+  rotate: var(--zieh-neigung, 0deg);
+  transform-origin: calc(var(--zieh-x, 0px) + 50%) calc(var(--zieh-y, 0px) + 50%);
+}
+.board-wrap[data-zieh] .react-flow__node[data-gehoben='an'] {
+  scale: var(--zieh-skala, 1);
+  --card-shadow-lift: var(--zieh-schatten);   /* wer einen Schatten trägt, trägt den tieferen; Bilder ohne Rand bleiben ohne */
+  transition: box-shadow var(--zieh-heben-dauer) ease, scale var(--zieh-heben-dauer) var(--zieh-heben);
+}
+.board-wrap[data-zieh][data-gerastet] .react-flow__node[data-gehoben='an'] { scale: none; rotate: none; }
+@media (prefers-reduced-motion: reduce) {
+  .board-wrap[data-zieh] .react-flow__node { transition: box-shadow 0.18s ease, translate 0.12s ease; }
+  .board-wrap[data-zieh] .react-flow__node[data-gehoben] { scale: none; rotate: none; }
+}
 
 /* Undo/Redo im Dock */
 .dock button:disabled { opacity: 0.32; cursor: default; }

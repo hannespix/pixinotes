@@ -72,7 +72,7 @@ const STAND = {
       { id: 'b2', name: 'Zweites', edges: [], drawings: [], comments: [], nodes: [notiz('m1', 0, 'Gamma Karte')] },
     ],
     spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Allgemein', boardIds: ['b1', 'b2'] }] }],
-    activeId: 'b1', view: 'board', cardFocus: false, navLinks: false, clickZoom: false, physicsEnabled: false,
+    activeId: 'b1', view: 'board', cardFocus: false, navLinks: false, clickZoom: false,
   },
 };
 const fehler = [];

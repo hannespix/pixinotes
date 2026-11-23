@@ -47,7 +47,8 @@ const FELDER = [
   'cardFocus',
   'fokusEinKlick',
   'fokusVollbild',
-  'physicsEnabled', 'stiftZeichnet',
+  'ziehBewegung',     // M481: Bewegung beim Ziehen (ersetzt physicsEnabled)
+  'stiftZeichnet',
   'konfetti',        // M294: Konfetti beim Erledigen (Option)
   'handschriftOnline', // M320: Handschrift online erkennen (Opt-in)
   'handschriftAuto', 'handschriftKi', // M324: Vorschlag nach Schreibpause, KI-Korrektur
@@ -66,7 +67,7 @@ type Feld = (typeof FELDER)[number];
  * sie waren schlicht an. Danach gilt wieder: Was gespeichert ist, bleibt.
  */
 const SCHLIFF = 2;
-type Vorlieben = Partial<Record<Feld, unknown>> & { schliff?: number };
+type Vorlieben = Partial<Record<Feld, unknown>> & { schliff?: number; physicsEnabled?: unknown };
 
 function lies(): Vorlieben | null {
   try {
@@ -117,9 +118,11 @@ export function initEinstellungen(): () => void {
   // M294: Ruhige Fläche — einmalig. Gilt für gespeicherte Vorlieben ohne
   // Marke UND für Stände von vor M247 (dort steckt Physik im Hauptstand).
   if ((gespeichert?.schliff ?? 0) < 1) {
-    const st = useBoard.getState();
-    if (st.physicsEnabled || st.clickZoom) {
-      useBoard.setState({ physicsEnabled: false, clickZoom: false, ruheHinweis: true });
+    // M481: Die alte Physik gibt es nicht mehr (Bewegung beim Ziehen ersetzt sie) — ein alter Stand mit
+    // Physik an bekommt trotzdem den Hinweis, dass die Fläche jetzt ruhig ist.
+    const st = useBoard.getState() as ReturnType<typeof useBoard.getState> & { physicsEnabled?: boolean };
+    if (st.physicsEnabled || gespeichert?.physicsEnabled || st.clickZoom) {
+      useBoard.setState({ clickZoom: false, ruheHinweis: true });
     }
   }
   // M314: Optionen, die es nicht mehr gibt, einmalig auf ihre automatischen

@@ -34,8 +34,8 @@ export function ansichtScheibe(set: Setzen, get: Holen) {
     bildExportOpen: false,
     setBildExportOpen: (open) => set({ bildExportOpen: open }),
 
-    physicsEnabled: false,
-    setPhysicsEnabled: (on) => set({ physicsEnabled: on }),
+    ziehBewegung: true,
+    setZiehBewegung: (on) => set({ ziehBewegung: on }),
     konfetti: false,
     setKonfetti: (on) => set({ konfetti: on }),
     pfeilSchatten: true,

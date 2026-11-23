@@ -23,7 +23,6 @@ import { useBoardTasten } from './boardTasten';
 import { leeresStartboard, mutedHistory, selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon } from '../lib/pdfSeiten';
 import { frameMembers } from '../lib/arrange';
-import { computePush } from '../lib/physics';
 import { bildMasse, imageFileToDataUrl } from '../lib/image';
 import { canEmbed, makeImage, makeNote } from '../lib/nodes';
 import { textZuBloecken } from '../lib/notiz';
@@ -145,15 +144,6 @@ const nodeTypes: NodeTypes = {
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
 
-/** Physik: Reibung pro Frame für Wurf & Verdrängung */
-const FRICTION = 0.9;
-const MIN_SPEED = 0.5;
-/** Wie kräftig eingedrungene Karten pro Frame hinausfedern (0..1) */
-const PUSH_SPRING = 0.32;
-/** Wunschabstand zwischen Karten beim Verdrängen */
-const PUSH_GAP = 12;
-/** Geschwindigkeits-Deckel für weggeschobene Karten */
-const PUSH_MAX = 22;
 
 /**
  * M249: Jedes Board merkt sich, wo man zuletzt hingeschaut hat.
@@ -178,6 +168,7 @@ const gemerkteAnsicht = new Map<string, { x: number; y: number; zoom: number }>(
 
 export function Board() {
   const activeId = useBoard((s) => s.activeId);
+  const ziehBewegung = useBoard((s) => s.ziehBewegung); // M481
   const importEpoch = useBoard((s) => s.importEpoch);
   const nodes = useBoard((s) => selectActiveBoard(s).nodes);
   const edges = useBoard((s) => selectActiveBoard(s).edges);
@@ -862,86 +853,54 @@ export function Board() {
     return () => window.removeEventListener('keydown', onKey);
   }, [addNode, screenToFlowPosition, fitView]);
 
-  // ---------- Physik-Engine: Wurf-Momentum + Verdrängung (FigJam-Gefühl) ----------
-  // Ein gemeinsamer Loop integriert alle Geschwindigkeiten: geworfene Karten
-  // gleiten aus, überlappte Nachbarn federn beiseite — inkl. Kettenreaktion.
-  const dragTrack = useRef<{ id: string; x: number; y: number; t: number; vx: number; vy: number } | null>(null);
-  const animRef = useRef<number>(0);
-  const vels = useRef(new Map<string, { vx: number; vy: number }>());
-  const physicsOn = useRef(false);
-
-  const nodeRect = (n: Node) => ({
-    x: n.position.x,
-    y: n.position.y,
-    w: n.measured?.width ?? 260,
-    h: n.measured?.height ?? 120,
-  });
-
-  /** `mover` drückt alle überlappten Nachbarn federnd weg (Impuls sammeln) */
-  const pushNeighbors = useCallback((mover: Node, all: Node[], strength: number) => {
-    // Physik-Schalter (Dock-Magnet): aus = Karten dürfen überlappen/stapeln
-    if (!useBoard.getState().physicsEnabled) return;
-    const mr = nodeRect(mover);
-    for (const other of all) {
-      if (other.id === mover.id || dragTrack.current?.id === other.id) continue;
-      if ((other as AppNode).archived) continue; // Archivierte stehen still (meist unsichtbar)
-      if (other.type === 'frame') continue; // Rahmen sind Hintergrund — keine Verdrängung (M149)
-      const push = computePush(mr, nodeRect(other), PUSH_GAP);
-      if (!push) continue;
-      const v = vels.current.get(other.id) ?? { vx: 0, vy: 0 };
-      v.vx += push[0] * strength;
-      v.vy += push[1] * strength;
-      const speed = Math.hypot(v.vx, v.vy);
-      if (speed > PUSH_MAX) {
-        v.vx *= PUSH_MAX / speed;
-        v.vy *= PUSH_MAX / speed;
-      }
-      vels.current.set(other.id, v);
-    }
-  }, []);
-
-  const startPhysics = useCallback(() => {
-    if (physicsOn.current) return;
-    physicsOn.current = true;
-    const startBoard = useBoard.getState().activeId;
-    const tick = () => {
-      // Board gewechselt? Physik nicht aufs falsche Board schreiben (M4)
-      if (useBoard.getState().activeId !== startBoard) {
-        physicsOn.current = false;
-        vels.current.clear();
-        return;
-      }
-      const st = useBoard.getState();
-      const board = selectActiveBoard(st);
-      const moves: Array<[string, number, number]> = [];
-      for (const [id, v] of vels.current) {
-        const n = board.nodes.find((nn) => nn.id === id);
-        if (!n || dragTrack.current?.id === id) { vels.current.delete(id); continue; }
-        v.vx *= FRICTION;
-        v.vy *= FRICTION;
-        if (Math.hypot(v.vx, v.vy) < MIN_SPEED) { vels.current.delete(id); continue; }
-        moves.push([id, n.position.x + v.vx, n.position.y + v.vy]);
-      }
-      if (moves.length) {
-        st.setNodePositions(moves);
-        // Kettenreaktion: bewegte Karten verdrängen ihrerseits Nachbarn
-        const fresh = selectActiveBoard(useBoard.getState()).nodes;
-        for (const [id] of moves) {
-          const mover = fresh.find((n) => n.id === id);
-          if (mover) pushNeighbors(mover, fresh, PUSH_SPRING * 0.7);
-        }
-      }
-      if (vels.current.size > 0) animRef.current = requestAnimationFrame(tick);
-      else physicsOn.current = false;
+  // ---------- M481: Ziehen mit Gefühl — wie die Board-Kacheln der Übersicht (M440) ----------
+  // Die gegriffene Karte hebt sich und neigt sich mit dem Tempo, Nachbarn weichen weich aus und kehren zurück,
+  // beim Loslassen federt sie an ihren Platz. Rechnung in lib/ziehGefuehl.ts (gemeinsam mit der Übersicht),
+  // Kurven und Dauern in den --zieh-*-Tokens. Ersetzt die frühere Verdrängungs-/Wurf-Physik: Die schrieb jedes
+  // Bild alle angestoßenen Karten in den Stand (Live-Team, Kettenreaktion, Wurf hinter die Fanglinie). Jetzt
+  // weicht nur die Anzeige aus; übernommen wird beim Ablegen, im selben Rückgängig-Schritt wie der Zug.
+  // Die Bewegungs-Datei kommt erst mit dem ersten Druck auf die Fläche (Start-JS, M446) — bis die Maus die
+  // Zieh-Schwelle überschreitet, ist sie längst da.
+  const zg = useRef<typeof import('../lib/ziehGefuehl') | null>(null);
+  const zieh = useRef<import('../lib/ziehGefuehl').Zug | null>(null);
+  const zgLaden = useCallback(() => import('../lib/ziehGefuehl').then((m) => { zg.current = m; return m; }), []);
+  useEffect(() => {
+    const wrap = zoomWrapRef.current;
+    if (!wrap) return;
+    const laden = () => { if (!zg.current) void zgLaden(); };
+    wrap.addEventListener('pointerover', laden, { capture: true, once: true });
+    wrap.addEventListener('pointerdown', laden, { capture: true, once: true });
+    return () => { wrap.removeEventListener('pointerover', laden, { capture: true }); wrap.removeEventListener('pointerdown', laden, { capture: true }); };
+  }, [zgLaden]);
+  const ziehBeginnen = useCallback((node: Node) => {
+    zieh.current = null;
+    const st = useBoard.getState();
+    const wurzel = zoomWrapRef.current;
+    if (!st.ziehBewegung || !wurzel) return;
+    const starten = (m: typeof import('../lib/ziehGefuehl')) => {
+      const alle = selectActiveBoard(useBoard.getState()).nodes;
+      const jetzt = alle.find((n) => n.id === node.id);
+      if (jetzt) zieh.current = m.zugStarten(wurzel, jetzt, alle, getViewport().zoom || 1);
     };
-    animRef.current = requestAnimationFrame(tick);
-  }, [pushNeighbors]);
-
-  /** Neigungs-Effekt: gezogene Karte kippt leicht in Bewegungsrichtung */
-  const setTilt = (id: string, deg: number) => {
-    const el = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`);
-    if (el) el.style.setProperty('--tilt', `${deg.toFixed(2)}deg`);
-  };
+    if (zg.current) { starten(zg.current); return; }
+    // Allererster Zug (Finger: kein Überfahren vorher) — die Datei kommt noch; dann setzt das Gefühl mitten im Zug ein
+    void zgLaden().then((m) => { if (zugSchritt.current && !zieh.current) starten(m); });
+  }, [getViewport, zgLaden]);
+  const ziehSchritt = useCallback((node: Node) => {
+    zieh.current?.schritt(node.position.x, node.position.y, getViewport().zoom || 1, fangAktiv());
+  }, [getViewport]);
+  /** Loslassen: Karte senkt sich federnd, was noch ausweicht, bleibt dort (selber Rückgängig-Schritt wie der Zug) */
+  const ziehEnde = useCallback((abbrechen = false) => {
+    const z = zieh.current;
+    zieh.current = null;
+    if (!z) return;
+    const lagen = z.ende(abbrechen);
+    if (lagen.length === 0) return;
+    mutedHistory(() => useBoard.getState().setNodePositions(lagen));
+    z.aufloesen(lagen);
+  }, []);
+  // Board gewechselt oder Fläche weg mitten im Zug: nichts hängen lassen
+  useEffect(() => () => ziehEnde(true), [activeId, ziehEnde]);
 
   // Frame-Mitzug (M149): Beim Greifen eines Rahmens werden alle Karten
   // eingesammelt, deren MITTELPUNKT im Rahmen liegt — sie folgen dem Rahmen
@@ -1021,14 +980,13 @@ export function Board() {
       useBoard.getState().pushHistory();
       return;
     }
-    vels.current.delete(node.id); // gegriffene Karte gehorcht der Maus, nicht der Physik
-    dragTrack.current = { id: node.id, x: node.position.x, y: node.position.y, t: performance.now(), vx: 0, vy: 0 };
+    ziehBeginnen(node); // M481: heben, neigen, Nachbarn ausweichen lassen
     // M365: Auch das Verschieben ist ein Schritt, den Strg+Z zurücknimmt (bisher nur bei Rahmen) — in der
     // Gruppenarbeit holt man so eine versehentlich weggezogene Karte zurück, ohne anderen etwas zu nehmen.
     useBoard.getState().pushHistory();
     const past = useBoard.getState().past;
     zugSchritt.current = { eintrag: past[past.length - 1], x: node.position.x, y: node.position.y };
-  }, []);
+  }, [ziehBeginnen]);
 
   // Klick-Zoom (optional, ⚙ → Design → Bedienung): fliegt NUR, wenn die Karte
   // klein oder angeschnitten ist — wer schon nah dran arbeitet, wird nicht
@@ -1526,31 +1484,12 @@ export function Board() {
         }
       }
     }
-    if (node.type === 'frame') return; // Rahmen kennen weder Physik noch Neigung
-    const track = dragTrack.current;
-    if (!track || track.id !== node.id) return;
-    const now = performance.now();
-    const dt = Math.max(1, now - track.t);
-    // Geschwindigkeit in Flow-Einheiten pro Frame (~16 ms), leicht geglättet
-    track.vx = 0.6 * track.vx + 0.4 * ((node.position.x - track.x) / dt) * 16;
-    track.vy = 0.6 * track.vy + 0.4 * ((node.position.y - track.y) / dt) * 16;
-    track.x = node.position.x;
-    track.y = node.position.y;
-    track.t = now;
-    // Fancy: Karte neigt sich mit der Bewegung
-    setTilt(node.id, Math.max(-5, Math.min(5, track.vx * 0.45)));
-    // Verdrängung: alles, was unter der Karte liegt, federt beiseite
-    pushNeighbors(node, selectActiveBoard(useBoard.getState()).nodes, PUSH_SPRING);
-    if (vels.current.size > 0) startPhysics();
-  }, [pushNeighbors, startPhysics]);
-
-  // Physik-Loop beim Unmount stoppen (M4)
-  useEffect(() => () => { cancelAnimationFrame(animRef.current); physicsOn.current = false; }, []);
+    if (node.type === 'frame') return; // Rahmen heben und neigen sich nicht
+    ziehSchritt(node);
+  }, [ziehSchritt]);
 
   const onNodeDragStop = useCallback(
     (_: unknown, node: Node) => {
-      // M344: eingerastet abgelegt heißt genau dort — kein Wurf hinterher
-      const gefangen = fangAktiv();
       fangSetzen([]);
       frameDrag.current = null;
       if (node.type === 'frame') return;
@@ -1560,18 +1499,9 @@ export function Board() {
       if (zug && node.position.x === zug.x && node.position.y === zug.y) {
         useBoard.setState((s) => (s.past[s.past.length - 1] === zug.eintrag ? { past: s.past.slice(0, -1) } : {}));
       }
-      const track = dragTrack.current;
-      setTilt(node.id, 0);
-      if (!track || track.id !== node.id) return;
-      const { vx, vy } = track;
-      dragTrack.current = null;
-      if (!gefangen && Math.hypot(vx, vy) >= MIN_SPEED * 2 && useBoard.getState().physicsEnabled) {
-        // Wurf: Karte gleitet mit Momentum weiter (und räumt sich den Weg frei)
-        vels.current.set(node.id, { vx, vy });
-      }
-      if (vels.current.size > 0) startPhysics();
+      ziehEnde(); // M481: federnd ablegen, Ausgewichenes übernehmen
     },
-    [startPhysics],
+    [ziehEnde],
   );
 
   // ---------- Karten erstellen ----------
@@ -1730,6 +1660,7 @@ export function Board() {
     <div
       ref={zoomWrapRef}
       data-weit={weit && !focusCard ? '' : undefined}
+      data-zieh={ziehBewegung ? '' : undefined}
       className={`board-wrap ${spaceHeld ? 'space-pan' : ''} ${boardBg ? `board-bg-${boardBg}` : ''} ${nurLesen ? 'nur-lesen' : ''}`}
       onDrop={handleDrop}
       onDragOver={(e) => e.preventDefault()}

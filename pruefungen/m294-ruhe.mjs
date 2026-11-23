@@ -76,7 +76,7 @@ console.log('════ A: Frischer Start ════');
 {
   const { ctx, P } = await seite();
   const l = await lage(P);
-  pruefe('A1 Physik ist aus', l.physik === false, JSON.stringify(l));
+  pruefe('A1 Physik ist aus (M481: es gibt sie nicht mehr, „Bewegung beim Ziehen" ersetzt sie)', l.physik !== true && l.vPhysik !== true, JSON.stringify(l));
   pruefe('A2 Klick-Zoom ist aus', l.klickZoom === false);
   pruefe('A3 Konfetti ist aus', l.konfetti === false);
   pruefe('A4 die Vorlieben tragen die Marke schliff', l.schliff === 2, String(l.schliff));
@@ -90,7 +90,7 @@ console.log('════ B: Alter Stand mit Physik an, ohne Marke ════'
 {
   const { ctx, P } = await seite({ vorlieben: { physicsEnabled: true, clickZoom: true, milchglas: true } });
   const l = await lage(P);
-  pruefe('B1 Physik wurde ausgeschaltet', l.physik === false && l.vPhysik === false, JSON.stringify(l));
+  pruefe('B1 Physik wurde ausgeschaltet', l.physik !== true && l.vPhysik !== true, JSON.stringify(l));
   pruefe('B2 Klick-Zoom wurde ausgeschaltet', l.klickZoom === false && l.vKlick === false);
   pruefe('B3 die Marke ist jetzt gesetzt', l.schliff === 2, String(l.schliff));
   pruefe('B4 der Hinweis sagt, was passiert ist und wo es wieder anzuschalten ist', /Physik und Klick-Zoom sind jetzt aus/.test(l.toast) && /Darstellung/.test(l.toast), l.toast);
@@ -102,7 +102,7 @@ console.log('════ B2: Stand von vor M247 (Physik nur im Hauptstand) ═�
 {
   const { ctx, P } = await seite({ physikImHauptstand: true });
   const l = await lage(P);
-  pruefe('B5 auch dort: Physik aus, Marke gesetzt', l.physik === false && l.schliff === 2, JSON.stringify(l));
+  pruefe('B5 auch dort: Physik aus, Marke gesetzt', l.physik !== true && l.schliff === 2, JSON.stringify(l));
   pruefe('B6 … mit Hinweis', /jetzt aus/.test(l.toast), l.toast);
   await ctx.close();
 }
@@ -111,7 +111,7 @@ console.log('════ C: Bewusste Wahl mit Marke bleibt ════');
 {
   const { ctx, P } = await seite({ vorlieben: { physicsEnabled: true, clickZoom: false, schliff: 1 } });
   const l = await lage(P);
-  pruefe('C1 Physik bleibt an', l.physik === true, JSON.stringify(l));
+  pruefe('C1 bewusste Wahl mit Marke: kein Zwangs-Hinweis (M481: Physik selbst ist in „Bewegung beim Ziehen" aufgegangen)', l.schliff === 2, JSON.stringify(l));
   pruefe('C2 kein Umstellungs-Hinweis', !/jetzt aus/.test(l.toast), l.toast);
   await ctx.close();
 }
@@ -129,7 +129,7 @@ console.log('════ D: Der Schalter unter Einstellungen → Darstellung (M
   await zeile('Lebendige Fläche').check();
   await P.waitForTimeout(600);
   const l = await lage(P);
-  pruefe('D4 ein Häkchen schaltet Konfetti, Physik und Klick-Zoom zusammen ein', l.vKonfetti === true && l.vPhysik === true && l.vKlick === true, JSON.stringify(l));
+  pruefe('D4 ein Häkchen schaltet Konfetti und Klick-Zoom zusammen ein (M481: Physik → „Bewegung beim Ziehen")', l.vKonfetti === true && l.vKlick === true, JSON.stringify(l));
   // Ein Satz je Schalter: keine Erklär-Absätze mit mehr als zwei Sätzen im Reiter Design
   const lang = await P.evaluate(() => [...document.querySelectorAll('.modal-section .modal-hint')]
     .map((el) => el.textContent.trim()).filter((t) => (t.match(/[.!?](\s|$)/g) ?? []).length > 2));
