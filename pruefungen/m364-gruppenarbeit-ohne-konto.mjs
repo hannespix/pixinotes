@@ -707,6 +707,8 @@ await warteBis(B.P, async () => !!(await boardVon(B.P, 'bx')), 16000);
 await warteBis(B.P, async () => (await zustand(B.P)).activeId === 'bx', 8000);
 await warteBis(B.P, async () => /3 dabei/.test(await zahl(B.P)), 12000);
 pruefe('I2 drei im selben Kanal: Bernd sieht „3 dabei"', /3 dabei/.test(await zahl(B.P)) && sb.live.filter((l) => l.topic === topic).length === 3, `${await zahl(B.P)} / ${sb.live.filter((l) => l.topic === topic).length}`);
+// M477: Annas Anzeige folgt gedrosselt (250 ms) — nicht im selben Augenblick prüfen, in dem Bernd „3 dabei" sieht
+await warteBis(A.P, async () => (await chipNamen(A.P)).some((n) => /bernd/i.test(n)), 4000);
 pruefe('I3 Anna sieht Gerd und Bernd', (await chipNamen(A.P)).includes('Gerd') && (await chipNamen(A.P)).some((n) => /bernd/i.test(n)), JSON.stringify(await chipNamen(A.P)));
 await inKarte(G.P, 'Von Gerd');
 await warteBis(B.P, async () => (await B.P.locator('[data-taste="live-sperre"]').count()) === 1, 6000);

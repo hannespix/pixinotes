@@ -132,4 +132,6 @@ Modell voraus und läuft deshalb auf dem Rückweg.
 - Ändert jemand den Text einer Notiz auf anderem Weg (ältere Fassung, Werkzeug von außen), während sie gemeinsam offen
   ist, überschreibt ihn der Schreiber beim nächsten Tippen. Der Wechsel des Schreibers sichert nur, wenn sich das
   Dokument in der Sitzung geändert hat.
+- Geht der Kanal erst auf, während jemand schon in einer Notiz tippt (ein, zwei Sekunden nach dem Öffnen des Boards),
+  baut sich ihr Editor einmal neu auf (allein → Hülle); der Cursor muss dann neu gesetzt werden.
 - Keine neuen Oberflächentexte (Cursor-Schild = Name), daher keine Einträge in `src/sprache/en.json`.
