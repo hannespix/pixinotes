@@ -7,7 +7,6 @@ import {
   ConnectionMode,
   MiniMap,
   ReactFlow,
-  ViewportPortal,
   useReactFlow,
   type EdgeTypes,
   type Node,
@@ -15,7 +14,9 @@ import {
   type NodeTypes,
 } from '@xyflow/react';
 import { fangAktiv, fangen, fangSetzen, type Kasten } from '../lib/fang';
+import { zugSetzen } from '../lib/zugAnzeige';
 import { Fanglinien } from './Fanglinien';
+import { AnsichtPortal } from './AnsichtPortal';
 import { LiveSperren } from './LiveLeiste';
 import { LiveZeiger } from './Mauszeiger';
 import { PunkteMarken } from './Punkte';
@@ -979,7 +980,7 @@ export function Board() {
       const ids = new Set(zieh.map((c) => c.id));
       const mass = (n: AppNode) => ({ w: n.measured?.width ?? n.width ?? 260, h: n.measured?.height ?? n.height ?? 120 });
       const bewegt = alle.filter((n) => ids.has(n.id));
-      if (st.gridSnap || !st.fangLinien || strgRef.current || bewegt.some((n) => n.type === 'frame') || bewegt.length === 0) fangSetzen([]);
+      if (st.gridSnap || !st.fangLinien || strgRef.current || bewegt.some((n) => n.type === 'frame') || bewegt.length === 0) fangSetzen([], ende);
       else {
         let x1 = Infinity; let y1 = Infinity; let x2 = -Infinity; let y2 = -Infinity;
         for (const c of zieh) {
@@ -996,7 +997,7 @@ export function Board() {
         // eingerastet = exakt dort (Rundungsreste der Gleitkommarechnung weg, sonst läge 0 bei 8,9e-16)
         const glatt = (v: number) => Math.round(v * 1e6) / 1e6;
         if (f.dx || f.dy) for (const c of zieh) if (c.position) c.position = { x: f.dx ? glatt(c.position.x + f.dx) : c.position.x, y: f.dy ? glatt(c.position.y + f.dy) : c.position.y };
-        fangSetzen(ende ? [] : { linien: f.linien, abstaende: f.abstaende });
+        fangSetzen(ende ? [] : { linien: f.linien, abstaende: f.abstaende }, ende);
       }
     }
     onNodesChange(changes as Parameters<typeof onNodesChange>[0]);
@@ -1005,6 +1006,10 @@ export function Board() {
 
   const zugSchritt = useRef<{ eintrag: unknown; x: number; y: number } | null>(null);
   const onNodeDragStart = useCallback((_: unknown, node: Node) => {
+    zugSetzen(true); // M491: bewegte Kanten blenden ihren Schatten bis zum Ablegen aus
+    // M491: leere Beschriftungen (unsichtbar, `opacity: 0`) liegen im Zug nicht mehr im Bild — jede verschobene war eine
+    // eigene Ebene, die Chromium Bild für Bild neu einordnen musste (Layerize)
+    zoomWrapRef.current?.setAttribute('data-zug', '');
     // M390: JEDER Rahmen, der sich bewegt, nimmt seinen Inhalt mit — nicht nur der gegriffene. Vorher blieb der
     // Inhalt liegen, sobald zwei Rahmen gewählt waren oder man an einer mitgewählten Karte zog.
     {
@@ -1490,7 +1495,9 @@ export function Board() {
 
   const onNodeDragStop = useCallback(
     (_: unknown, node: Node) => {
-      fangSetzen([]);
+      fangSetzen([], true);
+      zugSetzen(false);
+      zoomWrapRef.current?.removeAttribute('data-zug');
       frameDrag.current = null;
       if (node.type === 'frame') return;
       // M365: Nichts bewegt (nur gezuckt)? Dann ist es kein Schritt.
@@ -1768,13 +1775,13 @@ export function Board() {
         // M373: der „React Flow"-Schriftzug unten rechts ist ausgeblendet (Nutzerwunsch); die Bibliothek ist in der Hilfe genannt
         proOptions={PRO_OPTIONEN}
       >
-        <ViewportPortal><Fanglinien /></ViewportPortal>
+        <AnsichtPortal><Fanglinien /></AnsichtPortal>
         {/* M364: Karten, die gerade ein anderer bearbeitet — Rahmen mit Namen */}
-        <ViewportPortal><LiveSperren /></ViewportPortal>
+        <AnsichtPortal><LiveSperren /></AnsichtPortal>
         {/* M375: Zeiger der anderen (und der Laser des Vorführenden) — in Board-Koordinaten */}
         {/* M377: Punkte an den Karten */}
-        <ViewportPortal><PunkteMarken /></ViewportPortal>
-        <ViewportPortal><LiveZeiger /></ViewportPortal>
+        <AnsichtPortal><PunkteMarken /></AnsichtPortal>
+        <AnsichtPortal><LiveZeiger /></AnsichtPortal>
         <Background
           variant={gridSnap ? BackgroundVariant.Lines : BackgroundVariant.Dots}
           gap={gridSnap ? 20 : 26}

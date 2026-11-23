@@ -18,16 +18,20 @@ export interface Abstand { art: 'h' | 'v'; von: number; bis: number; quer: numbe
 export interface Fang { linien: Fanglinie[]; abstaende: Abstand[] }
 
 const LEER: Fang = { linien: [], abstaende: [] };
+/** M491: leer, weil der Zug vorbei ist — erst dann gibt die Anzeige ihre Plätze frei (Fanglinien.tsx) */
+export const FANG_ENDE: Fang = { linien: [], abstaende: [] };
 let stand: Fang = LEER;
 const hoerer = new Set<() => void>();
 export const fangStand = (): Fang => stand;
 export const fangAktiv = (): boolean => stand.linien.length > 0 || stand.abstaende.length > 0;
 export function fangAbo(cb: () => void): () => void { hoerer.add(cb); return () => { hoerer.delete(cb); }; }
-export function fangSetzen(neu: Fanglinie[] | Fang): void {
+/** `ende`: der Zug ist vorbei (sonst: mitten im Zug gerade keine Linie) */
+export function fangSetzen(neu: Fanglinie[] | Fang, ende = false): void {
   const f: Fang = Array.isArray(neu) ? { linien: neu, abstaende: [] } : neu;
   if (f.linien.length === 0 && f.abstaende.length === 0) {
-    if (stand === LEER) return;
-    stand = LEER;
+    const leer = ende ? FANG_ENDE : LEER;
+    if (stand === leer || (stand === FANG_ENDE && !ende)) return;
+    stand = leer;
   } else stand = f;
   hoerer.forEach((h) => h());
 }

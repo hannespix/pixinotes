@@ -137,8 +137,14 @@ html[data-rein] .react-flow__node .happ-head { display: none !important; }
 [data-theme='dark'] { --kante-schatten: rgba(0, 0, 0, .42); }
 /* M434: eine gemeinsame Ebene für alle Pfeilschatten, ein einziger Weichzeichner darüber */
 .react-flow .react-flow__edges svg.pn-schatten-ebene { overflow: visible; position: absolute; left: 0; top: 0; width: 1px; height: 1px; pointer-events: none; filter: blur(5px); }
-.pn-kante-schatten { fill: none; stroke: var(--kante-schatten); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.pn-kante-schatten { fill: none; stroke: var(--kante-schatten); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; transition: stroke-opacity 0.3s ease; }
+/* M491: im Zug bewegte Kante — Schatten schnell weg, nach dem Ablegen mit 0,3 s zurück (LabeledEdge). Bewusst
+   `stroke-opacity`, nicht `opacity`: ein durchsichtiger Pfad im Weichzeichner ließ den Compositor die Ebene zeichnen. */
+.pn-kante-schatten.im-zug { stroke-opacity: 0; transition-duration: 0.08s; }
 .pn-kante-anker { display: none; }
+/* M491: fester Rahmen je Kante, nur im Zug — durchsichtig, nicht klickbar (Grund in LabeledEdge) */
+.pn-kante-rahmen { display: none; fill: rgba(0, 0, 0, 0); stroke: none; pointer-events: none; }
+.board-wrap[data-zug] .pn-kante-rahmen { display: inline; }
 html[data-kontrast='hoch'] .pn-schatten-ebene { display: none; }
 
 /* ===== M435: Formen (Schritt, Entscheidung, Start/Ende) mit Notiz-Text — mittig, transparent, wachsen mit ===== */

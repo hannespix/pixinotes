@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BaseEdge,
@@ -9,7 +9,7 @@ import {
 } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
 import { getFloatingEdgeParams, mitAnzeige } from '../lib/floatingEdge';
-import { anzeigeStand, anzeigeVon, hoeren, useAnzeige, type Anzeige } from '../lib/zugAnzeige';
+import { anzeigeStand, anzeigeVon, hoeren, nachZug, useAnzeige, zugLaeuft, type Anzeige } from '../lib/zugAnzeige';
 
 import type { AppNode } from '../types';
 
@@ -66,28 +66,62 @@ const rectOf = (n: AppNode, a?: Anzeige): ORect => {
  * Kante „nichts hat sich geändert" am Objekt erkennt.
  */
 type HRect = ORect & { id: string };
-let hStand: { nodes: AppNode[] | null; anz: number; liste: HRect[]; je: Map<AppNode, HRect> } = { nodes: null, anz: -1, liste: [], je: new Map() };
+/**
+ * M491: dazu `version` (zählt jeden neuen Stand) und `geaendert` (alte und neue Kästen der Karten, die sich seit der
+ * Vorgänger-Version bewegt haben). Eine Kante, die die Vorgänger-Version schon geprüft hat, braucht so nur die paar
+ * geänderten Kästen gegen ihren Korridor zu halten statt alle 200 — bei jedem Zug-Ereignis, für jede Kante.
+ */
+let hStand: { nodes: AppNode[] | null; anz: number; liste: HRect[]; je: Map<AppNode, HRect>; jeId: Map<string, HRect>; version: number; geaendert: HRect[] } = { nodes: null, anz: -1, liste: [], je: new Map(), jeId: new Map(), version: 0, geaendert: [] };
 function hindernisse(): HRect[] {
   const nodes = selectActiveBoard(useBoard.getState()).nodes;
   const anz = anzeigeStand();
   if (hStand.nodes === nodes && hStand.anz === anz) return hStand.liste;
-  const je = new Map<AppNode, HRect>(); const liste: HRect[] = [];
+  const je = new Map<AppNode, HRect>(); const jeId = new Map<string, HRect>(); const liste: HRect[] = []; const geaendert: HRect[] = [];
   for (const n of nodes) {
     // Rahmen sind Hintergrund-Flächen — Kanten dürfen ruhig darüberlaufen (M150)
     if (n.archived || n.type === 'frame') continue;
     const a = anzeigeVon(n.id);
-    const r = (!a && hStand.je.get(n)) || { id: n.id, ...rectOf(n, a) };
+    let r = (!a && hStand.je.get(n)) || { id: n.id, ...rectOf(n, a) };
+    const alt = hStand.jeId.get(n.id);
+    if (alt && alt.x1 === r.x1 && alt.y1 === r.y1 && alt.x2 === r.x2 && alt.y2 === r.y2) r = alt;   // gleiche Lage → dasselbe Objekt
+    else { geaendert.push(r); if (alt) geaendert.push(alt); }
     if (!a) je.set(n, r);
+    jeId.set(n.id, r);
     liste.push(r);
   }
-  hStand = { nodes, anz, liste, je };
+  for (const [id, alt] of hStand.jeId) if (!jeId.has(id)) geaendert.push(alt);
+  hStand = { nodes, anz, liste, je, jeId, version: hStand.version + 1, geaendert };
   return liste;
+}
+/**
+ * M491: Parallel-Versatz (M132) aller Kanten EINMAL je Kanten-Liste. Vorher filterte jede Kante bei jeder Änderung im
+ * Store die ganze Liste (100 Verbindungen: 10 000 Vergleiche plus Sortieren je Zug-Ereignis).
+ */
+const versatzJe = new WeakMap<readonly { id: string; source: string; target: string }[], Map<string, number>>();
+function parallelVersatz(edges: readonly { id: string; source: string; target: string }[]): Map<string, number> {
+  let m = versatzJe.get(edges);
+  if (m) return m;
+  const paare = new Map<string, string[]>();
+  for (const e of edges) {
+    const k = e.source < e.target ? `${e.source}\u0000${e.target}` : `${e.target}\u0000${e.source}`;
+    const l = paare.get(k); if (l) l.push(e.id); else paare.set(k, [e.id]);
+  }
+  m = new Map();
+  for (const ids of paare.values()) {
+    if (ids.length < 2) continue;
+    ids.sort();
+    ids.forEach((id, i) => m!.set(id, (i - (ids.length - 1) / 2) * 26));
+  }
+  versatzJe.set(edges, m);
+  return m;
 }
 /** M486: Hindernisse hängen am Stand UND an der Zug-Anzeige */
 const abo = (f: () => void) => { const a = useBoard.subscribe(f); const b = hoeren(f); return () => { a(); b(); }; };
 /** Weiteste Auslenkung der Kurve über die Endpunkte hinaus: Stummel 22 + Griff 110 bis zur Basis-Mitte, Ausweichen 240,
  *  Griff 110 um die verschobene Mitte (die Kurve bleibt in der Hülle ihrer Stützpunkte) — plus Luft */
 const KORRIDOR = 500;
+/** M491: halbe Kantenlänge des festen Rahmens einer Kante im Zug (Flächen-Punkte) */
+const RAHMEN = 1e6;
 
 /** Verbindungs-Stile für Prozessdiagramme. 'line' ist ein Altbestand
  *  (Kurve ohne Spitze) — die Spitze ist seit M146 ein EIGENER Schalter. */
@@ -194,13 +228,7 @@ export function LabeledEdge({
   // (je eine Zahl): Die Hindernis-Prüfung läuft im Abo gegen die Karten im Korridor, den die Kurve überhaupt erreichen
   // kann — bleibt der Ausweich-Versatz gleich, rendert die Kante nicht.
   // Parallel-Auffächerung: stabile Reihenfolge über sortierte Kanten-IDs
-  const pShift = useBoard((s) => {
-    const sib = selectActiveBoard(s).edges
-      .filter((e) => (e.source === source && e.target === target) || (e.source === target && e.target === source))
-      .map((e) => e.id)
-      .sort();
-    return sib.length > 1 ? (sib.indexOf(id) - (sib.length - 1) / 2) * 26 : 0;
-  });
+  const pShift = useBoard((s) => parallelVersatz(selectActiveBoard(s).edges).get(id) ?? 0);
   // M136/M137 — EINE Geometrie für alle Kurven-Kanten (Profi-Tool-Stil wie
   // Miro/Lucidchart): kurzer GERADER Stummel senkrecht aus dem Konnektor,
   // weiche kubische Kurve, GERADER Einlauf in den Ziel-Konnektor. Hindernis-
@@ -275,17 +303,24 @@ export function LabeledEdge({
     };
     return { dist, ax, ay, bx, by, c1bx, c1by, c2bx, c2by, baseMidX, baseMidY, mny, geometry, blockedAt };
   }, [kind, sx, sy, tx, ty, sPos, tPos]);
-  const vorher = useRef<{ b: object; p: number; h: ORect[]; off: number } | null>(null);
+  const vorher = useRef<{ b: object; p: number; h: ORect[]; off: number; ver: number } | null>(null);
   const off = useSyncExternalStore(abo, () => {
     const b = basis;
     if (!b) return 0;
     const m = KORRIDOR + Math.abs(pShift);
     const x1 = Math.min(sx, tx) - m, x2 = Math.max(sx, tx) + m, y1 = Math.min(sy, ty) - m, y2 = Math.max(sy, ty) + m;
-    const h: ORect[] = [];
-    for (const r of hindernisse()) if (r.id !== source && r.id !== target && r.x2 > x1 && r.x1 < x2 && r.y2 > y1 && r.y1 < y2) h.push(r);
-    // gleiche Hindernisse, gleiche Basis → gleiches Ergebnis (spart das Abtasten bei jedem Bild des Zugs)
+    const imKorridor = (r: HRect) => r.id !== source && r.id !== target && r.x2 > x1 && r.x1 < x2 && r.y2 > y1 && r.y1 < y2;
+    const liste = hindernisse();
     const v = vorher.current;
-    if (v && v.b === b && v.p === pShift && v.h.length === h.length && v.h.every((r, i) => r === h[i])) return v.off;
+    // M491: dieselbe Basis und seit der letzten Prüfung nichts im Korridor bewegt → dasselbe Ergebnis, ohne Schleife
+    if (v && v.b === b && v.p === pShift) {
+      if (v.ver === hStand.version) return v.off;
+      if (v.ver === hStand.version - 1 && !hStand.geaendert.some(imKorridor)) { v.ver = hStand.version; return v.off; }
+    }
+    const h: ORect[] = [];
+    for (const r of liste) if (imKorridor(r)) h.push(r);
+    // gleiche Hindernisse, gleiche Basis → gleiches Ergebnis (spart das Abtasten bei jedem Bild des Zugs)
+    if (v && v.b === b && v.p === pShift && v.h.length === h.length && v.h.every((r, i) => r === h[i])) { v.ver = hStand.version; return v.off; }
     let off = pShift;
     if (b.blockedAt(off, h)) {
       // M140: bevorzugt NACH OBEN ausweichen — lange Rückläufer laufen dann
@@ -296,7 +331,7 @@ export function LabeledEdge({
         if (cand !== undefined) { off = cand; break; }
       }
     }
-    vorher.current = { b, p: pShift, h, off };
+    vorher.current = { b, p: pShift, h, off, ver: hStand.version };
     return off;
   });
   // M486: Pfad nur neu, wenn sich Basis oder Ausweich-Versatz ändern (nicht bei Auswahl, Schatten, Label)
@@ -351,6 +386,22 @@ export function LabeledEdge({
 
   const commit = () => { updateEdgeLabel(id, draft.trim()); setEditing(false); };
 
+  // M491: Bewegt sich die Kante in einem Zug, bleibt ihr Schatten an der alten Stelle stehen und blendet aus — der
+  // gemeinsame Weichzeichner (M434) rastert dann während des Zugs nichts neu. Nach dem Ablegen kommt der Schatten an
+  // der neuen Stelle weich zurück (CSS-Übergang auf `opacity`, 72-netz…css). Ruhend unverändert.
+  const [, wecken] = useReducer((x: number) => x + 1, 0);
+  const schattenD = schattenPfad ?? edgePath;
+  const schattenT = schattenPfad ? undefined : 'translate(0 4)';
+  const ruhe = useRef<{ d: string; t?: string } | null>(null);
+  const imZug = useRef(false);
+  if (!imZug.current) {
+    if (ruhe.current && ruhe.current.d !== schattenD && zugLaeuft()) {
+      imZug.current = true;
+      nachZug(() => { imZug.current = false; wecken(); });
+    } else ruhe.current = { d: schattenD, t: schattenT };
+  }
+  const schatten = imZug.current && ruhe.current ? ruhe.current : { d: schattenD, t: schattenT };
+
   return (
     <>
       {customMarker && (head || headStart) && (
@@ -375,8 +426,13 @@ export function LabeledEdge({
           Der Verlauf der Linie ist ein Farbverlauf als Strich. */}
       {/* Anker: findet die gemeinsame Schatten-Ebene dieser Leinwand */}
       <g ref={anker} className="pn-kante-anker" aria-hidden="true" />
+      {/* M491: Rahmen fester Größe, nur im Zug da (`[data-zug]`, CSS): Chromium ordnet die Bild-Ebenen (Layerize, bei
+          200 Karten gut 6 ms) nur dann neu ein, wenn sich die Ausdehnung eines Mal-Abschnitts ändert — und eine Kante,
+          die der Karte folgt, ändert ihre Ausdehnung in jedem Bild. Mit dem (durchsichtigen, nie gemalten) Rahmen im
+          selben Abschnitt bleibt die Ausdehnung gleich; Karten verschiebt React Flow ohnehin per `transform`. */}
+      <rect className="pn-kante-rahmen" x={-RAHMEN} y={-RAHMEN} width={2 * RAHMEN} height={2 * RAHMEN} />
       {mitSchatten && ebene && createPortal(
-        <path className="pn-kante-schatten" data-kante={id} d={schattenPfad ?? edgePath} transform={schattenPfad ? undefined : 'translate(0 4)'}
+        <path className={imZug.current ? 'pn-kante-schatten im-zug' : 'pn-kante-schatten'} data-kante={id} d={schatten.d} transform={schatten.t}
           style={{ strokeWidth: width + 5, opacity: blass ? 0.35 : undefined }} />,
         ebene,
       )}

@@ -133,7 +133,7 @@ export function ausweichen(kandidaten: Ausweicher[], abstand = 12, stufen = 1) {
     if (!v) {
       if (!alt) return;
       versatz.delete(k.id);
-      if (k.el) { k.el.style.removeProperty('translate'); k.el.style.removeProperty('--zieh-stufe'); }
+      if (k.el) { k.el.style.removeProperty('translate'); k.el.style.removeProperty('--zieh-stufe'); stoeren(k.el); }
       return;
     }
     beruehrt.add(k.id);
@@ -142,6 +142,7 @@ export function ausweichen(kandidaten: Ausweicher[], abstand = 12, stufen = 1) {
     if (k.el) {
       if (stufe > 1) k.el.style.setProperty('--zieh-stufe', String(stufe - 1)); else k.el.style.removeProperty('--zieh-stufe');
       k.el.style.setProperty('translate', `${v[0].toFixed(1)}px ${v[1].toFixed(1)}px`);
+      stoeren(k.el);
     }
   };
   return {
@@ -204,6 +205,7 @@ export function versatzAufloesen(el: HTMLElement, x: number, y: number, id?: str
       el.style.transition = 'none';
       el.style.removeProperty('translate');
       el.style.removeProperty('--zieh-stufe');
+      stoeren(el);
       // M485: die Kanten im selben Bild zurück auf den Stand — der trägt jetzt die neue Lage
       if (id) { anzeigeSetzen(id); anzeigeMelden(); }
       void el.offsetWidth; // Stil jetzt anwenden, bevor der Übergang zurückkommt
@@ -223,9 +225,38 @@ export function versatzAufloesen(el: HTMLElement, x: number, y: number, id?: str
  * eigene Verbindung (mit dem Ziel ihres Ausweichens), denn Kanten weichen ihnen aus (LabeledEdge).
  * Geschrieben wird dabei nichts (kein Stand, kein Verlauf, kein Live-Team).
  */
+/**
+ * M491: Was eine Karte zeigen SOLL, wenn kein Übergang mehr läuft — aus ihrem Inline-Stil und denselben Regeln wie
+ * im CSS (34-praesentation.css, „Ziehen"): `translate` steht inline, die gehobene Karte trägt `--zieh-skala` und
+ * `--zieh-neigung` (die Neigung hat keinen Übergang, ihre Feder rechnet in JS), flach bei „weniger Bewegung" und an
+ * der Fanglinie.
+ */
+let gerastetJetzt = false;
+function erwartet(e: HTMLElement, arm: boolean): Anzeige {
+  const tr = e.style.translate || 'none';
+  const t = tr === 'none' ? [] : tr.split(' ').map(parseFloat);
+  const g = e.dataset.gehoben;
+  const flach = arm || (gerastetJetzt && g === 'an');
+  const s = g === 'an' && !flach ? parseFloat(e.style.getPropertyValue('--zieh-skala')) || 1 : 1;
+  const w = g && !flach ? parseFloat(e.style.getPropertyValue('--zieh-neigung')) || 0 : 0;
+  return [t[0] || 0, t[1] || 0, s, w];
+}
+const gleich = (a: Anzeige, b: Anzeige): boolean =>
+  Math.abs(a[0] - b[0]) < 0.05 && Math.abs(a[1] - b[1]) < 0.05 && Math.abs(a[2] - b[2]) < 1e-4 && Math.abs(a[3] - b[3]) < 0.01;
+/**
+ * M491: Wie oft hintereinander der berechnete Stil einer Karte schon genau dem erwarteten entsprach. Ab zwei Mal
+ * (einmal könnte ein überschwingender Übergang zufällig durchs Ziel laufen) ist sie „ruhig": Dann liest der
+ * Beobachter nicht mehr `getComputedStyle` (das erzwang je Bild eine Stil-Rechnung mitten im Bild, im Profil der
+ * größte JS-Posten beim Ziehen mit Verbindungen), sondern nimmt das Erwartete. Jede Änderung, die einen Übergang
+ * startet, stört die Ruhe wieder (`stoeren`).
+ */
+const ruhe = new WeakMap<HTMLElement, number>();
+const stoeren = (e: HTMLElement | null | undefined): void => { if (e) ruhe.delete(e); };
+
 export function kantenBeobachter(elVon: (id: string) => HTMLElement | null, beobachtet: () => Iterable<string>, verbunden: ReadonlySet<string>) {
   const zuletzt = new Map<string, Anzeige>();
   const els = new Map<string, HTMLElement | null>();
+  const arm = bewegungArm();
   let raf = 0; let bis = Infinity;
   const lesen = () => {
     raf = 0;
@@ -236,10 +267,18 @@ export function kantenBeobachter(elVon: (id: string) => HTMLElement | null, beob
       if (!e?.isConnected) continue;
       // M486: Karten ohne eigene Verbindung sind für die Kanten nur Hindernis — dafür reicht das Ziel des Ausweichens
       // (Inline-Stil, kostet nichts). Den berechneten Stil zu lesen erzwingt eine Stil-Rechnung mitten im Bild.
-      const cs = verbunden.has(id) ? getComputedStyle(e) : null;
-      const tr = cs ? cs.translate : e.style.translate || 'none';
-      const t = tr === 'none' ? [] : tr.split(' ').map(parseFloat);
-      const a: Anzeige = [t[0] || 0, t[1] || 0, !cs || cs.scale === 'none' ? 1 : parseFloat(cs.scale) || 1, !cs || cs.rotate === 'none' ? 0 : parseFloat(cs.rotate) || 0];
+      let a: Anzeige;
+      if (!verbunden.has(id)) {
+        const tr = e.style.translate || 'none';
+        const t = tr === 'none' ? [] : tr.split(' ').map(parseFloat);
+        a = [t[0] || 0, t[1] || 0, 1, 0];
+      } else if ((ruhe.get(e) ?? 0) >= 2) a = erwartet(e, arm);
+      else {
+        const cs = getComputedStyle(e);
+        const t = cs.translate === 'none' ? [] : cs.translate.split(' ').map(parseFloat);
+        a = [t[0] || 0, t[1] || 0, cs.scale === 'none' ? 1 : parseFloat(cs.scale) || 1, cs.rotate === 'none' ? 0 : parseFloat(cs.rotate) || 0];
+        ruhe.set(e, gleich(a, erwartet(e, arm)) ? (ruhe.get(e) ?? 0) + 1 : 0);
+      }
       const alt = zuletzt.get(id);
       if (Math.abs(a[0]) < 0.05 && Math.abs(a[1]) < 0.05 && Math.abs(a[2] - 1) < 1e-4 && Math.abs(a[3]) < 0.01) {
         if (alt) { zuletzt.delete(id); anzeigeSetzen(id); geaendert = true; }
@@ -309,6 +348,7 @@ export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugK
     e.style.setProperty('--zieh-x', `${n.position.x}px`);
     e.style.setProperty('--zieh-y', `${n.position.y}px`);
     e.dataset.gehoben = 'an';
+    stoeren(e);
     gehoben.push({ el: e, dx: n.position.x - x0, dy: n.position.y - y0 });
   }
   const ids = new Set(bewegt.map((n) => n.id));
@@ -334,7 +374,10 @@ export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugK
       const vx = tempo.messen(x * z, performance.now());
       // M344/M349: Greift eine Fanglinie, liegt die Karte flach — ihre Kanten stehen dann genau dort, wo sie
       // landen, und die Linie stimmt mit dem, was man sieht
-      if (gerastet !== gerastetVorher) { gerastetVorher = gerastet; wurzel.toggleAttribute('data-gerastet', gerastet); }
+      if (gerastet !== gerastetVorher) {
+        gerastetVorher = gerastet; gerastetJetzt = gerastet; wurzel.toggleAttribute('data-gerastet', gerastet);
+        for (const g of gehoben) stoeren(g.el);
+      }
       if (gerastet) neigung.gerade(); else neigung.tempo(vx);
       for (const g of gehoben) {
         g.el.style.setProperty('--zieh-x', `${x + g.dx}px`);
@@ -343,12 +386,12 @@ export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugK
       aus?.setze({ ...kasten, x: kasten.x + x - x0, y: kasten.y + y - y0 });
     },
     ende(abbrechen = false) {
-      wurzel.removeAttribute('data-gerastet');
+      wurzel.removeAttribute('data-gerastet'); gerastetJetzt = false;
       neigung.loslassen();
       beob?.nachlauf(LANDEN_MS + 400);
       for (const g of gehoben) {
-        g.el.dataset.gehoben = 'landet';
-        window.setTimeout(() => { if (g.el.dataset.gehoben === 'landet') delete g.el.dataset.gehoben; }, LANDEN_MS);
+        g.el.dataset.gehoben = 'landet'; stoeren(g.el);
+        window.setTimeout(() => { if (g.el.dataset.gehoben === 'landet') { delete g.el.dataset.gehoben; stoeren(g.el); } }, LANDEN_MS);
       }
       if (!aus) return [];
       if (abbrechen) { aus.zurueck(); return []; }

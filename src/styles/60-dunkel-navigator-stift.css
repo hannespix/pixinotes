@@ -21,23 +21,27 @@
   color: var(--ink) !important;
 }
 /* M492: Eine Notiz ohne bekannte Farbe (alter Stand, Import) hat kein Papier — ihr Text stand im Dunkeln als
-   BlockNote-Grau #3f3f3f auf der Fläche (1,7:1). Ohne Papier folgt die Schrift dem Theme wie bei Weiß. */
-[data-theme='dark'] .react-flow__node-note:has(.note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background'])),
-[data-theme='dark'] .react-flow__node-note:has(.note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background'])) .bn-editor { color: var(--ink); }
+   BlockNote-Grau #3f3f3f auf der Fläche (1,7:1). Ohne Papier folgt die Schrift dem Theme wie bei Weiß.
+   M491: ohne `:has()` direkt an der Karte — `[style*=…]` in einem `:has()` ließ Chromium bei JEDER Änderung eines
+   Inline-Stils (React Flow verschiebt Karten per `style`) den Stil des ganzen Dokuments neu rechnen: beim Ziehen
+   über 150 Mal auf 50 Mausbewegungen, je gut 40 ms. Keine Attribut-Selektoren auf `style` in `:has()`. */
+[data-theme='dark'] .react-flow__node-note .note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background']),
+[data-theme='dark'] .react-flow__node-note .note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background']) .bn-editor { color: var(--ink); }
 
 /* ================= M494: Editor-Farben auf dunklem Papier =================
    Schrift- und Hintergrundfarben im Text (BlockNote: `--bn-colors-highlights-*`) sind für helles Papier gemacht.
    Wo das Papier dunkel ist — weiße Notiz und Notiz ohne Farbe im Dunkeln, Protokoll im Thema im Dunkeln, Protokoll
    in einer dunklen eigenen Farbe (auch im Hellen) — gelten die Nachtstufen aus 00-tokens.css (`--nacht-hl-*`).
    Editor-Fläche und -Schrift zeigen dort auf die Karte, damit auch die Muster der Farbwahl (M492: „auf der
-   Editor-Fläche") die Farbe so zeigen, wie sie im Text steht. Haftnotizen in Farbe bleiben helles Papier (M338). */
+   Editor-Fläche") die Farbe so zeigen, wie sie im Text steht. Haftnotizen in Farbe bleiben helles Papier (M338).
+   M491: die Notiz ohne Farbe ohne `:has()` (Grund oben bei M492). */
 [data-theme='dark'] .react-flow__node-note:has(.sticky-white) .bn-root,
-[data-theme='dark'] .react-flow__node-note:has(.note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background'])) .bn-root {
+[data-theme='dark'] .react-flow__node-note .note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background']) .bn-root {
   --bn-colors-editor-text: var(--ink);
   --bn-colors-editor-background: var(--surface-card);
 }
 [data-theme='dark'] .react-flow__node-note:has(.sticky-white) .bn-root,
-[data-theme='dark'] .react-flow__node-note:has(.note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background'])) .bn-root,
+[data-theme='dark'] .react-flow__node-note .note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background']) .bn-root,
 [data-theme='dark'] .minutes-card.papier-thema .bn-root,
 .minutes-card.papier-dunkel .bn-root {
   --bn-colors-highlights-gray-text: var(--nacht-hl-grau);     --bn-colors-highlights-gray-background: var(--nacht-hl-grau-grund);
