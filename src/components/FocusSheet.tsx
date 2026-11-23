@@ -507,7 +507,9 @@ export function FocusSheet() {
           <span>{typeName}{siblings.length > 1 ? ` · ${index + 1} von ${siblings.length}` : ''}{dok ? ` · Seite ${dok.seite} von ${dok.seiten}` : ''}{zeit !== undefined && (
             // M453: ruhig in der Unterzeile — wann die Karte zuletzt inhaltlich geändert wurde (Lage/Größe zählen nicht)
             <> · <time className="focus-zeit" dateTime={new Date(zeit).toISOString()} title={`Zuletzt geändert: ${zeitLang(zeit)}`}>{`Geändert ${vorWann(zeit)}`}</time></>
-          )}{zeit === undefined && <span className="focus-zeit" title="Zuletzt geändert: unbekannt – die Karte stammt aus einem älteren Stand"> · Änderung unbekannt</span>}</span>
+          )}{zeit === undefined && <span className="focus-zeit" title="Zuletzt geändert: unbekannt – die Karte stammt aus einem älteren Stand"> · Änderung unbekannt</span>}
+          {/* M463: dezent – die Karte ist vom „Nach Themen ordnen" ausgenommen (Eigenschaft im ⋯) */}
+          {node.ohneOrdnen && <span className="focus-zeit focus-ohne-ordnen" title="„Nach Themen ordnen“ lässt diese Karte liegen – ändern im ⋯ der Karte"> · ordnet nicht mit</span>}</span>
         </div>
         {/* M424: Darstellung wie in der Präsentation — ein kleines Symbol; wer die Stufe verstellt hat, sieht dort die Prozent */}
         <span className="focus-ansicht" ref={ansichtHuelle}>

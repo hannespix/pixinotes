@@ -135,7 +135,7 @@ console.log('A  Ohne KI: lokales Briefing neben dem Ausschnitt');
   const i = (s) => text.indexOf(s);
   pruefe('A3 Fristen: überfällig zuerst, dann bald, dann später; Erledigtes fehlt', i('UEBERFAELLIG') >= 0 && i('UEBERFAELLIG') < i('BALD') && i('BALD') < i('SPAETER') && i('ERLEDIGT') < 0 && /überfällig/.test(text), text.slice(0, 600));
   pruefe('A4 offene ohne Frist werden gezählt, die Person steht dabei', /1 offene ohne Frist/.test(text) && text.includes('OHNEFRIST') && text.includes('@Anna'), text);
-  pruefe('A5 Entscheidung aus dem Protokoll und Risiko aus der Notiz', text.includes('Budget 20.000 Euro freigegeben') && text.includes('Stahllieferant ist blockiert') && /Risiken und Blocker/.test(text) && /1 Aufgabe\(n\) überfällig/.test(text), text);
+  pruefe('A5 Entscheidung aus dem Protokoll und Risiko aus der Notiz', text.includes('Budget 20.000 Euro freigegeben') && text.includes('Stahllieferant ist blockiert') && /Risiken und Blocker/.test(text) && /1 Aufgabe überfällig/.test(text), text);
   pruefe('A6 Abschnitte: Aufgaben, Entscheidungen, Inhalte, Risiken – keine Checklisten', ['Aufgaben und Fristen', 'Entscheidungen', 'Wichtigste Inhalte', 'Risiken und Blocker'].every((s) => text.includes(s)) && !typen.includes('checkListItem'), typen);
   pruefe('A7 ohne KI geht keine Anfrage hinaus; die Meldung sagt es', aufrufe.length === 0 && /ohne KI/.test(meldung), { aufrufe: aufrufe.length, meldung });
   await P.mouse.click(700, 860); await P.keyboard.press('Escape');

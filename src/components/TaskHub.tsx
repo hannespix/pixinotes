@@ -13,6 +13,7 @@ import { applyTopicTag, brainDigest, buildTopicOverview, type DigestLine, type T
 import { aiWeekPlan } from '../lib/aiActions';
 import { IBell, ICalendar, IChevronR, IFilter, IGantt, IKanban, INote, ISearch, IUsers, IWand, IX, ISonne } from './Icons';
 import { zahlWort } from '../lib/sprache';
+import { TermineAbschnitt } from './TermineAbschnitt';
 
 const PRIO_LABEL: Record<1 | 2 | 3, string> = { 1: '!!!', 2: '!!', 3: '!' };
 
@@ -624,6 +625,9 @@ export function TaskHub() {
           {boards.map((b) => <option key={b.id} value={b.id} translate="no">→ {b.name}</option>)}
         </select>
       </div>
+
+      {/* M469: Termine aus Kalender-Konten — eigener Abschnitt ohne Haken, nur mit verbundenem Konto */}
+      <TermineAbschnitt aufgaben={allTasks} offen={open} schliessen={() => setOpen(false)} />
 
       {tasks.length === 0 ? (
         <div className="taskhub-empty">

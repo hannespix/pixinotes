@@ -17,7 +17,6 @@ import { bildTextStarten } from './lib/textInBildern';
 import { initBoardVersionen, versionsAnhaenge, verwaisteAufraeumen, VERSIONEN_EREIGNIS } from './lib/boardVersionen';
 import { initWebdavSync } from './lib/webdav';
 import { initFilesSync } from './lib/filesSync';
-import { initKontoSync } from './lib/kontoSync';
 import { initBrain } from './lib/brain';
 import { kiAbbrechen } from './lib/ai';
 import { AboutMenu } from './components/AboutMenu';
@@ -32,12 +31,13 @@ import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
 import { Tastatur } from './components/Tastatur';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
+import { kontoKennung, termineZuErinnern } from './lib/termineZentrale';
+import { fristenAusstehend, fristenLaden } from './lib/dates';
+import { rufnummernLaden } from './lib/rufnummer';
 import { autoArchivAlleBoards } from './lib/ticketArchiv';
 import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
 import { initGrabsteine } from './lib/grabsteine';
-import { linkOeffnen, linkTokenAbholen } from './lib/linkTeilen';
 import { einladungAnnehmen, einladungOffen, einladungTokenAbholen } from './lib/einladung';
-import { initGastSync } from './lib/gastSync';
 import { folgeIch, initVorfuehren, VORFUEHR_EREIGNIS, werFuehrtVor } from './lib/vorfuehren';
 import { initMauszeiger } from './lib/mauszeiger';
 import { initGruppenraum } from './lib/gruppenraum';
@@ -46,11 +46,12 @@ import { PunkteLeiste } from './components/Punkte';
 import { Vorfuehren } from './components/Vorfuehren';
 import { SprachHinweis } from './components/SprachHinweis';
 import { GastNameDialog, LiveLeiste, NAME_FRAGEN } from './components/LiveLeiste';
-import { FreigabeHost } from './components/FreigabeDialog';
+import { FreigabeHost, freigabeDialogLaden } from './components/FreigabeHost';
 import { BildEditorHost } from './components/BildEditorHost';
 import { EbeneLoeschenHost } from './components/EbeneLoeschenDialog';
 import { getAuthor } from './components/CommentLayer';
-import { loadKonto } from './lib/kontoSync';
+import { loadKonto } from './lib/kontoSitzung';
+import { initSyncStart } from './lib/syncStart';
 import { sprache, zahlWort } from './lib/sprache';
 import { ILock } from './components/Icons';
 import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick gespeicherte Seitenstriche (M354-Fehler) einmal richten
@@ -115,6 +116,18 @@ function Versionen() {
   return boardId ? <Suspense fallback={null}><VersionenDialogLazy boardId={boardId} onClose={() => setBoardId(null)} /></Suspense> : null;
 }
 
+/** M466: Das Outlook-Fenster (Microsoft Graph) kommt erst mit dem ersten Aufruf — Strg+K „Outlook" oder ＋ → Outlook */
+const OutlookLazy = lazy(() => import('./components/OutlookFenster').then((m) => ({ default: m.OutlookFenster })));
+function Outlook() {
+  const [offen, setOffen] = useState(false);
+  useEffect(() => {
+    const auf = () => setOffen(true);
+    window.addEventListener('pixinotes:outlook', auf);
+    return () => window.removeEventListener('pixinotes:outlook', auf);
+  }, []);
+  return offen ? <Suspense fallback={null}><OutlookLazy onClose={() => setOffen(false)} /></Suspense> : null;
+}
+
 /** M385: Die QR-Einblendung (samt Rechenbibliothek) wird erst geladen, wenn jemand sie aufruft */
 const QrBlendeLazy = lazy(() => import('./components/QrBlende').then((m) => ({ default: m.QrBlende })));
 function Qr() {
@@ -135,7 +148,7 @@ function Qr() {
  */
 const LADER = {
   overview: () => import('./components/Overview'),
-  taskhub: () => import('./components/TaskHub'),
+  taskhub: () => Promise.all([import('./components/TaskHub'), fristenLaden().catch(() => {})]).then(([m]) => m),   // M459: liest Fristen
   presenter: () => import('./components/Presenter'),
   suche: () => import('./components/SearchOverlay'),
   recherche: () => import('./components/RechercheDialog'),
@@ -192,6 +205,12 @@ function imLeerlaufVorladen() {
   const los = () => {
     void kartenVorladen();
     for (const l of Object.values(LADER)) void l().catch(() => null);
+    // M459: Fristen- und Rufnummern-Erkennung, Freigabe-Dialog und der Konto-/Team-Abgleich (nur geladen, nicht
+    // gestartet) — für den Service Worker, damit sie auch offline da sind
+    void fristenLaden().catch(() => null);
+    void rufnummernLaden().catch(() => null);
+    void freigabeDialogLaden().catch(() => null);
+    void import('./lib/gastSync').catch(() => null);
   };
   const ric = (window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
   window.setTimeout(() => (ric ? ric(los, { timeout: 4000 }) : los()), VORLADEN_NACH_MS);
@@ -217,7 +236,7 @@ export default function App() {
   const nurLesenBoard = nurLesenId ? { id: nurLesenId, von: nurLesenVon } : null;
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); initBoardVersionen(); seitenBreitenReparieren(); imLeerlaufVorladen(); window.setTimeout(() => useBoard.getState().fristAnkerNachtragen(), 1200); }, []);
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initSyncStart(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); initBoardVersionen(); seitenBreitenReparieren(); imLeerlaufVorladen(); window.setTimeout(() => useBoard.getState().fristAnkerNachtragen(), 1200); }, []);
 
   // Eigene Apps (M158): verwaiste HTML-Inhalte in IndexedDB entsorgen —
   // NUR beim Start (dann kann kein Undo eine gelöschte App-Karte zurückholen,
@@ -306,16 +325,21 @@ export default function App() {
   // M357: Kurzer Link (#l=<token>) — die geteilte Fassung holen und DIREKT öffnen, ohne Rückfrage:
   // Wer auf einen Link klickt, will das Board sehen; es kommt als eigenes Board dazu und ersetzt nichts.
   useEffect(() => {
-    const token = linkTokenAbholen();
-    if (!token) return;
-    const st = useBoard.getState();
-    st.showToast('Geteiltes Board wird geladen …');
-    claimWriter(); // bewusster Import — auch aus einem Mitlese-Fenster wirksam
-    linkOeffnen(token, (name) => window.confirm(`Von „${name}" gibt es eine neuere Fassung.\n\nOK = neue Fassung laden (als weiteres Board, dein bisheriges bleibt)\nAbbrechen = dein bisheriges öffnen`))
-      .then((wie) => useBoard.getState().showToast(wie === 'vorhanden'
-        ? 'Geteiltes Board geöffnet – du hattest es schon.'
-        : 'Geteiltes Board geöffnet – es ist jetzt dein eigenes; Änderungen bleiben bei dir.', false, 6000))
-      .catch((e: Error) => useBoard.getState().showToast(`${e.message}`, false, 9000));
+    // M459: nur das Erkennen ist im Start — Laden und Öffnen (lib/linkTeilen.ts) kommen mit dem Link
+    const m = location.hash.match(/^#l=([A-Za-z0-9_-]{20,64})$/);
+    if (!m) return;
+    void import('./lib/linkTeilen').then(({ linkOeffnen, linkTokenAbholen }) => {
+      const token = linkTokenAbholen();
+      if (!token) return;
+      const st = useBoard.getState();
+      st.showToast('Geteiltes Board wird geladen …');
+      claimWriter(); // bewusster Import — auch aus einem Mitlese-Fenster wirksam
+      linkOeffnen(token, (name) => window.confirm(`Von „${name}" gibt es eine neuere Fassung.\n\nOK = neue Fassung laden (als weiteres Board, dein bisheriges bleibt)\nAbbrechen = dein bisheriges öffnen`))
+        .then((wie) => useBoard.getState().showToast(wie === 'vorhanden'
+          ? 'Geteiltes Board geöffnet – du hattest es schon.'
+          : 'Geteiltes Board geöffnet – es ist jetzt dein eigenes; Änderungen bleiben bei dir.', false, 6000))
+        .catch((e: Error) => useBoard.getState().showToast(`${e.message}`, false, 9000));
+    }).catch((e: Error) => useBoard.getState().showToast(`${e.message}`, false, 9000));
   }, []);
 
   // M360: Einladungslink (#e=<token>) — als Gast beitreten und das gemeinsame Board öffnen. Ohne Anmeldung
@@ -366,14 +390,28 @@ export default function App() {
   useEffect(() => {
     const remind = () => {
       const { boards, showToast } = useBoard.getState();
-      const hits = dueTasksToRemind(collectTasks(boards));
-      if (hits.length === 0) return;
+      const aufgaben = collectTasks(boards);
+      // M459: Die Fristen-Erkennung wurde eben erst angestoßen — mit ihr zählen, sonst fehlten die fälligen
+      const ausstehend = fristenAusstehend();
+      if (ausstehend) { void ausstehend.then(remind, () => {}); return; }
+      const hits = dueTasksToRemind(aufgaben);
       if (hits.length === 1) {
         showToast(`Fällig: „${hits[0].text}" (${hits[0].boardName}) – Details in der Aufgaben-Zentrale`);
         notifyBrowser('PixiNotes Aufgabe fällig', `${hits[0].text} (${hits[0].boardName})`);
-      } else {
+      } else if (hits.length > 1) {
         showToast(`${zahlWort(hits.length, 'Aufgabe', 'Aufgaben')} fällig – Details in der Aufgaben-Zentrale`);
         notifyBrowser('PixiNotes', `${hits.length} Aufgaben sind fällig`);
+      }
+      // M469: Termine aus Kalender-Konten kurz vor Beginn — nur mit Einstellung, nur aus gemerkten Abrufen (kein Netz)
+      const termine = termineZuErinnern(aufgaben);
+      if (termine.length) {
+        const t = termine[0];
+        const melden = () => {
+          if (termine.length === 1) showToast(`Termin um ${t.time}: „${t.title}" (${kontoKennung(t.provider)})`, false, 9000);
+          else showToast(`${zahlWort(termine.length, 'Termin', 'Termine')} beginnen gleich – ab ${t.time}: „${t.title}"`, false, 9000);
+          notifyBrowser('PixiNotes Termin', `${t.time} ${t.title}`);
+        };
+        if (hits.length) setTimeout(melden, 6000); else melden();
       }
     };
     const t0 = setTimeout(remind, 2500);
@@ -487,6 +525,7 @@ export default function App() {
       <Vorlagen />
       <Qr />
       <Versionen />
+      <Outlook />
       <BildExport />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
       <GeteiltDialog />

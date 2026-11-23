@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { selectActiveBoard, useBoard, type Stroke } from '../store';
 import { loadFile } from '../lib/fileStore';
-import { kontoDateiNachladen } from '../lib/kontoSync';
+
 import { pdfSeiteMasse, renderPdfPage } from '../lib/pdf';
 import { MarkerGruppen, StrichPfad } from './StrichPfad';
 import type { FileNode } from '../types';
@@ -24,6 +24,7 @@ import { FOLIE_ZOOM, type FolieZoom } from '../lib/folienWerkzeug';
 
 import { IPaperclip } from './Icons';
 import { radSchritt } from '../lib/radZoom';
+import { kontoDateiHolen } from '../lib/syncStart';
 export { dokumentArt, type DokumentArt } from '../lib/dokumentArt';
 
 /** Inhalt der Datei: aus der Karte (kleine Dateien), der Geräte-Ablage oder dem Konto */
@@ -35,7 +36,7 @@ function useQuelle(id: string, dataUrl: string | undefined): { quelle: string | 
     let url: string | null = null; let weg = false;
     void (async () => {
       let b = await loadFile(id).catch(() => undefined);
-      if (!b) { try { b = (await kontoDateiNachladen(id)) ?? undefined; } catch { b = undefined; } }
+      if (!b) { try { b = (await kontoDateiHolen(id)) ?? undefined; } catch { b = undefined; } }
       if (weg) return;
       if (!b) { setFehlt(true); return; }
       url = URL.createObjectURL(b);

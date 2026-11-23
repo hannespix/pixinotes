@@ -217,6 +217,21 @@ export function msHasNotes(acc = loadCalAccounts().ms): boolean {
   return !!acc && /Notes\.Read/i.test(acc.scopes ?? '');
 }
 
+/** M466: Deckt die Verbindung das Lesen des Postfachs (Outlook-Mails) ab? */
+export function msHasMail(acc = loadCalAccounts().ms): boolean {
+  return !!acc && (!!acc.token || !!acc.refreshToken) && /Mail\.Read/i.test(acc.scopes ?? '');
+}
+
+/**
+ * M466: Berechtigungs-Satz aus Bausteinen. Ohne OneNote und Postfach bleibt es exakt der alte Satz (MS_SCOPE) —
+ * bestehende Verbindungen erneuern damit weiter still. Das Postfach braucht User.Read für den Anzeigenamen.
+ */
+function msScope(notes: boolean, mail: boolean): string {
+  if (!notes && !mail) return MS_SCOPE;
+  if (!mail) return MS_SCOPE_NOTES;
+  return ['Calendars.Read', notes ? 'Notes.Read' : '', mail ? 'Mail.Read User.Read' : '', 'offline_access'].filter(Boolean).join(' ');
+}
+
 function b64url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -249,9 +264,13 @@ export function handleOAuthRedirect(): boolean {
  * Interaktiv mit Microsoft 365 verbinden (Popup, PKCE ohne Client-Secret).
  * `withNotes` fragt zusätzlich den OneNote-Lesezugriff ab (M184).
  */
-export async function connectMicrosoft(clientId: string, tenant = 'common', withNotes = false): Promise<string> {
-  const scope = withNotes ? MS_SCOPE_NOTES : MS_SCOPE;
-  const roh = await msAnmeldung(clientId, tenant, scope);
+export async function connectMicrosoft(clientId: string, tenant = 'common', withNotes = false, opts: { mail?: boolean; hint?: string } = {}): Promise<string> {
+  // M466: `opts.mail` fragt zusätzlich das Lesen des Postfachs ab (Outlook-Fenster); `hint` wählt das Konto vor.
+  // Was dieselbe App schon darf, bleibt dabei: OneNote freischalten nimmt das Postfach nicht weg und umgekehrt.
+  const alt = loadCalAccounts().ms;
+  const gleich = alt?.clientId === clientId;
+  const scope = msScope(withNotes || (gleich && msHasNotes(alt)), !!opts.mail || (gleich && msHasMail(alt)));
+  const roh = await msAnmeldung(clientId, tenant, scope, opts.hint);
   const acc: MsAccount = {
     clientId, tenant, token: roh.token, refreshToken: roh.refreshToken, tokenExp: roh.exp,
     connectedAs: loadCalAccounts().ms?.connectedAs, scopes: roh.scopes,
@@ -274,7 +293,7 @@ export interface MsRohToken { token: string; refreshToken?: string; exp: number;
  * Code-Tausch, OHNE die Kalender-Konten anzufassen. `connectMicrosoft` baut
  * darauf auf; der Konto-Sync ebenso, mit seinem eigenen Berechtigungs-Satz.
  */
-export async function msAnmeldung(clientId: string, tenant = 'common', scope = MS_SCOPE): Promise<MsRohToken> {
+export async function msAnmeldung(clientId: string, tenant = 'common', scope = MS_SCOPE, hint?: string): Promise<MsRohToken> {
   if (!oauthAvailable()) throw new Error('Anmelden geht nur über die gehostete App (http/https), nicht aus der Einzeldatei.');
   const { verifier, challenge } = await pkcePair();
   const state = `pixinotes-ms-${b64url(crypto.getRandomValues(new Uint8Array(12)))}`;
@@ -288,6 +307,8 @@ export async function msAnmeldung(clientId: string, tenant = 'common', scope = M
     state,
     code_challenge: challenge,
     code_challenge_method: 'S256',
+    // M466: E-Mail-Adresse → Microsoft wählt dieses Konto vor
+    ...(hint ? { login_hint: hint } : {}),
   }).toString();
 
   const popup = window.open(auth.toString(), 'pixinotes-ms-login', 'width=520,height=680');
@@ -499,7 +520,71 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false): P
 
   await Promise.all(jobs);
   if (errors.length === 0) cache.set(key, { at: Date.now(), events });
+  // M469: Für die Aufgaben-Zentrale merken — je Konto, das geantwortet hat (ein abgelaufenes
+  // Google-Konto soll die Outlook-Termine nicht mit ins Leere reißen)
+  const fehlgeschlagen = new Set<'google' | 'ms'>();
+  for (const f of errors) fehlgeschlagen.add(f.startsWith('Google') ? 'google' : 'ms');
+  if (fehlgeschlagen.size < 2) termineMerken(isoDay(from), isoDay(to), events, fehlgeschlagen);
   return { events, errors };
+}
+
+// ------------------------------------------------- Gemerkte Termine (M469) ----
+// Die Aufgaben-Zentrale zeigt „Termine heute und morgen" und kann kurz vor
+// Beginn erinnern — dafür darf sie beim Start KEINEN neuen Abruf auslösen
+// (m446). Deshalb merkt sich jeder erfolgreiche Abruf (Kalender-Karte,
+// Zentrale) die Termine der nächsten Wochen in einem eigenen Schlüssel —
+// wie die Tokens nie im Board, Sync, Link oder Export.
+const TERMINE_KEY = 'pixinotes-cal-termine';
+export const TERMINE_EREIGNIS = 'pixinotes-cal-termine';
+const TERMINE_VOR = 1;    // Tage zurück, die aufgehoben werden
+const TERMINE_NACH = 62;  // Tage voraus — genug für Heute/Morgen, ohne den Speicher zu füllen
+
+export interface GemerkteTermine {
+  /** Zeitpunkt des letzten erfolgreichen Abrufs, der heute abdeckte (epoch ms) */
+  stand: number;
+  /** abgedeckte Tage (yyyy-mm-dd) → Termine dieses Tages */
+  tage: Record<string, CalAccountEvent[]>;
+}
+
+export function gemerkteTermine(): GemerkteTermine {
+  try {
+    const roh = JSON.parse(localStorage.getItem(TERMINE_KEY) ?? 'null') as GemerkteTermine | null;
+    if (roh && typeof roh === 'object' && roh.tage && typeof roh.tage === 'object') return { stand: Number(roh.stand) || 0, tage: roh.tage };
+  } catch { /* defekt → leer */ }
+  return { stand: 0, tage: {} };
+}
+
+function termineSchreiben(g: GemerkteTermine) {
+  try {
+    localStorage.setItem(TERMINE_KEY, JSON.stringify(g));
+  } catch { /* M388: Speicher voll — die Kalender-Karte zeigt trotzdem */ }
+  window.dispatchEvent(new CustomEvent(TERMINE_EREIGNIS));
+}
+
+function termineMerken(vonIso: string, bisIso: string, events: CalAccountEvent[], fehlgeschlagen: Set<'google' | 'ms'>) {
+  const jetzt = new Date();
+  const min = isoDay(new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() - TERMINE_VOR));
+  const max = isoDay(new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() + TERMINE_NACH));
+  const alt = gemerkteTermine();
+  const tage: GemerkteTermine['tage'] = {};
+  for (const [tag, liste] of Object.entries(alt.tage)) {
+    if (tag < min || tag > max || !Array.isArray(liste)) continue;
+    // Im abgerufenen Bereich bleiben nur Termine der Konten, die diesmal nicht geantwortet haben
+    tage[tag] = tag < vonIso || tag > bisIso ? liste : liste.filter((e) => fehlgeschlagen.has(e.provider));
+  }
+  // Jeder Tag des Abrufs gilt als abgedeckt — auch ohne Termin (leere Liste = „sicher nichts")
+  const lauf = new Date(`${vonIso}T12:00:00`);
+  for (let i = 0; i < 400; i += 1) {
+    const tag = isoDay(lauf);
+    if (tag > bisIso) break;
+    if (tag >= min && tag <= max && !tage[tag]) tage[tag] = [];
+    lauf.setDate(lauf.getDate() + 1);
+  }
+  for (const ev of events) {
+    if (tage[ev.date]) tage[ev.date].push({ date: ev.date, title: ev.title, time: ev.time, provider: ev.provider });
+  }
+  const heute = isoDay(jetzt);
+  termineSchreiben({ stand: vonIso <= heute && bisIso >= heute ? Date.now() : alt.stand, tage });
 }
 
 /** Cache verwerfen (manueller ⟳ in der Kalender-Karte). */
@@ -512,4 +597,8 @@ export function disconnect(provider: 'google' | 'ms') {
   delete acc[provider];
   saveCalAccounts(acc);
   cache.clear();
+  // M469: Termine eines getrennten Kontos verschwinden auch aus der Aufgaben-Zentrale
+  const g = gemerkteTermine();
+  for (const tag of Object.keys(g.tage)) g.tage[tag] = g.tage[tag].filter((e) => e.provider !== provider);
+  termineSchreiben(g);
 }

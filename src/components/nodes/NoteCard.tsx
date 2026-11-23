@@ -16,6 +16,7 @@ import { appStateLines, fmtHM, linkedOfType, timeSums } from '../../lib/moduleFe
 import { loadAppState } from '../../lib/htmlStore';
 import type { TimeData } from '../../types';
 import { extractEntities } from '../../lib/entities';
+import { useRufnummernStand } from '../../lib/rufnummer';
 import { konfettiWerfen } from '../../lib/konfetti';
 import { checklistStand, FARB_NAMEN, noteTitle } from '../../lib/notiz';
 import { repairBlocks } from '../../lib/htmlBlocks';
@@ -57,7 +58,9 @@ function NoteDueChips({ text, title, blocks, anker }: { text: string; title: str
 /** ☎/✉/🔗-Chips: erkannte Telefonnummern, Mails & Links aus dem Notiz-Text
  *  (im BlockNote-Editor selbst können wir keine Links injizieren) */
 function NoteEntityChips({ text }: { text: string }) {
-  const ents = useMemo(() => extractEntities(text).slice(0, 4), [text]);
+  const rufStand = useRufnummernStand();   // M459: Nummern kommen still dazu, sobald die Erkennung geladen ist
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const ents = useMemo(() => extractEntities(text).slice(0, 4), [text, rufStand]);
   if (ents.length === 0) return null;
   const ICON = { tel: '\u260e', mail: '\u2709', url: '\ud83d\udd17' } as const;
   return (

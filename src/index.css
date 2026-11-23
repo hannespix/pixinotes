@@ -472,6 +472,17 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   position: absolute; top: 100%; left: 0; margin-top: 7px; min-width: min(160px, calc(60vw / var(--pn-anz, 1))); max-width: max(100%, 220px);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* M465: Mit Angaben aus dem Text im Bild stehen Name und Chips gemeinsam unter dem Bild — ebenfalls außerhalb der Karte */
+.card-shell > .bild-unten {
+  position: absolute; top: 100%; left: 0; margin-top: 7px; display: flex; flex-direction: column; gap: 5px;
+  width: max(100%, min(340px, calc(70vw / var(--pn-anz, 1)))); z-index: 2;
+}
+.bild-unten > .img-name.unterschrift { margin-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bildtext-chips { margin-top: 0; padding: 0; }
+.bildtext-frist { display: inline-flex; gap: 3px; }
+.due-chip.bildtext-aufgabe { display: inline-flex; align-items: center; gap: 4px; background: transparent; border-color: var(--border); color: var(--muted); }
+.due-chip.bildtext-aufgabe:hover { color: var(--ink); border-color: var(--accent); }
+.bildtext-chips .due-chip:not(.bildtext-aufgabe) { display: inline-flex; align-items: center; gap: 4px; }
 /* Nicht markiert: kein Griff, keine Anschlusspunkte, keine Lupe — auch nicht beim Zeigen */
 .react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .pn-handle,
 .react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .card-grip { opacity: 0; pointer-events: none; }
@@ -2529,6 +2540,30 @@ dl.leer-wege dd { margin: 0; }
 .th-done-row .task-text { cursor: default; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 55%, transparent); }
 .th-done-check { color: #2e9e63; font-weight: 800; flex: none; }
 .th-done-empty { color: var(--muted); font-size: 12px; padding: 6px 2px 2px 20px; }
+/* M469: Termine heute und morgen — ruhig, ohne Haken und ohne Kartenschatten */
+.th-termine { width: min(860px, 100%); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-soft); }
+.th-termine-kopf {
+  display: flex; align-items: center; gap: 8px; padding: 4px 2px 5px;
+  font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px;
+}
+.th-termine-erinnern {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 11.5px;
+}
+.th-termine-erinnern input { margin: 0; }
+.th-termine-tag { font-size: 11.5px; color: var(--muted); padding: 4px 2px 2px 21px; }
+.th-termine ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.th-termin {
+  display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left;
+  border: none; background: none; border-radius: var(--r-sm); padding: 5px 8px 5px 21px;
+  font-family: inherit; font-size: 13px; color: var(--ink); cursor: pointer;
+}
+.th-termin:hover { background: var(--surface-dim); }
+.th-termin:hover .th-termin-titel { color: var(--accent-strong); }
+.th-termin-zeit { flex: none; min-width: 62px; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+.th-termin-titel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.th-termin-konto { flex: none; font-size: 11px; color: var(--muted); }
+.th-termine-leer { color: var(--muted); font-size: 12px; padding: 2px 2px 4px 21px; }
 .th-week { display: inline-flex; gap: 3px; align-items: flex-end; height: 18px; margin-left: auto; }
 .th-week-bar { width: 7px; height: 100%; display: flex; align-items: flex-end; background: var(--surface-dim); border-radius: var(--r-xs); overflow: hidden; }
 .th-week-bar i { display: block; width: 100%; background: color-mix(in srgb, var(--accent) 55%, transparent); border-radius: var(--r-xs) var(--r-xs) 0 0; min-height: 2px; }
@@ -3064,6 +3099,8 @@ dl.leer-wege dd { margin: 0; }
   border-radius: var(--r-sm); cursor: pointer; font-size: 13px; padding: 0; text-align: center;
 }
 .sel-attr-hint { font-size: 10px; color: var(--muted); padding: 2px 6px 3px; line-height: 1.4; }
+/* M463: Änderungszeit im ⋯ der Karte – eine leise Zeile unter allen Einträgen, kein Knopf */
+.sel-menu-zeit { font-size: 10.5px; color: var(--muted); padding: 5px 8px 2px; margin-top: 3px; border-top: 1px solid var(--border-soft); }
 
 .sel-toolbar .sel-ai-wrap > button { position: relative; }
 /* M127: Zähler-Badge (z. B. Anzahl geankerter Markierungen) an Toolbar-Buttons */
@@ -4624,6 +4661,24 @@ button.link-dead:disabled { opacity: 0.45; }
 .on-sec span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .on-empty { font-size: 11px; color: var(--muted); padding: 2px 14px; }
 .on-progress { display: flex; align-items: center; gap: 9px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+
+/* M466: Outlook-Fenster — ruhige Liste wie ein Posteingang, ein Knopf je Mail */
+.outlook-modal { max-width: 620px; }
+.outlook-suche { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; color: var(--muted); }
+.outlook-suche input { flex: 1; min-width: 0; }
+.outlook-kopf { font-size: 12px; color: var(--muted); margin: 6px 0 4px; min-height: 16px; }
+.outlook-liste { list-style: none; margin: 0; padding: 0; max-height: min(52vh, 460px); overflow-y: auto; border-top: 1px solid var(--border-soft); }
+.outlook-mail { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--border-soft); }
+.outlook-text { flex: 1; min-width: 0; }
+.outlook-zeile1 { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.outlook-zeile1 b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.outlook-mail.ungelesen .outlook-zeile1 b, .outlook-mail.ungelesen .outlook-betreff { font-weight: 650; }
+.outlook-datum { color: var(--muted); font-size: 12px; flex: none; }
+.outlook-betreff, .outlook-vorschau { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.outlook-vorschau { color: var(--muted); font-size: 12px; }
+.outlook-mail > button { flex: none; }
+.outlook-leer { padding: 14px 2px; color: var(--muted); font-size: 13px; }
+.outlook-konto { flex: 1; font-size: 12px; color: var(--muted); align-self: center; }
 .on-bar { flex: 1; height: 6px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; }
 .on-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.3s ease; }
 
@@ -8235,7 +8290,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools
+    .kontakt-tools,
+    .bildtext-chips
 ) { transition: opacity 0.14s ease; }
 @media (hover: hover) {
   .react-flow__node:not(.selected):not(:focus-within):not(:hover) :is(
@@ -8247,7 +8303,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools
+    .kontakt-tools,
+    .bildtext-chips
   ) { opacity: 0; }
   /* Zeiger ruht auf der Karte: erst nach einem Moment einblenden. Als Animation (hält während des Verzugs bei 0),
      damit ein Klick — die Karte ist dann markiert, die Regel greift nicht mehr — sofort alles zeigt. */
@@ -8260,7 +8317,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools
+    .kontakt-tools,
+    .bildtext-chips
   ) { animation: pn-bedienung-ein 0.16s ease 0.35s backwards; }
 }
 /* Finger: kein Zeiger, der ruhen könnte — erst antippen (markieren), dann bedienen. Unsichtbares fängt keinen Tipp. */
@@ -8274,7 +8332,8 @@ html[data-kontrast='hoch'][data-theme='dark'] { --card-shadow: 0 0 0 1px rgba(25
     .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools
+    .kontakt-tools,
+    .bildtext-chips
   ) { opacity: 0; pointer-events: none; }
 }
 

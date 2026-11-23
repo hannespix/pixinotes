@@ -8,14 +8,20 @@
 //                                                       Dateien passen (M448, für schnelle Agenten-Läufe)
 //   node werkzeug/alle-pruefungen.mjs --geaendert --basis origin/anderer-zweig   → gegen einen anderen Stand
 //   node werkzeug/alle-pruefungen.mjs --geaendert --nur-zeigen                   → nur auflisten, nichts starten
+//   node werkzeug/alle-pruefungen.mjs --ohne-datenbank → Reihen an der lokalen Datenbank (psql/pntest) auslassen
+//                                                       (M468, der nächtliche CI-Lauf hat kein Postgres)
+//   node werkzeug/alle-pruefungen.mjs --json datei    → Ergebnis je Reihe als JSON (nach jeder Reihe neu
+//                                                       geschrieben, auch ein abgebrochener Lauf hinterlässt Daten)
+//   node werkzeug/alle-pruefungen.mjs --nur-zeigen    → Auswahl auflisten (Trockenlauf), nichts starten
 //
 // Jede Prüfung startet ihren eigenen kleinen Server und Browser. Was sich dabei in die Quere käme, läuft nie
 // gleichzeitig: Dateien mit demselben Port, und die Prüfungen an der lokalen Datenbank (eine gemeinsame Datenbank).
 // Fällt eine Datei durch, wird sie am Ende EINMAL allein wiederholt – unter Last kann eine Wartezeit knapp werden;
 // was auch allein durchfällt, ist ein echter Fehler. Rückgabewert 1, wenn danach noch etwas rot ist.
 import { spawn, spawnSync } from 'node:child_process';
-import { readdirSync, readFileSync, appendFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, appendFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const repo = fileURLToPath(new URL('..', import.meta.url));
@@ -23,6 +29,8 @@ const args = process.argv.slice(2);
 const wert = (name, sonst) => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : sonst; };
 const bahnen = Math.max(1, Number(wert('--bahnen', 4)) || 4);
 const bericht = wert('--bericht', '');
+const jsonDatei = wert('--json', '');
+const ohneDatenbank = args.includes('--ohne-datenbank');
 const basis = wert('--basis', '');
 const nurGeaendert = args.includes('--geaendert');
 const nurZeigen = args.includes('--nur-zeigen');
@@ -80,7 +88,6 @@ if (nurGeaendert) {
   if (grund.size === 0) console.log('  keine passende Reihe – für Änderungen an store.ts, index.css, App.tsx die volle Reihe laufen lassen');
   dateien = dateien.filter((n) => grund.has(n));
 }
-if (nurZeigen) process.exit(0);
 /** Was eine Datei für sich allein braucht: ihre Ports, und die gemeinsame Datenbank */
 const sperren = (name) => {
   const text = readFileSync(path.join(repo, 'pruefungen', name), 'utf-8');
@@ -90,11 +97,61 @@ const sperren = (name) => {
   if (/\bpsql\b|pntest/.test(text)) s.add('datenbank');
   return [...s];
 };
+// M468: --ohne-datenbank – dieselbe Erkennung wie für die Sperre („braucht Datenbank", M448). Ausgelassen, nicht
+// gelöscht: Ausgabe und JSON nennen die Reihen, damit niemand sie für geprüft hält.
+const ausgelassen = ohneDatenbank ? dateien.filter((n) => sperren(n).includes('datenbank')) : [];
+if (ausgelassen.length) {
+  console.log(`--ohne-datenbank: ${ausgelassen.length} Reihe(n) ausgelassen (brauchen die lokale Datenbank): ${ausgelassen.map((n) => n.replace(/\.mjs$/, '')).join(', ')}`);
+  dateien = dateien.filter((n) => !ausgelassen.includes(n));
+}
+if (nurZeigen) {
+  // bei --geaendert steht die Auswahl samt Grund schon oben
+  if (!nurGeaendert) { console.log(`${dateien.length} Reihe(n):`); for (const n of dateien) console.log(`  ${n.replace(/\.mjs$/, '')}  [${sperren(n).join(', ') || 'ohne Sperre'}]`); }
+  process.exit(0);
+}
 const offen = dateien.map((name) => ({ name, sperren: sperren(name) }));
 const belegt = new Set();
+// Sperren über alle Worktrees: Mehrere Agenten starten dieselben alten Reihen (feste Ports 4431–4776) zugleich.
+// Ein Verzeichnis je Sperre unter os.tmpdir() (mkdir ist atomar), darin die PID des Halters. Stirbt der Halter,
+// gilt die Sperre als frei. So warten Läufe aus verschiedenen Worktrees aufeinander, statt an EADDRINUSE zu scheitern.
+const SPERR_DIR = path.join(tmpdir(), 'pixinotes-pruef-sperren');
+mkdirSync(SPERR_DIR, { recursive: true });
+const sperrPfad = (s) => path.join(SPERR_DIR, s.replace(/[^a-z0-9]/gi, '_'));
+const lebt = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; } };
+const nehmen = (s) => {
+  const p = sperrPfad(s);
+  try { mkdirSync(p); writeFileSync(path.join(p, 'pid'), String(process.pid)); return true; } catch { /* belegt */ }
+  let pid = 0;
+  try { pid = Number(readFileSync(path.join(p, 'pid'), 'utf-8')); } catch { /* gerade im Anlegen */ return false; }
+  if (pid && !lebt(pid)) { rmSync(p, { recursive: true, force: true }); return nehmen(s); }
+  return false;
+};
+const freigeben = (s) => { try { if (Number(readFileSync(path.join(sperrPfad(s), 'pid'), 'utf-8')) === process.pid) rmSync(sperrPfad(s), { recursive: true, force: true }); } catch { /* schon frei */ } };
+const allesNehmen = (liste) => {
+  const genommen = [];
+  for (const s of liste) { if (nehmen(s)) genommen.push(s); else { genommen.forEach(freigeben); return false; } }
+  return true;
+};
+process.on('exit', () => { for (const s of belegt) freigeben(s); });
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => process.exit(130));
 const ergebnis = new Map();
 if (bericht) writeFileSync(bericht, '');
 const start = Date.now();
+// M468: maschinenlesbares Ergebnis für den Nachtlauf (Zusammenfassung, Issue „Nachtlauf rot"). Nach jeder Reihe neu
+// geschrieben – bricht der Lauf ab (Zeitlimit), bleibt der Stand bis dahin lesbar („fertig": false).
+const jsonStand = { start: new Date(start).toISOString(), bahnen, fertig: false, gesamt: dateien.length, ausgelassen: ausgelassen.map((n) => n.replace(/\.mjs$/, '')), reihen: {} };
+const jsonSchreiben = () => { if (jsonDatei) writeFileSync(jsonDatei, `${JSON.stringify({ ...jsonStand, minuten: Number(((Date.now() - start) / 60000).toFixed(1)), reihen: Object.values(jsonStand.reihen) }, null, 1)}\n`); };
+const merkeJson = (name, r, zweiter) => {
+  const reihe = name.replace(/\.mjs$/, '');
+  const summe = (r.aus.match(/^.*\d+ bestanden.*$/gm) ?? []).pop()?.trim() ?? '';
+  const fehler = r.rc === 0 ? [] : r.aus.split('\n').filter((z) => /✗|Error|error/.test(z)).slice(0, 8).map((z) => z.slice(0, 300));
+  const alt = jsonStand.reihen[reihe];
+  jsonStand.reihen[reihe] = zweiter
+    ? { ...alt, rot: r.rc !== 0, rc: r.rc, sek: alt.sek + r.sek, summe: summe || alt.summe, wiederholt: true, fehler: r.rc === 0 ? alt.fehler : fehler }
+    : { reihe, rot: r.rc !== 0, rc: r.rc, sek: r.sek, summe, wiederholt: false, fehler };
+  jsonSchreiben();
+};
+jsonSchreiben();
 
 const einmal = (name) => new Promise((fertig) => {
   const t0 = Date.now();
@@ -127,20 +184,22 @@ const zeile = (name, r, zusatz = '') => {
 
 await new Promise((alleFertig) => {
   let laufend = 0;
+  let wartet = false; // eine Nachfrage gleichzeitig, wenn fremde Worktrees Ports halten
   const weiter = () => {
     if (offen.length === 0 && laufend === 0) { alleFertig(); return; }
     while (laufend < bahnen) {
-      const i = offen.findIndex((d) => d.sperren.every((s) => !belegt.has(s)));
-      if (i < 0) break;
+      const i = offen.findIndex((d) => d.sperren.every((s) => !belegt.has(s)) && allesNehmen(d.sperren));
+      if (i < 0) { if (offen.length && !wartet) { wartet = true; setTimeout(() => { wartet = false; weiter(); }, 3000); } break; }
       const d = offen.splice(i, 1)[0];
       for (const s of d.sperren) belegt.add(s);
       laufend += 1;
       lauf(d.name).then((r) => {
         ergebnis.set(d.name, r);
+        merkeJson(d.name, r, false);
         // M448: auch der erste Fehlschlag kommt mit Grund in den Bericht – sonst ist ein Wackler, der beim
         // Wiederholen grün wird, hinterher nicht mehr zu finden
         zeile(d.name, r, r.rc === 0 ? '' : ' | erster Lauf rot, wird allein wiederholt');
-        for (const s of d.sperren) belegt.delete(s);
+        for (const s of d.sperren) { belegt.delete(s); freigeben(s); }
         laufend -= 1;
         weiter();
       });
@@ -153,12 +212,20 @@ await new Promise((alleFertig) => {
 const rot = [...ergebnis].filter(([, r]) => r.rc !== 0).map(([name]) => name).sort();
 const bleibtRot = [];
 for (const name of rot) {
+  const sp = sperren(name);
+  while (!allesNehmen(sp)) await new Promise((x) => setTimeout(x, 3000));
+  sp.forEach((s) => belegt.add(s));
   const r = await lauf(name);
+  sp.forEach((s) => { belegt.delete(s); freigeben(s); });
   zeile(name, r, r.rc === 0 ? ' | allein wiederholt: grün' : ' | auch allein rot');
+  merkeJson(name, r, true);
   if (r.rc !== 0) { bleibtRot.push(name); if (!bericht) console.log(r.aus.split('\n').filter((z) => /✗|Error/.test(z)).slice(0, 12).join('\n')); }
 }
 const minuten = ((Date.now() - start) / 60000).toFixed(1);
 console.log(`\n${dateien.length - bleibtRot.length} von ${dateien.length} Dateien grün · ${rot.length - bleibtRot.length} erst beim zweiten Mal · ${minuten} min bei ${bahnen} Bahnen`);
 if (bleibtRot.length) console.log(`rot: ${bleibtRot.join(', ')}`);
+if (ausgelassen.length) console.log(`ausgelassen (Datenbank): ${ausgelassen.map((n) => n.replace(/\.mjs$/, '')).join(', ')}`);
+jsonStand.fertig = true;
+jsonSchreiben();
 if (bericht) appendFileSync(bericht, 'FERTIG\n');
 process.exit(bleibtRot.length ? 1 : 0);

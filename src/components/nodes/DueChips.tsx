@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { detectDates, downloadIcs, formatDue, type DetectedDate } from '../../lib/dates';
+import { detectDates, downloadIcs, formatDue, useFristenStand, type DetectedDate } from '../../lib/dates';
 import { useBoard } from '../../store';
 import { ICalendar } from '../Icons';
 
@@ -15,8 +15,10 @@ export function DueChips({ text, context, fristen }: { text: string; context: st
     const t = setInterval(() => setNowTick((x) => x + 1), 10 * 60 * 1000);
     return () => clearInterval(t);
   }, []);
+  // M459: neu lesen, sobald die nachgeladene Erkennung da ist
+  const fristenStand = useFristenStand();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const dates = useMemo(() => (fristen ? fristen() : detectDates(text)), [text, nowTick, fristen]);
+  const dates = useMemo(() => (fristen ? fristen() : detectDates(text)), [text, nowTick, fristen, fristenStand]);
   if (dates.length === 0) return null;
 
   return (

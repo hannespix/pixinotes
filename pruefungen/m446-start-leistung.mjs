@@ -27,8 +27,9 @@ mkdirSync(SD, { recursive: true });
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 const DIST = path.join(__repo, 'dist');
 const PORT = 5446;
-/** Grenze knapp über dem gemessenen Stand (2,44 MB) — ein Rückschritt fällt sofort auf */
-const START_JS_GRENZE = 2_500_000;
+/** Grenze knapp über dem gemessenen Stand (M446: 2,44 MB; M459: 2 192 986 B ohne chrono, libphonenumber,
+ *  Konto-/Team-Abgleich; M467: 2 168 523 B ohne Buffer-/process-Ersatz) — ein Rückschritt fällt sofort auf */
+const START_JS_GRENZE = 2_190_000;
 
 let anfragen = [];
 const app = http.createServer((q, r) => {
@@ -107,7 +108,7 @@ console.log('\n════ A/B: Start ════');
   const summe = groesse(geladen);
   console.log(`  Start-JS ${(summe / 1024 / 1024).toFixed(2)} MB in ${geladen.length} Dateien: ${geladen.join(', ')}`);
   console.log(`  Board sichtbar nach ${board} ms`);
-  pruefe(`A1 Start-JS unter ${(START_JS_GRENZE / 1e6).toFixed(1)} MB (ist ${(summe / 1024 / 1024).toFixed(2)} MB; vorher 3,58 MB)`, summe < START_JS_GRENZE && summe > 1_000_000, String(summe));
+  pruefe(`A1 Start-JS unter ${(START_JS_GRENZE / 1024 / 1024).toFixed(2)} MB (ist ${(summe / 1024 / 1024).toFixed(2)} MB; vorher 3,58 MB)`, summe < START_JS_GRENZE && summe > 1_000_000, String(summe));
   const karten = geladen.filter((f) => /^(Kanban|Gantt|Calendar|Sheet|Mermaid|Week|Minutes|Time|HtmlApp|Bubbles|Shape)Card-/.test(f));
   pruefe('A2 beim Start kein seltener Kartentyp (Kanban, Zeitplan, Kalender, Tabelle, Diagramm …)', karten.length === 0, karten.join(', '));
   const ansichten = geladen.filter((f) => /^(Overview|TaskHub|Presenter|SearchOverlay|RechercheDialog|Settings|HelpOverlay)/.test(f));

@@ -6,7 +6,7 @@
 //   · Timer: Einer stellt die Uhr, alle sehen sie ablaufen. Verschickt wird die RESTZEIT, nicht die Uhrzeit des
 //     Endes — die Uhren der Geräte gehen nicht gleich. Wer später dazukommt, bekommt sie mit der nächsten
 //     Meldung (der Starter wiederholt sie alle drei Sekunden).
-import { ich, ichIn, LIVE_NACHRICHT, liveSenden, teilnehmerVon } from './gastSync';
+import { ich, ichIn, LIVE_NACHRICHT, liveSenden, teilnehmerVon } from './liveStand';
 
 // ---------- Reaktionen ----------
 export const REAKTIONEN = ['👍', '❤️', '👏', '😂', '🎉', '🤔', '✋', '✅'] as const;

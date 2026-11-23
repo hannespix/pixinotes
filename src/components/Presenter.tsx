@@ -38,7 +38,7 @@ import { SheetBody } from './nodes/SheetCard';
 import { FolienLaser } from './Mauszeiger';
 import { ReaktionsKnopf } from './Gruppenraum';
 import { ansichtMelden, folgeIch, folgenSetzen, ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenMitVortrag, vorfuehrenStart, vorfuehrenStopp, vortragAlleinSetzen, vortragMelden, vortragZuEnde, werFuehrtVor } from '../lib/vorfuehren';
-import { ich, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/gastSync';
+import { ich, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/liveStand';
 import { NotizRuhend } from './nodes/NotizRuhend';
 import type { RuheBlock } from '../lib/notizRuhend';
 

@@ -23,7 +23,8 @@ import { offeneSeite, seiteVon, strichRelativ } from './lib/pdfSeiten';
 import { findFreeSpot, frameMembers, sizeOf } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
 import { t, zahlWort } from './lib/sprache';
-import { fristAnkerPflegen, type FristAnker } from './lib/fristAnker';
+import { blockeMitDatum, fristAnkerNachLaden, fristAnkerPflegen, type FristAnker } from './lib/fristAnker';
+import { fristenBereit, fristenLaden } from './lib/dates';
 import { frisch, nachPatch } from './lib/kartenZeit';
 import { blocksToText } from './lib/serialize';
 import { linksUmbenennen, normalizeName } from './lib/links';
@@ -1432,6 +1433,8 @@ const mitFristAnker = (n: AppNode, data: Record<string, unknown>): Record<string
   const neu = fristAnkerPflegen(data.blocks, alt);
   return neu === alt ? data : { ...data, fristAnker: neu };
 };
+// M459: Wurde ein Text geschrieben, bevor die Fristen-Erkennung geladen war, trägt der Speicher den Anker danach nach
+fristAnkerNachLaden(() => useBoard.getState().fristAnkerNachtragen());
 
 export const useBoard = create<BoardState>()(
   persist(
@@ -1908,13 +1911,19 @@ export const useBoard = create<BoardState>()(
             past,
             boards: s0.boards.map((b) => (b.id !== board.id ? b : {
               ...b,
-              nodes: b.nodes.map((n) => (n.id === id ? ({ ...n, data: { ...n.data, ...mitFristAnker(n, { blocks }) } } as AppNode) : n)),
+              // M463: auch das Rückgängig im Editor ändert den Text von Hand – stempeln (M453)
+              nodes: b.nodes.map((n) => (n.id === id ? zeitNachPatch({ ...n, data: { ...n.data, ...mitFristAnker(n, { blocks }) } } as AppNode, n, { blocks }) : n)),
             })),
           });
         },
         fristAnkerNachtragen: () => {
           // Bestehende Notizen (vor M390 geschrieben, importiert, aus Vorlagen): Ihr Anker ist der Tag, an dem die
           // App sie zum ersten Mal sieht. Nur eigene Boards — in einem geteilten ändert jeder nur, was er anfasst.
+          // M459: Die Erkennung lädt bei Bedarf — steht irgendwo ein möglicher Termin, erst laden, dann nachtragen.
+          if (!fristenBereit()) {
+            const brauchts = get().boards.some((b) => !b.geteiltVon && b.nodes.some((n) => n.type === 'note' && blockeMitDatum((n.data as { blocks?: unknown }).blocks)));
+            if (brauchts) { void fristenLaden().then(() => get().fristAnkerNachtragen(), () => {}); return; }
+          }
           let geaendert = false;
           const boards = get().boards.map((b) => {
             if (b.geteiltVon) return b;
@@ -1975,11 +1984,12 @@ export const useBoard = create<BoardState>()(
           const ziel = neueId ?? id;
           const breite = typeof alt.width === 'number' ? alt.width : alt.measured?.width;
           const rahmen = (alt.data as { rahmen?: boolean }).rahmen === true;
-          const neu = {
+          // M463: ein ersetztes Bild ist eine inhaltliche Änderung – stempeln wie updateNodeData (M453)
+          const neu = zeitNachPatch({
             ...alt, id: ziel, data: { ...alt.data, ...patch },
             // rahmenlos IST die Karte das Bild — ihre Höhe folgt dem neuen Seitenverhältnis
             ...(!rahmen && breite && verhaeltnis > 0 ? { height: Math.max(8, Math.round(breite * verhaeltnis)) } : {}),
-          } as AppNode;
+          } as AppNode, alt, patch as Record<string, unknown>);
           const um = (k: string) => (k === id ? ziel : k);
           set({
             boards: get().boards.map((b) => {

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
+import inject from '@rollup/plugin-inject';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -40,6 +41,22 @@ function ocrDateienKopieren(): Plugin {
   };
 }
 
+/**
+ * M467: `process` als freier Name nur in den Node-Modulen des Outlook-Lesers (iconv-lite → stream-browserify →
+ * readable-stream, util, safer-buffer …) — sie lesen `process.env`/`process.nextTick` ohne typeof-Prüfung.
+ * Alle Pakete hier hängen nur an @kenjiuno/msgreader (lib/parseEmail.ts, per import() nachgeladen).
+ */
+function processNurMsg(): Plugin {
+  return {
+    ...(inject({
+      include: [/node_modules\/(@kenjiuno\/[^/]+|iconv-lite|safer-buffer|safe-buffer|string_decoder|stream-browserify|readable-stream|util|events|inherits)\//],
+      modules: { process: 'vite-plugin-node-polyfills/shims/process' },
+    }) as Plugin),
+    name: 'pixinotes-process-nur-msg',
+    enforce: 'post',
+  };
+}
+
 // Modus "single": baut EINE portable pixinotes.html (läuft per Doppelklick,
 // auch von file:// ohne Server/Installation/Adminrechte).
 export default defineConfig(({ mode }) => ({
@@ -53,10 +70,21 @@ export default defineConfig(({ mode }) => ({
     // die Anzeige nicht von Hand veraltet
     __APP_VERSION__: JSON.stringify(pkgVersion),
   },
-  // nodePolyfills: @kenjiuno/msgreader (iconv-lite) erwartet Node-Buffer im Browser
   plugins: [
     react(),
-    nodePolyfills({ include: ['buffer', 'stream', 'util'] }),
+    // nodePolyfills: @kenjiuno/msgreader (iconv-lite) erwartet Node-Module (buffer, stream, util) im Browser.
+    // M467: nur noch als Modul-Ersatz für `require('buffer' | 'stream' | 'util')`, OHNE globales Buffer/process/
+    // global. Das Plugin setzte sonst in JEDE Datei, die einen dieser Namen erwähnt, einen Import des Ersatzes —
+    // über lib0 (Editor) landeten so ~70 KB Buffer- und process-Ersatz im Start, obwohl dort jede Bibliothek
+    // `typeof process`/`typeof Buffer` prüft und den Browser-Weg nimmt. Gebraucht wird `process` nur im
+    // Stream-/util-Teil des .msg-Lesers — dorthin kommt er gezielt (processNurMsg) und damit ins MSG-Paket.
+    nodePolyfills({
+      include: ['buffer', 'stream', 'util'],
+      globals: { Buffer: false, global: false, process: false },
+      // derselbe Buffer-Ersatz wie bisher für `require('buffer')` (statt des rohen buffer-Pakets)
+      overrides: { buffer: 'vite-plugin-node-polyfills/shims/buffer' },
+    }),
+    processNurMsg(),
     ...(mode === 'single' ? [viteSingleFile({ removeViteModuleLoader: true })] : [ocrDateienKopieren()]),
   ],
   build:
@@ -72,6 +100,10 @@ export default defineConfig(({ mode }) => ({
               // statt dass eine 6-MB-Datei komplett neu kommt. Schwergewichte
               // (Mermaid-Rohtext, PDF, XLSX, MSG) bleiben eigene Nachlade-Teile.
               manualChunks(id) {
+                // M459: die Weichen der nachgeladenen Erkennungen gehören in deren Paket — sonst legt Rollup die reine
+                // Weiterleitung ins Start-Paket und zieht damit das ganze Paket wieder in den Start
+                if (/src\/lib\/rufnummerKern\.ts$/.test(id)) return 'rufnummer';
+                if (/src\/lib\/chronoKern\.ts$/.test(id)) return 'fristen';
                 if (!id.includes('node_modules/')) return undefined;
                 if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
                 // M446: NUR der Teil, den der Editor beim Start braucht. BlockNote lädt
@@ -83,6 +115,8 @@ export default defineConfig(({ mode }) => ({
                 if (/node_modules\/(@xyflow|d3-[a-z-]+|classcat|zustand)\//.test(id)) return 'fluss';
                 // M414: Rufnummern-Erkennung samt Länderdaten (rund 110 KB) — Fremdcode, der sich so gut wie nie ändert
                 if (/node_modules\/libphonenumber-js\//.test(id)) return 'rufnummer';
+                // M459: Fristen-Erkennung (chrono-node) — lädt bei Bedarf (lib/dates.ts)
+                if (/node_modules\/chrono-node\//.test(id)) return 'fristen';
                 return undefined;
               },
             },

@@ -16,6 +16,7 @@ import { idbDel, idbGet, idbKeys, idbSet } from './syncFolder';
 import { nodeToText } from './serialize';
 import { askAi } from './ai';
 import { mutedHistory, useBoard } from '../store';
+import type { AppNode } from '../types';
 
 const PREFIX = 'brain:v1:';
 const KEY = (boardId: string, nodeId: string) => `${PREFIX}${boardId}:${nodeId}`;
@@ -154,6 +155,21 @@ function cardText(nodeText: string): { title: string; text: string } {
   return { title, text: nodeText.slice(0, 1200) };
 }
 
+/**
+ * M465: Der Text einer Karte fürs Gehirn. Bei Bildern (und Dateien mit Bild-Vorschau) gehört der lokal
+ * erkannte Text (M452, `data.ocrText`) dazu — sonst fände die Bedeutungssuche den Screenshot der Rechnung
+ * nicht, wenn man nach „Abrechnung" fragt. Direkt aus data gelesen (nicht über textInBildern.ts): Das hält
+ * die Abhängigkeiten schlank, wie in kiModule.ts. Ändert sich der Text, ändert sich der Hash → neu einbetten.
+ * Ausgeschlossene Bereiche (M220) bleiben draußen: syncBrainIndex fragt brainBoardIds vor dieser Funktion.
+ */
+export function gehirnText(n: AppNode): string {
+  const raw = nodeToText(n).trim();
+  if (n.type !== 'image' && n.type !== 'file') return raw;
+  const ocr = (n.data as { ocrText?: unknown }).ocrText;
+  const bild = typeof ocr === 'string' ? ocr.trim() : '';
+  return bild ? `${raw}\nText im Bild: ${bild}`.trim() : raw;
+}
+
 /** Index mit dem Board-Stand abgleichen — nur Neues/Geändertes wird berechnet */
 /**
  * M220: Welche Boards gehören zum Gehirn?
@@ -194,7 +210,7 @@ export async function syncBrainIndex(): Promise<void> {
       if (!imGehirn.has(b.id)) continue; // M220: abgeschalteter Bereich
       for (const n of b.nodes) {
         if (n.archived) continue;
-        const raw = nodeToText(n).trim();
+        const raw = gehirnText(n);
         if (!raw) continue;
         const { title, text } = cardText(raw);
         want.set(KEY(b.id, n.id), { boardId: b.id, nodeId: n.id, boardName: b.name, title, text, hash: hashText(text) });
@@ -250,6 +266,13 @@ export function initBrain(): void {
   window.addEventListener('pixinotes:brain-scope', () => {
     if (dirtyTimer) clearTimeout(dirtyTimer);
     void syncBrainIndex();
+  });
+  // M465: Die Texterkennung eines Bildes ist fertig — bald neu einbetten, nicht erst nach zwölf Sekunden:
+  // Wer gerade einen Screenshot abgelegt hat, sucht oft gleich danach.
+  window.addEventListener('pixinotes:bildtext-fertig', () => {
+    if (!useBoard.getState().brain.on) return;
+    if (dirtyTimer) clearTimeout(dirtyTimer);
+    dirtyTimer = setTimeout(() => void syncBrainIndex(), 1500);
   });
 }
 

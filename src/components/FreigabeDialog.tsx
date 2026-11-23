@@ -14,8 +14,8 @@ import { gastVerlassen, kontoKanaele, rechtAus, sicherungVon, sicherungZurueck }
 import { gruppeVon, type GastRecht } from '../store';
 import { IX } from './Icons';
 
-/** M391: Den Einladungs-Dialog von überall öffnen */
-export const FREIGABE_OEFFNEN = 'pixinotes:freigabe-oeffnen';
+// M459: Ereignis und Host liegen in FreigabeHost.tsx (im Start), dieser Dialog kommt beim ersten Öffnen
+export { FREIGABE_OEFFNEN, FreigabeHost } from './FreigabeHost';
 
 /** M360: Rolle wählen — überall dieselben zwei Wörter */
 function RollenWahl({ wert, onChange, disabled, taste, label }: { wert: FreigabeRolle; onChange: (r: FreigabeRolle) => void; disabled?: boolean; taste?: string; label: string }) {
@@ -293,15 +293,4 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
       </div>
     </div>
   );
-}
-
-/** M391: Ein Ort, an dem der Dialog von überall aufgeht (Leiste „Einladen …", Befehle) */
-export function FreigabeHost() {
-  const [boardId, setBoardId] = useState<string | null>(null);
-  useEffect(() => {
-    const auf = (e: Event) => setBoardId((e as CustomEvent<{ boardId?: string }>).detail?.boardId ?? useBoard.getState().activeId);
-    window.addEventListener(FREIGABE_OEFFNEN, auf);
-    return () => window.removeEventListener(FREIGABE_OEFFNEN, auf);
-  }, []);
-  return boardId ? <FreigabeDialog boardId={boardId} onClose={() => setBoardId(null)} /> : null;
 }

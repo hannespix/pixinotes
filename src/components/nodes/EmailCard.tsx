@@ -3,13 +3,14 @@ import type { NodeProps } from '@xyflow/react';
 import { mutedHistory, selectActiveBoard, useBoard } from '../../store';
 import type { EmailNode, ParsedAttachment } from '../../types';
 import { enrichText } from '../../lib/entities';
+import { useRufnummernStand } from '../../lib/rufnummer';
 import { formatBytes, isImageMime } from '../../lib/parseEmail';
 import { makeImage, makeNote } from '../../lib/nodes';
 import { triggerDownload } from '../../lib/download';
 import { aiReady } from '../../lib/ai';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
-import { ICheck, IKanban, IMail, IWand, IPaperclip } from '../Icons';
+import { ICheck, IKanban, IMail, IPerson, IWand, IPaperclip } from '../Icons';
 
 const PREVIEW_CHARS = 420;
 
@@ -42,7 +43,9 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
   const text = expanded ? email.text : email.text.slice(0, PREVIEW_CHARS);
   const truncated = email.text.length > PREVIEW_CHARS;
   // Entity-Erkennung (libphonenumber etc.) nicht bei jedem Render neu (Audit PERF-2)
-  const enriched = useMemo(() => enrichText(text), [text]);
+  const rufStand = useRufnummernStand();   // M459: Telefon-Links kommen still dazu, sobald die Erkennung geladen ist
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const enriched = useMemo(() => enrichText(text), [text, rufStand]);
 
   /** Abgeleitetes Modul anlegen UND mit der E-Mail verbinden (M131) — ein History-Eintrag */
   const addDerived = (node: ReturnType<typeof makeNote>, label: string) => {
@@ -84,6 +87,28 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
   const stand = email.destillat as { notizId: string; aufgaben: unknown[]; uebernommen?: string } | undefined;
   const notizDa = useBoard((s) => !!stand && selectActiveBoard(s).nodes.some((n) => n.id === stand.notizId));
   const aufgabenOffen = !!stand && !stand.uebernommen && stand.aufgaben.length > 0 && notizDa;
+  // M463: Nach dem Destillat zusätzlich „Absender als Kontakt" anbieten – derselbe Weg wie im ⋯ der Mail (M457),
+  // solange noch kein Kontakt an der Mail hängt und der Absender bekannt ist
+  const kontaktDran = useBoard((s) => {
+    const b = selectActiveBoard(s);
+    return b.edges.some((e) => {
+      const andere = e.source === id ? e.target : e.target === id ? e.source : null;
+      return !!andere && b.nodes.some((n) => n.id === andere && n.type === 'kontakt');
+    });
+  });
+  const kontaktAngeboten = !!stand && notizDa && !kontaktDran && !!(email.fromAddress || email.fromName);
+  const alsKontakt = async () => {
+    setAiBusy(true);
+    try {
+      const { absenderAlsKontakt } = await import('../../lib/kontaktAusMail');
+      const r = await absenderAlsKontakt(id);
+      showToast(r.text, r.geaendert, 6000);
+    } catch (e) {
+      showToast(`Kontakt nicht angelegt: ${(e as Error).message}`, false, 6000);
+    } finally {
+      setAiBusy(false);
+    }
+  };
   const uebernehmen = async (wie: 'checkliste' | 'kanban') => {
     const { alsCheckliste, alsKanban } = await import('../../lib/mailDestillat');
     showToast(wie === 'checkliste' ? alsCheckliste(id) : alsKanban(id), true, 6000);
@@ -159,6 +184,13 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
           </button>
           <button className="nodrag" data-taste="destillat-kanban" onClick={() => void uebernehmen('kanban')} title="Neue Kanban-Karte mit je einem Ticket samt Frist und Person">
             <IKanban size={13} /> Als Tickets
+          </button>
+        </div>
+      )}
+      {kontaktAngeboten && (
+        <div className="card-actions email-aufgaben">
+          <button className="nodrag" data-taste="kontakt-nach-destillat" disabled={aiBusy} onClick={() => void alsKontakt()} title="Rufnummern, E-Mail und Anschrift aus der Signatur als Kontakt-Karte – ein vorhandener Kontakt wird ergänzt">
+            <IPerson size={13} /> Absender als Kontakt
           </button>
         </div>
       )}
