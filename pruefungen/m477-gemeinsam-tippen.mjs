@@ -568,6 +568,15 @@ await G.P.keyboard.press('Control+Home'); await G.P.keyboard.press('Shift+Contro
 await warteBis(A.P, () => A.P.evaluate(() => document.querySelectorAll('.react-flow__node[data-id="x1"] .ProseMirror-yjs-selection').length > 0), 4000);
 pruefe('C4 Gerds Markierung ist bei Anna zu sehen', await A.P.evaluate(() => document.querySelectorAll('.react-flow__node[data-id="x1"] .ProseMirror-yjs-selection').length > 0));
 await G.P.keyboard.press('End');
+// Strg+Z im Text nimmt nur das Eigene zurück
+await A.P.waitForTimeout(700);
+const vorZ = await editorText(A.P, 'x1');
+await A.P.keyboard.type(' XYZ', { delay: 20 });
+await warteBis(G.P, async () => /XYZ/.test(await editorText(G.P, 'x1') ?? ''), 4000);
+await A.P.waitForTimeout(700);
+await A.P.keyboard.press('Control+z');
+await warteBis(G.P, async () => !/XYZ/.test(await editorText(G.P, 'x1') ?? ''), 4000);
+pruefe('C5 Strg+Z nimmt Annas letzte Eingabe zurück – bei allen, Gerds Text bleibt', (await editorText(A.P, 'x1')) === vorZ && (await editorText(G.P, 'x1')) === vorZ && /Gerd vorn/.test(vorZ), JSON.stringify({ vorZ, a: await editorText(A.P, 'x1'), g: await editorText(G.P, 'x1') }));
 
 // ══ D ═══════════════════════════════════════════════════════════════
 console.log('\n════ D: Späteinsteiger ════');

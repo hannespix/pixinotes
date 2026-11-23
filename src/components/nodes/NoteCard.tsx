@@ -256,6 +256,7 @@ export function NotizEditor({ id, data, startPunkt, sitzung, abschied, fokus, oh
   const blocksSichern = useCallback((stand?: unknown[]) => {
     if (!sitzung) { updateNodeData(id, { blocks: editor.document }); return; }
     if (!sitzung.istSchreiber()) return;
+    if (useBoard.getState().activeId !== sitzung.boardId) return;   // Board gewechselt: updateNodeData träfe das neue
     const jetzt = stand ?? editor.document;
     const alt = selectActiveBoard(useBoard.getState()).nodes.find((n) => n.id === id)?.data.blocks;
     if (alt && JSON.stringify(alt) === JSON.stringify(jetzt)) return;
