@@ -1,5 +1,5 @@
 # M476 — Einfache Sicherung: ein Board oder alles sichern und wieder einspielen
-PR: #… · Prüfreihe: `pruefungen/m476-sicherung.mjs` (Port 5476) · Datum: 2026-11-23
+PR: #162 · Prüfreihe: `pruefungen/m476-sicherung.mjs` (Port 5476) · Datum: 2026-11-23
 
 ## Warum
 Nutzerwunsch: „einfache Backup funktion wäre top. Einzelne board als backup/alle boards als backup sichern.
