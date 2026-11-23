@@ -31,6 +31,7 @@ import { punkteMischen } from './punkte';
 import { vergleichsText, zeitenVereinen } from './abgleichZeiten';
 import type { BoardDoc, CommentThread, Project, Space, Stroke } from '../store';
 import type { AppNode } from '../types';
+import { istEingang } from './eingangId';
 
 export interface SyncStand {
   boards: BoardDoc[]; spaces: Space[];
@@ -488,7 +489,8 @@ export function dreiWegeMerge(basis0: SyncStand | null, lokal0: SyncStand, fremd
     if ((w === undefined) !== (l === undefined) || (w !== undefined && l !== undefined && w !== l && str(w) !== str(l))) geaendert.push(id);
   }
   bericht.konflikte = z.konflikte;
-  const spaces = mergeHierarchie(basis?.spaces, lokal.spaces, fremd.spaces, boards.map((b) => b.id), z);
+  // M478: Der Eingang ist ein System-Board ohne Projekt — er gehört nicht zu den „Waisen“, die ins erste Projekt wandern
+  const spaces = mergeHierarchie(basis?.spaces, lokal.spaces, fremd.spaces, boards.filter((b) => !istEingang(b)).map((b) => b.id), z);
 
   const gleicheBoards = (a: BoardDoc[], b: BoardDoc[]) =>
     a.length === b.length && a.every((x, i) => x === b[i] || (x.id === b[i].id && str(x) === str(b[i])));

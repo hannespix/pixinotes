@@ -10,6 +10,7 @@
 import { anyAccountConnected, fetchAccountEvents, gemerkteTermine, TERMINE_EREIGNIS, TERMINE_FASSUNG, type CalAccountEvent } from './calAccounts';
 import { tagLokal } from './tag';
 import type { IcsEvent } from './ics';
+import { istEingang } from './eingangId';
 
 /**
  * M473: Die Serien-Auflösung (lib/icsSerie.ts) wird erst nachgeladen, wenn eine Kalender-Karte eine Serie trägt — sie
@@ -124,6 +125,7 @@ const istZeit = (s: unknown): s is string => typeof s === 'string' && /^\d{2}:\d
 function ausKarten(boards: TerminBoard[], tag: string): ZentralTermin[] {
   const aus: ZentralTermin[] = [];
   for (const b of boards) {
+    if (istEingang(b)) continue;   // M478
     for (const n of b.nodes) {
       if (n.type !== 'calendar' || n.archived) continue;
       const d = (n.data ?? {}) as { myEvents?: unknown; icsEvents?: unknown; show?: { ics?: boolean } };

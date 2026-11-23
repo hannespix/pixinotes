@@ -69,6 +69,7 @@ import { SelectionToolbar } from './SelectionToolbar';
 import { BoardKontextmenue } from './Kontextmenue';
 import { fristenLaden } from '../lib/dates';
 import { rufnummernLaden } from '../lib/rufnummer';
+import { EINGANG_ZIEHEN, eingangHolen } from '../lib/eingang';
 
 /** M213: Jede Karte bekommt ihre eigene Fehlergrenze. Stolpert eine — etwa
  *  über kaputte Daten aus einem Import —, bleibt der Schaden auf sie
@@ -1633,6 +1634,14 @@ export function Board() {
       // sonst würde aus dem Ticket-Text eine Notiz-Karte erzeugt
       if (e.dataTransfer.types.includes('application/x-pixinotes-ticket')) return;
       const basePos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      // M478: aus der Eingangs-Liste gezogen — genau dort einsortieren, wo losgelassen wurde
+      if (e.dataTransfer.types.includes(EINGANG_ZIEHEN)) {
+        try {
+          const gruppen = JSON.parse(e.dataTransfer.getData(EINGANG_ZIEHEN)) as unknown;
+          if (Array.isArray(gruppen)) eingangHolen(gruppen.filter((g): g is string => typeof g === 'string'), undefined, basePos);
+        } catch { /* kein gültiger Eintrag */ }
+        return;
+      }
       const files = Array.from(e.dataTransfer.files);
 
       if (files.length === 0) {

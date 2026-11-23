@@ -28,6 +28,7 @@ import { t, zahlWort } from '../lib/sprache';
 
 import { INetz } from './Icons';
 import { KartenSymbol } from './KartenSymbol';
+import { EINGANG_ID, eingangOeffnen, marke, ohneEingang } from '../lib/eingang';
 interface Hit {
   boardId: string;
   boardName: string;
@@ -96,6 +97,9 @@ function buildCommands(): Command[] {
     // M408: das Archiv per Suche ein- und ausblenden
     { label: st().showArchived ? 'Archiv ausblenden' : 'Archiv einblenden', hint: 'Archivierte Karten und Boards zeigen oder verbergen', alias: 'archiv archiviert archive wiederfinden verschwunden weg restore',
       run: () => st().setShowArchived(!st().showArchived) },
+    // M478: was von außen kam und noch einsortiert werden will
+    { label: 'Eingang', hint: 'Aus Browser, Teilen und Outlook – einsortieren', alias: 'eingang inbox ablage schnellablage später geteilt erweiterung browser sortieren einsortieren',
+      run: () => eingangOeffnen() },
     // M466: Mails aus Microsoft 365 aufs Board holen (Fenster wird erst jetzt geladen)
     { label: 'Outlook', hint: 'Mails aus Microsoft 365 als E-Mail-Karte aufs Board holen', alias: 'outlook mail mails e-mail email postfach posteingang inbox microsoft 365 exchange graph',
       run: () => window.dispatchEvent(new CustomEvent('pixinotes:outlook')) },
@@ -229,6 +233,8 @@ export function SearchOverlay() {
 
   const jump = (hit: Hit) => {
     setOpen(false);
+    // M478: Eine Karte im Eingang liegt auf keinem Board — die Eingangs-Liste öffnet sich bei ihrem Eintrag
+    if (hit.boardId === EINGANG_ID) { eingangOeffnen(marke(hit.node)?.gruppe ?? hit.node.id); return; }
     focusNode(hit.boardId, hit.node.id);
   };
 
@@ -294,7 +300,7 @@ export function SearchOverlay() {
   const boardHits = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q || q === '#') return [];
-    return boards.filter((b) => b.name.toLowerCase().includes(q)).slice(0, 5);
+    return ohneEingang(boards).filter((b) => b.name.toLowerCase().includes(q)).slice(0, 5);
   }, [query, boards]);
 
   if (!open) return null;

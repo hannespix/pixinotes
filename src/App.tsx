@@ -54,6 +54,7 @@ import { loadKonto } from './lib/kontoSitzung';
 import { initSyncStart } from './lib/syncStart';
 import { sprache, zahlWort } from './lib/sprache';
 import { ILock } from './components/Icons';
+import { EINGANG_OEFFNEN, eingangWaechter } from './lib/eingang';
 import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick gespeicherte Seitenstriche (M354-Fehler) einmal richten
 
 /**
@@ -126,6 +127,19 @@ function Outlook() {
     return () => window.removeEventListener('pixinotes:outlook', auf);
   }, []);
   return offen ? <Suspense fallback={null}><OutlookLazy onClose={() => setOffen(false)} /></Suspense> : null;
+}
+
+/** M478: Die Eingangs-Liste wird erst geladen, wenn jemand sie öffnet (Zähler in der Spalte, Strg+K, Sprung) */
+const EingangLazy = lazy(() => import('./components/EingangFenster').then((m) => ({ default: m.EingangFenster })));
+function Eingang() {
+  const [offen, setOffen] = useState<{ gruppe?: string; n: number } | null>(null);
+  useEffect(() => {
+    const auf = (e: Event) => setOffen((o) => ({ gruppe: (e as CustomEvent<{ gruppe?: string }>).detail?.gruppe, n: (o?.n ?? 0) + 1 }));
+    window.addEventListener(EINGANG_OEFFNEN, auf);
+    const aus = eingangWaechter();
+    return () => { window.removeEventListener(EINGANG_OEFFNEN, auf); aus(); };
+  }, []);
+  return offen ? <Suspense fallback={null}><EingangLazy gruppe={offen.gruppe} wunsch={offen.n} onClose={() => setOffen(null)} /></Suspense> : null;
 }
 
 /** M385: Die QR-Einblendung (samt Rechenbibliothek) wird erst geladen, wenn jemand sie aufruft */
@@ -534,6 +548,7 @@ export default function App() {
       <Qr />
       <Versionen />
       <Outlook />
+      <Eingang />
       <BildExport />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
       <GeteiltDialog />

@@ -98,6 +98,12 @@ export interface BoardDoc {
    * Schalter „Archiv einblenden" holt es überall wieder ins Bild.
    */
   archived?: boolean;
+  /**
+   * M478: System-Board — „eingang" ist die Ablage für alles, was von außen kommt (Erweiterung, Teilen, Outlook
+   * „Später"). Es steht in keinem Projekt, nie in Übersicht, Reitern oder Präsentation, wird nie das aktive Board
+   * (lib/eingang.ts wacht darüber) — reist aber wie jedes Board mit Abgleich, Sicherung, Versionen und Suche.
+   */
+  system?: 'eingang';
 }
 
 /** Ein Kommentar-Pin an einer Karte mit seinem Gesprächsverlauf (M148) */

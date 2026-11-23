@@ -21,6 +21,7 @@ import { DragTitle } from './DragTitle';
 import { KartenSymbol } from '../KartenSymbol';
 import { t, zahlWort } from '../../lib/sprache';
 import { tageSeit, zeitLang } from '../../lib/kartenZeit';
+import { useNutzerBoards } from '../../lib/eingang';
 
 const TAG_RE = /#([\p{L}\d_-]{2,20})/gu;
 const TAG_MS = 86_400_000;
@@ -70,7 +71,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const kanban = data;
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
-  const boards = useBoard((s) => s.boards);
+  const boards = useNutzerBoards();   // M478: ohne den Eingang
   const openBoard = useBoard((s) => s.openBoard);
   const focusNode = useBoard((s) => s.focusNode);
   const setPresenting = useBoard((s) => s.setPresenting);

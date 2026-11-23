@@ -16,6 +16,7 @@ function sitzungsAnker(text: string, sitzung: string | undefined): Date | undefi
   return d && !Number.isNaN(d.getTime()) ? d : undefined;
 }
 import { triggerDownload } from './download';
+import { istEingang } from './eingangId';
 
 export type TaskUrgency = 'none' | 'ok' | 'soon' | 'overdue';
 
@@ -102,7 +103,7 @@ export function collectTasks(boards: BoardDoc[], now: Date = new Date()): TaskRe
     // M288: Ein archiviertes BOARD ruht genauso wie eine archivierte Karte —
     // sonst mahnte die Aufgaben-Zentrale weiter Fristen aus etwas an, das man
     // bewusst zur Seite gelegt hat.
-    if (board.archived) continue;
+    if (board.archived || istEingang(board)) continue;   // M478: Der Eingang wartet aufs Einsortieren, nicht auf Erledigung
     for (const node of board.nodes) {
       // Archivierte Karten gelten als erledigt: ihre Aufgaben tauchen weder in
       // der Aufgaben-Zentrale noch in Erinnerungen oder Sammel-Kanbans auf (M87)

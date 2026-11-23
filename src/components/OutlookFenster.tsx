@@ -14,6 +14,7 @@ import { patchCalAccounts, loadCalAccounts } from '../lib/calAccounts';
 import { outlookAbmelden, outlookAnmelden, outlookClientId, outlookListe, outlookMail, outlookStand, outlookTenant, outlookVorgabe, type OutlookMail } from '../lib/outlook';
 import { IMail, IPaperclip, IReload, ISearch, IX } from './Icons';
 import { zahlWort } from '../lib/sprache';
+import { inEingangLegen } from '../lib/eingang';
 
 /** Mitte des sichtbaren Ausschnitts in Board-Koordinaten (ohne React-Flow-Kontext: aus der Transformation) */
 function sichtMitte(w: number, h: number): { x: number; y: number } {
@@ -109,6 +110,18 @@ export function OutlookFenster({ onClose }: { onClose: () => void }) {
       useBoard.getState().addNode(karte);
       useBoard.getState().focusNode(useBoard.getState().activeId, karte.id);
       showToast(`„${daten.subject}" aufs Board geholt${daten.attachments.length ? ` – ${zahlWort(daten.attachments.length, 'Anhang', 'Anhänge')}` : ''}.`);
+    } catch (e) {
+      setFehler((e as Error).message);
+    } finally { setBusy(''); }
+  };
+
+  /** M478: „Später" — die Mail wartet im Eingang, bis man sie einsortiert (das offene Board bleibt unberührt) */
+  const spaeter = async (m: OutlookMail) => {
+    setBusy(m.id); setFehler('');
+    try {
+      const daten = await outlookMail(m.id, mitAnhaengen);
+      inEingangLegen([karteEntschaerfen(makeEmail({ x: 0, y: 0 }, daten))], 'outlook');
+      showToast(`„${daten.subject}" liegt im Eingang – einsortieren über „Eingang" in der Spalte.`);
     } catch (e) {
       setFehler((e as Error).message);
     } finally { setBusy(''); }
@@ -210,6 +223,7 @@ export function OutlookFenster({ onClose }: { onClose: () => void }) {
                       <div className="outlook-betreff" translate="no">{m.anhaenge && <IPaperclip size={12} />} {m.betreff}</div>
                       <div className="outlook-vorschau" translate="no">{m.vorschau}</div>
                     </div>
+                    <button className="outlook-spaeter" disabled={busy === m.id} onClick={() => void spaeter(m)} data-taste="outlook-spaeter" title="In den Eingang legen und später einsortieren">Später</button>
                     <button disabled={busy === m.id} onClick={() => void holen(m)} data-taste="outlook-holen" title={schonDa.has(m.id) ? 'Liegt schon auf einem Board – noch einmal holen' : 'Als E-Mail-Karte aufs Board legen'}>
                       {busy === m.id ? '…' : schonDa.has(m.id) ? 'Noch einmal' : 'Aufs Board'}
                     </button>
