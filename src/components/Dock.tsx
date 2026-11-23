@@ -50,7 +50,6 @@ export function Dock() {
    * morphen animiert (cubic-out, leicht gestaffelt) an ihre Zielplätze.
    */
   const [arrangeMenu, setArrangeMenu] = useState(false);
-  const setPhysicsEnabled = useBoard((s) => s.setPhysicsEnabled);
   const gridSnap = useBoard((s) => s.gridSnap);
   const setGridSnap = useBoard((s) => s.setGridSnap);
   // Hintergrund-Tönung des aktiven Boards — seit M126 hier statt in der Tab-Leiste
@@ -78,10 +77,7 @@ export function Dock() {
     } else {
       targets = computeArrangement(board.nodes.filter((n) => !n.archived), board.edges, mode);
     }
-    // Stapel-Modus: Physik MUSS aus, sonst drückt der nächste Drag alles wieder auseinander
-    if (mode === 'stack' && useBoard.getState().physicsEnabled) {
-      setPhysicsEnabled(false);
-    }
+    // M481: Stapel bleiben beim Ziehen liegen — wer beim Greifen schon unter der Karte lag, weicht nicht aus
     const starts = new Map(board.nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y }]));
     st.pushHistory();
     // M156: Quadranten-Rahmen anlegen bzw. wiederverwenden (Namen bleiben frei
@@ -701,7 +697,7 @@ export function Dock() {
             <button onClick={() => arrange('timeline')} title="Karten mit Fristen chronologisch von links nach rechts, Undatiertes darunter"><ITimelineIcon size={15} /> Zeitstrahl (Fristen)</button>
             <button onClick={() => arrange('quadrant')} title="Eisenhower: links oben wichtig+dringend · rechts oben wichtig · links unten dringend · rechts unten Rest"><IQuadrant size={15} /> Quadrant (wichtig/dringend)</button>
             <button onClick={() => arrange('circles')} title="Zusammenhängendes und Typ-Gruppen jeweils als Kreis-Bündel"><ICircles size={15} /> Kreis-Bündel</button>
-            <button onClick={() => arrange('stack')} title="Karten pro Modultyp überlappend stapeln – Überschriften bleiben sichtbar; Physik wird dafür ausgeschaltet"><IStack size={15} /> Stapeln (überlappend)</button>
+            <button onClick={() => arrange('stack')} title="Karten pro Modultyp überlappend stapeln – Überschriften bleiben sichtbar"><IStack size={15} /> Stapeln (überlappend)</button>
             <div className="dock-menu-label">Raster</div>
             <button
               className={gridSnap ? 'active' : ''}

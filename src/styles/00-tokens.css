@@ -33,6 +33,15 @@
   --r-pill: 3px;
   --card-shadow: 0 0 0 1px rgba(22, 25, 30, 0.09), 0 1px 2px rgba(22, 25, 30, 0.08);
   --card-shadow-lift: 0 0 0 1px rgba(22, 25, 30, 0.13), 0 6px 16px rgba(22, 25, 30, 0.14);
+  /* M481: Ziehen mit Gefühl — EINE Bewegungssprache für Übersicht (M440) und Board (lib/ziehGefuehl.ts).
+     feder: Ausweichen und Gleiten, leicht überschwingend · heben: Anheben beim Greifen · landen: Absenken beim Loslassen */
+  --zieh-feder: cubic-bezier(0.22, 1.28, 0.42, 1);
+  --zieh-feder-dauer: 0.46s;
+  --zieh-heben: cubic-bezier(0.3, 1.4, 0.5, 1);
+  --zieh-heben-dauer: 0.18s;
+  --zieh-landen: cubic-bezier(0.22, 1.3, 0.42, 1);
+  --zieh-landen-dauer: 0.38s;
+  --zieh-schatten: 0 0 0 1px rgba(22, 25, 30, 0.1), 0 18px 38px -12px rgba(22, 28, 45, 0.32), 0 6px 14px -6px rgba(22, 28, 45, 0.18);
   --chrome-shadow: 0 1px 2px rgba(22, 25, 30, 0.06), 0 3px 10px rgba(22, 25, 30, 0.08);  /* Leisten */
   --pop-shadow: 0 2px 6px rgba(22, 25, 30, 0.08), 0 14px 36px rgba(22, 25, 30, 0.16);    /* Menüs, Fenster */
   --edge: rgba(70, 76, 88, 0.55);     /* Verbindungs-Linie */
@@ -95,6 +104,7 @@
   --glass-border: var(--border-soft);
   --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.5);
   --card-shadow-lift: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 8px 20px rgba(0, 0, 0, 0.55);
+  --zieh-schatten: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 18px 40px -10px rgba(0, 0, 0, 0.6);
   --chrome-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 3px 10px rgba(0, 0, 0, 0.35);
   --pop-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 14px 36px rgba(0, 0, 0, 0.5);
   --edge: rgba(225, 229, 236, 0.5);

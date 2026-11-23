@@ -228,8 +228,8 @@ export function Settings() {
   const clickZoom = useBoard((s) => s.clickZoom);
   const setClickZoom = useBoard((s) => s.setClickZoom);
   // M294: Bewegung auf der Fläche als Optionen — Physik, Klick-Zoom, Konfetti
-  const physicsEnabled = useBoard((s) => s.physicsEnabled);
-  const setPhysicsEnabled = useBoard((s) => s.setPhysicsEnabled);
+  const ziehBewegung = useBoard((s) => s.ziehBewegung);
+  const setZiehBewegung = useBoard((s) => s.setZiehBewegung);
   const konfetti = useBoard((s) => s.konfetti);
   const bildTextAn = useBildTextAn();   // M452
   const setKonfetti = useBoard((s) => s.setKonfetti);
@@ -775,15 +775,21 @@ export function Settings() {
             <input type="checkbox" checked={wheelZoom} onChange={(e) => setWheelZoom(e.target.checked)} />
           </label>
           <p className="modal-hint">Aus: Rad scrollt, Zoomen mit Strg+Rad oder Pinch. An: Rad zoomt direkt.</p>
+          {/* M481: EIN Schalter für das Gefühl beim Ziehen — ersetzt Verdrängungs- und Wurf-Physik */}
+          <label className="modal-row modal-row-check">
+            <span>Bewegung beim Ziehen</span>
+            <input type="checkbox" checked={ziehBewegung} onChange={(e) => setZiehBewegung(e.target.checked)} data-taste="zieh-bewegung" />
+          </label>
+          <p className="modal-hint">Gegriffene Karten heben und neigen sich, Nachbarn weichen aus, beim Loslassen federn sie an ihren Platz. Aus: Karten folgen der Maus ohne Bewegung.</p>
           <label className="modal-row modal-row-check">
             <span>Lebendige Fläche</span>
             <input
               type="checkbox"
-              checked={physicsEnabled || clickZoom || konfetti}
-              onChange={(e) => { setPhysicsEnabled(e.target.checked); setClickZoom(e.target.checked); setKonfetti(e.target.checked); }}
+              checked={clickZoom || konfetti}
+              onChange={(e) => { setClickZoom(e.target.checked); setKonfetti(e.target.checked); }}
             />
           </label>
-          <p className="modal-hint">Karten weichen aus und lassen sich werfen, die Ansicht fliegt zu angeklickten Karten, Konfetti beim Erledigen. Aus bleibt die Fläche ruhig.</p>
+          <p className="modal-hint">Die Ansicht fliegt zu angeklickten Karten, Konfetti beim Erledigen. Aus bleibt die Fläche ruhig.</p>
           {/* M326: Finger-Gesten nach Procreate */}
           <label className="modal-row modal-row-check">
             <span>Finger-Gesten (wie Procreate)</span>

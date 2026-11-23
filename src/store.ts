@@ -646,11 +646,11 @@ interface BoardState {
   bildExportOpen: boolean;
   setBildExportOpen: (open: boolean) => void;
 
-  /** Physik (Verdrängung/Wurf) global an/aus — aus = Karten dürfen überlappen/stapeln.
-   *  M294: Voreinstellung AUS — die ruhige Fläche ist der Normalfall, die
-   *  Physik bleibt als Option (Dock → ⋯ oder ⚙ → Bedienung). */
-  physicsEnabled: boolean;
-  setPhysicsEnabled: (on: boolean) => void;
+  /** M481: Bewegung beim Ziehen — die gegriffene Karte hebt und neigt sich, Nachbarn weichen aus, beim Ablegen
+   *  federt sie an ihren Platz (wie die Board-Kacheln der Übersicht, M440). Ersetzt die frühere Verdrängungs-
+   *  und Wurf-Physik (`physicsEnabled`, die jedes Bild in den Stand schrieb). Voreinstellung an. */
+  ziehBewegung: boolean;
+  setZiehBewegung: (on: boolean) => void;
   /** M294: Konfetti beim Erledigen — bewusst eine Option, keine Voreinstellung */
   konfetti: boolean;
   setKonfetti: (on: boolean) => void;
@@ -1635,8 +1635,8 @@ export const useBoard = create<BoardState>()(
         bildExportOpen: false,
         setBildExportOpen: (open) => set({ bildExportOpen: open }),
 
-        physicsEnabled: false,
-        setPhysicsEnabled: (on) => set({ physicsEnabled: on }),
+        ziehBewegung: true,
+        setZiehBewegung: (on) => set({ ziehBewegung: on }),
         konfetti: false,
         setKonfetti: (on) => set({ konfetti: on }),
         pfeilSchatten: true,
@@ -3582,7 +3582,7 @@ export const useBoard = create<BoardState>()(
         rejectedLinks: s.rejectedLinks,
         templates: s.templates,
         ui: s.ui,
-        physicsEnabled: s.physicsEnabled,
+        ziehBewegung: s.ziehBewegung,
         konfetti: s.konfetti,
         pfeilSchatten: s.pfeilSchatten,
         stiftZeichnet: s.stiftZeichnet,
