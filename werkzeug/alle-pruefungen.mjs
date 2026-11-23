@@ -65,13 +65,13 @@ if (nurGeaendert) {
     const muster = new RegExp(`\\b${stamm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
     const nennt = (n) => datei.startsWith('src/') && (texte.get(n).includes(name) || (nennbar && muster.test(texte.get(n))));
     // Hilfe-Texte (HelpOverlay*.tsx) lesen über 50 Reihen mit – wer nur dort etwas ändert, will nicht die halbe
-    // Reihe abwarten. Was mehr als 20 Reihen nennen, zählt deshalb nicht als Grund (Hinweis statt Auswahl).
+    // Reihe abwarten. Was mehr als 30 Reihen nennen, zählt deshalb nicht als Grund (Hinweis statt Auswahl).
     const nennende = dateien.filter(nennt);
-    if (nennende.length > 20) console.log(`--geaendert: ${name} nennen ${nennende.length} Reihen – übergangen (bei Verdacht die volle Reihe)`);
+    if (nennende.length > 30) console.log(`--geaendert: ${name} nennen ${nennende.length} Reihen – übergangen (bei Verdacht die volle Reihe)`);
     for (const n of dateien) {
       if (datei === `pruefungen/${n}`) merke(n, 'selbst geändert');
       else if (nr && n.startsWith(`m${nr}`)) merke(n, `Meilenstein ${nr}: ${datei}`);
-      else if (nennende.length <= 20 && nennende.includes(n)) merke(n, `nennt ${name}`);
+      else if (nennende.length <= 30 && nennende.includes(n)) merke(n, `nennt ${name}`);
       else if (ws.some((w) => n.replace(/\.mjs$/, '').split('-').slice(1).some((t) => t.length >= 4 && (t.startsWith(w) || w.startsWith(t))))) merke(n, `Name passt zu ${datei}`);
     }
   }
