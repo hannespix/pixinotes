@@ -62,6 +62,6 @@ Dort sagt das Fenster, dass das Anmelden die gehostete App braucht; der Weg blei
 ## Grenzen / offen
 - Nur lesen, nur auf Abruf: kein Abo/Delta-Abgleich, nur Posteingang und Suche (keine Ordnerauswahl), kein Antworten
   oder Markieren über Graph.
-- Konto-Termine stehen wie bisher in der Kalender-Karte, nicht in der Aufgaben-Zentrale (die zeigt Aufgaben, keine
-  Termine).
+- ~~Konto-Termine stehen wie bisher in der Kalender-Karte, nicht in der Aufgaben-Zentrale (die zeigt Aufgaben, keine
+  Termine).~~ → erledigt in M469 (Abschnitt „Termine heute und morgen" in der Aufgaben-Zentrale).
 - Ohne `VITE_MS_CLIENT_ID` im Live-Build zeigt die App „noch nicht eingerichtet".

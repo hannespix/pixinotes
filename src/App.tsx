@@ -31,6 +31,7 @@ import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
 import { Tastatur } from './components/Tastatur';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
+import { kontoKennung, termineZuErinnern } from './lib/termineZentrale';
 import { fristenAusstehend, fristenLaden } from './lib/dates';
 import { rufnummernLaden } from './lib/rufnummer';
 import { autoArchivAlleBoards } from './lib/ticketArchiv';
@@ -394,13 +395,23 @@ export default function App() {
       const ausstehend = fristenAusstehend();
       if (ausstehend) { void ausstehend.then(remind, () => {}); return; }
       const hits = dueTasksToRemind(aufgaben);
-      if (hits.length === 0) return;
       if (hits.length === 1) {
         showToast(`Fällig: „${hits[0].text}" (${hits[0].boardName}) – Details in der Aufgaben-Zentrale`);
         notifyBrowser('PixiNotes Aufgabe fällig', `${hits[0].text} (${hits[0].boardName})`);
-      } else {
+      } else if (hits.length > 1) {
         showToast(`${zahlWort(hits.length, 'Aufgabe', 'Aufgaben')} fällig – Details in der Aufgaben-Zentrale`);
         notifyBrowser('PixiNotes', `${hits.length} Aufgaben sind fällig`);
+      }
+      // M469: Termine aus Kalender-Konten kurz vor Beginn — nur mit Einstellung, nur aus gemerkten Abrufen (kein Netz)
+      const termine = termineZuErinnern(aufgaben);
+      if (termine.length) {
+        const t = termine[0];
+        const melden = () => {
+          if (termine.length === 1) showToast(`Termin um ${t.time}: „${t.title}" (${kontoKennung(t.provider)})`, false, 9000);
+          else showToast(`${zahlWort(termine.length, 'Termin', 'Termine')} beginnen gleich – ab ${t.time}: „${t.title}"`, false, 9000);
+          notifyBrowser('PixiNotes Termin', `${t.time} ${t.title}`);
+        };
+        if (hits.length) setTimeout(melden, 6000); else melden();
       }
     };
     const t0 = setTimeout(remind, 2500);
