@@ -37273,6 +37273,15 @@ function makeTime(position) {
     data: { title: t("Zeiterfassung"), segs: [] }
   };
 }
+function makeKontakt(position, daten) {
+  return {
+    id: uid(),
+    type: "kontakt",
+    width: 300,
+    position,
+    data: { name: "", telefone: [], emails: [], ...daten }
+  };
+}
 function makeFrame(position, name = t("Neuer Rahmen")) {
   return {
     id: uid(),
@@ -38224,6 +38233,41 @@ function sortEntries(entries) {
   return [...entries].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || a.id.localeCompare(b.id));
 }
 
+// src/lib/vcard.ts
+init_define_import_meta_env();
+
+// src/lib/sicher.ts
+init_define_import_meta_env();
+
+// src/lib/kartenZeit.ts
+init_define_import_meta_env();
+var FRUEHESTENS = Date.UTC(2020, 0, 1);
+
+// src/lib/sicher.ts
+function kontaktBild(roh) {
+  if (typeof roh !== "string" || roh.length > 15e5) return null;
+  return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
+}
+
+// src/lib/vcard.ts
+function kontaktDaten(d) {
+  const text3 = (v) => typeof v === "string" ? v : "";
+  const telefone = (Array.isArray(d?.telefone) ? d.telefone : []).filter((t2) => !!t2 && typeof t2 === "object" && typeof t2.nummer === "string").map((t2) => ({ nummer: t2.nummer, ...typeof t2.art === "string" && t2.art ? { art: t2.art } : {} }));
+  const emails = (Array.isArray(d?.emails) ? d.emails : []).filter((m) => typeof m === "string");
+  return {
+    ...d,
+    name: text3(d?.name),
+    funktion: text3(d?.funktion),
+    firma: text3(d?.firma),
+    adresse: text3(d?.adresse),
+    web: text3(d?.web),
+    notiz: text3(d?.notiz),
+    telefone,
+    emails,
+    foto: kontaktBild(d?.foto) ?? void 0
+  };
+}
+
 // src/lib/kiModule.ts
 var KARTE_MAX = 6e3;
 var ISO = /^\d{4}-\d{2}-\d{2}$/;
@@ -38350,6 +38394,15 @@ ${bubblesAlsText(n.data)}`;
     case "kontakt":
       return `Kontakt
 ${nodeToText(n)}`;
+    // M452: Bilder (auch als Datei abgelegte) mit dem Text, den die Erkennung darin gefunden hat — so kann die
+    // KI aus Screenshots zusammenfassen und Aufgaben ziehen. Bewusst ohne Import aus textInBildern (MCP-Server).
+    case "image":
+    case "file": {
+      const ocr = typeof n.data.ocrText === "string" ? n.data.ocrText.trim() : "";
+      return ocr ? `${nodeToText(n)}
+Text im Bild (automatisch erkannt):
+${ocr}` : nodeToText(n);
+    }
     default:
       return nodeToText(n);
   }
@@ -38411,6 +38464,8 @@ function kiOpsText(typen) {
   if (typen.has("time")) z2.push('{"op":"add_time","id":"<Zeiterfassung-id>","segments":[{"date":"yyyy-mm-dd","start":540,"end":720,"kind":"arbeit|pause","note":"..."}]}');
   if (typen.has("bubbles")) z2.push('{"op":"add_ideas","id":"<Ideen-id>","ideas":["..."]}');
   if (typen.has("mermaid")) z2.push('{"op":"edit_mermaid","id":"<Diagramm-id>","code":"vollst\xE4ndiger neuer Mermaid-Code"}');
+  z2.push('{"op":"kontakt","name":"Vorname Nachname","funktion":"...","firma":"...","telefone":[{"nummer":"+49 761 123456","art":"Dienstlich|Mobil|Privat|Fax"}],"emails":["..."],"adresse":"Stra\xDFe 1\\n79098 Freiburg","web":"...","notiz":"...","from":"<optional>"} (Kontakt-Karte f\xFCr eine Person; nur die bekannten Felder angeben)');
+  if (typen.has("kontakt")) z2.push('{"op":"edit_kontakt","id":"<Kontakt-id>","name":"...","funktion":"...","firma":"...","telefone":[{"nummer":"...","art":"..."}],"emails":["..."],"adresse":"...","web":"...","notiz":"..."} (nur die genannten Felder \xE4ndern sich; "telefone" und "emails" ersetzen die ganze Liste \u2013 bisherige Nummern, die bleiben sollen, mit angeben; "" entfernt einen Wert)');
   return z2.join("\n");
 }
 var frisch = (id) => typeof id === "string" ? selectActiveBoard(useBoard.getState())?.nodes.find((n) => n.id === id) : void 0;
@@ -38540,6 +38595,31 @@ var vorgaengerVon = (v, rows) => {
 };
 function abschnitte(roh) {
   return liste(roh).map((s) => s).filter((s) => s && ISO.test(text(s.date)) && zahl(s.start) !== null && zahl(s.end) !== null && zahl(s.start) >= 0 && zahl(s.end) <= 1440 && zahl(s.end) > zahl(s.start)).slice(0, 120).map((s) => ({ id: uid(), date: text(s.date), start: Math.round(zahl(s.start)), end: Math.round(zahl(s.end)), kind: text(s.kind) === "pause" ? "pause" : "arbeit", ...text(s.note, 120) ? { note: text(s.note, 120) } : {} }));
+}
+var KONTAKT_TEXTE = [["name", 120], ["funktion", 120], ["firma", 160], ["adresse", 400], ["web", 300], ["notiz", 2e3]];
+function kontaktFelder(o) {
+  const aus = {};
+  for (const [feld, max] of KONTAKT_TEXTE) {
+    if (!(feld in o)) continue;
+    const roh = o[feld];
+    if (roh === null || roh === "") {
+      aus[feld] = "";
+      continue;
+    }
+    const t2 = typeof roh === "string" ? roh.replace(/\\n/g, "\n").trim().slice(0, max) : "";
+    if (t2) aus[feld] = t2;
+  }
+  if ("telefone" in o) {
+    aus.telefone = liste(o.telefone).slice(0, 12).map((t2) => {
+      if (typeof t2 === "string") return text(t2, 60) ? { nummer: text(t2, 60) } : null;
+      const r = t2;
+      const nummer = text(r?.nummer ?? r?.number, 60);
+      const art = text(r?.art ?? r?.type, 30);
+      return nummer ? { nummer, ...art ? { art } : {} } : null;
+    }).filter((t2) => !!t2);
+  }
+  if ("emails" in o) aus.emails = liste(o.emails).map((m) => text(m, 200)).filter((m) => /^[^\s@]+@[^\s@]+$/.test(m)).slice(0, 8);
+  return aus;
 }
 function kiAusfuehren(o, u) {
   const { st } = u;
@@ -39041,6 +39121,25 @@ function kiAusfuehren(o, u) {
       } else st.updateNodeData(n.id, { ideen });
       return true;
     }
+    /* ----- Kontakt (M454) ----- */
+    case "kontakt":
+    case "edit_kontakt": {
+      const neuAnlegen = o.op === "kontakt";
+      const n = neuAnlegen ? void 0 : ziel("kontakt");
+      if (!neuAnlegen && !n) return false;
+      const felder = kontaktFelder(o);
+      if (neuAnlegen) {
+        const d = kontaktDaten(felder);
+        if (!d.name && !d.firma && !d.telefone.length && !d.emails.length) return false;
+        const node2 = makeKontakt(u.place(220), d);
+        st.addNode(node2);
+        u.linkFrom(o, node2.id);
+        return true;
+      }
+      if (Object.keys(felder).length === 0) return false;
+      st.updateNodeData(n.id, felder);
+      return true;
+    }
     /* ----- Diagramm ----- */
     case "edit_mermaid": {
       const n = ziel("mermaid");
@@ -39109,7 +39208,7 @@ function textZuBloecken(text3) {
 }
 
 // mcp/motor.ts
-var ALLE_MODULE = /* @__PURE__ */ new Set(["note", "sheet", "kanban", "gantt", "week", "minutes", "time", "bubbles", "mermaid"]);
+var ALLE_MODULE = /* @__PURE__ */ new Set(["note", "sheet", "kanban", "gantt", "week", "minutes", "time", "bubbles", "mermaid", "kontakt"]);
 function boardFinden(stand, wer) {
   const w = wer.trim();
   return stand.boards.find((b) => b.id === w) ?? stand.boards.find((b) => b.name.trim().toLowerCase() === w.toLowerCase()) ?? stand.boards.find((b) => b.name.trim().toLowerCase().includes(w.toLowerCase()));
@@ -39471,7 +39570,7 @@ var text2 = (t2) => ({ content: [{ type: "text", text: t2 }] });
 var fehler = (t2) => ({ content: [{ type: "text", text: t2 }], isError: true });
 function serverBauen(sp) {
   const server = new McpServer({ name: "pixinotes", version: VERSION }, {
-    instructions: "PixiNotes ist ein Whiteboard mit Karten (Notizen und Modulen) auf einer Leinwand, gegliedert in Bereiche \u2192 Projekte \u2192 Boards. Arbeitsweise: pixinotes_uebersicht zeigt alle Boards; pixinotes_board_lesen liefert den Inhalt eines Boards samt Kennungen der Karten und ihrer Teile (Ticket, Vorgang, Zeile \u2026); pixinotes_board_anlegen legt ein Board an; pixinotes_bearbeiten f\xFChrt Operationen aus (Karten und Module anlegen, f\xFCllen, \xE4ndern, verbinden). Bevorzuge passende Module statt langer Notizen: Aufgaben \u2192 kanban, Termine/Phasen \u2192 gantt, Zahlen/Listen \u2192 sheet, Abl\xE4ufe \u2192 mermaid, Wochenpl\xE4ne \u2192 week, Besprechungen \u2192 minutes, Ideen sammeln \u2192 bubbles. \xC4ndere Vorhandenes, statt Doppeltes anzulegen. Keine Emojis in Titeln und Texten."
+    instructions: "PixiNotes ist ein Whiteboard mit Karten (Notizen und Modulen) auf einer Leinwand, gegliedert in Bereiche \u2192 Projekte \u2192 Boards. Arbeitsweise: pixinotes_uebersicht zeigt alle Boards; pixinotes_board_lesen liefert den Inhalt eines Boards samt Kennungen der Karten und ihrer Teile (Ticket, Vorgang, Zeile \u2026); pixinotes_board_anlegen legt ein Board an; pixinotes_bearbeiten f\xFChrt Operationen aus (Karten und Module anlegen, f\xFCllen, \xE4ndern, verbinden). Bevorzuge passende Module statt langer Notizen: Aufgaben \u2192 kanban, Termine/Phasen \u2192 gantt, Zahlen/Listen \u2192 sheet, Abl\xE4ufe \u2192 mermaid, Wochenpl\xE4ne \u2192 week, Besprechungen \u2192 minutes, Ideen sammeln \u2192 bubbles, Ansprechpartner \u2192 kontakt. \xC4ndere Vorhandenes, statt Doppeltes anzulegen. Keine Emojis in Titeln und Texten."
   });
   server.registerTool("pixinotes_uebersicht", {
     title: "Boards auflisten",

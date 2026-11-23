@@ -1,6 +1,6 @@
 // M443: PixiNotes als MCP-Server — KI-Modelle von außen (Claude Desktop, Claude Code, Cursor, …) legen Boards an,
 // lesen und füllen sie, mit allen Modulen der App: Notiz, Kanban, Zeitplan, Rechen-Tabelle, Wochenplaner,
-// Protokoll, Zeiterfassung, Ideen-Bubbles, Diagramm, Formen, Rahmen, Pfeile.
+// Protokoll, Zeiterfassung, Ideen-Bubbles, Diagramm, Kontakt (M454), Formen, Rahmen, Pfeile.
 //
 // Start:  node pixinotes-mcp.mjs --ordner "<Sync-Ordner von PixiNotes>"
 //    oder PIXINOTES_EMAIL=… PIXINOTES_PASSWORT=… node pixinotes-mcp.mjs --konto
@@ -51,7 +51,7 @@ export function serverBauen(sp: Speicher): McpServer {
     instructions: 'PixiNotes ist ein Whiteboard mit Karten (Notizen und Modulen) auf einer Leinwand, gegliedert in Bereiche → Projekte → Boards. '
       + 'Arbeitsweise: pixinotes_uebersicht zeigt alle Boards; pixinotes_board_lesen liefert den Inhalt eines Boards samt Kennungen der Karten und ihrer Teile (Ticket, Vorgang, Zeile …); '
       + 'pixinotes_board_anlegen legt ein Board an; pixinotes_bearbeiten führt Operationen aus (Karten und Module anlegen, füllen, ändern, verbinden). '
-      + 'Bevorzuge passende Module statt langer Notizen: Aufgaben → kanban, Termine/Phasen → gantt, Zahlen/Listen → sheet, Abläufe → mermaid, Wochenpläne → week, Besprechungen → minutes, Ideen sammeln → bubbles. '
+      + 'Bevorzuge passende Module statt langer Notizen: Aufgaben → kanban, Termine/Phasen → gantt, Zahlen/Listen → sheet, Abläufe → mermaid, Wochenpläne → week, Besprechungen → minutes, Ideen sammeln → bubbles, Ansprechpartner → kontakt. '
       + 'Ändere Vorhandenes, statt Doppeltes anzulegen. Keine Emojis in Titeln und Texten.',
   });
 

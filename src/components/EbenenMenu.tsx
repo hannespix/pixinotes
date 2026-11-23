@@ -6,11 +6,12 @@ import { FreigabeDialog } from './FreigabeDialog';
 import { LinkDialog } from './LinkDialog';
 import {
   IArchive, IArchiveRestore, ICopy, IDownload, IDuplicate, IMore, IMoveTo,
-  IPen, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck, IUsers, IX, IUhr,
+  IPen, IPerson, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck, IUsers, IX, IUhr,
 } from './Icons';
 import { MENUE_HIER } from '../lib/kontextmenue';
 import { versionenOeffnen } from '../lib/boardVersionen';
 import { ebeneLoeschenFragen } from './EbeneLoeschenDialog';
+import { kontakteHerunterladen } from '../lib/kontaktExport';
 
 /**
  * M288: Ein Menü für die Ebenen ÜBER der Karte.
@@ -227,6 +228,12 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
           <button role="menuitem" onClick={() => { downloadBoardFile(board); zu(); }}>
             <IDownload size={14} /> Als Datei sichern
           </button>
+          {/* M454: alle Kontakt-Karten des Boards als EINE .vcf – nur, wenn es welche gibt */}
+          {board.nodes.some((n) => n.type === 'kontakt') && (
+            <button role="menuitem" data-taste="board-kontakte" onClick={() => { kontakteHerunterladen(board.nodes, board.name); zu(); }}>
+              <IPerson size={14} /> {`Kontakte als vCard (${board.nodes.filter((n) => n.type === 'kontakt').length})`}
+            </button>
+          )}
           <button role="menuitem" onClick={() => { setView('board'); openBoard(boardId); setPresenting(true); zu(); }}>
             <IPlay size={14} /> Präsentieren
           </button>

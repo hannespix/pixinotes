@@ -5,13 +5,14 @@ import { selectActiveBoard, useBoard } from '../store';
 import { nodesToText } from '../lib/serialize';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
 import { textDateienAlsNotizen, textKarte } from '../lib/textNotiz';
+import { kontakteHerunterladen } from '../lib/kontaktExport';
 import { aiBriefing, aiEdges, aiPolish, aiPraesentation, aiPraesentationUeberarbeiten, aiProcess, aiTasks } from '../lib/aiActions';
 /** M410: Die Freitext-Anweisung wird erst geladen, wenn sie gebraucht wird (lib/kiAnweisung.ts) */
 const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => import('../lib/kiAnweisung').then((m) => m.aiCommand(...a));
 import { kiBeispiel, kiBlaettern } from '../lib/kiVerlauf';
 import { KACHEL_TYPEN, STICKY_COLORS, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICrop, IDuplicate, IFit, IFrame, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IDownload, IComment, ICompact, ICrop, IDuplicate, IFit, IFrame, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IPerson, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -26,6 +27,7 @@ import {
 } from './Icons';
 import { vorschauArt } from '../lib/fileStore';
 import { bildBearbeitbar, bildBearbeiten } from './BildEditorHost';
+import { BildTextMenue } from './BildTextMenue';
 import { mutedHistory } from '../store';
 import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
 import type { ArrangeMode } from '../lib/arrange';
@@ -783,6 +785,27 @@ export function SelectionToolbar() {
                     <ICrop size={14} /> Bild bearbeiten …
                   </button>
                 )}
+                {/* M457: Absender einer Mail als Kontakt-Karte (Kopf + Signatur, KI verfeinert, falls eingerichtet) –
+                    bewusst hier im ⋯ statt als weiterer Dauer-Knopf an der Mail */}
+                {single?.type === 'email' && (
+                  <button
+                    data-taste="absender-kontakt"
+                    disabled={aiBusy}
+                    title="Name, E-Mail, Funktion, Firma, Rufnummern und Anschrift aus Absender und Signatur – als Kontakt-Karte neben der Mail (ein vorhandener Kontakt wird ergänzt)"
+                    onClick={() => {
+                      setMenu(null);
+                      const mailId = single.id;
+                      setAiBusy(true);
+                      void import('../lib/kontaktAusMail')
+                        .then((m) => m.absenderAlsKontakt(mailId))
+                        .then((r) => showToast(r.text, r.geaendert, 6000))
+                        .catch((e) => showToast(`Kontakt nicht angelegt: ${(e as Error).message}`, false, 6000))
+                        .finally(() => setAiBusy(false));
+                    }}
+                  >
+                    <IPerson size={14} /> Absender als Kontakt
+                  </button>
+                )}
                 {/* M374: Bilder liegen rahmenlos auf dem Board — hier kommt die Karte mit Rand zurück (und wieder weg) */}
                 {selected.every((n) => n.type === 'image' || (n.type === 'file' && vorschauArt(String((n.data as { name?: string }).name ?? ''), (n.data as { mime?: string }).mime) === 'bild')) && (() => {
                   const alleMit = selected.every((n) => (n.data as { rahmen?: boolean }).rahmen === true);
@@ -797,6 +820,8 @@ export function SelectionToolbar() {
                     </button>
                   );
                 })()}
+                {/* M452: Text im Bild – kopieren oder gleich erkennen lassen (nur ein einzelnes Bild) */}
+                {selected.length === 1 && <BildTextMenue node={selected[0]} schliessen={() => setMenu(null)} />}
                 {/* M296: „Schrift & Größe" liegt hier — und NUR hier. M267 hatte
                     ihm einen eigenen Knopf in der Leiste gegeben; die Leiste soll
                     aber sechs Elemente haben, und ein Weg reicht. */}
@@ -852,6 +877,19 @@ export function SelectionToolbar() {
                 >
                   <IGlobe size={14} /> Nachschlagen (Wikipedia &amp; Web)
                 </button>
+                {/* M454: Kontakte der Auswahl als EINE .vcf – fürs Adressbuch (Outlook, Telefon) */}
+                {selected.some((n) => n.type === 'kontakt') && (() => {
+                  const zahl = selected.filter((n) => n.type === 'kontakt').length;
+                  return (
+                    <button
+                      data-taste="kontakte-vcard"
+                      onClick={() => { setMenu(null); kontakteHerunterladen(selected, board.name); }}
+                      title="Die gewählten Kontakte in einer vCard-Datei (.vcf) – für Outlook, Telefon, Adressbuch"
+                    >
+                      <IDownload size={14} /> {zahl === 1 ? 'Kontakt als vCard' : `${zahl} Kontakte als vCard`}
+                    </button>
+                  );
+                })()}
                 {single && (
                   <button onClick={() => { setMenu(null); asTemplate(); }} title="Karte als Vorlage speichern (＋-Menü → Vorlagen)">
                     <IBookmark size={14} /> Als Vorlage speichern

@@ -15,11 +15,12 @@ import { rechneBlatt, zeigeWert } from './formel';
 import { ersteZeile, spaltenName } from './tabellenAnsicht';
 import { bubblesAlsText, bubblesDaten } from './bubbles';
 import { sortEntries } from './minutes';
-import { makeBubbles, makeKanban, makeMinutes, makeSheet, makeTime } from './nodes';
+import { makeBubbles, makeKanban, makeKontakt, makeMinutes, makeSheet, makeTime } from './nodes';
+import { kontaktDaten } from './vcard';
 import { selectActiveBoard, useBoard } from '../store';
 import {
   doneCol, kanbanCols, mitSpalte, uid,
-  type AppNode, type GanttRow, type KanbanData, type KanbanItem, type MinutesData, type MinutesEntry,
+  type AppNode, type GanttRow, type KanbanData, type KanbanItem, type KontaktData, type KontaktTelefon, type MinutesData, type MinutesEntry,
   type SheetData, type TimeSeg, type WeekData, type WeekEntry, type ZellStil,
 } from '../types';
 
@@ -146,6 +147,13 @@ function lesen(n: AppNode, u: KiUmfeld): string {
     case 'shape': return `Form (${n.data.shape}): ${n.data.text || ''}`;
     // M450: Kontakt-Karte — die Felder als Zeilen (Name, Funktion · Firma, Tel., E-Mail, Anschrift …)
     case 'kontakt': return `Kontakt\n${nodeToText(n)}`;
+    // M452: Bilder (auch als Datei abgelegte) mit dem Text, den die Erkennung darin gefunden hat — so kann die
+    // KI aus Screenshots zusammenfassen und Aufgaben ziehen. Bewusst ohne Import aus textInBildern (MCP-Server).
+    case 'image':
+    case 'file': {
+      const ocr = typeof n.data.ocrText === 'string' ? n.data.ocrText.trim() : '';
+      return ocr ? `${nodeToText(n)}\nText im Bild (automatisch erkannt):\n${ocr}` : nodeToText(n);
+    }
     default: return nodeToText(n);
   }
 }
@@ -209,6 +217,9 @@ export function kiOpsText(typen: Set<string>): string {
   if (typen.has('time')) z.push('{"op":"add_time","id":"<Zeiterfassung-id>","segments":[{"date":"yyyy-mm-dd","start":540,"end":720,"kind":"arbeit|pause","note":"..."}]}');
   if (typen.has('bubbles')) z.push('{"op":"add_ideas","id":"<Ideen-id>","ideas":["..."]}');
   if (typen.has('mermaid')) z.push('{"op":"edit_mermaid","id":"<Diagramm-id>","code":"vollständiger neuer Mermaid-Code"}');
+  // M454: Kontakte anlegen und pflegen – Felder wie in der Kontakt-Karte (lib/vcard.ts schreibt daraus die vCard)
+  z.push('{"op":"kontakt","name":"Vorname Nachname","funktion":"...","firma":"...","telefone":[{"nummer":"+49 761 123456","art":"Dienstlich|Mobil|Privat|Fax"}],"emails":["..."],"adresse":"Straße 1\\n79098 Freiburg","web":"...","notiz":"...","from":"<optional>"} (Kontakt-Karte für eine Person; nur die bekannten Felder angeben)');
+  if (typen.has('kontakt')) z.push('{"op":"edit_kontakt","id":"<Kontakt-id>","name":"...","funktion":"...","firma":"...","telefone":[{"nummer":"...","art":"..."}],"emails":["..."],"adresse":"...","web":"...","notiz":"..."} (nur die genannten Felder ändern sich; "telefone" und "emails" ersetzen die ganze Liste – bisherige Nummern, die bleiben sollen, mit angeben; "" entfernt einen Wert)');
   return z.join('\n');
 }
 
@@ -337,6 +348,31 @@ const vorgaengerVon = (v: unknown, rows: GanttRow[]): string | undefined => {
 function abschnitte(roh: unknown): TimeSeg[] {
   return liste(roh).map((s) => s as Record<string, unknown>).filter((s) => s && ISO.test(text(s.date)) && zahl(s.start) !== null && zahl(s.end) !== null && zahl(s.start)! >= 0 && zahl(s.end)! <= 1440 && zahl(s.end)! > zahl(s.start)!)
     .slice(0, 120).map((s) => ({ id: uid(), date: text(s.date), start: Math.round(zahl(s.start)!), end: Math.round(zahl(s.end)!), kind: text(s.kind) === 'pause' ? 'pause' as const : 'arbeit' as const, ...(text(s.note, 120) ? { note: text(s.note, 120) } : {}) }));
+}
+
+/* ---------- Kontakt (M454) ---------- */
+const KONTAKT_TEXTE: Array<[keyof KontaktData, number]> = [['name', 120], ['funktion', 120], ['firma', 160], ['adresse', 400], ['web', 300], ['notiz', 2000]];
+/** Nur die Felder, die die Operation nennt – geprüft und gekürzt; "" leert einen Wert. Ein Foto nimmt die KI nie an. */
+function kontaktFelder(o: KiOp): Partial<KontaktData> {
+  const aus: Partial<KontaktData> = {};
+  for (const [feld, max] of KONTAKT_TEXTE) {
+    if (!(feld in o)) continue;
+    const roh = o[feld as string];
+    if (roh === null || roh === '') { aus[feld] = ''; continue; }
+    const t = typeof roh === 'string' ? roh.replace(/\\n/g, '\n').trim().slice(0, max) : '';
+    if (t) aus[feld] = t;
+  }
+  if ('telefone' in o) {
+    aus.telefone = liste(o.telefone).slice(0, 12).map((t): KontaktTelefon | null => {
+      if (typeof t === 'string') return text(t, 60) ? { nummer: text(t, 60) } : null;
+      const r = t as Record<string, unknown> | null;
+      const nummer = text(r?.nummer ?? r?.number, 60);
+      const art = text(r?.art ?? r?.type, 30);
+      return nummer ? { nummer, ...(art ? { art } : {}) } : null;
+    }).filter((t): t is KontaktTelefon => !!t);
+  }
+  if ('emails' in o) aus.emails = liste(o.emails).map((m) => text(m, 200)).filter((m) => /^[^\s@]+@[^\s@]+$/.test(m)).slice(0, 8);
+  return aus;
 }
 
 /**
@@ -690,6 +726,25 @@ export function kiAusfuehren(o: KiOp, u: KiUmgebung): boolean | undefined {
         Object.assign(n.data, { title: text(o.title, 60) || 'Ideen', frage: text(o.question, 200), ideen, gruppen });
         st.addNode(n); u.linkFrom(o, n.id);
       } else st.updateNodeData(n.id, { ideen });
+      return true;
+    }
+
+    /* ----- Kontakt (M454) ----- */
+    case 'kontakt':
+    case 'edit_kontakt': {
+      const neuAnlegen = o.op === 'kontakt';
+      const n = neuAnlegen ? undefined : ziel('kontakt');
+      if (!neuAnlegen && !n) return false;
+      const felder = kontaktFelder(o);
+      if (neuAnlegen) {
+        const d = kontaktDaten(felder);
+        if (!d.name && !d.firma && !d.telefone.length && !d.emails.length) return false;
+        const node = makeKontakt(u.place(220), d);
+        st.addNode(node); u.linkFrom(o, node.id);
+        return true;
+      }
+      if (Object.keys(felder).length === 0) return false;
+      st.updateNodeData(n!.id, felder);
       return true;
     }
 

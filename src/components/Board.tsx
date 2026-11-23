@@ -1,6 +1,6 @@
 import { fokusAnsicht, fokusAnsichtMarkieren, fokusStufeLoesen, fokusZoomFuer, FOKUS_ANSICHT_EREIGNIS, FOKUS_ZOOM_EREIGNIS } from '../lib/fokusAnsicht';
 import { overlayOffen } from '../lib/overlay';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background,
   BackgroundVariant,
@@ -35,20 +35,8 @@ import { ImageCard } from './nodes/ImageCard';
 import { boardZoomMelden } from '../lib/boardZoom';
 import { bedienMass, BOARD_ZOOM_MAX, BOARD_ZOOM_MIN, radAnteil, radSchritt } from '../lib/radZoom';
 import { FileCard } from './nodes/FileCard';
-import { KanbanCard } from './nodes/KanbanCard';
 import { PortalCard } from './nodes/PortalCard';
-import { ShapeCard } from './nodes/ShapeCard';
-import { MermaidCard } from './nodes/MermaidCard';
-import { GanttCard } from './nodes/GanttCard';
-import { CalendarCard } from './nodes/CalendarCard';
 import { FrameCard } from './nodes/FrameCard';
-import { WeekCard } from './nodes/WeekCard';
-import { SheetCard } from './nodes/SheetCard';
-import { MinutesCard } from './nodes/MinutesCard';
-import { TimeCard } from './nodes/TimeCard';
-import { HtmlAppCard } from './nodes/HtmlAppCard';
-import { BubblesCard } from './nodes/BubblesCard';
-import { KontaktCard } from './nodes/KontaktCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { focusable } from './FocusSheet';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -93,25 +81,61 @@ const guard = <P extends object>(C: React.ComponentType<P>): React.ComponentType
   return Guarded;
 };
 
+/**
+ * M446: Seltenere Kartentypen kommen erst, wenn eine solche Karte auf dem Board liegt (oder angelegt wird) —
+ * Kanban, Gantt, Kalender, Tabelle, Diagramm & Co. gehören nicht in den Start. Notiz, E-Mail, Bild, Datei,
+ * Rahmen und Portal bleiben fest dabei: Sie sind auf fast jedem Board und sollen ohne Verzug stehen.
+ * Bis der Teil da ist (lokal wenige Millisekunden), steht an der Stelle eine leere Fläche in Kartengröße —
+ * kein Spinner, kein Text, damit nichts flackert. `kartenVorladen()` holt alle Teile kurz nach dem Start im
+ * Leerlauf nach, damit das Anlegen später ohne Wartezeit geht und der Service Worker sie auch offline hat.
+ */
+const KARTEN_LADER = {
+  kanban: () => import('./nodes/KanbanCard').then((m) => m.KanbanCard),
+  shape: () => import('./nodes/ShapeCard').then((m) => m.ShapeCard),
+  mermaid: () => import('./nodes/MermaidCard').then((m) => m.MermaidCard),
+  gantt: () => import('./nodes/GanttCard').then((m) => m.GanttCard),
+  calendar: () => import('./nodes/CalendarCard').then((m) => m.CalendarCard),
+  week: () => import('./nodes/WeekCard').then((m) => m.WeekCard),
+  sheet: () => import('./nodes/SheetCard').then((m) => m.SheetCard),
+  minutes: () => import('./nodes/MinutesCard').then((m) => m.MinutesCard),
+  time: () => import('./nodes/TimeCard').then((m) => m.TimeCard),
+  htmlapp: () => import('./nodes/HtmlAppCard').then((m) => m.HtmlAppCard),
+  bubbles: () => import('./nodes/BubblesCard').then((m) => m.BubblesCard),
+  kontakt: () => import('./nodes/KontaktCard').then((m) => m.KontaktCard),
+} satisfies Record<string, () => Promise<React.ComponentType<any>>>;
+
+const spaet = (laden: () => Promise<React.ComponentType<any>>): React.ComponentType<any> => {
+  const Teil = lazy(() => laden().then((C) => ({ default: C })));
+  const Spaet = (props: object) => (
+    <Suspense fallback={<div className="karte-laedt" aria-hidden="true" />}><Teil {...props} /></Suspense>
+  );
+  return Spaet;
+};
+
+/** M446: alle nachgeladenen Kartentypen holen (im Leerlauf nach dem Start, siehe App.tsx) */
+export function kartenVorladen(): Promise<unknown> {
+  return Promise.all(Object.values(KARTEN_LADER).map((l) => l().catch(() => null)));
+}
+
 const nodeTypes: NodeTypes = {
   note: guard(NoteCard),
   email: guard(EmailCard),
   image: guard(ImageCard),
   file: guard(FileCard),
-  kanban: guard(KanbanCard),
+  kanban: guard(spaet(KARTEN_LADER.kanban)),
   portal: guard(PortalCard),
-  shape: guard(ShapeCard),
-  mermaid: guard(MermaidCard),
-  gantt: guard(GanttCard),
-  calendar: guard(CalendarCard),
+  shape: guard(spaet(KARTEN_LADER.shape)),
+  mermaid: guard(spaet(KARTEN_LADER.mermaid)),
+  gantt: guard(spaet(KARTEN_LADER.gantt)),
+  calendar: guard(spaet(KARTEN_LADER.calendar)),
   frame: guard(FrameCard),
-  week: guard(WeekCard),
-  sheet: guard(SheetCard),
-  minutes: guard(MinutesCard),
-  time: guard(TimeCard),
-  htmlapp: guard(HtmlAppCard),
-  bubbles: guard(BubblesCard),
-  kontakt: guard(KontaktCard),
+  week: guard(spaet(KARTEN_LADER.week)),
+  sheet: guard(spaet(KARTEN_LADER.sheet)),
+  minutes: guard(spaet(KARTEN_LADER.minutes)),
+  time: guard(spaet(KARTEN_LADER.time)),
+  htmlapp: guard(spaet(KARTEN_LADER.htmlapp)),
+  bubbles: guard(spaet(KARTEN_LADER.bubbles)),
+  kontakt: guard(spaet(KARTEN_LADER.kontakt)),
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
