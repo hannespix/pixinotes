@@ -1,0 +1,23 @@
+{
+  "name": { "message": "An PixiNotes senden" },
+  "beschreibung": { "message": "Markierten Text, die Seite, ein Bild oder ein Bildschirmfoto als Karte an PixiNotes schicken – ohne Server, direkt in den geöffneten Tab." },
+  "knopf": { "message": "Diese Seite an PixiNotes senden (Rechtsklick: sichtbaren Bereich als Bild)" },
+  "menueAuswahl": { "message": "Auswahl an PixiNotes senden" },
+  "menueSeite": { "message": "Seite an PixiNotes senden" },
+  "menueLink": { "message": "Link an PixiNotes senden" },
+  "menueBild": { "message": "Bild an PixiNotes senden" },
+  "menueBildschirm": { "message": "Sichtbaren Bereich als Bild an PixiNotes senden" },
+  "bildNichtLadbar": { "message": "Das Bild ließ sich nicht laden – hier ist seine Adresse." },
+  "fehlerKeineBerechtigung": { "message": "Für diese PixiNotes-Adresse fehlt die Berechtigung. Bilder kommen nur mit Berechtigung an – bitte in den Optionen erneut speichern." },
+  "fehlerNichtAngekommen": { "message": "PixiNotes hat die Sendung nicht angenommen. Ist die Adresse in den Optionen richtig?" },
+  "optTitel": { "message": "An PixiNotes senden – Optionen" },
+  "optAdresse": { "message": "Adresse von PixiNotes" },
+  "optAdresseHinweis": { "message": "Vorgabe: die Web-App auf GitHub Pages. Eine eigene Adresse (z. B. selbst betrieben) braucht einmal deine Zustimmung." },
+  "optDirekt": { "message": "Ohne Rückfrage auf das geöffnete Board legen" },
+  "optDirektHinweis": { "message": "Sonst fragt PixiNotes jedes Mal, auf welches Board es soll." },
+  "optSpeichern": { "message": "Speichern" },
+  "optGespeichert": { "message": "Gespeichert." },
+  "optUngueltig": { "message": "Bitte eine Adresse mit http:// oder https:// eingeben." },
+  "optAbgelehnt": { "message": "Gespeichert, aber ohne Berechtigung: Text und Links kommen an, Bilder nicht." },
+  "optDatenschutz": { "message": "Die Erweiterung sendet nichts ins Netz: Das Gesendete geht nur an den PixiNotes-Tab in diesem Browser. Kein Tracking." }
+}

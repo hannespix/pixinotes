@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-text="optTitel">An PixiNotes senden</title>
+  <style>
+    /* M458: schlicht wie die App – flach, eine Schrift, kein Schmuck */
+    :root { color-scheme: light dark; --rand: #d6d8dc; --leise: #5f6368; }
+    body { font: 14px/1.5 system-ui, sans-serif; margin: 16px; min-width: 340px; max-width: 520px; }
+    label { display: block; font-weight: 600; margin-top: 14px; }
+    input[type="url"] { box-sizing: border-box; width: 100%; padding: 7px 9px; margin-top: 4px; border: 1px solid var(--rand); border-radius: 6px; font: inherit; }
+    .wahl { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+    .hinweis { color: var(--leise); font-size: 13px; margin: 4px 0 0; }
+    button { margin-top: 16px; padding: 7px 16px; border: 0; border-radius: 6px; background: #1b1e24; color: #fff; font: inherit; cursor: pointer; }
+    #status { margin-left: 10px; }
+    @media (prefers-color-scheme: dark) { :root { --rand: #4a4d52; --leise: #a0a4aa; } button { background: #e8eaed; color: #1b1e24; } }
+  </style>
+</head>
+<body>
+  <label for="adresse" data-text="optAdresse">Adresse von PixiNotes</label>
+  <input id="adresse" type="url" spellcheck="false" autocomplete="off">
+  <p class="hinweis" data-text="optAdresseHinweis"></p>
+
+  <label class="wahl"><input id="direkt" type="checkbox"> <span data-text="optDirekt">Ohne Rückfrage</span></label>
+  <p class="hinweis" data-text="optDirektHinweis"></p>
+
+  <button id="speichern" data-text="optSpeichern">Speichern</button><span id="status" role="status"></span>
+  <p class="hinweis" data-text="optDatenschutz"></p>
+  <script src="optionen.js"></script>
+</body>
+</html>
