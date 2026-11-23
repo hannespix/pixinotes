@@ -100,6 +100,7 @@ Chromium: `/opt/pw-browsers/chromium` (sonst `PW_CHROMIUM=…`).
 - Neue Bedien-Elemente in Karten in die drei Listen des Blocks „Bedienung nur
   im Fokus" am Ende von `index.css` eintragen (M421).
 - Neue Tastenkürzel nur hinter `overlayOffen()` (`lib/overlay.ts`).
+- Zähl-Texte über `zahlWort(n, 'Karte', 'Karten')` in `lib/sprache.ts` — nie `${n} Karten` oder „Karte(n)" (M461).
 - Daten von außen (Links, Dateien, Sync, Live-Kanal) laufen durch
   `lib/sicher.ts`.
 - Schweres nachladen (`import()`), nicht in den Start-Bundle ziehen (M321).

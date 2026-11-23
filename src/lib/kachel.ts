@@ -12,6 +12,7 @@
  */
 import { doneCol, kanbanCols, type AppNode, type GanttData, type KanbanData, type MinutesData, type WeekData } from '../types';
 import { formatDueShort, urgencyFor } from './tasks';
+import { zahlWort } from './sprache';
 
 export interface KachelZeile { text: string; warn?: boolean }
 export interface KachelInfo { typ: string; titel: string; zeilen: KachelZeile[] }
@@ -66,7 +67,7 @@ export function kachelInfo(node: AppNode): KachelInfo | null {
       const w = node.data as WeekData;
       const e = Array.isArray(w.entries) ? w.entries : [];
       const spalten = w.cols?.length ?? w.days ?? 5;
-      const zeilen: KachelZeile[] = [{ text: `${e.length} Bl${e.length === 1 ? 'ock' : 'öcke'} in ${spalten} Spalten` }];
+      const zeilen: KachelZeile[] = [{ text: `${zahlWort(e.length, 'Block', 'Blöcke')} in ${zahlWort(spalten, 'Spalte', 'Spalten')}` }];
       if (!w.cols) {
         const heuteIdx = (new Date().getDay() + 6) % 7;
         const heute = e.filter((x) => x.day === heuteIdx).sort((a, b) => a.start - b.start);

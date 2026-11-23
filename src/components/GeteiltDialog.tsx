@@ -6,6 +6,7 @@ import { makeNote } from '../lib/nodes';
 import { notizBildHochladen } from '../lib/notizBild';
 import { nodeToText } from '../lib/serialize';
 import { IX, IFileText } from './Icons';
+import { zahlWort } from '../lib/sprache';
 
 /**
  * M290: „Teilen mit … PixiNotes" (Android).
@@ -109,7 +110,7 @@ export function GeteiltDialog() {
       gesetzt++;
     }
     showToast(gesetzt > 0
-      ? `Geteiltes übernommen – ${gesetzt} Karte(n) auf „${boards.find((b) => b.id === zielBoard)?.name}".`
+      ? `Geteiltes übernommen – ${zahlWort(gesetzt, 'Karte', 'Karten')} auf „${boards.find((b) => b.id === zielBoard)?.name}".`
       : 'Es war nichts Übernehmbares dabei.');
   };
 
@@ -139,7 +140,7 @@ export function GeteiltDialog() {
        auf demselben Board (dieselbe Regel wie beim Ablegen, M289). */
     if (abgelehnt.length) {
       await importFilesToBoard(dateien.filter((d) => abgelehnt.includes(d.name)), platz(zielBoard));
-      showToast(`${bilder} Bild(er) in die Notiz, ${abgelehnt.length} Datei(en) als Karte aufs Board.`);
+      showToast(`${zahlWort(bilder, 'Bild', 'Bilder')} in die Notiz, ${zahlWort(abgelehnt.length, 'Datei', 'Dateien')} als Karte aufs Board.`);
     } else {
       showToast(`Geteiltes in die Notiz „${(nodeToText(notiz).split('\n')[0] || 'Notiz').slice(0, 30)}" übernommen.`);
     }

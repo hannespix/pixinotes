@@ -22,7 +22,7 @@ import { istAmText } from './lib/notizText';
 import { offeneSeite, seiteVon, strichRelativ } from './lib/pdfSeiten';
 import { findFreeSpot, frameMembers, sizeOf } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
-import { t } from './lib/sprache';
+import { t, zahlWort } from './lib/sprache';
 import { fristAnkerPflegen, type FristAnker } from './lib/fristAnker';
 import { frisch, nachPatch } from './lib/kartenZeit';
 import { blocksToText } from './lib/serialize';
@@ -1531,10 +1531,10 @@ export const useBoard = create<BoardState>()(
           const n = weg.length;
           if (bleiben.length) {
             meldung = art === 'bereich'
-              ? t(`Bereich „${name}" mit ${n} Board(s) gelöscht – geteilte Boards anderer bleiben.`)
-              : t(`Projekt „${name}" mit ${n} Board(s) gelöscht – geteilte Boards anderer bleiben.`);
+              ? t(`Bereich „${name}" mit ${zahlWort(n, 'Board', 'Boards')} gelöscht – geteilte Boards anderer bleiben.`)
+              : t(`Projekt „${name}" mit ${zahlWort(n, 'Board', 'Boards')} gelöscht – geteilte Boards anderer bleiben.`);
           } else {
-            meldung = art === 'bereich' ? t(`Bereich „${name}" mit ${n} Board(s) gelöscht.`) : t(`Projekt „${name}" mit ${n} Board(s) gelöscht.`);
+            meldung = art === 'bereich' ? t(`Bereich „${name}" mit ${zahlWort(n, 'Board', 'Boards')} gelöscht.`) : t(`Projekt „${name}" mit ${zahlWort(n, 'Board', 'Boards')} gelöscht.`);
           }
         }
         ebenenUndo = { art, bereich, bereichIndex, projekt, projektIndex, boards: weg, activeId: s0.activeId, neuesBoard, neuesProjekt };
@@ -2750,7 +2750,7 @@ export const useBoard = create<BoardState>()(
               }
               : sp)),
           });
-          get().showToast(`Projekt „${projekt.name}" mit ${ids.length} Board(s) kopiert.`);
+          get().showToast(`Projekt „${projekt.name}" mit ${zahlWort(ids.length, 'Board', 'Boards')} kopiert.`);
         },
 
         archiveBoard: (boardId, an = true) => {

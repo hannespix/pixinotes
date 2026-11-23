@@ -23,7 +23,7 @@ const uf = new uFuzzy({
 });
 
 import type { AppNode } from '../types';
-import { t } from '../lib/sprache';
+import { t, zahlWort } from '../lib/sprache';
 
 import { INetz } from './Icons';
 import { KartenSymbol } from './KartenSymbol';
@@ -382,7 +382,7 @@ export function SearchOverlay() {
                   >
                     <span className="hit-main">
                       <span className="hit-title" translate="no">{b.name}</span>
-                      <span className="hit-snippet">{b.nodes.length} Karten · Board öffnen</span>
+                      <span className="hit-snippet">{`${zahlWort(b.nodes.length, 'Karte', 'Karten')} · Board öffnen`}</span>
                     </span>
                   </button>
                 ))}
