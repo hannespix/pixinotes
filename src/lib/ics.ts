@@ -1,8 +1,9 @@
 // iCalendar (.ics): das Austauschformat, das Outlook, Google und Apple
 // gleichermaßen sprechen. Hier: schlanker Parser für VEVENTs (Ganztages-
 // und Datetime-Termine, mehrtägig) + Export sichtbarer Einträge.
-// Bewusst ohne RRULE-Auflösung (Serientermine erscheinen am Starttag).
+// M473: Serientermine (RRULE, EXDATE, RECURRENCE-ID) und Zeitzonen (TZID) — Auflösung in lib/icsSerie.ts.
 import { triggerDownload } from './download';
+import { ereignisAus, msZuWand, ortsZeitAus, wandZuMs, zoneAus, type IcsSerie, type OrtsZeit } from './icsSerie';
 
 export interface IcsEvent {
   title: string;
@@ -29,85 +30,157 @@ export interface IcsEvent {
   note?: string;
   /** M471: Kennung aus dem Kalender (UID) — nur beim Import gesetzt */
   uid?: string;
+  /** M473: Serientermin — `start`/`startTime` nennen den ersten Termin, angezeigt wird über icsImFenster() */
+  serie?: IcsSerie;
 }
 
-function icsDate(val: string): { iso: string; dateOnly: boolean; mitternacht?: boolean; zeit?: string } | null {
+/** M473: eine Zeitangabe roh — Wandzeit in ihrer Zone („UTC" bei …Z, leer = floating) */
+interface IcsRoh { wand: string; tz?: string; nurTag: boolean }
+
+/** M473: Wert eines Parameters („DTSTART;TZID="W. Europe Standard Time";VALUE=…") */
+const parameter = (key: string, name: string): string | undefined =>
+  key.match(new RegExp(`;${name}=("[^"]*"|[^;]*)`, 'i'))?.[1]?.replace(/^"|"$/g, '');
+
+function icsZeit(key: string, val: string): IcsRoh | null {
   const m = val.trim().match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?/);
   if (!m) return null;
-  if (m[4] === undefined) return { iso: `${m[1]}-${m[2]}-${m[3]}`, dateOnly: true };
-  // M388: Zeitangaben in Weltzeit (…Z) gelten am hiesigen Tag — 23:30 Z im Sommer ist hier schon der nächste
-  if (m[7]) {
-    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]));
-    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const zeit = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    return { iso, dateOnly: false, mitternacht: d.getHours() === 0 && d.getMinutes() === 0, zeit };
-  }
-  // Ohne Z (auch mit TZID): Wandzeit, wie sie dasteht
-  return { iso: `${m[1]}-${m[2]}-${m[3]}`, dateOnly: false, mitternacht: m[4] === '00' && m[5] === '00', zeit: `${m[4]}:${m[5]}` };
+  if (m[4] === undefined) return { wand: `${m[1]}-${m[2]}-${m[3]}`, nurTag: true };
+  // M388: Weltzeit (…Z) gilt am hiesigen Tag. M473: … und eine TZID wird ebenso in die Ortszeit gerechnet
+  // (09:00 New York steht hier um 15:00); unbekannte Zonen bleiben Wandzeit wie bisher.
+  const tz = m[7] ? 'UTC' : zoneAus(parameter(key, 'TZID'));
+  return { wand: `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`, tz, nurTag: false };
 }
 
-/** M471: Text eines Feldes nach RFC 5545 entschlüsseln (\\, \, \; \n) */
+/** Roh → Ortszeit des Geräts */
+function ortsZeit(r: IcsRoh): OrtsZeit {
+  if (r.nurTag) return { tag: r.wand, nurTag: true, mitternacht: false };
+  if (!r.tz) return { tag: r.wand.slice(0, 10), zeit: r.wand.slice(11, 16), nurTag: false, mitternacht: r.wand.slice(11, 16) === '00:00' };
+  return ortsZeitAus(wandZuMs(r.wand, r.tz));
+}
+
+/** M473: Roh-Zeit als Schlüssel in der Zone einer Serie (für den Vergleich mit EXDATE/RECURRENCE-ID) */
+function inSerienZone(r: IcsRoh, serie: { tz?: string; ganztag: boolean }): string {
+  if (r.nurTag || serie.ganztag) return r.wand.slice(0, 10);
+  if (r.tz === serie.tz) return r.wand;
+  return msZuWand(wandZuMs(r.wand, r.tz), serie.tz);
+}
+
+/** M473: DURATION (P1D, PT1H30M, P1W) → Minuten */
+function dauerMinuten(val: string): number | undefined {
+  const m = val.trim().match(/^\+?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/i);
+  if (!m) return undefined;
+  return (+(m[1] ?? 0)) * 10080 + (+(m[2] ?? 0)) * 1440 + (+(m[3] ?? 0)) * 60 + (+(m[4] ?? 0)) + Math.round(+(m[5] ?? 0) / 60);
+}
+
+/** M471: Text eines Feldes nach RFC 5545 entschlüsseln (\\, \, \; \n) — in EINEM Durchgang, sonst frisst \\ das Folgezeichen (Audit R6-F9) */
 const icsText = (val: string, hoechstens: number): string => val
   .replace(/\\([\\,;nN])/g, (_, c: string) => (c === 'n' || c === 'N' ? ' ' : c))
   .trim().slice(0, hoechstens);
+
+/** M473: Zeile am ersten Doppelpunkt AUSSERHALB von Anführungszeichen teilen (TZID="(UTC+01:00) Amsterdam, …") */
+function teile(line: string): [string, string] | null {
+  let inQ = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const c = line[i];
+    if (c === '"') inQ = !inQ;
+    else if (c === ':' && !inQ) return [line.slice(0, i), line.slice(i + 1)];
+  }
+  return null;
+}
+
+const istFeld = (key: string, name: string) => key.toUpperCase() === name || key.toUpperCase().startsWith(`${name};`);
+
+const tagDiff = (a: string, b: string) => Math.round((Date.UTC(+b.slice(0, 4), +b.slice(5, 7) - 1, +b.slice(8, 10))
+  - Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1, +a.slice(8, 10))) / 864e5);
 
 const shiftDay = (iso: string, n: number): string =>
   new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) + n * 864e5)
     .toISOString().slice(0, 10);
 
-/** VEVENTs aus einem .ics-Text ziehen (Zeilen-Entfaltung nach RFC 5545) */
+/**
+ * VEVENTs aus einem .ics-Text ziehen (Zeilen-Entfaltung nach RFC 5545).
+ * M473: Zeiten mit TZID in Ortszeit; Serien (RRULE, EXDATE) bekommen `serie`, die erst beim Anzeigen für das
+ * sichtbare Fenster aufgelöst wird (lib/icsSerie.ts); verschobene Einzeltermine (RECURRENCE-ID) stehen als eigener
+ * Termin und fallen aus ihrer Serie, abgesagte (STATUS:CANCELLED) entfallen ganz.
+ */
 export function parseIcs(text: string): IcsEvent[] {
   const lines = text.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '').replace(/\r/g, '').split('\n');
   const out: IcsEvent[] = [];
+  const ersetzt: Array<{ uid: string; roh: IcsRoh }> = [];
   let cur: {
-    title?: string; start?: string; end?: string; endDateOnly?: boolean; endMitternacht?: boolean;
-    startZeit?: string; startMitternacht?: boolean; endZeit?: string; place?: string; uid?: string;
+    title?: string; start?: IcsRoh; end?: IcsRoh; dauer?: number; place?: string; uid?: string;
+    rrule?: string; exdate?: IcsRoh[]; recurrenceId?: IcsRoh; abgesagt?: boolean;
   } | null = null;
   for (const line of lines) {
     if (line.startsWith('BEGIN:VEVENT')) { cur = {}; continue; }
     if (line.startsWith('END:VEVENT')) {
-      if (cur?.title && cur.start) {
-        let end = cur.end;
-        // Ganztages-DTEND ist per RFC exklusiv → letzter Tag = end - 1
-        // M388: … und ein Ende um Punkt 0 Uhr ebenso (Outlook schreibt Ganztägiges so; ein Abendtermin bis
-        // Mitternacht belegte sonst auch den nächsten Tag)
-        if (end && (cur.endDateOnly || cur.endMitternacht)) end = shiftDay(end, -1);
-        if (end && end <= cur.start) end = undefined;
-        const ev: IcsEvent = { title: cur.title, start: cur.start, end };
-        // M471: Uhrzeit nur bei echten Zeitterminen — 0 Uhr bis 0 Uhr (Outlooks Ganztägiges) bleibt ohne
-        if (cur.startZeit && !(cur.startMitternacht && (cur.endMitternacht || !cur.endZeit))) {
-          ev.startTime = cur.startZeit;
-          if (cur.endZeit && !cur.endDateOnly) ev.endTime = cur.endZeit;
-        }
+      if (cur?.uid && cur.recurrenceId) ersetzt.push({ uid: cur.uid, roh: cur.recurrenceId });
+      if (cur?.title && cur.start && !(cur.recurrenceId && cur.abgesagt)) {
+        const b = ortsZeit(cur.start);
+        let e = cur.end ? ortsZeit(cur.end) : undefined;
+        if (!e && cur.dauer && !cur.start.nurTag) e = ortsZeitAus(wandZuMs(cur.start.wand, cur.start.tz) + cur.dauer * 60000);
+        // M388/M471: Ganztages-Ende und Ende um 0 Uhr exklusiv, 0 bis 0 Uhr bleibt ganztägig (ereignisAus)
+        const ev = ereignisAus({ title: cur.title }, b, e);
         if (cur.place) ev.place = cur.place;
         if (cur.uid) ev.uid = cur.uid;
+        if (cur.rrule && !cur.recurrenceId) {
+          const ganztag = cur.start.nurTag;
+          const tz = ganztag ? undefined : cur.start.tz;
+          let dauer = 0;
+          if (cur.end) {
+            dauer = ganztag ? tagDiff(cur.start.wand, cur.end.wand)
+              : Math.round((wandZuMs(cur.end.wand, cur.end.tz) - wandZuMs(cur.start.wand, cur.start.tz)) / 60000);
+          } else if (cur.dauer) dauer = ganztag ? Math.round(cur.dauer / 1440) : cur.dauer;
+          const serie: IcsSerie = { rrule: cur.rrule, beginn: cur.start.wand, dauer: Math.max(0, dauer) };
+          if (tz) serie.tz = tz;
+          const aus = (cur.exdate ?? []).map((x) => inSerienZone(x, { tz, ganztag }));
+          if (aus.length) serie.aus = [...new Set(aus)].slice(0, 500);
+          ev.serie = serie;
+        }
         out.push(ev);
       }
       cur = null;
       continue;
     }
     if (!cur) continue;
-    const idx = line.indexOf(':');
-    if (idx < 0) continue;
-    const key = line.slice(0, idx);
-    const val = line.slice(idx + 1);
-    if (key === 'SUMMARY' || key.startsWith('SUMMARY;')) {
-      // RFC-5545-Escapes in EINEM Durchgang — \\ gehört dazu, sonst frisst
-      // es das Folgezeichen (Audit R6-F9)
-      cur.title = val
-        .replace(/\\([\\,;nN])/g, (_, c: string) => (c === 'n' || c === 'N' ? ' ' : c))
-        .trim().slice(0, 120);
-    } else if (key === 'DTSTART' || key.startsWith('DTSTART;')) {
-      const d = icsDate(val);
-      if (d) { cur.start = d.iso; cur.startZeit = d.zeit; cur.startMitternacht = !!d.mitternacht; }
-    } else if (key === 'DTEND' || key.startsWith('DTEND;')) {
-      const d = icsDate(val);
-      if (d) { cur.end = d.iso; cur.endDateOnly = d.dateOnly; cur.endMitternacht = !!d.mitternacht; cur.endZeit = d.zeit; }
-    } else if (key === 'LOCATION' || key.startsWith('LOCATION;')) {
+    const kv = teile(line);
+    if (!kv) continue;
+    const [key, val] = kv;
+    if (istFeld(key, 'SUMMARY')) {
+      cur.title = icsText(val, 120);
+    } else if (istFeld(key, 'DTSTART')) {
+      const d = icsZeit(key, val);
+      if (d) cur.start = d;
+    } else if (istFeld(key, 'DTEND')) {
+      const d = icsZeit(key, val);
+      if (d) cur.end = d;
+    } else if (istFeld(key, 'DURATION')) {
+      cur.dauer = dauerMinuten(val);
+    } else if (istFeld(key, 'RRULE')) {
+      if (val.trim()) cur.rrule = val.trim().slice(0, 500);
+    } else if (istFeld(key, 'EXDATE')) {
+      for (const teil of val.split(',')) {
+        const d = icsZeit(key, teil);
+        if (d) (cur.exdate ??= []).push(d);
+      }
+    } else if (istFeld(key, 'RECURRENCE-ID')) {
+      const d = icsZeit(key, val);
+      if (d) cur.recurrenceId = d;
+    } else if (istFeld(key, 'STATUS')) {
+      cur.abgesagt = /^cancelled$/i.test(val.trim());
+    } else if (istFeld(key, 'LOCATION')) {
       const ort = icsText(val, 200);
       if (ort) cur.place = ort;
-    } else if (key === 'UID') {
+    } else if (key.toUpperCase() === 'UID') {
       if (val.trim()) cur.uid = val.trim().slice(0, 300);
+    }
+  }
+  // M473: Ersetzte Termine fallen aus ihrer Serie — der Ersatz steht als eigener Termin da (abgesagte gar nicht)
+  for (const { uid, roh } of ersetzt) {
+    for (const ev of out) {
+      if (ev.uid !== uid || !ev.serie) continue;
+      const k = inSerienZone(roh, { tz: ev.serie.tz, ganztag: !ev.serie.beginn.includes('T') });
+      ev.serie.aus = [...new Set([...(ev.serie.aus ?? []), k])].slice(0, 500);
     }
   }
   return out.slice(0, 500);
@@ -117,17 +190,26 @@ export function parseIcs(text: string): IcsEvent[] {
  * Termin-Duplikate (gleicher Titel + Starttag) zusammenführen.
  * M471: Ein schon vorhandener Eintrag ohne Uhrzeit (Import vor M471) übernimmt Uhrzeit, Ort und UID des neuen —
  * so bekommen bestehende Abos beim nächsten „Abos aktualisieren" ihre Uhrzeiten.
+ * M473: Der neue Stand gewinnt ganz (Serie, umgerechnete Zeitzone, Ausnahmen), und ältere Einträge mit derselben
+ * UID, die der neue Stand nicht mehr enthält (verschobener Einzeltermin, Tag vor der Zonen-Umrechnung), entfallen.
  */
 export function mergeEvents(existing: IcsEvent[], incoming: IcsEvent[]): IcsEvent[] {
-  const neu = new Map(incoming.map((e) => [`${e.title}|${e.start}`, e]));
+  const schluessel = (e: IcsEvent) => `${e.title}|${e.start}`;
+  const neu = new Map(incoming.map((e) => [schluessel(e), e]));
+  const uids = new Set(incoming.map((e) => e.uid).filter(Boolean));
   const seen = new Set<string>();
-  const alt = existing.map((e) => {
-    const k = `${e.title}|${e.start}`;
-    seen.add(k);
+  const alt: IcsEvent[] = [];
+  for (const e of existing) {
+    const k = schluessel(e);
     const n = neu.get(k);
-    return n && !e.startTime && !e.place && !e.uid && (n.startTime || n.place || n.uid) ? { ...e, ...n } : e;
-  });
-  const fresh = incoming.filter((e) => !seen.has(`${e.title}|${e.start}`));
+    if (!n && e.uid && uids.has(e.uid)) continue;
+    seen.add(k);
+    if (!n) { alt.push(e); continue; }
+    const zus: IcsEvent = { ...e, ...n };
+    for (const f of ['serie', 'startTime', 'endTime', 'end'] as const) if (n[f] === undefined) delete zus[f];
+    alt.push(zus);
+  }
+  const fresh = incoming.filter((e) => !seen.has(schluessel(e)));
   return [...alt, ...fresh].slice(-800);
 }
 

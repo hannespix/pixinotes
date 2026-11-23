@@ -31,7 +31,7 @@ import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
 import { Tastatur } from './components/Tastatur';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
-import { kontoKennung, termineHintergrund, termineZuErinnern } from './lib/termineZentrale';
+import { kontoKennung, serienAusstehend, termineHintergrund, termineZuErinnern } from './lib/termineZentrale';
 import { fristenAusstehend, fristenLaden } from './lib/dates';
 import { rufnummernLaden } from './lib/rufnummer';
 import { autoArchivAlleBoards } from './lib/ticketArchiv';
@@ -394,6 +394,9 @@ export default function App() {
       // M459: Die Fristen-Erkennung wurde eben erst angestoßen — mit ihr zählen, sonst fehlten die fälligen
       const ausstehend = fristenAusstehend();
       if (ausstehend) { void ausstehend.then(remind, () => {}); return; }
+      // M473: Serientermine aus ICS-Abos — die Auflösung lädt nach, bevor erinnert wird
+      const serienFehlen = serienAusstehend(useBoard.getState().boards);
+      if (serienFehlen) { void serienFehlen.then(remind, () => {}); return; }
       const hits = dueTasksToRemind(aufgaben);
       if (hits.length === 1) {
         showToast(`Fällig: „${hits[0].text}" (${hits[0].boardName}) – Details in der Aufgaben-Zentrale`);

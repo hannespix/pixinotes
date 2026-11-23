@@ -8,7 +8,7 @@
 // Der Klick öffnet den einzelnen Termin in der Kalender-Karte (lib/terminMarke.ts).
 import { useEffect, useState } from 'react';
 import { mutedHistory, useBoard } from '../store';
-import { fetchAccountEvents, TERMINE_EREIGNIS } from '../lib/calAccounts';
+import { fetchAccountEvents, kontoHinweise, TERMINE_EREIGNIS } from '../lib/calAccounts';
 import { kontoKennung, kontoVerbunden, setTerminErinnerung, TERMIN_VORLAUF_MIN, terminErinnerungAn, termineHeuteMorgen, terminZeit, type ZentralTermin } from '../lib/termineZentrale';
 import { setTerminMarke } from '../lib/terminMarke';
 import { makeCalendar } from '../lib/nodes';
@@ -54,6 +54,8 @@ export function TermineAbschnitt({ aufgaben, offen, schliessen }: {
   }, [offen]);
 
   const t = termineHeuteMorgen(aufgaben, new Date(), boards);
+  // M473: Konten, deren Anmeldung der Hintergrund-Abruf nicht erneuern konnte
+  const hinweise = verbunden ? kontoHinweise() : [];
   const anzahl = t.heute.length + t.morgen.length;
   // M471: Ohne Konto erscheint der Abschnitt nur, wenn Kalender-Karten heute/morgen etwas haben
   if (!verbunden && anzahl === 0) return null;
@@ -86,6 +88,17 @@ export function TermineAbschnitt({ aufgaben, offen, schliessen }: {
     schliessen();
     st.focusNode(st.activeId, karte.id);
     st.showToast('Kalender-Karte angelegt – dort stehen die Termine deiner Konten.');
+  };
+
+  /** M473: Mit Klick (Nutzer-Geste) darf Google das Anmeldefenster öffnen — der Hintergrund darf das nicht */
+  const erneuern = () => {
+    const heute = new Date();
+    setLaedt(true);
+    setFehler('');
+    fetchAccountEvents(heute, new Date(heute.getFullYear(), heute.getMonth(), heute.getDate() + 1), true)
+      .then(({ errors }) => setFehler(errors.join(' · ')))
+      .catch((e: Error) => setFehler(e.message))
+      .finally(() => setLaedt(false));
   };
 
   const datum = (iso: string) => new Date(`${iso}T12:00:00`)
@@ -136,6 +149,12 @@ export function TermineAbschnitt({ aufgaben, offen, schliessen }: {
         </>
       )}
       {anzahl > 0 && t.abgedeckt && fehler && <div className="th-termine-leer">Nicht alle Konten erreichbar: {fehler}</div>}
+      {hinweise.length > 0 && (
+        <div className="th-termine-leer th-termine-hinweis" role="status">
+          <span>{hinweise.map((k) => (k === 'google' ? 'Google' : 'Outlook')).join(' · ')}: Anmeldung abgelaufen – die Termine sind womöglich nicht aktuell.</span>
+          <button className="th-termine-erneuern" disabled={laedt} onClick={erneuern}>Erneut anmelden</button>
+        </div>
+      )}
     </section>
   );
 }
