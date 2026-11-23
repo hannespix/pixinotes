@@ -72,6 +72,20 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
       // Tab nur, wenn schon eine Karte gewählt ist oder den Fokus hat — sonst führt Tab wie gewohnt zu den Knöpfen
       const tab = e.key === 'Tab' && !strg && !e.altKey && aufFlaeche && !imText && (gewaehlt.length > 0 || !!t?.classList?.contains('react-flow__node'));
       if ((altPfeil || tab) && !st.focusCard && sichtbar.length) {
+        // M447: Tab an der letzten Karte (Umschalt+Tab an der ersten) verlässt die Fläche zum nächsten Bedienelement
+        // (Auswahl-Leiste, Dock) — vorher kreiste der Fokus ohne Ausweg nur durch die Karten (WCAG 2.1.2).
+        if (tab && gewaehlt.length) {
+          const reihe = lesefolge(sichtbar);
+          const i0 = reihe.findIndex((n) => n.id === gewaehlt[0].id);
+          if (i0 >= 0 && (e.shiftKey ? i0 === 0 : i0 === reihe.length - 1)) {
+            const anker = document.querySelector('.react-flow__viewport');
+            const ziele = anker ? [...document.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+              .filter((el) => el.tabIndex >= 0 && el.getClientRects().length > 0 && !anker.contains(el) && !el.closest('[aria-hidden="true"]')
+                && !!(anker.compareDocumentPosition(el) & (e.shiftKey ? Node.DOCUMENT_POSITION_PRECEDING : Node.DOCUMENT_POSITION_FOLLOWING))) : [];
+            const ziel = e.shiftKey ? ziele[ziele.length - 1] : ziele[0];
+            if (ziel) return tun(() => ziel.focus());
+          }
+        }
         return tun(() => {
           const folge = lesefolge(sichtbar);
           const zurueck = altPfeil ? e.key === 'ArrowUp' : e.shiftKey;

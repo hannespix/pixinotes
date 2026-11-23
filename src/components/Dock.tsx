@@ -514,6 +514,8 @@ export function Dock() {
           onClick={() => { const o = addMenu; closeDockMenus(); setAddMenu(!o); }}
           title="Objekt hinzufügen"
           aria-label="Objekt hinzufügen"
+          aria-haspopup="dialog"
+          aria-expanded={addMenu}
         >
           <IPlus />
         </button>
@@ -535,6 +537,8 @@ export function Dock() {
           data-taste="zeichnen"
           title="Zeichnen (Stift, Textmarker, Radierer)"
           aria-label="Zeichnen"
+          aria-haspopup="true"
+          aria-expanded={drawMenu}
         >
           {tool === 'marker' ? <IHighlighter /> : tool === 'eraser' ? <IEraser /> : <IPen />}
         </button>
@@ -731,6 +735,8 @@ export function Dock() {
           onClick={() => { const o = moreMenu || aiMenu || arrangeMenu; closeDockMenus(); setMoreMenu(!o); }}
           title="Mehr"
           aria-label="Mehr"
+          aria-haspopup="true"
+          aria-expanded={moreMenu || aiMenu || arrangeMenu}
         >
           <IMore />
         </button>
