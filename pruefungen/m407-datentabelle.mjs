@@ -200,8 +200,11 @@ console.log('C  Filtern und Sortieren – eine Ansicht');
   await P.locator('[data-taste="sheet-filter-wert"][data-wert="Kiel"] input').click(); await P.waitForTimeout(300);
   await filterZu(P);
   let b = await bild(P);
+  // M448: Der Store schreibt gebündelt (400 ms nach der letzten Änderung) – auf den gespeicherten Filter warten,
+  // statt nach fester Pause zu lesen
+  await P.waitForFunction(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes[0]?.data?.filter, null, { timeout: 3000 }).catch(() => {});
   d = await daten(P);
-  pruefe('C2 „Kiel" abgewählt: es bleiben Kopf, drei Datenzeilen und die Summe – mit ihren echten Zeilennummern', b.map((z) => z.nr).join(',') === '1,3,5,6,8' && JSON.stringify(d.filter) === '{"C":["Bremen","Hamburg"]}', b);
+  pruefe('C2 „Kiel" abgewählt: es bleiben Kopf, drei Datenzeilen und die Summe – mit ihren echten Zeilennummern', b.map((z) => z.nr).join(',') === '1,3,5,6,8' && JSON.stringify(d.filter) === '{"C":["Bremen","Hamburg"]}', { b, filter: d.filter });
   const fuss = await P.locator('[data-taste="sheet-filter-stand"]').textContent();
   pruefe('C3 der Fuß sagt „3 von 6 Zeilen"; der Knopf der Spalte ist hervorgehoben', fuss === '3 von 6 Zeilen' && (await P.locator('[data-taste="sheet-filter"][data-spalte="C"]').getAttribute('class')).includes(' an'), fuss);
   const summe = await zelle(P, 8, 1).textContent();

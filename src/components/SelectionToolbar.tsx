@@ -792,7 +792,8 @@ export function SelectionToolbar() {
                   <button
                     data-taste="absender-kontakt"
                     disabled={aiBusy}
-                    title="Name, E-Mail, Funktion, Firma, Rufnummern und Anschrift aus Absender und Signatur – als Kontakt-Karte neben der Mail (ein vorhandener Kontakt wird ergänzt)"
+                    // M448: Sprechblase höchstens 110 Zeichen (Leitplanke „Die App redet weniger", Prüfreihe m299)
+                    title="Rufnummern, E-Mail und Anschrift aus der Signatur als Kontakt-Karte – ein vorhandener Kontakt wird ergänzt"
                     onClick={() => {
                       setMenu(null);
                       const mailId = single.id;

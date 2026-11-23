@@ -153,7 +153,8 @@ console.log('════ E: Dienste ════');
   await P.waitForTimeout(250);
   const g = await h3s(P);
   // M320: Handschrift (Online-Erkennung als Opt-in) kam als vierter Abschnitt dazu
-  pruefe('E1 vier Abschnitte: KI-Assistent · Gehirn · Handschrift · Konten', g.length === 4 && /KI-Assistent/.test(g[0]) && /Gehirn/.test(g[1]) && /Handschrift/.test(g[2]) && /Konten/.test(g[3]), g.join(' | '));
+  // M448: seit M452 steht „Text in Bildern" (Texterkennung an/aus) zwischen Handschrift und Konten
+  pruefe('E1 fünf Abschnitte: KI-Assistent · Gehirn · Handschrift · Text in Bildern · Konten', g.length === 5 && /KI-Assistent/.test(g[0]) && /Gehirn/.test(g[1]) && /Handschrift/.test(g[2]) && /Text in Bildern/.test(g[3]) && /Konten/.test(g[4]), g.join(' | '));
   pruefe('E2 das Gehirn ist ein Häkchen, keine Auswahlliste', (await P.locator('.modal-row-check', { hasText: 'Gehirn einschalten' }).locator('input[type="checkbox"]').count()) === 1);
   const h4 = await P.locator('.modal-section h4').allTextContents();
   pruefe('E3 Konten: Google und Microsoft 365', h4.join(',') === 'Google,Microsoft 365', h4.join(','));
