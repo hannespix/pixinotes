@@ -5,7 +5,7 @@
 // Ticket (das seine Frist einmal festhält) widersprach der Notiz. Jetzt trägt die Notiz je Block mit relativer Angabe
 // einen ANKER: den Tag, an dem dieser Text entstand, und den Text selbst. Ändert sich der Text, entsteht ein neuer
 // Anker; bleibt er, bleibt die Frist stehen. Feste Daten („am 20.11.") brauchen keinen.
-import { detectDates, hatRelativesDatum, type DetectedDate } from './dates';
+import { detectDates, fristenLaden, hatRelativesDatumOderOffen, kannDatumSein, type DetectedDate } from './dates';
 import { tagLokal } from './tag';
 
 /** blockId → [Tag (JJJJ-MM-TT), Text des Blocks an diesem Tag] */
@@ -18,6 +18,25 @@ export function blockText(content: unknown): string {
   return content.map((c) => { const x = c as { text?: string; content?: unknown }; return typeof x?.text === 'string' ? x.text : blockText(x?.content); }).join('');
 }
 
+/**
+ * M459: Die Fristen-Erkennung lädt erst bei Bedarf (lib/dates.ts). Wer hier Anker setzt, solange sie noch fehlt,
+ * wüsste nicht, ob ein Text relativ ist — der Speicher meldet sich darum mit diesem Haken und trägt nach dem Laden
+ * nach (`fristAnkerNachtragen`).
+ */
+let nachLaden: (() => void) | null = null;
+let nachLadenAngestossen = false;
+export function fristAnkerNachLaden(fn: () => void): void { nachLaden = fn; }
+function spaeterNachtragen(): void {
+  if (nachLadenAngestossen) return;
+  nachLadenAngestossen = true;
+  void fristenLaden().then(() => nachLaden?.(), () => { nachLadenAngestossen = false; });
+}
+/** M459: Hat irgendein Block einen Text, in dem ein Datum stehen KANN? (dann lohnt das Laden der Erkennung) */
+export function blockeMitDatum(blocks: unknown): boolean {
+  const lauf = (bs: B[] | undefined): boolean => (bs ?? []).some((b) => kannDatumSein(blockText(b?.content)) || lauf(b?.children));
+  return lauf(Array.isArray(blocks) ? (blocks as B[]) : []);
+}
+
 /** Anker nach einer Text-Änderung nachführen. Gibt DASSELBE Objekt zurück, wenn sich nichts ändert. */
 export function fristAnkerPflegen(blocks: unknown, alt: FristAnker | undefined, heute: string = tagLokal()): FristAnker | undefined {
   const neu: FristAnker = {};
@@ -26,8 +45,12 @@ export function fristAnkerPflegen(blocks: unknown, alt: FristAnker | undefined, 
     for (const b of bs ?? []) {
       if (b?.id) {
         const text = blockText(b.content).trim();
-        if (text && hatRelativesDatum(text)) {
-          const a = alt?.[b.id];
+        const relativ = text ? hatRelativesDatumOderOffen(text) : false;
+        const a = alt?.[b.id];
+        if (relativ === null) {
+          // M459: noch unbekannt — ein bestehender Anker zum selben Text bleibt, ein neuer folgt nach dem Laden
+          if (a && a[1] === text) neu[b.id] = a; else spaeterNachtragen();
+        } else if (relativ) {
           if (a && a[1] === text) neu[b.id] = a;
           else { neu[b.id] = [heute, text]; gleich = false; }
         }

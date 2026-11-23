@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState, useLayoutEffect } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useBoard, type BoardSortierung } from '../store';
 import { boardToShareUrl, downloadBoardFile, hatAblageInhalt, SHARE_URL_LIMIT } from '../lib/share';
-import { FreigabeDialog } from './FreigabeDialog';
-import { LinkDialog } from './LinkDialog';
+import { FreigabeDialogSpaet } from './FreigabeHost';
+// M459: „Per Link teilen" (mit Konto-Anfragen) kommt erst beim Öffnen
+const LinkDialog = lazy(() => import('./LinkDialog').then((m) => ({ default: m.LinkDialog })));
 import {
   IArchive, IArchiveRestore, ICopy, IDownload, IDuplicate, IMore, IMoveTo,
   IPen, IPerson, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck, IUsers, IX, IUhr,
@@ -182,8 +183,8 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
 
   return (
     <>
-    {freigabe && createPortal(<FreigabeDialog boardId={boardId} onClose={() => setFreigabe(false)} />, document.body)}
-    {linkOffen && createPortal(<LinkDialog boardId={boardId} onClose={() => setLinkOffen(false)} ohneKonto={() => void teilen()} alsDatei={() => downloadBoardFile(board)} />, document.body)}
+    {freigabe && createPortal(<FreigabeDialogSpaet boardId={boardId} onClose={() => setFreigabe(false)} />, document.body)}
+    {linkOffen && createPortal(<Suspense fallback={null}><LinkDialog boardId={boardId} onClose={() => setLinkOffen(false)} ohneKonto={() => void teilen()} alsDatei={() => downloadBoardFile(board)} /></Suspense>, document.body)}
     <MenuHuelle titel={`Board „${board.name}": umbenennen, duplizieren, verschieben, archivieren, teilen, löschen`} klasse={klasse} kinder={(zu) => (
       verschieben ? (
         <>

@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { useBoard } from '../store';
 import { regrantSyncAccess, type SyncState } from '../lib/syncFolder';
 import { saveViaFiles } from '../lib/filesSync';
-import { kontoLabel, kontoNeuAnmelden } from '../lib/kontoSync';
+import { kontoLabel } from '../lib/kontoSitzung';
+// M459: der Konto-Abgleich lädt bei Bedarf — die Neu-Anmeldung holt ihn sich selbst
+const kontoNeuAnmelden = async (): Promise<boolean> => (await import('../lib/kontoSync')).kontoNeuAnmelden();
 import { ICloud, ICloudAlert, ICloudCheck, ICloudOff, ICloudUp } from './Icons';
 
 type Entry = { state: SyncState; at?: string };

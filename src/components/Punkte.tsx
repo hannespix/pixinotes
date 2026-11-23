@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useInternalNode } from '@xyflow/react';
 import { gruppeVon, karteFest, mutedHistory, selectActiveBoard, selectNurLesen, useBoard } from '../store';
-import { meineKennung, sperrenVon } from '../lib/gastSync';
+import { meineKennung, sperrenVon } from '../lib/liveStand';
 import { hatPunktVon, PUNKTE_MODUS, punkteModus, punkteModusSetzen, punkteZahl, punktSetzen } from '../lib/punkte';
 import { nodeToText } from '../lib/serialize';
 import type { AppNode } from '../types';
