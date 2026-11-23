@@ -17,6 +17,7 @@ export function NeuEn() {
             <section id="help-neu">
               <p>The latest releases in brief, newest first. Which version is currently running is shown at the bottom of the help.</p>
               <ul>
+                <li><b>Sort by topic (M445):</b> The AI sorts loose cards into named frames. For the whole board: Dock ⋯ → AI assistant → <b>Sort by topic …</b> (all cards that aren’t in a frame yet); for selected cards: ⋯ → Arrange … → <b>By topic …</b> or in the AI tools. First you see the proposal: every group with its name and its cards. You can rename groups there or untick them; only “Sort cards” changes the board. Then every group sits in its own frame, the cards inside as a grid, nothing overlaps. Without a chat AI, the Brain groups the cards by meaning and names the groups from their titles. One Ctrl+Z puts everything back.</li>
                 <li><b>Swipe in full-screen focus (M441):</b> When focus is in full screen (“content only”), you switch cards on the phone with a swipe: left for the next card, right for the previous one – anywhere on the screen. In a document the swipe turns the pages first. A table or kanban that can still scroll sideways scrolls first; swiping vertically scrolls as usual, two fingers zoom.</li>
                 <li><b>Dragging boards in the overview – with feel (M440):</b> When you grab a board tile in the hierarchy overview, it lifts, sticks to the mouse and tilts slightly in the direction you drag. The other tiles make room while you drag, the target project grows along and is quietly highlighted. When you let go, the tile glides softly into place – exactly where the gap was. With reduced motion you get short, calm transitions.</li>
                 <li><b>A clearer network (M439):</b> The only soft thing left in the network is the colour field of areas and projects – and even that now has a clear edge instead of a foggy fringe and sits more quietly in the background. Boards and card dots are bubbles with a hard edge and no outline, in richer gradients; connections run in a gradient from the shade of one board to the shade of the other. The text sits on top, strong and easy to read.</li>
@@ -327,7 +328,7 @@ export function HilfeEn() {
               <h4>AI</h4>
               <ul>
                 <li><b>Providers</b> under Settings → Services: Free, OpenRouter, your own key or Ollama (fully local). Keys stay on the device.</li>
-                <li>Dock ⋯ → <b>“AI assistant”</b> for the board, selection ⋯ → <b>“AI actions”</b> for selected cards: free text, cluster topics, extract tasks, diagram, briefing, improve text. Image cards are sent along as a photo if the model understands images.</li>
+                <li>Dock ⋯ → <b>“AI assistant”</b> for the board, selection ⋯ → <b>“AI actions”</b> for selected cards: free text, sort by topic, extract tasks, diagram, briefing, improve text. Image cards are sent along as a photo if the model understands images.</li>
                 <li>Every AI action is a single Ctrl+Z step.</li>
                 <li>With Ollama, PixiNotes reads the list of installed models. If the server doesn’t respond, the app distinguishes between “not running” and “not allowed” and shows the matching <code>OLLAMA_ORIGINS</code> instructions.</li>
               </ul>
