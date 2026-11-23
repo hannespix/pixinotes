@@ -805,8 +805,18 @@ function sperrHinweis(name: string): void {
   sperrHinweisAm = jetzt;
   queueMicrotask(() => useBoard.getState().showToast(`${name} bearbeitet diese Karte gerade – gleich wieder frei.`, false, 4000));
 }
-/** Gesperrte Karten behalten Inhalt und Lage (auch gegen Löschen); alles andere geht durch */
-function sperrschutz(alt: BoardDoc, neu: BoardDoc, sperren: Map<string, string>): BoardDoc {
+/**
+ * M477: Notizen, in denen gerade ANDERE gemeinsam tippen (Yjs, lib/notizGemeinsamKern.ts). Der Text ist frei — den
+ * schreiben alle zugleich —, Lage, Farbe, Archiv und Löschen nicht: Der Schreiber sichert die ganze Karte bei jedem
+ * Tastendruck; eine gleichzeitige Änderung desselben Stücks ginge im kartenweisen Abgleich verloren.
+ */
+const notizSchutz = new Map<string, Map<string, string>>();   // Board → Notiz → Name eines, der darin tippt
+export function setzeNotizSchutz(boardId: string, schutz: Map<string, string>): void {
+  if (schutz.size) notizSchutz.set(boardId, schutz); else notizSchutz.delete(boardId);
+}
+/** Gesperrte Karten behalten Inhalt und Lage (auch gegen Löschen); alles andere geht durch.
+ *  M477: `nurText` — der Text (`data.blocks`) darf sich ändern, sonst nichts (gemeinsames Tippen) */
+function sperrschutz(alt: BoardDoc, neu: BoardDoc, sperren: Map<string, string>, nurText = false): BoardDoc {
   const nach = new Map(neu.nodes.map((n) => [n.id, n]));
   let wer = '';
   let anders = false;
@@ -817,9 +827,10 @@ function sperrschutz(alt: BoardDoc, neu: BoardDoc, sperren: Map<string, string>)
     if (!name) continue;
     const m = nach.get(n.id);
     if (!m) { fehlend.push(n); wer = name; anders = true; continue; }
-    if (m !== n && inhaltAnders(n, m)) {
+    const text = nurText ? { ...n, data: { ...n.data, blocks: (m.data as { blocks?: unknown }).blocks } } as AppNode : n;
+    if (m !== n && inhaltAnders(text, m)) {
       // Auswahl und Maße dürfen sich ändern — Inhalt und Lage nicht
-      const a = n as Record<string, unknown>; const b = m as Record<string, unknown>;
+      const a = text as Record<string, unknown>; const b = m as Record<string, unknown>;
       const kopie: Record<string, unknown> = { ...a };
       for (const k of ANSICHT_FELDER) { if (b[k] === undefined) delete kopie[k]; else kopie[k] = b[k]; }
       zurueck.set(n.id, kopie as AppNode); wer = name; anders = true;
@@ -1111,6 +1122,8 @@ function leseschutz(alt: BoardDoc[], neu: BoardDoc[]): BoardDoc[] {
       const sperren = kartenSperren.get(b.id);
       const g = gruppen.get(b.id);
       let s = sperren ? sperrschutz(a, b, sperren) : b;
+      const tippen = notizSchutz.get(b.id);
+      if (tippen) s = sperrschutz(a, s, tippen, true);   // M477
       if (g) s = gruppenschutz(a, s, g);   // M365: Ersteller vermerken, Rechte der Gäste
       if (s !== b) geschuetzt = true;
       return s;
@@ -1468,7 +1481,7 @@ export const useBoard = create<BoardState>()(
       const set: typeof setRoh = ((teil: unknown, ersetzen?: boolean) => {
         if (leseschutzAus > 0) return (setRoh as (t: unknown, e?: boolean) => void)(teil, ersetzen);
         const vor = get();
-        if (kartenSperren.size === 0 && gruppen.size === 0 && !vor.boards.some((b) => b.geteiltRolle === 'lesen')) return (setRoh as (t: unknown, e?: boolean) => void)(teil, ersetzen);
+        if (kartenSperren.size === 0 && notizSchutz.size === 0 && gruppen.size === 0 && !vor.boards.some((b) => b.geteiltRolle === 'lesen')) return (setRoh as (t: unknown, e?: boolean) => void)(teil, ersetzen);
         let neu = (typeof teil === 'function' ? (teil as (s: BoardState) => Partial<BoardState>)(vor) : teil) as Partial<BoardState>;
         if (neu.boards && neu.boards !== vor.boards) neu = { ...neu, boards: leseschutz(vor.boards, neu.boards) };
         return (setRoh as (t: unknown, e?: boolean) => void)(neu, ersetzen);
