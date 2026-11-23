@@ -332,14 +332,17 @@ console.log('\n════ G: Fragment ════');
 {
   const b64 = (o) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64url');
   const daten = `data:image/png;base64,${BILD.toString('base64')}`;
-  await R.goto(`${APP}#pixinotes-senden=${b64({ v: 1, art: 'seite', titel: 'Über das Fragment', text: 'Grüße', adresse: 'https://example.org/', direkt: true, bild: { daten, name: 'b' } })}`, { waitUntil: 'networkidle' });
-  await R.waitForSelector('.geteilt-modal', { timeout: 8000 }).catch(() => {});
-  pruefe('G1 der Dialog fragt (auch wenn „direkt" im Link steht)', await R.locator('.geteilt-modal').count() === 1);
-  pruefe('G2 das Fragment ist aus der Adresse verschwunden', !(await R.evaluate(() => location.hash.includes('pixinotes-senden'))));
-  pruefe('G3 kein Bild über das Fragment', await R.locator('.geteilt-vorschau img').count() === 0);
-  const t = await R.locator('.geteilt-text').first().textContent().catch(() => '');
+  // In einem frischen Tab — so, wie ein Link ankommt (der alte Tab trägt noch die Rahmen aus F)
+  const L = await ctx.newPage();
+  await L.goto(`${APP}#pixinotes-senden=${b64({ v: 1, art: 'seite', titel: 'Über das Fragment', text: 'Grüße', adresse: 'https://example.org/', direkt: true, bild: { daten, name: 'b' } })}`, { waitUntil: 'load' });
+  await L.waitForSelector('.geteilt-modal', { timeout: 8000 }).catch(() => {});
+  pruefe('G1 der Dialog fragt (auch wenn „direkt" im Link steht)', await L.locator('.geteilt-modal').count() === 1);
+  pruefe('G2 das Fragment ist aus der Adresse verschwunden', !(await L.evaluate(() => location.hash.includes('pixinotes-senden'))));
+  pruefe('G3 kein Bild über das Fragment', await L.locator('.geteilt-vorschau img').count() === 0);
+  const t = await L.locator('.geteilt-text').first().textContent().catch(() => '');
   pruefe('G4 der Text ist da (Umlaute heil)', /Über das Fragment/.test(t) && /Grüße/.test(t), t);
-  await R.locator('.geteilt-verwerfen').click().catch(() => {});
+  await L.locator('.geteilt-verwerfen').click().catch(() => {});
+  await L.close();
 }
 
 // ══ H: Adresse ohne Berechtigung ════════════════════════════════════════
