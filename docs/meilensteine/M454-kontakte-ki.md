@@ -1,5 +1,5 @@
 # M454 — Kontakte für KI und MCP, Sammel-Export als eine .vcf
-PR: #… · Prüfreihe: `pruefungen/m454-kontakte-ki.mjs` (Port 5454) · Datum: 2026-11-23
+PR: #130 · Prüfreihe: `pruefungen/m454-kontakte-ki.mjs` (Port 5454) · Datum: 2026-11-23
 
 ## Warum
 Offen aus M450: Die App-KI konnte Kontakt-Karten nur lesen, der MCP-Server kannte sie gar nicht, und jede Karte ging
