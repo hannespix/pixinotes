@@ -56,6 +56,26 @@ const TextFont = createReactStyleSpec(
   },
 );
 
+/**
+ * M485: Quelltext ohne Rechtschreibprüfung. M482 schaltet sie in Notizen an — in Codeblöcken und `Inline-Code`
+ * zeichnete der Browser dann unter jedes `const` eine Wellenlinie. Das Attribut gehört an die Elemente, die der
+ * Editor selbst baut (Block-Ansicht bzw. Mark): von außen gesetzt würfe ProseMirror es beim Neuzeichnen wieder weg.
+ */
+const codeBlockRender = defaultBlockSpecs.codeBlock.implementation.render!;
+const codeBlockOhnePruefung: typeof defaultBlockSpecs.codeBlock = {
+  ...defaultBlockSpecs.codeBlock,
+  implementation: {
+    ...defaultBlockSpecs.codeBlock.implementation,
+    render(...a) {
+      const r = codeBlockRender.apply(this, a);
+      for (const e of [r.dom, r.contentDOM]) if (e instanceof HTMLElement) e.spellcheck = false;
+      return r;
+    },
+  },
+};
+const codeImpl = defaultStyleSpecs.code.implementation;
+const codeOhnePruefung: typeof defaultStyleSpecs.code = { ...defaultStyleSpecs.code, implementation: { ...codeImpl, mark: codeImpl.mark.configure({ HTMLAttributes: { spellcheck: 'false' } }) } };
+
 /** Gemeinsames Schema aller Notiz-Editoren (NoteCard, Protokoll, Presenter) —
  *  damit gestylte Blöcke ÜBERALL valide sind und identisch rendern. */
 export const noteSchema = BlockNoteSchema.create({
@@ -77,10 +97,11 @@ export const noteSchema = BlockNoteSchema.create({
      * Notiz mit Überschrift aus der ruhenden Darstellung geworfen.
      */
     heading: createHeadingBlockSpec({ levels: [1, 2, 3], allowToggleHeadings: false }),
+    codeBlock: codeBlockOhnePruefung,   // M485
     // M462: Seit BlockNote 0.4x liefert createReactBlockSpec eine Fabrik.
     rechentabelle: RechenTabelleBlock(),
   },
-  styleSpecs: { ...defaultStyleSpecs, textSize: TextSize, textFont: TextFont },
+  styleSpecs: { ...defaultStyleSpecs, code: codeOhnePruefung, textSize: TextSize, textFont: TextFont },   // M485: code
 });
 
 /** Größen-/Schrift-Knöpfe in der Formatier-Leiste (nur bei Textauswahl sichtbar) */
