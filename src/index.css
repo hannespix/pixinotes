@@ -3926,6 +3926,7 @@ dl.leer-wege dd { margin: 0; }
 .k-archiv-foot .collect-reset { flex: 1; }
 .ticket-erledigt { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #1f7a4a; font-weight: 600; }
 .ticket-erledigt .ticket-jump { display: inline-flex; align-items: center; gap: 4px; }
+.ticket-spaltenzeit { font-size: 12px; color: var(--muted); } /* M470: leise Spaltenzeit im Ticket */
 
 /* ---------- Kanban-Schliff (M295) ---------- */
 .kanban-body { min-width: 0; }
@@ -7638,6 +7639,12 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 }
 .versionen-vergleich button:hover, .versionen-vergleich button:focus-visible { background: var(--surface-3); }
 .versionen-vergleich button:disabled { opacity: 0.5; cursor: default; }
+/* M470: Häkchen je Zeile, „alle" und „Auswahl zurückholen" im Kopf der Liste */
+.versionen-vergleich .vv-kopf { display: flex; align-items: center; gap: 10px; min-height: 26px; }
+.versionen-vergleich .vv-kopf h3 { flex: 1; }
+.versionen-vergleich .vv-alle { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.versionen-vergleich .vv-wahl, .versionen-vergleich .vv-alle input { flex: none; margin: 0; accent-color: var(--accent-strong); }
+.versionen-vergleich .vv-kopf .versionen-haupt { font-weight: 600; }
 @media (max-width: 560px) {
   .versionen-teile { grid-template-columns: 1fr; padding: 0 12px; }
   .versionen-liste { max-height: 180px; }

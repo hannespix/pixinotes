@@ -19,10 +19,20 @@ import { insBild } from '../EbenenMenu';
 import { DragTitle } from './DragTitle';
 
 import { KartenSymbol } from '../KartenSymbol';
-import { zahlWort } from '../../lib/sprache';
+import { t, zahlWort } from '../../lib/sprache';
+import { tageSeit, zeitLang } from '../../lib/kartenZeit';
 
 const TAG_RE = /#([\p{L}\d_-]{2,20})/gu;
 const TAG_MS = 86_400_000;
+
+/** M470: „seit 3 Tagen in „In Arbeit"" – nur für Tickets mit eigenem Stempel (ältere ohne zeigen nichts Erfundenes) */
+function spaltenZeitText(it: KanbanItem, spalte: string): string | null {
+  if (typeof it.spalteSeit !== 'number') return null;
+  const tage = Math.max(0, tageSeit(it.spalteSeit));
+  return tage === 0
+    ? t('seit heute in „{0}“').replace('{0}', spalte)
+    : t('seit {0} in „{1}“').replace('{0}', zahlWort(tage, 'Tag', 'Tagen')).replace('{1}', spalte);
+}
 
 /** #Tags aus einem Ticket-Text ziehen (Trello-Labels light: einfach #tag tippen) */
 const tagsOf = (text: string): string[] => [...text.matchAll(TAG_RE)].map((m) => m[1].toLowerCase());
@@ -1410,6 +1420,12 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                     >{label}</button>
                   ))}
                 </span>
+                {Math.min(it.col, done) < done && spaltenZeitText(it, cols[Math.min(it.col, done)] ?? '') && (
+                  /* M470: Seit wann das Ticket in seiner Spalte steht – leise, genaue Zeit im Tooltip */
+                  <span className="ticket-spaltenzeit" data-taste="ticket-spaltenzeit" title={zeitLang(it.spalteSeit as number)}>
+                    {spaltenZeitText(it, cols[Math.min(it.col, done)] ?? '')}
+                  </span>
+                )}
                 {Math.min(it.col, done) === done && (
                   /* M293: Erledigt-Datum zeigen und von hier aus archivieren */
                   <span className="ticket-erledigt">
