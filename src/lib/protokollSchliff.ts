@@ -44,28 +44,132 @@ const kernWoerter = (s: string): string[] => suchNorm(s.replace(CARRY_MARK, ''))
   .split(/[^\p{L}\p{N}]+/u)
   .filter((w) => w.length >= 4 && !/^\d+$/.test(w) && !['top', 'tops', 'punkt', 'thema', 'bericht'].includes(w));
 
+// ================= M497: Beschlüsse gehören zu ihrem TOP =================
+// Ein Beschluss trägt seinen TOP (`top` = Kennung der Überschrift, `topText` = ihr Text als Rückfall, `top: ''` =
+// bewusst ohne TOP); ein TOP kann „nur Info" sein (`infoTops` der Sitzung). Die Wortregel von M495 gilt nur noch für
+// Beschlüsse ohne jede Zuordnung (aus älteren Fassungen, von der KI, aus dem Abgleich).
+
+export interface TopInfo { id?: string; text: string }
+type MitTop = { text?: string; top?: string; topText?: string };
+
+const ohneVermerk = (t: string): string => t.replace(CARRY_MARK, '').trim();
+const textSchluessel = (t: string): string => `text:${suchNorm(ohneVermerk(t))}`;
+/** Schlüssel eines TOPs für `infoTops` und `top`: die Kennung der Überschrift, sonst ihr Text */
+export const topSchluessel = (t: TopInfo): string => t.id || textSchluessel(t.text);
+
+/** Die Überschriften der Sitzung in Lesereihenfolge (auch eingerückte) — Text mit „(offen seit …)" */
+export function topsDerSitzung(e: MinutesEntry | undefined): TopInfo[] {
+  const out: TopInfo[] = [];
+  const walk = (bs: AnyBlock[] | undefined) => {
+    for (const b of bs ?? []) {
+      if (b?.type === 'heading') { const text = textOf(b.content).trim(); if (text) out.push({ id: b.id, text }); }
+      if (b?.children?.length) walk(b.children);
+    }
+  };
+  walk(e?.blocks as AnyBlock[] | undefined);
+  return out;
+}
+
+/** Hat der Beschluss eine Zuordnung (auch „bewusst ohne TOP")? Sonst gilt für ihn die Wortregel. */
+export const hatZuordnung = (d: MitTop): boolean => typeof d.top === 'string' || typeof d.topText === 'string';
+
 /**
- * TOPs der letzten Sitzung, zu denen kein Beschluss gefasst wurde. Beschlüsse hängen im Datenmodell an der Sitzung,
- * nicht am TOP — darum die Regel: Ein TOP gilt als beschlossen, wenn ein Beschluss eines seiner Wörter (≥ 4
- * Buchstaben) nennt („Sommerfest" ↔ „Das Sommerfest findet am 12.7. statt"). Die feste Tagesordnung kommt ohnehin
- * wieder, die Überschrift der Übergabe selbst ist kein TOP. Nur ein Vorschlag — abwählbar.
+ * Der TOP eines Beschlusses unter den Überschriften der Sitzung: zuerst über die Kennung, dann über den Text (die
+ * Kennung fehlt, solange eine neue Sitzung noch nie im Editor stand, und ist im Speicher einer allein geöffneten
+ * Sitzung manchmal eine andere als im Editor). `null` = ohne TOP oder der TOP steht nicht mehr im Text.
+ */
+export function topDesBeschlusses(tops: TopInfo[], d: MitTop): TopInfo | null {
+  if (!hatZuordnung(d) || d.top === '') return null;
+  if (d.top) {
+    const perId = tops.find((t) => t.id && t.id === d.top);
+    if (perId) return perId;
+    if (d.top.startsWith('text:')) { const perText = tops.find((t) => textSchluessel(t.text) === d.top); if (perText) return perText; }
+  }
+  if (d.topText) { const k = textSchluessel(d.topText); return tops.find((t) => textSchluessel(t.text) === k) ?? null; }
+  return null;
+}
+
+/** Ist der TOP als „nur Info" markiert? (Kennung oder Text — je nachdem, was beim Markieren bekannt war) */
+export function istInfoTop(t: TopInfo, infoTops: string[] | undefined): boolean {
+  if (!infoTops?.length) return false;
+  return (!!t.id && infoTops.includes(t.id)) || infoTops.includes(textSchluessel(t.text));
+}
+
+/** Beide Schlüssel eines TOPs (Kennung und Text) — zum Entfernen der Markierung */
+export const infoSchluessel = (t: TopInfo): string[] => [t.id, textSchluessel(t.text)].filter((x): x is string => !!x);
+
+/** Die Überschrift, unter der ein Block steht (Lesereihenfolge, auch in eingerückten Blöcken); null = vor dem ersten TOP */
+export function topVor(blocks: AnyBlock[] | undefined, blockId: string): TopInfo | null {
+  let zuletzt: TopInfo | null = null;
+  let gefunden = false;
+  const walk = (bs: AnyBlock[] | undefined): void => {
+    for (const b of bs ?? []) {
+      if (gefunden) return;
+      if (b?.id === blockId) { gefunden = true; return; }
+      if (b?.type === 'heading') { const text = textOf(b.content).trim(); if (text) zuletzt = { id: b.id, text }; }
+      if (b?.children?.length) walk(b.children);
+    }
+  };
+  walk(blocks);
+  return gefunden ? zuletzt : null;
+}
+
+/** Wortregel (M495): nennt der Beschluss ein Wort des TOPs ab vier Buchstaben? */
+const wortTreffer = (top: string, beschluss: string): boolean => {
+  const ohne = ohneVermerk(top);
+  const d = suchNorm(beschluss);
+  const woerter = kernWoerter(ohne);
+  return woerter.length ? woerter.some((w) => d.includes(w)) : d.includes(suchNorm(ohne));
+};
+
+/** Für einen getippten Beschluss: der TOP, den er eindeutig nennt (Wortregel) — sonst keiner */
+export function topRaten(tops: TopInfo[], text: string): TopInfo | null {
+  const treffer = tops.filter((t) => ohneVermerk(t.text) !== UEBERGABE_KOPF && wortTreffer(t.text, text));
+  return treffer.length === 1 ? treffer[0] : null;
+}
+
+/**
+ * TOPs der letzten Sitzung, zu denen kein Beschluss gefasst wurde. M497: entschieden über die Zuordnung der
+ * Beschlüsse; TOPs „nur Info" kommen nie mit. Nur Beschlüsse ohne jede Zuordnung (ältere) prüft noch die Wortregel
+ * von M495 (ein TOP gilt als beschlossen, wenn ein solcher Beschluss eines seiner Wörter ab vier Buchstaben nennt).
+ * Die feste Tagesordnung kommt ohnehin wieder, die Überschrift der Übergabe selbst ist kein TOP. Abwählbar.
  */
 export function offeneTops(data: MinutesData): string[] {
-  const e = latestEntry(data);
+  return topStand(data, latestEntry(data)).filter((x) => x.stand === 'offen').map((x) => x.top.text);
+}
+
+/**
+ * M497: Stand je TOP einer Sitzung — `beschluss` (ein Beschluss gehört dazu), `info` (nur Information) oder `offen`.
+ * Ohne die feste Tagesordnung (kommt ohnehin wieder) und ohne die Überschrift der Übergabe.
+ */
+export function topStand(data: MinutesData, e: MinutesEntry | undefined): Array<{ top: TopInfo; stand: 'beschluss' | 'info' | 'offen' }> {
   if (!e) return [];
   const fest = new Set((data.agenda ?? []).map((a) => suchNorm(a.trim())));
-  const beschluesse = (e.decisions ?? []).map((d) => suchNorm(d.text ?? ''));
-  const out: string[] = [];
-  for (const b of (e.blocks as AnyBlock[] | undefined) ?? []) {
-    if (b?.type !== 'heading') continue;
-    const roh = textOf(b.content).trim();
-    const ohne = roh.replace(CARRY_MARK, '').trim();
+  const tops = topsDerSitzung(e);
+  const beschluesse = e.decisions ?? [];
+  const zugeordnet = new Set(beschluesse.map((d) => topDesBeschlusses(tops, d)).filter((t): t is TopInfo => !!t));
+  const alte = beschluesse.filter((d) => !hatZuordnung(d)).map((d) => d.text ?? '');
+  const out: Array<{ top: TopInfo; stand: 'beschluss' | 'info' | 'offen' }> = [];
+  for (const top of tops) {
+    const ohne = ohneVermerk(top.text);
     if (!ohne || ohne === UEBERGABE_KOPF || fest.has(suchNorm(ohne))) continue;
-    const woerter = kernWoerter(ohne);
-    const beschlossen = woerter.length
-      ? beschluesse.some((d) => woerter.some((w) => d.includes(w)))
-      : beschluesse.some((d) => d.includes(suchNorm(ohne)));
-    if (!beschlossen) out.push(roh);
+    const stand = zugeordnet.has(top) || alte.some((d) => wortTreffer(top.text, d)) ? 'beschluss'
+      : istInfoTop(top, e.infoTops) ? 'info' : 'offen';
+    out.push({ top, stand });
+  }
+  return out;
+}
+
+/** M497: Die Beschlusslage der Reihe (neueste Sitzung zuerst) mit dem TOP, zu dem ein Beschluss gehört */
+export function beschlusslage(data: MinutesData): Array<{ text: string; date: string; entryId: string; top?: string }> {
+  const out: Array<{ text: string; date: string; entryId: string; top?: string }> = [];
+  for (const e of sortEntries(data.entries ?? [])) {
+    const tops = topsDerSitzung(e);
+    for (const d of e.decisions ?? []) {
+      if (!d.text?.trim()) continue;
+      const top = topDesBeschlusses(tops, d);
+      out.push({ text: d.text.trim(), date: e.date, entryId: e.id, ...(top ? { top: ohneVermerk(top.text) } : {}) });
+    }
   }
   return out;
 }
