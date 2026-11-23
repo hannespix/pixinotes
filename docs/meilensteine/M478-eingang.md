@@ -58,7 +58,7 @@ in die Arbeit — auch wenn man dort gerade nicht sortieren wollte.
   `Board.tsx` → `handleDrop` erkennt ihn vor den Dateien.
 - **Oberfläche:** `components/EingangFenster.tsx` (nachgeladen, Host `Eingang()` in `App.tsx`, Ereignis
   `pixinotes:eingang` = `EINGANG_OEFFNEN`, `eingangOeffnen(gruppe?)`), Zähler `eingangKnopf` in `Tabs.tsx` (Klasse
-  `tab-tasks`, `data-taste="eingang"`), Symbol `IEingang`, Stil `src/styles/eingang.css` (vor `99-…`).
+  `tab-tasks`, `data-taste="eingang"`), Symbol `IEingang`, Stil `src/styles/76-eingang.css` (nach `74-sicherung`, vor `99-…`).
 - **Option:** `localStorage` `pixinotes-eingang-sammeln` (`'0'` = aus), `eingangSammeln()`/`setEingangSammeln()`;
   Weiche in `GeteiltDialog.tsx` (Start mit `?geteilt=1` und `erweiterungEingang`).
 - Reihen m290 und m458 prüfen den Empfangs-Dialog und setzen die Option deshalb auf aus.
