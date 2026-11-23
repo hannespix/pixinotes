@@ -332,5 +332,5 @@ console.log('D  Briefing ohne KI: Risiken aus der Struktur (M444)');
 pruefe('E1 keine Fehler', fehler.length === 0, fehler);
 await browser.close();
 app.close();
-console.log(`\nM463: ${ok} ok, ${bad} fehlgeschlagen`);
+console.log(`\nM463: ${ok} bestanden, ${bad} fehlgeschlagen`);
 process.exit(bad ? 1 : 0);

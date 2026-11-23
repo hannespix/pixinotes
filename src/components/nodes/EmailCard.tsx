@@ -189,7 +189,7 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
       )}
       {kontaktAngeboten && (
         <div className="card-actions email-aufgaben">
-          <button className="nodrag" data-taste="kontakt-nach-destillat" disabled={aiBusy} onClick={() => void alsKontakt()} title="Name, E-Mail, Funktion, Firma, Rufnummern und Anschrift aus Absender und Signatur – als Kontakt-Karte neben der Mail (ein vorhandener Kontakt wird ergänzt)">
+          <button className="nodrag" data-taste="kontakt-nach-destillat" disabled={aiBusy} onClick={() => void alsKontakt()} title="Rufnummern, E-Mail und Anschrift aus der Signatur als Kontakt-Karte – ein vorhandener Kontakt wird ergänzt">
             <IPerson size={13} /> Absender als Kontakt
           </button>
         </div>
