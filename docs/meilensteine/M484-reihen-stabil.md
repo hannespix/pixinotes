@@ -10,7 +10,8 @@ m332, m447, m429, m354, m366. Jeder Agent verlor damit Wiederholungen und Gewiss
 - **Läufer:** `node werkzeug/alle-pruefungen.mjs <auswahl> --wiederhole N --bahnen B` legt jede Reihe N-mal in die
   Warteschlange (Durchgang für Durchgang, damit jede Reihe in jedem Durchgang neben anderen läuft), wiederholt
   nichts allein und meldet am Ende je Reihe „x von N grün · min–max s" sowie `FLATTERT`/`IMMER ROT`; Rückgabe 1, wenn
-  eine Reihe nicht N-mal grün war. Mit `--json` stehen `gruen`/`laeufe` je Reihe in der Datei.
+  eine Reihe nicht N-mal grün war. Mit `--json` stehen `gruen`/`laeufe` je Reihe in der Datei; `--ablage <ordner>`
+  legt die volle Ausgabe jedes roten Laufs als `<reihe>-<durchgang>.txt` ab (der Bericht zeigt nur die ersten Zeilen).
 - **m383 D2 war ein echter Fehler der App (M477):** Der Schreiber einer gemeinsam getippten Notiz wechselte mitten im
   Tippen. Gerd (Gast per Link) tippt in seine neue Notiz; Annas Notiz wacht dafür auf (M477) und tritt der Sitzung bei.
   Hatte Anna die kleinere Kennung, wurde **sie** sofort Schreiberin — beide sicherten kurz nacheinander, und Anna
@@ -40,11 +41,20 @@ m332, m447, m429, m354, m366. Jeder Agent verlor damit Wiederholungen und Gewiss
   des Zugs erscheint (MutationObserver), und prüft, ob einer Anna nennt.
 - **Nach M483 (nachgeladene Auswahl-Leiste):** m447 F wartet auf `.sel-toolbar` statt 600 ms; m332 `auswahlMenue` und
   m428 D2 warten auf Leiste, „Mehr"-Menü und KI-Menü statt 400/500 ms.
+- **m332 C6/C8/D1/E1:** Die Endmeldung kam, aber der gespeicherte Stand hatte noch 0 Notizen — der Speicher schreibt
+  verzögert, unter Last erst nach der Abfrage. `gespeichert()` wartet, bis `pixinotes-board` 1 s gleich bleibt.
+- **m477 C5:** Strg+Z nahm unter Last nur „XYZ", nicht „ XYZ" zurück — Yjs fasst Tasten nur binnen 500 ms zu einem
+  Schritt zusammen, die einzeln getippten Zeichen lagen weiter auseinander. Die Reihe fügt „ XYZ" in einem Zug ein.
 - **m354 A2:** Der Strich lag nach 400 ms noch nicht im gespeicherten Stand (der Wert der Meldung, eine Abfrage später,
   stimmte). `zeichnen()` wartet, bis sich der Stand ändert; die Prüfung, dass ein Radierer nichts trifft (E2), behält
   ihre feste Wartezeit.
-- **m429 A1:** Die Messung „kein Name springt" begann 200 ms nach dem Laden; unter Last lag die erste Lage der Namen
-  (Aufbau) noch darin. Sie beginnt jetzt, wenn alle vier Gruppen-Namen stehen; die Grenze (6, unter Last 12) bleibt.
+- **m429 A1/B1:** Die Messung „kein Name springt" begann 200 ms nach dem Laden; unter Last lag die erste Lage der Namen
+  (Aufbau) noch darin. Sie beginnt jetzt, wenn alle vier Gruppen-Namen stehen. Unter Last (Last über der Kernzahl)
+  zählt die Strecke über zwei Messintervalle: Messung und Bewegung laufen im selben Bildtakt, aber nicht immer in
+  derselben Reihenfolge — dann fallen zwei Gleit-Schritte in ein Intervall (gemessen 12,8 bei Grenze 12). Ein echter
+  Sprung (Name wechselt zwischen Ideen, Dutzende Punkte) bleibt darüber; ruhig gilt wie bisher das einzelne Intervall.
+  B1 wartet erst, bis 1 s lang nichts mehr läuft (höchstens 20 s), und prüft dann 3 s Stillstand.
+- **m366** (TimeoutError nur bei Last über 20 auf 4 Kernen, ohne verwertbare Ausgabe; mit `--ablage` nachzustellen).
 - **m366** („Port belegt") war kein Fehler der Reihe: andere Agenten starteten sie ohne den Läufer.
 
 ## Wie (Architektur)

@@ -58,8 +58,13 @@ allein grün und unter Last rot ist, ist fast immer eine dieser Ursachen:
 - **Rahmen (iframes) nicht an `frame.url()` erkennen:** unter Last meldet Playwright für `srcdoc`-Rahmen zeitweise
   `""`. Am Inhalt erkennen (`#edit`, eine bekannte Kennung) und alle Rahmen durchgehen, nicht nur den ersten.
 - **Nachweis:** `node werkzeug/alle-pruefungen.mjs m383 m428 --wiederhole 10 --bahnen 6` lässt die Auswahl zehnmal
-  nebeneinander laufen (ohne Einzelwiederholung) und meldet je Reihe „x von 10 grün". Zusätzliche CPU-Last für den
-  Nachweis: ein paar `node -e "for(;;);"`-Prozesse daneben.
+  nebeneinander laufen (ohne Einzelwiederholung) und meldet je Reihe „x von 10 grün"; `--ablage <ordner>` hebt die volle
+  Ausgabe jedes roten Laufs auf. Zusätzliche CPU-Last für den Nachweis: ein paar `node -e "for(;;);"`-Prozesse daneben.
+- **Gespeicherten Stand erst lesen, wenn er steht:** Der Speicher schreibt `pixinotes-board` verzögert. Wer nach einer
+  Aktion `localStorage` liest, wartet auf die erwartete Änderung oder darauf, dass der Stand eine Weile gleich bleibt.
+- **Tippen, das ein Rückgängig-Schritt sein soll, in einem Zug** (`keyboard.insertText`): einzeln getippte Tasten
+  fasst der Editor nur binnen kurzer Zeit zusammen, unter Last zerfällt die Eingabe in mehrere Schritte.
+- **Kurze Hinweise (Toasts) mitschreiben statt hinterher abfragen** (MutationObserver vor der Aktion, wie m332/m477).
 
 ## Brief für einen Arbeits-Agenten (Vorlage)
 ```
