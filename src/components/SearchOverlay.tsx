@@ -4,6 +4,7 @@ import uFuzzy from '@leeoniya/ufuzzy';
 import { mutedHistory, useBoard } from '../store';
 import { makeKanban, makeNote } from '../lib/nodes';
 import { nodeToText } from '../lib/serialize';
+import { vorWann, zeitLang, zeitVon } from '../lib/kartenZeit';
 import { collectAllTags } from '../lib/links';
 import { askBrain, brainSearch, type BrainHit } from '../lib/brain';
 import { aiReady } from '../lib/ai';
@@ -35,6 +36,8 @@ interface Hit {
   snippet: string;
   /** M452: Der Treffer steht im erkannten Text des Bildes, nicht in Name oder Titel */
   imBild?: boolean;
+  /** M453: letzte inhaltliche Änderung (fehlt = unbekannt) */
+  zeit?: number;
 }
 
 /** Spotlight-Suche (Strg/Cmd+K) über alle Boards — Treffer anklicken fliegt zur Karte. */
@@ -85,11 +88,17 @@ function buildCommands(): Command[] {
       run: () => { st().setOverviewMode('netz'); st().setView('overview'); } },
     { label: 'Aufgaben-Zentrale', hint: 'Alle offenen Aufgaben aller Boards', alias: 'tasks todo fristen',
       run: () => st().setTasksOpen(true) },
+    // M444: Lage des aktiven Boards als neue Notiz (Dock legt sie neben den sichtbaren Ausschnitt)
+    { label: 'Board-Briefing', hint: 'Lage des Boards: Fristen, Entscheidungen, Inhalte, Risiken', alias: 'briefing lage zusammenfassung überblick ueberblick fristen überfällig was ist wichtig heute status summary',
+      run: () => { st().setView('board'); setTimeout(() => window.dispatchEvent(new CustomEvent('pixinotes:board-briefing')), 120); } },
     { label: '▶ Präsentieren', hint: 'Karten als Folien zeigen', alias: 'presenter folien vortrag',
       run: () => st().setPresenting(true) },
     // M408: das Archiv per Suche ein- und ausblenden
     { label: st().showArchived ? 'Archiv ausblenden' : 'Archiv einblenden', hint: 'Archivierte Karten und Boards zeigen oder verbergen', alias: 'archiv archiviert archive wiederfinden verschwunden weg restore',
       run: () => st().setShowArchived(!st().showArchived) },
+    // M449: frühere Stände des offenen Boards
+    { label: 'Versionen', hint: 'Frühere Stände dieses Boards ansehen und wiederherstellen', alias: 'version versionen verlauf history zeitreise früher gestern stand wiederherstellen zurückholen backup sicherung snapshot',
+      run: () => window.dispatchEvent(new CustomEvent('pixinotes:versionen', { detail: { boardId: st().activeId } })) },
     { label: 'Einstellungen', hint: 'KI, Sync, Design, Daten', alias: 'settings optionen ki sync',
       run: () => st().setSettingsOpen(true) },
     { label: 'Hilfe', hint: 'Anleitung zu allen Funktionen', alias: 'help anleitung',
@@ -106,6 +115,8 @@ export function SearchOverlay() {
   const setOpen = useBoard((s) => s.setSearchOpen);
   const [query, setQuery] = useState('');
   const [cursor, setCursor] = useState(0);
+  // M453: Treffer nach „zuletzt geändert" ordnen statt nach Relevanz; ohne Eingabe: die zuletzt geänderten Karten
+  const [nachZeit, setNachZeit] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -152,6 +163,18 @@ export function SearchOverlay() {
 
   const hits = useMemo<Hit[]>(() => {
     const q = query.trim();
+    // M453: ohne Eingabe, aber nach Zeit sortiert — die zuletzt geänderten Karten aller Boards
+    if (!q && nachZeit) {
+      return entries
+        .map((e) => ({ e, z: zeitVon(e.node) }))
+        .filter((x): x is { e: typeof entries[number]; z: number } => x.z !== undefined)
+        .sort((a, b) => b.z - a.z)
+        .slice(0, 15)
+        .map(({ e, z }) => {
+          const zeilen = e.text.split('\n').map((l) => l.trim()).filter(Boolean);
+          return { boardId: e.boardId, boardName: e.boardName, node: e.node, title: (zeilen[0] ?? '').slice(0, 70), snippet: zeilen.slice(1).join(' ').slice(0, 100), zeit: z };
+        });
+    }
     if (!q) return [];
     const haystack = entries.map((e) => `${e.text} ${e.boardName}`);
 
@@ -171,6 +194,11 @@ export function SearchOverlay() {
         .filter((i) => i >= 0);
     }
 
+    // M453: nach Zeit — neueste zuerst, Karten ohne bekannte Änderung ans Ende (Relevanz bleibt die zweite Ordnung)
+    if (nachZeit) {
+      const rang = new Map(resultIdxs.map((i, r) => [i, r]));
+      resultIdxs = [...resultIdxs].sort((a, b) => ((zeitVon(entries[b].node) ?? -1) - (zeitVon(entries[a].node) ?? -1)) || ((rang.get(a) ?? 0) - (rang.get(b) ?? 0)));
+    }
     const firstToken = q.split(/\s+/)[0] ?? q;
     return resultIdxs.slice(0, 15).map((i) => {
       const e = entries[i];
@@ -191,9 +219,10 @@ export function SearchOverlay() {
         title: firstLine.slice(0, 70),
         snippet: (start > 0 ? '…' : '') + quelle.slice(start, at + 70).replace(/\n/g, ' '),
         imBild,
+        zeit: zeitVon(e.node),
       };
     });
-  }, [query, entries]);
+  }, [query, entries, nachZeit]);
 
   const jump = (hit: Hit) => {
     setOpen(false);
@@ -324,7 +353,16 @@ export function SearchOverlay() {
             )}
           </div>
         )}
-        {query.trim() && query.trim() !== '#' && (
+        {query.trim() !== '#' && (
+          <div className="search-sortierung">
+            <button type="button" className={nachZeit ? 'an' : ''} aria-pressed={nachZeit} data-taste="suche-nach-zeit"
+              title={nachZeit ? 'Wieder nach Relevanz ordnen' : 'Treffer nach der letzten Änderung ordnen – ohne Suchwort: die zuletzt geänderten Karten'}
+              onClick={() => { setNachZeit((v) => !v); setCursor(0); inputRef.current?.focus(); }}>
+              Zuletzt geändert zuerst
+            </button>
+          </div>
+        )}
+        {((query.trim() && query.trim() !== '#') || (!query.trim() && nachZeit)) && (
           <div className="search-results">
             {commands.length > 0 && (
               <div className="search-cmds">
@@ -362,7 +400,7 @@ export function SearchOverlay() {
                 ))}
               </div>
             )}
-            {hits.length === 0 && commands.length === 0 && boardHits.length === 0 && <div className="search-empty">Keine Treffer</div>}
+            {hits.length === 0 && commands.length === 0 && boardHits.length === 0 && <div className="search-empty">{query.trim() ? 'Keine Treffer' : 'Noch keine Karte mit bekanntem Änderungsdatum – das kommt mit der nächsten Änderung.'}</div>}
             {hits.map((h, i) => (
               <button
                 key={`${h.boardId}-${h.node.id}`}
@@ -378,6 +416,7 @@ export function SearchOverlay() {
                     <span translate="no">{h.snippet}</span>
                   </span>
                 </span>
+                {h.zeit !== undefined && <span className="hit-alter" title={`Zuletzt geändert: ${zeitLang(h.zeit)}`}>{vorWann(h.zeit)}</span>}
                 <span className="hit-board" translate="no">{h.boardName}</span>
               </button>
             ))}

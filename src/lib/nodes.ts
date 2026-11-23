@@ -10,6 +10,7 @@ import {
   uid,
   type AppNode,
   type EmailData,
+  type KontaktData,
   type ShapeKind,
   type StickyColor,
 } from '../types';
@@ -172,6 +173,17 @@ export function makeTime(position: Pos): AppNode {
     height: 380,
     position,
     data: { title: t('Zeiterfassung'), segs: [] },
+  };
+}
+
+/** M450: Kontakt-Karte — leer angelegt öffnet sie gleich die Felder; aus einer vCard kommt sie gefüllt */
+export function makeKontakt(position: Pos, daten?: Partial<KontaktData>): AppNode {
+  return {
+    id: uid(),
+    type: 'kontakt',
+    width: 300,
+    position,
+    data: { name: '', telefone: [], emails: [], ...daten },
   };
 }
 

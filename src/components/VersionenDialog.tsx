@@ -1,0 +1,189 @@
+// M449: Versionen eines Boards — frühere Stände ansehen und zurückholen (lib/boardVersionen.ts).
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useBoard } from '../store';
+import { GRUND_TEXT, versionenVon, versionLaden, versionSichern, type VersionInfo, type VersionStand } from '../lib/boardVersionen';
+import { skizzeVon } from '../lib/vorlagen';
+import { sprache } from '../lib/sprache';
+import type { AppNode } from '../types';
+import { IUhr, IX } from './Icons';
+
+const zeitFormat = () => new Intl.DateTimeFormat(sprache() === 'en' ? 'en-GB' : 'de-DE', {
+  weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+});
+const kurzFormat = () => new Intl.DateTimeFormat(sprache() === 'en' ? 'en-GB' : 'de-DE', {
+  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+});
+
+/** Karten in Rahmen liegen relativ zum Rahmen — für die Skizze auf die Fläche umrechnen */
+function absolut(nodes: AppNode[]): AppNode[] {
+  const nach = new Map(nodes.map((n) => [n.id, n]));
+  const lage = (n: AppNode, tiefe = 0): { x: number; y: number } => {
+    const p = n.parentId ? nach.get(n.parentId) : undefined;
+    if (!p || tiefe > 8) return n.position;
+    const o = lage(p, tiefe + 1);
+    return { x: o.x + n.position.x, y: o.y + n.position.y };
+  };
+  return nodes.filter((n) => !n.hidden).map((n) => ({ ...n, position: lage(n) }));
+}
+
+function Skizze({ stand }: { stand: VersionStand }) {
+  const { teile, verhaeltnis } = useMemo(() => skizzeVon({ nodes: absolut(stand.nodes), edges: stand.edges }), [stand]);
+  const B = 320, H = 200, R = 10;
+  const b = Math.min(B - 2 * R, (H - 2 * R) * verhaeltnis), hh = b / verhaeltnis;
+  const x0 = (B - b) / 2, y0 = (H - hh) / 2;
+  return (
+    <svg className="vorlage-skizze versionen-skizze" viewBox={`0 0 ${B} ${H}`} role="img" aria-label="Vorschau des Standes" data-taste="versionen-skizze" data-teile={teile.length}>
+      {teile.map((t, i) => (
+        <rect key={i} x={x0 + t.x * b} y={y0 + t.y * hh} width={Math.max(3, t.w * b)} height={Math.max(3, t.h * hh)} rx={3}
+          fill={t.farbe} className={t.art === 'frame' ? 'sk-rahmen' : 'sk-karte'} />
+      ))}
+    </svg>
+  );
+}
+
+export function VersionenDialog({ boardId, onClose }: { boardId: string; onClose: () => void }) {
+  const board = useBoard((s) => s.boards.find((b) => b.id === boardId));
+  const [liste, setListe] = useState<VersionInfo[] | null>(null);
+  const [wahl, setWahl] = useState<string | null>(null);
+  const [stand, setStand] = useState<VersionStand | null>(null);
+  const [frage, setFrage] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const zu = useRef<HTMLButtonElement>(null);
+  const lesen = board?.geteiltRolle === 'lesen';
+
+  const laden = async (waehle?: string) => {
+    const l = await versionenVon(boardId);
+    setListe(l);
+    setWahl((alt) => waehle ?? (alt && l.some((v) => v.id === alt) ? alt : l[0]?.id ?? null));
+  };
+  useEffect(() => { void laden(); }, [boardId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setFrage(false);
+    setStand(null);
+    if (!wahl) return;
+    let aktiv = true;
+    void versionLaden(wahl).then((s) => { if (aktiv) setStand(s); });
+    return () => { aktiv = false; };
+  }, [wahl]);
+
+  useEffect(() => {
+    zu.current?.focus();
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [onClose]);
+
+  const info = liste?.find((v) => v.id === wahl);
+  /** Was sich gegenüber jetzt ändern würde: Karten, die zurückkämen bzw. verschwänden */
+  const unterschied = useMemo(() => {
+    if (!stand || !board) return null;
+    const jetzt = new Set(board.nodes.map((n) => n.id));
+    const dann = new Set(stand.nodes.map((n) => n.id));
+    return {
+      zurueck: stand.nodes.filter((n) => !jetzt.has(n.id)).length,
+      weg: board.nodes.filter((n) => !dann.has(n.id)).length,
+    };
+  }, [stand, board]);
+
+  const sichernJetzt = async () => {
+    if (!board) return;
+    setBusy(true);
+    const v = await versionSichern(board, 'manuell');
+    setBusy(false);
+    const st = useBoard.getState();
+    if (v === 'gleich') st.showToast('Dieser Stand ist schon gesichert.');
+    else if (v) st.showToast('Stand gesichert.');
+    else st.showToast('Ein leeres Board wird nicht gesichert.');
+    await laden(v && v !== 'gleich' ? v.id : undefined);
+  };
+
+  const wiederherstellen = async () => {
+    if (!board || !stand || !info) return;
+    setBusy(true);
+    // Der jetzige Stand geht nicht verloren: erst sichern, dann einsetzen (zusätzlich ein Strg+Z-Schritt)
+    await versionSichern(useBoard.getState().boards.find((b) => b.id === boardId), 'wiederherstellen');
+    const st = useBoard.getState();
+    if (st.standEinsetzen(boardId, stand)) {
+      st.showToast(`Stand vom ${kurzFormat().format(info.at)} wiederhergestellt – Strg+Z nimmt es zurück.`, false, 7000);
+      window.dispatchEvent(new CustomEvent('pixinotes:einpassen'));
+      onClose();
+    }
+    setBusy(false);
+  };
+
+  const alsKopie = () => {
+    if (!board || !stand || !info) return;
+    const st = useBoard.getState();
+    const name = `${board.name} (Stand ${kurzFormat().format(info.at)})`;
+    if (st.standEinsetzen(boardId, stand, name)) {
+      st.showToast(`Kopie „${name}" angelegt – das Original bleibt, wie es ist.`, false, 6000);
+      onClose();
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal versionen-dialog" role="dialog" aria-modal="true" aria-label="Versionen" data-taste="versionen-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h2>Versionen {board && <small translate="no">„{board.name}"</small>}</h2>
+          <button ref={zu} className="modal-x" onClick={onClose} aria-label="Schließen"><IX size={16} /></button>
+        </div>
+        <div className="modal-body">
+          <p className="versionen-text">
+            PixiNotes sichert dieses Board selbst: beim Verlassen, alle 10 Minuten, wenn sich etwas geändert hat, und vor Abgleich, Import und KI-Umbau. Ältere Stände werden ausgedünnt (einer je Stunde, später einer je Tag).
+          </p>
+          {liste && !liste.length ? (
+            <p className="versionen-leer" data-taste="versionen-leer">Noch keine Versionen. Die erste entsteht, sobald du das Board änderst.</p>
+          ) : (
+            <div className="versionen-teile">
+              <ul className="versionen-liste" role="listbox" aria-label="Gesicherte Stände" data-taste="versionen-liste">
+                {(liste ?? []).map((v) => (
+                  <li key={v.id}>
+                    <button role="option" aria-selected={v.id === wahl} className={v.id === wahl ? 'aktiv' : ''}
+                      data-taste="version" data-karten={v.karten} data-grund={v.grund} onClick={() => setWahl(v.id)}>
+                      <b translate="no">{zeitFormat().format(v.at)}</b>
+                      <small>{v.karten === 1 ? '1 Karte' : `${v.karten} Karten`} · {GRUND_TEXT[v.grund] ?? v.grund}</small>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              <div className="versionen-vorschau">
+                {stand && info ? (
+                  <>
+                    <Skizze stand={stand} />
+                    <p className="versionen-zahlen" data-taste="versionen-zahlen">
+                      {info.karten === 1 ? '1 Karte' : `${info.karten} Karten`}, {info.pfeile === 1 ? '1 Verbindung' : `${info.pfeile} Verbindungen`}
+                      {unterschied && (unterschied.zurueck || unterschied.weg) ? (
+                        <> · gegenüber jetzt: {unterschied.zurueck ? `${unterschied.zurueck} kämen zurück` : ''}{unterschied.zurueck && unterschied.weg ? ', ' : ''}{unterschied.weg ? `${unterschied.weg} fielen weg` : ''}</>
+                      ) : null}
+                    </p>
+                    {frage ? (
+                      <div className="versionen-frage" role="alert">
+                        <p>Das Board bekommt diesen Stand. Der jetzige wird vorher als Version gesichert, und Strg+Z nimmt es zurück.</p>
+                        <div className="versionen-knoepfe">
+                          <button className="versionen-haupt" disabled={busy} onClick={() => void wiederherstellen()} data-taste="version-ersetzen-ja">Ja, wiederherstellen</button>
+                          <button disabled={busy} onClick={() => setFrage(false)}>Abbrechen</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="versionen-knoepfe">
+                        <button className="versionen-haupt" disabled={busy || lesen} onClick={() => setFrage(true)} data-taste="version-wiederherstellen"
+                          title={lesen ? 'Nur zum Lesen freigegeben – als Kopie öffnen geht' : 'Dieses Board auf den Stand zurücksetzen'}>Wiederherstellen …</button>
+                        <button disabled={busy} onClick={alsKopie} data-taste="version-kopie" title="Den Stand als neues Board daneben öffnen">Als Kopie öffnen</button>
+                      </div>
+                    )}
+                  </>
+                ) : wahl ? <p className="versionen-leer">Lädt …</p> : null}
+              </div>
+            </div>
+          )}
+          <div className="versionen-fuss">
+            <button disabled={busy || !board} onClick={() => void sichernJetzt()} data-taste="version-sichern"><IUhr size={14} /> Stand jetzt sichern</button>
+            {liste && <small>{liste.length === 1 ? '1 Version' : `${liste.length} Versionen`} · nur auf diesem Gerät</small>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

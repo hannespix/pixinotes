@@ -122,8 +122,14 @@ export function gruppierenNachVektoren(vek: Array<{ id: string; vec: number[] }>
   return gruppen.map((g) => g.map((x) => x.id));
 }
 
+/** M451: Meldung, wenn der Bereich des Boards vom Gehirn ausgeschlossen ist */
+export const GEHIRN_AUSGESCHLOSSEN = 'Dieser Bereich ist vom Gehirn ausgeschlossen – ohne Chat-KI lassen sich seine Karten nicht nach Themen ordnen. Einschalten unter Einstellungen → Gehirn → Bereiche.';
+
 async function perGehirn(boardId: string, karten: AppNode[]): Promise<{ gruppen: ThemenGruppe[]; hinweis: string }> {
-  const { kartenVektoren } = await import('./brain');
+  const { brainBoardIds, kartenVektoren } = await import('./brain');
+  // M451: Liegt das Board in einem vom Gehirn ausgeschlossenen Bereich, hat keine Karte einen Vektor — das ist kein
+  // Mangel an Inhalt (früher stand hier „Zu wenig Inhalt"), sondern eine Einstellung, und die soll die Meldung nennen.
+  if (!brainBoardIds().has(boardId)) throw new Error(GEHIRN_AUSGESCHLOSSEN);
   const vek = await kartenVektoren(boardId, karten.map((k) => k.id));
   const mit = karten.filter((k) => vek.has(k.id)).map((k) => ({ id: k.id, vec: vek.get(k.id)!.vec }));
   if (mit.length < 3) throw new Error('Zu wenig Inhalt zum Ordnen (mindestens 3 Karten mit Text).');
@@ -147,7 +153,11 @@ export async function themenVorschlagen(karten: AppNode[]): Promise<ThemenVorsch
     erg = kiDa ? await perKi(karten) : await perGehirn(boardId, karten);
   } catch (e) {
     if (!kiDa || !gehirnDa || kiAbgebrochen() || /Zu wenig Inhalt/.test((e as Error).message)) throw e;
-    erg = await perGehirn(boardId, karten);
+    // M451: Ist der Bereich vom Gehirn ausgeschlossen, gibt es keinen Rückfall — dann zählt der Fehler der KI
+    try { erg = await perGehirn(boardId, karten); } catch (g) {
+      if ((g as Error).message === GEHIRN_AUSGESCHLOSSEN) throw new Error(`${(e as Error).message} (Der Rückfall über das Gehirn geht nicht: Dieser Bereich ist vom Gehirn ausgeschlossen.)`);
+      throw g;
+    }
     erg.hinweis = ` – die KI war nicht erreichbar (${(e as Error).message}), gruppiert hat das Gehirn`;
     quelle = 'gehirn';
   }

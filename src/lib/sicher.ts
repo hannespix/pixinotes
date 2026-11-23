@@ -6,6 +6,7 @@
 // Zugriff auf alles, was hier gespeichert ist. Darum entscheidet an jeder solchen Stelle diese Datei, nicht
 // der Board-Inhalt.
 import type { AppNode } from '../types';
+import { zeitSaeubern } from './kartenZeit';
 import type { BoardDoc } from '../store';
 
 const protokoll = (roh: string): string | null => {
@@ -55,6 +56,15 @@ export function wordEntschaerfen(wurzel: HTMLElement): void {
   });
 }
 
+/**
+ * M450: Foto einer Kontakt-Karte — nur ein eingebettetes Rasterbild (data:image/png|jpeg|gif|webp). Keine Webadresse
+ * (die fragte beim Anzeigen einen fremden Server an), kein SVG (darin können Skripte stehen), nichts über 1,5 MB.
+ */
+export function kontaktBild(roh: unknown): string | null {
+  if (typeof roh !== 'string' || roh.length > 1_500_000) return null;
+  return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
+}
+
 const endlich = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /**
@@ -77,8 +87,10 @@ export function karteGueltig(n: unknown): n is AppNode {
  * Adressen in einer Karte entschärfen, die von außen kam: Eine „Live"-Seite, die keine fremde Webseite ist,
  * verliert ihre Adresse; Datei- und Bildquellen mit fremdem Schema werden geleert. Gibt dieselbe Karte zurück,
  * wenn nichts zu tun war.
+ * M453: Zeitpunkte (angelegt/geaendert) müssen glaubhafte Zahlen sein und dürfen nicht in der Zukunft liegen.
  */
-export function karteEntschaerfen<T extends AppNode>(n: T): T {
+export function karteEntschaerfen<T extends AppNode>(n0: T): T {
+  const n = zeitSaeubern(n0);
   const d = n.data as Record<string, unknown>;
   if (n.type === 'htmlapp' && d.url !== undefined && !fremdeWebAdresse(d.url)) {
     const { url: _u, live: _l, ...rest } = d;
@@ -86,6 +98,10 @@ export function karteEntschaerfen<T extends AppNode>(n: T): T {
   }
   if ((n.type === 'file' || n.type === 'sheet') && d.dataUrl !== undefined && !(typeof d.dataUrl === 'string' && /^(data:|blob:)/i.test(d.dataUrl))) {
     const { dataUrl: _d, ...rest } = d;
+    return { ...n, data: rest } as T;
+  }
+  if (n.type === 'kontakt' && d.foto !== undefined && !kontaktBild(d.foto)) {
+    const { foto: _f, ...rest } = d;
     return { ...n, data: rest } as T;
   }
   if (n.type === 'image' && d.src !== undefined && !ladbareQuelle(d.src)) {

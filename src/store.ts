@@ -24,6 +24,7 @@ import { findFreeSpot, frameMembers, sizeOf } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
 import { t } from './lib/sprache';
 import { fristAnkerPflegen, type FristAnker } from './lib/fristAnker';
+import { frisch, nachPatch } from './lib/kartenZeit';
 import { blocksToText } from './lib/serialize';
 import { linksUmbenennen, normalizeName } from './lib/links';
 
@@ -452,6 +453,12 @@ interface BoardState {
   /** M287: Projekt samt aller Boards kopieren (auf derselben Ebene) */
   duplicateProject: (projectId: string) => void;
   /**
+   * M449: Einen gesicherten Stand (lib/boardVersionen.ts) einsetzen. Ohne `alsKopie` bekommt das Board selbst den
+   * Stand — als EIN Rückgängig-Schritt, und weil es eine gewöhnliche Änderung ist, geht sie wie jede andere in den
+   * Sync. Mit `alsKopie` (Name) entsteht daneben ein neues Board mit frischen Kennungen. Rückgabe: Board-Id.
+   */
+  standEinsetzen: (boardId: string, stand: { nodes: AppNode[]; edges: Edge[]; drawings?: Stroke[]; comments?: CommentThread[] }, alsKopie?: string) => string | null;
+  /**
    * M288: Board archivieren bzw. zurückholen. Archivieren ist das sanfte
    * Löschen — nichts geht verloren, das Board tritt nur zur Seite. Wer das
    * gerade offene Board archiviert, wird auf ein sichtbares Nachbar-Board
@@ -731,6 +738,11 @@ function nurAnsicht(alt: BoardDoc, neu: BoardDoc): { board: BoardDoc; verworfen:
  * Mitgelesenes aussieht.
  */
 export const persistHaken: { board: (b: BoardDoc) => BoardDoc } = { board: (b) => b };
+/**
+ * M449: Vor Vorgängen, die viel auf einmal umbauen (Abgleich mit Ordner/Konto, Import eines Projekts), den Stand der
+ * betroffenen Boards sichern. lib/boardVersionen.ts hängt sich hier ein — der Store selbst kennt IndexedDB nicht.
+ */
+export const vorUmbauHaken: { sichern: (boards: BoardDoc[], grund: 'abgleich' | 'import') => void } = { sichern: () => {} };
 const kartenSperren = new Map<string, Map<string, string>>();   // Board → Karte → Name dessen, der sie hält
 export function setzeKartenSperren(boardId: string, sperren: Map<string, string>): void {
   if (sperren.size) kartenSperren.set(boardId, sperren); else kartenSperren.delete(boardId);
@@ -1376,6 +1388,10 @@ export function ohneStartboard<T extends { boards: BoardDoc[]; spaces: Space[] }
   };
 }
 
+/** M453: Inhaltliche Änderung von Hand stempelt die Karte — Automatik (runDerived) nicht */
+const zeitNachPatch = (neu: AppNode, alt: AppNode, patch: Record<string, unknown>): AppNode =>
+  (inDerived() ? neu : nachPatch(neu, alt, patch));
+
 /** M390: Ändern sich die Blöcke einer Notiz, wandern die Fristen-Anker mit (lib/fristAnker.ts). */
 const mitFristAnker = (n: AppNode, data: Record<string, unknown>): Record<string, unknown> => {
   // M435: Formen (Schritt, Entscheidung, Start/Ende) tragen formatierten Text wie Notizen — `text` bleibt die
@@ -1834,7 +1850,7 @@ export const useBoard = create<BoardState>()(
                     ...b,
                     nodes: b.nodes.map((n) =>
                       n.id === nodeId
-                        ? ({ ...n, data: { ...n.data, ...mitFristAnker(n, data), ...(bumpt ? { extEpoch: (((n.data as { extEpoch?: number }).extEpoch) ?? 0) + 1 } : {}) } } as AppNode)
+                        ? zeitNachPatch({ ...n, data: { ...n.data, ...mitFristAnker(n, data), ...(bumpt ? { extEpoch: (((n.data as { extEpoch?: number }).extEpoch) ?? 0) + 1 } : {}) } } as AppNode, n, patch)
                         : n,
                     ),
                   }
@@ -2185,6 +2201,12 @@ export const useBoard = create<BoardState>()(
           // mit neuem Zeitstempel hochladen (falsche Konflikte auf anderen Geräten)
           markImported(boards, spaces);
           fremdeNotizenMerken(get().boards, boards);
+          // M449: Was gleich überschrieben wird, vorher als Version sichern (der Abgleich höchstens alle 10 Minuten je Board)
+          {
+            const kommt = new Map(boards.map((b) => [b.id, b]));
+            const nimmt = sanft ? new Set(sanft.geaendert) : null;
+            vorUmbauHaken.sichern(get().boards.filter((b) => kommt.has(b.id) && kommt.get(b.id) !== b && (!nimmt || nimmt.has(b.id))), sanft ? 'abgleich' : 'import');
+          }
           if (sanft) {
             // M311: Hintergrund-Abgleich mit dem Sync-Ordner. Undo-Schritte zu
             // Boards, die drüben anders geworden sind, fallen weg — ein Undo
@@ -2244,6 +2266,11 @@ export const useBoard = create<BoardState>()(
         importProject: (proj, boards) => {
           if (!proj?.id || !proj.name || !Array.isArray(boards) || boards.length === 0) return;
           const s = get();
+          // M449: Die Boards des Projekts, die gleich ersetzt werden, vorher als Version sichern
+          {
+            const alt = new Set(s.spaces.flatMap((sp) => sp.projects).find((p) => p.id === proj.id)?.boardIds ?? []);
+            vorUmbauHaken.sichern(s.boards.filter((b) => alt.has(b.id)), 'import');
+          }
           // Bestehendes Projekt (egal in welchem Bereich) ersetzen …
           let oldIds: string[] = [];
           let found = false;
@@ -2624,6 +2651,58 @@ export const useBoard = create<BoardState>()(
           get().showToast(`Board „${quelle.name}" kopiert – die Kopie liegt daneben.`);
         },
 
+        standEinsetzen: (boardId, stand, alsKopie) => {
+          const st = get();
+          const quelle = st.boards.find((b) => b.id === boardId);
+          if (!quelle || !Array.isArray(stand?.nodes) || !Array.isArray(stand?.edges)) return null;
+          if (alsKopie === undefined) {
+            if (quelle.geteiltRolle === 'lesen') { st.showToast('Dieses Board ist nur zum Lesen freigegeben – als Kopie öffnen geht.'); return null; }
+            lastEditKey = '';
+            set({
+              activeId: boardId,
+              view: 'board',
+              lastDeleted: null,
+              past: [...st.past.slice(-(HISTORY_LIMIT - 1)), {
+                boardId, nodes: quelle.nodes, edges: quelle.edges, drawings: quelle.drawings, comments: quelle.comments, remount: true,
+              }],
+              future: [],
+              boards: st.boards.map((b) => (b.id === boardId
+                ? { ...b, nodes: stand.nodes, edges: stand.edges, drawings: stand.drawings ?? [], comments: stand.comments ?? b.comments }
+                : b)),
+              // Notiz-Editoren lesen ihren Text nur beim Aufbau — sonst zeigten sie den alten Inhalt
+              importEpoch: st.importEpoch + 1,
+            });
+            return boardId;
+          }
+          // Als Kopie: frische Kennungen (wie duplicateBoard), Pfeile, Rahmen-Kinder und Striche ziehen mit
+          const karte = new Map(stand.nodes.map((n) => [n.id, uid()]));
+          const nodes = stand.nodes.map((n) => {
+            const k = { ...JSON.parse(JSON.stringify(n)), id: karte.get(n.id) as string, selected: false } as AppNode;
+            if (n.parentId && karte.has(n.parentId)) (k as { parentId?: string }).parentId = karte.get(n.parentId);
+            return k;
+          });
+          const edges = stand.edges.filter((e) => karte.has(e.source) && karte.has(e.target))
+            .map((e) => ({ ...e, id: uid(), source: karte.get(e.source) as string, target: karte.get(e.target) as string, selected: false }));
+          const drawings = (stand.drawings ?? []).map((d) => ({ ...JSON.parse(JSON.stringify(d)), id: uid(), anchor: d.anchor ? karte.get(d.anchor) : undefined }));
+          const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, gastLink: _l, archived: _a, ...eigen } = quelle;
+          const kopie: BoardDoc = { ...eigen, id: uid(), name: alsKopie.slice(0, 80) || `${quelle.name} (Stand)`, nodes, edges, drawings, comments: [] };
+          anhaengeMitnehmen(stand.nodes, karte);
+          const boards = [...st.boards, kopie];
+          const eigenes = quelle.geteiltVon ? st.spaces.filter((sp) => sp.id !== 'geteilt').flatMap((sp) => sp.projects)[0] : undefined;
+          set({
+            boards,
+            spaces: sortiereProjekte(st.spaces.map((sp) => ({
+              ...sp,
+              projects: sp.projects.map((p) => (eigenes
+                ? (p.id === eigenes.id ? { ...p, boardIds: [...p.boardIds, kopie.id] } : p)
+                : p.boardIds.includes(boardId)
+                  ? { ...p, boardIds: p.boardIds.flatMap((id) => (id === boardId ? [id, kopie.id] : [id])) }
+                  : p)),
+            })), boards),
+          });
+          get().openBoard(kopie.id);
+          return kopie.id;
+        },
         duplicateProject: (projectId) => {
           const st = get();
           const raum = st.spaces.find((sp) => sp.projects.some((p) => p.id === projectId));
@@ -2905,7 +2984,7 @@ export const useBoard = create<BoardState>()(
 
         addNode: (node) => {
           get().pushHistory();
-          patchActive((b) => ({ nodes: [...b.nodes, node] }));
+          patchActive((b) => ({ nodes: [...b.nodes, frisch(node)] }));
         },
 
         dupliziere: (ids) => {
@@ -2919,7 +2998,7 @@ export const useBoard = create<BoardState>()(
           const belegt = (kk: number) => wahl.some((n) => b.nodes.some((x) => x.type === n.type && Math.abs(x.position.x - (n.position.x + 30 * kk)) < 2 && Math.abs(x.position.y - (n.position.y + 30 * kk)) < 2));
           while (k < 40 && belegt(k)) k += 1;
           const karte = new Map(wahl.map((n) => [n.id, uid()]));
-          const neu = wahl.map((n) => ({
+          const neu = wahl.map((n) => frisch({
             ...n, id: karte.get(n.id) as string, selected: true,
             position: { x: n.position.x + 30 * k, y: n.position.y + 30 * k },
             data: JSON.parse(JSON.stringify(n.data)),
@@ -2947,7 +3026,7 @@ export const useBoard = create<BoardState>()(
           }
           set({
             boards: get().boards.map((b) =>
-              b.id === boardId ? { ...b, nodes: [...b.nodes, node] } : b),
+              b.id === boardId ? { ...b, nodes: [...b.nodes, frisch(node)] } : b),
           });
         },
 
@@ -3285,7 +3364,7 @@ export const useBoard = create<BoardState>()(
           }
           patchActive((b) => ({
             nodes: b.nodes.map((n) =>
-              n.id === id ? ({ ...n, data: { ...n.data, ...mitFristAnker(n, data) } } as AppNode) : n,
+              n.id === id ? zeitNachPatch({ ...n, data: { ...n.data, ...mitFristAnker(n, data) } } as AppNode, n, data) : n,
             ),
           }));
         },
