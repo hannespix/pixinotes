@@ -6,6 +6,7 @@
 // Zugriff auf alles, was hier gespeichert ist. Darum entscheidet an jeder solchen Stelle diese Datei, nicht
 // der Board-Inhalt.
 import type { AppNode } from '../types';
+import { zeitSaeubern } from './kartenZeit';
 import type { BoardDoc } from '../store';
 
 const protokoll = (roh: string): string | null => {
@@ -86,8 +87,10 @@ export function karteGueltig(n: unknown): n is AppNode {
  * Adressen in einer Karte entschärfen, die von außen kam: Eine „Live"-Seite, die keine fremde Webseite ist,
  * verliert ihre Adresse; Datei- und Bildquellen mit fremdem Schema werden geleert. Gibt dieselbe Karte zurück,
  * wenn nichts zu tun war.
+ * M453: Zeitpunkte (angelegt/geaendert) müssen glaubhafte Zahlen sein und dürfen nicht in der Zukunft liegen.
  */
-export function karteEntschaerfen<T extends AppNode>(n: T): T {
+export function karteEntschaerfen<T extends AppNode>(n0: T): T {
+  const n = zeitSaeubern(n0);
   const d = n.data as Record<string, unknown>;
   if (n.type === 'htmlapp' && d.url !== undefined && !fremdeWebAdresse(d.url)) {
     const { url: _u, live: _l, ...rest } = d;

@@ -38238,6 +38238,12 @@ init_define_import_meta_env();
 
 // src/lib/sicher.ts
 init_define_import_meta_env();
+
+// src/lib/kartenZeit.ts
+init_define_import_meta_env();
+var FRUEHESTENS = Date.UTC(2020, 0, 1);
+
+// src/lib/sicher.ts
 function kontaktBild(roh) {
   if (typeof roh !== "string" || roh.length > 15e5) return null;
   return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;

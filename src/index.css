@@ -1014,6 +1014,15 @@ input.img-titel {
   border-radius: var(--r-pill); padding: 2px 9px; flex: none; max-width: 130px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* M453: Alter des Treffers und „Zuletzt geändert zuerst" — leise, ohne eigene Fläche */
+.hit-alter { font-size: 10.5px; color: var(--muted); flex: none; white-space: nowrap; }
+.search-sortierung { display: flex; justify-content: flex-end; padding: 0 10px 6px; }
+.search-sortierung button {
+  border: 1px solid transparent; background: none; color: var(--muted); font: inherit; font-size: 11.5px;
+  padding: 4px 10px; min-height: 32px; border-radius: var(--r-pill); cursor: pointer;
+}
+.search-sortierung button:hover { color: var(--ink); background: var(--surface-dim); }
+.search-sortierung button.an { color: var(--accent-strong); background: var(--accent-soft); border-color: var(--accent); }
 .search-empty { padding: 18px; font-size: 13px; color: var(--muted); text-align: center; }
 .search-footer {
   font-size: 10.5px; color: var(--muted); padding: 8px 16px;

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBoard, type Tool } from '../store';
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon, type DokumentBefehl } from '../lib/pdfSeiten';
 import { nodeToText } from '../lib/serialize';
+import { vorWann, zeitLang, zeitVon } from '../lib/kartenZeit';
 import type { AppNode } from '../types';
 import { ICheck, IChevronL, IChevronR, IComment, IEraser, IFit, IHighlighter, IMaximize, IPen, IPlay, IX } from './Icons';
 import { istRein, ReinRand, useReinAnsicht } from '../lib/reinAnsicht';
@@ -446,6 +447,7 @@ export function FocusSheet() {
   };
 
   const typeName = TYPE_LABEL[node.type ?? ''] ?? 'Karte';
+  const zeit = zeitVon(node);
   const vorige = folgeNachbar(siblings, board?.edges ?? [], node.id, false);
   const naechste = folgeNachbar(siblings, board?.edges ?? [], node.id, true);
 
@@ -502,7 +504,10 @@ export function FocusSheet() {
             ohnehin bei allen Karten-Werkzeugen. */}
         <div className="focus-title">
           <b translate="no">{cardTitle(node)}</b>
-          <span>{typeName}{siblings.length > 1 ? ` · ${index + 1} von ${siblings.length}` : ''}{dok ? ` · Seite ${dok.seite} von ${dok.seiten}` : ''}</span>
+          <span>{typeName}{siblings.length > 1 ? ` · ${index + 1} von ${siblings.length}` : ''}{dok ? ` · Seite ${dok.seite} von ${dok.seiten}` : ''}{zeit !== undefined && (
+            // M453: ruhig in der Unterzeile — wann die Karte zuletzt inhaltlich geändert wurde (Lage/Größe zählen nicht)
+            <> · <time className="focus-zeit" dateTime={new Date(zeit).toISOString()} title={`Zuletzt geändert: ${zeitLang(zeit)}`}>{`Geändert ${vorWann(zeit)}`}</time></>
+          )}{zeit === undefined && <span className="focus-zeit" title="Zuletzt geändert: unbekannt – die Karte stammt aus einem älteren Stand"> · Änderung unbekannt</span>}</span>
         </div>
         {/* M424: Darstellung wie in der Präsentation — ein kleines Symbol; wer die Stufe verstellt hat, sieht dort die Prozent */}
         <span className="focus-ansicht" ref={ansichtHuelle}>
