@@ -61,7 +61,11 @@ Sitzung ihrer Quelle vorbei.
 - `store/schutz.ts` `mitTextVon` (Kanban): alle Felder und die Reihenfolge bestehender Tickets gehen durch; ist nichts
   zurückzunehmen, bleiben die neuen Daten selbst (der Schutz vergleicht nach Identität und meldete sonst „… bearbeitet
   diese Karte" für eine Änderung, die er gar nicht zurücknimmt).
-- Start-JS unverändert unter der Grenze (neu im Start nur `lib/kanbanLive.ts` über die Aufgaben-Zentrale).
+- Start-JS: 2 108 819 B (Grenze 2 120 000 unverändert); neu im Start nur `lib/kanbanLive.ts` über die Aufgaben-Zentrale.
+
+## Nachweis
+`node werkzeug/alle-pruefungen.mjs m477 m487 m489 m498 --wiederhole 5 --bahnen 4`: je 5 von 5 grün. `--geaendert` (nach Einmischen
+von M497): 45 von 45 Reihen grün.
 
 ## Prüfreihe
 A Live-Runde · B Checkliste (dazu, abhaken, umbenennen) während Anna tippt, beide fügen zugleich hinzu, Alt+↑ während
