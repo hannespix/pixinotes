@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import { konfettiWerfen } from '../../lib/konfetti';
-import { mutedHistory, runDerived, useBoard } from '../../store';
+import { mutedHistory, runDerived, useBoard, useKarteFest } from '../../store';
 import { makeTicketDrag, type DropTarget } from '../../lib/dragTickets';
 import {
   kanbanCols, mitSpalte, openSubs, ticketBlockers, uid, wipFull, wipLimitOf,
@@ -22,6 +22,10 @@ import { KartenSymbol } from '../KartenSymbol';
 import { t, zahlWort } from '../../lib/sprache';
 import { tageSeit, zeitLang } from '../../lib/kartenZeit';
 import { useNutzerBoards } from '../../lib/eingang';
+import { liveVerbunden } from '../../lib/liveStand';
+
+/** M487: Titel und Beschreibung eines Tickets gemeinsam tippen — nachgeladen, nur im Live-Board (./KanbanGemeinsam.tsx) */
+const KanbanFeld = lazy(() => import('./KanbanGemeinsam'));
 
 const TAG_RE = /#([\p{L}\d_-]{2,20})/gu;
 const TAG_MS = 86_400_000;
@@ -78,6 +82,15 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
   const [newText, setNewText] = useState('');
   const [editingDue, setEditingDue] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  // M487: Im Live-Board tippen mehrere zugleich im Ticket-Fenster (Yjs). Einmal live, bleibt es dabei; lädt der
+  // Yjs-Teil nicht, gelten wieder die gewohnten Felder (`feldAllein`). Gefragt wird beim Zeichnen — also spätestens,
+  // wenn das Ticket-Fenster aufgeht (kein Takt je Kanban-Karte für jede Änderung der Runde).
+  const boardIdHier = useBoard((s) => s.activeId);
+  const jeLive = useRef(false);
+  if (liveVerbunden(boardIdHier)) jeLive.current = true;
+  const [feldAllein, setFeldAllein] = useState(false);
+  const feldFest = useKarteFest((data as { von?: string }).von);
+  const gemeinsameFelder = jeLive.current && !feldAllein;
   // Filterleiste (Trello-Stil): Textsuche, Schnellfilter, #Tag, Quell-Board.
   // Bewusst NICHT persistiert — Filter sind eine Ansicht, kein Zustand.
   const [filterOpen, setFilterOpen] = useState(false);
@@ -1391,13 +1404,20 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
               aria-label="Ticket bearbeiten"
             >
               <div className="ticket-modal-head">
-                <input
-                  className="ticket-title"
-                  value={it.text}
-                  readOnly={ausNotiz(it)}
-                  title={ausNotiz(it) ? 'Der Text kommt aus der Notiz – dort ändern (↗ am Ticket springt hin)' : undefined}
-                  onChange={(e) => patchTicket(it, { text: e.target.value })}
-                />
+                {/* M487: gemeinsam nur, wo das Ticket sich selbst gehört — ein eingesammeltes schreibt in seine Quelle (M390) */}
+                {gemeinsameFelder && !quelleVon(it) ? (
+                  <Suspense fallback={<input className="ticket-title" value={it.text} readOnly />}>
+                    <KanbanFeld boardId={boardIdHier} nodeId={id} itemId={it.id} feld="text" wert={it.text} darf={!feldFest} className="ticket-title" onAllein={() => setFeldAllein(true)} />
+                  </Suspense>
+                ) : (
+                  <input
+                    className="ticket-title"
+                    value={it.text}
+                    readOnly={ausNotiz(it)}
+                    title={ausNotiz(it) ? 'Der Text kommt aus der Notiz – dort ändern (↗ am Ticket springt hin)' : undefined}
+                    onChange={(e) => patchTicket(it, { text: e.target.value })}
+                  />
+                )}
                 <button className="taskhub-x" title="Schließen (Esc)" onClick={() => setDetailId(null)}><IX size={14} /></button>
               </div>
               <div className="ticket-meta-row">
@@ -1436,13 +1456,19 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
                 )}
               </div>
 
-              <textarea
-                className="ticket-note"
-                rows={4}
-                placeholder="Beschreibung / Details / Kontext … (#tags werden zu Labels)"
-                value={it.note ?? ''}
-                onChange={(e) => patchItem(it.id, { note: e.target.value || undefined })}
-              />
+              {gemeinsameFelder ? (
+                <Suspense fallback={<textarea className="ticket-note" rows={4} value={it.note ?? ''} readOnly />}>
+                  <KanbanFeld boardId={boardIdHier} nodeId={id} itemId={it.id} feld="note" wert={it.note ?? ''} darf={!feldFest} className="ticket-note" rows={4} placeholder="Beschreibung / Details / Kontext … (#tags werden zu Labels)" onAllein={() => setFeldAllein(true)} />
+                </Suspense>
+              ) : (
+                <textarea
+                  className="ticket-note"
+                  rows={4}
+                  placeholder="Beschreibung / Details / Kontext … (#tags werden zu Labels)"
+                  value={it.note ?? ''}
+                  onChange={(e) => patchItem(it.id, { note: e.target.value || undefined })}
+                />
+              )}
 
               {/* Checkliste (Trello-Stil) mit Fortschrittsbalken */}
               <div className="ticket-section">
