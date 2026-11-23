@@ -12,7 +12,7 @@ const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => impor
 import { kiBeispiel, kiBlaettern } from '../lib/kiVerlauf';
 import { KACHEL_TYPEN, STICKY_COLORS, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IDownload, IComment, ICompact, ICrop, IDuplicate, IFit, IFrame, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IDownload, IComment, ICompact, ICrop, IDuplicate, IFit, IFrame, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IPerson, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -783,6 +783,27 @@ export function SelectionToolbar() {
                 {selected.length === 1 && bildBearbeitbar(selected[0]) && (
                   <button data-taste="bild-bearbeiten" onClick={() => { setMenu(null); bildBearbeiten(selected[0].id); }}>
                     <ICrop size={14} /> Bild bearbeiten …
+                  </button>
+                )}
+                {/* M457: Absender einer Mail als Kontakt-Karte (Kopf + Signatur, KI verfeinert, falls eingerichtet) –
+                    bewusst hier im ⋯ statt als weiterer Dauer-Knopf an der Mail */}
+                {single?.type === 'email' && (
+                  <button
+                    data-taste="absender-kontakt"
+                    disabled={aiBusy}
+                    title="Name, E-Mail, Funktion, Firma, Rufnummern und Anschrift aus Absender und Signatur – als Kontakt-Karte neben der Mail (ein vorhandener Kontakt wird ergänzt)"
+                    onClick={() => {
+                      setMenu(null);
+                      const mailId = single.id;
+                      setAiBusy(true);
+                      void import('../lib/kontaktAusMail')
+                        .then((m) => m.absenderAlsKontakt(mailId))
+                        .then((r) => showToast(r.text, r.geaendert, 6000))
+                        .catch((e) => showToast(`Kontakt nicht angelegt: ${(e as Error).message}`, false, 6000))
+                        .finally(() => setAiBusy(false));
+                    }}
+                  >
+                    <IPerson size={14} /> Absender als Kontakt
                   </button>
                 )}
                 {/* M374: Bilder liegen rahmenlos auf dem Board — hier kommt die Karte mit Rand zurück (und wieder weg) */}
