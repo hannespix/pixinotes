@@ -129,8 +129,8 @@ export function setzeNotizSchutz(boardId: string, schutz: Map<string, string>): 
 }
 /**
  * M477/M487: Die Karte `alt` mit dem gemeinsam getippten Text aus `neu` — und sonst nichts von `neu`. Notiz: die Blöcke;
- * Protokoll: die Blöcke und (M493) Beschlüsse je Sitzungstermin (Datum, Teilnehmende bleiben); Kanban: Titel und Beschreibung je
- * Ticket (Spalte, Frist, Reihenfolge, neue oder entfernte Tickets bleiben).
+ * Protokoll: die Blöcke und (M493) Beschlüsse je Sitzungstermin (Datum, Teilnehmende bleiben); Kanban: (M498) alle Felder und
+ * die Reihenfolge der bestehenden Tickets (neue oder entfernte Tickets, Spalten, Titel bleiben).
  */
 function mitTextVon(alt: AppNode, neu: AppNode): AppNode {
   const a = alt.data as Record<string, unknown>; const b = neu.data as Record<string, unknown>;
@@ -151,7 +151,29 @@ function mitTextVon(alt: AppNode, neu: AppNode): AppNode {
   // M493: die Beschlüsse der Sitzung laufen gemeinsam ebenfalls über das Y-Dokument (lib/protokollLive.ts) — der
   // Schreiber sichert sie mit dem Text, sie gehen deshalb durch wie er
   if (alt.type === 'minutes') return je('entries', ['blocks', 'decisions']);
-  if (alt.type === 'kanban') return je('items', ['text', 'note']);
+  if (alt.type === 'kanban') {
+    // M498: Gemeinsam laufen jetzt alle Felder der Tickets (Person, Frist, Checkliste, Spalte …) und ihre Reihenfolge
+    // über das Y-Dokument (lib/notizGemeinsamKern.ts `kanbanOeffnen`) — der Schreiber sichert sie, sie gehen durch.
+    // Neue oder entfernte Tickets, Spalten und der Titel der Karte bleiben, wie sie sind.
+    const vorher = a.items; const nachher = b.items;
+    if (!Array.isArray(vorher) || !Array.isArray(nachher)) return alt;
+    const da = new Set((vorher as Mit[]).map((x) => x?.id));
+    const liste = (nachher as Mit[]).filter((x) => da.has(x?.id));
+    const drin = new Set(liste.map((x) => x?.id));
+    // Was es drüben nicht mehr gibt, bleibt hinter seinem bisherigen Vorgänger
+    (vorher as Mit[]).forEach((x, i) => {
+      if (drin.has(x?.id)) return;
+      const vor = i > 0 ? (vorher as Mit[])[i - 1]?.id : undefined;
+      const p = vor === undefined ? -1 : liste.findIndex((y) => y?.id === vor);
+      liste.splice(p + 1, 0, x);
+      drin.add(x?.id);
+    });
+    const data = { ...a, items: liste };
+    // Nichts am Inhalt zurückzunehmen: die neuen Daten selbst — der Schutz vergleicht nach Identität und meldete sonst
+    // „… bearbeitet diese Karte" für eine Änderung, die er gar nicht zurücknimmt (Lage und Archiv bleiben von `alt`)
+    if (JSON.stringify(data) === JSON.stringify(b)) return { ...alt, data: b } as unknown as AppNode;
+    return { ...alt, data } as unknown as AppNode;
+  }
   return { ...alt, data: { ...a, blocks: b.blocks } } as AppNode;
 }
 /** Gesperrte Karten behalten Inhalt und Lage (auch gegen Löschen); alles andere geht durch.

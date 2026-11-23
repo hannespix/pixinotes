@@ -30,7 +30,30 @@
 .feld-tippt b + b::before { content: ', '; color: var(--muted); font-weight: 400; }
 .feld-tippt-text { flex: none; max-width: 40%; }
 .feld-tippt-note { margin-top: -6px; }
+/* M498: Die Cursor der anderen stehen auch im Ticket-Feld als schmaler Strich in ihrer Farbe (wie in der Notiz), ihre
+   Markierung leicht eingefärbt, der Name nur kurz nach einer Bewegung. Die Lage liegt über dem Feld und nimmt keine
+   Klicks an. Die Hülle hält Feld und Lage zusammen, das Layout bleibt das des Felds. */
+.feld-huelle { position: relative; display: flex; min-width: 0; }
+.feld-huelle-text { flex: 1; }
+.feld-huelle-text > input { flex: 1; min-width: 0; }
+.feld-huelle-note { flex-direction: column; }
+.feld-cursor-lage { position: absolute; pointer-events: none; z-index: 1; }
+.feld-cursor-lage i, .feld-cursor-lage b { position: absolute; display: block; }
+.feld-cursor-strich { width: 2px; margin-left: -1px; border-radius: 1px; }
+.feld-cursor-markierung { opacity: 0.28; border-radius: 2px; }
+.feld-cursor-name {
+  transform: translate(-1px, -100%);
+  font-size: 11px;
+  line-height: 1.2;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 3px 3px 3px 0;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .feld-cursor-strich, .feld-cursor-name { transition: left 80ms linear, top 80ms linear; }
+}
 @media print {
   .note-editor .bn-collaboration-cursor__base { display: none; }
-  .feld-tippt { display: none; }
+  .feld-tippt, .feld-cursor-lage { display: none; }
 }
