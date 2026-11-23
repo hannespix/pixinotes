@@ -1,6 +1,6 @@
 // Karten → Text / HTML: für „Per E-Mail teilen", Zwischenablage (Outlook-Paste)
 // und die Suche. Bewusst schlicht gehalten — sauberes Office-taugliches HTML.
-import { doneCol, kanbanCols, type AppNode, type SheetData } from '../types';
+import { doneCol, kanbanCols, type AppNode, type KontaktData, type SheetData } from '../types';
 import { bubblesAlsText } from './bubbles';
 import { formatBytes } from './parseEmail';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from './formel';
@@ -405,6 +405,22 @@ export function blocksToMarkdown(blocks: unknown[] | undefined): string {
 
 /* ---------- Karten → Text/HTML ---------- */
 
+/** M450: Kontakt-Karte als Zeilen — Name zuerst (Titel in Suche und Fokus), dann Funktion/Firma, Rufnummern, E-Mail … */
+function kontaktZeilen(d0: Partial<KontaktData> | undefined): string[] {
+  const d = d0 ?? {};
+  const s = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  const tel = (Array.isArray(d.telefone) ? d.telefone : []).filter((t) => t && s(t.nummer)).map((t) => `Tel.${s(t.art) ? ` (${s(t.art)})` : ''}: ${s(t.nummer)}`);
+  const mail = (Array.isArray(d.emails) ? d.emails : []).map(s).filter(Boolean).map((m) => `E-Mail: ${m}`);
+  return [
+    s(d.name) || s(d.firma) || 'Kontakt',
+    [s(d.funktion), s(d.firma)].filter(Boolean).join(' · '),
+    ...tel, ...mail,
+    s(d.adresse) ? `Anschrift: ${s(d.adresse).replace(/\s*\n\s*/g, ', ')}` : '',
+    s(d.web) ? `Web: ${s(d.web)}` : '',
+    s(d.notiz),
+  ].filter(Boolean);
+}
+
 export function nodeToText(node: AppNode): string {
   const base = baseNodeText(node);
   // Attribute (Trilium-Stil: schlüssel=wert) anhängen — damit sind sie
@@ -483,6 +499,9 @@ function baseNodeText(node: AppNode): string {
       return `Eigene App: ${node.data.name} (${formatBytes(node.data.size)})`;
     case 'bubbles':
       return bubblesAlsText(node.data);
+    case 'kontakt':
+      // M450: alle Felder — so findet die Suche (Strg+K) einen Kontakt auch über Firma, Ort oder Rufnummer
+      return kontaktZeilen(node.data).join('\n');
     case 'time': {
       const t = node.data;
       const labels: Record<string, string> = { arbeit: 'Arbeit', pause: 'Pause' };
@@ -585,6 +604,10 @@ export function nodeToHtml(node: AppNode): string {
     case 'frame':
       // Abschnitts-Folie im Presenter: der Rahmen-Name als Zwischentitel
       return `<h2 style="text-align:center;margin-top:1.4em">${esc(node.data.name)}</h2>`;
+    case 'kontakt': {
+      const [kopf, ...rest] = kontaktZeilen(node.data);
+      return `<h3>${esc(kopf)}</h3>${rest.map((z) => `<p style="margin:2px 0;white-space:pre-wrap">${esc(z)}</p>`).join('')}`;
+    }
     case 'htmlapp':
       return `<p>Eigene App: <b>${esc(node.data.name)}</b> (${formatBytes(node.data.size)}) – läuft nur live auf dem Board.</p>`;
     case 'time': {
@@ -697,6 +720,10 @@ export function nodeToMarkdown(node: AppNode): string {
     }
     case 'mermaid':
       return `\`\`\`mermaid\n${node.data.code}\n\`\`\`${anhang}`;
+    case 'kontakt': {
+      const [kopf, ...rest] = kontaktZeilen(node.data);
+      return `### ${kopf}\n\n${rest.map((z) => `- ${z.replace(/\n/g, ' ')}`).join('\n')}${anhang}`;
+    }
     case 'frame':
       return `## ${node.data.name}`;
     case 'email':
