@@ -144,6 +144,8 @@ function lesen(n: AppNode, u: KiUmfeld): string {
     }
     case 'calendar': return `Kalender${n.data.month ? ` (${n.data.month})` : ''} – zeigt Fristen und Zeitplan-Einträge aller Boards; hat keinen eigenen Inhalt`;
     case 'shape': return `Form (${n.data.shape}): ${n.data.text || ''}`;
+    // M450: Kontakt-Karte — die Felder als Zeilen (Name, Funktion · Firma, Tel., E-Mail, Anschrift …)
+    case 'kontakt': return `Kontakt\n${nodeToText(n)}`;
     default: return nodeToText(n);
   }
 }
@@ -709,7 +711,7 @@ const TYP_WORTE: Array<[RegExp, string]> = [
   [/zeitplan|gantt|vorgang|meilenstein|phase/i, 'gantt'], [/protokoll|sitzung|beschluss|besprechung|meeting/i, 'minutes'],
   [/wochenplan|stundenplan|dienstplan|planer|schicht/i, 'week'], [/zeiterfassung|arbeitszeit|stunden/i, 'time'],
   [/diagramm|ablauf|flowchart|mermaid|workflow/i, 'mermaid'], [/notiz|text|absatz/i, 'note'], [/mail/i, 'email'],
-  [/datei|pdf|dokument|word/i, 'file'], [/idee|bubble|brainstorm/i, 'bubbles'], [/bild|foto|screenshot/i, 'image'],
+  [/datei|pdf|dokument|word/i, 'file'], [/idee|bubble|brainstorm/i, 'bubbles'], [/bild|foto|screenshot/i, 'image'], [/kontakt|telefon|anruf|ansprechpartner|adresse|visitenkarte/i, 'kontakt'],
 ];
 
 /**

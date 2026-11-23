@@ -25,6 +25,9 @@ Jeder Arbeits-Agent liefert selbstständig bis zum Merge.
    einmal laufen lassen. Bei Konflikt in Hilfe-/Sprachdateien: beide Seiten
    behalten.
 6. Merge-Methode: **Squash**, Titel `Betreff (MNNN) (#PR)`.
+7. **Erst mergen, wenn „PR prüfen“ für den Head-Commit grün ist**
+   (`mcp__github__actions_list`, `resource_id: pruefen.yml`, ~1 min). In
+   Runde 1 mergten zwei Agenten, bevor der Lauf überhaupt startete.
 
 ## Brief für einen Arbeits-Agenten (Vorlage)
 ```
