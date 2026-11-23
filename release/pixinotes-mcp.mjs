@@ -39426,6 +39426,14 @@ ${frei.map(zeile).join("\n")}`);
 ${teile.join("\n\n")}`.trim();
 }
 
+// src/lib/fluessigDaten.ts
+init_define_import_meta_env();
+var FLUESSIG_MAX = 32;
+function fluessigText(roh) {
+  const t2 = typeof roh === "string" ? roh : "";
+  return Array.from(t2.replace(/[\u0000-\u001f\u007f]+/g, " ")).slice(0, FLUESSIG_MAX).join("");
+}
+
 // src/lib/mermaidTemplates.ts
 init_define_import_meta_env();
 var MERMAID_TEMPLATES = {
@@ -40412,6 +40420,8 @@ ${g.rows.map((r) => `  ${r.start === r.end ? "\u25C6" : "\u25AC"} ${r.name}: ${r
       return bubblesAlsText(node2.data);
     case "kontakt":
       return kontaktZeilen(node2.data).join("\n");
+    case "fluessig":
+      return fluessigText(node2.data.text);
     case "time": {
       const t2 = node2.data;
       const labels = { arbeit: "Arbeit", pause: "Pause" };
@@ -40651,6 +40661,9 @@ ${bubblesAlsText(n.data)}`;
     case "kontakt":
       return `Kontakt
 ${nodeToText(n)}`;
+    // M500: Flüssige Schrift — die KI liest den Text (die Flüssigkeit ist nur Darstellung)
+    case "fluessig":
+      return `Fl\xFCssige Schrift (Schmuck-\xDCberschrift): ${nodeToText(n)}`;
     // M452: Bilder (auch als Datei abgelegte) mit dem Text, den die Erkennung darin gefunden hat — so kann die
     // KI aus Screenshots zusammenfassen und Aufgaben ziehen. Bewusst ohne Import aus textInBildern (MCP-Server).
     case "image":
