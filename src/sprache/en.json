@@ -3189,4 +3189,6 @@
 "Kontakt „{0}\" angelegt – mit {1}{2}":"Contact “{0}” created – with {1}{2}",
 "Kontakt „{0}\" angelegt{1}":"Contact “{0}” created{1}",
 "Rufnummern":"Phone numbers",
-" (von der KI geprüft)":" (checked by AI)"}
+" (von der KI geprüft)":" (checked by AI)",
+"· schläft":"· asleep",
+"Abo aus Kanban: „{0}\" fällig am {1}":"Subscription from Kanban: “{0}” due on {1}"}
