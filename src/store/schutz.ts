@@ -129,7 +129,7 @@ export function setzeNotizSchutz(boardId: string, schutz: Map<string, string>): 
 }
 /**
  * M477/M487: Die Karte `alt` mit dem gemeinsam getippten Text aus `neu` — und sonst nichts von `neu`. Notiz: die Blöcke;
- * Protokoll: die Blöcke je Sitzungstermin (Datum, Teilnehmende, Beschlüsse bleiben); Kanban: Titel und Beschreibung je
+ * Protokoll: die Blöcke und (M493) Beschlüsse je Sitzungstermin (Datum, Teilnehmende bleiben); Kanban: Titel und Beschreibung je
  * Ticket (Spalte, Frist, Reihenfolge, neue oder entfernte Tickets bleiben).
  */
 function mitTextVon(alt: AppNode, neu: AppNode): AppNode {
@@ -148,7 +148,9 @@ function mitTextVon(alt: AppNode, neu: AppNode): AppNode {
     });
     return { ...alt, data: { ...a, [feld]: liste } } as AppNode;
   };
-  if (alt.type === 'minutes') return je('entries', ['blocks']);
+  // M493: die Beschlüsse der Sitzung laufen gemeinsam ebenfalls über das Y-Dokument (lib/protokollLive.ts) — der
+  // Schreiber sichert sie mit dem Text, sie gehen deshalb durch wie er
+  if (alt.type === 'minutes') return je('entries', ['blocks', 'decisions']);
   if (alt.type === 'kanban') return je('items', ['text', 'note']);
   return { ...alt, data: { ...a, blocks: b.blocks } } as AppNode;
 }

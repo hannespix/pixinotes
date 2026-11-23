@@ -563,6 +563,75 @@ await G.P.evaluate(() => document.activeElement?.blur?.());
 await warteBis(A.P, () => eintragVon(serverBoard())?.attendees === 'Anna, Gerd', 10000);
 pruefe('B11 niemand tippt mehr: Gerd trägt die Teilnehmenden ein – der Protokolltext bleibt', eintragVon(serverBoard())?.attendees === 'Anna, Gerd' && serverProtokoll() === endeP, JSON.stringify({ att: eintragVon(serverBoard())?.attendees, s: serverProtokoll() }));
 
+// ══ B+ (M493) ═══════════════════════════════════════════════════════
+// Werkzeuge und Abhaken, während ein anderer gemeinsam in derselben Sitzung tippt: Sie laufen über das Y-Dokument.
+// Vorher nahm „§ Beschluss" die Zeile aus dem Text, der Beschluss selbst kam aber nicht an (Schutz der Karte bzw. der
+// Sicherungsstand des Schreibers überschrieb ihn), und ein Haken in der Übersicht wurde vom Schreiber wieder „geheilt".
+console.log('\n════ B+: Beschluss, Aufgabe und Abhaken, während ein anderer tippt (M493) ════');
+const beschluesseIn = (P) => karte(P, 'p1').locator('.pr-beschluss-text').evaluateAll((els) => els.map((e) => e.value));
+const blockMit = (blocks, t) => (blocks ?? []).find((b) => textDerBlocks([b]).includes(t));
+await insProtokoll(G.P, 'ende');
+await G.P.keyboard.press('Enter');
+await G.P.keyboard.insertText('Budget wird verdoppelt');
+await insProtokoll(A.P, 'anfang');
+await warteBis(A.P, async () => (await protokollText(A.P)).includes('Budget wird verdoppelt'), 8000);
+await Promise.all([
+  A.P.keyboard.type('Anna: ', { delay: 40 }),
+  (async () => { await G.P.waitForTimeout(60); await karte(G.P, 'p1').locator('[data-taste="pr-beschluss"]').click(); })(),
+]);
+const sollB = `Anna: ${endeP}`;
+await warteBis(A.P, async () => (await protokollText(A.P)) === sollB && (await protokollText(G.P)) === sollB
+  && (await beschluesseIn(A.P)).includes('Budget wird verdoppelt') && (await beschluesseIn(G.P)).includes('Budget wird verdoppelt'), 10000);
+pruefe('B12 Gerd macht seine Zeile zum Beschluss, während Anna vorne tippt – bei beiden aus dem Text, Annas Zeichen bleiben',
+  (await protokollText(A.P)) === sollB && (await protokollText(G.P)) === sollB, JSON.stringify([await protokollText(A.P), await protokollText(G.P)]));
+pruefe('B13 … und der Beschluss steht bei beiden in der Karte', (await beschluesseIn(A.P)).includes('Budget wird verdoppelt') && (await beschluesseIn(G.P)).includes('Budget wird verdoppelt'),
+  JSON.stringify([await beschluesseIn(A.P), await beschluesseIn(G.P)]));
+await warteBis(A.P, () => (eintragVon(serverBoard())?.decisions ?? []).some((d) => d.text === 'Budget wird verdoppelt') && serverProtokoll() === sollB, 15000);
+pruefe('B14 … und auf dem Server: Beschluss gespeichert, Zeile nicht mehr im Text', (eintragVon(serverBoard())?.decisions ?? []).some((d) => d.text === 'Budget wird verdoppelt') && serverProtokoll() === sollB,
+  JSON.stringify({ d: eintragVon(serverBoard())?.decisions, s: serverProtokoll() }));
+// Aufgabe: Gerd markiert eine neue Zeile als Aufgabe, während Anna weitertippt
+await insProtokoll(G.P, 'ende');
+await G.P.keyboard.press('Enter');
+await G.P.keyboard.insertText('Gerd: Raum buchen');
+await insProtokoll(A.P, 'anfang');
+await warteBis(A.P, async () => (await protokollText(A.P)).includes('Raum buchen'), 8000);
+await Promise.all([
+  A.P.keyboard.type('Neu ', { delay: 40 }),
+  (async () => { await G.P.waitForTimeout(60); await karte(G.P, 'p1').locator('[data-taste="pr-aufgabe"]').click(); })(),
+]);
+const sollA = `Neu ${sollB}Gerd: Raum buchen`;
+await warteBis(A.P, async () => serverProtokoll() === sollA && blockMit(eintragVon(serverBoard())?.blocks, 'Raum buchen')?.type === 'checkListItem'
+  && (await protokollText(G.P)) === sollA, 15000);
+const aufg = blockMit(eintragVon(serverBoard())?.blocks, 'Raum buchen');
+pruefe('B15 „Aufgabe" während Anna tippt: die Zeile ist ein offener Punkt, beide Texte vollständig – auch auf dem Server',
+  aufg?.type === 'checkListItem' && aufg.props?.checked === false && serverProtokoll() === sollA && (await protokollText(A.P)) === sollA && (await protokollText(G.P)) === sollA,
+  JSON.stringify({ aufg, s: serverProtokoll(), a: await protokollText(A.P), g: await protokollText(G.P) }));
+// Abhaken in der Übersicht, während Gerd in derselben Sitzung tippt
+await karte(A.P, 'p1').locator('[data-taste="pr-uebersicht"]').click();
+await warteBis(A.P, async () => (await karte(A.P, 'p1').locator('.pr-aufgabe', { hasText: 'Raum buchen' }).count()) === 1, 8000);
+await insProtokoll(G.P, 'anfang');
+await Promise.all([
+  G.P.keyboard.type('Gerd tippt weiter ', { delay: 45 }),
+  (async () => { await A.P.waitForTimeout(120); await karte(A.P, 'p1').locator('.pr-aufgabe', { hasText: 'Raum buchen' }).locator('input[type="checkbox"]').click(); })(),
+]);
+const sollH = `Gerd tippt weiter ${sollA}`;
+const gerdHaken = () => G.P.evaluate(() => {
+  const el = [...document.querySelectorAll('.react-flow__node[data-id="p1"] .minutes-body [data-content-type="checkListItem"]')].find((x) => /Raum buchen/.test(x.textContent));
+  return el ? el.getAttribute('data-checked') === 'true' || !!el.querySelector('input[type="checkbox"]:checked') : null;
+});
+await warteBis(A.P, async () => blockMit(eintragVon(serverBoard())?.blocks, 'Raum buchen')?.props?.checked === true && serverProtokoll() === sollH && (await gerdHaken()) === true, 15000);
+// noch einmal 2 s: Ein „Heilen" des Schreibers nähme den Haken danach wieder weg
+await A.P.waitForTimeout(2000);
+const gehakt = blockMit(eintragVon(serverBoard())?.blocks, 'Raum buchen');
+pruefe('B16 Anna hakt die Aufgabe in der Übersicht ab, während Gerd in der Sitzung tippt – der Haken bleibt (Server, bei Gerd im Text)',
+  gehakt?.props?.checked === true && (await gerdHaken()) === true, JSON.stringify({ gehakt, g: await gerdHaken() }));
+pruefe('B17 … und Gerds gleichzeitig getippter Text ist vollständig da', serverProtokoll() === sollH && (await protokollText(G.P)) === sollH, JSON.stringify({ s: serverProtokoll(), g: await protokollText(G.P) }));
+await warteBis(A.P, async () => (await karte(A.P, 'p1').locator('.pr-aufgabe', { hasText: 'Raum buchen' }).count()) === 0, 8000);
+pruefe('B18 … und in Annas Übersicht ist der Punkt erledigt', (await karte(A.P, 'p1').locator('.pr-aufgabe', { hasText: 'Raum buchen' }).count()) === 0);
+await G.P.keyboard.press('Escape'); await G.P.evaluate(() => document.activeElement?.blur?.());
+await karte(A.P, 'p1').locator('[data-taste="pr-sitzung"]').click();
+await warteBis(A.P, async () => (await protokollGemeinsam(A.P)) === 1 && (await protokollText(A.P)) === sollH, 10000);
+
 // ══ C ═══════════════════════════════════════════════════════════════
 console.log('\n════ C: Zwei tippen zugleich in einem Ticket ════');
 pruefe('C1 Anna und Gerd öffnen dasselbe Ticket', (await ticketOeffnen(A.P, 'Ticket eins')) && (await ticketOeffnen(G.P, 'Ticket eins')));

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useReactFlow, type NodeProps } from '@xyflow/react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
@@ -24,6 +24,7 @@ import { DragTitle } from './DragTitle';
 import { ICheck, ICopy, IMail, IMore, IPlus, ISearch, ISettings, ITrash, IUsers, IX } from '../Icons';
 import type { NotizSitzung } from '../../lib/notizGemeinsamKern';
 import { liveVerbunden, TEILNEHMER_EREIGNIS } from '../../lib/liveStand';
+import { PROTOKOLL_LIVE, protokollLive, type ProtokollLive } from '../../lib/protokollLive';
 import { useTakt } from '../LiveLeiste';
 import { NotizRuhend } from './NotizRuhend';
 import type { RuheBlock } from '../../lib/notizRuhend';
@@ -79,6 +80,22 @@ const inhaltText = (c: unknown): string => (typeof c === 'string'
 
 type Ansicht = 'sitzung' | 'uebersicht';
 
+/**
+ * M493: Ist diese Sitzung gerade gemeinsam geöffnet (Live-Board, ProtokollGemeinsam)? Dann laufen die Beschlüsse über
+ * das Y-Dokument — gezeigt, geändert und vom Schreiber gesichert —, nicht über den Speicher.
+ */
+function useProtokollLive(schluessel: string | null): ProtokollLive | null {
+  const [, neu] = useReducer((x: number) => x + 1, 0);
+  const live = schluessel ? protokollLive(schluessel) : null;
+  useEffect(() => {
+    const auf = (e: Event) => { if ((e as CustomEvent<string>).detail === schluessel) neu(); };
+    window.addEventListener(PROTOKOLL_LIVE, auf);
+    return () => window.removeEventListener(PROTOKOLL_LIVE, auf);
+  }, [schluessel]);
+  useEffect(() => live?.beiBeschluessen(() => neu()), [live]);
+  return live;
+}
+
 /** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
 export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   const m = data as MinutesData;
@@ -108,6 +125,21 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   const patch = (next: Partial<MinutesData>) => updateNodeData(id, next);
   const patchEntry = (entryId: string, next: Partial<MinutesEntry>) =>
     patch({ entries: (m.entries ?? []).map((e) => (e.id === entryId ? { ...e, ...next } : e)) });
+  const boardId = useBoard((s) => s.activeId);
+  // M493: Beschlüsse der gezeigten Sitzung — gemeinsam aus dem Y-Dokument, sonst aus dem Speicher
+  const live = useProtokollLive(entry ? `${id}:${entry.id}` : null);
+  const sitzungsBeschluesse = live ? live.beschluesse() : (entry?.decisions ?? []);
+  const beschlussDazu = (text: string) => {
+    if (!entry) return;
+    if (live) live.beschlussDazu(text);
+    else patchEntry(entry.id, { decisions: [...(entry.decisions ?? []), { id: uid(), text }] });
+  };
+  const beschlussSetzen = (bid: string, text: string | null) => {
+    if (!entry) return;
+    if (live) { live.beschlussSetzen(bid, text); return; }
+    const alt = entry.decisions ?? [];
+    patchEntry(entry.id, { decisions: text === null ? alt.filter((x) => x.id !== bid) : alt.map((x) => (x.id === bid ? { ...x, text } : x)) });
+  };
   const zeige = (entryId: string) => { patch({ current: entryId }); setAnsicht('sitzung'); setMenueOffen(false); };
 
   /** Neue Sitzung: Runde und offene Aufgaben der letzten übernehmen, Tagesordnung vorstrukturieren */
@@ -178,8 +210,9 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
     const b = blockAmCursor();
     const text = b ? inhaltText(b.content).trim() : '';
     if (ed && b && text) {
-      // Die Zeile WIRD zum Beschluss — sie steht danach nicht doppelt im Text
-      patchEntry(entry.id, { decisions: [...(entry.decisions ?? []), { id: uid(), text }] });
+      // Die Zeile WIRD zum Beschluss — sie steht danach nicht doppelt im Text. M493: gemeinsam beides über das
+      // Y-Dokument (Beschluss in der Sitzung, Zeile über den Editor), sonst über den Speicher
+      beschlussDazu(text);
       try { ed.removeBlocks([b]); } catch { /* egal */ }
       showToast('Als Beschluss festgehalten.');
       return;
@@ -202,7 +235,7 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   const addDecision = () => {
     const text = beschlussText.trim();
     if (!text || !entry) return;
-    patchEntry(entry.id, { decisions: [...(entry.decisions ?? []), { id: uid(), text }] });
+    beschlussDazu(text);
     setBeschlussText('');
   };
 
@@ -224,13 +257,26 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   const abhaken = (a: OffeneAufgabe) => {
     const e = (m.entries ?? []).find((x) => x.id === a.entryId);
     if (!e) return;
+    // M493: Im Live-Board kann gerade jemand gemeinsam in dieser Sitzung schreiben — dessen Schreiber „heilte" einen
+    // Haken über den Speicher wieder weg (M489, offen). Darum dort über das Y-Dokument der Sitzung abhaken.
+    if (liveVerbunden(boardId)) {
+      showToast(`Erledigt: ${a.text}`);
+      void import('../../lib/notizGemeinsamKern')
+        .then((k) => k.protokollHaken(boardId, id, e.id, repairBlocks(e.blocks as unknown[]), e.decisions ?? [], noteSchema, a.blockId))
+        .then((gut) => { if (!gut) showToast('Der Punkt steht im gemeinsamen Stand nicht mehr – nichts geändert.'); })
+        .catch(() => alleinAbhaken(e, a));   // Yjs lädt nicht: über den Speicher wie ohne Live-Kanal
+      return;
+    }
+    alleinAbhaken(e, a);
+    showToast(`Erledigt: ${a.text}`);
+  };
+  const alleinAbhaken = (e: MinutesEntry, a: OffeneAufgabe) => {
     // Der Editor dieser Sitzung ist in der Übersicht abgebaut — der Speicher ist hier die Wahrheit.
     // extEpoch: ein Editor, der dieselbe Sitzung doch zeigt (Präsentation), übernimmt den Stand.
     patch({
       entries: (m.entries ?? []).map((x) => (x.id === e.id ? { ...x, blocks: toggleCheckBlock(x.blocks, a.blockId) } : x)),
       extEpoch: ((m.extEpoch as number | undefined) ?? 0) + 1,
     });
-    showToast(`Erledigt: ${a.text}`);
   };
   const nachPerson = useMemo(() => {
     const g = new Map<string, OffeneAufgabe[]>();
@@ -461,14 +507,15 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
           </div>
 
           {entry && (
-            <div className="minutes-decisions nodrag">
+            // M493: gemeinsam laufen die Beschlüsse über das Y-Dokument — Hineinklicken nimmt keine Karten-Sperre
+            <div className="minutes-decisions nodrag" {...(live ? { 'data-ohne-sperre': '' } : {})}>
               <div className="pr-abschnitt-kopf">
                 <b>Beschlüsse</b>
                 {(stand.offen + stand.erledigt) > 0 && (
                   <span className="pr-stand">{zahlWort(stand.offen, 'Aufgabe offen', 'Aufgaben offen')} · {stand.erledigt} erledigt</span>
                 )}
               </div>
-              {(entry.decisions ?? []).map((d) => (
+              {sitzungsBeschluesse.map((d) => (
                 <div key={d.id} className="minutes-decision">
                   <span className="pr-para" aria-hidden="true">§</span>
                   <textarea
@@ -478,11 +525,11 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
                     value={d.text}
                     aria-label="Beschluss"
                     readOnly={nurLesen}
-                    onChange={(ev) => patchEntry(entry.id, { decisions: (entry.decisions ?? []).map((x) => (x.id === d.id ? { ...x, text: ev.target.value } : x)) })}
-                    onBlur={(ev) => { if (!ev.target.value.trim()) patchEntry(entry.id, { decisions: (entry.decisions ?? []).filter((x) => x.id !== d.id) }); }}
+                    onChange={(ev) => beschlussSetzen(d.id, ev.target.value)}
+                    onBlur={(ev) => { if (!ev.target.value.trim()) beschlussSetzen(d.id, null); }}
                   />
                   {!nurLesen && (
-                    <button title="Beschluss entfernen" aria-label="Beschluss entfernen" onClick={() => patchEntry(entry.id, { decisions: (entry.decisions ?? []).filter((x) => x.id !== d.id) })}>
+                    <button title="Beschluss entfernen" aria-label="Beschluss entfernen" onClick={() => beschlussSetzen(d.id, null)}>
                       <IX size={10} />
                     </button>
                   )}
@@ -504,7 +551,9 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
           )}
         </>
       ) : (
-        <div className="pr-uebersicht nodrag">
+        // M493: Suchen und Abhaken nehmen keine Karten-Sperre — der Haken läuft im Live-Board über das Y-Dokument der
+        // Sitzung; hielte der Klick die Karte, nähme der Schutz dem gemeinsamen Schreiber das Sichern ab (m487 B17)
+        <div className="pr-uebersicht nodrag" data-ohne-sperre="">
           <label className="pr-suche">
             <ISearch size={13} />
             <input
@@ -665,6 +714,11 @@ export function EntryEditor({ nodeId, entryId, blocks, editorRef, sitzung }: Ent
   // onChange feuert nicht mehr, wenn die Komponente schon abgebaut wird
   const latest = useRef(editor);
   latest.current = editor;
+  /* M493: Stand beim Aufbau — BlockNote ergänzt beim Laden Kennungen und Standardwerte. Wurde nichts getippt, schreibt
+     der Abbau nichts zurück: Sonst stand beim Wechsel in den gemeinsamen Modus auf diesem Gerät eine umgeformte
+     Fassung, auf den anderen noch die alte — zwei verschiedene Anfänge desselben Textes (m487 B5/B8). */
+  const beimAufbau = useRef<string | null>(null);
+  if (beimAufbau.current === null) beimAufbau.current = JSON.stringify(editor.document);
   useEffect(() => () => {
     if (sitzung) return;   // M487: gemeinsam sichert die Sitzung (nur der Schreiber, beim Verlassen `abschied`)
     try {
@@ -676,7 +730,8 @@ export function EntryEditor({ nodeId, entryId, blocks, editorRef, sitzung }: Ent
          Neuaufbau des Boards nach einer KI-Aktion: „Strg+Z macht alles rückgängig" nahm dann erst diesen leeren
          Schritt zurück, und die eigentliche Änderung blieb stehen. */
       const neu = latest.current.document;
-      if (JSON.stringify(alt.blocks ?? []) === JSON.stringify(neu)) return;
+      const neuJson = JSON.stringify(neu);
+      if (JSON.stringify(alt.blocks ?? []) === neuJson || neuJson === beimAufbau.current) return;
       mutedHistory(() => st.updateNodeData(nodeId, {
         entries: (data?.entries ?? []).map((e) => (e.id === entryId ? { ...e, blocks: neu } : e)),
       }));

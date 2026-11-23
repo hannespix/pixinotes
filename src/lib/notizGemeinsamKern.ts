@@ -24,7 +24,8 @@
 import * as Y from 'yjs';
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate, removeAwarenessStates } from 'y-protocols/awareness';
 import { BlockNoteEditor } from '@blocknote/core';
-import { blocksToYXmlFragment, withCollaboration } from '@blocknote/core/yjs';
+import { blocksToYXmlFragment, withCollaboration, yXmlFragmentToBlocks } from '@blocknote/core/yjs';
+import type { Beschluss, ProtokollLive } from './protokollLive';
 import { ich, ichIn, LIVE_NACHRICHT, liveSenden, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from './liveStand';
 import { notizYVonAussen, NOTIZ_Y_TEIL_ZEICHEN, type NotizYArt, type NotizYNachricht } from './sicherNotizY';
 import { NOTIZ_Y_EREIGNIS } from './notizGemeinsam';
@@ -216,7 +217,11 @@ export interface NotizSitzung {
   abschied(): void;
   schliessen(): void;
 }
-interface SitzungIntern extends NotizSitzung { empfangen(m: NotizYNachricht): void; rundeGeaendert(): void; bereit(): boolean; beimSchliessen(f: () => void): void }
+interface SitzungIntern extends NotizSitzung {
+  empfangen(m: NotizYNachricht): void; rundeGeaendert(): void; bereit(): boolean; beimSchliessen(f: () => void): void;
+  /** M493: noch einmal sichern (Beschlüsse geändert) — mit dem Stand des Editors, sonst nur das Übrige */
+  neuSichern(): void;
+}
 
 interface Anwesenheit { pn?: unknown; schreibt?: unknown; sichert?: unknown }
 
@@ -238,13 +243,16 @@ interface KernAuftrag {
 
 /** Die gespeicherten Blöcke deterministisch ins Dokument legen (siehe Kopf, Schritt 3) */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function blockAnfang(doc: Y.Doc, n: string, blocks: unknown[], schema: any): void {
+function blockAnfang(doc: Y.Doc, n: string, blocks: unknown[], schema: any, zusatz?: { kennung: string; anlegen(hilf: Y.Doc): void }): void {
   const roh = Array.isArray(blocks) && blocks.length ? blocks : [{ type: 'paragraph' }];
   const mitIds = mitKennungen(roh, `pn${streuwert(n).toString(36)}`);
   const hilf = new Y.Doc();
-  hilf.clientID = (streuwert(`${n}\n${JSON.stringify(mitIds)}`) % 0x7ffffffe) + 1;
+  // M493: Was sonst noch hineinkommt (Beschlüsse des Protokolls), gehört in die Kennung — gleiche Kennung heißt in Yjs
+  // gleicher Inhalt
+  hilf.clientID = (streuwert(`${n}\n${JSON.stringify(mitIds)}${zusatz ? `\n${zusatz.kennung}` : ''}`) % 0x7ffffffe) + 1;
   const ed = BlockNoteEditor.create({ schema });
   blocksToYXmlFragment(ed as never, mitIds as never, hilf.getXmlFragment(FRAGMENT));
+  zusatz?.anlegen(hilf);
   Y.applyUpdate(doc, Y.encodeStateAsUpdate(hilf), 'init');
   hilf.destroy();
 }
@@ -266,9 +274,13 @@ export function sitzungOeffnen(
     anfangen: (doc) => blockAnfang(doc, nodeId, blocks, schema),
     schreiben: (jetzt) => {
       const st = useBoard.getState();
-      const alt = selectActiveBoard(st).nodes.find((x) => x.id === nodeId)?.data.blocks;
+      const daten = selectActiveBoard(st).nodes.find((x) => x.id === nodeId)?.data;
+      const alt = daten?.blocks;
       if (alt && JSON.stringify(alt) === JSON.stringify(jetzt)) return;
-      st.updateNodeData(nodeId, { blocks: jetzt });
+      // M493: extEpoch unverändert mitgeben — sonst zählte der Speicher es hoch (M323), und der Editor des Schreibers
+      // ersetzte daraufhin seinen ganzen Inhalt durch genau diesen Stand (NoteCard). Kam dazwischen ein Zeichen (eigenes
+      // oder fremdes), drehte das Ersetzen es über Yjs bei allen zurück und warf den Cursor um.
+      st.updateNodeData(nodeId, { blocks: jetzt, extEpoch: daten?.extEpoch });
     },
   });
 }
@@ -277,26 +289,169 @@ export function sitzungOeffnen(
  * M487: Den Text EINER Sitzung eines Protokolls gemeinsam öffnen — derselbe Weg wie bei der Notiz (BlockNote + Yjs),
  * gespeichert wird `entries[…].blocks` des Sitzungstermins. Kanal-Schlüssel `Karte:Sitzungstermin`: Wer eine andere
  * Sitzung derselben Reihe offen hat, arbeitet in einem eigenen Dokument.
+ *
+ * M493: Im selben Dokument liegen die Beschlüsse der Sitzung (Y.Map `beschluesse`: Kennung → { text, o }, `o` = Lage
+ * in der Reihe) — der Schreiber sichert sie mit `entries[…].decisions`. Eine Y.Map statt einer Liste: Ändern zwei
+ * denselben Beschluss, gilt der letzte (eine Liste aus Löschen + Einfügen verdoppelte ihn). Die Marke `pn.beschluesse`
+ * sagt, dass das Dokument die Beschlüsse trägt — ein Dokument aus einer älteren Fassung (ohne) lässt sie im Speicher.
  */
+export interface ProtokollSitzung extends NotizSitzung, ProtokollLive {
+  /** Einen Checklisten-Punkt abhaken bzw. wieder öffnen — im Y-Dokument (Kennung oder `pos:`-Pfad, wie lib/tasks.ts) */
+  aufgabeHaken(blockId: string): boolean;
+  /** Trägt das Dokument die Beschlüsse (sonst begann es auf einem Gerät mit älterer Fassung — dann gilt der Speicher)? */
+  mitBeschluessen(): boolean;
+}
+const BESCHLUESSE = 'beschluesse';
+const MARKE = 'pn';
+/** Herkunft eigener Änderungen an Beschlüssen und Haken (nicht aus dem Editor) — gehen hinaus wie jede eigene */
+const LOKAL_PROTOKOLL = 'pn-protokoll';
+type BeschlussY = { text?: unknown; o?: unknown };
+function beschluesseAus(doc: Y.Doc): Beschluss[] {
+  const m = doc.getMap(BESCHLUESSE);
+  const liste: Array<{ id: string; text: string; o: number }> = [];
+  for (const [id, v] of m.entries()) {
+    const x = v as BeschlussY | null;
+    if (!x || typeof x.text !== 'string') continue;
+    liste.push({ id, text: x.text, o: typeof x.o === 'number' ? x.o : 0 });
+  }
+  liste.sort((a, b) => a.o - b.o || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return liste.map(({ id, text }) => ({ id, text }));
+}
 export function protokollOeffnen(
   boardId: string, nodeId: string, entryId: string, blocks: unknown[], // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema: any, darf: boolean, warten: boolean,
-): Promise<NotizSitzung> {
+  schema: any, darf: boolean, warten: boolean, beschluesse: Beschluss[] = [],
+): Promise<ProtokollSitzung> {
   const n = `${nodeId}:${entryId}`;
+  let docHier: Y.Doc | null = null;
+  const traegtBeschluesse = (d: Y.Doc): boolean => d.getMap(MARKE).get('beschluesse') === true;
   return kernOeffnen({
     boardId, nodeId, n, darf, warten,
     leer: (doc) => doc.getXmlFragment(FRAGMENT).length === 0,
-    anfangen: (doc) => blockAnfang(doc, n, blocks, schema),
+    anfangen: (doc) => blockAnfang(doc, n, blocks, schema, {
+      kennung: JSON.stringify(beschluesse.map((b) => [b.id, b.text])),
+      anlegen: (hilf) => {
+        const m = hilf.getMap(BESCHLUESSE);
+        beschluesse.forEach((b, i) => { if (b && typeof b.id === 'string' && typeof b.text === 'string') m.set(b.id, { text: b.text, o: i }); });
+        hilf.getMap(MARKE).set('beschluesse', true);
+      },
+    }),
     schreiben: (jetzt) => {
       const st = useBoard.getState();
       const node = selectActiveBoard(st).nodes.find((x) => x.id === nodeId);
-      const eintraege = (node?.data as { entries?: Array<{ id: string; blocks?: unknown }> } | undefined)?.entries;
+      const eintraege = (node?.data as { entries?: Array<{ id: string; blocks?: unknown; decisions?: Beschluss[] }> } | undefined)?.entries;
       const alt = eintraege?.find((e) => e.id === entryId);
       if (!eintraege || !alt) return;   // Sitzung gelöscht
-      if (JSON.stringify(alt.blocks ?? []) === JSON.stringify(jetzt)) return;
-      st.updateNodeData(nodeId, { entries: eintraege.map((e) => (e.id === entryId ? { ...e, blocks: jetzt } : e)) });
+      const neu: { blocks?: unknown; decisions?: Beschluss[] } = {};
+      // `jetzt` fehlt, wenn sich nur die Beschlüsse änderten und noch kein Editor-Stand bekannt ist
+      if (jetzt !== undefined && jetzt !== null && JSON.stringify(alt.blocks ?? []) !== JSON.stringify(jetzt)) neu.blocks = jetzt;
+      if (docHier && traegtBeschluesse(docHier)) {
+        const b = beschluesseAus(docHier);
+        if (JSON.stringify(alt.decisions ?? []) !== JSON.stringify(b)) neu.decisions = b;
+      }
+      if (!('blocks' in neu) && !('decisions' in neu)) return;
+      st.updateNodeData(nodeId, { entries: eintraege.map((e) => (e.id === entryId ? { ...e, ...neu } : e)) });
     },
+  }).then((s) => {
+    const doc = s.doc;
+    docHier = doc;
+    const karte = doc.getMap(BESCHLUESSE);
+    const p = s as SitzungIntern & ProtokollSitzung;
+    // Beschlüsse geändert (hier oder bei anderen): der Schreiber sichert
+    const beiAenderung = () => s.neuSichern();
+    karte.observe(beiAenderung);
+    s.beimSchliessen(() => karte.unobserve(beiAenderung));
+    p.mitBeschluessen = () => traegtBeschluesse(doc);
+    p.beschluesse = () => (traegtBeschluesse(doc) ? beschluesseAus(doc) : beschluesse);
+    p.beschlussSetzen = (id, text) => {
+      if (!traegtBeschluesse(doc)) return;
+      const alt = karte.get(id) as BeschlussY | undefined;
+      doc.transact(() => {
+        if (text === null) karte.delete(id);
+        else karte.set(id, { text, o: typeof alt?.o === 'number' ? alt.o : karte.size });
+      }, LOKAL_PROTOKOLL);
+    };
+    p.beschlussDazu = (text) => {
+      if (!traegtBeschluesse(doc)) return;
+      let o = 0;
+      for (const v of karte.values()) { const x = v as BeschlussY; if (typeof x?.o === 'number' && x.o >= o) o = x.o + 1; }
+      const id = `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+      doc.transact(() => karte.set(id, { text, o }), LOKAL_PROTOKOLL);
+    };
+    p.beiBeschluessen = (cb) => { karte.observe(cb); return () => karte.unobserve(cb); };
+    p.aufgabeHaken = (blockId) => {
+      const el = checkpunkt(doc.getXmlFragment(FRAGMENT), blockId);
+      if (!el) return false;
+      const an = el.getAttribute('checked') as unknown;
+      doc.transact(() => el.setAttribute('checked', (!(an === true || an === 'true')) as never), LOKAL_PROTOKOLL);
+      return true;
+    };
+    return p;
   });
+}
+/**
+ * Den Checklisten-Punkt im Y-Dokument finden: BlockNote legt je Block ein `blockContainer` (Attribut `id`) mit dem
+ * Inhalt als erstem Kind (`checkListItem`, Attribut `checked`) und den Unterpunkten in einer `blockGroup` an. `pos:`-
+ * Pfade (Blöcke ohne Kennung im Speicher, lib/minutes.ts) zählen die Blöcke je Ebene wie lib/tasks.ts.
+ */
+function checkpunkt(fragment: Y.XmlFragment, blockId: string): Y.XmlElement | null {
+  const byPos = blockId.startsWith('pos:') ? blockId.slice(4).split('.').map(Number) : null;
+  const elemente = (x: Y.XmlElement | Y.XmlFragment): Y.XmlElement[] =>
+    x.toArray().filter((k): k is Y.XmlElement => k instanceof Y.XmlElement);
+  const behaelter = (gruppe: Y.XmlElement): Y.XmlElement[] => elemente(gruppe).filter((k) => k.nodeName === 'blockContainer');
+  const inhalt = (bc: Y.XmlElement): Y.XmlElement | null => {
+    const k = elemente(bc).find((x) => x.nodeName !== 'blockGroup');
+    return k && k.nodeName === 'checkListItem' ? k : null;
+  };
+  const kinder = (bc: Y.XmlElement): Y.XmlElement | null => elemente(bc).find((x) => x.nodeName === 'blockGroup') ?? null;
+  const wurzel = elemente(fragment).find((x) => x.nodeName === 'blockGroup');
+  if (!wurzel) return null;
+  if (byPos) {
+    let ebene: Y.XmlElement | null = wurzel;
+    let bc: Y.XmlElement | null = null;
+    for (const i of byPos) {
+      if (!ebene || !Number.isInteger(i)) return null;
+      bc = behaelter(ebene)[i] ?? null;
+      if (!bc) return null;
+      ebene = kinder(bc);
+    }
+    return bc ? inhalt(bc) : null;
+  }
+  const suche = (gruppe: Y.XmlElement): Y.XmlElement | null => {
+    for (const bc of behaelter(gruppe)) {
+      if (bc.getAttribute('id') === blockId) return inhalt(bc);
+      const g = kinder(bc);
+      const tiefer = g ? suche(g) : null;
+      if (tiefer) return tiefer;
+    }
+    return null;
+  };
+  return suche(wurzel);
+}
+
+/**
+ * M493: Einen Punkt eines Protokolls abhaken, während im Live-Board womöglich jemand gemeinsam in derselben Sitzung
+ * schreibt (Übersicht der Karte). Vorher ging der Haken über den Speicher — der Schreiber der gemeinsamen Sitzung
+ * „heilte" die Karte danach mit seinem Y-Dokument, der Haken war wieder weg (M489, offen). Jetzt: kurz der Sitzung
+ * beitreten (Stand der anderen abwarten), den Haken im Y-Dokument setzen, sichern (wer gerade Schreiber ist) und
+ * wieder gehen. Liefert false, wenn der Punkt im gemeinsamen Stand nicht vorkommt.
+ */
+export async function protokollHaken(
+  boardId: string, nodeId: string, entryId: string, blocks: unknown[], beschluesse: Beschluss[], // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  schema: any, blockId: string,
+): Promise<boolean> {
+  const s = await protokollOeffnen(boardId, nodeId, entryId, blocks, schema, true, true, beschluesse);
+  try {
+    if (!s.aufgabeHaken(blockId)) return false;
+    // Ohne Editor: den Stand selbst in Blöcke wandeln (nur, wenn dieses Gerät gerade sichert)
+    if (s.istSchreiber()) {
+      const ed = BlockNoteEditor.create({ schema });
+      s.aenderung(yXmlFragmentToBlocks(ed as never, s.doc.getXmlFragment(FRAGMENT)));
+    }
+    s.jetztSenden();
+    return true;
+  } finally {
+    s.schliessen();
+  }
 }
 
 // ---------- M487: Texte in Feldern (Kanban-Tickets) ----------
@@ -598,6 +753,8 @@ async function kernOeffnen(auftrag: KernAuftrag): Promise<SitzungIntern> {
    * das die Zeilen der anderen mitnähme, gäbe es sonst obendrein.
    */
   let letzter: unknown = null;
+  /** M493: woher der aktuelle Stand des Editors kommt (anbinden) */
+  let quelle: (() => unknown) | null = null;
   const sichern = (jetzt: unknown) => {
     if (!istSchreiber()) return;
     const st = useBoard.getState();
@@ -605,6 +762,17 @@ async function kernOeffnen(auftrag: KernAuftrag): Promise<SitzungIntern> {
     mutedHistory(() => auftrag.schreiben(jetzt));
   };
   let standKam: (() => void) | null = null;
+  /** M493: Fragen (`hallo`), die kamen, während dieses Gerät selbst noch wartete — beantwortet, sobald es steht */
+  const fragen: Array<{ c: number; sv: Uint8Array | undefined }> = [];
+  /** M493: Ein anderes Gerät mit kleinerer Kennung öffnet dieselbe Sitzung gerade auch — sein Anfang gilt */
+  let kleinererBeginnt = false;
+  const antworten = (an: number, sv: Uint8Array | undefined) => {
+    jetztSenden();
+    // Der Neue soll den Cursor gleich sehen. M484: VOR dem Stand — mit dem Stand beginnt er, und wer schon sichert,
+    // muss er da schon kennen, sonst meldet er selbst Anspruch an
+    if (awareness.getLocalState() !== null) awSenden();
+    senden(boardId, { c: doc.clientID, n, a: 'stand', an, d: zuB64(Y.encodeStateAsUpdate(doc, sv)), sv: zuB64(Y.encodeStateVector(doc)) });
+  };
   const s: SitzungIntern = {
     boardId, nodeId, n, doc, awareness,
     optionen<T extends object>(basis: T): T {
@@ -625,34 +793,50 @@ async function kernOeffnen(auftrag: KernAuftrag): Promise<SitzungIntern> {
     aenderung(dokument) { letzter = dokument; sichern(dokument); },
     anbinden(darf, dokument) {
       s.darfSchreiben(darf);
+      quelle = dokument;
       // Der bisherige Schreiber ging: einmal den ganzen Stand sichern
       const ab = s.beiSchreiber(() => sichern(dokument()));
       // Der Schreiber heilt: Kommt die Notiz von außen mit anderem Text an (ein anderer hat sie verschoben oder umgefärbt
       // und dabei seinen etwas älteren gespeicherten Text mitgeschickt; eine ältere App-Fassung), gilt das Y-Dokument —
       // Lage und Farbe bleiben, der Text wird wieder der gemeinsame.
       let alt: unknown = null;
+      // M493: Das eigene Heilen löst kein weiteres aus. Nimmt der Schutz der Karte (store/schutz.ts: ein anderer hält
+      // sie oder tippt darin) den geschriebenen Stand sofort zurück, ist die Karte danach wieder „von außen anders" —
+      // vorher sicherte der Schreiber dann in einer endlosen Kette von Mikroaufgaben, die Seite stand still (m477 lief
+      // so ins Zeitlimit, hängend bei `keyboard.type`). Gesichert wird wieder bei der nächsten echten Änderung.
+      let heilt = false;
       const abo = useBoard.subscribe((st) => {
         const k = st.activeId === boardId ? selectActiveBoard(st).nodes.find((x) => x.id === nodeId) : undefined;
         if (!k || k === alt) return;
         alt = k;
-        if (istSchreiber()) queueMicrotask(() => { if (!zu) sichern(dokument()); });
+        if (heilt || !istSchreiber()) return;
+        queueMicrotask(() => {
+          if (zu) return;
+          heilt = true;
+          try { sichern(dokument()); } finally { heilt = false; }
+        });
       });
-      return () => { ab(); abo(); };
+      return () => { ab(); abo(); if (quelle === dokument) quelle = null; };
     },
     abschied() { if (letzter) sichern(letzter); },
+    neuSichern() { sichern(quelle ? quelle() : letzter ?? undefined); },
     bereit: () => bereit && !zu,
     beimSchliessen(f) { if (zu) f(); else aufraeumen.push(f); },
     empfangen(m) {
       if (zu || m.c === doc.clientID || m.a === 'offen') return;
       if (m.a === 'hallo') {
-        if (!bereit) return;   // wer selbst noch wartet, hat nichts zu geben
         let sv: Uint8Array | undefined;
         try { sv = m.sv ? ausB64(m.sv) : undefined; Y.decodeStateVector(sv ?? new Uint8Array([0])); } catch { return; }
-        jetztSenden();
-        // Der Neue soll den Cursor gleich sehen. M484: VOR dem Stand — mit dem Stand beginnt er, und wer schon sichert,
-        // muss er da schon kennen, sonst meldet er selbst Anspruch an
-        if (awareness.getLocalState() !== null) awSenden();
-        senden(boardId, { c: doc.clientID, n, a: 'stand', an: m.c, d: zuB64(Y.encodeStateAsUpdate(doc, sv)), sv: zuB64(Y.encodeStateVector(doc)) });
+        if (!bereit) {
+          // M493: Wer selbst noch wartet, hat noch nichts zu geben — er merkt sich die Frage und antwortet, sobald er
+          // steht. Vorher blieb die Frage unbeantwortet, der andere begann nach seiner Wartezeit selbst aus SEINEM
+          // gespeicherten Stand, und zwei verschiedene Anfänge landeten übereinander im Dokument (m487 B5).
+          if (fragen.length < 20 && !fragen.some((f) => f.c === m.c)) fragen.push({ c: m.c, sv });
+          // Beginnt gerade ein anderer mit kleinerer Kennung: auf SEINEN Stand warten statt selbst anzufangen
+          if (`${m.von}\u0000${String(m.c).padStart(10, '0')}` < meineKennung()) kleinererBeginnt = true;
+          return;
+        }
+        antworten(m.c, sv);
         return;
       }
       if (m.a === 'stand') {
@@ -727,10 +911,15 @@ async function kernOeffnen(auftrag: KernAuftrag): Promise<SitzungIntern> {
     });
     senden(boardId, { c: doc.clientID, n, a: 'hallo', sv: zuB64(Y.encodeStateVector(doc)) });
     await warteAuf(WARTE_MS);
-    if (!bekamStand && bekamAenderung) {
-      // Es wird getippt, aber die Grundlage fehlt noch: einmal nachfragen
+    if (!bekamStand && (bekamAenderung || kleinererBeginnt)) {
+      // Es wird getippt, aber die Grundlage fehlt noch — oder ein anderer fängt gerade an (M493): einmal nachfragen
       senden(boardId, { c: doc.clientID, n, a: 'hallo', sv: zuB64(Y.encodeStateVector(doc)) });
       await warteAuf(NOCHMAL_MS);
+    }
+    if (!bekamStand && kleinererBeginnt && !zu) {
+      // M493: unter Last kann sein Anfang länger brauchen — noch einmal, dann (Rückfall) selbst
+      senden(boardId, { c: doc.clientID, n, a: 'hallo', sv: zuB64(Y.encodeStateVector(doc)) });
+      await warteAuf(NOCHMAL_MS * 2);
     }
   }
   if (zu) return s;
@@ -742,5 +931,7 @@ async function kernOeffnen(auftrag: KernAuftrag): Promise<SitzungIntern> {
   if (offen.length) jetztSenden();
   warSchreiber = istSchreiber();
   anspruchMelden(warSchreiber);
+  // M493: wer während des Wartens fragte, bekommt jetzt den Stand
+  for (const f of fragen.splice(0)) antworten(f.c, f.sv);
   return s;
 }
