@@ -19,32 +19,44 @@ Kollaboration über Yjs.
 - **Ohne Live-Verbindung** bleibt alles wie vorher (ein Schreiber, Sperre, Board-Rückgängig für Text).
 
 ## Wie (Architektur)
-- `lib/notizGemeinsam.ts` (Start-Paket, klein): `gemeinsamMoeglich(boardId)` = `liveVerbunden`, Hook
-  `useGemeinsamMoeglich`, Nachlader `gemeinsamKern()`, Weckruf `NOTIZ_Y_WACH` (jede `hallo`/`upd`-Nachricht eines
-  Anwesenden für eine Notiz; `gemeinsamGewuenscht`).
-- `lib/notizGemeinsamKern.ts` (nachgeladen, Paket `gemeinsam` ≈ 135 KB + 6 KB): Sitzung je Notiz und Gerät
-  (`sitzungOeffnen(boardId, nodeId, blocks, schema, darf)`), `Y.Doc` + `y-protocols/awareness`, BlockNote
-  `withCollaboration` aus `@blocknote/core/yjs`.
-- `components/nodes/NoteCard.tsx`: `NotizEditorWahl` zwischen `NoteCard` und `NotizEditor` (Modi `allein` →
-  `pause` → `laedt` → `gemeinsam`, Hülle `.note-wahl` mit `display: contents`). `NotizEditor` nimmt `sitzung`,
-  `abschied`, `fokus`, `ohneSperre`. Gemeinsam: `blocksSichern()` statt `updateNodeData` (nur der Schreiber, ohne
-  Board-Verlaufsschritt via `mutedHistory`), `NOTIZ_EXTERN` wird nicht eingespielt, `extEpoch` nur vom Schreiber,
-  `data-ohne-sperre` am `.note-editor` (gastSync nimmt dann keine Sperre).
+- `components/nodes/NoteCard.tsx` (Start): `NotizEditorWahl` — solange das Board nie live war, der gewohnte
+  `NotizEditor`; sobald ein Kanal steht, die nachgeladene Hülle `NotizGemeinsam.tsx` (Suspense, Rückfall = ruhende
+  Ansicht). `NotizEditor` nimmt nur `sitzung`: Editor-Optionen über `sitzung.optionen()`, Änderungen über
+  `sitzung.aenderung()` (statt `updateNodeData`), `sitzung.anbinden()`, gespeicherte Stände (`NOTIZ_EXTERN`) werden
+  gemeinsam nicht eingespielt, `extEpoch` nur vom Schreiber, Strg+Z ohne Board-Rückgängig.
+- `components/nodes/NotizGemeinsam.tsx` (nachgeladen, ≈ 3 KB): Modi `allein` → `pause` → `laedt` → `gemeinsam`, Hülle
+  `.note-wahl` (`display: contents`, `data-ohne-sperre`, Klasse `note-gemeinsam`), Fokus nach dem Wechsel.
+- `lib/notizGemeinsam.ts` (lädt mit dem Abgleich, `lib/gastSync.ts` bindet es ein — Kanäle gibt es nur mit ihm):
+  horcht auf `LIVE_NACHRICHT`, Weckruf `NOTIZ_Y_WACH` (+ `pixinotes:notiz-aktiv` für ruhende Notizen),
+  `gemeinsamGewuenscht`, Nachlader `gemeinsamKern()`.
+- `lib/notizGemeinsamKern.ts` (nachgeladen, ≈ 8 KB + Paket `gemeinsam` ≈ 135 KB): Sitzung je Notiz und Gerät
+  (`sitzungOeffnen(boardId, nodeId, blocks, schema, darf, warten)`), `Y.Doc` + `y-protocols/awareness`, BlockNote
+  `withCollaboration` aus `@blocknote/core/yjs`; `sichern` (Schreiber, nur eigenes Board, nur wenn anders,
+  `mutedHistory`).
 - **Wann gemeinsam?** Nicht jeder Editor eines Live-Boards hält eine Sitzung (50 Notizen = 50 Fragen an jeden):
   allein, bis man die Notiz **betritt** (Pointer-/Fokus-Ereignis an der Hülle; der Klickpunkt wird über
   `startPunkt` an den neuen Editor weitergereicht) oder bis ein anderer in ihr arbeitet (`NOTIZ_Y_WACH`; eine ruhende
   Notiz wacht dafür auf). Gewechselt wird nie unter dem Cursor: zwischen zwei Editoren steht kurz die ruhende
   Ansicht, so sichert der alte, bevor der neue liest. Bricht der Kanal ab, geht es zurück zu `allein`, sobald der
-  Cursor die Notiz verlassen hat. Lädt der Kern nicht, bleibt es bei `allein` (mit Sperre).
-- **Lage bleibt geschützt:** `store.ts` `setzeNotizSchutz(boardId, Map<Notiz, Name>)` — tippt ein anderer in einer
-  Notiz (Awareness-Eintrag mit `cursor`), darf hier niemand sie verschieben, archivieren oder löschen; der Inhalt
-  (`data`) bleibt frei (`sperrschutz(…, datenFrei = true)`, Hinweis wie bei der Sperre). Sonst stünden Lage und Text
-  derselben Karte als zwei Änderungen im kartenweisen Abgleich, und eine ginge verloren.
-- `lib/sicher.ts`: `notizYVonAussen(roh, anwesende)` — Gestalt, Absender muss in der Presence stehen, Base64 nur
-  aus seinen Zeichen, je Nachricht ≤ `NOTIZ_Y_TEIL_ZEICHEN` (48 000), höchstens `NOTIZ_Y_TEILE_MAX` (90) Teile.
+  Cursor die Notiz verlassen hat. Lädt der Kern nicht, bleibt es bei `allein` (mit Sperre, Cursor zurück).
+- **Karte bleibt, wie sie ist, solange getippt wird:** `store.ts` `setzeNotizSchutz(boardId, Map<Notiz, Name>)` —
+  steht der Cursor eines anderen in der Notiz (Awareness-Feld `cursor`), darf hier nur ihr Text (`data.blocks`) sich
+  ändern; Lage, Farbe, Archiv, Löschen nicht (`sperrschutz(…, nurText = true)`, Hinweis wie bei der Sperre). Der
+  Schreiber sichert die ganze Karte bei jedem Tastendruck — eine gleichzeitige Änderung derselben Karte ginge im
+  kartenweisen Abgleich verloren.
+- **Der Schreiber heilt:** `anbinden` hört auf den Speicher; kommt die Notiz von außen mit anderem Text an (jemand hat
+  sie verschoben oder umgefärbt, als niemand tippte, und dabei seine ein paar Zeichen ältere gespeicherte Fassung des
+  Texts mitgeschickt), sichert der Schreiber den Text des Y-Dokuments erneut — Lage und Farbe bleiben (Prüfreihe E7/E8).
+- `lib/sicherNotizY.ts` (Teil der Schicht `lib/sicher.ts`, eigene Datei nur, damit sie nachlädt):
+  `notizYVonAussen(roh, anwesende)` — Gestalt, Absender muss in der Presence stehen, Base64 nur aus seinen Zeichen,
+  je Nachricht ≤ `NOTIZ_Y_TEIL_ZEICHEN` (48 000), höchstens `NOTIZ_Y_TEILE_MAX` (90) Teile, `offen` ≤ 200 Kennungen.
 - Vite `manualChunks`: `yjs`, `y-prosemirror`, `y-protocols` (samt ihrem eigenen lib0 0.2) und
-  `@blocknote/core/dist/yjs.js` → Paket `gemeinsam`; sonst zöge die Editor-Regel sie in den Start. Start-JS unverändert
-  (Grenze `START_JS_GRENZE` in m446/m459/m467 hält ohne Anhebung).
+  `@blocknote/core/dist/yjs.js` → Paket `gemeinsam`; sonst zöge die Editor-Regel sie in den Start.
+- **Start-JS:** Der Hauptzweig stand nach M476/M478 bei 2 239 956 B (44 B unter `START_JS_GRENZE` 2 240 000 in
+  m446/m459/m467). Damit Platz bleibt, lädt die **Live-Leiste** (Kürzel, Liste, Werkzeuge der Gruppe) jetzt erst, wenn
+  das Board live ist: `components/LiveLeisteVoll.tsx` (≈ 4,7 KB), `LiveLeiste.tsx` behält `LiveSperren`,
+  `GastNameDialog`, `NAME_FRAGEN`, `useTakt`, `kuerzel`, `farbe` und eine kleine `LiveLeiste`, die nachlädt (ohne Kanal
+  zeigte sie ohnehin nichts). Start nach M477: 2 237 043 B — Grenze unverändert.
 - Neue Abhängigkeiten: `yjs` 13.6, `y-prosemirror` 1.3, `y-protocols` 1.0 (optionale Peer-Abhängigkeiten von
   BlockNote 0.57; vorher nicht installiert).
 - CSS: `src/styles/77-gemeinsam-tippen.css` (Hülle, Cursor-Schild, fremde Markierung).
@@ -90,7 +102,7 @@ womöglich schon abgebaut). Wer nur lesen darf (`useKarteFest`), meldet `schreib
 ## Prüfreihe
 A Yjs/Nachrichten erst beim Betreten · B zwei tippen gleichzeitig vorne/hinten, gleicher Text, Karte währenddessen nicht verschieb- oder löschbar · C fremder Cursor mit
 Name + Farbe, Markierung, Strg+Z nur Eigenes · D Späteinsteiger (ungespeicherter Stand), zu dritt · E Server-JSON = Anzeige, jedes Stück
-einmal, kein Konflikt, andere Notiz unberührt · F Neuladen ohne Verdopplung, fremde/kaputte/zu große Nachrichten,
+einmal, kein Konflikt, andere Notiz unberührt; ohne Tippende darf Gerd sie verschieben, der Text bleibt (E7/E8) · F Neuladen ohne Verdopplung, fremde/kaputte/zu große Nachrichten,
 Start-Pakete ohne Yjs · G ohne Kanal wie bisher (kein Yjs, Board-Strg+Z) · H Hilfe, keine Seitenfehler.
 
 Angepasst: `m364`, `m365`, `m366`, `m372`, `m377` prüfen die Karten-Sperre an Notizen jetzt als **Rückweg** (der Kern wird durch eine Fassung ersetzt,
@@ -111,6 +123,8 @@ Modell voraus und läuft deshalb auf dem Rückweg.
   je Absender (Backlog).
 - Verdopplung ist nur noch im Randfall möglich: Zwei öffnen im selben Augenblick **verschiedene** gespeicherte
   Fassungen derselben Notiz (etwa eine gerade erst angekommene Änderung) — dann steht der Text einmal je Fassung da.
+- Solange der Cursor eines anderen in der Notiz steht, lässt sie sich nicht verschieben, umfärben oder löschen (wie die
+  frühere Sperre, nur für alles außer dem Text).
 - Board-Rückgängig nimmt gemeinsam getippten Text nicht zurück (Yjs-Undo im Editor tut es, nur Eigenes); ein
   Wiederherstellen aus den Versionen während einer laufenden Sitzung überschreibt der Schreiber beim nächsten Tippen.
 - Ändert jemand den Text einer Notiz auf anderem Weg (ältere Fassung, Werkzeug von außen), während sie gemeinsam offen

@@ -541,7 +541,7 @@ const tA = await editorText(A.P, 'x1'); const tG = await editorText(G.P, 'x1');
 console.log(`    Anna sieht: „${tA}"\n    Gerd sieht: „${tG}"`);
 pruefe('B6 beide sehen denselben Text – nichts verloren, nichts doppelt', tA === tG && tA === soll, JSON.stringify({ tA, tG }));
 await A.P.screenshot({ path: `${SD}/m477-b-anna.png` });
-// Während Anna tippt, bleibt die Karte, wo sie ist: Gerd kann sie nicht ziehen oder löschen (der Text bleibt frei)
+// Solange Anna darin tippt, bleibt die Karte, wo sie ist: Gerd kann sie nicht ziehen oder löschen (der Text bleibt frei)
 await heraus(G.P);
 const gezogen = await ziehen(G.P, 'x1', 160, 120);
 pruefe('B7 Gerd kann die Notiz nicht verschieben, solange Anna darin tippt', gezogen === false, String(gezogen));
@@ -615,6 +615,15 @@ const toasts = await Promise.all([A, G, B].map((g) => g.P.evaluate(() => documen
 pruefe('E5 kein Konflikt-Hinweis beim Abgleich', !toasts.some((t) => /Konflikt|gleichzeitig|überschrieben/i.test(t)), JSON.stringify(toasts));
 const x2 = (b) => JSON.stringify(b?.nodes.find((n) => n.id === 'x2')?.data.blocks ?? null);
 pruefe('E6 die andere Notiz blieb unberührt', x2(JSON.parse(zeileText(uidA, 'board-bx.json'))) === JSON.stringify([{ type: 'paragraph', content: 'Zweite Notiz' }]) && x2(await boardVon(G.P, 'bx')) === JSON.stringify([{ type: 'paragraph', content: 'Zweite Notiz' }]), x2(JSON.parse(zeileText(uidA, 'board-bx.json'))));
+
+// Niemand tippt mehr (die Sitzungen sind noch offen): Gerd darf die Notiz verschieben, der Text bleibt, wie er ist
+const lageVor = JSON.stringify(JSON.parse(zeileText(uidA, 'board-bx.json')).nodes.find((n) => n.id === 'x1')?.position);
+const frei = await ziehen(G.P, 'x1', 120, 90);
+const lageNach = await lage(G.P, 'x1');
+await warteBis(A.P, async () => JSON.stringify(JSON.parse(zeileText(uidA, 'board-bx.json')).nodes.find((n) => n.id === 'x1')?.position) === lageNach && (await lage(A.P, 'x1')) === lageNach, 12000);
+pruefe('E7 niemand tippt mehr: Gerd verschiebt die Notiz – die Lage gilt überall', frei === true && lageNach !== lageVor && (await lage(A.P, 'x1')) === lageNach && JSON.stringify(JSON.parse(zeileText(uidA, 'board-bx.json')).nodes.find((n) => n.id === 'x1')?.position) === lageNach, JSON.stringify({ frei, lageVor, lageNach, a: await lage(A.P, 'x1') }));
+await A.P.waitForTimeout(1500);
+pruefe('E8 … und der gemeinsame Text steht weiter vollständig auf dem Server', serverText('x1') === endText, JSON.stringify({ server: serverText('x1'), endText }));
 
 // ══ F ═══════════════════════════════════════════════════════════════
 console.log('\n════ F: Wieder öffnen, Rechte, falsche Nachrichten ════');

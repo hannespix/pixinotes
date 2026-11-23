@@ -26,9 +26,9 @@ import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate, removeAwareness
 import { BlockNoteEditor } from '@blocknote/core';
 import { blocksToYXmlFragment, withCollaboration } from '@blocknote/core/yjs';
 import { ich, ichIn, LIVE_NACHRICHT, liveSenden, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from './liveStand';
-import { notizYVonAussen, NOTIZ_Y_TEIL_ZEICHEN, type NotizYArt, type NotizYNachricht } from './sicher';
+import { notizYVonAussen, NOTIZ_Y_TEIL_ZEICHEN, type NotizYArt, type NotizYNachricht } from './sicherNotizY';
 import { NOTIZ_Y_EREIGNIS } from './notizGemeinsam';
-import { setzeNotizSchutz } from '../store';
+import { mutedHistory, selectActiveBoard, setzeNotizSchutz, useBoard } from '../store';
 
 /** Herkunft von Änderungen, die aus dem Kanal kamen — sie gehen nicht wieder hinaus */
 const FERN = 'pn-fern';
@@ -200,6 +200,12 @@ export interface NotizSitzung {
   darfSchreiben(an: boolean): void;
   /** Ausstehende Änderungen sofort senden */
   jetztSenden(): void;
+  /** Der Editor hat sich geändert (hier oder bei anderen): sichern, wenn dieses Gerät Schreiber ist */
+  aenderung(dokument: unknown[]): void;
+  /** Den Editor anbinden: darf er schreiben, woher kommt sein Stand (für den Schreiberwechsel) — gibt das Lösen zurück */
+  anbinden(darf: boolean, dokument: () => unknown[]): () => void;
+  /** Beim Verlassen: den letzten Stand sichern (der Editor ist dann womöglich schon abgebaut) */
+  abschied(): void;
   schliessen(): void;
 }
 interface SitzungIntern extends NotizSitzung { empfangen(m: NotizYNachricht): void; rundeGeaendert(): void; bereit(): boolean }
@@ -266,7 +272,7 @@ export async function sitzungOeffnen(
       else if (!awTimer) awTimer = setTimeout(awSenden, takt(boardId, 90));
     }
     schreiberPruefen();
-    // Tippt (Cursor im Editor) gerade jemand anderes hier? Dann bleibt die Karte, wo sie ist (Lage, Löschen)
+    // Tippt (Cursor im Editor) gerade jemand anderes hier? Dann bleibt die Karte, wie sie ist — bis auf den Text
     if (!zu) {
       let wer: string | null = null;
       for (const [cid, st] of awareness.getStates()) {
@@ -325,6 +331,20 @@ export async function sitzungOeffnen(
     try { Y.applyUpdate(doc, ausB64(d), FERN); return true; } catch { return false; }
   };
 
+  /**
+   * Das Block-JSON sichern — nur, wer Schreiber ist, nur ins eigene Board, nur wenn es anders ist, und ohne eigenen
+   * Rückgängig-Schritt im Board: Den Text nimmt Strg+Z im Editor zurück (nur das Eigene, Yjs); ein Board-Rückgängig,
+   * das die Zeilen der anderen mitnähme, gäbe es sonst obendrein.
+   */
+  let letzter: unknown[] | null = null;
+  const sichern = (jetzt: unknown[]) => {
+    if (!istSchreiber()) return;
+    const st = useBoard.getState();
+    if (st.activeId !== boardId) return;   // Board gewechselt: updateNodeData träfe das neue
+    const alt = selectActiveBoard(st).nodes.find((n) => n.id === nodeId)?.data.blocks;
+    if (alt && JSON.stringify(alt) === JSON.stringify(jetzt)) return;
+    mutedHistory(() => st.updateNodeData(nodeId, { blocks: jetzt }));
+  };
   let standKam: (() => void) | null = null;
   const s: SitzungIntern = {
     boardId, nodeId, doc, awareness,
@@ -343,6 +363,24 @@ export async function sitzungOeffnen(
       if (bereit) anwesenheitSetzen();
     },
     jetztSenden,
+    aenderung(dokument) { letzter = dokument; sichern(dokument); },
+    anbinden(darf, dokument) {
+      s.darfSchreiben(darf);
+      // Der bisherige Schreiber ging: einmal den ganzen Stand sichern
+      const ab = s.beiSchreiber(() => sichern(dokument()));
+      // Der Schreiber heilt: Kommt die Notiz von außen mit anderem Text an (ein anderer hat sie verschoben oder umgefärbt
+      // und dabei seinen etwas älteren gespeicherten Text mitgeschickt; eine ältere App-Fassung), gilt das Y-Dokument —
+      // Lage und Farbe bleiben, der Text wird wieder der gemeinsame.
+      let alt: unknown = null;
+      const abo = useBoard.subscribe((st) => {
+        const n = st.activeId === boardId ? selectActiveBoard(st).nodes.find((x) => x.id === nodeId) : undefined;
+        if (!n || n === alt) return;
+        alt = n;
+        if (istSchreiber()) queueMicrotask(() => { if (!zu) sichern(dokument()); });
+      });
+      return () => { ab(); abo(); };
+    },
+    abschied() { if (letzter) sichern(letzter); },
     bereit: () => bereit && !zu,
     empfangen(m) {
       if (zu || m.c === doc.clientID || m.a === 'offen') return;

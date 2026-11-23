@@ -807,16 +807,16 @@ function sperrHinweis(name: string): void {
 }
 /**
  * M477: Notizen, in denen gerade ANDERE gemeinsam tippen (Yjs, lib/notizGemeinsamKern.ts). Der Text ist frei — den
- * schreiben alle zugleich —, Lage, Archiv und Löschen nicht: Zieht einer die Karte, während ein anderer tippt, stünden
- * zwei Änderungen derselben Karte im kartenweisen Abgleich, und eine ginge verloren.
+ * schreiben alle zugleich —, Lage, Farbe, Archiv und Löschen nicht: Der Schreiber sichert die ganze Karte bei jedem
+ * Tastendruck; eine gleichzeitige Änderung desselben Stücks ginge im kartenweisen Abgleich verloren.
  */
 const notizSchutz = new Map<string, Map<string, string>>();   // Board → Notiz → Name eines, der darin tippt
 export function setzeNotizSchutz(boardId: string, schutz: Map<string, string>): void {
   if (schutz.size) notizSchutz.set(boardId, schutz); else notizSchutz.delete(boardId);
 }
 /** Gesperrte Karten behalten Inhalt und Lage (auch gegen Löschen); alles andere geht durch.
- *  M477: `datenFrei` — nur Lage und Bestand geschützt, der Inhalt (`data`) darf sich ändern (gemeinsames Tippen) */
-function sperrschutz(alt: BoardDoc, neu: BoardDoc, sperren: Map<string, string>, datenFrei = false): BoardDoc {
+ *  M477: `nurText` — der Text (`data.blocks`) darf sich ändern, sonst nichts (gemeinsames Tippen) */
+function sperrschutz(alt: BoardDoc, neu: BoardDoc, sperren: Map<string, string>, nurText = false): BoardDoc {
   const nach = new Map(neu.nodes.map((n) => [n.id, n]));
   let wer = '';
   let anders = false;
@@ -827,10 +827,11 @@ function sperrschutz(alt: BoardDoc, neu: BoardDoc, sperren: Map<string, string>,
     if (!name) continue;
     const m = nach.get(n.id);
     if (!m) { fehlend.push(n); wer = name; anders = true; continue; }
-    if (m !== n && (datenFrei ? inhaltAnders({ ...n, data: m.data }, m) : inhaltAnders(n, m))) {
+    const text = nurText ? { ...n, data: { ...n.data, blocks: (m.data as { blocks?: unknown }).blocks } } as AppNode : n;
+    if (m !== n && inhaltAnders(text, m)) {
       // Auswahl und Maße dürfen sich ändern — Inhalt und Lage nicht
-      const a = n as Record<string, unknown>; const b = m as Record<string, unknown>;
-      const kopie: Record<string, unknown> = { ...a, ...(datenFrei ? { data: b.data } : {}) };
+      const a = text as Record<string, unknown>; const b = m as Record<string, unknown>;
+      const kopie: Record<string, unknown> = { ...a };
       for (const k of ANSICHT_FELDER) { if (b[k] === undefined) delete kopie[k]; else kopie[k] = b[k]; }
       zurueck.set(n.id, kopie as AppNode); wer = name; anders = true;
     }
