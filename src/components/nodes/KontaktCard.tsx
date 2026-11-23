@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
 import { kontaktBild, fremdeWebAdresse } from '../../lib/sicher';
-import { telAdresse, vcardDateiname, vcardSchreiben } from '../../lib/vcard';
+import { kontaktDaten, telAdresse, vcardDateiname, vcardSchreiben } from '../../lib/vcard';
 import { triggerDownload } from '../../lib/download';
 import { warEbenAngelegt } from '../../lib/nodes';
 import type { KontaktData, KontaktNode, KontaktTelefon } from '../../types';
@@ -18,20 +18,6 @@ import { CardShell } from './CardShell';
  * Bearbeitet wird in Feldern, die erst mit „Bearbeiten“ erscheinen; eine leere Karte öffnet sie von selbst.
  * Die Bedienung (Bearbeiten, vCard) steht nur im Fokus (M421, Listen in index.css).
  */
-
-/** Daten in fester Gestalt — eine Karte aus einem fremden Board kann Felder anderer Art tragen */
-export function kontaktDaten(d: Partial<KontaktData> | undefined): KontaktData {
-  const text = (v: unknown) => (typeof v === 'string' ? v : '');
-  const telefone = (Array.isArray(d?.telefone) ? d!.telefone : [])
-    .filter((t): t is KontaktTelefon => !!t && typeof t === 'object' && typeof (t as KontaktTelefon).nummer === 'string')
-    .map((t) => ({ nummer: t.nummer, ...(typeof t.art === 'string' && t.art ? { art: t.art } : {}) }));
-  const emails = (Array.isArray(d?.emails) ? d!.emails : []).filter((m): m is string => typeof m === 'string');
-  return {
-    ...d,
-    name: text(d?.name), funktion: text(d?.funktion), firma: text(d?.firma), adresse: text(d?.adresse),
-    web: text(d?.web), notiz: text(d?.notiz), telefone, emails, foto: kontaktBild(d?.foto) ?? undefined,
-  };
-}
 
 /** Anfangsbuchstaben für den Platz des Fotos */
 function initialen(name: string): string {
