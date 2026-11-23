@@ -1,5 +1,4 @@
 // Export: Board als PNG/SVG/PDF, Boards als Markdown-Dateien in einen Ordner.
-import { toPng, toSvg } from 'html-to-image';
 import { getNodesBounds } from '@xyflow/react';
 import { allesZeigen } from './fernRuhe';
 import type { BoardDoc, Space } from '../store';
@@ -101,12 +100,12 @@ export async function exportBoard(o: BoardExportOptions): Promise<void> {
   let png: string;
   try {
     if (o.format === 'svg') {
-      let dataUrl = await toSvg(el, opts);
+      let dataUrl = await (await import('html-to-image')).toSvg(el, opts);   // M446: erst beim Export laden
       if (headerText) dataUrl = svgWithHeader(dataUrl, headerText);
       triggerDownload(dataUrl, `${sanitize(o.name)}.svg`);
       return;
     }
-    png = await toPng(el, opts);
+    png = await (await import('html-to-image')).toPng(el, opts);
   } catch (e) {
     druck?.close();
     throw e;
