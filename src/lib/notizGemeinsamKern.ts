@@ -26,6 +26,8 @@ import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate, removeAwareness
 import { BlockNoteEditor } from '@blocknote/core';
 import { blocksToYXmlFragment, withCollaboration, yXmlFragmentToBlocks } from '@blocknote/core/yjs';
 import type { Beschluss, ProtokollLive, TopZuordnung } from './protokollLive';
+import type { KanbanLive } from './kanbanLive';
+import type { KanbanItem } from '../types';
 import { ich, ichIn, LIVE_NACHRICHT, liveSenden, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from './liveStand';
 import { notizYVonAussen, NOTIZ_Y_TEIL_ZEICHEN, type NotizYArt, type NotizYNachricht } from './sicherNotizY';
 import { NOTIZ_Y_EREIGNIS } from './notizGemeinsam';
@@ -515,13 +517,26 @@ export async function protokollHaken(
 // Y.Map `texte` des Dokuments der Kanban-Karte (Schlüssel `Ticket:text` bzw. `Ticket:note`) — Yjs führt zwei, die im
 // selben Feld tippen, zeichengenau zusammen, wie in der Notiz. Gespeichert wird weiter das gewohnte `items`-JSON der
 // Karte, vom selben einen Schreiber wie bei der Notiz.
+//
+// M498: Auch alle übrigen Felder eines Tickets, seine Checkliste und die Reihenfolge der Tickets laufen über dieses
+// Dokument — in der Y.Map `kanban` als Überlagerung des Gespeicherten (nur was jemand seit dem Öffnen geändert hat):
+//   f␟Ticket␟Feld          → Wert (Person, Frist, Priorität, Spalte, Stempel, Abhängigkeiten …; null = entfernt)
+//   o␟Ticket               → Rang in der Reihe (beim Umsortieren bekommen ALLE Tickets einen neuen Rang)
+//   s␟Ticket␟Punkt␟Feld    → Checklisten-Punkt: text, done, o (Rang), x (entfernt)
+// Flache Schlüssel in EINER Map der Wurzel statt verschachtelter Typen: Zwei, die zugleich zum ersten Mal etwas an
+// einem Ticket ändern, legten sonst je eine eigene Y.Map an, und eine davon ginge verloren. So ändert jeder genau den
+// Schlüssel, den er meint — Person und Haken zugleich kommen beide an; ändern zwei dasselbe Feld, gilt der letzte.
 const TEXTE = 'texte';
+const KANBAN = 'kanban';
+const TR = '\u001f';
 /** Herkunft der eigenen Eingaben in Feldern — nur sie nimmt Strg+Z im Feld zurück */
 const LOKAL = 'pn-feld';
+/** M498: Herkunft eigener Änderungen an Tickets außerhalb der Textfelder (geht hinaus wie jede eigene) */
+const LOKAL_KANBAN = 'pn-kanban';
 
-/** Wer tippt gerade in einem Feld (Name und Teilnehmerfarbe) */
-export interface Tippende { name: string; farbe: string }
-export interface FeldSitzung extends NotizSitzung {
+/** Wer tippt gerade in einem Feld (Name, Teilnehmerfarbe — M498: und wo, als Stelle im Text dieses Geräts) */
+export interface Tippende { name: string; farbe: string; a: number; k: number; cid: number }
+export interface FeldSitzung extends NotizSitzung, KanbanLive {
   /** Ein Eingabefeld an den Text `key` binden (fehlt er, beginnt er deterministisch mit `anfang`) — gibt das Lösen zurück */
   feldBinden(el: HTMLInputElement | HTMLTextAreaElement, key: string, anfang: string): () => void;
   /** Die anderen, deren Cursor gerade in diesem Feld steht */
@@ -542,52 +557,190 @@ function verschieben(delta: Array<{ insert?: unknown; retain?: number; delete?: 
   return p;
 }
 
+/** Einen Y.Text auf `neu` bringen: gleicher Anfang, gleiches Ende — dazwischen ersetzt (Tippen, Löschen, Einfügen) */
+function textAngleichen(t: Y.Text, neu: string): void {
+  const alt = t.toString();
+  if (alt === neu) return;
+  let a = 0;
+  while (a < alt.length && a < neu.length && alt[a] === neu[a]) a++;
+  let e = 0;
+  while (e < alt.length - a && e < neu.length - a && alt[alt.length - 1 - e] === neu[neu.length - 1 - e]) e++;
+  if (alt.length - a - e > 0) t.delete(a, alt.length - a - e);
+  if (neu.length - a - e > 0) t.insert(a, neu.slice(a, neu.length - e));
+}
+
+type TicketRoh = Record<string, unknown> & { id: string };
+/**
+ * M498: Reihenfolge aus Rängen. Mit Rang: aufsteigend (gleich → nach Kennung, auf allen Geräten gleich). Ohne Rang
+ * (seit dem letzten Umsortieren über einen anderen Weg dazugekommen): direkt hinter dem Vorgänger, hinter dem es im
+ * Gespeicherten steht. Das ist stabil — schreibt der Schreiber die so geordnete Liste, ergibt sie geordnet wieder
+ * dieselbe (ein Rang „Stelle im Gespeicherten" für die übrigen wäre es nicht: die Stellen verrutschen beim Schreiben).
+ */
+function ordnen<T extends { id: string }>(liste: T[], rang: (id: string) => number | undefined): T[] {
+  if (!liste.some((x) => rang(x.id) !== undefined)) return liste;
+  const mit = liste.filter((x) => rang(x.id) !== undefined)
+    .sort((a, b) => (rang(a.id)! - rang(b.id)!) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const folger = new Map<string | null, T[]>();
+  let vor: string | null = null;
+  for (const x of liste) {
+    if (rang(x.id) === undefined) { const l = folger.get(vor) ?? []; l.push(x); folger.set(vor, l); }
+    vor = x.id;
+  }
+  const aus: T[] = [];
+  const nach = (id: string | null, tiefe: number): void => {
+    if (tiefe > 5000) return;
+    for (const f of folger.get(id) ?? []) { aus.push(f); nach(f.id, tiefe + 1); }
+  };
+  nach(null, 0);
+  for (const x of mit) { aus.push(x); nach(x.id, 0); }
+  return aus.length === liste.length && aus.every((x, i) => x === liste[i]) ? liste : aus;
+}
+const zahl = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+/** Werte für das Dokument: nur, was JSON ist (undefined → null = „Feld entfernt") */
+const rein = (v: unknown): unknown => (v === undefined ? null : JSON.parse(JSON.stringify(v)) as unknown);
+const gleich = (a: unknown, b: unknown): boolean => a === b || JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+/**
+ * M498: Welche Felder eines Tickets über das Dokument laufen — und wie ein gültiger Wert aussieht. Das Dokument ist eine
+ * fremde Eingabe (Kanal): Was nicht passt, bleibt beim Lesen außen vor (der Schreiber speichert nur Gültiges); ein
+ * unbekanntes Feld geht beim Ändern den Weg über den Speicher.
+ */
+const kurz = (v: unknown, n = 400): boolean => typeof v === 'string' && v.length <= n;
+const kennung = (v: unknown): boolean => kurz(v, 200);
+const FELD_OK: Record<string, (v: unknown) => boolean> = {
+  col: (v) => Number.isInteger(v) && (v as number) >= 0 && (v as number) < 100,
+  due: (v) => kurz(v, 40),
+  prio: (v) => v === 1 || v === 2 || v === 3,
+  who: (v) => kurz(v, 200),
+  deps: (v) => Array.isArray(v) && v.length <= 200 && v.every(kennung),
+  links: (v) => Array.isArray(v) && v.length <= 100 && v.every((l) => !!l && typeof l === 'object' && kennung((l as { boardId?: unknown }).boardId) && kennung((l as { nodeId?: unknown }).nodeId)),
+  link: (v) => !!v && typeof v === 'object' && kennung((v as { boardId?: unknown }).boardId)
+    && ['nodeId', 'itemId'].every((k) => (v as Record<string, unknown>)[k] === undefined || kennung((v as Record<string, unknown>)[k])),
+  erledigtAm: (v) => kurz(v, 40),
+  archiviertAm: (v) => kurz(v, 40),
+  zurueckAm: (v) => kurz(v, 40),
+  spalteSeit: (v) => typeof v === 'number' && Number.isFinite(v),
+};
+const PUNKT_OK: Record<string, (v: unknown) => boolean> = { text: (v) => kurz(v, 2000), done: (v) => typeof v === 'boolean' };
+
+/** M498: Die Überlagerung aus der Y.Map `kanban`, einmal je Durchgang zerlegt */
+interface Ueberlagerung {
+  felder: Map<string, Map<string, unknown>>;
+  rang: Map<string, number>;
+  punkte: Map<string, Map<string, Map<string, unknown>>>;
+}
+function ueberlagerung(m: Y.Map<unknown>): Ueberlagerung {
+  const u: Ueberlagerung = { felder: new Map(), rang: new Map(), punkte: new Map() };
+  for (const [key, v] of m.entries()) {
+    const t = key.split(TR);
+    if (t[0] === 'f' && t.length === 3 && t[2] !== 'id') {
+      const f = u.felder.get(t[1]) ?? new Map<string, unknown>();
+      f.set(t[2], v); u.felder.set(t[1], f);
+    } else if (t[0] === 'o' && t.length === 2) {
+      const r = zahl(v); if (r !== undefined) u.rang.set(t[1], r);
+    } else if (t[0] === 's' && t.length === 4 && t[3] !== 'id') {
+      const je = u.punkte.get(t[1]) ?? new Map<string, Map<string, unknown>>();
+      const p = je.get(t[2]) ?? new Map<string, unknown>();
+      p.set(t[3], v); je.set(t[2], p); u.punkte.set(t[1], je);
+    }
+  }
+  return u;
+}
+type Punkt = { id: string; text: string; done?: boolean };
+function punkteAnwenden(subs: Punkt[], je: Map<string, Map<string, unknown>>): Punkt[] {
+  const da = new Set(subs.map((p) => p.id));
+  const liste: Punkt[] = [];
+  for (const p of subs) {
+    const o = je.get(p.id);
+    if (!o) { liste.push(p); continue; }
+    if (o.get('x') === true) continue;
+    const q = { ...p } as Record<string, unknown>;
+    for (const [k, v] of o) {
+      if (!PUNKT_OK[k] || (v !== null && !PUNKT_OK[k](v))) continue;
+      if (v === null || v === undefined) delete q[k]; else q[k] = v;
+    }
+    if (typeof q.text !== 'string') q.text = p.text;
+    liste.push(q as Punkt);
+  }
+  for (const [sid, o] of je) {
+    if (da.has(sid) || o.get('x') === true || !PUNKT_OK.text(o.get('text')) || !kennung(sid)) continue;
+    liste.push({ id: sid, text: o.get('text') as string, ...(o.get('done') === true ? { done: true } : {}) });
+  }
+  return ordnen(liste, (id) => zahl(je.get(id)?.get('o')));
+}
+
 /**
  * M487: Die Texte einer Kanban-Karte gemeinsam öffnen (Ticket-Fenster im Live-Board). Anders als beim Block-Editor
  * entsteht das Dokument nicht beim Öffnen, sondern je Feld beim ersten Binden — ebenso deterministisch (Hilfsdokument
  * mit einer Yjs-Kennung aus Karte, Feld und gespeichertem Text): Zwei, die dasselbe Ticket zugleich öffnen, legen
- * dieselben Einträge an.
+ * dieselben Einträge an. M498: dazu die übrigen Felder, Checklisten und die Reihenfolge (Y.Map `kanban`, siehe oben).
  */
 export async function kanbanOeffnen(boardId: string, nodeId: string, darf: boolean, warten: boolean): Promise<FeldSitzung> {
+  let docHier: Y.Doc | null = null;
   const texteAus = (doc: Y.Doc): Record<string, string> => {
     const aus: Record<string, string> = {};
     for (const [k, v] of doc.getMap(TEXTE).entries()) if (v instanceof Y.Text) aus[k] = v.toString();
     return aus;
   };
+  /** M498: Die gespeicherten Tickets mit dem gemeinsamen Stand (dieselbe Liste, wenn nichts anders ist) */
+  const anwenden = (items: KanbanItem[]): KanbanItem[] => {
+    const doc = docHier;
+    if (!doc || !Array.isArray(items)) return items;
+    const u = ueberlagerung(doc.getMap(KANBAN));
+    const texte = texteAus(doc);
+    const geordnet = ordnen(items, (id) => u.rang.get(id));
+    let anders = geordnet !== items;
+    const aus = geordnet.map((it) => {
+      const roh = it as unknown as TicketRoh;
+      let x = roh;
+      const kopie = () => { if (x === roh) x = { ...roh }; };
+      for (const [feld, v] of u.felder.get(it.id) ?? []) {
+        if (!FELD_OK[feld] || (v !== null && !FELD_OK[feld](v)) || gleich(x[feld], v)) continue;
+        kopie();
+        if (v === null || v === undefined) delete x[feld]; else x[feld] = v;
+      }
+      for (const f of ['text', 'note'] as const) {
+        const v = texte[`${it.id}:${f}`];
+        if (v === undefined) continue;
+        // Eine leere Beschreibung heißt „keine" (wie im Ticket-Fenster ohne Live-Kanal)
+        const soll = f === 'note' && v === '' ? undefined : v;
+        if ((x[f] ?? undefined) === soll) continue;
+        kopie();
+        if (soll === undefined) delete x[f]; else x[f] = soll;
+      }
+      const je = u.punkte.get(it.id);
+      if (je) {
+        const vorher = (Array.isArray(x.subs) ? x.subs : []) as Punkt[];
+        const nachher = punkteAnwenden(vorher, je);
+        if (!gleich(vorher, nachher)) { kopie(); x.subs = nachher; }
+      }
+      if (x !== roh) anders = true;
+      return x as unknown as KanbanItem;
+    });
+    return anders ? aus : items;
+  };
   const s = await kernOeffnen({
     boardId, nodeId, n: nodeId, darf, warten,
     leer: () => false,
-    anfangen: () => { /* je Feld, siehe feldText */ },
-    schreiben: (wert) => {
-      const texte = wert as Record<string, string>;
+    anfangen: () => { /* je Feld, siehe feldText; M498: die Überlagerung beginnt leer */ },
+    schreiben: () => {
       const st = useBoard.getState();
       const node = selectActiveBoard(st).nodes.find((x) => x.id === nodeId);
       if (!node || node.type !== 'kanban') return;
-      const items = ((node.data as unknown as { items?: Array<Record<string, unknown> & { id: string }> }).items) ?? [];
-      let anders = false;
-      const neu = items.map((it) => {
-        let x = it;
-        for (const f of ['text', 'note'] as const) {
-          const v = texte[`${it.id}:${f}`];
-          if (v === undefined) continue;
-          // Eine leere Beschreibung heißt „keine" (wie im Ticket-Fenster ohne Live-Kanal)
-          const soll = f === 'note' && v === '' ? undefined : v;
-          if ((x[f] ?? undefined) === soll) continue;
-          x = { ...x };
-          if (soll === undefined) delete x[f]; else x[f] = soll;
-          anders = true;
-        }
-        return x;
-      });
-      if (anders) st.updateNodeData(nodeId, { items: neu });
+      const items = ((node.data as unknown as { items?: KanbanItem[] }).items) ?? [];
+      const neu = anwenden(items);
+      if (neu === items || gleich(neu, items)) return;
+      st.updateNodeData(nodeId, { items: neu });
     },
   });
   const { doc, awareness } = s;
+  docHier = doc;
   const karte = doc.getMap(TEXTE);
-  // Jede Änderung (eigene und fremde) an den Schreiber; der Speicher-Abo heilt Fassungen von außen (wie bei der Notiz)
+  const ueber = doc.getMap(KANBAN);
+  // Jede Änderung (eigene und fremde) an den Schreiber; der Speicher-Abo heilt Fassungen von außen (wie bei der Notiz).
+  // M498: jede Änderung im Dokument (Texte, Felder, Checklisten, Reihenfolge) — der Schreiber liest den Stand selbst
   const beiAenderung = () => s.aenderung(texteAus(doc));
-  karte.observeDeep(beiAenderung);
-  s.beimSchliessen(() => karte.unobserveDeep(beiAenderung));
+  doc.on('update', beiAenderung);
+  s.beimSchliessen(() => doc.off('update', beiAenderung));
   s.beimSchliessen(s.anbinden(darf, () => texteAus(doc)));
 
   const feldText = (key: string, anfang: string): Y.Text => {
@@ -602,28 +755,89 @@ export async function kanbanOeffnen(boardId: string, nodeId: string, darf: boole
     return karte.get(key) as Y.Text;
   };
   const f = s as SitzungIntern & FeldSitzung;
+  f.anwenden = anwenden;
+  f.bei = (cb) => { doc.on('update', cb); return () => doc.off('update', cb); };
+  /**
+   * M498: Eine Änderung der Ticketliste als Überlagerung — nur, was sich zwischen `alt` und `neu` unterscheidet. Neue
+   * oder entfernte Tickets lassen sich so nicht ausdrücken (sie gehen über den Speicher, siehe lib/kanbanLive.ts).
+   */
+  f.uebernehmen = (alt, neu) => {
+    if (!Array.isArray(alt) || !Array.isArray(neu) || alt.length !== neu.length) return false;
+    const A = new Map(alt.map((x) => [x.id, x]));
+    if (A.size !== alt.length || new Set(neu.map((x) => x.id)).size !== neu.length || neu.some((x) => !A.has(x.id))) return false;
+    // Wer nicht schreiben darf (nur lesen, Rechte der Gruppe), geht den Weg über den Speicher — dort greift der Schutz
+    if ((awareness.getLocalState() as Anwesenheit | null)?.schreibt !== true) return false;
+    // Nur Felder, die das Dokument kennt (und gültige Werte): sonst alles über den Speicher, nichts halb
+    for (const x of neu) {
+      const a = A.get(x.id)!;
+      if (a === x) continue;
+      const ra = a as unknown as TicketRoh; const rx = x as unknown as TicketRoh;
+      for (const k of new Set([...Object.keys(ra), ...Object.keys(rx)])) {
+        if (k === 'id' || gleich(ra[k], rx[k])) continue;
+        if (k === 'text' || k === 'note') { if (rx[k] !== undefined && typeof rx[k] !== 'string') return false; continue; }
+        if (k === 'subs') {
+          const n = rx.subs;
+          if (n !== undefined && (!Array.isArray(n) || n.some((p) => !p || typeof p !== 'object' || !kennung((p as Punkt).id) || !PUNKT_OK.text((p as Punkt).text)))) return false;
+          continue;
+        }
+        if (!FELD_OK[k] || (rx[k] !== undefined && !FELD_OK[k](rx[k]))) return false;
+      }
+    }
+    doc.transact(() => {
+      if (alt.some((x, i) => x.id !== neu[i].id)) neu.forEach((x, i) => ueber.set(`o${TR}${x.id}`, i));
+      for (const x of neu) {
+        const a = A.get(x.id)!;
+        if (a === x) continue;
+        const ra = a as unknown as TicketRoh; const rx = x as unknown as TicketRoh;
+        for (const k of new Set([...Object.keys(ra), ...Object.keys(rx)])) {
+          if (k === 'id' || gleich(ra[k], rx[k])) continue;
+          if (k === 'text' || k === 'note') {
+            const anfang = typeof ra[k] === 'string' ? ra[k] as string : '';
+            textAngleichen(feldText(`${x.id}:${k}`, anfang), typeof rx[k] === 'string' ? rx[k] as string : '');
+            continue;
+          }
+          if (k === 'subs') { punkteSetzen(x.id, (Array.isArray(ra.subs) ? ra.subs : []) as Punkt[], (Array.isArray(rx.subs) ? rx.subs : []) as Punkt[]); continue; }
+          ueber.set(`f${TR}${x.id}${TR}${k}`, rein(rx[k]));
+        }
+      }
+    }, LOKAL_KANBAN);
+    return true;
+  };
+  /** Checkliste: Punkte dazu, weg (Grabstein `x`), Text/Haken je Punkt; bei Dazu, Weg oder Umsortieren neue Ränge für alle */
+  const punkteSetzen = (tid: string, a: Punkt[], n: Punkt[]): void => {
+    const sk = (sid: string, k: string) => `s${TR}${tid}${TR}${sid}${TR}${k}`;
+    const An = new Map(a.filter((p) => p && typeof p.id === 'string').map((p) => [p.id, p]));
+    const Nn = new Map(n.filter((p) => p && typeof p.id === 'string').map((p) => [p.id, p]));
+    let gebaut = false;
+    for (const p of An.values()) if (!Nn.has(p.id)) { ueber.set(sk(p.id, 'x'), true); gebaut = true; }
+    for (const p of Nn.values()) {
+      const q = An.get(p.id) as unknown as Record<string, unknown> | undefined;
+      const rp = p as unknown as Record<string, unknown>;
+      if (!q) gebaut = true;
+      for (const k of new Set([...Object.keys(rp), ...Object.keys(q ?? {})])) {
+        if (!PUNKT_OK[k] || (q && gleich(q[k], rp[k]))) continue;
+        if (!q && rp[k] === undefined) continue;
+        ueber.set(sk(p.id, k), rein(rp[k]));
+      }
+    }
+    const reiheA = [...An.keys()].filter((id) => Nn.has(id)).join(TR);
+    const reiheN = [...Nn.keys()].filter((id) => An.has(id)).join(TR);
+    if (gebaut || reiheA !== reiheN) [...Nn.keys()].forEach((sid, i) => ueber.set(sk(sid, 'o'), i));
+  };
   f.feldBinden = (el, key, anfang) => {
     const t = feldText(key, anfang);
     const um = new Y.UndoManager(t, { trackedOrigins: new Set([LOKAL]), captureTimeout: 500 });
     el.value = t.toString();
     const cursorMelden = () => {
       if (document.activeElement !== el || awareness.getLocalState() === null) return;
-      awareness.setLocalStateField('cursor', { feld: key, a: el.selectionStart ?? 0, k: el.selectionEnd ?? 0 });
+      const a = el.selectionStart ?? 0; const k = el.selectionEnd ?? 0;
+      // M498: die Stelle auch als relative Yjs-Position — sie wandert beim Empfänger mit, wenn davor getippt wird
+      const rel = (i: number) => Y.relativePositionToJSON(Y.createRelativePositionFromTypeIndex(t, Math.min(i, t.length))) as unknown;
+      awareness.setLocalStateField('cursor', { feld: key, a, k, ra: rel(a), rk: rel(k) });
     };
     const cursorWeg = () => { if (awareness.getLocalState() !== null && (awareness.getLocalState() as { cursor?: { feld?: string } }).cursor?.feld === key) awareness.setLocalStateField('cursor', null); };
     const eingabe = () => {
-      const alt = t.toString(); const neu = el.value;
-      if (alt !== neu) {
-        // Was sich geändert hat: gleicher Anfang, gleiches Ende — dazwischen ersetzt (Tippen, Löschen, Einfügen, Ersetzen)
-        let a = 0;
-        while (a < alt.length && a < neu.length && alt[a] === neu[a]) a++;
-        let e = 0;
-        while (e < alt.length - a && e < neu.length - a && alt[alt.length - 1 - e] === neu[neu.length - 1 - e]) e++;
-        doc.transact(() => {
-          if (alt.length - a - e > 0) t.delete(a, alt.length - a - e);
-          if (neu.length - a - e > 0) t.insert(a, neu.slice(a, neu.length - e));
-        }, LOKAL);
-      }
+      if (t.toString() !== el.value) doc.transact(() => textAngleichen(t, el.value), LOKAL);
       cursorMelden();
     };
     const beobachter = (ev: Y.YTextEvent, tr: Y.Transaction) => {
@@ -665,15 +879,63 @@ export async function kanbanOeffnen(boardId: string, nodeId: string, darf: boole
   };
   f.tippende = (key) => {
     const aus: Tippende[] = [];
+    const t = karte.get(key);
+    const len = t instanceof Y.Text ? t.length : 0;
+    /** M498: Stelle des anderen in diesem Dokument — die relative Position zuerst, sonst die Zahl (ältere Fassung) */
+    const stelle = (rel: unknown, roh: unknown): number => {
+      if (rel && typeof rel === 'object' && t instanceof Y.Text) {
+        try {
+          const abs = Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(rel), doc);
+          if (abs && abs.type === t) return Math.max(0, Math.min(len, abs.index));
+        } catch { /* fremde Eingabe: nicht lesbar */ }
+      }
+      return typeof roh === 'number' && Number.isFinite(roh) ? Math.max(0, Math.min(len, Math.round(roh))) : len;
+    };
     for (const [cid, st] of awareness.getStates()) {
-      const x = st as { cursor?: { feld?: unknown } | null; user?: { name?: unknown; color?: unknown } } | null;
+      const x = st as { cursor?: { feld?: unknown; a?: unknown; k?: unknown; ra?: unknown; rk?: unknown } | null; user?: { name?: unknown; color?: unknown } } | null;
       if (cid === doc.clientID || !x || x.cursor?.feld !== key) continue;
-      aus.push({ name: typeof x.user?.name === 'string' ? x.user.name.slice(0, 40) : 'Jemand', farbe: typeof x.user?.color === 'string' ? x.user.color : '' });
+      aus.push({
+        name: typeof x.user?.name === 'string' ? x.user.name.slice(0, 40) : 'Jemand',
+        farbe: typeof x.user?.color === 'string' ? x.user.color : '',
+        a: stelle(x.cursor.ra, x.cursor.a), k: stelle(x.cursor.rk, x.cursor.k), cid,
+      });
     }
     return aus;
   };
   f.beiAnwesenheit = (cb) => { awareness.on('change', cb); return () => awareness.off('change', cb); };
   return f;
+}
+
+/**
+ * M498: Einen Checklisten-Punkt einer Notiz setzen (erledigt bzw. offen), während im Live-Board womöglich jemand
+ * gemeinsam darin schreibt — ein eingesammeltes Ticket, das erledigt wird, oder der Haken in der Aufgaben-Zentrale.
+ * Vorher ging das über den Speicher: Der Schreiber der Notiz „heilte" den Haken wieder weg, und das Ersetzen im Editor
+ * (extEpoch) drehte die letzten Zeichen der anderen zurück (wie beim Protokoll vor M493). Hält dieses Gerät die Notiz
+ * schon gemeinsam offen, ändert es deren Dokument (der Editor sichert); sonst tritt es kurz bei. False, wenn der Punkt
+ * im gemeinsamen Stand nicht vorkommt.
+ */
+export async function notizHaken(
+  boardId: string, nodeId: string, blocks: unknown[], // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  schema: any, blockId: string, an: boolean,
+): Promise<boolean> {
+  const da = sitzungen.get(schluessel(boardId, nodeId));
+  const s: NotizSitzung = da && da.bereit() ? da : await sitzungOeffnen(boardId, nodeId, blocks, schema, true, true);
+  const eigen = s !== da;
+  try {
+    const el = checkpunkt(s.doc.getXmlFragment(FRAGMENT), blockId);
+    if (!el) return false;
+    const war = el.getAttribute('checked') as unknown;
+    if ((war === true || war === 'true') !== an) s.doc.transact(() => el.setAttribute('checked', an as never), LOKAL_PROTOKOLL);
+    // Ohne eigenen Editor: den Stand selbst in Blöcke wandeln (nur, wenn dieses Gerät gerade sichert)
+    if (eigen && s.istSchreiber()) {
+      const ed = BlockNoteEditor.create({ schema });
+      s.aenderung(yXmlFragmentToBlocks(ed as never, s.doc.getXmlFragment(FRAGMENT)));
+    } else if (!eigen) (da as SitzungIntern).neuSichern();   // der Editor hat den Haken schon (y-prosemirror, synchron)
+    s.jetztSenden();
+    return true;
+  } finally {
+    if (eigen) s.schliessen();
+  }
 }
 
 async function kernOeffnen(auftrag: KernAuftrag): Promise<SitzungIntern> {

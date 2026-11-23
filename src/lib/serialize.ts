@@ -3,6 +3,7 @@
 import { doneCol, kanbanCols, type AppNode, type KontaktData, type SheetData } from '../types';
 import { bubblesAlsText } from './bubbles';
 import { fluessigText } from './fluessigDaten';
+import { EDITOR_GRUND, EDITOR_SCHRIFT } from './editorFarben';
 import { formatBytes } from './parseEmail';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from './formel';
 
@@ -158,9 +159,10 @@ export function blocksToText(blocks: unknown[] | undefined): string {
   return lines.join('\n');
 }
 
-/* M340: Farben der Notiz (BlockNote-Namen) als feste Werte — Outlook, Word und das PDF kennen die Namen nicht */
-const TEXT_FARBE: Record<string, string> = { gray: '#9b9a97', brown: '#64473a', red: '#e03e3e', orange: '#d9730d', yellow: '#dfab01', green: '#4d6461', blue: '#0b6e99', purple: '#6940a5', pink: '#ad1a72' };
-const GRUND_FARBE: Record<string, string> = { gray: '#ebeced', brown: '#e9e5e3', red: '#fbe4e4', orange: '#f6e9d9', yellow: '#fbf3db', green: '#ddedea', blue: '#ddebf1', purple: '#eae4f2', pink: '#f4dfeb' };
+/* M340: Farben der Notiz (BlockNote-Namen) als feste Werte — Outlook, Word und das PDF kennen die Namen nicht.
+   M499: die kräftigeren Hellstufen aus lib/editorFarben.ts — dieselben wie im Editor im hellen Modus */
+const TEXT_FARBE = EDITOR_SCHRIFT;
+const GRUND_FARBE = EDITOR_GRUND;
 const farbe = (v: unknown, t: Record<string, string>): string | null => {
   if (typeof v !== 'string' || !v || v === 'default') return null;
   if (t[v]) return t[v];

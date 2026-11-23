@@ -28,6 +28,24 @@
 [data-theme='dark'] .react-flow__node-note .note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background']),
 [data-theme='dark'] .react-flow__node-note .note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background']) .bn-editor { color: var(--ink); }
 
+/* ================= M499: Editor-Farben auf hellem Papier =================
+   Im hellen Modus steht jeder Editor auf hellem Papier (weiße Notiz, Haftnotiz, Protokoll). Dort gelten die
+   kräftigeren Hellstufen aus 00-tokens.css (`--tag-hl-*`) statt BlockNotes Originalen. Bewusst nur unter
+   `[data-theme='light']` (0,2,0): im Dunkeln bleibt alles wie in M494, und die Nachtstufen unten (0,3,0) gewinnen
+   im Protokoll mit dunkler eigener Farbe auch im Hellen. Die Muster der Farbwahl liegen in derselben `.bn-root`
+   und zeigen deshalb dieselben Töne. */
+[data-theme='light'] .bn-root {
+  --bn-colors-highlights-gray-text: var(--tag-hl-grau);     --bn-colors-highlights-gray-background: var(--tag-hl-grau-grund);
+  --bn-colors-highlights-brown-text: var(--tag-hl-braun);   --bn-colors-highlights-brown-background: var(--tag-hl-braun-grund);
+  --bn-colors-highlights-red-text: var(--tag-hl-rot);       --bn-colors-highlights-red-background: var(--tag-hl-rot-grund);
+  --bn-colors-highlights-orange-text: var(--tag-hl-orange); --bn-colors-highlights-orange-background: var(--tag-hl-orange-grund);
+  --bn-colors-highlights-yellow-text: var(--tag-hl-gelb);   --bn-colors-highlights-yellow-background: var(--tag-hl-gelb-grund);
+  --bn-colors-highlights-green-text: var(--tag-hl-gruen);   --bn-colors-highlights-green-background: var(--tag-hl-gruen-grund);
+  --bn-colors-highlights-blue-text: var(--tag-hl-blau);     --bn-colors-highlights-blue-background: var(--tag-hl-blau-grund);
+  --bn-colors-highlights-purple-text: var(--tag-hl-lila);   --bn-colors-highlights-purple-background: var(--tag-hl-lila-grund);
+  --bn-colors-highlights-pink-text: var(--tag-hl-rosa);     --bn-colors-highlights-pink-background: var(--tag-hl-rosa-grund);
+}
+
 /* ================= M494: Editor-Farben auf dunklem Papier =================
    Schrift- und Hintergrundfarben im Text (BlockNote: `--bn-colors-highlights-*`) sind für helles Papier gemacht.
    Wo das Papier dunkel ist — weiße Notiz und Notiz ohne Farbe im Dunkeln, Protokoll im Thema im Dunkeln, Protokoll
