@@ -70,6 +70,13 @@ Wechsel mit dem Board ohne Verbindungen bzw. dem alten Build).
 - **`LabeledEdge.tsx`:** `parallelVersatz(edges)` einmal je Kanten-Liste (WeakMap) statt je Kante;
   `hindernisse()` zählt `version` und liefert `geaendert` (alte und neue Kästen bewegter Karten) — eine Kante, die die
   Vorgänger-Version kennt, prüft nur diese gegen ihren Korridor.
+- **`60-dunkel-navigator-stift.css` (Fund beim Einmischen von M492):** Die Regel für Notizen ohne bekannte Farbe im
+  Dunkeln stand als `.react-flow__node-note:has(.note-card:not(…):not([style*='background']))`. Ein
+  Attribut-Selektor auf `style` in einem `:has()` ließ Chromium bei **jeder** Änderung eines Inline-Stils (React
+  Flow verschiebt Karten per `style`) den Stil des ganzen Dokuments neu rechnen — auch im hellen Design: 162 Mal auf
+  50 Mausbewegungen, Bildzeit 83 ms, Maus → Bild 183 ms. Jetzt steht die Regel ohne `:has()` direkt an
+  `.note-card` (gleiche Wirkung, M492 grün). **Regel: keine `style`-Attribut-Selektoren (und nichts, was sich je Bild
+  ändert) in `:has()`; Prüfreihe m491 T2 fängt das.**
 - Start-JS: winzig mehr (Rahmen, Plätze, Portal), Grenzen aus M459/M467/M483 unverändert.
 
 ## Messwerte
@@ -100,11 +107,15 @@ Trace (Thread-Zeit, je Bild bzw. je 50 Mausbewegungen):
 - Der Rest-Abstand zum Board ohne Verbindungen ist JS (React Flow rechnet je Store-Änderung die Lage aller 100
   Kanten, `memoizedSelector`; bewegte Kanten rendern je Bild zweimal: Lage und Anzeige) und Malen der bewegten
   Kanten.
-- Ein gewählte, leere Beschriftung bleibt im Zug sichtbar (wie vorher).
+- Eine gewählte, leere Beschriftung bleibt im Zug sichtbar (wie vorher).
+- Nebenbefund, nicht angefasst: Ein Klick auf das unsichtbare „+" einer leeren Beschriftung öffnet das Feld nicht
+  (trifft das ✕ bzw. öffnet nichts) — schon vor M491 so.
 
 ## Prüfreihe
 `m491-kanten-60fps`: L Bildzeit ≤ 20 ms und Maus → Bild ≤ Board ohne Verbindungen + 15 ms (bester von drei, im
 Wechsel), T Layerize je Bild und Stil-Rechnungen über das ganze Dokument aus dem Trace, S Schatten im Zug aus und
-unbewegt, ruhende Schatten bleiben, nach dem Ablegen zurück an der neuen Stelle, nach Zug + Strg+Z Bildpunkt für
-Bildpunkt wie vorher (hell und dunkel), B leere Beschriftung im Zug weg und danach wieder klickbar, der Rahmen fängt
-keinen Treffer.
+unbewegt, ruhende Schatten bleiben, nach dem Ablegen zurück an der neuen Stelle, hin- und zurückgezogen Bildpunkt
+für Bildpunkt wie vorher (hell und dunkel), B leere Beschriftung im Zug weg und danach wieder oben, der Rahmen fängt
+keinen Treffer. `M491_NUR=SB` führt nur einzelne Abschnitte aus (Fehlersuche).
+Ruhezustand gegen den Stand vor M491: `node werkzeug/bild-vergleich.mjs <alt> dist` — 11 von 11 Ansichten
+pixelgleich (Board hell/dunkel mit Verbindung, Auswahl, Fokus, Präsentation, Einstellungen, Telefon).
