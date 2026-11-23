@@ -272,6 +272,13 @@ console.log('\n════ T3: Dateien reisen im Sync-Stand mit ════');
     for (let i = 0; i < n; i++) {
       try {
         await felder.nth(i).setInputFiles(pfad);
+        // M474: Seit M476 ersetzt ein geladener Stand nicht mehr ungefragt alles, sondern öffnet die Vorschau
+        // „Sicherung einspielen" – dort den Stand übernehmen (ersetzen = wie früher „Stand laden").
+        const vorschau = Z.locator('[data-taste="sicherung-einspielen"]');
+        if (await vorschau.waitFor({ timeout: 4000 }).then(() => true, () => false)) {
+          await Z.locator('[data-taste="sicherung-ersetzen"]').check();
+          await vorschau.click();
+        }
         await Z.waitForTimeout(2500);
         if (await Z.locator('.file-card').count()) { geladen = true; break; }
       } catch { /* nächstes */ }
