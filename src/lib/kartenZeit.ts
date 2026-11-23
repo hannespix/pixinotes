@@ -9,12 +9,14 @@
 // Sync: Die Zahlen reisen mit der Karte (Ordner, Konto, Live-Team). Gestempelt wird nur, wo ein Mensch auf DIESEM
 // Gerät etwas ändert – nie beim Einarbeiten fremder Stände (importSync, Patches, Drei-Wege-Abgleich schreiben die
 // Karte, wie sie kam). Im Abgleich zählen zwei Fassungen, die sich nur im Zeitpunkt unterscheiden, nicht als
-// Konflikt; es gilt die spätere (syncMerge.ts). Was von außen kommt, säubert lib/sicher.ts (zeitSaeubern).
+// Konflikt; je Zeitfeld gilt der spätere Wert (M472: Liste und Regel in lib/abgleichZeiten.ts, genutzt von
+// syncMerge.ts). Was von außen kommt, säubert lib/sicher.ts (zeitSaeubern).
 //
 // Alte Boards haben keine Zahlen – dann heißt es „unbekannt", bis die Karte das nächste Mal geändert wird. Ein
 // erfundenes Datum (etwa der Tag der Umstellung) würde das Briefing auf Monate hinaus belügen.
 import { kanbanCols, type AppNode, type KanbanData, type KanbanItem } from '../types';
 import { sprache } from './sprache';
+import { ZEIT_FELDER_DATEN, ZEIT_FELDER_TICKET } from './abgleichZeiten';
 
 /** Felder in `data`, die nur Ansicht oder Aussehen sind – ihre Änderung stempelt nicht */
 const ANSICHT = new Set([
@@ -119,34 +121,39 @@ export function zeitSaeubern<T extends AppNode>(n0: T, jetzt = Date.now()): T {
   return kopie;
 }
 
-/** M470: `spalteSeit` an Tickets von außen (Sync, Datei, Live-Kanal): dieselbe Regel wie für die Karte */
+/** Ein Zeitwert (ms oder ISO-Text) von außen glaubhaft? */
+const zeitGueltig = (v: unknown, jetzt: number): boolean =>
+  gueltig(typeof v === 'string' ? Date.parse(v) : v, jetzt);
+
+/** M470/M472: Zeitfelder der Tickets (`spalteSeit`, Archiv-Uhr …) und der Daten (`ocrAm`) von außen: dieselbe Regel
+ *  wie für die Karte. Seit M472 gilt im Abgleich für sie „der spätere Wert" — ein Stempel aus der Zukunft gewönne
+ *  sonst für immer. */
 function ticketZeitSaeubern<T extends AppNode>(n: T, jetzt: number): T {
-  if (n.type !== 'kanban') return n;
-  const d = n.data as KanbanData;
+  let d = n.data as Record<string, unknown>;
+  if (ZEIT_FELDER_DATEN.some((f) => d[f] !== undefined && !zeitGueltig(d[f], jetzt))) {
+    d = { ...d };
+    for (const f of ZEIT_FELDER_DATEN) if (d[f] !== undefined && !zeitGueltig(d[f], jetzt)) delete d[f];
+  }
+  if (n.type !== 'kanban') return d === n.data ? n : ({ ...n, data: d } as T);
   const reinigen = (liste: unknown): { liste: unknown; anders: boolean } => {
     if (!Array.isArray(liste)) return { liste, anders: false };
     let anders = false;
     const aus = liste.map((it: unknown) => {
-      if (!it || typeof it !== 'object' || !('spalteSeit' in it)) return it;
-      const v = (it as KanbanItem).spalteSeit;
-      if (v === undefined || gueltig(v, jetzt)) return it;
+      if (!it || typeof it !== 'object') return it;
+      const x = it as Record<string, unknown>;
+      const weg = ZEIT_FELDER_TICKET.filter((f) => x[f] !== undefined && !zeitGueltig(x[f], jetzt));
+      if (!weg.length) return it;
       anders = true;
-      const { spalteSeit: _w, ...rest } = it as KanbanItem;
+      const rest = { ...x };
+      for (const f of weg) delete rest[f];
       return rest;
     });
     return { liste: aus, anders };
   };
   const i = reinigen(d.items);
   const a = reinigen(d.archiv);
-  if (!i.anders && !a.anders) return n;
+  if (!i.anders && !a.anders) return d === n.data ? n : ({ ...n, data: d } as T);
   return { ...n, data: { ...d, items: i.liste, ...(d.archiv !== undefined ? { archiv: a.liste } : {}) } } as T;
-}
-
-/** Von zwei inhaltsgleichen Fassungen die spätere (für den Abgleich: deterministisch auf beiden Geräten) */
-export function spaetere<T extends AppNode>(a: T, b: T): T {
-  const za = (a as T & MitZeit).geaendert ?? 0;
-  const zb = (b as T & MitZeit).geaendert ?? 0;
-  return zb > za ? b : a;
 }
 
 /** „vor 3 Tagen", „gestern", „vor 5 Minuten" (de-DE bzw. en) */

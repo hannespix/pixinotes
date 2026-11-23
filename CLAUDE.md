@@ -111,6 +111,7 @@ Chromium: `/opt/pw-browsers/chromium` (sonst `PW_CHROMIUM=…`).
 - Neue Tastenkürzel nur hinter `overlayOffen()` (`lib/overlay.ts`).
 - Eigene Mauszeiger nur über `--zeiger-*` im ersten `:root` von `src/styles/00-tokens.css` bzw. `lib/zeiger.ts`, immer mit Kontur und System-Fallback; kein nacktes `crosshair`, `cursor: none` nur mit sichtbarem Ersatz (M464).
 - Zähl-Texte über `zahlWort(n, 'Karte', 'Karten')` in `lib/sprache.ts` — nie `${n} Karten` oder „Karte(n)" (M461).
+- Neue Zeit-/Merkfelder, die jedes Gerät selbst stempelt (wie `geaendert`, `spalteSeit`), in die Listen von `lib/abgleichZeiten.ts` eintragen — sonst erzeugen sie im Abgleich Schein-Konflikte (M472).
 - Daten von außen (Links, Dateien, Sync, Live-Kanal) laufen durch
   `lib/sicher.ts`.
 - Schweres nachladen (`import()`), nicht in den Start-Bundle ziehen (M321).

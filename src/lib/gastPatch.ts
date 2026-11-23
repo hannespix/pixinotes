@@ -4,6 +4,10 @@
 // „Gesetzt" heißt: Das Objekt ersetzt sein Gegenstück mit derselben Kennung oder kommt neu dazu. Patches sind
 // absolut (kein „füge Text ein"), darum schadet es nicht, einen zweimal anzuwenden. Der Server (gast_aendern)
 // wendet sie genauso an wie patchAnwenden hier.
+//
+// M472: Zeit- und Merkfelder (lib/abgleichZeiten.ts) zählen hier bewusst MIT – eine Karte, die nur einen späteren
+// Stempel bekam (nach dem Zusammenführen), reist so zu den anderen. Ob zwei Fassungen sich wirklich widersprechen,
+// entscheidet allein der Drei-Wege-Abgleich (syncMerge.ts), in den jede Abweichung mündet (gastSync → mischen).
 import { karteEntschaerfen, karteGueltig } from './sicher';
 import type { BoardDoc } from '../store';
 
