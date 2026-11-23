@@ -159,7 +159,7 @@ console.log('A  „Nicht mit ordnen" (M445)');
   b = await stand(P);
   const pin = b.nodes.find((n) => n.id === 'pin');
   pruefe('A5 geordnet wird, die Karte bleibt liegen, wo sie war', b.nodes.filter((n) => n.type === 'frame').length === 2 && pin.position.x === vorPin.x && pin.position.y === vorPin.y, { pin: pin.position, rahmen: b.nodes.filter((n) => n.type === 'frame').length });
-  pruefe('A6 die Meldung nennt die ausgenommene Karte', /nicht mit geordnet: 1 Karte\b/.test(meldung), meldung);
+  pruefe('A6 die Meldung nennt die ausgenommene Karte', /nicht mit geordnet: 1 Karte(?!n)/.test(meldung), meldung);
   await mehr(P, 'pin');
   const zurueck = (await knopf.textContent().catch(() => '')) ?? '';
   await knopf.click().catch(() => {});

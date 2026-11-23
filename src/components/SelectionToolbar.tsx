@@ -932,8 +932,8 @@ export function SelectionToolbar() {
                       aria-pressed={alleAus}
                       onClick={() => { setMenu(null); void import('../lib/ohneOrdnen').then((m) => m.ohneOrdnenSetzen(selected.map((n) => n.id), !alleAus)); }}
                       title={alleAus
-                        ? 'Wieder mitordnen – „Nach Themen ordnen" darf die Karte in einen Rahmen legen'
-                        : 'Nicht mit ordnen – „Nach Themen ordnen" lässt die Karte liegen, wo sie ist'}
+                        ? 'Wieder mitordnen – „Nach Themen ordnen“ darf die Karte in einen Rahmen legen'
+                        : 'Nicht mit ordnen – „Nach Themen ordnen“ lässt die Karte liegen, wo sie ist'}
                     >
                       <IFrame size={14} /> {alleAus ? 'Wieder mit ordnen' : 'Nicht mit ordnen'}
                     </button>

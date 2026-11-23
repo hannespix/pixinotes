@@ -237,12 +237,8 @@ export function lageMarkdown(l: BoardLage, now: Date = new Date()): string {
   teile.push([`## ${t('Entscheidungen')}`, ...(ent.length ? ent : [`- ${t('Keine Beschlüsse gefunden.')}`])].join('\n'));
   teile.push([`## ${t('Wichtigste Inhalte')}`, ...(l.inhalte.length ? l.inhalte.map((i) => `- ${i.titel}`) : [`- ${t('Das Board ist noch leer.')}`])].join('\n'));
   const ris = [
-<<<<<<< HEAD
-    ...(l.ueberfaellig.length ? [`- **${t('{0} Aufgabe(n) überfällig').replace('{0}', String(l.ueberfaellig.length))}**`] : []),
-    ...l.befunde.map((b) => `- ${b.text}${b.karte ? ` (${b.karte})` : ''}`),
-=======
     ...(l.ueberfaellig.length ? [`- **${t('{0} überfällig').replace('{0}', zahlWort(l.ueberfaellig.length, 'Aufgabe', 'Aufgaben'))}**`] : []),
->>>>>>> origin/claude/notes-whiteboard-design-bnwvxj
+    ...l.befunde.map((b) => `- ${b.text}${b.karte ? ` (${b.karte})` : ''}`),
     ...l.risiken.map((r) => `- ${r.text}${r.karte && r.karte !== r.text ? ` (${r.karte})` : ''}`),
   ];
   teile.push([`## ${t('Risiken und Blocker')}`, ...(ris.length ? ris : [`- ${t('Nichts erkannt.')}`])].join('\n'));
