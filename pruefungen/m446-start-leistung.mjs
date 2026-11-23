@@ -30,7 +30,8 @@ const PORT = 5446;
 /** Grenze knapp über dem gemessenen Stand (M446: 2,44 MB; M459: 2 192 986 B ohne chrono, libphonenumber,
  *  Konto-/Team-Abgleich; M467: 2 168 523 B ohne Buffer-/process-Ersatz) — ein Rückschritt fällt sofort auf */
 // M462: BlockNote 0.57 (Tiptap 3, Mantine 8) — Start 2 220 718 B (+50 KB, Emoji-Auswahl schon nachgeladen; siehe docs/meilensteine/M462-blocknote.md)
-const START_JS_GRENZE = 2_240_000;
+// M482: Rechtschreibprüfung (lib/rechtschreibung.ts, muss vor dem ersten Fokus stehen) — Start 2 242 112 B; vorher 2 239 988 B
+const START_JS_GRENZE = 2_245_000;
 
 let anfragen = [];
 const app = http.createServer((q, r) => {

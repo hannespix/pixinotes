@@ -1,4 +1,5 @@
 import { initTelefonTastatur } from './lib/telefonTastatur';
+import { initRechtschreibung } from './lib/rechtschreibung';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import '@xyflow/react/dist/style.css';
@@ -66,6 +67,8 @@ if (!handleOAuthRedirect()) {
   initUebersetzung();
   // M386: „Fertig" statt „Weiter" auf der Telefon-Tastatur — Felder, die mit Enter abschließen, bekommen ihr Enter
   initTelefonTastatur();
+  // M482: Rechtschreibprüfung des Browsers ausdrücklich an in Feldern für freien Text, aus in Formeln, Code, Suche, Adressen
+  initRechtschreibung();
   // M381: Ist Englisch gewählt, wird vor dem ersten Rendern das Wörterbuch geladen — sonst blitzte die
   // Oberfläche kurz deutsch auf. Deutsch wartet auf nichts.
   const starten = () => ReactDOM.createRoot(document.getElementById('root')!).render(
