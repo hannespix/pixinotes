@@ -376,6 +376,21 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 .note-editor [data-content-type='checkListItem'] { margin: 0 !important; }
 .note-editor [data-content-type='checkListItem'] > .bn-block-content { display: flex; align-items: center; }
 
+/* M462: BlockNote 0.57 rückt Listen anders ein (Marke in 24px-Spalte) und setzt den Haken in eine
+   24px hohe Zeile mit eigenen Rändern — Listen- und Haken-Zeilen wurden höher und breiter. Hier die
+   kompakte Form aus 0.31 (Marke mit .5em Abstand, Haken in Zeilenhöhe). Gilt für alle Editoren
+   und für die ruhende Notiz (gleiche Klassen). */
+.bn-editor .bn-block-content:is([data-content-type='numberedListItem'], [data-content-type='bulletListItem']) { gap: .5em; }
+.bn-editor .bn-block-content:is([data-content-type='numberedListItem'], [data-content-type='bulletListItem'])::before { display: block; min-width: 0; padding-right: 0; }
+.bn-editor .bn-block-content[data-content-type='checkListItem'] > div:has(> input) { height: auto; display: flex; align-items: center; }
+.bn-editor .bn-block-content[data-content-type='checkListItem'] > div > input { margin: 0; margin-inline-end: .5em; width: auto; height: auto; }
+/* M462: Die Schluss-Klickfläche (bn-trailing-block) ersetzt den leeren Absatz, den 0.31 nach der ersten
+   Änderung anhängte. Sie ist eine leere Zeile hoch (nicht 30px) und nur, solange im Editor geschrieben
+   wird — vorher erschien die Zeile ebenfalls erst beim Schreiben. So wächst eine Karte nicht schon beim
+   Wecken (Fokus, M333), und die ruhende Notiz braucht keine Nachbildung (M338). */
+.bn-editor .bn-trailing-block { height: 1.5em; }
+.bn-editor:not(:focus-within) .bn-trailing-block { height: 0; }
+
 /* Tabellen im Notiz-Editor: klare Ränder, lesbar auf farbigem Grund */
 .note-editor table { border-collapse: collapse; }
 .note-editor th, .note-editor td {
@@ -7330,6 +7345,8 @@ html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !imp
    niemand in der Notiz steht. So trug jede Karte, die ein anderer angelegt hatte, bei allen übrigen nur diesen
    blassen Satz, und unter fertigem Text blieb er als graue Zeile stehen. Jetzt nur noch mit Tastatur-Fokus. */
 .note-editor .bn-editor:not(:focus-within) .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before { content: none !important; }
+/* M462: Seit BlockNote 0.57 steht der Hinweis als ::after am Block statt als ::before am Text */
+.note-editor .bn-editor:not(:focus-within) .bn-block-content:has(.ProseMirror-trailingBreak:only-child)::after { content: none !important; }
 
 /* ───── M373: Entscheidungs-Bubbles ───── */
 .bubbles-card { background: var(--surface-card); border-radius: var(--r); padding: 10px 12px 10px; overflow: hidden; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
@@ -8161,11 +8178,12 @@ body { font-family: var(--font-ui); }
 /* Titel und Überschriften */
 /* M420: Kartentitel (.drag-title) stehen wieder in der Sans — viele kleine Serifentitel machten das Board unruhig */
 .modal-head h2, .help-body h3, .ovc-space-name, .focus-title b, .bub-leer b,
-.bn-block-content[data-content-type='heading'][data-level='1'], .bn-block-content[data-content-type='heading'][data-level='2'] {
+/* M462: BlockNote 0.57 lässt data-level bei Stufe 1 (Vorgabe) weg — fehlt es, ist es Stufe 1 */
+.bn-block-content[data-content-type='heading']:is([data-level='1'], [data-level='2'], :not([data-level])) {
   font-family: var(--font-display); letter-spacing: -0.005em; font-optical-sizing: auto;
 }
 /* etwas leichter als fett: die Serife trägt die Rangordnung über Form und Größe (BlockNote setzt 700 mit langer Regel — darum :is mit Gewicht) */
-:is(.bn-container, .notiz-ruhend, .presenter-slide, .react-flow__node) .bn-block-outer .bn-block > .bn-block-content[data-content-type='heading']:is([data-level='1'], [data-level='2']) { font-weight: 560; }
+:is(.bn-container, .notiz-ruhend, .presenter-slide, .react-flow__node) .bn-block-outer .bn-block > .bn-block-content[data-content-type='heading']:is([data-level='1'], [data-level='2'], :not([data-level])) { font-weight: 560; }
 .ovc-space-name { font-weight: 600; }
 .modal-head h2 { font-weight: 600; }   /* Größe wie bisher (M347: höchstens 16 Punkte) */
 /* „Sehr gut lesbar": auch Titel und Überschriften in Atkinson (die Serife ist dort keine Hilfe) */
@@ -8518,6 +8536,8 @@ html[data-kontrast='hoch'] .pn-schatten-ebene { display: none; }
    an. In der Notiz ist das Platz zum Weiterschreiben, in der Form schob er den Text aus der Mitte. Er bleibt
    unsichtbar, solange der Cursor nicht in ihm steht. */
 .shape-body .bn-editor > .bn-block-group > .bn-block-outer:last-child:not(:first-child):has(> .bn-block > .bn-block-content[data-content-type="paragraph"]:not([data-is-empty-and-focused]) > .bn-inline-content > .ProseMirror-trailingBreak:only-child) { display: none; }
+/* M462: Seit BlockNote 0.57 ist der Platz zum Weiterschreiben eine Klickfläche statt eines Absatzes — in der Form ebenso unsichtbar */
+.shape-body .bn-trailing-block { display: none; }
 /* M436: Solange der Editor in der Form wach ist, liegen seine Leiste und ihre Menüs über Anfassern,
    Verbindungspunkten und der Form-Leiste — die gehören derselben Karte an und malten sich sonst darüber */
 .shape-inhalt.shape-inhalt-wach { z-index: 40; }

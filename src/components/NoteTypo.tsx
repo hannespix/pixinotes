@@ -11,11 +11,14 @@
 // verschiedene Sprachen für dieselbe Sache lernen muss.
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { BlockNoteSchema, defaultBlockSpecs, defaultStyleSpecs, filterSuggestionItems } from '@blocknote/core';
+import {
+  BlockNoteSchema, createHeadingBlockSpec, defaultBlockSpecs, defaultStyleSpecs, filterSuggestionItems,
+} from '@blocknote/core';
 import {
   createReactStyleSpec, FormattingToolbar, FormattingToolbarController,
   getDefaultReactSlashMenuItems, getFormattingToolbarItems, SuggestionMenuController,
-  useBlockNoteEditor, useComponentsContext, useEditorContentOrSelectionChange,
+  useBlockNoteEditor, useComponentsContext, useEditorChange, useEditorSelectionChange,
+  usePortalElement,
 } from '@blocknote/react';
 import { RechenTabelleBlock } from './RechenTabelle';
 import { IBookmark, ICalendar, IImage, IPaperclip, ISigma } from './Icons';
@@ -63,7 +66,20 @@ export const noteSchema = BlockNoteSchema.create({
    * öffnen und drucken. Angeboten wird sie aber nicht mehr (siehe
    * NoteSlashMenu): Neu eingefügt wird ab jetzt die Tabelle, die rechnen kann.
    */
-  blockSpecs: { ...defaultBlockSpecs, rechentabelle: RechenTabelleBlock },
+  blockSpecs: {
+    ...defaultBlockSpecs,
+    /**
+     * M462: Überschriften bleiben bei drei Stufen, ohne Aufklapp-Variante.
+     *
+     * BlockNote 0.57 kennt sechs Stufen und aufklappbare Überschriften. Die
+     * ruhende Notiz (lib/notizRuhend.ts) und die Exporte kennen drei — und die
+     * zusätzliche Eigenschaft `isToggleable` an JEDER Überschrift hätte jede
+     * Notiz mit Überschrift aus der ruhenden Darstellung geworfen.
+     */
+    heading: createHeadingBlockSpec({ levels: [1, 2, 3], allowToggleHeadings: false }),
+    // M462: Seit BlockNote 0.4x liefert createReactBlockSpec eine Fabrik.
+    rechentabelle: RechenTabelleBlock(),
+  },
   styleSpecs: { ...defaultStyleSpecs, textSize: TextSize, textFont: TextFont },
 });
 
@@ -100,10 +116,12 @@ function TypoButtons() {
   const [aktiv, setAktiv] = useState<{ textSize?: string; textFont?: string }>(
     () => editor.getActiveStyles() as { textSize?: string; textFont?: string },
   );
-  useEditorContentOrSelectionChange(
-    () => setAktiv(editor.getActiveStyles() as { textSize?: string; textFont?: string }),
-    editor as never,
-  );
+  // M462: BlockNote 0.57 trennt „Inhalt geändert" und „Auswahl geändert" in zwei Haken.
+  const aktivNeu = () => setAktiv(editor.getActiveStyles() as { textSize?: string; textFont?: string });
+  useEditorChange(aktivNeu, editor as never);
+  useEditorSelectionChange(aktivNeu, editor as never);
+  // M462: Menüs brauchen ihr Portal-Ziel ausdrücklich (sonst landen sie außerhalb des Editors)
+  const portalZiel = usePortalElement();
 
   const groesse = aktiv.textSize ?? null;
   const schrift = (aktiv.textFont as CardFont | undefined) ?? null;
@@ -156,7 +174,7 @@ function TypoButtons() {
       >
         A+
       </Components.FormattingToolbar.Button>
-      <Components.Generic.Menu.Root>
+      <Components.Generic.Menu.Root portalElement={portalZiel}>
         <Components.Generic.Menu.Trigger>
           <Components.FormattingToolbar.Button
             className="bn-button pn-typo-knopf"
@@ -220,14 +238,13 @@ const TELEFON_ABFRAGE = '(max-width: 700px), ((pointer: coarse) and (max-width: 
 function PhoneFormatDock() {
   const editor = useBlockNoteEditor() as unknown as typeof noteSchema.BlockNoteEditor;
   const [auswahl, setAuswahl] = useState(false);
-  useEditorContentOrSelectionChange(
-    () => {
-      let txt = '';
-      try { txt = editor.getSelectedText(); } catch { txt = ''; }
-      setAuswahl(txt.length > 0);
-    },
-    editor as never,
-  );
+  const auswahlNeu = () => {
+    let txt = '';
+    try { txt = editor.getSelectedText(); } catch { txt = ''; }
+    setAuswahl(txt.length > 0);
+  };
+  useEditorChange(auswahlNeu, editor as never);
+  useEditorSelectionChange(auswahlNeu, editor as never);
   /**
    * ProseMirror behält seine Auswahl auch ohne Fokus — wer aufs Board tippt,
    * hätte die Leiste sonst dauerhaft im Bild. Ein Tipp außerhalb von Editor,
@@ -267,6 +284,12 @@ function PhoneFormatDock() {
  * Bestehende Tabellen bleiben unberührt und lassen sich in der Notiz per
  * Knopf umwandeln (NoteCard).
  */
+/** M462: Menü-Einträge, die BlockNote seit 0.31 dazubekommen hat und die wir nicht anbieten */
+const NEUE_BLOECKE_057 = [
+  'toggle_list', 'divider', 'heading_4', 'heading_5', 'heading_6',
+  'toggle_heading', 'toggle_heading_2', 'toggle_heading_3',
+];
+
 export function NoteSlashMenu({ dateienAufsBoard }: {
   /** M302: Was mit gewählten Nicht-Bildern geschieht — die Notiz legt sie als Karten neben sich */
   dateienAufsBoard?: (dateien: File[]) => void;
@@ -297,7 +320,15 @@ export function NoteSlashMenu({ dateienAufsBoard }: {
            * 'isInGroup')"). Den Weg dorthin sperrt stattdessen `nurBilder`
            * unten — vor dem Editor, nicht in ihm.
            */
-          .filter((i) => !['video', 'audio', 'file'].includes((i as { key?: string }).key ?? ''));
+          .filter((i) => !['video', 'audio', 'file'].includes((i as { key?: string }).key ?? ''))
+          /**
+           * M462: Was BlockNote 0.57 neu ins Menü bringt (aufklappbare Liste,
+           * Trennlinie, Überschrift 4–6, aufklappbare Überschriften), bleibt
+           * draußen — „Weniger ist mehr", und die ruhende Notiz, Export und
+           * Handschrift kennen diese Blöcke nicht. Im Schema bleiben sie, damit
+           * eingefügter Inhalt von außen nicht scheitert.
+           */
+          .filter((i) => !NEUE_BLOECKE_057.includes((i as { key?: string }).key ?? ''));
         const eigene = [{
           title: 'Bild aus Zwischenablage',
           subtext: 'Screenshot oder kopiertes Foto direkt in den Text',
@@ -510,7 +541,7 @@ export function NoteToolbar() {
        * scrollbar) — die Regel dort setzt ihre eigenen Werte und bleibt
        * unberührt.
        */
-      floatingOptions={{ strategy: 'fixed' }}
+      floatingUIOptions={{ useFloatingOptions: { strategy: 'fixed' } }}
       formattingToolbar={() => (
         <FormattingToolbar>
           {getFormattingToolbarItems()}

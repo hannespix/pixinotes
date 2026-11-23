@@ -65,6 +65,8 @@ function NoteSlide({ node }: { node: NoteNode }) {
   });
   const editor = useCreateBlockNote({
     schema: noteSchema,
+    // M462: Strg+A markiert wie bisher die ganze Notiz (BlockNote 0.57: erst den Block)
+    selectAllBehavior: 'document',
     initialContent: initialContent as never,
     dictionary: sprache() === 'en' ? blockNoteEn : blockNoteDe,   // M381
     // M289: Damit Bilder überhaupt in den Text dürfen — Einfügen,

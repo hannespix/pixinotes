@@ -648,6 +648,11 @@ const hinweise = (P, auswahl) => P.evaluate((sel) => {
       const c = getComputedStyle(el, '::before').content;
       if (c && c !== 'none' && c !== 'normal' && c !== '""') aus.push(c.replace(/^"|"$/g, ''));
     }
+    // M462: BlockNote 0.57 zeigt den Hinweis als ::after am Block
+    for (const el of k.querySelectorAll('.bn-block-content')) {
+      const c = getComputedStyle(el, '::after').content;
+      if (c && c !== 'none' && c !== 'normal' && c !== '""') aus.push(c.replace(/^"|"$/g, ''));
+    }
   }
   return aus;
 }, auswahl);
