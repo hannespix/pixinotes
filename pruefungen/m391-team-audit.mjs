@@ -763,7 +763,10 @@ console.log('\n════ H: Befehl und Texte ════');
   const lies = (p) => readFileSync(path.join(__repo, p), 'utf8');
   pruefe('H2 die Hilfe nennt M391 – deutsch und englisch', lies('src/components/HelpOverlay.tsx').includes('(M391)') && lies('src/components/HelpOverlayEn.tsx').includes('(M391)'));
   const audit = lies('docs/AUDIT.md');
-  pruefe('H3 die Audit-Liste führt die Team-Funde; kein Fund ist mehr offen', /\| T1 \|/.test(audit) && !/\|[^\n|]*⏳[^\n]*\|\s*$/m.test(audit.split('\n').filter((z) => /^\| [A-Z]+\d+ \|/.test(z)).join('\n')), audit.split('\n').filter((z) => /^\| [A-Z]+\d+ \|/.test(z) && /⏳/.test(z)).map((z) => z.slice(0, 12)).join(' '));
+  // M448: nur die TEAM-Funde (T…) müssen erledigt sein – spätere Audits (M447 Barrierefreiheit, B…) führen
+  // bewusst offene Punkte als „⏳ eigene Aufgabe"; die gehören nicht zu diesem Meilenstein
+  const teamOffen = audit.split('\n').filter((z) => /^\| T\d+ \|/.test(z) && /⏳/.test(z));
+  pruefe('H3 die Audit-Liste führt die Team-Funde; kein Team-Fund ist mehr offen', /\| T1 \|/.test(audit) && teamOffen.length === 0, teamOffen.map((z) => z.slice(0, 12)).join(' '));
   pruefe('H4 kein fremder Dienst wurde angesprochen', fremd.length === 0, fremd.slice(0, 3).join(' '));
 }
 
