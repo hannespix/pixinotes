@@ -520,7 +520,71 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false): P
 
   await Promise.all(jobs);
   if (errors.length === 0) cache.set(key, { at: Date.now(), events });
+  // M469: Für die Aufgaben-Zentrale merken — je Konto, das geantwortet hat (ein abgelaufenes
+  // Google-Konto soll die Outlook-Termine nicht mit ins Leere reißen)
+  const fehlgeschlagen = new Set<'google' | 'ms'>();
+  for (const f of errors) fehlgeschlagen.add(f.startsWith('Google') ? 'google' : 'ms');
+  if (fehlgeschlagen.size < 2) termineMerken(isoDay(from), isoDay(to), events, fehlgeschlagen);
   return { events, errors };
+}
+
+// ------------------------------------------------- Gemerkte Termine (M469) ----
+// Die Aufgaben-Zentrale zeigt „Termine heute und morgen" und kann kurz vor
+// Beginn erinnern — dafür darf sie beim Start KEINEN neuen Abruf auslösen
+// (m446). Deshalb merkt sich jeder erfolgreiche Abruf (Kalender-Karte,
+// Zentrale) die Termine der nächsten Wochen in einem eigenen Schlüssel —
+// wie die Tokens nie im Board, Sync, Link oder Export.
+const TERMINE_KEY = 'pixinotes-cal-termine';
+export const TERMINE_EREIGNIS = 'pixinotes-cal-termine';
+const TERMINE_VOR = 1;    // Tage zurück, die aufgehoben werden
+const TERMINE_NACH = 62;  // Tage voraus — genug für Heute/Morgen, ohne den Speicher zu füllen
+
+export interface GemerkteTermine {
+  /** Zeitpunkt des letzten erfolgreichen Abrufs, der heute abdeckte (epoch ms) */
+  stand: number;
+  /** abgedeckte Tage (yyyy-mm-dd) → Termine dieses Tages */
+  tage: Record<string, CalAccountEvent[]>;
+}
+
+export function gemerkteTermine(): GemerkteTermine {
+  try {
+    const roh = JSON.parse(localStorage.getItem(TERMINE_KEY) ?? 'null') as GemerkteTermine | null;
+    if (roh && typeof roh === 'object' && roh.tage && typeof roh.tage === 'object') return { stand: Number(roh.stand) || 0, tage: roh.tage };
+  } catch { /* defekt → leer */ }
+  return { stand: 0, tage: {} };
+}
+
+function termineSchreiben(g: GemerkteTermine) {
+  try {
+    localStorage.setItem(TERMINE_KEY, JSON.stringify(g));
+  } catch { /* M388: Speicher voll — die Kalender-Karte zeigt trotzdem */ }
+  window.dispatchEvent(new CustomEvent(TERMINE_EREIGNIS));
+}
+
+function termineMerken(vonIso: string, bisIso: string, events: CalAccountEvent[], fehlgeschlagen: Set<'google' | 'ms'>) {
+  const jetzt = new Date();
+  const min = isoDay(new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() - TERMINE_VOR));
+  const max = isoDay(new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() + TERMINE_NACH));
+  const alt = gemerkteTermine();
+  const tage: GemerkteTermine['tage'] = {};
+  for (const [tag, liste] of Object.entries(alt.tage)) {
+    if (tag < min || tag > max || !Array.isArray(liste)) continue;
+    // Im abgerufenen Bereich bleiben nur Termine der Konten, die diesmal nicht geantwortet haben
+    tage[tag] = tag < vonIso || tag > bisIso ? liste : liste.filter((e) => fehlgeschlagen.has(e.provider));
+  }
+  // Jeder Tag des Abrufs gilt als abgedeckt — auch ohne Termin (leere Liste = „sicher nichts")
+  const lauf = new Date(`${vonIso}T12:00:00`);
+  for (let i = 0; i < 400; i += 1) {
+    const tag = isoDay(lauf);
+    if (tag > bisIso) break;
+    if (tag >= min && tag <= max && !tage[tag]) tage[tag] = [];
+    lauf.setDate(lauf.getDate() + 1);
+  }
+  for (const ev of events) {
+    if (tage[ev.date]) tage[ev.date].push({ date: ev.date, title: ev.title, time: ev.time, provider: ev.provider });
+  }
+  const heute = isoDay(jetzt);
+  termineSchreiben({ stand: vonIso <= heute && bisIso >= heute ? Date.now() : alt.stand, tage });
 }
 
 /** Cache verwerfen (manueller ⟳ in der Kalender-Karte). */
@@ -533,4 +597,8 @@ export function disconnect(provider: 'google' | 'ms') {
   delete acc[provider];
   saveCalAccounts(acc);
   cache.clear();
+  // M469: Termine eines getrennten Kontos verschwinden auch aus der Aufgaben-Zentrale
+  const g = gemerkteTermine();
+  for (const tag of Object.keys(g.tage)) g.tage[tag] = g.tage[tag].filter((e) => e.provider !== provider);
+  termineSchreiben(g);
 }

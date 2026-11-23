@@ -3403,4 +3403,17 @@
 "Diesen Strich aus dem Stand zurückholen":"Bring this stroke back from the saved state",
 "Erst die Karte zurückholen, an der der Strich hängt (oder mit auswählen)":"First bring back the card the stroke belongs to (or tick it too)",
 "Erst die Karten an den Enden zurückholen (oder mit auswählen)":"First bring back the cards at both ends (or tick them too)",
-"Seit {0} in „{1}“: {2}":"In “{1}” for {0}: {2}"}
+"Seit {0} in „{1}“: {2}":"In “{1}” for {0}: {2}",
+"Termin um {0}: „{1}\" ({2})":"Appointment at {0}: “{1}” ({2})",
+"{0} beginnen gleich – ab {1}: „{2}\"":"{0} start soon – from {1}: “{2}”",
+"Kalender-Karte angelegt – dort stehen die Termine deiner Konten.":"Calendar card created – it shows the appointments from your accounts.",
+"In der Kalender-Karte zeigen":"Show in the calendar card",
+"ganztägig":"all day",
+"Termine heute und morgen":"Appointments today and tomorrow",
+"Kurz vor Beginn (bis {0} Minuten vorher) eine Erinnerung zeigen":"Show a reminder shortly before it starts (up to {0} minutes ahead)",
+"Vorher erinnern":"Remind me beforehand",
+"Termine werden geladen …":"Loading appointments …",
+"Termine nicht abrufbar:":"Appointments not available:",
+"Heute und morgen keine Termine.":"No appointments today or tomorrow.",
+"Nicht alle Konten erreichbar:":"Not all accounts reachable:",
+"Morgen":"Tomorrow"}
