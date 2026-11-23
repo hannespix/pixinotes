@@ -580,7 +580,9 @@ await G.P.keyboard.press('End');
 // Strg+Z im Text nimmt nur das Eigene zurück
 await A.P.waitForTimeout(700);
 const vorZ = await editorText(A.P, 'x1');
-await A.P.keyboard.type(' XYZ', { delay: 20 });
+// M484: in einem Zug einfügen – Tasten einzeln fasst Yjs nur zu einem Rückgängig-Schritt, solange sie binnen 500 ms
+// kommen; unter Last lagen Leerzeichen und „XYZ" weiter auseinander, Strg+Z nahm nur „XYZ" (C5 rot mit „! ")
+await A.P.keyboard.insertText(' XYZ');
 await warteBis(G.P, async () => /XYZ/.test(await editorText(G.P, 'x1') ?? ''), 4000);
 await A.P.waitForTimeout(700);
 await A.P.keyboard.press('Control+z');

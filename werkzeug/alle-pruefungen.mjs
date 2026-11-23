@@ -16,6 +16,7 @@
 //   node werkzeug/alle-pruefungen.mjs m414 m383 --wiederhole 10 --bahnen 6
 //                                                     → Auswahl zehnmal unter Last, ohne Einzelwiederholung;
 //                                                       meldet je Reihe „x von 10 grün" und Flattern (M484)
+//   node werkzeug/alle-pruefungen.mjs … --ablage ordner → volle Ausgabe jedes roten Laufs als Datei dorthin (M484)
 //
 // Jede Prüfung startet ihren eigenen kleinen Server und Browser. Was sich dabei in die Quere käme, läuft nie
 // gleichzeitig: Dateien mit demselben Port, und die Prüfungen an der lokalen Datenbank (eine gemeinsame Datenbank).
@@ -40,6 +41,8 @@ const nurZeigen = args.includes('--nur-zeigen');
 // M484: --wiederhole N – jede Reihe N-mal in die Warteschlange, ohne den Einzellauf am Ende. So zeigt sich Flattern
 // unter Last (rot neben grün) statt im „beim zweiten Mal grün" unterzugehen.
 const wiederhole = Math.max(1, Number(wert('--wiederhole', 1)) || 1);
+const ablage = wert('--ablage', '');
+if (ablage) mkdirSync(ablage, { recursive: true });
 const filter = args.filter((a) => !a.startsWith('--'));
 
 let dateien = readdirSync(path.join(repo, 'pruefungen'))
@@ -209,6 +212,7 @@ await new Promise((alleFertig) => {
       laufend += 1;
       lauf(d.name).then((r) => {
         verlauf.get(d.name).push(r);
+        if (ablage && r.rc !== 0) writeFileSync(path.join(ablage, `${d.name.replace(/\.mjs$/, '')}-${d.durchgang}.txt`), r.aus);
         if (wiederhole > 1) {
           zeile(d.name, r, ` | Durchgang ${d.durchgang}/${wiederhole}${r.rc === 0 ? '' : ' | ROT'}`);
           if (r.rc !== 0 && !bericht) console.log(r.aus.split('\n').filter((z) => /✗|Error/.test(z)).slice(0, 8).map((z) => `    ${z.slice(0, 300)}`).join('\n'));

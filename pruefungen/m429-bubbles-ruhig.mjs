@@ -81,7 +81,14 @@ const spurNamen = async (P, ms) => P.evaluate((dauer) => new Promise((ok) => {
 const unterLast = os.loadavg()[0] > os.cpus().length;
 const sprungGrenze = unterLast ? 12 : 6;
 if (unterLast) console.log(`  (Rechner unter Last ${os.loadavg()[0].toFixed(1)} bei ${os.cpus().length} Kernen – Sprung-Grenze ${sprungGrenze} Punkte)`);
-const groessterSprung = (spur) => Math.max(0, ...Object.values(spur).map((p) => { let m = 0; for (let i = 1; i < p.length; i++) { const bilder = Math.max(1, (p[i][2] - p[i - 1][2]) / 16.7); m = Math.max(m, Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]) / bilder); } return m; }));
+// M484: Unter Last laufen Messung und Bewegung zwar im selben Bildtakt, aber nicht immer in derselben Reihenfolge —
+// dann fallen zwei Gleit-Schritte der App in ein Messintervall und keiner ins nächste (gemessen 12,8 bei Grenze 12).
+// Unter Last zählt deshalb die Strecke über zwei Messintervalle (je Bild gemittelt); ein echter Sprung (der Name wechselt
+// zwischen Ideen, Dutzende Punkte) bleibt darüber. Auf einem ruhigen Rechner gilt wie bisher das einzelne Intervall.
+const SCHRITT = unterLast ? 2 : 1;
+const groessterSprung = (spur) => Math.max(0, ...Object.values(spur).map((p) => { let m = 0; for (let i = SCHRITT; i < p.length; i++) { const bilder = Math.max(SCHRITT, (p[i][2] - p[i - SCHRITT][2]) / 16.7); m = Math.max(m, Math.hypot(p[i][0] - p[i - SCHRITT][0], p[i][1] - p[i - SCHRITT][1]) / bilder); } return m; }));
+/** M484: Warten, bis sich 1 s lang nichts mehr bewegt (höchstens ms) — das Einschwingen dauert unter Last länger */
+const stillBis = async (P, ms = 20000) => { const ende = Date.now() + ms; while (Date.now() < ende) { if ((await bewegung(P, 1000)) === 0) return; } };
 const bewegung = (P, ms, sel = '.bub-blase') => P.evaluate(([dauer, s]) => new Promise((ok) => {
   const lage = () => [...document.querySelectorAll(s)].map((b) => b.style.transform);
   let vor = lage(); let bewegt = 0; const t0 = performance.now();
@@ -115,7 +122,7 @@ console.log('\n════ B: Präsentation ════');
   const { ctx, P } = await auf(640, 440, { viewport: { width: 1440, height: 900 } });
   await P.mouse.click(1300, 860); await P.keyboard.press('Alt+p');
   await P.waitForSelector('.presenter .bub-buehne');
-  await P.waitForTimeout(7000);
+  await P.waitForTimeout(7000); await stillBis(P);
   const n = await bewegung(P, 3000);
   pruefe('B1 große Bühne: nach dem Einschwingen steht alles', n === 0, n);
   const lagen = await P.evaluate(() => { const r = [...document.querySelectorAll('.presenter .bub-blase')].map((b) => b.getBoundingClientRect()); let ueber = 0; for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) { const a = r[i], c = r[j]; const d = Math.hypot(a.x + a.width / 2 - c.x - c.width / 2, a.y + a.height / 2 - c.y - c.height / 2); if (d < (a.width + c.width) / 2 - 3) ueber++; } return ueber; });

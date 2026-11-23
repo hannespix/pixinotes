@@ -3,8 +3,8 @@ PR: siehe Merge-Titel „… (M484)" · Prüfreihe: keine neue (Läufer `werkzeu
 
 ## Warum
 Mehrere Agenten meldeten Reihen, die unter paralleler Last (`alle-pruefungen.mjs --bahnen 4`) rot und allein grün
-sind: m414-vorfuehren-gaeste, m383-karten-einzeln, m387, m428. Jeder Agent verlor damit Wiederholungen und
-Gewissheit („ist das meins?").
+sind: m414-vorfuehren-gaeste, m383-karten-einzeln, m387, m428; nach M483 (Auswahl-Leiste u. a. nachgeladen) dazu
+m332, m447, m429, m354, m366. Jeder Agent verlor damit Wiederholungen und Gewissheit („ist das meins?").
 
 ## Was
 - **Läufer:** `node werkzeug/alle-pruefungen.mjs <auswahl> --wiederhole N --bahnen B` legt jede Reihe N-mal in die
@@ -25,10 +25,27 @@ Gewissheit („ist das meins?").
 - **m383 sonst:** Marken für „seitdem nichts geschrieben" setzt die Reihe erst, wenn der nachgebaute Server 3 s
   nichts mehr bekommen hat (`serverRuhig`) — vorher konnte ein verspäteter Schreibvorgang des vorigen Schritts für den
   nächsten zählen; D1 wartet zusätzlich, bis Annas Text im Konto steht (Gerd sieht ihn über den Kanal früher).
+- **m387 I8/I11 war ein echter Fehler der App (M387, Folgen):** Wer dem Vorführenden folgt, bekommt für dessen offene
+  Dokument-Karten „zeige" (die Karte klappt auf) und, sobald sie dort zu sind, „zuklappen" — aber nur für Karten, die
+  in `aufGefolgt` stehen, und dort landete eine Karte nur, wenn sie hier noch zu war. Unter Last kam Annas Fokus vor
+  ihrer Seitenangabe an: Gerds Karte war im Fokus schon offen, bekam beim Blättern „zeige", stand aber nicht in der
+  Liste — nach dem Schließen des Fokus blieb sie bei Gerd offen (gemessen: Anna `auf: false`, Gerd `auf: true`).
+  Jetzt wird jede Karte gemerkt, der „zeige" galt; „zuklappen" nimmt nur das Zeigen zurück, eine selbst aufgeklappte
+  Karte bleibt offen.
 - **m387, m414:** `vortragStart` wartet auf die offene Präsentation (`.presenter`, bis 15 s) statt fester 700 ms (der
   Vortrag wird nachgeladen); m387 H1 wartet erst, bis Gerds Präsentation offen ist, dann die 2,5 s, in denen sie bei
-  Anna zu bleiben hat. In den Läufen dieses Meilensteins waren beide unter Last nicht rot zu bekommen — die Änderung
-  nimmt die einzige Stelle heraus, an der eine feste Pause einen positiven Zustand voraussetzte.
+  Anna zu bleiben hat. m414 ließ sich hier nicht rot machen.
+- **m477 B8:** Der Hinweis „Anna tippt gerade" erschien, war aber nach Zug und 900 ms Warten unter Last schon wieder
+  weg (auch ohne die Änderung dieses Meilensteins 2 von 4 rot). Die Reihe schreibt jetzt jeden Hinweis mit, der während
+  des Zugs erscheint (MutationObserver), und prüft, ob einer Anna nennt.
+- **Nach M483 (nachgeladene Auswahl-Leiste):** m447 F wartet auf `.sel-toolbar` statt 600 ms; m332 `auswahlMenue` und
+  m428 D2 warten auf Leiste, „Mehr"-Menü und KI-Menü statt 400/500 ms.
+- **m354 A2:** Der Strich lag nach 400 ms noch nicht im gespeicherten Stand (der Wert der Meldung, eine Abfrage später,
+  stimmte). `zeichnen()` wartet, bis sich der Stand ändert; die Prüfung, dass ein Radierer nichts trifft (E2), behält
+  ihre feste Wartezeit.
+- **m429 A1:** Die Messung „kein Name springt" begann 200 ms nach dem Laden; unter Last lag die erste Lage der Namen
+  (Aufbau) noch darin. Sie beginnt jetzt, wenn alle vier Gruppen-Namen stehen; die Grenze (6, unter Last 12) bleibt.
+- **m366** („Port belegt") war kein Fehler der Reihe: andere Agenten starteten sie ohne den Läufer.
 
 ## Wie (Architektur)
 - `src/lib/notizGemeinsamKern.ts`: Anwesenheit (`Awareness`) trägt neu `sichert: true`, solange ein Gerät Schreiber
@@ -42,15 +59,17 @@ Gewissheit („ist das meins?").
 - `pruefungen/m428-ki-ueberarbeiten.mjs`: `rahmen()` prüft alle Rahmen am Inhalt (`#edit`), 30 s; `anlegen()` wartet
   auf die neue Karte im Speicher und den Titel im Stand der Karte (`happ-state:<id>`), wirft sonst mit der Liste der
   Rahmen; `pfeilUndNeuLaden()` legt den Pfeil erneut an, falls die App ihn vor dem Neuladen überschrieb.
+- `src/components/Vorfuehren.tsx`: `aufGefolgt.current.add(karte)` für jede Karte, der „zeige" gilt.
 - Regeln für neue Reihen: `docs/AGENTEN.md` Abschnitt „Prüfreihen, die unter Last nicht flattern".
 
 ## Nachweis
 Last = Läufer mit 6 Bahnen plus drei Prozesse mit Dauerlast auf 4 Kernen. Vor der Änderung (je 3 Durchgänge):
-m383 1 von 3 und 0 von 3, m428 1 von 3; m414 und m387 je 3 von 3. Nach der Änderung: siehe PR (10 Durchgänge).
+m383 1 von 3 und 0 von 3, m428 1 von 3, m477 1 von 4 und 2 von 4 (Hauptzweig ohne diese Änderung); m414 und m387
+je 3 von 3, später m387 1 von 2, m354 1 von 2, m429 1 von 2. Nach der Änderung: siehe PR (10 Durchgänge).
 
 ## Grenzen / offen
-- m414 und m387 ließen sich hier nicht rot machen; ihre Meldungen stammten aus Läufen mit fremder Last (andere
-  Agenten). Kommt eins wieder, mit `--wiederhole` nachstellen — der Läufer zeigt die erste Fehlerzeile je Durchgang.
+- m414 ließ sich hier nicht rot machen; die Meldung stammte aus Läufen mit fremder Last (andere Agenten). Kommt es
+  wieder, mit `--wiederhole` nachstellen — der Läufer zeigt die erste Fehlerzeile je Durchgang.
 - Der Schreiber-Anspruch ist wie `schreibt` eine Selbstauskunft im Kanal: Ein manipuliertes Programm ohne Schreibrecht
   könnte ihn dauerhaft erheben, dann sicherte bei den anderen niemand den gemeinsamen Text (dieselbe Lücke wie das
   schon bisher selbst gemeldete `schreibt`; Server-Prüfung je Absender steht im BACKLOG unter M477).
