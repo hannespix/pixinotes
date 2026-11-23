@@ -220,6 +220,9 @@ Screenshots und Zwischendateien landen in `pruefungen/ablage/`
 | m456 | Navigation am Telefon barrierefrei (Befund B11 aus M447) |
 | m457 | Kontakt aus der Mail-Signatur |
 | m458 | Browser-Erweiterung „An PixiNotes senden" (Ordner `erweiterung/`) |
+| m460 | Versionen nachgeschärft: vergleichen, löschen, Team |
+| m461 | Einzahl und Mehrzahl stimmen, auf Deutsch und auf Englisch |
+| m464 | Mauszeiger überall gut sichtbar (Windows) |
 
 Die Reihen sind bewusst GEGEN DAS VERHALTEN geschrieben, nicht gegen die
 Struktur: Wo möglich messen sie Bildpunkte, echte Downloads, abgefangene
