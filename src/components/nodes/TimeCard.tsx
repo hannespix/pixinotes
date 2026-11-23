@@ -12,10 +12,12 @@ import { kwText, t as uebersetze } from '../../lib/sprache';
 /** Erfassungs-Arten: [Schlüssel, Label, Farbe]. Seit M171 bewusst nur noch
  *  Arbeit & Pause — Besonderheiten (Fahrzeit, Ortstermin …) gehören in die
  *  Bemerkung der Zeile; „zählt als Arbeitszeit" = alles außer Pause. */
+// M492: Farben als Tokens (styles/00-tokens.css) — als Schrift braucht das Dunkle eine hellere Stufe
 const KINDS: Array<[TimeSeg['kind'], string, string]> = [
-  ['arbeit', 'Arbeit', '#3c669c'],
-  ['pause', 'Pause', '#9c6f1c'],
+  ['arbeit', 'Arbeit', 'var(--zeit-arbeit)'],
+  ['pause', 'Pause', 'var(--zeit-pause)'],
 ];
+const schrift = (farbe: string) => farbe.replace(/\)$/, '-schrift)');
 const kindLabel = (k: TimeSeg['kind']) => KINDS.find(([key]) => key === k)?.[1] ?? k;
 const kindColor = (k: TimeSeg['kind']) => KINDS.find(([key]) => key === k)?.[2] ?? '#5b6470';
 
@@ -215,7 +217,7 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
             placeholder="Zeiterfassung"
           />
           {running && (
-            <span className="time-live" style={{ color: kindColor(running.kind) }}>
+            <span className="time-live" style={{ color: schrift(kindColor(running.kind)) }}>
               ● {kindLabel(running.kind)} · seit {toHM(running.start)} · {fmtDur(durOf(running))}
             </span>
           )}
@@ -226,7 +228,7 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
             <button
               key={k}
               className={`time-kind ${running?.kind === k ? 'on' : ''}`}
-              style={running?.kind === k ? { background: color, borderColor: color } : { color }}
+              style={running?.kind === k ? { background: color, borderColor: color } : { color: schrift(color) }}
               title={running?.kind === k ? `${label} läuft – Klick beendet` : running ? `Nahtlos zu ${label} wechseln` : `${label} jetzt starten`}
               onClick={() => record(k)}
             >
@@ -309,7 +311,7 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
                   <span className="time-wday-name">{fmtDayShort(d)}</span>
                   <span className="time-wday-kinds">
                     {KINDS.filter(([k]) => ks.get(k)).map(([k, label, color]) => (
-                      <span key={k} style={{ color }} title={label}>{label} {fmtCell(ks.get(k)!)}</span>
+                      <span key={k} style={{ color: schrift(color) }} title={label}>{label} {fmtCell(ks.get(k)!)}</span>
                     ))}
                   </span>
                   <span className="time-wday-total">{total ? fmtDur(total) : '—'}</span>
@@ -367,10 +369,10 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
         {/* Summen-Fuß je Ansicht (immer ohne Pausen; je-Art-Aufteilung im Tag) */}
         <div className="time-sums">
           {view === 'tag' && KINDS.filter(([k]) => daySums.get(k)).map(([k, label, color]) => (
-            <span key={k} className="time-sum" style={{ color }}>{label} {fmtDur(daySums.get(k)!)}</span>
+            <span key={k} className="time-sum" style={{ color: schrift(color) }}>{label} {fmtDur(daySums.get(k)!)}</span>
           ))}
           {view === 'woche' && KINDS.filter(([k]) => k !== 'pause' && kindsIn(monday, sunday).get(k)).map(([k, label, color]) => (
-            <span key={k} className="time-sum" style={{ color }}>{label} {fmtDur(kindsIn(monday, sunday).get(k)!)}</span>
+            <span key={k} className="time-sum" style={{ color: schrift(color) }}>{label} {fmtDur(kindsIn(monday, sunday).get(k)!)}</span>
           ))}
           <span className="time-flex" />
           {view === 'tag' && (
