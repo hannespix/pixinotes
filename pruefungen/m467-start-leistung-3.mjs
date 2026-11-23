@@ -22,8 +22,8 @@ const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 const DIST = process.env.PN_DIST ?? path.join(__repo, 'dist');
 const SINGLE = process.env.PN_SINGLE ?? path.join(__repo, 'release', 'pixinotes.html');
 const PORT = 5467;
-/** Grenze knapp über dem gemessenen Stand (siehe docs/meilensteine/M467-start-leistung-3.md) */
-const START_JS_GRENZE = 2_200_000;
+/** Grenze knapp über dem gemessenen Stand (2 168 523 B = 2,07 MiB; vorher 2 198 693 B, siehe docs/meilensteine/M467-start-leistung-3.md) */
+const START_JS_GRENZE = 2_190_000;
 
 let ok = 0; let bad = 0;
 const pruefe = (n, gut, info = '') => {
