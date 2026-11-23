@@ -366,7 +366,7 @@ Anbieter des Konto-Syncs**, kein Umbau.
   Tipp-Pause 1 s bei verbundenem Realtime. Grenze: Anhänge geteilter Boards
   liegen im Ordner des Besitzers und reisen (noch) nicht mit.
 - **Später möglich**: Anwesenheit und Cursor (Realtime Presence/Broadcast),
-  gemeinsames Tippen in einer Notiz (Yjs über Broadcast; BlockNote kann Yjs),
+  gemeinsames Tippen in einer Notiz (umgesetzt in M477, `docs/meilensteine/M477-gemeinsam-tippen.md`),
   Lese-Rolle in der Oberfläche, Anhänge geteilter Boards (Storage-Policy über
   die Freigabe), fortsetzbare Uploads (TUS) über 50 MB, OneDrive-Upload-
   Sitzungen über 4 MB, Google/Microsoft-Login über Supabase.

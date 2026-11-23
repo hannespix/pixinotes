@@ -124,6 +124,10 @@ export default defineConfig(({ mode }) => ({
                 if (/src\/lib\/chronoKern\.ts$/.test(id)) return 'fristen';
                 if (!id.includes('node_modules/')) return undefined;
                 if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react';
+                // M477: Gemeinsam tippen (Yjs, y-protocols, y-prosemirror samt ihrem lib0 und BlockNotes Yjs-Teil) lädt
+                // erst, wenn eine Notiz in einem Live-Board gemeinsam geöffnet wird — nie im Start (Regel unten zöge es
+                // ins Editor-Paket). lib0 aus dem Haupt-Ordner bleibt beim Editor: BlockNote nutzt es selbst.
+                if (/node_modules\/(yjs|y-prosemirror|y-protocols)\//.test(id) || /node_modules\/@blocknote\/core\/dist\/yjs\.js$/.test(id)) return 'gemeinsam';
                 // M446: NUR der Teil, den der Editor beim Start braucht. BlockNote lädt
                 // Emoji-Auswahl (emoji-mart samt 480 KB Daten) und die Markdown-/HTML-
                 // Kette (unified, remark, rehype, parse5 …) selbst per import() nach —
