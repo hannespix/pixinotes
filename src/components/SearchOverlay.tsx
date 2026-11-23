@@ -82,6 +82,9 @@ function buildCommands(): Command[] {
       run: () => { st().setOverviewMode('netz'); st().setView('overview'); } },
     { label: 'Aufgaben-Zentrale', hint: 'Alle offenen Aufgaben aller Boards', alias: 'tasks todo fristen',
       run: () => st().setTasksOpen(true) },
+    // M444: Lage des aktiven Boards als neue Notiz (Dock legt sie neben den sichtbaren Ausschnitt)
+    { label: 'Board-Briefing', hint: 'Lage des Boards: Fristen, Entscheidungen, Inhalte, Risiken', alias: 'briefing lage zusammenfassung überblick ueberblick fristen überfällig was ist wichtig heute status summary',
+      run: () => { st().setView('board'); setTimeout(() => window.dispatchEvent(new CustomEvent('pixinotes:board-briefing')), 120); } },
     { label: '▶ Präsentieren', hint: 'Karten als Folien zeigen', alias: 'presenter folien vortrag',
       run: () => st().setPresenting(true) },
     // M408: das Archiv per Suche ein- und ausblenden
