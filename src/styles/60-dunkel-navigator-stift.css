@@ -5,8 +5,8 @@
    also praktisch unsichtbar. Die Regel „Papier bleibt hell" gilt eben nur
    für die farbigen Töne; Weiß folgt dem Theme und braucht helle Schrift. */
 [data-theme='dark'] .react-flow__node-note:has(.sticky-white),
-[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .bn-editor,
-[data-theme='dark'] .minutes-card.sticky-white { color: var(--ink); }
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .bn-editor { color: var(--ink); }
+/* M489: Die Protokoll-Karte setzt ihre Schrift selbst nach ihrem Papier (--pr-ink, styles/52-…) */
 [data-theme='dark'] .react-flow__node-note:has(.sticky-white) .meta,
 [data-theme='dark'] .react-flow__node-note:has(.sticky-white) .due-chip { color: var(--muted); }
 [data-theme='dark'] .react-flow__node-note:has(.sticky-white) .due-chip {
