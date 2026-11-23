@@ -3178,4 +3178,6 @@
 "Kontakt als vCard":"Contact as vCard",
 "{0} Kontakte als vCard":"{0} contacts as vCard",
 "Kontakte als vCard ({0})":"Contacts as vCard ({0})",
-"Die gewählten Kontakte in einer vCard-Datei (.vcf) – für Outlook, Telefon, Adressbuch":"The selected contacts in one vCard file (.vcf) – for Outlook, phone, address book"}
+"Die gewählten Kontakte in einer vCard-Datei (.vcf) – für Outlook, Telefon, Adressbuch":"The selected contacts in one vCard file (.vcf) – for Outlook, phone, address book",
+"· schläft":"· asleep",
+"Abo aus Kanban: „{0}\" fällig am {1}":"Subscription from Kanban: “{0}” due on {1}"}

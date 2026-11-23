@@ -140,6 +140,13 @@ export function kartenName(name: string): string {
     .replace(/^E-Mail: /, 'Email: ');
 }
 
+/**
+ * M455: Kalenderwoche als kurzes Schild („KW 48" / „Wk 48"). Das Wörterbuch kann „KW {0}" nicht als Muster
+ * führen (zu wenig feste Buchstaben, siehe ladeWoerterbuch) — und wer die Breite des Schilds misst
+ * (Gantt-Kopfzeile), braucht den Text, der wirklich gezeichnet wird, nicht den deutschen.
+ */
+export const kwText = (n: number | string): string => (aktiv === 'en' ? `Wk ${n}` : `KW ${n}`);
+
 // ---------- Beobachter ----------
 /** Bereiche, in denen nichts übersetzt wird: Inhalte der Nutzer, Editoren, Code */
 const AUS = '[translate="no"], [contenteditable="true"], [contenteditable=""], .bn-editor, .ProseMirror, script, style, textarea, code, [data-sprache="aus"]';

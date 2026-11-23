@@ -12,6 +12,13 @@ import { IChevronL, IChevronR, IMore, IOrt, ILink, ITrash } from '../Icons';
 import { CardShell } from './CardShell';
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
+/**
+ * M455: Anfangsbuchstaben der Wochentage (Jahresansicht) über Intl in der Sprache der Oberfläche. „Mo"[0] blieb
+ * auf Englisch „M D M D F S S" — ein einzelner Buchstabe ist für das Wörterbuch kein Text. Erst beim Zeichnen
+ * gebildet: Die englische Oberfläche stellt die Datumsformate beim Start um (lib/sprache.ts).
+ */
+const wochentagBuchstaben = (): string[] =>
+  Array.from({ length: 7 }, (_, i) => new Date(2026, 0, 5 + i, 12).toLocaleDateString('de-DE', { weekday: 'narrow' }));
 const DAY = 864e5;
 
 interface CalEntry {
@@ -780,7 +787,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
                   {erster.toLocaleDateString('de-DE', { month: 'short' })}
                 </button>
                 <div className="cal-jahr-raster">
-                  {WEEKDAYS.map((w) => <span key={w} className="cal-jahr-dow">{w[0]}</span>)}
+                  {wochentagBuchstaben().map((b, i) => <span key={WEEKDAYS[i]} className="cal-jahr-dow">{b}</span>)}
                   {felder.map((iso, i) => {
                     if (!iso) return <span key={`l${i}`} />;
                     const anzahl = (byDay.get(iso)?.length ?? 0) + (stripsByDay.get(iso)?.length ?? 0);

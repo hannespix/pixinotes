@@ -23,6 +23,8 @@ import { InlineName } from './InlineName';
 import { wurzelZoom } from '../lib/anzeige';
 import { BereichMenu, BoardMenu, ProjektMenu, insBild } from './EbenenMenu';
 import { ITarget, IZoomIn, IZoomOut } from './Icons';
+import { kartenName } from '../lib/sprache';
+import { SVG_INHALT } from '../lib/uebersetzung';
 
 interface SpaceZoneData { space: Space; accent: string; [key: string]: unknown }
 interface ProjectZoneData { project: Project; spaceId: string; [key: string]: unknown }
@@ -1409,7 +1411,8 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
       const rest = b.nodes.filter((n) => !connected.has(n.id));
       const cards = [...linked, ...rest].slice(0, Math.max(linked.length, MAX_SATELLITES)).map((n) => ({
         nodeId: n.id,
-        title: (nodeToText(n).split('\n').find((l) => l.trim()) ?? n.type ?? 'Karte').slice(0, 40),
+        // M455: allgemeine Bezeichnungen („Kalender (Monatsansicht)“) in der Sprache der Oberfläche, eigene Titel bleiben
+        title: kartenName(nodeToText(n).split('\n').find((l) => l.trim()) ?? n.type ?? 'Karte').slice(0, 40),
       }));
       return { boardId: b.id, total: b.nodes.length, cards, edges: b.edges.map((e) => ({ s: e.source, t: e.target })) };
     });
@@ -1569,7 +1572,8 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
                   ref={(el) => { if (el) regionTextEls.current.set(rg.key, el); else regionTextEls.current.delete(rg.key); }}
                   x={geo.label.x} y={geo.label.y} style={{ color: rg.accent }} fontSize={ui(15)}
                 >
-                  {rg.schlaeft ? `${rg.name} · schläft` : rg.name}
+                  {/* M455: der Name ist Inhalt, „schläft“ Oberfläche — getrennt, damit nur das Wort übersetzt wird */}
+                  <tspan {...SVG_INHALT}>{rg.name}</tspan>{rg.schlaeft ? ' · schläft' : ''}
                 </text>
               )}
             </g>
@@ -1677,10 +1681,11 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
                   className={`ov-graph-dot ${marking ? (hits.cards.has(d.key) ? 'hit' : 'dim') : ''}`}
                   onClick={() => { openBoard(sb.boardId); focusNode(sb.boardId, d.nodeId); }}
                 >
-                  <title>{d.title}</title>
+                  <title {...SVG_INHALT}>{d.title}</title>
                   <circle cx={d.x} cy={d.y} r={ui(5)} strokeWidth={0} fill={tropfenPlan.boardFarbe.has(sb.boardId) ? `url(#${verlaufId(sb.boardId)})` : `url(#netz-tropfen-${farbIndex.get(sb.boardId) ?? 0})`} />
                   {lod === 2 && (
                     <text
+                      {...SVG_INHALT}
                       className="ov-graph-dot-label"
                       x={d.x + ui(9)} y={d.y + ui(4)} fontSize={ui(11.5)}
                       stroke="var(--bg)" strokeWidth={ui(3)} paintOrder="stroke"
@@ -1732,7 +1737,9 @@ export function GraphView({ embedded = false }: { embedded?: boolean }) {
                   Bewusst ohne Schatten und Glanz (flat), und ohne Filter: kostet beim Zeichnen fast nichts. */}
               {tropfenPlan.boardFarbe.has(n.id) && <BoardVerlauf id={verlaufId(n.id)} farbe={tropfenPlan.boardFarbe.get(n.id)!} />}
               <circle className="ov-tropfen" r={rad} strokeWidth={0} fill={tropfenPlan.boardFarbe.has(n.id) ? `url(#${verlaufId(n.id)})` : `url(#netz-tropfen-${farbIndex.get(n.id) ?? 0})`} />
+              {/* M455: Board-Namen sind Inhalt — kein Übersetzer fasst sie an (auch nicht „Planung“ → „Planning“) */}
               <text
+                {...SVG_INHALT}
                 x={0} y={rad + ui(17)} textAnchor="middle"
                 // Deckel in SVG-Einheiten: weit rausgezoomt schrumpfen Namen,
                 // statt sich gegenseitig zu überlagern
