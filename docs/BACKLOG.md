@@ -17,9 +17,8 @@ immer Vorrang vor dieser Liste.
 | — | Wissensbasis: HISTORIE.md, README aktualisieren | docs/ |
 
 ## Offene Punkte aus gemergten Meilensteinen
-- M445: Auto-Aufräumen (nächtlich) und Pin „nicht mit ordnen“ fehlen
 - M449: Versionen nur je Gerät (reisen nicht mit Sync/Export)
-- M444: Risiko-Erkennung ohne KI nur Wortmuster
+- M463: „lange in Arbeit“ misst die Kanban-Karte, nicht das einzelne Ticket (Tickets tragen keine eigene Zeit)
 - M458: Erweiterung nicht im Chrome-/Edge-/Firefox-Store (nur „Entpackt laden“); kein Weg in die portable pixinotes.html; keine feste Schnellablage-Zone (KONZEPT „Inbox-Ecke“)
 - M466: Outlook nur lesen und auf Abruf (kein Abo/Delta-Abgleich, keine Ordner außer Posteingang, kein Antworten über Graph); Konto-Termine stehen wie bisher nur in der Kalender-Karte, nicht in der Aufgaben-Zentrale; braucht `VITE_MS_CLIENT_ID` im Build
 

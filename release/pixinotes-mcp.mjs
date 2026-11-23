@@ -39136,15 +39136,127 @@ function tagLokal(d = /* @__PURE__ */ new Date()) {
 
 // mcp/storeShim.ts
 init_define_import_meta_env();
+
+// src/lib/kartenZeit.ts
+init_define_import_meta_env();
+
+// src/lib/sprache.ts
+init_define_import_meta_env();
+var aktiv = "de";
+var exakt = /* @__PURE__ */ new Map();
+var ENDUNG = /^(e|en|n|er|ern|s|se|änge|öcke|üsse)$/;
+var EINZAHL = /^(ang|ock|uss)$/;
+var muster = [];
+var eigene = /* @__PURE__ */ new Set();
+var merk = /* @__PURE__ */ new Map();
+var luecken = /* @__PURE__ */ new Set();
+var TASTEN = { Strg: "Ctrl", Umschalt: "Shift", Entf: "Del", Leertaste: "Space", Eingabe: "Enter", R\u00FCcktaste: "Backspace", Pos1: "Home", Ende: "End", "Bild\u2191": "PgUp", "Bild\u2193": "PgDn", Einfg: "Ins", Pfeiltasten: "Arrow keys", Pfeil: "Arrow" };
+var TASTE = /Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Bild[↑↓]|Einfg|Pfeil/;
+function schlageNach(kern) {
+  const bekannt = merk.get(kern);
+  if (bekannt !== void 0) return bekannt;
+  let en = exakt.get(kern) ?? null;
+  if (en === null) {
+    for (const m of muster) {
+      const t2 = m.re.exec(kern);
+      if (!t2) continue;
+      en = m.en.replace(/\u0001(\d+)\u0002/g, (_, i) => {
+        const teil = t2[Number(i) + 1] ?? "";
+        if (m.endung.has(Number(i)) && (teil === "" || ENDUNG.test(teil) || EINZAHL.test(teil))) return ENDUNG.test(teil) ? "s" : "";
+        const r = /^(\s*)([\s\S]*?)(\s*)$/.exec(teil);
+        const innen = r ? exakt.get(r[2]) : void 0;
+        return innen !== void 0 && r ? r[1] + innen + r[3] : teil;
+      });
+      break;
+    }
+  }
+  if (en === null && TASTE.test(kern) && /^[^a-zäöü]*([A-ZÄÖÜ][A-Za-zäöü0-9↑↓]*|[^A-Za-zäöü])([+ /,·–-]+([A-ZÄÖÜ][A-Za-zäöü0-9↑↓]*|[^A-Za-zäöü]))*$/.test(kern)) {
+    en = kern.replace(/Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Ende|Bild↑|Bild↓|Einfg|Pfeiltasten|Pfeil/g, (w) => TASTEN[w] ?? w);
+  }
+  if (merk.size > 6e3) merk.clear();
+  merk.set(kern, en);
+  if (en !== null) eigene.add(en);
+  return en;
+}
+var HAT_BUCHSTABEN = /[A-Za-zÄÖÜäöüß]{2}/;
+function t(text3) {
+  if (aktiv !== "en" || !text3) return text3;
+  const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(text3);
+  if (!m) return text3;
+  const kern = m[2].replace(/\s+/g, " ");
+  if (!HAT_BUCHSTABEN.test(kern)) return text3;
+  const en = schlageNach(kern);
+  if (en === null) {
+    if (!eigene.has(kern) && !nurZahlWorte(kern)) luecken.add(kern);
+    return text3;
+  }
+  return m[1] + en + m[3];
+}
+var REGEL_DE = new Intl.PluralRules("de-DE");
+var REGEL_EN = new Intl.PluralRules("en-GB");
+var zahlWorte = /* @__PURE__ */ new Set();
+function nurZahlWorte(kern) {
+  if (!zahlWorte.size) return false;
+  let rest = kern;
+  for (const z2 of zahlWorte) if (rest.includes(z2)) rest = rest.split(z2).join(" ");
+  return rest !== kern && !HAT_BUCHSTABEN.test(rest);
+}
+
+// src/lib/kartenZeit.ts
+var ANSICHT = /* @__PURE__ */ new Set([
+  "extEpoch",
+  "month",
+  "view",
+  "current",
+  "dayWidth",
+  "filter",
+  "filterAn",
+  "sort",
+  "kompakt",
+  "groupBy",
+  "colW",
+  "rahmen",
+  "color",
+  "hex",
+  "look",
+  "show",
+  "fitOnLoad",
+  "icsEvents",
+  "lokal",
+  "ref",
+  // M463: Merker an der Mail, dass ein Destillat daneben liegt (M451) – die Mail selbst bleibt unverändert
+  "destillat"
+]);
+var FRUEHESTENS = Date.UTC(2020, 0, 1);
+function inhaltGeaendert(alt, patch) {
+  for (const [k, v] of Object.entries(patch)) {
+    if (ANSICHT.has(k)) continue;
+    const a = alt[k];
+    if (a === v) continue;
+    if (a && v && typeof a === "object" && typeof v === "object" && JSON.stringify(a) === JSON.stringify(v)) continue;
+    if (a === void 0 && v === void 0) continue;
+    return true;
+  }
+  return false;
+}
+function nachPatch(neu, alt, patch, jetzt = Date.now()) {
+  if (!inhaltGeaendert(alt.data, patch)) return neu;
+  return { ...neu, geaendert: jetzt };
+}
+function frisch(n, jetzt = Date.now()) {
+  return { ...n, angelegt: jetzt, geaendert: jetzt };
+}
+
+// mcp/storeShim.ts
 var zustand = { boards: [], spaces: [], activeId: "" };
 var neueId = () => Math.random().toString(36).slice(2, 10);
 var aendern = (fn) => {
   zustand.boards = zustand.boards.map((b) => b.id === zustand.activeId ? { ...b, ...fn(b) } : b);
 };
 var aktionen = {
-  addNode: (node2) => aendern((b) => ({ nodes: [...b.nodes, node2] })),
+  addNode: (node2) => aendern((b) => ({ nodes: [...b.nodes, frisch(node2)] })),
   updateNodeData: (id, data) => aendern((b) => ({
-    nodes: b.nodes.map((n) => n.id === id ? { ...n, data: { ...n.data, ...data } } : n)
+    nodes: b.nodes.map((n) => n.id === id ? nachPatch({ ...n, data: { ...n.data, ...data } }, n, data) : n)
   })),
   addLabeledEdge: (source, target, label, kind = "arrow") => aendern((b) => b.edges.some((e) => e.source === source && e.target === target) ? {} : { edges: [...b.edges, { id: `e-${neueId()}`, source, target, type: "labeled", data: { label, kind } }] }),
   removeNodes: (ids) => {
@@ -39272,68 +39384,6 @@ var MERMAID_TEMPLATES = {
   Zeitstrahl: "timeline\n  title Projektverlauf\n  2026 Q1 : Konzept : Abstimmung\n  2026 Q2 : Umsetzung\n  2026 Q3 : Pilot : Schulung\n  2026 Q4 : Rollout",
   Quadrant: 'quadrantChart\n  title Priorisierung\n  x-axis "Geringer Aufwand" --> "Hoher Aufwand"\n  y-axis "Geringer Nutzen" --> "Hoher Nutzen"\n  quadrant-1 "Sofort machen"\n  quadrant-2 "Einplanen"\n  quadrant-3 "Verwerfen"\n  quadrant-4 "Nebenbei"\n  "Portal-Relaunch": [0.7, 0.85]\n  "Ablage aufr\xE4umen": [0.25, 0.4]\n  "Neues Formular": [0.3, 0.75]'
 };
-
-// src/lib/sprache.ts
-init_define_import_meta_env();
-var aktiv = "de";
-var exakt = /* @__PURE__ */ new Map();
-var ENDUNG = /^(e|en|n|er|ern|s|se|änge|öcke|üsse)$/;
-var EINZAHL = /^(ang|ock|uss)$/;
-var muster = [];
-var eigene = /* @__PURE__ */ new Set();
-var merk = /* @__PURE__ */ new Map();
-var luecken = /* @__PURE__ */ new Set();
-var TASTEN = { Strg: "Ctrl", Umschalt: "Shift", Entf: "Del", Leertaste: "Space", Eingabe: "Enter", R\u00FCcktaste: "Backspace", Pos1: "Home", Ende: "End", "Bild\u2191": "PgUp", "Bild\u2193": "PgDn", Einfg: "Ins", Pfeiltasten: "Arrow keys", Pfeil: "Arrow" };
-var TASTE = /Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Bild[↑↓]|Einfg|Pfeil/;
-function schlageNach(kern) {
-  const bekannt = merk.get(kern);
-  if (bekannt !== void 0) return bekannt;
-  let en = exakt.get(kern) ?? null;
-  if (en === null) {
-    for (const m of muster) {
-      const t2 = m.re.exec(kern);
-      if (!t2) continue;
-      en = m.en.replace(/\u0001(\d+)\u0002/g, (_, i) => {
-        const teil = t2[Number(i) + 1] ?? "";
-        if (m.endung.has(Number(i)) && (teil === "" || ENDUNG.test(teil) || EINZAHL.test(teil))) return ENDUNG.test(teil) ? "s" : "";
-        const r = /^(\s*)([\s\S]*?)(\s*)$/.exec(teil);
-        const innen = r ? exakt.get(r[2]) : void 0;
-        return innen !== void 0 && r ? r[1] + innen + r[3] : teil;
-      });
-      break;
-    }
-  }
-  if (en === null && TASTE.test(kern) && /^[^a-zäöü]*([A-ZÄÖÜ][A-Za-zäöü0-9↑↓]*|[^A-Za-zäöü])([+ /,·–-]+([A-ZÄÖÜ][A-Za-zäöü0-9↑↓]*|[^A-Za-zäöü]))*$/.test(kern)) {
-    en = kern.replace(/Strg|Umschalt|Entf|Leertaste|Eingabe|Rücktaste|Pos1|Ende|Bild↑|Bild↓|Einfg|Pfeiltasten|Pfeil/g, (w) => TASTEN[w] ?? w);
-  }
-  if (merk.size > 6e3) merk.clear();
-  merk.set(kern, en);
-  if (en !== null) eigene.add(en);
-  return en;
-}
-var HAT_BUCHSTABEN = /[A-Za-zÄÖÜäöüß]{2}/;
-function t(text3) {
-  if (aktiv !== "en" || !text3) return text3;
-  const m = /^(\s*)([\s\S]*?)(\s*)$/.exec(text3);
-  if (!m) return text3;
-  const kern = m[2].replace(/\s+/g, " ");
-  if (!HAT_BUCHSTABEN.test(kern)) return text3;
-  const en = schlageNach(kern);
-  if (en === null) {
-    if (!eigene.has(kern) && !nurZahlWorte(kern)) luecken.add(kern);
-    return text3;
-  }
-  return m[1] + en + m[3];
-}
-var REGEL_DE = new Intl.PluralRules("de-DE");
-var REGEL_EN = new Intl.PluralRules("en-GB");
-var zahlWorte = /* @__PURE__ */ new Set();
-function nurZahlWorte(kern) {
-  if (!zahlWorte.size) return false;
-  let rest = kern;
-  for (const z2 of zahlWorte) if (rest.includes(z2)) rest = rest.split(z2).join(" ");
-  return rest !== kern && !HAT_BUCHSTABEN.test(rest);
-}
 
 // src/types.ts
 init_define_import_meta_env();
@@ -40414,12 +40464,6 @@ var import_react2 = __toESM(require_react(), 1);
 
 // src/lib/sicher.ts
 init_define_import_meta_env();
-
-// src/lib/kartenZeit.ts
-init_define_import_meta_env();
-var FRUEHESTENS = Date.UTC(2020, 0, 1);
-
-// src/lib/sicher.ts
 function kontaktBild(roh) {
   if (typeof roh !== "string" || roh.length > 15e5) return null;
   return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
@@ -40644,7 +40688,7 @@ function kiOpsText(typen) {
   if (typen.has("kontakt")) z2.push('{"op":"edit_kontakt","id":"<Kontakt-id>","name":"...","funktion":"...","firma":"...","telefone":[{"nummer":"...","art":"..."}],"emails":["..."],"adresse":"...","web":"...","notiz":"..."} (nur die genannten Felder \xE4ndern sich; "telefone" und "emails" ersetzen die ganze Liste \u2013 bisherige Nummern, die bleiben sollen, mit angeben; "" entfernt einen Wert)');
   return z2.join("\n");
 }
-var frisch = (id) => typeof id === "string" ? selectActiveBoard(useBoard.getState())?.nodes.find((n) => n.id === id) : void 0;
+var frisch2 = (id) => typeof id === "string" ? selectActiveBoard(useBoard.getState())?.nodes.find((n) => n.id === id) : void 0;
 async function kiVorbereiten(plan, mdToBlocks) {
   const aus = /* @__PURE__ */ new Map();
   for (const o of plan) {
@@ -40800,7 +40844,7 @@ function kontaktFelder(o) {
 function kiAusfuehren(o, u) {
   const { st } = u;
   const ziel = (typ) => {
-    const n = frisch(o.id);
+    const n = frisch2(o.id);
     return n && u.known.has(n.id) && n.type === typ ? n : void 0;
   };
   switch (o.op) {
@@ -40822,7 +40866,7 @@ function kiAusfuehren(o, u) {
     case "set_color": {
       const farbe = text(o.color);
       if (!["yellow", "pink", "mint", "sky", "white"].includes(farbe)) return false;
-      const ids = liste(o.ids).map((i) => frisch(i)).filter((n) => !!n && u.known.has(n.id) && (n.type === "note" || n.type === "minutes"));
+      const ids = liste(o.ids).map((i) => frisch2(i)).filter((n) => !!n && u.known.has(n.id) && (n.type === "note" || n.type === "minutes"));
       for (const n of ids) st.updateNodeData(n.id, { color: farbe, hex: void 0 });
       return ids.length > 0;
     }

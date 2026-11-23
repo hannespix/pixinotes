@@ -42,9 +42,9 @@ ich zuletzt angefasst" und „was liegt seit Wochen herum" oft die eigentliche F
   `UNBERUEHRT_TAGE` 30, `MAIL_TAGE` 7.
 
 ## Grenzen / offen
-- Wege, die Karteninhalt ohne `updateNodeData*` schreiben (z. B. Bild ersetzen, Kanban-Rücksync über eigene
+- → M463: Bild ersetzen, Editor-Rückgängig und der MCP-Server stempeln jetzt. (Vorher: Wege, die Karteninhalt ohne `updateNodeData*` schreiben (z. B. Bild ersetzen, Kanban-Rücksync über eigene
   Pfade, MCP-Server), stempeln noch nicht; Karten aus Importen (Datei, Vorlage) sind „unbekannt" oder tragen den
-  Zeitpunkt der Quelle, bis sie geändert werden.
+  Zeitpunkt der Quelle, bis sie geändert werden. Kanban-Rücksync bleibt als Automatik bewusst ohne Stempel.)
 - Bei echtem Konflikt (beide Seiten geändert) bleibt die hiesige Fassung samt ihrem Zeitpunkt; ein „spätere
   Änderung gewinnt" für den Inhalt wäre ein eigener Meilenstein (Konfliktregeln, m311).
-- Kein Filter „älter als …" in der Suche; kein Zeitpunkt im Kontextmenü (der Fokus reicht vorerst).
+- Kein Filter „älter als …" in der Suche. Zeitpunkt im Kontextmenü → M463 (leise Zeile ganz unten im ⋯).

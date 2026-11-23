@@ -5,6 +5,7 @@
 // Genau die stellt dieser Ersatz bereit — auf einem Stand im Speicher, den der MCP-Server lädt und wieder sichert.
 // Beim Bündeln (werkzeug/mcp-bauen.mjs) wird jeder Import von src/store.ts hierher umgelenkt.
 import type { AppNode } from '../src/types';
+import { frisch, nachPatch } from '../src/lib/kartenZeit';
 
 export interface Kante { id: string; source: string; target: string; type?: string; data?: Record<string, unknown>; [k: string]: unknown }
 export interface BoardDoc { id: string; name: string; nodes: AppNode[]; edges: Kante[]; drawings?: unknown[]; [k: string]: unknown }
@@ -28,10 +29,12 @@ const aendern = (fn: (b: BoardDoc) => Partial<BoardDoc>) => {
 };
 
 /** Dieselben Mutatoren wie im echten Store — nur ohne Verlauf, Hinweise und Oberfläche */
+// M463: Auch Änderungen über den MCP-Server stempeln die Karte (angelegt/geaendert, M453) – sonst stünde eine von
+// einem KI-Programm geschriebene Karte im Board-Briefing als „lange unberührt".
 const aktionen = {
-  addNode: (node: AppNode) => aendern((b) => ({ nodes: [...b.nodes, node] })),
+  addNode: (node: AppNode) => aendern((b) => ({ nodes: [...b.nodes, frisch(node)] })),
   updateNodeData: (id: string, data: Record<string, unknown>) => aendern((b) => ({
-    nodes: b.nodes.map((n) => (n.id === id ? ({ ...n, data: { ...n.data, ...data } } as AppNode) : n)),
+    nodes: b.nodes.map((n) => (n.id === id ? nachPatch({ ...n, data: { ...n.data, ...data } } as AppNode, n, data) : n)),
   })),
   addLabeledEdge: (source: string, target: string, label: string, kind = 'arrow') => aendern((b) => (
     b.edges.some((e) => e.source === source && e.target === target)
