@@ -188,17 +188,27 @@ export async function connectGoogle(clientId: string, hint?: string): Promise<st
 }
 
 /** Stiller Token-Refresh (ohne Popup); wirft, wenn eine neue Anmeldung nötig ist. */
+/**
+ * M473: Ohne Antwort von GIS (Fenster geblockt, Dienst hängt) gibt die Erneuerung nach dieser Zeit auf — vorher
+ * fehlte `error_callback`, und ein geblocktes Fenster ließ den Abruf für immer warten.
+ */
+const GOOGLE_ERNEUERN_MS = 20_000;
+const GOOGLE_ABGELAUFEN = 'Google-Sitzung abgelaufen – bitte in den Einstellungen neu verbinden.';
+
 async function refreshGoogle(acc: GoogleAccount): Promise<GoogleAccount> {
   await loadGis();
   const token = await new Promise<{ access_token: string; expires_in: number }>((resolve, reject) => {
+    const uhr = window.setTimeout(() => reject(new Error(GOOGLE_ABGELAUFEN)), GOOGLE_ERNEUERN_MS);
     const client = window.google!.accounts.oauth2.initTokenClient({
       client_id: acc.clientId,
       scope: GOOGLE_SCOPE,
       prompt: '',
       callback: (resp) => {
-        if (resp.error || !resp.access_token) reject(new Error('Google-Sitzung abgelaufen – bitte in den Einstellungen neu verbinden.'));
+        window.clearTimeout(uhr);
+        if (resp.error || !resp.access_token) reject(new Error(GOOGLE_ABGELAUFEN));
         else resolve({ access_token: resp.access_token, expires_in: resp.expires_in ?? 3600 });
       },
+      error_callback: () => { window.clearTimeout(uhr); reject(new Error(GOOGLE_ABGELAUFEN)); },
     });
     client.requestAccessToken({ prompt: '' });
   });
@@ -480,8 +490,10 @@ const CACHE_MS = 5 * 60 * 1000;
 
 /**
  * Alle Termine der verbundenen Konten im Zeitraum [from, to] (inklusive).
- * M471: `opts.still` (Hintergrund-Abruf ohne Nutzer-Geste) erneuert ein abgelaufenes Google-Token nicht — das bräuchte
- * den Google-Anmeldedienst und womöglich ein Fenster; das Konto zählt dann als „hat nicht geantwortet".
+ * M471: `opts.still` = Hintergrund-Abruf ohne Nutzer-Geste.
+ * M473: Auch im Hintergrund wird ein abgelaufenes Token erneuert (Google still über GIS, Outlook über das
+ * Refresh-Token) — wie beim Öffnen der Kalender-Karte. Scheitert das, merkt sich die App den Hinweis
+ * (kontoHinweise()), den die Aufgaben-Zentrale leise zeigt; der nächste gelungene Abruf nimmt ihn zurück.
  */
 export async function fetchAccountEvents(from: Date, to: Date, force = false, opts: { still?: boolean } = {}): Promise<{ events: CalAccountEvent[]; errors: string[] }> {
   const key = `${isoDay(from)}|${isoDay(to)}`;
@@ -494,12 +506,17 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false, op
   const timeMax = new Date(to.getFullYear(), to.getMonth(), to.getDate() + 1).toISOString();
 
   const jobs: Array<Promise<void>> = [];
+  /** M473: Konten, deren Token sich nicht erneuern ließ */
+  const ohneErneuerung = new Set<'google' | 'ms'>();
+  const erneuert = async <T>(konto: 'google' | 'ms', f: () => Promise<T>): Promise<T> => {
+    try { return await f(); } catch (e) { ohneErneuerung.add(konto); throw e; }
+  };
 
   jobs.push((async () => {
     try {
-      let acc = opts.still ? loadCalAccounts().google ?? null : await freshGoogle();
-      if (!acc?.token) return;
-      if (opts.still && !(acc.tokenExp && acc.tokenExp > Date.now())) throw new Error('Sitzung abgelaufen');
+      const erst = await erneuert('google', freshGoogle);
+      if (!erst?.token) return;
+      let acc: GoogleAccount = erst;
       const calendars = (acc.calendars ?? []).filter((c) => c.enabled);
       for (const cal of calendars) {
         type GZeit = { date?: string; dateTime?: string };
@@ -516,8 +533,8 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false, op
           data = await run(acc);
         } catch (e) {
           if (!(e instanceof AuthExpired)) throw e;
-          if (opts.still) throw new Error('Sitzung abgelaufen');
-          acc = await refreshGoogle(acc);
+          const a = acc;
+          acc = await erneuert('google', () => refreshGoogle(a));
           data = await run(acc);
         }
         for (const ev of data.items ?? []) {
@@ -547,7 +564,7 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false, op
 
   jobs.push((async () => {
     try {
-      let acc = await freshMs();
+      let acc = await erneuert('ms', freshMs);
       if (!acc) return;
       type MZeit = { dateTime?: string; timeZone?: string };
       const run = async (a: MsAccount) => msApi<{ value?: Array<{ id?: string; subject?: string; isAllDay?: boolean; start?: MZeit; end?: MZeit; location?: { displayName?: string }; webLink?: string }> }>(
@@ -565,7 +582,8 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false, op
         data = await run(acc);
       } catch (e) {
         if (!(e instanceof AuthExpired)) throw e;
-        acc = await refreshMicrosoft(acc);
+        const a = acc;
+        acc = await erneuert('ms', () => refreshMicrosoft(a));
         data = await run(acc);
       }
       for (const ev of data.value ?? []) {
@@ -600,6 +618,7 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false, op
   const fehlgeschlagen = new Set<'google' | 'ms'>();
   for (const f of errors) fehlgeschlagen.add(f.startsWith('Google') ? 'google' : 'ms');
   if (fehlgeschlagen.size < 2) termineMerken(isoDay(from), isoDay(to), events, fehlgeschlagen);
+  hinweiseFuehren(fehlgeschlagen, ohneErneuerung, !!opts.still);
   return { events, errors };
 }
 
@@ -679,6 +698,37 @@ function termineMerken(vonIso: string, bisIso: string, events: CalAccountEvent[]
   termineSchreiben({ v: TERMINE_FASSUNG, stand: vonIso <= heute && bisIso >= heute ? Date.now() : alt.v === TERMINE_FASSUNG ? alt.stand : 0, tage });
 }
 
+// ------------------------------------------- Hinweis „Anmeldung abgelaufen" (M473) ----
+// Scheitert die Erneuerung im Hintergrund (Fenster ohne Geste geblockt, Zugriff entzogen), soll die Zentrale das
+// leise sagen statt still mit alten Terminen zu erinnern. Nur der Name des Kontos wird gemerkt, nie ein Token.
+const HINWEIS_KEY = 'pixinotes:konto-hinweis';
+
+/** Konten, deren Anmeldung im Hintergrund nicht erneuert werden konnte */
+export function kontoHinweise(): Array<'google' | 'ms'> {
+  try {
+    const roh = JSON.parse(localStorage.getItem(HINWEIS_KEY) ?? '[]') as unknown;
+    return Array.isArray(roh) ? roh.filter((k): k is 'google' | 'ms' => k === 'google' || k === 'ms') : [];
+  } catch { return []; }
+}
+
+function hinweiseSchreiben(liste: Array<'google' | 'ms'>) {
+  const alt = kontoHinweise();
+  if (alt.length === liste.length && alt.every((k) => liste.includes(k))) return;
+  try {
+    if (liste.length) localStorage.setItem(HINWEIS_KEY, JSON.stringify(liste));
+    else localStorage.removeItem(HINWEIS_KEY);
+  } catch { /* privates Fenster */ }
+  window.dispatchEvent(new CustomEvent(TERMINE_EREIGNIS));
+}
+
+/** Nach einem Abruf: Wer geantwortet hat, verliert seinen Hinweis; im Hintergrund gescheiterte Erneuerung setzt ihn */
+function hinweiseFuehren(fehlgeschlagen: Set<'google' | 'ms'>, ohneErneuerung: Set<'google' | 'ms'>, still: boolean) {
+  const verbunden = loadCalAccounts();
+  const neu = new Set(kontoHinweise().filter((k) => fehlgeschlagen.has(k) && (k === 'google' ? googleConnected(verbunden.google) : msConnected(verbunden.ms))));
+  if (still) for (const k of ohneErneuerung) neu.add(k);
+  hinweiseSchreiben([...neu]);
+}
+
 /** Cache verwerfen (manueller ⟳ in der Kalender-Karte). */
 export function invalidateAccountEvents() {
   cache.clear();
@@ -689,6 +739,7 @@ export function disconnect(provider: 'google' | 'ms') {
   delete acc[provider];
   saveCalAccounts(acc);
   cache.clear();
+  hinweiseSchreiben(kontoHinweise().filter((k) => k !== provider));
   // M469: Termine eines getrennten Kontos verschwinden auch aus der Aufgaben-Zentrale
   const g = gemerkteTermine();
   for (const tag of Object.keys(g.tage)) g.tage[tag] = g.tage[tag].filter((e) => e.provider !== provider);

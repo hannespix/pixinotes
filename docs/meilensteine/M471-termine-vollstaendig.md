@@ -48,8 +48,9 @@ zuletzt jemand von Hand geholt hatte.
 - CSS: `.cal-termin*`, `.cal-chip.markiert` bei `.cal-dayedit-foot`; `.th-termin-ort` im M469-Block.
 
 ## Grenzen / offen
-- Serientermine aus ICS-Abos werden weiter nicht aufgelöst (nur der Starttag, wie bisher in der Karte).
-- ICS-Zeiten mit `TZID` gelten als Wandzeit (wie bisher die Tage); nur Weltzeit (`…Z`) wird umgerechnet.
-- Ein abgelaufenes Google-Token erneuert der Hintergrund-Abruf nicht — bis zum nächsten Öffnen von Zentrale oder
-  Kalender-Karte erinnert die App dann mit den zuletzt gemerkten Google-Terminen.
+- ~~Serientermine aus ICS-Abos werden weiter nicht aufgelöst (nur der Starttag, wie bisher in der Karte).~~ → erledigt in M473
+- ~~ICS-Zeiten mit `TZID` gelten als Wandzeit (wie bisher die Tage); nur Weltzeit (`…Z`) wird umgerechnet.~~ → erledigt in M473
+- ~~Ein abgelaufenes Google-Token erneuert der Hintergrund-Abruf nicht — bis zum nächsten Öffnen von Zentrale oder
+  Kalender-Karte erinnert die App dann mit den zuletzt gemerkten Google-Terminen.~~ → erledigt in M473 (Erneuerung im
+  Hintergrund, sonst Hinweis in der Zentrale)
 - Die Kalender-Karte zeigt Konto-Einträge weiter nur am Starttag (die Zentrale an jedem Tag).

@@ -7,8 +7,35 @@
 // gibt es keinen Netzverkehr (m446). Einzige Ausnahme (M471): Ist die Erinnerung eingeschaltet, holt
 // termineHintergrund() Heute/Morgen sparsam nach (höchstens alle 15 Minuten), damit die Erinnerung
 // auch neue Termine kennt.
-import { anyAccountConnected, fetchAccountEvents, gemerkteTermine, TERMINE_FASSUNG, type CalAccountEvent } from './calAccounts';
+import { anyAccountConnected, fetchAccountEvents, gemerkteTermine, TERMINE_EREIGNIS, TERMINE_FASSUNG, type CalAccountEvent } from './calAccounts';
 import { tagLokal } from './tag';
+import type { IcsEvent } from './ics';
+
+/**
+ * M473: Die Serien-Auflösung (lib/icsSerie.ts) wird erst nachgeladen, wenn eine Kalender-Karte eine Serie trägt — sie
+ * gehört nicht in den Start (m446). Bis sie da ist, steht eine Serie wie vor M473 nur an ihrem ersten Tag; danach
+ * meldet TERMINE_EREIGNIS, damit die Zentrale neu zeichnet.
+ */
+let serienModul: typeof import('./icsSerie') | null = null;
+let serienLaden: Promise<void> | null = null;
+function serien(): typeof import('./icsSerie') | null {
+  if (serienModul) return serienModul;
+  serienLaden ??= import('./icsSerie').then((m) => {
+    serienModul = m;
+    window.dispatchEvent(new CustomEvent(TERMINE_EREIGNIS));
+  }, () => { serienLaden = null; });
+  return null;
+}
+const hatSerie = (boards: TerminBoard[]): boolean => boards.some((b) => b.nodes.some((n) => n.type === 'calendar' && !n.archived
+  && Array.isArray((n.data as { icsEvents?: unknown } | undefined)?.icsEvents)
+  && ((n.data as { icsEvents: Array<{ serie?: unknown } | null> }).icsEvents).some((e) => !!e?.serie)));
+
+/** M473: Versprechen, wenn die Serien-Auflösung für die Erinnerung noch geladen werden muss (wie fristenAusstehend) */
+export function serienAusstehend(boards: TerminBoard[]): Promise<void> | null {
+  if (serienModul || !terminErinnerungAn() || !hatSerie(boards)) return null;
+  serien();
+  return serienLaden;
+}
 
 /** Woher ein Termin stammt: Konto (Google/Outlook), eigener Termin einer Kalender-Karte oder ICS-Import/-Abo */
 export type TerminQuelle = 'google' | 'ms' | 'eigen' | 'ics';
@@ -116,7 +143,10 @@ function ausKarten(boards: TerminBoard[], tag: string): ZentralTermin[] {
       }
       // Ausgeblendete ICS-Termine einer Karte bleiben auch hier draußen
       if (d.show?.ics === false) continue;
-      for (const ev of (Array.isArray(d.icsEvents) ? d.icsEvents : []) as IcsRoh[]) {
+      // M473: Serien aus Abos für genau diesen Tag auflösen (Zeiten mit TZID sind schon in Ortszeit gerechnet)
+      const ics = (Array.isArray(d.icsEvents) ? d.icsEvents : []).filter((e) => e && typeof e === 'object') as IcsEvent[];
+      const m = ics.some((e) => e.serie) ? serien() : null;
+      for (const ev of (m ? m.icsImFenster(ics, tag, tag) : ics) as IcsRoh[]) {
         if (!ev || !istTag(ev.start) || typeof ev.title !== 'string' || !ev.title.trim()) continue;
         const bis = istTag(ev.end) && ev.end > ev.start ? ev.end : ev.start;
         if (tag < ev.start || tag > bis) continue;
@@ -245,8 +275,9 @@ export const HINTERGRUND_MS = 15 * 60 * 1000;
 /**
  * Holt Heute/Morgen still nach, wenn die Erinnerung an ist, ein Konto verbunden ist und das Gemerkte fehlt oder
  * älter als eine Viertelstunde ist. Ohne Erinnerung: kein Netz (m446, m469 A1). Gibt das Versprechen des Abrufs
- * zurück oder null, wenn nichts zu tun war. Ein abgelaufenes Google-Token wird dabei nicht erneuert (kein Fenster
- * ohne Nutzer-Geste) — Outlook erneuert über sein Refresh-Token ohne Fenster.
+ * zurück oder null, wenn nichts zu tun war. M473: Ein abgelaufenes Token wird dabei erneuert wie in der Kalender-Karte
+ * (Google still über GIS, Outlook über sein Refresh-Token); scheitert das, zeigt die Zentrale einen leisen Hinweis
+ * (calAccounts.kontoHinweise) statt eines Fehlers.
  */
 export function termineHintergrund(jetzt: Date = new Date()): Promise<void> | null {
   if (!terminErinnerungAn() || !kontoVerbunden()) return null;

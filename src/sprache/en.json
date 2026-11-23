@@ -3423,4 +3423,6 @@
 "Termine nicht abrufbar:":"Appointments not available:",
 "Heute und morgen keine Termine.":"No appointments today or tomorrow.",
 "Nicht alle Konten erreichbar:":"Not all accounts reachable:",
-"Morgen":"Tomorrow"}
+"Morgen":"Tomorrow",
+": Anmeldung abgelaufen – die Termine sind womöglich nicht aktuell.":": sign-in expired – the appointments may be out of date.",
+"Erneut anmelden":"Sign in again"}

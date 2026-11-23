@@ -234,6 +234,7 @@ Screenshots und Zwischendateien landen in `pruefungen/ablage/`
 | m467 | Start ohne Node-Ersatz (Buffer/process); .msg mit Anhang in Web und Single-File, .eml |
 | m468 | Nachtlauf: Läufer ohne Datenbank, Issue „Nachtlauf rot" anlegen/erneuern/schließen, Chromium-Pfad, Workflow |
 | m469 | Termine aus Kalender-Konten in der Aufgaben-Zentrale |
+| m473 | Kalender korrekt: Serientermine (RRULE/EXDATE/RECURRENCE-ID), Zeitzonen über die Sommerzeit, Google-Token im Hintergrund erneuern |
 
 Die Reihen sind bewusst GEGEN DAS VERHALTEN geschrieben, nicht gegen die
 Struktur: Wo möglich messen sie Bildpunkte, echte Downloads, abgefangene

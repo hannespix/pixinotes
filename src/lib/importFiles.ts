@@ -16,7 +16,7 @@ import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, ma
 import { docxToBlocks } from './docx';
 import { boardDateienUebernehmen, cloneSharedBoard, parseBoardDatei } from './share';
 import { uebernimmDateien } from './syncFolder';
-import { mergeEvents, parseIcs, type IcsEvent } from './ics';
+import type { IcsEvent } from './ics';
 import { vcardLesen, vcardText, VCARD_MAX } from './vcard';
 import { saveHtml } from './htmlStore';
 import { saveFile } from './fileStore';
@@ -159,6 +159,8 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
     try {
       if (ext === 'ics') {
         // Outlook/Google/Apple-Kalender: Termine in die Kalender-Karte mergen
+        // M473: Der ICS-Leser (mit Zeitzonen und Serien) lädt erst hier nach — er gehört nicht in den Start (m446)
+        const { mergeEvents, parseIcs } = await import('./ics');
         const events = parseIcs(await file.text());
         if (events.length === 0) { showToast('Keine Termine in der .ics-Datei gefunden.'); continue; }
         const st = useBoard.getState();

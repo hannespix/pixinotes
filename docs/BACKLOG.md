@@ -20,6 +20,7 @@ immer Vorrang vor dieser Liste.
 - M449: Versionen nur je Gerät (reisen nicht mit Sync/Export)
 - M470: Ändern zwei Geräte dasselbe Ticket mit verschiedener Spaltenzeit (`spalteSeit`), zählt das im Abgleich als Unterschied (kein „spätere gilt“ wie bei `geaendert`); Versionen holen Gespräche (Kommentare) nicht einzeln zurück
 - M458: Erweiterung nicht im Chrome-/Edge-/Firefox-Store (nur „Entpackt laden“); kein Weg in die portable pixinotes.html; keine feste Schnellablage-Zone (KONZEPT „Inbox-Ecke“)
+- M473: Serien ohne `BYHOUR`/`BYWEEKNO`/`BYYEARDAY` und nicht stündlich; Export über einen Zeitraum nimmt Serien nur im sichtbaren Fenster mit; stille Google-Erneuerung scheitert ohne Geste meist (dann Hinweis in der Zentrale)
 - M466: Outlook nur lesen und auf Abruf (kein Abo/Delta-Abgleich, keine Ordner außer Posteingang, kein Antworten über Graph); braucht `VITE_MS_CLIENT_ID` im Build
 
 ## Ideen (noch nicht vergeben)

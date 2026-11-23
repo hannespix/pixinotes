@@ -6,6 +6,7 @@ import { collectTasks } from '../../lib/tasks';
 import { linkedNeighborIds } from '../../lib/links';
 import { nodeToText } from '../../lib/serialize';
 import { downloadIcsEvents, fetchIcsUrl, mergeEvents, parseIcs, type IcsEvent } from '../../lib/ics';
+import { icsImFenster } from '../../lib/icsSerie';
 import { notizTermine } from '../../lib/notizTermine';
 import { anyAccountConnected, fetchAccountEvents, invalidateAccountEvents, type CalAccountEvent } from '../../lib/calAccounts';
 import { IChevronL, IChevronR, IMore, IOrt, ILink, ITrash } from '../Icons';
@@ -208,18 +209,24 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
   const ym = (data.month as string) ?? ymOf(new Date());
   const [year, month] = ym.split('-').map(Number);
   const anchorIso = (data.anchor as string) ?? todayIso;
+  // Sichtbarer Bereich plus Puffer (Monat: ±2 Wochen, Woche: −1/+2 Wochen)
+  const fenster = (): [Date, Date] => [
+    view === 'jahr' ? new Date(year, 0, 1)
+      : view === 'week' ? new Date(new Date(`${anchorIso}T12:00:00`).getTime() - 7 * DAY)
+        : new Date(year, month - 1, -7),
+    view === 'jahr' ? new Date(year, 11, 31)
+      : view === 'week' ? new Date(new Date(`${anchorIso}T12:00:00`).getTime() + 14 * DAY)
+        : new Date(year, month, 14),
+  ];
+  const [fensterVon, fensterBis] = fenster().map(isoOf);
+  // M473: Serientermine aus ICS-Abos nur für dieses Fenster auflösen (sonst stand eine Serie nur am ersten Tag)
+  const icsSichtbar = useMemo(() => icsImFenster(icsEvents, fensterVon, fensterBis), [icsEvents, fensterVon, fensterBis]);
 
   useEffect(() => {
     const showKonto = (data.show as Partial<ShowFlags> | undefined)?.konto ?? true;
     if (!showKonto || !anyAccountConnected()) { setAccEvents([]); setAccError(''); return; }
     let cancelled = false;
-    // Sichtbarer Bereich plus Puffer (Monat: ±2 Wochen, Woche: −1/+2 Wochen)
-    const from = view === 'jahr' ? new Date(year, 0, 1)
-      : view === 'week' ? new Date(new Date(`${anchorIso}T12:00:00`).getTime() - 7 * DAY)
-        : new Date(year, month - 1, -7);
-    const to = view === 'jahr' ? new Date(year, 11, 31)
-      : view === 'week' ? new Date(new Date(`${anchorIso}T12:00:00`).getTime() + 14 * DAY)
-        : new Date(year, month, 14);
+    const [from, to] = fenster();
     fetchAccountEvents(from, to)
       .then(({ events, errors }) => {
         if (cancelled) return;
@@ -289,7 +296,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
       }
     }
     if (show.ics) {
-      for (const ev of icsEvents) {
+      for (const ev of icsSichtbar) {
         // M471: derselbe Schlüssel wie in der Aufgaben-Zentrale — dort angeklickt, hier markiert
         const key = terminSchluessel('ics', { id: ev.uid, beginn: ev.start, time: ev.startTime, title: ev.title });
         const termin: ZentralTermin = {
@@ -348,7 +355,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     }
     return { byDay, stripsByDay };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceBoards, scope, linkedIds, show.tasks, show.gantt, show.miles, show.ics, show.konto, show.notiz, icsEvents, accEvents, myEvents]);
+  }, [sourceBoards, scope, linkedIds, show.tasks, show.gantt, show.miles, show.ics, show.konto, show.notiz, icsSichtbar, accEvents, myEvents]);
 
   const nav = (delta: number) => {
     if (view === 'jahr') {
