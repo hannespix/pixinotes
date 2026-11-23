@@ -68,6 +68,11 @@ jobs:
       - name: MCP-Server bauen und in die Site legen
         run: npm run build:mcp && cp release/pixinotes-mcp.mjs dist/pixinotes-mcp.mjs
 
+      # M458: Browser-Erweiterung „An PixiNotes senden" (Ordner erweiterung/) als ZIP zum Download neben der App –
+      # installiert wird sie im Entwicklermodus („Entpackt laden"), siehe Hilfe. Kein Store, kein Server.
+      - name: Browser-Erweiterung packen und in die Site legen
+        run: npm run build:erweiterung && cp release/pixinotes-erweiterung.zip dist/pixinotes-erweiterung.zip
+
       - name: Pages konfigurieren
         uses: actions/configure-pages@v5
         with:
