@@ -44,7 +44,13 @@ wird **Ende-zu-Ende mit playwright-core** gegen den gebauten `dist/`.
 
 ```
 src/App.tsx            Rahmen, Ansichten, Overlays
-src/store.ts           Zustand-Store: Boards, Karten, Verlauf (Undo), Sync-Haken
+src/store.ts           Einstieg des Zustand-Stores (setzt die Scheiben zusammen, exportiert alles)
+src/store/             Store in Scheiben (M480): typen (BoardState, Board, Strich),
+                       struktur (Bereiche/Projekte/Boards), karten, kanten, zeichnen,
+                       kommentare, ansicht (Dialoge, Einstellungen), verlauf (Undo),
+                       abgleich (importSync, Import), hinweise (Toast), schutz
+                       (Leseschutz, Sperren, Gruppenrechte), speicher (persist,
+                       Single-Writer, migrate), start, selektoren
 src/types.ts           Datenmodell (Karte = Node mit data je Typ)
 src/components/        Oberfläche; nodes/ = ein Kartentyp je Datei (*Card.tsx)
 src/lib/               Logik ohne JSX (ein Thema je Datei, deutsche Namen)
@@ -56,8 +62,10 @@ pruefungen/mNNN-*.mjs  E2E-Reihe je Meilenstein
 release/               portable Single-File + PWA-Beiwerk
 ```
 
-Hotspots (viele Änderungen, Konfliktgefahr): `store.ts`, `src/styles/`,
-`Board.tsx`, `App.tsx`, `HelpOverlay*.tsx`, `Settings.tsx`.
+Hotspots (viele Änderungen, Konfliktgefahr): `src/store/` (neue Aktion in die
+Scheibe ihres Themas, Typ in `store/typen.ts` → `BoardState`; `store.ts` nur
+anfassen für einen neuen öffentlichen Namen), `src/styles/`, `Board.tsx`,
+`App.tsx`, `HelpOverlay*.tsx`, `Settings.tsx`.
 
 ## 4. Befehle
 ```bash
