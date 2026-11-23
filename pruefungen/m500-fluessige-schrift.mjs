@@ -28,6 +28,8 @@ const SD = process.env.PN_BILDER ?? path.join(__repo, 'pruefungen', 'ablage');
 mkdirSync(SD, { recursive: true });
 const PORT = 5500;
 const START_JS_GRENZE = 2_120_000;
+/** NUR=K (oder NUR=AF …) lässt nur diese Abschnitte laufen — zum schnellen Nachprüfen */
+const laufe = (teil) => !process.env.NUR || [...teil].some((b) => process.env.NUR.includes(b));
 let ok = 0; let bad = 0;
 const pruefe = (n, gut, info = '') => {
   if (gut) { ok += 1; console.log(`  ✓ ${n}`); } else { bad += 1; console.log(`  ✗ ${n} ${typeof info === 'string' ? info : JSON.stringify(info)}`); }
@@ -108,7 +110,7 @@ const jsAssets = () => [...new Set(anfragen)].filter((p) => p.startsWith('/asset
 
 // ══ A: Anlegen, Start-JS ═══════════════════════════════════════════
 console.log('\n════ A: Anlegen und Start ════');
-{
+if (laufe('A')) {
   const { ctx, P, fehler } = await seite([note('n1', 'Hallo Welt')]);
   await P.waitForLoadState('networkidle');
   await P.waitForTimeout(400);
@@ -138,7 +140,7 @@ console.log('\n════ A: Anlegen und Start ════');
 
 // ══ B–E: eine Karte im Bild, eine weit draußen ═════════════════════
 console.log('\n════ B–E: Zeichnen, Text, Maus, Ruhe ════');
-{
+if (laufe('BCDE')) {
   const { ctx, P, fehler } = await seite([fl('f1', 'Wasserfall', 0, 0), fl('f2', 'Draußen', 9000, 6000)]);
   await P.waitForSelector('.react-flow__node[data-id="f1"]', { state: 'attached' });
   await P.waitForTimeout(500);
@@ -259,7 +261,7 @@ async function fps(P, ids) {
   const b1 = await P.evaluate(() => window.__bilder);
   return { fps: Math.round((b1 - b0) / ((Date.now() - t0) / 1000)), maxLaufend };
 }
-{
+if (laufe('F')) {
   const { ctx, P } = await seite([fl('p1', 'Eins', 0, 0)]);
   await warteBis(P, () => !!document.querySelector('[data-id="p1"] canvas.fl-flaeche')?.__fluessig); await ruht(P, 'p1');
   const eins = await fps(P, ['p1']);
@@ -276,7 +278,7 @@ async function fps(P, ids) {
 
 // ══ G: Reduzierte Bewegung ═════════════════════════════════════════
 console.log('\n════ G: Reduzierte Bewegung ════');
-{
+if (laufe('G')) {
   const { ctx, P, fehler } = await seite([fl('r1', 'Ruhig', 0, 0)], { reduziert: true });
   await warteBis(P, () => !!document.querySelector('[data-id="r1"] canvas.fl-flaeche')?.__fluessig);
   await warteBis(P, () => { const c = document.querySelector('[data-id="r1"] canvas.fl-flaeche'); return c && c.width > 10; });
@@ -292,7 +294,7 @@ console.log('\n════ G: Reduzierte Bewegung ════');
 
 // ══ H: Ohne WebGL2 ═════════════════════════════════════════════════
 console.log('\n════ H: Ohne WebGL2 ════');
-{
+if (laufe('H')) {
   const { ctx, P, fehler } = await seite([fl('w1', 'Ohne Grafik', 0, 0)], { ohneGl: true });
   const da = await P.waitForSelector('[data-id="w1"] .fl-ersatz', { timeout: 15000 }).then(() => true, () => false);
   pruefe('H1 ohne WebGL2 steht der Text als normale Schrift', da && /Ohne Grafik/.test(await P.locator('[data-id="w1"] .fl-ersatz-text').innerText()));
@@ -303,7 +305,7 @@ console.log('\n════ H: Ohne WebGL2 ════');
 
 // ══ I: Dunkel ══════════════════════════════════════════════════════
 console.log('\n════ I: Dunkel ════');
-{
+if (laufe('I')) {
   const { ctx, P, fehler } = await seite([fl('d1', 'Nachtschrift', 0, 0), fl('d2', 'Akzent', 0, 260, { farbe: 'akzent' })], { ui: { theme: 'dark', accent: 'blau' } });
   await warteBis(P, () => !!document.querySelector('[data-id="d1"] canvas.fl-flaeche')?.__fluessig);
   await ruht(P, 'd1'); await ruht(P, 'd2');
@@ -322,7 +324,7 @@ console.log('\n════ I: Dunkel ════');
 
 // ══ J: Präsentation, Export ═══════════════════════════════════════
 console.log('\n════ J: Präsentation und Export ════');
-{
+if (laufe('J')) {
   const { ctx, P, fehler } = await seite([fl('j1', 'Vortrag', 0, 0)]);
   await warteBis(P, () => !!document.querySelector('[data-id="j1"] canvas.fl-flaeche')?.__fluessig);
   await P.keyboard.press('Control+k');
@@ -347,7 +349,7 @@ console.log('\n════ J: Präsentation und Export ════');
 
 // ══ K: Ein-Datei-Fassung ════════════════════════════════════════════
 console.log('\n════ K: Ein-Datei-Fassung ════');
-{
+if (laufe('K')) {
   const rel = process.env.PN_SINGLE ?? path.join(__repo, 'release', 'pixinotes.html');
   if (!existsSync(rel) || !readFileSync(rel, 'utf8').includes('fl-flaeche')) {
     console.log('  (release/pixinotes.html ohne diese Karte — `npm run build:single` baut sie; der Release-Lauf nach dem Merge prüft sie)');
