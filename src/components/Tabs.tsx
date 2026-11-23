@@ -96,6 +96,7 @@ export function Tabs() {
   /* M412: Ragen Reiter links oder rechts über die Reihe hinaus? Statt eines Rollbalkens zeigt ein weicher Rand,
      dass es dort weitergeht (Stylesheet: .gerollt, .mehr-rechts). */
   const [rollt, setRollt] = useState({ links: false, rechts: false });
+  const reiheSchluessel = boards.map((b) => b.id + b.name).join('\n');
   const rollMessen = () => {
     const el = reiheRef.current;
     if (!el) return;
@@ -123,8 +124,10 @@ export function Tabs() {
     ro.observe(el);
     const spaeter = window.setTimeout(rollMessen, 400);   // nach dem weichen Hinrollen zum aktiven Reiter
     return () => { ro.disconnect(); window.clearTimeout(spaeter); };
+    // M486: nicht nach JEDEM Render — die Reihe rendert bei jedem Zug-Ereignis mit (sie hört auf `boards`), und das
+    // Messen von scrollWidth erzwang dann ein Layout der ganzen Seite (über 40 ms je Mausbewegung mit 200 Karten)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  });
+  }, [reiheSchluessel, activeId, view, spalte]);
 
   /**
    * M261: Reihe oder Wähler? Das entscheidet der PLATZ, nicht die Fenstergröße.

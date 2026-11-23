@@ -112,7 +112,7 @@
    (`data-zieh` an der Fläche, lib/ziehGefuehl.ts und Board.tsx `ziehBeginnen`).
    · Nachbarn weichen über `translate` aus und gleiten zurück (Feder-Kurve, leicht überschwingend).
    · Die gegriffene Karte (`data-gehoben="an"`) hebt sich (`scale`, je nach Größe 1–6 %) und neigt sich mit dem
-     Tempo (`rotate`, Variable an der Fläche). Die Drehpunkte stehen auf ihrer Mitte: React Flow setzt die Lage
+     Tempo (`rotate`, Variable an der gehobenen Karte, M486). Die Drehpunkte stehen auf ihrer Mitte: React Flow setzt die Lage
      als Inline-`transform`, die Einzel-Eigenschaften `scale`/`rotate` wirken davor — `--zieh-x/-y` (die Lage
      der Karte) rücken den Ursprung an die richtige Stelle.
    · M344-Lehre: Eine gehobene, geneigte Karte zeigt ihre Kanten nicht dort, wo sie landen. Greift eine

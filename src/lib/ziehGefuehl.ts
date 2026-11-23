@@ -63,16 +63,20 @@ export interface Neigung {
  * Gedämpfte Feder für die Neigung (M440): Das Ziel klingt ab (×0,86 je Bild), der Winkel folgt ihm (×0,22).
  * Schreibt den Winkel als CSS-Variable `variable` an `el`; in Ruhe wird die Variable entfernt.
  */
-export function neigungsFeder(el: HTMLElement | null, variable: string, grenze = 7): Neigung {
+export function neigungsFeder(ziel1: Element | null | HTMLElement[], variable: string, grenze = 7): Neigung {
   let winkel = 0; let ziel = 0; let raf = 0; let aktiv = true;
   const arm = bewegungArm();
-  const schreib = () => { if (el) el.style.setProperty(variable, `${winkel.toFixed(2)}deg`); };
+  // M486: auch mehrere Elemente (die gehobenen Karten). Die Variable an der ganzen Fläche zu setzen ließ den Browser
+  // je Bild den Stil ALLER Karten neu berechnen (sie erben sie) — mit 200 Karten der größte Posten beim Ziehen.
+  const els = (Array.isArray(ziel1) ? ziel1 : ziel1 ? [ziel1] : []) as HTMLElement[];
+  const setzen = (w: string | null) => { for (const e of els) if (w === null) e.style.removeProperty(variable); else e.style.setProperty(variable, w); };
+  const schreib = () => setzen(`${winkel.toFixed(2)}deg`);
   const schritt = () => {
     ziel *= 0.86;
     winkel += (ziel - winkel) * 0.22;
     schreib();
     if (aktiv || Math.abs(winkel) > 0.05) raf = requestAnimationFrame(schritt);
-    else { raf = 0; winkel = 0; if (el) el.style.removeProperty(variable); }
+    else { raf = 0; winkel = 0; setzen(null); }
   };
   const an = () => { if (!raf && !arm) raf = requestAnimationFrame(schritt); };
   an();
@@ -80,7 +84,7 @@ export function neigungsFeder(el: HTMLElement | null, variable: string, grenze =
     tempo(vx) { if (arm) return; ziel = Math.max(-grenze, Math.min(grenze, vx * NEIGUNG_JE_TEMPO)); an(); },
     loslassen() { aktiv = false; ziel = 0; an(); },
     gerade() { ziel = 0; winkel = 0; schreib(); },
-    stop() { aktiv = false; cancelAnimationFrame(raf); raf = 0; winkel = 0; if (el) el.style.removeProperty(variable); },
+    stop() { aktiv = false; cancelAnimationFrame(raf); raf = 0; winkel = 0; setzen(null); },
   };
 }
 
@@ -215,24 +219,36 @@ export function versatzAufloesen(el: HTMLElement, x: number, y: number, id?: str
  * M485: Die Kanten folgen der sichtbaren Karte. Gehoben, geneigt und ausgewichen wird über CSS am Knoten (mit
  * Übergängen); was davon gerade zu sehen ist, liest dieser Beobachter je Bild aus dem berechneten Stil (`translate`,
  * `scale`, `rotate` — mitten im Übergang der aktuelle Zwischenwert) und gibt es über lib/zugAnzeige.ts an die
- * Kanten. Nur für Karten mit Verbindung und nur, solange sich etwas bewegt — ohne Kanten kostet er nichts.
+ * Kanten. Nur, solange sich etwas bewegt — ohne Kanten auf dem Board läuft er gar nicht. M486: auch Karten ohne
+ * eigene Verbindung (mit dem Ziel ihres Ausweichens), denn Kanten weichen ihnen aus (LabeledEdge).
  * Geschrieben wird dabei nichts (kein Stand, kein Verlauf, kein Live-Team).
  */
 export function kantenBeobachter(elVon: (id: string) => HTMLElement | null, beobachtet: () => Iterable<string>, verbunden: ReadonlySet<string>) {
   const zuletzt = new Map<string, Anzeige>();
   const els = new Map<string, HTMLElement | null>();
-  let raf = 0; let bis = Infinity;
+  let raf = 0; let bis = Infinity; let fertig = false;
+  /* M486: Gelesen wird NACH der Stil- und Layout-Rechnung des Bildes (Rückruf eines ResizeObservers), nicht im
+     Animations-Rückruf davor: Dort erzwang getComputedStyle eine zusätzliche Stil-Rechnung über das ganze Board
+     (mit 100 Verbindungen der größte Posten je Bild). Danach ist der Stil frisch, das Lesen kostet nichts, und was die
+     Kanten daraufhin ändern, zeichnet der Browser noch im selben Bild. Den Takt gibt ein winziger, unsichtbarer Kasten,
+     dessen Breite je Bild wechselt. */
+  const takt = document.createElement('div');
+  takt.setAttribute('aria-hidden', 'true');
+  takt.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;visibility:hidden;pointer-events:none;contain:strict';
+  document.body.appendChild(takt);
+  const ro = new ResizeObserver(() => lesen());
   const lesen = () => {
-    raf = 0;
     let bewegt = false; let geaendert = false;
     for (const id of beobachtet()) {
-      if (!verbunden.has(id)) continue;
       let e = els.get(id);
       if (e === undefined) { e = elVon(id); els.set(id, e); }
       if (!e?.isConnected) continue;
-      const cs = getComputedStyle(e);
-      const t = cs.translate === 'none' ? [] : cs.translate.split(' ').map(parseFloat);
-      const a: Anzeige = [t[0] || 0, t[1] || 0, cs.scale === 'none' ? 1 : parseFloat(cs.scale) || 1, cs.rotate === 'none' ? 0 : parseFloat(cs.rotate) || 0];
+      // M486: Karten ohne eigene Verbindung sind für die Kanten nur Hindernis — dafür reicht das Ziel des Ausweichens
+      // (Inline-Stil, kostet nichts). Den berechneten Stil zu lesen erzwingt eine Stil-Rechnung mitten im Bild.
+      const cs = verbunden.has(id) ? getComputedStyle(e) : null;
+      const tr = cs ? cs.translate : e.style.translate || 'none';
+      const t = tr === 'none' ? [] : tr.split(' ').map(parseFloat);
+      const a: Anzeige = [t[0] || 0, t[1] || 0, !cs || cs.scale === 'none' ? 1 : parseFloat(cs.scale) || 1, !cs || cs.rotate === 'none' ? 0 : parseFloat(cs.rotate) || 0];
       const alt = zuletzt.get(id);
       if (Math.abs(a[0]) < 0.05 && Math.abs(a[1]) < 0.05 && Math.abs(a[2] - 1) < 1e-4 && Math.abs(a[3]) < 0.01) {
         if (alt) { zuletzt.delete(id); anzeigeSetzen(id); geaendert = true; }
@@ -242,12 +258,15 @@ export function kantenBeobachter(elVon: (id: string) => HTMLElement | null, beob
       if (alt && a.every((v, i) => Math.abs(v - alt[i]) < 0.01)) continue;
       zuletzt.set(id, a); anzeigeSetzen(id, a); geaendert = true;
     }
-    if (bewegt || performance.now() < bis) raf = requestAnimationFrame(lesen);
-    else if (zuletzt.size) { for (const id of zuletzt.keys()) anzeigeSetzen(id); zuletzt.clear(); geaendert = true; }   // nichts hängen lassen
+    if (bewegt || performance.now() < bis) an();
+    else if (!fertig) {
+      if (zuletzt.size) { for (const id of zuletzt.keys()) anzeigeSetzen(id); zuletzt.clear(); geaendert = true; }   // nichts hängen lassen
+      fertig = true; ro.disconnect(); takt.remove();
+    }
     if (geaendert) anzeigeMelden();
   };
-  const an = () => { if (!raf) raf = requestAnimationFrame(lesen); };
-  an();
+  const an = () => { if (!raf && !fertig) raf = requestAnimationFrame(() => { raf = 0; takt.style.width = takt.style.width === '2px' ? '1px' : '2px'; }); };
+  ro.observe(takt);   // meldet sich nach dem nächsten Layout zum ersten Mal
   return {
     /** Zug vorbei: noch so lange schauen, bis Landen und Zurückgleiten vorbei sind */
     nachlauf(ms: number) { bis = performance.now() + ms; an(); },
@@ -319,7 +338,7 @@ export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugK
   const beob = verbunden?.size
     ? kantenBeobachter(el, function* () { for (const n of bewegt) yield n.id; if (aus) yield* aus.beruehrt; }, verbunden)
     : null;
-  const neigung = neigungsFeder(wurzel, '--zieh-neigung', neigungsGrenze(kasten.w, kasten.h));
+  const neigung = neigungsFeder(gehoben.map((g) => g.el), '--zieh-neigung', neigungsGrenze(kasten.w, kasten.h));
   const tempo = tempoMesser(x0 * zoom, performance.now());
   let gerastetVorher = false;
   return {
