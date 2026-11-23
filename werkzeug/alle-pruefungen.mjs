@@ -83,6 +83,11 @@ if (nurGeaendert) {
       else if (ws.some((w) => n.replace(/\.mjs$/, '').split('-').slice(1).some((t) => t.length >= 4 && (t.startsWith(w) || w.startsWith(t))))) merke(n, `Name passt zu ${datei}`);
     }
   }
+  // Wächter-Reihen zählen Kacheln/Menüeinträge oder prüfen Längen und Listen (Tooltips, Hilfe, „Was ist neu",
+  // Einstellungen, Text in Bildern). Fast jeder neue Meilenstein ändert dort etwas – sie laufen deshalb bei
+  // --geaendert immer mit (Befund M448: m296, m299, m300, m312, m314, m316 brachen nach Merges).
+  const WAECHTER = ['m296', 'm299', 'm300', 'm312', 'm314', 'm316', 'm381', 'm397'];
+  for (const n of dateien) if (WAECHTER.some((w) => n.startsWith(`${w}-`))) merke(n, 'Wächter (zählt/prüft Listen)');
   console.log(`--geaendert: ${geaendert.length} geänderte Datei(en) seit ${ref} (${vorfahr.slice(0, 8)}) → ${grund.size} Reihe(n)`);
   for (const [n, g] of [...grund].sort()) console.log(`  ${n.replace(/\.mjs$/, '')}  ← ${g}`);
   if (grund.size === 0) console.log('  keine passende Reihe – für Änderungen an store.ts, index.css, App.tsx die volle Reihe laufen lassen');
