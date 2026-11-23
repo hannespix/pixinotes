@@ -58,6 +58,7 @@ Jede Nachricht: `{ von: ich().id, c: Yjs-Kennung, n: Notiz-Kennung, a: Art, … 
 | `stand` | `an` (Yjs-Kennung des Fragenden), `d` (was ihm fehlt), `sv` (eigener Stand) | jede Sitzung, die schon bereit ist, auf `hallo` |
 | `upd` | `d` (Yjs-Änderung, gebündelt mit `Y.mergeUpdates`) | eigene Änderungen, Takt 40 ms (bis 8 Leute) / 120 ms (bis 20) / 240 ms; der Fragende schickt nach `stand` zurück, was nur er hat |
 | `aw` | `d` (Awareness-Meldung nur des eigenen Eintrags) | Cursor/Markierung/Name, Takt 90/270/540 ms; beim Schließen sofort die Abmeldung |
+| `offen` | `ns` (Notiz-Kennungen, ≤ 200), `n: '_'` | jedes Gerät mit offenen Sitzungen, sobald jemand neu in den Kanal kommt (60–300 ms gestreut) |
 | `teil` | `k`, `i`, `z`, `ganz`, Stück von `d` | Nachrichten über 48 000 Zeichen, zusammengesetzt beim Empfänger (≤ 3 offene je Absender, 20 s) |
 
 Eingang: `LIVE_NACHRICHT` (gastSync reicht unbekannte Ereignisse weiter) → `notizYVonAussen` → Sitzung. Eine
@@ -65,6 +66,9 @@ Awareness-Meldung wird nur angenommen, wenn sie genau einen Eintrag mit der Yjs-
 Absenders trägt (`awareEigene`). Verlässt jemand den Kanal, nimmt `rundeGeaendert` seinen Cursor heraus.
 
 ### Start eines Dokuments (keine Verdopplung)
+0. Gewartet wird nur, wo schon jemand arbeitet (`gemeinsamGewuenscht`: ein `hallo`/`upd` dieser Notiz kam an, oder sie
+   stand in einer `offen`-Liste). Sonst beginnt die Sitzung sofort aus dem Block-JSON und schickt nur ein `hallo`
+   zum Wecken — so gehen beim Betreten keine Tasten verloren (eine frisch angelegte Notiz nimmt sofort Text an).
 1. `hallo` mit leerem Stand-Vektor, warten bis 450 ms auf `stand` (allein im Kanal: gar nicht).
 2. Kam nur `upd` (es wird getippt, Grundlage fehlt): noch einmal fragen, 800 ms.
 3. Sonst aus dem Block-JSON beginnen — **deterministisch**: Hilfsdokument mit Yjs-Kennung = Streuwert(Notiz +
@@ -89,8 +93,11 @@ Name + Farbe, Markierung, Strg+Z nur Eigenes · D Späteinsteiger (ungespeichert
 einmal, kein Konflikt, andere Notiz unberührt · F Neuladen ohne Verdopplung, fremde/kaputte/zu große Nachrichten,
 Start-Pakete ohne Yjs · G ohne Kanal wie bisher (kein Yjs, Board-Strg+Z) · H Hilfe, keine Seitenfehler.
 
-Angepasst: `m364` prüft die Karten-Sperre an Notizen jetzt als **Rückweg** (der Kern wird durch eine Fassung ersetzt,
-die ablehnt — ein abgebrochener Abruf löste `vite:preloadError` aus und lüde die Seite neu).
+Angepasst: `m364`, `m365`, `m366`, `m372`, `m377` prüfen die Karten-Sperre an Notizen jetzt als **Rückweg** (der Kern wird durch eine Fassung ersetzt,
+die ablehnt — ein abgebrochener Abruf löste `vite:preloadError` aus und lüde die Seite neu). Lehnt der Kern ab, bleibt
+der Editor allein (`kernKaputt`) und bekommt den Cursor zurück. Im gemeinsamen Modus schreibt der Schreiber auch Text,
+den ein anderer getippt hat — m366 (Version des Gasts = Server, Besitzer schreibt im Sturm nicht) setzt das alte
+Modell voraus und läuft deshalb auf dem Rückweg.
 
 ## Grenzen / offen
 - Nur **Notizen**. Protokoll (`MinutesCard`), Präsentation (`Presenter`) und andere Karten bleiben bei „wer zuerst
@@ -106,4 +113,7 @@ die ablehnt — ein abgebrochener Abruf löste `vite:preloadError` aus und lüde
   Fassungen derselben Notiz (etwa eine gerade erst angekommene Änderung) — dann steht der Text einmal je Fassung da.
 - Board-Rückgängig nimmt gemeinsam getippten Text nicht zurück (Yjs-Undo im Editor tut es, nur Eigenes); ein
   Wiederherstellen aus den Versionen während einer laufenden Sitzung überschreibt der Schreiber beim nächsten Tippen.
+- Ändert jemand den Text einer Notiz auf anderem Weg (ältere Fassung, Werkzeug von außen), während sie gemeinsam offen
+  ist, überschreibt ihn der Schreiber beim nächsten Tippen. Der Wechsel des Schreibers sichert nur, wenn sich das
+  Dokument in der Sitzung geändert hat.
 - Keine neuen Oberflächentexte (Cursor-Schild = Name), daher keine Einträge in `src/sprache/en.json`.
