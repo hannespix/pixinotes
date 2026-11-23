@@ -39,6 +39,10 @@ Jeder Arbeits-Agent liefert selbstständig bis zum Merge.
 8. **Vor jedem PR** `node werkzeug/alle-pruefungen.mjs --geaendert` laufen lassen – das
    nimmt die betroffenen Reihen und immer die Wächter-Reihen (Kacheln, Tooltips,
    Hilfe, „Was ist neu", Englisch, ohne Emoji) mit, die neue Meilensteine sonst brechen.
+9. **Farben und Dunkelmodus:** Wer Farben, Flächen oder Menüs anfasst, misst mit
+   `werkzeug/kontrast-pruefen.mjs` (M492) — von Hand `node werkzeug/kontrast-pruefen.mjs dist --dunkel`
+   oder in einer Reihe `kontrastScan(page, sel)`: meldet jede sichtbare Schrift unter 4,5:1 zu ihrem
+   tatsächlich gezeichneten Hintergrund. Farben nur über Tokens (`src/styles/00-tokens.css`).
 
 ## Prüfreihen, die unter Last nicht flattern (M484)
 Mehrere Agenten lassen Reihen gleichzeitig laufen; dann bekommt jeder Browser nur einen Bruchteil der CPU. Was

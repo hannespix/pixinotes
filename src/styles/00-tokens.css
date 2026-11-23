@@ -21,6 +21,12 @@
   --border-soft: #d9dce2;
   /* M489: Warnschrift (überfällige Frist) — 6,5:1 auf Weiß; im Dunkeln heller */
   --warn-text: #b3261e;
+  /* M492: Zeiterfassung — Arbeit/Pause als Fläche (weiße Schrift darauf) und als Schrift auf der Karte.
+     Die Fläche bleibt in beiden Themes gleich, die Schrift wird im Dunkeln heller (vorher 2,2:1 bzw. 2,9:1). */
+  --zeit-arbeit: #3c669c;
+  --zeit-pause: #9c6f1c;
+  --zeit-arbeit-schrift: #3c669c;
+  --zeit-pause-schrift: #9c6f1c;
   /* M489: Schrift auf „Papier", das NICHT dem Theme folgt: Farbtöne bleiben im Dunkeln helles Papier (M338),
      eine dunkle eigene Kartenfarbe bleibt auch im Hellen dunkel. Feste Werte, in beiden Themes gleich —
      muted hält ≥ 4,8:1 auf allen vier Pastelltönen, auch in ihrer gedämpften Dunkel-Fassung. */
@@ -115,6 +121,8 @@
   --border: rgba(255, 255, 255, 0.24);
   --border-soft: rgba(255, 255, 255, 0.12);
   --warn-text: #ff9b8f;
+  --zeit-arbeit-schrift: #8fb1e6;   /* 5,9:1 auf der Knopffläche, 7,0:1 auf der Karte */
+  --zeit-pause-schrift: #e0b56a;    /* 6,7:1 bzw. 8,1:1 */
   --glass: var(--surface);
   --glass-strong: var(--surface);
   --glass-border: var(--border-soft);

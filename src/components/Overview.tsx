@@ -1,5 +1,5 @@
 import { tropfenMalen, hexRgb, tonDrehen, type TropfenKreis, type TropfenBruecke } from '../lib/netzTropfen';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   applyNodeChanges,
   Background,
@@ -1948,7 +1948,7 @@ function SpaceZone({ data }: NodeProps<Node<SpaceZoneData, 'ovSpace'>>) {
   return (
     <div className="ovc-space" style={{ borderColor: accent }}>
       <div className="ovc-space-head">
-        <InlineName value={space.name} className="ovc-space-name" style={{ color: accent }} editing={editing} onEditingChange={setEditing} onRename={(n) => renameSpace(space.id, n)} />
+        <InlineName value={space.name} className="ovc-space-name" style={{ '--bereich-farbe': accent } as CSSProperties} editing={editing} onEditingChange={setEditing} onRename={(n) => renameSpace(space.id, n)} />
         {/* M312: „+ Projekt" und „✕" standen hier offen in jeder Zeile — jetzt
             dasselbe ⋯ wie an Projekt und Board, sichtbar beim Zeigen. */}
         <div className="ov-head-actions nodrag">
