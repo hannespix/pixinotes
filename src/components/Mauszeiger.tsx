@@ -209,7 +209,7 @@ export function FolienLaser({ boardId, folie, an, senden }: { boardId: string; f
     const r = e.currentTarget.getBoundingClientRect();
     if (r.width < 4 || r.height < 4) return;
     const x = (e.clientX - r.left) / r.width; const y = (e.clientY - r.top) / r.height;
-    if (punkt.current) { punkt.current.style.left = `${x * 100}%`; punkt.current.style.top = `${y * 100}%`; punkt.current.style.opacity = '1'; }
+    if (punkt.current) { punkt.current.style.left = `${x * 100}%`; punkt.current.style.top = `${y * 100}%`; punkt.current.style.opacity = '1'; punkt.current.dataset.sichtbar = ''; }
     if (!senden) return;
     const blatt = document.querySelector('.presenter .presenter-slide') as HTMLElement | null;
     const anker = blatt ? ankerBei(blatt, e.clientX, e.clientY) : null;
@@ -226,7 +226,8 @@ export function FolienLaser({ boardId, folie, an, senden }: { boardId: string; f
     }
     zeigerMelden(boardId, x, y, { laser: true, folie, anker });
   };
-  const weg = () => { if (punkt.current) punkt.current.style.opacity = '0'; if (senden) zeigerWeg(boardId); };
+  // M464: data-sichtbar sagt dem CSS, dass der Punkt als Ersatz zu sehen ist — erst dann verschwindet der Systemzeiger
+  const weg = () => { if (punkt.current) { punkt.current.style.opacity = '0'; delete punkt.current.dataset.sichtbar; } if (senden) zeigerWeg(boardId); };
   const raus = (e: ReactPointerEvent<HTMLDivElement>) => {
     clearTimeout(fingerWeg.current);
     if (e.pointerType === 'touch') fingerWeg.current = setTimeout(weg, 1500); else weg();

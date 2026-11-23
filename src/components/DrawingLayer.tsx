@@ -19,6 +19,7 @@ import { markerEinrasten } from '../lib/markerZeile';
 import { istAmText } from '../lib/notizText';
 import type { AppNode } from '../types';
 import { IType, IX, IPen } from './Icons';
+import { ZEIGER } from '../lib/zeiger';
 
 const EMPTY: Stroke[] = [];
 const PEN_COLORS = ['#16191e', '#e0392b', '#e8a13a', '#3fa564', '#4f7cff', '#a05fd4'];
@@ -1253,7 +1254,7 @@ export function DrawingLayer() {
       <svg
         className="drawing-layer"
         style={{
-          cursor: tool === 'eraser' ? 'cell' : 'crosshair',
+          cursor: tool === 'eraser' ? ZEIGER.radierer : ZEIGER.fadenkreuz,   // M464: Fadenkreuz mit Kontur (lib/zeiger.ts)
           // Durchgriff: Finger erreichen React Flow (Schieben, Zoomen); Stift & Maus zeichnen über den Fenster-Zuhörer
           pointerEvents: active && !durchgriff ? 'auto' : 'none',
         }}
