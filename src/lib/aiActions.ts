@@ -1,4 +1,4 @@
-// KI-Aktionen aufs ganze Board oder eine Auswahl: Clustern & Anordnen,
+// KI-Aktionen aufs ganze Board oder eine Auswahl (Clustern: lib/themenOrdnen.ts),
 // Aufgaben/Termine extrahieren, Prozesse ableiten, Briefings, Verbindungen.
 // Alle Aktionen sind NICHT destruktiv: sie legen neue Karten an bzw. ordnen
 // nur Positionen — und jede läuft über die Undo-History.
@@ -341,51 +341,7 @@ export async function aiPraesentationUeberarbeiten(id: string, wunsch: string, f
   return `Präsentation überarbeitet: ${bisher.folien.length + 1} → ${g.folien.length} Folien. Die vorige Fassung holt das Menü der Karte (⋮) zurück.`;
 }
 
-const SECTION_COLORS = ['#eef2ff', '#e6f7ec', '#fff4e0', '#ffe9ef', '#f3eeff', '#eef7ff'];
-
-/** Themen-Cluster: Karten gruppieren, in Spalten anordnen, Sektions-Header setzen */
-export async function aiCluster(nodes: AppNode[]): Promise<string> {
-  const items = await gather(nodes);
-  if (items.length < 3) throw new Error('Zu wenig Inhalt zum Clustern (mind. 3 Karten mit Text).');
-  const { clusters } = await askJson<{ clusters: Array<{ title: string; nodeIds: string[] }> }>(
-    `Gruppiere die folgenden Whiteboard-Karten in 2-5 thematische Cluster. Jede Karte gehört in genau ein Cluster. Prägnante deutsche Cluster-Titel (max. 4 Wörter). Antworte NUR mit JSON, exakt in dieser Form: {"clusters":[{"title":"...","nodeIds":["..."]}]}\n\nKarten:\n${JSON.stringify(items)}`,
-  );
-  if (!clusters?.length) throw new Error('Keine Cluster erkannt.');
-
-  const st = useBoard.getState();
-  st.pushHistory();
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  // Cluster-Raster nicht über UNBETEILIGTE Karten legen (M130): freien
-  // Ursprung relativ zu den Karten suchen, die nicht mitgeclustert werden
-  const GAP_X = 90, GAP_Y = 44, COLW = 380;
-  const moved = new Set(nodes.map((n) => n.id));
-  const others = selectActiveBoard(useBoard.getState()).nodes.filter((n) => !moved.has(n.id));
-  const origin = findFreeSpot(others, { x: 80, y: 140 }, { w: clusters.length * (COLW + GAP_X), h: 680 });
-  const X0 = origin.x, Y0 = origin.y;
-  const moves: Array<[string, number, number]> = [];
-  mutedHistory(() => clusters.forEach((c, i) => {
-    const x = X0 + i * (COLW + GAP_X);
-    const titleId = uid();
-    st.addNode({
-      id: titleId, type: 'shape', width: 320, height: 52,
-      position: { x, y: Y0 - 80 },
-      data: { shape: 'terminator', text: c.title || `Thema ${i + 1}`, color: SECTION_COLORS[i % SECTION_COLORS.length] },
-    } as AppNode);
-    let y = Y0;
-    for (const nid of c.nodeIds ?? []) {
-      const node = byId.get(nid);
-      if (!node) continue;
-      moves.push([nid, x, y]);
-      y += (node.measured?.height ?? (node.height as number | undefined) ?? 170) + GAP_Y;
-      // Titel-Bubble mit jeder Karte verbinden (dezente Linie ohne Pfeil) —
-      // so bleibt das Thema beim Aufräumen als Cluster zusammen
-      st.addLabeledEdge(titleId, nid, '', 'line');
-    }
-  }));
-  if (moves.length === 0) throw new Error('Die KI hat keine bekannten Karten-IDs geliefert.');
-  st.setNodePositions(moves);
-  return `${clusters.length} Themen-Cluster angeordnet: ${clusters.map((c) => c.title).join(' · ')}${auslassungsHinweis()}`;
-}
+// M445: „Themen clustern & anordnen“ (aiCluster) ist nach lib/themenOrdnen.ts umgezogen – mit Vorschau und Rahmen.
 
 /** Aufgaben & Termine aus dem Inhalt ziehen → Kanban mit Fälligkeiten */
 export async function aiTasks(nodes: AppNode[], pos: { x: number; y: number }): Promise<string> {
