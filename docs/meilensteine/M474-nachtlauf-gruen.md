@@ -22,6 +22,12 @@ Innenabstand stimmten, aber `data.rahmen` stand nach 500 ms noch nicht in localS
 m382 (gebündeltes Schreiben, langsamer Runner), lokal grün. D4 fragt jetzt wie D6 derselben Reihe bis 4 s nach.
 `m414` war ein Wackler (beim zweiten Mal grün) und bleibt unverändert.
 
+## Dritter Lauf (Run 45172972051, nach #163)
+m374 grün. Neu rot **m269** T4a („das zweite Gerät übernimmt den Stand"), auch lokal: bewusst geänderte
+Oberfläche – seit M476 (#162) öffnet ein geladener kompletter Stand die Vorschau „Sicherung einspielen", statt
+ungefragt alles zu ersetzen; die Reihe wartete auf die Karte, die erst nach „Einspielen" kommt. T4 wählt jetzt in
+der Vorschau „Vorhandene ersetzen" und spielt ein (entspricht dem früheren „Stand laden"); Erwartungen unverändert.
+
 ## Grenzen / offen
 - Runner-Unterschiede, die hier auffielen: geringere Rechenleistung (Zeitfenster um Debounces). Schriften
   spielten bei diesen fünf Reihen keine Rolle.
