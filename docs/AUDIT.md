@@ -202,3 +202,30 @@ ohne Befund.
 Server: Die Migrationen `inhalt_pruefen` (M388) und `team_haertung` (M391) liegen im Repository und sind gegen ein
 lokales Postgres geprüft (`m388b`, `m391b`). Einspielen braucht die Bestätigung des Besitzers der Datenbank; bis dahin
 gilt, was die App prüft. Die App läuft mit und ohne sie.
+
+## 5 · Barrierefreiheit (M447)
+
+Vorgehen: Automatischer Durchgang mit Playwright in Hell **und** Dunkel (`pruefungen/m447-barrierefreiheit.mjs`) über
+Kopfleiste, Seitenleiste, Dock, Auswahl-Leiste, beide Kontextmenüs, Einstellungen (alle Reiter), Hilfe, Suche (Strg+K),
+Aufgaben-Zentrale, Übersicht und Karten-Fokus. Gemessen: zugänglicher Name jedes Bedienelements und Felds, Kontrast jeder
+Schrift gegen den tatsächlich darunterliegenden Grund (aus `getComputedStyle` gerechnet, durchscheinende Schichten und
+Deckkraft der Vorfahren eingerechnet, feste Leisten über `elementsFromPoint`), sichtbarer Fokus bei jedem Tab-Schritt
+(Ring, Schatten, Randfarbe oder Grund ändert sich), Fenster (role, aria-modal, Fokus hinein, Tab im Kreis, Esc, Fokus
+zurück), Tab-Reihenfolge bis ins Dock, `prefers-reduced-motion`, Tippziele am Tablet. Dazu eine Durchsicht aller
+Fenster im Quelltext. Ohne Befund blieben: Namen (keine namenlosen Knöpfe, alle Felder beschriftet), Kontraste im
+Dunkeln, Einstellungen, Hilfe, Suche, Karten-Fokus, Übersicht, reduzierte Bewegung, Tippziele.
+
+| Nr | Fund | Status |
+|----|------|--------|
+| B1 | „Impressum · Datenschutz" im Hellen mit 3,7:1 (Deckkraft 0,8) | ✅ volle Deckung |
+| B2 | Tab auf dem Board kreiste ohne Ausweg durch die Karten — Auswahl-Leiste und Dock waren per Tab nicht erreichbar (WCAG 2.1.2) | ✅ nach der letzten Karte (Umschalt+Tab: vor der ersten) verlässt Tab die Fläche |
+| B3 | Aufgaben-Zentrale: Der Fokus blieb beim Öffnen auf dem ausgehängten Board, nach dem Schließen stand er nirgends | ✅ Fokus hinein, beim Schließen zurück auf den Knopf |
+| B4 | Aufklapp-Knöpfe ohne Zustand: Dock „+", „Zeichnen", „Mehr"; Auswahl-Leiste „Mehr", „Rahmen" | ✅ `aria-expanded` + `aria-haspopup` |
+| B5 | Das Menü einer Karte (⋯ und Rechtsklick) war für Vorlese-Programme eine lose Knopfsammlung — das Menü der Fläche dagegen ein Menü | ✅ `role="menu"`, Einträge `menuitem` |
+| B6 | Fenster ohne `aria-modal`: Recherche, Kanban (Einsammeln, Archiv, Ticket) | ✅ |
+| B7 | Nachschlagen ohne `role="dialog"` | ✅ |
+| B8 | Bild-Lupe ohne `role="dialog"` und ohne Fokus-Führung (Tab lief ins Board dahinter) | ✅ gehört jetzt zu `lib/fensterFokus.ts` |
+| B9 | Hilfe-Suchfeld zeigt den Fokus nur als Randfarbe (kein Ring) | ➖ Randfarbe im Akzent ist ein sichtbarer Fokus (2.4.7); die Prüfung vergleicht mit und ohne Fokus |
+| B10 | Suchfelder ohne sichtbares Etikett, benannt über Platzhalter bzw. `aria-label` | ➖ Chrome und Vorlese-Programme lesen beides als Namen; ein Etikett je Suchfeld widerspräche dem ruhigen Leitbild — die Prüfung lässt den Platzhalter gelten |
+| B11 | Navigation als Ausklapp-Spalte am Telefon (`.nav-panel`): `role="dialog"` ohne `aria-modal` und ohne Fokus-Falle | ⏳ eigene Aufgabe — die Spalte ist dort Teil der Kopfleiste, eine Falle müsste die Kopfleiste ausnehmen |
+| B12 | Vor dem Board liegen am Laptop rund 50 Tab-Stationen der Navigation | ➖ F6 springt von Bereich zu Bereich (M345), Strg+K sucht |

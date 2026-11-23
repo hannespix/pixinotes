@@ -2305,6 +2305,8 @@ dl.leer-wege dd { margin: 0; }
   display: flex; flex-direction: column; align-items: center;
   padding: var(--head-space) 18px calc(24px + var(--safe-bottom)); overflow-y: auto;
 }
+/* M447: nimmt beim Öffnen den Fokus auf (Vorlese-Programm liest „Aufgaben"), zeigt dafür aber keinen Rahmen ums Ganze */
+.taskhub:focus { outline: none; }
 .taskhub-head {
   width: min(860px, 100%); display: flex; align-items: center; gap: 12px;
   margin-bottom: 14px; flex-wrap: wrap;
@@ -3902,9 +3904,10 @@ body:has(.dock-menu) .toast { bottom: auto; top: calc(16px + var(--safe-top, 0px
   /* right: 104px lässt der „React Flow"-Attribution ihren Platz */
   position: fixed; right: 104px; bottom: 1px; z-index: 45;
   display: flex; align-items: center; gap: 5px;
-  font-size: 10.5px; color: var(--muted); opacity: 0.8;
+  /* M447: volle Deckung auch im Hellen — mit 0,8 stand die Zeile bei 3,7:1 statt 4,5:1 (dezent bleibt sie
+     durch Größe und Farbe) */
+  font-size: 10.5px; color: var(--muted);
 }
-.legal-corner:hover { opacity: 1; }
 /* M389: Im Dunkeln stand die Zeile mit 2,3:1 da — „leicht erkennbar" (§ 5 DDG) ist das nicht. */
 [data-theme='dark'] .legal-corner { opacity: 1; }
 .legal-corner .link-btn { font-size: 10.5px; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }

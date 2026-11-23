@@ -218,9 +218,18 @@ export function SelectionToolbar() {
       el.style.maxHeight = `${Math.max(160, unten - oben)}px`;
     }
   }, [menu, menuPos, amZeiger]);
+  // M447: Das „Mehr"-Menü (auch das Rechtsklick-Menü einer Karte) ist für Vorlese-Programme ein Menü: Einträge, die
+  // noch keine Rolle tragen, werden zu menuitem — nach jedem Zeichnen, weil Einträge je nach Auswahl wechseln.
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (menu !== 'more' || !el) return;
+    el.querySelectorAll('button:not([role])').forEach((b) => b.setAttribute('role', 'menuitem'));
+  });
   const menuPortal = (extraClass: string, content: React.ReactNode) => createPortal(
     <div
       ref={menuRef}
+      role={menu === 'more' ? 'menu' : undefined}
+      aria-label={menu === 'more' ? 'Kartenmenü' : undefined}
       className={`sel-ai-menu sel-menu-fixed nodrag ${extraClass}`}
       style={menuPos.down
         // nach unten: normal an der Oberkante ankern
@@ -479,6 +488,8 @@ export function SelectionToolbar() {
             className={menu === 'frame' ? 'ai-on' : ''}
             data-smbtn
             onClick={toggleMenu('frame')}
+            aria-haspopup="true"
+            aria-expanded={menu === 'frame'}
             title="Rahmen: Inhalt anordnen · Tönung · Umbenennen"
           ><IGridLayout size={15} /><span className="sel-label"> Rahmen</span></button>
         </span>
@@ -894,6 +905,8 @@ export function SelectionToolbar() {
             data-smbtn
             data-taste="auswahl-mehr"
             onClick={toggleMenu('more')}
+            aria-haspopup="menu"
+            aria-expanded={menu !== null && menu !== 'frame'}
             title="Mehr"
             aria-label="Mehr"
           ><IMore size={15} /></button>
