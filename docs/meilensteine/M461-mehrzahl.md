@@ -1,5 +1,5 @@
 # M461 — Englische Oberfläche: Einzahl und Mehrzahl stimmen
-PR: #… · Prüfreihe: `pruefungen/m461-mehrzahl.mjs` (Port 5461) · Datum: 2026-11-23
+PR: #139 · Prüfreihe: `pruefungen/m461-mehrzahl.mjs` (Port 5461) · Datum: 2026-11-23
 
 ## Warum
 M455 meldete: In der Hierarchie-Ansicht der Übersicht steht in englischer Oberfläche „1 cards". Ursache war
