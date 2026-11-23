@@ -43,6 +43,9 @@ Jeder Arbeits-Agent liefert selbstständig bis zum Merge.
    `werkzeug/kontrast-pruefen.mjs` (M492) — von Hand `node werkzeug/kontrast-pruefen.mjs dist --dunkel`
    oder in einer Reihe `kontrastScan(page, sel)`: meldet jede sichtbare Schrift unter 4,5:1 zu ihrem
    tatsächlich gezeichneten Hintergrund. Farben nur über Tokens (`src/styles/00-tokens.css`).
+   Bedienelemente (M494): `randScan(page, sel)` misst Ränder von Feldern und Kästchen, `fokusScan(page, sel)`
+   die Fokusringe (je ≥ 3:1, WCAG 1.4.11; von Hand `--rand` / `--fokus`). Feldränder nehmen `--feld-rand`,
+   Schrift auf einer frei gewählten Farbe kommt aus `lib/lesbareSchrift.ts` (nie fest Weiß).
 
 ## Prüfreihen, die unter Last nicht flattern (M484)
 Mehrere Agenten lassen Reihen gleichzeitig laufen; dann bekommt jeder Browser nur einen Bruchteil der CPU. Was

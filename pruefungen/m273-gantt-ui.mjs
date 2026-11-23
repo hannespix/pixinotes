@@ -115,8 +115,9 @@ console.log('\n════ T2: Balken-Beschriftung & Co. ════');
     const innen = [...document.querySelectorAll('.gantt-barlabel.innen')].map((t) => t.textContent);
     const heutePille = [...document.querySelectorAll('.gantt-kopf text')].some((t) => t.textContent === 'Heute');
     // Fortschritt: Overlay in Balkenhöhe (15) statt 4-Punkte-Strich
+    // M494: unter dunkler Schrift hellt der Überzug auf statt abzudunkeln — beide Fassungen zählen
     const overlays = [...document.querySelectorAll('.gantt-bar rect')].filter((r) =>
-      r.getAttribute('fill')?.includes('rgba(0,0,0,.26)'));
+      /rgba\(0,0,0,\.26\)|rgba\(255,255,255,\.4\)/.test(r.getAttribute('fill') ?? ''));
     /* M280: Beschriftet werden nur Balken IM Fenster — ein Name weit
        außerhalb wäre unsichtbar, könnte aber am Rand hervorlugen. Also
        zählt der Test die sichtbaren Balken, nicht alle Zeilen. */
