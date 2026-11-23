@@ -3,6 +3,7 @@ import { useBoard } from '../store';
 import { KUERZEL, taste } from '../lib/tasten';
 import { MailLink } from './MailLink';
 import { sprache } from '../lib/sprache';
+import { NeuesteZuerst } from './NeuesteZuerst';
 
 /**
  * Die Hilfe (Fragezeichen im Dock): sechs Abschnitte in Alltagssprache, dazu Impressum
@@ -170,7 +171,7 @@ export function HelpOverlay() {
                 Hilfe daneben beschreibt nur, wie die App heute aussieht. */}
             <section id="help-neu">
               <p>Die letzten Ausbaustufen in Kürze, neueste zuerst. Welche Fassung gerade läuft, steht am Fuß der Hilfe.</p>
-              <ul>
+              <ul><NeuesteZuerst>
                 <li><b>Termine in der Aufgaben-Zentrale (M469):</b> Ist ein Google- oder Outlook-Kalender verbunden, zeigt die Aufgaben-Zentrale oben <b>„Termine heute und morgen"</b> – mit Uhrzeit, Titel und Konto, ohne Haken (Termine sind keine Aufgaben). Ein Klick öffnet die Kalender-Karte am Tag des Termins (gibt es keine, wird eine angelegt). Steht ein Termin schon als Zeitplan-Vorgang in der Liste, erscheint er nicht doppelt. Mit dem Häkchen <b>„Vorher erinnern"</b> meldet sich die App bis 15 Minuten vor Beginn (Standard: aus). Beim Start fragt die App kein Konto ab – sie nutzt, was Kalender-Karte und Zentrale zuletzt geholt haben.</li>
                 <li><b>Termine vollständig (M471):</b> Die Zentrale zeigt Beginn und Ende, den Ort und neben Google und Outlook auch die eigenen Termine deiner Kalender-Karten und ICS-Abos – jeder Termin nur einmal. Ein Klick öffnet <b>genau diesen Termin</b> in der Kalender-Karte, mit „In Outlook öffnen" bzw. „In Google Kalender öffnen". Mit „Vorher erinnern" holt die App Heute und Morgen still nach (höchstens alle 15 Minuten), damit auch neue Termine erinnert werden; ohne das Häkchen fragt sie beim Start weiter kein Konto ab.</li>
                 <li><b>Text in Bildern nutzen (M465):</b> Steht auf einem Bild eine Telefonnummer, E-Mail-Adresse, Web-Adresse oder Frist, erscheint sie unter dem <b>markierten</b> Bild als kleiner Knopf: anrufen, Mail schreiben, Seite öffnen, Frist in den Kalender (.ics). Eine Frist wird erst mit <b>„als Aufgabe"</b> zur Aufgabe – von selbst landet nichts aus Bildern in der Aufgaben-Zentrale. Das Gehirn (Suche nach Bedeutung) liest den Text im Bild jetzt mit; ausgeschlossene Bereiche bleiben draußen.</li>
@@ -376,7 +377,7 @@ export function HelpOverlay() {
                 <li><b>Kaputte Karte reißt nichts mehr mit:</b> Stolpert ein Modul über beschädigte Daten, erscheint an seiner Stelle eine Meldung statt einer weißen Seite. Der Rest des Boards arbeitet weiter, und die Daten bleiben unangetastet.</li>
                 <li><b>Karte im Fokus (Handy):</b> Ein Tipp auf eine Karte öffnet sie <b>formatfüllend</b> – mit Titel und ✕ oben, Blättern unten. Der Grund: Die Module sind kleine Anwendungen, und ein Stundenraster oder Kanban im Canvas auf Handy-Breite zu bedienen ist ein Kampf, den man nicht gewinnt. Im Fokus gibt es nur, was zu diesem Modul gehört; Verbinden, Anordnen und Archivieren bleiben Board-Sache. <b>Wischen</b> blättert zur Nachbarkarte, <b>nach unten wischen</b>, das <b>✕</b> oder die <b>Zurück-Taste</b> führen aufs Board. Abschaltbar unter Einstellungen → Design → Bedienung.</li>
                 <li><b>Ruhe am Handy, wenn die Tastatur kommt</b> – sobald du tippst, weicht alles, was gerade nicht hilft: Das Dock fährt weg, Zoom-Knöpfe und Fußzeile blenden aus, und die Eingabe-Blasen von Planer und Kalender docken als Blatt direkt über der Tastatur an, statt das Modul zu verdecken, in das du schreibst. Ist etwas ausgewählt, übernimmt die Auswahl-Leiste die Dock-Zeile – eine Leiste statt zweier gestapelter, und nie mehr zweireihig.</li>
-              </ul>
+              </NeuesteZuerst></ul>
             </section>
             </div>
             )}
