@@ -184,8 +184,9 @@ async function geraet(name, opt = {}) {
   await P.waitForTimeout(1200);
   return g;
 }
-const sitzung = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-konto-sync') ?? 'null'));
-const toast = (P) => P.evaluate(() => (window.__hinweise ?? []).join(' | '));
+// Während der Weiterleitung kann der Seitenkontext kurz fehlen — dann gilt „noch nicht da“
+const sitzung = (P) => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-konto-sync') ?? 'null')).catch(() => null);
+const toast = (P) => P.evaluate(() => (window.__hinweise ?? []).join(' | ')).catch(() => '');
 async function warteBis(P, fn, ms = 12000) {
   const ende = Date.now() + ms;
   while (Date.now() < ende) { if (await fn()) return true; await P.waitForTimeout(200); }
@@ -322,7 +323,7 @@ sb.rueckweg = 'code';
   await G.ctx.close();
 }
 
-console.log(`\n${ok} ok, ${bad} fehlgeschlagen`);
+console.log(`\nM479: ${ok} bestanden, ${bad} fehlgeschlagen`);
 await browser.close();
 app.close();
 process.exit(bad ? 1 : 0);

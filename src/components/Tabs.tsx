@@ -7,7 +7,9 @@ import { collectTasks } from '../lib/tasks';
 import { useFristenStand } from '../lib/dates';
 import { InlineName } from './InlineName';
 import { NavTree } from './Navigation';
-import { IChevronL, IChevronR, IHelp, IHome, IPanelLeft, IPlus, ITasks, IVorlage, IX } from './Icons';
+import { IChevronL, IChevronR, IEingang, IHelp, IHome, IPanelLeft, IPlus, ITasks, IVorlage, IX } from './Icons';
+import { eingangOeffnen, eingangZahl } from '../lib/eingang';
+import { zahlWort } from '../lib/sprache';
 
 /**
  * Die Navigation der App.
@@ -62,6 +64,8 @@ export function Tabs() {
     return { open: ts.length, overdue: ts.filter((t) => t.urgency === 'overdue').length };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boards, fristenStand]);
+  // M478: wartende Einträge im Eingang — ohne Eintrag kein Knopf (die Spalte bleibt so ruhig wie vorher)
+  const eingangWartet = useMemo(() => eingangZahl(boards), [boards]);
   // M245: Die Ausstülpung ist in der Breite ziehbar, die Breite wird gemerkt
   const navBreite = useBoard((s) => s.navBreite);
   const setNavBreite = useBoard((s) => s.setNavBreite);
@@ -304,6 +308,21 @@ export function Tabs() {
     </button>
   );
 
+  /** M478: Eintrag „Eingang" — direkt unter „Aufgaben", nur solange etwas darin wartet */
+  const eingangKnopf = (klasse: string, danach?: () => void) => (eingangWartet > 0 ? (
+    <button
+      className={`${klasse} tab-eingang`}
+      data-taste="eingang"
+      title={`Eingang: ${zahlWort(eingangWartet, 'Eintrag wartet', 'Einträge warten')} aufs Einsortieren`}
+      aria-label={`Eingang, ${zahlWort(eingangWartet, 'Eintrag', 'Einträge')}`}
+      onClick={() => { eingangOeffnen(); danach?.(); }}
+    >
+      <IEingang size={15} />
+      <span className="tab-home-label">Eingang</span>
+      <span className="tab-badge">{eingangWartet}</span>
+    </button>
+  ) : null);
+
   return (
     <div className={`tabs ${kompakt ? 'kompakt' : ''} ${krumeKurz ? 'krume-kurz' : ''} ${spalte ? 'spalte' : ''}`} ref={leisteRef}>
       {spalte && <div className="spalte-griff" {...spalteGriff}><span /></div>}
@@ -321,6 +340,7 @@ export function Tabs() {
       </button>
       )}
       {spalte && aufgabenKnopf('tab-tasks')}
+      {spalte && eingangKnopf('tab-tasks')}
       {!spalte && !kompakt && (
         /* Brotkrume „Bereich › Projekt" öffnet den Baum als Ausstülpung von links */
         <button
@@ -350,6 +370,7 @@ export function Tabs() {
                 onClick={() => { setOverviewMode('hierarchie'); setTasksOpen(false); setView('overview'); setNavOpen(false); }}
               ><IHome size={13} /> Übersicht</button>
               {aufgabenKnopf('nav-overview', () => setNavOpen(false))}
+              {eingangKnopf('nav-overview', () => setNavOpen(false))}
               {breit && (
                 /* M308: Der Weg zurück zur Spalte — ab Tablet-Breite, am Telefon gibt es keine */
                 <button

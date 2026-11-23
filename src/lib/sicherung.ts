@@ -20,6 +20,7 @@ import { uid, type AppNode, type KanbanData } from '../types';
 import { boardVonAussen, karteEntschaerfen, karteGueltig } from './sicher';
 import { idbDel, idbGet, idbKeys, idbSet, KONTO_DIRTY_KEY, SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, type SyncDatei, type SyncDirHandle } from './syncFolder';
 import { zumWeitergeben } from './share';
+import { EINGANG_ID, istEingang } from './eingangId';
 import { versionSichern } from './boardVersionen';
 import { VORLIEBEN_FELDER, vorliebenAuszug } from './einstellungen';
 import { ZipArchive } from './unzip';
@@ -198,7 +199,7 @@ export async function sicherungBauen(art: SicherungArt, boardId?: string | Board
   };
   const blob = zipBauen([{ name: MANIFEST, daten: new TextEncoder().encode(JSON.stringify(manifest)) }, ...eintraege]);
   return {
-    blob, name, boards: boards.length,
+    blob, name, boards: boards.filter((b) => !istEingang(b)).length,   // M478: der Eingang zählt nicht als Board
     karten: boards.reduce((s, b) => s + b.nodes.length, 0),
     dateien: new Set(roh.map((a) => a.id)).size + bilder.length,
   };
@@ -392,7 +393,7 @@ export interface SicherungUeberblick {
 export function ueberblick(s: Sicherung): SicherungUeberblick {
   const hier = new Set(useBoard.getState().boards.map((b) => b.id));
   return {
-    boards: s.boards.length,
+    boards: s.boards.filter((b) => !istEingang(b)).length,
     karten: s.boards.reduce((n, b) => n + b.nodes.length, 0),
     dateien: new Set(s.anhaenge.map((a) => a.id)).size + s.bilder,
     vorlagen: s.templates.length,
@@ -481,7 +482,9 @@ export async function sicherungEinspielen(s: Sicherung, modus: Modus): Promise<s
     const boardMap = new Map(s.boards.map((b) => [b.id, uid()]));
     const karte = new Map(s.boards.flatMap((b) => b.nodes.map((n) => [n.id, uid()] as [string, string])));
     const namen = new Set(st.boards.map((b) => b.name));
-    const boards = s.boards.map((b) => {
+    // M478: Der Eingang ist kein Board zum Danebenlegen — seine Einträge kommen (mit frischen Kennungen) in den eigenen
+    const eingangDatei = s.boards.find(istEingang);
+    const boards = s.boards.filter((b) => !istEingang(b)).map((b) => {
       const k = kopiereBoard(b, boardMap, karte);
       return namen.has(k.name) ? { ...k, name: `${k.name} (Sicherung ${datum})` } : k;
     });
@@ -508,6 +511,12 @@ export async function sicherungEinspielen(s: Sicherung, modus: Modus): Promise<s
         spaces[0] = { ...spaces[0], projects: [...spaces[0].projects, { id: uid(), name: 'Weitere Boards', boardIds: lose }] };
       }
       useBoard.getState().importStructure({ spaces, boards, activeId: boardMap.get(s.activeId ?? '') });
+    }
+    if (eingangDatei?.nodes.length) {
+      const dazu = kopiereBoard(eingangDatei, boardMap, karte).nodes;
+      useBoard.setState((x) => (x.boards.some(istEingang)
+        ? { boards: x.boards.map((b) => (istEingang(b) ? { ...b, nodes: [...b.nodes, ...dazu] } : b)) }
+        : { boards: [...x.boards, { id: EINGANG_ID, name: 'Eingang', system: 'eingang', nodes: dazu, edges: [], drawings: [] }] }));
     }
     if (neueVorlagen.length) useBoard.setState({ templates: [...useBoard.getState().templates, ...neueVorlagen] });
     await speicherSchreiben(speicher, vorher.speicher);
@@ -549,7 +558,8 @@ export async function sicherungEinspielen(s: Sicherung, modus: Modus): Promise<s
           }),
         }));
       }
-      const neuLose = s.boards.filter((b) => !hier.has(b.id) && !spaces.some((sp) => sp.projects.some((p) => p.boardIds.includes(b.id))));
+      // M478: Der Eingang steht in keinem Projekt und kommt auch nach dem Einspielen in keines
+      const neuLose = s.boards.filter((b) => !istEingang(b) && !hier.has(b.id) && !spaces.some((sp) => sp.projects.some((p) => p.boardIds.includes(b.id))));
       if (neuLose.length && spaces[0]?.projects[0]) {
         spaces = spaces.map((sp, i) => (i ? sp : { ...sp, projects: sp.projects.map((p, j) => (j ? p : { ...p, boardIds: [...p.boardIds, ...neuLose.map((b) => b.id)] })) }));
       }

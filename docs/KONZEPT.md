@@ -170,7 +170,7 @@ Alle KI-Features folgen einer Regel: **Vorschlagen, nie überschreiben.** Vorsch
 
 - **Papierkorb mit Zeitreise:** Nichts ist je weg. Board-History als Zeitstrahl — „zeig mir das Board von letztem Dienstag".
 - **Fokus-Modus:** Eine Karte/Cluster groß in die Mitte, Rest abgedunkelt. Perfekt zum Schreiben oder Präsentieren.
-- **Schnellablage („Inbox-Ecke"):** Bildschirmrand-Zone. Alles, was man schnell reinwirft (auch per Browser-Extension oder E-Mail an `board@pixinotes`), sammelt sich dort zum späteren Einsortieren.
+- **Schnellablage („Inbox-Ecke"):** (umgesetzt als „Eingang", M478 — Liste in der Spalte statt Bildschirmrand-Zone; E-Mail an `board@pixinotes` noch offen) Bildschirmrand-Zone. Alles, was man schnell reinwirft (auch per Browser-Extension oder E-Mail an `board@pixinotes`), sammelt sich dort zum späteren Einsortieren.
 - **Vorlagen-Karten:** Meeting-Notiz, Daily, Retro, Entscheidungslog, Pro/Contra — per `/`-Menü, aber auch *eigene* Karten als Vorlage speichern.
 - **Karten-Farben mit Bedeutung (optional):** Farb-Legende pro Board („Gelb = Idee, Rot = dringend") — die KI schlägt beim Erstellen die passende Farbe vor.
 - **Erinnerungen:** Jede Karte kann klingeln (Browser-Push): „⏰ Karte *Angebot freigeben* — heute fällig".

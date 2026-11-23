@@ -56,6 +56,8 @@ const browser = await chromium.launch({ executablePath: CHROMIUM, args: ['--no-s
 async function seite(viewport = { width: 1280, height: 860 }, finger = false) {
   const ctx = await browser.newContext({ viewport, hasTouch: finger, isMobile: finger });
   await ctx.addInitScript(() => {
+    // M478: Diese Reihe prüft den Empfangs-Dialog — mit dem Eingang (Vorgabe an) wartet Geteiltes ohne Dialog dort (m478)
+    localStorage.setItem('pixinotes-eingang-sammeln', '0');
     localStorage.setItem('pixinotes-onboarded', '1');
     localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state: {
       boards: [
