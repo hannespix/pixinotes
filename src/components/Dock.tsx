@@ -17,7 +17,7 @@ import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode
 import {
   IAppWindow, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
-  ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITimelineIcon, ITimer, IWand, IWeek, IX,
+  ICopy, IImage, IMail, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITimelineIcon, ITimer, IWand, IWeek, IX,
  IBubbles , IUsers, IArchive, IFolien, IUhr, IPerson
 } from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
@@ -417,6 +417,8 @@ export function Dock() {
     { id: 'zwischenablage', gruppe: 'Einfügen', name: 'Zwischen\u00adablage', hinweis: 'Bild aus der Zwischenablage einfügen (am PC: Strg+V)', suchwort: 'einfügen paste screenshot kopiert', icon: <ICopy size={18} />, tun: () => void ausZwischenablage() },
     { id: 'app', gruppe: 'Einfügen', name: 'Eigene App', hinweis: 'Eine HTML-Datei als lauffähige App-Karte', suchwort: 'html widget programm', icon: <IAppWindow size={18} />, tun: () => happFileRef.current?.click() },
     { id: 'appurl', gruppe: 'Einfügen', name: 'App von URL', hinweis: 'HTML-App von einer Internet-Adresse', suchwort: 'link einbetten web adresse', icon: <IAppWindow size={18} />, tun: () => void addHtmlAppUrl() },
+    // M466: Mails aus Microsoft 365 holen — das Fenster lädt erst beim Klick
+    { id: 'outlook', gruppe: 'Einfügen', name: 'Outlook', hinweis: 'Mails aus Microsoft 365 als E-Mail-Karte aufs Board holen', suchwort: 'mail mails e-mail email postfach posteingang microsoft 365 exchange', icon: <IMail size={18} />, tun: () => { setAddMenu(false); window.dispatchEvent(new CustomEvent('pixinotes:outlook')); } },
     { id: 'rahmen', gruppe: 'Ordnen', name: 'Rahmen', hinweis: 'Benannter Rahmen auf dem Board, nimmt seine Karten mit – nicht der Bereich in der Übersicht', suchwort: 'gruppe bereich zusammenfassen', icon: <IFrame size={18} />, tun: () => add(() => makeFrame(centerPos(640, 420))) },
     // M450: Kontakt-Karte — in „Ordnen“, dort ist noch Platz in der Zeile (die anderen Gruppen sind mit fünf voll)
     { id: 'kontakt', gruppe: 'Ordnen', name: 'Kontakt', hinweis: 'Visitenkarte mit Rufnummer, E-Mail und Anschrift – auch aus einer .vcf-Datei', suchwort: 'person adresse telefon visitenkarte vcard vcf adressbuch ansprechpartner', icon: <IPerson size={18} />, tun: () => add(() => { const n = makeKontakt(centerPos(300, 180)); alsEbenAngelegt(n.id); return n; }) },

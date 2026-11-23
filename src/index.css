@@ -4635,6 +4635,24 @@ button.link-dead:disabled { opacity: 0.45; }
 .on-sec span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .on-empty { font-size: 11px; color: var(--muted); padding: 2px 14px; }
 .on-progress { display: flex; align-items: center; gap: 9px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+
+/* M466: Outlook-Fenster — ruhige Liste wie ein Posteingang, ein Knopf je Mail */
+.outlook-modal { max-width: 620px; }
+.outlook-suche { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; color: var(--muted); }
+.outlook-suche input { flex: 1; min-width: 0; }
+.outlook-kopf { font-size: 12px; color: var(--muted); margin: 6px 0 4px; min-height: 16px; }
+.outlook-liste { list-style: none; margin: 0; padding: 0; max-height: min(52vh, 460px); overflow-y: auto; border-top: 1px solid var(--border-soft); }
+.outlook-mail { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--border-soft); }
+.outlook-text { flex: 1; min-width: 0; }
+.outlook-zeile1 { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.outlook-zeile1 b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.outlook-mail.ungelesen .outlook-zeile1 b, .outlook-mail.ungelesen .outlook-betreff { font-weight: 650; }
+.outlook-datum { color: var(--muted); font-size: 12px; flex: none; }
+.outlook-betreff, .outlook-vorschau { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.outlook-vorschau { color: var(--muted); font-size: 12px; }
+.outlook-mail > button { flex: none; }
+.outlook-leer { padding: 14px 2px; color: var(--muted); font-size: 13px; }
+.outlook-konto { flex: 1; font-size: 12px; color: var(--muted); align-self: center; }
 .on-bar { flex: 1; height: 6px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; }
 .on-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.3s ease; }
 

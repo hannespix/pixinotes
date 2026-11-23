@@ -115,6 +115,18 @@ function Versionen() {
   return boardId ? <Suspense fallback={null}><VersionenDialogLazy boardId={boardId} onClose={() => setBoardId(null)} /></Suspense> : null;
 }
 
+/** M466: Das Outlook-Fenster (Microsoft Graph) kommt erst mit dem ersten Aufruf — Strg+K „Outlook" oder ＋ → Outlook */
+const OutlookLazy = lazy(() => import('./components/OutlookFenster').then((m) => ({ default: m.OutlookFenster })));
+function Outlook() {
+  const [offen, setOffen] = useState(false);
+  useEffect(() => {
+    const auf = () => setOffen(true);
+    window.addEventListener('pixinotes:outlook', auf);
+    return () => window.removeEventListener('pixinotes:outlook', auf);
+  }, []);
+  return offen ? <Suspense fallback={null}><OutlookLazy onClose={() => setOffen(false)} /></Suspense> : null;
+}
+
 /** M385: Die QR-Einblendung (samt Rechenbibliothek) wird erst geladen, wenn jemand sie aufruft */
 const QrBlendeLazy = lazy(() => import('./components/QrBlende').then((m) => ({ default: m.QrBlende })));
 function Qr() {
@@ -487,6 +499,7 @@ export default function App() {
       <Vorlagen />
       <Qr />
       <Versionen />
+      <Outlook />
       <BildExport />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
       <GeteiltDialog />
