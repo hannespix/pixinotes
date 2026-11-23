@@ -27,6 +27,7 @@ import { browserErkenntHandschrift } from '../lib/handschrift';
 import { setBildTextAn, useBildTextAn } from '../lib/textInBildern';
 import { aiReady } from '../lib/ai';
 import { eingangSammeln, setEingangSammeln } from '../lib/eingang';
+import { rechtschreibungAn, setRechtschreibung } from '../lib/rechtschreibung';
 import {
   applyFilesSync, canShareFiles, filesSyncDirty, filesSyncStamp, isAppleTouch,
   isStandalone, readSyncFile, saveViaFiles,
@@ -116,6 +117,7 @@ export function Settings() {
   const spaces = useBoard((s) => s.spaces);
   const boards = useBoard((s) => s.boards);
   const [eingangAn, setEingangAn] = useState(eingangSammeln);
+  const [rsAn, setRsAn] = useState(rechtschreibungAn);
   const showToast = useBoard((s) => s.showToast);
   const [busy, setBusy] = useState('');
   const [syncHandle, setSyncHandle] = useState<SyncDirHandle | null>(null);
@@ -796,6 +798,12 @@ export function Settings() {
             <input type="checkbox" checked={eingangAn} onChange={(e) => { setEingangSammeln(e.target.checked); setEingangAn(e.target.checked); }} data-taste="eingang-sammeln" />
           </label>
           <p className="modal-hint">Was aus dem Browser, dem Teilen-Menü oder per Outlook „Später" kommt, wartet in der Spalte unter „Aufgaben", bis du es einsortierst – aus: sofort nach dem Ziel fragen. Ablegen per Ziehen und Strg+V gehen immer direkt aufs Board.</p>
+          {/* M482: Rechtschreibprüfung des Browsers — an in Feldern für freien Text, je Gerät abschaltbar */}
+          <label className="modal-row modal-row-check">
+            <span>Rechtschreibung prüfen</span>
+            <input type="checkbox" checked={rsAn} onChange={(e) => { setRechtschreibung(e.target.checked); setRsAn(e.target.checked); }} data-taste="rechtschreibung" />
+          </label>
+          <p className="modal-hint">Der Browser unterstreicht Tippfehler beim Bearbeiten von Notizen, Tickets, Zellen und Namen; Rechtsklick zeigt Vorschläge. Formeln, Code, Such- und Adressfelder bleiben ohne.</p>
         </section>
         </>
         )}

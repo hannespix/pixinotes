@@ -3527,4 +3527,6 @@
 "{n} Vorlage":"{n} template",
 "{n} Vorlagen":"{n} templates",
 "{n} ungültige Teile":"{n} invalid parts",
-"{n} ungültiger Teil":"{n} invalid part"}
+"{n} ungültiger Teil":"{n} invalid part",
+"Rechtschreibung prüfen":"Check spelling",
+"Der Browser unterstreicht Tippfehler beim Bearbeiten von Notizen, Tickets, Zellen und Namen; Rechtsklick zeigt Vorschläge. Formeln, Code, Such- und Adressfelder bleiben ohne.":"Your browser underlines typos while you edit notes, tickets, cells and names; right-click shows suggestions. Formulas, code, search and address fields stay unchecked."}

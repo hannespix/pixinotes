@@ -147,7 +147,7 @@ export function KontaktCard({ id, data, selected }: NodeProps<KontaktNode>) {
             <button className="kontakt-dazu" onClick={() => patch({ emails: [...k.emails, ''] })}><IPlus size={13} /> E-Mail</button>
           </div>
           <textarea className="kontakt-feld" rows={3} value={k.adresse} placeholder="Anschrift" aria-label="Anschrift" onChange={(e) => patch({ adresse: e.target.value })} />
-          <input className="kontakt-feld" value={k.web} placeholder="Webseite" aria-label="Webseite" onChange={(e) => patch({ web: e.target.value })} />
+          <input className="kontakt-feld" inputMode="url" data-rechtschreibung="aus" value={k.web} placeholder="Webseite" aria-label="Webseite" onChange={(e) => patch({ web: e.target.value })} />
           <textarea className="kontakt-feld" rows={2} value={k.notiz} placeholder="Notiz" aria-label="Notiz" onChange={(e) => patch({ notiz: e.target.value })} />
           <div className="kontakt-foto-zeile">
             <button className="kontakt-dazu" onClick={() => fotoRef.current?.click()}>{k.foto ? 'Foto ändern' : 'Foto wählen'}</button>
