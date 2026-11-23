@@ -3,7 +3,6 @@
 import { doneCol, kanbanCols, type AppNode, type KontaktData, type SheetData } from '../types';
 import { bubblesAlsText } from './bubbles';
 import { fluessigText } from './fluessigDaten';
-import { pixiBildAdresse } from './pixiBild';
 import { EDITOR_GRUND, EDITOR_SCHRIFT } from './editorFarben';
 import { formatBytes } from './parseEmail';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from './formel';
@@ -618,8 +617,11 @@ export function nodeToHtml(node: AppNode): string {
       return `<p style="font:500 2.4em Georgia,serif;text-align:center;margin:.4em 0">${esc(fluessigText(node.data.text))}</p>`;
     case 'pixi': {
       // M501: als Standbild (SVG im data:-Bild) — E-Mail, Zwischenablage, Präsentation ohne Board
+      // Das Bild kommt von der Figur auf dem Board (wie beim Diagramm) — die Pixeldaten bleiben so aus dem Start-Bundle
       const name = typeof node.data.name === 'string' ? node.data.name.trim() : '';
-      return `<p style="text-align:center"><img src="${pixiBildAdresse(node.data.farbe as string | undefined)}" width="192" height="192" alt="${esc(name ? `Pixi „${name}“` : 'Pixi, das Maskottchen')}"/>${name ? `<br/>${esc(name)}` : ''}</p>`;
+      const alt = esc(name ? `Pixi „${name}“` : 'Pixi, das Maskottchen');
+      const bild = pixiStandbild(node.id);
+      return `<p style="text-align:center">${bild ? `<img src="${bild}" width="192" height="192" alt="${alt}"/>` : `[${alt}]`}${name ? `<br/>${esc(name)}` : ''}</p>`;
     }
     case 'kontakt': {
       const [kopf, ...rest] = kontaktZeilen(node.data);
@@ -685,6 +687,23 @@ export function nodeToHtml(node: AppNode): string {
     default:
       return `<p style="white-space:pre-wrap">${esc(nodeToText(node))}</p>`;
   }
+}
+
+/** M501: Pixi, wie er gerade auf dem Board steht, als SVG-Bildadresse — mit festen Farben, nur die sichtbaren Formen */
+function pixiStandbild(nodeId: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const svg = document.querySelector(`.react-flow__node[data-id="${CSS.escape(nodeId)}"] svg.pixi-svg`) as SVGSVGElement | null;
+  if (!svg) return null;
+  const klon = svg.cloneNode(true) as SVGSVGElement;
+  const quelle = svg.querySelectorAll('path');
+  klon.querySelectorAll('path').forEach((p, i) => {
+    const st = getComputedStyle(quelle[i]);
+    if (st.display === 'none' || st.opacity === '0') p.remove();
+    else p.setAttribute('fill', st.fill);
+  });
+  klon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  klon.setAttribute('width', '192'); klon.setAttribute('height', '192');
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(klon))}`;
 }
 
 /** Das gerenderte Diagramm einer Karte als SVG-Bildadresse (nur im Browser, nur wenn es auf dem Board steht) */

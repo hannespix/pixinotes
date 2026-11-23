@@ -142,21 +142,3 @@ export const PIXI_FARBEN: Array<{ hex: string; name: string }> = [
 ];
 /** Nur glatte Hex-Farben — alles andere (url(), var(), Text) fällt auf die Standardfarbe zurück */
 export const pixiFarbe = (f: unknown): string | undefined => (typeof f === 'string' && /^#[0-9a-f]{6}$/i.test(f) ? f.toLowerCase() : undefined);
-
-/** Feste Farben für das Standbild im Export (Datei, Präsentation ohne Board, Zwischenablage) */
-const EXPORT = { koerper: '#e3efa8', tinte: '#0f380f', wangen: '#7a9a1c', spitze: '#e0b400', schatten: 'rgba(15,56,15,0.18)' };
-
-/** M501: Pixi als eigenständige SVG-Datei (Export) — still, freundlich, ohne Bewegung */
-export function pixiSvgText(farbe?: string, groesse = 192): string {
-  const k = pixiFarbe(farbe) ?? EXPORT.koerper;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEWBOX}" width="${groesse}" height="${groesse}" shape-rendering="crispEdges">`
-    + `<path fill="${EXPORT.schatten}" d="${TEILE.schatten}"/>`
-    + `<path fill="${k}" d="${TEILE.fill}"/><path fill="${EXPORT.tinte}" d="${TEILE.kontur}"/>`
-    + `<path fill="${EXPORT.wangen}" d="${TEILE.wangen}"/><path fill="${EXPORT.spitze}" d="${TEILE.spitze}"/>`
-    + `<path fill="${EXPORT.tinte}" d="${TEILE.augen.offen}"/><path fill="${k}" d="${TEILE.glanz.offen}"/>`
-    + `<path fill="${EXPORT.tinte}" d="${TEILE.muender.laecheln}"/></svg>`;
-}
-
-/** Als Bildadresse (data:) — für HTML-Export und Präsentation */
-export const pixiBildAdresse = (farbe?: string, groesse?: number) =>
-  `data:image/svg+xml;charset=utf-8,${encodeURIComponent(pixiSvgText(farbe, groesse))}`;

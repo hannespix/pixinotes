@@ -26,7 +26,7 @@ eigenes Werk des Nutzers, Übernahme erwünscht, Herkunft im Dateikopf von `lib/
   per Doppelklick als Unterschrift.
 - **Hell/Dunkel**: Körper bleibt hell mit dunkler Kontur (wie pix-el); Arme, Zzz und Noten stehen neben dem Körper
   auf dem Board-Grund und werden im Dunkeln hell. Eigene Körperfarbe wählt die Kontur über `istHell`.
-- Präsentation: Pixi lebt auf der Folie (`slide-pixi`). Export (HTML, Zwischenablage, E-Mail): Standbild als SVG.
+- Präsentation: Pixi lebt auf der Folie (`slide-pixi`). Export (HTML, Zwischenablage, E-Mail): Standbild als SVG, abgenommen von der Figur auf dem Board (feste Farben, nur sichtbare Formen); ohne Board ein Platzhalter „[Pixi, das Maskottchen]“.
   Suche/KI lesen „Maskottchen Pixi“ (+ Name); im Sync stehen nur die Optionen `name`, `farbe`, `schlafen`.
 
 ## Wie (Architektur)
@@ -34,7 +34,8 @@ eigenes Werk des Nutzers, Übernahme erwünscht, Herkunft im Dateikopf von `lib/
   `iconPath`; `TEILE` mit Körper, Kontur, Wangen, Spitze, Schatten, acht Augenformen (offen, zu, froh, halb, groß,
   Herz, Spirale, kneifen; rechts gespiegelt), sieben Mündern, Armen (schräg, gerade, unten) und Effekten (Zzz, Noten,
   Herzen, Funken, „!“, Puff, Sterne, Kichern). `ANSICHT` = viewBox −8 −16 48 48. `PIXI_FARBEN`, `pixiFarbe` (nur
-  `#rrggbb`), `pixiSvgText`/`pixiBildAdresse` fürs Standbild.
+  `#rrggbb`). Das Standbild für den Export nimmt `serialize.ts` (`pixiStandbild`) von der gezeichneten Figur — so bleiben
+  die Pixeldaten aus dem Start-Bundle (Start-JS +≈2 KB: 2 112 358 B).
 - `lib/pixiVerhalten.ts`: `PIXI_ANIMATIONEN` (Dauer, Gewicht, ruhig, augen, mund, arme, effekt, eigenerBlick),
   `PixiHirn` (Zustandsmaschine mit eingespeister Uhr und Zufall; `schritt()` liefert die ms bis zum nächsten Aufruf,
   `aktivitaet`, `nah`, `tippen`, `reaktion`, `optionen`), `blickZu`, Gesten `istKitzeln`, `istKreisen`,
