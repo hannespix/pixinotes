@@ -24,6 +24,7 @@ import { findFreeSpot, frameMembers, sizeOf } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
 import { t } from './lib/sprache';
 import { fristAnkerPflegen, type FristAnker } from './lib/fristAnker';
+import { frisch, nachPatch } from './lib/kartenZeit';
 import { blocksToText } from './lib/serialize';
 import { linksUmbenennen, normalizeName } from './lib/links';
 
@@ -1387,6 +1388,10 @@ export function ohneStartboard<T extends { boards: BoardDoc[]; spaces: Space[] }
   };
 }
 
+/** M453: Inhaltliche Änderung von Hand stempelt die Karte — Automatik (runDerived) nicht */
+const zeitNachPatch = (neu: AppNode, alt: AppNode, patch: Record<string, unknown>): AppNode =>
+  (inDerived() ? neu : nachPatch(neu, alt, patch));
+
 /** M390: Ändern sich die Blöcke einer Notiz, wandern die Fristen-Anker mit (lib/fristAnker.ts). */
 const mitFristAnker = (n: AppNode, data: Record<string, unknown>): Record<string, unknown> => {
   // M435: Formen (Schritt, Entscheidung, Start/Ende) tragen formatierten Text wie Notizen — `text` bleibt die
@@ -1845,7 +1850,7 @@ export const useBoard = create<BoardState>()(
                     ...b,
                     nodes: b.nodes.map((n) =>
                       n.id === nodeId
-                        ? ({ ...n, data: { ...n.data, ...mitFristAnker(n, data), ...(bumpt ? { extEpoch: (((n.data as { extEpoch?: number }).extEpoch) ?? 0) + 1 } : {}) } } as AppNode)
+                        ? zeitNachPatch({ ...n, data: { ...n.data, ...mitFristAnker(n, data), ...(bumpt ? { extEpoch: (((n.data as { extEpoch?: number }).extEpoch) ?? 0) + 1 } : {}) } } as AppNode, n, patch)
                         : n,
                     ),
                   }
@@ -2979,7 +2984,7 @@ export const useBoard = create<BoardState>()(
 
         addNode: (node) => {
           get().pushHistory();
-          patchActive((b) => ({ nodes: [...b.nodes, node] }));
+          patchActive((b) => ({ nodes: [...b.nodes, frisch(node)] }));
         },
 
         dupliziere: (ids) => {
@@ -2993,7 +2998,7 @@ export const useBoard = create<BoardState>()(
           const belegt = (kk: number) => wahl.some((n) => b.nodes.some((x) => x.type === n.type && Math.abs(x.position.x - (n.position.x + 30 * kk)) < 2 && Math.abs(x.position.y - (n.position.y + 30 * kk)) < 2));
           while (k < 40 && belegt(k)) k += 1;
           const karte = new Map(wahl.map((n) => [n.id, uid()]));
-          const neu = wahl.map((n) => ({
+          const neu = wahl.map((n) => frisch({
             ...n, id: karte.get(n.id) as string, selected: true,
             position: { x: n.position.x + 30 * k, y: n.position.y + 30 * k },
             data: JSON.parse(JSON.stringify(n.data)),
@@ -3021,7 +3026,7 @@ export const useBoard = create<BoardState>()(
           }
           set({
             boards: get().boards.map((b) =>
-              b.id === boardId ? { ...b, nodes: [...b.nodes, node] } : b),
+              b.id === boardId ? { ...b, nodes: [...b.nodes, frisch(node)] } : b),
           });
         },
 
@@ -3359,7 +3364,7 @@ export const useBoard = create<BoardState>()(
           }
           patchActive((b) => ({
             nodes: b.nodes.map((n) =>
-              n.id === id ? ({ ...n, data: { ...n.data, ...mitFristAnker(n, data) } } as AppNode) : n,
+              n.id === id ? zeitNachPatch({ ...n, data: { ...n.data, ...mitFristAnker(n, data) } } as AppNode, n, data) : n,
             ),
           }));
         },

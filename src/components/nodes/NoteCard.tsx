@@ -16,7 +16,7 @@ import { appStateLines, fmtHM, linkedOfType, timeSums } from '../../lib/moduleFe
 import { loadAppState } from '../../lib/htmlStore';
 import type { TimeData } from '../../types';
 import { extractEntities } from '../../lib/entities';
-import confetti from 'canvas-confetti';
+import { konfettiWerfen } from '../../lib/konfetti';
 import { checklistStand, FARB_NAMEN, noteTitle } from '../../lib/notiz';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { editorUpload } from '../../lib/notizBild';
@@ -559,7 +559,7 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
   useEffect(() => {
     const offen = stand.gesamt - stand.erledigt;
     if (stand.gesamt > 0 && offen === 0 && vorherOffen.current > 0 && konfetti) {
-      confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
+      konfettiWerfen({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
     }
     vorherOffen.current = offen;
   }, [stand.gesamt, stand.erledigt, konfetti]);

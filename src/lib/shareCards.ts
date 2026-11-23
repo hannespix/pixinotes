@@ -2,7 +2,6 @@
 // Alles serverlos: Der Übernahme-Link nutzt die #b=-Mechanik der Board-Links
 // (gzip+base64 im URL-Fragment), das PDF entsteht komplett im Browser
 // (html-to-image → JPEG → minimaler, handgeschriebener PDF-Container).
-import { toCanvas } from 'html-to-image';
 import { uid, type AppNode } from '../types';
 import type { BoardDoc, Stroke } from '../store';
 import { nodesToHtml, nodesToWhatsapp, sicherKuerzen } from './serialize';
@@ -165,6 +164,7 @@ export async function cardsToPdf(nodes: AppNode[], title = 'pixinotes-karten'): 
   document.body.appendChild(host);
   try {
     const scale = 2;
+    const { toCanvas } = await import('html-to-image');   // M446: erst beim Teilen laden
     const cv = await toCanvas(host, {
       pixelRatio: scale,
       backgroundColor: '#fff',
