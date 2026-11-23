@@ -543,9 +543,18 @@ pruefe('B6 beide sehen denselben Text – nichts verloren, nichts doppelt', tA =
 await A.P.screenshot({ path: `${SD}/m477-b-anna.png` });
 // Solange Anna darin tippt, bleibt die Karte, wo sie ist: Gerd kann sie nicht ziehen oder löschen (der Text bleibt frei)
 await heraus(G.P);
+// M484: jeden Hinweis mitschreiben, der während des Ziehens erscheint — unter Last war er nach Zug und 900 ms Warten
+// schon wieder verschwunden (B8 rot, obwohl er kam)
+await G.P.evaluate(() => {
+  const w = window; w.__hinweise484 = [];
+  const merken = () => { const t = document.querySelector('.toast')?.textContent; if (t && w.__hinweise484.at(-1) !== t) w.__hinweise484.push(t); };
+  w.__hinweisBeob484?.disconnect();
+  w.__hinweisBeob484 = new MutationObserver(merken); w.__hinweisBeob484.observe(document.body, { childList: true, subtree: true, characterData: true });
+});
 const gezogen = await ziehen(G.P, 'x1', 160, 120);
+const hinweise = await G.P.evaluate(() => { window.__hinweisBeob484?.disconnect(); return window.__hinweise484 ?? []; });
 pruefe('B7 Gerd kann die Notiz nicht verschieben, solange Anna darin tippt', gezogen === false, String(gezogen));
-pruefe('B8 … ein Hinweis nennt Anna', new RegExp(annaName, 'i').test(await toast(G.P)), await toast(G.P));
+pruefe('B8 … ein Hinweis nennt Anna', hinweise.some((t) => new RegExp(annaName, 'i').test(t)), JSON.stringify(hinweise));
 await G.P.keyboard.press('Delete'); await G.P.waitForTimeout(600);
 pruefe('B9 … und nicht löschen', (await boardVon(G.P, 'bx')).nodes.some((n) => n.id === 'x1'));
 await G.P.mouse.click(1400, 870); await G.P.waitForTimeout(200);

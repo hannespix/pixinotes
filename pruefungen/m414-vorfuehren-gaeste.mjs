@@ -649,7 +649,8 @@ async function rahmen(P, klasse, id) {
 const anteil = (f, sel = null) => f.evaluate((s) => { const e = s ? document.querySelector(s) : document.scrollingElement; return e.scrollTop / Math.max(1, e.scrollHeight - e.clientHeight); }, sel);
 const folie = (P) => P.locator('.presenter .presenter-count').textContent().catch(() => '');
 const imVortrag = (P) => P.locator('.presenter').count();
-const vortragStart = async (P) => { await P.locator('.dock button[aria-label="Mehr"]').click(); await P.waitForTimeout(250); await P.locator('.dock-menu button', { hasText: 'Präsentieren' }).first().click(); await P.waitForTimeout(700); };
+// M484: auf die offene Präsentation warten statt fester 700 ms – der Vortrag wird nachgeladen, unter Last dauert das länger
+const vortragStart = async (P) => { await P.locator('.dock button[aria-label="Mehr"]').click(); await P.waitForTimeout(250); await P.locator('.dock-menu button', { hasText: 'Präsentieren' }).first().click(); await P.waitForSelector('.presenter', { timeout: 15000 }).catch(() => {}); await P.waitForTimeout(400); };
 // ---------- M414 ----------
 function pdfText(n) {
   const obj = [];

@@ -13,6 +13,9 @@
 //   node werkzeug/alle-pruefungen.mjs --json datei    → Ergebnis je Reihe als JSON (nach jeder Reihe neu
 //                                                       geschrieben, auch ein abgebrochener Lauf hinterlässt Daten)
 //   node werkzeug/alle-pruefungen.mjs --nur-zeigen    → Auswahl auflisten (Trockenlauf), nichts starten
+//   node werkzeug/alle-pruefungen.mjs m414 m383 --wiederhole 10 --bahnen 6
+//                                                     → Auswahl zehnmal unter Last, ohne Einzelwiederholung;
+//                                                       meldet je Reihe „x von 10 grün" und Flattern (M484)
 //
 // Jede Prüfung startet ihren eigenen kleinen Server und Browser. Was sich dabei in die Quere käme, läuft nie
 // gleichzeitig: Dateien mit demselben Port, und die Prüfungen an der lokalen Datenbank (eine gemeinsame Datenbank).
@@ -34,6 +37,9 @@ const ohneDatenbank = args.includes('--ohne-datenbank');
 const basis = wert('--basis', '');
 const nurGeaendert = args.includes('--geaendert');
 const nurZeigen = args.includes('--nur-zeigen');
+// M484: --wiederhole N – jede Reihe N-mal in die Warteschlange, ohne den Einzellauf am Ende. So zeigt sich Flattern
+// unter Last (rot neben grün) statt im „beim zweiten Mal grün" unterzugehen.
+const wiederhole = Math.max(1, Number(wert('--wiederhole', 1)) || 1);
 const filter = args.filter((a) => !a.startsWith('--'));
 
 let dateien = readdirSync(path.join(repo, 'pruefungen'))
@@ -114,7 +120,10 @@ if (nurZeigen) {
   if (!nurGeaendert) { console.log(`${dateien.length} Reihe(n):`); for (const n of dateien) console.log(`  ${n.replace(/\.mjs$/, '')}  [${sperren(n).join(', ') || 'ohne Sperre'}]`); }
   process.exit(0);
 }
-const offen = dateien.map((name) => ({ name, sperren: sperren(name) }));
+// M484: bei --wiederhole stehen die Durchgänge hintereinander (erst alle Reihen einmal, dann alle ein zweites Mal …),
+// damit jede Reihe in jedem Durchgang neben anderen läuft und nicht ihre eigenen Wiederholungen abwartet.
+const offen = Array.from({ length: wiederhole }, (_, d) => dateien.map((name) => ({ name, durchgang: d + 1, sperren: sperren(name) }))).flat();
+const verlauf = new Map(dateien.map((n) => [n, []]));
 const belegt = new Set();
 // Sperren über alle Worktrees: Mehrere Agenten starten dieselben alten Reihen (feste Ports 4431–4776) zugleich.
 // Ein Verzeichnis je Sperre unter os.tmpdir() (mkdir ist atomar), darin die PID des Halters. Stirbt der Halter,
@@ -199,11 +208,17 @@ await new Promise((alleFertig) => {
       for (const s of d.sperren) belegt.add(s);
       laufend += 1;
       lauf(d.name).then((r) => {
-        ergebnis.set(d.name, r);
-        merkeJson(d.name, r, false);
-        // M448: auch der erste Fehlschlag kommt mit Grund in den Bericht – sonst ist ein Wackler, der beim
-        // Wiederholen grün wird, hinterher nicht mehr zu finden
-        zeile(d.name, r, r.rc === 0 ? '' : ' | erster Lauf rot, wird allein wiederholt');
+        verlauf.get(d.name).push(r);
+        if (wiederhole > 1) {
+          zeile(d.name, r, ` | Durchgang ${d.durchgang}/${wiederhole}${r.rc === 0 ? '' : ' | ROT'}`);
+          if (r.rc !== 0 && !bericht) console.log(r.aus.split('\n').filter((z) => /✗|Error/.test(z)).slice(0, 8).map((z) => `    ${z.slice(0, 300)}`).join('\n'));
+        } else {
+          ergebnis.set(d.name, r);
+          merkeJson(d.name, r, false);
+          // M448: auch der erste Fehlschlag kommt mit Grund in den Bericht – sonst ist ein Wackler, der beim
+          // Wiederholen grün wird, hinterher nicht mehr zu finden
+          zeile(d.name, r, r.rc === 0 ? '' : ' | erster Lauf rot, wird allein wiederholt');
+        }
         for (const s of d.sperren) { belegt.delete(s); freigeben(s); }
         laufend -= 1;
         weiter();
@@ -212,6 +227,24 @@ await new Promise((alleFertig) => {
   };
   weiter();
 });
+
+if (wiederhole > 1) {
+  const minuten = ((Date.now() - start) / 60000).toFixed(1);
+  console.log(`\n--wiederhole ${wiederhole}: ${minuten} min bei ${bahnen} Bahnen`);
+  const flattern = [];
+  for (const [name, rs] of verlauf) {
+    const gruen = rs.filter((r) => r.rc === 0).length;
+    const sek = rs.map((r) => r.sek);
+    console.log(`  ${name.replace(/\.mjs$/, '')}: ${gruen} von ${rs.length} grün · ${Math.min(...sek)}–${Math.max(...sek)} s${gruen < rs.length ? (gruen ? ' · FLATTERT' : ' · IMMER ROT') : ''}`);
+    if (gruen < rs.length) flattern.push(name.replace(/\.mjs$/, ''));
+    jsonStand.reihen[name] = { reihe: name.replace(/\.mjs$/, ''), rot: gruen < rs.length, gruen, laeufe: rs.length, sek: sek.reduce((a, b) => a + b, 0), wiederholt: false, fehler: [] };
+  }
+  if (flattern.length) console.log(`nicht stabil: ${flattern.join(', ')}`);
+  jsonStand.fertig = true;
+  jsonSchreiben();
+  if (bericht) appendFileSync(bericht, 'FERTIG\n');
+  process.exit(flattern.length ? 1 : 0);
+}
 
 // Was durchfiel, einmal allein
 const rot = [...ergebnis].filter(([, r]) => r.rc !== 0).map(([name]) => name).sort();

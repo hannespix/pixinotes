@@ -210,7 +210,7 @@ export interface NotizSitzung {
 }
 interface SitzungIntern extends NotizSitzung { empfangen(m: NotizYNachricht): void; rundeGeaendert(): void; bereit(): boolean }
 
-interface Anwesenheit { pn?: unknown; schreibt?: unknown }
+interface Anwesenheit { pn?: unknown; schreibt?: unknown; sichert?: unknown }
 
 /**
  * Eine Notiz gemeinsam öffnen. Löst auf, sobald das Dokument steht (Stand der anderen da oder aus dem Block-JSON
@@ -285,16 +285,24 @@ export async function sitzungOeffnen(
     }
   });
 
-  /** Wer speichert? Unter allen mit offener Notiz, die schreiben dürfen: die kleinste Kennung */
+  /**
+   * Wer speichert? Unter allen mit offener Notiz, die schreiben dürfen: wer es schon tut (`sichert`), sonst die kleinste
+   * Kennung. M484: Vorher galt allein die kleinste Kennung — kam jemand mit kleinerer Kennung dazu (seine Notiz wacht
+   * auf, weil ein anderer darin tippt), wechselte der Schreiber mitten im Tippen: Beide sicherten kurz nacheinander,
+   * der Besitzer schrieb den Text des Gasts ins Konto (m383 D2, unter Last). Jetzt bleibt der Schreiber, bis er geht;
+   * melden zwei zugleich Anspruch an, gilt unter ihnen die kleinste Kennung.
+   */
   const schreiberKennung = (): string | null => {
     let best: string | null = null;
+    let bestMitAnspruch: string | null = null;
     for (const [cid, st] of awareness.getStates()) {
       const s = st as Anwesenheit | null;
       if (!s || typeof s.pn !== 'string' || s.schreibt !== true) continue;
       const k = `${s.pn}\u0000${String(cid).padStart(10, '0')}`;
       if (best === null || k < best) best = k;
+      if (s.sichert === true && (bestMitAnspruch === null || k < bestMitAnspruch)) bestMitAnspruch = k;
     }
-    return best;
+    return bestMitAnspruch ?? best;
   };
   const meineKennung = (): string => `${selbst}\u0000${String(doc.clientID).padStart(10, '0')}`;
   const istSchreiber = (): boolean => {
@@ -308,6 +316,13 @@ export async function sitzungOeffnen(
     const jetzt = istSchreiber();
     if (jetzt && !warSchreiber) { warSchreiber = true; if (geaendert) for (const cb of [...schreiberRufe]) { try { cb(); } catch { /* egal */ } } }
     else if (!jetzt) warSchreiber = false;
+    anspruchMelden(jetzt);
+  }
+  /** M484: den anderen sagen, ob dieses Gerät gerade sichert (Feld `sichert` in der Anwesenheit) */
+  function anspruchMelden(an: boolean): void {
+    const st = awareness.getLocalState() as Anwesenheit | null;
+    if (!st || zu || (st.sichert === true) === an) return;
+    awareness.setLocalState({ ...st, sichert: an });
   }
   const anwesenheitSetzen = () => {
     const ichHier = ichIn(boardId);
@@ -389,8 +404,10 @@ export async function sitzungOeffnen(
         let sv: Uint8Array | undefined;
         try { sv = m.sv ? ausB64(m.sv) : undefined; Y.decodeStateVector(sv ?? new Uint8Array([0])); } catch { return; }
         jetztSenden();
+        // Der Neue soll den Cursor gleich sehen. M484: VOR dem Stand — mit dem Stand beginnt er, und wer schon sichert,
+        // muss er da schon kennen, sonst meldet er selbst Anspruch an
+        if (awareness.getLocalState() !== null) awSenden();
         senden(boardId, { c: doc.clientID, n: nodeId, a: 'stand', an: m.c, d: zuB64(Y.encodeStateAsUpdate(doc, sv)), sv: zuB64(Y.encodeStateVector(doc)) });
-        if (awareness.getLocalState() !== null) awSenden();   // der Neue soll den Cursor gleich sehen
         return;
       }
       if (m.a === 'stand') {
@@ -487,5 +504,6 @@ export async function sitzungOeffnen(
   // Änderungen, die während des Wartens hier entstanden (sollte nicht vorkommen), jetzt hinaus
   if (offen.length) jetztSenden();
   warSchreiber = istSchreiber();
+  anspruchMelden(warSchreiber);
   return s;
 }
