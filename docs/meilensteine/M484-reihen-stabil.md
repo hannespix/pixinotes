@@ -80,9 +80,23 @@ m332, m447, m429, m354, m366. Jeder Agent verlor damit Wiederholungen und Gewiss
 - Regeln für neue Reihen: `docs/AGENTEN.md` Abschnitt „Prüfreihen, die unter Last nicht flattern".
 
 ## Nachweis
-Last = Läufer mit 6 Bahnen plus drei Prozesse mit Dauerlast auf 4 Kernen. Vor der Änderung (je 3 Durchgänge):
-m383 1 von 3 und 0 von 3, m428 1 von 3, m477 1 von 4 und 2 von 4 (Hauptzweig ohne diese Änderung); m414 und m387
-je 3 von 3, später m387 1 von 2, m354 1 von 2, m429 1 von 2. Nach der Änderung: siehe PR (10 Durchgänge).
+Last = Läufer mit 6 Bahnen auf 4 Kernen, dazu andere Agenten (Lastmittel 10–20) bzw. Prozesse mit Dauerlast.
+Vor der Änderung: m383 1 von 3 und 0 von 3, m428 1 von 3, m477 2 von 4 (Hauptzweig), m387 1 von 2, m354 1 von 2,
+m332 7 von 10 (nach M483), m366 8 von 10. Nach der Änderung (`--wiederhole 10 --bahnen 6`, zuletzt nach dem Einmischen
+von M487):
+
+| Reihe | grün |
+|---|---|
+| m383-karten-einzeln | 10 von 10 |
+| m387-praesentation-fuer-alle | 10 von 10 |
+| m414-vorfuehren-gaeste | 10 von 10 |
+| m428-ki-ueberarbeiten | 10 von 10 |
+| m366-grosse-gruppe | 10 von 10 |
+| m477-gemeinsam-tippen | 10 von 10 |
+| m332, m354, m447, m400–m409 | je 10 von 10 (Lauf davor) |
+| m476-sicherung | 6 von 6 |
+| m429-bubbles-ruhig | 7 von 10 (A1, offen) |
+| m487-gemeinsam-weiter | 8 von 10 (B5/B8, offen, M487) |
 
 ## Grenzen / offen
 - **m429 A1 flattert weiter** (in 10 Durchgängen 1–3 rot, Werte 8,8 bis 21 bei Grenze 6/12): Die Reihe misst ein
