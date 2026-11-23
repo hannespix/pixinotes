@@ -1,6 +1,6 @@
 import { tagLokal } from '../lib/tag';
 import { useEffect, useMemo, useState } from 'react';
-import confetti from 'canvas-confetti';
+import { konfettiWerfen } from '../lib/konfetti';
 import { mutedHistory, useBoard } from '../store';
 import { doneCol, kanbanCols, mitSpalte, openSubs, ticketBlockers, uid, type GanttData, type KanbanData } from '../types';
 import { makeKanban, makeNote } from '../lib/nodes';
@@ -245,7 +245,7 @@ export function TaskHub() {
       updateNodeDataOnBoard(t.boardId, t.nodeId, {
         items: k.items.map((it) => (it.id === t.itemId ? mitSpalte(it, doneCol(k), k) : it)),
       });
-      if (useBoard.getState().konfetti) confetti({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
+      if (useBoard.getState().konfetti) konfettiWerfen({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
     } else if (t.kind === 'gantt') {
       logDone(t);
       // Gantt-Vorgang erledigen = Fortschritt auf 100 % (M113)
@@ -253,7 +253,7 @@ export function TaskHub() {
       updateNodeDataOnBoard(t.boardId, t.nodeId, {
         rows: g.rows.map((r) => (r.id === t.itemId ? { ...r, progress: 100 } : r)),
       });
-      if (useBoard.getState().konfetti) confetti({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
+      if (useBoard.getState().konfetti) konfettiWerfen({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
     } else if (node.type === 'minutes') {
       // M390: Die Punkte der Protokoll-Reihe liegen in den SITZUNGEN (entries[].blocks), nicht in data.blocks. Der
       // Haken schrieb vorher ins Leere — der Punkt blieb offen, „Heute geschafft" zählte trotzdem jedes Mal weiter.

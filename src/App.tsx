@@ -1,14 +1,10 @@
 import { QR_EREIGNIS, type QrWunsch } from './lib/qr';
-import { lazy, Suspense, useEffect, useState, type CSSProperties } from 'react';
+import { lazy, Suspense, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { Board } from './components/Board';
+import { Board, kartenVorladen } from './components/Board';
 import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
 import { TopActions } from './components/TopActions';
-import { Overview } from './components/Overview';
-import { SearchOverlay } from './components/SearchOverlay';
-import { RechercheDialog } from './components/RechercheDialog';
-import { Presenter } from './components/Presenter';
 import {
   adoptPersistedState, claimWriter, getWriterRole, reassertPersist,
   selectActiveBoard, selectNurLesen, singleWriterSupported, takeOverWriter, useBoard, type WriterRole,
@@ -22,7 +18,6 @@ import { initFilesSync } from './lib/filesSync';
 import { initKontoSync } from './lib/kontoSync';
 import { initBrain } from './lib/brain';
 import { kiAbbrechen } from './lib/ai';
-import { TaskHub } from './components/TaskHub';
 import { AboutMenu } from './components/AboutMenu';
 import { FocusSheet } from './components/FocusSheet';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -118,6 +113,67 @@ function Qr() {
   return wunsch ? <Suspense fallback={null}><QrBlendeLazy wunsch={wunsch} onClose={() => setWunsch(null)} /></Suspense> : null;
 }
 
+/**
+ * M446: Übersicht, Aufgaben-Zentrale, Präsentation, Suche und Recherche gehören nicht in den Start — sie kommen
+ * mit dem ersten Aufruf (wie Hilfe und Einstellungen, M377/M398) und bleiben danach eingehängt, damit ihr
+ * Zustand das Schließen überlebt wie zuvor. Kurz nach dem Start holt `imLeerlaufVorladen()` sie still nach:
+ * Der erste Aufruf wartet dann nicht, und der Service Worker hat sie auch für den Offline-Betrieb.
+ */
+const LADER = {
+  overview: () => import('./components/Overview'),
+  taskhub: () => import('./components/TaskHub'),
+  presenter: () => import('./components/Presenter'),
+  suche: () => import('./components/SearchOverlay'),
+  recherche: () => import('./components/RechercheDialog'),
+};
+const OverviewLazy = lazy(() => LADER.overview().then((m) => ({ default: m.Overview })));
+const TaskHubLazy = lazy(() => LADER.taskhub().then((m) => ({ default: m.TaskHub })));
+const PresenterLazy = lazy(() => LADER.presenter().then((m) => ({ default: m.Presenter })));
+const SearchOverlayLazy = lazy(() => LADER.suche().then((m) => ({ default: m.SearchOverlay })));
+const RechercheLazy = lazy(() => LADER.recherche().then((m) => ({ default: m.RechercheDialog })));
+
+/** Einmal geöffnet, bleibt der Teil eingehängt (er schließt sich selbst über seinen Store-Schalter) */
+function BeiBedarf({ offen, children }: { offen: boolean; children: ReactNode }) {
+  const [geladen, setGeladen] = useState(false);
+  useEffect(() => { if (offen) setGeladen(true); }, [offen]);
+  return offen || geladen ? <Suspense fallback={null}>{children}</Suspense> : null;
+}
+function Praesentation() {
+  return <BeiBedarf offen={useBoard((s) => s.presenting)}><PresenterLazy /></BeiBedarf>;
+}
+function Recherche() {
+  return <BeiBedarf offen={useBoard((s) => s.rechercheOpen)}><RechercheLazy /></BeiBedarf>;
+}
+/** Die Suche öffnet auch per Strg/⌘ + K — bis der Teil da ist, hört dieser kleine Platzhalter auf die Taste */
+function Suche() {
+  const offen = useBoard((s) => s.searchOpen);
+  const [geladen, setGeladen] = useState(false);
+  useEffect(() => { if (offen) setGeladen(true); }, [offen]);
+  useEffect(() => {
+    if (geladen) return;   // ab jetzt fängt SearchOverlay die Taste selbst
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); useBoard.getState().setSearchOpen(true); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [geladen]);
+  return offen || geladen ? <Suspense fallback={null}><SearchOverlayLazy /></Suspense> : null;
+}
+
+/** M446: Nachgeladenes still holen, sobald der Start durch ist — nicht, wenn der Browser Daten sparen soll */
+function imLeerlaufVorladen() {
+  const sparen = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+  if (sparen) return;
+  const los = () => {
+    void kartenVorladen();
+    for (const l of Object.values(LADER)) void l().catch(() => null);
+  };
+  const ric = (window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+  window.setTimeout(() => (ric ? ric(los, { timeout: 4000 }) : los()), VORLADEN_NACH_MS);
+}
+/** So lange nach dem Laden warten — der Start selbst (erstes Board, Editor) hat Vorrang */
+const VORLADEN_NACH_MS = 4000;
+
 export default function App() {
   const toast = useBoard((s) => s.toast);
   const view = useBoard((s) => s.view);
@@ -136,7 +192,7 @@ export default function App() {
   const nurLesenBoard = nurLesenId ? { id: nurLesenId, von: nurLesenVon } : null;
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); window.setTimeout(() => useBoard.getState().fristAnkerNachtragen(), 1200); }, []);
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); imLeerlaufVorladen(); window.setTimeout(() => useBoard.getState().fristAnkerNachtragen(), 1200); }, []);
 
   // Eigene Apps (M158): verwaiste HTML-Inhalte in IndexedDB entsorgen —
   // NUR beim Start (dann kann kein Undo eine gelöschte App-Karte zurückholen,
@@ -372,11 +428,11 @@ export default function App() {
         <Tabs />
         {view === 'overview' ? (
           <ErrorBoundary what="Die Übersicht" full>
-            <Overview />
+            <Suspense fallback={null}><OverviewLazy /></Suspense>
             {/* M297: Der Baum steht in der linken Spalte (Tabs) — in jeder Ansicht. */}
           </ErrorBoundary>
         ) : presenting ? null : tasksOpen ? (
-          <ErrorBoundary what="Die Aufgaben-Zentrale" full><TaskHub /></ErrorBoundary>
+          <ErrorBoundary what="Die Aufgaben-Zentrale" full><Suspense fallback={null}><TaskHubLazy /></Suspense></ErrorBoundary>
         ) : (
           // Während Präsentation/Aufgaben-Zentrale ist das Board ausgehängt:
           // Beide editieren dieselben Karten, und die Karten-Editoren (BlockNote)
@@ -394,7 +450,7 @@ export default function App() {
           </>
         )}
         <Onboarding />
-        <SearchOverlay />
+        <Suche />
       <Hilfe />
       <Vorlagen />
       <Qr />
@@ -405,8 +461,8 @@ export default function App() {
       <TooltipLayer />
       <Tastatur />
         <Einstellungen />
-        <RechercheDialog />
-        <Presenter />
+        <Recherche />
+        <Praesentation />
         {/* §5 DDG: Impressum muss leicht erkennbar und unmittelbar erreichbar
             sein — darum dauerhaft sichtbare, klar beschriftete Links (1 Klick),
             nicht nur versteckt in Hilfe/Einstellungen */}

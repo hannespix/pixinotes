@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
-import confetti from 'canvas-confetti';
+import { konfettiWerfen } from '../../lib/konfetti';
 import { mutedHistory, runDerived, useBoard } from '../../store';
 import { makeTicketDrag, type DropTarget } from '../../lib/dragTickets';
 import {
@@ -404,7 +404,7 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       return;
     }
     if (col === done && useBoard.getState().konfetti) {
-      confetti({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
+      konfettiWerfen({ particleCount: 60, spread: 55, origin: { y: 0.7 }, scalar: 0.8 });
     }
     // Beim Spaltenwechsel zusätzlich an die gewünschte Stelle einsortieren —
     // mitSpalte pflegt dabei den Erledigt-Stempel (Uhr der Auto-Archivierung, M293)
