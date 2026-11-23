@@ -17,6 +17,7 @@ import { initAutoSync } from './lib/syncFolder';
 import { initProjectAutoSync } from './lib/projectSync';
 import { cleanupOrphanHtml } from './lib/htmlStore';
 import { cleanupOrphanFiles } from './lib/fileStore';
+import { initBoardVersionen, versionsAnhaenge, verwaisteAufraeumen, VERSIONEN_EREIGNIS } from './lib/boardVersionen';
 import { initWebdavSync } from './lib/webdav';
 import { initFilesSync } from './lib/filesSync';
 import { initKontoSync } from './lib/kontoSync';
@@ -106,6 +107,18 @@ function Vorlagen() {
   return wunsch ? <Suspense fallback={null}><VorlagenDialogLazy wunsch={wunsch} onClose={() => setWunsch(null)} /></Suspense> : null;
 }
 
+/** M449: Der Versionen-Dialog wird erst geladen, wenn ihn jemand aufruft (Mehr-Menü, Board-⋯, Strg+K) */
+const VersionenDialogLazy = lazy(() => import('./components/VersionenDialog').then((m) => ({ default: m.VersionenDialog })));
+function Versionen() {
+  const [boardId, setBoardId] = useState<string | null>(null);
+  useEffect(() => {
+    const auf = (e: Event) => setBoardId((e as CustomEvent<{ boardId?: string }>).detail?.boardId ?? useBoard.getState().activeId);
+    window.addEventListener(VERSIONEN_EREIGNIS, auf);
+    return () => window.removeEventListener(VERSIONEN_EREIGNIS, auf);
+  }, []);
+  return boardId ? <Suspense fallback={null}><VersionenDialogLazy boardId={boardId} onClose={() => setBoardId(null)} /></Suspense> : null;
+}
+
 /** M385: Die QR-Einblendung (samt Rechenbibliothek) wird erst geladen, wenn jemand sie aufruft */
 const QrBlendeLazy = lazy(() => import('./components/QrBlende').then((m) => ({ default: m.QrBlende })));
 function Qr() {
@@ -136,17 +149,21 @@ export default function App() {
   const nurLesenBoard = nurLesenId ? { id: nurLesenId, von: nurLesenVon } : null;
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); seitenBreitenReparieren(); window.setTimeout(() => useBoard.getState().fristAnkerNachtragen(), 1200); }, []);
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initKontoSync(); initGastSync(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); initBoardVersionen(); seitenBreitenReparieren(); window.setTimeout(() => useBoard.getState().fristAnkerNachtragen(), 1200); }, []);
 
   // Eigene Apps (M158): verwaiste HTML-Inhalte in IndexedDB entsorgen —
   // NUR beim Start (dann kann kein Undo eine gelöschte App-Karte zurückholen,
   // deren Inhalt hier gerade wegfiele); verzögert, damit der Boot flüssig bleibt
   useEffect(() => {
-    const t = setTimeout(() => {
+    const t = setTimeout(async () => {
+      // M449: Inhalte, die ein gesicherter Board-Stand noch braucht, bleiben liegen — sonst käme eine Datei-Karte
+      // aus einer älteren Version leer zurück
+      const ausVersionen = await versionsAnhaenge();
+      void verwaisteAufraeumen(new Set(useBoard.getState().boards.map((b) => b.id)));
       const ids = new Set(
         [...useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'htmlapp').map((n) => n.id)),
           // M390: … und der Vorlagen — ihr Tool-Quelltext liegt unter der Kennung der Vorlage
-          ...useBoard.getState().templates.filter((t) => t.node.type === 'htmlapp').map((t) => t.node.id)],
+          ...useBoard.getState().templates.filter((t) => t.node.type === 'htmlapp').map((t) => t.node.id), ...ausVersionen],
       );
       void cleanupOrphanHtml(ids);
       // M259: dasselbe für die Inhalte von Datei-Karten
@@ -155,7 +172,7 @@ export default function App() {
         // noch unter der Datei-Kennung — das Aufräumen löschte ihn sonst, bevor er je gezeigt wurde
         // M406: … und der Rechen-Tabellen aus einer Excel-Datei – ihr Original liegt unter der Kennung der Karte
         [...useBoard.getState().boards.flatMap((b) => b.nodes.filter((n) => n.type === 'file' || n.type === 'htmlapp' || n.type === 'sheet').map((n) => n.id)),
-          ...useBoard.getState().templates.filter((t) => t.node.type === 'file' || t.node.type === 'htmlapp' || t.node.type === 'sheet').map((t) => t.node.id)],
+          ...useBoard.getState().templates.filter((t) => t.node.type === 'file' || t.node.type === 'htmlapp' || t.node.type === 'sheet').map((t) => t.node.id), ...ausVersionen],
       );
       void cleanupOrphanFiles(dateiIds);
     }, 8000);
@@ -398,6 +415,7 @@ export default function App() {
       <Hilfe />
       <Vorlagen />
       <Qr />
+      <Versionen />
       <BildExport />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
       <GeteiltDialog />
