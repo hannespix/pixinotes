@@ -33,7 +33,10 @@ Last-Durchschnitt 9–15), und zwei Befunde lagen in der App selbst.
 | m299 | Sprechblase „Absender als Kontakt" (M457) 155 Zeichen → gekürzt (`SelectionToolbar.tsx`) | **App repariert** |
 | m299 | „Was ist neu" nicht absteigend (parallele Merges setzten M452 vor M458, M449 weit unten) → `HelpOverlay*.tsx` umsortiert | **App repariert** |
 | m299 | Hilfe zur Browser-Erweiterung (M458) ein Punkt über 420 Zeichen → zwei Punkte | **App repariert** |
+| m320 | C5 unter Last zwei gleiche Anfragen an den Handschrift-Dienst: Vorschlag nach der Schreibpause und Knopf „Text" erkannten dieselben Striche je einmal → `handschriftKandidaten` merkt die letzte Erkennung (auch laufend) | **App repariert** |
 | m296 | 23 Kacheln seit der Kontakt-Karte (M450) | angepasst |
+| m314 | Dienste-Abschnitt „Text in Bildern" (M452) | angepasst |
+| m398 | Meldungen mit richtiger Mehrzahl „3 Boards" (M461) | angepasst |
 | m312 | ⋯ Mehr trägt „Versionen" (M449) | angepasst |
 | m300 | Dienste-Abschnitt „Text in Bildern" (M452) | angepasst |
 | m391 | H3 verlangte „kein offener Fund" in ganz `AUDIT.md`; M447 führt bewusst offene Punkte – jetzt nur Team-Funde (T…) | angepasst |
@@ -42,12 +45,20 @@ Last-Durchschnitt 9–15), und zwei Befunde lagen in der App selbst.
 | m407 | C2 las localStorage vor dem gebündelten Schreiben (400 ms) → wartet auf den gespeicherten Filter | Wackler |
 | m419 | B4/C1b Takt ≤ 20 ms ist unter Fremdlast nicht zu halten → Grenze 40 ms, wenn die Last über der Kernzahl liegt (Ausgabe sagt es) | Wackler |
 | m425 | Editor im Rahmen unter Last später als 8 s → wartet bis 20 s auf `#edit` | Wackler |
-| m429 | Sprung „je Bild" bei ausgefallenen Bildern → auf verstrichene 60-Hz-Bilder umgelegt (parallel auch im Hauptzweig gelöst, dessen Fassung gilt) | Wackler |
+| m429 | Sprung „je Bild" bei ausgefallenen Bildern → auf verstrichene 60-Hz-Bilder umgelegt (parallel auch im Hauptzweig gelöst, dessen Fassung gilt); unter schwerer Last trotzdem 11–12 Punkte → Grenze 12 statt 6, wenn die Last über der Kernzahl liegt | Wackler |
+| m273, m328, m387, m389 | unter voller Last einmal rot, allein grün (Doppelklick, Zeitgrenzen) | Wackler, vom Werkzeug wiederholt |
 | m381 u. a. | `EADDRINUSE` durch Reihen anderer Agenten | Werkzeug wiederholt |
 | m383b, m388b, m391b | brauchen ein lokales Postgres; hier vorhanden (`service postgresql start`), daher grün; fehlt es, melden sie laut „ÜBERSPRUNGEN" | braucht Datenbank (hier lauffähig) |
 
-Alle übrigen Reihen waren grün; unter voller Last wurden einzelne erst beim
+Alle übrigen Reihen waren grün. Drei volle Läufe (je ~35–42 min, vier Bahnen):
+164/168, 174/176, 184/187 grün; die jeweils roten Reihen stehen oben und sind
+danach einzeln grün gelaufen. Unter voller Last werden einzelne Reihen erst beim
 allein wiederholten Lauf grün (das Werkzeug wiederholt jeden Fehlschlag einmal).
+
+Lehre für parallele Agenten: Reihen, die Mengen zählen (Kacheln, Menüeinträge,
+Abschnitte, „Was ist neu"-Reihenfolge, Längen-Leitplanken), brechen bei fremden
+Meilensteinen – vor dem Merge `node werkzeug/alle-pruefungen.mjs --geaendert`
+plus `m296 m299 m300 m312 m314 m316` laufen lassen.
 
 ## Wie (Architektur)
 - `werkzeug/alle-pruefungen.mjs`: `einmal()` startet eine Reihe, `lauf()`
