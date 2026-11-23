@@ -81,12 +81,17 @@ Wechsel mit dem Board ohne Verbindungen bzw. dem alten Build).
 
 ## Messwerte
 Prüf-Chromium, 200 Karten, Zug über das Board wie M486, je Lauf 50 Mausbewegungen; Median Bildzeit / Median
-Maus → Bild. A = Stand vor M491, B = M491, im Wechsel, Last 8–14 (`uptime`):
+Maus → Bild. A = Stand vor M491, B = M491, im Wechsel (`uptime` je Reihe):
 
 | | ohne Verbindungen | 100 Verbindungen |
 |---|---|---|
-| vorher (A) | 16,7 ms / 28–35 ms | 16,7–33,4 ms (meist 33,3) / 77–88 ms |
-| nachher (B) | 16,7 ms / 26–32 ms | 16,7 ms / 32–44 ms |
+| vorher (A), Last 8–16 | 16,7 ms / 28–35 ms | 16,7–33,4 ms (meist 33,3) / 77–88 ms |
+| nachher (B), Last 8–16 | 16,7 ms / 26–32 ms | 16,7 ms (4 von 4) / 32–44 ms |
+| vorher (A), Last 0,5–2,7 | 16,7 ms / 28–31 ms | 16,7–33,2 ms / 67–74 ms |
+| nachher (B), Last 0,5–2,7 | 16,7 ms / 26–30 ms | 16,7 ms (3 von 3) / 35–36 ms |
+
+Ziel erreicht: Median Bildzeit 16,7 ms (≤ 20 ms), Maus → Bild 6–10 ms über dem Board ohne Verbindungen (≤ 15 ms).
+Nach dem Einmischen von M492 (ohne die `:has()`-Korrektur unten): 83 ms / 183 ms — mit Korrektur wie in der Tabelle.
 
 Trace (Thread-Zeit, je Bild bzw. je 50 Mausbewegungen):
 
@@ -95,7 +100,6 @@ Trace (Thread-Zeit, je Bild bzw. je 50 Mausbewegungen):
 | Stil-Rechnungen über > 1 000 Elemente | 36–37 (≈ 1 500 ms) | 0–1 |
 | Layerize je Bild (Median), 100 Verbindungen | 6,5–7,0 ms | 0,9–1,8 ms |
 | Raster-Threads, 100 Verbindungen | ≈ 1 150 ms | ≈ 300–500 ms |
-| JS-Selbstzeit `lesen` (Kanten-Beobachter, Profil) | 150–350 ms | siehe unten |
 
 ## Grenzen / offen
 - Die Zahlen schwanken auf der geteilten Maschine stark; die Prüfreihe misst deshalb im Wechsel mit dem Board ohne
