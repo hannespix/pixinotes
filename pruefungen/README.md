@@ -204,6 +204,14 @@ Screenshots und Zwischendateien landen in `pruefungen/ablage/`
 | m438 | Seitenleiste: Projekte und Boards ruhig unterscheidbar |
 | m440 | Boards in der Übersicht ziehen: haften, ausweichen, federnd ablegen |
 | m441 | Vollbild-Fokus am Telefon: mit einem Wisch zur nächsten Karte |
+| m442 | Google einfacher verknüpfen: E-Mail-Adresse statt technischer Felder |
+| m443 | MCP-Schnittstelle: KI-Modelle legen von außen Boards an, lesen und füllen sie – mit allen Modulen |
+| m444 | KI: Board-Briefing „Was ist auf diesem Board gerade wichtig?" |
+| m445 | Karten nach Themen ordnen (Auto-Clustering) |
+| m447 | Barrierefreiheit (WCAG 2.1 AA): Kern-Oberfläche per Tastatur und Vorlese-Programm bedienbar |
+| m449 | Board-Versionen: frühere Stände ansehen und wiederherstellen |
+| m450 | Kontakt-Karte: Visitenkarte mit Rufnummern, E-Mail, Anschrift; vCard rein und raus |
+| m451 | E-Mail-Destillat: Kernaussage, offene Fragen, Aufgaben, Termine aus einem langen Mail-Verlauf |
 
 Die Reihen sind bewusst GEGEN DAS VERHALTEN geschrieben, nicht gegen die
 Struktur: Wo möglich messen sie Bildpunkte, echte Downloads, abgefangene
