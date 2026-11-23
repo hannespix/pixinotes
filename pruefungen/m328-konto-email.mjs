@@ -336,7 +336,8 @@ async function notiz(P, text, x = 900, y = 500) {
 console.log('\n════ A: Gerät A erstellt ein PixiNotes-Konto (E-Mail + Passwort) ════');
 const A = await geraet('A', standA);
 await kontoPanel(A.P);
-pruefe('A1 „Anmelde-Link per E-Mail" steht vor Google/Microsoft; Hinweis nennt E-Mail', (await A.P.locator('[data-taste="konto-link"]').count()) === 1 && (await A.P.locator('.modal-hint', { hasText: 'Mit E-Mail anmelden' }).count()) === 1);
+  // M479: der Hinweis nennt jetzt auch Google (Supabase-OAuth)
+pruefe('A1 „Anmelde-Link per E-Mail" steht vor Google/Microsoft; Hinweis nennt E-Mail', (await A.P.locator('[data-taste="konto-link"]').count()) === 1 && (await A.P.locator('.modal-hint', { hasText: /Mit E-Mail (oder Google )?anmelden/ }).count()) === 1);
 pruefe('A2 der Link-Knopf ist ohne gültige E-Mail aus', !(await A.P.locator('[data-taste="konto-link"]').isEnabled()));
 await A.P.locator('[data-taste="konto-email"]').fill('anna@example.de');
 pruefe('A3 … und mit E-Mail an', await A.P.locator('[data-taste="konto-link"]').isEnabled());

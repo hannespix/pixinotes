@@ -38,8 +38,10 @@ const GAST_KEY = 'pixinotes-gast';
 /** Gibt es auf diesem Gerät etwas, das der Abgleich betreut? */
 export function syncNoetig(): boolean {
   if (loadKonto()) return true;
-  // Rückkehr vom E-Mail-Link (lib/kontoSupabase.ts `sbRueckkehrLesen`) — auch mit Fehlermeldung
-  if (/(?:^#|&)(?:access_token|error|error_description)=/.test(location.hash)) return true;
+  // Rückkehr vom E-Mail-Link (#access_token=…, #error=…) und M479 von „Mit Google anmelden" (?code=…, ?error=…):
+  // ein Ausdruck über die ganze Adresse, weil jedes Byte hier im Start-Paket liegt. Ein fremdes ?code= lädt den
+  // Abgleich nur unnötig früh — angenommen wird es nicht (`sbRueckkehrCode` verlangt den eigenen Verifier).
+  if (/[#?&](access_token|error|code)=/.test(location.href)) return true;
   try {
     const m = JSON.parse(localStorage.getItem(GAST_KEY) ?? '{}') as Record<string, unknown> | null;
     if (m && typeof m === 'object' && Object.keys(m).length > 0) return true;
