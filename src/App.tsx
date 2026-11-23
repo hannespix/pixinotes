@@ -36,7 +36,7 @@ import { initGrabsteine } from './lib/grabsteine';
 import { linkOeffnen, linkTokenAbholen } from './lib/linkTeilen';
 import { einladungAnnehmen, einladungOffen, einladungTokenAbholen } from './lib/einladung';
 import { initGastSync } from './lib/gastSync';
-import { initVorfuehren } from './lib/vorfuehren';
+import { folgeIch, initVorfuehren, VORFUEHR_EREIGNIS, werFuehrtVor } from './lib/vorfuehren';
 import { initMauszeiger } from './lib/mauszeiger';
 import { initGruppenraum } from './lib/gruppenraum';
 import { GruppenraumSchicht } from './components/Gruppenraum';
@@ -138,8 +138,19 @@ function BeiBedarf({ offen, children }: { offen: boolean; children: ReactNode })
   useEffect(() => { if (offen) setGeladen(true); }, [offen]);
   return offen || geladen ? <Suspense fallback={null}>{children}</Suspense> : null;
 }
+/** Die Präsentation öffnet sich auch, wenn ich jemandem folge, der vorführt (M371/M387) — das entscheidet der
+ *  Presenter selbst; er muss dafür nur eingehängt sein, sobald ein Vortrag läuft, dem ich folge. */
 function Praesentation() {
-  return <BeiBedarf offen={useBoard((s) => s.presenting)}><PresenterLazy /></BeiBedarf>;
+  const presenting = useBoard((s) => s.presenting);
+  const boardId = useBoard((s) => s.activeId);
+  const [, takt] = useState(0);
+  useEffect(() => {
+    const auf = () => takt((n) => n + 1);
+    window.addEventListener(VORFUEHR_EREIGNIS, auf);
+    return () => window.removeEventListener(VORFUEHR_EREIGNIS, auf);
+  }, []);
+  const folgeVortrag = folgeIch(boardId) && !!werFuehrtVor(boardId)?.vortrag;
+  return <BeiBedarf offen={presenting || folgeVortrag}><PresenterLazy /></BeiBedarf>;
 }
 function Recherche() {
   return <BeiBedarf offen={useBoard((s) => s.rechercheOpen)}><RechercheLazy /></BeiBedarf>;

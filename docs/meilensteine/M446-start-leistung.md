@@ -31,7 +31,9 @@ Kein sichtbarer Verhaltenswechsel. Gemessen mit `dist/`, Board mit einer Notiz, 
 - **`App.tsx` `LADER` + `BeiBedarf`:** Übersicht, Aufgaben-Zentrale, Präsentation, Suche und Recherche kommen
   mit dem ersten Aufruf und bleiben danach eingehängt (Muster wie Hilfe/Einstellungen, M377/M398).
   `Suche()` hört bis zum Laden selbst auf Strg/⌘+K und gibt die Taste dann an `SearchOverlay` ab (kein
-  Doppel-Umschalten). Presenter importiert die Karten-Bodies weiter statisch — er ist selbst nachgeladen.
+  Doppel-Umschalten). `Praesentation()` hängt den Presenter auch ein, sobald ich jemandem folge, der
+  vorführt (`folgeIch` + `werFuehrtVor().vortrag`, auf `VORFUEHR_EREIGNIS`) — die Präsentation öffnet sich dann
+  im Presenter selbst (M371/M387; ohne das blieben m380/m384/m387 rot). Presenter importiert die Karten-Bodies weiter statisch — er ist selbst nachgeladen.
 - **`imLeerlaufVorladen()`** (App-Start, nach `VORLADEN_NACH_MS` = 4 s im `requestIdleCallback`, nicht bei
   `saveData`): holt alle nachgeladenen Teile still nach. So wartet der erste Aufruf nicht, und der Service
   Worker (stale-while-revalidate, kein Precache) hat sie auch für den Offline-Betrieb — vorher lagen alle
