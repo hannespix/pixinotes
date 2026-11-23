@@ -4,7 +4,7 @@ import { brainStatus, rebuildBrainIndex, syncBrainIndex } from '../lib/brain';
 import { claimWriter, flushPersist, useBoard } from '../store';
 import {
   connectGoogle, connectMicrosoft, disconnect as disconnectCalAccount,
-  invalidateAccountEvents, loadCalAccounts, msHasNotes, oauthAvailable, patchCalAccounts, type CalAccounts,
+  invalidateAccountEvents, loadCalAccounts, msHasMail, msHasNotes, oauthAvailable, patchCalAccounts, type CalAccounts,
 } from '../lib/calAccounts';
 import { exportToFolder } from '../lib/exporter';
 import { OneNoteImport } from './OneNoteImport';
@@ -1571,7 +1571,7 @@ export function Settings() {
           {(calAcc.ms?.token || calAcc.ms?.refreshToken) ? (
             <>
               <div className="modal-note">
-                Verbunden{calAcc.ms.connectedAs ? <> als „<span translate="no">{calAcc.ms.connectedAs}</span>"</> : ''} · Kalender ✓ · OneNote {msHasNotes(calAcc.ms) ? '✓' : '—'}
+                Verbunden{calAcc.ms.connectedAs ? <> als „<span translate="no">{calAcc.ms.connectedAs}</span>"</> : ''} · Kalender ✓ · OneNote {msHasNotes(calAcc.ms) ? '✓' : '—'} · Postfach {msHasMail(calAcc.ms) ? '✓' : '—'}
               </div>
               <div className="modal-buttons">
                 {!msHasNotes(calAcc.ms) && (
