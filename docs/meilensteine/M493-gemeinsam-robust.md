@@ -80,7 +80,7 @@ Die Prüfungen lasen in keinem dieser Fälle zu früh; sie blieben unverändert 
 - `components/TaskHub.tsx`: Haken an Protokoll-Punkten im aktiven Live-Board über `protokollHaken`.
 - `store/schutz.ts` `mitTextVon`: beim Protokoll gehen `blocks` **und** `decisions` durch (beide sichert der
   gemeinsame Schreiber).
-- Start-JS: unverändert unter der Grenze (2 120 000 B); neu im Start nur der `liveVerbunden`-Import der Zentrale.
+- Start-JS: 2 107 104 B (Grenze 2 120 000 unverändert); neu im Start nur der `liveVerbunden`-Import der Zentrale.
 
 ## Prüfreihe
 `m487` neu B12–B18: Gerd macht eine Zeile zum Beschluss, während Anna vorne tippt (aus dem Text, bei beiden als
@@ -89,9 +89,16 @@ Sitzung tippt — der Haken bleibt (Server, Gerds Editor, auch nach 2 s), Gerds 
 Gegen die Fassung vor M493: B13, B14, B16, B18 rot.
 
 ## Nachweis
-`node werkzeug/alle-pruefungen.mjs m477 m487 m489 --wiederhole 10 --bahnen 4` (dazu Dauerlast-Prozesse):
-siehe PR. Experiment (nur Abschnitt B, fünffach parallel, Last 20–28): vorher 2 von 20 Läufen mit verdoppeltem bzw.
-verlorenem Text, danach 50 von 50 Runden richtig.
+`node werkzeug/alle-pruefungen.mjs m477 m487 m489 --wiederhole 10 --bahnen 4` mit Dauerlast-Prozessen daneben:
+
+| Reihe | Last 9 | Last 17–22 |
+|---|---|---|
+| m477-gemeinsam-tippen | 10 von 10 | 10 von 10 |
+| m487-gemeinsam-weiter (mit B12–B18) | 10 von 10 | 10 von 10 |
+| m489-protokoll-neu | 10 von 10 | 10 von 10 |
+
+Experiment (nur Abschnitt B, fünffach parallel, Last 20–28): vorher 2 von 20 Läufen mit verdoppeltem bzw. verlorenem
+Text, danach 50 von 50 Runden richtig. Dazu grün: m364, m365, m366, m372, m377, m383, m483 und `--geaendert` (41 Reihen).
 
 ## Grenzen / offen
 - Unterscheiden sich die **gespeicherten** Stände zweier Geräte wirklich (eine Änderung ist noch unterwegs) und
