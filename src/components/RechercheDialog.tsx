@@ -16,6 +16,7 @@ import { fuehreRechercheAus, planeRecherche, type RecherchePlan } from '../lib/r
 import { nodesToText } from '../lib/serialize';
 import { selectActiveBoard } from '../store';
 import { IX } from './Icons';
+import { zahlWort } from '../lib/sprache';
 
 type Phase = 'eingabe' | 'plane' | 'fragen' | 'laeuft';
 
@@ -69,7 +70,7 @@ export function RechercheDialog() {
     try {
       const erg = await fuehreRechercheAus(auftrag.trim(), p, a, setSchritt);
       showToast(erg.quellen
-        ? `Recherche fertig – Notiz mit ${erg.quellen} Quelle(n) liegt auf dem Board. Strg+Z entfernt sie.`
+        ? `Recherche fertig – Notiz mit ${zahlWort(erg.quellen, 'Quelle', 'Quellen')} liegt auf dem Board. Strg+Z entfernt sie.`
         : 'Recherche fertig – keine Quelle erreichbar, die Notiz sagt ehrlich, was offen blieb.', false, 8000);
       schliessen();
     } catch (e) {

@@ -3,6 +3,7 @@ import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../../store';
 import type { FrameNode } from '../../types';
 import { frameMembers } from '../../lib/arrange';
+import { zahlWort } from '../../lib/sprache';
 
 /**
  * Frame (M149/M150): benannter Rahmen-Bereich à la Miro. Liegt hinter allen
@@ -70,7 +71,7 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
             {data.name}
           </span>
         )}
-        {memberCount > 0 && <span className="frame-count" title={`${memberCount} Karte(n) in diesem Rahmen – sie wandern mit dem Rahmen mit`}>{memberCount}</span>}
+        {memberCount > 0 && <span className="frame-count" title={`${zahlWort(memberCount, 'Karte', 'Karten')} in diesem Rahmen – sie wandern mit dem Rahmen mit`}>{memberCount}</span>}
       </div>
       <div className="frame-body" style={tint ? { background: `${tint}55` } : undefined} />
     </div>

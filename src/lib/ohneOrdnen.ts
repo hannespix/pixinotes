@@ -6,6 +6,7 @@
 // Bewusst hier statt in store.ts (Hotspot): ein Schritt im Verlauf, dann ein Store-Update.
 import { useBoard } from '../store';
 import type { AppNode } from '../types';
+import { zahlWort } from './sprache';
 
 /** Karten vom Ordnen ausnehmen (an) oder wieder mitordnen (aus) – EIN Schritt im Verlauf */
 export function ohneOrdnenSetzen(ids: string[], an: boolean): void {
@@ -24,7 +25,8 @@ export function ohneOrdnenSetzen(ids: string[], an: boolean): void {
       }),
     })),
   }));
+  // M461: Zahl und Wort über zahlWort – als ganze Sätze ohne angehängte Endungen
   st.showToast(an
-    ? (ids.length === 1 ? 'Die Karte ordnet nicht mehr mit – „Nach Themen ordnen" lässt sie liegen.' : `${ids.length} Karten ordnen nicht mehr mit – „Nach Themen ordnen" lässt sie liegen.`)
-    : (ids.length === 1 ? 'Die Karte ordnet wieder mit.' : `${ids.length} Karten ordnen wieder mit.`), 'schritt', 4000);
+    ? `Vom Ordnen ausgenommen: ${zahlWort(ids.length, 'Karte', 'Karten')} – „Nach Themen ordnen“ lässt sie liegen.`
+    : `Wieder mit geordnet: ${zahlWort(ids.length, 'Karte', 'Karten')}.`, 'schritt', 4000);
 }

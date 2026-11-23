@@ -12,6 +12,7 @@ import { aiReady, mdToBlocks } from '../lib/ai';
 import { applyTopicTag, brainDigest, buildTopicOverview, type DigestLine, type TopicCluster } from '../lib/brain';
 import { aiWeekPlan } from '../lib/aiActions';
 import { IBell, ICalendar, IChevronR, IFilter, IGantt, IKanban, INote, ISearch, IUsers, IWand, IX, ISonne } from './Icons';
+import { zahlWort } from '../lib/sprache';
 
 const PRIO_LABEL: Record<1 | 2 | 3, string> = { 1: '!!!', 2: '!!', 3: '!' };
 
@@ -452,7 +453,7 @@ export function TaskHub() {
   const exportIcs = () => {
     const n = downloadTasksIcs(tasks);
     showToast(n > 0
-      ? `${n} Aufgabe(n) mit Frist als Kalender-Datei exportiert – in Outlook öffnen.`
+      ? `${zahlWort(n, 'Aufgabe', 'Aufgaben')} mit Frist als Kalender-Datei exportiert – in Outlook öffnen.`
       : 'Keine Aufgaben mit Fälligkeitsdatum in dieser Ansicht.');
   };
 
@@ -466,7 +467,7 @@ export function TaskHub() {
             Board-Auswahl hinter dem Trichter — ohne diesen Zusatz wüsste man
             nicht, dass gerade nur ein Board gezeigt wird. */}
         <span className="taskhub-meta">
-          {tasks.length} angezeigt{boardFilter !== 'all'
+          {`${zahlWort(tasks.length, 'Aufgabe', 'Aufgaben')} angezeigt`}{boardFilter !== 'all'
             ? ` · ${boardFilter === AKTIV ? aktivName : boards.find((b) => b.id === boardFilter)?.name ?? 'Board'}`
             : ' · alle Boards'}{overdue > 0 ? ` · ${overdue} überfällig` : ''}
         </span>
@@ -515,7 +516,7 @@ export function TaskHub() {
                         onClick={() => {
                           const n = applyTopicTag(d.cluster!, d.label!);
                           showToast(n > 0
-                            ? `„thema = ${d.label}" auf ${n} Karte(n) gesetzt – über Strg+K findbar, Strg+Z macht es rückgängig.`
+                            ? `„thema = ${d.label}" auf ${zahlWort(n, 'Karte', 'Karten')} gesetzt – über Strg+K findbar, Strg+Z macht es rückgängig.`
                             : `Alle Karten tragen „thema = ${d.label}" bereits.`);
                         }}
                         title={'Allen Karten dieser Themen-Insel die Eigenschaft „thema" geben – danach über Strg+K und Schwimmbahnen nutzbar'}
@@ -631,7 +632,7 @@ export function TaskHub() {
             : filter === 'all' && boardFilter === AKTIV && allTasks.length > 0
               // M231: Der häufigste Leerfall seit der neuen Voreinstellung —
               // hier ist nichts, anderswo schon. Das gehört dazugesagt.
-              ? `Auf „${aktivName}" ist nichts offen. Über die Board-Auswahl siehst du alle Boards (${allTasks.length} Aufgaben).`
+              ? `Auf „${aktivName}" ist nichts offen. Über die Board-Auswahl siehst du alle Boards (${zahlWort(allTasks.length, 'Aufgabe', 'Aufgaben')}).`
               : 'Keine Aufgaben in dieser Ansicht.'}
         </div>
       ) : (

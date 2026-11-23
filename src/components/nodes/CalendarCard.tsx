@@ -10,6 +10,7 @@ import { notizTermine } from '../../lib/notizTermine';
 import { anyAccountConnected, fetchAccountEvents, invalidateAccountEvents, type CalAccountEvent } from '../../lib/calAccounts';
 import { IChevronL, IChevronR, IMore, IOrt, ILink, ITrash } from '../Icons';
 import { CardShell } from './CardShell';
+import { zahlWort } from '../../lib/sprache';
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 /**
@@ -416,7 +417,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     const events = parseIcs(await file.text());
     if (events.length === 0) { showToast('Keine Termine in der Datei gefunden.'); return; }
     updateNodeData(id, { icsEvents: mergeEvents(icsEvents, events) });
-    showToast(`${events.length} Termin(e) importiert – als „Externe Termine" eingeblendet`);
+    showToast(`${zahlWort(events.length, 'Termin', 'Termine')} importiert – als „Externe Termine" eingeblendet`);
   };
 
   const subscribeUrl = () => {
@@ -447,8 +448,8 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
     updateNodeData(id, { icsEvents: merged });
     setBusy(false);
     showToast(fail === 0
-      ? `Abos aktualisiert: ${added} neue Termin(e) aus ${ok} Kalender(n)`
-      : `${ok} Abo(s) aktualisiert, ${fail} fehlgeschlagen – viele Server erlauben Browser-Zugriff (CORS) nicht; dann die .ics-Datei importieren.`);
+      ? `Abos aktualisiert: ${zahlWort(added, 'neuer Termin', 'neue Termine')} aus ${zahlWort(ok, 'Kalender', 'Kalendern')}`
+      : `${zahlWort(ok, 'Abo', 'Abos')} aktualisiert, ${fail} fehlgeschlagen – viele Server erlauben Browser-Zugriff (CORS) nicht; dann die .ics-Datei importieren.`);
   };
 
   /**
@@ -582,7 +583,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
       const spanne = von && bis
         ? `${new Date(`${von}T12:00:00`).toLocaleDateString('de-DE')} – ${new Date(`${bis}T12:00:00`).toLocaleDateString('de-DE')}`
         : 'alle Zeiträume';
-      showToast(`${n} Termine exportiert (${spanne})${konto ? `, davon ${konto} aus verbundenen Konten` : ''} – in Outlook über „Datei → Öffnen & Exportieren → Importieren" einlesen.`, false, 9000);
+      showToast(`${zahlWort(n, 'Termin', 'Termine')} exportiert (${spanne})${konto ? `, davon ${konto} aus verbundenen Konten` : ''} – in Outlook über „Datei → Öffnen & Exportieren → Importieren" einlesen.`, false, 9000);
     } finally {
       setBusy(false);
     }

@@ -21,7 +21,7 @@ import { collectTasks, formatDueShort, type TaskRef } from './tasks';
 import { nodeToText } from './serialize';
 import { findFreeSpot } from './arrange';
 import { tagLokal } from './tag';
-import { t } from './sprache';
+import { t, zahlWort } from './sprache';
 import { tageSeit, zeitVon } from './kartenZeit';
 
 export interface BoardLage {
@@ -83,7 +83,7 @@ function befundeSammeln(board: BoardDoc, karten: AppNode[], ueberfaellig: TaskRe
   const alt = [...ueberfaellig].filter((a) => a.due).sort((a, b) => (a.due ?? '').localeCompare(b.due ?? ''));
   for (const a of alt.slice(0, BEFUND_MAX)) {
     const tage = Math.max(1, tageSeit(Date.parse(`${a.due}T23:59:59`), jetzt) + 1);
-    out.push({ text: t('Frist seit {0} Tagen überschritten: {1}').replace('{0}', String(tage)).replace('{1}', a.text.trim().slice(0, 120)), karte: name.get(a.nodeId) ?? '' });
+    out.push({ text: t('Frist seit {0} überschritten: {1}').replace('{0}', zahlWort(tage, 'Tag', 'Tagen')).replace('{1}', a.text.trim().slice(0, 120)), karte: name.get(a.nodeId) ?? '' });
   }
   // 2. Tickets, die lange „in Arbeit" stehen: mittlere Spalten einer Kanban-Karte, die seit IN_ARBEIT_TAGE niemand
   //    geändert hat (Tickets tragen keine eigene Zeit – die Karte stempelt bei jedem Verschieben, M453)
@@ -237,8 +237,12 @@ export function lageMarkdown(l: BoardLage, now: Date = new Date()): string {
   teile.push([`## ${t('Entscheidungen')}`, ...(ent.length ? ent : [`- ${t('Keine Beschlüsse gefunden.')}`])].join('\n'));
   teile.push([`## ${t('Wichtigste Inhalte')}`, ...(l.inhalte.length ? l.inhalte.map((i) => `- ${i.titel}`) : [`- ${t('Das Board ist noch leer.')}`])].join('\n'));
   const ris = [
+<<<<<<< HEAD
     ...(l.ueberfaellig.length ? [`- **${t('{0} Aufgabe(n) überfällig').replace('{0}', String(l.ueberfaellig.length))}**`] : []),
     ...l.befunde.map((b) => `- ${b.text}${b.karte ? ` (${b.karte})` : ''}`),
+=======
+    ...(l.ueberfaellig.length ? [`- **${t('{0} überfällig').replace('{0}', zahlWort(l.ueberfaellig.length, 'Aufgabe', 'Aufgaben'))}**`] : []),
+>>>>>>> origin/claude/notes-whiteboard-design-bnwvxj
     ...l.risiken.map((r) => `- ${r.text}${r.karte && r.karte !== r.text ? ` (${r.karte})` : ''}`),
   ];
   teile.push([`## ${t('Risiken und Blocker')}`, ...(ris.length ? ris : [`- ${t('Nichts erkannt.')}`])].join('\n'));
@@ -321,5 +325,5 @@ export async function boardBriefing(rechtsOben: { x: number; y: number }, mitKi:
   mutedHistory(() => st.addNode(notiz));
   st.focusNode(boardId, notiz.id);
   const zahl = lage.ueberfaellig.length;
-  return `${t('Board-Briefing angelegt')} (${wie})${zahl ? ` – ${t('{0} Aufgabe(n) überfällig').replace('{0}', String(zahl))}` : ''}${ausgelassen}.`;
+  return `${t('Board-Briefing angelegt')} (${wie})${zahl ? ` – ${t('{0} überfällig').replace('{0}', zahlWort(zahl, 'Aufgabe', 'Aufgaben'))}` : ''}${ausgelassen}.`;
 }
