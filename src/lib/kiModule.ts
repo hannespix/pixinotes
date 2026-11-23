@@ -147,6 +147,8 @@ function lesen(n: AppNode, u: KiUmfeld): string {
     case 'shape': return `Form (${n.data.shape}): ${n.data.text || ''}`;
     // M450: Kontakt-Karte — die Felder als Zeilen (Name, Funktion · Firma, Tel., E-Mail, Anschrift …)
     case 'kontakt': return `Kontakt\n${nodeToText(n)}`;
+    // M500: Flüssige Schrift — die KI liest den Text (die Flüssigkeit ist nur Darstellung)
+    case 'fluessig': return `Flüssige Schrift (Schmuck-Überschrift): ${nodeToText(n)}`;
     // M501: Maskottchen — nur Schmuck, nichts zu lesen oder zu bedienen
     case 'pixi': return `${nodeToText(n)} – Schmuck ohne Inhalt`;
     // M452: Bilder (auch als Datei abgelegte) mit dem Text, den die Erkennung darin gefunden hat — so kann die

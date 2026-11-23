@@ -3,6 +3,7 @@
 import { tagLokal } from './tag';
 import { useBoard } from '../store';
 import { leereBubbles } from './bubbles';
+import { FLUESSIG_START } from './fluessigDaten';
 import { MERMAID_TEMPLATES } from './mermaidTemplates';
 import { t } from './sprache';
 import {
@@ -184,6 +185,19 @@ export function makeKontakt(position: Pos, daten?: Partial<KontaktData>): AppNod
     width: 300,
     position,
     data: { name: '', telefone: [], emails: [], ...daten },
+  };
+}
+
+/** M500: Flüssige Schrift — startet mit „Hallo“; die Größe ist fest (die Flüssigkeit füllt die Karte, Auto-Größe aus) */
+export function makeFluessig(position: Pos, text = FLUESSIG_START): AppNode {
+  return {
+    id: uid(),
+    type: 'fluessig',
+    width: 440,
+    height: 220,
+    position,
+    autoFit: false,
+    data: { text: t(text) },
   };
 }
 

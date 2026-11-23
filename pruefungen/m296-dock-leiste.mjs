@@ -70,7 +70,7 @@ console.log('════ A: ＋-Menü (M316: eine Modul-Palette) ════')
   // Modulen als Kacheln in Gruppen — die Prüfung folgt der neuen Gestalt.
   const kacheln = await P.locator('.modul-palette .modul-kachel').count();
   const labels = await P.locator('.modul-palette .dock-menu-label').count();
-  pruefe('A1 eine Palette: 25 Kacheln (M373 Entscheidungs-Bubbles, M425 Präsentation, M450 Kontakt, M466 Outlook, M501 Pixi) in fünf Gruppen, kein „Weitere Module"', kacheln === 25 && labels === 5 && (await P.locator('.dock-menu-mehr').count()) === 0, `kacheln=${kacheln} labels=${labels}`);
+  pruefe('A1 eine Palette: 26 Kacheln (M373 Entscheidungs-Bubbles, M425 Präsentation, M450 Kontakt, M466 Outlook, M500 Flüssige Schrift, M501 Pixi) in fünf Gruppen, kein „Weitere Module"', kacheln === 26 && labels === 5 && (await P.locator('.dock-menu-mehr').count()) === 0, `kacheln=${kacheln} labels=${labels}`);
   const texte = await P.locator('.modul-palette .modul-kachel').allTextContents();
   pruefe('A2 die Kernmodule sind da: Notiz, Kanban, Rechen-Tabelle, Datei oder Bild, Zeitplan', ['Notiz', 'Kanban', 'Rechen-Tabelle', 'Datei oder Bild', 'Zeitplan'].every((t) => texte.some((x) => x.includes(t))), JSON.stringify(texte));
   const hoehe = await P.evaluate(() => document.querySelector('.modul-palette').getBoundingClientRect().height);

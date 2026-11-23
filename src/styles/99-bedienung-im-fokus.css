@@ -18,6 +18,7 @@
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
     .kontakt-tools, .pixi-tools,
+    .fl-werkzeuge,
     .bildtext-chips
 ) { transition: opacity 0.14s ease; }
 @media (hover: hover) {
@@ -31,6 +32,7 @@
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
     .kontakt-tools, .pixi-tools,
+    .fl-werkzeuge,
     .bildtext-chips
   ) { opacity: 0; }
   /* Zeiger ruht auf der Karte: erst nach einem Moment einblenden. Als Animation (hält während des Verzugs bei 0),
@@ -45,6 +47,7 @@
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
     .kontakt-tools, .pixi-tools,
+    .fl-werkzeuge,
     .bildtext-chips
   ) { animation: pn-bedienung-ein 0.16s ease 0.35s backwards; }
 }
@@ -60,6 +63,7 @@
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
     .kontakt-tools, .pixi-tools,
+    .fl-werkzeuge,
     .bildtext-chips
   ) { opacity: 0; pointer-events: none; }
 }

@@ -473,6 +473,10 @@ export interface KontaktData {
 }
 export type KontaktNode = Node<KontaktData, 'kontakt'>;
 
+/** M500: Flüssige Schrift — ein kurzer Text als Flüssigkeit (Liquid Type; Daten: lib/fluessigDaten.ts) */
+export type FluessigNode = Node<import('./lib/fluessigDaten').FluessigData, 'fluessig'>;
+
+
 /** M501: Pixi, das Maskottchen — gespeichert werden nur die Optionen, nie der Zustand (Blick, Animation) */
 export interface PixiData {
   /** Name unter der Figur (leer: keiner) */
@@ -486,7 +490,7 @@ export interface PixiData {
 export type PixiNode = Node<PixiData, 'pixi'>;
 
 export type AppNode =
-  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode | MinutesNode | SheetNode | BubblesNode | KontaktNode | PixiNode)
+  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode | MinutesNode | SheetNode | BubblesNode | KontaktNode | FluessigNode | PixiNode)
   // Archiv (M87): Karten jedes Typs lassen sich als Ganzes „erledigt" ablegen —
   // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface.
   // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der

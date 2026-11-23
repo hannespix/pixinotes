@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useOutsideClose } from '../lib/useOutsideClose';
 import { useReactFlow } from '@xyflow/react';
 import { anhaengeMitnehmen, mutedHistory, useBoard } from '../store';
-import { makeBubbles, makeCalendar, makeFrame, makeGantt, makeKanban, makeKontakt, makeMermaid, makeMinutes, makeNote, makePixi, makePortal, makeShape, alsEbenAngelegt, makeSheet, makeTime, makeWeek } from '../lib/nodes';
+import { makeBubbles, makeCalendar, makeFluessig, makeFrame, makeGantt, makeKanban, makeKontakt, makeMermaid, makeMinutes, makeNote, makePixi, makePortal, makeShape, alsEbenAngelegt, makeSheet, makeTime, makeWeek } from '../lib/nodes';
 import { importFilesToBoard, importHtmlAppFromUrl, praesentationAnlegen } from '../lib/importSpaet';
 import { punkteModusSetzen } from '../lib/punkte';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
@@ -24,7 +24,7 @@ import {
   IAppWindow, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IMail, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITimelineIcon, ITimer, IWand, IWeek, IX,
- IBubbles , IUsers, IArchive, IFolien, IUhr, IPerson, IPixi
+ IBubbles , IUsers, IArchive, IFolien, IUhr, IPerson, IFluessig, IPixi
 } from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
 import { t } from '../lib/sprache';
@@ -424,6 +424,8 @@ export function Dock() {
     { id: 'rahmen', gruppe: 'Ordnen', name: 'Rahmen', hinweis: 'Benannter Rahmen auf dem Board, nimmt seine Karten mit – nicht der Bereich in der Übersicht', suchwort: 'gruppe bereich zusammenfassen', icon: <IFrame size={18} />, tun: () => add(() => makeFrame(centerPos(640, 420))) },
     // M450: Kontakt-Karte — in „Ordnen“, dort ist noch Platz in der Zeile (die anderen Gruppen sind mit fünf voll)
     { id: 'kontakt', gruppe: 'Ordnen', name: 'Kontakt', hinweis: 'Visitenkarte mit Rufnummer, E-Mail und Anschrift – auch aus einer .vcf-Datei', suchwort: 'person adresse telefon visitenkarte vcard vcf adressbuch ansprechpartner', icon: <IPerson size={18} />, tun: () => add(() => { const n = makeKontakt(centerPos(300, 180)); alsEbenAngelegt(n.id); return n; }) },
+    // M500: Flüssige Schrift (Liquid Type) — ein Blickfang als Überschrift eines Boards, darum bei „Ordnen“
+    { id: 'fluessig', gruppe: 'Ordnen', name: 'Flüssige Schrift', hinweis: 'Ein kurzer Text als Flüssigkeit – mit der Maus schubsen, gedrückt halten lässt sie platzen', suchwort: 'liquid type flüssig tropfen schrift überschrift titel animation blickfang', icon: <IFluessig size={18} />, tun: () => add(() => makeFluessig(centerPos(440, 220))) },
     // M501: Pixi, das Maskottchen — in „Ordnen“, dort ist noch Platz (es ordnet nichts, aber es hält gute Laune auf dem Board)
     { id: 'pixi', gruppe: 'Ordnen', name: 'Pixi', hinweis: 'Kleines Maskottchen: schaut dem Zeiger nach und hat immer etwas vor', suchwort: 'maskottchen figur pixel freund spass deko augen', icon: <IPixi size={18} />, tun: () => add(() => makePixi(centerPos(192, 192))) },
     { id: 'portal', gruppe: 'Ordnen', name: 'Portal', hinweis: 'Portal zu einem anderen Board', suchwort: 'link verweis board sprung', icon: <IFolder size={18} />, tun: () => { add(() => makePortal(centerPos(200, 140))); showToast('Portal: verlinke ein anderes Board.'); } },

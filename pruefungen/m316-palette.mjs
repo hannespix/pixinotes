@@ -74,7 +74,7 @@ console.log('\n════ A: Eine Palette ════');
   pruefe('A2 Gruppen: Notieren & Rechnen · Planen · Ablauf · Einfügen · Ordnen · Vorlagen', gruppen.join(' · ') === 'Notieren & Rechnen · Planen · Ablauf · Einfügen · Ordnen · Vorlagen', gruppen.join(' · '));
   const n = await kacheln(P).count();
   const namen = await kacheln(P).locator('> span:first-of-type').allTextContents();
-  pruefe('A3 25 Modul-Kacheln mit eindeutigen Namen (M466 Outlook, M501 Pixi)', n === 25 && new Set(namen).size === 25, `${n}: ${namen.join(', ')}`);
+  pruefe('A3 26 Modul-Kacheln mit eindeutigen Namen (M466 Outlook, M500 Flüssige Schrift, M501 Pixi)', n === 26 && new Set(namen).size === 26, `${n}: ${namen.join(', ')}`);
   const symbole = await P.evaluate(() => [...document.querySelectorAll('.modul-palette .modul-kachel')].every((b) => b.querySelector('svg') && b.textContent.trim().length > 0));
   pruefe('A4 jede Kachel hat Symbol und Namen', symbole);
   const lage = await P.evaluate(() => {

@@ -41,6 +41,7 @@ const TYPE_LABEL: Record<string, string> = {
   image: 'Bild', file: 'Datei', email: 'E-Mail', htmlapp: 'App', shape: 'Form',
   portal: 'Portal', frame: 'Rahmen', sheet: 'Rechen-Tabelle', bubbles: 'Bubbles',
   kontakt: 'Kontakt', pixi: 'Pixi',
+  fluessig: 'Flüssige Schrift',
 };
 
 /** Karten, die im Fokus nichts gewinnen — sie bleiben Board-Sache */

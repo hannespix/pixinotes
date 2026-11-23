@@ -2086,6 +2086,6 @@ const TYP_NAME: Record<string, string> = {
   note: 'Notiz', kanban: 'Kanban', gantt: 'Zeitplan', calendar: 'Kalender',
   sheet: 'Rechen-Tabelle', file: 'Datei', image: 'Bild', frame: 'Rahmen',
   minutes: 'Protokoll', week: 'Wochenplan', time: 'Zeiterfassung',
-  diagram: 'Diagramm', portal: 'Portal', shape: 'Form', htmlapp: 'App', bubbles: 'Bubbles', kontakt: 'Kontakt', pixi: 'Pixi',
+  diagram: 'Diagramm', portal: 'Portal', shape: 'Form', htmlapp: 'App', bubbles: 'Bubbles', kontakt: 'Kontakt', fluessig: 'Flüssige Schrift', pixi: 'Pixi',
 };
 
