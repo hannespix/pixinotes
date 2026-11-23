@@ -436,6 +436,9 @@ h3 { font-size: 14px; margin: 0 0 8px; }
   padding: 4px 9px; cursor: pointer; font-family: inherit; color: var(--ink);
 }
 .card-actions button:hover { background: var(--border); }
+/* M451: Aufgaben aus dem E-Mail-Destillat übernehmen — eine zweite, umbrechende Zeile unter den Aktionen */
+.email-aufgaben { flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.email-aufgaben-label { font-size: 12px; color: var(--muted); }
 
 /* ---------- Bild-Karte ---------- */
 .image-card { position: relative; background: var(--surface-card); border-radius: var(--r); padding: 8px; overflow: hidden; display: flex; flex-direction: column; }

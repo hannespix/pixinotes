@@ -20,7 +20,6 @@ immer Vorrang vor dieser Liste.
 - Microsoft-Graph-Anbindung (Outlook-Mails/Termine live) — Roadmap Phase 4
 - Browser-Erweiterung „An PixiNotes senden" (Capture)
 - Eingebaute Übersetzung der Oberfläche statt Browser-Übersetzer (UMBAU Zeile 54)
-- E-Mail-Destillat: Thread → Kernaussage, offene Fragen, Aufgaben (KONZEPT §5)
 - Nächtlicher CI-Lauf aller Prüfreihen (braucht Chromium im Runner)
 - BlockNote 0.31 → aktuelle Fassung – schließt die 22 „moderaten" Meldungen in tiptap/uuid (AUDIT C6), neue Editor-Funktionen – package.json, NoteCard.tsx, NotizRuhend.tsx, notizRuhend.ts
 - Gemeinsames Tippen in einer Notiz (Yjs über Realtime-Broadcast, BlockNote kann Yjs) – heute sperrt das Team ganze Karten (UMBAU §5a „Später möglich") – NoteCard.tsx, lib/gastSync.ts, lib/kontoSupabase.ts
