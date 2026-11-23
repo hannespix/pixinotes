@@ -63,15 +63,20 @@ async function auf(w, h, geraet = devices['Pixel 7'], dunkel = true) {
 const spurNamen = async (P, ms) => P.evaluate((dauer) => new Promise((ok) => {
   const spur = {}; const t0 = performance.now();
   const lauf = () => {
+    const jetzt = performance.now();
     for (const n of document.querySelectorAll('.bub-ring-name')) {
       const m = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(n.style.transform); if (!m) continue;
-      (spur[n.dataset.gruppe] ??= []).push([+m[1], +m[2]]);
+      (spur[n.dataset.gruppe] ??= []).push([+m[1], +m[2], jetzt]);
     }
-    if (performance.now() - t0 < dauer) requestAnimationFrame(lauf); else ok(spur);
+    if (jetzt - t0 < dauer) requestAnimationFrame(lauf); else ok(spur);
   };
   requestAnimationFrame(lauf);
 }), ms);
-const groessterSprung = (spur) => Math.max(0, ...Object.values(spur).map((p) => { let m = 0; for (let i = 1; i < p.length; i++) m = Math.max(m, Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1])); return m; }));
+// M448: „je Bild" heißt je 60-Hz-Bild. Unter Last (mehrere Prüfungen und Agenten teilen sich die CPU) fallen
+// Bilder aus, die Gruppen-Physik rechnet mit der verstrichenen Zeit weiter – zwischen zwei gezeichneten Bildern
+// liegt dann der Weg von zwei oder drei. Der Sprung wird deshalb auf die Zahl der verstrichenen 16,7-ms-Bilder
+// umgelegt; ein echter Sprung (Name wechselt den Platz in einem Bild) bleibt so groß wie vorher.
+const groessterSprung = (spur) => Math.max(0, ...Object.values(spur).map((p) => { let m = 0; for (let i = 1; i < p.length; i++) m = Math.max(m, Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]) / Math.max(1, Math.round((p[i][2] - p[i - 1][2]) / (1000 / 60)))); return m; }));
 const bewegung = (P, ms, sel = '.bub-blase') => P.evaluate(([dauer, s]) => new Promise((ok) => {
   const lage = () => [...document.querySelectorAll(s)].map((b) => b.style.transform);
   let vor = lage(); let bewegt = 0; const t0 = performance.now();
