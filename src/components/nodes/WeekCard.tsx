@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
@@ -6,6 +6,7 @@ import { uid, type WeekData, type WeekEntry, type WeekNode } from '../../types';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { IPlus, IX } from '../Icons';
+import { farbeAlsSchrift, farbeZuRgb, geschichteterGrund, istHell, mischen, rgbZuHex, useThema } from '../../lib/lesbareSchrift';
 
 const DAY_SHORT = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 export const DAY_LONG = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag', 'Sonntag'];
@@ -58,6 +59,15 @@ export function WeekCard({ id, data, selected }: NodeProps<WeekNode>) {
 export function WeekBody({ id, data, selected, folie }: { id: string; data: WeekData; selected?: boolean; /** auf einer Folie der Präsentation: der Block-Editor muss über ihr liegen */ folie?: boolean }) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const [pop, setPop] = useState<{ entryId: string; x: number; y: number } | null>(null);
+  // M494: Schrift eines Blocks = seine Farbe, so weit abgedunkelt bzw. aufgehellt, dass sie auf der gezeichneten
+  // Blockfläche ≥ 4,5:1 hat. Freie Farben liegen zu 25 % über der Tagesspalte (im Dunkeln dunkel getönt) — dort
+  // stand vorher die Farbe selbst als Schrift; zwei Palettenfarben hatten auch im Hellen nur 3,8:1 bzw. 4,4:1.
+  const thema = useThema();
+  const spaltenGrund = useMemo(() => geschichteterGrund(['--surface', '--surface-dim'], thema === 'dark' ? '#1d2024' : '#ffffff'), [thema]);
+  const blockSchrift = (flaeche: string, farbe: string, anteil: number) => {
+    const f = farbeZuRgb(flaeche); const g = farbeZuRgb(spaltenGrund);
+    return f && g ? farbeAlsSchrift(farbe, rgbZuHex(mischen(f, g, anteil))) : farbe;
+  };
 
   const days = data.days === 7 ? 7 : 5;
   const customCols = Array.isArray(data.cols) && data.cols.length >= 2;
@@ -263,10 +273,11 @@ export function WeekBody({ id, data, selected, folie }: { id: string; data: Week
                   const [bg, strong] = en.colorHex
                     ? [`${en.colorHex}40`, en.colorHex]
                     : ENTRY_COLORS[(en.color ?? 0) % ENTRY_COLORS.length];
+                  const schrift = en.colorHex ? blockSchrift(en.colorHex, strong, 0.25) : blockSchrift(bg, strong, 1);
                   return (
                     <button
                       key={en.id}
-                      className="week-entry"
+                      className={`week-entry${istHell(schrift) ? ' schrift-hell' : ''}`}
                       style={{
                         top: `${((en.start - from) / span) * 100}%`,
                         height: `${(en.dur / span) * 100}%`,
@@ -274,7 +285,7 @@ export function WeekBody({ id, data, selected, folie }: { id: string; data: Week
                         width: `${100 / l.lanes}%`,
                         background: bg,
                         borderLeftColor: strong,
-                        color: strong,
+                        color: schrift,
                       }}
                       title={`${labelOf(en.start, en.dur)} ${en.text}${en.who ? ` (${en.who})` : ''}`}
                       onClick={(e) => { e.stopPropagation(); setPop({ entryId: en.id, x: e.clientX, y: e.clientY }); }}

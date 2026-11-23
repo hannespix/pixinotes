@@ -51,7 +51,7 @@
 .bub-pille button.an, .bub-knopf.an { background: var(--accent-fill); border-color: var(--accent); color: #fff; }
 .bub-pille button:hover, .bub-knopf:hover:not(:disabled), .bub-menue button:hover:not(:disabled) { border-color: var(--accent); }
 .bub-knopf:disabled, .bub-dazu:disabled, .bub-menue button:disabled { opacity: 0.45; cursor: default; }
-.bub-pille-feld { border: 1px solid var(--border-soft); border-radius: var(--r-xs); background: var(--surface); color: var(--ink); font-family: inherit; font-size: 12px; padding: 4px 7px; outline: none; flex: 1 1 140px; min-width: 0; }
+.bub-pille-feld { border: 1px solid var(--feld-rand); border-radius: var(--r-xs); background: var(--surface); color: var(--ink); font-family: inherit; font-size: 12px; padding: 4px 7px; outline: none; flex: 1 1 140px; min-width: 0; }
 .bub-pille-feld.kurz { flex: 0 1 120px; }
 /* M386: Bestätigen im Feld — am Telefon der einzige sichere Weg, eine Änderung abzuschließen */
 .bub-pille button.bub-pille-ok { background: var(--accent-fill); border-color: var(--accent); color: #fff; font-weight: 700; }

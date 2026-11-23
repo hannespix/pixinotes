@@ -28,6 +28,32 @@
 [data-theme='dark'] .react-flow__node-note .note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background']),
 [data-theme='dark'] .react-flow__node-note .note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background']) .bn-editor { color: var(--ink); }
 
+/* ================= M494: Editor-Farben auf dunklem Papier =================
+   Schrift- und Hintergrundfarben im Text (BlockNote: `--bn-colors-highlights-*`) sind für helles Papier gemacht.
+   Wo das Papier dunkel ist — weiße Notiz und Notiz ohne Farbe im Dunkeln, Protokoll im Thema im Dunkeln, Protokoll
+   in einer dunklen eigenen Farbe (auch im Hellen) — gelten die Nachtstufen aus 00-tokens.css (`--nacht-hl-*`).
+   Editor-Fläche und -Schrift zeigen dort auf die Karte, damit auch die Muster der Farbwahl (M492: „auf der
+   Editor-Fläche") die Farbe so zeigen, wie sie im Text steht. Haftnotizen in Farbe bleiben helles Papier (M338). */
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .bn-root,
+[data-theme='dark'] .react-flow__node-note:has(.note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background'])) .bn-root {
+  --bn-colors-editor-text: var(--ink);
+  --bn-colors-editor-background: var(--surface-card);
+}
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .bn-root,
+[data-theme='dark'] .react-flow__node-note:has(.note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background'])) .bn-root,
+[data-theme='dark'] .minutes-card.papier-thema .bn-root,
+.minutes-card.papier-dunkel .bn-root {
+  --bn-colors-highlights-gray-text: var(--nacht-hl-grau);     --bn-colors-highlights-gray-background: var(--nacht-hl-grau-grund);
+  --bn-colors-highlights-brown-text: var(--nacht-hl-braun);   --bn-colors-highlights-brown-background: var(--nacht-hl-braun-grund);
+  --bn-colors-highlights-red-text: var(--nacht-hl-rot);       --bn-colors-highlights-red-background: var(--nacht-hl-rot-grund);
+  --bn-colors-highlights-orange-text: var(--nacht-hl-orange); --bn-colors-highlights-orange-background: var(--nacht-hl-orange-grund);
+  --bn-colors-highlights-yellow-text: var(--nacht-hl-gelb);   --bn-colors-highlights-yellow-background: var(--nacht-hl-gelb-grund);
+  --bn-colors-highlights-green-text: var(--nacht-hl-gruen);   --bn-colors-highlights-green-background: var(--nacht-hl-gruen-grund);
+  --bn-colors-highlights-blue-text: var(--nacht-hl-blau);     --bn-colors-highlights-blue-background: var(--nacht-hl-blau-grund);
+  --bn-colors-highlights-purple-text: var(--nacht-hl-lila);   --bn-colors-highlights-purple-background: var(--nacht-hl-lila-grund);
+  --bn-colors-highlights-pink-text: var(--nacht-hl-rosa);     --bn-colors-highlights-pink-background: var(--nacht-hl-rosa-grund);
+}
+
 /* ================= M492: BlockNote-Menüs folgen dem Erscheinungsbild =================
    Die Editoren laufen mit `theme="light"`, weil ihr INHALT auf Papier steht (Haftnotizen bleiben im Dunkeln
    hell, M338; Protokoll und weiße Notiz setzen ihre Schrift selbst, M284/M489) — BlockNotes dunkles Thema hätte

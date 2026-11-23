@@ -49,7 +49,7 @@
 .gantt-rowbar-name { font-weight: 600; color: var(--ink); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gantt-rowbar button { border: none; background: none; cursor: pointer; font-size: 11px; padding: 1px 4px; border-radius: var(--r-xs); }
 .gantt-rowbar button:hover { background: var(--border); }
-.gantt-rowbar select { font-size: 11px; margin-left: 3px; border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface); }
+.gantt-rowbar select { font-size: 11px; margin-left: 3px; border: 1px solid var(--feld-rand); border-radius: var(--r-sm); background: var(--surface); }
 /* M280: Rahmen um den Roller — trägt die weichen Kanten, die zeigen, dass
    es rechts (oder links) weitergeht. Ohne sie endete das Diagramm mit einem
    harten Schnitt am Kartenrand und wirkte abgeschnitten statt scrollbar. */
@@ -120,7 +120,7 @@
 .gantt-zeile:hover { fill: rgba(79, 124, 255, .06); }
 .gantt-zeile.sel { fill: rgba(79, 124, 255, .09); }
 .gantt-barlabel { font-size: 10px; fill: var(--muted); }
-.gantt-barlabel.innen { fill: #fff; font-weight: 600; }
+.gantt-barlabel.innen { fill: var(--auf-farbe-hell); font-weight: 600; }
 .gantt-heute-text { font-size: 8.5px; font-weight: 700; fill: #fff; letter-spacing: .03em; }
 .gantt-labels-kopf {
   display: flex; align-items: flex-end; padding: 0 8px 5px;
@@ -281,7 +281,7 @@
   .th-quickboard { max-width: 118px; }
 }
 .taskhub-quick {
-  width: min(860px, 100%); border: 1px dashed var(--border-soft); border-radius: var(--r); padding: 9px 13px;
+  width: min(860px, 100%); border: 1px dashed var(--feld-rand); border-radius: var(--r); padding: 9px 13px;  /* M494: Feldrand ≥ 3:1 (WCAG 1.4.11) */
   font-family: inherit; font-size: 12.5px; margin-bottom: 12px; background: var(--surface-card); outline: none; color: var(--ink);
 }
 .taskhub-quick:focus { border-color: var(--accent); border-style: solid; }
@@ -358,7 +358,10 @@
 
 .cal-grid.week { grid-template-rows: auto 1fr; }
 .cal-grid.week .cal-cell { min-height: 150px; }
-.cal-grid.week .cal-strip { height: 13px; font-size: 8.5px; color: #fff; line-height: 13px; padding: 0 4px; text-align: left; white-space: nowrap; overflow: hidden; }
+.cal-grid.week .cal-strip { height: 13px; font-size: 8.5px; color: var(--auf-farbe-hell); line-height: 13px; padding: 0 4px; text-align: left; white-space: nowrap; overflow: hidden; }
+/* M494: In der Wochenansicht trägt der Streifen Schrift — die Blässe steckt deshalb in der Fläche (color-mix im
+   Stil, CalendarCard), nicht in der Deckkraft des Elements; die Schriftfarbe folgt der Helligkeit (lesbareSchrift) */
+.cal-grid.week .cal-strip, .cal-grid.week .cal-strip.ext { opacity: 1; }
 .cal-nav button.on { background: var(--accent-fill); color: #fff; }
 .slide-cal .cal-grid.week .cal-cell { min-height: 46vh; }
 

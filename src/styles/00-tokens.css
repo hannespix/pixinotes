@@ -24,9 +24,10 @@
   /* M492: Zeiterfassung — Arbeit/Pause als Fläche (weiße Schrift darauf) und als Schrift auf der Karte.
      Die Fläche bleibt in beiden Themes gleich, die Schrift wird im Dunkeln heller (vorher 2,2:1 bzw. 2,9:1). */
   --zeit-arbeit: #3c669c;
-  --zeit-pause: #9c6f1c;
+  /* M494: Pause einen Hauch dunkler — Weiß darauf hatte 4,46:1 (jetzt 4,59:1), als Schrift auf Weiß ebenso */
+  --zeit-pause: #9a6d1b;
   --zeit-arbeit-schrift: #3c669c;
-  --zeit-pause-schrift: #9c6f1c;
+  --zeit-pause-schrift: #9a6d1b;
   /* M489: Schrift auf „Papier", das NICHT dem Theme folgt: Farbtöne bleiben im Dunkeln helles Papier (M338),
      eine dunkle eigene Kartenfarbe bleibt auch im Hellen dunkel. Feste Werte, in beiden Themes gleich —
      muted hält ≥ 4,8:1 auf allen vier Pastelltönen, auch in ihrer gedämpften Dunkel-Fassung. */
@@ -40,6 +41,30 @@
   --nacht-linie: rgba(255, 255, 255, 0.22);
   --nacht-flaeche: rgba(255, 255, 255, 0.09);
   --nacht-warn: #ffb4a9;
+  /* M494: Editor-Farben (BlockNote: Schrift- und Hintergrundfarbe im Text) auf DUNKLEM Papier — weiße Notiz und
+     Protokoll im Thema im Dunkeln, dunkle eigene Protokollfarbe. BlockNotes Farben sind für helles Papier gemacht
+     (Braun 1,9:1, Grau 2,8:1 auf der dunklen Karte). Hier je Farbe eine Nachtstufe: Schrift hell und gedeckt
+     (Leuchtdichte ≈ 0,4–0,55), Hintergrund dunkel getönt (≈ 0,035–0,045) — so hält JEDE Kombination ≥ 4,5:1:
+     Farbschrift auf Karte/Fläche/Grund und auf jedem Hintergrund, Standardschrift auf jedem Hintergrund.
+     Helles Papier und der helle Modus behalten BlockNotes Farben unverändert. */
+  --nacht-hl-grau: #b5b4b0;    --nacht-hl-grau-grund: #3a3c40;
+  --nacht-hl-braun: #d0a891;   --nacht-hl-braun-grund: #43362f;
+  --nacht-hl-rot: #f5948b;     --nacht-hl-rot-grund: #4f2b2b;
+  --nacht-hl-orange: #f0a35e;  --nacht-hl-orange-grund: #4a3520;
+  --nacht-hl-gelb: #e2c04a;    --nacht-hl-gelb-grund: #463c1b;
+  --nacht-hl-gruen: #8fbcb3;   --nacht-hl-gruen-grund: #233d38;
+  --nacht-hl-blau: #73b8e2;    --nacht-hl-blau-grund: #1f3a4a;
+  --nacht-hl-lila: #b9a0ea;    --nacht-hl-lila-grund: #382d4d;
+  --nacht-hl-rosa: #ee93c6;    --nacht-hl-rosa-grund: #482a3d;
+  /* M494: Schrift auf einer FREI gewählten Farbe (Gantt-Balken, Kalender-Streifen, Wochenplan-Blöcke).
+     lib/lesbareSchrift.ts wählt nach der Helligkeit der gezeichneten Fläche; Schwarz nur, wo Weiß und Tinte
+     beide knapp unter 4,5:1 bleiben (mittlere Helligkeit). In beiden Themes gleich — die Fläche ist es auch. */
+  --auf-farbe-hell: #ffffff;
+  --auf-farbe-dunkel: #16191e;
+  --auf-farbe-schwarz: #000000;
+  /* M494: Rand eines Eingabefelds (Nicht-Text-Kontrast, WCAG 1.4.11) — ≥ 3:1 auf Weiß, --bg, --surface-3 und
+     --surface-2. --border-soft (1,4:1) bleibt für Trennlinien und Karten, wo der Rand nichts bedienbar macht. */
+  --feld-rand: #80868f;
   /* Die alten Glas-Tokens zeigen auf deckende Flächen — Regeln, die sie noch
      nennen, bleiben gültig und werden einfach opak. */
   --glass: var(--surface);
@@ -123,6 +148,7 @@
   --warn-text: #ff9b8f;
   --zeit-arbeit-schrift: #8fb1e6;   /* 5,9:1 auf der Knopffläche, 7,0:1 auf der Karte */
   --zeit-pause-schrift: #e0b56a;    /* 6,7:1 bzw. 8,1:1 */
+  --feld-rand: #737983;              /* M494: ≥ 3:1 auf --bg, --surface, --surface-card und --surface-2 */
   --glass: var(--surface);
   --glass-strong: var(--surface);
   --glass-border: var(--border-soft);

@@ -15,6 +15,7 @@ import { zahlWort } from '../../lib/sprache';
 import { ausKonto, kontoKennung, terminSchluessel, terminZeit, type ZentralTermin } from '../../lib/termineZentrale';
 import { setTerminMarke, terminMarke, TERMIN_MARKE_EREIGNIS, type TerminMarke } from '../../lib/terminMarke';
 import { fremdeWebAdresse } from '../../lib/sicher';
+import { farbeAlsSchrift, lesbareSchrift, tokenFarbe, useThema } from '../../lib/lesbareSchrift';
 
 const WEEKDAYS = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'];
 /**
@@ -166,6 +167,22 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
    * Eigene Termine öffnen stattdessen ihren Editor.
    */
   const [markiert, setMarkiert] = useState<string | null>(null);
+  // M494: Streifen der Wochenansicht tragen den Namen auf der frei gewählten Farbe — Schrift nach der Helligkeit
+  // der gezeichneten Fläche (vorher fest Weiß: Blau 3,7:1, Grün 3,1:1); farbige Termin-Titel im Tagesdialog
+  // behalten ihren Farbton, werden aber so weit abgedunkelt bzw. aufgehellt, dass sie lesbar sind
+  const thema = useThema();
+  const zellGrund = useMemo(() => tokenFarbe('--surface', thema === 'dark' ? '#1d2024' : '#ffffff'), [thema]);
+  // Der Tagesdialog liegt je nach Ansicht auf --surface-3 oder --surface: der Titel muss auf beiden lesbar sein
+  const menuGrund = useMemo(() => [tokenFarbe('--surface-3', thema === 'dark' ? '#181b1f' : '#f6f7f9'), zellGrund], [thema, zellGrund]);
+  const streifenStil = (farbe: string | undefined, ext?: boolean) => {
+    if (view !== 'week' || !farbe) return { background: farbe };
+    // Die Deckkraft steckt in der Fläche (color-mix), nicht im Element: sonst würde die Schrift mit verblassen
+    const anteil = ext ? 0.65 : 0.85;
+    return {
+      background: `color-mix(in srgb, ${farbe} ${anteil * 100}%, var(--surface))`,
+      color: lesbareSchrift(farbe, { grund: zellGrund, deckkraft: anteil }),
+    };
+  };
   const [detail, setDetail] = useState<ZentralTermin | null>(null);
   const eigeneRef = useRef(myEvents);
   eigeneRef.current = myEvents;
@@ -898,7 +915,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
                 key={`s${i}`}
                 className={`cal-strip ${s.ext ? 'ext' : ''} ${s.key && s.key === markiert ? 'markiert' : ''}`}
                 translate="no"
-                style={{ background: s.color }}
+                style={streifenStil(s.color, s.ext)}
                 title={s.ownDate ? `${s.text} (eigener Termin – Klick öffnet ihn)` : `${s.text}${s.ext ? ' (extern)' : ' – zur Karte springen'}`}
                 onClick={(ev) => {
                   ev.stopPropagation();
@@ -964,7 +981,7 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
               <button
                 className="cal-dayedit-title"
                 translate="no"
-                style={ev.color ? { color: ev.color } : undefined}
+                style={ev.color ? { color: farbeAlsSchrift(ev.color, menuGrund) } : undefined}
                 title={`${ownTip(ev)} – Klick: bearbeiten`}
                 onClick={() => { setEvEdit({ ...ev }); setEvIsNew(false); setLinkQuery(''); }}
               >
