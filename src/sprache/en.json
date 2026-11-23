@@ -3193,4 +3193,17 @@
 "Kontakt als vCard":"Contact as vCard",
 "{0} Kontakte als vCard":"{0} contacts as vCard",
 "Kontakte als vCard ({0})":"Contacts as vCard ({0})",
-"Die gewählten Kontakte in einer vCard-Datei (.vcf) – für Outlook, Telefon, Adressbuch":"The selected contacts in one vCard file (.vcf) – for Outlook, phone, address book"}
+"Die gewählten Kontakte in einer vCard-Datei (.vcf) – für Outlook, Telefon, Adressbuch":"The selected contacts in one vCard file (.vcf) – for Outlook, phone, address book",
+"Absender als Kontakt":"Sender as contact",
+"Name, E-Mail, Funktion, Firma, Rufnummern und Anschrift aus Absender und Signatur – als Kontakt-Karte neben der Mail (ein vorhandener Kontakt wird ergänzt)":"Name, email, role, company, phone numbers and address from the sender and signature – as a contact card next to the email (an existing contact is completed)",
+"Kontakt nicht angelegt: {0}":"Contact not created: {0}",
+"In dieser Mail stehen keine Absender-Angaben, aus denen ein Kontakt werden könnte.":"This email has no sender details that could become a contact.",
+"„{0}\" steht schon als Kontakt auf dem Board – nichts zu ergänzen.":"“{0}” is already a contact on this board – nothing to add.",
+"Kontakt „{0}\" ergänzt: {1}{2}":"Contact “{0}” completed: {1}{2}",
+"„{0}\" steht schon als Kontakt auf dem Board – nichts zu ergänzen, mit der Mail verbunden.":"“{0}” is already a contact on this board – nothing to add, linked to the email.",
+"Kontakt „{0}\" angelegt – mit {1}{2}":"Contact “{0}” created – with {1}{2}",
+"Kontakt „{0}\" angelegt{1}":"Contact “{0}” created{1}",
+"Rufnummern":"Phone numbers",
+" (von der KI geprüft)":" (checked by AI)",
+"· schläft":"· asleep",
+"Abo aus Kanban: „{0}\" fällig am {1}":"Subscription from Kanban: “{0}” due on {1}"}
