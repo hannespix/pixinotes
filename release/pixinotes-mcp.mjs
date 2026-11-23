@@ -38394,6 +38394,15 @@ ${bubblesAlsText(n.data)}`;
     case "kontakt":
       return `Kontakt
 ${nodeToText(n)}`;
+    // M452: Bilder (auch als Datei abgelegte) mit dem Text, den die Erkennung darin gefunden hat — so kann die
+    // KI aus Screenshots zusammenfassen und Aufgaben ziehen. Bewusst ohne Import aus textInBildern (MCP-Server).
+    case "image":
+    case "file": {
+      const ocr = typeof n.data.ocrText === "string" ? n.data.ocrText.trim() : "";
+      return ocr ? `${nodeToText(n)}
+Text im Bild (automatisch erkannt):
+${ocr}` : nodeToText(n);
+    }
     default:
       return nodeToText(n);
   }
