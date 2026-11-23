@@ -24,6 +24,12 @@ Auswahl samt Grund, ohne etwas zu starten. Für Änderungen an `store.ts`,
 Die Reihen `m383b`, `m388b`, `m391b` brauchen ein lokales Postgres
 (`service postgresql start`, Nutzer `postgres`); fehlt es, melden sie laut
 „ÜBERSPRUNGEN" und gelten als bestanden.
+`--ohne-datenbank` lässt sie ganz aus (und nennt sie), `--json datei` schreibt
+das Ergebnis je Reihe maschinenlesbar, `--nur-zeigen` ist der Trockenlauf.
+
+**Nachtlauf (M468):** `.github/workflows/nachtlauf.yml` fährt jede Nacht alle
+Reihen ohne Datenbank auf einem GitHub-Runner; rote Reihen stehen im Issue
+„Nachtlauf rot" (siehe `docs/AGENTEN.md`, „Nachtlauf").
 
 Chromium: Standardpfad `/opt/pw-browsers/chromium` (Claude-Umgebung) —
 anderswo per Umgebungsvariable `PW_CHROMIUM=/pfad/zu/chromium` setzen.
@@ -224,6 +230,7 @@ Screenshots und Zwischendateien landen in `pruefungen/ablage/`
 | m461 | Einzahl und Mehrzahl stimmen, auf Deutsch und auf Englisch |
 | m464 | Mauszeiger überall gut sichtbar (Windows) |
 | m467 | Start ohne Node-Ersatz (Buffer/process); .msg mit Anhang in Web und Single-File, .eml |
+| m468 | Nachtlauf: Läufer ohne Datenbank, Issue „Nachtlauf rot" anlegen/erneuern/schließen, Chromium-Pfad, Workflow |
 
 Die Reihen sind bewusst GEGEN DAS VERHALTEN geschrieben, nicht gegen die
 Struktur: Wo möglich messen sie Bildpunkte, echte Downloads, abgefangene
