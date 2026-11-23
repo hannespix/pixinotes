@@ -142,6 +142,14 @@ const nodeTypes: NodeTypes = {
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };
+// M486: fest statt je Render neu — ein neues Objekt hier zeichnete bei jedem Zug-Ereignis jede Verbindung neu
+// (React Flow reicht die Vorgabe an jede Kante weiter)
+const KANTEN_VORGABE = {
+  style: { stroke: 'var(--edge)', strokeWidth: 2 },
+  labelStyle: { fontSize: 11, fill: 'var(--muted)' },
+  labelBgStyle: { fill: 'var(--bg)', fillOpacity: 0.9 },
+};
+const PRO_OPTIONEN = { hideAttribution: true };
 
 /**
  * M483: Die Auswahl-Leiste (samt KI-Aktionen, Ausrichten, Rahmen-Werkzeugen) gehört nicht in den Start — auf einem
@@ -789,6 +797,9 @@ export function Board() {
   // NodeResizer & Co. ihren Kontext; das CSS stellt sie stattdessen
   // formatfüllend (siehe .focus-mode im Stylesheet).
   const focusCard = useBoard((s) => s.focusCard);
+  // M486: Gleiche Karte → dasselbe Objekt. Sonst hielte React Flow jede Karte mit Klasse (Schrift, Größe, Archiv)
+  // bei jedem Zug-Ereignis für geändert und zeichnete sie samt ihrer Verbindungen neu.
+  const rfCache = useRef(new WeakMap<AppNode, AppNode>());
   const rfNodes = useMemo(
     () => nodes.map((n) => {
       // M200: Schrift/Größe pro Karte als Klassen am Node-Wrapper — das CSS
@@ -800,19 +811,25 @@ export function Board() {
         n.id === focusCard ? 'pn-focused' : '',
       ].filter(Boolean).join(' ');
       if (!cls && !n.archived) return n;
-      return { ...n, hidden: n.archived ? !showArchived : undefined, className: cls || undefined };
+      const alt = rfCache.current.get(n);
+      if (alt && alt.className === (cls || undefined) && alt.hidden === (n.archived ? !showArchived : undefined)) return alt;
+      const neu = { ...n, hidden: n.archived ? !showArchived : undefined, className: cls || undefined };
+      rfCache.current.set(n, neu);
+      return neu;
     }),
     [nodes, showArchived, focusCard],
   );
+  // M486: hängt nur an der Menge archivierter Karten, nicht an jeder Lage — sonst neue Kanten-Objekte je Zug-Ereignis
+  const archivKey = useMemo(() => nodes.filter((n) => n.archived).map((n) => n.id).join('\n'), [nodes]);
   const rfEdges = useMemo(() => {
-    const arch = new Set(nodes.filter((n) => n.archived).map((n) => n.id));
+    const arch = new Set(archivKey ? archivKey.split('\n') : []);
     if (arch.size === 0) return edges;
     return edges.map((e) =>
       arch.has(e.source) || arch.has(e.target)
         ? { ...e, hidden: !showArchived, className: 'archived-edge' }
         : e,
     );
-  }, [nodes, edges, showArchived]);
+  }, [archivKey, edges, showArchived]);
 
   // Suche: nach Board-Wechsel zur gefundenen Karte fliegen und sie markieren
   useEffect(() => {
@@ -1790,13 +1807,9 @@ export function Board() {
         maxZoom={BOARD_ZOOM_MAX * anzeige}
         fitView
         fitViewOptions={{ padding: 0.25, maxZoom: anzeige }}
-        defaultEdgeOptions={{
-          style: { stroke: 'var(--edge)', strokeWidth: 2 },
-          labelStyle: { fontSize: 11, fill: 'var(--muted)' },
-          labelBgStyle: { fill: 'var(--bg)', fillOpacity: 0.9 },
-        }}
+        defaultEdgeOptions={KANTEN_VORGABE}
         // M373: der „React Flow"-Schriftzug unten rechts ist ausgeblendet (Nutzerwunsch); die Bibliothek ist in der Hilfe genannt
-        proOptions={{ hideAttribution: true }}
+        proOptions={PRO_OPTIONEN}
       >
         <ViewportPortal><Fanglinien /></ViewportPortal>
         {/* M364: Karten, die gerade ein anderer bearbeitet — Rahmen mit Namen */}
