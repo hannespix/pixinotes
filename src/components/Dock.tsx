@@ -263,7 +263,7 @@ export function Dock() {
       const { boardBriefing } = await import('../lib/boardBriefing');
       const rechtsOben = screenToFlowPosition({ x: window.innerWidth, y: 90 });
       const msg = await boardBriefing(rechtsOben, mitKi, (m) => showToast(`KI: ${m}`, false, 180000, true));
-      showToast(mitKi ? msg : `${msg} Mit eingerichteter KI (Einstellungen) wird es ausführlicher.`, false, 7000);
+      showToast(mitKi ? msg : `${msg} Mit eingerichteter KI (Einstellungen) wird es ausführlicher.`, false, msg.includes('unberücksichtigt') ? 12000 : 7000);
     } catch (e) {
       showToast(`Briefing fehlgeschlagen: ${(e as Error).message}`, false, 8000);
     } finally {

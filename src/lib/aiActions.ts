@@ -63,7 +63,7 @@ export const DATEI_MAX_ZEICHEN = 8_000;
  *  passten — die Aktionen hängen das ihrer Meldung an, statt zu schweigen. */
 let letzteAuslassung = 0;
 /** Hinweis für die Ergebnis-Meldung, wenn Karten weggelassen wurden */
-function auslassungsHinweis(): string {
+export function auslassungsHinweis(): string {
   return letzteAuslassung > 0
     ? ` – ${letzteAuslassung} Karte(n) passten nicht mehr in den Kontext und blieben unberücksichtigt (weniger Karten auswählen oder die Freitext-Anweisung nutzen, die in Portionen arbeitet)`
     : '';

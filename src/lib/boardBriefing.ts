@@ -152,8 +152,9 @@ export async function boardBriefing(rechtsOben: { x: number; y: number }, mitKi:
   const lage = lageSammeln(board, now);
   let md = lageMarkdown(lage, now);
   let wie = t('ohne KI');
+  let ausgelassen = '';
   if (mitKi) {
-    const [{ askAi, kiAbgebrochen }, { gather }, { aufDemselbenBoard }] = await Promise.all([import('./ai'), import('./aiActions'), import('./zielBoard')]);
+    const [{ askAi, kiAbgebrochen }, { gather, auslassungsHinweis },{ aufDemselbenBoard }] = await Promise.all([import('./ai'), import('./aiActions'), import('./zielBoard')]);
     try {
       fortschritt?.(t('Lage wird zusammengefasst …'));
       const items = await gather(board.nodes.filter((n) => !n.archived));
@@ -174,7 +175,8 @@ export async function boardBriefing(rechtsOben: { x: number; y: number }, mitKi:
       ));
       if (kiAbgebrochen()) return t('Abgebrochen – kein Briefing angelegt.');
       const ki = kiTextSaeubern(antwort);
-      if (ki) { md = `${aufgabenMarkdown(lage, now)}\n\n${ki}`; wie = t('mit KI'); }
+      // M332: Karten, die nicht mehr in den Kontext passten, nennt die Meldung – wie bei allen Board-Aktionen
+      if (ki) { md = `${aufgabenMarkdown(lage, now)}\n\n${ki}`; wie = t('mit KI'); ausgelassen = auslassungsHinweis(); }
     } catch (e) {
       if (kiAbgebrochen()) return t('Abgebrochen – kein Briefing angelegt.');
       wie = `${t('ohne KI')} – ${t('die KI antwortete nicht')} (${(e as Error).message.slice(0, 80)})`;
@@ -193,5 +195,5 @@ export async function boardBriefing(rechtsOben: { x: number; y: number }, mitKi:
   mutedHistory(() => st.addNode(notiz));
   st.focusNode(boardId, notiz.id);
   const zahl = lage.ueberfaellig.length;
-  return `${t('Board-Briefing angelegt')} (${wie})${zahl ? ` – ${t('{0} Aufgabe(n) überfällig').replace('{0}', String(zahl))}` : ''}.`;
+  return `${t('Board-Briefing angelegt')} (${wie})${zahl ? ` – ${t('{0} Aufgabe(n) überfällig').replace('{0}', String(zahl))}` : ''}${ausgelassen}.`;
 }
