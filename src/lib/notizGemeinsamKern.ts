@@ -103,7 +103,7 @@ function senden(boardId: string, m: Omit<NotizYNachricht, 'von'>): void {
   const k = Math.random().toString(36).slice(2, 12);
   for (let i = 0; i < z; i++) {
     liveSenden(boardId, NOTIZ_Y_EREIGNIS, {
-      von: voll.von, c: voll.c, n: voll.n, a: 'teil', k, i, z, ganz: voll.a as Exclude<NotizYArt, 'teil'>,
+      von: voll.von, c: voll.c, n: voll.n, a: 'teil', k, i, z, ganz: voll.a as Exclude<NotizYArt, 'teil' | 'offen'>,
       ...(voll.an !== undefined ? { an: voll.an } : {}), ...(i === 0 && voll.sv ? { sv: voll.sv } : {}),
       d: d.slice(i * NOTIZ_Y_TEIL_ZEICHEN, (i + 1) * NOTIZ_Y_TEIL_ZEICHEN),
     } satisfies NotizYNachricht);
@@ -111,7 +111,7 @@ function senden(boardId: string, m: Omit<NotizYNachricht, 'von'>): void {
 }
 
 // ---------- Empfangen ----------
-interface Teile { teile: string[]; da: number; z: number; ganz: Exclude<NotizYArt, 'teil'>; an?: number; sv?: string; seit: number }
+interface Teile { teile: string[]; da: number; z: number; ganz: Exclude<NotizYArt, 'teil' | 'offen'>; an?: number; sv?: string; seit: number }
 const teilLager = new Map<string, Teile>();
 function zusammensetzen(m: NotizYNachricht): NotizYNachricht | null {
   const key = `${m.von}\n${m.c}\n${m.k}`;
@@ -161,7 +161,27 @@ function horchen(): void {
   window.addEventListener(TEILNEHMER_EREIGNIS, (e) => {
     const boardId = (e as CustomEvent<string>).detail;
     for (const s of sitzungen.values()) if (!boardId || s.boardId === boardId) s.rundeGeaendert();
+    if (boardId) neueMelden(boardId);
   });
+}
+
+/**
+ * Wer neu in den Kanal kommt, erfährt einmal, in welchen Notizen hier gerade gemeinsam gearbeitet wird (`offen`).
+ * Nur für diese wartet sein Öffnen auf den Stand der anderen; jede andere Notiz beginnt sofort aus dem Block-JSON
+ * (niemand hält ein Y-Dokument dazu). Die Meldung kommt mit kleiner Streuung, damit nicht alle zugleich senden.
+ */
+const bekannt = new Map<string, Set<string>>();
+const meldeTimer = new Map<string, ReturnType<typeof setTimeout>>();
+function neueMelden(boardId: string): void {
+  const jetzt = new Set(teilnehmerVon(boardId).map((t) => t.id));
+  const vorher = bekannt.get(boardId) ?? new Set<string>();
+  bekannt.set(boardId, jetzt);
+  if (![...jetzt].some((id) => !vorher.has(id) && id !== ich().id) || meldeTimer.has(boardId)) return;
+  meldeTimer.set(boardId, setTimeout(() => {
+    meldeTimer.delete(boardId);
+    const ns = [...sitzungen.values()].filter((x) => x.boardId === boardId && x.bereit()).map((x) => x.nodeId).slice(0, 200);
+    if (ns.length) liveSenden(boardId, NOTIZ_Y_EREIGNIS, { von: ich().id, c: 1, n: '_', a: 'offen', ns } satisfies NotizYNachricht);
+  }, 60 + Math.random() * 240));
 }
 
 // ---------- Sitzung ----------
@@ -182,7 +202,7 @@ export interface NotizSitzung {
   jetztSenden(): void;
   schliessen(): void;
 }
-interface SitzungIntern extends NotizSitzung { empfangen(m: NotizYNachricht): void; rundeGeaendert(): void }
+interface SitzungIntern extends NotizSitzung { empfangen(m: NotizYNachricht): void; rundeGeaendert(): void; bereit(): boolean }
 
 interface Anwesenheit { pn?: unknown; schreibt?: unknown }
 
@@ -194,6 +214,8 @@ interface Anwesenheit { pn?: unknown; schreibt?: unknown }
 export async function sitzungOeffnen(
   boardId: string, nodeId: string, blocks: unknown[], // eslint-disable-next-line @typescript-eslint/no-explicit-any
   schema: any, darf: boolean,
+  /** Arbeitet hier schon jemand (lib/notizGemeinsam.ts gemeinsamGewuenscht)? Nur dann auf seinen Stand warten */
+  warten = true,
 ): Promise<NotizSitzung> {
   horchen();
   const alt = sitzungen.get(schluessel(boardId, nodeId));
@@ -222,7 +244,10 @@ export async function sitzungOeffnen(
     offen = [];
     if (!leer(u)) senden(boardId, { c: doc.clientID, n: nodeId, a: 'upd', d: zuB64(u) });
   };
+  /** Hat sich das Dokument seit dem Start geändert (hier oder bei anderen)? Nur dann gibt es beim Schreiberwechsel etwas zu sichern */
+  let geaendert = false;
   doc.on('update', (u: Uint8Array, herkunft: unknown) => {
+    if (bereit && herkunft !== 'init') geaendert = true;
     if (herkunft === FERN || herkunft === 'init' || zu) return;
     offen.push(u);
     if (!bereit) return;   // vor dem Start nichts senden (der Stand geht mit der Antwort auf `hallo`)
@@ -275,7 +300,7 @@ export async function sitzungOeffnen(
   function schreiberPruefen(): void {
     if (!bereit || zu) return;
     const jetzt = istSchreiber();
-    if (jetzt && !warSchreiber) { warSchreiber = true; for (const cb of [...schreiberRufe]) { try { cb(); } catch { /* egal */ } } }
+    if (jetzt && !warSchreiber) { warSchreiber = true; if (geaendert) for (const cb of [...schreiberRufe]) { try { cb(); } catch { /* egal */ } } }
     else if (!jetzt) warSchreiber = false;
   }
   const anwesenheitSetzen = () => {
@@ -318,8 +343,9 @@ export async function sitzungOeffnen(
       if (bereit) anwesenheitSetzen();
     },
     jetztSenden,
+    bereit: () => bereit && !zu,
     empfangen(m) {
-      if (zu || m.c === doc.clientID) return;
+      if (zu || m.c === doc.clientID || m.a === 'offen') return;
       if (m.a === 'hallo') {
         if (!bereit) return;   // wer selbst noch wartet, hat nichts zu geben
         let sv: Uint8Array | undefined;
@@ -390,7 +416,10 @@ export async function sitzungOeffnen(
 
   // --- Start: erst fragen, dann (falls niemand antwortet) aus dem Block-JSON beginnen ---
   const andere = teilnehmerVon(boardId).some((t) => t.id !== selbst) || teilnehmerVon(boardId).length === 0;
-  if (liveVerbunden(boardId) && andere) {
+  if (liveVerbunden(boardId) && andere && !warten) {
+    // Niemand arbeitet in dieser Notiz: sofort beginnen, die anderen nur wecken (sie fragen dann selbst)
+    senden(boardId, { c: doc.clientID, n: nodeId, a: 'hallo', sv: zuB64(Y.encodeStateVector(doc)) });
+  } else if (liveVerbunden(boardId) && andere) {
     const warten = (ms: number) => new Promise<void>((auf) => {
       const t = setTimeout(() => { standKam = null; auf(); }, ms);
       standKam = () => { clearTimeout(t); standKam = null; auf(); };

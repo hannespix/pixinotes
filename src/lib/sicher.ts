@@ -249,7 +249,7 @@ export function boardVonAussen(roh: unknown, id: string): BoardDoc | null {
 export const NOTIZ_Y_TEIL_ZEICHEN = 48_000;
 /** Höchstens so viele Teile hat eine zerlegte Nachricht (≈ 4 MB Base64) — mehr ist kein Tippen mehr */
 export const NOTIZ_Y_TEILE_MAX = 90;
-export type NotizYArt = 'hallo' | 'stand' | 'upd' | 'aw' | 'teil';
+export type NotizYArt = 'hallo' | 'stand' | 'upd' | 'aw' | 'teil' | 'offen';
 /** Eine Nachricht des gemeinsamen Tippens, so wie sie nach der Prüfung weitergegeben wird */
 export interface NotizYNachricht {
   /** Kennung des Absenders im Kanal (ich().id) */
@@ -265,10 +265,12 @@ export interface NotizYNachricht {
   d?: string;
   sv?: string;
   /** Teile einer zerlegten Nachricht: Schlüssel, Nummer, Anzahl, Art der ganzen Nachricht */
-  k?: string; i?: number; z?: number; ganz?: Exclude<NotizYArt, 'teil'>;
+  k?: string; i?: number; z?: number; ganz?: Exclude<NotizYArt, 'teil' | 'offen'>;
+  /** `offen`: die Notizen, die der Absender gerade gemeinsam offen hat (für Neue im Kanal) */
+  ns?: string[];
 }
 const B64 = /^[A-Za-z0-9+/]*={0,2}$/;
-const ARTEN_Y = new Set<string>(['hallo', 'stand', 'upd', 'aw', 'teil']);
+const ARTEN_Y = new Set<string>(['hallo', 'stand', 'upd', 'aw', 'teil', 'offen']);
 /**
  * M477: Eine Nachricht „gemeinsam tippen" aus dem Live-Kanal. Wie patchSaeubern: Die Gestalt muss stimmen, sonst fällt
  * sie weg — und sie muss von jemandem kommen, der gerade im Kanal ANWESEND ist (Presence). Größen sind begrenzt (eine
@@ -294,6 +296,9 @@ export function notizYVonAussen(roh: unknown, anwesend: ReadonlySet<string>): No
     if (m.ganz !== 'hallo' && m.ganz !== 'stand' && m.ganz !== 'upd' && m.ganz !== 'aw') return null;
     if (aus.d === undefined) return null;
     aus.k = m.k; aus.i = m.i; aus.z = m.z; aus.ganz = m.ganz;
+  } else if (aus.a === 'offen') {
+    if (!Array.isArray(m.ns) || m.ns.length > 200 || !m.ns.every((x) => typeof x === 'string' && /^[\w:.-]{1,200}$/.test(x))) return null;
+    aus.ns = [...m.ns as string[]];
   } else if ((aus.a === 'upd' || aus.a === 'aw') && aus.d === undefined) return null;
   return aus;
 }

@@ -10,6 +10,7 @@
 // wirklich eine Notiz in einem Live-Board geöffnet wird (M321: Schweres nachladen).
 import { useEffect, useState } from 'react';
 import { LIVE_NACHRICHT, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from './liveStand';
+import { notizYVonAussen } from './sicher';
 
 /** Ereignisname im Live-Kanal */
 export const NOTIZ_Y_EREIGNIS = 'notiz-y';
@@ -37,7 +38,8 @@ export function useGemeinsamMoeglich(boardId: string): boolean {
  * Wann wird eine Notiz gemeinsam geöffnet? Nicht jeder Editor eines Live-Boards hält eine Sitzung (ein Board mit 50
  * Notizen schickte sonst beim Öffnen 50 Fragen an jeden): Eine Notiz geht in den Modus „gemeinsam", sobald man sie
  * selbst betritt (Klick, Tastatur) — oder sobald jemand anderes in ihr arbeitet. Das meldet hier jede Frage (`hallo`)
- * und jede Änderung (`upd`) eines Anwesenden: Ereignis NOTIZ_Y_WACH, die Karte weckt ihren Editor.
+ * und jede Änderung (`upd`) eines Anwesenden, und für Neue im Kanal die Liste `offen`: Ereignis NOTIZ_Y_WACH, die Karte
+ * weckt ihren Editor. Nur wo jemand arbeitet, wartet das Öffnen auf dessen Stand — sonst beginnt es sofort.
  */
 export const NOTIZ_Y_WACH = 'pixinotes:notiz-y-wach';
 const gewuenscht = new Set<string>();
@@ -47,15 +49,17 @@ if (typeof window !== 'undefined') {
   window.addEventListener(LIVE_NACHRICHT, (e) => {
     const { boardId, ereignis, inhalt } = (e as CustomEvent<{ boardId?: unknown; ereignis?: unknown; inhalt?: unknown }>).detail ?? {};
     if (ereignis !== NOTIZ_Y_EREIGNIS || typeof boardId !== 'string') return;
-    const m = inhalt as { von?: unknown; n?: unknown; a?: unknown; ganz?: unknown } | null;
-    if (!m || typeof m.n !== 'string' || typeof m.von !== 'string') return;
+    if (!teilnehmerVon(boardId).some((t) => t.id === (inhalt as { von?: unknown } | null)?.von)) return;   // nur Anwesende
+    const m = notizYVonAussen(inhalt, new Set(teilnehmerVon(boardId).map((t) => t.id)));
+    if (!m) return;
     const art = m.a === 'teil' ? m.ganz : m.a;
-    if (art !== 'hallo' && art !== 'upd') return;
-    if (!teilnehmerVon(boardId).some((t) => t.id === m.von)) return;   // nur Anwesende (die volle Prüfung: lib/sicher.ts)
-    const key = `${boardId}\n${m.n}`;
+    // `offen`: Wer schon in Notizen arbeitet, sagt es jedem, der neu in den Kanal kommt
+    const notizen = art === 'offen' ? (m.ns ?? []) : art === 'hallo' || art === 'upd' ? [m.n] : [];
     if (gewuenscht.size > 500) gewuenscht.clear();
-    gewuenscht.add(key);
-    window.dispatchEvent(new CustomEvent(NOTIZ_Y_WACH, { detail: { boardId, nodeId: m.n } }));
+    for (const n of notizen) {
+      gewuenscht.add(`${boardId}\n${n}`);
+      window.dispatchEvent(new CustomEvent(NOTIZ_Y_WACH, { detail: { boardId, nodeId: n } }));
+    }
   });
 }
 

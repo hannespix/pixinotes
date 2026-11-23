@@ -36,6 +36,10 @@ Kollaboration über Yjs.
   Notiz wacht dafür auf). Gewechselt wird nie unter dem Cursor: zwischen zwei Editoren steht kurz die ruhende
   Ansicht, so sichert der alte, bevor der neue liest. Bricht der Kanal ab, geht es zurück zu `allein`, sobald der
   Cursor die Notiz verlassen hat. Lädt der Kern nicht, bleibt es bei `allein` (mit Sperre).
+- **Lage bleibt geschützt:** `store.ts` `setzeNotizSchutz(boardId, Map<Notiz, Name>)` — tippt ein anderer in einer
+  Notiz (Awareness-Eintrag mit `cursor`), darf hier niemand sie verschieben, archivieren oder löschen; der Inhalt
+  (`data`) bleibt frei (`sperrschutz(…, datenFrei = true)`, Hinweis wie bei der Sperre). Sonst stünden Lage und Text
+  derselben Karte als zwei Änderungen im kartenweisen Abgleich, und eine ginge verloren.
 - `lib/sicher.ts`: `notizYVonAussen(roh, anwesende)` — Gestalt, Absender muss in der Presence stehen, Base64 nur
   aus seinen Zeichen, je Nachricht ≤ `NOTIZ_Y_TEIL_ZEICHEN` (48 000), höchstens `NOTIZ_Y_TEILE_MAX` (90) Teile.
 - Vite `manualChunks`: `yjs`, `y-prosemirror`, `y-protocols` (samt ihrem eigenen lib0 0.2) und
@@ -80,10 +84,13 @@ Verlassen der Sitzung sichert der Schreiber den letzten Stand (`abschied`, aus `
 womöglich schon abgebaut). Wer nur lesen darf (`useKarteFest`), meldet `schreibt: false`.
 
 ## Prüfreihe
-A Yjs/Nachrichten erst beim Betreten · B zwei tippen gleichzeitig vorne/hinten, gleicher Text · C fremder Cursor mit
-Name + Farbe, Markierung · D Späteinsteiger (ungespeicherter Stand), zu dritt · E Server-JSON = Anzeige, jedes Stück
+A Yjs/Nachrichten erst beim Betreten · B zwei tippen gleichzeitig vorne/hinten, gleicher Text, Karte währenddessen nicht verschieb- oder löschbar · C fremder Cursor mit
+Name + Farbe, Markierung, Strg+Z nur Eigenes · D Späteinsteiger (ungespeicherter Stand), zu dritt · E Server-JSON = Anzeige, jedes Stück
 einmal, kein Konflikt, andere Notiz unberührt · F Neuladen ohne Verdopplung, fremde/kaputte/zu große Nachrichten,
 Start-Pakete ohne Yjs · G ohne Kanal wie bisher (kein Yjs, Board-Strg+Z) · H Hilfe, keine Seitenfehler.
+
+Angepasst: `m364` prüft die Karten-Sperre an Notizen jetzt als **Rückweg** (der Kern wird durch eine Fassung ersetzt,
+die ablehnt — ein abgebrochener Abruf löste `vite:preloadError` aus und lüde die Seite neu).
 
 ## Grenzen / offen
 - Nur **Notizen**. Protokoll (`MinutesCard`), Präsentation (`Presenter`) und andere Karten bleiben bei „wer zuerst

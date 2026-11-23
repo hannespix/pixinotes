@@ -348,6 +348,9 @@ const standB = {
 async function geraet(name, stand, anker = '') {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   await dienste(ctx);
+  // M477: Notizen tippen im Live-Board gemeinsam (Yjs, geprüft in m477) und sperren nicht. Diese Reihe prüft die
+  // Karten-Sperre an Notizen — den Rückweg, wenn der Yjs-Teil nicht lädt: ein Kern, der ablehnt.
+  await ctx.route(/\/assets\/notizGemeinsamKern-[^/]*\.js$/, (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: 'export async function sitzungOeffnen() { throw new Error("M477: Yjs-Teil abgeschaltet"); }' }));
   await ctx.addInitScript(({ st, konfig }) => {
     if (localStorage.getItem('pixinotes-board')) return;
     localStorage.setItem('pixinotes-onboarded', '1');

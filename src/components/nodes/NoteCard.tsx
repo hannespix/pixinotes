@@ -596,7 +596,7 @@ export function NotizEditor({ id, data, startPunkt, sitzung, abschied, fokus, oh
 }
 
 type EditorModus =
-  | { art: 'allein' }
+  | { art: 'allein'; fokus?: boolean }
   | { art: 'pause'; danach: 'allein' | 'laedt'; fokus: boolean }
   | { art: 'laedt'; fokus: boolean }
   | { art: 'gemeinsam'; s: NotizSitzung; fokus: boolean };
@@ -660,9 +660,10 @@ function NotizEditorWahl({ id, data, startPunkt }: { id: string; data: NoteNode[
     const fokus = modus.fokus;
     const blocks = (selectActiveBoard(useBoard.getState()).nodes.find((n) => n.id === id)?.data.blocks ?? []) as unknown[];
     gemeinsamKern()
-      .then((k) => k.sitzungOeffnen(boardId, id, repairBlocks(blocks), noteSchema as never, !nurLesenRef.current))
+      // Warten auf den Stand der anderen nur, wo schon jemand arbeitet — sonst sofort (keine verschluckten Tasten)
+      .then((k) => k.sitzungOeffnen(boardId, id, repairBlocks(blocks), noteSchema as never, !nurLesenRef.current, gemeinsamGewuenscht(boardId, id)))
       .then((s) => { if (weg) { s.schliessen(); return; } setModus({ art: 'gemeinsam', s, fokus }); })
-      .catch(() => { kernKaputt.current = true; if (!weg) setModus({ art: 'allein' }); });
+      .catch(() => { kernKaputt.current = true; if (!weg) setModus({ art: 'allein', fokus }); });   // Yjs lädt nicht: allein weiter, Cursor zurück
     return () => { weg = true; };
   }, [modus, boardId, id]);
   // Sitzung verlassen: zuerst sichern (wer Schreiber ist), dann zu
@@ -683,7 +684,7 @@ function NotizEditorWahl({ id, data, startPunkt }: { id: string; data: NoteNode[
       onPointerDownCapture={(e) => { if (e.button === 0) betreten({ x: e.clientX, y: e.clientY }); }}
       onFocusCapture={() => betreten(null)}
     >
-      {modus.art === 'allein' && <NotizEditor id={id} data={data} startPunkt={startPunkt} ohneSperre={live && !kernKaputt.current} />}
+      {modus.art === 'allein' && <NotizEditor id={id} data={data} startPunkt={startPunkt} fokus={modus.fokus} ohneSperre={live && !kernKaputt.current} />}
       {modus.art === 'gemeinsam' && <NotizEditor key={modus.s.doc.clientID} id={id} data={data} startPunkt={startPunkt} sitzung={modus.s} abschied={abschied} fokus={modus.fokus} />}
       {(modus.art === 'pause' || modus.art === 'laedt') && (
         <div className="nodrag nowheel note-editor" translate="no">
