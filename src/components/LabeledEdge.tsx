@@ -14,12 +14,6 @@ import { anzeigeStand, anzeigeVon, hoeren, useAnzeige, type Anzeige } from '../l
 import type { AppNode } from '../types';
 
 /**
- * M434: EIN gemeinsamer Weichzeichner für alle Pfeilschatten (User-Idee). Jede Verbindung legt ihren Schatten als
- * eine schlichte Linie in eine gemeinsame Ebene ganz unten in React Flows Kanten-Schicht; die Ebene trägt einen
- * einzigen CSS-Weichzeichner. Statt eines Filters je Pfeil (M432: bis 300 ms je Bild) oder fünf Lagen je Pfeil
- * (M433) rechnet der Browser einmal über alles — und der Schatten läuft wirklich weich aus.
- */
-/**
  * M486: Ziel der Beschriftungen — dasselbe wie React Flows `EdgeLabelRenderer`, aber gemerkt: Der suchte es bei
  * JEDER Änderung im React-Flow-Stand (also bei jedem Zug-Ereignis) für jede Kante neu per querySelector im ganzen Board.
  */
@@ -31,6 +25,12 @@ function labelZiel(von: Element | null): Element | null {
   if (!z?.isConnected) { z = rf.querySelector('.react-flow__edgelabel-renderer'); labelZiele.set(rf, z); }
   return z;
 }
+/**
+ * M434: EIN gemeinsamer Weichzeichner für alle Pfeilschatten (User-Idee). Jede Verbindung legt ihren Schatten als
+ * eine schlichte Linie in eine gemeinsame Ebene ganz unten in React Flows Kanten-Schicht; die Ebene trägt einen
+ * einzigen CSS-Weichzeichner. Statt eines Filters je Pfeil (M432: bis 300 ms je Bild) oder fünf Lagen je Pfeil
+ * (M433) rechnet der Browser einmal über alles — und der Schatten läuft wirklich weich aus.
+ */
 const ebenen = new WeakMap<Element, SVGSVGElement>();
 function schattenEbene(von: Element | null): SVGSVGElement | null {
   const schicht = von?.closest('.react-flow__edges');
@@ -85,8 +85,9 @@ function hindernisse(): HRect[] {
 }
 /** M486: Hindernisse hängen am Stand UND an der Zug-Anzeige */
 const abo = (f: () => void) => { const a = useBoard.subscribe(f); const b = hoeren(f); return () => { a(); b(); }; };
-/** Weiteste Auslenkung der Kurve vom Direktweg (Stummel 22 + Griff 110 + Ausweichen 240) plus Luft */
-const KORRIDOR = 400;
+/** Weiteste Auslenkung der Kurve über die Endpunkte hinaus: Stummel 22 + Griff 110 bis zur Basis-Mitte, Ausweichen 240,
+ *  Griff 110 um die verschobene Mitte (die Kurve bleibt in der Hülle ihrer Stützpunkte) — plus Luft */
+const KORRIDOR = 500;
 
 /** Verbindungs-Stile für Prozessdiagramme. 'line' ist ein Altbestand
  *  (Kurve ohne Spitze) — die Spitze ist seit M146 ein EIGENER Schalter. */

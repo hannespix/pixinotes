@@ -226,18 +226,9 @@ export function versatzAufloesen(el: HTMLElement, x: number, y: number, id?: str
 export function kantenBeobachter(elVon: (id: string) => HTMLElement | null, beobachtet: () => Iterable<string>, verbunden: ReadonlySet<string>) {
   const zuletzt = new Map<string, Anzeige>();
   const els = new Map<string, HTMLElement | null>();
-  let raf = 0; let bis = Infinity; let fertig = false;
-  /* M486: Gelesen wird NACH der Stil- und Layout-Rechnung des Bildes (Rückruf eines ResizeObservers), nicht im
-     Animations-Rückruf davor: Dort erzwang getComputedStyle eine zusätzliche Stil-Rechnung über das ganze Board
-     (mit 100 Verbindungen der größte Posten je Bild). Danach ist der Stil frisch, das Lesen kostet nichts, und was die
-     Kanten daraufhin ändern, zeichnet der Browser noch im selben Bild. Den Takt gibt ein winziger, unsichtbarer Kasten,
-     dessen Breite je Bild wechselt. */
-  const takt = document.createElement('div');
-  takt.setAttribute('aria-hidden', 'true');
-  takt.style.cssText = 'position:fixed;left:0;top:0;width:1px;height:1px;visibility:hidden;pointer-events:none;contain:strict';
-  document.body.appendChild(takt);
-  const ro = new ResizeObserver(() => lesen());
+  let raf = 0; let bis = Infinity;
   const lesen = () => {
+    raf = 0;
     let bewegt = false; let geaendert = false;
     for (const id of beobachtet()) {
       let e = els.get(id);
@@ -258,15 +249,12 @@ export function kantenBeobachter(elVon: (id: string) => HTMLElement | null, beob
       if (alt && a.every((v, i) => Math.abs(v - alt[i]) < 0.01)) continue;
       zuletzt.set(id, a); anzeigeSetzen(id, a); geaendert = true;
     }
-    if (bewegt || performance.now() < bis) an();
-    else if (!fertig) {
-      if (zuletzt.size) { for (const id of zuletzt.keys()) anzeigeSetzen(id); zuletzt.clear(); geaendert = true; }   // nichts hängen lassen
-      fertig = true; ro.disconnect(); takt.remove();
-    }
+    if (bewegt || performance.now() < bis) raf = requestAnimationFrame(lesen);
+    else if (zuletzt.size) { for (const id of zuletzt.keys()) anzeigeSetzen(id); zuletzt.clear(); geaendert = true; }   // nichts hängen lassen
     if (geaendert) anzeigeMelden();
   };
-  const an = () => { if (!raf && !fertig) raf = requestAnimationFrame(() => { raf = 0; takt.style.width = takt.style.width === '2px' ? '1px' : '2px'; }); };
-  ro.observe(takt);   // meldet sich nach dem nächsten Layout zum ersten Mal
+  const an = () => { if (!raf) raf = requestAnimationFrame(lesen); };
+  an();
   return {
     /** Zug vorbei: noch so lange schauen, bis Landen und Zurückgleiten vorbei sind */
     nachlauf(ms: number) { bis = performance.now() + ms; an(); },
