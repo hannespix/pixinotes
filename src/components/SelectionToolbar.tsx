@@ -27,10 +27,12 @@ import {
 } from './Icons';
 import { vorschauArt } from '../lib/fileStore';
 import { bildBearbeitbar, bildBearbeiten } from './BildEditorHost';
+import { BildTextMenue } from './BildTextMenue';
 import { mutedHistory } from '../store';
 import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
 import type { ArrangeMode } from '../lib/arrange';
 import { KARTEN_EREIGNIS, kartenWunschNehmen } from '../lib/kontextmenue';
+import { zahlWort } from '../lib/sprache';
 
 /**
  * Aktionsleiste, die direkt über der Selektion schwebt (NodeToolbar):
@@ -375,7 +377,7 @@ export function SelectionToolbar() {
     useBoard.getState().setAiBusy(true);
     kiAbbruchZuruecksetzen();
     setAiBusy(true);
-    showToast(`KI analysiert ${selected.length} Karte(n) …`, false, 120000, true);
+    showToast(`KI analysiert ${zahlWort(selected.length, 'Karte', 'Karten')} …`, false, 120000, true);
     try {
       const pos = screenToFlowPosition({ x: window.innerWidth / 2 + 160, y: window.innerHeight / 2 - 80 });
       // M332: Stapel-Aktionen melden ihren Fortschritt; der Toast bietet „Abbrechen"
@@ -451,7 +453,7 @@ export function SelectionToolbar() {
 
   const bar = (
     <>
-      <span className="sel-count">{selected.length + selFrames.length} ausgewählt{selFrames.length > 0 ? ` (${selFrames.length} Rahmen)` : ''}</span>
+      <span className="sel-count">{selected.length + selFrames.length} ausgewählt{selFrames.length > 0 ? ` (${zahlWort(selFrames.length, 'Rahmen', 'Rahmen')})` : ''}</span>
       {selFrames.length > 0 && (
         <span className="sel-ai-wrap">
           {menu === 'frame' && menuPortal('sel-frame-menu', (
@@ -819,6 +821,8 @@ export function SelectionToolbar() {
                     </button>
                   );
                 })()}
+                {/* M452: Text im Bild – kopieren oder gleich erkennen lassen (nur ein einzelnes Bild) */}
+                {selected.length === 1 && <BildTextMenue node={selected[0]} schliessen={() => setMenu(null)} />}
                 {/* M296: „Schrift & Größe" liegt hier — und NUR hier. M267 hatte
                     ihm einen eigenen Knopf in der Leiste gegeben; die Leiste soll
                     aber sechs Elemente haben, und ein Weg reicht. */}
