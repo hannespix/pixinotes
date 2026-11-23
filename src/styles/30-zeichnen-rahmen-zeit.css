@@ -229,6 +229,8 @@
   font-size: 8px; font-weight: 700;
 }
 .week-pop-who { font-size: 11.5px; }
+/* M494: Steht helle Schrift auf dem Block (freie Farbe im Dunkeln), liegt die Marke dunkel darunter */
+.week-entry.schrift-hell .week-entry-who { background: rgba(0, 0, 0, 0.3); }
 .week-day {
   position: relative; flex: 1; min-width: 0; cursor: copy;
   background: var(--surface-dim); border-radius: var(--r-sm);
@@ -244,7 +246,7 @@
   display: flex; flex-direction: column; gap: 0; line-height: 1.2;
   min-height: 14px;
 }
-.week-entry-time { font-size: 8.5px; font-weight: 700; opacity: .8; }
+.week-entry-time { font-size: 8.5px; font-weight: 700; }  /* M494: ohne opacity — sie nahm der Zeit ein Fünftel Kontrast */
 .week-entry-text { font-size: 10.5px; font-weight: 600; overflow: hidden; overflow-wrap: anywhere; }
 .week-pop {
   position: fixed; z-index: 75; width: 240px;
@@ -253,12 +255,13 @@
   display: flex; flex-direction: column; gap: 7px;
 }
 .week-pop-text {
-  border: 1px solid var(--border-soft); border-radius: var(--r); background: var(--surface-dim);
+  border: 1px solid var(--feld-rand);  /* M494: Feldrand ≥ 3:1 (WCAG 1.4.11) */
+  border-radius: var(--r); background: var(--surface-dim);
   font-family: inherit; font-size: 12.5px; padding: 6px 8px; color: var(--ink);
 }
 .week-pop-row { display: flex; align-items: center; gap: 6px; }
 .week-pop-row select {
-  flex: 1; border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface-dim);
+  flex: 1; border: 1px solid var(--feld-rand); border-radius: var(--r-sm); background: var(--surface-dim);
   font-family: inherit; font-size: 12px; color: var(--ink); padding: 4px 5px;
 }
 .week-pop-colors { gap: 5px; }
