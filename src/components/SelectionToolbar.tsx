@@ -212,7 +212,13 @@ export function SelectionToolbar() {
     else if (inLayout(b.left) < 8) el.style.left = '8px';
     // M350: am Zeiger geöffnet kann es unten aus dem Bild ragen — dann nach oben verankern
     const unten = inLayout(window.innerHeight) - 8;
-    if (inLayout(b.bottom) > unten) { el.style.top = `${Math.max(8, unten - inLayout(b.height))}px`; el.style.bottom = 'auto'; }
+    // M474: Am Knopf nach unten geöffnet und zu hoch für den Platz darunter (Anzeige 175 %, das Menü ist mit den
+    // Jahren auf ~370 Punkte gewachsen) wurde es bisher nach oben geschoben – und lag dann ÜBER seinem eigenen Knopf
+    // (Nachtlauf, m268: 624 px Überdeckung). Bleibt genug Platz, bleibt es am Knopf und rollt stattdessen.
+    const platzUnten = unten - menuPos.y;
+    const amKnopfNachUnten = menuPos.down && !amZeiger && platzUnten >= 160;
+    if (inLayout(b.bottom) > unten && amKnopfNachUnten) el.style.maxHeight = `${platzUnten}px`;
+    else if (inLayout(b.bottom) > unten) { el.style.top = `${Math.max(8, unten - inLayout(b.height))}px`; el.style.bottom = 'auto'; }
     // M389: Nach oben geöffnet kann es OBEN aus dem Bild ragen (Tablet im Karten-Fokus: Leiste mitten im Bild, Menü
     // 420 hoch) — die ersten Einträge lagen dann unter der Kopfzeile. Es bleibt unter ihr und rollt, wenn es muss.
     const kopf = document.querySelector('.focus-head')?.getBoundingClientRect().bottom ?? 0;
