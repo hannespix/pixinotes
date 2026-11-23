@@ -1,6 +1,7 @@
 // Board-Statistiken — eine Quelle statt zweier divergierender reduce()-Kopien (Audit H3).
 import type { BoardDoc } from '../store';
 import { isOpenItem } from '../types';
+import { zahlWort } from './sprache';
 
 export function countOpenTickets(board: BoardDoc): number {
   return board.nodes.reduce(
@@ -12,5 +13,5 @@ export function countOpenTickets(board: BoardDoc): number {
 /** „5 Karten · 3 offen" — einheitliche Meta-Zeile für Kacheln & Portale */
 export function boardMetaLabel(board: BoardDoc): string {
   const open = countOpenTickets(board);
-  return `${board.nodes.length} Karten${open > 0 ? ` · ${open} offen` : ''}`;
+  return `${zahlWort(board.nodes.length, 'Karte', 'Karten')}${open > 0 ? ` · ${open} offen` : ''}`;
 }

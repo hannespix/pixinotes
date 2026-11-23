@@ -27,6 +27,7 @@ import { sofortStartenVormerken, VIBE_STUDIO, vibeStudioVorlage } from './vibeSt
 /** M337: Word beim Import als Notiz statt als Dokument-Karte? Nein — die Umwandlung gibt es auf Wunsch (textNotiz.ts) */
 const WORD_ALS_NOTIZ = false;
 import type { AppNode } from '../types';
+import { zahlWort } from './sprache';
 
 /** Kopie in den Team-Ordner legen und den Pfad an der Karte vermerken —
  *  bewusst fire-and-forget: der Import wartet nicht auf den Cloud-Ordner */
@@ -165,7 +166,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         if (!cal) { cal = makeCalendar(pos); st.addNode(cal); }
         const cur = (cal.data.icsEvents as IcsEvent[] | undefined) ?? [];
         st.updateNodeData(cal.id, { icsEvents: mergeEvents(cur, events) });
-        showToast(`${events.length} Termin(e) in die Kalender-Karte importiert`);
+        showToast(`${zahlWort(events.length, 'Termin', 'Termine')} in die Kalender-Karte importiert`);
         placed++;
         continue;
       }
@@ -176,7 +177,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         kontakte.forEach((k, i) => addNode(makeKontakt({ x: pos.x + (i % 4) * 320, y: pos.y + Math.floor(i / 4) * 230 }, k)));
         showToast(kontakte.length === 1
           ? `Kontakt „${kontakte[0].name}" übernommen.`
-          : `${kontakte.length} Kontakte übernommen${kontakte.length >= VCARD_MAX ? ` (höchstens ${VCARD_MAX} je Datei)` : ''}.`);
+          : `${zahlWort(kontakte.length, 'Kontakt', 'Kontakte')} übernommen${kontakte.length >= VCARD_MAX ? ` (höchstens ${VCARD_MAX} je Datei)` : ''}.`);
         placed++;
         continue;
       }
@@ -223,7 +224,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
           if (!canEmbed(img.src.length)) break;
           addNode(makeImage({ x: pos.x + 380, y: pos.y + (imgOffset - 1) * 220 }, img.src, img.alt ?? file.name));
         }
-        showToast(`„${res.title || file.name}" als Notiz übernommen${res.images.length ? ` (+ ${Math.min(res.images.length, 8)} Bild(er))` : ''}.`);
+        showToast(`„${res.title || file.name}" als Notiz übernommen${res.images.length ? ` (+ ${zahlWort(Math.min(res.images.length, 8), 'Bild', 'Bilder')})` : ''}.`);
         mirror(file, note.id, mirrorNote);
         placed++;
         continue;
@@ -322,7 +323,7 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
       if (ext === 'eml' || file.type === 'message/rfc822') {
         const email = await parseEml(await file.arrayBuffer());
         addNode(makeEmail(pos, email));
-        showToast(`„${email.subject}" importiert – ${email.attachments.length} Anhänge als Chips`);
+        showToast(`„${email.subject}" importiert – ${zahlWort(email.attachments.length, 'Anhang', 'Anhänge')} als Chips`);
         mirror(file, null, mirrorNote);
       } else if (ext === 'msg') {
         const email = await parseMsg(await file.arrayBuffer());

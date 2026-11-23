@@ -20,7 +20,7 @@ import { collectTasks, formatDueShort, type TaskRef } from './tasks';
 import { nodeToText } from './serialize';
 import { findFreeSpot } from './arrange';
 import { tagLokal } from './tag';
-import { t } from './sprache';
+import { t, zahlWort } from './sprache';
 import { tageSeit, zeitVon } from './kartenZeit';
 
 export interface BoardLage {
@@ -186,7 +186,7 @@ export function lageMarkdown(l: BoardLage, now: Date = new Date()): string {
   teile.push([`## ${t('Entscheidungen')}`, ...(ent.length ? ent : [`- ${t('Keine Beschlüsse gefunden.')}`])].join('\n'));
   teile.push([`## ${t('Wichtigste Inhalte')}`, ...(l.inhalte.length ? l.inhalte.map((i) => `- ${i.titel}`) : [`- ${t('Das Board ist noch leer.')}`])].join('\n'));
   const ris = [
-    ...(l.ueberfaellig.length ? [`- **${t('{0} Aufgabe(n) überfällig').replace('{0}', String(l.ueberfaellig.length))}**`] : []),
+    ...(l.ueberfaellig.length ? [`- **${t('{0} überfällig').replace('{0}', zahlWort(l.ueberfaellig.length, 'Aufgabe', 'Aufgaben'))}**`] : []),
     ...l.risiken.map((r) => `- ${r.text}${r.karte && r.karte !== r.text ? ` (${r.karte})` : ''}`),
   ];
   teile.push([`## ${t('Risiken und Blocker')}`, ...(ris.length ? ris : [`- ${t('Nichts erkannt.')}`])].join('\n'));
@@ -268,5 +268,5 @@ export async function boardBriefing(rechtsOben: { x: number; y: number }, mitKi:
   mutedHistory(() => st.addNode(notiz));
   st.focusNode(boardId, notiz.id);
   const zahl = lage.ueberfaellig.length;
-  return `${t('Board-Briefing angelegt')} (${wie})${zahl ? ` – ${t('{0} Aufgabe(n) überfällig').replace('{0}', String(zahl))}` : ''}${ausgelassen}.`;
+  return `${t('Board-Briefing angelegt')} (${wie})${zahl ? ` – ${t('{0} überfällig').replace('{0}', zahlWort(zahl, 'Aufgabe', 'Aufgaben'))}` : ''}${ausgelassen}.`;
 }
