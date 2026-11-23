@@ -15,7 +15,7 @@ import { canEmbed, makeCalendar, makeEmail, makeFile, makeHtmlApp, makeImage, ma
 // dem Deploy nicht auffindbar (dieselbe Falle wie beim Mermaid-Modul, M90).
 import { docxToBlocks } from './docx';
 import { boardDateienUebernehmen, cloneSharedBoard, parseBoardDatei } from './share';
-import { uebernimmDateien } from './syncFolder';
+import { sicherungEinspielenOeffnen } from './sicherungTakt';
 import type { IcsEvent } from './ics';
 import { vcardLesen, vcardText, VCARD_MAX } from './vcard';
 import { saveHtml } from './htmlStore';
@@ -183,6 +183,12 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         placed++;
         continue;
       }
+      if (ext === 'pixinotes') {
+        // M476: Eine Sicherung (ein Board oder alles) — erst die Vorschau, dann einspielen
+        sicherungEinspielenOeffnen(file);
+        placed++;
+        continue;
+      }
       if (ext === 'json') {
         // Geteiltes Board (.pixiboard.json) oder Voll-Export importieren
         const text = await file.text();
@@ -198,13 +204,9 @@ export async function importFilesToBoard(files: File[], basePos: { x: number; y:
         }
         const full = JSON.parse(text);
         if (full?.app === 'pixinotes' && Array.isArray(full.boards) && full.boards.length > 0) {
-          if (window.confirm(`Kompletten Stand vom ${full.savedAt ? new Date(full.savedAt).toLocaleString('de-DE') : '?'} laden? Die aktuellen Boards werden ersetzt.`)) {
-            useBoard.getState().importSync(full.boards, full.spaces ?? [], full.activeId ?? full.boards[0].id);
-            // M390: auch Vorlagen und die Inhalte der Geräte-Ablage aus der Sicherung
-            if (Array.isArray(full.templates)) useBoard.setState({ templates: full.templates });
-            void uebernimmDateien(full).then((nn) => { if (nn > 0) window.dispatchEvent(new CustomEvent('pixinotes:dateien-da')); });
-            showToast('Stand aus Datei geladen');
-          }
+          // M476: Ein kompletter Stand ersetzt nicht mehr ungefragt alles — die Vorschau zeigt, was drin ist,
+          // und bietet „als Kopie" (Standard) oder „vorhandene ersetzen" (mit Versionen und Rückgängig)
+          sicherungEinspielenOeffnen(file);
           placed++;
           continue;
         }

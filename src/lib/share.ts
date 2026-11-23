@@ -6,8 +6,7 @@
 import { kartenVonAussen } from './sicher';
 import type { BoardDoc } from '../store';
 import { uid, type AppNode, type KanbanData } from '../types';
-import { triggerDownload } from './download';
-import { anhangKarte, dateienVonKarten, uebernimmDateien, type SyncDatei } from './syncFolder';
+import { anhangKarte, uebernimmDateien, type SyncDatei } from './syncFolder';
 
 interface SharePayload {
   app: 'pixinotes-board';
@@ -50,7 +49,7 @@ export const SHARE_URL_LIMIT = 60_000;
  * trägt das Einladungs-Token und die E-Mail des Besitzers — wer eine Kopie weitergab, gab damit auch den
  * Zugang zum Original weiter. (lib/linkTeilen.ts nimmt dieselben Felder heraus.)
  */
-function zumWeitergeben(board: BoardDoc): BoardDoc {
+export function zumWeitergeben(board: BoardDoc): BoardDoc {
   const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, gastLink: _l, ...eigen } = board as BoardDoc & { gastWar?: unknown };
   delete (eigen as { gastWar?: unknown }).gastWar;
   return { ...eigen, nodes: eigen.nodes.map((n) => (n.selected ? { ...n, selected: false } : n)) } as BoardDoc;
@@ -63,16 +62,13 @@ export async function boardToShareUrl(board: BoardDoc): Promise<string> {
   return `${base}#b=${packed}`;
 }
 
-/** Fallback für große Boards (Bilder!): als .pixiboard.json herunterladen */
-export function downloadBoardFile(board: BoardDoc): void {
-  // M390: mit dem, was in der Geräte-Ablage liegt (große Dateien, eigene Tools) — die Datei ist das ganze Board
-  void (async () => {
-    const dateien = await dateienVonKarten(board.nodes).catch(() => ({}));
-    const payload: SharePayload = { app: 'pixinotes-board', version: 2, board: zumWeitergeben(board), ...(Object.keys(dateien).length ? { dateien } : {}) };
-    const url = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: 'application/json' }));
-    triggerDownload(url, `${board.name.replace(/[^\p{L}\d\-_ ]/gu, '').trim().slice(0, 40) || 'board'}.pixiboard.json`);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  })();
+/**
+ * Fallback für große Boards (Bilder!) und Board-⋯ → „Sicherung herunterladen": EINE Datei mit allem.
+ * M476: Das ist jetzt die Sicherung (.pixinotes, lib/sicherung.ts) — Anhänge als Binärdaten, eingespielt über die
+ * Vorschau. Die alte `.pixiboard.json` wird weiter gelesen.
+ */
+export function downloadBoardFile(board: BoardDoc, still = true): void {
+  void import('./sicherung').then((m) => m.boardSichern(board, still));
 }
 
 /** M390: Hat das Board Inhalte, die in keinen Link passen (sie liegen in der Geräte-Ablage, nicht im Board)? */
