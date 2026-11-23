@@ -1,5 +1,5 @@
 # M452 — Text in Bildern finden
-PR: #… · Prüfreihe: `pruefungen/m452-text-in-bildern.mjs` (Port 5452) · Datum: 2026-11-23
+PR: #137 · Prüfreihe: `pruefungen/m452-text-in-bildern.mjs` (Port 5452) · Datum: 2026-11-23
 
 ## Warum
 KONZEPT §9 (offen, BACKLOG): Screenshots sind im Büro die häufigste Bild-Karte, aber für Suche und KI
