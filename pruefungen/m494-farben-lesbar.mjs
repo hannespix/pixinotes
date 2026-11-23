@@ -4,8 +4,8 @@
  *   A  Editor-Farben (BlockNote: jede Schriftfarbe, jede Hintergrundfarbe und jede Kombination) auf einer WEISSEN
  *      Notiz im Dunkeln — ruhend und im Editor — sowie im Protokoll im Thema (dunkel) und im Protokoll mit dunkler
  *      eigener Farbe (hell): jede Stelle ≥ 4,5:1.
- *   B  Hell bleibt unverändert: dieselbe Notiz im Hellen und eine gelbe Haftnotiz im Dunkeln zeigen genau BlockNotes
- *      Farben (helles Papier).
+ *   B  Helles Papier: eine gelbe Haftnotiz im Dunkeln zeigt genau BlockNotes Farben; dieselbe Notiz im Hellen zeigt seit
+ *      M499 die kräftigeren Hellstufen (vorher ebenfalls BlockNotes Farben, die dort zu schwach waren).
  *   C  Schrift auf frei gewählten Farben (hell, mittel, dunkel): Gantt-Balken (mit und ohne Fortschritt),
  *      Kalender-Streifen der Wochenansicht und farbige Termine im Tagesdialog, Wochenplan-Blöcke (Palette und freie
  *      Farben), Zeiterfassung mit laufender Pause, Kanban-Etiketten — in Hell und Dunkel ≥ 4,5:1.
@@ -56,6 +56,8 @@ const farbBloecke = () => [
   ...FARBEN.map((g) => ({ type: 'paragraph', content: [span(`${g}:`, { backgroundColor: g }), ...FARBEN.map((f) => span(` ${f.slice(0, 3)}`, { textColor: f, backgroundColor: g }))] })),
 ];
 const BLOCKNOTE_HELL = { red: 'rgb(224, 62, 62)', gray: 'rgb(155, 154, 151)', blueGrund: 'rgb(221, 235, 241)' };
+// M499: im hellen Modus gelten eigene Hellstufen (--tag-hl-*, lib/editorFarben.ts) statt BlockNotes Originalen
+const M499_HELL = { red: 'rgb(180, 35, 24)', gray: 'rgb(94, 93, 89)', blueGrund: 'rgb(214, 231, 247)' };
 
 const stand = (nodes) => ({ boards: [{ id: 'b0', name: 'Prüfung', edges: [], drawings: [], comments: [], nodes }], spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Einstieg', boardIds: ['b0'] }] }], activeId: 'b0', view: 'board' });
 async function seite(nodes, { dunkel = true, hoehe = 1000 } = {}) {
@@ -128,7 +130,7 @@ console.log('════ B: Hell und helles Papier unverändert ════');
   {
     const { ctx, P } = await seite([{ id: 'w1', type: 'note', width: 760, height: 560, position: { x: 80, y: 60 }, data: { color: 'white', blocks: farbBloecke() } }], { dunkel: false });
     const f = await farbeVon(P, '.react-flow__node[data-id="w1"]');
-    pruefe(`B weiße Notiz hell: BlockNotes Farben (${f.red}, ${f.gray}, ${f.blueGrund})`, f.red === BLOCKNOTE_HELL.red && f.gray === BLOCKNOTE_HELL.gray && f.blueGrund === BLOCKNOTE_HELL.blueGrund, JSON.stringify(f));
+    pruefe(`B weiße Notiz hell: Hellstufen aus M499 (${f.red}, ${f.gray}, ${f.blueGrund})`, f.red === M499_HELL.red && f.gray === M499_HELL.gray && f.blueGrund === M499_HELL.blueGrund, JSON.stringify(f));
     await ctx.close();
   }
   {

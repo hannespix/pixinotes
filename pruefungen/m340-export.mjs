@@ -115,7 +115,7 @@ console.log('\n════ A: Formatiert kopieren ════');
   const z = await zwischenablage(P);
   const h = z['text/html'] ?? ''; const x = z['text/plain'] ?? '';
   pruefe('A1 Unterpunkte sind dabei – auch der tief verschachtelte Haken', h.includes('Unterpunkt tief') && h.includes('☑ ganz unten erledigt'), h.slice(0, 300));
-  pruefe('A2 Fett, Kursiv und Farbe bleiben', /<b>fett<\/b>/.test(h) && /<i>kursiv<\/i>/.test(h) && /color:#e03e3e[^>]*>rot/.test(h));
+  pruefe('A2 Fett, Kursiv und Farbe bleiben', /<b>fett<\/b>/.test(h) && /<i>kursiv<\/i>/.test(h) && /color:#b42318[^>]*>rot/.test(h)); // M499: Export nimmt die kräftigere Hellstufe (vorher BlockNotes #e03e3e)
   pruefe('A3 der Link bleibt ein Link', /<a href="https:\/\/example\.com\/plan"[^>]*>Plan<\/a>/.test(h));
   pruefe('A4 Zitat, nummerierte Liste und Tabelle (mit Fett in der Zelle)', /<blockquote[^>]*>Ein Zitat/.test(h) && /<ol[^>]*>\s*<li>Erstens/.test(h) && /<td[^>]*><b>Zelle 2<\/b><\/td>/.test(h));
   pruefe('A5 Kanban mit Frist, Person und Beschreibung', /Angebot schreiben.*bis 2026-12-01.*@Mia.*mit Anlage/s.test(h));
