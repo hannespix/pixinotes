@@ -98,6 +98,11 @@ const toast = (P) => P.evaluate(() => document.querySelector('.toast')?.textCont
 const warte = (P, ms = 600) => P.waitForTimeout(ms);
 const welle = (x0, y0, n = 18, amp = 14) => Array.from({ length: n }, (_, i) => [x0 + i * 3, y0 + Math.sin(i / 1.7) * amp + (i % 3) * 2]);
 const letzter = async (P) => (await striche(P)).at(-1);
+/** M484: Nach einem Strich warten, bis er im gespeicherten Stand liegt (statt fester 400 ms – unter Last zu knapp) */
+const strichGespeichert = async (P, vorher, ms = 10000) => {
+  for (let t = 0; t < ms; t += 100) { if (JSON.stringify(await striche(P)) !== vorher) return; await P.waitForTimeout(100); }
+};
+const zeichnen = async (P, punkte, o) => { const vorher = JSON.stringify(await striche(P)); await zug(P, punkte, o); await strichGespeichert(P, vorher); await P.waitForTimeout(150); };
 const zoomAuf = (P, z) => P.evaluate((z) => window.dispatchEvent(new CustomEvent('pixinotes:test-zoom', { detail: z })), z);
 
 console.log('════ A: Stift-Palette ════');
@@ -105,12 +110,12 @@ let { ctx, P } = await seite();
 await werkzeug(P, 'Stift');
 const stufen = P.locator('.draw-palette .draw-dicke');
 pruefe('A1 drei Stufen, „Fein" vorgewählt, dazu ein Regler', (await stufen.count()) === 3 && (await stufen.nth(0).evaluate((e) => e.classList.contains('on'))) && (await P.locator('.draw-palette .draw-regler').count()) === 1);
-await zug(P, welle(500, 400), { id: 21 }); await warte(P, 400);
+await zeichnen(P, welle(500, 400), { id: 21 });
 pruefe('A2 ein Strich bei Zoom 1 ist 1,2 breit (fein)', (await letzter(P))?.width === 1.2, String((await letzter(P))?.width));
 
 console.log('\n════ B: stufenlos ════');
 await P.locator('.draw-palette .draw-regler').fill('0.6'); await warte(P, 150);
-await zug(P, welle(500, 480), { id: 22 }); await warte(P, 400);
+await zeichnen(P, welle(500, 480), { id: 22 });
 pruefe('B1 Regler auf 0,6 → der Strich ist 0,6 breit', (await letzter(P))?.width === 0.6, String((await letzter(P))?.width));
 pruefe('B2 keine Stufe hervorgehoben, der Wert steht daneben', (await P.locator('.draw-palette .draw-dicke.on').count()) === 0 && /0,6/.test(await P.locator('.draw-staerke-wert').textContent()));
 await P.reload({ waitUntil: 'networkidle' }); await warte(P, 1600);
@@ -124,7 +129,7 @@ await P.mouse.move(700, 450);
 for (let i = 0; i < 6; i++) { await P.keyboard.down('Control'); await P.mouse.wheel(0, -100); await P.keyboard.up('Control'); await warte(P, 80); }
 await warte(P, 500);
 const z = await P.evaluate(() => Number((document.querySelector('.react-flow__viewport').style.transform.match(/scale\(([\d.]+)\)/) ?? [])[1] ?? 1));
-await zug(P, welle(600, 500), { id: 23 }); await warte(P, 400);
+await zeichnen(P, welle(600, 500), { id: 23 });
 const wC = (await letzter(P))?.width;
 pruefe('C1 vergrößert (Zoom > 1,3) zeichnet „fein" auf dem Board dünner – am Schirm gleich dick', z > 1.3 && Math.abs(wC * z - 1.2) < 0.05, `zoom ${z} breite ${wC}`);
 await ctx.close();
@@ -135,7 +140,7 @@ await werkzeug(P, 'Textmarker');
 const mb = P.locator('.draw-palette .draw-dicke[aria-label^="Markerbreite"]');
 pruefe('D1 drei Markerbreiten, „Mittel" vorgewählt', (await mb.count()) === 3 && (await mb.nth(1).evaluate((e) => e.classList.contains('on'))));
 await mb.nth(2).click(); await warte(P, 100);
-await zug(P, [[400, 300], [460, 300], [520, 300], [580, 300], [640, 300], [700, 300], [760, 300], [820, 300]], { id: 31, art: 'mouse' }); await warte(P, 400);
+await zeichnen(P, [[400, 300], [460, 300], [520, 300], [580, 300], [640, 300], [700, 300], [760, 300], [820, 300]], { id: 31, art: 'mouse' });
 pruefe('D2 „Breit" zeichnet mit Breite 22', (await letzter(P))?.width === 22, String((await letzter(P))?.width));
 await ctx.close();
 
@@ -143,7 +148,7 @@ console.log('\n════ E: Radierer ════');
 ({ ctx, P } = await seite());
 await werkzeug(P, 'Stift');
 // leicht gewellt, damit er nicht zur Linie einrastet — die Punkte liegen dicht (3 Pt.)
-await zug(P, welle(450, 500, 60, 1.5), { id: 41 }); await warte(P, 400);
+await zeichnen(P, welle(450, 500, 60, 1.5), { id: 41 });
 const punkteE = (await striche(P))[0]?.points.length;
 const vorE = (await striche(P)).length;
 await werkzeug(P, 'Radierer');
@@ -154,7 +159,7 @@ await zug(P, [[540, 518], [545, 518], [550, 518]], { id: 42 }); await warte(P, 9
 const nachKlein = await striche(P);
 pruefe('E2 „Klein" (6) verfehlt den Strich 18 Punkte daneben', nachKlein.length === vorE && nachKlein[0].points.length === punkteE, JSON.stringify(nachKlein.map((s) => s.points.length)));
 await rg.nth(2).click(); await warte(P, 100);
-await zug(P, [[540, 518], [545, 518], [550, 518]], { id: 43 }); await warte(P, 900);
+await zeichnen(P, [[540, 518], [545, 518], [550, 518]], { id: 43 });
 const nachGross = await striche(P);
 pruefe('E3 „Groß" (24) erwischt ihn an derselben Stelle', JSON.stringify(nachGross) !== JSON.stringify(nachKlein), JSON.stringify(nachGross.map((s) => s.points.length)));
 await ctx.close();

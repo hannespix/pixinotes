@@ -131,11 +131,13 @@ async function auswaehlen(P, ids) {
   await P.waitForTimeout(1500);
 }
 async function auswahlMenue(P, menue, knopfText) {
+  // M484: Leiste und Menüs werden seit M483 nachgeladen – auf sie warten statt fester 400 ms (unter Last zu knapp)
+  await P.waitForSelector('.sel-toolbar button[aria-label="Mehr"]', { timeout: 15000 }).catch(() => {});
   await P.evaluate(() => [...document.querySelectorAll('.sel-toolbar button')].find((b) => b.getAttribute('aria-label') === 'Mehr')?.click());
-  await P.waitForTimeout(400);
+  await P.waitForSelector('.sel-more-menu', { timeout: 15000 }).catch(() => {});
   if (menue === 'ai') {
     await P.evaluate(() => [...(document.querySelector('.sel-more-menu')?.querySelectorAll('button') ?? [])].find((b) => b.textContent.includes('KI-Aktionen'))?.click());
-    await P.waitForTimeout(400);
+    await P.waitForSelector('.sel-ai-menu', { timeout: 15000 }).catch(() => {});
     return P.evaluate((t) => { const b = [...(document.querySelector('.sel-ai-menu')?.querySelectorAll('button') ?? [])].find((x) => x.textContent.includes(t)); b?.click(); return !!b; }, knopfText);
   }
   return P.evaluate((t) => { const b = [...(document.querySelector('.sel-more-menu')?.querySelectorAll('button') ?? [])].find((x) => x.textContent.includes(t)); b?.click(); return !!b; }, knopfText);

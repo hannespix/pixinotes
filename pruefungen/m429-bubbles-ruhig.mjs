@@ -93,6 +93,9 @@ console.log('\n════ A/C: Board ════');
 {
   globalThis.WARTE = 200;
   const { ctx, P } = await auf(640, 440, { viewport: { width: 1440, height: 900 } });
+  // M484: erst messen, wenn alle vier Gruppen-Namen stehen – unter Last kam der Aufbau (erste Lage der Namen) sonst
+  // in die Messung und zählte als Sprung (17 Punkte bei Last über der Kernzahl)
+  await P.waitForFunction(() => [...document.querySelectorAll('.bub-ring-name')].filter((n) => /translate\(/.test(n.style.transform)).length >= 4, null, { timeout: 15000 }).catch(() => {});
   const frueh = await spurNamen(P, 5000);
   pruefe(`A1 beim Einschwingen: kein Name springt (≤ ${sprungGrenze} Punkte je Bild)`, groessterSprung(frueh) <= sprungGrenze, groessterSprung(frueh).toFixed(1));
   await P.waitForTimeout(2500);

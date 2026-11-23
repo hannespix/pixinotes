@@ -181,9 +181,10 @@ console.log('\n════ D: Freitext, Auswahl ════');
   await fertig(P);
   pruefe('D1 „Mach die Präsentation kürzer" überarbeitet die vorhandene (keine zweite)', (aufrufe[0] ?? '').startsWith('Du überarbeitest') && (await board(P)).nodes.filter((n) => n.type === 'htmlapp').length === 1 && (await idb(P, `happ:${id}`)).includes('Kurzbericht Q3'));
   const k = await P.locator(`.react-flow__node[data-id="${id}"]`).boundingBox();
-  await P.mouse.click(k.x + 60, k.y + 12); await P.waitForTimeout(400);
-  await P.evaluate(() => [...(document.querySelector('.sel-toolbar')?.querySelectorAll('button') ?? [])].find((x) => x.getAttribute('aria-label') === 'Mehr')?.click()); await P.waitForTimeout(500);
-  await P.evaluate(() => [...(document.querySelector('.sel-more-menu')?.querySelectorAll('button') ?? [])].find((b) => b.textContent.includes('KI-Aktionen'))?.click()); await P.waitForTimeout(400);
+  // M484: Auswahl-Leiste und Menüs laden seit M483 nach – auf sie warten statt fester Pausen
+  await P.mouse.click(k.x + 60, k.y + 12); await P.waitForSelector('.sel-toolbar button[aria-label="Mehr"]', { timeout: 15000 }).catch(() => {});
+  await P.evaluate(() => [...(document.querySelector('.sel-toolbar')?.querySelectorAll('button') ?? [])].find((x) => x.getAttribute('aria-label') === 'Mehr')?.click()); await P.waitForSelector('.sel-more-menu', { timeout: 15000 }).catch(() => {});
+  await P.evaluate(() => [...(document.querySelector('.sel-more-menu')?.querySelectorAll('button') ?? [])].find((b) => b.textContent.includes('KI-Aktionen'))?.click()); await P.waitForSelector('[data-taste="ki-praesentation-ueberarbeiten"]', { timeout: 15000 }).catch(() => {});
   pruefe('D2 Auswahl-KI einer Präsentation: „Präsentation überarbeiten"', (await P.locator('[data-taste="ki-praesentation-ueberarbeiten"]').count()) === 1);
   await ctx.close();
 }

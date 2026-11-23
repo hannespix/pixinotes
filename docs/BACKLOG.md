@@ -7,9 +7,7 @@ immer Vorrang vor dieser Liste.
 ## Läuft
 | Nr. | Thema |
 |---|---|
-| M483 | Start-JS entlasten |
-| M484 | Flatternde Prüfreihen stabilisieren (m414, m383, m387, m428; Läufer `--wiederhole N`) |
-| M485 | Ziehen-Feinschliff: Linien folgen der gehobenen Karte, Kettenreaktion beim Ausweichen, Codeblöcke in Notizen ohne Rechtschreibprüfung |
+| M484 | Flatternde Prüfreihen stabilisieren (m414, m383, m387, m428, m477; Läufer `--wiederhole N`) |
 
 ## Offene Punkte aus gemergten Meilensteinen
 - M449: Versionen nur je Gerät (reisen nicht mit Sync/Export)
@@ -19,8 +17,8 @@ immer Vorrang vor dieser Liste.
 - M473: Serien ohne `BYHOUR`/`BYWEEKNO`/`BYYEARDAY` und nicht stündlich; Export über einen Zeitraum nimmt Serien nur im sichtbaren Fenster mit; stille Google-Erneuerung scheitert ohne Geste meist (dann Hinweis in der Zentrale)
 - M477: Gemeinsam tippen nur in Notizen (nicht Protokoll, Präsentation, Kanban-Texte); Mitwirkende mit älterer App-Fassung sperren die Notiz weiter; Kanal-Teilnehmer ohne Schreibrecht könnten mit einem manipulierten Programm Text unterschieben, den der Schreiber speichert (Server prüft Notiz-Inhalte nicht je Absender)
 - M480: `store/struktur.ts` und `store/karten.ts` mit je ~650 Zeilen noch die größten Scheiben (Portale aus Karten, Stände/Zurückholen aus Struktur herauslösen, wenn sie wieder Konfliktherd werden)
-- M481: Nachbarn weichen nur einstufig aus (keine Kettenreaktion, ein Nachbar kann auf einen dritten gleiten); Linien zeigen während des Zugs auf die ungehobene Lage (→ M485)
-- M482: Codeblöcke innerhalb einer Notiz werden mitgeprüft (→ M485)
+- M481: Nachbarn weichen nur einstufig aus (keine Kettenreaktion, ein Nachbar kann auf einen dritten gleiten); Linien zeigen während des Zugs auf die ungehobene Lage (→ erledigt in M485)
+- M482: Codeblöcke innerhalb einer Notiz werden mitgeprüft (→ erledigt in M485)
 - M466: Outlook nur lesen und auf Abruf (kein Abo/Delta-Abgleich, keine Ordner außer Posteingang, kein Antworten über Graph); braucht `VITE_MS_CLIENT_ID` im Build
 
 ## Ideen (noch nicht vergeben)
