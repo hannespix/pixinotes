@@ -16,6 +16,12 @@ immer Vorrang vor dieser Liste.
 | M449 | Board-Versionen: Stände wiederherstellen (Zeitreise) | store, Speicher |
 | — | Wissensbasis: HISTORIE.md, README aktualisieren | docs/ |
 
+## Offene Punkte aus gemergten Meilensteinen
+- M445: Auto-Aufräumen (nächtlich) und Pin „nicht mit ordnen“ fehlen
+- M449: Versionen nur je Gerät (reisen nicht mit Sync/Export); Live-Team-Änderungen lösen keine eigene Sicherung aus; einzelne Stände nicht löschbar; kein Vergleich Karte für Karte
+- M444: Risiko-Erkennung ohne KI nur Wortmuster
+- M450: Kontakt-Karte aus einer Mail-Signatur erzeugen
+
 ## Ideen (noch nicht vergeben)
 - Microsoft-Graph-Anbindung (Outlook-Mails/Termine live) — Roadmap Phase 4
 - Browser-Erweiterung „An PixiNotes senden" (Capture)
