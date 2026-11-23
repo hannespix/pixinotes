@@ -83,6 +83,8 @@ Briefing und MCP alles wie bisher, und alte Protokolle brauchen keine Umwandlung
 - Datenmodell: **unverändert** (`MinutesData`, `MinutesEntry`); keine Migration, keine neuen Merkfelder für
   `lib/abgleichZeiten.ts` (`current` und `extEpoch` zählen schon nicht als Inhalt, `lib/kartenZeit.ts`).
 - Hilfe (beide Sprachen), `src/sprache/en.json` (56 Texte).
+- Start-JS: 2 107 883 B mit eingemischtem M486/M488 (Grenze 2 120 000 unverändert). Die Karte selbst lädt weiter nach
+  (`React.lazy`, M446); in den Start kommt nur `lib/minutes.ts`, weil die Kachel die offenen Aufgaben zählt.
 
 ## Prüfreihe
 A Kontraste aller sichtbaren Texte (berechnete Farbe gegen den durch alle halbdurchsichtigen Flächen gemischten
@@ -91,6 +93,11 @@ und offene Aufgaben (mit „offen seit“, ohne Erledigtes), Meldung · C Zeile 
 mit Frist, Beschlusslage, Abhaken, Suche + Sprung · D altes Protokoll (Blöcke ohne Kennung, Semikolon-Runde,
 unbekannte Felder) ohne Verlust · E Neuladen · F Telefon hell/dunkel ohne Überlauf, Werkzeuge in der Datumszeile,
 Ziele ≥ 28 px am Schirm · G Kachel, keine Seitenfehler.
+
+Angepasste alte Reihen (nur Selektoren — das gemessene Verhalten bleibt): `m421` (Bedienung in Ruhe unsichtbar:
+`.pr-werkzeuge` statt der entfallenen Blätter-Zeile `.minutes-nav` und `.minutes-top-add`; Inhalt `.pr-datum` statt
+`.minutes-meta input[type=date]`), `m487` (Teilnehmende über `.pr-person-neu` statt des Freitextfelds — Sperr-Hinweis
+und Speichern „Anna, Gerd“ unverändert geprüft), `m381` (englische Rückfrage beim Sitzung-Löschen, jetzt über ⋯).
 
 ## Grenzen / offen
 - Die BlockNote-Menüs (Formatierleiste, Einfügen-Menü) bleiben im hellen Thema (wie in Notizen).
