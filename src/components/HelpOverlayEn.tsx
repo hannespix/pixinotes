@@ -10,13 +10,14 @@
 import { KUERZEL, taste } from '../lib/tasten';
 import { t } from '../lib/sprache';
 import { MailLink } from './MailLink';
+import { NeuesteZuerst } from './NeuesteZuerst';
 
 export function NeuEn() {
   return (
     <div className="help-en" data-sprache="aus" lang="en">
             <section id="help-neu">
               <p>The latest releases in brief, newest first. Which version is currently running is shown at the bottom of the help.</p>
-              <ul>
+              <ul><NeuesteZuerst>
                 <li><b>Appointments in the Task hub (M469):</b> With a Google or Outlook calendar connected, the Task hub shows <b>“Appointments today and tomorrow”</b> at the top – with time, title and account, without check boxes (appointments are not tasks). A click opens the calendar card on the day of the appointment (if there is none, one is created). An appointment that is already in the list as a timeline task does not appear twice. With <b>“Remind me beforehand”</b> the app reminds you up to 15 minutes before it starts (off by default). At startup the app does not query any account – it uses what the calendar card and the Task hub fetched last.</li>
                 <li><b>Complete appointments (M471):</b> The Task hub shows start and end, the location and, besides Google and Outlook, the own appointments of your calendar cards and ICS subscriptions – each appointment only once. A click opens <b>exactly this appointment</b> in the calendar card, with “Open in Outlook” or “Open in Google Calendar”. With “Remind me beforehand” the app quietly fetches today and tomorrow (at most every 15 minutes) so that new appointments are reminded too; without it, the app still queries no account at startup.</li>
                 <li><b>Use text in images (M465):</b> If an image shows a phone number, email address, web address or deadline, it appears as a small button below the <b>selected</b> image: call, write an email, open the page, add the deadline to your calendar (.ics). A deadline only becomes a task with <b>“as task”</b> – nothing from images lands in the task center on its own. The brain (search by meaning) now reads the text in images too; excluded areas stay out.</li>
@@ -222,7 +223,7 @@ export function NeuEn() {
                 <li><b>A broken card no longer takes anything down with it:</b> If a module stumbles over damaged data, a message appears in its place instead of a white page. The rest of the board keeps working, and the data stays untouched.</li>
                 <li><b>Card in Focus (phone):</b> A tap on a card opens it <b>full-screen</b> – with title and ✕ at the top, paging at the bottom. The reason: the modules are small applications, and operating an hourly grid or Kanban on the canvas at phone width is a fight you don’t win. In Focus there is only what belongs to this module; connecting, arranging and archiving remain board matters. <b>Swiping</b> pages to the neighboring card; <b>swiping down</b>, the <b>✕</b> or the <b>Back button</b> lead to the board. Can be switched off under Settings → Design → Controls.</li>
                 <li><b>Calm on the phone when the keyboard comes up</b> – as soon as you type, everything that isn’t helping at the moment makes way: the dock slides away, zoom buttons and footer fade out, and the input bubbles of the planner and calendar dock as a sheet directly above the keyboard instead of covering the module you are writing in. If something is selected, the selection bar takes over the dock row – one bar instead of two stacked ones, and never two rows again.</li>
-              </ul>
+              </NeuesteZuerst></ul>
             </section>
     </div>
   );
