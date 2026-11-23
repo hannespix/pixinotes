@@ -45,6 +45,7 @@ Ein früherer Revisions-Ansatz (Kommentar „Trilium-Paket: Board-Verlauf" in `s
 
 ## Grenzen / offen
 - Versionen liegen **nur auf diesem Gerät**; sie reisen nicht mit Sync/Export (bewusst: Größe, Datenschutz).
-- Live-Team-Änderungen (Realtime-Deltas) lösen keine eigene „Vor Abgleich"-Sicherung aus; sie sind über Takt und
-  Verlassen abgedeckt.
-- Kein Vergleich Karte für Karte im Dialog (nur Zahlen + Skizze), kein Löschen einzelner Stände.
+- ~~Live-Team-Änderungen (Realtime-Deltas) lösen keine eigene „Vor Abgleich"-Sicherung aus; sie sind über Takt und
+  Verlassen abgedeckt.~~ → erledigt in M460 (große Schübe anderer sichern vorher, gedrosselt).
+- ~~Kein Vergleich Karte für Karte im Dialog (nur Zahlen + Skizze), kein Löschen einzelner Stände.~~ → erledigt in
+  M460 (Vergleich, einzelne Karten zurückholen, Stände löschen).

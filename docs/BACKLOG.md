@@ -18,7 +18,7 @@ immer Vorrang vor dieser Liste.
 
 ## Offene Punkte aus gemergten Meilensteinen
 - M445: Auto-Aufräumen (nächtlich) und Pin „nicht mit ordnen“ fehlen
-- M449: Versionen nur je Gerät (reisen nicht mit Sync/Export); Live-Team-Änderungen lösen keine eigene Sicherung aus; einzelne Stände nicht löschbar; kein Vergleich Karte für Karte
+- M449: Versionen nur je Gerät (reisen nicht mit Sync/Export)
 - M444: Risiko-Erkennung ohne KI nur Wortmuster
 - M450: Kontakt-Karte aus einer Mail-Signatur erzeugen
 

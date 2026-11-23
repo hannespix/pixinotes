@@ -30,9 +30,10 @@
 import { idbDel, idbGet, idbKeys, idbSet } from './syncFolder';
 import { persistHaken, useBoard, vorUmbauHaken, type BoardDoc, type CommentThread, type Stroke } from '../store';
 import type { AppNode } from '../types';
+import { inhaltGeaendert } from './kartenZeit';
 import type { Edge } from '@xyflow/react';
 
-export type VersionGrund = 'verlassen' | 'automatisch' | 'sitzung' | 'manuell' | 'abgleich' | 'import' | 'ki' | 'wiederherstellen';
+export type VersionGrund = 'verlassen' | 'automatisch' | 'sitzung' | 'manuell' | 'abgleich' | 'import' | 'ki' | 'wiederherstellen' | 'team';
 
 export interface VersionInfo {
   id: string;
@@ -70,12 +71,15 @@ export const GRUND_TEXT: Record<VersionGrund, string> = {
   import: 'Vor Import',
   ki: 'Vor KI-Umbau',
   wiederherstellen: 'Vor Wiederherstellen',
+  team: 'Vor Änderungen anderer',
 };
 
 export const VERSIONEN_MAX = 50;
 const BYTES_MAX = 20 * 1024 * 1024;
 const BLOB_AB = 16 * 1024;
 export const TAKT_MS = 10 * 60 * 1000;
+/** M460: Höchstens eine Sicherung „Vor Änderungen anderer" je Board in diesem Abstand (ein Team schiebt oft in Schüben) */
+export const FREMD_ABSTAND_MS = 2 * 60 * 1000;
 const STUNDE = 3600_000;
 const TAG = 24 * STUNDE;
 
@@ -248,6 +252,58 @@ async function blobsAufraeumen(schluessel?: Set<string>): Promise<void> {
   for (const k of keys) if (k.startsWith('ver-blob:') && !gebraucht.has(k.slice(9))) await idbDel(k);
 }
 
+/**
+ * M460: Einen Stand löschen. Geteilte große Zeichenketten (`ver-blob:`) bleiben, solange ein anderer Stand sie
+ * braucht. Datei- und Tool-Inhalte (`file:`/`html:` unter der Kartenkennung) werden hier NICHT angefasst: Sie können
+ * auch an Karten jetzt, an anderen Ständen, an Vorlagen oder an einem Rückgängig-Schritt hängen. Das Aufräumen beim
+ * Start (App.tsx, `versionsAnhaenge`) gibt sie frei, sobald sie niemand mehr braucht — dieselbe Regel wie bisher.
+ */
+export function versionLoeschen(boardId: string, versionId: string): Promise<boolean> {
+  return nacheinander(async () => {
+    try {
+      const liste = (await idbGet<VersionInfo[]>(IX(boardId))) ?? [];
+      const bleibt = liste.filter((v) => v.id !== versionId);
+      if (bleibt.length === liste.length) return false;
+      if (bleibt.length) await idbSet(IX(boardId), bleibt); else await idbDel(IX(boardId));
+      await idbDel(VER(versionId));
+      await blobsAufraeumen();
+      // Der „gleiche Stand"-Schutz merkt sich die letzte Prüfsumme — nach dem Löschen des jüngsten gilt die davor
+      const letzte = bleibt[bleibt.length - 1];
+      if (letzte) { letzteSig.set(boardId, letzte.sig); letzteZeit.set(boardId, letzte.at); }
+      else { letzteSig.delete(boardId); letzteZeit.delete(boardId); }
+      return true;
+    } catch { return false; }
+  });
+}
+
+export interface KartenVergleich {
+  /** Seitdem neu (gibt es jetzt, damals nicht) */
+  neu: AppNode[];
+  /** Seitdem gelöscht (die Fassung aus dem Stand) */
+  geloescht: AppNode[];
+  /** Seitdem inhaltlich geändert: damalige und jetzige Fassung */
+  geaendert: { dann: AppNode; jetzt: AppNode }[];
+}
+
+const inhalt = (n: AppNode) => (n.data ?? {}) as Record<string, unknown>;
+/**
+ * M460: Was ist seit dem Stand passiert — Karte für Karte. „Geändert" heißt: der INHALT (data) ist anders; Lage,
+ * Größe und Ansichtsfelder (Monat, Zoom, Filter … — dieselbe Liste wie M453) zählen nicht. Pur.
+ */
+export function kartenVergleich(stand: VersionStand, jetzt: AppNode[]): KartenVergleich {
+  const dann = new Map(stand.nodes.map((n) => [n.id, n]));
+  const hier = new Map(jetzt.map((n) => [n.id, n]));
+  const neu = jetzt.filter((n) => !dann.has(n.id));
+  const geloescht = stand.nodes.filter((n) => !hier.has(n.id));
+  const geaendert: KartenVergleich['geaendert'] = [];
+  for (const d of stand.nodes) {
+    const j = hier.get(d.id);
+    if (!j || j.data === d.data) continue;
+    if (j.type !== d.type || inhaltGeaendert(inhalt(d), inhalt(j)) || inhaltGeaendert(inhalt(j), inhalt(d))) geaendert.push({ dann: d, jetzt: j });
+  }
+  return { neu, geloescht, geaendert };
+}
+
 export async function versionLaden(id: string): Promise<VersionStand | null> {
   try {
     const roh = await idbGet<unknown>(VER(id));
@@ -305,6 +361,15 @@ export function initBoardVersionen(): void {
   /** Boards, deren Stand VOR der ersten Änderung dieser Sitzung schon gesichert ist */
   const basis = new Set<string>();
 
+  // M460: Große Änderung anderer — vorher sichern, gedrosselt je Board (nicht über die 10-Minuten-Bremse des Abgleichs)
+  const letzterSchub = new Map<string, number>();
+  vorUmbauHaken.fremdSchub = (b) => {
+    const jetzt = Date.now();
+    if (jetzt - (letzterSchub.get(b.id) ?? 0) < FREMD_ABSTAND_MS) return;
+    letzterSchub.set(b.id, jetzt);
+    void versionSichern(b, 'team');
+    basis.add(b.id);
+  };
   vorUmbauHaken.sichern = (boards, grund) => {
     for (const b of boards) {
       void versionSichern(b, grund, grund === 'abgleich' ? TAKT_MS : 0);

@@ -7550,6 +7550,23 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 .versionen-knoepfe button:disabled, .versionen-fuss button:disabled { opacity: 0.5; cursor: default; }
 .versionen-fuss { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 14px 20px 16px; }
 .versionen-fuss small { font-size: 11.5px; color: var(--muted); }
+/* M460: Löschen ist leise (ohne Rahmen) — es soll neben Wiederherstellen nicht gleich gewichtig wirken */
+.versionen-knoepfe button.versionen-leise { border-color: transparent; background: none; color: var(--muted); margin-left: auto; }
+.versionen-knoepfe button.versionen-leise:hover { color: var(--ink); background: var(--surface-3); }
+/* M460: Karte für Karte — eine ruhige Liste unter der Vorschau, Zurückholen als kleiner Textknopf */
+.versionen-vergleich h3 { font-size: 11.5px; font-weight: 600; color: var(--muted); margin: 2px 0 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.versionen-vergleich ul { list-style: none; margin: 0; padding: 0; max-height: 168px; overflow-y: auto; border: 1px solid var(--border-soft); border-radius: var(--r); }
+.versionen-vergleich li { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12.5px; min-height: 30px; }
+.versionen-vergleich li + li { border-top: 1px solid var(--border-soft); }
+.versionen-vergleich li > svg { flex: none; color: var(--muted); }
+.versionen-vergleich .vv-titel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.versionen-vergleich small { flex: none; font-size: 11.5px; color: var(--muted); }
+.versionen-vergleich button {
+  flex: none; font-family: inherit; font-size: 12px; cursor: pointer; color: var(--accent-strong); background: none; border: 0;
+  border-radius: var(--r); padding: 3px 6px;
+}
+.versionen-vergleich button:hover, .versionen-vergleich button:focus-visible { background: var(--surface-3); }
+.versionen-vergleich button:disabled { opacity: 0.5; cursor: default; }
 @media (max-width: 560px) {
   .versionen-teile { grid-template-columns: 1fr; padding: 0 12px; }
   .versionen-liste { max-height: 180px; }
