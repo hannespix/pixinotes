@@ -544,9 +544,9 @@ await warteBis(G.P, async () => (await fremdeCursor(G.P)).includes(annaName), 40
 pruefe('B6 Gerd sieht Annas Cursor mit ihrem Namen im Protokoll', (await fremdeCursor(G.P)).includes(annaName), JSON.stringify(await fremdeCursor(G.P)));
 await A.P.screenshot({ path: `${SD}/m487-b-protokoll.png` });
 // Während Anna tippt, bleiben die übrigen Felder der Karte, wie sie sind (sonst hielte Gerd die Karte)
-await G.P.locator('.react-flow__node[data-id="p1"] .minutes-meta input[type="text"]').click();
+await G.P.locator('.react-flow__node[data-id="p1"] .pr-person-neu').click();
 await G.P.waitForTimeout(500);
-pruefe('B7 Teilnehmende ändern geht nicht, solange Anna im Protokoll tippt – ein Hinweis nennt sie', new RegExp(annaName).test(await toast(G.P)) && !(await G.P.evaluate(() => document.activeElement?.matches?.('.minutes-meta input'))), await toast(G.P));
+pruefe('B7 Teilnehmende ändern geht nicht, solange Anna im Protokoll tippt – ein Hinweis nennt sie', new RegExp(annaName).test(await toast(G.P)) && !(await G.P.evaluate(() => document.activeElement?.matches?.('.pr-person-neu'))), await toast(G.P));
 await A.P.keyboard.press('Escape'); await A.P.evaluate(() => document.activeElement?.blur?.());
 await G.P.keyboard.press('Escape'); await G.P.evaluate(() => document.activeElement?.blur?.());
 const endeP = await protokollText(A.P);
@@ -557,7 +557,7 @@ const e1 = eintragVon(serverBoard());
 pruefe('B9 gespeichert wird das gewohnte Block-JSON der Sitzung (Datum bleibt)', Array.isArray(e1?.blocks) && e1.blocks[0]?.type === 'paragraph' && e1.date === '2026-11-23' && !JSON.stringify(e1).includes('ydoc'), JSON.stringify(e1).slice(0, 200));
 pruefe('B10 kein Konflikt-Hinweis', (await keinKonflikt([A, G])).gut, JSON.stringify((await keinKonflikt([A, G])).t));
 // Niemand tippt mehr: Teilnehmende sind wieder frei
-await G.P.locator('.react-flow__node[data-id="p1"] .minutes-meta input[type="text"]').click();
+await G.P.locator('.react-flow__node[data-id="p1"] .pr-person-neu').click();
 await G.P.keyboard.type('Anna, Gerd', { delay: 20 });
 await G.P.evaluate(() => document.activeElement?.blur?.());
 await warteBis(A.P, () => eintragVon(serverBoard())?.attendees === 'Anna, Gerd', 10000);

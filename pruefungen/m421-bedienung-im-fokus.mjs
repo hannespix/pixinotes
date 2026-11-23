@@ -65,7 +65,7 @@ const BEDIENUNG = {
   c1: ['.cal-nav'],
   b1: ['.bub-schritte', '.bub-leiste', '.bub-gruppe-neu', '.bub-ansicht', '.bub-zahl'],
   t1: ['.time-rec', '.time-nav', '.time-empty'],
-  m1: ['.minutes-nav', '.minutes-new', '.minutes-setup-btn', '.minutes-top-add', '.minutes-decision-add'],
+  m1: ['.minutes-new', '.minutes-setup-btn', '.pr-werkzeuge', '.minutes-decision-add'],   // M489: Werkzeuge statt Blätter-Zeile und ＋ TOP
   r1: ['.sheet-tools', '.sheet-fuss'],
   h1: ['.happ-size', '.happ-head .happ-btn'],
 };
@@ -76,7 +76,7 @@ const INHALT = {
   c1: ['.cal-grid', '.cal-head'],
   b1: ['.bub-blase', '.bub-frage-feld'],
   t1: ['.time-title, .time-head'],
-  m1: ['.minutes-head', '.minutes-meta input[type="date"]'],
+  m1: ['.minutes-head', '.pr-datum'],
   r1: ['.sheet-grid td'],
   h1: ['.happ-head'],
 };
@@ -107,7 +107,7 @@ const deckkraft = (P, liste) => P.evaluate((liste) => {
 }, liste);
 const lage = (P) => P.evaluate(() => {
   const out = {};
-  for (const [id, sel] of [['k1', '.kanban-col'], ['g1', '.gantt-svg'], ['c1', '.cal-grid'], ['b1', '.bub-buehne'], ['t1', '.time-wrap'], ['m1', '.minutes-meta'], ['r1', '.sheet-grid'], ['h1', '.happ-body']]) {
+  for (const [id, sel] of [['k1', '.kanban-col'], ['g1', '.gantt-svg'], ['c1', '.cal-grid'], ['b1', '.bub-buehne'], ['t1', '.time-wrap'], ['m1', '.pr-sitzung-kopf'], ['r1', '.sheet-grid'], ['h1', '.happ-body']]) {
     const k = document.querySelector(`.react-flow__node[data-id="${id}"]`); const e = k?.querySelector(sel); if (!e) { out[id] = null; continue; }
     const r = e.getBoundingClientRect(); const kr = k.getBoundingClientRect();
     out[id] = [r.left, r.top, r.width, r.height, kr.width, kr.height].map((v) => Math.round(v * 10) / 10).join(' ');

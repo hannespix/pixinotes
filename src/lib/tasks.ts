@@ -8,7 +8,7 @@ import { detectDates } from './dates';
 import { ankerFuer, type FristAnker } from './fristAnker';
 
 /** M390: Anker eines Protokoll-Punkts — der Tag, seit dem er offen ist, sonst der Sitzungstag. */
-function sitzungsAnker(text: string, sitzung: string | undefined): Date | undefined {
+export function sitzungsAnker(text: string, sitzung: string | undefined): Date | undefined {
   const m = /\(offen seit (\d{1,2})\.(\d{1,2})\.(\d{2,4})\)/i.exec(text);
   const d = m
     ? new Date(m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]), Number(m[2]) - 1, Number(m[1]), 0, 0, 1)
