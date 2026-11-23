@@ -25,6 +25,7 @@ Oberfläche, Bedienung erst im Fokus, keine neuen Knöpfe ohne Grund.
 | Arbeitsweise mehrerer Agenten parallel | `docs/AGENTEN.md` |
 | MCP-Server für KI-Programme von außen (`mcp/`, `npm run build:mcp`) | `docs/MCP.md` |
 | Audits (Design, Logik, Code/Security) mit Befund-Listen | `docs/AUDIT.md` |
+| Einrichtung für den Betreiber (Google, Microsoft, Supabase, Variablen) | `docs/EINRICHTUNG.md` |
 | E2E-Prüfreihen (eine je Meilenstein) | `pruefungen/` + `pruefungen/README.md` |
 | Werkzeuge (Prüfungen parallel, Sprache, App-Zeichen) | `werkzeug/` |
 | Server (Supabase-Migrationen, RLS) | `supabase/migrations/` |
