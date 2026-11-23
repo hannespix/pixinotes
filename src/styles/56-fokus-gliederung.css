@@ -1,0 +1,421 @@
+/* ================= M212 → M333: Karte im Fokus = Zoom auf dem Board =================
+   M333: Kein zweiter Editor und keine Vollbild-Position mehr. Die Kamera fährt im
+   Board auf die Karte (Board.tsx, fokusZoomen), der Rest tritt zurück. Stift,
+   Finger, Handschrift, Radierer und Gesten arbeiten auf derselben Fläche weiter —
+   genau das ging im alten Blatt nicht, weil die Zeichenebene darunter lag. */
+.focus-mode .react-flow__node:not(.pn-focused) {
+  opacity: .22; pointer-events: none; filter: saturate(.5);
+  transition: opacity .25s ease;
+}
+.focus-mode .react-flow__edges { opacity: .25; }
+.focus-mode .react-flow__minimap,
+.focus-mode .dock,
+.focus-mode .logo-wrap,
+.focus-mode .top-actions,
+.focus-mode .tabs,
+.focus-mode .backlinks,
+.focus-mode .legal-corner,
+.focus-mode .react-flow__controls,
+.focus-mode .react-flow__attribution { display: none !important; }
+.focus-mode .react-flow__node.pn-focused {
+  z-index: 3 !important;
+}
+/* M413: Die Karte behält im Fokus ihre Form – die Kamera fährt heran (Board.tsx). Nur am Telefon füllt ein Modul
+   weiter die Schirmbreite: zusammengeschoben auf die Breite eines Telefons ließe es sich nicht bedienen. */
+@media (max-width: 640px) {
+  /* M424: nur bei der Darstellung „Automatisch" — wer Einpassen, Seitenbreite oder Originalgröße wählt, bekommt die Karte, wie sie ist */
+  html:not([data-fokus-ansicht]) .focus-mode .react-flow__node.pn-focused:is(.react-flow__node-kanban, .react-flow__node-gantt, .react-flow__node-week, .react-flow__node-sheet,
+    .react-flow__node-time, .react-flow__node-minutes, .react-flow__node-calendar, .react-flow__node-bubbles, .react-flow__node-mermaid, .react-flow__node-htmlapp) {
+    min-width: calc(var(--fokus-platz, calc(100vw / var(--pn-anz, 1))) - var(--fokus-rand, 8px)) !important;
+  }
+}
+.focus-mode .pn-focused .card-shell,
+.focus-mode .pn-focused .card-body { width: 100% !important; }
+
+/* Board-Werkzeuge an der Karte treten im Fokus zurück: Verschiebe-Griff, Löschen, Verbindungspunkte */
+.focus-mode .pn-focused .card-grip,
+.focus-mode .pn-focused .react-flow__handle { display: none !important; }
+.focus-mode .pn-focused .card-body { box-shadow: 0 14px 44px rgba(0, 0, 0, .26) !important; }
+
+/* Kopfzeile: Zurück · Titel · Mehr */
+.focus-head {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 60;
+  height: var(--focus-top); padding: calc(var(--safe-top)) 6px 0;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--glass); border-bottom: 1px solid var(--glass-border);
+  animation: pn-fade-in 0.18s ease-out;
+}
+.focus-head button {
+  flex: none; width: 44px; height: 44px; display: grid; place-items: center;
+  border: none; background: none; color: var(--ink); cursor: pointer; border-radius: var(--r);
+}
+.focus-head button:hover { background: var(--surface-2); }
+.focus-title { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.focus-title b {
+  font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.focus-title span { font-size: 11px; color: var(--muted); }
+
+/* Blätter-Leiste unten — die einzige Leiste im Fokus */
+.focus-nav {
+  position: fixed; left: 0; right: 0; bottom: var(--kb); z-index: 60;
+  /* M225: FESTE Höhe. Vorher stand hier --focus-bottom — seit der Werkzeug-
+     leiste ist das aber der Platz für BEIDE Zeilen, und die Blätter-Leiste
+     legte sich über die Werkzeuge (Tippen auf „Weiter" traf „Löschen"). */
+  height: 52px; padding-bottom: env(safe-area-inset-bottom, 0px);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding-inline: 6px;
+  background: var(--glass); border-top: 1px solid var(--glass-border);
+  animation: pn-fade-in 0.18s ease-out;
+  transition: bottom 0.18s ease;
+}
+.focus-nav button {
+  width: 56px; height: 44px; display: grid; place-items: center;
+  border: none; background: none; color: var(--ink); cursor: pointer; border-radius: var(--r);
+}
+.focus-nav button:hover { background: var(--surface-2); }
+
+/* Tastatur offen: die Blätter-Leiste hilft beim Tippen nicht */
+[data-keyboard='on'] .focus-nav { display: none; }
+/**
+ * M291: Der Fuß im Fokus — drei Zeilen, EINE Rechnung, an der WURZEL.
+ *
+ * Der Fehler, den das behebt (User-Bildschirmfoto, gemessen): Die
+ * Formatier-Leiste lag exakt über der Blätter-Zeile (beide 792–844).
+ * Der Grund war nicht die Rechnung, sondern ihr ORT: `--focus-bottom` stand
+ * an `.focus-mode`, also am App-Container. Die Formatier-Leiste ist aber ein
+ * Portal am <body> — sie liegt NEBEN diesem Container, nicht darin, und erbte
+ * deshalb die 0 von der Wurzel statt der 104.
+ *
+ * Darum werden die drei Höhen jetzt an der Wurzel geführt, wo sie jeder
+ * sieht: die Blätter-Zeile, die Werkzeugleiste der Karte und die
+ * Formatier-Leiste. Die Stapelung von unten nach oben ist bewusst:
+ *   Blättern (Ortswechsel) · Formatieren (was ich JETZT tue) · Karten-Werkzeuge
+ * Mit offener Tastatur fällt das Blättern weg — dort hilft es nicht.
+ */
+:root {
+  --focus-top: 52px;
+  --focus-nav-h: 0px;      /* Blätter-Zeile („1 von 8") */
+  --focus-tools-h: 0px;    /* Werkzeugleiste der Karte */
+  --focus-format-h: 0px;   /* Formatier-Leiste (Portal am body!) */
+  --focus-bottom: 0px;     /* Summe — so viel Platz lässt die Karte unten frei */
+}
+:root:has(.app.focus-mode .focus-nav) { --focus-nav-h: 52px; }
+:root:has(.app.focus-mode):has(.sel-toolbar-dock) { --focus-tools-h: 52px; }
+:root:has(body[data-formatierleiste='an']) { --focus-format-h: 44px; }
+:root:has(.app.focus-mode) {
+  --focus-bottom: calc(var(--focus-nav-h) + var(--focus-tools-h) + var(--focus-format-h));
+}
+/* Tastatur offen: Die Blätter-Zeile ist ausgeblendet (siehe oben) — sie darf
+   dann auch keinen Platz mehr beanspruchen. Höhere Spezifität als die
+   :has()-Regeln darüber, damit sie wirklich gewinnt. */
+html[data-keyboard='on']:has(.app.focus-mode) { --focus-nav-h: 0px; }
+
+/* ================= M213: Fehlergrenzen ================= */
+.err-box {
+  margin: 8px; padding: 14px 16px; border-radius: var(--r-lg);
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 12.5px; line-height: 1.5; color: var(--ink);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.err-box b { font-size: 13.5px; }
+.err-box p { margin: 0; color: var(--muted); }
+.err-full {
+  position: fixed; inset: var(--head-space, 96px) 12px 12px; z-index: 40;
+  overflow: auto; box-shadow: var(--pop-shadow);
+}
+.err-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+.err-acts button {
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--ink);
+  border-radius: var(--r); padding: 8px 13px; min-height: 40px;
+  font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.err-acts button:hover { border-color: var(--accent); color: var(--accent-strong); }
+.err-box details { font-size: 11px; color: var(--muted); }
+.err-box summary { cursor: pointer; }
+.err-box code {
+  display: block; margin-top: 6px; padding: 7px 9px; border-radius: var(--r-sm);
+  background: var(--surface-2); word-break: break-word; font-size: 10.5px;
+}
+@media (pointer: coarse) { .err-acts button { min-height: 44px; } }
+
+/* ================= M215: Ticket-Ziehen an Maus und Finger ================= */
+/* Kein HTML5-Drag mehr: Der Browser darf beim Ziehen weder Text markieren noch
+   die Spalte scrollen — sonst kämpfen Geste und Seite gegeneinander. */
+.kanban-item { touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.kanban-item.dragging {
+  opacity: 0.45; transform: scale(0.98);
+  /* Solange gezogen wird, gehört die Geste dem Ticket */
+  touch-action: none;
+}
+/* Einfügemarke: zeigt, WO das Ticket landet — auch beim Umsortieren
+   innerhalb derselben Spalte */
+.k-drop-mark {
+  height: 3px; margin: 3px 2px; border-radius: var(--r-xs);
+  background: var(--accent); box-shadow: 0 0 0 1px var(--accent-soft);
+  animation: pn-fade-in 0.12s ease-out;
+}
+
+/* M214: typgerechte Aktionen in der Fokus-Fußleiste */
+.focus-acts { flex: 1; display: flex; justify-content: center; gap: 6px; min-width: 0; }
+.focus-act {
+  width: auto !important; padding: 0 14px;
+  border: 1px solid var(--border) !important; background: var(--surface-2) !important;
+  font-size: 12.5px; white-space: nowrap;
+  /* M389: Die Knöpfe der Leiste sind ein Raster (ein Zeichen, mittig) — mit Wort daneben stand das Zeichen ÜBER
+     dem Wort und der Knopf sah aus wie ein ungestalteter Browser-Knopf. */
+  display: inline-flex !important; align-items: center; gap: 6px;
+}
+.focus-act:hover { border-color: var(--accent) !important; color: var(--accent-strong); }
+.focus-nav-gap { width: 56px; flex: none; }
+
+/* M225: Die Werkzeugleiste der Karte GEHÖRT in den Fokus.
+   In M214 war sie hier ausgeblendet, weil sie über der Karte schwebte. Damit
+   waren aber KI, Nachschlagen, Schrift, Farbe und Eigenschaften am Handy nur
+   noch erreichbar, indem man den Fokus verließ, herauszoomte und die Karte
+   auf dem Board traf — für die Hauptarbeitsweise am Telefon unbrauchbar.
+   Jetzt sitzt sie fest über der Blätter-Zeile, quer scrollbar, und die Karte
+   bekommt den Platz dafür (--focus-bottom). */
+body:has(.app.focus-mode) .sel-toolbar-dock {
+  left: 0; right: 0; translate: 0 0;
+  /* M291: eine Rechnung für beide Fälle — mit und ohne Tastatur, mit und
+     ohne Formatier-Leiste. Vorher standen hier feste 52px und daneben eine
+     zweite Regel für die Tastatur; sobald die Formatier-Leiste dazukam,
+     lagen zwei Leisten aufeinander. */
+  bottom: calc(var(--kb) + var(--focus-nav-h) + var(--focus-format-h));
+  /* Feste Höhe, damit der Platz, den die Karte darüber freilässt
+     (--focus-bottom), exakt passt und nichts überlappt */
+  height: 52px; box-sizing: border-box; align-items: center; padding: 0 8px;
+  width: 100%; max-width: none; border-radius: 0;
+  border-left: none; border-right: none; border-bottom: none;
+  justify-content: flex-start;
+  overflow-x: auto; scrollbar-width: none;
+}
+body:has(.app.focus-mode) .sel-toolbar-dock::-webkit-scrollbar { display: none; }
+body:has(.app.focus-mode) .sel-toolbar-dock button { flex: none; }
+/* M291: Die Rechnung oben deckt die offene Tastatur mit ab (--kb steckt drin) */
+
+/* ================= M216: Befehle in der Suche ================= */
+.search-cmds { border-bottom: 1px solid var(--border-soft); padding-bottom: 6px; margin-bottom: 4px; }
+.search-cmd {
+  display: flex; width: 100%; align-items: center; gap: 10px;
+  padding: 9px 12px; min-height: 44px; border: none; background: none;
+  border-radius: var(--r); text-align: left; font: inherit; color: var(--ink); cursor: pointer;
+}
+.search-cmd:hover { background: var(--accent-soft); }
+
+/* ================= M217: Begrüßung beim ersten Start ================= */
+.onb-backdrop {
+  position: fixed; inset: 0; z-index: 200;
+  display: grid; place-items: center; padding: 16px;
+  background: rgba(30, 24, 12, 0.42);
+  animation: pn-fade-in 0.2s ease-out;
+}
+.onb {
+  width: min(460px, 100%); max-height: calc(calc(100dvh / var(--pn-anz, 1)) - 32px); overflow: auto;
+  background: var(--surface); border-radius: var(--r-lg); padding: 24px 24px 18px;
+  box-shadow: var(--pop-shadow);
+}
+.onb h2 { margin: 0 0 10px; font-size: 21px; letter-spacing: -0.02em; }
+.onb h2 span { color: var(--accent-strong); }
+.onb-lead { margin: 0 0 14px; font-size: 13.5px; line-height: 1.6; color: var(--ink); }
+.onb-steps { margin: 0 0 18px; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; }
+.onb-steps li { font-size: 13px; line-height: 1.55; color: var(--muted); }
+.onb-steps b { color: var(--ink); }
+.onb-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.onb-acts button {
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--ink);
+  border-radius: var(--r); padding: 10px 15px; min-height: 44px;
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+.onb-acts button:hover { border-color: var(--accent); color: var(--accent-strong); }
+.onb-primary {
+  border-color: var(--accent) !important;
+  background: var(--accent-fill) !important; color: #fff !important; font-weight: 600;
+}
+.onb-primary:hover { filter: brightness(1.06); color: #fff !important; }
+.onb-foot { margin: 14px 0 0; font-size: 11px; line-height: 1.5; color: var(--muted); }
+
+/* ================= M220: Sub-Brains — Bereiche im Gehirn ================= */
+.brain-scope { margin: 10px 0 4px; padding: 10px 12px; border: 1px solid var(--border-soft); border-radius: var(--r); }
+.brain-scope-head { font-size: 12px; font-weight: 600; margin-bottom: 7px; }
+.brain-scope-row {
+  display: flex; align-items: center; gap: 9px; padding: 7px 4px; min-height: 40px;
+  font-size: 12.5px; cursor: pointer; border-radius: var(--r);
+}
+.brain-scope-row:hover { background: var(--surface-2); }
+.brain-scope-row.off .brain-scope-name { color: var(--muted); text-decoration: line-through; }
+.brain-scope-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brain-scope-count { font-size: 11px; color: var(--muted); flex: none; }
+@media (pointer: coarse) { .brain-scope-row { min-height: 44px; } }
+
+/* ================= M221: Gliederung als Gelände ================= */
+/* Bereiche und Projekte sind Untergrund, keine Objekte: sehr leise Füllung,
+   weiche Kontur, nie im Weg. Der Zeiger geht durch — geklickt wird nur der
+   Rand (siehe .ov-region path unten), damit man Knoten weiter frei greift. */
+.ov-region { pointer-events: none; }
+.ov-region path {
+  fill: currentColor; fill-opacity: 0.07;
+  stroke: currentColor; stroke-opacity: 0.28; stroke-width: 1.5;
+  transition: fill-opacity 0.2s ease, stroke-opacity 0.2s ease;
+}
+.ov-region-project path { fill-opacity: 0.05; stroke-dasharray: 6 7; stroke-opacity: 0.22; }
+.ov-region text {
+  fill: currentColor; fill-opacity: 0.66; font-weight: 700;
+  text-anchor: middle; letter-spacing: 0.01em;
+  paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round;
+}
+/* Nur die Kontur ist anfassbar — so bleibt die Fläche für Knoten und Pan frei */
+.ov-region path { pointer-events: stroke; cursor: pointer; }
+.ov-region:hover path { fill-opacity: 0.12; stroke-opacity: 0.5; }
+/* M220-Bezug: abgeschaltetes Sub-Brain = schlafende Region */
+.ov-region.schlaeft path {
+  fill: var(--muted); stroke: var(--muted);
+  fill-opacity: 0.05; stroke-opacity: 0.3; stroke-dasharray: 3 6;
+}
+.ov-region.schlaeft text { fill: var(--muted); fill-opacity: 0.7; font-weight: 600; }
+
+/* ================= M222: Zoom wechselt die Gliederungs-Ebene =================
+   Der Wechsel läuft über Deckkraft, nicht über Ein-/Ausblenden im DOM: So
+   gleiten die Ebenen ineinander, statt zu springen. Alles bleibt anfassbar,
+   was sichtbar ist — und was unsichtbar ist, fängt keine Klicks ab. */
+.ov-graph-svg .ov-graph-node,
+.ov-graph-svg .ov-region-project,
+.ov-graph-svg .ov-bundle {
+  transition: opacity 0.28s ease;
+}
+
+/* --- Weit draußen: nur die Bereichs-Kontinente und ihre Bänder --- */
+.ov-graph-svg.geo-space .ov-graph-node { opacity: 0.22; pointer-events: none; }
+.ov-graph-svg.geo-space .ov-region-project { opacity: 0; }
+/* Einzelne Verbindungen tragen keine eigene Klasse — sie liegen als direkte
+   <line>-Kinder im SVG. Weit draußen treten sie hinter die Bänder zurück. */
+/* M223: Der Ausschnitt lebt als eigene Ebene — Verschieben und Zoomen sind
+   damit reines Zeichnen statt einer Neuvermessung des SVG. */
+.ov-graph-svg.geo-space .ov-graph-vp > line,
+.ov-graph-svg.geo-space .ov-graph-suggest { opacity: 0.12; transition: opacity 0.28s ease; }
+.ov-graph-svg .ov-graph-vp > line { transition: opacity 0.28s ease; }
+.ov-graph-svg.geo-space .ov-region-space path { fill-opacity: 0.13; stroke-opacity: 0.45; }
+.ov-graph-svg.geo-space .ov-region-space text { font-size: 1.25em; fill-opacity: 0.85; }
+
+/* --- Mittlere Höhe: Projekte treten hervor, Bänder verblassen --- */
+.ov-graph-svg.geo-project .ov-graph-node { opacity: 0.75; }
+.ov-graph-svg.geo-project .ov-bundle { opacity: 0.35; }
+
+/* --- Ganz nah: die Boards, Bänder stören nicht mehr --- */
+.ov-graph-svg.geo-board .ov-bundle { opacity: 0; pointer-events: none; }
+
+/* Das Band selbst */
+.ov-bundle { pointer-events: none; }
+.ov-bundle line {
+  stroke: var(--accent); stroke-opacity: 0.3; stroke-linecap: round;
+}
+.ov-bundle text {
+  fill: var(--accent-strong); fill-opacity: 0.9; font-weight: 700; text-anchor: middle;
+  paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round;
+}
+
+/* ================= M224: Sehen und Treffen =================
+   Drei unabhängige Stellschrauben für Augen, die nicht mehr die besten sind.
+   Die Anzeigegröße selbst sitzt als `zoom` am Wurzelelement (siehe
+   lib/anzeige.ts) — hier stehen nur Schrift und Kontrast. */
+
+/* Atkinson Hyperlegible überall: eigens dafür entworfen, dass sich ähnliche
+   Buchstaben (I l 1, O 0, a o) auch bei Sehschwäche unterscheiden lassen.
+   Handschrift- und Monospace-Karten behalten ihre bewusst gewählte Schrift. */
+html[data-lesbar='an'] body,
+html[data-lesbar='an'] button,
+html[data-lesbar='an'] input,
+html[data-lesbar='an'] select,
+html[data-lesbar='an'] textarea,
+html[data-lesbar='an'] .react-flow__node:not(.pn-font-hand):not(.pn-font-mono) {
+  font-family: 'Atkinson Hyperlegible', system-ui, -apple-system, sans-serif;
+}
+
+/* Hoher Kontrast: Genau die Mittel, die eine Oberfläche modern wirken lassen —
+   Milchglas, zarte Ränder, gedämpfte Zweitschrift, Papiertextur — kosten
+   Kontrast. Hier fallen sie weg, statt sie allen zuzumuten. */
+html[data-kontrast='hoch'] {
+  --muted: #3c424c;
+  --border: #6a7079;
+  --border-soft: #858b95;
+}
+html[data-kontrast='hoch'][data-theme='dark'] {
+  --muted: #d5d9e0;
+  --border: #979da7;
+  --border-soft: #7a8089;
+}
+html[data-kontrast='hoch'] .glass,
+html[data-kontrast='hoch'] .dock,
+html[data-kontrast='hoch'] .tabs,
+html[data-kontrast='hoch'] .top-actions,
+html[data-kontrast='hoch'] .logo,
+html[data-kontrast='hoch'] .sel-toolbar,
+html[data-kontrast='hoch'] .focus-head,
+html[data-kontrast='hoch'] .focus-nav,
+html[data-kontrast='hoch'] .modal,
+html[data-kontrast='hoch'] .dock-menu,
+html[data-kontrast='hoch'] .sel-ai-menu {
+  background: var(--surface) !important;
+  border-color: var(--border) !important;
+}
+/* Textur weg: das feine Rauschen legt sich sonst über jeden Buchstaben */
+html[data-kontrast='hoch'] .react-flow__pane::after { display: none !important; opacity: 0 !important; }
+/* Zweitschrift und Platzhalter dürfen nicht mehr verblassen */
+html[data-kontrast='hoch'] ::placeholder { color: var(--muted); opacity: 1; }
+html[data-kontrast='hoch'] .card-body { border: 1.5px solid var(--border); }
+/* Fokusring kräftiger — Tastaturbedienung soll man SEHEN */
+html[data-kontrast='hoch'] :focus-visible { outline: 3px solid var(--accent-strong); outline-offset: 2px; }
+
+/* Anzeigegröße direkt im Logo-Menü — A− / Wert / A+ (M224) */
+
+/* ================= M226: Formatieren am Handy =================
+   Die Formatierungsleiste von BlockNote schwebt normalerweise an der
+   Auswahl. Auf einem Telefon heißt das: Sie legt sich über genau den Satz,
+   den man gerade formatieren will, und läuft rechts aus dem Bild — die
+   letzten Knöpfe (Einrücken, Link) sind gar nicht erreichbar (User-Report).
+
+   Darum dockt sie hier unten an, über der Tastatur — wie in Google Docs
+   und Notion. Der Text bleibt sichtbar, und die Leiste lässt sich quer
+   schieben, statt abgeschnitten zu werden.
+
+   Angefasst wird die UMHÜLLENDE Box: BlockNote positioniert sie per
+   Inline-transform (floating-ui). Ein transform erzeugt einen eigenen
+   Bezugsrahmen — ein position:fixed am Kind allein bliebe wirkungslos. */
+@media (max-width: 700px), (pointer: coarse) and (max-width: 900px) {
+  div:has(> .bn-formatting-toolbar),
+  div:has(> .bn-link-toolbar) {
+    position: fixed !important;
+    left: 0 !important; right: 0 !important; top: auto !important;
+    /* M291: NUR die Blätter-Zeile liegt darunter — die Werkzeugleiste der
+       Karte rückt ihrerseits über die Formatier-Leiste (siehe unten). Vorher
+       stand hier --focus-bottom; das ist die SUMME und am body ohnehin 0. */
+    bottom: calc(var(--kb) + var(--focus-nav-h, 0px)) !important;
+    transform: none !important;
+    width: 100% !important; max-width: 100% !important;
+    z-index: 80 !important;
+  }
+  .bn-toolbar.bn-formatting-toolbar,
+  .bn-toolbar.bn-link-toolbar {
+    width: 100%; max-width: none; border-radius: 0;
+    box-sizing: border-box;
+    overflow-x: auto; scrollbar-width: none;
+    flex-wrap: nowrap; justify-content: flex-start;
+    box-shadow: var(--pop-shadow);
+  }
+  .bn-toolbar.bn-formatting-toolbar::-webkit-scrollbar,
+  .bn-toolbar.bn-link-toolbar::-webkit-scrollbar { display: none; }
+  /* Fingergerecht wie alles andere (M198) */
+  .bn-toolbar.bn-formatting-toolbar button,
+  .bn-toolbar.bn-formatting-toolbar .mantine-Button-root {
+    min-width: 44px; min-height: 44px; flex: none;
+  }
+}
+
+/* ================= M228 → M333: Der Fokus gilt überall =================
+   M228 stellte die Karte ab Tablet-Breite als Blatt über das Board (left 50 %,
+   feste Breite und Höhe). M333 ersetzt das durch den Zoom im Board: Die Regeln
+   zur Lage der Karte sind weg, das Zurücktreten der übrigen Karten steht im
+   M333-Block oben. `fokus-voll` (M235) ist damit ohne Wirkung und bleibt nur als
+   Klasse erhalten. */
+.focus-head, .focus-nav { z-index: 60; }

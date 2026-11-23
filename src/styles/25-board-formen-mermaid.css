@@ -1,0 +1,424 @@
+/* ---------- Empty-State ---------- */
+.empty-board-hint {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px;
+  pointer-events: none; z-index: 5; color: var(--muted);
+}
+/* M397: ein ruhiger Textblock, linksbündig gesetzt – keine gestrichelten Kästchen */
+.leer-block { display: flex; flex-direction: column; gap: 14px; max-width: min(340px, calc(100vw - 48px)); }
+.leer-titel { margin: 0; font-size: 15px; font-weight: 650; color: var(--ink); letter-spacing: -0.005em; }
+.leer-wege { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+dl.leer-wege { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; }
+dl.leer-wege dt { color: var(--ink); font-weight: 550; }
+dl.leer-wege dd { margin: 0; }
+.leer-finger { display: none; }
+@media (hover: none) and (pointer: coarse) {
+  .leer-maus { display: none !important; }
+  .leer-finger { display: block; }
+}
+.leer-knoepfe { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-top: 2px; }
+
+/* Auto-Größe-Schalter in der Auswahl-Leiste (M103) */
+.sel-toolbar button.on { background: var(--accent-soft); color: var(--accent-strong); }
+
+/* ⤢-Angebots-Chip (M104): erscheint dezent, wenn der Inhalt über die feste
+   Kartengröße hinausläuft — nur bei Hover/Auswahl sichtbar, greift NIE selbst */
+.fit-hint {
+  position: absolute; right: 5px; bottom: 5px; z-index: 6;
+  width: 24px; height: 24px; border-radius: var(--r);
+  border: 1px solid var(--accent); background: var(--surface); color: var(--accent-strong);
+  cursor: pointer; font-size: 13px; line-height: 1; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--chrome-shadow);
+  opacity: 0; transition: opacity 0.15s, transform 0.1s;
+}
+.card-shell:hover .fit-hint, .react-flow__node.selected .fit-hint { opacity: 0.92; }
+.fit-hint:hover { opacity: 1 !important; transform: scale(1.1); background: var(--accent-soft); }
+@media (pointer: coarse) { .fit-hint { opacity: 0.92; width: 30px; height: 30px; font-size: 15px; } }
+
+/* ---------- Resize-Griffe (M102: klar unterscheidbar vom Verbinden) ----------
+   Weiße Quadrate mit neutralem Rand = klassischer Auswahlrahmen („Größe").
+   Die Verbindungspunkte sind dagegen runde Akzent-Kreise mit ＋ („Aktion"). */
+.react-flow__resize-control.handle {
+  width: 10px; height: 10px; border-radius: var(--r-xs);
+  background: var(--surface) !important;
+  border: 1.5px solid var(--muted) !important;
+  box-shadow: var(--chrome-shadow);
+  /* Über dem card-body: sonst verdeckt der Inhalt die innere Hälfte der
+     Greifzone — Ziehen ab der Mittellinie war wirkungslos (M107). Unter den
+     ＋-Verbindungspunkten (5) und Griff/✕/Chip (5-6). */
+  z-index: 4;
+}
+.react-flow__resize-control.line { border-color: var(--border) !important; opacity: 0.8; z-index: 4; }
+/* Kanten wirklich GREIFBAR machen: die Standard-Linien sind nur 1 px dick —
+   Größenändern über die Kanten war damit praktisch unmöglich (M105).
+   Sichtbar bleibt die feine Linie (border), die Greifzone wird 10 px. */
+.react-flow__resize-control.line.left,
+.react-flow__resize-control.line.right { width: 10px !important; }
+.react-flow__resize-control.line.top,
+.react-flow__resize-control.line.bottom { height: 10px !important; }
+@media (pointer: coarse) {
+  .react-flow__resize-control.handle { width: 16px; height: 16px; border-radius: var(--r-xs); }
+  .react-flow__resize-control.line.left,
+  .react-flow__resize-control.line.right { width: 16px !important; }
+  .react-flow__resize-control.line.top,
+  .react-flow__resize-control.line.bottom { height: 16px !important; }
+}
+
+/* ---------- Übersicht als Canvas ---------- */
+.ov-canvas .react-flow__node { box-shadow: none; transition: none; }
+.ov-canvas .react-flow__node:hover { box-shadow: none; }
+.ov-canvas .react-flow__node.selected { outline: none; }
+.ovc-space {
+  width: 100%; height: 100%; border: 2.5px solid; border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, 0.42); padding: 12px 18px;
+}
+.ovc-space-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.ovc-space-name { font-size: 19px; font-weight: 800; letter-spacing: -0.01em; }
+.ovc-project {
+  width: 100%; height: 100%; background: rgba(255, 255, 255, 0.75);
+  border-radius: var(--r-lg); padding: 10px 13px; border: 1.5px dashed var(--surface-dim);
+}
+.ovc-project-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ovc-tile { width: 100%; height: 100%; cursor: pointer; box-shadow: var(--card-shadow); }
+.ovc-tile:hover { box-shadow: var(--card-shadow-lift); }
+.ovc-tile-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.ovc-tile .ov-board-name { display: block; padding-right: 46px; }
+.ovc-tile:hover .ovc-tile-actions { opacity: 1; }
+.ovc-tile-actions button {
+  border: none; background: var(--surface); color: var(--ink); border-radius: var(--r-sm);
+  font-size: 10px; cursor: pointer; padding: 3px 5px; box-shadow: 0 1px 3px var(--border);
+}
+
+@media (pointer: coarse) {
+  .ovc-tile-actions { opacity: 1; }
+}
+
+/* ---------- Editierbare Verbindungs-Labels ---------- */
+.edge-label {
+  position: absolute; pointer-events: all;
+  display: flex; align-items: center; gap: 3px;
+  /* Heller Chip mit Schatten — bleibt auch im Export auf jeder Fläche lesbar (M140) */
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--r-pill);
+  box-shadow: var(--chrome-shadow);
+  padding: 2px 4px 2px 8px; font-size: 11px; color: var(--muted);
+  box-shadow: 0 1px 3px var(--border); max-width: 200px;
+}
+.edge-label.selected { border-color: var(--accent); }
+.edge-label.empty {
+  opacity: 0; transition: opacity 0.15s;
+  padding: 1px 5px; background: var(--accent-fill); color: #fff; border-color: var(--accent);
+}
+.react-flow__edge:hover .edge-label.empty,
+.edge-label.empty.selected { opacity: 1; }
+.edge-label-text { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.edge-label.empty .edge-label-text { font-weight: 700; }
+.edge-label-input {
+  border: none; outline: none; background: transparent; font-family: inherit;
+  font-size: 11px; width: 90px; color: var(--ink);
+}
+.edge-label-x {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  font-size: 9px; padding: 2px 3px; border-radius: 50%; line-height: 1;
+  opacity: 0; transition: opacity 0.15s;
+}
+.edge-label:hover .edge-label-x { opacity: 0.7; }
+.edge-label.selected .edge-label-x { opacity: 0.7; }
+.edge-label-x:hover { background: #ffe3e0; color: #a4231a; opacity: 1; }
+/* Ruhiges Board (M124): Beschriftete Verbindungen zeigen unausgewählt nur
+   ihren Text — Stil-Knopf erst bei Hover (Maus) bzw. Auswahl (Touch) */
+.edge-label:not(.selected):not(:hover) .edge-kind-btn { display: none; }
+
+@media (pointer: coarse) {
+  /* Wie bei den ＋-Verbindungspunkten (M112/M124): Optionen erst, wenn die
+     Verbindung ANGETIPPT (ausgewählt) ist — keine Dauer-Pillen auf dem Board */
+  .edge-label.selected .edge-label-x { opacity: 1; }
+}
+
+.edge-kind-btn {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  font-size: 11px; padding: 1px 3px; border-radius: var(--r-xs); line-height: 1;
+}
+.edge-kind-btn:hover { background: var(--border); color: var(--ink); }
+
+/* M146: feingliedrige Verbindungsoptionen — Spitze an/aus + Farbpalette,
+   als eigene Leiste unter dem Label-Chip, nur bei ausgewählter Verbindung */
+.edge-opts {
+  position: absolute; pointer-events: all;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--r);
+  padding: 4px 8px; box-shadow: var(--chrome-shadow);
+}
+.edge-opts-row { display: flex; align-items: center; gap: 4px; }
+.edge-opt-btn {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 2px; border-radius: var(--r-sm); line-height: 0;
+}
+.edge-opt-btn:hover { background: var(--border); color: var(--ink); }
+.edge-opt-btn.on { color: var(--accent-strong); }
+.edge-opt-btn.on.edge-opt-width { background: var(--accent-soft); }
+.edge-opt-sep { width: 1px; height: 13px; background: var(--border-soft); }
+.edge-color-dot {
+  width: 14px; height: 14px; border-radius: 50%; cursor: pointer; padding: 0;
+  border: 2px solid transparent; background-clip: padding-box;
+}
+.edge-color-dot.default { background: var(--edge); }
+.edge-color-dot:hover { transform: scale(1.15); }
+.edge-color-dot.on { border-color: var(--accent); }
+
+/* ---------- Prozess-Formen ---------- */
+.shape-wrap { width: 100%; height: 100%; position: relative; }
+.shape-body {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 8px; font-size: 12.5px; color: var(--ink);
+  border: 1.5px solid rgba(0,0,0,.35); box-sizing: border-box;
+}
+.shape-process .shape-body { border-radius: var(--r-sm); }
+.shape-terminator .shape-body { border-radius: 999px; }
+.shape-note .shape-body { border-radius: var(--r-xs); border-style: dashed; }
+.shape-decision .shape-body {
+  border: none; background: transparent !important;
+  padding: 8px 18%;
+}
+/* Raute als clip-path statt rotate(45deg): bleibt bei jeder Kartengröße exakt
+   in der Fläche (die rotierte Variante lief bei breiten Karten über den Rand). */
+.shape-decision .shape-body::before {
+  content: ''; position: absolute; inset: 0;
+  background: rgba(0,0,0,.35);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+.shape-decision .shape-body::after {
+  content: ''; position: absolute; inset: 2px;
+  background: var(--shape-fill, #fff);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+.shape-decision .shape-text, .shape-decision .shape-input, .shape-decision .shape-ph { position: relative; z-index: 1; }
+.shape-text { white-space: pre-wrap; word-break: break-word; }
+.shape-ph { color: var(--muted); }
+.shape-input {
+  width: 92%; height: 80%; border: none; background: transparent; resize: none;
+  outline: none; font-family: inherit; font-size: 12.5px; text-align: center; color: var(--ink);
+}
+.shape-toolbar {
+  /* UNTER der Form: oben ist bei schmalen Formen kein Platz — dort sitzen
+     schon Verbindungspunkt und ✕ (Überlappung, User-Screenshot) */
+  position: absolute; bottom: -48px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 4px; opacity: 0; transition: opacity .15s; z-index: 6;
+}
+.shape-wrap:hover .shape-toolbar, .react-flow__node.selected .shape-toolbar { opacity: 1; }
+.shape-toolbar button {
+  border: none; background: var(--surface); border-radius: var(--r-sm); font-size: 11px; cursor: pointer;
+  width: 24px; height: 22px; padding: 0; display: inline-flex; align-items: center;
+  justify-content: center; box-shadow: var(--chrome-shadow);
+}
+.shape-handle { opacity: 0 !important; }
+.shape-wrap:hover .shape-handle { opacity: 1 !important; }
+@media (hover: none) { .react-flow__node.selected .shape-handle { opacity: 1 !important; } }
+/* Während des Verbindens leuchten auch Form-Anschlüsse als Ziele auf —
+   das !important oben würde die allgemeine M112-Regel sonst ausstechen */
+.react-flow:has(.react-flow__connectionline) .shape-handle { opacity: 1 !important; }
+
+/* ---------- Mermaid-Karte ---------- */
+/* M92 „integral": Das Diagramm liegt RAHMENLOS auf der Fläche — kein
+   Karten-Kasten. Nur bei Hover/Auswahl zeigt eine dezente gestrichelte
+   Kontur, wo die Karte endet (zum Greifen/Resizen). */
+/* Im Ruhezustand WIRKLICH randlos: kein Hintergrund, kein Schatten, kein
+   Rahmen — das Diagramm liegt frei auf der Fläche. Erst bei Hover/Auswahl
+   kommt Milchglas + gestrichelte Kontur dazu (zum Greifen/Resizen und damit
+   es beim Bearbeiten über anderen Karten lesbar bleibt). */
+.mermaid-card {
+  background: transparent; border-radius: var(--r); padding: 6px; overflow: hidden;
+  display: flex; flex-direction: column;
+  outline: 1.5px dashed transparent; outline-offset: -1px;
+  transition: outline-color 0.15s ease, background 0.15s ease;
+}
+.react-flow__node:has(> .card-shell > .mermaid-card) { box-shadow: none; }
+.react-flow__node:hover .mermaid-card,
+.react-flow__node.selected .mermaid-card {
+  background: var(--surface-glass);
+  outline-color: var(--border-soft);
+}
+.react-flow__node.selected .mermaid-card { outline-color: var(--accent); }
+/* Der solide Standard-Auswahlrahmen würde doch wieder einen Kasten zeichnen —
+   bei Mermaid übernimmt das die gestrichelte Kontur */
+.react-flow__node.selected:has(> .card-shell > .mermaid-card) { outline: none; }
+
+/* Schwebende Werkzeugleiste unterm Diagramm (nur bei Auswahl).
+   M99-Polish: mehr Kontrast (Rand + kräftiger Schatten), spürbares
+   Hover-/Druck-Feedback auf allen Bedienelementen. */
+.mm-toolbar {
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--surface); border-radius: var(--r-lg); padding: 7px 9px;
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--pop-shadow);
+  max-width: min(600px, calc(92vw / var(--pn-anz, 1)));
+}
+.mm-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.mm-row > button {
+  border: 1px solid transparent; background: var(--surface-dim); border-radius: var(--r-sm);
+  font-family: inherit; font-size: 11px; color: var(--ink);
+  padding: 4px 9px; cursor: pointer; white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease, box-shadow 0.12s ease;
+}
+.mm-row > button:hover {
+  background: var(--accent-soft); border-color: var(--accent);
+}
+.mm-row > button:active { transform: scale(0.96); }
+.mm-row > button.active {
+  background: var(--accent-soft); border-color: var(--accent);
+  color: var(--accent-strong); font-weight: 650;
+}
+.mm-row > button.danger { color: #a4231a; }
+.mm-row > button.danger:hover { background: rgba(164, 35, 26, 0.1); border-color: rgba(164, 35, 26, 0.45); }
+.mm-sel-name { font-size: 11px; font-weight: 750; color: var(--accent-strong); padding: 0 3px; }
+/* Schritt-/Verbindungs-Zeile: erscheint ZUSÄTZLICH über der Hauptzeile */
+.mm-step-row { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: var(--r); padding: 4px 7px; }
+.mm-step-row > button { background: var(--surface); }
+.mm-row > .mm-dot { flex: none; }
+.mm-dot { transition: transform 0.1s ease, box-shadow 0.1s ease; }
+.mm-dot:hover { transform: scale(1.2); box-shadow: 0 0 0 3px var(--accent-soft); }
+.mm-dot:active { transform: scale(1.02); }
+.mm-sep { width: 1px; height: 16px; background: var(--border); margin: 0 3px; }
+.mm-shape { font-size: 12px; padding: 4px 7px; }
+.mm-dot-s { width: 17px; height: 17px; }
+/* Diagramm-Elemente: klares Hover-Feedback (M99) */
+.mermaid-svg g.node:hover, .mermaid-svg g.rough-node:hover {
+  filter: drop-shadow(0 3px 6px rgba(22, 25, 30, 0.32)) brightness(1.04);
+}
+.mermaid-svg g.mm-selected { filter: drop-shadow(0 0 4px var(--accent)); }
+.mermaid-svg path.flowchart-link { cursor: pointer; transition: stroke-width 0.12s ease; }
+.mermaid-svg path.flowchart-link:hover { stroke-width: 3px !important; }
+.mermaid-svg path.mm-selected-edge { stroke: var(--accent-strong) !important; stroke-width: 3px !important; }
+/* Klick-Ziele der weiteren Diagrammtypen (M100): Sequenz, Gantt, Mindmap, Kreis */
+.mermaid-svg text.messageText, .mermaid-svg text.actor, .mermaid-svg rect.actor,
+.mermaid-svg rect.task, .mermaid-svg text.taskText,
+.mermaid-svg g.mindmap-node, .mermaid-svg g.legend, .mermaid-svg path.pieCircle { cursor: pointer; }
+.mermaid-svg text.messageText:hover, .mermaid-svg text.actor:hover, .mermaid-svg text.taskText:hover { opacity: 0.7; }
+.mermaid-svg rect.task:hover, .mermaid-svg rect.actor:hover, .mermaid-svg g.mindmap-node:hover,
+.mermaid-svg path.pieCircle:hover, .mermaid-svg g.legend:hover {
+  filter: brightness(1.06) drop-shadow(0 2px 4px rgba(22, 25, 30, 0.25));
+}
+.mermaid-svg .mm-selected-el { filter: drop-shadow(0 0 4px var(--accent)); }
+.mermaid-svg text.mm-selected-el { fill: var(--accent-strong) !important; font-weight: 700; }
+.mermaid-svg rect.mm-selected-el { stroke: var(--accent-strong) !important; stroke-width: 2.5px !important; }
+/* Status, Zeitstrahl, Quadrant + Details (M101) */
+.mermaid-svg text.sectionTitle { cursor: pointer; }
+.mermaid-svg text.sectionTitle:hover { opacity: 0.7; }
+[data-kind='timeline'] .mermaid-svg g.timeline-node { cursor: pointer; }
+[data-kind='timeline'] .mermaid-svg g.timeline-node:hover { filter: brightness(1.06) drop-shadow(0 2px 4px rgba(22, 25, 30, 0.25)); }
+[data-kind='quadrant'] .mermaid-svg g.data-point,
+[data-kind='quadrant'] .mermaid-svg text { cursor: pointer; }
+[data-kind='quadrant'] .mermaid-svg g.data-point:hover { filter: brightness(1.1) drop-shadow(0 2px 4px rgba(22, 25, 30, 0.3)); }
+[data-kind='state'] .mermaid-svg .edgePaths path { cursor: pointer; transition: stroke-width 0.12s ease; }
+[data-kind='state'] .mermaid-svg .edgePaths path:hover { stroke-width: 3px !important; }
+.mm-ai-row input {
+  flex: 1; min-width: 200px; border: 1.5px solid var(--border-soft); border-radius: var(--r);
+  background: var(--surface); color: var(--ink);
+  font-family: inherit; font-size: 11.5px; padding: 5px 9px;
+}
+.mm-ai-row input:focus { outline: none; border-color: var(--accent); }
+.mm-ai-row > button {
+  flex: none; border: none; background: var(--accent-fill); color: #fff;
+  border-radius: var(--r); cursor: pointer; font-size: 13px; padding: 4px 12px;
+}
+.mm-ai-row > button:disabled { opacity: 0.5; cursor: default; }
+.mm-hint-connect { color: var(--accent-strong); font-weight: 700; opacity: 1; }
+/* Inline-Umbenennen: Eingabefeld schwebt direkt über dem Schritt im Bild
+   (kein Browser-Dialog, User-Feedback M92) */
+.mm-rename {
+  position: absolute; z-index: 6; box-sizing: border-box;
+  border: 1.5px solid var(--accent); border-radius: var(--r);
+  background: var(--surface); color: var(--ink);
+  font-family: inherit; font-size: 12px; padding: 5px 8px;
+  box-shadow: var(--pop-shadow);
+}
+.mm-rename:focus { outline: none; border-color: var(--accent-strong); }
+/* Vorlagen-Rückfrage inline im Popover (statt window.confirm) */
+.mm-pop button.mm-confirm { color: #a4231a; font-weight: 700; }
+.mm-pop button.mm-confirm:hover { background: rgba(164, 35, 26, 0.12); }
+.mermaid-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.mermaid-tools { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+.mermaid-tools button {
+  border: none; background: var(--surface-dim); border-radius: var(--r-sm); font-size: 10.5px;
+  padding: 2px 7px; cursor: pointer; font-family: inherit; color: var(--ink);
+}
+.mermaid-tools button:hover, .mermaid-tools button.active { background: var(--accent-soft); }
+.mermaid-split { display: flex; gap: 8px; flex: 1; min-height: 0; }
+/* In der Karte: feste, schmale Code-Spalte — das Diagramm behält seine Fläche
+   (die Auto-Größe rechnet diese Breite mit ein, M94). Fläche = var(--surface),
+   damit der Code im rahmenlosen Kontext lesbar auf der Karte liegt. */
+.mermaid-code {
+  flex: 0 0 min(320px, 45%); min-width: 0; border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm); padding: 7px;
+  font-family: ui-monospace, monospace; font-size: 11px; resize: none; outline: none;
+  background: var(--surface); color: var(--ink); line-height: 1.4;
+}
+/* Im Presenter (Vollbild-Folie) darf der Code-Editor weiter mitwachsen */
+.slide-mermaid-split .mermaid-code { flex: 1; }
+/* ---------- Mermaid-WYSIWYG (M91) ---------- */
+
+.mm-pop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 30;
+  background: var(--surface); border-radius: var(--r); padding: 7px;
+  box-shadow: var(--pop-shadow);
+  display: flex; flex-direction: column; gap: 3px; min-width: 150px;
+  /* M218: Auch nach dem Umklappen kann die Liste länger sein als der Platz —
+     dann wird gescrollt, statt Einträge unerreichbar zu machen. */
+  max-height: min(calc(52vh / var(--pn-anz, 1)), 320px); overflow-y: auto; overscroll-behavior: contain;
+}
+/* Kein Platz nach unten (Karte liegt tief)? Dann über dem Knopf aufklappen. */
+
+.mm-pop button {
+  border: none; background: none; border-radius: var(--r-sm); text-align: left;
+  font-family: inherit; font-size: 11.5px; color: var(--ink);
+  padding: 5px 9px; cursor: pointer;
+}
+.mm-pop button:hover, .mm-pop button.active { background: var(--accent-soft); }
+.mm-dot {
+  width: 20px; height: 20px; border-radius: 50%; cursor: pointer;
+  border: 1.5px solid var(--border-soft); padding: 0;
+}
+.mm-dot.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.mm-dot-none { background: linear-gradient(135deg, var(--surface) 45%, var(--border-soft) 45%, var(--border-soft) 55%, var(--surface) 55%); }
+.mermaid-svg g.node, .mermaid-svg g.rough-node { cursor: pointer; }
+/* Handschrift-Look (M96): Scribble-Schrift auch dann, wenn einzelne
+   Diagrammtypen die fontFamily aus der init-Direktive ignorieren.
+   Deckt SVG-Text UND HTML-Labels (foreignObject-spans) ab. */
+.mm-hand .mermaid-svg :is(text, tspan, span, div, p) {
+  font-family: 'Kalam', 'Segoe Print', 'Comic Sans MS', cursive !important;
+}
+.mermaid-svg g.mm-selected rect,
+.mermaid-svg g.mm-selected polygon,
+.mermaid-svg g.mm-selected circle,
+.mermaid-svg g.mm-selected path {
+  stroke: var(--accent-strong) !important; stroke-width: 2.5px !important;
+}
+.mm-hint {
+  position: absolute; left: 8px; bottom: 6px; pointer-events: none;
+  font-size: 10px; color: var(--muted);
+  background: var(--surface-glass); border-radius: var(--r-sm); padding: 2px 7px;
+}
+.mermaid-preview { position: relative; flex: 1; min-width: 0; overflow: auto; display: flex; align-items: center; justify-content: center; }
+/* Diagramm füllt die Kartenbreite — sonst rendert z. B. Gantt winzig in
+   einer großen Karte (M90); Höhe wächst mit, der Container scrollt */
+.mermaid-svg { width: 100%; }
+.mermaid-svg svg { width: 100% !important; max-width: 100%; height: auto; }
+/* M389: Das Diagramm passt IMMER ganz in die Karte. Vorher bestimmte allein die Breite die Größe — ein hohes
+   Diagramm (Ablauf von oben nach unten) ragte oben und unten heraus, und weil die Fläche mittig ausrichtet, war
+   der Anfang nicht einmal durch Rollen zu erreichen. Die viewBox hält das Seitenverhältnis. */
+.mermaid-card .mermaid-preview > .mermaid-svg { height: 100%; }
+.mermaid-card .mermaid-preview > .mermaid-svg svg { display: block; height: 100%; max-height: 100%; }
+/* M389: Ohne gewähltes Farbschema malt Mermaid jede zweite Mindmap-Ebene fast weiß — auf einer weißen Karte
+   sichtbar, auf dem Board-Grund (die Karte ist rahmenlos) verschwanden Kästen UND Äste. Kontur und Äste bekommen
+   deshalb eine feste, ruhige Farbe. Ein gewähltes Schema bleibt unberührt. */
+.mermaid-svg.mm-schlicht g.mindmap-node :is(rect, path, circle, polygon) { stroke: var(--muted); stroke-width: 1px; }
+.mermaid-svg.mm-schlicht path[class*='section-edge-'] { stroke: var(--muted) !important; }
+.mermaid-svg.stale { opacity: 0.45; }
+/* Fehler als Overlay-Chip — das letzte gültige Diagramm bleibt sichtbar */
+.mermaid-error {
+  position: absolute; left: 8px; right: 8px; bottom: 8px;
+  font-size: 11px; line-height: 1.45; color: #a4231a;
+  background: var(--surface); border: 1px solid rgba(164, 35, 26, 0.35);
+  border-radius: var(--r); padding: 6px 9px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}

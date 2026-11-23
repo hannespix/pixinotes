@@ -10,7 +10,7 @@ import '@fontsource/atkinson-hyperlegible/700.css';
 // M416/M420: Zwei Schriften für das ganze Tool — Geist (klar und ruhig, für Bedienung und Text) und Newsreader (eine
 // zeitlose Serife mit optischen Größen für die großen Stellen). Beide frei (SIL Open Font License) und hier
 // eingebunden: Es geht nichts an einen Schriften-Dienst, und das Tool sieht offline und als Einzeldatei genauso aus.
-// Geist selbst wird in index.css eingebunden (eigene Fassung mit angepassten Zeilenmaßen).
+// Geist selbst wird in src/styles/70-kopfleiste-schrift-netz.css eingebunden (eigene Fassung mit angepassten Zeilenmaßen).
 import '@fontsource-variable/newsreader/opsz.css';
 import './index.css';
 import App from './App';

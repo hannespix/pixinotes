@@ -1,0 +1,137 @@
+/* ---------- Verbinden ohne Frickelei ---------- */
+/* Große Trefferfläche (22px), Sichtpunkt: Akzent-Kreis mit ＋ (M102) —
+   rund + Akzentfarbe + Symbol = „hier entsteht etwas", klar getrennt von
+   den weißen, eckigen Resize-Griffen. Fadenkreuz statt Pfeil-Cursor. */
+.pn-handle {
+  width: 22px !important; height: 22px !important;
+  background: transparent !important; border: none !important;
+  opacity: 0; transition: opacity 0.15s;
+  cursor: var(--zeiger-fadenkreuz) !important;
+  /* Über dem Karteninhalt: die innere Kreis-Hälfte (Optik UND Trefferfläche)
+     wurde sonst vom später gerenderten card-body verdeckt (M102) */
+  z-index: 5 !important;
+}
+.pn-handle::after {
+  content: '+'; position: absolute; inset: 4px; border-radius: 50%;
+  background: var(--accent-fill); border: 1.5px solid #fff;
+  color: #fff; font-size: 11px; line-height: 1; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--chrome-shadow);
+  transition: transform 0.12s ease;
+}
+.pn-handle:hover::after { transform: scale(1.3); }
+/* Ganzkarten-Ziel: unsichtbar & inaktiv — bis eine Verbindung gezogen wird */
+.pn-handle-body {
+  position: absolute !important; inset: 0 !important; top: 0 !important; left: 0 !important;
+  width: 100% !important; height: 100% !important; transform: none !important;
+  border-radius: var(--r) !important; border: none !important; background: transparent !important;
+  opacity: 1; pointer-events: none !important; min-width: 0 !important; min-height: 0 !important;
+}
+/* Während des Verbindens: Ganzkarten-Ziel aktiv, alle Anschlüsse sichtbar,
+   Karte unter dem Zeiger leuchtet als Ziel auf */
+.react-flow:has(.react-flow__connectionline) .pn-handle-body { pointer-events: all !important; }
+/* M464: React Flow setzt an Anschlüssen das System-Fadenkreuz — unter Windows kaum sichtbar */
+.react-flow__handle.connectionindicator { cursor: var(--zeiger-fadenkreuz); }
+.react-flow:has(.react-flow__connectionline) .pn-handle { opacity: 1; }
+.react-flow:has(.react-flow__connectionline) .pn-handle-body:hover {
+  box-shadow: inset 0 0 0 2.5px var(--accent);
+  background: rgba(79, 124, 255, 0.07) !important;
+}
+
+/* ---------- Sichtbarer Verschiebe-Griff ---------- */
+.card-grip {
+  /* Leicht links der Mitte: die Kartenmitte oben gehört dem ＋-Verbindungs-
+     punkt — vorher lagen Griff und Anschluss exakt übereinander (M102) */
+  position: absolute; top: -11px; left: calc(50% - 40px); transform: translateX(-50%);
+  width: 46px; height: 17px; border-radius: var(--r); background: var(--surface);
+  box-shadow: var(--chrome-shadow); cursor: grab; z-index: 6;
+  display: flex; align-items: center; justify-content: center; color: #b0aa99;
+  opacity: 0; transition: opacity 0.15s;
+}
+.card-shell:hover .card-grip, .react-flow__node.selected .card-grip { opacity: 1; }
+.card-grip:hover { color: var(--accent-strong); }
+.card-grip:active { cursor: grabbing; }
+@media (pointer: coarse) {
+  .card-grip { opacity: 1 !important; width: 56px; height: 22px; top: -14px; left: calc(50% - 50px); }
+}
+
+/* ---------- KI-Assistent-Menüs ---------- */
+.dock-menu-ai { min-width: 240px; }
+.sel-ai-wrap { position: relative; display: inline-flex; }
+.sel-ai-menu {
+  position: absolute; bottom: calc(100% + 10px); right: 0; background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r); box-shadow: var(--pop-shadow); padding: 5px;
+  display: flex; flex-direction: column; gap: 2px; min-width: 200px; z-index: 20;
+}
+.sel-ai-menu button {
+  width: 100%; text-align: left; border: none; background: none; font-family: inherit;
+  font-size: 12.5px; padding: 7px 10px; border-radius: var(--r-sm); cursor: pointer; color: var(--ink);
+}
+.sel-ai-menu button:hover { background: var(--surface-2); }
+.sel-toolbar button.ai-on { color: var(--accent-strong); background: var(--accent-soft); }
+
+/* Teilen-Button in der Tab-Leiste */
+
+/* ---------- Trilium-Paket: Attribute, Verlauf, Vorlagen ---------- */
+.sel-attr-menu { min-width: 250px; gap: 4px; }
+.sel-attr-title { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 3px 6px 1px; }
+.sel-attr-row {
+  display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 4px 6px;
+  background: var(--surface-3); border-radius: var(--r-sm);
+}
+.sel-attr-row b { color: var(--ink); font-weight: 650; }
+.sel-attr-row span { color: var(--muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel-attr-row button {
+  border: none; background: none; cursor: pointer; color: var(--muted); padding: 2px;
+  display: inline-flex; border-radius: var(--r-sm); width: auto;
+}
+.sel-attr-row button:hover { color: #c0392b; background: rgba(192,57,43,.1); }
+.sel-attr-add { display: flex; gap: 4px; padding: 2px 4px; }
+.sel-attr-add input {
+  flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: var(--r-sm);
+  font-family: inherit; font-size: 12px; padding: 5px 7px; background: var(--surface);
+}
+.sel-attr-add input:focus { outline: none; border-color: var(--accent); }
+.sel-attr-add button {
+  width: 28px; flex: none; border: none; background: var(--accent-fill); color: #fff;
+  border-radius: var(--r-sm); cursor: pointer; font-size: 13px; padding: 0; text-align: center;
+}
+.sel-attr-hint { font-size: 10px; color: var(--muted); padding: 2px 6px 3px; line-height: 1.4; }
+/* M463: Änderungszeit im ⋯ der Karte – eine leise Zeile unter allen Einträgen, kein Knopf */
+.sel-menu-zeit { font-size: 10.5px; color: var(--muted); padding: 5px 8px 2px; margin-top: 3px; border-top: 1px solid var(--border-soft); }
+
+.sel-toolbar .sel-ai-wrap > button { position: relative; }
+/* M127: Zähler-Badge (z. B. Anzahl geankerter Markierungen) an Toolbar-Buttons */
+
+/* M127: Zielkarte blitzt kurz auf, wenn eine Markierung an ihr angeankert wird */
+@keyframes anchor-flash {
+  0% { box-shadow: 0 0 0 3px var(--accent); }
+  100% { box-shadow: 0 0 0 14px rgba(0, 0, 0, 0); }
+}
+.react-flow__node.anchor-flash { animation: anchor-flash 0.7s ease-out; border-radius: var(--r-lg); }
+
+.dock-menu-template-x {
+  position: absolute; right: 7px; top: 50%; transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: var(--r-sm); color: var(--muted); cursor: pointer;
+}
+.dock-menu-template-x:hover { color: #c0392b; background: rgba(192,57,43,.12); }
+
+/* ---------- Kalender: Options-Panel + externe Termine ---------- */
+.cal-menu {
+  display: flex; gap: 18px; background: var(--surface-3); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 9px 12px; margin-bottom: 6px; flex-wrap: wrap;
+}
+.cal-menu-col { display: flex; flex-direction: column; gap: 4px; min-width: 170px; }
+.cal-menu-label { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 2px; }
+.cal-menu-check { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink); cursor: pointer; }
+.cal-menu-col button {
+  border: none; background: var(--surface); border-radius: var(--r-sm); padding: 5px 9px; cursor: pointer;
+  font-family: inherit; font-size: 11.5px; text-align: left; color: var(--ink);
+  box-shadow: var(--chrome-shadow);
+}
+.cal-menu-col button:hover { background: var(--accent-soft); }
+.cal-menu-col button:disabled { opacity: .5; cursor: default; }
+.cal-chip.ext { border-left-color: #8a8375; background: var(--surface-dim); }
+.cal-strip.ext { opacity: .65; }

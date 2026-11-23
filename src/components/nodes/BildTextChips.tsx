@@ -13,7 +13,7 @@ import { ICalendar, ILink, IMail, ITelefon, ITasks } from '../Icons';
  * eine Rufnummer im Screenshot genauso erkannt wird wie im Notiztext.
  *
  * Ruhig: Die Chips erscheinen nur am markierten Bild (die Karten rendern sie nur mit `selected`), in Ruhe steht
- * nichts zusätzlich da. Außerdem stehen sie in den Listen „Bedienung nur im Fokus" (index.css, M421).
+ * nichts zusätzlich da. Außerdem stehen sie in den Listen „Bedienung nur im Fokus" (src/styles/99-bedienung-im-fokus.css, M421).
  *
  * Fristen aus Bildern kommen bewusst NICHT von selbst in die Aufgaben-Zentrale — die Erkennung ist dafür zu
  * unsicher (ein Rechnungsdatum ist keine Frist). Erst der Klick „als Aufgabe" legt ein Ticket an.

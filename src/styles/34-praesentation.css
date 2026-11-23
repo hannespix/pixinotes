@@ -1,0 +1,119 @@
+/* ---------- Präsentationsmodus ---------- */
+.presenter {
+  position: fixed; inset: 0; z-index: 95; background: #1a1814;
+  display: flex; flex-direction: column; color: #e9ebee;
+}
+.presenter-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 22px; font-size: 13px; color: #b8b2a4;
+}
+.presenter-head button { border: none; background: rgba(255,255,255,.1); color: #e9ebee; border-radius: var(--r); cursor: pointer; font-size: 14px; padding: 5px 11px; }
+.presenter-count { font-variant-numeric: tabular-nums; }
+.presenter-slide {
+  flex: 1; margin: 0 6vw 10px; background: var(--surface-card); color: var(--ink); border-radius: var(--r-lg);
+  box-shadow: var(--pop-shadow); overflow: auto; padding: 40px 48px;
+  font-size: clamp(15px, 2.4vw, 26px); line-height: 1.5;
+}
+.presenter-slide h3 { font-size: 1.5em; margin: 0 0 0.5em; }
+.presenter-slide h4 { font-size: 1.1em; margin: 0.6em 0 0.2em; color: var(--muted); }
+.presenter-slide img { max-width: 100%; height: auto; border-radius: var(--r); }
+.presenter-slide ul { padding-left: 1.2em; }
+.presenter-slide table { border-collapse: collapse; }
+.presenter-foot {
+  display: flex; align-items: center; justify-content: center; gap: 18px; padding: 0 22px 18px;
+}
+.presenter-foot > button {
+  border: none; background: rgba(255,255,255,.12); color: #e9ebee; border-radius: var(--r);
+  cursor: pointer; font-size: 14px; padding: 9px 18px; font-family: inherit;
+}
+.presenter-foot > button:disabled, .presenter-foot > button[aria-disabled='true'] { opacity: .35; cursor: default; }
+.presenter-dots { display: flex; gap: 0; min-width: 0; flex: 0 1 auto; }
+/* M389: zu sehen 9 px, zu treffen 24 × 32 px — der Punkt ist nur noch das Bild im Knopf */
+.presenter-dots button { width: 24px; flex: 0 1 auto; min-width: 11px; height: 32px; border: none; background: none; cursor: pointer; padding: 0; display: grid; place-items: center; }
+.presenter-dots button::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.28); }
+.presenter-dots button:hover::before { background: rgba(255,255,255,.55); }
+.presenter-dots button.on::before { background: #e9ebee; }
+
+/* ---------- KI-Aktionen ---------- */
+/* M397: KI-Knöpfe tragen die Akzentfarbe der App – kein eigenes Violett */
+.ai-btn { background: var(--accent-soft) !important; color: var(--accent-strong) !important; font-weight: 600; }
+.ai-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 24%, transparent) !important; }
+.ai-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* ---------- Touch: Untermenüs über dem höheren Dock (50px-Buttons) ansetzen.
+   Muss NACH den Basisregeln von .draw-palette/.dock-menu stehen, sonst
+   verliert der Override bei gleicher Spezifität. ---------- */
+@media (pointer: coarse) {
+  .draw-palette { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .dock-menu { bottom: 68px; }
+}
+
+/* ---------- Sehr schmale Screens: Dock muss komplett ins Bild passen,
+   sonst ragen ➕-Menü & Buttons seitlich raus ---------- */
+@media (max-width: 520px) {
+  .dock {
+    max-width: calc(calc(100vw / var(--pn-anz, 1)) - 12px);
+    gap: 2px; padding: 6px;
+  }
+  /* Nur die Werkzeugleisten-Buttons verkleinern — NICHT die Einträge im ➕-Menü */
+  .dock > button, .dock-add-wrap > button { width: 40px; height: 40px; font-size: 18px; }
+
+  /* Menü am linken Dock-Rand ausrichten, aber nie über den Viewport hinaus */
+  .dock-menu { bottom: 52px; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 20px); }
+}
+
+/* ---------- Editierbare Präsentations-Folien ---------- */
+.presenter-hint-edit { font-size: 12px; color: #8a8375; margin-left: auto; margin-right: 14px; }
+.presenter-slide.editable {
+  display: flex; align-items: flex-start; justify-content: flex-start;
+  padding: 28px; overflow: auto;
+}
+/* Auto-Margins statt align/justify-center: zentriert, wenn Platz ist — aber
+   hoher Inhalt (großes Kanban) bleibt oben erreichbar & scrollbar. Mit
+   align-items:center wäre die Oberkante unerreichbar abgeschnitten (User-Report). */
+.presenter-slide.editable > * { margin: auto; }
+/* Notiz: großer Editor auf Haftnotiz-Grund */
+.slide-note {
+  width: min(880px, 100%); max-height: 100%; overflow: auto;
+  border-radius: var(--r-lg); padding: 34px 26px;
+  box-shadow: var(--pop-shadow);
+  align-self: center;
+}
+.slide-note .bn-editor { font-size: clamp(16px, 2vw, 22px); }
+/* Form: Original-Optik in groß, Text direkt tippbar */
+.slide-shape { width: min(640px, 90%); height: min(360px, calc(60vh / var(--pn-anz, 1))); position: relative; align-self: center; flex: none; }
+.slide-shape .shape-body { font-size: 22px; }
+.slide-shape-input { font-size: 22px !important; text-align: center; }
+/* Kanban: volle Interaktion, etwas größer gesetzt */
+.slide-kanban {
+  width: min(1040px, 100%); align-self: center;
+  padding: 22px 26px !important; box-shadow: var(--pop-shadow);
+}
+.slide-kanban .kanban-title { font-size: 20px; }
+.slide-kanban .kanban-col-name { font-size: 13px; }
+.slide-kanban .kanban-item { font-size: 15px; }
+.slide-kanban .kanban-add input { font-size: 15px; }
+.slide-kanban .kanban-addcol, .slide-kanban .kanban-col-x { opacity: 1; }
+/* Mermaid: großes Diagramm, Code zuschaltbar */
+.slide-mermaid { width: 100%; height: 100%; display: flex; flex-direction: column; }
+.slide-mermaid .mermaid-head { font-size: 15px; }
+.slide-mermaid-split { flex: 1; display: flex; gap: 12px; min-height: 0; }
+.slide-mermaid .mermaid-code { flex: 0 0 34%; font-size: 14px; min-height: 0; }
+.slide-mermaid .mermaid-preview { flex: 1; min-height: 0; overflow: auto; display: flex; align-items: center; justify-content: center; }
+.slide-mermaid .mermaid-svg { width: 100%; }
+.slide-mermaid .mermaid-svg svg { max-width: 100%; max-height: calc(62vh / var(--pn-anz, 1)); height: auto; }
+
+/* Hinweis in der Zeichen-Palette — auf schmalen Screens ausblenden */
+
+/* ---------- Physik-Effekte: natürliches Drag-Gefühl ---------- */
+/* Beim Ablegen federt die Karte mit leichtem Overshoot zurück */
+.react-flow__node > * { transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+/* M344: Beim Ziehen bleibt die Karte, wie sie ist — vorher wurde sie um 3,5 % vergrößert und in
+   Bewegungsrichtung geneigt. Das sah lebendig aus, aber ihre Kanten standen dann nicht mehr dort,
+   wo sie nach dem Ablegen liegen: Ausrichten an einer Oberkante war Glückssache. Der angehobene
+   Schatten (oben) zeigt weiterhin, dass sie in der Hand ist. */
+.react-flow__node.dragging > * { transform: none; transition: none; }
+
+/* Undo/Redo im Dock */
+.dock button:disabled { opacity: 0.32; cursor: default; }
+.dock button:disabled:hover { background: none; }

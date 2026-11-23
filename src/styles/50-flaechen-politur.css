@@ -1,0 +1,123 @@
+/* ================= M172: Design-Politur =================
+   Glas-Optik (backdrop-blur), dezente Farbverläufe, flüssige Ein-/Ausblendungen
+   und Viewport-feste Menüs. Steht bewusst am DATEIENDE: bei gleicher
+   Spezifität gewinnt die spätere Regel — so übersteuern die Polituren die
+   Basisregeln oben, ohne sie anzufassen. */
+
+/* ---------- Fläche: ruhiger, einfarbiger Grund (M315) ----------
+   Der Mesh-Verlauf und die Papiertextur (M173/M178) sind weg: Sie kosteten
+   auf jedem Schwenk Rechenzeit und sahen nach „KI-Vorlage" aus. Die Fläche
+   ist jetzt --bg, das Punktraster darauf gibt die Orientierung. Board-Tönungen
+   (M88) haben höhere Spezifität und gewinnen weiterhin. */
+.react-flow { background: var(--bg); }
+
+/* ================= M315: Flächen — deckend, kantig, ruhig =================
+   Kein Milchglas mehr. Alles, was über dem Inhalt schwebt, ist eine deckende
+   Fläche mit 1-px-Kante und flachem Schatten: Leisten bekommen --chrome-shadow,
+   Menüs und Fenster --pop-shadow. Das liest sich ruhiger, rendert ohne
+   backdrop-filter schneller und sieht in Hell und Dunkel gleich aus. */
+.logo, .top-actions, .tabs, .sel-toolbar, .draw-palette, .dock, .mm-toolbar,
+.ov-mode, .ov-graph-toggles, .ov-graph-zoom, .writer-banner {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--chrome-shadow);
+}
+.dock::before, .mm-toolbar::before { content: none; }
+/* Menüs & Panels */
+.dock-menu, .frame-menu, .happ-menu, .sel-menu-fixed, .tab-bg-menu,
+.cal-menu, .week-pop, .mm-pop, .comment-panel, .lookup-panel, .backlinks-panel,
+.search-box, .edge-opts {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  box-shadow: var(--pop-shadow);
+}
+/* Fenster, in denen GELESEN wird (M246): deckend, mit Kante */
+.modal, .ticket-modal {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+}
+/* Kopfzeile und Reiter kleben deckend oben (M246) */
+.modal-head { background: var(--surface); z-index: 2; }
+.modal-tabs {
+  position: sticky; top: 53px; z-index: 2;
+  background: var(--surface);
+}
+/* Abdunkler dimmen nur — keine Blur-Ebene mehr darunter */
+.modal-backdrop::before, .search-backdrop::before,
+.lookup-backdrop::before, .nav-backdrop::before { content: none; }
+.modal-backdrop { background: rgba(14, 16, 20, 0.42); }
+.toast, .tipbox {
+  background: #16191e; color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+[data-theme='dark'] .tipbox { background: #292d33; }
+
+/* ---------- Akzent-Stellen: Vollton statt Verlauf (M315) ---------- */
+.ai-cmd-go { background: var(--accent-fill) !important; }
+.ai-cmd-go:hover { filter: brightness(1.08); }
+
+/* ---------- Flüssige Ein-/Ausblendungen ---------- */
+@keyframes pn-pop-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pn-fade-in { from { opacity: 0; } to { opacity: 1; } }
+/* Elemente OHNE eigenes Basis-transform dürfen die Pop-Animation nutzen —
+   die anderen (Dock-Menü zentriert, Auswahl-Menü mit translate-Anker) faden */
+.frame-menu, .happ-menu, .tab-bg-menu, .cal-menu, .week-pop,
+.mm-pop, .modal, .ticket-modal, .lookup-panel, .collect-panel {
+  animation: pn-pop-in 0.14s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.dock-menu, .sel-menu-fixed, .comment-panel {
+  animation: pn-fade-in 0.16s ease-out;
+}
+.modal-backdrop, .lookup-backdrop { animation: pn-fade-in 0.2s ease-out; }
+.dock button, .sel-toolbar button, .top-actions button, .tab, .dock-menu button,
+.frame-menu button, .happ-menu button, .modal-buttons button, .taskhub-actions button,
+.time-kind, .time-views button, .lookup-src {
+  transition: background 0.16s ease, color 0.16s ease, transform 0.14s ease,
+    box-shadow 0.16s ease, border-color 0.16s ease;
+}
+.dock > button:active, .dock-add-wrap > button:active { transform: scale(0.96); }
+.dock-menu button:active, .frame-menu button:active, .happ-menu button:active { transform: scale(0.96); }
+.lookup-src:hover { border-color: var(--accent); }
+
+/* ---------- Menüs & Popover: immer im Sichtfenster ---------- */
+.frame-menu, .happ-menu {
+  max-width: calc(calc(100vw / var(--pn-anz, 1)) - 16px);
+  max-height: min(calc(72vh / var(--pn-anz, 1)), calc(calc(100vh / var(--pn-anz, 1)) - 24px));
+  overflow-y: auto;
+}
+.cal-menu, .week-pop, .mm-pop { max-width: min(460px, calc(92vw / var(--pn-anz, 1))); max-height: calc(62vh / var(--pn-anz, 1)); overflow-y: auto; }
+.dock-menu { max-width: min(320px, calc(calc(100vw / var(--pn-anz, 1)) - 16px)); }
+
+/* ---------- Responsive-Ausbau: Phone ---------- */
+@media (max-width: 640px) {
+  .topbar { top: calc(8px + var(--safe-top)); left: 8px; gap: 6px; }
+  .logo { font-size: 15px; padding: 6px 11px; }
+  .tabs { top: calc(52px + var(--safe-top)); left: 8px; max-width: var(--kopf-voll, calc(calc(100vw / var(--pn-anz, 1)) - 16px)); }
+  /* Kopf- und Tab-Leiste rücken zusammen — Freiraum entsprechend knapper (M189) */
+  :root { --head-space: calc(106px + var(--safe-top)); }
+  /* Modals als Vollbild-Blätter — kein Gefummel mit Rändern */
+  .modal-backdrop { padding: 0; align-items: stretch; }
+  .modal { width: calc(100vw / var(--pn-anz, 1)); height: calc(100dvh / var(--pn-anz, 1)); max-height: calc(100dvh / var(--pn-anz, 1)); border-radius: 0; border: none; }
+  .modal-head { border-radius: 0; }
+  .ticket-modal-backdrop { padding: 0; align-items: stretch; }
+  .ticket-modal { width: calc(100vw / var(--pn-anz, 1)); height: calc(100dvh / var(--pn-anz, 1)); max-height: calc(100dvh / var(--pn-anz, 1)); border-radius: 0; border: none; }
+  .comment-panel { max-width: calc(calc(100vw / var(--pn-anz, 1)) - 16px); }
+  .lookup-backdrop { padding: 10px 8px; }
+  .lookup-panel { max-height: calc(calc(100dvh / var(--pn-anz, 1)) - 20px); }
+  /* M189: NICHT den Kopf-Freiraum wegkürzen — nur die Seitenränder.
+     Vorher lief die Aufgaben-Zentrale unter Kopf- und Tab-Leiste. */
+  .taskhub { padding-left: 10px; padding-right: 10px; }
+  .collect-panel { max-width: calc(calc(100vw / var(--pn-anz, 1)) - 24px); }
+}
+@media (max-width: 520px) {
+  /* Dock-Menüs auf Phones FEST mittig über dem Dock verankern (fixed +
+     translate statt transform: so bleibt die Einblende-Animation frei) —
+     am Knopf verankert liefen sie links/rechts aus dem Bild */
+  .dock-menu {
+    position: fixed; left: 50%; right: auto; translate: -50% 0;
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  }
+}

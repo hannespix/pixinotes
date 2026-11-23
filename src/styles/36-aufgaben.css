@@ -1,0 +1,232 @@
+/* ---------- Aufgaben-Zentrale ---------- */
+.taskhub {
+  position: fixed; inset: 0; z-index: 40; background: var(--bg);
+  display: flex; flex-direction: column; align-items: center;
+  padding: var(--head-space) 18px calc(24px + var(--safe-bottom)); overflow-y: auto;
+}
+/* M447: nimmt beim Öffnen den Fokus auf (Vorlese-Programm liest „Aufgaben"), zeigt dafür aber keinen Rahmen ums Ganze */
+.taskhub:focus { outline: none; }
+.taskhub-head {
+  width: min(860px, 100%); display: flex; align-items: center; gap: 12px;
+  margin-bottom: 14px; flex-wrap: wrap;
+}
+.taskhub-head h2 { margin: 0; font-size: 20px; }
+.taskhub-meta { color: var(--muted); font-size: 13px; }
+.taskhub-actions { margin-left: auto; display: flex; gap: 6px; }
+.taskhub-actions button {
+  border: none; background: var(--surface); border-radius: var(--r); padding: 7px 12px; cursor: pointer;
+  font-family: inherit; font-size: 12.5px; box-shadow: var(--chrome-shadow);
+}
+.taskhub-actions button:hover { background: var(--accent-soft); }
+.taskhub-x { font-size: 13px !important; }
+.taskhub-list {
+  list-style: none; margin: 0; padding: 0; width: min(860px, 100%);
+  display: flex; flex-direction: column; gap: 7px;
+}
+.task-row {
+  display: flex; flex-direction: column; background: var(--surface-card);
+  border-radius: var(--r); padding: 10px 14px; box-shadow: var(--chrome-shadow);
+  border-left: 4px solid transparent;
+}
+/* Kompakte Hauptzeile (M116): Klick klappt die Werkzeuge auf */
+.task-main { display: flex; align-items: center; gap: 10px; cursor: pointer; min-width: 0; }
+.task-row.open { box-shadow: var(--chrome-shadow); }
+.task-caret { color: var(--muted); font-size: 10px; flex: none; }
+.task-prio-mark { letter-spacing: 1px; }
+.task-prio-mark.prio-1 { color: #d84b3d; }
+.task-prio-mark.prio-2 { color: #e8a13a; }
+.task-prio-mark.prio-3 { color: #4f7cff; }
+.task-myday-mark { flex: none; font-size: 12px; }
+/* Aufgeklappte Werkzeugleiste (M116) */
+.task-tools {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--border-soft);
+}
+.task-tools .task-myday, .task-jump, .task-tools .task-detail-btn {
+  border: 1px solid var(--border); background: var(--surface); border-radius: var(--r-sm);
+  font-family: inherit; font-size: 10.5px; color: var(--muted); cursor: pointer; padding: 3px 8px;
+  display: inline-flex; align-items: center; gap: 4px; opacity: 1; filter: none;
+}
+.task-tools .task-myday:hover, .task-jump:hover, .task-tools .task-detail-btn:hover {
+  color: var(--accent-strong); border-color: var(--accent);
+}
+.task-tools .task-myday.on { color: var(--accent-strong); border-color: var(--accent); background: var(--accent-soft); }
+.task-board-tools { display: none; }
+@media (max-width: 640px) {
+  .th-label { display: none; } /* Kopf-Knöpfe mobil nur als Icons */
+  .task-main .task-board { display: none; } /* Board-Chip mobil nur in den Werkzeugen */
+  .task-board-tools { display: inline; }
+}
+.task-row.urgency-overdue { border-left-color: #d84b3d; }
+.task-row.urgency-soon { border-left-color: #e8a13a; }
+.task-row input[type='checkbox'] { width: 17px; height: 17px; cursor: pointer; flex: none; }
+.task-text {
+  border: none; background: none; font-family: inherit; font-size: 13.5px; color: var(--ink);
+  cursor: pointer; text-align: left; flex: 1; min-width: 0; padding: 0;
+  display: flex; gap: 8px; align-items: baseline;
+}
+.task-text:hover { color: var(--accent-strong); }
+.task-kind { flex: none; }
+.task-due { font-size: 11.5px; white-space: nowrap; color: var(--muted); }
+.task-due.urgency-overdue { color: #a4231a; font-weight: 700; }
+.task-due.urgency-soon { color: #8a5a00; font-weight: 600; }
+.task-board {
+  font-size: 11px; color: var(--muted); background: var(--surface-dim);
+  border-radius: var(--r-pill); padding: 3px 9px; white-space: nowrap; flex: none;
+}
+/* Gruppierte Aufgabenliste (M113): Fristen-Abschnitte bzw. Personen */
+.th-group ul { list-style: none; margin: 0 0 4px; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.th-group-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  border: none; background: none; cursor: pointer; font-family: inherit;
+  font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.4px; padding: 8px 2px 5px;
+}
+.th-group-head:hover { color: var(--accent-strong); }
+.th-group-caret { width: 12px; flex: none; font-size: 10px; }
+.th-group-count {
+  background: var(--surface-dim); border-radius: var(--r-pill); padding: 1px 8px;
+  font-size: 11px; font-weight: 600;
+}
+.task-who {
+  font-size: 11px; color: var(--accent-strong); background: var(--accent-soft);
+  border-radius: 999px; padding: 3px 9px; white-space: nowrap; flex: none;
+}
+.task-snooze { display: flex; gap: 3px; flex: none; }
+.task-snooze button {
+  border: 1px solid var(--border); background: var(--surface); border-radius: var(--r-sm);
+  font-family: inherit; font-size: 10px; color: var(--muted); cursor: pointer; padding: 2px 6px;
+}
+.task-snooze button:hover { color: var(--accent-strong); border-color: var(--accent); }
+/* Suche + Tags (M114) */
+.th-searchrow { flex-wrap: wrap; margin-top: -4px; }
+.th-search {
+  display: flex; align-items: center; gap: 6px; background: var(--surface);
+  border-radius: var(--r-pill); padding: 4px 11px; box-shadow: var(--chrome-shadow); color: var(--muted);
+}
+.th-search input {
+  border: none; background: none; outline: none; font-family: inherit;
+  font-size: 12px; color: var(--ink); width: 150px;
+}
+.taskhub-quickrow { width: min(860px, 100%); display: flex; gap: 8px; align-items: stretch; margin-bottom: 12px; }
+.taskhub-quickrow .taskhub-quick { margin-bottom: 0; flex: 1; width: auto; }
+.th-quickboard { margin-left: 0; max-width: 180px; }
+/* Priorität (M114): Klick-Chip !!!/!!/! */
+.task-prio {
+  border: none; background: none; cursor: pointer; font-family: inherit;
+  font-weight: 800; font-size: 12px; padding: 2px 5px; border-radius: var(--r-sm); flex: none;
+  color: color-mix(in srgb, var(--muted) 45%, transparent); letter-spacing: 1px;
+}
+.task-prio.prio-1 { color: #d84b3d; }
+.task-prio.prio-2 { color: #e8a13a; }
+.task-prio.prio-3 { color: #4f7cff; }
+.task-prio:hover { background: var(--surface-dim); }
+.k-prio { font-weight: 800; letter-spacing: 1px; }
+.k-prio.prio-1 { color: #d84b3d; }
+.k-prio.prio-2 { color: #e8a13a; }
+.k-prio.prio-3 { color: #4f7cff; }
+/* Spalten-Umstellung (M114) */
+.task-col {
+  border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 10.5px; font-family: inherit;
+  padding: 1px 4px; color: var(--muted); background: var(--surface); flex: none; max-width: 110px;
+}
+/* „Heute geschafft" (M114) */
+.th-done { width: min(860px, 100%); margin-top: 14px; border-top: 1px dashed var(--border-soft); padding-top: 4px; }
+.th-done ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.th-done-row { opacity: 0.75; }
+.th-done-row .task-text { cursor: default; text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 55%, transparent); }
+.th-done-check { color: #2e9e63; font-weight: 800; flex: none; }
+.th-done-empty { color: var(--muted); font-size: 12px; padding: 6px 2px 2px 20px; }
+/* M469: Termine heute und morgen — ruhig, ohne Haken und ohne Kartenschatten */
+.th-termine { width: min(860px, 100%); margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px dashed var(--border-soft); }
+.th-termine-kopf {
+  display: flex; align-items: center; gap: 8px; padding: 4px 2px 5px;
+  font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px;
+}
+.th-termine-erinnern {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
+  font-weight: 500; text-transform: none; letter-spacing: 0; font-size: 11.5px;
+}
+.th-termine-erinnern input { margin: 0; }
+.th-termine-tag { font-size: 11.5px; color: var(--muted); padding: 4px 2px 2px 21px; }
+.th-termine ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.th-termin {
+  display: flex; align-items: baseline; gap: 10px; width: 100%; text-align: left;
+  border: none; background: none; border-radius: var(--r-sm); padding: 5px 8px 5px 21px;
+  font-family: inherit; font-size: 13px; color: var(--ink); cursor: pointer;
+}
+.th-termin:hover { background: var(--surface-dim); }
+.th-termin:hover .th-termin-titel { color: var(--accent-strong); }
+.th-termin-zeit { flex: none; min-width: 62px; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+.th-termin-titel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.th-termin-konto { flex: none; font-size: 11px; color: var(--muted); }
+/* M471: Ort des Termins — leise, gekürzt */
+.th-termin-ort { flex: 0 1 auto; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; color: var(--muted); display: inline-flex; align-items: center; gap: 3px; }
+.th-termine-leer { color: var(--muted); font-size: 12px; padding: 2px 2px 4px 21px; }
+/* M473: leiser Hinweis, wenn der Hintergrund-Abruf eine Anmeldung nicht erneuern konnte */
+.th-termine-hinweis { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.th-termine-erneuern { border: none; background: none; padding: 0; font: inherit; color: var(--accent-strong); text-decoration: underline; cursor: pointer; }
+.th-termine-erneuern:disabled { color: var(--muted); cursor: default; }
+.th-week { display: inline-flex; gap: 3px; align-items: flex-end; height: 18px; margin-left: auto; }
+.th-week-bar { width: 7px; height: 100%; display: flex; align-items: flex-end; background: var(--surface-dim); border-radius: var(--r-xs); overflow: hidden; }
+.th-week-bar i { display: block; width: 100%; background: color-mix(in srgb, var(--accent) 55%, transparent); border-radius: var(--r-xs) var(--r-xs) 0 0; min-height: 2px; }
+.th-week-bar i.today { background: var(--accent); }
+/* „Mein Tag" (M115) */
+.task-myday {
+  border: none; background: none; cursor: pointer; font-family: inherit;
+  font-size: 13px; padding: 2px 4px; border-radius: var(--r-sm); flex: none;
+  opacity: 0.35; filter: grayscale(1);
+}
+.task-myday:hover { opacity: 0.8; background: var(--surface-dim); }
+.task-myday.on { opacity: 1; filter: none; }
+.task-detail-btn {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 2px 3px; border-radius: var(--r-sm); flex: none; display: flex; align-items: center;
+}
+.task-detail-btn:hover, .task-detail-btn.on { color: var(--accent-strong); background: var(--surface-dim); }
+/* Detail-Spalte (M115) */
+.th-detail {
+  position: fixed; top: 96px; right: 14px; bottom: 14px; z-index: 45;
+  width: min(360px, calc(calc(100vw / var(--pn-anz, 1)) - 28px));
+  background: var(--surface-card); border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
+  padding: 14px 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 11px;
+}
+.th-detail-head { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.th-detail-head .taskhub-x { margin-left: auto; }
+.th-field { display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: var(--muted); }
+.th-field > span { font-weight: 600; }
+.th-field input:not([type='range']), .th-field textarea {
+  border: 1px solid var(--border); border-radius: var(--r); padding: 7px 9px;
+  font-family: inherit; font-size: 12.5px; color: var(--ink); background: var(--surface);
+  outline: none; resize: vertical;
+}
+.th-field input:focus, .th-field textarea:focus { border-color: var(--accent); }
+.th-field-2col { flex-direction: row; gap: 10px; }
+.th-field-2col label { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.th-prio-row { display: flex; gap: 5px; flex-wrap: wrap; }
+.th-detail-hint { font-size: 12px; color: var(--muted); margin: 0; }
+.th-detail-foot { margin-top: auto; display: flex; align-items: center; gap: 8px; justify-content: space-between; padding-top: 6px; }
+.taskhub-empty { width: min(860px, 100%); color: var(--muted); font-size: 14px; padding: 30px 0; }
+.taskhub-foot { width: min(860px, 100%); color: var(--muted); font-size: 11.5px; margin-top: 16px; }
+
+/* Aufgaben-Badge am Dock-Button */
+
+/* Die Leiste selbst ist der Bezugspunkt: ein Knopf mit Zahl bekommt etwas
+   mehr Luft nach rechts, damit Symbol und Zahl als EINE Einheit lesbar sind */
+
+/* Fälligkeit am Kanban-Ticket */
+.kanban-due {
+  flex-basis: 100%; border: none; background: var(--surface-dim); cursor: pointer;
+  font-family: inherit; font-size: 10px; color: var(--muted); border-radius: var(--r-sm);
+  padding: 2px 6px; text-align: left; margin-top: 2px;
+}
+.kanban-due.urgency-soon { background: #ffe4b8; color: #8a5a00; }
+.kanban-due.urgency-overdue { background: #ffd2cc; color: #a4231a; font-weight: 700; }
+.kanban-due-input {
+  flex-basis: 100%; margin-top: 3px; border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+  font-family: inherit; font-size: 10.5px; padding: 2px 5px; color: var(--ink); background: var(--surface);
+}
+
+/* Portal: Öffnen + Präsentieren nebeneinander */
+.portal-actions { display: flex; gap: 5px; justify-content: center; }

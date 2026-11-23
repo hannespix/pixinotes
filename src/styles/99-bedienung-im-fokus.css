@@ -1,0 +1,65 @@
+/* ---------- M421: Bedienung nur im Fokus ----------
+   „Das UI bei den Ideabubbles etc. immer nur einblenden, wenn das Modul im Fokus ist … für alle Module mit
+   sichtbarem UI, außer es ist wichtig, dass Bestandteile immer angezeigt werden."
+   In Ruhe zeigt eine Karte nur ihren Inhalt. Die Bedienung (Werkzeuge, Eingabezeilen, Blättern, Schritte) blendet
+   ein, wenn die Karte markiert ist, der Fokus in ihr liegt oder der Zeiger auf ihr ruht (kurz verzögert, damit
+   beim Überfahren nichts aufblitzt). Sie behält ihren Platz — nichts springt. Was Inhalt ist oder einen Zustand
+   zeigt, bleibt: Titel, Daten, Spaltenköpfe, die laufende Zeiterfassung, ein gesetzter Filter, eine offene
+   Abstimmung. Gilt nur auf dem Board; Karten-Fokus und Präsentation zeigen alles.
+   Die Liste steht dreimal (Übergang, Zeiger, Finger) — neue Bedien-Klassen in alle drei eintragen. */
+@keyframes pn-bedienung-ein { from { opacity: 0; } }
+.react-flow__node :where(
+    .kanban-add,
+    .gantt-tools, .gantt-addzeile,
+    .cal-nav,
+    .bub:not([data-phase='offen']) :is(.bub-ansicht, .bub-schritte, .bub-gruppe-neu, .bub-leiste, .bub-zahl, .bub-frage-feld:placeholder-shown),
+    .time-rec, .time-nav, .time-empty,
+    .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
+    .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
+    .happ-size, .happ-head .happ-btn,
+    .kontakt-tools,
+    .bildtext-chips
+) { transition: opacity 0.14s ease; }
+@media (hover: hover) {
+  .react-flow__node:not(.selected):not(:focus-within):not(:hover) :is(
+    .kanban-add,
+    .gantt-tools, .gantt-addzeile,
+    .cal-nav,
+    .bub:not([data-phase='offen']) :is(.bub-ansicht, .bub-schritte, .bub-gruppe-neu, .bub-leiste, .bub-zahl, .bub-frage-feld:placeholder-shown),
+    .time-rec, .time-nav, .time-empty,
+    .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
+    .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
+    .happ-size, .happ-head .happ-btn,
+    .kontakt-tools,
+    .bildtext-chips
+  ) { opacity: 0; }
+  /* Zeiger ruht auf der Karte: erst nach einem Moment einblenden. Als Animation (hält während des Verzugs bei 0),
+     damit ein Klick — die Karte ist dann markiert, die Regel greift nicht mehr — sofort alles zeigt. */
+  .react-flow__node:not(.selected):not(:focus-within):hover :is(
+    .kanban-add,
+    .gantt-tools, .gantt-addzeile,
+    .cal-nav,
+    .bub:not([data-phase='offen']) :is(.bub-ansicht, .bub-schritte, .bub-gruppe-neu, .bub-leiste, .bub-zahl, .bub-frage-feld:placeholder-shown),
+    .time-rec, .time-nav, .time-empty,
+    .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
+    .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
+    .happ-size, .happ-head .happ-btn,
+    .kontakt-tools,
+    .bildtext-chips
+  ) { animation: pn-bedienung-ein 0.16s ease 0.35s backwards; }
+}
+/* Finger: kein Zeiger, der ruhen könnte — erst antippen (markieren), dann bedienen. Unsichtbares fängt keinen Tipp. */
+@media (hover: none) {
+  .react-flow__node:not(.selected):not(:focus-within) :is(
+    .kanban-add,
+    .gantt-tools, .gantt-addzeile,
+    .cal-nav,
+    .bub:not([data-phase='offen']) :is(.bub-ansicht, .bub-schritte, .bub-gruppe-neu, .bub-leiste, .bub-zahl, .bub-frage-feld:placeholder-shown),
+    .time-rec, .time-nav, .time-empty,
+    .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
+    .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
+    .happ-size, .happ-head .happ-btn,
+    .kontakt-tools,
+    .bildtext-chips
+  ) { opacity: 0; pointer-events: none; }
+}

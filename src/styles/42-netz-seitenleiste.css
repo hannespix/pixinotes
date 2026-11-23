@@ -1,0 +1,319 @@
+/* ---------- Obsidian-Paket: Wikilinks, Tags, Board-Netz ---------- */
+.link-chip { background: rgba(79,124,255,.1); color: var(--accent-strong); font-weight: 600; }
+.link-chip:hover { border-color: var(--accent); }
+.link-chip.unresolved { background: var(--surface-dim); color: var(--muted); font-weight: 400; }
+
+.search-tags { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 16px; }
+.search-tag {
+  border: none; background: rgba(79,124,255,.1); color: var(--accent-strong); border-radius: var(--r-pill);
+  padding: 5px 12px; font-family: inherit; font-size: 12.5px; cursor: pointer; font-weight: 600;
+}
+.search-tag:hover { background: rgba(79,124,255,.22); }
+.search-tag span { color: var(--muted); font-weight: 400; margin-left: 3px; }
+
+.ov-mode {
+  position: fixed;
+  top: max(var(--head-space), var(--kopf-oben, 0px));
+  right: calc(18px + var(--app-rand));
+  z-index: 55; display: flex; gap: 2px;
+  background: var(--surface); border-radius: var(--r); padding: 3px; box-shadow: var(--chrome-shadow);
+}
+.ov-mode button {
+  border: none; background: none; font-family: inherit; font-size: 12px; cursor: pointer;
+  padding: 5px 12px; border-radius: var(--r); color: var(--muted);
+}
+.ov-mode button.on { background: var(--accent-fill); color: #fff; }
+.ov-graph { position: fixed; inset: 0; padding: calc(90px + var(--safe-top)) 24px calc(24px + var(--safe-bottom)); background: var(--bg); display: flex; flex-direction: column; }
+/* M304: Die Fläche beginnt RECHTS der linken Spalte (`--nav-offen`, gemessen in
+   Tabs.tsx). Vorher lag ein Drittel des Netzes unter der Navigation, und
+   „Alles einpassen" passte in die verdeckte Breite ein. */
+.ov-graph { left: var(--nav-offen, 0px); transition: left 0.18s ease; }
+.ov-graph-svg { flex: 1; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+.ov-graph-svg:active { cursor: grabbing; }
+.ov-graph-zoom {
+  position: fixed; right: calc(18px + var(--app-rand)); bottom: calc(52px + var(--app-rand)); z-index: 55;
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--surface); border-radius: var(--r); padding: 4px; box-shadow: var(--chrome-shadow);
+}
+.ov-graph-zoom button {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  width: 34px; height: 34px; border-radius: var(--r);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.ov-graph-zoom button:hover { background: var(--surface-2); color: var(--ink); }
+.ov-graph-node { cursor: pointer; }
+/* M419: Board-Kugeln sind Tropfen (Farbe aus dem Verlauf, siehe NetzDefs) — hier nur Kontur und Hover */
+.ov-graph-node .ov-tropfen { stroke: var(--netz-kontur); transition: filter .15s; }
+.ov-graph-node:hover .ov-tropfen { filter: saturate(1.35) brightness(1.03); }
+.ov-graph-node text { font-size: 12px; fill: var(--ink); font-family: inherit; pointer-events: none; }
+.ov-graph-node .ov-graph-count { font-size: 10px; fill: var(--muted); }
+.ov-graph-legend { text-align: center; font-size: 11.5px; color: var(--muted); padding-top: 6px; }
+
+/* ---------- Backlinks-Panel + Graph-Toggles ---------- */
+.backlinks { position: fixed; right: 18px; bottom: 190px; z-index: 45; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.backlinks-pill {
+  border: none; background: var(--surface); border-radius: var(--r-pill); cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600; color: var(--muted);
+  padding: 6px 13px; box-shadow: var(--chrome-shadow);
+}
+.backlinks-pill:hover, .backlinks-pill.on { color: var(--accent-strong); }
+.backlinks-panel {
+  background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
+  padding: 8px; width: 260px; max-height: 300px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.backlinks-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); padding: 2px 6px 6px;
+}
+.backlinks-head button { border: none; background: none; cursor: pointer; color: var(--muted); display: inline-flex; }
+.backlinks-row {
+  display: flex; align-items: center; gap: 7px; border: none; background: none;
+  font-family: inherit; font-size: 12px; color: var(--ink); padding: 6px 8px;
+  border-radius: var(--r-sm); cursor: pointer; text-align: left;
+}
+.backlinks-row:hover { background: var(--surface-2); }
+.backlinks-icon { color: var(--muted); display: inline-flex; flex: none; }
+.backlinks-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.backlinks-board { font-size: 10px; color: var(--muted); background: var(--surface-dim); border-radius: var(--r-pill); padding: 2px 7px; flex: none; }
+
+.ov-graph-toggles {
+  /* M248: UNTER die Kopfleiste, nicht daneben. Die feste 64 stammt aus einer
+     Zeit mit einreihigem Kopf; sobald er umbricht (schmaler Schirm, Text-Zoom,
+     linke Navigation), stand der Filter mitten in den Aktionsknöpfen
+     (User-Screenshot). `--head-space` ist die eine Wahrheit dafür. */
+  /**
+   * `--kopf-oben` ist die GEMESSENE Unterkante der Aktionsleiste (M236,
+   * lib/kopfmass.ts), `--head-space` der aus dem Layout abgeleitete Wert.
+   * Beide können mal der größere sein: In der linken Navigation ist der
+   * abgeleitete Wert klein (die Boards stehen ja seitlich) — aber bei
+   * Text-Zoom wächst die Leiste über ihn hinaus, und dann stand der Filter
+   * mitten in den Knöpfen. `max()` nimmt immer den, der wirklich reicht.
+   */
+  position: fixed;
+  top: max(var(--head-space), var(--kopf-oben, 0px));
+  /**
+   * M252: …und RECHTS neben der linken Navigation, nicht darunter.
+   *
+   * `--nav-offen` ist die gemessene rechte Kante der linken Spalte bzw. des
+   * offenen Navigators (Tabs.tsx) und 0, wenn dort nichts steht. Vorher klebte
+   * die Leiste fest bei 18 Punkten und verschwand hinter dem Panel
+   * (User-Screenshot). Ein höherer z-index wäre die falsche Antwort gewesen:
+   * Dann läge der Filter ÜBER dem Navigator, den man gerade benutzt.
+   */
+  left: calc(18px + var(--app-rand) + var(--nav-offen, 0px));
+  z-index: 55; display: flex; gap: 12px; flex-wrap: wrap;
+  /* Rechts endet sie VOR dem Umschalter „Hierarchie · Netz" — dessen Breite
+     misst Overview.tsx, denn sie wächst mit der Textgröße */
+  max-width: calc(100% - 48px - 2 * var(--app-rand) - var(--nav-offen, 0px) - var(--ov-mode-breite, 0px));
+  transition: left 0.18s ease, max-width 0.18s ease;
+  background: var(--surface); border-radius: var(--r); padding: 7px 13px; box-shadow: var(--chrome-shadow);
+}
+/* M253: Eine Beschriftung bricht NIE mitten im Wort. In der schmal gezogenen
+   Leiste stand „Nur dieses Projekt" sonst über drei Zeilen (User-Screenshot) —
+   die Zeile darf umbrechen, das Wort nicht. */
+.ov-graph-toggle {
+  display: flex; align-items: center; gap: 5px; font-size: 12px;
+  color: var(--ink); cursor: pointer; white-space: nowrap;
+}
+.ov-graph-dot { cursor: pointer; }
+.ov-graph-dot circle { stroke: var(--netz-kontur); }
+.ov-graph-dot:hover circle { stroke: var(--accent); }
+.ov-graph-dot-label { fill: var(--muted); font-family: inherit; pointer-events: none; }
+.ov-graph-dot:hover .ov-graph-dot-label { fill: var(--accent); }
+
+/* ---------- M193: Netz tiefer integriert — Standort, Suche, Projekt-Filter ---------- */
+/* „Du bist hier": Ring um das aktuell geöffnete Board */
+.ov-graph-here { fill: none; stroke: var(--accent); opacity: 0.5; }
+.ov-graph-node.here text { font-weight: 700; }
+/* Suche hebt HERVOR statt zu filtern — Nicht-Treffer treten zurück,
+   bleiben aber sichtbar, damit der Zusammenhang erhalten bleibt */
+.ov-graph-node.dim, .ov-graph-dot.dim { opacity: 0.22; }
+.ov-graph-node.hit .ov-tropfen { stroke: var(--accent); filter: saturate(1.8); }
+.ov-graph-node.hit text { fill: var(--ink); font-weight: 700; }
+.ov-graph-dot.hit circle { fill: var(--accent); stroke: var(--accent-strong); }
+.ov-graph-find { display: flex; align-items: center; gap: 7px; }
+.ov-graph-find input {
+  font-family: inherit; font-size: 12px; padding: 5px 9px; width: 170px;
+  border: 1px solid var(--border-soft); border-radius: var(--r);
+  background: var(--surface); color: var(--ink); outline: none;
+}
+.ov-graph-find input:focus { border-color: var(--accent); }
+.ov-graph-hits { font-size: 11px; color: var(--accent-strong); white-space: nowrap; }
+.ov-graph-hits.none { color: var(--muted); font-weight: 400; }
+
+/* ---------- M195: Physik + manuelles Verknüpfen ---------- */
+/* M196: Die Bubbles dürfen sich NICHT wie Text markieren lassen — auf
+   Touchscreens startete das lange Drücken/Ziehen sonst eine blaue
+   Textauswahl statt des Drags. -webkit-touch-callout unterdrückt zusätzlich
+   das iOS-Kopier-Blatt, das unser Langdruck-Menü überlagert hätte. */
+.ov-graph-svg, .ov-graph-svg * {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+/* Baum in der Seitenleiste: gleiche Falle bei langem Drücken auf Board-Namen */
+.side-tree button, .ov-graph-toggles label {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ov-graph-node.linking circle { stroke-dasharray: 5 4; animation: pn-link-pulse 0.9s ease-in-out infinite; }
+@keyframes pn-link-pulse { 50% { stroke-opacity: 0.35; } }
+.ov-graph-linkhint {
+  position: absolute; left: 50%; bottom: 46px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; white-space: nowrap;
+  font-size: 12.5px; color: var(--ink); padding: 8px 14px; border-radius: var(--r-pill);
+  background: var(--glass-strong); border: 1px solid var(--glass-border);
+  z-index: 56;
+}
+.ov-graph-linkhint button {
+  border: 1px solid var(--border-soft); background: none; border-radius: var(--r-pill);
+  padding: 3px 10px; font: inherit; font-size: 11.5px; cursor: pointer; color: var(--muted);
+}
+.ov-graph-linkhint button:hover { border-color: var(--accent); color: var(--accent-strong); }
+.ov-graph-ctx {
+  position: fixed; z-index: 90; min-width: 190px;
+  display: flex; flex-direction: column; gap: 2px; padding: 5px;
+  border-radius: var(--r); background: var(--glass-strong); border: 1px solid var(--glass-border);
+  box-shadow: var(--pop-shadow);
+  animation: pn-fade-in 0.12s ease-out;
+}
+.ov-graph-ctx-title {
+  font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 4px 9px 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ov-graph-ctx button {
+  text-align: left; border: none; background: none; font-family: inherit;
+  font-size: 12.5px; padding: 7px 10px; border-radius: var(--r-sm); cursor: pointer; color: var(--ink);
+}
+.ov-graph-ctx button:hover { background: var(--accent-soft); }
+
+/* ---------- M194: Seitenleiste — Überblick neben der Arbeit ---------- */
+/**
+ * M245: Slideout statt schwebender Karte.
+ *
+ * Der Befund war: „Kann man diese Sidebar als Slideout von rechts statt als
+ * Card gestalten? Ohne BG-Blur? Genauso das linke Menü — nicht freischwebende
+ * Fenster, sondern seitliche Ausstülpungen."
+ *
+ * Drei Änderungen machen aus einer Karte eine Ausstülpung:
+ *  · Sie klebt am Rand (`right: 0` statt `right: 10px`) und hat nur an der
+ *    INNEN liegenden Kante Rundungen. Eine allseits gerundete Fläche mit Luft
+ *    ringsum liest sich als eigenes Fenster; eine, die aus der Bildkante
+ *    herauswächst, als Teil des Fensters.
+ *  · Sie ist deckend. Milchglas ist schön, wenn etwas kurz über dem Inhalt
+ *    liegt — bei einer Fläche, in der man liest und Namen vergleicht, kostet
+ *    die durchscheinende Arbeitsfläche nur Ruhe.
+ *  · Der Rand ist ein Anfasser mit sichtbarem Griff.
+ */
+/* Eingebettetes Netz: aus dem fixed-Vollbild in den Leisten-Körper holen */
+.ov-graph.embedded { position: absolute; inset: 0; padding: 0; background: none; }
+/**
+ * M253: In der Überblick-Leiste gelten andere Regeln als im Netz-Vollbild.
+ *
+ *  · Die Platzreserve für den Umschalter „Hierarchie · Netz" (M252) gilt hier
+ *    NICHT — der Umschalter steht gar nicht daneben, sondern in der Kopfzeile
+ *    der Leiste. Ohne dieses `max-width: none` schrumpfte der Filter mit jeder
+ *    Verbreiterung des Umschalters weiter zusammen.
+ *  · Die Höhe ist gedeckelt: Wer die Leiste schmal UND niedrig zieht, hätte
+ *    sonst nur noch Filter und kein Netz mehr gesehen. Bleibt kein Platz,
+ *    scrollt der Filter — das Netz behält immer seinen Anteil.
+ */
+.ov-graph.embedded .ov-graph-toggles {
+  position: static; display: flex; flex-wrap: wrap; gap: 6px 10px;
+  margin: 8px 10px 4px; padding: 6px 10px;
+  max-width: none; max-height: 45%; overflow-y: auto;
+}
+/* Das Suchfeld bekommt eine eigene Zeile über die volle Breite. Vorher stand
+   es als schmales Flex-Kind neben den Kästchen und wurde auf 13 Punkte
+   zusammengedrückt — ein Feld, in das man nichts mehr tippen konnte. */
+.ov-graph.embedded .ov-graph-find { flex: 1 0 100%; min-width: 0; }
+.ov-graph.embedded .ov-graph-find input {
+  width: 100%; min-width: 0; box-sizing: border-box;
+}
+.ov-graph.embedded .ov-graph-zoom { position: absolute; right: 8px; bottom: 8px; }
+.ov-graph.embedded .ov-graph-linkhint { bottom: 10px; max-width: calc(100% - 16px); white-space: normal; }
+/* Baum-Ansicht in der Leiste */
+.side-tree { flex: 1; overflow-y: auto; padding: 8px 10px 10px; font-size: 12.5px; }
+.side-tree-find {
+  width: 100%; box-sizing: border-box; font-family: inherit; font-size: 12px;
+  padding: 6px 10px; margin-bottom: 8px; border: 1px solid var(--border-soft);
+  border-radius: var(--r); background: var(--surface); color: var(--ink); outline: none;
+}
+.side-tree-find:focus { border-color: var(--accent); }
+.side-space { margin-bottom: 10px; }
+.side-space-name {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--muted); padding: 4px 2px;
+}
+.side-proj { margin: 2px 0 6px 6px; }
+/* M288: Projektzeile trägt jetzt ihr eigenes ⋯-Menü — Name links, Menü rechts */
+.side-proj-head { display: flex; align-items: center; gap: 4px; }
+.side-proj-head .ebenen-menu-knopf { opacity: 0; transition: opacity 0.12s ease; }
+.side-proj-head:hover .ebenen-menu-knopf,
+.side-proj-head .ebenen-menu-knopf:focus-visible,
+.side-proj-head .ebenen-menu-knopf.auf { opacity: 1; }
+.side-proj-name { flex: 1; min-width: 0; font-size: 12px; font-weight: 700; color: var(--ink); padding: 2px 2px 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* dasselbe Zurückhalten beim Board: erst beim Darüberfahren, am Finger immer */
+.side-board .ebenen-menu-knopf { opacity: 0; transition: opacity 0.12s ease; }
+.side-board:hover .ebenen-menu-knopf,
+.side-board .ebenen-menu-knopf:focus-visible,
+.side-board .ebenen-menu-knopf.auf { opacity: 1; }
+@media (pointer: coarse) {
+  .side-proj-head .ebenen-menu-knopf, .side-board .ebenen-menu-knopf { opacity: 1; }
+}
+.side-board {
+  display: flex; align-items: center; gap: 2px; border-radius: var(--r); padding: 2px 4px 2px 0;
+}
+.side-board.active { background: var(--accent-soft); }
+.side-board.active .side-board-name { font-weight: 700; }
+.side-board-arrow {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 3px; border-radius: var(--r-sm); display: inline-flex; transition: transform 0.15s;
+  /* M338: mittig — sonst sitzt das Symbol oben im hohen Finger-Knopf und dreht sich beim Aufklappen in den Namen */
+  align-items: center; justify-content: center; flex: none;
+}
+.side-board-arrow.open { transform: rotate(90deg); }
+.side-board-name {
+  flex: 1; min-width: 0; text-align: left; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 12.5px; color: var(--ink); padding: 4px 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: var(--r-sm);
+}
+.side-board-name:hover { color: var(--accent-strong); }
+.side-board-count { font-size: 10px; color: var(--muted); background: var(--surface-dim); border-radius: var(--r-pill); padding: 1px 6px; flex: 0 0 auto; }
+.side-cards { margin: 1px 0 4px 24px; display: flex; flex-direction: column; }
+.side-card {
+  text-align: left; border: none; background: none; cursor: pointer; font: inherit;
+  font-size: 11.5px; color: var(--muted); padding: 3px 6px; border-radius: var(--r-sm);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.side-card:hover { background: var(--surface-2); color: var(--ink); }
+.side-empty { font-size: 11px; color: var(--muted); padding: 2px 6px; font-style: italic; }
+/* M310: Boards im Baum ziehen — Linie über oder unter der Zielzeile */
+.side-board[draggable="true"] { cursor: grab; }
+.side-board.zieht { opacity: 0.45; }
+.side-board.ziel-vor { box-shadow: inset 0 2px 0 0 var(--accent); }
+.side-board.ziel-nach { box-shadow: inset 0 -2px 0 0 var(--accent); }
+.ebenen-menu button.aktiv { color: var(--accent-strong); font-weight: 600; }
+.ebenen-menu-leer { display: inline-block; width: 14px; }
+/* M309: Archivierte Karten sind im Baum verborgen, bis man das Archiv
+   einblendet — dann stehen sie gedimmt da, der Schalter sitzt am Fuß. */
+.side-card.archiviert { opacity: 0.55; font-style: italic; }
+.side-archiv {
+  display: inline-flex; align-items: center; gap: 6px; margin: 10px 4px 4px;
+  border: 1px solid var(--border-soft); background: none; border-radius: var(--r-pill);
+  padding: 4px 10px; font: inherit; font-size: 11px; color: var(--muted); cursor: pointer;
+}
+.side-archiv:hover, .side-archiv.on { border-color: var(--accent); color: var(--accent-strong); }
+
+.top-actions button.on { background: var(--accent-soft); color: var(--accent-strong); }
+/* Phone: Als Vollflächen-Blatt statt schmaler Spalte */
+@media (max-width: 640px) {
+  /* Phone: Die Ausstülpung füllt die Breite — ein 8-Punkte-Anfasser trifft
+     am Finger ohnehin niemand. */
+  .nav-grip { display: none; }
+}
+@media (max-width: 640px) {
+  .ov-graph-find input { width: 120px; }
+}

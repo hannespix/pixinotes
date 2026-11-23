@@ -20,10 +20,13 @@ Jeder Arbeits-Agent liefert selbstständig bis zum Merge.
    (`$TMPDIR/pixinotes-pruef-sperren/`, PID des Halters, tote Halter werden
    übernommen) – parallele Agenten warten aufeinander statt an EADDRINUSE zu
    scheitern.
-3. **CSS:** neue Regeln nicht ans Ende von `index.css` hängen, sondern an den
-   thematisch passenden Abschnitt (oder in den Block des Moduls) — das Ende
-   ist der Konflikt-Hotspot. Ausnahme: die drei Listen „Bedienung nur im
-   Fokus".
+3. **CSS:** das Stylesheet liegt in Teildateien `src/styles/NN-bereich.css`
+   (M475); `src/index.css` bindet sie nur per @import ein (nie Regeln dort).
+   Neue Regeln in die Datei ihres Bereichs, dort an den thematisch passenden
+   Abschnitt — nicht ans Dateiende. Die drei Listen „Bedienung nur im Fokus"
+   stehen in `99-bedienung-im-fokus.css`, die zuletzt eingebunden wird.
+   Braucht ein Bereich viel Neues, lieber eine neue Teildatei mit freier
+   Nummer zwischen den Nachbarn (plus @import an der passenden Stelle).
 4. **Gebaute Dateien** (`release/pixinotes.html`, `dist/`) nie committen —
    `release.yml` erledigt das nach dem Merge.
 5. **Vor dem Merge** den Hauptzweig einmischen, bauen, die eigene Reihe noch

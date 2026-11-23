@@ -1,0 +1,267 @@
+/* ---------- Hilfe-Seite ---------- */
+.help-modal { width: min(860px, calc(94vw / var(--pn-anz, 1))); max-height: calc(86vh / var(--pn-anz, 1)); display: flex; flex-direction: column; }
+.help-layout { display: flex; min-height: 0; flex: 1; }
+.help-nav {
+  flex: none; width: 210px; border-right: 1px solid var(--border-soft);
+  padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto;
+}
+.help-nav button {
+  border: none; background: none; cursor: pointer; font-family: inherit; font-size: 12.5px;
+  color: var(--ink); text-align: left; padding: 7px 10px; border-radius: var(--r);
+  display: flex; align-items: center; gap: 8px;
+}
+.help-nav button:hover { background: var(--surface-2); }
+.help-nav button.on { background: var(--accent-soft); color: var(--accent-strong); font-weight: 650; }
+.help-body { flex: 1; min-width: 0; overflow-y: auto; padding: 6px 22px 20px; scroll-behavior: smooth; }
+.help-body section { padding: 14px 0 6px; border-bottom: 1px solid var(--border-soft); }
+
+/* Hilfe-Suche: Feld im Kopf, Filterung blendet Sektionen ohne Treffer aus */
+.help-search {
+  flex: 1; max-width: 280px; margin: 0 12px;
+  border: 1.5px solid var(--border-soft); border-radius: var(--r);
+  background: var(--surface); color: var(--ink);
+  font-family: inherit; font-size: 12.5px; padding: 6px 10px;
+}
+.help-search:focus { outline: none; border-color: var(--accent); }
+.help-count {
+  margin-left: auto; font-style: normal; font-size: 10.5px; font-weight: 700;
+  background: var(--accent-soft); color: var(--accent-strong);
+  border-radius: var(--r); padding: 1px 7px;
+}
+.help-empty { font-size: 12px; color: var(--muted); padding: 10px; line-height: 1.5; }
+.help-body.help-filtering section { display: none; }
+.help-body.help-filtering section.help-hit { display: block; }
+.help-body h3 { font-size: 15px; margin: 4px 0 8px; }
+.help-body p { font-size: 13px; line-height: 1.55; color: var(--ink); margin: 6px 0; }
+.help-body ul { margin: 6px 0; padding-left: 20px; }
+.help-body li { font-size: 12.5px; line-height: 1.6; color: var(--ink); margin: 4px 0; }
+.help-keys { border-collapse: collapse; font-size: 12.5px; margin-top: 6px; }
+.help-keys td { padding: 5px 14px 5px 0; border-bottom: 1px solid var(--border-soft); }
+.help-keys kbd {
+  background: var(--surface-3); border: 1px solid var(--border); border-bottom-width: 2px;
+  border-radius: var(--r-sm); padding: 1px 6px; font-family: inherit; font-size: 11px;
+}
+.help-foot { text-align: center; font-size: 11px; color: var(--muted); padding: 14px 0 4px; }
+/* Rechtliches: unter den sechs Abschnitten, klein, aber immer da (M299) */
+.help-nav-recht {
+  margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border-soft);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.help-nav button.recht { font-size: 11.5px; color: var(--muted); padding: 5px 10px; }
+.help-nav button.recht.on { color: var(--accent-strong); }
+/* „Was ist neu" als eigene Seite im selben Fenster: kein Menü, nur die Liste */
+.help-zurueck { margin-left: auto; margin-right: 14px; font-size: 12.5px; }
+.help-body.help-neu section { border-bottom: none; padding-top: 4px; }
+.help-body.help-neu li { margin: 8px 0; }
+.help-foot .link-btn { font-size: 11px; }
+@media (max-width: 700px) {
+  .help-layout { flex-direction: column; }
+  .help-nav { width: 100%; flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid var(--border-soft); }
+  .help-nav button { font-size: 11.5px; padding: 5px 8px; }
+  .help-nav-recht { margin-top: 0; padding-top: 0; border-top: none; flex-direction: row; width: 100%; }
+}
+
+/* ---------- Tooltip-System (ersetzt native title-Tooltips) ---------- */
+.tipbox {
+  position: fixed; z-index: 300; transform: translate(-50%, -100%);
+  background: #26241f; color: #f4f0e6; font-size: 12px; line-height: 1.45;
+  padding: 7px 11px; border-radius: var(--r); max-width: 300px; text-align: center;
+  box-shadow: var(--pop-shadow); pointer-events: none;
+  animation: tip-in 0.12s ease-out;
+}
+.tipbox.below { transform: translate(-50%, 0); }
+[data-theme='dark'] .tipbox { background: #46423a; color: #f4f0e6; }
+/* M251: Das Tastenkürzel in der Sprechblase — als Taste gezeichnet, damit man
+   auf einen Blick sieht, dass es zum Drücken und nicht zum Lesen ist */
+.tipbox .tip-taste {
+  display: inline-block; margin-left: 7px; padding: 1px 6px;
+  font: inherit; font-size: 11px; font-weight: 700; white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.28); border-bottom-width: 2px;
+  border-radius: var(--r-sm); background: rgba(255, 255, 255, 0.12); color: inherit;
+}
+@keyframes tip-in {
+  from { opacity: 0; transform: translate(-50%, -100%) translateY(3px); }
+  to { opacity: 1; transform: translate(-50%, -100%); }
+}
+
+/* ---------- Design-Reiter: Akzent-Swatches ---------- */
+.accent-swatches { display: flex; gap: 8px; }
+.accent-swatch {
+  width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent;
+  cursor: pointer; box-shadow: var(--chrome-shadow); padding: 0;
+}
+.accent-swatch:hover { transform: scale(1.1); }
+.accent-swatch.on { border-color: var(--surface); outline: 2px solid var(--ink); }
+
+/* ---------- Einstellungen: Reiter + Gefahrenzone ---------- */
+.modal-tabs {
+  display: flex; gap: 4px; padding: 10px 20px 0; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-soft);
+}
+.modal-tabs button {
+  border: none; background: none; cursor: pointer; font-family: inherit;
+  font-size: 12.5px; color: var(--muted); padding: 8px 12px;
+  border-radius: var(--r) var(--r) 0 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.modal-tabs button:hover { color: var(--ink); background: var(--surface-3); }
+@media (max-width: 480px) {
+  .modal-tabs { gap: 0; padding: 8px 10px 0; flex-wrap: nowrap; }
+  .modal-tabs button { font-size: 12px; padding: 8px 8px; }
+}
+.modal-tabs button.on { color: var(--accent-strong); font-weight: 650; border-bottom-color: var(--accent); background: var(--surface-3); }
+.modal-danger { border: 1px solid rgba(216, 75, 61, .3); border-radius: var(--r-lg); background: rgba(216, 75, 61, .04); }
+.modal-danger h3 { color: #a4231a; }
+.modal-buttons button.danger { border-color: rgba(216,75,61,.4); color: #a4231a; }
+.modal-buttons button.danger:hover:not(:disabled) { background: rgba(216,75,61,.08); border-color: #d84b3d; }
+
+/* ---------- Kopfleiste: Brotkrume + Navigator-Baum ---------- */
+
+.tab-nav {
+  display: inline-flex; align-items: center; gap: 5px; border: none; cursor: pointer;
+  background: var(--surface-2); border-radius: var(--r); padding: 5px 10px; font-family: inherit;
+  font-size: 12px; color: var(--ink); max-width: 300px;
+}
+.tab-nav:hover, .tab-nav.active { background: var(--accent-soft); }
+.tab-nav-space, .tab-nav-proj { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab-nav-space { color: var(--muted); max-width: 130px; }
+.tab-nav-proj { font-weight: 650; max-width: 150px; }
+/**
+ * M261: Auf schmalen Leisten tritt der Bereichsname zurück.
+ *
+ * Gemessen am Telefon: „Regierungspräsidium › Referat 21" belegte 138 der
+ * 366 Punkte der ganzen Leiste — mehr als der Board-Titel, um den es hier
+ * eigentlich geht. Der Bereich steht weiterhin in der Sprechblase des
+ * Knopfes und im Navigator, den derselbe Knopf öffnet.
+ *
+ * Die Klasse kommt aus der Messung in Tabs.tsx und hängt an der Obergrenze
+ * der Leiste — NICHT am Reihe/Wähler-Modus, sonst schaukeln sich beide auf.
+ */
+.tabs.krume-kurz .tab-nav-space,
+.tabs.krume-kurz .tab-nav > svg:first-of-type { display: none; }
+.tabs.krume-kurz .tab-nav { padding: 5px 8px; }
+/* M301: Am Telefon ein Knopf mit dem Weg „Projekt › Board" statt Brotkrume + Wähler */
+.tab-pfad { flex: 1 1 auto; min-width: 0; max-width: none; justify-content: flex-start; }
+.tab-pfad .tab-pfad-proj { font-weight: 400; color: var(--muted); max-width: 40%; flex: none; }
+.tab-pfad-trenner { color: var(--muted); flex: none; }
+.tab-pfad-board { font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tab-pfad > svg:first-of-type { display: inline-block !important; }
+ 
+/* ---------- KI-Freitext-Kommando ---------- */
+.ai-cmd-input {
+  width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--r);
+  font-family: inherit; font-size: 12.5px; padding: 7px 9px; background: var(--surface-3);
+  color: var(--ink); resize: none; line-height: 1.4;
+}
+.ai-cmd-input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.ai-cmd-go {
+  border: none; background: var(--accent-fill); color: #fff !important; border-radius: var(--r);
+  font-family: inherit; font-size: 12.5px; font-weight: 600; padding: 8px 10px;
+  cursor: pointer; text-align: center !important;
+}
+.ai-cmd-go:hover { filter: brightness(.9); }
+.ai-cmd-go:disabled { opacity: .45; cursor: default; }
+.sel-ai-menu .ai-cmd-small { margin-bottom: 2px; font-size: 12px; }
+
+/* ---------- Responsivitäts-Overrides (Audit Runde 5) ----------
+   WICHTIG: Dieser Block muss am DATEIENDE stehen — bei gleicher Spezifität
+   gewinnt die spätere Regel, sonst schlagen die Basisregeln oben die
+   Media-Query-Overrides (Kaskaden-Falle aus Runde 2). */
+@media (max-width: 860px) {
+  /* Übersicht-Bedienelemente unter die (auf 62px gerutschte) Tab-Leiste —
+     sonst überlappen sie sich genau dort (R5-1) */
+  .ov-mode { top: calc(112px + var(--safe-top)); right: 12px; }
+  .ov-graph-toggles { top: calc(112px + var(--safe-top)); left: 12px; right: auto; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 160px); flex-wrap: wrap; gap: 8px 12px; }
+  .ov-graph { padding: calc(156px + var(--safe-top)) 12px calc(12px + var(--safe-bottom)); }
+  .backlinks { right: 12px; bottom: 150px; }
+  .backlinks-panel { max-width: calc(calc(100vw / var(--pn-anz, 1)) - 24px); }
+}
+
+@media (max-width: 640px) {
+  /* Selection-Toolbar: umbrechen statt über den Rand laufen (R5-4) */
+  .sel-toolbar { flex-wrap: wrap; justify-content: center; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 16px); }
+  .sel-toolbar .sel-label, .sel-count { display: none; }
+  /* Popover (KI/Attribute) mittig überm Button verankern statt rechtsbündig —
+     rechtsbündig schiebt es bei mittig sitzenden Buttons aus dem Bild (R5-5) */
+  .sel-ai-menu {
+    right: auto; left: 50%; transform: translateX(-50%);
+    width: max-content; max-width: min(320px, calc(calc(100vw / var(--pn-anz, 1)) - 24px)); min-width: 0;
+  }
+  /* Aufgaben-Zeile: Fälligkeit & Board-Chip in die zweite Zeile (R5-6) */
+  .task-row { flex-wrap: wrap; }
+  .task-text { flex: 1 1 calc(100% - 40px); }
+  .task-due-input { margin-left: 27px; }
+  .task-board { margin-left: auto; }
+  /* Netz-Ansicht: Umschalter + Filter passen nicht nebeneinander → stapeln */
+  .ov-graph-toggles { top: calc(158px + var(--safe-top)); max-width: calc(calc(100vw / var(--pn-anz, 1)) - 24px); }
+  .ov-graph { padding-top: calc(205px + var(--safe-top)); }
+  .ov-graph-zoom { right: 12px; bottom: 60px; }
+  /* Brotkrume kompakt: nur der Projektname, Baum auf Viewport-Breite */
+  .tab-nav-space { display: none; }
+  .tab-nav > svg { display: none; }
+  .tab-nav-proj { max-width: 110px; }
+}
+
+@media (max-width: 860px) {
+  /* Zoom-Controls (+/−/Einpassen) verschwinden sonst hinterm Dock (User-Screenshot) */
+  .react-flow__controls {
+    margin-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+    margin-left: 8px !important;
+  }
+}
+
+/* ---------- Dark-Mode-Nachzügler ---------- */
+[data-theme='dark'] .react-flow__minimap { background: var(--surface); }
+[data-theme='dark'] .react-flow__minimap-mask { fill: rgba(20, 19, 16, 0.65); }
+[data-theme='dark'] .react-flow__minimap-node { fill: #4a463d; }
+[data-theme='dark'] .portal-card { background: var(--surface-2); color: var(--ink); }
+[data-theme='dark'] .react-flow__controls button { background: var(--surface); fill: var(--ink); color: var(--ink); border-bottom-color: var(--border-soft); }
+[data-theme='dark'] .react-flow__controls button:hover { background: var(--surface-2); }
+/* M191: halbtransparent, damit der Glas-Blur des Toasts auch dunkel wirkt */
+[data-theme='dark'] .toast { background: rgba(22, 25, 30, 0.86); }
+
+/* ---------- Dark Mode: Kontrast-Durchgang (Signalfarben aufhellen) ---------- */
+[data-theme='dark'] .task-due.urgency-overdue { color: #ff9a8c; }
+[data-theme='dark'] .task-due.urgency-soon { color: #ffcf8a; }
+[data-theme='dark'] .mermaid-error { color: #ff9a8c; }
+/* CSS-Audit M94: harte Rottöne der Mermaid-Leiste + Kalender-Fehler waren im
+   Dunkelmodus fast unlesbar (dunkelrot auf dunkler Fläche) */
+[data-theme='dark'] .mm-row > button.danger,
+[data-theme='dark'] .mm-pop button.mm-confirm,
+[data-theme='dark'] .cal-menu-err { color: #ff9a8c; }
+[data-theme='dark'] .mm-pop button.mm-confirm:hover { background: rgba(255, 154, 140, 0.15); }
+[data-theme='dark'] .modal-danger h3 { color: #ff9a8c; }
+[data-theme='dark'] .modal-buttons button.danger { color: #ff9a8c; border-color: rgba(255, 154, 140, 0.4); }
+[data-theme='dark'] .task-due-input.urgency-overdue { color: #ff9a8c; border-color: rgba(255, 154, 140, 0.45); }
+[data-theme='dark'] .sel-attr-row button:hover,
+[data-theme='dark'] .dock-menu-template-x:hover { color: #ff9a8c; }
+[data-theme='dark'] .sel-toolbar button.danger { color: #ff9a8c; }
+
+/* ---------- Dark Mode: Design-Audit Runde 7 ---------- */
+/* Übersicht: Bereichs-/Projekt-Flächen waren hartes Weiß-Overlay → in Dunkel
+   werden sie zu dezenten Aufhellungs-Schichten (Schrift = --ink bleibt lesbar) */
+[data-theme='dark'] .ovc-space { background: rgba(255, 255, 255, 0.05); }
+[data-theme='dark'] .ovc-project { background: rgba(255, 255, 255, 0.07); }
+[data-theme='dark'] .ov-minimap { background: rgba(255, 255, 255, 0.07); }
+/* Haftnotizen bleiben helles Papier → native Checkboxen & Datums-Chips
+   dürfen dort NICHT dem dunklen color-scheme folgen */
+[data-theme='dark'] .react-flow__node-note { color-scheme: light; }
+[data-theme='dark'] .react-flow__node-note .due-chip { background: rgba(0, 0, 0, 0.08); color: #5a616d; }
+[data-theme='dark'] .ticket-erledigt { color: #7fd6a4; } /* M293: Erledigt-Grün lesbar auf dunklem Grund */
+/* Tooltip hebt sich sonst kaum vom dunklen Grund ab */
+[data-theme='dark'] .tipbox { border: 1px solid var(--border-soft); }
+
+/* Slash-Menü („/") ragt über den Kartenrand — solange es offen ist, darf die
+   Notiz nicht clippen (die Karte liegt durch Auto-Vordergrund ohnehin oben) */
+.note-card:has(.bn-suggestion-menu) { overflow: visible; }
+/* M143: Menü „eine Ebene über die Karte" — die Karte mit offenem Menü hebt
+   sich über ALLE Nachbarkarten; das Menü selbst scrollt in sich (contain),
+   ohne dass das Board mitscrollt oder zoomt */
+.react-flow__node:has(.bn-suggestion-menu) { z-index: 1000 !important; }
+.note-card .bn-suggestion-menu {
+  z-index: 40; max-height: min(420px, calc(55vh / var(--pn-anz, 1))); width: min(360px, calc(84vw / var(--pn-anz, 1)));
+  overscroll-behavior: contain; scrollbar-width: thin;
+}
+/* M144: BlockNote gibt den Einträgen eine FIXE Höhe — Titel + Beschreibung +
+   Shortcut-Badge quellen dann in den nächsten Eintrag (Overlap-Report).
+   Höhe freigeben, damit jeder Eintrag so hoch ist wie sein Inhalt. */
+.note-card .bn-suggestion-menu-item { height: auto !important; min-height: 44px; }

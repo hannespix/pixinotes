@@ -1,0 +1,163 @@
+:root {
+  /* M315: EINE Schicht Tokens, an der die ganze Oberfläche hängt — kühle
+     Neutraltöne statt Creme, deckende Flächen statt Milchglas, knappe Radien
+     statt Pillen, flache Schatten mit 1-px-Kante statt weicher Wolken. */
+  --bg: #f3f4f6;
+  --ink: #16191e;
+  --muted: #5a616d;            /* 5,7:1 auf --bg, 6,2:1 auf Weiß */
+  --accent: #4f7cff;
+  --accent-strong: #3557c9;    /* kräftiges Akzent-Blau für Text/Links */
+  --accent-soft: rgba(79, 124, 255, 0.13);
+  /* M389: Fläche unter WEISSER Schrift (Knöpfe, aktive Reiter, Zähler). Der Akzent selbst trägt Weiß nur mit
+     3,7:1; diese Stufe hält 4,6:1 — in allen fünf Akzentfarben, hell wie dunkel. */
+  --accent-fill: #456de0;
+  --surface: #ffffff;        /* Menüs, Panels, Buttons */
+  --surface-2: #eaecf0;      /* Hover/aktive Flächen */
+  --surface-3: #f6f7f9;      /* eingebettete Felder */
+  --surface-card: #ffffff;   /* Karten-Papier (Kanban, Gantt, …) */
+  --surface-glass: var(--surface);
+  --surface-dim: rgba(22, 25, 30, 0.06);
+  --border: rgba(22, 25, 30, 0.22);
+  --border-soft: #d9dce2;
+  /* Die alten Glas-Tokens zeigen auf deckende Flächen — Regeln, die sie noch
+     nennen, bleiben gültig und werden einfach opak. */
+  --glass: var(--surface);
+  --glass-strong: var(--surface);
+  --glass-border: var(--border-soft);
+  /* Radien: xs Chips/Felder · sm Knöpfe · r Karten/Menüeinträge · lg Fenster/Leisten.
+     Pillen gibt es nicht mehr; echte Kreise (Punkte, Avatare) bleiben 50 %. */
+  --r-xs: 2px;
+  --r-sm: 3px;
+  --r: 4px;
+  --r-lg: 6px;
+  --r-pill: 3px;
+  --card-shadow: 0 0 0 1px rgba(22, 25, 30, 0.09), 0 1px 2px rgba(22, 25, 30, 0.08);
+  --card-shadow-lift: 0 0 0 1px rgba(22, 25, 30, 0.13), 0 6px 16px rgba(22, 25, 30, 0.14);
+  --chrome-shadow: 0 1px 2px rgba(22, 25, 30, 0.06), 0 3px 10px rgba(22, 25, 30, 0.08);  /* Leisten */
+  --pop-shadow: 0 2px 6px rgba(22, 25, 30, 0.08), 0 14px 36px rgba(22, 25, 30, 0.16);    /* Menüs, Fenster */
+  --edge: rgba(70, 76, 88, 0.55);     /* Verbindungs-Linie */
+  --edge-head: #8e949e;               /* Pfeilspitze: deckend = --edge über --bg gemischt */
+  /* M189 Kopf-Freiraum: Kopf- und Tab-Leiste schweben fixiert über allem.
+     Jede Vollbild-Ansicht muss darunter beginnen — die Zahl hier ist die
+     EINZIGE Wahrheit dafür, damit sie nicht je Ansicht auseinanderläuft.
+     --safe-top fängt die Statusleisten-Kerbe ab (viewport-fit=cover). */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /**
+   * M248/M249: Der Abstand der App zur Fensterkante.
+   *
+   * M248 hat die App als gerundete Fläche auf einen eigenen Grund gelegt —
+   * „der Hintergrund der PixiNotes-App (Radius um alles) funde ich noch nicht
+   * so gelungen, kann man das wieder weg machen". Also zurück auf null: Die
+   * Arbeitsfläche läuft wieder bis an den Fensterrand.
+   *
+   * Die Variablen bleiben, weil das ganze schwebende Chrome (Kopfleiste,
+   * Tabs, Dock, Netz-Filter) inzwischen damit rechnet. Auf 0 kosten sie
+   * nichts, und der Rahmen ließe sich mit einer einzigen Zahl wieder
+   * einschalten, falls er doch einmal gewünscht ist.
+   */
+  --app-rand: 0px;
+  --head-space: calc(110px + var(--safe-top) + var(--app-rand));
+  /*
+   * M464: Eigene Mauszeiger — nur hier (und für Inline-Styles über lib/zeiger.ts).
+   * Unter Windows ist das System-Fadenkreuz („Präzisionsauswahl") ein dünnes, invertierendes
+   * 1-px-Kreuz: auf mittelgrauen Flächen, Screenshots und bei 150 % Anzeige kaum zu sehen.
+   * Darum ein eigenes Fadenkreuz mit Doppelkontur (dunkel innen, weiß außen) — sichtbar auf
+   * hellem und dunklem Grund. 24 px (über 32 px ignoriert Chrome/Edge unter Windows den Zeiger
+   * am Fensterrand), Hotspot in der Mitte, immer mit System-Fallback dahinter.
+   */
+  --zeiger-fadenkreuz: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M12 2v7M12 15v7M2 12h7M15 12h7' stroke='%23fff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M12 2v7M12 15v7M2 12h7M15 12h7' stroke='%23111' stroke-width='2' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='12' r='1.7' fill='%23111' stroke='%23fff' stroke-width='1.2'/%3E%3C/svg%3E") 12 12, crosshair;
+}
+
+/* ---------- Akzentfarben-Themes ---------- */
+[data-accent='gruen'] { --accent: #2e9e63; --accent-strong: #1f7a49; --accent-soft: rgba(46, 158, 99, 0.16); --accent-fill: #268453; }
+[data-accent='violett'] { --accent: #7c5cff; --accent-strong: #5b3fd4; --accent-soft: rgba(124, 92, 255, 0.16); --accent-fill: #7253ee; }
+[data-accent='orange'] { --accent: #e0762e; --accent-strong: #b1571a; --accent-soft: rgba(224, 118, 46, 0.16); --accent-fill: #b35e24; }
+[data-accent='rosa'] { --accent: #d44f6e; --accent-strong: #a83353; --accent-soft: rgba(212, 79, 110, 0.16); --accent-fill: #c24662; }
+
+/* ---------- Dunkles Design (nach den Akzenten: --accent-strong muss hell werden) ---------- */
+[data-theme='dark'] {
+  /* native Elemente (Datums-Picker, Scrollbalken, Selects) dunkel rendern */
+  color-scheme: dark;
+  --bg: #141618;
+  --ink: #e9ebee;
+  --muted: #a3aab5;
+  --surface: #1d2024;
+  --surface-2: #292d33;
+  --surface-3: #181b1f;
+  --surface-card: #21252a;
+  --surface-glass: var(--surface);
+  --surface-dim: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.24);
+  --border-soft: rgba(255, 255, 255, 0.12);
+  --glass: var(--surface);
+  --glass-strong: var(--surface);
+  --glass-border: var(--border-soft);
+  --card-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 1px 2px rgba(0, 0, 0, 0.5);
+  --card-shadow-lift: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 8px 20px rgba(0, 0, 0, 0.55);
+  --chrome-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 3px 10px rgba(0, 0, 0, 0.35);
+  --pop-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), 0 14px 36px rgba(0, 0, 0, 0.5);
+  --edge: rgba(225, 229, 236, 0.5);
+  --edge-head: #7c8390;
+  /* M389: Akzent ALS SCHRIFT auf dunklem Grund braucht eine hellere Stufe (der Akzent selbst: 4,4:1 auf
+     Flächen, 3,7:1 auf getönten Flächen — zu wenig für 12-px-Schrift). */
+  --accent-strong: #8eabff;
+}
+[data-theme='dark'][data-accent='gruen'] { --accent-strong: #5fcf93; }
+[data-theme='dark'][data-accent='violett'] { --accent-strong: #ab98ff; }
+[data-theme='dark'][data-accent='orange'] { --accent-strong: #f3a06b; }
+[data-theme='dark'][data-accent='rosa'] { --accent-strong: #f08ea6; }
+/* Haftnotizen & Prozess-Formen bleiben helles „Papier" — Text darauf dunkel */
+[data-theme='dark'] .react-flow__node-note,
+[data-theme='dark'] .shape-body { color: #16191e; }
+[data-theme='dark'] .react-flow__node-note .meta { color: #5a616d; }
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+
+/**
+ * M263: Eine Bildlaufleiste für die ganze App — schmal, ohne Rinne, ohne
+ * Pfeilknöpfe.
+ *
+ * Die Vorgabe des Systems ist eine breite, helle Leiste mit Knöpfen an beiden
+ * Enden (User-Screenshot unter Linux/Chromium). Sie liegt wie ein Fremdkörper
+ * auf der Fläche und läuft an den Enden über die Rundungen. `scrollbar-width`
+ * und `scrollbar-color` VERERBEN sich — einmal an der Wurzel gesetzt, gilt
+ * die Optik in jedem Fenster, Menü und Panel.
+ *
+ * Die ::-webkit-Regeln daneben sind für Safari (iPad/iPhone), das die
+ * Standard-Eigenschaften noch nicht kennt. Dort ergibt der durchsichtige
+ * Rand um den Daumen dieselbe schwebende Pille.
+ */
+:root {
+  --lauf-daumen: rgba(70, 76, 88, 0.32);
+  --lauf-daumen-aktiv: rgba(70, 76, 88, 0.52);
+  scrollbar-color: var(--lauf-daumen) transparent;
+}
+/* `scrollbar-color` vererbt sich, `scrollbar-width` NICHT (CSS-Scrollbars-1) —
+   deshalb einmal für alles statt an dreißig einzelnen Behältern. */
+* { scrollbar-width: thin; }
+[data-theme='dark'] {
+  --lauf-daumen: rgba(255, 255, 255, 0.24);
+  --lauf-daumen-aktiv: rgba(255, 255, 255, 0.42);
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: var(--lauf-daumen);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--lauf-daumen-aktiv); }
+::-webkit-scrollbar-corner { background: transparent; }
+body {
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.app { height: 100%; position: relative; }
+.board-wrap { height: 100%; }
+.react-flow { background: var(--bg); }

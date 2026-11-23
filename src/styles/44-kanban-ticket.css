@@ -1,0 +1,129 @@
+/* ---------- Kanban: Ticket-Detail, Chips, klickbarer Text ---------- */
+.kanban-item-text { cursor: pointer; }
+.kanban-item-text:hover { color: var(--accent-strong); }
+.kanban-chips { display: inline-flex; gap: 4px; align-items: center; margin-left: 4px; flex: none; }
+.kanban-chips em, .kanban-chips button {
+  font-style: normal; font-size: 9px; font-weight: 700; border: none; cursor: pointer;
+  border-radius: var(--r-pill); padding: 1px 5px; line-height: 1.5;
+}
+.k-who { background: var(--accent-soft); color: var(--accent-strong); }
+.k-note { background: var(--surface-dim); color: var(--muted); }
+.k-link { background: var(--accent-soft); color: var(--accent-strong); font-size: 10px; }
+.k-link:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+
+/* ---------- Ticket-Modal (M118, Trello-Vorbild) ---------- */
+.ticket-modal-backdrop { z-index: 90; }
+.ticket-modal {
+  width: min(620px, calc(96vw / var(--pn-anz, 1))); max-height: calc(86vh / var(--pn-anz, 1)); overflow-y: auto;
+  background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 12px;
+  font-size: 13px; color: var(--ink);
+}
+.ticket-modal-head { display: flex; align-items: center; gap: 10px; }
+.ticket-modal .ticket-title {
+  flex: 1; font-size: 16.5px; font-weight: 700; border: 1px solid transparent;
+  border-radius: var(--r); padding: 6px 8px; background: none; font-family: inherit; color: var(--ink); outline: none;
+}
+.ticket-modal .ticket-title:hover, .ticket-modal .ticket-title:focus { border-color: var(--border); background: var(--surface-card); }
+.ticket-meta-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ticket-meta-row label { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.ticket-meta-row input, .ticket-colsel {
+  border: 1px solid var(--border); border-radius: var(--r-sm); padding: 4px 7px;
+  font-family: inherit; font-size: 12px; color: var(--ink); background: var(--surface-card);
+}
+.ticket-meta-row input[type='text'] { width: 110px; }
+.ticket-prio-row { display: inline-flex; gap: 4px; }
+.prio-btn {
+  border: 1px solid var(--border); background: var(--surface-card); border-radius: var(--r-sm);
+  font-family: inherit; font-weight: 800; letter-spacing: 1px; font-size: 11px;
+  padding: 4px 8px; cursor: pointer; color: var(--muted); opacity: 0.65;
+}
+.prio-btn.on { opacity: 1; border-width: 2px; }
+.prio-btn.prio-1 { color: #d84b3d; } .prio-btn.prio-1.on { border-color: #d84b3d; }
+.prio-btn.prio-2 { color: #e8a13a; } .prio-btn.prio-2.on { border-color: #e8a13a; }
+.prio-btn.prio-3 { color: #4f7cff; } .prio-btn.prio-3.on { border-color: #4f7cff; }
+.ticket-modal .ticket-note {
+  border: 1px solid var(--border); border-radius: var(--r); padding: 9px 11px;
+  font-family: inherit; font-size: 12.5px; color: var(--ink); background: var(--surface-card);
+  resize: vertical; outline: none; min-height: 70px;
+}
+.ticket-modal .ticket-note:focus { border-color: var(--accent); }
+.ticket-section { display: flex; flex-direction: column; gap: 6px; border-top: 1px dashed var(--border-soft); padding-top: 10px; }
+.ticket-section-head { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 12.5px; }
+.ticket-progress-label { color: var(--muted); font-weight: 600; font-size: 11.5px; }
+.ticket-blocked-label {
+  background: #d84b3d; color: #fff; border-radius: var(--r-pill); font-size: 10px;
+  padding: 2px 8px; font-weight: 700; letter-spacing: 0.3px;
+}
+.ticket-progress { height: 7px; border-radius: var(--r-pill); background: var(--surface-dim); overflow: hidden; }
+.ticket-progress i { display: block; height: 100%; background: #2e9e63; border-radius: var(--r-pill); transition: width 0.2s; }
+.ticket-sub { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.ticket-sub input[type='checkbox'] { width: 15px; height: 15px; flex: none; cursor: pointer; }
+.ticket-sub span { flex: 1; min-width: 0; }
+.ticket-sub span.done, .ticket-dep span.done { text-decoration: line-through; color: var(--muted); }
+.ticket-sub button, .ticket-dep button, .ticket-linkrow > button:last-child {
+  border: none; background: none; color: var(--muted); cursor: pointer; padding: 2px; flex: none;
+}
+.ticket-sub button:hover, .ticket-dep button:hover, .ticket-linkrow > button:last-child:hover { color: #d84b3d; }
+.ticket-sub-add, .ticket-dep-add, .ticket-link-add {
+  border: 1px dashed var(--border); border-radius: var(--r); padding: 6px 9px;
+  font-family: inherit; font-size: 12px; color: var(--ink); background: none; outline: none; width: 100%;
+}
+.ticket-sub-add:focus { border-color: var(--accent); border-style: solid; }
+.ticket-dep { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.ticket-dep span { flex: 1; min-width: 0; }
+.ticket-dep span.ticket-dep-state { flex: none; font-weight: 800; color: var(--muted); width: 14px; }
+.ticket-dep-state.done { color: #2e9e63; }
+.ticket-hint { font-size: 11px; color: var(--muted); }
+.ticket-linkrow { display: flex; align-items: center; gap: 6px; }
+.ticket-linkjump {
+  flex: 1; min-width: 0; text-align: left; border: 1px solid var(--border); background: var(--surface-card);
+  border-radius: var(--r); padding: 6px 9px; font-family: inherit; font-size: 12px; color: var(--ink); cursor: pointer;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ticket-linkjump:hover { border-color: var(--accent); color: var(--accent-strong); }
+.ticket-linkjump em { color: var(--muted); font-style: normal; font-size: 11px; }
+/* Face-Badges (M118) */
+/* Echte Tag-Labels am Ticket (M121, Trello-Stil) */
+.k-labels { display: flex; flex-wrap: wrap; gap: 3px; width: 100%; }
+.k-label {
+  border: none; font-family: inherit; font-size: 9.5px; font-weight: 700;
+  border-radius: var(--r-pill); padding: 1.5px 8px; cursor: pointer; letter-spacing: 0.2px;
+}
+.k-label:hover { filter: brightness(0.93); }
+.k-subs, .k-blocked, .k-links {
+  cursor: pointer; font-style: normal; font-size: 10px; border-radius: var(--r-pill);
+  padding: 1.5px 6px; background: var(--surface-dim); color: var(--muted); white-space: nowrap;
+}
+.k-subs.done { background: rgba(46,158,99,.18); color: #1f7a4a; font-weight: 700; }
+.k-blocked { background: rgba(216,75,61,.15); }
+.ticket-detail-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+}
+.ticket-detail-head button { border: none; background: none; cursor: pointer; color: var(--muted); display: inline-flex; padding: 3px; border-radius: var(--r-sm); }
+.ticket-detail-head button:hover { background: var(--surface-2); color: var(--ink); }
+.ticket-title {
+  border: 1px solid var(--border); border-radius: var(--r); font-family: inherit;
+  font-size: 13px; font-weight: 600; padding: 7px 9px; color: var(--ink);
+}
+.ticket-note {
+  border: 1px solid var(--border); border-radius: var(--r); font-family: inherit;
+  font-size: 12px; padding: 7px 9px; color: var(--ink); resize: vertical; background: var(--surface-3);
+}
+.ticket-title:focus, .ticket-note:focus, .ticket-row input:focus, .ticket-row select:focus { outline: none; border-color: var(--accent); }
+.ticket-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ticket-row label { font-size: 10.5px; font-weight: 600; color: var(--muted); display: inline-flex; align-items: center; gap: 3px; flex: none; }
+.ticket-row input, .ticket-row select {
+  border: 1px solid var(--border); border-radius: var(--r-sm); font-family: inherit;
+  font-size: 11.5px; padding: 4px 7px; color: var(--ink); min-width: 0; flex: 1; background: var(--surface);
+}
+.ticket-jump {
+  border: none; background: var(--accent-soft); color: var(--accent-strong); border-radius: var(--r-sm);
+  font-family: inherit; font-size: 11px; font-weight: 600; padding: 5px 9px; cursor: pointer; flex: none;
+}
+.ticket-jump:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.ticket-detail-foot { font-size: 10px; color: var(--muted); text-align: center; }
+.slide-kanban { position: relative; }
+.kanban-addcol.k-auto-on { color: #fff; background: var(--accent-fill); opacity: 1; }
+.kanban-addcol.k-auto-on:hover { background: var(--accent-strong); }

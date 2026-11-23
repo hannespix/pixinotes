@@ -1,0 +1,382 @@
+/* ---------- Projekt-Tabs ---------- */
+.tabs {
+  position: fixed; top: calc(14px + var(--safe-top) + var(--app-rand));
+  /* M236: links neben der GEMESSENEN Aktionsleiste, nicht neben einer
+     geschätzten (siehe Media-Block weiter unten und lib/kopfmass.ts) */
+  left: var(--kopf-links, 394px);
+  display: flex; gap: 4px; z-index: 50; align-items: center;
+  background: var(--surface-glass);
+  padding: 5px; border-radius: var(--r-lg); box-shadow: var(--chrome-shadow);
+  max-width: var(--kopf-rest, calc(42vw / var(--pn-anz, 1)));
+}
+/* Nur die Board-Tabs scrollen; Home/Teilen/Verlauf/＋ bleiben immer sichtbar.
+   Kein overflow auf .tabs selbst — sonst wird das Verlaufs-Dropdown geclippt. */
+.tabs-scroll {
+  display: flex; gap: 4px; align-items: center;
+  overflow-x: auto; min-width: 0; scrollbar-width: thin;
+}
+.tab {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; padding: 5px 10px; border-radius: var(--r);
+  cursor: pointer; white-space: nowrap; color: var(--muted);
+}
+.tab:hover { background: var(--surface-2); }
+/**
+ * M236: Das aktive Board bleibt IMMER stehen.
+ *
+ * Vorher scrollte es mit den anderen aus dem Bild — auf schmalen Schirmen
+ * fast immer, weil die Reihe dort nur ein paar Zentimeter breit ist. Man sah
+ * dann nirgends mehr, wo man gerade arbeitet (User-Report). `sticky` klebt
+ * es an den linken Rand der Reihe; die übrigen Tabs ziehen dahinter vorbei.
+ *
+ * Der Hintergrund ist doppelt gebaut: `--accent-soft` ist durchscheinend
+ * (0,14–0,16 Alpha), sonst liefen die vorbeiziehenden Tabs sichtbar
+ * hindurch. Die Farbe liegt darum als Verlaufsbild auf einer deckenden
+ * Fläche — dieselbe Optik, aber blickdicht.
+ */
+.tab.active {
+  /* M261: EINE Regel für den aktiven Reiter — vorher stand weiter unten ein
+     zweiter Block aus M172, der mit der Kurzschreibweise `background` die
+     Grundfarbe wieder auf durchsichtig setzte. Gemessen: rgba(0,0,0,0), und
+     genau dadurch schienen die vorbeiziehenden Titel hindurch. Wer hier etwas
+     ändert, ändert es bitte HIER — nicht in einem zweiten Block. */
+  background-color: var(--surface);
+  background-image: linear-gradient(135deg, var(--accent-soft), var(--accent-soft));
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+  color: var(--ink); font-weight: 600;
+  position: sticky; left: 0; z-index: 2;
+}
+/* Damit die vorbeiziehenden Reiter sichtbar DAHINTER verschwinden statt an
+   einer harten Kante zu kollidieren: ein kurzer Schatten an der rechten Seite. */
+.tab.active::after {
+  content: ''; position: absolute; top: 0; right: -10px; bottom: 0; width: 10px;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.10), transparent);
+  pointer-events: none;
+}
+.tab-count {
+  font-size: 10px; background: var(--surface-dim); border-radius: var(--r-pill);
+  padding: 1px 6px; color: var(--muted);
+}
+
+.tab input {
+  border: none; outline: none; font-family: inherit; font-size: 12.5px;
+  background: transparent; width: 130px; color: var(--ink);
+}
+.tab-add {
+  border: none; background: none; font-size: 16px; color: var(--muted);
+  width: 28px; height: 28px; border-radius: var(--r); cursor: pointer;
+}
+/* M238: Teilen + ＋ als Gruppe — in der Reihe eine Flex-Zeile in der Flex-Zeile
+   (optisch unverändert), in der linken Spalte der Fuß der Liste. */
+.tabs-foot { display: flex; align-items: center; gap: 4px; }
+/* M308: Die Spalte ist ziehbar (Griff am rechten Rand) und per Knopf
+   ausblendbar — vorher gab es dafür nur Alt+U und die Einstellungen. */
+.spalte-griff { display: none; }
+.app.nav-links .tabs.spalte .spalte-griff {
+  display: block; position: absolute; top: 0; bottom: 0; right: 0; width: 10px;
+  cursor: col-resize; touch-action: none; z-index: 3;
+}
+.spalte-griff span {
+  position: absolute; top: 10px; bottom: 10px; right: 0; width: 3px; border-radius: var(--r-xs);
+  background: transparent; transition: background 0.15s;
+}
+.spalte-griff:hover span, .spalte-griff:active span { background: var(--accent); }
+@media (pointer: coarse) { .app.nav-links .tabs.spalte .spalte-griff { width: 18px; } }
+.tab-spalte-zu {
+  border: none; background: none; color: var(--muted); cursor: pointer;
+  width: 28px; height: 28px; border-radius: var(--r); margin-left: auto;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.tab-spalte-zu:hover { background: var(--surface-2); color: var(--ink); }
+.tab-add:hover { background: var(--surface-2); color: var(--ink); }
+
+/* ---------- Portal-Karte ---------- */
+.portal-card {
+  /* M397: ruhige Fläche mit festem Rand – kein violetter Verlauf, keine Strichelung */
+  background: var(--surface-card);
+  border-radius: var(--r-lg); padding: 16px; text-align: center;
+  border: 1px solid var(--border);
+}
+.portal-icon { font-size: 26px; margin-bottom: 4px; }
+.portal-name { font-weight: 700; font-size: 13.5px; margin-bottom: 2px; }
+.portal-open {
+  margin-top: 10px; border: none; background: var(--accent-fill); color: #fff;
+  font-family: inherit; font-size: 12px; padding: 5px 14px; border-radius: var(--r);
+  cursor: pointer;
+}
+.portal-open:hover { filter: brightness(.9); }
+.portal-select {
+  margin-top: 8px; font-family: inherit; font-size: 12px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); padding: 4px 6px;
+  background: var(--surface); width: 100%;
+}
+/* M262: Gegenseitigkeit auf einen Blick — steht der Rückverweis, sagt es die
+   Karte; fehlt er (ältere Portale), lässt er sich hier nachtragen. */
+.portal-rueck {
+  margin-top: 6px; font-size: 11px; color: var(--muted);
+  background: var(--surface-dim); border-radius: var(--r-pill); padding: 2px 9px;
+  display: inline-block;
+}
+.portal-rueck-add {
+  margin-top: 6px; font-family: inherit; font-size: 11px; cursor: pointer;
+  border: 1px dashed var(--border-soft); background: transparent; color: var(--muted);
+  border-radius: var(--r-pill); padding: 3px 9px; min-height: 24px;
+}
+.portal-rueck-add:hover { border-color: var(--accent); color: var(--ink); }
+@media (pointer: coarse) {
+  .portal-rueck-add { font-size: 12.5px; min-height: 32px; padding: 5px 11px; }
+}
+
+/* ---------- M450: Kontakt-Karte ----------
+   Eine Visitenkarte: flach, ruhig, Foto oder Initialen links, darunter Rufnummern, E-Mail, Anschrift als Links.
+   Bearbeiten und vCard-Export stehen nur im Fokus (Listen „Bedienung nur im Fokus“). */
+.kontakt-card { background: var(--surface-card); border-radius: var(--r-lg); border: 1px solid var(--border); padding: 12px 14px; }
+.kontakt-kopf { display: flex; align-items: center; gap: 10px; }
+.kontakt-foto {
+  flex: none; width: 44px; height: 44px; border-radius: 50%; overflow: hidden;
+  display: grid; place-items: center; background: var(--surface-2); color: var(--muted);
+  font-weight: 700; font-size: 15px; letter-spacing: 0.02em;
+}
+.kontakt-foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.kontakt-titel { flex: 1; min-width: 0; }
+.kontakt-name { font-weight: 700; font-size: 14.5px; line-height: 1.25; color: var(--ink); overflow-wrap: anywhere; }
+.kontakt-unter { font-size: 12px; color: var(--muted); margin-top: 1px; overflow-wrap: anywhere; }
+.kontakt-tools { display: flex; gap: 2px; align-self: flex-start; }
+.kontakt-knopf {
+  display: inline-grid; place-items: center; width: 28px; height: 28px; border: none; border-radius: var(--r-sm);
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.kontakt-knopf:hover { background: var(--surface-2); color: var(--ink); }
+.kontakt-inhalt { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
+.kontakt-zeile { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.kontakt-zeile > svg { flex: none; margin-top: 2px; color: var(--muted); }
+.kontakt-link { color: var(--accent-strong); text-decoration: none; overflow-wrap: anywhere; }
+.kontakt-link:hover { text-decoration: underline; }
+.kontakt-art-text { color: var(--muted); font-size: 11.5px; margin-top: 1px; }
+.kontakt-adresse { white-space: pre-line; overflow-wrap: anywhere; }
+.kontakt-karte { font-size: 11.5px; margin-left: 4px; }
+.kontakt-notiz { margin: 4px 0 0; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; border-top: 1px solid var(--border-soft); padding-top: 6px; }
+.kontakt-leer { margin: 0; color: var(--muted); font-size: 12px; }
+.kontakt-form { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.kontakt-feld {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 13px; color: var(--ink);
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); padding: 5px 7px; background: var(--surface);
+  resize: vertical;
+}
+.kontakt-feld:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.kontakt-gruppe { display: flex; flex-direction: column; gap: 4px; }
+.kontakt-zeile-feld { display: flex; gap: 4px; align-items: center; }
+.kontakt-zeile-feld .kontakt-art { flex: 0 0 92px; }
+.kontakt-weg {
+  flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; border: none; border-radius: var(--r-sm);
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.kontakt-weg:hover { background: var(--surface-2); color: var(--ink); }
+.kontakt-dazu {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; font: inherit; font-size: 12px;
+  border: none; background: transparent; color: var(--accent-strong); padding: 3px 2px; cursor: pointer;
+}
+.kontakt-foto-zeile { display: flex; gap: 10px; }
+@media (pointer: coarse) {
+  .kontakt-knopf, .kontakt-weg { width: 40px; height: 40px; }
+  .kontakt-dazu { min-height: 36px; }
+}
+
+/* ---------- Übersicht (Mission Control) ---------- */
+.ov-head-actions { display: flex; gap: 4px; opacity: 0.55; transition: opacity 0.15s; }
+.ovc-space:hover .ov-head-actions, .ovc-project:hover .ov-head-actions { opacity: 1; }
+.ov-head-actions button {
+  border: none; background: var(--surface-dim); border-radius: var(--r-sm);
+  font-family: inherit; font-size: 11.5px; padding: 4px 9px; cursor: pointer; color: var(--ink);
+}
+.ov-head-actions button:hover { background: var(--border); }
+
+.ov-project-name { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+
+.ov-board {
+  position: relative; width: 190px; background: var(--surface-card); border-radius: var(--r-lg);
+  border-top: 4px solid; padding: 12px 12px 10px; cursor: pointer;
+  box-shadow: var(--card-shadow); transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.ov-board:hover { box-shadow: var(--card-shadow-lift); }
+.ov-board:active { cursor: grabbing; }
+.ov-board-name { font-size: 13px; font-weight: 700; display: block; margin-bottom: 3px; word-break: break-word; }
+.ov-board-meta { font-size: 10.5px; color: var(--muted); margin-bottom: 8px; }
+.ov-minimap {
+  width: 100%; height: 52px; background: rgba(0, 0, 0, 0.04); border-radius: var(--r-sm); display: block;
+}
+.ov-minimap.empty {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10.5px; color: var(--muted);
+}
+.ov-empty { font-size: 12px; color: var(--muted); padding: 10px 4px; }
+.ov-empty.small { font-size: 11px; padding: 12px; border: 1.5px dashed var(--border-soft); border-radius: var(--r); }
+.inline-edit {
+  border: none; outline: 2px solid var(--accent); border-radius: var(--r-sm);
+  font-family: inherit; font-size: inherit; font-weight: inherit;
+  background: var(--surface); padding: 1px 6px; max-width: 100%;
+}
+.tab-home {
+  border: none; background: none; font-size: 15px; width: 30px; height: 30px;
+  border-radius: var(--r); cursor: pointer; flex: none;
+}
+.tab-home:hover { background: var(--surface-2); }
+.tab-home.active { background: var(--accent-soft); }
+.tab-home-label { display: none; }
+/* M297: DER Baum (Navigation.tsx) — in der Spalte und in der Ausstülpung */
+.nav-tree .side-proj-name { border: none; background: none; text-align: left; cursor: pointer; font-family: inherit; }
+.nav-tree .side-proj-name:hover { color: var(--accent-strong); }
+.nav-tree .side-proj { margin-left: 0; }
+.nav-panel .nav-tree { flex: 1; min-height: 0; margin-top: 4px; }
+
+@media (pointer: coarse) {
+  .ov-head-actions { opacity: 1 !important; }
+}
+
+/* ---------- Dock ---------- */
+.dock {
+  /* M248: Das Dock rückt mit dem Rahmen nach oben und weicht einer offenen
+     Seitenleiste aus — sonst stünde es nicht mehr mittig im FREIEN Raum. */
+  position: fixed; left: 50%; bottom: calc(18px + var(--app-rand));
+  transform: translateX(calc(-50% - var(--seite-rechts, 0px) / 2));
+  background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
+  display: flex; gap: 4px; padding: 7px; z-index: 50;
+}
+.dock button {
+  border: none; background: none; font-size: 19px; width: 42px; height: 42px;
+  border-radius: var(--r); cursor: pointer;
+}
+.dock button:hover { background: var(--surface-2); }
+
+/* ---------- Auswahl-Toolbar ---------- */
+.sel-toolbar {
+  background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
+  display: flex; align-items: center; gap: 4px; padding: 7px 10px;
+}
+.sel-count { font-size: 11.5px; color: var(--muted); margin-right: 4px; white-space: nowrap; }
+.sel-toolbar button {
+  border: none; background: none; font-family: inherit; font-size: 12.5px;
+  padding: 7px 10px; border-radius: var(--r); cursor: pointer; color: var(--ink);
+  white-space: nowrap;
+}
+.sel-toolbar button:hover { background: var(--surface-2); }
+.sel-toolbar button.danger:hover { background: #ffe3e0; }
+
+/* ---------- M243: Anfasser der Bearbeiten-Leiste ---------- */
+/* Der Versatz reist als Variable an; `translate` ist bewusst NICHT `transform`
+   — den belegt bei der schwebenden Leiste React Flow (Verankerung an der
+   Karte). Die eigenständige Eigenschaft legt sich sauber davor. */
+/* M267: `--lv-typo` schiebt die Karten-Leiste aus dem Weg, solange die
+   Formatier-Leiste des Texts oben an der Karte steht — sonst liegen zwei
+   Leisten übereinander und die vordere verdeckt die hintere. Gesetzt wird die
+   Variable unten am `body`, sobald eine Formatier-Leiste im Bild ist. */
+/* M268: Der Versatz sitzt am ANKER (dem Kasten, den React Flow positioniert),
+   nicht am sichtbaren Balken — der trägt den Anzeige-Faktor und würde den
+   Versatz sonst mitskalieren. */
+/* M292: Kein gemerkter Versatz mehr — die Leiste sitzt an der Karte (oben,
+   sonst unten) oder als feste Zeile unten. Geblieben ist nur das Ausweichen
+   vor der Formatier-Leiste (M267). */
+.sel-toolbar-anker { translate: 0 var(--lv-typo, 0px); }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed; bottom: 84px; left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  background: #16191e; color: #fff; font-size: 12.5px; padding: 8px 16px;
+  border-radius: var(--r); opacity: 0; transition: all 0.25s ease;
+  /* Über ALLEN Overlays (Modals 80, Presenter 95): Fehlermeldungen z. B. vom
+     WebDAV-Verbinden müssen auch bei offenen Einstellungen lesbar sein */
+  z-index: 120; pointer-events: none; max-width: calc(80vw / var(--pn-anz, 1));
+}
+/* M268: Die Blase selbst fängt KEINE Klicks mehr ab — nur noch ihr Knopf.
+   Vorher lag über dem unteren Bilddrittel eine unsichtbare Sperre: Wer dort
+   zeichnen oder eine Karte anfassen wollte, traf die Blase. Bei „Anzeige
+   175 %" wächst sie mit und deckte entsprechend mehr Leinwand zu (gemessen:
+   ein Stiftstrich bei 600/700 kam gar nicht erst an). */
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast-undo {
+  pointer-events: auto;
+  margin-left: 12px; border: none; background: rgba(255, 255, 255, 0.16);
+  color: #ffd76a; font-family: inherit; font-size: 12.5px; font-weight: 700;
+  padding: 3px 11px; border-radius: var(--r-sm); cursor: pointer;
+}
+.toast-undo:hover { background: rgba(255, 255, 255, 0.28); }
+
+/* ---------- Board-Optionen (M88): Hintergrund-Tönung, Timer ---------- */
+/* Dezente Tönungen — hell und dunkel je eigene Werte, Karten bleiben lesbar.
+   WICHTIG: auf .react-flow legen — die Flow-Ebene malt sonst mit var(--bg)
+   über die Wrapper-Farbe */
+.board-bg-grau .react-flow { background: #ececec; }
+.board-bg-blau .react-flow { background: #e8f0f8; }
+.board-bg-gelb .react-flow { background: #faf3d9; }
+.board-bg-gruen .react-flow { background: #e8f3e4; }
+.board-bg-rosa .react-flow { background: #f9ebee; }
+.board-bg-flieder .react-flow { background: #f0ecf7; }
+[data-theme='dark'] .board-bg-grau .react-flow { background: #26241f; }
+[data-theme='dark'] .board-bg-blau .react-flow { background: #20262e; }
+[data-theme='dark'] .board-bg-gelb .react-flow { background: #2a2619; }
+[data-theme='dark'] .board-bg-gruen .react-flow { background: #20281e; }
+[data-theme='dark'] .board-bg-rosa .react-flow { background: #2b2124; }
+[data-theme='dark'] .board-bg-flieder .react-flow { background: #262130; }
+
+/* Hintergrund-Swatches — seit M126 im 🧹-Board-Optionen-Menü des Docks */
+.tab-bg-swatches { display: flex; gap: 7px; padding: 2px 4px 4px; }
+.tab-bg-swatch {
+  width: 26px; height: 26px; border-radius: var(--r); cursor: pointer;
+  border: 1.5px solid var(--border-soft);
+}
+.tab-bg-swatch.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.tab-bg-swatch.bg-none { background: var(--bg); }
+.tab-bg-swatch.bg-grau { background: #ececec; }
+.tab-bg-swatch.bg-blau { background: #e8f0f8; }
+.tab-bg-swatch.bg-gelb { background: #faf3d9; }
+.tab-bg-swatch.bg-gruen { background: #e8f3e4; }
+.tab-bg-swatch.bg-rosa { background: #f9ebee; }
+.tab-bg-swatch.bg-flieder { background: #f0ecf7; }
+[data-theme='dark'] .tab-bg-swatch.bg-grau { background: #26241f; }
+[data-theme='dark'] .tab-bg-swatch.bg-blau { background: #20262e; }
+[data-theme='dark'] .tab-bg-swatch.bg-gelb { background: #2a2619; }
+[data-theme='dark'] .tab-bg-swatch.bg-gruen { background: #20281e; }
+[data-theme='dark'] .tab-bg-swatch.bg-rosa { background: #2b2124; }
+[data-theme='dark'] .tab-bg-swatch.bg-flieder { background: #262130; }
+
+/* Archiv (M87): eingeblendete Archiv-Karten sind gedimmt und tragen ein Band */
+.react-flow__node.archived-card { opacity: 0.55; filter: saturate(0.5); }
+.react-flow__node.archived-card::after {
+  content: 'Archiviert';
+  position: absolute; top: -9px; right: 12px; z-index: 5; pointer-events: none;
+  background: var(--surface-2); color: var(--muted);
+  border: 1px solid var(--border-soft); border-radius: var(--r-pill);
+  font-size: 9px; font-weight: 750; letter-spacing: 0.06em; text-transform: uppercase;
+  padding: 1.5px 8px;
+}
+.react-flow__edge.archived-edge { opacity: 0.35; }
+
+/* Sync-Status als Wolken-Icon in der Aktionsleiste (M85/M86): erbt das
+   Button-Styling von .top-actions; nur der Aufmerksamkeits-Zustand bekommt
+   ein zurückhaltendes Amber statt einer lauten Warnfarbe */
+.top-actions button.sync-warn { color: #c07c10; }
+[data-theme='dark'] .top-actions button.sync-warn { color: #e8a83d; }
+.top-actions button.sync-pending svg { animation: sync-pulse 1.4s ease-in-out infinite; }
+@keyframes sync-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+/* Mitlese-Banner (Single-Writer): zweites Fenster liest nur mit */
+.writer-banner {
+  position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface-card); color: var(--ink);
+  border: 1.5px solid var(--accent); border-radius: var(--r-lg);
+  box-shadow: var(--pop-shadow);
+  font-size: 12.5px; line-height: 1.45; padding: 9px 14px;
+  z-index: 70; max-width: min(640px, calc(92vw / var(--pn-anz, 1)));
+}
+.writer-banner button {
+  flex: none; border: none; cursor: pointer;
+  background: var(--accent-fill); color: #fff;
+  font-family: inherit; font-size: 12.5px; font-weight: 700;
+  padding: 6px 12px; border-radius: var(--r); white-space: nowrap;
+}
+.writer-banner button:hover { filter: brightness(1.08); }
