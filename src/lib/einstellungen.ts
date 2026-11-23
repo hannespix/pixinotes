@@ -94,6 +94,11 @@ const auszug = (s: Record<string, unknown>): Vorlieben => {
   return v;
 };
 
+/** M476: Welche Felder als Vorliebe gelten — die Sicherung nimmt genau diese mit (nie Schlüssel oder Zugänge) */
+export const VORLIEBEN_FELDER: readonly string[] = FELDER;
+/** M476: Die Vorlieben, wie sie gerade gelten (für „Alles sichern") */
+export const vorliebenAuszug = (): Record<string, unknown> => auszug(useBoard.getState() as unknown as Record<string, unknown>);
+
 /**
  * Beim Start anwenden — VOR dem ersten Bild.
  *

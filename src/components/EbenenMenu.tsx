@@ -170,7 +170,7 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
         await navigator.clipboard.writeText(url);
         // M390: ehrlich bleiben — was in der Geräte-Ablage liegt, passt in keinen Link
         showToast(hatAblageInhalt(board)
-          ? 'Teilen-Link kopiert. Große Dateien und eigene Tools passen nicht in den Link – dafür „Als Datei sichern".'
+          ? 'Teilen-Link kopiert. Große Dateien und eigene Tools passen nicht in den Link – dafür „Sicherung herunterladen".'
           : 'Teilen-Link kopiert, er enthält das komplette Board.', false, hatAblageInhalt(board) ? 8000 : undefined);
       } catch {
         window.prompt('Link zum Kopieren (Strg+C):', url); // M340: Zwischenablage gesperrt — der Link ist trotzdem da
@@ -184,7 +184,7 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
   return (
     <>
     {freigabe && createPortal(<FreigabeDialogSpaet boardId={boardId} onClose={() => setFreigabe(false)} />, document.body)}
-    {linkOffen && createPortal(<Suspense fallback={null}><LinkDialog boardId={boardId} onClose={() => setLinkOffen(false)} ohneKonto={() => void teilen()} alsDatei={() => downloadBoardFile(board)} /></Suspense>, document.body)}
+    {linkOffen && createPortal(<Suspense fallback={null}><LinkDialog boardId={boardId} onClose={() => setLinkOffen(false)} ohneKonto={() => void teilen()} alsDatei={() => downloadBoardFile(board, false)} /></Suspense>, document.body)}
     <MenuHuelle titel={`Board „${board.name}": umbenennen, duplizieren, verschieben, archivieren, teilen, löschen`} klasse={klasse} kinder={(zu) => (
       verschieben ? (
         <>
@@ -227,8 +227,9 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
           <button role="menuitem" onClick={() => { setLinkOffen(true); zu(); }} data-taste="board-link">
             <IShare size={14} /> Kopie per Link teilen …
           </button>
-          <button role="menuitem" onClick={() => { downloadBoardFile(board); zu(); }}>
-            <IDownload size={14} /> Als Datei sichern
+          {/* M476: EINE Datei mit allem (Anhänge, Bilder, PDFs, Kommentare, Striche, Vorlagen) — einspielen per Ablegen */}
+          <button role="menuitem" data-taste="board-sicherung" onClick={() => { downloadBoardFile(board, false); zu(); }}>
+            <IDownload size={14} /> Sicherung herunterladen
           </button>
           {/* M454: alle Kontakt-Karten des Boards als EINE .vcf – nur, wenn es welche gibt */}
           {board.nodes.some((n) => n.type === 'kontakt') && (

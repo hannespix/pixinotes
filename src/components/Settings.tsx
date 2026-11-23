@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { sprache, spracheSetzen, zahlWort } from '../lib/sprache';
 import { brainStatus, rebuildBrainIndex, syncBrainIndex } from '../lib/brain';
-import { claimWriter, flushPersist, useBoard } from '../store';
+import { useBoard } from '../store';
 import {
   connectGoogle, connectMicrosoft, disconnect as disconnectCalAccount,
   invalidateAccountEvents, loadCalAccounts, msHasMail, msHasNotes, oauthAvailable, patchCalAccounts, type CalAccounts,
@@ -11,9 +11,9 @@ import { OneNoteImport } from './OneNoteImport';
 import {
   applySync, checkSyncRemote, disconnectSync, ensurePermission, getSyncHandle, knownStamp,
   permissionState, pickSyncFolder, readSync, syncSupported, writeSync,
-  SYNC_DIRTY_KEY, WEBDAV_DIRTY_KEY, type SyncDirHandle,
+  type SyncDirHandle,
 } from '../lib/syncFolder';
-import { dateienVonKarten, uebernimmDateien } from '../lib/syncFolder';
+import { AUTO_KEY, letzteSicherung, sicherungEinspielenOeffnen } from '../lib/sicherungTakt';
 import {
   applyWebdav, clearWebdav, corsRequestText, loadWebdav, saveWebdav, webdavRead, webdavStamp,
   webdavTest, webdavWrite, type WebdavConfig,
@@ -247,6 +247,18 @@ export function Settings() {
   const setUiAccent = useBoard((s) => s.setUiAccent);
   // WICHTIG: vor dem early-return deklarieren (Hook-Reihenfolge!)
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // M476: Sicherung — Anzeige „Letzte Sicherung" und der gewählte Ordner der Auto-Sicherung
+  const [sicherTick, setSicherTick] = useState(0);
+  const [autoOrdner, setAutoOrdner] = useState('');
+  const autoAnJetzt = (() => { try { return localStorage.getItem(AUTO_KEY) === '1'; } catch { return false; } })();
+  useEffect(() => {
+    if (!open || !autoAnJetzt) return;
+    let aktiv = true;
+    void import('../lib/sicherung').then((m) => m.autoOrdner()).then((h) => { if (aktiv && h) setAutoOrdner(h.name); });
+    const neu = () => setSicherTick((x) => x + 1);
+    window.addEventListener('pixinotes:sicherung-stand', neu);
+    return () => { aktiv = false; window.removeEventListener('pixinotes:sicherung-stand', neu); };
+  }, [open, autoAnJetzt]);
   // M190: Dateien-App-Sync (iPad & Co.) — eigener Datei-Dialog, damit er nicht
   // mit dem allgemeinen Datei-Import im Daten-Reiter kollidiert
   const filesSyncRef = useRef<HTMLInputElement>(null);
@@ -569,49 +581,34 @@ export function Settings() {
   const freieProjekte = projekte.filter(({ p }) => !psMeta[p.id]);
   const psWahl = freieProjekte.some(({ p }) => p.id === psPick) ? psPick : (freieProjekte[0]?.p.id ?? '');
 
-  // ---- Datei-Sync: funktioniert überall (Firefox, file://, USB-Stick, Mail-Anhang) ----
-  const exportStateFile = async () => {
-    const st = useBoard.getState();
-    // M390: „Der komplette Stand" heißt jetzt auch komplett — mit den Karten-Vorlagen und mit allem, was in der
-    // Geräte-Ablage liegt (große Dateien, Quelltexte eigener Tools; auch die der Vorlagen).
+  // ---- M476: Sicherung — EINE Datei (.pixinotes) mit allem; geht überall (Firefox, file://, USB-Stick, Mail-Anhang) ----
+  const allesSichernKlick = async () => {
     setBusy('datei');
-    const dateien = await dateienVonKarten([...st.boards.flatMap((b) => b.nodes), ...st.templates.map((t) => t.node)]).catch(() => ({}));
-    const payload = {
-      app: 'pixinotes', version: 2, savedAt: new Date().toISOString(),
-      boards: st.boards, spaces: st.spaces, activeId: st.activeId,
-      templates: st.templates,
-      ...(Object.keys(dateien).length ? { dateien } : {}),
-    };
-    const url = URL.createObjectURL(new Blob([JSON.stringify(payload)], { type: 'application/json' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `pixinotes-daten-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    showToast('Kompletter Stand als Datei exportiert');
-  };
-
-  const importStateFile = async (file: File) => {
     try {
-      const p = JSON.parse(await file.text());
-      if (p?.app !== 'pixinotes' || !Array.isArray(p.boards) || p.boards.length === 0) {
-        showToast('Das ist keine gültige PixiNotes-Datei.');
-        return;
-      }
-      if (!window.confirm(`Stand vom ${p.savedAt ? new Date(p.savedAt).toLocaleString('de-DE') : '?'} laden? Die aktuellen Boards werden ersetzt.`)) return;
-      claimWriter(); // bewusster Import — auch aus einem Mitlese-Fenster wirksam
-      useBoard.getState().importSync(p.boards, p.spaces ?? [], p.activeId ?? p.boards[0].id);
-      // M390: Vorlagen und Inhalte der Geräte-Ablage aus der Sicherung zurücklegen
-      if (Array.isArray(p.templates)) useBoard.setState({ templates: p.templates });
-      void uebernimmDateien(p).then((n) => { if (n > 0) window.dispatchEvent(new CustomEvent('pixinotes:dateien-da')); });
-      if (!flushPersist()) { showToast(QUOTA_IMPORT_MSG); return; }
-      // Der Datei-Stand liegt in keinem Sync-Ziel → kein Fast-Forward darüber
-      try { localStorage.setItem(SYNC_DIRTY_KEY, '1'); localStorage.setItem(WEBDAV_DIRTY_KEY, '1'); } catch { /* unkritisch */ }
-      showToast('Stand aus Datei geladen');
-      setOpen(false);
-    } catch {
-      showToast('Datei konnte nicht gelesen werden.');
+      const m = await import('../lib/sicherung');
+      await m.allesSichern();
+    } catch (e) {
+      showToast(`Sichern abgebrochen: ${String((e as Error).message)}`, false, 8000);
     }
+    setBusy('');
+    setSicherTick((x) => x + 1);
+  };
+  const sicherungEinspielenKlick = (f: File) => {
+    setOpen(false);
+    sicherungEinspielenOeffnen(f);
+  };
+  const autoUmschalten = async (an: boolean) => {
+    const m = await import('../lib/sicherung');
+    if (!an) { await m.autoAusschalten(); setAutoOrdner(''); setSicherTick((x) => x + 1); return; }
+    setBusy('auto');
+    try {
+      const name = await m.autoEinschalten();
+      if (name) { setAutoOrdner(name); showToast(`Automatische Sicherung an – täglich in „${name}", die letzten ${m.AUTO_BEHALTEN} bleiben.`, false, 6000); }
+    } catch (e) {
+      if ((e as Error)?.name !== 'AbortError') showToast(`Ordner nicht verfügbar: ${String((e as Error).message)}`, false, 8000);
+    }
+    setBusy('');
+    setSicherTick((x) => x + 1);
   };
 
   const doExport = async (fn: () => Promise<unknown>, label: string) => {
@@ -627,7 +624,7 @@ export function Settings() {
   const resetEverything = async () => {
     // M390: EIN Text (kein zusammengesetzter) — nur so findet ihn das Wörterbuch; die Rückfrage stand auf Englisch
     // sonst deutsch da, mit einem einzelnen übersetzten Wort
-    if (!window.confirm(`Wirklich ALLES leeren?\n\nAlle Bereiche, Projekte, Boards, Karten, Versionen und Vorlagen werden gelöscht. Ein verbundener Sync-Ordner wird getrennt (seine Dateien bleiben unangetastet). KI-Einstellungen bleiben erhalten.\n\nTipp: Vorher unter „Daten" den Stand als Datei exportieren – er enthält auch Vorlagen, große Dateien und eigene Tools.`)) return;
+    if (!window.confirm(`Wirklich ALLES leeren?\n\nAlle Bereiche, Projekte, Boards, Karten, Versionen und Vorlagen werden gelöscht. Ein verbundener Sync-Ordner wird getrennt (seine Dateien bleiben unangetastet). KI-Einstellungen bleiben erhalten.\n\nTipp: Vorher unter „Daten" „Alles sichern" – die Datei enthält auch Vorlagen, große Dateien und eigene Tools.`)) return;
     const word = window.prompt('Zur Bestätigung bitte LEEREN eingeben:');
     if ((word ?? '').trim().toUpperCase() !== 'LEEREN') {
       showToast('Abgebrochen – nichts wurde gelöscht.');
@@ -781,23 +778,36 @@ export function Settings() {
         {/* ---- Daten: sichern & laden, Export, Import, Beispieldaten, leeren ---- */}
         {tab === 'daten' && (
         <>
-        <section className="modal-section">
+        {/* M476: Sichern & Laden — EINE Datei mit allem, Einspielen mit Vorschau, optional automatisch in einen Ordner */}
+        <section className="modal-section" key={`sicher-${sicherTick}`}>
           <h3>Sichern &amp; Laden</h3>
-          <p className="modal-hint">Der komplette Stand als Datei, für Backups und den Umzug auf ein anderes Gerät. Geht in jedem Browser.</p>
+          <p className="modal-hint">Alles in einer Datei (.pixinotes) – Boards, Anhänge, Vorlagen und Einstellungen, ohne KI-Schlüssel und Zugangsdaten. Ein einzelnes Board sichert das ⋯ des Boards.</p>
           <div className="modal-buttons">
-            <button disabled={!!busy} onClick={exportStateFile}>Datei exportieren</button>
-            <button disabled={!!busy} onClick={() => fileInputRef.current?.click()}>Datei laden…</button>
+            <button disabled={!!busy} onClick={() => void allesSichernKlick()} data-taste="alles-sichern">{busy === 'datei' ? '…' : 'Alles sichern'}</button>
+            <button disabled={!!busy} onClick={() => fileInputRef.current?.click()} data-taste="sicherung-einspielen">Sicherung einspielen…</button>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json,application/json"
+              accept=".pixinotes,.json,application/json,application/zip"
               style={{ display: 'none' }}
               onChange={(e) => {
                 const f = e.target.files?.[0];
-                if (f) void importStateFile(f);
+                if (f) sicherungEinspielenKlick(f);
                 e.target.value = '';
               }}
             />
+          </div>
+          {hasFolderApi && (
+            <label className="modal-row modal-row-check">
+              <span>Automatisch sichern{autoOrdner ? <> in „<span translate="no">{autoOrdner}</span>"</> : ''}</span>
+              <input type="checkbox" checked={autoAnJetzt} disabled={busy === 'auto'} onChange={(e) => void autoUmschalten(e.target.checked)} data-taste="auto-sicherung" />
+            </label>
+          )}
+          <div className="modal-note" data-taste="letzte-sicherung">
+            {hasFolderApi && autoAnJetzt ? 'Einmal am Tag und beim Verlassen in den gewählten Ordner, die letzten 7 bleiben liegen. ' : ''}
+            {letzteSicherung()
+              ? `Letzte Sicherung: ${new Date(letzteSicherung()!).toLocaleString('de-DE')} (${Math.floor((Date.now() - letzteSicherung()!) / 86_400_000) === 0 ? 'heute' : `vor ${zahlWort(Math.floor((Date.now() - letzteSicherung()!) / 86_400_000), 'Tag', 'Tagen')}`}).`
+              : 'Noch keine Sicherung. Der Browser-Speicher allein ist kein Backup.'}
           </div>
         </section>
 
@@ -1182,7 +1192,7 @@ export function Settings() {
 
         <section className="modal-section modal-danger">
           <h3>Alles leeren &amp; neu starten</h3>
-          <p className="modal-hint">Löscht alle Bereiche, Projekte, Boards, Karten und Vorlagen, ohne Rückgängig. Vorher oben „Datei exportieren".</p>
+          <p className="modal-hint">Löscht alle Bereiche, Projekte, Boards, Karten und Vorlagen, ohne Rückgängig. Vorher oben „Alles sichern".</p>
           <div className="modal-buttons">
             <button className="danger" disabled={!!busy} onClick={() => void resetEverything()}>
               Alles leeren…
