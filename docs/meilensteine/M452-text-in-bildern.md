@@ -57,7 +57,7 @@ unsichtbar — wer nach „Rechnungsnummer" sucht, fand den Screenshot der Rechn
 | Nachlade-Teil `ocrEngine-*.js` | 16 KB (gzip 7 KB) |
 | `dist/ocr/` auf GitHub Pages | 16 MB (Worker 0,1 MB · je Kern 3,9 MB × 3 · deu 1,3 MB · eng 3,0 MB) |
 | Download beim ersten Erkennen | ≈ 8,3 MB (Worker + ein Kern + beide Sprachen), danach aus dem Cache |
-| `release/pixinotes.html` | 11,72 MB → 11,74 MB (+ 23 KB: Nachlade-Teil eingebettet, ohne Kern/Sprachdaten) |
+| `release/pixinotes.html` | 11,81 MB → 11,84 MB (+ 27 KB: Nachlade-Teil eingebettet, ohne Kern/Sprachdaten) |
 
 ## Prüfreihe
 A Start und Leerlauf ohne Bild laden keine Engine-Datei · B Erkennung im Leerlauf, gespeichert, alle Dateien
