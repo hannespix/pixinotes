@@ -1,5 +1,5 @@
 # M448 — Prüfreihen-Gesundheit: die ganze Reihe grün und verlässlich
-PR: #… · Prüfreihen: alle (`node werkzeug/alle-pruefungen.mjs`) · Datum: 2026-11-23
+PR: #143, #… · Prüfreihen: alle (`node werkzeug/alle-pruefungen.mjs`) · Datum: 2026-11-23
 
 ## Warum
 Die Prüfreihen sind das Merge-Tor für automatisch arbeitende Agenten. Nach den
@@ -23,7 +23,7 @@ Last-Durchschnitt 9–15), und zwei Befunde lagen in der App selbst.
     statt rot zu melden.
   - Der Bericht nennt auch den ersten Fehlschlag mit Grund (`erster Lauf rot,
     wird allein wiederholt`) – Wackler bleiben so auffindbar.
-- `pruefungen/README.md`: Reihentabelle bis m464, Aufruf der parallelen Reihe,
+- `pruefungen/README.md`: Reihentabelle bis m469, Aufruf der parallelen Reihe,
   Hinweis zu den Datenbank-Reihen.
 
 ## Ergebnis je Reihe (nur, was nicht ohne Weiteres grün war)
@@ -33,6 +33,7 @@ Last-Durchschnitt 9–15), und zwei Befunde lagen in der App selbst.
 | m299 | Sprechblase „Absender als Kontakt" (M457) 155 Zeichen → gekürzt (`SelectionToolbar.tsx`) | **App repariert** |
 | m299 | „Was ist neu" nicht absteigend (parallele Merges setzten M452 vor M458, M449 weit unten) → `HelpOverlay*.tsx` umsortiert | **App repariert** |
 | m299 | Hilfe zur Browser-Erweiterung (M458) ein Punkt über 420 Zeichen → zwei Punkte | **App repariert** |
+| m299 | Hilfe „Outlook live" (M466) ein Punkt über 420 Zeichen → zwei Punkte (de/en) | **App repariert** |
 | m320 | C5 unter Last zwei gleiche Anfragen an den Handschrift-Dienst: Vorschlag nach der Schreibpause und Knopf „Text" erkannten dieselben Striche je einmal → `handschriftKandidaten` merkt die letzte Erkennung (auch laufend) | **App repariert** |
 | m296 | 23 Kacheln seit der Kontakt-Karte (M450) | angepasst |
 | m314 | Dienste-Abschnitt „Text in Bildern" (M452) | angepasst |
