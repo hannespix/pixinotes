@@ -40,7 +40,7 @@ es nur im Dock – ohne Chat-KI ging es gar nicht.
   `data-anordnen="themen"`). `m399` erwartet den neuen Knopf im Anordnen-Feld.
 
 ## Grenzen / offen
-- Kein automatisches nächtliches Aufräumen und kein Pin „vom Aufräumen ausschließen" (KONZEPT nennt beides).
+- Kein automatisches nächtliches Aufräumen (bewusst). Pin „vom Aufräumen ausschließen" → M463 („Nicht mit ordnen" im ⋯ der Karte).
 - Karten aus bestehenden Rahmen werden bei Auswahl herausgenommen; verschachtelte Rahmen werden nicht gebildet.
 - Liegt das Board in einem vom Gehirn ausgeschlossenen Bereich, hat der Rückfall keine Vektoren („zu wenig Inhalt") – behoben in M451: die Meldung nennt den Ausschluss.
 - Keine Morph-Animation – die Karten springen an ihren Platz (ruhiger, und die Messung bleibt eindeutig).

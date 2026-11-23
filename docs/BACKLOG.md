@@ -17,9 +17,8 @@ immer Vorrang vor dieser Liste.
 | — | Wissensbasis: HISTORIE.md, README aktualisieren | docs/ |
 
 ## Offene Punkte aus gemergten Meilensteinen
-- M445: Auto-Aufräumen (nächtlich) und Pin „nicht mit ordnen“ fehlen
 - M449: Versionen nur je Gerät (reisen nicht mit Sync/Export)
-- M444: Risiko-Erkennung ohne KI nur Wortmuster
+- M463: „lange in Arbeit“ misst die Kanban-Karte, nicht das einzelne Ticket (Tickets tragen keine eigene Zeit)
 - M458: Erweiterung nicht im Chrome-/Edge-/Firefox-Store (nur „Entpackt laden“); kein Weg in die portable pixinotes.html; keine feste Schnellablage-Zone (KONZEPT „Inbox-Ecke“)
 
 ## Ideen (noch nicht vergeben)

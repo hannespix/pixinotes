@@ -38,7 +38,7 @@ man Name, Rufnummern und Anschrift von Hand in eine Kontakt-Karte abtippen.
 - Lage über `findFreeSpot` rechts neben der Mail; `makeKontakt` + `addLabeledEdge` in `mutedHistory`.
 
 ## Grenzen / offen
-- Das Destillat (M451) bietet „Absender als Kontakt“ nicht zusätzlich an – der Weg über das ⋯ der Mail reicht.
-- Ein vorhandener Kontakt wird nur über die E-Mail-Adresse erkannt, nicht über den Namen (gleichnamige Personen).
+- → M463: Das Destillat (M451) bietet „Absender als Kontakt“ jetzt zusätzlich an (derselbe Aufruf wie im ⋯).
+- → M463: Ein vorhandener Kontakt wird auch über den Namen erkannt (normalisiert); eine andere Adresse kommt als weitere E-Mail dazu.
 - Anschriften außerhalb von DE/AT/CH (z. B. britische Postleitzahlen) erkennt nur die KI.
 - Weitere Personen im Verlauf (zitierte Signaturen) werden bewusst nicht als Kontakt angeboten.
