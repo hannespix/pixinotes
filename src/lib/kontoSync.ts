@@ -21,7 +21,7 @@ import {
   uebernimmDateien, WEBDAV_DIRTY_KEY, type EinarbeitenErgebnis, type SyncDatei, type SyncPayload, type SyncWeg,
 } from './syncFolder';
 import { googleTokenFuer, loadCalAccounts, msAnmeldung, msTokenErneuern, oauthAvailable } from './calAccounts';
-import { NetzFehler, sbAbmelden, sbErneuern, sbKontoLoeschen, sbLinkWarErwartet, sbNutzer, sbRealtime, sbRueckkehrLesen, supabaseKonfig, type RealtimeEreignis, type RealtimeGriff, type SbSitzung } from './kontoSupabase';
+import { NetzFehler, sbAbmelden, sbCodeTauschen, sbErneuern, sbKontoLoeschen, sbLinkWarErwartet, sbNutzer, sbRealtime, sbRueckkehrCode, sbRueckkehrLesen, supabaseKonfig, type RealtimeEreignis, type RealtimeGriff, type SbSitzung } from './kontoSupabase';
 import { nurAuswahlAnders } from './syncMerge';
 import { patchFuer, type Patch } from './gastPatch';
 import { anhangGroesse, anhangLokal } from './htmlStore';
@@ -1433,12 +1433,17 @@ export function initKontoSync(): void {
   let timer: ReturnType<typeof setTimeout> | undefined;
   // M328: Rückkehr vom E-Mail-Link — die Sitzung hängt an der Adresse
   try {
-    const rk = sbRueckkehrLesen();
-    if (rk) {
-      // M388: Ein Link, den dieses Gerät nicht angefordert hat oder der eine andere Anmeldung ersetzt: erst fragen
-      const erwartet = sbLinkWarErwartet();
+    const rkLink = sbRueckkehrLesen();
+    // M479: Rückkehr von „Mit Google anmelden" (PKCE: ?code=…, nur wenn dieses Gerät die Anmeldung begonnen hat)
+    const rkCode = rkLink ? null : sbRueckkehrCode();
+    if (rkLink || rkCode) {
+      // M388: Ein Link, den dieses Gerät nicht angefordert hat oder der eine andere Anmeldung ersetzt: erst fragen.
+      // Ein Code lässt sich nur mit dem hier gemerkten Verifier tauschen — er ist immer selbst angefordert.
+      const erwartet = sbLinkWarErwartet() || !!rkCode;
       const bisher = loadKonto();
+      let rk = rkLink as SbSitzung;
       void (async () => {
+        if (rkCode) rk = await sbCodeTauschen(rkCode.code, rkCode.verifier);
         if (erwartet && (!bisher || bisher.userId === rk.userId)) return true;
         const wer = (await sbNutzer(rk.token))?.email ?? '…';
         return window.confirm(`Mit dem PixiNotes-Konto ${wer} anmelden?\n\nDieser Anmelde-Link wurde nicht auf diesem Gerät angefordert${bisher ? ' – und hier ist schon ein Konto angemeldet' : ''}. Nach dem Anmelden gleichen sich die Boards dieses Geräts mit diesem Konto ab. Bestätige nur, wenn es dein eigenes Konto ist.`);

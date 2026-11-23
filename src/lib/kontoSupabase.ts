@@ -56,6 +56,8 @@ const fehlerText = (j: TokenAntwort, status: number): string => {
   if (/signups not allowed/i.test(roh)) return 'Neue Konten sind beim Betreiber gerade nicht freigeschaltet.';
   if (/password should be|weak password/i.test(roh)) return 'Das Passwort ist zu kurz – mindestens 6 Zeichen.';
   if (/refresh_token|invalid refresh/i.test(roh)) return 'Anmeldung abgelaufen – bitte neu anmelden.';
+  if (/unsupported provider|provider is not enabled/i.test(roh)) return ANBIETER_AUS_TEXT;
+  if (/flow state|code verifier|auth code/i.test(roh)) return 'Die Anmeldung ist abgelaufen – bitte noch einmal auf „Mit Google anmelden" tippen.';
   return roh ? `PixiNotes-Konto: ${roh}` : `PixiNotes-Konto: HTTP ${status}`;
 };
 
@@ -183,16 +185,123 @@ export function sbLinkWarErwartet(): boolean {
 
 export function sbRueckkehrLesen(): SbSitzung | null {
   const hash = location.hash.startsWith('#') ? location.hash.slice(1) : '';
-  if (!/access_token=/.test(hash)) return null;
+  // M479: Auch eine Absage von Google kommt (beim impliziten Ablauf) als #error=… zurück — aber nur, wenn dieses
+  // Gerät gerade eine Anmeldung über einen Anbieter begonnen hat; fremde #error-Adressen bleiben unberührt.
+  const nurFehler = !/access_token=/.test(hash) && /(?:^|&)error(?:_description)?=/.test(hash) && oauthOffen();
+  if (!/access_token=/.test(hash) && !nurFehler) return null;
   const p = new URLSearchParams(hash);
   const token = p.get('access_token'), refresh = p.get('refresh_token');
   const fehler = p.get('error_description') ?? p.get('error');
   try { history.replaceState(null, '', `${location.pathname}${location.search}`); } catch { /* egal */ }
-  if (fehler) throw new Error(`PixiNotes-Konto: ${decodeURIComponent(fehler.replace(/\+/g, ' '))}`);
+  try { localStorage.removeItem(PKCE_KEY); } catch { /* egal */ }   // M479: kam die Sitzung im Fragment, ist der Code-Weg erledigt
+  if (fehler) throw new Error(oauthFehlerText(p.get('error') ?? '', fehler));
   if (!token || !refresh) return null;
   const expiresIn = Number(p.get('expires_in') ?? 3600);
   const expiresAt = Number(p.get('expires_at') ?? 0);
   return { token, refreshToken: refresh, exp: expiresAt ? expiresAt * 1000 : Date.now() + (expiresIn - 60) * 1000, userId: jwtSub(token) };
+}
+
+/* ───────────── M479: Mit Google (oder Microsoft) anmelden — über Supabase ───────────── */
+//
+// Warum: „google anmeldung fehlt noch! (per email adresse)". Die Drive-Verknüpfung (M317/M442) braucht eine
+// Google-Client-ID im Build; die Anmeldung am PixiNotes-Konto über Supabase braucht nur, dass der Betreiber den
+// Anbieter Google im Supabase-Dashboard einschaltet. Ablauf: Weiterleitung an /auth/v1/authorize mit PKCE
+// (code_challenge) — Google zeigt die Kontowahl, vorgewählt mit der eingetippten Adresse (login_hint reicht
+// Supabase an Google durch). Zurück kommt `?code=…`; der Tausch gegen die Sitzung braucht den hier gemerkten
+// code_verifier, darum kann ein fremder Link dieses Gerät nicht in ein anderes Konto holen (vgl. M388). Liefert
+// der Server doch eine Sitzung im Fragment (impliziter Ablauf), nimmt sie `sbRueckkehrLesen` wie beim E-Mail-Link.
+
+export type SbAnbieter = 'google' | 'azure';
+export const ANBIETER_AUS_TEXT = 'Google-Anmeldung ist beim Betreiber noch nicht eingeschaltet – bis dahin mit E-Mail-Link anmelden.';
+const anbieterAusText = (a: SbAnbieter): string => (a === 'google' ? ANBIETER_AUS_TEXT : 'Microsoft-Anmeldung ist beim Betreiber noch nicht eingeschaltet – bis dahin mit E-Mail-Link anmelden.');
+/** Der Anbieter ist im Supabase-Projekt nicht eingeschaltet — kein technischer Fehler, ein Hinweis für den Nutzer */
+export class AnbieterAusFehler extends Error {}
+
+const PKCE_KEY = 'pixinotes-sb-pkce';
+interface PkceMerk { verifier: string; t: number; anbieter: SbAnbieter }
+function pkceLesen(): PkceMerk | null {
+  try {
+    const m = JSON.parse(localStorage.getItem(PKCE_KEY) ?? 'null') as PkceMerk | null;
+    if (m?.verifier && Date.now() - m.t < 3600_000) return m;
+  } catch { /* unlesbar */ }
+  return null;
+}
+const oauthOffen = (): boolean => !!pkceLesen();
+
+function oauthFehlerText(code: string, beschreibung: string): string {
+  const t = decodeURIComponent(beschreibung.replace(/\+/g, ' '));
+  if (/unsupported provider|provider is not enabled/i.test(t)) return ANBIETER_AUS_TEXT;
+  if (/access_denied/i.test(code) && !/email/i.test(t)) return 'Anmeldung abgebrochen – nichts geändert.';
+  return `PixiNotes-Konto: ${t}`;
+}
+
+const b64url = (bytes: Uint8Array): string => btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+/** Welche Anmeldewege das Projekt eingeschaltet hat (öffentlich: GET /auth/v1/settings). null = nicht erreichbar */
+export async function sbAnbieterAn(k = supabaseKonfig()): Promise<Record<string, boolean> | null> {
+  if (!k.url || !k.key) return null;
+  try {
+    const res = await fetch(`${k.url}/auth/v1/settings`, { headers: { apikey: k.key } });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { external?: Record<string, boolean> };
+    return j.external && typeof j.external === 'object' ? j.external : null;
+  } catch { return null; }
+}
+
+/** Die Adresse, zu der Google bzw. Supabase zurückleiten (ohne Fragment, ohne Reste einer früheren Rückkehr) */
+function rueckkehrZiel(): string {
+  const u = new URL(location.href);
+  u.hash = '';
+  for (const n of ['code', 'error', 'error_code', 'error_description', 'state']) u.searchParams.delete(n);
+  return u.toString();
+}
+
+/**
+ * Anmeldung über einen Anbieter beginnen: prüft, ob er eingeschaltet ist, merkt den code_verifier und leitet weiter.
+ * Liefert die Ziel-Adresse (für Prüfreihen); `weiter = false` leitet nicht selbst weiter.
+ */
+export async function sbOAuthStarten(anbieter: SbAnbieter, hint?: string, weiter = true, k = supabaseKonfig()): Promise<string> {
+  if (!k.url || !k.key) throw new Error('PixiNotes-Konto: Der Betreiber hat noch kein Konto-Backend hinterlegt.');
+  if (!/^https?:$/.test(location.protocol)) throw new Error('Die Einzeldatei kann keine Anmeldung über Google – dafür die gehostete App nutzen oder mit E-Mail und Passwort anmelden.');
+  const an = await sbAnbieterAn(k);
+  // Nicht eingeschaltet: Supabase würde mit einer nackten JSON-Fehlerseite antworten (400 „Unsupported provider")
+  if (an && an[anbieter] !== true) throw new AnbieterAusFehler(anbieterAusText(anbieter));
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(48)));
+  const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+  try { localStorage.setItem(PKCE_KEY, JSON.stringify({ verifier, t: Date.now(), anbieter } satisfies PkceMerk)); } catch { /* ohne Merkzeichen scheitert gleich der Tausch – mit Meldung */ }
+  linkErwartet();
+  const q = new URLSearchParams({ provider: anbieter, redirect_to: rueckkehrZiel(), code_challenge: challenge, code_challenge_method: 's256' });
+  if (anbieter === 'azure') q.set('scopes', 'email');   // Microsoft liefert die Adresse sonst nicht mit
+  const mail = (hint ?? '').trim();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) q.set('login_hint', mail);   // Supabase reicht weitere Parameter an Google durch
+  const ziel = `${k.url}/auth/v1/authorize?${q.toString()}`;
+  if (weiter) location.assign(ziel);
+  return ziel;
+}
+
+/**
+ * Rückkehr mit `?code=…` (PKCE): Liest Code bzw. Fehler aus der Adresse und räumt sie auf. Nur, wenn dieses Gerät
+ * die Anmeldung begonnen hat — ein `?code=` anderer Herkunft (z. B. Microsoft-Popup, M184) bleibt unberührt.
+ */
+export function sbRueckkehrCode(): { code: string; verifier: string } | null {
+  const merk = pkceLesen();
+  if (!merk) return null;
+  const p = new URLSearchParams(location.search);
+  const code = p.get('code'), fehler = p.get('error_description') ?? p.get('error');
+  if (!code && !fehler) return null;
+  try {
+    const u = new URL(location.href);
+    for (const n of ['code', 'error', 'error_code', 'error_description', 'state']) u.searchParams.delete(n);
+    history.replaceState(null, '', `${u.pathname}${u.search}${location.hash}`);
+  } catch { /* egal */ }
+  try { localStorage.removeItem(PKCE_KEY); } catch { /* egal */ }
+  if (fehler) throw new Error(oauthFehlerText(p.get('error') ?? '', fehler));
+  return code ? { code, verifier: merk.verifier } : null;
+}
+
+/** Code gegen die Sitzung tauschen (grant_type=pkce) */
+export async function sbCodeTauschen(code: string, verifier: string, k = supabaseKonfig()): Promise<SbSitzung> {
+  return sitzungAus(await authRuf('token?grant_type=pkce', { auth_code: code, code_verifier: verifier }, k));
 }
 
 /* ───────────── Realtime (Phoenix-Kanal, minimal) ───────────── */
