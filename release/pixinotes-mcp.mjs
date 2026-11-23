@@ -40418,6 +40418,8 @@ ${g.rows.map((r) => `  ${r.start === r.end ? "\u25C6" : "\u25AC"} ${r.name}: ${r
       return `Eigene App: ${node2.data.name} (${formatBytes(node2.data.size)})`;
     case "bubbles":
       return bubblesAlsText(node2.data);
+    case "pixi":
+      return `Maskottchen Pixi${typeof node2.data.name === "string" && node2.data.name.trim() ? ` \u201E${node2.data.name.trim()}\u201C` : ""}`;
     case "kontakt":
       return kontaktZeilen(node2.data).join("\n");
     case "fluessig":
@@ -40664,6 +40666,9 @@ ${nodeToText(n)}`;
     // M500: Flüssige Schrift — die KI liest den Text (die Flüssigkeit ist nur Darstellung)
     case "fluessig":
       return `Fl\xFCssige Schrift (Schmuck-\xDCberschrift): ${nodeToText(n)}`;
+    // M501: Maskottchen — nur Schmuck, nichts zu lesen oder zu bedienen
+    case "pixi":
+      return `${nodeToText(n)} \u2013 Schmuck ohne Inhalt`;
     // M452: Bilder (auch als Datei abgelegte) mit dem Text, den die Erkennung darin gefunden hat — so kann die
     // KI aus Screenshots zusammenfassen und Aufgaben ziehen. Bewusst ohne Import aus textInBildern (MCP-Server).
     case "image":
@@ -41435,7 +41440,8 @@ var TYP_WORTE = [
   [/datei|pdf|dokument|word/i, "file"],
   [/idee|bubble|brainstorm/i, "bubbles"],
   [/bild|foto|screenshot/i, "image"],
-  [/kontakt|telefon|anruf|ansprechpartner|adresse|visitenkarte/i, "kontakt"]
+  [/kontakt|telefon|anruf|ansprechpartner|adresse|visitenkarte/i, "kontakt"],
+  [/maskottchen|pixi/i, "pixi"]
 ];
 function kiRang(wunsch, karten, zuletzt, naehe) {
   const worte = [...new Set(wunsch.toLowerCase().split(/[^a-zäöüß0-9]+/i).filter((w) => w.length >= 4))];
