@@ -37158,10 +37158,19 @@ function t(text3) {
   if (!HAT_BUCHSTABEN.test(kern)) return text3;
   const en = schlageNach(kern);
   if (en === null) {
-    if (!eigene.has(kern)) luecken.add(kern);
+    if (!eigene.has(kern) && !nurZahlWorte(kern)) luecken.add(kern);
     return text3;
   }
   return m[1] + en + m[3];
+}
+var REGEL_DE = new Intl.PluralRules("de-DE");
+var REGEL_EN = new Intl.PluralRules("en-GB");
+var zahlWorte = /* @__PURE__ */ new Set();
+function nurZahlWorte(kern) {
+  if (!zahlWorte.size) return false;
+  let rest = kern;
+  for (const z2 of zahlWorte) if (rest.includes(z2)) rest = rest.split(z2).join(" ");
+  return rest !== kern && !HAT_BUCHSTABEN.test(rest);
 }
 
 // src/types.ts
