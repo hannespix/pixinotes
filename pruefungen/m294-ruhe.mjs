@@ -77,7 +77,7 @@ console.log('════ A: Frischer Start ════');
   const { ctx, P } = await seite();
   const l = await lage(P);
   pruefe('A1 Physik ist aus (M481: es gibt sie nicht mehr, „Bewegung beim Ziehen" ersetzt sie)', l.physik !== true && l.vPhysik !== true, JSON.stringify(l));
-  pruefe('A2 Klick-Zoom ist aus', l.klickZoom === false);
+  pruefe('A2 Klick-Zoom ist aus (M490: es gibt ihn nicht mehr)', l.klickZoom !== true);
   pruefe('A3 Konfetti ist aus', l.konfetti === false);
   pruefe('A4 die Vorlieben tragen die Marke schliff', l.schliff === 2, String(l.schliff));
   pruefe('A5 kein Spickzettel-Toast mehr beim Start', !/Doppelklick = Notiz/.test(l.toast), l.toast);
@@ -91,9 +91,9 @@ console.log('════ B: Alter Stand mit Physik an, ohne Marke ════'
   const { ctx, P } = await seite({ vorlieben: { physicsEnabled: true, clickZoom: true, milchglas: true } });
   const l = await lage(P);
   pruefe('B1 Physik wurde ausgeschaltet', l.physik !== true && l.vPhysik !== true, JSON.stringify(l));
-  pruefe('B2 Klick-Zoom wurde ausgeschaltet', l.klickZoom === false && l.vKlick === false);
+  pruefe('B2 Klick-Zoom ist weg (M490: die Option gibt es nicht mehr, der Wert wird verworfen)', l.klickZoom !== true && l.vKlick !== true, JSON.stringify(l));
   pruefe('B3 die Marke ist jetzt gesetzt', l.schliff === 2, String(l.schliff));
-  pruefe('B4 der Hinweis sagt, was passiert ist und wo es wieder anzuschalten ist', /Physik und Klick-Zoom sind jetzt aus/.test(l.toast) && /Darstellung/.test(l.toast), l.toast);
+  pruefe('B4 der Hinweis sagt, was passiert ist und wo es einzustellen ist', /Physik ist jetzt aus/.test(l.toast) && /Darstellung/.test(l.toast), l.toast);
   await P.screenshot({ path: `${SD}/m294-b-umstellung.png` });
   await ctx.close();
 }
@@ -116,20 +116,21 @@ console.log('════ C: Bewusste Wahl mit Marke bleibt ════');
   await ctx.close();
 }
 
-console.log('════ D: Der Schalter unter Einstellungen → Darstellung (M314: Lebendige Fläche) ════');
+console.log('════ D: Der Schalter unter Einstellungen → Darstellung (M490: Konfetti beim Erledigen) ════');
 {
   const { ctx, P } = await seite();
   await P.locator('[data-taste="einstellungen"]').click();
   await P.locator('.modal-tabs button', { hasText: 'Darstellung' }).click();
   await P.waitForTimeout(300);
   const zeile = (text) => P.locator('.modal-row-check', { hasText: text }).locator('input[type="checkbox"]');
-  pruefe('D1 „Lebendige Fläche" steht da und ist aus', (await zeile('Lebendige Fläche').count()) === 1 && !(await zeile('Lebendige Fläche').isChecked()));
-  pruefe('D2 keine Einzelschalter mehr für Physik und Klick-Zoom', (await zeile('Physik').count()) === 0 && (await zeile('Klick-Zoom').count()) === 0);
-  pruefe('D3 kein Einzelschalter mehr für Konfetti', (await zeile('Konfetti').count()) === 0);
-  await zeile('Lebendige Fläche').check();
+  // M490: „Lebendige Fläche" ist aufgelöst – Konfetti hat einen eigenen Schalter, Klick-Zoom entfiel
+  pruefe('D1 „Konfetti beim Erledigen" steht da und ist aus', (await zeile('Konfetti beim Erledigen').count()) === 1 && !(await zeile('Konfetti beim Erledigen').isChecked()));
+  pruefe('D2 keine Schalter für Physik und Klick-Zoom', (await zeile('Physik').count()) === 0 && (await zeile('Klick-Zoom').count()) === 0);
+  pruefe('D3 keine „Lebendige Fläche" mehr', (await zeile('Lebendige Fläche').count()) === 0);
+  await zeile('Konfetti beim Erledigen').check();
   await P.waitForTimeout(600);
   const l = await lage(P);
-  pruefe('D4 ein Häkchen schaltet Konfetti und Klick-Zoom zusammen ein (M481: Physik → „Bewegung beim Ziehen")', l.vKonfetti === true && l.vKlick === true, JSON.stringify(l));
+  pruefe('D4 das Häkchen schaltet nur Konfetti ein', l.vKonfetti === true && l.vKlick !== true, JSON.stringify(l));
   // Ein Satz je Schalter: keine Erklär-Absätze mit mehr als zwei Sätzen im Reiter Design
   const lang = await P.evaluate(() => [...document.querySelectorAll('.modal-section .modal-hint')]
     .map((el) => el.textContent.trim()).filter((t) => (t.match(/[.!?](\s|$)/g) ?? []).length > 2));

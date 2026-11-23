@@ -42,7 +42,6 @@ const FELDER = [
   'navLinks',        // Navigation links statt oben
   'navBreite',       // Breite des linken Slideouts
   'spalteBreite',    // M308: Breite der linken Spalte (am Griff gezogen)
-  'clickZoom',
   'wheelZoom',
   'cardFocus',
   'fokusEinKlick',
@@ -54,6 +53,7 @@ const FELDER = [
   'handschriftAuto', 'handschriftKi', // M324: Vorschlag nach Schreibpause, KI-Korrektur
   'fingerGesten',    // M326: Finger-Gesten nach Procreate
   'gridSnap',
+  'fangLinien',      // M490: Einrasten an Fanglinien (Aus · Fanglinien · Raster)
   'showArchived',
   'overviewMode',
   'graphLayers',
@@ -120,9 +120,10 @@ export function initEinstellungen(): () => void {
   if ((gespeichert?.schliff ?? 0) < 1) {
     // M481: Die alte Physik gibt es nicht mehr (Bewegung beim Ziehen ersetzt sie) — ein alter Stand mit
     // Physik an bekommt trotzdem den Hinweis, dass die Fläche jetzt ruhig ist.
-    const st = useBoard.getState() as ReturnType<typeof useBoard.getState> & { physicsEnabled?: boolean };
+    // M490: Klick-Zoom gibt es nicht mehr (der Fokus hat ihn seit M314 ohnehin immer verdrängt).
+    const st = useBoard.getState() as ReturnType<typeof useBoard.getState> & { physicsEnabled?: boolean; clickZoom?: boolean };
     if (st.physicsEnabled || gespeichert?.physicsEnabled || st.clickZoom) {
-      useBoard.setState({ clickZoom: false, ruheHinweis: true });
+      useBoard.setState({ ruheHinweis: true });
     }
   }
   // M314: Optionen, die es nicht mehr gibt, einmalig auf ihre automatischen

@@ -60,16 +60,14 @@ export function ansichtScheibe(set: Setzen, get: Holen) {
 
     gridSnap: false,
     setGridSnap: (on) => set({ gridSnap: on }),
+    fangLinien: true,
+    setFangLinien: (on) => set({ fangLinien: on }),
     anzeige: 1,
     setAnzeige: (z) => set({ anzeige: Math.min(1.8, Math.max(1, z)) }),
     lesbareSchrift: false,
     setLesbareSchrift: (on) => set({ lesbareSchrift: on }),
     hoherKontrast: false,
     setHoherKontrast: (on) => set({ hoherKontrast: on }),
-    // M294: aus — die Ansicht bleibt, wo sie ist; wer den Flug mag,
-    // schaltet ihn unter ⚙ → Bedienung wieder ein
-    clickZoom: false,
-    setClickZoom: (on) => set({ clickZoom: on }),
     wheelZoom: false,
     setWheelZoom: (on) => set({ wheelZoom: on }),
     handschriftOnline: false,
