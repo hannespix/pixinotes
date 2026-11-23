@@ -170,6 +170,7 @@ function MermaidSlide({ node }: { node: MermaidNode }) {
             className="mermaid-code"
             value={node.data.code}
             spellCheck={false}
+            data-rechtschreibung="aus"
             onChange={(e) => updateNodeData(node.id, { code: e.target.value })}
           />
         )}

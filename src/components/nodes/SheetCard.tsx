@@ -380,6 +380,8 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
                         <input
                           ref={eingabe}
                           className="sheet-eingabe"
+                          // M482: Text in der Zelle wird geprüft, Formeln und Zahlen nicht
+                          data-rechtschreibung="formel"
                           value={entwurf}
                           onChange={(e) => setEntwurf(e.target.value)}
                           onBlur={(e) => { if (!(e.relatedTarget as HTMLElement | null)?.closest?.('.sheet-link-feld')) uebernimm(); }}
@@ -428,7 +430,7 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
             {/* M407: der Link dieser Zelle */}
             <label className="sheet-link-feld nodrag">
               <span>Link</span>
-              <input value={linkEntwurf} placeholder="https://… (optional)" data-taste="sheet-link-feld" aria-label="Link dieser Zelle" spellCheck={false} inputMode="url"
+              <input value={linkEntwurf} placeholder="https://… (optional)" data-taste="sheet-link-feld" aria-label="Link dieser Zelle" spellCheck={false} data-rechtschreibung="aus" inputMode="url"
                 onChange={(e) => setLinkEntwurf(e.target.value)}
                 onBlur={(e) => { if (!(e.relatedTarget as HTMLElement | null)?.classList?.contains('sheet-eingabe')) uebernimm(); }}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); uebernimm(); } else if (e.key === 'Escape') { e.preventDefault(); setEdit(null); } e.stopPropagation(); }}
