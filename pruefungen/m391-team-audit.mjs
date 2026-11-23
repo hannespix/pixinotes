@@ -439,7 +439,10 @@ async function boardWechseln(P, name, projekt) {
 async function notiz(P, text, x = 900, y = 500) {
   const vorher = await P.locator('.react-flow__node').count();
   await P.mouse.dblclick(x, y);
+  // M484: zusätzlich auf den Cursor in der neuen Notiz warten – unter Last kam er nach den 700 ms, der Rückfall-Klick
+  // traf dann die Hülle einer anderen Karte und hing 30 s (m366 TimeoutError)
   await P.waitForTimeout(700);
+  await P.waitForFunction(() => document.activeElement?.getAttribute('contenteditable') === 'true', null, { timeout: 8000 }).catch(() => {});
   const aktiv = await P.evaluate(() => document.activeElement?.getAttribute('contenteditable') === 'true');
   if (!aktiv) { await P.locator('.react-flow__node').last().locator('[contenteditable="true"]').first().click(); await P.waitForTimeout(300); }
   await P.keyboard.type(text, { delay: 20 });
