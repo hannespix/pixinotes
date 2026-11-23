@@ -48,12 +48,14 @@ src/types.ts           Datenmodell (Karte = Node mit data je Typ)
 src/components/        Oberfläche; nodes/ = ein Kartentyp je Datei (*Card.tsx)
 src/lib/               Logik ohne JSX (ein Thema je Datei, deutsche Namen)
 src/sprache/en.json    englische Oberfläche (werkzeug/sprache-*.mjs)
-src/index.css          ein Stylesheet (~8 400 Zeilen), Tokens als CSS-Variablen
+src/index.css          nur @import der Teildateien in fester Reihenfolge (M475)
+src/styles/NN-*.css    Stylesheet je Bereich; 00-tokens = CSS-Variablen/Hell/Dunkel,
+                       99-bedienung-im-fokus = M421-Listen (immer zuletzt)
 pruefungen/mNNN-*.mjs  E2E-Reihe je Meilenstein
 release/               portable Single-File + PWA-Beiwerk
 ```
 
-Hotspots (viele Änderungen, Konfliktgefahr): `store.ts`, `index.css`,
+Hotspots (viele Änderungen, Konfliktgefahr): `store.ts`, `src/styles/`,
 `Board.tsx`, `App.tsx`, `HelpOverlay*.tsx`, `Settings.tsx`.
 
 ## 4. Befehle
@@ -98,9 +100,16 @@ Chromium: `/opt/pw-browsers/chromium` (sonst `PW_CHROMIUM=…`).
 - Keine Emojis in der Oberfläche (Prüfreihe m397, `werkzeug/ohne-emoji.mjs`);
   Symbole aus `components/Icons.tsx`.
 - Neue Bedien-Elemente in Karten in die drei Listen des Blocks „Bedienung nur
-  im Fokus" am Ende von `index.css` eintragen (M421).
+  im Fokus" in `src/styles/99-bedienung-im-fokus.css` eintragen (M421).
+- CSS: neue Regeln in die Teildatei ihres Bereichs unter `src/styles/` (an den
+  thematisch passenden Abschnitt, nicht ans Dateiende), nie in `src/index.css`
+  (dort nur @import, Prüfreihe m475). Neue Teildatei = freie Nummer zwischen den
+  Nachbarn + @import an derselben Stelle; die Nummern geben die Kaskade vor,
+  `99-…` bleibt zuletzt. Ein Umbau, der nur verschieben soll, wird mit
+  `werkzeug/css-vergleich.mjs` (gebautes CSS) und `werkzeug/bild-vergleich.mjs`
+  (Bildschirmfotos zweier Builds) belegt (M475).
 - Neue Tastenkürzel nur hinter `overlayOffen()` (`lib/overlay.ts`).
-- Eigene Mauszeiger nur über `--zeiger-*` im ersten `:root` von `index.css` bzw. `lib/zeiger.ts`, immer mit Kontur und System-Fallback; kein nacktes `crosshair`, `cursor: none` nur mit sichtbarem Ersatz (M464).
+- Eigene Mauszeiger nur über `--zeiger-*` im ersten `:root` von `src/styles/00-tokens.css` bzw. `lib/zeiger.ts`, immer mit Kontur und System-Fallback; kein nacktes `crosshair`, `cursor: none` nur mit sichtbarem Ersatz (M464).
 - Zähl-Texte über `zahlWort(n, 'Karte', 'Karten')` in `lib/sprache.ts` — nie `${n} Karten` oder „Karte(n)" (M461).
 - Daten von außen (Links, Dateien, Sync, Live-Kanal) laufen durch
   `lib/sicher.ts`.

@@ -1,0 +1,245 @@
+/* ───── M373: Entscheidungs-Bubbles ───── */
+.bubbles-card { background: var(--surface-card); border-radius: var(--r); padding: 10px 12px 10px; overflow: hidden; display: flex; flex-direction: column; height: 100%; box-sizing: border-box; }
+.bub-kopf { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex: none; }
+.bub-titel { font-weight: 700; font-size: 14px; color: var(--ink); flex: 1; min-width: 0; border: none; background: transparent; outline: none; font-family: inherit; }
+.bub { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.bub-frage { display: flex; align-items: center; gap: 8px; flex: none; }
+.bub-frage-feld { flex: 1; min-width: 0; border: none; background: transparent; outline: none; font-family: inherit; font-size: 13px; color: var(--ink); padding: 2px 0; }
+.bub-frage-feld::placeholder { color: var(--muted); }
+.bub-zahl { flex: none; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.bub-buehne {
+  position: relative; flex: 1; min-height: 120px; overflow: hidden; border-radius: var(--r);
+  background: var(--surface); border: 1px solid var(--border-soft); touch-action: none; cursor: default;
+}
+.bub-blase {
+  position: absolute; left: 0; top: 0; width: 80px; height: 80px; border-radius: 50%; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 0.55em;
+  color: #fff; font-weight: 700; line-height: 1.15; cursor: grab; user-select: none; will-change: transform;
+  box-shadow: 0 2px 6px rgba(22, 25, 30, 0.22), inset 0 -6px 14px rgba(0, 0, 0, 0.12), inset 0 5px 10px rgba(255, 255, 255, 0.18);
+  outline: none;
+}
+.bub-blase:active { cursor: grabbing; }
+.bub-blase.gewaehlt, .bub-blase:focus-visible { box-shadow: 0 0 0 3px var(--surface-card), 0 0 0 6px var(--ink); z-index: 3; }
+.bub-blase.vorn { z-index: 2; }
+/* (kein Prozent-Innenabstand an der Blase: Prozente bezögen sich auf die Breite der Bühne, nicht der Blase) */
+.bub-text { display: block; width: 100%; max-height: 4.6em; overflow: hidden; overflow-wrap: break-word; hyphens: auto; pointer-events: none; }
+/* M422: nur lange Wörter trennen (mindestens 10 Zeichen, je Teil mindestens 4) — „Kuchen" bleibt ganz, statt „Ku-chen" */
+.bub-text { hyphenate-limit-chars: 10 4 4; -webkit-hyphenate-limit-before: 4; -webkit-hyphenate-limit-after: 4; }
+.bub-mal, .bub-punkte {
+  position: absolute; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 10px;
+  background: var(--surface-card); color: var(--ink); font-size: 11px; font-weight: 700; line-height: 20px; box-shadow: 0 1px 3px rgba(22, 25, 30, 0.3); pointer-events: none; white-space: nowrap;
+}
+/* auf dem Rand des Kreises (nicht in der Ecke seines Quadrats — dort deckt sie die Nachbarblase zu) */
+.bub-mal { right: 6%; top: 6%; }
+.bub-punkte { left: 6%; top: 6%; }
+.bub-meine {
+  position: absolute; bottom: 3%; left: 50%; transform: translateX(-50%); border: none; cursor: pointer; font-family: inherit;
+  background: rgba(22, 25, 30, 0.55); color: #fff; font-size: 9px; letter-spacing: 1px; line-height: 1; padding: 3px 7px; border-radius: 9px;
+}
+.bub-ring { position: absolute; left: 0; top: 0; border: 2px dashed; border-radius: 50%; box-sizing: border-box; pointer-events: none; opacity: 0; transition: opacity 0.2s; }
+.bub-ring-name { position: absolute; left: 0; top: 0; z-index: 4; opacity: 0; background: var(--surface); padding: 1px 8px; border-radius: 9px; font-size: 11.5px; font-weight: 700; line-height: 1.35; white-space: nowrap; max-width: 60%; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.bub-leer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 0 12%; text-align: center; color: var(--muted); font-size: 12.5px; line-height: 1.45; pointer-events: none; }
+.bub-leer b { color: var(--ink); font-size: 14px; }
+.bub-pille {
+  position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 5; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--pop-shadow); padding: 6px 8px; font-size: 12px;
+}
+.bub-pille-text { font-weight: 700; flex: 1 1 120px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bub-pille button, .bub-knopf, .bub-dazu, .bub-menue button {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink); font-family: inherit; font-size: 12px; cursor: pointer; border-radius: var(--r-xs); padding: 4px 9px; white-space: nowrap;
+}
+.bub-pille button.an, .bub-knopf.an { background: var(--accent-fill); border-color: var(--accent); color: #fff; }
+.bub-pille button:hover, .bub-knopf:hover:not(:disabled), .bub-menue button:hover:not(:disabled) { border-color: var(--accent); }
+.bub-knopf:disabled, .bub-dazu:disabled, .bub-menue button:disabled { opacity: 0.45; cursor: default; }
+.bub-pille-feld { border: 1px solid var(--border-soft); border-radius: var(--r-xs); background: var(--surface); color: var(--ink); font-family: inherit; font-size: 12px; padding: 4px 7px; outline: none; flex: 1 1 140px; min-width: 0; }
+.bub-pille-feld.kurz { flex: 0 1 120px; }
+/* M386: Bestätigen im Feld — am Telefon der einzige sichere Weg, eine Änderung abzuschließen */
+.bub-pille button.bub-pille-ok { background: var(--accent-fill); border-color: var(--accent); color: #fff; font-weight: 700; }
+@media (pointer: coarse) {
+  /* Finger statt Mauszeiger: größere Knöpfe; 16 px Schrift, damit das Telefon beim Antippen nicht hineinzoomt */
+  .bub-pille button { min-width: 38px; min-height: 36px; }
+  .bub-pille-feld, .bub-eingabe, .bub-frage-feld { font-size: 16px; }
+  .bub-pille-feld { padding: 6px 8px; }
+  /* Am Telefon ist die Karte verkleinert, damit sie auf den Bildschirm passt — Bearbeiten-Leiste und Eingabe
+     blieben dabei winzig. Sie halten ihre Größe auf dem Bildschirm (Kehrwert des Zooms, höchstens 2,4-fach)
+     und brechen dafür in mehr Zeilen um. */
+  .bub-pille, .bub-leiste { zoom: clamp(1, var(--pn-inv, 1), 2.4); }
+}
+/* Am Telefon: die Leiste zur gewählten Blase/Gruppe steht fest am unteren Bildschirmrand (nicht in der Karte,
+   die dort über den Rand reicht oder verkleinert ist), über dem Dock und über der Tastatur */
+.bub-pille.am-schirm {
+  position: fixed; left: calc(8px + var(--safe-left, 0px)); right: calc(8px + var(--safe-right, 0px)); bottom: calc(112px + var(--app-rand, 0px) + env(safe-area-inset-bottom, 0px));
+  z-index: 62; zoom: 1; font-size: 14px; padding: 8px 10px; gap: 8px; max-height: calc(46vh / var(--pn-anz, 1)); overflow-y: auto;
+}
+[data-keyboard='on'] .bub-pille.am-schirm { bottom: calc(8px + var(--kb)); }
+.bub-pille.am-schirm button { min-width: 42px; min-height: 40px; font-size: 14px; }
+.bub-pille.am-schirm .bub-pille-feld { font-size: 16px; padding: 8px 10px; min-height: 40px; flex-basis: 160px; }
+.bub-pille.am-schirm .bub-pille-text { font-size: 15px; flex-basis: 100%; white-space: normal; }
+.bub-ergebnis { flex: none; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink); padding: 2px 2px 0; }
+.bub-ergebnis i { font-style: normal; color: var(--muted); font-weight: 700; }
+.bub-leiste { flex: none; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bub-eingabe { flex: 1 1 150px; min-width: 0; border: 1px solid var(--border-soft); border-radius: var(--r-xs); background: var(--surface); color: var(--ink); font-family: inherit; font-size: 13px; padding: 6px 9px; outline: none; }
+.bub-eingabe:focus { border-color: var(--accent); }
+.bub-dazu { font-weight: 700; padding: 5px 11px; }
+.bub-rest { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.bub-mehr { position: relative; }
+.bub-menue {
+  position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 20; min-width: 210px; display: flex; flex-direction: column; gap: 4px;
+  background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--pop-shadow); padding: 8px;
+}
+.bub-menue button { text-align: left; white-space: normal; }
+.bub-menue label { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--ink); padding: 2px 2px 4px; }
+.bub-stufen { display: inline-flex; align-items: center; gap: 6px; }
+.bub-stufen button { padding: 2px 8px; }
+/* ── M378: Platz und Punkte klar getrennt (eine nackte Zahl wurde als Platz gelesen) ── */
+.bub-punkte i { font-style: normal; font-size: 8px; margin-right: 3px; vertical-align: 1px; opacity: .75; }
+.bub-punkte.unten { left: 50%; top: auto; bottom: 7%; transform: translateX(-50%); font-size: 10px; height: 17px; line-height: 17px; padding: 0 6px; background: rgba(22, 25, 30, .55); color: #fff; box-shadow: none; }
+.bub-platz {
+  position: absolute; left: 4%; top: 4%; min-width: 24px; height: 24px; padding: 0 5px; box-sizing: border-box; border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; line-height: 1; font-style: normal;
+  background: var(--surface-card); color: var(--ink); box-shadow: 0 1px 4px rgba(22, 25, 30, .35); pointer-events: none; white-space: nowrap;
+}
+.bub-platz.p1 { background: #f2b705; color: #3b2a00; }
+.bub-platz.p2 { background: #c9d0d8; color: #23282e; }
+.bub-platz.p3 { background: #d98a4e; color: #3a1c05; }
+.bub-platz.klein { position: static; min-width: 20px; height: 20px; font-size: 11.5px; box-shadow: none; margin-right: 5px; vertical-align: middle; }
+.bub-ergebnis { align-items: center; gap: 6px 16px; }
+.bub-ergebnis > span { display: inline-flex; align-items: center; white-space: nowrap; }
+.bub-ergebnis i { margin-left: 6px; }
+.bub-zeile-punkte { display: inline-flex; align-items: center; white-space: nowrap; }
+.bub.gross .bub-platz { min-width: 32px; height: 32px; border-radius: 16px; font-size: 17px; }
+.bub.gross .bub-platz.klein { min-width: 24px; height: 24px; font-size: 14px; }
+.bub.gross .bub-punkte.unten { font-size: 13px; height: 22px; line-height: 22px; }
+/* ── M378: Ablauf, Gruppieren mit der Hand, Liste ── */
+.bub-ansicht { flex: none; width: 26px; height: 24px; border: 1px solid var(--border-soft); border-radius: var(--r-xs); background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; line-height: 1; padding: 0; }
+.bub-ansicht:hover, .bub-ansicht.an { border-color: var(--accent); }
+.bub-schritte { flex: none; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.bub-schritt {
+  display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px 0 4px; border: 1px solid var(--border-soft); border-radius: 11px;
+  background: var(--surface); color: var(--muted); font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.bub-schritt i { font-style: normal; display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; border-radius: 50%; background: var(--surface-3); color: var(--muted); font-size: 9.5px; font-weight: 700; }
+.bub-schritt:disabled { cursor: default; }
+.bub-schritt:hover:not(:disabled) { border-color: var(--accent); color: var(--ink); }
+.bub-schritt.war { color: var(--ink); }
+.bub-schritt.war i { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); color: var(--accent-strong); }
+.bub-schritt.jetzt { background: var(--accent-fill); border-color: var(--accent); color: #fff; }
+.bub-schritt.jetzt i { background: rgba(255, 255, 255, .28); color: #fff; }
+.bub-regeln { margin-left: auto; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.bub-ring { border-width: 1.5px; transition: opacity 0.2s, box-shadow .15s; }
+.bub-ring.ziel, .bub-ring.gewaehlt { border-style: solid; box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent); }
+.bub-ring-name { pointer-events: auto; cursor: grab; user-select: none; box-shadow: 0 1px 3px rgba(22, 25, 30, .18); border: 1px solid transparent; }
+.bub-ring-name:hover, .bub-ring-name.gewaehlt { border-color: currentColor; }
+.bub-ring-name:active { cursor: grabbing; }
+.bub-blase.zieht { z-index: 6; cursor: grabbing; opacity: .93; box-shadow: 0 10px 22px rgba(22, 25, 30, .35), inset 0 -6px 14px rgba(0, 0, 0, .12), inset 0 5px 10px rgba(255, 255, 255, .18); }
+.bub-blase.ziel { box-shadow: 0 0 0 3px var(--surface-card), 0 0 0 6px var(--accent); }
+.bub-blase.verdeckt { background: repeating-linear-gradient(135deg, #9aa2ae 0 6px, #8b93a0 6px 12px) !important; color: rgba(255, 255, 255, .9); }
+.bub-gruppe-neu {
+  position: absolute; left: 8px; top: 8px; z-index: 4; height: 24px; padding: 0 9px; border: 1px dashed var(--border); border-radius: 12px;
+  background: var(--surface-card); color: var(--muted); font-family: inherit; font-size: 11.5px; cursor: pointer;
+}
+.bub-gruppe-neu:hover { border-color: var(--accent); color: var(--accent-strong); border-style: solid; }
+.bub-pille-punkt { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.bub-pille-zahl { font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.bub-liste { position: absolute; inset: 0; z-index: 7; overflow: auto; background: var(--surface); padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 8px; cursor: default; }
+.bub-liste section { display: flex; flex-direction: column; gap: 2px; }
+.bub-liste h5 { margin: 2px 0; font-size: 11.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.bub-liste h5 i { font-style: normal; color: var(--muted); font-weight: 600; }
+.bub-zeile {
+  display: flex; align-items: center; gap: 8px; min-height: 28px; padding: 3px 8px; border: 1px solid transparent; border-radius: var(--r-xs);
+  background: var(--surface-card); color: var(--ink); font-family: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+}
+.bub-zeile:hover, .bub-zeile.gewaehlt { border-color: var(--accent); }
+.bub-zeile-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.bub-zeile-mal, .bub-zeile-von { flex: none; font-size: 11px; color: var(--muted); white-space: nowrap; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
+.bub-zeile-punkte { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bub-zeile-leer { font-size: 11.5px; color: var(--muted); padding: 2px 8px; }
+.bub-menue label.bub-schalter { justify-content: flex-start; gap: 7px; cursor: pointer; flex-wrap: wrap; padding: 3px 2px; }
+.bub-schalter small { flex-basis: 100%; margin: -2px 0 0 22px; font-size: 10.5px; color: var(--muted); }
+.bub-timer { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink); padding: 2px; flex-wrap: wrap; }
+.bub-timer button { padding: 3px 8px; }
+.bub-timer button.an { border-color: var(--accent); color: var(--accent-strong, var(--accent)); font-weight: 600; }
+/* ---------- M415: Tropfen — Gruppen fließen als Tropfen um ihre Ideen, freie Ideen sind eigene Tropfen ---------- */
+.bub { --bub-grund: #ffffff; --bub-kontur: rgba(34, 38, 48, .72); }
+[data-theme='dark'] .bub { --bub-grund: #1b202a; --bub-kontur: rgba(226, 231, 240, .55); }
+.bub-filter { position: absolute; width: 0; height: 0; overflow: hidden; }
+.bub-formen { position: absolute; inset: 0; pointer-events: none; }
+.bub-form { position: absolute; left: 0; top: 0; width: 0; height: 0; border-radius: 50%; will-change: transform; }
+.bub-form.kuppe { border-radius: 999px; }
+.bub.tropfen .bub-blase {
+  color: var(--ink); font-weight: 650;
+  border: 1.5px solid var(--bub-kontur);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--bub-farbe, #7b8494) 30%, transparent), inset 0 -5px 10px rgba(11, 18, 32, .05);
+}
+/* freie Ideen: Die Fläche ist der Tropfen darunter (samt Kontur) */
+.bub.tropfen .bub-blase[data-frei], .bub.tropfen .bub-blase.zieht { background: transparent !important; border-color: transparent; box-shadow: none; }
+.bub.tropfen .bub-blase.gewaehlt, .bub.tropfen .bub-blase:focus-visible { box-shadow: 0 0 0 3px var(--surface-card), 0 0 0 5px var(--accent); border-color: transparent; }
+.bub.tropfen .bub-blase.ziel { box-shadow: 0 0 0 3px var(--surface-card), 0 0 0 5px var(--accent); }
+.bub.tropfen .bub-blase.verdeckt { color: rgba(255, 255, 255, .92); }
+/* der Ring ist im Tropfen nur noch Ziel und Auswahl — die Form zeichnet der Tropfen */
+.bub.tropfen .bub-ring { border-color: transparent !important; background: transparent !important; }
+.bub.tropfen .bub-ring.ziel, .bub.tropfen .bub-ring.gewaehlt { border: 2px dashed var(--accent) !important; box-shadow: none; }
+/* Der Name steht im Tropfen oben, wie eine Überschrift: ohne Pille, im dunklen Ton der Gruppe */
+.bub.tropfen .bub-ring-name {
+  background: transparent; box-shadow: none; border: none; padding: 0 4px; max-width: 70%;
+  color: color-mix(in srgb, var(--g, currentColor) 62%, var(--ink)) !important; letter-spacing: -0.01em;
+}
+.bub.tropfen .bub-ring-name:hover, .bub.tropfen .bub-ring-name.gewaehlt { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+/* ---------- M415: Das Modul randlos — die Tropfen liegen auf dem Board, die Bedienung tritt zurück ---------- */
+.react-flow__node-bubbles:has(.bub.tropfen) { box-shadow: none; background: transparent; }
+.react-flow__node-bubbles:has(.bub.tropfen):hover, .react-flow__node-bubbles:has(.bub.tropfen).dragging { box-shadow: 0 0 0 1px var(--border-soft); }
+.bubbles-card:has(.bub.tropfen) { background: transparent; }
+.bubbles-card:has(.bub.tropfen) .bub-kopf > svg { color: var(--muted); }
+.bubbles-card:has(.bub.tropfen) .bub-titel { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
+.bub.tropfen .bub-frage-feld { font-size: 14px; }
+.bub.tropfen .bub-ansicht { border-color: transparent; background: transparent; color: var(--muted); }
+.bub.tropfen .bub-ansicht:hover, .bub.tropfen .bub-ansicht.an { background: var(--surface-2); color: var(--ink); }
+/* Ablauf als schlichte Textreiter: der jetzige unterstrichen */
+.bub.tropfen .bub-schritte { gap: 12px; }
+.bub.tropfen .bub-schritt { border: none; background: transparent; border-radius: 0; height: 24px; padding: 0 1px; color: var(--muted); box-shadow: none; }
+.bub.tropfen .bub-schritt i { background: transparent; width: auto; height: auto; font-size: 10.5px; color: inherit; opacity: .7; }
+.bub.tropfen .bub-schritt:hover:not(:disabled) { color: var(--ink); }
+.bub.tropfen .bub-schritt.war { color: var(--ink); }
+.bub.tropfen .bub-schritt.war i { background: transparent; color: inherit; }
+.bub.tropfen .bub-schritt.jetzt { background: transparent; color: var(--ink); box-shadow: inset 0 -2px 0 var(--accent); }
+.bub.tropfen .bub-schritt.jetzt i { background: transparent; color: var(--accent-strong, var(--accent)); opacity: 1; }
+/* die Bühne ohne Kasten */
+.bub.tropfen .bub-buehne { background: transparent; border-color: transparent; }
+.bub.tropfen .bub-gruppe-neu { border-color: transparent; background: transparent; color: var(--muted); }
+.bub.tropfen .bub-gruppe-neu:hover { color: var(--ink); border-color: transparent; }
+/* unten eine schwebende Leiste: Feld und Knöpfe ohne eigene Rahmen */
+.bub.tropfen .bub-leiste {
+  align-self: center; width: min(100%, 760px); box-sizing: border-box; padding: 4px 4px 4px 14px; gap: 4px;
+  background: var(--surface-card); border: 1px solid var(--border-soft); border-radius: 20px; box-shadow: 0 6px 18px rgba(22, 25, 30, .07);
+}
+.bub.tropfen .bub-eingabe { border: none; background: transparent; padding: 6px 2px; }
+.bub.tropfen .bub-leiste .bub-dazu, .bub.tropfen .bub-leiste .bub-knopf:not(.an) { border-color: transparent; background: transparent; border-radius: 14px; }
+.bub.tropfen .bub-leiste .bub-dazu:hover:not(:disabled), .bub.tropfen .bub-leiste .bub-knopf:not(.an):hover:not(:disabled) { background: var(--surface-2); }
+.bub.tropfen .bub-leiste .bub-knopf.an { border-radius: 14px; }
+.bub.tropfen .bub-pille { border-radius: 16px; }
+/* M415: Idee an der Stelle des Doppelklicks */
+.bub-hier {
+  position: absolute; z-index: 7; width: 180px; height: 32px; box-sizing: border-box; padding: 0 12px;
+  border: 1.5px solid var(--bub-kontur, var(--border)); border-radius: 16px; background: var(--surface-card); color: var(--ink);
+  font: inherit; font-size: 13px; outline: none; box-shadow: 0 8px 22px rgba(22, 25, 30, .16);
+}
+/* M415: Farbe einer Gruppe */
+.bub-farben { display: inline-flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.bub-pille button.bub-farbe {
+  width: 18px; height: 18px; min-width: 0; padding: 0; border-radius: 50%; background: var(--f); border: 2px solid var(--surface-card);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--f) 55%, transparent);
+}
+.bub-pille button.bub-farbe.an { box-shadow: 0 0 0 2px var(--ink); }
+.bub-pille.am-schirm button.bub-farbe { width: 30px; height: 30px; min-height: 0; }
+.bub.gross .bub-schritt { font-size: 13px; height: 26px; border-radius: 13px; }
+.bub.gross .bub-zeile { font-size: 16px; min-height: 36px; }
+/* als Folie: die Bühne füllt die Folie, alles etwas größer */
+.presenter-slide.editable > .slide-bubbles { width: 100%; height: 100%; margin: 0; align-self: stretch; padding: 0; background: transparent; }
+.slide-bubbles-titel { margin: 0 0 4px; font-size: 1em; }
+.bub.gross .bub-frage-feld { font-size: 0.8em; }
+.bub.gross .bub-eingabe { font-size: 16px; padding: 9px 12px; }
+.bub.gross .bub-knopf, .bub.gross .bub-dazu { font-size: 14px; padding: 7px 13px; }
+.bub.gross .bub-ergebnis { font-size: 15px; }
+.bub.gross .bub-mal, .bub.gross .bub-punkte { font-size: 14px; height: 26px; line-height: 26px; min-width: 26px; border-radius: 13px; }
+
+html[data-alles-zeigen] .live-zeiger { display: none !important; }

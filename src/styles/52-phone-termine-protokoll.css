@@ -1,0 +1,356 @@
+/* ================= M174: Phone-Konzept + Textur-Nachschärfung ================= */
+/* Auswahl-Leiste auf Phones: feste Aktionsleiste über dem Dock — oben bleibt
+   Platz für Kopf- und Tab-Leiste (Kollisions-Befund aus dem User-Screenshot) */
+.sel-toolbar-dock {
+  position: fixed; left: 50%; translate: -50% 0;
+  /* M267: Am Telefon dockt die Formatier-Leiste unten an (M226) — genau dort,
+     wo diese Leiste steht. Solange sie im Bild ist, rückt die Karten-Leiste
+     um deren Höhe nach oben, statt sich verdecken zu lassen. */
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px) + var(--lv-typo-dock, 0px));
+  z-index: 60; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 10px);
+  flex-wrap: wrap; justify-content: center;
+  animation: pn-fade-in 0.16s ease-out;
+  border-radius: var(--r-lg);
+}
+.sel-toolbar-dock .sel-label { display: none; }
+.sel-toolbar-dock button { padding: 9px 11px; }
+/* Portal-Menü der Auswahl-Leiste: die Mobile-Zentrier-Regel für .sel-ai-menu
+   (transform: translateX(-50%)) darf die feste Verankerung nicht verschieben */
+.sel-menu-fixed { transform: none; }
+
+/* ---------- M175: Dark-Mode-Lesbarkeit (helle Flächen + helle Schrift) ---------- */
+[data-theme='dark'] .sel-toolbar button.danger:hover { background: rgba(216, 75, 61, 0.32); }
+
+/* ---------- M176: eigene Kalender-Termine + Tabellen-Chip ---------- */
+.cal-chip.own { border-left-color: var(--accent); font-weight: 600; }
+.cal-dayedit { max-width: min(340px, 94%); }
+.cal-dayedit-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12.5px; }
+.cal-dayedit-head button, .cal-dayedit-row button {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  font-family: inherit; font-size: 11px; padding: 3px 6px; border-radius: var(--r-sm); flex: none;
+}
+.cal-dayedit-head button:hover, .cal-dayedit-row button:hover { background: var(--surface-2); color: var(--ink); }
+.cal-dayedit-add { display: flex; gap: 5px; margin: 8px 0 6px; }
+.cal-dayedit-add input[type='time'] { flex: 0 0 auto; width: 86px; }
+.cal-dayedit-add input {
+  flex: 1; min-width: 0; font-family: inherit; font-size: 12.5px; padding: 6px 9px;
+  border: 1px solid var(--border-soft); border-radius: var(--r); outline: none;
+  background: var(--surface); color: var(--ink);
+}
+.cal-dayedit-add button {
+  border: 1px solid var(--accent); background: var(--accent-fill); color: #fff;
+  border-radius: var(--r); cursor: pointer; padding: 0 11px; font-size: 14px;
+}
+.cal-dayedit-add button:disabled { opacity: 0.4; cursor: default; }
+.cal-dayedit-row { display: flex; align-items: center; gap: 3px; font-size: 12px; padding: 2px 0; }
+.cal-dayedit-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-dayedit-foot { font-size: 10px; color: var(--muted); margin-top: 6px; border-top: 1px solid var(--border-soft); padding-top: 6px; }
+/* M471: einzelner Termin aus der Aufgaben-Zentrale — markiert im Raster, Angaben in einer ruhigen Fläche */
+.cal-chip.markiert, .cal-strip.markiert { outline: 2px solid var(--accent); outline-offset: 0; opacity: 1; }
+.cal-termin { display: flex; flex-direction: column; gap: 4px; }
+.cal-termin-zeile { font-size: 12px; color: var(--ink); display: flex; align-items: center; gap: 4px; }
+.cal-termin-quelle { color: var(--muted); font-size: 11px; }
+.cal-termin-link { align-self: flex-start; margin-top: 4px; font-size: 12px; color: var(--accent-strong); text-decoration: underline; }
+.table-del-chip { color: #a4231a; }
+
+/* ---------- M177: Termin-Detail-Editor ---------- */
+.cal-evform { display: flex; flex-direction: column; gap: 6px; }
+.cal-evform input, .cal-evform textarea {
+  font-family: inherit; font-size: 12.5px; padding: 6px 9px; min-width: 0;
+  border: 1px solid var(--border-soft); border-radius: var(--r); outline: none;
+  background: var(--surface); color: var(--ink); resize: vertical;
+}
+.cal-evform-title { font-weight: 700; }
+.cal-evform-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.cal-evform-grid label {
+  display: flex; flex-direction: column; gap: 2px;
+  font-size: 10px; color: var(--muted); min-width: 0;
+}
+.cal-evform-colors { display: flex; gap: 6px; }
+.cal-evform-dot {
+  width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent;
+  cursor: pointer; padding: 0;
+}
+.cal-evform-dot.on { border-color: var(--ink); }
+.cal-evform-link { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.cal-evform-pick { display: flex; flex-direction: column; gap: 3px; }
+.cal-evform-hit {
+  border: none; background: var(--surface-2); border-radius: var(--r-sm); cursor: pointer;
+  font-family: inherit; font-size: 11.5px; color: var(--ink); text-align: left; padding: 5px 8px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cal-evform-hit:hover { background: var(--accent-soft); }
+.cal-evform-actions { display: flex; gap: 5px; align-items: center; border-top: 1px solid var(--border-soft); padding-top: 7px; }
+.cal-evform-actions button {
+  border: 1px solid var(--border-soft); background: var(--surface-3); border-radius: var(--r);
+  cursor: pointer; font-family: inherit; font-size: 11.5px; color: var(--ink); padding: 6px 9px;
+}
+.cal-evform-save { flex: 1; background: var(--accent-fill) !important; color: #fff !important; border-color: var(--accent) !important; font-weight: 700; }
+.cal-evform-save:disabled { opacity: 0.4; cursor: default; }
+.cal-dayedit-sub { font-size: 10px; color: var(--muted); }
+.cal-dayedit-more { display: flex; gap: 5px; margin-top: 4px; }
+.cal-dayedit-more button {
+  flex: 1; border: 1px dashed var(--border-soft); background: none; border-radius: var(--r);
+  cursor: pointer; font-family: inherit; font-size: 11px; color: var(--muted); padding: 5px 7px;
+}
+.cal-dayedit-more button:hover { color: var(--accent-strong); border-color: var(--accent); }
+.cal-dayedit-title { border: none; background: none; font-family: inherit; font-size: 12px; color: var(--ink); text-align: left; cursor: pointer; padding: 2px 4px; border-radius: var(--r-sm); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-dayedit-title:hover { background: var(--surface-2); }
+
+/* ---------- M178: Dark Mode — Tabellen auf hellem Notiz-Papier ---------- */
+/* Notizen bleiben im Dunkeln helles Papier mit dunkler Schrift; BlockNote
+   setzt in Tabellenzellen aber eigene Farb-Variablen, die die helle
+   Theme-Schrift durchreichten (User-Report: weiße Schrift auf heller Zelle) */
+/* M284: `:not(.rt-zelle)` — die Rechen-Tabelle bringt ihre eigenen Farben
+   mit (Papier- oder Theme-Palette je nach Notizton) und darf hier nicht
+   pauschal auf dunkle Schrift gezwungen werden. */
+[data-theme='dark'] .note-editor table:not(.rt-tabelle),
+[data-theme='dark'] .note-editor th,
+[data-theme='dark'] .note-editor td:not(.rt-zelle),
+[data-theme='dark'] .note-editor td:not(.rt-zelle) p,
+[data-theme='dark'] .note-editor th p {
+  color: #16191e !important;
+}
+
+/* ---------- M181: Rahmen-Aktionen gebündelt in der Auswahl-Leiste ---------- */
+/* Ein Menü statt zwei (User-Screenshot): Anordnen + Tönung + Umbenennen leben
+   im „Rahmen"-Popover der Auswahl-Leiste; der Rahmenkopf trägt keine eigenen
+   Werkzeuge mehr. Tönungs-Punkte zum direkten Probieren (Menü bleibt offen). */
+.sel-frame-tints { display: flex; align-items: center; gap: 6px; padding: 4px 8px 6px; }
+.sel-frame-tints .tint-dot {
+  width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%; cursor: pointer; padding: 0;
+  border: 1px solid rgba(120, 110, 90, 0.45);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.sel-frame-tints .tint-dot:hover { transform: scale(1.12); border-color: var(--accent-strong); }
+.sel-frame-tints .tint-dot.none {
+  background:
+    linear-gradient(135deg, transparent 44%, #d84b3d 46%, #d84b3d 54%, transparent 56%),
+    #fff;
+}
+.sel-frame-tints .tint-dot.on { border: 2px solid var(--accent); }
+
+/* ---------- M183: Navigator als zentrales Glas-Overlay ---------- */
+/* Body-Portal statt Menü in der Tab-Leiste: Die Leiste ist selbst eine
+   Glas-Fläche (backdrop-filter) — ein Kind darin kann per Spezifikation
+   nichts mehr blurren (Backdrop-Root). Als Portal wirkt der Blur wieder,
+   und das Panel sitzt zentriert über allem (User-Screenshot). */
+.nav-backdrop {
+  position: fixed; inset: 0; z-index: 70;
+  background: rgba(44, 34, 14, 0.28);
+  animation: pn-fade-in 0.16s ease-out;
+}
+[data-theme='dark'] .nav-backdrop { background: rgba(0, 0, 0, 0.45); }
+/* M245: Der Navigator ist die Ausstülpung am LINKEN Rand — dieselbe Bauform
+   wie der Überblick rechts, gespiegelt. Vorher ein zentriertes Glasfenster,
+   das den halben Schirm verdeckte. */
+.nav-panel {
+  position: fixed; left: var(--app-rand); top: var(--head-space);
+  bottom: var(--app-rand);
+  width: 380px; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 40px);
+  display: flex; flex-direction: column;
+  /* M249: gespiegelt — allein die obere RECHTE Ecke steht frei */
+  border-radius: 0 var(--r-lg) 0 0;
+  padding: 12px 18px 10px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-soft); border-left: none;
+  box-shadow: var(--pop-shadow);
+  animation: pn-slide-in-left 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+/* Der Kopf des Navigators darf in der schmalen Spalte umbrechen */
+.nav-panel .nav-head { flex-wrap: wrap; row-gap: 6px; }
+.nav-panel .nav-head > b { flex: 1 0 100%; }
+.nav-head {
+  display: flex; align-items: center; gap: 10px;
+  padding-bottom: 9px; border-bottom: 1px solid var(--border-soft);
+}
+.nav-head > b { flex: 1; font-size: 13px; color: var(--ink); }
+.nav-overview {
+  display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
+  border: 1px solid var(--border-soft); background: none; border-radius: var(--r-pill);
+  padding: 5px 12px; font: inherit; font-size: 11.5px; font-weight: 650;
+  color: var(--ink); cursor: pointer;
+}
+.nav-overview:hover { border-color: var(--accent); color: var(--accent-strong); }
+.nav-x {
+  flex: 0 0 auto; border: none; background: none; cursor: pointer;
+  color: var(--muted); padding: 5px; border-radius: var(--r); display: inline-flex;
+}
+.nav-x:hover { color: var(--ink); background: var(--surface-2); }
+@media (max-width: 640px) {
+  .nav-panel { width: 100% !important; max-width: none; padding: 12px 10px 8px;
+    border-radius: var(--r-lg) var(--r-lg) 0 0; border-left: 1px solid var(--border-soft); }
+  .nav-head > b { font-size: 12px; }
+}
+
+/* ---------- M184: OneNote-Import (Einstellungen → Daten) ---------- */
+.on-tree {
+  max-height: 260px; overflow-y: auto; margin: 8px 0 4px;
+  border: 1px solid var(--border-soft); border-radius: var(--r); padding: 6px 8px;
+  background: var(--surface-1);
+}
+.on-book + .on-book { margin-top: 8px; border-top: 1px solid var(--border-soft); padding-top: 8px; }
+.on-book-name {
+  display: block; width: 100%; text-align: left; border: none; background: none;
+  cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; color: var(--ink);
+  padding: 3px 4px; border-radius: var(--r-sm);
+}
+.on-book-name:hover { background: var(--surface-2); }
+.on-count { font-weight: 400; font-size: 10px; color: var(--muted); margin-left: 6px; }
+.on-sec {
+  display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink);
+  padding: 3px 4px 3px 14px; border-radius: var(--r-sm); cursor: pointer;
+}
+.on-sec:hover { background: var(--surface-2); }
+.on-sec input { flex: 0 0 auto; }
+.on-sec span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.on-empty { font-size: 11px; color: var(--muted); padding: 2px 14px; }
+.on-progress { display: flex; align-items: center; gap: 9px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+
+/* M466: Outlook-Fenster — ruhige Liste wie ein Posteingang, ein Knopf je Mail */
+.outlook-modal { max-width: 620px; }
+.outlook-suche { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; color: var(--muted); }
+.outlook-suche input { flex: 1; min-width: 0; }
+.outlook-kopf { font-size: 12px; color: var(--muted); margin: 6px 0 4px; min-height: 16px; }
+.outlook-liste { list-style: none; margin: 0; padding: 0; max-height: min(52vh, 460px); overflow-y: auto; border-top: 1px solid var(--border-soft); }
+.outlook-mail { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--border-soft); }
+.outlook-text { flex: 1; min-width: 0; }
+.outlook-zeile1 { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.outlook-zeile1 b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.outlook-mail.ungelesen .outlook-zeile1 b, .outlook-mail.ungelesen .outlook-betreff { font-weight: 650; }
+.outlook-datum { color: var(--muted); font-size: 12px; flex: none; }
+.outlook-betreff, .outlook-vorschau { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.outlook-vorschau { color: var(--muted); font-size: 12px; }
+.outlook-mail > button { flex: none; }
+.outlook-leer { padding: 14px 2px; color: var(--muted); font-size: 13px; }
+.outlook-konto { flex: 1; font-size: 12px; color: var(--muted); align-self: center; }
+.on-bar { flex: 1; height: 6px; border-radius: var(--r-pill); background: var(--surface-2); overflow: hidden; }
+.on-bar i { display: block; height: 100%; background: var(--accent); transition: width 0.3s ease; }
+
+/* ---------- M186: Protokoll-Reihe ---------- */
+.minutes-card { display: flex; flex-direction: column; overflow: hidden; }
+.minutes-head { display: flex; align-items: center; gap: 4px; padding: 2px 2px 6px; }
+.minutes-title { flex: 1; min-width: 0; font-weight: 700; font-size: 13px; color: var(--ink); }
+.minutes-head button {
+  flex: 0 0 auto; border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 4px; border-radius: var(--r-sm); display: inline-flex;
+}
+.minutes-head button:hover { color: var(--accent-strong); background: var(--surface-2); }
+
+/* Einrichten: Rhythmus, Wiedervorlage, feste Tagesordnung */
+.minutes-setup {
+  background: var(--surface-1); border: 1px solid var(--border-soft); border-radius: var(--r);
+  padding: 8px 9px; margin-bottom: 7px; font-size: 11.5px;
+}
+.minutes-setup > label { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.minutes-setup > label > span { flex: 1; color: var(--muted); }
+.minutes-setup select, .minutes-setup input[type='text'] {
+  font: inherit; font-size: 11.5px; border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm); padding: 3px 6px; background: var(--surface); color: var(--ink);
+}
+.minutes-carry { align-items: flex-start !important; }
+.minutes-carry span { line-height: 1.35; }
+.minutes-agenda { border-top: 1px solid var(--border-soft); padding-top: 6px; margin-top: 4px; }
+.minutes-agenda > b { display: block; font-size: 10.5px; color: var(--muted); margin-bottom: 4px; }
+.minutes-top { display: flex; gap: 4px; margin-bottom: 3px; }
+.minutes-top input { flex: 1; min-width: 0; font: inherit; font-size: 11.5px; border: 1px solid var(--border-soft); border-radius: var(--r-sm); padding: 3px 6px; background: var(--surface); color: var(--ink); }
+.minutes-top button { border: none; background: none; cursor: pointer; color: var(--muted); padding: 2px 4px; border-radius: var(--r-sm); }
+.minutes-top button:hover { color: #d84b3d; background: var(--surface-2); }
+.minutes-add-top {
+  border: 1px dashed var(--border-soft); background: none; border-radius: var(--r-sm); cursor: pointer;
+  font: inherit; font-size: 10.5px; color: var(--muted); padding: 3px 8px; width: 100%;
+}
+.minutes-add-top:hover { color: var(--accent-strong); border-color: var(--accent); }
+
+/* Blättern zwischen den Sitzungen */
+.minutes-nav { display: flex; align-items: center; gap: 4px; margin-bottom: 5px; }
+.minutes-nav button {
+  flex: 0 0 auto; border: 1px solid var(--border-soft); background: var(--surface);
+  cursor: pointer; color: var(--ink); padding: 3px 5px; border-radius: var(--r-sm); display: inline-flex;
+}
+.minutes-nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); }
+.minutes-nav button:disabled { opacity: 0.35; cursor: default; }
+.minutes-nav select {
+  flex: 1; min-width: 0; font: inherit; font-size: 12px; font-weight: 650;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); padding: 3px 6px;
+  background: var(--surface); color: var(--ink);
+}
+.minutes-count { flex: 0 0 auto; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.minutes-nav .minutes-del { border-color: transparent; color: var(--muted); }
+.minutes-nav .minutes-del:hover { color: #d84b3d; border-color: #d84b3d; }
+
+.minutes-meta { display: flex; gap: 5px; margin-bottom: 5px; }
+.minutes-meta input {
+  font: inherit; font-size: 11px; border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+  padding: 3px 6px; background: var(--surface); color: var(--ink); min-width: 0;
+}
+.minutes-meta input[type='date'] { flex: 0 0 auto; }
+.minutes-meta input[type='text'] { flex: 1; }
+
+.minutes-body { flex: 1; min-height: 90px; overflow-y: auto; }
+.minutes-body .note-editor { background: none; }
+
+/* Beschlüsse: bewusst abgesetzt — sie sind das Gedächtnis der Reihe */
+.minutes-decisions {
+  border-top: 1px solid var(--border-soft); margin-top: 6px; padding-top: 6px; font-size: 11.5px;
+}
+.minutes-decisions > b { display: block; font-size: 10.5px; color: var(--muted); margin-bottom: 4px; }
+.minutes-decision {
+  display: flex; align-items: flex-start; gap: 6px; padding: 3px 6px; border-radius: var(--r-sm);
+  background: var(--surface-1); margin-bottom: 3px; line-height: 1.35;
+}
+.minutes-decision span { flex: 1; min-width: 0; }
+.minutes-decision button { border: none; background: none; cursor: pointer; color: var(--muted); padding: 1px 3px; border-radius: var(--r-sm); }
+.minutes-decision button:hover { color: #d84b3d; }
+.minutes-decision.old { background: none; opacity: 0.8; }
+.minutes-decision.old em { font-size: 10px; color: var(--muted); font-style: normal; }
+.minutes-decision-add {
+  width: 100%; font: inherit; font-size: 11.5px; border: 1px dashed var(--border-soft);
+  border-radius: var(--r-sm); padding: 3px 7px; background: none; color: var(--ink);
+}
+.minutes-decision-add:focus { border-style: solid; border-color: var(--accent); outline: none; }
+.minutes-all-decisions { margin-top: 5px; }
+.minutes-all-decisions summary { font-size: 10.5px; color: var(--muted); cursor: pointer; }
+.minutes-empty { padding: 18px 10px; text-align: center; color: var(--muted); font-size: 12px; }
+.minutes-empty button {
+  display: block; margin: 8px auto 0; border: 1px solid var(--border-soft); background: var(--surface);
+  border-radius: var(--r); padding: 5px 12px; font: inherit; font-size: 12px; color: var(--ink); cursor: pointer;
+}
+.minutes-empty button:hover { border-color: var(--accent); color: var(--accent-strong); }
+
+/* ---------- M187: Protokoll-Reihe — Farbe & Sitzungs-TOPs ---------- */
+/* Die Karte nimmt dieselben Paletten-Töne wie eine Notiz (sticky-*), damit
+   sich Protokolle im Board genauso einordnen lassen wie Haftnotizen. */
+.minutes-card .minutes-dot { position: static; flex: 0 0 auto; margin-right: 1px; }
+.minutes-card .minutes-colorpick { position: static; flex: 0 0 auto; width: 17px; height: 17px; }
+
+/* Innenflächen erben die Kartenfarbe, statt sie mit Grau zu überdecken */
+.minutes-card .minutes-setup,
+.minutes-card .minutes-decision { background: rgba(255, 255, 255, 0.42); }
+[data-theme='dark'] .minutes-card .minutes-setup,
+[data-theme='dark'] .minutes-card .minutes-decision { background: rgba(0, 0, 0, 0.12); }
+.minutes-card .minutes-nav select,
+.minutes-card .minutes-meta input,
+.minutes-card .minutes-nav button { background: rgba(255, 255, 255, 0.62); }
+[data-theme='dark'] .minutes-card .minutes-nav select,
+[data-theme='dark'] .minutes-card .minutes-meta input,
+[data-theme='dark'] .minutes-card .minutes-nav button { background: rgba(0, 0, 0, 0.18); }
+
+/* Tagesordnung der laufenden Sitzung */
+.minutes-tops {
+  display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+  margin-bottom: 5px; padding-bottom: 5px; border-bottom: 1px dashed var(--border-soft);
+}
+.minutes-top-chip {
+  font-size: 10px; font-weight: 600; color: var(--ink);
+  background: rgba(255, 255, 255, 0.62); border: 1px solid var(--border-soft);
+  border-radius: var(--r-pill); padding: 2px 8px; max-width: 150px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+[data-theme='dark'] .minutes-top-chip { background: rgba(0, 0, 0, 0.2); }
+.minutes-top-add {
+  font: inherit; font-size: 10px; font-weight: 650; color: var(--muted);
+  border: 1px dashed var(--border-soft); background: none; border-radius: var(--r-pill);
+  padding: 2px 9px; cursor: pointer;
+}
+.minutes-top-add:hover { color: var(--accent-strong); border-color: var(--accent); border-style: solid; }

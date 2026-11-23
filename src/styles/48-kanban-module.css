@@ -1,0 +1,480 @@
+/* ---------- Kanban: Filterleiste, Zähler & Board-Gruppen (M65) ---------- */
+.kanban-filter {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  padding: 4px 2px 7px; font-size: 10.5px;
+}
+.k-filter-q {
+  flex: 1 1 110px; min-width: 90px; border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm); padding: 3px 8px; font-family: inherit; font-size: 11px;
+  background: var(--surface-3); color: var(--ink); outline: none;
+}
+.k-filter-q:focus { border-color: var(--accent); }
+.k-chip {
+  border: 1px solid var(--border-soft); background: var(--surface-dim);
+  color: var(--muted); border-radius: var(--r-pill); padding: 2px 8px; cursor: pointer;
+  font-family: inherit; font-size: 10.5px; white-space: nowrap;
+}
+.k-chip:hover { border-color: var(--accent); color: var(--ink); }
+.k-chip.on { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent); font-weight: 600; }
+[data-theme='dark'] .k-chip.on { color: var(--ink); }
+.k-filter-board {
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); padding: 2px 4px;
+  font-family: inherit; font-size: 10.5px; background: var(--surface-3);
+  color: var(--ink); max-width: 150px;
+}
+.k-filter-count { color: var(--muted); font-weight: 700; margin-left: 2px; }
+.kanban-count {
+  font-size: 9.5px; color: var(--muted); background: var(--surface-dim);
+  border-radius: var(--r-pill); padding: 1px 6px; flex: none; font-weight: 700;
+  border: none; font-family: inherit; cursor: pointer;
+}
+.kanban-count:hover { color: var(--accent-strong); }
+.k-group-head {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); padding: 6px 2px 3px; display: flex; align-items: center; gap: 5px;
+}
+.k-group-head em { font-style: normal; background: var(--surface-dim); border-radius: var(--r-pill); padding: 0 5px; }
+
+/* ---------- Kanban: Einsammeln konfigurieren (M68) ---------- */
+.collect-panel { max-height: 340px; overflow-y: auto; }
+.collect-hint { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+.collect-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 11.5px; }
+.collect-row label { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; cursor: pointer; color: var(--ink); }
+.collect-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.collect-clear { border: none; background: none; color: var(--muted); cursor: pointer; padding: 2px 4px; border-radius: var(--r-sm); flex: none; }
+.collect-clear:hover { color: #c0392b; background: rgba(192, 57, 43, 0.1); }
+[data-theme='dark'] .collect-clear:hover { color: #ff9a8c; }
+.collect-reset {
+  margin-top: 6px; border: 1px solid var(--border-soft); background: var(--surface-dim);
+  color: var(--muted); border-radius: var(--r-sm); padding: 4px 8px; font-family: inherit;
+  font-size: 10.5px; cursor: pointer;
+}
+.collect-reset:hover { color: var(--ink); border-color: var(--accent); }
+/* ---------- Ticket-Archiv (M293) ---------- */
+.k-head-count { font-style: normal; font-size: 8.5px; font-weight: 800; margin-left: 3px; line-height: 1; }
+.kanban-col-archiv { color: var(--muted); }
+.k-archiv-auto { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 11.5px; color: var(--ink); padding: 2px 0 4px; }
+.k-archiv-auto label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.k-archiv-auto input[type='checkbox'] { accent-color: var(--accent); margin: 0; }
+.k-archiv-auto input[type='number'] {
+  width: 54px; font-family: inherit; font-size: 11px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 2px 5px; background: var(--surface); color: var(--ink); outline: none;
+}
+.k-archiv-auto input[type='number']:focus { border-color: var(--accent); }
+.k-archiv-auto input[type='number']:disabled { opacity: 0.45; }
+.k-archiv-row .collect-name { flex: 1; text-decoration: line-through; color: var(--muted); }
+.k-archiv-meta { font-style: normal; font-size: 9.5px; color: var(--muted); white-space: nowrap; flex: none; }
+.k-archiv-back:hover { color: var(--accent-strong); background: var(--accent-soft); }
+.k-archiv-foot { display: flex; gap: 6px; }
+.k-archiv-foot .collect-reset { flex: 1; }
+.ticket-erledigt { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: #1f7a4a; font-weight: 600; }
+.ticket-erledigt .ticket-jump { display: inline-flex; align-items: center; gap: 4px; }
+.ticket-spaltenzeit { font-size: 12px; color: var(--muted); } /* M470: leise Spaltenzeit im Ticket */
+
+/* ---------- Kanban-Schliff (M295) ---------- */
+.kanban-body { min-width: 0; }
+/* Statuszeile: nur was gerade läuft — Automatiken und ein gefülltes Archiv */
+.kanban-status { display: flex; flex-wrap: wrap; gap: 4px; margin: -2px 0 7px; }
+.k-status-chip {
+  border: none; background: var(--surface-dim); color: var(--muted); border-radius: var(--r-pill);
+  padding: 2px 8px; font-size: 10px; font-family: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px; line-height: 1.3;
+}
+.k-status-chip:hover { color: var(--ink); background: var(--border); }
+.k-status-chip em { font-style: normal; font-weight: 800; }
+/* ⋯-Menü der Kopfzeile: dieselbe Hülle wie das Ebenen-Menü */
+.k-menu { min-width: 236px; }
+.k-menu button.on { color: var(--accent-strong); font-weight: 600; }
+.k-menu button.on svg { color: var(--accent-strong); }
+/* Zeitgruppen der Erledigt-Spalte */
+.k-done-head { justify-content: space-between; padding-right: 0; }
+.k-done-toggle {
+  border: none; background: none; font: inherit; color: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px; padding: 0; text-transform: inherit; letter-spacing: inherit;
+}
+.k-done-toggle svg { transition: transform 0.12s; }
+.k-done-toggle svg.auf { transform: rotate(90deg); }
+.k-done-toggle:hover { color: var(--ink); }
+.k-done-archiv {
+  border: none; background: none; color: var(--muted); cursor: pointer; padding: 1px 4px; border-radius: var(--r-xs);
+  opacity: 0; transition: opacity 0.15s; display: inline-flex;
+}
+.k-done-head:hover .k-done-archiv, .k-done-archiv:focus-visible { opacity: 1; }
+.k-done-archiv:hover { background: var(--border); color: var(--ink); }
+/* Kompakte Tickets: nur Text, Priorität und Frist — Chips erst beim Zeigen */
+.k-kompakt .kanban-item { padding: 4px 7px; row-gap: 2px; }
+.k-kompakt .kanban-item > .k-labels, .k-kompakt .kanban-item > .kanban-chips { display: none; }
+.k-kompakt .kanban-item:hover > .kanban-chips { display: inline-flex; }
+/* Archiv- und Einsammel-Fenster (Portal) — die Karten-Regeln des alten Inline-Panels gelten nicht mehr */
+.k-panel-modal { width: min(560px, calc(96vw / var(--pn-anz, 1))); gap: 8px; }
+.k-panel-modal.collect-panel { max-height: calc(84vh / var(--pn-anz, 1)); }
+@media (pointer: coarse) { .k-done-archiv { opacity: 1; } }
+
+/* ---------- Kachel-Ansicht großer Module (M298) ---------- */
+.card-body.kachel {
+  display: flex !important; flex-direction: column; gap: 4px; padding: 12px 14px 10px;
+  background: var(--surface-card); border-radius: var(--r); overflow: hidden;
+}
+.kachel { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.kachel-typ { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.kachel-titel { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.25; overflow-wrap: anywhere; }
+.kachel-zeile { font-size: 11.5px; color: var(--muted); line-height: 1.35; overflow-wrap: anywhere; }
+.kachel-zeile.warn { color: #a4231a; font-weight: 600; }
+[data-theme='dark'] .kachel-zeile.warn { color: #ff9a8c; }
+.kachel-fuss { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.kachel-knopf {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--muted); border-radius: var(--r-pill);
+  padding: 3px 10px; font-size: 10.5px; font-family: inherit; cursor: pointer;
+}
+.kachel-knopf:hover { color: var(--ink); border-color: var(--accent); }
+
+/* ---------- Dock- und Leisten-Schliff (M296) ---------- */
+
+/* Der Toast weicht nach oben aus, solange ein Dock-Menü offen ist — er lag
+   genau über dessen unteren Einträgen (Bildschirmfoto der UI-Durchsicht) */
+body:has(.dock-menu) .toast { bottom: auto; top: calc(16px + var(--safe-top, 0px)); transform: translateX(-50%); }
+
+/* ---------- Präsentation: weniger Totraum auf kleinen Screens (M69) ---------- */
+@media (max-width: 860px) {
+  .presenter-slide { margin: 0 10px 8px; padding: 18px 20px; font-size: 15px; }
+  .presenter-slide.editable { padding: 12px; }
+  .presenter-head { padding: 8px 12px; font-size: 12px; }
+  .presenter-hint-edit { display: none; }
+  .slide-kanban { padding: 12px !important; }
+  .slide-gantt, .slide-cal { padding: 12px !important; }
+  .presenter-foot { padding: 0 10px 10px; gap: 10px; }
+}
+
+/* Kalender: Fehlerzeile im Konten-Block (M70) */
+.cal-menu-err { font-size: 10px; color: #a4231a; max-width: 220px; padding: 2px 0; }
+[data-theme='dark'] .cal-menu-err { color: #ff9a8c; }
+
+/* ---------- ☎/✉/🔗-Chips unter Notizen (M72) ---------- */
+/* Notizen sind immer helles Papier → feste Farben, auch im dunklen Theme */
+.due-chip.ent-chip { text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.ent-chip-tel { background: rgba(10, 125, 64, 0.12) !important; color: #0a7d40 !important; font-weight: 600; }
+.ent-chip-mail, .ent-chip-url { background: rgba(79, 124, 255, 0.12) !important; color: #3557c9 !important; }
+.due-chip.ent-chip:hover { border-color: currentColor; }
+
+/* Übersicht hat jetzt ein Mini-Dock unten mittig → „+ Neuer Bereich" darüber (M73) */
+
+/* Bedienungs-Schalter im Design-Reiter (M74) */
+.modal-row-check input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--accent); }
+
+/* ---------- Rechtliches (M75) ---------- */
+.legal-hint { font-size: 11px; color: var(--muted); }
+
+/* Dauerhafte Fehlerbox im Modal (z. B. WebDAV/CORS) — Toasts verschwinden
+   und liegen optisch weit weg vom Einstellungsfenster */
+.modal-error {
+  margin-top: 10px; padding: 9px 12px; border-radius: var(--r);
+  border: 1.5px solid rgba(217, 83, 79, 0.45); background: rgba(217, 83, 79, 0.09);
+  color: var(--ink); font-size: 12px; line-height: 1.55;
+}
+
+/* Immer sichtbare Legal-Links (§5 DDG: leicht erkennbar, unmittelbar erreichbar).
+   Sitzt im schmalen Streifen UNTER der Minimap; dezent, aber klar beschriftet. */
+.legal-corner {
+  /* right: 104px lässt der „React Flow"-Attribution ihren Platz */
+  position: fixed; right: 104px; bottom: 1px; z-index: 45;
+  display: flex; align-items: center; gap: 5px;
+  /* M447: volle Deckung auch im Hellen — mit 0,8 stand die Zeile bei 3,7:1 statt 4,5:1 (dezent bleibt sie
+     durch Größe und Farbe) */
+  font-size: 10.5px; color: var(--muted);
+}
+/* M389: Im Dunkeln stand die Zeile mit 2,3:1 da — „leicht erkennbar" (§ 5 DDG) ist das nicht. */
+[data-theme='dark'] .legal-corner { opacity: 1; }
+.legal-corner .link-btn { font-size: 10.5px; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+.legal-corner .link-btn:hover { color: var(--accent-strong); }
+.help-body h4 { margin: 0.9em 0 0.3em; font-size: 13px; }
+
+/* Tooltips dürfen mehrzeilig sein (Netz-Hover-Vorschau, M76) */
+.tipbox { white-space: pre-line; max-width: 300px; text-align: left; }
+
+/* Leertaste halten = Pannen auch über Karten (M76): Karten kurz durchklick-transparent */
+.space-pan .react-flow__node,
+.space-pan .drawing-layer { pointer-events: none !important; }
+.space-pan .react-flow__pane { cursor: grab !important; }
+
+/* ---------- Header-Aktionen neben dem Logo (M77) ---------- */
+.top-actions {
+  pointer-events: auto; display: flex; align-items: center; gap: 2px;
+  background: var(--surface); border-radius: var(--r-lg); padding: 3px 4px;
+  box-shadow: var(--chrome-shadow);
+}
+.top-actions button {
+  border: none; background: none; width: 30px; height: 30px; border-radius: var(--r);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--muted); cursor: pointer;
+}
+.top-actions button:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+.top-actions button:disabled { opacity: 0.35; cursor: default; }
+.top-actions-sep { width: 1px; height: 18px; background: var(--border-soft); margin: 0 3px; }
+@media (max-width: 640px) {
+  .top-actions { padding: 2px 3px; }
+  .top-actions button { width: 27px; height: 27px; }
+}
+
+/* ---------- Eigene App / HTML-Einbettung (M158) ---------- */
+.happ-card { background: var(--surface); border-radius: var(--r-lg); overflow: hidden; }
+.happ-wrap { display: flex; flex-direction: column; height: 100%; }
+.happ-head {
+  display: flex; align-items: center; gap: 7px; padding: 7px 10px;
+  border-bottom: 1px solid var(--border-soft); color: var(--muted);
+  cursor: grab; /* dragHandle: nur hier lässt sich die Karte ziehen */
+}
+.happ-head:active { cursor: grabbing; }
+.happ-title {
+  flex: 1; min-width: 0; border: none; background: none; font: inherit;
+  font-size: 12.5px; font-weight: 700; color: var(--ink); padding: 2px 4px; border-radius: var(--r-sm);
+}
+.happ-title:focus { outline: none; background: var(--surface-2); }
+.happ-size { font-size: 10.5px; white-space: nowrap; }
+.happ-btn {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--muted);
+  width: 26px; height: 24px; border-radius: var(--r-sm); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+}
+.happ-btn:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+.happ-btn:disabled { opacity: 0.35; cursor: default; }
+.happ-startbtn { color: #2e9e63; border-color: rgba(46, 158, 99, 0.5); }
+.happ-stopbtn { color: #d9534f; border-color: rgba(217, 83, 79, 0.45); }
+.happ-body { position: relative; flex: 1; min-height: 0; }
+.happ-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: none; background: #fff; }
+/* Nicht ausgewählt: transparente Wache über der App — Klick wählt die Karte,
+   Ziehen/Schwenken des Boards bleibt möglich; erst die Auswahl reicht durch */
+.happ-guard { position: absolute; inset: 0; cursor: pointer; }
+/* Während irgendeine Karte gezogen/skaliert wird, darf die App keine
+   Zeigereingaben schlucken — sonst reißt die Geste über der iframe ab */
+.react-flow__node.dragging .happ-frame,
+.react-flow__node.resizing .happ-frame { pointer-events: none; }
+.happ-poster {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px; padding: 18px;
+  color: var(--muted); text-align: center;
+}
+.happ-poster p { margin: 0; font-size: 12px; line-height: 1.55; max-width: 340px; }
+.happ-load {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 12px; padding: 6px 14px; border-radius: var(--r); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.happ-load:hover:not(:disabled) { background: var(--surface-2); }
+.happ-load:disabled { opacity: 0.4; cursor: default; }
+.happ-go { border-color: rgba(46, 158, 99, 0.5); color: #2e9e63; font-weight: 700; }
+/* Natives Vollbild: die Karte selbst wird fullscreen — Kopfleiste bleibt
+   als Steuerleiste oben (Stop/Neustart/Verkleinern), die App füllt den Rest */
+.happ-full:fullscreen { background: var(--surface); border-radius: 0; }
+/* M393: Im Vollbild gehört der Schirm dem Tool. Die Kopfleiste zieht sich nach oben zurück und kommt, wenn der
+   Zeiger den oberen Rand berührt (die schmale Greifkante hängt an ihr, sonst schluckte das Tool die Bewegung).
+   Beim Eintritt bleibt sie einen Moment stehen — so sieht man, wo sie ist (lib/randLeiste.ts). */
+.happ-full:fullscreen { position: relative; }
+.happ-full:fullscreen .happ-head {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 4; cursor: default;
+  background: var(--surface);
+  transform: translateY(-100%); transition: transform 0.2s ease;
+}
+.happ-full:fullscreen .happ-head::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 6px; }
+.happ-full:fullscreen .happ-head.da,
+.happ-full:fullscreen .happ-head:has(:focus-visible) { transform: none; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16); }
+
+/* ---------- Team-Anlagen (M159) ---------- */
+.file-teamload {
+  margin: 2px 10px 8px; padding: 5px 10px; border-radius: var(--r);
+  border: 1px dashed var(--border-soft); background: none; color: var(--accent-strong);
+  font: inherit; font-size: 11.5px; cursor: pointer;
+}
+.file-teamload:hover:not(:disabled) { background: var(--surface-2); }
+.file-teamload:disabled { opacity: 0.5; cursor: default; }
+
+/* ---------- Ziehbare Karten-Titel (M160) ---------- */
+/* Als Text (statt dauerhaftem Eingabefeld) ist die Titelzeile ZIEHBAR und
+   damit auf jeder Karte die verlässliche Anfass-Fläche — Doppelklick benennt
+   um (dieselbe Konvention wie bei Rahmen, Formen und Mermaid). */
+.drag-title {
+  cursor: grab; user-select: none; -webkit-user-select: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  display: block;
+}
+.drag-title:active { cursor: grabbing; }
+.drag-title-empty { color: var(--muted); }
+
+/* ---------- Zeiterfassung: Ansichtsmodi (M161) ---------- */
+.time-views { display: inline-flex; gap: 2px; background: var(--surface-2); border-radius: var(--r); padding: 2px; }
+.time-views button {
+  border: none; background: none; font: inherit; font-size: 11px; color: var(--muted);
+  padding: 3px 8px; border-radius: var(--r-sm); cursor: pointer;
+}
+.time-views button.on { background: var(--surface); color: var(--ink); font-weight: 700; box-shadow: var(--chrome-shadow); }
+/* Woche: eine klickbare Zeile je Tag */
+.time-wday {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border: none; border-left: 3px solid var(--border-soft); border-radius: var(--r);
+  background: var(--surface-2); font: inherit; font-size: 12px; color: var(--ink);
+  padding: 6px 10px; margin-bottom: 4px; cursor: pointer; text-align: left;
+}
+.time-wday:hover { filter: brightness(0.97); }
+.time-wday.is-today { border-left-color: var(--accent); }
+.time-wday.is-empty { color: var(--muted); background: none; border: 1px dashed var(--border-soft); border-left-width: 3px; padding: 5px 10px; }
+.time-wday-name { width: 86px; flex: none; font-weight: 700; }
+.time-wday-kinds { flex: 1; display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; }
+.time-wday-total { font-weight: 700; white-space: nowrap; }
+/* Monat: Kalenderraster mit Tagessummen */
+.time-month { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; align-content: start; overflow-y: auto; }
+.time-month-wd { font-size: 10.5px; color: var(--muted); text-align: center; padding-bottom: 2px; }
+.time-mday {
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface);
+  font: inherit; font-size: 10.5px; color: var(--muted); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 2px; min-height: 38px;
+}
+.time-mday b { color: var(--ink); font-size: 11px; }
+.time-mday:hover { background: var(--surface-2); }
+.time-mday.is-today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+/* Jahr: 12 Monats-Kacheln */
+.time-year { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; align-content: start; }
+.time-ymonth {
+  border: 1px solid var(--border-soft); border-radius: var(--r); background: var(--surface);
+  font: inherit; font-size: 11.5px; color: var(--muted); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 4px;
+}
+.time-ymonth b { color: var(--ink); font-size: 13px; }
+.time-ymonth:hover { background: var(--surface-2); }
+.time-ymonth.is-today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* ---------- In anderes Board verschieben (M163) ---------- */
+.sel-move-menu { max-height: 300px; overflow-y: auto; min-width: 200px; }
+.sel-move-label {
+  font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.04em; padding: 5px 9px 3px; margin-top: 2px;
+  border-top: 1px solid var(--border-soft);
+}
+.sel-move-menu .sel-move-label { border-top: none; margin-top: 0; }
+.sel-move-proj { font-size: 10.5px; color: var(--muted); margin-left: auto; padding-left: 10px; }
+
+/* ---------- Einsammeln: einzelne Quellen-Karten (M166) ---------- */
+.collect-expand {
+  border: none; background: none; color: var(--muted); cursor: pointer;
+  width: 18px; height: 18px; padding: 0; display: inline-flex; align-items: center;
+  justify-content: center; border-radius: var(--r-sm); flex: none;
+  transition: transform 0.15s;
+}
+.collect-expand:hover { background: var(--surface-2); color: var(--ink); }
+.collect-expand.open { transform: rotate(90deg); }
+.collect-subs { margin: 0 0 4px 24px; padding-left: 8px; border-left: 2px solid var(--border-soft); }
+.collect-sub {
+  display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink);
+  padding: 3px 4px; border-radius: var(--r-sm); cursor: pointer;
+}
+.collect-sub:hover { background: var(--surface-2); }
+.collect-sub input[type='checkbox'] { accent-color: var(--accent); }
+.collect-sub input:disabled + .collect-name { opacity: 0.45; }
+.collect-sub-count { margin-left: auto; font-size: 10.5px; color: var(--muted); }
+.collect-sub-empty { font-size: 11px; color: var(--muted); padding: 3px 4px; }
+
+/* ---------- Tote Sprung-Links (M167): Ziel wurde gelöscht ---------- */
+.link-dead, .link-dead:hover {
+  opacity: 0.45; cursor: default !important; color: var(--muted) !important;
+  background: none !important; text-decoration: none; pointer-events: auto;
+}
+button.link-dead:disabled { opacity: 0.45; }
+
+/* ---------- Nachschlagen (M168) ---------- */
+.lookup-backdrop {
+  position: fixed; inset: 0; z-index: 80; background: rgba(22, 25, 30, 0.35);
+  display: flex; align-items: flex-start; justify-content: center; padding: 9vh 16px 16px;
+}
+.lookup-panel {
+  width: min(560px, 100%); max-height: calc(78vh / var(--pn-anz, 1)); overflow-y: auto;
+  background: var(--surface); border-radius: var(--r-lg); padding: 14px;
+  box-shadow: var(--pop-shadow);
+  display: flex; flex-direction: column; gap: 8px;
+}
+.lookup-head { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.lookup-input {
+  flex: 1; min-width: 0; border: 1px solid var(--border-soft); background: var(--surface-2);
+  color: var(--ink); font: inherit; font-size: 14px; padding: 8px 11px; border-radius: var(--r);
+}
+.lookup-input:focus { outline: none; border-color: var(--accent); }
+.lookup-lang { border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; padding: 6px; border-radius: var(--r); }
+.lookup-go {
+  border: none; background: var(--accent-fill); color: #fff; font: inherit; font-size: 12.5px;
+  font-weight: 700; padding: 8px 14px; border-radius: var(--r); cursor: pointer;
+}
+.lookup-go:disabled { opacity: 0.4; cursor: default; }
+.lookup-x { border: none; background: none; color: var(--muted); cursor: pointer; padding: 6px; border-radius: var(--r); }
+.lookup-x:hover { background: var(--surface-2); color: var(--ink); }
+.lookup-section {
+  font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.04em; margin-top: 4px;
+}
+.lookup-hits { display: flex; flex-direction: column; gap: 4px; }
+.lookup-hit {
+  display: flex; flex-direction: column; gap: 1px; text-decoration: none;
+  padding: 7px 10px; border-radius: var(--r); border: 1px solid var(--border-soft);
+  background: var(--surface); color: var(--ink);
+}
+.lookup-hit:hover { background: var(--surface-2); }
+.lookup-hit b { font-size: 13px; }
+.lookup-hit span { font-size: 11.5px; color: var(--muted); }
+.lookup-note { font-size: 12px; color: var(--muted); padding: 4px 2px; }
+.lookup-coarse { display: flex; flex-wrap: wrap; gap: 6px; }
+.lookup-src {
+  display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+  font-size: 12px; color: var(--ink); padding: 6px 11px; border-radius: var(--r-pill);
+  border: 1px solid var(--border-soft); background: var(--surface);
+}
+.lookup-src:hover { background: var(--surface-2); }
+.lookup-src.off { opacity: 0.4; pointer-events: none; }
+.lookup-src svg { color: var(--muted); }
+.lookup-foot { font-size: 10.5px; color: var(--muted); border-top: 1px solid var(--border-soft); padding-top: 8px; }
+
+/* M168-Fix: Die Popover der Auswahl-Leiste (KI/Attribute/Ausrichten/Verschieben)
+   leben als PORTAL mit fester Bildschirmposition — innerhalb der NodeToolbar
+   deckelt der Stacking-Kontext des Flow-Viewports jeden z-index unter der Kopf-
+   und Tab-Leiste (z-index 50); bei Karten nahe der Oberkante fingen die Leisten
+   dann die Klicks auf die Menüpunkte ab (M151-Muster wie frame-/happ-menu).
+   Steht bewusst NACH dem Responsive-Block: dessen .sel-ai-menu-Zentrierung
+   (left 50% + translateX) gilt nur für die alte In-Toolbar-Variante. */
+.sel-menu-fixed {
+  position: fixed; bottom: auto; right: auto; z-index: 75;
+  max-height: min(420px, calc(calc(100vh / var(--pn-anz, 1)) - 24px)); overflow-y: auto;
+  max-width: min(320px, calc(calc(100vw / var(--pn-anz, 1)) - 16px));
+}
+
+/* ---------- Verbindungen als Daten-Abos (M169) ---------- */
+.collect-abo {
+  flex: 0 0 auto; font-size: 9.5px; font-weight: 700; color: var(--accent-strong);
+  border: 1px solid currentColor; border-radius: var(--r-pill); padding: 1px 6px;
+  margin-left: 4px; white-space: nowrap;
+}
+
+/* ---------- Daten-Abos Vollausbau (M170) ---------- */
+/* ⏱-Chip an Kanban/Notiz: Arbeitszeit aus der verbundenen Zeiterfassung */
+.abo-time-chip {
+  flex: 0 0 auto; font-size: 10.5px; font-weight: 700; color: #3c669c;
+  border: 1px solid currentColor; border-radius: var(--r-pill); padding: 2px 8px;
+  white-space: nowrap; cursor: help; align-self: center;
+}
+/* Abo-Fußzeile unter Notizen (⏱-Chip + 📟-App-Auszug) */
+.abo-feeds { display: flex; flex-direction: column; gap: 5px; padding: 4px 10px 8px; align-items: flex-start; }
+.abo-extract {
+  display: flex; flex-direction: column; gap: 1px; width: 100%;
+  font-size: 11px; color: var(--ink); background: rgba(0, 0, 0, 0.05);
+  border-radius: var(--r); padding: 6px 9px; cursor: help;
+}
+.abo-extract b { font-size: 11px; }
+.abo-extract span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.abo-extract-empty { font-style: italic; }
+/* Abo-Meilensteine im Zeitplan: aus dem verbundenen Kanban abgeleitet */
+.gantt-label.abo { color: var(--muted); font-style: italic; }
+/* Soll/Ist in der Zeiterfassung (aus dem verbundenen Wochenplan) */
+.time-soll { font-size: 11px; color: var(--muted); white-space: nowrap; cursor: help; }
+.time-soll b { color: var(--ink); }
+/* Abo-Chip im Mermaid-Diagramm (Checkliste aus verbundener Notiz) */
+.mm-abo-chip {
+  position: absolute; top: 6px; right: 6px; z-index: 5;
+  font-size: 10px; font-weight: 700; font-family: inherit; cursor: pointer;
+  color: var(--muted); background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: var(--r-pill); padding: 2px 8px;
+}
+.mm-abo-chip.on { color: var(--accent-strong); border-color: currentColor; }

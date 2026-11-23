@@ -1,0 +1,283 @@
+/* ================= M198: Entrümpelung + barrierefreie Bedienung ================= */
+/* Sichtbarer Fokusring für Tastatur-Bedienung — überall einheitlich. Bewusst
+   :focus-visible (nicht :focus): Maus-/Touch-Klicks bleiben ringfrei, nur die
+   Tab-Navigation bekommt die deutliche Markierung. */
+button:focus-visible, [role='button']:focus-visible, a:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+/* Toggles im ⋯-Menü (Physik, Auto-Größe, Archiv): aktiver Zustand sichtbar */
+.dock-menu button.on, .sel-ai-menu button.on { background: var(--accent-soft); color: var(--accent-strong); }
+.sel-more-menu { min-width: 230px; }
+
+/* Touch-Geräte: Mindest-Zielgröße ~44×44 px (WCAG 2.5.8) + luftigere Abstände.
+   Die Dock-Hauptknöpfe sind oben schon auf 50×50 vergrößert — hier kommen
+   Auswahl-Leiste, Menü-Einträge, Kopfleisten- und Seitenleisten-Ziele dazu. */
+@media (pointer: coarse) {
+  .dock { gap: 8px; padding: 9px; }
+  .sel-toolbar { gap: 7px; }
+  .sel-toolbar button { min-width: 44px; min-height: 44px; }
+  .dock-menu button, .sel-ai-menu button { min-height: 44px; }
+  .top-actions button { width: 40px; height: 40px; }
+  .side-tree button { min-height: 44px; }
+}
+/* Auf Phones bleibt die Kopfleiste kompakt (27px-Regel unten) — dort schafft
+   die Zwei-Zeilen-Kopfleiste sonst keine Luft; 40px gilt ab Tablet-Breite. */
+@media (pointer: coarse) and (max-width: 640px) {
+  /* M255: von 32 auf 36 — die Kopfleiste bricht ohnehin um (M236 misst das),
+     also kostet der Zuwachs keine Überlappung, bringt aber spürbar Treffer. */
+  .top-actions button { width: 36px; height: 36px; }
+}
+
+/* ================= M200: Schrift & Textgröße pro Karte ================= */
+/* Kalam global verfügbar machen (bisher nur fürs Mermaid-Rendern injiziert) */
+@font-face {
+  font-family: 'Kalam'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('../assets/kalam-latin.woff2') format('woff2');
+}
+/* Kuratierte Stapel — bewusst wenige, alle offline. Das *-!important ist hier
+   gewollt: Die Karte hat der Nutzer EXPLIZIT umgestellt, also gewinnt seine
+   Wahl auch gegen modulinterne font-family-Regeln (BlockNote, Mermaid …). */
+.react-flow__node.pn-font-serif, .react-flow__node.pn-font-serif * { font-family: Georgia, 'Iowan Old Style', Cambria, 'Times New Roman', serif !important; }
+.react-flow__node.pn-font-lesbar, .react-flow__node.pn-font-lesbar * { font-family: 'Atkinson Hyperlegible', system-ui, sans-serif !important; }
+.react-flow__node.pn-font-hand, .react-flow__node.pn-font-hand * { font-family: 'Kalam', 'Segoe Print', 'Comic Sans MS', cursive !important; }
+.react-flow__node.pn-font-mono, .react-flow__node.pn-font-mono * { font-family: ui-monospace, 'Cascadia Mono', Consolas, 'Courier New', monospace !important; }
+/* Textgröße in Stufen: wirkt auf die Text-Körper der Module (Notiz-Editor,
+   Formen, Kanban-Tickets, Rahmen-Titel, Protokoll) — Überschriften in Notizen
+   skalieren relativ mit (em-basiert). S bleibt bewusst ≥ 12px (Lesbarkeit). */
+.react-flow__node.pn-size-s { --pn-fs: 12px; }
+.react-flow__node.pn-size-l { --pn-fs: 17px; }
+.react-flow__node.pn-size-xl { --pn-fs: 21px; }
+.react-flow__node[class*='pn-size-'] :is(.bn-editor, .shape-body, .shape-input, .kanban-item, .frame-name, .email-body, .file-card, .portal-name) {
+  font-size: var(--pn-fs) !important;
+}
+/* Schrift-Menü: Größen-Reihe als gleichbreite Stufen-Knöpfe */
+/* M267: Die Stufen heißen jetzt Klein · Standard · Groß · Riesig statt
+   S/M/L/XL — vier volle Wörter passen nicht mehr nebeneinander in ein
+   Popover-Menü, also ein 2×2-Raster. Es bleibt eine EINZIGE Fläche, in der
+   man die aktuelle Stufe auf einen Blick sieht (Rahmen in Akzentfarbe). */
+.sel-font-sizes {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 4px 10px 6px;
+}
+.sel-font-sizes button {
+  text-align: center; border: 1px solid var(--border-soft) !important;
+  border-radius: var(--r); justify-content: center;
+}
+.sel-font-sizes button.on { border-color: var(--accent) !important; }
+/* Der Weg zurück steht sichtbar im Menü statt versteckt im „nochmal drücken" */
+.sel-font-menu .sel-typo-reset { margin-top: 4px; color: var(--muted); }
+.sel-font-menu .sel-typo-reset svg { flex: none; }
+
+/* M267: Das Aa-Menü der Formatier-Leiste (markierter Text) — gleiche Ordnung
+   wie das Karten-Menü: Größe, Schriftart, Weg zurück */
+.pn-typo-menu { min-width: 190px; }
+.pn-typo-menu .mantine-Menu-label { font-size: 11px; letter-spacing: .02em; }
+
+/* M267: Solange die Formatier-Leiste steht, macht die Karten-Leiste Platz.
+   Die Werte sind die Höhe der Leiste plus Luft — schwebend nach oben,
+   angedockt (Telefon) nach oben über die untere Leiste hinweg. */
+body[data-formatierleiste='an'] { --lv-typo: -52px; --lv-typo-dock: 56px; }
+
+/* ================= M202: Teilen-Dialog für Karten ================= */
+.share-cards-modal { max-width: 560px; }
+.share-cards-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px; padding: 4px 2px 2px;
+}
+.share-cards-grid button, .share-cards-grid a.share-ziel {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  min-height: 76px; padding: 12px 14px; border-radius: var(--r-lg); cursor: pointer;
+  border: 1px solid var(--border-soft); background: var(--surface-card);
+  font: inherit; color: var(--ink); text-align: left;
+}
+.share-cards-grid button:hover, .share-cards-grid a.share-ziel:hover { background: var(--surface-2); border-color: var(--accent); }
+.share-cards-grid button:disabled { opacity: 0.6; cursor: default; }
+.share-cards-grid a.share-ziel { text-decoration: none; box-sizing: border-box; }
+.share-cards-grid button b, .share-cards-grid a.share-ziel b { font-size: 13.5px; }
+.share-cards-grid button span, .share-cards-grid a.share-ziel span { font-size: 11.5px; color: var(--muted); }
+.share-cards-grid .share-emoji { font-size: 18px; color: inherit; }
+.share-cards-grid button svg { color: var(--muted); }
+.share-cards-foot { margin-top: 12px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+
+/* ================= M203: Netz-Performance ================= */
+/* Während sich das Netz bewegt (Physik/Drag), pausiert das Glas der
+   Seitenleiste: backdrop-filter erzwingt sonst bei JEDEM Frame einen teuren
+   Repaint der komplett verwischten Fläche — das ruckelte selbst auf starken
+   GPUs. Sobald das Netz zur Ruhe kommt, kehrt der Blur zurück. */
+
+/* ================= M204: Gehirn (semantischer Index) ================= */
+.search-sem { border-top: 1px solid var(--border-soft); margin-top: 4px; padding-top: 4px; }
+.search-sem-head { font-size: 11px; font-weight: 700; color: var(--muted); padding: 4px 10px 2px; letter-spacing: 0.02em; }
+.backlinks-sub { margin-top: 6px; border-top: 1px solid var(--border-soft); padding-top: 6px; }
+
+/* ================= M205: Synapsen (Verknüpfungs-Vorschläge) ================= */
+.ov-graph-suggest line:first-child {
+  stroke: var(--accent); opacity: 0.55; pointer-events: none;
+  animation: sug-pulse 2.6s ease-in-out infinite;
+}
+.ov-graph-suggest-hit { stroke: transparent; cursor: pointer; }
+.ov-graph-suggest:hover line:first-child { opacity: 0.95; }
+@keyframes sug-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.75; } }
+@media (prefers-reduced-motion: reduce) { .ov-graph-suggest line:first-child { animation: none; } }
+.ov-graph-ctx-sub { font-size: 11px; color: var(--muted); padding: 0 10px 6px; max-width: 240px; }
+
+/* ================= M206: „Frag dein Gehirn" ================= */
+.search-ask {
+  margin: 6px 10px 0; padding: 9px 12px; min-height: 40px;
+  border: 1px solid var(--border-soft); border-radius: var(--r); cursor: pointer;
+  background: var(--surface-2); color: var(--ink); font: inherit; font-size: 12.5px; text-align: left;
+}
+.search-ask:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.search-ask:disabled { opacity: 0.65; cursor: default; }
+.search-answer {
+  margin: 8px 10px 0; padding: 11px 13px; border-radius: var(--r-lg);
+  background: var(--accent-soft); border: 1px solid var(--border-soft);
+}
+.search-answer-text { font-size: 13px; line-height: 1.5; color: var(--ink); white-space: pre-wrap; }
+.search-answer-src { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.search-src-chip {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink);
+  border-radius: var(--r-pill); padding: 4px 10px; font: inherit; font-size: 11px; cursor: pointer;
+}
+.search-src-chip:hover { border-color: var(--accent); color: var(--accent-strong); }
+.search-answer-foot { margin-top: 8px; font-size: 10.5px; color: var(--muted); }
+@media (pointer: coarse) { .search-src-chip { min-height: 34px; } }
+
+/* ================= M207: Gehirn-Puls ================= */
+.brain-pulse { margin: 0 0 8px; border: 1px solid var(--border-soft); border-radius: var(--r-lg); overflow: hidden; background: var(--surface-card); }
+.brain-pulse-head {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px;
+  padding: 9px 12px; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 650; color: var(--ink); text-align: left;
+}
+.brain-pulse-head:hover { background: var(--surface-2); }
+.brain-pulse-count { background: var(--accent-soft); color: var(--accent-strong); border-radius: var(--r-pill); padding: 1px 8px; font-size: 11px; }
+.brain-pulse-caret { margin-left: auto; color: var(--muted); }
+.brain-pulse-body { padding: 2px 8px 8px; }
+.brain-pulse-row {
+  display: flex; align-items: baseline; gap: 8px; width: 100%; min-height: 36px;
+  padding: 7px 8px; border: none; border-radius: var(--r); background: none; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--ink); text-align: left;
+}
+.brain-pulse-row:hover { background: var(--surface-2); }
+.brain-pulse-kind {
+  flex: none; font-size: 10px; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase;
+  color: var(--muted); border: 1px solid var(--border-soft); border-radius: var(--r-pill); padding: 1px 7px;
+}
+.brain-pulse-row.kind-vorschlag .brain-pulse-kind { color: var(--accent-strong); border-color: var(--accent); }
+.brain-pulse-text { flex: 1; line-height: 1.45; }
+.brain-pulse-foot { padding: 6px 8px 2px; font-size: 10.5px; color: var(--muted); line-height: 1.5; }
+
+/* ================= M208/M209: Themen-Aktionen im Puls ================= */
+.brain-pulse-item { border-radius: var(--r); }
+.brain-pulse-item.kind-thema { background: color-mix(in srgb, var(--accent-soft) 40%, transparent); }
+.brain-pulse-acts { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 8px 8px 10px; }
+.brain-pulse-acts button {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink);
+  border-radius: var(--r-pill); padding: 5px 11px; min-height: 32px;
+  font: inherit; font-size: 11.5px; cursor: pointer;
+}
+.brain-pulse-acts button:hover { border-color: var(--accent); color: var(--accent-strong); background: var(--surface-2); }
+@media (pointer: coarse) { .brain-pulse-acts button { min-height: 40px; } }
+
+/* ================= M210: „Über PixiNotes" am Logo ================= */
+
+/* Trefferfläche des Logos am Finger: Die Kopfleiste ist am Handy bewusst
+   flach (M189 — sie überlagerte sonst die Ansichten), sichtbar bleibt das
+   Logo also 32px hoch. Der unsichtbare Streifen NACH OBEN bringt die
+   Trefferhöhe auf 44px, ohne die Leiste wachsen zu lassen. Bewusst nur nach
+   oben: dort liegt freier Rand, nach unten käme die Tab-Leiste in die Quere. */
+@media (pointer: coarse) and (max-width: 640px) {
+  .logo { position: relative; }
+  .logo::after { content: ''; position: absolute; inset: -12px 0 0 0; }
+}
+
+/* ================= M211: Handy-Ansicht bei offener Tastatur =================
+   Grundlage ist die CSS-Variable --kb (Tastaturhöhe, gesetzt in lib/viewport.ts)
+   und das Merkmal [data-keyboard='on'] am <html>. Auf dem Desktop bleibt --kb
+   immer 0px, alle calc() unten rechnen dort also unverändert. */
+:root { --kb: 0px; }
+
+/* --- 1. Schwebende Leisten weichen der Tastatur --- */
+/* Das Dock hilft beim Tippen nicht und stünde sonst mitten im Restbild:
+   es fährt nach unten weg statt einfach zu verschwinden (kein Sprung). */
+[data-keyboard='on'] .dock {
+  transform: translateX(-50%) translateY(150%);
+  opacity: 0; pointer-events: none;
+}
+.dock { transition: transform 0.18s ease, opacity 0.18s ease; }
+/* Rechtliches und die React-Flow-Attribution kleben am unteren Rand und lägen
+   sonst unter der Tastatur begraben (User-Screenshot) */
+[data-keyboard='on'] .legal-corner,
+[data-keyboard='on'] .react-flow__attribution,
+[data-keyboard='on'] .backlinks { display: none; }
+/* Die Auswahl-Leiste bleibt erreichbar und rückt direkt über die Tastatur */
+[data-keyboard='on'] .sel-toolbar-dock { bottom: calc(10px + var(--kb) + var(--lv-typo-dock, 0px)); }
+.sel-toolbar-dock { transition: bottom 0.18s ease; }
+/* Toasts ebenso — sonst poppt die Meldung hinter der Tastatur auf */
+[data-keyboard='on'] .toast { bottom: calc(20px + var(--kb)); }
+/* M291: Im Fokus steht unten bis zu ein dreizeiliger Fuß (Blättern,
+   Formatieren, Karten-Werkzeuge). Die Meldung gehört darüber — gemessen lag
+   sie sonst mitten auf der Werkzeugleiste. */
+html:has(.app.focus-mode) .toast,
+html[data-keyboard='on']:has(.app.focus-mode) .toast {
+  bottom: calc(20px + var(--kb) + var(--focus-bottom, 0px));
+}
+
+/* --- 2. Eine Leiste statt zwei: die Auswahl übernimmt die Dock-Zeile --- */
+/* M318: auf JEDER Breite, nicht nur am Telefon. Sobald die Auswahl-Leiste
+   unten andockt (kein Platz an der Karte), fährt das Dock weg und die Leiste
+   nimmt seine Zeile — vorher standen am PC zwei Leisten mit zwei ⋯
+   übereinander. :has statt eines neuen Store-Flags — die Auswahl-Leiste steht
+   als Portal im Body, das Dock daneben; wer da ist, gewinnt. */
+body:has(.sel-toolbar-dock) .dock {
+  transform: translateX(calc(-50% - var(--seite-rechts, 0px) / 2)) translateY(150%);
+  opacity: 0; pointer-events: none;
+}
+/* M277: `--lv-typo-dock` reist in JEDE bottom-Rechnung mit — die
+   Formatier-Leiste dockt auch auf Board-Ebene unten an, und ohne den Versatz
+   stünden beide Leisten übereinander. Seitlich folgt die Leiste dem Dock
+   (rechte Seitenleiste: --seite-rechts). */
+body:has(.sel-toolbar-dock) .sel-toolbar-dock {
+  bottom: calc(18px + var(--app-rand) + var(--lv-typo-dock, 0px));
+  translate: calc(-50% - var(--seite-rechts, 0px) / 2) 0;
+}
+@media (max-width: 640px) {
+  body:has(.sel-toolbar-dock) .sel-toolbar-dock {
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px) + var(--lv-typo-dock, 0px));
+  }
+  /* … außer die Tastatur ist offen: dann gewinnt sie (data-keyboard sitzt am
+     <html>, steht also VOR dem body im Selektor) */
+  [data-keyboard='on'] body:has(.sel-toolbar-dock) .sel-toolbar-dock {
+    bottom: calc(10px + var(--kb) + var(--lv-typo-dock, 0px));
+  }
+  /* NIE zweireihig: umbrechende Knöpfe kosten doppelte Höhe mitten im Bild.
+     Passt etwas nicht, wird waagerecht geschoben statt gestapelt. */
+  .sel-toolbar-dock {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    max-width: calc(calc(100vw / var(--pn-anz, 1)) - 12px); justify-content: flex-start;
+  }
+  .sel-toolbar-dock::-webkit-scrollbar { display: none; }
+  .sel-toolbar-dock button { flex: none; padding: 9px 10px; }
+}
+
+/* --- 3. Eingabe-Blasen docken am Handy unten an, statt das Modul zu verdecken --- */
+/* Die Blase wird per Portal auf den Klickpunkt gesetzt (Inline-Style) — am
+   Handy landet sie damit ausgerechnet ÜBER dem Planer, in den man einträgt.
+   Darum hier als Blatt am unteren Rand, über der Tastatur. */
+@media (max-width: 640px) {
+  .week-pop, .cal-dayedit {
+    left: 8px !important; right: 8px; top: auto !important;
+    bottom: calc(10px + var(--kb));
+    width: auto !important; max-width: none !important;
+    max-height: min(calc(52vh / var(--pn-anz, 1)), calc(calc(100dvh / var(--pn-anz, 1)) - var(--kb) - 20px)); overflow-y: auto;
+    transition: bottom 0.18s ease;
+  }
+}
+
+/* --- 4. Zoom-Knöpfe am Handy einklappen --- */
+/* Zwei Finger zoomen dort ohnehin; die Knöpfe sind reine Fläche.
+   Auf Tablets bleiben sie (dort ist Platz und ein Stift im Spiel). */
+@media (max-width: 640px) {
+  .react-flow__controls { display: none; }
+}

@@ -1,0 +1,410 @@
+/* ---------- Karten (gemeinsam) ---------- */
+.card-shell { position: relative; width: 100%; height: 100%; }
+/* M446: Platzhalter, solange ein nachgeladener Kartentyp kommt — leer und in Kartengröße, damit nichts flackert */
+.karte-laedt { width: 100%; height: 100%; min-height: 24px; }
+.card-body { position: relative; width: 100%; height: 100%; }
+.react-flow__node {
+  border-radius: var(--r);
+  box-shadow: var(--card-shadow);
+  transition: box-shadow 0.18s ease;
+  font-size: 13px;
+}
+.react-flow__node:hover, .react-flow__node.dragging { box-shadow: var(--card-shadow-lift); }
+/* M338: Die ruhende Notiz braucht die Grundregeln des Editors, auch wenn auf dem Board noch KEIN Editor
+   lebt — die Bibliothek trägt sie erst beim ersten Editor nach, und ohne sie bräche Text anders um. */
+.notiz-ruhend .ProseMirror {
+  position: relative; word-wrap: break-word; white-space: pre-wrap; white-space: break-spaces;
+  -webkit-font-variant-ligatures: none; font-variant-ligatures: none; font-feature-settings: "liga" 0;
+}
+.notiz-ruhend .ProseMirror [contenteditable="false"] { white-space: normal; }
+.notiz-ruhend .bn-editor { outline: none; }
+/* M338: Fern-Ruhe (lib/fernRuhe.ts) — der Inhalt einer Karte weit außerhalb des Bildes wird nicht
+   gerechnet und nicht gezeichnet; die gemerkten Innenmaße halten ihre Größe. Export und Druck zeigen alles. */
+.card-shell[data-fern] > .card-body { content-visibility: hidden; contain-intrinsic-size: var(--fern-w, auto) var(--fern-h, auto); }
+html[data-alles-zeigen] .card-shell[data-fern] > .card-body { content-visibility: visible; }
+/* M340: Für die Bild-Aufnahme verschwindet die Bedienung — Auswahlrahmen, Griffe, Anschlusspunkte, Scrollbalken.
+   Die Aufnahme zeigt eine gescrollte Notiz von oben (ein Bild kennt keinen Scrollstand): Schatten nur unten. */
+html[data-alles-zeigen] .react-flow__node.selected { outline: none !important; }
+html[data-alles-zeigen] :is(.react-flow__resize-control, .pn-handle, .card-grip, .color-dot, .note-farben, .fit-hint, .note-spur, .note-mehr.oben, .react-flow__nodesselection, .react-flow__selection) { visibility: hidden !important; }
+html[data-alles-zeigen] .card-shell[data-rollt] > .note-mehr.unten { opacity: 1; }
+@media print { .card-shell[data-fern] > .card-body { content-visibility: visible; } }
+/* M338: Griff, Anschlusspunkte und Farbpunkt sind ohne Zeiger auf der Karte unsichtbar — „durchsichtig“
+   (opacity 0) ließ den Browser sie trotzdem bei jedem Schwenk mitführen: sechs Ebenen je Karte.
+   Die vier Anschlusspunkte und der Farbpunkt sind jetzt wirklich weg (gemessen: ein Drittel weniger
+   Zeichenarbeit beim Schwenken); der Griff bleibt als leere Fläche greifbar — er ragt über die Karte
+   hinaus, und wer von oben kommt, soll ihn treffen. Nur für Maus-Geräte; am Finger gelten die eigenen
+   Regeln (immer sichtbar bzw. an der Auswahl). */
+@media (hover: hover) and (pointer: fine) {
+  .react-flow__node:not(.selected):not(:hover) .card-grip { opacity: 1; transition: none; background: transparent; box-shadow: none; }
+  .react-flow__node:not(.selected):not(:hover) .card-grip > *,
+  .react-flow__node:not(.selected):not(:hover) .pn-handle,
+  .react-flow__node:not(.selected):not(:hover) .color-dot { visibility: hidden; }
+  /* beim Verbinden zeigen sich die Anschlusspunkte aller Karten (wie bisher) */
+  .react-flow:has(.react-flow__connectionline) .react-flow__node .pn-handle { visibility: visible; }
+}
+.react-flow__node.selected { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r); }
+/* Prozess-Formen zeichnen sich selbst (Raute/Stadion/…) — der rechteckige
+   Node-Container bleibt unsichtbar, sonst liegt eine Schatten-„Pille" um die Form */
+.react-flow__node-shape,
+.react-flow__node-shape:hover,
+.react-flow__node-shape.dragging { box-shadow: none; }
+/* Tiefe stattdessen an der Form selbst: drop-shadow folgt der clip-path-Kontur */
+.react-flow__node-shape .shape-body { filter: drop-shadow(0 2px 5px rgba(22, 25, 30, 0.16)); }
+.react-flow__node-shape:hover .shape-body,
+.react-flow__node-shape.dragging .shape-body { filter: drop-shadow(0 5px 12px rgba(22, 25, 30, 0.22)); }
+
+/* Sichtbarkeit der Verbindungspunkte (Gestalt: siehe „Verbinden ohne
+   Frickelei" weiter unten — dort liegt die EINZIGE Optik-Definition, M102) */
+.card-shell:hover .pn-handle { opacity: 1; }
+
+.meta { font-size: 11px; color: var(--muted); }
+h3 { font-size: 14px; margin: 0 0 8px; }
+
+/* ---------- Haftnotizen ---------- */
+.note-card {
+  min-height: 90px; padding: 10px 6px 10px;
+  border-radius: var(--r); overflow: hidden;
+  /* M339: Passt der Inhalt nicht in die Karte, scrollt er — die Leiste des Browsers bleibt aus,
+     ein eigener schlanker Daumen (CardShell) zeigt und bewegt den Stand. */
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+}
+.note-card::-webkit-scrollbar { display: none; }
+/* Eine Notiz ohne feste Höhe wächst mit dem Inhalt — aber nicht endlos: darüber scrollt sie.
+   Im Fokus zeigt sie alles, dort rollt die Kamera (M334). */
+.card-shell[data-ohne-hoehe] > .note-card { max-height: var(--notiz-max, 640px); }
+.focus-mode .pn-focused .card-shell[data-ohne-hoehe] > .note-card { max-height: none; }
+/* Der Stift schreibt auf der Notiz, statt sie zu scrollen (unter Windows scrollt ein Stift wie ein
+   Finger); den Finger-Zug übernimmt das Board von Hand (Board.tsx). */
+.card-shell[data-rollt] > .note-card { touch-action: none; }
+.note-spur { position: absolute; top: 0; bottom: 0; right: 2px; width: 10px; z-index: 5; pointer-events: none; display: none; }
+.card-shell[data-rollt] > .note-spur { display: block; }
+.note-daumen {
+  position: absolute; top: 0; right: 0; width: 10px; min-height: 28px; pointer-events: auto; cursor: default;
+  opacity: 0; transition: opacity .18s ease; touch-action: none;
+}
+/* schmaler Strich, der beim Zeigen breiter wird — die Trefferfläche ist die ganze Spur */
+.note-daumen::after {
+  content: ''; position: absolute; top: 0; bottom: 0; right: 1px; width: 4px; border-radius: 3px;
+  background: rgba(22, 25, 30, .34); transition: width .12s ease, background .12s ease;
+}
+.note-daumen:hover::after, .card-shell[data-rollzug] .note-daumen::after { width: 7px; background: rgba(22, 25, 30, .55); }
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-daumen::after { background: rgba(255, 255, 255, .38); }
+.card-shell:hover > .note-spur .note-daumen, .react-flow__node.selected .note-daumen, .card-shell[data-rollzug] .note-daumen { opacity: 1; }
+@media (hover: none) { .note-daumen { opacity: .8; } }
+/* Oben bzw. unten folgt noch Text: ein weicher Schatten an der Kante */
+.note-mehr { position: absolute; left: 0; right: 0; height: 14px; z-index: 4; pointer-events: none; opacity: 0; transition: opacity .18s ease; }
+.note-mehr.oben { top: 0; border-radius: var(--r) var(--r) 0 0; background: linear-gradient(to bottom, rgba(22, 25, 30, .13), transparent); }
+.note-mehr.unten { bottom: 0; border-radius: 0 0 var(--r) var(--r); background: linear-gradient(to top, rgba(22, 25, 30, .13), transparent); }
+.card-shell[data-mehr-oben] > .note-mehr.oben, .card-shell[data-mehr-unten] > .note-mehr.unten { opacity: 1; }
+/* Striche auf dem Text: im Scrollbereich, über dem Text, nie im Weg */
+.notiz-striche { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; z-index: 3; }
+/* Der Einpassen-Knopf weicht dem Balken aus */
+.card-shell[data-rollt] > .fit-hint { right: 16px; }
+@media print { .note-spur, .note-mehr { display: none !important; } }
+.sticky-yellow { background: #fff3a3; }
+.sticky-pink   { background: #ffd6e0; }
+.sticky-mint   { background: #d2f5dd; }
+.sticky-sky    { background: #d9ecff; }
+.sticky-white  { background: var(--surface-card); }
+/* M338: Im Dunkeln bleiben Haftnotizen helles Papier — aber eine Stufe ruhiger. Die vollen Pastelltöne
+   waren auf fast schwarzem Grund die hellsten Flächen des ganzen Schirms und blendeten abends. */
+[data-theme='dark'] .sticky-yellow { background: #e9dc8c; }
+[data-theme='dark'] .sticky-pink   { background: #e8bcc8; }
+[data-theme='dark'] .sticky-mint   { background: #b6dcc2; }
+[data-theme='dark'] .sticky-sky    { background: #bdd3ea; }
+/* Der Hinweis „React Flow" unten rechts trägt die Farben der Oberfläche statt eines weißen Kästchens */
+.react-flow__attribution { background: transparent !important; }
+.react-flow__attribution a { color: var(--muted) !important; opacity: .7; }
+
+.color-dot {
+  position: absolute; top: 8px; right: 10px; z-index: 4;
+  /* padding 0: der Knopf-Innenabstand des Browsers (1px 6px) zog den Punkt zum Oval (M338) */
+  width: 14px; height: 14px; padding: 0; border-radius: 50%; cursor: pointer;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  background: conic-gradient(#fff3a3, #ffd6e0, #d2f5dd, #d9ecff, #fff3a3);
+  opacity: 0; transition: opacity 0.15s;
+}
+.card-shell:hover .color-dot { opacity: 1; }
+
+/* BlockNote in der Karte: transparent & kompakt */
+.note-editor .bn-editor {
+  background: transparent !important;
+  padding-inline: 10px !important;
+  font-size: 13px;
+}
+.note-editor .bn-block-outer { line-height: 1.4; }
+.note-editor { cursor: text; }
+/* Kompaktere Zeilen — v. a. Checklisten waren zu hoch */
+.note-editor .bn-block-content { padding: 1px 0 !important; }
+.note-editor .bn-block-group .bn-block-group { margin-left: 14px; }
+/* M230: BlockNote zeichnet links neben jedem eingerückten Block eine dünne
+   senkrechte Linie („Verschachtelungs-Hilfslinie"). Die sieht exakt aus wie
+   der Balken einer Zitat-Formatierung — Nutzer lasen sie genau so („beim
+   Einrücken wird immer die Zitat-Formatierung mit eingefügt"). Schlimmer
+   noch: sie sitzt bei -20px, unsere kompaktere Einrückung (14px) schiebt sie
+   damit noch links neben den Aufzählungspunkt der Elternzeile — sie hängt in
+   der Luft. Die Ebene erkennt man ohnehin am Zeichen (• ◦ ▪), die Linie ist
+   reine Störung. Gilt für alle Editoren (Notiz, Protokoll, Präsentation). */
+.bn-block-group .bn-block-group > .bn-block-outer::before { content: none !important; }
+.note-editor [data-content-type='checkListItem'] { margin: 0 !important; }
+.note-editor [data-content-type='checkListItem'] > .bn-block-content { display: flex; align-items: center; }
+
+/* M462: BlockNote 0.57 rückt Listen anders ein (Marke in 24px-Spalte) und setzt den Haken in eine
+   24px hohe Zeile mit eigenen Rändern — Listen- und Haken-Zeilen wurden höher und breiter. Hier die
+   kompakte Form aus 0.31 (Marke mit .5em Abstand, Haken in Zeilenhöhe). Gilt für alle Editoren
+   und für die ruhende Notiz (gleiche Klassen). */
+.bn-editor .bn-block-content:is([data-content-type='numberedListItem'], [data-content-type='bulletListItem']) { gap: .5em; }
+.bn-editor .bn-block-content:is([data-content-type='numberedListItem'], [data-content-type='bulletListItem'])::before { display: block; min-width: 0; padding-right: 0; }
+.bn-editor .bn-block-content[data-content-type='checkListItem'] > div:has(> input) { height: auto; display: flex; align-items: center; }
+.bn-editor .bn-block-content[data-content-type='checkListItem'] > div > input { margin: 0; margin-inline-end: .5em; width: auto; height: auto; }
+/* M462: Die Schluss-Klickfläche (bn-trailing-block) ersetzt den leeren Absatz, den 0.31 nach der ersten
+   Änderung anhängte. Sie ist eine leere Zeile hoch (nicht 30px) und nur, solange im Editor geschrieben
+   wird — vorher erschien die Zeile ebenfalls erst beim Schreiben. So wächst eine Karte nicht schon beim
+   Wecken (Fokus, M333), und die ruhende Notiz braucht keine Nachbildung (M338). */
+.bn-editor .bn-trailing-block { height: 1.5em; }
+.bn-editor:not(:focus-within) .bn-trailing-block { height: 0; }
+
+/* Tabellen im Notiz-Editor: klare Ränder, lesbar auf farbigem Grund */
+.note-editor table { border-collapse: collapse; }
+.note-editor th, .note-editor td {
+  border: 1px solid rgba(0, 0, 0, 0.22) !important;
+  background: rgba(255, 255, 255, 0.45);
+  padding: 4px 7px;
+  font-size: 12.5px;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ink);
+}
+
+/* ---------- E-Mail-Karte ---------- */
+.email-card {
+  background: var(--surface-card); border-radius: var(--r); padding: 14px 16px 14px; overflow: hidden;
+}
+.email-from { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.email-from b { font-size: 12.5px; }
+.avatar {
+  width: 28px; height: 28px; border-radius: 50%; flex: none;
+  background: #6c8ef5; color: #fff; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.email-body {
+  font-size: 12.5px; line-height: 1.5; margin: 0;
+  white-space: pre-wrap; word-break: break-word;
+  cursor: text; user-select: text;
+}
+.link-btn {
+  border: none; background: none; color: var(--accent-strong);
+  font-size: 12px; cursor: pointer; padding: 0; font-family: inherit;
+}
+
+.ent-tel {
+  color: #0a7d40; font-weight: 600; text-decoration: none;
+  border-bottom: 1.5px dotted #0a7d40; white-space: nowrap;
+}
+.ent-tel:hover { background: rgba(10, 125, 64, 0.1); border-radius: var(--r-xs); }
+.ent-link { color: var(--accent-strong); word-break: break-all; }
+.ent-path {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.92em; word-break: break-all; opacity: 0.9;
+}
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip {
+  font-size: 11px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--r-pill);
+  padding: 3px 10px; display: inline-flex; gap: 5px; align-items: center;
+  cursor: pointer; box-shadow: 0 1px 2px var(--surface-dim);
+  transition: transform 0.12s ease, border-color 0.12s ease; font-family: inherit;
+}
+.chip:hover { border-color: var(--accent); }
+.chip-size { color: var(--muted); font-size: 10px; }
+
+/* ---------- Fristen-Chips ---------- */
+.due-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; padding: 0 4px; }
+.due-chip {
+  font-size: 10.5px; font-family: inherit; border-radius: var(--r-pill); cursor: pointer;
+  padding: 3px 9px; border: 1px solid transparent; white-space: nowrap;
+  background: var(--surface-dim); color: var(--ink);
+}
+.due-chip:hover { border-color: var(--accent); }
+.due-soon { background: #ffe4b8; color: #8a5a00; }
+.due-overdue { background: #ffd2cc; color: #a4231a; font-weight: 700; }
+
+.card-actions { display: flex; gap: 6px; margin-top: 10px; }
+.card-actions button {
+  font-size: 11px; border: none; background: var(--surface-dim); border-radius: var(--r-sm);
+  padding: 4px 9px; cursor: pointer; font-family: inherit; color: var(--ink);
+}
+.card-actions button:hover { background: var(--border); }
+/* M451: Aufgaben aus dem E-Mail-Destillat übernehmen — eine zweite, umbrechende Zeile unter den Aktionen */
+.email-aufgaben { flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.email-aufgaben-label { font-size: 12px; color: var(--muted); }
+
+/* ---------- Bild-Karte ---------- */
+.image-card { position: relative; background: var(--surface-card); border-radius: var(--r); padding: 8px; overflow: hidden; display: flex; flex-direction: column; }
+.image-card img { width: 100%; min-height: 0; flex: 1; object-fit: contain; border-radius: var(--r-sm); display: block; }
+.img-name { margin-top: 6px; }
+/* M374: Bilder liegen rahmenlos auf dem Board — die Karte IST das Bild. Kein Rand, keine Fläche, kein
+   Schatten; Durchsichtiges bleibt durchsichtig. Rahmen, Griffe, Lupe und Name kommen erst mit der Auswahl.
+   Der Schatten der Karte sitzt sonst am Knoten — bei Bildern trägt ihn nur die Fassung „mit Rahmen". */
+.react-flow__node-image, .react-flow__node-image:hover, .react-flow__node-image.dragging { box-shadow: none; border-radius: 0; }
+.react-flow__node-image.selected { border-radius: 2px; }
+.image-card.mit-rahmen { box-shadow: var(--card-shadow); }
+/* M392: Ein Foto, das als Datei in der Geräte-Ablage liegt, ist auf dem Board dasselbe Bild — auch ohne Schatten am Knoten */
+.react-flow__node-file:has(.image-card.rahmenlos), .react-flow__node-file:has(.image-card.rahmenlos):hover, .react-flow__node-file.dragging:has(.image-card.rahmenlos) { box-shadow: none; border-radius: 0; }
+.react-flow__node-file.selected:has(.image-card.rahmenlos) { border-radius: 2px; }
+.image-card.rahmenlos:not(.kachel) { background: none; padding: 0; border-radius: 0; overflow: visible; }
+.image-card.rahmenlos:not(.kachel) img { border-radius: 0; }
+.image-card.kachel { box-shadow: var(--card-shadow); }
+/* Der Name steht UNTER dem Bild, außerhalb der Karte — er verändert ihre Maße nicht */
+.card-shell > .img-name.unterschrift {
+  position: absolute; top: 100%; left: 0; margin-top: 7px; min-width: min(160px, calc(60vw / var(--pn-anz, 1))); max-width: max(100%, 220px);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* M465: Mit Angaben aus dem Text im Bild stehen Name und Chips gemeinsam unter dem Bild — ebenfalls außerhalb der Karte */
+.card-shell > .bild-unten {
+  position: absolute; top: 100%; left: 0; margin-top: 7px; display: flex; flex-direction: column; gap: 5px;
+  width: max(100%, min(340px, calc(70vw / var(--pn-anz, 1)))); z-index: 2;
+}
+.bild-unten > .img-name.unterschrift { margin-top: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bildtext-chips { margin-top: 0; padding: 0; }
+.bildtext-frist { display: inline-flex; gap: 3px; }
+.due-chip.bildtext-aufgabe { display: inline-flex; align-items: center; gap: 4px; background: transparent; border-color: var(--border); color: var(--muted); }
+.due-chip.bildtext-aufgabe:hover { color: var(--ink); border-color: var(--accent); }
+.bildtext-chips .due-chip:not(.bildtext-aufgabe) { display: inline-flex; align-items: center; gap: 4px; }
+/* Nicht markiert: kein Griff, keine Anschlusspunkte, keine Lupe — auch nicht beim Zeigen */
+.react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .pn-handle,
+.react-flow__node:not(.selected) .card-shell[data-ruhig]:hover .card-grip { opacity: 0; pointer-events: none; }
+.react-flow__node:not(.selected) .image-card.rahmenlos:not(.kachel) :is(.bild-lupe-auf, .bild-bearbeiten-auf) { opacity: 0; pointer-events: none; }
+html[data-kontrast='hoch'] .image-card.rahmenlos:not(.kachel) { border: 0; }
+.focus-mode .pn-focused .image-card.rahmenlos:not(.kachel) { box-shadow: none !important; }
+
+/* ---------- Datei-Karte ---------- */
+/* M254: Bildvorschau auf der Datei-Karte — dieselbe Rolle wie die
+   PDF-Vorschau: sofort sehen, was drinsteckt, statt nur den Dateinamen. */
+.file-thumb {
+  /* M264: jetzt ein Knopf um das Bild — er öffnet die zoombare Ansicht */
+  display: block; width: 100%; margin-top: 6px; padding: 0; border: none;
+  border-radius: var(--r); overflow: hidden; cursor: zoom-in; line-height: 0;
+  background: var(--surface-dim);
+}
+.file-thumb img {
+  display: block; width: 100%; height: auto; max-height: 320px; object-fit: contain;
+}
+.file-card { background: var(--surface-card); border-radius: var(--r); padding: 6px; overflow: hidden; }
+/* M263: Titelzeile der Datei-Karte — Symbol plus umbenennbarer Titel */
+.file-kopf { display: flex; align-items: center; gap: 8px; padding: 6px 10px 2px; min-width: 0; }
+.file-titel { font-weight: 700; font-size: 13px; flex: 1; min-width: 0; }
+.file-titel.drag-title { line-height: 1.35; }
+input.file-titel {
+  border: 1px solid var(--accent); border-radius: var(--r-sm); padding: 3px 7px;
+  background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 700;
+  outline: none; width: 100%;
+}
+.file-body {
+  display: flex; align-items: center; gap: 10px; border: none; background: none;
+  font-family: inherit; font-size: 12.5px; color: var(--ink);
+  padding: 2px 12px 6px; cursor: pointer; text-align: left;
+}
+/* M397: gezeichnetes Symbol in fester Kachel – die Kopfzeile ist so hoch wie zuvor */
+.file-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 24px; height: 24px; color: var(--muted); }
+/* Der Titel der Bild-Karte steht in derselben Zeile wie das Symbol */
+.img-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.img-titel { flex: 1; min-width: 0; }
+input.img-titel {
+  border: 1px solid var(--accent); border-radius: var(--r-sm); padding: 2px 6px;
+  background: var(--surface); color: var(--ink); font-size: 12px; outline: none; width: 100%;
+}
+
+/* ---------- Kanban-Karte ---------- */
+.kanban-card { background: var(--surface-card); border-radius: var(--r); padding: 12px 14px 12px; overflow: hidden; }
+.kanban-head { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.kanban-title {
+  border: none; background: transparent; font-family: inherit; font-weight: 700;
+  font-size: 14px; width: 100%; outline: none; color: var(--ink);
+}
+.kanban-addcol {
+  border: none; background: var(--surface-dim); border-radius: var(--r-sm); cursor: pointer;
+  font-size: 10px; padding: 4px 7px; line-height: 1; flex: none;
+  opacity: 0; transition: opacity 0.15s;
+}
+.kanban-card:hover .kanban-addcol, .react-flow__node.selected .kanban-addcol { opacity: 1; }
+.kanban-addcol:hover { background: var(--border); }
+.kanban-cols { display: flex; gap: 8px; position: relative; }
+.kanban-col {
+  flex: 1; min-width: 0; background: rgba(0, 0, 0, 0.045); border-radius: var(--r); padding: 7px; min-height: 80px;
+  transition: background 0.12s, outline-color 0.12s; outline: 2px dashed transparent; outline-offset: -2px;
+}
+/* Drag & Drop (M119) */
+.kanban-col.drop-target { background: var(--accent-soft); outline-color: var(--accent); }
+.kanban-item { cursor: grab; }
+.kanban-item.dragging { opacity: 0.45; cursor: grabbing; }
+/* Abhängigkeits-Pfeile (M119) */
+.k-dep-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 3; overflow: visible;
+}
+.k-dep-path { fill: none; stroke-width: 1.6; stroke-dasharray: 4 3; opacity: 0.75; }
+.k-dep-path.open { stroke: #d84b3d; }
+.k-dep-path.done { stroke: #2e9e63; }
+/* WIP-Limit (M119) */
+.kanban-wip-input {
+  width: 44px; font-family: inherit; font-size: 10px; border: 1px solid var(--accent);
+  border-radius: var(--r-pill); padding: 1px 5px; background: var(--surface); color: var(--ink); outline: none; flex: none;
+}
+.kanban-count.wip-full { background: #d84b3d; color: #fff; }
+.kanban-col-head { display: flex; align-items: center; gap: 2px; margin: 0 0 7px; }
+.kanban-col-name {
+  width: 100%; min-width: 0; border: none; background: transparent; outline: none;
+  font-family: inherit; font-weight: 700; font-size: 10.5px; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--muted); padding: 0;
+}
+.kanban-col-name:focus { color: var(--ink); }
+.kanban-col-x {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  font-size: 9px; padding: 1px 3px; border-radius: var(--r-xs); line-height: 1; flex: none;
+  opacity: 0; transition: opacity 0.15s;
+}
+.kanban-col:hover .kanban-col-x { opacity: 1; }
+.kanban-col-x:hover { background: var(--border); color: var(--ink); }
+.kanban-item {
+  background: var(--surface); border-radius: var(--r-sm); padding: 6px 8px; font-size: 11.5px;
+  box-shadow: 0 1px 3px var(--border); margin-bottom: 6px;
+  border-left: 3px solid #f5b53f;
+  /* M295: Raster statt umbrechender Zeile — der Text teilte sich die Zeile
+     mit Chips und Aktionen und wurde auf wenige Buchstaben gequetscht
+     („Sitzungsra um buchen"). Jetzt: Text links in voller Breite, Aktionen
+     rechts daneben, Labels, Chips und Frist in eigenen Zeilen darunter. */
+  display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 4px; align-items: start; position: relative;
+}
+.kanban-item > .kanban-item-text { min-width: 0; overflow-wrap: anywhere; }
+/* Die Aktionen schweben beim Zeigen als Pille an der Unterkante des Tickets,
+   statt dem Text dauerhaft Platz wegzunehmen — unsichtbar nahmen sie ihn
+   vorher auch. An der Unterkante verdecken sie keinen Text; oben rechts
+   lagen sie bei kurzen Tickets genau über dem Wort, das man anklicken will. */
+.kanban-item > .kanban-item-actions {
+  position: absolute; right: 6px; bottom: -9px; margin-left: 0; z-index: 2;
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--r-pill);
+  padding: 1px 3px; box-shadow: var(--chrome-shadow);
+}
+@media (pointer: coarse) {
+  /* Am Touch-Gerät sind sie immer sichtbar — dann gehören sie in den Fluss, sonst verdecken sie Text */
+  .kanban-item > .kanban-item-actions { position: static; justify-self: end; background: none; box-shadow: none; padding: 0; }
+}
+.kanban-item > .k-labels, .kanban-item > .kanban-chips,
+.kanban-item > .kanban-due, .kanban-item > .kanban-due-input { grid-column: 1 / -1; justify-self: start; }
+.kanban-item > .kanban-chips { margin-left: 0; flex-wrap: wrap; }
+.kanban-item.col-mid { border-left-color: var(--accent); }
+.kanban-item.col-done { border-left-color: #55b96a; opacity: 0.75; }
+.done-text { text-decoration: line-through; }
+.kanban-item-actions { display: flex; gap: 2px; opacity: 0; transition: opacity 0.15s; }
+.kanban-item:hover .kanban-item-actions { opacity: 1; }
+.kanban-item-actions button {
+  border: none; background: var(--surface-dim); border-radius: var(--r-xs);
+  font-size: 10px; cursor: pointer; padding: 1px 5px; font-family: inherit;
+}
+.kanban-add input {
+  width: 100%; margin-top: 8px; border: 1px dashed var(--border-soft); border-radius: var(--r-sm);
+  background: transparent; padding: 6px 9px; font-family: inherit; font-size: 12px;
+  outline: none; color: var(--ink);
+}
+.kanban-add input:focus { border-color: var(--accent); }

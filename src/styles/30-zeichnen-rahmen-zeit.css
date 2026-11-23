@@ -1,0 +1,360 @@
+/* ---------- Zeichen-Layer ---------- */
+.drawing-layer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 6; touch-action: none; }
+.draw-palette {
+  position: fixed; left: 50%; bottom: 78px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px; z-index: 55;
+  background: var(--surface); border-radius: var(--r-lg); padding: 7px 10px; box-shadow: var(--pop-shadow);
+  /* Schmale Screens: umbrechen statt überlaufen */
+  flex-wrap: wrap; justify-content: center; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 20px);
+}
+.draw-swatch { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #fff; cursor: pointer; box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
+.draw-swatch.active { box-shadow: 0 0 0 2px var(--accent); }
+.draw-hint { font-size: 11.5px; color: var(--muted); margin-left: 4px; }
+.draw-done { border: none; background: var(--accent-soft); color: var(--accent-strong); font-weight: 600; border-radius: var(--r); padding: 5px 12px; cursor: pointer; font-family: inherit; font-size: 12px; }
+
+/* ---------- Dock-Erweiterungen ---------- */
+.dock-add-wrap { position: relative; }
+
+.dock button.active { background: var(--accent-soft); }
+.dock-menu {
+  position: absolute; bottom: 54px; left: 0; background: var(--surface); border-radius: var(--r-lg);
+  box-shadow: var(--pop-shadow); padding: 6px; display: flex; flex-direction: column;
+  gap: 2px; min-width: 190px;
+  /* Auf kleinen Screens nie unter Topbar/Tabs schieben — lieber intern scrollen */
+  max-height: calc(calc(100vh / var(--pn-anz, 1)) - 170px); overflow-y: auto;
+}
+.dock-menu button {
+  width: 100%; text-align: left; border: none; background: none; font-family: inherit;
+  font-size: 13px; padding: 7px 10px; border-radius: var(--r); cursor: pointer; color: var(--ink);
+  /* M144: strikt linksbündig mit Icon-Spalte — kein Zentrierungs-Eindruck mehr */
+  display: flex; align-items: center; justify-content: flex-start; gap: 9px;
+}
+.dock-menu button svg { flex: 0 0 auto; color: var(--muted); }
+.dock-menu button:hover { background: var(--surface-2); }
+.dock-menu-label { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 6px 10px 2px; }
+
+/* ---------- Frames: benannte Rahmen-Bereiche (M149) ---------- */
+/* Rahmen liegen IMMER hinter den Karten — auch ausgewählt (React Flow setzt
+   inline z-Indizes, deshalb !important) */
+.react-flow__node:has(> .frame-wrap) { z-index: -5 !important; }
+/* Fläche WIRKLICH durchklick-transparent (M150): nur Titel-Leiste, Konnektoren
+   und Resize-Griffe fangen Zeiger-Ereignisse — Doppelklick/Auswahl/Pan wirken
+   im Rahmen weiter aufs Board */
+.react-flow__node:has(> .frame-wrap) { pointer-events: none !important; }
+.react-flow__node:has(> .frame-wrap) .frame-head,
+.react-flow__node:has(> .frame-wrap) .pn-handle,
+.react-flow__node:has(> .frame-wrap) .react-flow__resize-control { pointer-events: all; }
+.frame-wrap { width: 100%; height: 100%; position: relative; }
+.frame-body {
+  position: absolute; inset: 0; border-radius: var(--r-lg);
+  border: 1.5px solid var(--border); background: rgba(125, 115, 95, 0.05);
+  /* Fläche ist durchklick-transparent: Pan/Auswahl/Doppelklick wirken im Rahmen weiter */
+  pointer-events: none;
+}
+/* Auswahl zeigt der abgerundete Rand SELBST (M152) — die eckigen Resizer-
+   Linien sind aus, sonst ragen sie über die runden Ecken hinaus */
+.frame-wrap.selected .frame-body { border-color: var(--accent); border-style: solid; border-width: 2px; }
+.frame-head {
+  position: absolute; top: -30px; left: 8px; height: 26px; max-width: calc(100% - 16px);
+  display: inline-flex; align-items: center; gap: 6px; padding: 0 11px;
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--r);
+  font-size: 12px; font-weight: 700; color: var(--muted); cursor: grab;
+  box-shadow: var(--chrome-shadow); white-space: nowrap;
+}
+.frame-wrap.selected .frame-head { color: var(--ink); border-color: var(--accent); }
+.frame-name { overflow: hidden; text-overflow: ellipsis; }
+.frame-name-input {
+  border: none; outline: none; background: transparent; font-family: inherit;
+  font-size: 12px; font-weight: 700; color: var(--ink); width: 160px;
+}
+
+/* Mitglieder-Zähler: macht sichtbar, dass die Karten „eingefangen" sind (M150) */
+.frame-count {
+  background: var(--surface-dim); color: var(--muted); border-radius: var(--r-pill);
+  font-size: 9.5px; font-weight: 700; min-width: 16px; height: 15px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+/* Anordnen-Menü NUR für den Rahmen-Inhalt (M150). Seit M151 ein PORTAL mit
+   fixer Position — im Frame-Node läge es hinter den Karten (z-Index −5) */
+.frame-menu, .happ-menu {
+  position: fixed; z-index: 75; min-width: 170px;
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--r);
+  box-shadow: var(--pop-shadow); padding: 5px; cursor: default;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.frame-menu button, .happ-menu button {
+  display: flex; align-items: center; justify-content: flex-start; gap: 8px;
+  width: 100%; border: none; background: none; cursor: pointer; color: var(--ink);
+  font-family: inherit; font-size: 12.5px; padding: 6px 9px; border-radius: var(--r-sm);
+  text-align: left; line-height: 1.2;
+}
+.frame-menu button:hover, .happ-menu button:hover { background: var(--surface-2); }
+.frame-menu button svg, .happ-menu button svg { flex: 0 0 auto; color: var(--muted); }
+/* Verbindungspunkte des Rahmens: nur bei Auswahl/Hover sichtbar (wie Karten) */
+.frame-handle { pointer-events: all; }
+
+/* ---------- Zeiterfassung (M157) ---------- */
+.time-card { background: var(--surface); border-radius: var(--r-lg); }
+.time-wrap { display: flex; flex-direction: column; height: 100%; padding: 10px 12px 10px; gap: 7px; }
+.time-head { display: flex; align-items: center; gap: 8px; }
+.time-title {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  font-family: inherit; font-size: 14px; font-weight: 700; color: var(--ink);
+}
+.time-live { font-size: 11px; font-weight: 700; white-space: nowrap; animation: time-pulse 2s ease-in-out infinite; }
+@keyframes time-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.time-rec { display: flex; flex-wrap: wrap; gap: 5px; }
+.time-kind {
+  border: 1.5px solid var(--border-soft); background: var(--surface-dim); cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 700; padding: 6px 11px; border-radius: var(--r-pill);
+}
+.time-kind.on { color: #fff !important; }
+.time-stop {
+  border: 1.5px solid #c0392b; color: #c0392b; background: none; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: var(--r-pill);
+  margin-left: auto;
+}
+.time-stop:disabled { opacity: 0.35; cursor: default; }
+.time-nav { display: flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.time-nav button {
+  border: none; background: var(--surface-dim); border-radius: var(--r-sm); cursor: pointer;
+  color: var(--muted); padding: 3px 6px; line-height: 0; font-family: inherit;
+}
+.time-nav button:hover { color: var(--ink); }
+.time-today { font-size: 11px; line-height: 1.2 !important; }
+.time-flex { flex: 1; }
+.time-add {
+  display: inline-flex !important; align-items: center; gap: 4px; font-size: 11.5px !important;
+  line-height: 1.2 !important; border: 1px dashed var(--border) !important; background: none !important;
+}
+.time-add:hover { color: var(--accent-strong) !important; border-color: var(--accent) !important; }
+.time-rows { flex: 1; min-height: 60px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.time-empty { font-size: 11.5px; color: var(--muted); padding: 10px 4px; }
+.time-row {
+  display: flex; align-items: center; gap: 5px; padding: 4px 6px 4px 8px;
+  background: var(--surface-dim); border-radius: var(--r-sm); border-left: 3px solid;
+}
+.time-row select, .time-row input[type='time'] {
+  border: 1px solid transparent; border-radius: var(--r-sm); background: transparent;
+  font-family: inherit; font-size: 11.5px; color: var(--ink); padding: 2px 2px;
+}
+.time-row select:hover, .time-row input[type='time']:hover { border-color: var(--border-soft); background: var(--surface); }
+.time-sep { color: var(--muted); font-size: 11px; }
+.time-runlabel { font-size: 11px; font-weight: 700; color: var(--accent-strong); }
+.time-note {
+  flex: 1; min-width: 40px; border: none; outline: none; background: transparent;
+  font-family: inherit; font-size: 11.5px; color: var(--ink);
+}
+.time-note::placeholder { color: var(--muted); opacity: .6; }
+.time-dur { font-size: 11px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.time-del {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 2px; border-radius: var(--r-sm); line-height: 0; opacity: 0.5;
+}
+.time-row:hover .time-del { opacity: 1; }
+.time-del:hover { color: #c0392b; background: rgba(192, 57, 43, 0.1); }
+.time-sums {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  border-top: 1px solid var(--border-soft); padding-top: 6px; font-size: 11px;
+}
+.time-sum { font-weight: 700; }
+.time-total { color: var(--muted); }
+.time-total b { color: var(--ink); font-size: 12px; }
+
+/* ---------- Freier Farbwähler (M155) — überall neben den festen Paletten ---------- */
+.pn-colorpick {
+  width: 18px; height: 18px; padding: 0; border: 1.5px dashed var(--muted);
+  border-radius: 50%; background: none; cursor: pointer; flex: none;
+  -webkit-appearance: none; appearance: none; overflow: hidden;
+}
+.pn-colorpick::-webkit-color-swatch-wrapper { padding: 1px; }
+.pn-colorpick::-webkit-color-swatch { border: none; border-radius: 50%; }
+.pn-colorpick::-moz-color-swatch { border: none; border-radius: 50%; }
+.pn-colorpick.on { border-style: solid; border-color: var(--accent); }
+.pn-colorpick:hover { border-color: var(--accent-strong); }
+/* Notiz: Farbwähler neben dem Palette-Punkt, gleiche Ein-/Ausblend-Logik */
+/* M323: Die eigene Farbe steht IN der Palette (note-farben), nicht mehr lose neben dem Farbpunkt */
+.note-farben .note-colorpick { position: static; opacity: 1; }
+
+/* ---------- Wochenplan: Stundenraster (M153) ---------- */
+.week-card { background: var(--surface); border-radius: var(--r-lg); }
+.week-wrap { display: flex; flex-direction: column; height: 100%; padding: 10px 12px 12px; gap: 4px; }
+.week-head { display: flex; align-items: center; gap: 8px; }
+.week-title {
+  flex: 1; min-width: 0; border: none; outline: none; background: transparent;
+  font-family: inherit; font-size: 14px; font-weight: 700; color: var(--ink);
+}
+.week-tools { display: inline-flex; align-items: center; gap: 4px; }
+.week-tools select {
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface-dim);
+  font-family: inherit; font-size: 10.5px; color: var(--ink); padding: 2px 3px;
+}
+.week-sep { font-size: 10.5px; color: var(--muted); }
+.week-daynames { display: flex; gap: 3px; }
+.week-daynames .week-gutter { flex: 0 0 38px; }
+.week-dayname {
+  flex: 1; min-width: 0; text-align: center; font-size: 10.5px; font-weight: 700; color: var(--muted);
+  display: inline-flex; align-items: center; justify-content: center; gap: 2px;
+}
+.week-grid { position: relative; flex: 1; min-height: 180px; display: flex; gap: 3px; }
+.week-times { position: relative; flex: 0 0 38px; }
+/* Eigene Zeilen (M154): breitere Beschriftungs-Spalte für Namen */
+.week-daynames.wide-gutter .week-gutter, .week-grid.wide-gutter .week-times { flex-basis: 84px; }
+.week-times span {
+  position: absolute; right: 6px; transform: translateY(-1px);
+  font-size: 9.5px; color: var(--muted);
+}
+.week-times .week-slot-label {
+  left: 0; right: 4px; transform: translateY(-50%); text-align: right;
+  display: inline-flex; align-items: center; justify-content: flex-end; gap: 2px;
+  font-size: 10px; font-weight: 600; overflow: hidden;
+}
+.week-col-input, .week-slot-input {
+  width: 100%; min-width: 0; border: 1px dashed var(--border-soft); border-radius: var(--r-sm);
+  background: transparent; font-family: inherit; font-weight: 700; color: var(--ink);
+  text-align: center; padding: 1px 2px;
+}
+.week-col-input { font-size: 10.5px; }
+.week-slot-input { font-size: 9.5px; text-align: right; }
+.week-mini-x, .week-mini-add {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 1px; border-radius: var(--r-xs); line-height: 0; flex: none;
+}
+.week-mini-x:hover { color: #c0392b; background: rgba(192, 57, 43, 0.1); }
+.week-mini-add { border: 1px dashed var(--border-soft); }
+.week-mini-add:hover { color: var(--accent-strong); border-color: var(--accent); }
+.week-slot-add { position: absolute; bottom: 2px; right: 4px; }
+.week-entry-who {
+  background: rgba(255, 255, 255, 0.65); border-radius: var(--r-xs); padding: 0 3px; margin-left: 3px;
+  font-size: 8px; font-weight: 700;
+}
+.week-pop-who { font-size: 11.5px; }
+.week-day {
+  position: relative; flex: 1; min-width: 0; cursor: copy;
+  background: var(--surface-dim); border-radius: var(--r-sm);
+  /* Stunden-Linien: eine Linie je Stunde über die CSS-Variable --week-hour */
+  background-image: repeating-linear-gradient(
+    to bottom, transparent 0, transparent calc(var(--week-hour) - 1px),
+    var(--border-soft) calc(var(--week-hour) - 1px), var(--border-soft) var(--week-hour));
+}
+.week-entry {
+  position: absolute; box-sizing: border-box; overflow: hidden; cursor: pointer;
+  border: none; border-left: 3px solid; border-radius: var(--r-sm);
+  font-family: inherit; text-align: left; padding: 2px 4px;
+  display: flex; flex-direction: column; gap: 0; line-height: 1.2;
+  min-height: 14px;
+}
+.week-entry-time { font-size: 8.5px; font-weight: 700; opacity: .8; }
+.week-entry-text { font-size: 10.5px; font-weight: 600; overflow: hidden; overflow-wrap: anywhere; }
+.week-pop {
+  position: fixed; z-index: 75; width: 240px;
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--r);
+  box-shadow: var(--pop-shadow); padding: 9px;
+  display: flex; flex-direction: column; gap: 7px;
+}
+.week-pop-text {
+  border: 1px solid var(--border-soft); border-radius: var(--r); background: var(--surface-dim);
+  font-family: inherit; font-size: 12.5px; padding: 6px 8px; color: var(--ink);
+}
+.week-pop-row { display: flex; align-items: center; gap: 6px; }
+.week-pop-row select {
+  flex: 1; border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface-dim);
+  font-family: inherit; font-size: 12px; color: var(--ink); padding: 4px 5px;
+}
+.week-pop-colors { gap: 5px; }
+.week-color-dot {
+  width: 16px; height: 16px; border-radius: 50%; cursor: pointer; padding: 0;
+  border: 2px solid transparent;
+}
+.week-color-dot.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.week-pop-del {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 3px; border-radius: var(--r-sm); line-height: 0;
+}
+.week-pop-del:hover { background: rgba(192, 57, 43, 0.12); color: #c0392b; }
+
+/* ---------- Kommentar-Pins & -Panel (M148) ---------- */
+.comment-pin {
+  position: absolute; z-index: 9; pointer-events: all;
+  width: 26px; height: 26px; border-radius: 50% 50% 50% var(--r-xs);
+  border: 2px solid var(--surface); background: var(--accent-fill); color: #fff;
+  font-size: 10px; font-weight: 700; font-family: inherit; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  box-shadow: var(--chrome-shadow);
+}
+.comment-pin:hover { transform-origin: center; filter: brightness(1.08); }
+.comment-pin.resolved { background: var(--surface-dim); color: var(--muted); box-shadow: none; opacity: .75; }
+.comment-pin.open { outline: 2px solid var(--accent-strong); }
+.comment-pin-count {
+  position: absolute; top: -6px; right: -7px; background: #d05353; color: #fff;
+  border-radius: 999px; font-size: 8.5px; min-width: 14px; height: 14px; padding: 0 3px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.comment-panel {
+  position: fixed; z-index: 70; width: min(320px, calc(calc(100vw / var(--pn-anz, 1)) - 28px));
+  background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--r-lg);
+  box-shadow: var(--pop-shadow);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+/* M263: Am Bildschirmrand geparkt — nur noch am Telefon, wo neben der Karte
+   ohnehin kein Platz für eine Blase ist. */
+.comment-panel.fest { right: 14px; top: 86px; }
+/* … sonst als Sprechblase an der Karte, mit Zipfel zur Karte hin */
+.comment-panel.an-karte { animation: comment-pop 0.14s ease-out; }
+.comment-panel.an-karte::before {
+  content: ''; position: absolute; top: 18px; width: 10px; height: 10px;
+  background: var(--surface); border: 1px solid var(--border-soft);
+  transform: rotate(45deg);
+}
+.comment-panel.an-karte[data-seite='rechts']::before {
+  left: -6px; border-right: none; border-top: none;
+}
+.comment-panel.an-karte[data-seite='links']::before {
+  right: -6px; border-left: none; border-bottom: none;
+}
+@keyframes comment-pop {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.comment-panel-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 12px; font-size: 13px; border-bottom: 1px solid var(--border-soft);
+}
+.comment-panel-tools { display: flex; align-items: center; gap: 4px; }
+.comment-panel-tools button {
+  border: none; background: none; cursor: pointer; color: var(--muted); font-family: inherit;
+  font-size: 11px; padding: 3px 7px; border-radius: var(--r-sm); display: inline-flex; align-items: center;
+}
+.comment-panel-tools button:hover { background: var(--surface-2); color: var(--ink); }
+.comment-panel-tools button.danger:hover { background: rgba(192, 57, 43, 0.1); color: #c0392b; }
+.comment-msgs { max-height: calc(40vh / var(--pn-anz, 1)); overflow-y: auto; padding: 8px 12px; display: flex; flex-direction: column; gap: 8px; }
+.comment-msg { display: flex; flex-direction: column; gap: 1px; }
+.comment-msg-meta { font-size: 10.5px; color: var(--muted); }
+.comment-msg-text { font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
+.comment-compose { display: flex; flex-direction: column; gap: 6px; padding: 9px 12px; border-top: 1px solid var(--border-soft); }
+.comment-name, .comment-input {
+  border: 1px solid var(--border-soft); border-radius: var(--r); background: var(--surface-dim);
+  font-family: inherit; font-size: 12.5px; padding: 6px 8px; color: var(--ink); resize: none;
+}
+.comment-send {
+  align-self: flex-end; border: none; background: var(--accent-fill); color: #fff; cursor: pointer;
+  font-family: inherit; font-size: 12px; font-weight: 600; padding: 5px 14px; border-radius: var(--r);
+}
+.comment-send:disabled { opacity: .45; cursor: default; }
+
+/* ---------- Team-Sync: Projekt-Liste (M145) ---------- */
+.psync-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 4px; }
+.psync-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px;
+  border: 1px solid var(--border-soft); border-radius: var(--r); padding: 7px 10px;
+  background: var(--surface-dim);
+}
+.psync-name { font-size: 12.5px; min-width: 140px; flex: 1 1 auto; }
+.psync-status { font-size: 11px; color: var(--muted); flex: 1 1 100%; }
+.psync-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.psync-actions button {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink);
+  border-radius: var(--r-sm); cursor: pointer; font-family: inherit; font-size: 11.5px; padding: 4px 9px;
+}
+.psync-actions button:hover { background: var(--surface-2); }
+.psync-actions button:disabled { opacity: .5; cursor: default; }

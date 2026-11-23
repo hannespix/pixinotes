@@ -1,0 +1,454 @@
+/* ================= M255: Barrierefreiheit & Responsivität Stufe 3 =================
+ *
+ * Gemessen statt geschätzt: Ein Durchgang über iPhone SE, iPhone 15, iPad hoch,
+ * iPad quer und PC hat vier Gruppen von Verstößen gefunden — zu kleine
+ * Eingabefelder (die iOS zum Zoomen bringen), zu kleine Tippziele, zu kleine
+ * Schrift und Überlauf. Hier stehen die Antworten darauf.
+ */
+
+/* ---- 1. Die iOS-Zoomfalle ----
+ * Safari auf dem iPhone zoomt die GANZE Seite, sobald man ein Eingabefeld
+ * antippt, dessen Schrift kleiner als 16 px ist. Danach steht alles schief und
+ * man muss von Hand zurückzoomen. Es gibt keinen Trick dagegen außer: 16 px.
+ * Gefunden bei Kanban-Spaltennamen (10,5), Kanban-Eingabe (12), Auswahllisten
+ * in den Einstellungen (13) und der Netz-Suche (12).
+ */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='button']):not([type='submit']),
+  textarea, select,
+  /* Genauer benannt, wo eine bestehende Regel spezifischer ist als das nackte
+     Element — sonst gewinnt die alte Größe. */
+  .modal-row select, .modal-row input, .kanban-col-name, .kanban-add input,
+  .ov-graph-find input, .side-tree-find {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* ---- 2. Tippziele ----
+ * Zwei Klassen von Zielen, zwei Maße:
+ *
+ *  · Bedien-Chrome (Kopfleiste, Reiter, Dock, Fenster-Schließer) bekommt die
+ *    vollen 44 × 44 aus WCAG 2.5.5 — dort ist Platz.
+ *  · Winzige Schalter INNERHALB von Karten (Kanban-Zähler 8 × 6, Spalte
+ *    schließen 7 × 5, Farbpunkt 10 × 10) würden das Kartenlayout sprengen,
+ *    wenn sie wirklich 44 px groß würden. Sie wachsen deshalb sichtbar auf ein
+ *    brauchbares Maß und bekommen zusätzlich eine unsichtbare Fangfläche
+ *    ringsum. Der Finger trifft, das Layout bleibt ruhig.
+ */
+@media (pointer: coarse) {
+   .modal-x, .tab-home, .tab-add,
+  .focus-x, .modal-tabs button, .ov-graph-zoom button,
+  .dock > button, .dock-add-wrap > button {
+    min-width: 44px; min-height: 44px;
+  }
+  /* Zeilenhohe Ziele: 44 wäre zu wuchtig, 36 trifft der Daumen sicher */
+  .logo, .tab-nav, .ov-mode button, .legal-corner .link-btn, .modal-foot .link-btn {
+    min-height: 36px;
+  }
+  /* Kästchen im Netz-Filter: die Standardgröße ist 13 px — am Finger nichts */
+  .ov-graph-toggle input[type='checkbox'] { width: 20px; height: 20px; }
+  .ov-graph-toggle { position: relative; min-height: 32px; }
+  /* Die Zoom-Knöpfe von React Flow kommen mit 26 px aus der Bibliothek */
+  .react-flow__controls-button { width: 40px !important; height: 40px !important; }
+  /* Auf schmalen Telefonen ist in der Reiter-Zeile kein Platz für 44 px —
+     dort bleibt das Ziel sichtbar kleiner, die Fangfläche aber groß. */
+  @media (max-width: 640px) {
+     .tab-home, .tab-add { min-width: 34px; min-height: 34px; }
+  }
+
+  /* Karten-interne Kleinschalter: sichtbar größer … */
+  .kanban-col-x, .kanban-count, .kanban-addcol,
+  .kanban-item-actions button {
+    min-width: 28px; min-height: 28px; position: relative;
+  }
+  /* M338: Der Farbpunkt bleibt in der Kartenecke — `position: relative` holte ihn in den Textfluss,
+     und jede Notiz bekam am Tablet oben einen leeren Streifen mit einem Kreis davor. */
+  .color-dot { min-width: 28px; min-height: 28px; }
+  /* … plus unsichtbare Fangfläche. `inset` statt fester Größe, damit sich die
+     Zonen benachbarter Schalter nicht gegenseitig zudecken. */
+  .kanban-col-x::after, .kanban-count::after, .kanban-addcol::after,
+  .kanban-item-actions button::after, .color-dot::after {
+    content: ''; position: absolute; inset: -7px; border-radius: var(--r);
+  }
+  /* Der Zähler ist kein Ziel zum Treffen, sondern eine Anzeige — er darf die
+     Nachbarn nicht überdecken. */
+  .kanban-count::after { inset: -3px; }
+}
+
+/* ---- 3. Schrift-Untergrenze auf Touch-Geräten ----
+ * Am Telefon gab es Texte mit 10 px (Menü-Überschriften, Fußzeilen, Legenden).
+ * Das ist am Arm-Abstand nicht mehr lesbar. Statt jede Stelle einzeln
+ * hochzusetzen, gilt eine Untergrenze — die relativen Abstufungen bleiben.
+ */
+@media (pointer: coarse) {
+  .dock-menu-label, .dock-menu-foot, .legal-corner .link-btn,
+  .modal-foot, .modal-foot .link-btn, .ov-graph-legend, .ov-graph-legend b,
+  .sel-count, .tab-nav-space, .tab-nav-proj, .kanban-item-text,
+  .modal-hint, .modal-hint b, .ov-graph-toggle, .ov-mode button {
+    font-size: max(13px, 1em);
+  }
+  .side-empty, .meta { font-size: max(12.5px, 1em); }
+}
+
+/* ---- 4. Überlauf ----
+ * Die Auswahllisten in den Einstellungen liefen am iPhone über den rechten
+ * Rand hinaus (bis 407 bei 375 Punkten Fensterbreite), weil ihre Breite dem
+ * längsten Eintrag folgte. Sie bleiben jetzt im Fenster; bei Bedarf bricht die
+ * Zeile um, statt sich zu strecken.
+ */
+.modal-row select, .modal-row input[type='text'], .modal-row input[type='url'],
+.modal-row input[type='password'], .modal-row input[type='email'] {
+  max-width: 100%; box-sizing: border-box;
+}
+@media (max-width: 560px) {
+  .modal-row { flex-wrap: wrap; }
+  .modal-row select, .modal-row input[type='text'], .modal-row input[type='url'],
+  .modal-row input[type='password'], .modal-row input[type='email'] {
+    flex: 1 1 100%; min-width: 0;
+  }
+}
+
+/* ---------- Rechen-Tabelle (M256) ----------
+ * Ein Raster, das rechnet. Angezeigt wird das Ergebnis, beim Hineinklicken
+ * die Formel — deshalb hat die Zelle im Ruhezustand und im Bearbeiten-Zustand
+ * dieselbe Höhe: Sonst springt die ganze Tabelle bei jedem Klick.
+ */
+.sheet-card {
+  background: var(--surface-card); border-radius: var(--r); padding: 8px 10px 6px;
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.sheet-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.sheet-tools { display: flex; align-items: center; gap: 4px; margin-left: auto; flex: none; }
+.sheet-tools button {
+  display: inline-flex; align-items: center; gap: 3px;
+  border: 1px solid var(--border-soft); background: var(--surface-3);
+  color: var(--muted); border-radius: var(--r-sm); padding: 3px 6px;
+  font-family: inherit; font-size: 11px; cursor: pointer; white-space: nowrap;
+}
+.sheet-tools button:hover { border-color: var(--accent); color: var(--accent-strong); }
+.sheet-quelle {
+  font-size: 11px; color: var(--muted); margin-bottom: 5px;
+  display: flex; align-items: center; gap: 8px; min-width: 0;
+}
+.sheet-quelle-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* M406: das Original der Tabelle – ein kleiner Knopf am Ende der Quellenzeile */
+.sheet-original {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; min-height: 22px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 11px; cursor: pointer; white-space: nowrap;
+}
+.sheet-original:hover { background: var(--surface-2); }
+.sheet-original[aria-busy='true'] { opacity: .6; cursor: progress; }
+@media (pointer: coarse) { .sheet-original { min-height: 40px; padding: 6px 12px; font-size: 13px; } }
+.sheet-scroll { flex: 1; min-height: 0; overflow: auto; border-radius: var(--r-sm); overscroll-behavior: contain; }
+/* M409: Getrennte Ränder statt zusammengelegter – bei zusammengelegten verlieren stehenbleibende Zellen ihre Linien,
+   und der Inhalt schien beim Rollen durch die Fugen. Jede Zelle zeichnet rechts und unten; oben und links schließen
+   die erste Zeile und die erste Spalte ab. */
+.sheet-grid { border-collapse: separate; border-spacing: 0; width: 100%; table-layout: fixed; }
+.sheet-grid th, .sheet-grid td {
+  border: 0; border-right: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); padding: 0; height: 26px;
+  font-size: 12.5px; color: var(--ink); overflow: hidden;
+}
+.sheet-grid thead th { border-top: 1px solid var(--border-soft); }
+.sheet-grid tr > :first-child { border-left: 1px solid var(--border-soft); }
+/* Spalten- und Zeilenköpfe bleiben beim Scrollen stehen – deckend: `--surface-dim` ist durchscheinend, darunter liegt
+   darum die Fläche der Karte (sonst las man die Zeilen, die darunter durchrollen) */
+.sheet-kopf {
+  background: linear-gradient(var(--surface-dim), var(--surface-dim)), var(--surface-card); color: var(--muted); font-size: 11px;
+  font-weight: 700; text-align: center; position: sticky; top: 0; z-index: 4;
+}
+.sheet-zeilenkopf { left: 0; top: auto; width: 34px; min-width: 34px; z-index: 2; }
+.sheet-eck {
+  background: linear-gradient(var(--surface-dim), var(--surface-dim)), var(--surface-card); position: sticky; left: 0; top: 0; z-index: 5;
+  width: 34px; min-width: 34px;
+}
+/* M407: Der Innenabstand galt nie – die allgemeine Regel für th/td (padding: 0) war genauer; Text und Zahlen klebten am Rand */
+.sheet-grid td.sheet-zelle { cursor: text; padding: 0 5px; text-align: left; }
+.sheet-zelle > span {
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Zahlen rechtsbündig — so sieht man Größenordnungen auf einen Blick */
+.sheet-grid td.sheet-zelle.zahl { text-align: right; font-variant-numeric: tabular-nums; }
+/* M409: Zeilenumbruch aus Excel – die Zeile wächst mit */
+.sheet-zelle.umbruch > span { white-space: normal; overflow-wrap: anywhere; line-height: 1.3; padding: 3px 0; }
+.sheet-zelle.fehler { color: #c0392b; font-weight: 600; }
+[data-theme='dark'] .sheet-zelle.fehler { color: #ff8b7a; }
+.sheet-zelle:hover { background: var(--accent-soft); }
+.sheet-eingabe {
+  width: 100%; height: 24px; box-sizing: border-box; border: 2px solid var(--accent);
+  border-radius: var(--r-xs); background: var(--surface-2); color: var(--ink);
+  font-family: inherit; font-size: 12.5px; padding: 0 4px; outline: none;
+}
+.sheet-fuss { font-size: 11px; color: var(--muted); margin-top: 5px; }
+.sheet-fuss code {
+  background: var(--surface-dim); border-radius: var(--r-xs); padding: 0 3px;
+  font-size: 0.95em;
+}
+/* M255: Am Touchgerät darf keine Eingabe unter 16px liegen — sonst zoomt iOS
+   beim Antippen die ganze Seite. Zeilen und Knöpfe wachsen entsprechend mit. */
+@media (pointer: coarse) {
+  .sheet-eingabe { font-size: 16px; height: 30px; }
+  .sheet-grid th, .sheet-grid td { height: 32px; font-size: 14px; }
+  .sheet-kopf { font-size: 12.5px; }
+  .sheet-tools button { font-size: 13px; padding: 6px 8px; min-height: 32px; }
+  .sheet-quelle, .sheet-fuss { font-size: max(13px, 1em); }
+}
+/* Griff am rechten Rand jedes Spaltenkopfes — schmal, aber gut zu treffen.
+   Ein Bezugspunkt muss nicht gesetzt werden: `position: sticky` am Kopf ist
+   selbst schon einer. Ein zusätzliches `position: relative` würde das Kleben
+   der Kopfzeile beim Scrollen wieder aufheben. */
+.sheet-breite {
+  position: absolute; top: 0; right: 0; width: 8px; height: 100%;
+  cursor: col-resize; touch-action: none;
+}
+/* Bewusst NICHT über den Rand hinaus: Die Kopfzelle schneidet zu langen Text
+   ab (overflow: hidden) — und schnitte damit auch den überstehenden Teil des
+   Griffs weg. Er wäre dann schmaler, als er aussieht, und ginge am Rand ins
+   Leere. Innen liegend ist er auf voller Breite zu treffen. */
+.sheet-breite:hover { background: var(--accent); opacity: .5; }
+@media (pointer: coarse) { .sheet-breite { width: 16px; } }
+
+/* ---------- Modell-Auswahl für lokale Server (M257) ----------
+ * Die Liste kommt vom Server selbst. Sie muss zwei Dinge auf einmal zeigen:
+ * den Namen (den man eintippen könnte) und die Größe (die entscheidet, ob es
+ * auf diesem Rechner überhaupt läuft).
+ */
+.btn-mini {
+  padding: 4px 8px; font-size: 12px; flex: none; white-space: nowrap;
+}
+.modal-note.warn { color: #b3502f; }
+[data-theme='dark'] .modal-note.warn { color: #ffab8f; }
+.modell-liste {
+  border: 1px solid var(--border-soft); border-radius: var(--r); margin: 6px 0 2px;
+  background: var(--surface-3); overflow: hidden;
+}
+.modell-kopf, .modell-fuss {
+  font-size: 12px; color: var(--muted); padding: 6px 10px;
+}
+.modell-fuss { border-top: 1px solid var(--border-soft); }
+.modell-zeile {
+  display: flex; align-items: baseline; gap: 8px; width: 100%;
+  padding: 7px 10px; border: none; border-top: 1px solid var(--border-soft);
+  background: none; font-family: inherit; font-size: 13px; color: var(--ink);
+  text-align: left; cursor: pointer;
+}
+.modell-zeile:hover { background: var(--accent-soft); }
+.modell-zeile.aktiv { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.modell-zeile span { margin-left: auto; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.modell-tipps { margin-top: 8px; }
+.modell-tipps summary { font-size: 13px; cursor: pointer; color: var(--accent-strong); }
+.modell-tipp {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 5px 0; border-top: 1px solid var(--border-soft); font-size: 12.5px;
+}
+.modell-tipp code {
+  background: var(--surface-dim); border-radius: var(--r-sm); padding: 2px 6px;
+  font-size: 12px; user-select: all;      /* ein Klick markiert den ganzen Befehl */
+}
+.modell-tipp-platz { color: var(--muted); font-variant-numeric: tabular-nums; }
+.modell-tipp-zweck { color: var(--muted); flex: 1 1 190px; }
+.modell-tipp .btn-mini { margin-left: auto; }
+/* M255: Am Touchgerät bleiben Eingaben bei 16px und Ziele bei 44px */
+@media (pointer: coarse) {
+  .modell-zeile { font-size: 14px; min-height: 44px; }
+  .modell-kopf, .modell-fuss, .modell-tipp, .modell-tipps summary { font-size: max(13px, 1em); }
+  .btn-mini { font-size: 14px; min-height: 44px; padding: 8px 12px; }
+}
+/* Anleitung bei blockiertem Zugriff (M258) — der Befehl muss zum Kopieren
+   taugen, deshalb Festbreitenschrift und eigene Zeilen. */
+.ollama-hilfe { color: var(--ink); }
+.ollama-hilfe b { color: #b3502f; }
+[data-theme='dark'] .ollama-hilfe b { color: #ffab8f; }
+.ollama-hilfe p { margin: 5px 0; color: var(--muted); }
+.ollama-hilfe pre {
+  background: var(--surface-dim); border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm); padding: 8px 10px; margin: 6px 0;
+  font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all;
+  user-select: all;                     /* ein Klick markiert alles zum Kopieren */
+}
+@media (pointer: coarse) {
+  .ollama-hilfe p, .ollama-hilfe pre { font-size: max(13px, 1em); }
+}
+
+/* ---------- Vorschauen auf der Datei-Karte (M259) ----------
+ * Ton, Bewegtbild und Text kann der Browser von Haus aus zeigen — sie brauchen
+ * nur Platz und einen Rahmen, der zur Karte passt.
+ */
+.file-media { display: block; width: 100%; margin-top: 6px; border-radius: var(--r); }
+.file-media[src=''] { display: none; }
+video.file-media { max-height: 320px; background: #000; }
+audio.file-media { height: 40px; }
+.file-text {
+  margin-top: 6px; border: 1px solid var(--border-soft); border-radius: var(--r);
+  background: var(--surface-3); max-height: 260px; overflow: auto;
+}
+.file-text pre {
+  margin: 0; padding: 8px 10px; font-size: 11.5px; line-height: 1.45;
+  white-space: pre-wrap; word-break: break-word; color: var(--ink);
+}
+.file-text-mehr {
+  padding: 4px 10px 6px; font-size: 11px; color: var(--muted);
+  border-top: 1px solid var(--border-soft);
+}
+/* Warum hier nichts zu sehen ist — kein Rätsel, sondern ein Satz */
+.file-nopreview {
+  margin-top: 6px; font-size: 11.5px; color: var(--muted); line-height: 1.45;
+}
+@media (pointer: coarse) {
+  .file-text pre, .file-text-mehr, .file-nopreview { font-size: max(13px, 1em); }
+  audio.file-media { height: 48px; }
+}
+.file-teamnote {
+  margin-top: 5px; font-size: 11px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@media (pointer: coarse) { .file-teamnote { font-size: max(12.5px, 1em); } }
+
+/* ---------- Board-Wähler auf schmalen Schirmen (M261) ----------
+ * Gemessen: Bei 390 Punkten Fensterbreite bleiben der Reihe 142 Punkte, ein
+ * einzelner Reiter braucht 215. Es war dort also NIE ein Reiter vollständig
+ * zu sehen — man scrollte an abgeschnittenen Wörtern entlang. Ein Wähler mit
+ * Liste zeigt stattdessen einen vollständigen Namen und auf Tipp alle.
+ */
+.tab-picker-wrap { position: relative; min-width: 0; flex: 1; }
+
+.tab-picker-pfeil { transform: rotate(90deg); flex: none; opacity: .6; transition: transform .15s; }
+
+/* Rechtsbündig aufgeklappt: Der Wähler ist das letzte flexible Element der
+   Leiste, seine rechte Kante liegt damit immer im Bild — eine linksbündige
+   Liste mit 240 Punkten Mindestbreite schoss dagegen am Telefon (gemessen)
+   und am Tablet rechts hinaus. */
+
+/* In der Liste ist der ✕ immer sichtbar — am Finger gibt es kein Hovern */
+
+/* ================= M283: Die eine Tabelle — sie rechnet =================
+   Ein Raster mitten in der Notiz. Bewusst ruhig gehalten: Es soll wie ein
+   Teil des Textes wirken, nicht wie ein eingebettetes Fremdprogramm.
+
+   M284: Die Farben kommen aus Variablen, NICHT direkt aus den Theme-Flächen.
+   Grund steht in Zeile 78: „Haftnotizen & Prozess-Formen bleiben helles
+   Papier — Text darauf dunkel." Im Dunkelmodus sind `--surface` & Co. aber
+   dunkel; auf dem hellen Papier ergab das eine graue Platte mit dunkler
+   Schrift darauf — im Bildschirmfoto des Nutzers unlesbar. Auf Papier-Karten
+   gelten deshalb durchscheinende Überlagerungen (dasselbe Muster wie in der
+   Protokoll-Karte), überall sonst die Theme-Flächen. */
+.rt-block {
+  --rt-flaeche: var(--surface-2);
+  --rt-leiste: var(--surface-3);
+  --rt-knopf: var(--surface-dim);
+  --rt-knopf-hover: var(--border);
+  --rt-rand: var(--border);
+  --rt-linie: var(--border-soft);
+  --rt-text: var(--ink);
+  --rt-leise: var(--muted);
+  --rt-spur: rgba(79, 124, 255, 0.16);
+  --rt-link: var(--accent-strong);
+  margin: 6px 0; border: 1px solid var(--rt-rand); border-radius: var(--r);
+  background: var(--rt-flaeche); color: var(--rt-text); overflow: hidden;
+}
+/* Im dunklen Thema ist der Akzent auf dunklem Grund zu dunkel (gemessen:
+   Kontrast 3,4) — der Link bekommt dort einen helleren Ton. */
+[data-theme='dark'] .rt-block { --rt-link: #9db7ff; }
+/* Papier-Karten: die FARBIGEN Haftnotiz-/Protokoll-Töne (#fff3a3 & Co.)
+   bleiben in beiden Themes hell — dort gilt die Papier-Palette.
+   Bewusst NICHT „.sticky-white": Weiß ist `var(--surface-card)` und damit im
+   Dunkelmodus eine dunkle Karte; dort passt die Theme-Palette oben. */
+.sticky-yellow .rt-block,
+.sticky-pink .rt-block,
+.sticky-mint .rt-block,
+.sticky-sky .rt-block,
+.shape-body .rt-block {
+  --rt-flaeche: rgba(255, 255, 255, 0.44);
+  --rt-leiste: rgba(255, 255, 255, 0.62);
+  --rt-knopf: rgba(0, 0, 0, 0.07);
+  --rt-knopf-hover: rgba(0, 0, 0, 0.15);
+  --rt-rand: rgba(0, 0, 0, 0.22);
+  --rt-linie: rgba(0, 0, 0, 0.13);
+  --rt-text: #16191e;
+  --rt-leise: #5a616d;
+  --rt-spur: rgba(79, 124, 255, 0.14);
+  /* fester, kräftiger Ton statt var(--accent): auf den ruhigeren Papiertönen des dunklen Designs (M338)
+     fiel der helle Akzent unter Kontrast 3 */
+  --rt-link: #3557c9;
+}
+.rt-roller { overflow-x: auto; scrollbar-width: thin; }
+.rt-tabelle { border-collapse: collapse; width: 100%; font-size: 13px; }
+.rt-zelle {
+  border: 1px solid var(--rt-linie); padding: 0; min-width: 74px;
+  vertical-align: middle;
+  /* M284: Die Schriftfarbe steht AUSDRÜCKLICH hier, nicht geerbt. BlockNote
+     setzt in Tabellenzellen eigene Farbwerte (siehe M172); ohne diese Regel
+     stand im Dunkelmodus helle Schrift auf dem hellen Notizpapier. */
+  color: var(--rt-text) !important;
+  /* M284: BlockNote legt auf jedes `td` im Editor eine eigene helle Fläche
+     (gemessen: rgba(255,255,255,.45)). Auf der dunklen Karte ergab das
+     helles Grau unter heller Schrift — Kontrast 2,5. Ohne Nachdruck gewinnt
+     BlockNotes eigene Regel. Eingefärbte Zellen setzen ihre Farbe direkt am
+     Element und stechen den Nachdruck ohnehin. */
+  background: transparent !important;
+}
+.rt-zelle.aktiv { outline: 2px solid var(--accent); outline-offset: -2px; }
+.rt-zelle.fett { font-weight: 700; }
+.rt-zelle.aus-l { text-align: left; }
+.rt-zelle.aus-m { text-align: center; }
+.rt-zelle.aus-r { text-align: right; }
+/* Eine eingefärbte Zelle trägt immer dunkle Schrift: Die Töne sind hell
+   gewählt (Ampel), und im Dunkelmodus stünde sonst helle Schrift darauf. */
+.rt-zelle[style*="--rt-zellbg"] {
+  background: var(--rt-zellbg) !important;
+  color: #16191e !important;
+}
+/* Wert und Eingabe füllen die Zelle ganz aus — so trifft jeder Klick */
+.rt-wert, .rt-eingabe {
+  display: block; width: 100%; box-sizing: border-box;
+  border: none; background: none; font: inherit; color: inherit;
+  text-align: inherit; padding: 5px 8px; min-height: 30px; cursor: cell;
+}
+.rt-eingabe { outline: 2px solid var(--accent); outline-offset: -2px; cursor: text; }
+.rt-wert:hover { background: var(--rt-spur); }
+.rt-linkzelle { display: flex; align-items: center; gap: 2px; padding: 0 4px; }
+.rt-link {
+  flex: 1; min-width: 0; border: none; background: none; font: inherit;
+  color: var(--rt-link); text-align: inherit; padding: 5px 4px;
+  cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rt-link:hover { text-decoration: underline; }
+.rt-linkedit {
+  border: none; background: none; cursor: pointer; color: var(--rt-leise);
+  font-size: 11px; padding: 2px 4px; border-radius: var(--r-xs); flex: none;
+}
+.rt-linkedit:hover { background: var(--rt-knopf); color: var(--rt-text); }
+.rt-leiste {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 3px;
+  padding: 4px 6px; border-top: 1px solid var(--rt-linie);
+  background: var(--rt-leiste);
+}
+.rt-leiste button {
+  display: inline-flex; align-items: center; gap: 3px;
+  border: none; background: var(--rt-knopf); border-radius: var(--r-sm);
+  cursor: pointer; font-size: 11px; padding: 3px 7px; font-family: inherit;
+  color: var(--rt-text);
+}
+.rt-leiste button:hover:not(:disabled) { background: var(--rt-knopf-hover); }
+.rt-leiste button:disabled { opacity: 0.4; cursor: default; }
+.rt-leiste button.an { background: var(--accent-fill); color: #fff; }
+.rt-leiste .rt-summe { font-weight: 600; }
+.rt-trenner { width: 1px; height: 16px; background: var(--rt-rand); margin: 0 3px; }
+.rt-adr { font-size: 11px; color: var(--rt-leise); font-weight: 600; min-width: 26px; }
+.rt-farbe {
+  width: 18px; height: 18px; padding: 0; border-radius: var(--r-sm) !important;
+  border: 1px solid var(--rt-rand) !important;
+}
+.rt-farbe.ohne { background: repeating-linear-gradient(45deg, #fff, #fff 3px, #d9dce2 3px, #d9dce2 6px); }
+.rt-farbe.an { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rt-hilfe {
+  padding: 3px 8px 5px; font-size: 10.5px; color: var(--rt-leise);
+  border-top: 1px solid var(--rt-linie); background: var(--rt-leiste);
+}
+.rt-hilfe code { background: var(--rt-knopf); border-radius: var(--r-xs); padding: 0 3px; font-size: 10px; }
+/* Am Finger gelten wieder die großzügigen Ziele aus M198/M282 */
+@media (pointer: coarse) {
+  .rt-wert, .rt-eingabe { min-height: 38px; }
+  .rt-leiste button { min-height: 36px; padding: 4px 9px; }
+  .rt-farbe { width: 26px; height: 26px; }
+}

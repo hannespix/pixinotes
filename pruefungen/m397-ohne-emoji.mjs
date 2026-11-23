@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import http from 'node:http';
+import { cssQuelle } from '../werkzeug/css-quelle.mjs';
 import { chromium, devices } from 'playwright-core';
 import { bearbeiten } from '../werkzeug/ohne-emoji.mjs';
 const __repo = fileURLToPath(new URL('..', import.meta.url));
@@ -52,7 +53,7 @@ console.log('A  Regel im Quelltext');
   const start = lies('index.html'); const manifest = lies('public/manifest.webmanifest');
   pruefe('A4 Startseite und Manifest: kein Emoji, die Leistenfarbe ist der App-Grund', !BUNT.test(start) && !BUNT.test(manifest)
     && /name="theme-color" content="#f3f4f6"/.test(start) && /"theme_color": "#f3f4f6"/.test(manifest) && !manifest.includes('—'));
-  const css = lies('src/index.css').split('\n').filter((z) => !/data-accent='violett'/.test(z)).join('\n');
+  const css = cssQuelle(__repo).split('\n').filter((z) => !/data-accent='violett'/.test(z)).join('\n');
   pruefe('A5 kein eigenes Violett für KI und Portal – sie tragen die Akzentfarbe', !/#5b3fd4|#4a30b8|124, ?92, ?255|#f4efff|#453c63|#beadff/.test(css));
   const portal = css.slice(css.indexOf('.portal-card {'), css.indexOf('.portal-icon'));
   pruefe('A6 die Portal-Karte hat keinen Verlauf und keine Strichelung', !/gradient|dashed/.test(portal), portal.slice(0, 200));
