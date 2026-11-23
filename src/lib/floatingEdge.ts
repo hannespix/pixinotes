@@ -6,6 +6,7 @@
 // Randpunkten zu zerfasern.
 import { Position, type InternalNode } from '@xyflow/react';
 import { drehe, winkelVon } from './drehung';
+import type { Anzeige } from './zugAnzeige';
 
 /** M400: Winkel einer schräg liegenden Karte (0 = gerade) */
 const schraeg = (n: InternalNode): number => winkelVon(n as unknown as { winkel?: number });
@@ -67,4 +68,21 @@ export function getFloatingEdgeParams(source: InternalNode, target: InternalNode
     sourcePos: sourceSide,
     targetPos: targetSide,
   };
+}
+
+/**
+ * M485: Knoten so, wie er während eines Zugs zu sehen ist — verschoben (Ausweichen), um die Mitte vergrößert
+ * (Heben) und geneigt. Die Kante dockt dann an der sichtbaren Karte an statt an ihrer Lage im Stand.
+ */
+export function mitAnzeige(n: InternalNode, a?: Anzeige): InternalNode {
+  if (!a) return n;
+  const [dx, dy, s, w] = a;
+  const b = n.measured.width ?? 0; const h = n.measured.height ?? 0;
+  const p = n.internals.positionAbsolute;
+  return {
+    ...n,
+    winkel: schraeg(n) + w,
+    measured: { width: b * s, height: h * s },
+    internals: { ...n.internals, positionAbsolute: { x: p.x + dx - (b * (s - 1)) / 2, y: p.y + dy - (h * (s - 1)) / 2 } },
+  } as InternalNode;
 }

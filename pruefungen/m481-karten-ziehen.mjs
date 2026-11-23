@@ -121,8 +121,12 @@ const spur = (P, id, n = 40) => P.evaluate(async ([id, n]) => {
   pruefe('B2 … nur als Anzeige: im Stand (und damit im Live-Team) liegt er noch an seinem Platz', bLaden.x === bPos0.x && bLaden.y === bPos0.y, bLaden);
   await P.screenshot({ path: path.join(SD, 'm481-ausweichen.png') });
   // weiterziehen — B kehrt gleitend zurück
+  // M485: die Spur läuft schon während der Mausbewegung — jeder Zugschritt kostet im Prüf-Chromium so viel, dass das
+  // Zurückgleiten (0,46 s) sonst halb vorbei war, bevor gemessen wurde (B4 fiel jedes zweite Mal)
+  const bSpurP = spur(P, 'b', 50);
   await P.mouse.move(ueberB[0], ueberB[1] + 330 * z, { steps: 6 });
-  const bSpur = await spur(P, 'b', 36);
+  const bSpur = await bSpurP;
+  await P.waitForTimeout(300);
   const bEnde = await rahmen(P, 'b');
   const stufen = new Set(bSpur.map((p) => `${Math.round(p[0])},${Math.round(p[1])}`)).size;
   pruefe('B3 zieht die Karte weiter, kehrt der Nachbar zurück', Math.abs(bEnde.x - b0.x) < 1 && Math.abs(bEnde.y - b0.y) < 1, { b0, bEnde });

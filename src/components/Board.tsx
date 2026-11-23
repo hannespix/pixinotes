@@ -878,9 +878,10 @@ export function Board() {
     const wurzel = zoomWrapRef.current;
     if (!st.ziehBewegung || !wurzel) return;
     const starten = (m: typeof import('../lib/ziehGefuehl')) => {
-      const alle = selectActiveBoard(useBoard.getState()).nodes;
-      const jetzt = alle.find((n) => n.id === node.id);
-      if (jetzt) zieh.current = m.zugStarten(wurzel, jetzt, alle, getViewport().zoom || 1);
+      const b = selectActiveBoard(useBoard.getState());
+      const jetzt = b.nodes.find((n) => n.id === node.id);
+      // M485: Karten mit Verbindung — deren Kanten folgen der sichtbaren (gehobenen, ausweichenden) Lage
+      if (jetzt) zieh.current = m.zugStarten(wurzel, jetzt, b.nodes, getViewport().zoom || 1, new Set(b.edges.flatMap((e) => [e.source, e.target])));
     };
     if (zg.current) { starten(zg.current); return; }
     // Allererster Zug (Finger: kein Überfahren vorher) — die Datei kommt noch; dann setzt das Gefühl mitten im Zug ein
