@@ -39140,6 +39140,29 @@ init_define_import_meta_env();
 // src/lib/kartenZeit.ts
 init_define_import_meta_env();
 
+// src/types.ts
+init_define_import_meta_env();
+var STICKY_COLORS = ["yellow", "pink", "mint", "sky", "white"];
+var KANBAN_COLS = ["To Do", "Doing", "Done"];
+function kanbanCols(data) {
+  return data.cols && data.cols.length >= 2 ? data.cols : [...KANBAN_COLS];
+}
+function doneCol(data) {
+  return kanbanCols(data).length - 1;
+}
+function mitSpalte(it, col, data, now = /* @__PURE__ */ new Date()) {
+  const dc = doneCol(data);
+  if (col >= dc) {
+    return { ...it, col, erledigtAm: it.col >= dc && it.erledigtAm ? it.erledigtAm : now.toISOString() };
+  }
+  if (it.erledigtAm === void 0) return { ...it, col };
+  const { erledigtAm: _weg, ...rest } = it;
+  return { ...rest, col };
+}
+function uid() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+}
+
 // src/lib/sprache.ts
 init_define_import_meta_env();
 var aktiv = "de";
@@ -39241,7 +39264,35 @@ function inhaltGeaendert(alt, patch) {
 }
 function nachPatch(neu, alt, patch, jetzt = Date.now()) {
   if (!inhaltGeaendert(alt.data, patch)) return neu;
-  return { ...neu, geaendert: jetzt };
+  let aus = { ...neu, geaendert: jetzt };
+  if (alt.type === "kanban" && Array.isArray(patch.items)) {
+    const items = spaltenStempeln(alt.data, neu.data, jetzt);
+    if (items) aus = { ...aus, data: { ...aus.data, items } };
+  }
+  return aus;
+}
+function spaltenStempeln(alt, neu, jetzt = Date.now()) {
+  if (!Array.isArray(neu.items)) return null;
+  const vorher = new Map((Array.isArray(alt.items) ? alt.items : []).map((it) => [it.id, it]));
+  const altCols = kanbanCols(alt);
+  const neuCols = kanbanCols(neu);
+  const gleicheSpalten = JSON.stringify(altCols) === JSON.stringify(neuCols);
+  let anders = false;
+  const items = neu.items.map((it) => {
+    const a = vorher.get(it.id);
+    let seit;
+    if (!a) seit = jetzt;
+    else if (a.col !== it.col && (gleicheSpalten || altCols[a.col] !== neuCols[it.col])) seit = jetzt;
+    else seit = a.spalteSeit;
+    if (seit === it.spalteSeit) return it;
+    anders = true;
+    if (seit === void 0) {
+      const { spalteSeit: _w, ...rest } = it;
+      return rest;
+    }
+    return { ...it, spalteSeit: seit };
+  });
+  return anders ? items : null;
 }
 function frisch(n, jetzt = Date.now()) {
   return { ...n, angelegt: jetzt, geaendert: jetzt };
@@ -39384,29 +39435,6 @@ var MERMAID_TEMPLATES = {
   Zeitstrahl: "timeline\n  title Projektverlauf\n  2026 Q1 : Konzept : Abstimmung\n  2026 Q2 : Umsetzung\n  2026 Q3 : Pilot : Schulung\n  2026 Q4 : Rollout",
   Quadrant: 'quadrantChart\n  title Priorisierung\n  x-axis "Geringer Aufwand" --> "Hoher Aufwand"\n  y-axis "Geringer Nutzen" --> "Hoher Nutzen"\n  quadrant-1 "Sofort machen"\n  quadrant-2 "Einplanen"\n  quadrant-3 "Verwerfen"\n  quadrant-4 "Nebenbei"\n  "Portal-Relaunch": [0.7, 0.85]\n  "Ablage aufr\xE4umen": [0.25, 0.4]\n  "Neues Formular": [0.3, 0.75]'
 };
-
-// src/types.ts
-init_define_import_meta_env();
-var STICKY_COLORS = ["yellow", "pink", "mint", "sky", "white"];
-var KANBAN_COLS = ["To Do", "Doing", "Done"];
-function kanbanCols(data) {
-  return data.cols && data.cols.length >= 2 ? data.cols : [...KANBAN_COLS];
-}
-function doneCol(data) {
-  return kanbanCols(data).length - 1;
-}
-function mitSpalte(it, col, data, now = /* @__PURE__ */ new Date()) {
-  const dc = doneCol(data);
-  if (col >= dc) {
-    return { ...it, col, erledigtAm: it.col >= dc && it.erledigtAm ? it.erledigtAm : now.toISOString() };
-  }
-  if (it.erledigtAm === void 0) return { ...it, col };
-  const { erledigtAm: _weg, ...rest } = it;
-  return { ...rest, col };
-}
-function uid() {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
-}
 
 // src/lib/nodes.ts
 var CARD_WIDTHS = {
