@@ -98,7 +98,8 @@ async function gatherAlle(nodes: AppNode[]): Promise<Ctx[]> {
   return all;
 }
 
-async function gather(nodes: AppNode[]): Promise<Ctx[]> {
+/** M444: auch fürs Board-Briefing (lib/boardBriefing.ts) – derselbe Platzdeckel wie alle Board-Aktionen */
+export async function gather(nodes: AppNode[]): Promise<Ctx[]> {
   const all = await gatherAlle(nodes);
   let budget = CTX_MAX_CHARS;
   const out: Ctx[] = [];
