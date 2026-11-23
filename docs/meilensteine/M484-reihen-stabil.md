@@ -35,7 +35,11 @@ m332, m447, m429, m354, m366. Jeder Agent verlor damit Wiederholungen und Gewiss
   Karte bleibt offen.
 - **m387, m414:** `vortragStart` wartet auf die offene Präsentation (`.presenter`, bis 15 s) statt fester 700 ms (der
   Vortrag wird nachgeladen); m387 H1 wartet erst, bis Gerds Präsentation offen ist, dann die 2,5 s, in denen sie bei
-  Anna zu bleiben hat. m414 ließ sich hier nicht rot machen.
+  Anna zu bleiben hat.
+- **m414 F1:** Das untergeschobene fremde Abbild (Folgenummer 1e9) wurde unter Last vom nächsten echten Abbild Annas
+  ersetzt, bevor die Reihe es las (gewollt: eine viel kleinere Nummer gilt als Neubeginn) — `getComputedStyle(null)`,
+  Absturz bzw. `null`. Die Reihe liest es jetzt neu und sendet es nach je 1,5 s erneut, bis sie es zu fassen bekommt;
+  geprüft wird weiter dasselbe (ohne Skripte, Rahmen, Weiterleitung, Ereignis-Merkmale, `javascript:`).
 - **m477 B8:** Der Hinweis „Anna tippt gerade" erschien, war aber nach Zug und 900 ms Warten unter Last schon wieder
   weg (auch ohne die Änderung dieses Meilensteins 2 von 4 rot). Die Reihe schreibt jetzt jeden Hinweis mit, der während
   des Zugs erscheint (MutationObserver), und prüft, ob einer Anna nennt.
@@ -81,8 +85,10 @@ m383 1 von 3 und 0 von 3, m428 1 von 3, m477 1 von 4 und 2 von 4 (Hauptzweig ohn
 je 3 von 3, später m387 1 von 2, m354 1 von 2, m429 1 von 2. Nach der Änderung: siehe PR (10 Durchgänge).
 
 ## Grenzen / offen
-- m414 ließ sich hier nicht rot machen; die Meldung stammte aus Läufen mit fremder Last (andere Agenten). Kommt es
-  wieder, mit `--wiederhole` nachstellen — der Läufer zeigt die erste Fehlerzeile je Durchgang.
+- m429 A1 misst ein Gleiten Bild für Bild; bei Last über dem Vierfachen der Kernzahl (gemessen 18,5 auf 4 Kernen) kam
+  es noch einmal auf 13,7 (Grenze 12). Weiter lockern hieße, einen echten Sprung zu übersehen — offen gelassen.
+- m477 lief einmal in das Zeitlimit des Läufers (600 s, hängend bei `keyboard.type` nach Abschnitt B, Last ~20 auf
+  4 Kernen); nicht wieder aufgetreten, Ursache offen.
 - Der Schreiber-Anspruch ist wie `schreibt` eine Selbstauskunft im Kanal: Ein manipuliertes Programm ohne Schreibrecht
   könnte ihn dauerhaft erheben, dann sicherte bei den anderen niemand den gemeinsamen Text (dieselbe Lücke wie das
   schon bisher selbst gemeldete `schreibt`; Server-Prüfung je Absender steht im BACKLOG unter M477).
