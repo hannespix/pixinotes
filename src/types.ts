@@ -359,7 +359,17 @@ export interface MinutesEntry {
   blocks?: unknown[];
   /** Beschlüsse: bewusst KEINE Aufgaben, sondern Festlegungen. In der
    *  Verwaltung ist die Beschlusslage oft wichtiger als das Protokoll. */
-  decisions?: Array<{ id: string; text: string }>;
+  decisions?: Array<{
+    id: string; text: string;
+    /** M497: Zu welchem TOP gehört der Beschluss — Kennung der Überschrift (fehlt sie, zählt `topText`); '' = bewusst
+     *  ohne TOP. Fehlt das Feld ganz (ältere Beschlüsse), entscheidet die Wortregel (lib/protokollSchliff.ts). */
+    top?: string;
+    /** M497: Text der Überschrift bei der Zuordnung — Rückfall, wenn die Kennung nicht (mehr) passt */
+    topText?: string;
+  }>;
+  /** M497: TOPs, die nur der Information dienen (ohne Beschluss, nie übergeben): Kennung der Überschrift oder
+   *  `text:<normalisierter Text>` */
+  infoTops?: string[];
   /** Externer Schreiber hat blocks geändert (Rück-Sync) — erzwingt Editor-Refresh */
   extEpoch?: number;
 }
@@ -381,6 +391,9 @@ export interface MinutesData {
   rhythm?: 'woche' | 'zweiwochen' | 'monat' | 'quartal' | '';
   /** Offene Punkte beim Anlegen automatisch übernehmen (Standard: an) */
   carryOpen?: boolean;
+  /** M497: abgelehnte Personen-Vorschläge („Mia zur Runde hinzufügen?" → ×), klein geschrieben — wer später doch in
+   *  die Runde kommt, fällt heraus */
+  personenAbgelehnt?: string[];
   [key: string]: unknown;
 }
 export type MinutesNode = Node<MinutesData, 'minutes'>;
