@@ -16,11 +16,16 @@ immer Vorrang vor dieser Liste.
 | M449 | Board-Versionen: Stände wiederherstellen (Zeitreise) | store, Speicher |
 | — | Wissensbasis: HISTORIE.md, README aktualisieren | docs/ |
 
+## Offene Punkte aus gemergten Meilensteinen
+- M445: Auto-Aufräumen (nächtlich) und Pin „nicht mit ordnen“ fehlen
+- M449: Versionen nur je Gerät (reisen nicht mit Sync/Export); Live-Team-Änderungen lösen keine eigene Sicherung aus; einzelne Stände nicht löschbar; kein Vergleich Karte für Karte
+- M444: Risiko-Erkennung ohne KI nur Wortmuster
+- M450: Kontakt-Karte aus einer Mail-Signatur erzeugen
+
 ## Ideen (noch nicht vergeben)
 - Microsoft-Graph-Anbindung (Outlook-Mails/Termine live) — Roadmap Phase 4
 - Browser-Erweiterung „An PixiNotes senden" (Capture)
 - Eingebaute Übersetzung der Oberfläche statt Browser-Übersetzer (UMBAU Zeile 54)
-- E-Mail-Destillat: Thread → Kernaussage, offene Fragen, Aufgaben (KONZEPT §5)
 - Nächtlicher CI-Lauf aller Prüfreihen (braucht Chromium im Runner)
 - BlockNote 0.31 → aktuelle Fassung – schließt die 22 „moderaten" Meldungen in tiptap/uuid (AUDIT C6), neue Editor-Funktionen – package.json, NoteCard.tsx, NotizRuhend.tsx, notizRuhend.ts
 - Gemeinsames Tippen in einer Notiz (Yjs über Realtime-Broadcast, BlockNote kann Yjs) – heute sperrt das Team ganze Karten (UMBAU §5a „Später möglich") – NoteCard.tsx, lib/gastSync.ts, lib/kontoSupabase.ts
