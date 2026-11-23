@@ -6,9 +6,10 @@ import { FreigabeDialog } from './FreigabeDialog';
 import { LinkDialog } from './LinkDialog';
 import {
   IArchive, IArchiveRestore, ICopy, IDownload, IDuplicate, IMore, IMoveTo,
-  IPen, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck, IUsers, IX,
+  IPen, IPlay, IPlus, IShare, ITrash, IReihenfolge, ICheck, IUsers, IX, IUhr,
 } from './Icons';
 import { MENUE_HIER } from '../lib/kontextmenue';
+import { versionenOeffnen } from '../lib/boardVersionen';
 import { ebeneLoeschenFragen } from './EbeneLoeschenDialog';
 
 /**
@@ -210,6 +211,10 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
           </button>
           <button role="menuitem" onClick={() => setVerschieben(true)}>
             <IMoveTo size={14} /> In Projekt verschieben …
+          </button>
+          {/* M449: frühere Stände dieses Boards (automatisch gesichert) */}
+          <button role="menuitem" onClick={() => { versionenOeffnen(boardId); zu(); }} data-taste="board-versionen">
+            <IUhr size={14} /> Versionen …
           </button>
           <div className="ebenen-menu-titel">Weitergeben</div>
           {/* M391: immer da — ohne Konto sagt der Dialog, was fehlt (vorher fehlte der Punkt und niemand fand die Funktion) */}

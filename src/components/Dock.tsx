@@ -10,6 +10,7 @@ import { aiBriefing, aiEdges, aiPraesentation, aiProcess, aiTasks } from '../lib
 /** M410: Die Freitext-Anweisung wird erst geladen, wenn sie gebraucht wird (lib/kiAnweisung.ts) */
 const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => import('../lib/kiAnweisung').then((m) => m.aiCommand(...a));
 import { kiBlaettern } from '../lib/kiVerlauf';
+import { versionenOeffnen, versionSichern } from '../lib/boardVersionen';
 import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
 import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
@@ -17,7 +18,7 @@ import {
   IAppWindow, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITimelineIcon, ITimer, IWand, IWeek, IX,
- IBubbles , IUsers, IArchive, IFolien
+ IBubbles , IUsers, IArchive, IFolien, IUhr
 } from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
 import { t } from '../lib/sprache';
@@ -232,6 +233,8 @@ export function Dock() {
     try {
       const st = useBoard.getState();
       const nodes = selectActiveBoard(st).nodes;
+      // M449: Vor dem KI-Umbau den Stand sichern — falls das Ergebnis nicht gefällt und Strg+Z nicht mehr reicht
+      void versionSichern(selectActiveBoard(st), 'ki');
       // M332: Stapel-Aktionen melden ihren Fortschritt; der Toast bietet „Abbrechen"
       const fortschritt = (m: string) => showToast(`KI: ${m}`, false, 180000, true);
       const msg = await fn(nodes, screenToFlowPosition({ x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 120 }), fortschritt);
@@ -565,6 +568,15 @@ export function Dock() {
               aria-label="Alles einpassen"
             >
               <ICompact size={16} /> Alles einpassen
+            </button>
+            {/* M449: frühere Stände des Boards ansehen und zurückholen */}
+            <button
+              onClick={() => { setMoreMenu(false); versionenOeffnen(useBoard.getState().activeId); }}
+              data-taste="dock-versionen"
+              title="Frühere Stände dieses Boards ansehen und wiederherstellen"
+              aria-label="Versionen"
+            >
+              <IUhr size={16} /> Versionen …
             </button>
             {(archivZahl > 0 || showArchived) && (
               <button

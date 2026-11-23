@@ -452,6 +452,12 @@ interface BoardState {
   /** M287: Projekt samt aller Boards kopieren (auf derselben Ebene) */
   duplicateProject: (projectId: string) => void;
   /**
+   * M449: Einen gesicherten Stand (lib/boardVersionen.ts) einsetzen. Ohne `alsKopie` bekommt das Board selbst den
+   * Stand — als EIN Rückgängig-Schritt, und weil es eine gewöhnliche Änderung ist, geht sie wie jede andere in den
+   * Sync. Mit `alsKopie` (Name) entsteht daneben ein neues Board mit frischen Kennungen. Rückgabe: Board-Id.
+   */
+  standEinsetzen: (boardId: string, stand: { nodes: AppNode[]; edges: Edge[]; drawings?: Stroke[]; comments?: CommentThread[] }, alsKopie?: string) => string | null;
+  /**
    * M288: Board archivieren bzw. zurückholen. Archivieren ist das sanfte
    * Löschen — nichts geht verloren, das Board tritt nur zur Seite. Wer das
    * gerade offene Board archiviert, wird auf ein sichtbares Nachbar-Board
@@ -731,6 +737,11 @@ function nurAnsicht(alt: BoardDoc, neu: BoardDoc): { board: BoardDoc; verworfen:
  * Mitgelesenes aussieht.
  */
 export const persistHaken: { board: (b: BoardDoc) => BoardDoc } = { board: (b) => b };
+/**
+ * M449: Vor Vorgängen, die viel auf einmal umbauen (Abgleich mit Ordner/Konto, Import eines Projekts), den Stand der
+ * betroffenen Boards sichern. lib/boardVersionen.ts hängt sich hier ein — der Store selbst kennt IndexedDB nicht.
+ */
+export const vorUmbauHaken: { sichern: (boards: BoardDoc[], grund: 'abgleich' | 'import') => void } = { sichern: () => {} };
 const kartenSperren = new Map<string, Map<string, string>>();   // Board → Karte → Name dessen, der sie hält
 export function setzeKartenSperren(boardId: string, sperren: Map<string, string>): void {
   if (sperren.size) kartenSperren.set(boardId, sperren); else kartenSperren.delete(boardId);
@@ -2185,6 +2196,12 @@ export const useBoard = create<BoardState>()(
           // mit neuem Zeitstempel hochladen (falsche Konflikte auf anderen Geräten)
           markImported(boards, spaces);
           fremdeNotizenMerken(get().boards, boards);
+          // M449: Was gleich überschrieben wird, vorher als Version sichern (der Abgleich höchstens alle 10 Minuten je Board)
+          {
+            const kommt = new Map(boards.map((b) => [b.id, b]));
+            const nimmt = sanft ? new Set(sanft.geaendert) : null;
+            vorUmbauHaken.sichern(get().boards.filter((b) => kommt.has(b.id) && kommt.get(b.id) !== b && (!nimmt || nimmt.has(b.id))), sanft ? 'abgleich' : 'import');
+          }
           if (sanft) {
             // M311: Hintergrund-Abgleich mit dem Sync-Ordner. Undo-Schritte zu
             // Boards, die drüben anders geworden sind, fallen weg — ein Undo
@@ -2244,6 +2261,11 @@ export const useBoard = create<BoardState>()(
         importProject: (proj, boards) => {
           if (!proj?.id || !proj.name || !Array.isArray(boards) || boards.length === 0) return;
           const s = get();
+          // M449: Die Boards des Projekts, die gleich ersetzt werden, vorher als Version sichern
+          {
+            const alt = new Set(s.spaces.flatMap((sp) => sp.projects).find((p) => p.id === proj.id)?.boardIds ?? []);
+            vorUmbauHaken.sichern(s.boards.filter((b) => alt.has(b.id)), 'import');
+          }
           // Bestehendes Projekt (egal in welchem Bereich) ersetzen …
           let oldIds: string[] = [];
           let found = false;
@@ -2624,6 +2646,58 @@ export const useBoard = create<BoardState>()(
           get().showToast(`Board „${quelle.name}" kopiert – die Kopie liegt daneben.`);
         },
 
+        standEinsetzen: (boardId, stand, alsKopie) => {
+          const st = get();
+          const quelle = st.boards.find((b) => b.id === boardId);
+          if (!quelle || !Array.isArray(stand?.nodes) || !Array.isArray(stand?.edges)) return null;
+          if (alsKopie === undefined) {
+            if (quelle.geteiltRolle === 'lesen') { st.showToast('Dieses Board ist nur zum Lesen freigegeben – als Kopie öffnen geht.'); return null; }
+            lastEditKey = '';
+            set({
+              activeId: boardId,
+              view: 'board',
+              lastDeleted: null,
+              past: [...st.past.slice(-(HISTORY_LIMIT - 1)), {
+                boardId, nodes: quelle.nodes, edges: quelle.edges, drawings: quelle.drawings, comments: quelle.comments, remount: true,
+              }],
+              future: [],
+              boards: st.boards.map((b) => (b.id === boardId
+                ? { ...b, nodes: stand.nodes, edges: stand.edges, drawings: stand.drawings ?? [], comments: stand.comments ?? b.comments }
+                : b)),
+              // Notiz-Editoren lesen ihren Text nur beim Aufbau — sonst zeigten sie den alten Inhalt
+              importEpoch: st.importEpoch + 1,
+            });
+            return boardId;
+          }
+          // Als Kopie: frische Kennungen (wie duplicateBoard), Pfeile, Rahmen-Kinder und Striche ziehen mit
+          const karte = new Map(stand.nodes.map((n) => [n.id, uid()]));
+          const nodes = stand.nodes.map((n) => {
+            const k = { ...JSON.parse(JSON.stringify(n)), id: karte.get(n.id) as string, selected: false } as AppNode;
+            if (n.parentId && karte.has(n.parentId)) (k as { parentId?: string }).parentId = karte.get(n.parentId);
+            return k;
+          });
+          const edges = stand.edges.filter((e) => karte.has(e.source) && karte.has(e.target))
+            .map((e) => ({ ...e, id: uid(), source: karte.get(e.source) as string, target: karte.get(e.target) as string, selected: false }));
+          const drawings = (stand.drawings ?? []).map((d) => ({ ...JSON.parse(JSON.stringify(d)), id: uid(), anchor: d.anchor ? karte.get(d.anchor) : undefined }));
+          const { geteiltVon: _g, geteiltVonName: _n, geteiltRolle: _r, gastLink: _l, archived: _a, ...eigen } = quelle;
+          const kopie: BoardDoc = { ...eigen, id: uid(), name: alsKopie.slice(0, 80) || `${quelle.name} (Stand)`, nodes, edges, drawings, comments: [] };
+          anhaengeMitnehmen(stand.nodes, karte);
+          const boards = [...st.boards, kopie];
+          const eigenes = quelle.geteiltVon ? st.spaces.filter((sp) => sp.id !== 'geteilt').flatMap((sp) => sp.projects)[0] : undefined;
+          set({
+            boards,
+            spaces: sortiereProjekte(st.spaces.map((sp) => ({
+              ...sp,
+              projects: sp.projects.map((p) => (eigenes
+                ? (p.id === eigenes.id ? { ...p, boardIds: [...p.boardIds, kopie.id] } : p)
+                : p.boardIds.includes(boardId)
+                  ? { ...p, boardIds: p.boardIds.flatMap((id) => (id === boardId ? [id, kopie.id] : [id])) }
+                  : p)),
+            })), boards),
+          });
+          get().openBoard(kopie.id);
+          return kopie.id;
+        },
         duplicateProject: (projectId) => {
           const st = get();
           const raum = st.spaces.find((sp) => sp.projects.some((p) => p.id === projectId));
