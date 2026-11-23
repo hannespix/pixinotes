@@ -3,7 +3,7 @@ PR: siehe Merge-Titel „… (M502)" · Prüfreihe: `pruefungen/m502-start-leich
 
 ## Warum
 M483 hatte das Start-JS auf 2 097 102 B gesenkt und die Grenzen auf 2 120 000 B (m459, m467, m483) bzw. 2 125 000 B
-(m446) gesetzt. Mit M484–M500 stand es wieder bei 2 110 339 B — keine 10 KB Luft mehr. Ziel: wieder mindestens 60 KB
+(m446) gesetzt. Mit M484–M500 stand es wieder bei 2 110 339 B, mit M501 (Pixi) bei 2 112 358 B — keine 8 KB Luft mehr. Ziel: wieder mindestens 60 KB
 Luft, ohne Verhaltensänderung, und die Grenzen erneut auf neuen Stand + gut 20 KB senken.
 
 ## Was
@@ -11,12 +11,12 @@ Nichts Sichtbares. Was ein frisch geöffnetes Board nicht braucht, kommt mit dem
 kurz nach dem Start (`imLeerlaufVorladen`, App.tsx) — danach steht es ohne Verzug da, und der Service Worker hat es
 auch offline.
 
-| Messung (Board mit zwei Notizen, 1440×900) | vorher | nachher |
+| Messung (Board mit zwei Notizen, 1440×900; beide Seiten mit M501) | vorher | nachher |
 |---|---:|---:|
-| Start-JS gesamt | 2 110 339 B | **2 042 564 B** (−67 775 B) |
-| davon App-Teil `index-*.js` | 765 616 B | 697 841 B |
+| Start-JS gesamt | 2 112 358 B | **2 044 571 B** (−67 787 B) |
+| davon App-Teil `index-*.js` | 767 635 B | 699 848 B |
 | Editor, Fluss, React | 1 344 723 B | 1 344 723 B (unverändert) |
-| Luft zur alten Grenze 2 120 000 B | 9 661 B | 77 436 B |
+| Luft zur alten Grenze 2 120 000 B | 7 642 B | 75 429 B |
 | Grenze m459 / m467 / m483 / m502 | 2 120 000 B | **2 065 000 B** |
 | Grenze m446 (misst etwas mehr: +~4 KB) | 2 125 000 B | **2 070 000 B** |
 

@@ -23,7 +23,7 @@ const __repo = fileURLToPath(new URL('..', import.meta.url));
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 const DIST = path.join(__repo, 'dist');
 const PORT = 5502;
-/** M502: gemessen 2 042 564 B (vorher 2 110 339 B) — Grenze mit gut 20 KB Polster (siehe M502-start-leicht-2.md) */
+/** M502: gemessen 2 044 571 B mit M501 (vorher 2 112 358 B) — Grenze mit gut 20 KB Polster (siehe M502-start-leicht-2.md) */
 const START_JS_GRENZE = 2_065_000;
 /** Was M502 aus dem Start nimmt (Dateinamen der Nachlade-Teile; Groß/klein zählt: Mauszeiger ≠ mauszeiger) */
 const NACHGELADEN = ['vorfuehren', 'Vorfuehren', 'mauszeiger', 'Mauszeiger', 'gruppenraum', 'Gruppenraum', 'brain', 'RechenTabelleGitter',
@@ -94,7 +94,7 @@ console.log('\n════ A: Start ════');
   const geladen = jsAssets();
   const summe = groesse(geladen);
   console.log(`  Start-JS ${(summe / 1024 / 1024).toFixed(2)} MB (${summe} B) in ${geladen.length} Dateien: ${geladen.join(', ')}`);
-  pruefe(`A1 Start-JS unter ${START_JS_GRENZE} B (ist ${summe} B; vorher 2 110 339 B)`, summe < START_JS_GRENZE && summe > 1_000_000, String(summe));
+  pruefe(`A1 Start-JS unter ${START_JS_GRENZE} B (ist ${summe} B; vorher 2 112 358 B)`, summe < START_JS_GRENZE && summe > 1_000_000, String(summe));
   const imStart = NACHGELADEN.filter((n) => teil(n));
   pruefe('A2 kein neu nachgeladener Teil im Start (Live-Team, Gehirn, Rechen-Tabelle, Kommentare, Punkte, Nachschlagen, Handschrift, Bildtext)', imStart.length === 0, imStart.join(', '));
   const dateien = readdirSync(join(DIST, 'assets'));
