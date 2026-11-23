@@ -7439,6 +7439,38 @@ html[data-alles-zeigen] .live-zeiger { display: none !important; }
 [data-theme='dark'] .vorlage-skizze svg, [data-theme='dark'] svg.vorlage-skizze { background: #262a31; }
 [data-theme='dark'] .vorlage-skizze .sk-karte, [data-theme='dark'] .vorlage-skizze .sk-rahmen { opacity: 0.82; }
 .vorlagen-fuss { font-size: 11.5px; color: var(--muted); margin: 6px 20px 16px; }
+/* M449: Versionen eines Boards — Liste links, Vorschau rechts */
+.modal.versionen-dialog { width: min(760px, calc(96vw / var(--pn-anz, 1))); }
+.versionen-dialog .modal-head h2 small { font-size: 12.5px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+.versionen-text { font-size: 12.5px; line-height: 1.5; color: var(--muted); margin: 14px 20px 10px; }
+.versionen-leer { font-size: 13px; color: var(--muted); margin: 18px 20px; }
+.versionen-teile { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(0, 1.4fr); gap: 14px; padding: 0 20px; }
+.versionen-liste { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow-y: auto; border: 1px solid var(--border-soft); border-radius: var(--r); }
+.versionen-liste li + li { border-top: 1px solid var(--border-soft); }
+.versionen-liste button {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; cursor: pointer;
+  font-family: inherit; color: var(--ink); background: none; border: 0; padding: 8px 12px;
+}
+.versionen-liste button:hover, .versionen-liste button:focus-visible { background: var(--surface-3); outline: none; }
+.versionen-liste button.aktiv { background: var(--accent-soft); }
+.versionen-liste b { font-size: 13px; font-weight: 600; }
+.versionen-liste small { font-size: 11.5px; color: var(--muted); }
+.versionen-vorschau { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.versionen-zahlen { font-size: 12.5px; color: var(--muted); margin: 0; }
+.versionen-frage p { font-size: 12.5px; line-height: 1.5; margin: 0 0 8px; }
+.versionen-knoepfe { display: flex; flex-wrap: wrap; gap: 8px; }
+.versionen-knoepfe button, .versionen-fuss button {
+  font-family: inherit; font-size: 13px; cursor: pointer; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r); padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px;
+}
+.versionen-knoepfe button.versionen-haupt { background: var(--accent); border-color: var(--accent); color: #fff; }
+.versionen-knoepfe button:disabled, .versionen-fuss button:disabled { opacity: 0.5; cursor: default; }
+.versionen-fuss { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 14px 20px 16px; }
+.versionen-fuss small { font-size: 11.5px; color: var(--muted); }
+@media (max-width: 560px) {
+  .versionen-teile { grid-template-columns: 1fr; padding: 0 12px; }
+  .versionen-liste { max-height: 180px; }
+}
 @media (max-width: 520px) {
   .vorlagen-gitter { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 12px 4px; }
 }
