@@ -54,8 +54,8 @@ m332, m447, m429, m354, m366. Jeder Agent verlor damit Wiederholungen und Gewiss
   derselben Reihenfolge — dann fallen zwei Gleit-Schritte in ein Intervall (gemessen 12,8 bei Grenze 12). Ein echter
   Sprung (Name wechselt zwischen Ideen, Dutzende Punkte) bleibt darüber; ruhig gilt wie bisher das einzelne Intervall.
   B1 wartet erst, bis 1 s lang nichts mehr läuft (höchstens 20 s), und prüft dann 3 s Stillstand.
-- **m366** (TimeoutError nur bei Last über 20 auf 4 Kernen, ohne verwertbare Ausgabe; mit `--ablage` nachzustellen).
-- **m366** („Port belegt") war kein Fehler der Reihe: andere Agenten starteten sie ohne den Läufer.
+- **m366:** „Port belegt" war kein Fehler der Reihe (andere Agenten starteten sie ohne den Läufer). Ein TimeoutError
+  trat nur bei Last über 20 auf 4 Kernen auf, ohne verwertbare Ausgabe — dafür gibt es jetzt `--ablage` (siehe Nachweis).
 
 ## Wie (Architektur)
 - `src/lib/notizGemeinsamKern.ts`: Anwesenheit (`Awareness`) trägt neu `sichert: true`, solange ein Gerät Schreiber
