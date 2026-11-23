@@ -11,7 +11,7 @@ const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => impor
 import { kiBeispiel, kiBlaettern } from '../lib/kiVerlauf';
 import { KACHEL_TYPEN, STICKY_COLORS, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICrop, IDuplicate, IFit, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICrop, IDuplicate, IFit, IFrame, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -218,9 +218,18 @@ export function SelectionToolbar() {
       el.style.maxHeight = `${Math.max(160, unten - oben)}px`;
     }
   }, [menu, menuPos, amZeiger]);
+  // M447: Das „Mehr"-Menü (auch das Rechtsklick-Menü einer Karte) ist für Vorlese-Programme ein Menü: Einträge, die
+  // noch keine Rolle tragen, werden zu menuitem — nach jedem Zeichnen, weil Einträge je nach Auswahl wechseln.
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (menu !== 'more' || !el) return;
+    el.querySelectorAll('button:not([role])').forEach((b) => b.setAttribute('role', 'menuitem'));
+  });
   const menuPortal = (extraClass: string, content: React.ReactNode) => createPortal(
     <div
       ref={menuRef}
+      role={menu === 'more' ? 'menu' : undefined}
+      aria-label={menu === 'more' ? 'Kartenmenü' : undefined}
       className={`sel-ai-menu sel-menu-fixed nodrag ${extraClass}`}
       style={menuPos.down
         // nach unten: normal an der Oberkante ankern
@@ -479,6 +488,8 @@ export function SelectionToolbar() {
             className={menu === 'frame' ? 'ai-on' : ''}
             data-smbtn
             onClick={toggleMenu('frame')}
+            aria-haspopup="true"
+            aria-expanded={menu === 'frame'}
             title="Rahmen: Inhalt anordnen · Tönung · Umbenennen"
           ><IGridLayout size={15} /><span className="sel-label"> Rahmen</span></button>
         </span>
@@ -543,6 +554,11 @@ export function SelectionToolbar() {
                   <IWand size={14} /> {selected.filter((n) => n.type === 'note').length > 1 ? `Texte verbessern (${selected.filter((n) => n.type === 'note').length})` : 'Text verbessern'}
                 </button>
               )}
+              {/* M445: Auswahl in benannte Rahmen ordnen – mit Vorschau (lib/themenOrdnen.ts) */}
+              {selected.length >= 3 && (
+                <button disabled={aiBusy} data-taste="ki-themen" title="Die markierten Karten nach Themen in benannte Rahmen ordnen – erst nach deiner Bestätigung"
+                  onClick={() => { setMenu(null); void import('../lib/themenOrdnen').then((m) => m.themenOrdnenStarten(selected)); }}>Nach Themen ordnen …</button>
+              )}
               <button disabled={aiBusy} onClick={() => runAi(aiTasks)}>Aufgaben extrahieren</button>
               <button disabled={aiBusy} onClick={() => runAi(aiProcess)}>Als Workflow-Diagramm</button>
               <button disabled={aiBusy} onClick={() => runAi(aiBriefing)}>Zusammenfassen</button>
@@ -594,6 +610,10 @@ export function SelectionToolbar() {
               <button data-anordnen="grid" onClick={() => anordnen('grid')} title="Spalten und Zeilen bündig, Reihenfolge wie gelesen"><IRaster size={14} /> Raster</button>
               <button data-anordnen="pack" onClick={() => anordnen('pack')} title="Dicht aneinander, ohne Lücken und Überlappen"><IPacken size={14} /> Kompakt packen</button>
               <button data-anordnen="tidy" onClick={() => anordnen('tidy')} title="Anordnung bleibt, Abstände werden gleich, nichts überlappt"><IOrdnen size={14} /> Aufräumen</button>
+              {/* M445: auch hier, weil es ohne Chat-KI über das Gehirn geht (die KI-Werkzeuge erscheinen nur mit KI) */}
+              {selected.length >= 3 && (
+                <button data-anordnen="themen" onClick={() => { setMenu(null); void import('../lib/themenOrdnen').then((m) => m.themenOrdnenStarten(selected)); }} title="Nach Themen in benannte Rahmen ordnen – per KI oder Gehirn, erst nach deiner Bestätigung"><IFrame size={14} /> Nach Themen …</button>
+              )}
               {/* M400: Zettel locker hinlegen – und wieder gerade */}
               {selected.some((n) => istDrehbar(n)) && (
                 <>
@@ -894,6 +914,8 @@ export function SelectionToolbar() {
             data-smbtn
             data-taste="auswahl-mehr"
             onClick={toggleMenu('more')}
+            aria-haspopup="menu"
+            aria-expanded={menu !== null && menu !== 'frame'}
             title="Mehr"
             aria-label="Mehr"
           ><IMore size={15} /></button>

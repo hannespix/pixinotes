@@ -48,6 +48,7 @@ import { MinutesCard } from './nodes/MinutesCard';
 import { TimeCard } from './nodes/TimeCard';
 import { HtmlAppCard } from './nodes/HtmlAppCard';
 import { BubblesCard } from './nodes/BubblesCard';
+import { KontaktCard } from './nodes/KontaktCard';
 import { EdgeMarkerDefs, LabeledEdge } from './LabeledEdge';
 import { focusable } from './FocusSheet';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -110,6 +111,7 @@ const nodeTypes: NodeTypes = {
   time: guard(TimeCard),
   htmlapp: guard(HtmlAppCard),
   bubbles: guard(BubblesCard),
+  kontakt: guard(KontaktCard),
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };

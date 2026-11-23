@@ -82,7 +82,7 @@ export function RechercheDialog() {
 
   return (
     <div className="modal-backdrop nodrag" onClick={(e) => { if (e.target === e.currentTarget && phase !== 'laeuft') schliessen(); }}>
-      <div className="modal recherche-modal" role="dialog" aria-label="Recherche mit Quellen">
+      <div className="modal recherche-modal" role="dialog" aria-modal="true" aria-label="Recherche mit Quellen">
         <div className="modal-head">
           <h2>Recherche mit echten Quellen</h2>
           <button className="modal-x" title="Schließen" onClick={schliessen}><IX size={16} /></button>
