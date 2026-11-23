@@ -11,10 +11,15 @@ const lage = new Map<string, Anzeige>();
 const hoerer = new Set<() => void>();
 
 /** Anzeige einer Karte setzen (ohne Wert: wieder wie im Stand). Erst `anzeigeMelden` weckt die Kanten. */
-export const anzeigeSetzen = (id: string, a?: Anzeige): void => { if (a) lage.set(id, a); else lage.delete(id); };
+let stand = 0;
+export const anzeigeSetzen = (id: string, a?: Anzeige): void => { stand += 1; if (a) lage.set(id, a); else lage.delete(id); };
+/** M486: zählt jede Änderung — Kanten rechnen ihre Hindernisse nur bei neuem Stand neu */
+export const anzeigeStand = (): number => stand;
 /** Kanten neu zeichnen lassen — einmal je Bild, nicht je Karte */
 export const anzeigeMelden = (): void => hoerer.forEach((f) => f());
 
-const hoeren = (f: () => void) => { hoerer.add(f); return () => { hoerer.delete(f); }; };
+export const hoeren = (f: () => void) => { hoerer.add(f); return () => { hoerer.delete(f); }; };
+/** M486: Anzeige einer Karte ohne Abo (Hindernisse der Kanten) */
+export const anzeigeVon = (id: string): Anzeige | undefined => lage.get(id);
 /** Die Anzeige einer Karte als React-Wert (undefined = wie im Stand) */
 export const useAnzeige = (id: string): Anzeige | undefined => useSyncExternalStore(hoeren, () => lage.get(id));
