@@ -23,3 +23,18 @@ export const hoeren = (f: () => void) => { hoerer.add(f); return () => { hoerer.
 export const anzeigeVon = (id: string): Anzeige | undefined => lage.get(id);
 /** Die Anzeige einer Karte als React-Wert (undefined = wie im Stand) */
 export const useAnzeige = (id: string): Anzeige | undefined => useSyncExternalStore(hoeren, () => lage.get(id));
+
+/**
+ * M491: Läuft gerade ein Zug? Kanten, die sich darin bewegen, blenden ihren weichen Schatten aus (der gemeinsame
+ * Weichzeichner, M434, müsste sonst Bild für Bild neu gerastert werden) und holen ihn nach dem Ablegen zurück.
+ */
+let zug = false;
+const nachZugHoerer = new Set<() => void>();
+export const zugLaeuft = (): boolean => zug;
+export function zugSetzen(an: boolean): void {
+  if (zug === an) return;
+  zug = an;
+  if (!an) { const h = [...nachZugHoerer]; nachZugHoerer.clear(); h.forEach((f) => f()); }
+}
+/** Einmal rufen, sobald der laufende Zug vorbei ist */
+export const nachZug = (f: () => void): void => { nachZugHoerer.add(f); };

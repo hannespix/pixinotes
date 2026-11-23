@@ -111,6 +111,9 @@ dl.leer-wege dd { margin: 0; }
 }
 .react-flow__edge:hover .edge-label.empty,
 .edge-label.empty.selected { opacity: 1; }
+/* M491: im Zug (`data-zug` an der Fläche, Board.tsx) sind leere, nicht gewählte Beschriftungen ganz weg — unsichtbar
+   waren sie ohnehin, aber jede verschobene musste Chromium Bild für Bild neu einordnen */
+.board-wrap[data-zug] .edge-label.empty:not(.selected) { display: none; }
 .edge-label-text { cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .edge-label.empty .edge-label-text { font-weight: 700; }
 .edge-label-input {

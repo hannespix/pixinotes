@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useInternalNode, useReactFlow, useStore, ViewportPortal } from '@xyflow/react';
+import { useInternalNode, useReactFlow, useStore } from '@xyflow/react';
+import { AnsichtPortal } from './AnsichtPortal';
 import { selectActiveBoard, useBoard, type CommentThread } from '../store';
 import { drehe, winkelVon } from '../lib/drehung';
 import { IPen, ITrash, IX } from './Icons';
@@ -286,12 +287,12 @@ export function CommentLayer() {
   }, []);
   return (
     <>
-      <ViewportPortal>
+      <AnsichtPortal>
         {threads.map((t) => (
           <CommentPin key={t.id} thread={t}
             nr={t.seite != null ? seitenKommentare(threads, t.nodeId, t.seite).findIndex((c) => c.id === t.id) + 1 : undefined} />
         ))}
-      </ViewportPortal>
+      </AnsichtPortal>
       <CommentPanel />
     </>
   );
