@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
-import { mutedHistory, useBoard } from '../../store';
+import { mutedHistory, selectActiveBoard, useBoard } from '../../store';
 import type { EmailNode, ParsedAttachment } from '../../types';
 import { enrichText } from '../../lib/entities';
 import { formatBytes, isImageMime } from '../../lib/parseEmail';
 import { makeImage, makeNote } from '../../lib/nodes';
 import { triggerDownload } from '../../lib/download';
-import { aiReady, askAi, textToBlocks } from '../../lib/ai';
+import { aiReady } from '../../lib/ai';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
-import { IMail, IWand, IPaperclip } from '../Icons';
+import { ICheck, IKanban, IMail, IWand, IPaperclip } from '../Icons';
 
 const PREVIEW_CHARS = 420;
 
@@ -66,22 +66,27 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
     }
   };
 
-  const summarize = async () => {
+  // M451: Destillat statt Zusammenfassung — Kernaussage, offene Fragen, Aufgaben mit Frist und Person, Termine und
+  // Zahlen als gegliederte Notiz daneben (lib/mailDestillat.ts, nachgeladen). Die Mail bleibt unverändert.
+  const destillieren = async () => {
     setAiBusy(true);
     try {
-      const answer = await askAi(
-        `Fasse diese E-Mail in 3-5 kurzen Stichpunkten auf Deutsch zusammen. Nenne konkrete Aufgaben und Fristen zuerst. Antworte NUR mit den Stichpunkten (mit "- " beginnend).\n\nBetreff: ${email.subject}\n\n${email.text.slice(0, 6000)}`,
-      );
-      addDerived(makeNote(
-        { x: positionAbsoluteX + 340, y: positionAbsoluteY },
-        { color: 'yellow', blocks: textToBlocks('Zusammenfassung', answer) },
-      ), 'Zusammenfassung');
-      showToast('Zusammenfassung als Notiz daneben gelegt');
+      const { mailDestillieren } = await import('../../lib/mailDestillat');
+      showToast(await mailDestillieren(id), false, 5000);
     } catch (e) {
       showToast(`KI-Fehler: ${(e as Error).message}`);
     } finally {
       setAiBusy(false);
     }
+  };
+
+  // M451: Die erkannten Aufgaben mit einem Klick übernehmen — als Checkliste in der Notiz oder als Kanban-Tickets
+  const stand = email.destillat as { notizId: string; aufgaben: unknown[]; uebernommen?: string } | undefined;
+  const notizDa = useBoard((s) => !!stand && selectActiveBoard(s).nodes.some((n) => n.id === stand.notizId));
+  const aufgabenOffen = !!stand && !stand.uebernommen && stand.aufgaben.length > 0 && notizDa;
+  const uebernehmen = async (wie: 'checkliste' | 'kanban') => {
+    const { alsCheckliste, alsKanban } = await import('../../lib/mailDestillat');
+    showToast(wie === 'checkliste' ? alsCheckliste(id) : alsKanban(id), true, 6000);
   };
 
   const reply = () => {
@@ -141,11 +146,22 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
       <div className="card-actions">
         <button className="nodrag" onClick={reply}>↩ Antworten</button>
         {aiReady(ai) && (
-          <button className="nodrag ai-btn" onClick={summarize} disabled={aiBusy} title="KI fasst die Mail als Notiz zusammen">
-            {aiBusy ? '…' : <><IWand size={13} /> Zusammenfassen</>}
+          <button className="nodrag ai-btn" onClick={destillieren} disabled={aiBusy} title="KI destilliert den Verlauf: Kernaussage, offene Fragen, Aufgaben, Termine und Zahlen – als Notiz daneben">
+            {aiBusy ? '…' : <><IWand size={13} /> Destillat</>}
           </button>
         )}
       </div>
+      {aufgabenOffen && (
+        <div className="card-actions email-aufgaben">
+          <span className="email-aufgaben-label">Aufgaben übernehmen:</span>
+          <button className="nodrag" data-taste="destillat-checkliste" onClick={() => void uebernehmen('checkliste')} title="Die Aufgaben-Punkte im Destillat werden abhakbar">
+            <ICheck size={13} /> Als Checkliste
+          </button>
+          <button className="nodrag" data-taste="destillat-kanban" onClick={() => void uebernehmen('kanban')} title="Neue Kanban-Karte mit je einem Ticket samt Frist und Person">
+            <IKanban size={13} /> Als Tickets
+          </button>
+        </div>
+      )}
     </CardShell>
   );
 }
