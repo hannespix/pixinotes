@@ -8380,3 +8380,4 @@ html[data-kontrast='hoch'] .ov-graph-node .ov-tropfen { stroke: var(--ink); stro
   margin: 0 0 8px; padding: 8px 10px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--border-soft);
   font-size: 11.5px; line-height: 1.45; overflow-x: auto; white-space: pre;
 }
+.mcp-code code { word-break: normal; font: inherit; background: none; padding: 0; }

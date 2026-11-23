@@ -80,7 +80,10 @@ type SyncWeg = 'konto' | 'ordner' | 'webdav' | 'datei';
 
 /** M443: Der MCP-Server liegt neben der App; in der portablen Datei (file://) zeigt der Link auf die Website */
 const MCP_DATEI = /^https?:/.test(typeof location !== 'undefined' ? location.protocol : '') ? 'pixinotes-mcp.mjs' : 'https://hannespix.github.io/pixinotes/pixinotes-mcp.mjs';
-const MCP_KONFIG = JSON.stringify({ mcpServers: { pixinotes: { command: 'node', args: ['/Pfad/zu/pixinotes-mcp.mjs', '--ordner', '/Pfad/zum/Sync-Ordner'] } } }, null, 2);
+/** Der Eintrag fürs KI-Programm — als Code nicht übersetzt, darum stehen die Platzhalter gleich in der Sprache der Oberfläche */
+const mcpKonfig = () => JSON.stringify({ mcpServers: { pixinotes: { command: 'node', args: sprache() === 'en'
+  ? ['/path/to/pixinotes-mcp.mjs', '--ordner', '/path/to/sync-folder']
+  : ['/Pfad/zu/pixinotes-mcp.mjs', '--ordner', '/Pfad/zum/Sync-Ordner'] } } }, null, 2);
 
 /**
  * Einstellungen: Design, Daten, Synchronisation, Dienste (KI, Gehirn, Konten).
@@ -1353,9 +1356,9 @@ export function Settings() {
               <li><a href={MCP_DATEI} download="pixinotes-mcp.mjs">pixinotes-mcp.mjs laden</a> und ablegen (braucht Node.js 18 oder neuer).</li>
               <li>Im KI-Programm als MCP-Server eintragen, die Pfade durch deine ersetzen:</li>
             </ol>
-            <pre className="mcp-code">{MCP_KONFIG}</pre>
+            <pre className="mcp-code"><code>{mcpKonfig()}</code></pre>
             <div className="modal-buttons">
-              <button data-taste="mcp-kopieren" onClick={() => { void navigator.clipboard?.writeText(MCP_KONFIG).then(() => showToast('Eintrag kopiert.'), () => showToast('Kopieren nicht möglich – bitte markieren.')); }}>Eintrag kopieren</button>
+              <button data-taste="mcp-kopieren" onClick={() => { void navigator.clipboard?.writeText(mcpKonfig()).then(() => showToast('Eintrag kopiert.'), () => showToast('Kopieren nicht möglich – bitte markieren.')); }}>Eintrag kopieren</button>
             </div>
             <p className="modal-note">Ohne Sync-Ordner geht es auch über dein PixiNotes-Konto: statt --ordner das Argument --konto und PIXINOTES_EMAIL/PIXINOTES_PASSWORT als Umgebung.</p>
           </details>
