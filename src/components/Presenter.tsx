@@ -34,6 +34,7 @@ import { BubblesBody } from './nodes/BubblesCard';
 import { WeekBody } from './nodes/WeekCard';
 import { TimeBody } from './nodes/TimeCard';
 import { MinutesBody } from './nodes/MinutesCard';
+import { papierArt } from '../lib/minutes';
 import { SheetBody } from './nodes/SheetCard';
 import { FolienLaser } from './Mauszeiger';
 import { ReaktionsKnopf } from './Gruppenraum';
@@ -241,7 +242,7 @@ function SlideContent({ node }: { node: AppNode }) {
     case 'minutes': {
       const m = (node as MinutesNode).data;
       return (
-        <div className={`slide-modul slide-minutes minutes-card sticky-${m.color ?? 'white'}`} style={m.hex ? { background: m.hex } : undefined} data-taste="folie-minutes">
+        <div className={`slide-modul slide-minutes minutes-card sticky-${m.color ?? 'white'} papier-${papierArt(m)}`} style={m.hex ? { background: m.hex } : undefined} data-taste="folie-minutes">
           <MinutesBody id={node.id} data={m} />
         </div>
       );
