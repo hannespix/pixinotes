@@ -1,5 +1,5 @@
 # M450 — Kontakt-Karte: Visitenkarte mit tel:, mailto:, Kartenlink; vCard rein und raus
-PR: #? · Prüfreihe: `pruefungen/m450-kontakt-karte.mjs` (Port 5450) · Datum: 2026-11-23
+PR: #126 · Prüfreihe: `pruefungen/m450-kontakt-karte.mjs` (Port 5450) · Datum: 2026-11-23
 
 ## Warum
 KONZEPT §3.7 war offen: Im Büroalltag liegen Ansprechpartner überall verstreut (Signaturen, Outlook, Zettel). Eine
