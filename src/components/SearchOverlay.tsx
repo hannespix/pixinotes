@@ -104,7 +104,7 @@ function buildCommands(): Command[] {
     { label: 'Versionen', hint: 'Frühere Stände dieses Boards ansehen und wiederherstellen', alias: 'version versionen verlauf history zeitreise früher gestern stand wiederherstellen zurückholen backup sicherung snapshot',
       run: () => window.dispatchEvent(new CustomEvent('pixinotes:versionen', { detail: { boardId: st().activeId } })) },
     // M476: Sicherung — alles in eine Datei, dieses Board, oder eine Sicherung einspielen (Code lädt erst jetzt)
-    { label: 'Alles sichern', hint: 'Alle Boards mit Anhängen und Einstellungen als eine Datei (ohne KI-Schlüssel)', alias: 'sicherung sichern backup alles export datei herunterladen speichern umzug',
+    { label: 'Alles sichern', hint: 'Alle Boards mit Anhängen als eine Datei (ohne KI-Schlüssel)', alias: 'sicherung sichern backup alles export datei herunterladen speichern umzug',
       run: () => { void import('../lib/sicherung').then((m) => m.allesSichern()); } },
     { label: 'Sicherung dieses Boards', hint: 'Das offene Board mit Anhängen als Datei herunterladen', alias: 'sicherung sichern backup board datei herunterladen export',
       run: () => { void import('../lib/sicherung').then((m) => m.boardSichern(st().activeId)); } },

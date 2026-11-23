@@ -781,7 +781,7 @@ export function Settings() {
         {/* M476: Sichern & Laden — EINE Datei mit allem, Einspielen mit Vorschau, optional automatisch in einen Ordner */}
         <section className="modal-section" key={`sicher-${sicherTick}`}>
           <h3>Sichern &amp; Laden</h3>
-          <p className="modal-hint">Alles in einer Datei (.pixinotes): Bereiche, Boards, Anhänge, Vorlagen und Einstellungen – für Backups und den Umzug auf ein anderes Gerät. KI-Schlüssel und Zugangsdaten sind nicht enthalten. Ein einzelnes Board: im ⋯ des Boards „Sicherung herunterladen".</p>
+          <p className="modal-hint">Alles in einer Datei (.pixinotes) – Boards, Anhänge, Vorlagen und Einstellungen, ohne KI-Schlüssel und Zugangsdaten. Ein einzelnes Board sichert das ⋯ des Boards.</p>
           <div className="modal-buttons">
             <button disabled={!!busy} onClick={() => void allesSichernKlick()} data-taste="alles-sichern">{busy === 'datei' ? '…' : 'Alles sichern'}</button>
             <button disabled={!!busy} onClick={() => fileInputRef.current?.click()} data-taste="sicherung-einspielen">Sicherung einspielen…</button>

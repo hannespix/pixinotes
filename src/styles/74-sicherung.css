@@ -1,4 +1,4 @@
-/* M476: Sicherung einspielen — Vorschau-Dialog (lädt mit dem Dialog nach, nicht im Start) */
+/* M476: Sicherung einspielen — Vorschau-Dialog (components/SicherungDialog.tsx) */
 .sicherung-dialog { width: min(520px, calc(100vw - 24px)); }
 .sicherung-zahlen { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0 10px; padding: 0; list-style: none; font-size: 13.5px; }
 .sicherung-zahlen b { font-weight: 600; }

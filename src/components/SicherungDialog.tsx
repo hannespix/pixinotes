@@ -4,7 +4,6 @@ import { eingespieltMelden, OHNE, sicherungEinspielen, sicherungLesen, ueberblic
 import { t, zahlWort } from '../lib/sprache';
 import { useBoard } from '../store';
 import { IX } from './Icons';
-import '../styles/sicherung.css';
 
 export function SicherungDialog({ datei, onClose }: { datei?: File; onClose: () => void }) {
   const [quelle, setQuelle] = useState<File | undefined>(datei);
