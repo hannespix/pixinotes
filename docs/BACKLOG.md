@@ -24,7 +24,6 @@ immer Vorrang vor dieser Liste.
 
 ## Ideen (noch nicht vergeben)
 - Eingebaute Übersetzung der Oberfläche statt Browser-Übersetzer (UMBAU Zeile 54)
-- Nächtlicher CI-Lauf aller Prüfreihen (braucht Chromium im Runner)
 - BlockNote 0.31 → aktuelle Fassung – schließt die 22 „moderaten" Meldungen in tiptap/uuid (AUDIT C6), neue Editor-Funktionen – package.json, NoteCard.tsx, NotizRuhend.tsx, notizRuhend.ts
 - Gemeinsames Tippen in einer Notiz (Yjs über Realtime-Broadcast, BlockNote kann Yjs) – heute sperrt das Team ganze Karten (UMBAU §5a „Später möglich") – NoteCard.tsx, lib/gastSync.ts, lib/kontoSupabase.ts
 - Server-Migrationen `inhalt_pruefen` und `team_haertung` einspielen (braucht Freigabe des Besitzers) – serverseitige Prüfung der Gast-Schreibvorgänge, Stempel-Grenze, Sperr-Reihenfolge (AUDIT S9/A12/A13) – supabase/migrations/
