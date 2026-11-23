@@ -31,6 +31,7 @@ const FolienStift = lazy(() => import('./FolienStift').then((m) => ({ default: m
 const FolienKommentare = lazy(() => import('./FolienKommentare').then((m) => ({ default: m.FolienKommentare })));
 import { ICheck, IComment, IEraser, IFit, IHighlighter, IMaximize, IPen, IUndo, IMegafon } from './Icons';
 import { BubblesBody } from './nodes/BubblesCard';
+import { FluessigBuehne } from './nodes/FluessigCard';
 import { WeekBody } from './nodes/WeekCard';
 import { TimeBody } from './nodes/TimeCard';
 import { MinutesBody } from './nodes/MinutesCard';
@@ -44,7 +45,7 @@ import { NotizRuhend } from './nodes/NotizRuhend';
 import type { RuheBlock } from '../lib/notizRuhend';
 
 /** Kartentypen, die auf der Folie LIVE editierbar sind */
-const EDITABLE = new Set(['note', 'shape', 'mermaid', 'kanban', 'gantt', 'calendar', 'bubbles', 'week', 'time', 'minutes', 'sheet']);
+const EDITABLE = new Set(['note', 'shape', 'mermaid', 'kanban', 'gantt', 'calendar', 'bubbles', 'week', 'time', 'minutes', 'sheet', 'fluessig']);
 
 /** Bedient der Nutzer gerade ein Eingabe-/Bedienelement? Dann keine Folien-Navigation.
  *  SELECT/BUTTON gehören dazu: Pfeiltasten/Leertaste wählen dort Werte (Audit R6-F4) */
@@ -223,6 +224,13 @@ function SlideContent({ node }: { node: AppNode }) {
         <div className="slide-bubbles bubbles-card">
           <h3 className="slide-bubbles-titel" translate="no">{(node as BubblesNode).data.title || 'Ideen'}</h3>
           <BubblesBody id={node.id} data={(node as BubblesNode).data} gross />
+        </div>
+      );
+    case 'fluessig':
+      // M500: die Flüssigkeit lebt auch auf der Folie — anfassen, schubsen, platzen lassen
+      return (
+        <div className={`slide-modul slide-fluessig fluessig-card fl-farbe-${(node.data as { farbe?: string }).farbe === 'akzent' ? 'akzent' : 'schrift'}`} data-taste="folie-fluessig">
+          <FluessigBuehne data={node.data as never} greifbar aussehen="folie" />
         </div>
       );
     // M380: Auch Wochenplan, Zeiterfassung, Protokoll und Rechen-Tabelle leben auf der Folie — vorher standen

@@ -47,5 +47,10 @@
  "{0}/storage/v1{1}{2}",
  "{0}{1}.json",
  "“WebAppPassword”: the origin above is entered there.",
- "Calendars.Read"
+ "Calendars.Read",
+ "2D-Zeichenfläche nicht verfügbar",
+ "WebGL2 ist auf diesem Gerät nicht verfügbar.",
+ "Shader",
+ "Programm",
+ "Die Grafikoberfläche konnte nicht angelegt werden."
 ]

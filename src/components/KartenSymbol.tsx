@@ -2,7 +2,7 @@
 // Vorher stand an jeder dieser Stellen eine eigene Liste bunter Emojis.
 import type { ComponentType, SVGProps } from 'react';
 import {
-  IAppWindow, IArchive, IBubbles, ICalendar, IDiagram, IFileText, IFolder, IFolien, IFrame, IGantt, IImage, IKanban, IMail, IMinutes,
+  IAppWindow, IArchive, IBubbles, ICalendar, IDiagram, IFileText, IFluessig, IFolder, IFolien, IFrame, IGantt, IImage, IKanban, IMail, IMinutes,
   INote, IPaperclip, IPerson, ISquare, ITabelle, ITimer, IWeek,
 } from './Icons';
 
@@ -10,7 +10,7 @@ type Symbol = ComponentType<SVGProps<SVGSVGElement> & { size?: number }>;
 const KARTE: Record<string, Symbol> = {
   note: INote, email: IMail, kanban: IKanban, sheet: ITabelle, gantt: IGantt, calendar: ICalendar, image: IImage, file: IPaperclip,
   portal: IFolder, shape: ISquare, mermaid: IDiagram, bubbles: IBubbles, frame: IFrame, week: IWeek, minutes: IMinutes, time: ITimer,
-  htmlapp: IAppWindow, pdf: IFileText, kontakt: IPerson,
+  htmlapp: IAppWindow, pdf: IFileText, kontakt: IPerson, fluessig: IFluessig,
 };
 const ENDUNG: Record<string, Symbol> = {
   pdf: IFileText, doc: IFileText, docx: IFileText, txt: IFileText, md: IFileText, xlsx: ITabelle, xls: ITabelle, csv: ITabelle,

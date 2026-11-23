@@ -15,7 +15,7 @@ import { IHighlighter, ILink, IPen, IUhr, IX } from './Icons';
 const ART_NAME: Record<string, string> = {
   note: 'Notiz', email: 'E-Mail', kanban: 'Kanban', gantt: 'Zeitplan', calendar: 'Kalender', sheet: 'Rechen-Tabelle', file: 'Datei',
   image: 'Bild', frame: 'Rahmen', minutes: 'Protokoll', week: 'Wochenplan', time: 'Zeiterfassung', mermaid: 'Diagramm', portal: 'Portal',
-  shape: 'Form', htmlapp: 'App', bubbles: 'Bubbles', kontakt: 'Kontakt', pdf: 'PDF',
+  shape: 'Form', htmlapp: 'App', bubbles: 'Bubbles', kontakt: 'Kontakt', fluessig: 'Flüssige Schrift', pdf: 'PDF',
 };
 /** M460: Titel oder erste Zeile einer Karte (für den Vergleich Karte für Karte) */
 function kartenName(n: AppNode): string {
