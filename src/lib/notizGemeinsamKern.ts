@@ -28,6 +28,7 @@ import { blocksToYXmlFragment, withCollaboration } from '@blocknote/core/yjs';
 import { ich, ichIn, LIVE_NACHRICHT, liveSenden, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from './liveStand';
 import { notizYVonAussen, NOTIZ_Y_TEIL_ZEICHEN, type NotizYArt, type NotizYNachricht } from './sicher';
 import { NOTIZ_Y_EREIGNIS } from './notizGemeinsam';
+import { setzeNotizSchutz } from '../store';
 
 /** Herkunft von Änderungen, die aus dem Kanal kamen — sie gehen nicht wieder hinaus */
 const FERN = 'pn-fern';
@@ -134,6 +135,15 @@ function zusammensetzen(m: NotizYNachricht): NotizYNachricht | null {
 }
 
 const sitzungen = new Map<string, SitzungIntern>();
+/** Board → Notiz → Name eines anderen, der gerade darin tippt (Cursor im Editor) — an den Speicher (setzeNotizSchutz) */
+const schutz = new Map<string, Map<string, string>>();
+function schutzSetzen(boardId: string, nodeId: string, name: string | null): void {
+  const m = new Map(schutz.get(boardId) ?? []);
+  if ((m.get(nodeId) ?? null) === name) return;
+  if (name) m.set(nodeId, name); else m.delete(nodeId);
+  if (m.size) schutz.set(boardId, m); else schutz.delete(boardId);
+  setzeNotizSchutz(boardId, m);
+}
 const schluessel = (boardId: string, nodeId: string): string => `${boardId}\n${nodeId}`;
 let horchtSchon = false;
 function horchen(): void {
@@ -231,6 +241,17 @@ export async function sitzungOeffnen(
       else if (!awTimer) awTimer = setTimeout(awSenden, takt(boardId, 90));
     }
     schreiberPruefen();
+    // Tippt (Cursor im Editor) gerade jemand anderes hier? Dann bleibt die Karte, wo sie ist (Lage, Löschen)
+    if (!zu) {
+      let wer: string | null = null;
+      for (const [cid, st] of awareness.getStates()) {
+        const x = st as (Anwesenheit & { cursor?: unknown; user?: { name?: unknown } }) | null;
+        if (cid === doc.clientID || !x || x.pn === selbst || !x.cursor) continue;
+        wer = typeof x.user?.name === 'string' ? x.user.name.slice(0, 40) : 'Jemand';
+        break;
+      }
+      schutzSetzen(boardId, nodeId, wer);
+    }
   });
 
   /** Wer speichert? Unter allen mit offener Notiz, die schreiben dürfen: die kleinste Kennung */
@@ -357,6 +378,7 @@ export async function sitzungOeffnen(
       jetztSenden();
       if (bereit) { awareness.setLocalState(null); awSenden(); }
       zu = true;
+      schutzSetzen(boardId, nodeId, null);
       clearTimeout(awTimer);
       schreiberRufe.clear();
       if (sitzungen.get(schluessel(boardId, nodeId)) === s) sitzungen.delete(schluessel(boardId, nodeId));

@@ -469,6 +469,30 @@ const serverText = (id) => { try { return textDerBlocks(JSON.parse(zeileText(uid
 const vorkommen = (t, s) => (t.match(new RegExp(s, 'g')) ?? []).length;
 const notizY = () => sb.aufrufe.notizY ?? 0;
 
+/** Ein Punkt, an dem man genau DIESE Karte greift (nicht ihren Text, keinen Knopf) */
+const greifpunkt = (P, id) => P.evaluate((i) => {
+  const karte = document.querySelector(`.react-flow__node[data-id="${i}"]`);
+  if (!karte) return null;
+  const r = karte.getBoundingClientRect();
+  for (const dy of [7, 9, 5, 11, r.height - 7]) {
+    for (let dx = 14; dx < r.width - 14; dx += 12) {
+      const el = document.elementFromPoint(r.left + dx, r.top + dy);
+      if (el && el.closest('.react-flow__node') === karte && !el.closest('.nodrag, button, input, [contenteditable="true"], .react-flow__resize-control')) return [r.left + dx, r.top + dy];
+    }
+  }
+  return null;
+}, id);
+const lage = async (P, id) => JSON.stringify((await boardVon(P, 'bx')).nodes.find((n) => n.id === id)?.position);
+const ziehen = async (P, id, dx, dy) => {
+  const vorher = await lage(P, id);
+  const g = await greifpunkt(P, id);
+  if (!g) return 'kein Griff';
+  await P.mouse.move(g[0], g[1]); await P.mouse.down(); await P.mouse.move(g[0] + dx / 2, g[1] + dy / 2, { steps: 6 }); await P.mouse.move(g[0] + dx, g[1] + dy, { steps: 6 }); await P.mouse.up();
+  await P.waitForTimeout(900);
+  return (await lage(P, id)) !== vorher;
+};
+const toast = (P) => P.evaluate(() => document.querySelector('.toast')?.textContent ?? '');
+
 // ══ A ═══════════════════════════════════════════════════════════════
 console.log('\n════ A: Live-Runde, die Notizen ruhen ════');
 const A = await geraet('A', standA);
@@ -517,6 +541,15 @@ const tA = await editorText(A.P, 'x1'); const tG = await editorText(G.P, 'x1');
 console.log(`    Anna sieht: „${tA}"\n    Gerd sieht: „${tG}"`);
 pruefe('B6 beide sehen denselben Text – nichts verloren, nichts doppelt', tA === tG && tA === soll, JSON.stringify({ tA, tG }));
 await A.P.screenshot({ path: `${SD}/m477-b-anna.png` });
+// Während Anna tippt, bleibt die Karte, wo sie ist: Gerd kann sie nicht ziehen oder löschen (der Text bleibt frei)
+await heraus(G.P);
+const gezogen = await ziehen(G.P, 'x1', 160, 120);
+pruefe('B7 Gerd kann die Notiz nicht verschieben, solange Anna darin tippt', gezogen === false, String(gezogen));
+pruefe('B8 … ein Hinweis nennt Anna', new RegExp(annaName, 'i').test(await toast(G.P)), await toast(G.P));
+await G.P.keyboard.press('Delete'); await G.P.waitForTimeout(600);
+pruefe('B9 … und nicht löschen', (await boardVon(G.P, 'bx')).nodes.some((n) => n.id === 'x1'));
+await G.P.mouse.click(1400, 870); await G.P.waitForTimeout(200);
+pruefe('B10 Gerd betritt die Notiz wieder', await hinein(G.P, 'x1', 'anfang'));
 await G.P.screenshot({ path: `${SD}/m477-b-gerd.png` });
 
 // ══ C ═══════════════════════════════════════════════════════════════
