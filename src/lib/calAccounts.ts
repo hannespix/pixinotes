@@ -217,6 +217,21 @@ export function msHasNotes(acc = loadCalAccounts().ms): boolean {
   return !!acc && /Notes\.Read/i.test(acc.scopes ?? '');
 }
 
+/** M466: Deckt die Verbindung das Lesen des Postfachs (Outlook-Mails) ab? */
+export function msHasMail(acc = loadCalAccounts().ms): boolean {
+  return !!acc && (!!acc.token || !!acc.refreshToken) && /Mail\.Read/i.test(acc.scopes ?? '');
+}
+
+/**
+ * M466: Berechtigungs-Satz aus Bausteinen. Ohne OneNote und Postfach bleibt es exakt der alte Satz (MS_SCOPE) —
+ * bestehende Verbindungen erneuern damit weiter still. Das Postfach braucht User.Read für den Anzeigenamen.
+ */
+function msScope(notes: boolean, mail: boolean): string {
+  if (!notes && !mail) return MS_SCOPE;
+  if (!mail) return MS_SCOPE_NOTES;
+  return ['Calendars.Read', notes ? 'Notes.Read' : '', mail ? 'Mail.Read User.Read' : '', 'offline_access'].filter(Boolean).join(' ');
+}
+
 function b64url(bytes: Uint8Array): string {
   return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
@@ -249,9 +264,13 @@ export function handleOAuthRedirect(): boolean {
  * Interaktiv mit Microsoft 365 verbinden (Popup, PKCE ohne Client-Secret).
  * `withNotes` fragt zusätzlich den OneNote-Lesezugriff ab (M184).
  */
-export async function connectMicrosoft(clientId: string, tenant = 'common', withNotes = false): Promise<string> {
-  const scope = withNotes ? MS_SCOPE_NOTES : MS_SCOPE;
-  const roh = await msAnmeldung(clientId, tenant, scope);
+export async function connectMicrosoft(clientId: string, tenant = 'common', withNotes = false, opts: { mail?: boolean; hint?: string } = {}): Promise<string> {
+  // M466: `opts.mail` fragt zusätzlich das Lesen des Postfachs ab (Outlook-Fenster); `hint` wählt das Konto vor.
+  // Was dieselbe App schon darf, bleibt dabei: OneNote freischalten nimmt das Postfach nicht weg und umgekehrt.
+  const alt = loadCalAccounts().ms;
+  const gleich = alt?.clientId === clientId;
+  const scope = msScope(withNotes || (gleich && msHasNotes(alt)), !!opts.mail || (gleich && msHasMail(alt)));
+  const roh = await msAnmeldung(clientId, tenant, scope, opts.hint);
   const acc: MsAccount = {
     clientId, tenant, token: roh.token, refreshToken: roh.refreshToken, tokenExp: roh.exp,
     connectedAs: loadCalAccounts().ms?.connectedAs, scopes: roh.scopes,
@@ -274,7 +293,7 @@ export interface MsRohToken { token: string; refreshToken?: string; exp: number;
  * Code-Tausch, OHNE die Kalender-Konten anzufassen. `connectMicrosoft` baut
  * darauf auf; der Konto-Sync ebenso, mit seinem eigenen Berechtigungs-Satz.
  */
-export async function msAnmeldung(clientId: string, tenant = 'common', scope = MS_SCOPE): Promise<MsRohToken> {
+export async function msAnmeldung(clientId: string, tenant = 'common', scope = MS_SCOPE, hint?: string): Promise<MsRohToken> {
   if (!oauthAvailable()) throw new Error('Anmelden geht nur über die gehostete App (http/https), nicht aus der Einzeldatei.');
   const { verifier, challenge } = await pkcePair();
   const state = `pixinotes-ms-${b64url(crypto.getRandomValues(new Uint8Array(12)))}`;
@@ -288,6 +307,8 @@ export async function msAnmeldung(clientId: string, tenant = 'common', scope = M
     state,
     code_challenge: challenge,
     code_challenge_method: 'S256',
+    // M466: E-Mail-Adresse → Microsoft wählt dieses Konto vor
+    ...(hint ? { login_hint: hint } : {}),
   }).toString();
 
   const popup = window.open(auth.toString(), 'pixinotes-ms-login', 'width=520,height=680');

@@ -75,6 +75,23 @@ export function textVonAussen(roh: unknown, hoechstens = 20_000): string {
   return roh.normalize('NFC').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u202A-\u202E\u2066-\u2069]/g, '').trim().slice(0, hoechstens);
 }
 
+/**
+ * M466: Mail-Inhalt aus Microsoft Graph (meist HTML) als reiner Text für die E-Mail-Karte. Das HTML wird nur in ein
+ * TRÄGES Dokument geparst (DOMParser: keine Skripte, keine Ereignisse, kein Nachladen von Bildern oder Styles), dann
+ * fallen script/style/head/Formulare weg, Blöcke werden Zeilenumbrüche, und am Ende gilt dieselbe Säuberung wie für
+ * jeden Text von außen. Auf dem Board steht danach nie HTML — ein „<script>" in der Mail bleibt Buchstabe oder fällt weg.
+ */
+export function mailTextVonAussen(roh: unknown, art: 'html' | 'text' = 'html', hoechstens = 200_000): string {
+  if (typeof roh !== 'string') return '';
+  if (art === 'text') return textVonAussen(roh, hoechstens);
+  const doc = new DOMParser().parseFromString(roh.slice(0, 2_000_000), 'text/html');
+  doc.querySelectorAll('script, style, head, noscript, template, iframe, object, embed, svg, form').forEach((el) => el.remove());
+  doc.querySelectorAll('br').forEach((el) => el.replaceWith('\n'));
+  doc.querySelectorAll('p, div, li, tr, h1, h2, h3, h4, h5, h6, blockquote, table').forEach((el) => el.append('\n'));
+  const text = (doc.body?.textContent ?? '').replace(/\u00a0/g, ' ').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+  return textVonAussen(text, hoechstens);
+}
+
 /** M458: Webadresse von außen (Quelle einer gesendeten Seite) — nur http(s), höchstens 2 000 Zeichen */
 export function webAdresseVonAussen(roh: unknown): string | null {
   if (typeof roh !== 'string' || !roh.trim() || roh.length > 2000) return null;
