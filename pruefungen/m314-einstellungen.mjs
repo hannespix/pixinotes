@@ -114,7 +114,8 @@ console.log('\n════ A: Reiter ════');
   console.log('\n════ D: Dienste ════');
   await reiter(P, 'Dienste');
   const s = await h3s(P);
-  pruefe('D1 Dienste: KI-Assistent · Gehirn · Handschrift (M320) · Konten', s.length === 4 && /KI/.test(s[0]) && /Gehirn/.test(s[1]) && /Handschrift/.test(s[2]) && /Konten/.test(s[3]), s.join(' | '));
+  // M448: seit M452 steht „Text in Bildern" (Texterkennung an/aus) zwischen Handschrift und Konten
+  pruefe('D1 Dienste: KI-Assistent · Gehirn · Handschrift (M320) · Text in Bildern (M452) · Konten', s.length === 5 && /KI/.test(s[0]) && /Gehirn/.test(s[1]) && /Handschrift/.test(s[2]) && /Text in Bildern/.test(s[3]) && /Konten/.test(s[4]), s.join(' | '));
   await P.locator('.modal-row-check', { hasText: 'Gehirn einschalten' }).locator('input').check();
   await P.waitForTimeout(500);
   // M442: Im Reiter steht auch die eingeklappte Google-Einrichtung „Für Betreiber" — gezählt wird im Gehirn-Abschnitt
