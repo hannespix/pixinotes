@@ -14,7 +14,7 @@ Jeder Fund wurde am Code nachgeprüft, bevor er behoben wurde. Status: ✅ behob
 | C3 | `xlsx.ts`: Zweig für Text-Ergebnisse von Formeln (`t="str"`) nie erreichbar — „&amp;" kam roh an | ✅ |
 | C4 | `CalendarCard`: frisches `[]` je Durchlauf ließ die Terminberechnung bei jedem Rendern neu laufen | ✅ |
 | C5 | Abhängigkeiten mit bekannten Lücken: dompurify (kritisch), prosemirror-view (XSS beim Einfügen), markdown-it, katex, mermaid | ✅ aktualisiert (`npm audit fix`) |
-| C6 | Übrig: 22 „moderate" Meldungen in tiptap/uuid — nur über BlockNote 0.31 → 0.57 lösbar (großer Versionssprung) | ➖ eigener Schritt, nicht im Audit |
+| C6 | Übrig: 22 „moderate" Meldungen in tiptap/uuid — nur über BlockNote 0.31 → 0.57 lösbar (großer Versionssprung) | ✅ M462: BlockNote 0.57 (Tiptap 3); `npm audit` 36 → 16 Meldungen, moderat 25 → 5, keine mehr in tiptap/BlockNote (`uuid` nur noch über mermaid) |
 
 ### 1.2 Sicherheit
 

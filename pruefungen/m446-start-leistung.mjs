@@ -1,7 +1,7 @@
 /**
  * M446 — Start-Leistung: schneller erster Bildaufbau.
  *
- *   A  Start-JS: Was bis zum bedienbaren Board über die Leitung kommt, bleibt unter 2,5 MB
+ *   A  Start-JS: Was bis zum bedienbaren Board über die Leitung kommt, bleibt unter 2,6 MB (M462)
  *      (vorher 3,58 MB). Kein Kartentyp außer den Grundkarten, keine Übersicht, Aufgaben-Zentrale,
  *      Präsentation, Suche, keine Emoji-Daten und keine Markdown-Kette beim Start.
  *   B  Startzeit: das Board steht lokal in unter 1,5 s.
@@ -27,8 +27,10 @@ mkdirSync(SD, { recursive: true });
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 const DIST = path.join(__repo, 'dist');
 const PORT = 5446;
-/** Grenze knapp über dem gemessenen Stand (2,44 MB) — ein Rückschritt fällt sofort auf */
-const START_JS_GRENZE = 2_500_000;
+/** Grenze knapp über dem gemessenen Stand (2,44 MB) — ein Rückschritt fällt sofort auf.
+ *  M462: BlockNote 0.31 → 0.57 (Tiptap 3, Mantine 8, Emoji-Auswahl frimousse statisch
+ *  im Editor-Paket) kostet +50 KB (+21 KB gzip) — Stand 2,52 MB, Grenze 2,6 MB. */
+const START_JS_GRENZE = 2_600_000;
 
 let anfragen = [];
 const app = http.createServer((q, r) => {

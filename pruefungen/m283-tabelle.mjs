@@ -224,21 +224,10 @@ console.log('\n════ T4: Alte Tabelle umwandeln ════');
   const { ctx, P } = await seite(BLOCKS);
   pruefe('T4a die alte Fließtext-Tabelle wird weiter angezeigt', await P.evaluate(() =>
     !!document.querySelector('.bn-editor table:not(.rt-tabelle)')));
-  // Cursor in die alte Tabelle setzen
-  await P.evaluate(() => {
-    const alt = document.querySelector('.bn-editor table:not(.rt-tabelle)');
-    const zelle = alt?.querySelector('td, th');
-    const r = zelle.getBoundingClientRect();
-    zelle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: r.left + 5, clientY: r.top + 5 }));
-    const sel = document.getSelection();
-    const range = document.createRange();
-    range.selectNodeContents(zelle);
-    range.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(range);
-    zelle.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-    document.dispatchEvent(new Event('selectionchange'));
-  });
+  // Cursor in die alte Tabelle setzen — M462: mit echtem Klick. Eine per Skript gesetzte
+  // DOM-Auswahl ohne Fokus übernimmt ProseMirror seit Tiptap 3 nicht mehr.
+  const altZelle = P.locator('.bn-editor table:not(.rt-tabelle) td').first();
+  await altZelle.click(); await P.waitForTimeout(300); await altZelle.click();
   await P.waitForTimeout(700);
   const knopf = await P.evaluate(() => {
     const b = [...document.querySelectorAll('.due-chip')].find((x) => x.textContent.includes('Rechnen lassen'));

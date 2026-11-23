@@ -56,14 +56,15 @@ function Gruppe({ blocks, pfad, onHaken }: { blocks: RuheBlock[]; pfad: number[]
         } else if (b.type === 'quote') {
           innen = <blockquote className="bn-inline-content">{inline(b.content)}</blockquote>;
         } else if (b.type === 'checkListItem') {
+          // M462: BlockNote 0.57 legt Haken und Text direkt in den Block (ohne Hülle wie in 0.31)
           innen = (
-            <div>
+            <>
               <div contentEditable={false} suppressContentEditableWarning>
                 <input type="checkbox" checked={p.checked === true} aria-labelledby={`label-${id}`}
                   onChange={(e) => onHaken(hier, e.target.checked)} onClick={(e) => e.stopPropagation()} />
               </div>
               <p className="bn-inline-content" id={`label-${id}`}>{inline(b.content)}</p>
-            </div>
+            </>
           );
         } else {
           innen = <p className="bn-inline-content">{inline(b.content)}</p>;
@@ -72,7 +73,7 @@ function Gruppe({ blocks, pfad, onHaken }: { blocks: RuheBlock[]; pfad: number[]
           <div key={id} className="bn-block-outer" data-node-type="blockOuter" data-id={id} data-text-color={tc} data-background-color={bc}>
             <div className="bn-block" data-node-type="blockContainer" data-id={id} data-text-color={tc} data-background-color={bc}>
               <div className="bn-block-content" data-content-type={b.type}
-                data-level={b.type === 'heading' ? (p.level === 2 || p.level === 3 ? p.level : 1) : undefined}
+                data-level={b.type === 'heading' && (p.level === 2 || p.level === 3) ? p.level : undefined /* M462: Stufe 1 ohne Attribut, wie der Editor */}
                 data-index={b.type === 'numberedListItem' ? nummer : undefined}
                 data-checked={b.type === 'checkListItem' && p.checked === true ? 'true' : undefined}
                 data-text-alignment={ausrichtung}>
@@ -87,20 +88,17 @@ function Gruppe({ blocks, pfad, onHaken }: { blocks: RuheBlock[]; pfad: number[]
   );
 }
 
-/**
- * Der Editor hängt nach der ERSTEN Änderung einen leeren Schluss-Absatz an. Bei Notizen mit
- * Nummern-Listen passiert diese „Änderung" schon beim Aufbau (die Nummern werden gesetzt) —
- * die ruhende Ansicht zeigt den Absatz dann ebenfalls, sonst spränge die Karte beim Wecken um eine Zeile.
+/*
+ * M462: Bis BlockNote 0.31 hängte der Editor nach der ersten Änderung einen leeren
+ * Schluss-Absatz an (bei Nummern-Listen schon beim Aufbau) — die ruhende Ansicht ahmte das
+ * nach. Seit 0.57 bleibt der Inhalt, wie er gespeichert ist; die Klickfläche zum Weiterschreiben
+ * (`bn-trailing-block`) hat nur der Editor mit Fokus Höhe (index.css) — die ruhende Ansicht braucht nichts.
  */
-const hatNummern = (bs: RuheBlock[]): boolean => bs.some((b) => b.type === 'numberedListItem' || (b.children?.length ? hatNummern(b.children) : false));
-const leer = (c: unknown): boolean => c == null || c === '' || (Array.isArray(c) && c.length === 0);
-const SCHLUSS: RuheBlock = { id: 'r-schluss', type: 'paragraph', content: [] };
 
-export const NotizRuhend = memo(function NotizRuhend({ blocks: roh, onHaken }: { blocks: RuheBlock[]; onHaken: (pfad: number[], an: boolean) => void }) {
-  const letzter = roh[roh.length - 1];
-  const blocks = hatNummern(roh) && !(letzter && leer(letzter.content) && !letzter.children?.length) ? [...roh, SCHLUSS] : roh;
+export const NotizRuhend = memo(function NotizRuhend({ blocks, onHaken }: { blocks: RuheBlock[]; onHaken: (pfad: number[], an: boolean) => void }) {
+  // M462: Die Farb-Variablen (Text, Hervorhebungen) hängen seit BlockNote 0.57 an .bn-root
   return (
-    <div className="bn-container light bn-mantine notiz-ruhend" data-color-scheme="light" data-mantine-color-scheme="light">
+    <div className="bn-root bn-container light bn-mantine notiz-ruhend" data-color-scheme="light" data-mantine-color-scheme="light">
       <div className="ProseMirror bn-editor bn-default-styles" translate="no">
         <Gruppe blocks={blocks} pfad={[]} onHaken={onHaken} />
       </div>
