@@ -1,0 +1,504 @@
+{
+ "erzeugt": "BlockNote 0.31.3 (PixiNotes vor M462)",
+ "notizen": [
+  {
+   "id": "nA",
+   "blocks": [
+    {
+     "id": "567709dc-13b2-438e-b8e2-5a270c2b33dc",
+     "type": "heading",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left",
+      "level": 1
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Projektplan Kaiserstuhl",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "69b0f55f-edc2-41b6-9b6f-0c20c53e038e",
+     "type": "paragraph",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Fett",
+       "styles": {
+        "bold": true
+       }
+      },
+      {
+       "type": "text",
+       "text": " kursiv",
+       "styles": {
+        "italic": true
+       }
+      },
+      {
+       "type": "text",
+       "text": " unterstrichen",
+       "styles": {
+        "underline": true
+       }
+      },
+      {
+       "type": "text",
+       "text": " durch",
+       "styles": {
+        "strike": true
+       }
+      },
+      {
+       "type": "text",
+       "text": " code",
+       "styles": {
+        "code": true
+       }
+      },
+      {
+       "type": "text",
+       "text": " rot",
+       "styles": {
+        "textColor": "red"
+       }
+      },
+      {
+       "type": "text",
+       "text": " gelb",
+       "styles": {
+        "backgroundColor": "yellow"
+       }
+      },
+      {
+       "type": "text",
+       "text": " groß",
+       "styles": {
+        "textSize": "gross"
+       }
+      },
+      {
+       "type": "text",
+       "text": " Serif",
+       "styles": {
+        "textFont": "serif"
+       }
+      },
+      {
+       "type": "text",
+       "text": " ",
+       "styles": {}
+      },
+      {
+       "type": "link",
+       "href": "https://example.org",
+       "content": [
+        {
+         "type": "text",
+         "text": "Verweis",
+         "styles": {}
+        }
+       ]
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "01071a5e-8e80-4b4f-9e10-260c0e53dbf4",
+     "type": "heading",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left",
+      "level": 2
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Aufgaben",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "08f27d8e-d305-49f8-8388-91b26c94c60e",
+     "type": "checkListItem",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left",
+      "checked": true
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Angebot einholen",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "b887eeaa-23c0-4a7a-bbd5-c94275d5ca74",
+     "type": "checkListItem",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left",
+      "checked": false
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Sitzung am 11.11.2026 vorbereiten",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "1f7ad7d1-d451-49ee-9ed1-406de7e62fa1",
+     "type": "bulletListItem",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Punkt eins",
+       "styles": {}
+      }
+     ],
+     "children": [
+      {
+       "id": "cca8abd5-0a0a-4d6d-9684-a1a9189ea78e",
+       "type": "bulletListItem",
+       "props": {
+        "textColor": "default",
+        "backgroundColor": "default",
+        "textAlignment": "left"
+       },
+       "content": [
+        {
+         "type": "text",
+         "text": "Unterpunkt",
+         "styles": {}
+        }
+       ],
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": "41147d97-dc89-4c63-9534-fc35e4981dfd",
+     "type": "numberedListItem",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Erstens",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "0bc1b304-a660-46af-b7d3-e23e814aabe6",
+     "type": "numberedListItem",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Zweitens",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "b8205655-1248-492f-92ca-b3be1dd22cb0",
+     "type": "heading",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left",
+      "level": 3
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Details",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "346bb1eb-befe-4624-bf87-f7af4625d3b9",
+     "type": "paragraph",
+     "props": {
+      "textColor": "blue",
+      "backgroundColor": "gray",
+      "textAlignment": "center"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Mittig blau auf grau",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "87953773-0d3c-4082-a383-bde62de96d3f",
+     "type": "quote",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Weniger ist mehr.",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "7d11f01a-ddce-4725-b900-76afbbd51cfa",
+     "type": "codeBlock",
+     "props": {
+      "language": "javascript"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "const a = 1;",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "5ba97389-42fc-4f08-b1f4-66d4356bbf2f",
+     "type": "paragraph",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Ende der Notiz",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "f2284d61-55a6-42ca-bf7b-85dbfcdeafab",
+     "type": "paragraph",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+     },
+     "content": [],
+     "children": []
+    }
+   ]
+  },
+  {
+   "id": "nB",
+   "blocks": [
+    {
+     "id": "8515304d-c3c4-4ac3-93b5-c0155e87c4d4",
+     "type": "paragraph",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Kosten",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "6cfe9e35-21a3-48c2-8f7f-9d8b5b15ef42",
+     "type": "rechentabelle",
+     "props": {
+      "zellen": "{\"A1\":\"Posten\",\"B1\":\"Betrag\",\"A2\":\"Software\",\"B2\":\"1200\",\"A3\":\"Schulung\",\"B3\":\"450,50\",\"A4\":\"Summe\",\"B4\":\"=SUMME(B2:B3)\"}",
+      "stil": "{\"A1\":{\"fett\":true}}",
+      "spalten": 2,
+      "zeilen": 4
+     },
+     "children": []
+    },
+    {
+     "id": "40f7b3aa-f0fd-4ffd-a6be-c6e4d99e3c13",
+     "type": "table",
+     "props": {
+      "textColor": "default"
+     },
+     "content": {
+      "type": "tableContent",
+      "columnWidths": [
+       null,
+       null
+      ],
+      "rows": [
+       {
+        "cells": [
+         {
+          "type": "tableCell",
+          "content": [
+           {
+            "type": "text",
+            "text": "Alt A",
+            "styles": {}
+           }
+          ],
+          "props": {
+           "colspan": 1,
+           "rowspan": 1,
+           "backgroundColor": "default",
+           "textColor": "default",
+           "textAlignment": "left"
+          }
+         },
+         {
+          "type": "tableCell",
+          "content": [
+           {
+            "type": "text",
+            "text": "10",
+            "styles": {}
+           }
+          ],
+          "props": {
+           "colspan": 1,
+           "rowspan": 1,
+           "backgroundColor": "default",
+           "textColor": "default",
+           "textAlignment": "left"
+          }
+         }
+        ]
+       },
+       {
+        "cells": [
+         {
+          "type": "tableCell",
+          "content": [
+           {
+            "type": "text",
+            "text": "Alt B",
+            "styles": {}
+           }
+          ],
+          "props": {
+           "colspan": 1,
+           "rowspan": 1,
+           "backgroundColor": "default",
+           "textColor": "default",
+           "textAlignment": "left"
+          }
+         },
+         {
+          "type": "tableCell",
+          "content": [
+           {
+            "type": "text",
+            "text": "32",
+            "styles": {}
+           }
+          ],
+          "props": {
+           "colspan": 1,
+           "rowspan": 1,
+           "backgroundColor": "default",
+           "textColor": "default",
+           "textAlignment": "left"
+          }
+         }
+        ]
+       }
+      ]
+     },
+     "children": []
+    },
+    {
+     "id": "2b471709-5d45-4b48-8fc4-e1ba9a43a259",
+     "type": "image",
+     "props": {
+      "backgroundColor": "default",
+      "textAlignment": "left",
+      "name": "",
+      "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGNgYGD4z8DAwMDAAAAPAAHQ8E3pAAAAAElFTkSuQmCC",
+      "caption": "Grauer Punkt",
+      "showPreview": true,
+      "previewWidth": 120
+     },
+     "children": []
+    },
+    {
+     "id": "1b94c4f2-2d34-4ead-ac0a-437db858466c",
+     "type": "paragraph",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+     },
+     "content": [
+      {
+       "type": "text",
+       "text": "Nach dem Bild",
+       "styles": {}
+      }
+     ],
+     "children": []
+    },
+    {
+     "id": "4247f3a9-eb9b-47cd-b378-d2b89c7d4788",
+     "type": "paragraph",
+     "props": {
+      "textColor": "default",
+      "backgroundColor": "default",
+      "textAlignment": "left"
+     },
+     "content": [],
+     "children": []
+    }
+   ]
+  }
+ ]
+}

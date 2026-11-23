@@ -26,7 +26,8 @@ const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 const DIST = path.join(__repo, 'dist');
 const PORT = 5459;
 /** Grenze knapp über dem gemessenen Stand (M467: 2 168 523 B = 2,07 MiB; M459: 2 192 986 B; M446: 2 441 218 B) */
-const START_JS_GRENZE = 2_190_000;
+// M462: BlockNote 0.57 (Tiptap 3, Mantine 8) — Start 2 220 718 B (+50 KB, Emoji-Auswahl schon nachgeladen; siehe docs/meilensteine/M462-blocknote.md)
+const START_JS_GRENZE = 2_240_000;
 
 let anfragen = [];
 const gastAufrufe = [];
