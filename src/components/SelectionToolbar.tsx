@@ -28,6 +28,7 @@ import {
 import { vorschauArt } from '../lib/fileStore';
 import { bildBearbeitbar, bildBearbeiten } from './BildEditorHost';
 import { mutedHistory } from '../store';
+import { vorWann, zeitLang, zeitVon } from '../lib/kartenZeit';
 import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
 import type { ArrangeMode } from '../lib/arrange';
 import { KARTEN_EREIGNIS, kartenWunschNehmen } from '../lib/kontextmenue';
@@ -918,6 +919,22 @@ export function SelectionToolbar() {
                     Als Notiz übernehmen ({selected.filter(textKarte).length})
                   </button>
                 )}
+                {/* M463: Karte vom „Nach Themen ordnen" ausnehmen – eine Eigenschaft, kein Dauer-Knopf an der Karte */}
+                {(() => {
+                  const alleAus = selected.every((n) => n.ohneOrdnen);
+                  return (
+                    <button
+                      data-taste="ohne-ordnen"
+                      aria-pressed={alleAus}
+                      onClick={() => { setMenu(null); void import('../lib/ohneOrdnen').then((m) => m.ohneOrdnenSetzen(selected.map((n) => n.id), !alleAus)); }}
+                      title={alleAus
+                        ? 'Wieder mitordnen – „Nach Themen ordnen" darf die Karte in einen Rahmen legen'
+                        : 'Nicht mit ordnen – „Nach Themen ordnen" lässt die Karte liegen, wo sie ist'}
+                    >
+                      <IFrame size={14} /> {alleAus ? 'Wieder mit ordnen' : 'Nicht mit ordnen'}
+                    </button>
+                  );
+                })()}
                 {allArchived ? (
                   <button
                     onClick={() => { setMenu(null); setArchived(selected.map((n) => n.id), false); }}
@@ -941,6 +958,13 @@ export function SelectionToolbar() {
                     <ITrash size={14} /> Löschen
                   </button>
                 )}
+                {/* M463: wann der Inhalt zuletzt geändert wurde – eine leise Zeile, kein Knopf (M453) */}
+                {single && (() => {
+                  const zeit = zeitVon(single);
+                  return zeit !== undefined
+                    ? <div className="sel-menu-zeit" data-zeit="1" title={`Zuletzt geändert: ${zeitLang(zeit)}`}>{`Geändert ${vorWann(zeit)}`}</div>
+                    : <div className="sel-menu-zeit" data-zeit="1" title="Zuletzt geändert: unbekannt – die Karte stammt aus einem älteren Stand">Änderung unbekannt</div>;
+                })()}
               </>
             );
           })())}

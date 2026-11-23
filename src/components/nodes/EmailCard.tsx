@@ -9,7 +9,7 @@ import { triggerDownload } from '../../lib/download';
 import { aiReady } from '../../lib/ai';
 import { CardShell } from './CardShell';
 import { DueChips } from './DueChips';
-import { ICheck, IKanban, IMail, IWand, IPaperclip } from '../Icons';
+import { ICheck, IKanban, IMail, IPerson, IWand, IPaperclip } from '../Icons';
 
 const PREVIEW_CHARS = 420;
 
@@ -84,6 +84,28 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
   const stand = email.destillat as { notizId: string; aufgaben: unknown[]; uebernommen?: string } | undefined;
   const notizDa = useBoard((s) => !!stand && selectActiveBoard(s).nodes.some((n) => n.id === stand.notizId));
   const aufgabenOffen = !!stand && !stand.uebernommen && stand.aufgaben.length > 0 && notizDa;
+  // M463: Nach dem Destillat zusätzlich „Absender als Kontakt" anbieten – derselbe Weg wie im ⋯ der Mail (M457),
+  // solange noch kein Kontakt an der Mail hängt und der Absender bekannt ist
+  const kontaktDran = useBoard((s) => {
+    const b = selectActiveBoard(s);
+    return b.edges.some((e) => {
+      const andere = e.source === id ? e.target : e.target === id ? e.source : null;
+      return !!andere && b.nodes.some((n) => n.id === andere && n.type === 'kontakt');
+    });
+  });
+  const kontaktAngeboten = !!stand && notizDa && !kontaktDran && !!(email.fromAddress || email.fromName);
+  const alsKontakt = async () => {
+    setAiBusy(true);
+    try {
+      const { absenderAlsKontakt } = await import('../../lib/kontaktAusMail');
+      const r = await absenderAlsKontakt(id);
+      showToast(r.text, r.geaendert, 6000);
+    } catch (e) {
+      showToast(`Kontakt nicht angelegt: ${(e as Error).message}`, false, 6000);
+    } finally {
+      setAiBusy(false);
+    }
+  };
   const uebernehmen = async (wie: 'checkliste' | 'kanban') => {
     const { alsCheckliste, alsKanban } = await import('../../lib/mailDestillat');
     showToast(wie === 'checkliste' ? alsCheckliste(id) : alsKanban(id), true, 6000);
@@ -159,6 +181,13 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
           </button>
           <button className="nodrag" data-taste="destillat-kanban" onClick={() => void uebernehmen('kanban')} title="Neue Kanban-Karte mit je einem Ticket samt Frist und Person">
             <IKanban size={13} /> Als Tickets
+          </button>
+        </div>
+      )}
+      {kontaktAngeboten && (
+        <div className="card-actions email-aufgaben">
+          <button className="nodrag" data-taste="kontakt-nach-destillat" disabled={aiBusy} onClick={() => void alsKontakt()} title="Name, E-Mail, Funktion, Firma, Rufnummern und Anschrift aus Absender und Signatur – als Kontakt-Karte neben der Mail (ein vorhandener Kontakt wird ergänzt)">
+            <IPerson size={13} /> Absender als Kontakt
           </button>
         </div>
       )}

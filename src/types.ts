@@ -462,7 +462,8 @@ export type AppNode =
   // winkel (M400): Die Karte liegt schräg – Grad im Uhrzeigersinn um ihre Mitte; fehlt ⇒ gerade (lib/drehung.ts).
   // angelegt/geaendert (M453): Zeitpunkt der Anlage bzw. der letzten INHALTLICHEN Änderung (ms, lib/kartenZeit.ts) —
   // fehlt bei Karten aus der Zeit davor („unbekannt").
-  & { angelegt?: number; geaendert?: number; archived?: boolean; autoFit?: boolean; font?: CardFont; fontSize?: CardSize; kachel?: boolean; kachelMass?: { w: number; h: number }; winkel?: number };
+  // ohneOrdnen (M463): „Nicht mit ordnen" – „Nach Themen ordnen" (lib/themenOrdnen.ts) lässt die Karte liegen.
+  & { angelegt?: number; geaendert?: number; ohneOrdnen?: boolean; archived?: boolean; autoFit?: boolean; font?: CardFont; fontSize?: CardSize; kachel?: boolean; kachelMass?: { w: number; h: number }; winkel?: number };
 
 /** M298: Modultypen, die sich zur Kachel zusammenklappen lassen */
 export const KACHEL_TYPEN: ReadonlySet<string> = new Set(['kanban', 'gantt', 'week', 'minutes']);

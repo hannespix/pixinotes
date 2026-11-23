@@ -1883,7 +1883,8 @@ export const useBoard = create<BoardState>()(
             past,
             boards: s0.boards.map((b) => (b.id !== board.id ? b : {
               ...b,
-              nodes: b.nodes.map((n) => (n.id === id ? ({ ...n, data: { ...n.data, ...mitFristAnker(n, { blocks }) } } as AppNode) : n)),
+              // M463: auch das Rückgängig im Editor ändert den Text von Hand – stempeln (M453)
+              nodes: b.nodes.map((n) => (n.id === id ? zeitNachPatch({ ...n, data: { ...n.data, ...mitFristAnker(n, { blocks }) } } as AppNode, n, { blocks }) : n)),
             })),
           });
         },
@@ -1950,11 +1951,12 @@ export const useBoard = create<BoardState>()(
           const ziel = neueId ?? id;
           const breite = typeof alt.width === 'number' ? alt.width : alt.measured?.width;
           const rahmen = (alt.data as { rahmen?: boolean }).rahmen === true;
-          const neu = {
+          // M463: ein ersetztes Bild ist eine inhaltliche Änderung – stempeln wie updateNodeData (M453)
+          const neu = zeitNachPatch({
             ...alt, id: ziel, data: { ...alt.data, ...patch },
             // rahmenlos IST die Karte das Bild — ihre Höhe folgt dem neuen Seitenverhältnis
             ...(!rahmen && breite && verhaeltnis > 0 ? { height: Math.max(8, Math.round(breite * verhaeltnis)) } : {}),
-          } as AppNode;
+          } as AppNode, alt, patch as Record<string, unknown>);
           const um = (k: string) => (k === id ? ziel : k);
           set({
             boards: get().boards.map((b) => {

@@ -215,8 +215,10 @@ async function kiVerfeinern(mail: EmailData, roh: Partial<KontaktData>, signatur
 
 const FELD_NAMEN: Record<string, string> = { name: 'Name', funktion: 'Funktion', firma: 'Firma', telefone: 'Rufnummer', emails: 'E-Mail', adresse: 'Anschrift', web: 'Webseite' };
 
-/** Nur leere Felder füllen; Rückgabe: was ergänzt wurde */
-export function kontaktErgaenzen(alt: KontaktData, neu: Partial<KontaktData>): { patch: Partial<KontaktData>; felder: string[] } {
+/** Nur leere Felder füllen; Rückgabe: was ergänzt wurde.
+ *  M463: `weitereEmails` – der Kontakt wurde über den NAMEN erkannt: neue Adressen kommen als weitere E-Mail dazu,
+ *  statt dass ein zweiter Kontakt derselben Person entsteht. */
+export function kontaktErgaenzen(alt: KontaktData, neu: Partial<KontaktData>, opt: { weitereEmails?: boolean } = {}): { patch: Partial<KontaktData>; felder: string[] } {
   const patch: Partial<KontaktData> = {};
   const felder: string[] = [];
   for (const f of ['name', 'funktion', 'firma', 'adresse', 'web'] as const) {
@@ -224,7 +226,13 @@ export function kontaktErgaenzen(alt: KontaktData, neu: Partial<KontaktData>): {
     if (typeof wert === 'string' && wert && !(alt[f] ?? '').trim()) { patch[f] = wert; felder.push(FELD_NAMEN[f]); }
   }
   if (neu.telefone?.length && !alt.telefone.some((t) => t.nummer.trim())) { patch.telefone = neu.telefone; felder.push(FELD_NAMEN.telefone); }
-  if (neu.emails?.length && !alt.emails.some((m) => m.trim())) { patch.emails = neu.emails; felder.push(FELD_NAMEN.emails); }
+  const altMails = alt.emails.filter((m) => m.trim());
+  if (neu.emails?.length && !altMails.length) { patch.emails = neu.emails; felder.push(FELD_NAMEN.emails); }
+  else if (opt.weitereEmails && neu.emails?.length) {
+    const bekannt = new Set(altMails.map((m) => m.trim().toLowerCase()));
+    const dazu = neu.emails.filter((m) => m.trim() && !bekannt.has(m.trim().toLowerCase()));
+    if (dazu.length) { patch.emails = [...altMails, ...dazu]; felder.push(dazu.length > 1 ? 'weitere E-Mails' : 'weitere E-Mail'); }
+  }
   return { patch, felder };
 }
 
@@ -232,6 +240,29 @@ export function kontaktErgaenzen(alt: KontaktData, neu: Partial<KontaktData>): {
 function kontaktMitAdresse(nodes: AppNode[], emails: string[]): AppNode | undefined {
   const gesucht = new Set(emails.map((m) => m.trim().toLowerCase()).filter(Boolean));
   return nodes.find((n) => n.type === 'kontakt' && !n.archived && kontaktDaten(n.data as Partial<KontaktData>).emails.some((m) => gesucht.has(m.trim().toLowerCase())));
+}
+
+/** Anreden und Titel zählen beim Namensvergleich nicht („Dr. Anna Berg" = „Anna Berg") */
+const ANREDE = new Set(['herr', 'frau', 'hr', 'fr', 'dr', 'prof', 'dipl', 'ing', 'mag', 'mr', 'mrs', 'ms', 'miss', 'sir']);
+
+/** M463: Name zum Vergleichen – klein, Umlaute ausgeschrieben (ä = ae, ß = ss), ohne Akzente, Anreden und Satzzeichen,
+ *  Wörter sortiert („Berg, Anna" = „anna berg" = „Anna BERG"). Leer, wenn weniger als zwei Namensteile übrig bleiben:
+ *  ein Vorname allein ist kein Beleg für dieselbe Person. */
+export function personSchluessel(name: string): string {
+  const teile = name.toLowerCase()
+    .replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ü/g, 'ue').replace(/ß/g, 'ss')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .split(/[^a-z0-9-]+/)
+    .map((w) => w.replace(/^-+|-+$/g, ''))
+    .filter((w) => w.length > 0 && !ANREDE.has(w));
+  return teile.length >= 2 ? teile.sort().join(' ') : '';
+}
+
+/** M463: Ein Kontakt auf dem Board mit demselben Namen (normalisiert) */
+function kontaktMitNamen(nodes: AppNode[], name: string): AppNode | undefined {
+  const gesucht = personSchluessel(name);
+  if (!gesucht) return undefined;
+  return nodes.find((n) => n.type === 'kontakt' && !n.archived && personSchluessel(kontaktDaten(n.data as Partial<KontaktData>).name) === gesucht);
 }
 
 /** Absender der Mail als Kontakt-Karte (oder vorhandenen Kontakt ergänzen). Rückgabe = Meldung für den Nutzer und ob
@@ -259,11 +290,13 @@ export async function absenderAlsKontakt(mailId: string): Promise<{ text: string
   const st = useBoard.getState();
   const nodes = selectActiveBoard(st).nodes;
   const m = nodes.find((n) => n.id === mailId) ?? mail;
-  const vorhanden = kontaktMitAdresse(nodes, d.emails);
+  // Erst über die Adresse, dann (M463) über den Namen – dieselbe Person mit einer zweiten Adresse wird ergänzt
+  const perAdresse = kontaktMitAdresse(nodes, d.emails);
+  const vorhanden = perAdresse ?? kontaktMitNamen(nodes, d.name);
   const anzeige = (k: KontaktData) => k.name || k.firma || k.emails[0] || 'Kontakt';
   if (vorhanden) {
     const alt = kontaktDaten(vorhanden.data as Partial<KontaktData>);
-    const { patch, felder: ergaenzt } = kontaktErgaenzen(alt, d);
+    const { patch, felder: ergaenzt } = kontaktErgaenzen(alt, d, { weitereEmails: !perAdresse });
     const pfeilFehlt = !selectActiveBoard(st).edges.some((x) => (x.source === mailId && x.target === vorhanden.id) || (x.source === vorhanden.id && x.target === mailId));
     if (!ergaenzt.length && !pfeilFehlt) return meldung(`„${anzeige(alt)}" steht schon als Kontakt auf dem Board – nichts zu ergänzen.`);
     st.pushHistory();
