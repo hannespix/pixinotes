@@ -3099,4 +3099,16 @@
 "Vor KI-Umbau":"Before AI rework",
 "Vor Wiederherstellen":"Before restoring",
 "Dieses Board ist nur zum Lesen freigegeben – als Kopie öffnen geht.":"This board is shared read-only – opening it as a copy works.",
-"{0} (Stand)":"{0} (version)"}
+"{0} (Stand)":"{0} (version)",
+"Zuletzt geändert: {0}":"Last changed: {0}",
+"Geändert {0}":"Changed {0}",
+"Zuletzt geändert: unbekannt – die Karte stammt aus einem älteren Stand":"Last changed: unknown – the card comes from an older state",
+"· Änderung unbekannt":"· Change unknown",
+"Wieder nach Relevanz ordnen":"Sort by relevance again",
+"Treffer nach der letzten Änderung ordnen – ohne Suchwort: die zuletzt geänderten Karten":"Sort hits by their last change – without a search term: the most recently changed cards",
+"Zuletzt geändert zuerst":"Recently changed first",
+"Noch keine Karte mit bekanntem Änderungsdatum – das kommt mit der nächsten Änderung.":"No card with a known change date yet – that comes with the next change.",
+"(ohne Betreff)":"(no subject)",
+"Lange unberührt":"Untouched for a long time",
+"seit {0} Tagen ohne Folgeaktivität":"no follow-up for {0} days",
+"seit {0} Tagen unverändert":"unchanged for {0} days"}

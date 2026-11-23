@@ -28,6 +28,7 @@
 import type { Edge } from '@xyflow/react';
 import { bubblesMischen, type BubblesData } from './bubbles';
 import { punkteMischen } from './punkte';
+import { spaetere } from './kartenZeit';
 import type { BoardDoc, CommentThread, Project, Space, Stroke } from '../store';
 import type { AppNode } from '../types';
 
@@ -240,7 +241,8 @@ function bubblesVereinen(nodes: AppNode[], lokal: AppNode[], fremd: AppNode[]): 
  */
 const ohnePunkte = (n: AppNode): string => {
   const { punkte: _p, ...daten } = n.data as Record<string, unknown>;
-  const { measured: _m, selected: _s, dragging: _d, ...karte } = n as AppNode & { measured?: unknown; selected?: unknown; dragging?: unknown };
+  // M453: ohne den Zeitstempel — zwei Geräte mit derselben Fassung, aber verschiedenem Zeitpunkt, sind sich einig
+  const { measured: _m, selected: _s, dragging: _d, geaendert: _g, ...karte } = n as AppNode & { measured?: unknown; selected?: unknown; dragging?: unknown };
   return str({ ...karte, data: daten }) ?? '';
 };
 
@@ -255,7 +257,8 @@ function mergeBoard(basis: BoardDoc | undefined, lokal: BoardDoc, fremd: BoardDo
       if (l.type === 'bubbles' && f.type === 'bubbles') return l;
       // M377: Hat eine Seite nur Punkte vergeben, gilt der Inhalt der anderen — die Punkte werden danach vereinigt
       const lo = ohnePunkte(l); const fo = ohnePunkte(f);
-      if (lo === fo) return l;
+      // M453: inhaltsgleich, nur anders gestempelt — kein Konflikt; die spätere Fassung gilt (auf beiden Geräten gleich)
+      if (lo === fo) return spaetere(l, f);
       if (b) { const bo = ohnePunkte(b); if (bo === lo) return f; if (bo === fo) return l; }
       z.konflikte += 1; return l;
     }),
