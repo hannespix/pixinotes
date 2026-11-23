@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useReactFlow, type NodeProps } from '@xyflow/react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
@@ -16,6 +16,11 @@ import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from '.
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { IChevronL, IChevronR, IPlus, ISettings, IX } from '../Icons';
+import type { NotizSitzung } from '../../lib/notizGemeinsamKern';
+import { liveVerbunden, TEILNEHMER_EREIGNIS } from '../../lib/liveStand';
+import { useTakt } from '../LiveLeiste';
+import { NotizRuhend } from './NotizRuhend';
+import type { RuheBlock } from '../../lib/notizRuhend';
 
 /**
  * Protokoll-Reihe (M186): eine Karte für eine ganze Besprechungsserie.
@@ -263,7 +268,7 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
             </div>
           )}
 
-          {entry && <EntryEditor key={entry.id} nodeId={id} entryId={entry.id} blocks={entry.blocks} editorRef={editorRef} />}
+          {entry && <EntryEditorWahl key={entry.id} nodeId={id} entryId={entry.id} blocks={entry.blocks} editorRef={editorRef} />}
 
           {entry && (
             <div className="minutes-decisions nodrag">
@@ -306,31 +311,59 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   );
 }
 
+/** M487: Im Live-Board übernimmt die Hülle für gemeinsames Tippen (nachgeladen, nur wenn ein Kanal steht) */
+const ProtokollGemeinsam = lazy(() => import('./ProtokollGemeinsam'));
+export interface EntryEditorProps {
+  nodeId: string; entryId: string; blocks?: unknown[];
+  editorRef?: { current: unknown };
+}
+function EntryEditorWahl(p: EntryEditorProps) {
+  const boardId = useBoard((s) => s.activeId);
+  useTakt(TEILNEHMER_EREIGNIS);
+  // Einmal live, bleibt die Hülle (sie geht selbst zurück zu „allein", wenn der Kanal fehlt — nie unter dem Cursor)
+  const jeLive = useRef(false);
+  if (liveVerbunden(boardId)) jeLive.current = true;
+  return jeLive.current
+    ? <Suspense fallback={<ProtokollRuhend blocks={p.blocks} />}><ProtokollGemeinsam {...p} /></Suspense>
+    : <EntryEditor {...p} />;
+}
+/** M487: Der Protokolltext ohne Editor — kurz, während die Hülle zwischen zwei Editoren wechselt */
+export function ProtokollRuhend({ blocks }: { blocks?: unknown[] }) {
+  return (
+    <div className="minutes-body nodrag">
+      <div className="note-editor" translate="no">
+        <NotizRuhend blocks={(blocks ?? []) as RuheBlock[]} onHaken={() => { /* gleich wieder ein Editor */ }} />
+      </div>
+    </div>
+  );
+}
+
 /**
  * Protokolltext einer Sitzung. Eigene Komponente, damit der `key`-Wechsel
  * beim Blättern den Editor sauber neu aufbaut (BlockNote liest nur beim Mount).
+ * M487: `sitzung` — gemeinsam tippen im Live-Board (Yjs, Hülle ./ProtokollGemeinsam.tsx); sonst allein wie bisher.
  */
-function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
-  nodeId: string; entryId: string; blocks?: unknown[];
-  editorRef?: { current: unknown };
-}) {
+export function EntryEditor({ nodeId, entryId, blocks, editorRef, sitzung }: EntryEditorProps & { sitzung?: NotizSitzung }) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const [initialContent] = useState<PartialBlock[] | undefined>(() => {
     const safe = repairBlocks(blocks) as PartialBlock[];
     return safe.length > 0 ? safe : undefined;
   });
   const nurLesen = useNurLesen(); // M360
-  const editor = useCreateBlockNote({
+  const basis = {
     schema: noteSchema,
     // M462: Strg+A markiert wie bisher die ganze Notiz (BlockNote 0.57: erst den Block)
-    selectAllBehavior: 'document',
+    selectAllBehavior: 'document' as const,
     initialContent: initialContent as never,
     dictionary: sprache() === 'en' ? blockNoteEn : blockNoteDe,   // M381
     // M289: Damit Bilder überhaupt in den Text dürfen — Einfügen,
     // Ablegen und der Dateiwähler des Bild-Blocks laufen hier durch
     uploadFile: editorUpload(),   // M303: nie eine abgewiesene Zusage
-  });
+  };
+  // M487: gemeinsam — derselbe Editor, dazu die Yjs-Kollaboration (Inhalt aus dem Y-Dokument statt initialContent)
+  const editor = useCreateBlockNote(sitzung ? sitzung.optionen(basis) : basis);
   useAndroidBackspaceFix(editor);
+  useEffect(() => sitzung?.anbinden(!nurLesen, () => editor.document), [sitzung, nurLesen, editor]);
   if (editorRef) editorRef.current = editor;
 
   // Beim Verlassen der Sitzung (Blättern) den letzten Stand sichern —
@@ -338,6 +371,7 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
   const latest = useRef(editor);
   latest.current = editor;
   useEffect(() => () => {
+    if (sitzung) return;   // M487: gemeinsam sichert die Sitzung (nur der Schreiber, beim Verlassen `abschied`)
     try {
       const st = useBoard.getState();
       const board = st.boards.find((b) => b.nodes.some((n) => n.id === nodeId));
@@ -380,6 +414,8 @@ function EntryEditor({ nodeId, entryId, blocks, editorRef }: {
         formattingToolbar={false}
           slashMenu={false}   /* M283: eigenes Einfügen-Menü (NoteSlashMenu) */
         onChange={() => {
+          // M487: gemeinsam auch Änderungen der anderen — gesichert nur vom Schreiber
+          if (sitzung) { sitzung.aenderung(editor.document); return; }
           const st = useBoard.getState();
           const board = st.boards.find((b) => b.nodes.some((n) => n.id === nodeId));
           const cur = ((board?.nodes.find((n) => n.id === nodeId)?.data as MinutesData | undefined)?.entries) ?? [];

@@ -17,6 +17,20 @@
 }
 /* Markierung der anderen: die Farbe kommt aus der Person (Inline-Stil von y-prosemirror) */
 .note-editor .ProseMirror-yjs-selection { border-radius: 2px; }
+/* M487: Im Ticket-Fenster eines Kanbans (schlichte Felder statt Block-Editor) steht, wer gerade im Feld tippt — leise,
+   der Name in der Teilnehmerfarbe. Beim Titel rechts neben dem Feld, bei der Beschreibung darunter. */
+.feld-tippt {
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.feld-tippt b { font-weight: 700; }
+.feld-tippt b + b::before { content: ', '; color: var(--muted); font-weight: 400; }
+.feld-tippt-text { flex: none; max-width: 40%; }
+.feld-tippt-note { margin-top: -6px; }
 @media print {
   .note-editor .bn-collaboration-cursor__base { display: none; }
+  .feld-tippt { display: none; }
 }
