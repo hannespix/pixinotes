@@ -82,7 +82,7 @@ m332, m447, m429, m354, m366. Jeder Agent verlor damit Wiederholungen und Gewiss
 ## Nachweis
 Last = Läufer mit 6 Bahnen auf 4 Kernen, dazu andere Agenten (Lastmittel 10–20) bzw. Prozesse mit Dauerlast.
 Vor der Änderung: m383 1 von 3 und 0 von 3, m428 1 von 3, m477 2 von 4 (Hauptzweig), m387 1 von 2, m354 1 von 2,
-m332 7 von 10 (nach M483), m366 8 von 10. Nach der Änderung (`--wiederhole 10 --bahnen 6`, zuletzt nach dem Einmischen
+m332 in 3 von 4 Durchgängen rot (nach M483), m366 8 von 10. Nach der Änderung (`--wiederhole 10 --bahnen 6`, zuletzt nach dem Einmischen
 von M487):
 
 | Reihe | grün |
