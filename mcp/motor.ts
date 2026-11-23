@@ -9,7 +9,7 @@ import { standHolen, standSetzen, useBoard, type BoardDoc, type Space } from './
 
 export interface Stand { boards: BoardDoc[]; spaces: Space[]; activeId: string }
 
-const ALLE_MODULE = new Set(['note', 'sheet', 'kanban', 'gantt', 'week', 'minutes', 'time', 'bubbles', 'mermaid']);
+const ALLE_MODULE = new Set(['note', 'sheet', 'kanban', 'gantt', 'week', 'minutes', 'time', 'bubbles', 'mermaid', 'kontakt']);
 
 /** Ein Board über Kennung oder Namen finden (Groß-/Kleinschreibung egal) */
 export function boardFinden(stand: Stand, wer: string): BoardDoc | undefined {
