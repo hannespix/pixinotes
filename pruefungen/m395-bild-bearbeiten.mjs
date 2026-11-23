@@ -257,10 +257,15 @@ console.log('\n════ E: Helligkeit, Kontrast, Sättigung ════');
   let k = await karte(P, 'bild'); let m = await lesen(P, k.data.src, [[0.5, 0.5]]);
   pruefe('E2 heller: die Mitte (128, 128, 140) wird um rund 45 Stufen heller', Math.abs(m.farben[0][0] - 173) < 6 && Math.abs(m.farben[0][2] - 185) < 6, m.farben[0]);
   await rueckgaengig(P);
+  // M502: den gespeicherten Stand erst lesen, wenn er steht (AGENTEN.md „unter Last") — erst das Rückgängig, dann das Ergebnis
+  let vorSrc = k.data.src;
+  for (let i = 0; i < 40 && (await karte(P, 'bild')).data.src === vorSrc; i += 1) await P.waitForTimeout(200);
+  vorSrc = (await karte(P, 'bild')).data.src;
   await oeffne(P, 'bild');
   await P.locator('[data-taste="be-anpassen"]').click();
   await regler(P, 'be-saettigung', -100); await P.waitForTimeout(300);
   await fertig(P);
+  for (let i = 0; i < 40 && (await karte(P, 'bild')).data.src === vorSrc; i += 1) await P.waitForTimeout(200);
   k = await karte(P, 'bild'); m = await lesen(P, k.data.src, [[0.9, 0.1], [0.1, 0.9]]);
   pruefe('E3 Sättigung ganz herunter: das Bild ist grau', m.farben.every((f) => Math.abs(f[0] - f[1]) < 4 && Math.abs(f[1] - f[2]) < 4), m.farben);
   await rueckgaengig(P);

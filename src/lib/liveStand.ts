@@ -4,7 +4,7 @@
 // Kanal? Wer ist noch da? Wer hält welche Karte? Der Abgleich selbst (lib/gastSync.ts, mit lib/kontoSync.ts zusammen
 // über 100 KB) lädt erst, wenn ein Konto oder ein Gast-Zugang da ist (lib/syncStart.ts). Bis dahin sind die Karten
 // hier leer — genau das, was der Abgleich ohne Kanal auch meldete. gastSync füllt sie und reicht alles weiter.
-import { getAuthor } from '../components/CommentLayer';
+import { getAuthor } from './autor';
 import { useBoard } from '../store';
 import { loadKonto } from './kontoSitzung';
 import type { LiveKanal, Teilnehmer } from './liveKanal';

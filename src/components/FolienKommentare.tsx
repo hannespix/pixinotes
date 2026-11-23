@@ -6,7 +6,7 @@
 // Speichers — was hier entsteht, steht danach auch auf dem Board.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { selectActiveBoard, useBoard, selectNurLesen } from '../store';
-import { getAuthor, setAuthor } from './CommentLayer';
+import { getAuthor, setAuthor } from '../lib/autor';
 import { IX } from './Icons';
 
 const zeit = (iso: string) => {

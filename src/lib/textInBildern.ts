@@ -223,7 +223,9 @@ let gestartet = false;
  * Einmal beim Start (App.tsx): Erst nach dem Laden und einer Atempause schauen, ob Bilder warten; danach
  * bei jeder Änderung der Boards (eingefügtes Bild) erneut — entprellt, die Arbeit selbst im Leerlauf.
  */
-export function bildTextStarten(): () => void {
+/** `verzugMs`: so lange nach dem Laden der Seite bis zur ersten Runde (M502: die App startet diesen Teil selbst erst
+ *  nach 4 s und gibt dann 0 mit — zusammen wie vorher) */
+export function bildTextStarten(verzugMs = 4000): () => void {
   if (gestartet) return () => {};
   gestartet = true;
   let letzteBoards = useBoard.getState().boards;
@@ -232,7 +234,7 @@ export function bildTextStarten(): () => void {
     letzteBoards = s.boards;
     planen();
   });
-  const los = () => planen(4000);
+  const los = () => planen(verzugMs);
   if (document.readyState === 'complete') los();
   else window.addEventListener('load', los, { once: true });
   const sichtbar = () => { if (document.visibilityState === 'visible') planen(); };

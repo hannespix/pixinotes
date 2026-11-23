@@ -32,7 +32,8 @@ const PORT = 5446;
 // M462: BlockNote 0.57 (Tiptap 3, Mantine 8) — Start 2 220 718 B (+50 KB, Emoji-Auswahl schon nachgeladen; siehe docs/meilensteine/M462-blocknote.md)
 // M482: Rechtschreibprüfung (lib/rechtschreibung.ts, muss vor dem ersten Fokus stehen) — Start 2 242 112 B; vorher 2 239 988 B
 // M483: Auswahl-Leiste, Import, KI-Aktionen, Beispiele, Dialoge und Kalender-Abruf nachgeladen — Start rund 142 KB leichter; Grenze GESENKT auf neuer Stand + gut 20 KB (docs/meilensteine/M483-start-leicht.md)
-const START_JS_GRENZE = 2_125_000;
+// M502: Live-Team, Gehirn, Rechen-Tabelle, Kommentare, Punkte, Nachschlagen, Handschrift-Struktur, Bildtext nachgeladen — Start 2 044 571 B mit M501 (vorher 2 112 358 B); Grenze GESENKT auf neuer Stand + gut 20 KB (docs/meilensteine/M502-start-leicht-2.md)
+const START_JS_GRENZE = 2_070_000;
 
 let anfragen = [];
 const app = http.createServer((q, r) => {

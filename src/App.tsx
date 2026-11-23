@@ -1,7 +1,7 @@
 import { QR_EREIGNIS, type QrWunsch } from './lib/qr';
 import { lazy, Suspense, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { auswahlLeisteLaden, Board, kartenVorladen } from './components/Board';
+import { auswahlLeisteLaden, Board, kartenVorladen, kommentareLaden } from './components/Board';
 import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
 import { TopActions } from './components/TopActions';
@@ -14,11 +14,10 @@ import { sicherungStartFaellig, SICHERUNG_EREIGNIS } from './lib/sicherungTakt';
 import { initProjectAutoSync } from './lib/projectSync';
 import { cleanupOrphanHtml } from './lib/htmlStore';
 import { cleanupOrphanFiles } from './lib/fileStore';
-import { bildTextStarten } from './lib/textInBildern';
 import { initBoardVersionen, versionsAnhaenge, verwaisteAufraeumen, VERSIONEN_EREIGNIS } from './lib/boardVersionen';
 import { initWebdavSync } from './lib/webdav';
 import { initFilesSync } from './lib/filesSync';
-import { initBrain } from './lib/brain';
+import { initBrain } from './lib/brainStart';
 import { kiAbbrechen } from './lib/ai';
 import { AboutMenu } from './components/AboutMenu';
 import { FocusSheet } from './components/FocusSheet';
@@ -26,7 +25,6 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Onboarding } from './components/Onboarding';
 import { BacklinksPanel } from './components/BacklinksPanel';
 import { GeteiltHost } from './components/GeteiltHost';
-import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
 import { Tastatur } from './components/Tastatur';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
@@ -37,18 +35,16 @@ import { autoArchivAlleBoards } from './lib/ticketArchiv';
 import { clearShareHash, cloneSharedBoard, readShareHash } from './lib/share';
 import { initGrabsteine } from './lib/grabsteine';
 import { einladungAnnehmen, einladungOffen, einladungTokenAbholen } from './lib/einladung';
-import { folgeIch, initVorfuehren, VORFUEHR_EREIGNIS, werFuehrtVor } from './lib/vorfuehren';
-import { initMauszeiger } from './lib/mauszeiger';
-import { initGruppenraum } from './lib/gruppenraum';
-import { GruppenraumSchicht } from './components/Gruppenraum';
-import { PunkteLeiste } from './components/Punkte';
-import { Vorfuehren } from './components/Vorfuehren';
+// M502: Vorführen, Mauszeiger und Gruppenraum kommen mit dem Live-Abgleich (lib/gastSync.ts) — hier nur der leichte Teil
+import { folgeIch, VORFUEHR_EREIGNIS, werFuehrtVor } from './lib/vorfuehrenLeicht';
+import { PunkteLeisteSpaet, punkteLaden } from './components/PunkteSpaet';
+import { rechenTabelleLaden } from './components/RechenTabelle';
 import { SprachHinweis } from './components/SprachHinweis';
-import { GastNameDialog, LiveLeiste, NAME_FRAGEN } from './components/LiveLeiste';
+import { GastNameDialog, GruppenraumSpaet, LiveLeiste, NAME_FRAGEN, VorfuehrenSpaet } from './components/LiveLeiste';
 import { FreigabeHost, freigabeDialogLaden } from './components/FreigabeHost';
 import { BildEditorHost } from './components/BildEditorHost';
 import { EbeneLoeschenHost } from './components/EbeneLoeschenDialog';
-import { getAuthor } from './components/CommentLayer';
+import { getAuthor } from './lib/autor';
 import { loadKonto } from './lib/kontoSitzung';
 import { initSyncStart } from './lib/syncStart';
 import { sprache, zahlWort } from './lib/sprache';
@@ -181,6 +177,8 @@ const LADER = {
   // M483: Karten teilen und Bild/PDF-Export — Dialoge, die erst mit dem Aufruf gebraucht werden
   teilen: () => import('./components/ShareCardsModal'),
   bildExport: () => import('./components/BildExport'),
+  // M502: Nachschlagen (Wikipedia & Co.) — öffnet erst auf Wunsch
+  nachschlagen: () => import('./components/LookupPanel'),
 };
 const OverviewLazy = lazy(() => LADER.overview().then((m) => ({ default: m.Overview })));
 const TaskHubLazy = lazy(() => LADER.taskhub().then((m) => ({ default: m.TaskHub })));
@@ -189,6 +187,7 @@ const SearchOverlayLazy = lazy(() => LADER.suche().then((m) => ({ default: m.Sea
 const RechercheLazy = lazy(() => LADER.recherche().then((m) => ({ default: m.RechercheDialog })));
 const ShareCardsLazy = lazy(() => LADER.teilen().then((m) => ({ default: m.ShareCardsModal })));
 const BildExportLazy = lazy(() => LADER.bildExport().then((m) => ({ default: m.BildExport })));
+const LookupLazy = lazy(() => LADER.nachschlagen().then((m) => ({ default: m.LookupPanel })));
 
 /** Einmal geöffnet, bleibt der Teil eingehängt (er schließt sich selbst über seinen Store-Schalter) */
 function BeiBedarf({ offen, children }: { offen: boolean; children: ReactNode }) {
@@ -216,6 +215,10 @@ function KartenTeilen() {
 }
 function BildExportFenster() {
   return <BeiBedarf offen={useBoard((s) => s.bildExportOpen)}><BildExportLazy /></BeiBedarf>;
+}
+/** M502: Nachschlagen (M168) — der Teil kommt mit dem ersten Aufruf */
+function Nachschlagen() {
+  return <BeiBedarf offen={useBoard((s) => s.lookup !== null)}><LookupLazy /></BeiBedarf>;
 }
 function Recherche() {
   return <BeiBedarf offen={useBoard((s) => s.rechercheOpen)}><RechercheLazy /></BeiBedarf>;
@@ -257,12 +260,24 @@ function imLeerlaufVorladen() {
     void import('./components/GeteiltDialog').catch(() => null);
     void import('./components/EbeneLoeschenFenster').catch(() => null);
     void import('./lib/kontaktExport').catch(() => null);
+    // M502: Rechen-Tabelle in Notizen, Live-Team (Vorführen, Zeiger, Gruppenraum kommen mit gastSync bzw. dem
+    // Presenter), Handschrift-Struktur und das Gehirn — damit der erste Aufruf nicht wartet und alles offline da ist
+    void rechenTabelleLaden().catch(() => null);
+    void kommentareLaden().catch(() => null);
+    void punkteLaden().catch(() => null);
+    void import('./components/Vorfuehren').catch(() => null);
+    void import('./components/Mauszeiger').catch(() => null);
+    void import('./components/Gruppenraum').catch(() => null);
+    void import('./lib/handschriftStruktur').catch(() => null);
+    void import('./lib/brain').catch(() => null);
   };
   const ric = (window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
   window.setTimeout(() => (ric ? ric(los, { timeout: 4000 }) : los()), VORLADEN_NACH_MS);
 }
 /** So lange nach dem Laden warten — der Start selbst (erstes Board, Editor) hat Vorrang */
 const VORLADEN_NACH_MS = 4000;
+/** M502: Texterkennung in Bildern — Wächter laden und die erste Runde planen (vorher: 4 s nach dem Laden) */
+const BILDTEXT_NACH_MS = 4000;
 
 export default function App() {
   const toast = useBoard((s) => s.toast);
@@ -282,7 +297,7 @@ export default function App() {
   const nurLesenBoard = nurLesenId ? { id: nurLesenId, von: nurLesenVon } : null;
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initSyncStart(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); initBoardVersionen(); seitenBreitenReparieren();
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initSyncStart(); initBrain(); initGrabsteine(); initBoardVersionen(); seitenBreitenReparieren();
     // M476: Auto-Sicherung bzw. die Erinnerung nach 14 Tagen — der Code dafür lädt nur nach, wenn etwas fällig ist
     window.setTimeout(() => { if (sicherungStartFaellig()) void import('./lib/sicherung').then((m) => m.sicherungStart()); }, 6000); imLeerlaufVorladen(); window.setTimeout(() => useBoard.getState().fristAnkerNachtragen(), 1200); }, []);
 
@@ -315,7 +330,16 @@ export default function App() {
   }, []);
 
   // M452: Text in Bildern erkennen — die Engine kommt erst im Leerlauf und nur, wenn ein Bild wartet
-  useEffect(() => bildTextStarten(), []);
+  // M502: … und auch ihr Wächter (lib/textInBildern.ts) lädt erst nach dem Start — die erste Runde lief ohnehin erst
+  // 4 s nach dem Laden der Seite
+  useEffect(() => {
+    let stopp: (() => void) | null = null;
+    let weg = false;
+    const t = window.setTimeout(() => {
+      void import('./lib/textInBildern').then((m) => { if (!weg) stopp = m.bildTextStarten(0); }).catch(() => {});
+    }, BILDTEXT_NACH_MS);
+    return () => { weg = true; window.clearTimeout(t); stopp?.(); };
+  }, []);
 
   // M294: Der Gesten-Spickzettel beim Sitzungsstart ist weg — die Begrüßung
   // beim ersten Start und der Hinweis auf der leeren Fläche sagen dasselbe,
@@ -587,7 +611,7 @@ export default function App() {
       <BildExportFenster />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
       <GeteiltHost />
-      <LookupPanel />
+      <Nachschlagen />
       <TooltipLayer />
       <Tastatur />
         <Einstellungen />
@@ -607,11 +631,11 @@ export default function App() {
         {view === 'board' && !presenting && !focusCard && !tasksOpen && <LiveLeiste />}
         {/* M367: „Folgt mir" — wer vorführt, wer folgt */}
         {/* M371: auch während der Präsentation — sie gehört jetzt zur Ansicht, die der Vorführende mitnimmt */}
-        {view === 'board' && !tasksOpen && <Vorfuehren />}
+        {view === 'board' && !tasksOpen && <VorfuehrenSpaet />}
         {/* M376: aufsteigende Reaktionen und die gemeinsame Uhr — über Board und Präsentation */}
-        {view === 'board' && !tasksOpen && <GruppenraumSchicht />}
+        {view === 'board' && !tasksOpen && <GruppenraumSpaet />}
         {/* M377: Punkte-Modus — Karten antippen statt auswählen */}
-        {view === 'board' && !tasksOpen && !presenting && <PunkteLeiste />}
+        {view === 'board' && !tasksOpen && !presenting && <PunkteLeisteSpaet />}
         <GastNameDialog />
         <FreigabeHost />
         <BildEditorHost />

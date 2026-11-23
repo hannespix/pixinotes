@@ -6,7 +6,12 @@ import { SEITEN_EREIGNIS, seiteVon, strichRelativ } from '../lib/pdfSeiten';
 import { uid } from '../types';
 import { finalizeStroke, recognizeShapes, type Pt } from '../lib/strokeShapes';
 import { handschriftKandidaten, handschriftWeg, kiKorrektur, textAufraeumen, type SchriftKontext } from '../lib/handschrift';
-import { TEXT_ARTEN, artSetzen, artVorsatz, hauptArt, istListe, markerAusStrichen, zeilenMitArt, zeilenZuBloecken, type BlockArt, type ZeileMitArt } from '../lib/handschriftStruktur';
+import type { BlockArt, ZeileMitArt } from '../lib/handschriftStruktur';
+// M502: Marker, Textarten und Blöcke der Handschrift (~9 KB) kommen mit der ersten Erkennung — die braucht ohnehin
+// ihre Engine (lib/handschrift.ts); bis dahin gibt es keinen Vorschlag, der sie zeigen müsste
+type Struktur = typeof import('../lib/handschriftStruktur');
+let struktur: Struktur | null = null;
+const strukturLaden = (): Promise<Struktur> => import('../lib/handschriftStruktur').then((m) => (struktur = m));
 import { bboxVon, istKritzel, istSchleife, istWaagerechteLinie, punktInPolygon, ueberdeckung, type Box } from '../lib/stiftGesten';
 import { inhaltMitEinfuegung, inhaltOhneBereiche, offsetUnterPunkt, woerterImBlock, woerterMarkieren, type BlockInhalt, type Wort } from '../lib/stiftText';
 import { aiReady } from '../lib/ai';
@@ -1027,7 +1032,7 @@ export function DrawingLayer() {
    * die Schrift links der Listen-Einrückung — unter dem Punkt statt unter dem
    * Text —, will der Schreiber zurück zu normalem Text, wie auf Papier.
    */
-  const kontextArt = (ziel: AppNode | null, box: { minX: number; minY: number; h: number }): BlockArt | null => {
+  const kontextArt = (hs: Struktur, ziel: AppNode | null, box: { minX: number; minY: number; h: number }): BlockArt | null => {
     if (!ziel) return null;
     const bezug = bezugFinden(ziel, box);
     let art: string | null = bezug?.type ?? null;
@@ -1039,7 +1044,7 @@ export function DrawingLayer() {
       const letzter = [...bloecke].reverse().find((b) => (b.querySelector('.bn-inline-content')?.textContent ?? '').trim() !== '');
       if (letzter && sy >= letzter.getBoundingClientRect().top) { art = (letzter.querySelector('.bn-block-content') as HTMLElement | null)?.dataset.contentType ?? null; blockEl = letzter; }
     }
-    if (!istListe(art)) return null;
+    if (!hs.istListe(art)) return null;
     // Nur unterhalb der Liste: Schrift auf einer bestehenden Zeile wird dort eingefügt (M325), auch vor dem Zeilenanfang
     const inhalt = !bezug ? (blockEl?.querySelector('.bn-inline-content') as HTMLElement | null) : null;
     if (inhalt) {
@@ -1056,19 +1061,20 @@ export function DrawingLayer() {
    * Zielnotiz anwenden. `ki`: die KI-korrigierten Zeilen, wenn eine KI läuft.
    */
   const schriftErkennen = async (eigene: Stroke[], mitKi: boolean): Promise<{ zeilen: ZeileMitArt[]; ki: Promise<ZeileMitArt[]> | null }> => {
+    const hs = await strukturLaden();
     const punkte = eigene.map(absolut);
     const box = bboxVon(punkte.flat());
     const ziel = zielNotiz(eigene);
-    const form = markerAusStrichen(punkte);
+    const form = hs.markerAusStrichen(punkte);
     const k = await handschriftKandidaten(form.ohneMarker.length > 0 ? form.ohneMarker : punkte);
     const text = textAufraeumen(k.text);
     if (!text) return { zeilen: [], ki: null };
-    const kontext = kontextArt(ziel, box);
-    const zeilen = zeilenMitArt(text.split('\n'), form.zeilen, kontext);
+    const kontext = kontextArt(hs, ziel, box);
+    const zeilen = hs.zeilenMitArt(text.split('\n'), form.zeilen, kontext);
     let ki: Promise<ZeileMitArt[]> | null = null;
     if (mitKi) {
       ki = kiKorrektur(text, k.alternativen, kontextFuer(ziel)).then((besser) => {
-        const neu = zeilenMitArt(besser.split('\n'), form.zeilen, kontext);
+        const neu = hs.zeilenMitArt(besser.split('\n'), form.zeilen, kontext);
         if (neu.length !== zeilen.length) return neu;
         // Die KI korrigiert Lesefehler, nicht die Struktur — Form und Kontext bleiben
         return neu.map((z, i) => (z.quelle === 'text' ? z : { ...z, art: zeilen[i].art, checked: zeilen[i].checked, level: zeilen[i].level, quelle: zeilen[i].quelle }));
@@ -1084,7 +1090,7 @@ export function DrawingLayer() {
    * Block nach dem Block unter der Schrift (neben einer Liste als Listenpunkt),
    * ohne Bezug ans Ende.
    */
-  const inNotizEinfuegen = (ziel: AppNode, zeilen: ZeileMitArt[], box: { minX: number; minY: number; h: number }) => {
+  const inNotizEinfuegen = (hs: Struktur, ziel: AppNode, zeilen: ZeileMitArt[], box: { minX: number; minY: number; h: number }) => {
     const alt = mitPfadIds(((ziel.data as { blocks?: unknown[] }).blocks ?? []) as Array<{ id?: string; type?: string; content?: unknown; children?: unknown[] }>);
     const bezug = bezugFinden(ziel, box);
     const text = zeilen.map((z) => z.text).join('\n');
@@ -1120,7 +1126,7 @@ export function DrawingLayer() {
       }
     }
     // M327: Die Zeilen tragen ihre Art schon (Form, Text-Marker oder Kontext der Notiz)
-    const neue = zeilenZuBloecken(zeilen);
+    const neue = hs.zeilenZuBloecken(zeilen);
     // Ein leerer Schluss-Absatz (BlockNote hält ihn bereit) soll nicht zwischen Text und Schrift stehen
     const leer = (b: { type?: string; content?: unknown }) => b.type === 'paragraph' && Array.isArray(b.content) && b.content.length === 0;
     let out: unknown[];
@@ -1146,6 +1152,7 @@ export function DrawingLayer() {
     setErkennt(true);
     vorschlagVerwerfen();
     try {
+      const hs = await strukturLaden();
       const punkte = eigene.map(absolut);
       const box = bboxVon(punkte.flat());
       const ziel = zielNotiz(eigene);
@@ -1158,10 +1165,10 @@ export function DrawingLayer() {
       if (!text) { showToast('Keine Schrift erkannt – deutlicher schreiben oder größer.'); return; }
       const kurz = text.length > 40 ? `${text.slice(0, 40)}…` : text;
       if (ziel) {
-        inNotizEinfuegen(ziel, zeilen, box);
+        inNotizEinfuegen(hs, ziel, zeilen, box);
         showToast(`In „${noteTitle((ziel.data as { blocks?: unknown[] }).blocks)}" eingefügt: „${kurz}"`);
       } else {
-        addNode(makeNote({ x: box.minX, y: box.minY }, { color: 'white', blocks: zeilenZuBloecken(zeilen) }));
+        addNode(makeNote({ x: box.minX, y: box.minY }, { color: 'white', blocks: hs.zeilenZuBloecken(zeilen) }));
         showToast(`Neue Notiz: „${kurz}"`);
       }
       removeStrokes(eigene.map((s) => s.id));
@@ -1322,20 +1329,20 @@ export function DrawingLayer() {
               aria-label="Erkannten Text übernehmen"
               onClick={() => void handschriftUebernehmen(vorschlag.zeilen)}
             >
-              <b><IPen size={13} />{vorschlag.status === 'ki' ? '…' : ''}</b>{vorschlag.zeilen.map((z) => artVorsatz(z) + z.text).join('\n')}
+              <b><IPen size={13} />{vorschlag.status === 'ki' ? '…' : ''}</b>{vorschlag.zeilen.map((z) => (struktur?.artVorsatz(z) ?? '') + z.text).join('\n')}
             </button>
           )}
-          {vorschlag.status !== 'erkennt' && (
+          {vorschlag.status !== 'erkennt' && struktur && (
             // M327: Textart umschalten — Text, Aufzählung, Nummern, Kästchen, Überschrift
             <span className="vorschlag-arten" role="group" aria-label="Textart">
-              {TEXT_ARTEN.map((a) => (
+              {struktur.TEXT_ARTEN.map((a) => (
                 <button
                   key={a.art}
-                  className={`vorschlag-art ${hauptArt(vorschlag.zeilen) === a.art ? 'on' : ''}`}
+                  className={`vorschlag-art ${struktur!.hauptArt(vorschlag.zeilen) === a.art ? 'on' : ''}`}
                   title={`Als ${a.name} übernehmen`}
                   aria-label={`Als ${a.name} übernehmen`}
-                  aria-pressed={hauptArt(vorschlag.zeilen) === a.art}
-                  onClick={() => setVorschlag((v) => (v ? { ...v, zeilen: artSetzen(v.zeilen, a.art) } : v))}
+                  aria-pressed={struktur!.hauptArt(vorschlag.zeilen) === a.art}
+                  onClick={() => setVorschlag((v) => (v ? { ...v, zeilen: struktur!.artSetzen(v.zeilen, a.art) } : v))}
                 >{a.kurz}</button>
               ))}
             </span>

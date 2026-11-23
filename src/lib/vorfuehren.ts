@@ -29,6 +29,7 @@
 // Vorführenden im Tool steht — vorher rechnete jedes Gerät das Tool selbst, mit seinem eigenen Speicherstand,
 // eigenem Zufall und eigener Zeit; nachgestellt wurden nur Eingaben. Das Spiegeln lädt erst nach, wenn es gebraucht wird.
 import { ich, ichIn, LIVE_NACHRICHT, liveSenden, teilnehmerVon } from './liveStand';
+import { VORFUEHR_EREIGNIS, vorfuehrenAnmelden } from './vorfuehrenLeicht';
 
 export interface Sicht { x: number; y: number; w: number; h: number }
 /** Stelle im Vortrag: die Karte, die als Folie offen ist, und die Seite darin */
@@ -84,7 +85,8 @@ export function eingabeAus(roh: unknown): Eingabe | null {
   }
   return aus;
 }
-export const VORFUEHR_EREIGNIS = 'pixinotes:vorfuehren';
+// M502: der Name des Ereignisses steht im leichten Teil (Start-Paket); hier weitergereicht für alle bisherigen Importe
+export { VORFUEHR_EREIGNIS };
 /** Eingaben des Vorführenden kamen an: detail = { boardId, karte, liste } */
 export const EINGABE_EREIGNIS = 'pixinotes:zeig-eingabe';
 /** Ein Rollstand kam an: detail = { boardId, karte, roll } */
@@ -145,6 +147,8 @@ export function spiegelErbitten(boardId: string, karte: string): void {
 export const werFuehrtVor = (boardId: string): Zeiger | null => zeiger.get(boardId) ?? null;
 export const ichFuehreVor = (boardId: string): boolean => meinBoard === boardId;
 export const folgeIch = (boardId: string): boolean => !!zeiger.get(boardId) && meinBoard !== boardId && !geloest.has(boardId);
+// M502: Die App fragt beim Start über lib/vorfuehrenLeicht.ts — ab jetzt antwortet dieser Teil
+vorfuehrenAnmelden({ folgeIch, werFuehrtVor });
 export function folgenSetzen(boardId: string, an: boolean): void {
   if (an) geloest.delete(boardId); else { geloest.add(boardId); spiegelVergessen(boardId); }
   melden(boardId);

@@ -22,7 +22,8 @@ const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 const DIST = path.join(__repo, 'dist');
 const PORT = 5483;
 /** M483: gemessen 2 097 102 B (vorher 2 238 181 B) — Grenze mit gut 20 KB Polster, damit es nicht gleich wieder aufgebraucht ist */
-const START_JS_GRENZE = 2_120_000;
+// M502: Live-Team, Gehirn, Rechen-Tabelle, Kommentare, Punkte, Nachschlagen, Handschrift-Struktur, Bildtext nachgeladen — Start 2 044 571 B mit M501 (vorher 2 112 358 B); Grenze GESENKT auf neuer Stand + gut 20 KB (docs/meilensteine/M502-start-leicht-2.md)
+const START_JS_GRENZE = 2_065_000;
 /** Was M483 aus dem Start nimmt (Dateinamen der Nachlade-Teile) */
 const NACHGELADEN = ['SelectionToolbar', 'importFiles', 'aiActions', 'starter', 'ShareCardsModal', 'BildExport', 'GeteiltDialog',
   'EbeneLoeschenFenster', 'calAccounts', 'kontaktExport', 'bildBearbeiten'];
