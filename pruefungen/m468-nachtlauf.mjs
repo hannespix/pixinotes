@@ -2,7 +2,7 @@
  * M468 — Nächtlicher CI-Lauf aller Prüfreihen (.github/workflows/nachtlauf.yml).
  *
  * Ohne Browser und ohne Port: geprüft wird das Werkzeug, das der Lauf benutzt.
- *   A  Läufer: --ohne-datenbank lässt genau die Reihen an der lokalen Datenbank aus (psql/pntest) und nennt sie,
+ *   A  Läufer: --ohne-datenbank lässt genau die Reihen an der lokalen Datenbank aus und nennt sie,
  *      --nur-zeigen startet nichts, ohne die Option bleiben die Datenbank-Reihen in der Auswahl.
  *   B  Auswertung (werkzeug/nachtlauf-melden.cjs) gegen ein nachgebautes GitHub: rot → EIN Issue „Nachtlauf rot"
  *      mit Label und den roten Reihen, wieder rot → dasselbe Issue erneuert, grün → geschlossen, Build kaputt →
@@ -30,10 +30,14 @@ const tmp = mkdtempSync(path.join(tmpdir(), 'm468-'));
 
 // ---------- A Läufer ----------
 const alle = readdirSync(path.join(__repo, 'pruefungen')).filter((n) => /^m\d.*\.mjs$/.test(n));
-const mitDb = alle.filter((n) => /\bpsql\b|pntest/.test(readFileSync(path.join(__repo, 'pruefungen', n), 'utf-8'))).map((n) => n.replace(/\.mjs$/, ''));
+// Das Muster des Läufers zusammengesetzt: stünde es wörtlich hier, hielte der Läufer DIESE Reihe für eine
+// Datenbank-Reihe – der erste Nachtlauf ließ m468 genau deshalb aus.
+const DB_MUSTER = new RegExp(['\\bps', 'ql\\b|pn', 'test'].join(''));
+const mitDb = alle.filter((n) => DB_MUSTER.test(readFileSync(path.join(__repo, 'pruefungen', n), 'utf-8'))).map((n) => n.replace(/\.mjs$/, ''));
 const ohne = knoten(['werkzeug/alle-pruefungen.mjs', '--ohne-datenbank', '--nur-zeigen']);
 const gelistet = [...ohne.stdout.matchAll(/^ {2}(m\S+)/gm)].map((m) => m[1]);
 pruefe('A1 es gibt Reihen an der lokalen Datenbank (sonst prüft A nichts)', mitDb.length >= 3, mitDb);
+pruefe('A1b diese Reihe selbst gilt nicht als Datenbank-Reihe', !mitDb.includes('m468-nachtlauf'), mitDb);
 pruefe('A2 --ohne-datenbank --nur-zeigen endet ohne Fehler', ohne.status === 0, ohne.stderr);
 pruefe('A3 keine Datenbank-Reihe in der Auswahl', gelistet.length > 0 && mitDb.every((n) => !gelistet.includes(n)), gelistet.filter((n) => mitDb.includes(n)));
 pruefe('A4 alle übrigen Reihen sind dabei', gelistet.length === alle.length - mitDb.length, `${gelistet.length} von ${alle.length - mitDb.length}`);

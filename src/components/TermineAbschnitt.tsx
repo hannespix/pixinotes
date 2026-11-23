@@ -4,13 +4,16 @@
 // (Google, Outlook) mit Uhrzeit, Titel und Konto — ohne Haken, denn Termine sind keine Aufgaben.
 // Ein Klick führt zur Kalender-Karte (auf den Tag des Termins gestellt). Ohne verbundenes Konto
 // erscheint der Abschnitt gar nicht.
+// M471: Mit Ende und Ort, dazu eigene Termine der Kalender-Karten und ICS-Abos (dann auch ohne Konto).
+// Der Klick öffnet den einzelnen Termin in der Kalender-Karte (lib/terminMarke.ts).
 import { useEffect, useState } from 'react';
 import { mutedHistory, useBoard } from '../store';
 import { fetchAccountEvents, TERMINE_EREIGNIS } from '../lib/calAccounts';
-import { kontoKennung, kontoVerbunden, setTerminErinnerung, TERMIN_VORLAUF_MIN, terminErinnerungAn, termineHeuteMorgen, type ZentralTermin } from '../lib/termineZentrale';
+import { kontoKennung, kontoVerbunden, setTerminErinnerung, TERMIN_VORLAUF_MIN, terminErinnerungAn, termineHeuteMorgen, terminZeit, type ZentralTermin } from '../lib/termineZentrale';
+import { setTerminMarke } from '../lib/terminMarke';
 import { makeCalendar } from '../lib/nodes';
 import { sprache, zahlWort } from '../lib/sprache';
-import { ICalendar } from './Icons';
+import { ICalendar, IOrt } from './Icons';
 
 /** Nach so langer Zeit holt das Öffnen der Zentrale Heute/Morgen frisch (sonst reicht das Gemerkte) */
 const FRISCH_MS = 15 * 60 * 1000;
@@ -24,6 +27,7 @@ export function TermineAbschnitt({ aufgaben, offen, schliessen }: {
   const [laedt, setLaedt] = useState(false);
   const [fehler, setFehler] = useState('');
   const [erinnern, setErinnern] = useState(terminErinnerungAn);
+  const boards = useBoard((s) => s.boards);
   const verbunden = kontoVerbunden();
 
   useEffect(() => {
@@ -49,20 +53,26 @@ export function TermineAbschnitt({ aufgaben, offen, schliessen }: {
     return () => { weg = true; };
   }, [offen]);
 
-  if (!verbunden) return null;
-  const t = termineHeuteMorgen(aufgaben);
+  const t = termineHeuteMorgen(aufgaben, new Date(), boards);
   const anzahl = t.heute.length + t.morgen.length;
+  // M471: Ohne Konto erscheint der Abschnitt nur, wenn Kalender-Karten heute/morgen etwas haben
+  if (!verbunden && anzahl === 0) return null;
 
-  /** Zur Kalender-Karte springen (aktives Board zuerst) — gibt es keine, legt der Klick eine an */
+  /**
+   * Zur Kalender-Karte springen und den Termin dort öffnen (M471). Eigene und ICS-Termine in IHRE Karte, Konto-Termine
+   * in die erste Kalender-Karte (aktives Board zuerst) — gibt es keine, legt der Klick eine an.
+   */
   const zumKalender = (ev: ZentralTermin) => {
     const st = useBoard.getState();
     const tagDaten = ev.date === t.heuteIso
       ? { month: undefined, anchor: undefined }
       : { month: ev.date.slice(0, 7), anchor: ev.date };
     const reihe = [...st.boards].sort((a, b) => (a.id === st.activeId ? -1 : b.id === st.activeId ? 1 : 0));
-    for (const b of reihe) {
-      const karte = b.nodes.find((n) => n.type === 'calendar');
+    const eigeneKarte = ev.boardId && ev.nodeId ? st.boards.find((b) => b.id === ev.boardId && b.nodes.some((n) => n.id === ev.nodeId)) : undefined;
+    for (const b of eigeneKarte ? [eigeneKarte] : reihe) {
+      const karte = eigeneKarte ? b.nodes.find((n) => n.id === ev.nodeId) : b.nodes.find((n) => n.type === 'calendar' && !n.archived);
       if (!karte) continue;
+      setTerminMarke({ kartenId: karte.id, termin: ev });
       mutedHistory(() => st.updateNodeDataOnBoard(b.id, karte.id, tagDaten));
       schliessen();
       st.openBoard(b.id);
@@ -71,6 +81,7 @@ export function TermineAbschnitt({ aufgaben, offen, schliessen }: {
     }
     const karte = makeCalendar({ x: 120, y: 120 });
     if (ev.date !== t.heuteIso) karte.data = { month: ev.date.slice(0, 7), anchor: ev.date };
+    setTerminMarke({ kartenId: karte.id, termin: ev });
     st.addNode(karte);
     schliessen();
     st.focusNode(st.activeId, karte.id);
@@ -84,10 +95,11 @@ export function TermineAbschnitt({ aufgaben, offen, schliessen }: {
     <ul>
       {termine.map((ev) => (
         <li key={ev.key}>
-          <button className="th-termin" onClick={() => zumKalender(ev)} title="In der Kalender-Karte zeigen">
-            <span className="th-termin-zeit">{ev.time ?? 'ganztägig'}</span>
+          <button className="th-termin" onClick={() => zumKalender(ev)} title="Termin in der Kalender-Karte öffnen">
+            <span className="th-termin-zeit">{terminZeit(ev)}</span>
             <span className="th-termin-titel" translate="no">{ev.title}</span>
-            <span className="th-termin-konto">{kontoKennung(ev.provider)}</span>
+            {ev.place && <span className="th-termin-ort" translate="no"><IOrt size={11} /> {ev.place}</span>}
+            <span className="th-termin-konto">{kontoKennung(ev.quelle)}</span>
           </button>
         </li>
       ))}

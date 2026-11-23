@@ -114,7 +114,7 @@ console.log('════ A: ruhend nach dem Laden ════');
   await P.waitForTimeout(900);
   const nach = await lagen(P, 'n1');
   pruefe('B1 der Editor ist da', vor.ruhend && !nach.ruhend && (await editoren(P)).includes('n1'));
-  pruefe('B2 gleich viele Blöcke, gleiche Kartenhöhe', vor.bloecke.length === nach.bloecke.length && vor.bloecke.length === 18 && vor.hoehe === nach.hoehe, JSON.stringify({ vor: [vor.bloecke.length, vor.hoehe, vor.bloecke.map((b) => b.typ[0] + ':' + b.text)], nach: [nach.bloecke.length, nach.hoehe, nach.bloecke.map((b) => b.typ[0] + ':' + b.text)] }));
+  pruefe('B2 gleich viele Blöcke, gleiche Kartenhöhe', vor.bloecke.length === nach.bloecke.length && vor.bloecke.length === 17 /* M462: kein angehängter Schluss-Absatz mehr */ && vor.hoehe === nach.hoehe, JSON.stringify({ vor: [vor.bloecke.length, vor.hoehe, vor.bloecke.map((b) => b.typ[0] + ':' + b.text)], nach: [nach.bloecke.length, nach.hoehe, nach.bloecke.map((b) => b.typ[0] + ':' + b.text)] }));
   const abweichung = [];
   vor.bloecke.forEach((b, i) => { const n = nach.bloecke[i]; if (!n) return; for (const k of ['x', 'y', 'w', 'h', 'ix', 'iw', 'ih']) if (Math.abs(b[k] - n[k]) > 0.6) abweichung.push(`${i} ${b.typ} „${b.text}" ${k}: ${b[k]} → ${n[k]}`); if (b.schrift !== n.schrift) abweichung.push(`${i} ${b.typ} Schrift ${b.schrift} → ${n.schrift}`); if (b.index !== n.index) abweichung.push(`${i} Nummer ${b.index} → ${n.index}`); });
   pruefe('B3 jeder Block liegt, wo er ruhend lag – Lage, Größe, Schrift, Nummer', abweichung.length === 0, '\n      ' + abweichung.slice(0, 12).join('\n      '));

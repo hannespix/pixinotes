@@ -45,3 +45,10 @@ Backlog-Idee „Nächtlicher CI-Lauf aller Prüfreihen".
 - Der Runner hat andere Schriften und eine andere Grundlast als die Claude-Umgebung; Reihen, die Pixel oder
   Takte messen, können dort anders ausfallen. Wackler stehen in der Zusammenfassung und im Issue getrennt.
 - Geplante Läufe laufen nur auf dem Standardzweig (= Hauptzweig) und setzen nach 60 Tagen ohne Commit aus.
+
+## Erster Lauf (2026-11-23, von Hand)
+Run 45151709744: 183 von 188 Reihen grün in 40,2 min bei 3 Bahnen, keine Wackler; rot und in Issue #154
+„Nachtlauf rot" eingetragen: m268 (175 %: Menü 624 px vom Knopf), m299 (Hilfe-Punkt „Outlook live", M466, über
+420 Zeichen), m314 (Dienste-Liste trägt „Text in Bildern"), m382 (englische Standardnamen neuer Karten), m398
+(Lösch-Meldungen samt „Rückgängig"). Der Lauf ließ m468 selbst als „Datenbank-Reihe" aus, weil ihr Quelltext das
+Erkennungsmuster wörtlich enthielt – die Reihe setzt es jetzt zusammen und prüft das (A1b).

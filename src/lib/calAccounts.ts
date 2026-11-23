@@ -17,6 +17,20 @@ export interface CalAccountEvent {
   title: string;
   time?: string;       // hh:mm, wenn kein Ganztagstermin
   provider: 'google' | 'ms';
+  /**
+   * M471: Kennung beim Anbieter, Ende, Ort und Web-Link. Fehlen bei Einträgen aus der Zeit vor M471 (Zwischenspeicher
+   * Fassung 1) — alles Lesende muss ohne sie auskommen.
+   */
+  id?: string;
+  /** hh:mm Ende (Ortszeit), nur bei Zeitterminen */
+  end?: string;
+  /** yyyy-mm-dd letzter Tag (inklusiv), nur wenn er nach dem Starttag liegt */
+  endDate?: string;
+  /** ganztägig (ohne Uhrzeit) */
+  allDay?: boolean;
+  place?: string;
+  /** Adresse des Termins bei Google/Outlook — erst beim Anzeigen über lib/sicher.ts (fremdeWebAdresse) geprüft */
+  link?: string;
 }
 
 export interface GoogleAccount {
@@ -399,8 +413,8 @@ export async function msAccessToken(needNotes = false): Promise<string> {
   return fresh.token;
 }
 
-async function msApi<T>(acc: MsAccount, url: string): Promise<T> {
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${acc.token}`, Prefer: 'outlook.timezone="Europe/Berlin"' } });
+async function msApi<T>(acc: MsAccount, url: string, zeitzone = 'Europe/Berlin'): Promise<T> {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${acc.token}`, Prefer: `outlook.timezone="${zeitzone}"` } });
   if (res.status === 401) throw new AuthExpired('ms');
   if (!res.ok) throw new Error(`Microsoft Graph: HTTP ${res.status}`);
   return res.json() as Promise<T>;
@@ -429,13 +443,47 @@ async function freshMs(): Promise<MsAccount | null> {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const isoDay = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const tagVerschieben = (iso: string, n: number) => {
+  const d = new Date(`${iso.slice(0, 10)}T12:00:00`);
+  d.setDate(d.getDate() + n);
+  return isoDay(d);
+};
+
+/**
+ * M471: Zeitangabe von Graph. Mit `Prefer: outlook.timezone="UTC"` kommt Weltzeit ohne Versatz („…T08:30:00.0000000",
+ * timeZone „UTC") — dann rechnet Date in die Ortszeit. Ohne Zonenangabe gilt die Zeit, wie sie dasteht (Wandzeit).
+ */
+function msZeit(z?: { dateTime?: string; timeZone?: string }): Date | null {
+  if (!z?.dateTime) return null;
+  const roh = z.dateTime.slice(0, 19);
+  const welt = /^(utc|etc\/utc|coordinated universal time)$/i.test(z.timeZone ?? '') || /[zZ]$/.test(z.dateTime);
+  const d = new Date(welt ? `${roh}Z` : roh);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** M471: Zusatzfelder säubern — leere weglassen, Längen begrenzen, Enddatum nur nach dem Starttag */
+function termFelder(f: { id?: string; end?: string; endDate?: string; allDay: boolean; place?: string; link?: string; date: string }): Partial<CalAccountEvent> {
+  const aus: Partial<CalAccountEvent> = {};
+  if (typeof f.id === 'string' && f.id) aus.id = f.id.slice(0, 300);
+  if (f.end) aus.end = f.end;
+  if (f.endDate && f.endDate > f.date) aus.endDate = f.endDate;
+  if (f.allDay) aus.allDay = true;
+  if (typeof f.place === 'string' && f.place.trim()) aus.place = f.place.trim().slice(0, 200);
+  if (typeof f.link === 'string' && /^https:\/\//i.test(f.link)) aus.link = f.link.slice(0, 2000);
+  return aus;
+}
 
 // Kleiner Bereichs-Cache (5 min) — die Kalender-Karte rendert oft
 const cache = new Map<string, { at: number; events: CalAccountEvent[] }>();
 const CACHE_MS = 5 * 60 * 1000;
 
-/** Alle Termine der verbundenen Konten im Zeitraum [from, to] (inklusive). */
-export async function fetchAccountEvents(from: Date, to: Date, force = false): Promise<{ events: CalAccountEvent[]; errors: string[] }> {
+/**
+ * Alle Termine der verbundenen Konten im Zeitraum [from, to] (inklusive).
+ * M471: `opts.still` (Hintergrund-Abruf ohne Nutzer-Geste) erneuert ein abgelaufenes Google-Token nicht — das bräuchte
+ * den Google-Anmeldedienst und womöglich ein Fenster; das Konto zählt dann als „hat nicht geantwortet".
+ */
+export async function fetchAccountEvents(from: Date, to: Date, force = false, opts: { still?: boolean } = {}): Promise<{ events: CalAccountEvent[]; errors: string[] }> {
   const key = `${isoDay(from)}|${isoDay(to)}`;
   const hit = cache.get(key);
   if (!force && hit && Date.now() - hit.at < CACHE_MS) return { events: hit.events, errors: [] };
@@ -449,14 +497,18 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false): P
 
   jobs.push((async () => {
     try {
-      let acc = await freshGoogle();
-      if (!acc) return;
+      let acc = opts.still ? loadCalAccounts().google ?? null : await freshGoogle();
+      if (!acc?.token) return;
+      if (opts.still && !(acc.tokenExp && acc.tokenExp > Date.now())) throw new Error('Sitzung abgelaufen');
       const calendars = (acc.calendars ?? []).filter((c) => c.enabled);
       for (const cal of calendars) {
-        const run = async (a: GoogleAccount) => googleApi<{ items?: Array<{ summary?: string; start?: { date?: string; dateTime?: string } }> }>(
+        type GZeit = { date?: string; dateTime?: string };
+        const run = async (a: GoogleAccount) => googleApi<{ items?: Array<{ id?: string; summary?: string; start?: GZeit; end?: GZeit; location?: string; htmlLink?: string }> }>(
           a,
           `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.id)}/events?${new URLSearchParams({
-            timeMin, timeMax, singleEvents: 'true', orderBy: 'startTime', maxResults: '250', fields: 'items(summary,start)',
+            timeMin, timeMax, singleEvents: 'true', orderBy: 'startTime', maxResults: '250',
+            // M471: Kennung, Ende, Ort und Web-Link mitnehmen
+            fields: 'items(id,summary,start,end,location,htmlLink)',
           })}`,
         );
         let data;
@@ -464,6 +516,7 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false): P
           data = await run(acc);
         } catch (e) {
           if (!(e instanceof AuthExpired)) throw e;
+          if (opts.still) throw new Error('Sitzung abgelaufen');
           acc = await refreshGoogle(acc);
           data = await run(acc);
         }
@@ -471,11 +524,19 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false): P
           const dt = ev.start?.dateTime;
           const date = ev.start?.date ?? (dt ? isoDay(new Date(dt)) : undefined);
           if (!date) continue;
+          // Zeittermine tragen einen Versatz („+01:00") → new Date rechnet in die Ortszeit des Geräts
+          const ende = ev.end?.dateTime ? new Date(ev.end.dateTime) : undefined;
+          // Ganztägiges Ende ist bei Google exklusiv (Tag danach)
+          const endTag = ev.end?.date ? tagVerschieben(ev.end.date, -1) : ende ? isoDay(ende) : undefined;
           events.push({
             date,
-            title: ev.summary || '(ohne Titel)',
-            time: dt ? `${pad(new Date(dt).getHours())}:${pad(new Date(dt).getMinutes())}` : undefined,
+            title: (ev.summary || '(ohne Titel)').slice(0, 200),
+            time: dt ? hhmm(new Date(dt)) : undefined,
             provider: 'google',
+            ...termFelder({
+              id: ev.id, end: ende ? hhmm(ende) : undefined, endDate: endTag, allDay: !dt,
+              place: ev.location, link: ev.htmlLink, date,
+            }),
           });
         }
       }
@@ -488,11 +549,16 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false): P
     try {
       let acc = await freshMs();
       if (!acc) return;
-      const run = async (a: MsAccount) => msApi<{ value?: Array<{ subject?: string; isAllDay?: boolean; start?: { dateTime?: string } }> }>(
+      type MZeit = { dateTime?: string; timeZone?: string };
+      const run = async (a: MsAccount) => msApi<{ value?: Array<{ id?: string; subject?: string; isAllDay?: boolean; start?: MZeit; end?: MZeit; location?: { displayName?: string }; webLink?: string }> }>(
         a,
         `https://graph.microsoft.com/v1.0/me/calendarview?${new URLSearchParams({
-          startDateTime: timeMin, endDateTime: timeMax, $top: '200', $select: 'subject,start,isAllDay', $orderby: 'start/dateTime',
+          startDateTime: timeMin, endDateTime: timeMax, $top: '200',
+          // M471: Kennung, Ende, Ort und Web-Link mitnehmen
+          $select: 'id,subject,start,end,isAllDay,location,webLink', $orderby: 'start/dateTime',
         })}`,
+        // M471: Weltzeit anfordern und hier in die Ortszeit des Geräts rechnen — „Europe/Berlin" fest stimmte nur dort
+        'UTC',
       );
       let data;
       try {
@@ -503,14 +569,23 @@ export async function fetchAccountEvents(from: Date, to: Date, force = false): P
         data = await run(acc);
       }
       for (const ev of data.value ?? []) {
-        const dt = ev.start?.dateTime;
-        if (!dt) continue;
-        // Graph liefert (per Prefer-Header) lokale Zeit ohne Offset
+        const beginn = msZeit(ev.start);
+        if (!beginn) continue;
+        const ende = msZeit(ev.end);
+        // Ganztägiges steht bei Graph als Mitternacht bis Mitternacht (Ende exklusiv) — der Tag gilt, wie er dasteht
+        const date = ev.isAllDay ? ev.start!.dateTime!.slice(0, 10) : isoDay(beginn);
+        const endTag = ev.isAllDay
+          ? (ev.end?.dateTime ? tagVerschieben(ev.end.dateTime.slice(0, 10), -1) : undefined)
+          : ende ? isoDay(ende) : undefined;
         events.push({
-          date: dt.slice(0, 10),
-          title: ev.subject || '(ohne Titel)',
-          time: ev.isAllDay ? undefined : dt.slice(11, 16),
+          date,
+          title: (ev.subject || '(ohne Titel)').slice(0, 200),
+          time: ev.isAllDay ? undefined : hhmm(beginn),
           provider: 'ms',
+          ...termFelder({
+            id: ev.id, end: !ev.isAllDay && ende ? hhmm(ende) : undefined, endDate: endTag, allDay: !!ev.isAllDay,
+            place: ev.location?.displayName, link: ev.webLink, date,
+          }),
         });
       }
     } catch (e) {
@@ -538,8 +613,12 @@ const TERMINE_KEY = 'pixinotes-cal-termine';
 export const TERMINE_EREIGNIS = 'pixinotes-cal-termine';
 const TERMINE_VOR = 1;    // Tage zurück, die aufgehoben werden
 const TERMINE_NACH = 62;  // Tage voraus — genug für Heute/Morgen, ohne den Speicher zu füllen
+/** M471: aktuelle Fassung des Zwischenspeichers (siehe GemerkteTermine.v) */
+export const TERMINE_FASSUNG = 2;
 
 export interface GemerkteTermine {
+  /** M471: Fassung des Zwischenspeichers — 1 (M469: nur Tag, Uhrzeit, Titel, Konto) oder 2 (mit Kennung, Ende, Ort, Link) */
+  v: number;
   /** Zeitpunkt des letzten erfolgreichen Abrufs, der heute abdeckte (epoch ms) */
   stand: number;
   /** abgedeckte Tage (yyyy-mm-dd) → Termine dieses Tages */
@@ -549,9 +628,11 @@ export interface GemerkteTermine {
 export function gemerkteTermine(): GemerkteTermine {
   try {
     const roh = JSON.parse(localStorage.getItem(TERMINE_KEY) ?? 'null') as GemerkteTermine | null;
-    if (roh && typeof roh === 'object' && roh.tage && typeof roh.tage === 'object') return { stand: Number(roh.stand) || 0, tage: roh.tage };
+    if (roh && typeof roh === 'object' && roh.tage && typeof roh.tage === 'object') {
+      return { v: Number(roh.v) || 1, stand: Number(roh.stand) || 0, tage: roh.tage };
+    }
   } catch { /* defekt → leer */ }
-  return { stand: 0, tage: {} };
+  return { v: TERMINE_FASSUNG, stand: 0, tage: {} };
 }
 
 function termineSchreiben(g: GemerkteTermine) {
@@ -581,10 +662,21 @@ function termineMerken(vonIso: string, bisIso: string, events: CalAccountEvent[]
     lauf.setDate(lauf.getDate() + 1);
   }
   for (const ev of events) {
-    if (tage[ev.date]) tage[ev.date].push({ date: ev.date, title: ev.title, time: ev.time, provider: ev.provider });
+    const eintrag: CalAccountEvent = { date: ev.date, title: ev.title, time: ev.time, provider: ev.provider };
+    for (const k of ['id', 'end', 'endDate', 'allDay', 'place', 'link'] as const) if (ev[k] !== undefined) (eintrag as unknown as Record<string, unknown>)[k] = ev[k];
+    // M471: Mehrtägiges steht an jedem abgedeckten Tag (Eintrag bleibt der des Beginns; Lesende sehen am Tag ≠ date die Fortsetzung)
+    const bis = ev.endDate && ev.endDate > ev.date ? ev.endDate : ev.date;
+    const lauf2 = new Date(`${ev.date}T12:00:00`);
+    for (let i = 0; i < 60; i += 1) {
+      const tag = isoDay(lauf2);
+      if (tag > bis) break;
+      if (tage[tag] && tag >= vonIso && tag <= bisIso) tage[tag].push(eintrag);
+      lauf2.setDate(lauf2.getDate() + 1);
+    }
   }
   const heute = isoDay(jetzt);
-  termineSchreiben({ stand: vonIso <= heute && bisIso >= heute ? Date.now() : alt.stand, tage });
+  // Fassung 1 gilt als veraltet: ihr Stand zählt nicht — das nächste Öffnen holt Ende, Ort und Link nach
+  termineSchreiben({ v: TERMINE_FASSUNG, stand: vonIso <= heute && bisIso >= heute ? Date.now() : alt.v === TERMINE_FASSUNG ? alt.stand : 0, tage });
 }
 
 /** Cache verwerfen (manueller ⟳ in der Kalender-Karte). */

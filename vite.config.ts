@@ -57,6 +57,23 @@ function processNurMsg(): Plugin {
   };
 }
 
+/**
+ * M462: „frimousse" (Emoji-Auswahl von BlockNote 0.57) für alle Module auf den Nachlader
+ * src/lib/frimousseNachladen.tsx lenken — nur der Nachlader selbst bekommt das echte Paket (per import()).
+ * So bleibt die Bibliothek aus dem Start-Paket, wie früher emoji-mart bei BlockNote 0.31.
+ */
+function frimousseNachladen(): Plugin {
+  const nachlader = resolve('src/lib/frimousseNachladen.tsx');
+  return {
+    name: 'pixinotes-frimousse-nachladen',
+    enforce: 'pre',
+    resolveId(quelle, importeur) {
+      if (quelle !== 'frimousse' || !importeur || resolve(importeur.split('?')[0]) === nachlader) return null;
+      return nachlader;
+    },
+  };
+}
+
 // Modus "single": baut EINE portable pixinotes.html (läuft per Doppelklick,
 // auch von file:// ohne Server/Installation/Adminrechte).
 export default defineConfig(({ mode }) => ({
@@ -85,6 +102,7 @@ export default defineConfig(({ mode }) => ({
       overrides: { buffer: 'vite-plugin-node-polyfills/shims/buffer' },
     }),
     processNurMsg(),
+    frimousseNachladen(),
     ...(mode === 'single' ? [viteSingleFile({ removeViteModuleLoader: true })] : [ocrDateienKopieren()]),
   ],
   build:
@@ -99,7 +117,7 @@ export default defineConfig(({ mode }) => ({
               // Fluss bleiben dann im Browser-Cache (und im Service Worker),
               // statt dass eine 6-MB-Datei komplett neu kommt. Schwergewichte
               // (Mermaid-Rohtext, PDF, XLSX, MSG) bleiben eigene Nachlade-Teile.
-              manualChunks(id) {
+              manualChunks(id, { getModuleInfo }) {
                 // M459: die Weichen der nachgeladenen Erkennungen gehören in deren Paket — sonst legt Rollup die reine
                 // Weiterleitung ins Start-Paket und zieht damit das ganze Paket wieder in den Start
                 if (/src\/lib\/rufnummerKern\.ts$/.test(id)) return 'rufnummer';
@@ -111,7 +129,16 @@ export default defineConfig(({ mode }) => ({
                 // Kette (unified, remark, rehype, parse5 …) selbst per import() nach —
                 // stand das hier mit im Paket, zog manualChunks sie in den Start
                 // (rund 1 MB Quelltext, der fürs erste Board nie gebraucht wird).
-                if (/node_modules\/(@blocknote|@tiptap|prosemirror-[a-z-]+|y-prosemirror|yjs|lib0|@mantine|@floating-ui|linkifyjs)\//.test(id)) return 'editor';
+                if (/node_modules\/(@blocknote|@tiptap|prosemirror-[a-z-]+|y-prosemirror|yjs|lib0|@mantine|@floating-ui|linkifyjs)\//.test(id)) {
+                  // M462: BlockNote 0.57 legt die Emoji-Namen je Sprache (frimousse,
+                  // 75–190 KB je Datei, 20 Sprachen) als eigene Module in
+                  // @blocknote/core/dist ab und lädt sie per import() nach. Ohne
+                  // diese Ausnahme zog die Regel oben alle in den Start (4,2 MB).
+                  // Was nur dynamisch erreicht wird, bleibt ein eigener Nachlade-Teil.
+                  const info = getModuleInfo(id);
+                  if (info && info.importers.length === 0 && info.dynamicImporters.length > 0) return undefined;
+                  return 'editor';
+                }
                 if (/node_modules\/(@xyflow|d3-[a-z-]+|classcat|zustand)\//.test(id)) return 'fluss';
                 // M414: Rufnummern-Erkennung samt Länderdaten (rund 110 KB) — Fremdcode, der sich so gut wie nie ändert
                 if (/node_modules\/libphonenumber-js\//.test(id)) return 'rufnummer';
