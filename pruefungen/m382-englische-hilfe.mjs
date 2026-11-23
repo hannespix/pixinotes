@@ -182,6 +182,10 @@ const palette = async (P) => { if (!(await P.locator('.modul-palette').count()))
     if (await k.count()) { await k.click(); await P.waitForTimeout(500); } else console.log(`    (Kachel ${id} fehlt)`);
     await P.mouse.click(1400, 880); await P.waitForTimeout(200);
   }
+  // M474: Der Store schreibt gebündelt (400 ms nach der letzten Änderung). Auf dem langsameren CI-Runner
+  // (Nachtlauf, nachgestellt mit 6-facher CPU-Drosselung) war die zuletzt angelegte Kanban-Karte nach den
+  // festen Pausen noch nicht in localStorage – also warten, bis sie gespeichert ist, statt sofort zu lesen.
+  await P.waitForFunction(() => JSON.parse(localStorage.getItem('pixinotes-board') ?? 'null')?.state?.boards?.[0]?.nodes?.some((n) => n.type === 'kanban'), null, { timeout: 8000 }).catch(() => {});
   const d = (await gespeichert(P)).boards[0].nodes;
   const titel = Object.fromEntries(d.map((n) => [n.type, n.data.title ?? n.data.name]));
   console.log('    Titel:', JSON.stringify(titel));
