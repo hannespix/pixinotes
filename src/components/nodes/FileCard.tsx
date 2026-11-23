@@ -17,6 +17,7 @@ import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/f
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { BildLupe } from './BildLupe';
+import { BildTextChips } from './BildTextChips';
 import { ICrop, IDownload, IX, IImage, IComment } from '../Icons';
 import { bildBearbeiten } from '../BildEditorHost';
 
@@ -214,9 +215,13 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
         />
       </div>
     );
+    // M465: Angaben aus dem Text im Bild — nur am markierten Bild, unter ihm (wie bei der Bild-Karte)
+    const ocr = selected && typeof file.ocrText === 'string' ? file.ocrText : '';
+    const chips = ocr ? <BildTextChips nodeId={id} ocr={ocr} titel={titel} /> : null;
+    const unter = eigenerTitel || selected ? unterschrift : undefined;
     return (
       <CardShell id={id} selected={selected} minWidth={24} minHeight={24} seitenverhaeltnis ruhig
-        aussen={eigenerTitel || selected ? unterschrift : undefined}
+        aussen={chips ? <div className="bild-unten">{unter}{chips}</div> : unter}
         className="image-card rahmenlos datei-bild">
         <img src={quelle!} alt={titel || 'Bild'} draggable={false} onLoad={anlegen} onError={() => setBildKaputt(true)} />
         {!fest && !/svg/i.test(`${file.mime ?? ''} ${file.name}`) && (
