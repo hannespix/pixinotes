@@ -502,6 +502,9 @@ function baseNodeText(node: AppNode): string {
       return `Eigene App: ${node.data.name} (${formatBytes(node.data.size)})`;
     case 'bubbles':
       return bubblesAlsText(node.data);
+    case 'pixi':
+      // M501: nur Schmuck, kein Inhalt — der Name (falls vergeben) macht sie in der Suche auffindbar
+      return `Maskottchen Pixi${typeof node.data.name === 'string' && node.data.name.trim() ? ` „${node.data.name.trim()}“` : ''}`;
     case 'kontakt':
       // M450: alle Felder — so findet die Suche (Strg+K) einen Kontakt auch über Firma, Ort oder Rufnummer
       return kontaktZeilen(node.data).join('\n');
@@ -612,6 +615,14 @@ export function nodeToHtml(node: AppNode): string {
       return `<h2 style="text-align:center;margin-top:1.4em">${esc(node.data.name)}</h2>`;
     case 'fluessig':
       return `<p style="font:500 2.4em Georgia,serif;text-align:center;margin:.4em 0">${esc(fluessigText(node.data.text))}</p>`;
+    case 'pixi': {
+      // M501: als Standbild (SVG im data:-Bild) — E-Mail, Zwischenablage, Präsentation ohne Board
+      // Das Bild kommt von der Figur auf dem Board (wie beim Diagramm) — die Pixeldaten bleiben so aus dem Start-Bundle
+      const name = typeof node.data.name === 'string' ? node.data.name.trim() : '';
+      const alt = esc(name ? `Pixi „${name}“` : 'Pixi, das Maskottchen');
+      const bild = pixiStandbild(node.id);
+      return `<p style="text-align:center">${bild ? `<img src="${bild}" width="192" height="192" alt="${alt}"/>` : `[${alt}]`}${name ? `<br/>${esc(name)}` : ''}</p>`;
+    }
     case 'kontakt': {
       const [kopf, ...rest] = kontaktZeilen(node.data);
       return `<h3>${esc(kopf)}</h3>${rest.map((z) => `<p style="margin:2px 0;white-space:pre-wrap">${esc(z)}</p>`).join('')}`;
@@ -676,6 +687,23 @@ export function nodeToHtml(node: AppNode): string {
     default:
       return `<p style="white-space:pre-wrap">${esc(nodeToText(node))}</p>`;
   }
+}
+
+/** M501: Pixi, wie er gerade auf dem Board steht, als SVG-Bildadresse — mit festen Farben, nur die sichtbaren Formen */
+function pixiStandbild(nodeId: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const svg = document.querySelector(`.react-flow__node[data-id="${CSS.escape(nodeId)}"] svg.pixi-svg`) as SVGSVGElement | null;
+  if (!svg) return null;
+  const klon = svg.cloneNode(true) as SVGSVGElement;
+  const quelle = svg.querySelectorAll('path');
+  klon.querySelectorAll('path').forEach((p, i) => {
+    const st = getComputedStyle(quelle[i]);
+    if (st.display === 'none' || st.opacity === '0') p.remove();
+    else p.setAttribute('fill', st.fill);
+  });
+  klon.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  klon.setAttribute('width', '192'); klon.setAttribute('height', '192');
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(klon))}`;
 }
 
 /** Das gerenderte Diagramm einer Karte als SVG-Bildadresse (nur im Browser, nur wenn es auf dem Board steht) */

@@ -107,6 +107,7 @@ const KARTEN_LADER = {
   kontakt: () => Promise.all([import('./nodes/KontaktCard'), rufnummernLaden().catch(() => {})]).then(([m]) => m.KontaktCard),
   // M500: die Karte selbst ist klein — die Engine (WebGL2) holt sie erst, wenn sie sichtbar wird
   fluessig: () => import('./nodes/FluessigCard').then((m) => m.FluessigCard),
+  pixi: () => import('./nodes/PixiCard').then((m) => m.PixiCard),
 } satisfies Record<string, () => Promise<React.ComponentType<any>>>;
 
 const spaet = (laden: () => Promise<React.ComponentType<any>>): React.ComponentType<any> => {
@@ -142,6 +143,7 @@ const nodeTypes: NodeTypes = {
   bubbles: guard(spaet(KARTEN_LADER.bubbles)),
   kontakt: guard(spaet(KARTEN_LADER.kontakt)),
   fluessig: guard(spaet(KARTEN_LADER.fluessig)),
+  pixi: guard(spaet(KARTEN_LADER.pixi)),
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };

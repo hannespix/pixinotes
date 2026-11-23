@@ -201,6 +201,11 @@ export function makeFluessig(position: Pos, text = FLUESSIG_START): AppNode {
   };
 }
 
+/** M501: Pixi, das Maskottchen — quadratisch, Kantenlänge ein Vielfaches von 48 (Pixelraster der Figur) */
+export function makePixi(position: Pos): AppNode {
+  return { id: uid(), type: 'pixi', width: 192, height: 192, autoFit: false, position, data: {} };
+}
+
 /** Eigene App (M158): eingebettetes HTML-Tool. KEIN dragHandle (M160): das
  *  machte die Karte praktisch unverschiebbar (Kopfzeile war vom nodrag-Titel
  *  bedeckt, der Universal-Griff lag außerhalb des Handles). Die laufende App
