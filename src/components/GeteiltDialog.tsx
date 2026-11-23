@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useBoard } from '../store';
 import { alsDateien, geteiltMarkeAbholen, leseGeteiltes, loescheGeteiltes, type Geteiltes } from '../lib/geteilt';
 import { erweiterungEingang } from '../lib/erweiterung';
-import { webAdresseVonAussen } from '../lib/sicher';
+import { eingangSammeln, geteiltesInEingang, textBloecke } from '../lib/eingang';
 import { importFilesToBoard } from '../lib/importFiles';
 import { makeNote } from '../lib/nodes';
 import { notizBildHochladen } from '../lib/notizBild';
@@ -37,28 +37,6 @@ function platzAuf(boardId: string): { x: number; y: number } {
   const unten = Math.max(...nodes.map((n) => n.position.y + (n.height ?? 200)));
   const links = Math.min(...nodes.map((n) => n.position.x));
   return { x: links, y: unten + 60 };
-}
-
-/**
- * Text des Geteilten als Notiz-Blöcke. M458: Die Adresse wird ein echter Verweis (nur http/https — eine
- * „javascript:"-Adresse wäre schon im Eingang verworfen worden, hier wird es noch einmal geprüft).
- */
-function textBloecke(g: Geteiltes): unknown[] {
-  const zeilen = [g.titel, g.text].filter(Boolean).join('\n').split('\n');
-  const bloecke: unknown[] = zeilen.map((zeile) => ({
-    type: 'paragraph',
-    content: zeile ? [{ type: 'text', text: zeile, styles: {} }] : [],
-  }));
-  if (g.adresse) {
-    const href = webAdresseVonAussen(g.adresse);
-    bloecke.push({
-      type: 'paragraph',
-      content: href
-        ? [{ type: 'link', href, content: [{ type: 'text', text: g.adresse, styles: {} }] }]
-        : [{ type: 'text', text: g.adresse, styles: {} }],
-    });
-  }
-  return bloecke;
 }
 
 /**
@@ -100,8 +78,10 @@ export function GeteiltDialog() {
       if (!g) return;
       // Ohne Marke nur übernehmen, was frisch ist (max. 5 Minuten alt)
       const frisch = Date.now() - new Date(g.wann).getTime() < 5 * 60_000;
-      if (marke || frisch) setGabe(g);
-      else void loescheGeteiltes();
+      if (!marke && !frisch) { void loescheGeteiltes(); return; }
+      // M478: Mit „Eingehendes im Eingang sammeln" wartet es dort, statt mitten in der Arbeit nach dem Ziel zu fragen
+      if (eingangSammeln()) void geteiltesInEingang(g, 'teilen').finally(() => void loescheGeteiltes());
+      else setGabe(g);
     });
   }, []);
 
@@ -109,6 +89,9 @@ export function GeteiltDialog() {
      landet das Gesendete gleich auf dem geöffneten Board, mit einer kurzen Meldung. */
   useEffect(() => erweiterungEingang(({ gabe: g, direkt }) => {
     const st = useBoard.getState();
+    /* M478: „Ohne Rückfrage auf das geöffnete Board" ist ein gezieltes Ziel und bleibt direkt; alles andere wartet im
+       Eingang (Einstellung, Vorgabe an) statt den Empfangs-Dialog mitten in die Arbeit zu stellen. */
+    if (!direkt && eingangSammeln()) { void geteiltesInEingang(g, 'erweiterung'); return; }
     if (!direkt || !st.boards.some((b) => b.id === st.activeId)) { setZielBoard(st.activeId); setGabe(g); return; }
     const ziel = st.activeId;
     st.setView('board');

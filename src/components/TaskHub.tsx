@@ -14,6 +14,7 @@ import { aiWeekPlan } from '../lib/aiActions';
 import { IBell, ICalendar, IChevronR, IFilter, IGantt, IKanban, INote, ISearch, IUsers, IWand, IX, ISonne } from './Icons';
 import { zahlWort } from '../lib/sprache';
 import { TermineAbschnitt } from './TermineAbschnitt';
+import { useNutzerBoards } from '../lib/eingang';
 
 const PRIO_LABEL: Record<1 | 2 | 3, string> = { 1: '!!!', 2: '!!', 3: '!' };
 
@@ -71,7 +72,7 @@ function bucketOf(t: TaskRef, todayIso: string): Bucket {
 export function TaskHub() {
   const open = useBoard((s) => s.tasksOpen);
   const setOpen = useBoard((s) => s.setTasksOpen);
-  const boards = useBoard((s) => s.boards);
+  const boards = useNutzerBoards();   // M478: ohne den Eingang
   const activeId = useBoard((s) => s.activeId);
   const openBoard = useBoard((s) => s.openBoard);
   const focusNode = useBoard((s) => s.focusNode);

@@ -5,6 +5,7 @@ import { zeigtAuf } from '../../lib/portale';
 import type { PortalNode } from '../../types';
 import { IPlay, IFolder } from '../Icons';
 import { CardShell } from './CardShell';
+import { useNutzerBoards } from '../../lib/eingang';
 
 /**
  * Portal-Karte: verlinkt ein anderes Projekt-Board (Obsidian-Gefühl, aber visuell).
@@ -17,7 +18,7 @@ import { CardShell } from './CardShell';
  * bietet den Rückverweis für ältere, einseitige Portale zum Nachtragen an.
  */
 export function PortalCard({ id, data, selected }: NodeProps<PortalNode>) {
-  const boards = useBoard((s) => s.boards);
+  const boards = useNutzerBoards();   // M478: ohne den Eingang
   const activeId = useBoard((s) => s.activeId);
   const portalZielSetzen = useBoard((s) => s.portalZielSetzen);
   const rueckverweisNachtragen = useBoard((s) => s.rueckverweisNachtragen);
