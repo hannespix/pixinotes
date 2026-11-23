@@ -1,0 +1,257 @@
+/* ---------- M423: Das Netz tropfiger, organischer, farbiger ----------
+   Die Inseln sind zwei Canvas-Flächen auf der Netz-Ebene (lib/netzTropfen.ts): weichgezeichnet und hart geschnitten
+   wie die Ideabubbles, die Töne laufen ineinander. Bereiche als heller Kontinent, Projekte als dichtere Tropfen. */
+.ov-flaeche { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; transition: opacity 0.28s ease; }
+.ov-flaeche-raum { opacity: calc(0.2 * var(--netz-insel)); }
+.ov-flaeche-projekt { opacity: calc(0.46 * var(--netz-insel)); }
+.ov-graph-svg.geo-space .ov-flaeche-projekt { opacity: 0; }
+.ov-graph-svg.geo-space .ov-flaeche-raum { opacity: calc(0.32 * var(--netz-insel)); }
+:root[data-theme='dark'] { --netz-insel: 0.7; }
+html[data-kontrast='hoch'] .ov-flaeche-projekt { opacity: 0.3; }
+
+/* ---------- M424: Darstellung im Karten-Fokus (wie in der Präsentation) ---------- */
+.focus-ansicht { position: relative; flex: none; display: inline-flex; }
+.focus-head .focus-ansicht-knopf { width: auto; min-width: 44px; padding: 0 8px; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.focus-head .focus-ansicht-knopf.an { background: var(--surface-2); color: var(--ink); }
+.focus-ansicht-menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 70; min-width: 196px; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border-soft); border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
+}
+.focus-head .focus-ansicht-menu button {
+  display: flex; align-items: center; gap: 8px; width: 100%; height: auto; min-height: 36px; text-align: left; place-items: initial;
+  font: inherit; font-size: 13px; padding: 8px 10px; white-space: nowrap;
+}
+.focus-ansicht-haken { width: 14px; height: 14px; flex: none; display: inline-grid; place-items: center; color: var(--accent-strong); }
+.focus-ansicht-stufe { display: flex; align-items: center; gap: 4px; padding: 0 0 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border-soft); }
+.focus-ansicht-stufe > span { flex: 1; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; }
+.focus-head .focus-ansicht-stufe button { width: 40px; flex: none; justify-content: center; font-size: 17px; line-height: 1; padding: 6px 0; }
+@media (pointer: coarse) {
+  .focus-head .focus-ansicht-menu button { min-height: 44px; }
+  .focus-head .focus-ansicht-stufe button { width: 44px; }
+}
+
+/* ---------- M426: Nur Inhalt (Vollbild ohne Bedienung) ----------
+   „Im Präsentations- und im Fokus-Modus ein Vollbild, welches alle UI-Elemente ausblendet … 100 % Content ohne Rahmen,
+   Menüs etc." Am Wurzelelement steht data-rein (vortrag | fokus, lib/reinAnsicht.tsx). Taste F schaltet, Esc kehrt
+   zurück; der einzige sichtbare Rückweg ist eine Kante oben, die erst beim Überfahren oder Antippen einen Knopf zeigt. */
+html[data-rein-ruhe], html[data-rein-ruhe] * { cursor: none !important; }
+.rein-rand {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 400; height: calc(26px + var(--safe-top, 0px));
+  display: flex; justify-content: center; align-items: flex-start; pointer-events: auto;
+}
+.rein-zurueck {
+  margin-top: calc(10px + var(--safe-top, 0px)); display: inline-flex; align-items: center; gap: 8px;
+  border: none; border-radius: 999px; padding: 7px 10px 7px 15px; cursor: pointer;
+  font: 600 13px/1.2 var(--font-ui); color: #fff; background: rgba(24, 24, 27, 0.82);
+  opacity: 0; transform: translateY(-140%); pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.rein-rand.da .rein-zurueck { opacity: 1; transform: none; pointer-events: auto; }
+.rein-zurueck kbd { font: 600 11px/1 var(--font-ui); padding: 3px 6px; border-radius: 5px; background: rgba(255, 255, 255, 0.18); color: #fff; }
+.rein-zurueck:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .rein-zurueck { transition: opacity 0.15s ease; transform: none; } }
+
+/* Präsentation: die Folie randlos über den ganzen Schirm — ohne Kopf, Fuß, Rahmen, Schatten */
+.presenter.rein > .presenter-head,
+.presenter.rein > .presenter-foot,
+.presenter.rein .folien-palette,
+.presenter.rein .folie-dok-leiste,
+html[data-rein] .zeig-band { display: none !important; }
+.presenter.rein > .presenter-slide { margin: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+.presenter.rein > .presenter-slide.editable > * { box-shadow: none; }
+.presenter.rein > .presenter-slide.dokument { margin: 0 !important; }
+
+/* Karten-Fokus: nur die Karte — keine Leisten, keine anderen Karten, keine Pfeile, kein Punktraster, kein Rahmen */
+:root[data-rein='fokus'] {
+  --focus-top: 0px !important; --focus-nav-h: 0px !important; --focus-tools-h: 0px !important;
+  --focus-format-h: 0px !important; --focus-bottom: 0px !important;
+}
+html[data-rein='fokus'] :is(.focus-head, .focus-nav, .sel-toolbar, .sel-toolbar-dock, .sel-menu-fixed, .fokus-spur, .react-flow__background,
+  .react-flow__edges, .react-flow__edgelabel-renderer, .react-flow__nodesselection, .react-flow__selection, .react-flow__resize-control,
+  .pn-handle, .card-grip, .color-dot, .note-farben, .fit-hint, .note-spur, .bn-formatting-toolbar, .bn-side-menu) { display: none !important; }
+html[data-rein='fokus'] .focus-mode .react-flow__node:not(.pn-focused) { opacity: 0 !important; visibility: hidden; }
+html[data-rein='fokus'] .react-flow__node.pn-focused { outline: none !important; box-shadow: none !important; }
+html[data-rein='fokus'] .focus-mode .pn-focused .card-body { box-shadow: none !important; border-color: transparent !important; }
+/* Die Bedienung der Module (M421) bleibt weg — auch markiert, mit dem Zeiger darauf oder mit dem Fokus darin.
+   Dieselbe Liste wie im M421-Block (dort steht sie dreimal) — neue Bedien-Klassen auch hier eintragen. */
+html[data-rein] :is(.react-flow__node, .presenter-slide) :is(
+    .kanban-add,
+    .gantt-tools, .gantt-addzeile,
+    .cal-nav,
+    .bub:not([data-phase='offen']) :is(.bub-ansicht, .bub-schritte, .bub-gruppe-neu, .bub-leiste, .bub-zahl, .bub-frage-feld:placeholder-shown),
+    .time-rec, .time-nav, .time-empty,
+    .minutes-colorpick, .minutes-setup-btn, .minutes-new, .minutes-nav, .minutes-top-add, .minutes-decision-add, .minutes-meta input:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
+    .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
+    .happ-size, .happ-head,
+    /* dazu, was M421 als „immer da" stehen lässt, für den Vortrag aber Bedienung ist */
+    .kanban-addcol, .kanban-col-x, .kanban-item-actions, .card-actions
+) { opacity: 0 !important; pointer-events: none !important; animation: none !important; }
+/* Ein Tool (eigene App, Präsentation aus Vibe Studio) füllt die Karte ohne Kopfzeile */
+html[data-rein] .react-flow__node .happ-head { display: none !important; }
+
+/* Knöpfe zum Einschalten */
+.focus-head .focus-rein-knopf { flex: none; color: var(--muted); }
+.focus-head .focus-rein-knopf:hover { color: var(--ink); }
+/* „Nur Inhalt" auch als Eintrag im Menü „Darstellung" (Präsentation und Fokus) */
+.presenter-head .presenter-ansicht-menu .rein-wahl, .focus-head .focus-ansicht-menu .rein-wahl { border-top: 1px solid var(--border); margin-top: 4px; padding-top: 8px; }
+.rein-wahl kbd { margin-left: auto; font: 600 11px/1 var(--font-ui); padding: 3px 6px; border-radius: 5px; background: var(--surface-2); color: var(--muted); }
+
+/* ---------- M430: Kanban bei wenig Breite ----------
+   „Unsauber, wenn die Modulbreite nicht ausreicht … Überlappungen im UI." Die Leiste eines Tickets (‹ Frist ✕ ›) war
+   breiter als ein schmales Ticket und ragte über die Nachbarspalte; im Spaltenkopf drückten Zähler und Knöpfe den
+   Namen auf wenige Buchstaben („TO", „DC") oder ganz weg. Jetzt bricht die Leiste innerhalb des Tickets um, und der
+   Name behält seinen Platz: Was im Kopf nicht daneben passt, rückt in eine zweite Zeile. */
+.kanban-item > .kanban-item-actions { max-width: calc(100% - 12px); flex-wrap: wrap; justify-content: flex-end; }
+@media (pointer: coarse) { .kanban-item > .kanban-item-actions { max-width: 100%; } }
+.kanban-col-head { flex-wrap: wrap; justify-content: flex-end; row-gap: 3px; }
+.kanban-col-head > .kanban-col-name { flex: 1 1 5em; min-width: min(100%, 5em); width: auto; }
+/* Ist das Ticket schmal, stehen die Knöpfe als ordentliches Raster (zwei je Zeile, gleich breit) unter dem Text,
+   statt einzeln untereinander oder über den Rand hinaus */
+.kanban-item { container-type: inline-size; }
+/* Finger: Die Leiste steht im Ticket (in den Fluss) — schmal als Raster */
+@media (pointer: coarse) {
+  @container (max-width: 170px) {
+    .kanban-item-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; }
+    .kanban-item-actions button { min-width: 0; width: 100%; }
+    .kanban-item > .kanban-item-actions { justify-self: stretch; }
+  }
+}
+/* Maus: Die Leiste ist eine kleine Pille rechts unten, die nur beim Zeigen erscheint — schmal werden ihre Knöpfe
+   kompakter (sie darf nie über den Text wachsen, sonst fängt sie dort die Klicks ab), und unsichtbar nimmt sie keine */
+@media (pointer: fine) {
+  .kanban-item:not(:hover):not(:focus-within) > .kanban-item-actions { pointer-events: none; }
+  @container (max-width: 170px) {
+    .kanban-item > .kanban-item-actions { gap: 0; padding: 1px; flex-wrap: nowrap; }
+    .kanban-item-actions button { padding: 1px 3px; }
+  }
+}
+
+/* ---------- M432: Pfeile mit Tiefe — weicher, perspektivischer Schatten unter jeder Verbindung ----------
+   „3D-Schatten bei Pfeilen etc. fehlen mir noch." Die Karten bleiben flach (M417); die Verbindungen heben sich ab:
+   Unter jeder Linie liegt ein weicher Schatten, der an den Enden die Karten berührt und zur Mitte hin tiefer liegt
+   (LabeledEdge.tsx), und die Linie gewinnt vom Start zum Ziel an Kraft. Hoher Kontrast: ohne Schatten. */
+/* M433: „Pfeil-Schatten bitte weicher" — fünf sehr blasse Lagen (LabeledEdge, SCHATTEN_LAGEN) statt zwei: In der Mitte
+   decken sich alle (zusammen etwa so dicht wie vorher), nach außen läuft der Schatten in feinen Stufen aus */
+:root { --kante-schatten: rgba(15, 22, 38, .16); }
+[data-theme='dark'] { --kante-schatten: rgba(0, 0, 0, .42); }
+/* M434: eine gemeinsame Ebene für alle Pfeilschatten, ein einziger Weichzeichner darüber */
+.react-flow .react-flow__edges svg.pn-schatten-ebene { overflow: visible; position: absolute; left: 0; top: 0; width: 1px; height: 1px; pointer-events: none; filter: blur(5px); }
+.pn-kante-schatten { fill: none; stroke: var(--kante-schatten); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.pn-kante-anker { display: none; }
+html[data-kontrast='hoch'] .pn-schatten-ebene { display: none; }
+
+/* ===== M435: Formen (Schritt, Entscheidung, Start/Ende) mit Notiz-Text — mittig, transparent, wachsen mit ===== */
+.shape-inhalt { width: 100%; position: relative; z-index: 1; min-width: 0; }
+.shape-body .note-editor { cursor: text; }
+.shape-body .note-editor .bn-editor { padding-inline: 0 !important; font-size: 12.5px; }
+.react-flow__node-shape .shape-body .bn-block-content[data-content-type="paragraph"],
+.react-flow__node-shape .shape-body .bn-block-content[data-content-type="heading"] { justify-content: center; }
+.react-flow__node-shape .shape-body .bn-block-content[data-content-type="paragraph"] > .bn-inline-content,
+.react-flow__node-shape .shape-body .bn-block-content[data-content-type="heading"] > .bn-inline-content { text-align: center; }
+/* Die Titelzeile der Notiz (erster Absatz fett) gilt in Formen nicht — hier steht ein kurzer Schritt, kein Titel */
+.shape-body .note-editor .bn-editor > .bn-block-group:has(> .bn-block-outer:nth-child(2)) > .bn-block-outer:first-child > .bn-block > .bn-block-content[data-content-type="paragraph"] > p { font-weight: inherit; font-size: 1em; letter-spacing: normal; }
+.shape-decision .shape-body { padding: 6px 25%; }
+.shape-terminator .shape-body { padding: 8px 16px; }
+.shape-body .shape-ph { position: relative; z-index: 1; display: block; }
+/* Listen in Formen: Punkt und Text stehen zusammen in der Mitte */
+.react-flow__node-shape .shape-body .bn-block-content:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"], [data-content-type="checkListItem"]) { justify-content: center; }
+.react-flow__node-shape .shape-body .bn-block-content:is([data-content-type="bulletListItem"], [data-content-type="numberedListItem"], [data-content-type="checkListItem"]) > .bn-inline-content { flex: 0 1 auto; width: auto; text-align: left; }
+.slide-shape .slide-shape-text .bn-editor { font-size: 22px; }
+
+/* ===== M436: Formen — keine leere Zeile unter einer Überschrift =====
+   BlockNote hängt hinter einen letzten Block, der kein Absatz ist (Überschrift, Liste …), immer einen leeren Absatz
+   an. In der Notiz ist das Platz zum Weiterschreiben, in der Form schob er den Text aus der Mitte. Er bleibt
+   unsichtbar, solange der Cursor nicht in ihm steht. */
+.shape-body .bn-editor > .bn-block-group > .bn-block-outer:last-child:not(:first-child):has(> .bn-block > .bn-block-content[data-content-type="paragraph"]:not([data-is-empty-and-focused]) > .bn-inline-content > .ProseMirror-trailingBreak:only-child) { display: none; }
+/* M462: Seit BlockNote 0.57 ist der Platz zum Weiterschreiben eine Klickfläche statt eines Absatzes — in der Form ebenso unsichtbar */
+.shape-body .bn-trailing-block { display: none; }
+/* M436: Solange der Editor in der Form wach ist, liegen seine Leiste und ihre Menüs über Anfassern,
+   Verbindungspunkten und der Form-Leiste — die gehören derselben Karte an und malten sich sonst darüber */
+.shape-inhalt.shape-inhalt-wach { z-index: 40; }
+.react-flow__node-shape:has(.shape-inhalt-wach) { z-index: 1001 !important; }
+/* Der Schatten der Form (filter) macht sie zu einem eigenen Stapel — der Editor käme darin nicht über die
+   Anfasser hinaus. Solange geschrieben wird, ruht der Schatten. */
+.react-flow__node-shape .shape-body:has(.shape-inhalt-wach) { filter: none; }
+
+/* ===== M437: Fokus mit angehefteter Seitenleiste — kein toter Streifen links =====
+   Im Fokus tritt die Leiste zurück (.focus-mode .tabs), ihr Band (::before) und der Abstand der Fläche blieben aber
+   stehen: links ein leerer Streifen, auch in „Nur Inhalt". Jetzt bekommt die Fläche die ganze Breite. */
+@media (min-width: 861px) {
+  .app.nav-links.focus-mode::before { display: none; }
+  .app.nav-links.focus-mode .board-wrap { margin-left: 0; }
+}
+
+/* ===== M438: Seitenleiste — Projekte und Boards ruhig unterscheidbar =====
+   „In der Sidebar sehen Boards und Projekte vom Format her gleich aus … irgendwie sollte das abgesetzt sein, ohne
+   unruhig zu wirken." Das Projekt ist ein Ordner: leises Ordner-Symbol, halbfette Schrift. Seine Boards hängen
+   eingerückt an einer feinen Linie, in normaler Schrift — das gewählte Board trägt die Fläche und halbfett. */
+.nav-tree .side-proj-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12.5px; letter-spacing: 0; }
+.side-proj-name .side-proj-ordner { flex: none; color: var(--muted); opacity: 0.85; }
+.side-proj.auf .side-proj-ordner { color: var(--accent-strong); opacity: 0.7; }
+.side-proj-name .side-proj-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-proj-boards { margin: 1px 0 4px 11px; padding-left: 5px; border-left: 1px solid var(--border); }
+.side-proj-boards .side-board-name { font-weight: 400; }
+.side-proj-boards .side-board.active .side-board-name { font-weight: 600; }
+.side-proj-boards .side-board-arrow { opacity: 0.55; }
+.side-proj-boards .side-board:hover .side-board-arrow, .side-proj-boards .side-board-arrow.open { opacity: 1; }
+
+/* ===== M439: Netz sauberer — weich ist nur die Farbfläche, alles darauf hat harte Kanten =====
+   „Blur zu krass, Schrift verblasst hinter dem Fog … Blur-Ebene nur für Farbfelder nutzen, gerne harte Kanten ohne
+   Rand für die Blasen und Verbindungen, aber mit schönen Farbverläufen." Die Farbflächen (Bereiche, Projekte) sind
+   leiser und klar begrenzt; Boards, Karten-Punkte und Verbindungen stehen mit harter Kante ohne Rand in kräftigeren
+   Verläufen darauf; die Schrift liegt klar darüber. */
+.ov-flaeche-raum { opacity: calc(0.12 * var(--netz-insel)); }
+.ov-flaeche-projekt { opacity: calc(0.26 * var(--netz-insel)); }
+.ov-graph-svg.geo-space .ov-flaeche-raum { opacity: calc(0.2 * var(--netz-insel)); }
+.ov-graph-node .ov-tropfen, .ov-graph-dot circle { stroke: none; }
+.ov-graph-node:hover .ov-tropfen { filter: saturate(1.2) brightness(1.04); }
+.ov-graph-dot:hover circle { stroke: none; filter: brightness(1.08) saturate(1.2); }
+.ov-graph-node:focus-visible > circle.ov-tropfen { stroke: var(--accent); stroke-width: 2px; }
+html[data-kontrast='hoch'] .ov-graph-node .ov-tropfen { stroke: var(--ink); stroke-width: 1px; }
+.ov-kante-portal { stroke-linecap: round; opacity: 0.8; }
+.ov-kante-wiki { stroke-linecap: round; opacity: 0.85; }
+.ov-sat-linie { opacity: 0.38; }
+/* Schrift: klar und dunkel, mit einem schmalen Hof in der Grundfarbe — sie steht über Fläche und Linien */
+.ov-graph-node text { fill: var(--ink); }
+.ov-graph-node .ov-graph-count { fill: color-mix(in srgb, var(--ink) 78%, transparent); }
+.ov-graph-dot-label { fill: color-mix(in srgb, var(--ink) 78%, transparent); }
+.ov-region text { fill-opacity: 1; }
+:root[data-theme='dark'] .ov-graph-node .ov-graph-count { fill: color-mix(in srgb, #fff 86%, transparent); }
+
+/* ===== M440: Boards in der Übersicht ziehen — haften, ausweichen, federnd ablegen =====
+   Die Kacheln (und die Zonen, die mitwachsen) gleiten zu ihrem Platz; die Kurve schwingt leicht über, wie eine
+   gedämpfte Feder. Die gezogene Kachel selbst gleitet nicht (sie haftet an der Maus) — sie hebt sich, neigt sich mit
+   dem Tempo und senkt sich beim Ablegen wieder. */
+.ov-canvas.ov-weich .react-flow__node:not(.dragging) {
+  transition: transform 0.46s cubic-bezier(0.22, 1.28, 0.42, 1), width 0.34s cubic-bezier(0.3, 1, 0.4, 1), height 0.34s cubic-bezier(0.3, 1, 0.4, 1);
+}
+.ov-canvas .react-flow__node-ovBoard .ovc-tile {
+  transform: rotate(var(--ovc-neigung, 0deg));
+  transition: transform 0.38s cubic-bezier(0.22, 1.3, 0.42, 1), box-shadow 0.25s ease;
+  will-change: auto;
+}
+.ov-canvas .react-flow__node-ovBoard.dragging { z-index: 1000 !important; cursor: grabbing; }
+.ov-canvas .react-flow__node-ovBoard.dragging .ovc-tile {
+  transform: scale(1.06) rotate(var(--ovc-neigung, 0deg));
+  box-shadow: 0 18px 38px -12px rgba(22, 28, 45, 0.32), 0 6px 14px -6px rgba(22, 28, 45, 0.18);
+  transition: transform 0.18s cubic-bezier(0.3, 1.4, 0.5, 1), box-shadow 0.18s ease;
+  cursor: grabbing;
+}
+[data-theme='dark'] .ov-canvas .react-flow__node-ovBoard.dragging .ovc-tile { box-shadow: 0 18px 40px -10px rgba(0, 0, 0, 0.6); }
+/* Das Ziel-Projekt zeigt leise, dass es die Kachel aufnimmt */
+.ov-canvas .react-flow__node.ovc-ziel .ovc-project { border-color: color-mix(in srgb, var(--accent) 55%, transparent); border-style: solid; background: color-mix(in srgb, var(--accent) 6%, rgba(255, 255, 255, 0.75)); }
+[data-theme='dark'] .ov-canvas .react-flow__node.ovc-ziel .ovc-project { background: color-mix(in srgb, var(--accent) 10%, rgba(255, 255, 255, 0.07)); }
+.ov-canvas .react-flow__node-ovProject .ovc-project { transition: border-color 0.2s ease, background-color 0.2s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .ov-canvas.ov-weich .react-flow__node:not(.dragging) { transition: transform 0.12s ease, width 0.12s ease, height 0.12s ease; }
+  .ov-canvas .react-flow__node-ovBoard .ovc-tile { transform: none !important; }
+}
+/* M443: Einrichtung des MCP-Servers — knapp, Code zum Kopieren */
+.mcp-schritte { margin: 0 0 8px; padding-left: 18px; font-size: 12.5px; color: var(--ink); line-height: 1.55; }
+.mcp-schritte a { color: var(--accent-strong); }   /* M447: Akzent als Schrift = --accent-strong (≥ 4,5:1, M389) */
+.mcp-code {
+  margin: 0 0 8px; padding: 8px 10px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--border-soft);
+  font-size: 11.5px; line-height: 1.45; overflow-x: auto; white-space: pre;
+}
+.mcp-code code { word-break: normal; font: inherit; background: none; padding: 0; }

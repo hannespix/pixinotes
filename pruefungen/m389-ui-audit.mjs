@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { readFileSync, existsSync } from 'node:fs';
 import http from 'node:http';
+import { cssQuelle } from '../werkzeug/css-quelle.mjs';
 import { chromium } from 'playwright-core';
 const __repo = fileURLToPath(new URL('..', import.meta.url));
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
@@ -224,7 +225,7 @@ console.log('\n════ E: Diagramme und Beispiele ════');
 // ══ F ═══════════════════════════════════════════════════════════════
 console.log('\n════ F: Aufgeräumt, Texte ════');
 const quelle = (p) => readFileSync(path.join(__repo, p), 'utf8');
-const css = quelle('src/index.css');
+const css = cssQuelle(__repo);
 const tot = ['about-menu', 'tab-picker-liste', 'card-x', 'dock-tasks', 'side-board-pen', 'mm-pop-wrap', 'legal-link', 'sel-badge'];
 pruefe('F1 tote Klassen stehen nicht mehr im Stylesheet', tot.every((k) => !new RegExp(`\\.${k}(?![\\w-])`).test(css)), tot.filter((k) => new RegExp(`\\.${k}(?![\\w-])`).test(css)).join());
 pruefe('F2 die Sammel-Regeln, in denen sie standen, gelten weiter (Griffe bei weitem Zoom unsichtbar)', /\[data-weit\] \.react-flow__node :is\(\.card-grip, \.color-dot, \.note-farben, \.fit-hint\)/.test(css) && /html\[data-alles-zeigen\] :is\(\.react-flow__resize-control, \.pn-handle, \.card-grip/.test(css));

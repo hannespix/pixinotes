@@ -16,7 +16,7 @@ import { CardShell } from './CardShell';
  * Handy), E-Mail als mailto:, die Anschrift mit einem schlichten Link zur Karte von OpenStreetMap — bewusst nur
  * ein Link, nichts eingebettet (eine eingebettete Karte fragte bei jedem Anzeigen einen fremden Server an).
  * Bearbeitet wird in Feldern, die erst mit „Bearbeiten“ erscheinen; eine leere Karte öffnet sie von selbst.
- * Die Bedienung (Bearbeiten, vCard) steht nur im Fokus (M421, Listen in index.css).
+ * Die Bedienung (Bearbeiten, vCard) steht nur im Fokus (M421, Listen in src/styles/99-bedienung-im-fokus.css).
  */
 
 /** Anfangsbuchstaben für den Platz des Fotos */

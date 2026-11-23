@@ -19,7 +19,7 @@ Dateien passen: die Reihe selbst, die Reihe derselben Meilenstein-Nummer, Reihen
 deren Quelltext den geänderten Dateinamen nennt, und Reihen, deren Name ein Wort
 des Dateinamens trägt (`GanttCard.tsx` → `m271-gantt`). `--nur-zeigen` listet die
 Auswahl samt Grund, ohne etwas zu starten. Für Änderungen an `store.ts`,
-`index.css` oder `App.tsx` bleibt die volle Reihe der sichere Weg.
+`src/styles/` oder `App.tsx` bleibt die volle Reihe der sichere Weg.
 
 Die Reihen `m383b`, `m388b`, `m391b` brauchen ein lokales Postgres
 (`service postgresql start`, Nutzer `postgres`); fehlt es, melden sie laut

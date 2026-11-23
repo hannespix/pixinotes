@@ -1,0 +1,409 @@
+/* ---------- M379: Vorlagen beim Anlegen eines Boards ---------- */
+.modal.vorlagen-dialog { width: min(820px, calc(96vw / var(--pn-anz, 1))); }
+.vorlagen-dialog .modal-head h2 small { font-size: 12.5px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+.vorlagen-gitter { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; padding: 16px 20px 6px; }
+.vorlage {
+  display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: left; cursor: pointer;
+  font-family: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg); padding: 8px 8px 10px;
+}
+.vorlage:hover, .vorlage:focus-visible { border-color: var(--accent); background: var(--accent-soft); outline: none; }
+.vorlage:focus-visible { box-shadow: 0 0 0 2px var(--accent-soft); }
+.vorlage b { font-size: 13.5px; font-weight: 700; padding: 4px 4px 0; }
+.vorlage small { font-size: 11.5px; line-height: 1.4; color: var(--muted); padding: 0 4px; }
+.vorlage-skizze { display: block; width: 100%; aspect-ratio: 16 / 10; background: var(--surface-3); border-radius: var(--r); }
+.vorlage-skizze.leer { display: flex; align-items: center; justify-content: center; font-size: 26px; color: var(--muted); border: 1px dashed var(--border); background: none; }
+.vorlage-skizze .sk-karte { stroke: rgba(40, 48, 64, 0.22); stroke-width: 0.6; }
+.vorlage-skizze .sk-rahmen { stroke: rgba(40, 48, 64, 0.3); stroke-width: 0.6; stroke-dasharray: 2.5 2; }
+.vorlage-skizze .sk-spalte { fill: rgba(255, 255, 255, 0.75); }
+.vorlage-skizze .sk-balken { fill: rgba(63, 120, 90, 0.55); }
+.vorlage-skizze .sk-blase.b1 { fill: #4f7cff; opacity: 0.8; }
+.vorlage-skizze .sk-blase.b2 { fill: #e07a3f; opacity: 0.8; }
+.vorlage-skizze .sk-blase.b3 { fill: #3fa564; opacity: 0.8; }
+[data-theme='dark'] .vorlage-skizze svg, [data-theme='dark'] svg.vorlage-skizze { background: #262a31; }
+[data-theme='dark'] .vorlage-skizze .sk-karte, [data-theme='dark'] .vorlage-skizze .sk-rahmen { opacity: 0.82; }
+.vorlagen-fuss { font-size: 11.5px; color: var(--muted); margin: 6px 20px 16px; }
+/* M449: Versionen eines Boards — Liste links, Vorschau rechts */
+.modal.versionen-dialog { width: min(760px, calc(96vw / var(--pn-anz, 1))); }
+.versionen-dialog .modal-head h2 small { font-size: 12.5px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+.versionen-text { font-size: 12.5px; line-height: 1.5; color: var(--muted); margin: 14px 20px 10px; }
+.versionen-leer { font-size: 13px; color: var(--muted); margin: 18px 20px; }
+.versionen-teile { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(0, 1.4fr); gap: 14px; padding: 0 20px; }
+.versionen-liste { list-style: none; margin: 0; padding: 0; max-height: 340px; overflow-y: auto; border: 1px solid var(--border-soft); border-radius: var(--r); }
+.versionen-liste li + li { border-top: 1px solid var(--border-soft); }
+.versionen-liste button {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; cursor: pointer;
+  font-family: inherit; color: var(--ink); background: none; border: 0; padding: 8px 12px;
+}
+.versionen-liste button:hover, .versionen-liste button:focus-visible { background: var(--surface-3); outline: none; }
+.versionen-liste button.aktiv { background: var(--accent-soft); }
+.versionen-liste b { font-size: 13px; font-weight: 600; }
+.versionen-liste small { font-size: 11.5px; color: var(--muted); }
+.versionen-vorschau { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.versionen-zahlen { font-size: 12.5px; color: var(--muted); margin: 0; }
+.versionen-frage p { font-size: 12.5px; line-height: 1.5; margin: 0 0 8px; }
+.versionen-knoepfe { display: flex; flex-wrap: wrap; gap: 8px; }
+.versionen-knoepfe button, .versionen-fuss button {
+  font-family: inherit; font-size: 13px; cursor: pointer; color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r); padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px;
+}
+.versionen-knoepfe button.versionen-haupt { background: var(--accent); border-color: var(--accent); color: #fff; }
+.versionen-knoepfe button:disabled, .versionen-fuss button:disabled { opacity: 0.5; cursor: default; }
+.versionen-fuss { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 14px 20px 16px; }
+.versionen-fuss small { font-size: 11.5px; color: var(--muted); }
+/* M460: Löschen ist leise (ohne Rahmen) — es soll neben Wiederherstellen nicht gleich gewichtig wirken */
+.versionen-knoepfe button.versionen-leise { border-color: transparent; background: none; color: var(--muted); margin-left: auto; }
+.versionen-knoepfe button.versionen-leise:hover { color: var(--ink); background: var(--surface-3); }
+/* M460: Karte für Karte — eine ruhige Liste unter der Vorschau, Zurückholen als kleiner Textknopf */
+.versionen-vergleich h3 { font-size: 11.5px; font-weight: 600; color: var(--muted); margin: 2px 0 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.versionen-vergleich ul { list-style: none; margin: 0; padding: 0; max-height: 168px; overflow-y: auto; border: 1px solid var(--border-soft); border-radius: var(--r); }
+.versionen-vergleich li { display: flex; align-items: center; gap: 8px; padding: 5px 8px; font-size: 12.5px; min-height: 30px; }
+.versionen-vergleich li + li { border-top: 1px solid var(--border-soft); }
+.versionen-vergleich li > svg { flex: none; color: var(--muted); }
+.versionen-vergleich .vv-titel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.versionen-vergleich small { flex: none; font-size: 11.5px; color: var(--muted); }
+.versionen-vergleich button {
+  flex: none; font-family: inherit; font-size: 12px; cursor: pointer; color: var(--accent-strong); background: none; border: 0;
+  border-radius: var(--r); padding: 3px 6px;
+}
+.versionen-vergleich button:hover, .versionen-vergleich button:focus-visible { background: var(--surface-3); }
+.versionen-vergleich button:disabled { opacity: 0.5; cursor: default; }
+/* M470: Häkchen je Zeile, „alle" und „Auswahl zurückholen" im Kopf der Liste */
+.versionen-vergleich .vv-kopf { display: flex; align-items: center; gap: 10px; min-height: 26px; }
+.versionen-vergleich .vv-kopf h3 { flex: 1; }
+.versionen-vergleich .vv-alle { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.versionen-vergleich .vv-wahl, .versionen-vergleich .vv-alle input { flex: none; margin: 0; accent-color: var(--accent-strong); }
+.versionen-vergleich .vv-kopf .versionen-haupt { font-weight: 600; }
+@media (max-width: 560px) {
+  .versionen-teile { grid-template-columns: 1fr; padding: 0 12px; }
+  .versionen-liste { max-height: 180px; }
+}
+@media (max-width: 520px) {
+  .vorlagen-gitter { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 12px 12px 4px; }
+}
+
+/* ---------- M380: Wochenplan, Zeiterfassung, Protokoll, Rechen-Tabelle als lebende Folie ---------- */
+.presenter-slide.editable > .slide-modul {
+  width: min(1120px, 100%); height: min(calc(74vh / var(--pn-anz, 1)), 100%); align-self: center; text-align: left;
+  box-shadow: var(--pop-shadow); border-radius: var(--r-lg); position: relative;
+}
+.presenter-slide.editable > .slide-modul.slide-sheet { height: auto; max-height: 100%; width: min(1000px, 100%); padding: 16px 20px 14px; }
+.presenter-slide.editable > .slide-modul.slide-minutes { width: min(880px, 100%); padding: 16px 20px 14px; }
+.presenter-slide.editable > .slide-modul.slide-time { width: min(840px, 100%); height: min(calc(64vh / var(--pn-anz, 1)), 100%); }
+.slide-modul .drag-title { cursor: text; }
+.slide-week .week-title, .slide-time .time-title, .slide-minutes .minutes-title, .slide-sheet .drag-title { font-size: 19px; }
+.slide-week .week-wrap, .slide-time .time-wrap { padding: 18px 22px 20px; }
+.slide-week .week-dayname { font-size: 12.5px; }
+/* der Block-Editor des Wochenplans hängt am Dokument — über der Präsentation (z 95) muss er darüber liegen */
+.week-pop.auf-folie { z-index: 120; }
+.slide-week .week-entry-time { font-size: 11px; }
+.slide-week .week-entry-text { font-size: 14px; }
+.slide-week .week-entry-who { font-size: 10.5px; }
+.slide-minutes .note-editor { font-size: 16px; }
+.slide-sheet table { font-size: 15px; }
+@media (max-width: 640px) {
+  .presenter-slide.editable > .slide-modul { height: min(calc(78vh / var(--pn-anz, 1)), 100%); }
+  .slide-week .week-wrap, .slide-time .time-wrap { padding: 10px 10px 12px; }
+  .presenter-slide.editable > .slide-modul.slide-sheet, .presenter-slide.editable > .slide-modul.slide-minutes { padding: 10px 10px 8px; }
+}
+
+/* ---------- M381: englische Oberfläche ---------- */
+.help-en-hinweis { margin: 0 0 14px; padding: 9px 12px; border: 1px solid var(--accent); border-radius: var(--r); background: var(--accent-soft); font-size: 13px; line-height: 1.45; }
+.help-de, .help-en { display: contents; }
+
+/* ── M385: QR-Code zum Mitmachen ─────────────────────────────────────── */
+.qr-blende.gross {
+  position: fixed; inset: 0; z-index: 140; display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, #0b1020 72%, transparent); padding: calc(16px + var(--safe-top, 0px)) 16px 16px;
+}
+.qr-karte {
+  background: var(--surface-card); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-lg, 14px);
+  box-shadow: var(--pop-shadow); padding: 20px 24px 18px; width: min(560px, 100%); max-height: 100%; overflow: auto;
+  display: flex; flex-direction: column; gap: 12px; text-align: center;
+}
+.qr-kopf { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.qr-kopf h2 { margin: 0; font-size: 26px; letter-spacing: -.01em; }
+.qr-text { margin: 0; font-size: 16px; line-height: 1.45; color: var(--text); text-wrap: balance; }
+.qr-konto { color: var(--muted); }
+/* Der Code selbst: immer Weiß mit schwarzen Feldern, so groß wie Bildschirm und Karte es hergeben */
+.qr-code { background: #fff; border-radius: var(--r, 8px); line-height: 0; align-self: center; width: min(100%, calc(58vh / var(--pn-anz, 1)), 460px); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+.qr-code svg { width: 100%; height: 100%; display: block; border-radius: inherit; }
+.qr-warte { color: #555; font-size: 13px; line-height: 1.4; padding: 12px; }
+.qr-adresse { font-family: var(--mono, ui-monospace, monospace); font-size: 11px; color: var(--muted); word-break: break-all; user-select: all; line-height: 1.35; }
+.qr-fuss { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.qr-dabei { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+.qr-knoepfe { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.qr-knoepfe button {
+  display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; padding: 7px 12px; cursor: pointer;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--r, 8px);
+}
+.qr-knoepfe button:hover, .qr-knoepfe button:focus-visible { border-color: var(--accent); }
+/* Klein in der Ecke: bleibt über Board, Fokus und Präsentation stehen; ziehen verschiebt */
+.qr-blende.ecke {
+  position: fixed; right: calc(14px + var(--app-rand, 0px)); bottom: calc(190px + var(--app-rand, 0px)); z-index: 140;
+  width: 188px; padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 6px;
+  background: var(--surface-card); color: var(--text); border: 1px solid var(--border); border-radius: var(--r, 8px);
+  box-shadow: var(--pop-shadow); cursor: grab; touch-action: none; user-select: none;
+}
+.qr-blende.ecke:active { cursor: grabbing; }
+.qr-ecke-kopf { display: flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; }
+.qr-ecke-kopf span { flex: 1; text-align: left; }
+.qr-ecke-kopf button { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; background: none; color: var(--muted); border-radius: var(--r-xs, 4px); cursor: pointer; }
+.qr-ecke-kopf button:hover, .qr-ecke-kopf button:focus-visible { background: var(--surface); color: var(--text); }
+.qr-blende.ecke .qr-code { width: 100%; }
+.qr-ecke-fuss { font-size: 12px; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) {
+  .qr-karte { padding: 16px 14px 14px; }
+  .qr-kopf h2 { font-size: 22px; }
+  .qr-blende.ecke { width: 140px; bottom: calc(120px + var(--app-rand, 0px)); }
+}
+@media print { .qr-blende { display: none; } }
+
+/* ---------- M388: Raster-Farbe aus dem Stylesheet ---------- */
+/* Vorher las das Board die Farbe beim Zeichnen aus dem Dokument — nach dem Wechsel Hell/Dunkel blieben die Punkte
+   in der alten Farbe, bis sich das Board aus anderem Grund neu zeichnete. */
+.react-flow { --xy-background-pattern-color: #d3d6dc; }
+:root[data-theme="dark"] .react-flow { --xy-background-pattern-color: #2e3238; }
+
+/* ---------- M389: UI-Audit — Tippziele ---------- */
+/* Maus: Die kleinsten Ziele wachsen auf 22 Punkte (Schließen-Kreuz der Fenster, Auf-/Zuklapp-Pfeile der Spalte). */
+.modal-x { display: inline-grid; place-items: center; border-radius: var(--r-sm); }
+.modal-x:hover { background: var(--surface-2); color: var(--ink); }
+@media (pointer: fine) {
+  .modal-x { min-width: 28px; min-height: 28px; }
+  .side-board-arrow, .ebenen-menu-knopf { min-width: 22px; min-height: 22px; }
+  .sel-ai-menu .sel-farbe { min-width: 22px; min-height: 22px; }
+}
+/* Finger: Nichts, was man antippt, ist schmaler oder flacher als 40 Punkte. */
+@media (pointer: coarse) {
+  .ebenen-menu-knopf, .side-board-arrow { min-width: 40px; min-height: 40px; }
+  .sel-ai-menu .sel-farbe { width: 36px; height: 36px; }
+  .presenter-head button { min-width: 44px; min-height: 40px; }
+  .th-chip { min-width: 40px; }
+  .presenter-dots button { width: 36px; height: 40px; }
+  @media (max-width: 640px) {
+     .tab-home, .tab-add { min-width: 40px; min-height: 40px; }
+  }
+}
+
+/* M389: Das Fenster selbst nimmt beim Öffnen den Fokus (lib/fensterFokus.ts) — ohne Rahmen, es ist kein Ziel. */
+[data-fenster]:focus { outline: none; }
+
+/* M390: Anzeigegröße und Bildschirm-Einheiten. `vh`/`vw` messen das FENSTER; die Anzeigegröße vergrößert aber alles
+   (zoom an der Wurzel). Ein Fenster mit „höchstens 84vh" war bei 150 % darum 126 % der Bildschirmhöhe hoch — die
+   untersten Knöpfe („Alles leeren", „Mit Microsoft verbinden") lagen unerreichbar unter dem Rand, das ＋-Menü begann
+   über dem oberen. Alle Höhen und Breiten in vh/vw sind deshalb durch den Faktor geteilt (--pn-anz, sonst 1). */
+
+/* M397: Gezeichnete Symbole im laufenden Text sitzen auf der Zeilenmitte statt auf der Grundlinie.
+   :where() wiegt nichts – jede eigene Regel einer Leiste oder eines Knopfs geht vor. */
+:where(span, b, em, i, p, li, label, dt, dd, h2, small, div, button, a) > svg[aria-hidden='true'][stroke='currentColor'] { vertical-align: -0.14em; }
+.hit-icon, .portal-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+
+/* ---------- M398: Projekt oder Bereich samt Boards löschen ---------- */
+.modal.ebene-weg { width: min(460px, calc(100vw - 24px)); }
+.ebene-weg-inhalt { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.ebene-weg-liste { list-style: none; margin: 0 0 14px; padding: 0; max-height: 168px; overflow-y: auto; border: 1px solid var(--border-soft); border-radius: var(--r); }
+.ebene-weg-liste li { display: flex; align-items: baseline; gap: 8px; padding: 5px 9px; font-size: 12.5px; border-bottom: 1px solid var(--border-soft); }
+.ebene-weg-liste li:last-child { border-bottom: none; }
+.ebene-weg-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.ebene-weg-ort, .ebene-weg-zahl, .ebene-weg-marke { flex: none; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ebene-weg-ort { max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ebene-weg-marke { border: 1px solid var(--border-soft); border-radius: var(--r-xs); padding: 0 5px; }
+.ebene-weg-wahl { border: none; margin: 0 0 4px; padding: 0; display: grid; gap: 6px; }
+.ebene-weg-wahl legend { padding: 0; margin-bottom: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.ebene-weg-wahl label { display: flex; align-items: flex-start; gap: 9px; padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: var(--r); cursor: pointer; }
+.ebene-weg-wahl label:has(input:checked) { border-color: var(--border); background: var(--surface-2); }
+.ebene-weg-wahl label.aus { opacity: .55; cursor: default; }
+.ebene-weg-wahl input[type='radio'] { margin: 2px 0 0; accent-color: var(--accent-fill); flex: none; }
+.ebene-weg-wahl label > span { display: grid; gap: 4px; min-width: 0; flex: 1; font-size: 12.5px; color: var(--ink); }
+.ebene-weg-wahl small { font-size: 11.5px; color: var(--muted); }
+.ebene-weg-wahl select { font: inherit; font-size: 12.5px; padding: 5px 7px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); max-width: 100%; }
+.ebene-weg-knoepfe { justify-content: flex-end; margin-top: 14px; }
+.ebene-weg .modal-buttons button.danger { background: #c8392b; border-color: #c8392b; color: #fff; font-weight: 600; }
+.ebene-weg .modal-buttons button.danger:hover:not(:disabled) { background: #b23024; border-color: #b23024; }
+
+/* M398 (Nachtrag zu M397): Pfeile, Haken und Dreiecke (↩ ▶ ☑ ↔ …) sind Schriftzeichen. Manche Geräte malen sie
+   von sich aus als buntes Emoji – hier wird die Textform verlangt. Inhalte der Nutzer bleiben, wie getippt. */
+:root { font-variant-emoji: text; }
+.bn-editor, .note-editor, [translate='no'], input, textarea, [contenteditable='true'] { font-variant-emoji: normal; }
+.reakt-wahl, .reakt-flug { font-variant-emoji: emoji; }
+
+/* ---------- M399: Anordnen – Symbol-Zeilen im Menü der Auswahl ---------- */
+.sel-ai-menu.anordnen-menu { min-width: 0; width: max-content; }
+.anordnen-reihe { display: flex; align-items: center; gap: 2px; padding: 0 3px 2px; }
+.anordnen-reihe > i { width: 1px; height: 18px; background: var(--border-soft); margin: 0 5px; flex: none; }
+.sel-ai-menu .anordnen-knopf { width: 32px; height: 30px; padding: 0; display: grid; place-items: center; flex: none; color: var(--ink); }
+.sel-ai-menu .anordnen-knopf:disabled { opacity: .35; cursor: default; background: none; }
+@media (pointer: coarse) { .sel-ai-menu .anordnen-knopf { width: 40px; height: 38px; } }
+
+/* ---------- M400: Karten schräg legen ---------- */
+/* Die Hülle dreht sich um ihre Mitte; der Knoten darum bleibt gerade (React Flow rechnet mit geraden Kästen).
+   Schatten und Auswahlrahmen wandern deshalb vom Knoten auf die Hülle – sonst bliebe ein gerader Kasten stehen. */
+.card-shell[data-winkel] { transform: rotate(var(--winkel)); box-shadow: var(--card-shadow); border-radius: var(--r); transition: box-shadow 0.18s ease; }
+.react-flow__node.dragging > .card-shell[data-winkel] { transform: rotate(var(--winkel)); }
+.react-flow__node:has(> .card-shell[data-winkel]),
+.react-flow__node:has(> .card-shell[data-winkel]):hover,
+.react-flow__node.dragging:has(> .card-shell[data-winkel]) { box-shadow: none; }
+.react-flow__node:hover > .card-shell[data-winkel], .react-flow__node.dragging > .card-shell[data-winkel] { box-shadow: var(--card-shadow-lift); }
+.react-flow__node.selected:has(> .card-shell[data-winkel]) { outline: none; }
+.react-flow__node.selected > .card-shell[data-winkel] { outline: 2px solid var(--accent); outline-offset: 2px; }
+.react-flow__node-image > .card-shell[data-winkel], .card-shell[data-winkel]:has(.image-card.rahmenlos) { box-shadow: none !important; border-radius: 0; }
+html[data-alles-zeigen] .react-flow__node.selected > .card-shell[data-winkel] { outline: none !important; }
+/* Dreh-Knopf: außen an der unteren rechten Ecke – dort liegt sonst nichts */
+.dreh-knopf {
+  position: absolute; right: -30px; bottom: -30px; z-index: 7; width: 22px; height: 22px; padding: 0;
+  display: grid; place-items: center; border-radius: 50%; cursor: grab; touch-action: none;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink); box-shadow: var(--chrome-shadow);
+}
+.dreh-knopf:hover { background: var(--surface-2); }
+.dreh-knopf:active { cursor: grabbing; }
+@media (pointer: coarse) { .dreh-knopf { width: 32px; height: 32px; right: -40px; bottom: -40px; } }
+.dreh-anzeige {
+  position: absolute; left: 50%; top: -34px; transform: translateX(-50%) rotate(calc(-1 * var(--winkel, 0deg))); z-index: 8; pointer-events: none;
+  background: var(--ink); color: var(--surface); font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: var(--r-sm); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+/* Eck-Griffe der schrägen Karte: dieselben weißen Quadrate wie am geraden Auswahlrahmen */
+.karte-eck-griff { position: absolute; width: 9px; height: 9px; z-index: 6; background: var(--surface); border: 1px solid var(--border); border-radius: 1px; touch-action: none; }
+.karte-eck-griff.oben { top: -7px; } .karte-eck-griff.unten { bottom: -7px; }
+.karte-eck-griff.links { left: -7px; } .karte-eck-griff.rechts { right: -7px; }
+.karte-eck-griff.oben.links, .karte-eck-griff.unten.rechts { cursor: nwse-resize; }
+.karte-eck-griff.oben.rechts, .karte-eck-griff.unten.links { cursor: nesw-resize; }
+@media (pointer: coarse) { .karte-eck-griff { width: 16px; height: 16px; } .karte-eck-griff.oben { top: -11px; } .karte-eck-griff.unten { bottom: -11px; } .karte-eck-griff.links { left: -11px; } .karte-eck-griff.rechts { right: -11px; } }
+
+/* ---------- M402: Zoom in der Präsentation, Pfeil-Menü über den Karten ---------- */
+/* Der Inhalt der Folie wird als Ganzes vergrößert oder verkleinert; die Folie rollt, was übersteht */
+.presenter-slide.gezoomt > :first-child { transform: translate(var(--fz-x, 0px), var(--fz-y, 0px)) scale(var(--fz, 1)); transform-origin: 0 0; }
+.presenter-slide.fz-heim > :first-child { transition: transform .16s ease-out; }
+@media (prefers-reduced-motion: reduce) { .presenter-slide.fz-heim > :first-child { transition: none; } }
+.presenter-slide.gezoomt.fz-kurz > :first-child { margin-bottom: var(--fz-unten, 0px) !important; }
+.presenter-slide.gezoomt.fz-ohne-x { overflow-x: hidden; }
+.presenter-slide.gezoomt.fz-ohne-y { overflow-y: hidden; }
+/* ---------- M403: Darstellung der Folien, Verschieben mit der Maus ---------- */
+/* Folien ohne eigene Bedienung (Bild, Mail, Text): Was die Folie nicht füllt, steht in ihrer Mitte – wie bei den
+   editierbaren Folien über Auto-Ränder, damit hoher Inhalt oben erreichbar bleibt */
+.presenter-slide:not(.editable):not(.app):not(.dokument) { display: flex; align-items: flex-start; justify-content: flex-start; }
+.presenter-slide:not(.editable):not(.app):not(.dokument) > * { margin: auto; min-width: 0; max-width: 100%; }
+/* „Einpassen" und „Volle Breite": Der Platz des Rollbalkens bleibt frei (sonst änderte sein Erscheinen die Stufe) */
+/* Ein Bild ist nie breiter als die Folie (die Angabe am Bild selbst, 600 Punkte, gewann am Telefon und schob es seitlich hinaus) */
+.presenter-slide:not(.editable):not(.app):not(.dokument) > div > img { max-width: min(100%, 600px) !important; display: block; }
+.presenter-slide.fz-modus { scrollbar-gutter: stable both-edges; }
+/* „Volle Breite": Was in sich rollt, füllt die Höhe der Folie und rollt weiter in sich */
+.presenter-slide.fz-fest > .slide-note { max-height: min(100%, var(--fz-hoch, 100%)); }
+/* Verschieben: die Hand zeigt, wo ein Zug den Ausschnitt bewegt */
+.presenter-slide.zieh-bereit, .presenter-slide.zieh-bereit *, .folie-dok-flaeche.zieh-bereit, .folie-dok-flaeche.zieh-bereit * { cursor: grab; }
+html.folie-hand .presenter-slide, html.folie-hand .presenter-slide *, html.folie-hand .folien-stift, html.folie-hand .folien-stift * { cursor: grab !important; }
+html.folie-zieht, html.folie-zieht * { cursor: grabbing !important; user-select: none !important; -webkit-user-select: none !important; }
+/* Das Symbol der Darstellung in der Kopfzeile; selbst gezoomt zeigt es die Stufe */
+.presenter-ansicht { position: relative; flex: none; display: inline-flex; }
+.presenter-head .presenter-zoom { font-size: 12px; font-variant-numeric: tabular-nums; justify-content: center; }
+.presenter-ansicht-menu {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; min-width: 184px; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border-soft); border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
+}
+.presenter-head .presenter-ansicht-menu button {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; text-align: left; border: none; background: none; color: var(--ink);
+  font: inherit; font-size: 13px; padding: 8px 10px; border-radius: var(--r); cursor: pointer; white-space: nowrap;
+}
+.presenter-head .presenter-ansicht-menu button:hover { background: var(--surface-2); }
+.presenter-ansicht-haken { width: 14px; height: 14px; flex: none; display: inline-grid; place-items: center; color: var(--accent-strong); }
+.presenter-ansicht-stufe { display: flex; align-items: center; gap: 4px; padding: 0 0 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border-soft); }
+.presenter-ansicht-stufe > span { flex: 1; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.presenter-head .presenter-ansicht-stufe button { width: 36px; flex: none; justify-content: center; font-size: 17px; line-height: 1; padding: 6px 0; }
+/* Schmaler Schirm: Das Symbol steht weit links – die Auswahl hängt dann an der Kopfzeile, nicht am Symbol */
+@media (max-width: 640px) {
+  .presenter-head { position: relative; }
+  .presenter-ansicht { position: static; }
+  .presenter-ansicht-menu { left: 10px; right: auto; top: calc(100% + 2px); }
+}
+@media (pointer: coarse) {
+  .presenter-head .presenter-ansicht-menu button { min-height: 44px; }
+  .presenter-head .presenter-ansicht-stufe button { width: 44px; }
+}
+/* Das Menü der ausgewählten Verbindung (Spitze, Farbe, Stärke) und ihr Namens-Chip liegen über den Karten –
+   sie stehen in der Fläche und gerieten sonst unter jede Karte, die später angefasst wurde (höherer z-index) */
+.edge-opts, .edge-label.selected { z-index: 2147483000; }
+
+/* ---------- M404: Bedienung aufgeklappter Dokument-Karten im Zoom ---------- */
+/* Titel, Dateizeile, Blätterleiste und Kommentarliste wachsen nur bis 130 % mit (`--pn-ui`, von Board.tsx gesetzt):
+   Wer zum Lesen hineinzoomt, bekommt mehr Seite – nicht größere Knöpfe. Nur aufgeklappt; die zugeklappte Karte
+   und andere Dateien bestehen aus genau diesen Teilen und zoomen wie bisher. */
+.file-card:has(.pdf-seite-wrap) :is(.file-kopf, .file-body, .pdf-seite-bar, .pdf-kommentare) { zoom: var(--pn-ui, 1); }
+
+/* ---------- M407: Rechen-Tabelle als Datentabelle – Links, Kopfzeile, Filtern und Sortieren ---------- */
+/* Link in einer Zelle: der Text öffnet ihn, der Stift (oder ein Klick daneben) bearbeitet */
+.sheet-link { color: var(--accent-strong); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.sheet-zelle.mit-link, .sheet-zelle.mit-filter { position: relative; }
+.sheet-link-stift {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 20px; height: 20px; padding: 0;
+  display: none; place-items: center; border: 1px solid var(--border-soft); border-radius: var(--r-xs);
+  background: var(--surface); color: var(--muted); cursor: pointer;
+}
+.sheet-zelle.mit-link:hover .sheet-link-stift, .sheet-link-stift:focus-visible { display: grid; }
+/* M411: Steht der Link rechtsbündig (eine Nummer), säße der Stift genau auf ihm – am Finger öffnete ein Tipp auf
+   die Nummer dann die Bearbeitung statt des Links. Der Stift wechselt dort auf die linke Seite. */
+.sheet-zelle.mit-link.stift-links .sheet-link-stift { right: auto; left: 2px; }
+/* Kopfzeile der Datentabelle: kräftig, bleibt beim Rollen unter den Spaltenbuchstaben stehen */
+.sheet-grid.datentabelle .sheet-kopfzeile > td {
+  font-weight: 700; background: linear-gradient(var(--surface-dim), var(--surface-dim)), var(--surface-card);
+  position: sticky; top: var(--sheet-kopf-h, 28px); z-index: 3; padding-right: 22px;
+}
+/* M409: … samt ihrer Zeilennummer (sie steht oben UND links fest) */
+.sheet-grid.datentabelle .sheet-kopfzeile > th { top: var(--sheet-kopf-h, 28px); z-index: 4; }
+.sheet-grid.datentabelle .sheet-datenzeile:nth-child(even) > td { background: color-mix(in srgb, var(--surface-dim) 45%, transparent); }
+.sheet-grid.datentabelle .sheet-datenzeile > td:hover { background: var(--accent-soft); }
+.sheet-filter-knopf {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; padding: 0;
+  display: grid; place-items: center; border: 0; border-radius: var(--r-xs);
+  background: transparent; color: inherit; opacity: .55; cursor: pointer;
+}
+/* M409: leise – ohne Kasten, in der Farbe der Kopfzeile (auch auf einer farbigen aus Excel); kräftig erst unter
+   dem Zeiger oder wenn die Spalte gefiltert bzw. sortiert ist */
+.sheet-filter-knopf:hover, .sheet-filter-knopf:focus-visible, .sheet-filter-knopf[aria-expanded='true'] { opacity: 1; background: color-mix(in srgb, currentColor 16%, transparent); }
+.sheet-filter-knopf.an { opacity: 1; background: var(--accent-fill); color: #fff; }
+/* gefiltert oder sortiert: die echten Zeilennummern in der Akzentfarbe – wie in Excel */
+.sheet-zeilenkopf.gefiltert { color: var(--accent-strong); }
+.sheet-fuss { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.sheet-fuss-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-filter-weg, .sheet-link-feld input {
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 11px;
+}
+.sheet-filter-weg { flex: none; padding: 2px 8px; min-height: 22px; cursor: pointer; white-space: nowrap; }
+.sheet-filter-weg:hover { border-color: var(--accent); color: var(--accent-strong); }
+.sheet-link-feld { flex: 1 1 150px; min-width: 110px; margin-left: auto; display: inline-flex; align-items: center; gap: 5px; }
+.sheet-link-feld input { flex: 1; min-width: 0; height: 22px; padding: 0 6px; }
+.sheet-link-feld input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+/* das Fenster am Filterknopf */
+.sheet-filter-menu { min-width: 216px; max-width: 280px; }
+.sheet-filter-haken { margin-left: auto; display: inline-grid; color: var(--accent-strong); }
+.sheet-filter-suche {
+  width: 100%; box-sizing: border-box; height: 28px; padding: 0 8px; margin: 2px 0 4px; font: inherit; font-size: 13px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface); color: var(--ink);
+}
+.sheet-filter-zeile { display: flex; gap: 4px; padding: 0 2px 4px; }
+.ebenen-menu.sheet-filter-menu .sheet-filter-zeile button {
+  width: auto; flex: 1; text-align: center; justify-content: center; padding: 4px 8px; font-size: 12px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+}
+.sheet-filter-liste { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.sheet-filter-liste label {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: var(--r-sm); cursor: pointer;
+  font-size: 13px; color: var(--ink); min-width: 0;
+}
+.sheet-filter-liste label:hover { background: var(--surface-2); }
+.sheet-filter-liste input { flex: none; accent-color: var(--accent); }
+.sheet-filter-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-filter-zahl { flex: none; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sheet-filter-mehr { padding: 6px 8px; font-size: 12px; color: var(--muted); }
+@media (pointer: coarse) {
+  .sheet-link-stift { display: grid; width: 28px; height: 28px; }
+  .sheet-zelle.mit-link { padding-right: 32px; }
+  .sheet-zelle.mit-link.stift-links { padding-right: 5px; padding-left: 32px; }
+  .sheet-filter-knopf { width: 28px; height: 28px; }
+  .sheet-grid.datentabelle .sheet-kopfzeile > td { padding-right: 34px; }
+  .sheet-filter-weg { min-height: 36px; font-size: 13px; padding: 4px 12px; }
+  .sheet-link-feld input { height: 36px; font-size: 16px; }
+  .sheet-filter-liste label { padding: 9px 8px; font-size: 15px; }
+  .sheet-filter-suche { height: 40px; font-size: 16px; }
+}

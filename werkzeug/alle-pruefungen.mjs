@@ -90,7 +90,7 @@ if (nurGeaendert) {
   for (const n of dateien) if (WAECHTER.some((w) => n.startsWith(`${w}-`))) merke(n, 'Wächter (zählt/prüft Listen)');
   console.log(`--geaendert: ${geaendert.length} geänderte Datei(en) seit ${ref} (${vorfahr.slice(0, 8)}) → ${grund.size} Reihe(n)`);
   for (const [n, g] of [...grund].sort()) console.log(`  ${n.replace(/\.mjs$/, '')}  ← ${g}`);
-  if (grund.size === 0) console.log('  keine passende Reihe – für Änderungen an store.ts, index.css, App.tsx die volle Reihe laufen lassen');
+  if (grund.size === 0) console.log('  keine passende Reihe – für Änderungen an store.ts, src/styles/, App.tsx die volle Reihe laufen lassen');
   dateien = dateien.filter((n) => grund.has(n));
 }
 /** Was eine Datei für sich allein braucht: ihre Ports, und die gemeinsame Datenbank */

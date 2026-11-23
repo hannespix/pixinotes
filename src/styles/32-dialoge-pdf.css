@@ -1,0 +1,275 @@
+/* ---------- Modal (Einstellungen) ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 80; background: rgba(22, 25, 30,.3);
+  display: flex; align-items: flex-start; justify-content: center; padding: 8vh 16px;
+}
+/**
+ * M263: Die Fensterschale läuft nicht mehr selbst über.
+ *
+ * Vorher scrollte `.modal` als Ganzes. Die Bildlaufleiste des Browsers sitzt
+ * dann am äußersten Rand des Fensters — mitsamt Pfeilknöpfen und heller
+ * Rinne, quer über die abgerundeten Ecken (User-Screenshot). Jetzt ist die
+ * Schale eine geschlossene, abgerundete Fläche (`overflow: hidden`), und nur
+ * `.modal-body` darin läuft über: Was dort gezeichnet wird — auch die
+ * Bildlaufleiste — wird von der Rundung beschnitten. Nebenbei bleiben
+ * Kopfzeile, Reiter und Fußzeile stehen, statt mitzuscrollen.
+ */
+.modal {
+  width: min(560px, calc(96vw / var(--pn-anz, 1))); max-height: calc(84vh / var(--pn-anz, 1)); overflow: hidden; background: var(--surface);
+  border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
+  display: flex; flex-direction: column;
+}
+.modal-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border-soft); position: sticky; top: 0; background: var(--surface); border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.modal-head h2 { font-size: 17px; margin: 0; }
+.modal-x { border: none; background: none; font-size: 15px; cursor: pointer; color: var(--muted); }
+.modal-section { padding: 16px 20px; border-bottom: 1px solid var(--border-soft); }
+.modal-section h3 { font-size: 14px; margin: 0 0 8px; }
+.modal-hint { font-size: 12px; color: var(--muted); line-height: 1.5; margin: 0 0 12px; }
+.modal-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 13px; }
+.modal-row span { color: var(--muted); }
+.modal-row select, .modal-row input {
+  flex: 1; max-width: 320px; font-family: inherit; font-size: 13px; padding: 7px 10px;
+  border: 1px solid var(--border-soft); border-radius: var(--r); outline: none; background: var(--surface); color: var(--ink);
+}
+.modal-note { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+/* M190: Aufklappbarer Hilfe-Block (z. B. CORS-Freigabe) — steht meist im Weg,
+   wird aber gebraucht, sobald etwas klemmt */
+.modal-details {
+  border: 1px solid var(--border-soft); border-radius: var(--r);
+  padding: 8px 12px; margin-bottom: 12px; background: var(--surface-3);
+}
+.modal-details > summary {
+  cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--ink);
+  list-style: none; padding: 2px 0;
+}
+.modal-details > summary::-webkit-details-marker { display: none; }
+.modal-details > summary::before { content: '▸ '; color: var(--muted); }
+.modal-details[open] > summary::before { content: '▾ '; }
+.modal-details[open] > summary { margin-bottom: 8px; }
+.modal-details .modal-hint { margin-bottom: 8px; }
+.modal-details code { word-break: break-all; }
+.modal-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.modal-buttons button {
+  border: 1px solid var(--border-soft); background: var(--surface-3); border-radius: var(--r); padding: 9px 13px;
+  font-family: inherit; font-size: 12.5px; cursor: pointer; color: var(--ink);
+}
+.modal-buttons button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.modal-buttons button:disabled { opacity: .5; cursor: default; }
+.modal-foot { padding: 12px 20px; font-size: 11px; color: var(--muted); text-align: center; }
+/* M445: Nach Themen ordnen – Vorschlag prüfen (components/ThemenDialog.tsx) */
+.themen-liste { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.themen-liste li { border: 1px solid var(--border-soft); border-radius: var(--r); padding: 8px 10px; }
+.themen-liste li.aus { opacity: .55; }
+.themen-kopf { display: flex; align-items: center; gap: 8px; }
+.themen-name { flex: 1; min-width: 0; border: 1px solid transparent; border-radius: var(--r); padding: 4px 6px; background: transparent; color: var(--ink); font: inherit; font-weight: 600; font-size: 13.5px; }
+.themen-name:hover, .themen-name:focus { border-color: var(--border-soft); background: var(--surface-3); outline: none; }
+.themen-zahl { font-size: 12px; color: var(--muted); min-width: 1.5em; text-align: right; }
+.themen-karten { font-size: 12px; color: var(--muted); line-height: 1.45; margin: 4px 0 0 26px; }
+.themen-dialog .modal-buttons button.primaer { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; font-weight: 600; }
+.themen-dialog .modal-buttons button.primaer:hover:not(:disabled) { background: var(--accent-fill); border-color: var(--accent-fill); filter: brightness(1.07); }
+/* M300: Seg-Schalter (Erscheinungsbild, Anzeigegröße, Sync-Weg, Obergrenze …) —
+   vorher trugen die Knöpfe die Klasse, aber keine Regel: Der aktive Zustand
+   war unsichtbar. */
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; background: var(--surface); }
+.seg button {
+  border: none; border-left: 1px solid var(--border-soft); background: none; color: var(--muted);
+  font-family: inherit; font-size: 12px; padding: 5px 10px; cursor: pointer; white-space: nowrap;
+}
+.seg button:first-child { border-left: none; }
+.seg button:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+.seg button.on { background: var(--accent-soft); color: var(--accent-strong); font-weight: 650; }
+.seg button:disabled { opacity: .45; cursor: default; }
+.modal-section h4 { font-size: 13px; margin: 14px 0 6px; }
+.psync-neu select { flex: 1 1 auto; min-width: 0; }
+.psync-neu button {
+  flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+  font-family: inherit; font-size: 12.5px; padding: 6px 12px; border-radius: var(--r); cursor: pointer;
+}
+.psync-neu button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.psync-neu button:disabled { opacity: .5; cursor: default; }
+.bild-export { width: min(460px, calc(94vw / var(--pn-anz, 1))); }
+.on-konto .link-btn { font-size: inherit; }
+
+@media (pointer: coarse) {
+  /* Form-Anschlüsse NICHT dauerhaft einblenden — wie überall gilt seit
+     M112: sichtbar erst bei Auswahl bzw. während des Verbindens */
+  /* feste Chip-Größe — Android rendert Emojis sonst übergroß und die
+     Buttons wachsen ineinander */
+  .shape-toolbar button { width: 34px; height: 32px; font-size: 15px; }
+
+}
+
+/* ---------- PDF-Vorschau ---------- */
+.pdf-thumb {
+  display: block; width: calc(100% - 8px); margin: 2px 4px 4px; padding: 0;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); overflow: hidden; cursor: zoom-in;
+  background: var(--surface); line-height: 0;
+}
+.pdf-thumb canvas { width: 100%; height: auto; }
+/* M335: PDF-Karte zugeklappt (Aufklappen-Knopf) und aufgeklappt (eine Seite, Blätterleiste) */
+.pdf-aufklappen {
+  display: block; width: calc(100% - 8px); margin: 0 4px 4px; padding: 5px 8px;
+  border: 1px dashed var(--border-soft); border-radius: var(--r-sm); background: var(--surface);
+  color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; text-align: center;
+}
+.pdf-aufklappen:hover { border-color: var(--accent); color: var(--accent-strong); }
+.pdf-seite-wrap { margin: 0 4px 4px; }
+.pdf-seite-bar {
+  display: flex; align-items: center; gap: 4px; padding: 2px 0 6px;
+  font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.pdf-seite-bar button {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink);
+  border-radius: var(--r-sm); min-width: 26px; height: 26px; padding: 0 6px; cursor: pointer; font: inherit; font-size: 13px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pdf-seite-bar button:disabled, .pdf-seite-bar button[aria-disabled='true'] { opacity: .35; cursor: default; }
+.pdf-seite-bar button.on { background: var(--accent-fill); color: #fff; border-color: var(--accent); }
+.pdf-seite-nr {
+  width: 40px; height: 26px; text-align: center; font: inherit; font-size: 12.5px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); outline: none;
+}
+.pdf-seite-nr:focus { border-color: var(--accent); }
+.pdf-seite-luft { flex: 1; }
+.pdf-pin-hinweis { font-size: 11.5px; color: var(--accent-strong); padding: 0 2px 4px; }
+.pdf-seite {
+  position: relative; border: 1px solid var(--border-soft); border-radius: var(--r-sm); overflow: hidden;
+  background: #fff; line-height: 0;
+}
+.pdf-seite canvas { width: 100%; height: auto; display: block; }
+.pdf-seite.pin-modus { cursor: var(--zeiger-fadenkreuz); outline: 2px solid var(--accent); outline-offset: -2px; }
+/* M337: Word-Seite — docx-preview baut die Seiten auf, sichtbar ist eine, skaliert auf Kartenbreite */
+.word-seite { line-height: normal; color: #000; }
+.word-inhalt { position: relative; }
+.word-inhalt section.docx { box-sizing: border-box; background: #fff; margin: 0 !important; box-shadow: none !important; overflow: hidden; }
+.word-laedt { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--muted); min-height: 120px; line-height: 1.4; }
+.word-stile { display: none; }
+/* Pin an einer Stelle der Seite: rund, kleiner, Spitze unten links zeigt auf die Stelle */
+.comment-pin.auf-seite { width: 22px; height: 22px; border-radius: 50% 50% 50% 0; font-size: 9px; }
+/* M336: Textblase neben dem Seiten-Pin und Kommentarliste unter der Seite */
+.comment-blase {
+  position: absolute; z-index: 8; pointer-events: all; cursor: pointer;
+  max-width: 190px; padding: 4px 7px; border-radius: var(--r-sm) var(--r-sm) var(--r-sm) 0;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border-soft);
+  box-shadow: var(--chrome-shadow); font-size: 10.5px; line-height: 1.3;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.comment-blase b { font-size: 10px; color: var(--muted); }
+.comment-blase-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.comment-blase.resolved { opacity: .6; }
+.comment-blase.open { border-color: var(--accent); }
+.comment-seite { margin-left: 8px; font-size: 11px; color: var(--muted); font-weight: 600; }
+.pdf-kommentar-zahl { margin-left: 3px; font-size: 10px; font-weight: 700; color: var(--accent-strong); }
+.pdf-seite-bar button.on .pdf-kommentar-zahl { color: #fff; }
+.pdf-kommentare { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+.pdf-kommentare-kopf { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11.5px; padding: 0 2px; }
+.pdf-kommentare-kopf button, .pdf-kommentare-andere button {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink); border-radius: var(--r-sm);
+  font: inherit; font-size: 11px; padding: 1px 7px; cursor: pointer;
+}
+.pdf-kommentare-kopf button.on { background: var(--accent-fill); color: #fff; border-color: var(--accent); }
+.pdf-kommentar {
+  display: flex; align-items: flex-start; gap: 7px; text-align: left; width: 100%;
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink); border-radius: var(--r-sm);
+  padding: 4px 7px; font: inherit; font-size: 12px; cursor: pointer; line-height: 1.35;
+}
+.pdf-kommentar:hover, .pdf-kommentar.open { border-color: var(--accent); }
+.pdf-kommentar.resolved { opacity: .6; }
+.pdf-kommentar-nr {
+  flex: none; width: 18px; height: 18px; border-radius: 50% 50% 50% 0; background: var(--accent-fill); color: #fff;
+  font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; margin-top: 1px;
+}
+.pdf-kommentar.resolved .pdf-kommentar-nr { background: var(--surface-dim); color: var(--muted); }
+.pdf-kommentar-text { min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.pdf-kommentare-andere { color: var(--muted); font-size: 11.5px; padding: 0 2px; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.pdf-backdrop {
+  position: fixed; inset: 0; z-index: 90; background: rgba(30,26,18,.55);
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.pdf-viewer {
+  background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--pop-shadow);
+  /* M242: Prozent des Hintergrunds statt vw/vh. `vw`/`vh` kennen den
+     Anzeige-Zoom (A− / A+) nicht — bei 175 % versprechen sie fast doppelt so
+     viel Platz, wie das Layout hat, und die Fußzeile des Viewers rutschte
+     unter den Bildrand. Der Hintergrund liegt dagegen als `fixed; inset: 0`
+     exakt auf dem Auslauf; sein Innenmaß ist die Wahrheit. */
+  max-width: min(960px, 100%); max-height: 100%;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.pdf-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; border-bottom: 1px solid var(--border-soft); font-size: 13px;
+}
+.pdf-bar b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pdf-nav { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); flex: none; }
+.pdf-nav button {
+  border: none; background: var(--surface-dim); border-radius: var(--r-sm); cursor: pointer;
+  font-size: 13px; padding: 3px 9px; font-family: inherit;
+}
+.pdf-nav button:disabled { opacity: .35; cursor: default; }
+/**
+ * M264: Die Vorschaufläche ist zoombar.
+ *
+ * `overflow: auto` erledigt das Schieben im vergrößerten Bild von selbst —
+ * am Finger wie an der Maus. `touch-action: pan-x pan-y` lässt das native
+ * Schieben zu, überlässt das Kneifen aber uns (sonst zoomte der Browser die
+ * ganze Seite statt der Seite im Viewer).
+ * `align-items: flex-start` ist nötig, weil eine zentrierte Flex-Zeile
+ * überstehenden Inhalt oben abschneidet und nicht mehr scrollen lässt.
+ */
+.pdf-page {
+  overflow: auto; background: #efece6; padding: 14px;
+  display: flex; align-items: flex-start;
+  /**
+   * M265: `safe center` statt `center` — sonst ist die linke Hälfte des
+   * vergrößerten Blattes NICHT ERREICHBAR.
+   *
+   * Ein zentriertes Flex-Element, das breiter ist als sein Behälter, ragt auf
+   * BEIDEN Seiten hinaus. Nach links entsteht dabei kein Scrollbereich (der
+   * Bildlauf beginnt bei 0 = linke Kante des Behälters), der Überstand dort
+   * ist damit unerreichbar — gemessen: 2197 Punkte Inhalt, aber nur 1577
+   * erreichbar, 635 Punkte davon fielen hinten runter. Genau die Meldung
+   * „das Scrollen ist nicht sauber". `safe` schaltet in diesem Fall auf
+   * `start` um: zentriert, solange es passt — sobald nicht, oben/links
+   * ausgerichtet und alles erreichbar.
+   */
+  justify-content: center;
+  justify-content: safe center;
+  touch-action: pan-x pan-y; overscroll-behavior: contain; cursor: zoom-in;
+}
+.pdf-page.gezoomt { cursor: grab; }
+.pdf-page.gezoomt:active { cursor: grabbing; }
+.pdf-page canvas, .pdf-page img {
+  max-width: none; height: auto; box-shadow: var(--chrome-shadow); border-radius: var(--r-xs);
+  flex: none; display: block;
+}
+/* Eingepasst bleibt eingepasst — erst darüber darf die Seite überstehen */
+.pdf-page:not(.gezoomt) canvas, .pdf-page:not(.gezoomt) img { max-width: 100%; }
+.lupe-knoepfe { display: inline-flex; align-items: center; gap: 2px; }
+.lupe-knoepfe .lupe-stand {
+  min-width: 52px; text-align: center; font-variant-numeric: tabular-nums;
+}
+@media (pointer: coarse) {
+  .pdf-nav button { min-height: 34px; min-width: 34px; }
+}
+/**
+ * ⤢ auf der Bild-Karte: zurückhaltend, aber immer erreichbar.
+ *
+ * Bewusst LINKS oben statt rechts: Rechts oben sitzt der ✕-Löschknopf der
+ * ausgewählten Karte (er ragt sogar nach außen) und fängt die Tipps ab —
+ * derselbe Fund wie beim Kommentar-Pin in M148, hier von der Prüfreihe
+ * gemeldet, bevor es jemand am Gerät erlebt.
+ */
+:is(.bild-lupe-auf, .bild-bearbeiten-auf) {
+  position: absolute; top: 6px; left: 6px; z-index: 3;
+  border: none; border-radius: var(--r); cursor: pointer; font-size: 13px; line-height: 1;
+  padding: 5px 7px; background: rgba(20, 18, 14, 0.5); color: #fff;
+  opacity: 0; transition: opacity 0.15s;
+}
+.image-card:hover :is(.bild-lupe-auf, .bild-bearbeiten-auf), .react-flow__node.selected :is(.bild-lupe-auf, .bild-bearbeiten-auf) { opacity: 1; }
+:is(.bild-lupe-auf, .bild-bearbeiten-auf):hover { background: rgba(20, 18, 14, 0.75); }
+@media (pointer: coarse) {
+  /* Am Finger gibt es kein Hovern — dort steht der Knopf dauerhaft da */
+  :is(.bild-lupe-auf, .bild-bearbeiten-auf) { opacity: 0.85; min-height: 32px; min-width: 32px; }
+}

@@ -26,6 +26,7 @@ const SD = path.join(__repo, 'pruefungen', 'ablage');
 import { mkdirSync, readFileSync, existsSync } from 'node:fs';
 mkdirSync(SD, { recursive: true });
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
+import { cssQuelle } from '../werkzeug/css-quelle.mjs';
 import { chromium } from 'playwright-core';
 import http from 'node:http';
 import { extname, join } from 'node:path';
@@ -197,7 +198,7 @@ console.log('════ H: Quelltext ════');
   const s = readFileSync(join(__repo, 'src/components/Settings.tsx'), 'utf8');
   pruefe('H1 alte Reiter-Namen (ki, kalender, export) werden umgeleitet', /ALT_REITER[^]*?ki: 'dienste'[^]*?kalender: 'dienste'[^]*?export: 'daten'/.test(s));
   pruefe('H2 keine Bild-Export-Optionen mehr in den Einstellungen', !/expFormat|exportBoard/.test(s));
-  const css = readFileSync(join(__repo, 'src/index.css'), 'utf8');
+  const css = cssQuelle(__repo);
   pruefe('H3 der Seg-Schalter hat jetzt eine Regel für den aktiven Zustand', /\.seg button\.on/.test(css));
 }
 

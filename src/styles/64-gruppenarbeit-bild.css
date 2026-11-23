@@ -1,0 +1,490 @@
+/* ---------- M364: Gruppenarbeit — wer ist dabei, wer bearbeitet welche Karte ---------- */
+.live-leiste {
+  position: fixed; top: calc(58px + var(--safe-top) + var(--app-rand)); right: calc(14px + var(--app-rand));
+  display: flex; align-items: center; gap: 4px;
+  background: var(--surface-card); border: 1px solid var(--border); border-radius: 999px;
+  box-shadow: var(--pop-shadow); padding: 4px 10px 4px 4px; z-index: 55;
+  font-size: 12px; color: var(--muted); white-space: nowrap;
+}
+.live-chip {
+  width: 26px; height: 26px; flex: none; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--farbe, #6b7280); color: #fff; border: 2px solid var(--surface-card);
+  font: inherit; font-size: 10.5px; font-weight: 700; letter-spacing: .02em; line-height: 1; padding: 0;
+  margin-left: -8px; cursor: default;
+}
+.live-chip:first-child { margin-left: 0; }
+.live-chip.schreibt { box-shadow: 0 0 0 2px var(--farbe, #6b7280); }
+.live-chip.mehr { background: var(--surface); color: var(--ink); border-color: var(--border); }
+.live-zahl { margin-left: 6px; }
+.focus-mode .live-leiste { display: none; }
+@media (max-width: 520px) {
+  .live-leiste { top: calc(54px + var(--safe-top) + var(--app-rand)); right: calc(8px + var(--app-rand)); }
+  .live-zahl { display: none; }
+  .live-leiste { padding-right: 4px; }
+}
+/* Rahmen um eine Karte, die gerade ein anderer bearbeitet (Board-Koordinaten) */
+.live-sperre {
+  position: absolute; left: 0; top: 0; box-sizing: border-box; pointer-events: none; z-index: 3000;
+  border: 2px solid var(--farbe, #6b7280); border-radius: var(--r);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--farbe, #6b7280) 22%, transparent);
+}
+.live-sperre-name {
+  position: absolute; left: -2px; bottom: 100%; margin-bottom: 2px;
+  background: var(--farbe, #6b7280); color: #fff; font-size: 11px; font-weight: 700; line-height: 1;
+  padding: 3px 7px; border-radius: var(--r-xs); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+}
+.freigabe-schalter {
+  display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; font-size: 12.5px; line-height: 1.4; cursor: pointer; flex-basis: 100%;
+}
+.freigabe-schalter input { margin-top: 2px; flex: none; }
+.gast-name-dialog { max-width: 420px; }
+/* M387: Kommt ein Gast dazu, während vorgeführt wird, liegt die Frage nach dem Namen über der Präsentation (95) und dem Band (97) */
+.modal-backdrop.ueber-vortrag { z-index: 99; }
+.gast-name-dialog .freigabe-zeile input { flex: 1; min-width: 0; }
+/* M365: Rechte der Gäste und Sicherung im Freigabe-Dialog */
+.freigabe-schalter.recht { align-items: center; cursor: default; }
+.freigabe-schalter.recht select { flex: 1; min-width: 0; }
+.freigabe-zeile.sicherung { margin-top: 8px; justify-content: space-between; }
+/* M366: Teilnehmer-Leiste für viele — wenige Kürzel, Zahl, aufklappbare Liste */
+.live-mehr {
+  display: inline-flex; align-items: center; border: none; background: none; padding: 0;
+  font: inherit; color: inherit; cursor: pointer; border-radius: 999px;
+}
+.live-mehr:hover .live-zahl { color: var(--ink); }
+.live-mehr .live-chip:first-child { margin-left: 0; }
+.live-mehr:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.live-liste {
+  position: absolute; top: calc(100% + 6px); right: 0; width: max-content; min-width: 270px; max-width: min(330px, calc(92vw / var(--pn-anz, 1)));
+  max-height: min(calc(72vh / var(--pn-anz, 1)), 520px); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r);
+  box-shadow: var(--pop-shadow); padding: 6px; white-space: normal; color: var(--ink);
+}
+.live-liste-kopf { font-size: 11px; color: var(--muted); padding: 4px 6px 6px; }
+.live-liste-zeile { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: var(--r-xs); font-size: 12.5px; }
+.live-liste-zeile:hover { background: var(--surface); }
+.live-punkt { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--farbe, #6b7280); }
+.live-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-neben { font-size: 11px; color: var(--muted); flex: none; }
+/* M391: Die Liste der Gruppe trägt auch ihre Werkzeuge — mit Namen statt runder Symbol-Knöpfe in der Leiste */
+.live-zeile-knopf {
+  flex: none; width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: var(--r-xs); background: none; color: var(--muted); cursor: pointer; padding: 0;
+}
+.live-zeile-knopf:hover, .live-zeile-knopf:focus-visible { border-color: var(--accent); color: var(--accent-strong); outline: none; }
+.live-liste-hinweis { margin: 4px 0 0; padding: 6px 8px; border-radius: var(--r-xs); background: var(--surface); font-size: 11.5px; line-height: 1.4; color: var(--ink); }
+.live-liste-aktionen { display: flex; flex-direction: column; gap: 1px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border-soft); }
+.live-liste-aktionen > button {
+  display: flex; align-items: center; gap: 9px; width: 100%; min-height: 34px; padding: 5px 8px; text-align: left;
+  border: none; border-radius: var(--r-xs); background: none; color: var(--ink); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.live-liste-aktionen > button:hover, .live-liste-aktionen > button:focus-visible { background: var(--surface); outline: none; }
+.live-liste-aktionen > button > svg:first-child, .live-zeichen { flex: none; width: 15px; text-align: center; color: var(--muted); }
+.live-liste-aktionen > button > svg:last-child:not(:first-child) { margin-left: auto; color: var(--accent-strong); }
+.timer-zeile { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; min-height: 34px; padding: 5px 8px; font-size: 12.5px; }
+.timer-zeile-titel { display: inline-flex; align-items: center; gap: 9px; }
+.timer-zeile-titel svg { color: var(--muted); }
+.timer-zeile-zeiten { display: inline-flex; align-items: center; gap: 3px; flex-wrap: wrap; margin-left: auto; }
+.timer-zeile-zeiten button {
+  min-width: 28px; height: 26px; padding: 0 6px; border: 1px solid var(--border-soft); border-radius: var(--r-xs);
+  background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.timer-zeile-zeiten button:hover, .timer-zeile-zeiten button:focus-visible { border-color: var(--accent); color: var(--accent-strong); outline: none; }
+.timer-zeile-zeiten button.stopp { color: #c92a2a; }
+.timer-zeile-einheit { font-size: 11px; color: var(--muted); margin: 0 2px; }
+@media (pointer: coarse) {
+  .live-liste-aktionen > button, .timer-zeile { min-height: 44px; }
+  .timer-zeile-zeiten button { min-width: 38px; height: 38px; }
+  .live-zeile-knopf { width: 40px; height: 40px; }
+}
+/* M367: „Folgt mir" */
+.live-zeig {
+  margin-left: 6px; width: 26px; height: 26px; flex: none; border-radius: 50%; border: 1px solid var(--border-soft);
+  background: var(--surface); cursor: pointer; font-size: 13px; line-height: 1; padding: 0;
+}
+.live-zeig:hover, .live-zeig:focus-visible { border-color: var(--accent); }
+.live-zeig.an { background: var(--accent-fill); border-color: var(--accent-fill); }
+/* M377: Punkte auf Karten */
+.punkte-punkt { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: currentColor; flex: none; }
+.punkte-marke {
+  position: absolute; left: 0; top: 0; z-index: 2900; margin: -11px 0 0 -30px;
+  display: inline-flex; align-items: center; gap: 4px; height: 22px; min-width: 22px; padding: 0 7px 0 6px;
+  border: 1.5px solid var(--surface-card); border-radius: 999px; background: #495057; color: #fff;
+  font: inherit; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .25); pointer-events: auto;
+}
+.punkte-marke.mein { background: var(--accent-fill); }
+.punkte-marke:hover, .punkte-marke:focus-visible { filter: brightness(1.12); outline: none; }
+html[data-punkte-modus] .react-flow__node { cursor: pointer !important; }
+html[data-punkte-modus] .react-flow__node * { cursor: pointer !important; }
+html[data-punkte-modus] .react-flow__node:hover { outline: 2px dashed var(--accent); outline-offset: 3px; }
+html[data-alles-zeigen] .punkte-leiste { display: none !important; }
+.punkte-leiste {
+  position: fixed; left: 50%; bottom: calc(92px + var(--safe-bottom, 0px)); transform: translateX(-50%); z-index: 58;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: calc(calc(100vw / var(--pn-anz, 1)) - 24px);
+  background: var(--surface-card); color: var(--ink); border: 1px solid var(--accent); border-radius: var(--r); box-shadow: var(--pop-shadow);
+  padding: 8px 10px 8px 14px; font-size: 12.5px;
+}
+.punkte-leiste-text { display: inline-flex; align-items: center; gap: 6px; color: var(--accent-strong); }
+.punkte-leiste-text b { color: var(--ink); }
+.punkte-leiste-zahl { color: var(--muted); font-variant-numeric: tabular-nums; }
+.punkte-leiste-zahl b { color: var(--ink); }
+.punkte-leiste button {
+  height: 28px; padding: 0 10px; border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.punkte-leiste button:hover:not(:disabled), .punkte-leiste button.an { border-color: var(--accent); color: var(--accent-strong); }
+.punkte-leiste button:disabled { opacity: .45; cursor: default; }
+.punkte-leiste button.haupt { background: var(--accent-fill); border-color: var(--accent); color: #fff; font-weight: 700; }
+.punkte-leiste button.haupt:hover { filter: brightness(1.08); color: #fff; }
+.punkte-rang-wrap { position: relative; display: inline-flex; }
+.punkte-rang {
+  position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); width: min(340px, calc(calc(100vw / var(--pn-anz, 1)) - 32px)); max-height: calc(46vh / var(--pn-anz, 1)); overflow: auto;
+  background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--pop-shadow); padding: 4px;
+  display: flex; flex-direction: column;
+}
+.punkte-leiste .punkte-rang-zeile {
+  display: flex; align-items: center; gap: 8px; height: auto; min-height: 30px; padding: 4px 8px; border: none; background: none; text-align: left; white-space: normal;
+}
+.punkte-leiste .punkte-rang-zeile:hover { background: var(--surface-3); color: var(--ink); }
+.punkte-rang-platz { flex: none; width: 1.8em; color: var(--muted); font-variant-numeric: tabular-nums; }
+.punkte-rang-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.punkte-rang-zahl { flex: none; display: inline-flex; align-items: center; gap: 4px; font-weight: 700; font-variant-numeric: tabular-nums; color: #495057; }
+.punkte-rang-zahl.mein { color: var(--accent-strong); }
+.punkte-rang-mehr { padding: 4px 8px; font-size: 11.5px; color: var(--muted); }
+/* M376: Reaktionen und gemeinsamer Timer */
+.reakt-wrap { position: relative; display: inline-flex; }
+.live-zeig.reakt-knopf.an { background: var(--surface); border-color: var(--accent); color: var(--accent-strong); }
+.reakt-wahl {
+  position: absolute; top: calc(100% + 8px); right: -6px; z-index: 60; display: flex; align-items: center; gap: 2px;
+  background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--pop-shadow); padding: 4px;
+}
+.reakt-wahl button {
+  width: 34px; height: 34px; border: none; background: none; border-radius: var(--r-sm); cursor: pointer; font-size: 19px; line-height: 1; padding: 0;
+  transition: transform .12s ease, background .12s ease;
+}
+.reakt-wahl button:hover, .reakt-wahl button:focus-visible { background: var(--surface-3); transform: scale(1.18); outline: none; }
+.reakt-wahl button:active { transform: scale(.92); }
+.presenter-head .reakt-wahl { right: 0; }
+/* Die laufende Uhr — oben in der Mitte, bei allen */
+.gruppen-timer {
+  position: fixed; top: calc(58px + var(--safe-top) + var(--app-rand)); left: 50%; transform: translateX(-50%); z-index: 96;
+  display: flex; align-items: center; gap: 8px; overflow: hidden;
+  background: var(--surface-card); color: var(--ink); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--pop-shadow);
+  padding: 6px 8px 6px 12px; font-size: 12.5px; white-space: nowrap;
+}
+.gruppen-timer::after {
+  content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--anteil, 0%); background: var(--accent); transition: width .25s linear;
+}
+.gruppen-timer.im-vortrag { top: calc(10px + var(--safe-top)); }
+.gruppen-timer-zeit { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 2.6em; }
+.gruppen-timer-von { color: var(--muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.gruppen-timer button {
+  width: 22px; height: 22px; flex: none; border: none; border-radius: 50%; background: var(--surface-3); color: var(--muted);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
+}
+.gruppen-timer button:hover { color: var(--ink); }
+.gruppen-timer.knapp .gruppen-timer-zeit { color: #e8590c; }
+.gruppen-timer.knapp::after { background: #e8590c; }
+.gruppen-timer.um { border-color: #e03131; animation: timer-um 1s ease-in-out infinite; }
+.gruppen-timer.um .gruppen-timer-zeit { color: #e03131; }
+@keyframes timer-um { 0%, 100% { box-shadow: var(--pop-shadow), 0 0 0 0 rgba(224, 49, 49, .5); } 50% { box-shadow: var(--pop-shadow), 0 0 0 8px rgba(224, 49, 49, 0); } }
+/* Reaktionen steigen von unten auf */
+.reakt-schicht { position: fixed; inset: 0; z-index: 97; pointer-events: none; overflow: hidden; }
+.reakt-flug {
+  position: absolute; bottom: 92px; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transform: translateX(-50%); animation: reakt-steigen 2.8s cubic-bezier(.2, .7, .3, 1) forwards;
+}
+.reakt-zeichen { font-size: 38px; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .25)); }
+.reakt-name {
+  background: var(--farbe, #6b7280); color: #fff; font-size: 10.5px; font-weight: 700; line-height: 1; padding: 3px 6px; border-radius: var(--r-xs);
+  max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@keyframes reakt-steigen {
+  0% { opacity: 0; transform: translate(-50%, 20px) scale(.5); }
+  12% { opacity: 1; transform: translate(-50%, 0) scale(1.15); }
+  22% { transform: translate(-50%, -24px) scale(1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--drift, 0px)), -46vh) scale(.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reakt-flug { animation: reakt-ruhig 2.8s linear forwards; }
+  .gruppen-timer.um { animation: none; }
+  @keyframes reakt-ruhig { 0% { opacity: 0; } 10%, 80% { opacity: 1; } 100% { opacity: 0; } }
+}
+html[data-alles-zeigen] :is(.gruppen-timer, .reakt-schicht) { display: none !important; }
+/* M375: Live-Mauszeiger (Board-Koordinaten, im ViewportPortal) und Laserpointer */
+.live-zeiger {
+  position: absolute; left: 0; top: 0; z-index: 3100; pointer-events: none; transform-origin: 0 0;
+  transition-property: transform; transition-timing-function: linear; will-change: transform;
+}
+.live-zeiger-pfeil { display: block; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .28)); }
+.live-zeiger-name {
+  position: absolute; left: 14px; top: 16px; background: var(--farbe, #6b7280); color: #fff;
+  font-size: 11px; font-weight: 700; line-height: 1; padding: 3px 7px; border-radius: var(--r-xs);
+  white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 3px rgba(0, 0, 0, .22);
+}
+.laser-punkt {
+  display: block; width: 14px; height: 14px; border-radius: 50%; background: #ff2d2d;
+  box-shadow: 0 0 0 3px rgba(255, 45, 45, .28), 0 0 14px 5px rgba(255, 45, 45, .55);
+}
+.live-zeiger.laser .laser-punkt { margin: -7px 0 0 -7px; }
+.live-zeiger.laser .live-zeiger-name { left: 12px; top: 10px; background: #d91e1e; }
+/* Laser auf der Folie: eine Schicht genau über der Folie */
+.folien-laser { position: absolute; z-index: 4; pointer-events: none; overflow: hidden; border-radius: var(--r-lg); }
+/* M464: Den Systemzeiger nur verstecken, solange der eigene Laserpunkt wirklich zu sehen ist (data-sichtbar) —
+   vorher war der Zeiger nach L ohne Bewegung einfach weg, ohne Punkt als Ersatz. Ohne :has() bleibt er sichtbar. */
+.folien-laser.an { pointer-events: auto; touch-action: none; }
+.folien-laser.an:has(> .laser-punkt.mein[data-sichtbar]) { cursor: none; }
+.folien-laser .laser-punkt {
+  position: absolute; margin: -7px 0 0 -7px; pointer-events: none;
+  transition-property: left, top; transition-timing-function: linear;
+}
+.folien-laser .laser-punkt.mein { transition: opacity .15s; }
+/* M414: Die Stelle liegt hier gerade außerhalb des Bildes – der Punkt steht blass am Rand, in ihrer Richtung */
+.folien-laser .laser-punkt.fern.rand { opacity: .45; }
+.folien-laser .laser-punkt .live-zeiger-name { left: 16px; top: 12px; background: #d91e1e; }
+.presenter-laser { display: inline-flex; align-items: center; gap: 6px; }
+.laser-knopf-punkt { width: 9px; height: 9px; border-radius: 50%; background: #ff4a4a; box-shadow: 0 0 6px 1px rgba(255, 74, 74, .7); }
+@media (prefers-reduced-motion: reduce) { .live-zeiger, .folien-laser .laser-punkt { transition-duration: 0ms !important; } }
+.zeig-band {
+  position: fixed; top: calc(14px + var(--safe-top) + var(--app-rand)); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface-card); color: var(--ink); border: 1px solid var(--border); border-radius: 999px;
+  box-shadow: var(--pop-shadow); font-size: 12.5px; line-height: 1.3; padding: 5px 6px 5px 14px;
+  z-index: 61; max-width: min(520px, calc(92vw / var(--pn-anz, 1))); white-space: nowrap;
+}
+.zeig-band.ich { border-color: var(--accent); }
+/* M387: Im Karten-Fokus (öffnet sich jetzt auch bei allen, die folgen) sitzt das Band unter der Kopfzeile — sonst verdeckt es am Telefon den Kartentitel */
+.app.focus-mode .zeig-band:not(.im-vortrag) { top: calc(var(--focus-top) + 8px); }
+.zeig-band span { overflow: hidden; text-overflow: ellipsis; }
+.zeig-band button {
+  flex: none; border: none; cursor: pointer; background: var(--accent-fill); color: #fff;
+  font-family: inherit; font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 999px; white-space: nowrap;
+}
+.zeig-band button.leise { background: var(--surface); color: var(--ink); border: 1px solid var(--border-soft); }
+
+/* M368: Hinweis für anderssprachige Nutzer — der Browser kann die Oberfläche übersetzen */
+.sprach-hinweis {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: calc(86px + var(--safe-bottom, 0px) + var(--app-rand, 0px));
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface-card); color: var(--ink); border: 1px solid var(--accent); border-radius: 14px;
+  box-shadow: var(--pop-shadow); font-size: 13px; line-height: 1.4; padding: 9px 10px 9px 14px;
+  z-index: 400; width: max-content; max-width: min(560px, calc(calc(100vw / var(--pn-anz, 1)) - 24px));
+}
+.sprach-hinweis .sprach-text { flex: 1; min-width: 0; }
+.sprach-hinweis button + button { background: transparent; color: var(--accent-strong); border: 1px solid var(--accent); padding: 6px 12px; }
+.sprach-hinweis button {
+  flex: none; border: none; cursor: pointer; background: var(--accent-fill); color: #fff;
+  font-family: inherit; font-size: 12.5px; font-weight: 700; padding: 7px 14px; border-radius: 999px;
+}
+
+/* M370: leerer Start — die Beispiele sind ein Angebot auf dem leeren Board */
+.empty-board-hint .empty-beispiele {
+  pointer-events: auto; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600;
+  color: var(--ink); background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 7px 13px;
+}
+.empty-board-hint .empty-beispiele:hover, .empty-board-hint .empty-beispiele:focus-visible { background: var(--surface-2); }
+/* M397: das zweite Angebot ist nur Text – ein Knopf reicht als Hauptweg */
+.empty-board-hint .empty-beispiele.still { background: none; border-color: transparent; color: var(--muted); padding: 7px 4px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border); }
+.empty-board-hint .empty-beispiele.still:hover, .empty-board-hint .empty-beispiele.still:focus-visible { background: none; color: var(--ink); }
+
+/* M371: Tools und Webseiten als Folie — sie füllen die Folie, ohne Rand, und laufen wirklich */
+.presenter-slide.app { padding: 0; overflow: hidden; display: flex; }
+.slide-app { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: #fff; }
+.slide-app-frame { flex: 1; min-height: 0; width: 100%; border: 0; display: block; background: #fff; }
+/* M414: Das Abbild des Vorführenden zeigt nur – bedienen lässt es sich nicht (wer selbst will, löst sich im Band) */
+.slide-app-frame.spiegel, .happ-frame.spiegel { pointer-events: none; }
+.slide-app-hinweis { margin: auto; padding: 24px; color: var(--muted); font-size: 16px; text-align: center; }
+.slide-app-fuss { flex: none; padding: 6px 14px; font-size: 12px; line-height: 1.35; color: #5b6472; background: #f1f3f6; border-top: 1px solid #dfe3ea; }
+.presenter-head .presenter-team { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.presenter-head .presenter-team.an { background: var(--accent-fill); color: #fff; }
+/* das Vorführ-Band über der Präsentation: unten links neben der Fußleiste — dort verdeckt es keine Folie;
+   auf schmalen Schirmen ist daneben kein Platz, dann sitzt es mittig über der Fußleiste */
+.zeig-band.im-vortrag { z-index: 97; top: auto; left: 22px; transform: none; bottom: calc(14px + var(--safe-bottom, 0px)); max-width: min(360px, calc(30vw / var(--pn-anz, 1))); }
+@media (max-width: 900px) {
+  .zeig-band.im-vortrag { left: 50%; transform: translateX(-50%); bottom: calc(64px + var(--safe-bottom, 0px)); max-width: calc(92vw / var(--pn-anz, 1)); }
+}
+/* M393: Läuft ein Tool als Folie, füllt es den Schirm bis oben: Die Kopfzeile der Präsentation zieht sich zurück
+   und kommt am oberen Rand wieder (wie im Vollbild der Karte). Die Fußzeile bleibt — über ihr wird geblättert,
+   denn Tasten landen im Tool. */
+.presenter-slide.app { margin: 0 0 10px; border-radius: 0; }
+.presenter:has(> .presenter-slide.app) > .presenter-head {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 6; background: #1a1814;
+  transform: translateY(-100%); transition: transform 0.2s ease;
+}
+.presenter:has(> .presenter-slide.app) > .presenter-head::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 6px; }
+/* mit dem Finger braucht die Greifkante mehr Höhe */
+@media (pointer: coarse) {
+  .happ-full:fullscreen .happ-head::after,
+  .presenter:has(> .presenter-slide.app) > .presenter-head::after { height: 18px; }
+}
+.presenter:has(> .presenter-slide.app) > .presenter-head.da,
+.presenter:has(> .presenter-slide.app) > .presenter-head:has(:focus-visible),
+.presenter:has(> .presenter-slide.app) > .presenter-head:has(.reakt-wahl) { transform: none; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); }
+
+/* ---------- M395: Bild bearbeiten ---------- */
+/* der Knopf am Bild: neben der Lupe, sichtbar wie sie (markiert bzw. unter dem Zeiger) */
+.bild-bearbeiten-auf { left: 40px; display: inline-flex; align-items: center; justify-content: center; padding: 4px 7px; }
+@media (pointer: coarse) { .bild-bearbeiten-auf { left: 44px; } }
+.bild-editor {
+  position: fixed; inset: 0; z-index: 130; display: flex; flex-direction: column; background: #1a1814; color: #e9ebee;
+  padding: var(--safe-top, 0px) 0 var(--safe-bottom, 0px); touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.be-kopf { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 14px; }
+.be-kopf button, .be-leiste button, .be-auto {
+  border: none; background: rgba(255, 255, 255, .1); color: #e9ebee; font: inherit; font-size: 13px; padding: 7px 12px;
+  border-radius: var(--r); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none;
+}
+.be-kopf button:hover, .be-leiste button:hover, .be-auto:hover { background: rgba(255, 255, 255, .18); }
+.be-kopf button:focus-visible, .be-leiste button:focus-visible, .be-auto:focus-visible, .bild-editor input:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.be-kopf .be-fertig { background: var(--accent-fill); color: #fff; font-weight: 700; padding: 7px 18px; }
+.be-kopf .be-fertig:disabled { opacity: .55; cursor: default; }
+.be-kopf .be-zurueck { background: none; color: #b8b2a4; }
+.be-titel { flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: center; gap: 10px; font-size: 13px; color: #b8b2a4; }
+.be-titel b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e9ebee; font-weight: 600; }
+.be-masse { flex: none; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.be-buehne { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.be-hinweis { color: #b8b2a4; font-size: 14px; }
+.be-blatt { position: relative; flex: none; cursor: var(--zeiger-fadenkreuz); touch-action: none; }
+.be-blatt canvas { display: block; width: 100%; height: 100%; background:
+  repeating-conic-gradient(#3a3731 0% 25%, #2b2924 0% 50%) 0 0 / 16px 16px; }
+.be-schicht { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.be-dunkel { fill: rgba(12, 11, 9, .62); }
+.be-pixel { fill: rgba(255, 255, 255, .08); stroke: #fff; stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
+.be-entwurf { fill: rgba(255, 255, 255, .16); stroke: #fff; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.be-rahmen { position: absolute; box-sizing: border-box; border: 1.5px solid #fff; cursor: move; box-shadow: 0 0 0 1px rgba(0, 0, 0, .35); }
+/* Drittel-Linien: nur während des Ziehens — sie helfen beim Setzen, stören beim Ansehen */
+.be-drittel { position: absolute; inset: 0; opacity: 0; transition: opacity .12s; pointer-events: none; background:
+  linear-gradient(to right, transparent calc(33.33% - .5px), rgba(255, 255, 255, .55) calc(33.33% - .5px) calc(33.33% + .5px), transparent calc(33.33% + .5px) calc(66.66% - .5px), rgba(255, 255, 255, .55) calc(66.66% - .5px) calc(66.66% + .5px), transparent calc(66.66% + .5px)),
+  linear-gradient(to bottom, transparent calc(33.33% - .5px), rgba(255, 255, 255, .55) calc(33.33% - .5px) calc(33.33% + .5px), transparent calc(33.33% + .5px) calc(66.66% - .5px), rgba(255, 255, 255, .55) calc(66.66% - .5px) calc(66.66% + .5px), transparent calc(66.66% + .5px)); }
+.bild-editor.zieht .be-drittel { opacity: 1; }
+/* Griffe: sichtbar klein, greifbar groß (die Fläche drumherum gehört dazu) */
+.be-griff { position: absolute; width: 30px; height: 30px; margin: -15px 0 0 -15px; }
+.be-griff::after { content: ''; position: absolute; left: 9px; top: 9px; width: 12px; height: 12px; background: #fff; border-radius: 2px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .4); }
+.be-griff.nw { left: 0; top: 0; cursor: nwse-resize; } .be-griff.no { left: 100%; top: 0; cursor: nesw-resize; }
+.be-griff.sw { left: 0; top: 100%; cursor: nesw-resize; } .be-griff.so { left: 100%; top: 100%; cursor: nwse-resize; }
+.be-griff.n { left: 50%; top: 0; cursor: ns-resize; } .be-griff.s { left: 50%; top: 100%; cursor: ns-resize; }
+.be-griff.w { left: 0; top: 50%; cursor: ew-resize; } .be-griff.o { left: 100%; top: 50%; cursor: ew-resize; }
+.be-griff.n::after, .be-griff.s::after { width: 22px; height: 6px; left: 4px; top: 12px; }
+.be-griff.w::after, .be-griff.o::after { width: 6px; height: 22px; left: 12px; top: 4px; }
+@media (pointer: coarse) { .be-griff { width: 44px; height: 44px; margin: -22px 0 0 -22px; } .be-griff::after { left: 16px; top: 16px; } .be-griff.n::after, .be-griff.s::after { left: 11px; top: 19px; } .be-griff.w::after, .be-griff.o::after { left: 19px; top: 11px; } }
+/* Leiste: eine Zeile; auf schmalen Schirmen rollt sie seitlich */
+.be-leiste { flex: none; display: flex; align-items: center; justify-content: safe center; gap: 14px; padding: 10px 14px 12px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; }
+.be-leiste::-webkit-scrollbar { display: none; }
+.be-gruppe { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+.be-leiste button { min-width: 36px; height: 34px; padding: 0 10px; }
+.be-leiste button.an { background: var(--accent-fill); color: #fff; }
+.be-formate button { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.be-gerade, .be-regler { gap: 8px; font-size: 12.5px; color: #b8b2a4; }
+.be-gerade input { width: 150px; }
+.be-gerade output, .be-regler output { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: #e9ebee; }
+.bild-editor input[type='range'] { accent-color: var(--accent-fill); touch-action: none; cursor: pointer; }
+.be-anpassen { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 22px; padding: 8px 14px 0; }
+.be-regler { display: inline-flex; align-items: center; }
+.be-regler input { width: 140px; }
+.be-regler span { min-width: 68px; }
+@media (max-width: 620px) {
+  .be-kopf { padding: 8px 10px; gap: 6px; }
+  .be-kopf button { padding: 7px 10px; }
+  .be-titel b { display: none; }
+  /* am Telefon zwei Zeilen statt seitlich rollen — sonst lägen Regler und Verpixeln außer Sicht */
+  .be-leiste { gap: 8px 10px; padding: 8px 10px 10px; flex-wrap: wrap; justify-content: center; overflow: visible; touch-action: none; }
+  .be-formate { flex-basis: 100%; justify-content: center; }
+  .be-gerade input { width: 110px; }
+  .be-regler input { width: 120px; }
+}
+
+/* ---------- M394: Stift und Kommentare in der Präsentation ---------- */
+/* Die Zeichenschicht liegt über der Folie (wie der Laser) — sie fängt Eingaben nur, solange ein Werkzeug gewählt ist */
+.folien-stift { position: absolute; z-index: 3; pointer-events: none; overflow: hidden; }
+.folien-stift > svg { display: block; width: 100%; height: 100%; pointer-events: none; overflow: hidden; }
+.folien-stift.an { z-index: 5; pointer-events: auto; touch-action: none; cursor: var(--zeiger-fadenkreuz); }
+.folien-stift.an.eraser { cursor: cell; }
+.folien-pin { pointer-events: all; cursor: pointer; outline: none; }
+.folien-pin circle { fill: #f5b301; stroke: #fff; stroke-width: 2; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .35)); }
+.folien-pin text { fill: #1a1814; font-weight: 800; font-family: inherit; pointer-events: none; }
+.folien-pin.erledigt circle { fill: #9aa3ad; }
+.folien-pin:hover circle, .folien-pin:focus-visible circle { stroke: #1a1814; }
+/* Kopfzeile: zwei kleine Knöpfe */
+.presenter-head .presenter-ikon { display: inline-flex; align-items: center; gap: 5px; padding: 6px 9px; }
+.presenter-zahl { font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums; }
+/* schmale Kopfzeile: der Board-Name kürzt sich, die Zählung bricht nicht um */
+.presenter-head > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.presenter-head .presenter-count { white-space: nowrap; flex: none; }
+.presenter-head button { flex: none; }
+/* Werkzeuge: erst da, wenn gezeichnet wird — als schmale Säule am linken Rand (unten mittig stehen die Leisten
+   des Dokuments und das Blättern); auf flachen Schirmen liegt sie quer unter der Kopfzeile */
+.folien-palette {
+  position: absolute; z-index: 7; left: 10px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 5px; max-height: calc(100% - 130px);
+  background: #26231e; border: 1px solid rgba(255, 255, 255, .14); border-radius: var(--r-lg); box-shadow: 0 8px 26px rgba(0, 0, 0, .45);
+}
+.folien-palette > button {
+  border: none; background: none; color: #e9ebee; min-width: 34px; height: 34px; padding: 0 8px; border-radius: var(--r);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font: inherit; font-size: 13px;
+}
+.folien-palette > button:hover { background: rgba(255, 255, 255, .1); }
+.folien-palette > button.an { background: var(--accent-fill); color: #fff; }
+.folien-palette .folien-fertig { background: rgba(255, 255, 255, .1); }
+.folien-farben { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; padding: 7px 0; margin: 2px 0; border-top: 1px solid rgba(255, 255, 255, .14); border-bottom: 1px solid rgba(255, 255, 255, .14); }
+.folien-farbe { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .28); padding: 0; cursor: pointer; }
+.folien-farbe.an { border-color: #fff; box-shadow: 0 0 0 2px var(--accent-fill); }
+.folien-palette button:focus-visible, .folien-farbe:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+/* flache und schmale Schirme: quer unter der Kopfzeile — die Säule läge sonst auf dem Text */
+@media (max-height: 520px), (max-width: 620px) {
+  .folien-palette { left: 50%; top: 52px; transform: translateX(-50%); flex-direction: row; max-height: none; max-width: calc(100% - 16px); padding: 5px 6px; overflow-x: auto; }
+  .folien-palette > button, .folien-farbe { flex: none; }
+  .folien-farben { flex-direction: row; padding: 0 7px; margin: 0 2px; border: none; border-left: 1px solid rgba(255, 255, 255, .14); border-right: 1px solid rgba(255, 255, 255, .14); }
+}
+/* Kommentare: eine Spalte rechts — auf breiten Schirmen rückt die Folie zur Seite, nichts wird verdeckt */
+.folien-kommentare {
+  position: absolute; z-index: 8; right: 12px; top: 54px; bottom: calc(60px + var(--safe-bottom, 0px)); width: min(340px, calc(100% - 24px));
+  display: flex; flex-direction: column; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--border-soft); border-radius: var(--r-lg); box-shadow: 0 10px 34px rgba(0, 0, 0, .45); overflow: hidden;
+}
+@media (min-width: 1100px) {
+  .presenter.mit-kommentaren > .presenter-slide { margin-right: 364px; }
+}
+@media (max-width: 620px) {
+  .folien-kommentare { left: 8px; right: 8px; width: auto; top: auto; max-height: 62%; }
+}
+.fk-kopf { display: flex; align-items: center; gap: 8px; padding: 9px 10px 9px 13px; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+.fk-kopf button { margin-left: auto; border: none; background: none; color: var(--muted); cursor: pointer; padding: 5px; border-radius: var(--r-sm); display: inline-flex; }
+.fk-kopf button:hover { background: var(--surface-2); color: var(--ink); }
+.fk-seite { font-size: 11px; font-weight: 700; color: var(--muted); background: var(--surface-2); padding: 2px 7px; border-radius: 999px; }
+.fk-liste { flex: 1; min-height: 0; overflow: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+.fk-leer { margin: 14px 6px; font-size: 12.5px; color: var(--muted); text-align: center; }
+.fk-faden { display: flex; flex-direction: column; gap: 7px; padding: 9px 10px; border: 1px solid var(--border-soft); border-radius: var(--r); cursor: default; }
+.fk-faden.gewaehlt { border-color: var(--accent-strong); box-shadow: 0 0 0 1px var(--accent-strong); }
+.fk-faden.erledigt .fk-beitrag { opacity: .55; }
+.fk-beitrag { display: flex; flex-direction: column; gap: 1px; }
+.fk-meta { font-size: 10.5px; color: var(--muted); }
+.fk-text { font-size: 13px; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+.fk-knoepfe { display: flex; gap: 6px; }
+.fk-knoepfe button, .fk-woanders button {
+  border: 1px solid var(--border-soft); background: none; color: var(--muted); font: inherit; font-size: 11.5px; padding: 3px 9px; border-radius: var(--r-sm); cursor: pointer;
+}
+.fk-knoepfe button:hover, .fk-woanders button:hover { background: var(--surface-2); color: var(--ink); }
+.fk-faden.antwort .fk-knoepfe button:first-child { border-color: var(--accent-strong); color: var(--accent-strong); }
+.fk-woanders { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 4px 2px; font-size: 11.5px; color: var(--muted); }
+.fk-schreiben { display: flex; flex-direction: column; gap: 6px; padding: 9px 10px; border-top: 1px solid var(--border-soft); }
+.fk-antwort-an { display: flex; align-items: center; justify-content: space-between; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.fk-antwort-an button { border: none; background: none; color: var(--muted); cursor: pointer; padding: 3px; display: inline-flex; border-radius: var(--r-sm); }
+.fk-name, .fk-eingabe {
+  border: 1px solid var(--border-soft); border-radius: var(--r); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 13px; padding: 7px 9px; resize: none; width: 100%; box-sizing: border-box;
+}
+.fk-name:focus, .fk-eingabe:focus { outline: none; border-color: var(--accent-strong); }
+.fk-senden { align-self: flex-end; border: none; background: var(--accent-fill); color: #fff; font: inherit; font-size: 12.5px; font-weight: 700; padding: 6px 14px; border-radius: var(--r); cursor: pointer; }
+.fk-senden:disabled { opacity: .45; cursor: default; }
+
+/* M372: Der Schreibhinweis des Editors („Text eingeben oder '/' für Befehle tippen") gehört dem, der gerade in
+   der Notiz schreibt. Der Editor hängt ihn an die Stelle seiner Schreibmarke — die gibt es aber auch, wenn
+   niemand in der Notiz steht. So trug jede Karte, die ein anderer angelegt hatte, bei allen übrigen nur diesen
+   blassen Satz, und unter fertigem Text blieb er als graue Zeile stehen. Jetzt nur noch mit Tastatur-Fokus. */
+.note-editor .bn-editor:not(:focus-within) .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before { content: none !important; }
+/* M462: Seit BlockNote 0.57 steht der Hinweis als ::after am Block statt als ::before am Text */
+.note-editor .bn-editor:not(:focus-within) .bn-block-content:has(.ProseMirror-trailingBreak:only-child)::after { content: none !important; }

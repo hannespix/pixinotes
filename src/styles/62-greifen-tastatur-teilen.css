@@ -1,0 +1,440 @@
+/* ================= M343: Karten greifen in jeder Zoomstufe =================
+   Griff, Anschlusspunkte, Auswahlrahmen und Größen-Kanten liegen in der gezoomten Fläche und
+   schrumpften mit ihr — bei 15 % war der Griff 7 × 3 Bildpunkte groß. Jetzt behalten sie ihre
+   BILDSCHIRM-Größe: `--pn-inv` (Kehrwert des Zooms, von Board.tsx gesetzt, sobald der Zoom ruht)
+   rechnet die Verkleinerung der Fläche wieder heraus — so, wie es tldraw, Miro und Figma machen.
+   Und im weiten Zoom (`data-weit`, unter ~45 %) ist die ganze Karte der Griff: Text ist dort
+   ohnehin nicht zu lesen, also fasst man die Karte überall an. */
+.card-grip {
+  /* Lage ohne translate, damit die Skalierung um die Unterkante-Mitte nichts verschiebt */
+  left: calc(50% - 40px * var(--pn-inv, 1)); margin-left: -23px; transform: none;
+  transform-origin: 50% 100%; scale: var(--pn-inv, 1);
+}
+@media (pointer: coarse) {
+  .card-grip { left: calc(50% - 50px * var(--pn-inv, 1)); margin-left: -28px; }
+}
+.pn-handle {
+  width: calc(22px * var(--pn-inv, 1)) !important; height: calc(22px * var(--pn-inv, 1)) !important;
+}
+.pn-handle::after {
+  inset: calc(4px * var(--pn-inv, 1)); font-size: calc(11px * var(--pn-inv, 1)); border-width: calc(1.5px * var(--pn-inv, 1));
+}
+@media (pointer: coarse) {
+  .react-flow__handle.pn-handle { width: calc(28px * var(--pn-inv, 1)) !important; height: calc(28px * var(--pn-inv, 1)) !important; }
+  .react-flow__handle.pn-handle::after { inset: calc(5px * var(--pn-inv, 1)); font-size: calc(13px * var(--pn-inv, 1)); }
+}
+/* Der Auswahlrahmen — auch, solange die Karte den Fokus hat: React Flow nimmt fokussierten Karten den
+   Umriss (`.selectable:focus { outline: none }`, stärker als unsere Regel). Direkt nach dem Anklicken
+   hatte eine Karte deshalb gar keinen Rahmen; er erschien erst, wenn der Fokus woanders lag. */
+.react-flow__node.selected,
+.react-flow__node.selectable.selected:focus,
+.react-flow__node.selectable.selected:focus-visible {
+  outline: calc(2px * var(--pn-inv, 1)) solid var(--accent); outline-offset: calc(2px * var(--pn-inv, 1));
+}
+.ov-canvas .react-flow__node.selectable.selected,
+.ov-canvas .react-flow__node.selectable.selected:focus,
+.ov-canvas .react-flow__node.selectable.selected:focus-visible { outline: none; }
+html[data-alles-zeigen] .react-flow__node.selectable.selected:focus,
+html[data-alles-zeigen] .react-flow__node.selectable.selected:focus-visible { outline: none !important; }
+/* Größen-Kanten (die Ecken skaliert React Flow selbst) */
+.react-flow__resize-control.line.left,
+.react-flow__resize-control.line.right { width: calc(10px * var(--pn-inv, 1)) !important; }
+.react-flow__resize-control.line.top,
+.react-flow__resize-control.line.bottom { height: calc(10px * var(--pn-inv, 1)) !important; }
+@media (pointer: coarse) {
+  .react-flow__resize-control.line.left,
+  .react-flow__resize-control.line.right { width: calc(16px * var(--pn-inv, 1)) !important; }
+  .react-flow__resize-control.line.top,
+  .react-flow__resize-control.line.bottom { height: calc(16px * var(--pn-inv, 1)) !important; }
+}
+/* Bedienelemente AUF der Karte wachsen mit, aber gedeckelt — sie sollen die Karte nicht zudecken */
+.color-dot { transform-origin: 100% 0; scale: min(var(--pn-inv, 1), 2.2); }
+.fit-hint { transform-origin: 100% 100%; scale: min(var(--pn-inv, 1), 2.2); }
+.note-spur { transform-origin: 100% 50%; scale: min(var(--pn-inv, 1), 2.5) 1; }
+
+/* Weiter Zoom: die ganze Karte ist der Griff */
+[data-weit] .react-flow__node > .card-shell > .card-body { pointer-events: none; }
+[data-weit] .react-flow__node { cursor: grab; }
+[data-weit] .react-flow__node.dragging { cursor: grabbing; }
+[data-weit] .react-flow__node :is(.card-grip, .color-dot, .note-farben, .fit-hint) { visibility: hidden !important; }
+/* Anschlusspunkte nur an der gewählten Karte — an jeder Karte unter dem Zeiger wären sie im Weg */
+[data-weit] .react-flow__node:not(.selected) .pn-handle { visibility: hidden !important; }
+[data-weit] .react-flow__node.selected .pn-handle { opacity: 1; visibility: visible; }
+@media (hover: hover) and (pointer: fine) {
+  /* „Die kann ich greifen": ein dünner Rahmen unter dem Zeiger */
+  [data-weit] .react-flow__node:hover:not(.selected):not(.dragging) {
+    outline: calc(1.5px * var(--pn-inv, 1)) solid color-mix(in srgb, var(--accent) 55%, transparent);
+    outline-offset: calc(2px * var(--pn-inv, 1));
+  }
+}
+/* Verbindungslinien bleiben sichtbar (2 Flächenpunkte wären bei 15 % ein Drittel Bildpunkt) – aber maßvoll:
+   M401: `--pn-kante` (Board.tsx) hält die Linie bei knapp einem Bildpunkt, damit die Pfeilspitze (8 × Linienstärke)
+   nicht größer wird als die Karten, auf die sie zeigt. */
+[data-weit] .react-flow__edge-path { stroke-width: calc(var(--pn-kante, 2) * 1px) !important; }
+html[data-alles-zeigen] [data-weit] .react-flow__node { outline: none !important; }
+
+/* M344: Fanglinien beim Ziehen — magenta wie in Figma, Strichstärke in Bildschirm-Größe */
+.fanglinie { position: absolute; background: #ff2d87; pointer-events: none; z-index: 4000; }
+.fanglinie.v { width: calc(1px * var(--pn-inv, 1)); margin-left: calc(-0.5px * var(--pn-inv, 1)); }
+.fanglinie.h { height: calc(1px * var(--pn-inv, 1)); margin-top: calc(-0.5px * var(--pn-inv, 1)); }
+
+/* ================= M345: Pfeiltasten überall — sichtbarer Tastatur-Fokus =================
+   Wer mit den Pfeilen durch Baum, Übersicht, Netz und Aufgaben geht, muss sehen, wo er steht. */
+.ov-canvas .react-flow__node-ovBoard:focus-visible { outline: none; }
+.ov-canvas .react-flow__node-ovBoard:focus-visible > .ov-board {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.ov-graph-node:focus { outline: none; }
+.ov-graph-node:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 50%; }
+.ov-graph-node:focus-visible > circle:not(.ov-graph-here) { stroke: var(--accent); }
+.ov-graph-node:focus-visible text { font-weight: 700; }
+.task-main:focus { outline: none; }
+.task-main:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+.nav-tree :is(.side-proj-name, .side-board-name, .side-card, .side-tree-find, .side-archiv):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* ================= M346: Scrollbalken der Notiz — sichtbar und greifbar, auch ohne Zoom-Modus =================
+   Bisher erschien der Balken erst unter dem Zeiger, war herausgezoomt wenige Bildpunkte schmal und im
+   weiten Zoom ganz ausgeblendet: Dass eine Notiz mehr Text hat, sah man nur im Fokus. Jetzt steht er an
+   jeder überlaufenden Notiz, behält (über --pn-inv) seine Bildschirm-Breite und lässt sich in jeder
+   Zoomstufe ziehen; über einer gewählten Notiz rollt zusätzlich das Rad (Board.tsx). */
+.card-shell[data-rollt] > .note-spur .note-daumen { opacity: .62; }
+.card-shell[data-rollt]:hover > .note-spur .note-daumen,
+.react-flow__node.selected .card-shell[data-rollt] > .note-spur .note-daumen,
+.card-shell[data-rollt][data-rollzug] > .note-spur .note-daumen { opacity: 1; }
+.note-daumen { cursor: grab; }
+.card-shell[data-rollzug] .note-daumen { cursor: grabbing; }
+.note-daumen::after { width: 5px; }
+.note-daumen:hover::after, .card-shell[data-rollzug] .note-daumen::after { width: 7px; }
+.note-spur { scale: min(var(--pn-inv, 1), 4.5) 1; }
+@media (pointer: coarse) { .note-spur { width: 16px; } .note-daumen { width: 16px; } }
+
+/* M346: Im Fokus zeigt auch die Notiz mit fester Höhe ihren ganzen Text (wie die ohne feste Höhe seit
+   M334 — die Kamera rollt), wird aber nie kleiner, als sie auf dem Board ist. */
+.focus-mode .react-flow__node-note.pn-focused { height: auto !important; }
+.focus-mode .pn-focused .card-shell > .note-card { max-height: none; min-height: max(90px, var(--karte-h, 0px)); }
+/* Was unter der vergrößerten Karte läge, tritt ganz zurück (Board.tsx setzt die Marke) */
+.focus-mode .react-flow__node[data-fokus-weg] { opacity: 0 !important; }
+
+/* M346: Scrollbalken des Fokus — die Kamera rollt über die lange Karte, der Balken zeigt und bewegt den Stand */
+.fokus-spur { position: fixed; right: 3px; width: 16px; z-index: 40; display: none; pointer-events: none; }
+.focus-mode .fokus-spur[data-an] { display: block; }
+.fokus-daumen { position: absolute; top: 0; right: 0; width: 16px; pointer-events: auto; touch-action: none; cursor: grab; }
+.fokus-daumen[data-zug] { cursor: grabbing; }
+.fokus-daumen::after {
+  content: ''; position: absolute; top: 0; bottom: 0; right: 3px; width: 6px; border-radius: 4px;
+  background: color-mix(in srgb, var(--ink) 30%, transparent); transition: width .12s ease, background .12s ease;
+}
+.fokus-daumen:hover::after, .fokus-daumen[data-zug]::after { width: 9px; background: color-mix(in srgb, var(--ink) 55%, transparent); }
+@media print { .fokus-spur { display: none !important; } }
+
+/* ================= M347: Überschriften kleiner; Menüs und Einstellungen nachgemessen =================
+   Überschriften: BlockNote setzt H1/H2/H3 auf 3em/2em/1.3em — in einer 13-Punkt-Notiz 39/26/17 Punkte,
+   eine H1 sprengte jede Karte. Jetzt eine ruhige Stufung; alle anderen Titel eine Stufe kleiner. */
+.bn-block-content[data-content-type="heading"] { --level: 1.5em; }
+.bn-block-content[data-content-type="heading"][data-level="2"] { --level: 1.28em; }
+.bn-block-content[data-content-type="heading"][data-level="3"] { --level: 1.12em; }
+.note-editor .bn-editor > .bn-block-group:has(> .bn-block-outer:nth-child(2)) > .bn-block-outer:first-child > .bn-block > .bn-block-content[data-content-type="paragraph"] > p { font-size: 1.08em; }
+.modal-head h2 { font-size: 15.5px; }
+.taskhub-head h2 { font-size: 17px; }
+.onb h2 { font-size: 18px; }
+.help-body h3 { font-size: 14px; }
+.ovc-space-name { font-size: 16px; }
+.presenter-slide h3 { font-size: 1.25em; }
+.slide-kanban .kanban-title, .slide-gantt .kanban-title { font-size: 17px; }
+.slide-cal .cal-title { font-size: 16px; }
+
+/* Einstellungen: Häkchen rechtsbündig wie Umschalter und Farbpunkte (die allgemeine flex:1-Regel
+   für Eingabefelder streckte sie, das Häkchen saß mitten in der Zeile) */
+.modal-row-check input[type='checkbox'] { flex: none; margin: 0 2px 0 auto; }
+
+/* Auswahl-Menü: Die Farbfelder erbten Breite, Innenabstand und „kein Hintergrund" der Menü-Einträge —
+   zu sehen war ein leeres Kästchen statt fünf Farben */
+.sel-ai-menu .sel-farbe {
+  flex: none; width: 20px; height: 20px; min-height: 0; padding: 0; border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, .18);
+}
+.sel-ai-menu .sel-farbe.note-farbe-yellow { background: #fff3a3; }
+.sel-ai-menu .sel-farbe.note-farbe-pink { background: #ffd6e0; }
+.sel-ai-menu .sel-farbe.note-farbe-mint { background: #d2f5dd; }
+.sel-ai-menu .sel-farbe.note-farbe-sky { background: #d9ecff; }
+.sel-ai-menu .sel-farbe.note-farbe-white { background: #ffffff; }
+.sel-ai-menu .sel-farbe.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface); }
+
+/* Am Finger: Ziele mindestens 36 Punkte, Gruppentitel klein statt größer als die Einträge */
+@media (pointer: coarse) {
+  .dock-menu .dock-menu-label, .modul-palette .modul-gruppe .dock-menu-label { font-size: 11px; }
+  .modul-palette .dock-menu-foot { font-size: 12px; }
+  .seg button { min-height: 36px; padding-inline: 12px; }
+   .modal button[aria-label^="Akzentfarbe"] { min-width: 36px; min-height: 36px; }
+  .modal-row { min-height: 36px; }
+  .modal-row span { font-size: 14px; }
+  .modal-hint { font-size: 13px; }
+  /* :where — ohne Gewicht: gilt nur, wo kein Knopf seine eigene (größere) Höhe hat (m290: „Übernehmen“ 44) */
+  :where(.modal) :where(button, select) { min-height: 36px; }
+  .modal-row-check input[type='checkbox'] { width: 22px; height: 22px; }
+  .note-farben { top: 40px; gap: 8px; padding: 8px; }
+  .note-farbe { width: 32px; height: 32px; }
+  .sel-ai-menu .sel-farbe { width: 30px; height: 30px; }
+  .sel-farben { gap: 8px; flex-wrap: wrap; }
+  .side-board-arrow { min-width: 32px; }
+  .nav-overview { min-height: 38px; }
+  .nav-x { min-width: 38px; min-height: 38px; }
+  .ov-graph-ctx button { min-height: 42px; }
+  .help-nav button { min-height: 36px; }
+  .taskhub-actions button, .th-chip { min-height: 36px; }
+  .taskhub select, .th-group-head { min-height: 36px; }
+}
+
+/* Telefon: Aufgaben-Schnelleingabe untereinander statt abgeschnitten nebeneinander */
+@media (max-width: 640px) {
+  .taskhub-quickrow { flex-wrap: wrap; }
+  .taskhub-quickrow .taskhub-quick { flex: 1 1 100%; font-size: 15px; }
+  .taskhub-quickrow .th-quickboard { max-width: none; flex: 1 1 100%; }
+}
+/* M347: Hilfe am Telefon — Titel, Suchfeld und Schließen in einer Zeile, ohne über den Rand zu ragen */
+@media (max-width: 640px) {
+  .help-modal .modal-head { gap: 10px; padding: 12px 14px; }
+  .help-modal .modal-head h2 { white-space: nowrap; flex: none; }
+  .help-modal .help-search { min-width: 0; flex: 1; width: auto; }
+}
+
+/* ================= M349: Abstandsmarken beim Fangen — mittig zwischen zwei Karten, gleiche Abstände =================
+   Magenta wie die Fanglinien; Strich und Endmarken in Bildschirm-Größe, das Maß als kleine Plakette. */
+.fang-abstand { position: absolute; pointer-events: none; z-index: 4000; }
+.fang-abstand.h { height: 0; border-top: calc(1px * var(--pn-inv, 1)) solid #ff2d87; }
+.fang-abstand.v { width: 0; border-left: calc(1px * var(--pn-inv, 1)) solid #ff2d87; }
+.fang-abstand::before, .fang-abstand::after { content: ''; position: absolute; background: #ff2d87; }
+.fang-abstand.h::before, .fang-abstand.h::after {
+  top: calc(-5px * var(--pn-inv, 1)); width: calc(1px * var(--pn-inv, 1)); height: calc(9px * var(--pn-inv, 1));
+}
+.fang-abstand.h::before { left: 0; } .fang-abstand.h::after { right: 0; }
+.fang-abstand.v::before, .fang-abstand.v::after {
+  left: calc(-5px * var(--pn-inv, 1)); height: calc(1px * var(--pn-inv, 1)); width: calc(9px * var(--pn-inv, 1));
+}
+.fang-abstand.v::before { top: 0; } .fang-abstand.v::after { bottom: 0; }
+.fang-mass {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%; scale: var(--pn-inv, 1);
+  background: #ff2d87; color: #fff; font: 600 10.5px/1 var(--font, system-ui, sans-serif);
+  font-variant-numeric: tabular-nums; padding: 3px 5px; border-radius: 4px; white-space: nowrap;
+}
+.fang-abstand.h .fang-mass { top: calc(-1px * var(--pn-inv, 1)); }
+.fang-abstand.v .fang-mass { left: calc(-1px * var(--pn-inv, 1)); }
+
+/* ================= M350: Eigenes Rechtsklick-Menü ================= */
+.kontext-menue button > span { flex: 1; }
+.kontext-taste {
+  margin-left: auto; padding-left: 14px; font: 500 11px/1 var(--font, system-ui, sans-serif);
+  color: var(--muted); background: none; border: none;
+}
+@media (pointer: coarse) { .kontext-taste { display: none; } }
+.sel-ai-menu button.sel-menu-gefahr { color: #c0392b; }
+.sel-ai-menu button.sel-menu-gefahr svg { color: #c0392b; }
+[data-theme='dark'] .sel-ai-menu button.sel-menu-gefahr, [data-theme='dark'] .sel-ai-menu button.sel-menu-gefahr svg { color: #ff9a8c; }
+/* Am Zeiger geöffnet (Rechtsklick) darf das Karten-Menü die ganze Höhe nutzen — sonst lag „Löschen" hinter einem Rollbalken */
+.sel-menu-fixed.am-zeiger { max-height: calc(calc(100vh / var(--pn-anz, 1)) - 16px); }
+
+/* M352: Die Seite nimmt beim Klick den Tastatur-Fokus (Pfeile/Leertaste blättern) — ohne Rahmen bei Maus und Stift */
+.pdf-seite:focus:not(:focus-visible) { outline: none; }
+
+/* ===== M354: Stärken für Stift, Textmarker und Radierer — Stufen und Regler; Vorschlag über dem Geschriebenen ===== */
+.draw-palette .draw-dicke i.balken { border-radius: 2px; opacity: .55; }
+.draw-palette .draw-dicke i.ring { background: none; border: 1.5px solid var(--ink); box-sizing: border-box; }
+.draw-palette .draw-regler { width: 92px; accent-color: var(--accent); cursor: pointer; margin: 0 2px; }
+.draw-palette .draw-staerke-wert { min-width: 2.2em; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+@media (pointer: coarse) { .draw-palette .draw-regler { width: 120px; height: 28px; } }
+.schrift-vorschlag.oben { transform: translateY(-100%); }
+@media (max-width: 700px) { .draw-palette .draw-regler { width: 72px; } .draw-palette .draw-staerke-wert { display: none; } }
+
+/* ===== M357: Per Link teilen ===== */
+.freigabe-dialog .link-zeile { display: flex; gap: 6px; align-items: stretch; margin: 6px 0 2px; }
+.freigabe-dialog .link-zeile input { flex: 1; min-width: 0; font: inherit; font-size: 12.5px; padding: 7px 9px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink); }
+.freigabe-dialog .link-zeile button { white-space: nowrap; }
+.freigabe-dialog .link-weg { color: #b3502f; }
+[data-theme='dark'] .freigabe-dialog .link-weg { color: #ffab8f; }
+@media (max-width: 520px) { .freigabe-dialog .link-zeile { flex-wrap: wrap; } .freigabe-dialog .link-zeile input { flex-basis: 100%; } }
+
+/* ===== M359: Kommentar-Pins und -Blasen liegen ÜBER den Karten — auch über gewählten =====
+   Sie leben in derselben Ebene wie die Karten (ViewportPortal). React Flow hebt eine gewählte oder gezogene
+   Karte auf z-index 1000 + eigene Ebene; mit 9 und 8 lagen Pin und Blase dann DARUNTER: Sobald man die PDF
+   anklickte, verschwand der Teil der Blase, der über der Karte lag. */
+.comment-pin { z-index: 3001; }
+.comment-blase { z-index: 3000; }
+
+/* ---------- M360: Freigabe mit Rollen, Einladungslink, nur lesend geteilte Boards ---------- */
+/* M391: Ein Hauptweg (Link erstellen / kopieren), alles Weitere eingeklappt */
+.freigabe-dialog .freigabe-satz { margin: 10px 0 0; }
+.freigabe-dialog .freigabe-satz + .modal-buttons { margin-top: 12px; }
+.freigabe-mehr { margin-top: 12px; border-top: 1px solid var(--border-soft); padding-top: 6px; }
+.freigabe-mehr > summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--muted); padding: 5px 0; border-radius: var(--r-xs); }
+.freigabe-mehr > summary:hover, .freigabe-mehr[open] > summary { color: var(--ink); }
+.freigabe-mehr > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.freigabe-mehr[open] > summary { margin-bottom: 6px; }
+@media (pointer: coarse) { .freigabe-mehr > summary { padding: 11px 0; } }
+.freigabe-dialog .freigabe-block { border: 1px solid var(--border-soft); border-radius: var(--r); padding: 10px 12px; margin: 0 0 10px; background: var(--surface-3); }
+.freigabe-dialog .freigabe-titel { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+.freigabe-dialog .freigabe-zeile { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12.5px; color: var(--muted); }
+.freigabe-dialog .freigabe-zeile input {
+  flex: 1 1 170px; min-width: 0; font: inherit; font-size: 13px; padding: 7px 10px;
+  border: 1px solid var(--border-soft); border-radius: var(--r); outline: none; background: var(--surface); color: var(--ink);
+}
+.freigabe-dialog .freigabe-zeile input:focus-visible, .freigabe-dialog .freigabe-rolle:focus-visible { border-color: var(--accent); }
+.freigabe-dialog .freigabe-zeile button, .freigabe-dialog .link-zeile button {
+  border: 1px solid var(--border-soft); background: var(--surface); border-radius: var(--r); padding: 7px 11px;
+  font-family: inherit; font-size: 12.5px; cursor: pointer; color: var(--ink); white-space: nowrap;
+}
+.freigabe-dialog .freigabe-zeile button:hover:not(:disabled), .freigabe-dialog .link-zeile button:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.freigabe-dialog .freigabe-zeile button:disabled { opacity: .5; cursor: default; }
+.freigabe-dialog :is(.link-zeile, .modal-buttons, .freigabe-zeile) button.primaer { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; font-weight: 600; }
+.freigabe-dialog :is(.link-zeile, .modal-buttons, .freigabe-zeile) button.primaer:hover:not(:disabled) { background: var(--accent-fill); border-color: var(--accent-fill); filter: brightness(1.07); }
+.freigabe-dialog .freigabe-zeile .link-weg { margin-left: auto; }
+.freigabe-dialog .freigabe-rolle {
+  font: inherit; font-size: 12.5px; padding: 6px 8px; border: 1px solid var(--border-soft); border-radius: var(--r);
+  background: var(--surface); color: var(--ink); cursor: pointer;
+}
+.freigabe-dialog .freigabe-liste li { grid-template-columns: minmax(0, 1fr) auto auto auto; }
+.freigabe-dialog .freigabe-liste .freigabe-rolle { padding: 3px 6px; font-size: 12px; }
+@media (max-width: 520px) {
+  .freigabe-dialog .freigabe-liste li { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .freigabe-dialog .freigabe-liste .freigabe-stand { display: none; }
+}
+/* Hinweisband über einem nur lesend geteilten Board */
+.lese-band {
+  position: fixed; top: 58px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface-card); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 999px;
+  box-shadow: var(--pop-shadow);
+  font-size: 12.5px; line-height: 1.3; padding: 5px 6px 5px 14px;
+  z-index: 60; max-width: min(560px, calc(92vw / var(--pn-anz, 1))); white-space: nowrap;
+}
+.lese-band span { overflow: hidden; text-overflow: ellipsis; }
+.lese-band button {
+  flex: none; border: none; cursor: pointer; background: var(--accent-fill); color: #fff;
+  font-family: inherit; font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 999px; white-space: nowrap;
+}
+.lese-band button:hover { filter: brightness(1.08); }
+/* Nichts zum Anfassen, was ändern würde: Größen-Griffe und Verbindungs-Punkte */
+.board-wrap.nur-lesen .react-flow__resize-control,
+.board-wrap.nur-lesen .react-flow__handle { visibility: hidden; pointer-events: none; }
+.board-wrap.nur-lesen .bn-editor { cursor: default; }
+
+/* ---------- M362: Kommentare bearbeiten ---------- */
+.comment-msg-meta { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 20px; }
+.comment-msg-tools { display: inline-flex; gap: 2px; opacity: .55; }
+.comment-msg:hover .comment-msg-tools, .comment-msg-tools:focus-within { opacity: 1; }
+.comment-msg-tools button {
+  border: none; background: none; cursor: pointer; color: var(--muted); padding: 3px; border-radius: var(--r-xs);
+  display: inline-grid; place-items: center; width: 22px; height: 22px;
+}
+.comment-msg-tools button:hover { background: var(--surface-2); color: var(--ink); }
+.comment-msg-tools button.danger:hover { background: rgba(192, 57, 43, 0.1); color: #c0392b; }
+.comment-msg.bearbeiten { gap: 5px; }
+.comment-msg.bearbeiten .comment-input { width: 100%; box-sizing: border-box; }
+.comment-msg-knoepfe { display: flex; justify-content: flex-end; gap: 6px; }
+.comment-msg-knoepfe button:not(.comment-send) {
+  border: 1px solid var(--border-soft); background: none; color: var(--ink); cursor: pointer;
+  font-family: inherit; font-size: 12px; padding: 4px 10px; border-radius: var(--r);
+}
+.comment-msg-knoepfe .comment-send { align-self: auto; }
+@media (hover: none) { .comment-msg-tools { opacity: 1; } .comment-msg-tools button { width: 28px; height: 28px; } }
+
+/* ---------- M363: Dokument-Folie in der Präsentation (PDF, Word, großes Bild) ---------- */
+/* Das Blatt bekommt den ganzen Platz: kein Folienrahmen, kein Innenabstand — die Seite ist die Folie */
+.presenter-slide.dokument {
+  margin: 0 12px 8px; padding: 0; background: none; box-shadow: none; overflow: hidden;
+  display: flex; min-height: 0; font-size: 14px; line-height: 1.4;
+}
+.folie-dok { position: relative; flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.folie-dok.leer { align-items: center; justify-content: center; color: #e9ebee; text-align: center; font-size: 16px; }
+.folie-dok-hinweis { color: #b8b2a4; font-size: 13px; }
+.folie-dok-flaeche {
+  flex: 1; min-height: 0; overflow: auto; display: grid; outline: none;
+  /* Ein Finger rollt (nativ, mit Schwung); zwei Finger zoomen — das rechnet die Folie selbst */
+  touch-action: pan-x pan-y; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  scrollbar-color: rgba(255,255,255,.35) transparent;
+}
+/* margin:auto zentriert, solange Platz ist — ein größeres Blatt bleibt bis zur Kante rollbar */
+.folie-dok-seite {
+  position: relative; margin: auto; background: #fff; color: #000; border-radius: 2px;
+  box-shadow: 0 6px 28px rgba(0,0,0,.45); overflow: hidden; min-height: 80px;
+}
+.folie-dok-seite canvas, .folie-dok-seite > img { display: block; width: 100%; height: 100%; border-radius: 0; max-width: none; }
+.folie-dok-seite .folie-word { position: absolute; inset: 0; overflow: hidden; }
+.folie-dok-striche { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.folie-dok-leiste {
+  /* Unter dem Blatt, nicht darüber: Die Leiste verdeckt keine Zeile der Seite */
+  align-self: center; flex: none; margin-top: 8px;
+  display: flex; align-items: center; gap: 4px; padding: 4px;
+  background: #24211c; color: #e9ebee; border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px; box-shadow: 0 4px 18px rgba(0,0,0,.4);
+  font-size: 13px; white-space: nowrap; max-width: calc(100% - 16px);
+}
+.folie-dok-leiste button {
+  border: none; background: none; color: inherit; cursor: pointer; font-family: inherit; font-size: 15px;
+  min-width: 36px; height: 36px; padding: 0 10px; border-radius: 999px; display: inline-grid; place-items: center;
+}
+.folie-dok-leiste button:hover { background: rgba(255,255,255,.14); }
+.folie-dok-leiste button:focus-visible, .folie-dok-nr input:focus-visible { outline: 2px solid #8fb4ff; outline-offset: 1px; }
+.folie-dok-leiste button[aria-disabled='true'] { opacity: .35; cursor: default; }
+.folie-dok-leiste .folie-dok-modus { font-size: 12.5px; min-width: 96px; }
+.folie-dok-nr { display: inline-flex; align-items: center; gap: 5px; padding: 0 4px; color: #b8b2a4; font-variant-numeric: tabular-nums; }
+.folie-dok-nr input {
+  width: 3.2em; height: 28px; text-align: center; font: inherit; color: #fff; background: rgba(255,255,255,.12);
+  border: 1px solid transparent; border-radius: 8px; padding: 0 4px;
+}
+.folie-dok-trenner { width: 1px; height: 20px; background: rgba(255,255,255,.18); margin: 0 2px; }
+@media (max-width: 860px) {
+  .presenter-slide.dokument { margin: 0 0 6px; }
+  .folie-dok-leiste { margin-top: 6px; }
+  /* M405: Die Fußleiste bleibt auch am Telefon auf Dokument-Folien stehen – „Weiter" und „Zurück" sind bei jedem
+     Kartentyp an derselben Stelle (vorher wich sie hier der Leiste des Dokuments, und aus einer langen PDF kam man
+     nur Seite für Seite heraus). Dafür rückt sie auf Dokument-Folien enger an die Leiste darüber. */
+  .presenter.mit-dokument .presenter-slide.dokument { margin-bottom: 4px; }
+  .presenter.mit-dokument .folie-dok-leiste { margin-top: 4px; }
+  .folie-dok-nr > span:first-child { display: none; }
+  .folie-dok-leiste .folie-dok-modus { min-width: 0; }
+}
+@media (pointer: coarse) {
+  .folie-dok-leiste button { min-width: 44px; height: 44px; font-size: 18px; }
+  .folie-dok-leiste .folie-dok-modus { font-size: 13px; }
+  .folie-dok-nr input { height: 34px; font-size: 15px; }
+  .presenter-foot > button { padding: 12px 18px; }
+  .presenter-head button { padding: 9px 14px; }
+}
+
+/* ---------- M363: Dokument im Fokus — Fußleiste blättert Seiten und trägt die Zeichenwerkzeuge ---------- */
+.focus-nav.dokument { gap: 2px; }
+.focus-nav.dokument .focus-acts { gap: 2px; align-items: center; overflow-x: auto; scrollbar-width: none; justify-content: safe center; }
+.focus-nav.dokument .focus-acts::-webkit-scrollbar { display: none; }
+/* M413: Seiten blättern – eine Gruppe um die Seitenzahl. Außen an der Leiste steht bei jeder Karte „Karte" */
+.focus-seiten { flex: none; display: inline-flex; align-items: center; border: 1px solid var(--border-soft); border-radius: var(--r); background: var(--surface); margin-right: 4px; }
+.focus-seiten .focus-seite { padding: 0 2px; }
+.focus-nav .focus-seite-knopf { width: 40px; height: 40px; flex: none; color: var(--ink); }
+.focus-seiten .focus-seite input { height: 30px; border-color: transparent; background: var(--surface-2); }
+/* Am Telefon reicht der Platz unten nicht für beide Paare. Bei einem Dokument stehen dort die SEITEN außen (wie
+   bisher – hineingezoomt schiebt der Finger das Blatt, ohne Knöpfe käme man nicht zur nächsten Seite); die
+   Karten-Knöpfe stehen dann im Kopf (FocusSheet). */
+.focus-nav.dokument > .focus-seite-knopf { width: 48px; height: 44px; flex: none; }
+.focus-kopf-karten { flex: none; display: inline-flex; align-items: center; }
+.focus-nav button[aria-disabled='true'] { opacity: .3; cursor: default; }
+.focus-seite { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); padding: 0 6px; white-space: nowrap; }
+.focus-seite input {
+  width: 2.6em; height: 34px; text-align: center; font: inherit; font-size: 14px; color: var(--ink);
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--r-sm); padding: 0 2px;
+}
+.focus-seite input:focus-visible { outline: none; border-color: var(--accent); }
+.focus-nav .focus-werkzeug { width: 44px; height: 44px; flex: none; border-radius: var(--r); color: var(--ink); }
+.focus-nav .focus-werkzeug.on { background: var(--accent-fill); color: #fff; }
+.focus-nav .focus-werkzeug.on:hover { background: var(--accent-fill); filter: brightness(1.06); }
+.focus-nav .focus-act.nur-zeichen { width: 44px !important; padding: 0; flex: none; border-color: transparent !important; background: none !important; }
+.focus-nav .focus-act.nur-zeichen:hover { background: var(--surface-2) !important; }
+/* Die Seitenzahl in der Fußleiste wird getippt — dann bleibt die Leiste über der Tastatur stehen */
+[data-keyboard='on'] .focus-nav.dokument:has(.focus-seite input:focus) { display: flex; }

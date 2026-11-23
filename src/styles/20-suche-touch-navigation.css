@@ -1,0 +1,214 @@
+/* ---------- Suche (Strg+K) ---------- */
+.search-backdrop {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(22, 25, 30, 0.25);
+  display: flex; justify-content: center; align-items: flex-start; padding-top: 14vh;
+}
+.search-box {
+  width: min(620px, calc(92vw / var(--pn-anz, 1))); background: var(--surface); border-radius: var(--r-lg);
+  box-shadow: var(--pop-shadow); overflow: hidden;
+}
+.search-box input {
+  width: 100%; border: none; outline: none; font-family: inherit;
+  font-size: 16px; padding: 16px 18px; color: var(--ink);
+}
+.search-results { max-height: calc(46vh / var(--pn-anz, 1)); overflow-y: auto; border-top: 1px solid var(--border-soft); }
+.search-hit {
+  display: flex; gap: 10px; align-items: center; width: 100%;
+  border: none; background: none; font-family: inherit; text-align: left;
+  padding: 10px 16px; cursor: pointer;
+}
+.search-hit.active { background: var(--accent-soft); }
+.hit-icon { font-size: 18px; flex: none; }
+.hit-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.hit-title { font-size: 13.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hit-snippet { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* M452: Der Treffer kam aus dem Text im Bild — leise Marke vor dem Ausschnitt */
+.hit-im-bild { color: var(--accent-strong); font-weight: 600; margin-right: 6px; }
+.hit-board {
+  font-size: 10.5px; color: var(--muted); background: var(--surface-dim);
+  border-radius: var(--r-pill); padding: 2px 9px; flex: none; max-width: 130px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* M453: Alter des Treffers und „Zuletzt geändert zuerst" — leise, ohne eigene Fläche */
+.hit-alter { font-size: 10.5px; color: var(--muted); flex: none; white-space: nowrap; }
+.search-sortierung { display: flex; justify-content: flex-end; padding: 0 10px 6px; }
+.search-sortierung button {
+  border: 1px solid transparent; background: none; color: var(--muted); font: inherit; font-size: 11.5px;
+  padding: 4px 10px; min-height: 32px; border-radius: var(--r-pill); cursor: pointer;
+}
+.search-sortierung button:hover { color: var(--ink); background: var(--surface-dim); }
+.search-sortierung button.an { color: var(--accent-strong); background: var(--accent-soft); border-color: var(--accent); }
+.search-empty { padding: 18px; font-size: 13px; color: var(--muted); text-align: center; }
+.search-footer {
+  font-size: 10.5px; color: var(--muted); padding: 8px 16px;
+  border-top: 1px solid var(--border-soft); background: var(--surface-3);
+}
+
+/* ---------- React-Flow-Feintuning ---------- */
+.pn-minimap { border-radius: var(--r); overflow: hidden; }
+.react-flow__controls { border-radius: var(--r); overflow: hidden; box-shadow: var(--chrome-shadow); }
+.react-flow__edge-path { stroke-linecap: round; }
+
+/* ---------- Selektierte Karte: Controls auch ohne Hover (Maus & Touch) ---------- */
+.react-flow__node.selected .color-dot {
+  opacity: 1;
+}
+/* M301: Die ＋-Verbindungspunkte erscheinen am PC nur beim Zeigen auf die Karte —
+   eine ausgewählte Karte trug sonst dauerhaft vier Kreise. Ohne Maus (Touch)
+   bleibt die Auswahl der einzige Weg, sie zu zeigen. */
+@media (hover: none) {
+  .react-flow__node.selected .pn-handle { opacity: 1; }
+}
+/* M295: Die Ticket-Aktionen NICHT mehr bei ausgewählter Karte an jedem
+   Ticket — vier Knöpfe mal vierzehn Tickets waren die unruhigste Stelle der
+   App. Sie erscheinen beim Zeigen aufs Ticket; Touch-Geräte (unten) zeigen
+   sie weiterhin immer, dort gibt es kein Zeigen. */
+
+/* ---------- Touch-Geräte: größere Ziele, Controls immer sichtbar ---------- */
+@media (pointer: coarse) {
+  /* ✕ und ＋-Verbindungspunkte absichtlich NICHT dabei: sie erscheinen erst,
+     wenn die Karte aktiv (selektiert) ist — dauerhaft sichtbare Lösch-Knöpfe
+     und Anschluss-Plusse auf jeder Karte wirken unruhig (M112, User-Wunsch).
+     Beim Ziehen einer Verbindung leuchten die ＋ aller Karten als Ziele auf. */
+  .color-dot, .kanban-item-actions,
+  .kanban-addcol, .kanban-col-x { opacity: 1 !important; }
+
+  .color-dot { width: 22px; height: 22px; top: 6px; right: 8px; }
+  /* Höhere Spezifität als die Basisregel weiter unten (beide !important) */
+  .react-flow__handle.pn-handle { width: 28px !important; height: 28px !important; }
+  .react-flow__handle.pn-handle::after { inset: 5px; font-size: 13px; }
+  /* Nur Werkzeugleisten-Buttons — Menü-Einträge behalten ihre Listenform */
+  .dock > button, .dock-add-wrap > button { width: 50px; height: 50px; font-size: 22px; }
+  .dock-menu button { padding: 10px 12px; font-size: 14px; }
+  .kanban-item-actions button { padding: 5px 9px; font-size: 13px; }
+  .chip { padding: 6px 13px; font-size: 12px; }
+  .card-actions button { padding: 7px 12px; font-size: 12px; }
+  .tab { padding: 8px 12px; font-size: 13.5px; }
+
+  .link-btn { font-size: 13px; padding: 4px; }
+}
+
+/* ---------- Schmale Screens (Tablet hochkant / Phone) ---------- */
+/* M89/M236: Die Tab-Leiste darf nie in die Aktionsleiste laufen.
+ *
+ * M89 löste das mit zwei festen Zahlen: ab 1361px zentriert (dort war die
+ * Rechnung (100vw − 42vw)/2 ≥ 394px erfüllt), darunter links bei 394px
+ * verankert. Die 394 waren die damals gemessene Breite der Aktionsleiste —
+ * und genau daran ging es kaputt, sobald jemand den Text-Zoom benutzt: Die
+ * Leiste wird breiter, die Zahl bleibt, die Tabs schieben sich darunter
+ * (User-Screenshot: die Lupe verschwindet hinter der Brotkrume).
+ *
+ * Jetzt liefert `--kopf-links` die GEMESSENE rechte Kante (lib/kopfmass.ts).
+ * `max()` behält die Zentrierung, wo sie passt, und schiebt die Leiste sonst
+ * genau so weit nach rechts, wie nötig — stufenlos statt in zwei Sprüngen.
+ *
+ * Zentriert wird gar nicht mehr: Eine Leiste, die je nach Fensterbreite mal
+ * mittig und mal links sitzt, ist kein Gewinn — sie wandert beim Verkleinern
+ * unter der Hand weg. Links neben der Aktionsleiste steht sie immer an
+ * derselben Stelle, und der Platz nach rechts gehört ganz den Boards.
+ */
+@media (min-width: 861px) {
+  .tabs {
+    left: var(--kopf-links, 394px);
+    transform: none;
+    max-width: var(--kopf-rest, calc(42vw / var(--pn-anz, 1)));
+  }
+}
+
+@media (max-width: 860px) {
+  .hint { display: none; }
+  .tabs {
+    top: calc(62px + var(--safe-top)); left: 12px; transform: none;
+    /* M236: gemessen statt vw — siehe lib/kopfmass.ts */
+    max-width: var(--kopf-voll, calc(calc(100vw / var(--pn-anz, 1)) - 24px));
+  }
+  .topbar { left: calc(12px + var(--app-rand)); }
+  /* Zwei Zeilen statt einer: Die Tab-Leiste endet erst bei ~104px (M189) */
+  :root { --head-space: calc(118px + var(--safe-top) + var(--app-rand)); }
+  .dock { bottom: calc(12px + var(--safe-bottom) + var(--app-rand)); }
+  .react-flow__minimap { display: none; }
+}
+
+/* M236: Zwei Zeilen auch dann, wenn die Media-Query es nicht merkt.
+ *
+ * `@media (max-width: 860px)` sieht die Fensterbreite OHNE den Zoom der
+ * Wurzel. Bei 175 % gilt ein 900 Punkte breites Fenster darum weiter als
+ * „Desktop", obwohl fürs Layout nur 514 Punkte bleiben — und davon frisst
+ * die Aktionsleiste allein 369. Der Marker kommt deshalb aus der Messung
+ * (lib/kopfmass.ts) und schlägt die Media-Query per Spezifität, egal in
+ * welcher Reihenfolge die Regeln stehen. */
+html[data-kopf-eng='an'] .tabs {
+  top: calc(62px + var(--safe-top));
+  left: 12px;
+  max-width: var(--kopf-voll, calc(calc(100vw / var(--pn-anz, 1)) - 24px));
+}
+html[data-kopf-eng='an'] { --head-space: calc(118px + var(--safe-top) + var(--app-rand)); }
+html[data-kopf-eng='an'] .hint { display: none; }
+
+/* ---------- M238: Navigation als linke Spalte (optional, ab Tablet) ----------
+ *
+ * Der Grund ist Geometrie, nicht Geschmack: Am großen Schirm ist Platz nach
+ * unten reichlich und nach rechts knapp. Eine Spalte zeigt zwanzig
+ * Board-Namen untereinander, wo die Reihe schon bei fünf überläuft — und
+ * ganz nebenbei kann dort nichts mehr mit der Aktionsleiste kollidieren,
+ * weil beide untereinander stehen statt nebeneinander.
+ *
+ * Am Telefon gilt das Gegenteil: Dort ist die Breite das knappe Gut, eine
+ * feste Spalte fräße ein Drittel davon. Deshalb wirkt die Einstellung erst
+ * ab 861 Punkten — der Schalter darf gesetzt bleiben, das Stylesheet
+ * entscheidet.
+ */
+@media (min-width: 861px) {
+  .app.nav-links { --nav-w: 268px; --nav-band: calc(var(--nav-w) + 36px + var(--app-rand)); }
+  /* M297: Die Spalte ist ein RAHMEN, kein Kasten auf der Fläche — ein Band von
+     oben bis unten, und die Fläche beginnt rechts davon. Vorher schwebten
+     Logo, Aktionen und Board-Liste als drei Kästen über dem Board, und Karten
+     gerieten darunter (am Tablet ganze Notizen). */
+  .app.nav-links::before {
+    content: ''; position: fixed; top: 0; bottom: 0; left: 0; width: var(--nav-band);
+    background: var(--surface-dim); border-right: 1px solid var(--border-soft);
+    z-index: 40; pointer-events: none;
+  }
+  .app.nav-links .board-wrap { margin-left: var(--nav-band); }
+  /* M338: Logo und Aktionen stehen in EINER Zeile (vorher zwei Kästen übereinander, der zweite
+     zu zwei Dritteln leer) — die Board-Liste rückt um eine Zeile nach oben. Wird die Spalte sehr
+     schmal gezogen, bricht die Zeile um, und die gemessene Kopfhöhe (lib/kopfmass.ts) folgt. */
+  .app.nav-links .topbar {
+    flex-direction: row; flex-wrap: wrap; align-items: stretch;
+    width: var(--nav-w); gap: 8px;
+  }
+  .app.nav-links .topbar .logo { height: 100%; display: inline-flex; align-items: center; }
+  .app.nav-links .topbar .top-actions { flex: 1; flex-wrap: wrap; justify-content: flex-end; }
+  .app.nav-links .tabs {
+    left: 18px; top: var(--kopf-oben, 78px);
+    bottom: calc(14px + var(--app-rand) + var(--safe-bottom));
+    width: var(--nav-w); max-width: var(--nav-w); max-height: none;
+    flex-direction: column; align-items: stretch; gap: 2px;
+    background: var(--surface);
+  }
+  .app.nav-links .tabs .nav-tree { flex: 1; min-height: 0; padding: 4px 2px 8px; }
+  /* 🏠 wird zur ersten Zeile des Baums: Symbol und Wort */
+  .app.nav-links .tab-home {
+    align-self: stretch; width: auto; height: 32px; display: flex; align-items: center; gap: 8px;
+    padding: 0 8px; justify-content: flex-start; font-size: 12.5px; font-weight: 600; color: var(--ink);
+  }
+  .app.nav-links .tab-home-label { display: inline; }
+  /* Das Kleben aus M236 ist hier gegenstandslos (M266: samt Schatten) */
+  .app.nav-links .tab.active { position: static; }
+  .app.nav-links .tab.active::after { content: none; }
+  /* Teilen und ＋ nebeneinander am Fuß der Spalte */
+  .app.nav-links .tabs-foot { justify-content: flex-start; gap: 4px; padding-top: 4px; border-top: 1px solid var(--border-soft); }
+  /* Oben wird keine zweite Zeile mehr freigehalten — die Boards stehen links */
+  .app.nav-links { --head-space: calc(74px + var(--safe-top) + var(--app-rand)); }
+  /* Was unten mittig steht, steht mittig über der FLÄCHE, nicht über dem Fenster.
+     `--nav-offen` misst Tabs.tsx (rechte Kante der Spalte). */
+  .app.nav-links .dock, .app.nav-links .toast, .app.nav-links .draw-palette,
+  body:has(.app.nav-links) .sel-toolbar-dock {
+    left: calc(50% + var(--nav-offen, 0px) / 2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

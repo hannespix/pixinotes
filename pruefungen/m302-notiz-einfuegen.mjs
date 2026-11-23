@@ -19,6 +19,7 @@ const SD = path.join(__repo, 'pruefungen', 'ablage');
 import { mkdirSync, readFileSync, existsSync } from 'node:fs';
 mkdirSync(SD, { recursive: true });
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
+import { cssQuelle } from '../werkzeug/css-quelle.mjs';
 import { chromium } from 'playwright-core';
 import http from 'node:http';
 import { extname, join } from 'node:path';
@@ -129,7 +130,7 @@ console.log('════ C: Bild aus Datei ════');
 console.log('════ D: Quelltext ════');
 {
   const karte = readFileSync(join(__repo, 'src/components/nodes/NoteCard.tsx'), 'utf8');
-  const css = readFileSync(join(__repo, 'src/index.css'), 'utf8');
+  const css = cssQuelle(__repo);
   pruefe('D1 kein Bild-Chip mehr in der Notiz-Karte', !/bild-chip/.test(karte));
   pruefe('D2 keine Chip-Regel mehr im Stylesheet', !/bild-chip/.test(css));
 }

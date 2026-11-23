@@ -1,0 +1,62 @@
+/* ================= M268: Anzeige-Zoom und die Leinwand =================
+   `zoom` am Wurzelelement (M224) vergrößert alles — aber es spaltet die
+   Zahlen: Bildpunkt-Rechtecke und Zeigerkoordinaten tragen den Faktor,
+   `offsetWidth` und die Verschiebung der Leinwand nicht. React Flow mischt
+   beides und rechnet dann um genau diesen Faktor daneben.
+
+   Der Renderer nimmt den Zoom deshalb wieder heraus. In seinem Inneren sind
+   Layout- und Bildschirm-Punkte wieder dasselbe, und sämtliche Rechnerei —
+   Anfasser, Ziehen, Doppelklick, Verbinden — stimmt wie bei 100 %. Dass die
+   Karten trotzdem größer werden, besorgt der Board-Zoom (Board.tsx: alle
+   Zoom-Grenzen laufen mit dem Faktor).
+
+   Bewusst NICHT an `.react-flow`: Zoom-Knöpfe, Übersichtskarte und Fußzeile
+   hängen daneben und sollen ihre Vergrößerung behalten. Die Zeichenebene
+   liegt zwar außerhalb des Renderers, rechnet aber mit derselben
+   Verschiebung — sie muss deshalb mit. */
+.react-flow__renderer,
+.drawing-layer { zoom: var(--pn-gegen, 1); }
+
+/* Die Karten-Leiste hängt im Renderer (React Flow setzt ihre Position dort).
+   Ihre LAGE muss also im ausgeglichenen Raum bleiben, ihr INHALT aber wieder
+   mitwachsen — darum der innere Kasten mit dem Faktor. */
+.sel-toolbar-anker > .sel-toolbar { zoom: var(--pn-anz, 1); }
+
+/* ---------- Topbar ---------- */
+.topbar {
+  /* M248: um den App-Rand nach innen — sonst läge die Kopfleiste auf dem
+     Grund statt auf der Arbeitsfläche */
+  /**
+   * M248: z-index 56 statt 50 — über der Tab-Leiste und dem Netz-Filter.
+   *
+   * Das Logo-Menü trägt zwar selbst z-index 60, aber das gilt nur INNERHALB
+   * der Kopfleiste: Deren eigener z-index eröffnet einen Stapel-Kontext, und
+   * nach außen zählt nur dieser eine Wert. Gegen eine gleichrangige Leiste,
+   * die später im Dokument steht, verliert das Menü also — in der linken
+   * Navigation legte sich die Board-Spalte darüber (User-Screenshot).
+   * Dieselbe Falle wie bei der Fokus-Karte in M237.
+   *
+   * Dass die Leiste damit nichts blockiert, sichert `pointer-events: none`:
+   * Klicks gehen hindurch, nur ihre Kinder fangen sie ab.
+   */
+  position: fixed; top: calc(14px + var(--safe-top) + var(--app-rand));
+  left: calc(18px + var(--app-rand)); z-index: 56;
+  display: flex; align-items: center; gap: 12px; pointer-events: none;
+}
+.logo-wrap { position: relative; pointer-events: auto; }
+.logo {
+  font-weight: 800; font-size: 17px; letter-spacing: -0.02em;
+  background: var(--surface); padding: 7px 14px; border-radius: var(--r-lg);
+  box-shadow: var(--chrome-shadow); pointer-events: auto;
+  /* M210: vom div zum Knopf — Schriftfarbe/-familie erben statt Browser-Default */
+  font-family: inherit; color: var(--ink); cursor: pointer; display: block;
+}
+.logo:hover { background: var(--surface-2); }
+.logo.active { box-shadow: 0 0 0 2px var(--accent) inset, var(--chrome-shadow); }
+/* M397: Wortmarke in einer Farbe – der zweite Teil ist nur leichter gesetzt */
+.logo span { font-weight: 500; }
+.hint {
+  font-size: 12px; color: var(--muted);
+  background: var(--surface-glass); padding: 5px 11px; border-radius: var(--r-pill);
+  max-width: calc(24vw / var(--pn-anz, 1)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}

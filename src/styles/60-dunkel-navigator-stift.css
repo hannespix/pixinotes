@@ -1,0 +1,420 @@
+/* ================= M284: Weiße Notizen im Dunkelmodus =================
+   Beim Nachmessen der Tabelle aufgefallen und älter als sie: Eine weiße
+   Haftnotiz ist im Dunkelmodus eine DUNKLE Karte (`--surface-card`), ihr
+   Text stand aber pauschal auf #16191e — gemessen 43,42,39 auf 57,53,48,
+   also praktisch unsichtbar. Die Regel „Papier bleibt hell" gilt eben nur
+   für die farbigen Töne; Weiß folgt dem Theme und braucht helle Schrift. */
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white),
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .bn-editor,
+[data-theme='dark'] .minutes-card.sticky-white { color: var(--ink); }
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .meta,
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .due-chip { color: var(--muted); }
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .due-chip {
+  background: rgba(255, 255, 255, 0.1);
+}
+/* Die Fließtext-Tabelle in einer weißen Notiz ebenso (Gegenstück zu M172) */
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-editor table:not(.rt-tabelle),
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-editor th,
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-editor td:not(.rt-zelle),
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-editor td:not(.rt-zelle) p,
+[data-theme='dark'] .react-flow__node-note:has(.sticky-white) .note-editor th p {
+  color: var(--ink) !important;
+}
+
+/* ================= M285: Karten aus jeder Ansicht bearbeiten =================
+   Die Mini-Vorschau war ein Bild; jetzt ist jedes Rechteck ein Ziel. Der
+   Zeiger nennt die Karte, der Klick öffnet dieselbe Bearbeitung wie überall. */
+.ov-mini-karte { cursor: pointer; transition: opacity 0.12s ease; }
+.ov-mini-karte:hover { opacity: 0.85 !important; }
+/* Karten im Netz-Menü — dieselbe Liste wie im Navigator, nur direkt am Knoten */
+.ov-graph-ctx-title.klein {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--muted); margin-top: 4px;
+}
+.ov-graph-ctx-karte {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 230px;
+}
+.ov-graph-ctx-mehr { font-size: 10.5px; color: var(--muted); padding: 2px 8px 4px; }
+
+/* ================= M286: Navigator in der Übersicht =================
+   Am Telefon füllt die Leiste den Schirm — in der Übersicht deckte sie damit
+   genau das zu, was man sehen wollte. Dort ist die Übersicht selbst schon der
+   Navigator; die Leiste erscheint deshalb erst ab Tablet-Breite. */
+
+/* M287: Umbenennen-Stift im Navigator — Boards heißen dort nicht mehr nur so,
+   sie lassen sich auch dort ändern (vorher nur in der Tab-Leiste und auf der
+   Kachel in der Übersicht). */
+
+/* Am Finger gibt es kein „darüberfahren" — dort steht der Stift immer da */
+
+/* M288: Das gemeinsame ⋯-Menü für Boards und Projekte. Es sieht überall gleich
+   aus — Navigator, Seitenleiste, Übersicht —, damit man beim Ansichtswechsel
+   nichts Neues lernen muss. */
+.ebenen-menu-wrap { display: inline-flex; flex: none; position: relative; }
+.ebenen-menu-knopf {
+  border: none; background: none; cursor: pointer; color: var(--muted);
+  padding: 3px 4px; border-radius: var(--r-sm); line-height: 1; display: inline-flex;
+  align-items: center; justify-content: center;
+}
+.ebenen-menu-knopf:hover, .ebenen-menu-knopf.auf { background: var(--surface-2); color: var(--ink); }
+.ebenen-menu {
+  position: fixed; z-index: 3000; background: var(--surface); border-radius: var(--r-lg);
+  border: 1px solid var(--border-soft); box-shadow: var(--pop-shadow); padding: 6px; display: flex;
+  flex-direction: column; gap: 2px; min-width: 224px; max-width: 300px;
+  max-height: calc(calc(100vh / var(--pn-anz, 1)) - 90px); overflow-y: auto;
+}
+.ebenen-menu button {
+  width: 100%; text-align: left; border: none; background: none; font-family: inherit;
+  font-size: 13px; padding: 8px 10px; border-radius: var(--r); cursor: pointer; color: var(--ink);
+  display: flex; align-items: center; justify-content: flex-start; gap: 9px;
+}
+.ebenen-menu button svg { flex: 0 0 auto; color: var(--muted); }
+.ebenen-menu button:hover:not(:disabled) { background: var(--surface-2); }
+.ebenen-menu button:disabled { opacity: .45; cursor: default; }
+.ebenen-menu button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ebenen-menu-titel {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); padding: 7px 10px 2px;
+}
+.ebenen-menu-zurueck { color: var(--muted) !important; font-size: 12px !important; }
+.ebenen-menu-gefahr { color: #c0392b !important; }
+.ebenen-menu-gefahr svg { color: #c0392b !important; }
+[data-theme='dark'] .ebenen-menu-gefahr,
+[data-theme='dark'] .ebenen-menu-gefahr svg { color: #ff9a8c !important; }
+/* Am Finger ist „darüberfahren" keine Geste — der Knopf steht dort immer da
+   und ist groß genug (M282: 40 Punkte). */
+@media (pointer: coarse) {
+  .ebenen-menu-knopf { min-width: 34px; min-height: 34px; opacity: 1 !important; }
+  .ebenen-menu button { padding: 11px 12px; font-size: 14px; }
+}
+
+/* Archivierte Boards zeigen sich nur mit „Archiv einblenden" — dann aber
+   sichtbar gedimmt, genau wie archivierte Karten auf dem Board. */
+.side-board.archiviert .side-board-name,
+.ov-board.archiviert { opacity: .55; }
+.ov-board.archiviert { border-style: dashed; }
+.archiv-marke {
+  font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); border: 1px solid var(--border-soft); border-radius: var(--r-sm);
+  padding: 1px 4px; flex: none;
+}
+
+/* M289: Bilder IM Notiztext.
+   BlockNote gibt dem Bild eine Vorschaubreite in Bildpunkten (Standard 512).
+   In einer 270 Punkte breiten Notiz ragte es damit über den Rand hinaus und
+   wurde von `overflow: hidden` der Karte abgeschnitten. Die Breite der Karte
+   gewinnt deshalb immer — im Vollbild-Fokus bleibt trotzdem Platz für ein
+   großes Bild, weil die Karte dort selbst breit ist. */
+.note-editor .bn-visual-media,
+.note-editor img,
+.bn-editor img {
+  max-width: 100%; height: auto; border-radius: var(--r);
+}
+.note-editor .bn-visual-media-wrapper,
+.note-editor .bn-file-block-content-wrapper { max-width: 100%; }
+/* Die Bildunterschrift soll wie Text der Karte aussehen, nicht wie Fremdkörper */
+.note-editor .bn-visual-media-caption { font-size: 11.5px; color: var(--muted); }
+/* Der Bild-Chip ist am Telefon der Hauptweg (dort gibt es kein Strg+V) und
+   muss deshalb eine echte Trefferfläche haben — gemessen waren es 20 Punkte,
+   das ist für einen Finger zu wenig (M282: 34 als Untergrenze). */
+@media (pointer: coarse) {
+}
+
+/* M290: „Von einer anderen App geteilt" — der Empfangs-Dialog.
+   Er ist die erste Sekunde nach dem Teilen und muss deshalb ohne Nachdenken
+   lesbar sein: was kam an, wohin soll es, in welcher Form. */
+.geteilt-modal { max-width: 460px; width: min(460px, calc(calc(100vw / var(--pn-anz, 1)) - 24px)); }
+.geteilt-vorschau {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start;
+  background: var(--surface-3); border-radius: var(--r); padding: 10px; margin-bottom: 12px;
+  max-height: 210px; overflow-y: auto;
+}
+.geteilt-stueck { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 92px; }
+.geteilt-stueck img {
+  width: 92px; height: 72px; object-fit: cover; border-radius: var(--r);
+  border: 1px solid var(--border-soft);
+}
+.geteilt-symbol { font-size: 30px; line-height: 1.6; }
+.geteilt-name {
+  font-size: 10.5px; color: var(--muted); max-width: 92px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.geteilt-text { font-size: 12.5px; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+.geteilt-zeile { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-size: 13px; }
+.geteilt-zeile > span { flex: 0 0 104px; color: var(--muted); }
+.geteilt-zeile select {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 7px 8px;
+  border-radius: var(--r); border: 1px solid var(--border-soft); background: var(--surface);
+  color: var(--ink);
+}
+.geteilt-wahl { display: flex; flex-direction: column; gap: 4px; }
+.geteilt-wahl label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.geteilt-wahl label.aus { opacity: .5; cursor: default; }
+.geteilt-hinweis {
+  font-size: 11.5px; color: var(--muted); background: var(--surface-dim);
+  border-radius: var(--r); padding: 7px 9px; margin-top: 6px;
+}
+.geteilt-foot { display: flex; justify-content: flex-end; gap: 8px; }
+.geteilt-foot button {
+  font: inherit; font-size: 13px; padding: 9px 16px; border-radius: var(--r); cursor: pointer;
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--ink);
+}
+.geteilt-ok { background: var(--accent-fill) !important; border-color: var(--accent) !important; color: #fff !important; font-weight: 600; }
+.geteilt-ok:disabled { opacity: .6; cursor: default; }
+/* Am Telefon ist das der Normalfall — dort wird es großzügiger */
+@media (pointer: coarse) {
+  .geteilt-zeile select, .geteilt-foot button { min-height: 42px; font-size: 14px; }
+  .geteilt-wahl label { min-height: 34px; }
+}
+/* Am Telefon sind Modals sonst Vollbild-Blätter (Arbeitsflächen). Dieser
+   Dialog ist aber EINE Entscheidung — als Vollbild klaffte in der Mitte eine
+   leere Fläche (Bildschirmfoto der Prüfreihe). Er bleibt deshalb eine Karte,
+   die nur so hoch ist wie ihr Inhalt. */
+@media (max-width: 640px) {
+  .modal-backdrop:has(.geteilt-modal) { padding: 12px; align-items: center; }
+  .modal.geteilt-modal {
+    width: calc(calc(100vw / var(--pn-anz, 1)) - 24px); height: auto; max-height: calc(92dvh / var(--pn-anz, 1));
+    border-radius: var(--r-lg); overflow: auto;
+  }
+  .modal.geteilt-modal .modal-head { border-radius: var(--r-lg) var(--r-lg) 0 0; }
+}
+
+/* ---------- M296: Telefon — Rechtliches liegt im Logo-Menü, nicht unter dem Dock ---------- */
+/* Steht am Ende des Stylesheets, damit es die Grundregel von .legal-corner sicher überschreibt. */
+@media (max-width: 640px) {
+  .legal-corner { display: none; }
+  .react-flow__attribution { bottom: 84px; }
+}
+
+/* ===== M312: Weniger ist mehr — Rahmen (Kopfleiste, Spalte, Dock, Übersicht) ===== */
+/* Suche-Knopf oben nur, wenn keine Spalte mit Suchfeld zu sehen ist */
+@media (min-width: 861px) {
+  .app.nav-links .top-actions .ta-suche { display: none; }
+}
+/* Das Suchfeld im Baum ist ein Knopf: öffnet die eine Suche (Strg+K) */
+.side-tree-find {
+  display: flex; align-items: center; gap: 7px; text-align: left; cursor: pointer;
+  color: var(--muted);
+}
+.side-tree-find span { flex: 1; }
+.side-tree-find kbd {
+  font-family: inherit; font-size: 9.5px; color: var(--muted); border: 1px solid var(--border-soft);
+  border-radius: var(--r-sm); padding: 1px 5px; background: var(--surface-dim);
+}
+.side-tree-find:hover { border-color: var(--border); color: var(--ink); }
+/* Bereichs-Zeile mit ⋯ beim Zeigen */
+.side-space-head { display: flex; align-items: center; gap: 4px; }
+.side-space-head .side-space-name { flex: 1; }
+.side-space-head:hover .ebenen-menu-knopf, .side-space-head .ebenen-menu-knopf.auf,
+.side-space-head .ebenen-menu-knopf:focus-visible { opacity: 1; }
+/* Aufgaben in der Spalte: wie Übersicht, mit Zahl rechts */
+.tab-badge {
+  margin-left: auto; min-width: 18px; height: 18px; padding: 0 6px; border-radius: var(--r);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10.5px; font-weight: 700; background: var(--surface-dim); color: var(--muted);
+}
+.tab-badge.red { background: #d84b3d; color: #fff; }
+.tabs:not(.spalte) .tab-tasks { display: none; }
+.nav-head .tab-tasks .tab-home-label { display: inline; }
+.nav-head .tab-tasks .tab-badge { margin-left: 2px; height: 16px; min-width: 16px; font-size: 10px; }
+/* ＋ Neu als Menü am Fuß */
+.neu-wrap { position: relative; display: inline-flex; }
+.ebenen-menu.neu-menu {
+  position: absolute; left: 0; bottom: calc(100% + 6px); top: auto; min-width: 230px; z-index: 60;
+}
+.tabs:not(.spalte) .ebenen-menu.neu-menu { bottom: auto; top: calc(100% + 6px); left: auto; right: 0; }
+.neu-menu small { color: var(--muted); font-size: 11px; margin-left: 4px; font-weight: 400; }
+/* Übersicht: Zeilen und Kacheln tragen nur ein ⋯, sichtbar beim Zeigen */
+.ov-head-actions { opacity: 0; }
+.ovc-space:hover .ov-head-actions, .ovc-project:hover .ov-head-actions,
+.ov-head-actions:focus-within, .ov-head-actions:has(.ebenen-menu-knopf.auf) { opacity: 1; }
+.ov-head-actions .ebenen-menu-knopf { opacity: 1; }
+.ovc-tile-actions .ebenen-menu-knopf { opacity: 1; }
+.ovc-tile .ov-board-name { padding-right: 28px; }
+@media (hover: none) {
+  .ov-head-actions, .ovc-tile-actions, .side-space-head .ebenen-menu-knopf { opacity: 1; }
+}
+/* Fassung im Fuß der Hilfe */
+.help-fassung { display: block; margin-top: 6px; font-size: 11px; color: var(--muted); }
+
+/* Bereichs-⋯ im Baum erst beim Zeigen — wie bei Projekt und Board */
+.side-space-head .ebenen-menu-knopf { opacity: 0; transition: opacity 0.15s; }
+.side-space-head:hover .ebenen-menu-knopf, .side-space-head .ebenen-menu-knopf.auf,
+.side-space-head .ebenen-menu-knopf:focus-visible { opacity: 1; }
+@media (hover: none) { .side-space-head .ebenen-menu-knopf { opacity: 1; } }
+
+/* M312: Der Eintrag Aufgaben in der Spalte sieht aus wie Übersicht, ist aber eine eigene Klasse */
+.tabs.spalte .tab-tasks {
+  /* M315: dieselbe Zeile wie 🏠 — Symbol und Wort nebeneinander, volle Breite */
+  border: none; background: none; cursor: pointer; flex: none; border-radius: var(--r);
+  align-self: stretch; width: auto; height: 32px; display: flex; align-items: center; gap: 8px;
+  padding: 0 8px; justify-content: flex-start; font-size: 12.5px; font-weight: 600; color: var(--ink);
+}
+.tabs.spalte .tab-tasks:hover { background: var(--surface-2); }
+.tabs.spalte .tab-tasks.active { background: var(--accent-soft); }
+.tabs.spalte .tab-tasks .tab-home-label { display: inline; }
+
+/* ===== M313: Karte — Auswahl-Leiste und Modulköpfe ===== */
+.kopf-mehr { color: var(--muted); }
+.gantt-tools .ebenen-menu-wrap, .sheet-tools .ebenen-menu-wrap, .mm-row .ebenen-menu-wrap { display: inline-flex; align-items: center; }
+.kopf-menu-dots { display: flex; gap: 6px; padding: 4px 12px 6px; align-items: center; }
+.kopf-menu-dots .mm-dot { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+.kopf-menu-dots .mm-dot.on { border-color: var(--ink); }
+.kopf-menu-dots .mm-dot-none { background: var(--surface-dim); }
+
+/* ===== M314: Einstellungen — Erweitertes eingeklappt ===== */
+.modal-details { margin-top: 10px; border-top: 1px solid var(--border-soft); padding-top: 8px; }
+.modal-details > summary { cursor: pointer; font-size: 12.5px; color: var(--muted); padding: 4px 0; list-style: none; }
+.modal-details > summary::-webkit-details-marker { display: none; }
+.modal-details > summary::before { content: '›'; display: inline-block; width: 14px; transition: transform 0.15s; }
+.modal-details[open] > summary::before { transform: rotate(90deg); }
+.modal-details > summary:hover { color: var(--ink); }
+
+/* ===== M316: Modul-Palette — alle Module auf einen Blick ===== */
+/* Die Palette steht mittig ÜBER dem Dock (das Dock ist der Bezugsrahmen:
+   fixed + transform), nicht links am ＋ wie die übrigen Flyouts. Zentriert
+   wird mit `translate` — dieselbe Eigenschaft wie in der Phone-Regel für
+   .dock-menu (M174), sonst verschöben beide zusammen doppelt. */
+.dock-menu.modul-palette {
+  left: 50%; right: auto; translate: -50% 0; transform: none; bottom: calc(100% + 8px);
+  width: min(470px, calc(calc(100vw / var(--pn-anz, 1)) - 16px)); max-width: none; padding: 8px; gap: 2px;
+}
+.modul-suche {
+  display: flex; align-items: center; gap: 6px; padding: 0 8px; margin-bottom: 2px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); background: var(--surface-3);
+}
+.modul-suche:focus-within { border-color: var(--accent); }
+.modul-suche svg { color: var(--muted); flex: none; }
+.modul-suche input {
+  flex: 1; min-width: 0; border: none; background: none; font: inherit; font-size: 13px;
+  padding: 7px 0; color: var(--ink); outline: none;
+}
+.modul-suche input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.modul-palette .modul-gruppe .dock-menu-label { padding: 5px 4px 2px; font-size: 10px; }
+.modul-raster { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 3px; }
+/* `.dock button` setzt 42 × 42 — die Kachel wächst mit ihrem Namen (zwei Zeilen) */
+.dock-menu .modul-kachel {
+  width: auto; height: auto; min-height: 56px; flex-direction: column; justify-content: center; align-items: center; gap: 5px;
+  padding: 7px 3px 6px; text-align: center; font-size: 11px; line-height: 1.2; letter-spacing: -0.01em;
+  border: 1px solid transparent; position: relative; hyphens: manual;
+}
+.dock-menu .modul-kachel:hover { background: var(--surface-2); border-color: var(--border-soft); }
+.dock-menu .modul-kachel:focus-visible { border-color: var(--accent); outline: none; }
+.dock-menu .modul-kachel > svg { color: var(--ink); }
+.dock-menu .modul-kachel:hover > svg { color: var(--accent-strong); }
+.modul-kachel > span:first-of-type {
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; max-width: 100%;
+}
+.dock-menu .modul-vorlage { padding-right: 4px !important; }
+.modul-vorlage .dock-menu-template-x { top: 3px; right: 3px; transform: none; opacity: 0; }
+.modul-vorlage:hover .dock-menu-template-x, .modul-vorlage:focus-within .dock-menu-template-x { opacity: 1; }
+@media (pointer: coarse) { .modul-vorlage .dock-menu-template-x { opacity: 1; } }
+.modul-leer { font-size: 12px; color: var(--muted); padding: 10px 6px; }
+@media (max-width: 640px) {
+  .modul-raster { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .dock-menu.modul-palette { max-height: calc(calc(100vh / var(--pn-anz, 1)) - 150px - var(--safe-top)); }
+}
+
+/* ===== M320: Handschrift → Text in der Zeichen-Palette ===== */
+.draw-palette .draw-text {
+  display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--border-soft);
+  background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; font-weight: 600;
+  padding: 4px 9px; border-radius: var(--r-sm); cursor: pointer; margin-left: 4px;
+}
+.draw-palette .draw-text:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-strong); }
+.draw-palette .draw-text:disabled { opacity: 0.5; cursor: default; }
+
+/* ===== M323: Notiz nachgeschärft ===== */
+/* Titelzeile: der erste Absatz einer MEHRZEILIGEN Notiz liest sich als Titel */
+.note-editor .bn-editor > .bn-block-group:has(> .bn-block-outer:nth-child(2)) > .bn-block-outer:first-child > .bn-block > .bn-block-content[data-content-type="paragraph"] > p {
+  font-weight: 650; font-size: 1.14em; letter-spacing: -0.005em;
+}
+/* Farbpunkt zeigt die aktuelle Farbe statt eines Regenbogens; Palette darunter */
+.react-flow__node-note .color-dot { background: rgba(255,255,255,.55); border-color: rgba(0,0,0,.3); }
+.react-flow__node-note .color-dot.on { border-color: var(--ink); }
+.note-farben {
+  position: absolute; top: 28px; right: 8px; z-index: 7;
+  display: flex; align-items: center; gap: 6px; padding: 6px;
+  background: var(--surface-pop, var(--surface-card)); border: 1px solid var(--border-soft);
+  border-radius: var(--r); box-shadow: var(--pop-shadow);
+}
+.note-farbe, .sel-farbe {
+  width: 22px; height: 22px; border-radius: 50%; padding: 0; cursor: pointer;
+  border: 2px solid rgba(0, 0, 0, .18);
+}
+.note-farbe.on, .sel-farbe.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface-card); }
+.note-farbe-yellow { background: #fff3a3; }
+.note-farbe-pink   { background: #ffd6e0; }
+.note-farbe-mint   { background: #d2f5dd; }
+.note-farbe-sky    { background: #d9ecff; }
+.note-farbe-white  { background: #ffffff; }
+.note-farben .pn-colorpick { width: 22px; height: 22px; }
+.sel-farben { display: flex; align-items: center; gap: 6px; padding: 6px 12px; }
+.sel-farben-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); margin-right: 2px; }
+.sel-farbe { width: 18px; height: 18px; }
+/* Checklisten-Fortschritt */
+.note-fortschritt {
+  display: flex; align-items: center; gap: 8px; margin: 4px 10px 0;
+  font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.note-fortschritt-balken { flex: 1; height: 3px; background: rgba(0, 0, 0, .12); border-radius: 2px; overflow: hidden; }
+.note-fortschritt-balken > i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
+.note-fortschritt.fertig { color: #2f7a3d; }
+.note-fortschritt.fertig .note-fortschritt-balken > i { background: #3d9a4e; }
+/* Fokus: Lesetypografie für Notizen */
+.focus-mode .react-flow__node-note.pn-focused .note-editor .bn-editor {
+  font-size: 16px !important; line-height: 1.55; max-width: 72ch; margin-inline: auto; padding-block: 14px !important;
+}
+
+/* ===== M324: Stift & Handschrift 2 ===== */
+/* Vorschlag nach der Schreibpause: unter dem Geschriebenen, ein Tipp übernimmt */
+.schrift-vorschlag {
+  position: fixed; z-index: 60; display: inline-flex; align-items: center; gap: 2px;
+  max-width: min(420px, calc(80vw / var(--pn-anz, 1))); padding: 2px 2px 2px 4px;
+  background: var(--surface-pop, var(--surface-card)); color: var(--ink);
+  border: 1px solid var(--border-soft); border-radius: var(--r); box-shadow: var(--pop-shadow);
+  font-size: 13px; line-height: 1.3; pointer-events: auto;
+}
+.schrift-vorschlag .vorschlag-text {
+  all: unset; cursor: pointer; padding: 5px 8px; border-radius: var(--r-xs);
+  white-space: pre-line; overflow: hidden; text-overflow: ellipsis; max-height: 4.2em;
+}
+.schrift-vorschlag .vorschlag-text:hover { background: var(--surface-hover, rgba(0,0,0,.05)); }
+.schrift-vorschlag .vorschlag-text b { font-weight: 600; color: var(--accent-strong); margin-right: 6px; }
+.schrift-vorschlag .vorschlag-text.erkennt { color: var(--muted); font-style: italic; cursor: default; }
+.schrift-vorschlag .vorschlag-weg { all: unset; cursor: pointer; width: 26px; height: 26px; display: grid; place-items: center; border-radius: var(--r-xs); color: var(--muted); }
+.schrift-vorschlag .vorschlag-weg:hover { background: var(--surface-hover, rgba(0,0,0,.05)); color: var(--ink); }
+/* Strichstärke in der Palette: drei Punkte, der gewählte dunkel umrandet */
+.draw-palette .draw-dicke { all: unset; cursor: pointer; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; }
+.draw-palette .draw-dicke i { display: block; border-radius: 50%; background: var(--ink); }
+.draw-palette .draw-dicke.on { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.draw-palette .draw-dicke:hover { background: rgba(0,0,0,.05); }
+.draw-palette .draw-trenner { width: 1px; height: 18px; background: var(--border-soft); margin: 0 2px; }
+
+/* ===== M325: Stift wie auf Surface und iPad ===== */
+.draw-palette .draw-radierer-art {
+  all: unset; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; padding: 4px 9px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-sm); color: var(--muted); background: var(--surface);
+}
+.draw-palette .draw-radierer-art + .draw-radierer-art { margin-left: 4px; }
+.draw-palette .draw-radierer-art.on { color: var(--ink); border-color: var(--ink); }
+
+/* ===== M327: Struktur aus der Handschrift — Textart im Vorschlag umschalten ===== */
+.schrift-vorschlag { flex-wrap: wrap; }
+.schrift-vorschlag .vorschlag-arten { display: inline-flex; align-items: center; gap: 1px; padding: 0 2px; margin-left: 2px; border-left: 1px solid var(--border-soft); }
+.schrift-vorschlag .vorschlag-art {
+  all: unset; cursor: pointer; min-width: 24px; height: 24px; padding: 0 4px; display: grid; place-items: center;
+  border-radius: var(--r-xs); font-size: 12px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.schrift-vorschlag .vorschlag-art:hover { background: var(--surface-hover, rgba(0,0,0,.05)); color: var(--ink); }
+.schrift-vorschlag .vorschlag-art.on { color: var(--accent-strong); box-shadow: inset 0 0 0 1.5px var(--accent); }
+
+/* ===== M330: Geteilte Boards ===== */
+.side-board-geteilt { font-size: 12px; margin-left: auto; margin-right: 4px; opacity: .8; display: inline-flex; align-items: center; }
+.freigabe-dialog .freigabe-liste { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.freigabe-dialog .freigabe-liste li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--border-soft); border-radius: var(--r-sm); }
+.freigabe-dialog .freigabe-mail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.freigabe-dialog .freigabe-stand { font-size: 12px; color: var(--muted); }
+.freigabe-dialog .freigabe-stand.an { color: var(--accent-strong); }
+.freigabe-dialog .freigabe-weg { all: unset; cursor: pointer; width: 26px; height: 26px; display: grid; place-items: center; border-radius: var(--r-xs); color: var(--muted); }
+.freigabe-dialog .freigabe-weg:hover { background: var(--surface-hover, rgba(0,0,0,.05)); color: var(--ink); }
