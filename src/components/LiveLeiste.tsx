@@ -10,7 +10,7 @@ import { useInternalNode } from '@xyflow/react';
 import { useBoard } from '../store';
 import { liveAuf, nameGeaendert, SPERREN_EREIGNIS, sperrenVon, TEILNEHMER_EREIGNIS } from '../lib/liveStand';
 import type { Teilnehmer } from '../lib/liveKanal';
-import { getAuthor, setAuthor } from './CommentLayer';
+import { getAuthor, setAuthor } from '../lib/autor';
 import { IX } from './Icons';
 
 export const NAME_FRAGEN = 'pixinotes:gast-name';
@@ -44,6 +44,34 @@ export function LiveLeiste() {
   useTakt(TEILNEHMER_EREIGNIS);
   if (!liveAuf(boardId)) return null;
   return <Suspense fallback={null}><LiveLeisteVoll /></Suspense>;
+}
+
+/**
+ * M502: Vorführen-Band, Live-Mauszeiger und Gruppenraum (Reaktionen, Timer) zeigen nur in einem Live-Board etwas —
+ * ihr Code lädt darum erst, wenn das erste Board dieser Sitzung live ist, und bleibt danach eingehängt (wie früher
+ * von Anfang an). Ohne Kanal hängen sie nichts ins DOM. Die Kanal-Seite startet lib/gastSync.ts.
+ */
+let liveTeamDa = false;
+function useLiveTeam(): boolean {
+  const boardId = useBoard((s) => s.activeId);
+  useTakt(TEILNEHMER_EREIGNIS);
+  if (liveAuf(boardId)) liveTeamDa = true;
+  return liveTeamDa;
+}
+const LiveZeigerVoll = lazy(() => import('./Mauszeiger').then((m) => ({ default: m.LiveZeiger })));
+const VorfuehrenVoll = lazy(() => import('./Vorfuehren').then((m) => ({ default: m.Vorfuehren })));
+const GruppenraumVoll = lazy(() => import('./Gruppenraum').then((m) => ({ default: m.GruppenraumSchicht })));
+/** Gehört in ein <ViewportPortal> des Boards (M375) */
+export function LiveZeigerSpaet() {
+  return useLiveTeam() ? <Suspense fallback={null}><LiveZeigerVoll /></Suspense> : null;
+}
+/** M367 „Folgt mir" — Band und Mitfahren der Ansicht */
+export function VorfuehrenSpaet() {
+  return useLiveTeam() ? <Suspense fallback={null}><VorfuehrenVoll /></Suspense> : null;
+}
+/** M376 — aufsteigende Reaktionen und die gemeinsame Uhr */
+export function GruppenraumSpaet() {
+  return useLiveTeam() ? <Suspense fallback={null}><GruppenraumVoll /></Suspense> : null;
 }
 
 function Sperre({ id, t }: { id: string; t: Teilnehmer }) {

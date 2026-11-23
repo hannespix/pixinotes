@@ -30,6 +30,10 @@ export {
 import { liveKanal, type Teilnehmer } from './liveKanal';
 // M477: Gemeinsam tippen in Notizen — horcht auf den Kanal (Weckruf, Stand-Fragen); lädt mit dem Abgleich, nie im Start
 import './notizGemeinsam';
+// M502: Vorführen, Live-Mauszeiger und Gruppenraum hören auf den Live-Kanal — sie kommen mit diesem Teil statt mit dem Start
+import { initVorfuehren } from './vorfuehren';
+import { initMauszeiger } from './mauszeiger';
+import { initGruppenraum } from './gruppenraum';
 import { notizSchutz } from '../store/schutz';
 import { istPatch, patchAnwenden, patchAus, patchSaeubern, type Patch } from './gastPatch';
 import { boardVonAussen, karteEntschaerfen, karteGueltig } from './sicher';
@@ -170,6 +174,8 @@ function exklusiv<T>(boardId: string, fn: () => Promise<T>): Promise<T> {
 const optionenAm = new Map<string, number>();
 function kanalOeffnen(boardId: string, kanalName: string, beiStand: () => void): void {
   if (kanaele.has(boardId)) return;
+  // M502: vor der ersten Nachricht lauschen (früher startete App.tsx sie beim Start; jedes init läuft nur einmal)
+  initVorfuehren(); initMauszeiger(); initGruppenraum();
   const k = supabaseKonfig();
   kanaele.set(boardId, liveKanal(k, kanalName, { ...ich(), ...meineKarte(boardId) }, {
     nachricht: (ereignis, inhalt) => {

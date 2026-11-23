@@ -8,10 +8,9 @@ import { IPen, ITrash, IX } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 import { blasenAn, SEITEN_EREIGNIS, seiteVon, seitenKommentare } from '../lib/pdfSeiten';
 
-/** Verfasser-Name: rein lokal (localStorage), wandert NIE ohne den Kommentar */
-const AUTHOR_KEY = 'pixinotes:author';
-export const getAuthor = (): string => localStorage.getItem(AUTHOR_KEY) ?? '';
-export const setAuthor = (name: string) => { try { localStorage.setItem(AUTHOR_KEY, name.trim().slice(0, 40)); } catch { /* Sitzung reicht */ } };
+import { getAuthor, setAuthor } from '../lib/autor';
+// M502: Verfasser-Name im leichten Teil (Start-Paket) — hier weitergereicht für alle bisherigen Importe
+export { getAuthor, setAuthor } from '../lib/autor';
 
 const initials = (name: string) =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('') || '?';

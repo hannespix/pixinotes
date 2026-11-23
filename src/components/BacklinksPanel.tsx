@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useBoard } from '../store';
 import { collectBacklinks } from '../lib/links';
-import { relatedToBoard, type BrainHit } from '../lib/brain';
+import type { BrainHit } from '../lib/brain';
 import { IFolder, INote, IX, INetz } from './Icons';
 
 /**
@@ -26,7 +26,8 @@ export function BacklinksPanel() {
     if (!brainOn) { setRelated([]); return; }
     let gone = false;
     const load = () => {
-      relatedToBoard(activeId, 5)
+      // M502: lib/brain.ts lädt erst hier (nur mit eingeschaltetem Gehirn), nicht mit dem Start
+      import('../lib/brain').then((m) => m.relatedToBoard(activeId, 5))
         .then((r) => { if (!gone) setRelated(r); })
         .catch(() => { if (!gone) setRelated([]); });
     };

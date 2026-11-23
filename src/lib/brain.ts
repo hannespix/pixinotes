@@ -114,7 +114,6 @@ async function embed(texts: string[], kind: 'doc' | 'query'): Promise<number[][]
 let mem: Map<string, BrainEntry> | null = null;
 let loading: Promise<void> | null = null;
 let running = false;
-let dirtyTimer: ReturnType<typeof setTimeout> | null = null;
 let lastError = '';
 
 async function loadIndex(): Promise<void> {
@@ -252,29 +251,7 @@ export async function rebuildBrainIndex(): Promise<void> {
   await syncBrainIndex();
 }
 
-/** Start: Erst-Indexierung kurz nach dem Boot, danach nach Änderungen (entprellt) */
-export function initBrain(): void {
-  setTimeout(() => void syncBrainIndex(), 3500);
-  useBoard.subscribe((s, prev) => {
-    if (!s.brain.on || s.boards === prev.boards) return;
-    if (dirtyTimer) clearTimeout(dirtyTimer);
-    dirtyTimer = setTimeout(() => void syncBrainIndex(), 12_000);
-  });
-  // M220: Ein Bereich wurde zu-/abgeschaltet — SOFORT abgleichen, nicht erst
-  // nach der üblichen Wartezeit. Wer „privat" abschaltet, will nicht zwölf
-  // Sekunden lang hoffen, dass die Vektoren wirklich verschwinden.
-  window.addEventListener('pixinotes:brain-scope', () => {
-    if (dirtyTimer) clearTimeout(dirtyTimer);
-    void syncBrainIndex();
-  });
-  // M465: Die Texterkennung eines Bildes ist fertig — bald neu einbetten, nicht erst nach zwölf Sekunden:
-  // Wer gerade einen Screenshot abgelegt hat, sucht oft gleich danach.
-  window.addEventListener('pixinotes:bildtext-fertig', () => {
-    if (!useBoard.getState().brain.on) return;
-    if (dirtyTimer) clearTimeout(dirtyTimer);
-    dirtyTimer = setTimeout(() => void syncBrainIndex(), 1500);
-  });
-}
+// M502: der Start (initBrain) liegt in lib/brainStart.ts — dieser Teil lädt erst, wenn das Gehirn an ist
 
 /* ---------- Abfragen ---------- */
 

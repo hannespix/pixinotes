@@ -17,9 +17,8 @@ import { fangAktiv, fangen, fangSetzen, type Kasten } from '../lib/fang';
 import { zugSetzen } from '../lib/zugAnzeige';
 import { Fanglinien } from './Fanglinien';
 import { AnsichtPortal } from './AnsichtPortal';
-import { LiveSperren } from './LiveLeiste';
-import { LiveZeiger } from './Mauszeiger';
-import { PunkteMarken } from './Punkte';
+import { LiveSperren, LiveZeigerSpaet } from './LiveLeiste';
+import { PunkteMarkenSpaet } from './PunkteSpaet';
 import { useBoardTasten } from './boardTasten';
 import { leeresStartboard, mutedHistory, selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { DOKUMENT_BEFEHL, SEITEN_EREIGNIS, seiteVon } from '../lib/pdfSeiten';
@@ -65,7 +64,6 @@ const MINIMAP_AB = 10;
 const istMaus = () => window.matchMedia('(pointer: fine)').matches;
 import { DrawingLayer } from './DrawingLayer';
 import { FingerGesten } from './FingerGesten';
-import { CommentLayer } from './CommentLayer';
 import { BoardKontextmenue } from './Kontextmenue';
 import { fristenLaden } from '../lib/dates';
 import { rufnummernLaden } from '../lib/rufnummer';
@@ -163,6 +161,20 @@ const PRO_OPTIONEN = { hideAttribution: true };
  * eingehängt (auch über einen Board-Wechsel hinweg), wie vorher. Den Rechtsklick-Wunsch („Mehr"-Menü am Zeiger)
  * holt sie sich beim Einhängen selbst ab (kartenWunschNehmen, M350). Schon die erste Berührung/Taste stößt das Laden an.
  */
+/**
+ * M502: Die Kommentar-Ebene (Pins, Gesprächs-Panel; ~15 KB Quelltext) lädt, sobald das Board Kommentare hat oder
+ * einer geöffnet wird — bei einem Board mit Kommentaren also gleich beim Öffnen, sonst still im Leerlauf (App.tsx).
+ * Einmal da, bleibt sie eingehängt (auch über einen Board-Wechsel). Der Verfasser-Name liegt in lib/autor.ts.
+ */
+export const kommentareLaden = () => import('./CommentLayer');
+const KommentareSpaet = lazy(() => kommentareLaden().then((m) => ({ default: m.CommentLayer })));
+let kommentareEingehaengt = false;
+function Kommentare() {
+  const da = useBoard((s) => (selectActiveBoard(s).comments?.length ?? 0) > 0 || s.commentOpen !== null);
+  if (da) kommentareEingehaengt = true;
+  return kommentareEingehaengt ? <Suspense fallback={null}><KommentareSpaet /></Suspense> : null;
+}
+
 export const auswahlLeisteLaden = () => import('./SelectionToolbar');
 const AuswahlLeisteSpaet = lazy(() => auswahlLeisteLaden().then((m) => ({ default: m.SelectionToolbar })));
 let auswahlLeisteEingehaengt = false;
@@ -1783,8 +1795,8 @@ export function Board() {
         <AnsichtPortal><LiveSperren /></AnsichtPortal>
         {/* M375: Zeiger der anderen (und der Laser des Vorführenden) — in Board-Koordinaten */}
         {/* M377: Punkte an den Karten */}
-        <AnsichtPortal><PunkteMarken /></AnsichtPortal>
-        <AnsichtPortal><LiveZeiger /></AnsichtPortal>
+        <AnsichtPortal><PunkteMarkenSpaet /></AnsichtPortal>
+        <AnsichtPortal><LiveZeigerSpaet /></AnsichtPortal>
         <Background
           variant={gridSnap ? BackgroundVariant.Lines : BackgroundVariant.Dots}
           gap={gridSnap ? 20 : 26}
@@ -1803,7 +1815,7 @@ export function Board() {
         <BoardKontextmenue />
         <DrawingLayer />
         <FingerGesten />
-        <CommentLayer />
+        <Kommentare />
       </ReactFlow>
       <div className="fokus-spur" ref={fokusSpurRef} aria-hidden="true">
         <div

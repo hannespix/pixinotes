@@ -25,7 +25,8 @@ const PORT = 5467;
 /** Grenze knapp über dem gemessenen Stand (2 168 523 B = 2,07 MiB; vorher 2 198 693 B, siehe docs/meilensteine/M467-start-leistung-3.md) */
 // M462: BlockNote 0.57 (Tiptap 3, Mantine 8) — Start 2 220 718 B (+50 KB, Emoji-Auswahl schon nachgeladen; siehe docs/meilensteine/M462-blocknote.md)
 // M483: Start 2 097 102 B (vorher 2 238 181 B) — Grenze GESENKT auf neuer Stand + gut 20 KB, damit das Polster nicht gleich wieder verbraucht ist (docs/meilensteine/M483-start-leicht.md)
-const START_JS_GRENZE = 2_120_000;
+// M502: Live-Team, Gehirn, Rechen-Tabelle, Kommentare, Punkte, Nachschlagen, Handschrift-Struktur, Bildtext nachgeladen — Start 2 042 564 B (vorher 2 110 339 B); Grenze GESENKT auf neuer Stand + gut 20 KB (docs/meilensteine/M502-start-leicht-2.md)
+const START_JS_GRENZE = 2_065_000;
 
 let ok = 0; let bad = 0;
 const pruefe = (n, gut, info = '') => {
