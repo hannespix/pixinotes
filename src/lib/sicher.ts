@@ -91,6 +91,9 @@ export function webAdresseVonAussen(roh: unknown): string | null {
 export function rasterBildVonAussen(roh: unknown, hoechstens = 25_000_000): string | null {
   if (typeof roh !== 'string' || roh.length > hoechstens) return null;
   return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
+}
+
+/**
  * M457: Kontakt-Felder, die aus einer fremden E-Mail (Signatur) oder aus einer KI-Antwort stammen. Nur Text, gekürzt,
  * ohne Steuerzeichen; E-Mail nur in Adressform, Webseite nur http(s) (auch ohne „https://“ geschrieben), Rufnummern
  * höchstens zwölf, kein Foto. Felder, die nicht als brauchbarer Text kommen, fehlen im Ergebnis.
