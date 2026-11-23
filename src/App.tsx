@@ -1,7 +1,7 @@
 import { QR_EREIGNIS, type QrWunsch } from './lib/qr';
 import { lazy, Suspense, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { Board, kartenVorladen } from './components/Board';
+import { auswahlLeisteLaden, Board, kartenVorladen } from './components/Board';
 import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
 import { TopActions } from './components/TopActions';
@@ -25,9 +25,7 @@ import { FocusSheet } from './components/FocusSheet';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Onboarding } from './components/Onboarding';
 import { BacklinksPanel } from './components/BacklinksPanel';
-import { ShareCardsModal } from './components/ShareCardsModal';
-import { BildExport } from './components/BildExport';
-import { GeteiltDialog } from './components/GeteiltDialog';
+import { GeteiltHost } from './components/GeteiltHost';
 import { LookupPanel } from './components/LookupPanel';
 import { TooltipLayer } from './components/TooltipLayer';
 import { Tastatur } from './components/Tastatur';
@@ -56,6 +54,7 @@ import { initSyncStart } from './lib/syncStart';
 import { sprache, zahlWort } from './lib/sprache';
 import { ILock } from './components/Icons';
 import { EINGANG_OEFFNEN, eingangWaechter } from './lib/eingang';
+import { importLaden } from './lib/importSpaet';
 import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick gespeicherte Seitenstriche (M354-Fehler) einmal richten
 
 /**
@@ -179,12 +178,17 @@ const LADER = {
   presenter: () => import('./components/Presenter'),
   suche: () => import('./components/SearchOverlay'),
   recherche: () => import('./components/RechercheDialog'),
+  // M483: Karten teilen und Bild/PDF-Export — Dialoge, die erst mit dem Aufruf gebraucht werden
+  teilen: () => import('./components/ShareCardsModal'),
+  bildExport: () => import('./components/BildExport'),
 };
 const OverviewLazy = lazy(() => LADER.overview().then((m) => ({ default: m.Overview })));
 const TaskHubLazy = lazy(() => LADER.taskhub().then((m) => ({ default: m.TaskHub })));
 const PresenterLazy = lazy(() => LADER.presenter().then((m) => ({ default: m.Presenter })));
 const SearchOverlayLazy = lazy(() => LADER.suche().then((m) => ({ default: m.SearchOverlay })));
 const RechercheLazy = lazy(() => LADER.recherche().then((m) => ({ default: m.RechercheDialog })));
+const ShareCardsLazy = lazy(() => LADER.teilen().then((m) => ({ default: m.ShareCardsModal })));
+const BildExportLazy = lazy(() => LADER.bildExport().then((m) => ({ default: m.BildExport })));
 
 /** Einmal geöffnet, bleibt der Teil eingehängt (er schließt sich selbst über seinen Store-Schalter) */
 function BeiBedarf({ offen, children }: { offen: boolean; children: ReactNode }) {
@@ -205,6 +209,13 @@ function Praesentation() {
   }, []);
   const folgeVortrag = folgeIch(boardId) && !!werFuehrtVor(boardId)?.vortrag;
   return <BeiBedarf offen={presenting || folgeVortrag}><PresenterLazy /></BeiBedarf>;
+}
+/** M483: Teilen-Dialog für ausgewählte Karten (M202) und Bild-Export — beide über ihren Store-Schalter */
+function KartenTeilen() {
+  return <BeiBedarf offen={useBoard((s) => !!s.shareCards)}><ShareCardsLazy /></BeiBedarf>;
+}
+function BildExportFenster() {
+  return <BeiBedarf offen={useBoard((s) => s.bildExportOpen)}><BildExportLazy /></BeiBedarf>;
 }
 function Recherche() {
   return <BeiBedarf offen={useBoard((s) => s.rechercheOpen)}><RechercheLazy /></BeiBedarf>;
@@ -238,6 +249,14 @@ function imLeerlaufVorladen() {
     void rufnummernLaden().catch(() => null);
     void freigabeDialogLaden().catch(() => null);
     void import('./lib/gastSync').catch(() => null);
+    // M483: Auswahl-Leiste, Datei-Import und Beispiele — damit die erste Auswahl, das erste Ablegen und „Beispiele
+    // laden" ohne Verzug gehen und der Service Worker sie auch offline hat
+    void auswahlLeisteLaden().catch(() => null);
+    void importLaden().catch(() => null);
+    void import('./lib/starter').catch(() => null);
+    void import('./components/GeteiltDialog').catch(() => null);
+    void import('./components/EbeneLoeschenFenster').catch(() => null);
+    void import('./lib/kontaktExport').catch(() => null);
   };
   const ric = (window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
   window.setTimeout(() => (ric ? ric(los, { timeout: 4000 }) : los()), VORLADEN_NACH_MS);
@@ -550,7 +569,7 @@ export default function App() {
             <Dock />
             <ErrorBoundary what="Das Backlinks-Panel"><BacklinksPanel /></ErrorBoundary>
             {/* M202: Teilen-Dialog für ausgewählte Karten */}
-            <ShareCardsModal />
+            <KartenTeilen />
             {/* M212: Karte im Fokus (Handy) — Rahmen und Bedienung; die Karte
                 selbst bleibt im Board-Baum und wird per CSS formatfüllend */}
             <FocusSheet />
@@ -565,9 +584,9 @@ export default function App() {
       <SicherungEinspielen />
       <Outlook />
       <Eingang />
-      <BildExport />
+      <BildExportFenster />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
-      <GeteiltDialog />
+      <GeteiltHost />
       <LookupPanel />
       <TooltipLayer />
       <Tastatur />

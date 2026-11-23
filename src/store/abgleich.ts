@@ -4,7 +4,6 @@
  *
  * M480: aus src/store.ts herausgelöst (reiner Umbau) – src/store.ts bleibt der Einstieg und exportiert alles weiter.
  */
-import { buildStarter } from '../lib/starter';
 import { uid } from '../types';
 import type { BoardDoc, HistoryEntry, Project, Space, BoardState, Setzen, Holen } from './typen';
 import { ohneLeseschutz, vorUmbauHaken, FREMD_SCHUB_AB, kartenSchub } from './schutz';
@@ -20,7 +19,8 @@ let importUndo: { boards: BoardDoc[]; spaces: Space[]; activeId: string } | null
 /** M480: Teil des Board-Speichers – Abgleich und Import */
 export function abgleichScheibe(set: Setzen, get: Holen) {
   return {
-    addStarter: () => {
+    // M483: Die Beispiele (lib/starter.ts, rund 25 KB Inhalt) kommen erst mit dem Wunsch — nicht mit jedem Start
+    addStarter: () => { void import('../lib/starter').then(({ buildStarter }) => {
       const fresh = buildStarter();
       // M370: Steht nur das unberührte Startboard da, ersetzen die Beispiele es samt seinem leeren Bereich
       const nurStart = !!leeresStartboard(get().boards) && get().spaces.length === 1 && get().spaces[0].projects.length === 1;
@@ -33,7 +33,7 @@ export function abgleichScheibe(set: Setzen, get: Holen) {
         importEpoch: get().importEpoch + 1,
       });
       get().showToast(`Beispiele geladen: ${fresh.spaces.length} Bereiche, ${fresh.boards.length} Boards zum Ausprobieren.`);
-    },
+    }); },
 
     // M184: Struktur-Import (OneNote). Bewusst EIN set() statt vieler
     // addBoard-Aufrufe: Letztere setzen jedes Mal activeId neu und legen

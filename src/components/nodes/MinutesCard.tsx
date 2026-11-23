@@ -11,7 +11,7 @@ import { allDecisions, buildEntry, currentEntry, entryLabel, nextDate, sortEntri
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { useAndroidBackspaceFix } from '../../lib/blocknoteAndroidFix';
 import { editorUpload } from '../../lib/notizBild';
-import { importFilesToBoard } from '../../lib/importFiles';
+import { importFilesToBoard } from '../../lib/importSpaet';
 import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from '../NoteTypo';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';

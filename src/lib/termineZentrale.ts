@@ -7,7 +7,8 @@
 // gibt es keinen Netzverkehr (m446). Einzige Ausnahme (M471): Ist die Erinnerung eingeschaltet, holt
 // termineHintergrund() Heute/Morgen sparsam nach (höchstens alle 15 Minuten), damit die Erinnerung
 // auch neue Termine kennt.
-import { anyAccountConnected, fetchAccountEvents, gemerkteTermine, TERMINE_EREIGNIS, TERMINE_FASSUNG, type CalAccountEvent } from './calAccounts';
+// M483: nur der leichte Teil der Konten im Start; der Abruf (lib/calAccounts.ts) kommt mit dem ersten Hintergrund-Abruf
+import { anyAccountConnected, gemerkteTermine, TERMINE_EREIGNIS, TERMINE_FASSUNG, type CalAccountEvent } from './calKonten';
 import { tagLokal } from './tag';
 import type { IcsEvent } from './ics';
 import { istEingang } from './eingangId';
@@ -291,5 +292,5 @@ export function termineHintergrund(jetzt: Date = new Date()): Promise<void> | nu
   if (Math.abs(jetzt.getTime() - letzter) < HINTERGRUND_MS) return null;
   try { localStorage.setItem(ABRUF_KEY, String(jetzt.getTime())); } catch { /* Speicher voll */ }
   const morgen = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() + 1);
-  return fetchAccountEvents(jetzt, morgen, false, { still: true }).then(() => undefined, () => undefined);
+  return import('./calAccounts').then((m) => m.fetchAccountEvents(jetzt, morgen, false, { still: true })).then(() => undefined, () => undefined);
 }
