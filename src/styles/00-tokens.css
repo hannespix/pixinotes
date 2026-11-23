@@ -19,6 +19,21 @@
   --surface-dim: rgba(22, 25, 30, 0.06);
   --border: rgba(22, 25, 30, 0.22);
   --border-soft: #d9dce2;
+  /* M489: Warnschrift (überfällige Frist) — 6,5:1 auf Weiß; im Dunkeln heller */
+  --warn-text: #b3261e;
+  /* M489: Schrift auf „Papier", das NICHT dem Theme folgt: Farbtöne bleiben im Dunkeln helles Papier (M338),
+     eine dunkle eigene Kartenfarbe bleibt auch im Hellen dunkel. Feste Werte, in beiden Themes gleich —
+     muted hält ≥ 4,8:1 auf allen vier Pastelltönen, auch in ihrer gedämpften Dunkel-Fassung. */
+  --papier-ink: #16191e;
+  --papier-muted: #454b56;
+  --papier-linie: rgba(22, 25, 30, 0.2);
+  --papier-flaeche: rgba(22, 25, 30, 0.06);
+  --papier-warn: #9e1f17;
+  --nacht-ink: #f1f2f4;
+  --nacht-muted: #c4c9d1;
+  --nacht-linie: rgba(255, 255, 255, 0.22);
+  --nacht-flaeche: rgba(255, 255, 255, 0.09);
+  --nacht-warn: #ffb4a9;
   /* Die alten Glas-Tokens zeigen auf deckende Flächen — Regeln, die sie noch
      nennen, bleiben gültig und werden einfach opak. */
   --glass: var(--surface);
@@ -99,6 +114,7 @@
   --surface-dim: rgba(255, 255, 255, 0.08);
   --border: rgba(255, 255, 255, 0.24);
   --border-soft: rgba(255, 255, 255, 0.12);
+  --warn-text: #ff9b8f;
   --glass: var(--surface);
   --glass-strong: var(--surface);
   --glass-border: var(--border-soft);

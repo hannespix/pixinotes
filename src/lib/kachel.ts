@@ -13,6 +13,7 @@
 import { doneCol, kanbanCols, type AppNode, type GanttData, type KanbanData, type MinutesData, type WeekData } from '../types';
 import { formatDueShort, urgencyFor } from './tasks';
 import { zahlWort } from './sprache';
+import { offeneAufgaben } from './minutes';
 
 export interface KachelZeile { text: string; warn?: boolean }
 export interface KachelInfo { typ: string; titel: string; zeilen: KachelZeile[] }
@@ -88,6 +89,16 @@ export function kachelInfo(node: AppNode): KachelInfo | null {
       const zeilen: KachelZeile[] = [{
         text: `${entries.length} Sitzung${entries.length === 1 ? '' : 'en'}${entries[0] ? ` · zuletzt ${datum(entries[0].date)}` : ''}`,
       }];
+      // M489: Was aus der Reihe noch offen ist — die offenen Aufgaben der neuesten Sitzung, mit der nächsten Frist
+      const offen = Array.isArray(m.entries) ? offeneAufgaben(m) : [];
+      if (offen.length > 0) {
+        const ueber = offen.filter((a) => a.ueberfaellig).length;
+        const naechste = offen.map((a) => a.frist).filter((f): f is string => !!f).sort()[0];
+        zeilen.push({
+          text: `${zahlWort(offen.length, 'offene Aufgabe', 'offene Aufgaben')}${ueber ? ` · ${ueber} überfällig` : naechste ? ` · nächste Frist ${datum(naechste)}` : ''}`,
+          ...(ueber ? { warn: true } : {}),
+        });
+      }
       if (beschluesse > 0) zeilen.push({ text: `${beschluesse} Beschl${beschluesse === 1 ? 'uss' : 'üsse'}` });
       return { typ: 'Protokoll-Reihe', titel: m.title || 'Protokoll', zeilen };
     }

@@ -4,10 +4,16 @@ import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
-import { sprache } from '../../lib/sprache';
+import { sprache, zahlWort } from '../../lib/sprache';
 import { mutedHistory, useBoard, useNurLesen } from '../../store';
-import { STICKY_COLORS, uid, type MinutesData, type MinutesNode } from '../../types';
-import { allDecisions, buildEntry, currentEntry, entryLabel, nextDate, sortEntries } from '../../lib/minutes';
+import { STICKY_COLORS, uid, type MinutesData, type MinutesEntry, type MinutesNode } from '../../types';
+import {
+  allDecisions, anwesenheit, aufgabenStand, buildEntry, carryOverBlocks, currentEntry, entryLabel, fristText, kurzDatum, langDatum,
+  nextDate, offeneAufgaben, papierArt, sitzungAlsText, sortEntries, sucheInReihe, tagesordnung, teilnehmende,
+  teilnehmendeText, type OffeneAufgabe,
+} from '../../lib/minutes';
+import { toggleCheckBlock } from '../../lib/tasks';
+import { fristenLaden, useFristenStand } from '../../lib/dates';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { useAndroidBackspaceFix } from '../../lib/blocknoteAndroidFix';
 import { editorUpload } from '../../lib/notizBild';
@@ -15,7 +21,7 @@ import { importFilesToBoard } from '../../lib/importSpaet';
 import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from '../NoteTypo';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
-import { IChevronL, IChevronR, IPlus, ISettings, IX } from '../Icons';
+import { ICheck, ICopy, IMail, IMore, IPlus, ISearch, ISettings, ITrash, IUsers, IX } from '../Icons';
 import type { NotizSitzung } from '../../lib/notizGemeinsamKern';
 import { liveVerbunden, TEILNEHMER_EREIGNIS } from '../../lib/liveStand';
 import { useTakt } from '../LiveLeiste';
@@ -23,126 +29,251 @@ import { NotizRuhend } from './NotizRuhend';
 import type { RuheBlock } from '../../lib/notizRuhend';
 
 /**
- * Protokoll-Reihe (M186): eine Karte für eine ganze Besprechungsserie.
+ * Protokoll-Reihe (M186, neu gedacht in M489): eine Karte für eine ganze Besprechungsserie.
  *
- * Angezeigt wird immer genau EINE Sitzung — geblättert wird mit ◀ ▶ oder über
- * die Datumsliste. Der Editor wird bewusst bei jedem Sitzungswechsel neu
- * aufgebaut (key={entry.id}): BlockNote liest seinen Inhalt nur beim Mount,
- * sonst zeigte das Blättern hartnäckig die vorige Sitzung.
+ * Zwei Ansichten, umgeschaltet im Kopf:
+ *  · „Sitzung" — die Sitzungsleiste (neueste zuerst, „+" legt die nächste an), Kopf der Sitzung (Datum, Titel,
+ *    Runde), Tagesordnung als Sprungmarken, der Protokolltext und die Beschlüsse dieser Sitzung. Drei Werkzeuge
+ *    markieren die Zeile, in der der Cursor steht: als TOP, als Aufgabe (Checklisten-Punkt), als Beschluss.
+ *  · „Übersicht" — was über die ganze Reihe zählt: offene Aufgaben nach Person mit Frist, die Beschlusslage, die
+ *    Teilnahme und eine Suche über alle Sitzungen.
+ *
+ * Das Datenmodell ist unverändert (entries[].blocks/decisions/attendees) — Aufgaben SIND die Checklisten-Punkte
+ * im Text, Person („Anna: …", „@Anna") und Frist („bis Freitag") stehen darin. So lesen Zentrale, Wiedervorlage,
+ * KI, Export und MCP alles wie bisher, und alte Protokolle brauchen keine Umwandlung.
+ *
+ * Der Editor wird bei jedem Sitzungswechsel neu aufgebaut (key={entry.id}): BlockNote liest seinen Inhalt nur
+ * beim Mount, sonst zeigte das Blättern hartnäckig die vorige Sitzung.
  */
 export function MinutesCard({ id, data, selected }: NodeProps<MinutesNode>) {
+  const m = data as MinutesData;
   return (
     <CardShell
       id={id}
       selected={selected}
       minWidth={320}
       minHeight={300}
-      className={`minutes-card sticky-${(data as MinutesData).color ?? 'white'}`}
-      style={(data as MinutesData).hex ? { background: (data as MinutesData).hex } : undefined}
+      className={`minutes-card sticky-${m.color ?? 'white'} papier-${papierArt(m)}`}
+      style={m.hex ? { background: m.hex } : undefined}
     >
       <MinutesBody id={id} data={data} />
     </CardShell>
   );
 }
 
+/** M489: Was die Werkzeuge vom lebenden Editor der angezeigten Sitzung brauchen */
+interface EditorBlock { id: string; type: string; content?: unknown; children?: EditorBlock[] }
+interface LebenderEditor {
+  document: EditorBlock[];
+  insertBlocks: (b: unknown[], ref: unknown, pos: 'before' | 'after') => unknown;
+  updateBlock: (ref: unknown, upd: unknown) => unknown;
+  removeBlocks: (refs: unknown[]) => unknown;
+  getTextCursorPosition: () => { block: EditorBlock };
+  setTextCursorPosition: (ref: unknown, place?: 'start' | 'end') => void;
+  focus: () => void;
+}
+
+const inhaltText = (c: unknown): string => (typeof c === 'string'
+  ? c
+  : Array.isArray(c) ? c.map((s) => (s as { text?: string })?.text ?? '').join('') : '');
+
+type Ansicht = 'sitzung' | 'uebersicht';
+
 /** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
 export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   const m = data as MinutesData;
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
+  const nurLesen = useNurLesen();
+  const [ansicht, setAnsicht] = useState<Ansicht>('sitzung');
   const [setupOpen, setSetupOpen] = useState(false);
-  // M187: Zugriff auf den LEBENDEN Editor der angezeigten Sitzung. Ein TOP wird
-  // von ihm selbst eingefügt statt über den Speicher — sonst überholt der
-  // Editor beim nächsten Neuaufbau die Änderung mit seinem alten Stand.
-  const editorRef = useRef<{ document: unknown[]; insertBlocks: (b: unknown[], ref: unknown, pos: string) => void } | null>(null);
-  const [decisionText, setDecisionText] = useState('');
+  const [menueOffen, setMenueOffen] = useState(false);
+  const [suche, setSuche] = useState('');
+  const [beschlussText, setBeschlussText] = useState('');
+  const [personText, setPersonText] = useState('');
+  // M187: Zugriff auf den LEBENDEN Editor der angezeigten Sitzung. Werkzeuge ändern über ihn statt über den
+  // Speicher — sonst überholt der Editor beim nächsten Neuaufbau die Änderung mit seinem alten Stand.
+  const editorRef = useRef<LebenderEditor | null>(null);
+  const textRef = useRef<HTMLDivElement>(null);
+  const beschlussFeld = useRef<HTMLTextAreaElement>(null);
+  const leisteRef = useRef<HTMLDivElement>(null);
+  const fristen = useFristenStand();
+  useEffect(() => { void fristenLaden(); }, []);
 
   const sorted = useMemo(() => sortEntries(m.entries ?? []), [m.entries]);
   const entry = currentEntry(m);
-  const idx = entry ? sorted.findIndex((e) => e.id === entry.id) : -1;
+  const offen = useMemo(() => offeneAufgaben(m), [m, fristen]);   // eslint-disable-line react-hooks/exhaustive-deps
+  const beschluesse = useMemo(() => allDecisions(m), [m]);
 
   const patch = (next: Partial<MinutesData>) => updateNodeData(id, next);
-  const patchEntry = (entryId: string, next: Partial<typeof sorted[number]>) =>
+  const patchEntry = (entryId: string, next: Partial<MinutesEntry>) =>
     patch({ entries: (m.entries ?? []).map((e) => (e.id === entryId ? { ...e, ...next } : e)) });
+  const zeige = (entryId: string) => { patch({ current: entryId }); setAnsicht('sitzung'); setMenueOffen(false); };
 
-  /** Neue Sitzung: Tagesordnung + offene Punkte der letzten Sitzung */
+  /** Neue Sitzung: Runde und offene Aufgaben der letzten übernehmen, Tagesordnung vorstrukturieren */
   const addEntry = () => {
     const date = nextDate(m);
     const fresh = buildEntry(m, date);
-    const carried = (fresh.blocks ?? []).filter((b) => (b as { type?: string })?.type === 'checkListItem').length;
+    const aufgaben = m.carryOpen === false ? 0 : carryOverBlocks(sortEntries(m.entries ?? [])[0]).length;
+    const personen = teilnehmende(fresh.attendees).length;
     patch({ entries: [...(m.entries ?? []), fresh], current: fresh.id });
-    showToast(carried > 0
-      ? `Neue Sitzung angelegt – ${carried} offene(r) Punkt(e) aus der letzten Sitzung übernommen.`
-      : 'Neue Sitzung angelegt.');
+    setAnsicht('sitzung');
+    const dazu = [personen ? zahlWort(personen, 'Person', 'Personen') : '', aufgaben ? zahlWort(aufgaben, 'offene Aufgabe', 'offene Aufgaben') : ''].filter(Boolean);
+    showToast(dazu.length
+      ? `Sitzung am ${langDatum(date)} angelegt – übernommen: ${dazu.join(' und ')}.`
+      : `Sitzung am ${langDatum(date)} angelegt.`);
   };
 
   const removeEntry = (entryId: string) => {
+    setMenueOffen(false);
     const e = (m.entries ?? []).find((x) => x.id === entryId);
     if (e && !window.confirm(`Sitzung „${entryLabel(e)}" mit ihrem gesamten Protokoll löschen?`)) return;
     const rest = (m.entries ?? []).filter((x) => x.id !== entryId);
     patch({ entries: rest, current: sortEntries(rest)[0]?.id });
   };
 
-  const go = (delta: number) => {
-    if (sorted.length === 0) return;
-    const next = sorted[Math.min(sorted.length - 1, Math.max(0, idx + delta))];
-    if (next) patch({ current: next.id });
+  // ---------- Werkzeuge: die Zeile am Cursor markieren ----------
+  const imText = () => !!textRef.current?.contains(document.activeElement);
+  /** Block am Cursor — oder null, wenn der Cursor nicht im Protokolltext steht */
+  const blockAmCursor = (): EditorBlock | null => {
+    const ed = editorRef.current;
+    if (!ed || !imText()) return null;
+    try { return ed.getTextCursorPosition().block; } catch { return null; }
+  };
+  /** Neuer Block am Ende, Cursor hinein */
+  const anhaengen = (block: Record<string, unknown>) => {
+    const ed = editorRef.current;
+    if (!ed || !entry) return;
+    try {
+      const letzter = ed.document[ed.document.length - 1];
+      const leer = letzter && letzter.type === 'paragraph' && !inhaltText(letzter.content).trim();
+      if (leer) ed.updateBlock(letzter, block);
+      else ed.insertBlocks([block], letzter, 'after');
+      const ziel = ed.document[ed.document.length - 1];
+      ed.setTextCursorPosition(ziel, 'end');
+      ed.focus();
+    } catch { /* Editor gerade im Umbau */ }
+  };
+  const alsTop = () => {
+    const ed = editorRef.current;
+    const b = blockAmCursor();
+    if (ed && b) {
+      try { ed.updateBlock(b, b.type === 'heading' ? { type: 'paragraph' } : { type: 'heading', props: { level: 3 } }); } catch { /* egal */ }
+      return;
+    }
+    anhaengen({ type: 'heading', props: { level: 3 }, content: '' });
+  };
+  const alsAufgabe = () => {
+    const ed = editorRef.current;
+    const b = blockAmCursor();
+    if (ed && b) {
+      try { ed.updateBlock(b, b.type === 'checkListItem' ? { type: 'paragraph' } : { type: 'checkListItem', props: { checked: false } }); } catch { /* egal */ }
+      return;
+    }
+    anhaengen({ type: 'checkListItem', props: { checked: false }, content: '' });
+  };
+  const alsBeschluss = () => {
+    if (!entry) return;
+    const ed = editorRef.current;
+    const b = blockAmCursor();
+    const text = b ? inhaltText(b.content).trim() : '';
+    if (ed && b && text) {
+      // Die Zeile WIRD zum Beschluss — sie steht danach nicht doppelt im Text
+      patchEntry(entry.id, { decisions: [...(entry.decisions ?? []), { id: uid(), text }] });
+      try { ed.removeBlocks([b]); } catch { /* egal */ }
+      showToast('Als Beschluss festgehalten.');
+      return;
+    }
+    beschlussFeld.current?.focus();
+  };
+  /** Sprungmarke der Tagesordnung: Cursor an die Überschrift */
+  const springeZu = (top: { id?: string; text: string }) => {
+    const ed = editorRef.current;
+    if (!ed) return;
+    const ziel = ed.document.find((b) => (top.id && b.id === top.id) || (b.type === 'heading' && inhaltText(b.content).trim() === top.text));
+    if (!ziel) return;
+    try { ed.setTextCursorPosition(ziel, 'end'); ed.focus(); } catch { /* egal */ }
+    // Nur den Protokolltext rollen — scrollIntoView rollte auch die Arbeitsfläche mit
+    const el = textRef.current?.querySelector<HTMLElement>(`[data-id="${ziel.id}"]`);
+    const box = textRef.current?.querySelector<HTMLElement>('.minutes-body');
+    if (el && box) box.scrollTop += el.getBoundingClientRect().top - box.getBoundingClientRect().top - 8;
   };
 
   const addDecision = () => {
-    const text = decisionText.trim();
+    const text = beschlussText.trim();
     if (!text || !entry) return;
     patchEntry(entry.id, { decisions: [...(entry.decisions ?? []), { id: uid(), text }] });
-    setDecisionText('');
+    setBeschlussText('');
   };
 
-  const decisions = useMemo(() => allDecisions(m), [m]);
-
-  /** M187: Farbe wie bei der Notiz-Karte — Punkt schaltet die Palette weiter */
-  const cycleColor = () => {
-    const cur = m.color ?? 'white';
-    const next = STICKY_COLORS[(STICKY_COLORS.indexOf(cur) + 1) % STICKY_COLORS.length];
-    patch({ color: next, hex: undefined });   // zurück zur Palette
-  };
-
-  /**
-   * M187: Tagesordnungspunkt NUR für diese Sitzung. Der Punkt landet direkt
-   * als Überschrift im Protokoll — bewusst ohne zweite Datenhaltung: Die TOPs
-   * einer Sitzung leben in ihrem Text. So lassen sie sich im Editor frei
-   * umbenennen, verschieben und löschen, ohne dass zwei Listen auseinanderlaufen.
-   */
-  const addTop = () => {
+  // ---------- Runde ----------
+  const runde = teilnehmende(entry?.attendees);
+  const personDazu = () => {
     if (!entry) return;
-    const name = window.prompt('Tagesordnungspunkt für diese Sitzung:');
-    if (!name?.trim()) return;
-    const fresh = [
-      { type: 'heading', props: { level: 3 }, content: name.trim() },
-      { type: 'paragraph', content: '' },
-    ];
-    const ed = editorRef.current;
-    if (ed && ed.document.length > 0) {
-      // Der Editor fügt selbst ein; sein onChange schreibt in den Speicher
-      ed.insertBlocks(fresh, ed.document[ed.document.length - 1], 'after');
-    } else {
-      patchEntry(entry.id, { blocks: [...((entry.blocks as unknown[]) ?? []), ...fresh] });
-    }
-    showToast(`TOP „${name.trim()}" angelegt – gilt nur für diese Sitzung.`);
+    const neu = teilnehmende(personText);
+    if (neu.length === 0) return;
+    patchEntry(entry.id, { attendees: teilnehmendeText(teilnehmende([...runde, ...neu].join(','))) });
+    setPersonText('');
+  };
+  const personWeg = (name: string) => {
+    if (!entry) return;
+    patchEntry(entry.id, { attendees: teilnehmendeText(runde.filter((n) => n !== name)) });
   };
 
-  /** TOPs der laufenden Sitzung: aus den Überschriften abgeleitet (eine Wahrheit) */
-  const tops = useMemo(() => {
-    const out: string[] = [];
-    for (const b of ((entry?.blocks as Array<Record<string, unknown>>) ?? [])) {
-      if (b?.type !== 'heading') continue;
-      const c = b.content;
-      const t = typeof c === 'string' ? c : Array.isArray(c) ? c.map((s) => (s as { text?: string })?.text ?? '').join('') : '';
-      if (t.trim()) out.push(t.trim());
+  // ---------- Übersicht ----------
+  const abhaken = (a: OffeneAufgabe) => {
+    const e = (m.entries ?? []).find((x) => x.id === a.entryId);
+    if (!e) return;
+    // Der Editor dieser Sitzung ist in der Übersicht abgebaut — der Speicher ist hier die Wahrheit.
+    // extEpoch: ein Editor, der dieselbe Sitzung doch zeigt (Präsentation), übernimmt den Stand.
+    patch({
+      entries: (m.entries ?? []).map((x) => (x.id === e.id ? { ...x, blocks: toggleCheckBlock(x.blocks, a.blockId) } : x)),
+      extEpoch: ((m.extEpoch as number | undefined) ?? 0) + 1,
+    });
+    showToast(`Erledigt: ${a.text}`);
+  };
+  const nachPerson = useMemo(() => {
+    const g = new Map<string, OffeneAufgabe[]>();
+    for (const a of offen) {
+      const k = a.person ?? '';
+      g.set(k, [...(g.get(k) ?? []), a]);
     }
-    return out;
-  }, [entry]);
+    return [...g.entries()].sort((a, b) => (a[0] === '' ? 1 : b[0] === '' ? -1 : a[0].localeCompare(b[0])));
+  }, [offen]);
+  const treffer = useMemo(() => (suche.trim() ? sucheInReihe(m, suche) : []), [m, suche]);
+  const teilnahme = useMemo(() => anwesenheit(m), [m]);
+
+  // ---------- Versenden ----------
+  const alsText = async () => {
+    if (!entry) return;
+    setMenueOffen(false);
+    try { await navigator.clipboard.writeText(sitzungAlsText(m, entry)); showToast('Sitzung als Text kopiert.'); }
+    catch { showToast('Kopieren ging nicht – der Browser hat den Zugriff verweigert.'); }
+  };
+  const perMail = () => {
+    if (!entry) return;
+    setMenueOffen(false);
+    const betreff = `${m.title?.trim() || 'Protokoll'} – ${langDatum(entry.date)}`;
+    window.open(`mailto:?subject=${encodeURIComponent(betreff)}&body=${encodeURIComponent(sitzungAlsText(m, entry))}`, '_self');
+  };
+
+  /** M187: Farbe wie bei der Notiz-Karte */
+  const farbe = (c: (typeof STICKY_COLORS)[number]) => patch({ color: c, hex: undefined });
+
+  const tops = useMemo(() => tagesordnung(entry), [entry]);
+  // Die gezeigte Sitzung in der Leiste sichtbar halten — nur die Leiste rollt (nie die Arbeitsfläche)
+  useEffect(() => {
+    const leiste = leisteRef.current;
+    const aktiv = leiste?.querySelector<HTMLElement>('.pr-tag[aria-selected="true"]');
+    if (!leiste || !aktiv) return;
+    const l = aktiv.offsetLeft - leiste.offsetLeft;
+    if (l < leiste.scrollLeft) leiste.scrollLeft = l - 8;
+    else if (l + aktiv.offsetWidth > leiste.scrollLeft + leiste.clientWidth) leiste.scrollLeft = l + aktiv.offsetWidth - leiste.clientWidth + 8;
+  }, [entry?.id, ansicht]);
+  const stand = aufgabenStand(entry);
 
   return (
-    <>
+    <div className="pr-rahmen">
       <div className="minutes-head">
         <DragTitle
           value={m.title}
@@ -150,19 +281,23 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
           className="minutes-title"
           placeholder="Besprechungsreihe"
         />
-        <button className="color-dot minutes-dot nodrag" title="Kartenfarbe wechseln (Palette)" onClick={cycleColor} />
-        <input
-          type="color"
-          className="pn-colorpick minutes-colorpick nodrag"
-          title="Eigene Kartenfarbe wählen"
-          value={m.hex ?? '#ffffff'}
-          onChange={(e) => patch({ hex: e.target.value })}
-        />
-        <button className="minutes-setup-btn nodrag" title="Reihe einrichten: feste Tagesordnung, Rhythmus, Wiedervorlage" onClick={() => setSetupOpen((o) => !o)}>
-          <ISettings size={12} />
-        </button>
-        <button className="minutes-new nodrag" title="Neue Sitzung anlegen (übernimmt offene Punkte)" onClick={addEntry}>
-          <IPlus size={12} />
+        {sorted.length > 0 && (
+          <div className="pr-umschalter nodrag" role="tablist" aria-label="Ansicht der Protokollreihe">
+            <button role="tab" aria-selected={ansicht === 'sitzung'} className="pr-reiter" data-taste="pr-sitzung" onClick={() => setAnsicht('sitzung')}>
+              Sitzung
+            </button>
+            <button role="tab" aria-selected={ansicht === 'uebersicht'} className="pr-reiter" data-taste="pr-uebersicht" onClick={() => setAnsicht('uebersicht')} title="Offene Aufgaben, Beschlüsse und Suche über alle Sitzungen">
+              Übersicht{offen.length > 0 && <span className="pr-zahl" aria-label={zahlWort(offen.length, 'offene Aufgabe', 'offene Aufgaben')}>{offen.length}</span>}
+            </button>
+          </div>
+        )}
+        {!nurLesen && sorted.length > 0 && (
+          <button className="minutes-new nodrag" title="Nächste Sitzung anlegen – übernimmt Runde und offene Aufgaben" aria-label="Nächste Sitzung anlegen" onClick={addEntry} data-taste="pr-neu">
+            <IPlus size={14} />
+          </button>
+        )}
+        <button className="minutes-setup-btn nodrag" aria-expanded={setupOpen} title="Reihe einrichten: Rhythmus, feste Tagesordnung, Farbe" onClick={() => setSetupOpen((o) => !o)}>
+          <ISettings size={14} />
         </button>
       </div>
 
@@ -179,12 +314,8 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
             </select>
           </label>
           <label className="minutes-carry">
-            <input
-              type="checkbox"
-              checked={m.carryOpen !== false}
-              onChange={(e) => patch({ carryOpen: e.target.checked })}
-            />
-            <span>Offene Punkte in die neue Sitzung übernehmen</span>
+            <input type="checkbox" checked={m.carryOpen !== false} onChange={(e) => patch({ carryOpen: e.target.checked })} />
+            <span>Offene Aufgaben in die neue Sitzung übernehmen</span>
           </label>
           <div className="minutes-agenda">
             <b>Feste Tagesordnung</b>
@@ -195,14 +326,34 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
                   placeholder="TOP …"
                   onChange={(e) => patch({ agenda: (m.agenda ?? []).map((t, j) => (j === i ? e.target.value : t)) })}
                 />
-                <button title="Punkt entfernen" onClick={() => patch({ agenda: (m.agenda ?? []).filter((_, j) => j !== i) })}>
+                <button title="Punkt entfernen" aria-label="Punkt entfernen" onClick={() => patch({ agenda: (m.agenda ?? []).filter((_, j) => j !== i) })}>
                   <IX size={10} />
                 </button>
               </div>
             ))}
             <button className="minutes-add-top" onClick={() => patch({ agenda: [...(m.agenda ?? []), ''] })}>
-              ＋ Tagesordnungspunkt
+              <IPlus size={10} /> Tagesordnungspunkt
             </button>
+          </div>
+          <div className="pr-farben">
+            <span>Farbe</span>
+            {STICKY_COLORS.map((c) => (
+              <button
+                key={c}
+                className={`pr-farbe sticky-${c}`}
+                aria-pressed={!m.hex && (m.color ?? 'white') === c}
+                title="Kartenfarbe"
+                aria-label="Kartenfarbe"
+                onClick={() => farbe(c)}
+              />
+            ))}
+            <input
+              type="color"
+              className="pn-colorpick minutes-colorpick"
+              title="Eigene Kartenfarbe wählen"
+              value={typeof m.hex === 'string' ? m.hex : '#ffffff'}
+              onChange={(e) => patch({ hex: e.target.value })}
+            />
           </div>
         </div>
       )}
@@ -210,104 +361,222 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
       {sorted.length === 0 ? (
         <div className="minutes-empty">
           Noch keine Sitzung.
-          <button className="nodrag" onClick={addEntry}>Erste Sitzung anlegen</button>
+          {!nurLesen && <button className="nodrag" onClick={addEntry}>Erste Sitzung anlegen</button>}
         </div>
-      ) : (
+      ) : ansicht === 'sitzung' ? (
         <>
-          <div className="minutes-nav nodrag">
-            <button disabled={idx >= sorted.length - 1} title="Ältere Sitzung" onClick={() => go(1)}><IChevronL size={12} /></button>
-            <select
-              value={entry?.id ?? ''}
-              title="Sitzung auswählen"
-              onChange={(e) => patch({ current: e.target.value })}
-            >
-              {sorted.map((e) => (
-                <option key={e.id} value={e.id}>{entryLabel(e)}</option>
-              ))}
-            </select>
-            <button disabled={idx <= 0} title="Neuere Sitzung" onClick={() => go(-1)}><IChevronR size={12} /></button>
-            <span className="minutes-count" title="Diese Sitzung von insgesamt">
-              {sorted.length - idx}/{sorted.length}
-            </span>
-            {entry && (
-              <button className="minutes-del" title="Diese Sitzung löschen" onClick={() => removeEntry(entry.id)}>
-                <IX size={11} />
-              </button>
-            )}
+          <div className="pr-leiste nodrag" role="tablist" aria-label="Sitzungen" ref={leisteRef}>
+            {sorted.map((e) => {
+              const aktiv = e.id === entry?.id;
+              return (
+                <button
+                  key={e.id}
+                  role="tab"
+                  aria-selected={aktiv}
+                  className="pr-tag"
+                  title={e.title?.trim() ? `${e.title.trim()} · ${langDatum(e.date)}` : langDatum(e.date)}
+                  onClick={() => patch({ current: e.id })}
+                >
+                  {kurzDatum(e.date)}
+                </button>
+              );
+            })}
           </div>
 
           {entry && (
-            <div className="minutes-meta nodrag">
+            <div className="pr-sitzung-kopf nodrag">
               <input
                 type="date"
+                className="pr-datum"
                 value={entry.date}
                 title="Datum der Sitzung"
+                aria-label="Datum der Sitzung"
                 onChange={(e) => patchEntry(entry.id, { date: e.target.value })}
               />
               <input
                 type="text"
-                placeholder="Teilnehmende …"
-                value={entry.attendees ?? ''}
-                title="Wer war dabei? (Freitext)"
-                onChange={(e) => patchEntry(entry.id, { attendees: e.target.value || undefined })}
+                className="pr-sitzung-titel"
+                placeholder="Titel (optional)"
+                aria-label="Titel der Sitzung"
+                value={entry.title ?? ''}
+                onChange={(e) => patchEntry(entry.id, { title: e.target.value || undefined })}
               />
+              <div className="pr-werkzeuge" role="toolbar" aria-label="Zeile am Cursor markieren">
+                <button onMouseDown={(e) => e.preventDefault()} onClick={alsTop} title="Zeile am Cursor als Tagesordnungspunkt (Überschrift)" data-taste="pr-top">TOP</button>
+                <button onMouseDown={(e) => e.preventDefault()} onClick={alsAufgabe} title="Zeile am Cursor als Aufgabe – Person mit „Name:“ oder @Name, Frist wie „bis Freitag“" aria-label="Als Aufgabe markieren" data-taste="pr-aufgabe">
+                  <ICheck size={12} /><span className="pr-wort">Aufgabe</span>
+                </button>
+                <button onMouseDown={(e) => e.preventDefault()} onClick={alsBeschluss} title="Zeile am Cursor als Beschluss festhalten" aria-label="Als Beschluss festhalten" data-taste="pr-beschluss">§<span className="pr-wort">Beschluss</span></button>
+                <div className="pr-menue-wrap">
+                  <button className="pr-mehr" aria-label="Weitere Aktionen der Sitzung" title="Kopieren, versenden, löschen" aria-expanded={menueOffen} onClick={() => setMenueOffen((o) => !o)}>
+                    <IMore size={14} />
+                  </button>
+                  {menueOffen && (
+                    <div className="pr-menue" role="menu">
+                      <button role="menuitem" onClick={() => void alsText()}><ICopy size={13} /> Als Text kopieren</button>
+                      <button role="menuitem" onClick={perMail}><IMail size={13} /> Per E-Mail versenden</button>
+                      {!nurLesen && <button role="menuitem" className="pr-gefahr" onClick={() => removeEntry(entry.id)}><ITrash size={13} /> Sitzung löschen</button>}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
-          {/* M187: Tagesordnung DIESER Sitzung — die feste Reihen-Vorlage im
-              ⚙-Menü gilt für alle künftigen, hier kommt der Punkt dazu, den es
-              nur heute braucht. */}
           {entry && (
-            <div className="minutes-tops nodrag">
-              {tops.map((t, i) => (
-                <span key={i} className="minutes-top-chip" translate="no" title="Tagesordnungspunkt dieser Sitzung (Überschrift im Protokoll)">{t}</span>
+            <div className="pr-runde nodrag" aria-label="Teilnehmende">
+              <IUsers size={13} />
+              {runde.map((n) => (
+                <span key={n} className="pr-person" translate="no">
+                  {n}
+                  {!nurLesen && <button className="pr-person-weg" title={`${n} entfernen`} aria-label={`${n} entfernen`} onClick={() => personWeg(n)}><IX size={9} /></button>}
+                </span>
               ))}
-              <button className="minutes-top-add" title="Tagesordnungspunkt nur für diese Sitzung anhängen" onClick={addTop}>
-                ＋ TOP
-              </button>
+              {!nurLesen && (
+                <input
+                  className="pr-person-neu"
+                  placeholder={runde.length ? '+ Person' : 'Wer ist dabei? Namen mit Komma'}
+                  aria-label="Person hinzufügen"
+                  value={personText}
+                  onChange={(e) => setPersonText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); personDazu(); } }}
+                  onBlur={personDazu}
+                />
+              )}
             </div>
           )}
 
-          {entry && <EntryEditorWahl key={entry.id} nodeId={id} entryId={entry.id} blocks={entry.blocks} editorRef={editorRef} />}
+          {tops.length > 0 && (
+            <div className="minutes-tops nodrag" aria-label="Tagesordnung">
+              {tops.map((t, i) => (
+                <button key={`${t.id ?? i}`} className="minutes-top-chip" translate="no" title="Zum Tagesordnungspunkt springen" onClick={() => springeZu(t)}>
+                  {t.text}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="pr-text" ref={textRef}>
+            {entry && <EntryEditorWahl key={entry.id} nodeId={id} entryId={entry.id} blocks={entry.blocks} editorRef={editorRef} />}
+          </div>
 
           {entry && (
             <div className="minutes-decisions nodrag">
-              <b title="Beschlüsse sind Festlegungen, keine Aufgaben – sie bleiben dauerhaft nachschlagbar">
-                Beschlüsse dieser Sitzung
-              </b>
+              <div className="pr-abschnitt-kopf">
+                <b>Beschlüsse</b>
+                {(stand.offen + stand.erledigt) > 0 && (
+                  <span className="pr-stand">{zahlWort(stand.offen, 'Aufgabe offen', 'Aufgaben offen')} · {stand.erledigt} erledigt</span>
+                )}
+              </div>
               {(entry.decisions ?? []).map((d) => (
                 <div key={d.id} className="minutes-decision">
-                  <span translate="no">§ {d.text}</span>
-                  <button
-                    title="Beschluss entfernen"
-                    onClick={() => patchEntry(entry.id, { decisions: (entry.decisions ?? []).filter((x) => x.id !== d.id) })}
-                  ><IX size={10} /></button>
+                  <span className="pr-para" aria-hidden="true">§</span>
+                  <textarea
+                    className="pr-beschluss-text"
+                    rows={1}
+                    translate="no"
+                    value={d.text}
+                    aria-label="Beschluss"
+                    readOnly={nurLesen}
+                    onChange={(ev) => patchEntry(entry.id, { decisions: (entry.decisions ?? []).map((x) => (x.id === d.id ? { ...x, text: ev.target.value } : x)) })}
+                    onBlur={(ev) => { if (!ev.target.value.trim()) patchEntry(entry.id, { decisions: (entry.decisions ?? []).filter((x) => x.id !== d.id) }); }}
+                  />
+                  {!nurLesen && (
+                    <button title="Beschluss entfernen" aria-label="Beschluss entfernen" onClick={() => patchEntry(entry.id, { decisions: (entry.decisions ?? []).filter((x) => x.id !== d.id) })}>
+                      <IX size={10} />
+                    </button>
+                  )}
                 </div>
               ))}
-              <input
-                className="minutes-decision-add"
-                placeholder="+ Beschluss festhalten…"
-                value={decisionText}
-                onChange={(e) => setDecisionText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') addDecision(); }}
-                onBlur={addDecision}
-              />
-              {decisions.length > (entry.decisions?.length ?? 0) && (
-                <details className="minutes-all-decisions">
-                  <summary>Beschlusslage der ganzen Reihe ({decisions.length})</summary>
-                  {decisions.map((d, i) => (
-                    <div key={i} className="minutes-decision old">
-                      <span translate="no">§ {d.text}</span>
-                      <em>{d.date}</em>
-                    </div>
-                  ))}
-                </details>
+              {!nurLesen && (
+                <textarea
+                  ref={beschlussFeld}
+                  rows={1}
+                  className="minutes-decision-add"
+                  placeholder="+ Beschluss festhalten …"
+                  value={beschlussText}
+                  onChange={(e) => setBeschlussText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addDecision(); } }}
+                  onBlur={addDecision}
+                />
               )}
             </div>
           )}
         </>
+      ) : (
+        <div className="pr-uebersicht nodrag">
+          <label className="pr-suche">
+            <ISearch size={13} />
+            <input
+              type="search"
+              placeholder="In allen Sitzungen suchen …"
+              aria-label="In allen Sitzungen suchen"
+              value={suche}
+              onChange={(e) => setSuche(e.target.value)}
+            />
+          </label>
+          {suche.trim() ? (
+            <section className="pr-abschnitt">
+              <h4>{zahlWort(treffer.length, 'Treffer', 'Treffer')}</h4>
+              {treffer.map((t, i) => (
+                <button key={i} className="pr-treffer" onClick={() => zeige(t.entryId)} title="Sitzung öffnen">
+                  <span className="pr-datum-chip">{kurzDatum(t.date)}</span>
+                  <span className="pr-treffer-text" translate="no">{t.art === 'beschluss' ? `§ ${t.text}` : t.text}</span>
+                </button>
+              ))}
+            </section>
+          ) : (
+            <>
+              <section className="pr-abschnitt" aria-label="Offene Aufgaben">
+                <h4>Offene Aufgaben <span className="pr-zahl">{offen.length}</span></h4>
+                {offen.length === 0 && <p className="pr-leer">Keine offenen Aufgaben. Aufgaben entstehen im Protokolltext: Zeile markieren und „Aufgabe“ wählen.</p>}
+                {nachPerson.map(([person, liste]) => (
+                  <div key={person} className="pr-gruppe">
+                    <div className="pr-gruppe-name" translate="no">{person || 'Ohne Person'}</div>
+                    {liste.map((a) => (
+                      <div key={a.blockId} className="pr-aufgabe">
+                        <input
+                          type="checkbox"
+                          aria-label={`Erledigt: ${a.text}`}
+                          disabled={nurLesen}
+                          onChange={() => abhaken(a)}
+                        />
+                        <span className="pr-aufgabe-text" translate="no">{a.text}</span>
+                        {a.frist && <span className={`pr-frist${a.ueberfaellig ? ' ueberfaellig' : ''}`} title={a.ueberfaellig ? 'Frist überschritten' : 'Frist'}>bis {fristText(a.frist)}</span>}
+                        {a.seit && <span className="pr-seit" title="Offen seit">seit {a.seit}</span>}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </section>
+              <section className="pr-abschnitt" aria-label="Beschlüsse">
+                <h4>Beschlüsse <span className="pr-zahl">{beschluesse.length}</span></h4>
+                {beschluesse.length === 0 && <p className="pr-leer">Noch keine Beschlüsse.</p>}
+                {beschluesse.map((d, i) => {
+                  const e = sorted.find((x) => x.date === d.date);
+                  return (
+                    <div key={i} className="pr-beschluss">
+                      <button className="pr-datum-chip" title="Sitzung öffnen" onClick={() => e && zeige(e.id)}>{kurzDatum(d.date)}</button>
+                      <span translate="no">{d.text}</span>
+                    </div>
+                  );
+                })}
+              </section>
+              {teilnahme.length > 0 && (
+                <section className="pr-abschnitt" aria-label="Teilnahme">
+                  <h4>Teilnahme</h4>
+                  <div className="pr-teilnahme">
+                    {teilnahme.map((t) => (
+                      <span key={t.name} className="pr-person" translate="no">{t.name} <em>{t.mal}/{sorted.length}</em></span>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
+          )}
+        </div>
       )}
-    </>
+    </div>
   );
 }
 
@@ -338,6 +607,14 @@ export function ProtokollRuhend({ blocks }: { blocks?: unknown[] }) {
   );
 }
 
+/** Die Sitzung, die ein Editor zeigt — aus dem Speicher (der Editor liest selbst nur beim Mount) */
+function gespeicherteSitzung(nodeId: string, entryId: string): { data?: MinutesData; entry?: MinutesEntry } {
+  const st = useBoard.getState();
+  const board = st.boards.find((b) => b.nodes.some((n) => n.id === nodeId));
+  const data = board?.nodes.find((n) => n.id === nodeId)?.data as MinutesData | undefined;
+  return { data, entry: (data?.entries ?? []).find((e) => e.id === entryId) };
+}
+
 /**
  * Protokolltext einer Sitzung. Eigene Komponente, damit der `key`-Wechsel
  * beim Blättern den Editor sauber neu aufbaut (BlockNote liest nur beim Mount).
@@ -366,6 +643,24 @@ export function EntryEditor({ nodeId, entryId, blocks, editorRef, sitzung }: Ent
   useEffect(() => sitzung?.anbinden(!nurLesen, () => editor.document), [sitzung, nurLesen, editor]);
   if (editorRef) editorRef.current = editor;
 
+  /* M489: Externer Schreiber (Haken in der Aufgaben-Zentrale oder der Übersicht) zählt extEpoch hoch — der lebende
+     Editor übernimmt den Stand seiner Sitzung. Vorher schrieb der nächste Tastendruck den alten Stand zurück und der
+     Haken aus der Zentrale war wieder weg. Gemeinsam übernimmt nur der Schreiber (er reicht es über Yjs weiter). */
+  const extEpoch = useBoard((s) => {
+    const n = s.boards.find((b) => b.id === s.activeId)?.nodes.find((x) => x.id === nodeId);
+    return (n?.data as MinutesData | undefined)?.extEpoch as number | undefined;
+  });
+  const letzteEpoche = useRef(extEpoch);
+  useEffect(() => {
+    if (extEpoch === letzteEpoche.current) return;
+    letzteEpoche.current = extEpoch;
+    if (sitzung && !sitzung.istSchreiber()) return;
+    const neu = gespeicherteSitzung(nodeId, entryId).entry?.blocks;
+    if (!neu?.length || JSON.stringify(neu) === JSON.stringify(editor.document)) return;
+    try { editor.replaceBlocks(editor.document, repairBlocks(neu) as never); } catch { /* Editor gerade im Umbau */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extEpoch]);
+
   // Beim Verlassen der Sitzung (Blättern) den letzten Stand sichern —
   // onChange feuert nicht mehr, wenn die Komponente schon abgebaut wird
   const latest = useRef(editor);
@@ -374,10 +669,7 @@ export function EntryEditor({ nodeId, entryId, blocks, editorRef, sitzung }: Ent
     if (sitzung) return;   // M487: gemeinsam sichert die Sitzung (nur der Schreiber, beim Verlassen `abschied`)
     try {
       const st = useBoard.getState();
-      const board = st.boards.find((b) => b.nodes.some((n) => n.id === nodeId));
-      const node = board?.nodes.find((n) => n.id === nodeId);
-      const cur = (node?.data as MinutesData | undefined)?.entries ?? [];
-      const alt = cur.find((e) => e.id === entryId);
+      const { data, entry: alt } = gespeicherteSitzung(nodeId, entryId);
       if (!alt) return;   // Sitzung wurde gelöscht
       /* M410: Das ist ein Nachsichern, keine Eingabe – also kein eigener Schritt für Rückgängig, und nichts
          schreiben, wenn sich nichts geändert hat. Vorher legte jeder Abbau des Editors einen Schritt an, auch der
@@ -386,7 +678,7 @@ export function EntryEditor({ nodeId, entryId, blocks, editorRef, sitzung }: Ent
       const neu = latest.current.document;
       if (JSON.stringify(alt.blocks ?? []) === JSON.stringify(neu)) return;
       mutedHistory(() => st.updateNodeData(nodeId, {
-        entries: cur.map((e) => (e.id === entryId ? { ...e, blocks: neu } : e)),
+        entries: (data?.entries ?? []).map((e) => (e.id === entryId ? { ...e, blocks: neu } : e)),
       }));
     } catch { /* Karte gerade im Abbau */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -402,23 +694,18 @@ export function EntryEditor({ nodeId, entryId, blocks, editorRef, sitzung }: Ent
 
   return (
     <div className="minutes-body nodrag" ref={huelle}>
-      {/* M267: dieselbe Formatier-Leiste wie in der Notiz-Karte. Das Schema
-          kennt textSize/textFont schon länger — nur die Knöpfe fehlten hier,
-          also stellte das Protokoll gestylten Text dar, ließ ihn aber nicht
-          setzen oder zurücknehmen. */}
+      {/* M267: dieselbe Formatier-Leiste wie in der Notiz-Karte. */}
       <BlockNoteView
         editor={editor}
         editable={!nurLesen}
         theme="light"
         className="note-editor"
         formattingToolbar={false}
-          slashMenu={false}   /* M283: eigenes Einfügen-Menü (NoteSlashMenu) */
+        slashMenu={false}   /* M283: eigenes Einfügen-Menü (NoteSlashMenu) */
         onChange={() => {
           // M487: gemeinsam auch Änderungen der anderen — gesichert nur vom Schreiber
           if (sitzung) { sitzung.aenderung(editor.document); return; }
-          const st = useBoard.getState();
-          const board = st.boards.find((b) => b.nodes.some((n) => n.id === nodeId));
-          const cur = ((board?.nodes.find((n) => n.id === nodeId)?.data as MinutesData | undefined)?.entries) ?? [];
+          const cur = gespeicherteSitzung(nodeId, entryId).data?.entries ?? [];
           updateNodeData(nodeId, {
             entries: cur.map((e) => (e.id === entryId ? { ...e, blocks: editor.document } : e)),
           });
