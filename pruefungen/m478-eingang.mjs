@@ -21,6 +21,7 @@
  *   I  Option aus: Empfangs-Dialog wie früher; „ohne Rückfrage" der Erweiterung geht immer direkt aufs Board.
  *   J  Abgleich über den Ordner: Am Telefon gesendet → am PC im Eingang; dort einsortiert → am Telefon leer.
  *      Normale Boards im Sync-Stand ohne neue Felder.
+ *   L  „Alles sichern" (M476) nimmt den Eingang mit; Einspielen als Kopie oder Ersetzen hängt ihn in kein Projekt.
  *   K  Keine Fehler.
  */
 // Läuft aus dem Repository: `node pruefungen/m478-eingang.mjs` (braucht `npm run build`)
@@ -29,6 +30,7 @@ import path from 'node:path';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import http from 'node:http';
 import { extname, join } from 'node:path';
+import { inflateRawSync } from 'node:zlib';
 import { chromium } from 'playwright-core';
 
 const __repo = fileURLToPath(new URL('..', import.meta.url));
@@ -361,6 +363,57 @@ console.log('\n════ I: Einstellung und „ohne Rückfrage" ════'
   st = await zustand(P);
   pruefe('I4 Verwerfen lässt im Eingang nichts zurück', gruppen(st.boards.find((b) => b.id === 'pixinotes-eingang')) === 1);
   await P.evaluate(() => localStorage.setItem('pixinotes-eingang-sammeln', '1'));
+}
+
+// ══ L: Sicherung (M476) ═════════════════════════════════════════════
+console.log('\n════ L: Alles sichern und einspielen ════');
+{
+  function unzip(buf) {
+    let e = buf.length - 22;
+    while (e >= 0 && buf.readUInt32LE(e) !== 0x06054b50) e -= 1;
+    const n = buf.readUInt16LE(e + 10); let p = buf.readUInt32LE(e + 16);
+    const out = new Map();
+    for (let i = 0; i < n; i++) {
+      const meth = buf.readUInt16LE(p + 10); const csize = buf.readUInt32LE(p + 20);
+      const nl = buf.readUInt16LE(p + 28); const xl = buf.readUInt16LE(p + 30); const cl = buf.readUInt16LE(p + 32);
+      const name = buf.subarray(p + 46, p + 46 + nl).toString('utf8'); const lo = buf.readUInt32LE(p + 42);
+      const start = lo + 30 + buf.readUInt16LE(lo + 26) + buf.readUInt16LE(lo + 28);
+      const roh = buf.subarray(start, start + csize);
+      out.set(name, meth === 8 ? inflateRawSync(roh) : Buffer.from(roh));
+      p += 46 + nl + xl + cl;
+    }
+    return out;
+  }
+  const datenReiter = async (G) => {
+    await G.keyboard.press('Escape'); await G.waitForTimeout(200);
+    await G.keyboard.press('Alt+e'); await G.waitForSelector('.modal-tabs');
+    await G.locator('.modal-tabs button', { hasText: 'Daten' }).click(); await G.waitForTimeout(300);
+  };
+  await datenReiter(P);
+  const [d] = await Promise.all([P.waitForEvent('download', { timeout: 15000 }), P.locator('[data-taste="alles-sichern"]').click()]);
+  const pfad = path.join(SD, 'm478-alles.pixinotes');
+  await d.saveAs(pfad);
+  const m = JSON.parse(unzip(readFileSync(pfad)).get('pixinotes.json').toString('utf8'));
+  const eb = (m.boards ?? []).find((b) => b.id === 'pixinotes-eingang');
+  pruefe('L1 „Alles sichern" nimmt den Eingang mit', eb?.system === 'eingang' && /Fährplan/.test(JSON.stringify(eb.nodes)), JSON.stringify((m.boards ?? []).map((b) => b.id)));
+  pruefe('L2 … ohne ihn in ein Projekt zu stellen', !(m.spaces ?? []).some((sp) => sp.projects.some((p) => p.boardIds.includes('pixinotes-eingang'))));
+  await P.keyboard.press('Escape'); await P.waitForTimeout(300);
+  for (const modus of ['kopie', 'ersetzen']) {
+    const neu = await geraet({ name: `einspielen-${modus}` });
+    await datenReiter(neu.P);
+    await neu.P.locator('.modal input[type="file"][accept*="pixinotes"]').first().setInputFiles(pfad);
+    await neu.P.waitForSelector('[data-taste="sicherung-einspielen"]', { timeout: 8000 });
+    if (modus === 'ersetzen') await neu.P.locator('[data-taste="sicherung-ersetzen"]').check();
+    await neu.P.locator('[data-taste="sicherung-einspielen"]').click(); await neu.P.waitForTimeout(1500);
+    await neu.P.keyboard.press('Escape'); await neu.P.waitForTimeout(400);
+    const st = await zustand(neu.P);
+    const eingaenge = st.boards.filter((b) => b.system === 'eingang' || b.id === 'pixinotes-eingang');
+    pruefe(`L3 ${modus}: genau EIN Eingang mit dem Eintrag, Zähler 1`, eingaenge.length === 1 && /Fährplan/.test(JSON.stringify(eingaenge[0].nodes)) && (await zaehler(neu.P)) === 1,
+      JSON.stringify(eingaenge.map((b) => [b.id, b.nodes.length])));
+    pruefe(`L4 ${modus}: der Eingang steht in keinem Projekt, nicht im Baum`, !st.spaces.some((sp) => sp.projects.some((p) => p.boardIds.some((id) => eingaenge.some((b) => b.id === id))))
+      && (await neu.P.locator('.tabs.spalte .side-board', { hasText: 'Eingang' }).count()) === 0, JSON.stringify(st.spaces.map((sp) => sp.projects.map((p) => p.boardIds))));
+    await neu.ctx.close();
+  }
 }
 
 // ══ J: Abgleich über den Ordner ══════════════════════════════════════

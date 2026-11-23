@@ -3439,7 +3439,7 @@
 "Aus Browser, Teilen und Outlook – einsortieren":"From browser, sharing and Outlook – sort in",
 "eingang inbox ablage schnellablage später geteilt erweiterung browser sortieren einsortieren":"inbox later shared extension browser sort quick capture",
 "Eingehendes im Eingang sammeln":"Collect incoming items in the inbox",
-"Was aus dem Browser (Erweiterung), dem Teilen-Menü oder per Outlook „Später\" kommt, wartet im Eingang (Spalte, unter Aufgaben), bis du es einsortierst. Aus: Es wird gleich nach dem Ziel gefragt. Ablegen per Ziehen und Strg+V gehen immer direkt aufs Board.":"Whatever comes from the browser (extension), the share menu or via Outlook “Later” waits in the inbox (sidebar, below Tasks) until you sort it in. Off: you are asked for the target right away. Dropping and Ctrl+V always go straight to the board.",
+"Was aus dem Browser, dem Teilen-Menü oder per Outlook „Später\" kommt, wartet in der Spalte unter „Aufgaben\", bis du es einsortierst – aus: sofort nach dem Ziel fragen. Ablegen per Ziehen und Strg+V gehen immer direkt aufs Board.":"Whatever comes from the browser, the share menu or via Outlook “Later” waits in the sidebar below “Tasks” until you sort it in – off: ask for the target right away. Dropping and Ctrl+V always go straight to the board.",
 "Eingang: {0} aufs Einsortieren":"Inbox: {0} to sort in",
 "{n} Eintrag wartet":"{n} entry waiting",
 "{n} Einträge warten":"{n} entries waiting",

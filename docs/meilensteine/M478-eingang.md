@@ -8,7 +8,7 @@ in die Arbeit — auch wenn man dort gerade nicht sortieren wollte.
 
 ## Was
 - **Eingang:** Erweiterung und Teilen legen ihr Gesendetes (Option „Eingehendes im Eingang sammeln", Einstellungen →
-  Design → Bedienung, Vorgabe an, je Gerät) in den Eingang statt aufs Board bzw. in den Empfangs-Dialog; eine kurze
+  Darstellung → Bedienung, Vorgabe an, je Gerät) in den Eingang statt aufs Board bzw. in den Empfangs-Dialog; eine kurze
   Meldung sagt es. Outlook hat je Mail neben „Aufs Board" ein leises **„Später"**.
 - Bleiben direkt aufs Board: „Ohne Rückfrage" der Erweiterung (ein gewähltes Ziel), Ablegen per Ziehen, Strg+V.
   Option aus: der Empfangs-Dialog wie bisher.
@@ -38,6 +38,10 @@ in die Arbeit — auch wenn man dort gerade nicht sortieren wollte.
   Termine (`lib/termineZentrale.ts`). Reiter und „In Board verschieben" gehen ohnehin über `spaces`.
   `syncMerge.mergeHierarchie` bekommt die Board-Kennungen **ohne** Eingang — sonst hängte es ihn als „Waise" ins erste
   Projekt (gefunden mit J4 der Reihe).
+- **Sicherung (M476):** „Alles sichern" nimmt den Eingang als Board mit. Beim Einspielen (`lib/sicherung.ts`) kommt er
+  in kein Projekt („Ersetzen": nicht unter `neuLose`; „Als Kopie": kein zweites Board, seine Karten gehen mit frischen
+  Kennungen in den eigenen Eingang); die Zahl „n Boards" zählt ihn nicht.
+- Reihe m314 zählt die Zeilen unter Darstellung jetzt bis zehn (die neue Option).
 - **Nie aktiv:** `eingangWaechter()` (Store-Abo, gestartet im `Eingang`-Host in `App.tsx`) setzt ein aktives
   Eingangs-Board auf das zuletzt offene zurück; kam der Sprung aus `focusNode` (`pendingFocus`), öffnet es die Liste
   bei diesem Eintrag. So greifen Präsentieren, Reiter, Undo und Rückfallwege nie auf den Eingang.

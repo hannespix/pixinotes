@@ -84,7 +84,8 @@ console.log('\n════ A: Reiter ════');
   // M326 ergänzte „Finger-Gesten (wie Procreate)" als siebte Zeile
   // M381: dazu die Sprache (Deutsch | English)
   // M434: „Pfeilschatten" kam auf ausdrücklichen Wunsch dazu (abschaltbar unter Darstellung)
-  pruefe('B2 genau neun Zeilen', JSON.stringify(z) === JSON.stringify(['Erscheinungsbild', 'Pfeilschatten', 'Akzentfarbe', 'Sprache', 'Anzeigegröße', 'Besser lesbar', 'Mausrad zoomt', 'Lebendige Fläche', 'Finger-Gesten (wie Procreate)']), JSON.stringify(z));
+  // M478: „Eingehendes im Eingang sammeln" (vernünftige Menschen wollen es verschieden: sammeln oder sofort fragen)
+  pruefe('B2 genau zehn Zeilen', JSON.stringify(z) === JSON.stringify(['Erscheinungsbild', 'Pfeilschatten', 'Akzentfarbe', 'Sprache', 'Anzeigegröße', 'Besser lesbar', 'Mausrad zoomt', 'Lebendige Fläche', 'Finger-Gesten (wie Procreate)', 'Eingehendes im Eingang sammeln']), JSON.stringify(z));
   pruefe('B3 keine Zeilen mehr für Milchglas, Navigation, Fokus, Stift, Physik, Klick-Zoom, Konfetti', !z.some((t) => /Milchglas|Navigation|Fokus|Stift|Physik|Klick|Konfetti|Kontrast|lesbare Schrift/.test(t)));
   const check = (text) => P.locator('.modal-row-check', { hasText: text }).locator('input[type="checkbox"]');
   await check('Besser lesbar').check();

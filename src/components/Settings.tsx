@@ -778,7 +778,7 @@ export function Settings() {
             <span>Eingehendes im Eingang sammeln</span>
             <input type="checkbox" checked={eingangAn} onChange={(e) => { setEingangSammeln(e.target.checked); setEingangAn(e.target.checked); }} data-taste="eingang-sammeln" />
           </label>
-          <p className="modal-hint">Was aus dem Browser (Erweiterung), dem Teilen-Menü oder per Outlook „Später" kommt, wartet im Eingang (Spalte, unter Aufgaben), bis du es einsortierst. Aus: Es wird gleich nach dem Ziel gefragt. Ablegen per Ziehen und Strg+V gehen immer direkt aufs Board.</p>
+          <p className="modal-hint">Was aus dem Browser, dem Teilen-Menü oder per Outlook „Später" kommt, wartet in der Spalte unter „Aufgaben", bis du es einsortierst – aus: sofort nach dem Ziel fragen. Ablegen per Ziehen und Strg+V gehen immer direkt aufs Board.</p>
         </section>
         </>
         )}
