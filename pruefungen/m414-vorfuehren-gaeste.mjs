@@ -882,12 +882,26 @@ fakeSenden(topic, 'zeigBild', { von: sb.zeigVon, karte: 'h1', s: 1e9, i: 0, n: 1
 let fb = null;
 await warteBis(H.P, async () => !!(fb = await toolRahmen(H.P, 'boese', true)), 6000);
 await H.P.waitForTimeout(800);
-const befund = fb ? await fb.evaluate(() => ({
-  skripte: document.querySelectorAll('script,iframe,meta,base').length,
-  on: [...document.querySelectorAll('*')].filter((e) => [...e.attributes].some((a) => /^on/i.test(a.name))).length,
-  js: [...document.querySelectorAll('[href],[action],[formaction]')].filter((e) => /javascript:/i.test(e.getAttribute('href') ?? e.getAttribute('action') ?? e.getAttribute('formaction') ?? '')).length,
-  stil: getComputedStyle(document.getElementById('boese')).color,
-})) : null;
+// M484: Unter Last kam zwischen Finden und Lesen ein echtes Abbild von Anna an und ersetzte das fremde (gewollt: eine
+// viel kleinere Folgenummer gilt als Neubeginn) — #boese war weg, getComputedStyle auf null. Dann das fremde Abbild
+// noch einmal senden, den Rahmen neu suchen und erneut lesen.
+const befundLesen = (f) => f.evaluate(() => {
+  const el = document.getElementById('boese');
+  if (!el) return null;
+  return {
+    skripte: document.querySelectorAll('script,iframe,meta,base').length,
+    on: [...document.querySelectorAll('*')].filter((e) => [...e.attributes].some((a) => /^on/i.test(a.name))).length,
+    js: [...document.querySelectorAll('[href],[action],[formaction]')].filter((e) => /javascript:/i.test(e.getAttribute('href') ?? e.getAttribute('action') ?? e.getAttribute('formaction') ?? '')).length,
+    stil: getComputedStyle(el).color,
+  };
+}).catch(() => null);
+let befund = fb ? await befundLesen(fb) : null;
+for (let i = 1; i <= 20 && !befund; i += 1) {
+  if (i % 5 === 0) fakeSenden(topic, 'zeigBild', { von: sb.zeigVon, karte: 'h1', s: 1e9 + i, i: 0, n: 1, z: 0, d: JSON.stringify(boese) });
+  await H.P.waitForTimeout(300);
+  fb = (await toolRahmen(H.P, 'boese', true)) ?? fb;
+  befund = fb ? await befundLesen(fb) : null;
+}
 pruefe('F1 das fremde Abbild wird gezeigt – aber ohne Skripte, Rahmen, Weiterleitung, Ereignis-Merkmale und javascript:-Adressen', !!befund && befund.skripte === 0 && befund.on === 0 && befund.js === 0 && befund.stil === 'rgb(255, 0, 0)', JSON.stringify(befund));
 pruefe('F2 nichts davon lief: Der Titel von Hannas Seite ist unverändert', (await H.P.title()) === titelVor && !/^B\d/.test(await H.P.title()), await H.P.title());
 await ta.click('#zufall');
