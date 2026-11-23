@@ -24,7 +24,7 @@ import { konfettiWerfen } from '../../lib/konfetti';
 import { checklistStand, FARB_NAMEN, noteTitle } from '../../lib/notiz';
 import { repairBlocks } from '../../lib/htmlBlocks';
 import { editorUpload } from '../../lib/notizBild';
-import { importFilesToBoard } from '../../lib/importFiles';
+import { importFilesToBoard } from '../../lib/importSpaet';
 import { CardShell } from './CardShell';
 import { NotizRuhend } from './NotizRuhend';
 import { hakenUmlegen, notizEinfach, type RuheBlock } from '../../lib/notizRuhend';

@@ -12,7 +12,6 @@ import {
 import { MENUE_HIER } from '../lib/kontextmenue';
 import { versionenOeffnen } from '../lib/boardVersionen';
 import { ebeneLoeschenFragen } from './EbeneLoeschenDialog';
-import { kontakteHerunterladen } from '../lib/kontaktExport';
 import { zahlWort } from '../lib/sprache';
 
 /**
@@ -231,9 +230,9 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
           <button role="menuitem" data-taste="board-sicherung" onClick={() => { downloadBoardFile(board, false); zu(); }}>
             <IDownload size={14} /> Sicherung herunterladen
           </button>
-          {/* M454: alle Kontakt-Karten des Boards als EINE .vcf – nur, wenn es welche gibt */}
+          {/* M454: alle Kontakt-Karten des Boards als EINE .vcf – nur, wenn es welche gibt (M483: der vCard-Schreiber lädt mit dem Klick) */}
           {board.nodes.some((n) => n.type === 'kontakt') && (
-            <button role="menuitem" data-taste="board-kontakte" onClick={() => { kontakteHerunterladen(board.nodes, board.name); zu(); }}>
+            <button role="menuitem" data-taste="board-kontakte" onClick={() => { const { nodes, name } = board; void import('../lib/kontaktExport').then((m) => m.kontakteHerunterladen(nodes, name)); zu(); }}>
               <IPerson size={14} /> {`Kontakte als vCard (${board.nodes.filter((n) => n.type === 'kontakt').length})`}
             </button>
           )}
