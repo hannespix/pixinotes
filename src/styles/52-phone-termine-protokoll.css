@@ -313,11 +313,20 @@
 .pr-farbe[aria-pressed='true'] { outline: 2px solid var(--accent); outline-offset: 1px; }
 .minutes-card .minutes-colorpick { position: static; flex: 0 0 auto; width: 22px; height: 22px; }
 
-/* Sitzungsleiste: neueste zuerst, rollt waagrecht (nie die Arbeitsfläche) */
+/* Sitzungsleiste: neueste zuerst; M495: so viele, wie in die Breite passen (die Karte misst), der Rest unter
+   „Ältere …" — rollt nur noch im Notfall waagrecht (nie die Arbeitsfläche) */
+.pr-leiste-zeile { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 0 auto; }
 .pr-leiste {
-  display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; min-width: 0; flex: 0 0 auto;
-  scrollbar-width: thin; padding-bottom: 2px;
+  display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; min-width: 0; flex: 0 1 auto;
+  scrollbar-width: none; padding-bottom: 2px;
 }
+.pr-aeltere {
+  flex: 0 0 auto; max-width: 9.5em; font: inherit; font-size: 12px; font-weight: 600; color: var(--pr-ink);
+  background: transparent; border: 1px dashed var(--pr-muted); border-radius: var(--r-sm); padding: 3px 4px;
+  cursor: pointer; margin-bottom: 2px; margin-left: auto;
+}
+.pr-aeltere:hover, .pr-aeltere:focus-visible { border-color: var(--accent); border-style: solid; }
+.pr-aeltere option, .pr-aeltere optgroup { color: var(--ink); background: var(--surface); }
 .pr-tag {
   flex: 0 0 auto; font: inherit; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums;
   border: 1px solid var(--pr-linie); background: transparent; color: var(--pr-ink);
@@ -372,6 +381,47 @@
   background: transparent; color: var(--pr-ink); padding: 2px 2px;
 }
 .pr-person-neu:focus { outline: none; border-bottom-color: var(--accent); border-bottom-style: solid; }
+
+/* M495: Vorschlag „Mia zur Runde hinzufügen?" — leise, eine Zeile, nur solange die Frage offen ist */
+.pr-vorschlag { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--pr-muted); min-width: 0; }
+.pr-vorschlag-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-vorschlag-ja {
+  flex: 0 0 auto; font: inherit; font-size: 11.5px; font-weight: 600; color: var(--pr-ink); background: transparent;
+  border: 1px solid var(--pr-linie); border-radius: var(--r-sm); padding: 1px 8px; cursor: pointer;
+}
+.pr-vorschlag-ja:hover { border-color: var(--accent); background: var(--pr-flaeche); }
+.pr-vorschlag-nein { flex: 0 0 auto; border: none; background: none; color: var(--pr-muted); cursor: pointer; padding: 2px 3px; display: inline-flex; border-radius: var(--r-xs); }
+.pr-vorschlag-nein:hover { color: var(--pr-ink); }
+
+/* M495: Übergabe an die nächste Sitzung — offene Aufgaben und TOPs ohne Beschluss, angehakt und abwählbar */
+.pr-uebergabe {
+  border: 1px solid var(--pr-linie); border-radius: var(--r); padding: 8px 10px; background: var(--pr-flaeche);
+  display: flex; flex-direction: column; gap: 6px; min-width: 0; max-height: 55%; overflow-y: auto; flex: 0 0 auto;
+}
+.pr-uebergabe-kopf { display: flex; align-items: center; gap: 8px; }
+.pr-uebergabe-kopf > b { font-size: 12.5px; color: var(--pr-ink); }
+.pr-uebergabe-kopf .pr-datum { border-color: var(--pr-linie); }
+.pr-uebergabe-liste { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pr-uebergabe-punkt { display: flex; align-items: flex-start; gap: 7px; line-height: 1.4; cursor: pointer; min-width: 0; color: var(--pr-ink); }
+.pr-uebergabe-punkt input { margin: 2px 0 0; flex: 0 0 auto; accent-color: var(--accent-fill); }
+.pr-art { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; color: var(--pr-muted); text-transform: uppercase; letter-spacing: 0.03em; padding-top: 1px; }
+.pr-uebergabe-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.pr-uebergabe-fuss { display: flex; justify-content: flex-end; gap: 6px; }
+.pr-knopf {
+  font: inherit; font-size: 12px; font-weight: 600; color: var(--pr-ink); background: transparent;
+  border: 1px solid var(--pr-linie); border-radius: var(--r-sm); padding: 4px 10px; cursor: pointer; min-height: 28px;
+}
+.pr-knopf:hover { border-color: var(--accent); }
+.pr-knopf.pr-haupt { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
+.pr-knopf.pr-haupt:hover { filter: brightness(1.08); }
+
+/* M495: „@" im Text — die Runde zur Auswahl. Ein Menü der Oberfläche, nicht des Papiers (wie M492) */
+.pr-at-liste {
+  min-width: 160px; max-width: 260px; background: var(--surface); color: var(--ink); border: 1px solid var(--border-soft);
+  border-radius: var(--r); box-shadow: var(--pop-shadow); padding: 4px; display: flex; flex-direction: column;
+}
+.pr-at-name { font-size: 12.5px; padding: 5px 8px; border-radius: var(--r-sm); cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-at-name:hover, .pr-at-name[aria-selected='true'] { background: var(--surface-2); }
 
 /* Tagesordnung der Sitzung: Sprungmarken in den Text */
 .minutes-tops { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -463,6 +513,6 @@
 .minutes-empty button:hover { filter: brightness(1.08); }
 /* Finger: größere Ziele für Leiste, Reiter und Werkzeuge — nach den Grundregeln, damit es greift (die Karte steht im Fokus verkleinert auf dem Schirm) */
 @media (pointer: coarse) {
-  .pr-tag, .pr-reiter, .pr-werkzeuge > button, .pr-mehr, .minutes-top-chip { min-height: 36px; }
+  .pr-tag, .pr-reiter, .pr-werkzeuge > button, .pr-mehr, .minutes-top-chip, .pr-aeltere, .pr-knopf, .pr-vorschlag-ja { min-height: 36px; }
   .minutes-head > button { width: 36px; height: 36px; }
 }

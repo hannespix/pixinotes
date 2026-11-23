@@ -81,7 +81,7 @@ html[data-rein] :is(.react-flow__node, .presenter-slide) :is(
     .cal-nav,
     .bub:not([data-phase='offen']) :is(.bub-ansicht, .bub-schritte, .bub-gruppe-neu, .bub-leiste, .bub-zahl, .bub-frage-feld:placeholder-shown),
     .time-rec, .time-nav, .time-empty,
-    .minutes-setup-btn, .minutes-new, .pr-werkzeuge, .pr-person-neu:placeholder-shown, .pr-person-weg, .pr-runde:not(:has(.pr-person)), .minutes-decision-add:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)),
+    .minutes-setup-btn, .minutes-new, .pr-werkzeuge, .pr-person-neu:placeholder-shown, .pr-person-weg, .pr-runde:not(:has(.pr-person)), .minutes-decision-add:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)), .pr-aeltere, .pr-vorschlag,
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head,
     /* dazu, was M421 als „immer da" stehen lässt, für den Vortrag aber Bedienung ist */

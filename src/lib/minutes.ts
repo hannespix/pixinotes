@@ -193,8 +193,14 @@ export const teilnehmendeText = (namen: string[]): string | undefined => (namen.
  * Person — darum zählt der Doppelpunkt nur, wenn der Name (oder ein Teil davon) in der Runde vorkommt; @ gilt immer.
  */
 export function personVon(text: string, runde: string[] = []): { person?: string; rest: string } {
-  const at = /(^|\s)@([\p{L}][\p{L}.-]{1,30})/u.exec(text);
-  if (at) return { person: at[2], rest: (text.slice(0, at.index) + text.slice(at.index + at[0].length)).replace(/\s{2,}/g, ' ').trim() };
+  // M495: „@Anna Berg" (zwei Wörter) nur, wenn genau so jemand in der Runde steht — die @-Liste fügt den vollen
+  // Namen ein, wenn der Vorname in der Runde zweimal vorkommt
+  const at = /(^|\s)@([\p{L}][\p{L}.-]{1,30})(\s[\p{Lu}][\p{L}.-]{1,30})?/u.exec(text);
+  if (at) {
+    const voll = at[3] && runde.some((r) => r.toLowerCase() === `${at[2]}${at[3]}`.toLowerCase());
+    const laenge = voll ? at[0].length : at[0].length - (at[3]?.length ?? 0);
+    return { person: voll ? `${at[2]}${at[3]}` : at[2], rest: (text.slice(0, at.index) + text.slice(at.index + laenge)).replace(/\s{2,}/g, ' ').trim() };
+  }
   const vorn = /^\s*([\p{Lu}][\p{L}.-]{1,30}(?:\s[\p{Lu}][\p{L}.-]{1,30})?)\s*:\s+(.+)$/u.exec(text);
   if (vorn) {
     const klein = vorn[1].toLowerCase();
