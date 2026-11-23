@@ -25,7 +25,7 @@ import * as Y from 'yjs';
 import { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate, removeAwarenessStates } from 'y-protocols/awareness';
 import { BlockNoteEditor } from '@blocknote/core';
 import { blocksToYXmlFragment, withCollaboration, yXmlFragmentToBlocks } from '@blocknote/core/yjs';
-import type { Beschluss, ProtokollLive } from './protokollLive';
+import type { Beschluss, ProtokollLive, TopZuordnung } from './protokollLive';
 import type { KanbanLive } from './kanbanLive';
 import type { KanbanItem } from '../types';
 import { ich, ichIn, LIVE_NACHRICHT, liveSenden, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from './liveStand';
@@ -307,61 +307,95 @@ const BESCHLUESSE = 'beschluesse';
 const MARKE = 'pn';
 /** Herkunft eigener Änderungen an Beschlüssen und Haken (nicht aus dem Editor) — gehen hinaus wie jede eigene */
 const LOKAL_PROTOKOLL = 'pn-protokoll';
-type BeschlussY = { text?: unknown; o?: unknown };
+type BeschlussY = { text?: unknown; o?: unknown; top?: unknown; topText?: unknown };
+/** M497: TOPs „nur Info" (Y.Map Schlüssel → true); die Marke `pn.tops` sagt, dass das Dokument sie trägt */
+const INFO_TOPS = 'infoTops';
+/** M497: Beschluss ohne die Lage — `top`/`topText` nur, wo gesetzt (ältere Beschlüsse bleiben, wie sie waren) */
+const beschlussVon = (id: string, x: BeschlussY): Beschluss => ({
+  id, text: String(x.text),
+  ...(typeof x.top === 'string' ? { top: x.top } : {}),
+  ...(typeof x.topText === 'string' ? { topText: x.topText } : {}),
+});
 function beschluesseAus(doc: Y.Doc): Beschluss[] {
   const m = doc.getMap(BESCHLUESSE);
-  const liste: Array<{ id: string; text: string; o: number }> = [];
+  const liste: Array<{ b: Beschluss; o: number }> = [];
   for (const [id, v] of m.entries()) {
     const x = v as BeschlussY | null;
     if (!x || typeof x.text !== 'string') continue;
-    liste.push({ id, text: x.text, o: typeof x.o === 'number' ? x.o : 0 });
+    liste.push({ b: beschlussVon(id, x), o: typeof x.o === 'number' ? x.o : 0 });
   }
-  liste.sort((a, b) => a.o - b.o || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  return liste.map(({ id, text }) => ({ id, text }));
+  liste.sort((a, b) => a.o - b.o || (a.b.id < b.b.id ? -1 : a.b.id > b.b.id ? 1 : 0));
+  return liste.map(({ b }) => b);
 }
+const infoTopsAus = (doc: Y.Doc): string[] => [...doc.getMap(INFO_TOPS).keys()].sort();
+/** M497: Felder der Zuordnung für den Eintrag in der Y.Map */
+const topFelder = (top?: TopZuordnung): Record<string, string> =>
+  (top ? { top: top.top, ...(top.topText ? { topText: top.topText } : {}) } : {});
 export function protokollOeffnen(
   boardId: string, nodeId: string, entryId: string, blocks: unknown[], // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema: any, darf: boolean, warten: boolean, beschluesse: Beschluss[] = [],
+  schema: any, darf: boolean, warten: boolean, beschluesse: Beschluss[] = [], infoTops: string[] = [],
 ): Promise<ProtokollSitzung> {
   const n = `${nodeId}:${entryId}`;
   let docHier: Y.Doc | null = null;
   const traegtBeschluesse = (d: Y.Doc): boolean => d.getMap(MARKE).get('beschluesse') === true;
+  const traegtTops = (d: Y.Doc): boolean => d.getMap(MARKE).get('tops') === true;
+  // M497: Zuordnung und Info-TOPs kommen nur in die Kennung, wenn es sie gibt — ohne sie beginnt das Dokument genau
+  // wie in M493 (gleiche Kennung heißt gleicher Inhalt, auch mit Geräten der älteren Fassung)
+  const mitTop = beschluesse.some((b) => b && (typeof b.top === 'string' || typeof b.topText === 'string'));
+  const info = [...new Set(infoTops.filter((k) => typeof k === 'string' && k))].sort();
   return kernOeffnen({
     boardId, nodeId, n, darf, warten,
     leer: (doc) => doc.getXmlFragment(FRAGMENT).length === 0,
     anfangen: (doc) => blockAnfang(doc, n, blocks, schema, {
-      kennung: JSON.stringify(beschluesse.map((b) => [b.id, b.text])),
+      kennung: JSON.stringify(beschluesse.map((b) => [b.id, b.text]))
+        + (mitTop ? `\n${JSON.stringify(beschluesse.map((b) => [b.top ?? null, b.topText ?? null]))}` : '')
+        + (info.length ? `\n${JSON.stringify(info)}` : ''),
       anlegen: (hilf) => {
         const m = hilf.getMap(BESCHLUESSE);
-        beschluesse.forEach((b, i) => { if (b && typeof b.id === 'string' && typeof b.text === 'string') m.set(b.id, { text: b.text, o: i }); });
+        beschluesse.forEach((b, i) => {
+          if (b && typeof b.id === 'string' && typeof b.text === 'string') {
+            m.set(b.id, { text: b.text, o: i, ...(typeof b.top === 'string' ? { top: b.top } : {}), ...(typeof b.topText === 'string' ? { topText: b.topText } : {}) });
+          }
+        });
         hilf.getMap(MARKE).set('beschluesse', true);
+        if (info.length) {
+          const t = hilf.getMap(INFO_TOPS);
+          for (const k of info) t.set(k, true);
+          hilf.getMap(MARKE).set('tops', true);
+        }
       },
     }),
     schreiben: (jetzt) => {
       const st = useBoard.getState();
       const node = selectActiveBoard(st).nodes.find((x) => x.id === nodeId);
-      const eintraege = (node?.data as { entries?: Array<{ id: string; blocks?: unknown; decisions?: Beschluss[] }> } | undefined)?.entries;
+      const eintraege = (node?.data as { entries?: Array<{ id: string; blocks?: unknown; decisions?: Beschluss[]; infoTops?: string[] }> } | undefined)?.entries;
       const alt = eintraege?.find((e) => e.id === entryId);
       if (!eintraege || !alt) return;   // Sitzung gelöscht
-      const neu: { blocks?: unknown; decisions?: Beschluss[] } = {};
+      const neu: { blocks?: unknown; decisions?: Beschluss[]; infoTops?: string[] } = {};
       // `jetzt` fehlt, wenn sich nur die Beschlüsse änderten und noch kein Editor-Stand bekannt ist
       if (jetzt !== undefined && jetzt !== null && JSON.stringify(alt.blocks ?? []) !== JSON.stringify(jetzt)) neu.blocks = jetzt;
       if (docHier && traegtBeschluesse(docHier)) {
         const b = beschluesseAus(docHier);
         if (JSON.stringify(alt.decisions ?? []) !== JSON.stringify(b)) neu.decisions = b;
       }
-      if (!('blocks' in neu) && !('decisions' in neu)) return;
+      if (docHier && traegtTops(docHier)) {
+        const t = infoTopsAus(docHier);
+        if (JSON.stringify([...(alt.infoTops ?? [])].sort()) !== JSON.stringify(t)) neu.infoTops = t;
+      }
+      if (!('blocks' in neu) && !('decisions' in neu) && !('infoTops' in neu)) return;
       st.updateNodeData(nodeId, { entries: eintraege.map((e) => (e.id === entryId ? { ...e, ...neu } : e)) });
     },
   }).then((s) => {
     const doc = s.doc;
     docHier = doc;
     const karte = doc.getMap(BESCHLUESSE);
+    const infoKarte = doc.getMap(INFO_TOPS);
     const p = s as SitzungIntern & ProtokollSitzung;
-    // Beschlüsse geändert (hier oder bei anderen): der Schreiber sichert
+    // Beschlüsse oder Info-TOPs geändert (hier oder bei anderen): der Schreiber sichert
     const beiAenderung = () => s.neuSichern();
     karte.observe(beiAenderung);
-    s.beimSchliessen(() => karte.unobserve(beiAenderung));
+    infoKarte.observe(beiAenderung);
+    s.beimSchliessen(() => { karte.unobserve(beiAenderung); infoKarte.unobserve(beiAenderung); });
     p.mitBeschluessen = () => traegtBeschluesse(doc);
     p.beschluesse = () => (traegtBeschluesse(doc) ? beschluesseAus(doc) : beschluesse);
     p.beschlussSetzen = (id, text) => {
@@ -369,17 +403,39 @@ export function protokollOeffnen(
       const alt = karte.get(id) as BeschlussY | undefined;
       doc.transact(() => {
         if (text === null) karte.delete(id);
-        else karte.set(id, { text, o: typeof alt?.o === 'number' ? alt.o : karte.size });
+        // M497: die Zuordnung zum TOP (und was eine neuere Fassung sonst trägt) bleibt beim Ändern des Texts
+        else karte.set(id, { ...(alt ?? {}), text, o: typeof alt?.o === 'number' ? alt.o : karte.size });
       }, LOKAL_PROTOKOLL);
     };
-    p.beschlussDazu = (text) => {
+    p.beschlussDazu = (text, top) => {
       if (!traegtBeschluesse(doc)) return;
       let o = 0;
       for (const v of karte.values()) { const x = v as BeschlussY; if (typeof x?.o === 'number' && x.o >= o) o = x.o + 1; }
       const id = `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-      doc.transact(() => karte.set(id, { text, o }), LOKAL_PROTOKOLL);
+      doc.transact(() => karte.set(id, { text, o, ...topFelder(top) }), LOKAL_PROTOKOLL);
     };
-    p.beiBeschluessen = (cb) => { karte.observe(cb); return () => karte.unobserve(cb); };
+    p.beschlussZuordnen = (id, top) => {
+      if (!traegtBeschluesse(doc)) return;
+      const alt = karte.get(id) as BeschlussY | undefined;
+      if (!alt || typeof alt.text !== 'string') return;
+      const neu: Record<string, unknown> = { ...alt };
+      delete neu.top; delete neu.topText;
+      doc.transact(() => karte.set(id, { ...neu, ...topFelder(top) }), LOKAL_PROTOKOLL);
+    };
+    // M497: Ohne Marke (Dokument einer älteren Fassung) gelten die Info-TOPs aus dem Speicher; die erste eigene
+    // Änderung übernimmt sie ins Dokument und setzt die Marke — ab dann sichert der Schreiber sie mit
+    p.infoTops = () => (traegtTops(doc) ? infoTopsAus(doc) : info);
+    p.infoTopSetzen = (k, an) => {
+      if (!traegtBeschluesse(doc) || !k) return;
+      doc.transact(() => {
+        if (!traegtTops(doc)) { for (const x of info) infoKarte.set(x, true); doc.getMap(MARKE).set('tops', true); }
+        if (an) infoKarte.set(k, true); else infoKarte.delete(k);
+      }, LOKAL_PROTOKOLL);
+    };
+    p.beiBeschluessen = (cb) => {
+      karte.observe(cb); infoKarte.observe(cb);
+      return () => { karte.unobserve(cb); infoKarte.unobserve(cb); };
+    };
     p.aufgabeHaken = (blockId) => {
       const el = checkpunkt(doc.getXmlFragment(FRAGMENT), blockId);
       if (!el) return false;
@@ -439,9 +495,9 @@ function checkpunkt(fragment: Y.XmlFragment, blockId: string): Y.XmlElement | nu
  */
 export async function protokollHaken(
   boardId: string, nodeId: string, entryId: string, blocks: unknown[], beschluesse: Beschluss[], // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  schema: any, blockId: string,
+  schema: any, blockId: string, infoTops: string[] = [],
 ): Promise<boolean> {
-  const s = await protokollOeffnen(boardId, nodeId, entryId, blocks, schema, true, true, beschluesse);
+  const s = await protokollOeffnen(boardId, nodeId, entryId, blocks, schema, true, true, beschluesse, infoTops);
   try {
     if (!s.aufgabeHaken(blockId)) return false;
     // Ohne Editor: den Stand selbst in Blöcke wandeln (nur, wenn dieses Gerät gerade sichert)

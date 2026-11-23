@@ -3635,4 +3635,13 @@
 "Person erwähnen":"Mention a person",
 "Wer":"Who",
 "Stand":"Status",
-"Ohne Datum":"No date"}
+"Ohne Datum":"No date",
+"TOP des Beschlusses":"Agenda item of the decision",
+"Zu welchem TOP gehört der Beschluss?":"Which agenda item does this decision belong to?",
+"ohne TOP":"no agenda item",
+"TOPs ohne Beschluss":"Agenda items without a decision",
+"Ohne Beschluss:":"No decision:",
+"Nur Information – wird nicht übergeben. Klick: wieder offen":"Information only – not carried over. Click: open again",
+"Als „nur Info“ markieren – kommt nicht in die nächste Sitzung":"Mark as “info only” – not carried over to the next meeting",
+"nur Info":"info only",
+"Gehört zu diesem TOP":"Belongs to this agenda item"}

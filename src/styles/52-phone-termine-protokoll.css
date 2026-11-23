@@ -464,6 +464,27 @@
 .minutes-decision button:hover { color: var(--pr-warn); }
 .minutes-decision-add { border: 1px dashed var(--pr-linie); border-radius: var(--r-sm); padding: 4px 8px; width: 100%; }
 .minutes-decision-add:focus { border-style: solid; border-color: var(--accent); outline: none; }
+/* M497: Zu welchem TOP gehört der Beschluss — leise Auswahl rechts in der Zeile; ohne TOP nur im Fokus (M421) */
+.pr-beschluss-top {
+  flex: 0 1 auto; max-width: 10em; min-width: 0; font: inherit; font-size: 11px; font-weight: 600; color: var(--pr-muted);
+  background: transparent; border: 1px dashed var(--pr-muted); border-radius: var(--r-sm); padding: 1px 3px; cursor: pointer;
+  text-overflow: ellipsis; align-self: center;
+}
+.pr-beschluss-top:not(.leer) { color: var(--pr-ink); }
+.pr-beschluss-top:hover, .pr-beschluss-top:focus-visible { border-color: var(--accent); border-style: solid; }
+.pr-beschluss-top option { color: var(--ink); background: var(--surface); }
+/* M497: TOPs ohne Beschluss — „nur Info" nimmt sie aus der Übergabe */
+.pr-top-stand { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11.5px; color: var(--pr-muted); padding-top: 2px; }
+.pr-top-stand-kopf { font-weight: 600; }
+.pr-top-offen { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; color: var(--pr-ink); }
+.pr-top-offen > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pr-top-offen.info > span { color: var(--pr-muted); }
+.pr-info-knopf {
+  flex: 0 0 auto; font: inherit; font-size: 11px; font-weight: 600; color: var(--pr-muted); background: transparent;
+  border: 1px dashed var(--pr-muted); border-radius: var(--r-sm); padding: 0 6px; cursor: pointer;
+}
+.pr-info-knopf:hover { border-color: var(--accent); color: var(--pr-ink); }
+.pr-info-knopf[aria-pressed='true'] { color: var(--pr-ink); background: var(--pr-flaeche); border-style: solid; }
 
 /* Übersicht: offene Aufgaben nach Person, Beschlusslage, Teilnahme, Suche */
 .pr-uebersicht { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 2px; }
@@ -492,6 +513,8 @@
 .pr-frist.ueberfaellig { color: var(--pr-warn); }
 .pr-beschluss { display: flex; align-items: flex-start; gap: 7px; line-height: 1.4; min-width: 0; }
 .pr-beschluss > span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* M497: der TOP, zu dem der Beschluss gehört */
+.pr-beschluss > .pr-beschluss-zu { flex: 0 1 auto; max-width: 40%; font-size: 11px; color: var(--pr-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pr-datum-chip {
   flex: 0 0 auto; font: inherit; font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums;
   color: var(--pr-ink); background: var(--pr-flaeche); border: none; border-radius: var(--r-sm); padding: 1px 6px; cursor: pointer;
@@ -513,6 +536,6 @@
 .minutes-empty button:hover { filter: brightness(1.08); }
 /* Finger: größere Ziele für Leiste, Reiter und Werkzeuge — nach den Grundregeln, damit es greift (die Karte steht im Fokus verkleinert auf dem Schirm) */
 @media (pointer: coarse) {
-  .pr-tag, .pr-reiter, .pr-werkzeuge > button, .pr-mehr, .minutes-top-chip, .pr-aeltere, .pr-knopf, .pr-vorschlag-ja { min-height: 36px; }
+  .pr-tag, .pr-reiter, .pr-werkzeuge > button, .pr-mehr, .minutes-top-chip, .pr-aeltere, .pr-knopf, .pr-vorschlag-ja, .pr-beschluss-top, .pr-info-knopf { min-height: 36px; }
   .minutes-head > button { width: 36px; height: 36px; }
 }

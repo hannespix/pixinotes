@@ -9,13 +9,14 @@ import { sprache, t, zahlWort } from '../../lib/sprache';
 import { mutedHistory, useBoard, useNurLesen } from '../../store';
 import { STICKY_COLORS, uid, type MinutesData, type MinutesEntry, type MinutesNode } from '../../types';
 import {
-  allDecisions, anwesenheit, aufgabenStand, currentEntry, entryLabel, fristText, kurzDatum, langDatum,
+  anwesenheit, aufgabenStand, currentEntry, entryLabel, fristText, kurzDatum, langDatum,
   nextDate, offeneAufgaben, papierArt, sitzungAlsText, sortEntries, suchNorm, sucheInReihe, tagesordnung, teilnehmende,
   teilnehmendeText, type OffeneAufgabe,
 } from '../../lib/minutes';
 import {
-  dateiName, erwaehnung, mailAdresse, nachMonat, neueSitzung, sitzungAlsHtml, sitzungAlsMarkdown, uebergabeVorschlag,
-  unbekanntePersonen, type UebergabePunkt,
+  beschlusslage, dateiName, erwaehnung, infoSchluessel, mailAdresse, nachMonat, neueSitzung, sitzungAlsHtml,
+  sitzungAlsMarkdown, topDesBeschlusses, topRaten, topSchluessel, topsDerSitzung, topStand, topVor, uebergabeVorschlag,
+  unbekanntePersonen, type TopInfo, type UebergabePunkt,
 } from '../../lib/protokollSchliff';
 import { triggerDownload } from '../../lib/download';
 import { overlayOffen } from '../../lib/overlay';
@@ -31,7 +32,7 @@ import { DragTitle } from './DragTitle';
 import { ICheck, ICopy, IDownload, IDrucker, IMail, IMore, IPlus, ISearch, ISettings, ITrash, IUsers, IX } from '../Icons';
 import type { NotizSitzung } from '../../lib/notizGemeinsamKern';
 import { liveVerbunden, TEILNEHMER_EREIGNIS } from '../../lib/liveStand';
-import { PROTOKOLL_LIVE, protokollLive, type ProtokollLive } from '../../lib/protokollLive';
+import { PROTOKOLL_LIVE, protokollLive, type ProtokollLive, type TopZuordnung } from '../../lib/protokollLive';
 import { useTakt } from '../LiveLeiste';
 import { NotizRuhend } from './NotizRuhend';
 import type { RuheBlock } from '../../lib/notizRuhend';
@@ -132,7 +133,7 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   const sorted = useMemo(() => sortEntries(m.entries ?? []), [m.entries]);
   const entry = currentEntry(m);
   const offen = useMemo(() => offeneAufgaben(m), [m, fristen]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const beschluesse = useMemo(() => allDecisions(m), [m]);
+  const beschluesse = useMemo(() => beschlusslage(m), [m]);
 
   const patch = (next: Partial<MinutesData>) => updateNodeData(id, next);
   const patchEntry = (entryId: string, next: Partial<MinutesEntry>) =>
@@ -141,10 +142,41 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   // M493: Beschlüsse der gezeigten Sitzung — gemeinsam aus dem Y-Dokument, sonst aus dem Speicher
   const live = useProtokollLive(entry ? `${id}:${entry.id}` : null);
   const sitzungsBeschluesse = live ? live.beschluesse() : (entry?.decisions ?? []);
-  const beschlussDazu = (text: string) => {
+  // M497: TOPs „nur Info" der Sitzung — gemeinsam ebenfalls aus dem Y-Dokument
+  const infoListe = live ? live.infoTops() : (entry?.infoTops ?? []);
+  // Die Überschriften der Sitzung (auch eingerückte) und ihr Stand: Beschluss, nur Info oder offen
+  const sitzungsTops = useMemo(() => topsDerSitzung(entry), [entry]);
+  const topStaende = entry ? topStand(m, { ...entry, decisions: sitzungsBeschluesse, infoTops: infoListe }) : [];
+  const beschlussDazu = (text: string, top?: TopZuordnung) => {
     if (!entry) return;
-    if (live) live.beschlussDazu(text);
-    else patchEntry(entry.id, { decisions: [...(entry.decisions ?? []), { id: uid(), text }] });
+    if (live) live.beschlussDazu(text, top);
+    else patchEntry(entry.id, { decisions: [...(entry.decisions ?? []), { id: uid(), text, ...(top ? { top: top.top, ...(top.topText ? { topText: top.topText } : {}) } : {}) }] });
+  };
+  /** M497: Zuordnung als Felder — `null` = bewusst ohne TOP */
+  const zuordnungVon = (top: TopInfo | null): TopZuordnung => (top ? { top: topSchluessel(top), topText: top.text } : { top: '' });
+  const beschlussZuordnen = (bid: string, top: TopInfo | null) => {
+    if (!entry) return;
+    const z = zuordnungVon(top);
+    if (live) { live.beschlussZuordnen(bid, z); return; }
+    patchEntry(entry.id, {
+      decisions: (entry.decisions ?? []).map((x) => {
+        if (x.id !== bid) return x;
+        const neu: typeof x = { ...x, top: z.top };
+        if (z.topText) neu.topText = z.topText; else delete neu.topText;
+        return neu;
+      }),
+    });
+  };
+  const infoSetzen = (top: TopInfo, an: boolean) => {
+    if (!entry) return;
+    if (live) {
+      if (an) live.infoTopSetzen(topSchluessel(top), true);
+      else for (const k of infoSchluessel(top)) live.infoTopSetzen(k, false);
+      return;
+    }
+    const weg = new Set(infoSchluessel(top));
+    const rest = infoListe.filter((k) => !weg.has(k));
+    patchEntry(entry.id, { infoTops: an ? [...rest, topSchluessel(top)] : (rest.length ? rest : undefined) });
   };
   const beschlussSetzen = (bid: string, text: string | null) => {
     if (!entry) return;
@@ -240,8 +272,11 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
     const text = b ? inhaltText(b.content).trim() : '';
     if (ed && b && text) {
       // Die Zeile WIRD zum Beschluss — sie steht danach nicht doppelt im Text. M493: gemeinsam beides über das
-      // Y-Dokument (Beschluss in der Sitzung, Zeile über den Editor), sonst über den Speicher
-      beschlussDazu(text);
+      // Y-Dokument (Beschluss in der Sitzung, Zeile über den Editor), sonst über den Speicher.
+      // M497: Der Beschluss merkt sich den TOP, unter dem die Zeile stand (vor dem ersten TOP: bewusst ohne)
+      let top: TopInfo | null = null;
+      try { top = topVor(ed.document as never, b.id); } catch { /* Editor im Umbau */ }
+      beschlussDazu(text, zuordnungVon(top));
       try { ed.removeBlocks([b]); } catch { /* egal */ }
       showToast('Als Beschluss festgehalten.');
       return;
@@ -264,7 +299,9 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   const addDecision = () => {
     const text = beschlussText.trim();
     if (!text || !entry) return;
-    beschlussDazu(text);
+    // M497: Nennt der getippte Beschluss genau einen TOP, gehört er dazu (in der Liste änderbar); sonst ohne Zuordnung
+    const geraten = topRaten(sitzungsTops, text);
+    beschlussDazu(text, geraten ? zuordnungVon(geraten) : undefined);
     setBeschlussText('');
   };
 
@@ -272,15 +309,35 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
   const runde = teilnehmende(entry?.attendees);
   const personDazu = (namen = teilnehmende(personText)) => {
     if (!entry || namen.length === 0) return;
-    patchEntry(entry.id, { attendees: teilnehmendeText(teilnehmende([...runde, ...namen].join(','))) });
+    // M497: Wer doch in die Runde kommt, fällt aus den abgelehnten Vorschlägen der Reihe heraus
+    const klein = new Set(namen.map((n) => n.toLowerCase()));
+    const abgelehntAlt = m.personenAbgelehnt ?? [];
+    const abgelehntNeu = abgelehntAlt.filter((n) => !klein.has(n));
+    patch({
+      entries: (m.entries ?? []).map((e) => (e.id === entry.id ? { ...e, attendees: teilnehmendeText(teilnehmende([...runde, ...namen].join(','))) } : e)),
+      ...(abgelehntNeu.length !== abgelehntAlt.length ? { personenAbgelehnt: abgelehntNeu.length ? abgelehntNeu : undefined } : {}),
+    });
+    setAbgelehnt((alt) => {
+      if (![...klein].some((n) => alt.has(n))) return alt;
+      const x = new Set(alt);
+      klein.forEach((n) => x.delete(n));
+      return x;
+    });
     setPersonText('');
   };
-  // M495: „Mia: …" in einer Aufgabe, Mia aber nicht in der Runde — vorschlagen statt still übergehen
-  const personVorschlaege = useMemo(
-    () => unbekanntePersonen(entry).filter((n) => !abgelehnt.has(`${entry?.id}:${n.toLowerCase()}`)),
-    [entry, abgelehnt],
-  );
-  const ablehnen = (n: string) => setAbgelehnt((alt) => new Set(alt).add(`${entry?.id}:${n.toLowerCase()}`));
+  // M495: „Mia: …" in einer Aufgabe, Mia aber nicht in der Runde — vorschlagen statt still übergehen.
+  // M497: Abgelehnte Namen merkt sich die Reihe (`personenAbgelehnt`, mit Abgleich); der lokale Satz hält sie auch
+  // dann weg, wenn der Kartenschutz die Änderung gerade zurücknimmt (jemand anderes tippt gemeinsam in der Karte)
+  const personVorschlaege = useMemo(() => {
+    const weg = new Set([...(m.personenAbgelehnt ?? []), ...abgelehnt]);
+    return unbekanntePersonen(entry).filter((n) => !weg.has(n.toLowerCase()));
+  }, [entry, abgelehnt, m.personenAbgelehnt]);
+  const ablehnen = (n: string) => {
+    const k = n.toLowerCase();
+    setAbgelehnt((alt) => new Set(alt).add(k));
+    const alt = m.personenAbgelehnt ?? [];
+    if (!alt.includes(k)) patch({ personenAbgelehnt: [...alt, k] });
+  };
   const personWeg = (name: string) => {
     if (!entry) return;
     patchEntry(entry.id, { attendees: teilnehmendeText(runde.filter((n) => n !== name)) });
@@ -295,7 +352,7 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
     if (liveVerbunden(boardId)) {
       showToast(`Erledigt: ${a.text}`);
       void import('../../lib/notizGemeinsamKern')
-        .then((k) => k.protokollHaken(boardId, id, e.id, repairBlocks(e.blocks as unknown[]), e.decisions ?? [], noteSchema, a.blockId))
+        .then((k) => k.protokollHaken(boardId, id, e.id, repairBlocks(e.blocks as unknown[]), e.decisions ?? [], noteSchema, a.blockId, e.infoTops ?? []))
         .then((gut) => { if (!gut) showToast('Der Punkt steht im gemeinsamen Stand nicht mehr – nichts geändert.'); })
         .catch(() => alleinAbhaken(e, a));   // Yjs lädt nicht: über den Speicher wie ohne Live-Kanal
       return;
@@ -709,6 +766,26 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
                     onChange={(ev) => beschlussSetzen(d.id, ev.target.value)}
                     onBlur={(ev) => { if (!ev.target.value.trim()) beschlussSetzen(d.id, null); }}
                   />
+                  {(sitzungsTops.length > 0 || !!topDesBeschlusses(sitzungsTops, d)) && (() => {
+                    // M497: Zu welchem TOP gehört der Beschluss? Ruhige Auswahl, erst im Fokus sichtbar (M421)
+                    const zu = topDesBeschlusses(sitzungsTops, d);
+                    const wert = zu ? String(sitzungsTops.indexOf(zu)) : '';
+                    return (
+                      <select
+                        className={`pr-beschluss-top${zu ? '' : ' leer'}`}
+                        value={wert}
+                        disabled={nurLesen}
+                        aria-label="TOP des Beschlusses"
+                        title="Zu welchem TOP gehört der Beschluss?"
+                        translate="no"
+                        data-taste="pr-beschluss-top"
+                        onChange={(ev) => beschlussZuordnen(d.id, ev.target.value === '' ? null : sitzungsTops[Number(ev.target.value)] ?? null)}
+                      >
+                        <option value="">ohne TOP</option>
+                        {sitzungsTops.map((tp, i) => <option key={`${tp.id ?? ''}${i}`} value={String(i)}>{tp.text}</option>)}
+                      </select>
+                    );
+                  })()}
                   {!nurLesen && (
                     <button title="Beschluss entfernen" aria-label="Beschluss entfernen" onClick={() => beschlussSetzen(d.id, null)}>
                       <IX size={10} />
@@ -727,6 +804,26 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addDecision(); } }}
                   onBlur={addDecision}
                 />
+              )}
+              {!nurLesen && topStaende.some((x) => x.stand !== 'beschluss') && (
+                // M497: TOPs ohne Beschluss — „nur Info" markiert sie, sie kommen dann nie in die Übergabe
+                <div className="pr-top-stand" aria-label="TOPs ohne Beschluss">
+                  <span className="pr-top-stand-kopf">Ohne Beschluss:</span>
+                  {topStaende.filter((x) => x.stand !== 'beschluss').map(({ top, stand }, i) => (
+                    <span key={`${top.id ?? ''}${i}`} className={`pr-top-offen${stand === 'info' ? ' info' : ''}`}>
+                      <span translate="no">{top.text}</span>
+                      <button
+                        className="pr-info-knopf"
+                        aria-pressed={stand === 'info'}
+                        title={stand === 'info' ? 'Nur Information – wird nicht übergeben. Klick: wieder offen' : 'Als „nur Info“ markieren – kommt nicht in die nächste Sitzung'}
+                        data-taste="pr-info"
+                        onClick={() => infoSetzen(top, stand !== 'info')}
+                      >
+                        nur Info
+                      </button>
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -782,15 +879,13 @@ export function MinutesBody({ id, data }: { id: string; data: MinutesData }) {
               <section className="pr-abschnitt" aria-label="Beschlüsse">
                 <h4>Beschlüsse <span className="pr-zahl">{beschluesse.length}</span></h4>
                 {beschluesse.length === 0 && <p className="pr-leer">Noch keine Beschlüsse.</p>}
-                {beschluesse.map((d, i) => {
-                  const e = sorted.find((x) => x.date === d.date);
-                  return (
-                    <div key={i} className="pr-beschluss">
-                      <button className="pr-datum-chip" title="Sitzung öffnen" onClick={() => e && zeige(e.id)}>{kurzDatum(d.date)}</button>
-                      <span translate="no">{d.text}</span>
-                    </div>
-                  );
-                })}
+                {beschluesse.map((d, i) => (
+                  <div key={i} className="pr-beschluss">
+                    <button className="pr-datum-chip" title="Sitzung öffnen" onClick={() => zeige(d.entryId)}>{kurzDatum(d.date)}</button>
+                    <span translate="no">{d.text}</span>
+                    {d.top && <span className="pr-beschluss-zu" translate="no" title="Gehört zu diesem TOP">{d.top}</span>}
+                  </div>
+                ))}
               </section>
               {teilnahme.length > 0 && (
                 <section className="pr-abschnitt" aria-label="Teilnahme">

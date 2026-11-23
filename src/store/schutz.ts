@@ -150,7 +150,8 @@ function mitTextVon(alt: AppNode, neu: AppNode): AppNode {
   };
   // M493: die Beschlüsse der Sitzung laufen gemeinsam ebenfalls über das Y-Dokument (lib/protokollLive.ts) — der
   // Schreiber sichert sie mit dem Text, sie gehen deshalb durch wie er
-  if (alt.type === 'minutes') return je('entries', ['blocks', 'decisions']);
+  // M497: ebenso die TOPs „nur Info" der Sitzung
+  if (alt.type === 'minutes') return je('entries', ['blocks', 'decisions', 'infoTops']);
   if (alt.type === 'kanban') {
     // M498: Gemeinsam laufen jetzt alle Felder der Tickets (Person, Frist, Checkliste, Spalte …) und ihre Reihenfolge
     // über das Y-Dokument (lib/notizGemeinsamKern.ts `kanbanOeffnen`) — der Schreiber sichert sie, sie gehen durch.
