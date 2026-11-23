@@ -186,6 +186,11 @@ export function karteEntschaerfen<T extends AppNode>(n0: T): T {
     const { foto: _f, ...rest } = d;
     return { ...n, data: rest } as T;
   }
+  // M501: Die Körperfarbe landet als CSS-Variable in der Karte — nur eine glatte Hex-Farbe, nie url(…) oder anderes
+  if (n.type === 'pixi' && d.farbe !== undefined && !(typeof d.farbe === 'string' && /^#[0-9a-f]{6}$/i.test(d.farbe))) {
+    const { farbe: _f, ...rest } = d;
+    return { ...n, data: rest } as T;
+  }
   if (n.type === 'image' && d.src !== undefined && !ladbareQuelle(d.src)) {
     return { ...n, data: { ...d, src: '' } } as T;
   }

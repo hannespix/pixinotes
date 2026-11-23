@@ -1,0 +1,157 @@
+/* ---------- M501: Pixi, das Maskottchen ----------
+   Figur aus pix-el (lib/pixiBild.ts), Verhalten aus lib/pixiVerhalten.ts. Die Karte setzt nur data-Attribute an `.pixi`
+   (anim, augen, mund, arme, effekt); hier wird eingeblendet und bewegt — alles in Pixel-Schritten (`steps`), damit die
+   Figur nie zwischen zwei Rasterpunkten steht. Rahmenlos wie ein Bild (M374): die Karte IST die Figur. */
+.react-flow__node-pixi, .react-flow__node-pixi:hover, .react-flow__node-pixi.dragging { box-shadow: none; border-radius: 0; }
+.react-flow__node-pixi.selected { border-radius: 2px; }
+.pixi-karte:not(.kachel) { background: none; padding: 0; border-radius: 0; overflow: visible; }
+.pixi { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.pixi-svg { display: block; flex: none; overflow: visible; }
+.pixi-svg:not([width]) { width: 100%; height: 100%; }
+
+.pixi-fill, .pixi-glanz { fill: var(--pixi-koerper); }
+.pixi-ink, .pixi-a, .pixi-m { fill: var(--pixi-tinte); }
+.pixi-wangen { fill: var(--pixi-wangen); }
+.pixi-spitze { fill: var(--pixi-spitze); }
+.pixi-schatten { fill: var(--pixi-schatten); transform-box: fill-box; transform-origin: center; }
+.pixi-arm path { fill: var(--pixi-arm); }
+.pixi-e { fill: var(--pixi-effekt); }
+.pixi-a-herz, .pixi-e:is(.pixi-e-herz1, .pixi-e-herz2, .pixi-e-herz3) { fill: var(--pixi-herz); }
+.pixi-e:is(.pixi-e-funkeA, .pixi-e-funkeB) { fill: var(--pixi-funke); }
+.pixi-koerper { transform-box: view-box; transform-origin: 16px 30px; }
+
+/* Nur die gültige Form zeigen — alle liegen bereit, nichts wird ein- oder ausgehängt (M491) */
+.pixi-a, .pixi-glanz, .pixi-m, .pixi-arm path, .pixi-e { display: none; }
+.pixi[data-augen='offen'] :is(.pixi-a-offen, .pixi-g-offen),
+.pixi[data-augen='zu'] .pixi-a-zu,
+.pixi[data-augen='froh'] .pixi-a-froh,
+.pixi[data-augen='halb'] .pixi-a-halb,
+.pixi[data-augen='gross'] :is(.pixi-a-gross, .pixi-g-gross),
+.pixi[data-augen='herz'] .pixi-a-herz,
+.pixi[data-augen='spirale'] .pixi-a-spirale,
+.pixi[data-augen='kneifen'] .pixi-a-kneifen,
+.pixi[data-mund='laecheln'] .pixi-m-laecheln,
+.pixi[data-mund='grinsen'] .pixi-m-grinsen,
+.pixi[data-mund='o'] .pixi-m-o,
+.pixi[data-mund='gaehnen'] .pixi-m-gaehnen,
+.pixi[data-mund='schief'] .pixi-m-schief,
+.pixi[data-mund='pfeifen'] .pixi-m-pfeifen,
+.pixi[data-mund='klein'] .pixi-m-klein { display: inline; }
+
+/* Arme */
+.pixi[data-arme='hoch'] .pixi-arm .pixi-arm-b { display: inline; }
+.pixi[data-arme='winken'] .pixi-arm-r :is(.pixi-arm-a, .pixi-arm-b) { display: inline; }
+.pixi[data-arme='winken'] .pixi-arm-r .pixi-arm-a { animation: pixi-takt-a 0.5s steps(1) infinite; }
+.pixi[data-arme='winken'] .pixi-arm-r .pixi-arm-b { animation: pixi-takt-b 0.5s steps(1) infinite; }
+.pixi[data-arme='tanzen'] .pixi-arm :is(.pixi-arm-a, .pixi-arm-c) { display: inline; }
+.pixi[data-arme='tanzen'] :is(.pixi-arm-r .pixi-arm-a, .pixi-arm-l .pixi-arm-c) { animation: pixi-takt-a 0.65s steps(1) infinite; }
+.pixi[data-arme='tanzen'] :is(.pixi-arm-r .pixi-arm-c, .pixi-arm-l .pixi-arm-a) { animation: pixi-takt-b 0.65s steps(1) infinite; }
+
+/* Effekte neben der Figur */
+.pixi[data-effekt='zzz'] :is(.pixi-e-z1, .pixi-e-z2, .pixi-e-z3) { display: inline; animation: pixi-zzz 2.4s steps(1) infinite backwards; }
+.pixi[data-effekt='zzz'] .pixi-e-z2 { animation-delay: 0.45s; }
+.pixi[data-effekt='zzz'] .pixi-e-z3 { animation-delay: 0.9s; }
+.pixi[data-effekt='noten'] :is(.pixi-e-note1, .pixi-e-note2) { display: inline; animation: pixi-steigen 1.3s steps(1) infinite backwards; }
+.pixi[data-effekt='noten'] .pixi-e-note2 { animation-delay: 0.65s; }
+.pixi[data-effekt='herzen'] :is(.pixi-e-herz1, .pixi-e-herz2, .pixi-e-herz3) { display: inline; animation: pixi-steigen 1.2s steps(1) infinite backwards; }
+.pixi[data-effekt='herzen'] .pixi-e-herz2 { animation-delay: 0.3s; }
+.pixi[data-effekt='herzen'] .pixi-e-herz3 { animation-delay: 0.6s; }
+.pixi[data-effekt='funken'] :is(.pixi-e-funkeA, .pixi-e-funkeB) { display: inline; }
+.pixi[data-effekt='funken'] .pixi-e-funkeA { animation: pixi-takt-a 0.4s steps(1) infinite; }
+.pixi[data-effekt='funken'] .pixi-e-funkeB { animation: pixi-takt-b 0.4s steps(1) infinite; }
+.pixi[data-effekt='funken'] .pixi-spitze { animation: pixi-funkeln 0.4s steps(1) infinite; }
+.pixi[data-effekt='ausruf'] .pixi-e-ausruf { display: inline; animation: pixi-takt-a 0.5s steps(1) 2; }
+.pixi[data-effekt='puff'] .pixi-e-puff { display: inline; animation: pixi-puff var(--pixi-d, 1.8s) steps(1) both; }
+.pixi[data-effekt='sterne'] :is(.pixi-e-sterneA, .pixi-e-sterneB) { display: inline; }
+.pixi[data-effekt='sterne'] .pixi-e-sterneA { animation: pixi-takt-a 0.35s steps(1) infinite; }
+.pixi[data-effekt='sterne'] .pixi-e-sterneB { animation: pixi-takt-b 0.35s steps(1) infinite; }
+.pixi[data-effekt='kichern'] :is(.pixi-e-kicherA, .pixi-e-kicherB) { display: inline; }
+.pixi[data-effekt='kichern'] .pixi-e-kicherA { animation: pixi-takt-a 0.2s steps(1) infinite; }
+.pixi[data-effekt='kichern'] .pixi-e-kicherB { animation: pixi-takt-b 0.2s steps(1) infinite; }
+
+/* Bewegung des Körpers je Animation (Dauer aus der Zustandsmaschine: --pixi-d) */
+.pixi[data-anim=''] .pixi-koerper { animation: pixi-atmen 2.4s steps(1) infinite; }
+.pixi[data-anim='schlafen'] .pixi-koerper { animation: pixi-atmen 3.6s steps(1) infinite; }
+.pixi[data-anim='huepfen'] .pixi-koerper { animation: pixi-hopp var(--pixi-d) steps(1); }
+.pixi[data-anim='huepfen'] .pixi-schatten { animation: pixi-schatten var(--pixi-d) steps(1); }
+.pixi[data-anim='freudensprung'] .pixi-koerper { animation: pixi-sprung var(--pixi-d) steps(1); }
+.pixi[data-anim='freudensprung'] .pixi-schatten { animation: pixi-schatten var(--pixi-d) steps(1); }
+.pixi[data-anim='herzchen'] .pixi-koerper, .pixi[data-anim='aufwachen'] .pixi-koerper { animation: pixi-hopp 0.9s steps(1); }
+.pixi[data-anim='staunen'] .pixi-koerper { animation: pixi-zucken var(--pixi-d) steps(1); }
+.pixi[data-anim='erschrecken'] .pixi-koerper { animation: pixi-schreck var(--pixi-d) steps(1); }
+.pixi[data-anim='niesen'] .pixi-koerper { animation: pixi-niesen var(--pixi-d) steps(1); }
+.pixi[data-anim='tanzen'] .pixi-koerper { animation: pixi-tanzen 0.65s steps(1) infinite; }
+.pixi[data-anim='pfeifen'] .pixi-koerper { animation: pixi-wiegen 1.3s steps(1) infinite; }
+.pixi[data-anim='kichern'] .pixi-koerper { animation: pixi-wackeln 0.3s steps(1) infinite; }
+.pixi[data-anim='schwindelig'] .pixi-koerper { animation: pixi-taumeln 0.9s steps(1) infinite; }
+.pixi[data-anim='kopfschief'] .pixi-koerper { animation: pixi-schief var(--pixi-d) steps(1); }
+.pixi[data-anim='gaehnen'] .pixi-koerper { animation: pixi-strecken var(--pixi-d) steps(1); }
+.pixi[data-anim='einschlafen'] .pixi-koerper { animation: pixi-sinken var(--pixi-d) steps(1) forwards; }
+.pixi[data-anim='umsehen'] .pixi-augen { animation: pixi-umsehen var(--pixi-d) steps(1); }
+/* Augen: Lider beim Blinzeln, Halb → zu beim Einschlafen, Spiralen beim Schwindel */
+.pixi[data-anim='blinzeln'] .pixi-a-zu, .pixi[data-anim='doppelblinzeln'] .pixi-a-zu, .pixi[data-anim='einschlafen'] .pixi-a-zu { display: inline; }
+.pixi[data-anim='blinzeln'] :is(.pixi-a-offen, .pixi-g-offen) { animation: pixi-lid-auf var(--pixi-d) steps(1) both; }
+.pixi[data-anim='blinzeln'] .pixi-a-zu { animation: pixi-lid-zu var(--pixi-d) steps(1) both; }
+.pixi[data-anim='doppelblinzeln'] :is(.pixi-a-offen, .pixi-g-offen) { animation: pixi-lid-auf2 var(--pixi-d) steps(1) both; }
+.pixi[data-anim='doppelblinzeln'] .pixi-a-zu { animation: pixi-lid-zu2 var(--pixi-d) steps(1) both; }
+.pixi[data-anim='einschlafen'] .pixi-a-zu { animation: pixi-lid-spaet var(--pixi-d) steps(1) both; }
+.pixi[data-anim='einschlafen'] .pixi-a-halb { animation: pixi-lid-frueh var(--pixi-d) steps(1) both; }
+.pixi[data-augen='spirale'] .pixi-a-spirale { transform-box: view-box; transform-origin: 16px 12px; animation: pixi-spiegeln 0.4s steps(1) infinite; }
+
+@keyframes pixi-takt-a { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes pixi-takt-b { 0%, 49% { opacity: 0; } 50%, 100% { opacity: 1; } }
+@keyframes pixi-atmen { 0%, 59% { translate: 0 0; } 60%, 100% { translate: 0 1px; } }
+@keyframes pixi-hopp { 0% { translate: 0 0; } 12% { translate: 0 1px; } 25% { translate: 0 -3px; } 38% { translate: 0 -5px; } 50% { translate: 0 -6px; } 62% { translate: 0 -4px; } 75% { translate: 0 -2px; } 88%, 100% { translate: 0 0; } }
+@keyframes pixi-sprung { 0% { translate: 0 0; } 10% { translate: 0 2px; } 22% { translate: 0 -5px; } 34% { translate: 0 -9px; } 46% { translate: 0 -11px; } 58% { translate: 0 -9px; } 70% { translate: 0 -5px; } 82% { translate: 0 1px; } 92%, 100% { translate: 0 0; } }
+@keyframes pixi-schatten { 0%, 21% { scale: 1; } 22%, 79% { scale: 0.7 1; } 80%, 100% { scale: 1; } }
+@keyframes pixi-zucken { 0%, 9% { translate: 0 0; } 10%, 29% { translate: 0 -2px; } 30%, 100% { translate: 0 0; } }
+@keyframes pixi-schreck { 0% { translate: 0 0; } 8% { translate: 0 -7px; } 20% { translate: 0 -5px; } 40% { translate: 0 -2px; } 55%, 100% { translate: 0 0; } }
+@keyframes pixi-niesen { 0%, 24% { translate: 0 0; } 25%, 54% { translate: 0 -1px; } 55%, 64% { translate: 0 2px; } 65%, 100% { translate: 0 0; } }
+@keyframes pixi-tanzen { 0%, 24% { translate: -2px 0; } 25%, 49% { translate: 0 -2px; } 50%, 74% { translate: 2px 0; } 75%, 100% { translate: 0 -2px; } }
+@keyframes pixi-wiegen { 0%, 49% { translate: -1px 0; } 50%, 100% { translate: 1px 0; } }
+@keyframes pixi-wackeln { 0%, 24% { translate: -1px 0; } 25%, 49% { translate: 1px -1px; } 50%, 74% { translate: -1px 0; } 75%, 100% { translate: 1px -1px; } }
+@keyframes pixi-taumeln { 0%, 24% { rotate: -6deg; } 25%, 49% { rotate: 0deg; } 50%, 74% { rotate: 6deg; } 75%, 100% { rotate: 0deg; } }
+@keyframes pixi-schief { 0%, 9% { rotate: 0deg; } 10%, 49% { rotate: -9deg; } 50%, 54% { rotate: 0deg; } 55%, 89% { rotate: 9deg; } 90%, 100% { rotate: 0deg; } }
+@keyframes pixi-strecken { 0%, 14% { translate: 0 0; } 15%, 29% { translate: 0 -1px; } 30%, 74% { translate: 0 -2px; } 75%, 100% { translate: 0 0; } }
+@keyframes pixi-sinken { 0%, 49% { translate: 0 0; } 50%, 100% { translate: 0 1px; } }
+@keyframes pixi-umsehen { 0%, 9% { translate: 0 0; } 10%, 34% { translate: -2px 0; } 35%, 39% { translate: 0 0; } 40%, 69% { translate: 2px 0; } 70%, 84% { translate: 0 -1px; } 85%, 100% { translate: 0 0; } }
+@keyframes pixi-lid-auf { 0%, 29% { opacity: 1; } 30%, 69% { opacity: 0; } 70%, 100% { opacity: 1; } }
+@keyframes pixi-lid-zu { 0%, 29% { opacity: 0; } 30%, 69% { opacity: 1; } 70%, 100% { opacity: 0; } }
+@keyframes pixi-lid-auf2 { 0%, 14% { opacity: 1; } 15%, 34% { opacity: 0; } 35%, 59% { opacity: 1; } 60%, 79% { opacity: 0; } 80%, 100% { opacity: 1; } }
+@keyframes pixi-lid-zu2 { 0%, 14% { opacity: 0; } 15%, 34% { opacity: 1; } 35%, 59% { opacity: 0; } 60%, 79% { opacity: 1; } 80%, 100% { opacity: 0; } }
+@keyframes pixi-lid-frueh { 0%, 59% { opacity: 1; } 60%, 100% { opacity: 0; } }
+@keyframes pixi-lid-spaet { 0%, 59% { opacity: 0; } 60%, 100% { opacity: 1; } }
+@keyframes pixi-spiegeln { 0%, 49% { scale: 1 1; } 50%, 100% { scale: -1 1; } }
+@keyframes pixi-zzz { 0%, 9% { opacity: 0; translate: 0 1px; } 10%, 44% { opacity: 1; translate: 0 0; } 45%, 79% { opacity: 1; translate: 0 -1px; } 80%, 100% { opacity: 0; } }
+@keyframes pixi-steigen { 0%, 24% { opacity: 1; translate: 0 2px; } 25%, 49% { opacity: 1; translate: 0 0; } 50%, 74% { opacity: 1; translate: 0 -2px; } 75%, 100% { opacity: 0; translate: 0 -4px; } }
+@keyframes pixi-funkeln { 0%, 49% { fill: var(--pixi-spitze); } 50%, 100% { fill: var(--pixi-koerper); } }
+@keyframes pixi-puff { 0%, 54% { opacity: 0; } 55%, 84% { opacity: 1; } 85%, 100% { opacity: 0; } }
+
+/* Außerhalb des Sichtfelds oder im verdeckten Tab steht alles still */
+.pixi[data-ruht] * { animation-play-state: paused !important; }
+/* „Bewegung reduzieren": keine Sprünge, kein Atmen, keine Effekte — nur Blinzeln und der Blick bleiben */
+@media (prefers-reduced-motion: reduce) {
+  .pixi :is(.pixi-koerper, .pixi-augen, .pixi-schatten, .pixi-e, .pixi-arm path, .pixi-spitze, .pixi-a-spirale) { animation: none !important; }
+}
+
+/* Name und Einstellungen stehen UNTER der Figur, außerhalb der Karte (wie die Bildunterschrift, M374) */
+.card-shell > .pixi-unten {
+  position: absolute; top: 100%; left: 50%; translate: -50% 0; margin-top: 6px; display: flex; flex-direction: column;
+  align-items: center; gap: 6px; z-index: 2;
+}
+.pixi-name { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.pixi-tools { display: flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: 999px; background: var(--surface); box-shadow: var(--chrome-shadow); white-space: nowrap; }
+.pixi-farbe, .pixi-schlaf {
+  width: 22px; height: 22px; border-radius: 50%; padding: 0; border: 1px solid var(--feld-rand); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--muted); background: var(--surface);
+}
+.pixi-farbe-standard { background: var(--pixi-koerper); }
+.pixi-farbe.gewaehlt { outline: 2px solid var(--accent-strong); outline-offset: 1px; }
+.pixi-schlaf { margin-left: 4px; }
+.pixi-schlaf.gewaehlt { color: var(--ink); border-color: var(--ink); }
+.pixi-tools button:focus-visible { outline: 2px solid var(--accent-strong); outline-offset: 2px; }
+
+/* Folie: groß in der Mitte */
+.slide-pixi { display: flex; flex-direction: column; align-items: center; justify-content: center; width: min(60vmin, 480px); height: min(60vmin, 480px); margin: 0 auto; }
+.slide-pixi .pixi { flex: 1; min-height: 0; }
+.slide-pixi-name { margin: 8px 0 0; font-size: 20px; }

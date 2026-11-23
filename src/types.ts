@@ -460,8 +460,20 @@ export interface KontaktData {
 }
 export type KontaktNode = Node<KontaktData, 'kontakt'>;
 
+/** M501: Pixi, das Maskottchen — gespeichert werden nur die Optionen, nie der Zustand (Blick, Animation) */
+export interface PixiData {
+  /** Name unter der Figur (leer: keiner) */
+  name?: string;
+  /** Körperfarbe als Hex (lib/pixiBild.ts PIXI_FARBEN); ohne: Token --pixi-koerper */
+  farbe?: string;
+  /** false: schläft nie ein */
+  schlafen?: boolean;
+  [key: string]: unknown;
+}
+export type PixiNode = Node<PixiData, 'pixi'>;
+
 export type AppNode =
-  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode | MinutesNode | SheetNode | BubblesNode | KontaktNode)
+  (| NoteNode | EmailNode | ImageNode | FileNode | KanbanNode | PortalNode | ShapeNode | MermaidNode | GanttNode | CalendarNode | FrameNode | WeekNode | TimeNode | HtmlAppNode | MinutesNode | SheetNode | BubblesNode | KontaktNode | PixiNode)
   // Archiv (M87): Karten jedes Typs lassen sich als Ganzes „erledigt" ablegen —
   // deshalb ein gemeinsames Flag auf Node-Ebene statt in jedem data-Interface.
   // autoFit (M103): Auto-Größe — die Karte wächst mit ihrem Inhalt, bis der

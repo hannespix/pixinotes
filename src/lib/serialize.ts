@@ -2,6 +2,7 @@
 // und die Suche. Bewusst schlicht gehalten — sauberes Office-taugliches HTML.
 import { doneCol, kanbanCols, type AppNode, type KontaktData, type SheetData } from '../types';
 import { bubblesAlsText } from './bubbles';
+import { pixiBildAdresse } from './pixiBild';
 import { formatBytes } from './parseEmail';
 import { indexZuAdresse, rechneBlatt, zeigeWert } from './formel';
 
@@ -499,6 +500,9 @@ function baseNodeText(node: AppNode): string {
       return `Eigene App: ${node.data.name} (${formatBytes(node.data.size)})`;
     case 'bubbles':
       return bubblesAlsText(node.data);
+    case 'pixi':
+      // M501: nur Schmuck, kein Inhalt — der Name (falls vergeben) macht sie in der Suche auffindbar
+      return `Maskottchen Pixi${typeof node.data.name === 'string' && node.data.name.trim() ? ` „${node.data.name.trim()}“` : ''}`;
     case 'kontakt':
       // M450: alle Felder — so findet die Suche (Strg+K) einen Kontakt auch über Firma, Ort oder Rufnummer
       return kontaktZeilen(node.data).join('\n');
@@ -604,6 +608,11 @@ export function nodeToHtml(node: AppNode): string {
     case 'frame':
       // Abschnitts-Folie im Presenter: der Rahmen-Name als Zwischentitel
       return `<h2 style="text-align:center;margin-top:1.4em">${esc(node.data.name)}</h2>`;
+    case 'pixi': {
+      // M501: als Standbild (SVG im data:-Bild) — E-Mail, Zwischenablage, Präsentation ohne Board
+      const name = typeof node.data.name === 'string' ? node.data.name.trim() : '';
+      return `<p style="text-align:center"><img src="${pixiBildAdresse(node.data.farbe as string | undefined)}" width="192" height="192" alt="${esc(name ? `Pixi „${name}“` : 'Pixi, das Maskottchen')}"/>${name ? `<br/>${esc(name)}` : ''}</p>`;
+    }
     case 'kontakt': {
       const [kopf, ...rest] = kontaktZeilen(node.data);
       return `<h3>${esc(kopf)}</h3>${rest.map((z) => `<p style="margin:2px 0;white-space:pre-wrap">${esc(z)}</p>`).join('')}`;

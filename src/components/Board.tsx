@@ -107,6 +107,7 @@ const KARTEN_LADER = {
   htmlapp: () => import('./nodes/HtmlAppCard').then((m) => m.HtmlAppCard),
   bubbles: () => import('./nodes/BubblesCard').then((m) => m.BubblesCard),
   kontakt: () => Promise.all([import('./nodes/KontaktCard'), rufnummernLaden().catch(() => {})]).then(([m]) => m.KontaktCard),
+  pixi: () => import('./nodes/PixiCard').then((m) => m.PixiCard),
 } satisfies Record<string, () => Promise<React.ComponentType<any>>>;
 
 const spaet = (laden: () => Promise<React.ComponentType<any>>): React.ComponentType<any> => {
@@ -141,6 +142,7 @@ const nodeTypes: NodeTypes = {
   htmlapp: guard(spaet(KARTEN_LADER.htmlapp)),
   bubbles: guard(spaet(KARTEN_LADER.bubbles)),
   kontakt: guard(spaet(KARTEN_LADER.kontakt)),
+  pixi: guard(spaet(KARTEN_LADER.pixi)),
 };
 
 const edgeTypes: EdgeTypes = { labeled: LabeledEdge };

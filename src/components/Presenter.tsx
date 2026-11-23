@@ -16,7 +16,7 @@ import { GanttBody } from './nodes/GanttCard';
 import { CalendarBody } from './nodes/CalendarCard';
 import { dokumentArt } from '../lib/dokumentArt';
 import { letzteSeite } from '../lib/pdfSeiten';
-import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, MinutesNode, NoteNode, ShapeNode, SheetNode, TimeNode, WeekNode } from '../types';
+import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, MinutesNode, NoteNode, PixiNode, ShapeNode, SheetNode, TimeNode, WeekNode } from '../types';
 import { HtmlAppSlide } from './nodes/HtmlAppCard';
 import { useRandLeiste } from '../lib/randLeiste';
 import { ReinRand, useReinAnsicht } from '../lib/reinAnsicht';
@@ -41,6 +41,7 @@ import { ReaktionsKnopf } from './Gruppenraum';
 import { ansichtMelden, folgeIch, folgenSetzen, ichFuehreVor, VORFUEHR_EREIGNIS, vorfuehrenMitVortrag, vorfuehrenStart, vorfuehrenStopp, vortragAlleinSetzen, vortragMelden, vortragZuEnde, werFuehrtVor } from '../lib/vorfuehren';
 import { ich, liveVerbunden, TEILNEHMER_EREIGNIS, teilnehmerVon } from '../lib/liveStand';
 import { NotizRuhend } from './nodes/NotizRuhend';
+import { PixiFigur } from './nodes/PixiCard';
 import type { RuheBlock } from '../lib/notizRuhend';
 
 /** Kartentypen, die auf der Folie LIVE editierbar sind */
@@ -253,6 +254,16 @@ function SlideContent({ node }: { node: AppNode }) {
           <SheetBody id={node.id} data={(node as SheetNode).data} />
         </div>
       );
+    case 'pixi': {
+      // M501: Pixi lebt auch auf der Folie — schaut dem Zeiger nach und hat etwas vor
+      const d = (node as PixiNode).data;
+      return (
+        <div className="slide-pixi" data-taste="folie-pixi">
+          <PixiFigur farbe={d.farbe} schlafen={d.schlafen !== false} name={d.name} />
+          {d.name?.trim() && <p className="slide-pixi-name" translate="no">{d.name}</p>}
+        </div>
+      );
+    }
     case 'htmlapp':
       // M371: Tools und Webseiten laufen auf der Folie wirklich (vorher: ein Standbild mit dem Namen)
       return <HtmlAppSlide node={node as HtmlAppNode} />;

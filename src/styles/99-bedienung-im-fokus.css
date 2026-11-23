@@ -17,7 +17,7 @@
     .minutes-setup-btn, .minutes-new, .pr-werkzeuge, .pr-person-neu:placeholder-shown, .pr-person-weg, .pr-runde:not(:has(.pr-person)), .minutes-decision-add:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)), .pr-aeltere, .pr-vorschlag,
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools,
+    .kontakt-tools, .pixi-tools,
     .bildtext-chips
 ) { transition: opacity 0.14s ease; }
 @media (hover: hover) {
@@ -30,7 +30,7 @@
     .minutes-setup-btn, .minutes-new, .pr-werkzeuge, .pr-person-neu:placeholder-shown, .pr-person-weg, .pr-runde:not(:has(.pr-person)), .minutes-decision-add:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)), .pr-aeltere, .pr-vorschlag,
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools,
+    .kontakt-tools, .pixi-tools,
     .bildtext-chips
   ) { opacity: 0; }
   /* Zeiger ruht auf der Karte: erst nach einem Moment einblenden. Als Animation (hält während des Verzugs bei 0),
@@ -44,7 +44,7 @@
     .minutes-setup-btn, .minutes-new, .pr-werkzeuge, .pr-person-neu:placeholder-shown, .pr-person-weg, .pr-runde:not(:has(.pr-person)), .minutes-decision-add:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)), .pr-aeltere, .pr-vorschlag,
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools,
+    .kontakt-tools, .pixi-tools,
     .bildtext-chips
   ) { animation: pn-bedienung-ein 0.16s ease 0.35s backwards; }
 }
@@ -59,7 +59,7 @@
     .minutes-setup-btn, .minutes-new, .pr-werkzeuge, .pr-person-neu:placeholder-shown, .pr-person-weg, .pr-runde:not(:has(.pr-person)), .minutes-decision-add:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)), .pr-aeltere, .pr-vorschlag,
     .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
     .happ-size, .happ-head .happ-btn,
-    .kontakt-tools,
+    .kontakt-tools, .pixi-tools,
     .bildtext-chips
   ) { opacity: 0; pointer-events: none; }
 }
