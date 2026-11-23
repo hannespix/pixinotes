@@ -1,5 +1,5 @@
 # M479 — Mit Google anmelden (PixiNotes-Konto)
-PR: #… · Prüfreihe: `pruefungen/m479-google-anmelden.mjs` · Datum: 2026-11-23
+PR: #165 · Prüfreihe: `pruefungen/m479-google-anmelden.mjs` · Datum: 2026-11-23
 
 ## Warum
 Nutzerwunsch: „google anmeldung fehlt noch! (per email adresse)". Die Google-Verknüpfung aus M317/M442
