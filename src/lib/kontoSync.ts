@@ -124,12 +124,12 @@ async function kontoName(s: KontoSitzung): Promise<string | undefined> {
 }
 
 /** Interaktiv anmelden (Popup). Speichert die Sitzung; Verbinden/Abgleich macht `kontoVerbinden`. */
-export async function kontoAnmelden(anbieter: Anbieter, clientId: string, tenant = 'common'): Promise<KontoSitzung> {
+export async function kontoAnmelden(anbieter: Anbieter, clientId: string, tenant = 'common', hint?: string): Promise<KontoSitzung> {
   if (!oauthAvailable()) throw new Error('Anmelden geht nur über die gehostete App (http/https), nicht aus der Einzeldatei.');
   if (!clientId.trim()) throw new Error(anbieter === 'google' ? 'Keine Google-Client-ID hinterlegt.' : 'Keine Microsoft-App-ID hinterlegt.');
   let s: KontoSitzung;
   if (anbieter === 'google') {
-    const t = await googleTokenFuer(clientId.trim(), GOOGLE_SCOPE_DRIVE, false);
+    const t = await googleTokenFuer(clientId.trim(), GOOGLE_SCOPE_DRIVE, false, hint);
     s = { anbieter, clientId: clientId.trim(), token: t.token, tokenExp: t.exp };
   } else {
     const t = await msAnmeldung(clientId.trim(), tenant, MS_SCOPE_DRIVE);
