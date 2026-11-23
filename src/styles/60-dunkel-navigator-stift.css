@@ -21,9 +21,12 @@
   color: var(--ink) !important;
 }
 /* M492: Eine Notiz ohne bekannte Farbe (alter Stand, Import) hat kein Papier — ihr Text stand im Dunkeln als
-   BlockNote-Grau #3f3f3f auf der Fläche (1,7:1). Ohne Papier folgt die Schrift dem Theme wie bei Weiß. */
-[data-theme='dark'] .react-flow__node-note:has(.note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background'])),
-[data-theme='dark'] .react-flow__node-note:has(.note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background'])) .bn-editor { color: var(--ink); }
+   BlockNote-Grau #3f3f3f auf der Fläche (1,7:1). Ohne Papier folgt die Schrift dem Theme wie bei Weiß.
+   M491: ohne `:has()` direkt an der Karte — `[style*=…]` in einem `:has()` ließ Chromium bei JEDER Änderung eines
+   Inline-Stils (React Flow verschiebt Karten per `style`) den Stil des ganzen Dokuments neu rechnen: beim Ziehen
+   über 150 Mal auf 50 Mausbewegungen, je gut 40 ms. Keine Attribut-Selektoren auf `style` in `:has()`. */
+[data-theme='dark'] .react-flow__node-note .note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background']),
+[data-theme='dark'] .react-flow__node-note .note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background']) .bn-editor { color: var(--ink); }
 
 /* ================= M492: BlockNote-Menüs folgen dem Erscheinungsbild =================
    Die Editoren laufen mit `theme="light"`, weil ihr INHALT auf Papier steht (Haftnotizen bleiben im Dunkeln
