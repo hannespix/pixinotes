@@ -8,7 +8,9 @@
 //     Fenster sein Eingabefeld schon selbst angewählt, bleibt es dabei).
 //   · Tab und Umschalt+Tab laufen im obersten Fenster im Kreis.
 //   · Beim Schließen kehrt der Fokus dorthin zurück, wo er vorher war.
-const FENSTER = '.modal-backdrop, .ticket-modal-backdrop, .search-backdrop, .onb-backdrop, .lookup-backdrop';
+// M447: auch die Bild-Lupe (.pdf-backdrop) ist ein Fenster
+// M456: und die ausklappbare Navigation am Telefon (.nav-backdrop, Tabs.tsx) — Fokus hinein, Tab im Kreis, zurück
+const FENSTER = '.modal-backdrop, .ticket-modal-backdrop, .search-backdrop, .onb-backdrop, .lookup-backdrop, .pdf-backdrop, .nav-backdrop';
 const ZIELE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
 
 const zieleIn = (w: Element): HTMLElement[] => [...w.querySelectorAll<HTMLElement>(ZIELE)].filter((el) => el.getClientRects().length > 0);

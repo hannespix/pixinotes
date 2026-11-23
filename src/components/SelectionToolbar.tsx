@@ -5,13 +5,14 @@ import { selectActiveBoard, useBoard } from '../store';
 import { nodesToText } from '../lib/serialize';
 import { aiReady, kiAbbruchZuruecksetzen } from '../lib/ai';
 import { textDateienAlsNotizen, textKarte } from '../lib/textNotiz';
+import { kontakteHerunterladen } from '../lib/kontaktExport';
 import { aiBriefing, aiEdges, aiPolish, aiPraesentation, aiPraesentationUeberarbeiten, aiProcess, aiTasks } from '../lib/aiActions';
 /** M410: Die Freitext-Anweisung wird erst geladen, wenn sie gebraucht wird (lib/kiAnweisung.ts) */
 const aiCommand: typeof import('../lib/kiAnweisung').aiCommand = (...a) => import('../lib/kiAnweisung').then((m) => m.aiCommand(...a));
 import { kiBeispiel, kiBlaettern } from '../lib/kiVerlauf';
 import { KACHEL_TYPEN, STICKY_COLORS, type AppNode } from '../types';
 import { FARB_NAMEN } from '../lib/notiz';
-import { IArchive, IArchiveRestore, IArrange, IBookmark, IComment, ICompact, ICrop, IDuplicate, IFit, IFrame, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
+import { IArchive, IArchiveRestore, IArrange, IBookmark, IDownload, IComment, ICompact, ICrop, IDuplicate, IFit, IFrame, IFlowH, IFlowV, IGlobe, IGridLayout, IImage, IMore, IMoveTo, IPalette, IPen, IShare, ITag, ITrash, IType, IUndo, IWand, IX, IMaximize } from './Icons';
 import { wurzelZoom } from '../lib/anzeige';
 // M267: Schrift-Stapel, Stufen und Beschriftungen kommen aus lib/typo.ts —
 // dieselbe Quelle wie für den markierten Text. Vorher lag hier eine zweite,
@@ -218,9 +219,18 @@ export function SelectionToolbar() {
       el.style.maxHeight = `${Math.max(160, unten - oben)}px`;
     }
   }, [menu, menuPos, amZeiger]);
+  // M447: Das „Mehr"-Menü (auch das Rechtsklick-Menü einer Karte) ist für Vorlese-Programme ein Menü: Einträge, die
+  // noch keine Rolle tragen, werden zu menuitem — nach jedem Zeichnen, weil Einträge je nach Auswahl wechseln.
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (menu !== 'more' || !el) return;
+    el.querySelectorAll('button:not([role])').forEach((b) => b.setAttribute('role', 'menuitem'));
+  });
   const menuPortal = (extraClass: string, content: React.ReactNode) => createPortal(
     <div
       ref={menuRef}
+      role={menu === 'more' ? 'menu' : undefined}
+      aria-label={menu === 'more' ? 'Kartenmenü' : undefined}
       className={`sel-ai-menu sel-menu-fixed nodrag ${extraClass}`}
       style={menuPos.down
         // nach unten: normal an der Oberkante ankern
@@ -479,6 +489,8 @@ export function SelectionToolbar() {
             className={menu === 'frame' ? 'ai-on' : ''}
             data-smbtn
             onClick={toggleMenu('frame')}
+            aria-haspopup="true"
+            aria-expanded={menu === 'frame'}
             title="Rahmen: Inhalt anordnen · Tönung · Umbenennen"
           ><IGridLayout size={15} /><span className="sel-label"> Rahmen</span></button>
         </span>
@@ -841,6 +853,19 @@ export function SelectionToolbar() {
                 >
                   <IGlobe size={14} /> Nachschlagen (Wikipedia &amp; Web)
                 </button>
+                {/* M454: Kontakte der Auswahl als EINE .vcf – fürs Adressbuch (Outlook, Telefon) */}
+                {selected.some((n) => n.type === 'kontakt') && (() => {
+                  const zahl = selected.filter((n) => n.type === 'kontakt').length;
+                  return (
+                    <button
+                      data-taste="kontakte-vcard"
+                      onClick={() => { setMenu(null); kontakteHerunterladen(selected, board.name); }}
+                      title="Die gewählten Kontakte in einer vCard-Datei (.vcf) – für Outlook, Telefon, Adressbuch"
+                    >
+                      <IDownload size={14} /> {zahl === 1 ? 'Kontakt als vCard' : `${zahl} Kontakte als vCard`}
+                    </button>
+                  );
+                })()}
                 {single && (
                   <button onClick={() => { setMenu(null); asTemplate(); }} title="Karte als Vorlage speichern (＋-Menü → Vorlagen)">
                     <IBookmark size={14} /> Als Vorlage speichern
@@ -903,6 +928,8 @@ export function SelectionToolbar() {
             data-smbtn
             data-taste="auswahl-mehr"
             onClick={toggleMenu('more')}
+            aria-haspopup="menu"
+            aria-expanded={menu !== null && menu !== 'frame'}
             title="Mehr"
             aria-label="Mehr"
           ><IMore size={15} /></button>

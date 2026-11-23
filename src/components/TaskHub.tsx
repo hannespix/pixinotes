@@ -1,6 +1,6 @@
 import { tagLokal } from '../lib/tag';
-import { useEffect, useMemo, useState } from 'react';
-import confetti from 'canvas-confetti';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { konfettiWerfen } from '../lib/konfetti';
 import { mutedHistory, useBoard } from '../store';
 import { doneCol, kanbanCols, mitSpalte, openSubs, ticketBlockers, uid, type GanttData, type KanbanData } from '../types';
 import { makeKanban, makeNote } from '../lib/nodes';
@@ -213,6 +213,23 @@ export function TaskHub() {
   const toggleGroup = (name: string) =>
     setCollapsed((s) => { const n = new Set(s); if (n.has(name)) n.delete(name); else n.add(name); return n; });
 
+  // M447: Die Zentrale legt sich über das Board — der Fokus geht hinein und nach dem Schließen dorthin zurück, wo er
+  // war (sonst stand er auf dem ausgehängten Board, und Tab begann wieder oben in der Navigation).
+  const wurzel = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const a = document.activeElement;
+    const vorher = a instanceof HTMLElement && a !== document.body ? a : null;
+    const el = wurzel.current;
+    if (el && !el.contains(document.activeElement)) el.focus({ preventScroll: true });
+    return () => {
+      requestAnimationFrame(() => {
+        const jetzt = document.activeElement;
+        if ((!jetzt || jetzt === document.body) && vorher?.isConnected) vorher.focus({ preventScroll: true });
+      });
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -245,7 +262,7 @@ export function TaskHub() {
       updateNodeDataOnBoard(t.boardId, t.nodeId, {
         items: k.items.map((it) => (it.id === t.itemId ? mitSpalte(it, doneCol(k), k) : it)),
       });
-      if (useBoard.getState().konfetti) confetti({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
+      if (useBoard.getState().konfetti) konfettiWerfen({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
     } else if (t.kind === 'gantt') {
       logDone(t);
       // Gantt-Vorgang erledigen = Fortschritt auf 100 % (M113)
@@ -253,7 +270,7 @@ export function TaskHub() {
       updateNodeDataOnBoard(t.boardId, t.nodeId, {
         rows: g.rows.map((r) => (r.id === t.itemId ? { ...r, progress: 100 } : r)),
       });
-      if (useBoard.getState().konfetti) confetti({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
+      if (useBoard.getState().konfetti) konfettiWerfen({ particleCount: 45, spread: 50, origin: { y: 0.4 }, scalar: 0.75 });
     } else if (node.type === 'minutes') {
       // M390: Die Punkte der Protokoll-Reihe liegen in den SITZUNGEN (entries[].blocks), nicht in data.blocks. Der
       // Haken schrieb vorher ins Leere — der Punkt blieb offen, „Heute geschafft" zählte trotzdem jedes Mal weiter.
@@ -442,7 +459,7 @@ export function TaskHub() {
   const canAskNotify = 'Notification' in window && Notification.permission === 'default';
 
   return (
-    <div className={`taskhub${filtersOpen ? ' filters-open' : ''}`} role="dialog" aria-label="Aufgaben">
+    <div ref={wurzel} tabIndex={-1} className={`taskhub${filtersOpen ? ' filters-open' : ''}`} role="dialog" aria-label="Aufgaben">
       <div className="taskhub-head">
         <h2>Aufgaben</h2>
         {/* M231: Der Umfang gehört in den Kopf. Auf schmalen Schirmen liegt die

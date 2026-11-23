@@ -3,7 +3,7 @@
 KI-Programme auf dem eigenen Rechner – Claude Desktop, Claude Code, Cursor, VS Code und alle anderen, die das
 [Model Context Protocol](https://modelcontextprotocol.io) sprechen – legen damit Boards an, lesen und füllen sie.
 Alle Module sind dabei: Notiz (Markdown), Kanban, Zeitplan (Gantt), Rechen-Tabelle mit Formeln, Wochenplaner,
-Protokoll, Zeiterfassung, Ideen-Bubbles, Diagramm (Mermaid), Ablauf-Formen, Rahmen und Pfeile.
+Protokoll, Zeiterfassung, Ideen-Bubbles, Diagramm (Mermaid), Kontakt (seit M454), Ablauf-Formen, Rahmen und Pfeile.
 
 ## Einrichten
 
@@ -55,6 +55,21 @@ das Bearbeiten-Werkzeug beschreibt sie dem Modell vollständig. Beispiele:
   { "op": "kanban", "title": "Aufgaben", "columns": ["Offen", "In Arbeit", "Erledigt"], "items": [{ "text": "Texte schreiben", "who": "Anna" }, { "text": "Bilder", "column": "In Arbeit" }] },
   { "op": "sheet", "title": "Budget", "rows": [["Posten", "Betrag"], ["Ads", "1200"], ["Design", "800"], ["Summe", "=SUMME(B2:B3)"]] },
   { "op": "edge", "source": "<Kennung>", "target": "<Kennung>", "label": "Kosten" }
+]
+```
+
+### Kontakte (M454)
+
+`kontakt` legt eine Kontakt-Karte an, `edit_kontakt` ändert eine vorhandene über ihre Kennung aus
+`pixinotes_board_lesen`. Felder: `name`, `funktion`, `firma`, `telefone` (Liste aus `{ "nummer", "art" }` oder
+einfachen Nummern), `emails`, `adresse` (Zeilen mit `\n`), `web`, `notiz`. Bei `edit_kontakt` ändern sich nur die
+genannten Felder; `telefone` und `emails` ersetzen die ganze Liste, `""` leert einen Wert. Ein Foto nimmt der Server
+nicht an. In der App gehen die Karten als vCard (.vcf) hinaus – einzeln oder mehrere in einer Datei.
+
+```json
+[
+  { "op": "kontakt", "name": "Clara Brandt", "funktion": "Ausbildungsberaterin", "firma": "Landratsamt", "telefone": [{ "nummer": "0761 2187-0", "art": "Dienstlich" }], "emails": ["clara.brandt@example.de"] },
+  { "op": "edit_kontakt", "id": "<Kennung>", "telefone": [{ "nummer": "0761 208-9999", "art": "Dienstlich" }] }
 ]
 ```
 
