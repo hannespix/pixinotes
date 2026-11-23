@@ -78,6 +78,10 @@ const TABS: ReadonlyArray<readonly [Reiter, string]> = [
 const ALT_REITER: Record<string, Reiter> = { ki: 'dienste', kalender: 'dienste', export: 'daten', sync: 'daten', konto: 'daten' };
 type SyncWeg = 'konto' | 'ordner' | 'webdav' | 'datei';
 
+/** M443: Der MCP-Server liegt neben der App; in der portablen Datei (file://) zeigt der Link auf die Website */
+const MCP_DATEI = /^https?:/.test(typeof location !== 'undefined' ? location.protocol : '') ? 'pixinotes-mcp.mjs' : 'https://hannespix.github.io/pixinotes/pixinotes-mcp.mjs';
+const MCP_KONFIG = JSON.stringify({ mcpServers: { pixinotes: { command: 'node', args: ['/Pfad/zu/pixinotes-mcp.mjs', '--ordner', '/Pfad/zum/Sync-Ordner'] } } }, null, 2);
+
 /**
  * Einstellungen: Design, Daten, Synchronisation, Dienste (KI, Gehirn, Konten).
  * Bewusst schlicht — läuft auch aus der Single-HTML.
@@ -1338,6 +1342,23 @@ export function Settings() {
               </div>
             </>
           )}
+          {/* M443: Von außen — KI-Programme legen über den MCP-Server Boards an und füllen sie */}
+          <details className="modal-details mcp-einrichtung" data-taste="mcp">
+            <summary>KI-Programme von außen (MCP)</summary>
+            <p className="modal-hint">
+              Claude, Cursor und andere KI-Programme auf deinem Rechner legen damit Boards an, lesen und füllen sie – mit
+              allen Modulen. Sie schreiben in deinen Sync-Ordner; PixiNotes übernimmt die Änderungen von allein.
+            </p>
+            <ol className="mcp-schritte">
+              <li><a href={MCP_DATEI} download="pixinotes-mcp.mjs">pixinotes-mcp.mjs laden</a> und ablegen (braucht Node.js 18 oder neuer).</li>
+              <li>Im KI-Programm als MCP-Server eintragen, die Pfade durch deine ersetzen:</li>
+            </ol>
+            <pre className="mcp-code">{MCP_KONFIG}</pre>
+            <div className="modal-buttons">
+              <button data-taste="mcp-kopieren" onClick={() => { void navigator.clipboard?.writeText(MCP_KONFIG).then(() => showToast('Eintrag kopiert.'), () => showToast('Kopieren nicht möglich – bitte markieren.')); }}>Eintrag kopieren</button>
+            </div>
+            <p className="modal-note">Ohne Sync-Ordner geht es auch über dein PixiNotes-Konto: statt --ordner das Argument --konto und PIXINOTES_EMAIL/PIXINOTES_PASSWORT als Umgebung.</p>
+          </details>
         </section>
 
         {/* ---- M204: Gehirn — semantischer Index ---- */}
