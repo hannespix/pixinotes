@@ -47,8 +47,9 @@ Regeln für neue Arbeit:
 - Teile importieren `useBoard` aus `../store` (Kreis Einstieg ↔ Teil): nur in Funktionen benutzen, nie beim Laden
   des Moduls.
 
-Gemessen: Start-JS (Haupt-Chunk) 891 972 B → 892 357 B (+385 B: die neun Scheiben-Funktionen und ihr Aufruf).
-Die Grenze der Reihen m446/m459/m467 (2 240 000 B) hält.
+Gemessen: Start-JS (Haupt-Chunk) gegen den Hauptzweig mit M481 892 725 B → 893 111 B (+386 B: die neun
+Scheiben-Funktionen und ihr Aufruf; vor M481/M482 ebenso 891 972 B → 892 357 B).
+Die Grenzen der Reihen m446 (2 245 000 B) sowie m459/m467 (2 240 000 B) halten.
 
 Prüfreihe `m480-store-scheiben.mjs` (Port 5480): Exporte unverändert, firstRun zuerst, kein Teil über 750 Zeilen;
 in der App Migration Fassung 4 → 5, Löschen mit Hinweis, Strg+Z/Strg+Y, Tippen als ein Schritt, Board wechseln,
