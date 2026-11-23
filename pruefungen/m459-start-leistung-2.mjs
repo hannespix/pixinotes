@@ -25,7 +25,7 @@ mkdirSync(SD, { recursive: true });
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 const DIST = path.join(__repo, 'dist');
 const PORT = 5459;
-/** Grenze knapp über dem gemessenen Stand (2 176 845 B = 2,08 MiB; M446: 2 441 218 B) */
+/** Grenze knapp über dem gemessenen Stand (2 192 986 B = 2,09 MiB; M446: 2 441 218 B) */
 const START_JS_GRENZE = 2_250_000;
 
 let anfragen = [];
@@ -115,7 +115,7 @@ console.log('\n════ A: Start ohne Termin, Rufnummer, Konto ════'
   const summe = groesse(geladen);
   const a = art(geladen);
   console.log(`  Start-JS ${(summe / 1024 / 1024).toFixed(2)} MB (${summe} B) in ${geladen.length} Dateien: ${geladen.join(', ')}`);
-  pruefe(`A1 Start-JS unter ${(START_JS_GRENZE / 1024 / 1024).toFixed(2)} MB (ist ${(summe / 1024 / 1024).toFixed(2)} MB; M446: 2,33 MB)`, summe < START_JS_GRENZE && summe > 1_000_000, String(summe));
+  pruefe(`A1 Start-JS unter ${(START_JS_GRENZE / 1024 / 1024).toFixed(2)} MB (ist ${(summe / 1024 / 1024).toFixed(2)} MB; vorher 2,35 MB)`, summe < START_JS_GRENZE && summe > 1_000_000, String(summe));
   pruefe('A2 keine Fristen-Erkennung (chrono-node) im Start', !a.chrono);
   pruefe('A3 keine Rufnummern-Erkennung (libphonenumber-js) im Start', !a.rufnummer);
   pruefe('A4 kein Konto-/Team-Abgleich (kontoSync, gastSync) und kein Freigabe-Dialog im Start', !a.konto && !a.gast && !a.freigabe, JSON.stringify(a));

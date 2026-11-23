@@ -37158,10 +37158,19 @@ function t(text3) {
   if (!HAT_BUCHSTABEN.test(kern)) return text3;
   const en = schlageNach(kern);
   if (en === null) {
-    if (!eigene.has(kern)) luecken.add(kern);
+    if (!eigene.has(kern) && !nurZahlWorte(kern)) luecken.add(kern);
     return text3;
   }
   return m[1] + en + m[3];
+}
+var REGEL_DE = new Intl.PluralRules("de-DE");
+var REGEL_EN = new Intl.PluralRules("en-GB");
+var zahlWorte = /* @__PURE__ */ new Set();
+function nurZahlWorte(kern) {
+  if (!zahlWorte.size) return false;
+  let rest = kern;
+  for (const z2 of zahlWorte) if (rest.includes(z2)) rest = rest.split(z2).join(" ");
+  return rest !== kern && !HAT_BUCHSTABEN.test(rest);
 }
 
 // src/types.ts
@@ -38238,6 +38247,12 @@ init_define_import_meta_env();
 
 // src/lib/sicher.ts
 init_define_import_meta_env();
+
+// src/lib/kartenZeit.ts
+init_define_import_meta_env();
+var FRUEHESTENS = Date.UTC(2020, 0, 1);
+
+// src/lib/sicher.ts
 function kontaktBild(roh) {
   if (typeof roh !== "string" || roh.length > 15e5) return null;
   return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
@@ -38388,6 +38403,15 @@ ${bubblesAlsText(n.data)}`;
     case "kontakt":
       return `Kontakt
 ${nodeToText(n)}`;
+    // M452: Bilder (auch als Datei abgelegte) mit dem Text, den die Erkennung darin gefunden hat — so kann die
+    // KI aus Screenshots zusammenfassen und Aufgaben ziehen. Bewusst ohne Import aus textInBildern (MCP-Server).
+    case "image":
+    case "file": {
+      const ocr = typeof n.data.ocrText === "string" ? n.data.ocrText.trim() : "";
+      return ocr ? `${nodeToText(n)}
+Text im Bild (automatisch erkannt):
+${ocr}` : nodeToText(n);
+    }
     default:
       return nodeToText(n);
   }

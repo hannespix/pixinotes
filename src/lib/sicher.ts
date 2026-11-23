@@ -5,7 +5,8 @@
 // statt „https://…" auch „javascript:…" heißen. Der Browser führt so etwas im Namen von PixiNotes aus, mit
 // Zugriff auf alles, was hier gespeichert ist. Darum entscheidet an jeder solchen Stelle diese Datei, nicht
 // der Board-Inhalt.
-import type { AppNode } from '../types';
+import type { AppNode, KontaktData, KontaktTelefon } from '../types';
+import { zeitSaeubern } from './kartenZeit';
 import type { BoardDoc } from '../store';
 
 const protokoll = (roh: string): string | null => {
@@ -64,6 +65,71 @@ export function kontaktBild(roh: unknown): string | null {
   return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
 }
 
+/**
+ * M458: Text, der von außen hereinkommt (Browser-Erweiterung, Teilen-Adresse). Nur Zeichenketten; Steuerzeichen
+ * außer Zeilenumbruch und Tabulator fallen weg, Länge gedeckelt. Spitze Klammern bleiben stehen — der Text landet
+ * ausschließlich als TEXT in Notiz und Dialog (nie als HTML), ein „<script>" darin ist dort nur Buchstaben.
+ */
+export function textVonAussen(roh: unknown, hoechstens = 20_000): string {
+  if (typeof roh !== 'string') return '';
+  return roh.normalize('NFC').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u202A-\u202E\u2066-\u2069]/g, '').trim().slice(0, hoechstens);
+}
+
+/** M458: Webadresse von außen (Quelle einer gesendeten Seite) — nur http(s), höchstens 2 000 Zeichen */
+export function webAdresseVonAussen(roh: unknown): string | null {
+  if (typeof roh !== 'string' || !roh.trim() || roh.length > 2000) return null;
+  try {
+    const u = new URL(roh.trim());
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
+  } catch { return null; }
+}
+
+/**
+ * M458: Eingebettetes Rasterbild von außen (Bild oder Bildschirmfoto aus der Browser-Erweiterung): nur
+ * data:image/png|jpeg|gif|webp als base64 — kein SVG (darin können Skripte stehen), keine Webadresse.
+ */
+export function rasterBildVonAussen(roh: unknown, hoechstens = 25_000_000): string | null {
+  if (typeof roh !== 'string' || roh.length > hoechstens) return null;
+  return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;
+}
+
+/**
+ * M457: Kontakt-Felder, die aus einer fremden E-Mail (Signatur) oder aus einer KI-Antwort stammen. Nur Text, gekürzt,
+ * ohne Steuerzeichen; E-Mail nur in Adressform, Webseite nur http(s) (auch ohne „https://“ geschrieben), Rufnummern
+ * höchstens zwölf, kein Foto. Felder, die nicht als brauchbarer Text kommen, fehlen im Ergebnis.
+ */
+export function kontaktVonAussen(roh: unknown): Partial<KontaktData> {
+  const o = (roh && typeof roh === 'object' && !Array.isArray(roh) ? roh : {}) as Record<string, unknown>;
+  const text = (v: unknown, max: number, zeilen = false): string => (typeof v === 'string'
+    ? (zeilen ? v.replace(/\r\n?/g, '\n') : v.replace(/\s+/g, ' '))
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u0008\u000b-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '')
+      .split('\n').map((z) => z.replace(/[ \t]+/g, ' ').trim()).filter(Boolean).join('\n').slice(0, max)
+    : '');
+  const aus: Partial<KontaktData> = {};
+  const name = text(o.name, 120); if (name) aus.name = name;
+  const funktion = text(o.funktion, 160); if (funktion) aus.funktion = funktion;
+  const firma = text(o.firma, 160); if (firma) aus.firma = firma;
+  const adresse = text(o.adresse, 300, true); if (adresse) aus.adresse = adresse;
+  const webRoh = text(o.web, 200);
+  const web = webRoh && fremdeWebAdresse(/^[a-z][a-z0-9+.-]*:/i.test(webRoh) ? webRoh : `https://${webRoh}`);
+  if (web) aus.web = webRoh.replace(/\/+$/, '');
+  if (Array.isArray(o.telefone)) {
+    const telefone = o.telefone.map((t): KontaktTelefon | null => {
+      const r = (typeof t === 'string' ? { nummer: t } : t) as Record<string, unknown> | null;
+      const nummer = text(r?.nummer, 40);
+      const art = text(r?.art, 30);
+      return nummer && /^[+(]?\d[\d\s()/.\-–]{4,}\d$/.test(nummer) ? { nummer, ...(art ? { art } : {}) } : null;
+    }).filter((t): t is KontaktTelefon => !!t).slice(0, 12);
+    if (telefone.length) aus.telefone = telefone;
+  }
+  if (Array.isArray(o.emails)) {
+    const emails = o.emails.map((m) => text(m, 200)).filter((m) => /^[\w.+-]+@[\w-]+(\.[\w-]+)+$/.test(m)).slice(0, 8);
+    if (emails.length) aus.emails = emails;
+  }
+  return aus;
+}
+
 const endlich = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /**
@@ -86,8 +152,10 @@ export function karteGueltig(n: unknown): n is AppNode {
  * Adressen in einer Karte entschärfen, die von außen kam: Eine „Live"-Seite, die keine fremde Webseite ist,
  * verliert ihre Adresse; Datei- und Bildquellen mit fremdem Schema werden geleert. Gibt dieselbe Karte zurück,
  * wenn nichts zu tun war.
+ * M453: Zeitpunkte (angelegt/geaendert) müssen glaubhafte Zahlen sein und dürfen nicht in der Zukunft liegen.
  */
-export function karteEntschaerfen<T extends AppNode>(n: T): T {
+export function karteEntschaerfen<T extends AppNode>(n0: T): T {
+  const n = zeitSaeubern(n0);
   const d = n.data as Record<string, unknown>;
   if (n.type === 'htmlapp' && d.url !== undefined && !fremdeWebAdresse(d.url)) {
     const { url: _u, live: _l, ...rest } = d;

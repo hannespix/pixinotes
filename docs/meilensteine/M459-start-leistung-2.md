@@ -14,13 +14,13 @@ Augenblick. Einladungslinks (`#e=…`) und Kurz-Links (`#l=…`) öffnen wie vor
 
 Gemessen mit `dist/`, Board mit einer Notiz „Hallo Welt", Chromium kalt (wie M446):
 
-| | vorher (M446) | nachher |
+| | vorher (Stand M456) | nachher (vor / nach Einmischen von M460–M464) |
 |---|---|---|
-| Start-JS (über die Leitung) | 2,35 MiB (2 465 230 B), 5 Dateien | 2,08 MiB (2 176 845 B), 4 Dateien — −12 % (seit M445: −42 %) |
-| Start-JS gzip | 784 KB | 699 KB |
-| eigener App-Teil (`index`) | 1 004 KB | 852 KB |
-| Paket `rufnummer` im Start | 137 KB | — (nur bei Text mit ≥ 6 Ziffern) |
-| chrono-node im Start | ~55 KB (im `index`) | — (nur bei Text, der ein Datum tragen kann) |
+| Start-JS (über die Leitung) | 2,35 MiB (2 465 230 B), 5 Dateien | 2 176 845 B / 2 192 986 B (2,09 MiB), 4 Dateien — −11 % |
+| Start-JS gzip (Vite-Angabe) | 784 KB | 699 KB / 708 KB |
+| eigener App-Teil (`index`) | 1 004 KB | 852 KB / 868 KB |
+| Paket `rufnummer` (libphonenumber) im Start | 137 KB | — (nur bei Text mit ≥ 6 Ziffern) |
+| chrono-node im Start | ~55 KB (im `index`) | — (Paket `fristen`, nur bei Text, der ein Datum tragen kann) |
 | kontoSync + gastSync + Freigabe-/Link-Dialog im Start | ~90 KB (im `index`) | — (nur mit Konto/Gast-Zugang) |
 
 ## Wie (Architektur)
@@ -58,7 +58,12 @@ Gemessen mit `dist/`, Board mit einer Notiz „Hallo Welt", Chromium kalt (wie M
   bleibt im Start, der Freigabe-Dialog selbst und der Link-Dialog (`EbenenMenu.tsx`) kommen beim ersten Öffnen.
 - **Im Leerlauf** (`imLeerlaufVorladen`, 4 s nach dem Start): zusätzlich Fristen-, Rufnummern-Erkennung, Freigabe-
   Dialog und gastSync (nur geladen, nicht gestartet) — für den Service Worker, damit sie offline da sind.
-- **Grenzen der Prüfreihen:** m446 und m459 messen gegen `START_JS_GRENZE` 2 250 000 B (knapp über 2 176 845 B).
+- **`vite.config.ts` `manualChunks`:** chrono-node → Paket `fristen`, libphonenumber-js → `rufnummer`, und die Weichen
+  `lib/chronoKern.ts`/`lib/rufnummerKern.ts` jeweils mit hinein. Ohne das legte Rollup die reine Weiterleitung
+  `rufnummerKern` ins Start-Paket (sobald ein zweiter Importeur wie `lib/kontaktAusMail.ts` dazukam) und lud damit
+  das ganze `rufnummer`-Paket wieder beim Start.
+- **Grenzen der Prüfreihen:** m446 und m459 messen gegen `START_JS_GRENZE` 2 250 000 B (knapp über 2 192 986 B).
+  m388/m390 bündeln `lib/dates.ts` direkt und warten vor den Fristen-Prüfungen auf `fristenLaden()`.
 
 ## Grenzen / offen
 - `vite-plugin-node-polyfills` setzt den Buffer-Ersatz (~67 KB Quelltext) ins Editor-Paket, weil eine Editor-

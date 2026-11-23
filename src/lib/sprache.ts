@@ -120,7 +120,7 @@ export function t(text: string): string {
   const kern = m[2].replace(/\s+/g, ' ');
   if (!HAT_BUCHSTABEN.test(kern)) return text;
   const en = schlageNach(kern);
-  if (en === null) { if (!eigene.has(kern)) luecken.add(kern); return text; }
+  if (en === null) { if (!eigene.has(kern) && !nurZahlWorte(kern)) luecken.add(kern); return text; }
   return m[1] + en + m[3];
 }
 
@@ -138,6 +138,54 @@ export function kartenName(name: string): string {
     .replace(/^Rahmen: /, 'Frame: ')
     .replace(/^Eigene App: /, 'HTML tool: ')
     .replace(/^E-Mail: /, 'Email: ');
+}
+
+/**
+ * M455: Kalenderwoche als kurzes Schild („KW 48" / „Wk 48"). Das Wörterbuch kann „KW {0}" nicht als Muster
+ * führen (zu wenig feste Buchstaben, siehe ladeWoerterbuch) — und wer die Breite des Schilds misst
+ * (Gantt-Kopfzeile), braucht den Text, der wirklich gezeichnet wird, nicht den deutschen.
+ */
+export const kwText = (n: number | string): string => (aktiv === 'en' ? `Wk ${n}` : `KW ${n}`);
+
+// ---------- Zahl und Wort (M461) ----------
+const REGEL_DE = new Intl.PluralRules('de-DE');
+const REGEL_EN = new Intl.PluralRules('en-GB');
+/**
+ * M461: Eine Zahl mit dem Wort in der passenden Form — „1 Karte", „2 Karten", „0 Karten"; englisch „1 card",
+ * „2 cards", „0 cards". ALLE Zähl-Texte der Oberfläche laufen hierüber (nicht `${n} Karten`, nicht „Karte(n)"):
+ * vorher stand in der Übersicht „1 Karten" bzw. „1 cards".
+ *
+ * Im Quelltext stehen nur die beiden deutschen Formen (`zahlWort(n, 'Karte', 'Karten')`). Die Form wählt
+ * Intl.PluralRules in der Sprache der Oberfläche; das Englische steht im Wörterbuch unter den Schlüsseln
+ * „{n} Karte" und „{n} Karten" (werkzeug/sprache-ernten.mjs erntet beide aus jedem Aufruf, nur Zeichenketten als
+ * Argumente; sind beide Formen gleich, steht im Eintrag „{n} frame|{n} frames"). „{n}" statt „{0}": so werden
+ * daraus keine allgemeinen Muster, die fremde Texte („Neue Karte") treffen.
+ * Steht der Aufruf in einer größeren Vorlage (`${zahlWort(…)} im Index`), übersetzt der Beobachter den Rest wie
+ * gewohnt über das Muster „{0} im Index" — das eingesetzte Englisch bleibt dabei stehen.
+ */
+export function zahlWort(n: number, einzahl: string, mehrzahl: string): string {
+  const en = aktiv === 'en';
+  const form = (en ? REGEL_EN : REGEL_DE).select(n) === 'one' ? einzahl : mehrzahl;
+  const zahl = n.toLocaleString(en ? 'en-GB' : 'de-DE');
+  if (!en) return `${zahl} ${form}`;
+  const eintrag = exakt.get(`{n} ${form}`);
+  if (eintrag === undefined) { luecken.add(`{n} ${form}`); return `${zahl} ${form}`; }
+  // Gleiche deutsche Formen („1 Rahmen", „2 Rahmen") teilen sich einen Schlüssel — der Eintrag nennt dann beide
+  // englischen Formen: „{n} frame|{n} frames"
+  const formen = eintrag.split('|');
+  const vorlage = formen.length > 1 && REGEL_EN.select(n) !== 'one' ? formen[1] : formen[0];
+  const aus = vorlage.replace('{n}', zahl);
+  eigene.add(aus);   // englischer Text: für den Beobachter keine Lücke
+  if (zahlWorte.size < 2000) zahlWorte.add(aus);
+  return aus;
+}
+/** Was zahlWort auf Englisch geschrieben hat — ein Text nur daraus („ (2 frames)") ist ebenso keine Lücke */
+const zahlWorte = new Set<string>();
+function nurZahlWorte(kern: string): boolean {
+  if (!zahlWorte.size) return false;
+  let rest = kern;
+  for (const z of zahlWorte) if (rest.includes(z)) rest = rest.split(z).join(' ');
+  return rest !== kern && !HAT_BUCHSTABEN.test(rest);
 }
 
 // ---------- Beobachter ----------
@@ -206,6 +254,8 @@ function datumAufEnglisch(): void {
  * gestartet; scheitert das Laden (offline, alte Fassung), bleibt die Oberfläche deutsch.
  */
 export async function initSprache(): Promise<void> {
+  // M461: für die Prüfreihe — den Zähl-Helfer in beiden Sprachen direkt aufrufen
+  (window as unknown as { __pnZahlWort?: typeof zahlWort }).__pnZahlWort = zahlWort;
   if (gewaehlt() !== 'en' || typeof MutationObserver === 'undefined') return;
   try {
     const wb = (await import('../sprache/en.json')).default as Record<string, string>;

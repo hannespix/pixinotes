@@ -149,3 +149,10 @@ export function initUebersetzung(): void {
     }
   }).observe(document.documentElement, { childList: true, subtree: true });
 }
+
+/**
+ * M455: translate="no" für SVG-Elemente (Namen in Gantt-Balken, Netz der Übersicht). Reacts SVG-Typen kennen
+ * das Attribut nicht, das Dokument schon: Die eingebaute englische Oberfläche (lib/sprache.ts) und der
+ * Übersetzer des Browsers suchen beide nach [translate="no"]. Gebrauch: <text {...SVG_INHALT}>.
+ */
+export const SVG_INHALT: object = { translate: 'no' };

@@ -22,9 +22,10 @@ import { istAmText } from './lib/notizText';
 import { offeneSeite, seiteVon, strichRelativ } from './lib/pdfSeiten';
 import { findFreeSpot, frameMembers, sizeOf } from './lib/arrange';
 import { baueRueckverweis } from './lib/portale';
-import { t } from './lib/sprache';
+import { t, zahlWort } from './lib/sprache';
 import { blockeMitDatum, fristAnkerNachLaden, fristAnkerPflegen, type FristAnker } from './lib/fristAnker';
 import { fristenBereit, fristenLaden } from './lib/dates';
+import { frisch, nachPatch } from './lib/kartenZeit';
 import { blocksToText } from './lib/serialize';
 import { linksUmbenennen, normalizeName } from './lib/links';
 
@@ -459,6 +460,12 @@ interface BoardState {
    */
   standEinsetzen: (boardId: string, stand: { nodes: AppNode[]; edges: Edge[]; drawings?: Stroke[]; comments?: CommentThread[] }, alsKopie?: string) => string | null;
   /**
+   * M460: Einzelne Karten aus einem gesicherten Stand zurückholen, ohne das übrige Board anzufassen: gelöschte kommen
+   * wieder (samt ihren Verbindungen zu Karten, die es noch gibt), geänderte bekommen ihren damaligen Inhalt. EIN
+   * Rückgängig-Schritt, eine gewöhnliche Änderung (Sync trägt sie weiter). Rückgabe: Zahl der geholten Karten.
+   */
+  kartenZurueckholen: (boardId: string, ids: string[], stand: { nodes: AppNode[]; edges: Edge[] }) => number;
+  /**
    * M288: Board archivieren bzw. zurückholen. Archivieren ist das sanfte
    * Löschen — nichts geht verloren, das Board tritt nur zur Seite. Wer das
    * gerade offene Board archiviert, wird auf ein sichtbares Nachbar-Board
@@ -742,7 +749,26 @@ export const persistHaken: { board: (b: BoardDoc) => BoardDoc } = { board: (b) =
  * M449: Vor Vorgängen, die viel auf einmal umbauen (Abgleich mit Ordner/Konto, Import eines Projekts), den Stand der
  * betroffenen Boards sichern. lib/boardVersionen.ts hängt sich hier ein — der Store selbst kennt IndexedDB nicht.
  */
-export const vorUmbauHaken: { sichern: (boards: BoardDoc[], grund: 'abgleich' | 'import') => void } = { sichern: () => {} };
+export const vorUmbauHaken: {
+  sichern: (boards: BoardDoc[], grund: 'abgleich' | 'import') => void;
+  /**
+   * M460: Änderungen anderer (Ordner, WebDAV, Konto, Gruppe — alles, was über importSync mit `sanft` kommt) wollen
+   * viele Karten dieses Boards auf einmal löschen oder ändern (`anzahl` ≥ FREMD_SCHUB_AB). Davor eigens sichern —
+   * die gewöhnliche Sicherung „Vor Abgleich" ist auf eine je 10 Minuten gedrosselt und fiele gerade dann oft aus.
+   * Ein Haken statt eines Imports: kontoSync/gastSync dürfen nachgeladen werden, der Store bleibt die eine Stelle.
+   */
+  fremdSchub: (b: BoardDoc, anzahl: number) => void;
+} = { sichern: () => {}, fremdSchub: () => {} };
+/** M460: Ab so vielen gelöschten oder geänderten Karten in einem Schub gilt eine Änderung von außen als groß */
+export const FREMD_SCHUB_AB = 5;
+/** M460: Wie viele Karten von `alt` verschwinden oder ändern sich, wenn `neu` kommt (neue Karten zählen nicht) */
+function kartenSchub(alt: AppNode[], neu: AppNode[]): number {
+  if (alt === neu) return 0;
+  const N = new Map(neu.map((n) => [n.id, n]));
+  let z = 0;
+  for (const n of alt) { const m = N.get(n.id); if (!m || (m !== n && !gleichesObjekt(n, m))) z += 1; }
+  return z;
+}
 const kartenSperren = new Map<string, Map<string, string>>();   // Board → Karte → Name dessen, der sie hält
 export function setzeKartenSperren(boardId: string, sperren: Map<string, string>): void {
   if (sperren.size) kartenSperren.set(boardId, sperren); else kartenSperren.delete(boardId);
@@ -1388,6 +1414,10 @@ export function ohneStartboard<T extends { boards: BoardDoc[]; spaces: Space[] }
   };
 }
 
+/** M453: Inhaltliche Änderung von Hand stempelt die Karte — Automatik (runDerived) nicht */
+const zeitNachPatch = (neu: AppNode, alt: AppNode, patch: Record<string, unknown>): AppNode =>
+  (inDerived() ? neu : nachPatch(neu, alt, patch));
+
 /** M390: Ändern sich die Blöcke einer Notiz, wandern die Fristen-Anker mit (lib/fristAnker.ts). */
 const mitFristAnker = (n: AppNode, data: Record<string, unknown>): Record<string, unknown> => {
   // M435: Formen (Schritt, Entscheidung, Start/Ende) tragen formatierten Text wie Notizen — `text` bleibt die
@@ -1529,10 +1559,10 @@ export const useBoard = create<BoardState>()(
           const n = weg.length;
           if (bleiben.length) {
             meldung = art === 'bereich'
-              ? t(`Bereich „${name}" mit ${n} Board(s) gelöscht – geteilte Boards anderer bleiben.`)
-              : t(`Projekt „${name}" mit ${n} Board(s) gelöscht – geteilte Boards anderer bleiben.`);
+              ? t(`Bereich „${name}" mit ${zahlWort(n, 'Board', 'Boards')} gelöscht – geteilte Boards anderer bleiben.`)
+              : t(`Projekt „${name}" mit ${zahlWort(n, 'Board', 'Boards')} gelöscht – geteilte Boards anderer bleiben.`);
           } else {
-            meldung = art === 'bereich' ? t(`Bereich „${name}" mit ${n} Board(s) gelöscht.`) : t(`Projekt „${name}" mit ${n} Board(s) gelöscht.`);
+            meldung = art === 'bereich' ? t(`Bereich „${name}" mit ${zahlWort(n, 'Board', 'Boards')} gelöscht.`) : t(`Projekt „${name}" mit ${zahlWort(n, 'Board', 'Boards')} gelöscht.`);
           }
         }
         ebenenUndo = { art, bereich, bereichIndex, projekt, projektIndex, boards: weg, activeId: s0.activeId, neuesBoard, neuesProjekt };
@@ -1848,7 +1878,7 @@ export const useBoard = create<BoardState>()(
                     ...b,
                     nodes: b.nodes.map((n) =>
                       n.id === nodeId
-                        ? ({ ...n, data: { ...n.data, ...mitFristAnker(n, data), ...(bumpt ? { extEpoch: (((n.data as { extEpoch?: number }).extEpoch) ?? 0) + 1 } : {}) } } as AppNode)
+                        ? zeitNachPatch({ ...n, data: { ...n.data, ...mitFristAnker(n, data), ...(bumpt ? { extEpoch: (((n.data as { extEpoch?: number }).extEpoch) ?? 0) + 1 } : {}) } } as AppNode, n, patch)
                         : n,
                     ),
                   }
@@ -2208,7 +2238,17 @@ export const useBoard = create<BoardState>()(
           {
             const kommt = new Map(boards.map((b) => [b.id, b]));
             const nimmt = sanft ? new Set(sanft.geaendert) : null;
-            vorUmbauHaken.sichern(get().boards.filter((b) => kommt.has(b.id) && kommt.get(b.id) !== b && (!nimmt || nimmt.has(b.id))), sanft ? 'abgleich' : 'import');
+            let betroffen = get().boards.filter((b) => kommt.has(b.id) && kommt.get(b.id) !== b && (!nimmt || nimmt.has(b.id)));
+            // M460: Große Änderung anderer → eigene, nur knapp gedrosselte Sicherung statt der 10-Minuten-Bremse
+            if (sanft) {
+              const gross = new Set<string>();
+              for (const b of betroffen) {
+                const n = kartenSchub(b.nodes, (kommt.get(b.id) as BoardDoc).nodes ?? []);
+                if (n >= FREMD_SCHUB_AB) { gross.add(b.id); vorUmbauHaken.fremdSchub(b, n); }
+              }
+              if (gross.size) betroffen = betroffen.filter((b) => !gross.has(b.id));
+            }
+            vorUmbauHaken.sichern(betroffen, sanft ? 'abgleich' : 'import');
           }
           if (sanft) {
             // M311: Hintergrund-Abgleich mit dem Sync-Ordner. Undo-Schritte zu
@@ -2706,6 +2746,61 @@ export const useBoard = create<BoardState>()(
           get().openBoard(kopie.id);
           return kopie.id;
         },
+        kartenZurueckholen: (boardId, ids, stand) => {
+          const st = get();
+          const quelle = st.boards.find((b) => b.id === boardId);
+          if (!quelle || !Array.isArray(stand?.nodes) || !ids.length) return 0;
+          if (quelle.geteiltRolle === 'lesen') { st.showToast('Dieses Board ist nur zum Lesen freigegeben – als Kopie öffnen geht.'); return 0; }
+          const dann = new Map(stand.nodes.map((n) => [n.id, n]));
+          const jetzt = new Map(quelle.nodes.map((n) => [n.id, n]));
+          const zeit = Date.now();
+          /** Lage auf der Fläche, falls der Rahmen von damals nicht mehr da ist */
+          const absolut = (n: AppNode, tiefe = 0): { x: number; y: number } => {
+            const p = n.parentId ? dann.get(n.parentId) : undefined;
+            if (!p || tiefe > 8) return n.position;
+            const o = absolut(p, tiefe + 1);
+            return { x: o.x + n.position.x, y: o.y + n.position.y };
+          };
+          const geholt = new Map<string, AppNode>();
+          for (const id of ids) {
+            const alt = dann.get(id);
+            if (!alt) continue;
+            const hier = jetzt.get(id);
+            let k = { ...(JSON.parse(JSON.stringify(alt)) as AppNode), selected: false } as AppNode;
+            if (hier) {
+              // Geändert: nur der Inhalt kommt zurück — Lage, Größe und Rahmen bleiben, wie sie jetzt sind
+              k = { ...hier, data: k.data, selected: false } as AppNode;
+            } else if (k.parentId && !jetzt.has(k.parentId)) {
+              const { parentId: _p, extent: _e, ...frei } = k as AppNode & { extent?: unknown };
+              k = { ...frei, position: absolut(alt) } as AppNode;
+            }
+            // Zurückholen ist eine Änderung von Hand (M453): jetzt geändert, angelegt bleibt
+            geholt.set(id, { ...k, geaendert: zeit } as AppNode);
+          }
+          if (!geholt.size) return 0;
+          const nodes = quelle.nodes.map((n) => geholt.get(n.id) ?? n);
+          for (const [id, k] of geholt) if (!jetzt.has(id)) nodes.push(k);
+          // Verbindungen gelöschter Karten, deren anderes Ende es noch (oder wieder) gibt
+          const da = new Set(nodes.map((n) => n.id));
+          const kanten = new Set(quelle.edges.map((e) => e.id));
+          const edges = [...quelle.edges, ...(stand.edges ?? []).filter((e) => !kanten.has(e.id)
+            && (geholt.has(e.source) || geholt.has(e.target)) && da.has(e.source) && da.has(e.target)).map((e) => ({ ...e, selected: false }))];
+          lastEditKey = '';
+          set({
+            activeId: boardId,
+            view: 'board',
+            lastDeleted: null,
+            past: [...st.past.slice(-(HISTORY_LIMIT - 1)), {
+              boardId, nodes: quelle.nodes, edges: quelle.edges, drawings: quelle.drawings, comments: quelle.comments,
+            }],
+            future: [],
+            boards: st.boards.map((b) => (b.id === boardId ? { ...b, nodes, edges } : b)),
+          });
+          // Notiz-Editoren lesen ihren Text nur beim Aufbau — die geänderten frischen sich an Ort und Stelle auf
+          const notizen = [...geholt.values()].filter((n) => n.type === 'note' && jetzt.has(n.id)).map((n) => n.id);
+          if (notizen.length) window.dispatchEvent(new CustomEvent(NOTIZ_EXTERN, { detail: notizen }));
+          return geholt.size;
+        },
         duplicateProject: (projectId) => {
           const st = get();
           const raum = st.spaces.find((sp) => sp.projects.some((p) => p.id === projectId));
@@ -2753,7 +2848,7 @@ export const useBoard = create<BoardState>()(
               }
               : sp)),
           });
-          get().showToast(`Projekt „${projekt.name}" mit ${ids.length} Board(s) kopiert.`);
+          get().showToast(`Projekt „${projekt.name}" mit ${zahlWort(ids.length, 'Board', 'Boards')} kopiert.`);
         },
 
         archiveBoard: (boardId, an = true) => {
@@ -2987,7 +3082,7 @@ export const useBoard = create<BoardState>()(
 
         addNode: (node) => {
           get().pushHistory();
-          patchActive((b) => ({ nodes: [...b.nodes, node] }));
+          patchActive((b) => ({ nodes: [...b.nodes, frisch(node)] }));
         },
 
         dupliziere: (ids) => {
@@ -3001,7 +3096,7 @@ export const useBoard = create<BoardState>()(
           const belegt = (kk: number) => wahl.some((n) => b.nodes.some((x) => x.type === n.type && Math.abs(x.position.x - (n.position.x + 30 * kk)) < 2 && Math.abs(x.position.y - (n.position.y + 30 * kk)) < 2));
           while (k < 40 && belegt(k)) k += 1;
           const karte = new Map(wahl.map((n) => [n.id, uid()]));
-          const neu = wahl.map((n) => ({
+          const neu = wahl.map((n) => frisch({
             ...n, id: karte.get(n.id) as string, selected: true,
             position: { x: n.position.x + 30 * k, y: n.position.y + 30 * k },
             data: JSON.parse(JSON.stringify(n.data)),
@@ -3029,7 +3124,7 @@ export const useBoard = create<BoardState>()(
           }
           set({
             boards: get().boards.map((b) =>
-              b.id === boardId ? { ...b, nodes: [...b.nodes, node] } : b),
+              b.id === boardId ? { ...b, nodes: [...b.nodes, frisch(node)] } : b),
           });
         },
 
@@ -3367,7 +3462,7 @@ export const useBoard = create<BoardState>()(
           }
           patchActive((b) => ({
             nodes: b.nodes.map((n) =>
-              n.id === id ? ({ ...n, data: { ...n.data, ...mitFristAnker(n, data) } } as AppNode) : n,
+              n.id === id ? zeitNachPatch({ ...n, data: { ...n.data, ...mitFristAnker(n, data) } } as AppNode, n, data) : n,
             ),
           }));
         },

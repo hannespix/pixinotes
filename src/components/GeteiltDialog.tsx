@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useBoard } from '../store';
 import { alsDateien, geteiltMarkeAbholen, leseGeteiltes, loescheGeteiltes, type Geteiltes } from '../lib/geteilt';
+import { erweiterungEingang } from '../lib/erweiterung';
+import { webAdresseVonAussen } from '../lib/sicher';
 import { importFilesToBoard } from '../lib/importFiles';
 import { makeNote } from '../lib/nodes';
 import { notizBildHochladen } from '../lib/notizBild';
 import { nodeToText } from '../lib/serialize';
 import { IX, IFileText } from './Icons';
+import { zahlWort } from '../lib/sprache';
 
 /**
  * M290: „Teilen mit … PixiNotes" (Android).
@@ -27,6 +30,53 @@ import { IX, IFileText } from './Icons';
  * Einfügen hier (Dock → ＋ → „Aus Zwischenablage einfügen" bzw. der Bild-Chip
  * in der Notiz).
  */
+/** Freier Platz unter dem, was schon auf dem Board liegt */
+function platzAuf(boardId: string): { x: number; y: number } {
+  const nodes = useBoard.getState().boards.find((b) => b.id === boardId)?.nodes ?? [];
+  if (nodes.length === 0) return { x: 80, y: 80 };
+  const unten = Math.max(...nodes.map((n) => n.position.y + (n.height ?? 200)));
+  const links = Math.min(...nodes.map((n) => n.position.x));
+  return { x: links, y: unten + 60 };
+}
+
+/**
+ * Text des Geteilten als Notiz-Blöcke. M458: Die Adresse wird ein echter Verweis (nur http/https — eine
+ * „javascript:"-Adresse wäre schon im Eingang verworfen worden, hier wird es noch einmal geprüft).
+ */
+function textBloecke(g: Geteiltes): unknown[] {
+  const zeilen = [g.titel, g.text].filter(Boolean).join('\n').split('\n');
+  const bloecke: unknown[] = zeilen.map((zeile) => ({
+    type: 'paragraph',
+    content: zeile ? [{ type: 'text', text: zeile, styles: {} }] : [],
+  }));
+  if (g.adresse) {
+    const href = webAdresseVonAussen(g.adresse);
+    bloecke.push({
+      type: 'paragraph',
+      content: href
+        ? [{ type: 'link', href, content: [{ type: 'text', text: g.adresse, styles: {} }] }]
+        : [{ type: 'text', text: g.adresse, styles: {} }],
+    });
+  }
+  return bloecke;
+}
+
+/**
+ * Das Geteilte als Karten auf ein Board legen — gemeinsam für den Dialog und, M458, für die Erweiterung mit
+ * „ohne Rückfrage". Gibt die Zahl der Karten zurück.
+ */
+async function aufsBoardLegen(g: Geteiltes, boardId: string): Promise<number> {
+  const pos = platzAuf(boardId);
+  const dateien = alsDateien(g);
+  let gesetzt = 0;
+  if (dateien.length) gesetzt += await importFilesToBoard(dateien, pos);
+  if (g.titel || g.text || g.adresse) {
+    useBoard.getState().addNode(makeNote({ x: pos.x + (gesetzt ? 300 : 0), y: pos.y }, { blocks: textBloecke(g) }));
+    gesetzt++;
+  }
+  return gesetzt;
+}
+
 export function GeteiltDialog() {
   const [gabe, setGabe] = useState<Geteiltes | null>(null);
   const boards = useBoard((s) => s.boards);
@@ -34,7 +84,6 @@ export function GeteiltDialog() {
   const activeId = useBoard((s) => s.activeId);
   const openBoard = useBoard((s) => s.openBoard);
   const setView = useBoard((s) => s.setView);
-  const addNode = useBoard((s) => s.addNode);
   const updateNodeData = useBoard((s) => s.updateNodeData);
   const showToast = useBoard((s) => s.showToast);
   const [zielBoard, setZielBoard] = useState(activeId);
@@ -56,6 +105,18 @@ export function GeteiltDialog() {
     });
   }, []);
 
+  /* M458: Browser-Erweiterung „An PixiNotes senden" — derselbe Dialog. Mit der Einstellung „ohne Rückfrage"
+     landet das Gesendete gleich auf dem geöffneten Board, mit einer kurzen Meldung. */
+  useEffect(() => erweiterungEingang(({ gabe: g, direkt }) => {
+    const st = useBoard.getState();
+    if (!direkt || !st.boards.some((b) => b.id === st.activeId)) { setZielBoard(st.activeId); setGabe(g); return; }
+    const ziel = st.activeId;
+    st.setView('board');
+    void aufsBoardLegen(g, ziel).then((n) => useBoard.getState().showToast(n > 0
+      ? `Aus dem Browser übernommen – ${zahlWort(n, 'Karte', 'Karten')} auf „${useBoard.getState().boards.find((b) => b.id === ziel)?.name}".`
+      : 'Es war nichts Übernehmbares dabei.'));
+  }), []);
+
   const notizen = useMemo(
     () => (boards.find((b) => b.id === zielBoard)?.nodes ?? []).filter((n) => n.type === 'note'),
     [boards, zielBoard],
@@ -70,14 +131,7 @@ export function GeteiltDialog() {
 
   const schliessen = () => { setGabe(null); void loescheGeteiltes(); };
 
-  /** Freier Platz unter dem, was schon auf dem Board liegt */
-  const platz = (boardId: string) => {
-    const nodes = boards.find((b) => b.id === boardId)?.nodes ?? [];
-    if (nodes.length === 0) return { x: 80, y: 80 };
-    const unten = Math.max(...nodes.map((n) => n.position.y + (n.height ?? 200)));
-    const links = Math.min(...nodes.map((n) => n.position.x));
-    return { x: links, y: unten + 60 };
-  };
+  const platz = platzAuf;
 
   const uebernehmen = async () => {
     setLaeuft(true);
@@ -96,20 +150,9 @@ export function GeteiltDialog() {
   };
 
   const aufsBoard = async () => {
-    const pos = platz(zielBoard);
-    let gesetzt = 0;
-    if (dateien.length) gesetzt += await importFilesToBoard(dateien, pos);
-    if (textTeil) {
-      addNode(makeNote({ x: pos.x + (gesetzt ? 300 : 0), y: pos.y }, {
-        blocks: textTeil.split('\n').map((zeile) => ({
-          type: 'paragraph',
-          content: zeile ? [{ type: 'text', text: zeile, styles: {} }] : [],
-        })),
-      }));
-      gesetzt++;
-    }
+    const gesetzt = await aufsBoardLegen(gabe, zielBoard);
     showToast(gesetzt > 0
-      ? `Geteiltes übernommen – ${gesetzt} Karte(n) auf „${boards.find((b) => b.id === zielBoard)?.name}".`
+      ? `Geteiltes übernommen – ${zahlWort(gesetzt, 'Karte', 'Karten')} auf „${boards.find((b) => b.id === zielBoard)?.name}".`
       : 'Es war nichts Übernehmbares dabei.');
   };
 
@@ -139,7 +182,7 @@ export function GeteiltDialog() {
        auf demselben Board (dieselbe Regel wie beim Ablegen, M289). */
     if (abgelehnt.length) {
       await importFilesToBoard(dateien.filter((d) => abgelehnt.includes(d.name)), platz(zielBoard));
-      showToast(`${bilder} Bild(er) in die Notiz, ${abgelehnt.length} Datei(en) als Karte aufs Board.`);
+      showToast(`${zahlWort(bilder, 'Bild', 'Bilder')} in die Notiz, ${zahlWort(abgelehnt.length, 'Datei', 'Dateien')} als Karte aufs Board.`);
     } else {
       showToast(`Geteiltes in die Notiz „${(nodeToText(notiz).split('\n')[0] || 'Notiz').slice(0, 30)}" übernommen.`);
     }
@@ -149,7 +192,7 @@ export function GeteiltDialog() {
     <div className="modal-backdrop" onClick={schliessen}>
       <div className="modal geteilt-modal" role="dialog" aria-modal="true" aria-label="Geteiltes übernehmen" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <b>Von einer anderen App geteilt</b>
+          <b>{gabe.herkunft === 'erweiterung' ? 'Aus dem Browser gesendet' : 'Von einer anderen App geteilt'}</b>
           <button className="modal-x" onClick={schliessen} aria-label="Verwerfen"><IX size={14} /></button>
         </div>
         <div className="modal-body">

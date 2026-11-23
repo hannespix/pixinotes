@@ -147,6 +147,13 @@ function lesen(n: AppNode, u: KiUmfeld): string {
     case 'shape': return `Form (${n.data.shape}): ${n.data.text || ''}`;
     // M450: Kontakt-Karte — die Felder als Zeilen (Name, Funktion · Firma, Tel., E-Mail, Anschrift …)
     case 'kontakt': return `Kontakt\n${nodeToText(n)}`;
+    // M452: Bilder (auch als Datei abgelegte) mit dem Text, den die Erkennung darin gefunden hat — so kann die
+    // KI aus Screenshots zusammenfassen und Aufgaben ziehen. Bewusst ohne Import aus textInBildern (MCP-Server).
+    case 'image':
+    case 'file': {
+      const ocr = typeof n.data.ocrText === 'string' ? n.data.ocrText.trim() : '';
+      return ocr ? `${nodeToText(n)}\nText im Bild (automatisch erkannt):\n${ocr}` : nodeToText(n);
+    }
     default: return nodeToText(n);
   }
 }

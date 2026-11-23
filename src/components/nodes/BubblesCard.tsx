@@ -39,6 +39,7 @@ import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 
 import { IBubbles, ITrash, IWand } from '../Icons';
+import { zahlWort } from '../../lib/sprache';
 /** M415: Lage und Größe eines Elements setzen — nur, was sich geändert hat (unveränderte Schreibvorgänge kosten im Tropfen-Look den ganzen Filter) */
 function setzen(el: HTMLElement, x: number, y: number, b: number, h: number): void {
   const tf = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`; const bw = `${b.toFixed(1)}px`; const hh = `${h.toFixed(1)}px`;
@@ -911,7 +912,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           onChange={(e) => updateNodeData(id, { frage: e.target.value.slice(0, 160) })} data-taste="bub-frage"
           enterKeyHint="done" onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
         />
-        <span className="bub-zahl" data-taste="bub-zahl">{blasen.length} {blasen.length === 1 ? 'Idee' : 'Ideen'}{personen > 1 ? ` · ${personen} Personen` : ''}</span>
+        <span className="bub-zahl" data-taste="bub-zahl">{zahlWort(blasen.length, 'Idee', 'Ideen')}{personen > 1 ? ` · ${personen} Personen` : ''}</span>
         <button className={`bub-ansicht nodrag${liste ? ' an' : ''}`} onClick={() => { setListe((l) => !l); setWahl(null); setGWahl(null); setFallen(null); }} aria-pressed={liste}
           title={liste ? 'Zurück zu den Blasen' : 'Als Liste zeigen – nach Gruppen und Punkten geordnet'} data-taste="bub-ansicht">{liste ? <IBubbles size={15} /> : '☰'}</button>
       </div>
@@ -1060,7 +1061,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
               autoFocus onFocus={(e) => e.target.select()} enterKeyHint="done"
               onBlur={(e) => gruppeUmbenennen(gGewaehlt[0], e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { gruppeUmbenennen(gGewaehlt[0], (e.target as HTMLInputElement).value); setGWahl(null); } if (e.key === 'Escape') setGWahl(null); }} />
-            <span className="bub-pille-zahl">{blasen.filter((b) => b.gruppe === gGewaehlt[0]).length} Ideen</span>
+            <span className="bub-pille-zahl">{zahlWort(blasen.filter((b) => b.gruppe === gGewaehlt[0]).length, 'Idee', 'Ideen')}</span>
             {/* M415: Farbe der Gruppe */}
             {!fest && (
               <span className="bub-farben" role="group" aria-label="Farbe der Gruppe" data-taste="bub-gruppe-farben">
@@ -1137,7 +1138,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         />
         <button className="bub-dazu" onClick={ideeDazu} disabled={fest || !eingabe.trim() || (!!regeln.zu && !leiten)} title="Idee hinzufügen" data-taste="bub-dazu">＋</button>
         {phase === 'offen' && <span className="bub-rest" data-taste="bub-rest">{uebrig} von {d.abstimmung.punkte} Punkten übrig – auf Blasen tippen</span>}
-        {leiten && phase === 'aus' && <button className="bub-knopf" onClick={() => phaseSetzen('offen')} disabled={blasen.length < 2} title={`Punkte-Abstimmung: jede Person vergibt ${d.abstimmung.punkte} Punkte`} data-taste="bub-abstimmen">Abstimmen</button>}
+        {leiten && phase === 'aus' && <button className="bub-knopf" onClick={() => phaseSetzen('offen')} disabled={blasen.length < 2} title={`Punkte-Abstimmung: jede Person vergibt ${zahlWort(d.abstimmung.punkte, 'Punkt', 'Punkte')}`} data-taste="bub-abstimmen">Abstimmen</button>}
         {leiten && phase === 'offen' && <button className="bub-knopf an" onClick={() => phaseSetzen('fertig')} data-taste="bub-auswerten">✓ Auswerten</button>}
         {leiten && phase === 'fertig' && <button className="bub-knopf" onClick={() => phaseSetzen('offen')} title="Abstimmung wieder öffnen" data-taste="bub-weiter">↺ Weiter abstimmen</button>}
         {leiten && (

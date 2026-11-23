@@ -27,7 +27,7 @@ mkdirSync(SD, { recursive: true });
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 const DIST = path.join(__repo, 'dist');
 const PORT = 5446;
-/** Grenze knapp über dem gemessenen Stand (M446: 2,44 MB; M459: 2 176 845 B ohne chrono, libphonenumber,
+/** Grenze knapp über dem gemessenen Stand (M446: 2,44 MB; M459: 2 192 986 B ohne chrono, libphonenumber,
  *  Konto-/Team-Abgleich) — ein Rückschritt fällt sofort auf */
 const START_JS_GRENZE = 2_250_000;
 

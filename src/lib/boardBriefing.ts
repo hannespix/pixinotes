@@ -7,6 +7,9 @@
 //   · Entscheidungen – Beschlüsse aus Protokoll-Karten, Zeilen „Beschluss: …" aus Notizen.
 //   · Wichtigste Inhalte – die gehaltvollsten Karten.
 //   · Risiken und Blocker – Zeilen mit „Risiko", „blockiert", „Verzug" … und überfällige Fristen.
+//   · M453: Lange unberührt – Karten, deren Inhalt seit über 30 Tagen niemand geändert hat, und E-Mail-Karten ohne
+//     Folgeaktivität (keine Notiz daran, kein Ticket dazu, keine Antwort im Gespräch). Nur Karten mit bekanntem
+//     Zeitpunkt; der Abschnitt erscheint nur, wenn es solche Karten gibt.
 // Mit KI schreibt das Modell Lage, Entscheidungen, Inhalte und Risiken aus dem ganzen Board (kiLesen über gather,
 // Platzbudget wie alle Board-Aktionen); ohne KI – oder wenn sie nicht antwortet – entsteht dasselbe Gerüst lokal.
 // Bewusst keine Checklisten „- [ ]" in der Notiz: Sie würden als neue Aufgaben in der Aufgaben-Zentrale auftauchen
@@ -18,7 +21,8 @@ import { fristenLaden } from './dates';
 import { nodeToText } from './serialize';
 import { findFreeSpot } from './arrange';
 import { tagLokal } from './tag';
-import { t } from './sprache';
+import { t, zahlWort } from './sprache';
+import { tageSeit, zeitVon } from './kartenZeit';
 
 export interface BoardLage {
   ueberfaellig: TaskRef[];
@@ -28,6 +32,39 @@ export interface BoardLage {
   entscheidungen: Array<{ text: string; datum?: string; karte: string }>;
   inhalte: Array<{ id: string; titel: string }>;
   risiken: Array<{ text: string; karte: string }>;
+  /** M453: Inhalt seit UNBERUEHRT_TAGE nicht geändert (älteste zuerst) */
+  unberuehrt: Array<{ titel: string; tage: number }>;
+  /** M453: E-Mail-Karten ohne Folgeaktivität seit MAIL_TAGE (älteste zuerst) */
+  mailsOhneFolge: Array<{ titel: string; tage: number }>;
+}
+
+/** M453: ab wann eine Karte als „lange unberührt" gilt */
+export const UNBERUEHRT_TAGE = 30;
+/** M453: ab wann eine E-Mail ohne Folgeaktivität genannt wird */
+export const MAIL_TAGE = 7;
+const LISTE_MAX = 6;
+
+/**
+ * M453: Hat nach dem Eingang einer E-Mail-Karte etwas an sie angeknüpft? Die Karte selbst wurde bearbeitet, eine
+ * verbundene Karte wurde danach geändert, ein Ticket verweist auf sie oder im Gespräch an ihr kam etwas dazu.
+ */
+function hatFolge(board: BoardDoc, mail: AppNode, seit: number): boolean {
+  const g = (mail as { geaendert?: number }).geaendert;
+  if (g !== undefined && g - seit > 60_000) return true;
+  const zeit = new Map(board.nodes.map((n) => [n.id, zeitVon(n)]));
+  for (const e of board.edges ?? []) {
+    const andere = e.source === mail.id ? e.target : e.target === mail.id ? e.source : null;
+    if (andere && (zeit.get(andere) ?? 0) > seit) return true;
+  }
+  for (const n of board.nodes) {
+    if (n.type !== 'kanban') continue;
+    const d = n.data as { items?: Array<{ link?: { nodeId?: string }; links?: Array<{ nodeId?: string }> }> };
+    if ((d.items ?? []).some((it) => it.link?.nodeId === mail.id || (it.links ?? []).some((l) => l.nodeId === mail.id))) return true;
+  }
+  for (const c of board.comments ?? []) {
+    if (c.nodeId === mail.id && c.msgs.some((m) => Date.parse(m.at) > seit)) return true;
+  }
+  return false;
 }
 
 const OHNE_INHALT = new Set(['shape', 'frame', 'portal', 'calendar', 'time']);
@@ -80,6 +117,26 @@ export function lageSammeln(board: BoardDoc, now: Date = new Date()): BoardLage 
     .slice(0, 5)
     .map(({ id, titel }) => ({ id, titel }));
 
+  // M453: lange unberührt — nur mit bekanntem Zeitpunkt (ältere Stände: unbekannt, kein erfundenes Datum)
+  const jetzt = now.getTime();
+  const unberuehrt: BoardLage['unberuehrt'] = [];
+  const mailsOhneFolge: BoardLage['mailsOhneFolge'] = [];
+  for (const n of karten) {
+    const z = zeitVon(n);
+    if (z === undefined) continue;
+    if (n.type === 'email') {
+      const seit = (n as { angelegt?: number }).angelegt ?? z;
+      const tage = tageSeit(seit, jetzt);
+      if (tage >= MAIL_TAGE && !hatFolge(board, n, seit)) mailsOhneFolge.push({ titel: (n.data as { subject?: string }).subject?.trim() || name.get(n.id) || t('(ohne Betreff)'), tage });
+      continue;
+    }
+    if (OHNE_INHALT.has(n.type ?? '')) continue;
+    const tage = tageSeit(z, jetzt);
+    if (tage >= UNBERUEHRT_TAGE && name.get(n.id)) unberuehrt.push({ titel: name.get(n.id) ?? '', tage });
+  }
+  unberuehrt.sort((a, b) => b.tage - a.tage);
+  mailsOhneFolge.sort((a, b) => b.tage - a.tage);
+
   return {
     ueberfaellig: aufgaben.filter((a) => a.urgency === 'overdue'),
     bald: aufgaben.filter((a) => a.urgency === 'soon'),
@@ -88,6 +145,8 @@ export function lageSammeln(board: BoardDoc, now: Date = new Date()): BoardLage 
     entscheidungen: entscheidungen.slice(0, 8),
     inhalte,
     risiken: risiken.slice(0, 6),
+    unberuehrt: unberuehrt.slice(0, LISTE_MAX),
+    mailsOhneFolge: mailsOhneFolge.slice(0, LISTE_MAX),
   };
 }
 
@@ -111,6 +170,16 @@ export function aufgabenMarkdown(l: BoardLage, now: Date = new Date()): string {
   return z.join('\n');
 }
 
+/** M453: Abschnitt „Lange unberührt" — leer, wenn es nichts zu nennen gibt */
+export function unberuehrtMarkdown(l: BoardLage): string {
+  if (!l.unberuehrt.length && !l.mailsOhneFolge.length) return '';
+  return [
+    `## ${t('Lange unberührt')}`,
+    ...l.mailsOhneFolge.map((m) => `- ${t('E-Mail')}: ${m.titel} – ${t('seit {0} Tagen ohne Folgeaktivität').replace('{0}', String(m.tage))}`),
+    ...l.unberuehrt.map((u) => `- ${u.titel} – ${t('seit {0} Tagen unverändert').replace('{0}', String(u.tage))}`),
+  ].join('\n');
+}
+
 /** Das ganze Briefing ohne KI */
 export function lageMarkdown(l: BoardLage, now: Date = new Date()): string {
   const teile = [aufgabenMarkdown(l, now)];
@@ -118,10 +187,12 @@ export function lageMarkdown(l: BoardLage, now: Date = new Date()): string {
   teile.push([`## ${t('Entscheidungen')}`, ...(ent.length ? ent : [`- ${t('Keine Beschlüsse gefunden.')}`])].join('\n'));
   teile.push([`## ${t('Wichtigste Inhalte')}`, ...(l.inhalte.length ? l.inhalte.map((i) => `- ${i.titel}`) : [`- ${t('Das Board ist noch leer.')}`])].join('\n'));
   const ris = [
-    ...(l.ueberfaellig.length ? [`- **${t('{0} Aufgabe(n) überfällig').replace('{0}', String(l.ueberfaellig.length))}**`] : []),
+    ...(l.ueberfaellig.length ? [`- **${t('{0} überfällig').replace('{0}', zahlWort(l.ueberfaellig.length, 'Aufgabe', 'Aufgaben'))}**`] : []),
     ...l.risiken.map((r) => `- ${r.text}${r.karte && r.karte !== r.text ? ` (${r.karte})` : ''}`),
   ];
   teile.push([`## ${t('Risiken und Blocker')}`, ...(ris.length ? ris : [`- ${t('Nichts erkannt.')}`])].join('\n'));
+  const alt = unberuehrtMarkdown(l);
+  if (alt) teile.push(alt);
   return teile.join('\n\n');
 }
 
@@ -178,7 +249,9 @@ export async function boardBriefing(rechtsOben: { x: number; y: number }, mitKi:
       if (kiAbgebrochen()) return t('Abgebrochen – kein Briefing angelegt.');
       const ki = kiTextSaeubern(antwort);
       // M332: Karten, die nicht mehr in den Kontext passten, nennt die Meldung – wie bei allen Board-Aktionen
-      if (ki) { md = `${aufgabenMarkdown(lage, now)}\n\n${ki}`; wie = t('mit KI'); ausgelassen = auslassungsHinweis(); }
+      // M453: „Lange unberührt" ist ein lokaler Befund wie die Fristen – er bleibt auch mit KI stehen
+      const alt = unberuehrtMarkdown(lage);
+      if (ki) { md = `${aufgabenMarkdown(lage, now)}\n\n${ki}${alt ? `\n\n${alt}` : ''}`; wie = t('mit KI'); ausgelassen = auslassungsHinweis(); }
     } catch (e) {
       if (kiAbgebrochen()) return t('Abgebrochen – kein Briefing angelegt.');
       wie = `${t('ohne KI')} – ${t('die KI antwortete nicht')} (${(e as Error).message.slice(0, 80)})`;
@@ -197,5 +270,5 @@ export async function boardBriefing(rechtsOben: { x: number; y: number }, mitKi:
   mutedHistory(() => st.addNode(notiz));
   st.focusNode(boardId, notiz.id);
   const zahl = lage.ueberfaellig.length;
-  return `${t('Board-Briefing angelegt')} (${wie})${zahl ? ` – ${t('{0} Aufgabe(n) überfällig').replace('{0}', String(zahl))}` : ''}${ausgelassen}.`;
+  return `${t('Board-Briefing angelegt')} (${wie})${zahl ? ` – ${t('{0} überfällig').replace('{0}', zahlWort(zahl, 'Aufgabe', 'Aufgaben'))}` : ''}${ausgelassen}.`;
 }
