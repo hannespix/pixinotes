@@ -124,6 +124,9 @@ Chromium: `/opt/pw-browsers/chromium` (sonst `PW_CHROMIUM=…`).
 - Daten von außen (Links, Dateien, Sync, Live-Kanal) laufen durch
   `lib/sicher.ts`.
 - Schweres nachladen (`import()`), nicht in den Start-Bundle ziehen (M321).
+- Leistung beim Ziehen (M491): in `:has()` keine `[style*=…]`-Selektoren (jede Inline-Stil-Änderung berechnet sonst das ganze Dokument neu); mitten im Zug nichts ins DOM ein- oder aushängen, sondern feste Plätze per Inline-Stil zeigen/verstecken. Prüfreihe m491 (T) fängt beides ab.
+- Kontraste (M492/M494): neue Farben nur als Token in `00-tokens.css` mit Hell- und Dunkelwert; Schrift auf frei gewählten Farben über `lib/lesbareSchrift.ts`; prüfen mit `werkzeug/kontrast-pruefen.mjs` (Text ≥ 4,5:1, Ränder/Fokus ≥ 3:1).
+- Gemeinsames Tippen (M477/M487/M493): Änderungen an Inhalten, die gerade gemeinsam bearbeitet werden (Notiz, Protokoll, Ticket-Felder), laufen über das Yjs-Dokument (`lib/notizGemeinsamKern.ts`), nie am Dokument vorbei in den Store.
 - Prüfreihen messen **Verhalten** (Pixel, Downloads, abgefangene Anfragen),
   nicht Klassennamen. Jede Reihe startet ihren eigenen Server auf einem festen
   Port — neue Reihen nehmen einen freien Port (siehe `docs/AGENTEN.md`).
