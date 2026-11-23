@@ -195,6 +195,26 @@ export function karteEntschaerfen<T extends AppNode>(n0: T): T {
   return n;
 }
 
+/**
+ * M470: Zeitpunkte eines Sync-Stands von außen (Ordner, WebDAV, Konto über fremdStandEinarbeiten): angelegt/geaendert
+ * der Karten und `spalteSeit` der Tickets müssen glaubhaft sein (zeitSaeubern) — sonst stünde ein Ticket „seit -40
+ * Tagen" in seiner Spalte oder ein Stempel aus der Zukunft gewönne jeden Abgleich. Sonst bleibt alles, wie es kam.
+ */
+export function zeitenVonAussen<T extends { nodes?: unknown }>(boards: T[]): T[] {
+  if (!Array.isArray(boards)) return boards;
+  return boards.map((b) => {
+    if (!b || typeof b !== 'object' || !Array.isArray(b.nodes)) return b;
+    let anders = false;
+    const nodes = (b.nodes as AppNode[]).map((n) => {
+      if (!n || typeof n !== 'object') return n;
+      const s = zeitSaeubern(n);
+      if (s !== n) anders = true;
+      return s;
+    });
+    return anders ? { ...b, nodes } : b;
+  });
+}
+
 /** Karten eines fremden Boards: Ungültiges fällt weg, Adressen werden entschärft */
 export function kartenVonAussen(nodes: unknown): AppNode[] {
   if (!Array.isArray(nodes)) return [];

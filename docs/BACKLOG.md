@@ -18,9 +18,9 @@ immer Vorrang vor dieser Liste.
 
 ## Offene Punkte aus gemergten Meilensteinen
 - M449: Versionen nur je Gerät (reisen nicht mit Sync/Export)
-- M463: „lange in Arbeit“ misst die Kanban-Karte, nicht das einzelne Ticket (Tickets tragen keine eigene Zeit)
+- M470: Ändern zwei Geräte dasselbe Ticket mit verschiedener Spaltenzeit (`spalteSeit`), zählt das im Abgleich als Unterschied (kein „spätere gilt“ wie bei `geaendert`); Versionen holen Gespräche (Kommentare) nicht einzeln zurück
 - M458: Erweiterung nicht im Chrome-/Edge-/Firefox-Store (nur „Entpackt laden“); kein Weg in die portable pixinotes.html; keine feste Schnellablage-Zone (KONZEPT „Inbox-Ecke“)
-- M466: Outlook nur lesen und auf Abruf (kein Abo/Delta-Abgleich, keine Ordner außer Posteingang, kein Antworten über Graph); Konto-Termine stehen wie bisher nur in der Kalender-Karte, nicht in der Aufgaben-Zentrale; braucht `VITE_MS_CLIENT_ID` im Build
+- M466: Outlook nur lesen und auf Abruf (kein Abo/Delta-Abgleich, keine Ordner außer Posteingang, kein Antworten über Graph); braucht `VITE_MS_CLIENT_ID` im Build
 
 ## Ideen (noch nicht vergeben)
 - Eingebaute Übersetzung der Oberfläche statt Browser-Übersetzer (UMBAU Zeile 54)

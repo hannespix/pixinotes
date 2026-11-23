@@ -86,12 +86,21 @@ export async function handschriftKandidaten(strichePunkte: Punkt[][], sprache = 
   const { striche, w, h } = normieren(strichePunkte.filter((s) => s.length > 1));
   if (striche.length === 0) throw new Error('Nichts geschrieben – erst mit dem Stift schreiben, dann „Text".');
   const weg = handschriftWeg();
-  let kandidaten: string[];
-  if (weg === 'browser') kandidaten = await imBrowser(striche, sprache);
-  else if (weg === 'online') kandidaten = await online(striche, w, h, sprache);
-  else throw new Error('Dein Browser erkennt Handschrift nicht selbst. Unter Einstellungen → Dienste → Handschrift lässt sich die Online-Erkennung einschalten.');
-  return { text: kandidaten[0] ?? '', alternativen: kandidaten.slice(1, 5) };
+  if (weg !== 'browser' && weg !== 'online') throw new Error('Dein Browser erkennt Handschrift nicht selbst. Unter Einstellungen → Dienste → Handschrift lässt sich die Online-Erkennung einschalten.');
+  // M448: Dieselben Striche nicht zweimal erkennen lassen. Der Vorschlag nach der Schreibpause (M324) und der Knopf
+  // „Text" fragten sonst beide – bei langsamem Rechner kurz hintereinander zwei gleiche Anfragen an den Online-Dienst
+  // (gefunden über m320-C5 unter Last). Gemerkt wird nur die letzte Anfrage, auch während sie noch läuft.
+  const schluessel = `${weg}|${sprache}|${w}x${h}|${JSON.stringify(striche)}`;
+  if (letzteErkennung?.schluessel !== schluessel) {
+    const ergebnis = (weg === 'browser' ? imBrowser(striche, sprache) : online(striche, w, h, sprache))
+      .then((kandidaten) => ({ text: kandidaten[0] ?? '', alternativen: kandidaten.slice(1, 5) }));
+    letzteErkennung = { schluessel, ergebnis };
+    // Ein Fehler wird nicht gemerkt – ein zweiter Versuch fragt neu
+    ergebnis.catch(() => { if (letzteErkennung?.schluessel === schluessel) letzteErkennung = null; });
+  }
+  return letzteErkennung!.ergebnis;
 }
+let letzteErkennung: { schluessel: string; ergebnis: Promise<Erkannt> } | null = null;
 
 /**
  * M324: Erkannten Text ohne KI aufräumen — Leerraum, Satzanfang groß,

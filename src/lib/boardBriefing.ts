@@ -6,8 +6,8 @@
 //     aus lib/tasks.ts (collectTasks), damit Daten und Reihenfolge stimmen und nichts erfunden wird.
 //   · Entscheidungen – Beschlüsse aus Protokoll-Karten, Zeilen „Beschluss: …" aus Notizen.
 //   · Wichtigste Inhalte – die gehaltvollsten Karten.
-//   · Risiken und Blocker – überfällige Fristen (M463: mit Namen und Dauer), Tickets lange „in Arbeit" (M463, über
-//     die Änderungszeit der Kanban-Karte), Pfeile mit blockierender Beziehung (M463) und Zeilen mit „Risiko" …
+//   · Risiken und Blocker – überfällige Fristen (M463: mit Namen und Dauer), Tickets lange „in Arbeit" (M463; M470:
+//     je Ticket seit dem Spaltenwechsel, ohne Stempel die Änderungszeit der Kanban-Karte), Pfeile mit blockierender Beziehung (M463) und Zeilen mit „Risiko" …
 //   · M453: Lange unberührt – Karten, deren Inhalt seit über 30 Tagen niemand geändert hat, und E-Mail-Karten ohne
 //     Folgeaktivität (keine Notiz daran, kein Ticket dazu, keine Antwort im Gespräch). Nur Karten mit bekanntem
 //     Zeitpunkt; der Abschnitt erscheint nur, wenn es solche Karten gibt.
@@ -23,7 +23,7 @@ import { nodeToText } from './serialize';
 import { findFreeSpot } from './arrange';
 import { tagLokal } from './tag';
 import { t, zahlWort } from './sprache';
-import { tageSeit, zeitVon } from './kartenZeit';
+import { spalteSeitVon, tageSeit, zeitVon } from './kartenZeit';
 
 export interface BoardLage {
   ueberfaellig: TaskRef[];
@@ -71,7 +71,8 @@ function hatFolge(board: BoardDoc, mail: AppNode, seit: number): boolean {
   return false;
 }
 
-/** M463: ab wann ein Ticket als „lange in Arbeit" gilt – gemessen an der letzten Änderung seiner Kanban-Karte (M453) */
+/** M463: ab wann ein Ticket als „lange in Arbeit" gilt – M470: gemessen ab seinem Spaltenwechsel (`spalteSeit`),
+ *  bei älteren Tickets ohne Stempel an der letzten Änderung seiner Kanban-Karte (M453) */
 export const IN_ARBEIT_TAGE = 14;
 const BEFUND_MAX = 3;
 /** M463: Beziehungsnamen an Pfeilen, die eine Blockade oder Abhängigkeit ausdrücken */
@@ -86,24 +87,25 @@ function befundeSammeln(board: BoardDoc, karten: AppNode[], ueberfaellig: TaskRe
     const tage = Math.max(1, tageSeit(Date.parse(`${a.due}T23:59:59`), jetzt) + 1);
     out.push({ text: t('Frist seit {0} überschritten: {1}').replace('{0}', zahlWort(tage, 'Tag', 'Tagen')).replace('{1}', a.text.trim().slice(0, 120)), karte: name.get(a.nodeId) ?? '' });
   }
-  // 2. Tickets, die lange „in Arbeit" stehen: mittlere Spalten einer Kanban-Karte, die seit IN_ARBEIT_TAGE niemand
-  //    geändert hat (Tickets tragen keine eigene Zeit – die Karte stempelt bei jedem Verschieben, M453)
-  let inArbeit = 0;
+  // 2. Tickets, die lange „in Arbeit" stehen: mittlere Spalten, seit IN_ARBEIT_TAGE in derselben Spalte (M470: je
+  //    Ticket ab dem Spaltenwechsel; ältere Tickets ohne Stempel nach der Änderungszeit ihrer Kanban-Karte, M463).
+  //    Die ältesten zuerst.
+  const lange: Array<{ tage: number; text: string; karte: string }> = [];
   for (const n of karten) {
-    if (n.type !== 'kanban' || inArbeit >= BEFUND_MAX) continue;
+    if (n.type !== 'kanban') continue;
     const d = n.data as KanbanData;
-    const z = zeitVon(n);
-    if (d.autoCollect || z === undefined) continue;
-    const tage = tageSeit(z, jetzt);
-    if (tage < IN_ARBEIT_TAGE) continue;
+    if (d.autoCollect) continue;
     const cols = kanbanCols(d);
     for (const it of d.items ?? []) {
-      if (inArbeit >= BEFUND_MAX) break;
       if (it.col <= 0 || it.col >= doneCol(d) || !it.text?.trim()) continue;
-      out.push({ text: t('Seit {0} Tagen in „{1}“: {2}').replace('{0}', String(tage)).replace('{1}', cols[it.col] ?? '').replace('{2}', it.text.trim().slice(0, 120)), karte: d.title || name.get(n.id) || '' });
-      inArbeit += 1;
+      const seit = spalteSeitVon(it, n);
+      if (seit === undefined) continue;
+      const tage = tageSeit(seit, jetzt);
+      if (tage < IN_ARBEIT_TAGE) continue;
+      lange.push({ tage, text: t('Seit {0} in „{1}“: {2}').replace('{0}', zahlWort(tage, 'Tag', 'Tagen')).replace('{1}', cols[it.col] ?? '').replace('{2}', it.text.trim().slice(0, 120)), karte: d.title || name.get(n.id) || '' });
     }
   }
+  for (const l of lange.sort((a, b) => b.tage - a.tage).slice(0, BEFUND_MAX)) out.push({ text: l.text, karte: l.karte });
   // 3. Pfeile, deren Beziehungsname eine Blockade nennt („blockiert", „wartet auf", „hängt an" …)
   const aktiv = new Set(karten.map((n) => n.id));
   let pfeile = 0;

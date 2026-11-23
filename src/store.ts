@@ -464,7 +464,8 @@ interface BoardState {
    * wieder (samt ihren Verbindungen zu Karten, die es noch gibt), geänderte bekommen ihren damaligen Inhalt. EIN
    * Rückgängig-Schritt, eine gewöhnliche Änderung (Sync trägt sie weiter). Rückgabe: Zahl der geholten Karten.
    */
-  kartenZurueckholen: (boardId: string, ids: string[], stand: { nodes: AppNode[]; edges: Edge[] }) => number;
+  /** M460/M470: Karten (und auf Wunsch einzelne Verbindungen und Striche) aus einem Stand zurückholen — ein Undo-Schritt */
+  kartenZurueckholen: (boardId: string, ids: string[], stand: { nodes: AppNode[]; edges: Edge[]; drawings?: Stroke[] }, extra?: { pfeile?: string[]; striche?: string[] }) => { karten: number; pfeile: number; striche: number };
   /**
    * M288: Board archivieren bzw. zurückholen. Archivieren ist das sanfte
    * Löschen — nichts geht verloren, das Board tritt nur zur Seite. Wer das
@@ -2748,11 +2749,14 @@ export const useBoard = create<BoardState>()(
           get().openBoard(kopie.id);
           return kopie.id;
         },
-        kartenZurueckholen: (boardId, ids, stand) => {
+        kartenZurueckholen: (boardId, ids, stand, extra) => {
           const st = get();
           const quelle = st.boards.find((b) => b.id === boardId);
-          if (!quelle || !Array.isArray(stand?.nodes) || !ids.length) return 0;
-          if (quelle.geteiltRolle === 'lesen') { st.showToast('Dieses Board ist nur zum Lesen freigegeben – als Kopie öffnen geht.'); return 0; }
+          const nichts = { karten: 0, pfeile: 0, striche: 0 };
+          const pfeilIds = extra?.pfeile ?? [];
+          const strichIds = extra?.striche ?? [];
+          if (!quelle || !Array.isArray(stand?.nodes) || !(ids.length || pfeilIds.length || strichIds.length)) return nichts;
+          if (quelle.geteiltRolle === 'lesen') { st.showToast('Dieses Board ist nur zum Lesen freigegeben – als Kopie öffnen geht.'); return nichts; }
           const dann = new Map(stand.nodes.map((n) => [n.id, n]));
           const jetzt = new Map(quelle.nodes.map((n) => [n.id, n]));
           const zeit = Date.now();
@@ -2779,14 +2783,36 @@ export const useBoard = create<BoardState>()(
             // Zurückholen ist eine Änderung von Hand (M453): jetzt geändert, angelegt bleibt
             geholt.set(id, { ...k, geaendert: zeit } as AppNode);
           }
-          if (!geholt.size) return 0;
           const nodes = quelle.nodes.map((n) => geholt.get(n.id) ?? n);
           for (const [id, k] of geholt) if (!jetzt.has(id)) nodes.push(k);
           // Verbindungen gelöschter Karten, deren anderes Ende es noch (oder wieder) gibt
           const da = new Set(nodes.map((n) => n.id));
           const kanten = new Set(quelle.edges.map((e) => e.id));
-          const edges = [...quelle.edges, ...(stand.edges ?? []).filter((e) => !kanten.has(e.id)
+          let edges = [...quelle.edges, ...(stand.edges ?? []).filter((e) => !kanten.has(e.id)
             && (geholt.has(e.source) || geholt.has(e.target)) && da.has(e.source) && da.has(e.target)).map((e) => ({ ...e, selected: false }))];
+          // M470: einzeln gewählte Verbindungen — nur, wenn beide Karten da sind (oder eben mit zurückkamen)
+          let pfeile = 0;
+          const altPfeile = new Map((stand.edges ?? []).map((e) => [e.id, e]));
+          for (const id of new Set(pfeilIds)) {
+            const e = altPfeile.get(id);
+            if (!e || !da.has(e.source) || !da.has(e.target)) continue;
+            const kopie = { ...(JSON.parse(JSON.stringify(e)) as Edge), selected: false };
+            edges = edges.some((x) => x.id === id) ? edges.map((x) => (x.id === id ? kopie : x)) : [...edges, kopie];
+            pfeile += 1;
+          }
+          // M470: einzeln gewählte Striche — ein an eine Karte geankerter nur, wenn die Karte da ist
+          let striche = 0;
+          let drawings = quelle.drawings;
+          const altStriche = new Map((stand.drawings ?? []).map((d) => [d.id, d]));
+          for (const id of new Set(strichIds)) {
+            const d = altStriche.get(id);
+            if (!d || (d.anchor && !da.has(d.anchor))) continue;
+            const kopie = JSON.parse(JSON.stringify(d)) as Stroke;
+            const liste = drawings ?? [];
+            drawings = liste.some((x) => x.id === id) ? liste.map((x) => (x.id === id ? kopie : x)) : [...liste, kopie];
+            striche += 1;
+          }
+          if (!geholt.size && !pfeile && !striche) return nichts;
           lastEditKey = '';
           set({
             activeId: boardId,
@@ -2796,12 +2822,12 @@ export const useBoard = create<BoardState>()(
               boardId, nodes: quelle.nodes, edges: quelle.edges, drawings: quelle.drawings, comments: quelle.comments,
             }],
             future: [],
-            boards: st.boards.map((b) => (b.id === boardId ? { ...b, nodes, edges } : b)),
+            boards: st.boards.map((b) => (b.id === boardId ? { ...b, nodes, edges, ...(drawings !== quelle.drawings ? { drawings } : {}) } : b)),
           });
           // Notiz-Editoren lesen ihren Text nur beim Aufbau — die geänderten frischen sich an Ort und Stelle auf
           const notizen = [...geholt.values()].filter((n) => n.type === 'note' && jetzt.has(n.id)).map((n) => n.id);
           if (notizen.length) window.dispatchEvent(new CustomEvent(NOTIZ_EXTERN, { detail: notizen }));
-          return geholt.size;
+          return { karten: geholt.size, pfeile, striche };
         },
         duplicateProject: (projectId) => {
           const st = get();
