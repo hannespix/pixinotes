@@ -39225,6 +39225,9 @@ function nurZahlWorte(kern) {
   return rest !== kern && !HAT_BUCHSTABEN.test(rest);
 }
 
+// src/lib/abgleichZeiten.ts
+init_define_import_meta_env();
+
 // src/lib/kartenZeit.ts
 var ANSICHT = /* @__PURE__ */ new Set([
   "extEpoch",
