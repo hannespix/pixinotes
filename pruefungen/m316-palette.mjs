@@ -110,7 +110,7 @@ console.log('\n════ B: Suche ════');
   await P.keyboard.type('xyzq'); await P.waitForTimeout(200);
   pruefe('B5 ohne Treffer ein ehrlicher Satz', (await P.locator('.modul-leer').count()) === 1 && (await kacheln(P).count()) === 0);
   await P.keyboard.press('Escape'); await P.waitForTimeout(200);
-  pruefe('B6 Esc leert zuerst die Suche, Palette bleibt offen', (await P.locator('.modul-palette').count()) === 1 && (await P.inputValue('.modul-suche input')) === '' && (await kacheln(P).count()) === 25);
+  pruefe('B6 Esc leert zuerst die Suche, Palette bleibt offen', (await P.locator('.modul-palette').count()) === 1 && (await P.inputValue('.modul-suche input')) === '' && (await kacheln(P).count()) === 26);
   await P.keyboard.press('Escape'); await P.waitForTimeout(200);
   pruefe('B7 zweites Esc schließt', (await P.locator('.modul-palette').count()) === 0);
   await ctx.close();
