@@ -327,7 +327,7 @@ export function HilfeEn() {
                 <li><b>Timeline (Gantt):</b> drag bars, ◆ milestone, arrows = dependencies with a conflict warning; scale from days to years.</li>
                 <li><b>Weekly plan:</b> a grid of columns (weekdays or custom: people, rooms) × rows (times of day or custom units). Clicking a slot creates a block.</li>
                 <li><b>Time tracking:</b> Work / Break with one click, every row directly editable; views: day, week, month, year.</li>
-                <li><b>Minutes series:</b> one card for a series of meetings. <b>＋</b> creates the next meeting and suggests attendees, open tasks and agenda items without a decision. TOP, Task and § Decision mark the line at the cursor (person as “Anna: …” or @, deadline like “by Friday”); a decision remembers its agenda item, an item without a decision can be marked “info only”. Older meetings are under “Older …”. The overview lists open tasks and decisions; ⋯ copies, sends, prints or saves.</li>
+                <li><b>Minutes series:</b> one card for a series of meetings. <b>＋</b> creates the next meeting and suggests attendees, open tasks and agenda items without a decision (not “info only”). TOP, Task and § Decision mark the line at the cursor (person as “Anna: …” or @, deadline “by Friday”), a decision remembers its agenda item. The overview lists open tasks and decisions; ⋯ copies, sends, prints or saves.</li>
                 <li><b>Tile:</b> ⋯ → “Show as tile” collapses these modules to type, title and key figures. “Open” shows the module in Focus, “Expand” brings it back at its previous size.</li>
               </ul>
               <h4>More modules</h4>
