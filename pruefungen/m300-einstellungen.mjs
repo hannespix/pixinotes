@@ -101,7 +101,8 @@ console.log('════ B: Darstellung ════');
   await seg.nth(0).click();
   // M314: Fokus-Umschalter sind automatisch (Handy: Tipp, PC: Doppelklick, Blatt) — keine Zeilen mehr
   pruefe('B5 keine Fokus-Umschalter mehr (automatisch)', (await P.locator('.modal-row-check', { hasText: 'Karte im Fokus' }).count()) === 0 && (await P.locator('.seg[aria-label="Fokus am PC öffnen mit"]').count()) === 0);
-  pruefe('B6 „Besser lesbar" und „Lebendige Fläche" stehen da', (await P.locator('.modal-row-check', { hasText: 'Besser lesbar' }).count()) === 1 && (await P.locator('.modal-row-check', { hasText: 'Lebendige Fläche' }).count()) === 1);
+  // M490: „Lebendige Fläche" ist aufgelöst – an ihrer Stelle steht „Konfetti beim Erledigen"
+  pruefe('B6 „Besser lesbar" und „Konfetti beim Erledigen" stehen da', (await P.locator('.modal-row-check', { hasText: 'Besser lesbar' }).count()) === 1 && (await P.locator('.modal-row-check', { hasText: 'Konfetti beim Erledigen' }).count()) === 1);
   pruefe('B7 kein Erklärtext im Design hat mehr als zwei Sätze', (await zuLang(P)).length === 0, JSON.stringify(await zuLang(P)));
   pruefe('B8 kein „Mehr dazu"-Sprung mehr aus dem Design', (await P.locator('.modal-body .link-btn', { hasText: 'Mehr dazu' }).count()) === 0);
   await P.locator('.modal').screenshot({ path: `${SD}/m300-b-design.png` });
