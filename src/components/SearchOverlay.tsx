@@ -7,6 +7,7 @@ import { nodeToText } from '../lib/serialize';
 import { collectAllTags } from '../lib/links';
 import { askBrain, brainSearch, type BrainHit } from '../lib/brain';
 import { aiReady } from '../lib/ai';
+import { bildText } from '../lib/textInBildern';
 
 // Fuzzy + Multi-Token: Tippfehler-tolerant (1 Fehler pro Wort), Wörter in
 // beliebiger Reihenfolge, Umlaute korrekt (Unicode-Preset für Deutsch).
@@ -32,6 +33,8 @@ interface Hit {
   node: AppNode;
   title: string;
   snippet: string;
+  /** M452: Der Treffer steht im erkannten Text des Bildes, nicht in Name oder Titel */
+  imBild?: boolean;
 }
 
 /** Spotlight-Suche (Strg/Cmd+K) über alle Boards — Treffer anklicken fliegt zur Karte. */
@@ -134,12 +137,14 @@ export function SearchOverlay() {
   // Nur bei geöffneter Suche bauen — sonst liefe das bei jedem Tastendruck
   // in irgendeiner Karte über alle Boards (Audit PERF-1).
   const entries = useMemo(() => {
-    const list: { boardId: string; boardName: string; node: AppNode; text: string }[] = [];
+    const list: { boardId: string; boardName: string; node: AppNode; text: string; ocr: string }[] = [];
     if (!open) return list;
     for (const b of boards) {
       for (const n of b.nodes) {
-        const text = nodeToText(n);
-        if (text.trim()) list.push({ boardId: b.id, boardName: b.name, node: n, text });
+        // M452: Bild-Karten tragen den Text, den die Erkennung im Bild gefunden hat — er zählt mit
+        const ocr = bildText(n);
+        const text = ocr ? `${nodeToText(n)}\n${ocr}` : nodeToText(n);
+        if (text.trim()) list.push({ boardId: b.id, boardName: b.name, node: n, text, ocr });
       }
     }
     return list;
@@ -170,7 +175,13 @@ export function SearchOverlay() {
     return resultIdxs.slice(0, 15).map((i) => {
       const e = entries[i];
       const firstLine = e.text.split('\n').find((l) => l.trim()) ?? '';
-      let at = e.text.toLowerCase().indexOf(firstToken.toLowerCase());
+      // M452: Steht keines der Suchwörter in Name/Titel/Board, kam der Treffer aus dem Bild — dann zeigt
+      // der Ausschnitt die Stelle im erkannten Text und die Zeile sagt es dazu
+      const worte = q.toLowerCase().split(/\s+/).filter(Boolean);
+      const basis = `${e.ocr ? e.text.slice(0, e.text.length - e.ocr.length) : e.text} ${e.boardName}`.toLowerCase();
+      const imBild = !!e.ocr && !worte.some((w) => basis.includes(w));
+      const quelle = imBild ? e.ocr : e.text;
+      let at = quelle.toLowerCase().indexOf(firstToken.toLowerCase());
       if (at === -1) at = 0;
       const start = Math.max(0, at - 30);
       return {
@@ -178,7 +189,8 @@ export function SearchOverlay() {
         boardName: e.boardName,
         node: e.node,
         title: firstLine.slice(0, 70),
-        snippet: (start > 0 ? '…' : '') + e.text.slice(start, at + 70).replace(/\n/g, ' '),
+        snippet: (start > 0 ? '…' : '') + quelle.slice(start, at + 70).replace(/\n/g, ' '),
+        imBild,
       };
     });
   }, [query, entries]);
@@ -361,7 +373,10 @@ export function SearchOverlay() {
                 <span className="hit-icon"><KartenSymbol art={h.node.type} size={15} /></span>
                 <span className="hit-main">
                   <span className="hit-title" translate={h.title ? 'no' : undefined}>{h.title || '(ohne Titel)'}</span>
-                  <span className="hit-snippet" translate="no">{h.snippet}</span>
+                  <span className="hit-snippet">
+                    {h.imBild && <span className="hit-im-bild">Treffer im Bild</span>}
+                    <span translate="no">{h.snippet}</span>
+                  </span>
                 </span>
                 <span className="hit-board" translate="no">{h.boardName}</span>
               </button>

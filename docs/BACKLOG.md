@@ -29,5 +29,4 @@ immer Vorrang vor dieser Liste.
 - `index.css` in Teil-Dateien je Modul aufteilen (Import-Reihenfolge erhalten) – weniger Merge-Konflikte paralleler Agenten am größten Hotspot (~8 400 Zeilen) – src/index.css, main.tsx
 - `store.ts` in Scheiben schneiden (Boards, Verlauf, Sync, Team) ohne API-Bruch – Hotspot entschärfen, schnellere Orientierung (3 500 Zeilen) – src/store.ts
 - Texte in SVG (Gantt-Balken, Netz-Beschriftungen) übersetzbar bzw. englisch – Lücke der Browser-Übersetzung und der englischen Oberfläche (UMBAU M368 „Grenzen") – GanttCard.tsx, Overview.tsx, lib/sprache.ts
-- Text in Bildern finden (OCR lokal, z. B. Tesseract-WASM, nachgeladen) – Screenshots durchsuchbar und für KI lesbar (KONZEPT §9, nicht umgesetzt) – ImageCard.tsx, Suche, lib/kiModule.ts
 - Kontakt-Karte (vCard rein/raus, Telefon/Mail als Aktionen) – KONZEPT §3.7 noch offen, Büroalltag – neue components/nodes/KontaktCard.tsx, Modul-Palette, lib/kiModule.ts

@@ -17,6 +17,7 @@ import { initAutoSync } from './lib/syncFolder';
 import { initProjectAutoSync } from './lib/projectSync';
 import { cleanupOrphanHtml } from './lib/htmlStore';
 import { cleanupOrphanFiles } from './lib/fileStore';
+import { bildTextStarten } from './lib/textInBildern';
 import { initWebdavSync } from './lib/webdav';
 import { initFilesSync } from './lib/filesSync';
 import { initKontoSync } from './lib/kontoSync';
@@ -161,6 +162,9 @@ export default function App() {
     }, 8000);
     return () => clearTimeout(t);
   }, []);
+
+  // M452: Text in Bildern erkennen — die Engine kommt erst im Leerlauf und nur, wenn ein Bild wartet
+  useEffect(() => bildTextStarten(), []);
 
   // M294: Der Gesten-Spickzettel beim Sitzungsstart ist weg — die Begrüßung
   // beim ersten Start und der Hinweis auf der leeren Fläche sagen dasselbe,

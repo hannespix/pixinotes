@@ -26,6 +26,7 @@ import {
 } from './Icons';
 import { vorschauArt } from '../lib/fileStore';
 import { bildBearbeitbar, bildBearbeiten } from './BildEditorHost';
+import { BildTextMenue } from './BildTextMenue';
 import { mutedHistory } from '../store';
 import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
 import type { ArrangeMode } from '../lib/arrange';
@@ -786,6 +787,8 @@ export function SelectionToolbar() {
                     </button>
                   );
                 })()}
+                {/* M452: Text im Bild – kopieren oder gleich erkennen lassen (nur ein einzelnes Bild) */}
+                {selected.length === 1 && <BildTextMenue node={selected[0]} schliessen={() => setMenu(null)} />}
                 {/* M296: „Schrift & Größe" liegt hier — und NUR hier. M267 hatte
                     ihm einen eigenen Knopf in der Leiste gegeben; die Leiste soll
                     aber sechs Elemente haben, und ein Weg reicht. */}

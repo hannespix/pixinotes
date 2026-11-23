@@ -24,6 +24,7 @@ import {
 } from '../lib/kontoSync';
 import { sbLinkSenden, sbPasswortAnmelden, sbRegistrieren, supabaseKonfig, supabaseKonfigSpeichern, supabaseKonfiguriert, type SbSitzung } from '../lib/kontoSupabase';
 import { browserErkenntHandschrift } from '../lib/handschrift';
+import { setBildTextAn, useBildTextAn } from '../lib/textInBildern';
 import { aiReady } from '../lib/ai';
 import {
   applyFilesSync, canShareFiles, filesSyncDirty, filesSyncStamp, isAppleTouch,
@@ -225,6 +226,7 @@ export function Settings() {
   const physicsEnabled = useBoard((s) => s.physicsEnabled);
   const setPhysicsEnabled = useBoard((s) => s.setPhysicsEnabled);
   const konfetti = useBoard((s) => s.konfetti);
+  const bildTextAn = useBildTextAn();   // M452
   const setKonfetti = useBoard((s) => s.setKonfetti);
   const pfeilSchatten = useBoard((s) => s.pfeilSchatten);
   const setPfeilSchatten = useBoard((s) => s.setPfeilSchatten);
@@ -1486,6 +1488,20 @@ export function Settings() {
               <p className="modal-hint">Deine eingerichtete KI korrigiert Lesefehler und kennt dabei Namen und Begriffe aus der Notiz und dem Board. Sie ergänzt nichts und lässt nichts weg.</p>
             </>
           )}
+        </section>
+
+        {/* ---- M452: Text in Bildern erkennen ---- */}
+        <section className="modal-section">
+          <h3>Text in Bildern</h3>
+          <label className="modal-row modal-row-check">
+            <span>Text in Bildern erkennen</span>
+            <input type="checkbox" checked={bildTextAn} onChange={(e) => setBildTextAn(e.target.checked)} data-taste="bild-text-an" />
+          </label>
+          <p className="modal-hint">
+            {import.meta.env.MODE === 'single'
+              ? 'Screenshots und Bilder werden durchsuchbar: PixiNotes liest den Text darin (Deutsch und Englisch), wenn der Rechner ruhig ist. Die Bilder bleiben auf dem Gerät. Die portable Datei holt die Erkennung (rund 8 MB) beim ersten Mal von der Web-Adresse der App – ohne Netz bleibt sie aus.'
+              : 'Screenshots und Bilder werden durchsuchbar: PixiNotes liest den Text darin (Deutsch und Englisch), wenn der Rechner ruhig ist – ganz auf diesem Gerät. Die Suche (Strg+K) findet ihn, die KI liest ihn mit, und über ⋯ lässt er sich kopieren.'}
+          </p>
         </section>
 
         {/* ---- Konten: Google & Microsoft 365 — Kalender, bei Microsoft auch OneNote ---- */}
