@@ -127,6 +127,31 @@ export const notizSchutz = new Map<string, Map<string, string>>();   // Board �
 export function setzeNotizSchutz(boardId: string, schutz: Map<string, string>): void {
   if (schutz.size) notizSchutz.set(boardId, schutz); else notizSchutz.delete(boardId);
 }
+/**
+ * M477/M487: Die Karte `alt` mit dem gemeinsam getippten Text aus `neu` — und sonst nichts von `neu`. Notiz: die Blöcke;
+ * Protokoll: die Blöcke je Sitzungstermin (Datum, Teilnehmende, Beschlüsse bleiben); Kanban: Titel und Beschreibung je
+ * Ticket (Spalte, Frist, Reihenfolge, neue oder entfernte Tickets bleiben).
+ */
+function mitTextVon(alt: AppNode, neu: AppNode): AppNode {
+  const a = alt.data as Record<string, unknown>; const b = neu.data as Record<string, unknown>;
+  type Mit = { id?: unknown } & Record<string, unknown>;
+  const je = (feld: string, felder: string[]): AppNode => {
+    const vorher = a[feld]; const nachher = b[feld];
+    if (!Array.isArray(vorher) || !Array.isArray(nachher)) return alt;
+    const nach = new Map((nachher as Mit[]).map((x) => [x?.id, x]));
+    const liste = (vorher as Mit[]).map((x) => {
+      const m = nach.get(x?.id);
+      if (!m) return x;
+      const y: Mit = { ...x };
+      for (const f of felder) { if (m[f] === undefined) delete y[f]; else y[f] = m[f]; }
+      return y;
+    });
+    return { ...alt, data: { ...a, [feld]: liste } } as AppNode;
+  };
+  if (alt.type === 'minutes') return je('entries', ['blocks']);
+  if (alt.type === 'kanban') return je('items', ['text', 'note']);
+  return { ...alt, data: { ...a, blocks: b.blocks } } as AppNode;
+}
 /** Gesperrte Karten behalten Inhalt und Lage (auch gegen Löschen); alles andere geht durch.
  *  M477: `nurText` — der Text (`data.blocks`) darf sich ändern, sonst nichts (gemeinsames Tippen) */
 function sperrschutz(alt: BoardDoc, neu: BoardDoc, sperren: Map<string, string>, nurText = false): BoardDoc {
@@ -140,7 +165,7 @@ function sperrschutz(alt: BoardDoc, neu: BoardDoc, sperren: Map<string, string>,
     if (!name) continue;
     const m = nach.get(n.id);
     if (!m) { fehlend.push(n); wer = name; anders = true; continue; }
-    const text = nurText ? { ...n, data: { ...n.data, blocks: (m.data as { blocks?: unknown }).blocks } } as AppNode : n;
+    const text = nurText ? mitTextVon(n, m) : n;
     if (m !== n && inhaltAnders(text, m)) {
       // Auswahl und Maße dürfen sich ändern — Inhalt und Lage nicht
       const a = text as Record<string, unknown>; const b = m as Record<string, unknown>;

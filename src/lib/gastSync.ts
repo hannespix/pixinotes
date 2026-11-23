@@ -30,6 +30,7 @@ export {
 import { liveKanal, type Teilnehmer } from './liveKanal';
 // M477: Gemeinsam tippen in Notizen — horcht auf den Kanal (Weckruf, Stand-Fragen); lädt mit dem Abgleich, nie im Start
 import './notizGemeinsam';
+import { notizSchutz } from '../store/schutz';
 import { istPatch, patchAnwenden, patchAus, patchSaeubern, type Patch } from './gastPatch';
 import { boardVonAussen, karteEntschaerfen, karteGueltig } from './sicher';
 import { anhangKarte, idbDel, idbGet, idbSet, liveHaken } from './syncFolder';
@@ -307,6 +308,15 @@ function anfassenPruefen(): void {
       if (karte && sperren.get(boardId)?.has(karte)) {
         // Die Karte hält schon jemand: nicht hineinschreiben lassen
         (document.activeElement as HTMLElement | null)?.blur?.();
+        continue;
+      }
+      // M487: In der Karte tippt gerade jemand gemeinsam (Protokolltext): Ihre übrigen Felder (Datum, Teilnehmende,
+      // Beschlüsse) bleiben so lange frei von einer Sperre — sonst hielte man die Karte, und der gemeinsame Text käme
+      // erst nach dem Loslassen in den Speicher. Ändern ließen sie sich ohnehin nicht (store/schutz.ts, nur der Text).
+      const tippt = karte ? notizSchutz.get(boardId)?.get(karte) : undefined;
+      if (karte && tippt) {
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        useBoard.getState().showToast(`${tippt} tippt gerade in dieser Karte – gleich wieder frei.`, false, 4000);
         continue;
       }
       if (karte) meine.set(boardId, { karte, seit: Date.now() }); else meine.delete(boardId);
