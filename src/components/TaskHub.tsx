@@ -292,10 +292,10 @@ export function TaskHub() {
       const ueberSpeicher = () => updateNodeDataOnBoard(t.boardId, t.nodeId, { entries, extEpoch: ((node.data as { extEpoch?: number }).extEpoch ?? 0) + 1 });
       // M493: Im Live-Board über das Y-Dokument der Sitzung — schreibt dort gerade jemand gemeinsam, „heilte" sein
       // Gerät einen Haken über den Speicher wieder weg (und das Ersetzen im Editor drehte seine letzten Zeichen zurück)
-      const eintrag = (md.entries ?? []).find((e) => e.id === sitzung) as { blocks?: unknown[]; decisions?: Array<{ id: string; text: string }> } | undefined;
+      const eintrag = (md.entries ?? []).find((e) => e.id === sitzung) as { blocks?: unknown[]; decisions?: Array<{ id: string; text: string }>; infoTops?: string[] } | undefined;
       if (!eintrag || t.boardId !== useBoard.getState().activeId || !liveVerbunden(t.boardId)) { ueberSpeicher(); return; }
       void Promise.all([import('../lib/notizGemeinsamKern'), import('./NoteTypo'), import('../lib/htmlBlocks')])
-        .then(([k, nt, hb]) => k.protokollHaken(t.boardId, t.nodeId, sitzung, hb.repairBlocks(eintrag.blocks ?? []), eintrag.decisions ?? [], nt.noteSchema, t.itemId))
+        .then(([k, nt, hb]) => k.protokollHaken(t.boardId, t.nodeId, sitzung, hb.repairBlocks(eintrag.blocks ?? []), eintrag.decisions ?? [], nt.noteSchema, t.itemId, eintrag.infoTops ?? []))
         .then((gut) => { if (!gut) ueberSpeicher(); })
         .catch(ueberSpeicher);
     } else {

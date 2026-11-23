@@ -9,14 +9,22 @@
 //
 // Ohne Abhängigkeiten — liegt im Paket der Karte, nie im Start, und zieht kein Yjs nach.
 
-export interface Beschluss { id: string; text: string }
+/** M497: `top`/`topText` — Zuordnung zum TOP (siehe types.ts MinutesEntry.decisions) */
+export interface Beschluss { id: string; text: string; top?: string; topText?: string }
+/** M497: Zuordnung eines Beschlusses zu einem TOP (`top: ''` = bewusst ohne TOP) */
+export interface TopZuordnung { top: string; topText?: string }
 export interface ProtokollLive {
   beschluesse(): Beschluss[];
   /** Text ändern; `null` entfernt den Beschluss */
   beschlussSetzen(id: string, text: string | null): void;
-  /** Neuer Beschluss am Ende */
-  beschlussDazu(text: string): void;
-  /** Rückruf bei jeder Änderung der Beschlüsse (hier oder bei anderen) — gibt das Abmelden zurück */
+  /** Neuer Beschluss am Ende (M497: mit TOP) */
+  beschlussDazu(text: string, top?: TopZuordnung): void;
+  /** M497: Beschluss einem TOP zuordnen bzw. lösen (`top: ''`) */
+  beschlussZuordnen(id: string, top: TopZuordnung): void;
+  /** M497: TOPs „nur Info" der Sitzung (Schlüssel wie MinutesEntry.infoTops) */
+  infoTops(): string[];
+  infoTopSetzen(schluessel: string, an: boolean): void;
+  /** Rückruf bei jeder Änderung der Beschlüsse oder Info-TOPs (hier oder bei anderen) — gibt das Abmelden zurück */
   beiBeschluessen(cb: () => void): () => void;
 }
 
