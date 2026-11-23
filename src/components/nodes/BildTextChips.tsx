@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { extractEntities, type EntityHit } from '../../lib/entities';
-import { detectDates, downloadIcs, formatDue, type DetectedDate } from '../../lib/dates';
+import { detectDates, downloadIcs, formatDue, useFristenStand, type DetectedDate } from '../../lib/dates';
+import { useRufnummernStand } from '../../lib/rufnummer';
 import { sichererVerweis } from '../../lib/sicher';
 import { fristAlsAufgabe } from '../../lib/bildTextAufgabe';
 import { useBoard } from '../../store';
@@ -41,7 +42,11 @@ export function bildAngaben(ocr: string, jetzt = new Date()): BildAngaben {
 export function BildTextChips({ nodeId, ocr, titel }: { nodeId: string; ocr: string; titel: string }) {
   const boardId = useBoard((s) => s.activeId);
   const showToast = useBoard((s) => s.showToast);
-  const { angaben, fristen } = useMemo(() => bildAngaben(ocr), [ocr]);
+  // M459: Fristen- und Rufnummern-Erkennung laden bei Bedarf — danach neu lesen
+  const fristenStand = useFristenStand();
+  const rufStand = useRufnummernStand();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const { angaben, fristen } = useMemo(() => bildAngaben(ocr), [ocr, fristenStand, rufStand]);
   if (angaben.length === 0 && fristen.length === 0) return null;
   const ICON = { tel: ITelefon, mail: IMail, url: ILink } as const;
   return (
