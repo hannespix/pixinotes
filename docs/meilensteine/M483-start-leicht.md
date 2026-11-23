@@ -14,8 +14,8 @@ erste Ablegen, „Beispiele laden" ohne Verzug, und der Service Worker hat die T
 
 | Messung (Board mit einer Notiz, 1440×900) | vorher | nachher |
 |---|---:|---:|
-| Start-JS gesamt | 2 238 181 B | **2 095 863 B** (−142 318 B) |
-| davon App-Teil `index-*.js` | 893 111 B | 750 793 B |
+| Start-JS gesamt (nach dem Einmischen von M485) | 2 238 181 B | **2 097 102 B** (−141 079 B) |
+| davon App-Teil `index-*.js` | 893 111 B | 752 032 B |
 | Editor, Fluss, React | 1 345 070 B | 1 345 070 B (unverändert) |
 | Grenze m459 / m467 | 2 240 000 B | **2 120 000 B** |
 | Grenze m446 (misst etwas mehr: +~4 KB) | 2 245 000 B | **2 125 000 B** |
@@ -48,7 +48,8 @@ Nachgeladen (Dateiname des Nachlade-Teils → Einstieg):
 - **Auswahl-Leiste:** `Board.tsx` → `auswahlLeisteLaden`, `AuswahlLeisteSpaet` (React.lazy), `AuswahlLeiste` hängt sie
   ein, sobald eine Karte gewählt ist, und lässt sie danach eingehängt (Modul-Merker `auswahlLeisteEingehaengt`, auch
   über einen Board-Wechsel/Remount). Den Rechtsklick-Wunsch holt sie sich beim Einhängen selbst ab
-  (`kartenWunschNehmen`, M350 — war schon so gebaut, weil sie „evtl. erst mit der Auswahl entsteht").
+  (`kartenWunschNehmen`, M350 — war schon so gebaut, weil sie „evtl. erst mit der Auswahl entsteht"). Schon die
+  erste Berührung oder Taste (`pointerdown`/`keydown`, einmal) stößt das Laden an — die Auswahl folgt erst danach.
 - **Import:** `src/lib/importSpaet.ts` — Weichen mit denselben Signaturen (`importFilesToBoard`,
   `importHtmlAppFromUrl`, `praesentationAnlegen`, alle schon vorher asynchron) und `importLaden` für den Leerlauf.
   Board, Dock, NoteCard, MinutesCard, GeteiltDialog und `lib/eingang.ts` importieren von dort.
