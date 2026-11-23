@@ -22,7 +22,7 @@ import {
   applyKonto, bekannteClientId, bekannterTenant, vorgabeClientId, kontoAbmelden, kontoAnmelden, kontoAnmeldenSupabase, kontoDateiMaxMb, kontoIstEigenes, kontoLabel, kontoLesen, kontoLiveVerbunden, kontoLoeschen, kontoStamp,
   kontoVerbinden, kontoWrite, loadKonto, type Anbieter, type KontoSitzung, type VerbindenErgebnis,
 } from '../lib/kontoSync';
-import { sbLinkSenden, sbPasswortAnmelden, sbRegistrieren, supabaseKonfig, supabaseKonfigSpeichern, supabaseKonfiguriert, type SbSitzung } from '../lib/kontoSupabase';
+import { AnbieterAusFehler, sbAnbieterAn, sbLinkSenden, sbOAuthStarten, sbPasswortAnmelden, sbRegistrieren, supabaseKonfig, supabaseKonfigSpeichern, supabaseKonfiguriert, type SbSitzung } from '../lib/kontoSupabase';
 import { browserErkenntHandschrift } from '../lib/handschrift';
 import { setBildTextAn, useBildTextAn } from '../lib/textInBildern';
 import { aiReady } from '../lib/ai';
@@ -212,6 +212,9 @@ export function Settings() {
   const [kontoMail, setKontoMail] = useState('');
   const [kontoPass, setKontoPass] = useState('');
   const [kontoLinkWeg, setKontoLinkWeg] = useState(false);
+  // M479: „Mit Google anmelden" am PixiNotes-Konto (Supabase-OAuth): welche Anbieter an sind, Hinweis wenn aus
+  const [sbWege, setSbWege] = useState<Record<string, boolean> | null>(null);
+  const [sbAus, setSbAus] = useState('');
   const [sbUrl, setSbUrl] = useState('');
   const [sbKey, setSbKey] = useState('');
   const anzeige = useBoard((s) => s.anzeige);
@@ -312,6 +315,14 @@ export function Settings() {
     // M360: Wer einer Einladung folgt, landet direkt bei der Anmeldung (Sprung „konto")
     setSyncWeg(konto || useBoard.getState().settingsSection === 'konto' ? 'konto' : dav ? 'webdav' : syncSupported() ? 'ordner' : 'datei');
   }, [open]);
+
+  // M479: Einmal still nachsehen, welche Anbieter das Konto-Backend kennt — Microsoft zeigt sich nur, wenn es an ist
+  useEffect(() => {
+    if (!open || syncWeg !== 'konto' || kontoSitz || !supabaseKonfiguriert() || !oauthAvailable()) return;
+    let aktiv = true;
+    void sbAnbieterAn().then((w) => { if (aktiv) setSbWege(w); });
+    return () => { aktiv = false; };
+  }, [open, syncWeg, kontoSitz]);
 
   // M328: Rückkehr vom E-Mail-Link meldet an, während das Blatt vielleicht offen ist
   useEffect(() => {
@@ -422,6 +433,12 @@ export function Settings() {
     await sbLinkSenden(kontoMail);
     setKontoLinkWeg(true);
     showToast(`Link an ${kontoMail.trim()} geschickt – ein Tipp darauf meldet dieses Gerät an.`, false, 8000);
+  });
+  // M479: Weiterleitung zu Google bzw. Microsoft; die eingetippte E-Mail wählt dort das Konto vor
+  const kontoOAuth = (anbieter: 'google' | 'azure') => doKonto('konto', async () => {
+    setSbAus('');
+    try { await sbOAuthStarten(anbieter, mailOk ? kontoMail.trim() : undefined); }
+    catch (e) { if (e instanceof AnbieterAusFehler) { setSbAus(e.message); return; } throw e; }
   });
   const kontoMailPasswort = () => doKonto('konto', async () => kontoSbFertig(await sbPasswortAnmelden(kontoMail, kontoPass)));
   const kontoMailRegistrieren = () => doKonto('konto', async () => {
@@ -836,7 +853,7 @@ export function Settings() {
             <>
               <p className="modal-hint">
                 {supabaseKonfiguriert()
-                  ? 'Mit E-Mail anmelden – ein PixiNotes-Konto, das auf jedem Gerät geht, auch ohne Google Drive oder OneDrive. Oder mit Google bzw. Microsoft: dann liegt der Stand im App-Ordner deines eigenen Drive/OneDrive.'
+                  ? 'Mit E-Mail oder Google anmelden – ein PixiNotes-Konto, das auf jedem Gerät geht, auch ohne Google Drive oder OneDrive. Oder den Stand im App-Ordner deines eigenen Google Drive bzw. OneDrive ablegen.'
                   : 'Mit Google oder Microsoft anmelden – PixiNotes legt seinen Stand im App-Ordner deines eigenen Google Drive bzw. OneDrive ab und gleicht ihn auf allen Geräten ab. Kein Server, nichts einzurichten.'}
               </p>
               {!oauthAvailable() && (
@@ -857,6 +874,31 @@ export function Settings() {
                         </button>
                       </div>
                       {kontoLinkWeg && <div className="modal-note">Link verschickt – ein Tipp darauf meldet dieses Gerät an. Kein Passwort nötig.</div>}
+                      {/* M479: gleichrangig zum E-Mail-Link — Anmeldung am PixiNotes-Konto über Google (Supabase-OAuth) */}
+                      {oauthAvailable() && (
+                        <div className="modal-buttons">
+                          <button disabled={busy === 'konto'} onClick={() => kontoOAuth('google')} data-taste="konto-sb-google">
+                            {busy === 'konto' ? '…' : 'Mit Google anmelden'}
+                          </button>
+                          {sbWege?.azure && (
+                            <button disabled={busy === 'konto'} onClick={() => kontoOAuth('azure')} data-taste="konto-sb-ms">
+                              {busy === 'konto' ? '…' : 'Mit Microsoft anmelden'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {sbAus && (
+                        <>
+                          <div className="modal-note" role="status" data-taste="konto-google-aus">{sbAus}</div>
+                          <details className="modal-details" data-taste="konto-google-betreiber">
+                            <summary>Für Betreiber</summary>
+                            <p className="modal-hint">
+                              Supabase → Authentication → Sign In / Providers → Google einschalten (Client-ID und Secret aus einem OAuth-Client „Webanwendung" in der Google Cloud Console,
+                              autorisierte Weiterleitungs-URI <code>{supabaseKonfig().url}/auth/v1/callback</code>). Unter Authentication → URL Configuration die App-Adresse <code>{location.origin + location.pathname}</code> als Redirect-URL erlauben.
+                            </p>
+                          </details>
+                        </>
+                      )}
                       <details className="modal-details">
                         <summary>Mit Passwort anmelden oder Konto erstellen</summary>
                         <label className="modal-row">
@@ -871,11 +913,12 @@ export function Settings() {
                     </div>
                   )}
                   <div className="modal-buttons">
+                    {/* M479: Mit PixiNotes-Konto heißen diese Knöpfe nach ihrem Ziel – sonst stünde „Mit Google anmelden" zweimal da */}
                     <button disabled={!oauthAvailable() || !kontoGid.trim() || busy === 'konto'} onClick={() => kontoConnect('google')} data-taste="konto-google">
-                      {busy === 'konto' ? '…' : 'Mit Google anmelden'}
+                      {busy === 'konto' ? '…' : supabaseKonfiguriert() ? 'Stand in Google Drive' : 'Mit Google anmelden'}
                     </button>
                     <button disabled={!oauthAvailable() || !kontoMsid.trim() || busy === 'konto'} onClick={() => kontoConnect('ms')} data-taste="konto-ms">
-                      {busy === 'konto' ? '…' : 'Mit Microsoft anmelden'}
+                      {busy === 'konto' ? '…' : supabaseKonfiguriert() ? 'Stand in OneDrive' : 'Mit Microsoft anmelden'}
                     </button>
                   </div>
                   <div className="modal-note">Google und Microsoft fragen beim ersten Mal einmal nach der Erlaubnis für den App-Ordner. Mehr sieht PixiNotes nicht.</div>
