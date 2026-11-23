@@ -283,6 +283,45 @@ export interface KartenVergleich {
   geloescht: AppNode[];
   /** Seitdem inhaltlich geändert: damalige und jetzige Fassung */
   geaendert: { dann: AppNode; jetzt: AppNode }[];
+  /** M470: Seitdem gelöschte Verbindungen (die Fassung aus dem Stand) */
+  pfeileGeloescht: Edge[];
+  /** M470: Seitdem geänderte Verbindungen (Beschriftung, Enden, Aussehen) */
+  pfeileGeaendert: { dann: Edge; jetzt: Edge }[];
+  /** M470: Seitdem gelöschte Striche */
+  stricheGeloescht: Stroke[];
+  /** M470: Seitdem geänderte Striche (Farbe, Breite, Punkte) */
+  stricheGeaendert: { dann: Stroke; jetzt: Stroke }[];
+}
+
+/** M470: Vergleichstext eines Objekts — Schlüssel sortiert (zwei Wege bauen dieselben Daten in anderer Reihenfolge),
+ *  Auswahl und Ziehen zählen nicht */
+function stabil(wert: unknown): string {
+  const ordnen = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(ordnen);
+    if (v && typeof v === 'object') {
+      const aus: Record<string, unknown> = {};
+      for (const k of Object.keys(v as Record<string, unknown>).sort()) {
+        if (k === 'selected' || k === 'dragging') continue;
+        aus[k] = ordnen((v as Record<string, unknown>)[k]);
+      }
+      return aus;
+    }
+    return v;
+  };
+  return JSON.stringify(ordnen(wert)) ?? '';
+}
+
+/** M470: gelöscht und geändert je Kennung (Pfeile, Striche) */
+function listenVergleich<T extends { id: string }>(dann: T[], jetzt: T[]): { geloescht: T[]; geaendert: { dann: T; jetzt: T }[] } {
+  const hier = new Map(jetzt.map((x) => [x.id, x]));
+  const geloescht: T[] = [];
+  const geaendert: { dann: T; jetzt: T }[] = [];
+  for (const d of dann) {
+    const j = hier.get(d.id);
+    if (!j) geloescht.push(d);
+    else if (j !== d && stabil(j) !== stabil(d)) geaendert.push({ dann: d, jetzt: j });
+  }
+  return { geloescht, geaendert };
 }
 
 const inhalt = (n: AppNode) => (n.data ?? {}) as Record<string, unknown>;
@@ -290,7 +329,7 @@ const inhalt = (n: AppNode) => (n.data ?? {}) as Record<string, unknown>;
  * M460: Was ist seit dem Stand passiert — Karte für Karte. „Geändert" heißt: der INHALT (data) ist anders; Lage,
  * Größe und Ansichtsfelder (Monat, Zoom, Filter … — dieselbe Liste wie M453) zählen nicht. Pur.
  */
-export function kartenVergleich(stand: VersionStand, jetzt: AppNode[]): KartenVergleich {
+export function kartenVergleich(stand: VersionStand, jetzt: AppNode[], jetztPfeile: Edge[] = [], jetztStriche: Stroke[] = []): KartenVergleich {
   const dann = new Map(stand.nodes.map((n) => [n.id, n]));
   const hier = new Map(jetzt.map((n) => [n.id, n]));
   const neu = jetzt.filter((n) => !dann.has(n.id));
@@ -301,7 +340,14 @@ export function kartenVergleich(stand: VersionStand, jetzt: AppNode[]): KartenVe
     if (!j || j.data === d.data) continue;
     if (j.type !== d.type || inhaltGeaendert(inhalt(d), inhalt(j)) || inhaltGeaendert(inhalt(j), inhalt(d))) geaendert.push({ dann: d, jetzt: j });
   }
-  return { neu, geloescht, geaendert };
+  // M470: auch Verbindungen und Striche
+  const p = listenVergleich(stand.edges ?? [], jetztPfeile);
+  const s = listenVergleich(stand.drawings ?? [], jetztStriche);
+  return {
+    neu, geloescht, geaendert,
+    pfeileGeloescht: p.geloescht, pfeileGeaendert: p.geaendert,
+    stricheGeloescht: s.geloescht, stricheGeaendert: s.geaendert,
+  };
 }
 
 export async function versionLaden(id: string): Promise<VersionStand | null> {

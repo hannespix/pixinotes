@@ -1,14 +1,15 @@
 // M449: Versionen eines Boards — frühere Stände ansehen und zurückholen (lib/boardVersionen.ts).
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useBoard } from '../store';
+import { useBoard, type Stroke } from '../store';
 import { GRUND_TEXT, kartenVergleich, versionenVon, versionLaden, versionLoeschen, versionSichern, type VersionInfo, type VersionStand } from '../lib/boardVersionen';
 import { nodeToText } from '../lib/serialize';
 import { vorWann, zeitLang, zeitVon } from '../lib/kartenZeit';
 import { KartenSymbol } from './KartenSymbol';
 import { skizzeVon } from '../lib/vorlagen';
-import { sprache } from '../lib/sprache';
+import { sprache, t, zahlWort } from '../lib/sprache';
 import type { AppNode } from '../types';
-import { IUhr, IX } from './Icons';
+import type { Edge } from '@xyflow/react';
+import { IHighlighter, ILink, IPen, IUhr, IX } from './Icons';
 
 /** Menschliche Namen der Kartenarten — für Karten ohne eigene Beschriftung */
 const ART_NAME: Record<string, string> = {
@@ -24,6 +25,19 @@ function kartenName(n: AppNode): string {
   let text = '';
   try { text = nodeToText(n).split('\n').find((z) => z.trim()) ?? ''; } catch { /* unbekannte Karte */ }
   return (text.trim() || ART_NAME[n.type ?? ''] || 'Karte').slice(0, 70);
+}
+
+/** M470: Name einer Verbindung — „A → B" und ihre Beschriftung */
+function pfeilName(e: Edge, karten: Map<string, AppNode>): string {
+  const ende = (id: string) => { const n = karten.get(id); return n ? kartenName(n).slice(0, 30) : t('Karte'); };
+  const label = String((e.data as { label?: unknown } | undefined)?.label ?? e.label ?? '').trim();
+  return `${ende(e.source)} → ${ende(e.target)}${label ? ` (${label.slice(0, 30)})` : ''}`;
+}
+/** M470: Name eines Strichs — Werkzeug und, falls an einer Karte, deren Name */
+function strichName(s: Stroke, karten: Map<string, AppNode>): string {
+  const art = t(s.tool === 'marker' ? 'Marker-Strich' : 'Stift-Strich');
+  const an = s.anchor ? karten.get(s.anchor) : undefined;
+  return an ? `${art} an „${kartenName(an).slice(0, 30)}“` : art;
 }
 
 const zeitFormat = () => new Intl.DateTimeFormat(sprache() === 'en' ? 'en-GB' : 'de-DE', {
@@ -67,6 +81,8 @@ export function VersionenDialog({ boardId, onClose }: { boardId: string; onClose
   const [stand, setStand] = useState<VersionStand | null>(null);
   const [frage, setFrage] = useState<false | 'ersetzen' | 'loeschen'>(false);
   const [busy, setBusy] = useState(false);
+  /** M470: Auswahl in „Seitdem" — Schlüssel `k:<Karte>`, `p:<Verbindung>`, `s:<Strich>` */
+  const [auswahl, setAuswahl] = useState<Set<string>>(() => new Set());
   const zu = useRef<HTMLButtonElement>(null);
   const lesen = board?.geteiltRolle === 'lesen';
 
@@ -80,6 +96,7 @@ export function VersionenDialog({ boardId, onClose }: { boardId: string; onClose
   useEffect(() => {
     setFrage(false);
     setStand(null);
+    setAuswahl(new Set());
     if (!wahl) return;
     let aktiv = true;
     void versionLaden(wahl).then((s) => { if (aktiv) setStand(s); });
@@ -105,15 +122,66 @@ export function VersionenDialog({ boardId, onClose }: { boardId: string; onClose
     };
   }, [stand, board]);
   /** M460: Karte für Karte — was ist seitdem neu, gelöscht, geändert */
-  const vergleich = useMemo(() => (stand && board ? kartenVergleich(stand, board.nodes) : null), [stand, board]);
+  const vergleich = useMemo(() => (stand && board ? kartenVergleich(stand, board.nodes, board.edges, board.drawings ?? []) : null), [stand, board]);
+  /** M470: Namen der Karten für Pfeile und Striche — jetzt oder damals */
+  const kartenNach = useMemo(() => new Map([...(stand?.nodes ?? []), ...(board?.nodes ?? [])].map((n) => [n.id, n])), [stand, board]);
+  const jetztDa = useMemo(() => new Set((board?.nodes ?? []).map((n) => n.id)), [board]);
+  /** M470: Wählbares in „Seitdem" (gelöscht oder geändert), für „alle" und zum Aufräumen der Auswahl */
+  const waehlbar = useMemo(() => {
+    if (!vergleich) return [] as string[];
+    return [
+      ...vergleich.geloescht.map((n) => `k:${n.id}`), ...vergleich.geaendert.map((x) => `k:${x.dann.id}`),
+      ...vergleich.pfeileGeloescht.map((e) => `p:${e.id}`), ...vergleich.pfeileGeaendert.map((x) => `p:${x.dann.id}`),
+      ...vergleich.stricheGeloescht.map((s) => `s:${s.id}`), ...vergleich.stricheGeaendert.map((x) => `s:${x.dann.id}`),
+    ];
+  }, [vergleich]);
+  // Was nach dem Zurückholen nicht mehr in der Liste steht, fällt aus der Auswahl
+  useEffect(() => {
+    setAuswahl((alt) => {
+      const da = new Set(waehlbar);
+      const neu = new Set([...alt].filter((k) => da.has(k)));
+      return neu.size === alt.size ? alt : neu;
+    });
+  }, [waehlbar]);
+  /** M470: Eine Verbindung geht nur zurück, wenn beide Karten da sind oder mit zurückgeholt werden */
+  const endeDa = (id: string, mit: Set<string>) => jetztDa.has(id) || mit.has(`k:${id}`);
+  const pfeilGeht = (e: Edge, mit: Set<string> = auswahl) => endeDa(e.source, mit) && endeDa(e.target, mit);
+  const strichGeht = (s: Stroke, mit: Set<string> = auswahl) => !s.anchor || endeDa(s.anchor, mit);
+  const umschalten = (k: string) => setAuswahl((alt) => {
+    const neu = new Set(alt);
+    if (neu.has(k)) neu.delete(k); else neu.add(k);
+    return neu;
+  });
 
-  const zurueckholen = (ids: string[], name: string) => {
+  /** M470: Karten, Verbindungen und Striche in EINEM Schritt zurückholen (ein Strg+Z) */
+  const zurueckholen = (schluessel: string[], name?: string) => {
     if (!stand || !board) return;
     const st = useBoard.getState();
-    const n = st.kartenZurueckholen(boardId, ids, stand);
-    if (n === 1) st.showToast(`„${name}" zurückgeholt – Strg+Z nimmt es zurück.`, false, 6000);
-    else if (n > 1) st.showToast(`${n} Karten zurückgeholt – Strg+Z nimmt es zurück.`, false, 6000);
+    const von = (art: string) => schluessel.filter((k) => k.startsWith(`${art}:`)).map((k) => k.slice(2));
+    const erg = st.kartenZurueckholen(boardId, von('k'), stand, { pfeile: von('p'), striche: von('s') });
+    const summe = erg.karten + erg.pfeile + erg.striche;
+    if (!summe) { st.showToast(t('Nichts zurückgeholt – die Karten an den Enden fehlen.')); return; }
+    setAuswahl(new Set());
+    if (summe === 1 && name) { st.showToast(`„${name}" zurückgeholt – Strg+Z nimmt es zurück.`, false, 6000); return; }
+    if (summe === erg.karten) { st.showToast(`${erg.karten} Karten zurückgeholt – Strg+Z nimmt es zurück.`, false, 6000); return; }
+    const teile = [
+      erg.karten ? zahlWort(erg.karten, 'Karte', 'Karten') : '',
+      erg.pfeile ? zahlWort(erg.pfeile, 'Verbindung', 'Verbindungen') : '',
+      erg.striche ? zahlWort(erg.striche, 'Strich', 'Striche') : '',
+    ].filter(Boolean).join(', ');
+    st.showToast(t('{0} zurückgeholt – Strg+Z nimmt es zurück.').replace('{0}', teile), false, 6000);
   };
+  /** M470: Häkchen vor einer Zeile (nur, wo sich etwas zurückholen lässt) */
+  const haken = (k: string, geht = true) => (lesen ? null : (
+    <input type="checkbox" className="vv-wahl" data-taste="vergleich-wahl" checked={auswahl.has(k)} disabled={busy || (!geht && !auswahl.has(k))}
+      aria-label={t('Für „Auswahl zurückholen" vormerken')} onChange={() => umschalten(k)} />
+  ));
+  const auswahlGeht = [...auswahl].filter((k) => {
+    if (k.startsWith('p:')) { const e = [...(vergleich?.pfeileGeloescht ?? []), ...(vergleich?.pfeileGeaendert.map((x) => x.dann) ?? [])].find((x) => x.id === k.slice(2)); return !!e && pfeilGeht(e); }
+    if (k.startsWith('s:')) { const s = [...(vergleich?.stricheGeloescht ?? []), ...(vergleich?.stricheGeaendert.map((x) => x.dann) ?? [])].find((x) => x.id === k.slice(2)); return !!s && strichGeht(s); }
+    return true;
+  });
+  const OHNE_ENDE = 'Erst die Karten an den Enden zurückholen (oder mit auswählen)';
 
   const loeschen = async () => {
     if (!info) return;
@@ -199,16 +267,31 @@ export function VersionenDialog({ boardId, onClose }: { boardId: string; onClose
                         <> · gegenüber jetzt: {unterschied.zurueck ? `${unterschied.zurueck} kämen zurück` : ''}{unterschied.zurueck && unterschied.weg ? ', ' : ''}{unterschied.weg ? `${unterschied.weg} fielen weg` : ''}</>
                       ) : null}
                     </p>
-                    {vergleich && (vergleich.neu.length + vergleich.geloescht.length + vergleich.geaendert.length) > 0 && (
+                    {vergleich && (vergleich.neu.length + waehlbar.length) > 0 && (
                       <div className="versionen-vergleich" data-taste="versionen-vergleich">
-                        <h3>Seitdem</h3>
+                        <div className="vv-kopf">
+                          <h3>Seitdem</h3>
+                          {!lesen && waehlbar.length > 1 && (
+                            <label className="vv-alle">
+                              <input type="checkbox" data-taste="vergleich-alle" disabled={busy} checked={waehlbar.every((k) => auswahl.has(k))}
+                                onChange={(e) => setAuswahl(e.target.checked ? new Set(waehlbar) : new Set())} /> alle
+                            </label>
+                          )}
+                          {!lesen && auswahl.size > 0 && (
+                            <button className="versionen-haupt" disabled={busy || !auswahlGeht.length} onClick={() => zurueckholen(auswahlGeht)} data-taste="auswahl-zurueckholen"
+                              data-anzahl={auswahlGeht.length} title="Alles Angehakte in einem Schritt zurückholen – ein Strg+Z nimmt es zurück">
+                              {t('Auswahl zurückholen ({0})').replace('{0}', String(auswahlGeht.length))}
+                            </button>
+                          )}
+                        </div>
                         <ul>
                           {vergleich.geloescht.map((n) => (
                             <li key={`g-${n.id}`} data-taste="vergleich-karte" data-art="geloescht" data-id={n.id}>
+                              {haken(`k:${n.id}`)}
                               <KartenSymbol art={n.type} size={14} aria-hidden="true" />
                               <span className="vv-titel" translate="no">{kartenName(n)}</span>
                               <small>gelöscht</small>
-                              {!lesen && <button disabled={busy} onClick={() => zurueckholen([n.id], kartenName(n))} data-taste="karte-zurueckholen"
+                              {!lesen && <button disabled={busy} onClick={() => zurueckholen([`k:${n.id}`], kartenName(n))} data-taste="karte-zurueckholen"
                                 title="Diese Karte aus dem Stand zurück aufs Board legen">Zurückholen</button>}
                             </li>
                           ))}
@@ -216,11 +299,40 @@ export function VersionenDialog({ boardId, onClose }: { boardId: string; onClose
                             const z = zeitVon(jetzt);
                             return (
                               <li key={`a-${dann.id}`} data-taste="vergleich-karte" data-art="geaendert" data-id={dann.id}>
+                                {haken(`k:${dann.id}`)}
                                 <KartenSymbol art={jetzt.type} size={14} aria-hidden="true" />
                                 <span className="vv-titel" translate="no">{kartenName(jetzt)}</span>
                                 <small title={z ? zeitLang(z) : undefined}>{z ? `geändert ${vorWann(z)}` : 'geändert'}</small>
-                                {!lesen && <button disabled={busy} onClick={() => zurueckholen([dann.id], kartenName(dann))} data-taste="karte-zurueckholen"
+                                {!lesen && <button disabled={busy} onClick={() => zurueckholen([`k:${dann.id}`], kartenName(dann))} data-taste="karte-zurueckholen"
                                   title="Den Inhalt von damals zurückholen – Lage und Größe bleiben">Zurückholen</button>}
+                              </li>
+                            );
+                          })}
+                          {[...vergleich.pfeileGeloescht.map((e) => ({ e, art: 'geloescht' as const })), ...vergleich.pfeileGeaendert.map((x) => ({ e: x.dann, art: 'geaendert' as const }))].map(({ e, art }) => {
+                            const geht = pfeilGeht(e);
+                            const name = pfeilName(e, kartenNach);
+                            return (
+                              <li key={`p-${e.id}`} data-taste="vergleich-pfeil" data-art={art} data-id={e.id} data-geht={geht ? '1' : '0'}>
+                                {haken(`p:${e.id}`, geht)}
+                                <ILink size={14} aria-hidden="true" />
+                                <span className="vv-titel" translate="no">{name}</span>
+                                <small>{art === 'geloescht' ? 'Verbindung gelöscht' : 'Verbindung geändert'}</small>
+                                {!lesen && <button disabled={busy || !pfeilGeht(e, new Set())} onClick={() => zurueckholen([`p:${e.id}`], name)} data-taste="pfeil-zurueckholen"
+                                  title={pfeilGeht(e, new Set()) ? 'Diese Verbindung aus dem Stand zurückholen' : t(OHNE_ENDE)}>Zurückholen</button>}
+                              </li>
+                            );
+                          })}
+                          {[...vergleich.stricheGeloescht.map((s) => ({ s, art: 'geloescht' as const })), ...vergleich.stricheGeaendert.map((x) => ({ s: x.dann, art: 'geaendert' as const }))].map(({ s, art }) => {
+                            const geht = strichGeht(s);
+                            const name = strichName(s, kartenNach);
+                            return (
+                              <li key={`s-${s.id}`} data-taste="vergleich-strich" data-art={art} data-id={s.id} data-geht={geht ? '1' : '0'}>
+                                {haken(`s:${s.id}`, geht)}
+                                {s.tool === 'marker' ? <IHighlighter size={14} aria-hidden="true" /> : <IPen size={14} aria-hidden="true" />}
+                                <span className="vv-titel" translate="no">{name}</span>
+                                <small>{art === 'geloescht' ? 'gelöscht' : 'geändert'}</small>
+                                {!lesen && <button disabled={busy || !strichGeht(s, new Set())} onClick={() => zurueckholen([`s:${s.id}`], name)} data-taste="strich-zurueckholen"
+                                  title={strichGeht(s, new Set()) ? 'Diesen Strich aus dem Stand zurückholen' : 'Erst die Karte zurückholen, an der der Strich hängt (oder mit auswählen)'}>Zurückholen</button>}
                               </li>
                             );
                           })}
