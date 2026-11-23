@@ -18,7 +18,7 @@
 /* Hilfe-Suche: Feld im Kopf, Filterung blendet Sektionen ohne Treffer aus */
 .help-search {
   flex: 1; max-width: 280px; margin: 0 12px;
-  border: 1.5px solid var(--border-soft); border-radius: var(--r);
+  border: 1.5px solid var(--feld-rand); border-radius: var(--r);  /* M494: Feldrand ≥ 3:1 (WCAG 1.4.11) */
   background: var(--surface); color: var(--ink);
   font-family: inherit; font-size: 12.5px; padding: 6px 10px;
 }

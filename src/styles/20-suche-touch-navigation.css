@@ -11,6 +11,8 @@
 .search-box input {
   width: 100%; border: none; outline: none; font-family: inherit;
   font-size: 16px; padding: 16px 18px; color: var(--ink);
+  /* M494: Das Feld IST die Suchfläche — im Dunkeln stand sonst das native Feldgrau (#3b3b3b) als Kasten darin */
+  background: transparent;
 }
 .search-results { max-height: calc(46vh / var(--pn-anz, 1)); overflow-y: auto; border-top: 1px solid var(--border-soft); }
 .search-hit {

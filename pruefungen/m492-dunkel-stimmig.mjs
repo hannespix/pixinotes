@@ -43,14 +43,10 @@ const heute = new Date(); const iso = (n) => { const d = new Date(heute.getTime(
 
 /**
  * Begründete Ausnahmen (Text unter 4,5:1, der so bleibt). Jede mit Grund; der Scan nimmt sie aus.
- *   - Kalender-Streifen der Wochenansicht: weiße Schrift auf der FREI gewählten Farbe einer Gantt-Zeile —
- *     Nutzerfarbe, in Hell und Dunkel gleich, kein Dunkelmodus-Fehler (offen, siehe M492-Datei).
- *   - Gantt-Balken: Name auf der frei gewählten Zeilenfarbe — ebenso.
+ * M494: Die beiden Ausnahmen (Kalender-Streifen der Wochenansicht, Gantt-Balken: Schrift auf der frei gewählten
+ * Zeilenfarbe) sind gestrichen — die Schrift folgt jetzt der Helligkeit der Fläche (lib/lesbareSchrift.ts).
  */
-const AUSNAHMEN = [
-  { klasse: /cal-strip/, grund: 'Nutzerfarbe einer Gantt-Zeile (Wochenansicht)' },
-  { klasse: /gantt-bar|g-bar/, grund: 'Nutzerfarbe einer Gantt-Zeile' },
-];
+const AUSNAHMEN = [];
 const ausnahme = (t) => AUSNAHMEN.some((a) => a.klasse.test(t.pfad) || a.klasse.test(t.klasse));
 
 const absatz = (t) => ({ type: 'paragraph', content: [{ type: 'text', text: t, styles: {} }] });
