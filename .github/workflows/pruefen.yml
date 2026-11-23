@@ -1,0 +1,33 @@
+# PR-Prüfung: Typen + Web-Build. Schnell (~1 min), damit Agenten ihre PRs
+# ohne Warten selbst mergen können. E2E-Reihen laufen lokal beim Agenten
+# (sie brauchen feste Ports und teils eine lokale Datenbank).
+name: PR prüfen
+
+on:
+  pull_request:
+    branches: [claude/notes-whiteboard-design-bnwvxj]
+  workflow_dispatch:
+
+concurrency:
+  group: pruefen-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typen + Build
+        run: npm run build
+      - name: Gebaute Single-File nicht im PR
+        # release/pixinotes.html baut release.yml nach dem Merge – im PR ist sie nur Konfliktstoff
+        run: |
+          git fetch --depth=1 origin ${{ github.base_ref }}
+          if git diff --name-only FETCH_HEAD...HEAD 2>/dev/null | grep -qx 'release/pixinotes.html'; then
+            echo "::warning::release/pixinotes.html im PR geändert – wird nach dem Merge ohnehin neu gebaut"
+          fi

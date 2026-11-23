@@ -26,7 +26,7 @@ const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 const DIST = process.env.PN_DIST ?? path.join(__repo, 'dist');
 const SD = path.join(__repo, 'pruefungen', 'ablage');
 mkdirSync(SD, { recursive: true });
-const PORT = 4778;
+const PORT = 5443;
 let ok = 0; let bad = 0;
 const pruefe = (n, gut, info = '') => {
   if (gut) { ok += 1; console.log(`  ✓ ${n}`); } else { bad += 1; console.log(`  ✗ ${n} ${typeof info === 'string' ? info : JSON.stringify(info)}`); }
@@ -191,8 +191,8 @@ await P.keyboard.press('Escape'); await P.waitForTimeout(300);
 pruefe('keine Seitenfehler', fehler.length === 0, fehler.slice(0, 3).join(' | '));
 {
   const hilfe = readFileSync(path.join(__repo, 'src/components/HelpOverlay.tsx'), 'utf8');
-  const umbau = readFileSync(path.join(__repo, 'docs/UMBAU.md'), 'utf8');
-  pruefe('E1 Hilfe, Umbau-Liste und Doku nennen M443', /M443/.test(hilfe) && /M443/.test(umbau) && existsSync(path.join(__repo, 'docs/MCP.md')));
+  const umbau = readdirSync(path.join(__repo, 'docs/meilensteine')).join(' ');
+  pruefe('E1 Hilfe, Meilenstein-Notiz und Doku nennen M443', /M443/.test(hilfe) && /M443/.test(umbau) && existsSync(path.join(__repo, 'docs/MCP.md')));
 }
 await browser.close(); app.close();
 console.log(`\nM443: ${ok} bestanden, ${bad} fehlgeschlagen`);

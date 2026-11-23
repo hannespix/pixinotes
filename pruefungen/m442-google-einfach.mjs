@@ -13,13 +13,13 @@
 // Läuft aus dem Repository: `node pruefungen/m442-google-einfach.mjs`
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import http from 'node:http';
 import { chromium } from 'playwright-core';
 const __repo = fileURLToPath(new URL('..', import.meta.url));
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 const DIST = process.env.PN_DIST ?? path.join(__repo, 'dist');
-const PORT = 4777;
+const PORT = 5442;
 let ok = 0; let bad = 0;
 const pruefe = (n, gut, info = '') => {
   if (gut) { ok += 1; console.log(`  ✓ ${n}`); } else { bad += 1; console.log(`  ✗ ${n} ${typeof info === 'string' ? info : JSON.stringify(info)}`); }
@@ -110,8 +110,8 @@ console.log('C  Konto-Anmeldung');
 pruefe('keine Seitenfehler', fehler.length === 0, fehler.slice(0, 3).join(' | '));
 {
   const hilfe = readFileSync(path.join(__repo, 'src/components/HelpOverlay.tsx'), 'utf8');
-  const umbau = readFileSync(path.join(__repo, 'docs/UMBAU.md'), 'utf8');
-  pruefe('D1 Hilfe und Umbau-Liste nennen M442', /M442/.test(hilfe) && /M442/.test(umbau));
+  const umbau = readdirSync(path.join(__repo, 'docs/meilensteine')).join(' ');
+  pruefe('D1 Hilfe und Meilenstein-Notiz nennen M442', /M442/.test(hilfe) && /M442/.test(umbau));
 }
 await browser.close(); app.close();
 console.log(`\nM442: ${ok} bestanden, ${bad} fehlgeschlagen`);
