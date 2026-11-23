@@ -213,7 +213,11 @@ console.log('════ A: rahmenlos ════');
   await P.locator('[data-taste="bild-rahmen"]').click();
   await P.waitForTimeout(500);
   const j1 = await lage(P, 'jpg');
-  pruefe('D4 danach ist das Bild eine Karte mit Rand', j1.klasse.includes('mit-rahmen') && j1.innen === '8px' && (await karte(P, 'jpg')).data.rahmen === true, `${j1.klasse} ${j1.innen}`);
+  // M474: Der Store schreibt gebündelt (400 ms nach der letzten Änderung); auf dem langsameren CI-Runner stand
+  // „rahmen" nach 500 ms noch nicht in localStorage (Nachtlauf 45165068307) – wie in D6 warten statt einmal lesen.
+  let gespeichert = false;
+  for (let i = 0; i < 20 && !gespeichert; i++) { gespeichert = (await karte(P, 'jpg'))?.data.rahmen === true; if (!gespeichert) await P.waitForTimeout(200); }
+  pruefe('D4 danach ist das Bild eine Karte mit Rand', j1.klasse.includes('mit-rahmen') && j1.innen === '8px' && gespeichert, `${j1.klasse} ${j1.innen} gespeichert=${gespeichert}`);
   await P.screenshot({ path: `${SD}/m374-d-mit-rahmen.png` });
   await P.locator('button[data-smbtn][aria-label="Mehr"]').click();
   await P.waitForSelector('[data-taste="bild-rahmen"]');
