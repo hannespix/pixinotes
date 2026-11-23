@@ -52,7 +52,9 @@ await P.evaluate(() => {
   new MutationObserver(() => { if (t0) { window.__lat.push(performance.now() - t0); t0 = 0; } })
     .observe(document.querySelector('.react-flow'), { subtree: true, attributes: true, attributeFilter: ['d'], childList: true });
 });
-const laufend = () => P.evaluate(() => { const e = document.querySelector('.drawing-layer .strich-laufend'); return e ? e.getAttribute('d').length : -1; });
+// M448: den ganzen Pfad vergleichen, nicht seine Länge – zwei verschiedene Pfade können gleich lang sein
+// (rund jede zehnte Bewegung), die Reihe zählte dann ein echtes Wachsen als Stillstand.
+const laufend = () => P.evaluate(() => { const e = document.querySelector('.drawing-layer .strich-laufend'); return e ? e.getAttribute('d') : -1; });
 const gespeichert = () => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].drawings);
 
 async function zug(werkzeug, y) {
@@ -69,7 +71,7 @@ console.log('\n════ A–C: Stift ════');
 {
   const l = await zug('p', 250);
   let wuchs = 0; for (let i = 1; i < l.length; i += 1) if (l[i] !== l[i - 1]) wuchs += 1;
-  pruefe('A1 der laufende Strich ist während des Zugs zu sehen', l.every((x) => x > 0), l.slice(0, 5));
+  pruefe('A1 der laufende Strich ist während des Zugs zu sehen', l.every((x) => typeof x === 'string' && x.length > 0), l.slice(0, 5).map((x) => String(x).length));
   pruefe('A2 er ändert sich mit (fast) jeder Bewegung', wuchs >= 36, `${wuchs} von 39`);
   const lat = await P.evaluate(() => window.__lat.slice().sort((a, b) => a - b));
   const median = lat[Math.floor(lat.length / 2)]; const p90 = lat[Math.floor(lat.length * 0.9)];
@@ -86,7 +88,7 @@ console.log('\n════ D: Textmarker ════');
 {
   const l = await zug('m', 450);
   let wuchs = 0; for (let i = 1; i < l.length; i += 1) if (l[i] !== l[i - 1]) wuchs += 1;
-  pruefe('D1 der Textmarker wächst ebenso mit jeder Bewegung', l.every((x) => x > 0) && wuchs >= 36, `${wuchs} von 39`);
+  pruefe('D1 der Textmarker wächst ebenso mit jeder Bewegung', l.every((x) => typeof x === 'string' && x.length > 0) && wuchs >= 36, `${wuchs} von 39`);
   const ds = await gespeichert();
   pruefe('D2 danach ein gespeicherter Textmarker-Strich', ds.filter((s) => !s.id.startsWith('alt') && s.tool === 'marker').length === 1);
 }

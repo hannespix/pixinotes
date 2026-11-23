@@ -3,6 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import { mutedHistory, selectActiveBoard, useBoard } from '../../store';
 import type { EmailNode, ParsedAttachment } from '../../types';
 import { enrichText } from '../../lib/entities';
+import { useRufnummernStand } from '../../lib/rufnummer';
 import { formatBytes, isImageMime } from '../../lib/parseEmail';
 import { makeImage, makeNote } from '../../lib/nodes';
 import { triggerDownload } from '../../lib/download';
@@ -42,7 +43,9 @@ export function EmailCard({ id, data, selected, positionAbsoluteX, positionAbsol
   const text = expanded ? email.text : email.text.slice(0, PREVIEW_CHARS);
   const truncated = email.text.length > PREVIEW_CHARS;
   // Entity-Erkennung (libphonenumber etc.) nicht bei jedem Render neu (Audit PERF-2)
-  const enriched = useMemo(() => enrichText(text), [text]);
+  const rufStand = useRufnummernStand();   // M459: Telefon-Links kommen still dazu, sobald die Erkennung geladen ist
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const enriched = useMemo(() => enrichText(text), [text, rufStand]);
 
   /** Abgeleitetes Modul anlegen UND mit der E-Mail verbinden (M131) — ein History-Eintrag */
   const addDerived = (node: ReturnType<typeof makeNote>, label: string) => {

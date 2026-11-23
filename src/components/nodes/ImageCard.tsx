@@ -6,6 +6,7 @@ import type { ImageNode } from '../../types';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 import { BildLupe } from './BildLupe';
+import { BildTextChips } from './BildTextChips';
 import { bildBearbeiten } from '../BildEditorHost';
 import { ICrop, IImage } from '../Icons';
 
@@ -60,12 +61,16 @@ export function ImageCard({ id, data, selected }: NodeProps<ImageNode>) {
       />
     </div>
   );
+  /* M465: Angaben aus dem Text im Bild (Telefon, Mail, Link, Frist) — nur am markierten Bild, unter ihm. */
+  const ocr = selected && typeof img.ocrText === 'string' ? img.ocrText : '';
+  const chips = ocr ? <BildTextChips nodeId={id} ocr={ocr} titel={titel} /> : null;
+  const unterName = !rahmen && (img.titel?.trim() || selected) ? name : undefined;
   return (
     <CardShell
       id={id}
       /* Rahmenlos steht der Name UNTER dem Bild und außerhalb des Kartenkörpers — sonst hielte ihn die
          Auto-Größe für Inhalt, der nicht hineinpasst, und zöge die Karte in die Länge. */
-      aussen={!rahmen && (img.titel?.trim() || selected) ? name : undefined}
+      aussen={chips ? <div className="bild-unten">{unterName}{chips}</div> : unterName}
       selected={selected}
       minWidth={rahmen ? 120 : 24}
       minHeight={rahmen ? 90 : 24}

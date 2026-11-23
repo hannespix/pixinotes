@@ -18,6 +18,7 @@
 import { useBoard, selectActiveBoard, mutedHistory, type BoardDoc } from '../store';
 import { doneCol, kanbanCols, type AppNode, type KanbanData, type MinutesData } from '../types';
 import { collectTasks, formatDueShort, type TaskRef } from './tasks';
+import { fristenLaden } from './dates';
 import { nodeToText } from './serialize';
 import { findFreeSpot } from './arrange';
 import { tagLokal } from './tag';
@@ -268,6 +269,7 @@ export const BRIEFING_BREITE = 380;
  * entsteht das Briefing lokal; abgebrochen wird ohne Karte.
  */
 export async function boardBriefing(rechtsOben: { x: number; y: number }, mitKi: boolean, fortschritt?: (m: string) => void): Promise<string> {
+  await fristenLaden().catch(() => {});   // M459: die Fristen-Erkennung lädt bei Bedarf
   const st0 = useBoard.getState();
   const board = selectActiveBoard(st0);
   const boardId = st0.activeId;

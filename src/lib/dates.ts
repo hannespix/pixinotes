@@ -1,7 +1,46 @@
 // Fristen-Erkennung: chrono-node (deutsch) findet Datumsangaben wie
 // „bis Freitag", „am 24.07." oder „nächste Woche" in Kartentexten.
-import { de as chronoDe, type ParsedResult } from 'chrono-node';
+//
+// M459: chrono-node (~120 KB) kommt nicht mehr im Start mit, sondern beim ersten Text, der überhaupt ein Datum
+// enthalten KANN (`kannDatumSein`). Bis dahin liefert `detectDates` nichts — die Chips erscheinen einen Augenblick
+// später; `useFristenStand()` zeichnet die Anzeigen dann neu. Ein Text ohne Ziffer, Wochentag, Monat, „heute",
+// „morgen" oder Zeiteinheit kann für chrono keinen Tag liefern — er braucht die Bibliothek nie.
+import { useSyncExternalStore } from 'react';
+import type { ParsedResult } from 'chrono-node';
 import { triggerDownload } from './download';
+
+type ChronoDe = typeof import('./chronoKern')['chronoDe'];
+let chronoDe: ChronoDe | null = null;
+let ladung: Promise<void> | null = null;
+let stand = 0;
+const hoerer = new Set<() => void>();
+/** Ist die Fristen-Erkennung geladen? */
+export const fristenBereit = (): boolean => !!chronoDe;
+/** Die Fristen-Erkennung laden (einmal; danach sofort erfüllt). Anzeigen, die `useFristenStand` nutzen, zeichnen neu. */
+export function fristenLaden(): Promise<void> {
+  if (!ladung) {
+    ladung = import('./chronoKern').then((m) => {
+      chronoDe = m.chronoDe;
+      fundSpeicher.clear();
+      stand += 1;
+      for (const h of [...hoerer]) h();
+    });
+    ladung.catch(() => { ladung = null; });   // offline und nicht im Cache: beim nächsten Text erneut versuchen
+  }
+  return ladung;
+}
+/** Läuft das Laden gerade? Dann das Versprechen (wer auf vollständige Fristen angewiesen ist, wartet darauf) */
+export const fristenAusstehend = (): Promise<void> | null => (chronoDe ? null : ladung);
+/** Zahl, die sich ändert, sobald die Erkennung geladen ist — in die Abhängigkeiten der Fristen-Anzeigen */
+export function useFristenStand(): number {
+  return useSyncExternalStore((h) => { hoerer.add(h); return () => { hoerer.delete(h); }; }, () => stand);
+}
+/**
+ * Kann chrono in diesem Text einen Tag finden? Großzügig (lieber einmal zu oft laden): Ziffern, Wochentage samt
+ * Kürzeln, Monate, die Tageswörter und alle Zeiteinheiten, auch als Zahlwort („in drei Tagen" enthält „tag").
+ */
+const KANN_DATUM = /\d|montag|dienstag|mittwoch|donnerstag|freitag|samstag|sonntag|\b(?:mo|di|mi|do|fr|sa|so|a|j|jr|h)\b|jan|j[äa]n|feb|m[äa]r|maerz|mrz|apr|mai|jun|jul|aug|sep|okt|nov|dez|jetzt|heute|morgen|gestern|nacht|mittag|abend|sek|min|std|stunde|tag|woche|monat|quartal|jahr/i;
+export const kannDatumSein = (text: string): boolean => KANN_DATUM.test(text);
 
 export interface DetectedDate {
   /** Originaltext, z. B. „bis Freitag" */
@@ -76,6 +115,9 @@ export function detectDates(text: string, now: Date = new Date(), anker?: Date):
   let funde = fundSpeicher.get(schluessel);
   if (!funde) {
     const lesbar = text.replace(KEIN_TERMIN, (m) => ' '.repeat(m.length));
+    if (!kannDatumSein(lesbar)) return [];
+    // M459: noch nicht geladen → anstoßen, vorerst nichts (nicht merken — nach dem Laden wird neu gelesen)
+    if (!chronoDe) { void fristenLaden().catch(() => {}); return []; }
     let results: ParsedResult[] = [];
     try {
       results = chronoDe.parse(lesbar, ref, { forwardDate: true });
@@ -109,7 +151,15 @@ export function detectDates(text: string, now: Date = new Date(), anker?: Date):
   return out.slice(0, 3);
 }
 
-/** M390: Hängt das Ergebnis am Tag des Lesens? („Freitag", „morgen", „in 3 Tagen" — nicht „20.11.") */
+/**
+ * M390: Hängt das Ergebnis am Tag des Lesens? („Freitag", „morgen", „in 3 Tagen" — nicht „20.11.")
+ * M459: `null` = weiß ich noch nicht (die Erkennung lädt gerade) — wer Daten daraus ableitet, ändert dann nichts.
+ */
+export function hatRelativesDatumOderOffen(text: string): boolean | null {
+  if (!text || text.length < 3 || !kannDatumSein(text)) return false;
+  if (!chronoDe) { void fristenLaden().catch(() => {}); return null; }
+  return hatRelativesDatum(text);
+}
 export function hatRelativesDatum(text: string): boolean {
   if (!text || text.length < 3) return false;
   const a = new Date(2026, 0, 5, 0, 0, 1);    // ein Montag
