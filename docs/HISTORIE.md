@@ -276,6 +276,40 @@ Browser; lange Aufgaben in Portionen mit Fortschritt und ehrlicher Meldung.
 
 ---
 
+## Phase 13 — Multi-Agent-Betrieb (23.11., M444–M479)
+
+Ein Orchestrator, bis zu sieben Arbeits-Agenten in eigenen Worktrees, jeder liefert
+bis zum Merge (Squash) – in einem Tag 36 Meilensteine, PR #120 bis #167.
+
+**Was entstand:** KI-Board-Briefing (M444), Ordnen nach Themen (M445), Versionen mit
+Vergleich und Zurückholen (M449/M460/M470), Kontakt-Karte mit vCard, KI/MCP und Signatur
+(M450/M454/M457/M463), E-Mail-Destillat (M451), Text in Bildern samt Gehirn und Chips
+(M452/M465), Änderungsdatum je Karte (M453/M472), Browser-Erweiterung (M458), Outlook
+live (M466), Termine in der Aufgaben-Zentrale mit Serien und Zeitzonen (M469/M471/M473),
+BlockNote 0.31 → 0.57 (M462), Barrierefreiheit (M447/M456), Mauszeiger unter Windows
+(M464), Sicherung als `.pixinotes` (M476), Eingang (M478), Mit Google anmelden über
+Supabase (M479). Start-JS 3,58 → ~2,2 MB (M446/M459/M467).
+
+**Werkzeug und Arbeitsweise:** CLAUDE.md, AGENTEN.md, BACKLOG.md, je Meilenstein eine
+Datei; PR-Prüfung als Merge-Tor; `release.yml` baut die Single-File nach dem Merge
+(vorher Konfliktquelle Nr. 1); Prüfreihen-Läufer mit Port-Sperre über Worktrees,
+`--geaendert` mit Wächter-Reihen; Nachtlauf aller Reihen mit Issue „Nachtlauf rot"
+(M468/M474); „Was ist neu" sortiert sich selbst; `index.css` in 29 Teile (M475).
+
+**Lehren:**
+- Konflikte entstehen an Dateien, an die jeder anhängt (Single-File, Tabellenzeilen,
+  Ende von index.css, „Was ist neu") – solche Stellen strukturell entschärfen, nicht
+  per Disziplin.
+- Agenten mergen gern vor dem CI-Lauf → Regel „erst nach grünem PR prüfen" ausdrücklich
+  in jeden Brief.
+- Zähl-/Längen-Reihen (Kacheln, Tooltips, Hilfe) brechen bei fast jedem Feature →
+  laufen als Wächter immer mit.
+- Große Umbauten (CSS-Aufteilung, store.ts) nur, wenn wenige Agenten laufen; vorher
+  Byte-/Pixel-Vergleich als Nachweis.
+- Start-JS-Grenze als Prüfreihe hält alle Agenten zum Nachladen an.
+- Betreiber-Schritte (OAuth-Clients, Supabase-Provider, Variablen) gesammelt in
+  `docs/EINRICHTUNG.md`.
+
 ## Entscheidungen, die man nicht rückgängig machen soll
 
 | Entscheidung | Seit | Warum |
