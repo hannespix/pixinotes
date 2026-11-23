@@ -41,7 +41,7 @@ Ursachen, jede für sich ließ alle Kanten bei jedem Zug-Ereignis rendern oder t
   Karten statt an der ganzen Fläche (die Variable erbt — vorher rechnete der Browser je Bild den Stil aller Karten
   neu). `kantenBeobachter` meldet auch Karten ohne eigene Verbindung, aber nur mit dem Ziel ihres Ausweichens
   (Inline-`translate`, ohne `getComputedStyle`) — sie sind für Kanten nur Hindernis.
-- Start-JS: +≈1,3 KB (die Kanten-Komponente liegt im Start), weit unter den Grenzen nach M483.
+- Start-JS: wenig mehr (die Kanten-Komponente liegt im Start), Grenzen aus M459/M467/M483 unverändert und grün.
 
 ## Messwerte (Prüf-Chromium, 200 Karten, 100 Verbindungen, Maschine mit Last 8–15 auf 4 Kernen)
 | | vorher | nachher |
