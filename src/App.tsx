@@ -6,10 +6,11 @@ import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
 import { TopActions } from './components/TopActions';
 import {
-  adoptPersistedState, claimWriter, getWriterRole, reassertPersist,
+  adoptPersistedState, claimWriter, getWriterRole, hinweisKnopfDruecken, reassertPersist,
   selectActiveBoard, selectNurLesen, singleWriterSupported, takeOverWriter, useBoard, type WriterRole,
 } from './store';
 import { initAutoSync } from './lib/syncFolder';
+import { sicherungStartFaellig, SICHERUNG_EREIGNIS } from './lib/sicherungTakt';
 import { initProjectAutoSync } from './lib/projectSync';
 import { cleanupOrphanHtml } from './lib/htmlStore';
 import { cleanupOrphanFiles } from './lib/fileStore';
@@ -114,6 +115,18 @@ function Versionen() {
     return () => window.removeEventListener(VERSIONEN_EREIGNIS, auf);
   }, []);
   return boardId ? <Suspense fallback={null}><VersionenDialogLazy boardId={boardId} onClose={() => setBoardId(null)} /></Suspense> : null;
+}
+
+/** M476: Sicherung einspielen — der Dialog (samt ZIP-Leser) kommt erst, wenn jemand eine Sicherung einspielt */
+const SicherungDialogLazy = lazy(() => import('./components/SicherungDialog').then((m) => ({ default: m.SicherungDialog })));
+function SicherungEinspielen() {
+  const [offen, setOffen] = useState<{ datei?: File } | null>(null);
+  useEffect(() => {
+    const auf = (e: Event) => setOffen({ datei: (e as CustomEvent<{ datei?: File }>).detail?.datei });
+    window.addEventListener(SICHERUNG_EREIGNIS, auf);
+    return () => window.removeEventListener(SICHERUNG_EREIGNIS, auf);
+  }, []);
+  return offen ? <Suspense fallback={null}><SicherungDialogLazy key={offen.datei?.name ?? '-'} datei={offen.datei} onClose={() => setOffen(null)} /></Suspense> : null;
 }
 
 /** M466: Das Outlook-Fenster (Microsoft Graph) kommt erst mit dem ersten Aufruf — Strg+K „Outlook" oder ＋ → Outlook */
@@ -236,7 +249,9 @@ export default function App() {
   const nurLesenBoard = nurLesenId ? { id: nurLesenId, von: nurLesenVon } : null;
 
   // Auto-Sync in den verbundenen Sync-Ordner (Nextcloud & Co.) — no-op ohne Verbindung
-  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initSyncStart(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); initBoardVersionen(); seitenBreitenReparieren(); imLeerlaufVorladen(); window.setTimeout(() => useBoard.getState().fristAnkerNachtragen(), 1200); }, []);
+  useEffect(() => { initAutoSync(); initProjectAutoSync(); initWebdavSync(); initFilesSync(); initSyncStart(); initVorfuehren(); initMauszeiger(); initGruppenraum(); initBrain(); initGrabsteine(); initBoardVersionen(); seitenBreitenReparieren();
+    // M476: Auto-Sicherung bzw. die Erinnerung nach 14 Tagen — der Code dafür lädt nur nach, wenn etwas fällig ist
+    window.setTimeout(() => { if (sicherungStartFaellig()) void import('./lib/sicherung').then((m) => m.sicherungStart()); }, 6000); imLeerlaufVorladen(); window.setTimeout(() => useBoard.getState().fristAnkerNachtragen(), 1200); }, []);
 
   // Eigene Apps (M158): verwaiste HTML-Inhalte in IndexedDB entsorgen —
   // NUR beim Start (dann kann kein Undo eine gelöschte App-Karte zurückholen,
@@ -533,6 +548,7 @@ export default function App() {
       <Vorlagen />
       <Qr />
       <Versionen />
+      <SicherungEinspielen />
       <Outlook />
       <BildExport />
       {/* M290: Aus einer anderen App geteilt (Android) — fragt nach dem Ziel */}
@@ -594,6 +610,9 @@ export default function App() {
             <button className="toast-undo" onClick={() => useBoard.getState().hinweisRueckgaengig()}>
               Rückgängig
             </button>
+          )}
+          {toast?.knopf && (
+            <button className="toast-undo" data-taste="hinweis-knopf" onClick={hinweisKnopfDruecken}>{toast.knopf}</button>
           )}
           {toast?.abbruch && (
             <button className="toast-undo" data-taste="ki-abbrechen" onClick={() => { kiAbbrechen(); useBoard.getState().showToast('Abbruch angefordert – die laufende Portion wird noch beendet …', false, 8000); }}>

@@ -278,19 +278,23 @@ console.log('\n════ F: Sicherung ════');
   const h = await profil(st);
   await h.P.keyboard.press('Alt+e'); await h.P.waitForSelector('.modal-tabs');
   await h.P.locator('.modal-tabs button', { hasText: 'Daten' }).click(); await h.P.waitForTimeout(300);
-  const [dl] = await Promise.all([h.P.waitForEvent('download'), h.P.locator('.modal button', { hasText: 'Datei exportieren' }).click()]);
-  const pfad = path.join(SD, 'm390-sicherung.json'); await dl.saveAs(pfad);
-  const datei = JSON.parse(readFileSync(pfad, 'utf8'));
-  pruefe('F1 die Sicherung enthält die eigenen Vorlagen', JSON.stringify(datei).includes('Vorlagen-Text') && JSON.stringify(datei).includes('Besprechung'), Object.keys(datei));
+  // M476: „Datei exportieren" heißt jetzt „Alles sichern" und liefert EINE .pixinotes-Datei (ZIP, JSON darin ungepackt)
+  const [dl] = await Promise.all([h.P.waitForEvent('download'), h.P.locator('.modal button', { hasText: 'Alles sichern' }).click()]);
+  const pfad = path.join(SD, 'm390-sicherung.pixinotes'); await dl.saveAs(pfad);
+  const datei = readFileSync(pfad).toString('utf8');
+  pruefe('F1 die Sicherung enthält die eigenen Vorlagen', datei.includes('Vorlagen-Text') && datei.includes('Besprechung'), datei.slice(0, 80));
   await h.ctx.close();
   // Auf einem frischen Gerät laden
   const h2 = await profil(standMit([brett('bx', 'Leer', [])]));
   await h2.P.keyboard.press('Alt+e'); await h2.P.waitForSelector('.modal-tabs');
   await h2.P.locator('.modal-tabs button', { hasText: 'Daten' }).click(); await h2.P.waitForTimeout(300);
-  await h2.P.locator('.modal input[type="file"][accept*="json"]').first().setInputFiles(pfad); await h2.P.waitForTimeout(1800);
+  await h2.P.locator('.modal input[type="file"][accept*="json"]').first().setInputFiles(pfad);
+  // M476: Erst die Vorschau, dann einspielen (Standard: als Kopie — nichts Vorhandenes geht verloren)
+  await h2.P.waitForSelector('[data-taste="sicherung-einspielen"]', { timeout: 8000 });
+  await h2.P.locator('[data-taste="sicherung-einspielen"]').click(); await h2.P.waitForTimeout(1800);
   const s2 = await h2.bis(async () => { const s = await h2.zustand(); return s.boards.some((b) => b.name === 'Planung') ? s : null; });
   pruefe('F2 zurückgeladen: Board UND Vorlage sind wieder da', !!s2 && s2.templates?.length === 1 && s2.templates[0].name === 'Besprechung', [s2?.boards.map((b) => b.name), s2?.templates, h2.dialoge]);
-  pruefe('F3 vor dem Ersetzen fragt GENAU eine Rückfrage', h2.dialoge.length === 1, h2.dialoge);
+  pruefe('F3 statt einer Browser-Rückfrage zeigt eine Vorschau, was drin ist (M476)', h2.dialoge.length === 0, h2.dialoge);
   await h2.ctx.close();
 }
 

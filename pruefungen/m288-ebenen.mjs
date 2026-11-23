@@ -101,7 +101,7 @@ let vorratSeite = null;
   vorratSeite = await menuEintraege(P);
   console.log('    Seitenleiste:', JSON.stringify(vorratSeite));
   for (const wort of ['Umbenennen', 'Duplizieren', 'In Projekt verschieben', 'Kopie per Link teilen',
-    'Als Datei sichern', 'Präsentieren', 'Archivieren', 'Löschen']) {
+    'Sicherung herunterladen', 'Präsentieren', 'Archivieren', 'Löschen']) {
     pruefe(`T1 „${wort}" steht im Board-Menü`, vorratSeite.some((t) => t.includes(wort)), JSON.stringify(vorratSeite));
   }
   await P.screenshot({ path: `${SD}/m288-boardmenu.png` });
