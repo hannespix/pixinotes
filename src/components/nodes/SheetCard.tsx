@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { createPortal } from 'react-dom';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
+import { useKartenAnsicht } from '../../lib/kartenAnsicht';
 import type { SheetData, SheetNode, ZellStil } from '../../types';
 import { formatiereZahl } from '../../lib/zahlFormat';
 import { CardShell } from './CardShell';
@@ -40,8 +41,10 @@ export function SheetCard({ id, data, selected }: NodeProps<SheetNode>) {
 }
 
 /** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
-export function SheetBody({ id, data }: { id: string; data: SheetData }) {
-  const updateNodeData = useBoard((s) => s.updateNodeData);
+/** M520: nur Ansicht (Filter, Sortierung, Spaltenbreite) — gilt in einem Board, das man nicht ändern darf, lokal (lib/kartenAnsicht.ts) */
+const TABELLE_ANSICHT = ['filterAn', 'filter', 'sort', 'kopf', 'bis', 'colW'] as const;
+export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) {
+  const [data, updateNodeData] = useKartenAnsicht(id, daten, TABELLE_ANSICHT);
   const showToast = useBoard((s) => s.showToast);
   const cells = useMemo(() => data.cells ?? {}, [data.cells]);
   const cols = Math.max(1, data.cols ?? 5);
@@ -135,7 +138,10 @@ export function SheetBody({ id, data }: { id: string; data: SheetData }) {
     else if (sichererLink(ziel)) links[edit] = ziel;
     else showToast('Als Link gehen nur Web-, Mail- und Telefon-Adressen – der Link wurde nicht übernommen.');
     const linksGeaendert = JSON.stringify(links) !== JSON.stringify(data.links ?? {});
-    updateNodeData(id, { cells: neu, ...(linksGeaendert ? { links: Object.keys(links).length ? links : undefined } : {}) });
+    // M520: Nur schreiben, wenn sich etwas geändert hat. Vorher legte schon das Hinein- und wieder Herausklicken
+    // einen Rückgängig-Schritt an — Strg+Z tat danach scheinbar nichts.
+    const zelleGeaendert = (cells[edit] ?? '') !== (neu[edit] ?? '');
+    if (zelleGeaendert || linksGeaendert) updateNodeData(id, { cells: neu, ...(linksGeaendert ? { links: Object.keys(links).length ? links : undefined } : {}) });
     const sp = edit.replace(/\d+/g, '');
     const z = Number(edit.replace(/\D+/g, ''));
     let spIdx = 0;
