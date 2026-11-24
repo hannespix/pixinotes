@@ -393,7 +393,9 @@ function vergleich(l: Lage): ZellWert | ZellWert[] {
   const lv = einzel(links);
   const rv = einzel(rechts);
   const a = zuZahl(lv); const b = zuZahl(rv);
-  const [x, y] = a !== null && b !== null ? [a, b] : [String(lv ?? ''), String(rv ?? '')];
+  // M520: Text vergleicht ohne Rücksicht auf Groß/Klein — wie Excel und LibreOffice (="ja"="Ja" ist WAHR). Eine aus
+  // Excel übernommene Formel wie =WENN(B2="offen";…) fand „Offen" sonst nicht und rechnete still den anderen Zweig.
+  const [x, y] = a !== null && b !== null ? [a, b] : [String(lv ?? '').toLowerCase(), String(rv ?? '').toLowerCase()];
   switch (op) {
     case '=': return x === y;
     case '<>': return x !== y;
