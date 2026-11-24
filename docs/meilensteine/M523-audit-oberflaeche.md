@@ -42,6 +42,8 @@ Prüfpunkte sind gegen den Stand vor dem Fix rot und danach grün (`PN_DIST=<alt
 | O21 | niedrig | Beschädigter Teilen-Link (`#b=…` abgeschnitten): die App startet stumm, der Rest bleibt in der Adresse | Fehler beim Entpacken wird verschluckt | ✅ Hinweis, Adresse aufgeräumt (K1) |
 | O22 | niedrig | Aus dem Teilen-Menü (Android) gekommen, aber nichts liegt bereit: die App startet stumm | `if (!g) return` | ✅ Hinweis (K2) |
 | O23 | niedrig | Teilnehmer-Seite `mitmachen.html` ohne Netz: es erscheint die App unter dieser Adresse | Offline-Ersatz galt für jede Navigation | ✅ nur noch für die App-Seite (F4, F5) |
+| O24 | niedrig | Englisch (Hinweis aus M520): Zeiterfassung zeigt „day" neben „Week/Month/Year"; Fristen „in 3 T."; am Beschluss „ohne TOP" | „Tag" steht im Wörterbuch klein (Einheit); das Muster im Wörterbuch hieß noch „in {1} Tagen"; die Auswahl trägt `translate="no"` (TOP-Texte des Nutzers) | ✅ Reiter per CSS groß, Muster „{0} · in {1} T.", fester Eintrag über `t()` (L1–L3) |
+| O25 | niedrig | Zähl-Texte mit Klammer-Endung (Hinweis aus M520): „1 Checklisten-Punkt(e)", „3 Frist(en)", „2 Karte(n)", „Eintrag/Einträge", „Quelle(n)", „Verbindung(en)", „Aufgabe(n)" — zwölf Stellen | vor M461 geschrieben bzw. später dazugekommen | ✅ `zahlWort` (deutsch und englisch), die Prüfreihe sucht den Quelltext danach ab (L4) |
 
 Ohne Befund blieben: die 26 Kacheln der Modul-Palette, die Einstellungs-Schalter (jeder wirkt und bleibt nach dem
 Neuladen), Darstellung in allen sechs Größen (nichts abgeschnitten, nichts aus dem Bild), Kontraste in Dunkel und
@@ -79,8 +81,13 @@ sehr langer Name, Sonderzeichen), Fokus + Fenster + Esc.
 - **Board löschen** fragt mit einem Browser-Dialog und hat kein „Rückgängig"; Bereich und Projekt haben ein eigenes
   Fenster und „Rückgängig" in der Meldung.
 - **Zurück-Taste des Browsers** verlässt die App (nur die Karte im Fokus steht im Verlauf).
-- **Hinweis von BlockNote** in der Konsole: Dem `viewport`-Meta fehlt `interactive-widget=resizes-content` (betrifft
-  die Bildschirmtastatur am Telefon; die App rechnet die Tastatur selbst ein, `--kb`).
+- **Hinweis von BlockNote** in der Konsole (bei jedem Start mit Notiz/Protokoll): Dem `viewport`-Meta fehlt
+  `interactive-widget=resizes-content`. **Bewusst nicht ergänzt:** Mit dem Zusatz verkleinert Chrome auf Android beim
+  Öffnen der Bildschirmtastatur das ganze Layout (`innerHeight` schrumpft mit). Die App rechnet die Tastatur aber
+  selbst ein (`lib/viewport.ts`, M211): `--kb = innerHeight − visualViewport.height`, dazu `data-keyboard` und 21
+  Regeln im Stylesheet plus zwei Stellen in `Board.tsx`. Mit dem Zusatz wäre diese Differenz 0 — Dock, Auswahl-Leiste
+  und angedockte Formatier-Leiste (M277) verhielten sich am Telefon anders. Das lässt sich nur am echten Gerät
+  beurteilen (Headless-Chromium hat keine Bildschirmtastatur); die Warnung selbst ist folgenlos.
 - Weitere Dialoge hören auf Esc, ohne nach dem Stapel zu fragen (Freigabe, Link, Bild-Export, Liste der Gruppe) —
   sie lassen sich nicht unter ein anderes Fenster bringen, außer über Alt+E/Alt+H; dort greift O3 nicht.
 

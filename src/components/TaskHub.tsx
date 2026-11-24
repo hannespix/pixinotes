@@ -269,7 +269,7 @@ export function TaskHub() {
       if (item) {
         const blk = ticketBlockers(item, k);
         if (blk.length > 0) { showToast(`Erst erledigen: ${blk.join(' · ')}`); return; }
-        if (openSubs(item) > 0) { showToast(`☑ Noch ${openSubs(item)} Checklisten-Punkt(e) im Ticket offen.`); return; }
+        if (openSubs(item) > 0) { showToast(`☑ Noch ${zahlWort(openSubs(item), 'Checklisten-Punkt', 'Checklisten-Punkte')} im Ticket offen.`); return; }
       }
       logDone(t); // „Heute geschafft"-Protokoll (M114)
       // mitSpalte stempelt das Erledigt-Datum — Uhr der Auto-Archivierung (M293)

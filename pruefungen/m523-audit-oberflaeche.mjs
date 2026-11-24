@@ -15,13 +15,15 @@
  *      in der Navigation); die englische Kürzel-Tabelle hat keine deutschen Reste.
  *   I  Kontrast: Bereichsnamen der Übersicht im Hellen ≥ 4,5:1 (klassisch und pix·el).
  *   K  Start mit beschädigtem Teilen-Link bzw. leerem Teilen-Ziel: ein Hinweis statt Schweigen.
+ *   L  Hinweise aus M520: englische Reste (Zeiterfassung „Day", Frist „in 3 d", „no agenda item") und Zähl-Texte
+ *      ohne Klammer-Endung („Karte(n)") im Quelltext.
  *   Z  Über die ganze Reihe: keine Fehler in der Konsole.
  */
 // Läuft aus dem Repository: `node pruefungen/m523-audit-oberflaeche.mjs` (braucht `npm run build`)
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import http from 'node:http';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { chromium } from 'playwright-core';
 import { kontrastScan } from '../werkzeug/kontrast-pruefen.mjs';
@@ -454,6 +456,62 @@ await teil(async () => {
     await ctx.close();
   }
 });
+
+// ══ L: Englische Reste und Zähl-Texte (Hinweise aus M520) ════════════════════════════════════════════════
+console.log('\n════ L: Englisch und Zähl-Texte ════');
+await teil(async () => {
+  // Ein Board mit einer Protokoll-Reihe (zwei Beschlüsse: einer mit, einer ohne TOP)
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await ctx.addInitScript(() => {
+    if (sessionStorage.getItem('__m523')) return;
+    sessionStorage.setItem('__m523', '1');
+    localStorage.setItem('pixinotes-onboarded', '1');
+    localStorage.setItem('pixinotes-sprache', 'en');
+    const tag = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+    const reihe = { title: 'Lenkungskreis', color: 'white', carryOpen: true, entries: [{ id: 'n1', date: tag, attendees: 'Anna Berg', blocks: [
+      { id: 'h1', type: 'heading', props: { level: 3 }, content: 'TOP 1: Haushalt' }, { id: 'q1', type: 'paragraph', content: 'Die Zahlen liegen vor.' },
+    ], decisions: [{ id: 'd1', text: 'Wir feiern im Hof.', top: 'h1', topText: 'TOP 1: Haushalt' }, { id: 'd2', text: 'Ohne Zuordnung.', top: '' }] }] };
+    const state = { boards: [{ id: 'b0', name: 'Test', edges: [], drawings: [], comments: [], nodes: [{ id: 'm1', type: 'minutes', position: { x: 40, y: 40 }, width: 560, height: 760, data: reihe }] }],
+      spaces: [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Einstieg', boardIds: ['b0'] }] }], activeId: 'b0', view: 'board' };
+    localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state }));
+  });
+  const P = await ctx.newPage();
+  P.on('pageerror', (e) => fehler.push(`pageerror: ${e.message.slice(0, 200)}`));
+  await P.goto(BASIS); await P.waitForSelector('.react-flow__node-minutes select.pr-beschluss-top', { timeout: 30000 });
+  await warteBis(P, () => [...document.querySelectorAll('select.pr-beschluss-top option')].length >= 2, 8000);
+  const erste = await P.locator('select.pr-beschluss-top option:first-child').allInnerTexts();
+  pruefe('L1 Protokoll englisch: der Eintrag „ohne TOP" ist übersetzt, die TOP-Texte des Nutzers bleiben', erste.length >= 2 && erste.every((t) => t === 'no agenda item') && (await P.locator('select.pr-beschluss-top option', { hasText: 'TOP 1: Haushalt' }).count()) >= 1, JSON.stringify(erste));
+  // Zeiterfassung dazu: die vier Reiter
+  await P.locator('.dock .dock-add-wrap button').first().click(); await P.waitForSelector('.modul-palette');
+  await P.locator('.modul-kachel[data-modul="zeit"]').click();
+  await P.waitForSelector('.time-views button');
+  const reiter = await P.locator('.time-views button').allInnerTexts();
+  pruefe('L2 Zeiterfassung englisch: Day · Week · Month · Year (nicht „day")', reiter.join('|') === 'Day|Week|Month|Year', reiter.join('|'));
+  await ctx.close();
+});
+await teil(async () => {
+  const { P, ctx } = await seite({ sprache: 'en' });
+  await P.keyboard.press('Alt+t'); await P.waitForSelector('.taskhub');
+  await P.waitForTimeout(400);
+  await P.locator('.taskhub select').first().selectOption('all');
+  await P.waitForSelector('.task-due');
+  const fristen = [...new Set(await P.locator('.task-due').allInnerTexts())];
+  pruefe('L3 Fristen englisch: „in 3 d" statt „in 3 T."', fristen.some((f) => /· in \d+ d$/.test(f)) && !fristen.some((f) => /T\.$|Tagen|heute|morgen|überfällig/.test(f)), fristen.slice(0, 6).join(' | '));
+  await ctx.close();
+});
+{
+  // L4: kein Zähl-Text mit Klammer-Endung mehr im Quelltext (M461: zahlWort) — Kommentare und die Hilfe ausgenommen
+  const funde = [];
+  const lauf = (dir) => { for (const n of readdirSync(dir)) { const f = join(dir, n); if (statSync(f).isDirectory()) { if (!/sprache$|mitmachen$/.test(f)) lauf(f); } else if (/\.tsx?$/.test(n) && !/^HelpOverlay/.test(n)) {
+    readFileSync(f, 'utf8').split('\n').forEach((z, i) => {
+      if (/^\s*(\/\/|\*|\/\*)/.test(z)) return;
+      const ohneKommentar = z.replace(/\s\/\/ .*$/, '').replace(/\{\/\*.*?\*\/\}/g, '');
+      if (/(^|[ >`'"„-])(?!String\(|Number\(|Array\(|Boolean\(|Symbol\(|Object\(|Error\()[A-ZÄÖÜ][a-zäöüß]{2,}\((e|n|en|er|s)\)[ .,:!?`'"<–-]/.test(ohneKommentar) || (/[A-ZÄÖÜ][a-zäöüß]{2,}\/[A-ZÄÖÜ][a-zäöüß]+e[n]?:/.test(ohneKommentar) && /\$\{/.test(ohneKommentar))) funde.push(`${path.relative(__repo, f)}:${i + 1}`);
+    });
+  } } };
+  lauf(path.join(__repo, 'src'));
+  pruefe('L4 kein Zähl-Text mit Klammer-Endung („${n} Karte(n)", „Eintrag/Einträge") im Quelltext', funde.length === 0, funde.join(', '));
+}
 
 // ══ Z: Konsole ═══════════════════════════════════════════════════════════════════════════════════════════
 console.log('\n════ Z: Konsole ════');
