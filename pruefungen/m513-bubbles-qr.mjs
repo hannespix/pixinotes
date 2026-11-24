@@ -418,5 +418,5 @@ pruefe('J4 Keine Seitenfehler', fehler.length === 0, fehler.join(' | '));
 
 await browser.close();
 app.close();
-console.log(`\nM513: ${ok} grün, ${bad} rot`);
+console.log(`\nM513: ${ok} bestanden, ${bad} fehlgeschlagen`);
 process.exit(bad ? 1 : 0);
