@@ -1,12 +1,11 @@
-import { useState, type SyntheticEvent } from 'react';
+import { useEffect, useState, type SyntheticEvent } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { runDerived, selectActiveBoard, useBoard, useKarteFest } from '../../store';
 import { triggerDownload } from '../../lib/download';
 import type { ImageNode } from '../../types';
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
-import { BildLupe } from './BildLupe';
-import { BildTextChips } from './BildTextChips';
+import { BildLupe, BildTextChips, bildTeileVorladen } from './bildSpaet';   // M519: nachgeladen
 import { bildBearbeiten } from '../BildEditorHost';
 import { ICrop, IImage } from '../Icons';
 
@@ -32,6 +31,7 @@ export function ImageCard({ id, data, selected }: NodeProps<ImageNode>) {
   const img = data;
   const titel = img.titel?.trim() || img.name || '';
   const [lupe, setLupe] = useState(false);
+  useEffect(() => bildTeileVorladen(), []);
   const fest = useKarteFest((img as { von?: string }).von);
   const rahmen = img.rahmen === true;
   /* Ältere Bild-Karten tragen eine von Hand gezogene Höhe, in der noch Rand und Namenszeile stecken —

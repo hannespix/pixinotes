@@ -16,8 +16,7 @@ import { loadFile, saveFile, vorschauArt, warumKeineVorschau } from '../../lib/f
 
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
-import { BildLupe } from './BildLupe';
-import { BildTextChips } from './BildTextChips';
+import { BildLupe, BildTextChips, bildTeileVorladen } from './bildSpaet';   // M519: nachgeladen
 import { ICrop, IDownload, IX, IImage, IComment } from '../Icons';
 import { bildBearbeiten } from '../BildEditorHost';
 
@@ -99,6 +98,7 @@ export function FileCard({ id, data, selected }: NodeProps<FileNode>) {
    * ist damit auch dann noch brauchbar, wenn er auftritt.
    */
   const istBild = !!quelle && art === 'bild';
+  useEffect(() => { if (istBild) bildTeileVorladen(); }, [istBild]);
   /**
    * M335: PDF zugeklappt oder aufgeklappt. Zugeklappt (Standard) zeigt die
    * Karte die erste Seite klein, Seitenzahl und Anmerkungszähler; aufgeklappt
