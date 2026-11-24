@@ -15,7 +15,8 @@ für den Desktop, wo oben mittig Platz ist:
   den Reaktions-Knopf → zugedeckt. `elementFromPoint` am Knopf traf `lese-kopie` bzw. `lese-band`
   (Bilder `vorher/iPhone-13-0.png`, `vorher/Pixel-7-0.png`).
 - `.zeig-band` („… führt vor“, Ebene 61, `top: 14px`): lag am Telefon quer über der Kopfzeile (Rückgängig, Suche).
-- `.gruppen-timer` (Ebene 96, `top: 58px`, mittig): konnte die Live-Leiste streifen.
+- `.gruppen-timer` (Ebene 96, `top: 58px`, mittig): überdeckte am schmalen Telefon die Live-Leiste – mit der
+  Stunden-Anzeige aus M512 („1:29:59“) noch breiter (Befund in M512, hier mit gelöst).
 Dazu war der Reaktions-Knopf 26 × 26 px, die Reaktionen 34 × 34 px – unter der Mindestgröße für Finger.
 
 ## Was
@@ -55,8 +56,10 @@ Dazu war der Reaktions-Knopf 26 × 26 px, die Reaktionen 34 × 34 px – unter d
   `--ebene-live` lassen.
 
 ## Prüfung
-`pruefungen/m511-reaktionen-telefon.mjs`: Anna (Desktop) lädt „nur lesen“ ein, vier Gäste (iPhone 13 hochkant,
-iPhone 13 quer, Pixel 7, Desktop); Anna führt vor und stellt den Timer – alle drei Bänder liegen an.
+`pruefungen/m511-reaktionen-telefon.mjs`: Anna (Desktop) lädt „nur lesen“ ein, fünf Gäste (iPhone 13 hochkant,
+iPhone 13 quer, Pixel 7, Galaxy S8 mit 360 px, Desktop); Anna führt vor und stellt den Timer auf 90 Minuten (freie
+Eingabe aus M512, Anzeige mit Stunden) – alle drei Bänder liegen an. Je Telefon steht die Uhr ganz im Bild unter
+der Live-Leiste.
 Je Telefon: kein Band über Live-Leiste/Kopfzeile/Reitern; Stapel unter der Live-Leiste; `elementFromPoint` am
 Mittelpunkt des Reaktions-Knopfs und jeder der acht Reaktionen trifft den Knopf, je ≥ 44 px, im Bild; jede getippte
 Reaktion kommt bei Anna an (MutationObserver); „Nur lesen“ wird kurz, bleibt sichtbar, klappt per Tipp auf
@@ -68,5 +71,7 @@ vorführt („Du führst vor“). Block F: die Gastgeberin selbst am Telefon (Si
 - Die Bänder bleiben am Telefon sichtbar (nur „Nur lesen“ schrumpft); „… führt vor“ trägt eine Handlung („Lösen“,
   „Beenden“) und bleibt darum ganz.
 - In der Folien-Präsentation am Telefon ist nichts verändert (Reaktions-Knopf im Kopf der Präsentation, M376).
-- M509/M510 (parallel) waren beim Bau noch nicht im Hauptzweig; ihre Hinweise gehören – wenn sie dauerhaft stehen –
-  in denselben Stapel.
+- M509 (Look beim Teilen) und M512 (freier Timer) sind eingemischt: der M509-Hinweis ist ein Toast unten (12 s), er
+  deckt die Reaktionen nicht. M510 war beim Bau noch nicht im Hauptzweig; dauerhafte Hinweise gehören in den Stapel.
+- Am sehr schmalen Telefon (360 px) mit vielen Teilnehmern reicht die Live-Leiste (über den Reitern, Ebene 55) ein
+  paar Punkte über deren rechten Rand; „+ Board“ bleibt frei.

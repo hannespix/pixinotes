@@ -1,18 +1,19 @@
 // M376: Reaktionen und gemeinsamer Timer — die Anzeige (Regeln und Kanal: lib/gruppenraum.ts)
 //
 //   · ReaktionsKnopf     – 😀 mit der kleinen Auswahl (Live-Leiste und Kopf der Präsentation)
-//   · TimerKnopf         – ⏱ mit den Zeiten (Live-Leiste)
+//   · TimerZeile         – Schnellwahl und freie Eingabe (M512: „90", „1h30", „45s") in der Liste der Gruppe
 //   · GruppenraumSchicht – über allem: aufsteigende Reaktionen (Board und Präsentation)
 //   · GruppenTimer       – die laufende Uhr (im Stapel der Dauerbänder, M511)
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { useBoard } from '../store';
 import {
-  REAKTION_EREIGNIS, REAKTIONEN, reagieren, TIMER_EREIGNIS, timerRest, timerStart, timerStopp, timerText, timerVergessen, timerVon,
+  REAKTION_EREIGNIS, REAKTIONEN, reagieren, TIMER_EREIGNIS, timerRest, timerStart, timerStartMs, timerStopp, timerText, timerVergessen, timerVon,
   type Reaktion,
 } from '../lib/gruppenraum';
 import { ich } from '../lib/liveStand';
 import { ITimer, IX, ILaecheln } from './Icons';
 import { zahlWort } from '../lib/sprache';
+import { timerDauerLesen } from '../lib/timerDauer';
 
 /** Aufklappen mit Schließen bei Klick daneben und Esc */
 function useAufklappen(wurzel: string): [boolean, (an: boolean | ((o: boolean) => boolean)) => void] {
@@ -45,16 +46,27 @@ export function ReaktionsKnopf({ boardId, klasse = 'live-zeig' }: { boardId: str
   );
 }
 
-const ZEITEN = [1, 2, 3, 5, 10, 15];
+/** M512: Schnellwahl um halbe und ganze Stunde ergänzt; alles andere über das freie Feld */
+const ZEITEN = [1, 2, 3, 5, 10, 15, 30, 60];
 /** M391: Timer stellen — eine Zeile in der Liste der Gruppe (vorher ein eigener Knopf in der Leiste) */
 export function TimerZeile({ boardId, fertig }: { boardId: string; fertig: () => void }) {
   const [, takt] = useState(0);
+  const [eingabe, setEingabe] = useState('');
+  const [fehler, setFehler] = useState('');
   useEffect(() => {
     const auf = () => takt((n) => n + 1);
     window.addEventListener(TIMER_EREIGNIS, auf);
     return () => window.removeEventListener(TIMER_EREIGNIS, auf);
   }, []);
   const laeuft = !!timerVon(boardId);
+  const gelesen = eingabe.trim() ? timerDauerLesen(eingabe) : null;
+  // M512: frei eingegebene Dauer — Enter oder „Start"; ungültig bleibt die Liste offen, mit einem Satz darunter
+  const frei = (e: FormEvent) => {
+    e.preventDefault();
+    const d = timerDauerLesen(eingabe);
+    if (d.fehler !== undefined) { setFehler(d.fehler); return; }
+    timerStartMs(boardId, d.ms); setEingabe(''); setFehler(''); fertig();
+  };
   return (
     <div className="timer-zeile" role="group" aria-label="Timer für alle stellen" data-taste="timer-wahl">
       <span className="timer-zeile-titel" title="Einer stellt die Uhr, alle sehen sie ablaufen"><ITimer size={15} /> Timer für alle</span>
@@ -65,6 +77,18 @@ export function TimerZeile({ boardId, fertig }: { boardId: string; fertig: () =>
         <span className="timer-zeile-einheit">min</span>
         {laeuft && <button className="stopp" data-taste="timer-stopp" onClick={() => { timerStopp(boardId); fertig(); }}>Anhalten</button>}
       </span>
+      <form className="timer-frei" onSubmit={frei} data-taste="timer-frei" noValidate>
+        {/* Zahlentastatur: eine Zahl sind Minuten („90"); am PC versteht das Feld auch 1h30, 1:30, 1,5 h, 45s */}
+        <input type="text" inputMode="numeric" enterKeyHint="go" autoComplete="off" spellCheck={false} maxLength={24}
+          value={eingabe} placeholder="Eigene Dauer, z. B. 90" aria-label="Eigene Dauer: Minuten oder z. B. 1h30, 1:30, 45s"
+          aria-invalid={!!fehler} aria-describedby="timer-frei-info" data-taste="timer-eingabe"
+          onChange={(e) => { setEingabe(e.target.value); setFehler(''); }}
+          onKeyDown={(e) => { if (e.key !== 'Escape') e.stopPropagation(); }} />
+        <button type="submit" data-taste="timer-frei-start" disabled={!eingabe.trim()}>Start</button>
+        <span id="timer-frei-info" className={`timer-frei-info${fehler ? ' fehler' : ''}`} role={fehler ? 'alert' : undefined} data-taste="timer-frei-info">
+          {fehler || (gelesen?.ms !== undefined ? `= ${timerText(gelesen.ms)}` : 'Minuten, oder 1h30 · 1:30 · 45s')}
+        </span>
+      </form>
     </div>
   );
 }
@@ -122,7 +146,8 @@ export function GruppenraumSchicht() {
 export function GruppenTimer() {
   const boardId = useBoard((s) => s.activeId);
   const imVortrag = useBoard((s) => s.presenting);
-  // Die Uhr: viermal je Sekunde nachsehen, solange sie läuft
+  // Die Uhr: M512 — genau dann nachsehen, wenn die Anzeige umspringt (höchstens einmal je Sekunde). Ein verdeckter
+  // Tab rechnet nicht mit: nur ein Wecker zum Ende (Ton beim Starter); beim Zurückkehren kommt die Restzeit aus dem Ende.
   const [, takt] = useState(0);
   const t = timerVon(boardId);
   const umSeit = useRef<{ lauf: number; seit: number } | null>(null);
@@ -133,7 +158,8 @@ export function GruppenTimer() {
   }, []);
   useEffect(() => {
     if (!t) { umSeit.current = null; return; }
-    const uhr = window.setInterval(() => {
+    let wecker = 0;
+    const nachsehen = () => {
       const jetzt = timerVon(boardId);
       if (!jetzt) return;
       if (timerRest(jetzt) <= 0) {
@@ -143,9 +169,21 @@ export function GruppenTimer() {
         } else if (Date.now() - umSeit.current.seit > 8000) timerVergessen(boardId, jetzt.lauf);   // Schlussmeldung stand acht Sekunden
       }
       takt((n) => n + 1);
-    }, 250);
-    return () => window.clearInterval(uhr);
-  }, [t?.lauf, boardId]);   // eslint-disable-line react-hooks/exhaustive-deps
+    };
+    const planen = () => {
+      window.clearTimeout(wecker);
+      const jetzt = timerVon(boardId);
+      if (!jetzt) return;
+      const rest = timerRest(jetzt);
+      // Anzeige rundet auf ganze Sekunden auf: sie springt, wenn der Rest die nächste volle Sekunde unterschreitet
+      const warte = rest <= 0 ? 1000 : document.hidden ? rest : (rest % 1000 || 1000);
+      wecker = window.setTimeout(() => { nachsehen(); planen(); }, warte + 15);
+    };
+    const sicht = () => { nachsehen(); planen(); };
+    nachsehen(); planen();
+    document.addEventListener('visibilitychange', sicht);
+    return () => { window.clearTimeout(wecker); document.removeEventListener('visibilitychange', sicht); };
+  }, [t?.lauf, t?.ende, boardId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const rest = timerRest(t);
   const um = !!t && rest <= 0;

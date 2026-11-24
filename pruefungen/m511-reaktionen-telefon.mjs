@@ -7,7 +7,7 @@
  *
  *   Aufbau  Anna lädt ein (nur lesen), vier Gäste: iPhone hochkant, iPhone quer, Pixel 7, Desktop; Anna führt vor
  *           und stellt den Timer — damit liegen alle drei Dauermeldungen an.
- *   A–C     Telefon: keine Meldung über Live-Leiste/Kopf; Reaktions-Knopf und alle acht Reaktionen frei (Mittelpunkt
+ *   A–C, S  Telefon (auch schmal, 360 px; Uhr mit Stunden aus M512): keine Meldung über Live-Leiste/Kopf; Reaktions-Knopf und alle acht Reaktionen frei (Mittelpunkt
  *           trifft den Knopf) und je 44 px; jede kommt bei Anna an; „Nur lesen" schrumpft, bleibt lesbar, klappt auf.
  *   D       Desktop: alles an seinem bisherigen Platz (Lage, Größe, Ebene).
  *   E       Wer am Telefon vorführt: „Du führst vor" unter dem Kopf, Reaktionen frei.
@@ -715,20 +715,23 @@ const beitreten = async (kurz, name, dev) => {
 const GH = await beitreten('GH', 'Gerd', devices['iPhone 13']);
 const GQ = await beitreten('GQ', 'Quentin', devices['iPhone 13 landscape']);
 const GP = await beitreten('GP', 'Paula', devices['Pixel 7']);
+const GS = await beitreten('GS', 'Sina', devices['Galaxy S8']);   // schmal: 360 px
 const GD = await beitreten('GD', 'Dora', null);
-await warteBis(A.P, async () => /5 dabei/.test(await zahl(A.P)), 15000);
+await warteBis(A.P, async () => /6 dabei/.test(await zahl(A.P)), 15000);
 // Anna führt vor und stellt fünf Minuten — damit liegen bei den Gästen alle drei Dauermeldungen an: „Nur lesen", „Anna führt vor", die Uhr
 // Erst klicken, wenn die Leiste frei ist (unter Last ordnet sich die Kopfzeile nach dem Dialog noch einen Moment)
 if (!(await warteBis(A.P, async () => !!(await lage(A.P, '[data-taste="live-auf"]'))[0]?.trifft, 15000))) console.log('    Annas Leiste verdeckt:', JSON.stringify(await lage(A.P, '[data-taste="live-auf"]')));
 await gruppeAuf(A.P);
 await A.P.locator('[data-taste="vorfuehren"]').click();
 await gruppeAuf(A.P);
-await A.P.locator('[data-taste="timer-min"][data-min="5"]').click();
+// M512: 90 Minuten — die Uhr zeigt Stunden („1:29:59“) und wird breiter (Rückmeldung aus M512)
+await A.P.locator('[data-taste="timer-eingabe"]').fill('90');
+await A.P.locator('[data-taste="timer-frei-start"]').click();
 await gruppeZu(A.P);
-for (const g of [GH, GQ, GP, GD]) {
+for (const g of [GH, GQ, GP, GS, GD]) {
   await warteBis(g.P, async () => (await g.P.locator('[data-taste="zeig-band"]').count()) === 1 && (await g.P.locator('[data-taste="timer-chip"]').count()) === 1, 15000);
 }
-pruefe('0b bei allen Gästen stehen „Nur lesen", „Anna führt vor" und die Uhr', (await Promise.all([GH, GQ, GP, GD].map(async (g) => (await g.P.locator('[data-taste="lese-band"], [data-taste="zeig-band"], [data-taste="timer-chip"]').count()) === 3))).every(Boolean));
+pruefe('0b bei allen Gästen stehen „Nur lesen", „Anna führt vor" und die Uhr', (await Promise.all([GH, GQ, GP, GS, GD].map(async (g) => (await g.P.locator('[data-taste="lese-band"], [data-taste="zeig-band"], [data-taste="timer-chip"]').count()) === 3))).every(Boolean));
 await mitschreiben(A.P);
 
 // ══ A–C: Gäste am Telefon ═══════════════════════════════════════════
@@ -743,6 +746,10 @@ const telefon = async (buchstabe, g, name, wie) => {
   for (const s of ['[data-taste="lese-band"]', '[data-taste="zeig-band"]', '[data-taste="timer-chip"]']) baender.push([s, await rechteck(P, s)]);
   const deckt = baender.filter(([, r]) => ueber(r, leiste) || ueber(r, kopf) || ueber(r, reiter)).map(([s]) => s);
   pruefe(`${buchstabe}1 keine Dauermeldung liegt über Live-Leiste, Kopfzeile oder Reitern`, deckt.length === 0, deckt.join(' '));
+  const uhr = await rechteck(P, '[data-taste="timer-chip"]');
+  const uhrText = await P.locator('[data-taste="timer-zeit"]').textContent().catch(() => '');
+  const breite = await P.evaluate(() => innerWidth);
+  pruefe(`${buchstabe}1b die Uhr mit Stunden (${uhrText}) steht ganz im Bild, unter der Live-Leiste`, /^1:\d\d:\d\d$/.test(uhrText) && !!uhr && uhr.l >= 0 && uhr.r <= breite && uhr.t >= leiste.b && !ueber(uhr, leiste), JSON.stringify([uhr, leiste]));
   const ebenen = await P.evaluate(() => ({ stapel: Number(getComputedStyle(document.querySelector('.dauerbaender')).zIndex), leiste: Number(getComputedStyle(document.querySelector('.live-leiste')).zIndex), display: getComputedStyle(document.querySelector('.dauerbaender')).display }));
   pruefe(`${buchstabe}2 die Dauerbänder stehen als Spalte eine Ebene unter der Live-Leiste`, ebenen.display === 'flex' && ebenen.stapel < ebenen.leiste, JSON.stringify(ebenen));
   const [auf] = await lage(P, '[data-taste="reakt-auf"]');
@@ -783,6 +790,7 @@ const telefon = async (buchstabe, g, name, wie) => {
 await telefon('A', GH, 'Gerd', 'iPhone hochkant');
 await telefon('B', GQ, 'Quentin', 'iPhone quer');
 await telefon('C', GP, 'Paula', 'Pixel 7');
+await telefon('S', GS, 'Sina', 'schmalen Telefon (Galaxy S8, 360 px)');
 
 // ══ D: Desktop unverändert ══════════════════════════════════════════
 console.log('\n════ D: Desktop – alles an seinem bisherigen Platz ════');
@@ -856,7 +864,7 @@ console.log('\n════ F: Anna (Gastgeberin) am Telefon ════');
     await warteBis(GH.P, async () => (await angekommen(GH.P)).some((x) => x.endsWith(':👏') && !x.startsWith('Gerd')), 8000);
     pruefe('F4 Gerd sieht Annas Applaus', (await angekommen(GH.P)).some((x) => x.endsWith(':👏') && !x.startsWith('Gerd')), JSON.stringify(await angekommen(GH.P)));
   }
-  const fehler = [GH, GQ, GP, GD].flatMap((g) => g.P.fehler).concat(P.fehler);
+  const fehler = [GH, GQ, GP, GS, GD].flatMap((g) => g.P.fehler).concat(P.fehler);
   pruefe('F5 keine Skriptfehler', fehler.length === 0, fehler.join(' | ').slice(0, 400));
 }
 
