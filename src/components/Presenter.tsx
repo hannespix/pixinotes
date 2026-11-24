@@ -36,6 +36,7 @@ import { WeekBody } from './nodes/WeekCard';
 import { TimeBody } from './nodes/TimeCard';
 import { MinutesBody } from './nodes/MinutesCard';
 import { papierArt } from '../lib/minutes';
+import { formSchrift, notizSchrift } from '../lib/lesbareSchrift';
 import { SheetBody } from './nodes/SheetCard';
 import { FolienLaser } from './Mauszeiger';
 import { ReaktionsKnopf } from './Gruppenraum';
@@ -81,9 +82,14 @@ function NoteSlide({ node }: { node: NoteNode }) {
      fremde Datei nur abgewiesen, nicht umgeleitet. */
   const huelle = useRef<HTMLDivElement>(null);
   useNurBilderInDenText(huelle);
+  const hex = typeof node.data.hex === 'string' && node.data.hex ? node.data.hex : undefined;
+  const schrift = notizSchrift(hex);
 
   return (
-    <div className={`slide-note sticky-${node.data.color} note-editor`} ref={huelle}>
+    // M515: wie auf dem Board — eigene Farbe als Fläche, Schrift nach dem Papier (weiß folgt dem Thema, eine dunkle
+    // oder mittlere eigene Farbe bringt ihre lesbare Schrift mit). Vorher stand BlockNote-Grau auf der dunklen Folie.
+    <div className={`slide-note sticky-${hex ? 'eigen' : node.data.color} papier-${papierArt(node.data)}${schrift.klasse} note-editor`}
+      style={hex ? { background: hex, ...schrift.stil } as CSSProperties : undefined} ref={huelle}>
       {/* M267: auch in der Präsentation dieselbe Formatier-Leiste — wer hier
           eine Folie nachbessert, soll nicht plötzlich andere Werkzeuge haben */}
       <BlockNoteView
@@ -105,11 +111,13 @@ function NoteSlide({ node }: { node: NoteNode }) {
 /** Form-Folie: Original-Optik (inkl. Raute/Stadion), Text direkt editierbar */
 function ShapeSlide({ node }: { node: ShapeNode }) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
+  const schrift = formSchrift(node.data.color);
   return (
     <div className={`shape-wrap shape-${node.data.shape} slide-shape`}>
+      {/* M515: dieselbe Schrift wie auf dem Board — nach der Füllung, nicht nach dem Thema der Folie */}
       <div
-        className="shape-body"
-        style={{ background: node.data.color, '--shape-fill': node.data.color } as CSSProperties}
+        className={`shape-body${schrift.klasse}`}
+        style={{ background: node.data.color, '--shape-fill': node.data.color, ...schrift.stil } as CSSProperties}
       >
         {/* M435: Formatierter Text (wie in Notizen) erscheint auf der Folie formatiert; schlichter Text bleibt direkt editierbar */}
         {Array.isArray(node.data.blocks) && node.data.blocks.length ? (

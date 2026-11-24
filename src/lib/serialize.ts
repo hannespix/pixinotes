@@ -576,7 +576,7 @@ export function nodeToHtml(node: AppNode): string {
       const cols = kanbanCols(k).map((col, i) => {
         const items = k.items.filter((it) => Math.min(it.col, done) === i);
         // M340: Frist, Person und Beschreibung gehören dazu — im Text standen sie schon, im HTML fehlten sie
-        const zeile = (it: (typeof k.items)[number]) => `<li>${i === done ? '☑' : '☐'} ${esc(it.text)}${it.due ? ` <span style="color:#777">(bis ${esc(it.due)})</span>` : ''}${it.who ? ` <span style="color:#777">@${esc(it.who)}</span>` : ''}${it.note ? `<br><span style="color:#555;font-size:.93em">${esc(it.note)}</span>` : ''}</li>`;
+        const zeile = (it: (typeof k.items)[number]) => `<li>${i === done ? '☑' : '☐'} ${esc(it.text)}${it.due ? ` <span style="color:var(--muted,#5f6670)">(bis ${esc(it.due)})</span>` : ''}${it.who ? ` <span style="color:var(--muted,#5f6670)">@${esc(it.who)}</span>` : ''}${it.note ? `<br><span style="color:#555;font-size:.93em">${esc(it.note)}</span>` : ''}</li>`;
         return `<h4>${esc(col)}</h4><ul style="list-style:none;padding-left:2px">${items.map(zeile).join('') || '<li>—</li>'}</ul>`;
       }).join('');
       const arch = k.archiv ?? []; // M293
@@ -603,12 +603,12 @@ export function nodeToHtml(node: AppNode): string {
       const bild = diagrammBild(node.id);
       return bild
         ? `<img src="${bild.src}" alt="Diagramm" style="max-width:100%;height:auto" width="${bild.w}" />`
-        : `<pre style="background:#faf8f3;border-radius:8px;padding:10px;font-size:13px;overflow:auto;white-space:pre-wrap">${esc(node.data.code)}</pre>`;
+        : `<pre style="background:#faf8f3;color:#16191e;border-radius:8px;padding:10px;font-size:13px;overflow:auto;white-space:pre-wrap">${esc(node.data.code)}</pre>`;
     }
     case 'file': {
       const f = node.data;
       const t = f.titel?.trim();
-      return `<p><b>${esc(t && t !== f.name ? t : f.name)}</b>${t && t !== f.name ? ` – ${esc(f.name)}` : ''} <span style="color:#777">(${formatBytes(f.size)})</span></p>`;
+      return `<p><b>${esc(t && t !== f.name ? t : f.name)}</b>${t && t !== f.name ? ` – ${esc(f.name)}` : ''} <span style="color:var(--muted,#5f6670)">(${formatBytes(f.size)})</span></p>`;
     }
     case 'frame':
       // Abschnitts-Folie im Presenter: der Rahmen-Name als Zwischentitel

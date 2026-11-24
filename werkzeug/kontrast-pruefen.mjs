@@ -50,6 +50,16 @@ function scanImBrowser([sel, grenze, alle, art = 'text']) {
     let bild = false;
     const nimm = (e) => {
       const s = getComputedStyle(e);
+      // M515: Eine Fläche aus ::before/::after, die das Element fast ganz ausfüllt (die Raute der Entscheidung zeichnet
+      // ihre Füllung so, die Form selbst ist durchsichtig), liegt über dem eigenen Grund und unter dem Text
+      for (const ps of ['::after', '::before']) {
+        const p = getComputedStyle(e, ps);
+        if (!p.content || p.content === 'none' || p.display === 'none' || !/absolute|fixed/.test(p.position)) continue;
+        const pc = rgba(p.backgroundColor);
+        if (pc[3] <= 0 || !e.clientWidth || !e.clientHeight || parseFloat(p.width) < e.clientWidth * 0.8 || parseFloat(p.height) < e.clientHeight * 0.8) continue;
+        schichten.push(pc);
+        if (pc[3] >= 1) return true;
+      }
       if (s.backgroundImage && s.backgroundImage !== 'none' && !/^url\(.*\.svg/.test(s.backgroundImage)) bild = true;
       const c = rgba(s.backgroundColor);
       if (c[3] > 0) schichten.push(c);
