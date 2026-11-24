@@ -28,6 +28,7 @@ import { BacklinksPanel } from './components/BacklinksPanel';
 import { GeteiltHost } from './components/GeteiltHost';
 import { TooltipLayer } from './components/TooltipLayer';
 import { Tastatur } from './components/Tastatur';
+import { NurBoard } from './lib/nurBoard';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
 import { kontoKennung, serienAusstehend, termineHintergrund, termineZuErinnern } from './lib/termineZentrale';
 import { fristenAusstehend, fristenLaden } from './lib/dates';
@@ -41,7 +42,8 @@ import { folgeIch, VORFUEHR_EREIGNIS, werFuehrtVor } from './lib/vorfuehrenLeich
 import { PunkteLeisteSpaet, punkteLaden } from './components/PunkteSpaet';
 import { rechenTabelleLaden } from './components/RechenTabelle';
 import { SprachHinweis } from './components/SprachHinweis';
-import { GastNameDialog, GruppenraumSpaet, LiveLeiste, NAME_FRAGEN, VorfuehrenSpaet } from './components/LiveLeiste';
+import { GastNameDialog, GruppenraumSpaet, GruppenTimerSpaet, LiveLeiste, NAME_FRAGEN, VorfuehrenSpaet } from './components/LiveLeiste';
+import { LeseBand } from './components/Dauerbaender';
 import { FreigabeHost, freigabeDialogLaden } from './components/FreigabeHost';
 import { BildEditorHost } from './components/BildEditorHost';
 import { EbeneLoeschenHost } from './components/EbeneLoeschenDialog';
@@ -49,7 +51,6 @@ import { getAuthor } from './lib/autor';
 import { loadKonto } from './lib/kontoSitzung';
 import { initSyncStart } from './lib/syncStart';
 import { sprache, zahlWort } from './lib/sprache';
-import { ILock } from './components/Icons';
 import { EINGANG_OEFFNEN, eingangWaechter } from './lib/eingang';
 import { importLaden } from './lib/importSpaet';
 import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick gespeicherte Seitenstriche (M354-Fehler) einmal richten
@@ -647,6 +648,8 @@ export default function App() {
       <Nachschlagen />
       <TooltipLayer />
       <Tastatur />
+      {/* M510: Oberfläche ausblenden – nur das Board (Alt+B, Esc) */}
+      <NurBoard moeglich={view === 'board' && !presenting && !focusCard && !tasksOpen} />
         <Einstellungen />
         <Recherche />
         <Praesentation />
@@ -662,10 +665,7 @@ export default function App() {
         )}
         {/* M364: Gruppenarbeit — wer ist gerade im Board */}
         {view === 'board' && !presenting && !focusCard && !tasksOpen && <LiveLeiste />}
-        {/* M367: „Folgt mir" — wer vorführt, wer folgt */}
-        {/* M371: auch während der Präsentation — sie gehört jetzt zur Ansicht, die der Vorführende mitnimmt */}
-        {view === 'board' && !tasksOpen && <VorfuehrenSpaet />}
-        {/* M376: aufsteigende Reaktionen und die gemeinsame Uhr — über Board und Präsentation */}
+        {/* M376: aufsteigende Reaktionen — über Board und Präsentation */}
         {view === 'board' && !tasksOpen && <GruppenraumSpaet />}
         {/* M377: Punkte-Modus — Karten antippen statt auswählen */}
         {view === 'board' && !tasksOpen && !presenting && <PunkteLeisteSpaet />}
@@ -675,27 +675,33 @@ export default function App() {
         <EbeneLoeschenHost />
         {/* M368: anderssprachigen Nutzern sagen, dass der Browser die Oberfläche übersetzen kann */}
         {!presenting && <SprachHinweis />}
-        {/* M360: Nur lesend geteiltes Board — sagen, warum nichts geht, und den Ausweg anbieten */}
-        {nurLesenBoard && view === 'board' && !presenting && !focusCard && (
-          <div className="lese-band" role="status" data-taste="lese-band">
-            <span><ILock size={13} /> <b>Nur lesen</b> · {nurLesenBoard.von ? `geteilt von ${nurLesenBoard.von}` : 'geteiltes Board'}</span>
-            <button onClick={() => useBoard.getState().duplicateBoard(nurLesenBoard.id)} data-taste="lese-kopie">Eigene Kopie anlegen</button>
-          </div>
-        )}
-        {writerRole === 'follower' && (
-          <div className="writer-banner" role="status">
-            <span>
-              {/* M247: genauer sagen, WAS hier nicht gespeichert wird. „Liest nur mit"
-                  klang wie „gar nichts geht" — dabei betrifft es nur die Inhalte;
-                  Design und Anzeige werden auch hier dauerhaft gemerkt. */}
-              PixiNotes ist in einem anderen Fenster/Tab geöffnet – <b>Änderungen an Karten
-              werden hier nicht gespeichert</b>, damit sich die Stände nicht gegenseitig
-              überschreiben. Design- und Anzeige-Einstellungen bleiben erhalten.
-            </span>
-            <button onClick={takeOverWriter}>Hier weiterarbeiten</button>
-          </div>
-        )}
-        <div className={`toast ${toast ? 'show' : ''}`}>
+        {/* M511: Dauerbänder in EINEM Stapel — am Telefon unter Kopfzeile und Live-Leiste (sie überdeckten dort die
+            Reaktionen), am Desktop `display: contents`, also jedes an seinem bisherigen Platz (Dauerbaender.tsx) */}
+        <div className={`dauerbaender${presenting ? ' im-vortrag' : ''}`} data-taste="dauerbaender">
+          {/* M360: Nur lesend geteiltes Board — sagen, warum nichts geht, und den Ausweg anbieten */}
+          {nurLesenBoard && view === 'board' && !presenting && !focusCard && <LeseBand id={nurLesenBoard.id} von={nurLesenBoard.von} />}
+          {writerRole === 'follower' && (
+            <div className="writer-banner" role="status">
+              <span>
+                {/* M247: genauer sagen, WAS hier nicht gespeichert wird. „Liest nur mit"
+                    klang wie „gar nichts geht" — dabei betrifft es nur die Inhalte;
+                    Design und Anzeige werden auch hier dauerhaft gemerkt. */}
+                PixiNotes ist in einem anderen Fenster/Tab geöffnet – <b>Änderungen an Karten
+                werden hier nicht gespeichert</b>, damit sich die Stände nicht gegenseitig
+                überschreiben. Design- und Anzeige-Einstellungen bleiben erhalten.
+              </span>
+              <button onClick={takeOverWriter}>Hier weiterarbeiten</button>
+            </div>
+          )}
+          {/* M367: „Folgt mir" — wer vorführt, wer folgt */}
+          {/* M371: auch während der Präsentation — sie gehört jetzt zur Ansicht, die der Vorführende mitnimmt */}
+          {view === 'board' && !tasksOpen && <VorfuehrenSpaet />}
+          {/* M376: die gemeinsame Uhr — über Board und Präsentation */}
+          {view === 'board' && !tasksOpen && <GruppenTimerSpaet />}
+        </div>
+        {/* M510: Mit ausgeblendeter Oberfläche zeigen sich nur Hinweise, die eine Antwort brauchen oder vor Verlust warnen
+            (Rückgängig, eigener Knopf, Abbrechen, Speicher voll) — `wichtig` */}
+        <div className={`toast ${toast ? 'show' : ''}${toast && (toast.undo || toast.knopf || toast.abbruch || /Speicher voll|nicht gespeichert|nicht gesichert/.test(toast.message)) ? ' wichtig' : ''}`}>
           {toast?.message}
           {toast?.undo && (
             <button className="toast-undo" onClick={() => useBoard.getState().hinweisRueckgaengig()}>

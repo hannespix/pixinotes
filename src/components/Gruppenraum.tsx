@@ -2,7 +2,8 @@
 //
 //   · ReaktionsKnopf     – 😀 mit der kleinen Auswahl (Live-Leiste und Kopf der Präsentation)
 //   · TimerZeile         – Schnellwahl und freie Eingabe (M512: „90", „1h30", „45s") in der Liste der Gruppe
-//   · GruppenraumSchicht – über allem: aufsteigende Reaktionen und die laufende Uhr (Board und Präsentation)
+//   · GruppenraumSchicht – über allem: aufsteigende Reaktionen (Board und Präsentation)
+//   · GruppenTimer       – die laufende Uhr (im Stapel der Dauerbänder, M511)
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { useBoard } from '../store';
 import {
@@ -112,8 +113,6 @@ function ton(): void {
 }
 
 export function GruppenraumSchicht() {
-  const boardId = useBoard((s) => s.activeId);
-  const imVortrag = useBoard((s) => s.presenting);
   const [fluege, setFluege] = useState<Flug[]>([]);
   useEffect(() => {
     const auf = (e: Event) => {
@@ -126,7 +125,27 @@ export function GruppenraumSchicht() {
     window.addEventListener(REAKTION_EREIGNIS, auf);
     return () => window.removeEventListener(REAKTION_EREIGNIS, auf);
   }, []);
+  if (fluege.length === 0) return null;
+  return (
+    <div className="reakt-schicht" aria-hidden="true">
+      {fluege.map((f) => (
+        <span key={f.k} className={`reakt-flug${f.ich ? ' ich' : ''}`} data-taste="reakt-flug" data-zeichen={f.zeichen} data-name={f.name}
+          style={{ left: `${f.links}%`, '--drift': `${f.drift}px`, '--farbe': f.farbe } as CSSProperties}>
+          <span className="reakt-zeichen">{f.zeichen}</span>
+          <span className="reakt-name" translate="no">{f.ich ? 'du' : f.name}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
 
+/**
+ * M511: Die laufende Uhr ist eine eigene Anzeige (vorher Teil der Schicht oben). Sie steht im Stapel der Dauerbänder
+ * (App.tsx, `.dauerbaender`): am Telefon unter der Kopfzeile statt quer über der Live-Leiste mit den Reaktionen.
+ */
+export function GruppenTimer() {
+  const boardId = useBoard((s) => s.activeId);
+  const imVortrag = useBoard((s) => s.presenting);
   // Die Uhr: M512 — genau dann nachsehen, wenn die Anzeige umspringt (höchstens einmal je Sekunde). Ein verdeckter
   // Tab rechnet nicht mit: nur ein Wecker zum Ende (Ton beim Starter); beim Zurückkehren kommt die Restzeit aus dem Ende.
   const [, takt] = useState(0);
@@ -168,28 +187,14 @@ export function GruppenraumSchicht() {
 
   const rest = timerRest(t);
   const um = !!t && rest <= 0;
+  if (!t) return null;
   return (
-    <>
-      {t && (
-        <div className={`gruppen-timer${um ? ' um' : ''}${rest > 0 && rest <= 10_000 ? ' knapp' : ''}${imVortrag ? ' im-vortrag' : ''}`} role="timer" aria-live="off" data-taste="timer-chip"
-          style={{ '--anteil': `${Math.max(0, Math.min(1, rest / Math.max(1, t.dauer))) * 100}%` } as CSSProperties}>
-          <ITimer size={14} />
-          <span className="gruppen-timer-zeit" data-taste="timer-zeit">{um ? 'Zeit ist um' : timerText(rest)}</span>
-          <span className="gruppen-timer-von" translate="no">{t.von === ich().id ? 'von dir' : `von ${t.name}`}</span>
-          <button onClick={() => timerStopp(boardId)} title={um ? 'Schließen' : 'Timer für alle anhalten'} aria-label={um ? 'Schließen' : 'Timer anhalten'} data-taste="timer-zu"><IX size={12} /></button>
-        </div>
-      )}
-      {fluege.length > 0 && (
-        <div className="reakt-schicht" aria-hidden="true">
-          {fluege.map((f) => (
-            <span key={f.k} className={`reakt-flug${f.ich ? ' ich' : ''}`} data-taste="reakt-flug" data-zeichen={f.zeichen} data-name={f.name}
-              style={{ left: `${f.links}%`, '--drift': `${f.drift}px`, '--farbe': f.farbe } as CSSProperties}>
-              <span className="reakt-zeichen">{f.zeichen}</span>
-              <span className="reakt-name" translate="no">{f.ich ? 'du' : f.name}</span>
-            </span>
-          ))}
-        </div>
-      )}
-    </>
+    <div className={`gruppen-timer${um ? ' um' : ''}${rest > 0 && rest <= 10_000 ? ' knapp' : ''}${imVortrag ? ' im-vortrag' : ''}`} role="timer" aria-live="off" data-taste="timer-chip"
+      style={{ '--anteil': `${Math.max(0, Math.min(1, rest / Math.max(1, t.dauer))) * 100}%` } as CSSProperties}>
+      <ITimer size={14} />
+      <span className="gruppen-timer-zeit" data-taste="timer-zeit">{um ? 'Zeit ist um' : timerText(rest)}</span>
+      <span className="gruppen-timer-von" translate="no">{t.von === ich().id ? 'von dir' : `von ${t.name}`}</span>
+      <button onClick={() => timerStopp(boardId)} title={um ? 'Schließen' : 'Timer für alle anhalten'} aria-label={um ? 'Schließen' : 'Timer anhalten'} data-taste="timer-zu"><IX size={12} /></button>
+    </div>
   );
 }

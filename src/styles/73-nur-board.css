@@ -1,0 +1,62 @@
+/* ---------- M510: Oberfläche ausblenden — nur das Board ----------
+   „Für die Sharing-Arbeit wäre manchmal praktisch, wenn man live das Board überträgt, aber das UI (Menüs, Rahmen mit
+   Anfassern etc.) ausgeblendet werden kann." Am Wurzelelement steht data-nur-board (lib/nurBoard.tsx; Alt+B, Esc,
+   ⋯ der Leiste, Suche). Verwandt mit „Nur Inhalt" (M426, 72-netz-nur-inhalt-formen.css), aber auf dem Board: Man
+   verschiebt, zoomt, klickt und schreibt weiter — nur ohne Leisten, Rahmen, Griffe und Knöpfe.
+   Die Leisten bleiben eingehängt und ziehen sich nur unsichtbar zurück (visibility, keine Änderung am DOM und an ihren
+   Maßen — die gemessene Kopfhöhe bleibt, nichts rechnet nach). Was zeigt, dass andere da sind und wohin jemand zeigt,
+   bleibt: Zeiger der Gäste, Laser, Reaktionen. Die Bedienung in den Karten (M421) steht in 99-bedienung-im-fokus.css. */
+html[data-nur-board] :is(
+    .app > .topbar, .app > .tabs, .app > .dock, .app > .legal-corner, .dauerbaender > .lese-band,   /* M511: im Stapel */
+    .backlinks, .live-leiste, .zeig-band, .gruppen-timer, .punkte-leiste, .sprach-hinweis, .draw-palette,
+    .sel-toolbar, .sel-toolbar-dock, .sel-menu-fixed, .sel-toolbar-anker,
+    .pn-minimap, .fokus-spur, .empty-board-hint, .app > .toast:not(.wichtig)
+) { visibility: hidden !important; pointer-events: none !important; }
+/* Die linke Spalte gibt auch ihren Platz her: Das Board reicht bis an den Rand (lib/nurBoard.tsx hält die Karten
+   dabei an ihrer Stelle) */
+html[data-nur-board] .app.nav-links::before { display: none; }
+html[data-nur-board] .app.nav-links .board-wrap { margin-left: 0; }
+/* Was unten mittig steht (wichtige Hinweise), steht mittig über dem ganzen Fenster */
+html[data-nur-board] .app.nav-links .toast { left: 50%; }
+
+/* Auf der Fläche: kein Auswahlrahmen, keine Anfasser, Anschlusspunkte, Drehknöpfe, Griffe, Farbpunkte, Rollbalken —
+   wie beim Bild-Export (M340), nur dass alles bedienbar bleibt. Gewählt ist trotzdem gewählt (Entf, Pfeiltasten). */
+html[data-nur-board] .react-flow__node.selected,
+html[data-nur-board] .react-flow__node.selectable.selected:focus,
+html[data-nur-board] .react-flow__node.selectable.selected:focus-visible,
+html[data-nur-board] .react-flow__node.selected > .card-shell[data-winkel],
+html[data-nur-board] [data-weit] .react-flow__node:hover { outline: none !important; }
+html[data-nur-board] :is(
+    .react-flow__resize-control, .pn-handle, .card-grip, .dreh-knopf, .color-dot, .note-farben, .fit-hint, .note-spur,
+    .note-mehr.oben, .shape-toolbar, .shape-handle, .react-flow__nodesselection, .react-flow__selection,
+    .react-flow__edgeupdater, .live-sperre
+) { visibility: hidden !important; }
+/* Bedienung, die M421 an der Karte stehen lässt: Menüs (⋯), Spalten anlegen und löschen, Ticket-Knöpfe */
+html[data-nur-board] .react-flow__node :is(
+    button[aria-haspopup], .kanban-addcol, .kanban-col-x, .kanban-item-actions, .card-actions, .happ-head .happ-btn,
+    .bild-lupe-auf, .bild-bearbeiten-auf
+) { opacity: 0 !important; pointer-events: none !important; animation: none !important; }
+
+/* Der dezente Umschalter: unten rechts, unsichtbar, bis sich die Maus bewegt — dann halb durchsichtig, unter dem
+   Zeiger ganz. Am Finger zeigt ein Tipp in die Ecke ihn, der zweite schaltet. Beim Einschalten steht er kurz mit
+   Beschriftung da, damit man weiß, wo er wohnt. */
+.nur-board-ecke {
+  position: fixed; z-index: 400;
+  right: env(safe-area-inset-right, 0px); bottom: var(--safe-bottom, 0px);
+  min-width: 72px; height: 72px; padding: 0 12px 12px 12px;
+  display: flex; align-items: flex-end; justify-content: flex-end; pointer-events: auto;
+}
+.nur-board-knopf {
+  display: inline-flex; align-items: center; gap: 8px; flex: none;
+  min-width: 44px; min-height: 44px; padding: 0 13px; justify-content: center;
+  border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+  font: 600 13px/1.2 var(--font-ui); color: var(--ink); background: var(--surface);
+  opacity: 0; transition: opacity 0.35s ease;
+}
+.nur-board-knopf.da { opacity: 0.62; }
+.nur-board-knopf.lang, .nur-board-knopf:hover, .nur-board-knopf:focus-visible { opacity: 1; }
+.nur-board-knopf:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.nur-board-text { display: none; white-space: nowrap; }
+.nur-board-knopf.lang .nur-board-text { display: inline; }
+.nur-board-text kbd { margin-left: 6px; font: 600 11px/1 var(--font-ui); padding: 3px 6px; border-radius: 5px; background: var(--surface-2); color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .nur-board-knopf { transition: none; } }

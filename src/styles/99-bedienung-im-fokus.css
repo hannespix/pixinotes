@@ -6,7 +6,8 @@
    beim Überfahren nichts aufblitzt). Sie behält ihren Platz — nichts springt. Was Inhalt ist oder einen Zustand
    zeigt, bleibt: Titel, Daten, Spaltenköpfe, die laufende Zeiterfassung, ein gesetzter Filter, eine offene
    Abstimmung. Gilt nur auf dem Board; Karten-Fokus und Präsentation zeigen alles.
-   Die Liste steht dreimal (Übergang, Zeiger, Finger) — neue Bedien-Klassen in alle drei eintragen. */
+   Die Liste steht viermal (Übergang, Zeiger, Finger, M510 „Oberfläche ausblenden" am Ende) — neue Bedien-Klassen in
+   alle vier eintragen. */
 @keyframes pn-bedienung-ein { from { opacity: 0; } }
 .react-flow__node :where(
     .kanban-add,
@@ -67,3 +68,18 @@
     .bildtext-chips
   ) { opacity: 0; pointer-events: none; }
 }
+/* M510: „Oberfläche ausblenden" (lib/nurBoard.tsx, 73-nur-board.css) — die Bedienung bleibt weg, auch an der gewählten
+   Karte, mit dem Zeiger darauf oder mit dem Fokus darin. Schreiben geht weiter; Unsichtbares fängt keinen Klick. */
+html[data-nur-board] .react-flow__node :is(
+    .kanban-add,
+    .gantt-tools, .gantt-addzeile,
+    .cal-nav,
+    .bub:not([data-phase='offen']) :is(.bub-ansicht, .bub-schritte, .bub-gruppe-neu, .bub-leiste, .bub-zahl, .bub-frage-feld:placeholder-shown),
+    .time-rec, .time-nav, .time-empty,
+    .minutes-setup-btn, .minutes-new, .pr-werkzeuge, .pr-person-neu:placeholder-shown, .pr-person-weg, .pr-runde:not(:has(.pr-person)), .minutes-decision-add:placeholder-shown, .minutes-decisions:not(:has(.minutes-decision)), .pr-aeltere, .pr-vorschlag, .pr-top-stand, .pr-beschluss-top.leer,
+    .sheet-tools, .sheet-fuss:not(:has(.sheet-filter-weg)),
+    .happ-size, .happ-head .happ-btn,
+    .kontakt-tools, .pixi-tools,
+    .fl-werkzeuge,
+    .bildtext-chips
+) { opacity: 0 !important; pointer-events: none !important; animation: none !important; }
