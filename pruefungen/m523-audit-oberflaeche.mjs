@@ -143,6 +143,17 @@ await teil(async () => {
   pruefe('A10 Suche + Einstellungen: Esc schließt nur die Einstellungen', await bleibt(P, () => !!document.querySelector('.search-box') && !document.querySelector('.modal[aria-label="Einstellungen"]')), JSON.stringify(await offen(P)));
   await P.keyboard.press('Escape'); await warteBis(P, () => !document.querySelector('.search-box'), 5000);
 
+  // A11: Während der Präsentation geöffnete Einstellungen — Esc schließt erst sie, dann die Präsentation (kein Festhängen)
+  await P.keyboard.press('Alt+p'); await P.waitForSelector('.presenter');
+  await P.keyboard.press('Alt+e'); await P.waitForSelector('.modal[aria-label="Einstellungen"]');
+  await P.waitForTimeout(400);
+  await P.keyboard.press('Escape');
+  const einstZu = await warteBis(P, () => !document.querySelector('.modal[aria-label="Einstellungen"]'), 5000);
+  const vortragNoch = await P.locator('.presenter').count();
+  await P.keyboard.press('Escape');
+  pruefe('A11 Einstellungen in der Präsentation: erstes Esc schließt sie, das zweite die Präsentation', einstZu && vortragNoch === 1 && await warteBis(P, () => !document.querySelector('.presenter'), 5000), `einst zu ${einstZu}, Vortrag ${vortragNoch}`);
+  for (let i = 0; i < 2 && (await P.locator('.presenter, .modal-backdrop').count()); i++) { await P.keyboard.press('Escape'); await P.waitForTimeout(300); }
+
   // ══ B: Kürzel hinter einem Fenster ══
   console.log('\n════ B: Kürzel hinter einem offenen Fenster ════');
   await P.keyboard.press('Alt+e'); await P.waitForSelector('.modal[aria-label="Einstellungen"]');
@@ -181,6 +192,11 @@ await teil(async () => {
   await P.keyboard.press('Alt+t'); await P.waitForSelector('.taskhub');
   await P.locator('.tabs button', { hasText: 'Schnelle Notizen' }).first().click();
   pruefe('C2 Karte im Baum bei offener Zentrale: die Karte ist zu sehen', await warteBis(P, () => !document.querySelector('.taskhub') && !!document.querySelector('.react-flow__node'), 10000), JSON.stringify(await offen(P)));
+  // C5: ein Board im Baum anklicken, während die Zentrale offen ist
+  if (await P.locator('.focus-head').count()) { await P.keyboard.press('Escape'); await P.waitForTimeout(400); }
+  await P.keyboard.press('Alt+t'); await P.waitForSelector('.taskhub');
+  await P.locator('.side-board-name', { hasText: 'Aufgaben-Zentrale' }).first().click();
+  pruefe('C5 Board im Baum bei offener Zentrale: das Board ist zu sehen', await warteBis(P, () => !document.querySelector('.taskhub') && !!document.querySelector('.dock') && /Aufgaben-Zentrale/.test(document.querySelector('.side-board.active')?.textContent ?? ''), 8000), JSON.stringify(await offen(P)));
   // C3/C4: aus der Übersicht
   if (await P.locator('.focus-head').count()) { await P.keyboard.press('Escape'); await P.waitForTimeout(400); }
   await P.locator('[data-taste="uebersicht"]').click(); await P.waitForSelector('.ov-mode');

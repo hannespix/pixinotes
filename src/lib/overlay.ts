@@ -21,7 +21,9 @@ export function obenauf(fenster: Iterable<Element>): Element | null {
   for (const w of fenster) if (!oben || liegtUeber(w, oben)) oben = w;
   return oben;
 }
-const STAPEL = `${FENSTER}, .nav-backdrop`;
+// Die Präsentation ist kein Fenster über einem Fenster, sondern eine Ansicht: Was während eines Vortrags aufgeht
+// (Einstellungen, Hilfe), schließt Esc zuerst — die Präsentation selbst wartet so lange (Presenter.tsx).
+const STAPEL = `${FENSTER.split(', ').filter((s) => s !== '.presenter').join(', ')}, .nav-backdrop`;
 /** Offene Fenster von unten nach oben */
 const stapel = (): Element[] => [...document.querySelectorAll(STAPEL)].sort((a, b) => (a === b ? 0 : liegtUeber(a, b) ? 1 : -1));
 /* Der Stapel, wie er beim Drücken von Esc stand. Die Zuhörer der Fenster laufen nacheinander, und React hängt ein

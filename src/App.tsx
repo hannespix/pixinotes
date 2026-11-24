@@ -42,7 +42,6 @@ import { einladungAnnehmen, einladungOffen, einladungTokenAbholen } from './lib/
 import { folgeIch, VORFUEHR_EREIGNIS, werFuehrtVor } from './lib/vorfuehrenLeicht';
 import { PunkteLeisteSpaet, punkteLaden } from './components/PunkteSpaet';
 import { rechenTabelleLaden } from './components/RechenTabelle';
-import { SprachHinweis } from './components/SprachHinweis';
 import { GastNameDialog, GruppenraumSpaet, GruppenTimerSpaet, LiveLeiste, NAME_FRAGEN, VorfuehrenSpaet } from './components/LiveLeiste';
 import { LeseBand } from './components/Dauerbaender';
 import { FreigabeHost, freigabeDialogLaden } from './components/FreigabeHost';
@@ -61,7 +60,7 @@ import { seitenBreitenReparieren } from './lib/seitenBreiten'; // M355: zu dick 
  * jemand sie aufruft. So bleibt der eigene App-Teil unter seiner Grenze (m321), obwohl Funktionen dazukommen.
  * Einmal geladen, bleibt sie da (Suchbegriff und Stelle bleiben beim Schließen erhalten).
  */
-const HelpOverlayLazy = lazy(async () => {
+const ladeHilfe = async () => {
   // M382: bei englischer Oberfläche kommt die englische Fassung der Hilfe gleich mit
   const [m, en] = await Promise.all([
     import('./components/HelpOverlay'),
@@ -69,7 +68,8 @@ const HelpOverlayLazy = lazy(async () => {
   ]);
   if (en) m.hilfeEnglischSetzen(en);
   return { default: m.HelpOverlay };
-});
+};
+const HelpOverlayLazy = lazy(ladeHilfe);
 function Hilfe() {
   const offen = useBoard((s) => s.helpOpen);
   const [geladen, setGeladen] = useState(false);
@@ -81,7 +81,8 @@ function Hilfe() {
  * M398: Die Einstellungen kommen erst mit dem ersten Öffnen – das große Blatt gehört nicht in den Start.
  * Danach bleibt es eingehängt: Reiter und Eingaben überleben das Schließen wie zuvor.
  */
-const SettingsLazy = lazy(() => import('./components/Settings').then((m) => ({ default: m.Settings })));
+const ladeEinstellungen = () => import('./components/Settings').then((m) => ({ default: m.Settings }));
+const SettingsLazy = lazy(ladeEinstellungen);
 function Einstellungen() {
   const offen = useBoard((s) => s.settingsOpen);
   const [geladen, setGeladen] = useState(false);
@@ -93,7 +94,8 @@ function Einstellungen() {
  * M379: Der Vorlagen-Dialog wird erst geladen, wenn ihn jemand aufruft (＋ Neu → „Board aus Vorlage",
  * oder der Knopf auf dem leeren Board) — die Vorlagen selbst reisen mit ihm, nicht mit dem Start.
  */
-const VorlagenDialogLazy = lazy(() => import('./components/VorlagenDialog').then((m) => ({ default: m.VorlagenDialog })));
+const ladeVorlagen = () => import('./components/VorlagenDialog').then((m) => ({ default: m.VorlagenDialog }));
+const VorlagenDialogLazy = lazy(ladeVorlagen);
 function Vorlagen() {
   const [wunsch, setWunsch] = useState<{ projectId?: string; inBoard?: string } | null>(null);
   useEffect(() => {
@@ -105,7 +107,8 @@ function Vorlagen() {
 }
 
 /** M449: Der Versionen-Dialog wird erst geladen, wenn ihn jemand aufruft (Mehr-Menü, Board-⋯, Strg+K) */
-const VersionenDialogLazy = lazy(() => import('./components/VersionenDialog').then((m) => ({ default: m.VersionenDialog })));
+const ladeVersionen = () => import('./components/VersionenDialog').then((m) => ({ default: m.VersionenDialog }));
+const VersionenDialogLazy = lazy(ladeVersionen);
 function Versionen() {
   const [boardId, setBoardId] = useState<string | null>(null);
   useEffect(() => {
@@ -117,7 +120,8 @@ function Versionen() {
 }
 
 /** M476: Sicherung einspielen — der Dialog (samt ZIP-Leser) kommt erst, wenn jemand eine Sicherung einspielt */
-const SicherungDialogLazy = lazy(() => import('./components/SicherungDialog').then((m) => ({ default: m.SicherungDialog })));
+const ladeSicherung = () => import('./components/SicherungDialog').then((m) => ({ default: m.SicherungDialog }));
+const SicherungDialogLazy = lazy(ladeSicherung);
 function SicherungEinspielen() {
   const [offen, setOffen] = useState<{ datei?: File } | null>(null);
   useEffect(() => {
@@ -128,8 +132,24 @@ function SicherungEinspielen() {
   return offen ? <Suspense fallback={null}><SicherungDialogLazy key={offen.datei?.name ?? '-'} datei={offen.datei} onClose={() => setOffen(null)} /></Suspense> : null;
 }
 
+/**
+ * M523: Der Sprach-Hinweis (M368) bringt seinen Text in 13 Sprachen mit — gut 3 KB im Start-Paket, die nur braucht,
+ * wessen Browser kein Deutsch führt (und wer ihn noch nicht weggeklickt hat). Er lädt jetzt erst dann. Dieselben
+ * Bedingungen wie in der Komponente selbst (sie entscheidet weiter über Sprache und Anzeige); scheitert das Nachladen,
+ * bleibt der Hinweis einfach aus.
+ */
+const SprachHinweisLazy = lazy(() => import('./components/SprachHinweis').then((m) => ({ default: m.SprachHinweis })).catch(() => ({ default: () => null })));
+const sprachHinweisNoetig = ((): boolean => {
+  try {
+    if (navigator.webdriver || localStorage.getItem('pixinotes-sprachhinweis') === '1') return false;
+    const liste = navigator.languages?.length ? navigator.languages : [navigator.language ?? ''];
+    return liste.some(Boolean) && !liste.some((l) => /^de\b/i.test(l));
+  } catch { return false; }
+})();
+
 /** M516: Die Diagnose „Als App installieren" kommt erst, wenn der Browser kein Angebot gemacht hat und jemand fragt */
-const AppInstallierenLazy = lazy(() => import('./components/AppInstallierenFenster').then((m) => ({ default: m.AppInstallierenFenster })));
+const ladeAppInstallieren = () => import('./components/AppInstallierenFenster').then((m) => ({ default: m.AppInstallierenFenster }));
+const AppInstallierenLazy = lazy(ladeAppInstallieren);
 function AppInstallieren() {
   const [offen, setOffen] = useState(false);
   useEffect(() => {
@@ -153,7 +173,8 @@ function Outlook() {
 }
 
 /** M478: Die Eingangs-Liste wird erst geladen, wenn jemand sie öffnet (Zähler in der Spalte, Strg+K, Sprung) */
-const EingangLazy = lazy(() => import('./components/EingangFenster').then((m) => ({ default: m.EingangFenster })));
+const ladeEingang = () => import('./components/EingangFenster').then((m) => ({ default: m.EingangFenster }));
+const EingangLazy = lazy(ladeEingang);
 function Eingang() {
   const [offen, setOffen] = useState<{ gruppe?: string; n: number } | null>(null);
   useEffect(() => {
@@ -287,14 +308,7 @@ function imLeerlaufVorladen() {
     void import('./lib/brain').catch(() => null);
     // M523: Einstellungen, Hilfe und die Dialoge der Leisten fehlten hier — ohne Netz ließ sich nach dem Start keines
     // davon öffnen, und der gescheiterte Nachlade-Versuch riss die ganze Darstellung mit („lässt sich nicht anzeigen")
-    void import('./components/Settings').catch(() => null);
-    void import('./components/HelpOverlay').catch(() => null);
-    if (sprache() === 'en') void import('./components/HelpOverlayEn').catch(() => null);
-    void import('./components/VorlagenDialog').catch(() => null);
-    void import('./components/VersionenDialog').catch(() => null);
-    void import('./components/SicherungDialog').catch(() => null);
-    void import('./components/EingangFenster').catch(() => null);
-    void import('./components/AppInstallierenFenster').catch(() => null);
+    for (const l of [ladeEinstellungen, ladeHilfe, ladeVorlagen, ladeVersionen, ladeSicherung, ladeEingang, ladeAppInstallieren]) void l().catch(() => null);
   };
   const ric = (window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
   window.setTimeout(() => (ric ? ric(los, { timeout: 4000 }) : los()), VORLADEN_NACH_MS);
@@ -700,7 +714,7 @@ export default function App() {
         <BildEditorHost />
         <EbeneLoeschenHost />
         {/* M368: anderssprachigen Nutzern sagen, dass der Browser die Oberfläche übersetzen kann */}
-        {!presenting && <SprachHinweis />}
+        {!presenting && sprachHinweisNoetig && <Suspense fallback={null}><SprachHinweisLazy /></Suspense>}
         {/* M511: Dauerbänder in EINEM Stapel — am Telefon unter Kopfzeile und Live-Leiste (sie überdeckten dort die
             Reaktionen), am Desktop `display: contents`, also jedes an seinem bisherigen Platz (Dauerbaender.tsx) */}
         <div className={`dauerbaender${presenting ? ' im-vortrag' : ''}`} data-taste="dauerbaender">

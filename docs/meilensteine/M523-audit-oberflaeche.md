@@ -26,6 +26,7 @@ Prüfpunkte sind gegen den Stand vor dem Fix rot und danach grün (`PN_DIST=<alt
 | O5 | mittel | Mit offenem Fenster wechselte Alt+G die Ansicht dahinter, Alt+U klappte die Spalte weg, Alt+W öffnete die Navigation hinter dem Fenster (Fokus verließ es), Alt+T die Aufgaben-Zentrale | M390 hatte nur die Board-Kürzel gesperrt; diese vier standen darüber | ✅ `Tastatur.tsx` (B1–B5) |
 | O6 | mittel | Alt+T oder Strg+K „Aufgaben-Zentrale" in der Übersicht: nichts passiert — und beim nächsten Board-Wechsel springt die Zentrale unerwartet auf | `tasksOpen` wird gesetzt, die Übersicht verdeckt die Zentrale | ✅ `setTasksOpen(true)` holt die Board-Ansicht (C3, C4) |
 | O7 | mittel | Aufgaben-Zentrale offen, Suche → Treffer bzw. Karte im Baum angeklickt: das Ziel bleibt hinter der Zentrale | `focusNode`/`oeffneKarte` wechseln Board und Ansicht, lassen die Zentrale aber offen | ✅ beide schließen sie (C1, C2) |
+| O7b | mittel | Aufgaben-Zentrale offen, Board im Baum (oder Reiter, Alt+→) angeklickt: das Board wechselt unsichtbar dahinter | `openBoard` lässt die Zentrale offen. Die Reihe m368 nennt den Schritt „zurück ins Board" — gemeint war immer, dass das Board erscheint; dort schloss bisher zufällig ein späteres Esc die Zentrale | ✅ `openBoard` schließt sie (C5) |
 | O8 | mittel | Strg+K, „einstellungen", Enter: nichts. Befehle und Boards waren mit der Tastatur nur über Tab erreichbar (die Einführung verspricht „führt Befehle aus") | Enter kennt nur Kartentreffer | ✅ ohne Kartentreffer führt Enter den ersten Befehl aus bzw. öffnet das erste Board; die Zeile ist markiert (D1–D4) |
 | O9 | mittel | Esc schließt „＋ Neu" und die ⋯-Menüs an Bereich, Projekt, Board nicht (per Tastatur geöffnet: kein Ausweg außer einem Eintrag) | Nur „Klick daneben" war verdrahtet | ✅ `lib/useEscSchliesst.ts`, Fokus zurück auf den Knopf; in der Ausstülpung schließt Esc nur das Menü (E1–E5, E9) |
 | O10 | mittel | Esc schließt den Recherche-Dialog und „Karten teilen" nicht | kein Esc-Zuhörer | ✅ (E7, E8) |
@@ -63,6 +64,11 @@ sehr langer Name, Sonderzeichen), Fokus + Fenster + Esc.
 - `store/ansicht.ts` `setTasksOpen`, `oeffneKarte`; `store/karten.ts` `focusNode`: Ansicht und Zentrale gehören zusammen.
 - `public/sw.js`: `einstiegVorladen()` in `install`; Offline-Ersatz nur für `/` und `/index.html`.
 - `App.tsx` `imLeerlaufVorladen()`: Einstellungen, Hilfe und Leisten-Dialoge.
+- **Start-Paket:** Der Hauptzweig lag 77 Byte unter der Grenze der Start-Reihen (2 065 000 B); die Fixes brauchten knapp
+  3 KB. Ausgleich ohne die Grenze anzuheben: `SprachHinweis` (M368, Texte in 13 Sprachen, gut 3 KB) lädt nur noch, wenn
+  der Browser kein Deutsch führt (`sprachHinweisNoetig` in `App.tsx`, dieselben Bedingungen wie in der Komponente;
+  scheitert das Nachladen, bleibt der Hinweis aus), und das Leerlauf-Vorladen nutzt die benannten Lader der Fenster
+  (`ladeEinstellungen`, `ladeHilfe` …) statt eigener `import()`-Ausdrücke. Stand danach: 2 064 033 B (967 B Luft).
 
 ## Grenzen / offen
 - **Fehlgeschlagenes Nachladen reißt die ganze Darstellung mit.** Jeder nachgeladene Teil ohne eigene Fehlergrenze
@@ -76,8 +82,6 @@ sehr langer Name, Sonderzeichen), Fokus + Fenster + Esc.
 - **Schriften nach dem ersten Besuch ohne Netz:** Ersatzschrift, bis ein zweiter Besuch mit Netz sie gecacht hat.
 - **Suche ohne Umlaute:** „ubersicht" findet „Übersicht" nicht, „vertraege" nicht „Verträge" (Tippfehler mit einem
   eingefügten Buchstaben werden gefunden). Wäre eine neue Fähigkeit (Umlaute falten).
-- **Board im Baum anklicken, während die Aufgaben-Zentrale offen ist:** Die Zentrale bleibt und zeigt die Aufgaben
-  des angeklickten Boards („Aktives Board – …"). Als Filter stimmig, als Navigation überraschend — Entscheidung.
 - **Board löschen** fragt mit einem Browser-Dialog und hat kein „Rückgängig"; Bereich und Projekt haben ein eigenes
   Fenster und „Rückgängig" in der Meldung.
 - **Zurück-Taste des Browsers** verlässt die App (nur die Karte im Fokus steht im Verlauf).
