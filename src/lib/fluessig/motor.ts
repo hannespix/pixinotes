@@ -24,6 +24,9 @@ export interface Einstellung {
   aussehen: string;
 }
 
+/** M506: Wo die Schrift steht (Anteile der Kartenfläche, 0…1) — die Karte legt dort ihre Klickfläche hin */
+export interface Umriss { l: number; o: number; r: number; u: number }
+
 /** Werte der MS-Seite von Liquid Type (src/MS/ms.mjs, `defaults`), dort von Hannes abgestimmt */
 const FX = {
   idleDelay: 4000, idleForce: 1.4, assembleSpread: 0.22, assembleMs: 2200, holdMs: 450, burstSpeed: 1200, burstFreeMs: 300,
@@ -179,10 +182,18 @@ export class Flaeche {
   greifbar = false;
   /** Zeitpunkt der letzten Berührung — bei mehr als MAX_AKTIV laufenden gewinnt die zuletzt berührte */
   beruehrt = 0;
+  /** M506: meldet den Umriss der ruhenden Schrift (null = keine Schrift) — die rahmenlose Karte greift nur dort */
+  umrissMelden: ((u: Umriss | null) => void) | null = null;
+  private umriss: Umriss | null = null;
   private io: IntersectionObserver | null = null;
   private weg: Array<() => void> = [];
 
-  constructor(canvas: HTMLCanvasElement, e: Einstellung) {
+  /**
+   * M506: `ereignisse` ist das Element, an dem Zeiger-Ereignisse gehört werden (die Bühne der Karte). Ruhend ist die
+   * Fläche selbst nicht anfassbar (pointer-events: none) — Bewegungen über der Klickfläche der Schrift kommen über
+   * die Bühne an, damit Schubsen und Magnet bleiben.
+   */
+  constructor(canvas: HTMLCanvasElement, e: Einstellung, ereignisse: HTMLElement = canvas) {
     this.canvas = canvas;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('2D-Zeichenfläche nicht verfügbar');
@@ -203,8 +214,8 @@ export class Flaeche {
     }) : null;
     if (this.io) this.io.observe(canvas); else this.sichtbar = true;
     const an = <K extends keyof HTMLElementEventMap>(typ: K, fn: (ev: HTMLElementEventMap[K]) => void) => {
-      canvas.addEventListener(typ, fn as EventListener);
-      this.weg.push(() => canvas.removeEventListener(typ, fn as EventListener));
+      ereignisse.addEventListener(typ, fn as EventListener);
+      this.weg.push(() => ereignisse.removeEventListener(typ, fn as EventListener));
     };
     an('pointerdown', (ev) => this.druck(ev));
     an('pointermove', (ev) => { if (this.pointer.id !== -1 && ev.pointerId !== this.pointer.id) return; this.bewegen(ev); });
@@ -327,12 +338,24 @@ export class Flaeche {
   }
 
   private vermessen(punkte: { x: number; y: number }[]): void {
-    if (!punkte.length) { this.centre = this.bereich = null; return; }
+    if (!punkte.length) { this.centre = this.bereich = null; this.umrissSetzen(null); return; }
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const p of punkte) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; }
     this.centre = { x: (x0 + x1) / 2, y: (y0 + y1) / 2, rx: (x1 - x0) * 0.42, ry: this.schriftGroesse * 0.3 };
     const reach = this.schriftGroesse * FX.magnetRadius * 0.5;
     this.bereich = { l: x0 - reach, r: x1 + reach, o: y0 - reach, u: y1 + reach };
+    // M506: Klickfläche = Schrift plus der Rand, in dem der Magnet zieht (mindestens 10 px) — wo die Schrift anzieht,
+    // lässt sie sich auch greifen; daneben bleibt das Board das Board
+    const rand = Math.max(10, reach), w = this.w || 1, h = this.h || 1;
+    this.umrissSetzen({
+      l: Math.max(0, (x0 - rand) / w), r: Math.min(1, (x1 + rand) / w),
+      o: Math.max(0, (y0 - rand) / h), u: Math.min(1, (y1 + rand) / h),
+    });
+  }
+
+  private umrissSetzen(u: Umriss | null): void {
+    this.umriss = u;
+    this.umrissMelden?.(u);
   }
 
   /** Ruhend neu zeichnen (Farbe, Größe, sichtbar geworden) — ohne einen Takt zu verlangen */
@@ -500,12 +523,12 @@ export class Flaeche {
   }
 
   /** Nur für Prüfreihen: wie die Flüssigkeit gerade steht */
-  zustand(): { teilchen: number; ruht: boolean; sichtbar: boolean } {
-    return { teilchen: this.fluid?.n ?? 0, ruht: this.ruht, sichtbar: this.sichtbar };
+  zustand(): { teilchen: number; ruht: boolean; sichtbar: boolean; umriss: Umriss | null } {
+    return { teilchen: this.fluid?.n ?? 0, ruht: this.ruht, sichtbar: this.sichtbar, umriss: this.umriss };
   }
 }
 
-export function flaecheAnlegen(canvas: HTMLCanvasElement, e: Einstellung): Flaeche | null {
+export function flaecheAnlegen(canvas: HTMLCanvasElement, e: Einstellung, ereignisse?: HTMLElement): Flaeche | null {
   if (!zeichnerHolen()) return null;
-  return new Flaeche(canvas, e);
+  return new Flaeche(canvas, e, ereignisse);
 }

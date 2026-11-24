@@ -1,5 +1,5 @@
 /**
- * M500 — Flüssige Schrift (Liquid Type von Hannes Pix als Karte).
+ * M500 — Flüssige Schrift (Liquid Type von Hannes Pix als Karte). Seit M506 rahmenlos: markiert wird über der Schrift.
  *
  *   A  Anlegen über ＋ (Suchwort „liquid“) → Karte mit „Hallo“; die Engine (motor-*.js) ist nicht im Start-JS und
  *      kommt erst, wenn eine solche Karte sichtbar ist; Start-JS unter der Grenze von M483.
@@ -92,6 +92,8 @@ const tinte = (P, id) => P.evaluate((kid) => {
 }, id);
 const unterschied = (a, b) => { let n = 0; for (let i = 0; i < Math.min(a.bild.length, b.bild.length); i++) if (a.bild[i] !== b.bild[i]) n++; return n; };
 const ruht = (P, id) => warteBis(P, (kid) => document.querySelector(`.react-flow__node[data-id="${kid}"] canvas.fl-flaeche`)?.__fluessig?.zustand().ruht === true, 15000, id);
+/** M506: ruhend greift die rahmenlose Karte nur über der Schrift (.fl-treffer) — dort in die Ecke klicken */
+const anSchrift = (P, id) => P.evaluate((kid) => { const r = document.querySelector(`.react-flow__node[data-id="${kid}"] .fl-treffer`).getBoundingClientRect(); return { x: r.left + 4, y: r.top + 4 }; }, id);
 const mitte = async (P, id) => { const b = await P.locator(`.react-flow__node[data-id="${id}"]`).boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2, b }; };
 /** Ansicht auf eine Karte: mit dem Rad hinschwenken (panOnScroll), mit Strg+Rad hineinzoomen, bis sie ~breit genug ist */
 async function aufKarte(P, id, breite = 400) {
@@ -153,7 +155,7 @@ if (laufe('BCDE')) {
 
   // C: markieren, Text im Feld der Werkzeugleiste ändern
   const m = await mitte(P, 'f1');
-  await P.mouse.click(m.b.x + 6, m.b.y + 6);
+  { const a = await anSchrift(P, 'f1'); await P.mouse.click(a.x, a.y); }
   await P.waitForSelector('[data-id="f1"].selected', { timeout: 5000 }).catch(() => {});
   await P.locator('[data-id="f1"] .fl-text').fill('I');
   await P.locator('[data-id="f1"] .fl-text').press('Enter');
@@ -198,7 +200,7 @@ if (laufe('BCDE')) {
   await P.mouse.move(1200, 760);
   // markiert: drücken und halten lässt platzen
   await ruht(P, 'f1');
-  await P.mouse.click(mm.b.x + 6, mm.b.y + 6);
+  { const a = await anSchrift(P, 'f1'); await P.mouse.click(a.x, a.y); }
   await P.waitForSelector('[data-id="f1"].selected', { timeout: 5000 }).catch(() => {});
   pruefe('D3 markiert gehört der Druck der Flüssigkeit (nodrag)', await P.evaluate(() => document.querySelector('[data-id="f1"] canvas.fl-flaeche').classList.contains('nodrag')));
   const posVor = await P.locator('.react-flow__node[data-id="f1"]').boundingBox();
@@ -234,7 +236,7 @@ if (laufe('BCDE')) {
   await warteBis(P, () => document.querySelector('[data-id="f1"] canvas.fl-flaeche')?.__fluessig?.zustand().sichtbar === true, 5000);
 
   // E4: verdeckter Tab → kein Takt, auch wenn sie gerade lief
-  await P.mouse.click(mm.b.x + 6, mm.b.y + 6);
+  { const a = await anSchrift(P, 'f1'); await P.mouse.click(a.x, a.y); }
   await P.mouse.move(mm.x - 40, mm.y); await P.mouse.down(); await P.waitForTimeout(550); await P.mouse.up();
   await P.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
   await P.waitForTimeout(150);
