@@ -696,8 +696,19 @@ console.log('\n════ D: Telefon ════');
   const kasten = await T.P.locator('[data-taste="live-liste"]').boundingBox();
   const ziele = await T.P.evaluate(() => [...document.querySelectorAll('[data-taste="live-liste"] .live-liste-aktionen > button')].map((b) => Math.round(b.getBoundingClientRect().height)));
   pruefe('D2 die Liste bleibt im Bild; ihre Zeilen sind mit dem Finger zu treffen (≥ 44)', !!kasten && kasten.x >= 0 && kasten.x + kasten.width <= 390 && kasten.y + kasten.height <= 780 && ziele.length >= 3 && ziele.every((h) => h >= 44), JSON.stringify([kasten, ziele]));
-  await T.P.touchscreen.tap(190, 600); await T.P.waitForTimeout(300);
-  pruefe('D3 ein Tipp daneben schließt sie', (await T.P.locator('[data-taste="live-liste"]').count()) === 0);
+  // M517: Seit M512 (Timer frei einstellbar) reicht die Liste am Telefon bis etwa y = 625 – der frühere feste Punkt
+  // (190, 600) lag im Feld „Eigene Dauer“ IN der Liste. Den Tipp-Punkt deshalb messen: eine Stelle auf der leeren
+  // Fläche des Boards, außerhalb von Liste und Leiste, auf der nichts anderes liegt.
+  const daneben = await T.P.evaluate(() => {
+    for (let y = 760; y >= 120; y -= 20) for (let x = 20; x <= 370; x += 25) {
+      const e = document.elementFromPoint(x, y);
+      if (e && e.closest('.react-flow__pane') && !e.closest('.live-leiste')) return { x, y };
+    }
+    return null;
+  });
+  if (daneben) await T.P.touchscreen.tap(daneben.x, daneben.y);
+  const zu = await warteBis(T.P, async () => (await T.P.locator('[data-taste="live-liste"]').count()) === 0, 3000);
+  pruefe('D3 ein Tipp daneben schließt sie', !!daneben && zu, JSON.stringify(daneben));
 }
 
 // ══ E ═══════════════════════════════════════════════════════════════
