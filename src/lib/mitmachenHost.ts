@@ -294,7 +294,7 @@ function abgleichen(): void {
   let weg = false;
   for (const [token, e] of Object.entries(g)) {
     const n = karteVon(e.board, e.karte);
-    const m = n && n.type === 'bubbles' ? mitmachenVon(n.data) : null;
+    const m = n && n.type === 'bubbles' ? mitmachenVon(n.data, n.id) : null;
     const boardDa = useBoard.getState().boards.some((b) => b.id === e.board);
     if (!n || !m || m.token !== token || !m.an) {
       // Runde beendet (oder Karte gelöscht): Schluss sagen, Schlüssel vergessen. Fehlt nur das Board (noch nicht

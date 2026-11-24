@@ -16,13 +16,23 @@ export const MITMACHEN_EREIGNIS = 'pixinotes:mitmachen';
 /** Web-Adresse der App — für Links aus der portablen Datei (file://), die selbst keine Adresse hat */
 export const WEB_ADRESSE = 'https://hannespix.github.io/pixinotes/';
 
-export interface MitmachenKarte { token: string; k: string; an: boolean; t: number; buehne?: boolean }
+export interface MitmachenKarte {
+  token: string; k: string; an: boolean; t: number; buehne?: boolean;
+  /** M520: Kennung der Karte, in der die Runde geöffnet wurde (fehlt bei Runden von vor M520) */
+  karte?: string;
+}
 interface Gemerkt { jwk: JsonWebKey; board: string; karte: string; seit: number }
 
-export function mitmachenVon(data: unknown): MitmachenKarte | null {
+/**
+ * Die Runde einer Karte. M520: `karte` = Kennung der fragenden Karte. Eine KOPIE (Duplizieren, Board kopieren,
+ * Vorlage, Import) trägt dasselbe Feld wie ihr Original — sie zeigte denselben Code, und wer ihn scannte, schrieb
+ * in die Ur-Karte. Steht im Feld eine andere Karte, gibt es für die fragende Karte keine Runde.
+ */
+export function mitmachenVon(data: unknown, karte?: string): MitmachenKarte | null {
   const m = (data as { mitmachen?: Partial<MitmachenKarte> } | null)?.mitmachen;
   if (!m || typeof m.token !== 'string' || typeof m.k !== 'string') return null;
-  return { token: m.token, k: m.k, an: !!m.an, t: Number(m.t) || 0, ...(m.buehne ? { buehne: true } : {}) };
+  if (karte && typeof m.karte === 'string' && m.karte !== karte) return null;
+  return { token: m.token, k: m.k, an: !!m.an, t: Number(m.t) || 0, ...(m.buehne ? { buehne: true } : {}), ...(typeof m.karte === 'string' ? { karte: m.karte } : {}) };
 }
 export function gemerkt(): Record<string, Gemerkt> {
   try { const r = JSON.parse(localStorage.getItem(MITMACHEN_KEY) ?? '{}') as Record<string, Gemerkt>; return r && typeof r === 'object' ? r : {}; } catch { return {}; }
@@ -86,7 +96,7 @@ export async function mitmachenOeffnen(board: string, karte: string, schreiben: 
   for (const [t, e] of Object.entries(g)) if (e.karte === karte) delete g[t];
   g[token] = { jwk: s.privat, board, karte, seit: Date.now() };
   gemerktSetzen(g);
-  const m: MitmachenKarte = { token, k: s.abdruck, an: true, t: Date.now() };
+  const m: MitmachenKarte = { token, k: s.abdruck, an: true, t: Date.now(), karte };
   schreiben(m);
   await gastgeberLaden();
   return m;

@@ -660,7 +660,16 @@ export function KanbanBody({ id, data }: { id: string; data: KanbanData }) {
       return it;
     });
     const wip = (kanban.wip ?? []).filter((_, i) => i !== idx);
-    updateNodeData(id, { cols: next, items, wip });
+    // M520: Das Löschen ist ein eigener Schritt und sagt, was geschah — mit „Rückgängig" im Hinweis. Vorher verschwand
+    // die Spalte wortlos, ihre Tickets lagen in der Nachbarspalte; am Telefon genügte dafür der zweite Tipp eines
+    // Doppeltipps auf die verkleinerte Karte (er traf das ✕ der Spalte, die sich gerade erst öffnete).
+    useBoard.getState().pushHistory();
+    mutedHistory(() => updateNodeData(id, { cols: next, items, wip }));
+    const verschoben = kanban.items.filter((it) => it.col === idx).length;
+    const ziel = next[Math.max(0, idx - 1)];
+    showToast(verschoben
+      ? `Spalte „${cols[idx]}" gelöscht – ${zahlWort(verschoben, 'Ticket', 'Tickets')} nach „${ziel}" verschoben.`
+      : `Spalte „${cols[idx]}" gelöscht.`, 'schritt');
   };
 
   /** WIP-Limit einer Spalte setzen (M119) — 0/leer = kein Limit */
