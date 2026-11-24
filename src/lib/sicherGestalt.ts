@@ -16,12 +16,12 @@ const endlich = (v: unknown): v is number => typeof v === 'number' && Number.isF
    nicht die eine Karte ausfallen, sondern PixiNotes als Ganzes — und weil der Stand gespeichert wird, bei jedem
    Start wieder („PixiNotes lässt sich gerade nicht anzeigen", ohne Ausweg). Über einen geteilten Link, eine
    Einladung zum Mitarbeiten oder eine Datei genügte dafür eine einzige Karte.
-   Regel je Feld: `liste` = muss eine Liste sein (sonst leer), `liste?` = darf fehlen (sonst weg), `text` = muss Text
-   sein (sonst leer), `text?`, `zahl` (sonst 0), `objekt?`. Einträge von Listen werden gerichtet, nicht verworfen:
+   Regel je Feld: `liste` = muss eine Liste sein (sonst leer), `listeOpt` = darf fehlen (sonst weg), `text` = muss Text
+   sein (sonst leer), `textOpt`, `zahl` (sonst 0), `objektOpt`. Einträge von Listen werden gerichtet, nicht verworfen:
    Was kein Objekt ist, fällt weg; fehlt einem Ticket die Spalte oder einer Zeile der Name, wird das Feld ergänzt.
    Unverändertes bleibt dasselbe Objekt — für heile Karten kostet das einen Blick je Feld. */
 type Satz = Record<string, unknown>;
-type FeldArt = 'liste' | 'liste?' | 'text' | 'text?' | 'zahl' | 'objekt?' | 'texte?';
+type FeldArt = 'liste' | 'listeOpt' | 'text' | 'textOpt' | 'zahl' | 'objektOpt' | 'texteOpt';
 /** Einen Listen-Eintrag richten: derselbe Eintrag, eine gerichtete Kopie oder `undefined` (fällt weg) */
 type Richten = (x: unknown, i: number) => unknown;
 const istSatz = (v: unknown): v is Satz => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -68,32 +68,32 @@ const ticket = mitListen(satzMit(['id', 'text'], ['col']), { subs: satzMit(['id'
  * `cols: 10000000` ließ sonst nicht die Karte ausfallen, sondern die Seite hängen.
  */
 const GESTALT: Record<string, { felder: Record<string, FeldArt>; eintraege?: Record<string, Richten>; bereich?: Record<string, [number, number]> }> = {
-  note: { felder: { blocks: 'liste?' }, eintraege: { blocks: nurSatz } },
-  email: { felder: { subject: 'text', fromName: 'text', fromAddress: 'text?', date: 'text?', text: 'text', attachments: 'liste' }, eintraege: { attachments: satzMit(['name'], ['size']) } },
-  image: { felder: { src: 'text', name: 'text?', titel: 'text?' } },
-  file: { felder: { name: 'text', size: 'zahl', mime: 'text?', titel: 'text?' } },
+  note: { felder: { blocks: 'listeOpt' }, eintraege: { blocks: nurSatz } },
+  email: { felder: { subject: 'text', fromName: 'text', fromAddress: 'textOpt', date: 'textOpt', text: 'text', attachments: 'liste' }, eintraege: { attachments: satzMit(['name'], ['size']) } },
+  image: { felder: { src: 'text', name: 'textOpt', titel: 'textOpt' } },
+  file: { felder: { name: 'text', size: 'zahl', mime: 'textOpt', titel: 'textOpt' } },
   kanban: {
-    felder: { title: 'text', items: 'liste', cols: 'liste?', archiv: 'liste?', collectFrom: 'liste?', collectExcludeNodes: 'liste?', ignoreKeys: 'liste?', wip: 'liste?' },
+    felder: { title: 'text', items: 'liste', cols: 'listeOpt', archiv: 'listeOpt', collectFrom: 'listeOpt', collectExcludeNodes: 'listeOpt', ignoreKeys: 'listeOpt', wip: 'listeOpt' },
     eintraege: { items: ticket, archiv: ticket, cols: nurText, collectFrom: nurText, collectExcludeNodes: nurText, ignoreKeys: nurText },
   },
-  portal: { felder: { boardId: 'text?' } },
-  shape: { felder: { text: 'text', shape: 'text?', color: 'text?' } },
+  portal: { felder: { boardId: 'textOpt' } },
+  shape: { felder: { text: 'text', shape: 'textOpt', color: 'textOpt' } },
   mermaid: { felder: { code: 'text' } },
   gantt: { felder: { title: 'text', rows: 'liste' }, eintraege: { rows: satzMit(['id', 'name', 'start', 'end']) }, bereich: { dayWidth: [0.01, 1000] } },
-  calendar: { felder: { month: 'text?' } },
-  frame: { felder: { name: 'text', color: 'text?' } },
-  week: { felder: { title: 'text', entries: 'liste', cols: 'liste?', slots: 'liste?' }, eintraege: { entries: satzMit(['id', 'text'], ['day', 'start', 'dur']), cols: nurText, slots: nurText }, bereich: { from: [0, 1440], to: [0, 2880] } },
-  sheet: { felder: { title: 'text?', cells: 'texte?', colW: 'objekt?', links: 'texte?', stile: 'objekt?', filter: 'objekt?', stilListe: 'liste?', verbunden: 'liste?' }, eintraege: { verbunden: nurText }, bereich: { cols: [1, 702], rows: [1, 1048576], kopf: [0, 1048576], bis: [0, 1048576] } },   // Zeilen: so viele fasst Excel
+  calendar: { felder: { month: 'textOpt' } },
+  frame: { felder: { name: 'text', color: 'textOpt' } },
+  week: { felder: { title: 'text', entries: 'liste', cols: 'listeOpt', slots: 'listeOpt' }, eintraege: { entries: satzMit(['id', 'text'], ['day', 'start', 'dur']), cols: nurText, slots: nurText }, bereich: { from: [0, 1440], to: [0, 2880] } },
+  sheet: { felder: { title: 'textOpt', cells: 'texteOpt', colW: 'objektOpt', links: 'texteOpt', stile: 'objektOpt', filter: 'objektOpt', stilListe: 'listeOpt', verbunden: 'listeOpt' }, eintraege: { verbunden: nurText }, bereich: { cols: [1, 702], rows: [1, 1048576], kopf: [0, 1048576], bis: [0, 1048576] } },   // Zeilen: so viele fasst Excel
   minutes: {
-    felder: { title: 'text', entries: 'liste', agenda: 'liste?', personenAbgelehnt: 'liste?' },
+    felder: { title: 'text', entries: 'liste', agenda: 'listeOpt', personenAbgelehnt: 'listeOpt' },
     eintraege: { entries: mitListen(satzMit(['id', 'date']), { blocks: nurSatz, decisions: satzMit(['id', 'text']), infoTops: nurText }), agenda: nurText, personenAbgelehnt: nurText },
   },
   time: { felder: { title: 'text', segs: 'liste' }, eintraege: { segs: satzMit(['id', 'date'], ['start']) } },
   htmlapp: { felder: { name: 'text', size: 'zahl' } },
-  bubbles: { felder: { title: 'text?', frage: 'text?', ideen: 'objekt?', stimmen: 'objekt?', gruppen: 'objekt?', abstimmung: 'objekt?', regeln: 'objekt?' } },
-  kontakt: { felder: { name: 'text', telefone: 'liste', emails: 'liste', funktion: 'text?', firma: 'text?', adresse: 'text?', web: 'text?', notiz: 'text?' }, eintraege: { telefone: satzMit(['nummer']), emails: nurText } },
+  bubbles: { felder: { title: 'textOpt', frage: 'textOpt', ideen: 'objektOpt', stimmen: 'objektOpt', gruppen: 'objektOpt', abstimmung: 'objektOpt', regeln: 'objektOpt' } },
+  kontakt: { felder: { name: 'text', telefone: 'liste', emails: 'liste', funktion: 'textOpt', firma: 'textOpt', adresse: 'textOpt', web: 'textOpt', notiz: 'textOpt' }, eintraege: { telefone: satzMit(['nummer']), emails: nurText } },
   fluessig: { felder: { text: 'text' } },
-  pixi: { felder: { name: 'text?' } },
+  pixi: { felder: { name: 'textOpt' } },
 };
 /**
  * M522: Inhalt einer Karte in die Gestalt ihrer Art bringen (siehe oben). Unbekannte Arten und Felder bleiben, wie sie
@@ -107,16 +107,16 @@ export function karteGestalt<T extends AppNode>(n: T): T {
   const setze = (k: string, v: unknown) => { if (aus === d) aus = { ...d }; if (v === undefined) delete aus[k]; else aus[k] = v; };
   for (const [k, art] of Object.entries(regel.felder)) {
     const v = d[k];
-    if (art === 'liste' || art === 'liste?') {
+    if (art === 'liste' || art === 'listeOpt') {
       if (!Array.isArray(v)) { if (v !== undefined || art === 'liste') setze(k, art === 'liste' ? [] : undefined); continue; }
       const liste = listeRichten(v, regel.eintraege?.[k]);
       if (liste !== v) setze(k, liste);
-    } else if (art === 'text' || art === 'text?') {
+    } else if (art === 'text' || art === 'textOpt') {
       if (!textFeld(v) && (v !== undefined || art === 'text')) setze(k, endlich(v) ? String(v) : art === 'text' ? '' : undefined);
     } else if (art === 'zahl') {
       if (!endlich(v)) setze(k, 0);
     } else if (v !== undefined && !istSatz(v)) setze(k, undefined);
-    else if (art === 'texte?' && istSatz(v) && !Object.values(v).every(textFeld)) {
+    else if (art === 'texteOpt' && istSatz(v) && !Object.values(v).every(textFeld)) {
       // Zellen einer Tabelle: Text je Zelle (eine Zahl wird ihr Text, alles andere fällt weg)
       setze(k, Object.fromEntries(Object.entries(v).flatMap(([z, w]) => (textFeld(w) ? [[z, w]] : endlich(w) ? [[z, String(w)]] : []))));
     }

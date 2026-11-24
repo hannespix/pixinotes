@@ -32,7 +32,7 @@ Abgleich (Ordner, WebDAV, Konto), Import/Export, Live/Teilen, `lib/sicher.ts`. H
 | D7 | mittel | Team-Projekt aktualisiert: Ein Board, das man hier in ein anderes Projekt gelegt hatte, stand danach in beiden — doppelt in Baum und Übersicht. | `importProject` trug die Boards ins Team-Projekt ein, ohne sie aus anderen Projekten zu nehmen. | ✅ |
 | D8 | mittel | Nur lesend geteiltes Board (auch: Karte, die gerade jemand anderes hält; Gast mit „nur Eigenes"): Karten meldeten Erfolg, obwohl nichts gespeichert wurde — „Arbeit beendet (2:00 h)", „gelöscht – Rückgängig". (Hinweis aus M520.) | Der Schutz sitzt am `set()` des Speichers und verwirft still; die Karte ruft direkt danach `showToast` mit ihrer Erfolgsmeldung. Der eigene Hinweis des Schutzes ist gedrosselt (einmal je 4 s) und wurde überschrieben. | ✅ Der Schutz merkt sich bis zum Ende des Handgriffs, warum er verworfen hat (`schutzVerworfen`); `showToast` zeigt dann diesen Grund statt der Erfolgsmeldung — eine Stelle für alle Karten. Am Schutz selbst ändert sich nichts. |
 | D9 | niedrig | Abgleich: Ein Board, das drüben gelöscht und hier bearbeitet wurde, blieb (richtig) — sprang aber ins erste Projekt des ersten Bereichs. | `mergeHierarchie` legte „Waisen" immer ins erste Projekt. | ✅ Eine Waise bleibt in ihrem Projekt (hier, sonst drüben), solange es das noch gibt. |
-| D10 | hoch | Wie D1, nur über Zahlen: Ein Zeitplan mit `dayWidth: [[]]`, eine Tabelle mit zehn Millionen Spalten oder ein Wochenplan „von −1e9 bis 1e12" ließ die **Seite hängen** (kein Fehlerbild, nichts ging mehr); eine Zahl statt Text in einer Tabellenzelle ließ die App ausfallen. Gefunden im Zufallslauf. | Diese Zahlen treiben Schleifen (Spalten, Zeilen, Stunden, Pixel je Tag) bzw. werden als Text gelesen (`startsWith`). | ✅ `GESTALT[…].bereich` (außerhalb → weg, es gilt die Vorgabe der Karte) und `texte?` für Zellen. Danach 704 zufällig verbogene Karten aller 20 Arten ohne Ausfall und ohne Hänger. |
+| D10 | hoch | Wie D1, nur über Zahlen: Ein Zeitplan mit `dayWidth: [[]]`, eine Tabelle mit zehn Millionen Spalten oder ein Wochenplan „von −1e9 bis 1e12" ließ die **Seite hängen** (kein Fehlerbild, nichts ging mehr); eine Zahl statt Text in einer Tabellenzelle ließ die App ausfallen. Gefunden im Zufallslauf. | Diese Zahlen treiben Schleifen (Spalten, Zeilen, Stunden, Pixel je Tag) bzw. werden als Text gelesen (`startsWith`). | ✅ `GESTALT[…].bereich` (außerhalb → weg, es gilt die Vorgabe der Karte) und `texteOpt` für Zellen. Danach 704 zufällig verbogene Karten aller 20 Arten ohne Ausfall und ohne Hänger. |
 
 ### Offen (braucht eine Entscheidung)
 | Nr | Schwere | Befund | Warum offen |
@@ -83,8 +83,8 @@ Abgleich (Ordner, WebDAV, Konto), Import/Export, Live/Teilen, `lib/sicher.ts`. H
 
 ## Wie (Architektur)
 - **`src/lib/sicherGestalt.ts` (neu, nachgeladen):**
-  - `karteGestalt(n)` — Tabelle `GESTALT` je Kartenart: Feld → `liste` | `liste?` | `text` | `text?` | `zahl` |
-    `objekt?` | `texte?` (Objekt aus Texten: Tabellenzellen), `bereich` (Zahl in Grenzen, sonst weg: `dayWidth`,
+  - `karteGestalt(n)` — Tabelle `GESTALT` je Kartenart: Feld → `liste` | `listeOpt` | `text` | `textOpt` | `zahl` |
+    `objektOpt` | `texteOpt` (Objekt aus Texten: Tabellenzellen), `bereich` (Zahl in Grenzen, sonst weg: `dayWidth`,
     `cols`, `rows`, `kopf`, `bis`, `from`, `to`), dazu je Liste ein „Richter" für die Einträge (`satzMit(['id','text'],['col'])` ergänzt fehlende Felder:
     Text leer, Zahl 0, Kennung nach Stelle; `nurText`, `nurSatz`; `mitListen` für Listen im Eintrag: `subs`, `deps`,
     `links` am Ticket, `blocks`, `decisions`, `infoTops` an der Protokoll-Sitzung). Heiles bleibt **dasselbe Objekt**.
