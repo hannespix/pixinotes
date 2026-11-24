@@ -2,10 +2,25 @@
    Die Flüssigkeit füllt die Karte; die Farbe kommt aus den Tokens (color → der Motor liest sie): Schrift oder Akzent.
    Die Schriftart folgt der Karte (pn-font-*); ohne eigene Wahl Georgia wie im Original. Bedienung liegt unten über
    der Fläche und erscheint nur im Fokus (M421-Listen in 99-bedienung-im-fokus.css) – nichts verschiebt sich. */
+/* M506: rahmenlos — ruhend liegt nur die Flüssigkeit auf dem Board: kein Rand, keine Fläche, kein Schatten, kein
+   Griff (wie Bilder M374 und Pixi M501). Markiert zeigt der übliche Auswahlrahmen, was man greift; erst der Karten-Fokus
+   gibt ihr die Kartenfläche zurück (dort liegt sie vor dem abgedunkelten Board). Gilt auch in hohem Kontrast. */
 .fluessig-card {
-  background: var(--surface-card); border-radius: var(--r-lg); border: 1px solid var(--border);
+  background: none; border-radius: 0; border: 0;
   height: 100%; position: relative; overflow: hidden;
 }
+.react-flow__node-fluessig, .react-flow__node-fluessig:hover, .react-flow__node-fluessig.dragging { box-shadow: none; border-radius: 0; }
+.react-flow__node-fluessig.selected { border-radius: 2px; }
+html[data-kontrast='hoch'] .react-flow__node-fluessig:not(.pn-focused) .fluessig-card { border: 0; }
+.focus-mode .pn-focused .fluessig-card { background: var(--surface-card); border: 1px solid var(--border); border-radius: var(--r-lg); }
+/* Klickfläche: Ruhend fängt die Karte nur über der Schrift (.fl-treffer, Lage aus dem Motor) — leere Kartenfläche
+   verhält sich wie das Board (abwählen, Rahmen aufziehen, verschieben, Karten darunter). React Flow setzt
+   pointer-events inline, darum !important. Markiert, im Fokus, mit dem Tastaturfokus darin oder beim Verbinden
+   gehört wieder die ganze Karte dem Zeiger. */
+.fl-treffer { position: absolute; inset: 0; pointer-events: none; }
+.react-flow__node-fluessig:not(.selected):not(.pn-focused):not(:focus-within) { pointer-events: none !important; }
+.react-flow__node-fluessig:not(.selected):not(.pn-focused):not(:focus-within) .fl-treffer { pointer-events: auto; }
+.react-flow:has(.react-flow__connectionline) .react-flow__node-fluessig { pointer-events: all !important; }
 .fluessig-card.fl-farbe-schrift .fl-buehne { color: var(--ink); }
 .fluessig-card.fl-farbe-akzent .fl-buehne { color: var(--accent-strong); }
 .fl-buehne {

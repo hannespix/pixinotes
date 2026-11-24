@@ -14,6 +14,9 @@ import { CardShell } from './CardShell';
  * sie findet wieder zusammen. Unmarkiert zieht ein Druck wie überall die Karte. Beim Erscheinen setzt sich die
  * Schrift aus Tropfen zusammen.
  *
+ * M506: Ruhend liegt die Karte rahmenlos auf dem Board (nur die Flüssigkeit) und fängt Zeiger nur über der Schrift
+ * (.fl-treffer, Lage meldet der Motor) — die leere Kartenfläche gehört dem Board. Markiert/im Fokus die ganze Karte.
+ *
  * Leistung: Die Engine kommt per import() erst, wenn die Karte sichtbar wird; sie rechnet nur, solange sich etwas
  * bewegt, und schläft danach (lib/fluessig/motor.ts). Ohne WebGL2 steht der Text als normale Schrift da.
  * Bedienung (Text, Zähigkeit, Farbe, Lebendig) nur im Fokus (M421, Listen in 99-bedienung-im-fokus.css).
@@ -28,6 +31,7 @@ const motorHolen = () => (motorLaden ??= import('../../lib/fluessig/motor'));
 export function FluessigBuehne({ data, greifbar, aussehen }: { data: Partial<FluessigData>; greifbar: boolean; aussehen: string }) {
   const d = fluessigDaten(data);
   const huelle = useRef<HTMLDivElement>(null);
+  const trefferRef = useRef<HTMLDivElement>(null);
   const flaecheRef = useRef<HTMLCanvasElement>(null);
   const motorFlaeche = useRef<Flaeche | null>(null);
   const [stand, setStand] = useState<'warten' | 'laeuft' | 'ersatz'>('warten');
@@ -45,9 +49,16 @@ export function FluessigBuehne({ data, greifbar, aussehen }: { data: Partial<Flu
     const starten = () => {
       motorHolen().then((m) => {
         if (aus) return;
-        const f = m.flaecheAnlegen(canvas, einstellungRef.current);
+        const f = m.flaecheAnlegen(canvas, einstellungRef.current, el);
         if (!f) { setStand('ersatz'); return; }
         motorFlaeche.current = f;
+        // M506: Die Klickfläche der rahmenlosen Karte folgt der Schrift (direkt am DOM, kein Render je Abtastung)
+        f.umrissMelden = (u) => {
+          const t = trefferRef.current;
+          if (!t) return;
+          t.style.inset = u ? `${u.o * 100}% ${(1 - u.r) * 100}% ${(1 - u.u) * 100}% ${u.l * 100}%` : '';
+          if (u) t.dataset.umriss = ''; else delete t.dataset.umriss;
+        };
         f.greifbar = greifbarRef.current;
         setStand('laeuft');
         const melden = () => f.groesse(el.clientWidth, el.clientHeight);
@@ -75,6 +86,9 @@ export function FluessigBuehne({ data, greifbar, aussehen }: { data: Partial<Flu
 
   return (
     <div ref={huelle} className="fl-buehne" data-stand={stand}>
+      {/* M506: Ruhend liegt die Karte rahmenlos auf dem Board und greift nur hier (Schrift + Magnet-Rand); ohne
+          Schrift, ohne WebGL2 oder bis die Engine da ist: die ganze Karte. Markiert gehört der Druck wieder der Fläche. */}
+      <div ref={trefferRef} className="fl-treffer" aria-hidden="true" />
       <canvas
         ref={flaecheRef}
         className={`fl-flaeche${greifbar ? ' nodrag nopan' : ''}`}
@@ -126,7 +140,7 @@ export function FluessigCard({ id, data, selected }: NodeProps<FluessigNode>) {
     </div>
   );
   return (
-    <CardShell id={id} selected={selected} minWidth={160} minHeight={90} className={`fluessig-card fl-farbe-${d.farbe}`} aussen={werkzeuge}>
+    <CardShell id={id} selected={selected} minWidth={160} minHeight={90} ruhig className={`fluessig-card fl-farbe-${d.farbe}`} aussen={werkzeuge}>
       <FluessigBuehne data={data} greifbar={!!selected || imFokus} aussehen={schrift} />
     </CardShell>
   );
