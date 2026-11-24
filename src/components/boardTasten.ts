@@ -4,6 +4,7 @@
 // auswählen, nicht zur nächsten springen, nicht in den Text hinein und wieder heraus.
 // Die Kürzel stehen (wie alle) in lib/tasten.ts; hier werden sie ausgeführt, weil sie die Kamera brauchen.
 import { overlayOffen } from '../lib/overlay';
+import { reiseStand } from '../lib/rahmenReise';
 import { leseFolge } from '../lib/kartenFolge';
 import { useEffect, type MutableRefObject } from 'react';
 import { selectActiveBoard, useBoard } from '../store';
@@ -28,6 +29,9 @@ export function useBoardTasten(kamera: Kamera, anzRef: MutableRefObject<number>)
       const st = useBoard.getState();
       if (st.view !== 'board' || st.presenting || st.searchOpen || st.settingsOpen || st.helpOpen || st.tasksOpen) return;
       if (overlayOffen()) return;   // M388: auch Ticket-Fenster und Bild-Lupe (lib/overlay.ts)
+      // M514: In der Rahmen-Reise gehören Pfeile, Pos1/Ende und Leertaste der Reise (components/RahmenReise.tsx) — dieser
+      // Zuhörer hängt früher am Fenster und wählte sonst die erste/letzte Karte samt Kamerafahrt, mitten in den Flug
+      if (reiseStand()) return;
       const t = e.target as HTMLElement | null;
       const closest = (sel: string) => (typeof t?.closest === 'function' ? t.closest(sel) : null);
       if (closest('.modal, [role="dialog"], [role="menu"], .dock-menu, .sel-more-menu, .nav-panel')) return;

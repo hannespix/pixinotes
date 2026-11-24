@@ -5,6 +5,7 @@ import { useBoard } from '../store';
 import { dokMelden, fokusMelden, folgeIch, folgenSetzen, ichFuehreVor, lebenszeichen, sichtMelden, VORFUEHR_EREIGNIS, vorfuehrenStopp, werFuehrtVor } from '../lib/vorfuehren';
 import { DOKUMENT_BEFEHL, offeneSeiten, SEITEN_EREIGNIS, seiteMerken, seiteVon, type DokumentBefehl } from '../lib/pdfSeiten';
 import { focusable } from './FocusSheet';
+import { rahmenReiseBeenden, rahmenReiseStarten, reiseLoesen, reiseStand } from '../lib/rahmenReise';
 
 import { IMegafon } from './Icons';
 export function Vorfuehren() {
@@ -79,6 +80,24 @@ export function Vorfuehren() {
     if (folgeIch(boardId) && g && focusCard !== g && werFuehrtVor(boardId)?.fokus === g) { fokusGefolgt.current = null; folgenSetzen(boardId, false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusCard]);
+  // M514: Ich folge: Zeigt der Vorführende Rahmen für Rahmen (Rahmen-Reise), reise ich mit — jedes Gerät füllt seinen
+  // Schirm mit demselben Rahmen. Endet seine Reise, endet meine; löse ich mich, reise ich ab hier allein weiter.
+  const dortRahmen = folge && z && !imVortrag ? z.rahmen : null;
+  const rahmenGefolgt = useRef(false);
+  useEffect(() => {
+    const r = reiseStand();
+    if (dortRahmen) {
+      rahmenReiseStarten(boardId, dortRahmen, true); rahmenGefolgt.current = true;
+      return;
+    }
+    if (!rahmenGefolgt.current) return;
+    rahmenGefolgt.current = false;
+    if (!r?.gefolgt) return;
+    // Vorführung vorbei oder Reise beim Vorführenden beendet: hier auch. Habe ich mich gelöst, reise ich allein weiter.
+    if (folge || !z) rahmenReiseBeenden(); else reiseLoesen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dortRahmen, folge, boardId, !z]);
+
   // Ich folge: Dokument-Karten klappen auf und blättern mit
   const dortDok = folge && z && !imVortrag ? JSON.stringify(z.dok) : '';
   const aufGefolgt = useRef(new Set<string>());
@@ -110,14 +129,14 @@ export function Vorfuehren() {
   if ((vorher.current.fokus && !focusCard) || (vorher.current.vortrag && !imVortrag)) ebenFrei.current = performance.now();
   vorher.current = { fokus: !!focusCard, vortrag: imVortrag };
   useEffect(() => {
-    if (!folge || !z || !sicht || imVortrag || focusCard) return;
+    if (!folge || !z || !sicht || imVortrag || focusCard || z.rahmen) return;   // M514: in der Rahmen-Reise führt der Rahmen die Kamera
     const fahren = () => void fitBounds({ x: z.sicht.x, y: z.sicht.y, width: z.sicht.w, height: z.sicht.h }, { duration: 260, padding: 0 });
     const warte = 400 - (performance.now() - ebenFrei.current);
     if (warte <= 0) { fahren(); return; }
     const t = setTimeout(fahren, warte);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folge, sicht, focusCard, imVortrag]);
+  }, [folge, sicht, focusCard, imVortrag, !!z?.rahmen]);
 
   // Wer selbst schwenkt oder zoomt, löst sich. M371: erst, wenn sich die Ansicht dabei wirklich bewegt hat —
   // ein Klick auf eine Karte (auswählen, ein Tool anhalten) ist kein Wegschauen und löst nicht mehr.
