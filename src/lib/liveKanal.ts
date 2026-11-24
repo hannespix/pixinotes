@@ -29,6 +29,8 @@ export function liveKanal(
   auf: { nachricht: (ereignis: string, inhalt: unknown) => void; teilnehmer: (liste: Teilnehmer[]) => void },
   /** Nutzer-Token, falls angemeldet — ohne nimmt der Server den öffentlichen Schlüssel */
   token?: string,
+  /** M513: stumm — ohne Presence (Mitmachen per QR: bei 200 Leuten ginge jede An- und Abmeldung an alle) */
+  opt: { stumm?: boolean } = {},
 ): LiveKanal {
   let ws: WebSocket | null = null;
   let aktiv = true, verbunden = false, ref = 0, pause = 1000, joinRef = '';
@@ -46,7 +48,7 @@ export function liveKanal(
     ws.send(JSON.stringify({ topic: t, event: ev, payload, ref: String(ref), ...(t === topic ? { join_ref: ev === 'phx_join' ? String(ref) : joinRef } : {}) }));
     if (ev === 'phx_join') joinRef = String(ref);
   };
-  const anmelden = () => roh('presence', { type: 'presence', event: 'track', payload: { id: selbst.id, name: selbst.name, farbe: selbst.farbe, karte: selbst.karte ?? null, seit: selbst.seit ?? null } });
+  const anmelden = () => opt.stumm ? undefined : roh('presence', { type: 'presence', event: 'track', payload: { id: selbst.id, name: selbst.name, farbe: selbst.farbe, karte: selbst.karte ?? null, seit: selbst.seit ?? null } });
   const metas = (wert: unknown): Teilnehmer | null => {
     // Mehrere Einträge je Schlüssel (erneutes Anmelden): der letzte gilt
     const alle = (wert as { metas?: Array<{ id?: string; name?: string; farbe?: string; karte?: string | null; seit?: number | null }> } | undefined)?.metas;
@@ -78,7 +80,7 @@ export function liveKanal(
     try { ws = new WebSocket(url); } catch { return; }
     ws.onopen = () => {
       roh('phx_join', {
-        config: { broadcast: { ack: false, self: false }, presence: { enabled: true, key: selbst.id }, postgres_changes: [], private: false },
+        config: { broadcast: { ack: false, self: false }, presence: { enabled: !opt.stumm, key: selbst.id }, postgres_changes: [], private: false },
         ...(token ? { access_token: token } : {}),
       });
       clearInterval(herz);

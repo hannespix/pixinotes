@@ -38,7 +38,10 @@ import {
 import { CardShell } from './CardShell';
 import { DragTitle } from './DragTitle';
 
-import { IBubbles, ITrash, IWand } from '../Icons';
+import { IBubbles, IQr, ITrash, IWand } from '../Icons';
+import { BubblesQr, MitmachenBuehne, useMitmachenStand } from '../BubblesQr';
+import { hierGastgeber, mitmachenOeffnen, mitmachenVon } from '../../lib/mitmachen';
+import { supabaseKonfiguriert } from '../../lib/kontoSupabase';
 import { zahlWort } from '../../lib/sprache';
 /** M415: Lage und Größe eines Elements setzen — nur, was sich geändert hat (unveränderte Schreibvorgänge kosten im Tropfen-Look den ganzen Filter) */
 function setzen(el: HTMLElement, x: number, y: number, b: number, h: number): void {
@@ -175,6 +178,30 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
   /** M415: neue Ideen, die an einer bestimmten Stelle entstehen sollen (statt vom Rand hereinzufliegen) */
   const startHier = useRef(new Map<string, { x: number; y: number }>());
   const gewaehlt = wahl ? blasen.find((b) => b.id === wahl) ?? null : null;
+  // M513: Mitmachen per QR — nur diese Karte teilen (Teilnehmer-Seite mitmachen.html, Gastgeber: lib/mitmachenHost.ts)
+  const mit = mitmachenVon(roh);
+  const mitAn = !!mit?.an;
+  const mitHier = mitAn && hierGastgeber(mit!.token, id);
+  const mitStand = useMitmachenStand(mitAn ? mit!.token : undefined);
+  const [qrOffen, setQrOffen] = useState(false);
+  const titel = typeof (roh as { title?: unknown }).title === 'string' ? (roh as { title: string }).title : '';
+  const mitmachen = async () => {
+    if (!leiten) return;
+    if (mitHier) { setQrOffen(true); return; }
+    if (!supabaseKonfiguriert()) { showToast('Mitmachen per QR braucht den Live-Server von PixiNotes – er ist in dieser Fassung nicht eingerichtet (⚙ → Daten → Konto).', false, 8000); return; }
+    if (mitAn && !window.confirm('Die Mitmach-Runde dieser Karte läuft auf einem anderen Gerät. Hier neu starten? Der bisherige Code gilt dann nicht mehr.')) return;
+    try {
+      await mitmachenOeffnen(boardId, id, (m) => updateRoh(id, { mitmachen: m }));
+      setQrOffen(true);
+    } catch { showToast('Mitmachen ließ sich nicht starten – der Browser kann hier keine Schlüssel erzeugen (sichere Verbindung nötig).', false, 7000); }
+  };
+  const mitBuehne = (an: boolean) => { if (mit && leiten) updateRoh(id, { mitmachen: { ...mit, buehne: an || undefined } }); };
+  const mitBeenden = () => {
+    if (!mit || !leiten) return;
+    updateRoh(id, { mitmachen: { ...mit, an: false, buehne: undefined, t: Date.now() } });
+    setQrOffen(false);
+    showToast('Mitmachen beendet – der Code gilt nicht mehr. Die Beiträge bleiben in der Karte.');
+  };
   useEffect(() => { if (wahl && !blasen.some((b) => b.id === wahl)) setWahl(null); }, [wahl, blasen]);
 
   // ───── Ändern: immer nur die betroffenen Einträge, mit frischem Zeitstempel ─────
@@ -946,6 +973,12 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           onChange={(e) => updateNodeData(id, { frage: e.target.value.slice(0, 160) })} data-taste="bub-frage"
           enterKeyHint="done" onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
         />
+        {mitAn && (
+          <button className="bub-mit-stand nodrag" data-taste="bub-mit-stand" disabled={!leiten} onClick={() => setQrOffen(true)}
+            title={leiten ? 'Mitmachen per QR läuft – Code zeigen' : 'Mitmachen per QR läuft'}>
+            <IQr size={13} aria-hidden="true" />{mitHier ? (mitStand.dabei ? `${mitStand.dabei} dabei` : 'QR offen') : 'QR offen'}
+          </button>
+        )}
         <span className="bub-zahl" data-taste="bub-zahl">{zahlWort(blasen.length, 'Idee', 'Ideen')}{personen > 1 ? ` · ${personen} Personen` : ''}</span>
         <button className={`bub-ansicht nodrag${liste ? ' an' : ''}`} onClick={() => { setListe((l) => !l); setWahl(null); setGWahl(null); setFallen(null); }} aria-pressed={liste}
           title={liste ? 'Zurück zu den Blasen' : 'Als Liste zeigen – nach Gruppen und Punkten geordnet'} data-taste="bub-ansicht">{liste ? <IBubbles size={15} /> : '☰'}</button>
@@ -963,6 +996,7 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           </span>
         )}
       </div>
+      <div className="bub-mitte">
       <div className="bub-buehne nodrag nopan" ref={buehne} onPointerDown={(e) => { if (e.target === e.currentTarget) { setWahl(null); setMenue(false); setGWahl(null); setFallen(null); } }}
         onDoubleClick={(e) => {
           // M415: Doppelklick auf die Fläche (oder einen Tropfen) — hier eine Idee eintragen
@@ -1156,6 +1190,10 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
           </Pille>
         )}
       </div>
+      {/* M513: der Code groß neben den Blasen — die Bühne macht ihm Platz (die Physik misst die kleinere Fläche) */}
+      {mitAn && mit!.buehne && <MitmachenBuehne karte={id} titel={titel} m={mit!} zu={leiten ? () => mitBuehne(false) : undefined} />}
+      </div>
+      {qrOffen && mitAn && leiten && <BubblesQr karte={id} titel={titel} m={mit!} onClose={() => setQrOffen(false)} buehneSetzen={mitBuehne} beenden={mitBeenden} />}
       {phase === 'fertig' && rang.length > 0 && (
         <div className="bub-ergebnis" data-taste="bub-ergebnis">
           {rang.slice(0, 5).map((b) => (
@@ -1175,6 +1213,10 @@ export function BubblesBody({ id, data: roh, gross = false }: { id: string; data
         {leiten && phase === 'aus' && <button className="bub-knopf" onClick={() => phaseSetzen('offen')} disabled={blasen.length < 2} title={`Punkte-Abstimmung: jede Person vergibt ${zahlWort(d.abstimmung.punkte, 'Punkt', 'Punkte')}`} data-taste="bub-abstimmen">Abstimmen</button>}
         {leiten && phase === 'offen' && <button className="bub-knopf an" onClick={() => phaseSetzen('fertig')} data-taste="bub-auswerten">✓ Auswerten</button>}
         {leiten && phase === 'fertig' && <button className="bub-knopf" onClick={() => phaseSetzen('offen')} title="Abstimmung wieder öffnen" data-taste="bub-weiter">↺ Weiter abstimmen</button>}
+        {leiten && (
+          <button className={`bub-knopf bub-mitmachen${mitAn ? ' an' : ''}`} onClick={() => void mitmachen()} aria-label="Mitmachen per QR"
+            title="Mitmachen per QR – nur diese Karte teilen: Teilnehmende reichen Ideen ein und stimmen ab, ohne das ganze Board" data-taste="bub-mitmachen"><IQr size={15} /></button>
+        )}
         {leiten && (
           <div className="bub-mehr">
             <button className="bub-knopf" onClick={() => setMenue((m) => !m)} aria-label="Weitere Funktionen" title="Weitere Funktionen" data-taste="bub-mehr">⋯</button>
