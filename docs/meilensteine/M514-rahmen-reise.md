@@ -59,7 +59,16 @@ auf der echten Fläche bleiben, nur die Kamera wandert von Rahmen zu Rahmen, die
   Finger-Zeiger (≥ 60 px, < 700 ms, waagerecht). `ResizeObserver` nicht nötig: Größenänderung kommt über den
   React-Flow-Speicher (`width/height`) und löst ein neues Einpassen aus.
 - Leistung (M491): Die Leiste steht von Anfang an, im Flug ändert sich im DOM nur die Kamera; die Reihenfolge rechnet
-  die Reise nur neu, wenn sich Rahmen oder Verbindungen ändern (Schlüssel aus Lage/Größe der Rahmen).
+  die Reise nur neu, wenn sich Rahmen oder Verbindungen ändern (Schlüssel aus Lage/Größe der Rahmen). Gemessen (Trace,
+  200 Karten): Vorher rechnete der Browser je Flug viermal die Stile des ganzen Boards neu (je um 180 ms, 5 000
+  Elemente) — die Bedien-Größe `--pn-ui` (Board.tsx `uiMelden`) wechselt beim Zoomen stufenweise, und eine Marke am
+  Wurzelelement kostete dasselbe. Jetzt: `reiseFliegt()`/`reiseFlugSetzen()` (lib/rahmenReise.ts) — im Flug ruft
+  `onViewportChange` `uiMelden` nicht, nach der Landung (`REISE_RUHT`) setzt Board.tsx Bedien-Größe und Zoom-Werte
+  (`zoomMelden(z, true)`) im selben Bild: eine Stilrechnung. Die Marke `data-reise-flug` steht an der Leiste. Ein
+  zweiter Flug kurz nach dem ersten (das Einpassen nach Größenänderung sprang beim Rahmenwechsel mit an) ist weg; das
+  Einpassen nach einer Größenänderung mitten im Flug übernimmt dessen Rest. Bricht etwas anderes die Fahrt ab, gilt
+  sie 400 ms nach der geplanten Landung als vorbei. `boardTasten.ts` schweigt während der Reise (`reiseStand()`): Es
+  hängt früher am Fenster und wählte bei Pos1/Ende die erste/letzte Karte samt eigener Kamerafahrt — mitten in den Flug.
 - `src/components/LabeledEdge.tsx`: `rahmenpfeil` (beide Enden `type === 'frame'`, gerichtet) → Strich `11 7`,
   Stärke ≥ 2,8, Klasse `pn-rahmenpfeil` (`abzweig`), Marke `.rahmenpfeil-nr`, Beschriftung `data-reise-nr`.
 - `src/store/kanten.ts` `onConnect`: Hinweis beim Verbinden zweier Rahmen.
