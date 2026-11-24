@@ -8,6 +8,7 @@ import {
   MiniMap,
   ReactFlow,
   useReactFlow,
+  useStoreApi,
   type EdgeTypes,
   type Node,
   type NodeChange,
@@ -973,9 +974,15 @@ export function Board() {
    * Kanten und Mitten der übrigen Karten ein — 6 Bildpunkte Fangweite, in jeder Zoomstufe gleich.
    * Strg/⌘ gedrückt: frei ablegen. Mit Raster-Fang hat das Raster Vorrang; Rahmen ziehen ihre
    * Karten über eigene Deltas mit und bleiben außen vor. M490: Einrasten „Aus" (fangLinien false) = frei.
+   * M505: Das Einrasten setzt weiter die Lage im Stand (exakt), meldet den Versatz aber dem Zug
+   * (`zieh.current.fang`) — die Anzeige gleitet dann an die Stelle, statt zu springen (lib/ziehGefuehl.ts).
+   * Das Raster rastet beim Ziehen von Karten deshalb hier ein statt in React Flow (`rasterSelbst`): React Flows
+   * `snapToGrid` liefert nur die schon gerastete Lage, der Sprung wäre nicht mehr zu erkennen.
    */
   const strgRef = useRef(false);
   const ziehtRef = useRef(false);
+  const rfStore = useStoreApi();
+  const rasterSelbst = useRef(false);
   useEffect(() => {
     const taste = (e: KeyboardEvent) => { strgRef.current = e.ctrlKey || e.metaKey; };
     const weg = () => { strgRef.current = false; };
@@ -989,18 +996,31 @@ export function Board() {
     const laeuft = changes.some((c) => c.type === 'position' && !!c.dragging);
     const ende = !laeuft && ziehtRef.current && changes.some((c) => c.type === 'position' && c.dragging === false);
     if (laeuft) ziehtRef.current = true;
-    const zieh = changes.filter((c): c is Extract<NodeChange, { type: 'position' }> => c.type === 'position' && !!c.position && (!!c.dragging || ende));
+    const zuege = changes.filter((c): c is Extract<NodeChange, { type: 'position' }> => c.type === 'position' && !!c.position && (!!c.dragging || ende));
     if (ende) ziehtRef.current = false;
-    if (zieh.length) {
+    if (zuege.length) {
       const st = useBoard.getState();
       const alle = selectActiveBoard(st).nodes;
-      const ids = new Set(zieh.map((c) => c.id));
+      const ids = new Set(zuege.map((c) => c.id));
       const mass = (n: AppNode) => ({ w: n.measured?.width ?? n.width ?? 260, h: n.measured?.height ?? n.height ?? 120 });
       const bewegt = alle.filter((n) => ids.has(n.id));
-      if (st.gridSnap || !st.fangLinien || strgRef.current || bewegt.some((n) => n.type === 'frame') || bewegt.length === 0) fangSetzen([], ende);
-      else {
+      // eingerastet = exakt dort (Rundungsreste der Gleitkommarechnung weg, sonst läge 0 bei 8,9e-16)
+      const glatt = (v: number) => Math.round(v * 1e6) / 1e6;
+      const frei = strgRef.current || bewegt.some((n) => n.type === 'frame') || bewegt.length === 0;
+      const roh = { rx: zuege[0].position!.x, ry: zuege[0].position!.y };   // M505: Lage unter dem Zeiger
+      if (st.gridSnap && rasterSelbst.current && !frei) {
+        // M505: Raster wie React Flow (Versatz der ersten Karte für alle), aber mit gemeldetem Versatz
+        fangSetzen([], ende);
+        const ref = zuege[0].position!;
+        const dx = Math.round(ref.x / 20) * 20 - ref.x; const dy = Math.round(ref.y / 20) * 20 - ref.y;
+        for (const c of zuege) if (c.position) c.position = { x: glatt(c.position.x + dx), y: glatt(c.position.y + dy) };
+        zieh.current?.fang({ dx, dy, zx: glatt(ref.x + dx), zy: glatt(ref.y + dy), ...roh });
+      } else if (st.gridSnap || !st.fangLinien || frei) {
+        fangSetzen([], ende);
+        zieh.current?.fang({ dx: 0, dy: 0, zx: null, zy: null, ...roh });
+      } else {
         let x1 = Infinity; let y1 = Infinity; let x2 = -Infinity; let y2 = -Infinity;
-        for (const c of zieh) {
+        for (const c of zuege) {
           const n = bewegt.find((k) => k.id === c.id);
           if (!n || !c.position) continue;
           const m = mass(n);
@@ -1011,10 +1031,10 @@ export function Board() {
           .filter((n) => !ids.has(n.id) && !n.selected && (!n.archived || st.showArchived))
           .map((n) => ({ x: n.position.x, y: n.position.y, ...mass(n) }));
         const f = fangen({ x: x1, y: y1, w: x2 - x1, h: y2 - y1 }, andere, 6 / (getViewport().zoom || 1));
-        // eingerastet = exakt dort (Rundungsreste der Gleitkommarechnung weg, sonst läge 0 bei 8,9e-16)
-        const glatt = (v: number) => Math.round(v * 1e6) / 1e6;
-        if (f.dx || f.dy) for (const c of zieh) if (c.position) c.position = { x: f.dx ? glatt(c.position.x + f.dx) : c.position.x, y: f.dy ? glatt(c.position.y + f.dy) : c.position.y };
+        if (f.dx || f.dy) for (const c of zuege) if (c.position) c.position = { x: f.dx ? glatt(c.position.x + f.dx) : c.position.x, y: f.dy ? glatt(c.position.y + f.dy) : c.position.y };
         fangSetzen(ende ? [] : { linien: f.linien, abstaende: f.abstaende }, ende);
+        // M505: den Sprung (einrasten, lösen, andere Stelle) gleitet die Anzeige ab
+        zieh.current?.fang({ dx: f.dx, dy: f.dy, zx: f.gx ? glatt(x1 + f.dx) : null, zy: f.gy ? glatt(y1 + f.dy) : null, ...roh });
       }
     }
     onNodesChange(changes as Parameters<typeof onNodesChange>[0]);
@@ -1045,13 +1065,19 @@ export function Board() {
       useBoard.getState().pushHistory();
       return;
     }
+    // M505: Raster beim Ziehen von Karten selbst einrasten (onNodesChangeFang) — React Flow liest `snapToGrid` je
+    // Mausbewegung aus seinem Stand; mit Rahmen in der Auswahl bleibt es bei React Flow (Mitzug über Deltas)
+    if (useBoard.getState().gridSnap && !(node.selected && selectActiveBoard(useBoard.getState()).nodes.some((n) => n.selected && n.type === 'frame'))) {
+      rasterSelbst.current = true;
+      rfStore.setState({ snapToGrid: false });
+    }
     ziehBeginnen(node); // M481: heben, neigen, Nachbarn ausweichen lassen
     // M365: Auch das Verschieben ist ein Schritt, den Strg+Z zurücknimmt (bisher nur bei Rahmen) — in der
     // Gruppenarbeit holt man so eine versehentlich weggezogene Karte zurück, ohne anderen etwas zu nehmen.
     useBoard.getState().pushHistory();
     const past = useBoard.getState().past;
     zugSchritt.current = { eintrag: past[past.length - 1], x: node.position.x, y: node.position.y };
-  }, [ziehBeginnen]);
+  }, [ziehBeginnen, rfStore]);
 
   // Leertaste halten + ziehen = Pannen, auch ÜBER Karten (Photoshop-Gewohnheit).
   // React Flow startet den Flächen-Pan nur auf der Fläche selbst — deshalb werden
@@ -1514,6 +1540,7 @@ export function Board() {
     (_: unknown, node: Node) => {
       fangSetzen([], true);
       zugSetzen(false);
+      if (rasterSelbst.current) { rasterSelbst.current = false; rfStore.setState({ snapToGrid: useBoard.getState().gridSnap }); }
       zoomWrapRef.current?.removeAttribute('data-zug');
       frameDrag.current = null;
       if (node.type === 'frame') return;
@@ -1525,7 +1552,7 @@ export function Board() {
       }
       ziehEnde(); // M481: federnd ablegen, Ausgewichenes übernehmen
     },
-    [ziehEnde],
+    [ziehEnde, rfStore],
   );
 
   // ---------- Karten erstellen ----------
