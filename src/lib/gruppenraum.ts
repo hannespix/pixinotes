@@ -44,8 +44,16 @@ const melden = (boardId: string): void => { window.dispatchEvent(new CustomEvent
 export const timerVon = (boardId: string): GruppenTimer | null => timer.get(boardId) ?? null;
 /** Restzeit in Millisekunden (nie negativ) */
 export const timerRest = (t: GruppenTimer | null): number => (t ? Math.max(0, t.ende - Date.now()) : 0);
-/** „4:05" */
-export const timerText = (ms: number): string => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+/** M512: Spanne eines Laufs — frei einstellbar von zehn Sekunden bis zwölf Stunden (vorher fest 1 bis 15 Minuten) */
+export const TIMER_MIN_MS = 10_000;
+export const TIMER_MAX_MS = 12 * 3_600_000;
+/** „4:05", ab einer Stunde „1:29:59" (M512) */
+export const timerText = (ms: number): string => {
+  const s = Math.ceil(ms / 1000);
+  const zwei = (n: number) => String(n).padStart(2, '0');
+  if (s >= 3600) return `${Math.floor(s / 3600)}:${zwei(Math.floor(s / 60) % 60)}:${zwei(s % 60)}`;
+  return `${Math.floor(s / 60)}:${zwei(s % 60)}`;
+};
 
 function senden(boardId: string): void {
   const t = timer.get(boardId);
@@ -57,8 +65,11 @@ function takten(): void {
   if (meine.length && !wiederholen) wiederholen = setInterval(() => { for (const [b] of timer) senden(b); }, 3000);
   if (!meine.length && wiederholen) { clearInterval(wiederholen); wiederholen = null; }
 }
-export function timerStart(boardId: string, minuten: number): void {
-  const dauer = Math.round(Math.min(120, Math.max(0.05, minuten)) * 60_000);
+export function timerStart(boardId: string, minuten: number): void { timerStartMs(boardId, minuten * 60_000); }
+/** M512: Start mit beliebiger Dauer in Millisekunden — auf die erlaubte Spanne begrenzt */
+export function timerStartMs(boardId: string, ms: number): void {
+  if (!Number.isFinite(ms)) return;
+  const dauer = Math.round(Math.min(TIMER_MAX_MS, Math.max(TIMER_MIN_MS, ms)));
   const t = ich();
   timer.set(boardId, { lauf: Date.now(), ende: Date.now() + dauer, dauer, von: t.id, name: t.name });
   senden(boardId); takten(); melden(boardId);
@@ -103,10 +114,11 @@ export function initGruppenraum(): void {
       if (alt && alt.lauf === m.lauf) { timer.delete(d.boardId); beendet.set(d.boardId, alt.lauf); takten(); melden(d.boardId); }
       return;
     }
-    if (m.rest <= 0 || m.rest > 121 * 60_000) return;
+    // M512: bis zwölf Stunden (plus eine Minute Spiel für abweichende Uhren); ältere Fassungen nahmen nur bis 121 Minuten an
+    if (m.rest <= 0 || m.rest > TIMER_MAX_MS + 60_000) return;
     if (beendet.get(d.boardId) === m.lauf) return;
     if (alt && alt.lauf > m.lauf) return;             // der spätere Start gilt
-    const dauer = typeof m.dauer === 'number' && m.dauer >= m.rest ? m.dauer : m.rest;
+    const dauer = typeof m.dauer === 'number' && m.dauer >= m.rest && m.dauer <= TIMER_MAX_MS + 60_000 ? m.dauer : m.rest;
     const ende = Date.now() + m.rest;
     // derselbe Lauf: nur nachstellen, wenn die Uhr merklich abweicht (sonst zittert die Anzeige)
     if (alt && alt.lauf === m.lauf && Math.abs(alt.ende - ende) < 1500) return;
