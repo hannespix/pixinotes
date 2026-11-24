@@ -279,10 +279,11 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                     )}
                   </div>
                 )}
-                <label className="freigabe-schalter look" data-taste="look-mitgeben">
+                {/* M509: erst sichtbar, wenn geteilt wird — vorher bleibt der Dialog bei einem Knopf (M391) */}
+                {geteiltWird && <label className="freigabe-schalter look" data-taste="look-mitgeben">
                   <input type="checkbox" checked={lookAn} onChange={(e) => setBoardLook(boardId, e.target.checked ? lookAusUi(ui) : { aus: true })} data-taste="look-mitgeben-schalter" />
-                  <span><b>Look mitgeben</b> – Gäste sehen das Board <span className="look-wort" data-taste="look-wort">{lookWort(lookAn && board.look && lookAktiv(board.look) ? board.look : lookAusUi(ui))}</span>{lookAn ? '' : ' nur, wenn du es einschaltest'}</span>
-                </label>
+                  <span><b>Look mitgeben</b> – Gäste sehen das Board in <span className="look-wort" data-taste="look-wort">{lookWort(lookAn && board.look && lookAktiv(board.look) ? board.look : lookAusUi(ui))}</span>{lookAn ? '' : ' nur, wenn du es einschaltest'}</span>
+                </label>}
                 <details className="freigabe-mehr" data-taste="freigabe-person" open={link === 'fehlt' || !!liste?.length || undefined}>
                   <summary>{liste?.length ? `Einzelne Personen (${liste.length})` : 'Einzelne Person per E-Mail einladen'}</summary>
                   <div className="freigabe-zeile">
