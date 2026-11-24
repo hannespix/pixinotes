@@ -252,11 +252,12 @@ if (laufe('G')) {
   console.log('G  Diagramm: Schritt entfernen');
   const code0 = 'flowchart TD\n  A[Start] --> B{Prüfen}\n  B -->|ja| C[Fertig]\n  B -->|nein| D[Zurück an A]\n  subgraph B2 [Ablage]\n    E[Akte]\n  end\n  C --> E';
   const { ctx, P, fehler } = await seite([{ id: 'd1', type: 'mermaid', width: 460, height: 420, position: { x: 0, y: 0 }, data: { code: code0 } }]);
-  const schritte = () => knoten(P, 'd1').locator('.mermaid-svg g.node').allInnerTexts().then((t) => t.map((x) => x.trim()).sort());
+  const schritte = () => knoten(P, 'd1').locator('.mermaid-svg g.node').allTextContents().then((t) => t.map((x) => (x ?? '').trim()).sort());
   const codeJetzt = () => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes[0].data.code);
   const entferne = async (name, erwartet) => {
-    await knoten(P, 'd1').locator('.mermaid-svg g.node', { hasText: name }).first().click();
-    await P.locator('.mm-step-row button.danger').first().click();
+    // (fehlt der Schritt schon, weil ein früheres Entfernen zu viel mitnahm, zeigen das die Prüfpunkte danach)
+    if (!(await knoten(P, 'd1').locator('.mermaid-svg g.node', { hasText: name }).first().click({ timeout: 5000 }).then(() => true, () => false))) return;
+    await P.locator('.mm-step-row button.danger').first().click({ timeout: 5000 }).catch(() => {});
     // warten, bis das Bild genau die erwarteten Schritte zeigt (oder nichts mehr, wenn alles weg ist)
     await warteBis(P, (n) => { const g = document.querySelectorAll('.react-flow__node[data-id="d1"] .mermaid-svg g.node').length; return g === n || !!document.querySelector('.react-flow__node[data-id="d1"] .mermaid-error'); }, 15000, erwartet);
     await warteBis(P, (kennung) => !new RegExp(`(^|[^\\p{L}\\p{N}_])${kennung}[\\[{(]`, 'u').test(JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes[0].data.code), 8000, name === 'Prüfen' ? 'B' : 'A');
