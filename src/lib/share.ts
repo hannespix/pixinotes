@@ -166,7 +166,7 @@ export async function readShareHash(): Promise<BoardDoc | null> {
   if (!m) return null;
   try {
     const board = parseBoardPayload(await gunzip(fromB64url(m[1])));
-    if (board) await gestaltLaden();   // M522: bevor cloneSharedBoard das Board prüft
+    if (board) await gestaltLaden().catch(() => null);   // M522: bevor cloneSharedBoard das Board prüft
     return board;
   } catch {
     return null;

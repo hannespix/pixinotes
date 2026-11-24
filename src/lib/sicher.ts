@@ -180,6 +180,13 @@ export const gestalt = {
 };
 /** M522: die Gestalt-Prüfung laden (einmal) — vor jedem Weg, der Fremdes im Start-Paket annimmt */
 export const gestaltLaden = () => import('./sicherGestalt');
+/**
+ * M522: Einen ganzen Stand prüfen (Sync-Datei, WebDAV, „Stand laden"). Lässt sich die Prüfung nicht laden (offline,
+ * der Teil liegt nicht im Cache), geht der Stand durch wie vor M522 — „Datei unlesbar" hieße sonst für den Abgleich
+ * „es gibt keine", und er überschriebe sie mit dem hiesigen Stand.
+ */
+export const standGeprueft = <T extends { boards: BoardDoc[]; spaces: unknown[]; geloescht?: Record<string, string> }>(p: T): Promise<T | null> =>
+  gestaltLaden().then((m) => m.standVonAussen(p as never) as T | null, () => p);
 
 /**
  * Adressen in einer Karte entschärfen, die von außen kam: Eine „Live"-Seite, die keine fremde Webseite ist,

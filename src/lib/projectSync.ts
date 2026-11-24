@@ -68,11 +68,14 @@ function isPayload(p: unknown): p is ProjectPayload {
     && Array.isArray(x.boards) && x.boards.length > 0;
 }
 
-// M522: Was im Paket steht, haben ANDERE geschrieben — es läuft durch lib/sicherGestalt.ts (paketVonAussen)
+// M522: Was im Paket steht, haben ANDERE geschrieben — es läuft durch lib/sicherGestalt.ts (paketVonAussen).
+// Lädt die Prüfung nicht (offline), gilt die Grundprüfung wie zuvor.
+const paketGeprueft = (p: unknown): Promise<ProjectPayload | null> =>
+  gestaltLaden().then((m) => m.paketVonAussen(p, isPayload), () => (isPayload(p) ? p : null));
 export async function readProjectFile(handle: SyncDirHandle, projectId: string): Promise<ProjectPayload | null> {
   try {
     const fh = await handle.getFileHandle(fileNameFor(projectId));
-    return (await gestaltLaden()).paketVonAussen(JSON.parse(await (await fh.getFile()).text()), isPayload);
+    return await paketGeprueft(JSON.parse(await (await fh.getFile()).text()));
   } catch {
     return null; // Datei existiert (noch) nicht oder ist unlesbar
   }
@@ -87,7 +90,7 @@ export async function scanProjectFiles(handle: SyncDirHandle): Promise<ProjectPa
       if (entry.kind !== 'file' || !FILE_RE.test(entry.name)) continue;
       try {
         const fh = await handle.getFileHandle(entry.name);
-        const p = (await gestaltLaden()).paketVonAussen(JSON.parse(await (await fh.getFile()).text()), isPayload);
+        const p = await paketGeprueft(JSON.parse(await (await fh.getFile()).text()));
         if (p) out.push(p);
       } catch { /* einzelne kaputte Datei überspringen */ }
     }

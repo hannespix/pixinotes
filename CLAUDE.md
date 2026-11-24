@@ -124,7 +124,9 @@ Chromium: `/opt/pw-browsers/chromium` (sonst `PW_CHROMIUM=…`).
 - Zähl-Texte über `zahlWort(n, 'Karte', 'Karten')` in `lib/sprache.ts` — nie `${n} Karten` oder „Karte(n)" (M461).
 - Neue Zeit-/Merkfelder, die jedes Gerät selbst stempelt (wie `geaendert`, `spalteSeit`), in die Listen von `lib/abgleichZeiten.ts` eintragen — sonst erzeugen sie im Abgleich Schein-Konflikte (M472).
 - Daten von außen (Links, Dateien, Sync, Live-Kanal) laufen durch
-  `lib/sicher.ts`.
+  `lib/sicher.ts`. Die Gestalt-Prüfung dazu (`lib/sicherGestalt.ts`, M522) lädt nach: Ein neuer Weg, der im
+  Start-Paket Fremdes annimmt, ruft vorher `await gestaltLaden()`; eine neue Kartenart oder ein neues Listen-Feld
+  kommt in die Tabelle `GESTALT` (sonst kann eine Karte von außen die ganze App zu Fall bringen).
 - Schweres nachladen (`import()`), nicht in den Start-Bundle ziehen (M321).
 - Leistung beim Ziehen (M491): in `:has()` keine `[style*=…]`-Selektoren (jede Inline-Stil-Änderung berechnet sonst das ganze Dokument neu); mitten im Zug nichts ins DOM ein- oder aushängen, sondern feste Plätze per Inline-Stil zeigen/verstecken. Prüfreihe m491 (T) fängt beides ab.
 - Kontraste (M492/M494): neue Farben nur als Token in `00-tokens.css` mit Hell- und Dunkelwert; Schrift auf frei gewählten Farben über `lib/lesbareSchrift.ts`; prüfen mit `werkzeug/kontrast-pruefen.mjs` (Text ≥ 4,5:1, Ränder/Fokus ≥ 3:1).

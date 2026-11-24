@@ -83,7 +83,7 @@ const GESTALT: Record<string, { felder: Record<string, FeldArt>; eintraege?: Rec
   calendar: { felder: { month: 'text?' } },
   frame: { felder: { name: 'text', color: 'text?' } },
   week: { felder: { title: 'text', entries: 'liste', cols: 'liste?', slots: 'liste?' }, eintraege: { entries: satzMit(['id', 'text'], ['day', 'start', 'dur']), cols: nurText, slots: nurText }, bereich: { from: [0, 1440], to: [0, 2880] } },
-  sheet: { felder: { title: 'text?', cells: 'texte?', colW: 'objekt?', links: 'texte?', stile: 'objekt?', filter: 'objekt?', stilListe: 'liste?', verbunden: 'liste?' }, eintraege: { verbunden: nurText }, bereich: { cols: [1, 702], rows: [1, 50000], kopf: [0, 50000], bis: [0, 50000] } },
+  sheet: { felder: { title: 'text?', cells: 'texte?', colW: 'objekt?', links: 'texte?', stile: 'objekt?', filter: 'objekt?', stilListe: 'liste?', verbunden: 'liste?' }, eintraege: { verbunden: nurText }, bereich: { cols: [1, 702], rows: [1, 1048576], kopf: [0, 1048576], bis: [0, 1048576] } },   // Zeilen: so viele fasst Excel
   minutes: {
     felder: { title: 'text', entries: 'liste', agenda: 'liste?', personenAbgelehnt: 'liste?' },
     eintraege: { entries: mitListen(satzMit(['id', 'date']), { blocks: nurSatz, decisions: satzMit(['id', 'text']), infoTops: nurText }), agenda: nurText, personenAbgelehnt: nurText },

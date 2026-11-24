@@ -205,7 +205,7 @@ export async function importFilesToBoard(
         const shared = datei?.board;
         if (shared) {
           const idMap = new Map<string, string>();
-          await gestaltLaden();   // M522: die Gestalt-Prüfung für cloneSharedBoard
+          await gestaltLaden().catch(() => null);   // M522: die Gestalt-Prüfung für cloneSharedBoard
           useBoard.getState().importBoard(cloneSharedBoard(shared, idMap));
           void boardDateienUebernehmen(datei?.dateien, idMap);   // M390: große Dateien und Tools aus der Datei
           showToast(`Geteiltes Board „${shared.name}" importiert`);

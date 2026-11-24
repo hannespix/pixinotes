@@ -30,15 +30,17 @@ Abgleich (Ordner, WebDAV, Konto), Import/Export, Live/Teilen, `lib/sicher.ts`. H
 | D5 | hoch | „Projekt beitreten" (Team-Ordner): Ein Paket mit kaputtem Board legte die App lahm. | Pakete anderer liefen an `lib/sicher.ts` vorbei direkt in `importProject`. | ✅ `paketVonAussen` |
 | D6 | mittel | Ein gelöschtes Projekt oder ein gelöschter Bereich kam nach dem Abgleich mit einem zweiten Gerät (Ordner, WebDAV) leer zurück. | Grabsteine (M351) gab es nur für Boards, Karten, Pfeile, Striche, Gespräche. Die Zusammenführung fragt aber auch bei Bereichen und Projekten „gelöscht oder nie gesehen?" — ohne Grabstein hieß es immer „nie gesehen": Das zweite Gerät behielt die Ebene und schrieb sie zurück. | ✅ `grabsteine.ts` → `ebenenVerschwunden`; „geteilt" (führt das Konto) bekommt keinen. |
 | D7 | mittel | Team-Projekt aktualisiert: Ein Board, das man hier in ein anderes Projekt gelegt hatte, stand danach in beiden — doppelt in Baum und Übersicht. | `importProject` trug die Boards ins Team-Projekt ein, ohne sie aus anderen Projekten zu nehmen. | ✅ |
+| D8 | mittel | Nur lesend geteiltes Board (auch: Karte, die gerade jemand anderes hält; Gast mit „nur Eigenes"): Karten meldeten Erfolg, obwohl nichts gespeichert wurde — „Arbeit beendet (2:00 h)", „gelöscht – Rückgängig". (Hinweis aus M520.) | Der Schutz sitzt am `set()` des Speichers und verwirft still; die Karte ruft direkt danach `showToast` mit ihrer Erfolgsmeldung. Der eigene Hinweis des Schutzes ist gedrosselt (einmal je 4 s) und wurde überschrieben. | ✅ Der Schutz merkt sich bis zum Ende des Handgriffs, warum er verworfen hat (`schutzVerworfen`); `showToast` zeigt dann diesen Grund statt der Erfolgsmeldung — eine Stelle für alle Karten. Am Schutz selbst ändert sich nichts. |
+| D9 | niedrig | Abgleich: Ein Board, das drüben gelöscht und hier bearbeitet wurde, blieb (richtig) — sprang aber ins erste Projekt des ersten Bereichs. | `mergeHierarchie` legte „Waisen" immer ins erste Projekt. | ✅ Eine Waise bleibt in ihrem Projekt (hier, sonst drüben), solange es das noch gibt. |
+| D10 | hoch | Wie D1, nur über Zahlen: Ein Zeitplan mit `dayWidth: [[]]`, eine Tabelle mit zehn Millionen Spalten oder ein Wochenplan „von −1e9 bis 1e12" ließ die **Seite hängen** (kein Fehlerbild, nichts ging mehr); eine Zahl statt Text in einer Tabellenzelle ließ die App ausfallen. Gefunden im Zufallslauf. | Diese Zahlen treiben Schleifen (Spalten, Zeilen, Stunden, Pixel je Tag) bzw. werden als Text gelesen (`startsWith`). | ✅ `GESTALT[…].bereich` (außerhalb → weg, es gilt die Vorgabe der Karte) und `texte?` für Zellen. Danach 704 zufällig verbogene Karten aller 20 Arten ohne Ausfall und ohne Hänger. |
 
-### Offen (braucht eine Entscheidung oder Platz im Start-Paket)
+### Offen (braucht eine Entscheidung)
 | Nr | Schwere | Befund | Warum offen |
 |----|---------|--------|-------------|
-| O1 | niedrig | Abgleich: Ein Board, das drüben gelöscht und hier bearbeitet wurde, bleibt (richtig) — springt aber ins **erste Projekt des ersten Bereichs** statt in seinem Projekt zu bleiben (`syncMerge.ts`, `mergeHierarchie`, Schritt 3 „Waisen"). | Fix ist geschrieben und mit 6 000 Zufallsläufen geprüft (Waise zuerst in ihr hiesiges, sonst ihr dortiges Projekt), kostet aber ~300 B im Start-Paket — die Grenze (2 065 000 B) hat nur noch 101 B Luft. |
-| O2 | niedrig | „Alles leeren" und danach eine Gesamt-Sicherung „ersetzen": das leere Startboard „Mein Board" bleibt neben dem Eingespielten stehen (beim Board-Import räumt M370 es weg). | Verhalten ändern = Entscheidung. |
-| O3 | niedrig | Ist der gespeicherte Stand kein lesbares JSON (nur durch Eingriff von außen möglich), startet die App leer und überschreibt ihn mit dem nächsten Speichern; eine Kopie des Rohtexts wird nicht aufgehoben. | Neue Funktion. |
-| O4 | Hinweis | **Start-JS-Grenze:** Vor diesem Meilenstein lag der Start bei 2 064 837 B, Grenze 2 065 000 B (m483/m502) — 163 B Luft. Jede Zeile im Start-Paket reißt fünf Reihen. Dieser Meilenstein hat darum die Prüfung nachladbar gebaut und die Einladungs-Mail des Team-Syncs (nur in den Einstellungen gebraucht) aus dem Start genommen; Stand danach 2 064 899 B. | Der nächste Meilenstein mit Start-Code braucht wieder einen Ausgleich. |
-| O5 | niedrig | Die Gestalt-Prüfung deckt Arten und Listen ab, nicht Wertebereiche (z. B. eine absurd große Zahl als Spaltenbreite). | Je Karte eigene Grenzen — Sache der Karten (M519/M520). |
+| O1 | niedrig | „Alles leeren" und danach eine Gesamt-Sicherung „ersetzen": das leere Startboard „Mein Board" bleibt neben dem Eingespielten stehen (beim Board-Import räumt M370 es weg). | Verhalten ändern = Entscheidung. |
+| O2 | niedrig | Ist der gespeicherte Stand kein lesbares JSON (nur durch Eingriff von außen möglich), startet die App leer und überschreibt ihn mit dem nächsten Speichern; eine Kopie des Rohtexts wird nicht aufgehoben. | Neue Funktion. |
+| O3 | Hinweis | **Start-JS-Grenze:** Vor diesem Meilenstein lag der Start bei 2 064 837 B, Grenze 2 065 000 B (m483/m502) — 163 B Luft; jede Zeile im Start-Paket riss fünf Reihen. Dieser Meilenstein lädt die Prüfung darum nach und hat zwei Texte, die nur die Einstellungen brauchen, aus dem Start genommen (Einladungs-Mail des Team-Syncs, Bitte an die IT für WebDAV/CORS). Stand danach: 2 062 596 B — rund 2,4 KB Luft. | Die Luft ist endlich; wer Start-Code ergänzt, misst nach (m502 A1). |
+| O4 | niedrig | Die Gestalt-Prüfung kennt die Zahlen, die Schleifen treiben (D10), nicht jede Zahl jeder Karte (z. B. eine absurde Frist in Tagen). Ein Board mit sehr vielen heilen Karten bleibt langsam. | Je Karte eigene Grenzen — Sache der Karten (M519/M520). |
 
 ### Geprüft, ohne Befund
 - **Speicher:** Stände v0 (Einzelboard), v1 (flach), v2 (tote `activeId`, Striche ohne Anker), v3 (`dragHandle`), v4
@@ -73,6 +75,7 @@ Abgleich (Ordner, WebDAV, Konto), Import/Export, Live/Teilen, `lib/sicher.ts`. H
   Fall bringen. Kaputte Inhalte werden beim Hereinkommen gerichtet; was sich nicht richten lässt (kein Objekt), fällt
   weg, der Rest des Boards kommt an.
 - Wer schon einen beschädigten Stand im Browser hat, kommt wieder hinein: Die App richtet ihn beim ersten Fehler.
+- Auf einem Board, das man nicht ändern darf, meldet keine Karte mehr einen Erfolg — der Hinweis nennt den Grund.
 - Der Abgleich über Ordner und WebDAV bricht an einer beschädigten Datei nicht mehr ab, löscht deswegen nichts
   Hiesiges und schreibt die Datei heil zurück.
 - Gelöschte Projekte und Bereiche bleiben gelöscht, auch mit einem zweiten Gerät am Sync-Ordner.
@@ -81,7 +84,8 @@ Abgleich (Ordner, WebDAV, Konto), Import/Export, Live/Teilen, `lib/sicher.ts`. H
 ## Wie (Architektur)
 - **`src/lib/sicherGestalt.ts` (neu, nachgeladen):**
   - `karteGestalt(n)` — Tabelle `GESTALT` je Kartenart: Feld → `liste` | `liste?` | `text` | `text?` | `zahl` |
-    `objekt?`, dazu je Liste ein „Richter" für die Einträge (`satzMit(['id','text'],['col'])` ergänzt fehlende Felder:
+    `objekt?` | `texte?` (Objekt aus Texten: Tabellenzellen), `bereich` (Zahl in Grenzen, sonst weg: `dayWidth`,
+    `cols`, `rows`, `kopf`, `bis`, `from`, `to`), dazu je Liste ein „Richter" für die Einträge (`satzMit(['id','text'],['col'])` ergänzt fehlende Felder:
     Text leer, Zahl 0, Kennung nach Stelle; `nurText`, `nurSatz`; `mitListen` für Listen im Eintrag: `subs`, `deps`,
     `links` am Ticket, `blocks`, `decisions`, `infoTops` an der Protokoll-Sitzung). Heiles bleibt **dasselbe Objekt**.
   - `strichVonAussen`, `gespraechVonAussen`, `boardGeprueft` (heil → dasselbe Board-Objekt, sonst `boardVonAussen`),
@@ -103,14 +107,23 @@ Abgleich (Ordner, WebDAV, Konto), Import/Export, Live/Teilen, `lib/sicher.ts`. H
   im selben Augenblick scheitern); war etwas zu richten, setzt die Grenze ihren Fehler zurück.
 - **`src/lib/grabsteine.ts`:** `ebenenVerschwunden(vor, nach)`; das Abo reagiert auch auf `spaces`.
 - **`src/store/abgleich.ts` `importProject`:** Kennungen aus dem Paket werden aus allen anderen Projekten genommen.
-- **`src/lib/projektEinladung.ts` (neu):** `buildInviteText`/`buildInviteMailto` unverändert aus `projectSync.ts`
-  herausgelöst — nur die (nachgeladenen) Einstellungen brauchen sie; schafft den Platz im Start-Paket.
-- Start-JS: 2 064 899 B (vorher 2 064 837 B, Grenze 2 065 000 B). `sicherGestalt` 6,9 KB, nachgeladen.
+- **`src/store/schutz.ts`:** `verworfenMerken(grund)` (aus `leseHinweis`, `sperrHinweis`, `rechtHinweis`; nur binnen
+  1,5 s nach einer Eingabe, gilt bis zum Ende des laufenden Handgriffs — Mikroaufgabe) und `schutzVerworfen()`.
+  **`src/store/hinweise.ts` `showToast`:** steht ein Grund an, ersetzt er die Meldung (ohne „Rückgängig").
+- **`src/lib/syncMerge.ts` `mergeHierarchie`:** Waisen zuerst in ihr Projekt (`heim`: drüben, dann hier — hier gewinnt).
+- **`src/lib/projektEinladung.ts`, `src/lib/webdavCorsText.ts` (neu):** `buildInviteText`/`buildInviteMailto` bzw.
+  `corsRequestText` unverändert aus `projectSync.ts`/`webdav.ts` herausgelöst — nur die (nachgeladenen) Einstellungen
+  brauchen sie; schafft den Platz im Start-Paket.
+- Start-JS: 2 062 596 B (vorher 2 064 837 B, Grenze 2 065 000 B). `sicherGestalt` rund 7,5 KB, nachgeladen.
 
 ## Prüfreihe
-`pruefungen/m522-audit-daten.mjs`, 34 Prüfpunkte: echte App aus `dist/` und ein „Labor" (echter Speicher und Abgleich
-ohne Oberfläche, aus dem Quelltext gebündelt; Sync-Ordner als nachgebaute Ordner-API). Gegen den Stand vor M522
-(`PN_DIST`/`PN_QUELLE` auf den alten Baum) sind die Punkte zu D1–D7 rot — siehe „Nachweis" im PR.
+`pruefungen/m522-audit-daten.mjs`, 41 Prüfpunkte: echte App aus `dist/` und ein „Labor" (echter Speicher und Abgleich
+ohne Oberfläche, aus dem Quelltext gebündelt; Sync-Ordner als nachgebaute Ordner-API).
+
+## Nachweis
+Gegen den Stand vor M522 (`PN_DIST`/`PN_QUELLE` auf den alten Baum): **9 bestanden, 32 fehlgeschlagen** — rot sind
+A1–A5, A7 (Link), B1–B5 (beschädigter Stand), C1–C7 (Sync-Ordner), D1–D4 (Team-Paket), E1–E3, E6 (Grabsteine),
+F2, F6, H1, H2 (Leseschutz) und G1 (Seitenfehler beim Link). Mit M522: **41 von 41**.
 
 ## Grenzen / offen
 Siehe „Offen". Supabase: nichts geändert, keine Migration nötig. Hilfe-Texte: unverändert (es gibt nichts Neues zu

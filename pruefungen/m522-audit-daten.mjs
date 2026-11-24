@@ -26,6 +26,8 @@
  *   F  Was heil ist, bleibt unberührt: Beispiele und frisch angelegte Karten gehen unverändert durch die Prüfung
  *      (dasselbe Objekt); die Sicherung übersteht die Rundreise (Karten, Verbindungen, Striche, Gespräche, Tönung,
  *      Look); der Drei-Wege-Abgleich kommt in 400 Zufallsläufen auf beiden Geräten zum selben Stand.
+ *   H  Nur lesend geteiltes Board: Eine Karte meldet keinen Erfolg („Arbeit beendet"), wenn der Leseschutz die Änderung
+ *      verworfen hat — der Hinweis nennt den Grund. Auf dem eigenen Board bleibt alles wie bisher.
  *   G  Keine Seitenfehler.
  */
 // Läuft aus dem Repository: `node pruefungen/m522-audit-daten.mjs`
@@ -170,6 +172,11 @@ const KAPUTT = [
   { id: 'k6', type: 'week', position: { x: 80, y: 560 }, data: { title: 'Ohne Einträge' } },
   { id: 'k7', type: 'kanban', position: { x: 420, y: 560 }, data: { title: 'Schräge Tickets', items: [null, 5, { id: 't1' }, { id: 't2', text: 'Bleibt', col: 1 }], cols: 5 } },
   { id: 'k8', type: 'shape', position: { x: 760, y: 560 }, data: { text: { kein: 'Text' } } },
+  // Zahlen, die Schleifen treiben — daran hing die ganze Seite (Zufallslauf im Audit)
+  { id: 'k9', type: 'gantt', position: { x: 1100, y: 80 }, data: { title: 'Pixel je Tag als Liste', dayWidth: [[]], rows: [{ id: 'r1', name: 'Vorgang', start: '2026-11-17', end: '2026-11-27' }] } },
+  { id: 'k10', type: 'sheet', position: { x: 1100, y: 320 }, data: { title: 'Zehn Millionen Spalten', cols: 10000000, rows: true } },
+  { id: 'k11', type: 'sheet', position: { x: 1100, y: 560 }, data: { title: 'Zahl als Zelle', cells: { A1: '1', B1: -1 }, cols: 5, rows: 8 } },
+  { id: 'k12', type: 'week', position: { x: 1440, y: 80 }, data: { title: 'Woche ohne Ende', days: 5, from: -1e9, to: 1e12, entries: [] } },
 ];
 
 // ══ A ═══════════════════════════════════════════════════════════════
@@ -192,19 +199,24 @@ console.log('A  Geteilter Link mit kaputtem Inhalt');
   pruefe('A2 die App läuft, die heile Notiz steht da', (await ausfall(P)) === 0 && (await P.locator('.react-flow__node', { hasText: 'Gut angekommen' }).count()) === 1, { ausfall: await ausfall(P), abgefangen: P.abgefangen });
   const kb = (art, titel) => gb?.nodes.find((n) => n.type === art && (n.data.title === titel || n.data.subject === titel));
   const schraeg = kb('kanban', 'Schräge Tickets');
-  pruefe('A3 kaputter Inhalt ist gerichtet, nicht verworfen: alle neun Karten sind da, Listen sind Listen',
-    gb?.nodes.length === 9 && Array.isArray(kb('kanban', 'Ohne Tickets')?.data.items) && Array.isArray(kb('gantt', 'Ohne Zeilen')?.data.rows)
+  pruefe('A3 kaputter Inhalt ist gerichtet, nicht verworfen: alle 13 Karten sind da, Listen sind Listen',
+    gb?.nodes.length === 13 && Array.isArray(kb('kanban', 'Ohne Tickets')?.data.items) && Array.isArray(kb('gantt', 'Ohne Zeilen')?.data.rows)
     && Array.isArray(kb('email', 'Ohne Anhänge')?.data.attachments) && Array.isArray(kb('time', 'Ohne Abschnitte')?.data.segs) && Array.isArray(kb('week', 'Ohne Einträge')?.data.entries)
     && !gb.nodes.some((n) => n.type === 'note' && typeof n.data.blocks === 'string'),
     gb?.nodes.map((n) => [n.type, Object.keys(n.data)]));
   pruefe('A4 … ein Ticket ohne Text und Spalte bleibt ein Ticket, was kein Ticket ist, fällt weg',
     schraeg?.data.items.length === 2 && schraeg.data.items.every((it) => typeof it.id === 'string' && typeof it.text === 'string' && typeof it.col === 'number') && schraeg.data.items.some((it) => it.text === 'Bleibt' && it.col === 1) && schraeg.data.cols === undefined,
     schraeg?.data);
+  const nk = (id) => gb?.nodes.find((n) => n.data.title === id)?.data;
+  pruefe('A4b Zahlen außerhalb jedes Sinns fallen weg (Pixel je Tag als Liste, zehn Millionen Spalten, Woche von −1e9 bis 1e12), eine Zahl als Zelle wird ihr Text',
+    !!nk('Pixel je Tag als Liste') && nk('Pixel je Tag als Liste').dayWidth === undefined && nk('Zehn Millionen Spalten')?.cols === undefined && nk('Zehn Millionen Spalten')?.rows === undefined
+    && nk('Zahl als Zelle')?.cells.B1 === '-1' && nk('Woche ohne Ende')?.from === undefined && nk('Woche ohne Ende')?.to === undefined,
+    [nk('Pixel je Tag als Liste'), nk('Zehn Millionen Spalten'), nk('Zahl als Zelle'), nk('Woche ohne Ende')]);
   pruefe('A5 nur gültige Verbindungen, Striche (nur Zahlenpaare) und Beiträge', gb?.edges.length === 1 && gb.drawings.length === 1 && gb.drawings[0].points.length === 2 && (gb.comments ?? []).length === 1 && gb.comments[0].msgs.length === 1,
     { e: gb?.edges, d: gb?.drawings, c: gb?.comments });
   pruefe('A6 keine einzelne Karte ist ausgefallen', (await karteAusgefallen(P)) === 0, await karteAusgefallen(P));
   await P.reload({ waitUntil: 'load' }); await P.waitForSelector('.react-flow, .err-box', { timeout: 20000 }).catch(() => {}); await P.waitForTimeout(1200);
-  pruefe('A7 nach dem Neuladen läuft die App weiter (der Stand ist gespeichert)', (await ausfall(P)) === 0 && (await P.locator('.react-flow__node').count()) >= 9, { ausfall: await ausfall(P), karten: await P.locator('.react-flow__node').count() });
+  pruefe('A7 nach dem Neuladen läuft die App weiter (der Stand ist gespeichert)', (await ausfall(P)) === 0 && (await P.locator('.react-flow__node').count()) >= 13, { ausfall: await ausfall(P), karten: await P.locator('.react-flow__node').count() });
   const tot = await rundgang(P);
   pruefe('A8 Übersicht, Aufgaben und Suche laufen (sie rechnen über alle Karten)', tot.length === 0, tot);
   await P.screenshot({ path: path.join(__repo, 'pruefungen', 'ablage', 'm522-a-link.png') }).catch(() => {});
@@ -252,13 +264,14 @@ console.log('C  Sync-Ordner mit beschädigter Datei');
     const { syncFolder, useBoard, flushPersist } = window.__pn;
     const h = await syncFolder.pickSyncFolder();
     const remote = await syncFolder.readSync(h);
-    const uebernommen = remote ? syncFolder.applySync(remote) : false;
+    let uebernommen = false;
+    try { uebernommen = remote ? syncFolder.applySync(remote) : false; } catch (e) { return { uebernommen: `WURF ${e}`, boards: [] }; }
     flushPersist();
     const s = useBoard.getState();
     return { uebernommen, boards: s.boards.map((b) => ({ id: b.id, name: b.name, nodes: Array.isArray(b.nodes) ? b.nodes.map((n) => ({ id: n.id, lage: !!n.position, items: n.type === 'kanban' ? Array.isArray(n.data.items) : null })) : null, edges: Array.isArray(b.edges) })) };
   });
   const by1 = r1.boards.find((b) => b.id === 'by');
-  pruefe('C1 „Stand laden": das Heile kommt an (neue Notiz, schräges Board), das Board ohne Kartenliste nicht', r1.uebernommen && r1.boards.find((b) => b.id === 'bx')?.nodes.length === 2 && !!by1 && !r1.boards.some((b) => b.id === 'kaputt'), r1);
+  pruefe('C1 „Stand laden": das Heile kommt an (neue Notiz, schräges Board), das Board ohne Kartenliste nicht', r1.uebernommen === true && r1.boards.find((b) => b.id === 'bx')?.nodes.length === 2 && !!by1 && !r1.boards.some((b) => b.id === 'kaputt'), r1);
   pruefe('C2 … die Karte ohne Lage fällt weg, das Kanban ohne Tickets hat eine Ticketliste, Verbindungen sind eine Liste', by1?.nodes.length === 2 && by1.nodes.every((n) => n.lage) && by1.nodes.find((n) => n.id === 'q1')?.items === true && by1.edges === true, by1);
   // Laufender Abgleich: Das „andere Gerät" schreibt eine neue Datei — mit einer neuen Notiz, einer kaputten Karte und dem
   // Board „Schräg" diesmal ganz ohne Kartenliste
@@ -269,13 +282,13 @@ console.log('C  Sync-Ordner mit beschädigter Datei');
     let erg; try { erg = await syncFolder.checkSyncRemote(true); } catch (e) { erg = `WURF ${e}`; }
     flushPersist();
     const s = useBoard.getState();
-    return { erg, bx: s.boards.find((b) => b.id === 'bx')?.nodes.map((n) => [n.id, n.type === 'gantt' ? Array.isArray(n.data.rows) : true]), by: s.boards.find((b) => b.id === 'by')?.nodes.length ?? null };
+    return { erg, bx: s.boards.find((b) => b.id === 'bx')?.nodes?.map((n) => [n.id, n.type === 'gantt' ? Array.isArray(n.data.rows) : true]), by: s.boards.find((b) => b.id === 'by')?.nodes?.length ?? null };
   });
   pruefe('C3 laufender Abgleich: die neue Notiz kommt an, die kaputte Karte gerichtet', r2.erg === 'zusammengefuehrt' && r2.bx?.some((n) => n[0] === 'x3') && r2.bx?.find((n) => n[0] === 'x4')?.[1] === true, r2);
   pruefe('C4 … das Board, das in der Datei kaputt war, wird hier NICHT gelöscht', r2.by === 2, r2);
   const geheilt = JSON.parse(ordner.dateien.get(HAUPT).text);
-  pruefe('C5 … und die Datei ist danach geheilt (dieses Gerät hat seinen Stand zurückgeschrieben)', ordner.schreiben > vorSchreiben && geheilt.boards.every((b) => Array.isArray(b.nodes) && Array.isArray(b.edges)) && geheilt.boards.find((b) => b.id === 'by')?.nodes.length === 2, { geschrieben: ordner.schreiben - vorSchreiben, boards: geheilt.boards.map((b) => [b.id, Array.isArray(b.nodes)]) });
-  const r3 = await L.evaluate(async () => { const { syncFolder } = window.__pn; return syncFolder.checkSyncRemote(true); });
+  pruefe('C5 … und die Datei ist danach geheilt (dieses Gerät hat seinen Stand zurückgeschrieben)', ordner.schreiben > vorSchreiben && geheilt.boards.every((b) => Array.isArray(b.nodes) && Array.isArray(b.edges)) && geheilt.boards.find((b) => b.id === 'by')?.nodes?.length === 2, { geschrieben: ordner.schreiben - vorSchreiben, boards: geheilt.boards.map((b) => [b.id, Array.isArray(b.nodes)]) });
+  const r3 = await L.evaluate(async () => { const { syncFolder } = window.__pn; try { return await syncFolder.checkSyncRemote(true); } catch (e) { return `WURF ${e}`; } });
   pruefe('C6 danach ist Ruhe (derselbe Stand noch einmal: nichts zu tun)', r3 === 'ruhe' && ordner.schreiben === vorSchreiben + 1, { r3, schreiben: ordner.schreiben - vorSchreiben });
   await L.close();
   const P = await seite(ctx);
@@ -492,7 +505,57 @@ console.log('F  Heiles bleibt unberührt');
       if (new Set(inH).size !== inH.length || ger.A.lokal.boards.some((b) => !inH.includes(b.id))) fehler.push(`${lauf}: Hierarchie`);
     } catch (e) { fehler.push(`${lauf}: ${e.message}`); }
   }
+  {
+    // Drüben gelöscht, hier bearbeitet: Das Board bleibt — und zwar in SEINEM Projekt
+    const b = (id, text) => board(id, id, [note(`n${id}`, text)]);
+    const raeume = (p2) => [{ id: 's1', name: 'Arbeit', projects: [{ id: 'p1', name: 'Eins', boardIds: ['b1'] }] }, { id: 's2', name: 'Privat', projects: [{ id: 'p2', name: 'Zwei', boardIds: p2 }] }];
+    const basis = { boards: [b('b1', 'x'), b('b2', 'x'), b('b3', 'x')], spaces: raeume(['b2', 'b3']) };
+    const hier = { boards: [b('b1', 'x'), b('b2', 'x'), b('b3', 'hier bearbeitet')], spaces: raeume(['b2', 'b3']) };
+    const drueben = { boards: [b('b1', 'x'), b('b2', 'x')], spaces: raeume(['b2']) };
+    const erg = dreiWegeMerge(basis, hier, drueben);
+    const wo = erg.spaces.flatMap((sp) => sp.projects).filter((p) => p.boardIds.includes('b3')).map((p) => p.id);
+    pruefe('F6 ein Board, das drüben gelöscht und hier bearbeitet wurde, bleibt in seinem Projekt (sprang ins erste)', erg.boards.some((x) => x.id === 'b3') && wo.join() === 'p2', { wo, spaces: erg.spaces });
+  }
   pruefe('F5 Drei-Wege-Abgleich, 400 Zufallsläufe: beide Geräte enden im selben Stand, kommen zur Ruhe, nichts Neues geht verloren, jedes Board genau einmal in der Hierarchie', fehler.length === 0, fehler.slice(0, 5));
+}
+
+// ══ H ═══════════════════════════════════════════════════════════════
+console.log('H  Nur lesen: kein Erfolg melden, wo nichts gespeichert wurde');
+{
+  const d = new Date();
+  const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const seit = Math.max(0, d.getHours() * 60 + d.getMinutes() - 120);
+  const zeit = (id) => ({ id, type: 'time', position: { x: 80, y: 80 }, width: 440, data: { title: 'Zeit', segs: [{ id: 's1', date: iso, start: seit, kind: 'arbeit' }] } });
+  const fremd = { ...board('lz', 'Nur zum Lesen', [zeit('zeitFremd')]), geteiltVon: 'uid-fremd', geteiltVonName: 'anna@example.de', geteiltRolle: 'lesen' };
+  const ctx = await kontext(stand([fremd, board('eigen', 'Mein Board', [zeit('zeitEigen')])]));
+  const P = await seite(ctx);
+  await P.waitForSelector('.react-flow__node[data-id="zeitFremd"] .time-stop', { timeout: 15000 });
+  /** Jeden Hinweis mitschreiben, der während des Handgriffs erscheint (M484: nicht hinterher abfragen) */
+  const mitschreiben = () => P.evaluate(() => {
+    const w = window; w.__hinweise = [];
+    const merken = () => { const t = document.querySelector('.toast')?.textContent; if (t && w.__hinweise.at(-1) !== t) w.__hinweise.push(t); };
+    w.__beob?.disconnect(); w.__beob = new MutationObserver(merken); w.__beob.observe(document.body, { childList: true, subtree: true, characterData: true });
+  });
+  const hinweise = () => P.evaluate(() => window.__hinweise ?? []);
+  const segEnde = async (bid, kid) => (await zustand(P)).boards.find((b) => b.id === bid).nodes.find((n) => n.id === kid).data.segs[0].end;
+  await mitschreiben();
+  await P.locator('.react-flow__node[data-id="zeitFremd"] .time-stop').click();
+  await warteBis(P, async () => (await hinweise()).length > 0, 4000);
+  await P.waitForTimeout(600);
+  const h1 = await hinweise();
+  pruefe('H1 nur lesen: „Stop" meldet NICHT „Arbeit beendet" – gespeichert wurde nichts', !h1.some((t) => /beendet/.test(t)) && (await segEnde('lz', 'zeitFremd')) === undefined, h1);
+  pruefe('H2 … sondern sagt, warum nichts geschah (nur zum Lesen freigegeben)', h1.some((t) => /nur zum Lesen freigegeben/.test(t)), h1);
+  // Gegenprobe auf dem eigenen Board: dort bleibt die Erfolgsmeldung, und es wird gespeichert
+  await P.locator('.tabs.spalte .side-board', { hasText: 'Mein Board' }).first().click();
+  await P.waitForSelector('.react-flow__node[data-id="zeitEigen"] .time-stop', { timeout: 15000 });
+  await P.waitForTimeout(5200);   // der Hinweis von eben ist verklungen
+  await mitschreiben();
+  await P.locator('.react-flow__node[data-id="zeitEigen"] .time-stop').click();
+  await warteBis(P, async () => (await hinweise()).some((t) => /beendet/.test(t)), 4000);
+  const beendet = await warteBis(P, async () => typeof (await segEnde('eigen', 'zeitEigen')) === 'number', 4000);
+  const h3 = await hinweise();
+  pruefe('H3 eigenes Board: „Arbeit beendet (…)" wie bisher, und der Abschnitt ist gespeichert', h3.some((t) => /Arbeit beendet/.test(t)) && beendet, h3);
+  await ctx.close();
 }
 
 // ══ G ═══════════════════════════════════════════════════════════════
