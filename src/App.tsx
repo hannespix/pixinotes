@@ -6,10 +6,11 @@ import { Dock } from './components/Dock';
 import { Tabs } from './components/Tabs';
 import { TopActions } from './components/TopActions';
 import {
-  adoptPersistedState, claimWriter, getWriterRole, hinweisKnopfDruecken, reassertPersist,
+  adoptPersistedState, claimWriter, getWriterRole, hinweisKnopfDruecken, hinweisMitKnopf, reassertPersist,
   selectActiveBoard, selectNurLesen, singleWriterSupported, takeOverWriter, useBoard, type WriterRole,
 } from './store';
 import { initAutoSync } from './lib/syncFolder';
+import { EIGENER_LOOK_EREIGNIS, eigenerLook, eigenerLookSetzen, hinweisEinmal, lookAnders, lookAusRoh, lookRohVon, lookWort, wirksamerLook } from './lib/boardLook';
 import { sicherungStartFaellig, SICHERUNG_EREIGNIS } from './lib/sicherungTakt';
 import { initProjectAutoSync } from './lib/projectSync';
 import { cleanupOrphanHtml } from './lib/htmlStore';
@@ -356,8 +357,32 @@ export default function App() {
   }, []);
 
   // Design anwenden: data-theme/-accent am <html>; „System" folgt dem Gerät live
-  const ui = useBoard((s) => s.ui);
+  const eigenUi = useBoard((s) => s.ui);
+  // M509: Auf einem geteilten Board gilt der Look, den der Teilende mitgegeben hat — nur solange es offen ist, und
+  // nie in die eigenen Einstellungen geschrieben. „Eigenen Look verwenden" merkt sich das Gerät je Board.
+  const lookRoh = useBoard((s) => lookRohVon(s.boards, s.activeId, s.view));
+  const [eigenTakt, setEigenTakt] = useState(0);
   useEffect(() => {
+    const auf = () => setEigenTakt((n) => n + 1);
+    window.addEventListener(EIGENER_LOOK_EREIGNIS, auf);
+    return () => window.removeEventListener(EIGENER_LOOK_EREIGNIS, auf);
+  }, []);
+  const boardLook = lookAusRoh(lookRoh);
+  const eigen = !!boardLook && eigenerLook(boardLook.id);
+  const { ui: wirkUi, fremd: fremderLook } = wirksamerLook(eigenUi, boardLook?.look, eigen);
+  const lookSchluessel = `${wirkUi.theme}|${wirkUi.design ?? ''}|${wirkUi.accent}|${fremderLook ? 'board' : ''}|${eigenTakt}`;
+  const lookFremdId = fremderLook && lookAnders(eigenUi, wirkUi) ? boardLook?.id : undefined;
+  useEffect(() => {
+    if (!lookFremdId || !hinweisEinmal(lookFremdId)) return;
+    const t = setTimeout(() => hinweisMitKnopf(`Dieses Board zeigt den Look des Teilenden (${lookWort(fremderLook ?? {})}).`, 'Eigenen Look verwenden',
+      () => eigenerLookSetzen(lookFremdId, true), 9000), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookFremdId]);
+  useEffect(() => {
+    const ui = wirkUi;
+    if (fremderLook) document.documentElement.dataset.lookVon = 'board';
+    else delete document.documentElement.dataset.lookVon;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     // M397: Die Statusleiste des Geräts trägt die Farbe des App-Grunds, nicht
     // mehr den Akzent – ein kräftig blauer Balken über einer ruhigen App
@@ -382,7 +407,8 @@ export default function App() {
     apply();
     mq.addEventListener('change', apply);
     return () => mq.removeEventListener('change', apply);
-  }, [ui]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lookSchluessel]);
 
   // Geteiltes Board im URL-Hash? (#b=… — der Link IST die Datei)
   useEffect(() => {

@@ -7,6 +7,12 @@ import type { AppNode } from '../types';
 import type { BoardState, Setzen, Holen } from './typen';
 import { selectNurLesen } from './selektoren';
 import { LESE_HINWEIS } from './schutz';
+import { lookNachziehen } from '../lib/boardLook';
+
+const lookFuerBoards = (boards: BoardState['boards'], ui: BoardState['ui']): Partial<BoardState> => {
+  const b = lookNachziehen(boards, ui);
+  return b ? { boards: b } : {};
+};
 
 
 /** M503: Die Karte, bei der eine Präsentation ohne ausdrückliche Startkarte beginnt – Fokus, sonst genau eine
@@ -93,9 +99,10 @@ export function ansichtScheibe(set: Setzen, get: Holen) {
     graphLayers: { cards: false, portals: true, wikis: true, projectOnly: false },
     setGraphLayer: (key, on) => set((s) => ({ graphLayers: { ...s.graphLayers, [key]: on } })),
     ui: { theme: 'system', accent: 'blau' },
-    setUiTheme: (theme) => set({ ui: { ...get().ui, theme } }),
-    setUiAccent: (accent) => set({ ui: { ...get().ui, accent } }),
-    setUiDesign: (design) => set({ ui: { ...get().ui, design } }),
+    // M509: Boards, die meinen Look mitgeben (beim Teilen), ziehen nach — die Gäste sehen die Änderung live
+    setUiTheme: (theme) => { const ui = { ...get().ui, theme }; set({ ui, ...lookFuerBoards(get().boards, ui) }); },
+    setUiAccent: (accent) => { const ui = { ...get().ui, accent }; set({ ui, ...lookFuerBoards(get().boards, ui) }); },
+    setUiDesign: (design) => { const ui = { ...get().ui, design }; set({ ui, ...lookFuerBoards(get().boards, ui) }); },
 
     settingsSection: null,
     setSettingsOpen: (open, section = null) => set({ settingsOpen: open, settingsSection: section }),

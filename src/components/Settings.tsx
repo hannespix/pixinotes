@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { sprache, spracheSetzen, zahlWort } from '../lib/sprache';
 import { brainStatus, rebuildBrainIndex, syncBrainIndex } from '../lib/brain';
 import { useBoard } from '../store';
+import { eigenerLook, eigenerLookSetzen, lookAusRoh, lookRohVon, lookWort } from '../lib/boardLook';
 import {
   connectGoogle, connectMicrosoft, disconnect as disconnectCalAccount,
   invalidateAccountEvents, loadCalAccounts, msHasMail, msHasNotes, oauthAvailable, patchCalAccounts, type CalAccounts,
@@ -253,6 +254,10 @@ export function Settings() {
   const setHandschriftKi = useBoard((s) => s.setHandschriftKi);
   const setWheelZoom = useBoard((s) => s.setWheelZoom);
   const ui = useBoard((s) => s.ui);
+  // M509: Auf einem geteilten Board mit mitgegebenem Look gilt dieser — die Auswahl unten wirkt auf die eigenen Boards
+  const boardLook = lookAusRoh(useBoard((s) => lookRohVon(s.boards, s.activeId, s.view)));
+  const [eigenLookTakt, setEigenLookTakt] = useState(0);
+  const lookWirkt = !!boardLook && !eigenerLook(boardLook.id) && eigenLookTakt >= 0;
   const setUiTheme = useBoard((s) => s.setUiTheme);
   const setUiAccent = useBoard((s) => s.setUiAccent);
   const setUiDesign = useBoard((s) => s.setUiDesign);
@@ -707,6 +712,12 @@ export function Settings() {
         <>
         <section className="modal-section">
           <h3>Aussehen</h3>
+          {lookWirkt && boardLook && (
+            <div className="modal-row look-hinweis" data-taste="look-hinweis">
+              <span className="modal-hint">Dieses geteilte Board zeigt den Look des Teilenden ({lookWort(boardLook.look)}). Deine Auswahl gilt für deine eigenen Boards.</span>
+              <button onClick={() => { eigenerLookSetzen(boardLook.id, true); setEigenLookTakt((n) => n + 1); }} data-taste="look-eigen-einst">Eigenen Look verwenden</button>
+            </div>
+          )}
           <div className="modal-row">
             <span>Erscheinungsbild</span>
             <div className="seg" role="group" aria-label="Erscheinungsbild">
