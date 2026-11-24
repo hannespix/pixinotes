@@ -19,6 +19,9 @@
  *   G  Diagramm, Schritt entfernen: nur der Schritt und seine Verbindungen verschwinden — die Nachbarn behalten ihre
  *      Beschriftung, auch wenn sie in derselben Zeile standen oder die Kennung in ihrem Text vorkommt. (Vorher blieb
  *      vom Vorlagen-Diagramm nur die Kopfzeile.)
+ *   H  Telefon, Doppeltipp auf eine verkleinerte Karte (Notiz, Kontakt, Mail; 8 Stellen, 90 und 250 ms Abstand): Der
+ *      Fokus ist offen, sonst ist nichts passiert — kein Haken, kein gewählter Verweis, keine neue Notiz, kein Fenster,
+ *      kein Cursor im Text. Danach nimmt die Karte Tipps an, „Zurück" wirkt sofort.
  * Bilder nach PN_BILDER (Standard pruefungen/ablage/).
  */
 // Läuft aus dem Repository: `node pruefungen/m519-audit-karten-a.mjs`
@@ -273,6 +276,77 @@ if (laufe('G')) {
   const nachA = { schritte: await schritte(), code: await codeJetzt() };
   pruefe('G3 „Start" (Kennung A) entfernen lässt den Schritt stehen, in dessen Beschriftung ein „A" vorkommt', JSON.stringify(nachA.schritte) === JSON.stringify(['Akte', 'Fertig', 'Zurück an A']), nachA);
   pruefe('G4 ohne Seitenfehler', fehler.length === 0, fehler.slice(0, 2));
+  await ctx.close();
+}
+
+// ───────────────────────────── H · Telefon: Doppeltipp auf eine verkleinerte Karte
+if (laufe('H')) {
+  console.log('H  Telefon: Doppeltipp öffnet den Fokus und löst sonst nichts aus');
+  const karten = {
+    notiz: { id: 'k', type: 'note', width: 260, position: { x: 0, y: 0 }, data: { color: 'yellow', blocks: [{ id: 'a', type: 'paragraph', content: 'Anruf 0761 208-1356' }, { id: 'c', type: 'checkListItem', props: { checked: false }, content: 'Punkt eins' }, { id: 'd', type: 'checkListItem', props: { checked: false }, content: 'Punkt zwei' }, { id: 'e', type: 'checkListItem', props: { checked: false }, content: 'Punkt drei' }] } },
+    kontakt: { id: 'k', type: 'kontakt', width: 300, position: { x: 0, y: 0 }, data: { name: 'Anna Müller', firma: 'Amt', telefone: [{ art: 'Dienstlich', nummer: '0761 208-1234' }, { art: 'Mobil', nummer: '0151 2345678' }], emails: ['anna@example.de'], adresse: 'Hauptstr. 1\n79098 Freiburg' } },
+    mail: { id: 'k', type: 'email', width: 300, position: { x: 0, y: 0 }, data: { subject: 'Rückruf', fromName: 'Erika Muster', fromAddress: 'erika@example.org', text: 'Bitte zurückrufen: 0761 208 1356\nMehr unter https://example.org', attachments: [{ name: 'a.txt', size: 5, mime: 'text/plain', dataUrl: 'data:text/plain;base64,SGFsbG8=' }] } },
+  };
+  // eine zweite Karte weit weg: Das Board zeigt beide, die Karten sind also klein (wie auf einem vollen Board)
+  const fern = notiz('fern', 'weit weg', 900, 900);
+  const punkte = [[0.2, 0.15], [0.5, 0.15], [0.85, 0.15], [0.2, 0.45], [0.5, 0.45], [0.8, 0.45], [0.3, 0.8], [0.7, 0.8]];
+  for (const [name, karte] of Object.entries(karten)) {
+    const auff = [];
+    for (const [fx, fy] of punkte) for (const pause of [90, 250]) {
+      const { ctx, P, fehler } = await seite([karte, fern], { viewport: { width: 390, height: 780 }, telefon: true });
+      // was der zweite Tipp auslösen könnte, mitschreiben statt ausführen: Verweise (tel:, mailto:, Web), Downloads
+      await P.evaluate(() => { window.__ausgeloest = []; document.addEventListener('click', (e) => { const a = e.target.closest?.('a[href]'); if (a && !e.defaultPrevented) { window.__ausgeloest.push(a.getAttribute('href')); e.preventDefault(); } }); });
+      const geladen = []; P.on('download', (d) => geladen.push(d.suggestedFilename()));
+      await knoten(P, 'k').waitFor({ state: 'visible', timeout: 20000 });
+      await warteBis(P, () => document.querySelectorAll('.react-flow__node').length === 2 && !!JSON.parse(localStorage.getItem('pixinotes-board') ?? '{}').state, 10000);
+      const stand0 = () => P.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes.map((k) => [k.id, k.data])));
+      const vorher = await stand0();
+      const b = await knoten(P, 'k').boundingBox();
+      const x = b.x + b.width * fx; const y = b.y + b.height * fy;
+      await P.touchscreen.tap(x, y); await P.waitForTimeout(pause); await P.touchscreen.tap(x, y);
+      const offen = await warteBis(P, () => !!document.querySelector('.focus-head'), 5000);
+      await P.waitForTimeout(1100);   // danach darf sich nichts mehr tun: der gespeicherte Stand (verzögert geschrieben) muss gleich bleiben
+      const z = await P.evaluate(() => ({ fokus: !!document.querySelector('.focus-head'), fenster: document.querySelectorAll('[role=dialog], .pdf-viewer, .modal').length, ausgeloest: window.__ausgeloest, karten: document.querySelectorAll('.react-flow__node').length,
+        tippt: !!document.activeElement && (document.activeElement.isContentEditable || /INPUT|TEXTAREA/.test(document.activeElement.tagName)) }));
+      const was = [];
+      if (!offen || !z.fokus) was.push('Fokus nicht offen');
+      if (await stand0() !== vorher) was.push('Inhalt geändert');
+      if (z.karten !== 2) was.push(`${z.karten} Karten`);
+      if (z.fenster) was.push('Fenster offen');
+      if (z.ausgeloest.length) was.push(`Verweis ${z.ausgeloest[0]}`);
+      if (geladen.length) was.push(`Download ${geladen[0]}`);
+      if (z.tippt) was.push('Cursor im Text');
+      if (fehler.length) was.push(fehler[0]);
+      if (was.length) auff.push(`(${fx}, ${fy}) ${pause} ms: ${was.join(', ')}`);
+      await ctx.close();
+    }
+    pruefe(`H ${name}: an ${punkte.length} Stellen, mit 90 und 250 ms Abstand – der Fokus ist offen, sonst ist nichts passiert`, auff.length === 0, auff.slice(0, 5));
+  }
+  // … und danach ist die Karte ganz normal zu bedienen
+  const { ctx, P } = await seite([karten.notiz, fern], { viewport: { width: 390, height: 780 }, telefon: true });
+  await knoten(P, 'k').waitFor({ state: 'visible', timeout: 20000 });
+  const b = await knoten(P, 'k').boundingBox();
+  await P.touchscreen.tap(b.x + b.width / 2, b.y + 8);
+  await warteBis(P, () => !!document.querySelector('.focus-head'), 8000);
+  await P.waitForTimeout(700);   // Schonfrist (450 ms) und Kamerafahrt vorbei
+  await knoten(P, 'k').locator('input[type=checkbox]').first().tap();
+  const gehakt = await warteBis(P, () => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards[0].nodes[0].data.blocks[1]?.props?.checked === true, 8000);
+  pruefe('H nach der Schonfrist nimmt die Karte Tipps an (Haken setzen)', gehakt);
+  // Zurück führt sofort hinaus — die Kopfzeile ist von der Schonfrist ausgenommen
+  await P.locator('.focus-x').tap();
+  await warteBis(P, () => !document.querySelector('.focus-head'), 8000);
+  // warten, bis die Kamera zurück ist (die Karte liegt wieder still), dann erneut öffnen
+  let lage = null; let still = 0;
+  for (let i = 0; i < 50 && still < 4; i++) {
+    await P.waitForTimeout(120);
+    const r = await knoten(P, 'k').boundingBox();
+    still = lage && r && Math.abs(r.x - lage.x) + Math.abs(r.y - lage.y) + Math.abs(r.width - lage.width) < 0.5 ? still + 1 : 0;
+    lage = r;
+  }
+  await P.touchscreen.tap(lage.x + lage.width / 2, lage.y + 8);
+  const wiederOffen = await warteBis(P, () => !!document.querySelector('.focus-head'), 8000);
+  await P.locator('.focus-x').tap({ timeout: 3000 }).catch(() => {});
+  pruefe('H „Zurück" in der Kopfzeile wirkt auch gleich nach dem Öffnen', wiederOffen && await warteBis(P, () => !document.querySelector('.focus-head'), 3000));
   await ctx.close();
 }
 
