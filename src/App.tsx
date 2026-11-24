@@ -27,6 +27,7 @@ import { BacklinksPanel } from './components/BacklinksPanel';
 import { GeteiltHost } from './components/GeteiltHost';
 import { TooltipLayer } from './components/TooltipLayer';
 import { Tastatur } from './components/Tastatur';
+import { NurBoard } from './lib/nurBoard';
 import { collectTasks, dueTasksToRemind, notifyBrowser } from './lib/tasks';
 import { kontoKennung, serienAusstehend, termineHintergrund, termineZuErinnern } from './lib/termineZentrale';
 import { fristenAusstehend, fristenLaden } from './lib/dates';
@@ -619,6 +620,8 @@ export default function App() {
       <Nachschlagen />
       <TooltipLayer />
       <Tastatur />
+      {/* M510: Oberfläche ausblenden – nur das Board (Alt+B, Esc) */}
+      <NurBoard moeglich={view === 'board' && !presenting && !focusCard && !tasksOpen} />
         <Einstellungen />
         <Recherche />
         <Praesentation />
@@ -667,7 +670,9 @@ export default function App() {
             <button onClick={takeOverWriter}>Hier weiterarbeiten</button>
           </div>
         )}
-        <div className={`toast ${toast ? 'show' : ''}`}>
+        {/* M510: Mit ausgeblendeter Oberfläche zeigen sich nur Hinweise, die eine Antwort brauchen oder vor Verlust warnen
+            (Rückgängig, eigener Knopf, Abbrechen, Speicher voll) — `wichtig` */}
+        <div className={`toast ${toast ? 'show' : ''}${toast && (toast.undo || toast.knopf || toast.abbruch || /Speicher voll|nicht gespeichert|nicht gesichert/.test(toast.message)) ? ' wichtig' : ''}`}>
           {toast?.message}
           {toast?.undo && (
             <button className="toast-undo" onClick={() => useBoard.getState().hinweisRueckgaengig()}>

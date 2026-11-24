@@ -28,6 +28,8 @@ import {
 } from './Icons';
 import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
 import { t } from '../lib/sprache';
+import { taste } from '../lib/tasten';
+import { nurBoardSetzen } from '../lib/nurBoard';
 
 /**
  * Das Werkzeug-Dock — drei Knöpfe: ＋ öffnet die Modul-Palette (M316: alle
@@ -600,6 +602,15 @@ export function Dock() {
               aria-label="Präsentieren"
             >
               <IPlay size={16} /> Präsentieren
+            </button>
+            {/* M510: nur das Board zeigen – für das Teilen des Bildschirms; Alt+B oder Esc holt die Oberfläche zurück */}
+            <button
+              onClick={() => { setMoreMenu(false); nurBoardSetzen(true); }}
+              data-taste="dock-nur-board"
+              title={`Menüs, Leisten, Rahmen und Anfasser ausblenden – nur das Board (${taste('nurBoard')}, Esc holt sie zurück)`}
+              aria-label="Oberfläche ausblenden"
+            >
+              <IAppWindow size={16} /> Oberfläche ausblenden
             </button>
             {/* M300: Der Bild-Export gehört zum Board, nicht in die Einstellungen —
                 er braucht das Board auf dem Schirm (er fotografiert die Fläche). */}
