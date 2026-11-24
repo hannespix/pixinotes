@@ -7,7 +7,7 @@ import { sprache } from '../lib/sprache';
 import { selectActiveBoard, selectNurLesen, useBoard } from '../store';
 import { nodeToHtml } from '../lib/serialize';
 import { buildMermaidSource, getMermaid, preloadHandFont } from '../lib/mermaid';
-import { kartenFolge } from '../lib/kartenFolge';
+import { folieAb, kartenFolge } from '../lib/kartenFolge';
 import { useAndroidBackspaceFix } from '../lib/blocknoteAndroidFix';
 import { editorUpload } from '../lib/notizBild';
 import { NoteSlashMenu, NoteToolbar, noteSchema, useNurBilderInDenText } from './NoteTypo';
@@ -361,36 +361,50 @@ export function Presenter() {
     return () => window.removeEventListener('pointerdown', zu, true);
   }, [ansichtMenu]);
 
-  const slides = useMemo(() => {
-    if (!open) return [];
+  const { reihe, slides } = useMemo(() => {
+    if (!open) return { reihe: [] as AppNode[], slides: [] as AppNode[] };
     // M413: dieselbe Reihenfolge wie beim Blättern im Fokus (lib/kartenFolge.ts) – Verbundenes am Stück und den
     // Pfeilen nach, Rahmen als Abschnitte, sonst Lesefolge
-    return kartenFolge(board.nodes.filter((n) => !n.archived), board.edges)
+    const alle = kartenFolge(board.nodes.filter((n) => !n.archived), board.edges);
+    return {
+      reihe: alle,
       // Editierbare Typen immer zeigen (auch leere Notizen — die füllt man live);
       // statische nur, wenn sie Inhalt haben. Archivierte Karten sind erledigt
       // und gehören nicht in den Vortrag (M87)
-      .filter((n) => EDITABLE.has(n.type) || nodeToHtml(n).trim());
+      slides: alle.filter((n) => EDITABLE.has(n.type) || nodeToHtml(n).trim()),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, board.nodes, board.edges]);
 
   /** M228: Aus dem Karten-Fokus heraus startet der Vortrag bei DIESER Karte —
    *  „ab hier präsentieren" heißt genau das und nicht „von vorn". */
-  const presentFrom = useBoard((s) => s.presentFrom);
   const setPresentFrom = useBoard((s) => s.setPresentFrom);
   /* M387: Die Stelle wird nur beim ÖFFNEN gesetzt. Vorher hing das an der Zahl der Folien — legte jemand im
-     Board während des Vortrags eine Karte an (oder löschte eine), sprang die Präsentation auf Folie 1 zurück. */
-  const stelleGesetzt = useRef(false);
+     Board während des Vortrags eine Karte an (oder löschte eine), sprang die Präsentation auf Folie 1 zurück.
+     M503: … und zwar schon im RENDER, in dem die Präsentation aufgeht (nicht erst in einem Effekt danach). Sonst
+     zeigte der erste Durchgang Folie 1 bzw. die Stelle des letzten Vortrags, meldete sie ans Team, und erst ein
+     Durchgang später sprang es auf die gewünschte Karte. Startkarte: wem ich folge, dessen Stelle – sonst die
+     gewünschte Karte (Fokus, Auswahl, Kontextmenü; siehe setPresenting) – sonst von vorn. */
+  const [offenStand, setOffenStand] = useState(false);
+  if (open !== offenStand) {
+    setOffenStand(open);
+    if (open) {
+      const dort = folgeIch(board.id) ? werFuehrtVor(board.id)?.vortrag : undefined;
+      const ziel = dort?.karte ?? useBoard.getState().presentFrom;
+      const ab = folieAb(reihe, slides, ziel ?? null);
+      // Aus dem Fokus eines Dokuments heraus geht es auf der Seite weiter, die dort offen lag
+      const seite = ab < 0 ? 1 : dort && slides[ab].id === dort.karte ? dort.seite
+        : slides[ab].id === ziel && dokumentArt(slides[ab]) ? letzteSeite(slides[ab].id) : 1;
+      setPos({ idx: Math.max(0, ab), seite });
+    }
+  }
   /** Die Karte, die offen ist — bleibt sie im Board, bleibt der Vortrag auf ihr, auch wenn davor Folien dazukommen */
   const offeneKarte = useRef<string | null>(null);
+  // Die Startkarte ist eine Absicht für genau dieses Öffnen – danach vergessen (Store nicht im Render ändern)
+  useEffect(() => { if (open && useBoard.getState().presentFrom) setPresentFrom(null); }, [open, setPresentFrom]);
   useEffect(() => {
-    if (!open) { stelleGesetzt.current = false; offeneKarte.current = null; return; }
-    if (!stelleGesetzt.current) {
-      stelleGesetzt.current = true;
-      const ab = presentFrom ? slides.findIndex((n) => n.id === presentFrom) : -1;
-      // Aus dem Fokus eines Dokuments heraus geht es auf der Seite weiter, die dort offen lag
-      setPos({ idx: ab >= 0 ? ab : 0, seite: ab >= 0 && dokumentArt(slides[ab]) ? letzteSeite(slides[ab].id) : 1 });
-      if (presentFrom) setPresentFrom(null);
-    } else if (offeneKarte.current) {
+    if (!open) { offeneKarte.current = null; return; }
+    if (offeneKarte.current) {
       const i = slides.findIndex((n) => n.id === offeneKarte.current);
       if (i >= 0) setPos((p) => (p.idx === i ? p : { ...p, idx: i }));
     }
@@ -538,7 +552,8 @@ export function Presenter() {
     }
     if (dort) {
       gefolgt.current = true;      // auch nach „Wieder folgen" in einer schon offenen Präsentation
-      if (!open) { fremdGeoeffnet.current = true; setOpen(true); return; }
+      // M503: mit der Stelle des Vorführenden als Start – nicht mit meiner eigenen Auswahl
+      if (!open) { fremdGeoeffnet.current = true; setOpen(true, dort.split('|')[0]); return; }
       const [karte, seite] = dort.split('|');
       const i = slides.findIndex((n) => n.id === karte);
       if (i >= 0) setPos((p) => (p.idx === i && p.seite === Number(seite) ? p : { idx: i, seite: Number(seite) }));

@@ -236,7 +236,8 @@ export function BoardMenu({ boardId, onRename, klasse = '' }: {
               <IPerson size={14} /> {`Kontakte als vCard (${board.nodes.filter((n) => n.type === 'kontakt').length})`}
             </button>
           )}
-          <button role="menuitem" onClick={() => { setView('board'); openBoard(boardId); setPresenting(true); zu(); }}>
+          {/* M503: Das Board, auf dem ich bin, startet bei der markierten Karte (bzw. von vorn ohne Auswahl); ein anderes Board von vorn */}
+          <button role="menuitem" onClick={() => { const hier = useBoard.getState().activeId === boardId; setView('board'); openBoard(boardId); setPresenting(true, hier ? undefined : null); zu(); }}>
             <IPlay size={14} /> Präsentieren
           </button>
           {!fremd && <div className="ebenen-menu-titel">Aufräumen</div>}

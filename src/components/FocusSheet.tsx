@@ -588,9 +588,9 @@ export function FocusSheet() {
             title="Ab dieser Karte präsentieren – Vollbild, Folienfolge aus den Verbindungen"
             onClick={() => {
               const st = useBoard.getState();
-              st.setPresentFrom(node.id);
+              // M503: die Startkarte geht mit dem Öffnen selbst (setPresenting(true, id)) – eine Absicht, ein Schritt
               setFocusCard(null);
-              st.setPresenting(true);
+              st.setPresenting(true, node.id);
             }}
           >
             <IPlay size={dok ? 16 : 12} /> {dok ? null : 'Präsentieren'}

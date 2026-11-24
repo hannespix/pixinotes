@@ -9,6 +9,16 @@ import { selectNurLesen } from './selektoren';
 import { LESE_HINWEIS } from './schutz';
 
 
+/** M503: Die Karte, bei der eine Präsentation ohne ausdrückliche Startkarte beginnt – Fokus, sonst genau eine
+ *  markierte Karte (mehrere markierte sind keine „Stelle"; dafür gibt es „Als Präsentation" in der Auswahl-Leiste) */
+function startKarte(s: BoardState): string | null {
+  const board = s.boards.find((b) => b.id === s.activeId);
+  if (!board) return null;
+  if (s.focusCard && board.nodes.some((n) => n.id === s.focusCard)) return s.focusCard;
+  const markiert = board.nodes.filter((n) => n.selected && !n.archived);
+  return markiert.length === 1 ? markiert[0].id : null;
+}
+
 /** M480: Teil des Board-Speichers – Ansicht und Einstellungen */
 export function ansichtScheibe(set: Setzen, get: Holen) {
   return {
@@ -156,7 +166,15 @@ export function ansichtScheibe(set: Setzen, get: Holen) {
     syncDateienMb: 25,
     setSyncDateienMb: (mb) => set({ syncDateienMb: Math.max(0, Math.min(500, Math.round(mb))) }),
 
-    setPresenting: (on) => set({ presenting: on }),
+    /* M503: „Präsentieren" öffnet dort, wo ich bin. Ohne ausdrückliche Startkarte (`ab` fehlt) gilt: eine schon
+       gewünschte Startkarte (presentFrom) – sonst die Karte im Fokus – sonst die EINE markierte Karte des Boards –
+       sonst von vorn. `ab: null` heißt ausdrücklich „von vorn" (ein anderes Board, das ganze Board aus dem Menü).
+       Vorher setzte nur der Fokus-Knopf eine Startkarte; Dock, Alt+P und Suche begannen immer bei Folie 1. */
+    setPresenting: (on, ab) => {
+      if (!on) { set({ presenting: false }); return; }
+      const s = get();
+      set({ presenting: true, presentFrom: ab !== undefined ? ab : (s.presentFrom ?? startKarte(s)) });
+    },
     setTool: (tool) => {
       // M360: Auf einem nur lesend geteilten Board gibt es nichts zu zeichnen
       if (tool !== 'select' && selectNurLesen(get())) { get().showToast(LESE_HINWEIS, false, 5000); return; }
