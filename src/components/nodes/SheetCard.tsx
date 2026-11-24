@@ -266,7 +266,8 @@ export function SheetBody({ id, data: daten }: { id: string; data: SheetData }) 
           </button>
           <MenuHuelle titel="Mehr: Spalte, Auto-Summe, CSV" klasse="kopf-mehr" kinder={(zu) => (
             <>
-              <button role="menuitem" onClick={() => { updateNodeData(id, { cols: Math.min(26, cols + 1) }); zu(); }} aria-label="Spalte anhängen">
+              {/* M520: bei 26 Spalten (A bis Z) ist Schluss — der Knopf sagt es, statt nichts zu tun */}
+              <button role="menuitem" onClick={() => { if (cols >= 26) showToast('Mehr als 26 Spalten (A bis Z) fasst die Tabelle nicht.'); else updateNodeData(id, { cols: cols + 1 }); zu(); }} aria-label="Spalte anhängen">
                 <IPlus size={14} /> Spalte anhängen
               </button>
               <button role="menuitem" onClick={() => { autoSumme(); zu(); }} title="Schreibt unter jede Zahlenspalte =SUMME(…)" aria-label="Auto-Summe">

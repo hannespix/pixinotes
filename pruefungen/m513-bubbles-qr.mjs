@@ -351,9 +351,11 @@ await T3.P.screenshot({ path: path.join(BILDER, 'telefon-abstimmen-dunkel.png') 
 // M520: − Zahl ＋ stehen NEBEN dem Text der Idee (vorher darunter — jede Zeile war anderthalbmal so hoch)
 const wahlLage = await T1.P.evaluate(() => [...document.querySelectorAll('[data-taste="mit-zeile"]')].map((z) => {
   const t = z.querySelector('.mit-text').getBoundingClientRect(); const s = z.querySelector('.mit-stimmen').getBoundingClientRect(); const r = z.getBoundingClientRect();
-  return { daneben: s.left >= t.right - 1 && s.top < t.bottom && s.bottom > t.top, hoch: Math.round(r.height), plus: Math.round(z.querySelector('[data-taste="mit-plus"]').getBoundingClientRect().width), imBild: s.right <= window.innerWidth };
+  return { daneben: s.left >= t.right - 1 && s.top < t.bottom && s.bottom > t.top, hoch: Math.round(r.height), text: Math.round(t.height), plus: Math.round(z.querySelector('[data-taste="mit-plus"]').getBoundingClientRect().width), imBild: s.right <= window.innerWidth };
 }));
-pruefe('F5 Abstimmen am Telefon: − Zahl ＋ neben dem Text, Zeile höchstens 80 px, Tastfläche ≥ 44 px, nichts ragt hinaus (M520)', wahlLage.length >= 3 && wahlLage.every((l) => l.daneben && l.hoch <= 80 && l.plus >= 44 && l.imBild), JSON.stringify(wahlLage.slice(0, 4)));
+// eine einzeilige Idee ist höchstens 80 px hoch (vorher 105); eine lange darf so hoch sein wie ihr Text
+const wahlSchlecht = wahlLage.filter((l) => !(l.daneben && l.plus >= 44 && l.imBild && l.hoch <= Math.max(80, l.text + 48)));
+pruefe('F5 Abstimmen am Telefon: − Zahl ＋ neben dem Text, einzeilige Idee höchstens 80 px hoch, Tastfläche ≥ 44 px, nichts ragt hinaus (M520)', wahlLage.length >= 3 && wahlLage.some((l) => l.text < 30 && l.hoch <= 80) && wahlSchlecht.length === 0, JSON.stringify(wahlSchlecht.slice(0, 4)));
 
 // ══ G ══
 console.log('\n════ G: Ergebnis ════');

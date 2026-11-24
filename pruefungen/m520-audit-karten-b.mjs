@@ -7,7 +7,7 @@
  *      der Ansichts-Knöpfe.
  *   C  Zeitplan: Tage, Wochenenden und Monate stehen auch westlich von Greenwich unter den Balken; Ziehen zurück
  *      an den Ausgangspunkt; Fortschritt 30 % steht im Feld; dunkelste Palettenfarbe im Dunkeln sichtbar.
- *   D  Rechen-Tabelle: Zelle öffnen und verlassen legt keinen Rückgängig-Schritt an.
+ *   D  Rechen-Tabelle: Zelle öffnen und verlassen legt keinen Rückgängig-Schritt an; die 27. Spalte meldet sich.
  *   E  Kalender: Ansicht wechseln bleibt beim gezeigten Zeitraum.
  *   F  Wochenplan: Ein Block vor Raster-Beginn ragt nicht über das Raster hinaus.
  *   G  Protokoll: Ein geleertes Datumsfeld lässt die Sitzung, wie sie ist.
@@ -208,6 +208,17 @@ const tabelle = () => ({ id: 'sh', type: 'sheet', width: 520, height: 340, posit
   await warteBis(async () => (await zelle('C2').innerText()).trim() === '1.324,4', 4000);
   pruefe('D2 eine echte Eingabe rechnet (1.234,50 + 89,90 = 1.324,4) und ist ein Schritt', (await zelle('C2').innerText()).trim() === '1.324,4' && await undoAn(P), await zelle('C2').innerText());
   await h.ctx.close();
+  // 26 Spalten (A bis Z) sind die Grenze: Der Knopf sagt es, statt nichts zu tun
+  const t26 = tabelle(); t26.data.cols = 25;
+  const g = await profil(standMit([brett('b1', 'Tabelle', [t26])]));
+  await g.waehlen('sh', 30, 12);
+  const anhaengen = async () => { await g.knoten('sh').locator('.sheet-tools button[aria-haspopup]').last().click(); await g.P.getByRole('menuitem', { name: 'Spalte anhängen' }).click(); };
+  await anhaengen();
+  await warteBis(async () => (await g.knoten('sh').locator('thead th.sheet-kopf').count()) === 26, 4000);
+  await anhaengen();
+  const gesagt = await warteBis(async () => (await g.toasts()).some((x) => /26 Spalten/.test(x)), 4000);
+  pruefe('D3 „Spalte anhängen" bei 26 Spalten: ein Hinweis statt eines Knopfs ohne Wirkung', gesagt && (await g.knoten('sh').locator('thead th.sheet-kopf').count()) === 26, await g.toasts());
+  await g.ctx.close();
 }
 
 // ══ E ═══════════════════════════════════════════════════════════════

@@ -1,5 +1,5 @@
 # M520 — Bugfixing-Audit, Karten B: Planung, Daten, Workshop
-PR: #213 · Prüfreihe: `pruefungen/m520-audit-karten-b.mjs` (Port 5520), dazu `m513` F5 · Datum: 2026-11-24
+PR: #210 · Prüfreihe: `pruefungen/m520-audit-karten-b.mjs` (Port 5520), dazu `m513` F5 · Datum: 2026-11-24
 
 ## Warum
 Auftrag des Besitzers: „Prüfe das gesamte Tool auf Logikfehler und UI-Fehler, ob alles läuft. Quasi ein großes
@@ -37,6 +37,7 @@ Zweigleisig, jeder Befund nachgestellt, bevor er hier landete:
 | 14 | niedrig | Teilnehmer-Seite (M513, offener Punkt): Beim Abstimmen stehen − Zahl ＋ unter dem Text statt daneben; jede Idee ist anderthalbmal so hoch | die Zeile brach am Telefon um (Flex mit 60 % Textbreite) | behoben: Raster (Klasse `wahl`), Text links, Knöpfe rechts; Prüfpunkt `m513` F5 |
 | 15 | mittel | Board nur zum Lesen (und Gäste mit „nur Eigenes"): Der Kalender lässt sich nicht blättern, im Protokoll keine ältere Sitzung öffnen, die Zeiterfassung bleibt in der Tagesansicht, Zeit-Skala und Sortieren/Filtern der Tabelle greifen nicht — jeweils nur der Hinweis „nur zum Lesen freigegeben" | diese Karten halten ihre Ansicht in den Daten; der Leseschutz verwirft jede Änderung an den Daten | behoben: `lib/kartenAnsicht.ts` (`useKartenAnsicht`) hält Ansichts-Felder lokal, wenn die Karte nicht geändert werden darf; der Speicher bleibt unberührt |
 | 16 | niedrig | Englische Oberfläche: Das Ergebnis der Ideabubbles nennt „2 Punkte" | Text ohne `zahlWort` | behoben |
+| 17 | niedrig | Rechen-Tabelle: „Spalte anhängen" tut bei 26 Spalten (A bis Z) nichts | die Grenze galt stumm | behoben: Hinweis „Mehr als 26 Spalten (A bis Z) fasst die Tabelle nicht." |
 
 **Ohne Befund** blieben: Kanban (Anlegen, Pfeile, Ziehen, WIP-Limit, Abhängigkeiten, Checkliste vor „Erledigt",
 Archiv, `spalteSeit`, Löschen mit Abhängigkeit, Rückgängig/Wiederholen, 400 Tickets), der Rechenkern der Tabelle
@@ -59,7 +60,7 @@ Ideabubbles (Budget, Verschmelzen, Ergebnis, 300 Ideen, Rückgängig); die Runde
   Bearbeiten erhalten.)
 - `KanbanCard.tsx` → `removeCol`: `pushHistory()` + `mutedHistory`, Hinweis mit `'schritt'` (Rückgängig im Hinweis, M390).
 - `src/mitmachen/main.ts` + `mitmachen.css`: Klasse `wahl` an der Zeile beim Abstimmen, Raster `1fr auto`.
-- `src/sprache/en.json`: sechs neue Einträge (Ansichts-Hinweise, Spalte gelöscht).
+- `src/sprache/en.json`: sieben neue Einträge (Ansichts-Hinweise, Spalte gelöscht, 26 Spalten).
 
 ## Grenzen / offen
 Brauchen eine Entscheidung oder sind keine Fehler, sondern fehlende Funktionen:
@@ -75,6 +76,9 @@ Brauchen eine Entscheidung oder sind keine Fehler, sondern fehlende Funktionen:
 - **Zähl-Texte** nach M461 noch mit Klammern: „Checklisten-Punkt(e)" (Kanban), „Frist(en)" (Zeitplan),
   „Eintrag/Einträge" (Kalender), „Karte(n)" (Kanban).
 - Zeiterfassung: Blättern in Monat/Jahr stellt den Tag auf den 15.; danach zeigt „Tag" den 15. (Schönheitsfehler).
+- Kalender: Eigene Termine eines Tages stehen in der Reihenfolge des Eintragens, nicht nach Uhrzeit; „Bis" vor „Von"
+  am selben Tag wird angenommen. Wochenplan → Soll der Zeiterfassung zählt auch Blöcke mit, die das Raster gerade
+  nicht zeigt (Samstag/Sonntag bei Mo–Fr, Blöcke außerhalb der Rasterzeit).
 
 ## Für andere Bereiche
 - **Fokus/Board (M519/M521)** — Doppeltipp am Telefon: Der erste Tipp auf eine verkleinerte Karte öffnet den Fokus,
@@ -90,6 +94,6 @@ Brauchen eine Entscheidung oder sind keine Fehler, sondern fehlende Funktionen:
   Kanban-Frist „in 2 T." und „§ ohne TOP" am Beschluss bleiben deutsch.
 
 ## Prüfreihe
-`m520` (38 Prüfpunkte): A Rechnen · B Kalenderwochen · C Zeitplan (vier Zeitzonen, Ziehen, Fortschritt, Dunkel per
+`m520` (39 Prüfpunkte): A Rechnen · B Kalenderwochen · C Zeitplan (vier Zeitzonen, Ziehen, Fortschritt, Dunkel per
 Bildpunkt) · D Tabelle · E Kalender · F Wochenplan · G Protokoll · H Kanban · I Ideabubbles/Mitmachen · J nur lesen ·
-K Englisch. Gegen den Stand vor M520 (`PN_DIST=<alter Build>`) sind 26 davon rot. Bilder: `pruefungen/ablage/m520/`.
+K Englisch. Gegen den Stand vor M520 (`PN_DIST=<alter Build>`) sind alle Prüfpunkte zu den Befunden rot. Bilder: `pruefungen/ablage/m520/`.

@@ -1612,6 +1612,7 @@
 "Stop":"Stop",
 "{0}es-Ansicht":"{0} view",
 "Tagesansicht":"Day view",
+"Mehr als 26 Spalten (A bis Z) fasst die Tabelle nicht.":"The table holds no more than 26 columns (A to Z).",
 "Spalte „{0}\" gelöscht – {1} nach „{2}\" verschoben.":"Column “{0}” deleted – {1} moved to “{2}”.",
 "Spalte „{0}\" gelöscht.":"Column “{0}” deleted.",
 "Wochenansicht":"Week view",
