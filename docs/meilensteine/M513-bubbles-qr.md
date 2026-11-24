@@ -12,7 +12,8 @@ Der bisherige QR-Code (M385) trägt den Einladungslink des Boards — wer ihn sc
 ganze App und bekommt alle Karten.
 
 ## Was
-- **In der Karte** (nur wer leitet, Leiste unten, also „Bedienung nur im Fokus" M421): Knopf mit QR-Zeichen
+- **In der Karte** (nur wer leitet; oben rechts neben ☰, also „Bedienung nur im Fokus" M421 — die Leiste unten ist
+  beim Abstimmen schon voll, ein weiterer Knopf schob ⋯ in eine zweite Zeile): Knopf mit QR-Zeichen
   „Mitmachen per QR" (`data-taste="bub-mitmachen"`). Öffnet ein großes Fenster (`BubblesQr`, Klassen der M385-Blende):
   Code (immer Schwarz auf Weiß), Kurzlink, „n Personen dabei" live, **Link kopieren**, **Groß auf der Bühne zeigen**,
   **Mitmachen beenden**, Schließen (✕, Esc, Klick daneben). Schließen beendet die Runde nicht.
@@ -21,7 +22,7 @@ ganze App und bekommt alle Karten.
 - **Bühne**: Der Code steht groß neben den Blasen in der Karte (`MitmachenBuehne`) — auf dem Board und auf der Folie der
   Präsentation (M380). Die Bühne der Blasen wird schmaler, nichts liegt übereinander.
 - **Teilnehmer-Seite** `mitmachen.html`: schlank, telefongerecht, folgt Hell/Dunkel des Geräts und dem Look des Boards
-  (pix·el, M507 — wird im Link als `d=pixel` mitgegeben). Zeigt Titel, Frage, die vier Schritte und je nach Schritt:
+  (Look des Boards M509 bzw. pix·el M507 — im Link als `t=dark|light`, `d=pixel`, `f=<Akzent>`). Zeigt Titel, Frage, die vier Schritte und je nach Schritt:
   - Sammeln: Name (freiwillig, fehlt bei „Namen ausblenden"), Idee senden, eigene Ideen zurückziehen; verdeckt sieht
     man nur Eigenes und „n Ideen von anderen (noch verdeckt)".
   - Gruppieren: Hinweis, Ideen nach Gruppen (nur lesen).
@@ -45,6 +46,7 @@ der Server (Supabase Realtime, öffentlicher Schlüssel, kein Konto) reicht nur 
 | `src/lib/mitmachenHost.ts` | Gastgeber: `mitmachenDienste()` gleicht mit dem Store ab (Runden dieser Karte starten/beenden, nur im Schreiber-Tab), hört auf Wünsche, prüft (`anwenden`), schreibt gebündelt per `updateNodeDataOnBoard` (ohne Verlaufseintrag, `mutedHistory`), sendet den signierten Stand |
 | `src/components/BubblesQr.tsx` | Fenster `BubblesQr`, `MitmachenBuehne`, `useMitmachenStand` |
 | `src/components/nodes/BubblesCard.tsx` | Knopf, Zustand, Bühne (Hülle `.bub-mitte` um `.bub-buehne`) |
+| `vite.config.ts` | zweiter Einstieg; der Schlüssel heißt `index`, damit der Start-Teil weiter `index-*.js` heißt (m379/m381 lesen ihn so) |
 | `mitmachen.html`, `src/mitmachen/main.ts`, `src/mitmachen/mitmachen.css` | Teilnehmer-Seite (Vanilla-TS, kein React); zweiter Einstieg in `vite.config.ts` (`rollupOptions.input`) |
 | `src/lib/liveKanal.ts` | neue Option `stumm` (ohne Presence) |
 | `src/App.tsx` | lädt den Gastgeber nach, wenn `pixinotes-mitmachen` existiert |
