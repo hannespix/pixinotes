@@ -176,9 +176,12 @@ dl.leer-wege dd { margin: 0; }
 .shape-wrap { width: 100%; height: 100%; position: relative; }
 .shape-body {
   width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-  text-align: center; padding: 8px; font-size: 12.5px; color: var(--ink);
+  text-align: center; padding: 8px; font-size: 12.5px; color: var(--shape-schrift, var(--ink));
   border: 1.5px solid rgba(0,0,0,.35); box-sizing: border-box;
 }
+/* M515: Eine dunkle oder mittlere eigene Füllung bringt ihre Schrift mit (lib/lesbareSchrift.ts formSchrift) —
+   auch für den formatierten Text (BlockNote-Grau wäre darauf unlesbar). Helle Füllungen setzen nichts. */
+.shape-body.schrift-eigen .bn-root { --bn-colors-editor-text: var(--shape-schrift); }
 .shape-process .shape-body { border-radius: var(--r-sm); }
 .shape-terminator .shape-body { border-radius: 999px; }
 .shape-note .shape-body { border-radius: var(--r-xs); border-style: dashed; }
@@ -203,7 +206,9 @@ dl.leer-wege dd { margin: 0; }
 .shape-ph { color: var(--muted); }
 .shape-input {
   width: 92%; height: 80%; border: none; background: transparent; resize: none;
-  outline: none; font-family: inherit; font-size: 12.5px; text-align: center; color: var(--ink);
+  outline: none; font-family: inherit; font-size: 12.5px; text-align: center;
+  /* M515: Schrift der Form erben — vorher die Thema-Tinte, im Dunkeln also hell auf hellem Pastell (Folie) */
+  color: inherit;
 }
 .shape-toolbar {
   /* UNTER der Form: oben ist bei schmalen Formen kein Platz — dort sitzen

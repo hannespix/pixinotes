@@ -27,7 +27,13 @@
   /* M494: Pause einen Hauch dunkler — Weiß darauf hatte 4,46:1 (jetzt 4,59:1), als Schrift auf Weiß ebenso */
   --zeit-pause: #9a6d1b;
   --zeit-arbeit-schrift: #3c669c;
-  --zeit-pause-schrift: #9a6d1b;
+  /* M515: als Schrift einen Hauch dunkler als die Fläche — auf dem getönten Knopf (--surface-dim) hatte #9a6d1b 4,0:1 */
+  --zeit-pause-schrift: #876016;
+  /* M515: Priorität als Schrift (Kanban „!!!", Aufgaben-Zentrale) — vorher feste Farben: Rot 4,2:1 auf Weiß und 3,9:1
+     im Dunkeln, Orange 2,2:1, Blau 3,7:1. Jetzt ≥ 4,5:1 auf Karte, getönter Fläche und --surface-2, hell wie dunkel. */
+  --prio-hoch: #bf3a2c;
+  --prio-mittel: #9a5800;
+  --prio-niedrig: #3557c9;
   /* M489: Schrift auf „Papier", das NICHT dem Theme folgt: Farbtöne bleiben im Dunkeln helles Papier (M338),
      eine dunkle eigene Kartenfarbe bleibt auch im Hellen dunkel. Feste Werte, in beiden Themes gleich —
      muted hält ≥ 4,8:1 auf allen vier Pastelltönen, auch in ihrer gedämpften Dunkel-Fassung. */
@@ -114,6 +120,9 @@
      --safe-top fängt die Statusleisten-Kerbe ab (viewport-fit=cover). */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* M511: seitliche Kerbe im Querformat — die Live-Leiste mit den Reaktionen rückt aus ihr heraus */
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
   /**
    * M248/M249: Der Abstand der App zur Fensterkante.
    *
@@ -129,6 +138,15 @@
    */
   --app-rand: 0px;
   --head-space: calc(110px + var(--safe-top) + var(--app-rand));
+  /*
+   * M511: Ebenen am oberen Rand — Bedienung liegt immer über Dauermeldungen.
+   * Am Telefon lag das Band „Nur lesen" (60) über der Live-Leiste (55) und damit über dem
+   * Reaktions-Knopf. Darum eine Reihenfolge statt einzelner Zahlen je Datei:
+   * Dauerbänder (Nur lesen, Vorführen, Timer, anderes Fenster) < Reiter/Dock (50) < Live-Leiste < Kopfzeile (56).
+   * Am Desktop sitzen die Bänder mittig neben der Live-Leiste und behalten ihre bisherigen Ebenen.
+   */
+  --ebene-dauerband: 49;
+  --ebene-live: 55;
   /*
    * M464: Eigene Mauszeiger — nur hier (und für Inline-Styles über lib/zeiger.ts).
    * Unter Windows ist das System-Fadenkreuz („Präzisionsauswahl") ein dünnes, invertierendes
@@ -154,9 +172,11 @@
 }
 
 /* ---------- Akzentfarben-Themes ---------- */
-[data-accent='gruen'] { --accent: #2e9e63; --accent-strong: #1f7a49; --accent-soft: rgba(46, 158, 99, 0.16); --accent-fill: #268453; }
+/* M515: --accent-strong von Grün und Orange eine Stufe dunkler — als Schrift auf --accent-soft (Personen-Kürzel,
+   Chips) hatten sie 4,5:1 bzw. 4,2:1 verfehlt; jetzt 5,0:1 bzw. 4,9:1 */
+[data-accent='gruen'] { --accent: #2e9e63; --accent-strong: #1b7243; --accent-soft: rgba(46, 158, 99, 0.16); --accent-fill: #268453; }
 [data-accent='violett'] { --accent: #7c5cff; --accent-strong: #5b3fd4; --accent-soft: rgba(124, 92, 255, 0.16); --accent-fill: #7253ee; }
-[data-accent='orange'] { --accent: #e0762e; --accent-strong: #b1571a; --accent-soft: rgba(224, 118, 46, 0.16); --accent-fill: #b35e24; }
+[data-accent='orange'] { --accent: #e0762e; --accent-strong: #a04e17; --accent-soft: rgba(224, 118, 46, 0.16); --accent-fill: #b35e24; }
 [data-accent='rosa'] { --accent: #d44f6e; --accent-strong: #a83353; --accent-soft: rgba(212, 79, 110, 0.16); --accent-fill: #c24662; }
 
 /* ---------- Dunkles Design (nach den Akzenten: --accent-strong muss hell werden) ---------- */
@@ -177,6 +197,9 @@
   --warn-text: #ff9b8f;
   --zeit-arbeit-schrift: #8fb1e6;   /* 5,9:1 auf der Knopffläche, 7,0:1 auf der Karte */
   --zeit-pause-schrift: #e0b56a;    /* 6,7:1 bzw. 8,1:1 */
+  --prio-hoch: #ff8a7d;             /* M515: ≥ 5:1 auf Karte, Fläche und --surface-2 */
+  --prio-mittel: #f0b45a;
+  --prio-niedrig: #8eabff;
   --feld-rand: #737983;              /* M494: ≥ 3:1 auf --bg, --surface, --surface-card und --surface-2 */
   --glass: var(--surface);
   --glass-strong: var(--surface);
@@ -293,9 +316,10 @@
   --lauf-daumen: rgba(212, 239, 120, 0.3);
   --lauf-daumen-aktiv: rgba(212, 239, 120, 0.5);
 }
-/* Haftnotizen & Prozess-Formen bleiben helles „Papier" — Text darauf dunkel */
-[data-theme='dark'] .react-flow__node-note,
-[data-theme='dark'] .shape-body { color: #16191e; }
+/* Haftnotizen & Prozess-Formen bleiben helles „Papier" — Text darauf dunkel (M515: eine Form mit dunkler eigener
+   Füllung setzt --shape-schrift, auch auf der Folie) */
+[data-theme='dark'] .react-flow__node-note { color: #16191e; }
+[data-theme='dark'] .shape-body { color: var(--shape-schrift, var(--papier-ink)); }
 [data-theme='dark'] .react-flow__node-note .meta { color: #5a616d; }
 
 * { box-sizing: border-box; }
