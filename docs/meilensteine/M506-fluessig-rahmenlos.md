@@ -1,5 +1,5 @@
 # M506 — Flüssige Schrift ohne Rahmen und Hintergrund
-PR: #… · Prüfreihe: `pruefungen/m506-fluessig-rahmenlos.mjs` (Port 5506) · Datum: 2026-11-24
+PR: #195 · Prüfreihe: `pruefungen/m506-fluessig-rahmenlos.mjs` (Port 5506) · Datum: 2026-11-24
 
 ## Warum
 Nutzerwunsch: „liquid text bitte rahmenlos und ohne hintergrund anbieten wenn ohne fokus“. Die Karte aus M500 stand
