@@ -111,6 +111,9 @@ export default defineConfig(({ mode }) => ({
       : {
           chunkSizeWarningLimit: 1500,
           rollupOptions: {
+            // M513: zweite Seite — Mitmachen per QR (nur eine Ideabubbles-Karte, ohne React und ohne Board). Die
+            // portable Datei bekommt sie nicht: Ihr QR-Code zeigt auf die Web-Adresse der App.
+            input: { index: resolve('index.html'), mitmachen: resolve('mitmachen.html') },   // „index“: der Start-Teil heißt wie bisher index-*.js
             output: {
               // M321: Fremdcode in stabile Pakete, getrennt vom eigenen Code.
               // Ein Deploy ändert meist nur den App-Teil — React, Editor und
