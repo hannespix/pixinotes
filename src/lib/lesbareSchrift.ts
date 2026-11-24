@@ -124,6 +124,38 @@ export function lesbareSchrift(flaeche: string | undefined, opt: { grund?: strin
   return SCHRIFT[f ? schriftArt(f) : 'dunkel'];
 }
 
+/** BlockNotes Standardschrift (#3f3f3f) — sie steht in Formen und Notizen, solange nichts anderes gesetzt ist */
+const EDITOR_GRAU: Rgb = [63, 63, 63];
+
+/**
+ * M515: Schrift für eine Fläche, auf der sonst die Vorgabe des Papiers steht (dunkle Tinte #16191e bzw. BlockNotes
+ * Grau #3f3f3f). Solange beide Vorgaben auf der GEZEICHNETEN Füllung ≥ 4,5:1 haben, liefert sie `null` — dann bleibt
+ * alles, wie es war (helles Pastell, Haftnotiz). Erst eine dunkle oder mittlere Füllung (eigene Farbe) bekommt die
+ * lesbare Schrift (Token `--auf-farbe-*`). Unbekannte Farbe: `null`.
+ */
+export function schriftAufFuellung(fuellung: string | undefined | null): string | null {
+  const f = farbeZuRgb(fuellung);
+  if (!f) return null;
+  const art = schriftArt(f);
+  if (art === 'dunkel' && kontrast(EDITOR_GRAU, f) >= GRENZE) return null;
+  return SCHRIFT[art];
+}
+
+/**
+ * M515: Klassen und Stil einer Fläche mit eigener Füllung (Form, Notiz in eigener Farbe; Board und Folie gleich) —
+ * eigene Schrift nur, wo die Füllung sie braucht: ` schrift-eigen` (+ ` schrift-hell` für helle Schrift, dort gelten
+ * die Nachtstufen der Editor-Farben) und die Schrift als CSS-Variable `name`.
+ */
+export function flaechenSchrift(fuellung: string | undefined | null, name: string): { klasse: string; stil: Record<string, string> } {
+  const s = schriftAufFuellung(fuellung);
+  if (!s) return { klasse: '', stil: {} };
+  return { klasse: s === SCHRIFT.hell ? ' schrift-eigen schrift-hell' : ' schrift-eigen', stil: { [name]: s } };
+}
+/** M515: Schrift einer Prozess-Form nach ihrer Füllung (`--shape-schrift`) */
+export const formSchrift = (fuellung: string | undefined | null) => flaechenSchrift(fuellung, '--shape-schrift');
+/** M515: Schrift einer Notiz in eigener Farbe (`--notiz-schrift`) */
+export const notizSchrift = (hex: string | undefined | null) => flaechenSchrift(hex, '--notiz-schrift');
+
 /** Dieselbe Entscheidung als Farbwert (für Messungen und Fälle ohne CSS-Variablen) */
 export function lesbareSchriftRgb(flaeche: Rgb): Rgb { return SCHRIFT_RGB[schriftArt(flaeche)]; }
 

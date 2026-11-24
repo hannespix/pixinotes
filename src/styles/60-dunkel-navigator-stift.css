@@ -61,7 +61,11 @@
 [data-theme='dark'] .react-flow__node-note:has(.sticky-white) .bn-root,
 [data-theme='dark'] .react-flow__node-note .note-card:not(.sticky-yellow, .sticky-pink, .sticky-mint, .sticky-sky, .sticky-white):not([style*='background']) .bn-root,
 [data-theme='dark'] .minutes-card.papier-thema .bn-root,
-.minutes-card.papier-dunkel .bn-root {
+.minutes-card.papier-dunkel .bn-root,
+.shape-body.schrift-hell .bn-root,
+[data-theme='dark'] .slide-note.papier-thema .bn-root,
+.slide-note.schrift-hell .bn-root,
+.note-card.schrift-hell .bn-root {
   --bn-colors-highlights-gray-text: var(--nacht-hl-grau);     --bn-colors-highlights-gray-background: var(--nacht-hl-grau-grund);
   --bn-colors-highlights-brown-text: var(--nacht-hl-braun);   --bn-colors-highlights-brown-background: var(--nacht-hl-braun-grund);
   --bn-colors-highlights-red-text: var(--nacht-hl-rot);       --bn-colors-highlights-red-background: var(--nacht-hl-rot-grund);

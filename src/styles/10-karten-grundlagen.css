@@ -112,6 +112,10 @@ h3 { font-size: 14px; margin: 0 0 8px; }
 [data-theme='dark'] .sticky-pink   { background: #e8bcc8; }
 [data-theme='dark'] .sticky-mint   { background: #b6dcc2; }
 [data-theme='dark'] .sticky-sky    { background: #bdd3ea; }
+/* M515: Eine Notiz in eigener Farbe (`sticky-eigen`, Fläche als Inline-Stil) ist ihr eigenes Papier. Reicht die
+   Vorgabe-Schrift auf ihr nicht (dunkle oder mittlere Farbe), bringt sie ihre Schrift mit (lib/lesbareSchrift.ts). */
+.note-card.schrift-eigen, .note-card.schrift-eigen .bn-editor, .note-card.schrift-eigen .meta { color: var(--notiz-schrift); }
+.note-card.schrift-eigen .bn-root { --bn-colors-editor-text: var(--notiz-schrift); }
 /* Der Hinweis „React Flow" unten rechts trägt die Farben der Oberfläche statt eines weißen Kästchens */
 .react-flow__attribution { background: transparent !important; }
 .react-flow__attribution a { color: var(--muted) !important; opacity: .7; }
