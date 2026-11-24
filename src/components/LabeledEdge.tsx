@@ -10,6 +10,7 @@ import {
 import { selectActiveBoard, useBoard } from '../store';
 import { getFloatingEdgeParams, mitAnzeige } from '../lib/floatingEdge';
 import { anzeigeStand, anzeigeVon, hoeren, nachZug, useAnzeige, zugLaeuft, type Anzeige } from '../lib/zugAnzeige';
+import { rahmenPfeilNr } from '../lib/rahmenReise';
 
 import type { AppNode } from '../types';
 
@@ -205,6 +206,14 @@ export function LabeledEdge({
   const headStart = data?.headStart === true;
   const shape: HeadShape = SHAPE_CYCLE.includes(data?.shape as HeadShape) ? (data?.shape as HeadShape) : 'arrow';
   const width = typeof data?.width === 'number' ? (data.width as number) : 2;
+  // M514: Rahmenpfeil — eine gerichtete Verbindung von Rahmen zu Rahmen legt die Reihenfolge der Rahmen-Reise fest.
+  // Er zeichnet sich gestrichelt und etwas kräftiger und trägt die Nummer seines Ziels in der Reise (0 = Abzweig).
+  const rahmenpfeil = sourceNode?.type === 'frame' && targetNode?.type === 'frame' && source !== target && head !== headStart;
+  const reiseNr = useBoard((s) => {
+    if (!rahmenpfeil) return 0;
+    const b = selectActiveBoard(s);
+    return rahmenPfeilNr(b.nodes, b.edges, id);
+  });
 
   // Floating: Andockpunkte aus den echten Knoten-Rechtecken berechnen — die
   // Linie tritt immer an der zugewandten Seite aus, keine Schleifen mehr.
@@ -447,20 +456,22 @@ export function LabeledEdge({
       <BaseEdge
         id={id}
         path={edgePath}
+        className={rahmenpfeil ? `pn-rahmenpfeil${reiseNr ? '' : ' abzweig'}` : undefined}
         markerEnd={head ? `url(#${markerId})` : undefined}
         markerStart={headStart ? `url(#${markerId})` : undefined}
         style={{
           // gewählt: in voller Kraft; sonst vom Start blasser zum Ziel kräftig (gerade Linien ohne Ausdehnung: einfarbig)
           stroke: selected || (Math.abs(tx - sx) < 1 && Math.abs(ty - sy) < 1) ? stroke : `url(#pn-verlauf-${id})`,
-          strokeWidth: selected ? width + 0.5 : width,
-          strokeDasharray: kind === 'dashed' ? '7 5' : undefined,
+          strokeWidth: (rahmenpfeil ? Math.max(width, 2.8) : width) + (selected ? 0.5 : 0),
+          strokeDasharray: rahmenpfeil ? '11 7' : kind === 'dashed' ? '7 5' : undefined,
         }}
       />
       {/* Marker-Defs einmalig (React Flow eigene Marker sind fummelig bei Farbe) */}
       {labels && createPortal(<>
         <div
-          className={`edge-label nodrag nopan ${label ? '' : 'empty'} ${selected ? 'selected' : ''}`}
+          className={`edge-label nodrag nopan ${label || rahmenpfeil ? '' : 'empty'} ${selected ? 'selected' : ''}${rahmenpfeil ? ' rahmenpfeil' : ''}`}
           data-edge-id={id}
+          data-reise-nr={rahmenpfeil ? reiseNr : undefined}
           style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
         >
           {editing ? (
@@ -471,7 +482,14 @@ export function LabeledEdge({
             />
           ) : (
             <>
-              <span className="edge-label-text" translate="no" onClick={() => { setDraft(label); setEditing(true); }} title="Klick: Beziehung benennen">
+              {rahmenpfeil && (
+                <span
+                  className={`rahmenpfeil-nr${reiseNr ? '' : ' abzweig'}`}
+                  title={reiseNr ? `Rahmenpfeil: ${reiseNr}. Rahmen der Rahmen-Reise (Doppelklick auf einen Rahmentitel präsentiert)` : 'Rahmenpfeil, Abzweig: Die Rahmen-Reise folgt dem zuerst gezogenen Pfeil'}
+                  aria-label={reiseNr ? `Rahmenpfeil zu Rahmen ${reiseNr}` : 'Rahmenpfeil, Abzweig'}
+                >{reiseNr || '–'}</span>
+              )}
+              <span className={`edge-label-text${rahmenpfeil && !label ? ' rp-leer' : ''}`} translate="no" onClick={() => { setDraft(label); setEditing(true); }} title="Klick: Beziehung benennen">
                 {label || '+'}
               </span>
               <button

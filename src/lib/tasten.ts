@@ -51,6 +51,9 @@ export const KUERZEL: Kuerzel[] = [
   { id: 'netz', taste: 'Alt+G', was: 'Netz-Ansicht – und zurück zum Board', gruppe: 'Ansichten' },
   { id: 'navigator', taste: 'Alt+W', was: 'Navigation: im Baum suchen (am Telefon: Baum öffnen)', gruppe: 'Ansichten' },
   { id: 'praesentation', taste: 'Alt+P', was: 'Präsentation starten', gruppe: 'Ansichten' },
+  // M514 — ausgeführt in Tastatur.tsx (Start) und components/RahmenReise.tsx (Blättern)
+  { id: 'rahmenReise', taste: 'Alt+Umschalt+P', was: 'Rahmen für Rahmen präsentieren, ab dem gewählten Rahmen (wie Doppelklick auf einen Rahmentitel) – und beenden', gruppe: 'Ansichten' },
+  { id: 'rahmenBlaettern', taste: '→ / Leertaste / Bild↓', was: 'Rahmen-Reise: nächster Rahmen (← / Umschalt+Leertaste / Bild↑: voriger, Pos1 / Ende: erster / letzter, Esc beendet)', gruppe: 'Ansichten', fremd: true },
   { id: 'baumPfeile', taste: '↑ ↓ → ←', was: 'im Navigationsbaum: weitergehen, aufklappen, zuklappen bzw. zum Übergeordneten', gruppe: 'Ansichten', fremd: true },
   { id: 'uebersichtPfeile', taste: 'Pfeiltasten, Enter', was: 'in Übersicht und Netz: zum Board in dieser Richtung, Enter öffnet es', gruppe: 'Ansichten', fremd: true },
   { id: 'aufgabenTasten', taste: 'Leertaste / Enter / Strg+Enter', was: 'Aufgaben-Zentrale: erledigen / Werkzeuge aufklappen / zur Karte springen', gruppe: 'Ansichten', fremd: true },
@@ -69,6 +72,7 @@ export const KUERZEL: Kuerzel[] = [
   { id: 'karteAlt', taste: 'Alt+↓ / Alt+↑', was: 'nächste / vorige Karte – auch beim Schreiben und im Fokus', gruppe: 'Karten', fremd: true },
   { id: 'karteRichtung', taste: 'Strg+Pfeiltaste', was: 'zur Karte in dieser Richtung springen', gruppe: 'Karten', fremd: true },
   { id: 'karteRand', taste: 'Pos1 / Ende', was: 'erste / letzte Karte des Boards auswählen', gruppe: 'Karten', fremd: true },
+  { id: 'rahmenUmbenennen', taste: 'F2', was: 'gewählten Rahmen umbenennen', gruppe: 'Karten', fremd: true },
   { id: 'auswahlDazu', taste: 'Strg+Umschalt+Pfeiltaste', was: 'Auswahl um die Karte in dieser Richtung erweitern', gruppe: 'Karten', fremd: true },
   { id: 'karteOeffnen', taste: 'Enter', was: 'in die gewählte Karte: Notiz schreiben, Modul im Fokus öffnen', gruppe: 'Karten', fremd: true },
   { id: 'karteVerlassen', taste: 'Esc', was: 'aus dem Notiz-Text zurück zur Karte (sie bleibt gewählt)', gruppe: 'Karten', fremd: true },

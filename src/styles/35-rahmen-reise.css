@@ -1,0 +1,55 @@
+/* ================= M514: Rahmen für Rahmen präsentieren — Rahmenpfeil und Rahmen-Reise ================= */
+
+/* ---------- Rahmenpfeil: eine Verbindung von Rahmen zu Rahmen (LabeledEdge.tsx) ---------- */
+/* Die Linie selbst trägt Strichelung und Stärke inline; die Marke zeigt die Nummer ihres Ziels in der Reise */
+/* In Ruhe nur die runde Marke — Chip, Stil-Knopf und ✕ erst beim Überfahren oder gewählt */
+.edge-label.rahmenpfeil { padding: 2px; gap: 4px; }
+.edge-label.rahmenpfeil:not(:hover):not(.selected) { background: none; border-color: transparent; box-shadow: none; padding: 0; }
+.edge-label.rahmenpfeil:not(:hover):not(.selected) .edge-label-x { display: none; }
+.edge-label.rahmenpfeil:is(:hover, .selected) { padding-right: 4px; }
+.rahmenpfeil-nr {
+  min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--r-pill);
+  display: inline-grid; place-items: center;
+  background: var(--ink); color: var(--surface);
+  font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1;
+}
+.rahmenpfeil-nr.abzweig { background: var(--surface-dim); color: var(--muted); }
+.edge-label.rahmenpfeil .edge-label-text.rp-leer { display: none; }
+.edge-label.rahmenpfeil:is(:hover, .selected) .edge-label-text.rp-leer { display: inline; font-weight: 700; }
+
+/* ---------- Rahmen-Reise: die Oberfläche tritt zurück (`html[data-rahmen-reise]`, RahmenReise.tsx) ---------- */
+html[data-rahmen-reise] :is(
+  .topbar, .tabs, .dock, .backlinks, .legal-corner, .lese-band, .writer-banner,
+  .react-flow__minimap, .react-flow__controls, .react-flow__attribution,
+  .sel-toolbar-anker, .sel-toolbar-dock, .live-leiste, .sync-status, .punkte-leiste, .fokus-spur
+) { display: none !important; }
+/* Die linke Navigation gibt ihren Platz frei — der Rahmen füllt das ganze Fenster */
+html[data-rahmen-reise] .app.nav-links .board-wrap { margin-left: 0 !important; }
+html[data-rahmen-reise] .app.nav-links::before { display: none !important; }
+/* Griffe und Verbindungspunkte des Rahmens stören das Bild; die Karten darin bleiben bedienbar */
+html[data-rahmen-reise] .react-flow__node-frame :is(.react-flow__resize-control, .pn-handle) { display: none !important; }
+
+/* Leiste unten: ‹ 3 / 8 Titel › ✕ — leise, verblasst in Ruhe (wieder da bei Zeiger, Taste oder Fokus) */
+.rahmen-reise-leiste {
+  position: fixed; left: 50%; bottom: calc(14px + var(--safe-bottom, 0px)); transform: translateX(-50%);
+  z-index: 70; max-width: calc(100vw - 24px);
+  display: flex; align-items: center; gap: 4px; padding: 4px;
+  background: var(--glass); border: 1px solid var(--glass-border); border-radius: var(--r-pill);
+  box-shadow: var(--chrome-shadow); color: var(--ink);
+  transition: opacity .45s ease;
+}
+.rahmen-reise-leiste[data-blass]:not(:hover):not(:focus-within) { opacity: .12; }
+.rahmen-reise-leiste button {
+  flex: none; width: 44px; height: 44px; display: grid; place-items: center;
+  border: none; background: none; color: var(--ink); cursor: pointer; border-radius: var(--r-pill);
+}
+.rahmen-reise-leiste button:hover:not(:disabled) { background: var(--surface-2); }
+.rahmen-reise-leiste button:disabled { color: var(--muted); opacity: .45; cursor: default; }
+.rahmen-reise-leiste .rr-ende { width: 36px; color: var(--muted); }
+.rahmen-reise-leiste .rr-zahl { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; padding: 0 4px; white-space: nowrap; }
+.rahmen-reise-leiste .rr-titel {
+  font-size: 13px; color: var(--muted); max-width: 40vw; padding: 0 6px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+@media (max-width: 640px) { .rahmen-reise-leiste .rr-titel { max-width: 30vw; } }
+@media (prefers-reduced-motion: reduce) { .rahmen-reise-leiste { transition: none; } }

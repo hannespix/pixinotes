@@ -66,6 +66,7 @@ const istMaus = () => window.matchMedia('(pointer: fine)').matches;
 import { DrawingLayer } from './DrawingLayer';
 import { FingerGesten } from './FingerGesten';
 import { BoardKontextmenue } from './Kontextmenue';
+import { RahmenReiseHost } from './RahmenReiseHost';
 import { fristenLaden } from '../lib/dates';
 import { rufnummernLaden } from '../lib/rufnummer';
 import { EINGANG_ZIEHEN, eingangHolen, eingangZielWeg } from '../lib/eingang';
@@ -1857,6 +1858,8 @@ export function Board() {
         <FingerGesten />
         <Kommentare />
       </ReactFlow>
+      {/* M514: Rahmen für Rahmen präsentieren — lädt erst mit der ersten Reise */}
+      <RahmenReiseHost />
       <div className="fokus-spur" ref={fokusSpurRef} aria-hidden="true">
         <div
           className="fokus-daumen"

@@ -34,6 +34,9 @@ import { arrangeFrameInside, FRAME_COLORS } from '../lib/frameOps';
 import type { ArrangeMode } from '../lib/arrange';
 import { KARTEN_EREIGNIS, kartenWunschNehmen } from '../lib/kontextmenue';
 import { zahlWort } from '../lib/sprache';
+import { rahmenReiseStarten } from '../lib/rahmenReise';
+import { richtung } from '../lib/kartenFolge';
+import { taste } from '../lib/tasten';
 
 /**
  * Aktionsleiste, die direkt über der Selektion schwebt (NodeToolbar):
@@ -466,7 +469,35 @@ export function SelectionToolbar() {
           {menu === 'frame' && menuPortal('sel-frame-menu', (
             <>
               {singleFrame && (
-                <button onClick={renameFrame}><IPen size={14} /> Umbenennen</button>
+                <>
+                  {/* M514: Rahmen für Rahmen präsentieren — ab diesem Rahmen */}
+                  <button data-taste="rahmen-praesentieren" onClick={() => { setMenu(null); rahmenReiseStarten(board.id, singleFrame.id); }}>
+                    <IPlay size={14} /> Rahmen präsentieren{taste('rahmenReise') && <kbd className="kontext-taste">{taste('rahmenReise')}</kbd>}
+                  </button>
+                  <button onClick={renameFrame}><IPen size={14} /> Umbenennen{taste('rahmenUmbenennen') && <kbd className="kontext-taste">{taste('rahmenUmbenennen')}</kbd>}</button>
+                  {(() => {
+                    // M514: Rahmenpfeil ziehen ohne Zielen — „Weiter zu Rahmen …" legt die Reihenfolge der Reise fest
+                    const andere = board.nodes.filter((n) => n.type === 'frame' && !n.archived && n.id !== singleFrame.id);
+                    if (!andere.length) return null;
+                    const ziele = new Set(board.edges.map((e) => richtung(e)).filter((r) => r?.von === singleFrame.id).map((r) => r!.nach));
+                    return (
+                      <>
+                        <div className="sel-attr-title">Weiter zu Rahmen</div>
+                        {andere.slice(0, 12).map((f) => (
+                          <button
+                            key={f.id}
+                            data-taste="rahmenpfeil-zu"
+                            disabled={ziele.has(f.id)}
+                            title={ziele.has(f.id) ? 'Rahmenpfeil besteht schon' : 'Rahmenpfeil zu diesem Rahmen ziehen – er legt die Reihenfolge der Rahmen-Reise fest'}
+                            onClick={() => { setMenu(null); useBoard.getState().addLabeledEdge(singleFrame.id, f.id, '', 'arrow'); }}
+                          >
+                            <IFrame size={14} /> <span translate="no">{(f.data as { name?: string }).name || 'Rahmen'}</span>
+                          </button>
+                        ))}
+                      </>
+                    );
+                  })()}
+                </>
               )}
               <div className="sel-attr-title">Inhalt anordnen</div>
               <button onClick={() => frameArrange('flow')}><IFlowH size={14} /> Fluss horizontal</button>

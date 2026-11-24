@@ -4,6 +4,7 @@ import { passt } from '../lib/tasten';
 import { usePfeilTasten } from './pfeilTasten';
 import { overlayOffen } from '../lib/overlay';
 import { useKontextSperre } from './Kontextmenue';
+import { rahmenReiseBeenden, rahmenReiseStarten, reiseStand, reiseStart } from '../lib/rahmenReise';
 
 /**
  * M251: Die globalen Tastenkürzel an einer Stelle.
@@ -75,6 +76,17 @@ export function Tastatur() {
        */
       const fenster = overlayOffen();
       const amBoard = st.view === 'board' && !st.tasksOpen && !fenster;
+      // M514: Rahmen für Rahmen präsentieren (und wieder beenden)
+      if (passt(e, 'rahmenReise')) {
+        if (reiseStand()) return tun(() => rahmenReiseBeenden());
+        if (!amBoard || st.presenting) return;
+        return tun(() => {
+          const b = selectActiveBoard(st);
+          const start = reiseStart(b.nodes, b.edges);
+          if (start) rahmenReiseStarten(st.activeId, start);
+          else st.showToast('Auf diesem Board gibt es noch keinen Rahmen – lege einen an, dann geht es Rahmen für Rahmen.');
+        });
+      }
       if (passt(e, 'praesentation')) { if (!st.presenting && fenster) return; return tun(() => st.setPresenting(!st.presenting)); }
 
       // Board wechseln — innerhalb des Projekts, in dem das aktive Board liegt
