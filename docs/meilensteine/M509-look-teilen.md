@@ -1,5 +1,5 @@
 # M509 — Der Look des Boards reist beim Teilen mit
-PR: #… · Prüfreihe: `pruefungen/m509-look-teilen.mjs` (Port 5509) · Datum: 2026-11-24
+PR: #200 · Prüfreihe: `pruefungen/m509-look-teilen.mjs` (Port 5509) · Datum: 2026-11-24
 
 ## Warum
 Nutzerwunsch: „der style des boards soll sich bei sharing (gemeinsame freigabe) mit übertragen. also wenn ich z. B.
