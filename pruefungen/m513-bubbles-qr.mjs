@@ -151,6 +151,20 @@ async function qrLesen(P, sel) {
 // ══ A ══
 console.log('\n════ A: QR-Fenster ════');
 pruefe('A1 Knopf „Mitmachen per QR" in der Karte', (await H.locator(`${W} [data-taste="bub-mitmachen"]`).count()) === 1);
+// M517: Bei „Oberfläche ausblenden" (M510) bleibt die Bedienung der Karte weg – auch dieser Knopf. (Er fehlte in der
+// fünften Liste von 99-bedienung-im-fokus.css, war über seine zweite Klasse .bub-ansicht aber schon erfasst; die Prüfung
+// hält das Verhalten fest, falls die Klassen sich trennen.)
+{
+  const stil = () => H.evaluate((sel) => { const k = document.querySelector(sel); const c = k && getComputedStyle(k); return c && { o: c.opacity, pe: c.pointerEvents }; }, `${W} [data-taste="bub-mitmachen"]`);
+  const sonst = await stil();
+  await H.evaluate(() => { document.documentElement.dataset.nurBoard = ''; });
+  // Die Deckkraft gleitet (Übergang 0,14 s) – auf den Endstand warten statt einmal zu messen
+  await warteBis(async () => (await stil())?.o === '0', 3000);
+  const weg = await stil();
+  await H.evaluate(() => { delete document.documentElement.dataset.nurBoard; });
+  const wieder = await warteBis(async () => (await stil())?.o === '1', 3000);
+  pruefe('A1b „Oberfläche ausblenden": Knopf unsichtbar und ohne Klick, danach wieder da', sonst?.o === '1' && weg?.o === '0' && weg?.pe === 'none' && wieder, JSON.stringify([sonst, weg]));
+}
 await H.locator(`${W} [data-taste="bub-mitmachen"]`).click();
 const fensterDa = await H.waitForSelector('[data-taste="mit-qr"]', { timeout: 10000 }).then(() => true, () => false);
 pruefe('A2 Fenster „Mitmachen per QR" offen', fensterDa);
