@@ -14,7 +14,8 @@ auf der echten Fläche bleiben, nur die Kamera wandert von Rahmen zu Rahmen, die
 - **Rahmen-Reise:** Doppelklick auf den Titel eines Rahmens (auch: `Alt+Umschalt+P` ab dem gewählten Rahmen bzw. dem
   Rahmen der gewählten Karte, sonst dem ersten; Rahmen-Menü → „Rahmen präsentieren"). Die Kamera fährt weich hin, der
   Rahmen samt Titel füllt das Fenster mit kleinem Rand (3 % der kürzeren Seite, 12–40 px), die Oberfläche tritt
-  zurück (Kopfleiste, Navigation, Dock, Minimap, Auswahl-Leiste, Live-Leiste, Griffe des Rahmens). Unten steht eine
+  zurück — über „Oberfläche ausblenden" (M510): Kopfleiste, Navigation, Dock, Minimap, Auswahl-Leiste, Live-Leiste,
+  Griffe. War sie schon ausgeblendet (Alt+B), bleibt sie es nach der Reise; sonst kommt sie mit dem Ende zurück. Unten steht eine
   leise Leiste „‹ 3 / 8 Titel › ✕", die nach 2,5 s Ruhe verblasst (zurück mit Zeiger, Taste, Fokus).
 - **Weiter:** →, Leertaste, Bild↓ (Präsentations-Klicker), Wischen nach links (Finger auf der Fläche, waagerecht über
   das Trackpad), Knopf ›. **Zurück:** ←, Umschalt+Leertaste, Bild↑, Wischen nach rechts, Knopf ‹. **Pos1/Ende:**
@@ -43,7 +44,11 @@ auf der echten Fläche bleiben, nur die Kamera wandert von Rahmen zu Rahmen, die
   `reiseLoesen`, `rahmenReiseBeenden`; `reiseStart(nodes, edges)` wählt den Start für Kürzel/Menü.
 - `src/lib/kartenFolge.ts`: `richtung(e)` jetzt exportiert (Rahmenpfeil = gerichtet, Spitze vorn XOR hinten).
 - `src/components/RahmenReiseHost.tsx` (in `Board.tsx` nach `</ReactFlow>`) lädt `src/components/RahmenReise.tsx`
-  (`lazy`, ~7,5 KB) erst mit der ersten Reise. Dort: Attribut `html[data-rahmen-reise]` (Oberfläche aus) und
+  (`lazy`, ~7,5 KB) erst mit der ersten Reise. Dort: `nurBoardSetzen(true)` (M510, `lib/nurBoard.tsx`; beim Ende
+  zurück auf den Stand davor, erst danach — zwei Bilder später — die Rückfahrt der Kamera, weil `NurBoard` beim
+  Umschalten die Kamera um die Breite der Spalte ausgleicht; nach einer Karte im Fokus wieder an), Attribut
+  `html[data-rahmen-reise]` (der Umschalter `.nur-board-ecke` steht nicht zusätzlich im Bild; das Esc von `NurBoard`
+  gilt in der Reise nicht, damit Esc zuerst die Reise beendet) und
   `html[data-reise-flug]` (solange die Kamera fährt — Prüfreihen warten darauf); Kamera über `setViewport(…, {duration})`
   (React Flows zeitbasierte d3-Fahrt; Dauer 420–900 ms nach Weg und Zoomsprung, 0 bei reduzierter Bewegung), Maße aus
   dem React-Flow-Speicher (`width/height/minZoom/maxZoom`), Rahmenlage aus `internals.positionAbsolute`, Platz `KOPF`
@@ -67,14 +72,11 @@ auf der echten Fläche bleiben, nur die Kamera wandert von Rahmen zu Rahmen, die
 - Live: `src/lib/vorfuehren.ts` — Feld `rahmen` am `Zeiger` und in der Meldung `zeig`, `rahmenMelden(boardId, id|null)`;
   `src/components/Vorfuehren.tsx` startet/beendet die gefolgte Reise (`rahmenReiseStarten(…, true)`) und lässt die
   Ausschnitt-Mitfahrt ruhen, solange der Vorführende einen Rahmen zeigt.
-- CSS: `src/styles/35-rahmen-reise.css` (neu): Rahmenpfeil-Marke, Ausblenden der Oberfläche unter
-  `html[data-rahmen-reise]`, Leiste `.rahmen-reise-leiste` (`data-blass`).
+- CSS: `src/styles/35-rahmen-reise.css` (neu): Rahmenpfeil-Marke, Leiste `.rahmen-reise-leiste` (`data-blass`); das
+  Ausblenden selbst steht in `73-nur-board.css` (M510).
 - Texte: Hilfe „Was ist neu" DE/EN, `src/sprache/en.json` (22 Texte).
 
 ## Grenzen / offen
-- **M510 (Oberfläche ausblenden)** lief parallel; die Reise blendet mit eigener Liste unter `html[data-rahmen-reise]`
-  aus. Sobald M510 ein gemeinsames Attribut (etwa `data-nur-board`) hat, kann die Reise es zusätzlich setzen und die
-  eigene Liste entfallen.
 - Drückt ein Folgender „Wieder folgen", springt er zum Rahmen des Vorführenden; Laser und Zeiger laufen wie bisher.
 - Die Reihenfolge an einer Verzweigung ist die Zieh-Reihenfolge der Pfeile; eine eigene Nummer zum Umsortieren gibt
   es (noch) nicht — Pfeil löschen und neu ziehen.

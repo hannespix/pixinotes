@@ -17,17 +17,11 @@
 .edge-label.rahmenpfeil .edge-label-text.rp-leer { display: none; }
 .edge-label.rahmenpfeil:is(:hover, .selected) .edge-label-text.rp-leer { display: inline; font-weight: 700; }
 
-/* ---------- Rahmen-Reise: die Oberfläche tritt zurück (`html[data-rahmen-reise]`, RahmenReise.tsx) ---------- */
-html[data-rahmen-reise] :is(
-  .topbar, .tabs, .dock, .backlinks, .legal-corner, .lese-band, .writer-banner,
-  .react-flow__minimap, .react-flow__controls, .react-flow__attribution,
-  .sel-toolbar-anker, .sel-toolbar-dock, .live-leiste, .sync-status, .punkte-leiste, .fokus-spur
-) { display: none !important; }
-/* Die linke Navigation gibt ihren Platz frei — der Rahmen füllt das ganze Fenster */
-html[data-rahmen-reise] .app.nav-links .board-wrap { margin-left: 0 !important; }
-html[data-rahmen-reise] .app.nav-links::before { display: none !important; }
-/* Griffe und Verbindungspunkte des Rahmens stören das Bild; die Karten darin bleiben bedienbar */
-html[data-rahmen-reise] .react-flow__node-frame :is(.react-flow__resize-control, .pn-handle) { display: none !important; }
+/* ---------- Rahmen-Reise: die Oberfläche tritt zurück ----------
+   Das Ausblenden übernimmt „Oberfläche ausblenden" (M510, `html[data-nur-board]`, 73-nur-board.css) — RahmenReise.tsx
+   schaltet es ein. Hier nur, was die Reise darüber hinaus braucht (`html[data-rahmen-reise]`): Ihr Ende ist das ✕ der
+   Leiste und Esc, der Umschalter in der Ecke steht dabei nicht zusätzlich im Bild. */
+html[data-rahmen-reise] .nur-board-ecke { display: none !important; }
 
 /* Leiste unten: ‹ 3 / 8 Titel › ✕ — leise, verblasst in Ruhe (wieder da bei Zeiger, Taste oder Fokus) */
 .rahmen-reise-leiste {

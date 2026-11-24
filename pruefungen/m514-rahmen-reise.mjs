@@ -439,7 +439,7 @@ const eingepasst = async (P, id) => { const l = await lage(P, id); return !!l &&
 /** Steht die Reise bei Rahmen `id` (Zahl „n / 3"), ist der Flug vorbei und der Rahmen eingepasst? */
 const stehtBei = (P, id, n, ms = 8000) => warteBis(P, async () => (await zahl(P)) === `${n} / 3`
   && !(await P.evaluate(() => document.documentElement.hasAttribute('data-reise-flug'))) && (await eingepasst(P, id)), ms);
-const sichtbar = (P, sel) => P.evaluate((sel) => [...document.querySelectorAll(sel)].some((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 0), sel);
+const sichtbar = (P, sel) => P.evaluate((sel) => [...document.querySelectorAll(sel)].some((e) => getComputedStyle(e).display !== 'none' && getComputedStyle(e).visibility !== 'hidden' && e.getBoundingClientRect().width > 0), sel);
 /** Ein Klick ins Leere (Auswahl weg) */
 const frei = async (P) => {
   await P.keyboard.press('Escape'); await P.waitForTimeout(150);
@@ -519,7 +519,8 @@ await kopf(B.P, 'r1').dblclick();
 pruefe('B1 Doppelklick auf den Titel startet die Rahmen-Reise beim ersten Rahmen (1 / 3)', await stehtBei(B.P, 'r1', 1), `${await zahl(B.P)} ${JSON.stringify(await lage(B.P, 'r1'))}`);
 const l1 = await lage(B.P, 'r1');
 pruefe('B2 der Rahmen füllt das Fenster (Kasten ganz drin, Breite oder Höhe bis auf den Rand, mittig)', l1.drin && l1.voll && l1.mittig, JSON.stringify(l1));
-pruefe('B3 die Oberfläche ist weg (Kopfleiste, Dock, Navigation)', !(await sichtbar(B.P, '.topbar')) && !(await sichtbar(B.P, '.dock')) && !(await sichtbar(B.P, '.tabs')));
+pruefe('B3 die Oberfläche ist weg (Kopfleiste, Dock, Navigation) – über „Oberfläche ausblenden" (M510)', !(await sichtbar(B.P, '.topbar')) && !(await sichtbar(B.P, '.dock')) && !(await sichtbar(B.P, '.tabs'))
+  && (await B.P.evaluate(() => document.documentElement.hasAttribute('data-nur-board'))) && !(await sichtbar(B.P, '.nur-board-knopf')));
 pruefe('B4 die Leiste nennt den Rahmen', (await titel(B.P)) === 'Start', await titel(B.P));
 pruefe('B5 kein Umbenennen-Feld (der Doppelklick benennt nicht mehr um)', (await B.P.locator('.frame-name-input').count()) === 0);
 await bild(B.P, '3-rahmen-1-start.png');
@@ -606,7 +607,21 @@ const zahlen = (t) => (t.match(/-?[\d.]+/g) ?? []).map(Number);
 const gleich = zahlen(vorReise).length === 3 && zahlen(vorReise).every((v, i) => Math.abs(v - zahlen(nachReise)[i]) < 1.5);
 pruefe('F1 Esc beendet die Reise', raus && (await B.P.locator('.rahmen-reise-leiste').count()) === 0);
 pruefe('F2 … und stellt die Ansicht von vorher wieder her', gleich, `${vorReise} → ${nachReise}`);
-pruefe('F3 die Oberfläche ist zurück', await sichtbar(B.P, '.dock'));
+pruefe('F3 die Oberfläche ist zurück', await sichtbar(B.P, '.dock') && !(await B.P.evaluate(() => document.documentElement.hasAttribute('data-nur-board'))));
+
+{
+  await einpassen(B.P);
+  await B.P.keyboard.press('Alt+b');
+  await warteBis(B.P, () => B.P.evaluate(() => document.documentElement.hasAttribute('data-nur-board')), 3000);
+  await kopf(B.P, 'r3').dblclick();
+  await stehtBei(B.P, 'r3', 2);
+  await B.P.keyboard.press('Escape');
+  const reiseZu = await warteBis(B.P, async () => !(await inReise(B.P)), 4000);
+  pruefe('F4 war die Oberfläche schon ausgeblendet (Alt+B), beendet Esc die Reise – und die Oberfläche bleibt aus', reiseZu && (await B.P.evaluate(() => document.documentElement.hasAttribute('data-nur-board'))));
+  await B.P.keyboard.press('Escape');
+  pruefe('F5 das nächste Esc holt die Oberfläche zurück', await warteBis(B.P, async () => !(await B.P.evaluate(() => document.documentElement.hasAttribute('data-nur-board'))), 3000));
+  await B.P.waitForTimeout(500);
+}
 
 // ══ H ═══════════════════════════════════════════════════════════════
 console.log('\n════ H: Kürzel, Menü, Umbenennen ════');

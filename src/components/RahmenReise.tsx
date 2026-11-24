@@ -1,7 +1,7 @@
 // M514: Rahmen für Rahmen präsentieren — direkt auf dem Board.
 //
 // Die Kamera fährt auf der echten Fläche zum Rahmen und passt ihn bildschirmfüllend ein; die Oberfläche tritt zurück
-// (`html[data-rahmen-reise]`, 35-rahmen-reise.css), unten steht eine leise Leiste „‹ 3 / 8 Titel ›", die verblasst.
+// („Oberfläche ausblenden", M510 `lib/nurBoard.tsx`; dazu `html[data-rahmen-reise]`, 35-rahmen-reise.css), unten steht eine leise Leiste „‹ 3 / 8 Titel ›", die verblasst.
 // Weiter geht es mit →, Leertaste, Bild↓ (Präsentations-Klicker), Wischen nach links (Finger, Trackpad) oder dem Knopf;
 // zurück mit ←, Umschalt+Leertaste, Bild↑, Wischen nach rechts. Pos1/Ende springen zum ersten/letzten Rahmen, Esc
 // beendet und stellt die Ansicht von vorher wieder her. Die Reihenfolge folgt den Rahmenpfeilen (lib/rahmenReise.ts).
@@ -22,6 +22,7 @@ import { rahmenReise, rahmenReiseBeenden, reiseAbo, reiseLoesen, reiseRahmenSetz
 import { overlayOffen } from '../lib/overlay';
 import { folgeIch, folgenSetzen, rahmenMelden, vorfuehrenMitVortrag, vortragZuEnde, werFuehrtVor } from '../lib/vorfuehren';
 import { ich, liveVerbunden, teilnehmerVon } from '../lib/liveStand';
+import { istNurBoard, nurBoardSetzen } from '../lib/nurBoard';
 import type { AppNode } from '../types';
 import { IChevronL, IChevronR, IX } from './Icons';
 
@@ -64,13 +65,23 @@ export default function RahmenReise() {
     if (gewaehlt.length) st.onNodesChange(gewaehlt.map((n) => ({ id: n.id, type: 'select' as const, selected: false })));
     (document.activeElement as HTMLElement | null)?.blur?.();
     document.documentElement.setAttribute('data-rahmen-reise', '');
+    // Die Oberfläche tritt zurück wie bei „Oberfläche ausblenden" (M510) — war die schon an, bleibt sie es danach
+    const nurVorher = istNurBoard();
+    nurBoardSetzen(true);
     return () => {
       document.documentElement.removeAttribute('data-rahmen-reise');
       document.documentElement.removeAttribute('data-reise-flug');
-      if (zurueck.current && vorher.current) void setViewport(vorher.current, { duration: ruhig() ? 0 : 420 });
+      if (!nurVorher) nurBoardSetzen(false);
+      // Erst wenn die Oberfläche wieder steht (die linke Spalte nimmt Platz, nurBoard gleicht die Kamera aus), zurück
+      // zur Ansicht von vorher — sonst überschriebe der Ausgleich die Rückfahrt
+      const v = vorher.current;
+      if (zurueck.current && v) requestAnimationFrame(() => requestAnimationFrame(() => { void setViewport(v, { duration: ruhig() ? 0 : 420 }); }));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Eine Karte im Fokus beendet „Oberfläche ausblenden" (M510) — danach steht wieder der Rahmen da, ohne Oberfläche
+  const fokus = useBoard((s) => s.focusCard);
+  useEffect(() => { if (!fokus) nurBoardSetzen(true); }, [fokus]);
   // Anderes Board: Die Reise gehört zum Board, auf dem sie begann
   useEffect(() => {
     if (stand && stand.boardId !== boardId) { zurueck.current = false; rahmenReiseBeenden(); }
