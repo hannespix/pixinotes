@@ -278,6 +278,9 @@ function mergeBoard(basis: BoardDoc | undefined, lokal: BoardDoc, fremd: BoardDo
   if (name) out.name = name;
   const bg = feld('bg');
   if (bg === undefined) delete out.bg; else out.bg = bg;
+  // M509: Look des Boards (beim Teilen mitgegeben) — dreiwegig wie der Hintergrund
+  const look = feld('look');
+  if (look === undefined) delete out.look; else out.look = look;
   const archived = feld('archived');
   if (archived === undefined) delete out.archived; else out.archived = archived;
   if (lokal.drawings || fremd.drawings) out.drawings = drawings;

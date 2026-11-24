@@ -46,6 +46,14 @@
 .freigabe-schalter.recht { align-items: center; cursor: default; }
 .freigabe-schalter.recht select { flex: 1; min-width: 0; }
 .freigabe-zeile.sicherung { margin-top: 8px; justify-content: space-between; }
+/* M509: Look mitgeben (Teilender) bzw. Look des Boards (Gast) — eine ruhige Zeile */
+.freigabe-schalter.look { margin: 10px 0 2px; color: var(--muted); }
+.freigabe-schalter.look b { color: var(--ink); font-weight: 600; }
+.freigabe-schalter.look .look-wort, .freigabe-zeile.look .look-wort { color: var(--ink); white-space: nowrap; }
+.freigabe-zeile.look { margin: 4px 0 10px; justify-content: space-between; }
+.look-hinweis { gap: 10px; align-items: center; }
+.look-hinweis .modal-hint { margin: 0; flex: 1; }
+.look-hinweis button { flex: none; }
 /* M366: Teilnehmer-Leiste für viele — wenige Kürzel, Zahl, aufklappbare Liste */
 .live-mehr {
   display: inline-flex; align-items: center; border: none; background: none; padding: 0;
