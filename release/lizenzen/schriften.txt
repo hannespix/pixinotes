@@ -295,3 +295,8 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
 ----------------------------------------------------------------------
 
 Kalam: Copyright (c) 2014 Indian Type Foundry (info@indiantypefoundry.com). SIL Open Font License 1.1 (Text wie oben).
+
+----------------------------------------------------------------------
+
+Jersey 10 (Pixelschrift des Designs „pix·el“, M507, unverändert aus pix-el.de übernommen):
+Copyright 2023 The Soft Type Project Authors (https://github.com/scfried/soft-type-jersey). SIL Open Font License 1.1 (Text wie oben).
