@@ -228,17 +228,18 @@ export function versatzAufloesen(el: HTMLElement, x: number, y: number, id?: str
 /**
  * M491: Was eine Karte zeigen SOLL, wenn kein Übergang mehr läuft — aus ihrem Inline-Stil und denselben Regeln wie
  * im CSS (34-praesentation.css, „Ziehen"): `translate` steht inline, die gehobene Karte trägt `--zieh-skala` und
- * `--zieh-neigung` (die Neigung hat keinen Übergang, ihre Feder rechnet in JS), flach bei „weniger Bewegung" und an
- * der Fanglinie.
+ * `--zieh-neigung` (die Neigung hat keinen Übergang, ihre Feder rechnet in JS), flach bei „weniger Bewegung".
+ * M505: An der Fanglinie wird sie nicht mehr schlagartig flach — `--zieh-hub` (1 = gehoben, 0 = flach) gleitet,
+ * Skala und Neigung im CSS sind damit gewichtet.
  */
-let gerastetJetzt = false;
 function erwartet(e: HTMLElement, arm: boolean): Anzeige {
   const tr = e.style.translate || 'none';
   const t = tr === 'none' ? [] : tr.split(' ').map(parseFloat);
   const g = e.dataset.gehoben;
-  const flach = arm || (gerastetJetzt && g === 'an');
-  const s = g === 'an' && !flach ? parseFloat(e.style.getPropertyValue('--zieh-skala')) || 1 : 1;
-  const w = g && !flach ? parseFloat(e.style.getPropertyValue('--zieh-neigung')) || 0 : 0;
+  const h = parseFloat(e.style.getPropertyValue('--zieh-hub'));
+  const hub = Number.isNaN(h) ? 1 : h;
+  const s = g === 'an' && !arm ? 1 + ((parseFloat(e.style.getPropertyValue('--zieh-skala')) || 1) - 1) * hub : 1;
+  const w = g && !arm ? (parseFloat(e.style.getPropertyValue('--zieh-neigung')) || 0) * hub : 0;
   return [t[0] || 0, t[1] || 0, s, w];
 }
 const gleich = (a: Anzeige, b: Anzeige): boolean =>
@@ -300,6 +301,109 @@ export function kantenBeobachter(elVon: (id: string) => HTMLElement | null, beob
   };
 }
 
+/* ───────────────────────── M505: weich einrasten ───────────────────────── */
+
+/** M505: Welcher Zug eine Karte gerade führt — ein spät aufräumender alter Zug fasst die des neuen nicht an */
+const weichBesitzer = new WeakMap<HTMLElement, object>();
+
+/**
+ * M505: Einrasten ohne Ruck. Die Fanglinie (bzw. das Raster) setzt die Lage im Stand hart — dort soll die Karte
+ * landen, und Kanten, Linien, Speicher rechnen damit. Gesehen wird aber die Lage im Stand PLUS ein Versatz
+ * (`translate` an der gehobenen Karte): Springt die Lage im Stand, weil die Karte einrastet, sich löst oder zum
+ * nächsten Rasterpunkt wechselt, nimmt der Versatz den Sprung auf (die Karte steht im selben Bild noch dort, wo
+ * sie war) und klingt nach der Uhr ab (`e^(−dt/τ)`, gleich schnell bei 30 und 60 Bildern je Sekunde). Bleibt die
+ * Karte an derselben Stelle eingerastet, ändert sich nichts — sie haftet, auch wenn der Zeiger weiterwandert.
+ *
+ * Dazu `--zieh-hub` (1 = gehoben, 0 = flach): An der Fanglinie klingen Heben und Neigung damit ab statt
+ * abzubrechen, beim Lösen kommen sie ebenso zurück. Die Neigungs-Feder rechnet derweil unsichtbar weiter.
+ *
+ * Bei „weniger Bewegung" nichts davon (wie bisher: kein Gleiten, keine Feder).
+ */
+function weichesEinrasten(els: HTMLElement[]) {
+  const arm = bewegungArm();
+  const ich = {};
+  for (const e of els) { weichBesitzer.set(e, ich); e.style.removeProperty('--zieh-hub'); e.removeAttribute('data-hub'); }
+  let ox = 0; let oy = 0;             // Versatz der Anzeige gegenüber dem Stand (Flächen-Punkte)
+  let dx = 0; let dy = 0;             // aktueller Fang-Versatz (Stand − Zeiger)
+  let zx: number | null = null; let zy: number | null = null;
+  let rx: number | null = null; let ry: number | null = null;   // Lage unter dem Zeiger beim letzten Ereignis
+  let hub = 1; let hubZiel = 1; let hubAn = false;
+  let raf = 0; let t = 0; let vorbei = false; const beginn = performance.now();
+  const schreibVersatz = () => {
+    const leer = Math.abs(ox) < 0.05 && Math.abs(oy) < 0.05;
+    if (leer) { ox = 0; oy = 0; }
+    for (const e of els) {
+      if (leer) e.style.removeProperty('translate');
+      else e.style.setProperty('translate', `${ox.toFixed(2)}px ${oy.toFixed(2)}px`);
+    }
+  };
+  const schreibHub = () => {
+    if (!hubAn && hub < 1 && !vorbei) {
+      // die Skala folgt dem Hub ab jetzt Bild für Bild — ohne CSS-Übergang (der liefe sonst jedes Bild neu an)
+      hubAn = true;
+      for (const e of els) { e.setAttribute('data-hub', ''); stoeren(e); }
+    }
+    for (const e of els) e.style.setProperty('--zieh-hub', hub.toFixed(3));
+  };
+  const lauf = (jetzt: number) => {
+    raf = 0;
+    const dt = Math.min(100, Math.max(0, jetzt - t)); t = jetzt;
+    if (!vorbei && (ox || oy)) {
+      const k = Math.exp(-dt / FANG_TAU_MS);
+      ox *= k; oy *= k;
+      schreibVersatz();
+    }
+    if (hub !== hubZiel) {
+      hub = hubZiel + (hub - hubZiel) * Math.exp(-dt / HUB_TAU_MS);
+      if (Math.abs(hub - hubZiel) < 0.002) hub = hubZiel;
+      schreibHub();
+    }
+    // Während des Zugs läuft der Rückruf durchgehend (kostet nichts, wenn nichts gleitet): So bleibt er in jedem Bild
+    // vor dem Kanten-Beobachter, der dieselbe Lage liest (zugStarten legt ihn zuerst an). Sicherheitsnetz: Karte weg
+    // oder nie beendet (kein `ende`) — dann hört er auf
+    if (!vorbei && els.some((e) => e.isConnected) && jetzt - beginn < 600_000) raf = requestAnimationFrame(lauf);
+    else if (hub !== hubZiel) raf = requestAnimationFrame(lauf);
+  };
+  const an = () => { if (!raf) { t = performance.now(); raf = requestAnimationFrame(lauf); } };
+  an();
+  return {
+    fang(e: Einrasten): void {
+      if (vorbei) return;
+      // Sprung je Achse nur, wenn sich die Fangstelle ändert (einrasten, lösen, andere Stelle). Bleibt sie, ändert
+      // sich der Fang-Versatz nur, weil der Zeiger wandert — die Karte haftet, es gibt nichts aufzunehmen.
+      const gleichX = e.zx === null ? zx === null : zx !== null && Math.abs(e.zx - zx) < 0.01;
+      const gleichY = e.zy === null ? zy === null : zy !== null && Math.abs(e.zy - zy) < 0.01;
+      // Geht der Sprung in der Bewegung des Zeigers unter (höchstens halb so groß wie sein Schritt in diesem
+      // Ereignis), rastet die Karte direkt ein: Sie bewegt sich in diesem Bild dann zwischen dem halben und dem
+      // anderthalbfachen Schritt, hält nie an und kehrt nie um — und es gibt kein Gleiten, das Bilder kostet, in
+      // denen sich sonst nichts bewegt (jedes bewegte Bild lässt alle betroffenen Kanten neu zeichnen, m491).
+      const schrittX = rx === null ? 0 : Math.abs(e.rx - rx); const schrittY = ry === null ? 0 : Math.abs(e.ry - ry);
+      if (!arm) {
+        if (!gleichX && Math.abs(e.dx - dx) > schrittX / 2) ox -= e.dx - dx;
+        if (!gleichY && Math.abs(e.dy - dy) > schrittY / 2) oy -= e.dy - dy;
+      }
+      dx = e.dx; dy = e.dy; zx = e.zx; zy = e.zy; rx = e.rx; ry = e.ry;
+      if (!gleichX || !gleichY) { schreibVersatz(); if (ox || oy) an(); }
+    },
+    flach(gerastet: boolean): void {
+      if (arm) return;
+      const ziel = gerastet ? 0 : 1;
+      if (ziel !== hubZiel) { hubZiel = ziel; an(); }
+    },
+    versatz: (): [number, number] => [dx, dy],
+    /** Loslassen: den Rest des Versatzes übernimmt der CSS-Übergang (Lande-Feder), der Hub klingt zu Ende */
+    ende(): void {
+      vorbei = true;
+      if (ox || oy) { ox = 0; oy = 0; for (const e of els) { e.style.removeProperty('translate'); stoeren(e); } }
+      for (const e of els) { e.removeAttribute('data-hub'); stoeren(e); }
+      if (hub !== hubZiel) an();
+      window.setTimeout(() => {
+        for (const e of els) if (weichBesitzer.get(e) === ich) { e.style.removeProperty('--zieh-hub'); weichBesitzer.delete(e); stoeren(e); }
+      }, LANDEN_MS + 50);
+    },
+  };
+}
+
 /* ───────────────────────── Ein Zug auf dem Board ───────────────────────── */
 
 /** M481: Bis zu so vielen gezogenen Karten heben sie sich und lassen Nachbarn ausweichen (darüber: ruhig, Leistung) */
@@ -309,17 +413,69 @@ export const AUSWEICH_ABSTAND = 12;
 /** So lange hält die abgelegte Karte ihre Neigung als Anzeige (Feder schwingt aus, Skala landet) */
 export const LANDEN_MS = 650;
 
+/* M504: Bewusst stapeln. Ausweichen ist der Normalfall; wer eine Karte aber AUF eine andere legen will, hält kurz
+   still (Verweilen = Absicht) oder hält Alt (⌥) gedrückt (niemand weicht aus, frei übereinander). */
+/** So lange muss die gezogene Karte über einer anderen stillstehen, bis diese zum Stapel-Ziel wird */
+export const VERWEILEN_MS = 450;
+/** So viel Zittern (Bildschirm-Punkte) zählt noch als Stillhalten — Finger zittern mehr als die Maus */
+export const RUHE_PX = 10;
+/** Wer sich so weit (Bildschirm-Punkte) vom Verweil-Punkt entfernt, hebt das Ziel wieder auf */
+export const LOESEN_PX = 28;
+/** Kaskaden-Versatz eines Stapels — derselbe wie Dock → Anordnen → „Stapeln (überlappend)" (lib/arrange.ts
+    `layoutStack`): die Kopfzeile der Karte darunter bleibt lesbar */
+export const STAPEL_DX = 26;
+export const STAPEL_DY = 46;
+/** So lange (ms) muss jemand über derselben Karte hin und her ziehen, bis einmal der Hinweis aufs Stapeln kommt */
+export const JAGD_MS = 1600;
+const GELERNT = 'pixinotes-stapel-gelernt';
+const merk = (k: string): boolean => { try { return localStorage.getItem(k) === '1'; } catch { return false; } };
+const merken = (k: string): void => { try { localStorage.setItem(k, '1'); } catch { /* privat: dann eben nicht */ } };
+/** Der einmalige Hinweis (deutsch; die Oberfläche übersetzt ihn über src/sprache/en.json) */
+export const STAPEL_HINWEIS = 'Halte die Karte kurz still, dann legt sie sich auf die andere (Stapel). Mit Alt weicht nichts aus.';
+export const STAPEL_HINWEIS_FINGER = 'Halte die Karte kurz still, dann legt sie sich auf die andere (Stapel).';
+
+/** Wie viel von der kleineren Fläche zwei Kästen gemeinsam haben (0…1) */
+const deckung = (a: Kasten, b: Kasten): number => {
+  const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  const oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  if (ox <= 0 || oy <= 0) return 0;
+  return (ox * oy) / Math.max(1, Math.min(a.w * a.h, b.w * b.h));
+};
+
 /** Was der Zug von einer Karte wissen muss (passt auf die Knoten von React Flow) */
 export interface ZugKnoten {
-  id: string; type?: string; selected?: boolean; hidden?: boolean; archived?: boolean;
+  id: string; type?: string; selected?: boolean; hidden?: boolean; archived?: boolean; zIndex?: number;
   position: { x: number; y: number };
   measured?: { width?: number; height?: number }; width?: number | null; height?: number | null;
 }
+/**
+ * M505: Was das Einrasten (Fanglinie oder Raster) mit der Lage im Stand macht — `dx`/`dy` = Versatz gegenüber der
+ * Lage unter dem Zeiger, `zx`/`zy` = Stelle, an der die Achse einrastet (null = frei), `rx`/`ry` = Lage unter dem
+ * Zeiger (ungefangen), daraus der Schritt dieses Ereignisses.
+ */
+export interface Einrasten { dx: number; dy: number; zx: number | null; zy: number | null; rx: number; ry: number }
+/** M505: Zeitkonstante, mit der die Karte an die Fangstelle gleitet (95 % nach ~105 ms) */
+export const FANG_TAU_MS = 35;
+/** M505: … und mit der Heben und Neigung an der Fanglinie abklingen bzw. zurückkommen */
+export const HUB_TAU_MS = 40;
+
 export interface Zug {
-  /** Die gegriffene Karte steht jetzt bei (x, y); `zoom` für das Tempo am Bildschirm, `gerastet` = Fanglinie greift */
-  schritt(x: number, y: number, zoom: number, gerastet: boolean): void;
-  /** Loslassen (oder abbrechen): liefert, was ausgewichen bleibt — als [id, x, y] zum Übernehmen */
+  /** Die gegriffene Karte steht jetzt bei (x, y); `zoom` für das Tempo am Bildschirm, `gerastet` = Fanglinie greift.
+      M504: `alt` = Alt/⌥ gedrückt (frei übereinander), `finger` = Touch (für den Hinweis), `zeiger` = Maus bzw. Finger
+      in Flächen-Punkten (das Stapel-Ziel ist die Karte darunter) */
+  schritt(x: number, y: number, zoom: number, gerastet: boolean, art?: { alt?: boolean; finger?: boolean; zeiger?: { x: number; y: number } }): void;
+  /** M504: Alt gedrückt bzw. losgelassen, auch ohne Mausbewegung */
+  frei(an: boolean): void;
+  /**
+   * M505: Das Einrasten hat die Lage im Stand verschoben (Board.tsx `onNodesChangeFang`, VOR `schritt`). Springt sie
+   * dabei (einrasten, lösen, nächster Rasterpunkt), übernimmt die Anzeige den Sprung als Versatz und gleitet ihn ab.
+   */
+  fang(e: Einrasten): void;
+  /** Loslassen (oder abbrechen): liefert, was ausgewichen bleibt — als [id, x, y] zum Übernehmen. M504: mit Stapel-Ziel
+      die neue Lage der gezogenen Karten auf dem Stapel (und kein Ausweichen) */
   ende(abbrechen?: boolean): Array<[string, number, number]>;
+  /** M504: nach `ende` — die gestapelten Karten von unten nach oben (leer ohne Stapel-Ziel) */
+  readonly gestapelt: string[];
   /** Nach dem Übernehmen: Versatz an genau diesen Karten ohne Ruck auflösen */
   aufloesen(lagen: Array<[string, number, number]>): void;
 }
@@ -331,7 +487,7 @@ const masse = (n: ZugKnoten) => ({ w: n.measured?.width ?? n.width ?? 260, h: n.
  * Auswahl, Rahmen dabei. Ausweichen nur, was beim Greifen NICHT schon unter der Karte lag (Stapel bleiben Stapel),
  * keine Rahmen, nichts Archiviertes und kein Rahmen-Inhalt (dort ist die Ordnung gewollt).
  */
-export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugKnoten[], zoom: number, verbunden?: ReadonlySet<string>): Zug | null {
+export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugKnoten[], zoom: number, verbunden?: ReadonlySet<string>, melden?: (text: string) => void): Zug | null {
   const bewegt = gegriffen.selected ? alle.filter((n) => n.selected) : alle.filter((n) => n.id === gegriffen.id);
   if (bewegt.length === 0 || bewegt.length > ZIEH_HEBEN_MAX || bewegt.some((n) => n.type === 'frame')) return null;
   const el = (id: string) => wurzel.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
@@ -363,45 +519,190 @@ export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugK
   }
   // M485: Kettenreaktion über mehrere Stufen — nicht bei „weniger Bewegung"
   const aus = kandidaten.length ? ausweichen(kandidaten, AUSWEICH_ABSTAND, bewegungArm() ? 1 : AUSWEICH_STUFEN) : null;
+  // M505: Fang-Gleiten und Neigung VOR dem Kanten-Beobachter anlegen — ihre Bild-Rückrufe laufen dann in jedem Bild
+  // vor seinem, und die Kanten lesen schon die Lage dieses Bilds (sonst hinkten sie ein Bild hinterher)
+  const weich = weichesEinrasten(gehoben.map((g) => g.el));
   const beob = verbunden?.size
     ? kantenBeobachter(el, function* () { for (const n of bewegt) yield n.id; if (aus) yield* aus.beruehrt; }, verbunden)
     : null;
   const neigung = neigungsFeder(gehoben.map((g) => g.el), '--zieh-neigung', neigungsGrenze(kasten.w, kasten.h));
   const tempo = tempoMesser(x0 * zoom, performance.now());
-  let gerastetVorher = false;
+  /* ── M504: Stapeln ──
+     Ziel kann jede sichtbare Karte sein, die nicht mitgezogen wird (auch Rahmen-Inhalt und was schon beim Greifen
+     darunter lag — die weichen ohnehin nicht aus). Gerechnet wird mit der Lage VOR dem Zug: Das Ziel ist ja gerade
+     ausgewichen, gemeint ist die Stelle, an der es lag. Alles nur Anzeige — in den Stand kommt erst das Ablegen. */
+  interface Stapelbar { id: string; z: number; i: number; k: Kasten }
+  const stapelbar: Stapelbar[] = [];
+  alle.forEach((n, i) => {
+    if (!ids.has(n.id) && n.type !== 'frame' && !n.archived && !n.hidden) stapelbar.push({ id: n.id, z: n.zIndex ?? 0, i, k: { x: n.position.x, y: n.position.y, ...masse(n) } });
+  });
+  const ausweichend = new Set(kandidaten.map((k) => k.id));
+  let box: Kasten = kasten;
+  let sx = x0 * zoom; let sy = y0 * zoom;
+  let ruheX = sx; let ruheY = sy; let uhr = 0;
+  let ziel: Stapelbar | null = null; let zielEl: HTMLElement | null = null; let zielX = 0; let zielY = 0;
+  let frei = false; let vorbei = false; let gestapelt: string[] = [];
+  let hinweisNoch = !!melden && !merk(GELERNT); let jagdId = ''; let jagd = 0; let jagdT = 0; let finger = false;
+  let zeiger: { x: number; y: number } | null = null;
+  /**
+   * Das Ziel ist die Karte unter dem Zeiger (Maus bzw. Finger) — wie bei jedem Ablegen: man zeigt, wohin. Liegen dort
+   * mehrere (ein Stapel), die oberste. Ohne Zeiger: die Karte, die die gezogene am meisten überdeckt (mindestens ein
+   * Viertel der kleineren Fläche).
+   */
+  const zielFinden = (k: Kasten): Stapelbar | null => {
+    let best: Stapelbar | null = null;
+    if (zeiger) {
+      const p = zeiger;
+      for (const s of stapelbar) {
+        if (p.x < s.k.x || p.x > s.k.x + s.k.w || p.y < s.k.y || p.y > s.k.y + s.k.h) continue;
+        if (!best || s.z > best.z || (s.z === best.z && s.i > best.i)) best = s;
+      }
+      return best;
+    }
+    let bestD = 0.25;
+    for (const s of stapelbar) { const d = deckung(k, s.k); if (d > bestD) { bestD = d; best = s; } }
+    return best;
+  };
+  const zielWeg = () => {
+    if (zielEl) { delete zielEl.dataset.stapelZiel; zielEl = null; }
+    ziel = null;
+  };
+  const verweilt = () => {
+    uhr = 0;
+    if (vorbei || frei || ziel) return;
+    const t = zielFinden(box);
+    if (!t) return;
+    ziel = t; zielX = sx; zielY = sy;
+    aus?.zurueck();                       // das Ziel (und wer sonst auswich) gleitet zurück an seinen Platz
+    zielEl = el(t.id);
+    if (zielEl) zielEl.dataset.stapelZiel = '';   // Attribut am Ziel, nichts wird ein- oder ausgehängt (M491)
+    hinweisNoch = false; merken(GELERNT);
+  };
+  const uhrNeu = () => { if (uhr) clearTimeout(uhr); uhr = window.setTimeout(verweilt, VERWEILEN_MS); };
+  const freiSetzen = (an: boolean) => {
+    if (vorbei || an === frei) return;
+    frei = an;
+    if (an) { if (uhr) clearTimeout(uhr); uhr = 0; zielWeg(); aus?.zurueck(); wurzel.setAttribute('data-frei', ''); return; }
+    wurzel.removeAttribute('data-frei');
+    ruheX = sx; ruheY = sy; uhrNeu();
+    aus?.setze(box);
+  };
+  uhrNeu();
+
+  /**
+   * M504: Auf den Stapel legen. Zum Stapel gehört, was mit dem Ziel (auch über Ecken) überlappt; obenauf liegt, was
+   * zuletzt gezeichnet wird (höchster zIndex, dann Reihenfolge). Die gezogenen Karten kommen in derselben Kaskade
+   * darauf wie bei „Stapeln (überlappend)" — so bleibt jede Kopfzeile lesbar und das Ablegen ist vorhersagbar.
+   */
+  const stapeln = (t: Stapelbar): Array<[string, number, number]> => {
+    const im = new Set([t.id]); const offen = [t];
+    while (offen.length && im.size < 40) {
+      const a = offen.pop()!;
+      for (const s of stapelbar) if (!im.has(s.id) && wegVektor(a.k, s.k, 0)) { im.add(s.id); offen.push(s); }
+    }
+    let oben = t;
+    for (const s of stapelbar) if (im.has(s.id) && (s.z > oben.z || (s.z === oben.z && s.i > oben.i))) oben = s;
+    const folge = [...bewegt].sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
+    gestapelt = folge.map((n) => n.id);
+    return folge.map((n, i) => [n.id, oben.k.x + STAPEL_DX * (i + 1), oben.k.y + STAPEL_DY * (i + 1)]);
+  };
+
   return {
-    schritt(x, y, z, gerastet) {
+    schritt(x, y, z, gerastet, art) {
       const vx = tempo.messen(x * z, performance.now());
       // M344/M349: Greift eine Fanglinie, liegt die Karte flach — ihre Kanten stehen dann genau dort, wo sie
-      // landen, und die Linie stimmt mit dem, was man sieht
-      if (gerastet !== gerastetVorher) {
-        gerastetVorher = gerastet; gerastetJetzt = gerastet; wurzel.toggleAttribute('data-gerastet', gerastet);
-        for (const g of gehoben) stoeren(g.el);
-      }
-      if (gerastet) neigung.gerade(); else neigung.tempo(vx);
+      // landen, und die Linie stimmt mit dem, was man sieht. M505: nicht mehr schlagartig — Heben und Neigung
+      // klingen ab (die Neigung rechnet unsichtbar weiter und kommt beim Lösen weich zurück)
+      weich.flach(gerastet);
+      neigung.tempo(vx);
+      // Drehpunkt = Lage im Stand (React Flows `transform`), also mit dem Fang-Versatz
+      const [fx, fy] = weich.versatz();
       for (const g of gehoben) {
-        g.el.style.setProperty('--zieh-x', `${x + g.dx}px`);
-        g.el.style.setProperty('--zieh-y', `${y + g.dy}px`);
+        g.el.style.setProperty('--zieh-x', `${x + g.dx + fx}px`);
+        g.el.style.setProperty('--zieh-y', `${y + g.dy + fy}px`);
       }
-      aus?.setze({ ...kasten, x: kasten.x + x - x0, y: kasten.y + y - y0 });
+      box = { ...kasten, x: kasten.x + x - x0, y: kasten.y + y - y0 };
+      sx = x * z; sy = y * z;
+      if (art?.finger) finger = true;
+      if (art?.zeiger) zeiger = art.zeiger;
+      if (art && !!art.alt !== frei) freiSetzen(!!art.alt);
+      if (frei) return;
+      // M504: Verweilen messen — wer sich weiter als RUHE_PX bewegt, fängt neu an; wer vom Ziel weggeht, hebt es auf
+      if (ziel && Math.hypot(sx - zielX, sy - zielY) > LOESEN_PX) zielWeg();
+      if (Math.hypot(sx - ruheX, sy - ruheY) > RUHE_PX) { ruheX = sx; ruheY = sy; uhrNeu(); }
+      if (ziel) return;
+      aus?.setze(box);
+      // M504: Einmal-Hinweis — jemand zieht lange über derselben Karte hin und her (sie weicht immer wieder aus)
+      if (hinweisNoch) {
+        const jetzt = performance.now();
+        if (jetzt - jagdT > 90) {
+          const t = zielFinden(box);
+          const id = t && ausweichend.has(t.id) ? t.id : '';
+          if (id && id === jagdId) jagd += Math.min(250, jetzt - jagdT); else jagd = 0;
+          jagdId = id; jagdT = jetzt;
+          if (jagd > JAGD_MS) { hinweisNoch = false; merken(GELERNT); melden?.(finger ? STAPEL_HINWEIS_FINGER : STAPEL_HINWEIS); }
+        }
+      }
     },
+    fang(e) { weich.fang(e); },
+    frei: freiSetzen,
     ende(abbrechen = false) {
-      wurzel.removeAttribute('data-gerastet'); gerastetJetzt = false;
+      if (uhr) clearTimeout(uhr); uhr = 0;
+      const t = frei ? null : ziel;
+      zielWeg();
+      vorbei = true;
+      wurzel.removeAttribute('data-frei');
       neigung.loslassen();
       beob?.nachlauf(LANDEN_MS + 400);
       for (const g of gehoben) {
         g.el.dataset.gehoben = 'landet'; stoeren(g.el);
         window.setTimeout(() => { if (g.el.dataset.gehoben === 'landet') { delete g.el.dataset.gehoben; stoeren(g.el); } }, LANDEN_MS);
       }
+      // M505: im selben Stil-Wechsel wie „landet" — der Rest des Fang-Versatzes gleitet mit der Lande-Feder (CSS)
+      weich.ende();
+      if (abbrechen) { aus?.zurueck(); return []; }
+      if (t) return stapeln(t);
       if (!aus) return [];
-      if (abbrechen) { aus.zurueck(); return []; }
       return aus.ende();
     },
+    get gestapelt() { return gestapelt; },
     aufloesen(lagen) {
       for (const [id, x, y] of lagen) {
-        const e = kandidaten.find((k) => k.id === id)?.el;
-        if (e) versatzAufloesen(e, x, y, id);
+        const k = kandidaten.find((c) => c.id === id);
+        if (k) { if (k.el) versatzAufloesen(k.el, x, y, id); continue; }
+        const g = ids.has(id) ? el(id) : null;
+        if (g) aufStapelGleiten(g, x, y);
       }
     },
   };
+}
+
+/**
+ * M504: Die abgelegte Karte gleitet von der Stelle, an der sie losgelassen wurde, auf ihren Platz im Stapel — wie
+ * `versatzAufloesen`, nur umgekehrt: Sobald React Flow sie an die neue Lage gesetzt hat, steht sie per `translate`
+ * noch an der alten (im selben Bild, kein Sprung) und gleitet über den Feder-Übergang zurück auf 0.
+ */
+function aufStapelGleiten(el: HTMLElement, x: number, y: number): void {
+  const lage = (): [number, number] | null => {
+    const m = /translate\(\s*(-?[\d.e+-]+)px\s*,\s*(-?[\d.e+-]+)px/.exec(el.style.transform);
+    return m ? [Number(m[1]), Number(m[2])] : null;
+  };
+  const von = lage();
+  if (!von) return;
+  let n = 0;
+  const pruefen = () => {
+    const l = lage();
+    if (l && Math.abs(l[0] - x) < 0.6 && Math.abs(l[1] - y) < 0.6) {
+      const tr0 = el.style.transition;
+      el.style.transition = 'none';
+      el.style.setProperty('translate', `${(von[0] - x).toFixed(1)}px ${(von[1] - y).toFixed(1)}px`);
+      stoeren(el);
+      void el.offsetWidth;   // Stil jetzt anwenden, bevor der Übergang zurückkommt
+      el.style.transition = tr0;
+      requestAnimationFrame(() => { el.style.removeProperty('translate'); stoeren(el); });
+      return;
+    }
+    if (++n <= 30) requestAnimationFrame(pruefen);
+  };
+  pruefen();
 }

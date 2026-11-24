@@ -73,6 +73,9 @@ const gespeichert = async (P, id, warte = 1300) => { await P.waitForTimeout(wart
 const griff = (P, id) => P.evaluate((id) => { const g = document.querySelector(`.react-flow__node[data-id="${id}"] .card-grip`) ?? document.querySelector(`.react-flow__node[data-id="${id}"]`); const r = g.getBoundingClientRect(); return [r.left + r.width / 2, r.top + Math.min(r.height / 2, 12)]; }, id);
 const drehung = (P, id) => P.evaluate((id) => { const s = getComputedStyle(document.querySelector(`.react-flow__node[data-id="${id}"]`)).rotate; return s === 'none' ? 0 : parseFloat(s); }, id);
 const leer = (P) => P.mouse.click(1420, 880).then(() => P.waitForTimeout(200));
+/** M504: Über einer Karte stillhalten legt die gezogene darauf (Stapel). Wo hier nur gewartet wird, bis das Ausweichen
+    zu sehen ist, bleibt die Karte deshalb in Bewegung — alle 110 ms 12 Punkte hin und her (quer zur Ausweichrichtung). */
+const zappeln = async (P, x, y, ms) => { const bis = Date.now() + ms; let i = 0; while (Date.now() < bis) { i += 1; await P.mouse.move(x + (i % 2 ? 12 : 0), y); await P.waitForTimeout(110); } await P.mouse.move(x, y); };
 /** Spur eines Elements über n Bilder (Rahmen je Bild) */
 const spur = (P, id, n = 40) => P.evaluate(async ([id, n]) => {
   const el = document.querySelector(`.react-flow__node[data-id="${id}"]`);
@@ -113,11 +116,12 @@ const spur = (P, id, n = 40) => P.evaluate(async ([id, n]) => {
   console.log('\n════ B: Nachbar weicht aus und kehrt zurück ════');
   // über B ziehen: A's Mitte auf B's linke Hälfte
   const ueberB = [b0.x + b0.w * 0.3 + (g[0] - a0.cx), b0.cy + 30 * z + (g[1] - a0.cy)];
-  await P.mouse.move(ueberB[0], ueberB[1], { steps: 10 }); await P.waitForTimeout(700);
+  await P.mouse.move(ueberB[0], ueberB[1], { steps: 10 }); await zappeln(P, ueberB[0], ueberB[1], 700);
   const b1 = await rahmen(P, 'b');
   const wegB = Math.hypot(b1.x - b0.x, b1.y - b0.y);
   pruefe('B1 der Nachbar unter der Karte ist beiseite geglitten', wegB > 40 * z, { b0: [b0.x, b0.y], b1: [b1.x, b1.y] });
-  const bLaden = await gespeichert(P, 'b', 1400);
+  await zappeln(P, ueberB[0], ueberB[1], 1400);
+  const bLaden = await gespeichert(P, 'b', 0);
   pruefe('B2 … nur als Anzeige: im Stand (und damit im Live-Team) liegt er noch an seinem Platz', bLaden.x === bPos0.x && bLaden.y === bPos0.y, bLaden);
   await P.screenshot({ path: path.join(SD, 'm481-ausweichen.png') });
   // weiterziehen — B kehrt gleitend zurück
@@ -133,8 +137,9 @@ const spur = (P, id, n = 40) => P.evaluate(async ([id, n]) => {
   pruefe('B4 … gleitend über mehrere Bilder', stufen >= 6, stufen);
 
   console.log('\n════ C: Ablegen auf dem Nachbarn – ein Schritt ════');
-  await P.mouse.move(ueberB[0], ueberB[1], { steps: 8 }); await P.waitForTimeout(650);
+  await P.mouse.move(ueberB[0], ueberB[1], { steps: 8 }); await zappeln(P, ueberB[0], ueberB[1], 650);
   const bVorLos = await rahmen(P, 'b');
+  await zappeln(P, ueberB[0], ueberB[1], 150);   // M504: das Messen dauert unter Last womöglich länger als das Verweilen
   await P.mouse.up();
   const bNach = await spur(P, 'b', 20);
   const sprung = Math.max(...bNach.map((p) => Math.hypot(p[0] - bVorLos.x, p[1] - bVorLos.y)));
