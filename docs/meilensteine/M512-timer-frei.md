@@ -44,7 +44,7 @@ festen Zeiten 1, 2, 3, 5, 10, 15 Minuten. `timerStart` hätte bis 120 Minuten an
   Stunden ist sie etwas breiter) — Kandidat für die Telefon-Live-Leiste (M511).
 
 ## Prüfreihe
-`pruefungen/m512-timer-frei.mjs` (52 Prüfungen, nachgebautes Supabase aus m376): A 90 Minuten bei Anna und Gerd,
+`pruefungen/m512-timer-frei.mjs` (54 Prüfungen, nachgebautes Supabase aus m376): A 90 Minuten bei Anna und Gerd, Kontraste der Zeile,
 Hanna kommt später · B zwölf Formen und sechs ungültige Eingaben, keine Board-Kürzel aus dem Feld · C späterer Start
 über „Start“, Anhalten (Uhr und Liste), Ende „Zeit ist um“ mit vorgestellter Uhr bei der Starterin · D elf Stunden
 kommen an, dreizehn nicht; Takt einmal je Sekunde; verdeckter Tab steht still und rechnet nach; Gesamtdauer begrenzt ·

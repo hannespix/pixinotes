@@ -19,6 +19,7 @@ import { mkdirSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 mkdirSync(SD, { recursive: true });
 const CHROMIUM = process.env.PW_CHROMIUM ?? '/opt/pw-browsers/chromium';
 import { chromium, devices } from 'playwright-core';
+import { kontrastScan, randScan, trefferZeile } from '../werkzeug/kontrast-pruefen.mjs';
 import http from 'node:http';
 import { extname, join } from 'node:path';
 
@@ -721,6 +722,8 @@ pruefe('A2 daneben ein freies Feld mit Zahlentastatur', (await feld(A.P).count()
 await eingeben(A.P, '90');
 pruefe('A3 vor dem Start steht darunter, was verstanden wurde: „= 1:30:00"', (await info(A.P)) === '= 1:30:00', await info(A.P));
 await A.P.screenshot({ path: `${SD}/m512-a-liste.png` });
+const schwach = [...await kontrastScan(A.P, '[data-taste="timer-wahl"]'), ...await randScan(A.P, '[data-taste="timer-frei"]')];
+pruefe('A3b Schrift ≥ 4,5:1 und Feldrand ≥ 3:1 in der Timer-Zeile', schwach.length === 0, schwach.map(trefferZeile).join(' | '));
 await feld(A.P).press('Enter');
 await warteBis(G.P, async () => !!(await uhr(G.P)), 8000);
 let ua = await uhr(A.P); let ug = await uhr(G.P);
@@ -756,6 +759,8 @@ for (const [text, re] of falsch) {
   const rot = (await feld(G.P).getAttribute('aria-invalid')) === 'true';
   pruefe(`B2 „${text}" wird abgelehnt: ${re.source}`, re.test(ist) && offen && rot, `${ist} offen=${offen} rot=${rot}`);
 }
+const schwachB = await kontrastScan(G.P, '[data-taste="timer-frei"]');
+pruefe('B2b die Fehlermeldung ist gut lesbar (≥ 4,5:1)', schwachB.length === 0, schwachB.map(trefferZeile).join(' | '));
 const ugB = await uhr(G.P);
 pruefe('B3 nach den Ablehnungen läuft weiter Annas 90-Minuten-Uhr (nichts wurde gestartet)', ugB && ugB.sek > 5300 && ugB.von === `von ${annaName}`, JSON.stringify(ugB));
 await feld(G.P).fill('1h30');
