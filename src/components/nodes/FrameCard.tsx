@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../../store';
 import type { FrameNode } from '../../types';
 import { frameMembers } from '../../lib/arrange';
 import { zahlWort } from '../../lib/sprache';
+import { rahmenReiseStarten } from '../../lib/rahmenReise';
 
 /**
  * Frame (M149/M150): benannter Rahmen-Bereich à la Miro. Liegt hinter allen
@@ -15,6 +16,8 @@ import { zahlWort } from '../../lib/sprache';
  * Anordnen, Tönung, Umbenennen, Verschieben und Löschen leben gebündelt in
  * der Auswahl-Leiste (ein Menü statt zwei, User-Screenshot); hier bleibt nur
  * das Doppelklick-Umbenennen direkt am Titel.
+ * M514: Der Doppelklick auf den Titel präsentiert jetzt den Rahmen (Rahmen-Reise, components/RahmenReise.tsx) —
+ * Umbenennen bleibt im Rahmen-Menü (Rechtsklick oder Auswahl-Leiste) und mit F2 am gewählten Rahmen.
  */
 export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
   const updateNodeData = useBoard((s) => s.updateNodeData);
@@ -29,6 +32,36 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
   });
 
   const tint = (data.color as string) || '';
+  // M514: F2 am gewählten Rahmen benennt ihn direkt am Titel um (wie bisher der Doppelklick)
+  useEffect(() => {
+    if (!selected || editing) return;
+    const taste = (e: KeyboardEvent) => {
+      if (e.key !== 'F2' || e.altKey || e.ctrlKey || e.metaKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+      e.preventDefault();
+      setDraft(data.name); setEditing(true);
+    };
+    window.addEventListener('keydown', taste);
+    return () => window.removeEventListener('keydown', taste);
+  }, [selected, editing, data.name]);
+  // M514: Gewählt liegen die Anfass-Linien des Rahmens über dem Titel — im weiten Zoom ganz (der Titel ist dann nur
+  // wenige Punkte hoch). Der Doppelklick landet so auf der Linie, nicht am Titel: am Ort des Titels trotzdem präsentieren.
+  const kopfRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!selected || editing) return;
+    const doppel = (e: MouseEvent) => {
+      const k = kopfRef.current;
+      if (!k || k.contains(e.target as Node)) return;
+      if (!(e.target as Element | null)?.closest?.('.react-flow__resize-control')) return;
+      const r = k.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+      e.stopPropagation();
+      rahmenReiseStarten(useBoard.getState().activeId, id);
+    };
+    window.addEventListener('dblclick', doppel, true);
+    return () => window.removeEventListener('dblclick', doppel, true);
+  }, [selected, editing, id]);
   const commit = () => {
     updateNodeData(id, { name: draft.trim() || 'Rahmen' });
     setEditing(false);
@@ -56,7 +89,16 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
       {[Position.Top, Position.Right, Position.Bottom, Position.Left].map((pos) => (
         <Handle key={pos} type="source" position={pos} id={pos} className="pn-handle frame-handle" />
       ))}
-      <div className="frame-head" title="Ziehen verschiebt den Rahmen samt Inhalt, Doppelklick benennt um">
+      <div
+        ref={kopfRef}
+        className="frame-head"
+        title="Ziehen verschiebt den Rahmen samt Inhalt, Doppelklick präsentiert ab diesem Rahmen"
+        onDoubleClick={(e) => {
+          if (editing) return;
+          e.stopPropagation();
+          rahmenReiseStarten(useBoard.getState().activeId, id);
+        }}
+      >
         {editing ? (
           <input
             autoFocus
@@ -67,7 +109,7 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
             onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
           />
         ) : (
-          <span className="frame-name" translate="no" onDoubleClick={() => { setDraft(data.name); setEditing(true); }}>
+          <span className="frame-name" translate="no">
             {data.name}
           </span>
         )}

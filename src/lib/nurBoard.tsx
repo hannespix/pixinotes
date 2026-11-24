@@ -98,6 +98,8 @@ export function NurBoard({ moeglich }: { moeglich: boolean }) {
     const taste_ = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
       if (tippt(e.target) || overlayOffen() || document.querySelector('[role="menu"]')) return;
+      // M514: In der Rahmen-Reise beendet Esc die Reise (components/RahmenReise.tsx) — sie stellt den Modus danach zurück
+      if (document.documentElement.hasAttribute('data-rahmen-reise')) return;
       e.preventDefault(); e.stopImmediatePropagation();
       nurBoardSetzen(false);
     };

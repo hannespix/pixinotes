@@ -106,8 +106,10 @@ self.addEventListener('fetch', (event) => {
       fetch(req)
         .then((res) => {
           // Nur echte Erfolge cachen — eine 404/500-Seite würde sonst die
-          // funktionierende Offline-Kopie der App ersetzen
-          if (res.ok) {
+          // funktionierende Offline-Kopie der App ersetzen. M513: und nur die
+          // App-Seite selbst — die Teilnehmer-Seite (mitmachen.html) darf sie
+          // nicht überschreiben.
+          if (res.ok && /\/(index\.html)?$/.test(new URL(req.url).pathname)) {
             const copy = res.clone();
             caches.open(CACHE).then((c) => c.put('./', copy));
           }

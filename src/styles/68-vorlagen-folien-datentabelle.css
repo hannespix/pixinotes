@@ -138,6 +138,9 @@
   background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--r, 8px);
 }
 .qr-knoepfe button:hover, .qr-knoepfe button:focus-visible { border-color: var(--accent); }
+/* M513: Mitmachen per QR an einer Ideabubbles-Karte — „beenden" ist die eine Aktion, die etwas abschaltet */
+.mit-blende .qr-knoepfe button.mit-ende { color: var(--warn-text); }
+.mit-blende .qr-knoepfe button.mit-ende:hover, .mit-blende .qr-knoepfe button.mit-ende:focus-visible { border-color: var(--warn-text); }
 /* Klein in der Ecke: bleibt über Board, Fokus und Präsentation stehen; ziehen verschiebt */
 .qr-blende.ecke {
   position: fixed; right: calc(14px + var(--app-rand, 0px)); bottom: calc(190px + var(--app-rand, 0px)); z-index: 140;
