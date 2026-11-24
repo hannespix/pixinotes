@@ -139,6 +139,7 @@ const spur = (P, id, n = 40) => P.evaluate(async ([id, n]) => {
   console.log('\n════ C: Ablegen auf dem Nachbarn – ein Schritt ════');
   await P.mouse.move(ueberB[0], ueberB[1], { steps: 8 }); await zappeln(P, ueberB[0], ueberB[1], 650);
   const bVorLos = await rahmen(P, 'b');
+  await zappeln(P, ueberB[0], ueberB[1], 150);   // M504: das Messen dauert unter Last womöglich länger als das Verweilen
   await P.mouse.up();
   const bNach = await spur(P, 'b', 20);
   const sprung = Math.max(...bNach.map((p) => Math.hypot(p[0] - bVorLos.x, p[1] - bVorLos.y)));

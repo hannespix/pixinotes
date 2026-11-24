@@ -74,6 +74,13 @@ const standBis = async (P, bed, ms = 8000) => {
   while (!bed(s) && Date.now() < bis) { await P.waitForTimeout(150); s = await knoten(P); }
   return s;
 };
+/** … und danach, bis der Stand eine Weile gleich bleibt (der Speicher schreibt auch mitten im Zug — die Lage der
+    gezogenen Karte steht dort schon, bevor das Ablegen die Nachbarn übernimmt) */
+const standRuhig = async (P, bed, ms = 8000) => {
+  let s = await standBis(P, bed, ms); let alt = JSON.stringify(s); const bis = Date.now() + ms;
+  for (let gleich = 0; gleich < 4 && Date.now() < bis;) { await P.waitForTimeout(200); s = await knoten(P); const neu = JSON.stringify(s); gleich = neu === alt ? gleich + 1 : 0; alt = neu; }
+  return s;
+};
 const griff = (P, id) => P.evaluate((id) => { const g = document.querySelector(`.react-flow__node[data-id="${id}"] .card-grip`) ?? document.querySelector(`.react-flow__node[data-id="${id}"]`); const r = g.getBoundingClientRect(); return [r.left + r.width / 2, r.top + Math.min(r.height / 2, 12)]; }, id);
 const leer = (P) => P.mouse.click(1420, 880).then(() => P.waitForTimeout(200));
 const markiert = (P) => P.evaluate(() => [...document.querySelectorAll('.react-flow__node[data-stapel-ziel]')].map((e) => e.getAttribute('data-id')));
@@ -108,8 +115,9 @@ const nah = (a, b, t = 1.5) => Math.abs(a.x - b.x) < t && Math.abs(a.y - b.y) < 
   const bA = await rahmen(P, 'b');
   pruefe('A1 über b gezogen (ohne stillzuhalten) weicht b aus', Math.hypot(bA.x - b0.x, bA.y - b0.y) > 40 * z, { b0: [b0.x, b0.y], bA: [bA.x, bA.y] });
   pruefe('A2 … keine Stapel-Markierung', (await markiert(P)).length === 0, await markiert(P));
+  await zappeln(P, ziel[0], ziel[1], 150);   // das Messen dauerte unter Last womöglich länger als das Verweilen
   await P.mouse.up();
-  let sA = await standBis(P, (s) => s.a.x !== s0.a.x);
+  let sA = await standRuhig(P, (s) => s.a.x !== s0.a.x && s.b.y !== s0.b.y);
   pruefe('A3 abgelegt: b bleibt beiseite, a liegt dort, wo sie losgelassen wurde (nicht im Stapel-Versatz)',
     Math.hypot(sA.b.x - s0.b.x, sA.b.y - s0.b.y) > 40 && Math.abs(sA.a.x - (s0.b.x + 50)) < 20 && Math.abs(sA.a.y - 30) < 20, sA);
   await leer(P);
@@ -198,7 +206,7 @@ const nah = (a, b, t = 1.5) => Math.abs(a.x - b.x) < t && Math.abs(a.y - b.y) < 
   const aE = await rahmen(P, 'a');
   await P.mouse.up();
   await P.keyboard.up('Alt');
-  const sE = await standBis(P, (s) => s.a.x !== s0.a.x);
+  const sE = await standRuhig(P, (s) => s.a.x !== s0.a.x);
   const erwartetX = s0.a.x + (aE.x - aD0.x) / z; const erwartetY = s0.a.y + (aE.y - aD0.y) / z;
   pruefe('E3 frei übereinander abgelegt: a liegt genau dort (über b), b unverändert',
     Math.abs(sE.a.x - erwartetX) < 10 && Math.abs(sE.a.y - erwartetY) < 10 && nah(sE.b, s0.b, 0.01) && sE.a.x > s0.b.x && sE.a.x < s0.b.x + 200, { a: sE.a, erwartet: [erwartetX, erwartetY] });
@@ -281,8 +289,13 @@ console.log('\n════ H: Einmal-Hinweis ════');
     await P.mouse.move(g[0], g[1], { steps: 8 }); await P.mouse.up();
     await P.waitForTimeout(500);
   };
-  await jagen();
   const hinweise = () => toasts.filter((t) => /kurz still/.test(t));
+  // Unter Last kann eine Pause zwischen zwei Mausbewegungen länger dauern als das Verweilen — dann wird b zum Ziel,
+  // und wer gestapelt hat, braucht den Hinweis nicht mehr (richtig so). Dann noch einmal von vorn.
+  for (let i = 0; i < 3 && hinweise().length === 0; i += 1) {
+    await P.evaluate(() => localStorage.removeItem('pixinotes-stapel-gelernt'));
+    await jagen();
+  }
   pruefe('H1 wer lange über b hin und her zieht, bekommt einmal den Hinweis aufs Stillhalten (und Alt)', hinweise().length >= 1 && /Alt/.test(hinweise()[0]), toasts);
   const n = hinweise().length;
   await jagen();
