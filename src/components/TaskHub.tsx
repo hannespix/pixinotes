@@ -2,6 +2,7 @@ import { tagLokal } from '../lib/tag';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { konfettiWerfen } from '../lib/konfetti';
 import { mutedHistory, useBoard } from '../store';
+import { fensterDarueber } from '../lib/overlay';
 import { ticketsSetzen } from '../lib/kanbanLive';
 import { liveVerbunden } from '../lib/liveStand';
 import { doneCol, kanbanCols, mitSpalte, openSubs, ticketBlockers, uid, type GanttData, type KanbanData } from '../types';
@@ -239,6 +240,8 @@ export function TaskHub() {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // M523: Liegt ein Fenster über der Zentrale (Einstellungen, Hilfe, Suche), gehört Esc ihm — vorher schloss ein Druck beides
+      if (fensterDarueber(null, e)) return;
       const t = e.target as HTMLElement;
       if (t.tagName === 'INPUT' || t.tagName === 'SELECT') { t.blur(); return; }
       setOpen(false);

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { sprache, spracheSetzen, zahlWort } from '../lib/sprache';
 import { brainStatus, rebuildBrainIndex, syncBrainIndex } from '../lib/brain';
 import { useBoard } from '../store';
+import { fensterDarueber } from '../lib/overlay';
 import { eigenerLook, eigenerLookSetzen, lookAusRoh, lookRohVon, lookWort } from '../lib/boardLook';
 import {
   connectGoogle, connectMicrosoft, disconnect as disconnectCalAccount,
@@ -183,6 +184,9 @@ export function Settings() {
     // ladeLokaleModelle hängt an denselben Werten wie die Bedingung oben
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, tab, ai.provider, ai.baseUrl, lokalGeprueft]);
+  // M523: Ein Reiterwechsel beginnt oben — der Rollstand des vorigen Reiters blieb stehen, der neue öffnete mittendrin
+  const koerper = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (koerper.current) koerper.current.scrollTop = 0; }, [tab]);
   // Direktsprung auf einen Reiter (z. B. „sync" vom Status-Chip in der Kopfleiste)
   const wantTab = useBoard((s) => s.settingsSection);
   useEffect(() => {
@@ -281,10 +285,12 @@ export function Settings() {
   const [filesTick, setFilesTick] = useState(0);   // erzwingt Neuanzeige nach Sichern/Laden
 
   // Esc schließt das Panel — wie überall sonst (Suche, TaskHub, Präsentation)
+  const huelle = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
+      // M523: nur, wenn kein anderes Fenster darüber liegt (Hilfe, Suche) — Esc schloss sonst beide auf einmal
+      if (e.key === 'Escape' && !fensterDarueber(huelle.current, e)) setOpen(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -680,7 +686,7 @@ export function Settings() {
   };
 
   return (
-    <div className="modal-backdrop" onClick={() => setOpen(false)}>
+    <div className="modal-backdrop" ref={huelle} onClick={() => setOpen(false)}>
       <div className="modal" role="dialog" aria-modal="true" aria-label="Einstellungen" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>Einstellungen</h2>
@@ -691,7 +697,7 @@ export function Settings() {
             angebundene Dienste zuletzt. */}
         <div className="modal-tabs">
           {TABS.map(([k, label]) => (
-            <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>
+            <button key={k} className={tab === k ? 'on' : ''} aria-pressed={tab === k} onClick={() => setTab(k)}>{label}</button>
           ))}
         </div>
 
@@ -699,7 +705,7 @@ export function Settings() {
             geschlossen (overflow: hidden). Dadurch kann keine Bildlaufleiste
             mehr über die abgerundeten Ecken laufen, und Kopfzeile samt
             Reitern bleiben immer stehen. */}
-        <div className="modal-body">
+        <div className="modal-body" ref={koerper}>
 
         {/* ---- Darstellung (M314: sechs Zeilen statt fünfzehn) ----
             Automatisch statt Option (Milchglas gibt es seit M315 gar nicht

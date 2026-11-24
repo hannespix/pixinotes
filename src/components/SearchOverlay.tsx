@@ -32,6 +32,7 @@ import { INetz } from './Icons';
 import { KartenSymbol } from './KartenSymbol';
 import { EINGANG_ID, eingangOeffnen, marke, ohneEingang } from '../lib/eingang';
 import { nurBoardSetzen } from '../lib/nurBoard';
+import { fensterDarueber } from '../lib/overlay';
 interface Hit {
   boardId: string;
   boardName: string;
@@ -87,7 +88,7 @@ function buildCommands(): Command[] {
     { label: 'Gemeinsam bearbeiten', hint: 'Andere per Link einladen – live im selben Board', alias: 'einladen teilen team gruppe gruppenarbeit zusammenarbeit freigeben freigabe share invite collaborate live link gast gäste',
       run: () => window.dispatchEvent(new CustomEvent('pixinotes:freigabe-oeffnen', { detail: {} })) },
     { label: 'Zur Übersicht', hint: 'Alle Bereiche, Projekte und Boards', alias: 'home start mission',
-      run: () => st().setView('overview') },
+      run: () => { st().setOverviewMode('hierarchie'); st().setTasksOpen(false); st().setView('overview'); } },   // M523: wie der Knopf — nicht ins zuletzt gezeigte Netz
     { label: 'Netz-Ansicht', hint: 'Boards als Graph', alias: 'graph netz verbindungen',
       run: () => { st().setOverviewMode('netz'); st().setView('overview'); } },
     { label: 'Aufgaben-Zentrale', hint: 'Alle offenen Aufgaben aller Boards', alias: 'tasks todo fristen',
@@ -150,6 +151,8 @@ export function SearchOverlay() {
         setQuery('');
         setCursor(0);
       } else if (e.key === 'Escape') {
+        // M523: nur die Suche selbst — liegt ein Fenster darüber (Einstellungen, Hilfe), gehört Esc ihm
+        if (fensterDarueber(document.querySelector('.search-backdrop'), e)) return;
         setOpen(false);
       }
     };
@@ -337,7 +340,13 @@ export function SearchOverlay() {
             if (e.key === 'ArrowUp') { e.preventDefault(); setCursor((c) => Math.max(c - 1, 0)); }
             // M206: Strg+Enter fragt das Gehirn, statt zum Treffer zu springen
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && canAsk) { e.preventDefault(); void ask(); return; }
-            if (e.key === 'Enter' && hits[cursor]) jump(hits[cursor]);
+            if (e.key === 'Enter' && hits[cursor]) { jump(hits[cursor]); return; }
+            // M523: Ohne Kartentreffer führt Enter den ersten Befehl aus bzw. öffnet das erste Board — vorher tat Enter
+            // dann nichts, Befehle waren mit der Tastatur nur über Tab zu erreichen
+            if (e.key === 'Enter' && !hits.length) {
+              if (commands[0]) { e.preventDefault(); setOpen(false); commands[0].run(); }
+              else if (boardHits[0]) { e.preventDefault(); setOpen(false); setView('board'); openBoard(boardHits[0].id); }
+            }
           }}
         />
         {canAsk && query.trim().length >= 3 && query.trim() !== '#' && (
@@ -392,10 +401,10 @@ export function SearchOverlay() {
             {commands.length > 0 && (
               <div className="search-cmds">
                 <div className="search-sem-head">⌘ Befehle</div>
-                {commands.map((c) => (
+                {commands.map((c, i) => (
                   <button
                     key={c.label}
-                    className="search-cmd"
+                    className={`search-cmd${!hits.length && i === 0 ? ' active' : ''}`}
                     title={c.hint}
                     onClick={() => { setOpen(false); c.run(); }}
                   >
@@ -410,10 +419,10 @@ export function SearchOverlay() {
             {boardHits.length > 0 && (
               <div className="search-cmds">
                 <div className="search-sem-head">Boards</div>
-                {boardHits.map((b) => (
+                {boardHits.map((b, i) => (
                   <button
                     key={b.id}
-                    className="search-cmd"
+                    className={`search-cmd${!hits.length && !commands.length && i === 0 ? ' active' : ''}`}
                     title="Board öffnen"
                     onClick={() => { setOpen(false); setView('board'); openBoard(b.id); }}
                   >

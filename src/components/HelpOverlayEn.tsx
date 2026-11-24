@@ -293,7 +293,7 @@ export function HilfeEn() {
               </ul>
               <h4>Board</h4>
               <ul>
-                <li>Dock <b>⋯ → “Clean up board”</b> arranges connected cards as a flow and the rest as a grid; Ctrl+Z restores everything. “Arrange &amp; background” offers variants, grid and tint.</li>
+                <li>Dock <b>⋯ → “Arrange &amp; background”</b> tidies the board: “Horizontal flow” arranges connected cards as a flow and the rest in groups, plus grid, compact, swim lanes, timeline and more; Ctrl+Z restores everything. Grid and tint are there too.</li>
                 <li><b>Ctrl+K</b> searches everywhere – including people, properties and #tags. <b>Ctrl+Z / Ctrl+Y</b> undo and redo.</li>
                 <li><b>Archiving:</b> card → ⋯ → “Archive”. Dock ⋯ → “Show archive” shows archived items dimmed; use “Restore” there.</li>
                 <li><b>Placing cards on top of each other:</b> While dragging, other cards make room. <b>Hold still</b> over a card for a moment to put the dragged one on top (stack); hold <b>Alt</b> and nothing makes room – the card lands freely.</li>
@@ -402,7 +402,7 @@ export function HilfeEn() {
               <h3>Tasks &amp; reminders</h3>
               <ul>
                 <li>Tasks come from everywhere: Kanban tickets, ☐ checklists in notes and Timeline tasks below 100 %.</li>
-                <li><b>in the dock</b> gathers everything across boards by due date: Overdue · Today · This week · Later · No due date. Check off, change the due date, +1T/+1W, change the column, calendar export.</li>
+                <li><b>Tasks</b> in the navigation (Alt+T) gathers everything across boards by due date: Overdue · Today · This week · Later · No due date. Check off, change the due date, +1T/+1W, change the column, calendar export.</li>
                 <li><b>Quick entry</b> understands “Bericht <b>bis Freitag @Anna #haushalt !!</b>”: due date, person, tag and priority (! low · !! medium · !!! high).</li>
                 <li>Tapping a row expands its tools; <b>› Details</b> opens the edit column.</li>
                 <li><b>My Day:</b> a hand-picked focus list for today. <b>Done today</b> logs what you checked off, with weekly bars.</li>

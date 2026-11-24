@@ -217,7 +217,11 @@ export function Dock() {
       e.stopPropagation();
       // M316: In der Palette leert Esc zuerst die Suche
       if (addMenu && suche) { setSuche(''); return; }
+      // M523: Der Fokus stand im Menü (Suchfeld der Palette) und fiel mit ihm ins Leere — zurück auf den Knopf
+      const knopf = dockRef.current?.contains(document.activeElement)
+        ? dockRef.current.querySelector<HTMLElement>('.dock-add-wrap > button[aria-expanded="true"]') : null;
       closeDockMenus();
+      knopf?.focus({ preventScroll: true });
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);

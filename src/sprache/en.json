@@ -1697,7 +1697,7 @@
 "Strg+K":"Ctrl+K",
 "durchsucht alles und führt Befehle aus.":"searches everything and runs commands.",
 "Loslegen":"Get started",
-"Du startest mit einem leeren Board. Die Einführung erscheint nur einmal; alles Weitere steht in der Hilfe: ein Klick auf das Logo oben links.":"You start with an empty board. This intro appears only once; everything else is in Help: click the logo at the top left.",
+"Du startest mit einem leeren Board. Die Einführung erscheint nur einmal; alles Weitere steht in der Hilfe: das Fragezeichen am Fuß der Navigation oder oben in der Leiste (Alt+H).":"You start with an empty board. This intro appears only once; everything else is in Help: the question mark at the bottom of the navigation or in the top bar (Alt+H).",
 "Es wurden keine Abschnitte gefunden – hat dieses Konto OneNote-Notizbücher?":"No sections were found – does this account have OneNote notebooks?",
 "Bitte mindestens einen Abschnitt auswählen.":"Please select at least one section.",
 "OneNote übernommen: {0} Board(s) mit {1} Seite(n)":"OneNote imported: {0} board(s) with {1} page(s)",
@@ -3822,4 +3822,8 @@
 "Als App installieren …":"Install as app …",
 "Eigenes Fenster, offline, im Startmenü – oder sehen, warum der Browser es nicht anbietet":"Its own window, offline, in the Start menu – or see why the browser doesn’t offer it",
 "app installieren install pwa startmenü startmenu taskleiste dock desktop home-bildschirm homescreen offline fenster verknüpfung shortcut":"install app pwa start menu taskbar dock desktop home screen homescreen offline window shortcut",
-"PixiNotes ist installiert – du findest die App im Startmenü, auf dem Home-Bildschirm oder im Dock.":"PixiNotes is installed – you’ll find the app in the Start menu, on the home screen or in the Dock."}
+"PixiNotes ist installiert – du findest die App im Startmenü, auf dem Home-Bildschirm oder im Dock.":"PixiNotes is installed – you’ll find the app in the Start menu, on the home screen or in the Dock.",
+"Der Link zum geteilten Board ist unvollständig oder beschädigt – bitte neu kopieren.":"The link to the shared board is incomplete or damaged – please copy it again.",
+"Das Geteilte ist nicht angekommen – bitte noch einmal teilen.":"The shared content did not arrive – please share it again.",
+"Rechtsklick":"Right-click",
+"wiederholen":"redo"}

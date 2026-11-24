@@ -59,10 +59,10 @@ export function Onboarding() {
             Beispiele laden
           </button>
         </div>
-        {/* M312: zwei Knöpfe statt drei — die Anleitung hängt ohnehin am Logo */}
+        {/* M312: zwei Knöpfe statt drei. M523: Die Hilfe hängt seit M412 am Fragezeichen, das Logo führt zur Übersicht */}
         <p className="onb-foot">
           Du startest mit einem leeren Board. Die Einführung erscheint nur einmal; alles Weitere
-          steht in der Hilfe: ein Klick auf das Logo oben links.
+          steht in der Hilfe: das Fragezeichen am Fuß der Navigation oder oben in der Leiste (Alt+H).
         </p>
       </div>
     </div>

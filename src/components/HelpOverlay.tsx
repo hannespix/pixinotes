@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useBoard } from '../store';
+import { fensterDarueber } from '../lib/overlay';
 import { KUERZEL, taste } from '../lib/tasten';
 import { MailLink } from './MailLink';
 import { sprache } from '../lib/sprache';
@@ -139,6 +140,8 @@ export function HelpOverlay() {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // M523: liegt ein anderes Fenster über der Hilfe (Einstellungen, Suche), gehört Esc ihm
+      if (fensterDarueber(document.querySelector('.help-modal')?.parentElement ?? null, e)) return;
       // Esc räumt erst die Suche, erst der zweite Druck schließt die Hilfe
       if (query) setQuery(''); else setOpen(false);
     };
@@ -491,7 +494,7 @@ export function HelpOverlay() {
               </ul>
               <h4>Board</h4>
               <ul>
-                <li>Dock <b>⋯ → „Board aufräumen"</b> ordnet Verbundenes als Fluss und den Rest als Raster; Strg+Z stellt alles wieder her. „Anordnen &amp; Hintergrund" bietet Varianten, Gitter und Tönung.</li>
+                <li>Dock <b>⋯ → „Anordnen &amp; Hintergrund"</b> räumt das Board auf: „Fluss horizontal" ordnet Verbundenes als Fluss und den Rest in Gruppen, dazu Raster, Kompakt, Schwimmbahnen, Zeitstrahl und weitere; Strg+Z stellt alles wieder her. Dort stehen auch Gitter und Tönung.</li>
                 <li><b>Strg+K</b> sucht überall – auch Personen, Eigenschaften und #Tags. <b>Strg+Z / Strg+Y</b> machen rückgängig und wiederholen.</li>
                 <li><b>Archivieren:</b> Karte → ⋯ → „Archivieren". Dock ⋯ → „Archiv einblenden" zeigt Archiviertes gedimmt; dort „Zurückholen".</li>
                 <li><b>Übereinander legen:</b> Beim Ziehen weichen andere Karten aus. Kurz über einer Karte <b>stillhalten</b> legt die gezogene darauf (Stapel); mit gedrückter <b>Alt</b>-Taste weicht nichts aus und die Karte landet frei.</li>
@@ -600,7 +603,7 @@ export function HelpOverlay() {
               <h3>Aufgaben &amp; Erinnerungen</h3>
               <ul>
                 <li>Aufgaben entstehen überall: Kanban-Tickets, ☐-Checklisten in Notizen und Zeitplan-Vorgänge unter 100 %.</li>
-                <li><b>im Dock</b> sammelt alles boardübergreifend nach Frist: Überfällig · Heute · Diese Woche · Später · Ohne Frist. Abhaken, Frist ändern, +1T/+1W, Spalte umstellen, Kalender-Export.</li>
+                <li><b>Aufgaben</b> in der Navigation (Alt+T) sammelt alles boardübergreifend nach Frist: Überfällig · Heute · Diese Woche · Später · Ohne Frist. Abhaken, Frist ändern, +1T/+1W, Spalte umstellen, Kalender-Export.</li>
                 <li>Die <b>Schnell-Eingabe</b> versteht „Bericht <b>bis Freitag @Anna #haushalt !!</b>": Frist, Person, Tag und Priorität (! niedrig · !! mittel · !!! hoch).</li>
                 <li>Antippen klappt die Werkzeuge einer Zeile auf; <b>› Details</b> öffnet die Bearbeiten-Spalte.</li>
                 <li><b>Mein Tag:</b> handverlesene Fokusliste für heute. <b>Heute geschafft</b> protokolliert Abgehaktes mit Wochen-Balken.</li>

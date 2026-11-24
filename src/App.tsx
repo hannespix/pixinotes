@@ -285,6 +285,16 @@ function imLeerlaufVorladen() {
     void import('./components/Gruppenraum').catch(() => null);
     void import('./lib/handschriftStruktur').catch(() => null);
     void import('./lib/brain').catch(() => null);
+    // M523: Einstellungen, Hilfe und die Dialoge der Leisten fehlten hier — ohne Netz ließ sich nach dem Start keines
+    // davon öffnen, und der gescheiterte Nachlade-Versuch riss die ganze Darstellung mit („lässt sich nicht anzeigen")
+    void import('./components/Settings').catch(() => null);
+    void import('./components/HelpOverlay').catch(() => null);
+    if (sprache() === 'en') void import('./components/HelpOverlayEn').catch(() => null);
+    void import('./components/VorlagenDialog').catch(() => null);
+    void import('./components/VersionenDialog').catch(() => null);
+    void import('./components/SicherungDialog').catch(() => null);
+    void import('./components/EingangFenster').catch(() => null);
+    void import('./components/AppInstallierenFenster').catch(() => null);
   };
   const ric = (window as Window & { requestIdleCallback?: (f: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
   window.setTimeout(() => (ric ? ric(los, { timeout: 4000 }) : los()), VORLADEN_NACH_MS);
@@ -429,8 +439,10 @@ export default function App() {
   // Geteiltes Board im URL-Hash? (#b=… — der Link IST die Datei)
   useEffect(() => {
     void (async () => {
+      const imLink = /^#b=/.test(location.hash);
       const shared = await readShareHash();
-      if (!shared) return;
+      // M523: Ein abgeschnittener oder beschädigter Link blieb stumm in der Adresse stehen — sagen, was los ist
+      if (!shared) { if (imLink) { clearShareHash(); useBoard.getState().showToast('Der Link zum geteilten Board ist unvollständig oder beschädigt – bitte neu kopieren.', false, 8000); } return; }
       clearShareHash();
       const st = useBoard.getState();
       if (window.confirm(`Geteiltes Board „${shared.name ?? 'Board'}" (${zahlWort(shared.nodes?.length ?? 0, 'Karte', 'Karten')}) übernehmen?`)) {
