@@ -40,6 +40,14 @@ Gemessen wurde die sichtbare Mitte der gezogenen Karte je Bild gegen den Zeiger 
   `d` nur, weil der Zeiger wandert — dann haftet sie (kein Nachziehen, sonst würde sie im schnellen Zug kaum
   einrasten). Der Versatz wird im Zeiger-Ereignis sofort geschrieben (kein Bild mit Sprung), der Bild-Rückruf lässt
   ihn abklingen.
+- **Nur gleiten, wo man den Sprung sähe:** Ist der Sprung höchstens halb so groß wie der Schritt des Zeigers in
+  diesem Ereignis (`rx`/`ry` in `Einrasten`), rastet die Karte direkt ein — sie bewegt sich dann zwischen dem halben
+  und dem anderthalbfachen Schritt, hält nie an und kehrt nie um. Grund (Trace wie M491, 200 Karten, 100
+  Verbindungen, Zug über das Raster der Karten, in dem fast jedes Ereignis die Fangstelle wechselt): Ein Gleiten bei
+  jedem Wechsel füllte die Bilder ZWISCHEN den Mausbewegungen mit Bewegung; jedes bewegte Bild zeichnet die
+  betroffenen Kanten neu und ordnet die Ebenen voll neu ein (`PaintArtifactCompositor::Update` 191 statt 85 Mal,
+  Layerize 1 543 statt 650 ms), die Bildzeit lag bei 33 statt 16,7 ms (m491 L1 rot). Mit der Regel: wie vorher.
+  Langsame Annäherung (wo man den Ruck sah) gleitet weiter.
 - **`--zieh-hub`** (1 gehoben … 0 flach, `HUB_TAU_MS` 40 ms) an der Karte; CSS (`34-praesentation.css`, „Ziehen"):
   `scale: calc(1 + (var(--zieh-skala) - 1) * var(--zieh-hub, 1))`, `rotate: calc(var(--zieh-neigung) * var(--zieh-hub, 1))`.
   Solange JS den Hub führt, trägt die Karte `data-hub` — dort ohne `scale`-Übergang (der liefe sonst jedes Bild neu
@@ -66,11 +74,16 @@ Gemessen wurde die sichtbare Mitte der gezogenen Karte je Bild gegen den Zeiger 
 |---|---|---|
 | größter Sprung beim Einrasten (je 16,7 ms) | 6,4 px | 2,3 px |
 | größter Sprung beim Lösen | 6,0 px | 2,3 px |
-| Neigung je Bild ab dem Einrasten | −5,3° → 0° (ein Bild) | −3,9 → −2,6 → −1,7 → −1,1 → −0,7 → … (Abfall ≤ 35 %) |
+| Neigung je Bild ab dem Einrasten | −5,3° → 0° (ein Bild) | −5,1 → −3,4 → −2,2 → −1,4 → −0,9 → … (Abfall ≤ 35 %) |
 | größter Sprung im Raster (Rasterweite 20 px) | 19 px | 7,2 px |
 | Kante ↔ sichtbare Karte beim Gleiten | — | ≤ 1,5 px je Bild |
+| 200 Karten, 100 Verbindungen, Trace: volle Ebenen-Neuordnung | 85–94 | wie vorher (nicht unter den größten Posten) |
 
 ## Grenzen / offen
+- Schnell gezogen rastet die Karte ohne Gleiten ein (siehe oben) — der Sprung geht in der Bewegung unter; Heben und
+  Neigung klingen auch dann weich ab.
+- Auf einen Stapel abgelegt (M504), während der Fang-Versatz noch gleitet: der Rest (≤ 6 Punkte) springt, bevor die
+  Karte auf den Stapel gleitet.
 - Mit „Bewegung beim Ziehen" aus (oder mehr als `ZIEH_HEBEN_MAX` gezogenen Karten) gibt es keinen Zug — dort rastet
   es weiter hart ein, wie vorher.
 - Rahmen (und Auswahlen mit Rahmen) rasten im Raster weiter über React Flow, hart: ihr Inhalt zieht über Deltas der
