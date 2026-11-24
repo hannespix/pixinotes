@@ -394,6 +394,16 @@ for (const [name, dunkel] of [['hell', false], ['dunkel', true]]) {
   const k = await kontrastScan(t.P, '.mit');
   pruefe(`I6 Kontrast Teilnehmer-Seite (${name}) ≥ 4,5:1`, k.length === 0, k.map(trefferZeile).join('\n'));
 }
+// Look des Boards im Link (M509): Thema und pix·el gelten auch auf einem hell eingestellten Telefon
+{
+  const t = await telefon('look', false, adresse2.replace('#', '#t=dark&d=pixel&'));
+  await t.P.waitForSelector('[data-taste="mit-liste"]', { timeout: 15000 }).catch(() => {});
+  const [th, de] = await t.P.evaluate(() => [document.documentElement.dataset.theme, document.documentElement.dataset.design]);
+  pruefe('I8 Mitgegebener Look (dunkel, pix·el) gilt auf der Teilnehmer-Seite', th === 'dark' && de === 'pixel', `${th} ${de}`);
+  const k = await kontrastScan(t.P, '.mit');
+  pruefe('I9 Kontrast im Look pix·el dunkel ≥ 4,5:1', k.length === 0, k.map(trefferZeile).join('\n'));
+  await t.P.screenshot({ path: path.join(BILDER, 'telefon-pixel-dunkel.png') });
+}
 pruefe('I7 Keine fremden Dienste', fremd.length === 0, fremd.slice(0, 5).join(', '));
 
 // ══ J ══

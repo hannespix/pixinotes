@@ -76,10 +76,12 @@ const en = /^en\b/i.test(navigator.language || '');
 const T = en ? EN : DE;
 document.documentElement.lang = en ? 'en' : 'de';
 
-// ───── Aussehen: Hell/Dunkel des Geräts, Look des Boards (pix·el) ─────
+// ───── Aussehen: Hell/Dunkel des Geräts — oder der Look, den das Board mitgibt (M509: Thema, pix·el, Akzent) ─────
+const linkFrueh = linkLesen(location.hash);
+if (linkFrueh?.akzent) document.documentElement.dataset.accent = linkFrueh.akzent;
 const dunkel = matchMedia('(prefers-color-scheme: dark)');
 const themaSetzen = () => {
-  document.documentElement.dataset.theme = dunkel.matches ? 'dark' : 'light';
+  document.documentElement.dataset.theme = linkFrueh?.thema ?? (dunkel.matches ? 'dark' : 'light');
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', getComputedStyle(document.body).backgroundColor || '#f3f4f6');
 };
 dunkel.addEventListener('change', themaSetzen);

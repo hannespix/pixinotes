@@ -54,8 +54,10 @@ export interface MitLink {
   token: string;
   /** Abdruck des öffentlichen Schlüssels des Gastgebers (SHA-256 des rohen P-256-Schlüssels, 16 Byte, base64url) */
   schluessel: string;
-  /** Look des Boards (M507) */
+  /** Look des Boards (M507/M509): Design, Hell/Dunkel (fehlt: wie das Gerät), Akzent */
   design?: 'pixel';
+  thema?: 'light' | 'dark';
+  akzent?: string;
   /** Server, falls er nicht der vorgegebene dieser Fassung ist */
   sb?: SupabaseKonfig;
 }
@@ -84,6 +86,8 @@ export function linkBauen(basis: string, l: MitLink): string {
   q.set('m', l.token);
   q.set('k', l.schluessel);
   if (l.design) q.set('d', l.design);
+  if (l.thema) q.set('t', l.thema);
+  if (l.akzent) q.set('f', l.akzent);
   if (l.sb) { q.set('u', l.sb.url); q.set('a', l.sb.key); }
   return `${basis}mitmachen.html#${q.toString()}`;
 }
@@ -95,7 +99,12 @@ export function linkLesen(hash: string): MitLink | null {
     if (!TOKEN_MUSTER.test(token) || !/^[A-Za-z0-9_-]{22}$/.test(schluessel)) return null;
     const u = q.get('u'); const a = q.get('a');
     const sb = u && a && /^https?:\/\//.test(u) ? { url: u.replace(/\/+$/, ''), key: a } : undefined;
-    return { token, schluessel, ...(q.get('d') === 'pixel' ? { design: 'pixel' as const } : {}), ...(sb ? { sb } : {}) };
+    const t = q.get('t'); const f = q.get('f') ?? '';
+    return {
+      token, schluessel, ...(q.get('d') === 'pixel' ? { design: 'pixel' as const } : {}),
+      ...(t === 'light' || t === 'dark' ? { thema: t } : {}), ...(/^(gruen|violett|orange|rosa)$/.test(f) ? { akzent: f } : {}),
+      ...(sb ? { sb } : {}),
+    };
   } catch { return null; }
 }
 export const standKanal = (token: string): string => `mit-${token}`;

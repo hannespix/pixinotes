@@ -57,7 +57,9 @@ export function BubblesQr({ karte, titel, m, onClose, buehneSetzen, beenden }: {
   karte: string; titel: string; m: MitmachenKarte; onClose: () => void; buehneSetzen: (an: boolean) => void; beenden: () => void;
 }) {
   const showToast = useBoard((s) => s.showToast);
-  const url = mitmachenLink(m);
+  const boardId = useBoard((s) => s.activeId);
+  useBoard((s) => s.boards.find((b) => b.id === s.activeId)?.look);
+  const url = mitmachenLink(m, boardId);
   const { dabei, verbunden } = useMitmachenStand(m.token);
   const hier = hierGastgeber(m.token, karte);
   useEffect(() => {
@@ -99,7 +101,9 @@ export function BubblesQr({ karte, titel, m, onClose, buehneSetzen, beenden }: {
 
 /** Der Code groß in der Karte (Bühne) — auf dem Board beim Teilen des Bildschirms und auf der Folie */
 export function MitmachenBuehne({ karte, titel, m, zu }: { karte: string; titel: string; m: MitmachenKarte; zu?: () => void }) {
-  const url = mitmachenLink(m);
+  const boardId = useBoard((s) => s.activeId);
+  useBoard((s) => s.boards.find((b) => b.id === s.activeId)?.look);
+  const url = mitmachenLink(m, boardId);
   const { dabei, verbunden } = useMitmachenStand(m.token);
   const hier = hierGastgeber(m.token, karte);
   return (

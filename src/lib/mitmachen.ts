@@ -7,6 +7,8 @@
 // Abgleich der Karte.
 import { supabaseKonfig, vorgabeSupabase } from './kontoSupabase';
 import { linkBauen, signierSchluessel, zufall, type MitLink } from './mitmachenProtokoll';
+import { lookAktiv } from './boardLook';
+import { useBoard } from '../store';
 
 export const MITMACHEN_KEY = 'pixinotes-mitmachen';
 /** Teilnehmerzahl oder Verbindung einer Runde hat sich geändert (detail: { token }) */
@@ -31,17 +33,32 @@ export function gemerktSetzen(m: Record<string, Gemerkt>): void {
 /** Ist dieses Gerät Gastgeber der Runde dieser Karte? */
 export const hierGastgeber = (token: string | undefined, karte: string): boolean => !!token && gemerkt()[token]?.karte === karte;
 
-/** Link zur Teilnehmer-Seite */
-export function mitmachenLink(m: Pick<MitmachenKarte, 'token' | 'k'>): string {
+/**
+ * Link zur Teilnehmer-Seite. Look: Gibt das Board einen Look mit (M509), reist er mit (Hell/Dunkel, Design, Akzent);
+ * sonst nur das Design dieses Geräts — Hell/Dunkel folgt dann dem Telefon.
+ */
+export function mitmachenLink(m: Pick<MitmachenKarte, 'token' | 'k'>, boardId?: string): string {
   const basis = /^https?:$/.test(location.protocol) ? `${location.origin}${location.pathname.replace(/[^/]*$/, '')}` : WEB_ADRESSE;
   const k = supabaseKonfig(); const v = vorgabeSupabase();
   const l: MitLink = {
     token: m.token, schluessel: m.k,
-    ...(document.documentElement.dataset.design === 'pixel' ? { design: 'pixel' as const } : {}),
+    ...lookFuerLink(boardId),
     // Server nur mitschicken, wenn er nicht der vorgegebene dieser Fassung ist (sonst wird der Code unnötig groß)
     ...(k.url && (k.url !== v.url || k.key !== v.key) ? { sb: k } : {}),
   };
   return linkBauen(basis, l);
+}
+
+function lookFuerLink(boardId: string | undefined): Pick<MitLink, 'design' | 'thema' | 'akzent'> {
+  const look = boardId ? useBoard.getState().boards.find((b) => b.id === boardId)?.look : undefined;
+  if (lookAktiv(look)) {
+    return {
+      ...(look.design === 'pixel' ? { design: 'pixel' as const } : {}),
+      ...(look.theme === 'light' || look.theme === 'dark' ? { thema: look.theme } : {}),
+      ...(look.design !== 'pixel' && look.accent && look.accent !== 'blau' ? { akzent: look.accent } : {}),
+    };
+  }
+  return document.documentElement.dataset.design === 'pixel' ? { design: 'pixel' } : {};
 }
 
 // ───── Teilnehmerzahl (vom Gastgeber gefüllt) ─────

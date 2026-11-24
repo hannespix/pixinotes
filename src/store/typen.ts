@@ -47,6 +47,14 @@ export interface Stroke {
   blockY?: number;
 }
 
+/** M509: Look eines geteilten Boards — nur bekannte Werte (lib/sicher.ts lookVonAussen) */
+export interface BoardLook {
+  aus?: boolean;
+  theme?: 'system' | 'light' | 'dark';
+  design?: 'klassisch' | 'pixel';
+  accent?: string;
+}
+
 /** Ebene 3: Ein Board = eine Leinwand voller Karten. */
 export interface BoardDoc {
   id: string;
@@ -56,6 +64,9 @@ export interface BoardDoc {
   drawings?: Stroke[];
   /** Dezente Hintergrund-Tönung (Palette-Schlüssel, M88) — fehlt ⇒ Standard */
   bg?: string;
+  /** M509: Look, den der Teilende dem Board mitgibt (Erscheinungsbild, Design, Akzent) — gilt bei Gästen für
+   *  dieses Board statt ihrer eigenen Geräte-Einstellung (lib/boardLook.ts); `aus` = bewusst keinen mitgeben */
+  look?: BoardLook;
   /** M330: Das Board gehört einem anderen PixiNotes-Konto (Nutzer-Id des Besitzers) und ist mit mir geteilt */
   geteiltVon?: string;
   /** M330: E-Mail des Besitzers — nur zur Anzeige */
@@ -386,6 +397,8 @@ export interface BoardState {
   renameBoard: (id: string, name: string) => void;
   /** Hintergrund-Tönung eines Boards setzen (undefined = Standard, M88) */
   setBoardBg: (id: string, bg: string | undefined) => void;
+  /** M509: Look des Boards setzen (undefined = keiner festgelegt) */
+  setBoardLook: (id: string, look: BoardLook | undefined) => void;
   /** Gitter anzeigen + Karten am Raster einrasten (persistiert, M88) */
   gridSnap: boolean;
   setGridSnap: (on: boolean) => void;

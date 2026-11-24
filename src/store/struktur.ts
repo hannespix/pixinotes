@@ -159,6 +159,9 @@ export function strukturScheibe(set: Setzen, get: Holen) {
     activeId: start.activeId,
     setBoardBg: (id, bg) =>
       set({ boards: get().boards.map((b) => (b.id === id ? { ...b, bg } : b)) }),
+    // M509: Look des Boards (beim Teilen mitgegeben) — wie der Hintergrund ein Feld des Boards, reist mit jedem Abgleich
+    setBoardLook: (id, look) =>
+      set({ boards: get().boards.map((b) => { if (b.id !== id) return b; const n = { ...b }; if (look) n.look = look; else delete n.look; return n; }) }),
 
     setView: (view) => set({ view }),
 
