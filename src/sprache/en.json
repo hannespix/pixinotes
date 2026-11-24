@@ -3696,4 +3696,11 @@
 "nur, wenn du es einschaltest":"only if you switch it on",
 "Dieses geteilte Board zeigt den Look des Teilenden (":"This shared board shows the look of the person sharing it (",
 "). Deine Auswahl gilt für deine eigenen Boards.":"). Your choice applies to your own boards.",
-"Dieses Board zeigt den Look des Teilenden ({0}).":"This board shows the look of the person sharing it ({0})."}
+"Dieses Board zeigt den Look des Teilenden ({0}).":"This board shows the look of the person sharing it ({0}).",
+"Menüs, Leisten, Rahmen und Anfasser ausblenden – nur das Board ({0}, Esc holt sie zurück)":"Hide menus, bars, frames and handles – just the board ({0}, Esc brings them back)",
+"Oberfläche ausblenden":"Hide interface",
+"Nur das Board zeigen – zum Teilen des Bildschirms; Esc holt sie zurück":"Show just the board – for sharing your screen; Esc brings the interface back",
+"nur board ui ausblenden menüs leisten verstecken bildschirm teilen übertragen sharing screen clean sauber vollbild zen":"only board ui hide menus bars toolbar chrome screen share sharing stream clean distraction free fullscreen zen",
+"Oberfläche einblenden ({0} oder Esc)":"Show interface ({0} or Esc)",
+"Oberfläche einblenden":"Show interface",
+"Oberfläche ausblenden – nur das Board; Esc holt sie zurück":"Hide interface – just the board; Esc brings it back"}
