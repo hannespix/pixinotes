@@ -92,9 +92,27 @@
 .timer-zeile-zeiten button:hover, .timer-zeile-zeiten button:focus-visible { border-color: var(--accent); color: var(--accent-strong); outline: none; }
 .timer-zeile-zeiten button.stopp { color: #c92a2a; }
 .timer-zeile-einheit { font-size: 11px; color: var(--muted); margin: 0 2px; }
+/* M512: freie Dauer — eine Zeile unter der Schnellwahl, darunter was verstanden wurde (oder warum nicht) */
+.timer-frei { flex-basis: 100%; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.timer-frei input {
+  flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--feld-rand); border-radius: var(--r-xs);
+  background: var(--surface-card); color: var(--ink); font: inherit; font-size: 12.5px; font-variant-numeric: tabular-nums;
+}
+.timer-frei input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.timer-frei input[aria-invalid="true"] { border-color: var(--warn-text); }
+.timer-frei button {
+  flex: none; height: 28px; padding: 0 10px; border: 1px solid var(--border-soft); border-radius: var(--r-xs);
+  background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer;
+}
+.timer-frei button:hover:not(:disabled), .timer-frei button:focus-visible { border-color: var(--accent); color: var(--accent-strong); outline: none; }
+.timer-frei button:disabled { cursor: default; color: var(--muted); }
+.timer-frei-info { flex-basis: 100%; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.timer-frei-info.fehler { color: var(--warn-text); }
 @media (pointer: coarse) {
   .live-liste-aktionen > button, .timer-zeile { min-height: 44px; }
-  .timer-zeile-zeiten button { min-width: 38px; height: 38px; }
+  .timer-zeile-zeiten button { min-width: 44px; height: 44px; }
+  .timer-frei input, .timer-frei button { height: 44px; font-size: 16px; }   /* 16 px: iOS zoomt sonst beim Antippen hinein */
+  .timer-frei button { min-width: 64px; }
   .live-zeile-knopf { width: 40px; height: 40px; }
 }
 /* M367: „Folgt mir" */
@@ -174,7 +192,7 @@ html[data-alles-zeigen] .punkte-leiste { display: none !important; }
   padding: 6px 8px 6px 12px; font-size: 12.5px; white-space: nowrap;
 }
 .gruppen-timer::after {
-  content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--anteil, 0%); background: var(--accent); transition: width .25s linear;
+  content: ''; position: absolute; left: 0; bottom: 0; height: 3px; width: var(--anteil, 0%); background: var(--accent); transition: width 1s linear;   /* M512: die Uhr springt einmal je Sekunde */
 }
 .gruppen-timer.im-vortrag { top: calc(10px + var(--safe-top)); }
 .gruppen-timer-zeit { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 2.6em; }
