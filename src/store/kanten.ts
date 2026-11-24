@@ -31,7 +31,10 @@ export function kantenScheibe(_set: Setzen, get: Holen, patchActive: AufsOffene)
       const pair = (consumer: string, sources: Set<string> | string = src) =>
         (t1 === consumer && (typeof sources === 'string' ? t2 === sources : sources.has(t2 ?? '')))
         || (t2 === consumer && (typeof sources === 'string' ? t1 === sources : sources.has(t1 ?? '')));
-      if ((t1 === 'kanban' && t2 === 'gantt') || (t1 === 'gantt' && t2 === 'kanban')) {
+      // M514: Von Rahmen zu Rahmen entsteht ein Rahmenpfeil — er legt die Reihenfolge der Rahmen-Reise fest
+      if (t1 === 'frame' && t2 === 'frame' && connection.source !== connection.target) {
+        get().showToast('Rahmenpfeil: legt die Reihenfolge fest – Doppelklick auf einen Rahmentitel präsentiert Rahmen für Rahmen.');
+      } else if ((t1 === 'kanban' && t2 === 'gantt') || (t1 === 'gantt' && t2 === 'kanban')) {
         get().showToast('Verbunden: Fristen werden Meilensteine, Vorgänge werden Tickets.');
       } else if (pair('kanban')) {
         get().showToast('Verbunden: Offene Punkte der Karte landen als Tickets im Kanban.');

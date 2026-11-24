@@ -53,6 +53,8 @@ export interface Zeiger {
   fokus: string | null;
   /** M387: aufgeklappte Dokument-Karten auf dem Board → offene Seite */
   dok: Record<string, number>;
+  /** M514: Rahmen, den der Vorführende in der Rahmen-Reise bildschirmfüllend zeigt (null = keine Reise) */
+  rahmen: string | null;
 }
 /**
  * M384: Eine Eingabe in einem Tool. `p` = Ort des Elements („#kennung" oder Weg von <body> aus), `a` = was geschah.
@@ -109,6 +111,7 @@ const meineRollen: Record<string, Roll> = {};
 let meineAnsicht: { karte: string; a: Ansicht } | null = null;
 let meinFokus: string | null = null;
 let meineDok: Record<string, number> = {};
+let meinRahmen: string | null = null;
 /** M387: Diese Vorführung hat die Präsentation von selbst begonnen — sie endet dann auch mit ihr */
 let mitVortrag = false;
 /** M384: letzter Wert je Feld und Tool — für alle, die später dazukommen (höchstens 150 Felder je Tool) */
@@ -160,7 +163,7 @@ export function vorfuehrenStart(boardId: string, ausVortrag = false): void {
   meinBoard = boardId; meinSeit = Date.now(); gesendet = '';
   const t = ichIn(boardId);
   mitVortrag = ausVortrag;
-  zeiger.set(boardId, { id: t.id, name: t.name, farbe: t.farbe, seit: meinSeit, zuletzt: Date.now(), sicht: { x: 0, y: 0, w: 0, h: 0 }, vortrag: vortragJetzt(), apps: [...meineApps], rollen: { ...meineRollen }, fokus: meinFokus, dok: { ...meineDok } });
+  zeiger.set(boardId, { id: t.id, name: t.name, farbe: t.farbe, seit: meinSeit, zuletzt: Date.now(), sicht: { x: 0, y: 0, w: 0, h: 0 }, vortrag: vortragJetzt(), apps: [...meineApps], rollen: { ...meineRollen }, fokus: meinFokus, dok: { ...meineDok }, rahmen: meinRahmen });
   melden(boardId);
 }
 /** Meine Stelle im Vortrag samt Ausschnitt (der gilt nur für die Folie, auf der er gemessen wurde) */
@@ -208,6 +211,7 @@ function standSenden(boardId: string, sofort = false): void {
   const stand = {
     sicht, ...(v ? { vortrag: v } : {}), ...(meineApps.size ? { apps: [...meineApps] } : {}), ...(Object.keys(meineRollen).length ? { rollen: meineRollen } : {}),
     ...(meinFokus ? { fokus: meinFokus } : {}), ...(Object.keys(meineDok).length ? { dok: meineDok } : {}),
+    ...(meinRahmen ? { rahmen: meinRahmen } : {}),
   };
   const text = JSON.stringify(stand);
   const jetzt = Date.now();
@@ -215,7 +219,7 @@ function standSenden(boardId: string, sofort = false): void {
   gesendet = text; gesendetAm = jetzt;
   const t = ichIn(boardId);
   const z = zeiger.get(boardId);
-  if (z) { z.sicht = sicht; z.zuletzt = jetzt; z.vortrag = v; z.apps = [...meineApps]; z.rollen = { ...meineRollen }; z.fokus = meinFokus; z.dok = { ...meineDok }; }
+  if (z) { z.sicht = sicht; z.zuletzt = jetzt; z.vortrag = v; z.apps = [...meineApps]; z.rollen = { ...meineRollen }; z.fokus = meinFokus; z.dok = { ...meineDok }; z.rahmen = meinRahmen; }
   liveSenden(boardId, 'zeig', { von: t.id, name: t.name, farbe: t.farbe, seit: meinSeit, ...stand });
 }
 /** Der Vorführende meldet seinen Ausschnitt (das Bauteil ruft das im Takt) */
@@ -252,6 +256,12 @@ export function ansichtMelden(boardId: string, karte: string, a: Ansicht): void 
 export function fokusMelden(boardId: string, karte: string | null): void {
   if (karte === meinFokus) return;
   meinFokus = karte;
+  if (meinBoard === boardId) standSenden(boardId, true);
+}
+/** M514: Rahmen der Rahmen-Reise (null = keine) — gemerkt wird er immer, gesendet, solange ich vorführe */
+export function rahmenMelden(boardId: string, rahmen: string | null): void {
+  if (rahmen === meinRahmen) return;
+  meinRahmen = rahmen;
   if (meinBoard === boardId) standSenden(boardId, true);
 }
 /** M387: aufgeklappte Dokument-Karten und ihre offene Seite */
@@ -403,7 +413,7 @@ export function initVorfuehren(): void {
       return;
     }
     if (d?.ereignis !== 'zeig') return;
-    const m = d.inhalt as { von?: unknown; name?: unknown; farbe?: unknown; seit?: unknown; ende?: unknown; sicht?: Partial<Sicht>; vortrag?: Partial<Vortrag>; apps?: unknown; rollen?: unknown; fokus?: unknown; dok?: unknown } | undefined;
+    const m = d.inhalt as { von?: unknown; name?: unknown; farbe?: unknown; seit?: unknown; ende?: unknown; sicht?: Partial<Sicht>; vortrag?: Partial<Vortrag>; apps?: unknown; rollen?: unknown; fokus?: unknown; dok?: unknown; rahmen?: unknown } | undefined;
     if (typeof m?.von !== 'string' || typeof m.seit !== 'number') return;
     // M388: Vorführen kann nur, wer im Board anwesend ist — und nicht „seit übermorgen": Mit einer Zeit in der
     // Zukunft ließe sich die Vorführung sonst dauerhaft an sich reißen (es führt vor, wer zuletzt begonnen hat).
@@ -435,6 +445,7 @@ export function initVorfuehren(): void {
       rollen: rollenAus(m.rollen),
       fokus: typeof m.fokus === 'string' && m.fokus.length <= 80 ? m.fokus : null,
       dok: dokAus(m.dok),
+      rahmen: typeof m.rahmen === 'string' && m.rahmen.length <= 80 ? m.rahmen : null,
     });
     melden(d.boardId);
   });

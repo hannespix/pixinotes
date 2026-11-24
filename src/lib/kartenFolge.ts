@@ -50,8 +50,8 @@ export function leseFolge<T extends AppNode>(ns: T[]): T[] {
   return zeilen(ns.map((n) => { const m = mass(n); return { n, oben: n.position.y, unten: n.position.y + m.h, h: m.h, x: n.position.x }; })).flat().map((k) => k.n);
 }
 
-/** Zeigt die Verbindung in eine Richtung? `null`: nein (keine oder zwei Spitzen) */
-function richtung(e: Edge): { von: string; nach: string } | null {
+/** Zeigt die Verbindung in eine Richtung? `null`: nein (keine oder zwei Spitzen) — M514: auch für die Rahmen-Reise */
+export function richtung(e: Edge): { von: string; nach: string } | null {
   const d = (e.data ?? {}) as { kind?: string; head?: boolean; headStart?: boolean };
   const vorn = typeof d.head === 'boolean' ? d.head : d.kind !== 'line';
   const hinten = d.headStart === true;
