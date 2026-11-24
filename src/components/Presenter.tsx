@@ -16,7 +16,7 @@ import { GanttBody } from './nodes/GanttCard';
 import { CalendarBody } from './nodes/CalendarCard';
 import { dokumentArt } from '../lib/dokumentArt';
 import { letzteSeite } from '../lib/pdfSeiten';
-import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, KanbanNode, MermaidNode, MinutesNode, NoteNode, PixiNode, ShapeNode, SheetNode, TimeNode, WeekNode } from '../types';
+import type { AppNode, BubblesNode, CalendarNode, FileNode, GanttNode, HtmlAppNode, ImageNode, KanbanNode, MermaidNode, MinutesNode, NoteNode, PixiNode, ShapeNode, SheetNode, TimeNode, WeekNode } from '../types';
 import { HtmlAppSlide } from './nodes/HtmlAppCard';
 import { useRandLeiste } from '../lib/randLeiste';
 import { ReinRand, useReinAnsicht } from '../lib/reinAnsicht';
@@ -192,6 +192,26 @@ function MermaidSlide({ node }: { node: MermaidNode }) {
   );
 }
 
+/**
+ * M508: Ist das Bild einer Bild-Karte eine Vektorgrafik? SVGs haben keine feste Größe in Pixeln (oft nur eine viewBox
+ * oder eine Breite in Prozent) – als <img> mit der 600-Punkte-Grenze der Bild-Folien wurden sie unsichtbar klein
+ * (ohne Größenangabe 0 × 0) oder hingen 600 Punkte breit am linken Rand (breiter als 600 Punkte angegeben).
+ */
+function istSvgBild(src: string, name = ''): boolean {
+  return /^data:image\/svg\+xml[;,]/i.test(src) || /\.svg(?:[?#]|$)/i.test(src.split(/[?#]/)[0] ?? '') || (!src.startsWith('data:') && /\.svg$/i.test(name));
+}
+
+/** M508: Vektorgrafik auf der Folie – mittig und so groß, wie die Folie es bei gleichem Seitenverhältnis zulässt.
+ *  Als <img> (nie eingebettet): ein SVG führt so kein Skript aus und lädt nichts nach, egal woher es kommt. */
+function SvgFolie({ node }: { node: ImageNode }) {
+  const d = node.data;
+  return (
+    <div className="slide-svg" translate="no" data-taste="folie-svg">
+      <img src={d.src} alt={d.titel?.trim() || d.name || 'Bild'} draggable={false} />
+    </div>
+  );
+}
+
 /** Eine Folie: editierbar wo möglich, sonst sicher serialisiertes HTML */
 function SlideContent({ node }: { node: AppNode }) {
   switch (node.type) {
@@ -275,6 +295,12 @@ function SlideContent({ node }: { node: AppNode }) {
     case 'htmlapp':
       // M371: Tools und Webseiten laufen auf der Folie wirklich (vorher: ein Standbild mit dem Namen)
       return <HtmlAppSlide node={node as HtmlAppNode} />;
+    case 'image': {
+      // M508: Vektorgrafiken füllen die Folie (mittig, Seitenverhältnis bleibt); Fotos bleiben wie bisher
+      const d = (node as ImageNode).data;
+      if (typeof d.src === 'string' && istSvgBild(d.src, d.name)) return <SvgFolie node={node as ImageNode} />;
+      return <div translate="no" dangerouslySetInnerHTML={{ __html: nodeToHtml(node) }} />;
+    }
     default:
       // E-Mail/Bild/Datei: Rendering über den escapenden Serializer — fremde Inhalte bleiben inert
       return <div translate="no" dangerouslySetInnerHTML={{ __html: nodeToHtml(node) }} />;
