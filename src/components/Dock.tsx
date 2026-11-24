@@ -21,7 +21,7 @@ import { selectActiveBoard } from '../store';
 import { uid, type AppNode, type ShapeKind } from '../types';
 import { arrangeQuadrantFull, computeArrangement, findFreeSpot, type ArrangeMode } from '../lib/arrange';
 import {
-  IAppWindow, IArrange, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
+  IAppWindow, IArrange, IInstallieren, IBookmark, ICalendar, ICircles, ICompact, IDiagram, IDiamond, IDownload, IEraser, IFlowH, IFlowV,
   IFolder, IFrame, IGantt, IGridLayout, IGridSnap, IHighlighter, IKanban, ILanes, IMinutes, IMore, IMousePointer, INote,
   ICopy, IImage, IMail, IPaperclip, IPen, IPill, IPlay, IPlus, IQuadrant, ISearch, ISigma, ISquare, IStack, ITimelineIcon, ITimer, IWand, IWeek, IX,
  IBubbles , IUsers, IArchive, IFolien, IUhr, IPerson, IFluessig, IPixi
@@ -30,6 +30,7 @@ import { ablageNehmen, ablageVerwerfen } from '../lib/kontextmenue';
 import { t } from '../lib/sprache';
 import { taste } from '../lib/tasten';
 import { nurBoardSetzen } from '../lib/nurBoard';
+import { appInstallieren } from '../lib/appInstallieren';
 
 /**
  * Das Werkzeug-Dock — drei Knöpfe: ＋ öffnet die Modul-Palette (M316: alle
@@ -647,6 +648,15 @@ export function Dock() {
                 <IArchive size={16} /> {showArchived ? 'Archiv ausblenden' : `Archiv einblenden (${archivZahl})`}
               </button>
             )}
+            {/* M516: Installieren als Eintrag statt eigener Knopf — ruft den Dialog des Browsers oder erklärt, warum er fehlt */}
+            <button
+              onClick={() => { setMoreMenu(false); void appInstallieren(); }}
+              data-taste="dock-app-installieren"
+              title="PixiNotes als App installieren – eigenes Fenster, offline, im Startmenü"
+              aria-label="Als App installieren"
+            >
+              <IInstallieren size={16} /> Als App installieren …
+            </button>
           </div>
         )}
         {aiMenu && (

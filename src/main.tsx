@@ -25,6 +25,7 @@ import { initUebersetzung } from './lib/uebersetzung';
 import { initSprache, sprache } from './lib/sprache';
 import { alteNamenOhneEmoji, startNamenAufEnglisch } from './store';
 import { fensterFokusStarten } from './lib/fensterFokus';
+import { appInstallierenStarten } from './lib/appInstallieren';
 
 // OAuth-Popup-Rücksprung (Kalender-Konten): Diese Seite dient dann nur als
 // Redirect-Ziel — Code ans Hauptfenster melden, App gar nicht erst rendern.
@@ -43,6 +44,8 @@ window.addEventListener('vite:preloadError', () => {
 });
 
 if (!handleOAuthRedirect()) {
+  // M516: Das Angebot des Browsers („beforeinstallprompt") kommt früh und nur einmal — ab jetzt aufheben
+  appInstallierenStarten();
   // M389: Fokus-Führung für alle Fenster (hinein beim Öffnen, Tab im Kreis, zurück beim Schließen)
   fensterFokusStarten();
   // M211: Tastaturhöhe als CSS-Variable — VOR dem Rendern, damit die

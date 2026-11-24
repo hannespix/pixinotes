@@ -12,6 +12,7 @@ import {
 import { initAutoSync } from './lib/syncFolder';
 import { EIGENER_LOOK_EREIGNIS, eigenerLook, eigenerLookSetzen, hinweisEinmal, lookAnders, lookAusRoh, lookRohVon, lookWort, wirksamerLook } from './lib/boardLook';
 import { sicherungStartFaellig, SICHERUNG_EREIGNIS } from './lib/sicherungTakt';
+import { APP_INSTALLIEREN_EREIGNIS } from './lib/appInstallieren';
 import { initProjectAutoSync } from './lib/projectSync';
 import { cleanupOrphanHtml } from './lib/htmlStore';
 import { cleanupOrphanFiles } from './lib/fileStore';
@@ -125,6 +126,18 @@ function SicherungEinspielen() {
     return () => window.removeEventListener(SICHERUNG_EREIGNIS, auf);
   }, []);
   return offen ? <Suspense fallback={null}><SicherungDialogLazy key={offen.datei?.name ?? '-'} datei={offen.datei} onClose={() => setOffen(null)} /></Suspense> : null;
+}
+
+/** M516: Die Diagnose „Als App installieren" kommt erst, wenn der Browser kein Angebot gemacht hat und jemand fragt */
+const AppInstallierenLazy = lazy(() => import('./components/AppInstallierenFenster').then((m) => ({ default: m.AppInstallierenFenster })));
+function AppInstallieren() {
+  const [offen, setOffen] = useState(false);
+  useEffect(() => {
+    const auf = () => setOffen(true);
+    window.addEventListener(APP_INSTALLIEREN_EREIGNIS, auf);
+    return () => window.removeEventListener(APP_INSTALLIEREN_EREIGNIS, auf);
+  }, []);
+  return offen ? <Suspense fallback={null}><AppInstallierenLazy onClose={() => setOffen(false)} /></Suspense> : null;
 }
 
 /** M466: Das Outlook-Fenster (Microsoft Graph) kommt erst mit dem ersten Aufruf — Strg+K „Outlook" oder ＋ → Outlook */
@@ -638,6 +651,7 @@ export default function App() {
       <Qr />
       <Versionen />
       <SicherungEinspielen />
+      <AppInstallieren />
       <Outlook />
       <Eingang />
       <BildExportFenster />

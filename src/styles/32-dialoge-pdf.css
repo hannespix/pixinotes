@@ -68,6 +68,15 @@
 .themen-karten { font-size: 12px; color: var(--muted); line-height: 1.45; margin: 4px 0 0 26px; }
 .themen-dialog .modal-buttons button.primaer { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; font-weight: 600; }
 .themen-dialog .modal-buttons button.primaer:hover:not(:disabled) { background: var(--accent-fill); border-color: var(--accent-fill); filter: brightness(1.07); }
+/* M516: Als App installieren — Diagnose (components/AppInstallierenFenster.tsx) */
+.app-installieren { width: min(520px, calc(100vw - 24px)); }
+.app-installieren-lage { margin: 0 0 8px; font-size: 14px; color: var(--ink); }
+.app-installieren-h { margin: 14px 0 6px; font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.app-installieren-schritte, .app-installieren-gruende { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.45; color: var(--ink); }
+.app-installieren-schritte li + li, .app-installieren-gruende li + li { margin-top: 4px; }
+.app-installieren .modal-buttons { justify-content: flex-end; margin-top: 14px; }
+.app-installieren .modal-buttons .link-btn { margin-right: auto; border: none; background: none; }
+.app-installieren .modal-buttons button.primaer { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; font-weight: 600; }
 /* M300: Seg-Schalter (Erscheinungsbild, Anzeigegröße, Sync-Weg, Obergrenze …) —
    vorher trugen die Knöpfe die Klasse, aber keine Regel: Der aktive Zustand
    war unsichtbar. */
