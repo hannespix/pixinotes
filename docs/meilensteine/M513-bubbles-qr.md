@@ -1,5 +1,5 @@
 # M513 — Ideabubbles einzeln per QR-Code teilen (Mitmachen ohne ganzes Board)
-PR: #… · Prüfreihe: `pruefungen/m513-bubbles-qr.mjs` (Port 5513) · Datum: 2026-11-24
+PR: #204 · Prüfreihe: `pruefungen/m513-bubbles-qr.mjs` (Port 5513) · Datum: 2026-11-24
 
 ## Warum
 Nutzerwunsch: „bei Idea-Bubbles bitte auch direkt in der Idea-Bubble eine Share-Möglichkeit per QR-Code einbauen.
