@@ -26,6 +26,7 @@ const uf = new uFuzzy({
 import type { AppNode } from '../types';
 import { t, zahlWort } from '../lib/sprache';
 import { sicherungEinspielenOeffnen } from '../lib/sicherungTakt';
+import { appInstallieren } from '../lib/appInstallieren';
 
 import { INetz } from './Icons';
 import { KartenSymbol } from './KartenSymbol';
@@ -118,6 +119,9 @@ function buildCommands(): Command[] {
       run: () => { void import('../lib/sicherung').then((m) => m.boardSichern(st().activeId)); } },
     { label: 'Sicherung einspielen', hint: 'Eine .pixinotes-Datei als Kopie hinzufügen oder Vorhandenes ersetzen', alias: 'sicherung einspielen backup laden wiederherstellen import datei restore',
       run: () => sicherungEinspielenOeffnen() },
+    // M516: Installieren — Dialog des Browsers, sonst Diagnose mit Anleitung
+    { label: 'Als App installieren', hint: 'Eigenes Fenster, offline, im Startmenü – oder sehen, warum der Browser es nicht anbietet', alias: 'app installieren install pwa startmenü startmenu taskleiste dock desktop home-bildschirm homescreen offline fenster verknüpfung shortcut',
+      run: () => { void appInstallieren(); } },
     { label: 'Einstellungen', hint: 'KI, Sync, Design, Daten', alias: 'settings optionen ki sync',
       run: () => st().setSettingsOpen(true) },
     { label: 'Hilfe', hint: 'Anleitung zu allen Funktionen', alias: 'help anleitung',
