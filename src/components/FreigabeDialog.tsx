@@ -13,6 +13,7 @@ import { einladungDesBoards, einladungLoeschen, EinladungNichtEingerichtet, einl
 import { gastVerlassen, kontoKanaele, rechtAus, sicherungVon, sicherungZurueck } from '../lib/gastSync';
 import { gruppeVon, type GastRecht } from '../store';
 import { IX } from './Icons';
+import { eigenerLook, eigenerLookSetzen, lookAktiv, lookAusUi, lookWort } from '../lib/boardLook';
 
 // M459: Ereignis und Host liegen in FreigabeHost.tsx (im Start), dieser Dialog kommt beim ersten Öffnen
 export { FREIGABE_OEFFNEN, FreigabeHost } from './FreigabeHost';
@@ -51,6 +52,20 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
   const perLink = !!board?.gastLink;   // M364: ohne Konto per Link eingewählt
   const nurLesen = board?.geteiltRolle === 'lesen';
   const mailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail.trim());
+  // M509: Look des Boards — der Teilende gibt seinen mit (Vorgabe an), Gäste können für sich darauf verzichten
+  const ui = useBoard((s) => s.ui);
+  const setBoardLook = useBoard((s) => s.setBoardLook);
+  const [eigenLook, setEigenLook] = useState(() => eigenerLook(boardId));
+  const lookAn = !board?.look?.aus;
+  const geteiltWird = !!link && link !== 'fehlt' || !!liste?.length;
+  useEffect(() => {
+    // Beim Erstellen/Öffnen einer Freigabe: den aktuellen Look mitgeben (oder auffrischen), außer er ist abgeschaltet
+    if (gast || !eigenesKonto || !board || board.look?.aus || !geteiltWird) return;
+    const neu = lookAusUi(ui);
+    const l = board.look;
+    if (!l || l.theme !== neu.theme || l.design !== neu.design || l.accent !== neu.accent) setBoardLook(boardId, neu);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geteiltWird, boardId]);
 
   const laden = async () => {
     try { setListe(await freigabenDesBoards(boardId)); setFehler(''); } catch (e) { setFehler((e as Error).message); setListe([]); }
@@ -182,6 +197,12 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                 ) : (
                   <p className="modal-hint">„<span translate="no">{board.name}</span>" gehört <b translate={board.geteiltVonName ? 'no' : undefined}>{board.geteiltVonName ?? 'einem anderen Konto'}</b> und ist für dich freigegeben. Ihr arbeitet live auf demselben Stand; gleichzeitige Änderungen werden zusammengeführt.</p>
                 )}
+                {lookAktiv(board.look) && (
+                  <div className="freigabe-zeile look" data-taste="look-gast">
+                    <span>{eigenLook ? 'Du siehst das Board in deinem eigenen Look.' : <>Das Board zeigt den Look des Teilenden: <span className="look-wort">{lookWort(board.look)}</span>.</>}</span>
+                    <button onClick={() => { eigenerLookSetzen(boardId, !eigenLook); setEigenLook(!eigenLook); }} data-taste="look-eigen">{eigenLook ? 'Look des Boards verwenden' : 'Eigenen Look verwenden'}</button>
+                  </div>
+                )}
                 <div className="modal-buttons">
                   <button disabled={busy} onClick={verlassen} data-taste="freigabe-verlassen">{busy ? '…' : perLink ? 'Board verlassen' : 'Freigabe verlassen'}</button>
                 </div>
@@ -258,6 +279,11 @@ export function FreigabeDialog({ boardId, onClose }: { boardId: string; onClose:
                     )}
                   </div>
                 )}
+                {/* M509: erst sichtbar, wenn geteilt wird — vorher bleibt der Dialog bei einem Knopf (M391) */}
+                {geteiltWird && <label className="freigabe-schalter look" data-taste="look-mitgeben">
+                  <input type="checkbox" checked={lookAn} onChange={(e) => setBoardLook(boardId, e.target.checked ? lookAusUi(ui) : { aus: true })} data-taste="look-mitgeben-schalter" />
+                  <span><b>Look mitgeben</b> – Gäste sehen das Board in <span className="look-wort" data-taste="look-wort">{lookWort(lookAn && board.look && lookAktiv(board.look) ? board.look : lookAusUi(ui))}</span>{lookAn ? '' : ' nur, wenn du es einschaltest'}</span>
+                </label>}
                 <details className="freigabe-mehr" data-taste="freigabe-person" open={link === 'fehlt' || !!liste?.length || undefined}>
                   <summary>{liste?.length ? `Einzelne Personen (${liste.length})` : 'Einzelne Person per E-Mail einladen'}</summary>
                   <div className="freigabe-zeile">
