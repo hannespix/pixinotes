@@ -3681,4 +3681,14 @@
 "Halte die Karte kurz still, dann legt sie sich auf die andere (Stapel). Mit Alt weicht nichts aus.":"Hold the card still for a moment and it goes on top of the other one (stack). Hold Alt and nothing makes room.",
 "Halte die Karte kurz still, dann legt sie sich auf die andere (Stapel).":"Hold the card still for a moment and it goes on top of the other one (stack).",
 "Hinweis ganz zeigen":"Show the full notice",
-"Hinweis verkleinern":"Shrink the notice"}
+"Hinweis verkleinern":"Shrink the notice",
+"Du siehst das Board in deinem eigenen Look.":"You see the board in your own look.",
+"Das Board zeigt den Look des Teilenden:":"The board shows the look of the person sharing it:",
+"Look des Boards verwenden":"Use the board's look",
+"Eigenen Look verwenden":"Use my own look",
+"Look mitgeben":"Pass on look",
+"– Gäste sehen das Board in":"– guests see the board in",
+"nur, wenn du es einschaltest":"only if you switch it on",
+"Dieses geteilte Board zeigt den Look des Teilenden (":"This shared board shows the look of the person sharing it (",
+"). Deine Auswahl gilt für deine eigenen Boards.":"). Your choice applies to your own boards.",
+"Dieses Board zeigt den Look des Teilenden ({0}).":"This board shows the look of the person sharing it ({0})."}
