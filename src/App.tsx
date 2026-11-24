@@ -366,13 +366,18 @@ export default function App() {
       const dark = ui.theme === 'dark' || (ui.theme === 'system' && mq.matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
       document.documentElement.dataset.accent = ui.accent;
+      // M507: Design „pix·el" – eigener Token-Satz und Pixel-Kanten (styles/90-design-pixel.css). Klassisch trägt
+      // KEIN Attribut: so bleibt jede Regel für Klassisch genau wie vorher.
+      const pixel = ui.design === 'pixel';
+      if (pixel) document.documentElement.dataset.design = 'pixel';
+      else delete document.documentElement.dataset.design;
       let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null;
       if (!meta) {
         meta = document.createElement('meta');
         meta.name = 'theme-color';
         document.head.appendChild(meta);
       }
-      meta.content = dark ? '#141618' : '#f3f4f6';
+      meta.content = pixel ? (dark ? '#0c170b' : '#f6f7ef') : dark ? '#141618' : '#f3f4f6';
     };
     apply();
     mq.addEventListener('change', apply);
