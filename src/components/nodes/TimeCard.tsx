@@ -2,6 +2,7 @@ import { tagLokal } from '../../lib/tag';
 import { useEffect, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
+import { useKartenAnsicht } from '../../lib/kartenAnsicht';
 import { uid, type TimeData, type TimeNode, type TimeSeg, type WeekData } from '../../types';
 import { fmtDiff, linkedOfType, sollForDate } from '../../lib/moduleFeeds';
 import { CardShell } from './CardShell';
@@ -24,7 +25,8 @@ const kindColor = (k: TimeSeg['kind']) => KINDS.find(([key]) => key === k)?.[2] 
 /** Ansichtsmodi (M161): Tag = editierbares Protokoll, Woche/Monat/Jahr =
  *  verdichtete Summen mit Absprung in die jeweils feinere Ebene */
 type TimeView = 'tag' | 'woche' | 'monat' | 'jahr';
-const VIEWS: Array<[TimeView, string]> = [['tag', 'Tag'], ['woche', 'Woche'], ['monat', 'Monat'], ['jahr', 'Jahr']];
+// M520: Der Hinweis am Knopf steht ausgeschrieben da — zusammengesetzt aus „Wort + es-Ansicht" hieß er „Wochees-Ansicht"
+const VIEWS: Array<[TimeView, string, string]> = [['tag', 'Tag', 'Tagesansicht'], ['woche', 'Woche', 'Wochenansicht'], ['monat', 'Monat', 'Monatsansicht'], ['jahr', 'Jahr', 'Jahresansicht']];
 
 const todayIso = () => tagLokal();   // M388: nach der Uhr des Geräts, nicht nach Weltzeit
 const nowMin = () => { const d = new Date(); return d.getHours() * 60 + d.getMinutes(); };
@@ -57,7 +59,10 @@ const mondayOf = (iso: string): string => {
   return addDaysIso(iso, -off);
 };
 const isoWeekNo = (iso: string): number => {
-  const d = new Date(`${iso}T12:00:00Z`);
+  // M520: ab Mitternacht (UTC) rechnen, nicht ab Mittag. Der halbe Tag schob die Woche um eins weiter, sobald der
+  // Donnerstag der Woche auf einen durch 7 teilbaren Tag des Jahres fällt — also in jedem Jahr, das an einem Freitag
+  // beginnt (2027, 2038 …): Dort hieß die Woche vom 4. Januar „KW 2", und so das ganze Jahr hindurch.
+  const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
   const y0 = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil(((d.getTime() - y0.getTime()) / 864e5 + 1) / 7);
@@ -90,8 +95,10 @@ export function TimeCard({ id, data, selected }: NodeProps<TimeNode>) {
 }
 
 /** M380: Der Inhalt ohne Kartenhülle — derselbe auf dem Board und als Folie in der Präsentation */
-export function TimeBody({ id, data }: { id: string; data: TimeData }) {
-  const updateNodeData = useBoard((s) => s.updateNodeData);
+/** M520: nur Ansicht — gilt in einem Board, das man nicht ändern darf, lokal (lib/kartenAnsicht.ts) */
+const ZEIT_ANSICHT = ['view'] as const;
+export function TimeBody({ id, data: daten }: { id: string; data: TimeData }) {
+  const [data, updateNodeData] = useKartenAnsicht(id, daten, ZEIT_ANSICHT);
   const showToast = useBoard((s) => s.showToast);
   const [day, setDay] = useState(todayIso());
   const view: TimeView = (data.view as TimeView) ?? 'tag';
@@ -247,8 +254,8 @@ export function TimeBody({ id, data }: { id: string; data: TimeData }) {
           {notToday && <button className="time-today" onClick={() => setDay(todayIso())}>Heute</button>}
           <span className="time-flex" />
           <span className="time-views">
-            {VIEWS.map(([v, label]) => (
-              <button key={v} className={view === v ? 'on' : ''} title={`${label}es-Ansicht`} onClick={() => setView(v)}>{label}</button>
+            {VIEWS.map(([v, label, hinweis]) => (
+              <button key={v} className={view === v ? 'on' : ''} title={hinweis} onClick={() => setView(v)}>{label}</button>
             ))}
           </span>
           {view === 'tag' && (

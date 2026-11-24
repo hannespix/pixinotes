@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { NodeProps } from '@xyflow/react';
 import { useBoard } from '../../store';
+import { useKartenAnsicht } from '../../lib/kartenAnsicht';
 import type { CalendarData, CalendarNode, GanttData } from '../../types';
 import { collectTasks } from '../../lib/tasks';
 import { linkedNeighborIds } from '../../lib/links';
@@ -106,12 +107,14 @@ const dayOf = (iso: string) => Math.floor(Date.UTC(+iso.slice(0, 4), +iso.slice(
  * Outlook, Google, Apple, Nextcloud). Export des Sichtbaren als .ics.
  */
 const KEINE_ICS: IcsEvent[] = [];
+/** M520: Felder, die nur die Ansicht sind — in einem Board, das man nicht ändern darf, gelten sie lokal (lib/kartenAnsicht.ts) */
+const KAL_ANSICHT = ['month', 'anchor', 'view', 'scope', 'show'] as const;
 const KEINE_EIGENEN: MyEvent[] = [];
 
-export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
+export function CalendarBody({ id, data: daten }: { id: string; data: CalendarData }) {
+  const [data, updateNodeData] = useKartenAnsicht(id, daten, KAL_ANSICHT);
   const boards = useBoard((s) => s.boards);
   const activeId = useBoard((s) => s.activeId);
-  const updateNodeData = useBoard((s) => s.updateNodeData);
   const openBoard = useBoard((s) => s.openBoard);
   const focusNode = useBoard((s) => s.focusNode);
   const presenting = useBoard((s) => s.presenting);
@@ -724,10 +727,18 @@ export function CalendarBody({ id, data }: { id: string; data: CalendarData }) {
           {/* M313: Ein Umschalter für die Ansicht, die Navigation, ein ⋯ — die
               Quelle (alle Boards · dieses Board · Verbunden) liegt im ⋯ */}
           <button
-            onClick={() => updateNodeData(id, {
-              view: view === 'month' ? 'week' : view === 'week' ? 'jahr' : 'month',
-              anchor: todayIso,
-            })}
+            onClick={() => {
+              /* M520: Der Wechsel der Ansicht bleibt, wo man gerade ist. Vorher sprang Monat → Woche immer auf die
+                 heutige Woche (wer im März 2027 blätterte, stand wieder im November 2026), und Woche → Jahr zeigte
+                 das Jahr des zuletzt gezeigten MONATS statt das der Woche. „Heute" bleibt beweglich: Liegt heute im
+                 gezeigten Zeitraum, wird nichts festgeschrieben (sonst stünde die Woche in vierzehn Tagen noch hier). */
+              const heuteYm = todayIso.slice(0, 7);
+              if (view === 'month') updateNodeData(id, { view: 'week', anchor: ym === heuteYm ? undefined : `${ym}-01` });
+              else if (view === 'week') {
+                const wocheYm = anchorIso.slice(0, 7);
+                updateNodeData(id, { view: 'jahr', month: wocheYm === heuteYm ? undefined : wocheYm });
+              } else updateNodeData(id, { view: 'month' });
+            }}
             title="Ansicht umschalten: Monat → Woche → Jahr"
           >
             {view === 'month' ? 'Woche' : view === 'week' ? 'Jahr' : 'Monat'}
