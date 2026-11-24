@@ -120,8 +120,12 @@ function achseFangen(k: Kasten, andere: Kasten[], schwelle: number, waagerecht: 
   return beste.filter((t) => Math.abs(t.d - d) < 0.25);
 }
 
-/** Versatz, der den Kasten an den anderen ausrichtet, und was dabei zu zeigen ist */
-export function fangen(k: Kasten, andere: Kasten[], schwelle: number): { dx: number; dy: number; linien: Fanglinie[]; abstaende: Abstand[] } {
+/**
+ * Versatz, der den Kasten an den anderen ausrichtet, und was dabei zu zeigen ist. M505: `gx`/`gy` = rastet die
+ * Achse ein (auch mit Versatz 0, wenn die Karte zufällig genau dort steht) — das weiche Einrasten unterscheidet so
+ * „bleibt an derselben Stelle" von „rastet ein / löst sich".
+ */
+export function fangen(k: Kasten, andere: Kasten[], schwelle: number): { dx: number; dy: number; gx: boolean; gy: boolean; linien: Fanglinie[]; abstaende: Abstand[] } {
   const tx = achseFangen(k, andere, schwelle, true);
   const ty = achseFangen(k, andere, schwelle, false);
   const dx = tx[0]?.d ?? 0; const dy = ty[0]?.d ?? 0;
@@ -153,5 +157,5 @@ export function fangen(k: Kasten, andere: Kasten[], schwelle: number): { dx: num
   }
   // dieselbe Strecke nur einmal markieren
   const gesehen = new Set<string>();
-  return { dx, dy, linien, abstaende: abstaende.filter((a) => { const s = `${a.art}${Math.round(a.von)}:${Math.round(a.bis)}:${Math.round(a.quer)}`; if (gesehen.has(s)) return false; gesehen.add(s); return true; }) };
+  return { dx, dy, gx: tx.length > 0, gy: ty.length > 0, linien, abstaende: abstaende.filter((a) => { const s = `${a.art}${Math.round(a.von)}:${Math.round(a.bis)}:${Math.round(a.quer)}`; if (gesehen.has(s)) return false; gesehen.add(s); return true; }) };
 }

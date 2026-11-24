@@ -116,7 +116,9 @@
      als Inline-`transform`, die Einzel-Eigenschaften `scale`/`rotate` wirken davor — `--zieh-x/-y` (die Lage
      der Karte) rücken den Ursprung an die richtige Stelle.
    · M344-Lehre: Eine gehobene, geneigte Karte zeigt ihre Kanten nicht dort, wo sie landen. Greift eine
-     Fanglinie (`data-gerastet`), liegt die Karte deshalb flach und gerade — Linie und Kante stimmen überein.
+     Fanglinie, liegt die Karte deshalb flach und gerade — Linie und Kante stimmen überein. M505: nicht mehr
+     schlagartig — `--zieh-hub` (1 gehoben … 0 flach, JS gleitet ihn) gewichtet Skala und Neigung; solange er
+     läuft (`data-hub`), folgt die Skala ohne eigenen Übergang. Den Sprung der Lage fängt ein `translate` ab.
    · Beim Loslassen (`data-gehoben="landet"`) senkt sie sich federnd, die Neigung schwingt aus.
    · M485: Kettenreaktion — wer von einer ausweichenden Nachbarin angestoßen wird (`--zieh-stufe` 1, 2), setzt
      sich je Stufe 45 ms später in Bewegung; die Welle läuft so sichtbar von der Karte weg. */
@@ -124,15 +126,15 @@
   transition: box-shadow 0.18s ease, translate var(--zieh-feder-dauer) var(--zieh-feder) calc(var(--zieh-stufe, 0) * 45ms), scale var(--zieh-landen-dauer) var(--zieh-landen);
 }
 .board-wrap[data-zieh] .react-flow__node[data-gehoben] {
-  rotate: var(--zieh-neigung, 0deg);
+  rotate: calc(var(--zieh-neigung, 0deg) * var(--zieh-hub, 1));
   transform-origin: calc(var(--zieh-x, 0px) + 50%) calc(var(--zieh-y, 0px) + 50%);
 }
 .board-wrap[data-zieh] .react-flow__node[data-gehoben='an'] {
-  scale: var(--zieh-skala, 1);
+  scale: calc(1 + (var(--zieh-skala, 1) - 1) * var(--zieh-hub, 1));
   --card-shadow-lift: var(--zieh-schatten);   /* wer einen Schatten trägt, trägt den tieferen; Bilder ohne Rand bleiben ohne */
   transition: box-shadow var(--zieh-heben-dauer) ease, scale var(--zieh-heben-dauer) var(--zieh-heben);
 }
-.board-wrap[data-zieh][data-gerastet] .react-flow__node[data-gehoben='an'] { scale: none; rotate: none; }
+.board-wrap[data-zieh] .react-flow__node[data-gehoben='an'][data-hub] { transition: box-shadow var(--zieh-heben-dauer) ease; }
 /* M504: Stapel-Ziel — wer die Karte kurz über einer anderen stillhält, legt sie darauf. Das Ziel ist zurückgeglitten
    und trägt eine ruhige gestrichelte Linie (Akzent ≥ 3:1 zur Fläche); nur ein Attribut, nichts wird eingehängt (M491). */
 .board-wrap[data-zieh] .react-flow__node[data-stapel-ziel] { outline: 2px dashed var(--accent); outline-offset: 6px; }

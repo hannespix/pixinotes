@@ -228,17 +228,18 @@ export function versatzAufloesen(el: HTMLElement, x: number, y: number, id?: str
 /**
  * M491: Was eine Karte zeigen SOLL, wenn kein Übergang mehr läuft — aus ihrem Inline-Stil und denselben Regeln wie
  * im CSS (34-praesentation.css, „Ziehen"): `translate` steht inline, die gehobene Karte trägt `--zieh-skala` und
- * `--zieh-neigung` (die Neigung hat keinen Übergang, ihre Feder rechnet in JS), flach bei „weniger Bewegung" und an
- * der Fanglinie.
+ * `--zieh-neigung` (die Neigung hat keinen Übergang, ihre Feder rechnet in JS), flach bei „weniger Bewegung".
+ * M505: An der Fanglinie wird sie nicht mehr schlagartig flach — `--zieh-hub` (1 = gehoben, 0 = flach) gleitet,
+ * Skala und Neigung im CSS sind damit gewichtet.
  */
-let gerastetJetzt = false;
 function erwartet(e: HTMLElement, arm: boolean): Anzeige {
   const tr = e.style.translate || 'none';
   const t = tr === 'none' ? [] : tr.split(' ').map(parseFloat);
   const g = e.dataset.gehoben;
-  const flach = arm || (gerastetJetzt && g === 'an');
-  const s = g === 'an' && !flach ? parseFloat(e.style.getPropertyValue('--zieh-skala')) || 1 : 1;
-  const w = g && !flach ? parseFloat(e.style.getPropertyValue('--zieh-neigung')) || 0 : 0;
+  const h = parseFloat(e.style.getPropertyValue('--zieh-hub'));
+  const hub = Number.isNaN(h) ? 1 : h;
+  const s = g === 'an' && !arm ? 1 + ((parseFloat(e.style.getPropertyValue('--zieh-skala')) || 1) - 1) * hub : 1;
+  const w = g && !arm ? (parseFloat(e.style.getPropertyValue('--zieh-neigung')) || 0) * hub : 0;
   return [t[0] || 0, t[1] || 0, s, w];
 }
 const gleich = (a: Anzeige, b: Anzeige): boolean =>
@@ -300,6 +301,109 @@ export function kantenBeobachter(elVon: (id: string) => HTMLElement | null, beob
   };
 }
 
+/* ───────────────────────── M505: weich einrasten ───────────────────────── */
+
+/** M505: Welcher Zug eine Karte gerade führt — ein spät aufräumender alter Zug fasst die des neuen nicht an */
+const weichBesitzer = new WeakMap<HTMLElement, object>();
+
+/**
+ * M505: Einrasten ohne Ruck. Die Fanglinie (bzw. das Raster) setzt die Lage im Stand hart — dort soll die Karte
+ * landen, und Kanten, Linien, Speicher rechnen damit. Gesehen wird aber die Lage im Stand PLUS ein Versatz
+ * (`translate` an der gehobenen Karte): Springt die Lage im Stand, weil die Karte einrastet, sich löst oder zum
+ * nächsten Rasterpunkt wechselt, nimmt der Versatz den Sprung auf (die Karte steht im selben Bild noch dort, wo
+ * sie war) und klingt nach der Uhr ab (`e^(−dt/τ)`, gleich schnell bei 30 und 60 Bildern je Sekunde). Bleibt die
+ * Karte an derselben Stelle eingerastet, ändert sich nichts — sie haftet, auch wenn der Zeiger weiterwandert.
+ *
+ * Dazu `--zieh-hub` (1 = gehoben, 0 = flach): An der Fanglinie klingen Heben und Neigung damit ab statt
+ * abzubrechen, beim Lösen kommen sie ebenso zurück. Die Neigungs-Feder rechnet derweil unsichtbar weiter.
+ *
+ * Bei „weniger Bewegung" nichts davon (wie bisher: kein Gleiten, keine Feder).
+ */
+function weichesEinrasten(els: HTMLElement[]) {
+  const arm = bewegungArm();
+  const ich = {};
+  for (const e of els) { weichBesitzer.set(e, ich); e.style.removeProperty('--zieh-hub'); e.removeAttribute('data-hub'); }
+  let ox = 0; let oy = 0;             // Versatz der Anzeige gegenüber dem Stand (Flächen-Punkte)
+  let dx = 0; let dy = 0;             // aktueller Fang-Versatz (Stand − Zeiger)
+  let zx: number | null = null; let zy: number | null = null;
+  let rx: number | null = null; let ry: number | null = null;   // Lage unter dem Zeiger beim letzten Ereignis
+  let hub = 1; let hubZiel = 1; let hubAn = false;
+  let raf = 0; let t = 0; let vorbei = false; const beginn = performance.now();
+  const schreibVersatz = () => {
+    const leer = Math.abs(ox) < 0.05 && Math.abs(oy) < 0.05;
+    if (leer) { ox = 0; oy = 0; }
+    for (const e of els) {
+      if (leer) e.style.removeProperty('translate');
+      else e.style.setProperty('translate', `${ox.toFixed(2)}px ${oy.toFixed(2)}px`);
+    }
+  };
+  const schreibHub = () => {
+    if (!hubAn && hub < 1 && !vorbei) {
+      // die Skala folgt dem Hub ab jetzt Bild für Bild — ohne CSS-Übergang (der liefe sonst jedes Bild neu an)
+      hubAn = true;
+      for (const e of els) { e.setAttribute('data-hub', ''); stoeren(e); }
+    }
+    for (const e of els) e.style.setProperty('--zieh-hub', hub.toFixed(3));
+  };
+  const lauf = (jetzt: number) => {
+    raf = 0;
+    const dt = Math.min(100, Math.max(0, jetzt - t)); t = jetzt;
+    if (!vorbei && (ox || oy)) {
+      const k = Math.exp(-dt / FANG_TAU_MS);
+      ox *= k; oy *= k;
+      schreibVersatz();
+    }
+    if (hub !== hubZiel) {
+      hub = hubZiel + (hub - hubZiel) * Math.exp(-dt / HUB_TAU_MS);
+      if (Math.abs(hub - hubZiel) < 0.002) hub = hubZiel;
+      schreibHub();
+    }
+    // Während des Zugs läuft der Rückruf durchgehend (kostet nichts, wenn nichts gleitet): So bleibt er in jedem Bild
+    // vor dem Kanten-Beobachter, der dieselbe Lage liest (zugStarten legt ihn zuerst an). Sicherheitsnetz: Karte weg
+    // oder nie beendet (kein `ende`) — dann hört er auf
+    if (!vorbei && els.some((e) => e.isConnected) && jetzt - beginn < 600_000) raf = requestAnimationFrame(lauf);
+    else if (hub !== hubZiel) raf = requestAnimationFrame(lauf);
+  };
+  const an = () => { if (!raf) { t = performance.now(); raf = requestAnimationFrame(lauf); } };
+  an();
+  return {
+    fang(e: Einrasten): void {
+      if (vorbei) return;
+      // Sprung je Achse nur, wenn sich die Fangstelle ändert (einrasten, lösen, andere Stelle). Bleibt sie, ändert
+      // sich der Fang-Versatz nur, weil der Zeiger wandert — die Karte haftet, es gibt nichts aufzunehmen.
+      const gleichX = e.zx === null ? zx === null : zx !== null && Math.abs(e.zx - zx) < 0.01;
+      const gleichY = e.zy === null ? zy === null : zy !== null && Math.abs(e.zy - zy) < 0.01;
+      // Geht der Sprung in der Bewegung des Zeigers unter (höchstens halb so groß wie sein Schritt in diesem
+      // Ereignis), rastet die Karte direkt ein: Sie bewegt sich in diesem Bild dann zwischen dem halben und dem
+      // anderthalbfachen Schritt, hält nie an und kehrt nie um — und es gibt kein Gleiten, das Bilder kostet, in
+      // denen sich sonst nichts bewegt (jedes bewegte Bild lässt alle betroffenen Kanten neu zeichnen, m491).
+      const schrittX = rx === null ? 0 : Math.abs(e.rx - rx); const schrittY = ry === null ? 0 : Math.abs(e.ry - ry);
+      if (!arm) {
+        if (!gleichX && Math.abs(e.dx - dx) > schrittX / 2) ox -= e.dx - dx;
+        if (!gleichY && Math.abs(e.dy - dy) > schrittY / 2) oy -= e.dy - dy;
+      }
+      dx = e.dx; dy = e.dy; zx = e.zx; zy = e.zy; rx = e.rx; ry = e.ry;
+      if (!gleichX || !gleichY) { schreibVersatz(); if (ox || oy) an(); }
+    },
+    flach(gerastet: boolean): void {
+      if (arm) return;
+      const ziel = gerastet ? 0 : 1;
+      if (ziel !== hubZiel) { hubZiel = ziel; an(); }
+    },
+    versatz: (): [number, number] => [dx, dy],
+    /** Loslassen: den Rest des Versatzes übernimmt der CSS-Übergang (Lande-Feder), der Hub klingt zu Ende */
+    ende(): void {
+      vorbei = true;
+      if (ox || oy) { ox = 0; oy = 0; for (const e of els) { e.style.removeProperty('translate'); stoeren(e); } }
+      for (const e of els) { e.removeAttribute('data-hub'); stoeren(e); }
+      if (hub !== hubZiel) an();
+      window.setTimeout(() => {
+        for (const e of els) if (weichBesitzer.get(e) === ich) { e.style.removeProperty('--zieh-hub'); weichBesitzer.delete(e); stoeren(e); }
+      }, LANDEN_MS + 50);
+    },
+  };
+}
+
 /* ───────────────────────── Ein Zug auf dem Board ───────────────────────── */
 
 /** M481: Bis zu so vielen gezogenen Karten heben sie sich und lassen Nachbarn ausweichen (darüber: ruhig, Leistung) */
@@ -344,6 +448,17 @@ export interface ZugKnoten {
   position: { x: number; y: number };
   measured?: { width?: number; height?: number }; width?: number | null; height?: number | null;
 }
+/**
+ * M505: Was das Einrasten (Fanglinie oder Raster) mit der Lage im Stand macht — `dx`/`dy` = Versatz gegenüber der
+ * Lage unter dem Zeiger, `zx`/`zy` = Stelle, an der die Achse einrastet (null = frei), `rx`/`ry` = Lage unter dem
+ * Zeiger (ungefangen), daraus der Schritt dieses Ereignisses.
+ */
+export interface Einrasten { dx: number; dy: number; zx: number | null; zy: number | null; rx: number; ry: number }
+/** M505: Zeitkonstante, mit der die Karte an die Fangstelle gleitet (95 % nach ~105 ms) */
+export const FANG_TAU_MS = 35;
+/** M505: … und mit der Heben und Neigung an der Fanglinie abklingen bzw. zurückkommen */
+export const HUB_TAU_MS = 40;
+
 export interface Zug {
   /** Die gegriffene Karte steht jetzt bei (x, y); `zoom` für das Tempo am Bildschirm, `gerastet` = Fanglinie greift.
       M504: `alt` = Alt/⌥ gedrückt (frei übereinander), `finger` = Touch (für den Hinweis), `zeiger` = Maus bzw. Finger
@@ -351,6 +466,11 @@ export interface Zug {
   schritt(x: number, y: number, zoom: number, gerastet: boolean, art?: { alt?: boolean; finger?: boolean; zeiger?: { x: number; y: number } }): void;
   /** M504: Alt gedrückt bzw. losgelassen, auch ohne Mausbewegung */
   frei(an: boolean): void;
+  /**
+   * M505: Das Einrasten hat die Lage im Stand verschoben (Board.tsx `onNodesChangeFang`, VOR `schritt`). Springt sie
+   * dabei (einrasten, lösen, nächster Rasterpunkt), übernimmt die Anzeige den Sprung als Versatz und gleitet ihn ab.
+   */
+  fang(e: Einrasten): void;
   /** Loslassen (oder abbrechen): liefert, was ausgewichen bleibt — als [id, x, y] zum Übernehmen. M504: mit Stapel-Ziel
       die neue Lage der gezogenen Karten auf dem Stapel (und kein Ausweichen) */
   ende(abbrechen?: boolean): Array<[string, number, number]>;
@@ -399,13 +519,14 @@ export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugK
   }
   // M485: Kettenreaktion über mehrere Stufen — nicht bei „weniger Bewegung"
   const aus = kandidaten.length ? ausweichen(kandidaten, AUSWEICH_ABSTAND, bewegungArm() ? 1 : AUSWEICH_STUFEN) : null;
+  // M505: Fang-Gleiten und Neigung VOR dem Kanten-Beobachter anlegen — ihre Bild-Rückrufe laufen dann in jedem Bild
+  // vor seinem, und die Kanten lesen schon die Lage dieses Bilds (sonst hinkten sie ein Bild hinterher)
+  const weich = weichesEinrasten(gehoben.map((g) => g.el));
   const beob = verbunden?.size
     ? kantenBeobachter(el, function* () { for (const n of bewegt) yield n.id; if (aus) yield* aus.beruehrt; }, verbunden)
     : null;
   const neigung = neigungsFeder(gehoben.map((g) => g.el), '--zieh-neigung', neigungsGrenze(kasten.w, kasten.h));
   const tempo = tempoMesser(x0 * zoom, performance.now());
-  let gerastetVorher = false;
-
   /* ── M504: Stapeln ──
      Ziel kann jede sichtbare Karte sein, die nicht mitgezogen wird (auch Rahmen-Inhalt und was schon beim Greifen
      darunter lag — die weichen ohnehin nicht aus). Gerechnet wird mit der Lage VOR dem Zug: Das Ziel ist ja gerade
@@ -490,15 +611,15 @@ export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugK
     schritt(x, y, z, gerastet, art) {
       const vx = tempo.messen(x * z, performance.now());
       // M344/M349: Greift eine Fanglinie, liegt die Karte flach — ihre Kanten stehen dann genau dort, wo sie
-      // landen, und die Linie stimmt mit dem, was man sieht
-      if (gerastet !== gerastetVorher) {
-        gerastetVorher = gerastet; gerastetJetzt = gerastet; wurzel.toggleAttribute('data-gerastet', gerastet);
-        for (const g of gehoben) stoeren(g.el);
-      }
-      if (gerastet) neigung.gerade(); else neigung.tempo(vx);
+      // landen, und die Linie stimmt mit dem, was man sieht. M505: nicht mehr schlagartig — Heben und Neigung
+      // klingen ab (die Neigung rechnet unsichtbar weiter und kommt beim Lösen weich zurück)
+      weich.flach(gerastet);
+      neigung.tempo(vx);
+      // Drehpunkt = Lage im Stand (React Flows `transform`), also mit dem Fang-Versatz
+      const [fx, fy] = weich.versatz();
       for (const g of gehoben) {
-        g.el.style.setProperty('--zieh-x', `${x + g.dx}px`);
-        g.el.style.setProperty('--zieh-y', `${y + g.dy}px`);
+        g.el.style.setProperty('--zieh-x', `${x + g.dx + fx}px`);
+        g.el.style.setProperty('--zieh-y', `${y + g.dy + fy}px`);
       }
       box = { ...kasten, x: kasten.x + x - x0, y: kasten.y + y - y0 };
       sx = x * z; sy = y * z;
@@ -523,19 +644,22 @@ export function zugStarten(wurzel: HTMLElement, gegriffen: ZugKnoten, alle: ZugK
         }
       }
     },
+    fang(e) { weich.fang(e); },
     frei: freiSetzen,
     ende(abbrechen = false) {
       if (uhr) clearTimeout(uhr); uhr = 0;
       const t = frei ? null : ziel;
       zielWeg();
       vorbei = true;
-      wurzel.removeAttribute('data-gerastet'); wurzel.removeAttribute('data-frei'); gerastetJetzt = false;
+      wurzel.removeAttribute('data-frei');
       neigung.loslassen();
       beob?.nachlauf(LANDEN_MS + 400);
       for (const g of gehoben) {
         g.el.dataset.gehoben = 'landet'; stoeren(g.el);
         window.setTimeout(() => { if (g.el.dataset.gehoben === 'landet') { delete g.el.dataset.gehoben; stoeren(g.el); } }, LANDEN_MS);
       }
+      // M505: im selben Stil-Wechsel wie „landet" — der Rest des Fang-Versatzes gleitet mit der Lande-Feder (CSS)
+      weich.ende();
       if (abbrechen) { aus?.zurueck(); return []; }
       if (t) return stapeln(t);
       if (!aus) return [];
