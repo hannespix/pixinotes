@@ -80,6 +80,14 @@
   align-self: center;
 }
 .slide-note .bn-editor { font-size: clamp(16px, 2vw, 22px); }
+/* M515: Schrift nach dem Papier der Notiz — wie auf dem Board (styles/60-…). Weiß (und Notiz ohne Farbe) folgt im
+   Dunkeln dem Thema; eine eigene Farbe, auf der BlockNote-Grau nicht reicht, bringt ihre Schrift mit (Presenter.tsx
+   NoteSlide, lib/lesbareSchrift.ts schriftAufFuellung). Haftnotizen in Farbe bleiben helles Papier. */
+[data-theme='dark'] .slide-note.papier-thema .bn-root {
+  --bn-colors-editor-text: var(--ink);
+  --bn-colors-editor-background: var(--surface-card);
+}
+.slide-note.schrift-eigen .bn-root { --bn-colors-editor-text: var(--notiz-schrift); }
 /* Form: Original-Optik in groß, Text direkt tippbar */
 .slide-shape { width: min(640px, 90%); height: min(360px, calc(60vh / var(--pn-anz, 1))); position: relative; align-self: center; flex: none; }
 .slide-shape .shape-body { font-size: 22px; }

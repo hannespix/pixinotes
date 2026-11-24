@@ -7,6 +7,7 @@ import { NotizEditor } from './NoteCard';
 import { NotizRuhend } from './NotizRuhend';
 import { hakenUmlegen, notizEinfach, type RuheBlock } from '../../lib/notizRuhend';
 import { warEbenAngelegt, alsEbenAngelegt } from '../../lib/nodes';
+import { formSchrift } from '../../lib/lesbareSchrift';
 
 const SHAPE_COLORS = ['#eef2ff', '#e6f7ec', '#fff4e0', '#ffe9ef', '#eef7ff', '#f3eeff', '#ffffff'];
 
@@ -56,6 +57,7 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
   };
 
   const handles = [Position.Top, Position.Right, Position.Bottom, Position.Left];
+  const schrift = useMemo(() => formSchrift(data.color), [data.color]);
 
   const blocks = useMemo<RuheBlock[]>(
     () => (Array.isArray(data.blocks) && data.blocks.length ? data.blocks as RuheBlock[] : textZuBlocks(data.text)),
@@ -175,8 +177,9 @@ export function ShapeCard({ id, data, selected }: NodeProps<ShapeNode>) {
       </div>
       <div
         ref={bodyRef}
-        className="shape-body"
-        style={{ background: data.color, '--shape-fill': data.color } as CSSProperties}
+        // M515: Schrift nach der gezeichneten Füllung — auf einer dunklen eigenen Farbe hell, sonst wie bisher
+        className={`shape-body${schrift.klasse}`}
+        style={{ background: data.color, '--shape-fill': data.color, ...schrift.stil } as CSSProperties}
         onDoubleClick={(e) => { if (!aktiv) { e.stopPropagation(); wecken(e.clientX, e.clientY); } }}
         onPointerDown={(e) => { druck.current = { x: e.clientX, y: e.clientY, gewaehlt: !!selected }; }}
         onClick={(e) => {

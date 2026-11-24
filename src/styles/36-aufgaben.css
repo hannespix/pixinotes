@@ -33,9 +33,9 @@
 .task-row.open { box-shadow: var(--chrome-shadow); }
 .task-caret { color: var(--muted); font-size: 10px; flex: none; }
 .task-prio-mark { letter-spacing: 1px; }
-.task-prio-mark.prio-1 { color: #d84b3d; }
-.task-prio-mark.prio-2 { color: #e8a13a; }
-.task-prio-mark.prio-3 { color: #4f7cff; }
+.task-prio-mark.prio-1 { color: var(--prio-hoch); }
+.task-prio-mark.prio-2 { color: var(--prio-mittel); }
+.task-prio-mark.prio-3 { color: var(--prio-niedrig); }
 .task-myday-mark { flex: none; font-size: 12px; }
 /* Aufgeklappte Werkzeugleiste (M116) */
 .task-tools {
@@ -117,14 +117,14 @@
   font-weight: 800; font-size: 12px; padding: 2px 5px; border-radius: var(--r-sm); flex: none;
   color: color-mix(in srgb, var(--muted) 45%, transparent); letter-spacing: 1px;
 }
-.task-prio.prio-1 { color: #d84b3d; }
-.task-prio.prio-2 { color: #e8a13a; }
-.task-prio.prio-3 { color: #4f7cff; }
+.task-prio.prio-1 { color: var(--prio-hoch); }
+.task-prio.prio-2 { color: var(--prio-mittel); }
+.task-prio.prio-3 { color: var(--prio-niedrig); }
 .task-prio:hover { background: var(--surface-dim); }
 .k-prio { font-weight: 800; letter-spacing: 1px; }
-.k-prio.prio-1 { color: #d84b3d; }
-.k-prio.prio-2 { color: #e8a13a; }
-.k-prio.prio-3 { color: #4f7cff; }
+.k-prio.prio-1 { color: var(--prio-hoch); }
+.k-prio.prio-2 { color: var(--prio-mittel); }
+.k-prio.prio-3 { color: var(--prio-niedrig); }
 /* Spalten-Umstellung (M114) */
 .task-col {
   border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 10.5px; font-family: inherit;
