@@ -133,6 +133,9 @@
   transition: box-shadow var(--zieh-heben-dauer) ease, scale var(--zieh-heben-dauer) var(--zieh-heben);
 }
 .board-wrap[data-zieh][data-gerastet] .react-flow__node[data-gehoben='an'] { scale: none; rotate: none; }
+/* M504: Stapel-Ziel — wer die Karte kurz über einer anderen stillhält, legt sie darauf. Das Ziel ist zurückgeglitten
+   und trägt eine ruhige gestrichelte Linie (Akzent ≥ 3:1 zur Fläche); nur ein Attribut, nichts wird eingehängt (M491). */
+.board-wrap[data-zieh] .react-flow__node[data-stapel-ziel] { outline: 2px dashed var(--accent); outline-offset: 6px; }
 @media (prefers-reduced-motion: reduce) {
   .board-wrap[data-zieh] .react-flow__node { transition: box-shadow 0.18s ease, translate 0.12s ease; }
   .board-wrap[data-zieh] .react-flow__node[data-gehoben] { scale: none; rotate: none; }
