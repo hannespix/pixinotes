@@ -95,6 +95,7 @@ export function ansichtScheibe(set: Setzen, get: Holen) {
     ui: { theme: 'system', accent: 'blau' },
     setUiTheme: (theme) => set({ ui: { ...get().ui, theme } }),
     setUiAccent: (accent) => set({ ui: { ...get().ui, accent } }),
+    setUiDesign: (design) => set({ ui: { ...get().ui, design } }),
 
     settingsSection: null,
     setSettingsOpen: (open, section = null) => set({ settingsOpen: open, settingsSection: section }),

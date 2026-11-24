@@ -209,6 +209,90 @@
 [data-theme='dark'][data-accent='violett'] { --accent-strong: #ab98ff; }
 [data-theme='dark'][data-accent='orange'] { --accent-strong: #f3a06b; }
 [data-theme='dark'][data-accent='rosa'] { --accent-strong: #f08ea6; }
+
+/* ---------- M507: Design „pix·el" (Einstellungen → Darstellung → Design) ----------
+   Die Palette von pix-el.de (eigenes Werk des Nutzers): vier LCD-Töne eines alten Handhelds, Papier, gelber Marker.
+   Höhere Spezifität (:root + Attribut) als Akzent- und Dunkel-Regeln: pix·el bringt sein LCD-Grün mit, die
+   Akzentfarbe gilt nur in Klassisch (sie bleibt gemerkt). Formen (Pixel-Kanten, Pixelschrift) in 90-design-pixel.css.
+   Gemessen (werkzeug/kontrast-pruefen.mjs, m507): Schrift ≥ 4,5:1, Feldrand und Fokus ≥ 3:1 — hell wie dunkel. */
+:root[data-design='pixel'] {
+  --lcd-0: #0f380f;            /* dunkelstes LCD-Grün: Rahmen, Pixelschatten */
+  --lcd-1: #306230;
+  --lcd-2: #7a9a1c;
+  --lcd-3: #a9c431;
+  --lcd-4: #e3efa8;            /* hellstes LCD-Grün: Hover, Auswahl */
+  --pix-marker: #ffe45e;       /* gelber Marker (Suchtreffer, aktive Wahl) — Schrift darauf ist Tinte */
+  --pix-punkt: #c9d3b4;        /* Punktraster der Fläche */
+  --pix-rahmen: #0f380f;       /* Pixel-Rahmen um Karten, Leisten, Fenster */
+  --pix-schlag: #306230;       /* harter Pixelschatten (Versatz, keine Unschärfe) */
+  --pix-px: 2px;               /* ein „Pixel" des Rahmens */
+  --pix-dunkel: #0f380f;       /* dunkle Fläche (Hinweise) in beiden Themes — Weiß darauf 13:1 */
+  --pix-gehaeuse: #20301f;     /* Gehäuse der Konsole auf pix-el: Grund der Präsentation */
+  --pix-gehaeuse-leise: #a9bd86; /* leise Schrift darauf (Gehäuse-Beschriftung): 6,9:1 hell, 9,8:1 dunkel */
+  --font-pixel: 'PN Jersey', 'Courier New', ui-monospace, monospace;
+  --font-etikett: 'Courier New', ui-monospace, 'Cascadia Mono', Consolas, monospace;   /* gesperrte Etiketten wie auf pix-el */
+  --bg: #f6f7ef;               /* Papier */
+  --ink: #12280f;              /* 14,6:1 auf Papier */
+  --muted: #4f5e48;            /* 6,3:1 auf Papier, 5,7:1 auf --surface-2 */
+  --accent: #487318;           /* 5,2:1 auf Papier — trägt auch Schrift */
+  --accent-strong: #306230;    /* 6,7:1 auf Papier, 5,9:1 auf --surface-2 */
+  --accent-soft: rgba(169, 196, 49, 0.32);
+  --accent-fill: #306230;      /* Weiß darauf 7,2:1 */
+  --surface: #ffffff;
+  --surface-2: #e3efa8;        /* Hover/aktiv: hellstes LCD-Grün wie auf pix-el */
+  --surface-3: #eef2e1;
+  --surface-card: #ffffff;
+  --surface-glass: var(--surface);
+  --surface-dim: rgba(15, 56, 15, 0.07);
+  --border: rgba(15, 56, 15, 0.5);
+  --border-soft: #d3dcc4;
+  --feld-rand: #6f7d69;        /* ≥ 3:1 auf Papier, Weiß und --surface-2 */
+  --edge: rgba(15, 56, 15, 0.6);
+  --edge-head: #6f8a6a;
+  --r-xs: 0px; --r-sm: 0px; --r: 0px; --r-lg: 0px; --r-pill: 0px;
+  /* Rahmen aus vier harten Schatten — die Ecken bleiben frei, das ergibt die gestufte Pixel-Ecke —
+     plus ein harter Versatz-Schatten. Nur box-shadow ohne Unschärfe: kein Filter, nichts Teures beim Ziehen. */
+  --pix-rahmen-schatten: 0 calc(-1 * var(--pix-px)) 0 0 var(--pix-rahmen), 0 var(--pix-px) 0 0 var(--pix-rahmen),
+    calc(-1 * var(--pix-px)) 0 0 0 var(--pix-rahmen), var(--pix-px) 0 0 0 var(--pix-rahmen);
+  --card-shadow: var(--pix-rahmen-schatten), 4px 4px 0 0 var(--pix-schlag);
+  --card-shadow-lift: var(--pix-rahmen-schatten), 7px 7px 0 0 var(--pix-schlag);
+  --zieh-schatten: var(--pix-rahmen-schatten), 10px 10px 0 0 var(--pix-schlag);
+  --chrome-shadow: var(--pix-rahmen-schatten), 3px 3px 0 0 var(--pix-schlag);
+  --pop-shadow: var(--pix-rahmen-schatten), 6px 6px 0 0 var(--pix-schlag);
+  --lauf-daumen: rgba(15, 56, 15, 0.38);
+  --lauf-daumen-aktiv: rgba(15, 56, 15, 0.6);
+}
+:root[data-design='pixel'][data-theme='dark'] {
+  --lcd-0: #d4ef78;
+  --lcd-1: #9cc43a;
+  --lcd-2: #4c7420;
+  --lcd-3: #14290f;
+  --lcd-4: #24401c;
+  --pix-marker: #8a7a12;       /* im Dunkeln gedämpfter Marker — helle Tinte darauf */
+  --pix-punkt: #233a1e;
+  --pix-rahmen: #5e8a2c;       /* ≥ 3:1 zum Grund, damit die Kante trägt */
+  --pix-schlag: #030803;
+  --pix-gehaeuse: #050a05;
+  --bg: #0c170b;
+  --ink: #e2f0c6;              /* 15,3:1 */
+  --muted: #acc19c;            /* 9,3:1 auf dem Grund, 6:1 auf --surface-2, 4,6:1 auf dem aktiven Suchtreffer */
+  --accent: #9cc43a;           /* 9,1:1 */
+  --accent-strong: #d4ef78;
+  --accent-soft: rgba(156, 196, 58, 0.2);
+  --accent-fill: #3d6b2a;      /* Weiß darauf 6,3:1 */
+  --surface: #12210f;
+  --surface-2: #24401c;
+  --surface-3: #0f1c0d;
+  --surface-card: #12210f;
+  --surface-dim: rgba(226, 240, 198, 0.08);
+  --border: rgba(212, 239, 120, 0.38);
+  --border-soft: #2a4123;
+  --feld-rand: #7f9c6e;        /* ≥ 3:1 auf Grund, Karte und --surface-2 */
+  --edge: rgba(212, 239, 120, 0.55);
+  --edge-head: #8aa86a;
+  --lauf-daumen: rgba(212, 239, 120, 0.3);
+  --lauf-daumen-aktiv: rgba(212, 239, 120, 0.5);
+}
 /* Haftnotizen & Prozess-Formen bleiben helles „Papier" — Text darauf dunkel */
 [data-theme='dark'] .react-flow__node-note,
 [data-theme='dark'] .shape-body { color: #16191e; }

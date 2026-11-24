@@ -59,13 +59,15 @@ const KLEIN = () => board([nz('a', 0, 0), nz('b', 420, 40, 'sky'), nz('c', 0, 32
 
 async function seite(st, { dunkel = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'de-DE', colorScheme: dunkel ? 'dark' : 'light' });
-  await ctx.addInitScript(([st, dunkel]) => {
+  // M507: PN_DESIGN=pixel fährt dieselbe Reihe im Design „pix·el" (Pixel-Rahmen aus harten Schatten)
+  await ctx.addInitScript(([st, dunkel, design]) => {
     if (localStorage.getItem('pixinotes-board')) return;
     localStorage.setItem('pixinotes-onboarded', '1');
     sessionStorage.setItem('pixinotes-hint-shown', '1');
-    localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ schliff: 2, navLinks: false, ...(dunkel ? { theme: 'dark' } : {}) }));
+    localStorage.setItem('pixinotes-einstellungen', JSON.stringify({ schliff: 2, navLinks: false, ...(dunkel ? { theme: 'dark' } : {}),
+      ...(design ? { ui: { theme: dunkel ? 'dark' : 'light', accent: 'blau', design } } : {}) }));
     localStorage.setItem('pixinotes-board', JSON.stringify({ version: 5, state: st }));
-  }, [st, dunkel]);
+  }, [st, dunkel, process.env.PN_DESIGN ?? '']);
   const P = await ctx.newPage();
   P.on('pageerror', (e) => fehler.push(e.message));
   await P.goto(`http://localhost:${PORT}/`, { waitUntil: 'networkidle' });

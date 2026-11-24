@@ -599,10 +599,11 @@ export interface BoardState {
   showArchived: boolean;
   setShowArchived: (on: boolean) => void;
 
-  /** Design: Hell/Dunkel/System + Akzentfarbe (persistiert) */
-  ui: { theme: 'system' | 'light' | 'dark'; accent: string };
+  /** Design: Hell/Dunkel/System + Akzentfarbe (persistiert); M507: `design` = Klassisch oder pix·el (fehlt = Klassisch) */
+  ui: { theme: 'system' | 'light' | 'dark'; accent: string; design?: 'klassisch' | 'pixel' };
   setUiTheme: (theme: 'system' | 'light' | 'dark') => void;
   setUiAccent: (accent: string) => void;
+  setUiDesign: (design: 'klassisch' | 'pixel') => void;
 }
 
 /**

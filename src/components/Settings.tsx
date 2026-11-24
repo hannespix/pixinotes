@@ -255,6 +255,7 @@ export function Settings() {
   const ui = useBoard((s) => s.ui);
   const setUiTheme = useBoard((s) => s.setUiTheme);
   const setUiAccent = useBoard((s) => s.setUiAccent);
+  const setUiDesign = useBoard((s) => s.setUiDesign);
   // WICHTIG: vor dem early-return deklarieren (Hook-Reihenfolge!)
   const fileInputRef = useRef<HTMLInputElement>(null);
   // M476: Sicherung — Anzeige „Letzte Sicherung" und der gewählte Ordner der Auto-Sicherung
@@ -715,6 +716,15 @@ export function Settings() {
             </div>
           </div>
           <p className="modal-hint">„System" folgt deinem Gerät. Haftnotizen bleiben auch im Dunkeln helles Papier.</p>
+          {/* M507: Design — Klassisch oder pix·el (LCD-Grün, Papier, Pixel-Kanten und Pixelschrift wie pix-el.de) */}
+          <div className="modal-row">
+            <span>Design</span>
+            <div className="seg" role="group" aria-label="Design" data-taste="design">
+              {([['klassisch', 'Klassisch'], ['pixel', 'pix·el']] as const).map(([v, label]) => (
+                <button key={v} className={(ui.design ?? 'klassisch') === v ? 'on' : ''} aria-pressed={(ui.design ?? 'klassisch') === v} data-design-wahl={v} onClick={() => setUiDesign(v)}>{label}</button>
+              ))}
+            </div>
+          </div>
           {/* M434: Der weiche Pfeilschatten lässt sich abschalten */}
           <label className="modal-row modal-row-check">
             <span>Pfeilschatten</span>
@@ -722,6 +732,8 @@ export function Settings() {
           </label>
           <div className="modal-row">
             <span>Akzentfarbe</span>
+            {/* M507: pix·el bringt sein LCD-Grün mit — die gewählte Farbe bleibt gemerkt und gilt wieder in Klassisch */}
+            {ui.design === 'pixel' ? <span className="modal-hint akzent-pixel">LCD-Grün (pix·el)</span> : (
             <div className="accent-swatches">
               {([
                 ['blau', '#4f7cff', 'Blau'],
@@ -740,6 +752,7 @@ export function Settings() {
                 />
               ))}
             </div>
+            )}
           </div>
           {/* M381: Die Oberfläche spricht Deutsch und Englisch — je Gerät; der Wechsel lädt die Seite neu */}
           <div className="modal-row">

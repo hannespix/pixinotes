@@ -1,0 +1,71 @@
+/* ================= M507: Design „pix·el" — Formen und Schrift =================
+   Wunsch: „ein bisschen das pix-el.de Design auf unser Tool übertragen als Option". Die Farben (LCD-Töne, Papier,
+   Marker) stehen als Token in 00-tokens.css (`:root[data-design='pixel']`); hier steht, was pix·el sonst ausmacht:
+     · Pixel-Kanten statt Rundungen — die Radien-Token sind 0, Rahmen aus vier harten Schatten mit freien Ecken
+       (die gestufte Pixel-Ecke von pix-el) und ein harter Versatz-Schatten statt weicher Wolken.
+     · Pixelschrift (Jersey 10, SIL OFL, aus pix-el) NUR für Titel und Überschriften — Fließtext und Bedienung
+       bleiben in der gut lesbaren Sans. „Besser lesbar" gewinnt weiter überall (Atkinson).
+     · Punktraster der Fläche in eckigen Punkten, gelber Marker für markierten Text.
+   Alles hängt an `html[data-design='pixel']`; ohne das Attribut (Klassisch) greift keine Regel und die Schrift
+   wird nie geladen (@font-face lädt erst, wenn ein Element sie benutzt).
+   Leistung (M491): keine :has()-Selektoren, keine Filter mit Unschärfe, keine neuen Animationen. */
+@font-face {
+  font-family: 'PN Jersey'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('../assets/jersey-10.woff2') format('woff2');
+}
+
+/* ---------- Pixelschrift für Titel ---------- */
+/* Jersey 10 ist bei gleicher Schriftgröße deutlich kleiner als die Sans — font-size-adjust gleicht die x-Höhe an,
+   so behalten Titel ihre Größe und Zeilenhöhe, ohne dass jede Stelle eine eigene Größe braucht. Fett gibt es in
+   einer Pixelschrift nicht (ein künstlich verdicktes Pixel verschmiert) — die Rangordnung trägt die Form. */
+html[data-design='pixel']:not([data-lesbar='an']) :is(
+  .logo, .modal-head h2, .help-body h3, .ovc-space-name, .focus-title b, .bub-leer b,
+  .drag-title, .kanban-title, .minutes-title, .week-title, .time-title,
+  .presenter-slide h3, .slide-bubbles-titel,
+  .bn-block-content[data-content-type='heading']
+) {
+  font-family: var(--font-pixel);
+  font-weight: 400; font-synthesis: none; letter-spacing: 0.02em;
+  font-size-adjust: ex-height 0.6;
+}
+/* BlockNote setzt das Gewicht der Überschriften mit langer Regel — gleich lang halten, damit Pixel gilt */
+html[data-design='pixel']:not([data-lesbar='an']) :is(.bn-container, .notiz-ruhend, .presenter-slide, .react-flow__node) .bn-block-outer .bn-block > .bn-block-content[data-content-type='heading'] {
+  font-weight: 400;
+}
+/* Die Wortmarke wie auf pix-el: etwas größer, der Punkt in der Mitte in Display-Grün */
+html[data-design='pixel']:not([data-lesbar='an']) .logo { font-size: 24px; letter-spacing: 0.03em; }
+/* Flüssige Schrift (M500): die Flüssigkeit formt die Pixelschrift — wie der Schriftzug auf pix-el */
+html[data-design='pixel']:not([data-lesbar='an']) .fluessig-card canvas { font-family: var(--font-pixel); }
+
+/* ---------- Fläche ---------- */
+html[data-design='pixel'] .react-flow { --xy-background-pattern-color: var(--pix-punkt); }
+/* eckige Punkte: die Kreise des Rasters ohne Kantenglättung (kostet nichts, rechnet nichts neu) */
+html[data-design='pixel'] .react-flow__background circle { shape-rendering: crispEdges; }
+html[data-design='pixel'] ::selection { background: var(--pix-marker); color: var(--ink); }
+
+/* ---------- Karten ---------- */
+/* Die Auswahl liegt außerhalb von Rahmen und Pixelschatten — sonst verschmölze sie mit der Kante */
+html[data-design='pixel'] .react-flow__node.selected { outline: 2px dashed var(--accent); outline-offset: 6px; }
+/* Prozess-Formen zeichnen ihren Schatten an der Kontur: hart statt weich (Unschärfe 0) */
+html[data-design='pixel'] .react-flow__node-shape .shape-body { filter: drop-shadow(3px 3px 0 var(--pix-schlag)); }
+html[data-design='pixel'] .react-flow__node-shape:hover .shape-body,
+html[data-design='pixel'] .react-flow__node-shape.dragging .shape-body { filter: drop-shadow(5px 5px 0 var(--pix-schlag)); }
+
+/* Kanban-Spalten: LCD-getönt statt grau */
+html[data-design='pixel'] .kanban-col { background: var(--surface-3); }
+
+/* ---------- Bedienung ---------- */
+/* Abschnitts-Etiketten in den Einstellungen als gesperrte Schreibmaschinen-Versalien wie die Etiketten auf pix-el */
+html[data-design='pixel']:not([data-lesbar='an']) .modal-section h3:not(.modal-danger h3) { font-family: var(--font-etikett); letter-spacing: 0.14em; }
+/* Hinweise (Toast) als dunkles LCD-Feld mit Pixel-Kante */
+html[data-design='pixel'] .toast { background: var(--pix-dunkel); box-shadow: var(--pix-rahmen-schatten); }
+/* Gewählte Stelle in Umschaltern = gedrückter Pixel-Knopf (dunkles LCD-Grün, helle Schrift) wie die Chips auf pix-el */
+html[data-design='pixel'] .seg { border-color: var(--pix-rahmen); }
+html[data-design='pixel'] .seg button.on { background: var(--lcd-1); color: #fff; }
+html[data-design='pixel'][data-theme='dark'] .seg button.on { background: var(--lcd-0); color: #0c170b; }
+/* Präsentation im Gehäuse der Konsole (wie die LCD-Bühne auf pix-el), die Seitenpunkte als Pixel */
+html[data-design='pixel'] .presenter { background: var(--pix-gehaeuse); }
+html[data-design='pixel'] .presenter-hint-edit { color: var(--pix-gehaeuse-leise); }
+html[data-design='pixel'] .presenter-dots button::before { border-radius: 0; }
+/* Einstellungen: statt der Farbtupfer ein Satz — pix·el bringt sein LCD-Grün mit */
+.akzent-pixel { margin: 0; }

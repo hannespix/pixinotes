@@ -118,6 +118,9 @@ if (typeof document !== 'undefined') {
   // Hell/Dunkel oder Akzentfarbe gewechselt: Tinte neu lesen
   new MutationObserver(() => { for (const f of flaechen) f.farbeNeu(); })
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-accent', 'class', 'style'] });
+  // M507: Design gewechselt (pix·el setzt die Pixelschrift) — die Flüssigkeit fließt in die neue Schriftform
+  new MutationObserver(() => { for (const f of flaechen) { f.farbeNeu(); f.abtasten(true); } wecken(); })
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-design', 'data-lesbar'] });
   reduziert?.addEventListener?.('change', () => { for (const f of flaechen) { f.loslassen(); f.neuZeichnen(); } wecken(); });
 }
 
