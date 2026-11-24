@@ -1,11 +1,12 @@
 import { warEbenAngelegt } from '../../lib/nodes';
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type MutableRefObject } from 'react';
 import { useReactFlow, type NodeProps } from '@xyflow/react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { PartialBlock } from '@blocknote/core';
 import { de as blockNoteDe, en as blockNoteEn } from '@blocknote/core/locales';
 import { sprache } from '../../lib/sprache';
+import { notizSchrift } from '../../lib/lesbareSchrift';
 import { kamVonAussen, NOTIZ_EXTERN, selectActiveBoard, useBoard, useKarteFest } from '../../store';
 import { liveVerbunden, TEILNEHMER_EREIGNIS } from '../../lib/liveStand';
 import { useTakt } from '../LiveLeiste';
@@ -646,9 +647,13 @@ export function NoteCard({ id, data, selected }: NodeProps<NoteNode>) {
     updateNodeData(id, { blocks: hakenUmlegen(bs, pfad, an) });
   }, [id, updateNodeData]);
 
+  // M515: Eine eigene Farbe ist ihr eigenes Papier — nicht „weiß" (das folgt im Dunkeln dem Thema: helle Schrift auf
+  // hellem Rosa) und nicht BlockNote-Grau auf dunklem Blau. Schrift nach der Füllung (lib/lesbareSchrift.ts).
+  const hex = typeof data.hex === 'string' && data.hex ? data.hex : undefined;
+  const schrift = notizSchrift(hex);
   return (
     <CardShell
-      id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${data.color}`} style={data.hex ? { background: data.hex as string } : undefined} schrumpft
+      id={id} selected={selected} minWidth={200} minHeight={90} className={`note-card sticky-${hex ? 'eigen' : data.color}${schrift.klasse}`} style={hex ? { background: hex, ...schrift.stil } as CSSProperties : undefined} schrumpft
       // M339: Lange Notizen scrollen in der Karte; der Farbpunkt liegt auf der Hülle und scrollt nicht mit
       rollt
       aussen={<>
