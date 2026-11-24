@@ -1491,7 +1491,20 @@ export function Board() {
     // M325: Ein STIFT-Tipp ist ein Klick wie mit der Maus (Cursor setzen, Haken,
     // Karte wählen) — nicht der Finger-Tipp, der am Tablet das Blatt öffnet.
     const stift = (e.nativeEvent as PointerEvent).pointerType === 'pen';
-    if (!e.shiftKey && !stift && (isPhoneFocus() || st0.fokusEinKlick) && oeffneFokus(node)) return;
+    if (e.shiftKey || stift || !(isPhoneFocus() || st0.fokusEinKlick) || !oeffneFokus(node)) return;
+    // M521: Doppeltipp — der zweite Tipp kam an, während die Karte schon aufging, und traf, was dann unter dem Finger
+    // lag (im Kanban verschob er ein Ticket oder löschte eine Spalte). Eine halbe Sekunde lang gehört kein Tipp dem
+    // Inhalt: so lange fährt die Kamera ohnehin noch. Gemessen wird an der Zeit der EREIGNISSE, nicht mit einer Uhr —
+    // das Aufgehen der Karte kann den Browser länger beschäftigen, der zweite Tipp wartet dann schon in der Schlange.
+    const t0 = e.timeStamp;
+    const arten = ['pointerdown', 'pointerup', 'click', 'dblclick'];
+    let unten = false;   // der Druck dieses Tipps wurde geschluckt — dann auch sein Loslassen und sein Klick
+    const stopp = (ev: Event) => {
+      if (ev.type === 'pointerdown') unten = ev.timeStamp - t0 < 500;
+      if (!unten) { if (ev.type === 'pointerdown') for (const a of arten) window.removeEventListener(a, stopp, true); return; }
+      ev.stopPropagation(); ev.preventDefault();
+    };
+    for (const a of arten) window.addEventListener(a, stopp, true);
   }, [oeffneFokus]);
 
   /**

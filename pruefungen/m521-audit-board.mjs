@@ -18,6 +18,8 @@
  *   K  Pfeiltasten am gewählten Rahmen: Der Inhalt wandert mit, Strg+Z nimmt den Schritt zurück.
  *   L  Rahmen (mit Karte gewählt) auf ein anderes Board: archivierte Karten im Rahmen kommen mit.
  *   M  Präsentation: Der schlichte Text einer Form steht in ihrer Mitte (vorher oben, in der Raute über den Rand).
+ *   N  Telefon: Der zweite Tipp eines Doppeltipps trifft nicht den Inhalt der Karte, die gerade im Fokus aufgeht.
+ *   O  Die Auswahl-Leiste bleibt über einer Karte am Bildrand waagerecht im Bild.
  */
 // Läuft aus dem Repository: `node pruefungen/m521-audit-board.mjs` (gegen einen anderen Build: PN_DIST=…)
 import { fileURLToPath } from 'node:url';
@@ -454,6 +456,93 @@ console.log('\n════ M: Präsentation — der Text einer Form steht in ih
   const b = await standBis(P, (b) => /zweiter/.test(k(b, 's2').data.text));
   pruefe('M4 … und der Text ist gespeichert', /zweiter/.test(k(b, 's2').data.text));
   await ctx.close();
+}
+
+/* ═══════════════════════ N: Doppeltipp am Telefon ═══════════════════════ */
+console.log('\n════ N: Telefon — der zweite Tipp eines Doppeltipps trifft nicht den Inhalt der aufgehenden Karte ════');
+{
+  const kb = () => ({ id: 'kb', type: 'kanban', width: 560, height: 380, position: { x: 40, y: 60 }, data: { title: 'Aufgaben', cols: ['To Do', 'In Arbeit', 'Erledigt'], wip: [null, 1, null], items: [
+    { id: 't1', text: 'Angebot schreiben', col: 0 }, { id: 't2', text: 'Rechnung prüfen', col: 1 }, { id: 't3', text: 'Altes erledigt', col: 2 }, { id: 't4', text: 'Viertes', col: 0 }] } });
+  const zweites = { id: 'n2', type: 'kanban', width: 560, height: 380, position: { x: 700, y: 900 }, data: { title: 'Zweites', items: [] } };
+  const kern = (d) => JSON.stringify({ cols: d.cols, items: d.items.map((i) => [i.id, i.col]) });
+  const soll = kern(kb().data);
+  const telefon = { hasTouch: true, isMobile: true, viewport: { width: 390, height: 780 } };
+  // Die beiden Stellen, an denen der zweite Tipp vorher ein Ticket verschob bzw. eine Spalte löschte — und eine dritte
+  let geaendert = []; let ohneFokus = 0;
+  for (const [fx, fy, pause] of [[0.7, 0.6, 90], [0.5, 0.85, 200], [0.8, 0.4, 200], [0.6, 0.2, 90]]) {
+    const { ctx, P } = await seite(stand([kb(), zweites]), telefon);
+    const r = await karte(P, 'kb');
+    const x = r.x + r.w * fx; const y = r.y + r.h * fy;
+    await P.touchscreen.tap(x, y); await P.waitForTimeout(pause); await P.touchscreen.tap(x, y);
+    if (!(await warteBis(P, () => !!document.querySelector('.focus-head'), null, 6000))) ohneFokus += 1;
+    await P.waitForTimeout(700);
+    const b = await standRuhig(P, 3000);
+    if (kern(k(b, 'kb').data) !== soll) geaendert.push(`${fx}/${fy}/${pause}: ${kern(k(b, 'kb').data)}`);
+    await ctx.close();
+  }
+  pruefe('N1 der erste Tipp öffnet die Karte im Fokus (alle vier Stellen)', ohneFokus === 0, ohneFokus);
+  pruefe('N2 der zweite Tipp ändert nichts am Kanban (kein Ticket verschoben, keine Spalte gelöscht)', geaendert.length === 0, geaendert);
+  // Danach gehören Tipps wieder dem Inhalt: Schließen-Knopf des Fokus
+  const { ctx, P } = await seite(stand([kb(), zweites]), telefon);
+  const r = await karte(P, 'kb');
+  await P.touchscreen.tap(r.cx, r.y + r.h * 0.6);
+  await P.waitForSelector('.focus-head'); await P.waitForTimeout(900);
+  const zu = await kasten(P, '.focus-head button');
+  await P.touchscreen.tap(zu.cx, zu.cy);
+  pruefe('N3 nach einer knappen Sekunde wirkt ein Tipp wieder (Fokus schließen)', await warteBis(P, () => !document.querySelector('.focus-head'), null, 6000));
+  await ctx.close();
+}
+
+/* ═══════════════════════ O: Auswahl-Leiste am Rand ═══════════════════════ */
+console.log('\n════ O: die Auswahl-Leiste bleibt über einer Karte am rechten Rand im Bild ════');
+{
+  const leiste = (P) => P.evaluate(() => { const l = document.querySelector('.sel-toolbar:not(.sel-toolbar-dock)'); if (!l) return null; const r = l.getBoundingClientRect(); const k = [...l.querySelectorAll('button')].map((b) => b.getBoundingClientRect()); return { links: r.left, rechts: r.right, breite: innerWidth, letzterRechts: Math.max(...k.map((q) => q.right)), ersterLinks: Math.min(...k.map((q) => q.left)) }; });
+  const karten = [nz('a', 0, 0), nz('b', 700, 0, 'sky'), nz('c', 0, 500, 'pink')];
+  // Telefon: Tipp öffnet den Fokus; nach dem Schließen bleibt die Karte gewählt, die Leiste steht über ihr
+  {
+    const { ctx, P } = await seite(stand(karten), { hasTouch: true, isMobile: true, viewport: { width: 390, height: 780 } });
+    const r = await karte(P, 'b');
+    await P.touchscreen.tap(r.cx, r.cy);
+    await P.waitForSelector('.focus-head'); await P.waitForTimeout(900);
+    const zu = await kasten(P, '.focus-head button'); await P.touchscreen.tap(zu.cx, zu.cy);
+    await warteBis(P, () => !document.querySelector('.focus-head'));
+    await warteBis(P, () => !!document.querySelector('.sel-toolbar:not(.sel-toolbar-dock)'));
+    await P.waitForTimeout(900);
+    const l = await leiste(P);
+    pruefe('O1 Telefon: die Leiste über der Karte am rechten Rand endet im Bild', !!l && l.rechts <= l.breite && l.links >= 0, l);
+    pruefe('O2 … der letzte Knopf (Löschen) ist ganz zu sehen', !!l && l.letzterRechts <= l.breite && l.ersterLinks >= 0, l);
+    await ctx.close();
+  }
+  // Schmales Fenster mit Maus: wählen, dann die Karte halb aus dem Bild schieben
+  {
+    const { ctx, P } = await seite(stand(karten), { viewport: { width: 390, height: 780 } });
+    const r = await karte(P, 'b');
+    await P.mouse.click(r.x + 5, r.y + 5);
+    await P.waitForSelector('.sel-toolbar:not(.sel-toolbar-dock)'); await P.waitForTimeout(500);
+    let l = await leiste(P);
+    pruefe('O3 Maus, 390 breit: die Leiste ragt nicht über den rechten Rand', !!l && l.letzterRechts <= l.breite, l);
+    await P.keyboard.down('Space'); await P.mouse.move(150, 600); await P.mouse.down(); await P.mouse.move(210, 600, { steps: 5 }); await P.mouse.up(); await P.keyboard.up('Space');
+    await P.waitForTimeout(600);
+    l = await leiste(P);
+    pruefe('O4 … auch nicht, wenn die Karte halb aus dem Bild geschoben ist', !!l && l.letzterRechts <= l.breite && l.ersterLinks >= 0, l);
+    // nach links hinaus
+    const ra = await karte(P, 'a'); await P.mouse.click(ra.x + 5, ra.y + 5); await P.waitForTimeout(400);
+    await P.keyboard.down('Space'); await P.mouse.move(250, 600); await P.mouse.down(); await P.mouse.move(120, 600, { steps: 5 }); await P.mouse.up(); await P.keyboard.up('Space');
+    await P.waitForTimeout(600);
+    l = await leiste(P);
+    pruefe('O5 … und links ebenso', !!l && l.ersterLinks >= 0 && l.letzterRechts <= l.breite, l);
+    await ctx.close();
+  }
+  // Breites Fenster: mitten im Bild bleibt die Leiste mittig über der Karte (kein Versatz)
+  {
+    const { ctx, P } = await seite(stand(karten));
+    const r = await karte(P, 'a');
+    await P.mouse.click(r.x + 5, r.y + 5);
+    await P.waitForSelector('.sel-toolbar:not(.sel-toolbar-dock)'); await P.waitForTimeout(500);
+    const l = await leiste(P); const ra = await karte(P, 'a');
+    pruefe('O6 mitten im Bild steht die Leiste wie bisher mittig über der Karte', !!l && nah((l.links + l.rechts) / 2, ra.cx, 2), { l, mitte: ra.cx });
+    await ctx.close();
+  }
 }
 
 await browser.close();

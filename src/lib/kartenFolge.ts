@@ -152,16 +152,16 @@ export function kartenFolge(karten: AppNode[], edges: Edge[]): AppNode[] {
   // der leere zuerst, Rahmen-Reise und Vortrag begannen in der Mitte. Jetzt gilt die Zeile wie in `leseFolge`: Ein
   // Rahmen steht mit seinem Kopf (Titel und oberer Teil) in einer Zeile; verglichen wird mit der Karte bzw. – liegt
   // sie in einem Rahmen – mit dessen Kopf, denn dort beginnt ihr Abschnitt.
-  const RAHMEN_KOPF = 120;
-  const kasten = (k: AppNode) => { const m = mass(k); const h = k.type === 'frame' ? Math.min(m.h, RAHMEN_KOPF) : m.h; return { x: k.position.x, oben: k.position.y, unten: k.position.y + h, h }; };
+  /** [links, oben, Höhe] — beim Rahmen nur sein Kopf (höchstens 120 Punkte) */
+  const kopf = (k: AppNode): [number, number, number] => { const h = mass(k).h; return [k.position.x, k.position.y, k.type === 'frame' ? Math.min(h, 120) : h]; };
   const liegtVor = (f: AppNode, n: AppNode) => {
-    const a = kasten(f); const b = kasten(vonId.get(rahmenVon.get(n.id) ?? '') ?? n);
-    const eineZeile = Math.min(a.unten, b.unten) - Math.max(a.oben, b.oben) >= 0.5 * Math.min(a.h, b.h);
-    return eineZeile ? a.x <= b.x : a.oben <= b.oben;
+    const [ax, ao, ah] = kopf(f); const [bx, bo, bh] = kopf(vonId.get(rahmenVon.get(n.id)!) ?? n);
+    // eine Zeile (Überdeckung wie in leseFolge): links vor rechts — sonst oben vor unten
+    return Math.min(ao + ah, bo + bh) - Math.max(ao, bo) >= 0.5 * Math.min(ah, bh) ? ax <= bx : ao <= bo;
   };
   const leer = rahmen.filter((f) => ![...rahmenVon.values()].includes(f.id)).sort((a, b) => (a.position.y - b.position.y) || (a.position.x - b.position.x));
   for (const n of teil) {
-    for (const f of leer) if (!gezeigt.has(f.id) && liegtVor(f, n)) zeige([f.id]);
+    for (const f of leer) if (liegtVor(f, n)) zeige([f.id]);
     if (gezeigt.has(n.id)) continue;
     const f = rahmenVon.get(n.id);
     if (!f) { mitGruppe(n.id); continue; }

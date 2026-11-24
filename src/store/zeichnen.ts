@@ -5,7 +5,7 @@
  */
 import { uid, type AppNode } from '../types';
 import { integrateStroke } from '../lib/strokeAnchor';
-import { seiteVon, strichRelativ } from '../lib/pdfSeiten';
+import { strichRelativ } from '../lib/pdfSeiten';
 import type { Stroke, BoardState, Setzen, Holen, AufsOffene } from './typen';
 import { zeitNachPatch } from './karten';
 
@@ -31,6 +31,16 @@ function radiert(rel: [number, number][], ox: number, oy: number, x: number, y: 
   }
   return drin;
 }
+
+/** Geankerte Striche liegen relativ zur Karte: ihr Versatz — `null`, wenn die Karte fehlt oder archiviert und ausgeblendet ist */
+const versatzVon = (nodes: AppNode[], zeigeArchiv: boolean) => {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  return (s: Stroke): [number, number] | null => {
+    if (!s.anchor) return [0, 0];
+    const n = byId.get(s.anchor);
+    return !n || (n.archived && !zeigeArchiv) ? null : [n.position.x, n.position.y];
+  };
+};
 
 /** M480: Teil des Board-Speichers – Zeichnen */
 export function zeichnenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) {
@@ -117,14 +127,7 @@ export function zeichnenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene
     eraseStrokesPartial: (x, y, radius) => {
       const board = get().boards.find((b) => b.id === get().activeId);
       if (!board) return;
-      const byId = new Map(board.nodes.map((n) => [n.id, n]));
-      const showArchived = get().showArchived;
-      const offsetOf = (s: Stroke): [number, number] | null => {
-        if (!s.anchor) return [0, 0];
-        const n = byId.get(s.anchor);
-        if (!n || (n.archived && !showArchived)) return null;
-        return [n.position.x, n.position.y];
-      };
+      const offsetOf = versatzVon(board.nodes, get().showArchived);
       let geaendert = false;
       const neu: Stroke[] = [];
       for (const s of board.drawings ?? []) {
@@ -156,14 +159,7 @@ export function zeichnenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene
       if (!board) return;
       // Geankerte Striche liegen relativ zur Karte — für den Treffer-Test
       // ihren Versatz auflösen; unsichtbare (Karte archiviert/weg) schonen
-      const byId = new Map(board.nodes.map((n) => [n.id, n]));
-      const showArchived = get().showArchived;
-      const offsetOf = (s: Stroke): [number, number] | null => {
-        if (!s.anchor) return [0, 0];
-        const n = byId.get(s.anchor);
-        if (!n || (n.archived && !showArchived)) return null;
-        return [n.position.x, n.position.y];
-      };
+      const offsetOf = versatzVon(board.nodes, get().showArchived);
       const near = (s: Stroke) => {
         const o = offsetOf(s);
         return !!o && radiert(strichRelativ(s), o[0], o[1], x, y, radius).some(Boolean);
@@ -174,38 +170,8 @@ export function zeichnenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene
       patchActive((b) => ({ drawings: (b.drawings ?? []).filter((s) => !near(s)) }));
     },
 
-    detachStrokes: (nodeIds) => {
-      const board = get().boards.find((b) => b.id === get().activeId);
-      if (!board) return;
-      const idSet = new Set(nodeIds);
-      const affected = (board.drawings ?? []).filter((s) => s.anchor && idSet.has(s.anchor));
-      if (affected.length === 0) return;
-      const byId = new Map(board.nodes.map((n) => [n.id, n]));
-      get().pushHistory();
-      patchActive((b) => ({
-        drawings: (b.drawings ?? []).map((s) => {
-          if (!s.anchor || !idSet.has(s.anchor)) return s;
-          const n = byId.get(s.anchor);
-          // M335: Seitenstriche kommen in Kartenpunkten zurück — verdeckte (Seite nicht offen) bleiben, wie sie sind
-          const rel = strichRelativ(s); // M339: Text-Striche dort, wo man sie gerade sieht
-          if (s.seite != null && rel.length === 0) return s;
-          const g = s.seitenBreite && s.anchor ? seiteVon(s.anchor) : undefined;
-          return {
-            ...s,
-            width: g ? s.width * g.k : s.width,
-            seitenBreite: undefined,
-            anchor: undefined,
-            seite: undefined,
-            amText: undefined,
-            block: undefined,
-            blockY: undefined,
-            points: n ? rel.map(([px, py]) => [px + n.position.x, py + n.position.y] as [number, number]) : rel,
-          };
-        }),
-      }));
-      get().showToast(affected.length === 1
-        ? 'Markierung von der Karte gelöst – sie bleibt frei auf dem Board.'
-        : `${affected.length} Markierungen von der Karte gelöst – sie bleiben frei auf dem Board.`);
-    },
+    // M521: selten gebraucht (Kartenmenü „Markierungen lösen") — der Teil kommt erst mit dem Aufruf, nicht mit dem
+    // Start (Start-JS, M446). Die Auswahl-Leiste holt ihn beim eigenen Laden schon einmal, auch für offline.
+    detachStrokes: (nodeIds) => { void import('./stricheLoesen').then((m) => m.stricheLoesen(get, patchActive, nodeIds)); },
   } satisfies Partial<BoardState>;
 }

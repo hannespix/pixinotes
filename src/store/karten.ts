@@ -341,8 +341,7 @@ export function kartenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) 
       if (!board) return;
       const idSet = new Set(ids);
       // M521: mitgewählte Verbindungen zwischen ANDEREN Karten gehen im selben Schritt mit (Entf mit Karte + Verbindung)
-      const kanten = new Set(kantenIds ?? []);
-      const kanteWeg = (e: { id: string; source: string; target: string }) => idSet.has(e.source) || idSet.has(e.target) || kanten.has(e.id);
+      const kanteWeg = (e: { id: string; source: string; target: string }) => idSet.has(e.source) || idSet.has(e.target) || !!kantenIds?.includes(e.id);
       const removedNodes = board.nodes.filter((n) => idSet.has(n.id));
       const removedEdges = board.edges.filter(kanteWeg);
       if (removedNodes.length === 0) return;

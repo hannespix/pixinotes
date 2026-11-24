@@ -1,4 +1,4 @@
-# M521 — Audit Board und Präsentation: zwölf Fehler behoben
+# M521 — Audit Board und Präsentation: vierzehn Fehler behoben
 PR: siehe Merge-Commit · Prüfreihe: `pruefungen/m521-audit-board.mjs` (Port 5521) · Datum: 2026-11-24
 
 ## Warum
@@ -28,11 +28,13 @@ grün ist.
 | B10 | niedrig | **Entf** mit Karte und (per Umschalt) mitgewählter Verbindung zwischen anderen Karten löschte nur die Karte. | `onBeforeDelete` reichte nur die Karten weiter und brach das Löschen der Bibliothek ab. | ✅ `removeNodes(ids, kantenIds)` — ein Schritt, ein Strg+Z |
 | B11 | niedrig | Rahmen (mit Karte gewählt) auf ein anderes Board verschoben: **archivierte Karten** im Rahmen blieben unsichtbar auf dem alten Board. | `moveNodesToBoard` rief `frameMembers` ohne `mitArchiv` (beim Ziehen seit M390 richtig). | ✅ |
 | B12 | niedrig | **Präsentation:** Der Text einer Form mit schlichtem Text (Schritt, Entscheidung — z. B. aus KI-Abläufen) stand oben statt mittig; in der Raute ragte schon ein kurzer Satz über die Form hinaus (im Dunkeln dort unlesbar). | Das Textfeld der Folie war fest 80 % hoch, Text beginnt in einem Textfeld oben. | ✅ `field-sizing: content` (mit `@supports`) — das Feld ist so hoch wie sein Text und steht in der Mitte |
+| B13 | mittel | **Telefon, Doppeltipp** auf eine verkleinerte Karte: Der erste Tipp öffnete den Fokus, der zweite traf, was dann unter dem Finger lag — im Kanban wurde so ein Ticket verschoben oder eine Spalte gelöscht (Hinweis aus M520, das nur die Folge entschärft hatte). | Der Tipp, der den Fokus öffnet (`onNodeClick`), ließ alle folgenden Tipps sofort an den Inhalt der aufgehenden Karte durch. | ✅ eine halbe Sekunde lang (gemessen an der Zeit der Ereignisse) gehört kein Tipp dem Inhalt — `Board.tsx` |
+| B14 | niedrig | **Auswahl-Leiste** über einer Karte am rechten oder linken Bildrand ragte aus dem Bild (am Telefon „Löschen" halb abgeschnitten; Hinweis aus M520). | Die Leiste hängt mittig an der Karte (`NodeToolbar`) — geprüft wurde nur oben/unten. | ✅ der innere Kasten rückt waagerecht ins Bild (8 Punkte Rand) — `SelectionToolbar.tsx` |
 
 ## Wie (Architektur)
 - `src/styles/30-zeichnen-rahmen-zeit.css`: `.frame-head { z-index: 5 }`, `.frame-wrap > .react-flow__resize-control.handle`
   und `.frame-wrap > .pn-handle` auf 6 (Linien bleiben auf 4, `25-board-formen-mermaid.css`). Der Doppelklick-Umweg aus
-  M514 in `FrameCard.tsx` bleibt als Rückfall.
+  M514 in `FrameCard.tsx` (Doppelklick auf die Linie am Ort des Titels abfangen) ist damit entfallen.
 - `src/store/zeichnen.ts`: `radiert(rel, ox, oy, x, y, radius)` → getroffene Punkte; liegt die Strecke zwischen zwei
   Punkten im Radius, gelten beide. Strecken kürzer als der Radius werden übersprungen (dichte Freihand-Striche wie bisher).
 - `src/components/RahmenReise.tsx`: `vorReise { boardId, ansicht, nur }` und `eingehaengt` am Modul; gemerkt wird nur beim
@@ -49,6 +51,17 @@ grün ist.
 - `src/store/kanten.ts` `onConnect`: keine Selbstverbindung. `src/store/karten.ts`: `removeNodes(ids, kantenIds?)`
   (Typ in `store/typen.ts`), `moveNodesToBoard` mit archivierten Rahmen-Mitgliedern.
 - `src/styles/34-praesentation.css`: `.slide-shape-input` mit `field-sizing: content; height: auto; max-height: 80%`.
+- `src/components/Board.tsx` `onNodeClick`: Öffnet der Tipp (bzw. der Klick mit „Mit einem Klick öffnen") den Fokus,
+  schluckt ein Zuhörer am Fenster (Erfassungsphase) `pointerdown`/`pointerup`/`click`/`dblclick`, solange der Druck
+  weniger als 500 ms nach dem öffnenden Klick kam (`timeStamp` der Ereignisse — das Aufgehen der Karte kann den Browser
+  länger beschäftigen als eine Uhr misst); der erste spätere Druck hängt den Zuhörer wieder aus.
+- `src/components/SelectionToolbar.tsx`: Layout-Effekt ohne Abhängigkeiten misst `.sel-toolbar` (nicht die feste Zeile
+  `.sel-toolbar-dock`) und setzt `translate` am inneren Kasten, in Layout-Punkten (`wurzelZoom`).
+- **Start-JS (M483/M502, Grenze 2 065 000 B):** Der Hauptzweig lag 163 B unter der Grenze, die Fixes kosten rund 1 KB.
+  Dafür zwei Entlastungen: `detachStrokes` („Markierungen lösen", Kartenmenü) ruft `src/store/stricheLoesen.ts`, das
+  erst beim Aufruf lädt (die Auswahl-Leiste holt es beim eigenen Laden vor — ohne Verzug und offline da); und der
+  Doppelklick-Umweg aus M514 in `FrameCard.tsx` ist entfallen (der Titel liegt jetzt selbst über den Linien). Stand
+  danach: 2 064 789 B, 211 B frei.
 
 ## Ohne Befund geprüft
 Rahmen ziehen mit verschachteltem Rahmen und Karten (Rückgängig/Wiederholen exakt), Karte löschen samt Verbindungen
@@ -75,6 +88,9 @@ Pos1/Ende/Strg+Pfeil/Tab), Finger (Schwenken, Zwei-Finger-Zoom, Karte und Rahmen
 - Reihenfolge an Verzweigungen der Rahmenpfeile umsortieren (offen aus M514) — neue Funktion, nicht Teil des Audits.
 
 ## Für andere Bereiche
+- **Orchestrator — Start-JS-Grenze:** Auf dem Hauptzweig waren vor diesem Meilenstein nur 163 B frei (jetzt 211 B).
+  Jeder weitere Fix im Start-Paket (Board, Store, Tastatur) reißt m459/m467/m483/m502 A1 — die anderen Audit-Zweige
+  brauchen entweder eigene Entlastung (etwas nachladen) oder die Grenze eine bewusste Entscheidung.
 - **M519 (Form):** `ShapeCard.tsx` Zeile ~174 `<input type="color" value={data.color}>` — eine Form ohne `color`
   (Daten von außen, alte Stände) wirft beim Auswählen die Konsolen-Warnung „The specified value "" does not conform
   to the required format"; Vorgabe wie in `makeShape` (`#eef2ff`) einsetzen.
