@@ -55,7 +55,8 @@ const LETZTE = 'src/styles/99-bedienung-im-fokus.css';
 pruefe('B1 99-bedienung-im-fokus.css wird zuletzt eingebunden', teile[teile.length - 1] === LETZTE, teile.slice(-2));
 const fokusCss = lies(LETZTE);
 const listen = [...fokusCss.matchAll(/:(?:where|is)\(\s*\n([\s\S]*?)\n\s*\)\s*\{/g)].map((m) => m[1].replace(/\s+/g, ' ').trim());
-pruefe('B2 die drei Listen (Übergang, Zeiger, Finger) stehen dort und sind gleich', listen.length >= 3 && listen.every((l) => l === listen[0]) && /kanban-add/.test(listen[0]), listen.length);
+// M517: seit M510 steht die Liste fünfmal (Übergang, Zeiger ruht, Zeiger mit Verzug, Finger, „Oberfläche ausblenden“)
+pruefe('B2 alle fünf Listen (Übergang, Zeiger, Finger, Oberfläche ausblenden) stehen dort und sind gleich', listen.length >= 5 && listen.every((l) => l === listen[0]) && /kanban-add/.test(listen[0]), { anzahl: listen.length, abweichend: listen.map((l, i) => (l === listen[0] ? -1 : i)).filter((i) => i >= 0) });
 const gebaut = readdirSync(path.join(DIST, 'assets')).filter((d) => /^index-.*\.css$/.test(d));
 let letzte = [];
 // M510: dahinter die vierte Liste – „Oberfläche ausblenden" (html[data-nur-board])
