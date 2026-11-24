@@ -745,15 +745,6 @@ export function SelectionToolbar() {
                     Weitergeben · Aufräumen. Verschieben kam aus der Leiste hierher. */}
                 {single && (
                   <>
-                    {/* M503: „Präsentieren" bei einer Karte heißt: ab GENAU dieser Karte – auch per Rechtsklick */}
-                    <button
-                      data-taste="auswahl-praesentieren"
-                      onClick={() => { setMenu(null); useBoard.getState().setPresenting(true, single.id); }}
-                      title="Ab dieser Karte präsentieren – Vollbild, Folienfolge aus den Verbindungen"
-                      aria-label="Ab dieser Karte präsentieren"
-                    >
-                      <IPlay size={14} /> Ab hier präsentieren
-                    </button>
                     <button
                       onClick={() => {
                         setMenu(null);
@@ -885,6 +876,17 @@ export function SelectionToolbar() {
                   </button>
                 )}
                 <div className="sel-attr-title">Weitergeben</div>
+                {/* M503: „Präsentieren" bei einer Karte heißt: ab GENAU dieser Karte – auch per Rechtsklick (Vorführen = Weitergeben) */}
+                {single && (
+                  <button
+                    data-taste="auswahl-praesentieren"
+                    onClick={() => { setMenu(null); useBoard.getState().setPresenting(true, single.id); }}
+                    title="Ab dieser Karte präsentieren – Vollbild, Folienfolge aus den Verbindungen"
+                    aria-label="Ab dieser Karte präsentieren"
+                  >
+                    <IPlay size={14} /> Ab hier präsentieren
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setMenu(null);

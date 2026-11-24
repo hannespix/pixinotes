@@ -1,5 +1,5 @@
 # M503 — Präsentation startet bei der gewählten Karte
-PR: #… · Prüfreihe: `pruefungen/m503-praesentation-ab-karte.mjs` (Port 5503) · Datum: 2026-11-24
+PR: #194 · Prüfreihe: `pruefungen/m503-praesentation-ab-karte.mjs` (Port 5503) · Datum: 2026-11-24
 
 ## Warum
 Rückmeldung: „wenn ich bei einem modul präsentieren klicke soll die präsentation an dieser stelle öffnen.
@@ -46,7 +46,7 @@ momentan öffnet es immer das erste modul nicht das ausgewählte."
   nur noch die offene Karte fest (M387). Öffnet sich die Präsentation beim Folgen, ruft der Presenter
   `setOpen(true, karteDesVorfuehrenden)` – nie die Auswahl des Gastes.
 - Einstiege: `FocusSheet` → `setPresenting(true, node.id)`; `SelectionToolbar` ⋯/Kontextmenü (eine Karte) neuer
-  Eintrag `data-taste="auswahl-praesentieren"` „Ab hier präsentieren"; `EbenenMenu` → `setPresenting(true,
+  Eintrag (als erster unter „Weitergeben“ – die Reihenfolge Kommentar · Eigenschaften · Verschieben vorn bleibt, m313) `data-taste="auswahl-praesentieren"` „Ab hier präsentieren"; `EbenenMenu` → `setPresenting(true,
   hier ? undefined : null)`; `PortalCard` → `setPresenting(true, null)`; Dock, `Tastatur` (Alt+P), `SearchOverlay`
   unverändert (`setPresenting(true)` → Fokus/Auswahl).
 - Englisch: „Ab hier präsentieren" in `src/sprache/en.json`; „Was ist neu" DE/EN.
