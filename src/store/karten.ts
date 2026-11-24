@@ -371,9 +371,10 @@ export function kartenScheibe(set: Setzen, get: Holen, patchActive: AufsOffene) 
       if (!src || !tgt || src.id === tgt.id) return;
       const idSet = new Set(ids);
       // Rahmen nehmen ihre Mitglieder mit (dieselbe Regel wie beim Ziehen)
+      // M521: auch die archivierten — sie blieben sonst unsichtbar auf dem alten Board zurück (wie M390 beim Ziehen)
       for (const n of src.nodes) {
         if (n.type === 'frame' && idSet.has(n.id)) {
-          for (const m of frameMembers(n, src.nodes, true)) idSet.add(m.id);
+          for (const m of frameMembers(n, src.nodes, true, true)) idSet.add(m.id);
         }
       }
       const moving = src.nodes.filter((n) => idSet.has(n.id));

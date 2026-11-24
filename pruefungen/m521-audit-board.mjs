@@ -16,6 +16,8 @@
  *   I  Reihenfolge: Ein leerer Rahmen steht in der Lesefolge seiner Zeile (Rahmen-Reise beginnt links, nicht beim
  *      leeren Rahmen in der Mitte; eine Karte links kommt vor dem leeren Rahmen rechts von ihr).
  *   K  Pfeiltasten am gewählten Rahmen: Der Inhalt wandert mit, Strg+Z nimmt den Schritt zurück.
+ *   L  Rahmen (mit Karte gewählt) auf ein anderes Board: archivierte Karten im Rahmen kommen mit.
+ *   M  Präsentation: Der schlichte Text einer Form steht in ihrer Mitte (vorher oben, in der Raute über den Rand).
  */
 // Läuft aus dem Repository: `node pruefungen/m521-audit-board.mjs` (gegen einen anderen Build: PN_DIST=…)
 import { fileURLToPath } from 'node:url';
@@ -404,6 +406,53 @@ console.log('\n════ K: Pfeiltasten am gewählten Rahmen ════');
   await P.keyboard.press('Control+z');
   b = await standBis(P, (b) => k(b, 'F').position.x === 0 && k(b, 'a').position.x === 60);
   pruefe('K3 Strg+Z nimmt das Schieben zurück (Rahmen und Inhalt)', k(b, 'F').position.x === 0 && k(b, 'F').position.y === 0 && k(b, 'a').position.x === 60 && k(b, 'a').position.y === 80, { F: k(b, 'F').position, a: k(b, 'a').position });
+  await ctx.close();
+}
+
+/* ═══════════════════════ L: Rahmen auf ein anderes Board ═══════════════════════ */
+console.log('\n════ L: Rahmen auf ein anderes Board — archivierte Karten darin kommen mit ════');
+{
+  const st = stand([fr('F', 0, 0, 700, 420, 'Rahmen'), nz('a', 40, 60), { ...nz('arch', 300, 60, 'green'), archived: true }, nz('x', 900, 60, 'pink')]);
+  st.boards.push({ id: 'b2', name: 'Zielboard', comments: [], edges: [], drawings: [], nodes: [nz('z1', 0, 0)] });
+  st.spaces[0].projects[0].boardIds.push('b2');
+  const { ctx, P } = await seite(st);
+  const beide = () => P.evaluate(() => JSON.parse(localStorage.getItem('pixinotes-board')).state.boards.map((b) => b.nodes.map((n) => n.id)));
+  await waehle(P, 'F');
+  const ga = await griff(P, 'a'); await P.keyboard.down('Shift'); await P.mouse.click(ga[0], ga[1]); await P.keyboard.up('Shift');
+  await P.waitForSelector('.sel-toolbar button[aria-label="Mehr"]');
+  await P.click('.sel-toolbar button[aria-label="Mehr"]');
+  await P.waitForSelector('button[aria-label="Verschieben"]');
+  await P.click('button[aria-label="Verschieben"]');
+  await warteBis(P, () => [...document.querySelectorAll('button[title]')].some((x) => / › Zielboard$/.test(x.title)));
+  await P.evaluate(() => [...document.querySelectorAll('button[title]')].find((x) => / › Zielboard$/.test(x.title))?.click());
+  const bis = Date.now() + 8000; let s = await beide();
+  while (Date.now() < bis && !s[1].includes('F')) { await P.waitForTimeout(150); s = await beide(); }
+  pruefe('L1 Rahmen und Karte liegen auf dem Zielboard', s[1].includes('F') && s[1].includes('a') && !s[0].includes('F'), s);
+  pruefe('L2 … die archivierte Karte aus dem Rahmen auch (nicht unsichtbar auf dem alten Board)', s[1].includes('arch') && !s[0].includes('arch') && s[0].includes('x'), s);
+  await ctx.close();
+}
+
+/* ═══════════════════════ M: Form auf der Folie ═══════════════════════ */
+console.log('\n════ M: Präsentation — der Text einer Form steht in ihrer Mitte ════');
+{
+  const form = (id, x, shape, text) => ({ id, type: 'shape', width: 200, height: 90, position: { x, y: 0 }, data: { shape, text, color: '#eef2ff' } });
+  const { ctx, P } = await seite(stand([form('s1', 0, 'decision', 'Ist das Budget für das kommende Jahr schon freigegeben?'), form('s2', 300, 'process', 'Schritt')]));
+  await P.keyboard.press('Alt+p');
+  await P.waitForSelector('.slide-shape-input'); await P.waitForTimeout(700);
+  const mass = () => P.evaluate(() => { const f = document.querySelector('.slide-shape .shape-body').getBoundingClientRect(); const t = document.querySelector('.slide-shape-input').getBoundingClientRect(); return { formMitte: (f.top + f.bottom) / 2, formH: f.height, feldMitte: (t.top + t.bottom) / 2, feldH: t.height }; });
+  let m = await mass();
+  pruefe('M1 Entscheidung: Das Textfeld ist so hoch wie sein Text und steht in der Mitte der Raute', nah(m.feldMitte, m.formMitte, 6) && m.feldH < m.formH * 0.45, m);
+  await P.keyboard.press('ArrowRight'); await P.waitForTimeout(600);
+  m = await mass();
+  pruefe('M2 Schritt: eine Zeile, mittig', nah(m.feldMitte, m.formMitte, 6) && m.feldH < 60, m);
+  // Weitertippen: Das Feld wächst mit und bleibt in der Mitte
+  await P.click('.slide-shape-input'); await P.keyboard.press('End');
+  await P.keyboard.insertText(' – und dazu noch ein zweiter, deutlich längerer Satz, der sicher in die nächste Zeile umbricht, und noch einer.');
+  await P.waitForTimeout(500);
+  const m2 = await mass();
+  pruefe('M3 beim Tippen wächst das Feld mit dem Text und bleibt mittig', m2.feldH > m.feldH + 20 && nah(m2.feldMitte, m2.formMitte, 6), m2);
+  const b = await standBis(P, (b) => /zweiter/.test(k(b, 's2').data.text));
+  pruefe('M4 … und der Text ist gespeichert', /zweiter/.test(k(b, 's2').data.text));
   await ctx.close();
 }
 
