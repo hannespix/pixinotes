@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useReactFlow, useStore as useRfStore, type Viewport } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../store';
-import { rahmenReise, rahmenReiseBeenden, reiseAbo, reiseLoesen, reiseRahmenSetzen, reiseStand } from '../lib/rahmenReise';
+import { rahmenReise, rahmenReiseBeenden, reiseAbo, reiseFlugSetzen, reiseLoesen, reiseRahmenSetzen, reiseStand } from '../lib/rahmenReise';
 import { overlayOffen } from '../lib/overlay';
 import { folgeIch, folgenSetzen, rahmenMelden, vorfuehrenMitVortrag, vortragZuEnde, werFuehrtVor } from '../lib/vorfuehren';
 import { ich, liveVerbunden, teilnehmerVon } from '../lib/liveStand';
@@ -70,7 +70,7 @@ export default function RahmenReise() {
     nurBoardSetzen(true);
     return () => {
       document.documentElement.removeAttribute('data-rahmen-reise');
-      document.documentElement.removeAttribute('data-reise-flug');
+      reiseFlugSetzen(false);
       if (!nurVorher) nurBoardSetzen(false);
       // Erst wenn die Oberfläche wieder steht (die linke Spalte nimmt Platz, nurBoard gleicht die Kamera aus), zurück
       // zur Ansicht von vorher — sonst überschriebe der Ausgleich die Rückfahrt
@@ -94,6 +94,8 @@ export default function RahmenReise() {
 
   /* ---------- Kamera ---------- */
   const flug = useRef(0);
+  /** Wann der laufende Flug landet — ein neues Einpassen mitten im Flug (die Fläche wurde breiter) übernimmt seinen Rest */
+  const flugBis = useRef(0);
   const fliegen = useCallback((dauer?: number) => {
     const id = reiseStand()?.rahmen;
     const f = id ? getInternalNode(id) : undefined;
@@ -109,10 +111,20 @@ export default function RahmenReise() {
     const v = getViewport();
     const ms = ruhig() ? 0 : dauer ?? Math.round(Math.min(900, 420 + 90 * Math.log2(1 + Math.hypot(x - v.x, y - v.y) / Math.max(breite, hoehe)) + 120 * Math.abs(Math.log2(zoom / v.zoom))));
     const nr = ++flug.current;
-    if (ms > 0) document.documentElement.setAttribute('data-reise-flug', '');
-    void Promise.resolve(setViewport({ x, y, zoom }, { duration: ms })).then(() => {
-      if (nr === flug.current) document.documentElement.removeAttribute('data-reise-flug');
-    });
+    flugBis.current = performance.now() + ms;
+    // Solange die Kamera fliegt: Marke an der Leiste (nicht am Wurzelelement — das wäre eine Stilrechnung über alles)
+    const leiste = () => document.querySelector('.rahmen-reise-leiste');
+    if (ms > 0) { reiseFlugSetzen(true); leiste()?.setAttribute('data-reise-flug', ''); }
+    const gelandet = () => {
+      if (nr !== flug.current) return;
+      flug.current += 1;
+      leiste()?.removeAttribute('data-reise-flug');
+      reiseFlugSetzen(false);
+    };
+    void Promise.resolve(setViewport({ x, y, zoom }, { duration: ms })).then(gelandet);
+    // Bricht etwas anderes die Fahrt ab (Mausrad, eine fremde Kamerafahrt), meldet React Flow nie ihr Ende — dann gilt
+    // sie kurz nach der geplanten Landung als vorbei
+    if (ms > 0) window.setTimeout(gelandet, ms + 400);
   }, [getInternalNode, getViewport, setViewport, breite, hoehe, minZoom, maxZoom]);
   // Zum Rahmen fliegen, sobald er wechselt (der erste Flug wartet, bis die Oberfläche weg ist und die Fläche steht)
   const erster = useRef(true);
@@ -128,15 +140,19 @@ export default function RahmenReise() {
     return () => { cancelAnimationFrame(r1); cancelAnimationFrame(r2); clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aktuell?.id]);
-  // Fenster anders groß, Telefon gedreht, Rahmen größer gezogen: neu einpassen
+  // Fenster anders groß, Telefon gedreht, Rahmen größer gezogen: neu einpassen. Nicht beim Wechsel zum nächsten Rahmen —
+  // den fliegt schon der Effekt oben an (ein zweiter Flug 120 ms später brach den ersten ab: ruckelig)
   const massRahmen = aktuell ? `${aktuell.width ?? aktuell.measured?.width}x${aktuell.height ?? aktuell.measured?.height}` : '';
-  const ersterMass = useRef(true);
+  const massVorher = useRef({ id: aktuell?.id, schluessel: `${breite}|${hoehe}|${massRahmen}` });
   useEffect(() => {
-    if (ersterMass.current) { ersterMass.current = false; return; }
-    const t = window.setTimeout(() => fliegen(ruhig() ? 0 : 200), 120);
+    const schluessel = `${breite}|${hoehe}|${massRahmen}`;
+    const v = massVorher.current;
+    massVorher.current = { id: aktuell?.id, schluessel };
+    if (v.id !== aktuell?.id || v.schluessel === schluessel) return;
+    const t = window.setTimeout(() => fliegen(ruhig() ? 0 : Math.max(200, flugBis.current - performance.now())), 120);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [breite, hoehe, massRahmen]);
+  }, [breite, hoehe, massRahmen, aktuell?.id]);
 
   /* ---------- Blättern ---------- */
   const schritt = useCallback((ziel: number | 'erster' | 'letzter') => {

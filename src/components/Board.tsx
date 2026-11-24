@@ -67,6 +67,7 @@ import { DrawingLayer } from './DrawingLayer';
 import { FingerGesten } from './FingerGesten';
 import { BoardKontextmenue } from './Kontextmenue';
 import { RahmenReiseHost } from './RahmenReiseHost';
+import { REISE_RUHT, reiseFliegt } from '../lib/rahmenReise';
 import { fristenLaden } from '../lib/dates';
 import { rufnummernLaden } from '../lib/rufnummer';
 import { EINGANG_ZIEHEN, eingangHolen, eingangZielWeg } from '../lib/eingang';
@@ -1159,6 +1160,13 @@ export function Board() {
     };
     if (sofort) setzen(); else zoomZeit.current = window.setTimeout(setzen, 90);
   }, []);
+  // M514: Im Flug der Rahmen-Reise ruht die Bedien-Größe (siehe lib/rahmenReise.ts) — nach der Landung beides auf einmal
+  // nachziehen (Bedien-Größe und Zoom-Werte im selben Bild: EINE Stilrechnung statt zwei)
+  useEffect(() => {
+    const ruht = () => { const z = getViewport().zoom; uiMeldenRef.current(z); zoomMelden(z, true); };
+    window.addEventListener(REISE_RUHT, ruht);
+    return () => window.removeEventListener(REISE_RUHT, ruht);
+  }, [getViewport, zoomMelden]);
   useEffect(() => {
     const id = requestAnimationFrame(() => { uiMelden(getViewport().zoom); zoomMelden(getViewport().zoom, true); });
     return () => { cancelAnimationFrame(id); window.clearTimeout(zoomZeit.current); };
@@ -1816,7 +1824,7 @@ export function Board() {
         // Zoom-Knöpfe und Flüge, nicht nur das Schwenken mit der Maus.
         // (M315: Die Papiertextur ist weg — und mit ihr die Kachel-Variablen,
         // die hier bei jedem Schwenk ins DOM geschrieben wurden.)
-        onViewportChange={(vp) => { gemerkteAnsicht.set(activeId, vp); uiMelden(vp.zoom); zoomMelden(vp.zoom); if (fokusRef.current) fokusBalken(vp.y); }}
+        onViewportChange={(vp) => { gemerkteAnsicht.set(activeId, vp); if (!reiseFliegt()) uiMelden(vp.zoom); zoomMelden(vp.zoom); if (fokusRef.current) fokusBalken(vp.y); }}
         // M343: im weiten Zoom gibt es keine „nicht ziehen"-Zonen — die ganze Karte ist der Griff, das Rad gehört dem Board
         noDragClassName={weit && !focusCard ? 'nodrag-aus' : 'nodrag'}
         noWheelClassName={weit && !focusCard ? 'nowheel-aus' : 'nowheel'}

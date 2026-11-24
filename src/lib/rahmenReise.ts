@@ -80,6 +80,19 @@ export function rahmenPfeilNr(nodes: AppNode[], edges: Edge[], edgeId: string): 
   return nrStand.nr.get(edgeId) ?? 0;
 }
 
+/* ---------- Fliegt die Kamera gerade? ---------- */
+// Während des Flugs rechnet das Board seine Bedien-Größe (`--pn-ui`, Board.tsx uiMelden) nicht nach: Jede Stufe davon
+// ist eine Stilrechnung über das ganze Board (bei 200 Karten 5 000 Elemente, gemessen um 180 ms) — im Flug zoomt die
+// Kamera durch viele Stufen. Nach der Landung einmal (Ereignis REISE_RUHT).
+let fliegt = false;
+export const REISE_RUHT = 'pixinotes:reise-ruht';
+export const reiseFliegt = (): boolean => fliegt;
+export function reiseFlugSetzen(an: boolean): void {
+  if (fliegt === an) return;
+  fliegt = an;
+  if (!an) window.dispatchEvent(new Event(REISE_RUHT));
+}
+
 /* ---------- Läuft eine Reise? ---------- */
 export interface ReiseStand {
   boardId: string;
