@@ -751,7 +751,7 @@ await warteBis(G.P, async () => (await imVortrag(G.P)) === 0, 6000);
 await A.P.locator('[data-taste="zeig-ende"]').click().catch(() => {});
 await gruppeAuf(A.P);
 await gruppeAuf(A.P);
-pruefe('C1 ⏱ bietet sechs Zeiten', (await A.P.locator('[data-taste="timer-min"]').count()) === 6 && (await A.P.locator('[data-taste="timer-stopp"]').count()) === 0);
+pruefe('C1 ⏱ bietet acht Zeiten (M512: dazu 30 und 60)', (await A.P.locator('[data-taste="timer-min"]').count()) === 8 && (await A.P.locator('[data-taste="timer-stopp"]').count()) === 0);
 await gruppeZu(A.P);
 await gruppeAuf(A.P);
 await A.P.locator('[data-taste="timer-min"][data-min="5"]').click();
