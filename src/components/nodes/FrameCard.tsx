@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
 import { selectActiveBoard, useBoard } from '../../store';
 import type { FrameNode } from '../../types';
@@ -45,6 +45,23 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
     window.addEventListener('keydown', taste);
     return () => window.removeEventListener('keydown', taste);
   }, [selected, editing, data.name]);
+  // M514: Gewählt liegen die Anfass-Linien des Rahmens über dem Titel — im weiten Zoom ganz (der Titel ist dann nur
+  // wenige Punkte hoch). Der Doppelklick landet so auf der Linie, nicht am Titel: am Ort des Titels trotzdem präsentieren.
+  const kopfRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!selected || editing) return;
+    const doppel = (e: MouseEvent) => {
+      const k = kopfRef.current;
+      if (!k || k.contains(e.target as Node)) return;
+      if (!(e.target as Element | null)?.closest?.('.react-flow__resize-control')) return;
+      const r = k.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+      e.stopPropagation();
+      rahmenReiseStarten(useBoard.getState().activeId, id);
+    };
+    window.addEventListener('dblclick', doppel, true);
+    return () => window.removeEventListener('dblclick', doppel, true);
+  }, [selected, editing, id]);
   const commit = () => {
     updateNodeData(id, { name: draft.trim() || 'Rahmen' });
     setEditing(false);
@@ -73,6 +90,7 @@ export function FrameCard({ id, data, selected }: NodeProps<FrameNode>) {
         <Handle key={pos} type="source" position={pos} id={pos} className="pn-handle frame-handle" />
       ))}
       <div
+        ref={kopfRef}
         className="frame-head"
         title="Ziehen verschiebt den Rahmen samt Inhalt, Doppelklick präsentiert ab diesem Rahmen"
         onDoubleClick={(e) => {
