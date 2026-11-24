@@ -34,9 +34,10 @@ import {
   isStandalone, readSyncFile, saveViaFiles,
 } from '../lib/filesSync';
 import {
-  applyProjectPayload, buildInviteMailto, buildInviteText, connectProjectSync, disconnectProjectSync,
+  applyProjectPayload, connectProjectSync, disconnectProjectSync,
   joinProjectFolder, projectHandle, projectStamp, projectSyncMeta, readProjectFile, writeProjectSync,
 } from '../lib/projectSync';
+import { buildInviteMailto, buildInviteText } from '../lib/projektEinladung';
 import {
   EINBETTUNGS_VORSCHLAEGE, VORSCHLAEGE, befrageServer, erlaubnisHilfe,
   istEinbettungsModell, zeigeGroesse, type Lage, type OllamaModell,

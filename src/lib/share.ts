@@ -3,7 +3,7 @@
 // Browser nie Richtung Server — der Link IST die Datei. Der Empfänger
 // öffnet ihn auf der Web-Version (oder jeder lokalen Kopie) und bekommt
 // das Board als neues Board importiert.
-import { kartenVonAussen } from './sicher';
+import { boardVonAussen, gestaltLaden, kartenVonAussen } from './sicher';
 import type { BoardDoc } from '../store';
 import { uid, type AppNode, type KanbanData } from '../types';
 import { anhangKarte, uebernimmDateien, type SyncDatei } from './syncFolder';
@@ -93,7 +93,10 @@ export async function boardDateienUebernehmen(dateien: Record<string, SyncDatei>
 }
 
 /** Board aus geteiltem Payload klonen: frische IDs, damit nichts kollidiert */
-export function cloneSharedBoard(board: BoardDoc, idMap: Map<string, string> = new Map()): BoardDoc {
+export function cloneSharedBoard(board0: BoardDoc, idMap: Map<string, string> = new Map()): BoardDoc {
+  // M522: Das GANZE Board prüfen, nicht nur die Karten — Verbindungen, Striche und Gespräche kamen ungeprüft an: ein
+  // Strich ohne Punkte oder `edges: "x"` in einem Link ließ den Import abbrechen oder die Fläche nach jedem Start ausfallen
+  const board: BoardDoc = boardVonAussen(board0, 'geteilt') ?? { id: 'geteilt', name: 'Board', nodes: [], edges: [] };
   // M357: Wer die Zuordnung alte → neue Karten-Id braucht (Anhänge liegen unter der Karten-Id), reicht die Karte herein
   // M388: Ein geteiltes Board stammt von anderen — ungültige Karten fallen weg, Adressen werden entschärft (lib/sicher.ts)
   const nodes = kartenVonAussen(board.nodes).map((n) => {
@@ -142,7 +145,7 @@ export function cloneSharedBoard(board: BoardDoc, idMap: Map<string, string> = n
     edges,
     drawings,
     ...(comments.length ? { comments } : {}),
-    ...(board.bg ? { bg: board.bg } : {}),
+    ...(typeof board.bg === 'string' && board.bg ? { bg: board.bg.slice(0, 40) } : {}),
   };
 }
 
@@ -163,6 +166,7 @@ export async function readShareHash(): Promise<BoardDoc | null> {
   if (!m) return null;
   try {
     const board = parseBoardPayload(await gunzip(fromB64url(m[1])));
+    if (board) await gestaltLaden();   // M522: bevor cloneSharedBoard das Board prüft
     return board;
   } catch {
     return null;

@@ -11,6 +11,7 @@
 //   Nextcloud liefert die standardmäßig NICHT — dann muss die IT die Origin
 //   freigeben, oder man nutzt den Sync-Ordner (Desktop-Client) bzw. Export.
 import { claimWriter, flushPersist, getWriterRole, inDerived, isImportedState, useBoard } from '../store';
+import { gestaltLaden } from './sicher';
 import {
   basisMerken, basisVergessen, buildSyncPayloadMitDateien, DATEI_BUDGET_MB, emitSyncStatus, fremdStandEinarbeiten,
   KONTO_DIRTY_KEY, notiereAenderung, SYNC_DIRTY_KEY, uebernimmDateien, WEBDAV_DIRTY_KEY, type SyncPayload, type SyncWeg,
@@ -207,7 +208,7 @@ export async function webdavRead(cfg: WebdavConfig): Promise<SyncPayload | null>
   if (!res.ok) throw new Error(`WebDAV: HTTP ${res.status}`);
   const p = (await res.json()) as SyncPayload;
   if (p?.app !== 'pixinotes' || !Array.isArray(p.boards) || p.boards.length === 0 || !Array.isArray(p.spaces)) return null;
-  return p;
+  return (await gestaltLaden()).standVonAussen(p);   // M522: Gestalt prüfen — null, wenn kein gültiges Board darin ist
 }
 
 /** Aktuellen Stand hochladen (Allow-List-Payload — ohne Einstellungen/Schlüssel). */
