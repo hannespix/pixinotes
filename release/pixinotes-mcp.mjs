@@ -40513,6 +40513,11 @@ var import_react2 = __toESM(require_react(), 1);
 
 // src/lib/sicher.ts
 init_define_import_meta_env();
+
+// src/lib/boardLook.ts
+init_define_import_meta_env();
+
+// src/lib/sicher.ts
 function kontaktBild(roh) {
   if (typeof roh !== "string" || roh.length > 15e5) return null;
   return /^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=]+$/i.test(roh) ? roh : null;

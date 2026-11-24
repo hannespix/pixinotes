@@ -8,6 +8,9 @@
 import type { AppNode, KontaktData, KontaktTelefon } from '../types';
 import { zeitSaeubern } from './kartenZeit';
 import type { BoardDoc } from '../store';
+import { lookVonAussen } from './boardLook';
+// M509: Look eines geteilten Boards — nur bekannte Werte
+export { lookVonAussen };
 
 const protokoll = (roh: string): string | null => {
   try { return new URL(roh, window.location.href).protocol; } catch { return null; }
@@ -238,8 +241,11 @@ export function boardVonAussen(roh: unknown, id: string): BoardDoc | null {
   if (!b || typeof b !== 'object' || Array.isArray(b) || !Array.isArray(b.nodes)) return null;
   const text = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
   const liste = <T,>(v: unknown, gut: (x: T) => boolean): T[] => (Array.isArray(v) ? (v as T[]).filter((x) => !!x && typeof x === 'object' && text((x as { id?: unknown }).id) && gut(x)) : []);
+  const look = lookVonAussen(b.look);
+  const { look: _l, ...ohneLook } = b as BoardDoc;
   return {
-    ...(b as BoardDoc),
+    ...(ohneLook as BoardDoc),
+    ...(look ? { look } : {}),
     id,
     name: typeof b.name === 'string' ? b.name.slice(0, 200) : 'Board',
     nodes: kartenVonAussen(b.nodes),

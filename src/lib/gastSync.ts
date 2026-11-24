@@ -939,7 +939,8 @@ function kontoAenderungenSenden(): void {
     letzterStand.set(id, jetzt);
     if (!vorher) { kanaele.get(id)?.senden('stand', {}); continue; }
     const p = patchAus(vorher, jetzt);
-    if (!p) continue;
+    // M509: Look und Hintergrund sind Felder des Boards — ein Patch kennt sie nicht; dann holen die anderen den Stand
+    if (!p) { if (JSON.stringify(vorher.look) !== JSON.stringify(jetzt.look) || vorher.bg !== jetzt.bg) kanaele.get(id)?.senden('stand', {}); continue; }
     kanaele.get(id)?.senden(JSON.stringify(p).length <= DELTA_MAX_ZEICHEN ? 'delta' : 'stand', JSON.stringify(p).length <= DELTA_MAX_ZEICHEN ? { p } : {});
   }
 }
