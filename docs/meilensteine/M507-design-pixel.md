@@ -1,5 +1,5 @@
 # M507 — Neue Design-Variante „pix·el“ in den Einstellungen
-PR: #… · Prüfreihe: `pruefungen/m507-design-pixel.mjs` (Port 5507) · Datum: 2026-11-24
+PR: #198 · Prüfreihe: `pruefungen/m507-design-pixel.mjs` (Port 5507) · Datum: 2026-11-24
 
 ## Warum
 Nutzerwunsch: „Können wir noch eine weitere Design-Variante in den Optionen zur Verfügung stellen und ein bisschen das
